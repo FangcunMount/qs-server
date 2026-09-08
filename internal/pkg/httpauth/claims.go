@@ -7,7 +7,6 @@ import (
 	pkgmiddleware "github.com/FangcunMount/qs-server/internal/pkg/middleware"
 )
 
-
 // resolveOrgIDFromClaims derives QS business org_id from IAM claims.
 func resolveOrgIDFromClaims(claims *pkgmiddleware.UserClaims) (uint64, bool) {
 	if claims == nil {

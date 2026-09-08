@@ -181,7 +181,6 @@ func GetUserID(c *gin.Context) string {
 	return ""
 }
 
-
 // resolveOrgIDClaim 读取 JWT 中明确的业务组织声明。
 func resolveOrgIDClaim(tokenClaims *auth.TokenClaims) string {
 	if tokenClaims == nil {

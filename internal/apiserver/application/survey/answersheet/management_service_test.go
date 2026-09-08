@@ -213,15 +213,17 @@ func TestManagementServiceGetByIDReturnsConvertedAnswerSheet(t *testing.T) {
 	if result.Answers[0].QuestionCode != "q1" || result.Answers[1].QuestionCode != "q2" {
 		t.Fatalf("unexpected answers: %+v", result.Answers)
 	}
-	if _, err := service.GetByIDInOrg(context.Background(), 1, 12); err != nil {
-		t.Fatalf("GetByIDInOrg same org returned error: %v", err)
-	}
-	if _, err := service.GetByIDInOrg(context.Background(), 2, 12); errors.ParseCoder(err).Code() != errorCode.ErrAnswerSheetNotFound {
-		t.Fatalf("GetByIDInOrg cross org error = %v, want not found", err)
-	}
-	if _, err := service.GetByIDInOrg(context.Background(), 0, 12); errors.ParseCoder(err).Code() != errorCode.ErrPermissionDenied {
-		t.Fatalf("GetByIDInOrg missing org error = %v, want permission denied", err)
-	}
+	t.Run("business organization ownership remains enforced without authorization partition context", func(t *testing.T) {
+		if _, err := service.GetByIDInOrg(context.Background(), 1, 12); err != nil {
+			t.Fatalf("GetByIDInOrg same org returned error: %v", err)
+		}
+		if _, err := service.GetByIDInOrg(context.Background(), 2, 12); errors.ParseCoder(err).Code() != errorCode.ErrAnswerSheetNotFound {
+			t.Fatalf("GetByIDInOrg cross org error = %v, want not found", err)
+		}
+		if _, err := service.GetByIDInOrg(context.Background(), 0, 12); errors.ParseCoder(err).Code() != errorCode.ErrPermissionDenied {
+			t.Fatalf("GetByIDInOrg missing org error = %v, want permission denied", err)
+		}
+	})
 }
 
 func TestManagementServiceDeleteDelegatesToRepository(t *testing.T) {

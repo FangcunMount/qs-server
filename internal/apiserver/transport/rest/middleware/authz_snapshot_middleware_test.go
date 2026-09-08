@@ -54,7 +54,9 @@ func TestAuthzSnapshotMiddlewareStoresSnapshotInGinAndRequestContext(t *testing.
 		return snap, nil
 	}, nil))
 	engine.GET("/check", func(c *gin.Context) {
-		if gotUserID!="701" { t.Fatalf("loaded user %q",gotUserID) }
+		if gotUserID != "701" {
+			t.Fatalf("loaded user %q", gotUserID)
+		}
 		if got := GetAuthzSnapshot(c); got != snap {
 			t.Fatalf("snapshot in gin context = %#v, want %#v", got, snap)
 		}

@@ -44,7 +44,6 @@ func UserIdentityMiddleware() gin.HandlerFunc {
 	}
 }
 
-
 // RequireOrgScopeMiddleware requires a resolvable QS business org_id in request context.
 func RequireOrgScopeMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
@@ -83,7 +82,6 @@ func GetOrgID(c *gin.Context) uint64 {
 	id, _ := val.(uint64)
 	return id
 }
-
 
 // GetPrincipal returns the Security Control Plane principal projection.
 func GetPrincipal(c *gin.Context) (securityplane.Principal, bool) {

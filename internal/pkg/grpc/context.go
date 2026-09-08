@@ -43,7 +43,6 @@ func AccountIDFromContext(ctx context.Context) string {
 	return contextStringValue(ctx, authContextKeyAccountID)
 }
 
-
 // OrgIDFromContext returns the QS business org_id from a gRPC request context.
 func OrgIDFromContext(ctx context.Context) (uint64, bool) {
 	if ctx == nil {
