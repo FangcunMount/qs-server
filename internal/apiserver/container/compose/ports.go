@@ -21,7 +21,6 @@ type ActorIAMPorts struct {
 	OperationAccountSvc *iam.OperationAccountService
 	IAMClient           *iam.Client
 	AuthzSnapshotLoader *iam.AuthzSnapshotLoader
-	ServiceAuthHelper   *iam.ServiceAuthHelper
 	ObjectAuthzChecker  *iam.ObjectAuthorizationChecker
 }
 

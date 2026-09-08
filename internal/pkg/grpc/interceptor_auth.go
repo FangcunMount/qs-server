@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"strings"
 
-	authnv2 "github.com/FangcunMount/iam/v3/api/grpc/iam/authn/v2"
-	auth "github.com/FangcunMount/iam/v3/pkg/sdk/auth/verifier"
+	authnv2 "github.com/FangcunMount/iam/v4/api/grpc/iam/authn/v2"
+	auth "github.com/FangcunMount/iam/v4/pkg/sdk/auth/verifier"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"

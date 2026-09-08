@@ -35,7 +35,7 @@ func (s *catalogBindingSyncer) SyncQuestionnaireVersion(ctx context.Context, que
 		return nil
 	}
 	return service.SynchronizeQuestionnaireVersion(ctx, modelcatalog.ActorContext{
-		Principal: securityplane.Principal{Kind: securityplane.PrincipalKindService, Source: securityplane.PrincipalSourceServiceAuth},
+		Principal: securityplane.Principal{Kind: securityplane.PrincipalKindService, Source: securityplane.PrincipalSourceInternal},
 	}, questionnaireCode, version)
 }
 

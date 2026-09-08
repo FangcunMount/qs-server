@@ -5,9 +5,9 @@ import (
 	"path/filepath"
 	"testing"
 
-	authnv2 "github.com/FangcunMount/iam/v3/api/grpc/iam/authn/v2"
-	sdk "github.com/FangcunMount/iam/v3/pkg/sdk"
-	auth "github.com/FangcunMount/iam/v3/pkg/sdk/auth/verifier"
+	authnv2 "github.com/FangcunMount/iam/v4/api/grpc/iam/authn/v2"
+	sdk "github.com/FangcunMount/iam/v4/pkg/sdk"
+	auth "github.com/FangcunMount/iam/v4/pkg/sdk/auth/verifier"
 	apiserveroptions "github.com/FangcunMount/qs-server/internal/apiserver/options"
 	collectionoptions "github.com/FangcunMount/qs-server/internal/collection-server/options"
 	genericoptions "github.com/FangcunMount/qs-server/internal/pkg/options"

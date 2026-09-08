@@ -7,10 +7,10 @@ import (
 	"testing"
 	"time"
 
-	authnv2 "github.com/FangcunMount/iam/v3/api/grpc/iam/authn/v2"
-	sdk "github.com/FangcunMount/iam/v3/pkg/sdk"
-	authjwks "github.com/FangcunMount/iam/v3/pkg/sdk/auth/jwks"
-	auth "github.com/FangcunMount/iam/v3/pkg/sdk/auth/verifier"
+	authnv2 "github.com/FangcunMount/iam/v4/api/grpc/iam/authn/v2"
+	sdk "github.com/FangcunMount/iam/v4/pkg/sdk"
+	authjwks "github.com/FangcunMount/iam/v4/pkg/sdk/auth/jwks"
+	auth "github.com/FangcunMount/iam/v4/pkg/sdk/auth/verifier"
 	"github.com/lestrrat-go/jwx/v2/jwa"
 	"github.com/lestrrat-go/jwx/v2/jwk"
 	"github.com/lestrrat-go/jwx/v2/jws"
@@ -87,7 +87,7 @@ func TestIAMV320AccessTokenBoundary(t *testing.T) {
 		{
 			name:      "service token stays rejected when caller tries to allow it",
 			claims:    contractClaims(now, "service"),
-			callerOpt: &auth.VerifyOptions{AllowedTokenTypes: []authnv2.TokenType{authnv2.TokenType_TOKEN_TYPE_SERVICE}},
+			callerOpt: &auth.VerifyOptions{AllowedTokenTypes: []authnv2.TokenType{authnv2.TokenType(3)}},
 		},
 		{
 			name: "wrong issuer",

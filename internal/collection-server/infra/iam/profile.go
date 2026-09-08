@@ -6,8 +6,8 @@ import (
 	"strings"
 
 	"github.com/FangcunMount/component-base/pkg/log"
-	identityv2 "github.com/FangcunMount/iam/v3/api/grpc/iam/identity/v2"
-	"github.com/FangcunMount/iam/v3/pkg/sdk/identity"
+	identityv2 "github.com/FangcunMount/iam/v4/api/grpc/iam/identity/v2"
+	"github.com/FangcunMount/iam/v4/pkg/sdk/identity"
 )
 
 // ProfileService wraps IAM profile commands used by collection-server.

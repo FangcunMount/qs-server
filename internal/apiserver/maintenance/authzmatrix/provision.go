@@ -9,10 +9,10 @@ import (
 	"strings"
 	"time"
 
-	authzv3 "github.com/FangcunMount/iam/v3/api/grpc/iam/authz/v3"
-	identityv2 "github.com/FangcunMount/iam/v3/api/grpc/iam/identity/v2"
-	"github.com/FangcunMount/iam/v3/pkg/sdk/authz"
-	"github.com/FangcunMount/iam/v3/pkg/sdk/identity"
+	authzv3 "github.com/FangcunMount/iam/v4/api/grpc/iam/authz/v3"
+	identityv2 "github.com/FangcunMount/iam/v4/api/grpc/iam/identity/v2"
+	"github.com/FangcunMount/iam/v4/pkg/sdk/authz"
+	"github.com/FangcunMount/iam/v4/pkg/sdk/identity"
 )
 
 const (
@@ -47,16 +47,15 @@ type Provisioner struct {
 	identity        *identity.Client
 	authz           *authz.Client
 	directory       *IAMSyntheticSubjectDirectory
-	tokens          TokenProvider
 	gitCommit       string
 	serviceIdentity string
 	now             func() time.Time
 }
 
-func NewProvisioner(identityClient *identity.Client, authzClient *authz.Client, tokens TokenProvider, gitCommit, serviceIdentity string) *Provisioner {
+func NewProvisioner(identityClient *identity.Client, authzClient *authz.Client, gitCommit, serviceIdentity string) *Provisioner {
 	return &Provisioner{
 		identity: identityClient, authz: authzClient,
-		directory: NewIAMSyntheticSubjectDirectory(identityClient, tokens), tokens: tokens,
+		directory: NewIAMSyntheticSubjectDirectory(identityClient),
 		gitCommit: strings.TrimSpace(gitCommit), serviceIdentity: strings.TrimSpace(serviceIdentity), now: time.Now,
 	}
 }
@@ -72,7 +71,7 @@ func (p *Provisioner) EnsureSubjects(ctx context.Context, confirmation string) (
 	if confirmation != ProvisionConfirmation {
 		return evidence, fmt.Errorf("explicit provisioning confirmation is required")
 	}
-	if p.identity == nil || p.authz == nil || p.directory == nil || p.tokens == nil {
+	if p.identity == nil || p.authz == nil || p.directory == nil {
 		return evidence, fmt.Errorf("IAM provisioning dependencies are unavailable")
 	}
 	if p.serviceIdentity != "qs-apiserver.svc" {
@@ -116,11 +115,7 @@ func (p *Provisioner) ensureSubject(ctx context.Context, nickname, role string) 
 		return evidence, err
 	}
 	if !equalRoles(snapshot.GetDirectRoles(), []string{role}) {
-		authorized, authErr := authorizedContext(ctx, p.tokens)
-		if authErr != nil {
-			return evidence, authErr
-		}
-		resp, authErr := p.authz.ReplaceManagedAssignments(authorized, &authzv3.ReplaceManagedAssignmentsRequest{
+		resp, authErr := p.authz.ReplaceManagedAssignments(ctx, &authzv3.ReplaceManagedAssignmentsRequest{
 			Subject: "user:" + userID, Domain: Domain, RoleNames: []string{role}, ChangedBy: ProvisionActor,
 			Reason: "stable AuthZ v3 synthetic Check evidence",
 		})
@@ -154,11 +149,7 @@ func (p *Provisioner) ensureSubject(ctx context.Context, nickname, role string) 
 }
 
 func (p *Provisioner) createIsolatedUser(ctx context.Context, nickname string) (string, error) {
-	authorized, err := authorizedContext(ctx, p.tokens)
-	if err != nil {
-		return "", err
-	}
-	resp, err := p.identity.CreateUser(authorized, &identityv2.CreateUserRequest{
+	resp, err := p.identity.CreateUser(ctx, &identityv2.CreateUserRequest{
 		Nickname: nickname,
 		Operator: &identityv2.OperatorContext{
 			OperatorId: ProvisionActor, OperatorName: ProvisionActor,
@@ -184,11 +175,7 @@ func createdIsolatedUserID(user *identityv2.User, nickname string) (string, erro
 }
 
 func (p *Provisioner) getSnapshot(ctx context.Context, userID string) (*authzv3.GetAuthorizationSnapshotResponse, error) {
-	authorized, err := authorizedContext(ctx, p.tokens)
-	if err != nil {
-		return nil, err
-	}
-	resp, err := p.authz.GetAuthorizationSnapshot(authorized, &authzv3.GetAuthorizationSnapshotRequest{
+	resp, err := p.authz.GetAuthorizationSnapshot(ctx, &authzv3.GetAuthorizationSnapshotRequest{
 		Subject: "user:" + userID, Domain: Domain, AppName: "qs",
 	})
 	if err != nil {

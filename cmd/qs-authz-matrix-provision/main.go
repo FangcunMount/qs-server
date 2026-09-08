@@ -40,14 +40,17 @@ func run(opts *apiserveroptions.Options) app.RunFunc {
 		}
 		defer func() { _ = iamModule.Close() }()
 		if iamModule.Client() == nil || iamModule.Client().SDK() == nil || iamModule.IdentityService() == nil ||
-			iamModule.IdentityService().Raw() == nil || iamModule.ServiceAuthHelper() == nil {
+			iamModule.IdentityService().Raw() == nil {
 			return fmt.Errorf("IAM provisioning dependencies are unavailable")
 		}
 
-		serviceIdentity := iamModule.ServiceAuthHelper().ServiceIdentity().ServiceID
+		serviceIdentity, err := iamModule.Client().LocalCertificateIdentity()
+		if err != nil {
+			return err
+		}
 		provisioner := authzmatrix.NewProvisioner(
 			iamModule.IdentityService().Raw(), iamModule.Client().SDK().Authz(),
-			iamModule.ServiceAuthHelper(), version.Get().GitCommit, serviceIdentity,
+			version.Get().GitCommit, serviceIdentity,
 		)
 		evidence, provisionErr := provisioner.EnsureSubjects(ctx, os.Getenv("QS_AUTHZ_MATRIX_PROVISION_CONFIRM"))
 		encoder := json.NewEncoder(os.Stdout)

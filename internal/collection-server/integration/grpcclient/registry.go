@@ -8,7 +8,6 @@ import (
 	"github.com/FangcunMount/qs-server/internal/collection-server/infra/grpcclient"
 	"github.com/FangcunMount/qs-server/internal/pkg/delegatedsubject"
 	"github.com/FangcunMount/qs-server/internal/pkg/resilience/admission"
-	"google.golang.org/grpc/credentials"
 )
 
 // GRPCClientRegistry gRPC 客户端注册器
@@ -85,8 +84,7 @@ func (r *GRPCClientRegistry) assessmentModelCatalogClient() *grpcclient.Assessme
 }
 
 // CreateGRPCClientManager 创建 gRPC 客户端管理器。
-// perRPC 非 nil 时（通常为 IAM ServiceAuthHelper）对 apiserver 的每次 RPC 附加服务 JWT metadata。
-func CreateGRPCClientManager(endpoint string, timeout int, insecure bool, tlsCertFile, tlsKeyFile, tlsCAFile, tlsServerName string, inflightWaitMs int, inflightSemaphore admission.Semaphore, perRPC credentials.PerRPCCredentials, delegatedSigner *delegatedsubject.Signer) (*grpcclient.Manager, error) {
+func CreateGRPCClientManager(endpoint string, timeout int, insecure bool, tlsCertFile, tlsKeyFile, tlsCAFile, tlsServerName string, inflightWaitMs int, inflightSemaphore admission.Semaphore, delegatedSigner *delegatedsubject.Signer) (*grpcclient.Manager, error) {
 	inflightWait := time.Duration(inflightWaitMs) * time.Millisecond
 	manager, err := grpcclient.NewManager(&grpcclient.ManagerConfig{
 		Endpoint:               endpoint,
@@ -99,7 +97,6 @@ func CreateGRPCClientManager(endpoint string, timeout int, insecure bool, tlsCer
 		TLSKeyFile:             tlsKeyFile,
 		TLSCAFile:              tlsCAFile,
 		TLSServerName:          tlsServerName,
-		PerRPCCredentials:      perRPC,
 		DelegatedSubjectSigner: delegatedSigner,
 	})
 	if err != nil {

@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	authzv3 "github.com/FangcunMount/iam/v3/api/grpc/iam/authz/v3"
-	"github.com/FangcunMount/iam/v3/pkg/sdk"
+	authzv3 "github.com/FangcunMount/iam/v4/api/grpc/iam/authz/v3"
+	"github.com/FangcunMount/iam/v4/pkg/sdk"
 	appauthz "github.com/FangcunMount/qs-server/internal/apiserver/application/authz"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -102,10 +102,10 @@ func (s *contractAuthorizationServer) Check(ctx context.Context, request *authzv
 	if s.failureCode != codes.OK {
 		return nil, status.Error(s.failureCode, "contract fixture failure")
 	}
-	metadataValues, ok := metadata.FromIncomingContext(ctx)
+	metadataValues, _ := metadata.FromIncomingContext(ctx)
 	authorization := metadataValues.Get("authorization")
-	if !ok || len(authorization) != 1 || authorization[0] != "Bearer contract-service-token" {
-		return nil, status.Error(codes.PermissionDenied, "service credential is required")
+	if len(authorization) != 0 {
+		return nil, status.Error(codes.PermissionDenied, "unexpected bearer metadata")
 	}
 	originType := ""
 	if attributes := request.GetObjectContext().GetAttributes(); len(attributes) == 1 {
@@ -138,12 +138,6 @@ type contractGRPCClient struct{ client *sdk.Client }
 func (c *contractGRPCClient) SDK() *sdk.Client { return c.client }
 func (*contractGRPCClient) IsEnabled() bool    { return true }
 
-type contractTokenProvider struct{}
-
-func (contractTokenProvider) GetToken(context.Context) (string, error) {
-	return "contract-service-token", nil
-}
-
 func newObjectCheckerContractFixture(t *testing.T) (*ObjectChecker, *contractAuthorizationServer) {
 	t.Helper()
 	listener := bufconn.Listen(1024 * 1024)
@@ -167,7 +161,7 @@ func newObjectCheckerContractFixture(t *testing.T) (*ObjectChecker, *contractAut
 		t.Fatalf("create IAM SDK client: %v", err)
 	}
 	t.Cleanup(func() { _ = client.Close() })
-	return NewObjectChecker(&contractGRPCClient{client: client}, contractTokenProvider{}), authorizationServer
+	return NewObjectChecker(&contractGRPCClient{client: client}), authorizationServer
 }
 
 func objectCheckRequest(subject, originType string) appauthz.ObjectCheckRequest {

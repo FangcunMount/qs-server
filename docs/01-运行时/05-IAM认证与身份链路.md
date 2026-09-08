@@ -67,7 +67,7 @@ collection 路由也会执行 JWT、UserIdentity、tenant domain 和 authz snaps
 
 - IAM Client；
 - `TokenVerifier`；
-- 可选 `ServiceAuthHelper`；
+- mTLS 客户端证书；
 - Identity/ProfileLink 等服务；
 - `AuthzSnapshotLoader`。
 
@@ -129,7 +129,7 @@ collection/worker 调用 apiserver 时存在两种完全不同的主体：
 - **服务主体**：证明请求来自受信任的 collection/worker 实例；
 - **最终用户主体**：证明当前前台操作代表哪个 IAM 用户。
 
-当前仓库内部 gRPC 主要使用 mTLS 建立服务身份边界。collection client 代码支持通过 `ServiceAuthHelper` 附加 PerRPC Service Token，但 apiserver 环境配置当前未默认开启 gRPC JWT auth；
+当前内部 gRPC 使用 mTLS 建立服务身份，通过 ACL 限制方法，业务接口继续校验用户委托与资源权限。客户端不注入服务 Bearer metadata。
 worker client 也主要依赖 mTLS。
 
 mTLS 不能自动表达最终用户的业务权限，Service Token 也不能冒充 Access Token。需要代表用户执行的 gRPC 用例，应显式传递或解析必要的 user/org/testee 上下文，并由服务端复核。

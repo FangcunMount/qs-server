@@ -69,8 +69,8 @@ func TestAPIServerDevProdConfigContracts(t *testing.T) {
 			if strings.Contains(name, ".prod.") && opts.MySQLOptions.LogLevel != 2 {
 				t.Fatalf("%s MySQL log level = %d, want 2 so real errors remain visible without SQL info traces", name, opts.MySQLOptions.LogLevel)
 			}
-			if opts.IAMOptions == nil || opts.IAMOptions.ServiceAuth == nil {
-				t.Fatal("apiserver IAM service auth config must be traceable")
+			if opts.IAMOptions == nil || opts.IAMOptions.GRPC == nil || opts.IAMOptions.GRPC.TLS == nil || !opts.IAMOptions.GRPC.TLS.Enabled {
+				t.Fatal("apiserver IAM mTLS config must be traceable")
 			}
 			assertSystemGovernanceConfig(t, name, opts.SystemGovernance)
 			assertEvaluationAuditRecoverySplit(t, name, opts)
@@ -156,8 +156,8 @@ func TestCollectionDevProdConfigContracts(t *testing.T) {
 			if opts.RateLimit == nil || !opts.RateLimit.Enabled {
 				t.Fatal("collection rate limit config must be traceable and enabled by default")
 			}
-			if opts.IAMOptions == nil || opts.IAMOptions.ServiceAuth == nil {
-				t.Fatal("collection IAM service auth config must be traceable")
+			if opts.IAMOptions == nil || opts.IAMOptions.GRPC == nil || opts.IAMOptions.GRPC.TLS == nil || !opts.IAMOptions.GRPC.TLS.Enabled {
+				t.Fatal("collection IAM mTLS config must be traceable")
 			}
 			assertCollectionGRPCClientIdentityContract(t, name, opts.GRPCClient)
 			assertProductionLogBudget(t, "collection", name, opts.Log)

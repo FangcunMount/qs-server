@@ -45,20 +45,15 @@ func TestOrgScopeFromIdentity(t *testing.T) {
 	}
 }
 
-func TestServiceIdentityFromInputCopiesAudienceAndDefaults(t *testing.T) {
+func TestServiceIdentityFromInputPreservesCertificateIdentityAndDefaults(t *testing.T) {
 	in := ServiceIdentityInput{
-		ServiceID:      "qs-apiserver",
-		TargetAudience: []string{"iam-service"},
-		CommonName:     "qs-apiserver.svc",
+		ServiceID:  "qs-apiserver",
+		CommonName: "qs-apiserver.svc",
 	}
 
 	identity := ServiceIdentityFromInput(in)
-	in.TargetAudience[0] = "mutated"
 
 	if identity.Source != securityplane.ServiceIdentitySourceUnknown {
 		t.Fatalf("source = %q, want unknown default", identity.Source)
-	}
-	if got := identity.Audiences(); len(got) != 1 || got[0] != "iam-service" {
-		t.Fatalf("audiences = %#v, want [iam-service]", got)
 	}
 }

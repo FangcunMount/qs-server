@@ -228,13 +228,6 @@ iam:
     refresh-interval: 1h
     cache-ttl: 24h
 
-  service-auth:
-    service-id: "qs-collection-server.svc"
-    target-audience: ["iam-service"]
-    token-ttl: 1h
-    refresh-before: 5m
-  
-  # 用户信息缓存
   user-cache:
     enabled: true
     ttl: 5m

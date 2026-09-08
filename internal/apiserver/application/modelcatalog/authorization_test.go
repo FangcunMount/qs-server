@@ -58,7 +58,7 @@ func TestSnapshotAuthorizerAllowsTrustedServiceCatalogCommandWithoutOrganization
 	})
 	actor := ActorContext{Principal: securityplane.Principal{
 		Kind:   securityplane.PrincipalKindService,
-		Source: securityplane.PrincipalSourceServiceAuth,
+		Source: securityplane.PrincipalSourceInternal,
 	}}
 	if err := (SnapshotAuthorizer{}).Authorize(ctx, actor, ActionManageCatalog, Resource{}); err != nil {
 		t.Fatalf("Authorize() trusted service actor error = %v", err)

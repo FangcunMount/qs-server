@@ -6,22 +6,16 @@ import (
 	"strconv"
 	"strings"
 
-	identityv2 "github.com/FangcunMount/iam/v3/api/grpc/iam/identity/v2"
-	serviceauth "github.com/FangcunMount/iam/v3/pkg/sdk/auth/serviceauth"
-	"github.com/FangcunMount/iam/v3/pkg/sdk/identity"
+	identityv2 "github.com/FangcunMount/iam/v4/api/grpc/iam/identity/v2"
+	"github.com/FangcunMount/iam/v4/pkg/sdk/identity"
 )
-
-type TokenProvider interface {
-	GetToken(context.Context) (string, error)
-}
 
 type IAMSyntheticSubjectDirectory struct {
 	identity *identity.Client
-	tokens   TokenProvider
 }
 
-func NewIAMSyntheticSubjectDirectory(identityClient *identity.Client, tokens TokenProvider) *IAMSyntheticSubjectDirectory {
-	return &IAMSyntheticSubjectDirectory{identity: identityClient, tokens: tokens}
+func NewIAMSyntheticSubjectDirectory(identityClient *identity.Client) *IAMSyntheticSubjectDirectory {
+	return &IAMSyntheticSubjectDirectory{identity: identityClient}
 }
 
 func (d *IAMSyntheticSubjectDirectory) FindActiveIsolatedUser(ctx context.Context, nickname string) (string, error) {
@@ -36,14 +30,10 @@ func (d *IAMSyntheticSubjectDirectory) FindActiveIsolatedUser(ctx context.Contex
 }
 
 func (d *IAMSyntheticSubjectDirectory) FindActiveIsolatedUsers(ctx context.Context, nickname string) ([]string, error) {
-	if d == nil || d.identity == nil || d.tokens == nil {
+	if d == nil || d.identity == nil {
 		return nil, fmt.Errorf("IAM identity directory is unavailable")
 	}
-	authorized, err := authorizedContext(ctx, d.tokens)
-	if err != nil {
-		return nil, err
-	}
-	resp, err := d.identity.SearchUsers(authorized, &identityv2.SearchUsersRequest{
+	resp, err := d.identity.SearchUsers(ctx, &identityv2.SearchUsersRequest{
 		Keyword: nickname,
 		Page:    &identityv2.OffsetPagination{Limit: 100},
 	})
@@ -67,18 +57,4 @@ func (d *IAMSyntheticSubjectDirectory) FindActiveIsolatedUsers(ctx context.Conte
 		return nil, fmt.Errorf("%w: IAM synthetic subject %q does not exist", ErrSubjectNotFound, nickname)
 	}
 	return userIDs, nil
-}
-
-func authorizedContext(ctx context.Context, tokens TokenProvider) (context.Context, error) {
-	if tokens == nil {
-		return nil, fmt.Errorf("IAM service token provider is required")
-	}
-	token, err := tokens.GetToken(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("get IAM service token: %w", err)
-	}
-	if strings.TrimSpace(token) == "" {
-		return nil, fmt.Errorf("IAM service token is empty")
-	}
-	return serviceauth.AuthorizationContext(ctx, token), nil
 }
