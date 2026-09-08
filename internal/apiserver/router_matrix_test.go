@@ -436,7 +436,6 @@ func TestRouterProtectedClinicianRoutePassesCapabilityMiddleware(t *testing.T) {
 	engine.Use(func(c *gin.Context) {
 		c.Set(restmiddleware.OrgIDKey, uint64(88))
 		c.Set(restmiddleware.UserIDKey, uint64(701))
-		c.Set(restmiddleware.TenantDomainKey, "tenant-a")
 		c.Set(restmiddleware.AuthzSnapshotKey, &authzapp.Snapshot{
 			EffectiveRoles: []string{"qs:admin"},
 			Permissions: []authzapp.Permission{

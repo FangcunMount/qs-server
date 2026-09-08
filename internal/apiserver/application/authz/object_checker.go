@@ -15,8 +15,8 @@ var (
 )
 
 type ObjectCheckRequest struct {
-	Subject    string
-	Domain     string
+	Subject string
+
 	Resource   string
 	Action     string
 	ObjectID   string

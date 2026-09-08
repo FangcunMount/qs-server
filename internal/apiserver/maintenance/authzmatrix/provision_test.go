@@ -3,7 +3,7 @@ package authzmatrix
 import (
 	"testing"
 
-	identityv2 "github.com/FangcunMount/iam/v4/api/grpc/iam/identity/v2"
+	identityv2 "github.com/FangcunMount/iam/v5/api/grpc/iam/identity/v2"
 )
 
 func TestCreatedIsolatedUserIDUsesAuthoritativeCreateResponse(t *testing.T) {

@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	authzv3 "github.com/FangcunMount/iam/v4/api/grpc/iam/authz/v3"
+	authzv4 "github.com/FangcunMount/iam/v5/api/grpc/iam/authz/v4"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/authz"
 )
 
@@ -28,12 +28,12 @@ func NewAssignmentClient(c GRPCClient) *AssignmentClient {
 }
 
 // ReplaceManaged atomically replaces only the QS roles delegated to qs-apiserver.
-func (a *AssignmentClient) ReplaceManaged(ctx context.Context, domain, targetUserIDStr string, roleNames []string, changedBy, reason string) (*ReplaceAssignmentsResult, error) {
+func (a *AssignmentClient) ReplaceManaged(ctx context.Context, targetUserIDStr string, roleNames []string, changedBy, reason string) (*ReplaceAssignmentsResult, error) {
 	if a == nil || a.client == nil {
 		return nil, fmt.Errorf("iam assignment client not available")
 	}
-	resp, err := a.client.SDK().Authz().ReplaceManagedAssignments(ctx, &authzv3.ReplaceManagedAssignmentsRequest{
-		Subject: authz.SubjectKey(targetUserIDStr), Domain: domain, RoleNames: append([]string(nil), roleNames...),
+	resp, err := a.client.SDK().Authz().ReplaceManagedAssignments(ctx, &authzv4.ReplaceManagedAssignmentsRequest{
+		Subject: authz.SubjectKey(targetUserIDStr), RoleNames: append([]string(nil), roleNames...),
 		ChangedBy: changedBy, Reason: reason,
 	})
 	if err != nil {

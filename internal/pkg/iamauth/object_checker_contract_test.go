@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	authzv3 "github.com/FangcunMount/iam/v4/api/grpc/iam/authz/v3"
-	"github.com/FangcunMount/iam/v4/pkg/sdk"
+	authzv4 "github.com/FangcunMount/iam/v5/api/grpc/iam/authz/v4"
+	"github.com/FangcunMount/iam/v5/pkg/sdk"
 	appauthz "github.com/FangcunMount/qs-server/internal/apiserver/application/authz"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -39,7 +39,7 @@ func TestObjectCheckerIAMV3ContractAssessmentRetryMatrix(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			decision, err := checker.CheckObject(context.Background(), appauthz.ObjectCheckRequest{
-				Subject: tt.subject, Domain: "fangcun", Resource: appauthz.AssessmentResource,
+				Subject: tt.subject, Resource: appauthz.AssessmentResource,
 				Action: "retry", ObjectID: "assessment-1",
 				Attributes: map[string]appauthz.ObjectAttribute{
 					appauthz.ObjectOriginTypeAttribute: appauthz.StringAttribute(tt.originType),
@@ -90,13 +90,13 @@ func TestObjectCheckerIAMV3ContractMapsUnavailableAndInvalidAttributes(t *testin
 }
 
 type contractAuthorizationServer struct {
-	authzv3.UnimplementedAuthorizationServiceServer
+	authzv4.UnimplementedAuthorizationServiceServer
 	calls       int
-	lastRequest *authzv3.CheckRequest
+	lastRequest *authzv4.CheckRequest
 	failureCode codes.Code
 }
 
-func (s *contractAuthorizationServer) Check(ctx context.Context, request *authzv3.CheckRequest) (*authzv3.CheckResponse, error) {
+func (s *contractAuthorizationServer) Check(ctx context.Context, request *authzv4.CheckRequest) (*authzv4.CheckResponse, error) {
 	s.calls++
 	s.lastRequest = request
 	if s.failureCode != codes.OK {
@@ -114,14 +114,14 @@ func (s *contractAuthorizationServer) Check(ctx context.Context, request *authzv
 	allowed := request.GetSubject() == "user:1" ||
 		request.GetSubject() == "user:2" && originType == "adhoc" ||
 		request.GetSubject() == "user:3" && originType == "plan"
-	response := &authzv3.CheckResponse{PolicyVersion: 41}
+	response := &authzv4.CheckResponse{PolicyVersion: 41}
 	if !allowed {
-		response.Reason = authzv3.DecisionReason_NOT_MATCHED
+		response.Reason = authzv4.DecisionReason_NOT_MATCHED
 		response.DenyCode = "policy_not_matched"
 		return response, nil
 	}
 	response.Allowed = true
-	response.Reason = authzv3.DecisionReason_ALLOWED
+	response.Reason = authzv4.DecisionReason_ALLOWED
 	switch request.GetSubject() {
 	case "user:1":
 		response.MatchedGrantId, response.MatchedRole = "100", "qs:admin"
@@ -143,7 +143,7 @@ func newObjectCheckerContractFixture(t *testing.T) (*ObjectChecker, *contractAut
 	listener := bufconn.Listen(1024 * 1024)
 	server := grpc.NewServer()
 	authorizationServer := &contractAuthorizationServer{}
-	authzv3.RegisterAuthorizationServiceServer(server, authorizationServer)
+	authzv4.RegisterAuthorizationServiceServer(server, authorizationServer)
 	go func() { _ = server.Serve(listener) }()
 	t.Cleanup(func() {
 		server.Stop()
@@ -166,7 +166,7 @@ func newObjectCheckerContractFixture(t *testing.T) (*ObjectChecker, *contractAut
 
 func objectCheckRequest(subject, originType string) appauthz.ObjectCheckRequest {
 	return appauthz.ObjectCheckRequest{
-		Subject: subject, Domain: "fangcun", Resource: appauthz.AssessmentResource,
+		Subject: subject, Resource: appauthz.AssessmentResource,
 		Action: "retry", ObjectID: "assessment-1",
 		Attributes: map[string]appauthz.ObjectAttribute{
 			appauthz.ObjectOriginTypeAttribute: appauthz.StringAttribute(originType),

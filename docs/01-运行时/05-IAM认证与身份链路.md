@@ -59,7 +59,7 @@ flowchart TD
 
 不同 route group 会使用不同能力检查，不能理解为每个端点机械执行完全相同的 middleware。总体顺序表达的是依赖关系：没有可信身份就无法解析范围，没有组织范围就不能安全读取业务资源，具备角色能力仍需校验目标资源归属。
 
-collection 路由也会执行 JWT、UserIdentity、tenant domain 和 authz snapshot 投影；随后由 BFF 用例通过 ProfileLink、Actor gRPC 和请求参数解析受试者与填写人。
+collection 路由也会执行 JWT、UserIdentity 和 authz snapshot 投影；随后由 BFF 用例通过 ProfileLink、Actor gRPC 和请求参数解析受试者与填写人。
 
 ## 5. Token 如何验证
 
@@ -71,10 +71,10 @@ collection 路由也会执行 JWT、UserIdentity、tenant domain 和 authz snaps
 - Identity/ProfileLink 等服务；
 - `AuthzSnapshotLoader`。
 
-qs-server 使用 IAM SDK `v3.2.0` 的固定 Token Profile：
+qs-server 使用 IAM SDK `v5.0.0` 的固定 Token Profile：
 
 - 令牌是使用 `RS256` 签名的 JWS，本地验签公钥来自 JWKS；`ES256` 或混合算法配置会在启动校验阶段失败。
-- issuer 和 audience 无论本地还是远程验证都必填；`sub`、`exp`、`user_id`、`tenant_id` 是当前必需 claims，且必须有过期时间。
+- issuer 和 audience 无论本地还是远程验证都必填；`sub`、`exp`、`user_id` 是当前必需 claims，且必须有过期时间。
 - HTTP 用户入口和可选的 gRPC 用户 JWT interceptor 只接受 Access Token；历史缺少 `token_type` 的用户 token 在 SDK 有界兼容规则下视为 Access Token。
 - Service Token 是独立的服务主体凭据，不能通过用户 bearer 入口。若未来需要入站 Service Token，必须建立独立 audience、required claims 和 interceptor。
 - JWKS 刷新失败时，旧缓存只能在配置的 `CacheTTL` 内继续使用。
@@ -83,10 +83,10 @@ TokenVerifier 支持使用 JWKS 在本地验证 token，并在配置允许时使
 
 ## 6. 授权快照与失效
 
-`AuthzSnapshotLoader` 把 IAM AuthZ v3 的授权快照加载到进程内缓存。快照包含用户角色、资源/动作、`AuthorizationMode` 和 `authz_version`；
-只有 `UNCONDITIONAL` 可以直接通过通用 capability 中间件，`OBJECT_CHECK_REQUIRED` 必须在加载对象后调用 IAM v3 `Check`。
+`AuthzSnapshotLoader` 把 IAM AuthZ v4 的授权快照加载到进程内缓存。快照包含用户角色、资源/动作、`AuthorizationMode` 和 `authz_version`；
+只有 `UNCONDITIONAL` 可以直接通过通用 capability 中间件，`OBJECT_CHECK_REQUIRED` 必须在加载对象后调用 IAM v4 `Check`。
 
-release 模式在启动受保护 transport 之前必须完成 IAM health 和只读快照探针，并确认 `TokenVerifier`、服务身份、v3 快照 loader 与对象 checker 都已装配。任一缺失都阻断启动；
+release 模式在启动受保护 transport 之前必须完成 IAM health 和只读快照探针，并确认 `TokenVerifier`、服务身份、v4 快照 loader 与对象 checker 都已装配。任一缺失都阻断启动；
 受保护 REST 在授权运行时不可用时返回 `503`，不回退为本地角色或无鉴权路由。
 
 apiserver 与 collection 可订阅 IAM 权限版本事件：

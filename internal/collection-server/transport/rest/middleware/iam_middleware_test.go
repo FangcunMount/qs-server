@@ -17,13 +17,13 @@ func TestUserIdentityMiddlewareKeepsLegacyKeysAndSecurityProjection(t *testing.T
 	router := gin.New()
 	router.Use(func(c *gin.Context) {
 		c.Set("user_claims", &pkgmiddleware.UserClaims{
-			UserID:       "42",
-			AccountID:    "acct-1",
-			TenantDomain: "fangcun",
-			OrgID:        "88",
-			SessionID:    "sess-1",
-			TokenID:      "tok-1",
-			AMR:          []string{"pwd"},
+			UserID:    "42",
+			AccountID: "acct-1",
+
+			OrgID:     "88",
+			SessionID: "sess-1",
+			TokenID:   "tok-1",
+			AMR:       []string{"pwd"},
 		})
 		c.Next()
 	})
@@ -41,9 +41,6 @@ func TestUserIdentityMiddlewareKeepsLegacyKeysAndSecurityProjection(t *testing.T
 		}
 		if principal.UserID != "42" || principal.AccountID != "acct-1" || principal.HasOrgID {
 			t.Fatalf("unexpected principal: %#v", principal)
-		}
-		if principal.TenantDomain != "fangcun" {
-			t.Fatalf("unexpected tenant domain: %#v", principal)
 		}
 		c.Status(http.StatusNoContent)
 	})

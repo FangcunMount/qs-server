@@ -3,21 +3,18 @@ package iamauth
 import (
 	"context"
 	"fmt"
-	"strings"
 	"sync"
 	"time"
 
-	authzv3 "github.com/FangcunMount/iam/v4/api/grpc/iam/authz/v3"
-	"github.com/FangcunMount/iam/v4/pkg/tenant"
+	authzv4 "github.com/FangcunMount/iam/v5/api/grpc/iam/authz/v4"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/authz"
 	"golang.org/x/sync/singleflight"
 )
 
 // SnapshotLoaderOptions 配置 IAM GetAuthorizationSnapshot。
 type SnapshotLoaderOptions struct {
-	AppName        string
-	CacheTTL       time.Duration
-	DomainOverride string
+	AppName  string
+	CacheTTL time.Duration
 }
 
 // SnapshotLoader CurrentAuthzSnapshot：GetAuthorizationSnapshot + 进程内缓存 + authz_version 水位失效。
@@ -25,10 +22,10 @@ type SnapshotLoader struct {
 	client GRPCClient
 	opts   SnapshotLoaderOptions
 
-	mu             sync.Mutex
-	cache          map[string]cachedSnap
-	tenantAuthzVer map[string]int64
-	group          singleflight.Group
+	mu            sync.Mutex
+	cache         map[string]cachedSnap
+	globalVersion int64
+	group         singleflight.Group
 }
 
 type cachedSnap struct {
@@ -45,18 +42,17 @@ func NewSnapshotLoader(client GRPCClient, opts SnapshotLoaderOptions) *SnapshotL
 		opts.CacheTTL = 30 * time.Second
 	}
 	return &SnapshotLoader{
-		client:         client,
-		opts:           opts,
-		cache:          make(map[string]cachedSnap),
-		tenantAuthzVer: make(map[string]int64),
+		client: client,
+		opts:   opts,
+		cache:  make(map[string]cachedSnap),
 	}
 }
 
-func cacheKey(domain, userID, app string) string {
-	return domain + "\x00" + userID + "\x00" + app
+func cacheKey(userID, app string) string {
+	return userID + "\x00" + app
 }
 
-func (l *SnapshotLoader) getCached(key, domain string) *authz.Snapshot {
+func (l *SnapshotLoader) getCached(key string) *authz.Snapshot {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	ent, ok := l.cache[key]
@@ -64,99 +60,77 @@ func (l *SnapshotLoader) getCached(key, domain string) *authz.Snapshot {
 		return nil
 	}
 	if ent.snap != nil {
-		if global, ok := l.tenantAuthzVer[domain]; ok && ent.snap.AuthzVersion < global {
+		if ent.snap.AuthzVersion < l.globalVersion {
 			return nil
 		}
 	}
 	return ent.snap
 }
 
-func (l *SnapshotLoader) setCached(key, domain string, snap *authz.Snapshot) {
+func (l *SnapshotLoader) setCached(key string, snap *authz.Snapshot) error {
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	if snap != nil && snap.AuthzVersion > l.tenantAuthzVer[domain] {
-		l.tenantAuthzVer[domain] = snap.AuthzVersion
+	if snap == nil || snap.AuthzVersion < l.globalVersion {
+		return fmt.Errorf("authorization snapshot is older than the observed policy version")
+	}
+	if snap.AuthzVersion > l.globalVersion {
+		l.globalVersion = snap.AuthzVersion
 	}
 	l.cache[key] = cachedSnap{snap: snap, expiresAt: time.Now().Add(l.opts.CacheTTL)}
+	return nil
 }
 
-// ObserveTenantAuthzVersion 用外部版本通知推进租户授权版本水位，并主动剔除旧快照。
-// tenantID 传入 IAM 版本消息中的 tenant/domain 值；QS 不自行改写该语义。
-func (l *SnapshotLoader) ObserveTenantAuthzVersion(tenantID string, version int64) {
-	if l == nil || tenantID == "" || version <= 0 {
+// ObserveAuthzVersion 推进全局授权版本水位并剔除旧快照。
+func (l *SnapshotLoader) ObserveAuthzVersion(version int64) {
+	if l == nil || version <= 0 {
 		return
 	}
-
 	l.mu.Lock()
 	defer l.mu.Unlock()
-
-	if current, ok := l.tenantAuthzVer[tenantID]; ok && version <= current {
+	if version <= l.globalVersion {
 		return
 	}
-	l.tenantAuthzVer[tenantID] = version
-
-	prefix := tenantID + "\x00"
+	l.globalVersion = version
 	for key, ent := range l.cache {
-		if !strings.HasPrefix(key, prefix) {
-			continue
-		}
 		if ent.snap != nil && ent.snap.AuthzVersion < version {
 			delete(l.cache, key)
 		}
 	}
 }
 
-// AuthorizationDomain 返回 IAM 授权域（与 JWT tenant domain 对齐）。
-func (l *SnapshotLoader) AuthorizationDomain() string {
-	if l != nil && l.opts.DomainOverride != "" {
-		return l.opts.DomainOverride
-	}
-	return tenant.DefaultID
-}
-
-// DomainForOrg 返回 IAM authorization domain；orgID 为 QS 业务组织，不作为授权域。
-func (l *SnapshotLoader) DomainForOrg(orgID int64) string {
-	_ = orgID
-	return l.AuthorizationDomain()
-}
-
 // Load 拉取授权快照。
-func (l *SnapshotLoader) Load(ctx context.Context, jwtTenantID, userIDStr string) (*authz.Snapshot, error) {
+func (l *SnapshotLoader) Load(ctx context.Context, userIDStr string) (*authz.Snapshot, error) {
 	if l == nil || l.client == nil || !l.client.IsEnabled() || l.client.SDK() == nil {
 		return nil, fmt.Errorf("iam client not available for authorization snapshot")
 	}
-	domain := jwtTenantID
-	if l.opts.DomainOverride != "" {
-		domain = l.opts.DomainOverride
-	}
-	if domain == "" || userIDStr == "" {
-		return nil, fmt.Errorf("domain and user id are required")
+	if userIDStr == "" {
+		return nil, fmt.Errorf("user id is required")
 	}
 
-	key := cacheKey(domain, userIDStr, l.opts.AppName)
-	if snap := l.getCached(key, domain); snap != nil {
+	key := cacheKey(userIDStr, l.opts.AppName)
+	if snap := l.getCached(key); snap != nil {
 		return snap, nil
 	}
 
 	v, err, _ := l.group.Do(key, func() (interface{}, error) {
-		if snap := l.getCached(key, domain); snap != nil {
+		if snap := l.getCached(key); snap != nil {
 			return snap, nil
 		}
 		sub := authz.SubjectKey(userIDStr)
-		resp, err := l.client.SDK().Authz().GetAuthorizationSnapshot(ctx, &authzv3.GetAuthorizationSnapshotRequest{
+		resp, err := l.client.SDK().Authz().GetAuthorizationSnapshot(ctx, &authzv4.GetAuthorizationSnapshotRequest{
 			Subject: sub,
-			Domain:  domain,
+
 			AppName: l.opts.AppName,
 		})
 		if err != nil {
 			return nil, err
 		}
 		snap := &authz.Snapshot{
-			DirectRoles:         append([]string(nil), resp.GetDirectRoles()...),
-			EffectiveRoles:      append([]string(nil), resp.GetRoles()...),
-			AuthzVersion:        resp.GetPolicyVersion(),
-			AuthorizationDomain: domain,
-			IAMAppName:          l.opts.AppName,
+			DirectRoles:    append([]string(nil), resp.GetDirectRoles()...),
+			EffectiveRoles: append([]string(nil), resp.GetRoles()...),
+			AuthzVersion:   resp.GetPolicyVersion(),
+
+			IAMAppName: l.opts.AppName,
 		}
 		for _, p := range resp.GetPermissions() {
 			if p == nil {
@@ -168,7 +142,9 @@ func (l *SnapshotLoader) Load(ctx context.Context, jwtTenantID, userIDStr string
 				Mode:     authz.AuthorizationMode(p.GetMode()),
 			})
 		}
-		l.setCached(key, domain, snap)
+		if err := l.setCached(key, snap); err != nil {
+			return nil, err
+		}
 		return snap, nil
 	})
 	if err != nil {

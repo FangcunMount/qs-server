@@ -4,7 +4,6 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/FangcunMount/component-base/pkg/logger"
 	pkgmiddleware "github.com/FangcunMount/qs-server/internal/pkg/middleware"
 	"github.com/FangcunMount/qs-server/internal/pkg/securityplane"
 	"github.com/FangcunMount/qs-server/internal/pkg/securityprojection"
@@ -12,12 +11,11 @@ import (
 )
 
 const (
-	UserIDKey       = "user_id"
-	UserIDStrKey    = "user_id_str"
-	OrgIDKey        = "org_id"
-	TenantDomainKey = "tenant_domain"
-	PrincipalKey    = "security_principal"
-	OrgScopeKey     = "security_org_scope"
+	UserIDKey    = "user_id"
+	UserIDStrKey = "user_id_str"
+	OrgIDKey     = "org_id"
+	PrincipalKey = "security_principal"
+	OrgScopeKey  = "security_org_scope"
 )
 
 // UserIdentityMiddleware projects IAM JWT claims into gin.Context.
@@ -42,20 +40,6 @@ func UserIdentityMiddleware() gin.HandlerFunc {
 		}
 
 		projectIdentityContext(c, claims)
-		c.Next()
-	}
-}
-
-// RequireTenantDomainMiddleware requires a non-empty IAM authorization domain claim.
-func RequireTenantDomainMiddleware() gin.HandlerFunc {
-	return func(c *gin.Context) {
-		claims := pkgmiddleware.GetUserClaims(c)
-		if claims == nil || tenantDomainFromClaims(claims) == "" {
-			logger.L(c.Request.Context()).Errorw("RequireTenantDomainMiddleware missing tenant domain", "claims_present", claims != nil)
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "tenant domain claim is required"})
-			c.Abort()
-			return
-		}
 		c.Next()
 	}
 }
@@ -99,16 +83,6 @@ func GetOrgID(c *gin.Context) uint64 {
 	return id
 }
 
-// GetTenantDomain returns the IAM authorization domain from gin.Context.
-func GetTenantDomain(c *gin.Context) string {
-	val, exists := c.Get(TenantDomainKey)
-	if !exists {
-		return ""
-	}
-	id, _ := val.(string)
-	return id
-}
-
 // GetPrincipal returns the Security Control Plane principal projection.
 func GetPrincipal(c *gin.Context) (securityplane.Principal, bool) {
 	val, exists := c.Get(PrincipalKey)
@@ -130,28 +104,26 @@ func GetOrgScope(c *gin.Context) (securityplane.OrgScope, bool) {
 }
 
 func projectIdentityContext(c *gin.Context, claims *pkgmiddleware.UserClaims) {
-	tenantDomain := tenantDomainFromClaims(claims)
-	c.Set(TenantDomainKey, tenantDomain)
 
-	setSecurityProjection(c, claims, tenantDomain, 0, false)
+	setSecurityProjection(c, claims, 0, false)
 }
 
-func setSecurityProjection(c *gin.Context, claims *pkgmiddleware.UserClaims, tenantDomain string, orgID uint64, hasOrg bool) {
+func setSecurityProjection(c *gin.Context, claims *pkgmiddleware.UserClaims, orgID uint64, hasOrg bool) {
 	if claims == nil {
 		return
 	}
 	principal := securityprojection.PrincipalFromInput(securityprojection.PrincipalInput{
-		Kind:         securityplane.PrincipalKindUser,
-		Source:       securityplane.PrincipalSourceHTTPJWT,
-		UserID:       claims.UserID,
-		AccountID:    claims.AccountID,
-		TenantDomain: tenantDomain,
-		OrgID:        orgID,
-		HasOrgID:     hasOrg,
-		SessionID:    claims.SessionID,
-		TokenID:      claims.TokenID,
-		AMR:          claims.AMR,
+		Kind:      securityplane.PrincipalKindUser,
+		Source:    securityplane.PrincipalSourceHTTPJWT,
+		UserID:    claims.UserID,
+		AccountID: claims.AccountID,
+
+		OrgID:     orgID,
+		HasOrgID:  hasOrg,
+		SessionID: claims.SessionID,
+		TokenID:   claims.TokenID,
+		AMR:       claims.AMR,
 	})
 	c.Set(PrincipalKey, principal)
-	c.Set(OrgScopeKey, securityprojection.OrgScopeFromIdentity(tenantDomain, orgID, hasOrg, ""))
+	c.Set(OrgScopeKey, securityprojection.OrgScopeFromIdentity(orgID, hasOrg))
 }

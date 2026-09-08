@@ -38,7 +38,7 @@ type SubjectSource interface {
 }
 
 type SnapshotReader interface {
-	Load(context.Context, string, string) (*appauthz.Snapshot, error)
+	Load(context.Context, string) (*appauthz.Snapshot, error)
 }
 
 type ObjectChecker interface {
@@ -107,7 +107,7 @@ func (r *Runner) Run(ctx context.Context) (Evidence, error) {
 	evidence := Evidence{
 		SchemaVersion: "iam-authz-production-matrix/v2",
 		CheckedAt:     r.now().UTC(), GitCommit: r.gitCommit, ServiceIdentity: r.serviceIdentity,
-		Domain: Domain, Resource: AssessmentResource, Action: RetryAction,
+		Resource: AssessmentResource, Action: RetryAction,
 	}
 	if r.subjects == nil || r.snapshots == nil || r.checker == nil {
 		return evidence, errors.New("authz matrix dependencies are incomplete")
@@ -126,7 +126,7 @@ func (r *Runner) Run(ctx context.Context) (Evidence, error) {
 
 	versions := make(map[int64]struct{})
 	for _, subject := range subjects {
-		snapshot, err := r.snapshots.Load(ctx, Domain, subject.UserID)
+		snapshot, err := r.snapshots.Load(ctx, subject.UserID)
 		if err != nil {
 			return evidence, fmt.Errorf("load IAM snapshot for %s subject: %w", subject.Kind, err)
 		}
@@ -154,7 +154,7 @@ func (r *Runner) Run(ctx context.Context) (Evidence, error) {
 
 	for _, testCase := range matrixCases(subjects) {
 		request := appauthz.ObjectCheckRequest{
-			Subject: appauthz.SubjectKey(testCase.subject.UserID), Domain: Domain,
+			Subject:  appauthz.SubjectKey(testCase.subject.UserID),
 			Resource: AssessmentResource, Action: testCase.action,
 			ObjectID:   "authz-production-matrix:" + testCase.objectSuffix,
 			Attributes: map[string]appauthz.ObjectAttribute{},

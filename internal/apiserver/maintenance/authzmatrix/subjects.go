@@ -168,7 +168,7 @@ func (s *StableSubjectSource) Load(ctx context.Context) ([]Subject, error) {
 func (s *StableSubjectSource) selectCandidateByDirectRole(ctx context.Context, candidates []string, role string) (string, error) {
 	matches := make([]string, 0, 1)
 	for _, userID := range candidates {
-		snapshot, err := s.snapshots.Load(ctx, Domain, userID)
+		snapshot, err := s.snapshots.Load(ctx, userID)
 		if err != nil {
 			return "", fmt.Errorf("load candidate IAM snapshot: %w", err)
 		}

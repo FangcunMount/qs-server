@@ -110,9 +110,9 @@ func (s staticSubjects) Load(context.Context) ([]Subject, error) {
 
 type staticSnapshots map[string][]string
 
-func (s staticSnapshots) Load(_ context.Context, domain, userID string) (*appauthz.Snapshot, error) {
+func (s staticSnapshots) Load(_ context.Context, userID string) (*appauthz.Snapshot, error) {
 	roles := append([]string(nil), s[userID]...)
-	return &appauthz.Snapshot{DirectRoles: roles, EffectiveRoles: append([]string(nil), roles...), AuthzVersion: 42, AuthorizationDomain: domain}, nil
+	return &appauthz.Snapshot{DirectRoles: roles, EffectiveRoles: append([]string(nil), roles...), AuthzVersion: 42}, nil
 }
 
 type matrixChecker struct {

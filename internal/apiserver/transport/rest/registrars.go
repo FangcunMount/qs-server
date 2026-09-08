@@ -3,8 +3,8 @@ package rest
 import (
 	"net/http"
 
-	authnv2 "github.com/FangcunMount/iam/v4/api/grpc/iam/authn/v2"
-	auth "github.com/FangcunMount/iam/v4/pkg/sdk/auth/verifier"
+	authnv3 "github.com/FangcunMount/iam/v5/api/grpc/iam/authn/v3"
+	auth "github.com/FangcunMount/iam/v5/pkg/sdk/auth/verifier"
 	codesHandler "github.com/FangcunMount/qs-server/internal/apiserver/transport/rest/handler"
 	restmiddleware "github.com/FangcunMount/qs-server/internal/apiserver/transport/rest/middleware"
 	"github.com/FangcunMount/qs-server/internal/pkg/middleware"
@@ -117,7 +117,6 @@ func (composer protectedGroupMiddlewareComposer) apply(group *gin.RouterGroup, r
 	verifyOpts := r.iamVerifyOptions()
 	group.Use(middleware.JWTAuthMiddlewareWithOptions(r.deps.IAM.TokenVerifier, verifyOpts))
 	group.Use(restmiddleware.UserIdentityMiddleware())
-	group.Use(restmiddleware.RequireTenantDomainMiddleware())
 	if r.deps.Actor.ActiveOperatorChecker != nil {
 		group.Use(restmiddleware.ResolveOperatorOrgScopeMiddleware(r.deps.Actor.ActiveOperatorChecker))
 	} else {
@@ -134,7 +133,6 @@ func unavailableAuthorizationMiddleware(routePrefix string) gin.HandlerFunc {
 		// from request headers. Production startup rejects missing IAM runtime.
 		if restmiddleware.GetAuthzSnapshot(c) != nil &&
 			restmiddleware.GetUserID(c) != 0 &&
-			restmiddleware.GetTenantDomain(c) != "" &&
 			restmiddleware.GetOrgID(c) != 0 {
 			c.Next()
 			return
@@ -167,6 +165,6 @@ func (r *Router) iamVerifyOptions() *auth.VerifyOptions {
 	return &auth.VerifyOptions{
 		ForceRemote:       r != nil && r.deps.IAM.ForceRemoteVerification,
 		IncludeMetadata:   true,
-		AllowedTokenTypes: []authnv2.TokenType{authnv2.TokenType_TOKEN_TYPE_ACCESS},
+		AllowedTokenTypes: []authnv3.TokenType{authnv3.TokenType_TOKEN_TYPE_ACCESS},
 	}
 }

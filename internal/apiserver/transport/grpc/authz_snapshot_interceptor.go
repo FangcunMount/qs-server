@@ -32,9 +32,8 @@ func NewAuthzSnapshotUnaryInterceptor(
 		if grpcAuthzSnapshotSkipMethod(info.FullMethod) {
 			return handler(ctx, req)
 		}
-		tenantDomain := grpcctx.TenantDomainFromContext(ctx)
 		userIDStr := grpcctx.UserIDFromContext(ctx)
-		if tenantDomain == "" || userIDStr == "" {
+		if userIDStr == "" {
 			// 未走 IAM（如健康检查、内部免鉴权 RPC）或无租户/用户声明：不注入快照。
 			return handler(ctx, req)
 		}
@@ -42,7 +41,7 @@ func NewAuthzSnapshotUnaryInterceptor(
 		if !hasOrg {
 			return nil, status.Errorf(codes.InvalidArgument, "organization scope is required for QS business routes")
 		}
-		snap, err := loader.Load(ctx, tenantDomain, userIDStr)
+		snap, err := loader.Load(ctx, userIDStr)
 		if err != nil {
 			return nil, status.Errorf(codes.Unavailable, "failed to load authorization snapshot: %v", err)
 		}

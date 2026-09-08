@@ -1039,7 +1039,7 @@ func assertIAMJWKSURLContract(t *testing.T, service, configName string, opts *ge
 	if opts.JWT.ForceRemoteVerification {
 		t.Fatalf("%s %s must use local-first JWT verification", service, configName)
 	}
-	wantClaims := []string{"sub", "exp", "user_id", "tenant_id"}
+	wantClaims := []string{"sub", "exp", "user_id"}
 	for _, claim := range wantClaims {
 		if !slices.Contains(opts.JWT.RequiredClaims, claim) {
 			t.Errorf("%s %s iam.jwt.required-claims = %v, missing %q", service, configName, opts.JWT.RequiredClaims, claim)

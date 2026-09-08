@@ -218,7 +218,7 @@ iam:
     audience: ["collection-api"]
     algorithms: ["RS256"] # 固定 IAM Token Profile 签名算法
     clock-skew: 30s
-    required-claims: ["sub", "exp", "user_id", "tenant_id"]
+    required-claims: ["sub", "exp", "user_id"]
     force-remote-verification: false # 开发环境允许本地 JWKS 验签
   
   # JWKS 配置

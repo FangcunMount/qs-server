@@ -52,7 +52,7 @@ func TestGovernedRetryChecksObjectBeforeStatusAndTransaction(t *testing.T) {
 	_, err := service.Authorize(context.Background(), Actor{OrgID: 1, OperatorUserID: 9}, GovernedRetryCommand{
 		AssessmentID: 1, ExpectedAttempt: 0, Origin: retrygovernance.AttemptOriginManual,
 		RequestID: "request-1", Reason: "manual retry",
-		AuthorizationSubject: "user:9", AuthorizationDomain: "fangcun", AuthorizationAction: "retry",
+		AuthorizationSubject: "user:9", AuthorizationAction: "retry",
 	})
 	if err == nil {
 		t.Fatal("Authorize() error = nil, want IAM denial")
@@ -78,7 +78,7 @@ func TestGovernedRetryMapsIAMUnavailableBeforeSideEffects(t *testing.T) {
 	)
 	_, err := service.Authorize(context.Background(), Actor{OrgID: 1, OperatorUserID: 9}, GovernedRetryCommand{
 		AssessmentID: 1, Origin: retrygovernance.AttemptOriginManual, RequestID: "request-1", Reason: "retry",
-		AuthorizationSubject: "user:9", AuthorizationDomain: "fangcun", AuthorizationAction: "retry",
+		AuthorizationSubject: "user:9", AuthorizationAction: "retry",
 	})
 	if err == nil || !errors.Is(err, appauthz.ErrAuthorizationUnavailable) || txCalls != 0 {
 		t.Fatalf("err=%v tx=%d", err, txCalls)

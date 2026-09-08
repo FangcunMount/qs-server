@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	identityv2 "github.com/FangcunMount/iam/v4/api/grpc/iam/identity/v2"
+	identityv2 "github.com/FangcunMount/iam/v5/api/grpc/iam/identity/v2"
 )
 
 func TestGetUserProfilesLoadsEveryIAMPage(t *testing.T) {

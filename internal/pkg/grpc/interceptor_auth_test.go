@@ -7,8 +7,8 @@ import (
 	"time"
 
 	basegrpc "github.com/FangcunMount/component-base/pkg/grpc/interceptors"
-	authnv2 "github.com/FangcunMount/iam/v4/api/grpc/iam/authn/v2"
-	auth "github.com/FangcunMount/iam/v4/pkg/sdk/auth/verifier"
+	authnv3 "github.com/FangcunMount/iam/v5/api/grpc/iam/authn/v3"
+	auth "github.com/FangcunMount/iam/v5/pkg/sdk/auth/verifier"
 	"github.com/FangcunMount/qs-server/internal/pkg/securityplane"
 	"github.com/FangcunMount/qs-server/internal/pkg/serviceidentity"
 )
@@ -20,19 +20,19 @@ func TestInjectUserContextIncludesSessionAndMetadata(t *testing.T) {
 		Claims: &auth.TokenClaims{
 			UserID:          "1001",
 			LoginIdentityID: "2001",
-			TenantDomain:    "fangcun",
-			OrgID:           "3001",
-			SessionID:       "session-1",
-			TokenID:         "token-1",
-			Roles:           []string{"admin"},
-			AMR:             []string{"pwd"},
+
+			OrgID:     "3001",
+			SessionID: "session-1",
+			TokenID:   "token-1",
+			Roles:     []string{"admin"},
+			AMR:       []string{"pwd"},
 			Extra: map[string]interface{}{
 				"username": "alice",
 			},
 		},
 		Metadata: &auth.VerifyMetadata{
-			TokenType: authnv2.TokenType_TOKEN_TYPE_ACCESS,
-			Status:    authnv2.TokenStatus_TOKEN_STATUS_VALID,
+			TokenType: authnv3.TokenType_TOKEN_TYPE_ACCESS,
+			Status:    authnv3.TokenStatus_TOKEN_STATUS_VALID,
 			IssuedAt:  now,
 			ExpiresAt: now.Add(time.Hour),
 		},
@@ -45,9 +45,6 @@ func TestInjectUserContextIncludesSessionAndMetadata(t *testing.T) {
 	}
 	if got := AccountIDFromContext(ctx); got != "2001" {
 		t.Fatalf("unexpected account_id: %v", got)
-	}
-	if got := TenantDomainFromContext(ctx); got != "fangcun" {
-		t.Fatalf("unexpected tenant_domain: %v", got)
 	}
 	if orgID, ok := OrgIDFromContext(ctx); ok {
 		t.Fatalf("org_id should not come from JWT claims, got %d", orgID)
@@ -79,12 +76,12 @@ func TestInjectedUserContextMapsToSecurityPlanePrincipalAndOrgScope(t *testing.T
 		Claims: &auth.TokenClaims{
 			UserID:          "1001",
 			LoginIdentityID: "2001",
-			TenantDomain:    "fangcun",
-			OrgID:           "3001",
-			SessionID:       "session-1",
-			TokenID:         "token-1",
-			Roles:           []string{"qs:operator"},
-			AMR:             []string{"pwd"},
+
+			OrgID:     "3001",
+			SessionID: "session-1",
+			TokenID:   "token-1",
+			Roles:     []string{"qs:operator"},
+			AMR:       []string{"pwd"},
 			Extra: map[string]interface{}{
 				"username": "alice",
 			},
@@ -107,7 +104,7 @@ func TestInjectedUserContextMapsToSecurityPlanePrincipalAndOrgScope(t *testing.T
 	if principal.Source != securityplane.PrincipalSourceGRPCJWT {
 		t.Fatalf("principal source = %q, want grpc_jwt", principal.Source)
 	}
-	if scope.HasOrgID || scope.OrgID != 0 || scope.TenantDomain != "fangcun" {
+	if scope.HasOrgID || scope.OrgID != 0 {
 		t.Fatalf("org scope = %#v, want tenant without JWT org", scope)
 	}
 	if got := principal.AuthenticationMethods(); len(got) != 1 || got[0] != "pwd" {
@@ -205,7 +202,7 @@ func TestBuildVerifyOptionsHonorsForceRemote(t *testing.T) {
 	if !opts.IncludeMetadata {
 		t.Fatal("expected IncludeMetadata to be enabled")
 	}
-	if len(opts.AllowedTokenTypes) != 1 || opts.AllowedTokenTypes[0] != authnv2.TokenType_TOKEN_TYPE_ACCESS {
+	if len(opts.AllowedTokenTypes) != 1 || opts.AllowedTokenTypes[0] != authnv3.TokenType_TOKEN_TYPE_ACCESS {
 		t.Fatalf("AllowedTokenTypes = %v, want access only", opts.AllowedTokenTypes)
 	}
 }

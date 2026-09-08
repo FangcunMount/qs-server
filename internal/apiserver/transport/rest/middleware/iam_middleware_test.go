@@ -21,13 +21,13 @@ func TestUserIdentityMiddlewareProjectsSecurityPrincipalAndScope(t *testing.T) {
 	router := gin.New()
 	router.Use(func(c *gin.Context) {
 		c.Set("user_claims", &pkgmiddleware.UserClaims{
-			UserID:       "42",
-			AccountID:    "account-1",
-			TenantDomain: "fangcun",
-			OrgID:        "88",
-			SessionID:    "session-1",
-			TokenID:      "token-1",
-			AMR:          []string{"pwd"},
+			UserID:    "42",
+			AccountID: "account-1",
+
+			OrgID:     "88",
+			SessionID: "session-1",
+			TokenID:   "token-1",
+			AMR:       []string{"pwd"},
 		})
 		c.Next()
 	})
@@ -47,7 +47,7 @@ func TestUserIdentityMiddlewareProjectsSecurityPrincipalAndScope(t *testing.T) {
 		if !ok {
 			t.Fatal("expected org scope projection")
 		}
-		if scope.TenantDomain != "fangcun" || scope.HasOrgID || scope.OrgID != 0 {
+		if scope.HasOrgID || scope.OrgID != 0 {
 			t.Fatalf("scope = %#v, want tenant without JWT org before QS resolver", scope)
 		}
 		if got := GetUserID(c); got != 42 {
@@ -73,8 +73,7 @@ func TestResolveOperatorOrgScopeMiddlewareInjectsScopeAndCurrentOperator(t *test
 	router := gin.New()
 	router.Use(func(c *gin.Context) {
 		c.Set("user_claims", &pkgmiddleware.UserClaims{
-			UserID:       "42",
-			TenantDomain: "fangcun",
+			UserID: "42",
 		})
 		c.Next()
 	})
@@ -86,7 +85,7 @@ func TestResolveOperatorOrgScopeMiddlewareInjectsScopeAndCurrentOperator(t *test
 			t.Fatalf("org_id = %d, want 88", got)
 		}
 		scope, ok := GetOrgScope(c)
-		if !ok || !scope.HasOrgID || scope.OrgID != 88 || scope.TenantDomain != "fangcun" {
+		if !ok || !scope.HasOrgID || scope.OrgID != 88 {
 			t.Fatalf("scope = %#v, want org 88", scope)
 		}
 		op := GetCurrentOperator(c)
@@ -119,8 +118,7 @@ func TestResolveOperatorOrgScopeMiddlewarePassesRequestedOrg(t *testing.T) {
 	router := gin.New()
 	router.Use(func(c *gin.Context) {
 		c.Set("user_claims", &pkgmiddleware.UserClaims{
-			UserID:       "42",
-			TenantDomain: "fangcun",
+			UserID: "42",
 		})
 		c.Next()
 	})
@@ -152,8 +150,7 @@ func TestResolveOperatorOrgScopeMiddlewareRejectsAmbiguousMembership(t *testing.
 	router := gin.New()
 	router.Use(func(c *gin.Context) {
 		c.Set("user_claims", &pkgmiddleware.UserClaims{
-			UserID:       "42",
-			TenantDomain: "fangcun",
+			UserID: "42",
 		})
 		c.Next()
 	})

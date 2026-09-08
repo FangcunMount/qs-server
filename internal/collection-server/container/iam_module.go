@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/FangcunMount/component-base/pkg/log"
-	auth "github.com/FangcunMount/iam/v4/pkg/sdk/auth/verifier"
+	auth "github.com/FangcunMount/iam/v5/pkg/sdk/auth/verifier"
 	"github.com/FangcunMount/qs-server/internal/collection-server/infra/iam"
 	"github.com/FangcunMount/qs-server/internal/pkg/options"
 )
@@ -265,7 +265,6 @@ func convertIAMOptions(opts *options.IAMOptions) *iam.IAMOptions {
 	if opts.AuthzCacheTTL > 0 {
 		iamOpts.AuthzCacheTTL = opts.AuthzCacheTTL
 	}
-	iamOpts.AuthzDomainOverride = opts.AuthzDomainOverride
 
 	return iamOpts
 }

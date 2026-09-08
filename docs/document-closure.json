@@ -2,7 +2,7 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "fc4136707c7c162fab01236b1dd1eebc897c7885",
+    "sha": "4c48caff07bcf3f447499aeebc3d404bdad0fdf0",
     "verified_on": "2026-09-08"
   },
   "status_policy": {
@@ -1684,8 +1684,8 @@
       "owner": "survey",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "e9f085e308009fbfdeb6d188c1af91e85c19b103",
-        "verified_on": "2026-08-20"
+        "source_sha": "4c48caff07bcf3f447499aeebc3d404bdad0fdf0",
+        "verified_on": "2026-09-08"
       },
       "fact_sources": [
         {
@@ -1802,8 +1802,8 @@
       "owner": "survey",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "e9f085e308009fbfdeb6d188c1af91e85c19b103",
-        "verified_on": "2026-08-20"
+        "source_sha": "4c48caff07bcf3f447499aeebc3d404bdad0fdf0",
+        "verified_on": "2026-09-08"
       },
       "fact_sources": [
         {
@@ -1890,8 +1890,8 @@
       "owner": "survey",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "e9f085e308009fbfdeb6d188c1af91e85c19b103",
-        "verified_on": "2026-08-20"
+        "source_sha": "4c48caff07bcf3f447499aeebc3d404bdad0fdf0",
+        "verified_on": "2026-09-08"
       },
       "fact_sources": [
         {
@@ -2628,8 +2628,8 @@
       "owner": "evaluation",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "f54d96322ebb7003804ae930f2f81ba5785c0ca3",
-        "verified_on": "2026-08-25"
+        "source_sha": "4c48caff07bcf3f447499aeebc3d404bdad0fdf0",
+        "verified_on": "2026-09-08"
       },
       "fact_sources": [
         {
@@ -2806,8 +2806,8 @@
       "owner": "evaluation",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "f54d96322ebb7003804ae930f2f81ba5785c0ca3",
-        "verified_on": "2026-08-25"
+        "source_sha": "4c48caff07bcf3f447499aeebc3d404bdad0fdf0",
+        "verified_on": "2026-09-08"
       },
       "fact_sources": [
         {
@@ -2864,8 +2864,8 @@
       "owner": "evaluation",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "f54d96322ebb7003804ae930f2f81ba5785c0ca3",
-        "verified_on": "2026-08-25"
+        "source_sha": "4c48caff07bcf3f447499aeebc3d404bdad0fdf0",
+        "verified_on": "2026-09-08"
       },
       "fact_sources": [
         {

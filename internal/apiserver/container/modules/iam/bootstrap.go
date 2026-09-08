@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/FangcunMount/component-base/pkg/logger"
-	auth "github.com/FangcunMount/iam/v4/pkg/sdk/auth/verifier"
+	auth "github.com/FangcunMount/iam/v5/pkg/sdk/auth/verifier"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
 	"github.com/FangcunMount/qs-server/internal/pkg/options"
 	"github.com/FangcunMount/qs-server/internal/pkg/resilience/backpressure"
@@ -148,9 +148,8 @@ func newIAMAuthzSnapshotLoader(client *iam.Client, opts *options.IAMOptions) *ia
 	}
 	iamOpts := convertIAMOptions(opts)
 	return iam.NewAuthzSnapshotLoader(client, iam.AuthzSnapshotLoaderOptions{
-		AppName:        iamOpts.AuthzAppName,
-		CacheTTL:       iamOpts.AuthzCacheTTL,
-		DomainOverride: iamOpts.AuthzDomainOverride,
+		AppName:  iamOpts.AuthzAppName,
+		CacheTTL: iamOpts.AuthzCacheTTL,
 	})
 }
 
@@ -234,7 +233,7 @@ func (m *Module) ValidateRequiredAuthzRuntime(ctx context.Context) error {
 	// A read-only sentinel snapshot proves that AuthZ v3 registration, service
 	// identity ACL, policy runtime, and the configured authorization domain are
 	// all usable before protected traffic is accepted.
-	if _, err := m.authzSnapshotLoader.Load(ctx, m.authzSnapshotLoader.AuthorizationDomain(), "1"); err != nil {
+	if _, err := m.authzSnapshotLoader.Load(ctx, "1"); err != nil {
 		return fmt.Errorf("IAM AuthZ v3 startup probe failed: %w", err)
 	}
 	return nil
@@ -357,7 +356,6 @@ func convertIAMOptions(opts *options.IAMOptions) *iam.IAMOptions {
 	if opts.AuthzCacheTTL > 0 {
 		iamOpts.AuthzCacheTTL = opts.AuthzCacheTTL
 	}
-	iamOpts.AuthzDomainOverride = opts.AuthzDomainOverride
 
 	return iamOpts
 }

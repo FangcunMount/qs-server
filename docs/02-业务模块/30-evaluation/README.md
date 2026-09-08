@@ -178,7 +178,7 @@ Assessment 固化 Questionnaire 与 AssessmentModel 的发布版本。运营发�
 ### 7.5 对象授权必须位于业务事实与事务之间
 
 人工 retry 先用授权快照确认存在 `qs:evaluation:collection:assessments/retry` 候选，
-再由 `GovernedRetryService` 加载 Assessment、校验组织与 Testee 等业务关系，从领域对象提取 `object.origin_type`，最后调用 IAM AuthZ v3 `Check`。
+再由 `GovernedRetryService` 加载 Assessment、校验组织与 Testee 等业务关系，从领域对象提取 `object.origin_type`，最后调用 IAM AuthZ v4 `Check`。
 只有对象授权通过后，才检查可观察的失败状态并进入 retry 事务。
 
 条件 Grant 只形成对象级 `retry` 候选，不能授予 list、search、`batch_evaluate` 或 `force_retry`；后两者仍要求无条件权限。IAM 拒绝返回 403，不可用或超时返回 503，属性契约或服务身份配置错误返回 500。

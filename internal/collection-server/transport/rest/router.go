@@ -5,13 +5,12 @@ import (
 	"slices"
 	"strings"
 
-	authnv2 "github.com/FangcunMount/iam/v4/api/grpc/iam/authn/v2"
-	auth "github.com/FangcunMount/iam/v4/pkg/sdk/auth/verifier"
+	authnv3 "github.com/FangcunMount/iam/v5/api/grpc/iam/authn/v3"
+	auth "github.com/FangcunMount/iam/v5/pkg/sdk/auth/verifier"
 	"github.com/FangcunMount/qs-server/internal/collection-server/concurrency"
 	"github.com/FangcunMount/qs-server/internal/collection-server/container"
 	"github.com/FangcunMount/qs-server/internal/collection-server/options"
 	collectionmiddleware "github.com/FangcunMount/qs-server/internal/collection-server/transport/rest/middleware"
-	"github.com/FangcunMount/qs-server/internal/pkg/httpauth"
 	pkgmiddleware "github.com/FangcunMount/qs-server/internal/pkg/middleware"
 	"github.com/FangcunMount/qs-server/internal/pkg/resilience/ratelimit"
 	"github.com/gin-gonic/gin"
@@ -135,7 +134,6 @@ func (r *Router) applyIAMAuth(api *gin.RouterGroup, skip func(*gin.Context) bool
 	api.Use(withAuthSkip(skip, pkgmiddleware.JWTAuthMiddlewareWithOptions(tokenVerifier, r.iamVerifyOptions())))
 	// collection 的 org 由 testee/业务层决定，不在 HTTP 入口解析 OrgScope；仅校验 IAM 身份与授权域。
 	api.Use(withAuthSkip(skip, collectionmiddleware.UserIdentityMiddleware()))
-	api.Use(withAuthSkip(skip, httpauth.RequireTenantDomainMiddleware()))
 }
 
 func unavailableAuthenticationMiddleware() gin.HandlerFunc {
@@ -159,7 +157,7 @@ func collectionAccessVerifyOptions(forceRemote bool) *auth.VerifyOptions {
 	return &auth.VerifyOptions{
 		ForceRemote:       forceRemote,
 		IncludeMetadata:   true,
-		AllowedTokenTypes: []authnv2.TokenType{authnv2.TokenType_TOKEN_TYPE_ACCESS},
+		AllowedTokenTypes: []authnv3.TokenType{authnv3.TokenType_TOKEN_TYPE_ACCESS},
 	}
 }
 

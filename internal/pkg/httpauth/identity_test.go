@@ -16,9 +16,9 @@ func TestUserIdentityMiddlewareProjectsClaimsToGinContext(t *testing.T) {
 	router := gin.New()
 	router.Use(func(c *gin.Context) {
 		c.Set("user_claims", &pkgmiddleware.UserClaims{
-			UserID:       "42",
-			TenantDomain: "fangcun",
-			OrgID:        "88",
+			UserID: "42",
+
+			OrgID: "88",
 		})
 		c.Next()
 	})
@@ -27,9 +27,6 @@ func TestUserIdentityMiddlewareProjectsClaimsToGinContext(t *testing.T) {
 		if got := GetUserID(c); got != 42 {
 			t.Fatalf("user_id = %d, want 42", got)
 		}
-		if got := GetTenantDomain(c); got != "fangcun" {
-			t.Fatalf("tenant_domain = %q, want fangcun", got)
-		}
 		if got := GetOrgID(c); got != 0 {
 			t.Fatalf("org_id = %d, want 0 before QS org resolver", got)
 		}
@@ -37,7 +34,7 @@ func TestUserIdentityMiddlewareProjectsClaimsToGinContext(t *testing.T) {
 		if !ok {
 			t.Fatal("expected security principal projection")
 		}
-		if principal.UserID != "42" || principal.TenantDomain != "fangcun" || principal.HasOrgID {
+		if principal.UserID != "42" || principal.HasOrgID {
 			t.Fatalf("principal = %#v, want user 42 domain fangcun without org", principal)
 		}
 		if got := principal.RoleNames(); len(got) != 0 {
@@ -59,7 +56,7 @@ func TestRequireOrgScopeMiddlewareRejectsMissingOrg(t *testing.T) {
 
 	router := gin.New()
 	router.Use(func(c *gin.Context) {
-		c.Set("user_claims", &pkgmiddleware.UserClaims{UserID: "42", TenantDomain: "fangcun"})
+		c.Set("user_claims", &pkgmiddleware.UserClaims{UserID: "42"})
 		c.Next()
 	})
 	router.Use(UserIdentityMiddleware())

@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"strings"
 
-	authnv2 "github.com/FangcunMount/iam/v4/api/grpc/iam/authn/v2"
-	auth "github.com/FangcunMount/iam/v4/pkg/sdk/auth/verifier"
+	authnv3 "github.com/FangcunMount/iam/v5/api/grpc/iam/authn/v3"
+	auth "github.com/FangcunMount/iam/v5/pkg/sdk/auth/verifier"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
@@ -31,7 +31,7 @@ func buildVerifyOptions(forceRemote bool) *auth.VerifyOptions {
 	return &auth.VerifyOptions{
 		ForceRemote:       forceRemote,
 		IncludeMetadata:   true,
-		AllowedTokenTypes: []authnv2.TokenType{authnv2.TokenType_TOKEN_TYPE_ACCESS},
+		AllowedTokenTypes: []authnv3.TokenType{authnv3.TokenType_TOKEN_TYPE_ACCESS},
 	}
 }
 
@@ -195,12 +195,9 @@ func (i *IAMAuthInterceptor) injectUserContext(ctx context.Context, result *auth
 	}
 	claims := result.Claims
 
-	tenantDomain := claims.AuthorizationDomain()
-
 	// 注入用户信息到 context，供后续业务逻辑使用
 	ctx = context.WithValue(ctx, authContextKeyUserID, claims.UserID)
 	ctx = context.WithValue(ctx, authContextKeyAccountID, resolveAccountID(claims))
-	ctx = context.WithValue(ctx, authContextKeyTenantDomain, tenantDomain)
 	ctx = context.WithValue(ctx, authContextKeySessionID, claims.SessionID)
 	ctx = context.WithValue(ctx, authContextKeyTokenID, claims.TokenID)
 
