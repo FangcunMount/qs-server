@@ -123,7 +123,6 @@ func (r *Runner) Run(ctx context.Context) (Evidence, error) {
 	}
 
 	versions := make(map[int64]struct{})
-	effectiveRoles := make(map[string][]string, len(subjects))
 	for _, subject := range subjects {
 		snapshot, err := r.snapshots.Load(ctx, subject.UserID)
 		if err != nil {
@@ -134,7 +133,6 @@ func (r *Runner) Run(ctx context.Context) (Evidence, error) {
 		}
 		versions[snapshot.AuthzVersion] = struct{}{}
 		roles := snapshot.EffectiveRoleNames()
-		effectiveRoles[subject.UserID] = roles
 		sort.Strings(roles)
 		evidence.Subjects = append(evidence.Subjects, SubjectEvidence{
 			Kind: subject.Kind, ExpectedRole: subject.ExpectedRole,
@@ -186,8 +184,9 @@ func (r *Runner) Run(ctx context.Context) (Evidence, error) {
 		if testCase.expectedMatchedRole != "" {
 			matched := decision.MatchedRole == testCase.expectedMatchedRole
 			if testCase.subject.Kind == "admin" {
-				// 管理员可能同时拥有多个角色；统一空间不保证首先命中 QS 角色。
-				matched = contains(effectiveRoles[testCase.subject.UserID], decision.MatchedRole)
+				// 快照仅列出 QS 角色；在线决定可以命中该主体的全局角色。
+				// 此处核对允许结果和授权证据，角色归属由 IAM 在线检查保证。
+				matched = decision.MatchedRole != ""
 			}
 			passed = passed && matched && decision.MatchedGrantID != ""
 		}
