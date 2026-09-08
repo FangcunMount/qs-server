@@ -2,8 +2,8 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "87f29960b14ff2b110ad748ea31257d0fec9f4ea",
-    "verified_on": "2026-09-05"
+    "sha": "fc4136707c7c162fab01236b1dd1eebc897c7885",
+    "verified_on": "2026-09-08"
   },
   "status_policy": {
     "doc_status": [
@@ -2008,8 +2008,8 @@
       "owner": "modelcatalog",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": "f54d96322ebb7003804ae930f2f81ba5785c0ca3",
-        "verified_on": "2026-08-25"
+        "source_sha": "fc4136707c7c162fab01236b1dd1eebc897c7885",
+        "verified_on": "2026-09-08"
       },
       "fact_sources": [
         {
@@ -2035,8 +2035,8 @@
           "path": "internal/apiserver/domain/modelcatalog/**/*.go",
           "selector": "package modelcatalog",
           "result": "matched",
-          "source_sha": "e9f085e308009fbfdeb6d188c1af91e85c19b103",
-          "verified_on": "2026-08-20"
+          "source_sha": "fc4136707c7c162fab01236b1dd1eebc897c7885",
+          "verified_on": "2026-09-08"
         }
       ],
       "production_evidence": {
@@ -2057,13 +2057,6 @@
           "severity": "medium",
           "summary": "Independent-questionnaire admission, replica-set/current-family smoke and production evidence remain conditional.",
           "exit_criteria": "Close the named contract/environment/production gaps, then re-sign affected dimensions."
-        },
-        {
-          "id": "IAM-V4-SOURCE-ANCHOR",
-          "kind": "verification",
-          "severity": "low",
-          "summary": "IAM v4 retirement changes the service identity source or configuration contract. Local tests are recorded in the retirement release checklist; the prior commit-based evidence is historical.",
-          "exit_criteria": "After committing the IAM v4 migration, rerun the listed checks and update the verified source SHA to that commit."
         }
       ]
     },
@@ -2193,8 +2186,8 @@
       "owner": "modelcatalog",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": "f54d96322ebb7003804ae930f2f81ba5785c0ca3",
-        "verified_on": "2026-08-25"
+        "source_sha": "fc4136707c7c162fab01236b1dd1eebc897c7885",
+        "verified_on": "2026-09-08"
       },
       "fact_sources": [
         {
@@ -2220,8 +2213,8 @@
           "path": "internal/apiserver/domain/modelcatalog/**/*.go",
           "selector": "package modelcatalog",
           "result": "matched",
-          "source_sha": "e9f085e308009fbfdeb6d188c1af91e85c19b103",
-          "verified_on": "2026-08-20"
+          "source_sha": "fc4136707c7c162fab01236b1dd1eebc897c7885",
+          "verified_on": "2026-09-08"
         }
       ],
       "production_evidence": {
@@ -2242,13 +2235,6 @@
           "severity": "medium",
           "summary": "Independent-questionnaire admission, replica-set/current-family smoke and production evidence remain conditional.",
           "exit_criteria": "Close the named contract/environment/production gaps, then re-sign affected dimensions."
-        },
-        {
-          "id": "IAM-V4-SOURCE-ANCHOR",
-          "kind": "verification",
-          "severity": "low",
-          "summary": "IAM v4 retirement changes the service identity source or configuration contract. Local tests are recorded in the retirement release checklist; the prior commit-based evidence is historical.",
-          "exit_criteria": "After committing the IAM v4 migration, rerun the listed checks and update the verified source SHA to that commit."
         }
       ]
     },
@@ -2288,8 +2274,8 @@
       "owner": "modelcatalog",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": "f54d96322ebb7003804ae930f2f81ba5785c0ca3",
-        "verified_on": "2026-08-25"
+        "source_sha": "fc4136707c7c162fab01236b1dd1eebc897c7885",
+        "verified_on": "2026-09-08"
       },
       "fact_sources": [
         {
@@ -2315,8 +2301,8 @@
           "path": "internal/apiserver/domain/modelcatalog/**/*.go",
           "selector": "package modelcatalog",
           "result": "matched",
-          "source_sha": "e9f085e308009fbfdeb6d188c1af91e85c19b103",
-          "verified_on": "2026-08-20"
+          "source_sha": "fc4136707c7c162fab01236b1dd1eebc897c7885",
+          "verified_on": "2026-09-08"
         }
       ],
       "production_evidence": {
@@ -2337,13 +2323,6 @@
           "severity": "medium",
           "summary": "Independent-questionnaire admission, replica-set/current-family smoke and production evidence remain conditional.",
           "exit_criteria": "Close the named contract/environment/production gaps, then re-sign affected dimensions."
-        },
-        {
-          "id": "IAM-V4-SOURCE-ANCHOR",
-          "kind": "verification",
-          "severity": "low",
-          "summary": "IAM v4 retirement changes the service identity source or configuration contract. Local tests are recorded in the retirement release checklist; the prior commit-based evidence is historical.",
-          "exit_criteria": "After committing the IAM v4 migration, rerun the listed checks and update the verified source SHA to that commit."
         }
       ]
     },
@@ -2503,8 +2482,8 @@
       "owner": "modelcatalog",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": "f54d96322ebb7003804ae930f2f81ba5785c0ca3",
-        "verified_on": "2026-08-25"
+        "source_sha": "fc4136707c7c162fab01236b1dd1eebc897c7885",
+        "verified_on": "2026-09-08"
       },
       "fact_sources": [
         {
@@ -2530,8 +2509,8 @@
           "path": "internal/apiserver/domain/modelcatalog/**/*.go",
           "selector": "package modelcatalog",
           "result": "matched",
-          "source_sha": "e9f085e308009fbfdeb6d188c1af91e85c19b103",
-          "verified_on": "2026-08-20"
+          "source_sha": "fc4136707c7c162fab01236b1dd1eebc897c7885",
+          "verified_on": "2026-09-08"
         }
       ],
       "production_evidence": {
@@ -2552,13 +2531,6 @@
           "severity": "medium",
           "summary": "Independent-questionnaire admission, replica-set/current-family smoke and production evidence remain conditional.",
           "exit_criteria": "Close the named contract/environment/production gaps, then re-sign affected dimensions."
-        },
-        {
-          "id": "IAM-V4-SOURCE-ANCHOR",
-          "kind": "verification",
-          "severity": "low",
-          "summary": "IAM v4 retirement changes the service identity source or configuration contract. Local tests are recorded in the retirement release checklist; the prior commit-based evidence is historical.",
-          "exit_criteria": "After committing the IAM v4 migration, rerun the listed checks and update the verified source SHA to that commit."
         }
       ]
     },
@@ -2568,8 +2540,8 @@
       "owner": "modelcatalog",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": "f54d96322ebb7003804ae930f2f81ba5785c0ca3",
-        "verified_on": "2026-08-25"
+        "source_sha": "fc4136707c7c162fab01236b1dd1eebc897c7885",
+        "verified_on": "2026-09-08"
       },
       "fact_sources": [
         {
@@ -2595,8 +2567,8 @@
           "path": "internal/apiserver/domain/modelcatalog/**/*.go",
           "selector": "package modelcatalog",
           "result": "matched",
-          "source_sha": "e9f085e308009fbfdeb6d188c1af91e85c19b103",
-          "verified_on": "2026-08-20"
+          "source_sha": "fc4136707c7c162fab01236b1dd1eebc897c7885",
+          "verified_on": "2026-09-08"
         }
       ],
       "production_evidence": {
@@ -2617,13 +2589,6 @@
           "severity": "medium",
           "summary": "Independent-questionnaire admission, replica-set/current-family smoke and production evidence remain conditional.",
           "exit_criteria": "Close the named contract/environment/production gaps, then re-sign affected dimensions."
-        },
-        {
-          "id": "IAM-V4-SOURCE-ANCHOR",
-          "kind": "verification",
-          "severity": "low",
-          "summary": "IAM v4 retirement changes the service identity source or configuration contract. Local tests are recorded in the retirement release checklist; the prior commit-based evidence is historical.",
-          "exit_criteria": "After committing the IAM v4 migration, rerun the listed checks and update the verified source SHA to that commit."
         }
       ]
     },
@@ -5290,8 +5255,8 @@
       "owner": "infra",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": "516fdf37335ed9f7ccf53a5bfdc488e6f8ee3da6",
-        "verified_on": "2026-09-04"
+        "source_sha": "fc4136707c7c162fab01236b1dd1eebc897c7885",
+        "verified_on": "2026-09-08"
       },
       "fact_sources": [
         {
@@ -5324,15 +5289,15 @@
           "kind": "command",
           "command": "go test -count=1 ./internal/pkg/cache/... ./internal/apiserver/cache/... ./internal/collection-server/cache ./internal/pkg/redisruntime/... ./internal/apiserver/application/systemgovernance/... ./internal/apiserver/transport/rest/... ./internal/pkg/signalcatalog ./internal/pkg/configcontract ./internal/pkg/architecture",
           "result": "passed",
-          "source_sha": "516fdf37335ed9f7ccf53a5bfdc488e6f8ee3da6",
-          "verified_on": "2026-09-04"
+          "source_sha": "fc4136707c7c162fab01236b1dd1eebc897c7885",
+          "verified_on": "2026-09-08"
         },
         {
           "kind": "command",
           "command": "go test -race -count=1 ./internal/pkg/cache/...",
           "result": "passed",
-          "source_sha": "516fdf37335ed9f7ccf53a5bfdc488e6f8ee3da6",
-          "verified_on": "2026-09-04"
+          "source_sha": "fc4136707c7c162fab01236b1dd1eebc897c7885",
+          "verified_on": "2026-09-08"
         }
       ],
       "production_evidence": {
@@ -5358,13 +5323,6 @@
           "severity": "high",
           "summary": "Passing repository gates does not constitute current production cache acceptance.",
           "exit_criteria": "Complete exact-SHA deployment, current production probes, threshold review and accountable signoff."
-        },
-        {
-          "id": "IAM-V4-SOURCE-ANCHOR",
-          "kind": "verification",
-          "severity": "low",
-          "summary": "IAM v4 retirement changes the service identity source or configuration contract. Local tests are recorded in the retirement release checklist; the prior commit-based evidence is historical.",
-          "exit_criteria": "After committing the IAM v4 migration, rerun the listed checks and update the verified source SHA to that commit."
         }
       ]
     },
