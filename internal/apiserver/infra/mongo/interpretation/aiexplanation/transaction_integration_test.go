@@ -35,7 +35,8 @@ import (
 func TestAIExplanationParticipantLifecycleIsAtomicOnReplicaSet(t *testing.T) {
 	_, db := mongodbtest.ReplicaSetDatabase(t)
 	fixture := newAIExplanationMongoFixture(t, db)
-	now := time.Date(2026, 8, 27, 13, 0, 0, 0, time.UTC)
+	// Keep this atomicity fixture live; expiration is covered by the TTL monitor test.
+	now := time.Now().UTC().Truncate(time.Millisecond)
 	generation := integrationGeneration(t, now)
 
 	t.Run("request rolls back budget reservation and generation when outbox staging fails", func(t *testing.T) {
