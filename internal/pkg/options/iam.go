@@ -36,7 +36,6 @@ type IAMOptions struct {
 	// Authz v3 快照（与 IAM authorization domain / app_name 对齐）
 	AuthzAppName  string        `json:"authz-app-name" mapstructure:"authz-app-name"`
 	AuthzCacheTTL time.Duration `json:"authz-cache-ttl" mapstructure:"authz-cache-ttl"`
-	// 仅迁移例外：默认留空，使 domain=JWT tenant_id（与 IAM 契约一致）
 
 	// Authz 版本同步订阅配置
 	AuthzSync *IAMAuthzSyncOptions `json:"authz-sync" mapstructure:"authz-sync"`

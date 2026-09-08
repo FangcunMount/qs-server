@@ -69,7 +69,7 @@ func (s *managementService) resolveFillerName(ctx context.Context, result *Answe
 	}
 }
 
-// GetByIDInOrg enforces tenant ownership for protected management reads.
+// GetByIDInOrg enforces business organization ownership for protected management reads.
 // A mismatch is reported as not found so callers cannot probe another org's IDs.
 func (s *managementService) GetByIDInOrg(ctx context.Context, orgID, id uint64) (*AnswerSheetResult, error) {
 	if orgID == 0 {

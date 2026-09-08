@@ -12,7 +12,7 @@ import (
 // requestedOrgID comes from X-Org-Id header or org_id query when present.
 type ResolveFunc func(ctx context.Context, userID uint64, requestedOrgID uint64) (uint64, error)
 
-// DefaultOrgID is the single-tenant fallback used until explicit org selection is wired.
+// DefaultOrgID is the default business organization used until explicit org selection is wired.
 const DefaultOrgID uint64 = 1
 
 // RequestedOrgIDHeader is the preferred HTTP header for org scope override.

@@ -44,7 +44,6 @@ func UserIdentityMiddleware() gin.HandlerFunc {
 	}
 }
 
-// RequireTenantDomainMiddleware requires a non-empty IAM authorization domain claim.
 
 // RequireOrgScopeMiddleware requires a resolvable QS business org_id in request context.
 func RequireOrgScopeMiddleware() gin.HandlerFunc {
@@ -85,7 +84,6 @@ func GetOrgID(c *gin.Context) uint64 {
 	return id
 }
 
-// GetTenantDomain returns the IAM authorization domain from gin.Context.
 
 // GetPrincipal returns the Security Control Plane principal projection.
 func GetPrincipal(c *gin.Context) (securityplane.Principal, bool) {

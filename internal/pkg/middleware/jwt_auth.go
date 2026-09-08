@@ -23,7 +23,6 @@ type UserClaimsContextKey struct{}
 type UserClaims struct {
 	UserID    string
 	AccountID string
-	// IAM 授权域（JWT tenant_id，如 fangcun / platform）
 	OrgID     string // IAM 业务组织 ID（JWT org_id 透传）
 	SessionID string
 	TokenID   string
@@ -182,9 +181,8 @@ func GetUserID(c *gin.Context) string {
 	return ""
 }
 
-// resolveTenantDomain 优先使用 SDK 授权域，缺失时从 Extra 的 tenant_id 兼容。
 
-// resolveOrgIDClaim 读取 JWT org_id；不从 tenant_id / org_id 混用 Extra 中的 tenant 键。
+// resolveOrgIDClaim 读取 JWT 中明确的业务组织声明。
 func resolveOrgIDClaim(tokenClaims *auth.TokenClaims) string {
 	if tokenClaims == nil {
 		return ""
@@ -205,7 +203,7 @@ func resolveOrgIDClaim(tokenClaims *auth.TokenClaims) string {
 	return ""
 }
 
-// logJWTClaimMapping 在 tenant/user 映射后仍为空时打 Debug（只记录 Extra 的键名，不记录值）。
+// logJWTClaimMapping 在用户标识映射为空时记录调试信息，不记录声明值。
 func logJWTClaimMapping(c *gin.Context, raw *auth.TokenClaims, mapped *UserClaims) {
 	if mapped == nil {
 		logger.L(c.Request.Context()).Debugw("jwt claims mapped is nil", "path", c.Request.URL.Path, "method", c.Request.Method)
