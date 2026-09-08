@@ -37,12 +37,12 @@ func TestCollectionMTLSWithoutServiceToken(t *testing.T) {
 	cfg := &servergrpc.Config{TLSCertFile: serverPair.CertFile, TLSKeyFile: serverPair.KeyFile, MTLS: servergrpc.MTLSConfig{Enabled: true, CAFile: ca.CAFile, RequireClientCert: true}, ACL: servergrpc.ACLConfig{Enabled: true, ConfigFile: "../../../configs/grpc-acl.prod.yaml", DefaultPolicy: "deny"}}
 	srv, err := servergrpc.NewServer(cfg, nil)
 	require.NoError(t, err)
-	t.Cleanup(srv.Server.Stop)
+	t.Cleanup(srv.Stop)
 	pb.RegisterQuestionnaireServiceServer(srv.Server, &certificateQuestionnaireServer{})
 	lis, err := net.Listen("tcp", "127.0.0.1:0")
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = lis.Close() })
-	go func() { _ = srv.Server.Serve(lis) }()
+	go func() { _ = srv.Serve(lis) }()
 	valid := ca.Issue(t, "qs-collection-server.svc", false)
 	manager, err := collection.NewManager(&collection.ManagerConfig{Endpoint: lis.Addr().String(), Timeout: time.Second, InflightSemaphore: admission.NewChannelSemaphore(2), TLSCertFile: valid.CertFile, TLSKeyFile: valid.KeyFile, TLSCAFile: ca.CAFile, TLSServerName: "server.test"})
 	require.NoError(t, err)
@@ -64,7 +64,7 @@ func TestCollectionMTLSWithoutServiceToken(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			conn, err := grpc.NewClient(lis.Addr().String(), grpc.WithTransportCredentials(credentials.NewTLS(ca.Client(tt.pair))))
 			require.NoError(t, err)
-			defer conn.Close()
+			defer func() { _ = conn.Close() }()
 			ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 			defer cancel()
 			ctx = metadata.AppendToOutgoingContext(ctx, "authorization", "Bearer forged-admin-token")

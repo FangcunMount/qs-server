@@ -80,12 +80,12 @@ func TestRequiredRuntimesUseCertificateAndRealRPCWithoutBearer(t *testing.T) {
 			if name == "qs-collection-server.svc" {
 				m, err := collection.NewIAMModule(ctx, opts)
 				require.NoError(t, err)
-				defer m.Close()
+				defer func() { _ = m.Close() }()
 				require.NoError(t, m.ValidateRequiredRuntime(ctx))
 			} else {
 				m, err := module.NewWithRuntimeOptions(ctx, opts, module.RuntimeOptions{})
 				require.NoError(t, err)
-				defer m.Close()
+				defer func() { _ = m.Close() }()
 				err = m.ValidateRequiredAuthzRuntime(ctx)
 				if name == "unknown.svc" {
 					require.Error(t, err)
