@@ -223,6 +223,7 @@ jobs:
       contents: read
     if: |
       always() &&
+      vars.PRODUCTION_DEPLOY_PAUSED != 'true' &&
       needs.docker.result == 'success' &&
       needs.plan.outputs.apiserver == 'true'
     env:
@@ -345,6 +346,7 @@ jobs:
       contents: read
     if: |
       always() &&
+      vars.PRODUCTION_DEPLOY_PAUSED != 'true' &&
       needs.docker.result == 'success' &&
       (needs.plan.outputs.apiserver != 'true' || needs.deploy-apiserver.result == 'success') &&
       needs.plan.outputs.collection == 'true'
@@ -452,6 +454,7 @@ jobs:
       contents: read
     if: |
       always() &&
+      vars.PRODUCTION_DEPLOY_PAUSED != 'true' &&
       needs.docker.result == 'success' &&
       (needs.plan.outputs.apiserver != 'true' || needs.deploy-apiserver.result == 'success') &&
       needs.plan.outputs.worker == 'true'
@@ -674,6 +677,10 @@ jobs:
     steps:
       - name: Log deployment status
         run: |
+          if [ "${{ vars.PRODUCTION_DEPLOY_PAUSED }}" = "true" ]; then
+            echo "Production deployment is paused for a coordinated release; inspect image build results separately."
+            exit 0
+          fi
           echo "=========================================="
           echo "Deployment Summary"
           echo "=========================================="
