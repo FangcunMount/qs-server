@@ -2,6 +2,7 @@ package testee
 
 import (
 	"context"
+	appauthz "github.com/FangcunMount/qs-server/internal/apiserver/application/authz"
 
 	"github.com/FangcunMount/component-base/pkg/errors"
 	actorreadmodel "github.com/FangcunMount/qs-server/internal/apiserver/port/actorreadmodel"
@@ -13,10 +14,18 @@ import (
 type queryService struct {
 	reader        actorreadmodel.TesteeReader
 	summaryReader actorreadmodel.AssessmentSummaryReader
+	selfService   bool
 }
 
 func NewQueryServiceWithAssessmentSummary(reader actorreadmodel.TesteeReader, summaryReader actorreadmodel.AssessmentSummaryReader) TesteeQueryService {
 	return &queryService{reader: reader, summaryReader: summaryReader}
+}
+
+// NewSelfServiceQueryServiceWithAssessmentSummary is reserved for the collection
+// BFF's mTLS-restricted Actor RPC surface. Its existing guardian/profile access
+// rules remain authoritative; backend transports must use the normal constructor.
+func NewSelfServiceQueryServiceWithAssessmentSummary(reader actorreadmodel.TesteeReader, summaryReader actorreadmodel.AssessmentSummaryReader) TesteeQueryService {
+	return &queryService{reader: reader, summaryReader: summaryReader, selfService: true}
 }
 
 // GetByID 根据ID查询受试者
@@ -159,6 +168,16 @@ func (s *queryService) enrichAssessmentSummaryRows(ctx context.Context, rows []a
 }
 
 func (s *queryService) enrichAssessmentSummaries(ctx context.Context, rows []*actorreadmodel.TesteeRow) error {
+	if err := appauthz.RequireResultPermission(ctx, appauthz.AssessmentResource, "read"); err != nil && !s.selfService {
+		for _, row := range rows {
+			if row != nil {
+				row.LastRiskLevel = ""
+				row.TotalAssessments = 0
+				row.LastAssessmentAt = nil
+			}
+		}
+		return nil
+	}
 	if s.summaryReader == nil || len(rows) == 0 {
 		return nil
 	}

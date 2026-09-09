@@ -35,6 +35,8 @@ tags:
   description: 测评评估
 - name: Evaluation-Assessment-Outcome
   description: Evaluation-Assessment-Outcome
+- name: Evaluation-Progress
+  description: Evaluation-Progress
 - name: Evaluation-Report
   description: 测评报告
 - name: Evaluation-Report-Outcome
@@ -3044,6 +3046,115 @@ paths:
                 $ref: '#/components/schemas/core.ErrResponse'
         '403':
           description: 无权访问该资源
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '500':
+          description: 服务内部错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+  /api/v1/evaluations/assessment-progress:
+    get:
+      tags:
+      - Evaluation-Progress
+      summary: 查询测评进度列表
+      operationId: 查询测评进度列表
+      description: 查询测评进度列表
+      parameters:
+      - type: integer
+        description: 页码
+        name: page
+        in: query
+      - type: integer
+        description: 每页数量
+        name: page_size
+        in: query
+      - type: string
+        description: 受试者ID
+        name: testee_id
+        in: query
+      - type: string
+        description: 流程状态
+        name: status
+        in: query
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/core.Response'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/operator.ProgressList'
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '429':
+          description: Too Many Requests
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '401':
+          description: 认证失败或访问令牌无效
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '500':
+          description: 服务内部错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+  /api/v1/evaluations/assessment-progress/{id}:
+    get:
+      tags:
+      - Evaluation-Progress
+      summary: 查询测评进度
+      operationId: 查询测评进度
+      description: 查询测评进度
+      parameters:
+      - type: string
+        description: 测评ID
+        name: id
+        in: path
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/core.Response'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/operator.Progress'
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '429':
+          description: Too Many Requests
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '401':
+          description: 认证失败或访问令牌无效
           content:
             application/json:
               schema:
@@ -12930,6 +13041,46 @@ components:
           type: integer
         traceID:
           type: string
+    operator.Progress:
+      type: object
+      properties:
+        evaluated_at:
+          type: string
+        failed_at:
+          type: string
+        id:
+          type: string
+          example: '0'
+        origin_id:
+          type: string
+        origin_type:
+          type: string
+        questionnaire_code:
+          type: string
+        questionnaire_version:
+          type: string
+        status:
+          type: string
+        submitted_at:
+          type: string
+        testee_id:
+          type: string
+          example: '0'
+    operator.ProgressList:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/operator.Progress'
+        page:
+          type: integer
+        page_size:
+          type: integer
+        total:
+          type: integer
+        total_pages:
+          type: integer
     output.InsightKind:
       type: string
       enum:

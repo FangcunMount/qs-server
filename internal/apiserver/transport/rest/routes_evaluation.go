@@ -27,6 +27,8 @@ func (r *Router) registerEvaluationProtectedRoutes(apiV1 *gin.RouterGroup) {
 	apiV1.GET("/assessments/:id/wait-report", r.rateLimitedHandlers(rateLimitBudgetWaitReport, journeyHandler.WaitReport)...)
 
 	evaluations := apiV1.Group("/evaluations")
+	evaluations.GET("/assessment-progress", withPermission(authzapp.AssessmentResource, "list_progress", r.rateLimitedHandlers(rateLimitBudgetQuery, evalHandler.ListAssessmentProgress)...)...)
+	evaluations.GET("/assessment-progress/:id", withPermission(authzapp.AssessmentResource, "read_progress", r.rateLimitedHandlers(rateLimitBudgetQuery, evalHandler.GetAssessmentProgress)...)...)
 	{
 		assessments := evaluations.Group("/assessments")
 		{

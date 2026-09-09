@@ -2917,6 +2917,46 @@ definitions:
       traceID:
         type: string
     type: object
+  operator.Progress:
+    properties:
+      evaluated_at:
+        type: string
+      failed_at:
+        type: string
+      id:
+        example: "0"
+        type: string
+      origin_id:
+        type: string
+      origin_type:
+        type: string
+      questionnaire_code:
+        type: string
+      questionnaire_version:
+        type: string
+      status:
+        type: string
+      submitted_at:
+        type: string
+      testee_id:
+        example: "0"
+        type: string
+    type: object
+  operator.ProgressList:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/operator.Progress'
+        type: array
+      page:
+        type: integer
+      page_size:
+        type: integer
+      total:
+        type: integer
+      total_pages:
+        type: integer
+    type: object
   output.InsightKind:
     enum:
     - reinforcing_pattern
@@ -8910,6 +8950,79 @@ paths:
       summary: 申请唯一 code
       tags:
       - 系统
+  /api/v1/evaluations/assessment-progress:
+    get:
+      parameters:
+      - description: 页码
+        in: query
+        name: page
+        type: integer
+      - description: 每页数量
+        in: query
+        name: page_size
+        type: integer
+      - description: 受试者ID
+        in: query
+        name: testee_id
+        type: string
+      - description: 流程状态
+        in: query
+        name: status
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/operator.ProgressList'
+              type: object
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "429":
+          description: Too Many Requests
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+      summary: 查询测评进度列表
+      tags:
+      - Evaluation-Progress
+  /api/v1/evaluations/assessment-progress/{id}:
+    get:
+      parameters:
+      - description: 测评ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/operator.Progress'
+              type: object
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "429":
+          description: Too Many Requests
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+      summary: 查询测评进度
+      tags:
+      - Evaluation-Progress
   /api/v1/evaluations/assessments:
     get:
       description: 分页查询测评列表

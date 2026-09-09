@@ -2,6 +2,7 @@ package workbench
 
 import (
 	"context"
+	appauthz "github.com/FangcunMount/qs-server/internal/apiserver/application/authz"
 	"strings"
 	"time"
 
@@ -75,6 +76,9 @@ func NewService(
 }
 
 func (s *service) GetSummary(ctx context.Context, scope Scope) (*SummaryResult, error) {
+	if err := appauthz.RequireResultPermission(ctx, appauthz.AssessmentResource, "read"); err != nil {
+		return nil, err
+	}
 	if err := s.ensureConfigured(); err != nil {
 		return nil, err
 	}
@@ -113,6 +117,9 @@ func (s *service) GetSummary(ctx context.Context, scope Scope) (*SummaryResult, 
 }
 
 func (s *service) ListQueue(ctx context.Context, dto ListQueueDTO) (*QueuePage, error) {
+	if err := appauthz.RequireResultPermission(ctx, appauthz.AssessmentResource, "read"); err != nil {
+		return nil, err
+	}
 	if err := s.ensureConfigured(); err != nil {
 		return nil, err
 	}

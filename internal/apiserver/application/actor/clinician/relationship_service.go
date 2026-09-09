@@ -2,6 +2,7 @@ package clinician
 
 import (
 	"context"
+	appauthz "github.com/FangcunMount/qs-server/internal/apiserver/application/authz"
 	"time"
 
 	"github.com/FangcunMount/component-base/pkg/errors"
@@ -350,6 +351,14 @@ func (s *relationshipService) ListClinicianRelations(ctx context.Context, dto Li
 }
 
 func (s *relationshipService) enrichAssignedRows(ctx context.Context, orgID int64, rows []actorreadmodel.TesteeRow) error {
+	if err := appauthz.RequireResultPermission(ctx, appauthz.AssessmentResource, "read"); err != nil {
+		for i := range rows {
+			rows[i].LastRiskLevel = ""
+			rows[i].TotalAssessments = 0
+			rows[i].LastAssessmentAt = nil
+		}
+		return nil
+	}
 	if s.summaryReader == nil || len(rows) == 0 {
 		return nil
 	}

@@ -2,6 +2,7 @@ package answersheet
 
 import (
 	"context"
+	appauthz "github.com/FangcunMount/qs-server/internal/apiserver/application/authz"
 
 	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/answersheet"
@@ -72,6 +73,9 @@ func (s *managementService) resolveFillerName(ctx context.Context, result *Answe
 // GetByIDInOrg enforces business organization ownership for protected management reads.
 // A mismatch is reported as not found so callers cannot probe another org's IDs.
 func (s *managementService) GetByIDInOrg(ctx context.Context, orgID, id uint64) (*AnswerSheetResult, error) {
+	if err := appauthz.RequireResultPermission(ctx, appauthz.AnswerSheetResource, "read"); err != nil {
+		return nil, err
+	}
 	if orgID == 0 {
 		return nil, errors.WithCode(errorCode.ErrPermissionDenied, "机构范围不能为空")
 	}
@@ -87,6 +91,9 @@ func (s *managementService) GetByIDInOrg(ctx context.Context, orgID, id uint64) 
 
 // List 查询答卷列表
 func (s *managementService) List(ctx context.Context, dto ListAnswerSheetsDTO) (*AnswerSheetSummaryListResult, error) {
+	if err := appauthz.RequireResultPermission(ctx, appauthz.AnswerSheetResource, "list"); err != nil {
+		return nil, err
+	}
 	if err := validateManagementListDTO(dto); err != nil {
 		return nil, err
 	}

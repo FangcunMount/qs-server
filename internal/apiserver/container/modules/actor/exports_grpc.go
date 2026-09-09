@@ -1,6 +1,9 @@
 package actor
 
-import grpctransport "github.com/FangcunMount/qs-server/internal/apiserver/transport/grpc"
+import (
+	testeeApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/testee"
+	grpctransport "github.com/FangcunMount/qs-server/internal/apiserver/transport/grpc"
+)
 
 // ExportGRPCDeps exposes actor capabilities to gRPC transport.
 func (m *Module) ExportGRPCDeps() grpctransport.ActorDeps {
@@ -10,7 +13,7 @@ func (m *Module) ExportGRPCDeps() grpctransport.ActorDeps {
 	}
 	deps.TesteeRegistrationService = m.TesteeRegistrationService
 	deps.TesteeManagementService = m.TesteeManagementService
-	deps.TesteeQueryService = m.TesteeQueryService
+	deps.TesteeQueryService = testeeApp.NewSelfServiceQueryServiceWithAssessmentSummary(m.ReadModel, m.AssessmentSummaryReader)
 	deps.ClinicianRelationshipService = m.ClinicianRelationshipService
 	deps.TesteeAssessmentAttentionService = m.TesteeAssessmentAttentionService
 	deps.OperatorLifecycleService = m.OperatorLifecycleService

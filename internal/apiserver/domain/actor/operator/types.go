@@ -17,6 +17,10 @@ func (r Role) String() string {
 
 // 新增的 QS 角色标识（与权限中心保持一致）
 const (
+	// RoleAssessmentOperator 组织测评与过程处理，不包含专业结果访问。
+	RoleAssessmentOperator Role = "qs:assessment_operator"
+	// RoleResultReviewer 查看与分析授权范围内的专业结果。
+	RoleResultReviewer Role = "qs:result_reviewer"
 	// RoleQSAdmin 管理员：所有 QS 资源的所有操作
 	RoleQSAdmin Role = "qs:admin"
 	// RoleContentManager 内容管理员：问卷和量表的完整管理

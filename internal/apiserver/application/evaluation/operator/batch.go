@@ -3,6 +3,7 @@ package operator
 
 import (
 	"context"
+	appauthz "github.com/FangcunMount/qs-server/internal/apiserver/application/authz"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/apperrors"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
@@ -40,6 +41,9 @@ func NewBatchExecutionService(assessments assessment.Repository, engine Executio
 }
 
 func (s *service) EvaluateBatch(ctx context.Context, actor Actor, assessmentIDs []uint64) (*BatchResult, error) {
+	if err := appauthz.RequireResultPermission(ctx, appauthz.AssessmentResource, "batch_evaluate"); err != nil {
+		return nil, err
+	}
 	if err := s.authorizer.validateActor(actor); err != nil {
 		return nil, err
 	}
