@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	appauthz "github.com/FangcunMount/qs-server/internal/apiserver/application/authz"
 	"strings"
 	"time"
 
@@ -294,6 +295,9 @@ func queryBounds(value DateRange) (time.Time, time.Time) {
 }
 
 func (s *ReadService) Overview(ctx context.Context, orgID int64, filter QueryFilter) (*Overview, error) {
+	if err := appauthz.RequireResultPermission(ctx, appauthz.AssessmentResource, "statistics"); err != nil {
+		return nil, err
+	}
 	r, freshness, permit, err := s.resolve(ctx, orgID, filter)
 	if err != nil {
 		return nil, err
@@ -401,6 +405,9 @@ func normalizePage(page, size int) (int, int) {
 }
 
 func (s *ReadService) Clinicians(ctx context.Context, orgID int64, clinicianID *uint64, operatorUserID *int64, filter QueryFilter, page, size int) (*Page[ClinicianItem], error) {
+	if err := appauthz.RequireResultPermission(ctx, appauthz.AssessmentResource, "statistics"); err != nil {
+		return nil, err
+	}
 	r, freshness, permit, err := s.resolve(ctx, orgID, filter)
 	if err != nil {
 		return nil, err
@@ -431,6 +438,9 @@ func (s *ReadService) Clinicians(ctx context.Context, orgID int64, clinicianID *
 }
 
 func (s *ReadService) Entries(ctx context.Context, orgID int64, entryID, clinicianID *uint64, active *bool, filter QueryFilter, page, size int) (*Page[EntryItem], error) {
+	if err := appauthz.RequireResultPermission(ctx, appauthz.AssessmentResource, "statistics"); err != nil {
+		return nil, err
+	}
 	r, freshness, permit, err := s.resolve(ctx, orgID, filter)
 	if err != nil {
 		return nil, err
@@ -465,6 +475,9 @@ func (s *ReadService) CurrentClinicianID(ctx context.Context, orgID, userID int6
 }
 
 func (s *ReadService) CurrentClinicianTesteeSummary(ctx context.Context, orgID, userID int64, filter QueryFilter) (*TesteeSummary, error) {
+	if err := appauthz.RequireResultPermission(ctx, appauthz.AssessmentResource, "statistics"); err != nil {
+		return nil, err
+	}
 	r, freshness, permit, err := s.resolve(ctx, orgID, filter)
 	if err != nil {
 		return nil, err

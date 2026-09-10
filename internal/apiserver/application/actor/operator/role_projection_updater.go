@@ -74,7 +74,7 @@ func persistOperatorRoleProjection(ctx context.Context, repo domain.Repository, 
 		return nil
 	}
 	direct := normalizedProjectedRoles(projection.DirectRoles)
-	effective := normalizedProjectedRoles(projection.EffectiveRoles)
+	effective := normalizedProjectedRoles(projection.DirectRoles)
 	if operatorRolesEqual(op.Roles(), direct) && operatorRolesEqual(op.EffectiveRoles(), effective) &&
 		op.AuthzPolicyVersion() == projection.PolicyVersion && op.AuthzProjectionPending() == pending {
 		return nil

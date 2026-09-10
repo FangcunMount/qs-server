@@ -2,6 +2,7 @@ package handler
 
 import (
 	"context"
+	appauthz "github.com/FangcunMount/qs-server/internal/apiserver/application/authz"
 	"strconv"
 	"time"
 
@@ -359,7 +360,7 @@ func (h *AssessmentReportJourneyHandler) ListReports(c *gin.Context) {
 
 // BatchEvaluate 批量评估
 // @Summary 批量评估
-// @Description 批量执行测评评估；仅 qs:evaluator 或 qs:admin 可访问
+// @Description 批量执行测评评估；需要 assessments batch_evaluate 权限
 // @Tags Evaluation-Admin
 // @Accept json
 // @Produce json
@@ -432,6 +433,12 @@ func (h *EvaluationOperatorHandler) RetryFailed(c *gin.Context) {
 	})
 	if err != nil {
 		h.Error(c, err)
+		return
+	}
+	if appauthz.RequireResultPermission(ctx, appauthz.AssessmentResource, "read") != nil {
+		// Retry authorization has succeeded. Do not fetch professional results for
+		// an operator who only has execution/progress permissions.
+		h.Success(c, gin.H{"id": strconv.FormatUint(id, 10), "accepted": true})
 		return
 	}
 	result, err := h.protectedQueryService.GetAssessment(ctx, evaluationoperator.Actor{OrgID: orgID, OperatorUserID: operatorUserID}, id)

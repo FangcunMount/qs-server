@@ -17,7 +17,7 @@ func TestRunnerExecutesProductionRoleOriginMatrix(t *testing.T) {
 	runner := NewRunner(
 		staticSubjects(subjects),
 		staticSnapshots{
-			"101": {RoleAdmin}, "102": {RoleEvaluator}, "103": {RolePlanManager}, "104": {RoleStaff},
+			"101": {RoleAdmin}, "102": {RoleAssessmentOperator}, "103": {RolePlanManager}, "104": {RoleResultReviewer},
 		},
 		matrixChecker{},
 		"0123456789abcdef",
@@ -57,10 +57,10 @@ func TestRunnerFailsClosedOnMatrixMismatch(t *testing.T) {
 	t.Parallel()
 
 	checker := matrixChecker{override: map[string]appauthz.ObjectDecision{
-		"user:102/retry/plan": {Allowed: true, MatchedRole: RoleEvaluator, PolicyVersion: 42},
+		"user:102/retry/plan": {Allowed: true, MatchedRole: RoleAssessmentOperator, PolicyVersion: 42},
 	}}
 	runner := NewRunner(staticSubjects(testSubjects()), staticSnapshots{
-		"101": {RoleAdmin}, "102": {RoleEvaluator}, "103": {RolePlanManager}, "104": {RoleStaff},
+		"101": {RoleAdmin}, "102": {RoleAssessmentOperator}, "103": {RolePlanManager}, "104": {RoleResultReviewer},
 	}, checker, "commit", "qs-apiserver.svc")
 
 	evidence, err := runner.Run(context.Background())
@@ -76,7 +76,7 @@ func TestRunnerRejectsConflictingResolvedRole(t *testing.T) {
 	t.Parallel()
 
 	runner := NewRunner(staticSubjects(testSubjects()), staticSnapshots{
-		"101": {RoleAdmin}, "102": {RoleEvaluator, RoleAdmin}, "103": {RolePlanManager}, "104": {RoleStaff},
+		"101": {RoleAdmin}, "102": {RoleAssessmentOperator, RoleAdmin}, "103": {RolePlanManager}, "104": {RoleResultReviewer},
 	}, matrixChecker{}, "commit", "qs-apiserver.svc")
 
 	_, err := runner.Run(context.Background())
@@ -96,9 +96,9 @@ func TestRunnerRequiresTrustedServiceIdentity(t *testing.T) {
 func testSubjects() []Subject {
 	return []Subject{
 		{Kind: "admin", ExpectedRole: RoleAdmin, UserID: "101"},
-		{Kind: "evaluator", ExpectedRole: RoleEvaluator, UserID: "102"},
+		{Kind: "operator", ExpectedRole: RoleAssessmentOperator, UserID: "102"},
 		{Kind: "plan_manager", ExpectedRole: RolePlanManager, UserID: "103"},
-		{Kind: "other", ExpectedRole: RoleStaff, UserID: "104"},
+		{Kind: "other", ExpectedRole: RoleResultReviewer, UserID: "104"},
 	}
 }
 
@@ -132,22 +132,22 @@ func (c matrixChecker) CheckObject(_ context.Context, request appauthz.ObjectChe
 	if decision, ok := c.override[request.Subject+"/"+request.Action+"/"+origin]; ok {
 		return decision, nil
 	}
-	role := map[string]string{"user:101": RoleAdmin, "user:102": RoleEvaluator, "user:103": RolePlanManager, "user:104": RoleStaff}[request.Subject]
+	role := map[string]string{"user:101": RoleAdmin, "user:102": RoleAssessmentOperator, "user:103": RolePlanManager, "user:104": RoleResultReviewer}[request.Subject]
 	decision := appauthz.ObjectDecision{PolicyVersion: 42}
 	switch {
 	case role == RoleAdmin:
 		decision.Allowed = true
 		decision.MatchedRole = RoleAdmin
 		decision.MatchedGrantID = "grant-admin"
-	case request.Action == RetryAction && role == RoleEvaluator && origin == "adhoc":
+	case request.Action == RetryAction && role == RoleAssessmentOperator && origin == "adhoc":
 		decision.Allowed = true
-		decision.MatchedRole = RoleEvaluator
-		decision.MatchedGrantID = "grant-evaluator"
+		decision.MatchedRole = RoleAssessmentOperator
+		decision.MatchedGrantID = "grant-operator"
 	case request.Action == RetryAction && role == RolePlanManager && origin == "plan":
 		decision.Allowed = true
 		decision.MatchedRole = RolePlanManager
 		decision.MatchedGrantID = "grant-plan-manager"
-	case request.Action == RetryAction && origin == "missing" && (role == RoleEvaluator || role == RolePlanManager):
+	case request.Action == RetryAction && origin == "missing" && (role == RoleAssessmentOperator || role == RolePlanManager):
 		decision.DenyCode = "attribute_missing"
 		decision.MissingAttributeKeys = []string{appauthz.ObjectOriginTypeAttribute}
 	default:
@@ -171,7 +171,7 @@ func TestRunnerChecksAdministratorGlobalMatchEvidence(t *testing.T) {
 				"user:101/retry/adhoc": {Allowed: true, MatchedRole: tc.matchedRole, MatchedGrantID: tc.grantID, PolicyVersion: 42},
 			}}
 			runner := NewRunner(staticSubjects(testSubjects()), staticSnapshots{
-				"101": {RoleAdmin}, "102": {RoleEvaluator}, "103": {RolePlanManager}, "104": {RoleStaff},
+				"101": {RoleAdmin}, "102": {RoleAssessmentOperator}, "103": {RolePlanManager}, "104": {RoleResultReviewer},
 			}, checker, "commit", "qs-apiserver.svc")
 			evidence, err := runner.Run(context.Background())
 			if (err == nil && evidence.Passed) != tc.wantPass {

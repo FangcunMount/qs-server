@@ -4,6 +4,7 @@ package clinician
 
 import (
 	"context"
+	appauthz "github.com/FangcunMount/qs-server/internal/apiserver/application/authz"
 
 	cberrors "github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/queryerror"
@@ -43,6 +44,9 @@ func NewService(reader interpretationreadmodel.ReportReader, access Access, proj
 	return &service{reader: reader, access: access, projection: mapper}
 }
 func (s *service) GetParticipantReport(ctx context.Context, actor Actor, q GetQuery) (*Report, error) {
+	if err := appauthz.RequireResultPermission(ctx, "qs:evaluation:collection:reports", "read"); err != nil {
+		return nil, err
+	}
 	if actor.OrgID == 0 || actor.OperatorUserID == 0 || q.TesteeID == 0 || q.AssessmentID == 0 {
 		return nil, cberrors.WithCode(code.ErrInvalidArgument, "clinician identity, testee ID and assessment ID are required")
 	}
@@ -59,6 +63,9 @@ func (s *service) GetParticipantReport(ctx context.Context, actor Actor, q GetQu
 	return s.projection.FromRow(ctx, *row, policy.AudienceClinician)
 }
 func (s *service) ListParticipantReports(ctx context.Context, actor Actor, q ListQuery) (*ListResult, error) {
+	if err := appauthz.RequireResultPermission(ctx, "qs:evaluation:collection:reports", "list"); err != nil {
+		return nil, err
+	}
 	if actor.OrgID == 0 || actor.OperatorUserID == 0 || q.TesteeID == 0 {
 		return nil, cberrors.WithCode(code.ErrInvalidArgument, "clinician identity and testee ID are required")
 	}

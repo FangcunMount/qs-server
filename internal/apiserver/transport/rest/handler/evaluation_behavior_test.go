@@ -3,8 +3,10 @@ package handler
 import (
 	"context"
 	"encoding/json"
+	appauthz "github.com/FangcunMount/qs-server/internal/apiserver/application/authz"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -271,3 +273,19 @@ func TestEvaluationHandlerWaitReportReturnsPendingWhenClientContextCanceled(t *t
 }
 
 var _ evaluationoperator.QueryService = (*operatorQueryStub)(nil)
+
+func TestProgressOnlyRetryReturnsAcceptanceWithoutResultQuery(t *testing.T) {
+	t.Setenv("QS_AUTHZ_ROLE_MODEL", appauthz.IndependentRoleModel)
+	query := &operatorQueryStub{result: &evaluationoperator.Assessment{ID: 301}}
+	actions := &governanceActionRunnerStub{}
+	h := NewEvaluationOperatorHandler(nil, query, actions)
+	c, rec := protectedContext(http.MethodPost, "/api/v1/evaluations/assessments/301/retry")
+	c.Params = gin.Params{{Key: "id", Value: "301"}}
+	h.RetryFailed(c)
+	if rec.Code != http.StatusOK || actions.calls != 1 || query.lastID != 0 {
+		t.Fatalf("status=%d actions=%d queried=%d", rec.Code, actions.calls, query.lastID)
+	}
+	if !strings.Contains(rec.Body.String(), `"accepted":true`) {
+		t.Fatal(rec.Body.String())
+	}
+}

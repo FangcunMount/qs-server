@@ -14,8 +14,8 @@ func TestReplaceRolesUsesDirectRolesAndPersistsEffectiveProjection(t *testing.T)
 	op := domain.NewOperator(1, 10001, "operator")
 	op.SetID(20001)
 	op.ReplaceRolesProjection(
-		[]domain.Role{domain.RoleEvaluatorQS},
-		[]domain.Role{domain.RoleEvaluatorQS, domain.RoleOperator},
+		[]domain.Role{domain.RoleResultReviewer},
+		[]domain.Role{domain.RoleResultReviewer, domain.RoleAssessmentOperator},
 		10, nil, false,
 	)
 	if err := repo.Save(context.Background(), op); err != nil {
@@ -25,7 +25,7 @@ func TestReplaceRolesUsesDirectRolesAndPersistsEffectiveProjection(t *testing.T)
 		committedVersion: 12,
 		projection: iambridge.OperatorRoleProjection{
 			DirectRoles:    []string{string(domain.RoleEvaluationPlanManager)},
-			EffectiveRoles: []string{string(domain.RoleEvaluationPlanManager), string(domain.RoleOperator)},
+			EffectiveRoles: []string{string(domain.RoleEvaluationPlanManager), string(domain.RoleAssessmentOperator)},
 			PolicyVersion:  12,
 		},
 	}
@@ -40,7 +40,7 @@ func TestReplaceRolesUsesDirectRolesAndPersistsEffectiveProjection(t *testing.T)
 	if !reflect.DeepEqual(op.Roles(), []domain.Role{domain.RoleEvaluationPlanManager}) {
 		t.Fatalf("direct roles = %v", op.Roles())
 	}
-	if !reflect.DeepEqual(op.EffectiveRoles(), []domain.Role{domain.RoleEvaluationPlanManager, domain.RoleOperator}) {
+	if !reflect.DeepEqual(op.EffectiveRoles(), []domain.Role{domain.RoleEvaluationPlanManager}) {
 		t.Fatalf("effective roles = %v", op.EffectiveRoles())
 	}
 	if op.AuthzPolicyVersion() != 12 || op.AuthzProjectionPending() {
@@ -52,7 +52,7 @@ func TestReplaceRolesReturnsSuccessAndMarksPendingWhenSnapshotLags(t *testing.T)
 	repo := newFakeOperatorRepo()
 	op := domain.NewOperator(1, 10001, "operator")
 	op.SetID(20001)
-	op.ReplaceRolesProjection([]domain.Role{domain.RoleEvaluatorQS}, []domain.Role{domain.RoleEvaluatorQS, domain.RoleOperator}, 10, nil, false)
+	op.ReplaceRolesProjection([]domain.Role{domain.RoleResultReviewer}, []domain.Role{domain.RoleResultReviewer, domain.RoleAssessmentOperator}, 10, nil, false)
 	if err := repo.Save(context.Background(), op); err != nil {
 		t.Fatal(err)
 	}
@@ -68,7 +68,7 @@ func TestReplaceRolesReturnsSuccessAndMarksPendingWhenSnapshotLags(t *testing.T)
 	if !op.AuthzProjectionPending() || op.AuthzPolicyVersion() != 10 {
 		t.Fatalf("projection version/pending = %d/%v, want 10/true", op.AuthzPolicyVersion(), op.AuthzProjectionPending())
 	}
-	if !reflect.DeepEqual(op.Roles(), []domain.Role{domain.RoleEvaluatorQS}) {
+	if !reflect.DeepEqual(op.Roles(), []domain.Role{domain.RoleResultReviewer}) {
 		t.Fatalf("lagging snapshot overwrote direct role evidence: %v", op.Roles())
 	}
 }

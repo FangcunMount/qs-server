@@ -21,9 +21,9 @@ func TestSQLSubjectSourceUsesReadOnlyDeterministicQueries(t *testing.T) {
 
 	mock.ExpectBegin()
 	expectSubjectQuery(mock, "admin", []string{RoleAdmin}, "101")
-	expectSubjectQuery(mock, "evaluator", []string{RoleEvaluator, RoleAdmin, RolePlanManager}, "102")
-	expectSubjectQuery(mock, "plan_manager", []string{RolePlanManager, RoleAdmin, RoleEvaluator}, "103")
-	expectSubjectQuery(mock, "other", []string{RoleStaff, RoleAdmin, RoleEvaluator, RolePlanManager}, "104")
+	expectSubjectQuery(mock, "operator", []string{RoleAssessmentOperator, RoleAdmin, RolePlanManager}, "102")
+	expectSubjectQuery(mock, "plan_manager", []string{RolePlanManager, RoleAdmin, RoleAssessmentOperator}, "103")
+	expectSubjectQuery(mock, "other", []string{RoleResultReviewer, RoleAdmin, RoleAssessmentOperator, RolePlanManager}, "104")
 	mock.ExpectCommit()
 
 	got, err := NewSQLSubjectSource(db).Load(context.Background())
@@ -49,13 +49,13 @@ func TestStableSubjectSourceUsesIsolatedIAMForEvaluatorAndPlanManager(t *testing
 
 	mock.ExpectBegin()
 	expectSubjectQuery(mock, "admin", []string{RoleAdmin}, "101")
-	expectSubjectQuery(mock, "other", []string{RoleStaff, RoleAdmin, RoleEvaluator, RolePlanManager}, "104")
+	expectSubjectQuery(mock, "other", []string{RoleResultReviewer, RoleAdmin, RoleAssessmentOperator, RolePlanManager}, "104")
 	mock.ExpectCommit()
 
 	directory := &syntheticDirectoryStub{userIDs: map[string][]string{
-		SyntheticEvaluatorNickname: {"102", "105"}, SyntheticPlanManagerNickname: {"103"},
+		SyntheticOperatorNickname: {"102", "105"}, SyntheticPlanManagerNickname: {"103"},
 	}}
-	snapshots := staticSnapshots{"102": {RoleEvaluator}, "103": {RolePlanManager}, "105": {}}
+	snapshots := staticSnapshots{"102": {RoleAssessmentOperator}, "103": {RolePlanManager}, "105": {}}
 	got, err := NewStableSubjectSource(db, directory, snapshots).Load(context.Background())
 	if err != nil {
 		t.Fatalf("Load() error = %v", err)
@@ -63,7 +63,7 @@ func TestStableSubjectSourceUsesIsolatedIAMForEvaluatorAndPlanManager(t *testing
 	if len(got) != 4 || got[1].UserID != "102" || got[1].Source != SubjectSourceSyntheticIAM {
 		t.Fatalf("Load() = %+v", got)
 	}
-	if strings.Join(directory.nicknames, ",") != SyntheticEvaluatorNickname+","+SyntheticPlanManagerNickname {
+	if strings.Join(directory.nicknames, ",") != SyntheticOperatorNickname+","+SyntheticPlanManagerNickname {
 		t.Fatalf("synthetic nicknames = %v", directory.nicknames)
 	}
 	for i, subject := range got {

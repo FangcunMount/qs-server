@@ -30,8 +30,8 @@ func TestObjectCheckerIAMV3ContractAssessmentRetryMatrix(t *testing.T) {
 	}{
 		{name: "admin adhoc", subject: "user:1", originType: "adhoc", allowed: true, role: "qs:admin"},
 		{name: "admin plan", subject: "user:1", originType: "plan", allowed: true, role: "qs:admin"},
-		{name: "evaluator adhoc", subject: "user:2", originType: "adhoc", allowed: true, role: "qs:evaluator"},
-		{name: "evaluator plan", subject: "user:2", originType: "plan", allowed: false},
+		{name: "operator adhoc", subject: "user:2", originType: "adhoc", allowed: true, role: "qs:assessment_operator"},
+		{name: "operator plan", subject: "user:2", originType: "plan", allowed: false},
 		{name: "plan manager adhoc", subject: "user:3", originType: "adhoc", allowed: false},
 		{name: "plan manager plan", subject: "user:3", originType: "plan", allowed: true, role: "qs:evaluation_plan_manager"},
 		{name: "other", subject: "user:4", originType: "adhoc", allowed: false},
@@ -126,7 +126,7 @@ func (s *contractAuthorizationServer) Check(ctx context.Context, request *authzv
 	case "user:1":
 		response.MatchedGrantId, response.MatchedRole = "100", "qs:admin"
 	case "user:2":
-		response.MatchedGrantId, response.MatchedRole = "102", "qs:evaluator"
+		response.MatchedGrantId, response.MatchedRole = "102", "qs:assessment_operator"
 	case "user:3":
 		response.MatchedGrantId, response.MatchedRole = "103", "qs:evaluation_plan_manager"
 	}

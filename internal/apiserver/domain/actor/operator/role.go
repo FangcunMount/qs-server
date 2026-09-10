@@ -8,7 +8,7 @@ import (
 // IsSupportedRole 判断角色是否为当前 QS 支持的角色。
 func IsSupportedRole(role Role) bool {
 	switch role {
-	case RoleQSAdmin, RoleContentManager, RoleEvaluatorQS, RoleOperator,
+	case RoleAssessmentOperator, RoleResultReviewer, RoleQSAdmin, RoleContentManager,
 		RoleEvaluationPlanManager:
 		return true
 	default:

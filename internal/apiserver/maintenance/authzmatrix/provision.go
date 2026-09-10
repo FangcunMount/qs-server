@@ -81,7 +81,7 @@ func (p *Provisioner) EnsureSubjects(ctx context.Context, confirmation string) (
 		nickname string
 		role     string
 	}{
-		{nickname: SyntheticEvaluatorNickname, role: RoleEvaluator},
+		{nickname: SyntheticOperatorNickname, role: RoleAssessmentOperator},
 		{nickname: SyntheticPlanManagerNickname, role: RolePlanManager},
 	} {
 		subjectEvidence, err := p.ensureSubject(ctx, subject.nickname, subject.role)

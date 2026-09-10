@@ -2,14 +2,14 @@
 
 ## 定位
 
-`Operator` 是 IAM User 在 QS 业务域中的员工投影，负责本地员工身份、机构归属、联系方式和激活状态。IAM 仍是角色分配、角色继承和权限授权的唯一事实源。
+`Operator` 是 IAM User 在 QS 业务域中的员工投影，负责本地员工身份、机构归属、联系方式和激活状态。IAM 仍是角色分配与权限授权的唯一事实源。
 
-`staff.roles` 保存 IAM 直接角色投影；`staff.effective_roles` 保存包含继承关系的有效角色投影。两者只用于管理端展示、查询和审计，不参与请求授权判定。
+`staff.roles` 与 `staff.effective_roles` 均保存 IAM 直接角色投影（兼容字段；继承已退役）。两者只用于管理端展示、查询和审计，不参与请求授权判定。
 
 ## 授权边界
 
-- 路由能力由请求期 IAM AuthZ v3 Snapshot 判断。
-- 对象级授权由业务对象加载后的 IAM AuthZ v3 Check 判断。
+- 路由能力由请求期 IAM AuthZ Snapshot 判断。
+- 对象级授权由业务对象加载后的 IAM AuthZ Check 判断。
 - Operator 聚合不提供 `HasRole`、`CanEvaluate` 等角色名授权旁路。
 - 员工角色编辑只调用 `ReplaceManagedAssignments` 原子替换 QS 可管理的直接角色。
 - 停用员工只改变 QS 业务激活状态，不撤销 IAM Assignment；业务入口通过 active operator 门禁拒绝停用员工。
@@ -17,9 +17,9 @@
 ## 角色投影
 
 ```text
-IAM Assignment / RoleInheritance
+IAM Assignment
   -> GetAuthorizationSnapshot
-  -> DirectRoles + EffectiveRoles + PolicyVersion
+  -> DirectRoles (+ EffectiveRoles 同值) + PolicyVersion
   -> staff 本地非权威投影
 ```
 
@@ -39,4 +39,4 @@ IAM 不可用时保留旧投影和 pending 标记；授权链本身仍 fail-clos
 - `Editor` / `Lifecycler`：修改本地资料及激活状态。
 - `Repository`：持久化聚合；`PendingProjectionRepository` 提供有界 pending 扫描。
 
-角色能力、继承闭包和对象条件均不在本子域重复建模。
+角色能力与对象条件均不在本子域重复建模。当前可分配角色：`qs:admin`、`qs:content_manager`、`qs:assessment_operator`、`qs:evaluation_plan_manager`、`qs:result_reviewer`。

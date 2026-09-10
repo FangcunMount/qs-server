@@ -68,12 +68,12 @@ func (s *Snapshot) DirectRoleNames() []string {
 	return append([]string(nil), s.DirectRoles...)
 }
 
-// EffectiveRoleNames returns direct roles plus their inheritance closure.
+// EffectiveRoleNames returns directly assigned roles; the effective field is retained on the wire.
 func (s *Snapshot) EffectiveRoleNames() []string {
 	if s == nil {
 		return nil
 	}
-	return append([]string(nil), s.EffectiveRoles...)
+	return append([]string(nil), s.DirectRoles...)
 }
 
 func actionCovers(have, want string) bool {

@@ -133,7 +133,7 @@ func (s *Operator) deactivate() {
 // ReplaceRolesProjection replaces the non-authoritative IAM role projection.
 func (s *Operator) ReplaceRolesProjection(directRoles, effectiveRoles []Role, policyVersion int64, projectedAt *time.Time, pending bool) {
 	s.roles = append([]Role(nil), directRoles...)
-	s.effectiveRoles = append([]Role(nil), effectiveRoles...)
+	s.effectiveRoles = append([]Role(nil), directRoles...)
 	s.authzPolicyVersion = policyVersion
 	s.authzProjectionPending = pending
 	if projectedAt == nil {
@@ -157,7 +157,7 @@ func (s *Operator) RestoreFromRepository(
 	isActive bool,
 ) {
 	s.roles = append([]Role(nil), roles...)
-	s.effectiveRoles = append([]Role(nil), effectiveRoles...)
+	s.effectiveRoles = append([]Role(nil), roles...)
 	s.authzPolicyVersion = authzPolicyVersion
 	s.authzProjectionPending = authzProjectionPending
 	if authzProjectedAt != nil {

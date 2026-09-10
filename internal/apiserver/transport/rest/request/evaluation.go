@@ -1,5 +1,11 @@
 package request
 
+import (
+	"encoding/json"
+	"fmt"
+	"github.com/FangcunMount/qs-server/internal/pkg/meta"
+)
+
 // ============= Assessment 相关请求 =============
 
 // CreateAssessmentRequest 创建测评请求
@@ -53,4 +59,26 @@ type ListReportsRequest struct {
 // BatchEvaluateRequest 批量评估请求
 type BatchEvaluateRequest struct {
 	AssessmentIDs []uint64 `json:"assessment_ids" valid:"required"` // 测评ID列表
+}
+
+// UnmarshalJSON accepts exact decimal strings and existing numeric IDs so a
+// browser never needs to round a snowflake ID through a JavaScript Number.
+func (r *BatchEvaluateRequest) UnmarshalJSON(data []byte) error {
+	var wire struct {
+		IDs []meta.ID `json:"assessment_ids"`
+	}
+	if err := json.Unmarshal(data, &wire); err != nil {
+		return err
+	}
+	if len(wire.IDs) == 0 {
+		return fmt.Errorf("assessment_ids is required")
+	}
+	r.AssessmentIDs = make([]uint64, len(wire.IDs))
+	for i, id := range wire.IDs {
+		if id.IsZero() {
+			return fmt.Errorf("assessment id must be positive")
+		}
+		r.AssessmentIDs[i] = id.Uint64()
+	}
+	return nil
 }

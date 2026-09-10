@@ -14,11 +14,11 @@ func TestRoleProjectionReconcilerConvergesPendingOperator(t *testing.T) {
 
 	op := domain.NewOperator(1, 101, "operator")
 	op.SetID(201)
-	op.ReplaceRolesProjection([]domain.Role{domain.RoleEvaluatorQS}, []domain.Role{domain.RoleEvaluatorQS}, 10, nil, true)
+	op.ReplaceRolesProjection([]domain.Role{domain.RoleResultReviewer}, []domain.Role{domain.RoleResultReviewer}, 10, nil, true)
 	repo := &pendingProjectionRepoStub{operators: []*domain.Operator{op}}
 	gateway := &projectionGatewayStub{projection: iambridge.OperatorRoleProjection{
 		DirectRoles:    []string{string(domain.RoleEvaluationPlanManager)},
-		EffectiveRoles: []string{string(domain.RoleEvaluationPlanManager), string(domain.RoleOperator)},
+		EffectiveRoles: []string{string(domain.RoleEvaluationPlanManager), string(domain.RoleAssessmentOperator)},
 		PolicyVersion:  12,
 	}}
 	reconciler := NewRoleProjectionReconciler(repo, gateway)

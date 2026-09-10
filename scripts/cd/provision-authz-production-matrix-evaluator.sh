@@ -74,7 +74,7 @@ if evidence.get("git_commit") != os.environ["DEPLOYED_SHA"]:
 if evidence.get("service_identity") != "qs-apiserver.svc":
     raise SystemExit("matrix provisioner did not use qs-apiserver.svc")
 expected = {
-    "__qs_authz_matrix_evaluator_v2__": "qs:evaluator",
+    "__qs_authz_matrix_evaluator_v2__": "qs:assessment_operator",
     "__qs_authz_matrix_plan_manager_v2__": "qs:evaluation_plan_manager",
 }
 subjects = evidence.get("subjects", [])
