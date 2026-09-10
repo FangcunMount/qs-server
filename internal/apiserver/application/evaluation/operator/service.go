@@ -59,7 +59,7 @@ func (s *queryService) loadAccessible(ctx context.Context, actor Actor, id uint6
 }
 
 func (s *queryService) GetAssessment(ctx context.Context, actor Actor, id uint64) (*Assessment, error) {
-	if err := appauthz.RequireResultPermission(ctx, appauthz.AssessmentResource, "read"); err != nil {
+	if err := appauthz.RequirePermission(ctx, appauthz.AssessmentResource, "read"); err != nil {
 		return nil, err
 	}
 	a, err := s.loadAccessible(ctx, actor, id)
@@ -119,7 +119,7 @@ func (s *queryService) listRows(ctx context.Context, actor Actor, q ListQuery) (
 }
 
 func (s *queryService) ListAssessments(ctx context.Context, actor Actor, q ListQuery) (*AssessmentList, error) {
-	if err := appauthz.RequireResultPermission(ctx, appauthz.AssessmentResource, "list"); err != nil {
+	if err := appauthz.RequirePermission(ctx, appauthz.AssessmentResource, "list"); err != nil {
 		return nil, err
 	}
 	rows, total, page, pageSize, err := s.listRows(ctx, actor, q)
@@ -138,7 +138,7 @@ func (s *queryService) ListAssessments(ctx context.Context, actor Actor, q ListQ
 }
 
 func (s *queryService) GetAssessmentOutcome(ctx context.Context, actor Actor, id uint64) (*OutcomeAssessment, error) {
-	if err := appauthz.RequireResultPermission(ctx, appauthz.AssessmentResource, "read"); err != nil {
+	if err := appauthz.RequirePermission(ctx, appauthz.AssessmentResource, "read"); err != nil {
 		return nil, err
 	}
 	if _, err := s.loadAccessible(ctx, actor, id); err != nil {
@@ -155,7 +155,7 @@ func (s *queryService) GetAssessmentOutcome(ctx context.Context, actor Actor, id
 }
 
 func (s *queryService) ListAssessmentsOutcome(ctx context.Context, actor Actor, q ListQuery) (*OutcomeAssessmentList, error) {
-	if err := appauthz.RequireResultPermission(ctx, appauthz.AssessmentResource, "list"); err != nil {
+	if err := appauthz.RequirePermission(ctx, appauthz.AssessmentResource, "list"); err != nil {
 		return nil, err
 	}
 	rows, total, page, pageSize, err := s.listRows(ctx, actor, q)
@@ -178,7 +178,7 @@ func (s *queryService) ListAssessmentsOutcome(ctx context.Context, actor Actor, 
 }
 
 func (s *queryService) GetScores(ctx context.Context, actor Actor, id uint64) (*Score, error) {
-	if err := appauthz.RequireResultPermission(ctx, appauthz.AssessmentResource, "read"); err != nil {
+	if err := appauthz.RequirePermission(ctx, appauthz.AssessmentResource, "read"); err != nil {
 		return nil, err
 	}
 	if _, err := s.loadAccessible(ctx, actor, id); err != nil {
@@ -195,7 +195,7 @@ func (s *queryService) GetScores(ctx context.Context, actor Actor, id uint64) (*
 }
 
 func (s *queryService) GetHighRiskFactors(ctx context.Context, actor Actor, id uint64) (*HighRiskFactors, error) {
-	if err := appauthz.RequireResultPermission(ctx, appauthz.AssessmentResource, "read"); err != nil {
+	if err := appauthz.RequirePermission(ctx, appauthz.AssessmentResource, "read"); err != nil {
 		return nil, err
 	}
 	if _, err := s.loadAccessible(ctx, actor, id); err != nil {
@@ -221,7 +221,7 @@ func (s *queryService) GetHighRiskFactors(ctx context.Context, actor Actor, id u
 }
 
 func (s *queryService) GetFactorTrend(ctx context.Context, actor Actor, q TrendQuery) (*FactorTrend, error) {
-	if err := appauthz.RequireResultPermission(ctx, appauthz.AssessmentResource, "read"); err != nil {
+	if err := appauthz.RequirePermission(ctx, appauthz.AssessmentResource, "read"); err != nil {
 		return nil, err
 	}
 	if err := s.ValidateTesteeAccess(ctx, actor, q.TesteeID); err != nil {
@@ -242,7 +242,7 @@ func (s *queryService) GetFactorTrend(ctx context.Context, actor Actor, q TrendQ
 }
 
 func (s *queryService) ListAssessmentRuns(ctx context.Context, actor Actor, id uint64, limit int) (*RunList, error) {
-	if err := appauthz.RequireResultPermission(ctx, appauthz.AssessmentResource, "read"); err != nil {
+	if err := appauthz.RequirePermission(ctx, appauthz.AssessmentResource, "read"); err != nil {
 		return nil, err
 	}
 	if _, err := s.loadAccessible(ctx, actor, id); err != nil {
@@ -264,7 +264,7 @@ func (s *queryService) ListAssessmentRuns(ctx context.Context, actor Actor, id u
 }
 
 func (s *queryService) GetLatestAssessmentRun(ctx context.Context, actor Actor, id uint64) (*Run, error) {
-	if err := appauthz.RequireResultPermission(ctx, appauthz.AssessmentResource, "read"); err != nil {
+	if err := appauthz.RequirePermission(ctx, appauthz.AssessmentResource, "read"); err != nil {
 		return nil, err
 	}
 	if _, err := s.loadAccessible(ctx, actor, id); err != nil {
@@ -281,7 +281,7 @@ func (s *queryService) GetLatestAssessmentRun(ctx context.Context, actor Actor, 
 }
 
 func (s *queryService) ListRetryableFailedRuns(ctx context.Context, actor Actor, limit int, cursor uint64) (*RetryableFailedRunList, error) {
-	if err := appauthz.RequireResultPermission(ctx, appauthz.AssessmentResource, "read"); err != nil {
+	if err := appauthz.RequirePermission(ctx, appauthz.AssessmentResource, "read"); err != nil {
 		return nil, err
 	}
 	if actor.OrgID <= 0 || actor.OperatorUserID <= 0 {

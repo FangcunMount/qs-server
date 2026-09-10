@@ -3,6 +3,7 @@ package testee
 import (
 	"context"
 	"errors"
+	authztest "github.com/FangcunMount/qs-server/internal/apiserver/application/authz/testutil"
 	"testing"
 	"time"
 
@@ -19,7 +20,7 @@ func TestListTesteesUsesUnifiedFilterForUnrestrictedQueries(t *testing.T) {
 	start := time.Date(2026, 4, 1, 0, 0, 0, 0, time.Local)
 	end := time.Date(2026, 4, 10, 0, 0, 0, 0, time.Local)
 
-	result, err := service.ListTestees(context.Background(), ListTesteeDTO{
+	result, err := service.ListTestees(authztest.WithPermission(context.Background(), "qs:evaluation:collection:assessments", "read"), ListTesteeDTO{
 		OrgID:          1,
 		Name:           "张",
 		KeyFocus:       &keyFocus,
@@ -71,7 +72,7 @@ func TestListTesteesReadsAssessmentSummaryOnceAndIgnoresSnapshots(t *testing.T) 
 	repo := &queryServiceRepoStub{listItems: []actorreadmodel.TesteeRow{{ID: 21, OrgID: 1, Name: "testee", LastAssessmentAt: &stale, TotalAssessments: 99, LastRiskLevel: "low"}}, countValue: 1}
 	summaries := &assessmentSummaryReaderStub{values: map[uint64]actorreadmodel.AssessmentSummary{21: {TesteeID: 21, TotalEvaluated: 2, LastEvaluatedAt: &latest, RiskLevel: "high"}}}
 	service := NewQueryServiceWithAssessmentSummary(repo, summaries)
-	result, err := service.ListTestees(context.Background(), ListTesteeDTO{OrgID: 1, Limit: 10})
+	result, err := service.ListTestees(authztest.WithPermission(context.Background(), "qs:evaluation:collection:assessments", "read"), ListTesteeDTO{OrgID: 1, Limit: 10})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -88,7 +89,7 @@ func TestListTesteesPropagatesAssessmentSummaryFailure(t *testing.T) {
 	repo := &queryServiceRepoStub{listItems: []actorreadmodel.TesteeRow{makeQueryServiceTesteeRow(21, time.Now())}, countValue: 1}
 	summaries := &assessmentSummaryReaderStub{err: errors.New("summary database unavailable")}
 	service := NewQueryServiceWithAssessmentSummary(repo, summaries)
-	if _, err := service.ListTestees(context.Background(), ListTesteeDTO{OrgID: 1, Limit: 10}); err == nil {
+	if _, err := service.ListTestees(authztest.WithPermission(context.Background(), "qs:evaluation:collection:assessments", "read"), ListTesteeDTO{OrgID: 1, Limit: 10}); err == nil {
 		t.Fatal("summary failure must fail the page")
 	}
 }
@@ -101,7 +102,7 @@ func TestListTesteesUsesUnifiedFilterForRestrictedQueries(t *testing.T) {
 	service := NewQueryServiceWithAssessmentSummary(repo, nil)
 	keyFocus := true
 
-	result, err := service.ListTestees(context.Background(), ListTesteeDTO{
+	result, err := service.ListTestees(authztest.WithPermission(context.Background(), "qs:evaluation:collection:assessments", "read"), ListTesteeDTO{
 		OrgID:                 1,
 		KeyFocus:              &keyFocus,
 		AccessibleTesteeIDs:   []uint64{31, 32},

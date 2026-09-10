@@ -76,7 +76,7 @@ func NewService(
 }
 
 func (s *service) GetSummary(ctx context.Context, scope Scope) (*SummaryResult, error) {
-	if err := appauthz.RequireResultPermission(ctx, appauthz.AssessmentResource, "read"); err != nil {
+	if err := appauthz.RequirePermission(ctx, appauthz.AssessmentResource, "read"); err != nil {
 		return nil, err
 	}
 	if err := s.ensureConfigured(); err != nil {
@@ -117,7 +117,7 @@ func (s *service) GetSummary(ctx context.Context, scope Scope) (*SummaryResult, 
 }
 
 func (s *service) ListQueue(ctx context.Context, dto ListQueueDTO) (*QueuePage, error) {
-	if err := appauthz.RequireResultPermission(ctx, appauthz.AssessmentResource, "read"); err != nil {
+	if err := appauthz.RequirePermission(ctx, appauthz.AssessmentResource, "read"); err != nil {
 		return nil, err
 	}
 	if err := s.ensureConfigured(); err != nil {

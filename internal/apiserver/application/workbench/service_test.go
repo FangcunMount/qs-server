@@ -3,6 +3,7 @@ package workbench
 import (
 	"context"
 	"errors"
+	authztest "github.com/FangcunMount/qs-server/internal/apiserver/application/authz/testutil"
 	"testing"
 	"time"
 
@@ -28,7 +29,7 @@ func TestServiceListHighRiskQueueUsesLatestRiskRowsAndExcludesNonHighRisk(t *tes
 	}}
 	svc := newTestService(testees, latestRisks, &followUpReaderStub{}, &assignmentHydratorStub{})
 
-	page, err := svc.ListQueue(context.Background(), ListQueueDTO{
+	page, err := svc.ListQueue(authztest.WithPermission(context.Background(), "qs:evaluation:collection:assessments", "read"), ListQueueDTO{
 		Scope:     Scope{Kind: ScopeKindClinicianMe, OrgID: 9, OperatorUserID: 701},
 		QueueType: QueueTypeHighRisk,
 		Page:      1,
@@ -59,7 +60,7 @@ func TestServiceListHighRiskQueueRequiresLatestRiskRows(t *testing.T) {
 	latestRisks := &latestRiskReaderStub{}
 	svc := newTestService(testees, latestRisks, &followUpReaderStub{}, &assignmentHydratorStub{})
 
-	page, err := svc.ListQueue(context.Background(), ListQueueDTO{
+	page, err := svc.ListQueue(authztest.WithPermission(context.Background(), "qs:evaluation:collection:assessments", "read"), ListQueueDTO{
 		Scope:     Scope{Kind: ScopeKindClinicianMe, OrgID: 9, OperatorUserID: 701},
 		QueueType: QueueTypeHighRisk,
 		Page:      1,
@@ -93,7 +94,7 @@ func TestServiceListFollowUpQueueReturnsOutstandingTaskPerTestee(t *testing.T) {
 	}}
 	svc := newTestService(testees, &latestRiskReaderStub{}, followUps, &assignmentHydratorStub{})
 
-	page, err := svc.ListQueue(context.Background(), ListQueueDTO{
+	page, err := svc.ListQueue(authztest.WithPermission(context.Background(), "qs:evaluation:collection:assessments", "read"), ListQueueDTO{
 		Scope:     Scope{Kind: ScopeKindClinicianMe, OrgID: 9, OperatorUserID: 701},
 		QueueType: QueueTypeFollowUp,
 		Page:      1,
@@ -130,7 +131,7 @@ func TestServiceListKeyFocusQueueUsesAssignedScope(t *testing.T) {
 	}
 	svc := newTestService(testees, &latestRiskReaderStub{}, &followUpReaderStub{}, &assignmentHydratorStub{})
 
-	page, err := svc.ListQueue(context.Background(), ListQueueDTO{
+	page, err := svc.ListQueue(authztest.WithPermission(context.Background(), "qs:evaluation:collection:assessments", "read"), ListQueueDTO{
 		Scope:     Scope{Kind: ScopeKindClinicianMe, OrgID: 9, OperatorUserID: 701},
 		QueueType: QueueTypeKeyFocus,
 		Page:      2,
@@ -179,7 +180,7 @@ func TestServiceKeyFocusQueueUsesEvaluationSummaryAndPropagatesFailure(t *testin
 		&assignmentHydratorStub{}, testees, &latestRiskReaderStub{}, &followUpReaderStub{}, summary,
 	)
 
-	page, err := svc.ListQueue(context.Background(), ListQueueDTO{Scope: Scope{Kind: ScopeKindClinicianMe, OrgID: 9, OperatorUserID: 701}, QueueType: QueueTypeKeyFocus, Page: 1, PageSize: 10})
+	page, err := svc.ListQueue(authztest.WithPermission(context.Background(), "qs:evaluation:collection:assessments", "read"), ListQueueDTO{Scope: Scope{Kind: ScopeKindClinicianMe, OrgID: 9, OperatorUserID: 701}, QueueType: QueueTypeKeyFocus, Page: 1, PageSize: 10})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -188,7 +189,7 @@ func TestServiceKeyFocusQueueUsesEvaluationSummaryAndPropagatesFailure(t *testin
 	}
 
 	summary.err = errors.New("summary database unavailable")
-	if _, err := svc.ListQueue(context.Background(), ListQueueDTO{Scope: Scope{Kind: ScopeKindClinicianMe, OrgID: 9, OperatorUserID: 701}, QueueType: QueueTypeKeyFocus, Page: 1, PageSize: 10}); err == nil {
+	if _, err := svc.ListQueue(authztest.WithPermission(context.Background(), "qs:evaluation:collection:assessments", "read"), ListQueueDTO{Scope: Scope{Kind: ScopeKindClinicianMe, OrgID: 9, OperatorUserID: 701}, QueueType: QueueTypeKeyFocus, Page: 1, PageSize: 10}); err == nil {
 		t.Fatal("summary query failure must fail the workbench page")
 	}
 }
@@ -205,7 +206,7 @@ func TestServiceGetSummaryReturnsEmptyWhenOperatorIsNotBoundToClinician(t *testi
 		&assessmentSummaryReaderStub{},
 	)
 
-	summary, err := svc.GetSummary(context.Background(), Scope{Kind: ScopeKindClinicianMe, OrgID: 9, OperatorUserID: 701})
+	summary, err := svc.GetSummary(authztest.WithPermission(context.Background(), "qs:evaluation:collection:assessments", "read"), Scope{Kind: ScopeKindClinicianMe, OrgID: 9, OperatorUserID: 701})
 	if err != nil {
 		t.Fatalf("GetSummary returned error: %v", err)
 	}
@@ -217,7 +218,7 @@ func TestServiceGetSummaryReturnsEmptyWhenOperatorIsNotBoundToClinician(t *testi
 func TestServiceListQueueRejectsUnknownQueueType(t *testing.T) {
 	svc := newTestService(&testeeReaderStub{}, &latestRiskReaderStub{}, &followUpReaderStub{}, &assignmentHydratorStub{})
 
-	_, err := svc.ListQueue(context.Background(), ListQueueDTO{
+	_, err := svc.ListQueue(authztest.WithPermission(context.Background(), "qs:evaluation:collection:assessments", "read"), ListQueueDTO{
 		Scope:     Scope{Kind: ScopeKindClinicianMe, OrgID: 9, OperatorUserID: 701},
 		QueueType: QueueType("unknown"),
 	})
@@ -249,7 +250,7 @@ func TestServiceListOrgAdminHighRiskQueueDoesNotRequireClinicianBindingAndHydrat
 	}}
 	svc := newTestService(testees, latestRisks, &followUpReaderStub{}, assignments)
 
-	page, err := svc.ListQueue(context.Background(), ListQueueDTO{
+	page, err := svc.ListQueue(authztest.WithPermission(context.Background(), "qs:evaluation:collection:assessments", "read"), ListQueueDTO{
 		Scope:     Scope{Kind: ScopeKindOrgAdmin, OrgID: 9},
 		QueueType: QueueTypeHighRisk,
 		Page:      1,
@@ -289,7 +290,7 @@ func TestServiceListOrgAdminQueueWithClinicianFilterUsesAssignedScope(t *testing
 	)
 	clinicianID := uint64(20)
 
-	page, err := svc.ListQueue(context.Background(), ListQueueDTO{
+	page, err := svc.ListQueue(authztest.WithPermission(context.Background(), "qs:evaluation:collection:assessments", "read"), ListQueueDTO{
 		Scope:     Scope{Kind: ScopeKindOrgAdmin, OrgID: 9, ClinicianID: &clinicianID},
 		QueueType: QueueTypeKeyFocus,
 		Page:      1,

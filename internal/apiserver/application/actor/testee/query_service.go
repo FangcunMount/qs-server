@@ -168,7 +168,7 @@ func (s *queryService) enrichAssessmentSummaryRows(ctx context.Context, rows []a
 }
 
 func (s *queryService) enrichAssessmentSummaries(ctx context.Context, rows []*actorreadmodel.TesteeRow) error {
-	if err := appauthz.RequireResultPermission(ctx, appauthz.AssessmentResource, "read"); err != nil && !s.selfService {
+	if err := appauthz.RequirePermission(ctx, appauthz.AssessmentResource, "read"); err != nil && !s.selfService {
 		for _, row := range rows {
 			if row != nil {
 				row.LastRiskLevel = ""

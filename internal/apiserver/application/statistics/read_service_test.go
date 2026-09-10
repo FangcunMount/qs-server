@@ -2,6 +2,7 @@ package statistics
 
 import (
 	"context"
+	authztest "github.com/FangcunMount/qs-server/internal/apiserver/application/authz/testutil"
 	"testing"
 	"time"
 
@@ -76,7 +77,7 @@ func TestReadServiceDefaultsToSevenCompleteShanghaiDays(t *testing.T) {
 	store := &readStoreStub{snapshot: &Snapshot{AsOfDate: time.Date(2026, 7, 21, 0, 0, 0, 0, time.UTC), SnapshotAt: time.Date(2026, 7, 22, 0, 30, 0, 0, time.FixedZone("CST", 8*3600)), DatabaseReadable: true}}
 	service := NewReadService(store)
 	service.now = func() time.Time { return time.Date(2026, 7, 22, 9, 0, 0, 0, time.FixedZone("CST", 8*3600)) }
-	value, err := service.Overview(context.Background(), 7, QueryFilter{})
+	value, err := service.Overview(authztest.WithPermission(context.Background(), "qs:evaluation:collection:assessments", "statistics"), 7, QueryFilter{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -90,7 +91,7 @@ func TestReadServiceDefaultsToSevenCompleteShanghaiDays(t *testing.T) {
 
 func TestReadServiceReturnsStatisticsNotReadyWithoutSuccessfulRun(t *testing.T) {
 	service := NewReadService(&readStoreStub{})
-	_, err := service.Overview(context.Background(), 7, QueryFilter{})
+	_, err := service.Overview(authztest.WithPermission(context.Background(), "qs:evaluation:collection:assessments", "statistics"), 7, QueryFilter{})
 	if err == nil || !componenterrors.IsCode(err, code.ErrStatisticsNotReady) {
 		t.Fatalf("err=%v", err)
 	}
@@ -99,10 +100,10 @@ func TestReadServiceReturnsStatisticsNotReadyWithoutSuccessfulRun(t *testing.T) 
 func TestReadServiceRejectsTodayAndOversizedCustomWindow(t *testing.T) {
 	store := &readStoreStub{snapshot: &Snapshot{AsOfDate: time.Date(2026, 7, 21, 0, 0, 0, 0, time.UTC), DatabaseReadable: true}}
 	service := NewReadService(store)
-	if _, err := service.Overview(context.Background(), 7, QueryFilter{Preset: "today"}); err == nil {
+	if _, err := service.Overview(authztest.WithPermission(context.Background(), "qs:evaluation:collection:assessments", "statistics"), 7, QueryFilter{Preset: "today"}); err == nil {
 		t.Fatal("today must not be accepted")
 	}
-	if _, err := service.Overview(context.Background(), 7, QueryFilter{Preset: "custom", From: "2025-01-01", To: "2026-07-21"}); err == nil {
+	if _, err := service.Overview(authztest.WithPermission(context.Background(), "qs:evaluation:collection:assessments", "statistics"), 7, QueryFilter{Preset: "custom", From: "2025-01-01", To: "2026-07-21"}); err == nil {
 		t.Fatal("oversized custom window must not be accepted")
 	}
 }
@@ -110,7 +111,7 @@ func TestReadServiceRejectsTodayAndOversizedCustomWindow(t *testing.T) {
 func TestReadServiceRejectsColdDatabaseFallbackWhilePublicationIsIncomplete(t *testing.T) {
 	store := &readStoreStub{snapshot: &Snapshot{AsOfDate: time.Date(2026, 7, 21, 0, 0, 0, 0, time.UTC)}}
 	service := NewReadService(store)
-	_, err := service.Overview(context.Background(), 7, QueryFilter{})
+	_, err := service.Overview(authztest.WithPermission(context.Background(), "qs:evaluation:collection:assessments", "statistics"), 7, QueryFilter{})
 	if err == nil || !componenterrors.IsCode(err, code.ErrStatisticsNotReady) {
 		t.Fatalf("err=%v", err)
 	}
@@ -123,7 +124,7 @@ func TestReadServiceKeepsServingPublishedCacheWhileDatabaseIsUnsafe(t *testing.T
 	store := &readStoreStub{snapshot: &Snapshot{AsOfDate: time.Date(2026, 7, 21, 0, 0, 0, 0, time.UTC)}}
 	cache := &readCacheStub{hit: true, value: Overview{OrgID: 7, Freshness: Freshness{AsOfDate: "2026-07-20"}}}
 	service := NewReadService(store, cache)
-	value, err := service.Overview(context.Background(), 7, QueryFilter{})
+	value, err := service.Overview(authztest.WithPermission(context.Background(), "qs:evaluation:collection:assessments", "statistics"), 7, QueryFilter{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -135,7 +136,7 @@ func TestReadServiceKeepsServingPublishedCacheWhileDatabaseIsUnsafe(t *testing.T
 func TestReadServiceMarksL1FallbackAsStale(t *testing.T) {
 	store := &readStoreStub{snapshot: &Snapshot{AsOfDate: time.Date(2026, 7, 21, 0, 0, 0, 0, time.UTC), DatabaseReadable: true}}
 	cache := &readCacheStub{hit: true, stale: true, value: Overview{OrgID: 7, Freshness: Freshness{AsOfDate: "2026-07-21"}}}
-	value, err := NewReadService(store, cache).Overview(context.Background(), 7, QueryFilter{})
+	value, err := NewReadService(store, cache).Overview(authztest.WithPermission(context.Background(), "qs:evaluation:collection:assessments", "statistics"), 7, QueryFilter{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -164,7 +165,7 @@ func TestReadServiceDiscardsDatabaseResultWhenPublicationChangesDuringRead(t *te
 	}
 	cache := &readCacheStub{}
 	service := NewReadService(store, cache)
-	_, err := service.Overview(context.Background(), 7, QueryFilter{})
+	_, err := service.Overview(authztest.WithPermission(context.Background(), "qs:evaluation:collection:assessments", "statistics"), 7, QueryFilter{})
 	if err == nil || !componenterrors.IsCode(err, code.ErrStatisticsNotReady) {
 		t.Fatalf("err=%v", err)
 	}

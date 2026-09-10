@@ -435,7 +435,7 @@ func (h *EvaluationOperatorHandler) RetryFailed(c *gin.Context) {
 		h.Error(c, err)
 		return
 	}
-	if appauthz.RequireResultPermission(ctx, appauthz.AssessmentResource, "read") != nil {
+	if appauthz.RequirePermission(ctx, appauthz.AssessmentResource, "read") != nil {
 		// Retry authorization has succeeded. Do not fetch professional results for
 		// an operator who only has execution/progress permissions.
 		h.Success(c, gin.H{"id": strconv.FormatUint(id, 10), "accepted": true})
