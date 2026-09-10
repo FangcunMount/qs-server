@@ -92,7 +92,7 @@ func (r *BaseRepository[T]) CreateAndSync(ctx context.Context, entity T, sync fu
 }
 
 // UpdateAndSync updates an entity and triggers the sync callback.
-func (r *BaseRepository[T]) UpdateAndSync(ctx context.Context, entity T, sync func(T)) error {
+func (r *BaseRepository[T]) UpdateAndSync(ctx context.Context, entity T, sync func(T), fields ...string) error {
 	ctx, release, err := r.acquire(ctx)
 	if err != nil {
 		return err
@@ -103,7 +103,16 @@ func (r *BaseRepository[T]) UpdateAndSync(ctx context.Context, entity T, sync fu
 	if userID > 0 {
 		entity.SetUpdatedBy(meta.FromUint64(userID))
 	}
-	result := r.WithContext(ctx).Updates(entity)
+	query := r.WithContext(ctx)
+	// Explicit mutable fields allow an aggregate to persist zero values without
+	// overwriting creation audit columns. Existing callers keep GORM defaults.
+	if len(fields) > 0 {
+		if userID > 0 {
+			fields = append(append([]string{}, fields...), "updated_by")
+		}
+		query = query.Select(fields)
+	}
+	result := query.Updates(entity)
 	if result.Error != nil {
 		if r.errTranslator != nil {
 			return r.errTranslator(result.Error)

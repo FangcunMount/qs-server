@@ -47,7 +47,9 @@ func (r *operatorRepository) Update(ctx context.Context, item *domain.Operator) 
 
 	return r.UpdateAndSync(ctx, po, func(po *OperatorPO) {
 		r.mapper.SyncID(po, item)
-	})
+	}, "org_id", "user_id", "roles", "effective_roles", "authz_policy_version",
+		"authz_projected_at", "authz_projection_pending", "name", "email", "phone",
+		"is_active", "updated_at")
 }
 
 // FindByID 根据ID查找操作者
