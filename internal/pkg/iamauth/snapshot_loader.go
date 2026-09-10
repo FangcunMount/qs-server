@@ -127,7 +127,7 @@ func (l *SnapshotLoader) Load(ctx context.Context, userIDStr string) (*authz.Sna
 		}
 		directRoles := append([]string(nil), resp.GetDirectRoles()...)
 		snap := &authz.Snapshot{
-			DirectRoles:    directRoles,
+			DirectRoles: directRoles,
 			// Independent role model: wire field retained; value equals direct roles.
 			EffectiveRoles: append([]string(nil), directRoles...),
 			AuthzVersion:   resp.GetPolicyVersion(),

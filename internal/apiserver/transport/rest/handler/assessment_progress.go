@@ -40,6 +40,7 @@ func (h *EvaluationOperatorHandler) GetAssessmentProgress(c *gin.Context) {
 	}
 	h.Success(c, result)
 }
+
 // ListAssessmentProgress 在业务访问范围内分页查询测评进度。
 // @Summary 查询测评进度列表
 // @Tags Evaluation-Progress
