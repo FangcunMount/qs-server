@@ -19,10 +19,10 @@ const (
 	RetryAction        = "retry"
 	ForceRetryAction   = "force_retry"
 
-	RoleAdmin       = "qs:admin"
-	RoleEvaluator   = "qs:evaluator"
-	RolePlanManager = "qs:evaluation_plan_manager"
-	RoleStaff       = "qs:staff"
+	RoleAdmin              = "qs:admin"
+	RoleAssessmentOperator = "qs:assessment_operator"
+	RolePlanManager        = "qs:evaluation_plan_manager"
+	RoleResultReviewer     = "qs:result_reviewer"
 )
 
 type Subject struct {
@@ -242,9 +242,9 @@ func matrixCases(subjects []Subject) []matrixCase {
 	}
 	result := make([]matrixCase, 0, 12)
 	for _, origin := range []string{"adhoc", "plan"} {
-		for _, kind := range []string{"admin", "evaluator", "plan_manager", "other"} {
+		for _, kind := range []string{"admin", "operator", "plan_manager", "other"} {
 			subject := byKind[kind]
-			allowed := kind == "admin" || (kind == "evaluator" && origin == "adhoc") || (kind == "plan_manager" && origin == "plan")
+			allowed := kind == "admin" || (kind == "operator" && origin == "adhoc") || (kind == "plan_manager" && origin == "plan")
 			item := matrixCase{subject: subject, scenario: "origin", action: RetryAction, originType: origin, objectSuffix: origin, expectedAllowed: allowed}
 			if allowed {
 				item.expectedMatchedRole = subject.ExpectedRole
@@ -254,11 +254,11 @@ func matrixCases(subjects []Subject) []matrixCase {
 			result = append(result, item)
 		}
 	}
-	evaluator := byKind["evaluator"]
+	operator := byKind["operator"]
 	result = append(result,
-		matrixCase{subject: evaluator, scenario: "attribute_missing", action: RetryAction, objectSuffix: "attribute-missing", expectedDenyCode: "attribute_missing", expectMissingOrigin: true},
-		matrixCase{subject: evaluator, scenario: "attribute_type_error", action: RetryAction, objectSuffix: "attribute-type-error", invalidOriginType: true, expectedErrorCode: "authorization_contract"},
-		matrixCase{subject: evaluator, scenario: "force_retry", action: ForceRetryAction, objectSuffix: "force-retry", expectedDenyCode: "policy_not_matched"},
+		matrixCase{subject: operator, scenario: "attribute_missing", action: RetryAction, objectSuffix: "attribute-missing", expectedDenyCode: "attribute_missing", expectMissingOrigin: true},
+		matrixCase{subject: operator, scenario: "attribute_type_error", action: RetryAction, objectSuffix: "attribute-type-error", invalidOriginType: true, expectedErrorCode: "authorization_contract"},
+		matrixCase{subject: operator, scenario: "force_retry", action: ForceRetryAction, objectSuffix: "force-retry", expectedDenyCode: "policy_not_matched"},
 		matrixCase{subject: byKind["admin"], scenario: "force_retry", action: ForceRetryAction, objectSuffix: "force-retry", expectedAllowed: true, expectedMatchedRole: RoleAdmin},
 	)
 	return result
@@ -279,7 +279,7 @@ func authorizationErrorCode(err error) string {
 }
 
 func validateSubjects(subjects []Subject) error {
-	want := map[string]string{"admin": RoleAdmin, "evaluator": RoleEvaluator, "plan_manager": RolePlanManager, "other": RoleStaff}
+	want := map[string]string{"admin": RoleAdmin, "operator": RoleAssessmentOperator, "plan_manager": RolePlanManager, "other": RoleResultReviewer}
 	if len(subjects) != len(want) {
 		return fmt.Errorf("production subject set has %d entries, want %d", len(subjects), len(want))
 	}
@@ -311,7 +311,7 @@ func validateResolvedRoles(subject Subject, roles []string) error {
 	if !contains(roles, subject.ExpectedRole) {
 		return fmt.Errorf("IAM snapshot for %s subject does not contain expected role %s", subject.Kind, subject.ExpectedRole)
 	}
-	for _, privileged := range []string{RoleAdmin, RoleEvaluator, RolePlanManager} {
+	for _, privileged := range []string{RoleAdmin, RoleAssessmentOperator, RolePlanManager} {
 		if privileged == subject.ExpectedRole {
 			continue
 		}

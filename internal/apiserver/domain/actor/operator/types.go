@@ -25,10 +25,6 @@ const (
 	RoleQSAdmin Role = "qs:admin"
 	// RoleContentManager 内容管理员：问卷和量表的完整管理
 	RoleContentManager Role = "qs:content_manager"
-	// RoleEvaluatorQS 评估员：测评相关只读 + 重试
-	RoleEvaluatorQS Role = "qs:evaluator"
 	// RoleEvaluationPlanManager 测评计划管理员：测评计划的管理权限
 	RoleEvaluationPlanManager Role = "qs:evaluation_plan_manager"
-	// RoleOperator 普通员工：只能查看受试者
-	RoleOperator Role = "qs:staff"
 )

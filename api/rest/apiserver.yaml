@@ -3577,7 +3577,7 @@ paths:
       tags:
       - Evaluation-Admin
       summary: 批量评估
-      description: 批量执行测评评估；仅 qs:evaluator 或 qs:admin 可访问
+      description: 批量执行测评评估；需要 assessments batch_evaluate 权限
       operationId: 批量评估
       parameters:
       - type: string

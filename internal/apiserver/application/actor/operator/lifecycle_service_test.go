@@ -18,7 +18,7 @@ func TestCreateAndSaveOperator_PersistsContactInfoOnCreate(t *testing.T) {
 		Name:     "章依文",
 		Email:    "zhangyiwen001@fangcunmount.com",
 		Phone:    "+8617700000001",
-		Roles:    []string{"qs:staff"},
+		Roles:    []string{"qs:assessment_operator"},
 		IsActive: true,
 	}
 
@@ -55,7 +55,7 @@ func TestCreateAndSaveOperator_ReusesExistingOperatorByUserID(t *testing.T) {
 		Name:     "章依文",
 		Email:    "zhangyiwen001@fangcunmount.com",
 		Phone:    "+8617700000001",
-		Roles:    []string{"qs:evaluator"},
+		Roles:    []string{"qs:result_reviewer"},
 		IsActive: true,
 	}
 
@@ -89,7 +89,7 @@ func TestValidateRegisterDTORequiresPasswordForNewIAMAccount(t *testing.T) {
 		OrgID: 1,
 		Name:  "章依文",
 		Phone: "+8617700000001",
-		Roles: []string{"qs:staff"},
+		Roles: []string{"qs:assessment_operator"},
 	})
 	if err == nil || !errors.IsCode(err, code.ErrValidation) {
 		t.Fatalf("validateRegisterDTO() error = %v, want validation error", err)

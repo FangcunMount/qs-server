@@ -9,9 +9,9 @@ import (
 func TestCreatedIsolatedUserIDUsesAuthoritativeCreateResponse(t *testing.T) {
 	userID, err := createdIsolatedUserID(&identityv2.User{
 		Id:       "12345",
-		Nickname: SyntheticEvaluatorNickname,
+		Nickname: SyntheticOperatorNickname,
 		Status:   identityv2.UserStatus_USER_STATUS_ACTIVE,
-	}, SyntheticEvaluatorNickname)
+	}, SyntheticOperatorNickname)
 	if err != nil {
 		t.Fatalf("createdIsolatedUserID() error = %v", err)
 	}
@@ -25,7 +25,7 @@ func TestCreatedIsolatedUserIDRejectsMismatchedResponse(t *testing.T) {
 		Id:       "12345",
 		Nickname: SyntheticPlanManagerNickname,
 		Status:   identityv2.UserStatus_USER_STATUS_ACTIVE,
-	}, SyntheticEvaluatorNickname)
+	}, SyntheticOperatorNickname)
 	if err == nil {
 		t.Fatal("createdIsolatedUserID() error = nil, want mismatch error")
 	}

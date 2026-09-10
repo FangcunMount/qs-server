@@ -13,7 +13,7 @@ const (
 	SubjectSourceProductionStaff = "production_staff"
 	SubjectSourceSyntheticIAM    = "synthetic_iam_user"
 
-	SyntheticEvaluatorNickname   = "__qs_authz_matrix_evaluator_v2__"
+	SyntheticOperatorNickname    = "__qs_authz_matrix_operator_v2__"
 	SyntheticPlanManagerNickname = "__qs_authz_matrix_plan_manager_v2__"
 )
 
@@ -45,9 +45,9 @@ func (s *SQLSubjectSource) Load(ctx context.Context) ([]Subject, error) {
 
 	queries := []subjectQuery{
 		{kind: "admin", role: RoleAdmin},
-		{kind: "evaluator", role: RoleEvaluator, excluded: []string{RoleAdmin, RolePlanManager}},
-		{kind: "plan_manager", role: RolePlanManager, excluded: []string{RoleAdmin, RoleEvaluator}},
-		{kind: "other", role: RoleStaff, excluded: []string{RoleAdmin, RoleEvaluator, RolePlanManager}},
+		{kind: "operator", role: RoleAssessmentOperator, excluded: []string{RoleAdmin, RolePlanManager}},
+		{kind: "plan_manager", role: RolePlanManager, excluded: []string{RoleAdmin, RoleAssessmentOperator}},
+		{kind: "other", role: RoleResultReviewer, excluded: []string{RoleAdmin, RoleAssessmentOperator, RolePlanManager}},
 	}
 	result := make([]Subject, 0, len(queries))
 	for _, query := range queries {
@@ -124,7 +124,7 @@ func (s *StableSubjectSource) Load(ctx context.Context) ([]Subject, error) {
 
 	queries := []subjectQuery{
 		{kind: "admin", role: RoleAdmin},
-		{kind: "other", role: RoleStaff, excluded: []string{RoleAdmin, RoleEvaluator, RolePlanManager}},
+		{kind: "other", role: RoleResultReviewer, excluded: []string{RoleAdmin, RoleAssessmentOperator, RolePlanManager}},
 	}
 	production := make(map[string]Subject, len(queries))
 	for _, query := range queries {
@@ -147,7 +147,7 @@ func (s *StableSubjectSource) Load(ctx context.Context) ([]Subject, error) {
 	for _, subject := range []struct {
 		kind, role, nickname string
 	}{
-		{kind: "evaluator", role: RoleEvaluator, nickname: SyntheticEvaluatorNickname},
+		{kind: "operator", role: RoleAssessmentOperator, nickname: SyntheticOperatorNickname},
 		{kind: "plan_manager", role: RolePlanManager, nickname: SyntheticPlanManagerNickname},
 	} {
 		candidates, syntheticErr := s.synthetic.FindActiveIsolatedUsers(ctx, subject.nickname)

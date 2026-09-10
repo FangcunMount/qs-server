@@ -19,11 +19,20 @@ func TestRequireCapabilityMiddleware(t *testing.T) {
 			{Resource: "qs:plan_task:collection:evaluation_plan_tasks", Action: "schedule", Mode: authzapp.AuthorizationModeUnconditional},
 		},
 	}
-	evaluatorSnap := &authzapp.Snapshot{
-		EffectiveRoles: []string{"qs:evaluator"},
+	operatorSnap := &authzapp.Snapshot{
+		EffectiveRoles: []string{"qs:assessment_operator"},
 		Permissions: []authzapp.Permission{
 			{Resource: authzapp.AssessmentResource, Action: "batch_evaluate", Mode: authzapp.AuthorizationModeUnconditional},
+			{Resource: authzapp.AssessmentResource, Action: "list_progress", Mode: authzapp.AuthorizationModeUnconditional},
+			{Resource: authzapp.AssessmentResource, Action: "read_progress", Mode: authzapp.AuthorizationModeUnconditional},
+		},
+	}
+	resultReviewerSnap := &authzapp.Snapshot{
+		EffectiveRoles: []string{"qs:result_reviewer"},
+		Permissions: []authzapp.Permission{
 			{Resource: "qs:answersheet:collection:answersheets", Action: "read", Mode: authzapp.AuthorizationModeUnconditional},
+			{Resource: authzapp.AssessmentResource, Action: "read", Mode: authzapp.AuthorizationModeUnconditional},
+			{Resource: authzapp.AssessmentResource, Action: "list", Mode: authzapp.AuthorizationModeUnconditional},
 		},
 	}
 	contentManagerSnap := &authzapp.Snapshot{
@@ -56,9 +65,30 @@ func TestRequireCapabilityMiddleware(t *testing.T) {
 			wantNextRun: true,
 		},
 		{
-			name:        "evaluator cannot pass plan manager capability",
+			name:        "operator cannot pass plan manager capability",
 			capability:  CapabilityManageEvaluationPlans,
-			snapshot:    evaluatorSnap,
+			snapshot:    operatorSnap,
+			wantStatus:  http.StatusForbidden,
+			wantNextRun: false,
+		},
+		{
+			name:        "result reviewer cannot pass plan manager capability",
+			capability:  CapabilityManageEvaluationPlans,
+			snapshot:    resultReviewerSnap,
+			wantStatus:  http.StatusForbidden,
+			wantNextRun: false,
+		},
+		{
+			name:        "operator can evaluate assessments",
+			capability:  CapabilityEvaluateAssessments,
+			snapshot:    operatorSnap,
+			wantStatus:  http.StatusOK,
+			wantNextRun: true,
+		},
+		{
+			name:        "result reviewer cannot evaluate assessments",
+			capability:  CapabilityEvaluateAssessments,
+			snapshot:    resultReviewerSnap,
 			wantStatus:  http.StatusForbidden,
 			wantNextRun: false,
 		},
@@ -91,11 +121,18 @@ func TestRequireCapabilityMiddleware(t *testing.T) {
 			wantNextRun: true,
 		},
 		{
-			name:        "evaluator can read answersheets",
+			name:        "result reviewer can read answersheets",
 			capability:  CapabilityReadAnswersheets,
-			snapshot:    evaluatorSnap,
+			snapshot:    resultReviewerSnap,
 			wantStatus:  http.StatusOK,
 			wantNextRun: true,
+		},
+		{
+			name:        "operator cannot read answersheets",
+			capability:  CapabilityReadAnswersheets,
+			snapshot:    operatorSnap,
+			wantStatus:  http.StatusForbidden,
+			wantNextRun: false,
 		},
 		{
 			name:        "content manager cannot read answersheets",
