@@ -3,7 +3,6 @@ package handler
 import (
 	"context"
 	"encoding/json"
-	appauthz "github.com/FangcunMount/qs-server/internal/apiserver/application/authz"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -275,7 +274,6 @@ func TestEvaluationHandlerWaitReportReturnsPendingWhenClientContextCanceled(t *t
 var _ evaluationoperator.QueryService = (*operatorQueryStub)(nil)
 
 func TestProgressOnlyRetryReturnsAcceptanceWithoutResultQuery(t *testing.T) {
-	t.Setenv("QS_AUTHZ_ROLE_MODEL", appauthz.IndependentRoleModel)
 	query := &operatorQueryStub{result: &evaluationoperator.Assessment{ID: 301}}
 	actions := &governanceActionRunnerStub{}
 	h := NewEvaluationOperatorHandler(nil, query, actions)

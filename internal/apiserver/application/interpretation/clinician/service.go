@@ -44,7 +44,7 @@ func NewService(reader interpretationreadmodel.ReportReader, access Access, proj
 	return &service{reader: reader, access: access, projection: mapper}
 }
 func (s *service) GetParticipantReport(ctx context.Context, actor Actor, q GetQuery) (*Report, error) {
-	if err := appauthz.RequireResultPermission(ctx, "qs:evaluation:collection:reports", "read"); err != nil {
+	if err := appauthz.RequirePermission(ctx, "qs:evaluation:collection:reports", "read"); err != nil {
 		return nil, err
 	}
 	if actor.OrgID == 0 || actor.OperatorUserID == 0 || q.TesteeID == 0 || q.AssessmentID == 0 {
@@ -63,7 +63,7 @@ func (s *service) GetParticipantReport(ctx context.Context, actor Actor, q GetQu
 	return s.projection.FromRow(ctx, *row, policy.AudienceClinician)
 }
 func (s *service) ListParticipantReports(ctx context.Context, actor Actor, q ListQuery) (*ListResult, error) {
-	if err := appauthz.RequireResultPermission(ctx, "qs:evaluation:collection:reports", "list"); err != nil {
+	if err := appauthz.RequirePermission(ctx, "qs:evaluation:collection:reports", "list"); err != nil {
 		return nil, err
 	}
 	if actor.OrgID == 0 || actor.OperatorUserID == 0 || q.TesteeID == 0 {

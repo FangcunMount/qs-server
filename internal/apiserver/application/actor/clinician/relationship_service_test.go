@@ -3,6 +3,7 @@ package clinician
 import (
 	"context"
 	"errors"
+	authztest "github.com/FangcunMount/qs-server/internal/apiserver/application/authz/testutil"
 	"testing"
 	"time"
 
@@ -147,7 +148,7 @@ func TestListAssignedTesteesUsesReadModel(t *testing.T) {
 		relationReader: relationReader,
 	}
 
-	result, err := svc.ListAssignedTestees(context.Background(), ListAssignedTesteeDTO{
+	result, err := svc.ListAssignedTestees(authztest.WithPermission(context.Background(), "qs:evaluation:collection:assessments", "read"), ListAssignedTesteeDTO{
 		OrgID:       1,
 		ClinicianID: 10,
 		Offset:      0,
@@ -190,7 +191,7 @@ func TestListAssignedTesteesUsesOneEvaluationSummaryBatch(t *testing.T) {
 	}}
 	svc := &relationshipService{relationReader: relationReader, summaryReader: summary}
 
-	result, err := svc.ListAssignedTestees(context.Background(), ListAssignedTesteeDTO{OrgID: 1, ClinicianID: 10, Limit: 10})
+	result, err := svc.ListAssignedTestees(authztest.WithPermission(context.Background(), "qs:evaluation:collection:assessments", "read"), ListAssignedTesteeDTO{OrgID: 1, ClinicianID: 10, Limit: 10})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -203,7 +204,7 @@ func TestListAssignedTesteesUsesOneEvaluationSummaryBatch(t *testing.T) {
 	}
 
 	summary.err = errors.New("summary database unavailable")
-	if _, err := svc.ListAssignedTestees(context.Background(), ListAssignedTesteeDTO{OrgID: 1, ClinicianID: 10, Limit: 10}); err == nil {
+	if _, err := svc.ListAssignedTestees(authztest.WithPermission(context.Background(), "qs:evaluation:collection:assessments", "read"), ListAssignedTesteeDTO{OrgID: 1, ClinicianID: 10, Limit: 10}); err == nil {
 		t.Fatal("summary query failure must fail the page")
 	}
 }

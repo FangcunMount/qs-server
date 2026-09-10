@@ -2,7 +2,7 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "04552f2f357c0374c14cf0e6913ff34823d170a1",
+    "sha": "390cefcc8ef2e1b9717bc037cd7162d287dea26c",
     "verified_on": "2026-09-10"
   },
   "status_policy": {
@@ -1684,7 +1684,7 @@
       "owner": "survey",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "04552f2f357c0374c14cf0e6913ff34823d170a1",
+        "source_sha": "bfbd991e01d16bc32891dea0e0ef9cdd8aac4f90",
         "verified_on": "2026-09-10"
       },
       "fact_sources": [
@@ -1802,7 +1802,7 @@
       "owner": "survey",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "04552f2f357c0374c14cf0e6913ff34823d170a1",
+        "source_sha": "bfbd991e01d16bc32891dea0e0ef9cdd8aac4f90",
         "verified_on": "2026-09-10"
       },
       "fact_sources": [
@@ -1890,7 +1890,7 @@
       "owner": "survey",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "04552f2f357c0374c14cf0e6913ff34823d170a1",
+        "source_sha": "bfbd991e01d16bc32891dea0e0ef9cdd8aac4f90",
         "verified_on": "2026-09-10"
       },
       "fact_sources": [
@@ -2628,7 +2628,7 @@
       "owner": "evaluation",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "04552f2f357c0374c14cf0e6913ff34823d170a1",
+        "source_sha": "bfbd991e01d16bc32891dea0e0ef9cdd8aac4f90",
         "verified_on": "2026-09-10"
       },
       "fact_sources": [
@@ -2806,7 +2806,7 @@
       "owner": "evaluation",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "04552f2f357c0374c14cf0e6913ff34823d170a1",
+        "source_sha": "bfbd991e01d16bc32891dea0e0ef9cdd8aac4f90",
         "verified_on": "2026-09-10"
       },
       "fact_sources": [
@@ -2864,7 +2864,7 @@
       "owner": "evaluation",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "04552f2f357c0374c14cf0e6913ff34823d170a1",
+        "source_sha": "bfbd991e01d16bc32891dea0e0ef9cdd8aac4f90",
         "verified_on": "2026-09-10"
       },
       "fact_sources": [
@@ -3449,7 +3449,7 @@
       "owner": "actor",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "04552f2f357c0374c14cf0e6913ff34823d170a1",
+        "source_sha": "bfbd991e01d16bc32891dea0e0ef9cdd8aac4f90",
         "verified_on": "2026-09-10"
       },
       "fact_sources": [
@@ -3507,7 +3507,7 @@
       "owner": "actor",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "04552f2f357c0374c14cf0e6913ff34823d170a1",
+        "source_sha": "bfbd991e01d16bc32891dea0e0ef9cdd8aac4f90",
         "verified_on": "2026-09-10"
       },
       "fact_sources": [
@@ -3565,7 +3565,7 @@
       "owner": "actor",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "04552f2f357c0374c14cf0e6913ff34823d170a1",
+        "source_sha": "bfbd991e01d16bc32891dea0e0ef9cdd8aac4f90",
         "verified_on": "2026-09-10"
       },
       "fact_sources": [
@@ -3623,7 +3623,7 @@
       "owner": "actor",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "04552f2f357c0374c14cf0e6913ff34823d170a1",
+        "source_sha": "bfbd991e01d16bc32891dea0e0ef9cdd8aac4f90",
         "verified_on": "2026-09-10"
       },
       "fact_sources": [
@@ -3681,7 +3681,7 @@
       "owner": "actor",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "04552f2f357c0374c14cf0e6913ff34823d170a1",
+        "source_sha": "bfbd991e01d16bc32891dea0e0ef9cdd8aac4f90",
         "verified_on": "2026-09-10"
       },
       "fact_sources": [
@@ -4123,7 +4123,7 @@
       "owner": "statistics",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "04552f2f357c0374c14cf0e6913ff34823d170a1",
+        "source_sha": "bfbd991e01d16bc32891dea0e0ef9cdd8aac4f90",
         "verified_on": "2026-09-10"
       },
       "fact_sources": [
@@ -4301,7 +4301,7 @@
       "owner": "statistics",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "04552f2f357c0374c14cf0e6913ff34823d170a1",
+        "source_sha": "bfbd991e01d16bc32891dea0e0ef9cdd8aac4f90",
         "verified_on": "2026-09-10"
       },
       "fact_sources": [
@@ -4359,7 +4359,7 @@
       "owner": "statistics",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "04552f2f357c0374c14cf0e6913ff34823d170a1",
+        "source_sha": "bfbd991e01d16bc32891dea0e0ef9cdd8aac4f90",
         "verified_on": "2026-09-10"
       },
       "fact_sources": [
@@ -5903,8 +5903,8 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "2a22b31a1b0fa3cd7135f7e160176a053733e15a",
-        "verified_on": "2026-08-25"
+        "source_sha": "390cefcc8ef2e1b9717bc037cd7162d287dea26c",
+        "verified_on": "2026-09-10"
       },
       "fact_sources": [
         {

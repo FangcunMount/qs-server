@@ -12,7 +12,6 @@ import (
 )
 
 func TestIndependentRolesDenyResultsBeforeReadingAnyRepository(t *testing.T) {
-	t.Setenv("QS_AUTHZ_ROLE_MODEL", appauthz.IndependentRoleModel)
 	ctx := appauthz.WithSnapshot(context.Background(), &appauthz.Snapshot{DirectRoles: []string{"qs:assessment_operator"}, Permissions: []appauthz.Permission{{Resource: appauthz.AssessmentResource, Action: "read_progress", Mode: appauthz.AuthorizationModeUnconditional}, {Resource: appauthz.AssessmentResource, Action: "list_progress", Mode: appauthz.AuthorizationModeUnconditional}}})
 	s := &queryService{}
 	_, err := s.GetAssessment(ctx, Actor{}, 1)

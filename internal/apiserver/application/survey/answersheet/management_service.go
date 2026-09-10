@@ -73,7 +73,7 @@ func (s *managementService) resolveFillerName(ctx context.Context, result *Answe
 // GetByIDInOrg enforces business organization ownership for protected management reads.
 // A mismatch is reported as not found so callers cannot probe another org's IDs.
 func (s *managementService) GetByIDInOrg(ctx context.Context, orgID, id uint64) (*AnswerSheetResult, error) {
-	if err := appauthz.RequireResultPermission(ctx, appauthz.AnswerSheetResource, "read"); err != nil {
+	if err := appauthz.RequirePermission(ctx, appauthz.AnswerSheetResource, "read"); err != nil {
 		return nil, err
 	}
 	if orgID == 0 {
@@ -91,7 +91,7 @@ func (s *managementService) GetByIDInOrg(ctx context.Context, orgID, id uint64) 
 
 // List 查询答卷列表
 func (s *managementService) List(ctx context.Context, dto ListAnswerSheetsDTO) (*AnswerSheetSummaryListResult, error) {
-	if err := appauthz.RequireResultPermission(ctx, appauthz.AnswerSheetResource, "list"); err != nil {
+	if err := appauthz.RequirePermission(ctx, appauthz.AnswerSheetResource, "list"); err != nil {
 		return nil, err
 	}
 	if err := validateManagementListDTO(dto); err != nil {

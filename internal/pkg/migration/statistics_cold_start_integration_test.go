@@ -4,6 +4,7 @@ package migration
 
 import (
 	"context"
+	authztest "github.com/FangcunMount/qs-server/internal/apiserver/application/authz/testutil"
 	"os"
 	"strconv"
 	"testing"
@@ -130,7 +131,7 @@ func TestStatisticsColdStartPublishIdempotencyAndRedisFailure(t *testing.T) {
 		"statistics_plan_fulfillment_daily", "statistics_org_snapshot",
 	})
 
-	overview, err := module.ReadService.Overview(t.Context(), orgID, statisticsApp.QueryFilter{Preset: "latest_complete_day"})
+	overview, err := module.ReadService.Overview(authztest.WithPermission(t.Context(), "qs:evaluation:collection:assessments", "statistics"), orgID, statisticsApp.QueryFilter{Preset: "latest_complete_day"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -151,7 +152,7 @@ func TestStatisticsColdStartPublishIdempotencyAndRedisFailure(t *testing.T) {
 	if err := runtimeRedis.Close(); err != nil {
 		t.Fatal(err)
 	}
-	stale, err := module.ReadService.Overview(t.Context(), orgID, statisticsApp.QueryFilter{Preset: "latest_complete_day"})
+	stale, err := module.ReadService.Overview(authztest.WithPermission(t.Context(), "qs:evaluation:collection:assessments", "statistics"), orgID, statisticsApp.QueryFilter{Preset: "latest_complete_day"})
 	if err != nil || !stale.Freshness.IsStale {
 		t.Fatalf("Redis-down stale read: value=%+v err=%v", stale, err)
 	}
@@ -167,7 +168,7 @@ func TestStatisticsColdStartPublishIdempotencyAndRedisFailure(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := overloadedModule.ReadService.Overview(t.Context(), orgID, statisticsApp.QueryFilter{}); !componenterrors.IsCode(err, code.ErrStatisticsOverloaded) {
+	if _, err := overloadedModule.ReadService.Overview(authztest.WithPermission(t.Context(), "qs:evaluation:collection:assessments", "statistics"), orgID, statisticsApp.QueryFilter{}); !componenterrors.IsCode(err, code.ErrStatisticsOverloaded) {
 		t.Fatalf("overloaded read error=%v", err)
 	}
 

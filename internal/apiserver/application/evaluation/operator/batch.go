@@ -41,7 +41,7 @@ func NewBatchExecutionService(assessments assessment.Repository, engine Executio
 }
 
 func (s *service) EvaluateBatch(ctx context.Context, actor Actor, assessmentIDs []uint64) (*BatchResult, error) {
-	if err := appauthz.RequireResultPermission(ctx, appauthz.AssessmentResource, "batch_evaluate"); err != nil {
+	if err := appauthz.RequirePermission(ctx, appauthz.AssessmentResource, "batch_evaluate"); err != nil {
 		return nil, err
 	}
 	if err := s.authorizer.validateActor(actor); err != nil {

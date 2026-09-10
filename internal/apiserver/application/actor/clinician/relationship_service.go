@@ -351,7 +351,7 @@ func (s *relationshipService) ListClinicianRelations(ctx context.Context, dto Li
 }
 
 func (s *relationshipService) enrichAssignedRows(ctx context.Context, orgID int64, rows []actorreadmodel.TesteeRow) error {
-	if err := appauthz.RequireResultPermission(ctx, appauthz.AssessmentResource, "read"); err != nil {
+	if err := appauthz.RequirePermission(ctx, appauthz.AssessmentResource, "read"); err != nil {
 		for i := range rows {
 			rows[i].LastRiskLevel = ""
 			rows[i].TotalAssessments = 0

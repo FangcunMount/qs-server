@@ -11,7 +11,6 @@ import (
 // Role isolation matrix for the independent-v1 cutover. Assertions are action
 // facts only; role labels are fixtures that match the IAM production matrix.
 func TestIndependentRolePermissionMatrix(t *testing.T) {
-	t.Setenv("QS_AUTHZ_ROLE_MODEL", IndependentRoleModel)
 
 	operator := &Snapshot{
 		DirectRoles: []string{"qs:assessment_operator"},
@@ -58,7 +57,7 @@ func TestIndependentRolePermissionMatrix(t *testing.T) {
 	type check struct {
 		resource string
 		action   string
-		via      string // "result" uses RequireResultPermission; "perm" uses RequirePermission
+		via      string // "result" uses RequirePermission; "perm" uses RequirePermission
 		allow    bool
 	}
 	cases := []struct {
@@ -132,7 +131,7 @@ func TestIndependentRolePermissionMatrix(t *testing.T) {
 				var err error
 				switch item.via {
 				case "result":
-					err = RequireResultPermission(ctx, item.resource, item.action)
+					err = RequirePermission(ctx, item.resource, item.action)
 				default:
 					err = RequirePermission(ctx, item.resource, item.action)
 				}
@@ -148,21 +147,21 @@ func TestIndependentRolePermissionMatrix(t *testing.T) {
 	}
 }
 
-func TestLegacyRoleModelSkipsResultGate(t *testing.T) {
+func TestLegacyRoleModelCannotBypassResultGate(t *testing.T) {
 	t.Setenv("QS_AUTHZ_ROLE_MODEL", "legacy")
 	ctx := WithSnapshot(context.Background(), &Snapshot{DirectRoles: []string{"qs:assessment_operator"}})
-	if err := RequireResultPermission(ctx, AssessmentResource, "read"); err != nil {
-		t.Fatalf("legacy mode must remain open until cutover: %v", err)
+	if err := RequirePermission(ctx, AssessmentResource, "read"); !cberrors.IsCode(err, code.ErrPermissionDenied) {
+		t.Fatalf("legacy environment must not bypass permission: %v", err)
 	}
 }
 
-func TestUnknownRoleModelFailsClosed(t *testing.T) {
+func TestObsoleteRoleModelDoesNotChangePermission(t *testing.T) {
 	t.Setenv("QS_AUTHZ_ROLE_MODEL", "not-a-model")
 	ctx := WithSnapshot(context.Background(), &Snapshot{
 		Permissions: []Permission{{Resource: AssessmentResource, Action: "read", Mode: AuthorizationModeUnconditional}},
 	})
-	err := RequireResultPermission(ctx, AssessmentResource, "read")
-	if !cberrors.IsCode(err, code.ErrPermissionDenied) {
-		t.Fatalf("unknown model error = %v, want permission denied", err)
+	err := RequirePermission(ctx, AssessmentResource, "read")
+	if err != nil {
+		t.Fatalf("obsolete configuration must not change valid permissions: %v", err)
 	}
 }

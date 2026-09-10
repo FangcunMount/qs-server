@@ -2,6 +2,7 @@ package answersheet
 
 import (
 	"context"
+	authztest "github.com/FangcunMount/qs-server/internal/apiserver/application/authz/testutil"
 	"math"
 	"testing"
 	"time"
@@ -109,7 +110,7 @@ func TestManagementServiceListUsesReadModelFilter(t *testing.T) {
 		reader: reader,
 	}
 
-	_, err := service.List(context.Background(), ListAnswerSheetsDTO{
+	_, err := service.List(authztest.WithPermission(context.Background(), "qs:answersheet:collection:answersheets", "list"), ListAnswerSheetsDTO{
 		OrgID:             88,
 		QuestionnaireCode: "QNR-009",
 		FillerID:          &fillerID,
@@ -214,13 +215,13 @@ func TestManagementServiceGetByIDReturnsConvertedAnswerSheet(t *testing.T) {
 		t.Fatalf("unexpected answers: %+v", result.Answers)
 	}
 	t.Run("business organization ownership remains enforced without authorization partition context", func(t *testing.T) {
-		if _, err := service.GetByIDInOrg(context.Background(), 1, 12); err != nil {
+		if _, err := service.GetByIDInOrg(authztest.WithPermission(context.Background(), "qs:answersheet:collection:answersheets", "read"), 1, 12); err != nil {
 			t.Fatalf("GetByIDInOrg same org returned error: %v", err)
 		}
-		if _, err := service.GetByIDInOrg(context.Background(), 2, 12); errors.ParseCoder(err).Code() != errorCode.ErrAnswerSheetNotFound {
+		if _, err := service.GetByIDInOrg(authztest.WithPermission(context.Background(), "qs:answersheet:collection:answersheets", "read"), 2, 12); errors.ParseCoder(err).Code() != errorCode.ErrAnswerSheetNotFound {
 			t.Fatalf("GetByIDInOrg cross org error = %v, want not found", err)
 		}
-		if _, err := service.GetByIDInOrg(context.Background(), 0, 12); errors.ParseCoder(err).Code() != errorCode.ErrPermissionDenied {
+		if _, err := service.GetByIDInOrg(authztest.WithPermission(context.Background(), "qs:answersheet:collection:answersheets", "read"), 0, 12); errors.ParseCoder(err).Code() != errorCode.ErrPermissionDenied {
 			t.Fatalf("GetByIDInOrg missing org error = %v, want permission denied", err)
 		}
 	})

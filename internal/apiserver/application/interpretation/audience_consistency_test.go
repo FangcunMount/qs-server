@@ -2,6 +2,7 @@ package interpretation_test
 
 import (
 	"context"
+	authztest "github.com/FangcunMount/qs-server/internal/apiserver/application/authz/testutil"
 	"testing"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/administration"
@@ -23,11 +24,11 @@ func TestRestrictedClinicianAdministrationMatchesClinicianModelExtra(t *testing.
 	adminSvc := administration.NewService(reader, restrictedAdminAccess{}, reportprojection.Mapper{})
 	clinicianSvc := clinician.NewService(reader, clinicianAccess{}, reportprojection.Mapper{})
 
-	adminReport, err := adminSvc.GetReport(context.Background(), administration.Actor{OrgID: 1, OperatorUserID: 2}, administration.GetQuery{AssessmentID: 42})
+	adminReport, err := adminSvc.GetReport(authztest.WithPermission(context.Background(), "qs:evaluation:collection:reports", "read"), administration.Actor{OrgID: 1, OperatorUserID: 2}, administration.GetQuery{AssessmentID: 42})
 	if err != nil {
 		t.Fatal(err)
 	}
-	clinicianReport, err := clinicianSvc.GetParticipantReport(context.Background(), clinician.Actor{OrgID: 1, OperatorUserID: 2}, clinician.GetQuery{TesteeID: 7, AssessmentID: 42})
+	clinicianReport, err := clinicianSvc.GetParticipantReport(authztest.WithPermission(context.Background(), "qs:evaluation:collection:reports", "read"), clinician.Actor{OrgID: 1, OperatorUserID: 2}, clinician.GetQuery{TesteeID: 7, AssessmentID: 42})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -49,7 +50,7 @@ func TestAdminAdministrationStillSeesModelExtra(t *testing.T) {
 	reader := &sharedReportReader{row: row}
 	adminSvc := administration.NewService(reader, adminActorAccess{}, reportprojection.Mapper{})
 
-	report, err := adminSvc.GetReport(context.Background(), administration.Actor{OrgID: 1, OperatorUserID: 2}, administration.GetQuery{AssessmentID: 42})
+	report, err := adminSvc.GetReport(authztest.WithPermission(context.Background(), "qs:evaluation:collection:reports", "read"), administration.Actor{OrgID: 1, OperatorUserID: 2}, administration.GetQuery{AssessmentID: 42})
 	if err != nil {
 		t.Fatal(err)
 	}

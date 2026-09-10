@@ -3,6 +3,7 @@ package administration
 import (
 	"context"
 	"errors"
+	authztest "github.com/FangcunMount/qs-server/internal/apiserver/application/authz/testutil"
 	"testing"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/reportprojection"
@@ -14,7 +15,7 @@ func TestGetAuthorizesBeforeRead(t *testing.T) {
 	denied := errors.New("denied")
 	r := &adminReader{}
 	s := NewService(r, adminAccess{err: denied}, reportprojection.Mapper{})
-	_, err := s.GetReport(context.Background(), Actor{OrgID: 1, OperatorUserID: 2}, GetQuery{AssessmentID: 3})
+	_, err := s.GetReport(authztest.WithPermission(context.Background(), "qs:evaluation:collection:reports", "read"), Actor{OrgID: 1, OperatorUserID: 2}, GetQuery{AssessmentID: 3})
 	if !errors.Is(err, denied) {
 		t.Fatal(err)
 	}
@@ -32,7 +33,7 @@ func TestListUsesResolvedScope(t *testing.T) {
 		IsAdmin:             false,
 		DecisionSource:      "test",
 	}}, reportprojection.Mapper{})
-	_, err := s.ListReports(context.Background(), Actor{OrgID: 1, OperatorUserID: 2}, ListQuery{})
+	_, err := s.ListReports(authztest.WithPermission(context.Background(), "qs:evaluation:collection:reports", "list"), Actor{OrgID: 1, OperatorUserID: 2}, ListQuery{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -49,7 +50,7 @@ func TestListUsesOrganizationScopeForAdministrator(t *testing.T) {
 		IsAdmin:        true,
 		DecisionSource: "test",
 	}}, reportprojection.Mapper{})
-	if _, err := s.ListReports(context.Background(), Actor{OrgID: 9, OperatorUserID: 2}, ListQuery{}); err != nil {
+	if _, err := s.ListReports(authztest.WithPermission(context.Background(), "qs:evaluation:collection:reports", "list"), Actor{OrgID: 9, OperatorUserID: 2}, ListQuery{}); err != nil {
 		t.Fatal(err)
 	}
 	if r.filter.OrgID == nil || *r.filter.OrgID != 9 {
@@ -67,7 +68,7 @@ func TestRestrictedClinicianAdministrationHidesModelExtra(t *testing.T) {
 		Restricted:     true,
 		DecisionSource: "test",
 	}}, reportprojection.Mapper{})
-	result, err := s.GetReport(context.Background(), Actor{OrgID: 1, OperatorUserID: 2}, GetQuery{AssessmentID: 3})
+	result, err := s.GetReport(authztest.WithPermission(context.Background(), "qs:evaluation:collection:reports", "read"), Actor{OrgID: 1, OperatorUserID: 2}, GetQuery{AssessmentID: 3})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -86,7 +87,7 @@ func TestAdminAdministrationKeepsModelExtra(t *testing.T) {
 		Restricted:     false,
 		DecisionSource: "test",
 	}}, reportprojection.Mapper{})
-	result, err := s.GetReport(context.Background(), Actor{OrgID: 1, OperatorUserID: 2}, GetQuery{AssessmentID: 3})
+	result, err := s.GetReport(authztest.WithPermission(context.Background(), "qs:evaluation:collection:reports", "read"), Actor{OrgID: 1, OperatorUserID: 2}, GetQuery{AssessmentID: 3})
 	if err != nil {
 		t.Fatal(err)
 	}

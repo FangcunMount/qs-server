@@ -5,13 +5,11 @@ import (
 	"testing"
 
 	cberrors "github.com/FangcunMount/component-base/pkg/errors"
-	appauthz "github.com/FangcunMount/qs-server/internal/apiserver/application/authz"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/stretchr/testify/require"
 )
 
 func TestIndependentRolesDenyAnswerSheetResultsBeforeRepository(t *testing.T) {
-	t.Setenv("QS_AUTHZ_ROLE_MODEL", appauthz.IndependentRoleModel)
 	s := &managementService{}
 	ctx := context.Background()
 

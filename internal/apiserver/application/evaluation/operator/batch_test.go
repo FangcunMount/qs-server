@@ -3,6 +3,7 @@ package operator
 import (
 	"context"
 	"errors"
+	authztest "github.com/FangcunMount/qs-server/internal/apiserver/application/authz/testutil"
 	"reflect"
 	"testing"
 
@@ -59,7 +60,7 @@ func TestEvaluateBatchValidatesEntireOrganizationBeforeExecuting(t *testing.T) {
 	worker := &workerStub{}
 	access := &accessCheckerStub{}
 
-	if _, err := NewBatchExecutionService(repo, worker, access).EvaluateBatch(context.Background(), Actor{OrgID: 1, OperatorUserID: 9}, []uint64{1, 2}); err == nil {
+	if _, err := NewBatchExecutionService(repo, worker, access).EvaluateBatch(authztest.WithPermission(context.Background(), "qs:evaluation:collection:assessments", "batch_evaluate"), Actor{OrgID: 1, OperatorUserID: 9}, []uint64{1, 2}); err == nil {
 		t.Fatal("EvaluateBatch() error = nil, want organization mismatch")
 	}
 	if len(worker.calls) != 0 {
@@ -76,7 +77,7 @@ func TestEvaluateBatchPreservesSynchronousAggregateResult(t *testing.T) {
 	worker := &workerStub{fails: map[uint64]error{2: errors.New("failed")}}
 	access := &accessCheckerStub{}
 
-	result, err := NewBatchExecutionService(repo, worker, access).EvaluateBatch(context.Background(), Actor{OrgID: 1, OperatorUserID: 9}, []uint64{1, 2, 3})
+	result, err := NewBatchExecutionService(repo, worker, access).EvaluateBatch(authztest.WithPermission(context.Background(), "qs:evaluation:collection:assessments", "batch_evaluate"), Actor{OrgID: 1, OperatorUserID: 9}, []uint64{1, 2, 3})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -96,7 +97,7 @@ func TestEvaluateBatchValidatesEveryTesteeBeforeExecuting(t *testing.T) {
 	worker := &workerStub{}
 	access := &accessCheckerStub{denied: map[uint64]error{102: errors.New("forbidden")}}
 
-	if _, err := NewBatchExecutionService(repo, worker, access).EvaluateBatch(context.Background(), Actor{OrgID: 1, OperatorUserID: 9}, []uint64{1, 2}); err == nil {
+	if _, err := NewBatchExecutionService(repo, worker, access).EvaluateBatch(authztest.WithPermission(context.Background(), "qs:evaluation:collection:assessments", "batch_evaluate"), Actor{OrgID: 1, OperatorUserID: 9}, []uint64{1, 2}); err == nil {
 		t.Fatal("EvaluateBatch() error = nil, want testee access denial")
 	}
 	if len(worker.calls) != 0 {

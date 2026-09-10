@@ -74,7 +74,7 @@ func NewService(reader interpretationreadmodel.ReportReader, access Access, proj
 }
 
 func (s *service) GetReport(ctx context.Context, actor Actor, query GetQuery) (*Report, error) {
-	if err := appauthz.RequireResultPermission(ctx, "qs:evaluation:collection:reports", "read"); err != nil {
+	if err := appauthz.RequirePermission(ctx, "qs:evaluation:collection:reports", "read"); err != nil {
 		return nil, err
 	}
 	if actor.OrgID == 0 || actor.OperatorUserID == 0 || query.AssessmentID == 0 {
@@ -98,7 +98,7 @@ func (s *service) GetReport(ctx context.Context, actor Actor, query GetQuery) (*
 }
 
 func (s *service) ListReports(ctx context.Context, actor Actor, query ListQuery) (*ListResult, error) {
-	if err := appauthz.RequireResultPermission(ctx, "qs:evaluation:collection:reports", "list"); err != nil {
+	if err := appauthz.RequirePermission(ctx, "qs:evaluation:collection:reports", "list"); err != nil {
 		return nil, err
 	}
 	if actor.OrgID == 0 || actor.OperatorUserID == 0 {
