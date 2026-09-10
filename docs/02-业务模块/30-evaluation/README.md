@@ -177,6 +177,8 @@ Assessment 固化 Questionnaire 与 AssessmentModel 的发布版本。运营发�
 
 ### 7.5 对象授权必须位于业务事实与事务之间
 
+后台完整测评、评分、趋势与运行记录查询始终检查对应动作权限，并同时保留组织和受试者关系范围。角色模型环境变量不再参与放行。进度查询使用独立 DTO；运营员重试成功后，无结果权限时只返回受理响应。参与者与监护人的自服务查询保持独立边界。
+
 人工 retry 先用授权快照确认存在 `qs:evaluation:collection:assessments/retry` 候选，
 再由 `GovernedRetryService` 加载 Assessment、校验组织与 Testee 等业务关系，从领域对象提取 `object.origin_type`，最后调用 IAM AuthZ v4 `Check`。
 只有对象授权通过后，才检查可观察的失败状态并进入 retry 事务。
