@@ -54,11 +54,3 @@ func toOperatorResultFromRow(row *actorreadmodel.OperatorRow) *OperatorResult {
 		IsActive:               row.IsActive,
 	}
 }
-
-func roleStrings(roles []domain.Role) []string {
-	result := make([]string, len(roles))
-	for index, role := range roles {
-		result[index] = string(role)
-	}
-	return result
-}
