@@ -43,6 +43,7 @@ func (h *AIWorkflowManagementHandler) failure(c *gin.Context, err error) {
 	}
 	h.Error(c, cberrors.WithCode(errorCode, "%s", message))
 }
+
 // Get godoc
 // @Summary 查询 qs-ai 评测状态
 // @Description 需要当前机构 OrgAdmin 权限；组织和操作人取认证上下文。管理功能默认关闭。
@@ -69,6 +70,7 @@ func (h *AIWorkflowManagementHandler) Get(c *gin.Context) {
 	}
 	h.Success(c, value)
 }
+
 // ResolveUnknown godoc
 // @Summary 处置 qs-ai 评测未知结果
 // @Description 需要当前机构 OrgAdmin 权限；组织和操作人取认证上下文。管理功能默认关闭。
