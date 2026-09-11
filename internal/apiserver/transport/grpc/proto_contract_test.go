@@ -45,7 +45,7 @@ func TestProtoGoPackageContractUsesSharedGRPCGenPath(t *testing.T) {
 	}
 }
 
-func TestGRPCRegistryHasConstructorForEveryProtoService(t *testing.T) {
+func TestGRPCProtoServicesHaveExplicitOwners(t *testing.T) {
 	t.Parallel()
 
 	registryData, err := os.ReadFile("registry.go")
@@ -55,6 +55,14 @@ func TestGRPCRegistryHasConstructorForEveryProtoService(t *testing.T) {
 	registry := string(registryData)
 	protoRoot := filepath.Clean("../../../../api/grpc/proto")
 	serviceRe := regexp.MustCompile(`(?m)^service\s+(\w+)`)
+	packageRe := regexp.MustCompile(`(?m)^package\s+([\w.]+)\s*;`)
+	// Shared contracts also describe external servers and independently hosted services.
+	// Pin each exception to its full name, contract path and concrete QS integration.
+	otherOwners := map[string]struct{ proto, source, call string }{
+		"qsai.workflow.v1.Commands": {"aiworkflow/workflow.proto", "../../infra/aibridge/client.go", "pb.NewCommandsClient("},
+		"qsai.workflow.v1.Results":  {"aiworkflow/workflow.proto", "../../../../cmd/qs-ai-bridge/main.go", "pb.RegisterResultsServer("},
+	}
+	seenOwners := make(map[string]bool)
 	constructorByService := map[string]string{
 		"AssessmentModelCatalogService":   "NewAssessmentModelCatalogService",
 		"ActorService":                    "NewActorService",
@@ -82,8 +90,34 @@ func TestGRPCRegistryHasConstructorForEveryProtoService(t *testing.T) {
 		if err != nil {
 			return err
 		}
+		packageMatch := packageRe.FindStringSubmatch(string(data))
+		if len(packageMatch) != 2 {
+			t.Fatalf("%s has no package declaration", path)
+		}
+		relative, err := filepath.Rel(protoRoot, path)
+		if err != nil {
+			return err
+		}
 		for _, match := range serviceRe.FindAllStringSubmatch(string(data), -1) {
 			serviceName := match[1]
+			fullName := packageMatch[1] + "." + serviceName
+			if owner, ok := otherOwners[fullName]; ok {
+				if filepath.ToSlash(relative) != owner.proto || seenOwners[fullName] {
+					t.Fatalf("unexpected or duplicate contract location for %s: %s", fullName, path)
+				}
+				seenOwners[fullName] = true
+				source, err := os.ReadFile(owner.source)
+				if err != nil {
+					return err
+				}
+				if !strings.Contains(string(source), owner.call) {
+					t.Fatalf("%s must use %s for %s", owner.source, owner.call, fullName)
+				}
+				if strings.Contains(registry, "Register"+serviceName+"Server(") {
+					t.Fatalf("%s must not be hosted by the main QS registry", fullName)
+				}
+				continue
+			}
 			constructor := constructorByService[serviceName]
 			if constructor == "" {
 				t.Fatalf("%s declares service %s without registry constructor contract", path, serviceName)
@@ -96,6 +130,11 @@ func TestGRPCRegistryHasConstructorForEveryProtoService(t *testing.T) {
 	})
 	if err != nil {
 		t.Fatal(err)
+	}
+	for name := range otherOwners {
+		if !seenOwners[name] {
+			t.Fatalf("stale service ownership contract: %s", name)
+		}
 	}
 }
 
@@ -239,5 +278,22 @@ func TestGRPCRegistryImportsTransportOwnedServiceFacade(t *testing.T) {
 	}
 	if !strings.Contains(source, "internal/apiserver/transport/grpc/service") {
 		t.Fatal("transport/grpc registry should depend on the transport-owned service facade")
+	}
+}
+
+func TestQSBridgeReleaseArtifactKeepsDefaultEntrypoint(t *testing.T) {
+	t.Parallel()
+	data, err := os.ReadFile("../../../../build/docker/Dockerfile.qs-apiserver")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, required := range []string{
+		"-o /build/bin/qs-ai-bridge ./cmd/qs-ai-bridge",
+		"COPY --from=builder --chown=www:www /build/bin/qs-ai-bridge /app/qs-ai-bridge",
+		`ENTRYPOINT ["/app/qs-apiserver"]`,
+	} {
+		if !strings.Contains(string(data), required) {
+			t.Fatalf("release image missing bridge/default entrypoint contract: %s", required)
+		}
 	}
 }
