@@ -54,17 +54,19 @@ type gateway struct {
 	version   int64
 	calls     int
 	fail      bool
+	changedBy string
 }
 
 func (g *gateway) IsEnabled() bool { return true }
 func (g *gateway) LoadOperatorRoleProjection(context.Context, int64, int64) (iambridge.OperatorRoleProjection, error) {
 	return iambridge.OperatorRoleProjection{ProtectedAccess: g.protected, DirectRoles: g.roles, EffectiveRoles: g.roles, PolicyVersion: g.version}, nil
 }
-func (g *gateway) ReplaceManagedOperatorRoles(context.Context, int64, int64, []string, string, string) (int64, error) {
+func (g *gateway) ReplaceManagedOperatorRoles(_ context.Context, _, _ int64, _ []string, changedBy, _ string) (int64, error) {
 	if !g.r.disabled {
 		panic("revocation before local disable")
 	}
 	g.calls++
+	g.changedBy = changedBy
 	if g.fail {
 		return 0, fmt.Errorf("IAM unavailable")
 	}
@@ -77,6 +79,15 @@ func fixture() (*Service, *memoryRepo, *gateway, context.Context, Command) {
 	g := &gateway{r: r, roles: []string{"qs:result_reviewer"}, version: 10}
 	ctx := authz.WithSnapshot(context.Background(), &authz.Snapshot{Permissions: []authz.Permission{{Resource: "qs:*:*:*", Action: "*", Mode: authz.AuthorizationModeUnconditional}}})
 	return NewService(r, g), r, g, ctx, Command{OrgID: 1, ActorID: 9, OperatorID: 7, ExpectedVersion: 3, RequestID: "exit-7", Reason: "doctor backend retirement"}
+}
+func TestRetirementDelegatesTheAuthenticatedUserReferenceToIAM(t *testing.T) {
+	s, _, g, ctx, cmd := fixture()
+	if _, err := s.Execute(ctx, cmd); err != nil {
+		t.Fatal(err)
+	}
+	if g.changedBy != "user:9" {
+		t.Fatalf("IAM requires a typed delegated user reference, got %q", g.changedBy)
+	}
 }
 func TestRetirementResumesAfterIAMFailureAndCompletedReplayDoesNotWrite(t *testing.T) {
 	s, r, g, ctx, cmd := fixture()

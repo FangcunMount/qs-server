@@ -109,7 +109,7 @@ func (s *Service) Execute(ctx context.Context, cmd Command) (*domain.Task, error
 		if task.Stage == domain.Disabled {
 			version := projection.PolicyVersion
 			if hasRoles {
-				version, err = s.authz.ReplaceManagedOperatorRoles(locked, task.OrgID, task.UserID, []string{}, fmt.Sprint(cmd.ActorID), task.Reason)
+				version, err = s.authz.ReplaceManagedOperatorRoles(locked, task.OrgID, task.UserID, []string{}, fmt.Sprintf("user:%d", cmd.ActorID), task.Reason)
 				if err != nil {
 					return fail(err)
 				}
