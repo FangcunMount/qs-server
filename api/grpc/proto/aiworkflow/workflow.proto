@@ -1,0 +1,26 @@
+syntax = "proto3";
+package qsai.workflow.v1;
+option go_package = "github.com/FangcunMount/qs-server/api/grpc/gen/aiworkflow";
+service Commands {
+ rpc Start(StartCommand) returns (Receipt);
+ rpc Change(ChangeCommand) returns (Receipt);
+}
+service Results { rpc Accept(StateEvent) returns (Acknowledgement); }
+message Actor { string org_id = 1; string subject_id = 2; }
+message StartCommand {
+ string request_id = 1; Actor actor = 2; string testee_id = 3;
+ repeated string assessment_ids = 4; string goal = 5;
+}
+message ChangeCommand {
+ string command_id = 1; string session_id = 2; Actor actor = 3;
+ string action = 4; int64 expected_version = 5; string question_id = 6;
+ optional string answer = 7; bool skip = 8;
+}
+message Receipt { string session_id = 1; string run_id = 2; string status = 3; int64 version = 4; }
+// Snapshot event. Intermediate versions may be skipped; newer versions never regress.
+message StateEvent {
+ string event_id = 1; string request_id = 2; string session_id = 3;
+ Actor actor = 4; string testee_id = 5; int64 version = 6; string status = 7;
+ string question_id = 8; string question = 9; bool can_skip = 10; string failure_code = 11;
+}
+message Acknowledgement { string event_id = 1; }

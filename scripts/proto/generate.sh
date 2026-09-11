@@ -24,4 +24,6 @@ generate "${PROTO_PATH}/interpretation/interpretation.proto"
 generate "${PROTO_PATH}/internalapi/internal.proto"
 generate "${PROTO_PATH}/assessmentmodel/assessment_model_catalog.proto"
 
+generate "${PROTO_PATH}/aiworkflow/workflow.proto"
+
 echo "Proto files generated successfully!"
