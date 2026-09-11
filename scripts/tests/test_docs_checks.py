@@ -25,17 +25,19 @@ class DocsFactsHelpersTest(unittest.TestCase):
 
     def test_grpc_inventory_includes_multiline_and_deprecated_rpcs(self) -> None:
         services, proto_file_count = check_docs_facts.grpc_inventory()
-        self.assertEqual(proto_file_count, 7)
-        self.assertEqual(len(services), 13)
-        self.assertEqual(sum(len(rpcs) for rpcs in services.values()), 55)
+        self.assertEqual(proto_file_count, 8)
+        self.assertEqual(len(services), 15)
+        self.assertEqual(sum(len(rpcs) for rpcs in services.values()), 58)
         self.assertIn("GenerateReportFromAssessment", services["interpretation.InterpretationAutomationService"])
         self.assertIn("ExecutePromptEvaluationStep", services["interpretation.AIExplanationAutomationService"])
         self.assertIn("SyncAssessmentAttention", services["internalapi.InternalService"])
+        self.assertEqual(services["qsai.workflow.v1.Commands"], ["Start", "Change"])
+        self.assertEqual(services["qsai.workflow.v1.Results"], ["Accept"])
 
     def test_migration_inventory_is_paired_and_current(self) -> None:
         inventory, issues = check_docs_facts.migration_inventory()
         self.assertEqual(issues, [])
-        self.assertEqual(inventory["mysql"], {"max_version": 71, "version_count": 71})
+        self.assertEqual(inventory["mysql"], {"max_version": 72, "version_count": 72})
         self.assertEqual(inventory["mongodb"], {"max_version": 33, "version_count": 33})
 
     def test_ledger_metadata_uses_named_fields(self) -> None:
