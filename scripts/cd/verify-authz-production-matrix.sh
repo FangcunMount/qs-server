@@ -47,7 +47,7 @@ fi
 
 evidence_file="$(mktemp /tmp/qs-authz-matrix-evidence.XXXXXX)"
 trap 'rm -f -- "$evidence_file"' EXIT
-printf '%s\n' "$matrix_output" | awk '/^\{"schema_version":"iam-authz-production-matrix\/v2"/{evidence=$0} END{print evidence}' >"$evidence_file"
+printf '%s\n' "$matrix_output" | awk '/^\{"schema_version":"iam-authz-production-matrix\/v3"/{evidence=$0} END{print evidence}' >"$evidence_file"
 if [ ! -s "$evidence_file" ]; then
   echo "Production AuthZ matrix evidence JSON is missing" >&2
   exit 1
@@ -62,16 +62,14 @@ with open(sys.argv[1], encoding="utf-8") as handle:
     evidence = json.load(handle)
 
 expected = {
-    ("admin", "adhoc"): True,
-    ("admin", "plan"): True,
-    ("evaluator", "adhoc"): True,
-    ("evaluator", "plan"): False,
-    ("plan_manager", "adhoc"): False,
-    ("plan_manager", "plan"): True,
-    ("other", "adhoc"): False,
-    ("other", "plan"): False,
+    ("admin", "retry"): True,
+    ("operator", "retry"): True,
+    ("plan_manager", "retry"): True,
+    ("other", "retry"): False,
+    ("operator", "force_retry"): False,
+    ("admin", "force_retry"): True,
 }
-if evidence.get("schema_version") != "iam-authz-production-matrix/v2":
+if evidence.get("schema_version") != "iam-authz-production-matrix/v3":
     raise SystemExit("unexpected AuthZ matrix evidence schema")
 if evidence.get("git_commit") != os.environ["DEPLOYED_SHA"]:
     raise SystemExit("AuthZ matrix binary SHA does not match deployed image")
@@ -79,16 +77,16 @@ if evidence.get("service_identity") != "qs-apiserver.svc":
     raise SystemExit("AuthZ matrix did not use qs-apiserver.svc")
 if evidence.get("policy_version", 0) <= 0 or evidence.get("passed") is not True:
     raise SystemExit("AuthZ matrix evidence is not a passing loaded policy")
-if len(evidence.get("subjects", [])) != 4 or len(evidence.get("cases", [])) != 12:
+if len(evidence.get("subjects", [])) != 4 or len(evidence.get("cases", [])) != 6:
     raise SystemExit("AuthZ matrix evidence is incomplete")
 
 subjects = {subject.get("kind"): subject for subject in evidence["subjects"]}
-if set(subjects) != {"admin", "evaluator", "plan_manager", "other"}:
+if set(subjects) != {"admin", "operator", "plan_manager", "other"}:
     raise SystemExit("AuthZ matrix subject kinds are incomplete")
 for kind in ("admin", "other"):
     if subjects[kind].get("source") != "production_staff":
         raise SystemExit(f"AuthZ matrix {kind} subject is not production staff")
-for kind in ("evaluator", "plan_manager"):
+for kind in ("operator", "plan_manager"):
     if subjects[kind].get("source") != "synthetic_iam_user":
         raise SystemExit(f"AuthZ matrix {kind} subject is not an isolated IAM user")
 for subject in subjects.values():
@@ -96,33 +94,22 @@ for subject in subjects.values():
         raise SystemExit("AuthZ matrix subject fingerprint is invalid")
 
 observed = {}
-special = {}
 for case in evidence["cases"]:
-    if case.get("scenario") == "origin" and case.get("action") == "retry" and case.get("origin_type"):
-        observed[(case["kind"], case["origin_type"])] = case.get("allowed")
-    else:
-        special[(case.get("kind"), case.get("scenario"), case.get("action"))] = case
-    if case.get("passed") is not True:
-        raise SystemExit(f"AuthZ matrix case failed: {case.get('kind')}/{case.get('scenario')}")
+    key = (case.get("kind"), case.get("action"))
+    if key in observed or key not in expected:
+        raise SystemExit("unexpected or duplicate action evidence")
+    if case.get("scenario") != case.get("action") or case.get("passed") is not True:
+        raise SystemExit("invalid action evidence")
+    if case.get("policy_version") != evidence["policy_version"]:
+        raise SystemExit("action evidence policy versions differ")
+    if case.get("expected_allowed") != expected[key] or case.get("error_code"):
+        raise SystemExit("unexpected action outcome")
+    observed[key] = case.get("allowed")
 if observed != expected:
-    raise SystemExit(f"AuthZ role x origin matrix mismatch: {observed}")
-missing = special.get(("evaluator", "attribute_missing", "retry"), {})
-if missing.get("allowed") is not False or missing.get("deny_code") != "attribute_missing" or "object.origin_type" not in missing.get("missing_attribute_keys", []):
-    raise SystemExit("AuthZ evaluator missing-attribute evidence is invalid")
-invalid_type = special.get(("evaluator", "attribute_type_error", "retry"), {})
-if invalid_type.get("error_code") != "authorization_contract":
-    raise SystemExit("AuthZ evaluator invalid-type evidence is invalid")
-evaluator_force = special.get(("evaluator", "force_retry", "force_retry"), {})
-if evaluator_force.get("allowed") is not False or evaluator_force.get("deny_code") != "policy_not_matched":
-    raise SystemExit("AuthZ evaluator force_retry evidence is invalid")
-admin_force = special.get(("admin", "force_retry", "force_retry"), {})
-if admin_force.get("allowed") is not True:
-    raise SystemExit("AuthZ admin force_retry evidence is invalid")
-if len(special) != 4:
-    raise SystemExit(f"AuthZ special-case evidence is incomplete: {sorted(special)}")
+    raise SystemExit(f"AuthZ role/action matrix mismatch: {observed}")
 print(
-    "Production AuthZ v3 matrix passed: "
-    f"subjects=4 cases=12 synthetic_subjects=2 "
+    "Production AuthZ action matrix passed: "
+    f"subjects=4 cases=6 synthetic_subjects=2 "
     f"policy_version={evidence['policy_version']} sha={evidence['git_commit']}"
 )
 PY

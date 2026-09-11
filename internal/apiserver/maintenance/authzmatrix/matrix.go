@@ -101,7 +101,7 @@ func (r *Runner) Run(ctx context.Context) (Evidence, error) {
 		return Evidence{}, errors.New("authz matrix runner is required")
 	}
 	evidence := Evidence{
-		SchemaVersion: "iam-authz-production-matrix/v2",
+		SchemaVersion: "iam-authz-production-matrix/v3",
 		CheckedAt:     r.now().UTC(), GitCommit: r.gitCommit, ServiceIdentity: r.serviceIdentity,
 		Resource: AssessmentResource, Action: RetryAction,
 	}
