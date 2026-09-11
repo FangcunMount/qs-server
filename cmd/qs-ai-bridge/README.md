@@ -26,3 +26,5 @@ go test -race ./internal/apiserver/application/aibridge ./internal/apiserver/inf
 协议源文件由 qs-ai 的 `integrations/workflow/proto/workflow.proto` 持有，本仓复制到 `api/grpc/proto/aiworkflow/workflow.proto`，使用现有生成脚本生成。跨语言回归入口位于 qs-ai 的 `tests/integration/test_delivery.py`，覆盖重复请求、确认丢失、乱序回传、接收端重启及错误证书身份。
 
 当前结果契约仅含状态、问题和阻断原因；正式 Artifact、真实资源授权/事实读取、产品入口切换和生产调度在后续批次实现。旧 AI 引擎及其流量保持原状。
+
+发布镜像 `qs-apiserver` 携带 `/app/qs-ai-bridge`，默认入口仍为原 apiserver。桥接命令与接收端需在事实授权、服务证书和数据库就绪后单独启用；发布镜像不等于启用新 AI 流量。
