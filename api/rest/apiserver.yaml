@@ -10044,6 +10044,73 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/core.ErrResponse'
+  /internal/v2/interpretation/ai-workflow/evaluations/{run_id}/start:
+    post:
+      tags:
+      - AI-Workflow-Management
+      summary: 启动已冻结的 qs-ai 评测
+      description: 需要当前机构 OrgAdmin 权限、明确确认和当前版本；超时后先回读状态。管理功能默认关闭。
+      operationId: 启动已冻结的qsai评测
+      parameters:
+      - type: string
+        description: 评测 Run UUID
+        name: run_id
+        in: path
+        required: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/aibridge.EvaluationStart'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/core.Response'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/aibridge.EvaluationState'
+        '400':
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '409':
+          description: Conflict
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
   /internal/v2/statistics/runs:
     get:
       tags:
@@ -10268,6 +10335,15 @@ paths:
                 $ref: '#/components/schemas/core.ErrResponse'
 components:
   schemas:
+    aibridge.EvaluationStart:
+      type: object
+      properties:
+        confirm:
+          type: boolean
+        expected_version:
+          type: integer
+        reason:
+          type: string
     aibridge.EvaluationState:
       type: object
       properties:

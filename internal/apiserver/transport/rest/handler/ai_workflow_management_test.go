@@ -55,3 +55,27 @@ func TestAIWorkflowManagementRejectsMissingIdentity(t *testing.T) {
 		t.Fatalf("status=%d calls=%d", w.Code, gateway.calls)
 	}
 }
+
+func (g *managementGateway) StartEvaluation(ctx context.Context, s app.EvaluationScope, _ app.EvaluationStart) (app.EvaluationState, error) {
+	return g.GetEvaluation(ctx, s)
+}
+
+func TestAIWorkflowStartUsesProtectedIdentityNotBody(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	gateway := &managementGateway{}
+	h := NewAIWorkflowManagementHandler(&app.EvaluationAdministration{Gateway: gateway})
+	body := `{"organization_id":999,"operator_user_id":999,"expected_version":6,"execution_id":"execution:1","decision":"cancel_run","reason":"确认取消","confirm":true,"acknowledged_duplicate_call_and_cost_risk":true}`
+	w := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(w)
+	ctx.Request = httptest.NewRequest("POST", "/", strings.NewReader(body))
+	ctx.Request.Header.Set("Content-Type", "application/json")
+	ctx.Params = gin.Params{{Key: "run_id", Value: "00000000-0000-4000-8000-000000000001"}}
+	ctx.Set(middleware.OrgIDKey, uint64(12))
+	ctx.Set(middleware.UserIDKey, uint64(34))
+	snapshot := &authz.Snapshot{EffectiveRoles: []string{"qs:admin"}, Permissions: []authz.Permission{{Resource: "qs:*:*:*", Action: "*", Mode: authz.AuthorizationModeUnconditional}}}
+	ctx.Request = ctx.Request.WithContext(authz.WithSnapshot(ctx.Request.Context(), snapshot))
+	h.Start(ctx)
+	if w.Code != 200 || gateway.calls != 1 || gateway.scope.OrganizationID != 12 || gateway.scope.OperatorUserID != 34 {
+		t.Fatalf("status=%d calls=%d scope=%+v", w.Code, gateway.calls, gateway.scope)
+	}
+}

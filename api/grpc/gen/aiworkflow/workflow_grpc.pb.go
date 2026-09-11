@@ -261,6 +261,7 @@ var Results_ServiceDesc = grpc.ServiceDesc{
 }
 
 const (
+	EvaluationManagement_Start_FullMethodName          = "/qsai.workflow.v1.EvaluationManagement/Start"
 	EvaluationManagement_Get_FullMethodName            = "/qsai.workflow.v1.EvaluationManagement/Get"
 	EvaluationManagement_ResolveUnknown_FullMethodName = "/qsai.workflow.v1.EvaluationManagement/ResolveUnknown"
 )
@@ -271,6 +272,8 @@ const (
 //
 // Trusted QS backend only. QS must authorize OrgAdmin before forwarding these operations.
 type EvaluationManagementClient interface {
+	// Explicitly schedules an existing frozen requested Run; does not call a model inline.
+	Start(ctx context.Context, in *EvaluationStartCommand, opts ...grpc.CallOption) (*EvaluationState, error)
 	Get(ctx context.Context, in *EvaluationQuery, opts ...grpc.CallOption) (*EvaluationState, error)
 	ResolveUnknown(ctx context.Context, in *UnknownResolutionCommand, opts ...grpc.CallOption) (*EvaluationState, error)
 }
@@ -281,6 +284,16 @@ type evaluationManagementClient struct {
 
 func NewEvaluationManagementClient(cc grpc.ClientConnInterface) EvaluationManagementClient {
 	return &evaluationManagementClient{cc}
+}
+
+func (c *evaluationManagementClient) Start(ctx context.Context, in *EvaluationStartCommand, opts ...grpc.CallOption) (*EvaluationState, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(EvaluationState)
+	err := c.cc.Invoke(ctx, EvaluationManagement_Start_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
 }
 
 func (c *evaluationManagementClient) Get(ctx context.Context, in *EvaluationQuery, opts ...grpc.CallOption) (*EvaluationState, error) {
@@ -309,6 +322,8 @@ func (c *evaluationManagementClient) ResolveUnknown(ctx context.Context, in *Unk
 //
 // Trusted QS backend only. QS must authorize OrgAdmin before forwarding these operations.
 type EvaluationManagementServer interface {
+	// Explicitly schedules an existing frozen requested Run; does not call a model inline.
+	Start(context.Context, *EvaluationStartCommand) (*EvaluationState, error)
 	Get(context.Context, *EvaluationQuery) (*EvaluationState, error)
 	ResolveUnknown(context.Context, *UnknownResolutionCommand) (*EvaluationState, error)
 	mustEmbedUnimplementedEvaluationManagementServer()
@@ -321,6 +336,9 @@ type EvaluationManagementServer interface {
 // pointer dereference when methods are called.
 type UnimplementedEvaluationManagementServer struct{}
 
+func (UnimplementedEvaluationManagementServer) Start(context.Context, *EvaluationStartCommand) (*EvaluationState, error) {
+	return nil, status.Error(codes.Unimplemented, "method Start not implemented")
+}
 func (UnimplementedEvaluationManagementServer) Get(context.Context, *EvaluationQuery) (*EvaluationState, error) {
 	return nil, status.Error(codes.Unimplemented, "method Get not implemented")
 }
@@ -346,6 +364,24 @@ func RegisterEvaluationManagementServer(s grpc.ServiceRegistrar, srv EvaluationM
 		t.testEmbeddedByValue()
 	}
 	s.RegisterService(&EvaluationManagement_ServiceDesc, srv)
+}
+
+func _EvaluationManagement_Start_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(EvaluationStartCommand)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(EvaluationManagementServer).Start(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: EvaluationManagement_Start_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(EvaluationManagementServer).Start(ctx, req.(*EvaluationStartCommand))
+	}
+	return interceptor(ctx, in, info, handler)
 }
 
 func _EvaluationManagement_Get_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
@@ -391,6 +427,10 @@ var EvaluationManagement_ServiceDesc = grpc.ServiceDesc{
 	ServiceName: "qsai.workflow.v1.EvaluationManagement",
 	HandlerType: (*EvaluationManagementServer)(nil),
 	Methods: []grpc.MethodDesc{
+		{
+			MethodName: "Start",
+			Handler:    _EvaluationManagement_Start_Handler,
+		},
 		{
 			MethodName: "Get",
 			Handler:    _EvaluationManagement_Get_Handler,

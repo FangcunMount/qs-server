@@ -52,3 +52,27 @@ func TestEvaluationClientForwardsConfirmedCommandOnce(t *testing.T) {
 		t.Fatal("transport retried uncertain mutation")
 	}
 }
+
+func (s *evaluationRPCStub) Start(ctx context.Context, r *pb.EvaluationStartCommand, _ ...grpc.CallOption) (*pb.EvaluationState, error) {
+	return s.ResolveUnknown(ctx, &pb.UnknownResolutionCommand{Scope: r.Scope, ExpectedVersion: r.ExpectedVersion, Reason: r.Reason, Confirm: r.Confirm})
+}
+
+func TestStartForwardsOnceAndDoesNotRetryUnknownOutcome(t *testing.T) {
+	rpc := &evaluationRPCStub{t: t}
+	client := &EvaluationClient{RPC: rpc}
+	scope := app.EvaluationScope{RunID: "run:1", OrganizationID: 7, OperatorUserID: 42}
+	command := app.EvaluationStart{ExpectedVersion: 1, Reason: "启动评测", Confirm: true}
+	if _, err := client.StartEvaluation(context.Background(), scope, command); err != nil {
+		t.Fatal(err)
+	}
+	if rpc.calls != 1 || rpc.command.Scope.OperatorUserId != 42 || rpc.command.ExpectedVersion != 1 || rpc.command.Reason != command.Reason || !rpc.command.Confirm {
+		t.Fatal("start command drift")
+	}
+	rpc.fail = context.DeadlineExceeded
+	if _, err := client.StartEvaluation(context.Background(), scope, command); !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatal(err)
+	}
+	if rpc.calls != 2 {
+		t.Fatal("uncertain start retried")
+	}
+}

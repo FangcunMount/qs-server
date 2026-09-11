@@ -48,3 +48,13 @@ func (c *EvaluationClient) ResolveUnknown(ctx context.Context, scope app.Evaluat
 	}
 	return state(response, scope)
 }
+
+func (c *EvaluationClient) StartEvaluation(ctx context.Context, scope app.EvaluationScope, command app.EvaluationStart) (app.EvaluationState, error) {
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+	response, err := c.RPC.Start(ctx, &pb.EvaluationStartCommand{Scope: query(scope), ExpectedVersion: command.ExpectedVersion, Reason: command.Reason, Confirm: command.Confirm})
+	if err != nil {
+		return app.EvaluationState{}, err
+	}
+	return state(response, scope)
+}

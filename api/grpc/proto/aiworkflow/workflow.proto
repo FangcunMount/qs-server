@@ -38,6 +38,8 @@ message EvidenceItem {
 
 // Trusted QS backend only. QS must authorize OrgAdmin before forwarding these operations.
 service EvaluationManagement {
+ // Explicitly schedules an existing frozen requested Run; does not call a model inline.
+ rpc Start(EvaluationStartCommand) returns (EvaluationState);
  rpc Get(EvaluationQuery) returns (EvaluationState);
  rpc ResolveUnknown(UnknownResolutionCommand) returns (EvaluationState);
 }
@@ -62,4 +64,11 @@ message EvaluationState {
  int64 unresolved_result_unknown_count = 4;
  // Audit-only decisions, excluding prompts, reports, model output and credentials.
  string resolutions_json = 5;
+}
+
+message EvaluationStartCommand {
+ EvaluationQuery scope = 1;
+ int64 expected_version = 2;
+ string reason = 3;
+ bool confirm = 4;
 }

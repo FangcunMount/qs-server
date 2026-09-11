@@ -104,3 +104,36 @@ func (h *AIWorkflowManagementHandler) ResolveUnknown(c *gin.Context) {
 	}
 	h.Success(c, value)
 }
+
+// Start godoc
+// @Summary 启动已冻结的 qs-ai 评测
+// @Description 需要当前机构 OrgAdmin 权限、明确确认和当前版本；超时后先回读状态。管理功能默认关闭。
+// @Tags AI-Workflow-Management
+// @Accept json
+// @Produce json
+// @Param run_id path string true "评测 Run UUID"
+// @Param body body app.EvaluationStart true "启动确认和预期版本"
+// @Success 200 {object} core.Response{data=app.EvaluationState}
+// @Failure 400 {object} core.ErrResponse
+// @Failure 401 {object} core.ErrResponse
+// @Failure 403 {object} core.ErrResponse
+// @Failure 404 {object} core.ErrResponse
+// @Failure 409 {object} core.ErrResponse
+// @Failure 500 {object} core.ErrResponse
+// @Router /internal/v2/interpretation/ai-workflow/evaluations/{run_id}/start [post]
+func (h *AIWorkflowManagementHandler) Start(c *gin.Context) {
+	scope, ok := h.scope(c)
+	if !ok {
+		return
+	}
+	var command app.EvaluationStart
+	if err := h.BindJSON(c, &command); err != nil {
+		return
+	}
+	value, err := h.service.Start(c.Request.Context(), scope, command)
+	if err != nil {
+		h.failure(c, err)
+		return
+	}
+	h.Success(c, value)
+}

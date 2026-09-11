@@ -57,6 +57,7 @@ func (r *Router) registerInterpretationInternalV2Routes(internalV2 *gin.RouterGr
 		management := handler.NewAIWorkflowManagementHandler(r.deps.Interpretation.AIWorkflowManagement)
 		group := internalV2.Group("/interpretation/ai-workflow/evaluations", restmiddleware.RequireCapabilityMiddleware(restmiddleware.CapabilityOrgAdmin))
 		group.GET("/:run_id", management.Get)
+		group.POST("/:run_id/start", management.Start)
 		group.POST("/:run_id/result-unknown/resolve", management.ResolveUnknown)
 	}
 

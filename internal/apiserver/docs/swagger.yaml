@@ -1,5 +1,14 @@
 basePath: /api/v1
 definitions:
+  aibridge.EvaluationStart:
+    properties:
+      confirm:
+        type: boolean
+      expected_version:
+        type: integer
+      reason:
+        type: string
+    type: object
   aibridge.EvaluationState:
     properties:
       resolutions:
@@ -13666,6 +13675,62 @@ paths:
           schema:
             $ref: '#/definitions/core.ErrResponse'
       summary: 处置 qs-ai 评测未知结果
+      tags:
+      - AI-Workflow-Management
+  /internal/v2/interpretation/ai-workflow/evaluations/{run_id}/start:
+    post:
+      consumes:
+      - application/json
+      description: 需要当前机构 OrgAdmin 权限、明确确认和当前版本；超时后先回读状态。管理功能默认关闭。
+      parameters:
+      - description: 评测 Run UUID
+        in: path
+        name: run_id
+        required: true
+        type: string
+      - description: 启动确认和预期版本
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/aibridge.EvaluationStart'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/aibridge.EvaluationState'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+      summary: 启动已冻结的 qs-ai 评测
       tags:
       - AI-Workflow-Management
   /internal/v2/statistics/runs:

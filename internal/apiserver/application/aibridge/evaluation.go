@@ -18,6 +18,11 @@ type EvaluationScope struct {
 	RunID                          string
 	OrganizationID, OperatorUserID int64
 }
+type EvaluationStart struct {
+	ExpectedVersion int64  `json:"expected_version"`
+	Reason          string `json:"reason"`
+	Confirm         bool   `json:"confirm"`
+}
 type UnknownResolution struct {
 	ExpectedVersion                      int64  `json:"expected_version"`
 	ExecutionID                          string `json:"execution_id"`
@@ -34,6 +39,7 @@ type EvaluationState struct {
 	Resolutions                  json.RawMessage `json:"resolutions" swaggertype:"array,object"`
 }
 type EvaluationGateway interface {
+	StartEvaluation(context.Context, EvaluationScope, EvaluationStart) (EvaluationState, error)
 	GetEvaluation(context.Context, EvaluationScope) (EvaluationState, error)
 	ResolveUnknown(context.Context, EvaluationScope, UnknownResolution) (EvaluationState, error)
 }
@@ -70,4 +76,15 @@ func (s *EvaluationAdministration) Resolve(ctx context.Context, scope Evaluation
 		return EvaluationState{}, ErrInvalid
 	}
 	return s.Gateway.ResolveUnknown(ctx, scope, command)
+}
+
+func (s *EvaluationAdministration) Start(ctx context.Context, scope EvaluationScope, command EvaluationStart) (EvaluationState, error) {
+	if err := s.authorize(ctx, scope); err != nil {
+		return EvaluationState{}, err
+	}
+	command.Reason = strings.TrimSpace(command.Reason)
+	if command.ExpectedVersion < 1 || !command.Confirm || command.Reason == "" || len(command.Reason) > 1000 || strings.ContainsAny(command.Reason, "<>") {
+		return EvaluationState{}, ErrInvalid
+	}
+	return s.Gateway.StartEvaluation(ctx, scope, command)
 }
