@@ -29,6 +29,7 @@ func (r *Receiver) Accept(ctx context.Context, e *pb.StateEvent) (*pb.Acknowledg
 		return nil, status.Error(codes.Unavailable, "receiver unavailable")
 	}
 	event := app.Event{EventID: e.EventId, RequestID: e.RequestId, SessionID: e.SessionId, Actor: app.Actor{OrgID: e.GetActor().GetOrgId(), SubjectID: e.GetActor().GetSubjectId()}, TesteeID: e.TesteeId, Version: e.Version, Status: e.Status, QuestionID: e.QuestionId, Question: e.Question, CanSkip: e.CanSkip, FailureCode: e.FailureCode}
+	event.ArtifactJSON = e.ArtifactJson
 	if err := r.Service.Accept(ctx, event); err != nil {
 		code := codes.Unavailable
 		switch {

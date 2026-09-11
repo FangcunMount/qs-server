@@ -95,7 +95,9 @@ func run() error {
 		}
 		config.ClientCAs = pool
 		config.ClientAuth = tls.RequireAndVerifyClientCert
-		server := grpc.NewServer(grpc.Creds(credentials.NewTLS(config)), grpc.MaxRecvMsgSize(65536))
+		// The artifact envelope is bounded at 128 KiB by the application;
+		// allow room for the surrounding protobuf event and actor metadata.
+		server := grpc.NewServer(grpc.Creds(credentials.NewTLS(config)), grpc.MaxRecvMsgSize(256*1024))
 		defer server.Stop()
 		pb.RegisterResultsServer(server, &receiver.Receiver{Service: s})
 		listener, e := net.Listen("tcp", *address)

@@ -25,6 +25,8 @@ message StateEvent {
  string event_id = 1; string request_id = 2; string session_id = 3;
  Actor actor = 4; string testee_id = 5; int64 version = 6; string status = 7;
  string question_id = 8; string question = 9; bool can_skip = 10; string failure_code = 11;
+ // Complete immutable ArtifactCandidate envelope; required only for completed.
+ string artifact_json = 12;
 }
 message Acknowledgement { string event_id = 1; }
 
