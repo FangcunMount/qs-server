@@ -30,6 +30,7 @@ services:
       - /evaluation.AssessmentIntakeService/ResolveAssessmentByAnswerSheetID
       - /interpretation.ParticipantReportService/GetAssessmentReport
       - /interpretation.ParticipantAIExplanationService/GetAIExplanationCapability
+      - /interpretation.ParticipantAIExplanationService/GetAIWorkflow
       - /interpretation.ParticipantAIExplanationService/RequestAIWorkflow
       - /interpretation.ParticipantAIExplanationService/RequestAIExplanation
       - /interpretation.ParticipantAIExplanationService/GetAIExplanation

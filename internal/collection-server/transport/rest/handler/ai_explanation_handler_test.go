@@ -175,3 +175,21 @@ func TestWorkflowHandlerUsesDistinctAcceptedRequestIdentity(t *testing.T) {
 		t.Fatalf("response=%d %s", recorder.Code, recorder.Body.String())
 	}
 }
+
+func (s *workflowHandlerStub) GetWorkflow(_ context.Context, testee, assessment uint64, requestID string) (*app.WorkflowResult, error) {
+	s.called = true
+	if testee != 7 || assessment != 42 || requestID != "00000000-0000-4000-8000-000000000001" {
+		return nil, app.ErrInvalidRequest
+	}
+	return &app.WorkflowResult{RequestID: requestID, Status: "running", Version: 2}, nil
+}
+func TestWorkflowReadHandlerUsesParticipantAndRequestIdentity(t *testing.T) {
+	stub := &workflowHandlerStub{}
+	h := NewAIExplanationHandler(stub)
+	recorder, c := newAIExplanationTestContext(http.MethodGet, "/api/v1/assessments/42/ai-workflows/00000000-0000-4000-8000-000000000001?testee_id=7", "")
+	c.Params = append(c.Params, gin.Param{Key: "id", Value: "42"}, gin.Param{Key: "request_id", Value: "00000000-0000-4000-8000-000000000001"})
+	h.GetWorkflow(c)
+	if !stub.called || recorder.Code != http.StatusOK || !strings.Contains(recorder.Body.String(), `"status":"running"`) || strings.Contains(recorder.Body.String(), "generation_id") {
+		t.Fatalf("response=%d %s", recorder.Code, recorder.Body.String())
+	}
+}

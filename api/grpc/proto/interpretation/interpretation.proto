@@ -16,6 +16,7 @@ service ParticipantReportService {
 // this service being configured or available.
 service ParticipantAIExplanationService {
   rpc RequestAIWorkflow(RequestAIWorkflowRequest) returns (AIWorkflowAccepted);
+  rpc GetAIWorkflow(GetAIWorkflowRequest) returns (AIWorkflowResult);
   rpc GetAIExplanationCapability(GetAIExplanationCapabilityRequest) returns (AIExplanationResponse);
   rpc RequestAIExplanation(RequestAIExplanationRequest) returns (AIExplanationResponse);
   rpc GetAIExplanation(GetAIExplanationRequest) returns (AIExplanationResponse);
@@ -298,3 +299,20 @@ message AIWorkflowAccessRequest {
   repeated string assessment_ids = 4;
 }
 message AIWorkflowAccessResponse {}
+
+// Reads the current QS projection after participant authorization. No legacy generation ID.
+message GetAIWorkflowRequest {
+  uint64 testee_id = 1;
+  uint64 assessment_id = 2;
+  string request_id = 3;
+}
+message AIWorkflowResult {
+  string request_id = 1;
+  string status = 2;
+  int64 version = 3;
+  // Validated ai-explanation-output/v1 JSON; only present for completed workflows.
+  string content_json = 4;
+  string artifact_id = 5;
+  string report_id = 6;
+  string source_version = 7;
+}

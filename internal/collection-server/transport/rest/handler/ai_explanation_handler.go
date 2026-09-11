@@ -265,3 +265,37 @@ func (h *AIExplanationHandler) RequestWorkflow(c *gin.Context) {
 	}
 	c.JSON(http.StatusAccepted, core.Response{Code: 0, Message: "accepted", Data: result})
 }
+
+// GetWorkflow reads a durable AI result with current participant authorization.
+// @Summary 读取 AI 工作流结果
+// @Tags AI解读
+// @Produce json
+// @Param id path string true "测评ID"
+// @Param request_id path string true "工作流请求UUID"
+// @Param testee_id query string true "受试者ID"
+// @Success 200 {object} core.Response{data=app.WorkflowResult}
+// @Failure 400 {object} core.ErrResponse
+// @Failure 403 {object} core.ErrResponse
+// @Failure 404 {object} core.ErrResponse
+// @Failure 503 {object} core.ErrResponse
+// @Security BearerAuth
+// @Router /api/v1/assessments/{id}/ai-workflows/{request_id} [get]
+func (h *AIExplanationHandler) GetWorkflow(c *gin.Context) {
+	testeeID, assessmentID, ok := h.parseIdentity(c)
+	if !ok {
+		return
+	}
+	service, ok := h.service.(interface {
+		GetWorkflow(context.Context, uint64, uint64, string) (*app.WorkflowResult, error)
+	})
+	if !ok {
+		h.respondError(c, app.ErrUnavailable)
+		return
+	}
+	result, err := service.GetWorkflow(c.Request.Context(), testeeID, assessmentID, c.Param("request_id"))
+	if err != nil {
+		h.respondError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, core.Response{Code: 0, Message: "success", Data: result})
+}

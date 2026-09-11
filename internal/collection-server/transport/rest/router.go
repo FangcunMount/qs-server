@@ -396,6 +396,11 @@ func (r *Router) registerEvaluationRoutes(api *gin.RouterGroup) {
 			rateCfg.AIExplanationRequestUserBurst,
 			aiExplanationHandler.RequestWorkflow,
 		)...)...)
+		assessments.GET("/:id/ai-workflows/:request_id", append([]gin.HandlerFunc{reportIdentity}, r.rateLimitedQueryHandlers(
+			r.container.RateLimitBackend(), "query", rateCfg,
+			rateCfg.QueryGlobalQPS, rateCfg.QueryGlobalBurst, rateCfg.QueryUserQPS, rateCfg.QueryUserBurst,
+			aiExplanationHandler.GetWorkflow,
+		)...)...)
 		assessments.GET("/:id/ai-explanations/:generation_id", append([]gin.HandlerFunc{reportIdentity}, r.rateLimitedQueryHandlers(
 			r.container.RateLimitBackend(),
 			"query",

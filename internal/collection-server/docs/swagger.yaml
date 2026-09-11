@@ -829,6 +829,23 @@ definitions:
       status:
         type: string
     type: object
+  github_com_FangcunMount_qs-server_internal_collection-server_application_aiexplanation.WorkflowResult:
+    properties:
+      artifact_id:
+        type: string
+      content:
+        type: object
+      report_id:
+        type: string
+      request_id:
+        type: string
+      source_version:
+        type: string
+      status:
+        type: string
+      version:
+        type: integer
+    type: object
   github_com_FangcunMount_qs-server_internal_collection-server_application_answersheet.Answer:
     properties:
       question_code:
@@ -2459,6 +2476,57 @@ paths:
       security:
       - BearerAuth: []
       summary: 请求新版 AI 报告快照任务
+      tags:
+      - AI解读
+  /api/v1/assessments/{id}/ai-workflows/{request_id}:
+    get:
+      parameters:
+      - description: 测评ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: 工作流请求UUID
+        in: path
+        name: request_id
+        required: true
+        type: string
+      - description: 受试者ID
+        in: query
+        name: testee_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/github_com_FangcunMount_qs-server_internal_collection-server_application_aiexplanation.WorkflowResult'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+      security:
+      - BearerAuth: []
+      summary: 读取 AI 工作流结果
       tags:
       - AI解读
   /api/v1/assessments/{id}/factors/high-risk:
