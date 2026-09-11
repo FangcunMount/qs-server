@@ -30,6 +30,7 @@ services:
       - /evaluation.AssessmentIntakeService/ResolveAssessmentByAnswerSheetID
       - /interpretation.ParticipantReportService/GetAssessmentReport
       - /interpretation.ParticipantAIExplanationService/GetAIExplanationCapability
+      - /interpretation.ParticipantAIExplanationService/RequestAIWorkflow
       - /interpretation.ParticipantAIExplanationService/RequestAIExplanation
       - /interpretation.ParticipantAIExplanationService/GetAIExplanation
       - /interpretation.ParticipantAIExplanationService/ExportAIExplanations
@@ -58,3 +59,9 @@ services:
       - /internalapi.InternalService/HandleQuestionnairePublishedPostActions
       - /internalapi.InternalService/HandleScalePublishedPostActions
       - /internalapi.InternalService/SendTaskOpenedMiniProgramNotification
+
+  - service_name: qs-ai.svc
+    enabled: true
+    description: AI durable participant authorization recheck
+    allowed_methods:
+      - /interpretation.AIWorkflowAccessService/Authorize

@@ -108,6 +108,7 @@ grpc:
 ai_explanation:
   enabled: false
   # 治理面可启用但用户流量保持关闭；Profile 发布与最小验收通过后再打开。
+  workflow_enabled: false # Enable after qs-ai command transport and relay are configured.
   participant_enabled: false
   provider: "deepseek"
   model: "deepseek-v4-flash"

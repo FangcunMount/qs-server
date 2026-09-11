@@ -203,3 +203,19 @@ func (s *Store) Projection(ctx context.Context, id string) (*app.Event, error) {
 	err = json.Unmarshal(raw, &result)
 	return &result, err
 }
+
+func (s *Store) Original(ctx context.Context, id string) (*app.Start, error) {
+	var raw []byte
+	err := s.DB.QueryRowContext(ctx, "SELECT payload FROM ai_bridge_requests WHERE request_id=?", id).Scan(&raw)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, app.ErrNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	var result app.Start
+	if err = json.Unmarshal(raw, &result); err != nil {
+		return nil, err
+	}
+	return &result, nil
+}

@@ -999,6 +999,88 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/v1/assessments/{id}/ai-workflows": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "AI解读"
+                ],
+                "summary": "请求新版 AI 报告快照任务",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "测评ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "受试者ID",
+                        "name": "testee_id",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "description": "稳定请求ID及标准报告ID",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/aiexplanation.WorkflowRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "202": {
+                        "description": "Accepted",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/github_com_FangcunMount_qs-server_internal_collection-server_application_aiexplanation.WorkflowAccepted"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "503": {
+                        "description": "Service Unavailable",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/assessments/{id}/factors/high-risk": {
             "get": {
                 "security": [
@@ -3227,6 +3309,21 @@ const docTemplate = `{
                 }
             }
         },
+        "aiexplanation.WorkflowRequest": {
+            "type": "object",
+            "required": [
+                "report_id",
+                "request_id"
+            ],
+            "properties": {
+                "report_id": {
+                    "type": "string"
+                },
+                "request_id": {
+                    "type": "string"
+                }
+            }
+        },
         "answersheet.AnswerSheetResponse": {
             "type": "object",
             "properties": {
@@ -4123,6 +4220,17 @@ const docTemplate = `{
                 },
                 "testee_id": {
                     "type": "integer"
+                }
+            }
+        },
+        "github_com_FangcunMount_qs-server_internal_collection-server_application_aiexplanation.WorkflowAccepted": {
+            "type": "object",
+            "properties": {
+                "request_id": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
                 }
             }
         },

@@ -18,12 +18,24 @@ type Actor struct {
 	OrgID     string `json:"org_id"`
 	SubjectID string `json:"subject_id"`
 }
+type Fact struct {
+	Ref   string `json:"ref"`
+	Value string `json:"value"`
+}
+type EvidenceItem struct {
+	AssessmentID  string `json:"assessment_id"`
+	TesteeID      string `json:"testee_id"`
+	ReportID      string `json:"report_id"`
+	SourceVersion string `json:"source_version"`
+	Facts         []Fact `json:"facts"`
+}
 type Start struct {
-	RequestID     string   `json:"request_id"`
-	Actor         Actor    `json:"actor"`
-	TesteeID      string   `json:"testee_id"`
-	AssessmentIDs []string `json:"assessment_ids"`
-	Goal          string   `json:"goal"`
+	Evidence      []EvidenceItem `json:"evidence,omitempty"`
+	RequestID     string         `json:"request_id"`
+	Actor         Actor          `json:"actor"`
+	TesteeID      string         `json:"testee_id"`
+	AssessmentIDs []string       `json:"assessment_ids"`
+	Goal          string         `json:"goal"`
 }
 type Change struct {
 	CommandID       string  `json:"command_id"`
@@ -62,6 +74,7 @@ type Command struct {
 }
 type Store interface {
 	StageStart(context.Context, Start) error
+	Original(context.Context, string) (*Start, error)
 	StageChange(context.Context, string, Change) error
 	Pending(context.Context, int) ([]Command, error)
 	Acknowledge(context.Context, Command, Receipt) error

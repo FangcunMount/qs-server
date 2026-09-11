@@ -3,6 +3,7 @@ package container
 import (
 	"context"
 	"fmt"
+	bridge "github.com/FangcunMount/qs-server/internal/apiserver/application/aibridge"
 
 	actoraccess "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/access"
 	actortestee "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/testee"
@@ -77,6 +78,11 @@ func (c *Container) initEvaluationModule() error {
 		return fmt.Errorf("failed to bind interpretation outcome service: %w", err)
 	}
 	c.ReportModule.BindReportProjection(reportprojection.Mapper{})
+	currentAIAccess := &bridge.CurrentAccess{Testees: c.ActorModule.ReadModel, Assessments: c.EvaluationModule.TesteeService}
+	if links := c.ProfileLinkService(); links != nil {
+		currentAIAccess.Links = links
+	}
+	c.ReportModule.BindCurrentAIAccess(currentAIAccess)
 	if err := c.ReportModule.BindParticipantAccess(participantInterpretationAccess{testees: c.ActorModule.TesteeQueryService, assessments: c.EvaluationModule.TesteeService}); err != nil {
 		return fmt.Errorf("failed to bind interpretation participant service: %w", err)
 	}

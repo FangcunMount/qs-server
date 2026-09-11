@@ -152,3 +152,26 @@ func newAIExplanationTestContext(method, target, body string) (*httptest.Respons
 	c.Request.Header.Set("Content-Type", "application/json")
 	return recorder, c
 }
+
+type workflowHandlerStub struct {
+	aiExplanationServiceStub
+	called bool
+}
+
+func (s *workflowHandlerStub) RequestWorkflow(_ context.Context, testee, assessment uint64, r app.WorkflowRequest) (*app.WorkflowAccepted, error) {
+	s.called = true
+	if testee != 7 || assessment != 42 || r.ReportID != "99" {
+		return nil, app.ErrInvalidRequest
+	}
+	return &app.WorkflowAccepted{RequestID: r.RequestID, Status: "accepted"}, nil
+}
+func TestWorkflowHandlerUsesDistinctAcceptedRequestIdentity(t *testing.T) {
+	stub := &workflowHandlerStub{}
+	h := NewAIExplanationHandler(stub)
+	recorder, c := newAIExplanationTestContext(http.MethodPost, "/api/v1/assessments/42/ai-workflows?testee_id=7", `{"request_id":"00000000-0000-4000-8000-000000000001","report_id":"99"}`)
+	c.Params = append(c.Params, gin.Param{Key: "id", Value: "42"})
+	h.RequestWorkflow(c)
+	if !stub.called || recorder.Code != http.StatusAccepted || strings.Contains(recorder.Body.String(), "generation_id") {
+		t.Fatalf("response=%d %s", recorder.Code, recorder.Body.String())
+	}
+}

@@ -160,6 +160,7 @@ var ParticipantReportService_ServiceDesc = grpc.ServiceDesc{
 }
 
 const (
+	ParticipantAIExplanationService_RequestAIWorkflow_FullMethodName          = "/interpretation.ParticipantAIExplanationService/RequestAIWorkflow"
 	ParticipantAIExplanationService_GetAIExplanationCapability_FullMethodName = "/interpretation.ParticipantAIExplanationService/GetAIExplanationCapability"
 	ParticipantAIExplanationService_RequestAIExplanation_FullMethodName       = "/interpretation.ParticipantAIExplanationService/RequestAIExplanation"
 	ParticipantAIExplanationService_GetAIExplanation_FullMethodName           = "/interpretation.ParticipantAIExplanationService/GetAIExplanation"
@@ -174,6 +175,7 @@ const (
 // Standard report reads stay on ParticipantReportService and do not depend on
 // this service being configured or available.
 type ParticipantAIExplanationServiceClient interface {
+	RequestAIWorkflow(ctx context.Context, in *RequestAIWorkflowRequest, opts ...grpc.CallOption) (*AIWorkflowAccepted, error)
 	GetAIExplanationCapability(ctx context.Context, in *GetAIExplanationCapabilityRequest, opts ...grpc.CallOption) (*AIExplanationResponse, error)
 	RequestAIExplanation(ctx context.Context, in *RequestAIExplanationRequest, opts ...grpc.CallOption) (*AIExplanationResponse, error)
 	GetAIExplanation(ctx context.Context, in *GetAIExplanationRequest, opts ...grpc.CallOption) (*AIExplanationResponse, error)
@@ -186,6 +188,16 @@ type participantAIExplanationServiceClient struct {
 
 func NewParticipantAIExplanationServiceClient(cc grpc.ClientConnInterface) ParticipantAIExplanationServiceClient {
 	return &participantAIExplanationServiceClient{cc}
+}
+
+func (c *participantAIExplanationServiceClient) RequestAIWorkflow(ctx context.Context, in *RequestAIWorkflowRequest, opts ...grpc.CallOption) (*AIWorkflowAccepted, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(AIWorkflowAccepted)
+	err := c.cc.Invoke(ctx, ParticipantAIExplanationService_RequestAIWorkflow_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
 }
 
 func (c *participantAIExplanationServiceClient) GetAIExplanationCapability(ctx context.Context, in *GetAIExplanationCapabilityRequest, opts ...grpc.CallOption) (*AIExplanationResponse, error) {
@@ -236,6 +248,7 @@ func (c *participantAIExplanationServiceClient) ExportAIExplanations(ctx context
 // Standard report reads stay on ParticipantReportService and do not depend on
 // this service being configured or available.
 type ParticipantAIExplanationServiceServer interface {
+	RequestAIWorkflow(context.Context, *RequestAIWorkflowRequest) (*AIWorkflowAccepted, error)
 	GetAIExplanationCapability(context.Context, *GetAIExplanationCapabilityRequest) (*AIExplanationResponse, error)
 	RequestAIExplanation(context.Context, *RequestAIExplanationRequest) (*AIExplanationResponse, error)
 	GetAIExplanation(context.Context, *GetAIExplanationRequest) (*AIExplanationResponse, error)
@@ -250,6 +263,9 @@ type ParticipantAIExplanationServiceServer interface {
 // pointer dereference when methods are called.
 type UnimplementedParticipantAIExplanationServiceServer struct{}
 
+func (UnimplementedParticipantAIExplanationServiceServer) RequestAIWorkflow(context.Context, *RequestAIWorkflowRequest) (*AIWorkflowAccepted, error) {
+	return nil, status.Error(codes.Unimplemented, "method RequestAIWorkflow not implemented")
+}
 func (UnimplementedParticipantAIExplanationServiceServer) GetAIExplanationCapability(context.Context, *GetAIExplanationCapabilityRequest) (*AIExplanationResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetAIExplanationCapability not implemented")
 }
@@ -282,6 +298,24 @@ func RegisterParticipantAIExplanationServiceServer(s grpc.ServiceRegistrar, srv 
 		t.testEmbeddedByValue()
 	}
 	s.RegisterService(&ParticipantAIExplanationService_ServiceDesc, srv)
+}
+
+func _ParticipantAIExplanationService_RequestAIWorkflow_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RequestAIWorkflowRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ParticipantAIExplanationServiceServer).RequestAIWorkflow(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ParticipantAIExplanationService_RequestAIWorkflow_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ParticipantAIExplanationServiceServer).RequestAIWorkflow(ctx, req.(*RequestAIWorkflowRequest))
+	}
+	return interceptor(ctx, in, info, handler)
 }
 
 func _ParticipantAIExplanationService_GetAIExplanationCapability_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
@@ -363,6 +397,10 @@ var ParticipantAIExplanationService_ServiceDesc = grpc.ServiceDesc{
 	ServiceName: "interpretation.ParticipantAIExplanationService",
 	HandlerType: (*ParticipantAIExplanationServiceServer)(nil),
 	Methods: []grpc.MethodDesc{
+		{
+			MethodName: "RequestAIWorkflow",
+			Handler:    _ParticipantAIExplanationService_RequestAIWorkflow_Handler,
+		},
 		{
 			MethodName: "GetAIExplanationCapability",
 			Handler:    _ParticipantAIExplanationService_GetAIExplanationCapability_Handler,
@@ -669,6 +707,113 @@ var AIExplanationAutomationService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ExecutePromptEvaluationStep",
 			Handler:    _AIExplanationAutomationService_ExecutePromptEvaluationStep_Handler,
+		},
+	},
+	Streams:  []grpc.StreamDesc{},
+	Metadata: "interpretation/interpretation.proto",
+}
+
+const (
+	AIWorkflowAccessService_Authorize_FullMethodName = "/interpretation.AIWorkflowAccessService/Authorize"
+)
+
+// AIWorkflowAccessServiceClient is the client API for AIWorkflowAccessService service.
+//
+// For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
+//
+// Durable participant access recheck; only the qs-ai mTLS workload may call it.
+type AIWorkflowAccessServiceClient interface {
+	Authorize(ctx context.Context, in *AIWorkflowAccessRequest, opts ...grpc.CallOption) (*AIWorkflowAccessResponse, error)
+}
+
+type aIWorkflowAccessServiceClient struct {
+	cc grpc.ClientConnInterface
+}
+
+func NewAIWorkflowAccessServiceClient(cc grpc.ClientConnInterface) AIWorkflowAccessServiceClient {
+	return &aIWorkflowAccessServiceClient{cc}
+}
+
+func (c *aIWorkflowAccessServiceClient) Authorize(ctx context.Context, in *AIWorkflowAccessRequest, opts ...grpc.CallOption) (*AIWorkflowAccessResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(AIWorkflowAccessResponse)
+	err := c.cc.Invoke(ctx, AIWorkflowAccessService_Authorize_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// AIWorkflowAccessServiceServer is the server API for AIWorkflowAccessService service.
+// All implementations must embed UnimplementedAIWorkflowAccessServiceServer
+// for forward compatibility.
+//
+// Durable participant access recheck; only the qs-ai mTLS workload may call it.
+type AIWorkflowAccessServiceServer interface {
+	Authorize(context.Context, *AIWorkflowAccessRequest) (*AIWorkflowAccessResponse, error)
+	mustEmbedUnimplementedAIWorkflowAccessServiceServer()
+}
+
+// UnimplementedAIWorkflowAccessServiceServer must be embedded to have
+// forward compatible implementations.
+//
+// NOTE: this should be embedded by value instead of pointer to avoid a nil
+// pointer dereference when methods are called.
+type UnimplementedAIWorkflowAccessServiceServer struct{}
+
+func (UnimplementedAIWorkflowAccessServiceServer) Authorize(context.Context, *AIWorkflowAccessRequest) (*AIWorkflowAccessResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method Authorize not implemented")
+}
+func (UnimplementedAIWorkflowAccessServiceServer) mustEmbedUnimplementedAIWorkflowAccessServiceServer() {
+}
+func (UnimplementedAIWorkflowAccessServiceServer) testEmbeddedByValue() {}
+
+// UnsafeAIWorkflowAccessServiceServer may be embedded to opt out of forward compatibility for this service.
+// Use of this interface is not recommended, as added methods to AIWorkflowAccessServiceServer will
+// result in compilation errors.
+type UnsafeAIWorkflowAccessServiceServer interface {
+	mustEmbedUnimplementedAIWorkflowAccessServiceServer()
+}
+
+func RegisterAIWorkflowAccessServiceServer(s grpc.ServiceRegistrar, srv AIWorkflowAccessServiceServer) {
+	// If the following call panics, it indicates UnimplementedAIWorkflowAccessServiceServer was
+	// embedded by pointer and is nil.  This will cause panics if an
+	// unimplemented method is ever invoked, so we test this at initialization
+	// time to prevent it from happening at runtime later due to I/O.
+	if t, ok := srv.(interface{ testEmbeddedByValue() }); ok {
+		t.testEmbeddedByValue()
+	}
+	s.RegisterService(&AIWorkflowAccessService_ServiceDesc, srv)
+}
+
+func _AIWorkflowAccessService_Authorize_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(AIWorkflowAccessRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AIWorkflowAccessServiceServer).Authorize(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AIWorkflowAccessService_Authorize_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AIWorkflowAccessServiceServer).Authorize(ctx, req.(*AIWorkflowAccessRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+// AIWorkflowAccessService_ServiceDesc is the grpc.ServiceDesc for AIWorkflowAccessService service.
+// It's only intended for direct use with grpc.RegisterService,
+// and not to be introspected or modified (even as a copy)
+var AIWorkflowAccessService_ServiceDesc = grpc.ServiceDesc{
+	ServiceName: "interpretation.AIWorkflowAccessService",
+	HandlerType: (*AIWorkflowAccessServiceServer)(nil),
+	Methods: []grpc.MethodDesc{
+		{
+			MethodName: "Authorize",
+			Handler:    _AIWorkflowAccessService_Authorize_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

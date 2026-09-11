@@ -227,3 +227,41 @@ func secondsUntilNextUTCDate(now time.Time) int {
 	}
 	return seconds
 }
+
+// RequestWorkflow queues a snapshot task through the existing participant identity boundary.
+// @Summary 请求新版 AI 报告快照任务
+// @Tags AI解读
+// @Accept json
+// @Produce json
+// @Param id path int true "测评ID"
+// @Param testee_id query int true "受试者ID"
+// @Param request body app.WorkflowRequest true "稳定请求ID及标准报告ID"
+// @Success 202 {object} core.Response{data=app.WorkflowAccepted}
+// @Failure 400 {object} core.ErrResponse
+// @Failure 403 {object} core.ErrResponse
+// @Failure 503 {object} core.ErrResponse
+// @Security BearerAuth
+// @Router /api/v1/assessments/{id}/ai-workflows [post]
+func (h *AIExplanationHandler) RequestWorkflow(c *gin.Context) {
+	testeeID, assessmentID, ok := h.parseIdentity(c)
+	if !ok {
+		return
+	}
+	var request app.WorkflowRequest
+	if err := h.BindJSON(c, &request); err != nil {
+		return
+	}
+	service, ok := h.service.(interface {
+		RequestWorkflow(context.Context, uint64, uint64, app.WorkflowRequest) (*app.WorkflowAccepted, error)
+	})
+	if !ok {
+		h.respondError(c, app.ErrUnavailable)
+		return
+	}
+	result, err := service.RequestWorkflow(c.Request.Context(), testeeID, assessmentID, request)
+	if err != nil {
+		h.respondError(c, err)
+		return
+	}
+	c.JSON(http.StatusAccepted, core.Response{Code: 0, Message: "accepted", Data: result})
+}
