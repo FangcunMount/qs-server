@@ -71,8 +71,8 @@ func (r *Router) registerActorPublicRoutes(publicAPI *gin.RouterGroup) {
 	publicAPI.POST("/assessment-entries/:token/intake", handlers.assessmentEntry.IntakeAssessmentEntry)
 }
 
-// registerActorProtectedRoutes 注册 Actor 模块相关的受保护路由。
-func (r *Router) registerActorProtectedRoutes(apiV1 *gin.RouterGroup) {
+// Retired endpoints return only 410, without consulting identity or business data.
+func (r *Router) registerRetiredActorRoutes(apiV1 *gin.RouterGroup) {
 	for _, prefix := range []string{"/clinicians", "/practitioners"} {
 		apiV1.Any(prefix+"/me", retiredClinicianAPI)
 		apiV1.Any(prefix+"/me/*path", retiredClinicianAPI)
@@ -82,6 +82,10 @@ func (r *Router) registerActorProtectedRoutes(apiV1 *gin.RouterGroup) {
 
 	apiV1.Any("/staff", retiredOperatorAPI)
 	apiV1.Any("/staff/:id", retiredOperatorAPI)
+}
+
+// registerActorProtectedRoutes 注册 Actor 模块相关的受保护路由。
+func (r *Router) registerActorProtectedRoutes(apiV1 *gin.RouterGroup) {
 	handlers := r.actorHandlers()
 	testeeHandler := handlers.testee
 	operatorClinicianHandler := handlers.operatorClinician

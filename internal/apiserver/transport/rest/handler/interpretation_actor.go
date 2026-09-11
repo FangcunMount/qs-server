@@ -8,13 +8,12 @@ import (
 
 	baseerrors "github.com/FangcunMount/component-base/pkg/errors"
 	interpretationcatalog "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/catalogreconcile"
-	interpretationclinician "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/clinician"
 	interpretationoperations "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/operations"
 	interpretationreporttemplate "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/reporttemplate"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/admission"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/policy"
 	domainreporttemplate "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/reporttemplate"
-	"github.com/FangcunMount/qs-server/internal/apiserver/transport/rest/response"
+	_ "github.com/FangcunMount/qs-server/internal/apiserver/transport/rest/response" // Swagger response contracts.
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 	"github.com/gin-gonic/gin"
@@ -112,11 +111,6 @@ func (h *InterpretationReportTemplateHandler) CreateDraft(c *gin.Context) {
 	h.Success(c, reportTemplateResponse(item))
 }
 
-type InterpretationClinicianHandler struct {
-	*BaseHandler
-	service interpretationclinician.Service
-}
-
 type InterpretationCatalogReconcileHandler struct {
 	*BaseHandler
 	service interpretationcatalog.Service
@@ -210,69 +204,6 @@ func (h *InterpretationCatalogReconcileHandler) CreateRepairPlan(c *gin.Context)
 		return
 	}
 	h.Success(c, plan)
-}
-
-func NewInterpretationClinicianHandler(s interpretationclinician.Service) *InterpretationClinicianHandler {
-	return &InterpretationClinicianHandler{BaseHandler: &BaseHandler{}, service: s}
-}
-
-// List godoc
-// @Summary 查询当前临床人员获授权受试者报告
-// @Tags Interpretation-Clinician
-// @Produce json
-// @Param testee_id path string true "受试者ID"
-// @Param page query int false "页码" default(1)
-// @Param page_size query int false "每页数量" default(10)
-// @Success 200 {object} core.Response{data=response.ReportListResponse}
-// @Router /api/v1/clinicians/me/testees/{testee_id}/reports [get]
-func (h *InterpretationClinicianHandler) List(c *gin.Context) {
-	org, user, err := h.RequireProtectedScope(c)
-	if err != nil {
-		h.Error(c, err)
-		return
-	}
-	testee, ok := parsePathUint(c, "testee_id", h.BaseHandler)
-	if !ok {
-		return
-	}
-	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
-	size, _ := strconv.Atoi(c.DefaultQuery("page_size", "10"))
-	result, err := h.service.ListParticipantReports(c.Request.Context(), interpretationclinician.Actor{OrgID: org, OperatorUserID: user}, interpretationclinician.ListQuery{TesteeID: testee, Page: page, PageSize: size})
-	if err != nil {
-		h.Error(c, err)
-		return
-	}
-	h.Success(c, response.NewReportListResponse(result))
-}
-
-// Get godoc
-// @Summary 查询当前临床人员获授权受试者报告详情
-// @Tags Interpretation-Clinician
-// @Produce json
-// @Param testee_id path string true "受试者ID"
-// @Param assessment_id path string true "测评ID"
-// @Success 200 {object} core.Response{data=response.ReportResponse}
-// @Router /api/v1/clinicians/me/testees/{testee_id}/reports/{assessment_id} [get]
-func (h *InterpretationClinicianHandler) Get(c *gin.Context) {
-	org, user, err := h.RequireProtectedScope(c)
-	if err != nil {
-		h.Error(c, err)
-		return
-	}
-	testee, ok := parsePathUint(c, "testee_id", h.BaseHandler)
-	if !ok {
-		return
-	}
-	assessment, ok := parsePathUint(c, "assessment_id", h.BaseHandler)
-	if !ok {
-		return
-	}
-	result, err := h.service.GetParticipantReport(c.Request.Context(), interpretationclinician.Actor{OrgID: org, OperatorUserID: user}, interpretationclinician.GetQuery{TesteeID: testee, AssessmentID: assessment})
-	if err != nil {
-		h.Error(c, err)
-		return
-	}
-	h.Success(c, response.NewReportResponse(result))
 }
 
 type InterpretationOperationsHandler struct {

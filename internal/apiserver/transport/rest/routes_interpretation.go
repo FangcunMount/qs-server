@@ -6,16 +6,6 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func (r *Router) registerInterpretationProtectedRoutes(apiV1 *gin.RouterGroup) {
-	if r.deps.Interpretation.ClinicianService == nil {
-		return
-	}
-	h := handler.NewInterpretationClinicianHandler(r.deps.Interpretation.ClinicianService)
-	reports := apiV1.Group("/clinicians/me/testees/:testee_id/reports")
-	reports.GET("", r.rateLimitedHandlers(rateLimitBudgetQuery, h.List)...)
-	reports.GET("/:assessment_id", r.rateLimitedHandlers(rateLimitBudgetQuery, h.Get)...)
-}
-
 func (r *Router) registerInterpretationInternalRoutes(internalV1 *gin.RouterGroup) {
 	g := internalV1.Group("/interpretation", restmiddleware.RequireCapabilityMiddleware(restmiddleware.CapabilityAuditInterpretation))
 	if r.deps.Interpretation.OperationsService != nil {

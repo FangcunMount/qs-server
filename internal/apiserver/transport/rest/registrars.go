@@ -70,6 +70,8 @@ func (registrar publicRouteRegistrar) register(engine *gin.Engine) {
 
 func (registrar protectedRouteRegistrar) register(engine *gin.Engine) {
 	r := registrar.router
+	r.registerRetiredActorRoutes(engine.Group("/api/v1"))
+	r.registerRetiredStatisticsRoutes(engine.Group("/api/v2"))
 	apiV1 := engine.Group("/api/v1")
 	r.applyProtectedGroupMiddlewares(apiV1, "/api/v1")
 
@@ -78,7 +80,6 @@ func (registrar protectedRouteRegistrar) register(engine *gin.Engine) {
 	r.registerNormTableProtectedRoutes(apiV1)
 	r.registerAnswersheetProtectedRoutes(apiV1)
 	r.registerEvaluationProtectedRoutes(apiV1)
-	r.registerInterpretationProtectedRoutes(apiV1)
 	r.registerActorProtectedRoutes(apiV1)
 	r.registerPlanProtectedRoutes(apiV1)
 	r.registerCodesRoutes(apiV1)

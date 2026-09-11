@@ -14,9 +14,12 @@ func (r *Router) newStatisticsHandler() *handler.StatisticsHandler {
 	return handler.NewStatisticsHandler(r.deps.Statistics.ReadService, r.deps.Statistics.Coordinator, r.deps.Statistics.RunStore)
 }
 
-func (r *Router) registerStatisticsProtectedRoutes(apiV2 *gin.RouterGroup) {
+func (r *Router) registerRetiredStatisticsRoutes(apiV2 *gin.RouterGroup) {
 	apiV2.Any("/statistics/clinicians/me", retiredClinicianAPI)
 	apiV2.Any("/statistics/clinicians/me/*path", retiredClinicianAPI)
+}
+
+func (r *Router) registerStatisticsProtectedRoutes(apiV2 *gin.RouterGroup) {
 	h := r.newStatisticsHandler()
 	if h == nil {
 		return
