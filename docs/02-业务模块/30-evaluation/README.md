@@ -226,7 +226,6 @@ make docs-hygiene
 
 ## 条件授权退役记录（2026-09-11）
 
-
 IAM 只判定主体对资源的动作权限。QS 重试应用入口使用 RequirePermission 校验 retry 或 force_retry，不再提交 object.origin_type，也不根据角色名限制测评来源。
 
 测评运营员和计划管理员可在各自既有业务访问范围内重试临时、计划测评；失败状态、可重试资格、期望次数、请求幂等、事务与 Outbox 保持。retry 不等于 force_retry，也不授予评分、答卷或报告读取。
