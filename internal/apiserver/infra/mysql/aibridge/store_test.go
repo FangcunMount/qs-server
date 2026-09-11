@@ -30,7 +30,7 @@ func fixture(t *testing.T) (*Store, app.Start) {
 				t.Error(e)
 			}
 		}
-		db.Close()
+		_ = db.Close()
 	})
 	return &Store{DB: db}, r
 }

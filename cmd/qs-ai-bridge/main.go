@@ -43,7 +43,7 @@ func run() error {
 	if err != nil {
 		return err
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 	db.SetMaxOpenConns(5)
 	s := &app.Service{Store: &store.Store{DB: db}}
 	switch *mode {
@@ -84,7 +84,7 @@ func run() error {
 			if e != nil {
 				return e
 			}
-			defer conn.Close()
+			defer func() { _ = conn.Close() }()
 			s.Sender = sender.New(conn)
 			n, e := s.Relay(ctx)
 			if e != nil {

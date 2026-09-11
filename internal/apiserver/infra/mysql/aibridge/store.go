@@ -27,7 +27,7 @@ func (s *Store) StageStart(ctx context.Context, r app.Start) error {
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 	_, err = tx.ExecContext(ctx, "INSERT INTO ai_bridge_requests(request_id,request_hash,payload) VALUES(?,?,?) ON DUPLICATE KEY UPDATE request_id=request_id", r.RequestID, hash, raw)
 	if err != nil {
 		return err
@@ -68,7 +68,7 @@ func (s *Store) StageChange(ctx context.Context, id string, r app.Change) error 
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 	var original []byte
 	var session sql.NullString
 	err = tx.QueryRowContext(ctx, "SELECT payload,session_id FROM ai_bridge_requests WHERE request_id=? FOR UPDATE", id).Scan(&original, &session)
@@ -95,7 +95,7 @@ func (s *Store) Pending(ctx context.Context, limit int) ([]app.Command, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	result := []app.Command{}
 	for rows.Next() {
 		var c app.Command
@@ -114,7 +114,7 @@ func (s *Store) Acknowledge(ctx context.Context, c app.Command, r app.Receipt) e
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 	var bound sql.NullString
 	if err = tx.QueryRowContext(ctx, "SELECT session_id FROM ai_bridge_requests WHERE request_id=? FOR UPDATE", c.RequestID).Scan(&bound); err != nil {
 		return err
@@ -143,7 +143,7 @@ func (s *Store) Accept(ctx context.Context, e app.Event) error {
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 	var original []byte
 	var bound sql.NullString
 	var version int64
