@@ -14252,6 +14252,10 @@ const docTemplate = `{
                     "type": "string",
                     "example": "0"
                 },
+                "manual_retry_available": {
+                    "description": "ManualRetryAvailable exposes only current workflow eligibility, not an authorization grant.",
+                    "type": "boolean"
+                },
                 "origin_id": {
                     "type": "string"
                 },

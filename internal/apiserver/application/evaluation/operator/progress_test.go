@@ -3,9 +3,17 @@ package operator
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	cberrors "github.com/FangcunMount/component-base/pkg/errors"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
+	assessment "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
+	evalrun "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/run"
+	readmodel "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationreadmodel"
+	runport "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationrun"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
+	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 	"testing"
+	"time"
 
 	appauthz "github.com/FangcunMount/qs-server/internal/apiserver/application/authz"
 	"github.com/stretchr/testify/require"
@@ -37,7 +45,7 @@ func TestProgressWireIsAnAllowlist(t *testing.T) {
 	require.NoError(t, err)
 	var fields map[string]any
 	require.NoError(t, json.Unmarshal(raw, &fields))
-	require.ElementsMatch(t, []string{"id", "testee_id", "questionnaire_code", "questionnaire_version", "origin_type", "status"}, keys(fields))
+	require.ElementsMatch(t, []string{"id", "testee_id", "questionnaire_code", "questionnaire_version", "origin_type", "status", "manual_retry_available"}, keys(fields))
 	for _, forbidden := range []string{"total_score", "risk_level", "failure_reason", "answer_sheet_id", "report", "error_message", "input_snapshot_ref"} {
 		require.NotContains(t, fields, forbidden)
 	}
@@ -48,4 +56,90 @@ func keys(m map[string]any) []string {
 		out = append(out, k)
 	}
 	return out
+}
+
+type progressRuns struct {
+	runport.Repository
+	latest *evalrun.EvaluationRun
+	err    error
+	calls  int
+}
+
+func (r *progressRuns) FindLatestByAssessmentID(context.Context, uint64) (*evalrun.EvaluationRun, error) {
+	r.calls++
+	return r.latest, r.err
+}
+func TestProgressManualRetryEligibility(t *testing.T) {
+	for _, tc := range []struct {
+		name            string
+		attempt         int
+		retryable, want bool
+	}{
+		{"automatic", 1, true, false}, {"manual", 3, true, true}, {"terminal", 3, false, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			record, createErr := assessment.NewAssessment(1, testee.NewID(101), assessment.NewQuestionnaireRefByCode(meta.NewCode("Q"), "1"), assessment.NewAnswerSheetRef(meta.FromUint64(201)), assessment.NewAdhocOrigin(), assessment.WithID(assessment.NewID(1)), assessment.WithEvaluationModel(assessment.NewScaleEvaluationModelRef(meta.ID(0), meta.NewCode("S"), "1", "test")))
+			require.NoError(t, createErr)
+			require.NoError(t, record.Submit())
+			require.NoError(t, record.MarkAsFailed("private failure"))
+			run := evalrun.NewEvaluationRunWithAttempt(1, tc.attempt)
+			require.NoError(t, run.Start(time.Now()))
+			require.NoError(t, run.Fail(time.Now(), evalrun.Failure{Kind: evalrun.FailureKindTimeout, Message: "private diagnostic", Retryable: tc.retryable}))
+			runs := &progressRuns{latest: &run}
+			s := &queryService{assessments: &assessmentRepoStub{items: map[uint64]*assessment.Assessment{1: record}}, access: &accessCheckerStub{}, runs: runs}
+			ctx := appauthz.WithSnapshot(context.Background(), &appauthz.Snapshot{Permissions: []appauthz.Permission{{Resource: appauthz.AssessmentResource, Action: "read_progress", Mode: appauthz.AuthorizationModeUnconditional}}})
+			result, err := s.GetProgress(ctx, Actor{OrgID: 1, OperatorUserID: 9}, 1)
+			require.NoError(t, err)
+			raw, err := json.Marshal(result)
+			require.NoError(t, err)
+			var fields map[string]any
+			require.NoError(t, json.Unmarshal(raw, &fields))
+			require.Equal(t, tc.want, fields["manual_retry_available"])
+			require.NotContains(t, string(raw), "private")
+			runs.latest = nil
+			result, err = s.GetProgress(ctx, Actor{OrgID: 1, OperatorUserID: 9}, 1)
+			require.NoError(t, err)
+			raw, _ = json.Marshal(result)
+			require.Contains(t, string(raw), `"manual_retry_available":false`)
+			runs.err = fmt.Errorf("storage failed")
+			_, err = s.GetProgress(ctx, Actor{OrgID: 1, OperatorUserID: 9}, 1)
+			require.Error(t, err)
+			calls := runs.calls
+			_, err = s.GetProgress(ctx, Actor{OrgID: 2, OperatorUserID: 9}, 1)
+			require.Error(t, err)
+			require.Equal(t, calls, runs.calls, "range rejection must precede run reads")
+		})
+	}
+}
+
+type progressReader struct {
+	readmodel.AssessmentReader
+	filter readmodel.AssessmentFilter
+}
+
+func (r *progressReader) ListAssessments(_ context.Context, f readmodel.AssessmentFilter, _ readmodel.PageRequest) ([]readmodel.AssessmentRow, int64, error) {
+	r.filter = f
+	return []readmodel.AssessmentRow{{ID: 1, TesteeID: 101, Status: "failed"}, {ID: 2, TesteeID: 101, Status: "evaluated"}}, 2, nil
+}
+func TestProgressListAddsEligibilityAfterScopeFiltering(t *testing.T) {
+	run := evalrun.NewEvaluationRunWithAttempt(1, 3)
+	require.NoError(t, run.Start(time.Now()))
+	require.NoError(t, run.Fail(time.Now(), evalrun.Failure{Kind: evalrun.FailureKindTimeout, Retryable: true}))
+	runs := &progressRuns{latest: &run}
+	reader := &progressReader{}
+	service := &queryService{reader: reader, access: &accessCheckerStub{}, runs: runs}
+	ctx := appauthz.WithSnapshot(context.Background(), &appauthz.Snapshot{Permissions: []appauthz.Permission{{Resource: appauthz.AssessmentResource, Action: "list_progress", Mode: appauthz.AuthorizationModeUnconditional}}})
+	id := uint64(101)
+	page, err := service.ListProgress(ctx, Actor{OrgID: 1, OperatorUserID: 9}, ListQuery{TesteeID: &id})
+	require.NoError(t, err)
+	require.EqualValues(t, 1, reader.filter.OrgID)
+	require.Equal(t, &id, reader.filter.TesteeID)
+	require.Equal(t, 2, page.Total)
+	require.True(t, page.Items[0].ManualRetryAvailable)
+	require.False(t, page.Items[1].ManualRetryAvailable)
+	require.Equal(t, 1, runs.calls, "completed rows must not load run diagnostics")
+	service.access = &accessCheckerStub{denied: map[uint64]error{101: fmt.Errorf("unrelated")}}
+	_, err = service.ListProgress(ctx, Actor{OrgID: 1, OperatorUserID: 9}, ListQuery{TesteeID: &id})
+	require.Error(t, err)
+	require.Equal(t, 1, runs.calls)
 }

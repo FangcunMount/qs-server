@@ -2635,7 +2635,7 @@
       "owner": "evaluation",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "0f4f703a5ed82866aaec41449de25f2144a94096",
+        "source_sha": "118afee15d7ceeef01a5641fa5bd17d69ddc2c80",
         "verified_on": "2026-09-11"
       },
       "fact_sources": [
@@ -2821,7 +2821,7 @@
       "owner": "evaluation",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "0f4f703a5ed82866aaec41449de25f2144a94096",
+        "source_sha": "118afee15d7ceeef01a5641fa5bd17d69ddc2c80",
         "verified_on": "2026-09-11"
       },
       "fact_sources": [
@@ -2887,7 +2887,7 @@
       "owner": "evaluation",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "0f4f703a5ed82866aaec41449de25f2144a94096",
+        "source_sha": "118afee15d7ceeef01a5641fa5bd17d69ddc2c80",
         "verified_on": "2026-09-11"
       },
       "fact_sources": [
