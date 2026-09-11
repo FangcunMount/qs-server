@@ -30,16 +30,19 @@ case "${1:-}" in
     rmdir "$FAKE_DOCKER_ROOT/active-pull"
     ;;
   save)
-    output=""
-    while [ "$#" -gt 0 ]; do
-      if [ "$1" = "-o" ]; then
-        output="$2"
-        break
-      fi
-      shift
-    done
-    [ -n "$output" ]
-    tar -cf "$output" -C "$FAKE_DOCKER_ROOT/payload" manifest.json
+    # The exporter must stream; writing a raw archive doubles peak disk use.
+    if [ "$#" != 2 ]; then
+      echo "docker save must write stdout" >&2
+      exit 2
+    fi
+    if [ "${FAKE_DOCKER_MODE:-}" = corrupt ]; then
+      printf 'not a tar archive'
+      exit 0
+    fi
+    tar -cf - -C "$FAKE_DOCKER_ROOT/payload" manifest.json
+    if [ "${FAKE_DOCKER_MODE:-}" = fail_after_tar ]; then
+      exit 1
+    fi
     ;;
   *)
     echo "unexpected fake docker command: $*" >&2
@@ -84,3 +87,42 @@ env "${COMMON_ENV[@]}" FAKE_DOCKER_MODE=retry SERVICE=collection \
 gzip -t "$TEST_ROOT/collection.tar.gz"
 
 echo "deployment image export serialization and retry contract passed"
+
+for mode in fail_after_tar corrupt; do
+  output="$TEST_ROOT/failed-${mode}.tar.gz"
+  if env "${COMMON_ENV[@]}" FAKE_DOCKER_MODE="$mode" SERVICE=apiserver \
+    DEPLOY_IMAGE_PACKAGE="$output" "$SCRIPT_DIR/export-image.sh" >/dev/null 2>&1; then
+    echo "invalid export accepted: $mode" >&2
+    exit 1
+  fi
+  [ ! -e "$output" ]
+  [ ! -d "$TEST_ROOT/export.lock" ]
+  if compgen -G "${output}.tmp.*" >/dev/null; then
+    echo "partial export leaked: $mode" >&2
+    exit 1
+  fi
+done
+
+echo "streaming export failure and integrity contract passed"
+
+cat >"$FAKE_BIN/gzip" <<'GZIP'
+#!/usr/bin/env bash
+printf 'partial compressed bytes'
+exit 7
+GZIP
+chmod +x "$FAKE_BIN/gzip"
+output="$TEST_ROOT/compression-failed.tar.gz"
+printf 'previous complete artifact' >"$output"
+if env "${COMMON_ENV[@]}" FAKE_DOCKER_MODE=serialize SERVICE=apiserver \
+  DEPLOY_IMAGE_PACKAGE="$output" "$SCRIPT_DIR/export-image.sh" >/dev/null 2>&1; then
+  echo "compression failure accepted" >&2
+  exit 1
+fi
+[ "$(cat "$output")" = 'previous complete artifact' ]
+[ ! -d "$TEST_ROOT/export.lock" ]
+if compgen -G "${output}.tmp.*" >/dev/null; then
+  echo "failed compressed export leaked" >&2
+  exit 1
+fi
+rm "$FAKE_BIN/gzip"
+echo "compression failure preserves prior artifact and releases lock"
