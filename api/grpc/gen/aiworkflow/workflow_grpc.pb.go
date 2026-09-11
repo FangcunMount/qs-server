@@ -259,3 +259,187 @@ var Results_ServiceDesc = grpc.ServiceDesc{
 	Streams:  []grpc.StreamDesc{},
 	Metadata: "aiworkflow/workflow.proto",
 }
+
+const (
+	EvaluationManagement_Start_FullMethodName          = "/qsai.workflow.v1.EvaluationManagement/Start"
+	EvaluationManagement_Get_FullMethodName            = "/qsai.workflow.v1.EvaluationManagement/Get"
+	EvaluationManagement_ResolveUnknown_FullMethodName = "/qsai.workflow.v1.EvaluationManagement/ResolveUnknown"
+)
+
+// EvaluationManagementClient is the client API for EvaluationManagement service.
+//
+// For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
+//
+// Trusted QS backend only. QS must authorize OrgAdmin before forwarding these operations.
+type EvaluationManagementClient interface {
+	// Explicitly schedules an existing frozen requested Run; does not call a model inline.
+	Start(ctx context.Context, in *EvaluationStartCommand, opts ...grpc.CallOption) (*EvaluationState, error)
+	Get(ctx context.Context, in *EvaluationQuery, opts ...grpc.CallOption) (*EvaluationState, error)
+	ResolveUnknown(ctx context.Context, in *UnknownResolutionCommand, opts ...grpc.CallOption) (*EvaluationState, error)
+}
+
+type evaluationManagementClient struct {
+	cc grpc.ClientConnInterface
+}
+
+func NewEvaluationManagementClient(cc grpc.ClientConnInterface) EvaluationManagementClient {
+	return &evaluationManagementClient{cc}
+}
+
+func (c *evaluationManagementClient) Start(ctx context.Context, in *EvaluationStartCommand, opts ...grpc.CallOption) (*EvaluationState, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(EvaluationState)
+	err := c.cc.Invoke(ctx, EvaluationManagement_Start_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *evaluationManagementClient) Get(ctx context.Context, in *EvaluationQuery, opts ...grpc.CallOption) (*EvaluationState, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(EvaluationState)
+	err := c.cc.Invoke(ctx, EvaluationManagement_Get_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *evaluationManagementClient) ResolveUnknown(ctx context.Context, in *UnknownResolutionCommand, opts ...grpc.CallOption) (*EvaluationState, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(EvaluationState)
+	err := c.cc.Invoke(ctx, EvaluationManagement_ResolveUnknown_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// EvaluationManagementServer is the server API for EvaluationManagement service.
+// All implementations must embed UnimplementedEvaluationManagementServer
+// for forward compatibility.
+//
+// Trusted QS backend only. QS must authorize OrgAdmin before forwarding these operations.
+type EvaluationManagementServer interface {
+	// Explicitly schedules an existing frozen requested Run; does not call a model inline.
+	Start(context.Context, *EvaluationStartCommand) (*EvaluationState, error)
+	Get(context.Context, *EvaluationQuery) (*EvaluationState, error)
+	ResolveUnknown(context.Context, *UnknownResolutionCommand) (*EvaluationState, error)
+	mustEmbedUnimplementedEvaluationManagementServer()
+}
+
+// UnimplementedEvaluationManagementServer must be embedded to have
+// forward compatible implementations.
+//
+// NOTE: this should be embedded by value instead of pointer to avoid a nil
+// pointer dereference when methods are called.
+type UnimplementedEvaluationManagementServer struct{}
+
+func (UnimplementedEvaluationManagementServer) Start(context.Context, *EvaluationStartCommand) (*EvaluationState, error) {
+	return nil, status.Error(codes.Unimplemented, "method Start not implemented")
+}
+func (UnimplementedEvaluationManagementServer) Get(context.Context, *EvaluationQuery) (*EvaluationState, error) {
+	return nil, status.Error(codes.Unimplemented, "method Get not implemented")
+}
+func (UnimplementedEvaluationManagementServer) ResolveUnknown(context.Context, *UnknownResolutionCommand) (*EvaluationState, error) {
+	return nil, status.Error(codes.Unimplemented, "method ResolveUnknown not implemented")
+}
+func (UnimplementedEvaluationManagementServer) mustEmbedUnimplementedEvaluationManagementServer() {}
+func (UnimplementedEvaluationManagementServer) testEmbeddedByValue()                              {}
+
+// UnsafeEvaluationManagementServer may be embedded to opt out of forward compatibility for this service.
+// Use of this interface is not recommended, as added methods to EvaluationManagementServer will
+// result in compilation errors.
+type UnsafeEvaluationManagementServer interface {
+	mustEmbedUnimplementedEvaluationManagementServer()
+}
+
+func RegisterEvaluationManagementServer(s grpc.ServiceRegistrar, srv EvaluationManagementServer) {
+	// If the following call panics, it indicates UnimplementedEvaluationManagementServer was
+	// embedded by pointer and is nil.  This will cause panics if an
+	// unimplemented method is ever invoked, so we test this at initialization
+	// time to prevent it from happening at runtime later due to I/O.
+	if t, ok := srv.(interface{ testEmbeddedByValue() }); ok {
+		t.testEmbeddedByValue()
+	}
+	s.RegisterService(&EvaluationManagement_ServiceDesc, srv)
+}
+
+func _EvaluationManagement_Start_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(EvaluationStartCommand)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(EvaluationManagementServer).Start(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: EvaluationManagement_Start_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(EvaluationManagementServer).Start(ctx, req.(*EvaluationStartCommand))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _EvaluationManagement_Get_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(EvaluationQuery)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(EvaluationManagementServer).Get(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: EvaluationManagement_Get_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(EvaluationManagementServer).Get(ctx, req.(*EvaluationQuery))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _EvaluationManagement_ResolveUnknown_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UnknownResolutionCommand)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(EvaluationManagementServer).ResolveUnknown(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: EvaluationManagement_ResolveUnknown_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(EvaluationManagementServer).ResolveUnknown(ctx, req.(*UnknownResolutionCommand))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+// EvaluationManagement_ServiceDesc is the grpc.ServiceDesc for EvaluationManagement service.
+// It's only intended for direct use with grpc.RegisterService,
+// and not to be introspected or modified (even as a copy)
+var EvaluationManagement_ServiceDesc = grpc.ServiceDesc{
+	ServiceName: "qsai.workflow.v1.EvaluationManagement",
+	HandlerType: (*EvaluationManagementServer)(nil),
+	Methods: []grpc.MethodDesc{
+		{
+			MethodName: "Start",
+			Handler:    _EvaluationManagement_Start_Handler,
+		},
+		{
+			MethodName: "Get",
+			Handler:    _EvaluationManagement_Get_Handler,
+		},
+		{
+			MethodName: "ResolveUnknown",
+			Handler:    _EvaluationManagement_ResolveUnknown_Handler,
+		},
+	},
+	Streams:  []grpc.StreamDesc{},
+	Metadata: "aiworkflow/workflow.proto",
+}

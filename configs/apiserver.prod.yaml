@@ -126,6 +126,13 @@ delegated-subject:
 # 手动触发的 AI 解读独立于标准报告链路；API key 使用 Provider 对应的环境变量注入。
 # Profile v6 已发布，发布证据 Run 635983278800646702 已批准。
 ai_explanation:
+  # QS-delegated management only; independent of local model generation.
+  workflow_management:
+    enabled: false
+    address: "qs-ai-grpc:50061"
+    ca_file: ""
+    cert_file: ""
+    key_file: ""
   enabled: true
   # 开放参与者手动生成；运行时仅匹配已发布 Profile，保留现有容量限制。
   workflow_enabled: false # Enable after qs-ai command transport and relay are configured.

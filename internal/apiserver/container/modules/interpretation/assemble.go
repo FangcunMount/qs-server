@@ -3,10 +3,12 @@ package interpretation
 import (
 	"context"
 	"fmt"
+	"io"
 	"strings"
 	"time"
 
 	bridge "github.com/FangcunMount/qs-server/internal/apiserver/application/aibridge"
+	bridgeClient "github.com/FangcunMount/qs-server/internal/apiserver/infra/aibridge"
 	bridgeStore "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/aibridge"
 
 	"go.mongodb.org/mongo-driver/mongo"
@@ -68,6 +70,8 @@ import (
 
 // Module assembles report read/query, builder-registry, and durable write capabilities.
 type Module struct {
+	aiManagement                *bridge.EvaluationAdministration
+	aiManagementConnection      io.Closer
 	aiWorkflowEnabled           bool
 	aiWorkflow                  *bridge.Participant
 	aiCurrentAccess             *bridge.CurrentAccess
@@ -244,6 +248,18 @@ func New(deps Deps) (*Module, error) {
 		return nil, err
 	}
 
+	if deps.AIExplanation != nil && deps.AIExplanation.WorkflowManagement.Enabled {
+		opts := deps.AIExplanation.WorkflowManagement
+		if err := opts.Validate(); err != nil {
+			return nil, err
+		}
+		client, connection, err := bridgeClient.DialEvaluationManagement(opts.Address, opts.CAFile, opts.CertFile, opts.KeyFile)
+		if err != nil {
+			return nil, err
+		}
+		module.aiManagement = &bridge.EvaluationAdministration{Gateway: client}
+		module.aiManagementConnection = connection
+	}
 	return module, nil
 }
 
@@ -952,6 +968,9 @@ func buildReportBuilderRegistry() (rendering.Registry, error) {
 
 // Cleanup releases module resources.
 func (m *Module) Cleanup() error {
+	if m != nil && m.aiManagementConnection != nil {
+		return m.aiManagementConnection.Close()
+	}
 	return nil
 }
 
@@ -967,4 +986,11 @@ func (m *Module) ModuleInfo() modules.ModuleInfo {
 		Version:     "1.0.0",
 		Description: "解读报告模块",
 	}
+}
+
+func (m *Module) AIWorkflowManagement() *bridge.EvaluationAdministration {
+	if m == nil {
+		return nil
+	}
+	return m.aiManagement
 }
