@@ -179,12 +179,7 @@ Assessment 固化 Questionnaire 与 AssessmentModel 的发布版本。运营发�
 
 后台完整测评、评分、趋势与运行记录查询始终检查对应动作权限，并同时保留组织和受试者关系范围。角色模型环境变量不再参与放行。进度查询使用独立 DTO；运营员重试成功后，无结果权限时只返回受理响应。参与者与监护人的自服务查询保持独立边界。
 
-人工 retry 先用授权快照确认存在 `qs:evaluation:collection:assessments/retry` 候选，
-再由 `GovernedRetryService` 加载 Assessment、校验组织与 Testee 等业务关系，从领域对象提取 `object.origin_type`，最后调用 IAM AuthZ v4 `Check`。
-只有对象授权通过后，才检查可观察的失败状态并进入 retry 事务。
-
-条件 Grant 只形成对象级 `retry` 候选，不能授予 list、search、`batch_evaluate` 或 `force_retry`；后两者仍要求无条件权限。IAM 拒绝返回 403，不可用或超时返回 503，属性契约或服务身份配置错误返回 500。
-以上失败均不得创建事务、写 Outbox 或产生 retry 副作用。
+人工 retry 在共享 `GovernedRetryService` 入口检查有效快照中的真实 retry / force_retry 动作权限，再加载测评并检查机构、受试者关系、失败状态和重试资格，最后进入事务与 Outbox。临时与计划来源不再参与 IAM 授权，角色名称不补足动作权限。旧条件快照不可放行。
 
 ## 8. 文档地图
 
@@ -213,7 +208,7 @@ Assessment 固化 Questionnaire 与 AssessmentModel 的发布版本。运营发�
 | 执行编排 | [`application/evaluation/execute`](../../../internal/apiserver/application/evaluation/execute/) |
 | 执行输入 | [`port/evaluationinput`](../../../internal/apiserver/port/evaluationinput/)、[`infra/evaluationinput`](../../../internal/apiserver/infra/evaluationinput/) |
 | 可靠提交 | [`application/evaluation/outcome/commit`](../../../internal/apiserver/application/evaluation/outcome/commit/) |
-| 对象级重试授权 | [`application/evaluation/operator/retry_governance.go`](../../../internal/apiserver/application/evaluation/operator/retry_governance.go)、[`application/authz/object_checker.go`](../../../internal/apiserver/application/authz/object_checker.go) |
+| 重试动作授权 | [`application/evaluation/operator/retry_governance.go`](../../../internal/apiserver/application/evaluation/operator/retry_governance.go)、[`application/authz/action_checker.go`](../../../internal/apiserver/application/authz/action_checker.go) |
 | MySQL 持久化 | [`infra/mysql/evaluation`](../../../internal/apiserver/infra/mysql/evaluation/)、[`infra/mysql/checkpoint`](../../../internal/apiserver/infra/mysql/checkpoint/) |
 | 事件契约 | [`configs/events.yaml`](../../../configs/events.yaml) |
 | 组合根 | [`container/modules/evaluation`](../../../internal/apiserver/container/modules/evaluation/) |
@@ -228,3 +223,13 @@ go test ./internal/apiserver/infra/mysql/evaluation ./internal/apiserver/infra/m
 go test ./internal/apiserver/container/modules/evaluation/...
 make docs-hygiene
 ```
+
+## 条件授权退役记录（2026-09-11）
+
+IAM 只判定主体对资源的动作权限。QS 重试应用入口使用 RequirePermission 校验 retry 或 force_retry，不再提交 object.origin_type，也不根据角色名限制测评来源。
+
+测评运营员和计划管理员可在各自既有业务访问范围内重试临时、计划测评；失败状态、可重试资格、期望次数、请求幂等、事务与 Outbox 保持。retry 不等于 force_retry，也不授予评分、答卷或报告读取。
+
+旧 OBJECT_CHECK_REQUIRED 快照不能满足动作权限。参与者和监护人自服务、机构边界和受试者关系检查继续使用原规则。Scope 留待单独设计。
+
+维护用授权矩阵仅验证资源／动作权限与命中证据，不再用来源参数伪装成实际测评验收。两类来源的真实重试必须使用专用测评数据验证。发布需与 IAM 授权迁移、运营端动作入口协调，混合版本期间保持受影响操作维护。

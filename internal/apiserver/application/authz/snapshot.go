@@ -118,23 +118,6 @@ func (s *Snapshot) HasResourceAction(resource, want string) bool {
 	return false
 }
 
-// HasObjectAuthorizationCandidate recognizes both unconditional and object-check permissions.
-// It is only a routing guard; IAM Check remains authoritative for object-check entries.
-func (s *Snapshot) HasObjectAuthorizationCandidate(resource, action string) bool {
-	if s == nil {
-		return false
-	}
-	for _, permission := range s.Permissions {
-		if permission.Mode == AuthorizationModeUnspecified {
-			continue
-		}
-		if resourceCovers(permission.Resource, resource) && actionCovers(permission.Action, action) {
-			return true
-		}
-	}
-	return false
-}
-
 // IsQSAdmin requires the final unconditional QS wildcard grant. A role name
 // alone is not an authorization decision.
 func (s *Snapshot) IsQSAdmin() bool {

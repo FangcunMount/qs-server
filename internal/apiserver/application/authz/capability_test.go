@@ -112,9 +112,6 @@ func TestConditionalPermissionNeverSatisfiesGenericCapability(t *testing.T) {
 	if snapshot.HasResourceAction(AssessmentResource, "retry") {
 		t.Fatal("conditional retry must not satisfy unconditional resource/action checks")
 	}
-	if !snapshot.HasObjectAuthorizationCandidate(AssessmentResource, "retry") {
-		t.Fatal("conditional retry must remain an object authorization candidate")
-	}
 	if DecideCapability(snapshot, CapabilityEvaluateAssessments).Allowed {
 		t.Fatal("conditional retry must not grant batch evaluation capability")
 	}

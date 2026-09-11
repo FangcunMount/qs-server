@@ -1,7 +1,6 @@
 package evaluation
 
 import (
-	appauthz "github.com/FangcunMount/qs-server/internal/apiserver/application/authz"
 	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
 	"gorm.io/gorm"
 
@@ -31,7 +30,6 @@ type BootstrapInput struct {
 	Observer                   *observability.ComponentObserver
 	MySQLLimiter               backpressure.Acquirer
 	TesteeAccessChecker        evaluationoperator.AccessChecker
-	ObjectAuthzChecker         appauthz.ObjectAuthorizationChecker
 	ExecutionPaths             []modelcatalog.ExecutionPath
 	RuntimeDescriptorRegistry  *evalpipeline.RuntimeDescriptorRegistry
 	PublishedModelReader       rulesetport.PublishedModelReader

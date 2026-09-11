@@ -41,7 +41,7 @@ func TestAuthzV3OnlyBoundaryDoesNotRegress(t *testing.T) {
 	}
 
 	assertArchitectureFileContains(t, root, "internal/pkg/iamauth/snapshot_loader.go", "api/grpc/iam/authz/v4")
-	assertArchitectureFileContains(t, root, "internal/pkg/iamauth/object_checker.go", "api/grpc/iam/authz/v4")
+	assertArchitectureFileContains(t, root, "internal/pkg/iamauth/action_checker.go", "api/grpc/iam/authz/v4")
 	assertArchitectureFileContains(t, root, "internal/apiserver/application/authz/snapshot.go", "AuthorizationModeObjectCheckRequired")
 }
 

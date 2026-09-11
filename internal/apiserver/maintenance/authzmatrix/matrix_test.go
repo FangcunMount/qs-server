@@ -2,7 +2,6 @@ package authzmatrix
 
 import (
 	"context"
-	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -29,7 +28,7 @@ func TestRunnerExecutesProductionRoleOriginMatrix(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Run() error = %v", err)
 	}
-	if !evidence.Passed || evidence.PolicyVersion != 42 || len(evidence.Cases) != 12 || len(evidence.Subjects) != 4 {
+	if !evidence.Passed || evidence.PolicyVersion != 42 || len(evidence.Cases) != 6 || len(evidence.Subjects) != 4 {
 		t.Fatalf("Run() evidence = %+v", evidence)
 	}
 	for _, subject := range evidence.Subjects {
@@ -42,7 +41,7 @@ func TestRunnerExecutesProductionRoleOriginMatrix(t *testing.T) {
 			t.Fatalf("failed case = %+v", testCase)
 		}
 	}
-	wantScenarios := map[string]int{"origin": 8, "attribute_missing": 1, "attribute_type_error": 1, "force_retry": 2}
+	wantScenarios := map[string]int{"retry": 4, "force_retry": 2}
 	for _, testCase := range evidence.Cases {
 		wantScenarios[testCase.Scenario]--
 	}
@@ -56,8 +55,8 @@ func TestRunnerExecutesProductionRoleOriginMatrix(t *testing.T) {
 func TestRunnerFailsClosedOnMatrixMismatch(t *testing.T) {
 	t.Parallel()
 
-	checker := matrixChecker{override: map[string]appauthz.ObjectDecision{
-		"user:102/retry/plan": {Allowed: true, MatchedRole: RoleAssessmentOperator, PolicyVersion: 42},
+	checker := matrixChecker{override: map[string]appauthz.ActionDecision{
+		"user:102/retry": {Allowed: false, MatchedRole: RoleAssessmentOperator, PolicyVersion: 42},
 	}}
 	runner := NewRunner(staticSubjects(testSubjects()), staticSnapshots{
 		"101": {RoleAdmin}, "102": {RoleAssessmentOperator}, "103": {RolePlanManager}, "104": {RoleResultReviewer},
@@ -116,47 +115,25 @@ func (s staticSnapshots) Load(_ context.Context, userID string) (*appauthz.Snaps
 }
 
 type matrixChecker struct {
-	override map[string]appauthz.ObjectDecision
+	override map[string]appauthz.ActionDecision
 }
 
-func (c matrixChecker) CheckObject(_ context.Context, request appauthz.ObjectCheckRequest) (appauthz.ObjectDecision, error) {
-	origin := "missing"
-	if attribute, ok := request.Attributes[appauthz.ObjectOriginTypeAttribute]; ok {
-		if attribute.Int64 != nil {
-			return appauthz.ObjectDecision{}, fmt.Errorf("%w: invalid origin type", appauthz.ErrAuthorizationContract)
-		}
-		if attribute.String != nil {
-			origin = *attribute.String
-		}
+func (c matrixChecker) CheckAction(_ context.Context, r appauthz.ActionCheckRequest) (appauthz.ActionDecision, error) {
+	if override, ok := c.override[r.Subject+"/"+r.Action]; ok {
+		return override, nil
 	}
-	if decision, ok := c.override[request.Subject+"/"+request.Action+"/"+origin]; ok {
-		return decision, nil
+	role := map[string]string{"user:101": RoleAdmin, "user:102": RoleAssessmentOperator, "user:103": RolePlanManager}[r.Subject]
+	allowed := role != "" && (r.Action == "retry" || role == RoleAdmin)
+	d := appauthz.ActionDecision{Allowed: allowed, PolicyVersion: 42}
+	if allowed {
+		d.MatchedRole = role
+		d.MatchedGrantID = "grant"
+	} else {
+		d.DenyCode = "policy_not_matched"
 	}
-	role := map[string]string{"user:101": RoleAdmin, "user:102": RoleAssessmentOperator, "user:103": RolePlanManager, "user:104": RoleResultReviewer}[request.Subject]
-	decision := appauthz.ObjectDecision{PolicyVersion: 42}
-	switch {
-	case role == RoleAdmin:
-		decision.Allowed = true
-		decision.MatchedRole = RoleAdmin
-		decision.MatchedGrantID = "grant-admin"
-	case request.Action == RetryAction && role == RoleAssessmentOperator && origin == "adhoc":
-		decision.Allowed = true
-		decision.MatchedRole = RoleAssessmentOperator
-		decision.MatchedGrantID = "grant-operator"
-	case request.Action == RetryAction && role == RolePlanManager && origin == "plan":
-		decision.Allowed = true
-		decision.MatchedRole = RolePlanManager
-		decision.MatchedGrantID = "grant-plan-manager"
-	case request.Action == RetryAction && origin == "missing" && (role == RoleAssessmentOperator || role == RolePlanManager):
-		decision.DenyCode = "attribute_missing"
-		decision.MissingAttributeKeys = []string{appauthz.ObjectOriginTypeAttribute}
-	default:
-		decision.DenyCode = "policy_not_matched"
-	}
-	return decision, nil
+	return d, nil
 }
 
-// 统一授权空间中，多角色管理员可以由其任一有效角色提供授权。
 func TestRunnerChecksAdministratorGlobalMatchEvidence(t *testing.T) {
 	for _, tc := range []struct {
 		name, matchedRole, grantID string
@@ -167,8 +144,8 @@ func TestRunnerChecksAdministratorGlobalMatchEvidence(t *testing.T) {
 		{"missing grant evidence", "platform_admin", "", false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			checker := matrixChecker{override: map[string]appauthz.ObjectDecision{
-				"user:101/retry/adhoc": {Allowed: true, MatchedRole: tc.matchedRole, MatchedGrantID: tc.grantID, PolicyVersion: 42},
+			checker := matrixChecker{override: map[string]appauthz.ActionDecision{
+				"user:101/retry": {Allowed: true, MatchedRole: tc.matchedRole, MatchedGrantID: tc.grantID, PolicyVersion: 42},
 			}}
 			runner := NewRunner(staticSubjects(testSubjects()), staticSnapshots{
 				"101": {RoleAdmin}, "102": {RoleAssessmentOperator}, "103": {RolePlanManager}, "104": {RoleResultReviewer},

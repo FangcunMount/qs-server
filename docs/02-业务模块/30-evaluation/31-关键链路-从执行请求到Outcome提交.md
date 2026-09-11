@@ -198,16 +198,13 @@ Worker handler 使用 `EvaluationRequestedData.ClassifyPayloadGate()` 把事件�
 公开 retry 路由与 system-governance action 最终都汇合到 `GovernedRetryService`，授权顺序固定为：
 
 ```text
-snapshot 中存在 retry 候选
+有效 snapshot 具备实际 retry / force_retry 动作权限
   -> 加载 Assessment 并校验组织/Testee 业务关系
-  -> 从 Assessment 读取 ID 与 OriginType
-  -> IAM AuthZ v4 Check(resource=qs:evaluation:collection:assessments, action=retry)
-  -> 检查 failed/manual_required 状态
+  -> 检查 failed/manual_required 状态与重试资格
   -> 事务内 AuthorizeRetry + evaluation.retry.requested Outbox
 ```
 
-对象属性只由已加载的领域对象提供，终端用户不能提交可信的 `object.origin_type`。条件授权不参与 list、search、batch 或 `force_retry`；IAM 拒绝、不可用、超时或契约错误都在事务和 Outbox 之前 fail closed。
-这样既避免内部治理入口绕过对象授权，也避免未授权调用者利用状态错误探测 Assessment 是否可重试。
+不向 IAM 提交对象属性，不以角色名称或测评来源补足动作权限。缺少有效权限时在事务和 Outbox 之前拒绝；业务范围与状态限制继续由 QS 执行。
 
 ---
 

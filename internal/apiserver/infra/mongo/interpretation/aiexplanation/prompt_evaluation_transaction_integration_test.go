@@ -39,7 +39,8 @@ func TestAIExplanationPromptEvaluationProgressIsAtomicOnReplicaSet(t *testing.T)
 		t.Fatal(err)
 	}
 	runner := aiExplanationMongoRunner(db)
-	now := time.Date(2026, 8, 27, 14, 0, 0, 0, time.UTC)
+	// Keep transaction fixtures inside retention; Mongo TTL uses wall-clock time.
+	now := time.Now().UTC().Truncate(time.Second)
 	newCommitter := func(t *testing.T, stager appevaluation.PromptEvaluationEventStager) *appevaluation.DurableCommitter {
 		t.Helper()
 		committer, err := appevaluation.NewDurableCommitter(
@@ -156,7 +157,8 @@ func TestAIExplanationPromptEvaluationV2ProgressIsAtomicOnReplicaSet(t *testing.
 		t.Fatal(err)
 	}
 	runner := aiExplanationMongoRunner(db)
-	now := time.Date(2026, 9, 1, 2, 0, 0, 0, time.UTC)
+	// Keep transaction fixtures inside retention; Mongo TTL uses wall-clock time.
+	now := time.Now().UTC().Truncate(time.Second)
 	newCommitter := func(t *testing.T, stager appevaluation.PromptEvaluationEventStager) *appevaluation.DurableCommitterV2 {
 		t.Helper()
 		committer, err := appevaluation.NewDurableCommitterV2(

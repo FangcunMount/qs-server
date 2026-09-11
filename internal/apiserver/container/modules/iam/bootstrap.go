@@ -21,7 +21,7 @@ type Module struct {
 	profileLinkSvc      *iam.ProfileLinkService
 	wechatAppService    *iam.WeChatAppService
 	authzSnapshotLoader *iam.AuthzSnapshotLoader
-	objectAuthzChecker  *iam.ObjectAuthorizationChecker
+	actionAuthzChecker  *iam.ActionAuthorizationChecker
 }
 
 type RuntimeOptions struct {
@@ -55,7 +55,7 @@ func NewWithRuntimeOptions(ctx context.Context, opts *options.IAMOptions, runtim
 		profileLinkSvc:      newIAMProfileLinkService(client),
 		wechatAppService:    newIAMWeChatAppService(client),
 		authzSnapshotLoader: newIAMAuthzSnapshotLoader(client, opts),
-		objectAuthzChecker:  iam.NewObjectAuthorizationChecker(client),
+		actionAuthzChecker:  iam.NewActionAuthorizationChecker(client),
 	}
 
 	logger.L(context.Background()).Infow("IAM module initialized successfully",
@@ -199,9 +199,9 @@ func (m *Module) AuthzSnapshotLoader() *iam.AuthzSnapshotLoader {
 	return m.authzSnapshotLoader
 }
 
-// ObjectAuthorizationChecker returns the authoritative IAM AuthZ v3 object checker.
-func (m *Module) ObjectAuthorizationChecker() *iam.ObjectAuthorizationChecker {
-	return m.objectAuthzChecker
+// ActionAuthorizationChecker returns the authoritative IAM AuthZ v3 action checker.
+func (m *Module) ActionAuthorizationChecker() *iam.ActionAuthorizationChecker {
+	return m.actionAuthzChecker
 }
 
 // IsEnabled 检查 IAM 模块是否启用
@@ -221,8 +221,8 @@ func (m *Module) ValidateRequiredAuthzRuntime(ctx context.Context) error {
 	if m.authzSnapshotLoader == nil {
 		return fmt.Errorf("IAM AuthZ v3 snapshot loader is required")
 	}
-	if m.objectAuthzChecker == nil {
-		return fmt.Errorf("IAM AuthZ v3 object checker is required")
+	if m.actionAuthzChecker == nil {
+		return fmt.Errorf("IAM AuthZ v3 action checker is required")
 	}
 	if _, err := m.client.LocalCertificateIdentity(); err != nil {
 		return err

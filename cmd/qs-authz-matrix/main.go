@@ -51,7 +51,7 @@ func run(opts *apiserveroptions.Options) app.RunFunc {
 			return fmt.Errorf("initialize IAM v4 client: %w", err)
 		}
 		defer func() { _ = iamModule.Close() }()
-		if iamModule.AuthzSnapshotLoader() == nil || iamModule.ObjectAuthorizationChecker() == nil ||
+		if iamModule.AuthzSnapshotLoader() == nil || iamModule.ActionAuthorizationChecker() == nil ||
 			iamModule.IdentityService() == nil || iamModule.IdentityService().Raw() == nil {
 			return fmt.Errorf("IAM v4 matrix dependencies are unavailable")
 		}
@@ -65,7 +65,7 @@ func run(opts *apiserveroptions.Options) app.RunFunc {
 				iamModule.IdentityService().Raw(),
 			), iamModule.AuthzSnapshotLoader()),
 			iamModule.AuthzSnapshotLoader(),
-			iamModule.ObjectAuthorizationChecker(),
+			iamModule.ActionAuthorizationChecker(),
 			version.Get().GitCommit,
 			serviceIdentity,
 		)
