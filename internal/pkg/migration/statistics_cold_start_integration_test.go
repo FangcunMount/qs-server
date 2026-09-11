@@ -213,7 +213,7 @@ func seedStatisticsColdStartBusinessFacts(t *testing.T, db *gorm.DB, mongoDB *mo
 	if err := mysqlActor.NewTesteeRepository(db).Save(ctx, testee); err != nil {
 		t.Fatal(err)
 	}
-	clinician := clinicianDomain.NewClinician(orgID, nil, "cold-start-clinician", "test", "doctor", clinicianDomain.TypeDoctor, "cold-start", true)
+	clinician := clinicianDomain.NewClinician(orgID, "cold-start-clinician", "test", "doctor", clinicianDomain.TypeDoctor, "cold-start", true)
 	if err := mysqlActor.NewClinicianRepository(db).Save(ctx, clinician); err != nil {
 		t.Fatal(err)
 	}
