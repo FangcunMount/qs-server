@@ -35,3 +35,31 @@ message EvidenceItem {
  string assessment_id = 1; string testee_id = 2; string report_id = 3;
  string source_version = 4; repeated Fact facts = 5;
 }
+
+// Trusted QS backend only. QS must authorize OrgAdmin before forwarding these operations.
+service EvaluationManagement {
+ rpc Get(EvaluationQuery) returns (EvaluationState);
+ rpc ResolveUnknown(UnknownResolutionCommand) returns (EvaluationState);
+}
+message EvaluationQuery {
+ string run_id = 1;
+ int64 organization_id = 2;
+ int64 operator_user_id = 3;
+}
+message UnknownResolutionCommand {
+ EvaluationQuery scope = 1;
+ int64 expected_version = 2;
+ string execution_id = 3;
+ string decision = 4;
+ string reason = 5;
+ bool confirm = 6;
+ bool acknowledged_duplicate_call_and_cost_risk = 7;
+}
+message EvaluationState {
+ string run_id = 1;
+ int64 version = 2;
+ string status = 3;
+ int64 unresolved_result_unknown_count = 4;
+ // Audit-only decisions, excluding prompts, reports, model output and credentials.
+ string resolutions_json = 5;
+}

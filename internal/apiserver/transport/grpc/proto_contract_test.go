@@ -59,6 +59,7 @@ func TestGRPCProtoServicesHaveExplicitOwners(t *testing.T) {
 	// Shared contracts also describe external servers and independently hosted services.
 	// Pin each exception to its full name, contract path and concrete QS integration.
 	otherOwners := map[string]struct{ proto, source, call string }{
+		"qsai.workflow.v1.EvaluationManagement":  {"aiworkflow/workflow.proto", "../../infra/aibridge/evaluation.go", "pb.NewEvaluationManagementClient("},
 		"qsai.workflow.v1.Commands":              {"aiworkflow/workflow.proto", "../../infra/aibridge/client.go", "pb.NewCommandsClient("},
 		"qsai.workflow.v1.Results":               {"aiworkflow/workflow.proto", "../../../../cmd/qs-ai-bridge/main.go", "pb.RegisterResultsServer("},
 		"interpretation.AIWorkflowAccessService": {"interpretation/interpretation.proto", "service/ai_workflow_access.go", "pb.RegisterAIWorkflowAccessServiceServer("},
