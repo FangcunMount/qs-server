@@ -1,5 +1,7 @@
 package interpretation
 
+import bridge "github.com/FangcunMount/qs-server/internal/apiserver/application/aibridge"
+
 import grpctransport "github.com/FangcunMount/qs-server/internal/apiserver/transport/grpc"
 
 func (m *Module) ExportGRPCDeps() grpctransport.InterpretationDeps {
@@ -17,6 +19,9 @@ func (m *Module) ExportGRPCDeps() grpctransport.InterpretationDeps {
 		deps.AIExplanationParticipant = m.aiExplanationService
 		deps.AIExplanationSubjectExport = m.aiSubjectExport
 	}
+	deps.CurrentAccess = m.aiCurrentAccess
 	deps.AIWorkflow = m.aiWorkflow
 	return deps
 }
+
+func (m *Module) BindCurrentAIAccess(access *bridge.CurrentAccess) { m.aiCurrentAccess = access }

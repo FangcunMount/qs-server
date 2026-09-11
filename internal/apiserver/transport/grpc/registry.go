@@ -88,6 +88,7 @@ type EvaluationDeps struct {
 }
 
 type InterpretationDeps struct {
+	CurrentAccess              *bridge.CurrentAccess
 	AutomationService          interpretationAutomation.Service
 	AIExplanationExecutor      aiExplanationExecution.Executor
 	AIExplanationEvaluation    *aiexplanationevaluation.OnlineRunner
@@ -140,6 +141,9 @@ func (r *Registry) RegisterServices() error {
 	}
 	if err := r.registerAIExplanationAutomationService(); err != nil {
 		return err
+	}
+	if r.deps.Interpretation.CurrentAccess != nil {
+		r.server.RegisterService(&service.AIWorkflowAccessService{Access: r.deps.Interpretation.CurrentAccess})
 	}
 	if err := r.registerParticipantAIExplanationService(); err != nil {
 		return err

@@ -59,3 +59,9 @@ services:
       - /internalapi.InternalService/HandleQuestionnairePublishedPostActions
       - /internalapi.InternalService/HandleScalePublishedPostActions
       - /internalapi.InternalService/SendTaskOpenedMiniProgramNotification
+
+  - service_name: qs-ai.svc
+    enabled: true
+    description: AI durable participant authorization recheck
+    allowed_methods:
+      - /interpretation.AIWorkflowAccessService/Authorize

@@ -286,3 +286,15 @@ message RequestAIWorkflowRequest {
  string request_id = 4;
 }
 message AIWorkflowAccepted { string request_id = 1; string status = 2; }
+
+// Durable participant access recheck; only the qs-ai mTLS workload may call it.
+service AIWorkflowAccessService {
+  rpc Authorize(AIWorkflowAccessRequest) returns (AIWorkflowAccessResponse);
+}
+message AIWorkflowAccessRequest {
+  string org_id = 1;
+  string subject_id = 2;
+  string testee_id = 3;
+  repeated string assessment_ids = 4;
+}
+message AIWorkflowAccessResponse {}

@@ -70,6 +70,7 @@ import (
 type Module struct {
 	aiWorkflowEnabled           bool
 	aiWorkflow                  *bridge.Participant
+	aiCurrentAccess             *bridge.CurrentAccess
 	aiBridge                    *bridge.Service
 	reader                      evaluationreadmodel.ReportReader
 	reportCatalog               evaluationreadmodel.BatchReportMetadataReader
