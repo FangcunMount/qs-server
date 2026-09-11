@@ -139,6 +139,14 @@ func TestMySQLRetirementCutoverAndRestore(t *testing.T) {
 	if done.State != "applied_unchanged" || f.writes != 1 {
 		t.Fatal(done.State, f.writes)
 	}
+	// Refreshing an unrelated administrator projection to the already committed
+	// IAM policy is expected convergence, not a new authorization fact.
+	if e = db.Exec("UPDATE staff SET authz_policy_version=11,authz_projected_at=NOW(3) WHERE id=9").Error; e != nil {
+		t.Fatal(e)
+	}
+	if _, e = tool.Verify(ctx, before.MigrationID); e != nil {
+		t.Fatal("projection refresh reported as fact drift", e)
+	}
 	for i := 0; i < 2; i++ {
 		if _, e = tool.Preflight(ctx, before.MigrationID, 9); e != nil {
 			t.Fatal(e)

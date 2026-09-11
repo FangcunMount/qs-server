@@ -225,7 +225,11 @@ func (t *Tool) currentHash(ctx context.Context, r *Report) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	operators, err := t.databaseDigest(ctx, t.table)
+	// IAM facts and policy versions below are authoritative. Projection refresh
+	// timestamps/versions are expected to converge after cutover and are not a
+	// change to the original Operator identity. Target projections are verified
+	// independently by verifyExits.
+	operators, err := t.databaseDigest(ctx, t.table, "roles", "effective_roles", "authz_policy_version", "authz_projected_at", "authz_projection_pending")
 	if err != nil {
 		return "", err
 	}
