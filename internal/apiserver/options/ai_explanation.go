@@ -25,6 +25,7 @@ const (
 // explanation runtime. APIKey is deliberately excluded from JSON rendering so
 // startup configuration diagnostics cannot print it.
 type AIExplanationOptions struct {
+	WorkflowManagement   AIWorkflowManagementOptions             `json:"workflow_management" mapstructure:"workflow_management"`
 	WorkflowEnabled      bool                                    `json:"workflow_enabled" mapstructure:"workflow_enabled"`
 	Enabled              bool                                    `json:"enabled" mapstructure:"enabled"`
 	ParticipantEnabled   bool                                    `json:"participant_enabled" mapstructure:"participant_enabled"`
@@ -134,6 +135,9 @@ func (o *AIExplanationOptions) completeAPIKey(getenv func(string) string) {
 func (o *AIExplanationOptions) Validate() []error {
 	if o == nil {
 		return nil
+	}
+	if err := o.WorkflowManagement.Validate(); err != nil {
+		return []error{err}
 	}
 	if !o.Enabled {
 		if o.ParticipantEnabled {

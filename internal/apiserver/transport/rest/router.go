@@ -5,6 +5,7 @@ import (
 	retirementApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/operatorretirement"
 	storeApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/store"
 	testeeStoreApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/testeestore"
+	bridge "github.com/FangcunMount/qs-server/internal/apiserver/application/aibridge"
 	"net/http"
 	"time"
 
@@ -142,6 +143,7 @@ type EvaluationDeps struct {
 }
 
 type InterpretationDeps struct {
+	AIWorkflowManagement        *bridge.EvaluationAdministration
 	ReportQueryJourney          reportqueryjourney.Service
 	ReportWaitJourney           reportwaitjourney.Service
 	ClinicianService            interpretationclinician.Service

@@ -53,6 +53,13 @@ func (r *Router) registerInterpretationInternalRoutes(internalV1 *gin.RouterGrou
 // evaluation runtime. The v1 group above intentionally keeps historical Run
 // and Recheck queries but registers no v1 Prompt-evaluation mutation routes.
 func (r *Router) registerInterpretationInternalV2Routes(internalV2 *gin.RouterGroup) {
+	if r.deps.Interpretation.AIWorkflowManagement != nil {
+		management := handler.NewAIWorkflowManagementHandler(r.deps.Interpretation.AIWorkflowManagement)
+		group := internalV2.Group("/interpretation/ai-workflow/evaluations", restmiddleware.RequireCapabilityMiddleware(restmiddleware.CapabilityOrgAdmin))
+		group.GET("/:run_id", management.Get)
+		group.POST("/:run_id/result-unknown/resolve", management.ResolveUnknown)
+	}
+
 	if r.deps.Interpretation.AIExplanationAdministration == nil {
 		return
 	}
