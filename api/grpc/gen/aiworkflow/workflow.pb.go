@@ -80,6 +80,7 @@ type StartCommand struct {
 	TesteeId      string                 `protobuf:"bytes,3,opt,name=testee_id,json=testeeId,proto3" json:"testee_id,omitempty"`
 	AssessmentIds []string               `protobuf:"bytes,4,rep,name=assessment_ids,json=assessmentIds,proto3" json:"assessment_ids,omitempty"`
 	Goal          string                 `protobuf:"bytes,5,opt,name=goal,proto3" json:"goal,omitempty"`
+	Evidence      []*EvidenceItem        `protobuf:"bytes,6,rep,name=evidence,proto3" json:"evidence,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -147,6 +148,13 @@ func (x *StartCommand) GetGoal() string {
 		return x.Goal
 	}
 	return ""
+}
+
+func (x *StartCommand) GetEvidence() []*EvidenceItem {
+	if x != nil {
+		return x.Evidence
+	}
+	return nil
 }
 
 type ChangeCommand struct {
@@ -486,6 +494,134 @@ func (x *Acknowledgement) GetEventId() string {
 	return ""
 }
 
+type Fact struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Ref           string                 `protobuf:"bytes,1,opt,name=ref,proto3" json:"ref,omitempty"`
+	Value         string                 `protobuf:"bytes,2,opt,name=value,proto3" json:"value,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Fact) Reset() {
+	*x = Fact{}
+	mi := &file_aiworkflow_workflow_proto_msgTypes[6]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Fact) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Fact) ProtoMessage() {}
+
+func (x *Fact) ProtoReflect() protoreflect.Message {
+	mi := &file_aiworkflow_workflow_proto_msgTypes[6]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Fact.ProtoReflect.Descriptor instead.
+func (*Fact) Descriptor() ([]byte, []int) {
+	return file_aiworkflow_workflow_proto_rawDescGZIP(), []int{6}
+}
+
+func (x *Fact) GetRef() string {
+	if x != nil {
+		return x.Ref
+	}
+	return ""
+}
+
+func (x *Fact) GetValue() string {
+	if x != nil {
+		return x.Value
+	}
+	return ""
+}
+
+type EvidenceItem struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	AssessmentId  string                 `protobuf:"bytes,1,opt,name=assessment_id,json=assessmentId,proto3" json:"assessment_id,omitempty"`
+	TesteeId      string                 `protobuf:"bytes,2,opt,name=testee_id,json=testeeId,proto3" json:"testee_id,omitempty"`
+	ReportId      string                 `protobuf:"bytes,3,opt,name=report_id,json=reportId,proto3" json:"report_id,omitempty"`
+	SourceVersion string                 `protobuf:"bytes,4,opt,name=source_version,json=sourceVersion,proto3" json:"source_version,omitempty"`
+	Facts         []*Fact                `protobuf:"bytes,5,rep,name=facts,proto3" json:"facts,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *EvidenceItem) Reset() {
+	*x = EvidenceItem{}
+	mi := &file_aiworkflow_workflow_proto_msgTypes[7]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *EvidenceItem) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*EvidenceItem) ProtoMessage() {}
+
+func (x *EvidenceItem) ProtoReflect() protoreflect.Message {
+	mi := &file_aiworkflow_workflow_proto_msgTypes[7]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use EvidenceItem.ProtoReflect.Descriptor instead.
+func (*EvidenceItem) Descriptor() ([]byte, []int) {
+	return file_aiworkflow_workflow_proto_rawDescGZIP(), []int{7}
+}
+
+func (x *EvidenceItem) GetAssessmentId() string {
+	if x != nil {
+		return x.AssessmentId
+	}
+	return ""
+}
+
+func (x *EvidenceItem) GetTesteeId() string {
+	if x != nil {
+		return x.TesteeId
+	}
+	return ""
+}
+
+func (x *EvidenceItem) GetReportId() string {
+	if x != nil {
+		return x.ReportId
+	}
+	return ""
+}
+
+func (x *EvidenceItem) GetSourceVersion() string {
+	if x != nil {
+		return x.SourceVersion
+	}
+	return ""
+}
+
+func (x *EvidenceItem) GetFacts() []*Fact {
+	if x != nil {
+		return x.Facts
+	}
+	return nil
+}
+
 var File_aiworkflow_workflow_proto protoreflect.FileDescriptor
 
 const file_aiworkflow_workflow_proto_rawDesc = "" +
@@ -494,14 +630,15 @@ const file_aiworkflow_workflow_proto_rawDesc = "" +
 	"\x05Actor\x12\x15\n" +
 	"\x06org_id\x18\x01 \x01(\tR\x05orgId\x12\x1d\n" +
 	"\n" +
-	"subject_id\x18\x02 \x01(\tR\tsubjectId\"\xb4\x01\n" +
+	"subject_id\x18\x02 \x01(\tR\tsubjectId\"\xf0\x01\n" +
 	"\fStartCommand\x12\x1d\n" +
 	"\n" +
 	"request_id\x18\x01 \x01(\tR\trequestId\x12-\n" +
 	"\x05actor\x18\x02 \x01(\v2\x17.qsai.workflow.v1.ActorR\x05actor\x12\x1b\n" +
 	"\ttestee_id\x18\x03 \x01(\tR\btesteeId\x12%\n" +
 	"\x0eassessment_ids\x18\x04 \x03(\tR\rassessmentIds\x12\x12\n" +
-	"\x04goal\x18\x05 \x01(\tR\x04goal\"\x9c\x02\n" +
+	"\x04goal\x18\x05 \x01(\tR\x04goal\x12:\n" +
+	"\bevidence\x18\x06 \x03(\v2\x1e.qsai.workflow.v1.EvidenceItemR\bevidence\"\x9c\x02\n" +
 	"\rChangeCommand\x12\x1d\n" +
 	"\n" +
 	"command_id\x18\x01 \x01(\tR\tcommandId\x12\x1d\n" +
@@ -539,7 +676,16 @@ const file_aiworkflow_workflow_proto_rawDesc = "" +
 	" \x01(\bR\acanSkip\x12!\n" +
 	"\ffailure_code\x18\v \x01(\tR\vfailureCode\",\n" +
 	"\x0fAcknowledgement\x12\x19\n" +
-	"\bevent_id\x18\x01 \x01(\tR\aeventId2\x94\x01\n" +
+	"\bevent_id\x18\x01 \x01(\tR\aeventId\".\n" +
+	"\x04Fact\x12\x10\n" +
+	"\x03ref\x18\x01 \x01(\tR\x03ref\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value\"\xc2\x01\n" +
+	"\fEvidenceItem\x12#\n" +
+	"\rassessment_id\x18\x01 \x01(\tR\fassessmentId\x12\x1b\n" +
+	"\ttestee_id\x18\x02 \x01(\tR\btesteeId\x12\x1b\n" +
+	"\treport_id\x18\x03 \x01(\tR\breportId\x12%\n" +
+	"\x0esource_version\x18\x04 \x01(\tR\rsourceVersion\x12,\n" +
+	"\x05facts\x18\x05 \x03(\v2\x16.qsai.workflow.v1.FactR\x05facts2\x94\x01\n" +
 	"\bCommands\x12B\n" +
 	"\x05Start\x12\x1e.qsai.workflow.v1.StartCommand\x1a\x19.qsai.workflow.v1.Receipt\x12D\n" +
 	"\x06Change\x12\x1f.qsai.workflow.v1.ChangeCommand\x1a\x19.qsai.workflow.v1.Receipt2T\n" +
@@ -558,7 +704,7 @@ func file_aiworkflow_workflow_proto_rawDescGZIP() []byte {
 	return file_aiworkflow_workflow_proto_rawDescData
 }
 
-var file_aiworkflow_workflow_proto_msgTypes = make([]protoimpl.MessageInfo, 6)
+var file_aiworkflow_workflow_proto_msgTypes = make([]protoimpl.MessageInfo, 8)
 var file_aiworkflow_workflow_proto_goTypes = []any{
 	(*Actor)(nil),           // 0: qsai.workflow.v1.Actor
 	(*StartCommand)(nil),    // 1: qsai.workflow.v1.StartCommand
@@ -566,22 +712,26 @@ var file_aiworkflow_workflow_proto_goTypes = []any{
 	(*Receipt)(nil),         // 3: qsai.workflow.v1.Receipt
 	(*StateEvent)(nil),      // 4: qsai.workflow.v1.StateEvent
 	(*Acknowledgement)(nil), // 5: qsai.workflow.v1.Acknowledgement
+	(*Fact)(nil),            // 6: qsai.workflow.v1.Fact
+	(*EvidenceItem)(nil),    // 7: qsai.workflow.v1.EvidenceItem
 }
 var file_aiworkflow_workflow_proto_depIdxs = []int32{
 	0, // 0: qsai.workflow.v1.StartCommand.actor:type_name -> qsai.workflow.v1.Actor
-	0, // 1: qsai.workflow.v1.ChangeCommand.actor:type_name -> qsai.workflow.v1.Actor
-	0, // 2: qsai.workflow.v1.StateEvent.actor:type_name -> qsai.workflow.v1.Actor
-	1, // 3: qsai.workflow.v1.Commands.Start:input_type -> qsai.workflow.v1.StartCommand
-	2, // 4: qsai.workflow.v1.Commands.Change:input_type -> qsai.workflow.v1.ChangeCommand
-	4, // 5: qsai.workflow.v1.Results.Accept:input_type -> qsai.workflow.v1.StateEvent
-	3, // 6: qsai.workflow.v1.Commands.Start:output_type -> qsai.workflow.v1.Receipt
-	3, // 7: qsai.workflow.v1.Commands.Change:output_type -> qsai.workflow.v1.Receipt
-	5, // 8: qsai.workflow.v1.Results.Accept:output_type -> qsai.workflow.v1.Acknowledgement
-	6, // [6:9] is the sub-list for method output_type
-	3, // [3:6] is the sub-list for method input_type
-	3, // [3:3] is the sub-list for extension type_name
-	3, // [3:3] is the sub-list for extension extendee
-	0, // [0:3] is the sub-list for field type_name
+	7, // 1: qsai.workflow.v1.StartCommand.evidence:type_name -> qsai.workflow.v1.EvidenceItem
+	0, // 2: qsai.workflow.v1.ChangeCommand.actor:type_name -> qsai.workflow.v1.Actor
+	0, // 3: qsai.workflow.v1.StateEvent.actor:type_name -> qsai.workflow.v1.Actor
+	6, // 4: qsai.workflow.v1.EvidenceItem.facts:type_name -> qsai.workflow.v1.Fact
+	1, // 5: qsai.workflow.v1.Commands.Start:input_type -> qsai.workflow.v1.StartCommand
+	2, // 6: qsai.workflow.v1.Commands.Change:input_type -> qsai.workflow.v1.ChangeCommand
+	4, // 7: qsai.workflow.v1.Results.Accept:input_type -> qsai.workflow.v1.StateEvent
+	3, // 8: qsai.workflow.v1.Commands.Start:output_type -> qsai.workflow.v1.Receipt
+	3, // 9: qsai.workflow.v1.Commands.Change:output_type -> qsai.workflow.v1.Receipt
+	5, // 10: qsai.workflow.v1.Results.Accept:output_type -> qsai.workflow.v1.Acknowledgement
+	8, // [8:11] is the sub-list for method output_type
+	5, // [5:8] is the sub-list for method input_type
+	5, // [5:5] is the sub-list for extension type_name
+	5, // [5:5] is the sub-list for extension extendee
+	0, // [0:5] is the sub-list for field type_name
 }
 
 func init() { file_aiworkflow_workflow_proto_init() }
@@ -596,7 +746,7 @@ func file_aiworkflow_workflow_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_aiworkflow_workflow_proto_rawDesc), len(file_aiworkflow_workflow_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   6,
+			NumMessages:   8,
 			NumExtensions: 0,
 			NumServices:   2,
 		},

@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	bridge "github.com/FangcunMount/qs-server/internal/apiserver/application/aibridge"
 	"testing"
 	"time"
 
@@ -96,5 +97,18 @@ func TestParticipantAIExplanationExportRejectsMissingOrganization(t *testing.T) 
 	_, err := NewParticipantAIExplanationService(nil, exporter, verifier).ExportAIExplanations(ctx, &interpretationpb.ExportAIExplanationsRequest{TesteeId: 7})
 	if status.Code(err) != codes.PermissionDenied {
 		t.Fatalf("code = %v, want PermissionDenied", status.Code(err))
+	}
+}
+
+func TestWorkflowRejectsUntrustedOrMissingDelegationBeforeBusinessAccess(t *testing.T) {
+	verifier, _ := delegatedsubject.NewVerifierFromOptions(&delegatedsubject.Options{Enabled: true, CurrentKey: "test-current-key", TTL: time.Minute})
+	service := NewParticipantAIExplanationService(nil, nil, verifier)
+	// Nil business dependencies deliberately panic if transport authentication is bypassed.
+	service.Workflow = &bridge.Participant{}
+	for _, ctx := range []context.Context{context.Background(), withMTLSWorkload(context.Background(), serviceidentity.CollectionServerCertificateCommonName)} {
+		_, err := service.RequestAIWorkflow(ctx, &interpretationpb.RequestAIWorkflowRequest{TesteeId: 7, AssessmentId: 42, ReportId: 99, RequestId: "00000000-0000-4000-8000-000000000001"})
+		if err == nil {
+			t.Fatal("untrusted request accepted")
+		}
 	}
 }

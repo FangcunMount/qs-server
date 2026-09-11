@@ -17,6 +17,7 @@ import (
 )
 
 type participantAIExplanationServiceStub struct {
+	interpretationpb.ParticipantAIExplanationServiceClient
 	t        *testing.T
 	verifier *delegatedsubject.Verifier
 }

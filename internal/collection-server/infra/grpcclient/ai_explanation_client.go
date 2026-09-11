@@ -193,3 +193,17 @@ func (c *ParticipantAIExplanationClient) attachDelegatedSubject(ctx context.Cont
 	}
 	return delegatedsubject.AppendToOutgoingContext(ctx, c.signer, input)
 }
+
+func (c *ParticipantAIExplanationClient) RequestWorkflow(ctx context.Context, testeeID, assessmentID, reportID uint64, requestID string) (*aiport.WorkflowAccepted, error) {
+	ctx, cancel := c.client.ContextWithTimeout(ctx)
+	defer cancel()
+	ctx, err := c.attachDelegatedSubject(ctx, testeeID, delegatedsubject.PurposeAIExplanationRequest)
+	if err != nil {
+		return nil, err
+	}
+	result, err := c.service.RequestAIWorkflow(ctx, &interpretationpb.RequestAIWorkflowRequest{TesteeId: testeeID, AssessmentId: assessmentID, ReportId: reportID, RequestId: requestID})
+	if err != nil {
+		return nil, err
+	}
+	return &aiport.WorkflowAccepted{RequestID: result.RequestId, Status: result.Status}, nil
+}

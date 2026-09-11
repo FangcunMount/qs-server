@@ -25,6 +25,7 @@ const (
 // explanation runtime. APIKey is deliberately excluded from JSON rendering so
 // startup configuration diagnostics cannot print it.
 type AIExplanationOptions struct {
+	WorkflowEnabled      bool                                    `json:"workflow_enabled" mapstructure:"workflow_enabled"`
 	Enabled              bool                                    `json:"enabled" mapstructure:"enabled"`
 	ParticipantEnabled   bool                                    `json:"participant_enabled" mapstructure:"participant_enabled"`
 	Provider             string                                  `json:"provider" mapstructure:"provider"`

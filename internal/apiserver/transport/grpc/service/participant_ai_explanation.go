@@ -3,11 +3,13 @@ package service
 import (
 	"context"
 	"errors"
+	"fmt"
 	"math"
 	"strings"
 	"time"
 
 	interpretationpb "github.com/FangcunMount/qs-server/api/grpc/gen/interpretation"
+	bridge "github.com/FangcunMount/qs-server/internal/apiserver/application/aibridge"
 	aiparticipant "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/aiexplanation/participant"
 	aisubjectexport "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/aiexplanation/subjectexport"
 	domainartifact "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/aiexplanation/artifact"
@@ -23,6 +25,7 @@ import (
 
 type ParticipantAIExplanationService struct {
 	interpretationpb.UnimplementedParticipantAIExplanationServiceServer
+	Workflow          *bridge.Participant
 	service           aiparticipant.Service
 	subjectExport     *aisubjectexport.Service
 	delegatedVerifier *delegatedsubject.Verifier
@@ -244,4 +247,28 @@ func optionalAIExplanationTime(value time.Time) string {
 		return ""
 	}
 	return value.UTC().Format(time.RFC3339Nano)
+}
+
+func (s *ParticipantAIExplanationService) RequestAIWorkflow(ctx context.Context, request *interpretationpb.RequestAIWorkflowRequest) (*interpretationpb.AIWorkflowAccepted, error) {
+	if request == nil || request.TesteeId == 0 || request.AssessmentId == 0 || request.ReportId == 0 {
+		return nil, status.Error(codes.InvalidArgument, "testee, assessment and report are required")
+	}
+	if s.Workflow == nil {
+		return nil, status.Error(codes.FailedPrecondition, "AI workflow is not configured")
+	}
+	token, err := verifyDelegatedSubject(ctx, s.delegatedVerifier, request.TesteeId, delegatedsubject.PurposeAIExplanationRequest, true)
+	if err != nil {
+		return nil, err
+	}
+	err = s.Workflow.Request(ctx, bridge.Actor{OrgID: fmt.Sprint(token.OrgID), SubjectID: token.UserID}, request.TesteeId, request.AssessmentId, request.ReportId, request.RequestId)
+	if errors.Is(err, bridge.ErrInvalid) {
+		return nil, status.Error(codes.InvalidArgument, "invalid workflow request")
+	}
+	if errors.Is(err, bridge.ErrConflict) {
+		return nil, status.Error(codes.Aborted, "workflow request or source conflict")
+	}
+	if err != nil {
+		return nil, toAIExplanationGRPCError(err)
+	}
+	return &interpretationpb.AIWorkflowAccepted{RequestId: request.RequestId, Status: "accepted"}, nil
 }

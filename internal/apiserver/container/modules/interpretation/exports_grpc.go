@@ -17,5 +17,6 @@ func (m *Module) ExportGRPCDeps() grpctransport.InterpretationDeps {
 		deps.AIExplanationParticipant = m.aiExplanationService
 		deps.AIExplanationSubjectExport = m.aiSubjectExport
 	}
+	deps.AIWorkflow = m.aiWorkflow
 	return deps
 }

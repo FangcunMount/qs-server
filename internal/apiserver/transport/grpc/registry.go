@@ -2,6 +2,7 @@ package grpc
 
 import (
 	"context"
+	bridge "github.com/FangcunMount/qs-server/internal/apiserver/application/aibridge"
 
 	"github.com/FangcunMount/component-base/pkg/log"
 	"github.com/FangcunMount/component-base/pkg/logger"
@@ -89,6 +90,7 @@ type InterpretationDeps struct {
 	AutomationService          interpretationAutomation.Service
 	AIExplanationExecutor      aiExplanationExecution.Executor
 	AIExplanationEvaluation    *aiexplanationevaluation.OnlineRunner
+	AIWorkflow                 *bridge.Participant
 	AIExplanationParticipant   aiExplanationParticipant.Service
 	AIExplanationSubjectExport *aiExplanationSubjectExport.Service
 	ParticipantService         interpretationParticipant.Service
@@ -250,15 +252,17 @@ func (r *Registry) registerAIExplanationAutomationService() error {
 }
 
 func (r *Registry) registerParticipantAIExplanationService() error {
-	if r.deps.Interpretation.AIExplanationParticipant == nil || r.deps.Interpretation.DelegatedSubjectVerifier == nil || !r.deps.Interpretation.DelegatedSubjectVerifier.Enabled() {
+	if (r.deps.Interpretation.AIExplanationParticipant == nil && r.deps.Interpretation.AIWorkflow == nil) || r.deps.Interpretation.DelegatedSubjectVerifier == nil || !r.deps.Interpretation.DelegatedSubjectVerifier.Enabled() {
 		log.Info("participant AI explanation is disabled; service not registered")
 		return nil
 	}
-	r.server.RegisterService(service.NewParticipantAIExplanationService(
+	participantService := service.NewParticipantAIExplanationService(
 		r.deps.Interpretation.AIExplanationParticipant,
 		r.deps.Interpretation.AIExplanationSubjectExport,
 		r.deps.Interpretation.DelegatedSubjectVerifier,
-	))
+	)
+	participantService.Workflow = r.deps.Interpretation.AIWorkflow
+	r.server.RegisterService(participantService)
 	log.Info("   🤖 participant AI explanation service registered")
 	return nil
 }
@@ -339,7 +343,7 @@ func (r *Registry) GetRegisteredServices() []string {
 	if r.deps.Interpretation.AIExplanationExecutor != nil || r.deps.Interpretation.AIExplanationEvaluation != nil {
 		services = append(services, "AIExplanationAutomationService")
 	}
-	if r.deps.Interpretation.AIExplanationParticipant != nil && r.deps.Interpretation.DelegatedSubjectVerifier != nil && r.deps.Interpretation.DelegatedSubjectVerifier.Enabled() {
+	if (r.deps.Interpretation.AIExplanationParticipant != nil || r.deps.Interpretation.AIWorkflow != nil) && r.deps.Interpretation.DelegatedSubjectVerifier != nil && r.deps.Interpretation.DelegatedSubjectVerifier.Enabled() {
 		services = append(services, "ParticipantAIExplanationService")
 	}
 

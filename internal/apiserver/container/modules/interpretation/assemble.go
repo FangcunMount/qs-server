@@ -3,6 +3,8 @@ package interpretation
 import (
 	"context"
 	"fmt"
+	bridge "github.com/FangcunMount/qs-server/internal/apiserver/application/aibridge"
+	bridgeStore "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/aibridge"
 	"strings"
 	"time"
 
@@ -65,6 +67,9 @@ import (
 
 // Module assembles report read/query, builder-registry, and durable write capabilities.
 type Module struct {
+	aiWorkflowEnabled           bool
+	aiWorkflow                  *bridge.Participant
+	aiBridge                    *bridge.Service
 	reader                      evaluationreadmodel.ReportReader
 	reportCatalog               evaluationreadmodel.BatchReportMetadataReader
 	executionExecutor           interpretationexecution.Executor
@@ -139,6 +144,14 @@ func New(deps Deps) (*Module, error) {
 	}
 
 	module := &Module{}
+	if deps.AIExplanation != nil {
+		module.aiWorkflowEnabled = deps.AIExplanation.WorkflowEnabled
+	}
+	sqlDB, err := deps.MySQLDB.DB()
+	if err != nil {
+		return nil, err
+	}
+	module.aiBridge = &bridge.Service{Store: &bridgeStore.Store{DB: sqlDB}}
 	reportStatusReporter, err := reportstatus.NewReporter(deps.OpsHandle, deps.ReportStatusConfig)
 	if err != nil {
 		return nil, errors.WithCode(code.ErrModuleInitializationFailed, "failed to initialize report status reporter: %v", err)
@@ -851,6 +864,14 @@ func (m *Module) BindParticipantAccess(access interpretationparticipant.Access) 
 }
 
 func (m *Module) tryBindAIExplanationParticipant() error {
+	if m != nil && m.aiWorkflowEnabled && m.aiWorkflow == nil && m.aiOutcomeRepo != nil && m.participantAccess != nil {
+		resolver, err := aiexplanationsource.NewResolver(m.reportCatalog, m.reportRepo, m.aiOutcomeRepo)
+		if err != nil {
+			return err
+		}
+		m.aiWorkflow = &bridge.Participant{Access: m.participantAccess, Sources: resolver, Bridge: m.aiBridge}
+	}
+
 	if m == nil || !m.aiParticipantEnabled || m.aiExplanationService != nil || m.aiOutcomeRepo == nil || m.participantAccess == nil {
 		return nil
 	}
