@@ -3,10 +3,11 @@ package aibridge
 import (
 	"context"
 	"encoding/json"
+	"time"
+
 	pb "github.com/FangcunMount/qs-server/api/grpc/gen/aiworkflow"
 	app "github.com/FangcunMount/qs-server/internal/apiserver/application/aibridge"
 	"google.golang.org/grpc"
-	"time"
 )
 
 type Client struct{ RPC pb.CommandsClient }

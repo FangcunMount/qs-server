@@ -3,10 +3,11 @@ package interpretation
 import (
 	"context"
 	"fmt"
-	bridge "github.com/FangcunMount/qs-server/internal/apiserver/application/aibridge"
-	bridgeStore "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/aibridge"
 	"strings"
 	"time"
+
+	bridge "github.com/FangcunMount/qs-server/internal/apiserver/application/aibridge"
+	bridgeStore "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/aibridge"
 
 	"go.mongodb.org/mongo-driver/mongo"
 

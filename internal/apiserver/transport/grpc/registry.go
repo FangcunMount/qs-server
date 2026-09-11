@@ -2,6 +2,7 @@ package grpc
 
 import (
 	"context"
+
 	bridge "github.com/FangcunMount/qs-server/internal/apiserver/application/aibridge"
 
 	"github.com/FangcunMount/component-base/pkg/log"

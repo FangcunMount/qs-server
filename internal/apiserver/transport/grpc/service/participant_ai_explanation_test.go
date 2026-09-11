@@ -2,9 +2,10 @@ package service
 
 import (
 	"context"
-	bridge "github.com/FangcunMount/qs-server/internal/apiserver/application/aibridge"
 	"testing"
 	"time"
+
+	bridge "github.com/FangcunMount/qs-server/internal/apiserver/application/aibridge"
 
 	interpretationpb "github.com/FangcunMount/qs-server/api/grpc/gen/interpretation"
 	aiparticipant "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/aiexplanation/participant"

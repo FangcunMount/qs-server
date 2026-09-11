@@ -3,13 +3,14 @@ package aibridge
 import (
 	"context"
 	"errors"
+	"testing"
+	"time"
+
 	source "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/aiexplanation/source"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/policy"
 	report "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/report"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 	"github.com/google/uuid"
-	"testing"
-	"time"
 )
 
 type accessStub struct{ err error }

@@ -2,9 +2,10 @@ package aiexplanation
 
 import (
 	"context"
+	"strconv"
+
 	aiport "github.com/FangcunMount/qs-server/internal/collection-server/port/aiexplanation"
 	"github.com/google/uuid"
-	"strconv"
 )
 
 type WorkflowRequest struct {
