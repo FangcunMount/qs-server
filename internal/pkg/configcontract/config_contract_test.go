@@ -293,10 +293,11 @@ func assertExactGRPCACLConfig(t *testing.T, configName string, data []byte) {
 	if aclConfig.DefaultPolicy != "deny" {
 		t.Fatalf("%s default_policy = %q, want deny", configName, aclConfig.DefaultPolicy)
 	}
-	if len(aclConfig.Services) != 2 {
-		t.Fatalf("%s service rule count = %d, want 2", configName, len(aclConfig.Services))
+	if len(aclConfig.Services) != 3 {
+		t.Fatalf("%s service rule count = %d, want 3", configName, len(aclConfig.Services))
 	}
 	expectedMethodsByIdentity := map[string][]string{
+		"qs-ai.svc": {"/interpretation.AIWorkflowAccessService/Authorize"},
 		serviceidentity.CollectionServerCertificateCommonName: collectiongrpcclient.ACLAllowedMethods(),
 		serviceidentity.WorkerCertificateCommonName:           workergrpcclient.ACLAllowedMethods(),
 	}
