@@ -2926,6 +2926,10 @@ definitions:
       id:
         example: "0"
         type: string
+      manual_retry_available:
+        description: ManualRetryAvailable exposes only current workflow eligibility,
+          not an authorization grant.
+        type: boolean
       origin_id:
         type: string
       origin_type:

@@ -2,6 +2,8 @@ package operator
 
 import (
 	"context"
+	evalrun "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/run"
+	"github.com/FangcunMount/qs-server/internal/pkg/retrygovernance"
 	"time"
 
 	appauthz "github.com/FangcunMount/qs-server/internal/apiserver/application/authz"
@@ -12,6 +14,8 @@ import (
 // Progress is an explicit allowlist. Never embed Assessment or Run: those
 // contain scores, clinical findings and internal failure diagnostics.
 type Progress struct {
+	// ManualRetryAvailable exposes only current workflow eligibility, not an authorization grant.
+	ManualRetryAvailable bool       `json:"manual_retry_available"`
 	ID                   uint64     `json:"id,string"`
 	TesteeID             uint64     `json:"testee_id,string"`
 	QuestionnaireCode    string     `json:"questionnaire_code"`
@@ -45,7 +49,11 @@ func (s *queryService) GetProgress(ctx context.Context, actor Actor, id uint64) 
 	if err != nil {
 		return nil, err
 	}
-	return &Progress{ID: a.ID().Uint64(), TesteeID: a.TesteeID().Uint64(), QuestionnaireCode: a.QuestionnaireRef().Code().String(), QuestionnaireVersion: a.QuestionnaireRef().Version(), OriginType: a.OriginType().String(), OriginID: a.OriginID(), Status: a.Status().String(), SubmittedAt: a.SubmittedAt(), EvaluatedAt: a.EvaluatedAt(), FailedAt: a.FailedAt()}, nil
+	available, err := s.manualRetryAvailable(ctx, a.ID().Uint64(), a.Status().String())
+	if err != nil {
+		return nil, err
+	}
+	return &Progress{ManualRetryAvailable: available, ID: a.ID().Uint64(), TesteeID: a.TesteeID().Uint64(), QuestionnaireCode: a.QuestionnaireRef().Code().String(), QuestionnaireVersion: a.QuestionnaireRef().Version(), OriginType: a.OriginType().String(), OriginID: a.OriginID(), Status: a.Status().String(), SubmittedAt: a.SubmittedAt(), EvaluatedAt: a.EvaluatedAt(), FailedAt: a.FailedAt()}, nil
 }
 func (s *queryService) ListProgress(ctx context.Context, actor Actor, q ListQuery) (*ProgressList, error) {
 	if err := appauthz.RequirePermission(ctx, appauthz.AssessmentResource, "list_progress"); err != nil {
@@ -61,7 +69,28 @@ func (s *queryService) ListProgress(ctx context.Context, actor Actor, q ListQuer
 	}
 	items := make([]*Progress, 0, len(rows))
 	for _, row := range rows {
-		items = append(items, &Progress{ID: row.ID, TesteeID: row.TesteeID, QuestionnaireCode: row.QuestionnaireCode, QuestionnaireVersion: row.QuestionnaireVersion, OriginType: row.OriginType, OriginID: row.OriginID, Status: row.Status, SubmittedAt: row.SubmittedAt, EvaluatedAt: row.EvaluatedAt, FailedAt: row.FailedAt})
+		available, err := s.manualRetryAvailable(ctx, row.ID, row.Status)
+		if err != nil {
+			return nil, err
+		}
+		items = append(items, &Progress{ManualRetryAvailable: available, ID: row.ID, TesteeID: row.TesteeID, QuestionnaireCode: row.QuestionnaireCode, QuestionnaireVersion: row.QuestionnaireVersion, OriginType: row.OriginType, OriginID: row.OriginID, Status: row.Status, SubmittedAt: row.SubmittedAt, EvaluatedAt: row.EvaluatedAt, FailedAt: row.FailedAt})
 	}
 	return &ProgressList{Items: items, Total: count, Page: page, PageSize: size, TotalPages: pages(count, size)}, nil
+}
+
+// Called only after permission and business-range filtering. No run details cross
+// the progress boundary; retry submission must recheck the current state.
+func (s *queryService) manualRetryAvailable(ctx context.Context, id uint64, status string) (bool, error) {
+	if status != "failed" || s.runs == nil {
+		return false, nil
+	}
+	run, err := s.runs.FindLatestByAssessmentID(ctx, id)
+	if err != nil {
+		return false, err
+	}
+	if run == nil || run.Attempt().Status != evalrun.StatusFailed {
+		return false, nil
+	}
+	decision := run.RetryDecision()
+	return decision != nil && decision.Disposition == retrygovernance.DispositionManualRequired, nil
 }
