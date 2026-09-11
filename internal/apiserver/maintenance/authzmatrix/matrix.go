@@ -40,8 +40,8 @@ type SnapshotReader interface {
 	Load(context.Context, string) (*appauthz.Snapshot, error)
 }
 
-type ObjectChecker interface {
-	CheckObject(context.Context, appauthz.ObjectCheckRequest) (appauthz.ObjectDecision, error)
+type ActionChecker interface {
+	CheckAction(context.Context, appauthz.ActionCheckRequest) (appauthz.ActionDecision, error)
 }
 
 type Evidence struct {
@@ -66,32 +66,30 @@ type SubjectEvidence struct {
 }
 
 type CaseEvidence struct {
-	Kind                 string   `json:"kind"`
-	Scenario             string   `json:"scenario"`
-	Action               string   `json:"action"`
-	OriginType           string   `json:"origin_type,omitempty"`
-	ExpectedAllowed      bool     `json:"expected_allowed"`
-	ExpectedErrorCode    string   `json:"expected_error_code,omitempty"`
-	Allowed              bool     `json:"allowed"`
-	ErrorCode            string   `json:"error_code,omitempty"`
-	DenyCode             string   `json:"deny_code,omitempty"`
-	MatchedRole          string   `json:"matched_role,omitempty"`
-	MatchedGrantID       string   `json:"matched_grant_id,omitempty"`
-	MissingAttributeKeys []string `json:"missing_attribute_keys,omitempty"`
-	PolicyVersion        int64    `json:"policy_version"`
-	Passed               bool     `json:"passed"`
+	Kind              string `json:"kind"`
+	Scenario          string `json:"scenario"`
+	Action            string `json:"action"`
+	ExpectedAllowed   bool   `json:"expected_allowed"`
+	ExpectedErrorCode string `json:"expected_error_code,omitempty"`
+	Allowed           bool   `json:"allowed"`
+	ErrorCode         string `json:"error_code,omitempty"`
+	DenyCode          string `json:"deny_code,omitempty"`
+	MatchedRole       string `json:"matched_role,omitempty"`
+	MatchedGrantID    string `json:"matched_grant_id,omitempty"`
+	PolicyVersion     int64  `json:"policy_version"`
+	Passed            bool   `json:"passed"`
 }
 
 type Runner struct {
 	subjects        SubjectSource
 	snapshots       SnapshotReader
-	checker         ObjectChecker
+	checker         ActionChecker
 	now             func() time.Time
 	gitCommit       string
 	serviceIdentity string
 }
 
-func NewRunner(subjects SubjectSource, snapshots SnapshotReader, checker ObjectChecker, gitCommit, serviceIdentity string) *Runner {
+func NewRunner(subjects SubjectSource, snapshots SnapshotReader, checker ActionChecker, gitCommit, serviceIdentity string) *Runner {
 	return &Runner{
 		subjects: subjects, snapshots: snapshots, checker: checker,
 		now: time.Now, gitCommit: strings.TrimSpace(gitCommit), serviceIdentity: strings.TrimSpace(serviceIdentity),
@@ -151,26 +149,14 @@ func (r *Runner) Run(ctx context.Context) (Evidence, error) {
 	}
 
 	for _, testCase := range matrixCases(subjects) {
-		request := appauthz.ObjectCheckRequest{
-			Subject:  appauthz.SubjectKey(testCase.subject.UserID),
-			Resource: AssessmentResource, Action: testCase.action,
-			ObjectID:   "authz-production-matrix:" + testCase.objectSuffix,
-			Attributes: map[string]appauthz.ObjectAttribute{},
-		}
-		if testCase.originType != "" {
-			request.Attributes[appauthz.ObjectOriginTypeAttribute] = appauthz.StringAttribute(testCase.originType)
-		}
-		if testCase.invalidOriginType {
-			invalid := int64(1)
-			request.Attributes[appauthz.ObjectOriginTypeAttribute] = appauthz.ObjectAttribute{Int64: &invalid}
-		}
-		decision, err := r.checker.CheckObject(ctx, request)
+		request := appauthz.ActionCheckRequest{Subject: appauthz.SubjectKey(testCase.subject.UserID), Resource: AssessmentResource, Action: testCase.action}
+		decision, err := r.checker.CheckAction(ctx, request)
 		errorCode := authorizationErrorCode(err)
 		if err != nil && testCase.expectedErrorCode == "" {
-			return evidence, fmt.Errorf("check %s/%s: %w", testCase.subject.Kind, testCase.objectSuffix, err)
+			return evidence, fmt.Errorf("check %s/%s: %w", testCase.subject.Kind, testCase.caseName, err)
 		}
 		if err == nil && testCase.expectedErrorCode != "" {
-			return evidence, fmt.Errorf("authorization matrix mismatch for %s/%s: expected error %s", testCase.subject.Kind, testCase.objectSuffix, testCase.expectedErrorCode)
+			return evidence, fmt.Errorf("authorization matrix mismatch for %s/%s: expected error %s", testCase.subject.Kind, testCase.caseName, testCase.expectedErrorCode)
 		}
 		policyVersion := evidence.PolicyVersion
 		if err == nil {
@@ -190,21 +176,16 @@ func (r *Runner) Run(ctx context.Context) (Evidence, error) {
 			}
 			passed = passed && matched && decision.MatchedGrantID != ""
 		}
-		missing := append([]string(nil), decision.MissingAttributeKeys...)
-		sort.Strings(missing)
-		if testCase.expectMissingOrigin {
-			passed = passed && contains(missing, appauthz.ObjectOriginTypeAttribute)
-		}
 		evidence.Cases = append(evidence.Cases, CaseEvidence{
-			Kind: testCase.subject.Kind, Scenario: testCase.scenario, Action: testCase.action, OriginType: testCase.originType,
+			Kind: testCase.subject.Kind, Scenario: testCase.scenario, Action: testCase.action,
 			ExpectedAllowed: testCase.expectedAllowed, ExpectedErrorCode: testCase.expectedErrorCode,
 			Allowed: decision.Allowed, ErrorCode: errorCode,
 			DenyCode: decision.DenyCode, MatchedRole: decision.MatchedRole,
-			MatchedGrantID: decision.MatchedGrantID, MissingAttributeKeys: missing,
-			PolicyVersion: policyVersion, Passed: passed,
+			MatchedGrantID: decision.MatchedGrantID,
+			PolicyVersion:  policyVersion, Passed: passed,
 		})
 		if !passed {
-			return evidence, fmt.Errorf("authorization matrix mismatch for %s/%s", testCase.subject.Kind, testCase.objectSuffix)
+			return evidence, fmt.Errorf("authorization matrix mismatch for %s/%s", testCase.subject.Kind, testCase.caseName)
 		}
 	}
 
@@ -225,14 +206,11 @@ type matrixCase struct {
 	subject             Subject
 	scenario            string
 	action              string
-	originType          string
-	invalidOriginType   bool
-	objectSuffix        string
+	caseName            string
 	expectedAllowed     bool
 	expectedErrorCode   string
 	expectedDenyCode    string
 	expectedMatchedRole string
-	expectMissingOrigin bool
 }
 
 func matrixCases(subjects []Subject) []matrixCase {
@@ -240,27 +218,21 @@ func matrixCases(subjects []Subject) []matrixCase {
 	for _, subject := range subjects {
 		byKind[subject.Kind] = subject
 	}
-	result := make([]matrixCase, 0, 12)
-	for _, origin := range []string{"adhoc", "plan"} {
-		for _, kind := range []string{"admin", "operator", "plan_manager", "other"} {
-			subject := byKind[kind]
-			allowed := kind == "admin" || (kind == "operator" && origin == "adhoc") || (kind == "plan_manager" && origin == "plan")
-			item := matrixCase{subject: subject, scenario: "origin", action: RetryAction, originType: origin, objectSuffix: origin, expectedAllowed: allowed}
-			if allowed {
-				item.expectedMatchedRole = subject.ExpectedRole
-			} else {
-				item.expectedDenyCode = "policy_not_matched"
-			}
-			result = append(result, item)
+
+	result := []matrixCase{}
+	for _, kind := range []string{"admin", "operator", "plan_manager", "other"} {
+		sub := byKind[kind]
+		allowed := kind != "other"
+		item := matrixCase{subject: sub, scenario: "retry", action: RetryAction, caseName: "retry", expectedAllowed: allowed}
+		if allowed {
+			item.expectedMatchedRole = sub.ExpectedRole
+		} else {
+			item.expectedDenyCode = "policy_not_matched"
 		}
+		result = append(result, item)
 	}
-	operator := byKind["operator"]
-	result = append(result,
-		matrixCase{subject: operator, scenario: "attribute_missing", action: RetryAction, objectSuffix: "attribute-missing", expectedDenyCode: "attribute_missing", expectMissingOrigin: true},
-		matrixCase{subject: operator, scenario: "attribute_type_error", action: RetryAction, objectSuffix: "attribute-type-error", invalidOriginType: true, expectedErrorCode: "authorization_contract"},
-		matrixCase{subject: operator, scenario: "force_retry", action: ForceRetryAction, objectSuffix: "force-retry", expectedDenyCode: "policy_not_matched"},
-		matrixCase{subject: byKind["admin"], scenario: "force_retry", action: ForceRetryAction, objectSuffix: "force-retry", expectedAllowed: true, expectedMatchedRole: RoleAdmin},
-	)
+	result = append(result, matrixCase{subject: byKind["operator"], scenario: "force_retry", action: ForceRetryAction, caseName: "force-retry", expectedDenyCode: "policy_not_matched"}, matrixCase{subject: byKind["admin"], scenario: "force_retry", action: ForceRetryAction, caseName: "force-retry", expectedAllowed: true, expectedMatchedRole: RoleAdmin})
+
 	return result
 }
 

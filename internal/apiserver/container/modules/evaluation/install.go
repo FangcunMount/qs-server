@@ -1,11 +1,11 @@
 package evaluation
 
 import (
-	"github.com/FangcunMount/qs-server/internal/apiserver/cache/catalog"
+	cachepolicy "github.com/FangcunMount/qs-server/internal/apiserver/cache/catalog"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container/compose"
 	surveymod "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/survey"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/workbenchreadmodel"
-	"github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
+	eventcatalog "github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime"
 )
 
@@ -41,7 +41,6 @@ func InstallFrom(host InstallHost) error {
 		MySQLLimiter:              host.MySQLLimiter(),
 		MongoLimiter:              host.MongoLimiter(),
 		TesteeAccessChecker:       NewTesteeAccessChecker(host.ActorPorts().TesteeAccess),
-		ObjectAuthzChecker:        host.ActorIAMPorts().ObjectAuthzChecker,
 		NormSubjectReader:         NewNormSubjectReader(host.ActorPorts().TesteeQuery),
 		SurveyRuntimeInfra:        host.SurveyRuntimeInfra(),
 		PublishedModelCatalog:     host.PublishedModelCatalog(),

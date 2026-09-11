@@ -21,7 +21,7 @@ type ActorIAMPorts struct {
 	OperationAccountSvc *iam.OperationAccountService
 	IAMClient           *iam.Client
 	AuthzSnapshotLoader *iam.AuthzSnapshotLoader
-	ObjectAuthzChecker  *iam.ObjectAuthorizationChecker
+	ActionAuthzChecker  *iam.ActionAuthorizationChecker
 }
 
 // SurveyPorts exposes survey-side outputs needed by downstream modules.

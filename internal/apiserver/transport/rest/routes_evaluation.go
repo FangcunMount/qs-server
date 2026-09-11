@@ -39,7 +39,7 @@ func (r *Router) registerEvaluationProtectedRoutes(apiV1 *gin.RouterGroup) {
 			assessments.GET("/:id/high-risk-factors", r.rateLimitedHandlers(rateLimitBudgetQuery, evalHandler.GetHighRiskFactors)...)
 			assessments.GET("/:id/runs/latest", r.rateLimitedHandlers(rateLimitBudgetQuery, evalHandler.GetLatestAssessmentRun)...)
 			assessments.GET("/:id/runs", r.rateLimitedHandlers(rateLimitBudgetQuery, evalHandler.ListAssessmentRuns)...)
-			assessmentAdmin := assessments.Group("", restmiddleware.RequireObjectAuthorizationCandidate(authzapp.AssessmentResource, "retry"))
+			assessmentAdmin := assessments.Group("", restmiddleware.RequirePermissionMiddleware(authzapp.AssessmentResource, "retry"))
 			assessmentAdmin.POST("/:id/retry", r.rateLimitedHandlers(rateLimitBudgetSubmit, evalHandler.RetryFailed)...)
 		}
 

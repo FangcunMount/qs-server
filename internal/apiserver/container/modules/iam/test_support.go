@@ -6,7 +6,7 @@ import iaminfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
 type TestModuleOptions struct {
 	TokenVerifier       *iaminfra.TokenVerifier
 	AuthzSnapshotLoader *iaminfra.AuthzSnapshotLoader
-	ObjectAuthzChecker  *iaminfra.ObjectAuthorizationChecker
+	ActionAuthzChecker  *iaminfra.ActionAuthorizationChecker
 }
 
 // NewTestModule builds an IAM module with injected dependencies.
@@ -14,6 +14,6 @@ func NewTestModule(opts TestModuleOptions) *Module {
 	return &Module{
 		tokenVerifier:       opts.TokenVerifier,
 		authzSnapshotLoader: opts.AuthzSnapshotLoader,
-		objectAuthzChecker:  opts.ObjectAuthzChecker,
+		actionAuthzChecker:  opts.ActionAuthzChecker,
 	}
 }

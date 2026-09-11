@@ -18,8 +18,8 @@ import (
 	"google.golang.org/grpc/test/bufconn"
 )
 
-func TestObjectCheckerIAMV3ContractAssessmentRetryMatrix(t *testing.T) {
-	checker, server := newObjectCheckerContractFixture(t)
+func TestActionCheckerIAMV3ContractAssessmentRetryMatrix(t *testing.T) {
+	checker, server := newActionCheckerContractFixture(t)
 
 	tests := []struct {
 		name       string
@@ -31,28 +31,22 @@ func TestObjectCheckerIAMV3ContractAssessmentRetryMatrix(t *testing.T) {
 		{name: "admin adhoc", subject: "user:1", originType: "adhoc", allowed: true, role: "qs:admin"},
 		{name: "admin plan", subject: "user:1", originType: "plan", allowed: true, role: "qs:admin"},
 		{name: "operator adhoc", subject: "user:2", originType: "adhoc", allowed: true, role: "qs:assessment_operator"},
-		{name: "operator plan", subject: "user:2", originType: "plan", allowed: false},
-		{name: "plan manager adhoc", subject: "user:3", originType: "adhoc", allowed: false},
+		{name: "operator plan", subject: "user:2", originType: "plan", allowed: true, role: "qs:assessment_operator"},
+		{name: "plan manager adhoc", subject: "user:3", originType: "adhoc", allowed: true, role: "qs:evaluation_plan_manager"},
 		{name: "plan manager plan", subject: "user:3", originType: "plan", allowed: true, role: "qs:evaluation_plan_manager"},
 		{name: "other", subject: "user:4", originType: "adhoc", allowed: false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			decision, err := checker.CheckObject(context.Background(), appauthz.ObjectCheckRequest{
-				Subject: tt.subject, Resource: appauthz.AssessmentResource,
-				Action: "retry", ObjectID: "assessment-1",
-				Attributes: map[string]appauthz.ObjectAttribute{
-					appauthz.ObjectOriginTypeAttribute: appauthz.StringAttribute(tt.originType),
-				},
-			})
+			decision, err := checker.CheckAction(context.Background(), appauthz.ActionCheckRequest{Subject: tt.subject, Resource: appauthz.AssessmentResource, Action: "retry"})
 			if err != nil {
-				t.Fatalf("CheckObject() error = %v", err)
+				t.Fatalf("CheckAction() error = %v", err)
 			}
 			if decision.Allowed != tt.allowed || decision.PolicyVersion != 41 || decision.MatchedRole != tt.role {
-				t.Fatalf("CheckObject() decision = %+v", decision)
+				t.Fatalf("CheckAction() decision = %+v", decision)
 			}
 			if !tt.allowed && decision.DenyCode != "policy_not_matched" {
-				t.Fatalf("CheckObject() deny code = %q", decision.DenyCode)
+				t.Fatalf("CheckAction() deny code = %q", decision.DenyCode)
 			}
 		})
 	}
@@ -60,33 +54,19 @@ func TestObjectCheckerIAMV3ContractAssessmentRetryMatrix(t *testing.T) {
 	if server.calls != len(tests) {
 		t.Fatalf("IAM Check calls = %d, want %d", server.calls, len(tests))
 	}
-	if server.lastRequest.GetObjectContext().GetObjectId() != "assessment-1" {
-		t.Fatalf("IAM object id = %q", server.lastRequest.GetObjectContext().GetObjectId())
-	}
-	attributes := server.lastRequest.GetObjectContext().GetAttributes()
-	if len(attributes) != 1 || attributes[0].GetKey() != "object.origin_type" || attributes[0].GetStringValue() != "adhoc" {
-		t.Fatalf("IAM typed attributes = %#v", attributes)
+	if server.lastRequest.ObjectContext != nil {
+		t.Fatal("action check sent retired object context")
 	}
 }
 
-func TestObjectCheckerIAMV3ContractMapsUnavailableAndInvalidAttributes(t *testing.T) {
-	checker, server := newObjectCheckerContractFixture(t)
+func TestActionCheckerIAMV3ContractMapsUnavailableAndInvalidAttributes(t *testing.T) {
+	checker, server := newActionCheckerContractFixture(t)
 	server.failureCode = codes.Unavailable
-	_, err := checker.CheckObject(context.Background(), objectCheckRequest("user:2", "adhoc"))
+	_, err := checker.CheckAction(context.Background(), objectCheckRequest("user:2", "adhoc"))
 	if !strings.Contains(errString(err), appauthz.ErrAuthorizationUnavailable.Error()) {
-		t.Fatalf("CheckObject() unavailable error = %v", err)
+		t.Fatalf("CheckAction() unavailable error = %v", err)
 	}
 
-	server.failureCode = codes.OK
-	invalid := objectCheckRequest("user:2", "adhoc")
-	value := int64(1)
-	invalid.Attributes[appauthz.ObjectOriginTypeAttribute] = appauthz.ObjectAttribute{
-		String: pointer("adhoc"), Int64: &value,
-	}
-	_, err = checker.CheckObject(context.Background(), invalid)
-	if !strings.Contains(errString(err), appauthz.ErrAuthorizationContract.Error()) || server.calls != 1 {
-		t.Fatalf("CheckObject() contract error = %v, IAM calls = %d", err, server.calls)
-	}
 }
 
 type contractAuthorizationServer struct {
@@ -107,13 +87,7 @@ func (s *contractAuthorizationServer) Check(ctx context.Context, request *authzv
 	if len(authorization) != 0 {
 		return nil, status.Error(codes.PermissionDenied, "unexpected bearer metadata")
 	}
-	originType := ""
-	if attributes := request.GetObjectContext().GetAttributes(); len(attributes) == 1 {
-		originType = attributes[0].GetStringValue()
-	}
-	allowed := request.GetSubject() == "user:1" ||
-		request.GetSubject() == "user:2" && originType == "adhoc" ||
-		request.GetSubject() == "user:3" && originType == "plan"
+	allowed := request.GetSubject() == "user:1" || request.GetSubject() == "user:2" || request.GetSubject() == "user:3"
 	response := &authzv4.CheckResponse{PolicyVersion: 41}
 	if !allowed {
 		response.Reason = authzv4.DecisionReason_NOT_MATCHED
@@ -138,7 +112,7 @@ type contractGRPCClient struct{ client *sdk.Client }
 func (c *contractGRPCClient) SDK() *sdk.Client { return c.client }
 func (*contractGRPCClient) IsEnabled() bool    { return true }
 
-func newObjectCheckerContractFixture(t *testing.T) (*ObjectChecker, *contractAuthorizationServer) {
+func newActionCheckerContractFixture(t *testing.T) (*ActionChecker, *contractAuthorizationServer) {
 	t.Helper()
 	listener := bufconn.Listen(1024 * 1024)
 	server := grpc.NewServer()
@@ -161,17 +135,11 @@ func newObjectCheckerContractFixture(t *testing.T) (*ObjectChecker, *contractAut
 		t.Fatalf("create IAM SDK client: %v", err)
 	}
 	t.Cleanup(func() { _ = client.Close() })
-	return NewObjectChecker(&contractGRPCClient{client: client}), authorizationServer
+	return NewActionChecker(&contractGRPCClient{client: client}), authorizationServer
 }
 
-func objectCheckRequest(subject, originType string) appauthz.ObjectCheckRequest {
-	return appauthz.ObjectCheckRequest{
-		Subject: subject, Resource: appauthz.AssessmentResource,
-		Action: "retry", ObjectID: "assessment-1",
-		Attributes: map[string]appauthz.ObjectAttribute{
-			appauthz.ObjectOriginTypeAttribute: appauthz.StringAttribute(originType),
-		},
-	}
+func objectCheckRequest(subject, origin string) appauthz.ActionCheckRequest {
+	return appauthz.ActionCheckRequest{Subject: subject, Resource: appauthz.AssessmentResource, Action: "retry"}
 }
 
 func pointer(value string) *string { return &value }

@@ -115,19 +115,6 @@ func RequireAnyPermissionMiddleware(permissions ...PermissionRequirement) gin.Ha
 	}
 }
 
-// RequireObjectAuthorizationCandidate is a cheap route guard. Conditional
-// candidates must still pass the authoritative IAM Check after object loading.
-func RequireObjectAuthorizationCandidate(resource, action string) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		snapshot := GetAuthzSnapshot(c)
-		if snapshot == nil || !snapshot.HasObjectAuthorizationCandidate(resource, action) {
-			abortPermissionDenied(c, errors.WithCode(code.ErrPermissionDenied, "object authorization candidate denied"))
-			return
-		}
-		c.Next()
-	}
-}
-
 func abortPermissionDenied(c *gin.Context, err error) {
 	core.WriteResponse(c, err, nil)
 	c.Abort()

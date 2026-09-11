@@ -2,14 +2,11 @@ package operator
 
 import (
 	"context"
-	"errors"
 	"fmt"
-	"strconv"
 	"time"
 
 	"github.com/FangcunMount/component-base/pkg/event"
 	appauthz "github.com/FangcunMount/qs-server/internal/apiserver/application/authz"
-	evalerrors "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/apperrors"
 	apptransaction "github.com/FangcunMount/qs-server/internal/apiserver/application/transaction"
 	domainassessment "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	evalrun "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/run"
@@ -51,12 +48,11 @@ type governedRetryService struct {
 	tx          apptransaction.Runner
 	events      EventStager
 	authorizer  authorizer
-	objectAuthz appauthz.ObjectAuthorizationChecker
 	now         func() time.Time
 }
 
-func NewGovernedRetryService(assessments domainassessment.Repository, runs evaluationrun.Repository, tx apptransaction.Runner, events EventStager, access AccessChecker, objectAuthz appauthz.ObjectAuthorizationChecker) GovernedRetryService {
-	return &governedRetryService{assessments: assessments, runs: runs, tx: tx, events: events, authorizer: authorizer{assessments: assessments, access: access}, objectAuthz: objectAuthz, now: time.Now}
+func NewGovernedRetryService(assessments domainassessment.Repository, runs evaluationrun.Repository, tx apptransaction.Runner, events EventStager, access AccessChecker) GovernedRetryService {
+	return &governedRetryService{assessments: assessments, runs: runs, tx: tx, events: events, authorizer: authorizer{assessments: assessments, access: access}, now: time.Now}
 }
 
 func (s *governedRetryService) Authorize(ctx context.Context, actor Actor, command GovernedRetryCommand) (*evalrun.EvaluationRun, error) {
@@ -68,29 +64,12 @@ func (s *governedRetryService) Authorize(ctx context.Context, actor Actor, comma
 		(command.AuthorizationAction != "retry" && command.AuthorizationAction != "force_retry") {
 		return nil, fmt.Errorf("evaluation retry governance input is invalid")
 	}
+	if err := appauthz.RequirePermission(ctx, appauthz.AssessmentResource, command.AuthorizationAction); err != nil {
+		return nil, err
+	}
 	assessmentRecord, err := s.authorizer.loadAssessment(ctx, actor, command.AssessmentID)
 	if err != nil {
 		return nil, err
-	}
-	if s.objectAuthz == nil {
-		return nil, evalerrors.ModuleNotConfigured("IAM object authorization checker is not configured")
-	}
-	decision, err := s.objectAuthz.CheckObject(ctx, appauthz.ObjectCheckRequest{
-		Subject:  command.AuthorizationSubject,
-		Resource: appauthz.AssessmentResource, Action: command.AuthorizationAction,
-		ObjectID: strconv.FormatUint(command.AssessmentID, 10),
-		Attributes: map[string]appauthz.ObjectAttribute{
-			appauthz.ObjectOriginTypeAttribute: appauthz.StringAttribute(assessmentRecord.OriginType().String()),
-		},
-	})
-	if err != nil {
-		if errors.Is(err, appauthz.ErrAuthorizationUnavailable) {
-			return nil, evalerrors.AuthorizationUnavailable(err, "IAM authorization is temporarily unavailable")
-		}
-		return nil, evalerrors.ModuleNotConfigured("IAM authorization contract failed: %v", err)
-	}
-	if !decision.Allowed {
-		return nil, evalerrors.PermissionDenied("assessment %s denied by IAM authorization", command.AuthorizationAction)
 	}
 	if !assessmentRecord.Status().IsFailed() {
 		return nil, fmt.Errorf("evaluation retry requires a failed assessment")
