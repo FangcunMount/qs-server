@@ -135,6 +135,10 @@ func (s *Store) Retry(ctx context.Context, id string) error {
 	return err
 }
 func (s *Store) Accept(ctx context.Context, e app.Event) error {
+	artifact, err := app.ValidateArtifact(e)
+	if err != nil {
+		return err
+	}
 	raw, hash, err := encode(e)
 	if err != nil {
 		return err
@@ -162,6 +166,15 @@ func (s *Store) Accept(ctx context.Context, e app.Event) error {
 	if request.Actor != e.Actor || request.TesteeID != e.TesteeID || (bound.Valid && bound.String != e.SessionID) {
 		return app.ErrConflict
 	}
+	if artifact != nil {
+		if len(request.Evidence) != 1 || len(request.AssessmentIDs) != 1 {
+			return app.ErrConflict
+		}
+		source := request.Evidence[0]
+		if artifact.AssessmentID != request.AssessmentIDs[0] || artifact.AssessmentID != source.AssessmentID || artifact.ReportID != source.ReportID || artifact.SourceVersion != source.SourceVersion {
+			return app.ErrConflict
+		}
+	}
 	var oldHash string
 	err = tx.QueryRowContext(ctx, "SELECT payload_hash FROM ai_bridge_events WHERE event_id=? OR (request_id=? AND version=?)", e.EventID, e.RequestID, e.Version).Scan(&oldHash)
 	if err == nil {
@@ -173,7 +186,7 @@ func (s *Store) Accept(ctx context.Context, e app.Event) error {
 	if !errors.Is(err, sql.ErrNoRows) {
 		return err
 	}
-	if state == "cancelled" && e.Version > version && e.Status != "cancelled" {
+	if (state == "cancelled" || state == "completed") && e.Version > version {
 		return app.ErrConflict
 	}
 	if _, err = tx.ExecContext(ctx, "INSERT INTO ai_bridge_events(event_id,request_id,version,payload_hash) VALUES(?,?,?,?)", e.EventID, e.RequestID, e.Version, hash); err != nil {

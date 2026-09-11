@@ -54,17 +54,18 @@ type Receipt struct {
 	Version   int64  `json:"version"`
 }
 type Event struct {
-	EventID     string `json:"event_id"`
-	RequestID   string `json:"request_id"`
-	SessionID   string `json:"session_id"`
-	Actor       Actor  `json:"actor"`
-	TesteeID    string `json:"testee_id"`
-	Version     int64  `json:"version"`
-	Status      string `json:"status"`
-	QuestionID  string `json:"question_id"`
-	Question    string `json:"question"`
-	CanSkip     bool   `json:"can_skip"`
-	FailureCode string `json:"failure_code"`
+	EventID      string `json:"event_id"`
+	RequestID    string `json:"request_id"`
+	SessionID    string `json:"session_id"`
+	Actor        Actor  `json:"actor"`
+	TesteeID     string `json:"testee_id"`
+	Version      int64  `json:"version"`
+	Status       string `json:"status"`
+	QuestionID   string `json:"question_id"`
+	Question     string `json:"question"`
+	CanSkip      bool   `json:"can_skip"`
+	FailureCode  string `json:"failure_code"`
+	ArtifactJSON string `json:"artifact_json,omitempty"`
 }
 type Command struct {
 	ID        string
@@ -146,12 +147,15 @@ func (s *Service) Accept(ctx context.Context, event Event) error {
 		return ErrInvalid
 	}
 	switch event.Status {
-	case "queued", "running", "awaiting_answer", "blocked", "cancelled":
+	case "queued", "running", "awaiting_answer", "blocked", "cancelled", "completed":
 	default:
 		return ErrInvalid
 	}
 	if event.Status == "awaiting_answer" && (!validID(event.QuestionID) || event.Question == "") {
 		return ErrInvalid
+	}
+	if _, err := ValidateArtifact(event); err != nil {
+		return err
 	}
 	return s.Store.Accept(ctx, event)
 }

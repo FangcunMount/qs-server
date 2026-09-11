@@ -2,7 +2,7 @@
 // versions:
 // 	protoc-gen-go v1.36.11
 // 	protoc        v5.29.3
-// source: aiworkflow/workflow.proto
+// source: workflow.proto
 
 package aiworkflow
 
@@ -31,7 +31,7 @@ type Actor struct {
 
 func (x *Actor) Reset() {
 	*x = Actor{}
-	mi := &file_aiworkflow_workflow_proto_msgTypes[0]
+	mi := &file_workflow_proto_msgTypes[0]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -43,7 +43,7 @@ func (x *Actor) String() string {
 func (*Actor) ProtoMessage() {}
 
 func (x *Actor) ProtoReflect() protoreflect.Message {
-	mi := &file_aiworkflow_workflow_proto_msgTypes[0]
+	mi := &file_workflow_proto_msgTypes[0]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -56,7 +56,7 @@ func (x *Actor) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Actor.ProtoReflect.Descriptor instead.
 func (*Actor) Descriptor() ([]byte, []int) {
-	return file_aiworkflow_workflow_proto_rawDescGZIP(), []int{0}
+	return file_workflow_proto_rawDescGZIP(), []int{0}
 }
 
 func (x *Actor) GetOrgId() string {
@@ -87,7 +87,7 @@ type StartCommand struct {
 
 func (x *StartCommand) Reset() {
 	*x = StartCommand{}
-	mi := &file_aiworkflow_workflow_proto_msgTypes[1]
+	mi := &file_workflow_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -99,7 +99,7 @@ func (x *StartCommand) String() string {
 func (*StartCommand) ProtoMessage() {}
 
 func (x *StartCommand) ProtoReflect() protoreflect.Message {
-	mi := &file_aiworkflow_workflow_proto_msgTypes[1]
+	mi := &file_workflow_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -112,7 +112,7 @@ func (x *StartCommand) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StartCommand.ProtoReflect.Descriptor instead.
 func (*StartCommand) Descriptor() ([]byte, []int) {
-	return file_aiworkflow_workflow_proto_rawDescGZIP(), []int{1}
+	return file_workflow_proto_rawDescGZIP(), []int{1}
 }
 
 func (x *StartCommand) GetRequestId() string {
@@ -173,7 +173,7 @@ type ChangeCommand struct {
 
 func (x *ChangeCommand) Reset() {
 	*x = ChangeCommand{}
-	mi := &file_aiworkflow_workflow_proto_msgTypes[2]
+	mi := &file_workflow_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -185,7 +185,7 @@ func (x *ChangeCommand) String() string {
 func (*ChangeCommand) ProtoMessage() {}
 
 func (x *ChangeCommand) ProtoReflect() protoreflect.Message {
-	mi := &file_aiworkflow_workflow_proto_msgTypes[2]
+	mi := &file_workflow_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -198,7 +198,7 @@ func (x *ChangeCommand) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ChangeCommand.ProtoReflect.Descriptor instead.
 func (*ChangeCommand) Descriptor() ([]byte, []int) {
-	return file_aiworkflow_workflow_proto_rawDescGZIP(), []int{2}
+	return file_workflow_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *ChangeCommand) GetCommandId() string {
@@ -269,7 +269,7 @@ type Receipt struct {
 
 func (x *Receipt) Reset() {
 	*x = Receipt{}
-	mi := &file_aiworkflow_workflow_proto_msgTypes[3]
+	mi := &file_workflow_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -281,7 +281,7 @@ func (x *Receipt) String() string {
 func (*Receipt) ProtoMessage() {}
 
 func (x *Receipt) ProtoReflect() protoreflect.Message {
-	mi := &file_aiworkflow_workflow_proto_msgTypes[3]
+	mi := &file_workflow_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -294,7 +294,7 @@ func (x *Receipt) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Receipt.ProtoReflect.Descriptor instead.
 func (*Receipt) Descriptor() ([]byte, []int) {
-	return file_aiworkflow_workflow_proto_rawDescGZIP(), []int{3}
+	return file_workflow_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *Receipt) GetSessionId() string {
@@ -327,25 +327,27 @@ func (x *Receipt) GetVersion() int64 {
 
 // Snapshot event. Intermediate versions may be skipped; newer versions never regress.
 type StateEvent struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	EventId       string                 `protobuf:"bytes,1,opt,name=event_id,json=eventId,proto3" json:"event_id,omitempty"`
-	RequestId     string                 `protobuf:"bytes,2,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
-	SessionId     string                 `protobuf:"bytes,3,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
-	Actor         *Actor                 `protobuf:"bytes,4,opt,name=actor,proto3" json:"actor,omitempty"`
-	TesteeId      string                 `protobuf:"bytes,5,opt,name=testee_id,json=testeeId,proto3" json:"testee_id,omitempty"`
-	Version       int64                  `protobuf:"varint,6,opt,name=version,proto3" json:"version,omitempty"`
-	Status        string                 `protobuf:"bytes,7,opt,name=status,proto3" json:"status,omitempty"`
-	QuestionId    string                 `protobuf:"bytes,8,opt,name=question_id,json=questionId,proto3" json:"question_id,omitempty"`
-	Question      string                 `protobuf:"bytes,9,opt,name=question,proto3" json:"question,omitempty"`
-	CanSkip       bool                   `protobuf:"varint,10,opt,name=can_skip,json=canSkip,proto3" json:"can_skip,omitempty"`
-	FailureCode   string                 `protobuf:"bytes,11,opt,name=failure_code,json=failureCode,proto3" json:"failure_code,omitempty"`
+	state       protoimpl.MessageState `protogen:"open.v1"`
+	EventId     string                 `protobuf:"bytes,1,opt,name=event_id,json=eventId,proto3" json:"event_id,omitempty"`
+	RequestId   string                 `protobuf:"bytes,2,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
+	SessionId   string                 `protobuf:"bytes,3,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
+	Actor       *Actor                 `protobuf:"bytes,4,opt,name=actor,proto3" json:"actor,omitempty"`
+	TesteeId    string                 `protobuf:"bytes,5,opt,name=testee_id,json=testeeId,proto3" json:"testee_id,omitempty"`
+	Version     int64                  `protobuf:"varint,6,opt,name=version,proto3" json:"version,omitempty"`
+	Status      string                 `protobuf:"bytes,7,opt,name=status,proto3" json:"status,omitempty"`
+	QuestionId  string                 `protobuf:"bytes,8,opt,name=question_id,json=questionId,proto3" json:"question_id,omitempty"`
+	Question    string                 `protobuf:"bytes,9,opt,name=question,proto3" json:"question,omitempty"`
+	CanSkip     bool                   `protobuf:"varint,10,opt,name=can_skip,json=canSkip,proto3" json:"can_skip,omitempty"`
+	FailureCode string                 `protobuf:"bytes,11,opt,name=failure_code,json=failureCode,proto3" json:"failure_code,omitempty"`
+	// Complete immutable ArtifactCandidate envelope; required only for completed.
+	ArtifactJson  string `protobuf:"bytes,12,opt,name=artifact_json,json=artifactJson,proto3" json:"artifact_json,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *StateEvent) Reset() {
 	*x = StateEvent{}
-	mi := &file_aiworkflow_workflow_proto_msgTypes[4]
+	mi := &file_workflow_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -357,7 +359,7 @@ func (x *StateEvent) String() string {
 func (*StateEvent) ProtoMessage() {}
 
 func (x *StateEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_aiworkflow_workflow_proto_msgTypes[4]
+	mi := &file_workflow_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -370,7 +372,7 @@ func (x *StateEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StateEvent.ProtoReflect.Descriptor instead.
 func (*StateEvent) Descriptor() ([]byte, []int) {
-	return file_aiworkflow_workflow_proto_rawDescGZIP(), []int{4}
+	return file_workflow_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *StateEvent) GetEventId() string {
@@ -450,6 +452,13 @@ func (x *StateEvent) GetFailureCode() string {
 	return ""
 }
 
+func (x *StateEvent) GetArtifactJson() string {
+	if x != nil {
+		return x.ArtifactJson
+	}
+	return ""
+}
+
 type Acknowledgement struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	EventId       string                 `protobuf:"bytes,1,opt,name=event_id,json=eventId,proto3" json:"event_id,omitempty"`
@@ -459,7 +468,7 @@ type Acknowledgement struct {
 
 func (x *Acknowledgement) Reset() {
 	*x = Acknowledgement{}
-	mi := &file_aiworkflow_workflow_proto_msgTypes[5]
+	mi := &file_workflow_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -471,7 +480,7 @@ func (x *Acknowledgement) String() string {
 func (*Acknowledgement) ProtoMessage() {}
 
 func (x *Acknowledgement) ProtoReflect() protoreflect.Message {
-	mi := &file_aiworkflow_workflow_proto_msgTypes[5]
+	mi := &file_workflow_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -484,7 +493,7 @@ func (x *Acknowledgement) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Acknowledgement.ProtoReflect.Descriptor instead.
 func (*Acknowledgement) Descriptor() ([]byte, []int) {
-	return file_aiworkflow_workflow_proto_rawDescGZIP(), []int{5}
+	return file_workflow_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *Acknowledgement) GetEventId() string {
@@ -504,7 +513,7 @@ type Fact struct {
 
 func (x *Fact) Reset() {
 	*x = Fact{}
-	mi := &file_aiworkflow_workflow_proto_msgTypes[6]
+	mi := &file_workflow_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -516,7 +525,7 @@ func (x *Fact) String() string {
 func (*Fact) ProtoMessage() {}
 
 func (x *Fact) ProtoReflect() protoreflect.Message {
-	mi := &file_aiworkflow_workflow_proto_msgTypes[6]
+	mi := &file_workflow_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -529,7 +538,7 @@ func (x *Fact) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Fact.ProtoReflect.Descriptor instead.
 func (*Fact) Descriptor() ([]byte, []int) {
-	return file_aiworkflow_workflow_proto_rawDescGZIP(), []int{6}
+	return file_workflow_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *Fact) GetRef() string {
@@ -559,7 +568,7 @@ type EvidenceItem struct {
 
 func (x *EvidenceItem) Reset() {
 	*x = EvidenceItem{}
-	mi := &file_aiworkflow_workflow_proto_msgTypes[7]
+	mi := &file_workflow_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -571,7 +580,7 @@ func (x *EvidenceItem) String() string {
 func (*EvidenceItem) ProtoMessage() {}
 
 func (x *EvidenceItem) ProtoReflect() protoreflect.Message {
-	mi := &file_aiworkflow_workflow_proto_msgTypes[7]
+	mi := &file_workflow_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -584,7 +593,7 @@ func (x *EvidenceItem) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use EvidenceItem.ProtoReflect.Descriptor instead.
 func (*EvidenceItem) Descriptor() ([]byte, []int) {
-	return file_aiworkflow_workflow_proto_rawDescGZIP(), []int{7}
+	return file_workflow_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *EvidenceItem) GetAssessmentId() string {
@@ -622,11 +631,11 @@ func (x *EvidenceItem) GetFacts() []*Fact {
 	return nil
 }
 
-var File_aiworkflow_workflow_proto protoreflect.FileDescriptor
+var File_workflow_proto protoreflect.FileDescriptor
 
-const file_aiworkflow_workflow_proto_rawDesc = "" +
+const file_workflow_proto_rawDesc = "" +
 	"\n" +
-	"\x19aiworkflow/workflow.proto\x12\x10qsai.workflow.v1\"=\n" +
+	"\x0eworkflow.proto\x12\x10qsai.workflow.v1\"=\n" +
 	"\x05Actor\x12\x15\n" +
 	"\x06org_id\x18\x01 \x01(\tR\x05orgId\x12\x1d\n" +
 	"\n" +
@@ -657,7 +666,7 @@ const file_aiworkflow_workflow_proto_rawDesc = "" +
 	"session_id\x18\x01 \x01(\tR\tsessionId\x12\x15\n" +
 	"\x06run_id\x18\x02 \x01(\tR\x05runId\x12\x16\n" +
 	"\x06status\x18\x03 \x01(\tR\x06status\x12\x18\n" +
-	"\aversion\x18\x04 \x01(\x03R\aversion\"\xde\x02\n" +
+	"\aversion\x18\x04 \x01(\x03R\aversion\"\x83\x03\n" +
 	"\n" +
 	"StateEvent\x12\x19\n" +
 	"\bevent_id\x18\x01 \x01(\tR\aeventId\x12\x1d\n" +
@@ -674,7 +683,8 @@ const file_aiworkflow_workflow_proto_rawDesc = "" +
 	"\bquestion\x18\t \x01(\tR\bquestion\x12\x19\n" +
 	"\bcan_skip\x18\n" +
 	" \x01(\bR\acanSkip\x12!\n" +
-	"\ffailure_code\x18\v \x01(\tR\vfailureCode\",\n" +
+	"\ffailure_code\x18\v \x01(\tR\vfailureCode\x12#\n" +
+	"\rartifact_json\x18\f \x01(\tR\fartifactJson\",\n" +
 	"\x0fAcknowledgement\x12\x19\n" +
 	"\bevent_id\x18\x01 \x01(\tR\aeventId\".\n" +
 	"\x04Fact\x12\x10\n" +
@@ -693,19 +703,19 @@ const file_aiworkflow_workflow_proto_rawDesc = "" +
 	"\x06Accept\x12\x1c.qsai.workflow.v1.StateEvent\x1a!.qsai.workflow.v1.AcknowledgementB;Z9github.com/FangcunMount/qs-server/api/grpc/gen/aiworkflowb\x06proto3"
 
 var (
-	file_aiworkflow_workflow_proto_rawDescOnce sync.Once
-	file_aiworkflow_workflow_proto_rawDescData []byte
+	file_workflow_proto_rawDescOnce sync.Once
+	file_workflow_proto_rawDescData []byte
 )
 
-func file_aiworkflow_workflow_proto_rawDescGZIP() []byte {
-	file_aiworkflow_workflow_proto_rawDescOnce.Do(func() {
-		file_aiworkflow_workflow_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_aiworkflow_workflow_proto_rawDesc), len(file_aiworkflow_workflow_proto_rawDesc)))
+func file_workflow_proto_rawDescGZIP() []byte {
+	file_workflow_proto_rawDescOnce.Do(func() {
+		file_workflow_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_workflow_proto_rawDesc), len(file_workflow_proto_rawDesc)))
 	})
-	return file_aiworkflow_workflow_proto_rawDescData
+	return file_workflow_proto_rawDescData
 }
 
-var file_aiworkflow_workflow_proto_msgTypes = make([]protoimpl.MessageInfo, 8)
-var file_aiworkflow_workflow_proto_goTypes = []any{
+var file_workflow_proto_msgTypes = make([]protoimpl.MessageInfo, 8)
+var file_workflow_proto_goTypes = []any{
 	(*Actor)(nil),           // 0: qsai.workflow.v1.Actor
 	(*StartCommand)(nil),    // 1: qsai.workflow.v1.StartCommand
 	(*ChangeCommand)(nil),   // 2: qsai.workflow.v1.ChangeCommand
@@ -715,7 +725,7 @@ var file_aiworkflow_workflow_proto_goTypes = []any{
 	(*Fact)(nil),            // 6: qsai.workflow.v1.Fact
 	(*EvidenceItem)(nil),    // 7: qsai.workflow.v1.EvidenceItem
 }
-var file_aiworkflow_workflow_proto_depIdxs = []int32{
+var file_workflow_proto_depIdxs = []int32{
 	0, // 0: qsai.workflow.v1.StartCommand.actor:type_name -> qsai.workflow.v1.Actor
 	7, // 1: qsai.workflow.v1.StartCommand.evidence:type_name -> qsai.workflow.v1.EvidenceItem
 	0, // 2: qsai.workflow.v1.ChangeCommand.actor:type_name -> qsai.workflow.v1.Actor
@@ -734,27 +744,27 @@ var file_aiworkflow_workflow_proto_depIdxs = []int32{
 	0, // [0:5] is the sub-list for field type_name
 }
 
-func init() { file_aiworkflow_workflow_proto_init() }
-func file_aiworkflow_workflow_proto_init() {
-	if File_aiworkflow_workflow_proto != nil {
+func init() { file_workflow_proto_init() }
+func file_workflow_proto_init() {
+	if File_workflow_proto != nil {
 		return
 	}
-	file_aiworkflow_workflow_proto_msgTypes[2].OneofWrappers = []any{}
+	file_workflow_proto_msgTypes[2].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
-			RawDescriptor: unsafe.Slice(unsafe.StringData(file_aiworkflow_workflow_proto_rawDesc), len(file_aiworkflow_workflow_proto_rawDesc)),
+			RawDescriptor: unsafe.Slice(unsafe.StringData(file_workflow_proto_rawDesc), len(file_workflow_proto_rawDesc)),
 			NumEnums:      0,
 			NumMessages:   8,
 			NumExtensions: 0,
 			NumServices:   2,
 		},
-		GoTypes:           file_aiworkflow_workflow_proto_goTypes,
-		DependencyIndexes: file_aiworkflow_workflow_proto_depIdxs,
-		MessageInfos:      file_aiworkflow_workflow_proto_msgTypes,
+		GoTypes:           file_workflow_proto_goTypes,
+		DependencyIndexes: file_workflow_proto_depIdxs,
+		MessageInfos:      file_workflow_proto_msgTypes,
 	}.Build()
-	File_aiworkflow_workflow_proto = out.File
-	file_aiworkflow_workflow_proto_goTypes = nil
-	file_aiworkflow_workflow_proto_depIdxs = nil
+	File_workflow_proto = out.File
+	file_workflow_proto_goTypes = nil
+	file_workflow_proto_depIdxs = nil
 }
