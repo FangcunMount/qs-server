@@ -2,6 +2,7 @@ package grpcclient
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 
 	interpretationpb "github.com/FangcunMount/qs-server/api/grpc/gen/interpretation"
@@ -206,4 +207,24 @@ func (c *ParticipantAIExplanationClient) RequestWorkflow(ctx context.Context, te
 		return nil, err
 	}
 	return &aiport.WorkflowAccepted{RequestID: result.RequestId, Status: result.Status}, nil
+}
+
+func (c *ParticipantAIExplanationClient) GetWorkflow(ctx context.Context, testeeID, assessmentID uint64, requestID string) (*aiport.WorkflowResult, error) {
+	ctx, cancel := c.client.ContextWithTimeout(ctx)
+	defer cancel()
+	ctx, err := c.attachDelegatedSubject(ctx, testeeID, delegatedsubject.PurposeAIExplanationGet)
+	if err != nil {
+		return nil, err
+	}
+	result, err := c.service.GetAIWorkflow(ctx, &interpretationpb.GetAIWorkflowRequest{TesteeId: testeeID, AssessmentId: assessmentID, RequestId: requestID})
+	if err != nil {
+		return nil, err
+	}
+	if result == nil {
+		return nil, fmt.Errorf("missing AI workflow result")
+	}
+	if result.ContentJson != "" && !json.Valid([]byte(result.ContentJson)) {
+		return nil, fmt.Errorf("invalid AI workflow content")
+	}
+	return &aiport.WorkflowResult{RequestID: result.RequestId, Status: result.Status, Version: result.Version, Content: json.RawMessage(result.ContentJson), ArtifactID: result.ArtifactId, ReportID: result.ReportId, SourceVersion: result.SourceVersion}, nil
 }

@@ -19,6 +19,35 @@ type Participant struct {
 	Bridge  *Service
 }
 
+// Read checks current participant access even when the result was generated earlier.
+// A nil projection means the durable request exists but no AI state has arrived yet.
+func (p *Participant) Read(ctx context.Context, actor Actor, testeeID, assessmentID uint64, requestID string) (*Event, error) {
+	if !validID(requestID) || !validNumber(actor.OrgID) || actor.SubjectID == "" || len(actor.SubjectID) > 128 || testeeID == 0 || assessmentID == 0 || p.Access == nil || p.Bridge == nil || p.Bridge.Store == nil {
+		return nil, ErrInvalid
+	}
+	if err := p.Access.AuthorizeOwnAssessment(ctx, testeeID, assessmentID); err != nil {
+		return nil, err
+	}
+	request, err := p.Bridge.Store.Original(ctx, requestID)
+	if err != nil {
+		return nil, err
+	}
+	if request == nil || request.Actor != actor || request.TesteeID != strconv.FormatUint(testeeID, 10) || len(request.AssessmentIDs) != 1 || request.AssessmentIDs[0] != strconv.FormatUint(assessmentID, 10) {
+		return nil, ErrNotFound
+	}
+	event, err := p.Bridge.Store.Projection(ctx, requestID)
+	if err != nil || event == nil {
+		return event, err
+	}
+	if event.RequestID != requestID || event.Actor != actor || event.TesteeID != request.TesteeID {
+		return nil, ErrConflict
+	}
+	if _, err := ValidateArtifact(*event); err != nil {
+		return nil, err
+	}
+	return event, nil
+}
+
 func (p *Participant) Request(ctx context.Context, actor Actor, testeeID, assessmentID, reportID uint64, requestID string) error {
 	if !validID(requestID) || !validNumber(actor.OrgID) || actor.SubjectID == "" || testeeID == 0 || assessmentID == 0 || reportID == 0 {
 		return ErrInvalid

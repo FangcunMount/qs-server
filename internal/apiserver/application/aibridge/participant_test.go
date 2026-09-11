@@ -101,3 +101,59 @@ func (s *stagingStore) Original(_ context.Context, id string) (*Start, error) {
 	}
 	return nil, ErrNotFound
 }
+
+type readingStore struct {
+	Store
+	request *Start
+	event   *Event
+	reads   int
+}
+
+func (s *readingStore) Original(context.Context, string) (*Start, error) {
+	s.reads++
+	return s.request, nil
+}
+func (s *readingStore) Projection(context.Context, string) (*Event, error) {
+	s.reads++
+	return s.event, nil
+}
+func TestParticipantWorkflowReadRequiresCurrentAccessAndRequestOwnership(t *testing.T) {
+	for _, scenario := range []string{"pending", "state", "revoked", "org", "owner", "testee", "assessment", "corrupt_projection"} {
+		t.Run(scenario, func(t *testing.T) {
+			id := uuid.NewString()
+			actor := Actor{"1", "parent"}
+			request := &Start{RequestID: id, Actor: actor, TesteeID: "7", AssessmentIDs: []string{"42"}}
+			event := &Event{RequestID: id, Actor: actor, TesteeID: "7", Status: "running"}
+			store := &readingStore{request: request, event: event}
+			var denied error
+			switch scenario {
+			case "pending":
+				store.event = nil
+			case "revoked":
+				denied = errors.New("revoked")
+			case "org":
+				request.Actor.OrgID = "2"
+			case "owner":
+				request.Actor.SubjectID = "other"
+			case "testee":
+				request.TesteeID = "8"
+			case "assessment":
+				request.AssessmentIDs = []string{"43"}
+			case "corrupt_projection":
+				event.Actor.SubjectID = "other"
+			}
+			p := Participant{Access: accessStub{denied}, Bridge: &Service{Store: store}}
+			result, err := p.Read(context.Background(), actor, 7, 42, id)
+			if scenario == "pending" || scenario == "state" {
+				if err != nil || result != store.event {
+					t.Fatalf("read=%v error=%v", result, err)
+				}
+			} else if err == nil || result != nil {
+				t.Fatal("unauthorized projection returned")
+			}
+			if scenario == "revoked" && store.reads != 0 {
+				t.Fatal("revoked request read persistence")
+			}
+		})
+	}
+}

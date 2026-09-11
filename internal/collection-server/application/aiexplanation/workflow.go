@@ -36,3 +36,24 @@ func (s *Service) RequestWorkflow(ctx context.Context, testeeID, assessmentID ui
 	}
 	return result, nil
 }
+
+type WorkflowResult = aiport.WorkflowResult
+
+func (s *Service) GetWorkflow(ctx context.Context, testeeID, assessmentID uint64, requestID string) (*WorkflowResult, error) {
+	id, err := uuid.Parse(requestID)
+	if err != nil || id.String() != requestID || id == uuid.Nil || testeeID == 0 || assessmentID == 0 {
+		return nil, ErrInvalidRequest
+	}
+	client, ok := s.client.(aiport.WorkflowReader)
+	if !ok {
+		return nil, ErrUnavailable
+	}
+	result, err := client.GetWorkflow(ctx, testeeID, assessmentID, requestID)
+	if err != nil {
+		return nil, err
+	}
+	if result == nil || result.RequestID != requestID {
+		return nil, ErrUnavailable
+	}
+	return result, nil
+}

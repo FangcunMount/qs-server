@@ -161,6 +161,7 @@ var ParticipantReportService_ServiceDesc = grpc.ServiceDesc{
 
 const (
 	ParticipantAIExplanationService_RequestAIWorkflow_FullMethodName          = "/interpretation.ParticipantAIExplanationService/RequestAIWorkflow"
+	ParticipantAIExplanationService_GetAIWorkflow_FullMethodName              = "/interpretation.ParticipantAIExplanationService/GetAIWorkflow"
 	ParticipantAIExplanationService_GetAIExplanationCapability_FullMethodName = "/interpretation.ParticipantAIExplanationService/GetAIExplanationCapability"
 	ParticipantAIExplanationService_RequestAIExplanation_FullMethodName       = "/interpretation.ParticipantAIExplanationService/RequestAIExplanation"
 	ParticipantAIExplanationService_GetAIExplanation_FullMethodName           = "/interpretation.ParticipantAIExplanationService/GetAIExplanation"
@@ -176,6 +177,7 @@ const (
 // this service being configured or available.
 type ParticipantAIExplanationServiceClient interface {
 	RequestAIWorkflow(ctx context.Context, in *RequestAIWorkflowRequest, opts ...grpc.CallOption) (*AIWorkflowAccepted, error)
+	GetAIWorkflow(ctx context.Context, in *GetAIWorkflowRequest, opts ...grpc.CallOption) (*AIWorkflowResult, error)
 	GetAIExplanationCapability(ctx context.Context, in *GetAIExplanationCapabilityRequest, opts ...grpc.CallOption) (*AIExplanationResponse, error)
 	RequestAIExplanation(ctx context.Context, in *RequestAIExplanationRequest, opts ...grpc.CallOption) (*AIExplanationResponse, error)
 	GetAIExplanation(ctx context.Context, in *GetAIExplanationRequest, opts ...grpc.CallOption) (*AIExplanationResponse, error)
@@ -194,6 +196,16 @@ func (c *participantAIExplanationServiceClient) RequestAIWorkflow(ctx context.Co
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(AIWorkflowAccepted)
 	err := c.cc.Invoke(ctx, ParticipantAIExplanationService_RequestAIWorkflow_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *participantAIExplanationServiceClient) GetAIWorkflow(ctx context.Context, in *GetAIWorkflowRequest, opts ...grpc.CallOption) (*AIWorkflowResult, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(AIWorkflowResult)
+	err := c.cc.Invoke(ctx, ParticipantAIExplanationService_GetAIWorkflow_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -249,6 +261,7 @@ func (c *participantAIExplanationServiceClient) ExportAIExplanations(ctx context
 // this service being configured or available.
 type ParticipantAIExplanationServiceServer interface {
 	RequestAIWorkflow(context.Context, *RequestAIWorkflowRequest) (*AIWorkflowAccepted, error)
+	GetAIWorkflow(context.Context, *GetAIWorkflowRequest) (*AIWorkflowResult, error)
 	GetAIExplanationCapability(context.Context, *GetAIExplanationCapabilityRequest) (*AIExplanationResponse, error)
 	RequestAIExplanation(context.Context, *RequestAIExplanationRequest) (*AIExplanationResponse, error)
 	GetAIExplanation(context.Context, *GetAIExplanationRequest) (*AIExplanationResponse, error)
@@ -265,6 +278,9 @@ type UnimplementedParticipantAIExplanationServiceServer struct{}
 
 func (UnimplementedParticipantAIExplanationServiceServer) RequestAIWorkflow(context.Context, *RequestAIWorkflowRequest) (*AIWorkflowAccepted, error) {
 	return nil, status.Error(codes.Unimplemented, "method RequestAIWorkflow not implemented")
+}
+func (UnimplementedParticipantAIExplanationServiceServer) GetAIWorkflow(context.Context, *GetAIWorkflowRequest) (*AIWorkflowResult, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetAIWorkflow not implemented")
 }
 func (UnimplementedParticipantAIExplanationServiceServer) GetAIExplanationCapability(context.Context, *GetAIExplanationCapabilityRequest) (*AIExplanationResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetAIExplanationCapability not implemented")
@@ -314,6 +330,24 @@ func _ParticipantAIExplanationService_RequestAIWorkflow_Handler(srv interface{},
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(ParticipantAIExplanationServiceServer).RequestAIWorkflow(ctx, req.(*RequestAIWorkflowRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ParticipantAIExplanationService_GetAIWorkflow_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetAIWorkflowRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ParticipantAIExplanationServiceServer).GetAIWorkflow(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ParticipantAIExplanationService_GetAIWorkflow_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ParticipantAIExplanationServiceServer).GetAIWorkflow(ctx, req.(*GetAIWorkflowRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -400,6 +434,10 @@ var ParticipantAIExplanationService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "RequestAIWorkflow",
 			Handler:    _ParticipantAIExplanationService_RequestAIWorkflow_Handler,
+		},
+		{
+			MethodName: "GetAIWorkflow",
+			Handler:    _ParticipantAIExplanationService_GetAIWorkflow_Handler,
 		},
 		{
 			MethodName: "GetAIExplanationCapability",

@@ -2,7 +2,7 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "90b600c8adab4309d3487c88dd4920160fbd731a",
+    "sha": "3d7bf959e56b35b5dcf31b53a5cc0ca411278eb3",
     "verified_on": "2026-09-11"
   },
   "status_policy": {
@@ -133,7 +133,7 @@
       "source": "api/grpc/proto",
       "proto_file_count": 8,
       "service_count": 16,
-      "rpc_count": 60,
+      "rpc_count": 61,
       "services": {
         "actor.ActorService": [
           "CreateTestee",
@@ -204,6 +204,7 @@
         ],
         "interpretation.ParticipantAIExplanationService": [
           "RequestAIWorkflow",
+          "GetAIWorkflow",
           "GetAIExplanationCapability",
           "RequestAIExplanation",
           "GetAIExplanation",

@@ -913,6 +913,79 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/core.ErrResponse'
+  /api/v1/assessments/{id}/ai-workflows/{request_id}:
+    get:
+      tags:
+      - AI解读
+      summary: 读取 AI 工作流结果
+      security:
+      - BearerAuth: []
+      operationId: 读取AI工作流结果
+      description: 读取 AI 工作流结果
+      parameters:
+      - type: string
+        description: 测评ID
+        name: id
+        in: path
+        required: true
+      - type: string
+        description: 工作流请求UUID
+        name: request_id
+        in: path
+        required: true
+      - type: string
+        description: 受试者ID
+        name: testee_id
+        in: query
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/core.Response'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/github_com_FangcunMount_qs-server_internal_collection-server_application_aiexplanation.WorkflowResult'
+        '400':
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '503':
+          description: Service Unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '401':
+          description: 认证失败或访问令牌无效
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '500':
+          description: 服务内部错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
   /api/v1/assessments/{id}/factors/high-risk:
     get:
       tags:
@@ -3511,6 +3584,23 @@ components:
           type: string
         status:
           type: string
+    github_com_FangcunMount_qs-server_internal_collection-server_application_aiexplanation.WorkflowResult:
+      type: object
+      properties:
+        artifact_id:
+          type: string
+        content:
+          type: object
+        report_id:
+          type: string
+        request_id:
+          type: string
+        source_version:
+          type: string
+        status:
+          type: string
+        version:
+          type: integer
     github_com_FangcunMount_qs-server_internal_collection-server_application_answersheet.Answer:
       type: object
       required:

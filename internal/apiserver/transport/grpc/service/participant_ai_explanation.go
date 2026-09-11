@@ -272,3 +272,45 @@ func (s *ParticipantAIExplanationService) RequestAIWorkflow(ctx context.Context,
 	}
 	return &interpretationpb.AIWorkflowAccepted{RequestId: request.RequestId, Status: "accepted"}, nil
 }
+
+// GetAIWorkflow rechecks current QS access; knowledge of a request ID grants no access.
+func (s *ParticipantAIExplanationService) GetAIWorkflow(ctx context.Context, request *interpretationpb.GetAIWorkflowRequest) (*interpretationpb.AIWorkflowResult, error) {
+	if request == nil || request.TesteeId == 0 || request.AssessmentId == 0 || strings.TrimSpace(request.RequestId) == "" {
+		return nil, status.Error(codes.InvalidArgument, "testee, assessment and request are required")
+	}
+	if s.Workflow == nil {
+		return nil, status.Error(codes.FailedPrecondition, "AI workflow is not configured")
+	}
+	token, err := verifyDelegatedSubject(ctx, s.delegatedVerifier, request.TesteeId, delegatedsubject.PurposeAIExplanationGet, true)
+	if err != nil {
+		return nil, err
+	}
+	event, err := s.Workflow.Read(ctx, bridge.Actor{OrgID: fmt.Sprint(token.OrgID), SubjectID: token.UserID}, request.TesteeId, request.AssessmentId, request.RequestId)
+	if errors.Is(err, bridge.ErrNotFound) {
+		return nil, status.Error(codes.NotFound, "AI workflow not found")
+	}
+	if errors.Is(err, bridge.ErrInvalid) {
+		return nil, status.Error(codes.InvalidArgument, "invalid workflow request")
+	}
+	if err != nil {
+		return nil, toAIExplanationGRPCError(err)
+	}
+	return toProtoAIWorkflowResult(request.RequestId, event)
+}
+
+func toProtoAIWorkflowResult(requestID string, event *bridge.Event) (*interpretationpb.AIWorkflowResult, error) {
+	result := &interpretationpb.AIWorkflowResult{RequestId: requestID, Status: "accepted"}
+	if event == nil {
+		return result, nil
+	}
+	result.Status, result.Version = event.Status, event.Version
+	artifact, err := bridge.ValidateArtifact(*event)
+	if err != nil {
+		return nil, status.Error(codes.Internal, "invalid stored workflow result")
+	}
+	if artifact != nil {
+		result.ContentJson, result.ArtifactId = artifact.ContentJSON, artifact.ID
+		result.ReportId, result.SourceVersion = artifact.ReportID, artifact.SourceVersion
+	}
+	return result, nil
+}

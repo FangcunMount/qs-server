@@ -33,6 +33,7 @@ func ACLAllowedMethods() []string {
 		interpretationpb.ParticipantAIExplanationService_GetAIExplanationCapability_FullMethodName,
 		interpretationpb.ParticipantAIExplanationService_RequestAIExplanation_FullMethodName,
 		interpretationpb.ParticipantAIExplanationService_RequestAIWorkflow_FullMethodName,
+		interpretationpb.ParticipantAIExplanationService_GetAIWorkflow_FullMethodName,
 		interpretationpb.ParticipantAIExplanationService_GetAIExplanation_FullMethodName,
 		interpretationpb.ParticipantAIExplanationService_ExportAIExplanations_FullMethodName,
 
