@@ -31,7 +31,7 @@ type EvaluationState struct {
 	Version                      int64           `json:"version"`
 	Status                       string          `json:"status"`
 	UnresolvedResultUnknownCount int64           `json:"unresolved_result_unknown_count"`
-	Resolutions                  json.RawMessage `json:"resolutions"`
+	Resolutions                  json.RawMessage `json:"resolutions" swaggertype:"array,object"`
 }
 type EvaluationGateway interface {
 	GetEvaluation(context.Context, EvaluationScope) (EvaluationState, error)

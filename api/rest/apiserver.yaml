@@ -15,6 +15,8 @@ servers:
 tags:
 - name: AI-Explanation-Administration
   description: AI-Explanation-Administration
+- name: AI-Workflow-Management
+  description: AI-Workflow-Management
 - name: Actor Store
   description: Actor Store
 - name: Actor Testee
@@ -9912,6 +9914,136 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/core.ErrResponse'
+  /internal/v2/interpretation/ai-workflow/evaluations/{run_id}:
+    get:
+      tags:
+      - AI-Workflow-Management
+      summary: 查询 qs-ai 评测状态
+      description: 需要当前机构 OrgAdmin 权限；组织和操作人取认证上下文。管理功能默认关闭。
+      operationId: 查询qsai评测状态
+      parameters:
+      - type: string
+        description: 评测 Run UUID
+        name: run_id
+        in: path
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/core.Response'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/aibridge.EvaluationState'
+        '400':
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '409':
+          description: Conflict
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+  /internal/v2/interpretation/ai-workflow/evaluations/{run_id}/result-unknown/resolve:
+    post:
+      tags:
+      - AI-Workflow-Management
+      summary: 处置 qs-ai 评测未知结果
+      description: '需要当前机构 OrgAdmin 权限；组织和操作人取认证上下文。管理功能默认关闭。
+
+        需确认重复调用和费用风险；超时后先查询状态，不自动重试。'
+      operationId: 处置qsai评测未知结果
+      parameters:
+      - type: string
+        description: 评测 Run UUID
+        name: run_id
+        in: path
+        required: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/aibridge.UnknownResolution'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/core.Response'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/aibridge.EvaluationState'
+        '400':
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '409':
+          description: Conflict
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
   /internal/v2/statistics/runs:
     get:
       tags:
@@ -10136,6 +10268,36 @@ paths:
                 $ref: '#/components/schemas/core.ErrResponse'
 components:
   schemas:
+    aibridge.EvaluationState:
+      type: object
+      properties:
+        resolutions:
+          type: array
+          items:
+            type: object
+        run_id:
+          type: string
+        status:
+          type: string
+        unresolved_result_unknown_count:
+          type: integer
+        version:
+          type: integer
+    aibridge.UnknownResolution:
+      type: object
+      properties:
+        acknowledged_duplicate_call_and_cost_risk:
+          type: boolean
+        confirm:
+          type: boolean
+        decision:
+          type: string
+        execution_id:
+          type: string
+        expected_version:
+          type: integer
+        reason:
+          type: string
     aiexplanation.ProviderFailureDiagnostics:
       type: object
       properties:

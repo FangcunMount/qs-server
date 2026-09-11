@@ -43,6 +43,20 @@ func (h *AIWorkflowManagementHandler) failure(c *gin.Context, err error) {
 	}
 	h.Error(c, cberrors.WithCode(errorCode, "%s", message))
 }
+// Get godoc
+// @Summary 查询 qs-ai 评测状态
+// @Description 需要当前机构 OrgAdmin 权限；组织和操作人取认证上下文。管理功能默认关闭。
+// @Tags AI-Workflow-Management
+// @Produce json
+// @Param run_id path string true "评测 Run UUID"
+// @Success 200 {object} core.Response{data=app.EvaluationState}
+// @Failure 400 {object} core.ErrResponse
+// @Failure 401 {object} core.ErrResponse
+// @Failure 403 {object} core.ErrResponse
+// @Failure 404 {object} core.ErrResponse
+// @Failure 409 {object} core.ErrResponse
+// @Failure 500 {object} core.ErrResponse
+// @Router /internal/v2/interpretation/ai-workflow/evaluations/{run_id} [get]
 func (h *AIWorkflowManagementHandler) Get(c *gin.Context) {
 	scope, ok := h.scope(c)
 	if !ok {
@@ -55,6 +69,23 @@ func (h *AIWorkflowManagementHandler) Get(c *gin.Context) {
 	}
 	h.Success(c, value)
 }
+// ResolveUnknown godoc
+// @Summary 处置 qs-ai 评测未知结果
+// @Description 需要当前机构 OrgAdmin 权限；组织和操作人取认证上下文。管理功能默认关闭。
+// @Tags AI-Workflow-Management
+// @Produce json
+// @Param run_id path string true "评测 Run UUID"
+// @Accept json
+// @Description 需确认重复调用和费用风险；超时后先查询状态，不自动重试。
+// @Param body body app.UnknownResolution true "人工决定及预期版本"
+// @Success 200 {object} core.Response{data=app.EvaluationState}
+// @Failure 400 {object} core.ErrResponse
+// @Failure 401 {object} core.ErrResponse
+// @Failure 403 {object} core.ErrResponse
+// @Failure 404 {object} core.ErrResponse
+// @Failure 409 {object} core.ErrResponse
+// @Failure 500 {object} core.ErrResponse
+// @Router /internal/v2/interpretation/ai-workflow/evaluations/{run_id}/result-unknown/resolve [post]
 func (h *AIWorkflowManagementHandler) ResolveUnknown(c *gin.Context) {
 	scope, ok := h.scope(c)
 	if !ok {
