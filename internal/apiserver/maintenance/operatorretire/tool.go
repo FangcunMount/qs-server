@@ -497,6 +497,17 @@ func (t *Tool) Apply(ctx context.Context, id, fingerprint string, actor int64, m
 		if r.Fingerprint != fingerprint || r.ActorID != actor || r.State != "executing" {
 			return fmt.Errorf("manifest cannot be reused with changed identity or fingerprint")
 		}
+		// Business tables are immutable during the maintenance window. Compare once
+		// before the batch and again in verifyExits; do not scan the entire business
+		// database for every retiring person. Binding and assignment checks remain
+		// per person because they govern each independent exit.
+		digest, e := t.businessDigest(ctx)
+		if e != nil {
+			return e
+		}
+		if digest != r.BusinessHash {
+			return fmt.Errorf("business facts drifted before retirement")
+		}
 		for _, c := range r.Candidates {
 			bindings, e := t.bindingDigest(ctx, id)
 			if e != nil {
@@ -518,13 +529,6 @@ func (t *Tool) Apply(ctx context.Context, id, fingerprint string, actor int64, m
 			}
 			if count != 1 {
 				return fmt.Errorf("actor has no active operator in company %d", c.OrgID)
-			}
-			digest, e := t.businessDigest(ctx)
-			if e != nil {
-				return e
-			}
-			if digest != r.BusinessHash {
-				return fmt.Errorf("business facts drifted during retirement")
 			}
 			snap, e := t.loader.LoadAssignmentFacts(ctx, fmt.Sprint(c.UserID))
 			if e != nil {
