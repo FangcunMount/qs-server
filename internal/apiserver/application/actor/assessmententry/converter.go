@@ -14,6 +14,7 @@ func toAssessmentEntryResult(item *domainAssessmentEntry.AssessmentEntry) *Asses
 	}
 
 	return &AssessmentEntryResult{
+		InvalidatedAt: item.InvalidatedAt(), InvalidationReason: item.InvalidationReason(),
 		ID:            item.ID().Uint64(),
 		OrgID:         item.OrgID(),
 		ClinicianID:   item.ClinicianID().Uint64(),
@@ -31,6 +32,7 @@ func toAssessmentEntryResultFromRow(row *actorreadmodel.AssessmentEntryRow) *Ass
 		return nil
 	}
 	return &AssessmentEntryResult{
+		InvalidatedAt: row.InvalidatedAt, InvalidationReason: row.InvalidationReason,
 		ID:            row.ID,
 		OrgID:         row.OrgID,
 		ClinicianID:   row.ClinicianID,
@@ -38,7 +40,7 @@ func toAssessmentEntryResultFromRow(row *actorreadmodel.AssessmentEntryRow) *Ass
 		TargetType:    row.TargetType,
 		TargetCode:    row.TargetCode,
 		TargetVersion: row.TargetVersion,
-		IsActive:      row.IsActive,
+		IsActive:      row.IsActive && row.InvalidatedAt == nil,
 		ExpiresAt:     row.ExpiresAt,
 	}
 }

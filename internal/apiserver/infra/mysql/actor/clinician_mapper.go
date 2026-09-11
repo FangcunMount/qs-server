@@ -62,6 +62,7 @@ func (m *ClinicianMapper) ToDomain(po *ClinicianPO) *domain.Clinician {
 		po.IsActive,
 	)
 	item.SetID(po.ID)
+	item.RestoreStore(po.StoreID, po.Version)
 	return item
 }
 
@@ -78,5 +79,6 @@ func (m *ClinicianMapper) ToDomains(pos []*ClinicianPO) []*domain.Clinician {
 func (m *ClinicianMapper) SyncID(po *ClinicianPO, item *domain.Clinician) {
 	if po != nil && item != nil {
 		item.SetID(po.ID)
+		item.RestoreStore(po.StoreID, po.Version)
 	}
 }

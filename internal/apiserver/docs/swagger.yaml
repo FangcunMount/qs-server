@@ -3222,6 +3222,23 @@ definitions:
       prefix:
         type: string
     type: object
+  request.AssignClinicianStoreRequest:
+    properties:
+      expected_version:
+        type: integer
+      reason:
+        type: string
+      request_id:
+        type: string
+      store_id:
+        example: ""
+        type: string
+    required:
+    - expected_version
+    - reason
+    - request_id
+    - store_id
+    type: object
   request.AssignClinicianTesteeRequest:
     properties:
       clinician_id:
@@ -3416,6 +3433,18 @@ definitions:
     required:
     - name
     type: object
+  request.CreateStoreRequest:
+    properties:
+      address:
+        type: string
+      code:
+        type: string
+      name:
+        type: string
+    required:
+    - code
+    - name
+    type: object
   request.EnrollTesteeRequest:
     properties:
       plan_id:
@@ -3564,6 +3593,13 @@ definitions:
         description: 受试者ID -> 开始日期（格式：YYYY-MM-DD）
         type: object
     type: object
+  request.StoreStatusRequest:
+    properties:
+      expected_version:
+        type: integer
+    required:
+    - expected_version
+    type: object
   request.TransferPrimaryClinicianRequest:
     properties:
       org_id:
@@ -3670,6 +3706,18 @@ definitions:
         items:
           type: string
         type: array
+    type: object
+  request.UpdateStoreRequest:
+    properties:
+      address:
+        type: string
+      expected_version:
+        type: integer
+      name:
+        type: string
+    required:
+    - expected_version
+    - name
     type: object
   request.UpdateTesteeRequest:
     properties:
@@ -4220,6 +4268,95 @@ definitions:
         type: string
       title:
         type: string
+    type: object
+  response.ClinicianResponse:
+    properties:
+      assessment_entry_count:
+        type: integer
+      assigned_testee_count:
+        type: integer
+      clinician_type:
+        type: string
+      clinician_type_label:
+        type: string
+      department:
+        type: string
+      employee_code:
+        type: string
+      id:
+        type: string
+      is_active:
+        type: boolean
+      is_active_label:
+        type: string
+      name:
+        type: string
+      operator_id:
+        type: string
+      org_id:
+        type: string
+      store_code:
+        type: string
+      store_configured:
+        type: boolean
+      store_id:
+        example: ""
+        type: string
+      store_name:
+        type: string
+      title:
+        type: string
+      version:
+        type: integer
+    type: object
+  response.ClinicianStoreAssignmentResponse:
+    properties:
+      change:
+        $ref: '#/definitions/response.ClinicianStoreHistoryResponse'
+      clinician:
+        $ref: '#/definitions/response.ClinicianResponse'
+      invalidated_count:
+        type: integer
+    type: object
+  response.ClinicianStoreHistoryListResponse:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/response.ClinicianStoreHistoryResponse'
+        type: array
+    type: object
+  response.ClinicianStoreHistoryResponse:
+    properties:
+      actor_id:
+        example: ""
+        type: string
+      clinician_id:
+        example: ""
+        type: string
+      created_at:
+        type: string
+      from_store_id:
+        example: ""
+        type: string
+      id:
+        example: ""
+        type: string
+      invalidated_count:
+        type: integer
+      kind:
+        type: string
+      org_id:
+        example: ""
+        type: string
+      reason:
+        type: string
+      request_id:
+        type: string
+      to_store_id:
+        example: ""
+        type: string
+      version:
+        type: integer
     type: object
   response.ClinicianWorkbenchQueueCountsResponse:
     properties:
@@ -5452,6 +5589,61 @@ definitions:
         type: number
       value:
         type: number
+    type: object
+  response.StoreListResponse:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/response.StoreResponse'
+        type: array
+      total:
+        type: integer
+    type: object
+  response.StoreProgressResponse:
+    properties:
+      active_configured:
+        type: integer
+      active_total:
+        type: integer
+      active_unconfigured:
+        type: integer
+      configured:
+        type: integer
+      total:
+        type: integer
+      unconfigured:
+        type: integer
+    type: object
+  response.StoreResponse:
+    properties:
+      address:
+        type: string
+      clinician_count:
+        type: integer
+      code:
+        type: string
+      created_at:
+        type: string
+      created_by:
+        example: ""
+        type: string
+      id:
+        example: ""
+        type: string
+      is_active:
+        type: boolean
+      name:
+        type: string
+      org_id:
+        example: ""
+        type: string
+      updated_at:
+        type: string
+      updated_by:
+        example: ""
+        type: string
+      version:
+        type: integer
     type: object
   response.SuggestionItem:
     properties:
@@ -8365,6 +8557,14 @@ paths:
         name: Authorization
         required: true
         type: string
+      - description: 服务门店 ID，与 unconfigured=true 互斥
+        in: query
+        name: store_id
+        type: string
+      - description: 仅查询未配置门店医生
+        in: query
+        name: unconfigured
+        type: boolean
       produces:
       - application/json
       responses:
@@ -8606,6 +8806,88 @@ paths:
       summary: 查询从业者关系列表
       tags:
       - Clinician
+  /api/v1/clinicians/{id}/store:
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 对象 ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: 请求
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/request.AssignClinicianStoreRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/response.ClinicianStoreAssignmentResponse'
+              type: object
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/core.Response'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/core.Response'
+      summary: 配置医生服务门店
+      tags:
+      - Actor Store
+  /api/v1/clinicians/{id}/store-history:
+    get:
+      consumes:
+      - application/json
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 对象 ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/response.ClinicianStoreHistoryListResponse'
+              type: object
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/core.Response'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/core.Response'
+      summary: 查询医生门店配置历史
+      tags:
+      - Actor Store
   /api/v1/clinicians/{id}/testees:
     get:
       parameters:
@@ -10850,6 +11132,295 @@ paths:
       summary: 更新员工
       tags:
       - Staff
+  /api/v1/stores:
+    get:
+      consumes:
+      - application/json
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 页码
+        in: query
+        name: page
+        type: integer
+      - description: 每页数量，最多 100
+        in: query
+        name: page_size
+        type: integer
+      - description: 名称或编号
+        in: query
+        name: search
+        type: string
+      - description: 启用状态
+        in: query
+        name: is_active
+        type: boolean
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/response.StoreListResponse'
+              type: object
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/core.Response'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/core.Response'
+      summary: 查询公司门店
+      tags:
+      - Actor Store
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 请求
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/request.CreateStoreRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/response.StoreResponse'
+              type: object
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/core.Response'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/core.Response'
+      summary: 创建门店
+      tags:
+      - Actor Store
+  /api/v1/stores/{id}:
+    get:
+      consumes:
+      - application/json
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 对象 ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/response.StoreResponse'
+              type: object
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/core.Response'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/core.Response'
+      summary: 查询门店详情
+      tags:
+      - Actor Store
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 对象 ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: 请求
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/request.UpdateStoreRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/response.StoreResponse'
+              type: object
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/core.Response'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/core.Response'
+      summary: 更新门店资料
+      tags:
+      - Actor Store
+  /api/v1/stores/{id}/activate:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 对象 ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: 请求
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/request.StoreStatusRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/response.StoreResponse'
+              type: object
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/core.Response'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/core.Response'
+      summary: 启用门店
+      tags:
+      - Actor Store
+  /api/v1/stores/{id}/deactivate:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 对象 ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: 请求
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/request.StoreStatusRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/response.StoreResponse'
+              type: object
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/core.Response'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/core.Response'
+      summary: 停用门店
+      tags:
+      - Actor Store
+  /api/v1/stores/configuration-progress:
+    get:
+      consumes:
+      - application/json
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/response.StoreProgressResponse'
+              type: object
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/core.Response'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/core.Response'
+      summary: 查询医生门店配置进度
+      tags:
+      - Actor Store
   /api/v1/testees:
     get:
       parameters:

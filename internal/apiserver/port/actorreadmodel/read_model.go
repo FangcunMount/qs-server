@@ -90,28 +90,33 @@ type OperatorReader interface {
 }
 
 type ClinicianFilter struct {
-	OrgID  int64
-	Offset int
-	Limit  int
+	StoreID      *uint64
+	Unconfigured bool
+	OrgID        int64
+	Offset       int
+	Limit        int
 }
 
 type ClinicianRow struct {
-	ID            uint64
-	OrgID         int64
-	OperatorID    *uint64
-	Name          string
-	Department    string
-	Title         string
-	ClinicianType string
-	EmployeeCode  string
-	IsActive      bool
+	StoreID              *uint64
+	StoreCode, StoreName string
+	Version              uint32
+	ID                   uint64
+	OrgID                int64
+	OperatorID           *uint64
+	Name                 string
+	Department           string
+	Title                string
+	ClinicianType        string
+	EmployeeCode         string
+	IsActive             bool
 }
 
 type ClinicianReader interface {
 	GetClinician(ctx context.Context, id uint64) (*ClinicianRow, error)
 	FindClinicianByOperator(ctx context.Context, orgID int64, operatorID uint64) (*ClinicianRow, error)
 	ListClinicians(ctx context.Context, filter ClinicianFilter) ([]ClinicianRow, error)
-	CountClinicians(ctx context.Context, orgID int64) (int64, error)
+	CountClinicians(ctx context.Context, filter ClinicianFilter) (int64, error)
 }
 
 type RelationFilter struct {
@@ -165,15 +170,17 @@ type AssessmentEntryFilter struct {
 }
 
 type AssessmentEntryRow struct {
-	ID            uint64
-	OrgID         int64
-	ClinicianID   uint64
-	Token         string
-	TargetType    string
-	TargetCode    string
-	TargetVersion string
-	IsActive      bool
-	ExpiresAt     *time.Time
+	InvalidatedAt      *time.Time
+	InvalidationReason string
+	ID                 uint64
+	OrgID              int64
+	ClinicianID        uint64
+	Token              string
+	TargetType         string
+	TargetCode         string
+	TargetVersion      string
+	IsActive           bool
+	ExpiresAt          *time.Time
 }
 
 type AssessmentEntryReader interface {

@@ -81,6 +81,7 @@ func (OperatorPO) TableName() string {
 
 // ClinicianPO 业务从业者持久化对象。
 type ClinicianPO struct {
+	StoreID *uint64 `gorm:"column:store_id;type:bigint unsigned"`
 	mysql.AuditFields
 
 	OrgID         int64   `gorm:"column:org_id;not null;index:idx_org_id"`
@@ -120,6 +121,8 @@ func (ClinicianRelationPO) TableName() string {
 
 // AssessmentEntryPO 测评入口持久化对象。
 type AssessmentEntryPO struct {
+	InvalidatedAt      *time.Time `gorm:"column:invalidated_at"`
+	InvalidationReason string     `gorm:"column:invalidation_reason"`
 	mysql.AuditFields
 
 	OrgID         int64              `gorm:"column:org_id;not null;index:idx_org_id"`

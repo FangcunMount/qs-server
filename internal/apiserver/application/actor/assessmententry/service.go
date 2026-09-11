@@ -385,6 +385,17 @@ func (s *service) resolveEntry(
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "failed to find assessment entry by token")
 	}
+	// A transaction-scoped clinician read serializes intake against store transfer.
+	if _, err := s.clinicianRepo.FindByID(ctx, entry.ClinicianID()); err != nil {
+		return nil, nil, err
+	}
+	entry, err = s.repo.LockByID(ctx, entry.ID())
+	if err != nil {
+		return nil, nil, err
+	}
+	if entry.InvalidatedAt() != nil {
+		return nil, nil, errors.WithCode(code.ErrInvalidArgument, "入口因医生调店已失效，请联系机构获取新入口")
+	}
 	if !entry.CanResolve(time.Now()) {
 		return nil, nil, errors.WithCode(code.ErrInvalidArgument, "assessment entry is inactive or expired")
 	}
@@ -414,6 +425,16 @@ func (s *service) setActive(ctx context.Context, entryID uint64, active bool) (*
 		item, err := s.repo.FindByID(txCtx, targetEntryID)
 		if err != nil {
 			return errors.Wrap(err, "failed to find assessment entry")
+		}
+		if _, err := s.clinicianRepo.FindByID(txCtx, item.ClinicianID()); err != nil {
+			return err
+		}
+		item, err = s.repo.LockByID(txCtx, targetEntryID)
+		if err != nil {
+			return err
+		}
+		if item.InvalidatedAt() != nil {
+			return errors.WithCode(code.ErrConflict, "入口因医生调店永久失效，请创建新入口")
 		}
 		if active {
 			item.Reactivate()

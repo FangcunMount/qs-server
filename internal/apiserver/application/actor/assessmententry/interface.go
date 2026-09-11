@@ -46,15 +46,17 @@ type ListAssessmentEntryDTO struct {
 
 // AssessmentEntryResult 测评入口结果。
 type AssessmentEntryResult struct {
-	ID            uint64
-	OrgID         int64
-	ClinicianID   uint64
-	Token         string
-	TargetType    string
-	TargetCode    string
-	TargetVersion string
-	IsActive      bool
-	ExpiresAt     *time.Time
+	InvalidatedAt      *time.Time
+	InvalidationReason string
+	ID                 uint64
+	OrgID              int64
+	ClinicianID        uint64
+	Token              string
+	TargetType         string
+	TargetCode         string
+	TargetVersion      string
+	IsActive           bool
+	ExpiresAt          *time.Time
 }
 
 // AssessmentEntryListResult 测评入口列表结果。

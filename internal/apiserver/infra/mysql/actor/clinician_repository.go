@@ -2,12 +2,15 @@ package actor
 
 import (
 	"context"
+	"github.com/FangcunMount/qs-server/internal/pkg/middleware"
+	"time"
 
 	"github.com/FangcunMount/component-base/pkg/errors"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/clinician"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/internal/pkg/database/mysql"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 type clinicianRepository struct {
@@ -39,20 +42,33 @@ func (r *clinicianRepository) Save(ctx context.Context, item *domain.Clinician) 
 func (r *clinicianRepository) Update(ctx context.Context, item *domain.Clinician) error {
 	po := r.mapper.ToPO(item)
 
-	return r.UpdateAndSync(ctx, po, func(saved *ClinicianPO) {
-		r.mapper.SyncID(saved, item)
+	res := r.WithContext(ctx).Model(&ClinicianPO{}).Where("id=? AND org_id=? AND version=? AND deleted_at IS NULL", item.ID(), item.OrgID(), item.Version()).Updates(map[string]any{
+		"name": po.Name, "department": po.Department, "title": po.Title, "clinician_type": po.ClinicianType, "employee_code": po.EmployeeCode, "is_active": po.IsActive, "operator_id": po.OperatorID, "version": gorm.Expr("version + 1"), "updated_at": time.Now().UTC(), "updated_by": middleware.GetUserIDFromContext(ctx),
 	})
+	if res.Error != nil {
+		return res.Error
+	}
+	if res.RowsAffected != 1 {
+		return errors.WithCode(code.ErrConflict, "clinician changed; refresh and retry")
+	}
+	item.RestoreStore(item.StoreID(), item.Version()+1)
+	return nil
 }
 
 func (r *clinicianRepository) FindByID(ctx context.Context, id domain.ID) (*domain.Clinician, error) {
-	po, err := r.BaseRepository.FindByID(ctx, id.Uint64())
+	query := r.WithContext(ctx)
+	if _, ok := mysql.TxFromContext(ctx); ok && query.Name() == "mysql" {
+		query = query.Clauses(clause.Locking{Strength: "UPDATE"})
+	}
+	var po ClinicianPO
+	err := query.Where("id = ?", id.Uint64()).First(&po).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, errors.WithCode(code.ErrUserNotFound, "clinician not found")
 		}
 		return nil, err
 	}
-	return r.mapper.ToDomain(po), nil
+	return r.mapper.ToDomain(&po), nil
 }
 
 func (r *clinicianRepository) FindByOperator(ctx context.Context, orgID int64, operatorID uint64) (*domain.Clinician, error) {

@@ -146,7 +146,7 @@ func (s *stubClinicianReader) FindClinicianByOperator(context.Context, int64, ui
 func (s *stubClinicianReader) ListClinicians(context.Context, actorreadmodel.ClinicianFilter) ([]actorreadmodel.ClinicianRow, error) {
 	panic("unexpected call")
 }
-func (s *stubClinicianReader) CountClinicians(context.Context, int64) (int64, error) {
+func (s *stubClinicianReader) CountClinicians(context.Context, actorreadmodel.ClinicianFilter) (int64, error) {
 	panic("unexpected call")
 }
 

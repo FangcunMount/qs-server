@@ -76,7 +76,7 @@ func (*queryClinicianReaderStub) ListClinicians(context.Context, actorreadmodel.
 	return nil, nil
 }
 
-func (*queryClinicianReaderStub) CountClinicians(context.Context, int64) (int64, error) {
+func (*queryClinicianReaderStub) CountClinicians(context.Context, actorreadmodel.ClinicianFilter) (int64, error) {
 	return 0, nil
 }
 

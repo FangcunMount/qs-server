@@ -84,6 +84,33 @@ jobs:
           QS_SERVER_TEST_MYSQL_DSN: 'root:root@tcp(127.0.0.1:3306)/action_audit_test?parseTime=true'
         run: go test ./internal/apiserver/infra/mysql/systemgovernance -run TestActionAuditLifecycleWithJSONColumns -count=1 -v
 
+  actor-store-mysql:
+    name: Actor Store MySQL Transactions
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: root
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -proot"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=20
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+      - name: Verify store migration and transaction rollback
+        env:
+          QS_STORE_REQUIRE_MYSQL: 'true'
+          QS_SERVER_TEST_MYSQL_DSN: 'root:root@tcp(127.0.0.1:3306)/mysql?parseTime=true'
+        run: go test ./internal/apiserver/infra/mysql/actor/store -run TestMySQLStore -count=1 -v
+
   runtime-closure-e2e:
     name: Seeddata Retirement and Current Runtime E2E
     runs-on: ubuntu-latest
@@ -513,7 +540,7 @@ jobs:
 
   build:
     name: Build Applications
-    needs: [test, runtime-closure-e2e, lint, lint-boundaries, deployment-contracts, tier1-test-policy, docs]
+    needs: [test, actor-store-mysql, runtime-closure-e2e, lint, lint-boundaries, deployment-contracts, tier1-test-policy, docs]
     runs-on: ubuntu-latest
     strategy:
       matrix:

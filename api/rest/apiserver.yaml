@@ -15,6 +15,8 @@ servers:
 tags:
 - name: AI-Explanation-Administration
   description: AI-Explanation-Administration
+- name: Actor Store
+  description: Actor Store
 - name: AnswerSheet-Management
   description: 答卷管理
 - name: AssessmentAssets
@@ -1986,6 +1988,14 @@ paths:
         name: Authorization
         in: header
         required: true
+      - type: string
+        description: 服务门店 ID，与 unconfigured=true 互斥
+        name: store_id
+        in: query
+      - type: boolean
+        description: 仅查询未配置门店医生
+        name: unconfigured
+        in: query
       responses:
         '200':
           description: OK
@@ -2912,6 +2922,120 @@ paths:
                 $ref: '#/components/schemas/core.ErrResponse'
         '403':
           description: 无权访问该资源
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '500':
+          description: 服务内部错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+  /api/v1/clinicians/{id}/store:
+    put:
+      tags:
+      - Actor Store
+      summary: 配置医生服务门店
+      operationId: 配置医生服务门店
+      description: 配置医生服务门店
+      parameters:
+      - type: string
+        description: Bearer 用户令牌
+        name: Authorization
+        in: header
+        required: true
+      - type: string
+        description: 对象 ID
+        name: id
+        in: path
+        required: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/request.AssignClinicianStoreRequest'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/core.Response'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/response.ClinicianStoreAssignmentResponse'
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.Response'
+        '409':
+          description: Conflict
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.Response'
+        '401':
+          description: 认证失败或访问令牌无效
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '500':
+          description: 服务内部错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+  /api/v1/clinicians/{id}/store-history:
+    get:
+      tags:
+      - Actor Store
+      summary: 查询医生门店配置历史
+      operationId: 查询医生门店配置历史
+      description: 查询医生门店配置历史
+      parameters:
+      - type: string
+        description: Bearer 用户令牌
+        name: Authorization
+        in: header
+        required: true
+      - type: string
+        description: 对象 ID
+        name: id
+        in: path
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/core.Response'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/response.ClinicianStoreHistoryListResponse'
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.Response'
+        '409':
+          description: Conflict
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.Response'
+        '401':
+          description: 认证失败或访问令牌无效
           content:
             application/json:
               schema:
@@ -6039,6 +6163,407 @@ paths:
                 $ref: '#/components/schemas/core.ErrResponse'
         '403':
           description: 无权访问该资源
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '500':
+          description: 服务内部错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+  /api/v1/stores:
+    get:
+      tags:
+      - Actor Store
+      summary: 查询公司门店
+      operationId: 查询公司门店
+      description: 查询公司门店
+      parameters:
+      - type: string
+        description: Bearer 用户令牌
+        name: Authorization
+        in: header
+        required: true
+      - type: integer
+        description: 页码
+        name: page
+        in: query
+      - type: integer
+        description: 每页数量，最多 100
+        name: page_size
+        in: query
+      - type: string
+        description: 名称或编号
+        name: search
+        in: query
+      - type: boolean
+        description: 启用状态
+        name: is_active
+        in: query
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/core.Response'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/response.StoreListResponse'
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.Response'
+        '409':
+          description: Conflict
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.Response'
+        '401':
+          description: 认证失败或访问令牌无效
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '500':
+          description: 服务内部错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+    post:
+      tags:
+      - Actor Store
+      summary: 创建门店
+      operationId: 创建门店
+      description: 创建门店
+      parameters:
+      - type: string
+        description: Bearer 用户令牌
+        name: Authorization
+        in: header
+        required: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/request.CreateStoreRequest'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/core.Response'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/response.StoreResponse'
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.Response'
+        '409':
+          description: Conflict
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.Response'
+        '401':
+          description: 认证失败或访问令牌无效
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '500':
+          description: 服务内部错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+  /api/v1/stores/configuration-progress:
+    get:
+      tags:
+      - Actor Store
+      summary: 查询医生门店配置进度
+      operationId: 查询医生门店配置进度
+      description: 查询医生门店配置进度
+      parameters:
+      - type: string
+        description: Bearer 用户令牌
+        name: Authorization
+        in: header
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/core.Response'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/response.StoreProgressResponse'
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.Response'
+        '409':
+          description: Conflict
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.Response'
+        '401':
+          description: 认证失败或访问令牌无效
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '500':
+          description: 服务内部错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+  /api/v1/stores/{id}:
+    get:
+      tags:
+      - Actor Store
+      summary: 查询门店详情
+      operationId: 查询门店详情
+      description: 查询门店详情
+      parameters:
+      - type: string
+        description: Bearer 用户令牌
+        name: Authorization
+        in: header
+        required: true
+      - type: string
+        description: 对象 ID
+        name: id
+        in: path
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/core.Response'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/response.StoreResponse'
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.Response'
+        '409':
+          description: Conflict
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.Response'
+        '401':
+          description: 认证失败或访问令牌无效
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '500':
+          description: 服务内部错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+    put:
+      tags:
+      - Actor Store
+      summary: 更新门店资料
+      operationId: 更新门店资料
+      description: 更新门店资料
+      parameters:
+      - type: string
+        description: Bearer 用户令牌
+        name: Authorization
+        in: header
+        required: true
+      - type: string
+        description: 对象 ID
+        name: id
+        in: path
+        required: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/request.UpdateStoreRequest'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/core.Response'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/response.StoreResponse'
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.Response'
+        '409':
+          description: Conflict
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.Response'
+        '401':
+          description: 认证失败或访问令牌无效
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '500':
+          description: 服务内部错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+  /api/v1/stores/{id}/activate:
+    post:
+      tags:
+      - Actor Store
+      summary: 启用门店
+      operationId: 启用门店
+      description: 启用门店
+      parameters:
+      - type: string
+        description: Bearer 用户令牌
+        name: Authorization
+        in: header
+        required: true
+      - type: string
+        description: 对象 ID
+        name: id
+        in: path
+        required: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/request.StoreStatusRequest'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/core.Response'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/response.StoreResponse'
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.Response'
+        '409':
+          description: Conflict
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.Response'
+        '401':
+          description: 认证失败或访问令牌无效
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '500':
+          description: 服务内部错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+  /api/v1/stores/{id}/deactivate:
+    post:
+      tags:
+      - Actor Store
+      summary: 停用门店
+      operationId: 停用门店
+      description: 停用门店
+      parameters:
+      - type: string
+        description: Bearer 用户令牌
+        name: Authorization
+        in: header
+        required: true
+      - type: string
+        description: 对象 ID
+        name: id
+        in: path
+        required: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/request.StoreStatusRequest'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/core.Response'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/response.StoreResponse'
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.Response'
+        '409':
+          description: Conflict
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.Response'
+        '401':
+          description: 认证失败或访问令牌无效
           content:
             application/json:
               schema:
@@ -13346,6 +13871,23 @@ components:
           additionalProperties: true
         prefix:
           type: string
+    request.AssignClinicianStoreRequest:
+      type: object
+      required:
+      - expected_version
+      - reason
+      - request_id
+      - store_id
+      properties:
+        expected_version:
+          type: integer
+        reason:
+          type: string
+        request_id:
+          type: string
+        store_id:
+          type: string
+          example: ''
     request.AssignClinicianTesteeRequest:
       type: object
       required:
@@ -13540,6 +14082,18 @@ components:
           description: IAM用户ID（优先使用）
           allOf:
           - $ref: '#/components/schemas/meta.ID'
+    request.CreateStoreRequest:
+      type: object
+      required:
+      - code
+      - name
+      properties:
+        address:
+          type: string
+        code:
+          type: string
+        name:
+          type: string
     request.EnrollTesteeRequest:
       type: object
       properties:
@@ -13688,6 +14242,13 @@ components:
           type: object
           additionalProperties:
             type: string
+    request.StoreStatusRequest:
+      type: object
+      required:
+      - expected_version
+      properties:
+        expected_version:
+          type: integer
     request.TransferPrimaryClinicianRequest:
       type: object
       required:
@@ -13795,6 +14356,18 @@ components:
           type: array
           items:
             type: string
+    request.UpdateStoreRequest:
+      type: object
+      required:
+      - expected_version
+      - name
+      properties:
+        address:
+          type: string
+        expected_version:
+          type: integer
+        name:
+          type: string
     request.UpdateTesteeRequest:
       type: object
       properties:
@@ -14345,6 +14918,95 @@ components:
           type: string
         title:
           type: string
+    response.ClinicianResponse:
+      type: object
+      properties:
+        assessment_entry_count:
+          type: integer
+        assigned_testee_count:
+          type: integer
+        clinician_type:
+          type: string
+        clinician_type_label:
+          type: string
+        department:
+          type: string
+        employee_code:
+          type: string
+        id:
+          type: string
+        is_active:
+          type: boolean
+        is_active_label:
+          type: string
+        name:
+          type: string
+        operator_id:
+          type: string
+        org_id:
+          type: string
+        store_code:
+          type: string
+        store_configured:
+          type: boolean
+        store_id:
+          type: string
+          example: ''
+        store_name:
+          type: string
+        title:
+          type: string
+        version:
+          type: integer
+    response.ClinicianStoreAssignmentResponse:
+      type: object
+      properties:
+        change:
+          $ref: '#/components/schemas/response.ClinicianStoreHistoryResponse'
+        clinician:
+          $ref: '#/components/schemas/response.ClinicianResponse'
+        invalidated_count:
+          type: integer
+    response.ClinicianStoreHistoryListResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/response.ClinicianStoreHistoryResponse'
+    response.ClinicianStoreHistoryResponse:
+      type: object
+      properties:
+        actor_id:
+          type: string
+          example: ''
+        clinician_id:
+          type: string
+          example: ''
+        created_at:
+          type: string
+        from_store_id:
+          type: string
+          example: ''
+        id:
+          type: string
+          example: ''
+        invalidated_count:
+          type: integer
+        kind:
+          type: string
+        org_id:
+          type: string
+          example: ''
+        reason:
+          type: string
+        request_id:
+          type: string
+        to_store_id:
+          type: string
+          example: ''
+        version:
+          type: integer
     response.ClinicianWorkbenchQueueCountsResponse:
       type: object
       properties:
@@ -15577,6 +16239,61 @@ components:
           type: number
         value:
           type: number
+    response.StoreListResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/response.StoreResponse'
+        total:
+          type: integer
+    response.StoreProgressResponse:
+      type: object
+      properties:
+        active_configured:
+          type: integer
+        active_total:
+          type: integer
+        active_unconfigured:
+          type: integer
+        configured:
+          type: integer
+        total:
+          type: integer
+        unconfigured:
+          type: integer
+    response.StoreResponse:
+      type: object
+      properties:
+        address:
+          type: string
+        clinician_count:
+          type: integer
+        code:
+          type: string
+        created_at:
+          type: string
+        created_by:
+          type: string
+          example: ''
+        id:
+          type: string
+          example: ''
+        is_active:
+          type: boolean
+        name:
+          type: string
+        org_id:
+          type: string
+          example: ''
+        updated_at:
+          type: string
+        updated_by:
+          type: string
+          example: ''
+        version:
+          type: integer
     response.SuggestionItem:
       type: object
       properties:

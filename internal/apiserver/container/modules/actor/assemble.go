@@ -1,6 +1,8 @@
 package actor
 
 import (
+	storeApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/store"
+	storeInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/actor/store"
 	"gorm.io/gorm"
 
 	redis "github.com/redis/go-redis/v9"
@@ -32,6 +34,7 @@ import (
 
 // Module assembles actor application services.
 type Module struct {
+	StoreService                     *storeApp.Service
 	TesteeRegistrationService        testeeApp.TesteeRegistrationService
 	TesteeManagementService          testeeApp.TesteeManagementService
 	TesteeQueryService               testeeApp.TesteeQueryService
@@ -91,6 +94,7 @@ func New(deps Deps) (*Module, error) {
 	profileLinkDirectory := iam.NewProfileLinkDirectory(profileLinkSvc, identitySvc)
 
 	txRunner := modtx.NewMySQLRunner(mysqlDB)
+	module.StoreService = storeApp.NewService(storeInfra.NewRepository(mysqlDB), txRunner)
 	mysqlOptions := mysql.BaseRepositoryOptions{Limiter: deps.MySQLLimiter}
 
 	baseTesteeRepo := actorInfra.NewTesteeRepository(mysqlDB, mysqlOptions)

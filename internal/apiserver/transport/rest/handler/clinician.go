@@ -565,6 +565,8 @@ func (h *OperatorClinicianHandler) GetClinician(c *gin.Context) {
 // @Produce json
 // @Param Authorization header string true "Bearer 用户令牌"
 // @Success 200 {object} core.Response
+// @Param store_id query string false "服务门店 ID，与 unconfigured=true 互斥"
+// @Param unconfigured query boolean false "仅查询未配置门店医生"
 // @Router /api/v1/clinicians [get]
 func (h *OperatorClinicianHandler) ListClinicians(c *gin.Context) {
 	req := request.ListClinicianRequest{Page: 1, PageSize: 20}
@@ -600,7 +602,26 @@ func (h *OperatorClinicianHandler) ListClinicians(c *gin.Context) {
 		return
 	}
 
+	var storeID *uint64
+	if raw, exists := c.GetQuery("store_id"); exists {
+		v, err := strconv.ParseUint(raw, 10, 64)
+		if err != nil || v == 0 {
+			h.Error(c, errors.WithCode(code.ErrInvalidArgument, "invalid store_id"))
+			return
+		}
+		storeID = &v
+	}
+	unconfigured := false
+	if raw, exists := c.GetQuery("unconfigured"); exists {
+		v, err := strconv.ParseBool(raw)
+		if err != nil {
+			h.Error(c, errors.WithCode(code.ErrInvalidArgument, "invalid unconfigured filter"))
+			return
+		}
+		unconfigured = v
+	}
 	result, err := h.clinicianQueryService.ListClinicians(c.Request.Context(), clinicianApp.ListClinicianDTO{
+		StoreID: storeID, Unconfigured: unconfigured,
 		OrgID:  orgID,
 		Offset: (req.Page - 1) * req.PageSize,
 		Limit:  req.PageSize,
@@ -1261,6 +1282,7 @@ func toClinicianResponse(item *clinicianApp.ClinicianResult) *response.Clinician
 	}
 
 	return &response.ClinicianResponse{
+		StoreID: item.StoreID, StoreCode: item.StoreCode, StoreName: item.StoreName, StoreConfigured: item.StoreID != nil, Version: item.Version,
 		ID:                   strconv.FormatUint(item.ID, 10),
 		OrgID:                strconv.FormatInt(item.OrgID, 10),
 		OperatorID:           operatorID,

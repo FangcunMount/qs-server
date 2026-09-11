@@ -6,17 +6,22 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/clinician"
 )
 
+// InvalidationReasonStoreTransfer 标识调店导致的永久失效。
+const InvalidationReasonStoreTransfer = "clinician_store_transfer"
+
 // AssessmentEntry 测评入口聚合根。
 type AssessmentEntry struct {
-	id            ID
-	orgID         int64
-	clinicianID   clinician.ID
-	token         string
-	targetType    TargetType
-	targetCode    string
-	targetVersion string
-	isActive      bool
-	expiresAt     *time.Time
+	invalidatedAt      *time.Time
+	invalidationReason string
+	id                 ID
+	orgID              int64
+	clinicianID        clinician.ID
+	token              string
+	targetType         TargetType
+	targetCode         string
+	targetVersion      string
+	isActive           bool
+	expiresAt          *time.Time
 }
 
 // NewAssessmentEntry 创建测评入口。
@@ -79,7 +84,7 @@ func (e *AssessmentEntry) TargetVersion() string {
 
 // IsActive 是否激活。
 func (e *AssessmentEntry) IsActive() bool {
-	return e.isActive
+	return e.invalidatedAt == nil && e.isActive
 }
 
 // ExpiresAt 获取过期时间。
@@ -94,7 +99,7 @@ func (e *AssessmentEntry) IsExpired(now time.Time) bool {
 
 // CanResolve 判断是否可解析。
 func (e *AssessmentEntry) CanResolve(now time.Time) bool {
-	return e.isActive && !e.IsExpired(now)
+	return e.invalidatedAt == nil && e.isActive && !e.IsExpired(now)
 }
 
 // SetID 设置ID。
@@ -109,5 +114,24 @@ func (e *AssessmentEntry) Deactivate() {
 
 // Reactivate 重新启用入口。
 func (e *AssessmentEntry) Reactivate() {
-	e.isActive = true
+	if e.invalidatedAt == nil {
+		e.isActive = true
+	}
 }
+
+// RestoreInvalidation retains permanent retirement independently of ordinary activation.
+func (e *AssessmentEntry) RestoreInvalidation(at *time.Time, reason string) {
+	if at != nil {
+		v := *at
+		e.invalidatedAt = &v
+	}
+	e.invalidationReason = reason
+}
+func (e *AssessmentEntry) InvalidatedAt() *time.Time {
+	if e.invalidatedAt == nil {
+		return nil
+	}
+	v := *e.invalidatedAt
+	return &v
+}
+func (e *AssessmentEntry) InvalidationReason() string { return e.invalidationReason }

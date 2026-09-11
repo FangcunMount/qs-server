@@ -7,6 +7,7 @@ import (
 )
 
 type actorHandlers struct {
+	store             *handler.StoreHandler
 	testee            *handler.TesteeHandler
 	operatorClinician *handler.OperatorClinicianHandler
 	assessmentEntry   *handler.AssessmentEntryHandler
@@ -16,6 +17,9 @@ type actorHandlers struct {
 func (r *Router) actorHandlers() actorHandlers {
 	deps := r.deps.Actor
 	handlers := actorHandlers{}
+	if deps.StoreService != nil {
+		handlers.store = handler.NewStoreHandler(deps.StoreService, deps.ClinicianQueryService)
+	}
 	if deps.TesteeQueryService != nil || deps.TesteeManagementService != nil || deps.TesteeBackendQueryService != nil || deps.TesteeAccessService != nil {
 		handlers.testee = handler.NewTesteeHandler(
 			deps.TesteeManagementService,
@@ -70,10 +74,20 @@ func (r *Router) registerActorProtectedRoutes(apiV1 *gin.RouterGroup) {
 	operatorClinicianHandler := handlers.operatorClinician
 	assessmentEntryHandler := handlers.assessmentEntry
 	workbenchHandler := handlers.workbench
-	if testeeHandler == nil && operatorClinicianHandler == nil && assessmentEntryHandler == nil && workbenchHandler == nil {
+	if handlers.store == nil && testeeHandler == nil && operatorClinicianHandler == nil && assessmentEntryHandler == nil && workbenchHandler == nil {
 		return
 	}
 
+	if h := handlers.store; h != nil {
+		stores := apiV1.Group("/stores", restmiddleware.RequireCapabilityMiddleware(restmiddleware.CapabilityOrgAdmin))
+		stores.GET("/configuration-progress", r.rateLimitedHandlers(rateLimitBudgetQuery, h.Progress)...)
+		stores.GET("", r.rateLimitedHandlers(rateLimitBudgetQuery, h.List)...)
+		stores.POST("", r.rateLimitedHandlers(rateLimitBudgetSubmit, h.Create)...)
+		stores.GET("/:id", r.rateLimitedHandlers(rateLimitBudgetQuery, h.Get)...)
+		stores.PUT("/:id", r.rateLimitedHandlers(rateLimitBudgetSubmit, h.Update)...)
+		stores.POST("/:id/activate", r.rateLimitedHandlers(rateLimitBudgetSubmit, h.Activate)...)
+		stores.POST("/:id/deactivate", r.rateLimitedHandlers(rateLimitBudgetSubmit, h.Deactivate)...)
+	}
 	testees := apiV1.Group("/testees")
 	{
 		if testeeHandler != nil {
@@ -112,6 +126,10 @@ func (r *Router) registerActorProtectedRoutes(apiV1 *gin.RouterGroup) {
 			return
 		}
 		adminClinicians := group.Group("", restmiddleware.RequireCapabilityMiddleware(restmiddleware.CapabilityOrgAdmin))
+		if h := handlers.store; h != nil {
+			adminClinicians.PUT("/:id/store", r.rateLimitedHandlers(rateLimitBudgetSubmit, h.Assign)...)
+			adminClinicians.GET("/:id/store-history", r.rateLimitedHandlers(rateLimitBudgetQuery, h.History)...)
+		}
 		adminClinicians.POST("", r.rateLimitedHandlers(rateLimitBudgetSubmit, operatorClinicianHandler.CreateClinician)...)
 		adminClinicians.GET("", r.rateLimitedHandlers(rateLimitBudgetQuery, operatorClinicianHandler.ListClinicians)...)
 		adminClinicians.PUT("/:id", r.rateLimitedHandlers(rateLimitBudgetSubmit, operatorClinicianHandler.UpdateClinician)...)

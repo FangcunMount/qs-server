@@ -2,6 +2,7 @@ package clinician
 
 import (
 	"context"
+	"github.com/FangcunMount/qs-server/internal/pkg/code"
 
 	"github.com/FangcunMount/component-base/pkg/errors"
 	domainRelation "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/relation"
@@ -56,16 +57,20 @@ func (s *queryService) GetByOperator(ctx context.Context, orgID int64, operatorI
 }
 
 func (s *queryService) ListClinicians(ctx context.Context, dto ListClinicianDTO) (*ClinicianListResult, error) {
-	items, err := s.clinicianReader.ListClinicians(ctx, actorreadmodel.ClinicianFilter{
+	if dto.StoreID != nil && (*dto.StoreID == 0 || dto.Unconfigured) {
+		return nil, errors.WithCode(code.ErrInvalidArgument, "store_id and unconfigured filters are mutually exclusive")
+	}
+	filter := actorreadmodel.ClinicianFilter{StoreID: dto.StoreID, Unconfigured: dto.Unconfigured,
 		OrgID:  dto.OrgID,
 		Offset: dto.Offset,
 		Limit:  dto.Limit,
-	})
+	}
+	items, err := s.clinicianReader.ListClinicians(ctx, filter)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to list clinicians")
 	}
 
-	totalCount, err := s.clinicianReader.CountClinicians(ctx, dto.OrgID)
+	totalCount, err := s.clinicianReader.CountClinicians(ctx, filter)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to count clinicians")
 	}

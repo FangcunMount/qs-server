@@ -8,4 +8,6 @@ type Repository interface {
 	Update(ctx context.Context, item *AssessmentEntry) error
 	FindByID(ctx context.Context, id ID) (*AssessmentEntry, error)
 	FindByToken(ctx context.Context, token string) (*AssessmentEntry, error)
+	// LockByID performs a current read after the owning clinician is locked.
+	LockByID(ctx context.Context, id ID) (*AssessmentEntry, error)
 }

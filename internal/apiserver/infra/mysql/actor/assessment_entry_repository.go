@@ -2,6 +2,8 @@ package actor
 
 import (
 	"context"
+	"github.com/FangcunMount/qs-server/internal/pkg/middleware"
+	"time"
 
 	"github.com/FangcunMount/component-base/pkg/errors"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/assessmententry"
@@ -9,6 +11,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/internal/pkg/database/mysql"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 type assessmentEntryRepository struct {
@@ -40,9 +43,14 @@ func (r *assessmentEntryRepository) Save(ctx context.Context, item *domain.Asses
 func (r *assessmentEntryRepository) Update(ctx context.Context, item *domain.AssessmentEntry) error {
 	po := r.mapper.ToPO(item)
 
-	return r.UpdateAndSync(ctx, po, func(saved *AssessmentEntryPO) {
-		r.mapper.SyncID(saved, item)
-	})
+	res := r.WithContext(ctx).Model(&AssessmentEntryPO{}).Where("id=? AND invalidated_at IS NULL", item.ID()).Updates(map[string]any{"is_active": po.IsActive, "expires_at": po.ExpiresAt, "updated_at": time.Now().UTC(), "updated_by": middleware.GetUserIDFromContext(ctx), "version": gorm.Expr("version + 1")})
+	if res.Error != nil {
+		return res.Error
+	}
+	if res.RowsAffected == 0 {
+		return errors.WithCode(code.ErrConflict, "entry permanently invalidated; create a new entry")
+	}
+	return nil
 }
 
 func (r *assessmentEntryRepository) FindByID(ctx context.Context, id domain.ID) (*domain.AssessmentEntry, error) {
@@ -96,4 +104,23 @@ func (r *assessmentEntryRepository) CountByClinician(ctx context.Context, orgID 
 		Where("org_id = ? AND clinician_id = ? AND deleted_at IS NULL", orgID, clinicianID).
 		Count(&count).Error
 	return count, err
+}
+
+// LockByID must follow the clinician lock, shared by intake, transfer and activation.
+func (r *assessmentEntryRepository) LockByID(ctx context.Context, id domain.ID) (*domain.AssessmentEntry, error) {
+	tx, err := mysql.RequireTx(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if tx.Name() == "mysql" {
+		tx = tx.Clauses(clause.Locking{Strength: "UPDATE"})
+	}
+	var po AssessmentEntryPO
+	if err = tx.WithContext(ctx).Where("id=? AND deleted_at IS NULL", id.Uint64()).First(&po).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, errors.WithCode(code.ErrUserNotFound, "assessment entry not found")
+		}
+		return nil, err
+	}
+	return r.mapper.ToDomain(&po), nil
 }

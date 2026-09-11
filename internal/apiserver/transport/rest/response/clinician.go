@@ -2,6 +2,11 @@ package response
 
 // ClinicianResponse 从业者响应。
 type ClinicianResponse struct {
+	StoreID              *uint64 `swaggertype:"string" json:"store_id,string"`
+	StoreCode            string  `json:"store_code"`
+	StoreName            string  `json:"store_name"`
+	StoreConfigured      bool    `json:"store_configured"`
+	Version              uint32  `json:"version"`
 	ID                   string  `json:"id"`
 	OrgID                string  `json:"org_id"`
 	OperatorID           *string `json:"operator_id,omitempty"`
@@ -28,18 +33,21 @@ type ClinicianListResponse struct {
 
 // AssessmentEntryResponse 测评入口响应。
 type AssessmentEntryResponse struct {
-	ID              string  `json:"id"`
-	OrgID           string  `json:"org_id"`
-	ClinicianID     string  `json:"clinician_id"`
-	Token           string  `json:"token"`
-	TargetType      string  `json:"target_type"`
-	TargetTypeLabel string  `json:"target_type_label,omitempty"`
-	TargetCode      string  `json:"target_code"`
-	TargetVersion   string  `json:"target_version,omitempty"`
-	IsActive        bool    `json:"is_active"`
-	IsActiveLabel   string  `json:"is_active_label,omitempty"`
-	ExpiresAt       *string `json:"expires_at,omitempty"`
-	QRCodeURL       string  `json:"qrcode_url,omitempty"`
+	InvalidatedAt          *string `json:"invalidated_at,omitempty"`
+	InvalidationReason     string  `json:"invalidation_reason,omitempty"`
+	PermanentlyInvalidated bool    `json:"permanently_invalidated"`
+	ID                     string  `json:"id"`
+	OrgID                  string  `json:"org_id"`
+	ClinicianID            string  `json:"clinician_id"`
+	Token                  string  `json:"token"`
+	TargetType             string  `json:"target_type"`
+	TargetTypeLabel        string  `json:"target_type_label,omitempty"`
+	TargetCode             string  `json:"target_code"`
+	TargetVersion          string  `json:"target_version,omitempty"`
+	IsActive               bool    `json:"is_active"`
+	IsActiveLabel          string  `json:"is_active_label,omitempty"`
+	ExpiresAt              *string `json:"expires_at,omitempty"`
+	QRCodeURL              string  `json:"qrcode_url,omitempty"`
 }
 
 // AssessmentEntryListResponse 测评入口列表响应。

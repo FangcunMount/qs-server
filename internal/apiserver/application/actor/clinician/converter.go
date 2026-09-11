@@ -14,7 +14,8 @@ func toClinicianResult(item *domainClinician.Clinician) *ClinicianResult {
 	}
 
 	return &ClinicianResult{
-		ID:                   item.ID().Uint64(),
+		ID:      item.ID().Uint64(),
+		StoreID: item.StoreID(), Version: item.Version(),
 		OrgID:                item.OrgID(),
 		OperatorID:           item.OperatorID(),
 		Name:                 item.Name(),
@@ -33,7 +34,8 @@ func toClinicianResultFromRow(row *actorreadmodel.ClinicianRow) *ClinicianResult
 		return nil
 	}
 	return &ClinicianResult{
-		ID:            row.ID,
+		ID:      row.ID,
+		StoreID: row.StoreID, StoreCode: row.StoreCode, StoreName: row.StoreName, Version: row.Version,
 		OrgID:         row.OrgID,
 		OperatorID:    row.OperatorID,
 		Name:          row.Name,

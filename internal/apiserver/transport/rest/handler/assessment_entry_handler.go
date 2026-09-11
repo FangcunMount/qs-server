@@ -491,6 +491,7 @@ func toAssessmentEntryResponse(item *assessmentEntryApp.AssessmentEntryResult, q
 	}
 
 	return &response.AssessmentEntryResponse{
+		InvalidatedAt: response.FormatDateTimePtr(item.InvalidatedAt), InvalidationReason: item.InvalidationReason, PermanentlyInvalidated: item.InvalidatedAt != nil,
 		ID:              strconv.FormatUint(item.ID, 10),
 		OrgID:           strconv.FormatInt(item.OrgID, 10),
 		ClinicianID:     strconv.FormatUint(item.ClinicianID, 10),
@@ -499,7 +500,7 @@ func toAssessmentEntryResponse(item *assessmentEntryApp.AssessmentEntryResult, q
 		TargetTypeLabel: response.LabelForTargetType(item.TargetType),
 		TargetCode:      item.TargetCode,
 		TargetVersion:   item.TargetVersion,
-		IsActive:        item.IsActive,
+		IsActive:        item.IsActive && item.InvalidatedAt == nil,
 		IsActiveLabel:   map[bool]string{true: "启用", false: "停用"}[item.IsActive],
 		ExpiresAt:       response.FormatDateTimePtr(item.ExpiresAt),
 		QRCodeURL:       qrCodeURL,

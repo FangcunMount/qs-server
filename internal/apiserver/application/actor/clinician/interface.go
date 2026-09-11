@@ -69,13 +69,18 @@ type BindClinicianOperatorDTO struct {
 
 // ListClinicianDTO 从业者列表查询。
 type ListClinicianDTO struct {
-	OrgID  int64
-	Offset int
-	Limit  int
+	StoreID      *uint64
+	Unconfigured bool
+	OrgID        int64
+	Offset       int
+	Limit        int
 }
 
 // ClinicianResult 从业者结果。
 type ClinicianResult struct {
+	StoreID              *uint64
+	StoreCode, StoreName string
+	Version              uint32
 	ID                   uint64
 	OrgID                int64
 	OperatorID           *uint64

@@ -2,6 +2,7 @@ package rest
 
 import (
 	"fmt"
+	storeApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/store"
 	"net/http"
 	"time"
 
@@ -113,6 +114,7 @@ type AssessmentModelDeps struct {
 }
 
 type ActorDeps struct {
+	StoreService                  *storeApp.Service
 	TesteeManagementService       testeeApp.TesteeManagementService
 	TesteeQueryService            testeeApp.TesteeQueryService
 	TesteeBackendQueryService     testeeApp.TesteeBackendQueryService

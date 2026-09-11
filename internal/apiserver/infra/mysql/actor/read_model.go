@@ -214,7 +214,11 @@ func (r *readModel) GetClinician(ctx context.Context, id uint64) (*actorreadmode
 		return nil, err
 	}
 	row := clinicianRowFromPO(&po)
-	return &row, nil
+	rows := []actorreadmodel.ClinicianRow{row}
+	if err := r.enrichClinicianStores(ctx, rows); err != nil {
+		return nil, err
+	}
+	return &rows[0], nil
 }
 
 func (r *readModel) FindClinicianByOperator(ctx context.Context, orgID int64, operatorID uint64) (*actorreadmodel.ClinicianRow, error) {
@@ -230,30 +234,72 @@ func (r *readModel) FindClinicianByOperator(ctx context.Context, orgID int64, op
 		return nil, errors.WithCode(code.ErrUserNotFound, "clinician not found")
 	}
 	row := clinicianRowFromPO(&po)
-	return &row, nil
-}
-
-func (r *readModel) ListClinicians(ctx context.Context, filter actorreadmodel.ClinicianFilter) ([]actorreadmodel.ClinicianRow, error) {
-	var pos []*ClinicianPO
-	err := r.WithContext(ctx).
-		Where("org_id = ? AND deleted_at IS NULL", filter.OrgID).
-		Order("id ASC").
-		Offset(filter.Offset).
-		Limit(filter.Limit).
-		Find(&pos).Error
-	if err != nil {
+	rows := []actorreadmodel.ClinicianRow{row}
+	if err := r.enrichClinicianStores(ctx, rows); err != nil {
 		return nil, err
 	}
-	return clinicianRowsFromPOs(pos), nil
+	return &rows[0], nil
 }
 
-func (r *readModel) CountClinicians(ctx context.Context, orgID int64) (int64, error) {
-	var count int64
-	err := r.WithContext(ctx).
-		Model(&ClinicianPO{}).
-		Where("org_id = ? AND deleted_at IS NULL", orgID).
-		Count(&count).Error
-	return count, err
+func (r *readModel) clinicianQuery(ctx context.Context, f actorreadmodel.ClinicianFilter) *gorm.DB {
+	q := r.WithContext(ctx).Model(&ClinicianPO{}).Where("org_id=? AND deleted_at IS NULL", f.OrgID)
+	if f.StoreID != nil {
+		q = q.Where("store_id=?", *f.StoreID)
+	}
+	if f.Unconfigured {
+		q = q.Where("store_id IS NULL")
+	}
+	return q
+}
+func (r *readModel) ListClinicians(ctx context.Context, f actorreadmodel.ClinicianFilter) ([]actorreadmodel.ClinicianRow, error) {
+	var pos []*ClinicianPO
+	if err := r.clinicianQuery(ctx, f).Order("id ASC").Offset(f.Offset).Limit(f.Limit).Find(&pos).Error; err != nil {
+		return nil, err
+	}
+	rows := clinicianRowsFromPOs(pos)
+	if err := r.enrichClinicianStores(ctx, rows); err != nil {
+		return nil, err
+	}
+	return rows, nil
+}
+func (r *readModel) CountClinicians(ctx context.Context, f actorreadmodel.ClinicianFilter) (int64, error) {
+	var n int64
+	err := r.clinicianQuery(ctx, f).Count(&n).Error
+	return n, err
+}
+
+// Batch load store display data; store IDs remain the association authority.
+func (r *readModel) enrichClinicianStores(ctx context.Context, rows []actorreadmodel.ClinicianRow) error {
+	ids := make([]uint64, 0, len(rows))
+	for _, v := range rows {
+		if v.StoreID != nil {
+			ids = append(ids, *v.StoreID)
+		}
+	}
+	if len(ids) == 0 {
+		return nil
+	}
+	var stores []struct {
+		ID         uint64
+		OrgID      int64
+		Code, Name string
+	}
+	if err := r.WithContext(ctx).Table("actor_stores").Where("id IN ?", ids).Find(&stores).Error; err != nil {
+		return err
+	}
+	for i := range rows {
+		if rows[i].StoreID == nil {
+			continue
+		}
+		for _, s := range stores {
+			if s.ID == *rows[i].StoreID && s.OrgID == rows[i].OrgID {
+				rows[i].StoreCode = s.Code
+				rows[i].StoreName = s.Name
+				break
+			}
+		}
+	}
+	return nil
 }
 
 func (r *readModel) ListAssignedTestees(ctx context.Context, filter actorreadmodel.RelationFilter) ([]actorreadmodel.TesteeRow, int64, error) {
@@ -593,6 +639,7 @@ func clinicianRowFromPO(po *ClinicianPO) actorreadmodel.ClinicianRow {
 		employeeCode = *po.EmployeeCode
 	}
 	return actorreadmodel.ClinicianRow{
+		StoreID: po.StoreID, Version: po.Version,
 		ID:            uint64(po.ID),
 		OrgID:         po.OrgID,
 		OperatorID:    po.OperatorID,
@@ -636,6 +683,7 @@ func assessmentEntryRowsFromPOs(pos []*AssessmentEntryPO) []actorreadmodel.Asses
 			targetVersion = *po.TargetVersion
 		}
 		rows = append(rows, actorreadmodel.AssessmentEntryRow{
+			InvalidatedAt: po.InvalidatedAt, InvalidationReason: po.InvalidationReason,
 			ID:            uint64(po.ID),
 			OrgID:         po.OrgID,
 			ClinicianID:   uint64(po.ClinicianID),

@@ -26,14 +26,16 @@ func (m *AssessmentEntryMapper) ToPO(item *domain.AssessmentEntry) *AssessmentEn
 	}
 
 	po := &AssessmentEntryPO{
-		OrgID:         item.OrgID(),
-		ClinicianID:   item.ClinicianID(),
-		Token:         item.Token(),
-		TargetType:    string(item.TargetType()),
-		TargetCode:    item.TargetCode(),
-		TargetVersion: targetVersion,
-		IsActive:      item.IsActive(),
-		ExpiresAt:     item.ExpiresAt(),
+		InvalidatedAt:      item.InvalidatedAt(),
+		InvalidationReason: item.InvalidationReason(),
+		OrgID:              item.OrgID(),
+		ClinicianID:        item.ClinicianID(),
+		Token:              item.Token(),
+		TargetType:         string(item.TargetType()),
+		TargetCode:         item.TargetCode(),
+		TargetVersion:      targetVersion,
+		IsActive:           item.IsActive(),
+		ExpiresAt:          item.ExpiresAt(),
 	}
 	if item.ID() > 0 {
 		po.ID = item.ID()
@@ -62,6 +64,7 @@ func (m *AssessmentEntryMapper) ToDomain(po *AssessmentEntryPO) *domain.Assessme
 		po.IsActive,
 		po.ExpiresAt,
 	)
+	item.RestoreInvalidation(po.InvalidatedAt, po.InvalidationReason)
 	item.SetID(po.ID)
 	return item
 }
@@ -78,6 +81,7 @@ func (m *AssessmentEntryMapper) ToDomains(pos []*AssessmentEntryPO) []*domain.As
 // SyncID 同步回领域对象。
 func (m *AssessmentEntryMapper) SyncID(po *AssessmentEntryPO, item *domain.AssessmentEntry) {
 	if po != nil && item != nil {
+		item.RestoreInvalidation(po.InvalidatedAt, po.InvalidationReason)
 		item.SetID(po.ID)
 	}
 }
