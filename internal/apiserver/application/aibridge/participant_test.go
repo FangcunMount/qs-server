@@ -9,6 +9,7 @@ import (
 	source "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/aiexplanation/source"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/policy"
 	report "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/report"
+	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationfact"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 	"github.com/google/uuid"
 )
@@ -59,7 +60,9 @@ func TestParticipantSnapshotAuthorizationAndSourceBinding(t *testing.T) {
 			if tc.denied {
 				denied = errors.New("denied")
 			}
-			sources := &sourceStub{current: &source.Current{Report: r}}
+			sources := &sourceStub{current: &source.Current{Report: r, Outcome: evaluationfact.NewRecord(evaluationfact.NewRecordInput{
+				ID: r.OutcomeID(), OrgID: 1, TesteeID: 7, AssessmentID: meta.FromUint64(42),
+			})}}
 			store := &stagingStore{}
 			p := Participant{Access: accessStub{denied}, Sources: sources, Bridge: &Service{Store: store}}
 			requestID := uuid.NewString()

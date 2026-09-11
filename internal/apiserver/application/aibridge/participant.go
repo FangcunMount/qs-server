@@ -2,7 +2,6 @@ package aibridge
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"strconv"
 
@@ -53,7 +52,7 @@ func (p *Participant) Request(ctx context.Context, actor Actor, testeeID, assess
 	if report.ID().Uint64() != reportID {
 		return ErrConflict
 	}
-	content, err := json.Marshal(report.Content())
+	content, err := reportSnapshot(current)
 	if err != nil {
 		return err
 	}
