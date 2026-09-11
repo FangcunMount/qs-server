@@ -27,7 +27,7 @@ class DocsFactsHelpersTest(unittest.TestCase):
         services, proto_file_count = check_docs_facts.grpc_inventory()
         self.assertEqual(proto_file_count, 8)
         self.assertEqual(len(services), 15)
-        self.assertEqual(sum(len(rpcs) for rpcs in services.values()), 58)
+        self.assertEqual(sum(len(rpcs) for rpcs in services.values()), 59)
         self.assertIn("GenerateReportFromAssessment", services["interpretation.InterpretationAutomationService"])
         self.assertIn("ExecutePromptEvaluationStep", services["interpretation.AIExplanationAutomationService"])
         self.assertIn("SyncAssessmentAttention", services["internalapi.InternalService"])
