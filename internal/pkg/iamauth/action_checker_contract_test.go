@@ -142,8 +142,6 @@ func objectCheckRequest(subject, origin string) appauthz.ActionCheckRequest {
 	return appauthz.ActionCheckRequest{Subject: subject, Resource: appauthz.AssessmentResource, Action: "retry"}
 }
 
-func pointer(value string) *string { return &value }
-
 func errString(err error) string {
 	if err == nil {
 		return ""
