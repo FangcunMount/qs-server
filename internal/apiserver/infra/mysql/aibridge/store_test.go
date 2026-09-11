@@ -2,9 +2,13 @@ package aibridge
 
 import (
 	"context"
+	"crypto/sha256"
 	"database/sql"
+	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"os"
+	"strings"
 	"sync"
 	"testing"
 
@@ -133,5 +137,77 @@ func TestUnknownRequestAndWrongSessionAreRejected(t *testing.T) {
 	e.Version++
 	if err := store.Accept(ctx, e); !errors.Is(err, app.ErrConflict) {
 		t.Fatalf("expected association conflict: %v", err)
+	}
+}
+
+func TestCompleteArtifactReplaySourceBindingAndTerminalGuard(t *testing.T) {
+	store, r := fixture(t)
+	ctx := context.Background()
+	r.Evidence = []app.EvidenceItem{{AssessmentID: "9", TesteeID: "7", ReportID: "99", SourceVersion: "standard-v1:101", Facts: []app.Fact{{Ref: "standard_report", Value: "{}"}}}}
+	if err := store.StageStart(ctx, r); err != nil {
+		t.Fatal(err)
+	}
+	event := app.Event{EventID: uuid.NewString(), RequestID: r.RequestID, SessionID: uuid.NewString(), Actor: r.Actor, TesteeID: r.TesteeID, Version: 4, Status: "completed"}
+	content := `{"schema_version":"ai-explanation-output/v1"}`
+	sum := sha256.Sum256([]byte(content))
+	d := "sha256:" + strings.Repeat("a", 64)
+	artifact := app.Artifact{ID: uuid.NewString(), SessionID: event.SessionID, RunID: uuid.NewString(), EvidenceSetID: uuid.NewString(), EvidenceFingerprint: strings.Repeat("a", 64), InvocationID: uuid.NewString(), ProviderRequestID: "provider", ContentJSON: content, ContentFingerprint: "sha256:" + hex.EncodeToString(sum[:]), InputFingerprint: d, ProfileID: "profile", ProfileVersion: "v6", ProfileFingerprint: d, PromptFingerprint: d, RouteFingerprint: d, OutputValidatorVersion: "v1", SafetyValidatorVersion: "v2", AssessmentID: "9", ReportID: "99", SourceVersion: "standard-v1:101", SchemaVersion: "qs-ai-artifact/v1"}
+	encodeArtifact := func(a app.Artifact) string {
+		raw, err := json.Marshal(a)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return string(raw)
+	}
+	for _, field := range []string{"assessment", "report", "version"} {
+		bad := artifact
+		switch field {
+		case "assessment":
+			bad.AssessmentID = "10"
+		case "report":
+			bad.ReportID = "100"
+		case "version":
+			bad.SourceVersion = "standard-v1:102"
+		}
+		event.ArtifactJSON = encodeArtifact(bad)
+		if err := store.Accept(ctx, event); !errors.Is(err, app.ErrConflict) {
+			t.Fatalf("%s: expected conflict, got %v", field, err)
+		}
+	}
+	projection, err := store.Projection(ctx, r.RequestID)
+	if err != nil || projection != nil {
+		t.Fatalf("rejected artifact persisted: %v %v", projection, err)
+	}
+	event.ArtifactJSON = encodeArtifact(artifact)
+	for i := 0; i < 2; i++ {
+		if err := store.Accept(ctx, event); err != nil {
+			t.Fatal(err)
+		}
+	}
+	projection, err = store.Projection(ctx, r.RequestID)
+	if err != nil || projection == nil || projection.ArtifactJSON != event.ArtifactJSON {
+		t.Fatalf("artifact missing: %v", err)
+	}
+	var count int
+	if err := store.DB.QueryRow("SELECT COUNT(*) FROM ai_bridge_events WHERE request_id=?", r.RequestID).Scan(&count); err != nil || count != 1 {
+		t.Fatalf("duplicate accepted: %d %v", count, err)
+	}
+	newer := event
+	newer.EventID = uuid.NewString()
+	newer.Version++
+	newer.Status = "running"
+	newer.ArtifactJSON = ""
+	if err := store.Accept(ctx, newer); !errors.Is(err, app.ErrConflict) {
+		t.Fatalf("terminal overwritten: %v", err)
+	}
+	older := newer
+	older.Version = 2
+	older.EventID = uuid.NewString()
+	if err := store.Accept(ctx, older); err != nil {
+		t.Fatal(err)
+	}
+	projection, err = store.Projection(ctx, r.RequestID)
+	if err != nil || projection.Status != "completed" || projection.ArtifactJSON != event.ArtifactJSON {
+		t.Fatalf("old event replaced artifact: %v", err)
 	}
 }
