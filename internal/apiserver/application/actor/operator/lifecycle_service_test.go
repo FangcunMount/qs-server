@@ -119,36 +119,36 @@ func newFakeOperatorRepo() *fakeOperatorRepo {
 	}
 }
 
-func (r *fakeOperatorRepo) Save(_ context.Context, staff *domain.Operator) error {
-	if _, exists := r.byUser[staff.UserID()]; exists {
+func (r *fakeOperatorRepo) Save(_ context.Context, operator *domain.Operator) error {
+	if _, exists := r.byUser[operator.UserID()]; exists {
 		return errors.WithCode(code.ErrUserAlreadyExists, "operator already exists in this organization")
 	}
-	if staff.ID() == 0 {
-		staff.SetID(domain.ID(r.nextID))
+	if operator.ID() == 0 {
+		operator.SetID(domain.ID(r.nextID))
 		r.nextID++
 	}
-	r.byUser[staff.UserID()] = staff
+	r.byUser[operator.UserID()] = operator
 	return nil
 }
 
-func (r *fakeOperatorRepo) Update(_ context.Context, staff *domain.Operator) error {
-	r.byUser[staff.UserID()] = staff
+func (r *fakeOperatorRepo) Update(_ context.Context, operator *domain.Operator) error {
+	r.byUser[operator.UserID()] = operator
 	r.updates++
 	return nil
 }
 
 func (r *fakeOperatorRepo) FindByID(_ context.Context, id domain.ID) (*domain.Operator, error) {
-	for _, staff := range r.byUser {
-		if staff.ID() == id {
-			return staff, nil
+	for _, operator := range r.byUser {
+		if operator.ID() == id {
+			return operator, nil
 		}
 	}
 	return nil, errors.WithCode(code.ErrUserNotFound, "operator not found")
 }
 
 func (r *fakeOperatorRepo) FindByUser(_ context.Context, _ int64, userID int64) (*domain.Operator, error) {
-	if staff, exists := r.byUser[userID]; exists {
-		return staff, nil
+	if operator, exists := r.byUser[userID]; exists {
+		return operator, nil
 	}
 	return nil, errors.WithCode(code.ErrUserNotFound, "operator not found")
 }
@@ -162,8 +162,8 @@ func (r *fakeOperatorRepo) ListByRole(_ context.Context, _ int64, _ domain.Role,
 }
 
 func (r *fakeOperatorRepo) Delete(_ context.Context, id domain.ID) error {
-	for userID, staff := range r.byUser {
-		if staff.ID() == id {
+	for userID, operator := range r.byUser {
+		if operator.ID() == id {
 			delete(r.byUser, userID)
 			return nil
 		}

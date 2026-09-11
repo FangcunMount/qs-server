@@ -25,11 +25,17 @@ type Permission struct {
 
 // Snapshot 即 CurrentAuthzSnapshot：IAM GetAuthorizationSnapshot 在单次请求内的授权投影。
 // 动作真值以 IAM 为准；不在 QS 内自造与 IAM 冲突的角色真值。
+type AssignmentRoleFact struct {
+	RoleID, RoleName, ManagementProtection string
+}
+
 type Snapshot struct {
-	DirectRoles    []string
-	EffectiveRoles []string
-	Permissions    []Permission
-	AuthzVersion   int64
+	AssignmentFacts         []AssignmentRoleFact
+	AssignmentFactsComplete bool
+	DirectRoles             []string
+	EffectiveRoles          []string
+	Permissions             []Permission
+	AuthzVersion            int64
 
 	IAMAppName string
 }

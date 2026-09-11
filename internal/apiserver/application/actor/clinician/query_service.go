@@ -48,14 +48,6 @@ func (s *queryService) GetBasicByID(ctx context.Context, clinicianID uint64) (*C
 	return toClinicianResultFromRow(item), nil
 }
 
-func (s *queryService) GetByOperator(ctx context.Context, orgID int64, operatorID uint64) (*ClinicianResult, error) {
-	item, err := s.clinicianReader.FindClinicianByOperator(ctx, orgID, operatorID)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to find clinician by operator")
-	}
-	return s.enrichCounts(ctx, toClinicianResultFromRow(item))
-}
-
 func (s *queryService) ListClinicians(ctx context.Context, dto ListClinicianDTO) (*ClinicianListResult, error) {
 	if dto.StoreID != nil && (*dto.StoreID == 0 || dto.Unconfigured) {
 		return nil, errors.WithCode(code.ErrInvalidArgument, "store_id and unconfigured filters are mutually exclusive")

@@ -44,8 +44,8 @@ type GetTesteeByProfileIDRequest struct {
 	ProfileID string `form:"profile_id"` // 用户档案ID（ProfileID）
 }
 
-// CreateStaffRequest 创建员工请求
-type CreateStaffRequest struct {
+// CreateOperatorRequest 创建员工请求
+type CreateOperatorRequest struct {
 	OrgID    int64    `json:"org_id"`                          // 兼容字段：机构ID
 	UserID   meta.ID  `json:"user_id,omitempty"`               // IAM用户ID（优先使用）
 	Roles    []string `json:"roles"`                           // 期望授予的角色列表（IAM 启用时转成 assignment）
@@ -56,8 +56,8 @@ type CreateStaffRequest struct {
 	IsActive *bool    `json:"is_active"`                       // 是否激活
 }
 
-// UpdateStaffRequest 更新员工请求
-type UpdateStaffRequest struct {
+// UpdateOperatorRequest 更新员工请求
+type UpdateOperatorRequest struct {
 	Roles    []string `json:"roles"`                           // 角色列表
 	Name     *string  `json:"name"`                            // 姓名
 	Email    *string  `json:"email" binding:"omitempty,email"` // 邮箱
@@ -65,8 +65,8 @@ type UpdateStaffRequest struct {
 	IsActive *bool    `json:"is_active"`                       // 是否激活
 }
 
-// ListStaffRequest 查询员工列表请求
-type ListStaffRequest struct {
+// ListOperatorRequest 查询员工列表请求
+type ListOperatorRequest struct {
 	OrgID    int64  `form:"org_id"`                                      // 兼容字段：机构ID
 	Role     string `form:"role"`                                        // 角色筛选
 	Page     int    `form:"page" binding:"omitempty,min=1"`              // 页码

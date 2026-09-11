@@ -9,7 +9,7 @@ import (
 )
 
 // managementService 受试者档案管理服务实现
-// 行为者：B端员工(Staff)
+// 行为者：B端员工(Operator)
 type managementService struct {
 	repo   domain.Repository
 	editor domain.Editor

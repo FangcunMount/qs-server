@@ -15,6 +15,8 @@ func (r *Router) newStatisticsHandler() *handler.StatisticsHandler {
 }
 
 func (r *Router) registerStatisticsProtectedRoutes(apiV2 *gin.RouterGroup) {
+	apiV2.Any("/statistics/clinicians/me", retiredClinicianAPI)
+	apiV2.Any("/statistics/clinicians/me/*path", retiredClinicianAPI)
 	h := r.newStatisticsHandler()
 	if h == nil {
 		return
@@ -26,10 +28,6 @@ func (r *Router) registerStatisticsProtectedRoutes(apiV2 *gin.RouterGroup) {
 	admin.GET("/clinicians/:id", r.rateLimitedHandlers(rateLimitBudgetQuery, h.Clinician)...)
 	admin.GET("/entries", r.rateLimitedHandlers(rateLimitBudgetQuery, h.Entries)...)
 	admin.GET("/entries/:id", r.rateLimitedHandlers(rateLimitBudgetQuery, h.Entry)...)
-	me := statistics.Group("/clinicians/me")
-	me.GET("/overview", r.rateLimitedHandlers(rateLimitBudgetQuery, h.CurrentClinicianOverview)...)
-	me.GET("/entries", r.rateLimitedHandlers(rateLimitBudgetQuery, h.CurrentClinicianEntries)...)
-	me.GET("/testees-summary", r.rateLimitedHandlers(rateLimitBudgetQuery, h.CurrentClinicianTestees)...)
 	statistics.POST("/contents/batch", append([]gin.HandlerFunc{restmiddleware.RequireAnyPermissionMiddleware(
 		restmiddleware.PermissionRequirement{Resource: authzapp.QuestionnaireResource, Action: "statistics"},
 		restmiddleware.PermissionRequirement{Resource: authzapp.AssessmentModelResource, Action: "read"},

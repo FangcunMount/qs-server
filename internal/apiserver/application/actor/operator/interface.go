@@ -27,9 +27,6 @@ type OperatorLifecycleService interface {
 	// EnsureByUser 确保操作者存在（幂等）
 	EnsureByUser(ctx context.Context, orgID int64, userID int64, name string) (*OperatorResult, error)
 
-	// Delete 删除操作者（离职）
-	Delete(ctx context.Context, operatorID uint64) error
-
 	// UpdateProfile 更新本地员工投影资料
 	UpdateProfile(ctx context.Context, dto UpdateOperatorProfileDTO) (*OperatorResult, error)
 
@@ -123,6 +120,7 @@ type ListOperatorDTO struct {
 
 // OperatorResult 操作者结果 DTO
 type OperatorResult struct {
+	Version                uint32
 	ID                     uint64
 	OrgID                  int64
 	UserID                 int64

@@ -2,6 +2,7 @@ package operator
 
 import (
 	"context"
+	retirement "github.com/FangcunMount/qs-server/internal/apiserver/port/operatorretirement"
 
 	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/actor/actorctx"
@@ -13,6 +14,7 @@ import (
 // authorizationService 操作者权限管理服务实现
 // 行为者：IT管理员/权限管理员
 type authorizationService struct {
+	gate       retirement.MutationGate
 	repo       domain.Repository
 	validator  domain.Validator
 	lifecycler domain.Lifecycler
@@ -27,8 +29,14 @@ func NewAuthorizationService(
 	lifecycler domain.Lifecycler,
 	uow apptransaction.Runner,
 	authz iambridge.OperatorAuthzGateway,
+	gates ...retirement.MutationGate,
 ) OperatorAuthorizationService {
+	var gate retirement.MutationGate
+	if len(gates) > 0 {
+		gate = gates[0]
+	}
 	return &authorizationService{
+		gate:       gate,
 		repo:       repo,
 		validator:  validator,
 		lifecycler: lifecycler,
@@ -37,7 +45,7 @@ func NewAuthorizationService(
 	}
 }
 
-func (s *authorizationService) ReplaceRoles(ctx context.Context, operatorID uint64, roleNames []string) error {
+func (s *authorizationService) replaceRoles(ctx context.Context, operatorID uint64, roleNames []string) error {
 	if err := s.requireOperatorAuthz(); err != nil {
 		return err
 	}
@@ -55,7 +63,7 @@ func (s *authorizationService) ReplaceRoles(ctx context.Context, operatorID uint
 		return errors.Wrap(err, "failed to find operator")
 	}
 	committedVersion, err := s.authz.ReplaceManagedOperatorRoles(ctx, op.OrgID(), op.UserID(), roleNames,
-		actorctx.IAMGrantedBySubject(ctx), "replace staff direct roles")
+		actorctx.IAMGrantedBySubject(ctx), "replace operator direct roles")
 	if err != nil {
 		return errors.Wrap(err, "iam replace managed assignments")
 	}
@@ -76,7 +84,7 @@ func (s *authorizationService) requireOperatorAuthz() error {
 }
 
 // Activate 激活操作者
-func (s *authorizationService) Activate(ctx context.Context, operatorID uint64) error {
+func (s *authorizationService) activate(ctx context.Context, operatorID uint64) error {
 	targetOperatorID, err := operatorIDFromUint64("operator_id", operatorID)
 	if err != nil {
 		return err
@@ -94,7 +102,7 @@ func (s *authorizationService) Activate(ctx context.Context, operatorID uint64) 
 }
 
 // Deactivate 停用操作者
-func (s *authorizationService) Deactivate(ctx context.Context, operatorID uint64) error {
+func (s *authorizationService) deactivate(ctx context.Context, operatorID uint64) error {
 	targetOperatorID, err := operatorIDFromUint64("operator_id", operatorID)
 	if err != nil {
 		return err
@@ -109,4 +117,28 @@ func (s *authorizationService) Deactivate(ctx context.Context, operatorID uint64
 		}
 		return s.repo.Update(txCtx, st)
 	})
+}
+
+func (s *authorizationService) mutate(ctx context.Context, id uint64, fn func(context.Context) error) error {
+	if s.gate == nil {
+		return fn(ctx)
+	}
+	targetID, err := operatorIDFromUint64("operator_id", id)
+	if err != nil {
+		return err
+	}
+	op, err := s.repo.FindByID(ctx, targetID)
+	if err != nil {
+		return err
+	}
+	return s.gate.WithinMutation(ctx, op.UserID(), fn)
+}
+func (s *authorizationService) ReplaceRoles(ctx context.Context, id uint64, roles []string) error {
+	return s.mutate(ctx, id, func(locked context.Context) error { return s.replaceRoles(locked, id, roles) })
+}
+func (s *authorizationService) Activate(ctx context.Context, id uint64) error {
+	return s.mutate(ctx, id, func(locked context.Context) error { return s.activate(locked, id) })
+}
+func (s *authorizationService) Deactivate(ctx context.Context, id uint64) error {
+	return s.mutate(ctx, id, func(locked context.Context) error { return s.deactivate(locked, id) })
 }

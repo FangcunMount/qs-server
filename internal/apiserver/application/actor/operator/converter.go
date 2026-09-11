@@ -21,6 +21,7 @@ func toOperatorResult(s *domain.Operator) *OperatorResult {
 
 	return &OperatorResult{
 		ID:                     s.ID().Uint64(),
+		Version:                s.Version(),
 		OrgID:                  s.OrgID(),
 		UserID:                 s.UserID(),
 		Roles:                  roles,
@@ -41,6 +42,7 @@ func toOperatorResultFromRow(row *actorreadmodel.OperatorRow) *OperatorResult {
 	}
 	return &OperatorResult{
 		ID:                     row.ID,
+		Version:                row.Version,
 		OrgID:                  row.OrgID,
 		UserID:                 row.UserID,
 		Roles:                  append([]string(nil), row.Roles...),

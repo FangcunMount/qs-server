@@ -43,8 +43,9 @@ type TesteeListResponse struct {
 	TotalPages int               `json:"total_pages"` // 总页数
 }
 
-// StaffResponse 员工响应
-type StaffResponse struct {
+// OperatorResponse 员工响应
+type OperatorResponse struct {
+	Version                uint32   `json:"version"`
 	ID                     string   `json:"id"`      // ID
 	OrgID                  string   `json:"org_id"`  // 机构ID
 	UserID                 string   `json:"user_id"` // 用户ID
@@ -61,11 +62,11 @@ type StaffResponse struct {
 	UpdatedAt              string   `json:"updated_at,omitempty"` // 更新时间
 }
 
-// StaffListResponse 员工列表响应
-type StaffListResponse struct {
-	Items      []*StaffResponse `json:"items"`       // 列表数据
-	Total      int64            `json:"total"`       // 总数
-	Page       int              `json:"page"`        // 当前页码
-	PageSize   int              `json:"page_size"`   // 每页数量
-	TotalPages int              `json:"total_pages"` // 总页数
+// OperatorListResponse 员工列表响应
+type OperatorListResponse struct {
+	Items      []*OperatorResponse `json:"items"`       // 列表数据
+	Total      int64               `json:"total"`       // 总数
+	Page       int                 `json:"page"`        // 当前页码
+	PageSize   int                 `json:"page_size"`   // 每页数量
+	TotalPages int                 `json:"total_pages"` // 总页数
 }

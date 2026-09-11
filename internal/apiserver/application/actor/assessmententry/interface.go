@@ -70,7 +70,6 @@ type AssessmentEntryListResult struct {
 // ClinicianSummaryResult 从业者摘要。
 type ClinicianSummaryResult struct {
 	ID            uint64
-	OperatorID    *uint64
 	Name          string
 	Department    string
 	Title         string

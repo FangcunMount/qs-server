@@ -10,7 +10,7 @@ import (
 )
 
 // backendQueryService 受试者后台查询服务实现
-// 行为者：B端员工(Staff) - 后台管理系统
+// 行为者：B端员工(Operator) - 后台管理系统
 // 职责：提供受试者详细信息查询能力（包含家长信息等后台管理所需数据）
 type backendQueryService struct {
 	queryService         TesteeQueryService

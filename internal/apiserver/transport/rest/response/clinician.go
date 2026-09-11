@@ -9,7 +9,6 @@ type ClinicianResponse struct {
 	Version              uint32  `json:"version"`
 	ID                   string  `json:"id"`
 	OrgID                string  `json:"org_id"`
-	OperatorID           *string `json:"operator_id,omitempty"`
 	Name                 string  `json:"name"`
 	Department           string  `json:"department,omitempty"`
 	Title                string  `json:"title,omitempty"`
@@ -61,13 +60,12 @@ type AssessmentEntryListResponse struct {
 
 // ClinicianSummaryResponse 从业者摘要响应。
 type ClinicianSummaryResponse struct {
-	ID                 string  `json:"id"`
-	OperatorID         *string `json:"operator_id,omitempty"`
-	Name               string  `json:"name"`
-	Department         string  `json:"department,omitempty"`
-	Title              string  `json:"title,omitempty"`
-	ClinicianType      string  `json:"clinician_type"`
-	ClinicianTypeLabel string  `json:"clinician_type_label,omitempty"`
+	ID                 string `json:"id"`
+	Name               string `json:"name"`
+	Department         string `json:"department,omitempty"`
+	Title              string `json:"title,omitempty"`
+	ClinicianType      string `json:"clinician_type"`
+	ClinicianTypeLabel string `json:"clinician_type_label,omitempty"`
 }
 
 // AssessmentEntryResolvedResponse 测评入口解析响应。

@@ -221,23 +221,22 @@ func (s *ReadStore) ListClinicians(ctx context.Context, orgID int64, clinicianID
 		args = append(args, *clinicianID)
 	}
 	if operatorUserID != nil {
-		where = append(where, "s.user_id=?", "s.deleted_at IS NULL")
-		args = append(args, *operatorUserID)
+		return nil, 0, errors.WithCode(code.ErrInvalidArgument, "clinician operator binding is retired")
 	}
 	whereSQL := strings.Join(where, " AND ")
 	var total int64
-	if err := s.db.WithContext(ctx).Raw("SELECT COUNT(*) FROM clinician c LEFT JOIN staff s ON s.id=c.operator_id WHERE "+whereSQL, args...).Scan(&total).Error; err != nil {
+	if err := s.db.WithContext(ctx).Raw("SELECT COUNT(*) FROM clinician c WHERE "+whereSQL, args...).Scan(&total).Error; err != nil {
 		return nil, 0, err
 	}
 	queryArgs := []any{orgID, from, to, orgID, from, to, orgID, orgID}
 	queryArgs = append(queryArgs, args...)
 	queryArgs = append(queryArgs, size, (page-1)*size)
 	var items []statisticsApp.ClinicianItem
-	err = s.db.WithContext(ctx).Raw(`SELECT c.id,c.operator_id,c.name,c.department,c.title,c.clinician_type,c.is_active,
+	err = s.db.WithContext(ctx).Raw(`SELECT c.id,c.name,c.department,c.title,c.clinician_type,c.is_active,
 		COALESCE(a.entry_opened_count,0) entry_opened_count,COALESCE(a.intake_confirmed_count,0) intake_confirmed_count,COALESCE(a.care_relationship_established_count,0) care_relationship_established_count,
 		COALESCE(e.assessment_created_count,0) assessment_created_count,COALESCE(e.outcome_committed_count,0) outcome_committed_count,COALESCE(e.report_generated_count,0) report_generated_count,
 		COALESCE(r.primary_testee_count,0) primary_testee_count,COALESCE(r.attending_testee_count,0) attending_testee_count,COALESCE(r.collaborator_testee_count,0) collaborator_testee_count,COALESCE(r.total_accessible_testees,0) total_accessible_testees,COALESCE(en.active_entry_count,0) active_entry_count
-		FROM clinician c LEFT JOIN staff s ON s.id=c.operator_id
+		FROM clinician c
 		LEFT JOIN (SELECT clinician_id,SUM(entry_opened_count) entry_opened_count,SUM(intake_confirmed_count) intake_confirmed_count,SUM(care_relationship_established_count) care_relationship_established_count FROM statistics_access_daily WHERE org_id=? AND stat_date>=? AND stat_date<? GROUP BY clinician_id) a ON a.clinician_id=c.id
 		LEFT JOIN (SELECT clinician_id,SUM(assessment_created_count) assessment_created_count,SUM(outcome_committed_count) outcome_committed_count,SUM(report_generated_count) report_generated_count FROM statistics_assessment_daily WHERE org_id=? AND stat_date>=? AND stat_date<? GROUP BY clinician_id) e ON e.clinician_id=c.id
 		LEFT JOIN (SELECT clinician_id,COUNT(DISTINCT CASE WHEN relation_type='primary' THEN testee_id END) primary_testee_count,COUNT(DISTINCT CASE WHEN relation_type='attending' THEN testee_id END) attending_testee_count,COUNT(DISTINCT CASE WHEN relation_type='collaborator' THEN testee_id END) collaborator_testee_count,COUNT(DISTINCT testee_id) total_accessible_testees FROM clinician_relation WHERE org_id=? AND is_active=1 AND deleted_at IS NULL GROUP BY clinician_id) r ON r.clinician_id=c.id
@@ -283,43 +282,6 @@ func (s *ReadStore) ListEntries(ctx context.Context, orgID int64, entryID, clini
 		LEFT JOIN (SELECT entry_id,SUM(assessment_created_count) assessment_created_count,SUM(outcome_committed_count) outcome_committed_count,SUM(report_generated_count) report_generated_count FROM statistics_assessment_daily WHERE org_id=? AND stat_date>=? AND stat_date<? GROUP BY entry_id) e ON e.entry_id=en.id
 		WHERE `+whereSQL+` ORDER BY en.id LIMIT ? OFFSET ?`, queryArgs...).Scan(&items).Error
 	return items, total, err
-}
-
-func (s *ReadStore) CurrentClinicianID(ctx context.Context, orgID, userID int64) (uint64, error) {
-	ctx, release, err := s.acquire(ctx)
-	if err != nil {
-		return 0, err
-	}
-	defer release()
-	var id uint64
-	err = s.db.WithContext(ctx).Raw(`SELECT c.id FROM clinician c JOIN staff s ON s.id=c.operator_id WHERE c.org_id=? AND s.user_id=? AND c.is_active=1 AND c.deleted_at IS NULL AND s.deleted_at IS NULL LIMIT 1`, orgID, userID).Scan(&id).Error
-	if err != nil {
-		return 0, err
-	}
-	if id == 0 {
-		return 0, errors.WithCode(code.ErrPermissionDenied, "current operator is not an active clinician")
-	}
-	return id, nil
-}
-
-func (s *ReadStore) CurrentClinicianTesteeSummary(ctx context.Context, orgID int64, clinicianID uint64, from, to time.Time) (statisticsApp.TesteeSummary, error) {
-	ctx, release, err := s.acquire(ctx)
-	if err != nil {
-		return statisticsApp.TesteeSummary{}, err
-	}
-	defer release()
-	var value statisticsApp.TesteeSummary
-	err = s.db.WithContext(ctx).Raw(`SELECT
-		COUNT(DISTINCT r.testee_id) total_accessible_testees,
-		COUNT(DISTINCT CASE WHEN r.relation_type='primary' THEN r.testee_id END) primary_testee_count,
-		COUNT(DISTINCT CASE WHEN r.relation_type='attending' THEN r.testee_id END) attending_testee_count,
-		COUNT(DISTINCT CASE WHEN r.relation_type='collaborator' THEN r.testee_id END) collaborator_testee_count,
-		COUNT(DISTINCT CASE WHEN t.is_key_focus=1 THEN r.testee_id END) key_focus_testee_count,
-		COUNT(DISTINCT CASE WHEN f.testee_id IS NOT NULL THEN r.testee_id END) assessed_in_window_count
-		FROM clinician_relation r JOIN testee t ON t.id=r.testee_id AND t.deleted_at IS NULL
-		LEFT JOIN (SELECT DISTINCT testee_id FROM statistics_assessment_fact WHERE org_id=? AND fact_type='outcome_committed' AND occurred_at>=? AND occurred_at<?) f ON f.testee_id=r.testee_id
-		WHERE r.org_id=? AND r.clinician_id=? AND r.is_active=1 AND r.deleted_at IS NULL`, orgID, from, to, orgID, clinicianID).Scan(&value).Error
-	return value, err
 }
 
 func (s *ReadStore) ContentBatch(ctx context.Context, orgID int64, asOfDate time.Time, refs []statisticsApp.ContentRef) ([]statisticsApp.ContentItem, error) {

@@ -13,7 +13,6 @@ type Clinician struct {
 	version       uint32
 	id            ID
 	orgID         int64
-	operatorID    *uint64
 	name          string
 	department    string
 	title         string
@@ -25,21 +24,13 @@ type Clinician struct {
 // NewClinician 创建从业者。
 func NewClinician(
 	orgID int64,
-	operatorID *uint64,
 	name, department, title string,
 	clinicianType Type,
 	employeeCode string,
 	isActive bool,
 ) *Clinician {
-	var copiedOperatorID *uint64
-	if operatorID != nil {
-		value := *operatorID
-		copiedOperatorID = &value
-	}
-
 	return &Clinician{
 		orgID:         orgID,
-		operatorID:    copiedOperatorID,
 		name:          name,
 		department:    department,
 		title:         title,
@@ -57,15 +48,6 @@ func (p *Clinician) ID() ID {
 // OrgID 获取机构ID。
 func (p *Clinician) OrgID() int64 {
 	return p.orgID
-}
-
-// OperatorID 获取关联的后台操作者ID。
-func (p *Clinician) OperatorID() *uint64 {
-	if p.operatorID == nil {
-		return nil
-	}
-	value := *p.operatorID
-	return &value
 }
 
 // Name 获取姓名。
@@ -114,17 +96,6 @@ func (p *Clinician) UpdateProfile(
 	p.title = title
 	p.clinicianType = clinicianType
 	p.employeeCode = employeeCode
-}
-
-// BindOperator 绑定后台操作者。
-func (p *Clinician) BindOperator(operatorID uint64) {
-	value := operatorID
-	p.operatorID = &value
-}
-
-// UnbindOperator 解绑后台操作者。
-func (p *Clinician) UnbindOperator() {
-	p.operatorID = nil
 }
 
 // Activate 激活从业者。

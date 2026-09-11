@@ -10,6 +10,8 @@ github.com/FangcunMount/iam/v5 v5.0.0 h1:QepuDZTabhVBC2pL6zdgFhgAptNGJ0mRJ/Ld/J1
 github.com/FangcunMount/iam/v5 v5.0.0/go.mod h1:pExB3fi3/bm3tiKJWis1oP/jIGSmXhy7Wcv7MAc8zeo=
 github.com/FangcunMount/iam/v5 v5.0.1 h1:I0SAcbIUrlOwRizrJVyXs2acevfd/hEls+fSqHgUYSU=
 github.com/FangcunMount/iam/v5 v5.0.1/go.mod h1:pExB3fi3/bm3tiKJWis1oP/jIGSmXhy7Wcv7MAc8zeo=
+github.com/FangcunMount/iam/v5 v5.1.0 h1:oJZmFQUfXwiRNphx0ShzOOnF4+9SQl2HWxf/PTL8szo=
+github.com/FangcunMount/iam/v5 v5.1.0/go.mod h1:pExB3fi3/bm3tiKJWis1oP/jIGSmXhy7Wcv7MAc8zeo=
 github.com/KyleBanks/depth v1.2.1 h1:5h8fQADFrWtarTdtDudMmGsC7GPbOAu6RVB3ffsVFHc=
 github.com/KyleBanks/depth v1.2.1/go.mod h1:jzSb9d0L43HxTQfT+oSA1EEp2q+ne2uh6XgeJcm8brE=
 github.com/Microsoft/go-winio v0.6.2 h1:F2VQgta7ecxGYO8k3ZZz3RS8fVIXVxONVUPlNERoyfY=

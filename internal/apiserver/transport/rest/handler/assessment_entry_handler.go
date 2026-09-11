@@ -127,108 +127,6 @@ func (h *AssessmentEntryHandler) ListClinicianAssessmentEntries(c *gin.Context) 
 	h.Success(c, toAssessmentEntryListResponse(result, page, pageSize))
 }
 
-// CreateMyAssessmentEntry 创建当前从业者测评入口。
-// @Summary 创建当前从业者测评入口
-// @Tags AssessmentEntry
-// @Accept json
-// @Produce json
-// @Param Authorization header string true "Bearer 用户令牌"
-// @Param request body request.CreateAssessmentEntryRequest true "创建测评入口请求"
-// @Success 200 {object} core.Response
-// @Router /api/v1/clinicians/me/assessment-entries [post]
-func (h *AssessmentEntryHandler) CreateMyAssessmentEntry(c *gin.Context) {
-	clinicianItem, err := h.currentClinician(c)
-	if err != nil {
-		h.Error(c, err)
-		return
-	}
-
-	var req request.CreateAssessmentEntryRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		h.Error(c, err)
-		return
-	}
-
-	result, err := h.assessmentEntryService.Create(c.Request.Context(), assessmentEntryApp.CreateAssessmentEntryDTO{
-		OrgID:         clinicianItem.OrgID,
-		ClinicianID:   clinicianItem.ID,
-		TargetType:    req.TargetType,
-		TargetCode:    req.TargetCode,
-		TargetVersion: req.TargetVersion,
-		ExpiresAt:     flexibleTimePtrToTimePtr(req.ExpiresAt),
-	})
-	if err != nil {
-		h.Error(c, err)
-		return
-	}
-
-	qrCodeURL := h.generateAssessmentEntryQRCodeURL(c.Request.Context(), result.Token)
-	h.SuccessResponseWithMessage(c, "测评入口创建成功", toAssessmentEntryResponse(result, qrCodeURL))
-}
-
-// ListMyAssessmentEntries 查询当前从业者测评入口列表。
-// @Summary 查询当前从业者测评入口列表
-// @Tags AssessmentEntry
-// @Produce json
-// @Param Authorization header string true "Bearer 用户令牌"
-// @Success 200 {object} core.Response
-// @Router /api/v1/clinicians/me/assessment-entries [get]
-func (h *AssessmentEntryHandler) ListMyAssessmentEntries(c *gin.Context) {
-	clinicianItem, err := h.currentClinician(c)
-	if err != nil {
-		h.Error(c, err)
-		return
-	}
-
-	page, pageSize := paginationFromContext(c)
-	result, err := h.assessmentEntryService.ListByClinician(c.Request.Context(), assessmentEntryApp.ListAssessmentEntryDTO{
-		OrgID:       clinicianItem.OrgID,
-		ClinicianID: clinicianItem.ID,
-		Offset:      (page - 1) * pageSize,
-		Limit:       pageSize,
-	})
-	if err != nil {
-		h.Error(c, err)
-		return
-	}
-
-	h.Success(c, toAssessmentEntryListResponse(result, page, pageSize))
-}
-
-// GetMyAssessmentEntry 获取当前从业者测评入口详情。
-// @Summary 获取当前从业者测评入口详情
-// @Tags AssessmentEntry
-// @Produce json
-// @Param Authorization header string true "Bearer 用户令牌"
-// @Param id path int true "测评入口ID"
-// @Success 200 {object} core.Response
-// @Router /api/v1/clinicians/me/assessment-entries/{id} [get]
-func (h *AssessmentEntryHandler) GetMyAssessmentEntry(c *gin.Context) {
-	clinicianItem, err := h.currentClinician(c)
-	if err != nil {
-		h.Error(c, err)
-		return
-	}
-
-	entryID, err := strconv.ParseUint(c.Param("id"), 10, 64)
-	if err != nil {
-		h.Error(c, err)
-		return
-	}
-
-	result, err := h.assessmentEntryService.GetByID(c.Request.Context(), entryID)
-	if err != nil {
-		h.Error(c, err)
-		return
-	}
-	if result.ClinicianID != clinicianItem.ID {
-		h.Error(c, errors.WithCode(code.ErrPermissionDenied, "assessment entry does not belong to current clinician"))
-		return
-	}
-
-	h.Success(c, toAssessmentEntryResponse(result, h.generateAssessmentEntryQRCodeURL(c.Request.Context(), result.Token)))
-}
-
 // GetAssessmentEntry 获取测评入口详情。
 // @Summary 获取测评入口详情
 // @Tags AssessmentEntry
@@ -282,30 +180,6 @@ func (h *AssessmentEntryHandler) DeactivateAssessmentEntry(c *gin.Context) {
 // @Router /api/v1/assessment-entries/{id}/reactivate [post]
 func (h *AssessmentEntryHandler) ReactivateAssessmentEntry(c *gin.Context) {
 	h.setAssessmentEntryActive(c, true)
-}
-
-// DeactivateMyAssessmentEntry 停用当前从业者测评入口。
-// @Summary 停用当前从业者测评入口
-// @Tags AssessmentEntry
-// @Produce json
-// @Param Authorization header string true "Bearer 用户令牌"
-// @Param id path int true "测评入口ID"
-// @Success 200 {object} core.Response
-// @Router /api/v1/clinicians/me/assessment-entries/{id}/deactivate [post]
-func (h *AssessmentEntryHandler) DeactivateMyAssessmentEntry(c *gin.Context) {
-	h.setMyAssessmentEntryActive(c, false)
-}
-
-// ReactivateMyAssessmentEntry 重新启用当前从业者测评入口。
-// @Summary 重新启用当前从业者测评入口
-// @Tags AssessmentEntry
-// @Produce json
-// @Param Authorization header string true "Bearer 用户令牌"
-// @Param id path int true "测评入口ID"
-// @Success 200 {object} core.Response
-// @Router /api/v1/clinicians/me/assessment-entries/{id}/reactivate [post]
-func (h *AssessmentEntryHandler) ReactivateMyAssessmentEntry(c *gin.Context) {
-	h.setMyAssessmentEntryActive(c, true)
 }
 
 // ResolveAssessmentEntry 解析公开测评入口。
@@ -368,36 +242,6 @@ func (h *AssessmentEntryHandler) generateAssessmentEntryQRCodeURL(ctx context.Co
 	return generated
 }
 
-func (h *AssessmentEntryHandler) currentClinician(c *gin.Context) (*clinicianApp.ClinicianResult, error) {
-	orgID, userID, err := h.RequireProtectedScope(c)
-	if err != nil {
-		return nil, err
-	}
-
-	operatorItem, err := h.operatorQueryService.GetByUser(c.Request.Context(), orgID, userID)
-	if err != nil {
-		logger.L(c.Request.Context()).Errorw("Failed to get operator for clinician",
-			"action", "current_clinician",
-			"org_id", orgID,
-			"user_id", userID,
-			"error", err.Error(),
-		)
-		return nil, err
-	}
-	if !operatorItem.IsActive {
-		return nil, errors.WithCode(code.ErrPermissionDenied, "operator is inactive")
-	}
-
-	clinicianItem, err := h.clinicianQueryService.GetByOperator(c.Request.Context(), orgID, operatorItem.ID)
-	if err != nil {
-		return nil, err
-	}
-	if !clinicianItem.IsActive {
-		return nil, errors.WithCode(code.ErrPermissionDenied, "clinician is inactive")
-	}
-	return clinicianItem, nil
-}
-
 func (h *AssessmentEntryHandler) setAssessmentEntryActive(c *gin.Context, active bool) {
 	orgID, operatorUserID, err := h.RequireProtectedScope(c)
 	if err != nil {
@@ -427,52 +271,6 @@ func (h *AssessmentEntryHandler) setAssessmentEntryActive(c *gin.Context, active
 	logger.L(c.Request.Context()).Infow("Assessment entry lifecycle changed",
 		"action", map[bool]string{true: "reactivate_assessment_entry", false: "deactivate_assessment_entry"}[active],
 		"org_id", orgID,
-		"assessment_entry_id", entryID,
-		"clinician_id", result.ClinicianID,
-		"operator_user_id", operatorUserID,
-		"is_active", result.IsActive,
-	)
-	if active {
-		h.SuccessResponseWithMessage(c, "测评入口已启用", toAssessmentEntryResponse(result, ""))
-		return
-	}
-	h.SuccessResponseWithMessage(c, "测评入口已停用", toAssessmentEntryResponse(result, ""))
-}
-
-func (h *AssessmentEntryHandler) setMyAssessmentEntryActive(c *gin.Context, active bool) {
-	clinicianItem, err := h.currentClinician(c)
-	if err != nil {
-		h.Error(c, err)
-		return
-	}
-	_, operatorUserID, err := h.RequireProtectedScope(c)
-	if err != nil {
-		h.Error(c, err)
-		return
-	}
-	entryID, err := strconv.ParseUint(c.Param("id"), 10, 64)
-	if err != nil {
-		h.Error(c, err)
-		return
-	}
-
-	var result *assessmentEntryApp.AssessmentEntryResult
-	if active {
-		result, err = h.assessmentEntryService.Reactivate(c.Request.Context(), entryID)
-	} else {
-		result, err = h.assessmentEntryService.Deactivate(c.Request.Context(), entryID)
-	}
-	if err != nil {
-		h.Error(c, err)
-		return
-	}
-	if result.ClinicianID != clinicianItem.ID {
-		h.Error(c, errors.WithCode(code.ErrPermissionDenied, "assessment entry does not belong to current clinician"))
-		return
-	}
-	logger.L(c.Request.Context()).Infow("Assessment entry lifecycle changed",
-		"action", map[bool]string{true: "reactivate_my_assessment_entry", false: "deactivate_my_assessment_entry"}[active],
-		"org_id", clinicianItem.OrgID,
 		"assessment_entry_id", entryID,
 		"clinician_id", result.ClinicianID,
 		"operator_user_id", operatorUserID,
@@ -532,15 +330,8 @@ func toClinicianSummaryResponse(item *assessmentEntryApp.ClinicianSummaryResult)
 		return nil
 	}
 
-	var operatorID *string
-	if item.OperatorID != nil {
-		value := strconv.FormatUint(*item.OperatorID, 10)
-		operatorID = &value
-	}
-
 	return &response.ClinicianSummaryResponse{
 		ID:                 strconv.FormatUint(item.ID, 10),
-		OperatorID:         operatorID,
 		Name:               item.Name,
 		Department:         item.Department,
 		Title:              item.Title,

@@ -110,6 +110,11 @@ jobs:
           QS_STORE_REQUIRE_MYSQL: 'true'
           QS_SERVER_TEST_MYSQL_DSN: 'root:root@tcp(127.0.0.1:3306)/mysql?parseTime=true'
         run: go test ./internal/apiserver/infra/mysql/actor/store -run TestMySQLStore -count=1 -v
+      - name: Verify operator retirement atomicity
+        env:
+          QS_OPERATOR_RETIREMENT_REQUIRE_MYSQL: 'true'
+          QS_SERVER_TEST_MYSQL_DSN: 'root:root@tcp(127.0.0.1:3306)/mysql?parseTime=true'
+        run: go test ./internal/apiserver/infra/mysql/actor/operatorretirement ./internal/apiserver/maintenance/operatorretire -count=1 -v
 
   runtime-closure-e2e:
     name: Seeddata Retirement and Current Runtime E2E

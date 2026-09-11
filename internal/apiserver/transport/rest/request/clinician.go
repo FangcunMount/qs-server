@@ -2,6 +2,7 @@ package request
 
 import (
 	"encoding/json"
+	"fmt"
 	"strings"
 	"time"
 
@@ -49,14 +50,13 @@ func (t *FlexibleTime) UnmarshalJSON(data []byte) error {
 
 // CreateClinicianRequest 创建从业者请求。
 type CreateClinicianRequest struct {
-	OrgID         int64    `json:"org_id"`
-	OperatorID    *meta.ID `json:"operator_id"`
-	Name          string   `json:"name" binding:"required"`
-	Department    string   `json:"department"`
-	Title         string   `json:"title"`
-	ClinicianType string   `json:"clinician_type" binding:"required"`
-	EmployeeCode  string   `json:"employee_code"`
-	IsActive      bool     `json:"is_active"`
+	OrgID         int64  `json:"org_id"`
+	Name          string `json:"name" binding:"required"`
+	Department    string `json:"department"`
+	Title         string `json:"title"`
+	ClinicianType string `json:"clinician_type" binding:"required"`
+	EmployeeCode  string `json:"employee_code"`
+	IsActive      bool   `json:"is_active"`
 }
 
 // UpdateClinicianRequest 更新从业者请求。
@@ -66,11 +66,6 @@ type UpdateClinicianRequest struct {
 	Title         string `json:"title"`
 	ClinicianType string `json:"clinician_type" binding:"required"`
 	EmployeeCode  string `json:"employee_code"`
-}
-
-// BindClinicianOperatorRequest 绑定从业者与后台操作者。
-type BindClinicianOperatorRequest struct {
-	OperatorID meta.ID `json:"operator_id" binding:"required"`
 }
 
 // ListClinicianRequest 从业者列表请求。
@@ -119,4 +114,42 @@ type IntakeByAssessmentEntryRequest struct {
 	Name      string     `json:"name" binding:"required"`
 	Gender    string     `json:"gender"`
 	Birthday  *time.Time `json:"birthday"`
+}
+
+func (r *CreateClinicianRequest) UnmarshalJSON(data []byte) error {
+	type plain CreateClinicianRequest
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal(data, &fields); err != nil {
+		return err
+	}
+	for _, key := range []string{"operator_id", "staff_id"} {
+		if _, exists := fields[key]; exists {
+			return fmt.Errorf("%s: clinician backend binding is retired", key)
+		}
+	}
+	var value plain
+	if err := json.Unmarshal(data, &value); err != nil {
+		return err
+	}
+	*r = CreateClinicianRequest(value)
+	return nil
+}
+
+func (r *UpdateClinicianRequest) UnmarshalJSON(data []byte) error {
+	type plain UpdateClinicianRequest
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal(data, &fields); err != nil {
+		return err
+	}
+	for _, key := range []string{"operator_id", "staff_id"} {
+		if _, exists := fields[key]; exists {
+			return fmt.Errorf("%s: clinician backend binding is retired", key)
+		}
+	}
+	var value plain
+	if err := json.Unmarshal(data, &value); err != nil {
+		return err
+	}
+	*r = UpdateClinicianRequest(value)
+	return nil
 }

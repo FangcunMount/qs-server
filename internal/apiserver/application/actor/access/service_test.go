@@ -6,7 +6,6 @@ import (
 
 	cberrors "github.com/FangcunMount/component-base/pkg/errors"
 	authzapp "github.com/FangcunMount/qs-server/internal/apiserver/application/authz"
-	domainRelation "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/relation"
 	actorreadmodel "github.com/FangcunMount/qs-server/internal/apiserver/port/actorreadmodel"
 	iambridge "github.com/FangcunMount/qs-server/internal/apiserver/port/iambridge"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
@@ -86,33 +85,17 @@ func TestResolveAccessScopeRejectsWhenSnapshotReaderMissing(t *testing.T) {
 	}
 }
 
-func TestValidateTesteeAccessUsesAccessGrantRelations(t *testing.T) {
-	operatorItem := actorreadmodel.OperatorRow{ID: 201, OrgID: 1, UserID: 101, Name: "operator", IsActive: true}
-	clinicianItem := actorreadmodel.ClinicianRow{ID: 301, OrgID: 1, Name: "clinician", IsActive: true}
-	testeeItem := actorreadmodel.TesteeRow{ID: 401, OrgID: 1, Name: "child"}
-
+func TestRetiredClinicianBindingDoesNotGrantCompanyDataScope(t *testing.T) {
 	relationRepo := &stubRelationReader{activeAllowed: true}
-	svc := NewTesteeAccessService(
-		&stubOperatorReader{item: operatorItem},
-		&stubClinicianReader{item: clinicianItem},
-		relationRepo,
-		&stubTesteeReader{item: testeeItem},
-		nil,
-	)
-
-	ctx := authzapp.WithSnapshot(context.Background(), &authzapp.Snapshot{})
-	if err := svc.ValidateTesteeAccess(ctx, 1, 101, 401); err != nil {
-		t.Fatalf("expected access validation to pass: %v", err)
+	svc := NewTesteeAccessService(&stubOperatorReader{item: actorreadmodel.OperatorRow{ID: 201, OrgID: 1, UserID: 101, IsActive: true}},
+		&stubClinicianReader{item: actorreadmodel.ClinicianRow{ID: 301, OrgID: 1, IsActive: true}}, relationRepo,
+		&stubTesteeReader{item: actorreadmodel.TesteeRow{ID: 401, OrgID: 1}}, nil)
+	ctx := authzapp.WithSnapshot(context.Background(), &authzapp.Snapshot{Permissions: []authzapp.Permission{{Resource: "qs:actor:collection:testees", Action: "read", Mode: authzapp.AuthorizationModeUnconditional}}})
+	if err := svc.ValidateTesteeAccess(ctx, 1, 101, 401); !cberrors.IsCode(err, code.ErrPermissionDenied) {
+		t.Fatalf("expected denial, got %v", err)
 	}
-
-	expected := accessRelationTypesToStrings(domainRelation.AccessGrantRelationTypes())
-	if len(relationRepo.lastRelationTypes) != len(expected) {
-		t.Fatalf("expected access validation to check %v, got %v", expected, relationRepo.lastRelationTypes)
-	}
-	for index := range expected {
-		if relationRepo.lastRelationTypes[index] != expected[index] {
-			t.Fatalf("expected access validation to check %v, got %v", expected, relationRepo.lastRelationTypes)
-		}
+	if len(relationRepo.lastRelationTypes) != 0 {
+		t.Fatal("retired binding was consulted")
 	}
 }
 

@@ -57,12 +57,12 @@ func (s *StringSliceCol) Scan(value interface{}) error {
 }
 
 // OperatorPO 后台操作者持久化对象
-// 兼容说明：底层表名仍为 `staff`，后续迁移前先保持存储结构稳定。
+// 兼容说明：底层表名仍为 `operator`，后续迁移前先保持存储结构稳定。
 type OperatorPO struct {
 	mysql.AuditFields
 
-	OrgID                  int64          `gorm:"column:org_id;not null;index:idx_org_id;uniqueIndex:uk_staff_org_user,priority:1"`
-	UserID                 int64          `gorm:"column:user_id;not null;index:idx_user_id;uniqueIndex:uk_staff_org_user,priority:2"`
+	OrgID                  int64          `gorm:"column:org_id;not null;index:idx_org_id;uniqueIndex:uk_operators_org_user,priority:1"`
+	UserID                 int64          `gorm:"column:user_id;not null;index:idx_user_id;uniqueIndex:uk_operators_org_user,priority:2"`
 	Roles                  StringSliceCol `gorm:"column:roles;type:json;not null"`
 	EffectiveRoles         StringSliceCol `gorm:"column:effective_roles;type:json;not null"`
 	AuthzPolicyVersion     int64          `gorm:"column:authz_policy_version;not null;default:0"`
@@ -76,7 +76,7 @@ type OperatorPO struct {
 
 // TableName 指定表名
 func (OperatorPO) TableName() string {
-	return "staff"
+	return "operators"
 }
 
 // ClinicianPO 业务从业者持久化对象。
@@ -85,7 +85,6 @@ type ClinicianPO struct {
 	mysql.AuditFields
 
 	OrgID         int64   `gorm:"column:org_id;not null;index:idx_org_id"`
-	OperatorID    *uint64 `gorm:"column:operator_id;type:bigint unsigned;index:idx_operator_id"`
 	Name          string  `gorm:"column:name;size:100;not null;index:idx_name"`
 	Department    string  `gorm:"column:department;size:100"`
 	Title         string  `gorm:"column:title;size:100"`

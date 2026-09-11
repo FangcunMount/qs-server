@@ -2,12 +2,12 @@ package operator
 
 import "time"
 
-// Operator 后台工作人员聚合根
+// Operator 运营操作人聚合根
 // 设计说明：
 // 1. Operator 是 IAM.User 在本 BC 的业务视图投影，不是完整的用户实体
 // 2. 持久化的核心目的：
 //   - 存储 direct/effective roles：GetAuthorizationSnapshot 的本地非权威投影
-//   - 多租户隔离：同一 IAM.User 在不同机构可能有不同角色
+//   - 公司成员身份：OrgID 表示公司；IAM 角色目前按 UserID 授予，不能推断为公司隔离授权
 //   - 审计追溯：操作记录用 ID 比 IAMUserID 更有业务语义
 //   - 性能优化：缓存常用字段（name），减少 RPC 调用
 //
@@ -19,8 +19,9 @@ import "time"
 //   - 审计字段由基础设施层（PO）处理
 //   - 任何授权判定必须使用请求期 IAM Snapshot/Check，不读取本地角色投影
 type Operator struct {
-	id                     ID     // 内部员工ID（主键）
-	orgID                  int64  // 所属机构（多租户隔离）
+	version                uint32
+	id                     ID     // 运营操作人ID（主键）
+	orgID                  int64  // 所属公司
 	userID                 int64  // 用户ID（外键，必须绑定）
 	roles                  []Role // IAM 直接角色的只读投影；列名为兼容保留
 	effectiveRoles         []Role
@@ -36,6 +37,7 @@ type Operator struct {
 // NewOperator 创建新的后台操作者
 func NewOperator(orgID int64, userID int64, name string) *Operator {
 	return &Operator{
+		version:        1,
 		orgID:          orgID,
 		userID:         userID,
 		name:           name,
@@ -47,7 +49,7 @@ func NewOperator(orgID int64, userID int64, name string) *Operator {
 
 // === Getter 访问方法 ===
 
-// ID 获取员工ID
+// ID 获取运营操作人ID
 func (s *Operator) ID() ID {
 	return s.id
 }
@@ -168,3 +170,6 @@ func (s *Operator) RestoreFromRepository(
 	s.phone = phone
 	s.isActive = isActive
 }
+
+func (s *Operator) Version() uint32               { return s.version }
+func (s *Operator) RestoreVersion(version uint32) { s.version = version }

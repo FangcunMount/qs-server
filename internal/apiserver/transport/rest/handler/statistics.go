@@ -134,30 +134,6 @@ func (h *StatisticsHandler) Clinician(c *gin.Context) {
 	h.Success(c, StatisticsClinicianDetailResponse{Item: value.Items[0], TimeRange: value.TimeRange, Freshness: value.Freshness})
 }
 
-// CurrentClinicianOverview godoc
-// @Summary 查询当前医生 Statistics 总览
-// @Tags Statistics
-// @Success 200 {object} core.Response{data=StatisticsClinicianDetailResponse}
-// @Failure 503 {object} core.ErrResponse
-// @Router /api/v2/statistics/clinicians/me/overview [get]
-func (h *StatisticsHandler) CurrentClinicianOverview(c *gin.Context) {
-	orgID, userID, err := h.RequireProtectedScope(c)
-	if err != nil {
-		h.Error(c, err)
-		return
-	}
-	value, err := h.read.Clinicians(c.Request.Context(), orgID, nil, &userID, statisticsFilter(c), 1, 1)
-	if err != nil {
-		h.Error(c, err)
-		return
-	}
-	if len(value.Items) == 0 {
-		h.Error(c, errors.WithCode(code.ErrPermissionDenied, "current operator is not an active clinician"))
-		return
-	}
-	h.Success(c, StatisticsClinicianDetailResponse{Item: value.Items[0], TimeRange: value.TimeRange, Freshness: value.Freshness})
-}
-
 // Entries godoc
 // @Summary 查询 Statistics 入口列表
 // @Tags Statistics
@@ -231,56 +207,6 @@ func (h *StatisticsHandler) Entry(c *gin.Context) {
 		return
 	}
 	h.Error(c, errors.WithCode(code.ErrPageNotFound, "entry not found"))
-}
-
-// CurrentClinicianEntries godoc
-// @Summary 查询当前医生 Statistics 入口
-// @Tags Statistics
-// @Success 200 {object} core.Response{data=statisticsApp.Page[statisticsApp.EntryItem]}
-// @Failure 503 {object} core.ErrResponse
-// @Router /api/v2/statistics/clinicians/me/entries [get]
-func (h *StatisticsHandler) CurrentClinicianEntries(c *gin.Context) {
-	orgID, userID, err := h.RequireProtectedScope(c)
-	if err != nil {
-		h.Error(c, err)
-		return
-	}
-	clinicianID, err := h.read.CurrentClinicianID(c.Request.Context(), orgID, userID)
-	if err != nil {
-		h.Error(c, err)
-		return
-	}
-	page, size, err := parseStatisticsPage(c)
-	if err != nil {
-		h.Error(c, err)
-		return
-	}
-	value, err := h.read.Entries(c.Request.Context(), orgID, nil, &clinicianID, nil, statisticsFilter(c), page, size)
-	if err != nil {
-		h.Error(c, err)
-		return
-	}
-	h.Success(c, value)
-}
-
-// CurrentClinicianTestees godoc
-// @Summary 查询当前医生 Statistics 受试者摘要
-// @Tags Statistics
-// @Success 200 {object} core.Response{data=statisticsApp.TesteeSummary}
-// @Failure 503 {object} core.ErrResponse
-// @Router /api/v2/statistics/clinicians/me/testees-summary [get]
-func (h *StatisticsHandler) CurrentClinicianTestees(c *gin.Context) {
-	orgID, userID, err := h.RequireProtectedScope(c)
-	if err != nil {
-		h.Error(c, err)
-		return
-	}
-	value, err := h.read.CurrentClinicianTesteeSummary(c.Request.Context(), orgID, userID, statisticsFilter(c))
-	if err != nil {
-		h.Error(c, err)
-		return
-	}
-	h.Success(c, value)
 }
 
 type StatisticsContentRequest struct {

@@ -69,6 +69,7 @@ type OperatorFilter struct {
 }
 
 type OperatorRow struct {
+	Version                uint32
 	ID                     uint64
 	OrgID                  int64
 	UserID                 int64
@@ -103,7 +104,6 @@ type ClinicianRow struct {
 	Version              uint32
 	ID                   uint64
 	OrgID                int64
-	OperatorID           *uint64
 	Name                 string
 	Department           string
 	Title                string
@@ -114,7 +114,6 @@ type ClinicianRow struct {
 
 type ClinicianReader interface {
 	GetClinician(ctx context.Context, id uint64) (*ClinicianRow, error)
-	FindClinicianByOperator(ctx context.Context, orgID int64, operatorID uint64) (*ClinicianRow, error)
 	ListClinicians(ctx context.Context, filter ClinicianFilter) ([]ClinicianRow, error)
 	CountClinicians(ctx context.Context, filter ClinicianFilter) (int64, error)
 }

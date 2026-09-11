@@ -53,6 +53,10 @@ tags:
   description: Interpretation-Operations
 - name: NormTable
   description: NormTable
+- name: Operator
+  description: Operator
+- name: Operators
+  description: Operators
 - name: Plan-Enrollment
   description: Plan-Enrollment
 - name: Plan-Lifecycle
@@ -69,8 +73,6 @@ tags:
   description: 问卷生命周期
 - name: Questionnaire-Query
   description: 问卷查询
-- name: Staff
-  description: Staff
 - name: Statistics
   description: Statistics
 - name: Statistics-Internal
@@ -85,8 +87,6 @@ tags:
   description: Task-Scheduler
 - name: Workbench
   description: Workbench
-- name: clinicians
-  description: clinicians
 - name: health
   description: health
 - name: 受试者
@@ -2064,330 +2064,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/core.ErrResponse'
-  /api/v1/clinicians/me:
-    get:
-      tags:
-      - Clinician
-      summary: 获取当前从业者信息
-      operationId: 获取当前从业者信息
-      description: 获取当前从业者信息
-      parameters:
-      - type: string
-        description: Bearer 用户令牌
-        name: Authorization
-        in: header
-        required: true
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/core.Response'
-        '401':
-          description: 认证失败或访问令牌无效
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/core.ErrResponse'
-        '403':
-          description: 无权访问该资源
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/core.ErrResponse'
-        '500':
-          description: 服务内部错误
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/core.ErrResponse'
-  /api/v1/clinicians/me/assessment-entries:
-    get:
-      tags:
-      - AssessmentEntry
-      summary: 查询当前从业者测评入口列表
-      operationId: 查询当前从业者测评入口列表
-      description: 查询当前从业者测评入口列表
-      parameters:
-      - type: string
-        description: Bearer 用户令牌
-        name: Authorization
-        in: header
-        required: true
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/core.Response'
-        '401':
-          description: 认证失败或访问令牌无效
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/core.ErrResponse'
-        '403':
-          description: 无权访问该资源
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/core.ErrResponse'
-        '500':
-          description: 服务内部错误
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/core.ErrResponse'
-    post:
-      tags:
-      - AssessmentEntry
-      summary: 创建当前从业者测评入口
-      operationId: 创建当前从业者测评入口
-      description: 创建当前从业者测评入口
-      parameters:
-      - type: string
-        description: Bearer 用户令牌
-        name: Authorization
-        in: header
-        required: true
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/request.CreateAssessmentEntryRequest'
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/core.Response'
-        '401':
-          description: 认证失败或访问令牌无效
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/core.ErrResponse'
-        '403':
-          description: 无权访问该资源
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/core.ErrResponse'
-        '500':
-          description: 服务内部错误
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/core.ErrResponse'
-  /api/v1/clinicians/me/assessment-entries/{id}:
-    get:
-      tags:
-      - AssessmentEntry
-      summary: 获取当前从业者测评入口详情
-      operationId: 获取当前从业者测评入口详情
-      description: 获取当前从业者测评入口详情
-      parameters:
-      - type: string
-        description: Bearer 用户令牌
-        name: Authorization
-        in: header
-        required: true
-      - type: integer
-        description: 测评入口ID
-        name: id
-        in: path
-        required: true
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/core.Response'
-        '401':
-          description: 认证失败或访问令牌无效
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/core.ErrResponse'
-        '403':
-          description: 无权访问该资源
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/core.ErrResponse'
-        '500':
-          description: 服务内部错误
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/core.ErrResponse'
-  /api/v1/clinicians/me/assessment-entries/{id}/deactivate:
-    post:
-      tags:
-      - AssessmentEntry
-      summary: 停用当前从业者测评入口
-      operationId: 停用当前从业者测评入口
-      description: 停用当前从业者测评入口
-      parameters:
-      - type: string
-        description: Bearer 用户令牌
-        name: Authorization
-        in: header
-        required: true
-      - type: integer
-        description: 测评入口ID
-        name: id
-        in: path
-        required: true
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/core.Response'
-        '401':
-          description: 认证失败或访问令牌无效
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/core.ErrResponse'
-        '403':
-          description: 无权访问该资源
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/core.ErrResponse'
-        '500':
-          description: 服务内部错误
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/core.ErrResponse'
-  /api/v1/clinicians/me/assessment-entries/{id}/reactivate:
-    post:
-      tags:
-      - AssessmentEntry
-      summary: 重新启用当前从业者测评入口
-      operationId: 重新启用当前从业者测评入口
-      description: 重新启用当前从业者测评入口
-      parameters:
-      - type: string
-        description: Bearer 用户令牌
-        name: Authorization
-        in: header
-        required: true
-      - type: integer
-        description: 测评入口ID
-        name: id
-        in: path
-        required: true
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/core.Response'
-        '401':
-          description: 认证失败或访问令牌无效
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/core.ErrResponse'
-        '403':
-          description: 无权访问该资源
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/core.ErrResponse'
-        '500':
-          description: 服务内部错误
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/core.ErrResponse'
-  /api/v1/clinicians/me/relations:
-    get:
-      tags:
-      - Clinician
-      summary: 查询当前从业者关系列表
-      operationId: 查询当前从业者关系列表
-      description: 查询当前从业者关系列表
-      parameters:
-      - type: string
-        description: Bearer 用户令牌
-        name: Authorization
-        in: header
-        required: true
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/core.Response'
-        '401':
-          description: 认证失败或访问令牌无效
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/core.ErrResponse'
-        '403':
-          description: 无权访问该资源
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/core.ErrResponse'
-        '500':
-          description: 服务内部错误
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/core.ErrResponse'
-  /api/v1/clinicians/me/testees:
-    get:
-      tags:
-      - Clinician
-      summary: 查询当前从业者受试者列表
-      operationId: 查询当前从业者受试者列表
-      description: 查询当前从业者受试者列表
-      parameters:
-      - type: string
-        description: Bearer 用户令牌
-        name: Authorization
-        in: header
-        required: true
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/core.Response'
-        '401':
-          description: 认证失败或访问令牌无效
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/core.ErrResponse'
-        '403':
-          description: 无权访问该资源
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/core.ErrResponse'
-        '500':
-          description: 服务内部错误
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/core.ErrResponse'
   /api/v1/clinicians/me/testees/{testee_id}/reports:
     get:
       tags:
@@ -2471,89 +2147,6 @@ paths:
                   properties:
                     data:
                       $ref: '#/components/schemas/response.ReportResponse'
-        '401':
-          description: 认证失败或访问令牌无效
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/core.ErrResponse'
-        '403':
-          description: 无权访问该资源
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/core.ErrResponse'
-        '500':
-          description: 服务内部错误
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/core.ErrResponse'
-  /api/v1/clinicians/me/workbench/queues/summary:
-    get:
-      tags:
-      - clinicians
-      summary: 获取当前医生工作台队列统计
-      description: 返回当前医生名下高风险、复诊、重点关注队列数量。队列由最新测评风险、开放任务、重点关注字段动态生成，不以用户标签为事实来源。
-      security:
-      - BearerAuth: []
-      operationId: 获取当前医生工作台队列统计
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/response.ClinicianWorkbenchQueueSummaryResponse'
-        '401':
-          description: 认证失败或访问令牌无效
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/core.ErrResponse'
-        '403':
-          description: 无权访问该资源
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/core.ErrResponse'
-        '500':
-          description: 服务内部错误
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/core.ErrResponse'
-  /api/v1/clinicians/me/workbench/queues/{queue_type}:
-    get:
-      tags:
-      - clinicians
-      summary: 获取当前医生工作台队列
-      description: queue_type 取值：high_risk、follow_up、key_focus。high_risk 使用最近一次有效测评风险，follow_up
-        返回每名受试者最紧急的待开放或已开放任务，key_focus 使用重点关注字段。
-      security:
-      - BearerAuth: []
-      operationId: 获取当前医生工作台队列
-      parameters:
-      - type: string
-        description: 队列类型：high_risk/follow_up/key_focus
-        name: queue_type
-        in: path
-        required: true
-      - type: integer
-        description: 页码，默认 1
-        name: page
-        in: query
-      - type: integer
-        description: 每页数量，默认 20，最大 100
-        name: page_size
-        in: query
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/response.ClinicianWorkbenchQueueResponse'
         '401':
           description: 认证失败或访问令牌无效
           content:
@@ -2797,55 +2390,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/core.ErrResponse'
-  /api/v1/clinicians/{id}/bind-operator:
-    post:
-      tags:
-      - Clinician
-      summary: 绑定操作员
-      operationId: 绑定操作员
-      description: 绑定操作员
-      parameters:
-      - type: string
-        description: Bearer 用户令牌
-        name: Authorization
-        in: header
-        required: true
-      - type: integer
-        description: 从业者ID
-        name: id
-        in: path
-        required: true
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/request.BindClinicianOperatorRequest'
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/core.Response'
-        '401':
-          description: 认证失败或访问令牌无效
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/core.ErrResponse'
-        '403':
-          description: 无权访问该资源
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/core.ErrResponse'
-        '500':
-          description: 服务内部错误
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/core.ErrResponse'
   /api/v1/clinicians/{id}/deactivate:
     post:
       tags:
@@ -3053,49 +2597,6 @@ paths:
       summary: 查询从业者受试者列表
       operationId: 查询从业者受试者列表
       description: 查询从业者受试者列表
-      parameters:
-      - type: string
-        description: Bearer 用户令牌
-        name: Authorization
-        in: header
-        required: true
-      - type: integer
-        description: 从业者ID
-        name: id
-        in: path
-        required: true
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/core.Response'
-        '401':
-          description: 认证失败或访问令牌无效
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/core.ErrResponse'
-        '403':
-          description: 无权访问该资源
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/core.ErrResponse'
-        '500':
-          description: 服务内部错误
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/core.ErrResponse'
-  /api/v1/clinicians/{id}/unbind-operator:
-    post:
-      tags:
-      - Clinician
-      summary: 解绑操作员
-      operationId: 解绑操作员
-      description: 解绑操作员
       parameters:
       - type: string
         description: Bearer 用户令牌
@@ -4027,6 +3528,265 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/core.Response'
+        '401':
+          description: 认证失败或访问令牌无效
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '403':
+          description: 无权访问该资源
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '500':
+          description: 服务内部错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+  /api/v1/operators:
+    get:
+      tags:
+      - Operator
+      summary: 查询员工列表
+      operationId: 查询员工列表
+      description: 查询员工列表
+      parameters:
+      - type: string
+        description: Bearer 用户令牌
+        name: Authorization
+        in: header
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.Response'
+        '401':
+          description: 认证失败或访问令牌无效
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '403':
+          description: 无权访问该资源
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '500':
+          description: 服务内部错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+    post:
+      tags:
+      - Operator
+      summary: 创建员工
+      operationId: 创建员工
+      description: 创建员工
+      parameters:
+      - type: string
+        description: Bearer 用户令牌
+        name: Authorization
+        in: header
+        required: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/request.CreateOperatorRequest'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.Response'
+        '401':
+          description: 认证失败或访问令牌无效
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '403':
+          description: 无权访问该资源
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '500':
+          description: 服务内部错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+  /api/v1/operators/{id}:
+    get:
+      tags:
+      - Operator
+      summary: 获取员工详情
+      operationId: 获取员工详情
+      description: 获取员工详情
+      parameters:
+      - type: string
+        description: Bearer 用户令牌
+        name: Authorization
+        in: header
+        required: true
+      - type: integer
+        description: 员工ID
+        name: id
+        in: path
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.Response'
+        '401':
+          description: 认证失败或访问令牌无效
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '403':
+          description: 无权访问该资源
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '500':
+          description: 服务内部错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+    put:
+      tags:
+      - Operator
+      summary: 更新员工
+      operationId: 更新员工
+      description: 更新员工
+      parameters:
+      - type: string
+        description: Bearer 用户令牌
+        name: Authorization
+        in: header
+        required: true
+      - type: integer
+        description: 员工ID
+        name: id
+        in: path
+        required: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/request.UpdateOperatorRequest'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.Response'
+        '401':
+          description: 认证失败或访问令牌无效
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '403':
+          description: 无权访问该资源
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '500':
+          description: 服务内部错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+    delete:
+      tags:
+      - Operators
+      summary: 退出运营操作人
+      operationId: 退出运营操作人
+      description: 退出运营操作人
+      parameters:
+      - type: string
+        description: Operator ID
+        name: id
+        in: path
+        required: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/handler.RetireOperatorRequest'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/handler.OperatorRetirementResponse'
+        '202':
+          description: Accepted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/handler.OperatorRetirementResponse'
+        '401':
+          description: 认证失败或访问令牌无效
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '403':
+          description: 无权访问该资源
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '500':
+          description: 服务内部错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+  /api/v1/operators/{id}/retirement:
+    get:
+      tags:
+      - Operators
+      summary: 查询运营操作人退出状态
+      operationId: 查询运营操作人退出状态
+      description: 查询运营操作人退出状态
+      parameters:
+      - type: string
+        description: Operator ID
+        name: id
+        in: path
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/handler.OperatorRetirementResponse'
         '401':
           description: 认证失败或访问令牌无效
           content:
@@ -5959,220 +5719,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/core.ErrResponse'
-  /api/v1/staff:
-    get:
-      tags:
-      - Staff
-      summary: 查询员工列表
-      operationId: 查询员工列表
-      description: 查询员工列表
-      parameters:
-      - type: string
-        description: Bearer 用户令牌
-        name: Authorization
-        in: header
-        required: true
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/core.Response'
-        '401':
-          description: 认证失败或访问令牌无效
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/core.ErrResponse'
-        '403':
-          description: 无权访问该资源
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/core.ErrResponse'
-        '500':
-          description: 服务内部错误
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/core.ErrResponse'
-    post:
-      tags:
-      - Staff
-      summary: 创建员工
-      operationId: 创建员工
-      description: 创建员工
-      parameters:
-      - type: string
-        description: Bearer 用户令牌
-        name: Authorization
-        in: header
-        required: true
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/request.CreateStaffRequest'
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/core.Response'
-        '401':
-          description: 认证失败或访问令牌无效
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/core.ErrResponse'
-        '403':
-          description: 无权访问该资源
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/core.ErrResponse'
-        '500':
-          description: 服务内部错误
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/core.ErrResponse'
-  /api/v1/staff/{id}:
-    get:
-      tags:
-      - Staff
-      summary: 获取员工详情
-      operationId: 获取员工详情
-      description: 获取员工详情
-      parameters:
-      - type: string
-        description: Bearer 用户令牌
-        name: Authorization
-        in: header
-        required: true
-      - type: integer
-        description: 员工ID
-        name: id
-        in: path
-        required: true
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/core.Response'
-        '401':
-          description: 认证失败或访问令牌无效
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/core.ErrResponse'
-        '403':
-          description: 无权访问该资源
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/core.ErrResponse'
-        '500':
-          description: 服务内部错误
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/core.ErrResponse'
-    put:
-      tags:
-      - Staff
-      summary: 更新员工
-      operationId: 更新员工
-      description: 更新员工
-      parameters:
-      - type: string
-        description: Bearer 用户令牌
-        name: Authorization
-        in: header
-        required: true
-      - type: integer
-        description: 员工ID
-        name: id
-        in: path
-        required: true
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/request.UpdateStaffRequest'
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/core.Response'
-        '401':
-          description: 认证失败或访问令牌无效
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/core.ErrResponse'
-        '403':
-          description: 无权访问该资源
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/core.ErrResponse'
-        '500':
-          description: 服务内部错误
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/core.ErrResponse'
-    delete:
-      tags:
-      - Staff
-      summary: 删除员工
-      operationId: 删除员工
-      description: 删除员工
-      parameters:
-      - type: string
-        description: Bearer 用户令牌
-        name: Authorization
-        in: header
-        required: true
-      - type: integer
-        description: 员工ID
-        name: id
-        in: path
-        required: true
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/core.Response'
-        '401':
-          description: 认证失败或访问令牌无效
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/core.ErrResponse'
-        '403':
-          description: 无权访问该资源
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/core.ErrResponse'
-        '500':
-          description: 服务内部错误
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/core.ErrResponse'
   /api/v1/stores:
     get:
       tags:
@@ -7451,135 +6997,6 @@ paths:
                   properties:
                     data:
                       $ref: '#/components/schemas/statistics.Page-statistics_ClinicianItem'
-        '503':
-          description: Service Unavailable
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/core.ErrResponse'
-        '401':
-          description: 认证失败或访问令牌无效
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/core.ErrResponse'
-        '403':
-          description: 无权访问该资源
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/core.ErrResponse'
-        '500':
-          description: 服务内部错误
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/core.ErrResponse'
-  /api/v2/statistics/clinicians/me/entries:
-    get:
-      tags:
-      - Statistics
-      summary: 查询当前医生 Statistics 入口
-      operationId: 查询当前医生Statistics入口
-      description: 查询当前医生 Statistics 入口
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                allOf:
-                - $ref: '#/components/schemas/core.Response'
-                - type: object
-                  properties:
-                    data:
-                      $ref: '#/components/schemas/statistics.Page-statistics_EntryItem'
-        '503':
-          description: Service Unavailable
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/core.ErrResponse'
-        '401':
-          description: 认证失败或访问令牌无效
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/core.ErrResponse'
-        '403':
-          description: 无权访问该资源
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/core.ErrResponse'
-        '500':
-          description: 服务内部错误
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/core.ErrResponse'
-  /api/v2/statistics/clinicians/me/overview:
-    get:
-      tags:
-      - Statistics
-      summary: 查询当前医生 Statistics 总览
-      operationId: 查询当前医生Statistics总览
-      description: 查询当前医生 Statistics 总览
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                allOf:
-                - $ref: '#/components/schemas/core.Response'
-                - type: object
-                  properties:
-                    data:
-                      $ref: '#/components/schemas/handler.StatisticsClinicianDetailResponse'
-        '503':
-          description: Service Unavailable
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/core.ErrResponse'
-        '401':
-          description: 认证失败或访问令牌无效
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/core.ErrResponse'
-        '403':
-          description: 无权访问该资源
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/core.ErrResponse'
-        '500':
-          description: 服务内部错误
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/core.ErrResponse'
-  /api/v2/statistics/clinicians/me/testees-summary:
-    get:
-      tags:
-      - Statistics
-      summary: 查询当前医生 Statistics 受试者摘要
-      operationId: 查询当前医生Statistics受试者摘要
-      description: 查询当前医生 Statistics 受试者摘要
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                allOf:
-                - $ref: '#/components/schemas/core.Response'
-                - type: object
-                  properties:
-                    data:
-                      $ref: '#/components/schemas/statistics.TesteeSummary'
         '503':
           description: Service Unavailable
           content:
@@ -13005,6 +12422,38 @@ components:
           type: string
         version:
           type: string
+    handler.OperatorRetirementResponse:
+      type: object
+      properties:
+        expected_version:
+          type: integer
+        needs_attention:
+          type: boolean
+        operator_id:
+          type: string
+        policy_version:
+          type: integer
+        reason:
+          type: string
+        request_id:
+          type: string
+        stage:
+          type: string
+    handler.RetireOperatorRequest:
+      type: object
+      required:
+      - expected_version
+      - reason
+      - request_id
+      properties:
+        expected_version:
+          type: integer
+        reason:
+          type: string
+          maxLength: 500
+        request_id:
+          type: string
+          maxLength: 64
     handler.StatisticsClinicianDetailResponse:
       type: object
       properties:
@@ -13928,13 +13377,6 @@ components:
           type: string
         questionnaire_version:
           type: string
-    request.BindClinicianOperatorRequest:
-      type: object
-      required:
-      - operator_id
-      properties:
-        operator_id:
-          $ref: '#/components/schemas/meta.ID'
     request.CreateAssessmentEntryRequest:
       type: object
       required:
@@ -14007,12 +13449,42 @@ components:
           type: boolean
         name:
           type: string
-        operator_id:
-          $ref: '#/components/schemas/meta.ID'
         org_id:
           type: integer
         title:
           type: string
+    request.CreateOperatorRequest:
+      type: object
+      required:
+      - name
+      properties:
+        email:
+          description: 邮箱
+          type: string
+        is_active:
+          description: 是否激活
+          type: boolean
+        name:
+          description: 姓名
+          type: string
+        org_id:
+          description: 兼容字段：机构ID
+          type: integer
+        password:
+          description: 新建 IAM 运营账号时的初始密码
+          type: string
+        phone:
+          description: 电话
+          type: string
+        roles:
+          description: 期望授予的角色列表（IAM 启用时转成 assignment）
+          type: array
+          items:
+            type: string
+        user_id:
+          description: IAM用户ID（优先使用）
+          allOf:
+          - $ref: '#/components/schemas/meta.ID'
     request.CreatePlanRequest:
       type: object
       properties:
@@ -14050,38 +13522,6 @@ components:
           type: string
         type:
           type: string
-    request.CreateStaffRequest:
-      type: object
-      required:
-      - name
-      properties:
-        email:
-          description: 邮箱
-          type: string
-        is_active:
-          description: 是否激活
-          type: boolean
-        name:
-          description: 姓名
-          type: string
-        org_id:
-          description: 兼容字段：机构ID
-          type: integer
-        password:
-          description: 新建 IAM 运营账号时的初始密码
-          type: string
-        phone:
-          description: 电话
-          type: string
-        roles:
-          description: 期望授予的角色列表（IAM 启用时转成 assignment）
-          type: array
-          items:
-            type: string
-        user_id:
-          description: IAM用户ID（优先使用）
-          allOf:
-          - $ref: '#/components/schemas/meta.ID'
     request.CreateStoreRequest:
       type: object
       required:
@@ -14308,6 +13748,26 @@ components:
           type: string
         title:
           type: string
+    request.UpdateOperatorRequest:
+      type: object
+      properties:
+        email:
+          description: 邮箱
+          type: string
+        is_active:
+          description: 是否激活
+          type: boolean
+        name:
+          description: 姓名
+          type: string
+        phone:
+          description: 电话
+          type: string
+        roles:
+          description: 角色列表
+          type: array
+          items:
+            type: string
     request.UpdateQuestionRequest:
       type: object
       properties:
@@ -14336,26 +13796,6 @@ components:
           type: string
         type:
           type: string
-    request.UpdateStaffRequest:
-      type: object
-      properties:
-        email:
-          description: 邮箱
-          type: string
-        is_active:
-          description: 是否激活
-          type: boolean
-        name:
-          description: 姓名
-          type: string
-        phone:
-          description: 电话
-          type: string
-        roles:
-          description: 角色列表
-          type: array
-          items:
-            type: string
     request.UpdateStoreRequest:
       type: object
       required:
@@ -14910,8 +14350,6 @@ components:
           type: string
         name:
           type: string
-        operator_id:
-          type: string
         org_id:
           type: string
         relation_type:
@@ -14940,8 +14378,6 @@ components:
         is_active_label:
           type: string
         name:
-          type: string
-        operator_id:
           type: string
         org_id:
           type: string
@@ -16595,8 +16031,6 @@ components:
           type: boolean
         name:
           type: string
-        operator_id:
-          type: integer
         outcome_committed_count:
           type: integer
         primary_testee_count:
@@ -17020,25 +16454,6 @@ components:
       - RunStatusFailed
       - RunStatusDataCommitted
       - RunStatusSucceeded
-    statistics.TesteeSummary:
-      type: object
-      properties:
-        assessed_in_window_count:
-          type: integer
-        attending_testee_count:
-          type: integer
-        collaborator_testee_count:
-          type: integer
-        freshness:
-          $ref: '#/components/schemas/statistics.Freshness'
-        key_focus_testee_count:
-          type: integer
-        primary_testee_count:
-          type: integer
-        time_range:
-          $ref: '#/components/schemas/statistics.DateRange'
-        total_accessible_testees:
-          type: integer
     systemgovernance.ActionDescriptor:
       type: object
       properties:

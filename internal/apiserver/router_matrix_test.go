@@ -172,21 +172,14 @@ func TestRouterRegisterRoutesIncludesKeyPaths(t *testing.T) {
 	assertRoutePresent(t, routes, http.MethodGet, "/api/v1/clinicians")
 	assertRoutePresent(t, routes, http.MethodGet, "/api/v1/workbench/queues/summary")
 	assertRoutePresent(t, routes, http.MethodGet, "/api/v1/workbench/queues/:queue_type")
-	assertRoutePresent(t, routes, http.MethodGet, "/api/v1/clinicians/me/workbench/queues/summary")
-	assertRoutePresent(t, routes, http.MethodGet, "/api/v1/clinicians/me/workbench/queues/:queue_type")
 	assertRoutePresent(t, routes, http.MethodGet, "/api/v1/practitioners")
-	assertRoutePresent(t, routes, http.MethodGet, "/api/v1/practitioners/me/workbench/queues/summary")
-	assertRoutePresent(t, routes, http.MethodGet, "/api/v1/practitioners/me/workbench/queues/:queue_type")
-	assertRoutePresent(t, routes, http.MethodGet, "/api/v1/staff")
+	assertRoutePresent(t, routes, http.MethodGet, "/api/v1/operators")
 	assertRoutePresent(t, routes, http.MethodGet, "/api/v1/assessment-entries/:id")
 	assertRoutePresent(t, routes, http.MethodGet, "/api/v2/statistics/overview")
 	assertRoutePresent(t, routes, http.MethodGet, "/api/v2/statistics/clinicians")
 	assertRoutePresent(t, routes, http.MethodGet, "/api/v2/statistics/clinicians/:id")
 	assertRoutePresent(t, routes, http.MethodGet, "/api/v2/statistics/entries")
 	assertRoutePresent(t, routes, http.MethodGet, "/api/v2/statistics/entries/:id")
-	assertRoutePresent(t, routes, http.MethodGet, "/api/v2/statistics/clinicians/me/overview")
-	assertRoutePresent(t, routes, http.MethodGet, "/api/v2/statistics/clinicians/me/entries")
-	assertRoutePresent(t, routes, http.MethodGet, "/api/v2/statistics/clinicians/me/testees-summary")
 	assertRoutePresent(t, routes, http.MethodPost, "/api/v2/statistics/contents/batch")
 	assertRouteAbsent(t, routes, http.MethodGet, "/api/v1/statistics/overview")
 	assertRoutePresent(t, routes, http.MethodGet, "/api/v1/testees/:id/plans")
@@ -561,6 +554,11 @@ func loadRouterMatrixOpenAPI(t *testing.T, path string) routerMatrixOpenAPISpec 
 }
 
 func routeMustBeDocumented(route gin.RouteInfo) bool {
+	// Tombstones are verified for 410 without dependencies in routes_actor_retired_test.
+	if strings.HasSuffix(route.Handler, ".retiredClinicianAPI") || strings.HasSuffix(route.Handler, ".retiredOperatorAPI") {
+		return false
+	}
+
 	if route.Method != http.MethodGet &&
 		route.Method != http.MethodPost &&
 		route.Method != http.MethodPut &&

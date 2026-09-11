@@ -5,10 +5,10 @@ import "context"
 // Repository 员工仓储接口
 type Repository interface {
 	// Save 保存员工
-	Save(ctx context.Context, staff *Operator) error
+	Save(ctx context.Context, operator *Operator) error
 
 	// Update 更新员工
-	Update(ctx context.Context, staff *Operator) error
+	Update(ctx context.Context, operator *Operator) error
 
 	// FindByID 根据ID查找员工
 	FindByID(ctx context.Context, id ID) (*Operator, error)

@@ -57,6 +57,10 @@ func (r *Router) actorHandlers() actorHandlers {
 	return handlers
 }
 
+func retiredOperatorAPI(c *gin.Context) {
+	c.JSON(410, gin.H{"code": 410, "message": "Operator API retired; use /api/v1/operators"})
+}
+
 func (r *Router) registerActorPublicRoutes(publicAPI *gin.RouterGroup) {
 	handlers := r.actorHandlers()
 	if handlers.assessmentEntry == nil {
@@ -69,6 +73,15 @@ func (r *Router) registerActorPublicRoutes(publicAPI *gin.RouterGroup) {
 
 // registerActorProtectedRoutes 注册 Actor 模块相关的受保护路由。
 func (r *Router) registerActorProtectedRoutes(apiV1 *gin.RouterGroup) {
+	for _, prefix := range []string{"/clinicians", "/practitioners"} {
+		apiV1.Any(prefix+"/me", retiredClinicianAPI)
+		apiV1.Any(prefix+"/me/*path", retiredClinicianAPI)
+		apiV1.Any(prefix+"/:id/bind-operator", retiredClinicianAPI)
+		apiV1.Any(prefix+"/:id/unbind-operator", retiredClinicianAPI)
+	}
+
+	apiV1.Any("/staff", retiredOperatorAPI)
+	apiV1.Any("/staff/:id", retiredOperatorAPI)
 	handlers := r.actorHandlers()
 	testeeHandler := handlers.testee
 	operatorClinicianHandler := handlers.operatorClinician
@@ -105,14 +118,16 @@ func (r *Router) registerActorProtectedRoutes(apiV1 *gin.RouterGroup) {
 	}
 
 	if operatorClinicianHandler != nil {
-		staff := apiV1.Group("/staff", restmiddleware.RequireCapabilityMiddleware(restmiddleware.CapabilityOrgAdmin))
+		operators := apiV1.Group("/operators", restmiddleware.RequireCapabilityMiddleware(restmiddleware.CapabilityOrgAdmin))
 		{
-			staff.POST("", r.rateLimitedHandlers(rateLimitBudgetSubmit, operatorClinicianHandler.CreateStaff)...)
-			staff.GET("", r.rateLimitedHandlers(rateLimitBudgetQuery, operatorClinicianHandler.ListStaff)...)
-			staff.GET("/:id", r.rateLimitedHandlers(rateLimitBudgetQuery, operatorClinicianHandler.GetStaff)...)
-			staff.PUT("/:id", r.rateLimitedHandlers(rateLimitBudgetSubmit, operatorClinicianHandler.UpdateStaff)...)
-			staff.DELETE("/:id", r.rateLimitedHandlers(rateLimitBudgetSubmit, operatorClinicianHandler.DeleteStaff)...)
+			operators.POST("", r.rateLimitedHandlers(rateLimitBudgetSubmit, operatorClinicianHandler.CreateOperator)...)
+			operators.GET("", r.rateLimitedHandlers(rateLimitBudgetQuery, operatorClinicianHandler.ListOperator)...)
+			operators.GET("/:id", r.rateLimitedHandlers(rateLimitBudgetQuery, operatorClinicianHandler.GetOperator)...)
+			operators.PUT("/:id", r.rateLimitedHandlers(rateLimitBudgetSubmit, operatorClinicianHandler.UpdateOperator)...)
+			operators.DELETE("/:id", r.rateLimitedHandlers(rateLimitBudgetSubmit, handler.NewOperatorRetirementHandler(r.deps.Actor.OperatorRetirementService).Retire)...)
 		}
+		operators.GET("/:id/retirement", handler.NewOperatorRetirementHandler(r.deps.Actor.OperatorRetirementService).Status)
+
 	}
 
 	if workbenchHandler != nil {
@@ -135,25 +150,10 @@ func (r *Router) registerActorProtectedRoutes(apiV1 *gin.RouterGroup) {
 		adminClinicians.PUT("/:id", r.rateLimitedHandlers(rateLimitBudgetSubmit, operatorClinicianHandler.UpdateClinician)...)
 		adminClinicians.POST("/:id/activate", r.rateLimitedHandlers(rateLimitBudgetSubmit, operatorClinicianHandler.ActivateClinician)...)
 		adminClinicians.POST("/:id/deactivate", r.rateLimitedHandlers(rateLimitBudgetSubmit, operatorClinicianHandler.DeactivateClinician)...)
-		adminClinicians.POST("/:id/bind-operator", r.rateLimitedHandlers(rateLimitBudgetSubmit, operatorClinicianHandler.BindClinicianOperator)...)
-		adminClinicians.POST("/:id/unbind-operator", r.rateLimitedHandlers(rateLimitBudgetSubmit, operatorClinicianHandler.UnbindClinicianOperator)...)
-		me := group.Group("/me")
-		me.GET("", r.rateLimitedHandlers(rateLimitBudgetQuery, operatorClinicianHandler.GetMyClinician)...)
-		me.GET("/testees", r.rateLimitedHandlers(rateLimitBudgetQuery, operatorClinicianHandler.ListMyClinicianTestees)...)
-		me.GET("/relations", r.rateLimitedHandlers(rateLimitBudgetQuery, operatorClinicianHandler.ListMyClinicianRelations)...)
-		if workbenchHandler != nil {
-			me.GET("/workbench/queues/summary", r.rateLimitedHandlers(rateLimitBudgetQuery, workbenchHandler.GetMyClinicianWorkbenchQueueSummary)...)
-			me.GET("/workbench/queues/:queue_type", r.rateLimitedHandlers(rateLimitBudgetQuery, workbenchHandler.ListMyClinicianWorkbenchQueue)...)
-		}
 		adminClinicians.GET("/:id", r.rateLimitedHandlers(rateLimitBudgetQuery, operatorClinicianHandler.GetClinician)...)
 		adminClinicians.GET("/:id/testees", r.rateLimitedHandlers(rateLimitBudgetQuery, operatorClinicianHandler.ListClinicianTestees)...)
 		adminClinicians.GET("/:id/relations", r.rateLimitedHandlers(rateLimitBudgetQuery, operatorClinicianHandler.ListClinicianRelations)...)
 		if assessmentEntryHandler != nil {
-			me.POST("/assessment-entries", r.rateLimitedHandlers(rateLimitBudgetSubmit, assessmentEntryHandler.CreateMyAssessmentEntry)...)
-			me.GET("/assessment-entries", r.rateLimitedHandlers(rateLimitBudgetQuery, assessmentEntryHandler.ListMyAssessmentEntries)...)
-			me.GET("/assessment-entries/:id", r.rateLimitedHandlers(rateLimitBudgetQuery, assessmentEntryHandler.GetMyAssessmentEntry)...)
-			me.POST("/assessment-entries/:id/deactivate", r.rateLimitedHandlers(rateLimitBudgetSubmit, assessmentEntryHandler.DeactivateMyAssessmentEntry)...)
-			me.POST("/assessment-entries/:id/reactivate", r.rateLimitedHandlers(rateLimitBudgetSubmit, assessmentEntryHandler.ReactivateMyAssessmentEntry)...)
 			adminClinicians.POST("/:id/assessment-entries", r.rateLimitedHandlers(rateLimitBudgetSubmit, assessmentEntryHandler.CreateClinicianAssessmentEntry)...)
 			adminClinicians.GET("/:id/assessment-entries", r.rateLimitedHandlers(rateLimitBudgetQuery, assessmentEntryHandler.ListClinicianAssessmentEntries)...)
 		}
@@ -186,4 +186,8 @@ func (r *Router) registerActorProtectedRoutes(apiV1 *gin.RouterGroup) {
 			assessmentEntries.POST("/:id/reactivate", r.rateLimitedHandlers(rateLimitBudgetSubmit, assessmentEntryHandler.ReactivateAssessmentEntry)...)
 		}
 	}
+}
+
+func retiredClinicianAPI(c *gin.Context) {
+	c.JSON(410, gin.H{"code": 410, "message": "医生后台身份与绑定入口已退役，请使用总部医生管理"})
 }

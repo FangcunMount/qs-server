@@ -62,7 +62,7 @@ IAM 和 Actor 解决的是不同问题：
 | FillerRef | 跨模块值对象 | IAM `user_id + filler_type` | 记录实际提交者，不替代 Testee |
 | TesteeRef | 跨模块值对象 | `testee_id`，可带 `profile_id` | 只携带稳定引用，不共享可变聚合 |
 | Operator | 聚合根 | `org_id + user_id` | 同一 User 在同一机构只有一个 Operator；直接/有效角色只作 IAM 投影；停用不撤销 IAM Assignment |
-| Clinician | 聚合根 | `org_id + clinician_id`，可选 `operator_id` | 业务从业者身份与后台账号解耦 |
+| Clinician | 聚合根 | `org_id + clinician_id`，可选 `store_id` | 业务从业者身份与后台账号解耦 |
 | ClinicianTesteeRelation | 聚合根 | 医生、受试者、关系类型、有效期 | 只有访问型关系授权；creator 只追踪来源 |
 | AssessmentEntry | 聚合根 | 全局唯一 token | 仅激活且未过期的入口可解析 |
 

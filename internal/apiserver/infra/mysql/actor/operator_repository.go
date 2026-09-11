@@ -2,6 +2,9 @@ package actor
 
 import (
 	"context"
+	retirement "github.com/FangcunMount/qs-server/internal/apiserver/port/operatorretirement"
+	middleware "github.com/FangcunMount/qs-server/internal/pkg/middleware"
+	"time"
 
 	"github.com/FangcunMount/component-base/pkg/errors"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/operator"
@@ -14,6 +17,7 @@ import (
 type operatorRepository struct {
 	mysql.BaseRepository[*OperatorPO]
 	mapper *OperatorMapper
+	gate   retirement.MutationGate
 }
 
 // NewOperatorRepository 创建操作者仓储
@@ -28,7 +32,7 @@ func NewOperatorRepository(db *gorm.DB, opts ...mysql.BaseRepositoryOptions) dom
 }
 
 // Save 保存操作者
-func (r *operatorRepository) Save(ctx context.Context, item *domain.Operator) error {
+func (r *operatorRepository) save(ctx context.Context, item *domain.Operator) error {
 	po := r.mapper.ToPO(item)
 
 	// 确保 BeforeCreate 被调用以生成 ID
@@ -42,14 +46,21 @@ func (r *operatorRepository) Save(ctx context.Context, item *domain.Operator) er
 }
 
 // Update 更新操作者
-func (r *operatorRepository) Update(ctx context.Context, item *domain.Operator) error {
+func (r *operatorRepository) update(ctx context.Context, item *domain.Operator) error {
 	po := r.mapper.ToPO(item)
-
-	return r.UpdateAndSync(ctx, po, func(po *OperatorPO) {
-		r.mapper.SyncID(po, item)
-	}, "org_id", "user_id", "roles", "effective_roles", "authz_policy_version",
-		"authz_projected_at", "authz_projection_pending", "name", "email", "phone",
-		"is_active", "updated_at")
+	result := r.WithContext(ctx).Model(&OperatorPO{}).Where("id=? AND org_id=? AND version=? AND deleted_at IS NULL", po.ID, po.OrgID, po.Version).
+		Updates(map[string]interface{}{"roles": po.Roles, "effective_roles": po.EffectiveRoles, "authz_policy_version": po.AuthzPolicyVersion,
+			"authz_projected_at": po.AuthzProjectedAt, "authz_projection_pending": po.AuthzProjectionPending, "name": po.Name, "email": po.Email, "phone": po.Phone,
+			"is_active": po.IsActive, "version": gorm.Expr("version+1"), "updated_at": time.Now().UTC(), "updated_by": middleware.GetUserIDFromContext(ctx)})
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected != 1 {
+		return errors.WithCode(code.ErrConflict, "operator changed; refresh and retry")
+	}
+	po.Version++
+	r.mapper.SyncID(po, item)
+	return nil
 }
 
 // FindByID 根据ID查找操作者
@@ -163,4 +174,22 @@ func translateOperatorError(err error) error {
 		return errors.WithCode(code.ErrUserNotFound, "operator not found")
 	}
 	return err
+}
+
+func NewGuardedOperatorRepository(db *gorm.DB, gate retirement.MutationGate, opts ...mysql.BaseRepositoryOptions) domain.Repository {
+	r := NewOperatorRepository(db, opts...).(*operatorRepository)
+	r.gate = gate
+	return r
+}
+func (r *operatorRepository) Save(ctx context.Context, item *domain.Operator) error {
+	if r.gate == nil {
+		return r.save(ctx, item)
+	}
+	return r.gate.WithinMutation(ctx, item.UserID(), func(locked context.Context) error { return r.save(locked, item) })
+}
+func (r *operatorRepository) Update(ctx context.Context, item *domain.Operator) error {
+	if r.gate == nil {
+		return r.update(ctx, item)
+	}
+	return r.gate.WithinMutation(ctx, item.UserID(), func(locked context.Context) error { return r.update(locked, item) })
 }

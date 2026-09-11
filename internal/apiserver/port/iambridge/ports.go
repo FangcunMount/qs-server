@@ -65,9 +65,11 @@ type OperatorAuthzGateway interface {
 }
 
 type OperatorRoleProjection struct {
-	DirectRoles    []string
-	EffectiveRoles []string
-	PolicyVersion  int64
+	// ProtectedAccess detects administrator capabilities even when global role names are app-filtered.
+	ProtectedAccess bool
+	DirectRoles     []string
+	EffectiveRoles  []string
+	PolicyVersion   int64
 }
 
 type ProfileReader interface {

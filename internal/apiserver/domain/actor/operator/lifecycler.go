@@ -9,10 +9,10 @@ import (
 // 负责管理 Operator 的生命周期（激活、停用）
 type Lifecycler interface {
 	// Activate 激活员工
-	Activate(staff *Operator) error
+	Activate(operator *Operator) error
 
 	// Deactivate 停用员工
-	Deactivate(staff *Operator) error
+	Deactivate(operator *Operator) error
 }
 
 // lifecycler 生命周期管理器实现
@@ -24,32 +24,32 @@ func NewLifecycler() Lifecycler {
 }
 
 // Activate 激活员工
-func (lc *lifecycler) Activate(staff *Operator) error {
+func (lc *lifecycler) Activate(operator *Operator) error {
 	// 1. 检查是否已激活（幂等）
-	if staff.IsActive() {
+	if operator.IsActive() {
 		return nil
 	}
 
 	// 2. 业务规则：激活前必须已绑定用户
-	if staff.UserID() <= 0 {
-		return errors.WithCode(code.ErrValidation, "cannot activate staff without user binding")
+	if operator.UserID() <= 0 {
+		return errors.WithCode(code.ErrValidation, "cannot activate operator without user binding")
 	}
 
 	// 3. 执行激活
-	staff.activate()
+	operator.activate()
 
 	return nil
 }
 
 // Deactivate 停用员工
-func (lc *lifecycler) Deactivate(staff *Operator) error {
+func (lc *lifecycler) Deactivate(operator *Operator) error {
 	// 1. 检查是否已停用（幂等）
-	if !staff.IsActive() {
+	if !operator.IsActive() {
 		return nil
 	}
 
 	// 停用只改变 QS 业务状态；IAM Assignment 与本地角色投影保持不变。
-	staff.deactivate()
+	operator.deactivate()
 
 	return nil
 }

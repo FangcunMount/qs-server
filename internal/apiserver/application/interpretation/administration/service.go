@@ -1,5 +1,5 @@
 // Package administration contains organization-scoped Interpretation queries
-// initiated by administrators and operations staff.
+// initiated by administrators and operations operator.
 package administration
 
 import (

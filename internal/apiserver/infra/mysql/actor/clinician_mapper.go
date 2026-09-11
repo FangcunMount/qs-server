@@ -26,7 +26,6 @@ func (m *ClinicianMapper) ToPO(item *domain.Clinician) *ClinicianPO {
 
 	po := &ClinicianPO{
 		OrgID:         item.OrgID(),
-		OperatorID:    item.OperatorID(),
 		Name:          item.Name(),
 		Department:    item.Department(),
 		Title:         item.Title(),
@@ -53,7 +52,6 @@ func (m *ClinicianMapper) ToDomain(po *ClinicianPO) *domain.Clinician {
 
 	item := domain.NewClinician(
 		po.OrgID,
-		po.OperatorID,
 		po.Name,
 		po.Department,
 		po.Title,

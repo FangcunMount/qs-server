@@ -9,7 +9,7 @@ import "context"
 //
 // 行为者识别：
 // 1. 答题者 (Testee/Filler) - C端用户，填写和提交答卷
-// 2. 管理员 (Staff/Admin) - B端用户，查看、管理、统计答卷
+// 2. 管理员 (Operator/Admin) - B端用户，查看、管理、统计答卷
 // 3. 评分系统 (Scoring System) - 自动计算并保存答卷分数
 
 // AnswerSheetSubmissionService 答卷提交服务
@@ -35,7 +35,7 @@ type AnswerSheetSubmissionService interface {
 }
 
 // AnswerSheetManagementService 答卷管理服务
-// 行为者：管理员 (Staff/Admin)
+// 行为者：管理员 (Operator/Admin)
 // 职责：答卷的查看、管理、删除
 // 变更来源：管理后台的管理需求变化
 type AnswerSheetManagementService interface {

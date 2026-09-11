@@ -14,6 +14,7 @@ func TestOperatorUpdatePersistsClearedProjectionPending(t *testing.T) {
 	var statement string
 	var values []any
 	if err := db.Callback().Update().After("gorm:update").Register("capture_projection", func(tx *gorm.DB) {
+		tx.RowsAffected = 1 // DryRun records SQL without executing it.
 		statement = tx.Statement.SQL.String()
 		values = tx.Statement.Vars
 	}); err != nil {
@@ -28,6 +29,9 @@ func TestOperatorUpdatePersistsClearedProjectionPending(t *testing.T) {
 	}
 	if !strings.Contains(statement, "`authz_projection_pending`=?") {
 		t.Fatalf("pending=false was omitted: %s", statement)
+	}
+	if !strings.Contains(statement, "version+1") || !strings.Contains(statement, "version=?") {
+		t.Fatalf("missing version guard: %s", statement)
 	}
 	foundFalse := false
 	for _, value := range values {

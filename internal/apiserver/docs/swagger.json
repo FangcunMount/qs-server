@@ -2037,261 +2037,6 @@
                 }
             }
         },
-        "/api/v1/clinicians/me": {
-            "get": {
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Clinician"
-                ],
-                "summary": "获取当前从业者信息",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Bearer 用户令牌",
-                        "name": "Authorization",
-                        "in": "header",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/core.Response"
-                        }
-                    }
-                }
-            }
-        },
-        "/api/v1/clinicians/me/assessment-entries": {
-            "get": {
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "AssessmentEntry"
-                ],
-                "summary": "查询当前从业者测评入口列表",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Bearer 用户令牌",
-                        "name": "Authorization",
-                        "in": "header",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/core.Response"
-                        }
-                    }
-                }
-            },
-            "post": {
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "AssessmentEntry"
-                ],
-                "summary": "创建当前从业者测评入口",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Bearer 用户令牌",
-                        "name": "Authorization",
-                        "in": "header",
-                        "required": true
-                    },
-                    {
-                        "description": "创建测评入口请求",
-                        "name": "request",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/request.CreateAssessmentEntryRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/core.Response"
-                        }
-                    }
-                }
-            }
-        },
-        "/api/v1/clinicians/me/assessment-entries/{id}": {
-            "get": {
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "AssessmentEntry"
-                ],
-                "summary": "获取当前从业者测评入口详情",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Bearer 用户令牌",
-                        "name": "Authorization",
-                        "in": "header",
-                        "required": true
-                    },
-                    {
-                        "type": "integer",
-                        "description": "测评入口ID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/core.Response"
-                        }
-                    }
-                }
-            }
-        },
-        "/api/v1/clinicians/me/assessment-entries/{id}/deactivate": {
-            "post": {
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "AssessmentEntry"
-                ],
-                "summary": "停用当前从业者测评入口",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Bearer 用户令牌",
-                        "name": "Authorization",
-                        "in": "header",
-                        "required": true
-                    },
-                    {
-                        "type": "integer",
-                        "description": "测评入口ID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/core.Response"
-                        }
-                    }
-                }
-            }
-        },
-        "/api/v1/clinicians/me/assessment-entries/{id}/reactivate": {
-            "post": {
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "AssessmentEntry"
-                ],
-                "summary": "重新启用当前从业者测评入口",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Bearer 用户令牌",
-                        "name": "Authorization",
-                        "in": "header",
-                        "required": true
-                    },
-                    {
-                        "type": "integer",
-                        "description": "测评入口ID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/core.Response"
-                        }
-                    }
-                }
-            }
-        },
-        "/api/v1/clinicians/me/relations": {
-            "get": {
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Clinician"
-                ],
-                "summary": "查询当前从业者关系列表",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Bearer 用户令牌",
-                        "name": "Authorization",
-                        "in": "header",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/core.Response"
-                        }
-                    }
-                }
-            }
-        },
-        "/api/v1/clinicians/me/testees": {
-            "get": {
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Clinician"
-                ],
-                "summary": "查询当前从业者受试者列表",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Bearer 用户令牌",
-                        "name": "Authorization",
-                        "in": "header",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/core.Response"
-                        }
-                    }
-                }
-            }
-        },
         "/api/v1/clinicians/me/testees/{testee_id}/reports": {
             "get": {
                 "produces": [
@@ -2388,77 +2133,6 @@
                                     }
                                 }
                             ]
-                        }
-                    }
-                }
-            }
-        },
-        "/api/v1/clinicians/me/workbench/queues/summary": {
-            "get": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "返回当前医生名下高风险、复诊、重点关注队列数量。队列由最新测评风险、开放任务、重点关注字段动态生成，不以用户标签为事实来源。",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "clinicians"
-                ],
-                "summary": "获取当前医生工作台队列统计",
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/response.ClinicianWorkbenchQueueSummaryResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/api/v1/clinicians/me/workbench/queues/{queue_type}": {
-            "get": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "queue_type 取值：high_risk、follow_up、key_focus。high_risk 使用最近一次有效测评风险，follow_up 返回每名受试者最紧急的待开放或已开放任务，key_focus 使用重点关注字段。",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "clinicians"
-                ],
-                "summary": "获取当前医生工作台队列",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "队列类型：high_risk/follow_up/key_focus",
-                        "name": "queue_type",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "integer",
-                        "description": "页码，默认 1",
-                        "name": "page",
-                        "in": "query"
-                    },
-                    {
-                        "type": "integer",
-                        "description": "每页数量，默认 20，最大 100",
-                        "name": "page_size",
-                        "in": "query"
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/response.ClinicianWorkbenchQueueResponse"
                         }
                     }
                 }
@@ -2646,53 +2320,6 @@
                         "required": true,
                         "schema": {
                             "$ref": "#/definitions/request.CreateAssessmentEntryRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/core.Response"
-                        }
-                    }
-                }
-            }
-        },
-        "/api/v1/clinicians/{id}/bind-operator": {
-            "post": {
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Clinician"
-                ],
-                "summary": "绑定操作员",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Bearer 用户令牌",
-                        "name": "Authorization",
-                        "in": "header",
-                        "required": true
-                    },
-                    {
-                        "type": "integer",
-                        "description": "从业者ID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "description": "绑定操作员请求",
-                        "name": "request",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/request.BindClinicianOperatorRequest"
                         }
                     }
                 ],
@@ -2918,41 +2545,6 @@
                     "Clinician"
                 ],
                 "summary": "查询从业者受试者列表",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Bearer 用户令牌",
-                        "name": "Authorization",
-                        "in": "header",
-                        "required": true
-                    },
-                    {
-                        "type": "integer",
-                        "description": "从业者ID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/core.Response"
-                        }
-                    }
-                }
-            }
-        },
-        "/api/v1/clinicians/{id}/unbind-operator": {
-            "post": {
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Clinician"
-                ],
-                "summary": "解绑操作员",
                 "parameters": [
                     {
                         "type": "string",
@@ -3908,6 +3500,224 @@
                         "description": "Not Found",
                         "schema": {
                             "$ref": "#/definitions/core.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/operators": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Operator"
+                ],
+                "summary": "查询员工列表",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/core.Response"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Operator"
+                ],
+                "summary": "创建员工",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "description": "创建员工请求",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/request.CreateOperatorRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/core.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/operators/{id}": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Operator"
+                ],
+                "summary": "获取员工详情",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "员工ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/core.Response"
+                        }
+                    }
+                }
+            },
+            "put": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Operator"
+                ],
+                "summary": "更新员工",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "员工ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "更新员工请求",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/request.UpdateOperatorRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/core.Response"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Operators"
+                ],
+                "summary": "退出运营操作人",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Operator ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "退出请求",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handler.RetireOperatorRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handler.OperatorRetirementResponse"
+                        }
+                    },
+                    "202": {
+                        "description": "Accepted",
+                        "schema": {
+                            "$ref": "#/definitions/handler.OperatorRetirementResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/operators/{id}/retirement": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Operators"
+                ],
+                "summary": "查询运营操作人退出状态",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Operator ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handler.OperatorRetirementResponse"
                         }
                     }
                 }
@@ -5901,185 +5711,6 @@
                 }
             }
         },
-        "/api/v1/staff": {
-            "get": {
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Staff"
-                ],
-                "summary": "查询员工列表",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Bearer 用户令牌",
-                        "name": "Authorization",
-                        "in": "header",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/core.Response"
-                        }
-                    }
-                }
-            },
-            "post": {
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Staff"
-                ],
-                "summary": "创建员工",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Bearer 用户令牌",
-                        "name": "Authorization",
-                        "in": "header",
-                        "required": true
-                    },
-                    {
-                        "description": "创建员工请求",
-                        "name": "request",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/request.CreateStaffRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/core.Response"
-                        }
-                    }
-                }
-            }
-        },
-        "/api/v1/staff/{id}": {
-            "get": {
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Staff"
-                ],
-                "summary": "获取员工详情",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Bearer 用户令牌",
-                        "name": "Authorization",
-                        "in": "header",
-                        "required": true
-                    },
-                    {
-                        "type": "integer",
-                        "description": "员工ID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/core.Response"
-                        }
-                    }
-                }
-            },
-            "put": {
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Staff"
-                ],
-                "summary": "更新员工",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Bearer 用户令牌",
-                        "name": "Authorization",
-                        "in": "header",
-                        "required": true
-                    },
-                    {
-                        "type": "integer",
-                        "description": "员工ID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "description": "更新员工请求",
-                        "name": "request",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/request.UpdateStaffRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/core.Response"
-                        }
-                    }
-                }
-            },
-            "delete": {
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Staff"
-                ],
-                "summary": "删除员工",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Bearer 用户令牌",
-                        "name": "Authorization",
-                        "in": "header",
-                        "required": true
-                    },
-                    {
-                        "type": "integer",
-                        "description": "员工ID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/core.Response"
-                        }
-                    }
-                }
-            }
-        },
         "/api/v1/stores": {
             "get": {
                 "consumes": [
@@ -7405,108 +7036,6 @@
                                     "properties": {
                                         "data": {
                                             "$ref": "#/definitions/statistics.Page-statistics_ClinicianItem"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    },
-                    "503": {
-                        "description": "Service Unavailable",
-                        "schema": {
-                            "$ref": "#/definitions/core.ErrResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/api/v2/statistics/clinicians/me/entries": {
-            "get": {
-                "tags": [
-                    "Statistics"
-                ],
-                "summary": "查询当前医生 Statistics 入口",
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/core.Response"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "$ref": "#/definitions/statistics.Page-statistics_EntryItem"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    },
-                    "503": {
-                        "description": "Service Unavailable",
-                        "schema": {
-                            "$ref": "#/definitions/core.ErrResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/api/v2/statistics/clinicians/me/overview": {
-            "get": {
-                "tags": [
-                    "Statistics"
-                ],
-                "summary": "查询当前医生 Statistics 总览",
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/core.Response"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "$ref": "#/definitions/handler.StatisticsClinicianDetailResponse"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    },
-                    "503": {
-                        "description": "Service Unavailable",
-                        "schema": {
-                            "$ref": "#/definitions/core.ErrResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/api/v2/statistics/clinicians/me/testees-summary": {
-            "get": {
-                "tags": [
-                    "Statistics"
-                ],
-                "summary": "查询当前医生 Statistics 受试者摘要",
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/core.Response"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "$ref": "#/definitions/statistics.TesteeSummary"
                                         }
                                     }
                                 }
@@ -14013,6 +13542,53 @@
                 }
             }
         },
+        "handler.OperatorRetirementResponse": {
+            "type": "object",
+            "properties": {
+                "expected_version": {
+                    "type": "integer"
+                },
+                "needs_attention": {
+                    "type": "boolean"
+                },
+                "operator_id": {
+                    "type": "string"
+                },
+                "policy_version": {
+                    "type": "integer"
+                },
+                "reason": {
+                    "type": "string"
+                },
+                "request_id": {
+                    "type": "string"
+                },
+                "stage": {
+                    "type": "string"
+                }
+            }
+        },
+        "handler.RetireOperatorRequest": {
+            "type": "object",
+            "required": [
+                "expected_version",
+                "reason",
+                "request_id"
+            ],
+            "properties": {
+                "expected_version": {
+                    "type": "integer"
+                },
+                "reason": {
+                    "type": "string",
+                    "maxLength": 500
+                },
+                "request_id": {
+                    "type": "string",
+                    "maxLength": 64
+                }
+            }
+        },
         "handler.StatisticsClinicianDetailResponse": {
             "type": "object",
             "properties": {
@@ -15387,17 +14963,6 @@
                 }
             }
         },
-        "request.BindClinicianOperatorRequest": {
-            "type": "object",
-            "required": [
-                "operator_id"
-            ],
-            "properties": {
-                "operator_id": {
-                    "$ref": "#/definitions/meta.ID"
-                }
-            }
-        },
         "request.CreateAssessmentEntryRequest": {
             "type": "object",
             "required": [
@@ -15502,14 +15067,58 @@
                 "name": {
                     "type": "string"
                 },
-                "operator_id": {
-                    "$ref": "#/definitions/meta.ID"
-                },
                 "org_id": {
                     "type": "integer"
                 },
                 "title": {
                     "type": "string"
+                }
+            }
+        },
+        "request.CreateOperatorRequest": {
+            "type": "object",
+            "required": [
+                "name"
+            ],
+            "properties": {
+                "email": {
+                    "description": "邮箱",
+                    "type": "string"
+                },
+                "is_active": {
+                    "description": "是否激活",
+                    "type": "boolean"
+                },
+                "name": {
+                    "description": "姓名",
+                    "type": "string"
+                },
+                "org_id": {
+                    "description": "兼容字段：机构ID",
+                    "type": "integer"
+                },
+                "password": {
+                    "description": "新建 IAM 运营账号时的初始密码",
+                    "type": "string"
+                },
+                "phone": {
+                    "description": "电话",
+                    "type": "string"
+                },
+                "roles": {
+                    "description": "期望授予的角色列表（IAM 启用时转成 assignment）",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "user_id": {
+                    "description": "IAM用户ID（优先使用）",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/meta.ID"
+                        }
+                    ]
                 }
             }
         },
@@ -15564,53 +15173,6 @@
                 },
                 "type": {
                     "type": "string"
-                }
-            }
-        },
-        "request.CreateStaffRequest": {
-            "type": "object",
-            "required": [
-                "name"
-            ],
-            "properties": {
-                "email": {
-                    "description": "邮箱",
-                    "type": "string"
-                },
-                "is_active": {
-                    "description": "是否激活",
-                    "type": "boolean"
-                },
-                "name": {
-                    "description": "姓名",
-                    "type": "string"
-                },
-                "org_id": {
-                    "description": "兼容字段：机构ID",
-                    "type": "integer"
-                },
-                "password": {
-                    "description": "新建 IAM 运营账号时的初始密码",
-                    "type": "string"
-                },
-                "phone": {
-                    "description": "电话",
-                    "type": "string"
-                },
-                "roles": {
-                    "description": "期望授予的角色列表（IAM 启用时转成 assignment）",
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
-                },
-                "user_id": {
-                    "description": "IAM用户ID（优先使用）",
-                    "allOf": [
-                        {
-                            "$ref": "#/definitions/meta.ID"
-                        }
-                    ]
                 }
             }
         },
@@ -15954,6 +15516,34 @@
                 }
             }
         },
+        "request.UpdateOperatorRequest": {
+            "type": "object",
+            "properties": {
+                "email": {
+                    "description": "邮箱",
+                    "type": "string"
+                },
+                "is_active": {
+                    "description": "是否激活",
+                    "type": "boolean"
+                },
+                "name": {
+                    "description": "姓名",
+                    "type": "string"
+                },
+                "phone": {
+                    "description": "电话",
+                    "type": "string"
+                },
+                "roles": {
+                    "description": "角色列表",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            }
+        },
         "request.UpdateQuestionRequest": {
             "type": "object",
             "properties": {
@@ -15994,34 +15584,6 @@
                 },
                 "type": {
                     "type": "string"
-                }
-            }
-        },
-        "request.UpdateStaffRequest": {
-            "type": "object",
-            "properties": {
-                "email": {
-                    "description": "邮箱",
-                    "type": "string"
-                },
-                "is_active": {
-                    "description": "是否激活",
-                    "type": "boolean"
-                },
-                "name": {
-                    "description": "姓名",
-                    "type": "string"
-                },
-                "phone": {
-                    "description": "电话",
-                    "type": "string"
-                },
-                "roles": {
-                    "description": "角色列表",
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
                 }
             }
         },
@@ -16846,9 +16408,6 @@
                 "name": {
                     "type": "string"
                 },
-                "operator_id": {
-                    "type": "string"
-                },
                 "org_id": {
                     "type": "string"
                 },
@@ -16891,9 +16450,6 @@
                     "type": "string"
                 },
                 "name": {
-                    "type": "string"
-                },
-                "operator_id": {
                     "type": "string"
                 },
                 "org_id": {
@@ -19348,9 +18904,6 @@
                 "name": {
                     "type": "string"
                 },
-                "operator_id": {
-                    "type": "integer"
-                },
                 "outcome_committed_count": {
                     "type": "integer"
                 },
@@ -19992,35 +19545,6 @@
                 "RunStatusDataCommitted",
                 "RunStatusSucceeded"
             ]
-        },
-        "statistics.TesteeSummary": {
-            "type": "object",
-            "properties": {
-                "assessed_in_window_count": {
-                    "type": "integer"
-                },
-                "attending_testee_count": {
-                    "type": "integer"
-                },
-                "collaborator_testee_count": {
-                    "type": "integer"
-                },
-                "freshness": {
-                    "$ref": "#/definitions/statistics.Freshness"
-                },
-                "key_focus_testee_count": {
-                    "type": "integer"
-                },
-                "primary_testee_count": {
-                    "type": "integer"
-                },
-                "time_range": {
-                    "$ref": "#/definitions/statistics.DateRange"
-                },
-                "total_accessible_testees": {
-                    "type": "integer"
-                }
-            }
         },
         "systemgovernance.ActionDescriptor": {
             "type": "object",
