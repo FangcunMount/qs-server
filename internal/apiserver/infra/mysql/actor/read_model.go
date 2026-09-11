@@ -221,26 +221,6 @@ func (r *readModel) GetClinician(ctx context.Context, id uint64) (*actorreadmode
 	return &rows[0], nil
 }
 
-func (r *readModel) FindClinicianByOperator(ctx context.Context, orgID int64, operatorID uint64) (*actorreadmodel.ClinicianRow, error) {
-	var po ClinicianPO
-	tx := r.WithContext(ctx).
-		Where("org_id = ? AND operator_id = ? AND deleted_at IS NULL", orgID, operatorID).
-		Limit(1).
-		Find(&po)
-	if tx.Error != nil {
-		return nil, tx.Error
-	}
-	if tx.RowsAffected == 0 {
-		return nil, errors.WithCode(code.ErrUserNotFound, "clinician not found")
-	}
-	row := clinicianRowFromPO(&po)
-	rows := []actorreadmodel.ClinicianRow{row}
-	if err := r.enrichClinicianStores(ctx, rows); err != nil {
-		return nil, err
-	}
-	return &rows[0], nil
-}
-
 func (r *readModel) clinicianQuery(ctx context.Context, f actorreadmodel.ClinicianFilter) *gorm.DB {
 	q := r.WithContext(ctx).Model(&ClinicianPO{}).Where("org_id=? AND deleted_at IS NULL", f.OrgID)
 	if f.StoreID != nil {
@@ -611,6 +591,7 @@ func testeeRowsFromPOs(pos []*TesteePO) []actorreadmodel.TesteeRow {
 
 func operatorRowFromPO(po *OperatorPO) actorreadmodel.OperatorRow {
 	return actorreadmodel.OperatorRow{
+		Version:                po.Version,
 		ID:                     uint64(po.ID),
 		OrgID:                  po.OrgID,
 		UserID:                 po.UserID,
@@ -642,7 +623,6 @@ func clinicianRowFromPO(po *ClinicianPO) actorreadmodel.ClinicianRow {
 		StoreID: po.StoreID, Version: po.Version,
 		ID:            uint64(po.ID),
 		OrgID:         po.OrgID,
-		OperatorID:    po.OperatorID,
 		Name:          po.Name,
 		Department:    po.Department,
 		Title:         po.Title,

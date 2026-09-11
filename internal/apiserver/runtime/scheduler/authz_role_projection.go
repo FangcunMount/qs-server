@@ -15,7 +15,7 @@ const (
 	roleProjectionReconcileLeaseKey = "global"
 )
 
-// AuthzRoleProjectionRunner periodically converges the non-authoritative staff
+// AuthzRoleProjectionRunner periodically converges the non-authoritative operator
 // role projection after IAM assignment changes.
 type AuthzRoleProjectionRunner struct {
 	reconciler operatorapp.OperatorRoleProjectionReconciler

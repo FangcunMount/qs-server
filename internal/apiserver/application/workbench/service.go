@@ -7,22 +7,12 @@ import (
 	"time"
 
 	"github.com/FangcunMount/component-base/pkg/errors"
-	clinicianApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/clinician"
-	operatorApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/operator"
 	domainRelation "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/relation"
 	actorreadmodel "github.com/FangcunMount/qs-server/internal/apiserver/port/actorreadmodel"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/planreadmodel"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/workbenchreadmodel"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
 )
-
-type operatorByUserQuery interface {
-	GetByUser(ctx context.Context, orgID int64, userID int64) (*operatorApp.OperatorResult, error)
-}
-
-type clinicianByOperatorQuery interface {
-	GetByOperator(ctx context.Context, orgID int64, operatorID uint64) (*clinicianApp.ClinicianResult, error)
-}
 
 type clinicianAssignmentReader interface {
 	ListAssignedTesteeIDs(ctx context.Context, orgID int64, clinicianID uint64) ([]uint64, error)
@@ -39,8 +29,6 @@ type testeeReader interface {
 }
 
 type service struct {
-	operatorQuery           operatorByUserQuery
-	clinicianQuery          clinicianByOperatorQuery
 	relationshipService     clinicianAssignmentReader
 	assignmentHydrator      assignmentHydrator
 	testeeReader            testeeReader
@@ -50,8 +38,6 @@ type service struct {
 }
 
 func NewService(
-	operatorQuery operatorByUserQuery,
-	clinicianQuery clinicianByOperatorQuery,
 	relationshipService clinicianAssignmentReader,
 	assignmentHydrator assignmentHydrator,
 	testeeReader testeeReader,
@@ -64,8 +50,6 @@ func NewService(
 		assessmentSummaryReader = assessmentSummaryReaders[0]
 	}
 	return &service{
-		operatorQuery:           operatorQuery,
-		clinicianQuery:          clinicianQuery,
 		relationshipService:     relationshipService,
 		assignmentHydrator:      assignmentHydrator,
 		testeeReader:            testeeReader,
@@ -266,13 +250,6 @@ func (s resolvedScope) isEmpty() bool {
 
 func (s *service) resolveScope(ctx context.Context, scope Scope) (resolvedScope, bool, error) {
 	switch scope.Kind {
-	case "", ScopeKindClinicianMe:
-		ids, ok, err := s.assignedTesteeIDs(ctx, scope)
-		return resolvedScope{
-			OrgID:               scope.OrgID,
-			TesteeIDs:           ids,
-			RestrictToTesteeIDs: true,
-		}, ok, err
 	case ScopeKindOrgAdmin:
 		if scope.OrgID <= 0 {
 			return resolvedScope{}, false, nil
@@ -293,37 +270,6 @@ func (s *service) resolveScope(ctx context.Context, scope Scope) (resolvedScope,
 	default:
 		return resolvedScope{}, false, errors.WithCode(code.ErrInvalidArgument, "unsupported workbench scope")
 	}
-}
-
-func (s *service) assignedTesteeIDs(ctx context.Context, scope Scope) ([]uint64, bool, error) {
-	if scope.OrgID <= 0 || scope.OperatorUserID <= 0 {
-		return nil, false, nil
-	}
-	operatorItem, err := s.operatorQuery.GetByUser(ctx, scope.OrgID, scope.OperatorUserID)
-	if err != nil {
-		if errors.IsCode(err, code.ErrUserNotFound) {
-			return nil, false, nil
-		}
-		return nil, false, errors.Wrap(err, "failed to find current operator")
-	}
-	if operatorItem == nil || !operatorItem.IsActive {
-		return nil, false, nil
-	}
-	clinicianItem, err := s.clinicianQuery.GetByOperator(ctx, scope.OrgID, operatorItem.ID)
-	if err != nil {
-		if errors.IsCode(err, code.ErrUserNotFound) {
-			return nil, false, nil
-		}
-		return nil, false, errors.Wrap(err, "failed to find current clinician")
-	}
-	if clinicianItem == nil || !clinicianItem.IsActive {
-		return nil, false, nil
-	}
-	ids, err := s.relationshipService.ListAssignedTesteeIDs(ctx, scope.OrgID, clinicianItem.ID)
-	if err != nil {
-		return nil, false, errors.Wrap(err, "failed to list assigned testees")
-	}
-	return uniqueUint64(ids), true, nil
 }
 
 func (s *service) hydrateTestees(ctx context.Context, orgID int64, ids []uint64) (map[uint64]Testee, error) {
@@ -426,7 +372,6 @@ func clinicianAssignmentFromRow(row actorreadmodel.TesteeRelationRow) ClinicianA
 	return ClinicianAssignment{
 		ID:            row.Clinician.ID,
 		OrgID:         row.Clinician.OrgID,
-		OperatorID:    row.Clinician.OperatorID,
 		Name:          row.Clinician.Name,
 		Department:    row.Clinician.Department,
 		Title:         row.Clinician.Title,
@@ -454,9 +399,7 @@ func relationTypesToStrings(types []domainRelation.RelationType) []string {
 }
 
 func (s *service) ensureConfigured() error {
-	if s.operatorQuery == nil ||
-		s.clinicianQuery == nil ||
-		s.relationshipService == nil ||
+	if s.relationshipService == nil ||
 		s.assignmentHydrator == nil ||
 		s.testeeReader == nil ||
 		s.latestRiskReader == nil ||

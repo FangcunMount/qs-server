@@ -54,7 +54,7 @@ func TestActionCheckerIAMV3ContractAssessmentRetryMatrix(t *testing.T) {
 	if server.calls != len(tests) {
 		t.Fatalf("IAM Check calls = %d, want %d", server.calls, len(tests))
 	}
-	if server.lastRequest.ObjectContext != nil {
+	if server.lastRequest.ObjectContext != nil { //nolint:staticcheck // Verify deprecated wire fields are never submitted.
 		t.Fatal("action check sent retired object context")
 	}
 }

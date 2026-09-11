@@ -84,24 +84,23 @@ type OverviewTrends struct {
 }
 
 type ClinicianItem struct {
-	ID                               uint64  `json:"id"`
-	OperatorID                       *uint64 `json:"operator_id,omitempty"`
-	Name                             string  `json:"name"`
-	Department                       string  `json:"department,omitempty"`
-	Title                            string  `json:"title,omitempty"`
-	ClinicianType                    string  `json:"clinician_type"`
-	IsActive                         bool    `json:"is_active"`
-	EntryOpenedCount                 int64   `json:"entry_opened_count"`
-	IntakeConfirmedCount             int64   `json:"intake_confirmed_count"`
-	CareRelationshipEstablishedCount int64   `json:"care_relationship_established_count"`
-	AssessmentCreatedCount           int64   `json:"assessment_created_count"`
-	OutcomeCommittedCount            int64   `json:"outcome_committed_count"`
-	ReportGeneratedCount             int64   `json:"report_generated_count"`
-	PrimaryTesteeCount               int64   `json:"primary_testee_count"`
-	AttendingTesteeCount             int64   `json:"attending_testee_count"`
-	CollaboratorTesteeCount          int64   `json:"collaborator_testee_count"`
-	TotalAccessibleTestees           int64   `json:"total_accessible_testees"`
-	ActiveEntryCount                 int64   `json:"active_entry_count"`
+	ID                               uint64 `json:"id"`
+	Name                             string `json:"name"`
+	Department                       string `json:"department,omitempty"`
+	Title                            string `json:"title,omitempty"`
+	ClinicianType                    string `json:"clinician_type"`
+	IsActive                         bool   `json:"is_active"`
+	EntryOpenedCount                 int64  `json:"entry_opened_count"`
+	IntakeConfirmedCount             int64  `json:"intake_confirmed_count"`
+	CareRelationshipEstablishedCount int64  `json:"care_relationship_established_count"`
+	AssessmentCreatedCount           int64  `json:"assessment_created_count"`
+	OutcomeCommittedCount            int64  `json:"outcome_committed_count"`
+	ReportGeneratedCount             int64  `json:"report_generated_count"`
+	PrimaryTesteeCount               int64  `json:"primary_testee_count"`
+	AttendingTesteeCount             int64  `json:"attending_testee_count"`
+	CollaboratorTesteeCount          int64  `json:"collaborator_testee_count"`
+	TotalAccessibleTestees           int64  `json:"total_accessible_testees"`
+	ActiveEntryCount                 int64  `json:"active_entry_count"`
 }
 
 type EntryItem struct {
@@ -181,8 +180,6 @@ type ReadStore interface {
 	OverviewTrends(context.Context, int64, time.Time, time.Time) (OverviewTrends, error)
 	ListClinicians(context.Context, int64, *uint64, *int64, time.Time, time.Time, int, int) ([]ClinicianItem, int64, error)
 	ListEntries(context.Context, int64, *uint64, *uint64, *bool, time.Time, time.Time, int, int) ([]EntryItem, int64, error)
-	CurrentClinicianID(context.Context, int64, int64) (uint64, error)
-	CurrentClinicianTesteeSummary(context.Context, int64, uint64, time.Time, time.Time) (TesteeSummary, error)
 	ContentBatch(context.Context, int64, time.Time, []ContentRef) ([]ContentItem, error)
 }
 
@@ -468,46 +465,6 @@ func (s *ReadService) Entries(ctx context.Context, orgID int64, entryID, clinici
 	value := &Page[EntryItem]{Items: items, Total: total, Page: page, PageSize: size, TotalPages: int((total + int64(size) - 1) / int64(size)), TimeRange: r, Freshness: freshness}
 	s.cacheSet(ctx, orgID, key, value)
 	return value, nil
-}
-
-func (s *ReadService) CurrentClinicianID(ctx context.Context, orgID, userID int64) (uint64, error) {
-	return s.store.CurrentClinicianID(ctx, orgID, userID)
-}
-
-func (s *ReadService) CurrentClinicianTesteeSummary(ctx context.Context, orgID, userID int64, filter QueryFilter) (*TesteeSummary, error) {
-	if err := appauthz.RequirePermission(ctx, appauthz.AssessmentResource, "statistics"); err != nil {
-		return nil, err
-	}
-	r, freshness, permit, err := s.resolve(ctx, orgID, filter)
-	if err != nil {
-		return nil, err
-	}
-	clinicianID, err := s.store.CurrentClinicianID(ctx, orgID, userID)
-	if err != nil {
-		return nil, err
-	}
-	from, to := queryBounds(r)
-	key := cacheKey("clinician_testees", clinicianID, r.Preset, r.From, r.To)
-	cached := &TesteeSummary{}
-	if hit, stale := s.cacheGet(ctx, orgID, key, cached); hit {
-		if stale {
-			cached.Freshness.IsStale = true
-		}
-		return cached, nil
-	}
-	if err := ensurePublishedResults(permit.readable); err != nil {
-		return nil, err
-	}
-	value, err := s.store.CurrentClinicianTesteeSummary(ctx, orgID, clinicianID, from, to)
-	if err != nil {
-		return nil, err
-	}
-	if err := s.validatePublishedResults(ctx, orgID, permit); err != nil {
-		return nil, err
-	}
-	value.TimeRange, value.Freshness = r, freshness
-	s.cacheSet(ctx, orgID, key, &value)
-	return &value, nil
 }
 
 func (s *ReadService) Contents(ctx context.Context, orgID int64, refs []ContentRef) (*ContentBatch, error) {

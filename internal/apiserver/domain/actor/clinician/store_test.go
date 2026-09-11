@@ -7,7 +7,7 @@ import (
 )
 
 func TestAssignStoreOwnsCompanyAndVersionRules(t *testing.T) {
-	cl := NewClinician(7, nil, "医生", "", "", Type("doctor"), "", false)
+	cl := NewClinician(7, "医生", "", "", Type("doctor"), "", false)
 	cl.RestoreStore(nil, 1)
 	target, err := store.New(2, 7, "A", "门店", "", 9, time.Now())
 	if err != nil {

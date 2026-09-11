@@ -130,6 +130,7 @@ func (r *authzSnapshotReader) LoadAuthzSnapshot(ctx context.Context, orgID, user
 }
 
 type operatorAuthzGateway struct {
+	fresh      bool
 	assignment *AuthzAssignmentClient
 	snapshot   *AuthzSnapshotLoader
 }
@@ -161,16 +162,35 @@ func (g *operatorAuthzGateway) LoadOperatorRoleProjection(ctx context.Context, o
 	if !g.IsEnabled() {
 		return iambridge.OperatorRoleProjection{}, fmt.Errorf("iam operator authorization gateway is not available")
 	}
-	snap, err := g.snapshot.Load(ctx, strconv.FormatInt(userID, 10))
+	load := g.snapshot.Load
+	if g.fresh {
+		load = g.snapshot.LoadAssignmentFacts
+	}
+	snap, err := load(ctx, strconv.FormatInt(userID, 10))
 	if err != nil {
 		return iambridge.OperatorRoleProjection{}, err
 	}
 	if snap == nil {
-		return iambridge.OperatorRoleProjection{}, nil
+		return iambridge.OperatorRoleProjection{}, fmt.Errorf("missing operator authorization snapshot")
 	}
-	return iambridge.OperatorRoleProjection{
-		DirectRoles: snap.DirectRoleNames(), EffectiveRoles: snap.EffectiveRoleNames(), PolicyVersion: snap.AuthzVersion,
-	}, nil
+	result := iambridge.OperatorRoleProjection{ProtectedAccess: snap.IsQSAdmin(), DirectRoles: snap.DirectRoleNames(), EffectiveRoles: snap.EffectiveRoleNames(), PolicyVersion: snap.AuthzVersion}
+	if g.fresh {
+		result.DirectRoles = nil
+		result.EffectiveRoles = nil
+		seen := map[string]bool{}
+		for _, f := range snap.AssignmentFacts {
+			if f.RoleID == "" || f.RoleName == "" || seen[f.RoleID] {
+				return iambridge.OperatorRoleProjection{}, fmt.Errorf("invalid complete assignment facts")
+			}
+			seen[f.RoleID] = true
+			if f.ManagementProtection != "standard" {
+				result.ProtectedAccess = true
+			}
+			result.DirectRoles = append(result.DirectRoles, f.RoleName)
+		}
+		result.EffectiveRoles = append([]string(nil), result.DirectRoles...)
+	}
+	return result, nil
 }
 
 type profileLinkDirectory struct {
@@ -338,4 +358,12 @@ func formatOptionalInt64(value int64) string {
 		return ""
 	}
 	return strconv.FormatInt(value, 10)
+}
+
+// NewOperatorRetirementAuthzGateway uses authoritative reads for destructive lifecycle decisions.
+func NewOperatorRetirementAuthzGateway(a *AuthzAssignmentClient, s *AuthzSnapshotLoader) iambridge.OperatorAuthzGateway {
+	if a == nil || s == nil {
+		return nil
+	}
+	return &operatorAuthzGateway{assignment: a, snapshot: s, fresh: true}
 }

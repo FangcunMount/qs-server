@@ -1,7 +1,9 @@
 package actor
 
 import (
+	retirementApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/operatorretirement"
 	storeApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/store"
+	retirementInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/actor/operatorretirement"
 	storeInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/actor/store"
 	"gorm.io/gorm"
 
@@ -34,6 +36,7 @@ import (
 
 // Module assembles actor application services.
 type Module struct {
+	OperatorRetirementService        *retirementApp.Service
 	StoreService                     *storeApp.Service
 	TesteeRegistrationService        testeeApp.TesteeRegistrationService
 	TesteeManagementService          testeeApp.TesteeManagementService
@@ -106,7 +109,9 @@ func New(deps Deps) (*Module, error) {
 		testeeRepo = baseTesteeRepo
 	}
 
-	operatorRepo := actorInfra.NewOperatorRepository(mysqlDB, mysqlOptions)
+	retirementRepo := retirementInfra.NewRepository(mysqlDB)
+	module.OperatorRetirementService = retirementApp.NewService(retirementRepo, iam.NewOperatorRetirementAuthzGateway(authzAssign, authzSnap))
+	operatorRepo := actorInfra.NewGuardedOperatorRepository(mysqlDB, retirementRepo, mysqlOptions)
 	clinicianRepo := actorInfra.NewClinicianRepository(mysqlDB, mysqlOptions)
 	relationRepo := actorInfra.NewRelationRepository(mysqlDB, mysqlOptions)
 	assessmentEntryRepo := actorInfra.NewAssessmentEntryRepository(mysqlDB, mysqlOptions)
@@ -164,6 +169,7 @@ func New(deps Deps) (*Module, error) {
 		userDirectory,
 		accountRegistrar,
 		operatorAuthzGateway,
+		retirementRepo,
 	)
 	module.OperatorAuthorizationService = operatorApp.NewAuthorizationService(
 		operatorRepo,
@@ -171,6 +177,7 @@ func New(deps Deps) (*Module, error) {
 		operatorLifecycler,
 		txRunner,
 		operatorAuthzGateway,
+		retirementRepo,
 	)
 	module.OperatorQueryService = operatorApp.NewQueryService(actorReadModel)
 	module.ActiveOperatorChecker = operatorApp.NewActiveOperatorChecker(actorReadModel)
@@ -178,7 +185,6 @@ func New(deps Deps) (*Module, error) {
 	module.OperatorRoleProjectionReconciler = operatorApp.NewRoleProjectionReconciler(operatorRepo, operatorAuthzGateway)
 	module.ClinicianLifecycleService = clinicianApp.NewLifecycleService(
 		clinicianRepo,
-		operatorRepo,
 		clinicianValidator,
 		txRunner,
 	)

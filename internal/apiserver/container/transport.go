@@ -474,8 +474,6 @@ func composeRESTWorkbenchDeps(c *Container) resttransport.WorkbenchDeps {
 		return deps
 	}
 	deps.WorkbenchService = workbenchApp.NewService(
-		c.ActorModule.OperatorQueryService,
-		c.ActorModule.ClinicianQueryService,
 		c.ActorModule.ClinicianRelationshipService,
 		c.ActorModule.ReadModel,
 		c.ActorModule.ReadModel,

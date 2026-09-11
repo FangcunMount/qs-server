@@ -6,29 +6,24 @@ import (
 	"github.com/FangcunMount/component-base/pkg/errors"
 	apptransaction "github.com/FangcunMount/qs-server/internal/apiserver/application/transaction"
 	domainClinician "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/clinician"
-	domainOperator "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/operator"
-	"github.com/FangcunMount/qs-server/internal/pkg/code"
 )
 
 type lifecycleService struct {
-	repo         domainClinician.Repository
-	operatorRepo domainOperator.Repository
-	validator    domainClinician.Validator
-	uow          apptransaction.Runner
+	repo      domainClinician.Repository
+	validator domainClinician.Validator
+	uow       apptransaction.Runner
 }
 
 // NewLifecycleService 创建从业者生命周期服务。
 func NewLifecycleService(
 	repo domainClinician.Repository,
-	operatorRepo domainOperator.Repository,
 	validator domainClinician.Validator,
 	uow apptransaction.Runner,
 ) ClinicianLifecycleService {
 	return &lifecycleService{
-		repo:         repo,
-		operatorRepo: operatorRepo,
-		validator:    validator,
-		uow:          uow,
+		repo:      repo,
+		validator: validator,
+		uow:       uow,
 	}
 }
 
@@ -38,7 +33,6 @@ func (s *lifecycleService) Register(ctx context.Context, dto RegisterClinicianDT
 	err := s.uow.WithinTransaction(ctx, func(txCtx context.Context) error {
 		if err := s.validator.ValidateForCreation(
 			dto.OrgID,
-			dto.OperatorID,
 			dto.Name,
 			dto.Department,
 			dto.Title,
@@ -48,25 +42,8 @@ func (s *lifecycleService) Register(ctx context.Context, dto RegisterClinicianDT
 			return err
 		}
 
-		if dto.OperatorID != nil {
-			operatorID, err := operatorIDFromUint64("operator_id", *dto.OperatorID)
-			if err != nil {
-				return err
-			}
-			if _, err := s.operatorRepo.FindByID(txCtx, operatorID); err != nil {
-				return errors.Wrap(err, "failed to find operator")
-			}
-
-			if _, err := s.repo.FindByOperator(txCtx, dto.OrgID, *dto.OperatorID); err == nil {
-				return errors.WithCode(code.ErrUserAlreadyExists, "clinician with this operator already exists")
-			} else if !errors.IsCode(err, code.ErrUserNotFound) {
-				return errors.Wrap(err, "failed to find clinician by operator")
-			}
-		}
-
 		result = domainClinician.NewClinician(
 			dto.OrgID,
-			dto.OperatorID,
 			dto.Name,
 			dto.Department,
 			dto.Title,
@@ -143,77 +120,6 @@ func (s *lifecycleService) Activate(ctx context.Context, clinicianID uint64) (*C
 
 func (s *lifecycleService) Deactivate(ctx context.Context, clinicianID uint64) (*ClinicianResult, error) {
 	return s.setActive(ctx, clinicianID, false)
-}
-
-func (s *lifecycleService) BindOperator(ctx context.Context, dto BindClinicianOperatorDTO) (*ClinicianResult, error) {
-	var result *domainClinician.Clinician
-	clinicianID, err := clinicianIDFromUint64("clinician_id", dto.ClinicianID)
-	if err != nil {
-		return nil, err
-	}
-	operatorID, err := operatorIDFromUint64("operator_id", dto.OperatorID)
-	if err != nil {
-		return nil, err
-	}
-
-	err = s.uow.WithinTransaction(ctx, func(txCtx context.Context) error {
-		item, err := s.repo.FindByID(txCtx, clinicianID)
-		if err != nil {
-			return errors.Wrap(err, "failed to find clinician")
-		}
-		operatorItem, err := s.operatorRepo.FindByID(txCtx, operatorID)
-		if err != nil {
-			return errors.Wrap(err, "failed to find operator")
-		}
-		if operatorItem.OrgID() != item.OrgID() {
-			return errors.WithCode(code.ErrInvalidArgument, "operator does not belong to clinician organization")
-		}
-
-		existing, err := s.repo.FindByOperator(txCtx, item.OrgID(), dto.OperatorID)
-		if err == nil && existing.ID() != item.ID() && existing.IsActive() {
-			return errors.WithCode(code.ErrUserAlreadyExists, "operator already bound to another active clinician")
-		}
-		if err != nil && !errors.IsCode(err, code.ErrUserNotFound) {
-			return errors.Wrap(err, "failed to validate clinician operator binding")
-		}
-
-		item.BindOperator(dto.OperatorID)
-		if err := s.repo.Update(txCtx, item); err != nil {
-			return errors.Wrap(err, "failed to bind operator")
-		}
-		result = item
-		return nil
-	})
-	if err != nil {
-		return nil, err
-	}
-	return toClinicianResult(result), nil
-}
-
-func (s *lifecycleService) UnbindOperator(ctx context.Context, clinicianID uint64) (*ClinicianResult, error) {
-	var result *domainClinician.Clinician
-	targetClinicianID, err := clinicianIDFromUint64("clinician_id", clinicianID)
-	if err != nil {
-		return nil, err
-	}
-
-	err = s.uow.WithinTransaction(ctx, func(txCtx context.Context) error {
-		item, err := s.repo.FindByID(txCtx, targetClinicianID)
-		if err != nil {
-			return errors.Wrap(err, "failed to find clinician")
-		}
-		item.UnbindOperator()
-		if err := s.repo.Update(txCtx, item); err != nil {
-			return errors.Wrap(err, "failed to unbind operator")
-		}
-		result = item
-		return nil
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	return toClinicianResult(result), nil
 }
 
 func (s *lifecycleService) Delete(ctx context.Context, clinicianID uint64) error {

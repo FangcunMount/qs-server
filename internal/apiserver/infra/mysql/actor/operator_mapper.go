@@ -43,6 +43,7 @@ func (m *OperatorMapper) ToPO(item *domain.Operator) *OperatorPO {
 		IsActive:               item.IsActive(),
 	}
 
+	po.Version = item.Version()
 	// 设置ID（如果已存在）
 	if item.ID() > 0 {
 		po.ID = meta.ID(item.ID())
@@ -62,6 +63,7 @@ func (m *OperatorMapper) ToDomain(po *OperatorPO) *domain.Operator {
 
 	// 设置ID
 	item.SetID(domain.ID(po.ID))
+	item.RestoreVersion(po.Version)
 
 	// 转换角色列表
 	roles := make([]domain.Role, len(po.Roles))
@@ -105,5 +107,6 @@ func (m *OperatorMapper) ToDomains(pos []*OperatorPO) []*domain.Operator {
 func (m *OperatorMapper) SyncID(po *OperatorPO, item *domain.Operator) {
 	if po != nil && item != nil {
 		item.SetID(domain.ID(po.ID))
+		item.RestoreVersion(po.Version)
 	}
 }

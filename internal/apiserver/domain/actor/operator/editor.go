@@ -5,11 +5,11 @@ package operator
 type Editor interface {
 	// UpdateBasicInfo 更新基本信息（姓名）
 	// 参数使用指针表示可选更新
-	UpdateBasicInfo(staff *Operator, name *string) error
+	UpdateBasicInfo(operator *Operator, name *string) error
 
 	// UpdateContactInfo 更新联系信息（邮箱、手机号）
 	// 参数使用指针表示可选更新
-	UpdateContactInfo(staff *Operator, email *string, phone *string) error
+	UpdateContactInfo(operator *Operator, email *string, phone *string) error
 }
 
 // editor 编辑器实现
@@ -25,14 +25,14 @@ func NewEditor(validator Validator) Editor {
 }
 
 // UpdateBasicInfo 更新基本信息
-func (e *editor) UpdateBasicInfo(staff *Operator, name *string) error {
+func (e *editor) UpdateBasicInfo(operator *Operator, name *string) error {
 	// 验证并更新姓名
 	if name != nil {
 		if err := e.validator.ValidateName(*name, false); err != nil {
 			return err
 		}
 		if *name != "" {
-			staff.name = *name
+			operator.name = *name
 		}
 	}
 
@@ -40,14 +40,14 @@ func (e *editor) UpdateBasicInfo(staff *Operator, name *string) error {
 }
 
 // UpdateContactInfo 更新联系信息
-func (e *editor) UpdateContactInfo(staff *Operator, email *string, phone *string) error {
+func (e *editor) UpdateContactInfo(operator *Operator, email *string, phone *string) error {
 	// 验证并更新邮箱
 	if email != nil {
 		if err := e.validator.ValidateEmail(*email); err != nil {
 			return err
 		}
 		if *email != "" {
-			staff.email = *email
+			operator.email = *email
 		}
 	}
 
@@ -57,7 +57,7 @@ func (e *editor) UpdateContactInfo(staff *Operator, email *string, phone *string
 			return err
 		}
 		if *phone != "" {
-			staff.phone = *phone
+			operator.phone = *phone
 		}
 	}
 

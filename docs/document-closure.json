@@ -2,7 +2,7 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "8c1c386e75b8b898d9fdea7bb647c726a6b10283",
+    "sha": "96638d4039d7f0e1e2fc477bcf1dc87e92293479",
     "verified_on": "2026-09-11"
   },
   "status_policy": {
@@ -84,8 +84,8 @@
   "machine_contracts": {
     "migrations": {
       "mysql": {
-        "max_version": 73,
-        "version_count": 73
+        "max_version": 76,
+        "version_count": 76
       },
       "mongodb": {
         "max_version": 33,
@@ -132,8 +132,8 @@
     "grpc": {
       "source": "api/grpc/proto",
       "proto_file_count": 8,
-      "service_count": 15,
-      "rpc_count": 59,
+      "service_count": 16,
+      "rpc_count": 60,
       "services": {
         "actor.ActorService": [
           "CreateTestee",
@@ -223,6 +223,9 @@
         "questionnaire.QuestionnaireService": [
           "GetQuestionnaire",
           "ListQuestionnaires"
+        ],
+        "interpretation.AIWorkflowAccessService": [
+          "Authorize"
         ]
       }
     }
@@ -1690,7 +1693,7 @@
       "path": "docs/02-业务模块/10-survey/21-核心设计-版本化与作答契约.md",
       "class": "primary",
       "owner": "survey",
-      "doc_status": "aligned",
+      "doc_status": "needs_review",
       "verified": {
         "source_sha": "bfbd991e01d16bc32891dea0e0ef9cdd8aac4f90",
         "verified_on": "2026-09-10"
@@ -1741,6 +1744,13 @@
           "severity": "medium",
           "summary": "Section answer rejection, replica-set E2E and historical Outbox debt remain explicit in module_signoff.",
           "exit_criteria": "Close the named contract/data/environment gaps, then re-sign affected dimensions."
+        },
+        {
+          "id": "OPERATOR-RETIREMENT-REVIEW",
+          "kind": "documentation",
+          "severity": "medium",
+          "summary": "Operator retirement changed referenced sources; the previous alignment evidence does not cover this release.",
+          "exit_criteria": "Reconcile all affected statements with Operator retirement and refresh source evidence after review."
         }
       ]
     },
@@ -1808,7 +1818,7 @@
       "path": "docs/02-业务模块/10-survey/31-关键链路-答卷校验与可靠受理.md",
       "class": "primary",
       "owner": "survey",
-      "doc_status": "aligned",
+      "doc_status": "needs_review",
       "verified": {
         "source_sha": "bfbd991e01d16bc32891dea0e0ef9cdd8aac4f90",
         "verified_on": "2026-09-10"
@@ -1859,6 +1869,13 @@
           "severity": "medium",
           "summary": "Section answer rejection, replica-set E2E and historical Outbox debt remain explicit in module_signoff.",
           "exit_criteria": "Close the named contract/data/environment gaps, then re-sign affected dimensions."
+        },
+        {
+          "id": "OPERATOR-RETIREMENT-REVIEW",
+          "kind": "documentation",
+          "severity": "medium",
+          "summary": "Operator retirement changed referenced sources; the previous alignment evidence does not cover this release.",
+          "exit_criteria": "Reconcile all affected statements with Operator retirement and refresh source evidence after review."
         }
       ]
     },
@@ -1896,7 +1913,7 @@
       "path": "docs/02-业务模块/10-survey/README.md",
       "class": "primary",
       "owner": "survey",
-      "doc_status": "aligned",
+      "doc_status": "needs_review",
       "verified": {
         "source_sha": "bfbd991e01d16bc32891dea0e0ef9cdd8aac4f90",
         "verified_on": "2026-09-10"
@@ -1947,6 +1964,13 @@
           "severity": "medium",
           "summary": "Section answer rejection, replica-set E2E and historical Outbox debt remain explicit in module_signoff.",
           "exit_criteria": "Close the named contract/data/environment gaps, then re-sign affected dimensions."
+        },
+        {
+          "id": "OPERATOR-RETIREMENT-REVIEW",
+          "kind": "documentation",
+          "severity": "medium",
+          "summary": "Operator retirement changed referenced sources; the previous alignment evidence does not cover this release.",
+          "exit_criteria": "Reconcile all affected statements with Operator retirement and refresh source evidence after review."
         }
       ]
     },
@@ -3479,7 +3503,7 @@
       "path": "docs/02-业务模块/50-actor/10-领域模型.md",
       "class": "primary",
       "owner": "actor",
-      "doc_status": "aligned",
+      "doc_status": "needs_review",
       "verified": {
         "source_sha": "cf98df7730e66d5e4df1393a70a545abd12f5b04",
         "verified_on": "2026-09-11"
@@ -3530,6 +3554,13 @@
           "severity": "high",
           "summary": "Two current-source P0 authorization gaps block the Actor security dimension.",
           "exit_criteria": "Implement Profile representation and User-to-Testee gates with negative tests, then re-sign security."
+        },
+        {
+          "id": "OPERATOR-RETIREMENT-REVIEW",
+          "kind": "documentation",
+          "severity": "medium",
+          "summary": "Operator retirement changed referenced sources; the previous alignment evidence does not cover this release.",
+          "exit_criteria": "Reconcile all affected statements with Operator retirement and refresh source evidence after review."
         }
       ]
     },
@@ -3537,7 +3568,7 @@
       "path": "docs/02-业务模块/50-actor/20-核心设计-身份、关系与资源授权.md",
       "class": "primary",
       "owner": "actor",
-      "doc_status": "aligned",
+      "doc_status": "needs_review",
       "verified": {
         "source_sha": "cf98df7730e66d5e4df1393a70a545abd12f5b04",
         "verified_on": "2026-09-11"
@@ -3588,6 +3619,13 @@
           "severity": "high",
           "summary": "Two current-source P0 authorization gaps block the Actor security dimension.",
           "exit_criteria": "Implement Profile representation and User-to-Testee gates with negative tests, then re-sign security."
+        },
+        {
+          "id": "OPERATOR-RETIREMENT-REVIEW",
+          "kind": "documentation",
+          "severity": "medium",
+          "summary": "Operator retirement changed referenced sources; the previous alignment evidence does not cover this release.",
+          "exit_criteria": "Reconcile all affected statements with Operator retirement and refresh source evidence after review."
         }
       ]
     },
@@ -3595,7 +3633,7 @@
       "path": "docs/02-业务模块/50-actor/30-关键链路-身份进入测评与报告访问.md",
       "class": "primary",
       "owner": "actor",
-      "doc_status": "aligned",
+      "doc_status": "needs_review",
       "verified": {
         "source_sha": "cf98df7730e66d5e4df1393a70a545abd12f5b04",
         "verified_on": "2026-09-11"
@@ -3646,6 +3684,13 @@
           "severity": "high",
           "summary": "Two current-source P0 authorization gaps block the Actor security dimension.",
           "exit_criteria": "Implement Profile representation and User-to-Testee gates with negative tests, then re-sign security."
+        },
+        {
+          "id": "OPERATOR-RETIREMENT-REVIEW",
+          "kind": "documentation",
+          "severity": "medium",
+          "summary": "Operator retirement changed referenced sources; the previous alignment evidence does not cover this release.",
+          "exit_criteria": "Reconcile all affected statements with Operator retirement and refresh source evidence after review."
         }
       ]
     },
@@ -3653,7 +3698,7 @@
       "path": "docs/02-业务模块/50-actor/90-设计问题与验证清单.md",
       "class": "primary",
       "owner": "actor",
-      "doc_status": "aligned",
+      "doc_status": "needs_review",
       "verified": {
         "source_sha": "cf98df7730e66d5e4df1393a70a545abd12f5b04",
         "verified_on": "2026-09-11"
@@ -3704,6 +3749,13 @@
           "severity": "high",
           "summary": "Two current-source P0 authorization gaps block the Actor security dimension.",
           "exit_criteria": "Implement Profile representation and User-to-Testee gates with negative tests, then re-sign security."
+        },
+        {
+          "id": "OPERATOR-RETIREMENT-REVIEW",
+          "kind": "documentation",
+          "severity": "medium",
+          "summary": "Operator retirement changed referenced sources; the previous alignment evidence does not cover this release.",
+          "exit_criteria": "Reconcile all affected statements with Operator retirement and refresh source evidence after review."
         }
       ]
     },
@@ -3711,7 +3763,7 @@
       "path": "docs/02-业务模块/50-actor/README.md",
       "class": "primary",
       "owner": "actor",
-      "doc_status": "aligned",
+      "doc_status": "needs_review",
       "verified": {
         "source_sha": "cf98df7730e66d5e4df1393a70a545abd12f5b04",
         "verified_on": "2026-09-11"
@@ -3762,6 +3814,13 @@
           "severity": "high",
           "summary": "Two current-source P0 authorization gaps block the Actor security dimension.",
           "exit_criteria": "Implement Profile representation and User-to-Testee gates with negative tests, then re-sign security."
+        },
+        {
+          "id": "OPERATOR-RETIREMENT-REVIEW",
+          "kind": "documentation",
+          "severity": "medium",
+          "summary": "Operator retirement changed referenced sources; the previous alignment evidence does not cover this release.",
+          "exit_criteria": "Reconcile all affected statements with Operator retirement and refresh source evidence after review."
         }
       ]
     },
@@ -4153,7 +4212,7 @@
       "path": "docs/02-业务模块/70-statistics/20-核心设计-业务数据、事实与统计分层.md",
       "class": "primary",
       "owner": "statistics",
-      "doc_status": "aligned",
+      "doc_status": "needs_review",
       "verified": {
         "source_sha": "bfbd991e01d16bc32891dea0e0ef9cdd8aac4f90",
         "verified_on": "2026-09-10"
@@ -4204,6 +4263,13 @@
           "severity": "medium",
           "summary": "Inactive-clinician cached self overview and current runtime/production evidence remain conditional.",
           "exit_criteria": "Require fresh active identity, add warm-cache negatives, run runtime/production checks, then re-sign."
+        },
+        {
+          "id": "OPERATOR-RETIREMENT-REVIEW",
+          "kind": "documentation",
+          "severity": "medium",
+          "summary": "Operator retirement changed referenced sources; the previous alignment evidence does not cover this release.",
+          "exit_criteria": "Reconcile all affected statements with Operator retirement and refresh source evidence after review."
         }
       ]
     },
@@ -4331,7 +4397,7 @@
       "path": "docs/02-业务模块/70-statistics/90-设计问题与重构清单.md",
       "class": "primary",
       "owner": "statistics",
-      "doc_status": "aligned",
+      "doc_status": "needs_review",
       "verified": {
         "source_sha": "bfbd991e01d16bc32891dea0e0ef9cdd8aac4f90",
         "verified_on": "2026-09-10"
@@ -4382,6 +4448,13 @@
           "severity": "medium",
           "summary": "Inactive-clinician cached self overview and current runtime/production evidence remain conditional.",
           "exit_criteria": "Require fresh active identity, add warm-cache negatives, run runtime/production checks, then re-sign."
+        },
+        {
+          "id": "OPERATOR-RETIREMENT-REVIEW",
+          "kind": "documentation",
+          "severity": "medium",
+          "summary": "Operator retirement changed referenced sources; the previous alignment evidence does not cover this release.",
+          "exit_criteria": "Reconcile all affected statements with Operator retirement and refresh source evidence after review."
         }
       ]
     },
@@ -4389,7 +4462,7 @@
       "path": "docs/02-业务模块/70-statistics/README.md",
       "class": "primary",
       "owner": "statistics",
-      "doc_status": "aligned",
+      "doc_status": "needs_review",
       "verified": {
         "source_sha": "bfbd991e01d16bc32891dea0e0ef9cdd8aac4f90",
         "verified_on": "2026-09-10"
@@ -4440,6 +4513,13 @@
           "severity": "medium",
           "summary": "Inactive-clinician cached self overview and current runtime/production evidence remain conditional.",
           "exit_criteria": "Require fresh active identity, add warm-cache negatives, run runtime/production checks, then re-sign."
+        },
+        {
+          "id": "OPERATOR-RETIREMENT-REVIEW",
+          "kind": "documentation",
+          "severity": "medium",
+          "summary": "Operator retirement changed referenced sources; the previous alignment evidence does not cover this release.",
+          "exit_criteria": "Reconcile all affected statements with Operator retirement and refresh source evidence after review."
         }
       ]
     },
@@ -5933,7 +6013,7 @@
       "path": "docs/03-基础设施/concurrency/70-可观测性-压测与验收.md",
       "class": "primary",
       "owner": "infra",
-      "doc_status": "aligned",
+      "doc_status": "needs_review",
       "verified": {
         "source_sha": "cf98df7730e66d5e4df1393a70a545abd12f5b04",
         "verified_on": "2026-09-11"
@@ -6062,6 +6142,13 @@
           "severity": "high",
           "summary": "Passing repository gates does not establish current production concurrency capacity, recovery or correctness acceptance.",
           "exit_criteria": "Attach deployed SHA, effective configuration, time-bounded metrics, capacity/recovery thresholds, correctness samples and signoff."
+        },
+        {
+          "id": "OPERATOR-RETIREMENT-REVIEW",
+          "kind": "documentation",
+          "severity": "medium",
+          "summary": "Operator retirement changed referenced sources; the previous alignment evidence does not cover this release.",
+          "exit_criteria": "Reconcile all affected statements with Operator retirement and refresh source evidence after review."
         }
       ]
     },

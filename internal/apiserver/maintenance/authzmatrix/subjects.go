@@ -10,8 +10,8 @@ import (
 )
 
 const (
-	SubjectSourceProductionStaff = "production_staff"
-	SubjectSourceSyntheticIAM    = "synthetic_iam_user"
+	SubjectSourceProductionOperator = "production_operator"
+	SubjectSourceSyntheticIAM       = "synthetic_iam_user"
 
 	SyntheticOperatorNickname    = "__qs_authz_matrix_operator_v2__"
 	SyntheticPlanManagerNickname = "__qs_authz_matrix_plan_manager_v2__"
@@ -57,7 +57,7 @@ func (s *SQLSubjectSource) Load(ctx context.Context) ([]Subject, error) {
 		}
 		result = append(result, Subject{
 			Kind: query.kind, ExpectedRole: query.role, UserID: userID,
-			Source: SubjectSourceProductionStaff,
+			Source: SubjectSourceProductionOperator,
 		})
 	}
 	if err := tx.Commit(); err != nil {
@@ -81,7 +81,7 @@ func selectSubject(ctx context.Context, tx *sql.Tx, query subjectQuery) (string,
 	if query.kind == "other" {
 		clauses = append(clauses, "JSON_LENGTH(roles) = 1")
 	}
-	statement := "SELECT CAST(user_id AS CHAR) FROM staff WHERE " + strings.Join(clauses, " AND ") + " ORDER BY user_id ASC LIMIT 1"
+	statement := "SELECT CAST(user_id AS CHAR) FROM operators WHERE " + strings.Join(clauses, " AND ") + " ORDER BY user_id ASC LIMIT 1"
 	var userID string
 	if err := tx.QueryRowContext(ctx, statement, args...).Scan(&userID); err != nil {
 		if err == sql.ErrNoRows {
@@ -134,7 +134,7 @@ func (s *StableSubjectSource) Load(ctx context.Context) ([]Subject, error) {
 		}
 		production[query.kind] = Subject{
 			Kind: query.kind, ExpectedRole: query.role, UserID: userID,
-			Source: SubjectSourceProductionStaff,
+			Source: SubjectSourceProductionOperator,
 		}
 	}
 	if err := tx.Commit(); err != nil {

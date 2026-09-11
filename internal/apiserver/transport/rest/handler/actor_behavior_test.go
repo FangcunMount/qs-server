@@ -391,7 +391,7 @@ func TestTesteeHandlerListTesteesDefaultsPaginationAndUsesProtectedScope(t *test
 	}
 }
 
-func TestOperatorClinicianHandlerListStaffDefaultsPaginationAndUsesProtectedOrgScope(t *testing.T) {
+func TestOperatorClinicianHandlerListOperatorDefaultsPaginationAndUsesProtectedOrgScope(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	query := &stubActorOperatorQueryService{
@@ -402,16 +402,16 @@ func TestOperatorClinicianHandlerListStaffDefaultsPaginationAndUsesProtectedOrgS
 	handler := newOperatorClinicianHandlerForTest()
 	handler.operatorQueryService = query
 
-	c, rec := newActorTestContext(http.MethodGet, "/api/v1/staff?org_id=91", nil)
+	c, rec := newActorTestContext(http.MethodGet, "/api/v1/operator?org_id=91", nil)
 	c.Set(restmiddleware.OrgIDKey, uint64(91))
 
-	handler.ListStaff(c)
+	handler.ListOperator(c)
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
 	}
 	if query.lastListDTO.OrgID != 91 || query.lastListDTO.Offset != 0 || query.lastListDTO.Limit != 20 {
-		t.Fatalf("unexpected staff dto: %+v", query.lastListDTO)
+		t.Fatalf("unexpected operator dto: %+v", query.lastListDTO)
 	}
 }
 

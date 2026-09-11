@@ -84,8 +84,8 @@ subjects = {subject.get("kind"): subject for subject in evidence["subjects"]}
 if set(subjects) != {"admin", "operator", "plan_manager", "other"}:
     raise SystemExit("AuthZ matrix subject kinds are incomplete")
 for kind in ("admin", "other"):
-    if subjects[kind].get("source") != "production_staff":
-        raise SystemExit(f"AuthZ matrix {kind} subject is not production staff")
+    if subjects[kind].get("source") != "production_operator":
+        raise SystemExit(f"AuthZ matrix {kind} subject is not production operator")
 for kind in ("operator", "plan_manager"):
     if subjects[kind].get("source") != "synthetic_iam_user":
         raise SystemExit(f"AuthZ matrix {kind} subject is not an isolated IAM user")

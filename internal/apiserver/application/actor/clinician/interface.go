@@ -11,8 +11,6 @@ type ClinicianLifecycleService interface {
 	Update(ctx context.Context, dto UpdateClinicianDTO) (*ClinicianResult, error)
 	Activate(ctx context.Context, clinicianID uint64) (*ClinicianResult, error)
 	Deactivate(ctx context.Context, clinicianID uint64) (*ClinicianResult, error)
-	BindOperator(ctx context.Context, dto BindClinicianOperatorDTO) (*ClinicianResult, error)
-	UnbindOperator(ctx context.Context, clinicianID uint64) (*ClinicianResult, error)
 	Delete(ctx context.Context, clinicianID uint64) error
 }
 
@@ -20,7 +18,6 @@ type ClinicianLifecycleService interface {
 type ClinicianQueryService interface {
 	GetByID(ctx context.Context, clinicianID uint64) (*ClinicianResult, error)
 	GetBasicByID(ctx context.Context, clinicianID uint64) (*ClinicianResult, error)
-	GetByOperator(ctx context.Context, orgID int64, operatorID uint64) (*ClinicianResult, error)
 	ListClinicians(ctx context.Context, dto ListClinicianDTO) (*ClinicianListResult, error)
 }
 
@@ -42,7 +39,6 @@ type ClinicianRelationshipService interface {
 // RegisterClinicianDTO 注册从业者。
 type RegisterClinicianDTO struct {
 	OrgID         int64
-	OperatorID    *uint64
 	Name          string
 	Department    string
 	Title         string
@@ -61,12 +57,6 @@ type UpdateClinicianDTO struct {
 	EmployeeCode  string
 }
 
-// BindClinicianOperatorDTO 绑定从业者与后台操作者。
-type BindClinicianOperatorDTO struct {
-	ClinicianID uint64
-	OperatorID  uint64
-}
-
 // ListClinicianDTO 从业者列表查询。
 type ListClinicianDTO struct {
 	StoreID      *uint64
@@ -83,7 +73,6 @@ type ClinicianResult struct {
 	Version              uint32
 	ID                   uint64
 	OrgID                int64
-	OperatorID           *uint64
 	Name                 string
 	Department           string
 	Title                string

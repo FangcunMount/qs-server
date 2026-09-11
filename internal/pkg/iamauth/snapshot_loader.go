@@ -13,8 +13,9 @@ import (
 
 // SnapshotLoaderOptions 配置 IAM GetAuthorizationSnapshot。
 type SnapshotLoaderOptions struct {
-	AppName  string
-	CacheTTL time.Duration
+	includeAssignmentFacts bool
+	AppName                string
+	CacheTTL               time.Duration
 }
 
 // SnapshotLoader CurrentAuthzSnapshot：GetAuthorizationSnapshot + 进程内缓存 + authz_version 水位失效。
@@ -120,7 +121,7 @@ func (l *SnapshotLoader) Load(ctx context.Context, userIDStr string) (*authz.Sna
 		resp, err := l.client.SDK().Authz().GetAuthorizationSnapshot(ctx, &authzv4.GetAuthorizationSnapshotRequest{
 			Subject: sub,
 
-			AppName: l.opts.AppName,
+			AppName: l.opts.AppName, IncludeAssignmentFacts: l.opts.includeAssignmentFacts,
 		})
 		if err != nil {
 			return nil, err
@@ -133,6 +134,13 @@ func (l *SnapshotLoader) Load(ctx context.Context, userIDStr string) (*authz.Sna
 			AuthzVersion:   resp.GetPolicyVersion(),
 
 			IAMAppName: l.opts.AppName,
+		}
+		snap.AssignmentFactsComplete = resp.GetAssignmentFactsComplete()
+		for _, f := range resp.GetAssignmentFacts() {
+			if f == nil {
+				return nil, fmt.Errorf("invalid assignment fact")
+			}
+			snap.AssignmentFacts = append(snap.AssignmentFacts, authz.AssignmentRoleFact{RoleID: f.GetRoleId(), RoleName: f.GetRoleName(), ManagementProtection: f.GetManagementProtection()})
 		}
 		for _, p := range resp.GetPermissions() {
 			if p == nil {
@@ -153,4 +161,54 @@ func (l *SnapshotLoader) Load(ctx context.Context, userIDStr string) (*authz.Sna
 		return nil, err
 	}
 	return v.(*authz.Snapshot), nil
+}
+
+// LoadFresh bypasses the process cache and in-flight cached reads for maintenance decisions.
+func (l *SnapshotLoader) LoadFresh(ctx context.Context, userID string) (*authz.Snapshot, error) {
+	if l == nil {
+		return nil, fmt.Errorf("authorization loader unavailable")
+	}
+	fresh := NewSnapshotLoader(l.client, l.opts)
+	l.mu.Lock()
+	fresh.globalVersion = l.globalVersion
+	l.mu.Unlock()
+	snap, err := fresh.Load(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	if snap == nil || snap.AuthzVersion <= 0 {
+		return nil, fmt.Errorf("invalid authoritative authorization snapshot")
+	}
+	// Recheck the shared watermark after the remote read; a concurrent policy event must not be lost.
+	if err := l.setCached(cacheKey(userID, l.opts.AppName), snap); err != nil {
+		return nil, err
+	}
+	return snap, nil
+}
+
+// LoadAssignmentFacts is restricted by IAM and never falls back to an app-filtered role list.
+func (l *SnapshotLoader) LoadAssignmentFacts(ctx context.Context, userID string) (*authz.Snapshot, error) {
+	if l == nil {
+		return nil, fmt.Errorf("authorization loader unavailable")
+	}
+	opts := l.opts
+	opts.includeAssignmentFacts = true
+	fresh := NewSnapshotLoader(l.client, opts)
+	l.mu.Lock()
+	fresh.globalVersion = l.globalVersion
+	l.mu.Unlock()
+	snap, err := fresh.Load(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	if snap == nil || !snap.AssignmentFactsComplete || snap.AuthzVersion <= 0 {
+		return nil, fmt.Errorf("IAM does not provide complete assignment facts; retirement is unavailable")
+	}
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if snap.AuthzVersion < l.globalVersion {
+		return nil, fmt.Errorf("assignment facts are older than observed policy version")
+	}
+	l.globalVersion = snap.AuthzVersion
+	return snap, nil
 }

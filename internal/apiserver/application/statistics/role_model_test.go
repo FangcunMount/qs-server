@@ -15,6 +15,4 @@ func TestProfessionalStatisticsDenyBeforeCacheOrStorage(t *testing.T) {
 	require.Error(t, err)
 	_, err = s.Entries(ctx, 1, nil, nil, nil, QueryFilter{}, 1, 10)
 	require.Error(t, err)
-	_, err = s.CurrentClinicianTesteeSummary(ctx, 1, 1, QueryFilter{})
-	require.Error(t, err)
 }

@@ -19,7 +19,7 @@ const (
 )
 
 // AuthzSnapshotMiddleware 加载 IAM GetAuthorizationSnapshot 并写入 gin 与 request context。
-// 若当前请求已解析出 active operator，则顺手将 IAM roles 投影回本地 staff/operator 表。
+// 若当前请求已解析出 active operator，则顺手将 IAM roles 投影回本地 operator/operator 表。
 func AuthzSnapshotMiddleware(loader *iamauth.SnapshotLoader, updater operatorapp.OperatorRoleProjectionUpdater) gin.HandlerFunc {
 	if loader == nil {
 		return func(c *gin.Context) {

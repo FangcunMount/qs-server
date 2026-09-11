@@ -8,7 +8,7 @@ func TestOperatorRoleProjectionIsCopied(t *testing.T) {
 
 	roles := item.Roles()
 	if len(roles) != 1 || roles[0] != RoleAssessmentOperator {
-		t.Fatalf("expected one staff role, got %v", roles)
+		t.Fatalf("expected one operator role, got %v", roles)
 	}
 }
 

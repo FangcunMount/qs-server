@@ -97,7 +97,7 @@ func translateError(err error) error {
 
 	// 处理唯一约束冲突
 	if mysql.IsDuplicateError(err) {
-		return errors.WithCode(code.ErrUserAlreadyExists, "testee or staff already exists")
+		return errors.WithCode(code.ErrUserAlreadyExists, "testee or operator already exists")
 	}
 
 	// 处理记录不存在

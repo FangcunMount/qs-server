@@ -29,9 +29,9 @@ func (f *factory) GetOrCreateByUser(
 	name string,
 ) (*Operator, error) {
 	// 先尝试查找
-	staff, err := f.repo.FindByUser(ctx, orgID, userID)
+	operator, err := f.repo.FindByUser(ctx, orgID, userID)
 	if err == nil {
-		return staff, nil
+		return operator, nil
 	}
 
 	// 如果不存在，创建新的
@@ -41,20 +41,20 @@ func (f *factory) GetOrCreateByUser(
 			return nil, err
 		}
 
-		staff = NewOperator(orgID, userID, name)
+		operator = NewOperator(orgID, userID, name)
 
-		if err := f.repo.Save(ctx, staff); err != nil {
+		if err := f.repo.Save(ctx, operator); err != nil {
 			if errors.IsCode(err, code.ErrUserAlreadyExists) {
 				existing, findErr := f.repo.FindByUser(ctx, orgID, userID)
 				if findErr == nil {
 					return existing, nil
 				}
 			}
-			return nil, errors.Wrap(err, "failed to save staff")
+			return nil, errors.Wrap(err, "failed to save operator")
 		}
 
-		return staff, nil
+		return operator, nil
 	}
 
-	return nil, errors.Wrap(err, "failed to find staff by user")
+	return nil, errors.Wrap(err, "failed to find operator by user")
 }

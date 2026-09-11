@@ -16,8 +16,7 @@ const (
 type ScopeKind string
 
 const (
-	ScopeKindClinicianMe ScopeKind = "clinician_me"
-	ScopeKindOrgAdmin    ScopeKind = "org_admin"
+	ScopeKindOrgAdmin ScopeKind = "org_admin"
 )
 
 type Service interface {
@@ -26,10 +25,9 @@ type Service interface {
 }
 
 type Scope struct {
-	Kind           ScopeKind
-	OrgID          int64
-	OperatorUserID int64
-	ClinicianID    *uint64
+	Kind        ScopeKind
+	OrgID       int64
+	ClinicianID *uint64
 }
 
 type ListQueueDTO struct {
@@ -100,7 +98,6 @@ type TaskSummary struct {
 type ClinicianAssignment struct {
 	ID            uint64
 	OrgID         int64
-	OperatorID    *uint64
 	Name          string
 	Department    string
 	Title         string

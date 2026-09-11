@@ -320,10 +320,13 @@ func TestMySQLStoreFullMigrationChain(t *testing.T) {
 			t.Fatalf("migration %s: %v", filepath.Base(path), err)
 		}
 	}
-	for _, table := range []string{"actor_stores", "clinician_store_history"} {
+	for _, table := range []string{"actor_stores", "clinician_store_history", "operators", "operator_retirement_tasks", "operator_retirement_manifests", "clinician_operator_binding_archive"} {
 		if !db.Migrator().HasTable(table) {
 			t.Fatalf("missing %s", table)
 		}
+	}
+	if db.Migrator().HasTable("staff") || db.Migrator().HasColumn("clinician", "operator_id") {
+		t.Fatal("retired operator structure remains")
 	}
 	for table, column := range map[string]string{"clinician": "store_id", "assessment_entry": "invalidated_at"} {
 		if !db.Migrator().HasColumn(table, column) {

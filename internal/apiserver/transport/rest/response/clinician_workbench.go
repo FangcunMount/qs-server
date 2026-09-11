@@ -51,15 +51,14 @@ type ClinicianWorkbenchTaskSummaryResponse struct {
 }
 
 type ClinicianAssignmentResponse struct {
-	ID            string  `json:"id"`
-	OrgID         string  `json:"org_id"`
-	OperatorID    *string `json:"operator_id,omitempty"`
-	Name          string  `json:"name"`
-	Department    string  `json:"department,omitempty"`
-	Title         string  `json:"title,omitempty"`
-	ClinicianType string  `json:"clinician_type"`
-	RelationType  string  `json:"relation_type"`
-	BoundAt       string  `json:"bound_at"`
+	ID            string `json:"id"`
+	OrgID         string `json:"org_id"`
+	Name          string `json:"name"`
+	Department    string `json:"department,omitempty"`
+	Title         string `json:"title,omitempty"`
+	ClinicianType string `json:"clinician_type"`
+	RelationType  string `json:"relation_type"`
+	BoundAt       string `json:"bound_at"`
 }
 
 func NewClinicianWorkbenchQueueSummaryResponse(result *workbenchApp.SummaryResult) *ClinicianWorkbenchQueueSummaryResponse {
@@ -163,15 +162,9 @@ func newClinicianAssignmentResponse(item *workbenchApp.ClinicianAssignment) *Cli
 	if item == nil {
 		return nil
 	}
-	var operatorID *string
-	if item.OperatorID != nil {
-		value := fmt.Sprintf("%d", *item.OperatorID)
-		operatorID = &value
-	}
 	return &ClinicianAssignmentResponse{
 		ID:            fmt.Sprintf("%d", item.ID),
 		OrgID:         fmt.Sprintf("%d", item.OrgID),
-		OperatorID:    operatorID,
 		Name:          item.Name,
 		Department:    item.Department,
 		Title:         item.Title,

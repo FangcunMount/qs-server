@@ -2,6 +2,7 @@ package operator
 
 import (
 	"context"
+	retirement "github.com/FangcunMount/qs-server/internal/apiserver/port/operatorretirement"
 	"strings"
 
 	"github.com/FangcunMount/component-base/pkg/errors"
@@ -15,6 +16,7 @@ import (
 // lifecycleService 操作者生命周期服务实现
 // 行为者：人事/行政部门
 type lifecycleService struct {
+	gate        retirement.MutationGate
 	repo        domain.Repository
 	factory     domain.Factory
 	validator   domain.Validator
@@ -37,8 +39,14 @@ func NewLifecycleService(
 	identitySvc iambridge.UserDirectory,
 	accountSvc iambridge.OperationAccountRegistrar,
 	authz iambridge.OperatorAuthzGateway,
+	gates ...retirement.MutationGate,
 ) OperatorLifecycleService {
+	var gate retirement.MutationGate
+	if len(gates) > 0 {
+		gate = gates[0]
+	}
 	return &lifecycleService{
+		gate:        gate,
 		repo:        repo,
 		factory:     factory,
 		validator:   validator,
@@ -52,7 +60,7 @@ func NewLifecycleService(
 }
 
 // Register 注册新操作者
-func (s *lifecycleService) Register(ctx context.Context, dto RegisterOperatorDTO) (*OperatorResult, error) {
+func (s *lifecycleService) registerResolved(ctx context.Context, dto RegisterOperatorDTO, userID int64) (*OperatorResult, error) {
 	if err := s.requireOperatorAuthz(); err != nil {
 		return nil, err
 	}
@@ -62,12 +70,6 @@ func (s *lifecycleService) Register(ctx context.Context, dto RegisterOperatorDTO
 	err := s.uow.WithinTransaction(ctx, func(txCtx context.Context) error {
 		// 1. 验证参数
 		if err := s.validateRegisterDTO(dto); err != nil {
-			return err
-		}
-
-		// 2. 解析已有用户或通过 IAM 注册完整运营账号。
-		userID, err := s.resolveOrCreateUser(ctx, dto)
-		if err != nil {
 			return err
 		}
 
@@ -101,7 +103,7 @@ func (s *lifecycleService) Register(ctx context.Context, dto RegisterOperatorDTO
 }
 
 // EnsureByUser 确保操作者存在（幂等）
-func (s *lifecycleService) EnsureByUser(ctx context.Context, orgID int64, userID int64, name string) (*OperatorResult, error) {
+func (s *lifecycleService) ensureByUser(ctx context.Context, orgID int64, userID int64, name string) (*OperatorResult, error) {
 	var result *domain.Operator
 
 	err := s.uow.WithinTransaction(ctx, func(txCtx context.Context) error {
@@ -116,20 +118,6 @@ func (s *lifecycleService) EnsureByUser(ctx context.Context, orgID int64, userID
 	}
 
 	return toOperatorResult(result), nil
-}
-
-// Delete 删除操作者
-func (s *lifecycleService) Delete(ctx context.Context, operatorID uint64) error {
-	targetOperatorID, err := operatorIDFromUint64("operator_id", operatorID)
-	if err != nil {
-		return err
-	}
-	return s.uow.WithinTransaction(ctx, func(txCtx context.Context) error {
-		if err := s.repo.Delete(txCtx, targetOperatorID); err != nil {
-			return errors.Wrap(err, "failed to delete operator")
-		}
-		return nil
-	})
 }
 
 // UpdateProfile 更新本地员工投影资料。
@@ -361,7 +349,7 @@ func (s *lifecycleService) syncIAMRolesAfterRegister(ctx context.Context, op *do
 		}
 	}
 	committedVersion, err := s.authz.ReplaceManagedOperatorRoles(ctx, op.OrgID(), op.UserID(), roleNames,
-		actorctx.IAMGrantedBySubject(ctx), "register staff direct roles")
+		actorctx.IAMGrantedBySubject(ctx), "register operator direct roles")
 	if err != nil {
 		return err
 	}
@@ -388,4 +376,64 @@ func (s *lifecycleService) rollbackRegisteredOperator(ctx context.Context, id do
 		}
 		return nil
 	})
+}
+
+// Register holds the same user lock as retirement through local creation and IAM role assignment.
+func (s *lifecycleService) Register(ctx context.Context, dto RegisterOperatorDTO) (*OperatorResult, error) {
+	if err := s.requireOperatorAuthz(); err != nil {
+		return nil, err
+	}
+	if err := s.validateRegisterDTO(dto); err != nil {
+		return nil, err
+	}
+	knownUser := dto.UserID
+	if knownUser == 0 && strings.TrimSpace(dto.Password) != "" {
+		id, found, err := s.findExistingUserByPhone(ctx, dto.Phone)
+		if err != nil {
+			return nil, err
+		}
+		if found {
+			knownUser = id
+		}
+	}
+	var result *OperatorResult
+	run := func(locked context.Context) error {
+		userID, err := s.resolveOrCreateUser(locked, dto)
+		if err != nil {
+			return err
+		}
+		if knownUser > 0 && userID != knownUser {
+			return errors.WithCode(code.ErrConflict, "operator identity changed")
+		}
+		write := func(writeCtx context.Context) error {
+			var err error
+			result, err = s.registerResolved(writeCtx, dto, userID)
+			return err
+		}
+		if s.gate != nil {
+			return s.gate.WithinMutation(locked, userID, write)
+		}
+		return write(locked)
+	}
+	var err error
+	if s.gate != nil && knownUser > 0 {
+		err = s.gate.WithinMutation(ctx, knownUser, run)
+	} else {
+		err = run(ctx)
+	}
+	return result, err
+}
+func (s *lifecycleService) EnsureByUser(ctx context.Context, org, user int64, name string) (*OperatorResult, error) {
+	var result *OperatorResult
+	run := func(locked context.Context) error {
+		var err error
+		result, err = s.ensureByUser(locked, org, user, name)
+		return err
+	}
+	if s.gate == nil {
+		err := run(ctx)
+		return result, err
+	}
+	err := s.gate.WithinMutation(ctx, user, run)
+	return result, err
 }

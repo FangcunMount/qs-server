@@ -38,9 +38,9 @@ func TestApiserverOpenAPIContractCoversKeyPublicRoutes(t *testing.T) {
 	assertOpenAPIOperation(t, spec, "/api/v2/statistics/overview", "get")
 	assertOpenAPIOperation(t, spec, "/api/v2/statistics/clinicians", "get")
 	assertOpenAPIOperation(t, spec, "/api/v2/statistics/clinicians/{id}", "get")
-	assertOpenAPIOperation(t, spec, "/api/v2/statistics/clinicians/me/overview", "get")
-	assertOpenAPIOperation(t, spec, "/api/v2/statistics/clinicians/me/entries", "get")
-	assertOpenAPIOperation(t, spec, "/api/v2/statistics/clinicians/me/testees-summary", "get")
+	assertOpenAPIOperationAbsent(t, spec, "/api/v2/statistics/clinicians/me/overview", "get")
+	assertOpenAPIOperationAbsent(t, spec, "/api/v2/statistics/clinicians/me/entries", "get")
+	assertOpenAPIOperationAbsent(t, spec, "/api/v2/statistics/clinicians/me/testees-summary", "get")
 	assertOpenAPIOperation(t, spec, "/api/v2/statistics/entries", "get")
 	assertOpenAPIOperation(t, spec, "/api/v2/statistics/entries/{id}", "get")
 	assertOpenAPIOperation(t, spec, "/api/v2/statistics/contents/batch", "post")
@@ -48,7 +48,7 @@ func TestApiserverOpenAPIContractCoversKeyPublicRoutes(t *testing.T) {
 	assertOpenAPIOperation(t, spec, "/api/v2/plans/testees/{testee_id}/enrollments", "get")
 	assertOpenAPIOperation(t, spec, "/testees/{id}", "get")
 	assertOpenAPIOperation(t, spec, "/clinicians", "get")
-	assertOpenAPIOperation(t, spec, "/clinicians/me", "get")
+	assertOpenAPIOperationAbsent(t, spec, "/clinicians/me", "get")
 	assertOpenAPIOperationAbsent(t, spec, "/practitioners", "get")
 	assertOpenAPIOperationAbsent(t, spec, "/practitioners/me", "get")
 	assertOpenAPIOperation(t, spec, "/health", "get")
@@ -311,7 +311,7 @@ func TestApiserverOpenAPIPreservesRootAndOperationSecurity(t *testing.T) {
 	if security, ok := publicInfo["security"].([]any); !ok || len(security) != 0 {
 		t.Fatal("public operation must explicitly override root security")
 	}
-	protected := paths["/api/v1/clinicians/me/workbench/queues/summary"].(map[string]any)["get"].(map[string]any)
+	protected := paths["/api/v1/workbench/queues/summary"].(map[string]any)["get"].(map[string]any)
 	if _, ok := protected["security"].([]any); !ok {
 		t.Fatal("operation-level security must be retained")
 	}

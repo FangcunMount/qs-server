@@ -10,7 +10,6 @@ import (
 // Validator 从业者验证器。
 type Validator interface {
 	ValidateOrgID(orgID int64) error
-	ValidateOperatorID(operatorID *uint64) error
 	ValidateName(name string) error
 	ValidateDepartment(department string) error
 	ValidateTitle(title string) error
@@ -18,7 +17,6 @@ type Validator interface {
 	ValidateType(clinicianType Type) error
 	ValidateForCreation(
 		orgID int64,
-		operatorID *uint64,
 		name, department, title string,
 		clinicianType Type,
 		employeeCode string,
@@ -35,13 +33,6 @@ func NewValidator() Validator {
 func (v *validator) ValidateOrgID(orgID int64) error {
 	if orgID <= 0 {
 		return errors.WithCode(code.ErrValidation, "orgID must be positive")
-	}
-	return nil
-}
-
-func (v *validator) ValidateOperatorID(operatorID *uint64) error {
-	if operatorID != nil && *operatorID == 0 {
-		return errors.WithCode(code.ErrValidation, "operatorID must be positive")
 	}
 	return nil
 }
@@ -89,15 +80,11 @@ func (v *validator) ValidateType(clinicianType Type) error {
 
 func (v *validator) ValidateForCreation(
 	orgID int64,
-	operatorID *uint64,
 	name, department, title string,
 	clinicianType Type,
 	employeeCode string,
 ) error {
 	if err := v.ValidateOrgID(orgID); err != nil {
-		return err
-	}
-	if err := v.ValidateOperatorID(operatorID); err != nil {
 		return err
 	}
 	if err := v.ValidateName(name); err != nil {

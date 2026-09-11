@@ -271,14 +271,14 @@ sequenceDiagram
 
 ## 8. Clinician：医生查看获授权受试者报告
 
-### 8.1 专用 REST 入口
+### 8.1 已退役的 REST 入口
 
 ```text
 GET /api/v1/clinicians/me/testees/{testee_id}/reports
 GET /api/v1/clinicians/me/testees/{testee_id}/reports/{assessment_id}
 ```
 
-路由从受保护 HTTP context 取得 OrgID 和 OperatorUserID，而不是让客户端在 query 中传入这两个 ID。
+上述医生后台入口已随 Operator 身份退役，所有请求直接返回 `410 Gone`，不再执行身份、授权或业务查询。以下授权链保留为退役前设计说明，不能作为当前运营后台的接入方式。
 
 ### 8.2 受试者授权链
 

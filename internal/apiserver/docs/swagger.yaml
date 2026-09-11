@@ -2356,6 +2356,38 @@ definitions:
       version:
         type: string
     type: object
+  handler.OperatorRetirementResponse:
+    properties:
+      expected_version:
+        type: integer
+      needs_attention:
+        type: boolean
+      operator_id:
+        type: string
+      policy_version:
+        type: integer
+      reason:
+        type: string
+      request_id:
+        type: string
+      stage:
+        type: string
+    type: object
+  handler.RetireOperatorRequest:
+    properties:
+      expected_version:
+        type: integer
+      reason:
+        maxLength: 500
+        type: string
+      request_id:
+        maxLength: 64
+        type: string
+    required:
+    - expected_version
+    - reason
+    - request_id
+    type: object
   handler.StatisticsClinicianDetailResponse:
     properties:
       freshness:
@@ -3279,13 +3311,6 @@ definitions:
       questionnaire_version:
         type: string
     type: object
-  request.BindClinicianOperatorRequest:
-    properties:
-      operator_id:
-        $ref: '#/definitions/meta.ID'
-    required:
-    - operator_id
-    type: object
   request.CreateAssessmentEntryRequest:
     properties:
       expires_at:
@@ -3354,14 +3379,44 @@ definitions:
         type: boolean
       name:
         type: string
-      operator_id:
-        $ref: '#/definitions/meta.ID'
       org_id:
         type: integer
       title:
         type: string
     required:
     - clinician_type
+    - name
+    type: object
+  request.CreateOperatorRequest:
+    properties:
+      email:
+        description: 邮箱
+        type: string
+      is_active:
+        description: 是否激活
+        type: boolean
+      name:
+        description: 姓名
+        type: string
+      org_id:
+        description: 兼容字段：机构ID
+        type: integer
+      password:
+        description: 新建 IAM 运营账号时的初始密码
+        type: string
+      phone:
+        description: 电话
+        type: string
+      roles:
+        description: 期望授予的角色列表（IAM 启用时转成 assignment）
+        items:
+          type: string
+        type: array
+      user_id:
+        allOf:
+        - $ref: '#/definitions/meta.ID'
+        description: IAM用户ID（优先使用）
+    required:
     - name
     type: object
   request.CreatePlanRequest:
@@ -3400,38 +3455,6 @@ definitions:
         type: string
       type:
         type: string
-    type: object
-  request.CreateStaffRequest:
-    properties:
-      email:
-        description: 邮箱
-        type: string
-      is_active:
-        description: 是否激活
-        type: boolean
-      name:
-        description: 姓名
-        type: string
-      org_id:
-        description: 兼容字段：机构ID
-        type: integer
-      password:
-        description: 新建 IAM 运营账号时的初始密码
-        type: string
-      phone:
-        description: 电话
-        type: string
-      roles:
-        description: 期望授予的角色列表（IAM 启用时转成 assignment）
-        items:
-          type: string
-        type: array
-      user_id:
-        allOf:
-        - $ref: '#/definitions/meta.ID'
-        description: IAM用户ID（优先使用）
-    required:
-    - name
     type: object
   request.CreateStoreRequest:
     properties:
@@ -3659,6 +3682,26 @@ definitions:
     - clinician_type
     - name
     type: object
+  request.UpdateOperatorRequest:
+    properties:
+      email:
+        description: 邮箱
+        type: string
+      is_active:
+        description: 是否激活
+        type: boolean
+      name:
+        description: 姓名
+        type: string
+      phone:
+        description: 电话
+        type: string
+      roles:
+        description: 角色列表
+        items:
+          type: string
+        type: array
+    type: object
   request.UpdateQuestionRequest:
     properties:
       code:
@@ -3686,26 +3729,6 @@ definitions:
         type: string
       type:
         type: string
-    type: object
-  request.UpdateStaffRequest:
-    properties:
-      email:
-        description: 邮箱
-        type: string
-      is_active:
-        description: 是否激活
-        type: boolean
-      name:
-        description: 姓名
-        type: string
-      phone:
-        description: 电话
-        type: string
-      roles:
-        description: 角色列表
-        items:
-          type: string
-        type: array
     type: object
   request.UpdateStoreRequest:
     properties:
@@ -4260,8 +4283,6 @@ definitions:
         type: string
       name:
         type: string
-      operator_id:
-        type: string
       org_id:
         type: string
       relation_type:
@@ -4290,8 +4311,6 @@ definitions:
       is_active_label:
         type: string
       name:
-        type: string
-      operator_id:
         type: string
       org_id:
         type: string
@@ -5945,8 +5964,6 @@ definitions:
         type: boolean
       name:
         type: string
-      operator_id:
-        type: integer
       outcome_committed_count:
         type: integer
       primary_testee_count:
@@ -6371,25 +6388,6 @@ definitions:
     - RunStatusFailed
     - RunStatusDataCommitted
     - RunStatusSucceeded
-  statistics.TesteeSummary:
-    properties:
-      assessed_in_window_count:
-        type: integer
-      attending_testee_count:
-        type: integer
-      collaborator_testee_count:
-        type: integer
-      freshness:
-        $ref: '#/definitions/statistics.Freshness'
-      key_focus_testee_count:
-        type: integer
-      primary_testee_count:
-        type: integer
-      time_range:
-        $ref: '#/definitions/statistics.DateRange'
-      total_accessible_testees:
-        type: integer
-    type: object
   systemgovernance.ActionDescriptor:
     properties:
       domain:
@@ -8729,37 +8727,6 @@ paths:
       summary: 为从业者创建测评入口
       tags:
       - AssessmentEntry
-  /api/v1/clinicians/{id}/bind-operator:
-    post:
-      consumes:
-      - application/json
-      parameters:
-      - description: Bearer 用户令牌
-        in: header
-        name: Authorization
-        required: true
-        type: string
-      - description: 从业者ID
-        in: path
-        name: id
-        required: true
-        type: integer
-      - description: 绑定操作员请求
-        in: body
-        name: request
-        required: true
-        schema:
-          $ref: '#/definitions/request.BindClinicianOperatorRequest'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/core.Response'
-      summary: 绑定操作员
-      tags:
-      - Clinician
   /api/v1/clinicians/{id}/deactivate:
     post:
       parameters:
@@ -8911,301 +8878,6 @@ paths:
       summary: 查询从业者受试者列表
       tags:
       - Clinician
-  /api/v1/clinicians/{id}/unbind-operator:
-    post:
-      parameters:
-      - description: Bearer 用户令牌
-        in: header
-        name: Authorization
-        required: true
-        type: string
-      - description: 从业者ID
-        in: path
-        name: id
-        required: true
-        type: integer
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/core.Response'
-      summary: 解绑操作员
-      tags:
-      - Clinician
-  /api/v1/clinicians/me:
-    get:
-      parameters:
-      - description: Bearer 用户令牌
-        in: header
-        name: Authorization
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/core.Response'
-      summary: 获取当前从业者信息
-      tags:
-      - Clinician
-  /api/v1/clinicians/me/assessment-entries:
-    get:
-      parameters:
-      - description: Bearer 用户令牌
-        in: header
-        name: Authorization
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/core.Response'
-      summary: 查询当前从业者测评入口列表
-      tags:
-      - AssessmentEntry
-    post:
-      consumes:
-      - application/json
-      parameters:
-      - description: Bearer 用户令牌
-        in: header
-        name: Authorization
-        required: true
-        type: string
-      - description: 创建测评入口请求
-        in: body
-        name: request
-        required: true
-        schema:
-          $ref: '#/definitions/request.CreateAssessmentEntryRequest'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/core.Response'
-      summary: 创建当前从业者测评入口
-      tags:
-      - AssessmentEntry
-  /api/v1/clinicians/me/assessment-entries/{id}:
-    get:
-      parameters:
-      - description: Bearer 用户令牌
-        in: header
-        name: Authorization
-        required: true
-        type: string
-      - description: 测评入口ID
-        in: path
-        name: id
-        required: true
-        type: integer
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/core.Response'
-      summary: 获取当前从业者测评入口详情
-      tags:
-      - AssessmentEntry
-  /api/v1/clinicians/me/assessment-entries/{id}/deactivate:
-    post:
-      parameters:
-      - description: Bearer 用户令牌
-        in: header
-        name: Authorization
-        required: true
-        type: string
-      - description: 测评入口ID
-        in: path
-        name: id
-        required: true
-        type: integer
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/core.Response'
-      summary: 停用当前从业者测评入口
-      tags:
-      - AssessmentEntry
-  /api/v1/clinicians/me/assessment-entries/{id}/reactivate:
-    post:
-      parameters:
-      - description: Bearer 用户令牌
-        in: header
-        name: Authorization
-        required: true
-        type: string
-      - description: 测评入口ID
-        in: path
-        name: id
-        required: true
-        type: integer
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/core.Response'
-      summary: 重新启用当前从业者测评入口
-      tags:
-      - AssessmentEntry
-  /api/v1/clinicians/me/relations:
-    get:
-      parameters:
-      - description: Bearer 用户令牌
-        in: header
-        name: Authorization
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/core.Response'
-      summary: 查询当前从业者关系列表
-      tags:
-      - Clinician
-  /api/v1/clinicians/me/testees:
-    get:
-      parameters:
-      - description: Bearer 用户令牌
-        in: header
-        name: Authorization
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/core.Response'
-      summary: 查询当前从业者受试者列表
-      tags:
-      - Clinician
-  /api/v1/clinicians/me/testees/{testee_id}/reports:
-    get:
-      parameters:
-      - description: 受试者ID
-        in: path
-        name: testee_id
-        required: true
-        type: string
-      - default: 1
-        description: 页码
-        in: query
-        name: page
-        type: integer
-      - default: 10
-        description: 每页数量
-        in: query
-        name: page_size
-        type: integer
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            allOf:
-            - $ref: '#/definitions/core.Response'
-            - properties:
-                data:
-                  $ref: '#/definitions/response.ReportListResponse'
-              type: object
-      summary: 查询当前临床人员获授权受试者报告
-      tags:
-      - Interpretation-Clinician
-  /api/v1/clinicians/me/testees/{testee_id}/reports/{assessment_id}:
-    get:
-      parameters:
-      - description: 受试者ID
-        in: path
-        name: testee_id
-        required: true
-        type: string
-      - description: 测评ID
-        in: path
-        name: assessment_id
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            allOf:
-            - $ref: '#/definitions/core.Response'
-            - properties:
-                data:
-                  $ref: '#/definitions/response.ReportResponse'
-              type: object
-      summary: 查询当前临床人员获授权受试者报告详情
-      tags:
-      - Interpretation-Clinician
-  /api/v1/clinicians/me/workbench/queues/{queue_type}:
-    get:
-      description: queue_type 取值：high_risk、follow_up、key_focus。high_risk 使用最近一次有效测评风险，follow_up
-        返回每名受试者最紧急的待开放或已开放任务，key_focus 使用重点关注字段。
-      parameters:
-      - description: 队列类型：high_risk/follow_up/key_focus
-        in: path
-        name: queue_type
-        required: true
-        type: string
-      - description: 页码，默认 1
-        in: query
-        name: page
-        type: integer
-      - description: 每页数量，默认 20，最大 100
-        in: query
-        name: page_size
-        type: integer
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/response.ClinicianWorkbenchQueueResponse'
-      security:
-      - BearerAuth: []
-      summary: 获取当前医生工作台队列
-      tags:
-      - clinicians
-  /api/v1/clinicians/me/workbench/queues/summary:
-    get:
-      description: 返回当前医生名下高风险、复诊、重点关注队列数量。队列由最新测评风险、开放任务、重点关注字段动态生成，不以用户标签为事实来源。
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/response.ClinicianWorkbenchQueueSummaryResponse'
-      security:
-      - BearerAuth: []
-      summary: 获取当前医生工作台队列统计
-      tags:
-      - clinicians
   /api/v1/codes/apply:
     post:
       consumes:
@@ -9775,6 +9447,149 @@ paths:
       summary: 获取常模表详情
       tags:
       - NormTable
+  /api/v1/operators:
+    get:
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/core.Response'
+      summary: 查询员工列表
+      tags:
+      - Operator
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 创建员工请求
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/request.CreateOperatorRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/core.Response'
+      summary: 创建员工
+      tags:
+      - Operator
+  /api/v1/operators/{id}:
+    delete:
+      consumes:
+      - application/json
+      parameters:
+      - description: Operator ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: 退出请求
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handler.RetireOperatorRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.OperatorRetirementResponse'
+        "202":
+          description: Accepted
+          schema:
+            $ref: '#/definitions/handler.OperatorRetirementResponse'
+      summary: 退出运营操作人
+      tags:
+      - Operators
+    get:
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 员工ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/core.Response'
+      summary: 获取员工详情
+      tags:
+      - Operator
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 员工ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: 更新员工请求
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/request.UpdateOperatorRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/core.Response'
+      summary: 更新员工
+      tags:
+      - Operator
+  /api/v1/operators/{id}/retirement:
+    get:
+      parameters:
+      - description: Operator ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.OperatorRetirementResponse'
+      summary: 查询运营操作人退出状态
+      tags:
+      - Operators
   /api/v1/plans:
     get:
       description: 分页查询计划列表，支持条件筛选。可通过量表编码（scale_code）筛选特定量表的计划
@@ -11014,124 +10829,6 @@ paths:
       summary: 获取已发布问卷
       tags:
       - Questionnaire-Query
-  /api/v1/staff:
-    get:
-      parameters:
-      - description: Bearer 用户令牌
-        in: header
-        name: Authorization
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/core.Response'
-      summary: 查询员工列表
-      tags:
-      - Staff
-    post:
-      consumes:
-      - application/json
-      parameters:
-      - description: Bearer 用户令牌
-        in: header
-        name: Authorization
-        required: true
-        type: string
-      - description: 创建员工请求
-        in: body
-        name: request
-        required: true
-        schema:
-          $ref: '#/definitions/request.CreateStaffRequest'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/core.Response'
-      summary: 创建员工
-      tags:
-      - Staff
-  /api/v1/staff/{id}:
-    delete:
-      parameters:
-      - description: Bearer 用户令牌
-        in: header
-        name: Authorization
-        required: true
-        type: string
-      - description: 员工ID
-        in: path
-        name: id
-        required: true
-        type: integer
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/core.Response'
-      summary: 删除员工
-      tags:
-      - Staff
-    get:
-      parameters:
-      - description: Bearer 用户令牌
-        in: header
-        name: Authorization
-        required: true
-        type: string
-      - description: 员工ID
-        in: path
-        name: id
-        required: true
-        type: integer
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/core.Response'
-      summary: 获取员工详情
-      tags:
-      - Staff
-    put:
-      consumes:
-      - application/json
-      parameters:
-      - description: Bearer 用户令牌
-        in: header
-        name: Authorization
-        required: true
-        type: string
-      - description: 员工ID
-        in: path
-        name: id
-        required: true
-        type: integer
-      - description: 更新员工请求
-        in: body
-        name: request
-        required: true
-        schema:
-          $ref: '#/definitions/request.UpdateStaffRequest'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/core.Response'
-      summary: 更新员工
-      tags:
-      - Staff
   /api/v1/stores:
     get:
       consumes:
@@ -11981,63 +11678,6 @@ paths:
           schema:
             $ref: '#/definitions/core.ErrResponse'
       summary: 查询 Statistics 医生详情
-      tags:
-      - Statistics
-  /api/v2/statistics/clinicians/me/entries:
-    get:
-      responses:
-        "200":
-          description: OK
-          schema:
-            allOf:
-            - $ref: '#/definitions/core.Response'
-            - properties:
-                data:
-                  $ref: '#/definitions/statistics.Page-statistics_EntryItem'
-              type: object
-        "503":
-          description: Service Unavailable
-          schema:
-            $ref: '#/definitions/core.ErrResponse'
-      summary: 查询当前医生 Statistics 入口
-      tags:
-      - Statistics
-  /api/v2/statistics/clinicians/me/overview:
-    get:
-      responses:
-        "200":
-          description: OK
-          schema:
-            allOf:
-            - $ref: '#/definitions/core.Response'
-            - properties:
-                data:
-                  $ref: '#/definitions/handler.StatisticsClinicianDetailResponse'
-              type: object
-        "503":
-          description: Service Unavailable
-          schema:
-            $ref: '#/definitions/core.ErrResponse'
-      summary: 查询当前医生 Statistics 总览
-      tags:
-      - Statistics
-  /api/v2/statistics/clinicians/me/testees-summary:
-    get:
-      responses:
-        "200":
-          description: OK
-          schema:
-            allOf:
-            - $ref: '#/definitions/core.Response'
-            - properties:
-                data:
-                  $ref: '#/definitions/statistics.TesteeSummary'
-              type: object
-        "503":
-          description: Service Unavailable
-          schema:
-            $ref: '#/definitions/core.ErrResponse'
-      summary: 查询当前医生 Statistics 受试者摘要
       tags:
       - Statistics
   /api/v2/statistics/contents/batch:

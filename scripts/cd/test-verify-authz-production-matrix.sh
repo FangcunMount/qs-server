@@ -34,7 +34,7 @@ chmod +x "$FAKE_DOCKER"
 
 evidence="$(python3 - <<'PYFIXTURE'
 import json
-subjects=[{"kind":k,"source":"production_staff" if k in ("admin","other") else "synthetic_iam_user","subject_fingerprint":str(i)*16} for i,k in enumerate(("admin","operator","plan_manager","other"),1)]
+subjects=[{"kind":k,"source":"production_operator" if k in ("admin","other") else "synthetic_iam_user","subject_fingerprint":str(i)*16} for i,k in enumerate(("admin","operator","plan_manager","other"),1)]
 cases=[{"kind":k,"scenario":a,"action":a,"expected_allowed":ok,"allowed":ok,"policy_version":27,"passed":True} for k,a,ok in [("admin","retry",True),("operator","retry",True),("plan_manager","retry",True),("other","retry",False),("operator","force_retry",False),("admin","force_retry",True)]]
 print(json.dumps({"schema_version":"iam-authz-production-matrix/v3","git_commit":"0123456789abcdef0123456789abcdef01234567","service_identity":"qs-apiserver.svc","policy_version":27,"subjects":subjects,"cases":cases,"passed":True},separators=(",",":")))
 PYFIXTURE

@@ -66,7 +66,7 @@ func fixture(t *testing.T) (*Service, *assignmentRepo) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	cl := clinicianDomain.NewClinician(7, nil, "医生", "", "", clinicianDomain.Type("doctor"), "", true)
+	cl := clinicianDomain.NewClinician(7, "医生", "", "", clinicianDomain.Type("doctor"), "", true)
 	cl.SetID(clinicianDomain.NewID(10))
 	cl.RestoreStore(nil, 1)
 	r := &assignmentRepo{target: target, clinician: cl}

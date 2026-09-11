@@ -63,22 +63,9 @@ func (s *service) ResolveAccessScope(ctx context.Context, orgID int64, operatorU
 		return &TesteeAccessScope{IsAdmin: true}, nil
 	}
 
-	clinicianItem, err := s.clinicianReader.FindClinicianByOperator(ctx, orgID, operatorItem.ID)
-	if err != nil {
-		if errors.IsCode(err, code.ErrUserNotFound) {
-			return nil, errors.WithCode(code.ErrPermissionDenied, "operator is not bound to clinician")
-		}
-		return nil, errors.Wrap(err, "failed to find clinician by operator")
-	}
-	if !clinicianItem.IsActive {
-		return nil, errors.WithCode(code.ErrPermissionDenied, "clinician is inactive")
-	}
-
-	clinicianID := clinicianItem.ID
-	return &TesteeAccessScope{
-		IsAdmin:     false,
-		ClinicianID: &clinicianID,
-	}, nil
+	// 医生后台身份已退役。Scope 建设之前，普通运营人员不会因拥有动作权限
+	// 自动获得公司全部受试者范围；原本未绑定医生的拒绝行为保持。
+	return nil, errors.WithCode(code.ErrPermissionDenied, "operator has no configured business data scope")
 }
 
 func (s *service) ValidateTesteeAccess(ctx context.Context, orgID int64, operatorUserID int64, testeeID uint64) error {

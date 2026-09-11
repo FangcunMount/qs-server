@@ -52,7 +52,6 @@ func toClinicianSummaryResult(item *domainClinician.Clinician) *ClinicianSummary
 
 	return &ClinicianSummaryResult{
 		ID:            item.ID().Uint64(),
-		OperatorID:    item.OperatorID(),
 		Name:          item.Name(),
 		Department:    item.Department(),
 		Title:         item.Title(),

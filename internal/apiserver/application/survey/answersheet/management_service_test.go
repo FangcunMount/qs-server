@@ -2,6 +2,7 @@ package answersheet
 
 import (
 	"context"
+	appauthz "github.com/FangcunMount/qs-server/internal/apiserver/application/authz"
 	authztest "github.com/FangcunMount/qs-server/internal/apiserver/application/authz/testutil"
 	"math"
 	"testing"
@@ -286,5 +287,23 @@ func TestManagementServiceDeleteWrapsMissingAnswerSheet(t *testing.T) {
 	}
 	if code := errors.ParseCoder(err).Code(); code != errorCode.ErrAnswerSheetNotFound {
 		t.Fatalf("error code = %d, want %d", code, errorCode.ErrAnswerSheetNotFound)
+	}
+}
+
+// Retiring an Operator must not make historical role labels sufficient to read results.
+func TestManagementListRejectsRevokedOperatorBeforeReadingResults(t *testing.T) {
+	for _, ctx := range []context.Context{
+		context.Background(),
+		appauthz.WithSnapshot(context.Background(), &appauthz.Snapshot{DirectRoles: []string{"qs:result_reviewer"}, AuthzVersion: 42}),
+	} {
+		reader := &answerSheetReaderStub{}
+		service := &managementService{reader: reader}
+		result, err := service.List(ctx, ListAnswerSheetsDTO{OrgID: 88, Page: 1, PageSize: 20})
+		if result != nil || err == nil || errors.ParseCoder(err).Code() != errorCode.ErrPermissionDenied {
+			t.Fatalf("revoked Operator result=%v error=%v", result, err)
+		}
+		if reader.listFilter.OrgID != 0 || reader.countFilter.OrgID != 0 {
+			t.Fatal("results or count read before authorization")
+		}
 	}
 }

@@ -249,7 +249,7 @@ func TestListClinicianRelationsUsesReadModel(t *testing.T) {
 }
 
 func makeActiveClinician(id uint64) *domainClinician.Clinician {
-	item := domainClinician.NewClinician(1, nil, "clinician", "", "", domainClinician.TypeCounselor, "", true)
+	item := domainClinician.NewClinician(1, "clinician", "", "", domainClinician.TypeCounselor, "", true)
 	item.SetID(domainClinician.ID(id))
 	return item
 }

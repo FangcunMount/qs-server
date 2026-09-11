@@ -89,7 +89,7 @@ func subjectSQLExpectation(kind string, roles []string) (string, []driver.Value)
 	if kind == "other" {
 		clauses = append(clauses, "JSON_LENGTH(roles) = 1")
 	}
-	query := "SELECT CAST(user_id AS CHAR) FROM staff WHERE " + strings.Join(clauses, " AND ") + " ORDER BY user_id ASC LIMIT 1"
+	query := "SELECT CAST(user_id AS CHAR) FROM operators WHERE " + strings.Join(clauses, " AND ") + " ORDER BY user_id ASC LIMIT 1"
 	args := make([]driver.Value, 0, len(roles))
 	for _, role := range roles {
 		args = append(args, jsonString(role))

@@ -43,7 +43,7 @@ func (r *clinicianRepository) Update(ctx context.Context, item *domain.Clinician
 	po := r.mapper.ToPO(item)
 
 	res := r.WithContext(ctx).Model(&ClinicianPO{}).Where("id=? AND org_id=? AND version=? AND deleted_at IS NULL", item.ID(), item.OrgID(), item.Version()).Updates(map[string]any{
-		"name": po.Name, "department": po.Department, "title": po.Title, "clinician_type": po.ClinicianType, "employee_code": po.EmployeeCode, "is_active": po.IsActive, "operator_id": po.OperatorID, "version": gorm.Expr("version + 1"), "updated_at": time.Now().UTC(), "updated_by": middleware.GetUserIDFromContext(ctx),
+		"name": po.Name, "department": po.Department, "title": po.Title, "clinician_type": po.ClinicianType, "employee_code": po.EmployeeCode, "is_active": po.IsActive, "version": gorm.Expr("version + 1"), "updated_at": time.Now().UTC(), "updated_by": middleware.GetUserIDFromContext(ctx),
 	})
 	if res.Error != nil {
 		return res.Error
@@ -67,21 +67,6 @@ func (r *clinicianRepository) FindByID(ctx context.Context, id domain.ID) (*doma
 			return nil, errors.WithCode(code.ErrUserNotFound, "clinician not found")
 		}
 		return nil, err
-	}
-	return r.mapper.ToDomain(&po), nil
-}
-
-func (r *clinicianRepository) FindByOperator(ctx context.Context, orgID int64, operatorID uint64) (*domain.Clinician, error) {
-	var po ClinicianPO
-	tx := r.WithContext(ctx).
-		Where("org_id = ? AND operator_id = ? AND deleted_at IS NULL", orgID, operatorID).
-		Limit(1).
-		Find(&po)
-	if tx.Error != nil {
-		return nil, tx.Error
-	}
-	if tx.RowsAffected == 0 {
-		return nil, errors.WithCode(code.ErrUserNotFound, "clinician not found")
 	}
 	return r.mapper.ToDomain(&po), nil
 }
