@@ -2,6 +2,7 @@ package operator
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -14,6 +15,9 @@ import (
 	outboxport "github.com/FangcunMount/qs-server/internal/apiserver/port/outbox"
 	"github.com/FangcunMount/qs-server/internal/pkg/retrygovernance"
 )
+
+// ErrRetryStateConflict means the latest assessment or run cannot accept this retry.
+var ErrRetryStateConflict = errors.New("evaluation retry state conflict")
 
 type GovernedRetryCommand struct {
 	AssessmentID         uint64
@@ -72,7 +76,7 @@ func (s *governedRetryService) Authorize(ctx context.Context, actor Actor, comma
 		return nil, err
 	}
 	if !assessmentRecord.Status().IsFailed() {
-		return nil, fmt.Errorf("evaluation retry requires a failed assessment")
+		return nil, fmt.Errorf("%w: evaluation retry requires a failed assessment", ErrRetryStateConflict)
 	}
 	expectedAttempt := command.ExpectedAttempt
 	if expectedAttempt == 0 {
@@ -81,14 +85,14 @@ func (s *governedRetryService) Authorize(ctx context.Context, actor Actor, comma
 			return nil, latestErr
 		}
 		if latest == nil || latest.RetryDecision() == nil {
-			return nil, fmt.Errorf("evaluation retry requires a failed run")
+			return nil, fmt.Errorf("%w: evaluation retry requires a failed run", ErrRetryStateConflict)
 		}
 		wantDisposition := retrygovernance.DispositionManualRequired
 		if command.Origin == retrygovernance.AttemptOriginForce {
 			wantDisposition = retrygovernance.DispositionTerminal
 		}
 		if latest.RetryDecision().Disposition != wantDisposition {
-			return nil, fmt.Errorf("evaluation retry is not available for the latest run")
+			return nil, fmt.Errorf("%w: evaluation retry is not available for the latest run", ErrRetryStateConflict)
 		}
 		expectedAttempt = latest.Attempt().Number
 	}

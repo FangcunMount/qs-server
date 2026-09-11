@@ -2,6 +2,7 @@ package operator
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"testing"
@@ -47,6 +48,9 @@ func TestRetryRequiresActionBeforeReadingOrWriting(t *testing.T) {
 			_, err := svc.Authorize(ctx, Actor{OrgID: 1, OperatorUserID: 9}, GovernedRetryCommand{AssessmentID: 1, AuthorizationSubject: "user:9", AuthorizationAction: tc.action, Origin: retrygovernance.AttemptOriginManual, RequestID: "test", Reason: "test"})
 			if err == nil {
 				t.Fatal("nonfailed assessment must be rejected")
+			}
+			if tc.allow && !errors.Is(err, ErrRetryStateConflict) {
+				t.Fatalf("expected typed retry state conflict: %v", err)
 			}
 			if tc.allow && !strings.Contains(err.Error(), "failed assessment") {
 				t.Fatalf("authorized action should reach state validation: %v", err)

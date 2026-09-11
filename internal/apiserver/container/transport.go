@@ -350,7 +350,7 @@ func normalizeGovernedRetryError(err error) error {
 	if err == nil {
 		return nil
 	}
-	if stderrors.Is(err, evaluationrun.ErrClaimLost) || stderrors.Is(err, evalrun.ErrInvalidRetrySchedule) ||
+	if stderrors.Is(err, evaluationOperator.ErrRetryStateConflict) || stderrors.Is(err, evaluationrun.ErrClaimLost) || stderrors.Is(err, evalrun.ErrInvalidRetrySchedule) ||
 		stderrors.Is(err, generation.ErrVersionConflict) || stderrors.Is(err, interpretationrun.ErrInvalidRetrySchedule) {
 		return baseerrors.WithCode(code.ErrConflict, "%s", err.Error())
 	}
