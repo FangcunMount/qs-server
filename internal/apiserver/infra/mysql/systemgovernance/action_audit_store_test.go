@@ -29,3 +29,15 @@ func TestDecodeActionAuditReplaySupportsV2ErrorAndLegacyResult(t *testing.T) {
 		t.Fatalf("legacy replay = %+v, %v", replay, err)
 	}
 }
+
+func TestEqualAuditJSONPreservesOrderIndependenceAndLargeIdentifiers(t *testing.T) {
+	if !equalAuditJSON(`{"schema_version":2,"result":{"id":636816846305178158}}`, `{"result": {"id": 636816846305178158}, "schema_version": 2}`) {
+		t.Fatal("MySQL normalization changed equality")
+	}
+	if equalAuditJSON(`{"id":636816846305178158}`, `{"id":636816846305178159}`) {
+		t.Fatal("different large identifiers compared equal")
+	}
+	if equalAuditJSON(``, `{}`) {
+		t.Fatal("invalid JSON compared equal")
+	}
+}

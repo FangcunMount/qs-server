@@ -3,6 +3,8 @@ package systemgovernance
 import (
 	"context"
 	"encoding/json"
+	"reflect"
+	"strings"
 	"time"
 
 	app "github.com/FangcunMount/qs-server/internal/apiserver/application/systemgovernance"
@@ -48,7 +50,8 @@ func (s *ActionAuditStore) Claim(ctx context.Context, record app.ActionAuditReco
 		RequestID: record.RequestID, ActionID: record.ActionID, OrgID: record.OrgID,
 		ActorUserID: record.ActorUserID, Component: record.Component,
 		TargetInstance: record.TargetInstance, InputJSON: string(input),
-		Status: "running", StartedAt: record.StartedAt,
+		// A running action has no result yet; JSON columns require a valid literal.
+		Status: "running", ResultJSON: "null", StartedAt: record.StartedAt,
 	}
 	result := s.db.WithContext(ctx).Clauses(clause.OnConflict{DoNothing: true}).Create(&row)
 	if result.Error != nil {
@@ -72,14 +75,11 @@ func (s *ActionAuditStore) Claim(ctx context.Context, record app.ActionAuditReco
 }
 
 func (s *ActionAuditStore) Complete(ctx context.Context, record app.ActionAuditRecord) error {
-	resultJSON := ""
-	if record.Result != nil || record.Error != nil {
-		encoded, err := json.Marshal(actionAuditEnvelope{SchemaVersion: 2, Result: record.Result, Error: record.Error})
-		if err != nil {
-			return err
-		}
-		resultJSON = string(encoded)
+	encoded, err := json.Marshal(actionAuditEnvelope{SchemaVersion: 2, Result: record.Result, Error: record.Error})
+	if err != nil {
+		return err
 	}
+	resultJSON := string(encoded)
 	updates := map[string]interface{}{
 		"status": record.Status, "result_json": resultJSON,
 		"finished_at": record.FinishedAt, "updated_at": time.Now(),
@@ -95,7 +95,7 @@ func (s *ActionAuditStore) Complete(ctx context.Context, record app.ActionAuditR
 		if err := s.db.WithContext(ctx).Where("org_id = ? AND request_id = ?", record.OrgID, record.RequestID).Take(&existing).Error; err != nil {
 			return err
 		}
-		if existing.ActionID == record.ActionID && existing.Status == record.Status && existing.ResultJSON == resultJSON {
+		if existing.ActionID == record.ActionID && existing.Status == record.Status && equalAuditJSON(existing.ResultJSON, resultJSON) {
 			return nil
 		}
 		return gorm.ErrRecordNotFound
@@ -119,3 +119,17 @@ func decodeActionAuditReplay(raw string) (*app.ActionAuditReplay, error) {
 }
 
 var _ app.ActionAuditStore = (*ActionAuditStore)(nil)
+
+// MySQL JSON columns normalize whitespace and member order. Preserve numeric
+// precision while comparing the stored envelope with a repeated completion.
+func equalAuditJSON(left, right string) bool {
+	values := make([]any, 2)
+	for i, raw := range []string{left, right} {
+		decoder := json.NewDecoder(strings.NewReader(raw))
+		decoder.UseNumber()
+		if err := decoder.Decode(&values[i]); err != nil {
+			return false
+		}
+	}
+	return reflect.DeepEqual(values[0], values[1])
+}

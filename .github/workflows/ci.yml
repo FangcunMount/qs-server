@@ -56,6 +56,34 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+  action-audit-mysql:
+    name: Action audit MySQL JSON lifecycle
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: action_audit_test
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -proot"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=20
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+      - name: Verify claim completion and replay against JSON columns
+        env:
+          QS_ACTION_AUDIT_REQUIRE_MYSQL: 'true'
+          QS_SERVER_TEST_MYSQL_DSN: 'root:root@tcp(127.0.0.1:3306)/action_audit_test?parseTime=true'
+        run: go test ./internal/apiserver/infra/mysql/systemgovernance -run TestActionAuditLifecycleWithJSONColumns -count=1 -v
+
   runtime-closure-e2e:
     name: Seeddata Retirement and Current Runtime E2E
     runs-on: ubuntu-latest
