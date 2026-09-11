@@ -2,6 +2,8 @@ package response
 
 // TesteeResponse 受试者响应
 type TesteeResponse struct {
+	StoreID         *string                  `json:"store_id"`
+	StoreVersion    uint32                   `json:"store_version"`
 	ID              string                   `json:"id"`                           // ID
 	OrgID           string                   `json:"org_id"`                       // 机构ID
 	ProfileID       *string                  `json:"profile_id,omitempty"`         // 用户档案ID

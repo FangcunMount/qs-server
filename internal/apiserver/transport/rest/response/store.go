@@ -52,3 +52,17 @@ type ClinicianStoreAssignmentResponse struct {
 type ClinicianStoreHistoryListResponse struct {
 	Items []ClinicianStoreHistoryResponse `json:"items"`
 }
+
+type TesteeStoreHistoryResponse struct {
+	ID          uint64    `swaggertype:"string" json:"id,string"`
+	OrgID       int64     `swaggertype:"string" json:"org_id,string"`
+	TesteeID    uint64    `swaggertype:"string" json:"testee_id,string"`
+	FromStoreID *uint64   `swaggertype:"string" json:"from_store_id,string"`
+	ToStoreID   uint64    `swaggertype:"string" json:"to_store_id,string"`
+	Kind        string    `json:"kind"`
+	ActorID     int64     `swaggertype:"string" json:"actor_id,string"`
+	CreatedAt   time.Time `json:"created_at"`
+	Reason      string    `json:"reason"`
+	RequestID   string    `json:"request_id"`
+	Version     uint32    `json:"version"`
+}

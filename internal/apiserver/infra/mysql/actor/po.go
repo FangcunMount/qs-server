@@ -15,6 +15,9 @@ import (
 type TesteePO struct {
 	mysql.AuditFields
 
+	StoreID      *uint64 `gorm:"column:store_id;type:bigint unsigned"`
+	StoreVersion uint32  `gorm:"column:store_version;not null;default:1"`
+
 	OrgID      int64          `gorm:"column:org_id;not null"`
 	ProfileID  *uint64        `gorm:"column:profile_id;type:bigint unsigned;index:idx_profile_id"`
 	Name       string         `gorm:"column:name;size:100;not null;index:idx_name"`

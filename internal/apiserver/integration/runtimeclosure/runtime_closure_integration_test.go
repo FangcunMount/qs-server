@@ -22,6 +22,8 @@ import (
 	interpretationpb "github.com/FangcunMount/qs-server/api/grpc/gen/interpretation"
 	assessmententryapp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/assessmententry"
 	clinicianapp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/clinician"
+	storeapp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/store"
+	"github.com/FangcunMount/qs-server/internal/apiserver/application/authz"
 	evaluationtesteeapp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/testee"
 	interpretationparticipantapp "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/participant"
 	assessmentintakejourney "github.com/FangcunMount/qs-server/internal/apiserver/application/journey/assessmentintake"
@@ -251,6 +253,7 @@ func TestCurrentRuntimeClosure(t *testing.T) {
 	}
 	assertReportWaitClosure(t, grpcDeps, testeeID, readiness.GetAssessmentId())
 	assertCurrentRuntimeFacts(t, gormDB, mongoDB, orgID, testeeID, entryID, taskID, answerResponse.GetId(), readiness.GetAssessmentId(), startedAt)
+	testScanAfterConcurrentClinicianTransfer(t, c, gormDB, orgID, testeeID, entryID)
 	assertLegacyBusinessDateStatistics(t, c, gormDB, orgID, testeeID)
 }
 
@@ -262,6 +265,15 @@ func createRuntimeActorAndEntry(t *testing.T, c *container.Container, grpcDeps g
 	})
 	if err != nil {
 		t.Fatalf("create Clinician: %v", err)
+	}
+	headquarters := authz.WithSnapshot(t.Context(), &authz.Snapshot{AuthzVersion: 1, Permissions: []authz.Permission{{Resource: "qs:*:*:*", Action: "*", Mode: authz.AuthorizationModeUnconditional}}})
+	operator := storeapp.Actor{OrgID: int64(orgID), UserID: 1}
+	serviceStore, err := c.ActorModule.StoreService.Create(headquarters, operator, "runtime-store", "runtime store", "")
+	if err != nil {
+		t.Fatalf("create service store: %v", err)
+	}
+	if _, err = c.ActorModule.StoreService.Assign(headquarters, operator, clinician.ID, storeapp.Change{StoreID: serviceStore.ID(), ExpectedVersion: clinician.Version, Reason: "runtime closure fixture", RequestID: "runtime-initial"}); err != nil {
+		t.Fatalf("configure clinician store: %v", err)
 	}
 	profileID := orgID + 1000000
 	actorService := grpcservice.NewActorService(
@@ -607,6 +619,13 @@ func assertCurrentRuntimeFacts(
 	}
 	assertCurrentTime(t, "assessment_entry.created_at", entry.CreatedAt, startedAt)
 	assertRowCount(t, db, "assessment_entry_resolve_log", "org_id = ? AND entry_id = ?", 1, orgID, entryID)
+	assertRowCount(t, db, "testee_store_history", "org_id = ? AND testee_id = ? AND entry_id = ? AND kind = 'scan_initial'", 1, orgID, testeeID, entryID)
+	var ownershipMatches int64
+	if err := db.Raw(`SELECT COUNT(*) FROM testee t JOIN assessment_entry e ON e.id=? AND e.org_id=t.org_id
+        JOIN clinician c ON c.id=e.clinician_id AND c.org_id=t.org_id
+        WHERE t.id=? AND t.org_id=? AND t.store_id=c.store_id AND t.store_id IS NOT NULL AND t.store_version=2`, entryID, testeeID, orgID).Scan(&ownershipMatches).Error; err != nil || ownershipMatches != 1 {
+		t.Fatalf("scan ownership mismatch: %d %v", ownershipMatches, err)
+	}
 	assertRowCount(t, db, "assessment_entry_intake_log", "org_id = ? AND entry_id = ? AND testee_id = ?", 1, orgID, entryID, testeeID)
 	assertRowCount(t, db, "clinician_relation", "org_id = ? AND source_type = 'assessment_entry' AND source_id = ? AND testee_id = ?", 2, orgID, entryID, testeeID)
 
@@ -688,5 +707,159 @@ func assertCurrentTime(t *testing.T, name string, value, floor time.Time) {
 	value = value.UTC()
 	if value.Before(floor) || value.After(time.Now().UTC().Add(10*time.Second)) {
 		t.Fatalf("%s=%s is outside current runtime window [%s, now]", name, value, floor)
+	}
+}
+
+// Hold the old store row until MySQL proves intake is waiting for it, then
+// transfer the clinician using the real application service. No timing guess
+// establishes the ordering and no production data is used.
+func testScanAfterConcurrentClinicianTransfer(t *testing.T, c *container.Container, db *gorm.DB, orgID, testeeID, entryID uint64) {
+	t.Helper()
+	ctx, cancel := context.WithTimeout(t.Context(), 20*time.Second)
+	defer cancel()
+	headquarters := authz.WithSnapshot(ctx, &authz.Snapshot{AuthzVersion: 1, Permissions: []authz.Permission{{Resource: "qs:*:*:*", Action: "*", Mode: authz.AuthorizationModeUnconditional}}})
+	actor := storeapp.Actor{OrgID: int64(orgID), UserID: 1}
+	next, err := c.ActorModule.StoreService.Create(headquarters, actor, "runtime-transfer", "runtime transfer", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var facts struct {
+		ClinicianID, StoreID, ProfileID uint64
+		Version                         uint32
+		Token                           string
+	}
+	if err = db.Raw(`SELECT c.id clinician_id,c.store_id,c.version,e.token,t.profile_id FROM assessment_entry e
+ JOIN clinician c ON c.id=e.clinician_id JOIN testee t ON t.id=? WHERE e.id=?`, testeeID, entryID).Scan(&facts).Error; err != nil {
+		t.Fatal(err)
+	}
+	tx := db.WithContext(ctx).Begin()
+	if tx.Error != nil {
+		t.Fatal(tx.Error)
+	}
+	defer tx.Rollback()
+	var locked uint64
+	if err = tx.Raw("SELECT id FROM actor_stores WHERE id=? FOR UPDATE", facts.StoreID).Scan(&locked).Error; err != nil {
+		t.Fatal(err)
+	}
+	done := make(chan error, 1)
+	go func() {
+		_, err := c.ActorModule.AssessmentEntryService.Intake(ctx, facts.Token, assessmententryapp.IntakeByAssessmentEntryDTO{ProfileID: &facts.ProfileID, Name: "runtime-closure-testee"})
+		done <- err
+	}()
+	waitForRuntimeLock(t, ctx, db, "actor_stores")
+	transfer, err := c.ActorModule.StoreService.Assign(headquarters, actor, facts.ClinicianID, storeapp.Change{StoreID: next.ID(), ExpectedVersion: facts.Version, Reason: "concurrent scan test", RequestID: "runtime-transfer"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if transfer.InvalidatedCount != 1 {
+		t.Fatalf("old entry not invalidated: %+v", transfer)
+	}
+	if err = tx.Commit().Error; err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case err := <-done:
+		if err == nil {
+			t.Fatal("scan accepted an entry invalidated while waiting")
+		}
+	case <-ctx.Done():
+		t.Fatal("scan did not finish")
+	}
+	if _, err = c.ActorModule.AssessmentEntryService.Resolve(ctx, facts.Token); err == nil {
+		t.Fatal("old entry resolved after transfer")
+	}
+	var current struct {
+		StoreID      uint64
+		StoreVersion uint32
+	}
+	if err = db.Table("testee").Select("store_id", "store_version").Where("id=?", testeeID).Take(&current).Error; err != nil {
+		t.Fatal(err)
+	}
+	if current.StoreID != facts.StoreID || current.StoreVersion != 2 {
+		t.Fatal("clinician transfer changed existing testee ownership")
+	}
+	assertRowCount(t, db, "assessment_entry_intake_log", "entry_id=?", 1, entryID)
+	assertRowCount(t, db, "testee_store_history", "testee_id=?", 1, testeeID)
+	// Inverse ordering: intake owns the clinician/entry locks and waits on
+	// the testee. Transfer must wait until that intake commits.
+	fresh, err := c.ActorModule.AssessmentEntryService.Create(ctx, assessmententryapp.CreateAssessmentEntryDTO{OrgID: int64(orgID), ClinicianID: facts.ClinicianID, TargetType: "scale", TargetCode: runtimeModelCode, TargetVersion: runtimeVersion})
+	if err != nil {
+		t.Fatal(err)
+	}
+	hold := db.WithContext(ctx).Begin()
+	if hold.Error != nil {
+		t.Fatal(hold.Error)
+	}
+	defer hold.Rollback()
+	if err = hold.Raw("SELECT id FROM testee WHERE id=? FOR UPDATE", testeeID).Scan(&locked).Error; err != nil {
+		t.Fatal(err)
+	}
+	intakeDone := make(chan error, 1)
+	go func() {
+		_, e := c.ActorModule.AssessmentEntryService.Intake(ctx, fresh.Token, assessmententryapp.IntakeByAssessmentEntryDTO{ProfileID: &facts.ProfileID, Name: "runtime-closure-testee"})
+		intakeDone <- e
+	}()
+	waitForRuntimeLock(t, ctx, db, "testee")
+	transferDone := make(chan error, 1)
+	go func() {
+		_, e := c.ActorModule.StoreService.Assign(headquarters, actor, facts.ClinicianID, storeapp.Change{StoreID: facts.StoreID, ExpectedVersion: transfer.Version, Reason: "inverse concurrent scan test", RequestID: "runtime-transfer-back"})
+		transferDone <- e
+	}()
+	waitForRuntimeLock(t, ctx, db, "clinician")
+	if err = hold.Commit().Error; err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case e := <-intakeDone:
+		if e != nil {
+			t.Fatalf("locked intake failed: %v", e)
+		}
+	case <-ctx.Done():
+		t.Fatal(ctx.Err())
+	}
+	select {
+	case e := <-transferDone:
+		if e != nil {
+			t.Fatalf("waiting transfer failed: %v", e)
+		}
+	case <-ctx.Done():
+		t.Fatal(ctx.Err())
+	}
+	if _, err = c.ActorModule.AssessmentEntryService.Resolve(ctx, fresh.Token); err == nil {
+		t.Fatal("completed intake entry revived after subsequent transfer")
+	}
+	assertRowCount(t, db, "assessment_entry_intake_log", "entry_id=?", 1, fresh.ID)
+	assertRowCount(t, db, "testee_store_history", "testee_id=?", 1, testeeID)
+	if err = db.Table("testee").Select("store_id", "store_version").Where("id=?", testeeID).Take(&current).Error; err != nil {
+		t.Fatal(err)
+	}
+	if current.StoreID != facts.StoreID || current.StoreVersion != 2 {
+		t.Fatal("scan at another store reassigned testee")
+	}
+}
+func waitForRuntimeLock(t *testing.T, ctx context.Context, db *gorm.DB, table string) {
+	t.Helper()
+	deadline := time.NewTimer(5 * time.Second)
+	defer deadline.Stop()
+	ticker := time.NewTicker(20 * time.Millisecond)
+	defer ticker.Stop()
+	for {
+		var count int64
+		err := db.WithContext(ctx).Raw(`SELECT COUNT(*) FROM performance_schema.data_lock_waits w
+   JOIN performance_schema.data_locks l ON l.ENGINE_LOCK_ID=w.REQUESTING_ENGINE_LOCK_ID
+   WHERE l.OBJECT_SCHEMA=DATABASE() AND l.OBJECT_NAME=?`, table).Scan(&count).Error
+		if err != nil {
+			t.Fatal(err)
+		}
+		if count > 0 {
+			return
+		}
+		select {
+		case <-ticker.C:
+		case <-deadline.C:
+			t.Fatalf("no observed lock wait for %s", table)
+		case <-ctx.Done():
+			t.Fatal(ctx.Err())
+		}
 	}
 }

@@ -2,6 +2,9 @@ package assessmententry
 
 import (
 	"context"
+	"github.com/FangcunMount/component-base/pkg/errors"
+	"github.com/FangcunMount/qs-server/internal/pkg/code"
+	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 	"time"
 )
 
@@ -15,14 +18,25 @@ func newIntakeUseCase(service *service) *intakeUseCase {
 
 func (u *intakeUseCase) Execute(ctx context.Context, token string, dto IntakeByAssessmentEntryDTO) (*AssessmentEntryIntakeResult, error) {
 	state := &intakeState{}
+	historyID := meta.New().Uint64()
 	err := u.service.uow.WithinTransaction(ctx, func(txCtx context.Context) error {
+		target, err := u.lockIntakeStore(txCtx, token)
+		if err != nil {
+			return err
+		}
 		if err := u.resolveEntry(txCtx, token, state); err != nil {
 			return err
+		}
+		if state.clinician.StoreID() == nil || *state.clinician.StoreID() != target.ID() {
+			return errors.WithCode(code.ErrConflict, "clinician store changed; refresh and scan again")
 		}
 		if err := u.validateProfile(txCtx, dto); err != nil {
 			return err
 		}
 		if err := u.resolveOrCreateTestee(txCtx, dto, state); err != nil {
+			return err
+		}
+		if err := u.assignIntakeStore(txCtx, state, target, historyID); err != nil {
 			return err
 		}
 		if err := u.ensureCreatorRelation(txCtx, state); err != nil {

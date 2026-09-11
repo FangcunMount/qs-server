@@ -2,6 +2,7 @@ package assessmententry
 
 import (
 	"context"
+	ownership "github.com/FangcunMount/qs-server/internal/apiserver/port/testeestore"
 	"strconv"
 	"time"
 
@@ -18,6 +19,7 @@ import (
 )
 
 type service struct {
+	ownership     ownership.IntakeRepository
 	repo          domainAssessmentEntry.Repository
 	clinicianRepo domainClinician.Repository
 	relationRepo  domainRelation.Repository
@@ -56,6 +58,7 @@ func NewService(
 	resolveLog ResolveLogWriter,
 	intakeLog IntakeLogWriter,
 	uow apptransaction.Runner,
+	storeOwnership ownership.IntakeRepository,
 	entryReaders ...actorreadmodel.AssessmentEntryReader,
 ) AssessmentEntryService {
 	var entryReader actorreadmodel.AssessmentEntryReader
@@ -63,6 +66,7 @@ func NewService(
 		entryReader = entryReaders[0]
 	}
 	return &service{
+		ownership:     storeOwnership,
 		repo:          repo,
 		clinicianRepo: clinicianRepo,
 		relationRepo:  relationRepo,

@@ -45,3 +45,15 @@ type Factory interface {
 		source string,
 	) (*Testee, error)
 }
+
+// OwnershipReader reads current ownership from authoritative storage. Cache
+// decorators may retain profile data but must not reuse cached ownership facts.
+type OwnershipReader interface {
+	FindCurrentOwnership(ctx context.Context, id ID) (Ownership, error)
+}
+
+type Ownership struct {
+	OrgID   int64
+	StoreID *uint64
+	Version uint32
+}

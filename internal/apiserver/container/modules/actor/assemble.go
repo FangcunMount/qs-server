@@ -3,8 +3,10 @@ package actor
 import (
 	retirementApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/operatorretirement"
 	storeApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/store"
+	testeeStoreApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/testeestore"
 	retirementInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/actor/operatorretirement"
 	storeInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/actor/store"
+	testeeStoreInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/actor/testeestore"
 	"gorm.io/gorm"
 
 	redis "github.com/redis/go-redis/v9"
@@ -37,6 +39,7 @@ import (
 // Module assembles actor application services.
 type Module struct {
 	OperatorRetirementService        *retirementApp.Service
+	TesteeStoreService               *testeeStoreApp.Service
 	StoreService                     *storeApp.Service
 	TesteeRegistrationService        testeeApp.TesteeRegistrationService
 	TesteeManagementService          testeeApp.TesteeManagementService
@@ -98,6 +101,7 @@ func New(deps Deps) (*Module, error) {
 
 	txRunner := modtx.NewMySQLRunner(mysqlDB)
 	module.StoreService = storeApp.NewService(storeInfra.NewRepository(mysqlDB), txRunner)
+	module.TesteeStoreService = testeeStoreApp.NewService(testeeStoreInfra.NewRepository(mysqlDB), txRunner)
 	mysqlOptions := mysql.BaseRepositoryOptions{Limiter: deps.MySQLLimiter}
 
 	baseTesteeRepo := actorInfra.NewTesteeRepository(mysqlDB, mysqlOptions)
@@ -215,6 +219,7 @@ func New(deps Deps) (*Module, error) {
 		resolveLogWriter,
 		intakeLogWriter,
 		txRunner,
+		testeeStoreInfra.NewRepository(mysqlDB),
 		actorReadModel,
 	)
 

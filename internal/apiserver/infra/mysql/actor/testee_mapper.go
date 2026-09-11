@@ -20,13 +20,15 @@ func (m *TesteeMapper) ToPO(domain *testee.Testee) *TesteePO {
 	}
 
 	po := &TesteePO{
-		OrgID:      domain.OrgID(),
-		Name:       domain.Name(),
-		Gender:     int8(domain.Gender()),
-		Birthday:   domain.Birthday(),
-		Tags:       domain.TagsAsStrings(),
-		Source:     domain.Source(),
-		IsKeyFocus: domain.IsKeyFocus(),
+		OrgID:        domain.OrgID(),
+		StoreID:      domain.StoreID(),
+		StoreVersion: domain.StoreVersion(),
+		Name:         domain.Name(),
+		Gender:       int8(domain.Gender()),
+		Birthday:     domain.Birthday(),
+		Tags:         domain.TagsAsStrings(),
+		Source:       domain.Source(),
+		IsKeyFocus:   domain.IsKeyFocus(),
 	}
 
 	// 处理 ProfileID
@@ -66,6 +68,7 @@ func (m *TesteeMapper) ToDomain(po *TesteePO) *testee.Testee {
 	)
 	domain.SetCreatedAt(po.CreatedAt)
 	domain.SetUpdatedAt(po.UpdatedAt)
+	domain.RestoreStore(po.StoreID, po.StoreVersion)
 
 	return domain
 }

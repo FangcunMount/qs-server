@@ -12,6 +12,7 @@ func (m *Module) ExportRESTDeps(qrCodeService qrcodeApp.QRCodeService) resttrans
 		return deps
 	}
 	deps.StoreService = m.StoreService
+	deps.TesteeStoreService = m.TesteeStoreService
 	deps.OperatorRetirementService = m.OperatorRetirementService
 	deps.TesteeManagementService = m.TesteeManagementService
 	deps.TesteeQueryService = m.TesteeQueryService

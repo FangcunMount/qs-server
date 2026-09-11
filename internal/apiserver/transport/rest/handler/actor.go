@@ -290,6 +290,8 @@ func (h *TesteeHandler) UpdateTestee(c *gin.Context) {
 
 // ListTestees 查询受试者列表。
 // @Summary 查询受试者列表
+// @Param store_id query string false "当前服务门店ID，与 unassigned_store=true 互斥"
+// @Param unassigned_store query boolean false "仅查询未归属门店的受试者"
 // @Tags 受试者
 // @Produce json
 // @Param Authorization header string true "Bearer 用户令牌"
@@ -400,6 +402,9 @@ func (h *TesteeHandler) parseTesteeListQuery(c *gin.Context) (*testeeListQuery, 
 		return nil, err
 	}
 
+	if req.StoreID != nil && req.UnassignedStore {
+		return nil, errors.WithCode(code.ErrInvalidArgument, "store_id and unassigned_store are mutually exclusive")
+	}
 	orgID, err := h.RequireProtectedOrgIDWithLegacy(c, req.OrgID)
 	if err != nil {
 		return nil, err
@@ -445,6 +450,7 @@ func (h *TesteeHandler) listTesteesByProfile(c *gin.Context, operatorUserID int6
 
 func (h *TesteeHandler) buildTesteeListDTO(c *gin.Context, operatorUserID int64, query *testeeListQuery) (testeeApp.ListTesteeDTO, error) {
 	dto := testeeApp.ListTesteeDTO{
+		StoreID: query.Request.StoreID, UnassignedStore: query.Request.UnassignedStore,
 		OrgID:          query.OrgID,
 		Name:           query.Request.Name,
 		KeyFocus:       query.Request.IsKeyFocus,
@@ -543,6 +549,12 @@ func testeeMatchesListFilter(
 	if result == nil {
 		return false
 	}
+	if req.StoreID != nil && (result.StoreID == nil || *result.StoreID != *req.StoreID) {
+		return false
+	}
+	if req.UnassignedStore && result.StoreID != nil {
+		return false
+	}
 	if req.Name != "" && !strings.Contains(strings.ToLower(result.Name), strings.ToLower(req.Name)) {
 		return false
 	}
@@ -607,6 +619,7 @@ func toTesteeResponse(result *testeeApp.TesteeResult) *response.TesteeResponse {
 	}
 
 	resp := &response.TesteeResponse{
+		StoreID: uint64StringPtr(result.StoreID), StoreVersion: result.StoreVersion,
 		ID:              idStr,
 		OrgID:           orgIDStr,
 		ProfileID:       profileIDStr,

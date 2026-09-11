@@ -127,6 +127,12 @@ func (r *readModel) ListTesteesByIDs(ctx context.Context, orgID int64, ids []uin
 
 func (r *readModel) applyTesteeFilter(query *gorm.DB, filter actorreadmodel.TesteeFilter) *gorm.DB {
 	query = query.Where("org_id = ? AND deleted_at IS NULL", filter.OrgID)
+	if filter.StoreID != nil {
+		query = query.Where("store_id = ?", *filter.StoreID)
+	}
+	if filter.UnassignedStore {
+		query = query.Where("store_id IS NULL")
+	}
 	if filter.RestrictToAccessScope {
 		query = query.Where("id IN ?", filter.AccessibleTesteeIDs)
 	}
@@ -567,6 +573,7 @@ func (r *readModel) loadClinicianRowsByID(ctx context.Context, ids []uint64) (ma
 
 func testeeRowFromPO(po *TesteePO) actorreadmodel.TesteeRow {
 	row := actorreadmodel.TesteeRow{
+		StoreID: po.StoreID, StoreVersion: po.StoreVersion,
 		ID:         uint64(po.ID),
 		OrgID:      po.OrgID,
 		ProfileID:  po.ProfileID,

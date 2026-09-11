@@ -4,6 +4,7 @@ import (
 	"fmt"
 	retirementApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/operatorretirement"
 	storeApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/store"
+	testeeStoreApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/testeestore"
 	"net/http"
 	"time"
 
@@ -116,6 +117,7 @@ type AssessmentModelDeps struct {
 
 type ActorDeps struct {
 	OperatorRetirementService     *retirementApp.Service
+	TesteeStoreService            *testeeStoreApp.Service
 	StoreService                  *storeApp.Service
 	TesteeManagementService       testeeApp.TesteeManagementService
 	TesteeQueryService            testeeApp.TesteeQueryService

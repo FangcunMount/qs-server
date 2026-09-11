@@ -3,6 +3,9 @@ package actorcache
 import (
 	"context"
 	"encoding/json"
+	"fmt"
+	dbctx "github.com/FangcunMount/qs-server/internal/pkg/database/mysql"
+	"sync/atomic"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/cache/catalog"
 	"github.com/FangcunMount/qs-server/internal/apiserver/cache/internal/adapterkit"
@@ -52,6 +55,9 @@ func newTesteeCacheEntryCodec(mapper *testeeInfra.TesteeMapper) adapterkit.Cache
 			if err := json.Unmarshal(data, &po); err != nil {
 				return nil, err
 			}
+			if po.StoreVersion == 0 {
+				return nil, fmt.Errorf("testee cache lacks current ownership version")
+			}
 			return mapper.ToDomain(&po), nil
 		},
 	}
@@ -62,21 +68,42 @@ func (r *CachedTesteeRepository) buildCacheKey(id testee.ID) string {
 	return r.keys.BuildTesteeInfoKey(id.Uint64())
 }
 
-// FindByID 根据ID查询受试者（优先从缓存读取）
+// FindByID caches profile information; current store ownership always comes from storage.
 func (r *CachedTesteeRepository) FindByID(ctx context.Context, id testee.ID) (*testee.Testee, error) {
+	// Transactional decisions must observe the transaction, not cached facts.
+	if _, ok := dbctx.TxFromContext(ctx); ok {
+		return r.repo.FindByID(ctx, id)
+	}
+	var loaded atomic.Bool
 	domain, err := adapterkit.ReadThroughObject(ctx, adapterkit.ObjectReadThroughOptions[testee.Testee]{
 		PolicyKey:        cachepolicy.CapabilityActorTestee,
 		CacheKey:         r.buildCacheKey(id),
 		PolicyProvider:   r.policies,
 		Observer:         r.observer,
 		Store:            r.store,
-		Load:             func(ctx context.Context) (*testee.Testee, error) { return r.repo.FindByID(ctx, id) },
+		Load:             func(ctx context.Context) (*testee.Testee, error) { loaded.Store(true); return r.repo.FindByID(ctx, id) },
 		CacheNegative:    true,
 		AsyncSetCached:   true,
 		AsyncSetNegative: true,
 	})
 	if err != nil {
 		return nil, err
+	}
+	if domain != nil && !loaded.Load() {
+		reader, ok := r.repo.(testee.OwnershipReader)
+		if !ok {
+			return r.repo.FindByID(ctx, id)
+		}
+		ownership, err := reader.FindCurrentOwnership(ctx, id)
+		if err != nil {
+			return nil, err
+		}
+		if ownership.Version == 0 || ownership.OrgID != domain.OrgID() {
+			return nil, fmt.Errorf("invalid current testee ownership")
+		}
+		current := *domain
+		current.RestoreStore(ownership.StoreID, ownership.Version)
+		domain = &current
 	}
 	return domain, nil
 }

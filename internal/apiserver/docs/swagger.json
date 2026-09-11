@@ -6091,6 +6091,18 @@
                 "parameters": [
                     {
                         "type": "string",
+                        "description": "当前服务门店ID，与 unassigned_store=true 互斥",
+                        "name": "store_id",
+                        "in": "query"
+                    },
+                    {
+                        "type": "boolean",
+                        "description": "仅查询未归属门店的受试者",
+                        "name": "unassigned_store",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
                         "description": "Bearer 用户令牌",
                         "name": "Authorization",
                         "in": "header",
@@ -6512,6 +6524,195 @@
                 "responses": {
                     "200": {
                         "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/core.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/testees/{id}/store": {
+            "put": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Actor Testee"
+                ],
+                "summary": "首次配置受试者服务门店",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "受试者 ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "归属配置",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/request.AssignTesteeStoreRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/response.TesteeStoreHistoryResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/core.Response"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/core.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/testees/{id}/store-history": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Actor Testee"
+                ],
+                "summary": "查询受试者服务门店变更历史",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "受试者 ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "上一页末尾历史 ID",
+                        "name": "before",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "每页数量，最多 100",
+                        "name": "limit",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/response.TesteeStoreHistoryResponse"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/core.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/testees/{id}/store-transfers": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Actor Testee"
+                ],
+                "summary": "总部调整受试者服务门店",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "受试者 ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "转店配置",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/request.AssignTesteeStoreRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/response.TesteeStoreHistoryResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/core.Response"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
                         "schema": {
                             "$ref": "#/definitions/core.Response"
                         }
@@ -14828,6 +15029,30 @@
                 }
             }
         },
+        "request.AssignTesteeStoreRequest": {
+            "type": "object",
+            "required": [
+                "expected_version",
+                "reason",
+                "request_id",
+                "store_id"
+            ],
+            "properties": {
+                "expected_version": {
+                    "type": "integer"
+                },
+                "reason": {
+                    "type": "string"
+                },
+                "request_id": {
+                    "type": "string"
+                },
+                "store_id": {
+                    "type": "string",
+                    "example": ""
+                }
+            }
+        },
         "request.BatchEvaluateRequest": {
             "type": "object",
             "properties": {
@@ -18623,9 +18848,59 @@
                     "description": "来源中文",
                     "type": "string"
                 },
+                "store_id": {
+                    "type": "string"
+                },
+                "store_version": {
+                    "type": "integer"
+                },
                 "updated_at": {
                     "description": "更新时间",
                     "type": "string"
+                }
+            }
+        },
+        "response.TesteeStoreHistoryResponse": {
+            "type": "object",
+            "properties": {
+                "actor_id": {
+                    "type": "string",
+                    "example": ""
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "from_store_id": {
+                    "type": "string",
+                    "example": ""
+                },
+                "id": {
+                    "type": "string",
+                    "example": ""
+                },
+                "kind": {
+                    "type": "string"
+                },
+                "org_id": {
+                    "type": "string",
+                    "example": ""
+                },
+                "reason": {
+                    "type": "string"
+                },
+                "request_id": {
+                    "type": "string"
+                },
+                "testee_id": {
+                    "type": "string",
+                    "example": ""
+                },
+                "to_store_id": {
+                    "type": "string",
+                    "example": ""
+                },
+                "version": {
+                    "type": "integer"
                 }
             }
         },

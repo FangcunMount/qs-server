@@ -19,3 +19,10 @@ type AssignClinicianStoreRequest struct {
 	Reason          string `json:"reason" binding:"required"`
 	RequestID       string `json:"request_id" binding:"required"`
 }
+
+type AssignTesteeStoreRequest struct {
+	StoreID         uint64 `swaggertype:"string" json:"store_id,string" binding:"required"`
+	ExpectedVersion uint32 `json:"expected_version" binding:"required"`
+	Reason          string `json:"reason" binding:"required"`
+	RequestID       string `json:"request_id" binding:"required"`
+}

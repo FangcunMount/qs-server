@@ -11,7 +11,11 @@ import "time"
 type Testee struct {
 	// === 核心标识 ===
 	id    ID
-	orgID int64 // 所属机构（医院、训练中心、学校等）
+	orgID int64 // 所属公司；门店归属独立维护
+
+	// === 当前服务门店 ===
+	storeID      *uint64 // nil 表示未归属，不代表公司全部门店
+	storeVersion uint32  // 归属专用版本，普通资料更新不改变它
 
 	// === 用户档案关联 ===
 	profileID *uint64 // 可选：关联的 IAM Profile ID
@@ -37,12 +41,13 @@ func NewTestee(
 	birthday *time.Time,
 ) *Testee {
 	return &Testee{
-		orgID:    orgID,
-		name:     name,
-		gender:   gender,
-		birthday: birthday,
-		source:   SourceUnknown,
-		tags:     make([]Tag, 0),
+		orgID:        orgID,
+		storeVersion: 1,
+		name:         name,
+		gender:       gender,
+		birthday:     birthday,
+		source:       SourceUnknown,
+		tags:         make([]Tag, 0),
 	}
 }
 

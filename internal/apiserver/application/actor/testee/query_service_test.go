@@ -191,3 +191,26 @@ func makeQueryServiceTesteeRow(id uint64, createdAt time.Time) actorreadmodel.Te
 		UpdatedAt: createdAt,
 	}
 }
+
+func TestStoreFilterRetainsAccessScopeAndRejectsAmbiguity(t *testing.T) {
+	repo := &queryServiceRepoStub{}
+	service := NewQueryServiceWithAssessmentSummary(repo, nil)
+	id := uint64(7)
+	dto := ListTesteeDTO{OrgID: 1, StoreID: &id, UnassignedStore: true}
+	if _, err := service.ListTestees(context.Background(), dto); err == nil {
+		t.Fatal("ambiguous store filter accepted")
+	}
+	if repo.listCalls != 0 {
+		t.Fatal("invalid filter read data")
+	}
+	dto.UnassignedStore = false
+	dto.RestrictToAccessScope = true
+	dto.AccessibleTesteeIDs = []uint64{21}
+	dto.Limit = 1
+	if _, err := service.ListTestees(context.Background(), dto); err != nil {
+		t.Fatal(err)
+	}
+	if repo.lastFilter.StoreID == nil || *repo.lastFilter.StoreID != 7 || !repo.lastFilter.RestrictToAccessScope || len(repo.lastFilter.AccessibleTesteeIDs) != 1 {
+		t.Fatal("store filter replaced access boundary")
+	}
+}

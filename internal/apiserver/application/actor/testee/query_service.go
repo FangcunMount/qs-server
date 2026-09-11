@@ -64,6 +64,9 @@ func (s *queryService) FindByProfile(ctx context.Context, orgID int64, profileID
 
 // ListTestees 列出受试者
 func (s *queryService) ListTestees(ctx context.Context, dto ListTesteeDTO) (*TesteeListResult, error) {
+	if dto.StoreID != nil && (*dto.StoreID == 0 || dto.UnassignedStore) {
+		return nil, errors.WithCode(code.ErrInvalidArgument, "store_id and unassigned_store are mutually exclusive")
+	}
 	if dto.RestrictToAccessScope {
 		for _, id := range dto.AccessibleTesteeIDs {
 			if _, err := testeeIDFromUint64("accessible_testee_id", id); err != nil {
@@ -73,6 +76,7 @@ func (s *queryService) ListTestees(ctx context.Context, dto ListTesteeDTO) (*Tes
 	}
 
 	filter := actorreadmodel.TesteeFilter{
+		StoreID: dto.StoreID, UnassignedStore: dto.UnassignedStore,
 		OrgID:                 dto.OrgID,
 		Name:                  dto.Name,
 		KeyFocus:              dto.KeyFocus,

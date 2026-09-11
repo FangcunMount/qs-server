@@ -17,6 +17,8 @@ tags:
   description: AI-Explanation-Administration
 - name: Actor Store
   description: Actor Store
+- name: Actor Testee
+  description: Actor Testee
 - name: AnswerSheet-Management
   description: 答卷管理
 - name: AssessmentAssets
@@ -6026,6 +6028,14 @@ paths:
       description: 查询受试者列表
       parameters:
       - type: string
+        description: 当前服务门店ID，与 unassigned_store=true 互斥
+        name: store_id
+        in: query
+      - type: boolean
+        description: 仅查询未归属门店的受试者
+        name: unassigned_store
+        in: query
+      - type: string
         description: Bearer 用户令牌
         name: Authorization
         in: header
@@ -6454,6 +6464,169 @@ paths:
                 $ref: '#/components/schemas/core.ErrResponse'
         '403':
           description: 无权访问该资源
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '500':
+          description: 服务内部错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+  /api/v1/testees/{id}/store:
+    put:
+      tags:
+      - Actor Testee
+      summary: 首次配置受试者服务门店
+      operationId: 首次配置受试者服务门店
+      description: 首次配置受试者服务门店
+      parameters:
+      - type: string
+        description: 受试者 ID
+        name: id
+        in: path
+        required: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/request.AssignTesteeStoreRequest'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/core.Response'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/response.TesteeStoreHistoryResponse'
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.Response'
+        '409':
+          description: Conflict
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.Response'
+        '401':
+          description: 认证失败或访问令牌无效
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '500':
+          description: 服务内部错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+  /api/v1/testees/{id}/store-history:
+    get:
+      tags:
+      - Actor Testee
+      summary: 查询受试者服务门店变更历史
+      operationId: 查询受试者服务门店变更历史
+      description: 查询受试者服务门店变更历史
+      parameters:
+      - type: string
+        description: 受试者 ID
+        name: id
+        in: path
+        required: true
+      - type: string
+        description: 上一页末尾历史 ID
+        name: before
+        in: query
+      - type: integer
+        description: 每页数量，最多 100
+        name: limit
+        in: query
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/core.Response'
+                - type: object
+                  properties:
+                    data:
+                      type: array
+                      items:
+                        $ref: '#/components/schemas/response.TesteeStoreHistoryResponse'
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.Response'
+        '401':
+          description: 认证失败或访问令牌无效
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '500':
+          description: 服务内部错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+  /api/v1/testees/{id}/store-transfers:
+    post:
+      tags:
+      - Actor Testee
+      summary: 总部调整受试者服务门店
+      operationId: 总部调整受试者服务门店
+      description: 总部调整受试者服务门店
+      parameters:
+      - type: string
+        description: 受试者 ID
+        name: id
+        in: path
+        required: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/request.AssignTesteeStoreRequest'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/core.Response'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/response.TesteeStoreHistoryResponse'
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.Response'
+        '409':
+          description: Conflict
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.Response'
+        '401':
+          description: 认证失败或访问令牌无效
           content:
             application/json:
               schema:
@@ -13252,6 +13425,23 @@ components:
           type: string
         testee_id:
           $ref: '#/components/schemas/meta.ID'
+    request.AssignTesteeStoreRequest:
+      type: object
+      required:
+      - expected_version
+      - reason
+      - request_id
+      - store_id
+      properties:
+        expected_version:
+          type: integer
+        reason:
+          type: string
+        request_id:
+          type: string
+        store_id:
+          type: string
+          example: ''
     request.BatchEvaluateRequest:
       type: object
       properties:
@@ -15809,9 +15999,44 @@ components:
         source_label:
           description: 来源中文
           type: string
+        store_id:
+          type: string
+        store_version:
+          type: integer
         updated_at:
           description: 更新时间
           type: string
+    response.TesteeStoreHistoryResponse:
+      type: object
+      properties:
+        actor_id:
+          type: string
+          example: ''
+        created_at:
+          type: string
+        from_store_id:
+          type: string
+          example: ''
+        id:
+          type: string
+          example: ''
+        kind:
+          type: string
+        org_id:
+          type: string
+          example: ''
+        reason:
+          type: string
+        request_id:
+          type: string
+        testee_id:
+          type: string
+          example: ''
+        to_store_id:
+          type: string
+          example: ''
+        version:
+          type: integer
     response.TrendDataPoint:
       type: object
       properties:

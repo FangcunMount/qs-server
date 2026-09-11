@@ -10,7 +10,8 @@ import (
 // toTesteeResult 将领域对象转换为应用层 DTO
 func toTesteeResult(testee *domain.Testee) *TesteeResult {
 	result := &TesteeResult{
-		ID:         testee.ID().Uint64(),
+		ID:      testee.ID().Uint64(),
+		StoreID: testee.StoreID(), StoreVersion: testee.StoreVersion(),
 		OrgID:      testee.OrgID(),
 		Name:       testee.Name(),
 		Gender:     int8(testee.Gender()),
@@ -39,7 +40,8 @@ func toTesteeResultFromRow(row *actorreadmodel.TesteeRow) *TesteeResult {
 		return nil
 	}
 	return &TesteeResult{
-		ID:               row.ID,
+		ID:      row.ID,
+		StoreID: row.StoreID, StoreVersion: row.StoreVersion,
 		OrgID:            row.OrgID,
 		ProfileID:        row.ProfileID,
 		Name:             row.Name,

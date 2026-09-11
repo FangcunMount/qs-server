@@ -141,6 +141,8 @@ type UpdateTesteeProfileDTO struct {
 
 // ListTesteeDTO 列出受试者 DTO
 type ListTesteeDTO struct {
+	StoreID               *uint64
+	UnassignedStore       bool
 	OrgID                 int64  // 机构ID
 	Name                  string // 姓名（模糊搜索）
 	KeyFocus              *bool  // 是否重点关注
@@ -154,17 +156,19 @@ type ListTesteeDTO struct {
 
 // TesteeResult 受试者结果 DTO
 type TesteeResult struct {
-	ID         uint64     // 受试者ID
-	OrgID      int64      // 机构ID
-	ProfileID  *uint64    // 用户档案ID
-	Name       string     // 姓名
-	Gender     int8       // 性别
-	Birthday   *time.Time // 出生日期
-	CreatedAt  time.Time  // 创建时间
-	UpdatedAt  time.Time  // 更新时间
-	Age        int        // 年龄
-	Source     string     // 数据来源
-	IsKeyFocus bool       // 是否重点关注
+	StoreID      *uint64    // 当前服务门店；nil 表示未归属
+	StoreVersion uint32     // 归属变更版本
+	ID           uint64     // 受试者ID
+	OrgID        int64      // 机构ID
+	ProfileID    *uint64    // 用户档案ID
+	Name         string     // 姓名
+	Gender       int8       // 性别
+	Birthday     *time.Time // 出生日期
+	CreatedAt    time.Time  // 创建时间
+	UpdatedAt    time.Time  // 更新时间
+	Age          int        // 年龄
+	Source       string     // 数据来源
+	IsKeyFocus   bool       // 是否重点关注
 
 	// 统计信息（仅后台管理需要）
 	LastAssessmentAt *time.Time // 最近测评时间

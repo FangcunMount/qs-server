@@ -1,0 +1,166 @@
+package testeestore
+
+import (
+	"context"
+	"errors"
+	"reflect"
+	"testing"
+	"time"
+
+	"github.com/FangcunMount/qs-server/internal/apiserver/application/authz"
+	"github.com/FangcunMount/qs-server/internal/apiserver/application/transaction"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/store"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
+	port "github.com/FangcunMount/qs-server/internal/apiserver/port/testeestore"
+)
+
+type repository struct {
+	port.Repository
+	target          *store.Store
+	subject         *testee.Testee
+	previous, saved *port.History
+	calls           []string
+	failHistory     bool
+}
+
+func (r *repository) LockStore(_ context.Context, org int64, id uint64) (*store.Store, error) {
+	r.calls = append(r.calls, "store")
+	if org != r.target.OrgID() || id != r.target.ID() {
+		return nil, errors.New("not found")
+	}
+	return r.target, nil
+}
+func (r *repository) LockTestee(_ context.Context, org int64, id uint64) (*testee.Testee, error) {
+	r.calls = append(r.calls, "testee")
+	if org != r.subject.OrgID() || id != r.subject.ID().Uint64() {
+		return nil, errors.New("not found")
+	}
+	copy := *r.subject
+	return &copy, nil
+}
+func (r *repository) FindChange(context.Context, int64, uint64, string) (*port.History, error) {
+	return r.previous, nil
+}
+func (r *repository) SaveOwnership(_ context.Context, h *port.History, _ uint32) error {
+	r.calls = append(r.calls, "save")
+	r.saved = h
+	return nil
+}
+func (r *repository) AppendHistory(context.Context, *port.History) error {
+	r.calls = append(r.calls, "history")
+	if r.failHistory {
+		return errors.New("history failure")
+	}
+	return nil
+}
+func admin() context.Context {
+	return authz.WithSnapshot(context.Background(), &authz.Snapshot{Permissions: []authz.Permission{{Resource: "qs:*:*:*", Action: "*", Mode: authz.AuthorizationModeUnconditional}}})
+}
+func fixture(t *testing.T) (*Service, *repository) {
+	t.Helper()
+	target, err := store.New(2, 7, "B", "B店", "", 9, time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	subject := testee.NewTestee(7, "测试", testee.Gender(0), nil)
+	subject.SetID(10)
+	r := &repository{target: target, subject: subject}
+	tx := transaction.RunnerFunc(func(ctx context.Context, fn func(context.Context) error) error {
+		before := r.saved
+		err := fn(ctx)
+		if err != nil {
+			r.saved = before
+		}
+		return err
+	})
+	return NewService(r, tx), r
+}
+func command() Change {
+	return Change{StoreID: 2, ExpectedVersion: 1, Reason: "归属配置", RequestID: "req-1"}
+}
+func TestInitialAndTransferUseOneOrderedTransaction(t *testing.T) {
+	for _, transfer := range []bool{false, true} {
+		s, r := fixture(t)
+		kind := "initial"
+		if transfer {
+			id := uint64(1)
+			r.subject.RestoreStore(&id, 1)
+			kind = "transfer"
+		}
+		var h *port.History
+		var err error
+		if transfer {
+			h, err = s.Transfer(admin(), Actor{7, 9}, 10, command())
+		} else {
+			h, err = s.AssignInitial(admin(), Actor{7, 9}, 10, command())
+		}
+		if err != nil {
+			t.Fatal(err)
+		}
+		if h.Kind != kind || h.Version != 2 || h.ActorID != 9 || h.RequestID != "req-1" {
+			t.Fatalf("invalid audit: %+v", h)
+		}
+		if !reflect.DeepEqual(r.calls, []string{"store", "testee", "save", "history"}) {
+			t.Fatalf("order: %v", r.calls)
+		}
+	}
+}
+func TestDeniedAndForeignRequestsCannotWrite(t *testing.T) {
+	for _, tc := range []struct {
+		ctx   context.Context
+		actor Actor
+	}{{context.Background(), Actor{7, 9}}, {admin(), Actor{8, 9}}, {admin(), Actor{7, 0}}} {
+		s, r := fixture(t)
+		if _, err := s.AssignInitial(tc.ctx, tc.actor, 10, command()); err == nil {
+			t.Fatal("invalid actor accepted")
+		}
+		if r.saved != nil {
+			t.Fatal("unauthorized write")
+		}
+	}
+}
+func TestRepeatedRequestReturnsHistoricalResultWithoutReapplying(t *testing.T) {
+	s, r := fixture(t)
+	first, err := s.AssignInitial(admin(), Actor{7, 9}, 10, command())
+	if err != nil {
+		t.Fatal(err)
+	}
+	r.previous = first
+	r.calls = nil
+	id := uint64(3)
+	r.subject.RestoreStore(&id, 3) // a subsequent audited transfer must not be undone
+	again, err := s.AssignInitial(admin(), Actor{7, 9}, 10, command())
+	if err != nil || again.ID != first.ID {
+		t.Fatalf("replay: %v", err)
+	}
+	if !reflect.DeepEqual(r.calls, []string{"store", "testee"}) || *r.subject.StoreID() != 3 {
+		t.Fatal("replay rewrote current ownership")
+	}
+	c := command()
+	c.Reason = "different"
+	if _, err = s.AssignInitial(admin(), Actor{7, 9}, 10, c); err == nil {
+		t.Fatal("conflicting request reused")
+	}
+	if _, err = s.Transfer(admin(), Actor{7, 9}, 10, command()); err == nil {
+		t.Fatal("initial request reused for transfer")
+	}
+}
+func TestFailedAuditReturnsNoSuccessAndRollsBackWrite(t *testing.T) {
+	s, r := fixture(t)
+	r.failHistory = true
+	h, err := s.AssignInitial(admin(), Actor{7, 9}, 10, command())
+	if err == nil || h != nil || r.saved != nil {
+		t.Fatal("failed audit left committed result")
+	}
+}
+func TestAlreadyOwnedTesteeNeedsExplicitTransfer(t *testing.T) {
+	s, r := fixture(t)
+	id := uint64(1)
+	r.subject.RestoreStore(&id, 1)
+	if _, err := s.AssignInitial(admin(), Actor{7, 9}, 10, command()); err == nil {
+		t.Fatal("implicit transfer accepted")
+	}
+	if r.saved != nil {
+		t.Fatal("implicit transfer wrote ownership")
+	}
+}

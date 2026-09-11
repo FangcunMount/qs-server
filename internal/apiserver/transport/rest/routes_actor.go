@@ -86,6 +86,12 @@ func (r *Router) registerRetiredActorRoutes(apiV1 *gin.RouterGroup) {
 
 // registerActorProtectedRoutes 注册 Actor 模块相关的受保护路由。
 func (r *Router) registerActorProtectedRoutes(apiV1 *gin.RouterGroup) {
+	if r.deps.Actor.TesteeStoreService != nil {
+		h := handler.NewTesteeStoreHandler(r.deps.Actor.TesteeStoreService)
+		apiV1.PUT("/testees/:id/store", h.AssignInitial)
+		apiV1.POST("/testees/:id/store-transfers", h.Transfer)
+		apiV1.GET("/testees/:id/store-history", h.History)
+	}
 	handlers := r.actorHandlers()
 	testeeHandler := handlers.testee
 	operatorClinicianHandler := handlers.operatorClinician

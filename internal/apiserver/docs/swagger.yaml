@@ -3289,6 +3289,23 @@ definitions:
     - clinician_id
     - testee_id
     type: object
+  request.AssignTesteeStoreRequest:
+    properties:
+      expected_version:
+        type: integer
+      reason:
+        type: string
+      request_id:
+        type: string
+      store_id:
+        example: ""
+        type: string
+    required:
+    - expected_version
+    - reason
+    - request_id
+    - store_id
+    type: object
   request.BatchEvaluateRequest:
     properties:
       assessment_ids:
@@ -5845,9 +5862,44 @@ definitions:
       source_label:
         description: 来源中文
         type: string
+      store_id:
+        type: string
+      store_version:
+        type: integer
       updated_at:
         description: 更新时间
         type: string
+    type: object
+  response.TesteeStoreHistoryResponse:
+    properties:
+      actor_id:
+        example: ""
+        type: string
+      created_at:
+        type: string
+      from_store_id:
+        example: ""
+        type: string
+      id:
+        example: ""
+        type: string
+      kind:
+        type: string
+      org_id:
+        example: ""
+        type: string
+      reason:
+        type: string
+      request_id:
+        type: string
+      testee_id:
+        example: ""
+        type: string
+      to_store_id:
+        example: ""
+        type: string
+      version:
+        type: integer
     type: object
   response.TrendDataPoint:
     properties:
@@ -11121,6 +11173,14 @@ paths:
   /api/v1/testees:
     get:
       parameters:
+      - description: 当前服务门店ID，与 unassigned_store=true 互斥
+        in: query
+        name: store_id
+        type: string
+      - description: 仅查询未归属门店的受试者
+        in: query
+        name: unassigned_store
+        type: boolean
       - description: Bearer 用户令牌
         in: header
         name: Authorization
@@ -11358,6 +11418,121 @@ paths:
       summary: 获取受试者量表分析
       tags:
       - 受试者
+  /api/v1/testees/{id}/store:
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: 受试者 ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: 归属配置
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/request.AssignTesteeStoreRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/response.TesteeStoreHistoryResponse'
+              type: object
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/core.Response'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/core.Response'
+      summary: 首次配置受试者服务门店
+      tags:
+      - Actor Testee
+  /api/v1/testees/{id}/store-history:
+    get:
+      parameters:
+      - description: 受试者 ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: 上一页末尾历史 ID
+        in: query
+        name: before
+        type: string
+      - description: 每页数量，最多 100
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/response.TesteeStoreHistoryResponse'
+                  type: array
+              type: object
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/core.Response'
+      summary: 查询受试者服务门店变更历史
+      tags:
+      - Actor Testee
+  /api/v1/testees/{id}/store-transfers:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: 受试者 ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: 转店配置
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/request.AssignTesteeStoreRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/response.TesteeStoreHistoryResponse'
+              type: object
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/core.Response'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/core.Response'
+      summary: 总部调整受试者服务门店
+      tags:
+      - Actor Testee
   /api/v1/testees/{id}/tasks:
     get:
       description: 查看某个受试者的所有任务

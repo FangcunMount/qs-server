@@ -6,6 +6,8 @@ import (
 )
 
 type TesteeFilter struct {
+	StoreID               *uint64
+	UnassignedStore       bool
 	OrgID                 int64
 	Name                  string
 	KeyFocus              *bool
@@ -18,6 +20,8 @@ type TesteeFilter struct {
 }
 
 type TesteeRow struct {
+	StoreID          *uint64 // 当前服务门店；nil 表示未归属
+	StoreVersion     uint32  // 归属变更版本
 	ID               uint64
 	OrgID            int64
 	ProfileID        *uint64

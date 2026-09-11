@@ -27,6 +27,8 @@ type UpdateTesteeRequest struct {
 
 // ListTesteeRequest 查询受试者列表请求
 type ListTesteeRequest struct {
+	StoreID          *uint64 `form:"store_id" binding:"omitempty,min=1"`          // 当前服务门店
+	UnassignedStore  bool    `form:"unassigned_store"`                            // 仅未归属受试者
 	OrgID            int64   `form:"org_id"`                                      // 兼容字段：机构ID
 	Name             string  `form:"name"`                                        // 姓名（模糊匹配）
 	IsKeyFocus       *bool   `form:"is_key_focus"`                                // 是否重点关注

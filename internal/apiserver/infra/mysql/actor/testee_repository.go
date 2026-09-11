@@ -43,7 +43,7 @@ func (r *testeeRepository) Save(ctx context.Context, t *testee.Testee) error {
 	})
 }
 
-// Update 更新受试者
+// Update 仅更新受试者资料；归属必须通过独立用例更新，不能覆盖并发转店。
 func (r *testeeRepository) Update(ctx context.Context, t *testee.Testee) error {
 	po := r.mapper.ToPO(t)
 
@@ -51,7 +51,7 @@ func (r *testeeRepository) Update(ctx context.Context, t *testee.Testee) error {
 		r.mapper.SyncID(po, t)
 		t.SetCreatedAt(po.CreatedAt)
 		t.SetUpdatedAt(po.UpdatedAt)
-	})
+	}, "profile_id", "name", "gender", "birthday", "tags", "source", "is_key_focus", "updated_at")
 }
 
 // FindByID 根据ID查找受试者
@@ -106,4 +106,18 @@ func translateError(err error) error {
 	}
 
 	return err
+}
+
+// FindCurrentOwnership bypasses cached profile data and honors transaction context.
+func (r *testeeRepository) FindCurrentOwnership(ctx context.Context, id testee.ID) (testee.Ownership, error) {
+	var row struct {
+		OrgID        int64
+		StoreID      *uint64
+		StoreVersion uint32
+	}
+	err := r.WithContext(ctx).Table("testee").Select("org_id", "store_id", "store_version").Where("id=? AND deleted_at IS NULL", id.Uint64()).Take(&row).Error
+	if err != nil {
+		return testee.Ownership{}, translateError(err)
+	}
+	return testee.Ownership{OrgID: row.OrgID, StoreID: row.StoreID, Version: row.StoreVersion}, nil
 }
