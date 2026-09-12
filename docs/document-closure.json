@@ -2,7 +2,7 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "983132ffb2355ce33919bb7d9650dc98ce05c9da",
+    "sha": "4c6d5dd926693fc147a882cf39cd65d806b4cbd1",
     "verified_on": "2026-09-12"
   },
   "status_policy": {
