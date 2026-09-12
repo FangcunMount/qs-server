@@ -1,6 +1,6 @@
 # QS AI workflow contract
 
-Source: `FangcunMount/qs-ai`, commit `77f3172172abc504114ad0d51c41a06f75a181c6`, path `integrations/workflow/proto/workflow.proto`.
+Source: `FangcunMount/qs-ai`, commit `4961d7bbdb913132bdc6dadb9512e948ac8f70b5`, path `integrations/workflow/proto/workflow.proto`.
 
 This copy is byte-identical to the pinned source. qs-ai owns this contract; synchronize the source and regenerate both languages when changing it. Go generation uses `scripts/proto/generate.sh`. The runnable integration entry and limitations are documented in `cmd/qs-ai-bridge/README.md`.
 
@@ -11,3 +11,5 @@ Freeze and GetFreezeReceipt are authorized QS proxies for native Prompt syntax v
 ProfileManagement Register/GetReceipt 复用 QS 管理授权和共用 mTLS 连接，注册不代表质量批准、发布或生效。回执核对原机构/操作者、命令和完整定义摘要，超时后查询原命令。
 
 SuiteManagement Register/GetReceipt 复用 QS OrgAdmin/解读审计授权，登记保留案例与新资产清单的绑定；注册不等于评测批准。回执绑定原命令、机构/操作者、套件版本及资产引用，超时查询原 command_id。共享现有 mTLS 连接，治理开关关闭时不注册路由。
+
+AssetCatalog List/Get 提供共享不可变配置目录，复用解读审计授权及 mTLS 连接。Go 校验分页顺序、筛选与游标、详情正文 SHA256；Prompt 源指纹与包摘要保持区分。目录不含命令审计和发布状态，不代表评测批准。

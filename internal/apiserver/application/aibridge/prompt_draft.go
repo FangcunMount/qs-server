@@ -23,7 +23,7 @@ type PromptDraftSource struct {
 }
 
 func (s PromptDraftSource) Valid() bool {
-	return strings.TrimSpace(s.Identity) != "" && len(s.Identity) <= 255 && utf8.ValidString(s.Identity) && frozenVersion.MatchString(s.Version) && frozenFingerprint.MatchString(s.Fingerprint) && ValidPromptChecksum(s.ContentSHA256)
+	return strings.TrimSpace(s.Identity) != "" && utf8.RuneCountInString(s.Identity) <= 255 && utf8.ValidString(s.Identity) && frozenVersion.MatchString(s.Version) && frozenFingerprint.MatchString(s.Fingerprint) && ValidPromptChecksum(s.ContentSHA256)
 }
 func ValidPromptChecksum(value string) bool { return frozenFingerprint.MatchString("sha256:" + value) }
 

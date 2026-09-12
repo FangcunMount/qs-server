@@ -1,5 +1,28 @@
 basePath: /api/v1
 definitions:
+  aibridge.AssetCatalogDetail:
+    properties:
+      definition_json:
+        type: string
+      item:
+        $ref: '#/definitions/aibridge.AssetCatalogItem'
+    type: object
+  aibridge.AssetCatalogItem:
+    properties:
+      kind:
+        type: string
+      reference:
+        $ref: '#/definitions/aibridge.PromptDraftSource'
+    type: object
+  aibridge.AssetCatalogPage:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/aibridge.AssetCatalogItem'
+        type: array
+      next_cursor:
+        type: string
+    type: object
   aibridge.CandidateReviewItem:
     properties:
       candidate_id:
@@ -14351,6 +14374,120 @@ paths:
       summary: 原子记录一批 v2 Candidate 人工审核
       tags:
       - AI-Explanation-Administration
+  /internal/v2/interpretation/ai-workflow/assets/{kind}:
+    get:
+      description: 需要当前机构解读审计权限。按种类及精确 identity 分页，仅返回引用，不代表批准或生效。游标绑定筛选，跨页不保证目录快照。
+      parameters:
+      - description: profile/prompt/route/schema/suite
+        in: path
+        name: kind
+        required: true
+        type: string
+      - description: 精确资产标识
+        in: query
+        name: identity
+        type: string
+      - description: 每页 1–50，默认 20
+        in: query
+        name: limit
+        type: integer
+      - description: 上一页游标
+        in: query
+        name: cursor
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/aibridge.AssetCatalogPage'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+      summary: 查询 qs-ai 共享不可变资产目录
+      tags:
+      - AI-Workflow-Assets
+  /internal/v2/interpretation/ai-workflow/assets/{kind}/detail:
+    get:
+      description: 需要当前机构解读审计权限。使用查询参数承载含斜线的标识及版本；核对原始字节摘要，不返回命令审计或发布状态。
+      parameters:
+      - description: profile/prompt/route/schema/suite
+        in: path
+        name: kind
+        required: true
+        type: string
+      - description: 精确资产标识
+        in: query
+        name: identity
+        required: true
+        type: string
+      - description: 精确版本
+        in: query
+        name: version
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/aibridge.AssetCatalogDetail'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+      summary: 查询 qs-ai 不可变资产原文
+      tags:
+      - AI-Workflow-Assets
   /internal/v2/interpretation/ai-workflow/evaluations/{run_id}:
     get:
       description: 需要当前机构解读审计权限；组织和操作人取认证上下文。管理功能默认关闭。

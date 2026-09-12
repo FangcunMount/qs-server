@@ -10190,6 +10190,186 @@
                 }
             }
         },
+        "/internal/v2/interpretation/ai-workflow/assets/{kind}": {
+            "get": {
+                "description": "需要当前机构解读审计权限。按种类及精确 identity 分页，仅返回引用，不代表批准或生效。游标绑定筛选，跨页不保证目录快照。",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "AI-Workflow-Assets"
+                ],
+                "summary": "查询 qs-ai 共享不可变资产目录",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "profile/prompt/route/schema/suite",
+                        "name": "kind",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "精确资产标识",
+                        "name": "identity",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "每页 1–50，默认 20",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "上一页游标",
+                        "name": "cursor",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/aibridge.AssetCatalogPage"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/internal/v2/interpretation/ai-workflow/assets/{kind}/detail": {
+            "get": {
+                "description": "需要当前机构解读审计权限。使用查询参数承载含斜线的标识及版本；核对原始字节摘要，不返回命令审计或发布状态。",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "AI-Workflow-Assets"
+                ],
+                "summary": "查询 qs-ai 不可变资产原文",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "profile/prompt/route/schema/suite",
+                        "name": "kind",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "精确资产标识",
+                        "name": "identity",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "精确版本",
+                        "name": "version",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/aibridge.AssetCatalogDetail"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/internal/v2/interpretation/ai-workflow/evaluations/{run_id}": {
             "get": {
                 "description": "需要当前机构解读审计权限；组织和操作人取认证上下文。管理功能默认关闭。",
@@ -12493,6 +12673,42 @@
         }
     },
     "definitions": {
+        "aibridge.AssetCatalogDetail": {
+            "type": "object",
+            "properties": {
+                "definition_json": {
+                    "type": "string"
+                },
+                "item": {
+                    "$ref": "#/definitions/aibridge.AssetCatalogItem"
+                }
+            }
+        },
+        "aibridge.AssetCatalogItem": {
+            "type": "object",
+            "properties": {
+                "kind": {
+                    "type": "string"
+                },
+                "reference": {
+                    "$ref": "#/definitions/aibridge.PromptDraftSource"
+                }
+            }
+        },
+        "aibridge.AssetCatalogPage": {
+            "type": "object",
+            "properties": {
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/aibridge.AssetCatalogItem"
+                    }
+                },
+                "next_cursor": {
+                    "type": "string"
+                }
+            }
+        },
         "aibridge.CandidateReviewItem": {
             "type": "object",
             "properties": {

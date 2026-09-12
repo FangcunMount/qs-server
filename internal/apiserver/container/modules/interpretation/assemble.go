@@ -73,6 +73,7 @@ type Module struct {
 	aiPublications              *bridge.PublicationAdministration
 	aiPromptDrafts              *bridge.PromptDraftAdministration
 	aiSuites                    *bridge.SuiteAdministration
+	aiAssets                    *bridge.AssetCatalogAdministration
 	aiProfiles                  *bridge.ProfileAdministration
 	aiManagementConnection      io.Closer
 	aiWorkflowEnabled           bool
@@ -264,6 +265,7 @@ func New(deps Deps) (*Module, error) {
 		module.aiPromptDrafts = &bridge.PromptDraftAdministration{Gateway: clients.PromptDrafts}
 		module.aiProfiles = &bridge.ProfileAdministration{Gateway: clients.Profiles}
 		module.aiSuites = &bridge.SuiteAdministration{Gateway: clients.Suites}
+		module.aiAssets = &bridge.AssetCatalogAdministration{Gateway: clients.Assets}
 		module.aiManagementConnection = clients.Connection
 	}
 	return module, nil
@@ -1013,4 +1015,11 @@ func (m *Module) AIWorkflowSuites() *bridge.SuiteAdministration {
 		return nil
 	}
 	return m.aiSuites
+}
+
+func (m *Module) AIWorkflowAssets() *bridge.AssetCatalogAdministration {
+	if m == nil {
+		return nil
+	}
+	return m.aiAssets
 }
