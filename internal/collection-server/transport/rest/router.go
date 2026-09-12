@@ -312,7 +312,7 @@ func (r *Router) registerAnswerSheetRoutes(api *gin.RouterGroup) {
 	rateCfg := ensureRateLimitOptions(r.container.RateLimitOptions())
 
 	api.POST("/answering-starts", r.rateLimitedSubmitHandlers(
-		r.container.RateLimitBackend(), "answering-start", rateCfg, rateCfg.SubmitGlobalQPS, rateCfg.SubmitGlobalBurst, rateCfg.SubmitUserQPS, rateCfg.SubmitUserBurst, answerSheetHandler.StartAnswering,
+		r.container.RateLimitBackend(), "submit", rateCfg, rateCfg.SubmitGlobalQPS, rateCfg.SubmitGlobalBurst, rateCfg.SubmitUserQPS, rateCfg.SubmitUserBurst, answerSheetHandler.StartAnswering,
 	)...)
 	answersheets := api.Group("/answersheets")
 	{

@@ -6,6 +6,8 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/FangcunMount/qs-server/internal/collection-server/options"
+
 	pkgmiddleware "github.com/FangcunMount/qs-server/internal/pkg/middleware"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/keyspace"
 	"github.com/FangcunMount/qs-server/internal/pkg/resilience"
@@ -143,4 +145,23 @@ func (r *rateLimitRecordingObserver) hasWithStrategy(outcome resilience.Outcome,
 		}
 	}
 	return false
+}
+
+// Exercise the registered route with rate limiting enabled, rather than calling
+// the handler directly: an unregistered budget rejects every production request.
+func TestAnsweringStartRouteUsesRegisteredSubmitBudget(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	opts := options.NewOptions()
+	opts.RateLimit.Enabled = true
+	c := mustNewCollectionContainer(t, opts, nil, nil, nil)
+	if err := c.Initialize(); err != nil {
+		t.Fatal(err)
+	}
+	engine := gin.New()
+	NewRouter(c).registerAnswerSheetRoutes(engine.Group("/api/v1"))
+	response := httptest.NewRecorder()
+	engine.ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/api/v1/answering-starts", nil))
+	if response.Code != http.StatusUnauthorized {
+		t.Fatalf("registered route must reach authentication, status=%d body=%s", response.Code, response.Body.String())
+	}
 }

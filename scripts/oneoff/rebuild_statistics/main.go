@@ -234,7 +234,7 @@ func (o options) validateAuthentication() error {
 
 func validateRunCompleteness(result runResult) error {
 	var issues []string
-	for _, collector := range []string{"access", "plan", "assessment"} {
+	for _, collector := range []string{"access", "plan", "assessment", "store_activity"} {
 		for _, metric := range []string{"inserted", "conflict"} {
 			key := collector + "." + metric
 			value, exists := result.FactCounts[key]

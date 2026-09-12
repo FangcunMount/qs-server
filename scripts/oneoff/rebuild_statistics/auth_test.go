@@ -216,7 +216,7 @@ func TestRunUsesIAMAuthenticationWithoutStaticToken(t *testing.T) {
 			if got := r.Header.Get("Authorization"); got != "Bearer "+freshToken {
 				t.Errorf("Authorization=%q", got)
 			}
-			_, _ = w.Write([]byte(`{"code":0,"data":{"id":100,"mode":"validate","status":"succeeded","stage":"completed","fact_counts":{"access.inserted":0,"access.conflict":0,"plan.inserted":0,"plan.conflict":0,"assessment.inserted":0,"assessment.conflict":0}}}`))
+			_, _ = w.Write([]byte(`{"code":0,"data":{"id":100,"mode":"validate","status":"succeeded","stage":"completed","fact_counts":{"access.inserted":0,"access.conflict":0,"plan.inserted":0,"plan.conflict":0,"assessment.inserted":0,"assessment.conflict":0,"store_activity.inserted":0,"store_activity.conflict":0}}}`))
 		default:
 			http.NotFound(w, r)
 		}

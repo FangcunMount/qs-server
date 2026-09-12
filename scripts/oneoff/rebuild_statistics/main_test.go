@@ -198,3 +198,30 @@ func TestExecuteRunWithCacheRecoveryResumesDataCommittedPublish(t *testing.T) {
 		t.Fatalf("paths=%v want=%v", paths, want)
 	}
 }
+
+func TestValidationCompletenessRequiresStoreActivity(t *testing.T) {
+	for _, tc := range []struct {
+		name      string
+		counts    map[string]int64
+		wantError bool
+	}{
+		{"missing", nil, true},
+		{"missing facts", map[string]int64{"store_activity.inserted": 1, "store_activity.conflict": 0}, true},
+		{"conflicting facts", map[string]int64{"store_activity.inserted": 0, "store_activity.conflict": 1}, true},
+		{"complete", map[string]int64{"store_activity.inserted": 0, "store_activity.conflict": 0}, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			counts := map[string]int64{"access.inserted": 0, "access.conflict": 0, "plan.inserted": 0, "plan.conflict": 0, "assessment.inserted": 0, "assessment.conflict": 0}
+			for k, v := range tc.counts {
+				counts[k] = v
+			}
+			err := validateRunCompleteness(runResult{FactCounts: counts})
+			if (err != nil) != tc.wantError {
+				t.Fatalf("error=%v wantError=%v", err, tc.wantError)
+			}
+			if err != nil && !strings.Contains(err.Error(), "store_activity") {
+				t.Fatalf("missing collector detail: %v", err)
+			}
+		})
+	}
+}

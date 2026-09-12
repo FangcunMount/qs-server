@@ -4,7 +4,7 @@
 `POST /internal/v2/statistics/runs`。人工操作与夜间同步共享 Collector、Projection、幂等规则、
 冲突检测和 `statistics_sync_run` 运行账本。
 
-先执行只读校验。校验不仅要求 Run 成功，还要求三个 Collector 的 `inserted/conflict`
+先执行只读校验。校验不仅要求 Run 成功，还要求四个 Collector（含开展工作量 `store_activity`） 的 `inserted/conflict`
 全部为零；缺少 Fact、Fact 冲突或响应缺少规范计数都会让工具非零退出：
 
 ```bash
