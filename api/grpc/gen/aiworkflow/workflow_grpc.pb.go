@@ -270,6 +270,7 @@ const (
 	EvaluationManagement_GetCandidate_FullMethodName   = "/qsai.workflow.v1.EvaluationManagement/GetCandidate"
 	EvaluationManagement_PreviewGates_FullMethodName   = "/qsai.workflow.v1.EvaluationManagement/PreviewGates"
 	EvaluationManagement_Finalize_FullMethodName       = "/qsai.workflow.v1.EvaluationManagement/Finalize"
+	EvaluationManagement_ReopenReview_FullMethodName   = "/qsai.workflow.v1.EvaluationManagement/ReopenReview"
 )
 
 // EvaluationManagementClient is the client API for EvaluationManagement service.
@@ -292,6 +293,8 @@ type EvaluationManagementClient interface {
 	PreviewGates(ctx context.Context, in *EvaluationGateQuery, opts ...grpc.CallOption) (*EvaluationGatePreview, error)
 	// Recompute gates under CAS; this records approval/rejection, never publishes a release.
 	Finalize(ctx context.Context, in *EvaluationFinalizeCommand, opts ...grpc.CallOption) (*EvaluationState, error)
+	// Reopen eligible semantic-review signatures, preserving the complete previous round.
+	ReopenReview(ctx context.Context, in *EvaluationReopenCommand, opts ...grpc.CallOption) (*EvaluationState, error)
 }
 
 type evaluationManagementClient struct {
@@ -392,6 +395,16 @@ func (c *evaluationManagementClient) Finalize(ctx context.Context, in *Evaluatio
 	return out, nil
 }
 
+func (c *evaluationManagementClient) ReopenReview(ctx context.Context, in *EvaluationReopenCommand, opts ...grpc.CallOption) (*EvaluationState, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(EvaluationState)
+	err := c.cc.Invoke(ctx, EvaluationManagement_ReopenReview_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // EvaluationManagementServer is the server API for EvaluationManagement service.
 // All implementations must embed UnimplementedEvaluationManagementServer
 // for forward compatibility.
@@ -412,6 +425,8 @@ type EvaluationManagementServer interface {
 	PreviewGates(context.Context, *EvaluationGateQuery) (*EvaluationGatePreview, error)
 	// Recompute gates under CAS; this records approval/rejection, never publishes a release.
 	Finalize(context.Context, *EvaluationFinalizeCommand) (*EvaluationState, error)
+	// Reopen eligible semantic-review signatures, preserving the complete previous round.
+	ReopenReview(context.Context, *EvaluationReopenCommand) (*EvaluationState, error)
 	mustEmbedUnimplementedEvaluationManagementServer()
 }
 
@@ -448,6 +463,9 @@ func (UnimplementedEvaluationManagementServer) PreviewGates(context.Context, *Ev
 }
 func (UnimplementedEvaluationManagementServer) Finalize(context.Context, *EvaluationFinalizeCommand) (*EvaluationState, error) {
 	return nil, status.Error(codes.Unimplemented, "method Finalize not implemented")
+}
+func (UnimplementedEvaluationManagementServer) ReopenReview(context.Context, *EvaluationReopenCommand) (*EvaluationState, error) {
+	return nil, status.Error(codes.Unimplemented, "method ReopenReview not implemented")
 }
 func (UnimplementedEvaluationManagementServer) mustEmbedUnimplementedEvaluationManagementServer() {}
 func (UnimplementedEvaluationManagementServer) testEmbeddedByValue()                              {}
@@ -632,6 +650,24 @@ func _EvaluationManagement_Finalize_Handler(srv interface{}, ctx context.Context
 	return interceptor(ctx, in, info, handler)
 }
 
+func _EvaluationManagement_ReopenReview_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(EvaluationReopenCommand)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(EvaluationManagementServer).ReopenReview(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: EvaluationManagement_ReopenReview_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(EvaluationManagementServer).ReopenReview(ctx, req.(*EvaluationReopenCommand))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // EvaluationManagement_ServiceDesc is the grpc.ServiceDesc for EvaluationManagement service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -674,6 +710,10 @@ var EvaluationManagement_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "Finalize",
 			Handler:    _EvaluationManagement_Finalize_Handler,
+		},
+		{
+			MethodName: "ReopenReview",
+			Handler:    _EvaluationManagement_ReopenReview_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

@@ -10542,6 +10542,73 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/core.ErrResponse'
+  /internal/v2/interpretation/ai-workflow/evaluations/{run_id}/reopen-review:
+    post:
+      tags:
+      - AI-Workflow-Management
+      summary: 重开 qs-ai 评测语义复核
+      description: 需要当前机构 OrgAdmin 权限、当前版本、理由和明确确认。AI 在事务内核对重开资格并保留旧审核和门槛，最多三轮；不调用模型或发布配置。超时后先回读状态，不自动重试。
+      operationId: 重开qsai评测语义复核
+      parameters:
+      - type: string
+        description: 评测 Run UUID
+        name: run_id
+        in: path
+        required: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/aibridge.EvaluationReopen'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/core.Response'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/aibridge.EvaluationState'
+        '400':
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '409':
+          description: Conflict
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
   /internal/v2/interpretation/ai-workflow/evaluations/{run_id}/result-unknown/resolve:
     post:
       tags:
@@ -11073,6 +11140,15 @@ components:
           $ref: '#/components/schemas/aibridge.FrozenEvaluationRef'
         suite:
           $ref: '#/components/schemas/aibridge.FrozenEvaluationRef'
+    aibridge.EvaluationReopen:
+      type: object
+      properties:
+        confirm:
+          type: boolean
+        expected_version:
+          type: integer
+        reason:
+          type: string
     aibridge.EvaluationReview:
       type: object
       properties:
@@ -11099,6 +11175,10 @@ components:
         finalization:
           type: object
         resolutions:
+          type: array
+          items:
+            type: object
+        review_reopenings:
           type: array
           items:
             type: object

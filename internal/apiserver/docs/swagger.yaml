@@ -104,6 +104,15 @@ definitions:
       suite:
         $ref: '#/definitions/aibridge.FrozenEvaluationRef'
     type: object
+  aibridge.EvaluationReopen:
+    properties:
+      confirm:
+        type: boolean
+      expected_version:
+        type: integer
+      reason:
+        type: string
+    type: object
   aibridge.EvaluationReview:
     properties:
       expected_version:
@@ -129,6 +138,10 @@ definitions:
       finalization:
         type: object
       resolutions:
+        items:
+          type: object
+        type: array
+      review_reopenings:
         items:
           type: object
         type: array
@@ -14376,6 +14389,62 @@ paths:
           schema:
             $ref: '#/definitions/core.ErrResponse'
       summary: 预览 qs-ai 评测发布门槛
+      tags:
+      - AI-Workflow-Management
+  /internal/v2/interpretation/ai-workflow/evaluations/{run_id}/reopen-review:
+    post:
+      consumes:
+      - application/json
+      description: 需要当前机构 OrgAdmin 权限、当前版本、理由和明确确认。AI 在事务内核对重开资格并保留旧审核和门槛，最多三轮；不调用模型或发布配置。超时后先回读状态，不自动重试。
+      parameters:
+      - description: 评测 Run UUID
+        in: path
+        name: run_id
+        required: true
+        type: string
+      - description: 重开确认
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/aibridge.EvaluationReopen'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/aibridge.EvaluationState'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+      summary: 重开 qs-ai 评测语义复核
       tags:
       - AI-Workflow-Management
   /internal/v2/interpretation/ai-workflow/evaluations/{run_id}/result-unknown/resolve:

@@ -8,6 +8,7 @@ import (
 )
 
 type managementStub struct {
+	reopen   EvaluationReopen
 	finalize EvaluationFinalize
 	review   EvaluationReview
 	calls    int
