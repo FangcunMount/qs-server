@@ -204,6 +204,7 @@ func TestCurrentRuntimeClosure(t *testing.T) {
 		grpcDeps.Plan.CommandService,
 		grpcDeps.Evaluation.IntakeService,
 		grpcDeps.Interpretation.ReportStatusReporter,
+		grpcDeps.Survey.SubmissionReader,
 	)
 	assessmentService := grpcservice.NewAssessmentIntakeService(journey, grpcDeps.Evaluation.IntakeService, grpcDeps.Survey.AnswerSheetManagementService)
 	evaluationService := grpcservice.NewEvaluationWorkerService(grpcDeps.Evaluation.WorkerService)
