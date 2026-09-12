@@ -107,3 +107,7 @@ func TestStartRequiresCurrentPermissionAndExplicitValidCommand(t *testing.T) {
 		t.Fatal("revoked start forwarded or scope drift")
 	}
 }
+
+func (g *managementStub) CreateEvaluation(ctx context.Context, s EvaluationScope, _ EvaluationCreate) (EvaluationState, error) {
+	return g.GetEvaluation(ctx, s)
+}

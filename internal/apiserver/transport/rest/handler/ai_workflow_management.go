@@ -137,3 +137,36 @@ func (h *AIWorkflowManagementHandler) Start(c *gin.Context) {
 	}
 	h.Success(c, value)
 }
+
+// Create godoc
+// @Summary 创建冻结的 qs-ai 评测
+// @Description 需要当前机构 OrgAdmin 权限、明确确认和固定 Run UUID；同一请求重放复用原 Run，内容冲突拒绝。管理功能默认关闭。
+// @Tags AI-Workflow-Management
+// @Accept json
+// @Produce json
+// @Param run_id path string true "评测 Run UUID"
+// @Param body body app.EvaluationCreate true "冻结引用和创建确认"
+// @Success 200 {object} core.Response{data=app.EvaluationState}
+// @Failure 400 {object} core.ErrResponse
+// @Failure 401 {object} core.ErrResponse
+// @Failure 403 {object} core.ErrResponse
+// @Failure 404 {object} core.ErrResponse
+// @Failure 409 {object} core.ErrResponse
+// @Failure 500 {object} core.ErrResponse
+// @Router /internal/v2/interpretation/ai-workflow/evaluations/{run_id}/create [post]
+func (h *AIWorkflowManagementHandler) Create(c *gin.Context) {
+	scope, ok := h.scope(c)
+	if !ok {
+		return
+	}
+	var command app.EvaluationCreate
+	if err := h.BindJSON(c, &command); err != nil {
+		return
+	}
+	value, err := h.service.Create(c.Request.Context(), scope, command)
+	if err != nil {
+		h.failure(c, err)
+		return
+	}
+	h.Success(c, value)
+}

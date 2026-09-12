@@ -1,5 +1,39 @@
 basePath: /api/v1
 definitions:
+  aibridge.EvaluationCreate:
+    properties:
+      confirm:
+        type: boolean
+      reason:
+        type: string
+      release:
+        $ref: '#/definitions/aibridge.EvaluationRelease'
+    type: object
+  aibridge.EvaluationRelease:
+    properties:
+      execution_policy:
+        $ref: '#/definitions/aibridge.FrozenEvaluationRef'
+      gate_policy:
+        $ref: '#/definitions/aibridge.FrozenEvaluationRef'
+      generation_route:
+        $ref: '#/definitions/aibridge.FrozenEvaluationRef'
+      input_schema:
+        $ref: '#/definitions/aibridge.FrozenEvaluationRef'
+      output_schema:
+        $ref: '#/definitions/aibridge.FrozenEvaluationRef'
+      profile:
+        $ref: '#/definitions/aibridge.FrozenEvaluationRef'
+      prompt:
+        $ref: '#/definitions/aibridge.FrozenEvaluationRef'
+      semantic_output_schema:
+        $ref: '#/definitions/aibridge.FrozenEvaluationRef'
+      semantic_prompt:
+        $ref: '#/definitions/aibridge.FrozenEvaluationRef'
+      semantic_route:
+        $ref: '#/definitions/aibridge.FrozenEvaluationRef'
+      suite:
+        $ref: '#/definitions/aibridge.FrozenEvaluationRef'
+    type: object
   aibridge.EvaluationStart:
     properties:
       confirm:
@@ -23,6 +57,15 @@ definitions:
         type: integer
       version:
         type: integer
+    type: object
+  aibridge.FrozenEvaluationRef:
+    properties:
+      fingerprint:
+        type: string
+      id:
+        type: string
+      version:
+        type: string
     type: object
   aibridge.UnknownResolution:
     properties:
@@ -13930,6 +13973,62 @@ paths:
           schema:
             $ref: '#/definitions/core.ErrResponse'
       summary: 查询 qs-ai 评测状态
+      tags:
+      - AI-Workflow-Management
+  /internal/v2/interpretation/ai-workflow/evaluations/{run_id}/create:
+    post:
+      consumes:
+      - application/json
+      description: 需要当前机构 OrgAdmin 权限、明确确认和固定 Run UUID；同一请求重放复用原 Run，内容冲突拒绝。管理功能默认关闭。
+      parameters:
+      - description: 评测 Run UUID
+        in: path
+        name: run_id
+        required: true
+        type: string
+      - description: 冻结引用和创建确认
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/aibridge.EvaluationCreate'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/aibridge.EvaluationState'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+      summary: 创建冻结的 qs-ai 评测
       tags:
       - AI-Workflow-Management
   /internal/v2/interpretation/ai-workflow/evaluations/{run_id}/result-unknown/resolve:

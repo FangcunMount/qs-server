@@ -928,6 +928,258 @@ func (x *EvaluationStartCommand) GetConfirm() bool {
 	return false
 }
 
+type FrozenEvaluationRef struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Version       string                 `protobuf:"bytes,2,opt,name=version,proto3" json:"version,omitempty"`
+	Fingerprint   string                 `protobuf:"bytes,3,opt,name=fingerprint,proto3" json:"fingerprint,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *FrozenEvaluationRef) Reset() {
+	*x = FrozenEvaluationRef{}
+	mi := &file_aiworkflow_workflow_proto_msgTypes[12]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *FrozenEvaluationRef) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*FrozenEvaluationRef) ProtoMessage() {}
+
+func (x *FrozenEvaluationRef) ProtoReflect() protoreflect.Message {
+	mi := &file_aiworkflow_workflow_proto_msgTypes[12]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use FrozenEvaluationRef.ProtoReflect.Descriptor instead.
+func (*FrozenEvaluationRef) Descriptor() ([]byte, []int) {
+	return file_aiworkflow_workflow_proto_rawDescGZIP(), []int{12}
+}
+
+func (x *FrozenEvaluationRef) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *FrozenEvaluationRef) GetVersion() string {
+	if x != nil {
+		return x.Version
+	}
+	return ""
+}
+
+func (x *FrozenEvaluationRef) GetFingerprint() string {
+	if x != nil {
+		return x.Fingerprint
+	}
+	return ""
+}
+
+type EvaluationRelease struct {
+	state                protoimpl.MessageState `protogen:"open.v1"`
+	Suite                *FrozenEvaluationRef   `protobuf:"bytes,1,opt,name=suite,proto3" json:"suite,omitempty"`
+	Prompt               *FrozenEvaluationRef   `protobuf:"bytes,2,opt,name=prompt,proto3" json:"prompt,omitempty"`
+	Profile              *FrozenEvaluationRef   `protobuf:"bytes,3,opt,name=profile,proto3" json:"profile,omitempty"`
+	InputSchema          *FrozenEvaluationRef   `protobuf:"bytes,4,opt,name=input_schema,json=inputSchema,proto3" json:"input_schema,omitempty"`
+	OutputSchema         *FrozenEvaluationRef   `protobuf:"bytes,5,opt,name=output_schema,json=outputSchema,proto3" json:"output_schema,omitempty"`
+	GenerationRoute      *FrozenEvaluationRef   `protobuf:"bytes,6,opt,name=generation_route,json=generationRoute,proto3" json:"generation_route,omitempty"`
+	SemanticPrompt       *FrozenEvaluationRef   `protobuf:"bytes,7,opt,name=semantic_prompt,json=semanticPrompt,proto3" json:"semantic_prompt,omitempty"`
+	SemanticOutputSchema *FrozenEvaluationRef   `protobuf:"bytes,8,opt,name=semantic_output_schema,json=semanticOutputSchema,proto3" json:"semantic_output_schema,omitempty"`
+	SemanticRoute        *FrozenEvaluationRef   `protobuf:"bytes,9,opt,name=semantic_route,json=semanticRoute,proto3" json:"semantic_route,omitempty"`
+	ExecutionPolicy      *FrozenEvaluationRef   `protobuf:"bytes,10,opt,name=execution_policy,json=executionPolicy,proto3" json:"execution_policy,omitempty"`
+	GatePolicy           *FrozenEvaluationRef   `protobuf:"bytes,11,opt,name=gate_policy,json=gatePolicy,proto3" json:"gate_policy,omitempty"`
+	unknownFields        protoimpl.UnknownFields
+	sizeCache            protoimpl.SizeCache
+}
+
+func (x *EvaluationRelease) Reset() {
+	*x = EvaluationRelease{}
+	mi := &file_aiworkflow_workflow_proto_msgTypes[13]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *EvaluationRelease) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*EvaluationRelease) ProtoMessage() {}
+
+func (x *EvaluationRelease) ProtoReflect() protoreflect.Message {
+	mi := &file_aiworkflow_workflow_proto_msgTypes[13]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use EvaluationRelease.ProtoReflect.Descriptor instead.
+func (*EvaluationRelease) Descriptor() ([]byte, []int) {
+	return file_aiworkflow_workflow_proto_rawDescGZIP(), []int{13}
+}
+
+func (x *EvaluationRelease) GetSuite() *FrozenEvaluationRef {
+	if x != nil {
+		return x.Suite
+	}
+	return nil
+}
+
+func (x *EvaluationRelease) GetPrompt() *FrozenEvaluationRef {
+	if x != nil {
+		return x.Prompt
+	}
+	return nil
+}
+
+func (x *EvaluationRelease) GetProfile() *FrozenEvaluationRef {
+	if x != nil {
+		return x.Profile
+	}
+	return nil
+}
+
+func (x *EvaluationRelease) GetInputSchema() *FrozenEvaluationRef {
+	if x != nil {
+		return x.InputSchema
+	}
+	return nil
+}
+
+func (x *EvaluationRelease) GetOutputSchema() *FrozenEvaluationRef {
+	if x != nil {
+		return x.OutputSchema
+	}
+	return nil
+}
+
+func (x *EvaluationRelease) GetGenerationRoute() *FrozenEvaluationRef {
+	if x != nil {
+		return x.GenerationRoute
+	}
+	return nil
+}
+
+func (x *EvaluationRelease) GetSemanticPrompt() *FrozenEvaluationRef {
+	if x != nil {
+		return x.SemanticPrompt
+	}
+	return nil
+}
+
+func (x *EvaluationRelease) GetSemanticOutputSchema() *FrozenEvaluationRef {
+	if x != nil {
+		return x.SemanticOutputSchema
+	}
+	return nil
+}
+
+func (x *EvaluationRelease) GetSemanticRoute() *FrozenEvaluationRef {
+	if x != nil {
+		return x.SemanticRoute
+	}
+	return nil
+}
+
+func (x *EvaluationRelease) GetExecutionPolicy() *FrozenEvaluationRef {
+	if x != nil {
+		return x.ExecutionPolicy
+	}
+	return nil
+}
+
+func (x *EvaluationRelease) GetGatePolicy() *FrozenEvaluationRef {
+	if x != nil {
+		return x.GatePolicy
+	}
+	return nil
+}
+
+type EvaluationCreateCommand struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Scope         *EvaluationQuery       `protobuf:"bytes,1,opt,name=scope,proto3" json:"scope,omitempty"`
+	Release       *EvaluationRelease     `protobuf:"bytes,2,opt,name=release,proto3" json:"release,omitempty"`
+	Reason        string                 `protobuf:"bytes,3,opt,name=reason,proto3" json:"reason,omitempty"`
+	Confirm       bool                   `protobuf:"varint,4,opt,name=confirm,proto3" json:"confirm,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *EvaluationCreateCommand) Reset() {
+	*x = EvaluationCreateCommand{}
+	mi := &file_aiworkflow_workflow_proto_msgTypes[14]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *EvaluationCreateCommand) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*EvaluationCreateCommand) ProtoMessage() {}
+
+func (x *EvaluationCreateCommand) ProtoReflect() protoreflect.Message {
+	mi := &file_aiworkflow_workflow_proto_msgTypes[14]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use EvaluationCreateCommand.ProtoReflect.Descriptor instead.
+func (*EvaluationCreateCommand) Descriptor() ([]byte, []int) {
+	return file_aiworkflow_workflow_proto_rawDescGZIP(), []int{14}
+}
+
+func (x *EvaluationCreateCommand) GetScope() *EvaluationQuery {
+	if x != nil {
+		return x.Scope
+	}
+	return nil
+}
+
+func (x *EvaluationCreateCommand) GetRelease() *EvaluationRelease {
+	if x != nil {
+		return x.Release
+	}
+	return nil
+}
+
+func (x *EvaluationCreateCommand) GetReason() string {
+	if x != nil {
+		return x.Reason
+	}
+	return ""
+}
+
+func (x *EvaluationCreateCommand) GetConfirm() bool {
+	if x != nil {
+		return x.Confirm
+	}
+	return false
+}
+
 var File_aiworkflow_workflow_proto protoreflect.FileDescriptor
 
 const file_aiworkflow_workflow_proto_rawDesc = "" +
@@ -1015,13 +1267,37 @@ const file_aiworkflow_workflow_proto_rawDesc = "" +
 	"\x05scope\x18\x01 \x01(\v2!.qsai.workflow.v1.EvaluationQueryR\x05scope\x12)\n" +
 	"\x10expected_version\x18\x02 \x01(\x03R\x0fexpectedVersion\x12\x16\n" +
 	"\x06reason\x18\x03 \x01(\tR\x06reason\x12\x18\n" +
+	"\aconfirm\x18\x04 \x01(\bR\aconfirm\"a\n" +
+	"\x13FrozenEvaluationRef\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x18\n" +
+	"\aversion\x18\x02 \x01(\tR\aversion\x12 \n" +
+	"\vfingerprint\x18\x03 \x01(\tR\vfingerprint\"\xcd\x06\n" +
+	"\x11EvaluationRelease\x12;\n" +
+	"\x05suite\x18\x01 \x01(\v2%.qsai.workflow.v1.FrozenEvaluationRefR\x05suite\x12=\n" +
+	"\x06prompt\x18\x02 \x01(\v2%.qsai.workflow.v1.FrozenEvaluationRefR\x06prompt\x12?\n" +
+	"\aprofile\x18\x03 \x01(\v2%.qsai.workflow.v1.FrozenEvaluationRefR\aprofile\x12H\n" +
+	"\finput_schema\x18\x04 \x01(\v2%.qsai.workflow.v1.FrozenEvaluationRefR\vinputSchema\x12J\n" +
+	"\routput_schema\x18\x05 \x01(\v2%.qsai.workflow.v1.FrozenEvaluationRefR\foutputSchema\x12P\n" +
+	"\x10generation_route\x18\x06 \x01(\v2%.qsai.workflow.v1.FrozenEvaluationRefR\x0fgenerationRoute\x12N\n" +
+	"\x0fsemantic_prompt\x18\a \x01(\v2%.qsai.workflow.v1.FrozenEvaluationRefR\x0esemanticPrompt\x12[\n" +
+	"\x16semantic_output_schema\x18\b \x01(\v2%.qsai.workflow.v1.FrozenEvaluationRefR\x14semanticOutputSchema\x12L\n" +
+	"\x0esemantic_route\x18\t \x01(\v2%.qsai.workflow.v1.FrozenEvaluationRefR\rsemanticRoute\x12P\n" +
+	"\x10execution_policy\x18\n" +
+	" \x01(\v2%.qsai.workflow.v1.FrozenEvaluationRefR\x0fexecutionPolicy\x12F\n" +
+	"\vgate_policy\x18\v \x01(\v2%.qsai.workflow.v1.FrozenEvaluationRefR\n" +
+	"gatePolicy\"\xc3\x01\n" +
+	"\x17EvaluationCreateCommand\x127\n" +
+	"\x05scope\x18\x01 \x01(\v2!.qsai.workflow.v1.EvaluationQueryR\x05scope\x12=\n" +
+	"\arelease\x18\x02 \x01(\v2#.qsai.workflow.v1.EvaluationReleaseR\arelease\x12\x16\n" +
+	"\x06reason\x18\x03 \x01(\tR\x06reason\x12\x18\n" +
 	"\aconfirm\x18\x04 \x01(\bR\aconfirm2\x94\x01\n" +
 	"\bCommands\x12B\n" +
 	"\x05Start\x12\x1e.qsai.workflow.v1.StartCommand\x1a\x19.qsai.workflow.v1.Receipt\x12D\n" +
 	"\x06Change\x12\x1f.qsai.workflow.v1.ChangeCommand\x1a\x19.qsai.workflow.v1.Receipt2T\n" +
 	"\aResults\x12I\n" +
-	"\x06Accept\x12\x1c.qsai.workflow.v1.StateEvent\x1a!.qsai.workflow.v1.Acknowledgement2\x9a\x02\n" +
-	"\x14EvaluationManagement\x12T\n" +
+	"\x06Accept\x12\x1c.qsai.workflow.v1.StateEvent\x1a!.qsai.workflow.v1.Acknowledgement2\xf2\x02\n" +
+	"\x14EvaluationManagement\x12V\n" +
+	"\x06Create\x12).qsai.workflow.v1.EvaluationCreateCommand\x1a!.qsai.workflow.v1.EvaluationState\x12T\n" +
 	"\x05Start\x12(.qsai.workflow.v1.EvaluationStartCommand\x1a!.qsai.workflow.v1.EvaluationState\x12K\n" +
 	"\x03Get\x12!.qsai.workflow.v1.EvaluationQuery\x1a!.qsai.workflow.v1.EvaluationState\x12_\n" +
 	"\x0eResolveUnknown\x12*.qsai.workflow.v1.UnknownResolutionCommand\x1a!.qsai.workflow.v1.EvaluationStateB;Z9github.com/FangcunMount/qs-server/api/grpc/gen/aiworkflowb\x06proto3"
@@ -1038,7 +1314,7 @@ func file_aiworkflow_workflow_proto_rawDescGZIP() []byte {
 	return file_aiworkflow_workflow_proto_rawDescData
 }
 
-var file_aiworkflow_workflow_proto_msgTypes = make([]protoimpl.MessageInfo, 12)
+var file_aiworkflow_workflow_proto_msgTypes = make([]protoimpl.MessageInfo, 15)
 var file_aiworkflow_workflow_proto_goTypes = []any{
 	(*Actor)(nil),                    // 0: qsai.workflow.v1.Actor
 	(*StartCommand)(nil),             // 1: qsai.workflow.v1.StartCommand
@@ -1052,6 +1328,9 @@ var file_aiworkflow_workflow_proto_goTypes = []any{
 	(*UnknownResolutionCommand)(nil), // 9: qsai.workflow.v1.UnknownResolutionCommand
 	(*EvaluationState)(nil),          // 10: qsai.workflow.v1.EvaluationState
 	(*EvaluationStartCommand)(nil),   // 11: qsai.workflow.v1.EvaluationStartCommand
+	(*FrozenEvaluationRef)(nil),      // 12: qsai.workflow.v1.FrozenEvaluationRef
+	(*EvaluationRelease)(nil),        // 13: qsai.workflow.v1.EvaluationRelease
+	(*EvaluationCreateCommand)(nil),  // 14: qsai.workflow.v1.EvaluationCreateCommand
 }
 var file_aiworkflow_workflow_proto_depIdxs = []int32{
 	0,  // 0: qsai.workflow.v1.StartCommand.actor:type_name -> qsai.workflow.v1.Actor
@@ -1061,23 +1340,38 @@ var file_aiworkflow_workflow_proto_depIdxs = []int32{
 	6,  // 4: qsai.workflow.v1.EvidenceItem.facts:type_name -> qsai.workflow.v1.Fact
 	8,  // 5: qsai.workflow.v1.UnknownResolutionCommand.scope:type_name -> qsai.workflow.v1.EvaluationQuery
 	8,  // 6: qsai.workflow.v1.EvaluationStartCommand.scope:type_name -> qsai.workflow.v1.EvaluationQuery
-	1,  // 7: qsai.workflow.v1.Commands.Start:input_type -> qsai.workflow.v1.StartCommand
-	2,  // 8: qsai.workflow.v1.Commands.Change:input_type -> qsai.workflow.v1.ChangeCommand
-	4,  // 9: qsai.workflow.v1.Results.Accept:input_type -> qsai.workflow.v1.StateEvent
-	11, // 10: qsai.workflow.v1.EvaluationManagement.Start:input_type -> qsai.workflow.v1.EvaluationStartCommand
-	8,  // 11: qsai.workflow.v1.EvaluationManagement.Get:input_type -> qsai.workflow.v1.EvaluationQuery
-	9,  // 12: qsai.workflow.v1.EvaluationManagement.ResolveUnknown:input_type -> qsai.workflow.v1.UnknownResolutionCommand
-	3,  // 13: qsai.workflow.v1.Commands.Start:output_type -> qsai.workflow.v1.Receipt
-	3,  // 14: qsai.workflow.v1.Commands.Change:output_type -> qsai.workflow.v1.Receipt
-	5,  // 15: qsai.workflow.v1.Results.Accept:output_type -> qsai.workflow.v1.Acknowledgement
-	10, // 16: qsai.workflow.v1.EvaluationManagement.Start:output_type -> qsai.workflow.v1.EvaluationState
-	10, // 17: qsai.workflow.v1.EvaluationManagement.Get:output_type -> qsai.workflow.v1.EvaluationState
-	10, // 18: qsai.workflow.v1.EvaluationManagement.ResolveUnknown:output_type -> qsai.workflow.v1.EvaluationState
-	13, // [13:19] is the sub-list for method output_type
-	7,  // [7:13] is the sub-list for method input_type
-	7,  // [7:7] is the sub-list for extension type_name
-	7,  // [7:7] is the sub-list for extension extendee
-	0,  // [0:7] is the sub-list for field type_name
+	12, // 7: qsai.workflow.v1.EvaluationRelease.suite:type_name -> qsai.workflow.v1.FrozenEvaluationRef
+	12, // 8: qsai.workflow.v1.EvaluationRelease.prompt:type_name -> qsai.workflow.v1.FrozenEvaluationRef
+	12, // 9: qsai.workflow.v1.EvaluationRelease.profile:type_name -> qsai.workflow.v1.FrozenEvaluationRef
+	12, // 10: qsai.workflow.v1.EvaluationRelease.input_schema:type_name -> qsai.workflow.v1.FrozenEvaluationRef
+	12, // 11: qsai.workflow.v1.EvaluationRelease.output_schema:type_name -> qsai.workflow.v1.FrozenEvaluationRef
+	12, // 12: qsai.workflow.v1.EvaluationRelease.generation_route:type_name -> qsai.workflow.v1.FrozenEvaluationRef
+	12, // 13: qsai.workflow.v1.EvaluationRelease.semantic_prompt:type_name -> qsai.workflow.v1.FrozenEvaluationRef
+	12, // 14: qsai.workflow.v1.EvaluationRelease.semantic_output_schema:type_name -> qsai.workflow.v1.FrozenEvaluationRef
+	12, // 15: qsai.workflow.v1.EvaluationRelease.semantic_route:type_name -> qsai.workflow.v1.FrozenEvaluationRef
+	12, // 16: qsai.workflow.v1.EvaluationRelease.execution_policy:type_name -> qsai.workflow.v1.FrozenEvaluationRef
+	12, // 17: qsai.workflow.v1.EvaluationRelease.gate_policy:type_name -> qsai.workflow.v1.FrozenEvaluationRef
+	8,  // 18: qsai.workflow.v1.EvaluationCreateCommand.scope:type_name -> qsai.workflow.v1.EvaluationQuery
+	13, // 19: qsai.workflow.v1.EvaluationCreateCommand.release:type_name -> qsai.workflow.v1.EvaluationRelease
+	1,  // 20: qsai.workflow.v1.Commands.Start:input_type -> qsai.workflow.v1.StartCommand
+	2,  // 21: qsai.workflow.v1.Commands.Change:input_type -> qsai.workflow.v1.ChangeCommand
+	4,  // 22: qsai.workflow.v1.Results.Accept:input_type -> qsai.workflow.v1.StateEvent
+	14, // 23: qsai.workflow.v1.EvaluationManagement.Create:input_type -> qsai.workflow.v1.EvaluationCreateCommand
+	11, // 24: qsai.workflow.v1.EvaluationManagement.Start:input_type -> qsai.workflow.v1.EvaluationStartCommand
+	8,  // 25: qsai.workflow.v1.EvaluationManagement.Get:input_type -> qsai.workflow.v1.EvaluationQuery
+	9,  // 26: qsai.workflow.v1.EvaluationManagement.ResolveUnknown:input_type -> qsai.workflow.v1.UnknownResolutionCommand
+	3,  // 27: qsai.workflow.v1.Commands.Start:output_type -> qsai.workflow.v1.Receipt
+	3,  // 28: qsai.workflow.v1.Commands.Change:output_type -> qsai.workflow.v1.Receipt
+	5,  // 29: qsai.workflow.v1.Results.Accept:output_type -> qsai.workflow.v1.Acknowledgement
+	10, // 30: qsai.workflow.v1.EvaluationManagement.Create:output_type -> qsai.workflow.v1.EvaluationState
+	10, // 31: qsai.workflow.v1.EvaluationManagement.Start:output_type -> qsai.workflow.v1.EvaluationState
+	10, // 32: qsai.workflow.v1.EvaluationManagement.Get:output_type -> qsai.workflow.v1.EvaluationState
+	10, // 33: qsai.workflow.v1.EvaluationManagement.ResolveUnknown:output_type -> qsai.workflow.v1.EvaluationState
+	27, // [27:34] is the sub-list for method output_type
+	20, // [20:27] is the sub-list for method input_type
+	20, // [20:20] is the sub-list for extension type_name
+	20, // [20:20] is the sub-list for extension extendee
+	0,  // [0:20] is the sub-list for field type_name
 }
 
 func init() { file_aiworkflow_workflow_proto_init() }
@@ -1092,7 +1386,7 @@ func file_aiworkflow_workflow_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_aiworkflow_workflow_proto_rawDesc), len(file_aiworkflow_workflow_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   12,
+			NumMessages:   15,
 			NumExtensions: 0,
 			NumServices:   3,
 		},
