@@ -24,6 +24,13 @@ definitions:
       template_id:
         type: string
     type: object
+  aibridge.DraftScope:
+    properties:
+      operator_user_id:
+        type: integer
+      organization_id:
+        type: integer
+    type: object
   aibridge.EvaluationCandidateEvidence:
     properties:
       candidate_id:
@@ -171,6 +178,15 @@ definitions:
       version:
         type: integer
     type: object
+  aibridge.FreezePromptDraft:
+    properties:
+      command_id:
+        type: string
+      expected_revision:
+        type: integer
+      reason:
+        type: string
+    type: object
   aibridge.FrozenEvaluationRef:
     properties:
       fingerprint:
@@ -178,6 +194,32 @@ definitions:
       id:
         type: string
       version:
+        type: string
+    type: object
+  aibridge.FrozenPromptCommand:
+    properties:
+      command_id:
+        type: string
+      draft_id:
+        type: string
+      expected_revision:
+        type: integer
+      reason:
+        type: string
+    type: object
+  aibridge.FrozenPromptReceipt:
+    properties:
+      asset:
+        $ref: '#/definitions/aibridge.PromptDraftSource'
+      command:
+        $ref: '#/definitions/aibridge.FrozenPromptCommand'
+      frozen_at:
+        type: string
+      scope:
+        $ref: '#/definitions/aibridge.DraftScope'
+      snapshot_sha256:
+        type: string
+      validator_version:
         type: string
     type: object
   aibridge.PromptDraftContent:
@@ -14891,6 +14933,62 @@ paths:
       summary: 从现有资产创建 qs-ai Prompt 草稿
       tags:
       - AI-Workflow-Prompt-Drafts
+  /internal/v2/interpretation/ai-workflow/prompt-drafts/{draft_id}/freeze:
+    post:
+      consumes:
+      - application/json
+      description: 需要当前机构 OrgAdmin 权限；组织和操作人取认证上下文。冻结只校验模板语法，不代表质量评测批准或发布。超时后查询原 command_id，不自动重试。
+      parameters:
+      - description: 草稿 UUID
+        in: path
+        name: draft_id
+        required: true
+        type: string
+      - description: 保存命令
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/aibridge.FreezePromptDraft'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/aibridge.FrozenPromptReceipt'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+      summary: 校验语法并冻结 qs-ai 原生 Prompt 资产
+      tags:
+      - AI-Workflow-Prompt-Drafts
   /internal/v2/interpretation/ai-workflow/prompt-drafts/{draft_id}/revisions:
     post:
       consumes:
@@ -14993,6 +15091,54 @@ paths:
           schema:
             $ref: '#/definitions/core.ErrResponse'
       summary: 查询 qs-ai 草稿保存的原始命令回执
+      tags:
+      - AI-Workflow-Prompt-Drafts
+  /internal/v2/interpretation/ai-workflow/prompt-drafts/freeze-commands/{command_id}:
+    get:
+      description: 需要当前机构解读审计权限，限原组织及原操作人。仅查询，不重发保存命令。
+      parameters:
+      - description: 原命令 UUID
+        in: path
+        name: command_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/aibridge.FrozenPromptReceipt'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+      summary: 查询 qs-ai Prompt 冻结的原始命令回执
       tags:
       - AI-Workflow-Prompt-Drafts
   /internal/v2/interpretation/ai-workflow/publications:

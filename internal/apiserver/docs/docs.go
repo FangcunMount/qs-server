@@ -11133,6 +11133,83 @@ const docTemplate = `{
                 }
             }
         },
+        "/internal/v2/interpretation/ai-workflow/prompt-drafts/freeze-commands/{command_id}": {
+            "get": {
+                "description": "需要当前机构解读审计权限，限原组织及原操作人。仅查询，不重发保存命令。",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "AI-Workflow-Prompt-Drafts"
+                ],
+                "summary": "查询 qs-ai Prompt 冻结的原始命令回执",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "原命令 UUID",
+                        "name": "command_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/aibridge.FrozenPromptReceipt"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/internal/v2/interpretation/ai-workflow/prompt-drafts/{draft_id}": {
             "get": {
                 "description": "需要当前机构解读审计权限。查询不触发校验、发布或模型调用。",
@@ -11260,6 +11337,95 @@ const docTemplate = `{
                                     "properties": {
                                         "data": {
                                             "$ref": "#/definitions/aibridge.PromptDraftState"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/internal/v2/interpretation/ai-workflow/prompt-drafts/{draft_id}/freeze": {
+            "post": {
+                "description": "需要当前机构 OrgAdmin 权限；组织和操作人取认证上下文。冻结只校验模板语法，不代表质量评测批准或发布。超时后查询原 command_id，不自动重试。",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "AI-Workflow-Prompt-Drafts"
+                ],
+                "summary": "校验语法并冻结 qs-ai 原生 Prompt 资产",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "草稿 UUID",
+                        "name": "draft_id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "保存命令",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/aibridge.FreezePromptDraft"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/aibridge.FrozenPromptReceipt"
                                         }
                                     }
                                 }
@@ -12049,6 +12215,17 @@ const docTemplate = `{
                 }
             }
         },
+        "aibridge.DraftScope": {
+            "type": "object",
+            "properties": {
+                "operator_user_id": {
+                    "type": "integer"
+                },
+                "organization_id": {
+                    "type": "integer"
+                }
+            }
+        },
         "aibridge.EvaluationCandidateEvidence": {
             "type": "object",
             "properties": {
@@ -12273,6 +12450,20 @@ const docTemplate = `{
                 }
             }
         },
+        "aibridge.FreezePromptDraft": {
+            "type": "object",
+            "properties": {
+                "command_id": {
+                    "type": "string"
+                },
+                "expected_revision": {
+                    "type": "integer"
+                },
+                "reason": {
+                    "type": "string"
+                }
+            }
+        },
         "aibridge.FrozenEvaluationRef": {
             "type": "object",
             "properties": {
@@ -12283,6 +12474,46 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "version": {
+                    "type": "string"
+                }
+            }
+        },
+        "aibridge.FrozenPromptCommand": {
+            "type": "object",
+            "properties": {
+                "command_id": {
+                    "type": "string"
+                },
+                "draft_id": {
+                    "type": "string"
+                },
+                "expected_revision": {
+                    "type": "integer"
+                },
+                "reason": {
+                    "type": "string"
+                }
+            }
+        },
+        "aibridge.FrozenPromptReceipt": {
+            "type": "object",
+            "properties": {
+                "asset": {
+                    "$ref": "#/definitions/aibridge.PromptDraftSource"
+                },
+                "command": {
+                    "$ref": "#/definitions/aibridge.FrozenPromptCommand"
+                },
+                "frozen_at": {
+                    "type": "string"
+                },
+                "scope": {
+                    "$ref": "#/definitions/aibridge.DraftScope"
+                },
+                "snapshot_sha256": {
+                    "type": "string"
+                },
+                "validator_version": {
                     "type": "string"
                 }
             }

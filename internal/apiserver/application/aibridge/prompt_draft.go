@@ -11,7 +11,10 @@ import (
 )
 
 // DraftScope is populated only from the protected QS context.
-type DraftScope struct{ OrganizationID, OperatorUserID int64 }
+type DraftScope struct {
+	OrganizationID int64 `json:"organization_id"`
+	OperatorUserID int64 `json:"operator_user_id"`
+}
 type PromptDraftSource struct {
 	Identity      string `json:"identity"`
 	Version       string `json:"version"`
@@ -20,8 +23,9 @@ type PromptDraftSource struct {
 }
 
 func (s PromptDraftSource) Valid() bool {
-	return strings.TrimSpace(s.Identity) != "" && len(s.Identity) <= 255 && utf8.ValidString(s.Identity) && frozenVersion.MatchString(s.Version) && frozenFingerprint.MatchString(s.Fingerprint) && frozenFingerprint.MatchString("sha256:"+s.ContentSHA256)
+	return strings.TrimSpace(s.Identity) != "" && len(s.Identity) <= 255 && utf8.ValidString(s.Identity) && frozenVersion.MatchString(s.Version) && frozenFingerprint.MatchString(s.Fingerprint) && ValidPromptChecksum(s.ContentSHA256)
 }
+func ValidPromptChecksum(value string) bool { return frozenFingerprint.MatchString("sha256:" + value) }
 
 type PromptDraftContent struct {
 	SystemMessage       string   `json:"system_message"`
@@ -97,6 +101,8 @@ type PromptDraftState struct {
 	SavedAt        string             `json:"saved_at"`
 }
 type PromptDraftGateway interface {
+	FreezePromptDraft(context.Context, DraftScope, string, FreezePromptDraft) (FrozenPromptReceipt, error)
+	GetPromptFreezeReceipt(context.Context, DraftScope, string) (FrozenPromptReceipt, error)
 	CreatePromptDraft(context.Context, DraftScope, string, CreatePromptDraft) (PromptDraftState, error)
 	RevisePromptDraft(context.Context, DraftScope, string, RevisePromptDraft) (PromptDraftState, error)
 	GetPromptDraft(context.Context, DraftScope, string, *int64) (PromptDraftState, error)
