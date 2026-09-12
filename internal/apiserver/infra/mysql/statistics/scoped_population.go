@@ -38,23 +38,28 @@ func (s *ReadStore) scopedPopulationMetrics(ctx context.Context, orgID int64, st
 			return result, err
 		}
 	}
-	facts := func() *gorm.DB { return s.scopedFacts(ctx, orgID, stores, "statistics_assessment_fact") }
-	for _, q := range []struct {
-		kind   string
-		target *int64
-	}{{"answersheet_submitted", &result.AnswerSheetSubmissionCount}, {"assessment_created", &result.AssessmentCount}, {"report_generated", &result.ReportCount}} {
-		if err := facts().Where("f.fact_type=?", q.kind).Count(q.target).Error; err != nil {
-			return result, err
-		}
-	}
-	var questionnaires, models int64
-	if err := facts().Distinct("f.questionnaire_code").Count(&questionnaires).Error; err != nil {
+	// Materialize the small grouped result once; totals and distinct content
+	// counts retain database collation semantics without rescanning history.
+	groups := s.scopedFacts(ctx, orgID, stores, "statistics_assessment_fact").
+		Select("f.fact_type, f.questionnaire_code, f.model_kind, f.model_code, COUNT(*) total").
+		Group("f.fact_type, f.questionnaire_code, f.model_kind, f.model_code")
+	var history app.OverviewMetrics
+	if err := s.db.WithContext(ctx).Raw(`WITH content_groups AS (?)
+SELECT
+ COALESCE(SUM(CASE WHEN fact_type='answersheet_submitted' THEN total ELSE 0 END),0) answer_sheet_submission_count,
+ COALESCE(SUM(CASE WHEN fact_type='assessment_created' THEN total ELSE 0 END),0) assessment_count,
+ COALESCE(SUM(CASE WHEN fact_type='report_generated' THEN total ELSE 0 END),0) report_count,
+ COUNT(DISTINCT questionnaire_code) + (SELECT COUNT(*) FROM (
+   SELECT model_kind,model_code FROM content_groups
+   WHERE model_code IS NOT NULL AND model_code<>'' AND model_kind IS NOT NULL
+   GROUP BY model_kind,model_code
+ ) AS models) content_count
+FROM content_groups`, groups).Scan(&history).Error; err != nil {
 		return result, err
 	}
-	modelPairs := facts().Where("f.model_code IS NOT NULL AND f.model_code<>'' AND f.model_kind IS NOT NULL").Select("f.model_kind,f.model_code").Group("f.model_kind,f.model_code")
-	if err := s.db.WithContext(ctx).Table("(?) AS models", modelPairs).Count(&models).Error; err != nil {
-		return result, err
-	}
-	result.ContentCount = questionnaires + models
+	result.AnswerSheetSubmissionCount = history.AnswerSheetSubmissionCount
+	result.AssessmentCount = history.AssessmentCount
+	result.ReportCount = history.ReportCount
+	result.ContentCount = history.ContentCount
 	return result, nil
 }

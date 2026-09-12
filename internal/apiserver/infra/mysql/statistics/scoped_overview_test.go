@@ -48,3 +48,40 @@ func createScopedOverviewFixture(t *testing.T, db *gorm.DB) {
 		require.NoError(t, db.Exec(ddl).Error)
 	}
 }
+
+func TestScopedPopulationAggregatesHistoryWithoutChangingContentOrOwnership(t *testing.T) {
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	require.NoError(t, err)
+	createScopedOverviewFixture(t, db)
+	require.NoError(t, db.Exec("INSERT INTO testee VALUES(2,1,8,NULL),(3,1,NULL,NULL),(4,1,7,'2026-09-01'),(5,2,7,NULL)").Error)
+	// Repeated questionnaire/model identities, null and empty values retain
+	// COUNT(DISTINCT) and grouped model-pair semantics across event types.
+	require.NoError(t, db.Exec(`INSERT INTO statistics_assessment_fact VALUES
+ (1,1,1,NULL,'answersheet_submitted',NULL,'Q','scale','S'),
+ (2,1,1,NULL,'answersheet_submitted',NULL,'Q','scale','S'),
+ (3,1,1,NULL,'assessment_created',NULL,'Q','scale','S'),
+ (4,1,1,NULL,'report_generated',NULL,NULL,'typology','S'),
+ (5,1,1,NULL,'other',NULL,'',NULL,'S'),
+ (6,1,1,NULL,'other',NULL,NULL,'scale',''),
+ (7,1,2,NULL,'answersheet_submitted',NULL,'OTHER','scale','OTHER'),
+ (8,1,3,NULL,'answersheet_submitted',NULL,'UNASSIGNED',NULL,NULL),
+ (9,1,4,NULL,'answersheet_submitted',NULL,'DELETED',NULL,NULL),
+ (10,1,5,NULL,'answersheet_submitted',NULL,'CROSS_ORG',NULL,NULL),
+ (11,2,1,NULL,'answersheet_submitted',NULL,'CROSS_FACT',NULL,NULL)`).Error)
+	store := NewReadStore(db, nil)
+	result, err := store.scopedPopulationMetrics(context.Background(), 1, authz.StoreRange{StoreIDs: []uint64{7}})
+	require.NoError(t, err)
+	require.EqualValues(t, 2, result.AnswerSheetSubmissionCount)
+	require.EqualValues(t, 1, result.AssessmentCount)
+	require.EqualValues(t, 1, result.ReportCount)
+	require.EqualValues(t, 4, result.ContentCount) // Q and empty questionnaire; two model kinds.
+	all, err := store.scopedPopulationMetrics(context.Background(), 1, authz.StoreRange{AllStores: true})
+	require.NoError(t, err)
+	require.EqualValues(t, 3, all.AnswerSheetSubmissionCount)
+	require.EqualValues(t, 6, all.ContentCount)
+	require.NoError(t, db.Exec("UPDATE testee SET store_id=8 WHERE id=1").Error)
+	empty, err := store.scopedPopulationMetrics(context.Background(), 1, authz.StoreRange{StoreIDs: []uint64{7}})
+	require.NoError(t, err)
+	require.Zero(t, empty.AnswerSheetSubmissionCount)
+	require.Zero(t, empty.ContentCount)
+}
