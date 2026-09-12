@@ -983,10 +983,12 @@ var PublicationManagement_ServiceDesc = grpc.ServiceDesc{
 }
 
 const (
-	PromptDraftManagement_Create_FullMethodName     = "/qsai.workflow.v1.PromptDraftManagement/Create"
-	PromptDraftManagement_Revise_FullMethodName     = "/qsai.workflow.v1.PromptDraftManagement/Revise"
-	PromptDraftManagement_Get_FullMethodName        = "/qsai.workflow.v1.PromptDraftManagement/Get"
-	PromptDraftManagement_GetReceipt_FullMethodName = "/qsai.workflow.v1.PromptDraftManagement/GetReceipt"
+	PromptDraftManagement_Create_FullMethodName           = "/qsai.workflow.v1.PromptDraftManagement/Create"
+	PromptDraftManagement_Revise_FullMethodName           = "/qsai.workflow.v1.PromptDraftManagement/Revise"
+	PromptDraftManagement_Get_FullMethodName              = "/qsai.workflow.v1.PromptDraftManagement/Get"
+	PromptDraftManagement_GetReceipt_FullMethodName       = "/qsai.workflow.v1.PromptDraftManagement/GetReceipt"
+	PromptDraftManagement_Freeze_FullMethodName           = "/qsai.workflow.v1.PromptDraftManagement/Freeze"
+	PromptDraftManagement_GetFreezeReceipt_FullMethodName = "/qsai.workflow.v1.PromptDraftManagement/GetFreezeReceipt"
 )
 
 // PromptDraftManagementClient is the client API for PromptDraftManagement service.
@@ -1000,6 +1002,9 @@ type PromptDraftManagementClient interface {
 	Revise(ctx context.Context, in *PromptDraftReviseCommand, opts ...grpc.CallOption) (*PromptDraftState, error)
 	Get(ctx context.Context, in *PromptDraftQuery, opts ...grpc.CallOption) (*PromptDraftState, error)
 	GetReceipt(ctx context.Context, in *PromptDraftReceiptQuery, opts ...grpc.CallOption) (*PromptDraftState, error)
+	// Freeze validated template syntax into a native immutable asset, not a release.
+	Freeze(ctx context.Context, in *PromptDraftFreezeCommand, opts ...grpc.CallOption) (*PromptDraftFreezeReceipt, error)
+	GetFreezeReceipt(ctx context.Context, in *PromptDraftReceiptQuery, opts ...grpc.CallOption) (*PromptDraftFreezeReceipt, error)
 }
 
 type promptDraftManagementClient struct {
@@ -1050,6 +1055,26 @@ func (c *promptDraftManagementClient) GetReceipt(ctx context.Context, in *Prompt
 	return out, nil
 }
 
+func (c *promptDraftManagementClient) Freeze(ctx context.Context, in *PromptDraftFreezeCommand, opts ...grpc.CallOption) (*PromptDraftFreezeReceipt, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(PromptDraftFreezeReceipt)
+	err := c.cc.Invoke(ctx, PromptDraftManagement_Freeze_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *promptDraftManagementClient) GetFreezeReceipt(ctx context.Context, in *PromptDraftReceiptQuery, opts ...grpc.CallOption) (*PromptDraftFreezeReceipt, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(PromptDraftFreezeReceipt)
+	err := c.cc.Invoke(ctx, PromptDraftManagement_GetFreezeReceipt_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // PromptDraftManagementServer is the server API for PromptDraftManagement service.
 // All implementations must embed UnimplementedPromptDraftManagementServer
 // for forward compatibility.
@@ -1061,6 +1086,9 @@ type PromptDraftManagementServer interface {
 	Revise(context.Context, *PromptDraftReviseCommand) (*PromptDraftState, error)
 	Get(context.Context, *PromptDraftQuery) (*PromptDraftState, error)
 	GetReceipt(context.Context, *PromptDraftReceiptQuery) (*PromptDraftState, error)
+	// Freeze validated template syntax into a native immutable asset, not a release.
+	Freeze(context.Context, *PromptDraftFreezeCommand) (*PromptDraftFreezeReceipt, error)
+	GetFreezeReceipt(context.Context, *PromptDraftReceiptQuery) (*PromptDraftFreezeReceipt, error)
 	mustEmbedUnimplementedPromptDraftManagementServer()
 }
 
@@ -1082,6 +1110,12 @@ func (UnimplementedPromptDraftManagementServer) Get(context.Context, *PromptDraf
 }
 func (UnimplementedPromptDraftManagementServer) GetReceipt(context.Context, *PromptDraftReceiptQuery) (*PromptDraftState, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetReceipt not implemented")
+}
+func (UnimplementedPromptDraftManagementServer) Freeze(context.Context, *PromptDraftFreezeCommand) (*PromptDraftFreezeReceipt, error) {
+	return nil, status.Error(codes.Unimplemented, "method Freeze not implemented")
+}
+func (UnimplementedPromptDraftManagementServer) GetFreezeReceipt(context.Context, *PromptDraftReceiptQuery) (*PromptDraftFreezeReceipt, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetFreezeReceipt not implemented")
 }
 func (UnimplementedPromptDraftManagementServer) mustEmbedUnimplementedPromptDraftManagementServer() {}
 func (UnimplementedPromptDraftManagementServer) testEmbeddedByValue()                               {}
@@ -1176,6 +1210,42 @@ func _PromptDraftManagement_GetReceipt_Handler(srv interface{}, ctx context.Cont
 	return interceptor(ctx, in, info, handler)
 }
 
+func _PromptDraftManagement_Freeze_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(PromptDraftFreezeCommand)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(PromptDraftManagementServer).Freeze(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: PromptDraftManagement_Freeze_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(PromptDraftManagementServer).Freeze(ctx, req.(*PromptDraftFreezeCommand))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _PromptDraftManagement_GetFreezeReceipt_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(PromptDraftReceiptQuery)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(PromptDraftManagementServer).GetFreezeReceipt(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: PromptDraftManagement_GetFreezeReceipt_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(PromptDraftManagementServer).GetFreezeReceipt(ctx, req.(*PromptDraftReceiptQuery))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // PromptDraftManagement_ServiceDesc is the grpc.ServiceDesc for PromptDraftManagement service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -1198,6 +1268,14 @@ var PromptDraftManagement_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetReceipt",
 			Handler:    _PromptDraftManagement_GetReceipt_Handler,
+		},
+		{
+			MethodName: "Freeze",
+			Handler:    _PromptDraftManagement_Freeze_Handler,
+		},
+		{
+			MethodName: "GetFreezeReceipt",
+			Handler:    _PromptDraftManagement_GetFreezeReceipt_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

@@ -10877,6 +10877,67 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/core.ErrResponse'
+  /internal/v2/interpretation/ai-workflow/prompt-drafts/freeze-commands/{command_id}:
+    get:
+      tags:
+      - AI-Workflow-Prompt-Drafts
+      summary: 查询 qs-ai Prompt 冻结的原始命令回执
+      description: 需要当前机构解读审计权限，限原组织及原操作人。仅查询，不重发保存命令。
+      operationId: 查询qsaiPrompt冻结的原始命令回执
+      parameters:
+      - type: string
+        description: 原命令 UUID
+        name: command_id
+        in: path
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/core.Response'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/aibridge.FrozenPromptReceipt'
+        '400':
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '409':
+          description: Conflict
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
   /internal/v2/interpretation/ai-workflow/prompt-drafts/{draft_id}:
     get:
       tags:
@@ -10973,6 +11034,73 @@ paths:
                   properties:
                     data:
                       $ref: '#/components/schemas/aibridge.PromptDraftState'
+        '400':
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '409':
+          description: Conflict
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+  /internal/v2/interpretation/ai-workflow/prompt-drafts/{draft_id}/freeze:
+    post:
+      tags:
+      - AI-Workflow-Prompt-Drafts
+      summary: 校验语法并冻结 qs-ai 原生 Prompt 资产
+      description: 需要当前机构 OrgAdmin 权限；组织和操作人取认证上下文。冻结只校验模板语法，不代表质量评测批准或发布。超时后查询原 command_id，不自动重试。
+      operationId: 校验语法并冻结qsai原生Prompt资产
+      parameters:
+      - type: string
+        description: 草稿 UUID
+        name: draft_id
+        in: path
+        required: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/aibridge.FreezePromptDraft'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/core.Response'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/aibridge.FrozenPromptReceipt'
         '400':
           description: Bad Request
           content:
@@ -11644,6 +11772,13 @@ components:
           type: string
         template_id:
           type: string
+    aibridge.DraftScope:
+      type: object
+      properties:
+        operator_user_id:
+          type: integer
+        organization_id:
+          type: integer
     aibridge.EvaluationCandidateEvidence:
       type: object
       properties:
@@ -11791,6 +11926,15 @@ components:
           type: integer
         version:
           type: integer
+    aibridge.FreezePromptDraft:
+      type: object
+      properties:
+        command_id:
+          type: string
+        expected_revision:
+          type: integer
+        reason:
+          type: string
     aibridge.FrozenEvaluationRef:
       type: object
       properties:
@@ -11799,6 +11943,32 @@ components:
         id:
           type: string
         version:
+          type: string
+    aibridge.FrozenPromptCommand:
+      type: object
+      properties:
+        command_id:
+          type: string
+        draft_id:
+          type: string
+        expected_revision:
+          type: integer
+        reason:
+          type: string
+    aibridge.FrozenPromptReceipt:
+      type: object
+      properties:
+        asset:
+          $ref: '#/components/schemas/aibridge.PromptDraftSource'
+        command:
+          $ref: '#/components/schemas/aibridge.FrozenPromptCommand'
+        frozen_at:
+          type: string
+        scope:
+          $ref: '#/components/schemas/aibridge.DraftScope'
+        snapshot_sha256:
+          type: string
+        validator_version:
           type: string
     aibridge.PromptDraftContent:
       type: object

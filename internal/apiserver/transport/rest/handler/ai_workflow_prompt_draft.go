@@ -68,7 +68,8 @@ func (h *AIWorkflowPromptDraftHandler) Create(c *gin.Context) {
 	}
 	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, 256*1024)
 	var command app.CreatePromptDraft
-	if err := h.BindJSON(c, &command); err != nil {
+	if err := c.ShouldBindJSON(&command); err != nil {
+		h.failure(c, app.ErrInvalid)
 		return
 	}
 	value, err := h.service.Create(c.Request.Context(), scope, c.Param("draft_id"), command)
@@ -102,7 +103,8 @@ func (h *AIWorkflowPromptDraftHandler) Revise(c *gin.Context) {
 	}
 	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, 256*1024)
 	var command app.RevisePromptDraft
-	if err := h.BindJSON(c, &command); err != nil {
+	if err := c.ShouldBindJSON(&command); err != nil {
+		h.failure(c, app.ErrInvalid)
 		return
 	}
 	value, err := h.service.Revise(c.Request.Context(), scope, c.Param("draft_id"), command)
@@ -174,6 +176,68 @@ func (h *AIWorkflowPromptDraftHandler) GetReceipt(c *gin.Context) {
 		return
 	}
 	value, err := h.service.GetReceipt(c.Request.Context(), scope, c.Param("command_id"))
+	if err != nil {
+		h.failure(c, err)
+		return
+	}
+	h.Success(c, value)
+}
+
+// Freeze godoc
+// @Summary 校验语法并冻结 qs-ai 原生 Prompt 资产
+// @Description 需要当前机构 OrgAdmin 权限；组织和操作人取认证上下文。冻结只校验模板语法，不代表质量评测批准或发布。超时后查询原 command_id，不自动重试。
+// @Tags AI-Workflow-Prompt-Drafts
+// @Accept json
+// @Produce json
+// @Param draft_id path string true "草稿 UUID"
+// @Param body body app.FreezePromptDraft true "保存命令"
+// @Success 200 {object} core.Response{data=app.FrozenPromptReceipt}
+// @Failure 400 {object} core.ErrResponse
+// @Failure 401 {object} core.ErrResponse
+// @Failure 403 {object} core.ErrResponse
+// @Failure 404 {object} core.ErrResponse
+// @Failure 409 {object} core.ErrResponse
+// @Failure 500 {object} core.ErrResponse
+// @Router /internal/v2/interpretation/ai-workflow/prompt-drafts/{draft_id}/freeze [post]
+func (h *AIWorkflowPromptDraftHandler) Freeze(c *gin.Context) {
+	scope, ok := h.scope(c)
+	if !ok {
+		return
+	}
+	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, 256*1024)
+	var command app.FreezePromptDraft
+	if err := c.ShouldBindJSON(&command); err != nil {
+		h.failure(c, app.ErrInvalid)
+		return
+	}
+	value, err := h.service.Freeze(c.Request.Context(), scope, c.Param("draft_id"), command)
+	if err != nil {
+		h.failure(c, err)
+		return
+	}
+	h.Success(c, value)
+}
+
+// GetFreezeReceipt godoc
+// @Summary 查询 qs-ai Prompt 冻结的原始命令回执
+// @Description 需要当前机构解读审计权限，限原组织及原操作人。仅查询，不重发保存命令。
+// @Tags AI-Workflow-Prompt-Drafts
+// @Produce json
+// @Param command_id path string true "原命令 UUID"
+// @Success 200 {object} core.Response{data=app.FrozenPromptReceipt}
+// @Failure 400 {object} core.ErrResponse
+// @Failure 401 {object} core.ErrResponse
+// @Failure 403 {object} core.ErrResponse
+// @Failure 404 {object} core.ErrResponse
+// @Failure 409 {object} core.ErrResponse
+// @Failure 500 {object} core.ErrResponse
+// @Router /internal/v2/interpretation/ai-workflow/prompt-drafts/freeze-commands/{command_id} [get]
+func (h *AIWorkflowPromptDraftHandler) GetFreezeReceipt(c *gin.Context) {
+	scope, ok := h.scope(c)
+	if !ok {
+		return
+	}
+	value, err := h.service.GetFreezeReceipt(c.Request.Context(), scope, c.Param("command_id"))
 	if err != nil {
 		h.failure(c, err)
 		return

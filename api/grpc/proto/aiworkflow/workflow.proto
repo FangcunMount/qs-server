@@ -266,6 +266,21 @@ service PromptDraftManagement {
  rpc Revise(PromptDraftReviseCommand) returns (PromptDraftState);
  rpc Get(PromptDraftQuery) returns (PromptDraftState);
  rpc GetReceipt(PromptDraftReceiptQuery) returns (PromptDraftState);
+ // Freeze validated template syntax into a native immutable asset, not a release.
+ rpc Freeze(PromptDraftFreezeCommand) returns (PromptDraftFreezeReceipt);
+ rpc GetFreezeReceipt(PromptDraftReceiptQuery) returns (PromptDraftFreezeReceipt);
+}
+message PromptDraftFreezeCommand {
+ PublicationScope scope = 1;
+ string draft_id = 2;
+ string command_id = 3;
+ int64 expected_revision = 4;
+ string reason = 5;
+}
+message PromptDraftFreezeReceipt {
+ string schema_version = 1;
+ string command_id = 2;
+ string receipt_json = 3;
 }
 message PromptDraftSource {
  string identity = 1;

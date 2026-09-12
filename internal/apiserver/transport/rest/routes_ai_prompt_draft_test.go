@@ -60,7 +60,7 @@ func TestDraftRoutesAuthorizationScopeAndHistoricalRead(t *testing.T) {
 	for _, admin := range []bool{false, true} {
 		g := &draftRouteGateway{}
 		e := draftRouter(g, admin)
-		for _, suffix := range []string{"/create", "/revisions"} {
+		for _, suffix := range []string{"/create", "/revisions", "/freeze"} {
 			raw, _ := json.Marshal(draftBody())
 			req := httptest.NewRequest("POST", draftRouteBase+"/"+publicationRouteID+suffix, strings.NewReader(string(raw)))
 			req.Header.Set("Content-Type", "application/json")
@@ -73,7 +73,7 @@ func TestDraftRoutesAuthorizationScopeAndHistoricalRead(t *testing.T) {
 				t.Fatal("audit write reached AI", w.Code, g.calls)
 			}
 		}
-		for _, suffix := range []string{"/" + publicationRouteID, "/" + publicationRouteID + "?revision=1", "/commands/" + publicationRouteID} {
+		for _, suffix := range []string{"/" + publicationRouteID, "/" + publicationRouteID + "?revision=1", "/commands/" + publicationRouteID, "/freeze-commands/" + publicationRouteID} {
 			w := httptest.NewRecorder()
 			e.ServeHTTP(w, httptest.NewRequest("GET", draftRouteBase+suffix, nil))
 			if w.Code != 200 {
@@ -150,6 +150,12 @@ func TestDraftServiceRechecksPermissionBeforeEveryCall(t *testing.T) {
 		if _, err := s.Get(ctx, scope, publicationRouteID, nil); !errors.Is(err, app.ErrGovernanceDenied) {
 			t.Fatal(err)
 		}
+		if _, err := s.Freeze(ctx, scope, publicationRouteID, app.FreezePromptDraft{}); !errors.Is(err, app.ErrGovernanceDenied) {
+			t.Fatal(err)
+		}
+		if _, err := s.GetFreezeReceipt(ctx, scope, publicationRouteID); !errors.Is(err, app.ErrGovernanceDenied) {
+			t.Fatal(err)
+		}
 		if _, err := s.GetReceipt(ctx, scope, publicationRouteID); !errors.Is(err, app.ErrGovernanceDenied) {
 			t.Fatal(err)
 		}
@@ -157,4 +163,15 @@ func TestDraftServiceRechecksPermissionBeforeEveryCall(t *testing.T) {
 	if g.calls != 0 {
 		t.Fatal("revoked request reached AI")
 	}
+}
+
+func (g *draftRouteGateway) FreezePromptDraft(_ context.Context, s app.DraftScope, id string, c app.FreezePromptDraft) (app.FrozenPromptReceipt, error) {
+	g.calls++
+	g.scope = s
+	return app.FrozenPromptReceipt{Scope: s, Command: app.FrozenPromptCommand{DraftID: id, CommandID: c.CommandID, ExpectedRevision: c.ExpectedRevision, Reason: c.Reason}}, g.err
+}
+func (g *draftRouteGateway) GetPromptFreezeReceipt(_ context.Context, s app.DraftScope, id string) (app.FrozenPromptReceipt, error) {
+	g.calls++
+	g.scope = s
+	return app.FrozenPromptReceipt{Scope: s, Command: app.FrozenPromptCommand{CommandID: id}}, g.err
 }

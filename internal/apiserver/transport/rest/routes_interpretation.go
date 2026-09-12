@@ -86,8 +86,10 @@ func (r *Router) registerInterpretationInternalV2Routes(internalV2 *gin.RouterGr
 		read := internalV2.Group("/interpretation/ai-workflow/prompt-drafts", restmiddleware.RequireCapabilityMiddleware(restmiddleware.CapabilityAuditInterpretation))
 		write.POST("/:draft_id/create", drafts.Create)
 		write.POST("/:draft_id/revisions", drafts.Revise)
+		write.POST("/:draft_id/freeze", drafts.Freeze)
 		read.GET("/:draft_id", drafts.Get)
 		read.GET("/commands/:command_id", drafts.GetReceipt)
+		read.GET("/freeze-commands/:command_id", drafts.GetFreezeReceipt)
 	}
 
 	if r.deps.Interpretation.AIExplanationAdministration == nil {
