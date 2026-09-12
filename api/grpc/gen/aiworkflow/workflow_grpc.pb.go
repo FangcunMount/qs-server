@@ -981,3 +981,225 @@ var PublicationManagement_ServiceDesc = grpc.ServiceDesc{
 	Streams:  []grpc.StreamDesc{},
 	Metadata: "aiworkflow/workflow.proto",
 }
+
+const (
+	PromptDraftManagement_Create_FullMethodName     = "/qsai.workflow.v1.PromptDraftManagement/Create"
+	PromptDraftManagement_Revise_FullMethodName     = "/qsai.workflow.v1.PromptDraftManagement/Revise"
+	PromptDraftManagement_Get_FullMethodName        = "/qsai.workflow.v1.PromptDraftManagement/Get"
+	PromptDraftManagement_GetReceipt_FullMethodName = "/qsai.workflow.v1.PromptDraftManagement/GetReceipt"
+)
+
+// PromptDraftManagementClient is the client API for PromptDraftManagement service.
+//
+// For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
+//
+// Draft revisions are editable governance records, never published Prompt assets.
+// QS authorizes each operation. Receipt lookup is restricted to the original actor.
+type PromptDraftManagementClient interface {
+	Create(ctx context.Context, in *PromptDraftCreateCommand, opts ...grpc.CallOption) (*PromptDraftState, error)
+	Revise(ctx context.Context, in *PromptDraftReviseCommand, opts ...grpc.CallOption) (*PromptDraftState, error)
+	Get(ctx context.Context, in *PromptDraftQuery, opts ...grpc.CallOption) (*PromptDraftState, error)
+	GetReceipt(ctx context.Context, in *PromptDraftReceiptQuery, opts ...grpc.CallOption) (*PromptDraftState, error)
+}
+
+type promptDraftManagementClient struct {
+	cc grpc.ClientConnInterface
+}
+
+func NewPromptDraftManagementClient(cc grpc.ClientConnInterface) PromptDraftManagementClient {
+	return &promptDraftManagementClient{cc}
+}
+
+func (c *promptDraftManagementClient) Create(ctx context.Context, in *PromptDraftCreateCommand, opts ...grpc.CallOption) (*PromptDraftState, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(PromptDraftState)
+	err := c.cc.Invoke(ctx, PromptDraftManagement_Create_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *promptDraftManagementClient) Revise(ctx context.Context, in *PromptDraftReviseCommand, opts ...grpc.CallOption) (*PromptDraftState, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(PromptDraftState)
+	err := c.cc.Invoke(ctx, PromptDraftManagement_Revise_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *promptDraftManagementClient) Get(ctx context.Context, in *PromptDraftQuery, opts ...grpc.CallOption) (*PromptDraftState, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(PromptDraftState)
+	err := c.cc.Invoke(ctx, PromptDraftManagement_Get_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *promptDraftManagementClient) GetReceipt(ctx context.Context, in *PromptDraftReceiptQuery, opts ...grpc.CallOption) (*PromptDraftState, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(PromptDraftState)
+	err := c.cc.Invoke(ctx, PromptDraftManagement_GetReceipt_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// PromptDraftManagementServer is the server API for PromptDraftManagement service.
+// All implementations must embed UnimplementedPromptDraftManagementServer
+// for forward compatibility.
+//
+// Draft revisions are editable governance records, never published Prompt assets.
+// QS authorizes each operation. Receipt lookup is restricted to the original actor.
+type PromptDraftManagementServer interface {
+	Create(context.Context, *PromptDraftCreateCommand) (*PromptDraftState, error)
+	Revise(context.Context, *PromptDraftReviseCommand) (*PromptDraftState, error)
+	Get(context.Context, *PromptDraftQuery) (*PromptDraftState, error)
+	GetReceipt(context.Context, *PromptDraftReceiptQuery) (*PromptDraftState, error)
+	mustEmbedUnimplementedPromptDraftManagementServer()
+}
+
+// UnimplementedPromptDraftManagementServer must be embedded to have
+// forward compatible implementations.
+//
+// NOTE: this should be embedded by value instead of pointer to avoid a nil
+// pointer dereference when methods are called.
+type UnimplementedPromptDraftManagementServer struct{}
+
+func (UnimplementedPromptDraftManagementServer) Create(context.Context, *PromptDraftCreateCommand) (*PromptDraftState, error) {
+	return nil, status.Error(codes.Unimplemented, "method Create not implemented")
+}
+func (UnimplementedPromptDraftManagementServer) Revise(context.Context, *PromptDraftReviseCommand) (*PromptDraftState, error) {
+	return nil, status.Error(codes.Unimplemented, "method Revise not implemented")
+}
+func (UnimplementedPromptDraftManagementServer) Get(context.Context, *PromptDraftQuery) (*PromptDraftState, error) {
+	return nil, status.Error(codes.Unimplemented, "method Get not implemented")
+}
+func (UnimplementedPromptDraftManagementServer) GetReceipt(context.Context, *PromptDraftReceiptQuery) (*PromptDraftState, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetReceipt not implemented")
+}
+func (UnimplementedPromptDraftManagementServer) mustEmbedUnimplementedPromptDraftManagementServer() {}
+func (UnimplementedPromptDraftManagementServer) testEmbeddedByValue()                               {}
+
+// UnsafePromptDraftManagementServer may be embedded to opt out of forward compatibility for this service.
+// Use of this interface is not recommended, as added methods to PromptDraftManagementServer will
+// result in compilation errors.
+type UnsafePromptDraftManagementServer interface {
+	mustEmbedUnimplementedPromptDraftManagementServer()
+}
+
+func RegisterPromptDraftManagementServer(s grpc.ServiceRegistrar, srv PromptDraftManagementServer) {
+	// If the following call panics, it indicates UnimplementedPromptDraftManagementServer was
+	// embedded by pointer and is nil.  This will cause panics if an
+	// unimplemented method is ever invoked, so we test this at initialization
+	// time to prevent it from happening at runtime later due to I/O.
+	if t, ok := srv.(interface{ testEmbeddedByValue() }); ok {
+		t.testEmbeddedByValue()
+	}
+	s.RegisterService(&PromptDraftManagement_ServiceDesc, srv)
+}
+
+func _PromptDraftManagement_Create_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(PromptDraftCreateCommand)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(PromptDraftManagementServer).Create(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: PromptDraftManagement_Create_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(PromptDraftManagementServer).Create(ctx, req.(*PromptDraftCreateCommand))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _PromptDraftManagement_Revise_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(PromptDraftReviseCommand)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(PromptDraftManagementServer).Revise(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: PromptDraftManagement_Revise_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(PromptDraftManagementServer).Revise(ctx, req.(*PromptDraftReviseCommand))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _PromptDraftManagement_Get_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(PromptDraftQuery)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(PromptDraftManagementServer).Get(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: PromptDraftManagement_Get_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(PromptDraftManagementServer).Get(ctx, req.(*PromptDraftQuery))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _PromptDraftManagement_GetReceipt_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(PromptDraftReceiptQuery)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(PromptDraftManagementServer).GetReceipt(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: PromptDraftManagement_GetReceipt_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(PromptDraftManagementServer).GetReceipt(ctx, req.(*PromptDraftReceiptQuery))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+// PromptDraftManagement_ServiceDesc is the grpc.ServiceDesc for PromptDraftManagement service.
+// It's only intended for direct use with grpc.RegisterService,
+// and not to be introspected or modified (even as a copy)
+var PromptDraftManagement_ServiceDesc = grpc.ServiceDesc{
+	ServiceName: "qsai.workflow.v1.PromptDraftManagement",
+	HandlerType: (*PromptDraftManagementServer)(nil),
+	Methods: []grpc.MethodDesc{
+		{
+			MethodName: "Create",
+			Handler:    _PromptDraftManagement_Create_Handler,
+		},
+		{
+			MethodName: "Revise",
+			Handler:    _PromptDraftManagement_Revise_Handler,
+		},
+		{
+			MethodName: "Get",
+			Handler:    _PromptDraftManagement_Get_Handler,
+		},
+		{
+			MethodName: "GetReceipt",
+			Handler:    _PromptDraftManagement_GetReceipt_Handler,
+		},
+	},
+	Streams:  []grpc.StreamDesc{},
+	Metadata: "aiworkflow/workflow.proto",
+}

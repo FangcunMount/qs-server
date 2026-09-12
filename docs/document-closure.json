@@ -132,8 +132,8 @@
     "grpc": {
       "source": "api/grpc/proto",
       "proto_file_count": 8,
-      "service_count": 18,
-      "rpc_count": 77,
+      "service_count": 19,
+      "rpc_count": 81,
       "services": {
         "actor.ActorService": [
           "CreateTestee",
@@ -234,6 +234,7 @@
           "Finalize",
           "ReopenReview"
         ],
+        "qsai.workflow.v1.PromptDraftManagement": ["Create", "Revise", "Get", "GetReceipt"],
         "qsai.workflow.v1.PublicationManagement": [
           "Publish",
           "Rollback",
