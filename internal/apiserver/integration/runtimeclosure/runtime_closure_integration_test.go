@@ -6,6 +6,9 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	actorctx "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/actorctx"
+	operatorDomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/operator"
+	mysqlActor "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/actor"
 	"io"
 	"log/slog"
 	"os"
@@ -168,6 +171,9 @@ func TestCurrentRuntimeClosure(t *testing.T) {
 
 	seedRuntimeCatalog(t, mongoDB)
 	orgID := uint64(820000 + time.Now().UnixNano()%10000)
+	if err := mysqlActor.NewOperatorRepository(gormDB).Save(t.Context(), operatorDomain.NewOperator(int64(orgID), 1, "runtime headquarters")); err != nil {
+		t.Fatal(err)
+	}
 	grpcDeps := c.BuildGRPCDeps(nil)
 	testeeID, entryID := createRuntimeActorAndEntry(t, c, grpcDeps, orgID)
 
@@ -259,14 +265,14 @@ func TestCurrentRuntimeClosure(t *testing.T) {
 
 func createRuntimeActorAndEntry(t *testing.T, c *container.Container, grpcDeps grpctransport.Deps, orgID uint64) (uint64, uint64) {
 	t.Helper()
-	clinician, err := c.ActorModule.ClinicianLifecycleService.Register(t.Context(), clinicianapp.RegisterClinicianDTO{
+	clinician, err := c.ActorModule.ClinicianLifecycleService.Register(runtimeHeadquarters(t.Context(), orgID), clinicianapp.RegisterClinicianDTO{
 		OrgID: int64(orgID), Name: "runtime-closure-clinician", Department: "integration", Title: "counselor",
 		ClinicianType: "counselor", EmployeeCode: fmt.Sprintf("runtime-%d", orgID), IsActive: true,
 	})
 	if err != nil {
 		t.Fatalf("create Clinician: %v", err)
 	}
-	headquarters := authz.WithSnapshot(t.Context(), &authz.Snapshot{AuthzVersion: 1, Permissions: []authz.Permission{{Resource: "qs:*:*:*", Action: "*", Mode: authz.AuthorizationModeUnconditional}}})
+	headquarters := runtimeHeadquarters(t.Context(), orgID)
 	operator := storeapp.Actor{OrgID: int64(orgID), UserID: 1}
 	serviceStore, err := c.ActorModule.StoreService.Create(headquarters, operator, "runtime-store", "runtime store", "")
 	if err != nil {
@@ -288,7 +294,7 @@ func createRuntimeActorAndEntry(t *testing.T, c *container.Container, grpcDeps g
 	if err != nil || testee.GetId() == 0 {
 		t.Fatalf("create Testee through Actor service: response=%+v err=%v", testee, err)
 	}
-	entry, err := c.ActorModule.AssessmentEntryService.Create(t.Context(), assessmententryapp.CreateAssessmentEntryDTO{
+	entry, err := c.ActorModule.AssessmentEntryService.Create(runtimeHeadquarters(t.Context(), orgID), assessmententryapp.CreateAssessmentEntryDTO{
 		OrgID: int64(orgID), ClinicianID: clinician.ID, TargetType: "scale", TargetCode: runtimeModelCode, TargetVersion: runtimeVersion,
 	})
 	if err != nil {
@@ -717,7 +723,7 @@ func testScanAfterConcurrentClinicianTransfer(t *testing.T, c *container.Contain
 	t.Helper()
 	ctx, cancel := context.WithTimeout(t.Context(), 20*time.Second)
 	defer cancel()
-	headquarters := authz.WithSnapshot(ctx, &authz.Snapshot{AuthzVersion: 1, Permissions: []authz.Permission{{Resource: "qs:*:*:*", Action: "*", Mode: authz.AuthorizationModeUnconditional}}})
+	headquarters := runtimeHeadquarters(ctx, orgID)
 	actor := storeapp.Actor{OrgID: int64(orgID), UserID: 1}
 	next, err := c.ActorModule.StoreService.Create(headquarters, actor, "runtime-transfer", "runtime transfer", "")
 	if err != nil {
@@ -782,7 +788,7 @@ func testScanAfterConcurrentClinicianTransfer(t *testing.T, c *container.Contain
 	assertRowCount(t, db, "testee_store_history", "testee_id=?", 1, testeeID)
 	// Inverse ordering: intake owns the clinician/entry locks and waits on
 	// the testee. Transfer must wait until that intake commits.
-	fresh, err := c.ActorModule.AssessmentEntryService.Create(ctx, assessmententryapp.CreateAssessmentEntryDTO{OrgID: int64(orgID), ClinicianID: facts.ClinicianID, TargetType: "scale", TargetCode: runtimeModelCode, TargetVersion: runtimeVersion})
+	fresh, err := c.ActorModule.AssessmentEntryService.Create(headquarters, assessmententryapp.CreateAssessmentEntryDTO{OrgID: int64(orgID), ClinicianID: facts.ClinicianID, TargetType: "scale", TargetCode: runtimeModelCode, TargetVersion: runtimeVersion})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -862,4 +868,14 @@ func waitForRuntimeLock(t *testing.T, ctx context.Context, db *gorm.DB, table st
 			t.Fatal(ctx.Err())
 		}
 	}
+}
+
+// Only headquarters setup uses this context; participant and worker flows retain
+// their own independent request contexts and relationship checks.
+func runtimeHeadquarters(ctx context.Context, orgID uint64) context.Context {
+	return authz.WithSnapshot(actorctx.WithOperatorOrgID(actorctx.WithGrantingUserID(ctx, 1), int64(orgID)), &authz.Snapshot{
+		AuthzVersion: 1, ScopeContractVersion: 1,
+		Permissions: []authz.Permission{{Resource: "qs:*:*:*", Action: "*", Mode: authz.AuthorizationModeUnconditional,
+			Scopes: []authz.DataScope{{OrgID: int64(orgID), Kind: "all_stores"}}}},
+	})
 }
