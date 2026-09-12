@@ -1573,3 +1573,147 @@ var SuiteManagement_ServiceDesc = grpc.ServiceDesc{
 	Streams:  []grpc.StreamDesc{},
 	Metadata: "aiworkflow/workflow.proto",
 }
+
+const (
+	AssetCatalog_List_FullMethodName = "/qsai.workflow.v1.AssetCatalog/List"
+	AssetCatalog_Get_FullMethodName  = "/qsai.workflow.v1.AssetCatalog/Get"
+)
+
+// AssetCatalogClient is the client API for AssetCatalog service.
+//
+// For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
+//
+// Immutable shared definitions only; QS authorizes readers. No audit receipts or activation state.
+type AssetCatalogClient interface {
+	List(ctx context.Context, in *AssetCatalogQuery, opts ...grpc.CallOption) (*AssetCatalogResponse, error)
+	Get(ctx context.Context, in *AssetCatalogGetQuery, opts ...grpc.CallOption) (*AssetCatalogResponse, error)
+}
+
+type assetCatalogClient struct {
+	cc grpc.ClientConnInterface
+}
+
+func NewAssetCatalogClient(cc grpc.ClientConnInterface) AssetCatalogClient {
+	return &assetCatalogClient{cc}
+}
+
+func (c *assetCatalogClient) List(ctx context.Context, in *AssetCatalogQuery, opts ...grpc.CallOption) (*AssetCatalogResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(AssetCatalogResponse)
+	err := c.cc.Invoke(ctx, AssetCatalog_List_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *assetCatalogClient) Get(ctx context.Context, in *AssetCatalogGetQuery, opts ...grpc.CallOption) (*AssetCatalogResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(AssetCatalogResponse)
+	err := c.cc.Invoke(ctx, AssetCatalog_Get_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// AssetCatalogServer is the server API for AssetCatalog service.
+// All implementations must embed UnimplementedAssetCatalogServer
+// for forward compatibility.
+//
+// Immutable shared definitions only; QS authorizes readers. No audit receipts or activation state.
+type AssetCatalogServer interface {
+	List(context.Context, *AssetCatalogQuery) (*AssetCatalogResponse, error)
+	Get(context.Context, *AssetCatalogGetQuery) (*AssetCatalogResponse, error)
+	mustEmbedUnimplementedAssetCatalogServer()
+}
+
+// UnimplementedAssetCatalogServer must be embedded to have
+// forward compatible implementations.
+//
+// NOTE: this should be embedded by value instead of pointer to avoid a nil
+// pointer dereference when methods are called.
+type UnimplementedAssetCatalogServer struct{}
+
+func (UnimplementedAssetCatalogServer) List(context.Context, *AssetCatalogQuery) (*AssetCatalogResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method List not implemented")
+}
+func (UnimplementedAssetCatalogServer) Get(context.Context, *AssetCatalogGetQuery) (*AssetCatalogResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method Get not implemented")
+}
+func (UnimplementedAssetCatalogServer) mustEmbedUnimplementedAssetCatalogServer() {}
+func (UnimplementedAssetCatalogServer) testEmbeddedByValue()                      {}
+
+// UnsafeAssetCatalogServer may be embedded to opt out of forward compatibility for this service.
+// Use of this interface is not recommended, as added methods to AssetCatalogServer will
+// result in compilation errors.
+type UnsafeAssetCatalogServer interface {
+	mustEmbedUnimplementedAssetCatalogServer()
+}
+
+func RegisterAssetCatalogServer(s grpc.ServiceRegistrar, srv AssetCatalogServer) {
+	// If the following call panics, it indicates UnimplementedAssetCatalogServer was
+	// embedded by pointer and is nil.  This will cause panics if an
+	// unimplemented method is ever invoked, so we test this at initialization
+	// time to prevent it from happening at runtime later due to I/O.
+	if t, ok := srv.(interface{ testEmbeddedByValue() }); ok {
+		t.testEmbeddedByValue()
+	}
+	s.RegisterService(&AssetCatalog_ServiceDesc, srv)
+}
+
+func _AssetCatalog_List_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(AssetCatalogQuery)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AssetCatalogServer).List(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AssetCatalog_List_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AssetCatalogServer).List(ctx, req.(*AssetCatalogQuery))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AssetCatalog_Get_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(AssetCatalogGetQuery)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AssetCatalogServer).Get(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AssetCatalog_Get_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AssetCatalogServer).Get(ctx, req.(*AssetCatalogGetQuery))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+// AssetCatalog_ServiceDesc is the grpc.ServiceDesc for AssetCatalog service.
+// It's only intended for direct use with grpc.RegisterService,
+// and not to be introspected or modified (even as a copy)
+var AssetCatalog_ServiceDesc = grpc.ServiceDesc{
+	ServiceName: "qsai.workflow.v1.AssetCatalog",
+	HandlerType: (*AssetCatalogServer)(nil),
+	Methods: []grpc.MethodDesc{
+		{
+			MethodName: "List",
+			Handler:    _AssetCatalog_List_Handler,
+		},
+		{
+			MethodName: "Get",
+			Handler:    _AssetCatalog_Get_Handler,
+		},
+	},
+	Streams:  []grpc.StreamDesc{},
+	Metadata: "aiworkflow/workflow.proto",
+}

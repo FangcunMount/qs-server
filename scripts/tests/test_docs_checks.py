@@ -26,8 +26,8 @@ class DocsFactsHelpersTest(unittest.TestCase):
     def test_grpc_inventory_includes_multiline_and_deprecated_rpcs(self) -> None:
         services, proto_file_count = check_docs_facts.grpc_inventory()
         self.assertEqual(proto_file_count, 8)
-        self.assertEqual(len(services), 21)
-        self.assertEqual(sum(len(rpcs) for rpcs in services.values()), 87)
+        self.assertEqual(len(services), 22)
+        self.assertEqual(sum(len(rpcs) for rpcs in services.values()), 89)
         self.assertIn("GenerateReportFromAssessment", services["interpretation.InterpretationAutomationService"])
         self.assertIn("ExecutePromptEvaluationStep", services["interpretation.AIExplanationAutomationService"])
         self.assertIn("SyncAssessmentAttention", services["internalapi.InternalService"])

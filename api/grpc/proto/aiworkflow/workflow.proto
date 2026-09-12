@@ -380,3 +380,27 @@ message SuiteRegistrationReceipt {
  string command_id = 2;
  string receipt_json = 3;
 }
+
+
+// Immutable shared definitions only; QS authorizes readers. No audit receipts or activation state.
+service AssetCatalog {
+  rpc List(AssetCatalogQuery) returns (AssetCatalogResponse);
+  rpc Get(AssetCatalogGetQuery) returns (AssetCatalogResponse);
+}
+message AssetCatalogQuery {
+  PublicationScope scope = 1;
+  string kind = 2;
+  string identity = 3;
+  int32 limit = 4;
+  string cursor = 5;
+}
+message AssetCatalogGetQuery {
+  PublicationScope scope = 1;
+  string kind = 2;
+  string identity = 3;
+  string version = 4;
+}
+message AssetCatalogResponse {
+  string schema_version = 1;
+  string payload_json = 2;
+}
