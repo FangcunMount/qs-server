@@ -36,7 +36,7 @@ message EvidenceItem {
  string source_version = 4; repeated Fact facts = 5;
 }
 
-// Trusted QS backend only. QS must authorize OrgAdmin before forwarding these operations.
+// Trusted QS backend only. QS authorizes governance writes and candidate audit reads.
 service EvaluationManagement {
  // The caller reuses scope.run_id for retries of the identical creation request.
  rpc Create(EvaluationCreateCommand) returns (EvaluationState);
@@ -46,6 +46,31 @@ service EvaluationManagement {
  rpc ResolveUnknown(UnknownResolutionCommand) returns (EvaluationState);
  // QS authorizes the selected review role; AI records the trusted operator and server time.
  rpc Review(EvaluationReviewCommand) returns (EvaluationState);
+ rpc ListCandidates(EvaluationQuery) returns (EvaluationCandidateIndex);
+ rpc GetCandidate(EvaluationCandidateQuery) returns (EvaluationCandidateEvidence);
+}
+message EvaluationCandidateSummary {
+ string candidate_id = 1;
+ string case_id = 2;
+ int32 slot_ordinal = 3;
+}
+message EvaluationCandidateIndex {
+ string run_id = 1;
+ int64 version = 2;
+ repeated EvaluationCandidateSummary candidates = 3;
+}
+message EvaluationCandidateQuery {
+ EvaluationQuery scope = 1;
+ string candidate_id = 2;
+ int64 expected_version = 3;
+}
+message EvaluationCandidateEvidence {
+ string run_id = 1;
+ int64 version = 2;
+ string candidate_id = 3;
+ bytes normalized_output = 4;
+ bytes semantic_output = 5;
+ string evidence_json = 6;
 }
 message EvaluationQuery {
  string run_id = 1;

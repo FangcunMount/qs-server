@@ -10150,7 +10150,7 @@ paths:
       tags:
       - AI-Workflow-Management
       summary: 查询 qs-ai 评测状态
-      description: 需要当前机构 OrgAdmin 权限；组织和操作人取认证上下文。管理功能默认关闭。
+      description: 需要当前机构解读审计权限；组织和操作人取认证上下文。管理功能默认关闭。
       operationId: 查询qsai评测状态
       parameters:
       - type: string
@@ -10170,6 +10170,138 @@ paths:
                   properties:
                     data:
                       $ref: '#/components/schemas/aibridge.EvaluationState'
+        '400':
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '409':
+          description: Conflict
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+  /internal/v2/interpretation/ai-workflow/evaluations/{run_id}/candidates:
+    get:
+      tags:
+      - AI-Workflow-Management
+      summary: 查询 qs-ai 评测候选列表
+      description: 需要当前机构解读审计权限。列表最多 35 条，版本用于详情读取与审核；列表不代表质量通过。
+      operationId: 查询qsai评测候选列表
+      parameters:
+      - type: string
+        description: 评测 Run UUID
+        name: run_id
+        in: path
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/core.Response'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/aibridge.EvaluationCandidateIndex'
+        '400':
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '409':
+          description: Conflict
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+  /internal/v2/interpretation/ai-workflow/evaluations/{run_id}/candidates/{candidate_id}:
+    get:
+      tags:
+      - AI-Workflow-Management
+      summary: 读取 qs-ai 候选的冻结审核证据
+      description: 需要当前机构解读审计权限及当前 Run 版本。正文和语义输出是保留原字节的 JSON 字符串，供展示与摘要校验；证据未完成或版本变化返回冲突。
+      operationId: 读取qsai候选的冻结审核证据
+      parameters:
+      - type: string
+        description: 评测 Run UUID
+        name: run_id
+        in: path
+        required: true
+      - type: string
+        description: 候选 ID
+        name: candidate_id
+        in: path
+        required: true
+      - type: integer
+        description: 列表返回的 Run 版本
+        name: expected_version
+        in: query
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/core.Response'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/aibridge.EvaluationCandidateEvidence'
         '400':
           description: Bad Request
           content:
@@ -10711,6 +10843,43 @@ components:
           type: string
         semantic_review:
           $ref: '#/components/schemas/aibridge.SemanticContradictionReview'
+    aibridge.EvaluationCandidateEvidence:
+      type: object
+      properties:
+        candidate_id:
+          type: string
+        evidence:
+          type: object
+        normalized_output:
+          description: Strings retain the original normalized bytes after JSON decoding,
+            including whitespace.
+          type: string
+        run_id:
+          type: string
+        semantic_output:
+          type: string
+        version:
+          type: integer
+    aibridge.EvaluationCandidateIndex:
+      type: object
+      properties:
+        candidates:
+          type: array
+          items:
+            $ref: '#/components/schemas/aibridge.EvaluationCandidateSummary'
+        run_id:
+          type: string
+        version:
+          type: integer
+    aibridge.EvaluationCandidateSummary:
+      type: object
+      properties:
+        candidate_id:
+          type: string
+        case_id:
+          type: string
+        slot_ordinal:
+          type: integer
     aibridge.EvaluationCreate:
       type: object
       properties:

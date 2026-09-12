@@ -46,7 +46,7 @@ func (h *AIWorkflowManagementHandler) failure(c *gin.Context, err error) {
 
 // Get godoc
 // @Summary 查询 qs-ai 评测状态
-// @Description 需要当前机构 OrgAdmin 权限；组织和操作人取认证上下文。管理功能默认关闭。
+// @Description 需要当前机构解读审计权限；组织和操作人取认证上下文。管理功能默认关闭。
 // @Tags AI-Workflow-Management
 // @Produce json
 // @Param run_id path string true "评测 Run UUID"

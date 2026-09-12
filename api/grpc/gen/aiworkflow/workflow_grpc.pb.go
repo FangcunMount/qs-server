@@ -266,13 +266,15 @@ const (
 	EvaluationManagement_Get_FullMethodName            = "/qsai.workflow.v1.EvaluationManagement/Get"
 	EvaluationManagement_ResolveUnknown_FullMethodName = "/qsai.workflow.v1.EvaluationManagement/ResolveUnknown"
 	EvaluationManagement_Review_FullMethodName         = "/qsai.workflow.v1.EvaluationManagement/Review"
+	EvaluationManagement_ListCandidates_FullMethodName = "/qsai.workflow.v1.EvaluationManagement/ListCandidates"
+	EvaluationManagement_GetCandidate_FullMethodName   = "/qsai.workflow.v1.EvaluationManagement/GetCandidate"
 )
 
 // EvaluationManagementClient is the client API for EvaluationManagement service.
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 //
-// Trusted QS backend only. QS must authorize OrgAdmin before forwarding these operations.
+// Trusted QS backend only. QS authorizes governance writes and candidate audit reads.
 type EvaluationManagementClient interface {
 	// The caller reuses scope.run_id for retries of the identical creation request.
 	Create(ctx context.Context, in *EvaluationCreateCommand, opts ...grpc.CallOption) (*EvaluationState, error)
@@ -282,6 +284,8 @@ type EvaluationManagementClient interface {
 	ResolveUnknown(ctx context.Context, in *UnknownResolutionCommand, opts ...grpc.CallOption) (*EvaluationState, error)
 	// QS authorizes the selected review role; AI records the trusted operator and server time.
 	Review(ctx context.Context, in *EvaluationReviewCommand, opts ...grpc.CallOption) (*EvaluationState, error)
+	ListCandidates(ctx context.Context, in *EvaluationQuery, opts ...grpc.CallOption) (*EvaluationCandidateIndex, error)
+	GetCandidate(ctx context.Context, in *EvaluationCandidateQuery, opts ...grpc.CallOption) (*EvaluationCandidateEvidence, error)
 }
 
 type evaluationManagementClient struct {
@@ -342,11 +346,31 @@ func (c *evaluationManagementClient) Review(ctx context.Context, in *EvaluationR
 	return out, nil
 }
 
+func (c *evaluationManagementClient) ListCandidates(ctx context.Context, in *EvaluationQuery, opts ...grpc.CallOption) (*EvaluationCandidateIndex, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(EvaluationCandidateIndex)
+	err := c.cc.Invoke(ctx, EvaluationManagement_ListCandidates_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *evaluationManagementClient) GetCandidate(ctx context.Context, in *EvaluationCandidateQuery, opts ...grpc.CallOption) (*EvaluationCandidateEvidence, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(EvaluationCandidateEvidence)
+	err := c.cc.Invoke(ctx, EvaluationManagement_GetCandidate_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // EvaluationManagementServer is the server API for EvaluationManagement service.
 // All implementations must embed UnimplementedEvaluationManagementServer
 // for forward compatibility.
 //
-// Trusted QS backend only. QS must authorize OrgAdmin before forwarding these operations.
+// Trusted QS backend only. QS authorizes governance writes and candidate audit reads.
 type EvaluationManagementServer interface {
 	// The caller reuses scope.run_id for retries of the identical creation request.
 	Create(context.Context, *EvaluationCreateCommand) (*EvaluationState, error)
@@ -356,6 +380,8 @@ type EvaluationManagementServer interface {
 	ResolveUnknown(context.Context, *UnknownResolutionCommand) (*EvaluationState, error)
 	// QS authorizes the selected review role; AI records the trusted operator and server time.
 	Review(context.Context, *EvaluationReviewCommand) (*EvaluationState, error)
+	ListCandidates(context.Context, *EvaluationQuery) (*EvaluationCandidateIndex, error)
+	GetCandidate(context.Context, *EvaluationCandidateQuery) (*EvaluationCandidateEvidence, error)
 	mustEmbedUnimplementedEvaluationManagementServer()
 }
 
@@ -380,6 +406,12 @@ func (UnimplementedEvaluationManagementServer) ResolveUnknown(context.Context, *
 }
 func (UnimplementedEvaluationManagementServer) Review(context.Context, *EvaluationReviewCommand) (*EvaluationState, error) {
 	return nil, status.Error(codes.Unimplemented, "method Review not implemented")
+}
+func (UnimplementedEvaluationManagementServer) ListCandidates(context.Context, *EvaluationQuery) (*EvaluationCandidateIndex, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListCandidates not implemented")
+}
+func (UnimplementedEvaluationManagementServer) GetCandidate(context.Context, *EvaluationCandidateQuery) (*EvaluationCandidateEvidence, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetCandidate not implemented")
 }
 func (UnimplementedEvaluationManagementServer) mustEmbedUnimplementedEvaluationManagementServer() {}
 func (UnimplementedEvaluationManagementServer) testEmbeddedByValue()                              {}
@@ -492,6 +524,42 @@ func _EvaluationManagement_Review_Handler(srv interface{}, ctx context.Context, 
 	return interceptor(ctx, in, info, handler)
 }
 
+func _EvaluationManagement_ListCandidates_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(EvaluationQuery)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(EvaluationManagementServer).ListCandidates(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: EvaluationManagement_ListCandidates_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(EvaluationManagementServer).ListCandidates(ctx, req.(*EvaluationQuery))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _EvaluationManagement_GetCandidate_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(EvaluationCandidateQuery)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(EvaluationManagementServer).GetCandidate(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: EvaluationManagement_GetCandidate_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(EvaluationManagementServer).GetCandidate(ctx, req.(*EvaluationCandidateQuery))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // EvaluationManagement_ServiceDesc is the grpc.ServiceDesc for EvaluationManagement service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -518,6 +586,14 @@ var EvaluationManagement_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "Review",
 			Handler:    _EvaluationManagement_Review_Handler,
+		},
+		{
+			MethodName: "ListCandidates",
+			Handler:    _EvaluationManagement_ListCandidates_Handler,
+		},
+		{
+			MethodName: "GetCandidate",
+			Handler:    _EvaluationManagement_GetCandidate_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

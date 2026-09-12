@@ -40,6 +40,8 @@ type EvaluationState struct {
 	Reviews                      json.RawMessage `json:"reviews" swaggertype:"array,object"`
 }
 type EvaluationGateway interface {
+	ListEvaluationCandidates(context.Context, EvaluationScope) (EvaluationCandidateIndex, error)
+	GetEvaluationCandidate(context.Context, EvaluationScope, CandidateQuery) (EvaluationCandidateEvidence, error)
 	ReviewEvaluation(context.Context, EvaluationScope, EvaluationReview) (EvaluationState, error)
 	CreateEvaluation(context.Context, EvaluationScope, EvaluationCreate) (EvaluationState, error)
 	StartEvaluation(context.Context, EvaluationScope, EvaluationStart) (EvaluationState, error)
@@ -49,12 +51,15 @@ type EvaluationGateway interface {
 type EvaluationAdministration struct{ Gateway EvaluationGateway }
 
 func (s *EvaluationAdministration) authorize(ctx context.Context, scope EvaluationScope) error {
+	return s.authorizeCapability(ctx, scope, authz.CapabilityOrgAdmin)
+}
+func (s *EvaluationAdministration) authorizeCapability(ctx context.Context, scope EvaluationScope, capability authz.Capability) error {
 	id, err := uuid.Parse(scope.RunID)
 	if err != nil || id == uuid.Nil || id.String() != scope.RunID || scope.OrganizationID <= 0 || scope.OperatorUserID <= 0 {
 		return ErrInvalid
 	}
 	snapshot, ok := authz.FromContext(ctx)
-	if !ok || !authz.DecideCapability(snapshot, authz.CapabilityOrgAdmin).Allowed {
+	if !ok || !authz.DecideCapability(snapshot, capability).Allowed {
 		return ErrGovernanceDenied
 	}
 	if s == nil || s.Gateway == nil {
@@ -63,7 +68,7 @@ func (s *EvaluationAdministration) authorize(ctx context.Context, scope Evaluati
 	return nil
 }
 func (s *EvaluationAdministration) Get(ctx context.Context, scope EvaluationScope) (EvaluationState, error) {
-	if err := s.authorize(ctx, scope); err != nil {
+	if err := s.authorizeCapability(ctx, scope, authz.CapabilityAuditInterpretation); err != nil {
 		return EvaluationState{}, err
 	}
 	return s.Gateway.GetEvaluation(ctx, scope)
