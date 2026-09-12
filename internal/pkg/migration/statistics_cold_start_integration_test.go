@@ -4,7 +4,10 @@ package migration
 
 import (
 	"context"
-	authztest "github.com/FangcunMount/qs-server/internal/apiserver/application/authz/testutil"
+	actoraccess "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/access"
+	actorctx "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/actorctx"
+	appauthz "github.com/FangcunMount/qs-server/internal/apiserver/application/authz"
+	operatorDomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/operator"
 	"os"
 	"strconv"
 	"testing"
@@ -106,8 +109,19 @@ func TestStatisticsColdStartPublishIdempotencyAndRedisFailure(t *testing.T) {
 
 	fixture := seedStatisticsColdStartBusinessFacts(t, gormDB, mongoDB, orgID, eventAt)
 	assertStatisticsAnswerSheetSource(t, mongoDB, orgID, fixture.answerSheetID, eventAt.Add(4*time.Minute))
+	operator := operatorDomain.NewOperator(orgID, 9001, "statistics reader")
+	if err := mysqlActor.NewOperatorRepository(gormDB).Save(t.Context(), operator); err != nil {
+		t.Fatal(err)
+	}
+	readers := mysqlActor.NewReadModel(gormDB)
+	scopeAccess := actoraccess.NewTesteeAccessService(readers, readers)
+	readContext := appauthz.WithSnapshot(actorctx.WithGrantingUserID(t.Context(), 9001), &appauthz.Snapshot{
+		ScopeContractVersion: 1, AuthzVersion: 1,
+		Permissions: []appauthz.Permission{{Resource: appauthz.AssessmentResource, Action: "statistics", Mode: appauthz.AuthorizationModeUnconditional,
+			Scopes: []appauthz.DataScope{{OrgID: orgID, Kind: "stores", StoreIDs: []uint64{9101}}}}},
+	})
 	module, err := statisticsModule.New(statisticsModule.Deps{
-		MySQLDB: gormDB, MongoDB: mongoDB, RedisClient: runtimeRedis,
+		MySQLDB: gormDB, MongoDB: mongoDB, RedisClient: runtimeRedis, ScopeAccess: scopeAccess,
 		QueryBuilder: queryBuilder, LockRunner: coldStartLockRunner{}, QueryTTL: time.Hour,
 	})
 	if err != nil {
@@ -131,7 +145,12 @@ func TestStatisticsColdStartPublishIdempotencyAndRedisFailure(t *testing.T) {
 		"statistics_plan_fulfillment_daily", "statistics_org_snapshot",
 	})
 
-	overview, err := module.ReadService.Overview(authztest.WithPermission(t.Context(), "qs:evaluation:collection:assessments", "statistics"), orgID, statisticsApp.QueryFilter{Preset: "latest_complete_day"})
+	// An action-only legacy snapshot must not acquire the fixture's store range.
+	legacy := appauthz.WithSnapshot(actorctx.WithGrantingUserID(t.Context(), 9001), &appauthz.Snapshot{Permissions: []appauthz.Permission{{Resource: appauthz.AssessmentResource, Action: "statistics", Mode: appauthz.AuthorizationModeUnconditional}}})
+	if _, err := module.ReadService.Overview(legacy, orgID, statisticsApp.QueryFilter{}); !componenterrors.IsCode(err, code.ErrPermissionDenied) {
+		t.Fatalf("unscoped read must fail: %v", err)
+	}
+	overview, err := module.ReadService.Overview(readContext, orgID, statisticsApp.QueryFilter{Preset: "latest_complete_day"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -142,6 +161,15 @@ func TestStatisticsColdStartPublishIdempotencyAndRedisFailure(t *testing.T) {
 		t.Fatalf("overview metrics=%+v", overview.Metrics)
 	}
 
+	otherStoreContext := appauthz.WithSnapshot(actorctx.WithGrantingUserID(t.Context(), 9001), &appauthz.Snapshot{
+		ScopeContractVersion: 1, AuthzVersion: 1,
+		Permissions: []appauthz.Permission{{Resource: appauthz.AssessmentResource, Action: "statistics", Mode: appauthz.AuthorizationModeUnconditional,
+			Scopes: []appauthz.DataScope{{OrgID: orgID, Kind: "stores", StoreIDs: []uint64{9102}}}}},
+	})
+	other, err := module.ReadService.Overview(otherStoreContext, orgID, statisticsApp.QueryFilter{Preset: "latest_complete_day"})
+	if err != nil || other == nil || other.Metrics.AssessmentCount != 0 || other.Metrics.ReportCount != 0 || other.Metrics.AnswerSheetSubmissionCount != 0 {
+		t.Fatalf("other store received company results: value=%+v err=%v", other, err)
+	}
 	second, err := module.Coordinator.Run(t.Context(), request)
 	if err != nil || second == nil || second.Status != statisticsDomain.RunStatusSucceeded || second.CacheGeneration <= first.CacheGeneration {
 		t.Fatalf("second publish: first=%+v second=%+v err=%v", first, second, err)
@@ -152,9 +180,9 @@ func TestStatisticsColdStartPublishIdempotencyAndRedisFailure(t *testing.T) {
 	if err := runtimeRedis.Close(); err != nil {
 		t.Fatal(err)
 	}
-	stale, err := module.ReadService.Overview(authztest.WithPermission(t.Context(), "qs:evaluation:collection:assessments", "statistics"), orgID, statisticsApp.QueryFilter{Preset: "latest_complete_day"})
-	if err != nil || !stale.Freshness.IsStale {
-		t.Fatalf("Redis-down stale read: value=%+v err=%v", stale, err)
+	fresh, err := module.ReadService.Overview(readContext, orgID, statisticsApp.QueryFilter{Preset: "latest_complete_day"})
+	if err != nil || fresh == nil || fresh.Freshness.IsStale || fresh.Metrics.AssessmentCount != 1 {
+		t.Fatalf("Redis-down scoped database read: value=%+v err=%v", fresh, err)
 	}
 
 	failed, err := module.Coordinator.Run(t.Context(), request)
@@ -162,13 +190,13 @@ func TestStatisticsColdStartPublishIdempotencyAndRedisFailure(t *testing.T) {
 		t.Fatalf("Redis-down publish: run=%+v err=%v", failed, err)
 	}
 	overloadedModule, err := statisticsModule.New(statisticsModule.Deps{
-		MySQLDB: gormDB, MongoDB: mongoDB, RedisClient: runtimeRedis,
+		MySQLDB: gormDB, MongoDB: mongoDB, RedisClient: runtimeRedis, ScopeAccess: scopeAccess,
 		QueryBuilder: queryBuilder, LockRunner: coldStartLockRunner{}, MySQLLimiter: overloadedReadLimiter{}, QueryTTL: time.Hour,
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := overloadedModule.ReadService.Overview(authztest.WithPermission(t.Context(), "qs:evaluation:collection:assessments", "statistics"), orgID, statisticsApp.QueryFilter{}); !componenterrors.IsCode(err, code.ErrStatisticsOverloaded) {
+	if _, err := overloadedModule.ReadService.Overview(readContext, orgID, statisticsApp.QueryFilter{}); !componenterrors.IsCode(err, code.ErrStatisticsOverloaded) {
 		t.Fatalf("overloaded read error=%v", err)
 	}
 
@@ -216,6 +244,15 @@ func seedStatisticsColdStartBusinessFacts(t *testing.T, db *gorm.DB, mongoDB *mo
 	clinician := clinicianDomain.NewClinician(orgID, "cold-start-clinician", "test", "doctor", clinicianDomain.TypeDoctor, "cold-start", true)
 	if err := mysqlActor.NewClinicianRepository(db).Save(ctx, clinician); err != nil {
 		t.Fatal(err)
+	}
+	// Fixture ownership is explicit; unassigned business data remains invisible.
+	if err := db.Exec("INSERT INTO actor_stores (id,org_id,code,name,is_active,version,created_by,updated_by,created_at,updated_at) VALUES (9101,?,'COLD','Cold start',1,1,9001,9001,?,?)", orgID, eventAt, eventAt).Error; err != nil {
+		t.Fatal(err)
+	}
+	for table, id := range map[string]uint64{"testee": testee.ID().Uint64(), "clinician": clinician.ID().Uint64()} {
+		if err := db.Table(table).Where("id=?", id).Update("store_id", 9101).Error; err != nil {
+			t.Fatal(err)
+		}
 	}
 	entry := assessmententryDomain.NewAssessmentEntry(orgID, clinician.ID(), "statistics-cold-start", assessmententryDomain.TargetTypeScale, "S-COLD", "v1", true, nil)
 	if err := mysqlActor.NewAssessmentEntryRepository(db).Save(ctx, entry); err != nil {
