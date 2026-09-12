@@ -131,3 +131,24 @@ func TestScopedRelationPageRejectsTransferDuringHydration(t *testing.T) {
 		})
 	}
 }
+
+func TestHeadquartersUnassignedFilterDoesNotIntersectAssignedOnly(t *testing.T) {
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	require.NoError(t, err)
+	require.NoError(t, db.Exec("CREATE TABLE testee(id INTEGER,org_id INTEGER,profile_id INTEGER,store_id INTEGER,deleted_at DATETIME)").Error)
+	require.NoError(t, db.Exec("INSERT INTO testee VALUES(1,1,11,NULL,NULL),(2,1,11,7,NULL),(3,2,11,NULL,NULL),(4,1,11,NULL,'2026-01-01')").Error)
+	reader := NewReadModel(db).(*readModel)
+	profile := uint64(11)
+	filter := rm.TesteeFilter{OrgID: 1, ProfileID: &profile, RestrictToStoreScope: true, AllAssignedStores: true, UnassignedStore: true}
+	var ids []uint64
+	require.NoError(t, reader.applyTesteeFilter(db.Table("testee"), filter).Pluck("id", &ids).Error)
+	require.Equal(t, []uint64{1}, ids)
+	filter.UnassignedStore = false
+	require.NoError(t, reader.applyTesteeFilter(db.Table("testee"), filter).Pluck("id", &ids).Error)
+	require.Equal(t, []uint64{2}, ids)
+	filter.AllAssignedStores = false
+	filter.AllowedStoreIDs = []uint64{7}
+	filter.UnassignedStore = true
+	require.NoError(t, reader.applyTesteeFilter(db.Table("testee"), filter).Pluck("id", &ids).Error)
+	require.Empty(t, ids)
+}

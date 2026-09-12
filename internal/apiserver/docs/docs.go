@@ -64,6 +64,12 @@ const docTemplate = `{
                     },
                     {
                         "type": "string",
+                        "description": "受试者ID（与填写人独立筛选）",
+                        "name": "testee_id",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
                         "description": "开始时间",
                         "name": "start_time",
                         "in": "query"
@@ -17103,6 +17109,58 @@ const docTemplate = `{
                 }
             }
         },
+        "response.AnswerDisplayResponse": {
+            "type": "object",
+            "properties": {
+                "question": {
+                    "$ref": "#/definitions/response.AnswerQuestionResponse"
+                },
+                "question_code": {
+                    "type": "string"
+                },
+                "question_type": {
+                    "type": "string"
+                },
+                "score": {
+                    "type": "number"
+                },
+                "value": {}
+            }
+        },
+        "response.AnswerOptionResponse": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "string"
+                },
+                "content": {
+                    "type": "string"
+                }
+            }
+        },
+        "response.AnswerQuestionResponse": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "string"
+                },
+                "options": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/response.AnswerOptionResponse"
+                    }
+                },
+                "question_type": {
+                    "type": "string"
+                },
+                "stem": {
+                    "type": "string"
+                },
+                "tips": {
+                    "type": "string"
+                }
+            }
+        },
         "response.AnswerSheetListResponse": {
             "type": "object",
             "properties": {
@@ -17123,7 +17181,7 @@ const docTemplate = `{
                 "answers": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/viewmodel.AnswerDTO"
+                        "$ref": "#/definitions/response.AnswerDisplayResponse"
                     }
                 },
                 "filled_at": {
@@ -22352,21 +22410,6 @@ const docTemplate = `{
                 "title": {
                     "type": "string"
                 }
-            }
-        },
-        "viewmodel.AnswerDTO": {
-            "type": "object",
-            "properties": {
-                "question_code": {
-                    "type": "string"
-                },
-                "question_type": {
-                    "type": "string"
-                },
-                "score": {
-                    "type": "number"
-                },
-                "value": {}
             }
         },
         "viewmodel.CalculationRuleDTO": {

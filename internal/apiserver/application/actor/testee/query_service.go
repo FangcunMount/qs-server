@@ -106,6 +106,10 @@ func (s *queryService) ListTestees(ctx context.Context, dto ListTesteeDTO) (*Tes
 		if err != nil {
 			return nil, err
 		}
+		// Unassigned records are a headquarters configuration list, never a store scope.
+		if dto.UnassignedStore && (!storeRange.AllStores || !snapshot.IsQSAdmin()) {
+			return nil, errors.WithCode(code.ErrPermissionDenied, "unassigned testees require headquarters access")
+		}
 		filter.RestrictToStoreScope = true
 		filter.AllAssignedStores = storeRange.AllStores
 		filter.AllowedStoreIDs = storeRange.StoreIDs

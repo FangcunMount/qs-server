@@ -96,6 +96,7 @@ func (h *AnswerSheetHandler) GetByID(c *gin.Context) {
 // @Param page_size query int false "每页数量" default(10)
 // @Param questionnaire_code query string false "问卷编码"
 // @Param filler_id query string false "填写人ID"
+// @Param testee_id query string false "受试者ID（与填写人独立筛选）"
 // @Param start_time query string false "开始时间"
 // @Param end_time query string false "结束时间"
 // @Success 200 {object} core.Response{data=response.AnswerSheetListResponse}
@@ -194,7 +195,16 @@ func buildAnswerSheetListDTO(c *gin.Context) (answersheet.ListAnswerSheetsDTO, e
 		return answersheet.ListAnswerSheetsDTO{}, errors.WithCode(code.ErrAnswerSheetInvalid, "每页数量必须为1-100的整数")
 	}
 
+	var testeeID *uint64
+	if raw := c.Query("testee_id"); raw != "" {
+		value, err := strconv.ParseUint(raw, 10, 64)
+		if err != nil || value == 0 {
+			return answersheet.ListAnswerSheetsDTO{}, errors.WithCode(code.ErrAnswerSheetInvalid, "受试者ID必须为正整数")
+		}
+		testeeID = &value
+	}
 	return answersheet.ListAnswerSheetsDTO{
+		TesteeID:          testeeID,
 		Page:              page,
 		PageSize:          pageSize,
 		QuestionnaireCode: c.Query("questionnaire_code"),

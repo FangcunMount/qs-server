@@ -14,15 +14,43 @@ func mustMetaIDFromUint64(value uint64) meta.ID {
 
 // AnswerSheetResponse 答卷响应
 type AnswerSheetResponse struct {
-	ID                meta.ID               `json:"id"`
-	QuestionnaireCode string                `json:"questionnaire_code"`
-	QuestionnaireVer  string                `json:"questionnaire_ver"`
-	Title             string                `json:"title"`
-	Score             float64               `json:"score"`
-	FillerID          meta.ID               `json:"filler_id"`
-	FillerName        string                `json:"filler_name"`
-	Answers           []viewmodel.AnswerDTO `json:"answers"`
-	FilledAt          string                `json:"filled_at"`
+	ID                meta.ID                 `json:"id"`
+	QuestionnaireCode string                  `json:"questionnaire_code"`
+	QuestionnaireVer  string                  `json:"questionnaire_ver"`
+	Title             string                  `json:"title"`
+	Score             float64                 `json:"score"`
+	FillerID          meta.ID                 `json:"filler_id"`
+	FillerName        string                  `json:"filler_name"`
+	Answers           []AnswerDisplayResponse `json:"answers"`
+	FilledAt          string                  `json:"filled_at"`
+}
+
+// AnswerDisplayResponse contains the recorded answer and its version-bound question display.
+type AnswerDisplayResponse struct {
+	viewmodel.AnswerDTO
+	Question *AnswerQuestionResponse `json:"question,omitempty"`
+}
+type AnswerQuestionResponse struct {
+	Code    string                 `json:"code"`
+	Type    string                 `json:"question_type"`
+	Stem    string                 `json:"stem"`
+	Tips    string                 `json:"tips"`
+	Options []AnswerOptionResponse `json:"options"`
+}
+type AnswerOptionResponse struct {
+	Code    string `json:"code"`
+	Content string `json:"content"`
+}
+
+func answerQuestionResponse(q *answersheet.AnswerQuestionResult) *AnswerQuestionResponse {
+	if q == nil {
+		return nil
+	}
+	result := &AnswerQuestionResponse{Code: q.Code, Type: q.Type, Stem: q.Stem, Tips: q.Tips, Options: []AnswerOptionResponse{}}
+	for _, option := range q.Options {
+		result.Options = append(result.Options, AnswerOptionResponse{Code: option.Code, Content: option.Content})
+	}
+	return result
 }
 
 // AnswerSheetListResponse 答卷列表响应
@@ -50,14 +78,14 @@ func NewAnswerSheetResponse(result *answersheet.AnswerSheetResult) *AnswerSheetR
 		return nil
 	}
 
-	answers := make([]viewmodel.AnswerDTO, 0, len(result.Answers))
+	answers := make([]AnswerDisplayResponse, 0, len(result.Answers))
 	for _, a := range result.Answers {
-		answers = append(answers, viewmodel.AnswerDTO{
+		answers = append(answers, AnswerDisplayResponse{AnswerDTO: viewmodel.AnswerDTO{
 			QuestionCode: a.QuestionCode,
 			QuestionType: a.QuestionType,
 			Value:        a.Value,
 			Score:        a.Score,
-		})
+		}, Question: answerQuestionResponse(a.Question)})
 	}
 
 	return &AnswerSheetResponse{

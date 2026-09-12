@@ -30,10 +30,11 @@ type AnswerSheetResult struct {
 
 // AnswerResult 答案结果
 type AnswerResult struct {
-	QuestionCode string      // 问题编码
-	QuestionType string      // 问题类型
-	Value        interface{} // 答案值
-	Score        float64     // 得分
+	Question     *AnswerQuestionResult // Version-bound display context, without authoring/scoring rules.
+	QuestionCode string                // 问题编码
+	QuestionType string                // 问题类型
+	Value        interface{}           // 答案值
+	Score        float64               // 得分
 }
 
 // AnswerSheetSummaryResult 答卷摘要结果（不包含答案详情，用于列表展示）

@@ -13,7 +13,7 @@ import (
 func TestBuildAnswerSheetListDTOParsesFilters(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
-	req := httptest.NewRequest("GET", "/api/v1/answersheets?page=2&page_size=30&questionnaire_code=QNR-001&filler_id=42&start_time=2026-04-01&end_time=2026-04-02", nil)
+	req := httptest.NewRequest("GET", "/api/v1/answersheets?page=2&page_size=30&questionnaire_code=QNR-001&filler_id=42&testee_id=636809251561419310&start_time=2026-04-01&end_time=2026-04-02", nil)
 	c, _ := gin.CreateTestContext(httptest.NewRecorder())
 	c.Request = req
 
@@ -23,6 +23,9 @@ func TestBuildAnswerSheetListDTOParsesFilters(t *testing.T) {
 	}
 	if dto.Page != 2 || dto.PageSize != 30 || dto.QuestionnaireCode != "QNR-001" {
 		t.Fatalf("unexpected dto: %+v", dto)
+	}
+	if dto.TesteeID == nil || *dto.TesteeID != 636809251561419310 {
+		t.Fatal("testee ID not preserved")
 	}
 	if dto.FillerID == nil || *dto.FillerID != 42 {
 		t.Fatalf("filler_id = %+v, want 42", dto.FillerID)
@@ -115,5 +118,15 @@ func TestOptionalDateQueryReturnsNilForInvalidDate(t *testing.T) {
 	}
 	if got := optionalDateQuery("2026-04-22"); got == nil || !got.Equal(time.Date(2026, 4, 22, 0, 0, 0, 0, time.UTC)) {
 		t.Fatalf("unexpected parsed date: %v", got)
+	}
+}
+
+func TestAnswerSheetListRejectsInvalidTesteeInsteadOfBroadeningQuery(t *testing.T) {
+	for _, raw := range []string{"0", "-1", "abc", "18446744073709551616"} {
+		c, _ := gin.CreateTestContext(httptest.NewRecorder())
+		c.Request = httptest.NewRequest("GET", "/api/v1/answersheets?testee_id="+raw, nil)
+		if _, err := buildAnswerSheetListDTO(c); err == nil {
+			t.Fatalf("accepted invalid ID %s", raw)
+		}
 	}
 }

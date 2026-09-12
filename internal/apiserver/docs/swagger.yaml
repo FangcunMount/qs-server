@@ -4101,6 +4101,40 @@ definitions:
       ready:
         type: boolean
     type: object
+  response.AnswerDisplayResponse:
+    properties:
+      question:
+        $ref: '#/definitions/response.AnswerQuestionResponse'
+      question_code:
+        type: string
+      question_type:
+        type: string
+      score:
+        type: number
+      value: {}
+    type: object
+  response.AnswerOptionResponse:
+    properties:
+      code:
+        type: string
+      content:
+        type: string
+    type: object
+  response.AnswerQuestionResponse:
+    properties:
+      code:
+        type: string
+      options:
+        items:
+          $ref: '#/definitions/response.AnswerOptionResponse'
+        type: array
+      question_type:
+        type: string
+      stem:
+        type: string
+      tips:
+        type: string
+    type: object
   response.AnswerSheetListResponse:
     properties:
       items:
@@ -4114,7 +4148,7 @@ definitions:
     properties:
       answers:
         items:
-          $ref: '#/definitions/viewmodel.AnswerDTO'
+          $ref: '#/definitions/response.AnswerDisplayResponse'
         type: array
       filled_at:
         type: string
@@ -7611,16 +7645,6 @@ definitions:
       title:
         type: string
     type: object
-  viewmodel.AnswerDTO:
-    properties:
-      question_code:
-        type: string
-      question_type:
-        type: string
-      score:
-        type: number
-      value: {}
-    type: object
   viewmodel.CalculationRuleDTO:
     properties:
       formula_type:
@@ -7740,6 +7764,10 @@ paths:
       - description: 填写人ID
         in: query
         name: filler_id
+        type: string
+      - description: 受试者ID（与填写人独立筛选）
+        in: query
+        name: testee_id
         type: string
       - description: 开始时间
         in: query

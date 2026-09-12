@@ -206,6 +206,7 @@ func (m *Module) initAnswerSheetSubModule(mongoDB *mongo.Database, mongoLimiter 
 	actorReader := actormysql.NewReadModel(mysqlDB)
 	scopeAccess := actoraccess.NewTesteeAccessService(actorReader, actorReader).(actoraccess.StoreScopeAccess)
 	sub.ManagementService = asApp.NewScopedManagementService(repo, reader, scopeAccess, identitySvc)
+	sub.ManagementService.(asApp.AnswerQuestionReaderInjector).SetAnswerQuestionReader(questionnaireRepo)
 	sub.ScoringService = asApp.NewAnswerSheetScoringService(repo, questionnaireRepo, answerScorer)
 	return nil
 }

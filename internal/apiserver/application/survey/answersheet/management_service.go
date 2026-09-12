@@ -17,6 +17,7 @@ import (
 // managementService 答卷管理服务实现
 // 行为者：管理员
 type managementService struct {
+	questions        AnswerQuestionReader
 	access           ManagementScopeAccess
 	repo             answersheet.Repository
 	reader           surveyreadmodel.AnswerSheetReader
@@ -127,6 +128,9 @@ func (s *managementService) GetByIDInOrg(ctx context.Context, orgID, id uint64) 
 	}
 	result := toAnswerSheetResult(sheet)
 	s.resolveFillerName(ctx, result)
+	if err := s.enrichAnswerQuestions(ctx, result); err != nil {
+		return nil, err
+	}
 	return result, nil
 }
 
@@ -143,9 +147,20 @@ func (s *managementService) List(ctx context.Context, dto ListAnswerSheetsDTO) (
 	if err != nil {
 		return nil, err
 	}
-	ids, err := s.access.ListStoreScopedTesteeIDs(ctx, org, user, appauthz.AnswerSheetResource, "list")
-	if err != nil {
-		return nil, err
+	var ids []uint64
+	if dto.TesteeID != nil {
+		if *dto.TesteeID == 0 {
+			return nil, errors.WithCode(errorCode.ErrAnswerSheetInvalid, "受试者ID不能为空")
+		}
+		if err := s.access.ValidateTesteeStoreAccess(ctx, org, user, *dto.TesteeID, appauthz.AnswerSheetResource, "list"); err != nil {
+			return nil, err
+		}
+		ids = []uint64{*dto.TesteeID}
+	} else {
+		ids, err = s.access.ListStoreScopedTesteeIDs(ctx, org, user, appauthz.AnswerSheetResource, "list")
+		if err != nil {
+			return nil, err
+		}
 	}
 	filter.RestrictToStoreScope = true
 	filter.StoreScopedTesteeIDs = ids
