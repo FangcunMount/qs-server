@@ -746,6 +746,8 @@ func TestMySQLStoreFilterAppliesBeforePaginationAndCount(t *testing.T) {
 	}
 	filter.StoreID = nil
 	filter.UnassignedStore = true
+	filter.RestrictToStoreScope = true
+	filter.AllAssignedStores = true
 	filter.Offset = 0
 	rows, err = reader.ListTestees(ctx, filter)
 	if err != nil {

@@ -129,7 +129,9 @@ func (r *readModel) applyTesteeFilter(query *gorm.DB, filter actorreadmodel.Test
 	query = query.Where("org_id = ? AND deleted_at IS NULL", filter.OrgID)
 	if filter.RestrictToStoreScope {
 		if filter.AllAssignedStores {
-			query = query.Where("store_id IS NOT NULL AND store_id > 0")
+			if !filter.UnassignedStore {
+				query = query.Where("store_id IS NOT NULL AND store_id > 0")
+			}
 		} else {
 			query = query.Where("store_id IN ?", filter.AllowedStoreIDs)
 		}

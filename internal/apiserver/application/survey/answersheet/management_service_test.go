@@ -225,14 +225,29 @@ func TestManagementServiceGetByIDReturnsConvertedAnswerSheet(t *testing.T) {
 		t.Fatalf("unexpected answers: %+v", result.Answers)
 	}
 	t.Run("business organization ownership remains enforced without authorization partition context", func(t *testing.T) {
+		questions := &versionQuestionReader{}
+		service.questions = questions
 		if _, err := service.GetByIDInOrg(authztest.WithPermission(actorctx.WithGrantingUserID(context.Background(), 9), "qs:answersheet:collection:answersheets", "read"), 1, 12); err != nil {
 			t.Fatalf("GetByIDInOrg same org returned error: %v", err)
+		}
+		if questions.calls != 1 || questions.version != "v1" {
+			t.Fatal("missing recorded-version display read")
 		}
 		if _, err := service.GetByIDInOrg(authztest.WithPermission(actorctx.WithGrantingUserID(context.Background(), 9), "qs:answersheet:collection:answersheets", "read"), 2, 12); errors.ParseCoder(err).Code() != errorCode.ErrAnswerSheetNotFound {
 			t.Fatalf("GetByIDInOrg cross org error = %v, want not found", err)
 		}
 		if _, err := service.GetByIDInOrg(authztest.WithPermission(actorctx.WithGrantingUserID(context.Background(), 9), "qs:answersheet:collection:answersheets", "read"), 0, 12); errors.ParseCoder(err).Code() != errorCode.ErrPermissionDenied {
 			t.Fatalf("GetByIDInOrg missing org error = %v, want permission denied", err)
+		}
+		if _, err := service.GetByIDInOrg(context.Background(), 1, 12); err == nil {
+			t.Fatal("missing action accepted")
+		}
+		service.access = &sheetScopeStub{err: errors.New("outside store")}
+		if _, err := service.GetByIDInOrg(authztest.WithPermission(actorctx.WithGrantingUserID(context.Background(), 9), appauthz.AnswerSheetResource, "read"), 1, 12); err == nil {
+			t.Fatal("outside store accepted")
+		}
+		if questions.calls != 1 {
+			t.Fatal("question content queried before scope or action authorization")
 		}
 	})
 }
@@ -353,5 +368,33 @@ func TestManagementListRejectsScopeBeforeQuery(t *testing.T) {
 	}
 	if access.action != "list" {
 		t.Fatal("incorrect action")
+	}
+}
+
+func TestManagementListTesteeFilterIsIndependentOfFillerAndChecksScope(t *testing.T) {
+	testeeID, fillerID := uint64(401), uint64(7)
+	for _, denied := range []bool{false, true} {
+		reader := &answerSheetReaderStub{}
+		access := &sheetScopeStub{}
+		if denied {
+			access.err = errors.New("outside store")
+		}
+		service := &managementService{access: access, reader: reader}
+		ctx := authztest.WithPermission(actorctx.WithGrantingUserID(context.Background(), 9), appauthz.AnswerSheetResource, "list")
+		_, err := service.List(ctx, ListAnswerSheetsDTO{OrgID: 1, TesteeID: &testeeID, FillerID: &fillerID, Page: 1, PageSize: 10})
+		if denied {
+			if err == nil || reader.listCalls != 0 || reader.countCalls != 0 {
+				t.Fatal("scope bypass")
+			}
+			continue
+		}
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, filter := range []surveyreadmodel.AnswerSheetFilter{reader.listFilter, reader.countFilter} {
+			if !filter.RestrictToStoreScope || len(filter.StoreScopedTesteeIDs) != 1 || filter.StoreScopedTesteeIDs[0] != testeeID || filter.FillerID == nil || *filter.FillerID != fillerID {
+				t.Fatalf("incorrect list/count filter: %+v", filter)
+			}
+		}
 	}
 }

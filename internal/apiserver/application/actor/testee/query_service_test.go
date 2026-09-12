@@ -327,3 +327,37 @@ func TestProfileListReservedForSelfService(t *testing.T) {
 		t.Fatalf("self-service changed: %+v", result)
 	}
 }
+
+func TestUnassignedInventoryRequiresHeadquartersAndNeverEnrichesResults(t *testing.T) {
+	for _, kind := range []string{"store", "all_stores", "headquarters"} {
+		t.Run(kind, func(t *testing.T) {
+			ctx := scopeQueryContext(context.Background())
+			snapshot, _ := appauthz.FromContext(ctx)
+			if kind != "store" {
+				snapshot.Permissions[0].Scopes = []appauthz.DataScope{{OrgID: 1, Kind: "all_stores"}}
+			}
+			if kind == "headquarters" {
+				snapshot.Permissions[0].Resource = "qs:*:*:*"
+				snapshot.Permissions[0].Action = "*"
+			}
+			repo := &queryServiceRepoStub{listItems: []actorreadmodel.TesteeRow{{ID: 1, OrgID: 1, TotalAssessments: 99, LastRiskLevel: "high"}}, countValue: 1}
+			summary := &assessmentSummaryReaderStub{}
+			result, err := NewQueryServiceWithAssessmentSummary(repo, summary).ListTestees(ctx, ListTesteeDTO{OrgID: 1, UnassignedStore: true, Limit: 10})
+			if kind != "headquarters" {
+				if err == nil || repo.listCalls != 0 || repo.countCalls != 0 {
+					t.Fatal("unassigned scope leaked")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !repo.lastFilter.UnassignedStore || !repo.lastFilter.AllAssignedStores || !repo.lastFilter.RestrictToStoreScope {
+				t.Fatal("lost inventory filter")
+			}
+			if summary.calls != 0 || result.Items[0].TotalAssessments != 0 || result.Items[0].LastRiskLevel != "" {
+				t.Fatal("unassigned professional data leaked")
+			}
+		})
+	}
+}
