@@ -11,6 +11,8 @@ import (
 )
 
 type evaluationRPCStub struct {
+	gateQuery         *pb.EvaluationGateQuery
+	gatePreview       *pb.EvaluationGatePreview
 	candidateIndex    *pb.EvaluationCandidateIndex
 	candidateEvidence *pb.EvaluationCandidateEvidence
 	candidateQuery    *pb.EvaluationCandidateQuery

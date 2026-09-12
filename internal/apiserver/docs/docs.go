@@ -10527,6 +10527,90 @@ const docTemplate = `{
                 }
             }
         },
+        "/internal/v2/interpretation/ai-workflow/evaluations/{run_id}/gates": {
+            "get": {
+                "description": "需要当前机构解读审计权限及明确 Run 版本。仅返回冻结证据的门槛预览，不批准 Run 或发布配置；证据未完成或版本变化返回冲突。",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "AI-Workflow-Management"
+                ],
+                "summary": "预览 qs-ai 评测发布门槛",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "评测 Run UUID",
+                        "name": "run_id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "当前 Run 版本",
+                        "name": "expected_version",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/aibridge.EvaluationGatePreview"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/internal/v2/interpretation/ai-workflow/evaluations/{run_id}/result-unknown/resolve": {
             "post": {
                 "description": "需要当前机构 OrgAdmin 权限；组织和操作人取认证上下文。管理功能默认关闭。\n需确认重复调用和费用风险；超时后先查询状态，不自动重试。",
@@ -11075,6 +11159,23 @@ const docTemplate = `{
                 },
                 "release": {
                     "$ref": "#/definitions/aibridge.EvaluationRelease"
+                }
+            }
+        },
+        "aibridge.EvaluationGatePreview": {
+            "type": "object",
+            "properties": {
+                "gate_result": {
+                    "type": "object"
+                },
+                "release_fingerprint": {
+                    "type": "string"
+                },
+                "run_id": {
+                    "type": "string"
+                },
+                "version": {
+                    "type": "integer"
                 }
             }
         },

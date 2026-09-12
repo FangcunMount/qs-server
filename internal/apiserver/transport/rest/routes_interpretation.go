@@ -59,6 +59,7 @@ func (r *Router) registerInterpretationInternalV2Routes(internalV2 *gin.RouterGr
 		read := internalV2.Group("/interpretation/ai-workflow/evaluations", restmiddleware.RequireCapabilityMiddleware(restmiddleware.CapabilityAuditInterpretation))
 		read.GET("/:run_id", management.Get)
 		read.GET("/:run_id/candidates", management.ListCandidates)
+		read.GET("/:run_id/gates", management.PreviewGates)
 		read.GET("/:run_id/candidates/:candidate_id", management.GetCandidate)
 		group.POST("/:run_id/start", management.Start)
 		group.POST("/:run_id/create", management.Create)

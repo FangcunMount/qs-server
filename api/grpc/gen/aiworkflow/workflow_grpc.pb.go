@@ -268,6 +268,7 @@ const (
 	EvaluationManagement_Review_FullMethodName         = "/qsai.workflow.v1.EvaluationManagement/Review"
 	EvaluationManagement_ListCandidates_FullMethodName = "/qsai.workflow.v1.EvaluationManagement/ListCandidates"
 	EvaluationManagement_GetCandidate_FullMethodName   = "/qsai.workflow.v1.EvaluationManagement/GetCandidate"
+	EvaluationManagement_PreviewGates_FullMethodName   = "/qsai.workflow.v1.EvaluationManagement/PreviewGates"
 )
 
 // EvaluationManagementClient is the client API for EvaluationManagement service.
@@ -286,6 +287,8 @@ type EvaluationManagementClient interface {
 	Review(ctx context.Context, in *EvaluationReviewCommand, opts ...grpc.CallOption) (*EvaluationState, error)
 	ListCandidates(ctx context.Context, in *EvaluationQuery, opts ...grpc.CallOption) (*EvaluationCandidateIndex, error)
 	GetCandidate(ctx context.Context, in *EvaluationCandidateQuery, opts ...grpc.CallOption) (*EvaluationCandidateEvidence, error)
+	// Read-only complete gate preview; does not approve the Run or publish a release.
+	PreviewGates(ctx context.Context, in *EvaluationGateQuery, opts ...grpc.CallOption) (*EvaluationGatePreview, error)
 }
 
 type evaluationManagementClient struct {
@@ -366,6 +369,16 @@ func (c *evaluationManagementClient) GetCandidate(ctx context.Context, in *Evalu
 	return out, nil
 }
 
+func (c *evaluationManagementClient) PreviewGates(ctx context.Context, in *EvaluationGateQuery, opts ...grpc.CallOption) (*EvaluationGatePreview, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(EvaluationGatePreview)
+	err := c.cc.Invoke(ctx, EvaluationManagement_PreviewGates_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // EvaluationManagementServer is the server API for EvaluationManagement service.
 // All implementations must embed UnimplementedEvaluationManagementServer
 // for forward compatibility.
@@ -382,6 +395,8 @@ type EvaluationManagementServer interface {
 	Review(context.Context, *EvaluationReviewCommand) (*EvaluationState, error)
 	ListCandidates(context.Context, *EvaluationQuery) (*EvaluationCandidateIndex, error)
 	GetCandidate(context.Context, *EvaluationCandidateQuery) (*EvaluationCandidateEvidence, error)
+	// Read-only complete gate preview; does not approve the Run or publish a release.
+	PreviewGates(context.Context, *EvaluationGateQuery) (*EvaluationGatePreview, error)
 	mustEmbedUnimplementedEvaluationManagementServer()
 }
 
@@ -412,6 +427,9 @@ func (UnimplementedEvaluationManagementServer) ListCandidates(context.Context, *
 }
 func (UnimplementedEvaluationManagementServer) GetCandidate(context.Context, *EvaluationCandidateQuery) (*EvaluationCandidateEvidence, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetCandidate not implemented")
+}
+func (UnimplementedEvaluationManagementServer) PreviewGates(context.Context, *EvaluationGateQuery) (*EvaluationGatePreview, error) {
+	return nil, status.Error(codes.Unimplemented, "method PreviewGates not implemented")
 }
 func (UnimplementedEvaluationManagementServer) mustEmbedUnimplementedEvaluationManagementServer() {}
 func (UnimplementedEvaluationManagementServer) testEmbeddedByValue()                              {}
@@ -560,6 +578,24 @@ func _EvaluationManagement_GetCandidate_Handler(srv interface{}, ctx context.Con
 	return interceptor(ctx, in, info, handler)
 }
 
+func _EvaluationManagement_PreviewGates_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(EvaluationGateQuery)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(EvaluationManagementServer).PreviewGates(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: EvaluationManagement_PreviewGates_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(EvaluationManagementServer).PreviewGates(ctx, req.(*EvaluationGateQuery))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // EvaluationManagement_ServiceDesc is the grpc.ServiceDesc for EvaluationManagement service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -594,6 +630,10 @@ var EvaluationManagement_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetCandidate",
 			Handler:    _EvaluationManagement_GetCandidate_Handler,
+		},
+		{
+			MethodName: "PreviewGates",
+			Handler:    _EvaluationManagement_PreviewGates_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

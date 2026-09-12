@@ -48,6 +48,18 @@ service EvaluationManagement {
  rpc Review(EvaluationReviewCommand) returns (EvaluationState);
  rpc ListCandidates(EvaluationQuery) returns (EvaluationCandidateIndex);
  rpc GetCandidate(EvaluationCandidateQuery) returns (EvaluationCandidateEvidence);
+ // Read-only complete gate preview; does not approve the Run or publish a release.
+ rpc PreviewGates(EvaluationGateQuery) returns (EvaluationGatePreview);
+}
+message EvaluationGateQuery {
+ EvaluationQuery scope = 1;
+ int64 expected_version = 2;
+}
+message EvaluationGatePreview {
+ string run_id = 1;
+ int64 version = 2;
+ string release_fingerprint = 3;
+ string gate_result_json = 4;
 }
 message EvaluationCandidateSummary {
  string candidate_id = 1;
