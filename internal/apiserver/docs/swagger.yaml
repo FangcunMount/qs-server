@@ -11,6 +11,19 @@ definitions:
       semantic_review:
         $ref: '#/definitions/aibridge.SemanticContradictionReview'
     type: object
+  aibridge.CreatePromptDraft:
+    properties:
+      command_id:
+        type: string
+      reason:
+        type: string
+      source:
+        $ref: '#/definitions/aibridge.PromptDraftSource'
+      target_version:
+        type: string
+      template_id:
+        type: string
+    type: object
   aibridge.EvaluationCandidateEvidence:
     properties:
       candidate_id:
@@ -167,6 +180,55 @@ definitions:
       version:
         type: string
     type: object
+  aibridge.PromptDraftContent:
+    properties:
+      allowed_placeholders:
+        items:
+          type: string
+        type: array
+      data_preamble:
+        type: string
+      system_message:
+        type: string
+      task_template:
+        type: string
+    type: object
+  aibridge.PromptDraftSource:
+    properties:
+      content_sha256:
+        type: string
+      fingerprint:
+        type: string
+      identity:
+        type: string
+      version:
+        type: string
+    type: object
+  aibridge.PromptDraftState:
+    properties:
+      command_id:
+        type: string
+      content:
+        $ref: '#/definitions/aibridge.PromptDraftContent'
+      draft_id:
+        type: string
+      operator_user_id:
+        type: integer
+      organization_id:
+        type: integer
+      reason:
+        type: string
+      revision:
+        type: integer
+      saved_at:
+        type: string
+      source:
+        $ref: '#/definitions/aibridge.PromptDraftSource'
+      target_version:
+        type: string
+      template_id:
+        type: string
+    type: object
   aibridge.PublicationCommand:
     properties:
       command_id:
@@ -246,6 +308,17 @@ definitions:
         type: string
       run_version:
         type: integer
+    type: object
+  aibridge.RevisePromptDraft:
+    properties:
+      command_id:
+        type: string
+      content:
+        $ref: '#/definitions/aibridge.PromptDraftContent'
+      expected_revision:
+        type: integer
+      reason:
+        type: string
     type: object
   aibridge.RollbackPublication:
     properties:
@@ -14710,6 +14783,218 @@ paths:
       summary: 启动已冻结的 qs-ai 评测
       tags:
       - AI-Workflow-Management
+  /internal/v2/interpretation/ai-workflow/prompt-drafts/{draft_id}:
+    get:
+      description: 需要当前机构解读审计权限。查询不触发校验、发布或模型调用。
+      parameters:
+      - description: 草稿 UUID
+        in: path
+        name: draft_id
+        required: true
+        type: string
+      - description: 正整数修订号；省略读取当前版本
+        in: query
+        name: revision
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/aibridge.PromptDraftState'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+      summary: 读取 qs-ai Prompt 草稿当前或历史修订
+      tags:
+      - AI-Workflow-Prompt-Drafts
+  /internal/v2/interpretation/ai-workflow/prompt-drafts/{draft_id}/create:
+    post:
+      consumes:
+      - application/json
+      description: 需要当前机构 OrgAdmin 权限；组织和操作人取认证上下文。保存不代表校验或发布。超时后查询原 command_id，不自动重试。
+      parameters:
+      - description: 草稿 UUID
+        in: path
+        name: draft_id
+        required: true
+        type: string
+      - description: 保存命令
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/aibridge.CreatePromptDraft'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/aibridge.PromptDraftState'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+      summary: 从现有资产创建 qs-ai Prompt 草稿
+      tags:
+      - AI-Workflow-Prompt-Drafts
+  /internal/v2/interpretation/ai-workflow/prompt-drafts/{draft_id}/revisions:
+    post:
+      consumes:
+      - application/json
+      description: 需要当前机构 OrgAdmin 权限；组织和操作人取认证上下文。保存不代表校验或发布。超时后查询原 command_id，不自动重试。
+      parameters:
+      - description: 草稿 UUID
+        in: path
+        name: draft_id
+        required: true
+        type: string
+      - description: 保存命令
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/aibridge.RevisePromptDraft'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/aibridge.PromptDraftState'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+      summary: 保存 qs-ai Prompt 草稿新修订
+      tags:
+      - AI-Workflow-Prompt-Drafts
+  /internal/v2/interpretation/ai-workflow/prompt-drafts/commands/{command_id}:
+    get:
+      description: 需要当前机构解读审计权限，限原组织及原操作人。仅查询，不重发保存命令。
+      parameters:
+      - description: 原命令 UUID
+        in: path
+        name: command_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/aibridge.PromptDraftState'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+      summary: 查询 qs-ai 草稿保存的原始命令回执
+      tags:
+      - AI-Workflow-Prompt-Drafts
   /internal/v2/interpretation/ai-workflow/publications:
     get:
       description: 需要当前机构解读审计权限。精确查询选择器，不执行运行时回退匹配。管理功能默认关闭。

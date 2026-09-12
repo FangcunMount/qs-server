@@ -2,7 +2,7 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "6e03d2ea61d94b661716926d6b28d7daa68191b0",
+    "sha": "a3d8bb017e6678dfd218bb272785f0e9477d8515",
     "verified_on": "2026-09-13"
   },
   "status_policy": {
@@ -132,8 +132,8 @@
     "grpc": {
       "source": "api/grpc/proto",
       "proto_file_count": 8,
-      "service_count": 18,
-      "rpc_count": 77,
+      "service_count": 19,
+      "rpc_count": 81,
       "services": {
         "actor.ActorService": [
           "CreateTestee",
@@ -234,6 +234,7 @@
           "Finalize",
           "ReopenReview"
         ],
+        "qsai.workflow.v1.PromptDraftManagement": ["Create", "Revise", "Get", "GetReceipt"],
         "qsai.workflow.v1.PublicationManagement": [
           "Publish",
           "Rollback",

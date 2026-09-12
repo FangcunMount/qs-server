@@ -145,6 +145,7 @@ type EvaluationDeps struct {
 type InterpretationDeps struct {
 	AIWorkflowManagement        *bridge.EvaluationAdministration
 	AIWorkflowPublications      *bridge.PublicationAdministration
+	AIWorkflowPromptDrafts      *bridge.PromptDraftAdministration
 	ReportQueryJourney          reportqueryjourney.Service
 	ReportWaitJourney           reportwaitjourney.Service
 	OperationsService           interpretationoperations.Service

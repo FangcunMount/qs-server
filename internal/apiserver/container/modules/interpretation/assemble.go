@@ -71,6 +71,7 @@ import (
 type Module struct {
 	aiManagement                *bridge.EvaluationAdministration
 	aiPublications              *bridge.PublicationAdministration
+	aiPromptDrafts              *bridge.PromptDraftAdministration
 	aiManagementConnection      io.Closer
 	aiWorkflowEnabled           bool
 	aiWorkflow                  *bridge.Participant
@@ -252,12 +253,13 @@ func New(deps Deps) (*Module, error) {
 		if err := opts.Validate(); err != nil {
 			return nil, err
 		}
-		client, publicationClient, connection, err := bridgeClient.DialGovernanceManagement(opts.Address, opts.CAFile, opts.CertFile, opts.KeyFile)
+		client, publicationClient, draftClient, connection, err := bridgeClient.DialGovernanceClients(opts.Address, opts.CAFile, opts.CertFile, opts.KeyFile)
 		if err != nil {
 			return nil, err
 		}
 		module.aiManagement = &bridge.EvaluationAdministration{Gateway: client}
 		module.aiPublications = &bridge.PublicationAdministration{Gateway: publicationClient}
+		module.aiPromptDrafts = &bridge.PromptDraftAdministration{Gateway: draftClient}
 		module.aiManagementConnection = connection
 	}
 	return module, nil
@@ -986,4 +988,11 @@ func (m *Module) AIWorkflowPublications() *bridge.PublicationAdministration {
 		return nil
 	}
 	return m.aiPublications
+}
+
+func (m *Module) AIWorkflowPromptDrafts() *bridge.PromptDraftAdministration {
+	if m == nil {
+		return nil
+	}
+	return m.aiPromptDrafts
 }

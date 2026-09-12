@@ -258,3 +258,58 @@ message PublicationReceipt {
  string reason = 6;
  string changed_at = 7;
 }
+
+// Draft revisions are editable governance records, never published Prompt assets.
+// QS authorizes each operation. Receipt lookup is restricted to the original actor.
+service PromptDraftManagement {
+ rpc Create(PromptDraftCreateCommand) returns (PromptDraftState);
+ rpc Revise(PromptDraftReviseCommand) returns (PromptDraftState);
+ rpc Get(PromptDraftQuery) returns (PromptDraftState);
+ rpc GetReceipt(PromptDraftReceiptQuery) returns (PromptDraftState);
+}
+message PromptDraftSource {
+ string identity = 1;
+ string version = 2;
+ string fingerprint = 3;
+ string content_sha256 = 4;
+}
+message PromptDraftContent {
+ string system_message = 1;
+ string task_template = 2;
+ string data_preamble = 3;
+ repeated string allowed_placeholders = 4;
+}
+message PromptDraftCreateCommand {
+ PublicationScope scope = 1;
+ string draft_id = 2;
+ string command_id = 3;
+ PromptDraftSource source = 4;
+ string template_id = 5;
+ string target_version = 6;
+ string reason = 7;
+}
+message PromptDraftReviseCommand {
+ PublicationScope scope = 1;
+ string draft_id = 2;
+ string command_id = 3;
+ int64 expected_revision = 4;
+ PromptDraftContent content = 5;
+ string reason = 6;
+}
+message PromptDraftQuery {
+ PublicationScope scope = 1;
+ string draft_id = 2;
+ // Absent reads current revision. Present values must be positive.
+ optional int64 revision = 3;
+}
+message PromptDraftReceiptQuery {
+ PublicationScope scope = 1;
+ string command_id = 2;
+}
+message PromptDraftState {
+ string schema_version = 1;
+ string draft_id = 2;
+ int64 revision = 3;
+ // Complete immutable revision, original source and actor/time/reason audit.
+ string snapshot_json = 4;
+}
