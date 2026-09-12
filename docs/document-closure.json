@@ -2,8 +2,8 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "e6d8ffdf7bad25ab58ea82ece6253b7489d3bc83",
-    "verified_on": "2026-09-12"
+    "sha": "7ce94064e40a5714483351501c65d7957de2b694",
+    "verified_on": "2026-09-13"
   },
   "status_policy": {
     "doc_status": [
@@ -133,7 +133,7 @@
       "source": "api/grpc/proto",
       "proto_file_count": 8,
       "service_count": 17,
-      "rpc_count": 67,
+      "rpc_count": 69,
       "services": {
         "actor.ActorService": [
           "CreateTestee",
@@ -227,7 +227,9 @@
           "Start",
           "Get",
           "ResolveUnknown",
-          "Review"
+          "Review",
+          "ListCandidates",
+          "GetCandidate"
         ],
         "qsai.workflow.v1.Results": [
           "Accept"
