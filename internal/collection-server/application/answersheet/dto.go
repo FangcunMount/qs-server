@@ -1,13 +1,16 @@
 package answersheet
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
+	"math"
 	"strconv"
 )
 
 // SubmitAnswerSheetRequest 提交答卷请求
 type SubmitAnswerSheetRequest struct {
+	AnsweringStartID     uint64 `json:"answering_start_id,omitempty" swaggertype:"string"`
 	QuestionnaireCode    string `json:"questionnaire_code" binding:"required"`
 	QuestionnaireVersion string `json:"questionnaire_version" binding:"required"`
 	IdempotencyKey       string `json:"idempotency_key" binding:"required" minLength:"8" maxLength:"128"`
@@ -30,7 +33,8 @@ func (r *SubmitAnswerSheetRequest) UnmarshalJSON(data []byte) error {
 	// 使用临时结构体避免递归调用
 	type Alias SubmitAnswerSheetRequest
 	aux := &struct {
-		TesteeID json.RawMessage `json:"testee_id"`
+		TesteeID         json.RawMessage `json:"testee_id"`
+		AnsweringStartID json.RawMessage `json:"answering_start_id"`
 		*Alias
 	}{
 		Alias: (*Alias)(r),
@@ -40,6 +44,21 @@ func (r *SubmitAnswerSheetRequest) UnmarshalJSON(data []byte) error {
 		return err
 	}
 
+	r.AnsweringStartID = 0
+	rawStart := bytes.TrimSpace(aux.AnsweringStartID)
+	if len(rawStart) > 0 && string(rawStart) != "null" && string(rawStart) != `""` {
+		text := string(rawStart)
+		if rawStart[0] == '"' {
+			if err := json.Unmarshal(rawStart, &text); err != nil {
+				return err
+			}
+		}
+		id, err := strconv.ParseUint(text, 10, 64)
+		if err != nil || id == 0 || id > math.MaxInt64 {
+			return fmt.Errorf("invalid answering_start_id")
+		}
+		r.AnsweringStartID = id
+	}
 	// 处理 TesteeID，支持字符串或数字
 	if len(aux.TesteeID) == 0 {
 		return fmt.Errorf("testee_id must be a string or number")

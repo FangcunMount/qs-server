@@ -36,3 +36,6 @@ type (
 	TrendPointOutput                  = grpcclient.TrendPointOutput
 	UpdateTesteeRequest               = grpcclient.UpdateTesteeRequest
 )
+
+type StartAnsweringInput = grpcclient.StartAnsweringInput
+type StartAnsweringOutput = grpcclient.StartAnsweringOutput

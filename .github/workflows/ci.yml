@@ -224,6 +224,16 @@ jobs:
             -run '^TestRetire' \
             -count=1 -timeout=15m -v ./internal/pkg/migration
 
+      - name: Verify answering starts and durable submission against real databases
+        env:
+          QS_SERVER_TEST_MYSQL_DSN: root:root@tcp(127.0.0.1:3306)/mysql?parseTime=true&multiStatements=true
+          QS_TESTEE_STORE_REQUIRE_MYSQL: 'true'
+          QS_SERVER_TEST_MONGO_URI: mongodb://127.0.0.1:27017/?replicaSet=rs0
+          STATISTICS_DATABASE_REQUIRED: '1'
+        run: |
+          test -n "$QS_SERVER_TEST_MYSQL_DSN" && test -n "$QS_SERVER_TEST_MONGO_URI"
+          go test -count=1 -timeout=5m -run 'TestMySQLAnsweringStart|TestAnsweringStartUnique|TestStoreActivityRealDatabase' ./internal/apiserver/infra/mysql/actor/testeestore ./internal/apiserver/infra/mongo/answersheet ./internal/apiserver/infra/mysql/statistics
+
       - name: Run Statistics migration and cold-start integration contracts
         env:
           MYSQL_DSN: root:root@tcp(127.0.0.1:3306)/mysql?parseTime=true&multiStatements=true&loc=Asia%2FShanghai

@@ -194,3 +194,46 @@ func newAnswerSheetTestContext(method, target, body string) (*httptest.ResponseR
 	c.Request.Header.Set("Content-Type", "application/json")
 	return recorder, c
 }
+
+type startHandlerService struct {
+	fakeAnswerSheetSubmissionService
+	created bool
+	calls   int
+}
+
+func (s *startHandlerService) StartAnswering(_ context.Context, user uint64, req *answersheet.StartAnsweringRequest) (*answersheet.StartAnsweringOutput, error) {
+	s.calls++
+	if user != 99 {
+		return nil, status.Error(codes.PermissionDenied, "unexpected user")
+	}
+	return &answersheet.StartAnsweringOutput{ID: "123", Created: s.created, StartedAt: "2026-09-12T00:00:00Z"}, nil
+}
+func TestAnsweringStartResponseAndTrustedFields(t *testing.T) {
+	service := &startHandlerService{created: true}
+	h := NewAnswerSheetHandler(service)
+	body := `{"request_key":"start-1234","testee_id":"7","questionnaire_code":"Q","questionnaire_version":"1"}`
+	for _, created := range []bool{true, false} {
+		service.created = created
+		recorder, c := newAnswerSheetTestContext(http.MethodPost, "/api/v1/answering-starts", body)
+		c.Set(collectionmiddleware.UserIDKey, uint64(99))
+		h.StartAnswering(c)
+		want := http.StatusOK
+		if created {
+			want = http.StatusCreated
+		}
+		if recorder.Code != want {
+			t.Fatalf("status %d: %s", recorder.Code, recorder.Body.String())
+		}
+	}
+	for _, field := range []string{"org_id", "store_id", "started_by_user_id", "started_at"} {
+		recorder, c := newAnswerSheetTestContext(http.MethodPost, "/api/v1/answering-starts", strings.TrimSuffix(body, "}")+`,"`+field+`":"1"}`)
+		c.Set(collectionmiddleware.UserIDKey, uint64(99))
+		h.StartAnswering(c)
+		if recorder.Code != 400 {
+			t.Fatalf("client %s accepted: %d", field, recorder.Code)
+		}
+	}
+	if service.calls != 2 {
+		t.Fatal("invalid trusted field reached application")
+	}
+}

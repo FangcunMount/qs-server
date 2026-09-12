@@ -17,6 +17,7 @@ type WireInput struct {
 	MySQLDB             *gorm.DB
 	EventPublisher      event.EventPublisher
 	IdentityService     *iam.IdentityService
+	ProfileLinkService  *iam.ProfileLinkService
 	HotsetRecorder      cachetarget.HotsetRecorder
 	CacheSignalNotifier quesApp.CacheSignalNotifier
 	SurveyRuntimeInfra  *SurveyRuntimeInfra
@@ -31,6 +32,7 @@ func Wire(in WireInput) (*Module, error) {
 		MySQLDB:             in.MySQLDB,
 		EventPublisher:      in.EventPublisher,
 		IdentityService:     in.IdentityService,
+		ProfileLinkService:  in.ProfileLinkService,
 		HotsetRecorder:      in.HotsetRecorder,
 		CacheSignalNotifier: in.CacheSignalNotifier,
 		OutboxProfile:       in.OutboxProfile,

@@ -252,6 +252,7 @@ func (s *SubmissionService) lookupThenAccept(
 			QuestionnaireCode:    req.QuestionnaireCode,
 			QuestionnaireVersion: req.QuestionnaireVersion,
 			IdempotencyKey:       req.IdempotencyKey,
+			AnsweringStartID:     req.AnsweringStartID,
 			WriterID:             writerID,
 			TesteeID:             req.TesteeID,
 			TaskID:               req.TaskID,

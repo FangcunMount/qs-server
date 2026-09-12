@@ -53,8 +53,9 @@ func NewAnswerSheetHandler(submissionService answerSheetSubmissionService) *Answ
 // @Router /api/v1/answersheets [post]
 func (h *AnswerSheetHandler) Submit(c *gin.Context) {
 	var req answersheet.SubmitAnswerSheetRequest
-	if err := h.BindJSON(c, &req); err != nil {
-		return // BindJSON 已包含 binding 标签校验
+	if err := c.ShouldBindJSON(&req); err != nil {
+		h.respondSubmitError(c, grpcstatus.Error(codes.InvalidArgument, "invalid answer sheet request"))
+		return
 	}
 	if req.TaskID == "" {
 		req.TaskID = c.Query("task_id")
@@ -223,4 +224,52 @@ func (h *AnswerSheetHandler) Get(c *gin.Context) {
 	}
 
 	h.Success(c, result)
+}
+
+// StartAnswering freezes conducting ownership when the participant starts.
+// @Summary 开始作答
+// @Tags 答卷
+// @Accept json
+// @Produce json
+// @Param request body answersheet.StartAnsweringRequest true "开始作答"
+// @Success 201 {object} core.Response{data=answersheet.StartAnsweringOutput}
+// @Success 200 {object} core.Response{data=answersheet.StartAnsweringOutput}
+// @Failure 400 {object} core.ErrResponse
+// @Failure 403 {object} core.ErrResponse
+// @Failure 409 {object} core.ErrResponse
+// @Failure 503 {object} core.ErrResponse
+// @Security BearerAuth
+// @Router /api/v1/answering-starts [post]
+func (h *AnswerSheetHandler) StartAnswering(c *gin.Context) {
+	user := h.GetUserID(c)
+	if user == 0 {
+		h.UnauthorizedResponse(c, "user not authenticated")
+		return
+	}
+	var req answersheet.StartAnsweringRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		h.respondSubmitError(c, grpcstatus.Error(codes.InvalidArgument, "invalid answering start request"))
+		return
+	}
+	service, ok := h.submissionService.(interface {
+		StartAnswering(context.Context, uint64, *answersheet.StartAnsweringRequest) (*answersheet.StartAnsweringOutput, error)
+	})
+	if !ok {
+		h.respondSubmitError(c, grpcstatus.Error(codes.Unavailable, "answering start unavailable"))
+		return
+	}
+	result, err := service.StartAnswering(c.Request.Context(), user, &req)
+	if err != nil {
+		h.respondSubmitError(c, err)
+		return
+	}
+	if result == nil || result.ID == "" {
+		h.respondSubmitError(c, grpcstatus.Error(codes.Unavailable, "answering start returned no record"))
+		return
+	}
+	responseStatus := http.StatusOK
+	if result.Created {
+		responseStatus = http.StatusCreated
+	}
+	c.JSON(responseStatus, core.Response{Code: 0, Message: "ok", Data: result})
 }

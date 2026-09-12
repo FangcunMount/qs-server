@@ -100,6 +100,7 @@ func lookupSubmissionFingerprint(existing *domainanswersheet.AnswerSheet, dto Lo
 		})
 	}
 	fingerprint, err := submitport.FingerprintIntent(submitport.SubmissionIntent{
+		AnsweringStartID:     dto.AnsweringStartID,
 		WriterID:             writerID,
 		TesteeID:             dto.TesteeID,
 		OrgID:                existing.SubmissionContext().OrgID().Uint64(),

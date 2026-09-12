@@ -359,6 +359,7 @@ func (x *Answer) GetValue() string {
 // 保存答卷请求
 type SaveAnswerSheetRequest struct {
 	state                protoimpl.MessageState `protogen:"open.v1"`
+	AnsweringStartId     uint64                 `protobuf:"varint,12,opt,name=answering_start_id,json=answeringStartId,proto3" json:"answering_start_id,omitempty"` // Optional; zero preserves legacy submission semantics.
 	QuestionnaireCode    string                 `protobuf:"bytes,1,opt,name=questionnaire_code,json=questionnaireCode,proto3" json:"questionnaire_code,omitempty"`
 	QuestionnaireVersion string                 `protobuf:"bytes,2,opt,name=questionnaire_version,json=questionnaireVersion,proto3" json:"questionnaire_version,omitempty"`
 	IdempotencyKey       string                 `protobuf:"bytes,3,opt,name=idempotency_key,json=idempotencyKey,proto3" json:"idempotency_key,omitempty"`
@@ -401,6 +402,13 @@ func (x *SaveAnswerSheetRequest) ProtoReflect() protoreflect.Message {
 // Deprecated: Use SaveAnswerSheetRequest.ProtoReflect.Descriptor instead.
 func (*SaveAnswerSheetRequest) Descriptor() ([]byte, []int) {
 	return file_answersheet_answersheet_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *SaveAnswerSheetRequest) GetAnsweringStartId() uint64 {
+	if x != nil {
+		return x.AnsweringStartId
+	}
+	return 0
 }
 
 func (x *SaveAnswerSheetRequest) GetQuestionnaireCode() string {
@@ -589,6 +597,7 @@ type LookupAnswerSheetSubmissionRequest struct {
 	TaskId               string                    `protobuf:"bytes,6,opt,name=task_id,json=taskId,proto3" json:"task_id,omitempty"`
 	OriginRef            *OriginRef                `protobuf:"bytes,7,opt,name=origin_ref,json=originRef,proto3" json:"origin_ref,omitempty"`
 	Answers              []*SubmissionIntentAnswer `protobuf:"bytes,8,rep,name=answers,proto3" json:"answers,omitempty"`
+	AnsweringStartId     uint64                    `protobuf:"varint,9,opt,name=answering_start_id,json=answeringStartId,proto3" json:"answering_start_id,omitempty"`
 	unknownFields        protoimpl.UnknownFields
 	sizeCache            protoimpl.SizeCache
 }
@@ -677,6 +686,13 @@ func (x *LookupAnswerSheetSubmissionRequest) GetAnswers() []*SubmissionIntentAns
 		return x.Answers
 	}
 	return nil
+}
+
+func (x *LookupAnswerSheetSubmissionRequest) GetAnsweringStartId() uint64 {
+	if x != nil {
+		return x.AnsweringStartId
+	}
+	return 0
 }
 
 type SubmissionIntentAnswer struct {
@@ -1027,6 +1043,175 @@ func (x *ListAnswerSheetsResponse) GetTotal() int64 {
 	return 0
 }
 
+// Trusted Collection identity; public HTTP does not accept org/user/store/time.
+type StartAnsweringRequest struct {
+	state                protoimpl.MessageState `protogen:"open.v1"`
+	RequestKey           string                 `protobuf:"bytes,1,opt,name=request_key,json=requestKey,proto3" json:"request_key,omitempty"`
+	WriterId             uint64                 `protobuf:"varint,2,opt,name=writer_id,json=writerId,proto3" json:"writer_id,omitempty"`
+	TesteeId             uint64                 `protobuf:"varint,3,opt,name=testee_id,json=testeeId,proto3" json:"testee_id,omitempty"`
+	OrgId                uint64                 `protobuf:"varint,4,opt,name=org_id,json=orgId,proto3" json:"org_id,omitempty"`
+	QuestionnaireCode    string                 `protobuf:"bytes,5,opt,name=questionnaire_code,json=questionnaireCode,proto3" json:"questionnaire_code,omitempty"`
+	QuestionnaireVersion string                 `protobuf:"bytes,6,opt,name=questionnaire_version,json=questionnaireVersion,proto3" json:"questionnaire_version,omitempty"`
+	ModelCode            string                 `protobuf:"bytes,7,opt,name=model_code,json=modelCode,proto3" json:"model_code,omitempty"`
+	ModelVersion         string                 `protobuf:"bytes,8,opt,name=model_version,json=modelVersion,proto3" json:"model_version,omitempty"`
+	OriginRef            *OriginRef             `protobuf:"bytes,9,opt,name=origin_ref,json=originRef,proto3" json:"origin_ref,omitempty"`
+	unknownFields        protoimpl.UnknownFields
+	sizeCache            protoimpl.SizeCache
+}
+
+func (x *StartAnsweringRequest) Reset() {
+	*x = StartAnsweringRequest{}
+	mi := &file_answersheet_answersheet_proto_msgTypes[13]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *StartAnsweringRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*StartAnsweringRequest) ProtoMessage() {}
+
+func (x *StartAnsweringRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_answersheet_answersheet_proto_msgTypes[13]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use StartAnsweringRequest.ProtoReflect.Descriptor instead.
+func (*StartAnsweringRequest) Descriptor() ([]byte, []int) {
+	return file_answersheet_answersheet_proto_rawDescGZIP(), []int{13}
+}
+
+func (x *StartAnsweringRequest) GetRequestKey() string {
+	if x != nil {
+		return x.RequestKey
+	}
+	return ""
+}
+
+func (x *StartAnsweringRequest) GetWriterId() uint64 {
+	if x != nil {
+		return x.WriterId
+	}
+	return 0
+}
+
+func (x *StartAnsweringRequest) GetTesteeId() uint64 {
+	if x != nil {
+		return x.TesteeId
+	}
+	return 0
+}
+
+func (x *StartAnsweringRequest) GetOrgId() uint64 {
+	if x != nil {
+		return x.OrgId
+	}
+	return 0
+}
+
+func (x *StartAnsweringRequest) GetQuestionnaireCode() string {
+	if x != nil {
+		return x.QuestionnaireCode
+	}
+	return ""
+}
+
+func (x *StartAnsweringRequest) GetQuestionnaireVersion() string {
+	if x != nil {
+		return x.QuestionnaireVersion
+	}
+	return ""
+}
+
+func (x *StartAnsweringRequest) GetModelCode() string {
+	if x != nil {
+		return x.ModelCode
+	}
+	return ""
+}
+
+func (x *StartAnsweringRequest) GetModelVersion() string {
+	if x != nil {
+		return x.ModelVersion
+	}
+	return ""
+}
+
+func (x *StartAnsweringRequest) GetOriginRef() *OriginRef {
+	if x != nil {
+		return x.OriginRef
+	}
+	return nil
+}
+
+type StartAnsweringResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            uint64                 `protobuf:"varint,1,opt,name=id,proto3" json:"id,omitempty"`
+	Created       bool                   `protobuf:"varint,2,opt,name=created,proto3" json:"created,omitempty"`
+	StartedAt     string                 `protobuf:"bytes,3,opt,name=started_at,json=startedAt,proto3" json:"started_at,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *StartAnsweringResponse) Reset() {
+	*x = StartAnsweringResponse{}
+	mi := &file_answersheet_answersheet_proto_msgTypes[14]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *StartAnsweringResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*StartAnsweringResponse) ProtoMessage() {}
+
+func (x *StartAnsweringResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_answersheet_answersheet_proto_msgTypes[14]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use StartAnsweringResponse.ProtoReflect.Descriptor instead.
+func (*StartAnsweringResponse) Descriptor() ([]byte, []int) {
+	return file_answersheet_answersheet_proto_rawDescGZIP(), []int{14}
+}
+
+func (x *StartAnsweringResponse) GetId() uint64 {
+	if x != nil {
+		return x.Id
+	}
+	return 0
+}
+
+func (x *StartAnsweringResponse) GetCreated() bool {
+	if x != nil {
+		return x.Created
+	}
+	return false
+}
+
+func (x *StartAnsweringResponse) GetStartedAt() string {
+	if x != nil {
+		return x.StartedAt
+	}
+	return ""
+}
+
 var File_answersheet_answersheet_proto protoreflect.FileDescriptor
 
 const file_answersheet_answersheet_proto_rawDesc = "" +
@@ -1072,8 +1257,9 @@ const file_answersheet_answersheet_proto_rawDesc = "" +
 	"\rquestion_code\x18\x01 \x01(\tR\fquestionCode\x12#\n" +
 	"\rquestion_type\x18\x02 \x01(\tR\fquestionType\x12\x14\n" +
 	"\x05score\x18\x03 \x01(\rR\x05score\x12\x14\n" +
-	"\x05value\x18\x04 \x01(\tR\x05value\"\xa5\x03\n" +
-	"\x16SaveAnswerSheetRequest\x12-\n" +
+	"\x05value\x18\x04 \x01(\tR\x05value\"\xd3\x03\n" +
+	"\x16SaveAnswerSheetRequest\x12,\n" +
+	"\x12answering_start_id\x18\f \x01(\x04R\x10answeringStartId\x12-\n" +
 	"\x12questionnaire_code\x18\x01 \x01(\tR\x11questionnaireCode\x123\n" +
 	"\x15questionnaire_version\x18\x02 \x01(\tR\x14questionnaireVersion\x12'\n" +
 	"\x0fidempotency_key\x18\x03 \x01(\tR\x0eidempotencyKey\x12\x14\n" +
@@ -1091,7 +1277,7 @@ const file_answersheet_answersheet_proto_rawDesc = "" +
 	"\x02id\x18\x02 \x01(\tR\x02id\"C\n" +
 	"\x17SaveAnswerSheetResponse\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\x04R\x02id\x12\x18\n" +
-	"\amessage\x18\x02 \x01(\tR\amessage\"\xfa\x02\n" +
+	"\amessage\x18\x02 \x01(\tR\amessage\"\xa8\x03\n" +
 	"\"LookupAnswerSheetSubmissionRequest\x12\x1b\n" +
 	"\twriter_id\x18\x01 \x01(\x04R\bwriterId\x12'\n" +
 	"\x0fidempotency_key\x18\x02 \x01(\tR\x0eidempotencyKey\x12-\n" +
@@ -1101,7 +1287,8 @@ const file_answersheet_answersheet_proto_rawDesc = "" +
 	"\atask_id\x18\x06 \x01(\tR\x06taskId\x125\n" +
 	"\n" +
 	"origin_ref\x18\a \x01(\v2\x16.answersheet.OriginRefR\toriginRef\x12=\n" +
-	"\aanswers\x18\b \x03(\v2#.answersheet.SubmissionIntentAnswerR\aanswers\"x\n" +
+	"\aanswers\x18\b \x03(\v2#.answersheet.SubmissionIntentAnswerR\aanswers\x12,\n" +
+	"\x12answering_start_id\x18\t \x01(\x04R\x10answeringStartId\"x\n" +
 	"\x16SubmissionIntentAnswer\x12#\n" +
 	"\rquestion_code\x18\x01 \x01(\tR\fquestionCode\x12#\n" +
 	"\rquestion_type\x18\x02 \x01(\tR\fquestionType\x12\x14\n" +
@@ -1123,8 +1310,27 @@ const file_answersheet_answersheet_proto_rawDesc = "" +
 	"\tpage_size\x18\x06 \x01(\x05R\bpageSize\"v\n" +
 	"\x18ListAnswerSheetsResponse\x12D\n" +
 	"\ranswer_sheets\x18\x01 \x03(\v2\x1f.answersheet.AnswerSheetSummaryR\fanswerSheets\x12\x14\n" +
-	"\x05total\x18\x02 \x01(\x03R\x05total2\xb1\x03\n" +
-	"\x12AnswerSheetService\x12\\\n" +
+	"\x05total\x18\x02 \x01(\x03R\x05total\"\xe8\x02\n" +
+	"\x15StartAnsweringRequest\x12\x1f\n" +
+	"\vrequest_key\x18\x01 \x01(\tR\n" +
+	"requestKey\x12\x1b\n" +
+	"\twriter_id\x18\x02 \x01(\x04R\bwriterId\x12\x1b\n" +
+	"\ttestee_id\x18\x03 \x01(\x04R\btesteeId\x12\x15\n" +
+	"\x06org_id\x18\x04 \x01(\x04R\x05orgId\x12-\n" +
+	"\x12questionnaire_code\x18\x05 \x01(\tR\x11questionnaireCode\x123\n" +
+	"\x15questionnaire_version\x18\x06 \x01(\tR\x14questionnaireVersion\x12\x1d\n" +
+	"\n" +
+	"model_code\x18\a \x01(\tR\tmodelCode\x12#\n" +
+	"\rmodel_version\x18\b \x01(\tR\fmodelVersion\x125\n" +
+	"\n" +
+	"origin_ref\x18\t \x01(\v2\x16.answersheet.OriginRefR\toriginRef\"a\n" +
+	"\x16StartAnsweringResponse\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\x04R\x02id\x12\x18\n" +
+	"\acreated\x18\x02 \x01(\bR\acreated\x12\x1d\n" +
+	"\n" +
+	"started_at\x18\x03 \x01(\tR\tstartedAt2\x8c\x04\n" +
+	"\x12AnswerSheetService\x12Y\n" +
+	"\x0eStartAnswering\x12\".answersheet.StartAnsweringRequest\x1a#.answersheet.StartAnsweringResponse\x12\\\n" +
 	"\x0fSaveAnswerSheet\x12#.answersheet.SaveAnswerSheetRequest\x1a$.answersheet.SaveAnswerSheetResponse\x12\x80\x01\n" +
 	"\x1bLookupAnswerSheetSubmission\x12/.answersheet.LookupAnswerSheetSubmissionRequest\x1a0.answersheet.LookupAnswerSheetSubmissionResponse\x12Y\n" +
 	"\x0eGetAnswerSheet\x12\".answersheet.GetAnswerSheetRequest\x1a#.answersheet.GetAnswerSheetResponse\x12_\n" +
@@ -1142,7 +1348,7 @@ func file_answersheet_answersheet_proto_rawDescGZIP() []byte {
 	return file_answersheet_answersheet_proto_rawDescData
 }
 
-var file_answersheet_answersheet_proto_msgTypes = make([]protoimpl.MessageInfo, 13)
+var file_answersheet_answersheet_proto_msgTypes = make([]protoimpl.MessageInfo, 15)
 var file_answersheet_answersheet_proto_goTypes = []any{
 	(*AnswerSheet)(nil),                         // 0: answersheet.AnswerSheet
 	(*AnswerSheetSummary)(nil),                  // 1: answersheet.AnswerSheetSummary
@@ -1157,6 +1363,8 @@ var file_answersheet_answersheet_proto_goTypes = []any{
 	(*GetAnswerSheetResponse)(nil),              // 10: answersheet.GetAnswerSheetResponse
 	(*ListAnswerSheetsRequest)(nil),             // 11: answersheet.ListAnswerSheetsRequest
 	(*ListAnswerSheetsResponse)(nil),            // 12: answersheet.ListAnswerSheetsResponse
+	(*StartAnsweringRequest)(nil),               // 13: answersheet.StartAnsweringRequest
+	(*StartAnsweringResponse)(nil),              // 14: answersheet.StartAnsweringResponse
 }
 var file_answersheet_answersheet_proto_depIdxs = []int32{
 	2,  // 0: answersheet.AnswerSheet.answers:type_name -> answersheet.Answer
@@ -1166,19 +1374,22 @@ var file_answersheet_answersheet_proto_depIdxs = []int32{
 	7,  // 4: answersheet.LookupAnswerSheetSubmissionRequest.answers:type_name -> answersheet.SubmissionIntentAnswer
 	0,  // 5: answersheet.GetAnswerSheetResponse.answer_sheet:type_name -> answersheet.AnswerSheet
 	1,  // 6: answersheet.ListAnswerSheetsResponse.answer_sheets:type_name -> answersheet.AnswerSheetSummary
-	3,  // 7: answersheet.AnswerSheetService.SaveAnswerSheet:input_type -> answersheet.SaveAnswerSheetRequest
-	6,  // 8: answersheet.AnswerSheetService.LookupAnswerSheetSubmission:input_type -> answersheet.LookupAnswerSheetSubmissionRequest
-	9,  // 9: answersheet.AnswerSheetService.GetAnswerSheet:input_type -> answersheet.GetAnswerSheetRequest
-	11, // 10: answersheet.AnswerSheetService.ListAnswerSheets:input_type -> answersheet.ListAnswerSheetsRequest
-	5,  // 11: answersheet.AnswerSheetService.SaveAnswerSheet:output_type -> answersheet.SaveAnswerSheetResponse
-	8,  // 12: answersheet.AnswerSheetService.LookupAnswerSheetSubmission:output_type -> answersheet.LookupAnswerSheetSubmissionResponse
-	10, // 13: answersheet.AnswerSheetService.GetAnswerSheet:output_type -> answersheet.GetAnswerSheetResponse
-	12, // 14: answersheet.AnswerSheetService.ListAnswerSheets:output_type -> answersheet.ListAnswerSheetsResponse
-	11, // [11:15] is the sub-list for method output_type
-	7,  // [7:11] is the sub-list for method input_type
-	7,  // [7:7] is the sub-list for extension type_name
-	7,  // [7:7] is the sub-list for extension extendee
-	0,  // [0:7] is the sub-list for field type_name
+	4,  // 7: answersheet.StartAnsweringRequest.origin_ref:type_name -> answersheet.OriginRef
+	13, // 8: answersheet.AnswerSheetService.StartAnswering:input_type -> answersheet.StartAnsweringRequest
+	3,  // 9: answersheet.AnswerSheetService.SaveAnswerSheet:input_type -> answersheet.SaveAnswerSheetRequest
+	6,  // 10: answersheet.AnswerSheetService.LookupAnswerSheetSubmission:input_type -> answersheet.LookupAnswerSheetSubmissionRequest
+	9,  // 11: answersheet.AnswerSheetService.GetAnswerSheet:input_type -> answersheet.GetAnswerSheetRequest
+	11, // 12: answersheet.AnswerSheetService.ListAnswerSheets:input_type -> answersheet.ListAnswerSheetsRequest
+	14, // 13: answersheet.AnswerSheetService.StartAnswering:output_type -> answersheet.StartAnsweringResponse
+	5,  // 14: answersheet.AnswerSheetService.SaveAnswerSheet:output_type -> answersheet.SaveAnswerSheetResponse
+	8,  // 15: answersheet.AnswerSheetService.LookupAnswerSheetSubmission:output_type -> answersheet.LookupAnswerSheetSubmissionResponse
+	10, // 16: answersheet.AnswerSheetService.GetAnswerSheet:output_type -> answersheet.GetAnswerSheetResponse
+	12, // 17: answersheet.AnswerSheetService.ListAnswerSheets:output_type -> answersheet.ListAnswerSheetsResponse
+	13, // [13:18] is the sub-list for method output_type
+	8,  // [8:13] is the sub-list for method input_type
+	8,  // [8:8] is the sub-list for extension type_name
+	8,  // [8:8] is the sub-list for extension extendee
+	0,  // [0:8] is the sub-list for field type_name
 }
 
 func init() { file_answersheet_answersheet_proto_init() }
@@ -1192,7 +1403,7 @@ func file_answersheet_answersheet_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_answersheet_answersheet_proto_rawDesc), len(file_answersheet_answersheet_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   13,
+			NumMessages:   15,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

@@ -2,6 +2,7 @@ package answersheet
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"go.mongodb.org/mongo-driver/bson"
@@ -77,6 +78,8 @@ func (r *Repository) Update(ctx context.Context, sheet *answersheet.AnswerSheet)
 
 	// 移除 _id 字段，避免更新主键
 	delete(updateData, "_id")
+	// A score or ordinary update cannot change acceptance-time start evidence.
+	delete(updateData, "start_context")
 
 	// 使用 $set 操作符包装更新数据
 	update := bson.M{"$set": updateData}
@@ -121,7 +124,11 @@ func (r *Repository) FindByID(ctx context.Context, id meta.ID) (*answersheet.Ans
 		return nil, err
 	}
 
-	return r.mapper.ToBO(&po), nil
+	sheet := r.mapper.ToBO(&po)
+	if sheet == nil {
+		return nil, fmt.Errorf("corrupt persisted answersheet %d", domainID)
+	}
+	return sheet, nil
 }
 
 // Delete 删除答卷（软删除）

@@ -20,6 +20,7 @@ func (m *AssessmentMapper) ToPO(domain *assessment.Assessment) *AssessmentPO {
 	}
 
 	po := &AssessmentPO{
+		ConductingContext:    encodeConductingContext(domain.ConductingContext()),
 		OrgID:                int64(domain.OrgID()),
 		TesteeID:             domain.TesteeID().Uint64(),
 		QuestionnaireCode:    domain.QuestionnaireRef().Code().String(),
@@ -136,6 +137,11 @@ func (m *AssessmentMapper) ToDomain(po *AssessmentPO) *assessment.Assessment {
 		po.FailureReason,
 		modelRef,
 	)
+	context, err := decodeConductingContext(po.ConductingContext)
+	if err != nil {
+		return nil
+	}
+	assessment.WithConductingContext(context)(a)
 	return a
 }
 

@@ -2,6 +2,8 @@ package acl
 
 import (
 	"context"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	"strconv"
 
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/answersheet"
@@ -74,6 +76,7 @@ func toGRPCSaveAnswerSheetInput(input *answersheet.SaveAnswerSheetInput) *grpcbr
 		QuestionnaireCode:    input.QuestionnaireCode,
 		QuestionnaireVersion: input.QuestionnaireVersion,
 		IdempotencyKey:       input.IdempotencyKey,
+		AnsweringStartID:     input.AnsweringStartID,
 		Title:                input.Title,
 		WriterID:             input.WriterID,
 		TesteeID:             input.TesteeID,
@@ -95,6 +98,7 @@ func (r *AnswerSheetDurableResultReader) LookupAcceptedSubmission(
 		QuestionnaireCode:    input.QuestionnaireCode,
 		QuestionnaireVersion: input.QuestionnaireVersion,
 		IdempotencyKey:       input.IdempotencyKey,
+		AnsweringStartID:     input.AnsweringStartID,
 		WriterID:             input.WriterID,
 		TesteeID:             input.TesteeID,
 		TaskID:               input.TaskID,
@@ -157,4 +161,25 @@ func toAnswerSheetResponse(result *grpcbridge.AnswerSheetOutput) *answersheet.An
 		CreatedAt:            result.CreatedAt,
 		UpdatedAt:            result.UpdatedAt,
 	}
+}
+
+func (w *AnswerSheetBFFWriter) StartAnswering(ctx context.Context, input *answersheet.StartAnsweringInput) (*answersheet.StartAnsweringOutput, error) {
+	downstream, ok := w.inner.(interface {
+		StartAnswering(context.Context, *grpcbridge.StartAnsweringInput) (*grpcbridge.StartAnsweringOutput, error)
+	})
+	if !ok {
+		return nil, status.Error(codes.Unavailable, "answering start unavailable")
+	}
+	req := &grpcbridge.StartAnsweringInput{RequestKey: input.Request.RequestKey, WriterID: input.UserID, TesteeID: input.TesteeID, OrgID: input.OrgID, QuestionnaireCode: input.Request.QuestionnaireCode, QuestionnaireVersion: input.Request.QuestionnaireVersion, ModelCode: input.Request.ModelCode, ModelVersion: input.Request.ModelVersion}
+	if input.Request.OriginRef != nil {
+		req.OriginRef = &grpcbridge.OriginRef{Type: input.Request.OriginRef.Type, ID: input.Request.OriginRef.ID}
+	}
+	result, err := downstream.StartAnswering(ctx, req)
+	if err != nil {
+		return nil, err
+	}
+	if result == nil || result.ID == 0 {
+		return nil, status.Error(codes.Unavailable, "answering start returned no record")
+	}
+	return &answersheet.StartAnsweringOutput{ID: strconv.FormatUint(result.ID, 10), Created: result.Created, StartedAt: result.StartedAt}, nil
 }

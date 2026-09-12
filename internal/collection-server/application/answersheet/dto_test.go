@@ -1,6 +1,9 @@
 package answersheet
 
-import "testing"
+import (
+	"encoding/json"
+	"testing"
+)
 
 func TestSubmitAnswerSheetRequestUnmarshalJSONAcceptsNumericTesteeID(t *testing.T) {
 	var req SubmitAnswerSheetRequest
@@ -32,5 +35,27 @@ func TestSubmitAnswerSheetRequestUnmarshalJSONRejectsFractionalTesteeID(t *testi
 
 	if err := req.UnmarshalJSON(payload); err == nil {
 		t.Fatal("expected fractional testee_id to be rejected")
+	}
+}
+
+func TestSubmitStartReferenceCompatibility(t *testing.T) {
+	for _, value := range []string{"null", `""`, `"99"`, "99"} {
+		var req SubmitAnswerSheetRequest
+		if err := json.Unmarshal([]byte(`{"testee_id":"7","answering_start_id":`+value+`}`), &req); err != nil {
+			t.Fatalf("%s: %v", value, err)
+		}
+		if (value == `"99"` || value == "99") && req.AnsweringStartID != 99 {
+			t.Fatal("start reference dropped")
+		}
+	}
+	for _, value := range []string{`"0"`, "0", "-1", `"missing"`, "{}", "[]", "true", `"9223372036854775808"`} {
+		var req SubmitAnswerSheetRequest
+		if err := json.Unmarshal([]byte(`{"testee_id":"7","answering_start_id":`+value+`}`), &req); err == nil {
+			t.Fatalf("invalid reference %s silently accepted", value)
+		}
+	}
+	var req SubmitAnswerSheetRequest
+	if err := json.Unmarshal([]byte(`{"testee_id":"7"}`), &req); err != nil || req.AnsweringStartID != 0 {
+		t.Fatal("legacy missing start rejected")
 	}
 }

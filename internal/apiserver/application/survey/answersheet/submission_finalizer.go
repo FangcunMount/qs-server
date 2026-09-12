@@ -37,6 +37,10 @@ func (s *submissionService) createAndSaveAnswerSheet(
 			"model_version", admission.ModelVersion(),
 		)
 	}
+	dto.startContext, err = s.resolveStart(ctx, dto, admission)
+	if err != nil {
+		return nil, err
+	}
 	if existing, err := s.findExistingSubmissionBeforeAttribution(ctx, dto, qnr, answers, admission, filledAt); err != nil || existing != nil {
 		return existing, err
 	}
@@ -142,6 +146,7 @@ func createAnswerSheet(
 	if err != nil {
 		return nil, errors.WrapC(err, errorCode.ErrAnswerSheetInvalid, "创建答卷提交上下文失败")
 	}
+	submissionContext = submissionContext.WithStartContext(dto.startContext)
 	l.Debugw("开始创建答卷领域对象", "questionnaire_code", dto.QuestionnaireCode, "filler_id", dto.FillerID, "answer_count", len(answers))
 	sheet, err := answersheet.Submit(answersheet.NewID(), questionnaireRef, submissionContext, answers, filledAt)
 	if err != nil {

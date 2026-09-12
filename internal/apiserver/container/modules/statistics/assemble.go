@@ -54,6 +54,7 @@ func New(deps Deps) (*Module, error) {
 		statisticsInfra.NewAccessFactCollector(deps.MySQLDB),
 		statisticsInfra.NewAssessmentFactCollector(deps.MySQLDB, deps.MongoDB),
 		statisticsInfra.NewPlanFactCollector(deps.MySQLDB),
+		statisticsInfra.NewStoreActivityCollector(deps.MySQLDB, deps.MongoDB),
 	)
 	if err != nil {
 		return nil, err

@@ -62,6 +62,7 @@ func (m *AnswerSheetMapper) ToPO(bo *answersheet.AnswerSheet) *AnswerSheetPO {
 		TaskID:               submissionContext.TaskID(),
 		Admission:            admissionToPO(submissionContext.Admission()),
 		Attribution:          attributionToPO(submissionContext.Attribution()),
+		StartContext:         startContextToPO(submissionContext.StartContext()),
 		TotalScore:           bo.Score(),
 		FilledAt:             bo.FilledAt(),
 		Answers:              answers,
@@ -133,6 +134,13 @@ func (m *AnswerSheetMapper) ToBO(po *AnswerSheetPO) *answersheet.AnswerSheet {
 		)
 	}
 
+	if po.StartContext != nil {
+		value, err := answersheet.RestoreStartContext(po.StartContext.ID, po.StartContext.StartedAt, po.StartContext.ConductingStoreID, po.StartContext.OwnershipVersion, po.StartContext.Version)
+		if err != nil {
+			return nil
+		}
+		submissionContext = submissionContext.WithStartContext(value)
+	}
 	// 使用 Reconstruct 重建答卷对象
 	return answersheet.ReconstructWithSubmissionContext(
 		po.DomainID,
@@ -243,4 +251,11 @@ func admissionFromPO(po *AdmissionPO) answersheet.Admission {
 	default:
 		return answersheet.Admission{}
 	}
+}
+
+func startContextToPO(value answersheet.StartContext) *StartContextPO {
+	if value.IsZero() {
+		return nil
+	}
+	return &StartContextPO{ID: value.ID(), StartedAt: value.StartedAt(), ConductingStoreID: value.StoreID(), OwnershipVersion: value.OwnershipVersion(), Version: value.Version()}
 }

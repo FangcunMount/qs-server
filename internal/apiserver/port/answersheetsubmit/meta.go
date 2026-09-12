@@ -32,6 +32,7 @@ type CompletedSubmission struct {
 // submission fingerprint. Derived IDs, timestamps, titles and scores are
 // deliberately excluded.
 type SubmissionIntent struct {
+	AnsweringStartID     uint64
 	WriterID             int64
 	TesteeID             uint64
 	OrgID                uint64
@@ -59,6 +60,7 @@ func Fingerprint(sheet *domainanswersheet.AnswerSheet) (string, error) {
 	code, version, _ := sheet.QuestionnaireInfo()
 	attribution := ctx.Attribution()
 	intent := SubmissionIntent{
+		AnsweringStartID:     ctx.StartContext().ID(),
 		WriterID:             ctx.Filler().UserID(),
 		TesteeID:             ctx.TesteeID().Uint64(),
 		OrgID:                ctx.OrgID().Uint64(),
@@ -97,6 +99,8 @@ func FingerprintIntent(intent SubmissionIntent) (string, error) {
 		QuestionnaireCode    string            `json:"questionnaire_code"`
 		QuestionnaireVersion string            `json:"questionnaire_version"`
 		Answers              []canonicalAnswer `json:"answers"`
+		EncodingVersion      uint32            `json:"encoding_version,omitempty"`
+		AnsweringStartID     uint64            `json:"answering_start_id,omitempty"`
 	}
 	answers := make([]canonicalAnswer, 0, len(intent.Answers))
 	for _, answer := range intent.Answers {
@@ -119,7 +123,14 @@ func FingerprintIntent(intent SubmissionIntent) (string, error) {
 		}
 		return answers[i].Value < answers[j].Value
 	})
+	// Omitted fields keep the historical canonical bytes exactly unchanged.
+	var encodingVersion uint32
+	if intent.AnsweringStartID != 0 {
+		encodingVersion = 2
+	}
 	payload, err := json.Marshal(canonicalSubmission{
+		EncodingVersion:      encodingVersion,
+		AnsweringStartID:     intent.AnsweringStartID,
 		WriterID:             intent.WriterID,
 		TesteeID:             intent.TesteeID,
 		OrgID:                intent.OrgID,

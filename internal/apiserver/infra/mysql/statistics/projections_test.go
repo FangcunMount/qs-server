@@ -14,7 +14,7 @@ import (
 func TestProjectionRegistriesSeparateWindowRepairFromGlobalPublication(t *testing.T) {
 	daily := NewDailyProjections(nil)
 	global := NewGlobalProjections(nil)
-	if got := projectionNames(daily); !reflect.DeepEqual(got, []string{"access_daily", "assessment_daily", "plan_activity_daily"}) {
+	if got := projectionNames(daily); !reflect.DeepEqual(got, []string{"access_daily", "assessment_daily", "plan_activity_daily", "store_activity_daily"}) {
 		t.Fatalf("daily=%v", got)
 	}
 	if got := projectionNames(global); !reflect.DeepEqual(got, []string{"plan_fulfillment", "organization_snapshot"}) {

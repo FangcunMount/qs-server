@@ -37,6 +37,7 @@ func (c *SubmissionCommitter) Save(
 		QuestionnaireCode:    req.QuestionnaireCode,
 		QuestionnaireVersion: req.QuestionnaireVersion,
 		IdempotencyKey:       req.IdempotencyKey,
+		AnsweringStartID:     req.AnsweringStartID,
 		Title:                req.Title,
 		WriterID:             writerID,
 		TesteeID:             testeeID,

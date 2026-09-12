@@ -17,7 +17,7 @@ qs-server 在 apiserver 启动阶段按配置执行 MySQL 与 MongoDB 向上迁�
 - MySQL：`NewMigrator(db, config)`；
 - MongoDB：`NewMongoMigrator(client, config)`；
 - dirty 状态会阻断继续迁移；
-- 当前目录末端版本为 MySQL `79`、MongoDB `33`。生产实际版本以数据库只读查询和[当前版本定档验收台账](../../../docs/00-总览/09-当前版本定档验收台账.md)为准；仓库目录版本不能单独证明生产已执行到该版本。
+- 当前目录末端版本为 MySQL `82`、MongoDB `34`。生产实际版本以数据库只读查询和[当前版本定档验收台账](../../../docs/00-总览/09-当前版本定档验收台账.md)为准；仓库目录版本不能单独证明生产已执行到该版本。
 
 ## 目录与职责
 
@@ -218,3 +218,12 @@ Apply 另需 `OPERATOR_RECOVERY_FINGERPRINT` 与 `OPERATOR_RECOVERY_MAINTENANCE=
 对于任何公司都没有 Operator 记录、但仍有后台授权的用户，使用 `operator-retire orphan-preflight|orphan-apply|orphan-verify`。输入改为 `OrgID`、`ActorID`、`UserID`、`RequestID`、`Reason`，文件须为私有权限；公司用于校验总部操作人，目标用户必须在所有公司都没有 Operator，包括软删除历史。工具仅允许已确认的运营员、结果评估员和计划管理员标准角色，保留 `user` 自服务角色；发现其他权限或人员关联即停止。
 
 孤立授权的 Apply 同样要求真实写入暂停和预演指纹。指纹包含完整角色事实及策略版本，后续重新赋权不能重放旧计划。工具通过 IAM 正常管理接口撤权，不制造 Operator 或退出任务。报告保留撤销前角色及提交的策略版本；`already_unprivileged` 仅说明当前没有后台角色，不能当作历史执行归属或业务验收证明。失败、响应不确定或后续事实变化时，先用只读命令核对，不自动重新授权。
+
+
+### Statistics 开展门店升级（未发布）
+
+MySQL 80 保存 Survey 不可变开始记录，81 为 Assessment 增加开展上下文，82 增加开展事实与日投影。MongoDB 34 对非空开始引用建立部分唯一索引。现有答卷不补写历史门店；旧客户端缺少开始引用时保持旧受理语义，并在统计中进入 `legacy_start_not_captured` 未知桶。
+
+必须先升级全部 QS Writer 和 Worker，再发布采集端；新开始事实启用后只能回退到保留新字段的兼容版本。80/81 有业务事实时禁止直接向下清理。统计投影失败可停止新视图发布，不影响答卷受理。
+
+运营统计使用 `qs:statistics:collection:operations read`；使用 IAM `statistics-operations preflight/apply --report <受限路径>` 独立配置，在维护窗口携带预演指纹和管理操作人执行。该工具不新增 Assignment，也不扩大 Scope。按现有 Statistics repair/validate/publish 流程补建查询窗口；旧发布批次未包含新投影时接口返回未就绪，不返回伪零。

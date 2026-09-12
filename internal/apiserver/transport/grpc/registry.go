@@ -2,6 +2,7 @@ package grpc
 
 import (
 	"context"
+	startApp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/answeringstart"
 
 	bridge "github.com/FangcunMount/qs-server/internal/apiserver/application/aibridge"
 
@@ -63,6 +64,8 @@ type SurveyScaleQRCodeGenerator interface {
 }
 
 type SurveyDeps struct {
+	SubmissionReader             assessmentintakejourney.SubmissionReader
+	AnsweringStartService        *startApp.Service
 	AnswerSheetSubmissionService answerSheetApp.AnswerSheetSubmissionService
 	AnswerSheetManagementService answerSheetApp.AnswerSheetManagementService
 	AnswerSheetScoringService    answerSheetApp.AnswerSheetScoringService
@@ -171,7 +174,7 @@ func (r *Registry) registerAnswerSheetService() error {
 		return nil
 	}
 
-	answerSheetService := service.NewAnswerSheetService(r.deps.Survey.AnswerSheetSubmissionService)
+	answerSheetService := service.NewAnswerSheetService(r.deps.Survey.AnswerSheetSubmissionService, r.deps.Survey.AnsweringStartService)
 	r.server.RegisterService(answerSheetService)
 	log.Info("   📋 AnswerSheet service registered")
 	return nil
@@ -230,6 +233,7 @@ func (r *Registry) registerEvaluationService() error {
 		r.deps.Plan.CommandService,
 		r.deps.Evaluation.IntakeService,
 		r.deps.Interpretation.ReportStatusReporter,
+		r.deps.Survey.SubmissionReader,
 	)
 	r.server.RegisterService(service.NewTesteeEvaluationService(r.deps.Evaluation.TesteeService))
 	r.server.RegisterService(service.NewParticipantReportService(r.deps.Interpretation.ParticipantService, r.deps.Interpretation.DelegatedSubjectVerifier))

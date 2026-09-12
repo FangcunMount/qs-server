@@ -20,6 +20,7 @@ type BootstrapInput struct {
 	MySQLDB             *gorm.DB
 	EventPublisher      event.EventPublisher
 	IdentityService     *iam.IdentityService
+	ProfileLinkService  *iam.ProfileLinkService
 	HotsetRecorder      cachetarget.HotsetRecorder
 	QuestionnaireRepo   questionnaire.Repository
 	QuestionnaireReader surveyreadmodel.QuestionnaireReader

@@ -79,3 +79,30 @@ func newMapperSubmittedSheet(t *testing.T) *domainAnswerSheet.AnswerSheet {
 	}
 	return sheet
 }
+
+func TestStartContextPersistenceAndCorruption(t *testing.T) {
+	mapper := NewAnswerSheetMapper()
+	po := mapper.ToPO(newMapperSubmittedSheet(t))
+	if po.StartContext != nil || mapper.ToBO(po).SubmissionContext().StartContext().State() != domainAnswerSheet.StartLegacy {
+		t.Fatal("legacy changed")
+	}
+	store := uint64(7)
+	po.StartContext = &StartContextPO{ID: 99, StartedAt: time.Now().UTC().Truncate(time.Millisecond), ConductingStoreID: &store, OwnershipVersion: 2, Version: 1}
+	bo := mapper.ToBO(po)
+	if bo == nil {
+		t.Fatal("valid context rejected")
+	}
+	back := mapper.ToPO(bo)
+	if back.StartContext.ID != 99 || *back.StartContext.ConductingStoreID != 7 || !back.StartContext.StartedAt.Equal(po.StartContext.StartedAt) {
+		t.Fatal("start evidence lost")
+	}
+	po.StartContext.Version = 42
+	if mapper.ToBO(po) != nil {
+		t.Fatal("corrupt context degraded to unknown")
+	}
+	po.StartContext.Version = 1
+	po.StartContext.ID = 0
+	if mapper.ToBO(po) != nil {
+		t.Fatal("invalid reference degraded to legacy")
+	}
+}

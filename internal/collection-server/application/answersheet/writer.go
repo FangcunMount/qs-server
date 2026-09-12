@@ -9,6 +9,7 @@ type AnswerSheetWriter interface {
 
 // SaveAnswerSheetInput 是 collection application 层的答卷保存输入。
 type SaveAnswerSheetInput struct {
+	AnsweringStartID     uint64
 	QuestionnaireCode    string
 	QuestionnaireVersion string
 	IdempotencyKey       string

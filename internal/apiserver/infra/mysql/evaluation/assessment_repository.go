@@ -2,6 +2,7 @@ package evaluation
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
@@ -59,7 +60,11 @@ func (r *assessmentRepository) FindByID(ctx context.Context, id assessment.ID) (
 		return nil, err
 	}
 
-	return r.mapper.ToDomain(po), nil
+	a := r.mapper.ToDomain(po)
+	if a == nil {
+		return nil, fmt.Errorf("corrupt assessment persistence")
+	}
+	return a, nil
 }
 
 // Delete 删除测评
@@ -83,7 +88,11 @@ func (r *assessmentRepository) FindByAnswerSheetID(ctx context.Context, answerSh
 		return nil, err
 	}
 
-	return r.mapper.ToDomain(&po), nil
+	a := r.mapper.ToDomain(&po)
+	if a == nil {
+		return nil, fmt.Errorf("corrupt assessment persistence")
+	}
+	return a, nil
 }
 
 // ==================== 辅助方法 ====================

@@ -25,6 +25,8 @@ func (r *Router) registerStatisticsProtectedRoutes(apiV2 *gin.RouterGroup) {
 		return
 	}
 	statistics := apiV2.Group("/statistics")
+	statistics.GET("/operations/overview", r.rateLimitedHandlers(rateLimitBudgetQuery, h.OperationsOverview)...)
+	statistics.GET("/operations/stores", r.rateLimitedHandlers(rateLimitBudgetQuery, h.OperationsStores)...)
 	admin := statistics.Group("", restmiddleware.RequireCapabilityMiddleware(restmiddleware.CapabilityOrgAdmin))
 	admin.GET("/overview", r.rateLimitedHandlers(rateLimitBudgetQuery, h.Overview)...)
 	admin.GET("/clinicians", r.rateLimitedHandlers(rateLimitBudgetQuery, h.Clinicians)...)

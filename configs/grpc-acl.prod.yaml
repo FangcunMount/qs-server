@@ -11,6 +11,7 @@ services:
     enabled: true
     description: collection-server BFF least-privilege apiserver RPC surface
     allowed_methods:
+      - /answersheet.AnswerSheetService/StartAnswering
       - /answersheet.AnswerSheetService/SaveAnswerSheet
       - /answersheet.AnswerSheetService/LookupAnswerSheetSubmission
       - /answersheet.AnswerSheetService/GetAnswerSheet

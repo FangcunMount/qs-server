@@ -13,6 +13,7 @@ import (
 // collection-server when calling qs-apiserver.
 func ACLAllowedMethods() []string {
 	return []string{
+		answersheetpb.AnswerSheetService_StartAnswering_FullMethodName,
 		answersheetpb.AnswerSheetService_SaveAnswerSheet_FullMethodName,
 		answersheetpb.AnswerSheetService_LookupAnswerSheetSubmission_FullMethodName,
 		answersheetpb.AnswerSheetService_GetAnswerSheet_FullMethodName,

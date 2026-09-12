@@ -23,6 +23,7 @@ func InstallFrom(host InstallHost) error {
 		MySQLDB:             host.MySQLDB(),
 		EventPublisher:      host.EventPublisher(),
 		IdentityService:     host.IdentityService(),
+		ProfileLinkService:  host.ActorIAMPorts().ProfileLinkService,
 		HotsetRecorder:      host.HotsetRecorder(),
 		CacheSignalNotifier: host.CacheSignalNotifier(),
 		SurveyRuntimeInfra:  infra,

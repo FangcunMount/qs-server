@@ -84,12 +84,12 @@
   "machine_contracts": {
     "migrations": {
       "mysql": {
-        "max_version": 79,
-        "version_count": 79
+        "max_version": 82,
+        "version_count": 82
       },
       "mongodb": {
-        "max_version": 33,
-        "version_count": 33
+        "max_version": 34,
+        "version_count": 34
       }
     },
     "events": {
@@ -133,7 +133,7 @@
       "source": "api/grpc/proto",
       "proto_file_count": 8,
       "service_count": 17,
-      "rpc_count": 64,
+      "rpc_count": 65,
       "services": {
         "actor.ActorService": [
           "CreateTestee",
@@ -145,6 +145,7 @@
           "GetTesteeCareContext"
         ],
         "answersheet.AnswerSheetService": [
+          "StartAnswering",
           "SaveAnswerSheet",
           "LookupAnswerSheetSubmission",
           "GetAnswerSheet",
@@ -198,6 +199,9 @@
           "ExecuteAIExplanation",
           "ExecutePromptEvaluationStep"
         ],
+        "interpretation.AIWorkflowAccessService": [
+          "Authorize"
+        ],
         "interpretation.InterpretationAutomationService": [
           "GenerateReportFromOutcome",
           "GenerateReportFromAssessment"
@@ -218,20 +222,17 @@
           "Start",
           "Change"
         ],
+        "qsai.workflow.v1.EvaluationManagement": [
+          "Start",
+          "Get",
+          "ResolveUnknown"
+        ],
         "qsai.workflow.v1.Results": [
           "Accept"
         ],
         "questionnaire.QuestionnaireService": [
           "GetQuestionnaire",
           "ListQuestionnaires"
-        ],
-        "interpretation.AIWorkflowAccessService": [
-          "Authorize"
-        ],
-        "qsai.workflow.v1.EvaluationManagement": [
-          "Start",
-          "Get",
-          "ResolveUnknown"
         ]
       }
     }

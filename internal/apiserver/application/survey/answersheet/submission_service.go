@@ -25,6 +25,7 @@ type submissionService struct {
 	questionnaireRepo questionnaire.Repository
 	binding           rulesetport.AssessmentBindingResolver
 	attribution       attributionport.Resolver
+	startResolver     AnsweringStartResolver
 }
 
 func (s *submissionService) SetAttributionResolver(resolver attributionport.Resolver) {

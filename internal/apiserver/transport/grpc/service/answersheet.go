@@ -1,6 +1,14 @@
 package service
 
 import (
+	"errors"
+	startApp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/answeringstart"
+	startDomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/answeringstart"
+	sheetDomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/answersheet"
+	startPort "github.com/FangcunMount/qs-server/internal/apiserver/port/answeringstart"
+	"math"
+	"time"
+
 	"context"
 	"fmt"
 	"regexp"
@@ -23,16 +31,20 @@ var safeAnswerSheetIdempotencyKey = regexp.MustCompile(`^[A-Za-z0-9._:-]{8,128}$
 // 提供答卷的提交、查询功能：提交答卷、查看我的答卷列表、查看我的答卷详情
 type AnswerSheetService struct {
 	pb.UnimplementedAnswerSheetServiceServer
+	starts            *startApp.Service
 	submissionService answersheet.AnswerSheetSubmissionService
 }
 
 // NewAnswerSheetService 创建答卷 gRPC 服务
 func NewAnswerSheetService(
 	submissionService answersheet.AnswerSheetSubmissionService,
+	starts ...*startApp.Service,
 ) *AnswerSheetService {
-	return &AnswerSheetService{
-		submissionService: submissionService,
+	result := &AnswerSheetService{submissionService: submissionService}
+	if len(starts) > 0 {
+		result.starts = starts[0]
 	}
+	return result
 }
 
 // RegisterService 注册 gRPC 服务
@@ -83,6 +95,7 @@ func (s *AnswerSheetService) SaveAnswerSheet(ctx context.Context, req *pb.SaveAn
 		return nil, err
 	}
 	dto := answersheet.SubmitAnswerSheetDTO{
+		AnsweringStartID:  req.AnsweringStartId,
 		QuestionnaireCode: req.QuestionnaireCode,
 		QuestionnaireVer:  questionnaireVer,
 		IdempotencyKey:    req.IdempotencyKey,
@@ -150,6 +163,7 @@ func (s *AnswerSheetService) LookupAnswerSheetSubmission(
 		})
 	}
 	dto := answersheet.LookupSubmissionDTO{
+		AnsweringStartID:  req.AnsweringStartId,
 		QuestionnaireCode: req.QuestionnaireCode,
 		QuestionnaireVer:  req.QuestionnaireVersion,
 		IdempotencyKey:    req.IdempotencyKey,
@@ -321,4 +335,36 @@ func toAnswerSheetGRPCError(err error) error {
 	default:
 		return status.Error(codes.Internal, err.Error())
 	}
+}
+
+func (s *AnswerSheetService) StartAnswering(ctx context.Context, req *pb.StartAnsweringRequest) (*pb.StartAnsweringResponse, error) {
+	if req == nil {
+		return nil, status.Error(codes.InvalidArgument, "start request required")
+	}
+	if s.starts == nil {
+		return nil, status.Error(codes.Unavailable, "answering start unavailable")
+	}
+	org, err := requestOrgIDUint64(ctx, req.OrgId)
+	if err != nil {
+		return nil, err
+	}
+	if org > math.MaxInt64 {
+		return nil, status.Error(codes.InvalidArgument, "invalid company")
+	}
+	origin := sheetDomain.OriginRef{Type: sheetDomain.OriginTypeSelfService}
+	if req.OriginRef != nil {
+		origin = sheetDomain.OriginRef{Type: sheetDomain.OriginType(req.OriginRef.Type), ID: req.OriginRef.Id}
+	}
+	intent := startDomain.Intent{OrgID: int64(org), UserID: req.WriterId, TesteeID: req.TesteeId, RequestKey: req.RequestKey, QuestionnaireCode: req.QuestionnaireCode, QuestionnaireVersion: req.QuestionnaireVersion, ModelCode: req.ModelCode, ModelVersion: req.ModelVersion, Origin: origin}
+	if err := intent.Validate(); err != nil {
+		return nil, status.Error(codes.InvalidArgument, err.Error())
+	}
+	result, err := s.starts.Start(ctx, intent)
+	if errors.Is(err, startPort.ErrConflict) {
+		return nil, status.Error(codes.AlreadyExists, "start request key reused with different input")
+	}
+	if err != nil {
+		return nil, toAnswerSheetGRPCError(err)
+	}
+	return &pb.StartAnsweringResponse{Id: result.Record.Context().ID(), Created: result.Created, StartedAt: result.Record.Context().StartedAt().Format(time.RFC3339Nano)}, nil
 }

@@ -19,6 +19,7 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
+	AnswerSheetService_StartAnswering_FullMethodName              = "/answersheet.AnswerSheetService/StartAnswering"
 	AnswerSheetService_SaveAnswerSheet_FullMethodName             = "/answersheet.AnswerSheetService/SaveAnswerSheet"
 	AnswerSheetService_LookupAnswerSheetSubmission_FullMethodName = "/answersheet.AnswerSheetService/LookupAnswerSheetSubmission"
 	AnswerSheetService_GetAnswerSheet_FullMethodName              = "/answersheet.AnswerSheetService/GetAnswerSheet"
@@ -31,6 +32,7 @@ const (
 //
 // 答卷服务 - 对外提供答卷管理功能
 type AnswerSheetServiceClient interface {
+	StartAnswering(ctx context.Context, in *StartAnsweringRequest, opts ...grpc.CallOption) (*StartAnsweringResponse, error)
 	// 保存答卷
 	SaveAnswerSheet(ctx context.Context, in *SaveAnswerSheetRequest, opts ...grpc.CallOption) (*SaveAnswerSheetResponse, error)
 	// 回读并校验已持久化的答卷提交意图
@@ -47,6 +49,16 @@ type answerSheetServiceClient struct {
 
 func NewAnswerSheetServiceClient(cc grpc.ClientConnInterface) AnswerSheetServiceClient {
 	return &answerSheetServiceClient{cc}
+}
+
+func (c *answerSheetServiceClient) StartAnswering(ctx context.Context, in *StartAnsweringRequest, opts ...grpc.CallOption) (*StartAnsweringResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(StartAnsweringResponse)
+	err := c.cc.Invoke(ctx, AnswerSheetService_StartAnswering_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
 }
 
 func (c *answerSheetServiceClient) SaveAnswerSheet(ctx context.Context, in *SaveAnswerSheetRequest, opts ...grpc.CallOption) (*SaveAnswerSheetResponse, error) {
@@ -95,6 +107,7 @@ func (c *answerSheetServiceClient) ListAnswerSheets(ctx context.Context, in *Lis
 //
 // 答卷服务 - 对外提供答卷管理功能
 type AnswerSheetServiceServer interface {
+	StartAnswering(context.Context, *StartAnsweringRequest) (*StartAnsweringResponse, error)
 	// 保存答卷
 	SaveAnswerSheet(context.Context, *SaveAnswerSheetRequest) (*SaveAnswerSheetResponse, error)
 	// 回读并校验已持久化的答卷提交意图
@@ -113,6 +126,9 @@ type AnswerSheetServiceServer interface {
 // pointer dereference when methods are called.
 type UnimplementedAnswerSheetServiceServer struct{}
 
+func (UnimplementedAnswerSheetServiceServer) StartAnswering(context.Context, *StartAnsweringRequest) (*StartAnsweringResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method StartAnswering not implemented")
+}
 func (UnimplementedAnswerSheetServiceServer) SaveAnswerSheet(context.Context, *SaveAnswerSheetRequest) (*SaveAnswerSheetResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method SaveAnswerSheet not implemented")
 }
@@ -144,6 +160,24 @@ func RegisterAnswerSheetServiceServer(s grpc.ServiceRegistrar, srv AnswerSheetSe
 		t.testEmbeddedByValue()
 	}
 	s.RegisterService(&AnswerSheetService_ServiceDesc, srv)
+}
+
+func _AnswerSheetService_StartAnswering_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(StartAnsweringRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AnswerSheetServiceServer).StartAnswering(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AnswerSheetService_StartAnswering_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AnswerSheetServiceServer).StartAnswering(ctx, req.(*StartAnsweringRequest))
+	}
+	return interceptor(ctx, in, info, handler)
 }
 
 func _AnswerSheetService_SaveAnswerSheet_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
@@ -225,6 +259,10 @@ var AnswerSheetService_ServiceDesc = grpc.ServiceDesc{
 	ServiceName: "answersheet.AnswerSheetService",
 	HandlerType: (*AnswerSheetServiceServer)(nil),
 	Methods: []grpc.MethodDesc{
+		{
+			MethodName: "StartAnswering",
+			Handler:    _AnswerSheetService_StartAnswering_Handler,
+		},
 		{
 			MethodName: "SaveAnswerSheet",
 			Handler:    _AnswerSheetService_SaveAnswerSheet_Handler,

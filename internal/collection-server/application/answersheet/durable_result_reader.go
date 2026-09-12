@@ -7,6 +7,7 @@ type DurableSubmitResultReader interface {
 }
 
 type LookupAcceptedSubmissionInput struct {
+	AnsweringStartID     uint64
 	QuestionnaireCode    string
 	QuestionnaireVersion string
 	IdempotencyKey       string

@@ -23,6 +23,7 @@ type AnswerSheetPO struct {
 	TaskID               string                 `bson:"task_id,omitempty" json:"task_id,omitempty"`
 	Admission            *AdmissionPO           `bson:"admission,omitempty" json:"admission,omitempty"`
 	Attribution          *AttributionSnapshotPO `bson:"attribution,omitempty" json:"attribution,omitempty"`
+	StartContext         *StartContextPO        `bson:"start_context,omitempty" json:"start_context,omitempty"`
 	SubmitMeta           *SubmitMetaPO          `bson:"submit_meta,omitempty" json:"submit_meta,omitempty"`
 	DurableAcceptance    *DurableAcceptancePO   `bson:"durable_acceptance,omitempty" json:"durable_acceptance,omitempty"`
 	TotalScore           float64                `bson:"total_score" json:"total_score"`
@@ -198,4 +199,13 @@ type AnswerSheetSummaryPO struct {
 	TotalScore         float64    `bson:"total_score"`
 	AnswerCount        int        `bson:"answer_count"` // 由聚合管道计算
 	FilledAt           *time.Time `bson:"filled_at"`
+}
+
+// StartContextPO is immutable; an absent document denotes a legacy submission.
+type StartContextPO struct {
+	ID                uint64    `bson:"id" json:"id"`
+	StartedAt         time.Time `bson:"started_at" json:"started_at"`
+	ConductingStoreID *uint64   `bson:"conducting_store_id" json:"conducting_store_id"`
+	OwnershipVersion  uint32    `bson:"ownership_version" json:"ownership_version"`
+	Version           uint32    `bson:"version" json:"version"`
 }

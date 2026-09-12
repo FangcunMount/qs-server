@@ -97,6 +97,98 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/v1/answering-starts": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "答卷"
+                ],
+                "summary": "开始作答",
+                "parameters": [
+                    {
+                        "description": "开始作答",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/github_com_FangcunMount_qs-server_internal_collection-server_application_answersheet.StartAnsweringRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/answersheet.StartAnsweringOutput"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/answersheet.StartAnsweringOutput"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "503": {
+                        "description": "Service Unavailable",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/answersheets": {
             "post": {
                 "security": [
@@ -3468,6 +3560,17 @@ const docTemplate = `{
                 }
             }
         },
+        "answersheet.StartAnsweringOutput": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "string"
+                },
+                "started_at": {
+                    "type": "string"
+                }
+            }
+        },
         "answersheet.SubmitAcceptedResponse": {
             "type": "object",
             "properties": {
@@ -3492,6 +3595,9 @@ const docTemplate = `{
                 "testee_id"
             ],
             "properties": {
+                "answering_start_id": {
+                    "type": "string"
+                },
                 "answers": {
                     "type": "array",
                     "items": {
@@ -4376,6 +4482,38 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "type": {
+                    "type": "string"
+                }
+            }
+        },
+        "github_com_FangcunMount_qs-server_internal_collection-server_application_answersheet.StartAnsweringRequest": {
+            "type": "object",
+            "required": [
+                "questionnaire_code",
+                "questionnaire_version",
+                "request_key",
+                "testee_id"
+            ],
+            "properties": {
+                "model_code": {
+                    "type": "string"
+                },
+                "model_version": {
+                    "type": "string"
+                },
+                "origin_ref": {
+                    "$ref": "#/definitions/github_com_FangcunMount_qs-server_internal_collection-server_application_answersheet.OriginRef"
+                },
+                "questionnaire_code": {
+                    "type": "string"
+                },
+                "questionnaire_version": {
+                    "type": "string"
+                },
+                "request_key": {
+                    "type": "string"
+                },
+                "testee_id": {
                     "type": "string"
                 }
             }

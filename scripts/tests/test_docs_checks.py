@@ -27,7 +27,7 @@ class DocsFactsHelpersTest(unittest.TestCase):
         services, proto_file_count = check_docs_facts.grpc_inventory()
         self.assertEqual(proto_file_count, 8)
         self.assertEqual(len(services), 17)
-        self.assertEqual(sum(len(rpcs) for rpcs in services.values()), 64)
+        self.assertEqual(sum(len(rpcs) for rpcs in services.values()), 65)
         self.assertIn("GenerateReportFromAssessment", services["interpretation.InterpretationAutomationService"])
         self.assertIn("ExecutePromptEvaluationStep", services["interpretation.AIExplanationAutomationService"])
         self.assertIn("SyncAssessmentAttention", services["internalapi.InternalService"])
@@ -38,8 +38,8 @@ class DocsFactsHelpersTest(unittest.TestCase):
     def test_migration_inventory_is_paired_and_current(self) -> None:
         inventory, issues = check_docs_facts.migration_inventory()
         self.assertEqual(issues, [])
-        self.assertEqual(inventory["mysql"], {"max_version": 79, "version_count": 79})
-        self.assertEqual(inventory["mongodb"], {"max_version": 33, "version_count": 33})
+        self.assertEqual(inventory["mysql"], {"max_version": 82, "version_count": 82})
+        self.assertEqual(inventory["mongodb"], {"max_version": 34, "version_count": 34})
 
     def test_ledger_metadata_uses_named_fields(self) -> None:
         text = (

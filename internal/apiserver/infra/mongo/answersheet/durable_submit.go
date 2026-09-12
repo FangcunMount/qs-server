@@ -4,6 +4,7 @@ import (
 	"context"
 	stderrors "errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/FangcunMount/component-base/pkg/event"
@@ -26,6 +27,13 @@ func (r *Repository) ensureIndexes(ctx context.Context) error {
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 
+	if _, err := r.Collection().Indexes().CreateOne(ctx, mongo.IndexModel{
+		Keys: bson.D{{Key: "start_context.id", Value: 1}},
+		Options: options.Index().SetName("uk_answersheet_answering_start").SetUnique(true).
+			SetPartialFilterExpression(bson.M{"start_context.id": bson.M{"$gt": 0}}),
+	}); err != nil {
+		return fmt.Errorf("create answering start uniqueness index: %w", err)
+	}
 	if _, err := r.Collection().Indexes().CreateOne(ctx, mongo.IndexModel{
 		Keys: bson.D{{Key: "submit_meta.writer_id", Value: 1}, {Key: "submit_meta.idempotency_key", Value: 1}},
 		Options: options.Index().SetName("uk_answersheet_submit_intent").SetUnique(true).
@@ -107,6 +115,11 @@ func (r *Repository) SaveSubmittedAnswerSheet(ctx context.Context, sheet *domain
 	}
 
 	if _, err := r.InsertOne(ctx, answerSheetDoc); err != nil {
+		if mongo.IsDuplicateKeyError(err) && strings.Contains(err.Error(), "uk_answersheet_answering_start") {
+			// The application still performs its normal post-transaction
+			// recovery for the original submission key before returning 409.
+			return nil, submitport.ErrIdempotencyConflict
+		}
 		return nil, err
 	}
 

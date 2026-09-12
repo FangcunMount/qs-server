@@ -8,6 +8,8 @@ func (m *Module) ExportGRPCDeps() grpctransport.SurveyDeps {
 	if m == nil {
 		return deps
 	}
+	deps.AnsweringStartService = m.AnsweringStart
+	deps.SubmissionReader = m.submissionReader
 	if m.AnswerSheet != nil {
 		deps.AnswerSheetSubmissionService = m.AnswerSheet.SubmissionService
 		deps.AnswerSheetManagementService = m.AnswerSheet.ManagementService

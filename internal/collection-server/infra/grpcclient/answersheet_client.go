@@ -10,6 +10,7 @@ import (
 
 // SaveAnswerSheetInput 保存答卷输入
 type SaveAnswerSheetInput struct {
+	AnsweringStartID     uint64
 	QuestionnaireCode    string
 	QuestionnaireVersion string
 	IdempotencyKey       string
@@ -42,6 +43,7 @@ type SaveAnswerSheetOutput struct {
 }
 
 type LookupAnswerSheetSubmissionInput struct {
+	AnsweringStartID     uint64
 	QuestionnaireCode    string
 	QuestionnaireVersion string
 	IdempotencyKey       string
@@ -117,6 +119,7 @@ func (c *AnswerSheetClient) SaveAnswerSheet(ctx context.Context, input *SaveAnsw
 		QuestionnaireCode:    input.QuestionnaireCode,
 		QuestionnaireVersion: input.QuestionnaireVersion,
 		IdempotencyKey:       input.IdempotencyKey,
+		AnsweringStartId:     input.AnsweringStartID,
 		Title:                input.Title,
 		WriterId:             input.WriterID,
 		TesteeId:             input.TesteeID,
@@ -156,6 +159,7 @@ func (c *AnswerSheetClient) LookupAnswerSheetSubmission(
 	req := &pb.LookupAnswerSheetSubmissionRequest{
 		WriterId:             input.WriterID,
 		IdempotencyKey:       input.IdempotencyKey,
+		AnsweringStartId:     input.AnsweringStartID,
 		QuestionnaireCode:    input.QuestionnaireCode,
 		QuestionnaireVersion: input.QuestionnaireVersion,
 		TesteeId:             input.TesteeID,
@@ -224,4 +228,30 @@ func (c *AnswerSheetClient) ListAnswerSheets(ctx context.Context, req *pb.ListAn
 	defer cancel()
 
 	return c.grpcClient.ListAnswerSheets(ctx, req)
+}
+
+type StartAnsweringInput struct {
+	RequestKey                                                       string
+	WriterID, TesteeID, OrgID                                        uint64
+	QuestionnaireCode, QuestionnaireVersion, ModelCode, ModelVersion string
+	OriginRef                                                        *OriginRef
+}
+type StartAnsweringOutput struct {
+	ID        uint64
+	Created   bool
+	StartedAt string
+}
+
+func (c *AnswerSheetClient) StartAnswering(ctx context.Context, input *StartAnsweringInput) (*StartAnsweringOutput, error) {
+	req := &pb.StartAnsweringRequest{RequestKey: input.RequestKey, WriterId: input.WriterID, TesteeId: input.TesteeID, OrgId: input.OrgID, QuestionnaireCode: input.QuestionnaireCode, QuestionnaireVersion: input.QuestionnaireVersion, ModelCode: input.ModelCode, ModelVersion: input.ModelVersion}
+	if input.OriginRef != nil {
+		req.OriginRef = &pb.OriginRef{Type: input.OriginRef.Type, Id: input.OriginRef.ID}
+	}
+	ctx, cancel := c.client.ContextWithTimeout(ctx)
+	defer cancel()
+	result, err := c.grpcClient.StartAnswering(ctx, req)
+	if err != nil {
+		return nil, err
+	}
+	return &StartAnsweringOutput{ID: result.Id, Created: result.Created, StartedAt: result.StartedAt}, nil
 }

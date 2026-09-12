@@ -1,22 +1,27 @@
 package answersheet
 
-import "time"
+import (
+	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/answersheet"
+	"time"
+)
 
 // ============= DTO 定义 =============
 // DTOs 用于应用服务层的输入参数
 
 // SubmitAnswerSheetDTO 提交答卷 DTO
 type SubmitAnswerSheetDTO struct {
-	QuestionnaireCode string        // 问卷编码
-	QuestionnaireVer  string        // 问卷版本（如 "1.0.1"，空字符串表示使用最新版本）
-	IdempotencyKey    string        // 业务幂等键（可选）
-	RequestID         string        // 一次入口请求的观测关联 ID，不参与业务幂等
-	TesteeID          uint64        // 受试者ID（传递给测评层）
-	OrgID             uint64        // 组织ID（传递给测评层）
-	FillerID          uint64        // 填写人ID
-	TaskID            string        // 计划任务ID（可选）
-	OriginRef         *OriginRefDTO // 受理来源（可选；旧 task_id 过渡期会映射为 plan_task）
-	Answers           []AnswerDTO   // 答案列表
+	AnsweringStartID  uint64              // 可选开始记录；零值仅兼容旧客户端
+	startContext      domain.StartContext // 仅共享提交服务从持久开始记录解析
+	QuestionnaireCode string              // 问卷编码
+	QuestionnaireVer  string              // 问卷版本（如 "1.0.1"，空字符串表示使用最新版本）
+	IdempotencyKey    string              // 业务幂等键（可选）
+	RequestID         string              // 一次入口请求的观测关联 ID，不参与业务幂等
+	TesteeID          uint64              // 受试者ID（传递给测评层）
+	OrgID             uint64              // 组织ID（传递给测评层）
+	FillerID          uint64              // 填写人ID
+	TaskID            string              // 计划任务ID（可选）
+	OriginRef         *OriginRefDTO       // 受理来源（可选；旧 task_id 过渡期会映射为 plan_task）
+	Answers           []AnswerDTO         // 答案列表
 }
 
 type OriginRefDTO struct {
@@ -35,6 +40,7 @@ type AnswerDTO struct {
 // durable submission intent. OrgID is deliberately absent: a replay compares
 // against the organization captured by the already accepted AnswerSheet.
 type LookupSubmissionDTO struct {
+	AnsweringStartID  uint64
 	QuestionnaireCode string
 	QuestionnaireVer  string
 	IdempotencyKey    string

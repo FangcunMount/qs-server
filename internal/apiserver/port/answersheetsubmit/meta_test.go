@@ -141,3 +141,29 @@ func fingerprintTestSheet(t *testing.T, id uint64, codes, values []string) *doma
 	}
 	return sheet
 }
+
+func TestFingerprintIncludesStartOnlyForNewEncoding(t *testing.T) {
+	base := SubmissionIntent{WriterID: 11, TesteeID: 22, OrgID: 33, QuestionnaireCode: "Q", QuestionnaireVersion: "1"}
+	legacy, err := FingerprintIntent(base)
+	if err != nil {
+		t.Fatal(err)
+	}
+	base.AnsweringStartID = 99
+	first, err := FingerprintIntent(base)
+	if err != nil {
+		t.Fatal(err)
+	}
+	base.AnsweringStartID = 100
+	second, err := FingerprintIntent(base)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if legacy == first || first == second {
+		t.Fatal("start is missing from versioned fingerprint")
+	}
+	base.AnsweringStartID = 0
+	restored, _ := FingerprintIntent(base)
+	if restored != legacy {
+		t.Fatal("legacy fingerprint changed")
+	}
+}

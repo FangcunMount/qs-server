@@ -104,6 +104,80 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/core.ErrResponse'
+  /api/v1/answering-starts:
+    post:
+      tags:
+      - 答卷
+      summary: 开始作答
+      security:
+      - BearerAuth: []
+      operationId: 开始作答
+      description: 开始作答
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/github_com_FangcunMount_qs-server_internal_collection-server_application_answersheet.StartAnsweringRequest'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/core.Response'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/answersheet.StartAnsweringOutput'
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/core.Response'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/answersheet.StartAnsweringOutput'
+        '400':
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '409':
+          description: Conflict
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '503':
+          description: Service Unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '401':
+          description: 认证失败或访问令牌无效
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '500':
+          description: 服务内部错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
   /api/v1/answersheets:
     post:
       tags:
@@ -3013,6 +3087,13 @@ components:
           type: integer
         status:
           type: string
+    answersheet.StartAnsweringOutput:
+      type: object
+      properties:
+        id:
+          type: string
+        started_at:
+          type: string
     answersheet.SubmitAcceptedResponse:
       type: object
       properties:
@@ -3031,6 +3112,8 @@ components:
       - questionnaire_version
       - testee_id
       properties:
+        answering_start_id:
+          type: string
         answers:
           type: array
           items:
@@ -3625,6 +3708,28 @@ components:
         id:
           type: string
         type:
+          type: string
+    github_com_FangcunMount_qs-server_internal_collection-server_application_answersheet.StartAnsweringRequest:
+      type: object
+      required:
+      - questionnaire_code
+      - questionnaire_version
+      - request_key
+      - testee_id
+      properties:
+        model_code:
+          type: string
+        model_version:
+          type: string
+        origin_ref:
+          $ref: '#/components/schemas/github_com_FangcunMount_qs-server_internal_collection-server_application_answersheet.OriginRef'
+        questionnaire_code:
+          type: string
+        questionnaire_version:
+          type: string
+        request_key:
+          type: string
+        testee_id:
           type: string
     github_com_FangcunMount_qs-server_internal_collection-server_application_questionnaire.ListQuestionnairesResponse:
       type: object

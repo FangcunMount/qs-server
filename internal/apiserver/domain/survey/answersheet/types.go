@@ -69,12 +69,13 @@ func (r QuestionnaireRef) IsEmpty() bool {
 
 // SubmissionContext 描述一次答卷提交的业务上下文。
 type SubmissionContext struct {
-	filler      *actor.FillerRef
-	testee      *actor.TesteeRef
-	orgID       meta.ID
-	taskID      string
-	admission   Admission
-	attribution AttributionSnapshot
+	filler       *actor.FillerRef
+	testee       *actor.TesteeRef
+	orgID        meta.ID
+	taskID       string
+	admission    Admission
+	attribution  AttributionSnapshot
+	startContext StartContext
 }
 
 func NewSubmissionContextWithAttribution(filler *actor.FillerRef, testee *actor.TesteeRef, orgID meta.ID, taskID string, attribution AttributionSnapshot, admission ...Admission) (SubmissionContext, error) {
@@ -182,12 +183,13 @@ func (c SubmissionContext) Attribution() AttributionSnapshot { return c.attribut
 
 func (c SubmissionContext) clone() SubmissionContext {
 	return SubmissionContext{
-		filler:      cloneFillerRef(c.filler),
-		testee:      cloneTesteeRef(c.testee),
-		orgID:       c.orgID,
-		taskID:      c.taskID,
-		admission:   c.admission,
-		attribution: c.attribution,
+		filler:       cloneFillerRef(c.filler),
+		testee:       cloneTesteeRef(c.testee),
+		orgID:        c.orgID,
+		taskID:       c.taskID,
+		admission:    c.admission,
+		attribution:  c.attribution,
+		startContext: c.startContext,
 	}
 }
 
@@ -207,4 +209,14 @@ func cloneTesteeRef(testee *actor.TesteeRef) *actor.TesteeRef {
 		return actor.NewTesteeRefWithProfile(testee.TesteeID(), *profileID)
 	}
 	return actor.NewTesteeRef(testee.TesteeID())
+}
+
+// StartContext 返回实际开始时冻结的开展归属，与提交时来源独立。
+func (c SubmissionContext) StartContext() StartContext { return c.startContext }
+
+// WithStartContext 创建包含开始事实的副本，不修改已经创建的答卷。
+func (c SubmissionContext) WithStartContext(start StartContext) SubmissionContext {
+	result := c.clone()
+	result.startContext = start
+	return result
 }

@@ -17,6 +17,7 @@ import (
 // 3. 记录评估结果摘要（总分、风险等级等兼容字段）
 // 4. 发布 Evaluation 领域事件（requested、outcome committed、failed）
 type Assessment struct {
+	conductingContext ConductingContext
 	// === 核心标识 ===
 	id    ID
 	orgID int64

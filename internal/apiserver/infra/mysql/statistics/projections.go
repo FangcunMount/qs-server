@@ -60,7 +60,7 @@ func calculateFulfillmentContract(tasks []fulfillmentContractTask, cutoff time.T
 
 func NewDailyProjections(db *gorm.DB) []statisticsDomain.Projection {
 	return []statisticsDomain.Projection{
-		&AccessDailyProjection{db}, &AssessmentDailyProjection{db}, &PlanActivityProjection{db},
+		&AccessDailyProjection{db}, &AssessmentDailyProjection{db}, &PlanActivityProjection{db}, &StoreActivityDailyProjection{db},
 	}
 }
 

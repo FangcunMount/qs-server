@@ -12,6 +12,7 @@ import (
 
 // AssessmentPO 测评持久化对象
 type AssessmentPO struct {
+	ConductingContext *string `gorm:"column:conducting_context;type:json;->;<-:create"`
 	mysql.AuditFields
 
 	// 组织信息

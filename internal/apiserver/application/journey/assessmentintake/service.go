@@ -4,6 +4,7 @@ package assessmentintake
 
 import (
 	"context"
+	domainassessment "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	"time"
 
 	"github.com/FangcunMount/component-base/pkg/errors"
@@ -74,7 +75,11 @@ type Service interface {
 }
 
 // service 评估入库服务实现
+type SubmissionReader interface {
+	FindByID(context.Context, meta.ID) (*domainanswersheet.AnswerSheet, error)
+}
 type service struct {
+	submissions  SubmissionReader
 	scoring      answersheetapp.AnswerSheetScoringService
 	binding      rulesetport.AssessmentBindingResolver
 	plans        planapp.TaskAssessmentResolver
@@ -84,8 +89,12 @@ type service struct {
 }
 
 // NewService 创建评估入库服务
-func NewService(scoring answersheetapp.AnswerSheetScoringService, binding rulesetport.AssessmentBindingResolver, plans planapp.TaskAssessmentResolver, planCommands planapp.PlanCommandService, intake evaluationintake.Service, reportStatus *reportstatus.Reporter) Service {
-	return &service{scoring: scoring, binding: binding, plans: plans, planCommands: planCommands, intake: intake, reportStatus: reportStatus}
+func NewService(scoring answersheetapp.AnswerSheetScoringService, binding rulesetport.AssessmentBindingResolver, plans planapp.TaskAssessmentResolver, planCommands planapp.PlanCommandService, intake evaluationintake.Service, reportStatus *reportstatus.Reporter, readers ...SubmissionReader) Service {
+	s := &service{scoring: scoring, binding: binding, plans: plans, planCommands: planCommands, intake: intake, reportStatus: reportStatus}
+	if len(readers) > 0 {
+		s.submissions = readers[0]
+	}
+	return s
 }
 
 // Ensure 确保评估入库
@@ -108,6 +117,10 @@ func (s *service) Ensure(ctx context.Context, command Command) (*Result, error) 
 	if s.intake == nil {
 		return nil, errors.WithCode(code.ErrModuleInitializationFailed, "evaluation intake is not configured")
 	}
+	conducting, err := s.loadConductingContext(ctx, command)
+	if err != nil {
+		return nil, err
+	}
 	if s.scoring != nil {
 		if err := s.scoring.CalculateAndSave(ctx, command.AnswerSheetID); err != nil {
 			return nil, err
@@ -120,7 +133,7 @@ func (s *service) Ensure(ctx context.Context, command Command) (*Result, error) 
 	}
 
 	// 创建评估入库命令
-	dto := evaluationintake.CreateCommand{OrgID: command.OrgID, TesteeID: command.TesteeID, QuestionnaireCode: command.QuestionnaireCode, QuestionnaireVersion: command.QuestionnaireVersion, AnswerSheetID: command.AnswerSheetID, OriginType: command.OriginType}
+	dto := evaluationintake.CreateCommand{ConductingContext: conducting, OrgID: command.OrgID, TesteeID: command.TesteeID, QuestionnaireCode: command.QuestionnaireCode, QuestionnaireVersion: command.QuestionnaireVersion, AnswerSheetID: command.AnswerSheetID, OriginType: command.OriginType}
 	if dto.OriginType == "" {
 		dto.OriginType = "adhoc"
 	}
@@ -163,6 +176,9 @@ func (s *service) Ensure(ctx context.Context, command Command) (*Result, error) 
 	existing, findErr := s.intake.FindByAnswerSheetID(ctx, command.AnswerSheetID)
 	switch {
 	case findErr == nil && existing != nil:
+		if !existing.ConductingContext.Equal(conducting) {
+			return nil, errors.WithCode(code.ErrConflict, "测评与答卷的开展上下文不一致")
+		}
 		observeAssessmentIntakeLookup(intakeLookupFound)
 		autoSubmitted, submitErr := s.submitPendingBoundAssessment(ctx, command, existing, bound)
 		if submitErr != nil {
@@ -222,6 +238,9 @@ func (s *service) Ensure(ctx context.Context, command Command) (*Result, error) 
 			existing, findErr := s.intake.FindByAnswerSheetID(ctx, command.AnswerSheetID)
 			switch {
 			case findErr == nil && existing != nil:
+				if !existing.ConductingContext.Equal(conducting) {
+					return nil, errors.WithCode(code.ErrConflict, "测评与答卷的开展上下文不一致")
+				}
 				observeAssessmentIntakeLookup(intakeLookupDuplicateHit)
 				autoSubmitted, submitErr := s.submitPendingBoundAssessment(ctx, command, existing, bound)
 				if submitErr != nil {
@@ -437,4 +456,27 @@ func (s *service) completePlan(ctx context.Context, orgID uint64, task *planapp.
 		"error", err.Error(),
 	)
 	return nil
+}
+
+func (s *service) loadConductingContext(ctx context.Context, command Command) (domainassessment.ConductingContext, error) {
+	if s.submissions == nil {
+		return domainassessment.ConductingContext{}, errors.WithCode(code.ErrDatabase, "持久答卷读取器不可用")
+	}
+	persisted, err := s.submissions.FindByID(ctx, meta.FromUint64(command.AnswerSheetID))
+	if err != nil {
+		return domainassessment.ConductingContext{}, err
+	}
+	if persisted == nil {
+		return domainassessment.ConductingContext{}, errors.WithCode(code.ErrDatabase, "答卷开始事实不可读取")
+	}
+	context := persisted.SubmissionContext()
+	q, v, _ := persisted.QuestionnaireInfo()
+	if q != command.QuestionnaireCode || v != command.QuestionnaireVersion || (!context.OrgID().IsZero() && context.OrgID().Uint64() != command.OrgID) || (!context.TesteeID().IsZero() && context.TesteeID().Uint64() != command.TesteeID) || (context.Filler() != nil && context.Filler().UserID() != int64(command.FillerID)) {
+		return domainassessment.ConductingContext{}, errors.WithCode(code.ErrConflict, "入库消息与持久答卷不一致")
+	}
+	start := context.StartContext()
+	if start.IsZero() {
+		return domainassessment.ConductingContext{}, nil
+	}
+	return domainassessment.NewConductingContext(start.ID(), start.StartedAt(), start.StoreID(), start.OwnershipVersion(), start.Version())
 }

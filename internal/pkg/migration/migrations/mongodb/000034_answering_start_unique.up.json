@@ -1,0 +1,19 @@
+[
+  {
+    "createIndexes": "answersheets",
+    "indexes": [
+      {
+        "key": {
+          "start_context.id": 1
+        },
+        "name": "uk_answersheet_answering_start",
+        "unique": true,
+        "partialFilterExpression": {
+          "start_context.id": {
+            "$gt": 0
+          }
+        }
+      }
+    ]
+  }
+]

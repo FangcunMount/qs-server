@@ -32,6 +32,7 @@ func normalizeModelValidationMode(mode ModelValidationMode) (ModelValidationMode
 }
 
 type CreateCommand struct {
+	ConductingContext                                                            domainassessment.ConductingContext
 	OrgID, TesteeID, AnswerSheetID                                               uint64
 	QuestionnaireCode, QuestionnaireVersion                                      string
 	ModelKind, ModelSubKind, ModelAlgorithm, ModelCode, ModelVersion, ModelTitle *string
@@ -40,6 +41,7 @@ type CreateCommand struct {
 	OriginID                                                                     *string
 }
 type Assessment struct {
+	ConductingContext                                           domainassessment.ConductingContext
 	ID, OrgID, TesteeID, AnswerSheetID                          uint64
 	QuestionnaireCode, QuestionnaireVersion, OriginType, Status string
 	OriginID                                                    *string
@@ -107,7 +109,7 @@ func (s *service) CreateForAnswerSheet(ctx context.Context, command CreateComman
 			return nil, evalerrors.AssessmentCreateFailed(err, "创建测评失败")
 		}
 	}
-	assessmentOptions := make([]domainassessment.AssessmentOption, 0, 2)
+	assessmentOptions := []domainassessment.AssessmentOption{domainassessment.WithConductingContext(command.ConductingContext)}
 	assessmentOptions = append(assessmentOptions, domainassessment.WithCreatedAt(time.Now()))
 	if req.ModelRef != nil {
 		assessmentOptions = append(assessmentOptions, domainassessment.WithEvaluationModel(*req.ModelRef))
@@ -155,5 +157,5 @@ func resultFromDomain(a *domainassessment.Assessment) (*Assessment, error) {
 		return nil, evalerrors.DatabaseMessage("机构ID超出 uint64 范围")
 	}
 	q := a.QuestionnaireRef()
-	return &Assessment{ID: a.ID().Uint64(), OrgID: org, TesteeID: a.TesteeID().Uint64(), QuestionnaireCode: q.Code().String(), QuestionnaireVersion: q.Version(), AnswerSheetID: a.AnswerSheetRef().ID().Uint64(), OriginType: a.OriginType().String(), OriginID: a.OriginID(), Status: a.Status().String(), SubmittedAt: a.SubmittedAt(), EvaluatedAt: a.EvaluatedAt(), FailedAt: a.FailedAt(), FailureReason: a.FailureReason()}, nil
+	return &Assessment{ConductingContext: a.ConductingContext(), ID: a.ID().Uint64(), OrgID: org, TesteeID: a.TesteeID().Uint64(), QuestionnaireCode: q.Code().String(), QuestionnaireVersion: q.Version(), AnswerSheetID: a.AnswerSheetRef().ID().Uint64(), OriginType: a.OriginType().String(), OriginID: a.OriginID(), Status: a.Status().String(), SubmittedAt: a.SubmittedAt(), EvaluatedAt: a.EvaluatedAt(), FailedAt: a.FailedAt(), FailureReason: a.FailureReason()}, nil
 }

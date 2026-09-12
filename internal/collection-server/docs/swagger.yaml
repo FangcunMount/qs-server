@@ -259,6 +259,13 @@ definitions:
       status:
         type: string
     type: object
+  answersheet.StartAnsweringOutput:
+    properties:
+      id:
+        type: string
+      started_at:
+        type: string
+    type: object
   answersheet.SubmitAcceptedResponse:
     properties:
       answersheet_id:
@@ -270,6 +277,8 @@ definitions:
     type: object
   answersheet.SubmitAnswerSheetRequest:
     properties:
+      answering_start_id:
+        type: string
       answers:
         items:
           $ref: '#/definitions/github_com_FangcunMount_qs-server_internal_collection-server_application_answersheet.Answer'
@@ -870,6 +879,28 @@ definitions:
         type: string
     required:
     - type
+    type: object
+  github_com_FangcunMount_qs-server_internal_collection-server_application_answersheet.StartAnsweringRequest:
+    properties:
+      model_code:
+        type: string
+      model_version:
+        type: string
+      origin_ref:
+        $ref: '#/definitions/github_com_FangcunMount_qs-server_internal_collection-server_application_answersheet.OriginRef'
+      questionnaire_code:
+        type: string
+      questionnaire_version:
+        type: string
+      request_key:
+        type: string
+      testee_id:
+        type: string
+    required:
+    - questionnaire_code
+    - questionnaire_version
+    - request_key
+    - testee_id
     type: object
   github_com_FangcunMount_qs-server_internal_collection-server_application_questionnaire.ListQuestionnairesResponse:
     properties:
@@ -1930,6 +1961,59 @@ paths:
       summary: 导出本人 AI 解读数据
       tags:
       - AI解读
+  /api/v1/answering-starts:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: 开始作答
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/github_com_FangcunMount_qs-server_internal_collection-server_application_answersheet.StartAnsweringRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/answersheet.StartAnsweringOutput'
+              type: object
+        "201":
+          description: Created
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/answersheet.StartAnsweringOutput'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+      security:
+      - BearerAuth: []
+      summary: 开始作答
+      tags:
+      - 答卷
   /api/v1/answersheets:
     post:
       consumes:

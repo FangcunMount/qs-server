@@ -7450,6 +7450,126 @@
                 }
             }
         },
+        "/api/v2/statistics/operations/overview": {
+            "get": {
+                "tags": [
+                    "Statistics"
+                ],
+                "summary": "当前授权范围内运营统计",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "上海日期，包含",
+                        "name": "from",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "上海日期，不包含",
+                        "name": "to",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "门店字符串 ID，逗号分隔，必须为授权子集",
+                        "name": "store_ids",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/statistics.OperationsOverview"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "503": {
+                        "description": "Service Unavailable",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v2/statistics/operations/stores": {
+            "get": {
+                "tags": [
+                    "Statistics"
+                ],
+                "summary": "授权门店指标与对比",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "上海日期，包含",
+                        "name": "from",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "上海日期，不包含",
+                        "name": "to",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "门店字符串 ID，逗号分隔",
+                        "name": "store_ids",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/statistics.OperationsOverview"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "503": {
+                        "description": "Service Unavailable",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v2/statistics/overview": {
             "get": {
                 "tags": [
@@ -19562,6 +19682,31 @@
                 }
             }
         },
+        "statistics.ActivityCounts": {
+            "type": "object",
+            "properties": {
+                "completions": {
+                    "type": "integer"
+                },
+                "submissions": {
+                    "type": "integer"
+                }
+            }
+        },
+        "statistics.ActivityDay": {
+            "type": "object",
+            "properties": {
+                "completions": {
+                    "type": "integer"
+                },
+                "date": {
+                    "type": "string"
+                },
+                "submissions": {
+                    "type": "integer"
+                }
+            }
+        },
         "statistics.AssessmentServiceStatistics": {
             "type": "object",
             "properties": {
@@ -19822,6 +19967,90 @@
                     "type": "boolean"
                 },
                 "snapshot_at": {
+                    "type": "string"
+                }
+            }
+        },
+        "statistics.OperationStore": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "string"
+                },
+                "completions": {
+                    "type": "integer"
+                },
+                "current_service_count": {
+                    "type": "integer"
+                },
+                "id": {
+                    "type": "string",
+                    "example": "0"
+                },
+                "is_active": {
+                    "type": "boolean"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "submissions": {
+                    "type": "integer"
+                }
+            }
+        },
+        "statistics.OperationsOverview": {
+            "type": "object",
+            "properties": {
+                "completions": {
+                    "type": "integer"
+                },
+                "current_population_read_at": {
+                    "type": "string"
+                },
+                "current_service_count": {
+                    "type": "integer"
+                },
+                "daily": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/statistics.ActivityDay"
+                    }
+                },
+                "from": {
+                    "type": "string"
+                },
+                "published_at": {
+                    "type": "string"
+                },
+                "published_version": {
+                    "type": "string",
+                    "example": "0"
+                },
+                "scope": {
+                    "type": "string"
+                },
+                "stores": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/statistics.OperationStore"
+                    }
+                },
+                "submissions": {
+                    "type": "integer"
+                },
+                "to_exclusive": {
+                    "type": "string"
+                },
+                "unknown": {
+                    "$ref": "#/definitions/statistics.ActivityCounts"
+                },
+                "unknown_reasons": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "$ref": "#/definitions/statistics.ActivityCounts"
+                    }
+                },
+                "workload_through": {
                     "type": "string"
                 }
             }

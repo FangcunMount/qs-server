@@ -65,6 +65,9 @@ func openDurableSubmitMongo(t *testing.T) *mongo.Database {
 	t.Helper()
 	uri := os.Getenv("QS_SERVER_TEST_MONGO_URI")
 	if uri == "" {
+		if os.Getenv("STATISTICS_DATABASE_REQUIRED") == "1" {
+			t.Fatal("QS_SERVER_TEST_MONGO_URI required")
+		}
 		t.Skip("QS_SERVER_TEST_MONGO_URI is not set; reliable-submit Mongo replica-set integration test skipped")
 	}
 	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
@@ -78,6 +81,9 @@ func openDurableSubmitMongo(t *testing.T) *mongo.Database {
 		t.Fatalf("Mongo hello: %v", err)
 	}
 	if hello["setName"] == nil {
+		if os.Getenv("STATISTICS_DATABASE_REQUIRED") == "1" {
+			t.Fatal("Mongo replica set required")
+		}
 		_ = client.Disconnect(context.Background())
 		t.Skip("QS_SERVER_TEST_MONGO_URI does not point to a replica set")
 	}
@@ -255,7 +261,7 @@ func TestDurableSubmissionTransactionAgainstMongoReplicaSet(t *testing.T) {
 	assertMongoCount(t, ctx, db.Collection("answersheets"), bson.M{"domain_id": bson.M{"$in": []uint64{90010005, 90010006}}}, 1)
 }
 
-func newIntegrationSheet(t *testing.T, id uint64, value string) *domainanswersheet.AnswerSheet {
+func newIntegrationSheet(t *testing.T, id uint64, value string, starts ...domainanswersheet.StartContext) *domainanswersheet.AnswerSheet {
 	t.Helper()
 	ref, err := domainanswersheet.NewQuestionnaireRef("QNR-INTEGRATION", "1.0.0", "Integration")
 	if err != nil {
@@ -266,6 +272,9 @@ func newIntegrationSheet(t *testing.T, id uint64, value string) *domainanswershe
 	)
 	if err != nil {
 		t.Fatal(err)
+	}
+	if len(starts) > 0 {
+		submission = submission.WithStartContext(starts[0])
 	}
 	answer, err := domainanswersheet.NewAnswer(meta.NewCode("Q1"), domainquestionnaire.TypeText, domainanswersheet.NewStringValue(value), 0)
 	if err != nil {
@@ -286,5 +295,77 @@ func assertMongoCount(t *testing.T, ctx context.Context, coll *mongo.Collection,
 	}
 	if got != want {
 		t.Fatalf("count %s = %d, want %d", coll.Name(), got, want)
+	}
+}
+
+func TestAnsweringStartUniqueAndImmutableAgainstMongoReplicaSet(t *testing.T) {
+	db := openDurableSubmitMongo(t)
+	ctx := t.Context()
+	repo, err := mongoanswersheet.NewRepository(db)
+	if err != nil {
+		t.Fatal(err)
+	}
+	outbox := db.Collection("domain_event_outbox")
+	store := appanswersheet.NewTransactionalSubmissionDurableStore(mongoIntegrationRunner(db), repo, integrationOutboxStager{coll: outbox}, nil)
+	id := uint64(77)
+	start, err := domainanswersheet.NewStartContext(999, time.Now().UTC().Truncate(time.Millisecond), &id, 2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	first := newIntegrationSheet(t, 910001, "same", start)
+	fp, err := submitport.Fingerprint(first)
+	if err != nil {
+		t.Fatal(err)
+	}
+	metaInfo := appanswersheet.DurableSubmitMeta{WriterID: 301, IdempotencyKey: "start-submit-first", Fingerprint: fp}
+	_, _, err = store.CreateDurably(ctx, first, metaInfo)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// A second submission key cannot claim the same start; all writes roll back.
+	second := newIntegrationSheet(t, 910002, "same", start)
+	fp2, err := submitport.Fingerprint(second)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, _, err = store.CreateDurably(ctx, second, appanswersheet.DurableSubmitMeta{WriterID: 301, IdempotencyKey: "start-submit-second", Fingerprint: fp2})
+	if !errors.Is(err, submitport.ErrIdempotencyConflict) {
+		t.Fatalf("expected start conflict: %v", err)
+	}
+	assertMongoCount(t, ctx, db.Collection("answersheets"), bson.M{}, 1)
+	assertMongoCount(t, ctx, outbox, bson.M{}, 1)
+	restored, err := repo.FindByID(ctx, first.ID())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if *restored.SubmissionContext().StartContext().StoreID() != 77 {
+		t.Fatal("frozen context changed")
+	}
+	// A failed Outbox stage leaves the start free for a subsequent retry.
+	otherStart, err := domainanswersheet.NewStartContext(1000, time.Now().UTC().Truncate(time.Millisecond), &id, 2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	changed := domainanswersheet.ReconstructWithSubmissionContext(first.ID(), first.QuestionnaireRef(), first.SubmissionContext().WithStartContext(otherStart), first.Answers(), first.FilledAt(), first.Score())
+	if err = repo.Update(ctx, changed); err != nil {
+		t.Fatal(err)
+	}
+	restored, err = repo.FindByID(ctx, first.ID())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if restored.SubmissionContext().StartContext().ID() != start.ID() {
+		t.Fatal("ordinary update replaced immutable start")
+	}
+	other := newIntegrationSheet(t, 910003, "other", otherStart)
+	otherFP, _ := submitport.Fingerprint(other)
+	otherMeta := appanswersheet.DurableSubmitMeta{WriterID: 301, IdempotencyKey: "start-failed-outbox", Fingerprint: otherFP}
+	failing := appanswersheet.NewTransactionalSubmissionDurableStore(mongoIntegrationRunner(db), repo, integrationOutboxStager{coll: outbox, err: errors.New("outbox failure")}, nil)
+	if _, _, err = failing.CreateDurably(ctx, other, otherMeta); err == nil {
+		t.Fatal("expected rollback")
+	}
+	assertMongoCount(t, ctx, db.Collection("answersheets"), bson.M{}, 1)
+	if _, _, err = store.CreateDurably(ctx, other, otherMeta); err != nil {
+		t.Fatal(err)
 	}
 }

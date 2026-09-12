@@ -6078,6 +6078,22 @@ definitions:
       testee_created_count:
         type: integer
     type: object
+  statistics.ActivityCounts:
+    properties:
+      completions:
+        type: integer
+      submissions:
+        type: integer
+    type: object
+  statistics.ActivityDay:
+    properties:
+      completions:
+        type: integer
+      date:
+        type: string
+      submissions:
+        type: integer
+    type: object
   statistics.AssessmentServiceStatistics:
     properties:
       trend:
@@ -6248,6 +6264,62 @@ definitions:
       is_stale:
         type: boolean
       snapshot_at:
+        type: string
+    type: object
+  statistics.OperationStore:
+    properties:
+      code:
+        type: string
+      completions:
+        type: integer
+      current_service_count:
+        type: integer
+      id:
+        example: "0"
+        type: string
+      is_active:
+        type: boolean
+      name:
+        type: string
+      submissions:
+        type: integer
+    type: object
+  statistics.OperationsOverview:
+    properties:
+      completions:
+        type: integer
+      current_population_read_at:
+        type: string
+      current_service_count:
+        type: integer
+      daily:
+        items:
+          $ref: '#/definitions/statistics.ActivityDay'
+        type: array
+      from:
+        type: string
+      published_at:
+        type: string
+      published_version:
+        example: "0"
+        type: string
+      scope:
+        type: string
+      stores:
+        items:
+          $ref: '#/definitions/statistics.OperationStore'
+        type: array
+      submissions:
+        type: integer
+      to_exclusive:
+        type: string
+      unknown:
+        $ref: '#/definitions/statistics.ActivityCounts'
+      unknown_reasons:
+        additionalProperties:
+          $ref: '#/definitions/statistics.ActivityCounts'
+        type: object
+      workload_through:
         type: string
     type: object
   statistics.OrganizationOverview:
@@ -12131,6 +12203,78 @@ paths:
           schema:
             $ref: '#/definitions/core.ErrResponse'
       summary: 查询 Statistics 入口详情
+      tags:
+      - Statistics
+  /api/v2/statistics/operations/overview:
+    get:
+      parameters:
+      - description: 上海日期，包含
+        in: query
+        name: from
+        type: string
+      - description: 上海日期，不包含
+        in: query
+        name: to
+        type: string
+      - description: 门店字符串 ID，逗号分隔，必须为授权子集
+        in: query
+        name: store_ids
+        type: string
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/statistics.OperationsOverview'
+              type: object
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+      summary: 当前授权范围内运营统计
+      tags:
+      - Statistics
+  /api/v2/statistics/operations/stores:
+    get:
+      parameters:
+      - description: 上海日期，包含
+        in: query
+        name: from
+        type: string
+      - description: 上海日期，不包含
+        in: query
+        name: to
+        type: string
+      - description: 门店字符串 ID，逗号分隔
+        in: query
+        name: store_ids
+        type: string
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/statistics.OperationsOverview'
+              type: object
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+      summary: 授权门店指标与对比
       tags:
       - Statistics
   /api/v2/statistics/overview:

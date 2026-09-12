@@ -7,6 +7,7 @@ option go_package = "github.com/FangcunMount/qs-server/api/grpc/gen/answersheet"
 
 // 答卷服务 - 对外提供答卷管理功能
 service AnswerSheetService {
+  rpc StartAnswering(StartAnsweringRequest) returns (StartAnsweringResponse);
   // 保存答卷
   rpc SaveAnswerSheet(SaveAnswerSheetRequest) returns (SaveAnswerSheetResponse);
 
@@ -63,6 +64,7 @@ message Answer {
 
 // 保存答卷请求
 message SaveAnswerSheetRequest {
+  uint64 answering_start_id = 12; // Optional; zero preserves legacy submission semantics.
   reserved 11;
   reserved "historical_context";
   string questionnaire_code = 1;
@@ -98,6 +100,7 @@ message LookupAnswerSheetSubmissionRequest {
   string task_id = 6;
   OriginRef origin_ref = 7;
   repeated SubmissionIntentAnswer answers = 8;
+  uint64 answering_start_id = 9;
 }
 
 message SubmissionIntentAnswer {
@@ -136,4 +139,22 @@ message ListAnswerSheetsRequest {
 message ListAnswerSheetsResponse {
   repeated AnswerSheetSummary answer_sheets = 1;
   int64 total = 2;
+}
+
+// Trusted Collection identity; public HTTP does not accept org/user/store/time.
+message StartAnsweringRequest {
+ string request_key = 1;
+ uint64 writer_id = 2;
+ uint64 testee_id = 3;
+ uint64 org_id = 4;
+ string questionnaire_code = 5;
+ string questionnaire_version = 6;
+ string model_code = 7;
+ string model_version = 8;
+ OriginRef origin_ref = 9;
+}
+message StartAnsweringResponse {
+ uint64 id = 1;
+ bool created = 2;
+ string started_at = 3;
 }

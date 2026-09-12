@@ -1,0 +1,21 @@
+CREATE TABLE answering_start (
+ id BIGINT UNSIGNED NOT NULL,
+ org_id BIGINT NOT NULL,
+ started_by_user_id BIGINT UNSIGNED NOT NULL,
+ testee_id BIGINT UNSIGNED NOT NULL,
+ request_key VARCHAR(128) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+ request_hash CHAR(64) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+ questionnaire_code VARCHAR(128) NOT NULL,
+ questionnaire_version VARCHAR(128) NOT NULL,
+ model_code VARCHAR(128) NOT NULL DEFAULT '',
+ model_version VARCHAR(128) NOT NULL DEFAULT '',
+ origin_type VARCHAR(32) NOT NULL,
+ origin_id VARCHAR(128) NOT NULL DEFAULT '',
+ started_at DATETIME(6) NOT NULL,
+ conducting_store_id BIGINT UNSIGNED NULL,
+ ownership_version INT UNSIGNED NOT NULL,
+ contract_version INT UNSIGNED NOT NULL,
+ PRIMARY KEY(id),
+ UNIQUE KEY uk_answering_start_request(org_id,started_by_user_id,request_key),
+ KEY idx_answering_start_testee(org_id,testee_id,started_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

@@ -1,6 +1,10 @@
 package survey
 
 import (
+	startApp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/answeringstart"
+	ownerInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/actor/testeestore"
+	startInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/survey/answeringstart"
+
 	actoraccess "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/access"
 	actormysql "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/actor"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -29,9 +33,11 @@ import (
 
 // Module assembles survey application services.
 type Module struct {
-	Questionnaire *QuestionnaireSubModule
-	AnswerSheet   *AnswerSheetSubModule
-	bindingSyncer *catalogBindingSyncer
+	submissionReader AnswerSheetStore
+	AnsweringStart   *startApp.Service
+	Questionnaire    *QuestionnaireSubModule
+	AnswerSheet      *AnswerSheetSubModule
+	bindingSyncer    *catalogBindingSyncer
 
 	eventPublisher event.EventPublisher
 }
@@ -42,6 +48,7 @@ type Deps struct {
 	MySQLDB             *gorm.DB
 	EventPublisher      event.EventPublisher
 	IdentityService     *iam.IdentityService
+	ProfileLinkService  *iam.ProfileLinkService
 	HotsetRecorder      cachetarget.HotsetRecorder
 	QuestionnaireRepo   questionnaire.Repository
 	QuestionnaireReader surveyreadmodel.QuestionnaireReader
@@ -86,6 +93,7 @@ func New(deps Deps) (*Module, error) {
 		bindingSyncer: &catalogBindingSyncer{},
 	}
 
+	module.submissionReader = normalized.AnswerSheetRepo
 	module.eventPublisher = normalized.EventPublisher
 	if err := module.initQuestionnaireSubModule(
 		modtx.NewMongoRunner(normalized.MongoDB, modtx.MongoRunnerOptions{
@@ -115,6 +123,12 @@ func New(deps Deps) (*Module, error) {
 		return nil, err
 	}
 
+	if normalized.MySQLDB != nil {
+		submission := module.AnswerSheet.SubmissionService
+		content := submission.(startApp.ContentAdmission)
+		module.AnsweringStart = startApp.NewService(startInfra.NewRepository(normalized.MySQLDB), modtx.NewMySQLRunner(normalized.MySQLDB), ownerInfra.NewRepository(normalized.MySQLDB), startApp.NewParticipantAdmission(content, actormysql.NewTesteeRepository(normalized.MySQLDB), normalized.ProfileLinkService))
+		submission.(asApp.AnsweringStartResolverInjector).SetAnsweringStartResolver(module.AnsweringStart)
+	}
 	return module, nil
 }
 

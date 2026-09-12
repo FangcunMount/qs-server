@@ -305,7 +305,7 @@ func factColumnSignature(values map[string]any) (string, []string, error) {
 
 func isFactTable(table string) bool {
 	switch table {
-	case "statistics_access_fact", "statistics_assessment_fact", "statistics_plan_fact":
+	case "statistics_store_activity_fact", "statistics_access_fact", "statistics_assessment_fact", "statistics_plan_fact":
 		return true
 	default:
 		return false
