@@ -50,10 +50,11 @@ func isolatedMySQL(t *testing.T) *gorm.DB {
 }
 
 type factsFake struct {
-	facts   []authz.AssignmentRoleFact
-	version int64
-	writes  int
-	fail    bool
+	facts     []authz.AssignmentRoleFact
+	version   int64
+	writes    int
+	fail      bool
+	changedBy string
 }
 
 func (f *factsFake) LoadFresh(context.Context, string) (*authz.Snapshot, error) {
@@ -63,7 +64,8 @@ func (f *factsFake) LoadAssignmentFacts(context.Context, string) (*authz.Snapsho
 	return &authz.Snapshot{AssignmentFacts: append([]authz.AssignmentRoleFact{}, f.facts...), AssignmentFactsComplete: true, AuthzVersion: f.version}, nil
 }
 func (f *factsFake) IsEnabled() bool { return true }
-func (f *factsFake) ReplaceManagedOperatorRoles(context.Context, int64, int64, []string, string, string) (int64, error) {
+func (f *factsFake) ReplaceManagedOperatorRoles(_ context.Context, _, _ int64, _ []string, changedBy, _ string) (int64, error) {
+	f.changedBy = changedBy
 	if f.fail {
 		return 0, fmt.Errorf("injected IAM failure")
 	}

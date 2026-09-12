@@ -108,7 +108,7 @@ func (t *Tool) OrphanApply(ctx context.Context, cmd OrphanCommand, fingerprint s
 		if result.Fingerprint != fingerprint {
 			return fmt.Errorf("orphan facts changed; repeat preflight")
 		}
-		version, err := t.gateway.ReplaceManagedOperatorRoles(locked, cmd.OrgID, cmd.UserID, []string{}, strconv.FormatInt(cmd.ActorID, 10), cmd.RequestID+": "+cmd.Reason)
+		version, err := t.gateway.ReplaceManagedOperatorRoles(locked, cmd.OrgID, cmd.UserID, []string{}, authz.SubjectKey(strconv.FormatInt(cmd.ActorID, 10)), cmd.RequestID+": "+cmd.Reason)
 		if err != nil {
 			return err
 		}

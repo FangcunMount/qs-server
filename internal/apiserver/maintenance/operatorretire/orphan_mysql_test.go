@@ -45,6 +45,8 @@ func TestMySQLOrphanRevocationGuardsAndReplay(t *testing.T) {
 	done, err := tool.OrphanApply(ctx, cmd, plan.Fingerprint, true)
 	require.NoError(t, err)
 	require.Equal(t, "verified", done.State)
+	// IAM replacement admission requires the delegated actor as a subject reference.
+	require.Equal(t, "user:9", facts.changedBy)
 	require.Greater(t, done.SubmittedPolicyVersion, plan.PolicyVersion)
 	require.Equal(t, retained(saved), facts.facts)
 	replay, err := tool.OrphanApply(ctx, cmd, plan.Fingerprint, true)
