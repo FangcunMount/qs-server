@@ -44,7 +44,7 @@ func TestAnswerSheetFilterToBSONMapsTypedFilter(t *testing.T) {
 	}
 }
 
-func TestAnswerSheetListPipelinePreservesListQuerySemantics(t *testing.T) {
+func TestAnswerSheetListPipelineIntersectsOptionalFilters(t *testing.T) {
 	t.Parallel()
 
 	fillerID := uint64(1001)
@@ -61,8 +61,8 @@ func TestAnswerSheetListPipelinePreservesListQuerySemantics(t *testing.T) {
 	}
 
 	match := pipeline[0]["$match"]
-	if !reflect.DeepEqual(match, mapAsBSONM(map[string]any{"org_id": uint64(88), "filler_id": int64(1001), "deleted_at": nil})) {
-		t.Fatalf("match = %#v, want filler_id int64 query without questionnaire_code", match)
+	if !reflect.DeepEqual(match, mapAsBSONM(map[string]any{"org_id": uint64(88), "filler_id": int64(1001), "questionnaire_code": "Q_A", "deleted_at": nil})) {
+		t.Fatalf("match = %#v, want filler_id int64 and questionnaire_code intersection", match)
 	}
 	if !reflect.DeepEqual(pipeline[1]["$sort"], mapAsBSONM(map[string]any{"filled_at": -1})) {
 		t.Fatalf("sort = %#v, want filled_at desc", pipeline[1]["$sort"])
@@ -174,5 +174,20 @@ func TestAnswerSheetStoreScopeAppliesBeforePageAndCount(t *testing.T) {
 	filter := surveyreadmodel.AnswerSheetFilter{RestrictToStoreScope: true, StoreScopedTesteeIDs: []uint64{7}}
 	if !reflect.DeepEqual(answerSheetFilterToBSON(filter)["testee_id"], bson.M{"$in": []uint64{}}) {
 		t.Fatal("missing company accepted")
+	}
+}
+
+func TestScopedAnswerListWithoutQuestionnaireMatchesCount(t *testing.T) {
+	filter := surveyreadmodel.AnswerSheetFilter{OrgID: 1, RestrictToStoreScope: true, StoreScopedTesteeIDs: []uint64{401}}
+	pipeline, err := answerSheetListPipeline(filter, surveyreadmodel.PageRequest{Page: 1, PageSize: 100})
+	if err != nil {
+		t.Fatal(err)
+	}
+	match := pipeline[0]["$match"].(bson.M)
+	if _, exists := match["questionnaire_code"]; exists {
+		t.Fatal("empty questionnaire code excludes every real answer")
+	}
+	if !reflect.DeepEqual(match, answerSheetFilterToBSON(filter)) {
+		t.Fatal("list and count select different answers")
 	}
 }

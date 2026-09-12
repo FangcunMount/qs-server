@@ -57,21 +57,16 @@ func answerSheetListPipeline(filter surveyreadmodel.AnswerSheetFilter, page surv
 }
 
 func answerSheetListFilterToBSON(filter surveyreadmodel.AnswerSheetFilter) (bson.M, error) {
-	query := bson.M{
-		"org_id":             filter.OrgID,
-		"questionnaire_code": filter.QuestionnaireCode,
-		"deleted_at":         nil,
+	query := bson.M{"org_id": filter.OrgID, "deleted_at": nil}
+	if filter.QuestionnaireCode != "" {
+		query["questionnaire_code"] = filter.QuestionnaireCode
 	}
 	if filter.FillerID != nil && *filter.FillerID > 0 {
 		fillerID, err := safeconv.Uint64ToInt64(*filter.FillerID)
 		if err != nil {
 			return nil, err
 		}
-		query = bson.M{
-			"org_id":     filter.OrgID,
-			"filler_id":  fillerID,
-			"deleted_at": nil,
-		}
+		query["filler_id"] = fillerID
 	}
 	applyAnswerSheetStoreScope(query, filter)
 	return query, nil
