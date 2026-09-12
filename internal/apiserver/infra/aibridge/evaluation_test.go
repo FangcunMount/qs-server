@@ -11,11 +11,15 @@ import (
 )
 
 type evaluationRPCStub struct {
-	create  *pb.EvaluationCreateCommand
-	calls   int
-	command *pb.UnknownResolutionCommand
-	fail    error
-	t       *testing.T
+	candidateIndex    *pb.EvaluationCandidateIndex
+	candidateEvidence *pb.EvaluationCandidateEvidence
+	candidateQuery    *pb.EvaluationCandidateQuery
+	review            *pb.EvaluationReviewCommand
+	create            *pb.EvaluationCreateCommand
+	calls             int
+	command           *pb.UnknownResolutionCommand
+	fail              error
+	t                 *testing.T
 }
 
 func (s *evaluationRPCStub) Get(ctx context.Context, r *pb.EvaluationQuery, _ ...grpc.CallOption) (*pb.EvaluationState, error) {

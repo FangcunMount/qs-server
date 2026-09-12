@@ -14,8 +14,9 @@ import (
 )
 
 type managementGateway struct {
-	calls int
-	scope app.EvaluationScope
+	review app.EvaluationReview
+	calls  int
+	scope  app.EvaluationScope
 }
 
 func (g *managementGateway) GetEvaluation(_ context.Context, s app.EvaluationScope) (app.EvaluationState, error) {
@@ -107,5 +108,41 @@ func TestAIWorkflowCreateUsesProtectedIdentityNotBody(t *testing.T) {
 	h.Create(ctx)
 	if w.Code != 200 || gateway.calls != 1 || gateway.scope.OrganizationID != 12 || gateway.scope.OperatorUserID != 34 {
 		t.Fatalf("status=%d calls=%d scope=%+v", w.Code, gateway.calls, gateway.scope)
+	}
+}
+
+func (g *managementGateway) ReviewEvaluation(ctx context.Context, s app.EvaluationScope, value app.EvaluationReview) (app.EvaluationState, error) {
+	g.review = value
+	return g.GetEvaluation(ctx, s)
+}
+
+func TestAIWorkflowReviewUsesProtectedScopeAndDoesNotAcceptClientAuditIdentity(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	gateway := &managementGateway{}
+	h := NewAIWorkflowManagementHandler(&app.EvaluationAdministration{Gateway: gateway})
+	body := `{"organization_id":999,"operator_user_id":999,"expected_version":7,"role":"assessment_semantics","reviews":[{"candidate_id":"candidate:1","decision":"approve","reason":"核对事实","reviewer":"user:999","reviewed_at":"2000-01-01"}]}`
+	for _, authorized := range []bool{true, false} {
+		w := httptest.NewRecorder()
+		ctx, _ := gin.CreateTestContext(w)
+		ctx.Request = httptest.NewRequest("POST", "/", strings.NewReader(body))
+		ctx.Request.Header.Set("Content-Type", "application/json")
+		ctx.Params = gin.Params{{Key: "run_id", Value: "00000000-0000-4000-8000-000000000001"}}
+		ctx.Set(middleware.OrgIDKey, uint64(12))
+		ctx.Set(middleware.UserIDKey, uint64(34))
+		if authorized {
+			snapshot := &authz.Snapshot{EffectiveRoles: []string{"qs:admin"}, Permissions: []authz.Permission{{Resource: "qs:*:*:*", Action: "*", Mode: authz.AuthorizationModeUnconditional}}}
+			ctx.Request = ctx.Request.WithContext(authz.WithSnapshot(ctx.Request.Context(), snapshot))
+		}
+		h.Review(ctx)
+		if authorized != (w.Code == 200) {
+			t.Fatalf("authorization=%v status=%d", authorized, w.Code)
+		}
+	}
+	if gateway.calls != 1 || gateway.scope.OrganizationID != 12 || gateway.scope.OperatorUserID != 34 {
+		t.Fatal("review identity or revocation bypassed")
+	}
+	raw, err := json.Marshal(gateway.review)
+	if err != nil || strings.Contains(string(raw), "user:999") || strings.Contains(string(raw), "2000-01-01") {
+		t.Fatal("client audit identity forwarded")
 	}
 }

@@ -46,7 +46,7 @@ func (h *AIWorkflowManagementHandler) failure(c *gin.Context, err error) {
 
 // Get godoc
 // @Summary 查询 qs-ai 评测状态
-// @Description 需要当前机构 OrgAdmin 权限；组织和操作人取认证上下文。管理功能默认关闭。
+// @Description 需要当前机构解读审计权限；组织和操作人取认证上下文。管理功能默认关闭。
 // @Tags AI-Workflow-Management
 // @Produce json
 // @Param run_id path string true "评测 Run UUID"
@@ -164,6 +164,39 @@ func (h *AIWorkflowManagementHandler) Create(c *gin.Context) {
 		return
 	}
 	value, err := h.service.Create(c.Request.Context(), scope, command)
+	if err != nil {
+		h.failure(c, err)
+		return
+	}
+	h.Success(c, value)
+}
+
+// Review godoc
+// @Summary 批量审核 qs-ai 评测候选
+// @Description 需要当前机构 OrgAdmin 权限；每批最多 35 个候选和一种审核职责。身份来自认证上下文，审核时间由 AI 服务端记录。超时后先回读状态，不自动重试。管理功能默认关闭。
+// @Tags AI-Workflow-Management
+// @Accept json
+// @Produce json
+// @Param run_id path string true "评测 Run UUID"
+// @Param body body app.EvaluationReview true "审核职责、候选决定和预期版本"
+// @Success 200 {object} core.Response{data=app.EvaluationState}
+// @Failure 400 {object} core.ErrResponse
+// @Failure 401 {object} core.ErrResponse
+// @Failure 403 {object} core.ErrResponse
+// @Failure 404 {object} core.ErrResponse
+// @Failure 409 {object} core.ErrResponse
+// @Failure 500 {object} core.ErrResponse
+// @Router /internal/v2/interpretation/ai-workflow/evaluations/{run_id}/reviews [post]
+func (h *AIWorkflowManagementHandler) Review(c *gin.Context) {
+	scope, ok := h.scope(c)
+	if !ok {
+		return
+	}
+	var command app.EvaluationReview
+	if err := h.BindJSON(c, &command); err != nil {
+		return
+	}
+	value, err := h.service.Review(c.Request.Context(), scope, command)
 	if err != nil {
 		h.failure(c, err)
 		return

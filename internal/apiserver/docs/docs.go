@@ -10195,7 +10195,7 @@ const docTemplate = `{
         },
         "/internal/v2/interpretation/ai-workflow/evaluations/{run_id}": {
             "get": {
-                "description": "需要当前机构 OrgAdmin 权限；组织和操作人取认证上下文。管理功能默认关闭。",
+                "description": "需要当前机构解读审计权限；组织和操作人取认证上下文。管理功能默认关闭。",
                 "produces": [
                     "application/json"
                 ],
@@ -10225,6 +10225,174 @@ const docTemplate = `{
                                     "properties": {
                                         "data": {
                                             "$ref": "#/definitions/aibridge.EvaluationState"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/internal/v2/interpretation/ai-workflow/evaluations/{run_id}/candidates": {
+            "get": {
+                "description": "需要当前机构解读审计权限。列表最多 35 条，版本用于详情读取与审核；列表不代表质量通过。",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "AI-Workflow-Management"
+                ],
+                "summary": "查询 qs-ai 评测候选列表",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "评测 Run UUID",
+                        "name": "run_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/aibridge.EvaluationCandidateIndex"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/internal/v2/interpretation/ai-workflow/evaluations/{run_id}/candidates/{candidate_id}": {
+            "get": {
+                "description": "需要当前机构解读审计权限及当前 Run 版本。正文和语义输出是保留原字节的 JSON 字符串，供展示与摘要校验；证据未完成或版本变化返回冲突。",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "AI-Workflow-Management"
+                ],
+                "summary": "读取 qs-ai 候选的冻结审核证据",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "评测 Run UUID",
+                        "name": "run_id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "候选 ID",
+                        "name": "candidate_id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "列表返回的 Run 版本",
+                        "name": "expected_version",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/aibridge.EvaluationCandidateEvidence"
                                         }
                                     }
                                 }
@@ -10387,6 +10555,95 @@ const docTemplate = `{
                         "required": true,
                         "schema": {
                             "$ref": "#/definitions/aibridge.UnknownResolution"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/aibridge.EvaluationState"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/internal/v2/interpretation/ai-workflow/evaluations/{run_id}/reviews": {
+            "post": {
+                "description": "需要当前机构 OrgAdmin 权限；每批最多 35 个候选和一种审核职责。身份来自认证上下文，审核时间由 AI 服务端记录。超时后先回读状态，不自动重试。管理功能默认关闭。",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "AI-Workflow-Management"
+                ],
+                "summary": "批量审核 qs-ai 评测候选",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "评测 Run UUID",
+                        "name": "run_id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "审核职责、候选决定和预期版本",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/aibridge.EvaluationReview"
                         }
                     }
                 ],
@@ -10735,6 +10992,78 @@ const docTemplate = `{
         }
     },
     "definitions": {
+        "aibridge.CandidateReviewItem": {
+            "type": "object",
+            "properties": {
+                "candidate_id": {
+                    "type": "string"
+                },
+                "decision": {
+                    "type": "string"
+                },
+                "reason": {
+                    "type": "string"
+                },
+                "semantic_review": {
+                    "$ref": "#/definitions/aibridge.SemanticContradictionReview"
+                }
+            }
+        },
+        "aibridge.EvaluationCandidateEvidence": {
+            "type": "object",
+            "properties": {
+                "candidate_id": {
+                    "type": "string"
+                },
+                "evidence": {
+                    "type": "object"
+                },
+                "normalized_output": {
+                    "description": "Strings retain the original normalized bytes after JSON decoding, including whitespace.",
+                    "type": "string"
+                },
+                "run_id": {
+                    "type": "string"
+                },
+                "semantic_output": {
+                    "type": "string"
+                },
+                "version": {
+                    "type": "integer"
+                }
+            }
+        },
+        "aibridge.EvaluationCandidateIndex": {
+            "type": "object",
+            "properties": {
+                "candidates": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/aibridge.EvaluationCandidateSummary"
+                    }
+                },
+                "run_id": {
+                    "type": "string"
+                },
+                "version": {
+                    "type": "integer"
+                }
+            }
+        },
+        "aibridge.EvaluationCandidateSummary": {
+            "type": "object",
+            "properties": {
+                "candidate_id": {
+                    "type": "string"
+                },
+                "case_id": {
+                    "type": "string"
+                },
+                "slot_ordinal": {
+                    "type": "integer"
+                }
+            }
+        },
         "aibridge.EvaluationCreate": {
             "type": "object",
             "properties": {
@@ -10787,6 +11116,23 @@ const docTemplate = `{
                 }
             }
         },
+        "aibridge.EvaluationReview": {
+            "type": "object",
+            "properties": {
+                "expected_version": {
+                    "type": "integer"
+                },
+                "reviews": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/aibridge.CandidateReviewItem"
+                    }
+                },
+                "role": {
+                    "type": "string"
+                }
+            }
+        },
         "aibridge.EvaluationStart": {
             "type": "object",
             "properties": {
@@ -10805,6 +11151,12 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "resolutions": {
+                    "type": "array",
+                    "items": {
+                        "type": "object"
+                    }
+                },
+                "reviews": {
                     "type": "array",
                     "items": {
                         "type": "object"
@@ -10834,6 +11186,32 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "version": {
+                    "type": "string"
+                }
+            }
+        },
+        "aibridge.SemanticContradictionReview": {
+            "type": "object",
+            "properties": {
+                "assertion_ordinal": {
+                    "type": "integer"
+                },
+                "candidate_excerpt": {
+                    "type": "string"
+                },
+                "execution_id": {
+                    "type": "string"
+                },
+                "original_detail": {
+                    "type": "string"
+                },
+                "output_fingerprint": {
+                    "type": "string"
+                },
+                "policy_version": {
+                    "type": "string"
+                },
+                "reason": {
                     "type": "string"
                 }
             }
