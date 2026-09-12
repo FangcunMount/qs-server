@@ -11,6 +11,8 @@ import (
 )
 
 type evaluationRPCStub struct {
+	finalCommand      *pb.EvaluationFinalizeCommand
+	finalState        *pb.EvaluationState
 	gateQuery         *pb.EvaluationGateQuery
 	gatePreview       *pb.EvaluationGatePreview
 	candidateIndex    *pb.EvaluationCandidateIndex

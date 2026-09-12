@@ -31,8 +31,12 @@ func state(response *pb.EvaluationState, scope app.EvaluationScope) (app.Evaluat
 	if json.Unmarshal([]byte(reviews), &history) != nil || history == nil || len(history) > 70 {
 		return app.EvaluationState{}, app.ErrConflict
 	}
+	final, err := finalization(response)
+	if err != nil || (len(final) > 0 && len(history) != 70) {
+		return app.EvaluationState{}, app.ErrConflict
+	}
 	return app.EvaluationState{RunID: response.RunId, Version: response.Version, Status: response.Status,
-		UnresolvedResultUnknownCount: response.UnresolvedResultUnknownCount, Resolutions: json.RawMessage(response.ResolutionsJson), Reviews: json.RawMessage(reviews)}, nil
+		UnresolvedResultUnknownCount: response.UnresolvedResultUnknownCount, Resolutions: json.RawMessage(response.ResolutionsJson), Reviews: json.RawMessage(reviews), Finalization: final}, nil
 }
 func (c *EvaluationClient) GetEvaluation(ctx context.Context, scope app.EvaluationScope) (app.EvaluationState, error) {
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)

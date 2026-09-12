@@ -57,6 +57,17 @@ definitions:
       release:
         $ref: '#/definitions/aibridge.EvaluationRelease'
     type: object
+  aibridge.EvaluationFinalize:
+    properties:
+      confirm:
+        type: boolean
+      expected_passed:
+        type: boolean
+      expected_version:
+        type: integer
+      reason:
+        type: string
+    type: object
   aibridge.EvaluationGatePreview:
     properties:
       gate_result:
@@ -115,6 +126,8 @@ definitions:
     type: object
   aibridge.EvaluationState:
     properties:
+      finalization:
+        type: object
       resolutions:
         items:
           type: object
@@ -14254,6 +14267,62 @@ paths:
           schema:
             $ref: '#/definitions/core.ErrResponse'
       summary: 创建冻结的 qs-ai 评测
+      tags:
+      - AI-Workflow-Management
+  /internal/v2/interpretation/ai-workflow/evaluations/{run_id}/finalize:
+    post:
+      consumes:
+      - application/json
+      description: 需要当前机构 OrgAdmin 权限、预览版本、预期结果和明确确认。AI 在事务内重新计算门槛并记录批准或拒绝；不发布配置。超时后先回读状态，不自动重试。
+      parameters:
+      - description: 评测 Run UUID
+        in: path
+        name: run_id
+        required: true
+        type: string
+      - description: 最终评审确认
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/aibridge.EvaluationFinalize'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/aibridge.EvaluationState'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+      summary: 完成 qs-ai 评测最终评审
       tags:
       - AI-Workflow-Management
   /internal/v2/interpretation/ai-workflow/evaluations/{run_id}/gates:

@@ -10524,6 +10524,95 @@
                 }
             }
         },
+        "/internal/v2/interpretation/ai-workflow/evaluations/{run_id}/finalize": {
+            "post": {
+                "description": "需要当前机构 OrgAdmin 权限、预览版本、预期结果和明确确认。AI 在事务内重新计算门槛并记录批准或拒绝；不发布配置。超时后先回读状态，不自动重试。",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "AI-Workflow-Management"
+                ],
+                "summary": "完成 qs-ai 评测最终评审",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "评测 Run UUID",
+                        "name": "run_id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "最终评审确认",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/aibridge.EvaluationFinalize"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/aibridge.EvaluationState"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/internal/v2/interpretation/ai-workflow/evaluations/{run_id}/gates": {
             "get": {
                 "description": "需要当前机构解读审计权限及明确 Run 版本。仅返回冻结证据的门槛预览，不批准 Run 或发布配置；证据未完成或版本变化返回冲突。",
@@ -11159,6 +11248,23 @@
                 }
             }
         },
+        "aibridge.EvaluationFinalize": {
+            "type": "object",
+            "properties": {
+                "confirm": {
+                    "type": "boolean"
+                },
+                "expected_passed": {
+                    "type": "boolean"
+                },
+                "expected_version": {
+                    "type": "integer"
+                },
+                "reason": {
+                    "type": "string"
+                }
+            }
+        },
         "aibridge.EvaluationGatePreview": {
             "type": "object",
             "properties": {
@@ -11248,6 +11354,9 @@
         "aibridge.EvaluationState": {
             "type": "object",
             "properties": {
+                "finalization": {
+                    "type": "object"
+                },
                 "resolutions": {
                     "type": "array",
                     "items": {

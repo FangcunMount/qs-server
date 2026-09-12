@@ -14,9 +14,10 @@ import (
 )
 
 type managementGateway struct {
-	review app.EvaluationReview
-	calls  int
-	scope  app.EvaluationScope
+	finalize app.EvaluationFinalize
+	review   app.EvaluationReview
+	calls    int
+	scope    app.EvaluationScope
 }
 
 func (g *managementGateway) GetEvaluation(_ context.Context, s app.EvaluationScope) (app.EvaluationState, error) {

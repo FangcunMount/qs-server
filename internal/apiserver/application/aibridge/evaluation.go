@@ -38,8 +38,10 @@ type EvaluationState struct {
 	UnresolvedResultUnknownCount int64           `json:"unresolved_result_unknown_count"`
 	Resolutions                  json.RawMessage `json:"resolutions" swaggertype:"array,object"`
 	Reviews                      json.RawMessage `json:"reviews" swaggertype:"array,object"`
+	Finalization                 json.RawMessage `json:"finalization,omitempty" swaggertype:"object"`
 }
 type EvaluationGateway interface {
+	FinalizeEvaluation(context.Context, EvaluationScope, EvaluationFinalize) (EvaluationState, error)
 	PreviewEvaluationGates(context.Context, EvaluationScope, int64) (EvaluationGatePreview, error)
 	ListEvaluationCandidates(context.Context, EvaluationScope) (EvaluationCandidateIndex, error)
 	GetEvaluationCandidate(context.Context, EvaluationScope, CandidateQuery) (EvaluationCandidateEvidence, error)
