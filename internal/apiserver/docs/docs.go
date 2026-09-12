@@ -11056,6 +11056,426 @@ const docTemplate = `{
                 }
             }
         },
+        "/internal/v2/interpretation/ai-workflow/publications": {
+            "get": {
+                "description": "需要当前机构解读审计权限。精确查询选择器，不执行运行时回退匹配。管理功能默认关闭。",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "AI-Workflow-Publications"
+                ],
+                "summary": "查询 qs-ai 配置选择器的当前发布",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "participant",
+                        "name": "audience",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "scale",
+                        "name": "model_kind",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "score_range",
+                        "name": "decision_kind",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "测评编码",
+                        "name": "model_code",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "测评版本，需要同时提供编码",
+                        "name": "model_version",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/aibridge.PublicationState"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/internal/v2/interpretation/ai-workflow/publications/commands/{command_id}": {
+            "get": {
+                "description": "需要当前机构解读审计权限；仅原组织和原操作人可读取。用于超时后确认原命令结果，查询不重放操作。",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "AI-Workflow-Publications"
+                ],
+                "summary": "查询 qs-ai 发布操作的原始回执",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "原发布命令 UUID",
+                        "name": "command_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/aibridge.PublicationReceipt"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/internal/v2/interpretation/ai-workflow/publications/disable": {
+            "post": {
+                "description": "需要当前机构 OrgAdmin 权限；组织和操作人取认证上下文。必须确认预期选择器版本及当前发布 ID；超时后按原 command_id 查询回执，不自动重试。管理功能默认关闭。",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "AI-Workflow-Publications"
+                ],
+                "summary": "停用当前选择器的 qs-ai 发布配置",
+                "parameters": [
+                    {
+                        "description": "发布操作与版本确认",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/aibridge.PublicationCommand"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/aibridge.PublicationReceipt"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/internal/v2/interpretation/ai-workflow/publications/publish": {
+            "post": {
+                "description": "需要当前机构 OrgAdmin 权限；组织和操作人取认证上下文。必须确认预期选择器版本及当前发布 ID；超时后按原 command_id 查询回执，不自动重试。管理功能默认关闭。",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "AI-Workflow-Publications"
+                ],
+                "summary": "发布通过评测的 qs-ai 配置",
+                "parameters": [
+                    {
+                        "description": "发布操作与版本确认",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/aibridge.PublishConfiguration"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/aibridge.PublicationReceipt"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/internal/v2/interpretation/ai-workflow/publications/rollback": {
+            "post": {
+                "description": "需要当前机构 OrgAdmin 权限；组织和操作人取认证上下文。必须确认预期选择器版本及当前发布 ID；超时后按原 command_id 查询回执，不自动重试。管理功能默认关闭。",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "AI-Workflow-Publications"
+                ],
+                "summary": "回退至历史 qs-ai 发布版本",
+                "parameters": [
+                    {
+                        "description": "发布操作与版本确认",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/aibridge.RollbackPublication"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/aibridge.PublicationReceipt"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/internal/v2/statistics/runs": {
             "get": {
                 "tags": [
@@ -11505,6 +11925,149 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "version": {
+                    "type": "string"
+                }
+            }
+        },
+        "aibridge.PublicationCommand": {
+            "type": "object",
+            "properties": {
+                "command_id": {
+                    "type": "string"
+                },
+                "confirm": {
+                    "type": "boolean"
+                },
+                "expected": {
+                    "$ref": "#/definitions/aibridge.PublicationExpectation"
+                },
+                "reason": {
+                    "type": "string"
+                }
+            }
+        },
+        "aibridge.PublicationExpectation": {
+            "type": "object",
+            "properties": {
+                "active_publication_id": {
+                    "type": "string"
+                },
+                "selector": {
+                    "$ref": "#/definitions/aibridge.PublicationSelector"
+                },
+                "version": {
+                    "type": "integer"
+                }
+            }
+        },
+        "aibridge.PublicationReceipt": {
+            "type": "object",
+            "properties": {
+                "action": {
+                    "type": "string"
+                },
+                "actor": {
+                    "type": "string"
+                },
+                "changed_at": {
+                    "type": "string"
+                },
+                "command_id": {
+                    "type": "string"
+                },
+                "current": {
+                    "$ref": "#/definitions/aibridge.PublicationState"
+                },
+                "previous": {
+                    "$ref": "#/definitions/aibridge.PublicationState"
+                },
+                "reason": {
+                    "type": "string"
+                }
+            }
+        },
+        "aibridge.PublicationSelector": {
+            "type": "object",
+            "properties": {
+                "audience": {
+                    "type": "string"
+                },
+                "decision_kind": {
+                    "type": "string"
+                },
+                "model_code": {
+                    "type": "string"
+                },
+                "model_kind": {
+                    "type": "string"
+                },
+                "model_version": {
+                    "type": "string"
+                }
+            }
+        },
+        "aibridge.PublicationState": {
+            "type": "object",
+            "properties": {
+                "active_publication_id": {
+                    "type": "string"
+                },
+                "changed_at": {
+                    "type": "string"
+                },
+                "publication": {
+                    "type": "object"
+                },
+                "selector": {
+                    "$ref": "#/definitions/aibridge.PublicationSelector"
+                },
+                "version": {
+                    "type": "integer"
+                }
+            }
+        },
+        "aibridge.PublishConfiguration": {
+            "type": "object",
+            "properties": {
+                "command_id": {
+                    "type": "string"
+                },
+                "confirm": {
+                    "type": "boolean"
+                },
+                "expected": {
+                    "$ref": "#/definitions/aibridge.PublicationExpectation"
+                },
+                "reason": {
+                    "type": "string"
+                },
+                "release_fingerprint": {
+                    "type": "string"
+                },
+                "run_id": {
+                    "type": "string"
+                },
+                "run_version": {
+                    "type": "integer"
+                }
+            }
+        },
+        "aibridge.RollbackPublication": {
+            "type": "object",
+            "properties": {
+                "command_id": {
+                    "type": "string"
+                },
+                "confirm": {
+                    "type": "boolean"
+                },
+                "expected": {
+                    "$ref": "#/definitions/aibridge.PublicationExpectation"
+                },
+                "reason": {
+                    "type": "string"
+                },
+                "target_publication_id": {
                     "type": "string"
                 }
             }

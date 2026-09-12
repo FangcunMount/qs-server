@@ -70,6 +70,7 @@ import (
 // Module assembles report read/query, builder-registry, and durable write capabilities.
 type Module struct {
 	aiManagement                *bridge.EvaluationAdministration
+	aiPublications              *bridge.PublicationAdministration
 	aiManagementConnection      io.Closer
 	aiWorkflowEnabled           bool
 	aiWorkflow                  *bridge.Participant
@@ -251,11 +252,12 @@ func New(deps Deps) (*Module, error) {
 		if err := opts.Validate(); err != nil {
 			return nil, err
 		}
-		client, connection, err := bridgeClient.DialEvaluationManagement(opts.Address, opts.CAFile, opts.CertFile, opts.KeyFile)
+		client, publicationClient, connection, err := bridgeClient.DialGovernanceManagement(opts.Address, opts.CAFile, opts.CertFile, opts.KeyFile)
 		if err != nil {
 			return nil, err
 		}
 		module.aiManagement = &bridge.EvaluationAdministration{Gateway: client}
+		module.aiPublications = &bridge.PublicationAdministration{Gateway: publicationClient}
 		module.aiManagementConnection = connection
 	}
 	return module, nil
@@ -977,4 +979,11 @@ func (m *Module) AIWorkflowManagement() *bridge.EvaluationAdministration {
 		return nil
 	}
 	return m.aiManagement
+}
+
+func (m *Module) AIWorkflowPublications() *bridge.PublicationAdministration {
+	if m == nil {
+		return nil
+	}
+	return m.aiPublications
 }
