@@ -40,6 +40,7 @@ type EvaluationState struct {
 	Reviews                      json.RawMessage `json:"reviews" swaggertype:"array,object"`
 }
 type EvaluationGateway interface {
+	PreviewEvaluationGates(context.Context, EvaluationScope, int64) (EvaluationGatePreview, error)
 	ListEvaluationCandidates(context.Context, EvaluationScope) (EvaluationCandidateIndex, error)
 	GetEvaluationCandidate(context.Context, EvaluationScope, CandidateQuery) (EvaluationCandidateEvidence, error)
 	ReviewEvaluation(context.Context, EvaluationScope, EvaluationReview) (EvaluationState, error)
