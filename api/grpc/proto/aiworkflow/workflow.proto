@@ -328,3 +328,28 @@ message PromptDraftState {
  // Complete immutable revision, original source and actor/time/reason audit.
  string snapshot_json = 4;
 }
+
+// Register a validated immutable Profile; this does not approve or publish it.
+// QS authorizes writes and reads; original command receipts retain actor scope.
+service ProfileManagement {
+ rpc Register(ProfileRegisterCommand) returns (ProfileRegistrationReceipt);
+ rpc GetReceipt(ProfileRegistrationQuery) returns (ProfileRegistrationReceipt);
+}
+message ProfileRegisterCommand {
+ PublicationScope scope = 1;
+ string command_id = 2;
+ PromptDraftSource source = 3;
+ string definition_json = 4;
+ PromptDraftSource prompt = 5;
+ PromptDraftSource generation_route = 6;
+ string reason = 7;
+}
+message ProfileRegistrationQuery {
+ PublicationScope scope = 1;
+ string command_id = 2;
+}
+message ProfileRegistrationReceipt {
+ string schema_version = 1;
+ string command_id = 2;
+ string receipt_json = 3;
+}

@@ -1281,3 +1281,149 @@ var PromptDraftManagement_ServiceDesc = grpc.ServiceDesc{
 	Streams:  []grpc.StreamDesc{},
 	Metadata: "aiworkflow/workflow.proto",
 }
+
+const (
+	ProfileManagement_Register_FullMethodName   = "/qsai.workflow.v1.ProfileManagement/Register"
+	ProfileManagement_GetReceipt_FullMethodName = "/qsai.workflow.v1.ProfileManagement/GetReceipt"
+)
+
+// ProfileManagementClient is the client API for ProfileManagement service.
+//
+// For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
+//
+// Register a validated immutable Profile; this does not approve or publish it.
+// QS authorizes writes and reads; original command receipts retain actor scope.
+type ProfileManagementClient interface {
+	Register(ctx context.Context, in *ProfileRegisterCommand, opts ...grpc.CallOption) (*ProfileRegistrationReceipt, error)
+	GetReceipt(ctx context.Context, in *ProfileRegistrationQuery, opts ...grpc.CallOption) (*ProfileRegistrationReceipt, error)
+}
+
+type profileManagementClient struct {
+	cc grpc.ClientConnInterface
+}
+
+func NewProfileManagementClient(cc grpc.ClientConnInterface) ProfileManagementClient {
+	return &profileManagementClient{cc}
+}
+
+func (c *profileManagementClient) Register(ctx context.Context, in *ProfileRegisterCommand, opts ...grpc.CallOption) (*ProfileRegistrationReceipt, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ProfileRegistrationReceipt)
+	err := c.cc.Invoke(ctx, ProfileManagement_Register_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *profileManagementClient) GetReceipt(ctx context.Context, in *ProfileRegistrationQuery, opts ...grpc.CallOption) (*ProfileRegistrationReceipt, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ProfileRegistrationReceipt)
+	err := c.cc.Invoke(ctx, ProfileManagement_GetReceipt_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// ProfileManagementServer is the server API for ProfileManagement service.
+// All implementations must embed UnimplementedProfileManagementServer
+// for forward compatibility.
+//
+// Register a validated immutable Profile; this does not approve or publish it.
+// QS authorizes writes and reads; original command receipts retain actor scope.
+type ProfileManagementServer interface {
+	Register(context.Context, *ProfileRegisterCommand) (*ProfileRegistrationReceipt, error)
+	GetReceipt(context.Context, *ProfileRegistrationQuery) (*ProfileRegistrationReceipt, error)
+	mustEmbedUnimplementedProfileManagementServer()
+}
+
+// UnimplementedProfileManagementServer must be embedded to have
+// forward compatible implementations.
+//
+// NOTE: this should be embedded by value instead of pointer to avoid a nil
+// pointer dereference when methods are called.
+type UnimplementedProfileManagementServer struct{}
+
+func (UnimplementedProfileManagementServer) Register(context.Context, *ProfileRegisterCommand) (*ProfileRegistrationReceipt, error) {
+	return nil, status.Error(codes.Unimplemented, "method Register not implemented")
+}
+func (UnimplementedProfileManagementServer) GetReceipt(context.Context, *ProfileRegistrationQuery) (*ProfileRegistrationReceipt, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetReceipt not implemented")
+}
+func (UnimplementedProfileManagementServer) mustEmbedUnimplementedProfileManagementServer() {}
+func (UnimplementedProfileManagementServer) testEmbeddedByValue()                           {}
+
+// UnsafeProfileManagementServer may be embedded to opt out of forward compatibility for this service.
+// Use of this interface is not recommended, as added methods to ProfileManagementServer will
+// result in compilation errors.
+type UnsafeProfileManagementServer interface {
+	mustEmbedUnimplementedProfileManagementServer()
+}
+
+func RegisterProfileManagementServer(s grpc.ServiceRegistrar, srv ProfileManagementServer) {
+	// If the following call panics, it indicates UnimplementedProfileManagementServer was
+	// embedded by pointer and is nil.  This will cause panics if an
+	// unimplemented method is ever invoked, so we test this at initialization
+	// time to prevent it from happening at runtime later due to I/O.
+	if t, ok := srv.(interface{ testEmbeddedByValue() }); ok {
+		t.testEmbeddedByValue()
+	}
+	s.RegisterService(&ProfileManagement_ServiceDesc, srv)
+}
+
+func _ProfileManagement_Register_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ProfileRegisterCommand)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ProfileManagementServer).Register(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ProfileManagement_Register_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ProfileManagementServer).Register(ctx, req.(*ProfileRegisterCommand))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ProfileManagement_GetReceipt_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ProfileRegistrationQuery)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ProfileManagementServer).GetReceipt(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ProfileManagement_GetReceipt_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ProfileManagementServer).GetReceipt(ctx, req.(*ProfileRegistrationQuery))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+// ProfileManagement_ServiceDesc is the grpc.ServiceDesc for ProfileManagement service.
+// It's only intended for direct use with grpc.RegisterService,
+// and not to be introspected or modified (even as a copy)
+var ProfileManagement_ServiceDesc = grpc.ServiceDesc{
+	ServiceName: "qsai.workflow.v1.ProfileManagement",
+	HandlerType: (*ProfileManagementServer)(nil),
+	Methods: []grpc.MethodDesc{
+		{
+			MethodName: "Register",
+			Handler:    _ProfileManagement_Register_Handler,
+		},
+		{
+			MethodName: "GetReceipt",
+			Handler:    _ProfileManagement_GetReceipt_Handler,
+		},
+	},
+	Streams:  []grpc.StreamDesc{},
+	Metadata: "aiworkflow/workflow.proto",
+}

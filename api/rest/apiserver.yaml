@@ -17,6 +17,8 @@ tags:
   description: AI-Explanation-Administration
 - name: AI-Workflow-Management
   description: AI-Workflow-Management
+- name: AI-Workflow-Profiles
+  description: AI-Workflow-Profiles
 - name: AI-Workflow-Prompt-Drafts
   description: AI-Workflow-Prompt-Drafts
 - name: AI-Workflow-Publications
@@ -10816,6 +10818,128 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/core.ErrResponse'
+  /internal/v2/interpretation/ai-workflow/profiles/commands/{command_id}:
+    get:
+      tags:
+      - AI-Workflow-Profiles
+      summary: 查询 qs-ai Profile 注册原命令回执
+      description: 需要当前机构解读审计权限，仅原机构及原操作人可查询。不重发注册，不触发发布。
+      operationId: 查询qsaiProfile注册原命令回执
+      parameters:
+      - type: string
+        description: 原命令 UUID
+        name: command_id
+        in: path
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/core.Response'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/aibridge.ProfileRegistrationReceipt'
+        '400':
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '409':
+          description: Conflict
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+  /internal/v2/interpretation/ai-workflow/profiles/register:
+    post:
+      tags:
+      - AI-Workflow-Profiles
+      summary: 注册 qs-ai 不可变 Profile 版本
+      description: 需要当前机构 OrgAdmin 权限，组织和操作人来自认证上下文。注册验证配置，不代表评测批准或发布。超时后查询原 command_id，不自动重试。
+      operationId: 注册qsai不可变Profile版本
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/aibridge.RegisterProfile'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/core.Response'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/aibridge.ProfileRegistrationReceipt'
+        '400':
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '409':
+          description: Conflict
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
   /internal/v2/interpretation/ai-workflow/prompt-drafts/commands/{command_id}:
     get:
       tags:
@@ -11970,6 +12094,17 @@ components:
           type: string
         validator_version:
           type: string
+    aibridge.ProfileRegistrationReceipt:
+      type: object
+      properties:
+        command:
+          $ref: '#/components/schemas/aibridge.RegisterProfile'
+        manifest:
+          $ref: '#/components/schemas/aibridge.RegisteredManifest'
+        registered_at:
+          type: string
+        scope:
+          $ref: '#/components/schemas/aibridge.DraftScope'
     aibridge.PromptDraftContent:
       type: object
       properties:
@@ -12099,6 +12234,34 @@ components:
           type: string
         run_version:
           type: integer
+    aibridge.RegisterProfile:
+      type: object
+      properties:
+        command_id:
+          type: string
+        definition_json:
+          type: string
+        generation_route:
+          $ref: '#/components/schemas/aibridge.PromptDraftSource'
+        prompt:
+          $ref: '#/components/schemas/aibridge.PromptDraftSource'
+        reason:
+          type: string
+        source:
+          $ref: '#/components/schemas/aibridge.PromptDraftSource'
+    aibridge.RegisteredManifest:
+      type: object
+      properties:
+        generation_route:
+          $ref: '#/components/schemas/aibridge.PromptDraftSource'
+        input_schema:
+          $ref: '#/components/schemas/aibridge.PromptDraftSource'
+        output_schema:
+          $ref: '#/components/schemas/aibridge.PromptDraftSource'
+        profile:
+          $ref: '#/components/schemas/aibridge.PromptDraftSource'
+        prompt:
+          $ref: '#/components/schemas/aibridge.PromptDraftSource'
     aibridge.RevisePromptDraft:
       type: object
       properties:

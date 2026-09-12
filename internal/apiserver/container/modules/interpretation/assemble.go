@@ -72,6 +72,7 @@ type Module struct {
 	aiManagement                *bridge.EvaluationAdministration
 	aiPublications              *bridge.PublicationAdministration
 	aiPromptDrafts              *bridge.PromptDraftAdministration
+	aiProfiles                  *bridge.ProfileAdministration
 	aiManagementConnection      io.Closer
 	aiWorkflowEnabled           bool
 	aiWorkflow                  *bridge.Participant
@@ -253,14 +254,15 @@ func New(deps Deps) (*Module, error) {
 		if err := opts.Validate(); err != nil {
 			return nil, err
 		}
-		client, publicationClient, draftClient, connection, err := bridgeClient.DialGovernanceClients(opts.Address, opts.CAFile, opts.CertFile, opts.KeyFile)
+		clients, err := bridgeClient.DialGovernance(opts.Address, opts.CAFile, opts.CertFile, opts.KeyFile)
 		if err != nil {
 			return nil, err
 		}
-		module.aiManagement = &bridge.EvaluationAdministration{Gateway: client}
-		module.aiPublications = &bridge.PublicationAdministration{Gateway: publicationClient}
-		module.aiPromptDrafts = &bridge.PromptDraftAdministration{Gateway: draftClient}
-		module.aiManagementConnection = connection
+		module.aiManagement = &bridge.EvaluationAdministration{Gateway: clients.Evaluation}
+		module.aiPublications = &bridge.PublicationAdministration{Gateway: clients.Publications}
+		module.aiPromptDrafts = &bridge.PromptDraftAdministration{Gateway: clients.PromptDrafts}
+		module.aiProfiles = &bridge.ProfileAdministration{Gateway: clients.Profiles}
+		module.aiManagementConnection = clients.Connection
 	}
 	return module, nil
 }
@@ -995,4 +997,11 @@ func (m *Module) AIWorkflowPromptDrafts() *bridge.PromptDraftAdministration {
 		return nil
 	}
 	return m.aiPromptDrafts
+}
+
+func (m *Module) AIWorkflowProfiles() *bridge.ProfileAdministration {
+	if m == nil {
+		return nil
+	}
+	return m.aiProfiles
 }
