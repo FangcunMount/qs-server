@@ -105,7 +105,7 @@ func (s *PublicationAdministration) Publish(ctx context.Context, scope Publicati
 	if err := s.authorize(ctx, scope, authz.CapabilityOrgAdmin); err != nil {
 		return PublicationReceipt{}, err
 	}
-	if !command.PublicationCommand.Valid() || !ValidPublicationID(command.RunID) || command.RunVersion < 1 || !frozenFingerprint.MatchString(command.ReleaseFingerprint) {
+	if !command.Valid() || !ValidPublicationID(command.RunID) || command.RunVersion < 1 || !frozenFingerprint.MatchString(command.ReleaseFingerprint) {
 		return PublicationReceipt{}, ErrInvalid
 	}
 	return s.Gateway.PublishConfiguration(ctx, scope, command)
@@ -114,7 +114,7 @@ func (s *PublicationAdministration) Rollback(ctx context.Context, scope Publicat
 	if err := s.authorize(ctx, scope, authz.CapabilityOrgAdmin); err != nil {
 		return PublicationReceipt{}, err
 	}
-	if !command.PublicationCommand.Valid() || !ValidPublicationID(command.TargetPublicationID) {
+	if !command.Valid() || !ValidPublicationID(command.TargetPublicationID) {
 		return PublicationReceipt{}, ErrInvalid
 	}
 	return s.Gateway.RollbackPublication(ctx, scope, command)
