@@ -64,6 +64,7 @@ func (r *Router) registerInterpretationInternalV2Routes(internalV2 *gin.RouterGr
 		group.POST("/:run_id/start", management.Start)
 		group.POST("/:run_id/create", management.Create)
 		group.POST("/:run_id/reviews", management.Review)
+		group.POST("/:run_id/finalize", management.Finalize)
 		group.POST("/:run_id/result-unknown/resolve", management.ResolveUnknown)
 	}
 

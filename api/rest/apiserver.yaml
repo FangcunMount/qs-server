@@ -10409,6 +10409,73 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/core.ErrResponse'
+  /internal/v2/interpretation/ai-workflow/evaluations/{run_id}/finalize:
+    post:
+      tags:
+      - AI-Workflow-Management
+      summary: 完成 qs-ai 评测最终评审
+      description: 需要当前机构 OrgAdmin 权限、预览版本、预期结果和明确确认。AI 在事务内重新计算门槛并记录批准或拒绝；不发布配置。超时后先回读状态，不自动重试。
+      operationId: 完成qsai评测最终评审
+      parameters:
+      - type: string
+        description: 评测 Run UUID
+        name: run_id
+        in: path
+        required: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/aibridge.EvaluationFinalize'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/core.Response'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/aibridge.EvaluationState'
+        '400':
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '409':
+          description: Conflict
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
   /internal/v2/interpretation/ai-workflow/evaluations/{run_id}/gates:
     get:
       tags:
@@ -10959,6 +11026,17 @@ components:
           type: string
         release:
           $ref: '#/components/schemas/aibridge.EvaluationRelease'
+    aibridge.EvaluationFinalize:
+      type: object
+      properties:
+        confirm:
+          type: boolean
+        expected_passed:
+          type: boolean
+        expected_version:
+          type: integer
+        reason:
+          type: string
     aibridge.EvaluationGatePreview:
       type: object
       properties:
@@ -11018,6 +11096,8 @@ components:
     aibridge.EvaluationState:
       type: object
       properties:
+        finalization:
+          type: object
         resolutions:
           type: array
           items:

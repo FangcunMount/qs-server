@@ -631,6 +631,83 @@ func (x *EvidenceItem) GetFacts() []*Fact {
 	return nil
 }
 
+type EvaluationFinalizeCommand struct {
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	Scope           *EvaluationQuery       `protobuf:"bytes,1,opt,name=scope,proto3" json:"scope,omitempty"`
+	ExpectedVersion int64                  `protobuf:"varint,2,opt,name=expected_version,json=expectedVersion,proto3" json:"expected_version,omitempty"`
+	// Presence is mandatory; false explicitly confirms the previewed rejection.
+	ExpectedPassed *bool  `protobuf:"varint,3,opt,name=expected_passed,json=expectedPassed,proto3,oneof" json:"expected_passed,omitempty"`
+	Reason         string `protobuf:"bytes,4,opt,name=reason,proto3" json:"reason,omitempty"`
+	Confirm        bool   `protobuf:"varint,5,opt,name=confirm,proto3" json:"confirm,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *EvaluationFinalizeCommand) Reset() {
+	*x = EvaluationFinalizeCommand{}
+	mi := &file_aiworkflow_workflow_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *EvaluationFinalizeCommand) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*EvaluationFinalizeCommand) ProtoMessage() {}
+
+func (x *EvaluationFinalizeCommand) ProtoReflect() protoreflect.Message {
+	mi := &file_aiworkflow_workflow_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use EvaluationFinalizeCommand.ProtoReflect.Descriptor instead.
+func (*EvaluationFinalizeCommand) Descriptor() ([]byte, []int) {
+	return file_aiworkflow_workflow_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *EvaluationFinalizeCommand) GetScope() *EvaluationQuery {
+	if x != nil {
+		return x.Scope
+	}
+	return nil
+}
+
+func (x *EvaluationFinalizeCommand) GetExpectedVersion() int64 {
+	if x != nil {
+		return x.ExpectedVersion
+	}
+	return 0
+}
+
+func (x *EvaluationFinalizeCommand) GetExpectedPassed() bool {
+	if x != nil && x.ExpectedPassed != nil {
+		return *x.ExpectedPassed
+	}
+	return false
+}
+
+func (x *EvaluationFinalizeCommand) GetReason() string {
+	if x != nil {
+		return x.Reason
+	}
+	return ""
+}
+
+func (x *EvaluationFinalizeCommand) GetConfirm() bool {
+	if x != nil {
+		return x.Confirm
+	}
+	return false
+}
+
 type EvaluationGateQuery struct {
 	state           protoimpl.MessageState `protogen:"open.v1"`
 	Scope           *EvaluationQuery       `protobuf:"bytes,1,opt,name=scope,proto3" json:"scope,omitempty"`
@@ -641,7 +718,7 @@ type EvaluationGateQuery struct {
 
 func (x *EvaluationGateQuery) Reset() {
 	*x = EvaluationGateQuery{}
-	mi := &file_aiworkflow_workflow_proto_msgTypes[8]
+	mi := &file_aiworkflow_workflow_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -653,7 +730,7 @@ func (x *EvaluationGateQuery) String() string {
 func (*EvaluationGateQuery) ProtoMessage() {}
 
 func (x *EvaluationGateQuery) ProtoReflect() protoreflect.Message {
-	mi := &file_aiworkflow_workflow_proto_msgTypes[8]
+	mi := &file_aiworkflow_workflow_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -666,7 +743,7 @@ func (x *EvaluationGateQuery) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use EvaluationGateQuery.ProtoReflect.Descriptor instead.
 func (*EvaluationGateQuery) Descriptor() ([]byte, []int) {
-	return file_aiworkflow_workflow_proto_rawDescGZIP(), []int{8}
+	return file_aiworkflow_workflow_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *EvaluationGateQuery) GetScope() *EvaluationQuery {
@@ -695,7 +772,7 @@ type EvaluationGatePreview struct {
 
 func (x *EvaluationGatePreview) Reset() {
 	*x = EvaluationGatePreview{}
-	mi := &file_aiworkflow_workflow_proto_msgTypes[9]
+	mi := &file_aiworkflow_workflow_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -707,7 +784,7 @@ func (x *EvaluationGatePreview) String() string {
 func (*EvaluationGatePreview) ProtoMessage() {}
 
 func (x *EvaluationGatePreview) ProtoReflect() protoreflect.Message {
-	mi := &file_aiworkflow_workflow_proto_msgTypes[9]
+	mi := &file_aiworkflow_workflow_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -720,7 +797,7 @@ func (x *EvaluationGatePreview) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use EvaluationGatePreview.ProtoReflect.Descriptor instead.
 func (*EvaluationGatePreview) Descriptor() ([]byte, []int) {
-	return file_aiworkflow_workflow_proto_rawDescGZIP(), []int{9}
+	return file_aiworkflow_workflow_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *EvaluationGatePreview) GetRunId() string {
@@ -762,7 +839,7 @@ type EvaluationCandidateSummary struct {
 
 func (x *EvaluationCandidateSummary) Reset() {
 	*x = EvaluationCandidateSummary{}
-	mi := &file_aiworkflow_workflow_proto_msgTypes[10]
+	mi := &file_aiworkflow_workflow_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -774,7 +851,7 @@ func (x *EvaluationCandidateSummary) String() string {
 func (*EvaluationCandidateSummary) ProtoMessage() {}
 
 func (x *EvaluationCandidateSummary) ProtoReflect() protoreflect.Message {
-	mi := &file_aiworkflow_workflow_proto_msgTypes[10]
+	mi := &file_aiworkflow_workflow_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -787,7 +864,7 @@ func (x *EvaluationCandidateSummary) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use EvaluationCandidateSummary.ProtoReflect.Descriptor instead.
 func (*EvaluationCandidateSummary) Descriptor() ([]byte, []int) {
-	return file_aiworkflow_workflow_proto_rawDescGZIP(), []int{10}
+	return file_aiworkflow_workflow_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *EvaluationCandidateSummary) GetCandidateId() string {
@@ -822,7 +899,7 @@ type EvaluationCandidateIndex struct {
 
 func (x *EvaluationCandidateIndex) Reset() {
 	*x = EvaluationCandidateIndex{}
-	mi := &file_aiworkflow_workflow_proto_msgTypes[11]
+	mi := &file_aiworkflow_workflow_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -834,7 +911,7 @@ func (x *EvaluationCandidateIndex) String() string {
 func (*EvaluationCandidateIndex) ProtoMessage() {}
 
 func (x *EvaluationCandidateIndex) ProtoReflect() protoreflect.Message {
-	mi := &file_aiworkflow_workflow_proto_msgTypes[11]
+	mi := &file_aiworkflow_workflow_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -847,7 +924,7 @@ func (x *EvaluationCandidateIndex) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use EvaluationCandidateIndex.ProtoReflect.Descriptor instead.
 func (*EvaluationCandidateIndex) Descriptor() ([]byte, []int) {
-	return file_aiworkflow_workflow_proto_rawDescGZIP(), []int{11}
+	return file_aiworkflow_workflow_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *EvaluationCandidateIndex) GetRunId() string {
@@ -882,7 +959,7 @@ type EvaluationCandidateQuery struct {
 
 func (x *EvaluationCandidateQuery) Reset() {
 	*x = EvaluationCandidateQuery{}
-	mi := &file_aiworkflow_workflow_proto_msgTypes[12]
+	mi := &file_aiworkflow_workflow_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -894,7 +971,7 @@ func (x *EvaluationCandidateQuery) String() string {
 func (*EvaluationCandidateQuery) ProtoMessage() {}
 
 func (x *EvaluationCandidateQuery) ProtoReflect() protoreflect.Message {
-	mi := &file_aiworkflow_workflow_proto_msgTypes[12]
+	mi := &file_aiworkflow_workflow_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -907,7 +984,7 @@ func (x *EvaluationCandidateQuery) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use EvaluationCandidateQuery.ProtoReflect.Descriptor instead.
 func (*EvaluationCandidateQuery) Descriptor() ([]byte, []int) {
-	return file_aiworkflow_workflow_proto_rawDescGZIP(), []int{12}
+	return file_aiworkflow_workflow_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *EvaluationCandidateQuery) GetScope() *EvaluationQuery {
@@ -945,7 +1022,7 @@ type EvaluationCandidateEvidence struct {
 
 func (x *EvaluationCandidateEvidence) Reset() {
 	*x = EvaluationCandidateEvidence{}
-	mi := &file_aiworkflow_workflow_proto_msgTypes[13]
+	mi := &file_aiworkflow_workflow_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -957,7 +1034,7 @@ func (x *EvaluationCandidateEvidence) String() string {
 func (*EvaluationCandidateEvidence) ProtoMessage() {}
 
 func (x *EvaluationCandidateEvidence) ProtoReflect() protoreflect.Message {
-	mi := &file_aiworkflow_workflow_proto_msgTypes[13]
+	mi := &file_aiworkflow_workflow_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -970,7 +1047,7 @@ func (x *EvaluationCandidateEvidence) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use EvaluationCandidateEvidence.ProtoReflect.Descriptor instead.
 func (*EvaluationCandidateEvidence) Descriptor() ([]byte, []int) {
-	return file_aiworkflow_workflow_proto_rawDescGZIP(), []int{13}
+	return file_aiworkflow_workflow_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *EvaluationCandidateEvidence) GetRunId() string {
@@ -1026,7 +1103,7 @@ type EvaluationQuery struct {
 
 func (x *EvaluationQuery) Reset() {
 	*x = EvaluationQuery{}
-	mi := &file_aiworkflow_workflow_proto_msgTypes[14]
+	mi := &file_aiworkflow_workflow_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1038,7 +1115,7 @@ func (x *EvaluationQuery) String() string {
 func (*EvaluationQuery) ProtoMessage() {}
 
 func (x *EvaluationQuery) ProtoReflect() protoreflect.Message {
-	mi := &file_aiworkflow_workflow_proto_msgTypes[14]
+	mi := &file_aiworkflow_workflow_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1051,7 +1128,7 @@ func (x *EvaluationQuery) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use EvaluationQuery.ProtoReflect.Descriptor instead.
 func (*EvaluationQuery) Descriptor() ([]byte, []int) {
-	return file_aiworkflow_workflow_proto_rawDescGZIP(), []int{14}
+	return file_aiworkflow_workflow_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *EvaluationQuery) GetRunId() string {
@@ -1090,7 +1167,7 @@ type UnknownResolutionCommand struct {
 
 func (x *UnknownResolutionCommand) Reset() {
 	*x = UnknownResolutionCommand{}
-	mi := &file_aiworkflow_workflow_proto_msgTypes[15]
+	mi := &file_aiworkflow_workflow_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1102,7 +1179,7 @@ func (x *UnknownResolutionCommand) String() string {
 func (*UnknownResolutionCommand) ProtoMessage() {}
 
 func (x *UnknownResolutionCommand) ProtoReflect() protoreflect.Message {
-	mi := &file_aiworkflow_workflow_proto_msgTypes[15]
+	mi := &file_aiworkflow_workflow_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1115,7 +1192,7 @@ func (x *UnknownResolutionCommand) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UnknownResolutionCommand.ProtoReflect.Descriptor instead.
 func (*UnknownResolutionCommand) Descriptor() ([]byte, []int) {
-	return file_aiworkflow_workflow_proto_rawDescGZIP(), []int{15}
+	return file_aiworkflow_workflow_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *UnknownResolutionCommand) GetScope() *EvaluationQuery {
@@ -1176,14 +1253,16 @@ type EvaluationState struct {
 	// Audit-only decisions, excluding prompts, reports, model output and credentials.
 	ResolutionsJson string `protobuf:"bytes,5,opt,name=resolutions_json,json=resolutionsJson,proto3" json:"resolutions_json,omitempty"`
 	// Append-only human audit records, including bounded contradiction-review excerpts.
-	ReviewsJson   string `protobuf:"bytes,6,opt,name=reviews_json,json=reviewsJson,proto3" json:"reviews_json,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	ReviewsJson string `protobuf:"bytes,6,opt,name=reviews_json,json=reviewsJson,proto3" json:"reviews_json,omitempty"`
+	// Revalidated final gate, release identity, actor, reason, server time and version.
+	FinalizationJson string `protobuf:"bytes,7,opt,name=finalization_json,json=finalizationJson,proto3" json:"finalization_json,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
 }
 
 func (x *EvaluationState) Reset() {
 	*x = EvaluationState{}
-	mi := &file_aiworkflow_workflow_proto_msgTypes[16]
+	mi := &file_aiworkflow_workflow_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1195,7 +1274,7 @@ func (x *EvaluationState) String() string {
 func (*EvaluationState) ProtoMessage() {}
 
 func (x *EvaluationState) ProtoReflect() protoreflect.Message {
-	mi := &file_aiworkflow_workflow_proto_msgTypes[16]
+	mi := &file_aiworkflow_workflow_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1208,7 +1287,7 @@ func (x *EvaluationState) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use EvaluationState.ProtoReflect.Descriptor instead.
 func (*EvaluationState) Descriptor() ([]byte, []int) {
-	return file_aiworkflow_workflow_proto_rawDescGZIP(), []int{16}
+	return file_aiworkflow_workflow_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *EvaluationState) GetRunId() string {
@@ -1253,6 +1332,13 @@ func (x *EvaluationState) GetReviewsJson() string {
 	return ""
 }
 
+func (x *EvaluationState) GetFinalizationJson() string {
+	if x != nil {
+		return x.FinalizationJson
+	}
+	return ""
+}
+
 type SemanticContradictionReview struct {
 	state             protoimpl.MessageState `protogen:"open.v1"`
 	PolicyVersion     string                 `protobuf:"bytes,1,opt,name=policy_version,json=policyVersion,proto3" json:"policy_version,omitempty"`
@@ -1268,7 +1354,7 @@ type SemanticContradictionReview struct {
 
 func (x *SemanticContradictionReview) Reset() {
 	*x = SemanticContradictionReview{}
-	mi := &file_aiworkflow_workflow_proto_msgTypes[17]
+	mi := &file_aiworkflow_workflow_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1280,7 +1366,7 @@ func (x *SemanticContradictionReview) String() string {
 func (*SemanticContradictionReview) ProtoMessage() {}
 
 func (x *SemanticContradictionReview) ProtoReflect() protoreflect.Message {
-	mi := &file_aiworkflow_workflow_proto_msgTypes[17]
+	mi := &file_aiworkflow_workflow_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1293,7 +1379,7 @@ func (x *SemanticContradictionReview) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SemanticContradictionReview.ProtoReflect.Descriptor instead.
 func (*SemanticContradictionReview) Descriptor() ([]byte, []int) {
-	return file_aiworkflow_workflow_proto_rawDescGZIP(), []int{17}
+	return file_aiworkflow_workflow_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *SemanticContradictionReview) GetPolicyVersion() string {
@@ -1357,7 +1443,7 @@ type CandidateReviewItem struct {
 
 func (x *CandidateReviewItem) Reset() {
 	*x = CandidateReviewItem{}
-	mi := &file_aiworkflow_workflow_proto_msgTypes[18]
+	mi := &file_aiworkflow_workflow_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1369,7 +1455,7 @@ func (x *CandidateReviewItem) String() string {
 func (*CandidateReviewItem) ProtoMessage() {}
 
 func (x *CandidateReviewItem) ProtoReflect() protoreflect.Message {
-	mi := &file_aiworkflow_workflow_proto_msgTypes[18]
+	mi := &file_aiworkflow_workflow_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1382,7 +1468,7 @@ func (x *CandidateReviewItem) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CandidateReviewItem.ProtoReflect.Descriptor instead.
 func (*CandidateReviewItem) Descriptor() ([]byte, []int) {
-	return file_aiworkflow_workflow_proto_rawDescGZIP(), []int{18}
+	return file_aiworkflow_workflow_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *CandidateReviewItem) GetCandidateId() string {
@@ -1425,7 +1511,7 @@ type EvaluationReviewCommand struct {
 
 func (x *EvaluationReviewCommand) Reset() {
 	*x = EvaluationReviewCommand{}
-	mi := &file_aiworkflow_workflow_proto_msgTypes[19]
+	mi := &file_aiworkflow_workflow_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1437,7 +1523,7 @@ func (x *EvaluationReviewCommand) String() string {
 func (*EvaluationReviewCommand) ProtoMessage() {}
 
 func (x *EvaluationReviewCommand) ProtoReflect() protoreflect.Message {
-	mi := &file_aiworkflow_workflow_proto_msgTypes[19]
+	mi := &file_aiworkflow_workflow_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1450,7 +1536,7 @@ func (x *EvaluationReviewCommand) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use EvaluationReviewCommand.ProtoReflect.Descriptor instead.
 func (*EvaluationReviewCommand) Descriptor() ([]byte, []int) {
-	return file_aiworkflow_workflow_proto_rawDescGZIP(), []int{19}
+	return file_aiworkflow_workflow_proto_rawDescGZIP(), []int{20}
 }
 
 func (x *EvaluationReviewCommand) GetScope() *EvaluationQuery {
@@ -1493,7 +1579,7 @@ type EvaluationStartCommand struct {
 
 func (x *EvaluationStartCommand) Reset() {
 	*x = EvaluationStartCommand{}
-	mi := &file_aiworkflow_workflow_proto_msgTypes[20]
+	mi := &file_aiworkflow_workflow_proto_msgTypes[21]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1505,7 +1591,7 @@ func (x *EvaluationStartCommand) String() string {
 func (*EvaluationStartCommand) ProtoMessage() {}
 
 func (x *EvaluationStartCommand) ProtoReflect() protoreflect.Message {
-	mi := &file_aiworkflow_workflow_proto_msgTypes[20]
+	mi := &file_aiworkflow_workflow_proto_msgTypes[21]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1518,7 +1604,7 @@ func (x *EvaluationStartCommand) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use EvaluationStartCommand.ProtoReflect.Descriptor instead.
 func (*EvaluationStartCommand) Descriptor() ([]byte, []int) {
-	return file_aiworkflow_workflow_proto_rawDescGZIP(), []int{20}
+	return file_aiworkflow_workflow_proto_rawDescGZIP(), []int{21}
 }
 
 func (x *EvaluationStartCommand) GetScope() *EvaluationQuery {
@@ -1560,7 +1646,7 @@ type FrozenEvaluationRef struct {
 
 func (x *FrozenEvaluationRef) Reset() {
 	*x = FrozenEvaluationRef{}
-	mi := &file_aiworkflow_workflow_proto_msgTypes[21]
+	mi := &file_aiworkflow_workflow_proto_msgTypes[22]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1572,7 +1658,7 @@ func (x *FrozenEvaluationRef) String() string {
 func (*FrozenEvaluationRef) ProtoMessage() {}
 
 func (x *FrozenEvaluationRef) ProtoReflect() protoreflect.Message {
-	mi := &file_aiworkflow_workflow_proto_msgTypes[21]
+	mi := &file_aiworkflow_workflow_proto_msgTypes[22]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1585,7 +1671,7 @@ func (x *FrozenEvaluationRef) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use FrozenEvaluationRef.ProtoReflect.Descriptor instead.
 func (*FrozenEvaluationRef) Descriptor() ([]byte, []int) {
-	return file_aiworkflow_workflow_proto_rawDescGZIP(), []int{21}
+	return file_aiworkflow_workflow_proto_rawDescGZIP(), []int{22}
 }
 
 func (x *FrozenEvaluationRef) GetId() string {
@@ -1628,7 +1714,7 @@ type EvaluationRelease struct {
 
 func (x *EvaluationRelease) Reset() {
 	*x = EvaluationRelease{}
-	mi := &file_aiworkflow_workflow_proto_msgTypes[22]
+	mi := &file_aiworkflow_workflow_proto_msgTypes[23]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1640,7 +1726,7 @@ func (x *EvaluationRelease) String() string {
 func (*EvaluationRelease) ProtoMessage() {}
 
 func (x *EvaluationRelease) ProtoReflect() protoreflect.Message {
-	mi := &file_aiworkflow_workflow_proto_msgTypes[22]
+	mi := &file_aiworkflow_workflow_proto_msgTypes[23]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1653,7 +1739,7 @@ func (x *EvaluationRelease) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use EvaluationRelease.ProtoReflect.Descriptor instead.
 func (*EvaluationRelease) Descriptor() ([]byte, []int) {
-	return file_aiworkflow_workflow_proto_rawDescGZIP(), []int{22}
+	return file_aiworkflow_workflow_proto_rawDescGZIP(), []int{23}
 }
 
 func (x *EvaluationRelease) GetSuite() *FrozenEvaluationRef {
@@ -1745,7 +1831,7 @@ type EvaluationCreateCommand struct {
 
 func (x *EvaluationCreateCommand) Reset() {
 	*x = EvaluationCreateCommand{}
-	mi := &file_aiworkflow_workflow_proto_msgTypes[23]
+	mi := &file_aiworkflow_workflow_proto_msgTypes[24]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1757,7 +1843,7 @@ func (x *EvaluationCreateCommand) String() string {
 func (*EvaluationCreateCommand) ProtoMessage() {}
 
 func (x *EvaluationCreateCommand) ProtoReflect() protoreflect.Message {
-	mi := &file_aiworkflow_workflow_proto_msgTypes[23]
+	mi := &file_aiworkflow_workflow_proto_msgTypes[24]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1770,7 +1856,7 @@ func (x *EvaluationCreateCommand) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use EvaluationCreateCommand.ProtoReflect.Descriptor instead.
 func (*EvaluationCreateCommand) Descriptor() ([]byte, []int) {
-	return file_aiworkflow_workflow_proto_rawDescGZIP(), []int{23}
+	return file_aiworkflow_workflow_proto_rawDescGZIP(), []int{24}
 }
 
 func (x *EvaluationCreateCommand) GetScope() *EvaluationQuery {
@@ -1865,7 +1951,14 @@ const file_aiworkflow_workflow_proto_rawDesc = "" +
 	"\ttestee_id\x18\x02 \x01(\tR\btesteeId\x12\x1b\n" +
 	"\treport_id\x18\x03 \x01(\tR\breportId\x12%\n" +
 	"\x0esource_version\x18\x04 \x01(\tR\rsourceVersion\x12,\n" +
-	"\x05facts\x18\x05 \x03(\v2\x16.qsai.workflow.v1.FactR\x05facts\"y\n" +
+	"\x05facts\x18\x05 \x03(\v2\x16.qsai.workflow.v1.FactR\x05facts\"\xf3\x01\n" +
+	"\x19EvaluationFinalizeCommand\x127\n" +
+	"\x05scope\x18\x01 \x01(\v2!.qsai.workflow.v1.EvaluationQueryR\x05scope\x12)\n" +
+	"\x10expected_version\x18\x02 \x01(\x03R\x0fexpectedVersion\x12,\n" +
+	"\x0fexpected_passed\x18\x03 \x01(\bH\x00R\x0eexpectedPassed\x88\x01\x01\x12\x16\n" +
+	"\x06reason\x18\x04 \x01(\tR\x06reason\x12\x18\n" +
+	"\aconfirm\x18\x05 \x01(\bR\aconfirmB\x12\n" +
+	"\x10_expected_passed\"y\n" +
 	"\x13EvaluationGateQuery\x127\n" +
 	"\x05scope\x18\x01 \x01(\v2!.qsai.workflow.v1.EvaluationQueryR\x05scope\x12)\n" +
 	"\x10expected_version\x18\x02 \x01(\x03R\x0fexpectedVersion\"\xa3\x01\n" +
@@ -1906,14 +1999,15 @@ const file_aiworkflow_workflow_proto_rawDesc = "" +
 	"\bdecision\x18\x04 \x01(\tR\bdecision\x12\x16\n" +
 	"\x06reason\x18\x05 \x01(\tR\x06reason\x12\x18\n" +
 	"\aconfirm\x18\x06 \x01(\bR\aconfirm\x12W\n" +
-	")acknowledged_duplicate_call_and_cost_risk\x18\a \x01(\bR$acknowledgedDuplicateCallAndCostRisk\"\xef\x01\n" +
+	")acknowledged_duplicate_call_and_cost_risk\x18\a \x01(\bR$acknowledgedDuplicateCallAndCostRisk\"\x9c\x02\n" +
 	"\x0fEvaluationState\x12\x15\n" +
 	"\x06run_id\x18\x01 \x01(\tR\x05runId\x12\x18\n" +
 	"\aversion\x18\x02 \x01(\x03R\aversion\x12\x16\n" +
 	"\x06status\x18\x03 \x01(\tR\x06status\x12E\n" +
 	"\x1funresolved_result_unknown_count\x18\x04 \x01(\x03R\x1cunresolvedResultUnknownCount\x12)\n" +
 	"\x10resolutions_json\x18\x05 \x01(\tR\x0fresolutionsJson\x12!\n" +
-	"\freviews_json\x18\x06 \x01(\tR\vreviewsJson\"\xb1\x02\n" +
+	"\freviews_json\x18\x06 \x01(\tR\vreviewsJson\x12+\n" +
+	"\x11finalization_json\x18\a \x01(\tR\x10finalizationJson\"\xb1\x02\n" +
 	"\x1bSemanticContradictionReview\x12%\n" +
 	"\x0epolicy_version\x18\x01 \x01(\tR\rpolicyVersion\x12!\n" +
 	"\fexecution_id\x18\x02 \x01(\tR\vexecutionId\x12-\n" +
@@ -1964,7 +2058,7 @@ const file_aiworkflow_workflow_proto_rawDesc = "" +
 	"\x05Start\x12\x1e.qsai.workflow.v1.StartCommand\x1a\x19.qsai.workflow.v1.Receipt\x12D\n" +
 	"\x06Change\x12\x1f.qsai.workflow.v1.ChangeCommand\x1a\x19.qsai.workflow.v1.Receipt2T\n" +
 	"\aResults\x12I\n" +
-	"\x06Accept\x12\x1c.qsai.workflow.v1.StateEvent\x1a!.qsai.workflow.v1.Acknowledgement2\xf6\x05\n" +
+	"\x06Accept\x12\x1c.qsai.workflow.v1.StateEvent\x1a!.qsai.workflow.v1.Acknowledgement2\xd2\x06\n" +
 	"\x14EvaluationManagement\x12V\n" +
 	"\x06Create\x12).qsai.workflow.v1.EvaluationCreateCommand\x1a!.qsai.workflow.v1.EvaluationState\x12T\n" +
 	"\x05Start\x12(.qsai.workflow.v1.EvaluationStartCommand\x1a!.qsai.workflow.v1.EvaluationState\x12K\n" +
@@ -1973,7 +2067,8 @@ const file_aiworkflow_workflow_proto_rawDesc = "" +
 	"\x06Review\x12).qsai.workflow.v1.EvaluationReviewCommand\x1a!.qsai.workflow.v1.EvaluationState\x12_\n" +
 	"\x0eListCandidates\x12!.qsai.workflow.v1.EvaluationQuery\x1a*.qsai.workflow.v1.EvaluationCandidateIndex\x12i\n" +
 	"\fGetCandidate\x12*.qsai.workflow.v1.EvaluationCandidateQuery\x1a-.qsai.workflow.v1.EvaluationCandidateEvidence\x12^\n" +
-	"\fPreviewGates\x12%.qsai.workflow.v1.EvaluationGateQuery\x1a'.qsai.workflow.v1.EvaluationGatePreviewB;Z9github.com/FangcunMount/qs-server/api/grpc/gen/aiworkflowb\x06proto3"
+	"\fPreviewGates\x12%.qsai.workflow.v1.EvaluationGateQuery\x1a'.qsai.workflow.v1.EvaluationGatePreview\x12Z\n" +
+	"\bFinalize\x12+.qsai.workflow.v1.EvaluationFinalizeCommand\x1a!.qsai.workflow.v1.EvaluationStateB;Z9github.com/FangcunMount/qs-server/api/grpc/gen/aiworkflowb\x06proto3"
 
 var (
 	file_aiworkflow_workflow_proto_rawDescOnce sync.Once
@@ -1987,7 +2082,7 @@ func file_aiworkflow_workflow_proto_rawDescGZIP() []byte {
 	return file_aiworkflow_workflow_proto_rawDescData
 }
 
-var file_aiworkflow_workflow_proto_msgTypes = make([]protoimpl.MessageInfo, 24)
+var file_aiworkflow_workflow_proto_msgTypes = make([]protoimpl.MessageInfo, 25)
 var file_aiworkflow_workflow_proto_goTypes = []any{
 	(*Actor)(nil),                       // 0: qsai.workflow.v1.Actor
 	(*StartCommand)(nil),                // 1: qsai.workflow.v1.StartCommand
@@ -1997,22 +2092,23 @@ var file_aiworkflow_workflow_proto_goTypes = []any{
 	(*Acknowledgement)(nil),             // 5: qsai.workflow.v1.Acknowledgement
 	(*Fact)(nil),                        // 6: qsai.workflow.v1.Fact
 	(*EvidenceItem)(nil),                // 7: qsai.workflow.v1.EvidenceItem
-	(*EvaluationGateQuery)(nil),         // 8: qsai.workflow.v1.EvaluationGateQuery
-	(*EvaluationGatePreview)(nil),       // 9: qsai.workflow.v1.EvaluationGatePreview
-	(*EvaluationCandidateSummary)(nil),  // 10: qsai.workflow.v1.EvaluationCandidateSummary
-	(*EvaluationCandidateIndex)(nil),    // 11: qsai.workflow.v1.EvaluationCandidateIndex
-	(*EvaluationCandidateQuery)(nil),    // 12: qsai.workflow.v1.EvaluationCandidateQuery
-	(*EvaluationCandidateEvidence)(nil), // 13: qsai.workflow.v1.EvaluationCandidateEvidence
-	(*EvaluationQuery)(nil),             // 14: qsai.workflow.v1.EvaluationQuery
-	(*UnknownResolutionCommand)(nil),    // 15: qsai.workflow.v1.UnknownResolutionCommand
-	(*EvaluationState)(nil),             // 16: qsai.workflow.v1.EvaluationState
-	(*SemanticContradictionReview)(nil), // 17: qsai.workflow.v1.SemanticContradictionReview
-	(*CandidateReviewItem)(nil),         // 18: qsai.workflow.v1.CandidateReviewItem
-	(*EvaluationReviewCommand)(nil),     // 19: qsai.workflow.v1.EvaluationReviewCommand
-	(*EvaluationStartCommand)(nil),      // 20: qsai.workflow.v1.EvaluationStartCommand
-	(*FrozenEvaluationRef)(nil),         // 21: qsai.workflow.v1.FrozenEvaluationRef
-	(*EvaluationRelease)(nil),           // 22: qsai.workflow.v1.EvaluationRelease
-	(*EvaluationCreateCommand)(nil),     // 23: qsai.workflow.v1.EvaluationCreateCommand
+	(*EvaluationFinalizeCommand)(nil),   // 8: qsai.workflow.v1.EvaluationFinalizeCommand
+	(*EvaluationGateQuery)(nil),         // 9: qsai.workflow.v1.EvaluationGateQuery
+	(*EvaluationGatePreview)(nil),       // 10: qsai.workflow.v1.EvaluationGatePreview
+	(*EvaluationCandidateSummary)(nil),  // 11: qsai.workflow.v1.EvaluationCandidateSummary
+	(*EvaluationCandidateIndex)(nil),    // 12: qsai.workflow.v1.EvaluationCandidateIndex
+	(*EvaluationCandidateQuery)(nil),    // 13: qsai.workflow.v1.EvaluationCandidateQuery
+	(*EvaluationCandidateEvidence)(nil), // 14: qsai.workflow.v1.EvaluationCandidateEvidence
+	(*EvaluationQuery)(nil),             // 15: qsai.workflow.v1.EvaluationQuery
+	(*UnknownResolutionCommand)(nil),    // 16: qsai.workflow.v1.UnknownResolutionCommand
+	(*EvaluationState)(nil),             // 17: qsai.workflow.v1.EvaluationState
+	(*SemanticContradictionReview)(nil), // 18: qsai.workflow.v1.SemanticContradictionReview
+	(*CandidateReviewItem)(nil),         // 19: qsai.workflow.v1.CandidateReviewItem
+	(*EvaluationReviewCommand)(nil),     // 20: qsai.workflow.v1.EvaluationReviewCommand
+	(*EvaluationStartCommand)(nil),      // 21: qsai.workflow.v1.EvaluationStartCommand
+	(*FrozenEvaluationRef)(nil),         // 22: qsai.workflow.v1.FrozenEvaluationRef
+	(*EvaluationRelease)(nil),           // 23: qsai.workflow.v1.EvaluationRelease
+	(*EvaluationCreateCommand)(nil),     // 24: qsai.workflow.v1.EvaluationCreateCommand
 }
 var file_aiworkflow_workflow_proto_depIdxs = []int32{
 	0,  // 0: qsai.workflow.v1.StartCommand.actor:type_name -> qsai.workflow.v1.Actor
@@ -2020,54 +2116,57 @@ var file_aiworkflow_workflow_proto_depIdxs = []int32{
 	0,  // 2: qsai.workflow.v1.ChangeCommand.actor:type_name -> qsai.workflow.v1.Actor
 	0,  // 3: qsai.workflow.v1.StateEvent.actor:type_name -> qsai.workflow.v1.Actor
 	6,  // 4: qsai.workflow.v1.EvidenceItem.facts:type_name -> qsai.workflow.v1.Fact
-	14, // 5: qsai.workflow.v1.EvaluationGateQuery.scope:type_name -> qsai.workflow.v1.EvaluationQuery
-	10, // 6: qsai.workflow.v1.EvaluationCandidateIndex.candidates:type_name -> qsai.workflow.v1.EvaluationCandidateSummary
-	14, // 7: qsai.workflow.v1.EvaluationCandidateQuery.scope:type_name -> qsai.workflow.v1.EvaluationQuery
-	14, // 8: qsai.workflow.v1.UnknownResolutionCommand.scope:type_name -> qsai.workflow.v1.EvaluationQuery
-	17, // 9: qsai.workflow.v1.CandidateReviewItem.semantic_review:type_name -> qsai.workflow.v1.SemanticContradictionReview
-	14, // 10: qsai.workflow.v1.EvaluationReviewCommand.scope:type_name -> qsai.workflow.v1.EvaluationQuery
-	18, // 11: qsai.workflow.v1.EvaluationReviewCommand.reviews:type_name -> qsai.workflow.v1.CandidateReviewItem
-	14, // 12: qsai.workflow.v1.EvaluationStartCommand.scope:type_name -> qsai.workflow.v1.EvaluationQuery
-	21, // 13: qsai.workflow.v1.EvaluationRelease.suite:type_name -> qsai.workflow.v1.FrozenEvaluationRef
-	21, // 14: qsai.workflow.v1.EvaluationRelease.prompt:type_name -> qsai.workflow.v1.FrozenEvaluationRef
-	21, // 15: qsai.workflow.v1.EvaluationRelease.profile:type_name -> qsai.workflow.v1.FrozenEvaluationRef
-	21, // 16: qsai.workflow.v1.EvaluationRelease.input_schema:type_name -> qsai.workflow.v1.FrozenEvaluationRef
-	21, // 17: qsai.workflow.v1.EvaluationRelease.output_schema:type_name -> qsai.workflow.v1.FrozenEvaluationRef
-	21, // 18: qsai.workflow.v1.EvaluationRelease.generation_route:type_name -> qsai.workflow.v1.FrozenEvaluationRef
-	21, // 19: qsai.workflow.v1.EvaluationRelease.semantic_prompt:type_name -> qsai.workflow.v1.FrozenEvaluationRef
-	21, // 20: qsai.workflow.v1.EvaluationRelease.semantic_output_schema:type_name -> qsai.workflow.v1.FrozenEvaluationRef
-	21, // 21: qsai.workflow.v1.EvaluationRelease.semantic_route:type_name -> qsai.workflow.v1.FrozenEvaluationRef
-	21, // 22: qsai.workflow.v1.EvaluationRelease.execution_policy:type_name -> qsai.workflow.v1.FrozenEvaluationRef
-	21, // 23: qsai.workflow.v1.EvaluationRelease.gate_policy:type_name -> qsai.workflow.v1.FrozenEvaluationRef
-	14, // 24: qsai.workflow.v1.EvaluationCreateCommand.scope:type_name -> qsai.workflow.v1.EvaluationQuery
-	22, // 25: qsai.workflow.v1.EvaluationCreateCommand.release:type_name -> qsai.workflow.v1.EvaluationRelease
-	1,  // 26: qsai.workflow.v1.Commands.Start:input_type -> qsai.workflow.v1.StartCommand
-	2,  // 27: qsai.workflow.v1.Commands.Change:input_type -> qsai.workflow.v1.ChangeCommand
-	4,  // 28: qsai.workflow.v1.Results.Accept:input_type -> qsai.workflow.v1.StateEvent
-	23, // 29: qsai.workflow.v1.EvaluationManagement.Create:input_type -> qsai.workflow.v1.EvaluationCreateCommand
-	20, // 30: qsai.workflow.v1.EvaluationManagement.Start:input_type -> qsai.workflow.v1.EvaluationStartCommand
-	14, // 31: qsai.workflow.v1.EvaluationManagement.Get:input_type -> qsai.workflow.v1.EvaluationQuery
-	15, // 32: qsai.workflow.v1.EvaluationManagement.ResolveUnknown:input_type -> qsai.workflow.v1.UnknownResolutionCommand
-	19, // 33: qsai.workflow.v1.EvaluationManagement.Review:input_type -> qsai.workflow.v1.EvaluationReviewCommand
-	14, // 34: qsai.workflow.v1.EvaluationManagement.ListCandidates:input_type -> qsai.workflow.v1.EvaluationQuery
-	12, // 35: qsai.workflow.v1.EvaluationManagement.GetCandidate:input_type -> qsai.workflow.v1.EvaluationCandidateQuery
-	8,  // 36: qsai.workflow.v1.EvaluationManagement.PreviewGates:input_type -> qsai.workflow.v1.EvaluationGateQuery
-	3,  // 37: qsai.workflow.v1.Commands.Start:output_type -> qsai.workflow.v1.Receipt
-	3,  // 38: qsai.workflow.v1.Commands.Change:output_type -> qsai.workflow.v1.Receipt
-	5,  // 39: qsai.workflow.v1.Results.Accept:output_type -> qsai.workflow.v1.Acknowledgement
-	16, // 40: qsai.workflow.v1.EvaluationManagement.Create:output_type -> qsai.workflow.v1.EvaluationState
-	16, // 41: qsai.workflow.v1.EvaluationManagement.Start:output_type -> qsai.workflow.v1.EvaluationState
-	16, // 42: qsai.workflow.v1.EvaluationManagement.Get:output_type -> qsai.workflow.v1.EvaluationState
-	16, // 43: qsai.workflow.v1.EvaluationManagement.ResolveUnknown:output_type -> qsai.workflow.v1.EvaluationState
-	16, // 44: qsai.workflow.v1.EvaluationManagement.Review:output_type -> qsai.workflow.v1.EvaluationState
-	11, // 45: qsai.workflow.v1.EvaluationManagement.ListCandidates:output_type -> qsai.workflow.v1.EvaluationCandidateIndex
-	13, // 46: qsai.workflow.v1.EvaluationManagement.GetCandidate:output_type -> qsai.workflow.v1.EvaluationCandidateEvidence
-	9,  // 47: qsai.workflow.v1.EvaluationManagement.PreviewGates:output_type -> qsai.workflow.v1.EvaluationGatePreview
-	37, // [37:48] is the sub-list for method output_type
-	26, // [26:37] is the sub-list for method input_type
-	26, // [26:26] is the sub-list for extension type_name
-	26, // [26:26] is the sub-list for extension extendee
-	0,  // [0:26] is the sub-list for field type_name
+	15, // 5: qsai.workflow.v1.EvaluationFinalizeCommand.scope:type_name -> qsai.workflow.v1.EvaluationQuery
+	15, // 6: qsai.workflow.v1.EvaluationGateQuery.scope:type_name -> qsai.workflow.v1.EvaluationQuery
+	11, // 7: qsai.workflow.v1.EvaluationCandidateIndex.candidates:type_name -> qsai.workflow.v1.EvaluationCandidateSummary
+	15, // 8: qsai.workflow.v1.EvaluationCandidateQuery.scope:type_name -> qsai.workflow.v1.EvaluationQuery
+	15, // 9: qsai.workflow.v1.UnknownResolutionCommand.scope:type_name -> qsai.workflow.v1.EvaluationQuery
+	18, // 10: qsai.workflow.v1.CandidateReviewItem.semantic_review:type_name -> qsai.workflow.v1.SemanticContradictionReview
+	15, // 11: qsai.workflow.v1.EvaluationReviewCommand.scope:type_name -> qsai.workflow.v1.EvaluationQuery
+	19, // 12: qsai.workflow.v1.EvaluationReviewCommand.reviews:type_name -> qsai.workflow.v1.CandidateReviewItem
+	15, // 13: qsai.workflow.v1.EvaluationStartCommand.scope:type_name -> qsai.workflow.v1.EvaluationQuery
+	22, // 14: qsai.workflow.v1.EvaluationRelease.suite:type_name -> qsai.workflow.v1.FrozenEvaluationRef
+	22, // 15: qsai.workflow.v1.EvaluationRelease.prompt:type_name -> qsai.workflow.v1.FrozenEvaluationRef
+	22, // 16: qsai.workflow.v1.EvaluationRelease.profile:type_name -> qsai.workflow.v1.FrozenEvaluationRef
+	22, // 17: qsai.workflow.v1.EvaluationRelease.input_schema:type_name -> qsai.workflow.v1.FrozenEvaluationRef
+	22, // 18: qsai.workflow.v1.EvaluationRelease.output_schema:type_name -> qsai.workflow.v1.FrozenEvaluationRef
+	22, // 19: qsai.workflow.v1.EvaluationRelease.generation_route:type_name -> qsai.workflow.v1.FrozenEvaluationRef
+	22, // 20: qsai.workflow.v1.EvaluationRelease.semantic_prompt:type_name -> qsai.workflow.v1.FrozenEvaluationRef
+	22, // 21: qsai.workflow.v1.EvaluationRelease.semantic_output_schema:type_name -> qsai.workflow.v1.FrozenEvaluationRef
+	22, // 22: qsai.workflow.v1.EvaluationRelease.semantic_route:type_name -> qsai.workflow.v1.FrozenEvaluationRef
+	22, // 23: qsai.workflow.v1.EvaluationRelease.execution_policy:type_name -> qsai.workflow.v1.FrozenEvaluationRef
+	22, // 24: qsai.workflow.v1.EvaluationRelease.gate_policy:type_name -> qsai.workflow.v1.FrozenEvaluationRef
+	15, // 25: qsai.workflow.v1.EvaluationCreateCommand.scope:type_name -> qsai.workflow.v1.EvaluationQuery
+	23, // 26: qsai.workflow.v1.EvaluationCreateCommand.release:type_name -> qsai.workflow.v1.EvaluationRelease
+	1,  // 27: qsai.workflow.v1.Commands.Start:input_type -> qsai.workflow.v1.StartCommand
+	2,  // 28: qsai.workflow.v1.Commands.Change:input_type -> qsai.workflow.v1.ChangeCommand
+	4,  // 29: qsai.workflow.v1.Results.Accept:input_type -> qsai.workflow.v1.StateEvent
+	24, // 30: qsai.workflow.v1.EvaluationManagement.Create:input_type -> qsai.workflow.v1.EvaluationCreateCommand
+	21, // 31: qsai.workflow.v1.EvaluationManagement.Start:input_type -> qsai.workflow.v1.EvaluationStartCommand
+	15, // 32: qsai.workflow.v1.EvaluationManagement.Get:input_type -> qsai.workflow.v1.EvaluationQuery
+	16, // 33: qsai.workflow.v1.EvaluationManagement.ResolveUnknown:input_type -> qsai.workflow.v1.UnknownResolutionCommand
+	20, // 34: qsai.workflow.v1.EvaluationManagement.Review:input_type -> qsai.workflow.v1.EvaluationReviewCommand
+	15, // 35: qsai.workflow.v1.EvaluationManagement.ListCandidates:input_type -> qsai.workflow.v1.EvaluationQuery
+	13, // 36: qsai.workflow.v1.EvaluationManagement.GetCandidate:input_type -> qsai.workflow.v1.EvaluationCandidateQuery
+	9,  // 37: qsai.workflow.v1.EvaluationManagement.PreviewGates:input_type -> qsai.workflow.v1.EvaluationGateQuery
+	8,  // 38: qsai.workflow.v1.EvaluationManagement.Finalize:input_type -> qsai.workflow.v1.EvaluationFinalizeCommand
+	3,  // 39: qsai.workflow.v1.Commands.Start:output_type -> qsai.workflow.v1.Receipt
+	3,  // 40: qsai.workflow.v1.Commands.Change:output_type -> qsai.workflow.v1.Receipt
+	5,  // 41: qsai.workflow.v1.Results.Accept:output_type -> qsai.workflow.v1.Acknowledgement
+	17, // 42: qsai.workflow.v1.EvaluationManagement.Create:output_type -> qsai.workflow.v1.EvaluationState
+	17, // 43: qsai.workflow.v1.EvaluationManagement.Start:output_type -> qsai.workflow.v1.EvaluationState
+	17, // 44: qsai.workflow.v1.EvaluationManagement.Get:output_type -> qsai.workflow.v1.EvaluationState
+	17, // 45: qsai.workflow.v1.EvaluationManagement.ResolveUnknown:output_type -> qsai.workflow.v1.EvaluationState
+	17, // 46: qsai.workflow.v1.EvaluationManagement.Review:output_type -> qsai.workflow.v1.EvaluationState
+	12, // 47: qsai.workflow.v1.EvaluationManagement.ListCandidates:output_type -> qsai.workflow.v1.EvaluationCandidateIndex
+	14, // 48: qsai.workflow.v1.EvaluationManagement.GetCandidate:output_type -> qsai.workflow.v1.EvaluationCandidateEvidence
+	10, // 49: qsai.workflow.v1.EvaluationManagement.PreviewGates:output_type -> qsai.workflow.v1.EvaluationGatePreview
+	17, // 50: qsai.workflow.v1.EvaluationManagement.Finalize:output_type -> qsai.workflow.v1.EvaluationState
+	39, // [39:51] is the sub-list for method output_type
+	27, // [27:39] is the sub-list for method input_type
+	27, // [27:27] is the sub-list for extension type_name
+	27, // [27:27] is the sub-list for extension extendee
+	0,  // [0:27] is the sub-list for field type_name
 }
 
 func init() { file_aiworkflow_workflow_proto_init() }
@@ -2076,13 +2175,14 @@ func file_aiworkflow_workflow_proto_init() {
 		return
 	}
 	file_aiworkflow_workflow_proto_msgTypes[2].OneofWrappers = []any{}
+	file_aiworkflow_workflow_proto_msgTypes[8].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_aiworkflow_workflow_proto_rawDesc), len(file_aiworkflow_workflow_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   24,
+			NumMessages:   25,
 			NumExtensions: 0,
 			NumServices:   3,
 		},

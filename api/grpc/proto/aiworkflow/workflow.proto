@@ -50,6 +50,16 @@ service EvaluationManagement {
  rpc GetCandidate(EvaluationCandidateQuery) returns (EvaluationCandidateEvidence);
  // Read-only complete gate preview; does not approve the Run or publish a release.
  rpc PreviewGates(EvaluationGateQuery) returns (EvaluationGatePreview);
+ // Recompute gates under CAS; this records approval/rejection, never publishes a release.
+ rpc Finalize(EvaluationFinalizeCommand) returns (EvaluationState);
+}
+message EvaluationFinalizeCommand {
+ EvaluationQuery scope = 1;
+ int64 expected_version = 2;
+ // Presence is mandatory; false explicitly confirms the previewed rejection.
+ optional bool expected_passed = 3;
+ string reason = 4;
+ bool confirm = 5;
 }
 message EvaluationGateQuery {
  EvaluationQuery scope = 1;
@@ -107,6 +117,8 @@ message EvaluationState {
  string resolutions_json = 5;
  // Append-only human audit records, including bounded contradiction-review excerpts.
  string reviews_json = 6;
+ // Revalidated final gate, release identity, actor, reason, server time and version.
+ string finalization_json = 7;
 }
 
 message SemanticContradictionReview {
