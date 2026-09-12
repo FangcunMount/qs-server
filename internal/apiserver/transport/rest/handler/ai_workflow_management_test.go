@@ -2,6 +2,7 @@ package handler
 
 import (
 	"context"
+	"encoding/json"
 	"net/http/httptest"
 	"strings"
 	"testing"
@@ -75,6 +76,35 @@ func TestAIWorkflowStartUsesProtectedIdentityNotBody(t *testing.T) {
 	snapshot := &authz.Snapshot{EffectiveRoles: []string{"qs:admin"}, Permissions: []authz.Permission{{Resource: "qs:*:*:*", Action: "*", Mode: authz.AuthorizationModeUnconditional}}}
 	ctx.Request = ctx.Request.WithContext(authz.WithSnapshot(ctx.Request.Context(), snapshot))
 	h.Start(ctx)
+	if w.Code != 200 || gateway.calls != 1 || gateway.scope.OrganizationID != 12 || gateway.scope.OperatorUserID != 34 {
+		t.Fatalf("status=%d calls=%d scope=%+v", w.Code, gateway.calls, gateway.scope)
+	}
+}
+
+func (g *managementGateway) CreateEvaluation(ctx context.Context, s app.EvaluationScope, _ app.EvaluationCreate) (app.EvaluationState, error) {
+	return g.GetEvaluation(ctx, s)
+}
+
+func TestAIWorkflowCreateUsesProtectedIdentityNotBody(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	gateway := &managementGateway{}
+	h := NewAIWorkflowManagementHandler(&app.EvaluationAdministration{Gateway: gateway})
+	refs := map[string]any{}
+	for _, name := range []string{"suite", "profile", "prompt", "input_schema", "output_schema", "generation_route", "semantic_prompt", "semantic_output_schema", "semantic_route", "execution_policy", "gate_policy"} {
+		refs[name] = map[string]string{"id": name, "version": "v1", "fingerprint": "sha256:" + strings.Repeat("a", 64)}
+	}
+	raw, _ := json.Marshal(map[string]any{"organization_id": 999, "operator_user_id": 999, "release": refs, "reason": "创建评测", "confirm": true})
+	body := string(raw)
+	w := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(w)
+	ctx.Request = httptest.NewRequest("POST", "/", strings.NewReader(body))
+	ctx.Request.Header.Set("Content-Type", "application/json")
+	ctx.Params = gin.Params{{Key: "run_id", Value: "00000000-0000-4000-8000-000000000001"}}
+	ctx.Set(middleware.OrgIDKey, uint64(12))
+	ctx.Set(middleware.UserIDKey, uint64(34))
+	snapshot := &authz.Snapshot{EffectiveRoles: []string{"qs:admin"}, Permissions: []authz.Permission{{Resource: "qs:*:*:*", Action: "*", Mode: authz.AuthorizationModeUnconditional}}}
+	ctx.Request = ctx.Request.WithContext(authz.WithSnapshot(ctx.Request.Context(), snapshot))
+	h.Create(ctx)
 	if w.Code != 200 || gateway.calls != 1 || gateway.scope.OrganizationID != 12 || gateway.scope.OperatorUserID != 34 {
 		t.Fatalf("status=%d calls=%d scope=%+v", w.Code, gateway.calls, gateway.scope)
 	}

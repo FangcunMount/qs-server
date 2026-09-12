@@ -10264,6 +10264,95 @@ const docTemplate = `{
                 }
             }
         },
+        "/internal/v2/interpretation/ai-workflow/evaluations/{run_id}/create": {
+            "post": {
+                "description": "需要当前机构 OrgAdmin 权限、明确确认和固定 Run UUID；同一请求重放复用原 Run，内容冲突拒绝。管理功能默认关闭。",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "AI-Workflow-Management"
+                ],
+                "summary": "创建冻结的 qs-ai 评测",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "评测 Run UUID",
+                        "name": "run_id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "冻结引用和创建确认",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/aibridge.EvaluationCreate"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/aibridge.EvaluationState"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/internal/v2/interpretation/ai-workflow/evaluations/{run_id}/result-unknown/resolve": {
             "post": {
                 "description": "需要当前机构 OrgAdmin 权限；组织和操作人取认证上下文。管理功能默认关闭。\n需确认重复调用和费用风险；超时后先查询状态，不自动重试。",
@@ -10640,6 +10729,58 @@ const docTemplate = `{
         }
     },
     "definitions": {
+        "aibridge.EvaluationCreate": {
+            "type": "object",
+            "properties": {
+                "confirm": {
+                    "type": "boolean"
+                },
+                "reason": {
+                    "type": "string"
+                },
+                "release": {
+                    "$ref": "#/definitions/aibridge.EvaluationRelease"
+                }
+            }
+        },
+        "aibridge.EvaluationRelease": {
+            "type": "object",
+            "properties": {
+                "execution_policy": {
+                    "$ref": "#/definitions/aibridge.FrozenEvaluationRef"
+                },
+                "gate_policy": {
+                    "$ref": "#/definitions/aibridge.FrozenEvaluationRef"
+                },
+                "generation_route": {
+                    "$ref": "#/definitions/aibridge.FrozenEvaluationRef"
+                },
+                "input_schema": {
+                    "$ref": "#/definitions/aibridge.FrozenEvaluationRef"
+                },
+                "output_schema": {
+                    "$ref": "#/definitions/aibridge.FrozenEvaluationRef"
+                },
+                "profile": {
+                    "$ref": "#/definitions/aibridge.FrozenEvaluationRef"
+                },
+                "prompt": {
+                    "$ref": "#/definitions/aibridge.FrozenEvaluationRef"
+                },
+                "semantic_output_schema": {
+                    "$ref": "#/definitions/aibridge.FrozenEvaluationRef"
+                },
+                "semantic_prompt": {
+                    "$ref": "#/definitions/aibridge.FrozenEvaluationRef"
+                },
+                "semantic_route": {
+                    "$ref": "#/definitions/aibridge.FrozenEvaluationRef"
+                },
+                "suite": {
+                    "$ref": "#/definitions/aibridge.FrozenEvaluationRef"
+                }
+            }
+        },
         "aibridge.EvaluationStart": {
             "type": "object",
             "properties": {
@@ -10674,6 +10815,20 @@ const docTemplate = `{
                 },
                 "version": {
                     "type": "integer"
+                }
+            }
+        },
+        "aibridge.FrozenEvaluationRef": {
+            "type": "object",
+            "properties": {
+                "fingerprint": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "version": {
+                    "type": "string"
                 }
             }
         },

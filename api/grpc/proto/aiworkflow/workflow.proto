@@ -38,6 +38,8 @@ message EvidenceItem {
 
 // Trusted QS backend only. QS must authorize OrgAdmin before forwarding these operations.
 service EvaluationManagement {
+ // The caller reuses scope.run_id for retries of the identical creation request.
+ rpc Create(EvaluationCreateCommand) returns (EvaluationState);
  // Explicitly schedules an existing frozen requested Run; does not call a model inline.
  rpc Start(EvaluationStartCommand) returns (EvaluationState);
  rpc Get(EvaluationQuery) returns (EvaluationState);
@@ -69,6 +71,27 @@ message EvaluationState {
 message EvaluationStartCommand {
  EvaluationQuery scope = 1;
  int64 expected_version = 2;
+ string reason = 3;
+ bool confirm = 4;
+}
+
+message FrozenEvaluationRef { string id = 1; string version = 2; string fingerprint = 3; }
+message EvaluationRelease {
+ FrozenEvaluationRef suite = 1;
+ FrozenEvaluationRef prompt = 2;
+ FrozenEvaluationRef profile = 3;
+ FrozenEvaluationRef input_schema = 4;
+ FrozenEvaluationRef output_schema = 5;
+ FrozenEvaluationRef generation_route = 6;
+ FrozenEvaluationRef semantic_prompt = 7;
+ FrozenEvaluationRef semantic_output_schema = 8;
+ FrozenEvaluationRef semantic_route = 9;
+ FrozenEvaluationRef execution_policy = 10;
+ FrozenEvaluationRef gate_policy = 11;
+}
+message EvaluationCreateCommand {
+ EvaluationQuery scope = 1;
+ EvaluationRelease release = 2;
  string reason = 3;
  bool confirm = 4;
 }

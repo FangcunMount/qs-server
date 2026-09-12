@@ -11,6 +11,7 @@ import (
 )
 
 type evaluationRPCStub struct {
+	create  *pb.EvaluationCreateCommand
 	calls   int
 	command *pb.UnknownResolutionCommand
 	fail    error
@@ -75,4 +76,9 @@ func TestStartForwardsOnceAndDoesNotRetryUnknownOutcome(t *testing.T) {
 	if rpc.calls != 2 {
 		t.Fatal("uncertain start retried")
 	}
+}
+
+func (s *evaluationRPCStub) Create(ctx context.Context, r *pb.EvaluationCreateCommand, _ ...grpc.CallOption) (*pb.EvaluationState, error) {
+	s.create = r
+	return s.ResolveUnknown(ctx, &pb.UnknownResolutionCommand{Scope: r.Scope, Reason: r.Reason, Confirm: r.Confirm})
 }
