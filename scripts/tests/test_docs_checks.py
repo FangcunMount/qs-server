@@ -26,13 +26,14 @@ class DocsFactsHelpersTest(unittest.TestCase):
     def test_grpc_inventory_includes_multiline_and_deprecated_rpcs(self) -> None:
         services, proto_file_count = check_docs_facts.grpc_inventory()
         self.assertEqual(proto_file_count, 8)
-        self.assertEqual(len(services), 17)
-        self.assertEqual(sum(len(rpcs) for rpcs in services.values()), 72)
+        self.assertEqual(len(services), 18)
+        self.assertEqual(sum(len(rpcs) for rpcs in services.values()), 77)
         self.assertIn("GenerateReportFromAssessment", services["interpretation.InterpretationAutomationService"])
         self.assertIn("ExecutePromptEvaluationStep", services["interpretation.AIExplanationAutomationService"])
         self.assertIn("SyncAssessmentAttention", services["internalapi.InternalService"])
         self.assertEqual(services["qsai.workflow.v1.Commands"], ["Start", "Change"])
         self.assertEqual(services["qsai.workflow.v1.Results"], ["Accept"])
+        self.assertEqual(services["qsai.workflow.v1.PublicationManagement"], ["Publish", "Rollback", "Disable", "Get", "GetReceipt"])
         self.assertEqual(services["interpretation.AIWorkflowAccessService"], ["Authorize"])
 
     def test_migration_inventory_is_paired_and_current(self) -> None:

@@ -180,3 +180,81 @@ message EvaluationCreateCommand {
  string reason = 3;
  bool confirm = 4;
 }
+
+// Shared configuration catalog. QS authorizes each operator before delegation.
+// Server timestamps and immutable evaluation proof are never supplied by callers.
+service PublicationManagement {
+ rpc Publish(PublicationPublishCommand) returns (PublicationReceipt);
+ rpc Rollback(PublicationRollbackCommand) returns (PublicationReceipt);
+ rpc Disable(PublicationDisableCommand) returns (PublicationReceipt);
+ rpc Get(PublicationQuery) returns (PublicationState);
+ // Same authorized organization/operator that submitted the command; read-only.
+ rpc GetReceipt(PublicationReceiptQuery) returns (PublicationReceipt);
+}
+message PublicationScope {
+ int64 organization_id = 1;
+ int64 operator_user_id = 2;
+}
+message PublicationSelector {
+ string audience = 1;
+ string model_kind = 2;
+ string decision_kind = 3;
+ optional string model_code = 4;
+ optional string model_version = 5;
+}
+message PublicationExpectation {
+ PublicationSelector selector = 1;
+ int64 version = 2;
+ // Empty only when explicitly confirming an inactive or never-published slot.
+ string active_publication_id = 3;
+}
+message PublicationPublishCommand {
+ PublicationScope scope = 1;
+ string command_id = 2;
+ PublicationExpectation expected = 3;
+ string reason = 4;
+ bool confirm = 5;
+ string run_id = 6;
+ int64 run_version = 7;
+ string release_fingerprint = 8;
+}
+message PublicationRollbackCommand {
+ PublicationScope scope = 1;
+ string command_id = 2;
+ PublicationExpectation expected = 3;
+ string reason = 4;
+ bool confirm = 5;
+ string target_publication_id = 6;
+}
+message PublicationDisableCommand {
+ PublicationScope scope = 1;
+ string command_id = 2;
+ PublicationExpectation expected = 3;
+ string reason = 4;
+ bool confirm = 5;
+}
+message PublicationQuery {
+ PublicationScope scope = 1;
+ PublicationSelector selector = 2;
+}
+message PublicationReceiptQuery {
+ PublicationScope scope = 1;
+ string command_id = 2;
+}
+message PublicationState {
+ PublicationSelector selector = 1;
+ int64 version = 2;
+ string active_publication_id = 3;
+ // Canonical qs-ai-publication/v1 record. Empty if no active publication.
+ string publication_json = 4;
+ string changed_at = 5;
+}
+message PublicationReceipt {
+ string command_id = 1;
+ PublicationState previous = 2;
+ PublicationState current = 3;
+ string action = 4;
+ string actor = 5;
+ string reason = 6;
+ string changed_at = 7;
+}
