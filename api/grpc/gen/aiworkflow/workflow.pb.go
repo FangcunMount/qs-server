@@ -1964,6 +1964,728 @@ func (x *EvaluationCreateCommand) GetConfirm() bool {
 	return false
 }
 
+type PublicationScope struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	OrganizationId int64                  `protobuf:"varint,1,opt,name=organization_id,json=organizationId,proto3" json:"organization_id,omitempty"`
+	OperatorUserId int64                  `protobuf:"varint,2,opt,name=operator_user_id,json=operatorUserId,proto3" json:"operator_user_id,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *PublicationScope) Reset() {
+	*x = PublicationScope{}
+	mi := &file_aiworkflow_workflow_proto_msgTypes[26]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PublicationScope) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PublicationScope) ProtoMessage() {}
+
+func (x *PublicationScope) ProtoReflect() protoreflect.Message {
+	mi := &file_aiworkflow_workflow_proto_msgTypes[26]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PublicationScope.ProtoReflect.Descriptor instead.
+func (*PublicationScope) Descriptor() ([]byte, []int) {
+	return file_aiworkflow_workflow_proto_rawDescGZIP(), []int{26}
+}
+
+func (x *PublicationScope) GetOrganizationId() int64 {
+	if x != nil {
+		return x.OrganizationId
+	}
+	return 0
+}
+
+func (x *PublicationScope) GetOperatorUserId() int64 {
+	if x != nil {
+		return x.OperatorUserId
+	}
+	return 0
+}
+
+type PublicationSelector struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Audience      string                 `protobuf:"bytes,1,opt,name=audience,proto3" json:"audience,omitempty"`
+	ModelKind     string                 `protobuf:"bytes,2,opt,name=model_kind,json=modelKind,proto3" json:"model_kind,omitempty"`
+	DecisionKind  string                 `protobuf:"bytes,3,opt,name=decision_kind,json=decisionKind,proto3" json:"decision_kind,omitempty"`
+	ModelCode     *string                `protobuf:"bytes,4,opt,name=model_code,json=modelCode,proto3,oneof" json:"model_code,omitempty"`
+	ModelVersion  *string                `protobuf:"bytes,5,opt,name=model_version,json=modelVersion,proto3,oneof" json:"model_version,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PublicationSelector) Reset() {
+	*x = PublicationSelector{}
+	mi := &file_aiworkflow_workflow_proto_msgTypes[27]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PublicationSelector) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PublicationSelector) ProtoMessage() {}
+
+func (x *PublicationSelector) ProtoReflect() protoreflect.Message {
+	mi := &file_aiworkflow_workflow_proto_msgTypes[27]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PublicationSelector.ProtoReflect.Descriptor instead.
+func (*PublicationSelector) Descriptor() ([]byte, []int) {
+	return file_aiworkflow_workflow_proto_rawDescGZIP(), []int{27}
+}
+
+func (x *PublicationSelector) GetAudience() string {
+	if x != nil {
+		return x.Audience
+	}
+	return ""
+}
+
+func (x *PublicationSelector) GetModelKind() string {
+	if x != nil {
+		return x.ModelKind
+	}
+	return ""
+}
+
+func (x *PublicationSelector) GetDecisionKind() string {
+	if x != nil {
+		return x.DecisionKind
+	}
+	return ""
+}
+
+func (x *PublicationSelector) GetModelCode() string {
+	if x != nil && x.ModelCode != nil {
+		return *x.ModelCode
+	}
+	return ""
+}
+
+func (x *PublicationSelector) GetModelVersion() string {
+	if x != nil && x.ModelVersion != nil {
+		return *x.ModelVersion
+	}
+	return ""
+}
+
+type PublicationExpectation struct {
+	state    protoimpl.MessageState `protogen:"open.v1"`
+	Selector *PublicationSelector   `protobuf:"bytes,1,opt,name=selector,proto3" json:"selector,omitempty"`
+	Version  int64                  `protobuf:"varint,2,opt,name=version,proto3" json:"version,omitempty"`
+	// Empty only when explicitly confirming an inactive or never-published slot.
+	ActivePublicationId string `protobuf:"bytes,3,opt,name=active_publication_id,json=activePublicationId,proto3" json:"active_publication_id,omitempty"`
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
+}
+
+func (x *PublicationExpectation) Reset() {
+	*x = PublicationExpectation{}
+	mi := &file_aiworkflow_workflow_proto_msgTypes[28]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PublicationExpectation) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PublicationExpectation) ProtoMessage() {}
+
+func (x *PublicationExpectation) ProtoReflect() protoreflect.Message {
+	mi := &file_aiworkflow_workflow_proto_msgTypes[28]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PublicationExpectation.ProtoReflect.Descriptor instead.
+func (*PublicationExpectation) Descriptor() ([]byte, []int) {
+	return file_aiworkflow_workflow_proto_rawDescGZIP(), []int{28}
+}
+
+func (x *PublicationExpectation) GetSelector() *PublicationSelector {
+	if x != nil {
+		return x.Selector
+	}
+	return nil
+}
+
+func (x *PublicationExpectation) GetVersion() int64 {
+	if x != nil {
+		return x.Version
+	}
+	return 0
+}
+
+func (x *PublicationExpectation) GetActivePublicationId() string {
+	if x != nil {
+		return x.ActivePublicationId
+	}
+	return ""
+}
+
+type PublicationPublishCommand struct {
+	state              protoimpl.MessageState  `protogen:"open.v1"`
+	Scope              *PublicationScope       `protobuf:"bytes,1,opt,name=scope,proto3" json:"scope,omitempty"`
+	CommandId          string                  `protobuf:"bytes,2,opt,name=command_id,json=commandId,proto3" json:"command_id,omitempty"`
+	Expected           *PublicationExpectation `protobuf:"bytes,3,opt,name=expected,proto3" json:"expected,omitempty"`
+	Reason             string                  `protobuf:"bytes,4,opt,name=reason,proto3" json:"reason,omitempty"`
+	Confirm            bool                    `protobuf:"varint,5,opt,name=confirm,proto3" json:"confirm,omitempty"`
+	RunId              string                  `protobuf:"bytes,6,opt,name=run_id,json=runId,proto3" json:"run_id,omitempty"`
+	RunVersion         int64                   `protobuf:"varint,7,opt,name=run_version,json=runVersion,proto3" json:"run_version,omitempty"`
+	ReleaseFingerprint string                  `protobuf:"bytes,8,opt,name=release_fingerprint,json=releaseFingerprint,proto3" json:"release_fingerprint,omitempty"`
+	unknownFields      protoimpl.UnknownFields
+	sizeCache          protoimpl.SizeCache
+}
+
+func (x *PublicationPublishCommand) Reset() {
+	*x = PublicationPublishCommand{}
+	mi := &file_aiworkflow_workflow_proto_msgTypes[29]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PublicationPublishCommand) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PublicationPublishCommand) ProtoMessage() {}
+
+func (x *PublicationPublishCommand) ProtoReflect() protoreflect.Message {
+	mi := &file_aiworkflow_workflow_proto_msgTypes[29]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PublicationPublishCommand.ProtoReflect.Descriptor instead.
+func (*PublicationPublishCommand) Descriptor() ([]byte, []int) {
+	return file_aiworkflow_workflow_proto_rawDescGZIP(), []int{29}
+}
+
+func (x *PublicationPublishCommand) GetScope() *PublicationScope {
+	if x != nil {
+		return x.Scope
+	}
+	return nil
+}
+
+func (x *PublicationPublishCommand) GetCommandId() string {
+	if x != nil {
+		return x.CommandId
+	}
+	return ""
+}
+
+func (x *PublicationPublishCommand) GetExpected() *PublicationExpectation {
+	if x != nil {
+		return x.Expected
+	}
+	return nil
+}
+
+func (x *PublicationPublishCommand) GetReason() string {
+	if x != nil {
+		return x.Reason
+	}
+	return ""
+}
+
+func (x *PublicationPublishCommand) GetConfirm() bool {
+	if x != nil {
+		return x.Confirm
+	}
+	return false
+}
+
+func (x *PublicationPublishCommand) GetRunId() string {
+	if x != nil {
+		return x.RunId
+	}
+	return ""
+}
+
+func (x *PublicationPublishCommand) GetRunVersion() int64 {
+	if x != nil {
+		return x.RunVersion
+	}
+	return 0
+}
+
+func (x *PublicationPublishCommand) GetReleaseFingerprint() string {
+	if x != nil {
+		return x.ReleaseFingerprint
+	}
+	return ""
+}
+
+type PublicationRollbackCommand struct {
+	state               protoimpl.MessageState  `protogen:"open.v1"`
+	Scope               *PublicationScope       `protobuf:"bytes,1,opt,name=scope,proto3" json:"scope,omitempty"`
+	CommandId           string                  `protobuf:"bytes,2,opt,name=command_id,json=commandId,proto3" json:"command_id,omitempty"`
+	Expected            *PublicationExpectation `protobuf:"bytes,3,opt,name=expected,proto3" json:"expected,omitempty"`
+	Reason              string                  `protobuf:"bytes,4,opt,name=reason,proto3" json:"reason,omitempty"`
+	Confirm             bool                    `protobuf:"varint,5,opt,name=confirm,proto3" json:"confirm,omitempty"`
+	TargetPublicationId string                  `protobuf:"bytes,6,opt,name=target_publication_id,json=targetPublicationId,proto3" json:"target_publication_id,omitempty"`
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
+}
+
+func (x *PublicationRollbackCommand) Reset() {
+	*x = PublicationRollbackCommand{}
+	mi := &file_aiworkflow_workflow_proto_msgTypes[30]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PublicationRollbackCommand) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PublicationRollbackCommand) ProtoMessage() {}
+
+func (x *PublicationRollbackCommand) ProtoReflect() protoreflect.Message {
+	mi := &file_aiworkflow_workflow_proto_msgTypes[30]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PublicationRollbackCommand.ProtoReflect.Descriptor instead.
+func (*PublicationRollbackCommand) Descriptor() ([]byte, []int) {
+	return file_aiworkflow_workflow_proto_rawDescGZIP(), []int{30}
+}
+
+func (x *PublicationRollbackCommand) GetScope() *PublicationScope {
+	if x != nil {
+		return x.Scope
+	}
+	return nil
+}
+
+func (x *PublicationRollbackCommand) GetCommandId() string {
+	if x != nil {
+		return x.CommandId
+	}
+	return ""
+}
+
+func (x *PublicationRollbackCommand) GetExpected() *PublicationExpectation {
+	if x != nil {
+		return x.Expected
+	}
+	return nil
+}
+
+func (x *PublicationRollbackCommand) GetReason() string {
+	if x != nil {
+		return x.Reason
+	}
+	return ""
+}
+
+func (x *PublicationRollbackCommand) GetConfirm() bool {
+	if x != nil {
+		return x.Confirm
+	}
+	return false
+}
+
+func (x *PublicationRollbackCommand) GetTargetPublicationId() string {
+	if x != nil {
+		return x.TargetPublicationId
+	}
+	return ""
+}
+
+type PublicationDisableCommand struct {
+	state         protoimpl.MessageState  `protogen:"open.v1"`
+	Scope         *PublicationScope       `protobuf:"bytes,1,opt,name=scope,proto3" json:"scope,omitempty"`
+	CommandId     string                  `protobuf:"bytes,2,opt,name=command_id,json=commandId,proto3" json:"command_id,omitempty"`
+	Expected      *PublicationExpectation `protobuf:"bytes,3,opt,name=expected,proto3" json:"expected,omitempty"`
+	Reason        string                  `protobuf:"bytes,4,opt,name=reason,proto3" json:"reason,omitempty"`
+	Confirm       bool                    `protobuf:"varint,5,opt,name=confirm,proto3" json:"confirm,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PublicationDisableCommand) Reset() {
+	*x = PublicationDisableCommand{}
+	mi := &file_aiworkflow_workflow_proto_msgTypes[31]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PublicationDisableCommand) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PublicationDisableCommand) ProtoMessage() {}
+
+func (x *PublicationDisableCommand) ProtoReflect() protoreflect.Message {
+	mi := &file_aiworkflow_workflow_proto_msgTypes[31]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PublicationDisableCommand.ProtoReflect.Descriptor instead.
+func (*PublicationDisableCommand) Descriptor() ([]byte, []int) {
+	return file_aiworkflow_workflow_proto_rawDescGZIP(), []int{31}
+}
+
+func (x *PublicationDisableCommand) GetScope() *PublicationScope {
+	if x != nil {
+		return x.Scope
+	}
+	return nil
+}
+
+func (x *PublicationDisableCommand) GetCommandId() string {
+	if x != nil {
+		return x.CommandId
+	}
+	return ""
+}
+
+func (x *PublicationDisableCommand) GetExpected() *PublicationExpectation {
+	if x != nil {
+		return x.Expected
+	}
+	return nil
+}
+
+func (x *PublicationDisableCommand) GetReason() string {
+	if x != nil {
+		return x.Reason
+	}
+	return ""
+}
+
+func (x *PublicationDisableCommand) GetConfirm() bool {
+	if x != nil {
+		return x.Confirm
+	}
+	return false
+}
+
+type PublicationQuery struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Scope         *PublicationScope      `protobuf:"bytes,1,opt,name=scope,proto3" json:"scope,omitempty"`
+	Selector      *PublicationSelector   `protobuf:"bytes,2,opt,name=selector,proto3" json:"selector,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PublicationQuery) Reset() {
+	*x = PublicationQuery{}
+	mi := &file_aiworkflow_workflow_proto_msgTypes[32]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PublicationQuery) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PublicationQuery) ProtoMessage() {}
+
+func (x *PublicationQuery) ProtoReflect() protoreflect.Message {
+	mi := &file_aiworkflow_workflow_proto_msgTypes[32]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PublicationQuery.ProtoReflect.Descriptor instead.
+func (*PublicationQuery) Descriptor() ([]byte, []int) {
+	return file_aiworkflow_workflow_proto_rawDescGZIP(), []int{32}
+}
+
+func (x *PublicationQuery) GetScope() *PublicationScope {
+	if x != nil {
+		return x.Scope
+	}
+	return nil
+}
+
+func (x *PublicationQuery) GetSelector() *PublicationSelector {
+	if x != nil {
+		return x.Selector
+	}
+	return nil
+}
+
+type PublicationReceiptQuery struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Scope         *PublicationScope      `protobuf:"bytes,1,opt,name=scope,proto3" json:"scope,omitempty"`
+	CommandId     string                 `protobuf:"bytes,2,opt,name=command_id,json=commandId,proto3" json:"command_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PublicationReceiptQuery) Reset() {
+	*x = PublicationReceiptQuery{}
+	mi := &file_aiworkflow_workflow_proto_msgTypes[33]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PublicationReceiptQuery) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PublicationReceiptQuery) ProtoMessage() {}
+
+func (x *PublicationReceiptQuery) ProtoReflect() protoreflect.Message {
+	mi := &file_aiworkflow_workflow_proto_msgTypes[33]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PublicationReceiptQuery.ProtoReflect.Descriptor instead.
+func (*PublicationReceiptQuery) Descriptor() ([]byte, []int) {
+	return file_aiworkflow_workflow_proto_rawDescGZIP(), []int{33}
+}
+
+func (x *PublicationReceiptQuery) GetScope() *PublicationScope {
+	if x != nil {
+		return x.Scope
+	}
+	return nil
+}
+
+func (x *PublicationReceiptQuery) GetCommandId() string {
+	if x != nil {
+		return x.CommandId
+	}
+	return ""
+}
+
+type PublicationState struct {
+	state               protoimpl.MessageState `protogen:"open.v1"`
+	Selector            *PublicationSelector   `protobuf:"bytes,1,opt,name=selector,proto3" json:"selector,omitempty"`
+	Version             int64                  `protobuf:"varint,2,opt,name=version,proto3" json:"version,omitempty"`
+	ActivePublicationId string                 `protobuf:"bytes,3,opt,name=active_publication_id,json=activePublicationId,proto3" json:"active_publication_id,omitempty"`
+	// Canonical qs-ai-publication/v1 record. Empty if no active publication.
+	PublicationJson string `protobuf:"bytes,4,opt,name=publication_json,json=publicationJson,proto3" json:"publication_json,omitempty"`
+	ChangedAt       string `protobuf:"bytes,5,opt,name=changed_at,json=changedAt,proto3" json:"changed_at,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *PublicationState) Reset() {
+	*x = PublicationState{}
+	mi := &file_aiworkflow_workflow_proto_msgTypes[34]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PublicationState) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PublicationState) ProtoMessage() {}
+
+func (x *PublicationState) ProtoReflect() protoreflect.Message {
+	mi := &file_aiworkflow_workflow_proto_msgTypes[34]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PublicationState.ProtoReflect.Descriptor instead.
+func (*PublicationState) Descriptor() ([]byte, []int) {
+	return file_aiworkflow_workflow_proto_rawDescGZIP(), []int{34}
+}
+
+func (x *PublicationState) GetSelector() *PublicationSelector {
+	if x != nil {
+		return x.Selector
+	}
+	return nil
+}
+
+func (x *PublicationState) GetVersion() int64 {
+	if x != nil {
+		return x.Version
+	}
+	return 0
+}
+
+func (x *PublicationState) GetActivePublicationId() string {
+	if x != nil {
+		return x.ActivePublicationId
+	}
+	return ""
+}
+
+func (x *PublicationState) GetPublicationJson() string {
+	if x != nil {
+		return x.PublicationJson
+	}
+	return ""
+}
+
+func (x *PublicationState) GetChangedAt() string {
+	if x != nil {
+		return x.ChangedAt
+	}
+	return ""
+}
+
+type PublicationReceipt struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	CommandId     string                 `protobuf:"bytes,1,opt,name=command_id,json=commandId,proto3" json:"command_id,omitempty"`
+	Previous      *PublicationState      `protobuf:"bytes,2,opt,name=previous,proto3" json:"previous,omitempty"`
+	Current       *PublicationState      `protobuf:"bytes,3,opt,name=current,proto3" json:"current,omitempty"`
+	Action        string                 `protobuf:"bytes,4,opt,name=action,proto3" json:"action,omitempty"`
+	Actor         string                 `protobuf:"bytes,5,opt,name=actor,proto3" json:"actor,omitempty"`
+	Reason        string                 `protobuf:"bytes,6,opt,name=reason,proto3" json:"reason,omitempty"`
+	ChangedAt     string                 `protobuf:"bytes,7,opt,name=changed_at,json=changedAt,proto3" json:"changed_at,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PublicationReceipt) Reset() {
+	*x = PublicationReceipt{}
+	mi := &file_aiworkflow_workflow_proto_msgTypes[35]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PublicationReceipt) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PublicationReceipt) ProtoMessage() {}
+
+func (x *PublicationReceipt) ProtoReflect() protoreflect.Message {
+	mi := &file_aiworkflow_workflow_proto_msgTypes[35]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PublicationReceipt.ProtoReflect.Descriptor instead.
+func (*PublicationReceipt) Descriptor() ([]byte, []int) {
+	return file_aiworkflow_workflow_proto_rawDescGZIP(), []int{35}
+}
+
+func (x *PublicationReceipt) GetCommandId() string {
+	if x != nil {
+		return x.CommandId
+	}
+	return ""
+}
+
+func (x *PublicationReceipt) GetPrevious() *PublicationState {
+	if x != nil {
+		return x.Previous
+	}
+	return nil
+}
+
+func (x *PublicationReceipt) GetCurrent() *PublicationState {
+	if x != nil {
+		return x.Current
+	}
+	return nil
+}
+
+func (x *PublicationReceipt) GetAction() string {
+	if x != nil {
+		return x.Action
+	}
+	return ""
+}
+
+func (x *PublicationReceipt) GetActor() string {
+	if x != nil {
+		return x.Actor
+	}
+	return ""
+}
+
+func (x *PublicationReceipt) GetReason() string {
+	if x != nil {
+		return x.Reason
+	}
+	return ""
+}
+
+func (x *PublicationReceipt) GetChangedAt() string {
+	if x != nil {
+		return x.ChangedAt
+	}
+	return ""
+}
+
 var File_aiworkflow_workflow_proto protoreflect.FileDescriptor
 
 const file_aiworkflow_workflow_proto_rawDesc = "" +
@@ -2136,7 +2858,74 @@ const file_aiworkflow_workflow_proto_rawDesc = "" +
 	"\x05scope\x18\x01 \x01(\v2!.qsai.workflow.v1.EvaluationQueryR\x05scope\x12=\n" +
 	"\arelease\x18\x02 \x01(\v2#.qsai.workflow.v1.EvaluationReleaseR\arelease\x12\x16\n" +
 	"\x06reason\x18\x03 \x01(\tR\x06reason\x12\x18\n" +
-	"\aconfirm\x18\x04 \x01(\bR\aconfirm2\x94\x01\n" +
+	"\aconfirm\x18\x04 \x01(\bR\aconfirm\"e\n" +
+	"\x10PublicationScope\x12'\n" +
+	"\x0forganization_id\x18\x01 \x01(\x03R\x0eorganizationId\x12(\n" +
+	"\x10operator_user_id\x18\x02 \x01(\x03R\x0eoperatorUserId\"\xe4\x01\n" +
+	"\x13PublicationSelector\x12\x1a\n" +
+	"\baudience\x18\x01 \x01(\tR\baudience\x12\x1d\n" +
+	"\n" +
+	"model_kind\x18\x02 \x01(\tR\tmodelKind\x12#\n" +
+	"\rdecision_kind\x18\x03 \x01(\tR\fdecisionKind\x12\"\n" +
+	"\n" +
+	"model_code\x18\x04 \x01(\tH\x00R\tmodelCode\x88\x01\x01\x12(\n" +
+	"\rmodel_version\x18\x05 \x01(\tH\x01R\fmodelVersion\x88\x01\x01B\r\n" +
+	"\v_model_codeB\x10\n" +
+	"\x0e_model_version\"\xa9\x01\n" +
+	"\x16PublicationExpectation\x12A\n" +
+	"\bselector\x18\x01 \x01(\v2%.qsai.workflow.v1.PublicationSelectorR\bselector\x12\x18\n" +
+	"\aversion\x18\x02 \x01(\x03R\aversion\x122\n" +
+	"\x15active_publication_id\x18\x03 \x01(\tR\x13activePublicationId\"\xd5\x02\n" +
+	"\x19PublicationPublishCommand\x128\n" +
+	"\x05scope\x18\x01 \x01(\v2\".qsai.workflow.v1.PublicationScopeR\x05scope\x12\x1d\n" +
+	"\n" +
+	"command_id\x18\x02 \x01(\tR\tcommandId\x12D\n" +
+	"\bexpected\x18\x03 \x01(\v2(.qsai.workflow.v1.PublicationExpectationR\bexpected\x12\x16\n" +
+	"\x06reason\x18\x04 \x01(\tR\x06reason\x12\x18\n" +
+	"\aconfirm\x18\x05 \x01(\bR\aconfirm\x12\x15\n" +
+	"\x06run_id\x18\x06 \x01(\tR\x05runId\x12\x1f\n" +
+	"\vrun_version\x18\a \x01(\x03R\n" +
+	"runVersion\x12/\n" +
+	"\x13release_fingerprint\x18\b \x01(\tR\x12releaseFingerprint\"\xa1\x02\n" +
+	"\x1aPublicationRollbackCommand\x128\n" +
+	"\x05scope\x18\x01 \x01(\v2\".qsai.workflow.v1.PublicationScopeR\x05scope\x12\x1d\n" +
+	"\n" +
+	"command_id\x18\x02 \x01(\tR\tcommandId\x12D\n" +
+	"\bexpected\x18\x03 \x01(\v2(.qsai.workflow.v1.PublicationExpectationR\bexpected\x12\x16\n" +
+	"\x06reason\x18\x04 \x01(\tR\x06reason\x12\x18\n" +
+	"\aconfirm\x18\x05 \x01(\bR\aconfirm\x122\n" +
+	"\x15target_publication_id\x18\x06 \x01(\tR\x13targetPublicationId\"\xec\x01\n" +
+	"\x19PublicationDisableCommand\x128\n" +
+	"\x05scope\x18\x01 \x01(\v2\".qsai.workflow.v1.PublicationScopeR\x05scope\x12\x1d\n" +
+	"\n" +
+	"command_id\x18\x02 \x01(\tR\tcommandId\x12D\n" +
+	"\bexpected\x18\x03 \x01(\v2(.qsai.workflow.v1.PublicationExpectationR\bexpected\x12\x16\n" +
+	"\x06reason\x18\x04 \x01(\tR\x06reason\x12\x18\n" +
+	"\aconfirm\x18\x05 \x01(\bR\aconfirm\"\x8f\x01\n" +
+	"\x10PublicationQuery\x128\n" +
+	"\x05scope\x18\x01 \x01(\v2\".qsai.workflow.v1.PublicationScopeR\x05scope\x12A\n" +
+	"\bselector\x18\x02 \x01(\v2%.qsai.workflow.v1.PublicationSelectorR\bselector\"r\n" +
+	"\x17PublicationReceiptQuery\x128\n" +
+	"\x05scope\x18\x01 \x01(\v2\".qsai.workflow.v1.PublicationScopeR\x05scope\x12\x1d\n" +
+	"\n" +
+	"command_id\x18\x02 \x01(\tR\tcommandId\"\xed\x01\n" +
+	"\x10PublicationState\x12A\n" +
+	"\bselector\x18\x01 \x01(\v2%.qsai.workflow.v1.PublicationSelectorR\bselector\x12\x18\n" +
+	"\aversion\x18\x02 \x01(\x03R\aversion\x122\n" +
+	"\x15active_publication_id\x18\x03 \x01(\tR\x13activePublicationId\x12)\n" +
+	"\x10publication_json\x18\x04 \x01(\tR\x0fpublicationJson\x12\x1d\n" +
+	"\n" +
+	"changed_at\x18\x05 \x01(\tR\tchangedAt\"\x96\x02\n" +
+	"\x12PublicationReceipt\x12\x1d\n" +
+	"\n" +
+	"command_id\x18\x01 \x01(\tR\tcommandId\x12>\n" +
+	"\bprevious\x18\x02 \x01(\v2\".qsai.workflow.v1.PublicationStateR\bprevious\x12<\n" +
+	"\acurrent\x18\x03 \x01(\v2\".qsai.workflow.v1.PublicationStateR\acurrent\x12\x16\n" +
+	"\x06action\x18\x04 \x01(\tR\x06action\x12\x14\n" +
+	"\x05actor\x18\x05 \x01(\tR\x05actor\x12\x16\n" +
+	"\x06reason\x18\x06 \x01(\tR\x06reason\x12\x1d\n" +
+	"\n" +
+	"changed_at\x18\a \x01(\tR\tchangedAt2\x94\x01\n" +
 	"\bCommands\x12B\n" +
 	"\x05Start\x12\x1e.qsai.workflow.v1.StartCommand\x1a\x19.qsai.workflow.v1.Receipt\x12D\n" +
 	"\x06Change\x12\x1f.qsai.workflow.v1.ChangeCommand\x1a\x19.qsai.workflow.v1.Receipt2T\n" +
@@ -2152,7 +2941,14 @@ const file_aiworkflow_workflow_proto_rawDesc = "" +
 	"\fGetCandidate\x12*.qsai.workflow.v1.EvaluationCandidateQuery\x1a-.qsai.workflow.v1.EvaluationCandidateEvidence\x12^\n" +
 	"\fPreviewGates\x12%.qsai.workflow.v1.EvaluationGateQuery\x1a'.qsai.workflow.v1.EvaluationGatePreview\x12Z\n" +
 	"\bFinalize\x12+.qsai.workflow.v1.EvaluationFinalizeCommand\x1a!.qsai.workflow.v1.EvaluationState\x12\\\n" +
-	"\fReopenReview\x12).qsai.workflow.v1.EvaluationReopenCommand\x1a!.qsai.workflow.v1.EvaluationStateB;Z9github.com/FangcunMount/qs-server/api/grpc/gen/aiworkflowb\x06proto3"
+	"\fReopenReview\x12).qsai.workflow.v1.EvaluationReopenCommand\x1a!.qsai.workflow.v1.EvaluationState2\xe1\x03\n" +
+	"\x15PublicationManagement\x12\\\n" +
+	"\aPublish\x12+.qsai.workflow.v1.PublicationPublishCommand\x1a$.qsai.workflow.v1.PublicationReceipt\x12^\n" +
+	"\bRollback\x12,.qsai.workflow.v1.PublicationRollbackCommand\x1a$.qsai.workflow.v1.PublicationReceipt\x12\\\n" +
+	"\aDisable\x12+.qsai.workflow.v1.PublicationDisableCommand\x1a$.qsai.workflow.v1.PublicationReceipt\x12M\n" +
+	"\x03Get\x12\".qsai.workflow.v1.PublicationQuery\x1a\".qsai.workflow.v1.PublicationState\x12]\n" +
+	"\n" +
+	"GetReceipt\x12).qsai.workflow.v1.PublicationReceiptQuery\x1a$.qsai.workflow.v1.PublicationReceiptB;Z9github.com/FangcunMount/qs-server/api/grpc/gen/aiworkflowb\x06proto3"
 
 var (
 	file_aiworkflow_workflow_proto_rawDescOnce sync.Once
@@ -2166,7 +2962,7 @@ func file_aiworkflow_workflow_proto_rawDescGZIP() []byte {
 	return file_aiworkflow_workflow_proto_rawDescData
 }
 
-var file_aiworkflow_workflow_proto_msgTypes = make([]protoimpl.MessageInfo, 26)
+var file_aiworkflow_workflow_proto_msgTypes = make([]protoimpl.MessageInfo, 36)
 var file_aiworkflow_workflow_proto_goTypes = []any{
 	(*Actor)(nil),                       // 0: qsai.workflow.v1.Actor
 	(*StartCommand)(nil),                // 1: qsai.workflow.v1.StartCommand
@@ -2194,6 +2990,16 @@ var file_aiworkflow_workflow_proto_goTypes = []any{
 	(*FrozenEvaluationRef)(nil),         // 23: qsai.workflow.v1.FrozenEvaluationRef
 	(*EvaluationRelease)(nil),           // 24: qsai.workflow.v1.EvaluationRelease
 	(*EvaluationCreateCommand)(nil),     // 25: qsai.workflow.v1.EvaluationCreateCommand
+	(*PublicationScope)(nil),            // 26: qsai.workflow.v1.PublicationScope
+	(*PublicationSelector)(nil),         // 27: qsai.workflow.v1.PublicationSelector
+	(*PublicationExpectation)(nil),      // 28: qsai.workflow.v1.PublicationExpectation
+	(*PublicationPublishCommand)(nil),   // 29: qsai.workflow.v1.PublicationPublishCommand
+	(*PublicationRollbackCommand)(nil),  // 30: qsai.workflow.v1.PublicationRollbackCommand
+	(*PublicationDisableCommand)(nil),   // 31: qsai.workflow.v1.PublicationDisableCommand
+	(*PublicationQuery)(nil),            // 32: qsai.workflow.v1.PublicationQuery
+	(*PublicationReceiptQuery)(nil),     // 33: qsai.workflow.v1.PublicationReceiptQuery
+	(*PublicationState)(nil),            // 34: qsai.workflow.v1.PublicationState
+	(*PublicationReceipt)(nil),          // 35: qsai.workflow.v1.PublicationReceipt
 }
 var file_aiworkflow_workflow_proto_depIdxs = []int32{
 	0,  // 0: qsai.workflow.v1.StartCommand.actor:type_name -> qsai.workflow.v1.Actor
@@ -2224,37 +3030,60 @@ var file_aiworkflow_workflow_proto_depIdxs = []int32{
 	23, // 25: qsai.workflow.v1.EvaluationRelease.gate_policy:type_name -> qsai.workflow.v1.FrozenEvaluationRef
 	16, // 26: qsai.workflow.v1.EvaluationCreateCommand.scope:type_name -> qsai.workflow.v1.EvaluationQuery
 	24, // 27: qsai.workflow.v1.EvaluationCreateCommand.release:type_name -> qsai.workflow.v1.EvaluationRelease
-	1,  // 28: qsai.workflow.v1.Commands.Start:input_type -> qsai.workflow.v1.StartCommand
-	2,  // 29: qsai.workflow.v1.Commands.Change:input_type -> qsai.workflow.v1.ChangeCommand
-	4,  // 30: qsai.workflow.v1.Results.Accept:input_type -> qsai.workflow.v1.StateEvent
-	25, // 31: qsai.workflow.v1.EvaluationManagement.Create:input_type -> qsai.workflow.v1.EvaluationCreateCommand
-	22, // 32: qsai.workflow.v1.EvaluationManagement.Start:input_type -> qsai.workflow.v1.EvaluationStartCommand
-	16, // 33: qsai.workflow.v1.EvaluationManagement.Get:input_type -> qsai.workflow.v1.EvaluationQuery
-	17, // 34: qsai.workflow.v1.EvaluationManagement.ResolveUnknown:input_type -> qsai.workflow.v1.UnknownResolutionCommand
-	21, // 35: qsai.workflow.v1.EvaluationManagement.Review:input_type -> qsai.workflow.v1.EvaluationReviewCommand
-	16, // 36: qsai.workflow.v1.EvaluationManagement.ListCandidates:input_type -> qsai.workflow.v1.EvaluationQuery
-	14, // 37: qsai.workflow.v1.EvaluationManagement.GetCandidate:input_type -> qsai.workflow.v1.EvaluationCandidateQuery
-	10, // 38: qsai.workflow.v1.EvaluationManagement.PreviewGates:input_type -> qsai.workflow.v1.EvaluationGateQuery
-	9,  // 39: qsai.workflow.v1.EvaluationManagement.Finalize:input_type -> qsai.workflow.v1.EvaluationFinalizeCommand
-	8,  // 40: qsai.workflow.v1.EvaluationManagement.ReopenReview:input_type -> qsai.workflow.v1.EvaluationReopenCommand
-	3,  // 41: qsai.workflow.v1.Commands.Start:output_type -> qsai.workflow.v1.Receipt
-	3,  // 42: qsai.workflow.v1.Commands.Change:output_type -> qsai.workflow.v1.Receipt
-	5,  // 43: qsai.workflow.v1.Results.Accept:output_type -> qsai.workflow.v1.Acknowledgement
-	18, // 44: qsai.workflow.v1.EvaluationManagement.Create:output_type -> qsai.workflow.v1.EvaluationState
-	18, // 45: qsai.workflow.v1.EvaluationManagement.Start:output_type -> qsai.workflow.v1.EvaluationState
-	18, // 46: qsai.workflow.v1.EvaluationManagement.Get:output_type -> qsai.workflow.v1.EvaluationState
-	18, // 47: qsai.workflow.v1.EvaluationManagement.ResolveUnknown:output_type -> qsai.workflow.v1.EvaluationState
-	18, // 48: qsai.workflow.v1.EvaluationManagement.Review:output_type -> qsai.workflow.v1.EvaluationState
-	13, // 49: qsai.workflow.v1.EvaluationManagement.ListCandidates:output_type -> qsai.workflow.v1.EvaluationCandidateIndex
-	15, // 50: qsai.workflow.v1.EvaluationManagement.GetCandidate:output_type -> qsai.workflow.v1.EvaluationCandidateEvidence
-	11, // 51: qsai.workflow.v1.EvaluationManagement.PreviewGates:output_type -> qsai.workflow.v1.EvaluationGatePreview
-	18, // 52: qsai.workflow.v1.EvaluationManagement.Finalize:output_type -> qsai.workflow.v1.EvaluationState
-	18, // 53: qsai.workflow.v1.EvaluationManagement.ReopenReview:output_type -> qsai.workflow.v1.EvaluationState
-	41, // [41:54] is the sub-list for method output_type
-	28, // [28:41] is the sub-list for method input_type
-	28, // [28:28] is the sub-list for extension type_name
-	28, // [28:28] is the sub-list for extension extendee
-	0,  // [0:28] is the sub-list for field type_name
+	27, // 28: qsai.workflow.v1.PublicationExpectation.selector:type_name -> qsai.workflow.v1.PublicationSelector
+	26, // 29: qsai.workflow.v1.PublicationPublishCommand.scope:type_name -> qsai.workflow.v1.PublicationScope
+	28, // 30: qsai.workflow.v1.PublicationPublishCommand.expected:type_name -> qsai.workflow.v1.PublicationExpectation
+	26, // 31: qsai.workflow.v1.PublicationRollbackCommand.scope:type_name -> qsai.workflow.v1.PublicationScope
+	28, // 32: qsai.workflow.v1.PublicationRollbackCommand.expected:type_name -> qsai.workflow.v1.PublicationExpectation
+	26, // 33: qsai.workflow.v1.PublicationDisableCommand.scope:type_name -> qsai.workflow.v1.PublicationScope
+	28, // 34: qsai.workflow.v1.PublicationDisableCommand.expected:type_name -> qsai.workflow.v1.PublicationExpectation
+	26, // 35: qsai.workflow.v1.PublicationQuery.scope:type_name -> qsai.workflow.v1.PublicationScope
+	27, // 36: qsai.workflow.v1.PublicationQuery.selector:type_name -> qsai.workflow.v1.PublicationSelector
+	26, // 37: qsai.workflow.v1.PublicationReceiptQuery.scope:type_name -> qsai.workflow.v1.PublicationScope
+	27, // 38: qsai.workflow.v1.PublicationState.selector:type_name -> qsai.workflow.v1.PublicationSelector
+	34, // 39: qsai.workflow.v1.PublicationReceipt.previous:type_name -> qsai.workflow.v1.PublicationState
+	34, // 40: qsai.workflow.v1.PublicationReceipt.current:type_name -> qsai.workflow.v1.PublicationState
+	1,  // 41: qsai.workflow.v1.Commands.Start:input_type -> qsai.workflow.v1.StartCommand
+	2,  // 42: qsai.workflow.v1.Commands.Change:input_type -> qsai.workflow.v1.ChangeCommand
+	4,  // 43: qsai.workflow.v1.Results.Accept:input_type -> qsai.workflow.v1.StateEvent
+	25, // 44: qsai.workflow.v1.EvaluationManagement.Create:input_type -> qsai.workflow.v1.EvaluationCreateCommand
+	22, // 45: qsai.workflow.v1.EvaluationManagement.Start:input_type -> qsai.workflow.v1.EvaluationStartCommand
+	16, // 46: qsai.workflow.v1.EvaluationManagement.Get:input_type -> qsai.workflow.v1.EvaluationQuery
+	17, // 47: qsai.workflow.v1.EvaluationManagement.ResolveUnknown:input_type -> qsai.workflow.v1.UnknownResolutionCommand
+	21, // 48: qsai.workflow.v1.EvaluationManagement.Review:input_type -> qsai.workflow.v1.EvaluationReviewCommand
+	16, // 49: qsai.workflow.v1.EvaluationManagement.ListCandidates:input_type -> qsai.workflow.v1.EvaluationQuery
+	14, // 50: qsai.workflow.v1.EvaluationManagement.GetCandidate:input_type -> qsai.workflow.v1.EvaluationCandidateQuery
+	10, // 51: qsai.workflow.v1.EvaluationManagement.PreviewGates:input_type -> qsai.workflow.v1.EvaluationGateQuery
+	9,  // 52: qsai.workflow.v1.EvaluationManagement.Finalize:input_type -> qsai.workflow.v1.EvaluationFinalizeCommand
+	8,  // 53: qsai.workflow.v1.EvaluationManagement.ReopenReview:input_type -> qsai.workflow.v1.EvaluationReopenCommand
+	29, // 54: qsai.workflow.v1.PublicationManagement.Publish:input_type -> qsai.workflow.v1.PublicationPublishCommand
+	30, // 55: qsai.workflow.v1.PublicationManagement.Rollback:input_type -> qsai.workflow.v1.PublicationRollbackCommand
+	31, // 56: qsai.workflow.v1.PublicationManagement.Disable:input_type -> qsai.workflow.v1.PublicationDisableCommand
+	32, // 57: qsai.workflow.v1.PublicationManagement.Get:input_type -> qsai.workflow.v1.PublicationQuery
+	33, // 58: qsai.workflow.v1.PublicationManagement.GetReceipt:input_type -> qsai.workflow.v1.PublicationReceiptQuery
+	3,  // 59: qsai.workflow.v1.Commands.Start:output_type -> qsai.workflow.v1.Receipt
+	3,  // 60: qsai.workflow.v1.Commands.Change:output_type -> qsai.workflow.v1.Receipt
+	5,  // 61: qsai.workflow.v1.Results.Accept:output_type -> qsai.workflow.v1.Acknowledgement
+	18, // 62: qsai.workflow.v1.EvaluationManagement.Create:output_type -> qsai.workflow.v1.EvaluationState
+	18, // 63: qsai.workflow.v1.EvaluationManagement.Start:output_type -> qsai.workflow.v1.EvaluationState
+	18, // 64: qsai.workflow.v1.EvaluationManagement.Get:output_type -> qsai.workflow.v1.EvaluationState
+	18, // 65: qsai.workflow.v1.EvaluationManagement.ResolveUnknown:output_type -> qsai.workflow.v1.EvaluationState
+	18, // 66: qsai.workflow.v1.EvaluationManagement.Review:output_type -> qsai.workflow.v1.EvaluationState
+	13, // 67: qsai.workflow.v1.EvaluationManagement.ListCandidates:output_type -> qsai.workflow.v1.EvaluationCandidateIndex
+	15, // 68: qsai.workflow.v1.EvaluationManagement.GetCandidate:output_type -> qsai.workflow.v1.EvaluationCandidateEvidence
+	11, // 69: qsai.workflow.v1.EvaluationManagement.PreviewGates:output_type -> qsai.workflow.v1.EvaluationGatePreview
+	18, // 70: qsai.workflow.v1.EvaluationManagement.Finalize:output_type -> qsai.workflow.v1.EvaluationState
+	18, // 71: qsai.workflow.v1.EvaluationManagement.ReopenReview:output_type -> qsai.workflow.v1.EvaluationState
+	35, // 72: qsai.workflow.v1.PublicationManagement.Publish:output_type -> qsai.workflow.v1.PublicationReceipt
+	35, // 73: qsai.workflow.v1.PublicationManagement.Rollback:output_type -> qsai.workflow.v1.PublicationReceipt
+	35, // 74: qsai.workflow.v1.PublicationManagement.Disable:output_type -> qsai.workflow.v1.PublicationReceipt
+	34, // 75: qsai.workflow.v1.PublicationManagement.Get:output_type -> qsai.workflow.v1.PublicationState
+	35, // 76: qsai.workflow.v1.PublicationManagement.GetReceipt:output_type -> qsai.workflow.v1.PublicationReceipt
+	59, // [59:77] is the sub-list for method output_type
+	41, // [41:59] is the sub-list for method input_type
+	41, // [41:41] is the sub-list for extension type_name
+	41, // [41:41] is the sub-list for extension extendee
+	0,  // [0:41] is the sub-list for field type_name
 }
 
 func init() { file_aiworkflow_workflow_proto_init() }
@@ -2264,15 +3093,16 @@ func file_aiworkflow_workflow_proto_init() {
 	}
 	file_aiworkflow_workflow_proto_msgTypes[2].OneofWrappers = []any{}
 	file_aiworkflow_workflow_proto_msgTypes[9].OneofWrappers = []any{}
+	file_aiworkflow_workflow_proto_msgTypes[27].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_aiworkflow_workflow_proto_rawDesc), len(file_aiworkflow_workflow_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   26,
+			NumMessages:   36,
 			NumExtensions: 0,
-			NumServices:   3,
+			NumServices:   4,
 		},
 		GoTypes:           file_aiworkflow_workflow_proto_goTypes,
 		DependencyIndexes: file_aiworkflow_workflow_proto_depIdxs,

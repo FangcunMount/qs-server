@@ -168,6 +168,7 @@ func TestRunPreparedServerStartsShutdownBeforeServing(t *testing.T) {
 	order := make(chan string, 3)
 	httpDone := make(chan struct{})
 	grpcDone := make(chan struct{})
+	releaseGRPC := make(chan struct{})
 	got := runPreparedServer(preparedServerRunDeps{
 		startShutdown: func() error {
 			order <- "shutdown"
@@ -182,11 +183,15 @@ func TestRunPreparedServerStartsShutdownBeforeServing(t *testing.T) {
 			runGRPC: func() error {
 				defer close(grpcDone)
 				order <- "grpc"
+				// Keep the successful peer serving until the HTTP failure wins.
+				// Avoid racing group completion against its queued error result.
+				<-releaseGRPC
 				return nil
 			},
 		},
 	})
 
+	close(releaseGRPC)
 	if got == nil || got.Error() != "http boom" {
 		t.Fatalf("runPreparedServer() error = %v, want http boom", got)
 	}

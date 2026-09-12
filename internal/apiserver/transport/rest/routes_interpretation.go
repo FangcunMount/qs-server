@@ -69,6 +69,17 @@ func (r *Router) registerInterpretationInternalV2Routes(internalV2 *gin.RouterGr
 		group.POST("/:run_id/result-unknown/resolve", management.ResolveUnknown)
 	}
 
+	if r.deps.Interpretation.AIWorkflowPublications != nil {
+		publications := handler.NewAIWorkflowPublicationHandler(r.deps.Interpretation.AIWorkflowPublications)
+		write := internalV2.Group("/interpretation/ai-workflow/publications", restmiddleware.RequireCapabilityMiddleware(restmiddleware.CapabilityOrgAdmin))
+		read := internalV2.Group("/interpretation/ai-workflow/publications", restmiddleware.RequireCapabilityMiddleware(restmiddleware.CapabilityAuditInterpretation))
+		write.POST("/publish", publications.Publish)
+		write.POST("/rollback", publications.Rollback)
+		write.POST("/disable", publications.Disable)
+		read.GET("", publications.Get)
+		read.GET("/commands/:command_id", publications.GetReceipt)
+	}
+
 	if r.deps.Interpretation.AIExplanationAdministration == nil {
 		return
 	}

@@ -719,3 +719,265 @@ var EvaluationManagement_ServiceDesc = grpc.ServiceDesc{
 	Streams:  []grpc.StreamDesc{},
 	Metadata: "aiworkflow/workflow.proto",
 }
+
+const (
+	PublicationManagement_Publish_FullMethodName    = "/qsai.workflow.v1.PublicationManagement/Publish"
+	PublicationManagement_Rollback_FullMethodName   = "/qsai.workflow.v1.PublicationManagement/Rollback"
+	PublicationManagement_Disable_FullMethodName    = "/qsai.workflow.v1.PublicationManagement/Disable"
+	PublicationManagement_Get_FullMethodName        = "/qsai.workflow.v1.PublicationManagement/Get"
+	PublicationManagement_GetReceipt_FullMethodName = "/qsai.workflow.v1.PublicationManagement/GetReceipt"
+)
+
+// PublicationManagementClient is the client API for PublicationManagement service.
+//
+// For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
+//
+// Shared configuration catalog. QS authorizes each operator before delegation.
+// Server timestamps and immutable evaluation proof are never supplied by callers.
+type PublicationManagementClient interface {
+	Publish(ctx context.Context, in *PublicationPublishCommand, opts ...grpc.CallOption) (*PublicationReceipt, error)
+	Rollback(ctx context.Context, in *PublicationRollbackCommand, opts ...grpc.CallOption) (*PublicationReceipt, error)
+	Disable(ctx context.Context, in *PublicationDisableCommand, opts ...grpc.CallOption) (*PublicationReceipt, error)
+	Get(ctx context.Context, in *PublicationQuery, opts ...grpc.CallOption) (*PublicationState, error)
+	// Same authorized organization/operator that submitted the command; read-only.
+	GetReceipt(ctx context.Context, in *PublicationReceiptQuery, opts ...grpc.CallOption) (*PublicationReceipt, error)
+}
+
+type publicationManagementClient struct {
+	cc grpc.ClientConnInterface
+}
+
+func NewPublicationManagementClient(cc grpc.ClientConnInterface) PublicationManagementClient {
+	return &publicationManagementClient{cc}
+}
+
+func (c *publicationManagementClient) Publish(ctx context.Context, in *PublicationPublishCommand, opts ...grpc.CallOption) (*PublicationReceipt, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(PublicationReceipt)
+	err := c.cc.Invoke(ctx, PublicationManagement_Publish_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *publicationManagementClient) Rollback(ctx context.Context, in *PublicationRollbackCommand, opts ...grpc.CallOption) (*PublicationReceipt, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(PublicationReceipt)
+	err := c.cc.Invoke(ctx, PublicationManagement_Rollback_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *publicationManagementClient) Disable(ctx context.Context, in *PublicationDisableCommand, opts ...grpc.CallOption) (*PublicationReceipt, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(PublicationReceipt)
+	err := c.cc.Invoke(ctx, PublicationManagement_Disable_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *publicationManagementClient) Get(ctx context.Context, in *PublicationQuery, opts ...grpc.CallOption) (*PublicationState, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(PublicationState)
+	err := c.cc.Invoke(ctx, PublicationManagement_Get_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *publicationManagementClient) GetReceipt(ctx context.Context, in *PublicationReceiptQuery, opts ...grpc.CallOption) (*PublicationReceipt, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(PublicationReceipt)
+	err := c.cc.Invoke(ctx, PublicationManagement_GetReceipt_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// PublicationManagementServer is the server API for PublicationManagement service.
+// All implementations must embed UnimplementedPublicationManagementServer
+// for forward compatibility.
+//
+// Shared configuration catalog. QS authorizes each operator before delegation.
+// Server timestamps and immutable evaluation proof are never supplied by callers.
+type PublicationManagementServer interface {
+	Publish(context.Context, *PublicationPublishCommand) (*PublicationReceipt, error)
+	Rollback(context.Context, *PublicationRollbackCommand) (*PublicationReceipt, error)
+	Disable(context.Context, *PublicationDisableCommand) (*PublicationReceipt, error)
+	Get(context.Context, *PublicationQuery) (*PublicationState, error)
+	// Same authorized organization/operator that submitted the command; read-only.
+	GetReceipt(context.Context, *PublicationReceiptQuery) (*PublicationReceipt, error)
+	mustEmbedUnimplementedPublicationManagementServer()
+}
+
+// UnimplementedPublicationManagementServer must be embedded to have
+// forward compatible implementations.
+//
+// NOTE: this should be embedded by value instead of pointer to avoid a nil
+// pointer dereference when methods are called.
+type UnimplementedPublicationManagementServer struct{}
+
+func (UnimplementedPublicationManagementServer) Publish(context.Context, *PublicationPublishCommand) (*PublicationReceipt, error) {
+	return nil, status.Error(codes.Unimplemented, "method Publish not implemented")
+}
+func (UnimplementedPublicationManagementServer) Rollback(context.Context, *PublicationRollbackCommand) (*PublicationReceipt, error) {
+	return nil, status.Error(codes.Unimplemented, "method Rollback not implemented")
+}
+func (UnimplementedPublicationManagementServer) Disable(context.Context, *PublicationDisableCommand) (*PublicationReceipt, error) {
+	return nil, status.Error(codes.Unimplemented, "method Disable not implemented")
+}
+func (UnimplementedPublicationManagementServer) Get(context.Context, *PublicationQuery) (*PublicationState, error) {
+	return nil, status.Error(codes.Unimplemented, "method Get not implemented")
+}
+func (UnimplementedPublicationManagementServer) GetReceipt(context.Context, *PublicationReceiptQuery) (*PublicationReceipt, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetReceipt not implemented")
+}
+func (UnimplementedPublicationManagementServer) mustEmbedUnimplementedPublicationManagementServer() {}
+func (UnimplementedPublicationManagementServer) testEmbeddedByValue()                               {}
+
+// UnsafePublicationManagementServer may be embedded to opt out of forward compatibility for this service.
+// Use of this interface is not recommended, as added methods to PublicationManagementServer will
+// result in compilation errors.
+type UnsafePublicationManagementServer interface {
+	mustEmbedUnimplementedPublicationManagementServer()
+}
+
+func RegisterPublicationManagementServer(s grpc.ServiceRegistrar, srv PublicationManagementServer) {
+	// If the following call panics, it indicates UnimplementedPublicationManagementServer was
+	// embedded by pointer and is nil.  This will cause panics if an
+	// unimplemented method is ever invoked, so we test this at initialization
+	// time to prevent it from happening at runtime later due to I/O.
+	if t, ok := srv.(interface{ testEmbeddedByValue() }); ok {
+		t.testEmbeddedByValue()
+	}
+	s.RegisterService(&PublicationManagement_ServiceDesc, srv)
+}
+
+func _PublicationManagement_Publish_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(PublicationPublishCommand)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(PublicationManagementServer).Publish(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: PublicationManagement_Publish_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(PublicationManagementServer).Publish(ctx, req.(*PublicationPublishCommand))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _PublicationManagement_Rollback_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(PublicationRollbackCommand)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(PublicationManagementServer).Rollback(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: PublicationManagement_Rollback_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(PublicationManagementServer).Rollback(ctx, req.(*PublicationRollbackCommand))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _PublicationManagement_Disable_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(PublicationDisableCommand)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(PublicationManagementServer).Disable(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: PublicationManagement_Disable_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(PublicationManagementServer).Disable(ctx, req.(*PublicationDisableCommand))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _PublicationManagement_Get_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(PublicationQuery)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(PublicationManagementServer).Get(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: PublicationManagement_Get_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(PublicationManagementServer).Get(ctx, req.(*PublicationQuery))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _PublicationManagement_GetReceipt_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(PublicationReceiptQuery)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(PublicationManagementServer).GetReceipt(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: PublicationManagement_GetReceipt_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(PublicationManagementServer).GetReceipt(ctx, req.(*PublicationReceiptQuery))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+// PublicationManagement_ServiceDesc is the grpc.ServiceDesc for PublicationManagement service.
+// It's only intended for direct use with grpc.RegisterService,
+// and not to be introspected or modified (even as a copy)
+var PublicationManagement_ServiceDesc = grpc.ServiceDesc{
+	ServiceName: "qsai.workflow.v1.PublicationManagement",
+	HandlerType: (*PublicationManagementServer)(nil),
+	Methods: []grpc.MethodDesc{
+		{
+			MethodName: "Publish",
+			Handler:    _PublicationManagement_Publish_Handler,
+		},
+		{
+			MethodName: "Rollback",
+			Handler:    _PublicationManagement_Rollback_Handler,
+		},
+		{
+			MethodName: "Disable",
+			Handler:    _PublicationManagement_Disable_Handler,
+		},
+		{
+			MethodName: "Get",
+			Handler:    _PublicationManagement_Get_Handler,
+		},
+		{
+			MethodName: "GetReceipt",
+			Handler:    _PublicationManagement_GetReceipt_Handler,
+		},
+	},
+	Streams:  []grpc.StreamDesc{},
+	Metadata: "aiworkflow/workflow.proto",
+}
