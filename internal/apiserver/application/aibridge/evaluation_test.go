@@ -8,8 +8,9 @@ import (
 )
 
 type managementStub struct {
-	calls int
-	scope EvaluationScope
+	review EvaluationReview
+	calls  int
+	scope  EvaluationScope
 }
 
 func (g *managementStub) GetEvaluation(_ context.Context, scope EvaluationScope) (EvaluationState, error) {

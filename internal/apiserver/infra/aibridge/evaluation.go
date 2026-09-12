@@ -23,8 +23,16 @@ func state(response *pb.EvaluationState, scope app.EvaluationScope) (app.Evaluat
 	if response == nil || response.RunId != scope.RunID || response.Version < 1 || response.UnresolvedResultUnknownCount < 0 || !json.Valid([]byte(response.ResolutionsJson)) {
 		return app.EvaluationState{}, app.ErrConflict
 	}
+	reviews := response.ReviewsJson
+	if reviews == "" { // Older AI versions do not expose review history yet.
+		reviews = "[]"
+	}
+	var history []json.RawMessage
+	if json.Unmarshal([]byte(reviews), &history) != nil || history == nil || len(history) > 70 {
+		return app.EvaluationState{}, app.ErrConflict
+	}
 	return app.EvaluationState{RunID: response.RunId, Version: response.Version, Status: response.Status,
-		UnresolvedResultUnknownCount: response.UnresolvedResultUnknownCount, Resolutions: json.RawMessage(response.ResolutionsJson)}, nil
+		UnresolvedResultUnknownCount: response.UnresolvedResultUnknownCount, Resolutions: json.RawMessage(response.ResolutionsJson), Reviews: json.RawMessage(reviews)}, nil
 }
 func (c *EvaluationClient) GetEvaluation(ctx context.Context, scope app.EvaluationScope) (app.EvaluationState, error) {
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)

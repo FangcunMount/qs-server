@@ -10342,6 +10342,73 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/core.ErrResponse'
+  /internal/v2/interpretation/ai-workflow/evaluations/{run_id}/reviews:
+    post:
+      tags:
+      - AI-Workflow-Management
+      summary: 批量审核 qs-ai 评测候选
+      description: 需要当前机构 OrgAdmin 权限；每批最多 35 个候选和一种审核职责。身份来自认证上下文，审核时间由 AI 服务端记录。超时后先回读状态，不自动重试。管理功能默认关闭。
+      operationId: 批量审核qsai评测候选
+      parameters:
+      - type: string
+        description: 评测 Run UUID
+        name: run_id
+        in: path
+        required: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/aibridge.EvaluationReview'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/core.Response'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/aibridge.EvaluationState'
+        '400':
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '409':
+          description: Conflict
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
   /internal/v2/interpretation/ai-workflow/evaluations/{run_id}/start:
     post:
       tags:
@@ -10633,6 +10700,17 @@ paths:
                 $ref: '#/components/schemas/core.ErrResponse'
 components:
   schemas:
+    aibridge.CandidateReviewItem:
+      type: object
+      properties:
+        candidate_id:
+          type: string
+        decision:
+          type: string
+        reason:
+          type: string
+        semantic_review:
+          $ref: '#/components/schemas/aibridge.SemanticContradictionReview'
     aibridge.EvaluationCreate:
       type: object
       properties:
@@ -10667,6 +10745,17 @@ components:
           $ref: '#/components/schemas/aibridge.FrozenEvaluationRef'
         suite:
           $ref: '#/components/schemas/aibridge.FrozenEvaluationRef'
+    aibridge.EvaluationReview:
+      type: object
+      properties:
+        expected_version:
+          type: integer
+        reviews:
+          type: array
+          items:
+            $ref: '#/components/schemas/aibridge.CandidateReviewItem'
+        role:
+          type: string
     aibridge.EvaluationStart:
       type: object
       properties:
@@ -10680,6 +10769,10 @@ components:
       type: object
       properties:
         resolutions:
+          type: array
+          items:
+            type: object
+        reviews:
           type: array
           items:
             type: object
@@ -10699,6 +10792,23 @@ components:
         id:
           type: string
         version:
+          type: string
+    aibridge.SemanticContradictionReview:
+      type: object
+      properties:
+        assertion_ordinal:
+          type: integer
+        candidate_excerpt:
+          type: string
+        execution_id:
+          type: string
+        original_detail:
+          type: string
+        output_fingerprint:
+          type: string
+        policy_version:
+          type: string
+        reason:
           type: string
     aibridge.UnknownResolution:
       type: object

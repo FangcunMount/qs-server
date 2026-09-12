@@ -44,6 +44,8 @@ service EvaluationManagement {
  rpc Start(EvaluationStartCommand) returns (EvaluationState);
  rpc Get(EvaluationQuery) returns (EvaluationState);
  rpc ResolveUnknown(UnknownResolutionCommand) returns (EvaluationState);
+ // QS authorizes the selected review role; AI records the trusted operator and server time.
+ rpc Review(EvaluationReviewCommand) returns (EvaluationState);
 }
 message EvaluationQuery {
  string run_id = 1;
@@ -66,6 +68,30 @@ message EvaluationState {
  int64 unresolved_result_unknown_count = 4;
  // Audit-only decisions, excluding prompts, reports, model output and credentials.
  string resolutions_json = 5;
+ // Append-only human audit records, including bounded contradiction-review excerpts.
+ string reviews_json = 6;
+}
+
+message SemanticContradictionReview {
+ string policy_version = 1;
+ string execution_id = 2;
+ string output_fingerprint = 3;
+ int32 assertion_ordinal = 4;
+ string original_detail = 5;
+ string candidate_excerpt = 6;
+ string reason = 7;
+}
+message CandidateReviewItem {
+ string candidate_id = 1;
+ string decision = 2;
+ string reason = 3;
+ SemanticContradictionReview semantic_review = 4;
+}
+message EvaluationReviewCommand {
+ EvaluationQuery scope = 1;
+ int64 expected_version = 2;
+ string role = 3;
+ repeated CandidateReviewItem reviews = 4;
 }
 
 message EvaluationStartCommand {

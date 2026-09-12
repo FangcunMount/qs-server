@@ -265,6 +265,7 @@ const (
 	EvaluationManagement_Start_FullMethodName          = "/qsai.workflow.v1.EvaluationManagement/Start"
 	EvaluationManagement_Get_FullMethodName            = "/qsai.workflow.v1.EvaluationManagement/Get"
 	EvaluationManagement_ResolveUnknown_FullMethodName = "/qsai.workflow.v1.EvaluationManagement/ResolveUnknown"
+	EvaluationManagement_Review_FullMethodName         = "/qsai.workflow.v1.EvaluationManagement/Review"
 )
 
 // EvaluationManagementClient is the client API for EvaluationManagement service.
@@ -279,6 +280,8 @@ type EvaluationManagementClient interface {
 	Start(ctx context.Context, in *EvaluationStartCommand, opts ...grpc.CallOption) (*EvaluationState, error)
 	Get(ctx context.Context, in *EvaluationQuery, opts ...grpc.CallOption) (*EvaluationState, error)
 	ResolveUnknown(ctx context.Context, in *UnknownResolutionCommand, opts ...grpc.CallOption) (*EvaluationState, error)
+	// QS authorizes the selected review role; AI records the trusted operator and server time.
+	Review(ctx context.Context, in *EvaluationReviewCommand, opts ...grpc.CallOption) (*EvaluationState, error)
 }
 
 type evaluationManagementClient struct {
@@ -329,6 +332,16 @@ func (c *evaluationManagementClient) ResolveUnknown(ctx context.Context, in *Unk
 	return out, nil
 }
 
+func (c *evaluationManagementClient) Review(ctx context.Context, in *EvaluationReviewCommand, opts ...grpc.CallOption) (*EvaluationState, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(EvaluationState)
+	err := c.cc.Invoke(ctx, EvaluationManagement_Review_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // EvaluationManagementServer is the server API for EvaluationManagement service.
 // All implementations must embed UnimplementedEvaluationManagementServer
 // for forward compatibility.
@@ -341,6 +354,8 @@ type EvaluationManagementServer interface {
 	Start(context.Context, *EvaluationStartCommand) (*EvaluationState, error)
 	Get(context.Context, *EvaluationQuery) (*EvaluationState, error)
 	ResolveUnknown(context.Context, *UnknownResolutionCommand) (*EvaluationState, error)
+	// QS authorizes the selected review role; AI records the trusted operator and server time.
+	Review(context.Context, *EvaluationReviewCommand) (*EvaluationState, error)
 	mustEmbedUnimplementedEvaluationManagementServer()
 }
 
@@ -362,6 +377,9 @@ func (UnimplementedEvaluationManagementServer) Get(context.Context, *EvaluationQ
 }
 func (UnimplementedEvaluationManagementServer) ResolveUnknown(context.Context, *UnknownResolutionCommand) (*EvaluationState, error) {
 	return nil, status.Error(codes.Unimplemented, "method ResolveUnknown not implemented")
+}
+func (UnimplementedEvaluationManagementServer) Review(context.Context, *EvaluationReviewCommand) (*EvaluationState, error) {
+	return nil, status.Error(codes.Unimplemented, "method Review not implemented")
 }
 func (UnimplementedEvaluationManagementServer) mustEmbedUnimplementedEvaluationManagementServer() {}
 func (UnimplementedEvaluationManagementServer) testEmbeddedByValue()                              {}
@@ -456,6 +474,24 @@ func _EvaluationManagement_ResolveUnknown_Handler(srv interface{}, ctx context.C
 	return interceptor(ctx, in, info, handler)
 }
 
+func _EvaluationManagement_Review_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(EvaluationReviewCommand)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(EvaluationManagementServer).Review(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: EvaluationManagement_Review_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(EvaluationManagementServer).Review(ctx, req.(*EvaluationReviewCommand))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // EvaluationManagement_ServiceDesc is the grpc.ServiceDesc for EvaluationManagement service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -478,6 +514,10 @@ var EvaluationManagement_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ResolveUnknown",
 			Handler:    _EvaluationManagement_ResolveUnknown_Handler,
+		},
+		{
+			MethodName: "Review",
+			Handler:    _EvaluationManagement_Review_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

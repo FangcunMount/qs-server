@@ -11,6 +11,7 @@ import (
 )
 
 type evaluationRPCStub struct {
+	review  *pb.EvaluationReviewCommand
 	create  *pb.EvaluationCreateCommand
 	calls   int
 	command *pb.UnknownResolutionCommand
