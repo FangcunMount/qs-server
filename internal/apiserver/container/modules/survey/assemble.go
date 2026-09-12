@@ -1,6 +1,8 @@
 package survey
 
 import (
+	actoraccess "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/access"
+	actormysql "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/actor"
 	"go.mongodb.org/mongo-driver/mongo"
 
 	"github.com/FangcunMount/component-base/pkg/errors"
@@ -187,7 +189,9 @@ func (m *Module) initAnswerSheetSubModule(mongoDB *mongo.Database, mongoLimiter 
 		// Resolver reads authoritative Actor/Plan facts before the Mongo durable transaction.
 		injector.SetAttributionResolver(attributioninfra.NewResolver(mysqlDB))
 	}
-	sub.ManagementService = asApp.NewManagementService(repo, reader, identitySvc)
+	actorReader := actormysql.NewReadModel(mysqlDB)
+	scopeAccess := actoraccess.NewTesteeAccessService(actorReader, actorReader).(actoraccess.StoreScopeAccess)
+	sub.ManagementService = asApp.NewScopedManagementService(repo, reader, scopeAccess, identitySvc)
 	sub.ScoringService = asApp.NewAnswerSheetScoringService(repo, questionnaireRepo, answerScorer)
 	return nil
 }

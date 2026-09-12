@@ -216,6 +216,20 @@ func (r *assessmentReadModel) ListLatestRiskQueue(
 }
 
 func applyAssessmentReadModelFilter(query *gorm.DB, filter evaluationreadmodel.AssessmentFilter) *gorm.DB {
+	if filter.RestrictToStoreScope {
+		// Resolve ownership from the current Testee, so transfers also move
+		// access to historical assessments. Never copy a historical store here.
+		if filter.OrgID <= 0 {
+			return query.Where("1 = 0")
+		}
+		owners := query.Session(&gorm.Session{NewDB: true}).Table("testee").Select("id").Where("org_id = ? AND deleted_at IS NULL", filter.OrgID)
+		if filter.AllAssignedStores {
+			owners = owners.Where("store_id IS NOT NULL AND store_id > 0")
+		} else {
+			owners = owners.Where("store_id IN ?", filter.AllowedStoreIDs)
+		}
+		query = query.Where("testee_id IN (?)", owners)
+	}
 	if filter.OrgID != 0 {
 		query = query.Where("org_id = ?", filter.OrgID)
 	}

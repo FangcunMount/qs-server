@@ -3,6 +3,7 @@ package operatorretirement
 import (
 	"context"
 	"fmt"
+	"github.com/FangcunMount/qs-server/internal/apiserver/application/actor/actorctx"
 	"strings"
 	"time"
 
@@ -20,20 +21,60 @@ type Command struct {
 	ExpectedVersion   uint32
 	RequestID, Reason string
 }
+type CompanyScope interface {
+	ResolveStoreRange(context.Context, int64, int64, string, string) (authz.StoreRange, error)
+}
 type Service struct {
-	repo  port.Repository
-	authz iambridge.OperatorAuthzGateway
+	scope       CompanyScope
+	maintenance bool
+	repo        port.Repository
+	authz       iambridge.OperatorAuthzGateway
 }
 
-func NewService(repo port.Repository, gateway iambridge.OperatorAuthzGateway) *Service {
-	return &Service{repo: repo, authz: gateway}
+// NewMaintenanceService is only for reviewed maintenance operations with authorization writes paused.
+// It supports historical retirement and explicit audited identity recovery, never online admission.
+func NewMaintenanceService(repo port.Repository, gateway iambridge.OperatorAuthzGateway) *Service {
+	return &Service{repo: repo, authz: gateway, maintenance: true}
+}
+
+// NewService enforces authenticated company Scope for online Operator retirement.
+func NewService(repo port.Repository, gateway iambridge.OperatorAuthzGateway, scope CompanyScope) *Service {
+	return &Service{repo: repo, authz: gateway, scope: scope}
+}
+func (s *Service) authorize(ctx context.Context, org, user int64, action string) error {
+	snapshot, ok := authz.FromContext(ctx)
+	if org <= 0 || user <= 0 || !ok || snapshot == nil || !snapshot.IsQSAdmin() {
+		return errors.WithCode(code.ErrPermissionDenied, "company administrator permission required")
+	}
+	if s.maintenance {
+		return nil
+	}
+	if s.scope == nil || actorctx.OperatorOrgID(ctx) != org || actorctx.GrantingUserID(ctx) != uint64(user) {
+		return errors.WithCode(code.ErrPermissionDenied, "authenticated company operator required")
+	}
+	allowed, err := s.scope.ResolveStoreRange(ctx, org, user, "qs:actor:collection:operators", action)
+	if err != nil {
+		return err
+	}
+	if !allowed.AllStores {
+		return errors.WithCode(code.ErrPermissionDenied, "headquarters company scope required")
+	}
+	return nil
 }
 
 // Execute always closes local admission before attempting IAM revocation.
 func (s *Service) Execute(ctx context.Context, cmd Command) (*domain.Task, error) {
-	snapshot, ok := authz.FromContext(ctx)
-	if cmd.OrgID <= 0 || cmd.ActorID <= 0 || !ok || snapshot == nil || !snapshot.IsQSAdmin() {
-		return nil, errors.WithCode(code.ErrPermissionDenied, "company administrator permission required")
+	return s.execute(ctx, cmd, true)
+}
+
+// Preview validates the same exit constraints without disabling identity or revoking roles.
+func (s *Service) Preview(ctx context.Context, cmd Command) (*domain.Task, error) {
+	return s.execute(ctx, cmd, false)
+}
+
+func (s *Service) execute(ctx context.Context, cmd Command, apply bool) (*domain.Task, error) {
+	if err := s.authorize(ctx, cmd.OrgID, cmd.ActorID, "delete"); err != nil {
+		return nil, err
 	}
 	if s.repo == nil || s.authz == nil || !s.authz.IsEnabled() {
 		return nil, fmt.Errorf("operator retirement dependencies unavailable")
@@ -92,6 +133,10 @@ func (s *Service) Execute(ctx context.Context, cmd Command) (*domain.Task, error
 		}
 		if _, err := backendRoles(projection.EffectiveRoles); err != nil {
 			return err
+		}
+		if !apply {
+			result = task
+			return nil
 		}
 		if result == nil {
 			if err := s.repo.Begin(locked, *task); err != nil {
@@ -166,9 +211,8 @@ func backendRoles(roles []string) (bool, error) {
 
 // Status reads durable progress without requiring an active target operator.
 func (s *Service) Status(ctx context.Context, orgID, actorID int64, operatorID uint64) (*domain.Task, error) {
-	snapshot, ok := authz.FromContext(ctx)
-	if orgID <= 0 || actorID <= 0 || !ok || snapshot == nil || !snapshot.IsQSAdmin() {
-		return nil, errors.WithCode(code.ErrPermissionDenied, "company administrator permission required")
+	if err := s.authorize(ctx, orgID, actorID, "read"); err != nil {
+		return nil, err
 	}
 	if s.repo == nil {
 		return nil, errors.WithCode(code.ErrInternalServerError, "retirement repository unavailable")

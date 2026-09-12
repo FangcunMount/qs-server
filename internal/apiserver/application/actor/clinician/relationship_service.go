@@ -2,7 +2,9 @@ package clinician
 
 import (
 	"context"
+	"github.com/FangcunMount/qs-server/internal/apiserver/application/actor/actorctx"
 	appauthz "github.com/FangcunMount/qs-server/internal/apiserver/application/authz"
+	"math"
 	"time"
 
 	"github.com/FangcunMount/component-base/pkg/errors"
@@ -14,7 +16,13 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
 )
 
+type SummaryScope interface {
+	ResolveStoreRange(context.Context, int64, int64, string, string) (appauthz.StoreRange, error)
+}
 type relationshipService struct {
+	operatorScope  SummaryScope
+	operatorOnly   bool
+	summaryScope   SummaryScope
 	relationRepo   domainRelation.Repository
 	clinicianRepo  domainClinician.Repository
 	testeeRepo     domainTestee.Repository
@@ -32,9 +40,11 @@ func NewRelationshipServiceWithAssessmentSummary(
 	uow apptransaction.Runner,
 	readModel actorreadmodel.ReadModel,
 	summaryReader actorreadmodel.AssessmentSummaryReader,
+	summaryScope SummaryScope,
 ) ClinicianRelationshipService {
 	service := NewRelationshipService(relationRepo, clinicianRepo, testeeRepo, uow, readModel).(*relationshipService)
 	service.summaryReader = summaryReader
+	service.summaryScope = summaryScope
 	return service
 }
 
@@ -156,6 +166,9 @@ func (s *relationshipService) assignRelation(ctx context.Context, dto AssignTest
 }
 
 func (s *relationshipService) assignRelationTx(ctx context.Context, dto AssignTesteeDTO) (*domainRelation.ClinicianTesteeRelation, error) {
+	if err := s.authorizeRelationWrite(ctx, dto.OrgID, dto.TesteeID); err != nil {
+		return nil, err
+	}
 	input, err := s.prepareRelationAssignment(ctx, dto)
 	if err != nil {
 		return nil, err
@@ -185,6 +198,12 @@ func (s *relationshipService) assignRelationTx(ctx context.Context, dto AssignTe
 }
 
 func (s *relationshipService) UnbindRelation(ctx context.Context, relationID uint64) (*RelationResult, error) {
+	if s.operatorOnly {
+		if _, err := s.authorizeRelationMutation(ctx, actorctx.OperatorOrgID(ctx)); err != nil {
+			return nil, err
+		}
+	}
+
 	var result *domainRelation.ClinicianTesteeRelation
 	targetRelationID, err := relationIDFromUint64("relation_id", relationID)
 	if err != nil {
@@ -195,6 +214,19 @@ func (s *relationshipService) UnbindRelation(ctx context.Context, relationID uin
 		item, err := s.relationRepo.FindByID(txCtx, targetRelationID)
 		if err != nil {
 			return errors.Wrap(err, "failed to find relation")
+		}
+		if err := s.authorizeRelationWrite(txCtx, item.OrgID(), item.TesteeID().Uint64()); err != nil {
+			return err
+		}
+		if s.operatorOnly {
+			locked, ok := s.relationRepo.(domainRelation.LockedRepository)
+			if !ok {
+				return errors.WithCode(code.ErrInternalServerError, "transactional relation locking unavailable")
+			}
+			item, err = locked.FindByIDForUpdate(txCtx, item.OrgID(), item.TesteeID(), targetRelationID)
+			if err != nil {
+				return err
+			}
 		}
 		if !item.IsActive() {
 			result = item
@@ -222,14 +254,18 @@ func (s *relationshipService) ListAssignedTestees(ctx context.Context, dto ListA
 	if s.relationReader == nil {
 		return nil, errors.WithCode(code.ErrInternalServerError, "relation reader is not configured")
 	}
-	rows, totalCount, err := s.relationReader.ListAssignedTestees(ctx, actorreadmodel.RelationFilter{
+	filter, err := s.operatorRelationFilter(ctx, actorreadmodel.RelationFilter{
 		OrgID:         dto.OrgID,
 		ClinicianID:   clinicianID.Uint64(),
 		RelationTypes: relationTypesToStrings(domainRelation.AccessGrantRelationTypes()),
 		ActiveOnly:    true,
 		Offset:        dto.Offset,
 		Limit:         dto.Limit,
-	})
+	}, "list")
+	if err != nil {
+		return nil, err
+	}
+	rows, totalCount, err := s.relationReader.ListAssignedTestees(ctx, filter)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to list assigned testees")
 	}
@@ -249,6 +285,22 @@ func (s *relationshipService) ListAssignedTestees(ctx context.Context, dto ListA
 }
 
 func (s *relationshipService) ListAssignedTesteeIDs(ctx context.Context, orgID int64, clinicianID uint64) ([]uint64, error) {
+	if s.operatorOnly {
+		result, err := s.ListAssignedTestees(ctx, ListAssignedTesteeDTO{OrgID: orgID, ClinicianID: clinicianID})
+		if err != nil {
+			return nil, err
+		}
+		ids := make([]uint64, 0, len(result.Items))
+		seen := map[uint64]bool{}
+		for _, item := range result.Items {
+			if !seen[item.ID] {
+				seen[item.ID] = true
+				ids = append(ids, item.ID)
+			}
+		}
+		return ids, nil
+	}
+
 	targetClinicianID, err := clinicianIDFromUint64("clinician_id", clinicianID)
 	if err != nil {
 		return nil, err
@@ -287,11 +339,15 @@ func (s *relationshipService) ListTesteeRelations(ctx context.Context, dto ListT
 	if s.relationReader == nil {
 		return nil, errors.WithCode(code.ErrInternalServerError, "relation reader is not configured")
 	}
-	rows, err := s.relationReader.ListTesteeRelations(ctx, actorreadmodel.RelationFilter{
+	filter, err := s.operatorRelationFilter(ctx, actorreadmodel.RelationFilter{
 		OrgID:      dto.OrgID,
 		TesteeID:   testeeID.Uint64(),
 		ActiveOnly: dto.ActiveOnly,
-	})
+	}, "read")
+	if err != nil {
+		return nil, err
+	}
+	rows, err := s.relationReader.ListTesteeRelations(ctx, filter)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to list testee relations")
 	}
@@ -314,13 +370,17 @@ func (s *relationshipService) ListClinicianRelations(ctx context.Context, dto Li
 	if s.relationReader == nil {
 		return nil, errors.WithCode(code.ErrInternalServerError, "relation reader is not configured")
 	}
-	rows, totalCount, err := s.relationReader.ListClinicianRelations(ctx, actorreadmodel.RelationFilter{
+	filter, err := s.operatorRelationFilter(ctx, actorreadmodel.RelationFilter{
 		OrgID:       dto.OrgID,
 		ClinicianID: clinicianID.Uint64(),
 		ActiveOnly:  dto.ActiveOnly,
 		Offset:      dto.Offset,
 		Limit:       dto.Limit,
-	})
+	}, "list")
+	if err != nil {
+		return nil, err
+	}
+	rows, totalCount, err := s.relationReader.ListClinicianRelations(ctx, filter)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to list clinician relations")
 	}
@@ -351,23 +411,36 @@ func (s *relationshipService) ListClinicianRelations(ctx context.Context, dto Li
 }
 
 func (s *relationshipService) enrichAssignedRows(ctx context.Context, orgID int64, rows []actorreadmodel.TesteeRow) error {
+	// Always clear cached/enriched fields before deciding whether a result may be loaded.
+	for i := range rows {
+		rows[i].LastRiskLevel = ""
+		rows[i].TotalAssessments = 0
+		rows[i].LastAssessmentAt = nil
+	}
 	if err := appauthz.RequirePermission(ctx, appauthz.AssessmentResource, "read"); err != nil {
-		for i := range rows {
-			rows[i].LastRiskLevel = ""
-			rows[i].TotalAssessments = 0
-			rows[i].LastAssessmentAt = nil
-		}
 		return nil
 	}
-	if s.summaryReader == nil || len(rows) == 0 {
+	user := actorctx.GrantingUserID(ctx)
+	if s.summaryReader == nil || s.summaryScope == nil || len(rows) == 0 || orgID <= 0 || actorctx.OperatorOrgID(ctx) != orgID || user == 0 || user > math.MaxInt64 {
 		return nil
+	}
+	allowed, err := s.summaryScope.ResolveStoreRange(ctx, orgID, int64(user), appauthz.AssessmentResource, "read")
+	if err != nil {
+		if errors.IsCode(err, code.ErrPermissionDenied) {
+			return nil
+		}
+		return err
 	}
 	ids := make([]uint64, 0, len(rows))
-	for i := range rows {
-		ids = append(ids, rows[i].ID)
-		rows[i].LastAssessmentAt = nil
-		rows[i].TotalAssessments = 0
-		rows[i].LastRiskLevel = ""
+	included := map[uint64]bool{}
+	for _, row := range rows {
+		if row.OrgID == orgID && allowed.Contains(row.StoreID) {
+			ids = append(ids, row.ID)
+			included[row.ID] = true
+		}
+	}
+	if len(ids) == 0 {
+		return nil
 	}
 	summaries, err := s.summaryReader.ReadAssessmentSummaries(ctx, orgID, ids)
 	if err != nil {
@@ -375,7 +448,7 @@ func (s *relationshipService) enrichAssignedRows(ctx context.Context, orgID int6
 	}
 	for i := range rows {
 		summary, ok := summaries[rows[i].ID]
-		if !ok {
+		if !ok || !included[rows[i].ID] {
 			continue
 		}
 		rows[i].TotalAssessments = summary.TotalEvaluated
@@ -490,7 +563,15 @@ func (s *relationshipService) loadActivePrimaryForAssignment(
 		return nil, nil
 	}
 
-	existingPrimaryRelation, err := s.relationRepo.FindActivePrimaryByTestee(ctx, input.orgID, input.testeeID)
+	find := s.relationRepo.FindActivePrimaryByTestee
+	if s.operatorOnly {
+		locked, ok := s.relationRepo.(domainRelation.AssignmentLockedRepository)
+		if !ok {
+			return nil, errors.WithCode(code.ErrInternalServerError, "transactional relation assignment reads unavailable")
+		}
+		find = locked.FindActivePrimaryByTesteeForUpdate
+	}
+	existingPrimaryRelation, err := find(ctx, input.orgID, input.testeeID)
 	if err != nil && !errors.IsCode(err, code.ErrUserNotFound) {
 		return nil, errors.Wrap(err, "failed to find active primary relation")
 	}
@@ -504,7 +585,15 @@ func (s *relationshipService) loadActiveAccessRelation(
 	ctx context.Context,
 	input *relationAssignmentInput,
 ) (*domainRelation.ClinicianTesteeRelation, error) {
-	existingRelation, err := s.relationRepo.FindActiveByTypes(
+	find := s.relationRepo.FindActiveByTypes
+	if s.operatorOnly {
+		locked, ok := s.relationRepo.(domainRelation.AssignmentLockedRepository)
+		if !ok {
+			return nil, errors.WithCode(code.ErrInternalServerError, "transactional relation assignment reads unavailable")
+		}
+		find = locked.FindActiveByTypesForUpdate
+	}
+	existingRelation, err := find(
 		ctx,
 		input.orgID,
 		input.clinicianID,

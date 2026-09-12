@@ -1,5 +1,7 @@
 # Evaluation 模块
 
+> Scope 重构复核中：下文原有模块结论保留为既有基线。当前工作区已增加运营入口的动作、公司及门店范围检查；历史上线证据不覆盖这次范围切换，待最终源码复核及普通角色线上验收后重新签署。
+
 > 状态：已实现，当前 canonical 文档已完成本轮重构。本文负责说明 Evaluation 为什么存在、稳定主链路是什么，以及它和 Survey、ModelCatalog、Calculation、Interpretation 的边界。
 
 ## 1. 30 秒结论

@@ -30,6 +30,9 @@ func (p PageRequest) Limit() int {
 }
 
 type AssessmentFilter struct {
+	RestrictToStoreScope  bool
+	AllowedStoreIDs       []uint64
+	AllAssignedStores     bool
 	OrgID                 int64
 	TesteeID              *uint64
 	AccessibleTesteeIDs   []uint64

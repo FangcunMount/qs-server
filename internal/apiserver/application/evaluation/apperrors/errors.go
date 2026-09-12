@@ -82,3 +82,8 @@ func AuthorizationUnavailable(err error, format string, args ...interface{}) err
 func Forbidden(format string, args ...interface{}) error {
 	return cberrors.WithCode(errorCode.ErrForbidden, format, args...)
 }
+
+// IsAssessmentScoreNotFound identifies optional missing score enrichment.
+func IsAssessmentScoreNotFound(err error) bool {
+	return cberrors.IsCode(err, errorCode.ErrAssessmentScoreNotFound)
+}

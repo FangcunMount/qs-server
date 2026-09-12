@@ -71,7 +71,7 @@ func (s *governedRetryService) Authorize(ctx context.Context, actor Actor, comma
 	if err := appauthz.RequirePermission(ctx, appauthz.AssessmentResource, command.AuthorizationAction); err != nil {
 		return nil, err
 	}
-	assessmentRecord, err := s.authorizer.loadAssessment(ctx, actor, command.AssessmentID)
+	assessmentRecord, err := s.authorizer.loadAssessment(ctx, actor, command.AssessmentID, command.AuthorizationAction)
 	if err != nil {
 		return nil, err
 	}

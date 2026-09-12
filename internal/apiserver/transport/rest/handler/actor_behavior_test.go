@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -66,6 +67,7 @@ func (*stubActorTesteeBackendQueryService) ListTesteesWithGuardians(context.Cont
 }
 
 type stubActorTesteeAccessService struct {
+	actorAccessApp.StoreScopeAccess
 	lastResolveOrgID      int64
 	lastResolveUserID     int64
 	lastValidateOrgID     int64
@@ -74,17 +76,7 @@ type stubActorTesteeAccessService struct {
 	validateErr           error
 	accessibleTesteeIDs   []uint64
 	accessibleTesteesErr  error
-	resolveScope          *actorAccessApp.TesteeAccessScope
 	resolveAccessScopeErr error
-}
-
-func (s *stubActorTesteeAccessService) ResolveAccessScope(_ context.Context, orgID int64, operatorUserID int64) (*actorAccessApp.TesteeAccessScope, error) {
-	s.lastResolveOrgID = orgID
-	s.lastResolveUserID = operatorUserID
-	if s.resolveScope != nil || s.resolveAccessScopeErr != nil {
-		return s.resolveScope, s.resolveAccessScopeErr
-	}
-	return &actorAccessApp.TesteeAccessScope{IsAdmin: true}, nil
 }
 
 func (s *stubActorTesteeAccessService) ValidateTesteeAccess(_ context.Context, orgID int64, operatorUserID int64, testeeID uint64) error {
@@ -369,7 +361,7 @@ func TestTesteeHandlerListTesteesDefaultsPaginationAndUsesProtectedScope(t *test
 			Items: []*testeeApp.TesteeResult{{ID: 5, OrgID: 91, Name: "Casey"}},
 		},
 	}
-	access := &stubActorTesteeAccessService{}
+	access := &stubActorTesteeAccessService{resolveAccessScopeErr: errors.New("legacy doctor gate must not run")}
 	handler := newTesteeHandlerForTest()
 	handler.testeeQueryService = query
 	handler.testeeAccessService = access
@@ -386,7 +378,7 @@ func TestTesteeHandlerListTesteesDefaultsPaginationAndUsesProtectedScope(t *test
 	if query.lastListDTO.OrgID != 91 || query.lastListDTO.Offset != 0 || query.lastListDTO.Limit != 20 {
 		t.Fatalf("unexpected testee list dto: %+v", query.lastListDTO)
 	}
-	if access.lastResolveOrgID != 91 || access.lastResolveUserID != 702 {
+	if access.lastResolveOrgID != 0 || access.lastResolveUserID != 0 {
 		t.Fatalf("unexpected access scope lookup: org=%d user=%d", access.lastResolveOrgID, access.lastResolveUserID)
 	}
 }
@@ -511,9 +503,10 @@ func TestOperatorClinicianHandlerListTesteeClinicianRelationsUsesProtectedScope(
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
 	}
-	if access.lastValidateOrgID != 91 || access.lastValidateUserID != 703 || access.lastValidateTesteeID != 11 {
-		t.Fatalf("unexpected access validation: org=%d user=%d testee=%d", access.lastValidateOrgID, access.lastValidateUserID, access.lastValidateTesteeID)
+	if access.lastValidateOrgID != 0 || access.lastValidateUserID != 0 || access.lastValidateTesteeID != 0 {
+		t.Fatal("legacy access gate ran before scoped application service")
 	}
+
 	if relations.lastTesteeRelationDTO.OrgID != 91 || relations.lastTesteeRelationDTO.TesteeID != 11 || relations.lastTesteeRelationDTO.ActiveOnly {
 		t.Fatalf("unexpected relation dto: %+v", relations.lastTesteeRelationDTO)
 	}
@@ -651,3 +644,123 @@ var _ clinicianApp.ClinicianQueryService = (*stubActorClinicianQueryService)(nil
 var _ clinicianApp.ClinicianRelationshipService = (*stubActorClinicianRelationshipService)(nil)
 var _ operatorApp.OperatorQueryService = (*stubActorOperatorQueryService)(nil)
 var _ assessmentEntryApp.AssessmentEntryService = (*stubActorAssessmentEntryService)(nil)
+
+func (s *stubActorTesteeAccessService) ValidateTesteeStoreAccess(ctx context.Context, orgID, userID int64, testeeID uint64, resource, action string) error {
+	if resource != "qs:actor:collection:testees" || action != "read" {
+		return errors.New("unexpected scope permission")
+	}
+	return s.ValidateTesteeAccess(ctx, orgID, userID, testeeID)
+}
+
+func TestTesteeDetailRejectsScopeBeforeGuardianQuery(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	backend := &stubActorTesteeBackendQueryService{}
+	h := newTesteeHandlerForTest()
+	h.testeeBackendQueryService = backend
+	h.testeeAccessService = &stubActorTesteeAccessService{validateErr: errors.New("outside store range")}
+	c, _ := newActorTestContext(http.MethodGet, "/api/v1/testees/11", nil)
+	c.Params = gin.Params{{Key: "id", Value: "11"}}
+	c.Set(restmiddleware.OrgIDKey, uint64(88))
+	c.Set(restmiddleware.UserIDKey, uint64(701))
+	h.GetTestee(c)
+	if backend.lastTesteeID != 0 {
+		t.Fatal("scope denial must precede guardian query")
+	}
+}
+
+func TestTesteeProfileListUsesListQueryInsteadOfDetail(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	query := &stubActorTesteeQueryService{listResult: &testeeApp.TesteeListResult{Items: []*testeeApp.TesteeResult{}}}
+	h := newTesteeHandlerForTest()
+	h.testeeQueryService = query
+	c, rec := newActorTestContext(http.MethodGet, "/api/v1/testees?profile_id=123", nil)
+	c.Set(restmiddleware.OrgIDKey, uint64(91))
+	c.Set(restmiddleware.UserIDKey, uint64(702))
+	h.ListTestees(c)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status=%d", rec.Code)
+	}
+	if query.lastFindProfileID != 0 {
+		t.Fatal("list must not use detail read permission")
+	}
+	if query.lastListDTO.ProfileID == nil || *query.lastListDTO.ProfileID != 123 {
+		t.Fatal("profile filter not forwarded")
+	}
+}
+
+type atomicProfileUpdaterStub struct {
+	testeeApp.TesteeManagementService
+	calls int
+	dto   testeeApp.UpdateProfileDTO
+	err   error
+}
+
+func (s *atomicProfileUpdaterStub) UpdateProfile(_ context.Context, dto testeeApp.UpdateProfileDTO) error {
+	s.calls++
+	s.dto = dto
+	return s.err
+}
+func TestUpdateTesteeAcknowledgesCommitWithoutReadingDetails(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	updater := &atomicProfileUpdaterStub{}
+	h := newTesteeHandlerForTest()
+	h.testeeManagementService = updater
+	// No query/access service is supplied: the mutation application owns its
+	// authorization and success must never trigger an additional detail query.
+	c, rec := newActorTestContext(http.MethodPut, "/api/v1/testees/11", []byte(`{"is_key_focus":true}`))
+	c.Params = gin.Params{{Key: "id", Value: "11"}}
+	c.Set(restmiddleware.OrgIDKey, uint64(88))
+	c.Set(restmiddleware.UserIDKey, uint64(701))
+	h.UpdateTestee(c)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status=%d body=%s", rec.Code, rec.Body.String())
+	}
+	if updater.calls != 1 || updater.dto.TesteeID != 11 || updater.dto.IsKeyFocus == nil || !*updater.dto.IsKeyFocus {
+		t.Fatalf("unexpected update %+v", updater)
+	}
+	if updater.dto.Name != nil || updater.dto.Gender != nil {
+		t.Fatal("omitted fields must not become zero values")
+	}
+	var payload struct {
+		Data map[string]any `json:"data"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &payload); err != nil {
+		t.Fatal(err)
+	}
+	if len(payload.Data) != 2 || payload.Data["id"] != "11" || payload.Data["updated"] != true {
+		t.Fatalf("unexpected mutation response %+v", payload.Data)
+	}
+}
+
+// The clinician parameter narrows Testee results; it must not require access to
+// the headquarters clinician directory. The application owns the scoped lookup.
+type scopedClinicianFilter struct {
+	clinicianApp.ClinicianRelationshipService
+	org       int64
+	clinician uint64
+	err       error
+}
+
+func (s *scopedClinicianFilter) ListAssignedTesteeIDs(_ context.Context, org int64, clinician uint64) ([]uint64, error) {
+	s.org, s.clinician = org, clinician
+	if s.err != nil {
+		return nil, s.err
+	}
+	return []uint64{17}, nil
+}
+func TestTesteeClinicianFilterUsesScopedRelationshipWithoutHeadquartersLookup(t *testing.T) {
+	c, _ := newActorTestContext(http.MethodGet, "/api/v1/testees?clinician_id=12", nil)
+	relation := &scopedClinicianFilter{}
+	h := &TesteeHandler{clinicianRelationshipService: relation}
+	id := uint64(12)
+	ids, restricted, err := h.resolveClinicianScopedTesteeIDs(c, 91, &id)
+	if err != nil || !restricted || len(ids) != 1 || ids[0] != 17 || relation.org != 91 || relation.clinician != 12 {
+		t.Fatalf("scoped clinician filter: %v %v %v %+v", ids, restricted, err, relation)
+	}
+	denied := errors.New("outside company or store scope")
+	relation.err = denied
+	ids, _, err = h.resolveClinicianScopedTesteeIDs(c, 91, &id)
+	if !errors.Is(err, denied) || ids != nil {
+		t.Fatalf("scope denial lost: %v %v", ids, err)
+	}
+}

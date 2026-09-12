@@ -234,3 +234,14 @@ func containsPlanVar(values []interface{}, want interface{}) bool {
 	}
 	return false
 }
+
+func TestTaskListScopeDoesNotReplaceExplicitTesteeFilter(t *testing.T) {
+	db := newDryRunPlanDB(t)
+	testeeID := uint64(3001)
+	var rows []AssessmentTaskPO
+	stmt := buildTaskListQuery(db.Session(&gorm.Session{DryRun: true}).Model(&AssessmentTaskPO{}), planreadmodel.TaskFilter{OrgID: 9, TesteeID: &testeeID, RestrictToAccessScope: true, AccessibleTesteeIDs: []uint64{3001, 3002}}).Find(&rows).Statement
+	sql := stmt.SQL.String()
+	if !strings.Contains(sql, "testee_id IN") || !strings.Contains(sql, "testee_id = ?") {
+		t.Fatalf("scope must intersect explicit testee: %s", sql)
+	}
+}

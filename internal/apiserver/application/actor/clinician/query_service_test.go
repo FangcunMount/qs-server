@@ -3,6 +3,9 @@ package clinician
 import (
 	"context"
 	"errors"
+	"github.com/FangcunMount/qs-server/internal/apiserver/application/actor/actorctx"
+	appauthz "github.com/FangcunMount/qs-server/internal/apiserver/application/authz"
+	authztest "github.com/FangcunMount/qs-server/internal/apiserver/application/authz/testutil"
 	"testing"
 
 	actorreadmodel "github.com/FangcunMount/qs-server/internal/apiserver/port/actorreadmodel"
@@ -128,4 +131,49 @@ func (s *queryAssessmentEntryReaderStub) CountAssessmentEntriesByClinician(conte
 
 func (*queryAssessmentEntryReaderStub) GetAssessmentEntryTitle(context.Context, uint64) (string, error) {
 	return "", nil
+}
+
+type clinicianQueryScope struct{}
+
+func (clinicianQueryScope) ResolveStoreRange(_ context.Context, org, user int64, resource, action string) (appauthz.StoreRange, error) {
+	if org != 1 || user != 9 {
+		panic("wrong query company")
+	}
+	if resource == "qs:actor:collection:clinicians" {
+		return appauthz.StoreRange{AllStores: true}, nil
+	}
+	if resource != "qs:actor:collection:testees" || action != "list" {
+		panic("wrong count permission")
+	}
+	return appauthz.StoreRange{StoreIDs: []uint64{7}}, nil
+}
+
+type scopedQueryRelations struct {
+	queryRelationReaderStub
+	filter actorreadmodel.RelationFilter
+}
+
+func (r *scopedQueryRelations) ListAssignedTestees(_ context.Context, f actorreadmodel.RelationFilter) ([]actorreadmodel.TesteeRow, int64, error) {
+	r.filter = f
+	return []actorreadmodel.TesteeRow{{ID: 1}, {ID: 1}, {ID: 2}}, 3, nil
+}
+func TestHeadquartersClinicianCountUsesSeparateTesteeScope(t *testing.T) {
+	reader := &queryClinicianReaderStub{row: &actorreadmodel.ClinicianRow{ID: 12, OrgID: 1}}
+	relations := &scopedQueryRelations{}
+	service := NewOperatorQueryService(reader, relations, nil, clinicianQueryScope{})
+	ctx := authztest.WithPermission(actorctx.WithGrantingUserID(actorctx.WithOperatorOrgID(context.Background(), 1), 9), "qs:*:*:*", "*")
+	result, err := service.GetByID(ctx, 12)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.AssignedTesteeCount != 2 || relations.listActiveCalls != 0 || !relations.filter.RestrictToStoreScope || relations.filter.AllAssignedStores || len(relations.filter.AllowedStoreIDs) != 1 || relations.filter.AllowedStoreIDs[0] != 7 {
+		t.Fatalf("unscoped count: %+v %+v", result, relations.filter)
+	}
+	reader.row.OrgID = 2
+	if _, err := service.GetByID(ctx, 12); err == nil {
+		t.Fatal("foreign company clinician visible")
+	}
+	if _, err := service.ListClinicians(context.Background(), ListClinicianDTO{OrgID: 1}); err == nil {
+		t.Fatal("missing authority allowed")
+	}
 }

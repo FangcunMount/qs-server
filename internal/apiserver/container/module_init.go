@@ -4,13 +4,14 @@ import (
 	"context"
 	"fmt"
 	bridge "github.com/FangcunMount/qs-server/internal/apiserver/application/aibridge"
+	appauthz "github.com/FangcunMount/qs-server/internal/apiserver/application/authz"
+	actormysql "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/actor"
 
 	actoraccess "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/access"
 	actortestee "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/testee"
 	evaluationoperator "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/operator"
 	evaluationtestee "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/testee"
 	interpretationadmin "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/administration"
-	interpretationclinician "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/clinician"
 	interpretationparticipant "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/participant"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/reportprojection"
 	modelcatalogHotRank "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/hotrank"
@@ -83,7 +84,7 @@ func (c *Container) initEvaluationModule() error {
 		currentAIAccess.Links = links
 	}
 	c.ReportModule.BindCurrentAIAccess(currentAIAccess)
-	if err := c.ReportModule.BindParticipantAccess(participantInterpretationAccess{testees: c.ActorModule.TesteeQueryService, assessments: c.EvaluationModule.TesteeService}); err != nil {
+	if err := c.ReportModule.BindParticipantAccess(participantInterpretationAccess{testees: actortestee.NewSelfServiceQueryServiceWithAssessmentSummary(c.ActorModule.ReadModel, nil), assessments: c.EvaluationModule.TesteeService}); err != nil {
 		return fmt.Errorf("failed to bind interpretation participant service: %w", err)
 	}
 	if err := c.ReportModule.BindAdministrationAccess(administrationInterpretationAccess{
@@ -92,9 +93,7 @@ func (c *Container) initEvaluationModule() error {
 	}); err != nil {
 		return fmt.Errorf("failed to bind interpretation administration service: %w", err)
 	}
-	if err := c.ReportModule.BindClinicianAccess(clinicianInterpretationAccess{relations: c.ActorModule.TesteeAccessService, ownership: c.EvaluationModule.TesteeService}); err != nil {
-		return fmt.Errorf("failed to bind interpretation clinician service: %w", err)
-	}
+
 	return nil
 }
 
@@ -132,78 +131,51 @@ type administrationInterpretationAccess struct {
 	actors actoraccess.TesteeAccessService
 }
 
-type clinicianInterpretationAccess struct {
-	relations actoraccess.TesteeAccessService
-	ownership evaluationtestee.Service
-}
-
-const administrationDecisionSource = "actor.access.ResolveAccessScope"
-
-func (a clinicianInterpretationAccess) AuthorizeParticipant(ctx context.Context, actor interpretationclinician.Actor, testeeID uint64) error {
-	return a.relations.ValidateTesteeAccess(ctx, actor.OrgID, actor.OperatorUserID, testeeID)
-}
-func (a clinicianInterpretationAccess) AuthorizeParticipantAssessment(ctx context.Context, actor interpretationclinician.Actor, testeeID, assessmentID uint64) error {
-	if err := a.AuthorizeParticipant(ctx, actor, testeeID); err != nil {
-		return err
-	}
-	return a.ownership.AuthorizeAssessment(ctx, evaluationtestee.Actor{TesteeID: testeeID}, assessmentID)
-}
+const administrationDecisionSource = "actor.access.StoreScopeAccess"
 
 func (a administrationInterpretationAccess) AuthorizeAssessment(ctx context.Context, actor interpretationadmin.Actor, assessmentID uint64) (interpretationadmin.ReportAccessDecision, error) {
-	if a.access == nil {
-		return interpretationadmin.ReportAccessDecision{}, fmt.Errorf("administration assessment access service is not configured")
+	checker, ok := a.access.(evaluationoperator.AssessmentPermissionAuthorizer)
+	if !ok {
+		return interpretationadmin.ReportAccessDecision{}, fmt.Errorf("report assessment scope checker is not configured")
 	}
-	if _, err := a.access.GetAssessment(ctx, evaluationoperator.Actor{OrgID: actor.OrgID, OperatorUserID: actor.OperatorUserID}, assessmentID); err != nil {
+	if err := checker.AuthorizeAssessmentResource(ctx, evaluationoperator.Actor{OrgID: actor.OrgID, OperatorUserID: actor.OperatorUserID}, assessmentID, "qs:evaluation:collection:reports", "read"); err != nil {
 		return interpretationadmin.ReportAccessDecision{}, err
 	}
 	return a.decide(ctx, actor)
 }
-
 func (a administrationInterpretationAccess) ScopeReports(ctx context.Context, actor interpretationadmin.Actor, testeeID uint64) (interpretationadmin.ListScope, error) {
-	if a.access == nil {
-		return interpretationadmin.ListScope{}, fmt.Errorf("administration report access service is not configured")
+	checker, ok := a.actors.(actoraccess.StoreScopeAccess)
+	if !ok {
+		return interpretationadmin.ListScope{}, fmt.Errorf("report store scope checker is not configured")
 	}
-	scope, err := a.access.ScopeTesteeList(ctx, evaluationoperator.Actor{OrgID: actor.OrgID, OperatorUserID: actor.OperatorUserID}, testeeID)
-	if err != nil {
-		return interpretationadmin.ListScope{}, err
+	var ids []uint64
+	if testeeID != 0 {
+		if err := checker.ValidateTesteeStoreAccess(ctx, actor.OrgID, actor.OperatorUserID, testeeID, "qs:evaluation:collection:reports", "list"); err != nil {
+			return interpretationadmin.ListScope{}, err
+		}
+		ids = []uint64{testeeID}
+	} else {
+		var err error
+		ids, err = checker.ListStoreScopedTesteeIDs(ctx, actor.OrgID, actor.OperatorUserID, "qs:evaluation:collection:reports", "list")
+		if err != nil {
+			return interpretationadmin.ListScope{}, err
+		}
 	}
 	decision, err := a.decide(ctx, actor)
 	if err != nil {
 		return interpretationadmin.ListScope{}, err
 	}
-	return interpretationadmin.ListScope{
-		OrgID:               actor.OrgID,
-		TesteeID:            scope.TesteeID,
-		AccessibleTesteeIDs: scope.AccessibleTesteeIDs,
-		Restricted:          scope.Restricted,
-		Audience:            decision.Audience,
-		IsAdmin:             decision.IsAdmin,
-		DecisionSource:      decision.DecisionSource,
-	}, nil
+	return interpretationadmin.ListScope{OrgID: actor.OrgID, TesteeID: testeeID, RestrictToStoreScope: true, StoreScopedTesteeIDs: ids, Audience: decision.Audience, IsAdmin: decision.IsAdmin, DecisionSource: decision.DecisionSource}, nil
 }
-
 func (a administrationInterpretationAccess) decide(ctx context.Context, actor interpretationadmin.Actor) (interpretationadmin.ReportAccessDecision, error) {
-	if a.actors == nil {
-		return interpretationadmin.ReportAccessDecision{}, fmt.Errorf("administration actor access service is not configured")
+	snapshot, ok := appauthz.FromContext(ctx)
+	if !ok {
+		return interpretationadmin.ReportAccessDecision{}, fmt.Errorf("report authorization snapshot required")
 	}
-	scope, err := a.actors.ResolveAccessScope(ctx, actor.OrgID, actor.OperatorUserID)
-	if err != nil {
-		return interpretationadmin.ReportAccessDecision{}, err
+	if snapshot.IsQSAdmin() {
+		return interpretationadmin.ReportAccessDecision{Audience: interpretationpolicy.AudienceAdmin, IsAdmin: true, DecisionSource: administrationDecisionSource}, nil
 	}
-	if scope != nil && scope.IsAdmin {
-		return interpretationadmin.ReportAccessDecision{
-			Audience:       interpretationpolicy.AudienceAdmin,
-			IsAdmin:        true,
-			Restricted:     false,
-			DecisionSource: administrationDecisionSource,
-		}, nil
-	}
-	return interpretationadmin.ReportAccessDecision{
-		Audience:       interpretationpolicy.AudienceClinician,
-		IsAdmin:        false,
-		Restricted:     true,
-		DecisionSource: administrationDecisionSource,
-	}, nil
+	return interpretationadmin.ReportAccessDecision{Audience: interpretationpolicy.AudienceOperator, Restricted: true, DecisionSource: administrationDecisionSource}, nil
 }
 
 // initPlanModule 初始化计划模块
@@ -216,7 +188,9 @@ func (c *Container) initPlanModule() error {
 
 // initStatisticsModule 初始化统计模块
 func (c *Container) initStatisticsModule() error {
-	if err := statmod.InstallFrom(c); err != nil {
+	reader := actormysql.NewReadModel(c.MySQLDB())
+	access := actoraccess.NewTesteeAccessService(reader, reader).(actoraccess.StoreScopeAccess)
+	if err := statmod.InstallFrom(c, access); err != nil {
 		return fmt.Errorf("failed to initialize statistics module: %w", err)
 	}
 	return nil

@@ -6,6 +6,11 @@ import (
 )
 
 type TesteeFilter struct {
+	ProfileID *uint64
+	// Backend store range is independent of clinician/profile relationship filters.
+	RestrictToStoreScope  bool
+	AllowedStoreIDs       []uint64
+	AllAssignedStores     bool
 	StoreID               *uint64
 	UnassignedStore       bool
 	OrgID                 int64
@@ -123,14 +128,18 @@ type ClinicianReader interface {
 }
 
 type RelationFilter struct {
-	OrgID         int64
-	ClinicianID   uint64
-	TesteeID      uint64
-	TesteeIDs     []uint64
-	RelationTypes []string
-	ActiveOnly    bool
-	Offset        int
-	Limit         int
+	// 后台范围按受试者当前门店过滤，在关系分页及计数之前执行。
+	RestrictToStoreScope bool
+	AllowedStoreIDs      []uint64
+	AllAssignedStores    bool
+	OrgID                int64
+	ClinicianID          uint64
+	TesteeID             uint64
+	TesteeIDs            []uint64
+	RelationTypes        []string
+	ActiveOnly           bool
+	Offset               int
+	Limit                int
 }
 
 type RelationRow struct {
@@ -199,4 +208,10 @@ type ReadModel interface {
 	ClinicianReader
 	RelationReader
 	AssessmentEntryReader
+}
+
+// TesteeStoreSelector supplies current ownership IDs for cross-database queries.
+// Callers must apply these IDs before count/pagination, never after loading a page.
+type TesteeStoreSelector interface {
+	ListTesteeIDsInStores(context.Context, int64, []uint64, bool) ([]uint64, error)
 }

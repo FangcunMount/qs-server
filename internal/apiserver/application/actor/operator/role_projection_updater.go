@@ -2,6 +2,7 @@ package operator
 
 import (
 	"context"
+	"fmt"
 	"sort"
 	"time"
 
@@ -28,7 +29,7 @@ func (u roleProjectionUpdater) PersistFromSnapshot(ctx context.Context, op *Oper
 	if err != nil {
 		return err
 	}
-	return persistOperatorRolesFromSnapshot(ctx, u.repo, item, snap)
+	return u.refreshCompanyProjection(ctx, item, snap.AuthzVersion)
 }
 
 func (u roleProjectionUpdater) PersistFromSnapshotByUser(ctx context.Context, orgID int64, userID int64, snap *authzapp.Snapshot) error {
@@ -39,7 +40,7 @@ func (u roleProjectionUpdater) PersistFromSnapshotByUser(ctx context.Context, or
 	if err != nil {
 		return err
 	}
-	return persistOperatorRolesFromSnapshot(ctx, u.repo, op, snap)
+	return u.refreshCompanyProjection(ctx, op, snap.AuthzVersion)
 }
 
 func (u roleProjectionUpdater) SyncRoles(ctx context.Context, orgID int64, operatorID uint64) error {
@@ -60,18 +61,28 @@ func (u roleProjectionUpdater) SyncRoles(ctx context.Context, orgID int64, opera
 	return persistOperatorRoleProjection(ctx, u.repo, op, projection, false)
 }
 
-func persistOperatorRolesFromSnapshot(ctx context.Context, repo domain.Repository, op *domain.Operator, snap *authzapp.Snapshot) error {
-	if snap == nil {
-		return nil
+// Request snapshots flatten role names across assignments. They are only a
+// version hint here; management facts supply the current company's projection.
+func (u roleProjectionUpdater) refreshCompanyProjection(ctx context.Context, op *domain.Operator, minimumVersion int64) error {
+	if u.authz == nil || !u.authz.IsEnabled() {
+		return fmt.Errorf("scoped operator projection gateway is required")
 	}
-	return persistOperatorRoleProjection(ctx, repo, op, iambridge.OperatorRoleProjection{
-		DirectRoles: snap.DirectRoleNames(), EffectiveRoles: snap.EffectiveRoleNames(), PolicyVersion: snap.AuthzVersion,
-	}, false)
+	projection, err := u.authz.LoadOperatorRoleProjection(ctx, op.OrgID(), op.UserID())
+	if err != nil {
+		return err
+	}
+	if projection.PolicyVersion < minimumVersion {
+		return fmt.Errorf("operator projection is older than request policy version")
+	}
+	return persistOperatorRoleProjection(ctx, u.repo, op, projection, false)
 }
 
 func persistOperatorRoleProjection(ctx context.Context, repo domain.Repository, op *domain.Operator, projection iambridge.OperatorRoleProjection, pending bool) error {
 	if repo == nil || op == nil {
 		return nil
+	}
+	if projection.PolicyVersion <= 0 || projection.PolicyVersion < op.AuthzPolicyVersion() {
+		return fmt.Errorf("operator projection policy version is invalid or stale")
 	}
 	direct := normalizedProjectedRoles(projection.DirectRoles)
 	effective := normalizedProjectedRoles(projection.DirectRoles)

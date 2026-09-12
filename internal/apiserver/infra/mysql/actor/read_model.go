@@ -127,6 +127,13 @@ func (r *readModel) ListTesteesByIDs(ctx context.Context, orgID int64, ids []uin
 
 func (r *readModel) applyTesteeFilter(query *gorm.DB, filter actorreadmodel.TesteeFilter) *gorm.DB {
 	query = query.Where("org_id = ? AND deleted_at IS NULL", filter.OrgID)
+	if filter.RestrictToStoreScope {
+		if filter.AllAssignedStores {
+			query = query.Where("store_id IS NOT NULL AND store_id > 0")
+		} else {
+			query = query.Where("store_id IN ?", filter.AllowedStoreIDs)
+		}
+	}
 	if filter.StoreID != nil {
 		query = query.Where("store_id = ?", *filter.StoreID)
 	}
@@ -135,6 +142,9 @@ func (r *readModel) applyTesteeFilter(query *gorm.DB, filter actorreadmodel.Test
 	}
 	if filter.RestrictToAccessScope {
 		query = query.Where("id IN ?", filter.AccessibleTesteeIDs)
+	}
+	if filter.ProfileID != nil {
+		query = query.Where("profile_id = ?", *filter.ProfileID)
 	}
 	if filter.Name != "" {
 		query = query.Where("name LIKE ?", "%"+filter.Name+"%")
@@ -297,7 +307,7 @@ func (r *readModel) ListAssignedTestees(ctx context.Context, filter actorreadmod
 	for _, relation := range relationRows {
 		testeeIDs = append(testeeIDs, uint64(relation.TesteeID))
 	}
-	testeesByID, err := r.loadTesteeRowsByID(ctx, testeeIDs)
+	testeesByID, err := r.loadRelationTesteeRows(ctx, filter, testeeIDs)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -401,7 +411,7 @@ func (r *readModel) ListClinicianRelations(ctx context.Context, filter actorread
 	for _, relation := range relationRows {
 		testeeIDs = append(testeeIDs, uint64(relation.TesteeID))
 	}
-	testeesByID, err := r.loadTesteeRowsByID(ctx, testeeIDs)
+	testeesByID, err := r.loadRelationTesteeRows(ctx, filter, testeeIDs)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -455,6 +465,17 @@ func (r *readModel) listRelationPOs(ctx context.Context, filter actorreadmodel.R
 	}
 	if len(filter.RelationTypes) > 0 {
 		query = query.Where("relation_type IN ?", filter.RelationTypes)
+	}
+
+	if filter.RestrictToStoreScope {
+		currentTestees := r.WithContext(ctx).Table("testee").Select("1").
+			Where("testee.id = clinician_relation.testee_id AND testee.org_id = ? AND testee.deleted_at IS NULL", filter.OrgID)
+		if filter.AllAssignedStores {
+			currentTestees = currentTestees.Where("testee.store_id IS NOT NULL AND testee.store_id > 0")
+		} else {
+			currentTestees = currentTestees.Where("testee.store_id IN ?", filter.AllowedStoreIDs)
+		}
+		query = query.Where("EXISTS (?)", currentTestees)
 	}
 
 	countQuery := query.Session(&gorm.Session{})
@@ -517,19 +538,25 @@ func (r *readModel) GetAssessmentEntryTitle(ctx context.Context, id uint64) (str
 	return fmt.Sprintf("%s:%s", po.TargetType, po.TargetCode), nil
 }
 
-func (r *readModel) loadTesteeRowsByID(ctx context.Context, ids []uint64) (map[uint64]actorreadmodel.TesteeRow, error) {
+// Recheck ownership during hydration. If a scoped page changed between the
+// relation query and this query, reject the page instead of returning partial
+// data with a stale total or an out-of-scope Testee.
+func (r *readModel) loadRelationTesteeRows(ctx context.Context, filter actorreadmodel.RelationFilter, ids []uint64) (map[uint64]actorreadmodel.TesteeRow, error) {
+	result := map[uint64]actorreadmodel.TesteeRow{}
 	if len(ids) == 0 {
-		return map[uint64]actorreadmodel.TesteeRow{}, nil
+		return result, nil
 	}
+	query := r.applyTesteeFilter(r.WithContext(ctx), actorreadmodel.TesteeFilter{OrgID: filter.OrgID, RestrictToStoreScope: filter.RestrictToStoreScope, AllowedStoreIDs: filter.AllowedStoreIDs, AllAssignedStores: filter.AllAssignedStores}).Where("id IN ?", uniqueUint64(ids))
 	var pos []*TesteePO
-	err := r.WithContext(ctx).Where("id IN ? AND deleted_at IS NULL", uniqueUint64(ids)).Find(&pos).Error
-	if err != nil {
+	if err := query.Find(&pos).Error; err != nil {
 		return nil, err
 	}
-	result := make(map[uint64]actorreadmodel.TesteeRow, len(pos))
 	for _, po := range pos {
 		row := testeeRowFromPO(po)
 		result[row.ID] = row
+	}
+	if filter.RestrictToStoreScope && len(result) != len(uniqueUint64(ids)) {
+		return nil, errors.WithCode(code.ErrConflict, "受试者归属已变化，请刷新列表")
 	}
 	return result, nil
 }
@@ -699,4 +726,17 @@ func uniqueUint64(items []uint64) []uint64 {
 		result = append(result, item)
 	}
 	return result
+}
+
+func (r *readModel) ListTesteeIDsInStores(ctx context.Context, orgID int64, stores []uint64, allAssigned bool) ([]uint64, error) {
+	if orgID <= 0 {
+		return nil, errors.WithCode(code.ErrPermissionDenied, "company scope required")
+	}
+	ids := []uint64{}
+	if !allAssigned && len(stores) == 0 {
+		return ids, nil
+	}
+	filter := actorreadmodel.TesteeFilter{OrgID: orgID, RestrictToStoreScope: true, AllowedStoreIDs: stores, AllAssignedStores: allAssigned}
+	err := r.applyTesteeFilter(r.WithContext(ctx).Model(&TesteePO{}), filter).Order("id ASC").Pluck("id", &ids).Error
+	return ids, err
 }

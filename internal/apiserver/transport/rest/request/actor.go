@@ -50,7 +50,7 @@ type GetTesteeByProfileIDRequest struct {
 type CreateOperatorRequest struct {
 	OrgID    int64    `json:"org_id"`                          // 兼容字段：机构ID
 	UserID   meta.ID  `json:"user_id,omitempty"`               // IAM用户ID（优先使用）
-	Roles    []string `json:"roles"`                           // 期望授予的角色列表（IAM 启用时转成 assignment）
+	Roles    []string `json:"roles"`                           // 已退役：仅允许空列表；角色与范围通过 authorization-scope 配置
 	Name     string   `json:"name" binding:"required"`         // 姓名
 	Email    string   `json:"email" binding:"omitempty,email"` // 邮箱
 	Phone    string   `json:"phone"`                           // 电话
@@ -60,7 +60,7 @@ type CreateOperatorRequest struct {
 
 // UpdateOperatorRequest 更新员工请求
 type UpdateOperatorRequest struct {
-	Roles    []string `json:"roles"`                           // 角色列表
+	Roles    []string `json:"roles"`                           // 已退役：非 null 字段拒绝，请使用 authorization-scope
 	Name     *string  `json:"name"`                            // 姓名
 	Email    *string  `json:"email" binding:"omitempty,email"` // 邮箱
 	Phone    *string  `json:"phone"`                           // 电话

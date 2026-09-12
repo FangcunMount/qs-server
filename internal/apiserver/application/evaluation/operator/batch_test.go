@@ -3,6 +3,7 @@ package operator
 import (
 	"context"
 	"errors"
+	appauthz "github.com/FangcunMount/qs-server/internal/apiserver/application/authz"
 	authztest "github.com/FangcunMount/qs-server/internal/apiserver/application/authz/testutil"
 	"reflect"
 	"testing"
@@ -32,13 +33,11 @@ type workerStub struct {
 }
 
 type accessCheckerStub struct {
-	denied map[uint64]error
-	calls  []uint64
+	actions []string
+	denied  map[uint64]error
+	calls   []uint64
 }
 
-func (*accessCheckerStub) ResolveAccessScope(context.Context, int64, int64) (*AccessScope, error) {
-	return &AccessScope{IsAdmin: true}, nil
-}
 func (s *accessCheckerStub) ValidateTesteeAccess(_ context.Context, _, _ int64, testeeID uint64) error {
 	s.calls = append(s.calls, testeeID)
 	return s.denied[testeeID]
@@ -122,3 +121,13 @@ func newAssessment(t *testing.T, orgID int64, id uint64) *assessment.Assessment 
 }
 
 var _ execute.WorkerExecutionService = (*workerStub)(nil)
+
+func (s *accessCheckerStub) ValidateTesteeStoreAccess(ctx context.Context, orgID, userID int64, testeeID uint64, resource, action string) error {
+	s.actions = append(s.actions, action)
+	return s.ValidateTesteeAccess(ctx, orgID, userID, testeeID)
+}
+
+func (s *accessCheckerStub) ResolveStoreRange(ctx context.Context, orgID, userID int64, resource, action string) (appauthz.StoreRange, error) {
+	snapshot, _ := appauthz.FromContext(ctx)
+	return snapshot.ResolveStoreRange(orgID, resource, action)
+}

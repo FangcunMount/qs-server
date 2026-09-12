@@ -2,6 +2,9 @@ package plan
 
 import (
 	"context"
+	"github.com/FangcunMount/qs-server/internal/apiserver/application/actor/actorctx"
+	appauthz "github.com/FangcunMount/qs-server/internal/apiserver/application/authz"
+	"math"
 	"strings"
 	"time"
 
@@ -15,6 +18,7 @@ import (
 // 查询Service 计划查询服务实现
 // 行为者：所有用户
 type queryService struct {
+	access       EnrollmentScopeChecker
 	planReader   planreadmodel.PlanReader
 	taskReader   planreadmodel.TaskReader
 	scaleCatalog ScaleCatalog
@@ -25,8 +29,14 @@ func NewQueryService(
 	planReader planreadmodel.PlanReader,
 	taskReader planreadmodel.TaskReader,
 	scaleCatalog ScaleCatalog,
+	access ...EnrollmentScopeChecker,
 ) PlanQueryService {
+	var checker EnrollmentScopeChecker
+	if len(access) > 0 {
+		checker = access[0]
+	}
 	return &queryService{
+		access:       checker,
 		planReader:   planReader,
 		taskReader:   taskReader,
 		scaleCatalog: scaleCatalog,
@@ -91,6 +101,14 @@ func (s *queryService) ListPlans(ctx context.Context, dto ListPlansDTO) (*PlanLi
 
 // GetTask 根据ID获取任务
 func (s *queryService) GetTask(ctx context.Context, orgID int64, taskID string) (*TaskResult, error) {
+	userID := actorctx.GrantingUserID(ctx)
+	if orgID <= 0 || actorctx.OperatorOrgID(ctx) != orgID || userID == 0 || userID > math.MaxInt64 || s.access == nil {
+		return nil, errors.WithCode(errorCode.ErrPermissionDenied, "trusted operator and task scope are required")
+	}
+	if err := appauthz.RequirePermission(ctx, appauthz.EvaluationPlanTaskResource, "read"); err != nil {
+		return nil, err
+	}
+
 	// 1. 转换参数
 	id, err := toTaskID(taskID)
 	if err != nil {
@@ -105,6 +123,12 @@ func (s *queryService) GetTask(ctx context.Context, orgID int64, taskID string) 
 	if err != nil {
 		return nil, errors.WithCode(errorCode.ErrPageNotFound, "任务不存在")
 	}
+	if row == nil || row.OrgID != orgID {
+		return nil, errors.WithCode(errorCode.ErrPageNotFound, "任务不存在")
+	}
+	if err := s.access.ValidateTesteeStoreAccess(ctx, orgID, int64(userID), row.TesteeID, appauthz.EvaluationPlanTaskResource, "read"); err != nil {
+		return nil, err
+	}
 	result := toTaskResultFromRow(*row)
 	result.ScaleTitle = s.resolveScaleTitle(ctx, result.ScaleCode)
 	return result, nil
@@ -112,6 +136,11 @@ func (s *queryService) GetTask(ctx context.Context, orgID int64, taskID string) 
 
 // ListTasks 查询任务列表
 func (s *queryService) ListTasks(ctx context.Context, dto ListTasksDTO) (*TaskListResult, error) {
+	allowed, err := s.taskListScope(ctx, dto.OrgID)
+	if err != nil {
+		return nil, err
+	}
+
 	// 1. 验证分页参数
 	if dto.Page <= 0 {
 		dto.Page = 1
@@ -180,6 +209,21 @@ func (s *queryService) ListTasks(ctx context.Context, dto ListTasksDTO) (*TaskLi
 			filter.AccessibleTesteeIDs = append(filter.AccessibleTesteeIDs, id.Uint64())
 		}
 	}
+	if filter.RestrictToAccessScope {
+		requested := make(map[uint64]struct{}, len(filter.AccessibleTesteeIDs))
+		for _, id := range filter.AccessibleTesteeIDs {
+			requested[id] = struct{}{}
+		}
+		intersection := make([]uint64, 0)
+		for _, id := range allowed {
+			if _, ok := requested[id]; ok {
+				intersection = append(intersection, id)
+			}
+		}
+		allowed = intersection
+	}
+	filter.RestrictToAccessScope = true
+	filter.AccessibleTesteeIDs = allowed
 	page, err := s.taskReader.ListTasks(ctx, filter, planreadmodel.PageRequest{Page: dto.Page, PageSize: dto.PageSize})
 	if err != nil {
 		return nil, errors.WrapC(err, errorCode.ErrDatabase, "查询任务列表失败")
@@ -267,6 +311,29 @@ func (s *queryService) ListTaskWindow(ctx context.Context, dto ListTaskWindowDTO
 			filter.TesteeIDs = append(filter.TesteeIDs, id.Uint64())
 		}
 	}
+	allowed, err := s.taskListScope(ctx, dto.OrgID)
+	if err != nil {
+		return nil, err
+	}
+	if len(filter.TesteeIDs) > 0 {
+		requested := make(map[uint64]struct{}, len(filter.TesteeIDs))
+		for _, id := range filter.TesteeIDs {
+			requested[id] = struct{}{}
+		}
+		narrowed := make([]uint64, 0)
+		for _, id := range allowed {
+			if _, ok := requested[id]; ok {
+				narrowed = append(narrowed, id)
+			}
+		}
+		allowed = narrowed
+	}
+	// The SQL window reader treats an empty ID list as unrestricted. Never
+	// forward an empty authorization range through that unfiltered contract.
+	if len(allowed) == 0 {
+		return &TaskWindowResult{Items: []*TaskResult{}, Page: dto.Page, PageSize: dto.PageSize, HasMore: false}, nil
+	}
+	filter.TesteeIDs = allowed
 	window, err := s.taskReader.ListTaskWindow(ctx, filter, planreadmodel.PageRequest{Page: dto.Page, PageSize: dto.PageSize})
 	if err != nil {
 		return nil, errors.WrapC(err, errorCode.ErrDatabase, "查询任务窗口失败")
@@ -279,29 +346,21 @@ func (s *queryService) ListTaskWindow(ctx context.Context, dto ListTaskWindowDTO
 	}, nil
 }
 
-// ListTasksByPlan 查询计划下的所有任务
+// ListTasksByPlan 查询当前授权范围内的计划任务。
 func (s *queryService) ListTasksByPlan(ctx context.Context, orgID int64, planID string) ([]*TaskResult, error) {
-	// 1. 转换参数
-	id, err := toPlanID(planID)
-	if err != nil {
-		return nil, errors.WithCode(errorCode.ErrInvalidArgument, "无效的计划ID: %v", err)
-	}
-	if err := s.ensurePlanInOrg(ctx, orgID, id); err != nil {
-		return nil, err
-	}
-
-	if s.taskReader == nil {
-		return nil, errors.WithCode(errorCode.ErrModuleInitializationFailed, "task read model is not configured")
-	}
-	rows, err := s.taskReader.ListTasksByPlanID(ctx, id.Uint64())
-	if err != nil {
-		return nil, errors.WrapC(err, errorCode.ErrDatabase, "查询任务失败")
-	}
-	return s.toTaskResultsWithScaleTitlesFromRows(ctx, rows), nil
+	return s.listTasksByPlanScoped(ctx, orgID, planID, nil, false)
 }
 
-// ListTasksByPlanInScope 查询计划下指定可访问范围内的任务。
+// ListTasksByPlanInScope additionally narrows the authoritative store range.
 func (s *queryService) ListTasksByPlanInScope(ctx context.Context, orgID int64, planID string, accessibleTesteeIDs []string) ([]*TaskResult, error) {
+	return s.listTasksByPlanScoped(ctx, orgID, planID, accessibleTesteeIDs, true)
+}
+
+func (s *queryService) listTasksByPlanScoped(ctx context.Context, orgID int64, planID string, requestedIDs []string, narrow bool) ([]*TaskResult, error) {
+	allowed, err := s.taskListScope(ctx, orgID)
+	if err != nil {
+		return nil, err
+	}
 	id, err := toPlanID(planID)
 	if err != nil {
 		return nil, errors.WithCode(errorCode.ErrInvalidArgument, "无效的计划ID: %v", err)
@@ -309,24 +368,30 @@ func (s *queryService) ListTasksByPlanInScope(ctx context.Context, orgID int64, 
 	if err := s.ensurePlanInOrg(ctx, orgID, id); err != nil {
 		return nil, err
 	}
-
-	testeeIDs := make([]testee.ID, 0, len(accessibleTesteeIDs))
-	for _, rawID := range accessibleTesteeIDs {
-		testeeID, err := toTesteeID(rawID)
-		if err != nil {
-			return nil, errors.WithCode(errorCode.ErrInvalidArgument, "无效的受试者ID: %v", err)
+	if narrow {
+		requested := make(map[uint64]struct{}, len(requestedIDs))
+		for _, raw := range requestedIDs {
+			parsed, err := toTesteeID(raw)
+			if err != nil {
+				return nil, errors.WithCode(errorCode.ErrInvalidArgument, "无效的受试者ID: %v", err)
+			}
+			requested[parsed.Uint64()] = struct{}{}
 		}
-		testeeIDs = append(testeeIDs, testeeID)
+		intersection := make([]uint64, 0)
+		for _, value := range allowed {
+			if _, ok := requested[value]; ok {
+				intersection = append(intersection, value)
+			}
+		}
+		allowed = intersection
 	}
-
+	if len(allowed) == 0 {
+		return []*TaskResult{}, nil
+	}
 	if s.taskReader == nil {
 		return nil, errors.WithCode(errorCode.ErrModuleInitializationFailed, "task read model is not configured")
 	}
-	rawIDs := make([]uint64, 0, len(testeeIDs))
-	for _, id := range testeeIDs {
-		rawIDs = append(rawIDs, id.Uint64())
-	}
-	rows, err := s.taskReader.ListTasksByPlanIDAndTesteeIDs(ctx, id.Uint64(), rawIDs)
+	rows, err := s.taskReader.ListTasksByPlanIDAndTesteeIDs(ctx, id.Uint64(), allowed)
 	if err != nil {
 		return nil, errors.WrapC(err, errorCode.ErrDatabase, "查询任务失败")
 	}
@@ -351,6 +416,10 @@ func (s *queryService) ListTasksByTestee(ctx context.Context, testeeID string) (
 		return nil, errors.WithCode(errorCode.ErrInvalidArgument, "无效的受试者ID: %v", err)
 	}
 
+	if err := s.requireTesteeListScope(ctx, testeeIDDomain.Uint64(), appauthz.EvaluationPlanTaskResource); err != nil {
+		return nil, err
+	}
+
 	if s.taskReader == nil {
 		return nil, errors.WithCode(errorCode.ErrModuleInitializationFailed, "task read model is not configured")
 	}
@@ -367,6 +436,10 @@ func (s *queryService) ListPlansByTestee(ctx context.Context, testeeID string) (
 	testeeIDDomain, err := toTesteeID(testeeID)
 	if err != nil {
 		return nil, errors.WithCode(errorCode.ErrInvalidArgument, "无效的受试者ID: %v", err)
+	}
+
+	if err := s.requireTesteeListScope(ctx, testeeIDDomain.Uint64(), appauthz.EvaluationPlanResource); err != nil {
+		return nil, err
 	}
 
 	if s.planReader == nil {
@@ -397,6 +470,10 @@ func (s *queryService) ListTasksByTesteeAndPlan(ctx context.Context, testeeID st
 	planIDDomain, err := toPlanID(planID)
 	if err != nil {
 		return nil, errors.WithCode(errorCode.ErrInvalidArgument, "无效的计划ID: %v", err)
+	}
+
+	if err := s.requireTesteeListScope(ctx, testeeIDDomain.Uint64(), appauthz.EvaluationPlanTaskResource); err != nil {
+		return nil, err
 	}
 
 	if s.taskReader == nil {

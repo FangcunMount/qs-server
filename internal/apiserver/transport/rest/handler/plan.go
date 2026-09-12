@@ -2,7 +2,6 @@ package handler
 
 import (
 	"context"
-	"strconv"
 
 	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/component-base/pkg/logger"
@@ -353,10 +352,6 @@ func (h *PlanHandler) EnrollTestee(c *gin.Context) {
 		h.Error(c, err)
 		return
 	}
-	if _, _, err := h.validateProtectedTesteeID(c, req.TesteeID); err != nil {
-		h.Error(c, err)
-		return
-	}
 	orgID, err := h.RequireProtectedOrgID(c)
 	if err != nil {
 		h.Error(c, err)
@@ -403,10 +398,6 @@ func (h *PlanHandler) TerminateEnrollment(c *gin.Context) {
 
 	if planID == "" || testeeID == "" {
 		h.Error(c, errors.WithCode(code.ErrInvalidArgument, "计划ID和受试者ID不能为空"))
-		return
-	}
-	if _, _, err := h.validateProtectedTesteeID(c, testeeID); err != nil {
-		h.Error(c, err)
 		return
 	}
 	orgID, err := h.RequireProtectedOrgID(c)
@@ -786,10 +777,6 @@ func (h *PlanHandler) GetTask(c *gin.Context) {
 		h.Error(c, err)
 		return
 	}
-	if _, _, err := h.validateProtectedTesteeID(c, result.TesteeID); err != nil {
-		h.Error(c, err)
-		return
-	}
 
 	h.Success(c, response.NewTaskResponse(result))
 }
@@ -809,7 +796,7 @@ func (h *PlanHandler) GetTask(c *gin.Context) {
 // @Failure 429 {object} core.ErrResponse
 // @Router /api/v1/plans/tasks [get]
 func (h *PlanHandler) ListTasks(c *gin.Context) {
-	orgID, operatorUserID, err := h.RequireProtectedScope(c)
+	orgID, _, err := h.RequireProtectedScope(c)
 	if err != nil {
 		h.Error(c, err)
 		return
@@ -824,12 +811,6 @@ func (h *PlanHandler) ListTasks(c *gin.Context) {
 		h.Error(c, err)
 		return
 	}
-	if req.TesteeID != "" {
-		if _, _, err := h.validateProtectedTesteeID(c, req.TesteeID); err != nil {
-			h.Error(c, err)
-			return
-		}
-	}
 
 	dto := planApp.ListTasksDTO{
 		OrgID:    orgID,
@@ -838,21 +819,6 @@ func (h *PlanHandler) ListTasks(c *gin.Context) {
 		Status:   req.Status,
 		Page:     req.Page,
 		PageSize: req.PageSize,
-	}
-
-	scope, err := h.testeeAccessService.ResolveAccessScope(c.Request.Context(), orgID, operatorUserID)
-	if err != nil {
-		h.Error(c, err)
-		return
-	}
-	if !scope.IsAdmin && req.TesteeID == "" {
-		allowedTesteeIDs, err := h.testeeAccessService.ListAccessibleTesteeIDs(c.Request.Context(), orgID, operatorUserID)
-		if err != nil {
-			h.Error(c, err)
-			return
-		}
-		dto.AccessibleTesteeIDs = allowedTesteeIDsToStrings(allowedTesteeIDs)
-		dto.RestrictToAccessScope = true
 	}
 
 	result, err := h.queryService.ListTasks(c.Request.Context(), dto)
@@ -881,28 +847,12 @@ func (h *PlanHandler) ListTasksByPlan(c *gin.Context) {
 		return
 	}
 
-	orgID, operatorUserID, err := h.RequireProtectedScope(c)
+	orgID, _, err := h.RequireProtectedScope(c)
 	if err != nil {
 		h.Error(c, err)
 		return
 	}
-	scope, err := h.testeeAccessService.ResolveAccessScope(c.Request.Context(), orgID, operatorUserID)
-	if err != nil {
-		h.Error(c, err)
-		return
-	}
-
-	var tasks []*planApp.TaskResult
-	if scope.IsAdmin {
-		tasks, err = h.queryService.ListTasksByPlan(c.Request.Context(), orgID, planID)
-	} else {
-		allowedTesteeIDs, accessErr := h.testeeAccessService.ListAccessibleTesteeIDs(c.Request.Context(), orgID, operatorUserID)
-		if accessErr != nil {
-			h.Error(c, accessErr)
-			return
-		}
-		tasks, err = h.queryService.ListTasksByPlanInScope(c.Request.Context(), orgID, planID, allowedTesteeIDsToStrings(allowedTesteeIDs))
-	}
+	tasks, err := h.queryService.ListTasksByPlan(c.Request.Context(), orgID, planID)
 	if err != nil {
 		h.Error(c, err)
 		return
@@ -927,7 +877,7 @@ func (h *PlanHandler) ListTasksByTestee(c *gin.Context) {
 		h.Error(c, errors.WithCode(code.ErrInvalidArgument, "受试者ID不能为空"))
 		return
 	}
-	if _, _, err := h.validateProtectedTesteeID(c, testeeID); err != nil {
+	if _, _, err := h.RequireProtectedScope(c); err != nil {
 		h.Error(c, err)
 		return
 	}
@@ -957,7 +907,7 @@ func (h *PlanHandler) ListPlansByTestee(c *gin.Context) {
 		h.Error(c, errors.WithCode(code.ErrInvalidArgument, "受试者ID不能为空"))
 		return
 	}
-	if _, _, err := h.validateProtectedTesteeID(c, testeeID); err != nil {
+	if _, _, err := h.RequireProtectedScope(c); err != nil {
 		h.Error(c, err)
 		return
 	}
@@ -1003,7 +953,7 @@ func (h *PlanHandler) ListTasksByTesteeAndPlan(c *gin.Context) {
 		h.Error(c, errors.WithCode(code.ErrInvalidArgument, "受试者ID和计划ID不能为空"))
 		return
 	}
-	if _, _, err := h.validateProtectedTesteeID(c, testeeID); err != nil {
+	if _, _, err := h.RequireProtectedScope(c); err != nil {
 		h.Error(c, err)
 		return
 	}
@@ -1015,39 +965,4 @@ func (h *PlanHandler) ListTasksByTesteeAndPlan(c *gin.Context) {
 	}
 
 	h.Success(c, response.NewTaskListResponseFromSlice(tasks))
-}
-
-func (h *PlanHandler) validateProtectedTesteeID(c *gin.Context, rawTesteeID string) (int64, int64, error) {
-	orgID, operatorUserID, err := h.RequireProtectedScope(c)
-	if err != nil {
-		return 0, 0, err
-	}
-	if rawTesteeID == "" {
-		return orgID, operatorUserID, nil
-	}
-
-	testeeID, err := toUint64(rawTesteeID)
-	if err != nil {
-		return 0, 0, errors.WithCode(code.ErrInvalidArgument, "无效的受试者ID: %s", rawTesteeID)
-	}
-	if err := h.testeeAccessService.ValidateTesteeAccess(c.Request.Context(), orgID, operatorUserID, testeeID); err != nil {
-		return 0, 0, err
-	}
-	return orgID, operatorUserID, nil
-}
-
-func allowedTesteeIDsToStrings(ids []uint64) []string {
-	if len(ids) == 0 {
-		return []string{}
-	}
-
-	results := make([]string, 0, len(ids))
-	for _, id := range ids {
-		results = append(results, strconv.FormatUint(id, 10))
-	}
-	return results
-}
-
-func toUint64(raw string) (uint64, error) {
-	return strconv.ParseUint(raw, 10, 64)
 }

@@ -2,6 +2,7 @@ package clinician
 
 import (
 	"context"
+	"github.com/FangcunMount/qs-server/internal/apiserver/application/actor/actorctx"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
 
 	"github.com/FangcunMount/component-base/pkg/errors"
@@ -10,6 +11,8 @@ import (
 )
 
 type queryService struct {
+	operatorOnly          bool
+	scope                 SummaryScope
 	clinicianReader       actorreadmodel.ClinicianReader
 	relationReader        actorreadmodel.RelationReader
 	assessmentEntryReader actorreadmodel.AssessmentEntryReader
@@ -28,6 +31,13 @@ func NewQueryService(
 	}
 }
 
+func NewOperatorQueryService(reader actorreadmodel.ClinicianReader, relations actorreadmodel.RelationReader, entries actorreadmodel.AssessmentEntryReader, scope SummaryScope) ClinicianQueryService {
+	s := NewQueryService(reader, relations, entries).(*queryService)
+	s.operatorOnly = true
+	s.scope = scope
+	return s
+}
+
 func (s *queryService) GetByID(ctx context.Context, clinicianID uint64) (*ClinicianResult, error) {
 	item, err := s.GetBasicByID(ctx, clinicianID)
 	if err != nil {
@@ -37,6 +47,12 @@ func (s *queryService) GetByID(ctx context.Context, clinicianID uint64) (*Clinic
 }
 
 func (s *queryService) GetBasicByID(ctx context.Context, clinicianID uint64) (*ClinicianResult, error) {
+	if s.operatorOnly {
+		if err := authorizeHeadquarters(ctx, s.scope, actorctx.OperatorOrgID(ctx), "read"); err != nil {
+			return nil, err
+		}
+	}
+
 	targetClinicianID, err := clinicianIDFromUint64("clinician_id", clinicianID)
 	if err != nil {
 		return nil, err
@@ -45,10 +61,19 @@ func (s *queryService) GetBasicByID(ctx context.Context, clinicianID uint64) (*C
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to find clinician")
 	}
+	if s.operatorOnly && (item == nil || item.OrgID != actorctx.OperatorOrgID(ctx)) {
+		return nil, errors.WithCode(code.ErrUserNotFound, "clinician not found in current company")
+	}
 	return toClinicianResultFromRow(item), nil
 }
 
 func (s *queryService) ListClinicians(ctx context.Context, dto ListClinicianDTO) (*ClinicianListResult, error) {
+	if s.operatorOnly {
+		if err := authorizeHeadquarters(ctx, s.scope, dto.OrgID, "list"); err != nil {
+			return nil, err
+		}
+	}
+
 	if dto.StoreID != nil && (*dto.StoreID == 0 || dto.Unconfigured) {
 		return nil, errors.WithCode(code.ErrInvalidArgument, "store_id and unconfigured filters are mutually exclusive")
 	}
@@ -89,12 +114,8 @@ func (s *queryService) enrichCounts(ctx context.Context, item *ClinicianResult) 
 		return nil, nil
 	}
 	if s.relationReader != nil {
-		ids, err := s.relationReader.ListActiveTesteeIDsByClinician(
-			ctx,
-			item.OrgID,
-			item.ID,
-			relationTypesToStrings(domainRelation.AccessGrantRelationTypes()),
-		)
+		ids, err := s.assignedTesteeIDsForCount(ctx, item)
+
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to count accessible testees")
 		}
@@ -112,4 +133,27 @@ func (s *queryService) enrichCounts(ctx context.Context, item *ClinicianResult) 
 		item.AssessmentEntryCount = count
 	}
 	return item, nil
+}
+
+func (s *queryService) assignedTesteeIDsForCount(ctx context.Context, item *ClinicianResult) ([]uint64, error) {
+	if !s.operatorOnly {
+		return s.relationReader.ListActiveTesteeIDsByClinician(ctx, item.OrgID, item.ID, relationTypesToStrings(domainRelation.AccessGrantRelationTypes()))
+	}
+	guard := relationshipService{operatorOnly: true, operatorScope: s.scope}
+	filter, err := guard.operatorRelationFilter(ctx, actorreadmodel.RelationFilter{OrgID: item.OrgID, ClinicianID: item.ID, ActiveOnly: true, RelationTypes: relationTypesToStrings(domainRelation.AccessGrantRelationTypes())}, "list")
+	if err != nil {
+		if errors.IsCode(err, code.ErrPermissionDenied) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	rows, _, err := s.relationReader.ListAssignedTestees(ctx, filter)
+	if err != nil {
+		return nil, err
+	}
+	ids := make([]uint64, 0, len(rows))
+	for _, row := range rows {
+		ids = append(ids, row.ID)
+	}
+	return ids, nil
 }

@@ -51,7 +51,7 @@ func (s *service) EvaluateBatch(ctx context.Context, actor Actor, assessmentIDs 
 		return nil, apperrors.ModuleNotConfigured("evaluation execution engine is not configured")
 	}
 	for _, id := range assessmentIDs {
-		if _, err := s.authorizer.loadAssessment(ctx, actor, id); err != nil {
+		if _, err := s.authorizer.loadAssessment(ctx, actor, id, "batch_evaluate"); err != nil {
 			return nil, err
 		}
 	}

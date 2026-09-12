@@ -12,26 +12,6 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/safeconv"
 )
 
-func (s *queryService) ScopeTesteeList(ctx context.Context, actor Actor, testeeID uint64) (TesteeListScope, error) {
-	result := TesteeListScope{TesteeID: testeeID}
-	if testeeID != 0 {
-		return result, s.ValidateTesteeAccess(ctx, actor, testeeID)
-	}
-	if s.access == nil {
-		return result, evalerrors.ModuleNotConfigured("testee access checker is not configured")
-	}
-	scope, err := s.access.ResolveAccessScope(ctx, actor.OrgID, actor.OperatorUserID)
-	if err != nil {
-		return result, err
-	}
-	if scope != nil && scope.IsAdmin {
-		return result, nil
-	}
-	result.AccessibleTesteeIDs, err = s.access.ListAccessibleTesteeIDs(ctx, actor.OrgID, actor.OperatorUserID)
-	result.Restricted = true
-	return result, err
-}
-
 type queryService struct {
 	assessments domainassessment.Repository
 	reader      evaluationreadmodel.AssessmentReader
@@ -44,66 +24,45 @@ func NewQueryService(assessments domainassessment.Repository, reader evaluationr
 	return &queryService{assessments: assessments, reader: reader, access: access, scores: scores, runs: runs}
 }
 
-func (s *queryService) ValidateTesteeAccess(ctx context.Context, actor Actor, testeeID uint64) error {
-	if actor.OrgID == 0 || actor.OperatorUserID == 0 {
-		return evalerrors.InvalidArgument("操作者范围不能为空")
-	}
-	if s.access == nil {
-		return evalerrors.ModuleNotConfigured("testee access checker is not configured")
-	}
-	return s.access.ValidateTesteeAccess(ctx, actor.OrgID, actor.OperatorUserID, testeeID)
-}
-
-func (s *queryService) loadAccessible(ctx context.Context, actor Actor, id uint64) (*domainassessment.Assessment, error) {
-	return (authorizer{assessments: s.assessments, access: s.access}).loadAssessment(ctx, actor, id)
+func (s *queryService) loadAccessible(ctx context.Context, actor Actor, id uint64, action string) (*domainassessment.Assessment, error) {
+	return (authorizer{assessments: s.assessments, access: s.access}).loadAssessment(ctx, actor, id, action)
 }
 
 func (s *queryService) GetAssessment(ctx context.Context, actor Actor, id uint64) (*Assessment, error) {
 	if err := appauthz.RequirePermission(ctx, appauthz.AssessmentResource, "read"); err != nil {
 		return nil, err
 	}
-	a, err := s.loadAccessible(ctx, actor, id)
+	a, err := s.loadAccessible(ctx, actor, id, "read")
 	if err != nil {
 		return nil, err
 	}
 	return assessmentFromDomain(a)
 }
 
-func (s *queryService) scopedList(ctx context.Context, actor Actor, q ListQuery) (ListQuery, error) {
-	if actor.OrgID == 0 || actor.OperatorUserID == 0 {
-		return q, evalerrors.InvalidArgument("操作者范围不能为空")
-	}
-	if s.access == nil {
-		return q, evalerrors.ModuleNotConfigured("testee access checker is not configured")
-	}
-	if q.TesteeID != nil {
-		if err := s.access.ValidateTesteeAccess(ctx, actor.OrgID, actor.OperatorUserID, *q.TesteeID); err != nil {
-			return q, err
-		}
-		return q, nil
-	}
-	scope, err := s.access.ResolveAccessScope(ctx, actor.OrgID, actor.OperatorUserID)
-	if err != nil {
-		return q, err
-	}
-	if scope != nil && scope.IsAdmin {
-		return q, nil
-	}
-	q.AccessibleTesteeIDs, err = s.access.ListAccessibleTesteeIDs(ctx, actor.OrgID, actor.OperatorUserID)
-	q.RestrictToAccessScope = true
-	return q, err
-}
-
-func (s *queryService) listRows(ctx context.Context, actor Actor, q ListQuery) ([]evaluationreadmodel.AssessmentRow, int64, int, int, error) {
+func (s *queryService) listRows(ctx context.Context, actor Actor, q ListQuery, action string) ([]evaluationreadmodel.AssessmentRow, int64, int, int, error) {
 	if s.reader == nil {
 		return nil, 0, 0, 0, evalerrors.ModuleNotConfigured("assessment read model is not configured")
 	}
-	q, err := s.scopedList(ctx, actor, q)
-	if err != nil {
-		return nil, 0, 0, 0, err
+	if actor.OrgID <= 0 || actor.OperatorUserID <= 0 {
+		return nil, 0, 0, 0, evalerrors.InvalidArgument("操作者范围不能为空")
+	}
+	if s.access == nil {
+		return nil, 0, 0, 0, evalerrors.ModuleNotConfigured("testee access checker is not configured")
+	}
+	if q.TesteeID != nil {
+		if err := s.access.ValidateTesteeStoreAccess(ctx, actor.OrgID, actor.OperatorUserID, *q.TesteeID, appauthz.AssessmentResource, action); err != nil {
+			return nil, 0, 0, 0, err
+		}
 	}
 	page, pageSize := normalizePagination(q.Page, q.PageSize)
 	filter := evaluationreadmodel.AssessmentFilter{OrgID: actor.OrgID, TesteeID: q.TesteeID, AccessibleTesteeIDs: q.AccessibleTesteeIDs, RestrictToAccessScope: q.RestrictToAccessScope}
+	stores, err := s.access.ResolveStoreRange(ctx, actor.OrgID, actor.OperatorUserID, appauthz.AssessmentResource, action)
+	if err != nil {
+		return nil, 0, 0, 0, err
+	}
+	filter.RestrictToStoreScope = true
+	filter.AllAssignedStores = stores.AllStores
+	filter.AllowedStoreIDs = stores.StoreIDs
 	if q.Status != "" {
 		status := domainassessment.Status(q.Status)
 		if !status.IsValid() {
@@ -122,7 +81,7 @@ func (s *queryService) ListAssessments(ctx context.Context, actor Actor, q ListQ
 	if err := appauthz.RequirePermission(ctx, appauthz.AssessmentResource, "list"); err != nil {
 		return nil, err
 	}
-	rows, total, page, pageSize, err := s.listRows(ctx, actor, q)
+	rows, total, page, pageSize, err := s.listRows(ctx, actor, q, "list")
 	if err != nil {
 		return nil, err
 	}
@@ -141,7 +100,7 @@ func (s *queryService) GetAssessmentOutcome(ctx context.Context, actor Actor, id
 	if err := appauthz.RequirePermission(ctx, appauthz.AssessmentResource, "read"); err != nil {
 		return nil, err
 	}
-	if _, err := s.loadAccessible(ctx, actor, id); err != nil {
+	if _, err := s.loadAccessible(ctx, actor, id, "read"); err != nil {
 		return nil, err
 	}
 	if s.reader == nil {
@@ -158,7 +117,7 @@ func (s *queryService) ListAssessmentsOutcome(ctx context.Context, actor Actor, 
 	if err := appauthz.RequirePermission(ctx, appauthz.AssessmentResource, "list"); err != nil {
 		return nil, err
 	}
-	rows, total, page, pageSize, err := s.listRows(ctx, actor, q)
+	rows, total, page, pageSize, err := s.listRows(ctx, actor, q, "list")
 	if err != nil {
 		return nil, err
 	}
@@ -181,7 +140,7 @@ func (s *queryService) GetScores(ctx context.Context, actor Actor, id uint64) (*
 	if err := appauthz.RequirePermission(ctx, appauthz.AssessmentResource, "read"); err != nil {
 		return nil, err
 	}
-	if _, err := s.loadAccessible(ctx, actor, id); err != nil {
+	if _, err := s.loadAccessible(ctx, actor, id, "read"); err != nil {
 		return nil, err
 	}
 	if s.scores == nil {
@@ -198,7 +157,7 @@ func (s *queryService) GetHighRiskFactors(ctx context.Context, actor Actor, id u
 	if err := appauthz.RequirePermission(ctx, appauthz.AssessmentResource, "read"); err != nil {
 		return nil, err
 	}
-	if _, err := s.loadAccessible(ctx, actor, id); err != nil {
+	if _, err := s.loadAccessible(ctx, actor, id, "read"); err != nil {
 		return nil, err
 	}
 	if s.scores == nil {
@@ -224,7 +183,10 @@ func (s *queryService) GetFactorTrend(ctx context.Context, actor Actor, q TrendQ
 	if err := appauthz.RequirePermission(ctx, appauthz.AssessmentResource, "read"); err != nil {
 		return nil, err
 	}
-	if err := s.ValidateTesteeAccess(ctx, actor, q.TesteeID); err != nil {
+	if s.access == nil {
+		return nil, evalerrors.ModuleNotConfigured("testee access checker is not configured")
+	}
+	if err := s.access.ValidateTesteeStoreAccess(ctx, actor.OrgID, actor.OperatorUserID, q.TesteeID, appauthz.AssessmentResource, "read"); err != nil {
 		return nil, err
 	}
 	if s.scores == nil {
@@ -245,7 +207,7 @@ func (s *queryService) ListAssessmentRuns(ctx context.Context, actor Actor, id u
 	if err := appauthz.RequirePermission(ctx, appauthz.AssessmentResource, "read"); err != nil {
 		return nil, err
 	}
-	if _, err := s.loadAccessible(ctx, actor, id); err != nil {
+	if _, err := s.loadAccessible(ctx, actor, id, "read"); err != nil {
 		return nil, err
 	}
 	if s.runs == nil {
@@ -267,7 +229,7 @@ func (s *queryService) GetLatestAssessmentRun(ctx context.Context, actor Actor, 
 	if err := appauthz.RequirePermission(ctx, appauthz.AssessmentResource, "read"); err != nil {
 		return nil, err
 	}
-	if _, err := s.loadAccessible(ctx, actor, id); err != nil {
+	if _, err := s.loadAccessible(ctx, actor, id, "read"); err != nil {
 		return nil, err
 	}
 	if s.runs == nil {

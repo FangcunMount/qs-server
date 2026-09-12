@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"fmt"
 	"strconv"
 	"strings"
@@ -86,8 +87,13 @@ func (h *TesteeHandler) GetTestee(c *gin.Context) {
 		return
 	}
 
-	orgID, _, err := h.validateProtectedTesteeAccess(c, id)
+	orgID, operatorUserID, err := h.RequireProtectedScope(c)
 	if err != nil {
+		h.Error(c, err)
+		return
+	}
+
+	if err := h.validateTesteeReadScope(c, orgID, operatorUserID, id); err != nil {
 		h.Error(c, err)
 		return
 	}
@@ -152,7 +158,7 @@ func (h *TesteeHandler) GetTesteeByProfileID(c *gin.Context) {
 		h.Error(c, err)
 		return
 	}
-	if err := h.testeeAccessService.ValidateTesteeAccess(c.Request.Context(), orgID, operatorUserID, testeeResult.ID); err != nil {
+	if err := h.validateTesteeReadScope(c, orgID, operatorUserID, testeeResult.ID); err != nil {
 		h.Error(c, err)
 		return
 	}
@@ -184,12 +190,8 @@ func (h *TesteeHandler) GetScaleAnalysis(c *gin.Context) {
 		h.Error(c, err)
 		return
 	}
-	orgID, operatorUserID, err := h.validateProtectedTesteeAccess(c, id)
+	orgID, operatorUserID, err := h.RequireProtectedScope(c)
 	if err != nil {
-		h.Error(c, err)
-		return
-	}
-	if err := h.ensureTesteeExists(c, "get_scale_analysis", id); err != nil {
 		h.Error(c, err)
 		return
 	}
@@ -209,83 +211,38 @@ func (h *TesteeHandler) GetScaleAnalysis(c *gin.Context) {
 // @Param Authorization header string true "Bearer 用户令牌"
 // @Param id path int true "受试者ID"
 // @Param request body request.UpdateTesteeRequest true "更新受试者请求"
-// @Success 200 {object} core.Response{data=response.TesteeResponse}
+// @Success 200 {object} core.Response{data=response.TesteeUpdateResponse}
 // @Router /api/v1/testees/{id} [put]
 func (h *TesteeHandler) UpdateTestee(c *gin.Context) {
-	idStr := c.Param("id")
-	id, err := strconv.ParseUint(idStr, 10, 64)
+	id, err := h.parseTesteeIDParam(c, "update_testee")
 	if err != nil {
-		logger.L(c.Request.Context()).Warnw("Invalid testee ID",
-			"action", "update_testee",
-			"testee_id", idStr,
-			"error", err.Error(),
-		)
 		h.Error(c, err)
 		return
 	}
-	if _, _, err := h.validateProtectedTesteeAccess(c, id); err != nil {
+	if _, _, err := h.RequireProtectedScope(c); err != nil {
 		h.Error(c, err)
 		return
 	}
-
 	var req request.UpdateTesteeRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		logger.L(c.Request.Context()).Warnw("Invalid request",
-			"action", "update_testee",
-			"testee_id", id,
-			"error", err.Error(),
-		)
 		h.Error(c, err)
 		return
 	}
-
-	if (req.Name != nil && *req.Name != "") || req.Gender != nil || req.Birthday != nil {
-		dto := toUpdateTesteeProfileDTO(id, &req)
-		err = h.testeeManagementService.UpdateBasicInfo(c.Request.Context(), dto)
-		if err != nil {
-			logger.L(c.Request.Context()).Errorw("Failed to update testee profile",
-				"action", "update_testee",
-				"resource", "testee",
-				"testee_id", id,
-				"error", err.Error(),
-			)
-			h.Error(c, err)
-			return
-		}
+	updater, ok := h.testeeManagementService.(testeeApp.ProfileUpdater)
+	if !ok {
+		h.Error(c, errors.WithCode(code.ErrInternalServerError, "atomic profile update unavailable"))
+		return
 	}
-
-	if req.IsKeyFocus != nil {
-		if *req.IsKeyFocus {
-			err = h.testeeManagementService.MarkAsKeyFocus(c.Request.Context(), id)
-		} else {
-			err = h.testeeManagementService.UnmarkKeyFocus(c.Request.Context(), id)
-		}
-		if err != nil {
-			logger.L(c.Request.Context()).Errorw("Failed to update key focus status",
-				"action", "update_testee",
-				"resource", "testee",
-				"testee_id", id,
-				"field", "is_key_focus",
-				"error", err.Error(),
-			)
-			h.Error(c, err)
-			return
-		}
+	dto := testeeApp.UpdateProfileDTO{TesteeID: id, Name: req.Name, Birthday: req.Birthday, IsKeyFocus: req.IsKeyFocus}
+	if req.Gender != nil {
+		value := toUpdateTesteeProfileDTO(id, &req).Gender
+		dto.Gender = &value
 	}
-
-	result, err := h.testeeQueryService.GetByID(c.Request.Context(), id)
-	if err != nil {
-		logger.L(c.Request.Context()).Errorw("Failed to get updated testee",
-			"action", "update_testee",
-			"resource", "testee",
-			"testee_id", id,
-			"error", err.Error(),
-		)
+	if err := updater.UpdateProfile(c.Request.Context(), dto); err != nil {
 		h.Error(c, err)
 		return
 	}
-
-	h.SuccessResponseWithMessage(c, "受试者更新成功", toTesteeResponse(result))
+	h.SuccessResponseWithMessage(c, "受试者更新成功", &response.TesteeUpdateResponse{ID: strconv.FormatUint(id, 10), Updated: true})
 }
 
 // ListTestees 查询受试者列表。
@@ -298,7 +255,7 @@ func (h *TesteeHandler) UpdateTestee(c *gin.Context) {
 // @Success 200 {object} core.Response{data=response.TesteeListResponse}
 // @Router /api/v1/testees [get]
 func (h *TesteeHandler) ListTestees(c *gin.Context) {
-	_, operatorUserID, err := h.RequireProtectedScope(c)
+	_, _, err := h.RequireProtectedScope(c)
 	if err != nil {
 		h.Error(c, err)
 		return
@@ -308,17 +265,7 @@ func (h *TesteeHandler) ListTestees(c *gin.Context) {
 		h.Error(c, err)
 		return
 	}
-	if query.Request.ProfileID != "" {
-		result, err := h.listTesteesByProfile(c, operatorUserID, query)
-		if err != nil {
-			h.Error(c, err)
-			return
-		}
-		h.Success(c, result)
-		return
-	}
-
-	dto, err := h.buildTesteeListDTO(c, operatorUserID, query)
+	dto, err := h.buildTesteeListDTO(c, query)
 	if err != nil {
 		h.Error(c, err)
 		return
@@ -379,18 +326,6 @@ func (h *TesteeHandler) parseTesteeIDParam(c *gin.Context, action string) (uint6
 	return id, nil
 }
 
-func (h *TesteeHandler) ensureTesteeExists(c *gin.Context, action string, testeeID uint64) error {
-	if _, err := h.testeeQueryService.GetByID(c.Request.Context(), testeeID); err != nil {
-		logger.L(c.Request.Context()).Errorw("Failed to get testee",
-			"action", action,
-			"testee_id", testeeID,
-			"error", err.Error(),
-		)
-		return err
-	}
-	return nil
-}
-
 func (h *TesteeHandler) parseTesteeListQuery(c *gin.Context) (*testeeListQuery, error) {
 	var req request.ListTesteeRequest
 	if err := c.ShouldBindQuery(&req); err != nil {
@@ -425,30 +360,7 @@ func (h *TesteeHandler) parseTesteeListQuery(c *gin.Context) (*testeeListQuery, 
 	}, nil
 }
 
-func (h *TesteeHandler) listTesteesByProfile(c *gin.Context, operatorUserID int64, query *testeeListQuery) (*response.TesteeListResponse, error) {
-	result, err := h.fetchTesteeByProfile(c, query.OrgID, query.Request.ProfileID)
-	if err != nil {
-		return nil, err
-	}
-	if err := h.testeeAccessService.ValidateTesteeAccess(c.Request.Context(), query.OrgID, operatorUserID, result.ID); err != nil {
-		return nil, err
-	}
-
-	clinicianTesteeIDs, restrictToClinicianScope, err := h.resolveClinicianScopedTesteeIDs(c, query.OrgID, query.Request.ClinicianID)
-	if err != nil {
-		return nil, err
-	}
-	if restrictToClinicianScope && !containsUint64(clinicianTesteeIDs, result.ID) {
-		return toTesteeListResponse([]*testeeApp.TesteeResult{}, 0, query.Page, query.PageSize), nil
-	}
-	if !testeeMatchesListFilter(result, query.Request, query.CreatedAtStart, query.CreatedAtEnd) {
-		return toTesteeListResponse([]*testeeApp.TesteeResult{}, 0, query.Page, query.PageSize), nil
-	}
-
-	return toTesteeListResponse([]*testeeApp.TesteeResult{result}, 1, query.Page, query.PageSize), nil
-}
-
-func (h *TesteeHandler) buildTesteeListDTO(c *gin.Context, operatorUserID int64, query *testeeListQuery) (testeeApp.ListTesteeDTO, error) {
+func (h *TesteeHandler) buildTesteeListDTO(c *gin.Context, query *testeeListQuery) (testeeApp.ListTesteeDTO, error) {
 	dto := testeeApp.ListTesteeDTO{
 		StoreID: query.Request.StoreID, UnassignedStore: query.Request.UnassignedStore,
 		OrgID:          query.OrgID,
@@ -460,6 +372,14 @@ func (h *TesteeHandler) buildTesteeListDTO(c *gin.Context, operatorUserID int64,
 		Limit:          query.PageSize,
 	}
 
+	if query.Request.ProfileID != "" {
+		id, err := strconv.ParseUint(query.Request.ProfileID, 10, 64)
+		if err != nil || id == 0 {
+			return testeeApp.ListTesteeDTO{}, errors.WithCode(code.ErrInvalidArgument, "invalid profile_id")
+		}
+		dto.ProfileID = &id
+	}
+
 	clinicianTesteeIDs, restrictToClinicianScope, err := h.resolveClinicianScopedTesteeIDs(c, query.OrgID, query.Request.ClinicianID)
 	if err != nil {
 		return testeeApp.ListTesteeDTO{}, err
@@ -467,19 +387,9 @@ func (h *TesteeHandler) buildTesteeListDTO(c *gin.Context, operatorUserID int64,
 	dto.AccessibleTesteeIDs = clinicianTesteeIDs
 	dto.RestrictToAccessScope = restrictToClinicianScope
 
-	scope, err := h.testeeAccessService.ResolveAccessScope(c.Request.Context(), query.OrgID, operatorUserID)
-	if err != nil {
-		return testeeApp.ListTesteeDTO{}, err
-	}
-	if scope.IsAdmin {
-		return dto, nil
-	}
+	// The shared query service applies the action-specific store range before
+	// count and pagination; clinician selection remains an intersecting filter.
 
-	allowedTesteeIDs, err := h.testeeAccessService.ListAccessibleTesteeIDs(c.Request.Context(), query.OrgID, operatorUserID)
-	if err != nil {
-		return testeeApp.ListTesteeDTO{}, err
-	}
-	dto.AccessibleTesteeIDs, dto.RestrictToAccessScope = mergeAccessibleTesteeIDs(dto.AccessibleTesteeIDs, dto.RestrictToAccessScope, allowedTesteeIDs)
 	return dto, nil
 }
 
@@ -487,25 +397,13 @@ func (h *TesteeHandler) resolveClinicianScopedTesteeIDs(c *gin.Context, orgID in
 	if clinicianID == nil {
 		return nil, false, nil
 	}
-	if _, err := requireClinicianInOrg(c.Request.Context(), h.clinicianQueryService, orgID, *clinicianID); err != nil {
-		return nil, false, err
-	}
+	// This is a Testee filter, not access to the headquarters clinician directory.
+	// The backstage relationship use case enforces company and action/store scope.
 	clinicianTesteeIDs, err := h.clinicianRelationshipService.ListAssignedTesteeIDs(c.Request.Context(), orgID, *clinicianID)
 	if err != nil {
 		return nil, false, err
 	}
 	return clinicianTesteeIDs, true, nil
-}
-
-func (h *TesteeHandler) validateProtectedTesteeAccess(c *gin.Context, testeeID uint64) (int64, int64, error) {
-	orgID, operatorUserID, err := h.RequireProtectedScope(c)
-	if err != nil {
-		return 0, 0, err
-	}
-	if err := h.testeeAccessService.ValidateTesteeAccess(c.Request.Context(), orgID, operatorUserID, testeeID); err != nil {
-		return 0, 0, err
-	}
-	return orgID, operatorUserID, nil
 }
 
 func parseInclusiveLocalDateRange(startRaw, endRaw string) (*time.Time, *time.Time, error) {
@@ -539,29 +437,6 @@ func createdAtInRange(createdAt time.Time, start, end *time.Time) bool {
 		return false
 	}
 	return true
-}
-
-func testeeMatchesListFilter(
-	result *testeeApp.TesteeResult,
-	req request.ListTesteeRequest,
-	createdAtStart, createdAtEnd *time.Time,
-) bool {
-	if result == nil {
-		return false
-	}
-	if req.StoreID != nil && (result.StoreID == nil || *result.StoreID != *req.StoreID) {
-		return false
-	}
-	if req.UnassignedStore && result.StoreID != nil {
-		return false
-	}
-	if req.Name != "" && !strings.Contains(strings.ToLower(result.Name), strings.ToLower(req.Name)) {
-		return false
-	}
-	if req.IsKeyFocus != nil && result.IsKeyFocus != *req.IsKeyFocus {
-		return false
-	}
-	return createdAtInRange(result.CreatedAt, createdAtStart, createdAtEnd)
 }
 
 func normalizePageRequest(page, pageSize, defaultPage, defaultPageSize int) (int, int) {
@@ -723,15 +598,6 @@ func toScaleAnalysisResponse(result *evaluationoperator.ScaleAnalysis) *response
 	return resp
 }
 
-func containsUint64(items []uint64, target uint64) bool {
-	for _, item := range items {
-		if item == target {
-			return true
-		}
-	}
-	return false
-}
-
 func intersectUint64Slices(left, right []uint64) []uint64 {
 	if len(left) == 0 || len(right) == 0 {
 		return []uint64{}
@@ -749,4 +615,16 @@ func intersectUint64Slices(left, right []uint64) []uint64 {
 		}
 	}
 	return result
+}
+
+// The application access service verifies active Operator, company and the
+// exact read permission before backend guardian enrichment is invoked.
+func (h *TesteeHandler) validateTesteeReadScope(c *gin.Context, orgID, userID int64, testeeID uint64) error {
+	access, ok := h.testeeAccessService.(interface {
+		ValidateTesteeStoreAccess(context.Context, int64, int64, uint64, string, string) error
+	})
+	if !ok {
+		return errors.WithCode(code.ErrPermissionDenied, "scoped testee access is unavailable")
+	}
+	return access.ValidateTesteeStoreAccess(c.Request.Context(), orgID, userID, testeeID, "qs:actor:collection:testees", "read")
 }

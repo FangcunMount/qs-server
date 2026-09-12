@@ -41,9 +41,6 @@ func (s *operatorQueryStub) GetAssessment(_ context.Context, actor evaluationope
 func (*operatorQueryStub) ValidateTesteeAccess(context.Context, evaluationoperator.Actor, uint64) error {
 	return nil
 }
-func (*operatorQueryStub) ScopeTesteeList(context.Context, evaluationoperator.Actor, uint64) (evaluationoperator.TesteeListScope, error) {
-	return evaluationoperator.TesteeListScope{}, nil
-}
 func (s *operatorQueryStub) ListAssessments(_ context.Context, _ evaluationoperator.Actor, query evaluationoperator.ListQuery) (*evaluationoperator.AssessmentList, error) {
 	s.lastList = query
 	if s.listResult == nil && s.listErr == nil {

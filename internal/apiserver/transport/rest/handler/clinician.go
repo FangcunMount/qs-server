@@ -189,6 +189,10 @@ func (h *OperatorClinicianHandler) UpdateOperator(c *gin.Context) {
 		h.Error(c, err)
 		return
 	}
+	if req.Roles != nil {
+		h.Error(c, errors.WithCode(code.ErrValidation, "role-only updates are retired; use authorization-scope"))
+		return
+	}
 	if err := h.updateOperatorProfile(c, id, req); err != nil {
 		h.Error(c, err)
 		return
@@ -784,15 +788,7 @@ func (h *OperatorClinicianHandler) syncOperatorAuthorization(c *gin.Context, ope
 	if err := h.syncOperatorActiveState(c, operatorID, current.IsActive, targetActive); err != nil {
 		return err
 	}
-	if !targetActive || req.Roles == nil {
-		return nil
-	}
-
-	latest, err := h.operatorQueryService.GetByID(c.Request.Context(), operatorID)
-	if err != nil {
-		return err
-	}
-	return h.syncOperatorRoles(c, operatorID, latest.Roles, req.Roles)
+	return nil
 }
 
 func (h *OperatorClinicianHandler) syncOperatorActiveState(c *gin.Context, operatorID uint64, currentActive, targetActive bool) error {
@@ -804,11 +800,6 @@ func (h *OperatorClinicianHandler) syncOperatorActiveState(c *gin.Context, opera
 	default:
 		return nil
 	}
-}
-
-func (h *OperatorClinicianHandler) syncOperatorRoles(c *gin.Context, operatorID uint64, currentRoles, targetRoles []string) error {
-	_ = currentRoles
-	return h.operatorAuthorizationService.ReplaceRoles(c.Request.Context(), operatorID, targetRoles)
 }
 
 func (h *OperatorClinicianHandler) requireClinicianInOrg(c *gin.Context, orgID int64, clinicianID uint64) (*clinicianApp.ClinicianResult, error) {
@@ -865,13 +856,12 @@ func (h *OperatorClinicianHandler) loadTesteeClinicianRelations(c *gin.Context, 
 	if err != nil {
 		return nil, err
 	}
-	orgID, operatorUserID, err := h.RequireProtectedScope(c)
+	orgID, _, err := h.RequireProtectedScope(c)
 	if err != nil {
 		return nil, err
 	}
-	if err := h.testeeAccessService.ValidateTesteeAccess(c.Request.Context(), orgID, operatorUserID, testeeID); err != nil {
-		return nil, err
-	}
+	// The shared relationship application service enforces action-paired store scope.
+
 	result, err := h.clinicianRelationshipService.ListTesteeRelations(c.Request.Context(), clinicianApp.ListTesteeRelationDTO{
 		OrgID:      orgID,
 		TesteeID:   testeeID,

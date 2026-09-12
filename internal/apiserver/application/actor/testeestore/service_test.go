@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/FangcunMount/qs-server/internal/apiserver/application/actor/actorctx"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/authz"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/transaction"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/store"
@@ -54,7 +55,7 @@ func (r *repository) AppendHistory(context.Context, *port.History) error {
 	return nil
 }
 func admin() context.Context {
-	return authz.WithSnapshot(context.Background(), &authz.Snapshot{Permissions: []authz.Permission{{Resource: "qs:*:*:*", Action: "*", Mode: authz.AuthorizationModeUnconditional}}})
+	return authz.WithSnapshot(actorctx.WithGrantingUserID(actorctx.WithOperatorOrgID(context.Background(), 7), 9), &authz.Snapshot{ScopeContractVersion: 1, AuthzVersion: 1, Permissions: []authz.Permission{{Resource: "qs:*:*:*", Action: "*", Mode: authz.AuthorizationModeUnconditional, Scopes: []authz.DataScope{{OrgID: 7, Kind: "all_stores"}}}}})
 }
 func fixture(t *testing.T) (*Service, *repository) {
 	t.Helper()
@@ -73,7 +74,7 @@ func fixture(t *testing.T) (*Service, *repository) {
 		}
 		return err
 	})
-	return NewService(r, tx), r
+	return NewService(r, tx, scopeChecker{}), r
 }
 func command() Change {
 	return Change{StoreID: 2, ExpectedVersion: 1, Reason: "归属配置", RequestID: "req-1"}
@@ -162,5 +163,82 @@ func TestAlreadyOwnedTesteeNeedsExplicitTransfer(t *testing.T) {
 	}
 	if r.saved != nil {
 		t.Fatal("implicit transfer wrote ownership")
+	}
+}
+
+// The production resolver additionally verifies active Operator membership.
+type scopeChecker struct{}
+
+func (scopeChecker) ResolveStoreRange(ctx context.Context, org, user int64, resource, action string) (authz.StoreRange, error) {
+	snapshot, _ := authz.FromContext(ctx)
+	return snapshot.ResolveStoreRange(org, resource, action)
+}
+func TestHeadquartersOwnershipRequiresCurrentCompanyActionScope(t *testing.T) {
+	for _, tc := range []struct {
+		name, action, kind string
+		org                int64
+	}{
+		{"foreign company", "*", "all_stores", 8},
+		{"selected store", "*", "stores", 7},
+		{"read cannot transfer", "read", "all_stores", 7},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			s, r := fixture(t)
+			snap, _ := authz.FromContext(admin())
+			// Keep administrative capability separate from the exact scoped action.
+			snap.Permissions[0].Scopes = nil
+			snap.Permissions = append(snap.Permissions, authz.Permission{Resource: "qs:actor:collection:testees", Action: tc.action, Mode: authz.AuthorizationModeUnconditional, Scopes: []authz.DataScope{{OrgID: tc.org, Kind: tc.kind}}})
+			if tc.kind == "stores" {
+				snap.Permissions[1].Scopes[0].StoreIDs = []uint64{2}
+			}
+			ctx := authz.WithSnapshot(admin(), snap)
+			if _, err := s.Transfer(ctx, Actor{7, 9}, 10, command()); err == nil {
+				t.Fatal("out-of-scope transfer accepted")
+			}
+			if len(r.calls) != 0 {
+				t.Fatal("denied request reached repository")
+			}
+		})
+	}
+}
+
+func (r *repository) History(context.Context, int64, uint64, uint64, int) ([]port.History, error) {
+	r.calls = append(r.calls, "read history")
+	return []port.History{}, nil
+}
+func TestOwnershipHistoryRequiresReadScope(t *testing.T) {
+	for _, action := range []string{"read", "update"} {
+		t.Run(action, func(t *testing.T) {
+			s, r := fixture(t)
+			snap, _ := authz.FromContext(admin())
+			snap.Permissions[0].Scopes = nil
+			snap.Permissions = append(snap.Permissions, authz.Permission{Resource: "qs:actor:collection:testees", Action: action, Mode: authz.AuthorizationModeUnconditional, Scopes: []authz.DataScope{{OrgID: 7, Kind: "all_stores"}}})
+			result, err := s.History(authz.WithSnapshot(admin(), snap), Actor{7, 9}, 10, 0, 20)
+			if action == "read" {
+				if err != nil || len(r.calls) != 1 {
+					t.Fatalf("authorized history: %v %v", err, r.calls)
+				}
+			} else if err == nil || result != nil || len(r.calls) != 0 {
+				t.Fatal("update permission exposed history")
+			}
+		})
+	}
+}
+
+type unavailableOperator struct{}
+
+func (unavailableOperator) ResolveStoreRange(context.Context, int64, int64, string, string) (authz.StoreRange, error) {
+	return authz.StoreRange{}, errors.New("operator inactive")
+}
+func TestOwnershipRejectsMissingOrInactiveScopeResolver(t *testing.T) {
+	for _, scope := range []CompanyScope{nil, unavailableOperator{}} {
+		s, r := fixture(t)
+		s.scope = scope
+		if _, err := s.AssignInitial(admin(), Actor{7, 9}, 10, command()); err == nil || len(r.calls) != 0 {
+			t.Fatal("missing active operator reached mutation")
+		}
+		if _, err := s.History(admin(), Actor{7, 9}, 10, 0, 20); err == nil || len(r.calls) != 0 {
+			t.Fatal("missing active operator reached history")
+		}
 	}
 }

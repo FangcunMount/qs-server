@@ -48,9 +48,6 @@ type routerEvaluationQueryStub struct{}
 func (*routerEvaluationQueryStub) ValidateTesteeAccess(context.Context, evaluationoperator.Actor, uint64) error {
 	return nil
 }
-func (*routerEvaluationQueryStub) ScopeTesteeList(context.Context, evaluationoperator.Actor, uint64) (evaluationoperator.TesteeListScope, error) {
-	return evaluationoperator.TesteeListScope{}, nil
-}
 func (*routerEvaluationQueryStub) GetAssessment(context.Context, evaluationoperator.Actor, uint64) (*evaluationoperator.Assessment, error) {
 	return &evaluationoperator.Assessment{}, nil
 }
@@ -487,6 +484,7 @@ func newRouterTestContainer() *container.Container {
 	c.ReportModule = &interpretationmod.Module{}
 	c.PlanModule = &planmod.Module{
 		CommandService:         planApp.NewCommandService(nil, nil, nil, nil, nil, nil),
+		OperatorCommandService: planApp.NewOperatorCommandService(planApp.NewCommandService(nil, nil, nil, nil, nil, nil), nil, nil),
 		QueryService:           planApp.NewQueryService(nil, nil, nil),
 		EnrollmentQueryService: planApp.NewEnrollmentQueryService(nil, nil),
 	}

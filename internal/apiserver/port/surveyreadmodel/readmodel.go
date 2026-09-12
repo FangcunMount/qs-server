@@ -51,11 +51,13 @@ type QuestionnaireReader interface {
 
 // AnswerSheetFilter contains typed filters for answer-sheet list queries.
 type AnswerSheetFilter struct {
-	OrgID             uint64
-	QuestionnaireCode string
-	FillerID          *uint64
-	StartTime         *time.Time
-	EndTime           *time.Time
+	RestrictToStoreScope bool
+	StoreScopedTesteeIDs []uint64
+	OrgID                uint64
+	QuestionnaireCode    string
+	FillerID             *uint64
+	StartTime            *time.Time
+	EndTime              *time.Time
 }
 
 // AnswerSheetSummaryRow is a transport-neutral answer-sheet list row.

@@ -3,6 +3,7 @@ package operatorretirement
 import (
 	"context"
 	"fmt"
+	"github.com/FangcunMount/qs-server/internal/apiserver/application/actor/actorctx"
 	authz "github.com/FangcunMount/qs-server/internal/apiserver/application/authz"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/operatorretirement"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/iambridge"
@@ -78,7 +79,7 @@ func fixture() (*Service, *memoryRepo, *gateway, context.Context, Command) {
 	r := &memoryRepo{}
 	g := &gateway{r: r, roles: []string{"qs:result_reviewer"}, version: 10}
 	ctx := authz.WithSnapshot(context.Background(), &authz.Snapshot{Permissions: []authz.Permission{{Resource: "qs:*:*:*", Action: "*", Mode: authz.AuthorizationModeUnconditional}}})
-	return NewService(r, g), r, g, ctx, Command{OrgID: 1, ActorID: 9, OperatorID: 7, ExpectedVersion: 3, RequestID: "exit-7", Reason: "doctor backend retirement"}
+	return NewMaintenanceService(r, g), r, g, ctx, Command{OrgID: 1, ActorID: 9, OperatorID: 7, ExpectedVersion: 3, RequestID: "exit-7", Reason: "doctor backend retirement"}
 }
 func TestRetirementDelegatesTheAuthenticatedUserReferenceToIAM(t *testing.T) {
 	s, _, g, ctx, cmd := fixture()
@@ -160,5 +161,60 @@ func TestGlobalAdministratorCannotBeRetiredWhenAppScopedRolesAreEmpty(t *testing
 	}
 	if r.disabled || r.deleted || g.calls != 0 {
 		t.Fatal("protected account modified")
+	}
+}
+
+type deniedCompanyScope struct{}
+
+func (deniedCompanyScope) ResolveStoreRange(context.Context, int64, int64, string, string) (authz.StoreRange, error) {
+	return authz.StoreRange{}, fmt.Errorf("inactive or out-of-scope operator")
+}
+func TestOnlineRetirementCannotUseMaintenanceAdmission(t *testing.T) {
+	for _, scope := range []CompanyScope{nil, deniedCompanyScope{}} {
+		_, repo, gateway, ctx, cmd := fixture()
+		ctx = actorctx.WithGrantingUserID(actorctx.WithOperatorOrgID(ctx, cmd.OrgID), uint64(cmd.ActorID))
+		service := NewService(repo, gateway, scope)
+		if _, err := service.Execute(ctx, cmd); err == nil || repo.disabled || gateway.calls != 0 {
+			t.Fatal("online retirement bypassed company admission")
+		}
+		if _, err := service.Status(ctx, cmd.OrgID, cmd.ActorID, cmd.OperatorID); err == nil {
+			t.Fatal("online history bypassed company admission")
+		}
+	}
+}
+
+type headquartersScope struct{ action string }
+
+func (s *headquartersScope) ResolveStoreRange(_ context.Context, org, user int64, resource, action string) (authz.StoreRange, error) {
+	if org != 1 || user != 9 || resource != "qs:actor:collection:operators" {
+		panic("wrong retirement permission")
+	}
+	s.action = action
+	return authz.StoreRange{AllStores: true}, nil
+}
+func TestOnlineRetirementChecksDeleteAndHistoryRead(t *testing.T) {
+	_, repo, gateway, ctx, cmd := fixture()
+	ctx = actorctx.WithGrantingUserID(actorctx.WithOperatorOrgID(ctx, 1), 9)
+	scope := &headquartersScope{}
+	service := NewService(repo, gateway, scope)
+	if _, err := service.Execute(ctx, cmd); err != nil || scope.action != "delete" || !repo.deleted {
+		t.Fatalf("retirement: %v", err)
+	}
+	if _, err := service.Status(ctx, 1, 9, 7); err != nil || scope.action != "read" {
+		t.Fatalf("history: %v", err)
+	}
+}
+
+func TestPreviewRetirementValidatesWithoutSideEffects(t *testing.T) {
+	s, r, g, ctx, cmd := fixture()
+	if task, err := s.Preview(ctx, cmd); err != nil || task == nil {
+		t.Fatal(task, err)
+	}
+	if r.task != nil || r.disabled || r.deleted || g.calls != 0 {
+		t.Fatal("preview changed operator or IAM")
+	}
+	g.protected = true
+	if _, err := s.Preview(ctx, cmd); err == nil {
+		t.Fatal("preview accepted protected administrator")
 	}
 }

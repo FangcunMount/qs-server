@@ -115,9 +115,11 @@ func TestProgressManualRetryEligibility(t *testing.T) {
 type progressReader struct {
 	readmodel.AssessmentReader
 	filter readmodel.AssessmentFilter
+	calls  int
 }
 
 func (r *progressReader) ListAssessments(_ context.Context, f readmodel.AssessmentFilter, _ readmodel.PageRequest) ([]readmodel.AssessmentRow, int64, error) {
+	r.calls++
 	r.filter = f
 	return []readmodel.AssessmentRow{{ID: 1, TesteeID: 101, Status: "failed"}, {ID: 2, TesteeID: 101, Status: "evaluated"}}, 2, nil
 }
@@ -128,12 +130,14 @@ func TestProgressListAddsEligibilityAfterScopeFiltering(t *testing.T) {
 	runs := &progressRuns{latest: &run}
 	reader := &progressReader{}
 	service := &queryService{reader: reader, access: &accessCheckerStub{}, runs: runs}
-	ctx := appauthz.WithSnapshot(context.Background(), &appauthz.Snapshot{Permissions: []appauthz.Permission{{Resource: appauthz.AssessmentResource, Action: "list_progress", Mode: appauthz.AuthorizationModeUnconditional}}})
+	ctx := appauthz.WithSnapshot(context.Background(), &appauthz.Snapshot{AuthzVersion: 1, ScopeContractVersion: 1, Permissions: []appauthz.Permission{{Resource: appauthz.AssessmentResource, Action: "list_progress", Mode: appauthz.AuthorizationModeUnconditional, Scopes: []appauthz.DataScope{{OrgID: 1, Kind: "stores", StoreIDs: []uint64{7}}}}}})
 	id := uint64(101)
 	page, err := service.ListProgress(ctx, Actor{OrgID: 1, OperatorUserID: 9}, ListQuery{TesteeID: &id})
 	require.NoError(t, err)
 	require.EqualValues(t, 1, reader.filter.OrgID)
 	require.Equal(t, &id, reader.filter.TesteeID)
+	require.True(t, reader.filter.RestrictToStoreScope)
+	require.Equal(t, []uint64{7}, reader.filter.AllowedStoreIDs)
 	require.Equal(t, 2, page.Total)
 	require.True(t, page.Items[0].ManualRetryAvailable)
 	require.False(t, page.Items[1].ManualRetryAvailable)
@@ -142,4 +146,29 @@ func TestProgressListAddsEligibilityAfterScopeFiltering(t *testing.T) {
 	_, err = service.ListProgress(ctx, Actor{OrgID: 1, OperatorUserID: 9}, ListQuery{TesteeID: &id})
 	require.Error(t, err)
 	require.Equal(t, 1, runs.calls)
+}
+
+func TestAssessmentListsKeepActionRangesSeparate(t *testing.T) {
+	reader := &progressReader{}
+	service := &queryService{reader: reader, access: &accessCheckerStub{}}
+	snapshot := &appauthz.Snapshot{AuthzVersion: 1, ScopeContractVersion: 1, Permissions: []appauthz.Permission{
+		{Resource: appauthz.AssessmentResource, Action: "list_progress", Mode: appauthz.AuthorizationModeUnconditional, Scopes: []appauthz.DataScope{{OrgID: 1, Kind: "stores", StoreIDs: []uint64{7}}}},
+		{Resource: appauthz.AssessmentResource, Action: "list", Mode: appauthz.AuthorizationModeUnconditional, Scopes: []appauthz.DataScope{{OrgID: 1, Kind: "stores", StoreIDs: []uint64{8}}}},
+	}}
+	ctx := appauthz.WithSnapshot(context.Background(), snapshot)
+	q := ListQuery{AccessibleTesteeIDs: []uint64{101}, RestrictToAccessScope: true}
+	for _, tc := range []struct {
+		action string
+		store  uint64
+	}{{"list_progress", 7}, {"list", 8}} {
+		_, _, _, _, err := service.listRows(ctx, Actor{OrgID: 1, OperatorUserID: 9}, q, tc.action)
+		require.NoError(t, err)
+		require.Equal(t, []uint64{tc.store}, reader.filter.AllowedStoreIDs)
+		require.True(t, reader.filter.RestrictToAccessScope)
+		require.Equal(t, []uint64{101}, reader.filter.AccessibleTesteeIDs)
+	}
+	snapshot.Permissions[1].Scopes = nil
+	_, _, _, _, err := service.listRows(ctx, Actor{OrgID: 1, OperatorUserID: 9}, q, "list")
+	require.Error(t, err)
+	require.Equal(t, 2, reader.calls, "missing list range must not borrow progress range")
 }

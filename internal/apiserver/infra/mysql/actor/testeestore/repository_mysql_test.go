@@ -3,6 +3,7 @@ package testeestore_test
 import (
 	"context"
 	"fmt"
+	"github.com/FangcunMount/qs-server/internal/apiserver/application/actor/actorctx"
 	app "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/testeestore"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/authz"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/transaction"
@@ -84,8 +85,8 @@ func fixture(t *testing.T) (*gorm.DB, *app.Service, context.Context) {
 	tx := transaction.RunnerFunc(func(ctx context.Context, fn func(context.Context) error) error {
 		return db.WithContext(ctx).Transaction(func(tx *gorm.DB) error { return fn(dbctx.WithTx(ctx, tx)) })
 	})
-	ctx := authz.WithSnapshot(context.Background(), &authz.Snapshot{Permissions: []authz.Permission{{Resource: "qs:*:*:*", Action: "*", Mode: authz.AuthorizationModeUnconditional}}})
-	return db, app.NewService(repo.NewRepository(db), tx), ctx
+	ctx := authz.WithSnapshot(actorctx.WithGrantingUserID(actorctx.WithOperatorOrgID(context.Background(), 7), 9), &authz.Snapshot{ScopeContractVersion: 1, AuthzVersion: 1, Permissions: []authz.Permission{{Resource: "qs:*:*:*", Action: "*", Mode: authz.AuthorizationModeUnconditional, Scopes: []authz.DataScope{{OrgID: 7, Kind: "all_stores"}}}}})
+	return db, app.NewService(repo.NewRepository(db), tx, testCompanyScope{}), ctx
 }
 func change(id uint64, version uint32, request string) app.Change {
 	return app.Change{StoreID: id, ExpectedVersion: version, Reason: "test ownership", RequestID: request}
@@ -770,4 +771,12 @@ func TestMySQLStoreFilterAppliesBeforePaginationAndCount(t *testing.T) {
 	if count != 0 || len(rows) != 0 {
 		t.Fatal("store filter expanded access scope")
 	}
+}
+
+// These persistence tests supply the explicit company range; active membership is tested in Actor access.
+type testCompanyScope struct{}
+
+func (testCompanyScope) ResolveStoreRange(ctx context.Context, org, user int64, resource, action string) (authz.StoreRange, error) {
+	snap, _ := authz.FromContext(ctx)
+	return snap.ResolveStoreRange(org, resource, action)
 }

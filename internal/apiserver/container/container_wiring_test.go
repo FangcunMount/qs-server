@@ -286,6 +286,7 @@ func TestContainerBuildRESTDepsExposesRouterFacingDependencies(t *testing.T) {
 	c.QRCodeObjectKeyPrefix = "rest-prefix"
 
 	planCommand := planApp.NewCommandService(nil, nil, nil, nil, nil, nil)
+	operatorCommand := planApp.NewOperatorCommandService(planCommand, nil, nil)
 	planQuery := planApp.NewQueryService(nil, nil, nil)
 	questionnaireQuery := appQuestionnaire.NewQueryService(nil, nil, nil, nil)
 	c.SurveyModule = &SurveyModule{
@@ -294,7 +295,7 @@ func TestContainerBuildRESTDepsExposesRouterFacingDependencies(t *testing.T) {
 	}
 	c.ActorModule = &ActorModule{}
 	c.EvaluationModule = &EvaluationModule{}
-	c.PlanModule = &PlanModule{CommandService: planCommand, QueryService: planQuery}
+	c.PlanModule = &PlanModule{CommandService: planCommand, OperatorCommandService: operatorCommand, QueryService: planQuery}
 	c.StatisticsModule = &StatisticsModule{}
 
 	deps := c.BuildRESTDeps(nil)
@@ -304,7 +305,7 @@ func TestContainerBuildRESTDepsExposesRouterFacingDependencies(t *testing.T) {
 	if deps.Survey.QuestionnaireQueryService != questionnaireQuery {
 		t.Fatalf("survey query service not extracted correctly: %#v", deps.Survey)
 	}
-	if deps.Plan.CommandService != planCommand || deps.Plan.QueryService != planQuery || !deps.Statistics.Enabled {
+	if deps.Plan.CommandService != operatorCommand || deps.Plan.QueryService != planQuery || !deps.Statistics.Enabled {
 		t.Fatalf("plan/statistics dependencies not extracted correctly")
 	}
 	if deps.CodesService != c.CodesService {

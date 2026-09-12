@@ -93,11 +93,10 @@ func (stubPlanQueryService) ListTasksByTesteeAndPlan(context.Context, string, st
 	return nil, nil
 }
 
-type planTesteeAccessService struct{}
-
-func (*planTesteeAccessService) ResolveAccessScope(context.Context, int64, int64) (*actorAccessApp.TesteeAccessScope, error) {
-	return &actorAccessApp.TesteeAccessScope{IsAdmin: true}, nil
+type planTesteeAccessService struct {
+	actorAccessApp.StoreScopeAccess
 }
+
 func (*planTesteeAccessService) ValidateTesteeAccess(context.Context, int64, int64, uint64) error {
 	return nil
 }

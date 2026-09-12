@@ -30,6 +30,7 @@ import (
 
 // Module assembles plan application services.
 type Module struct {
+	OperatorCommandService        planApp.PlanCommandService
 	CommandService                planApp.PlanCommandService
 	QueryService                  planApp.PlanQueryService
 	EnrollmentQueryService        planApp.EnrollmentQueryService
@@ -63,7 +64,7 @@ func New(deps Deps) (*Module, error) {
 	}
 
 	module := &Module{}
-	module.eventPublisher = normalized.EventPublisher
+	module.eventPublisher = planEntryInfra.NewCommitPublisher(normalized.EventPublisher)
 	module.testeeAccessService = normalized.TesteeAccess
 
 	mysqlOptions := mysql.BaseRepositoryOptions{Limiter: normalized.MySQLLimiter}
@@ -98,8 +99,11 @@ func New(deps Deps) (*Module, error) {
 		planRepo,
 		taskRepo,
 	)
-	module.QueryService = planApp.NewQueryService(planReadModel, planReadModel, scaleCatalog)
-	module.EnrollmentQueryService = planApp.NewEnrollmentQueryService(planInfra.NewEnrollmentReadStore(normalized.MySQLDB, normalized.MySQLLimiter), scaleCatalog)
+	operatorAccess, _ := normalized.TesteeAccess.(planApp.OperatorCommandScope)
+	module.OperatorCommandService = planApp.NewOperatorCommandService(module.CommandService, operatorAccess, taskRepo, planApp.OperatorMutationDependencies{Transaction: txRunner, Ownership: planInfra.OwnershipLocker{}})
+	enrollmentAccess, _ := normalized.TesteeAccess.(planApp.EnrollmentScopeChecker)
+	module.QueryService = planApp.NewQueryService(planReadModel, planReadModel, scaleCatalog, enrollmentAccess)
+	module.EnrollmentQueryService = planApp.NewEnrollmentQueryService(planInfra.NewEnrollmentReadStore(normalized.MySQLDB, normalized.MySQLLimiter), scaleCatalog, enrollmentAccess)
 	module.TaskAssessmentResolver = planApp.NewTaskAssessmentResolver(taskRepo)
 	module.TaskNotificationContextReader = planApp.NewTaskNotificationContextReader(taskRepo, planRepo)
 

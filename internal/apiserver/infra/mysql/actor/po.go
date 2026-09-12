@@ -60,7 +60,6 @@ func (s *StringSliceCol) Scan(value interface{}) error {
 }
 
 // OperatorPO 后台操作者持久化对象
-// 兼容说明：底层表名仍为 `operator`，后续迁移前先保持存储结构稳定。
 type OperatorPO struct {
 	mysql.AuditFields
 
@@ -74,7 +73,8 @@ type OperatorPO struct {
 	Name                   string         `gorm:"column:name;size:100;not null"`
 	Email                  string         `gorm:"column:email;size:255"`
 	Phone                  string         `gorm:"column:phone;size:20"`
-	IsActive               bool           `gorm:"column:is_active;not null;default:true;index:idx_is_active"`
+	// 启用状态由领域模型决定，不能用 ORM 默认值覆盖显式停用。
+	IsActive bool `gorm:"column:is_active;not null;index:idx_is_active"`
 }
 
 // TableName 指定表名

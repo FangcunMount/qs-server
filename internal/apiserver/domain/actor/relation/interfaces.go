@@ -32,3 +32,16 @@ type Repository interface {
 		relationTypes []RelationType,
 	) (*ClinicianTesteeRelation, error)
 }
+
+// LockedRepository reloads current relation state after the caller has locked
+// its Testee. Ownership identifiers are part of the query boundary.
+type LockedRepository interface {
+	FindByIDForUpdate(context.Context, int64, testee.ID, ID) (*ClinicianTesteeRelation, error)
+}
+
+// AssignmentLockedRepository reads current active relationships after the caller
+// locks the Testee; regular read-only callers retain snapshot reads.
+type AssignmentLockedRepository interface {
+	FindActivePrimaryByTesteeForUpdate(context.Context, int64, testee.ID) (*ClinicianTesteeRelation, error)
+	FindActiveByTypesForUpdate(context.Context, int64, clinician.ID, testee.ID, []RelationType) (*ClinicianTesteeRelation, error)
+}

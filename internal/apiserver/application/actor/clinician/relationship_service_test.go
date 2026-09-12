@@ -3,6 +3,8 @@ package clinician
 import (
 	"context"
 	"errors"
+	"github.com/FangcunMount/qs-server/internal/apiserver/application/actor/actorctx"
+	appauthz "github.com/FangcunMount/qs-server/internal/apiserver/application/authz"
 	authztest "github.com/FangcunMount/qs-server/internal/apiserver/application/authz/testutil"
 	"testing"
 	"time"
@@ -148,7 +150,7 @@ func TestListAssignedTesteesUsesReadModel(t *testing.T) {
 		relationReader: relationReader,
 	}
 
-	result, err := svc.ListAssignedTestees(authztest.WithPermission(context.Background(), "qs:evaluation:collection:assessments", "read"), ListAssignedTesteeDTO{
+	result, err := svc.ListAssignedTestees(authztest.WithPermission(actorctx.WithGrantingUserID(actorctx.WithOperatorOrgID(context.Background(), 1), 9), "qs:evaluation:collection:assessments", "read"), ListAssignedTesteeDTO{
 		OrgID:       1,
 		ClinicianID: 10,
 		Offset:      0,
@@ -169,13 +171,15 @@ func TestListAssignedTesteesUsesReadModel(t *testing.T) {
 }
 
 type relationshipAssessmentSummaryReader struct {
-	calls  int
-	err    error
-	values map[uint64]actorreadmodel.AssessmentSummary
+	requested []uint64
+	calls     int
+	err       error
+	values    map[uint64]actorreadmodel.AssessmentSummary
 }
 
-func (s *relationshipAssessmentSummaryReader) ReadAssessmentSummaries(context.Context, int64, []uint64) (map[uint64]actorreadmodel.AssessmentSummary, error) {
+func (s *relationshipAssessmentSummaryReader) ReadAssessmentSummaries(_ context.Context, _ int64, ids []uint64) (map[uint64]actorreadmodel.AssessmentSummary, error) {
 	s.calls++
+	s.requested = append([]uint64(nil), ids...)
 	return s.values, s.err
 }
 
@@ -183,15 +187,15 @@ func TestListAssignedTesteesUsesOneEvaluationSummaryBatch(t *testing.T) {
 	stale := time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC)
 	latest := time.Date(2026, 8, 2, 10, 0, 0, 0, time.UTC)
 	relationReader := &relationshipServiceRelationReader{
-		assignedRows:  []actorreadmodel.TesteeRow{{ID: 21, OrgID: 1, Name: "testee", TotalAssessments: 99, LastAssessmentAt: &stale, LastRiskLevel: "low"}},
+		assignedRows:  []actorreadmodel.TesteeRow{{ID: 21, OrgID: 1, StoreID: storePtr(7), Name: "testee", TotalAssessments: 99, LastAssessmentAt: &stale, LastRiskLevel: "low"}},
 		assignedTotal: 1,
 	}
 	summary := &relationshipAssessmentSummaryReader{values: map[uint64]actorreadmodel.AssessmentSummary{
 		21: {TesteeID: 21, TotalEvaluated: 3, LastEvaluatedAt: &latest, RiskLevel: "high"},
 	}}
-	svc := &relationshipService{relationReader: relationReader, summaryReader: summary}
+	svc := &relationshipService{relationReader: relationReader, summaryReader: summary, summaryScope: relationshipSummaryScope{}}
 
-	result, err := svc.ListAssignedTestees(authztest.WithPermission(context.Background(), "qs:evaluation:collection:assessments", "read"), ListAssignedTesteeDTO{OrgID: 1, ClinicianID: 10, Limit: 10})
+	result, err := svc.ListAssignedTestees(authztest.WithPermission(actorctx.WithGrantingUserID(actorctx.WithOperatorOrgID(context.Background(), 1), 9), "qs:evaluation:collection:assessments", "read"), ListAssignedTesteeDTO{OrgID: 1, ClinicianID: 10, Limit: 10})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -204,7 +208,7 @@ func TestListAssignedTesteesUsesOneEvaluationSummaryBatch(t *testing.T) {
 	}
 
 	summary.err = errors.New("summary database unavailable")
-	if _, err := svc.ListAssignedTestees(authztest.WithPermission(context.Background(), "qs:evaluation:collection:assessments", "read"), ListAssignedTesteeDTO{OrgID: 1, ClinicianID: 10, Limit: 10}); err == nil {
+	if _, err := svc.ListAssignedTestees(authztest.WithPermission(actorctx.WithGrantingUserID(actorctx.WithOperatorOrgID(context.Background(), 1), 9), "qs:evaluation:collection:assessments", "read"), ListAssignedTesteeDTO{OrgID: 1, ClinicianID: 10, Limit: 10}); err == nil {
 		t.Fatal("summary query failure must fail the page")
 	}
 }
@@ -432,4 +436,236 @@ func (s *relationshipServiceTesteeRepo) FindByProfile(context.Context, int64, ui
 
 func (s *relationshipServiceTesteeRepo) Delete(context.Context, domainTestee.ID) error {
 	return nil
+}
+
+func storePtr(id uint64) *uint64 { return &id }
+
+type relationshipSummaryScope struct{}
+
+func (relationshipSummaryScope) ResolveStoreRange(_ context.Context, org, user int64, resource, action string) (appauthz.StoreRange, error) {
+	if org != 1 || user != 9 || resource != appauthz.AssessmentResource || action != "read" {
+		panic("wrong summary authority")
+	}
+	return appauthz.StoreRange{StoreIDs: []uint64{7}}, nil
+}
+
+func TestRelationshipSummaryUsesItsOwnScopeAndClearsUnpermittedFields(t *testing.T) {
+	ctx := authztest.WithPermission(actorctx.WithGrantingUserID(actorctx.WithOperatorOrgID(context.Background(), 1), 9), appauthz.AssessmentResource, "read")
+	summary := &relationshipAssessmentSummaryReader{values: map[uint64]actorreadmodel.AssessmentSummary{21: {TotalEvaluated: 3, RiskLevel: "high"}, 22: {TotalEvaluated: 99, RiskLevel: "high"}, 23: {TotalEvaluated: 99, RiskLevel: "high"}}}
+	svc := &relationshipService{summaryReader: summary, summaryScope: relationshipSummaryScope{}}
+	rows := []actorreadmodel.TesteeRow{{ID: 21, OrgID: 1, StoreID: storePtr(7), TotalAssessments: 88}, {ID: 22, OrgID: 1, StoreID: storePtr(8), TotalAssessments: 88, LastRiskLevel: "stale"}, {ID: 23, OrgID: 1, TotalAssessments: 88, LastRiskLevel: "stale"}}
+	if err := svc.enrichAssignedRows(ctx, 1, rows); err != nil {
+		t.Fatal(err)
+	}
+	if len(summary.requested) != 1 || summary.requested[0] != 21 || rows[0].TotalAssessments != 3 {
+		t.Fatalf("wrong authorized summary set %v", summary.requested)
+	}
+	for _, row := range rows[1:] {
+		if row.TotalAssessments != 0 || row.LastRiskLevel != "" || row.LastAssessmentAt != nil {
+			t.Fatal("outside-store or unassigned summary leaked")
+		}
+	}
+	summary.calls = 0
+	svc.summaryScope = nil
+	rows[0].LastRiskLevel = "stale"
+	if err := svc.enrichAssignedRows(ctx, 1, rows); err != nil || summary.calls != 0 || rows[0].LastRiskLevel != "" || rows[0].TotalAssessments != 0 {
+		t.Fatal("missing scope reused cached result")
+	}
+}
+
+type relationReadScope struct{ action string }
+
+func (r relationReadScope) ResolveStoreRange(_ context.Context, org, user int64, resource, action string) (appauthz.StoreRange, error) {
+	if org != 1 || user != 9 || resource != "qs:actor:collection:testees" || action != r.action {
+		panic("wrong relationship read authority")
+	}
+	return appauthz.StoreRange{StoreIDs: []uint64{7}}, nil
+}
+func TestOperatorRelationFilterRequiresExplicitCompanyAndAction(t *testing.T) {
+	const resource = "qs:actor:collection:testees"
+	for _, action := range []string{"read", "list"} {
+		svc := &relationshipService{operatorOnly: true, operatorScope: relationReadScope{action: action}}
+		ctx := authztest.WithPermission(actorctx.WithGrantingUserID(actorctx.WithOperatorOrgID(context.Background(), 1), 9), resource, action)
+		filter, err := svc.operatorRelationFilter(ctx, actorreadmodel.RelationFilter{OrgID: 1, Offset: 4, Limit: 2}, action)
+		if err != nil || !filter.RestrictToStoreScope || len(filter.AllowedStoreIDs) != 1 || filter.AllowedStoreIDs[0] != 7 || filter.Offset != 4 || filter.Limit != 2 {
+			t.Fatalf("filter=%+v err=%v", filter, err)
+		}
+		for _, denied := range []context.Context{context.Background(), actorctx.WithOperatorOrgID(ctx, 2), actorctx.WithGrantingUserID(ctx, 0)} {
+			if _, err := svc.operatorRelationFilter(denied, actorreadmodel.RelationFilter{OrgID: 1}, action); err == nil {
+				t.Fatal("missing authority allowed")
+			}
+		}
+		svc.operatorScope = nil
+		if _, err := svc.operatorRelationFilter(ctx, actorreadmodel.RelationFilter{OrgID: 1}, action); err == nil {
+			t.Fatal("missing resolver allowed")
+		}
+	}
+}
+
+type lockedRelationTesteeRepo struct {
+	relationshipServiceTesteeRepo
+	locks int
+}
+
+func (r *lockedRelationTesteeRepo) FindByIDForUpdate(_ context.Context, org int64, id domainTestee.ID) (*domainTestee.Testee, error) {
+	r.locks++
+	if org != 1 || id != 20 {
+		panic("wrong ownership lock")
+	}
+	return r.item, nil
+}
+func TestOperatorRelationshipAssignmentRejectsTransferredTesteeBeforeWrite(t *testing.T) {
+	target := makeTestee(20)
+	store := uint64(8)
+	target.RestoreStore(&store, 2)
+	repo := &lockedRelationTesteeRepo{relationshipServiceTesteeRepo: relationshipServiceTesteeRepo{item: target}}
+	relations := &relationshipServiceRelationRepo{}
+	svc := &relationshipService{operatorOnly: true, operatorScope: relationReadScope{action: "update"}, relationRepo: relations, clinicianRepo: &relationshipServiceClinicianRepo{item: makeActiveClinician(10)}, testeeRepo: repo, uow: passthroughTxRunner{}}
+	ctx := authztest.WithPermission(actorctx.WithGrantingUserID(actorctx.WithOperatorOrgID(context.Background(), 1), 9), "qs:*:*:*", "*")
+	dto := AssignTesteeDTO{OrgID: 1, ClinicianID: 10, TesteeID: 20, RelationType: "attending"}
+	if _, err := svc.AssignTestee(ctx, dto); err == nil {
+		t.Fatal("transferred testee allowed")
+	}
+	if repo.locks != 1 || relations.saved != nil || relations.updated != nil {
+		t.Fatal("scope rejection wrote relation or skipped lock")
+	}
+	store = 7
+	target.RestoreStore(&store, 3)
+	if _, err := svc.AssignTestee(ctx, dto); err != nil {
+		t.Fatal(err)
+	}
+	if repo.locks != 2 || relations.saved == nil {
+		t.Fatal("in-scope assignment not saved")
+	}
+	relations.saved = nil
+	if _, err := svc.AssignTestee(actorctx.WithOperatorOrgID(ctx, 2), dto); err == nil {
+		t.Fatal("foreign company allowed")
+	}
+	if relations.saved != nil || repo.locks != 2 {
+		t.Fatal("foreign company accessed repository")
+	}
+}
+
+type unbindScopeRepo struct {
+	current *domainRelation.ClinicianTesteeRelation
+	relationshipServiceRelationRepo
+	item  *domainRelation.ClinicianTesteeRelation
+	reads int
+}
+
+func (r *unbindScopeRepo) FindByID(context.Context, domainRelation.ID) (*domainRelation.ClinicianTesteeRelation, error) {
+	r.reads++
+	return r.item, nil
+}
+func TestOperatorUnbindRejectsBeforeLookupAndChecksInactiveRelationScope(t *testing.T) {
+	target := makeTestee(20)
+	store := uint64(8)
+	target.RestoreStore(&store, 2)
+	repo := &lockedRelationTesteeRepo{relationshipServiceTesteeRepo: relationshipServiceTesteeRepo{item: target}}
+	item := domainRelation.NewClinicianTesteeRelation(1, 10, 20, domainRelation.RelationTypeAttending, domainRelation.SourceTypeManual, nil, true, time.Now(), nil)
+	item.SetID(55)
+	relations := &unbindScopeRepo{item: item}
+	svc := &relationshipService{operatorOnly: true, operatorScope: relationReadScope{action: "update"}, relationRepo: relations, testeeRepo: repo, uow: passthroughTxRunner{}}
+	if _, err := svc.UnbindRelation(context.Background(), 55); err == nil {
+		t.Fatal("unauthenticated unbind allowed")
+	}
+	if relations.reads != 0 {
+		t.Fatal("unauthenticated request loaded relation")
+	}
+	ctx := authztest.WithPermission(actorctx.WithGrantingUserID(actorctx.WithOperatorOrgID(context.Background(), 1), 9), "qs:*:*:*", "*")
+	if _, err := svc.UnbindRelation(ctx, 55); err == nil {
+		t.Fatal("foreign store unbind allowed")
+	}
+	if relations.updated != nil || !item.IsActive() {
+		t.Fatal("denied unbind changed relationship")
+	}
+	store = 7
+	target.RestoreStore(&store, 3)
+	if _, err := svc.UnbindRelation(ctx, 55); err != nil {
+		t.Fatal(err)
+	}
+	if relations.updated == nil || item.IsActive() {
+		t.Fatal("authorized unbind failed")
+	}
+	relations.updated = nil
+	if _, err := svc.UnbindRelation(ctx, 55); err != nil {
+		t.Fatal(err)
+	}
+	if relations.updated != nil {
+		t.Fatal("repeat unbind wrote again")
+	}
+	store = 8
+	target.RestoreStore(&store, 4)
+	if _, err := svc.UnbindRelation(ctx, 55); err == nil {
+		t.Fatal("inactive relation bypassed current scope")
+	}
+	if relations.updated != nil {
+		t.Fatal("denied inactive relation wrote")
+	}
+}
+
+func (r *unbindScopeRepo) FindByIDForUpdate(_ context.Context, org int64, testee domainTestee.ID, id domainRelation.ID) (*domainRelation.ClinicianTesteeRelation, error) {
+	if org != 1 || testee != 20 || id != 55 {
+		panic("wrong relation lock identity")
+	}
+	if r.current != nil {
+		return r.current, nil
+	}
+	return r.item, nil
+}
+
+func TestOperatorUnbindUsesCurrentLockedRelationInsteadOfInitialSnapshot(t *testing.T) {
+	target := makeTestee(20)
+	store := uint64(7)
+	target.RestoreStore(&store, 1)
+	repo := &lockedRelationTesteeRepo{relationshipServiceTesteeRepo: relationshipServiceTesteeRepo{item: target}}
+	stale := domainRelation.NewClinicianTesteeRelation(1, 10, 20, domainRelation.RelationTypeAttending, domainRelation.SourceTypeManual, nil, true, time.Now(), nil)
+	stale.SetID(55)
+	current := domainRelation.NewClinicianTesteeRelation(1, 10, 20, domainRelation.RelationTypeAttending, domainRelation.SourceTypeManual, nil, false, time.Now(), nil)
+	current.SetID(55)
+	relations := &unbindScopeRepo{item: stale, current: current}
+	svc := &relationshipService{operatorOnly: true, operatorScope: relationReadScope{action: "update"}, relationRepo: relations, testeeRepo: repo, uow: passthroughTxRunner{}}
+	ctx := authztest.WithPermission(actorctx.WithGrantingUserID(actorctx.WithOperatorOrgID(context.Background(), 1), 9), "qs:*:*:*", "*")
+	if _, err := svc.UnbindRelation(ctx, 55); err != nil {
+		t.Fatal(err)
+	}
+	if relations.updated != nil || !stale.IsActive() || repo.locks != 1 {
+		t.Fatal("stale relationship state overwritten")
+	}
+}
+
+func (r *relationshipServiceRelationRepo) FindActivePrimaryByTesteeForUpdate(ctx context.Context, org int64, id domainTestee.ID) (*domainRelation.ClinicianTesteeRelation, error) {
+	return r.FindActivePrimaryByTestee(ctx, org, id)
+}
+func (r *relationshipServiceRelationRepo) FindActiveByTypesForUpdate(ctx context.Context, org int64, clinician domainClinician.ID, id domainTestee.ID, types []domainRelation.RelationType) (*domainRelation.ClinicianTesteeRelation, error) {
+	return r.FindActiveByTypes(ctx, org, clinician, id, types)
+}
+
+type currentAssignmentRepo struct {
+	relationshipServiceRelationRepo
+	current *domainRelation.ClinicianTesteeRelation
+}
+
+func (r *currentAssignmentRepo) FindActiveByTypesForUpdate(context.Context, int64, domainClinician.ID, domainTestee.ID, []domainRelation.RelationType) (*domainRelation.ClinicianTesteeRelation, error) {
+	return r.current, nil
+}
+func TestOperatorAssignmentReusesRelationCommittedAfterOldSnapshot(t *testing.T) {
+	target := makeTestee(20)
+	store := uint64(7)
+	target.RestoreStore(&store, 1)
+	repo := &lockedRelationTesteeRepo{relationshipServiceTesteeRepo: relationshipServiceTesteeRepo{item: target}}
+	current := domainRelation.NewClinicianTesteeRelation(1, 10, 20, domainRelation.RelationTypeAttending, domainRelation.SourceTypeManual, nil, true, time.Now(), nil)
+	current.SetID(55)
+	// The ordinary snapshot method returns not found; the locked method sees
+	// the relation committed by an earlier writer while this request waited.
+	relations := &currentAssignmentRepo{current: current}
+	svc := &relationshipService{operatorOnly: true, operatorScope: relationReadScope{action: "update"}, relationRepo: relations, clinicianRepo: &relationshipServiceClinicianRepo{item: makeActiveClinician(10)}, testeeRepo: repo, uow: passthroughTxRunner{}}
+	ctx := authztest.WithPermission(actorctx.WithGrantingUserID(actorctx.WithOperatorOrgID(context.Background(), 1), 9), "qs:*:*:*", "*")
+	result, err := svc.AssignAttending(ctx, AssignTesteeDTO{OrgID: 1, ClinicianID: 10, TesteeID: 20})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.ID != 55 || relations.saved != nil || relations.updated != nil {
+		t.Fatal("concurrent relation was duplicated or overwritten")
+	}
 }

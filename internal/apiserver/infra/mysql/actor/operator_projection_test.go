@@ -9,6 +9,37 @@ import (
 	"time"
 )
 
+func TestOperatorSavePreservesExplicitActivity(t *testing.T) {
+	for _, active := range []bool{false, true} {
+		t.Run(map[bool]string{false: "inactive", true: "active"}[active], func(t *testing.T) {
+			db := newDryRunActorDB(t).Session(&gorm.Session{SkipDefaultTransaction: true})
+			var saved *OperatorPO
+			if err := db.Callback().Create().After("gorm:create").Register("capture_operator_activity", func(tx *gorm.DB) {
+				var ok bool
+				saved, ok = tx.Statement.Dest.(*OperatorPO)
+				if !ok {
+					t.Fatalf("unexpected insert type %T", tx.Statement.Dest)
+				}
+			}); err != nil {
+				t.Fatal(err)
+			}
+			op := domain.NewOperator(1, 2, "prepared operator")
+			op.SetID(3)
+			if !active {
+				if err := domain.NewLifecycler().Deactivate(op); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if err := NewOperatorRepository(db).Save(context.Background(), op); err != nil {
+				t.Fatal(err)
+			}
+			if saved == nil || saved.IsActive != active {
+				t.Fatalf("insert changed explicit activity %v: %+v", active, saved)
+			}
+		})
+	}
+}
+
 func TestOperatorUpdatePersistsClearedProjectionPending(t *testing.T) {
 	db := newDryRunActorDB(t).Session(&gorm.Session{DryRun: true, SkipDefaultTransaction: true})
 	var statement string

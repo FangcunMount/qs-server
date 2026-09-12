@@ -2,6 +2,8 @@ package evaluation
 
 import (
 	"context"
+	"fmt"
+	appauthz "github.com/FangcunMount/qs-server/internal/apiserver/application/authz"
 
 	actorAccessApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/access"
 	evaluationoperator "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/operator"
@@ -19,37 +21,18 @@ func NewTesteeAccessChecker(delegate actorAccessApp.TesteeAccessService) evaluat
 	return testeeAccessChecker{delegate: delegate}
 }
 
-func (c testeeAccessChecker) ResolveAccessScope(
-	ctx context.Context,
-	orgID int64,
-	operatorUserID int64,
-) (*evaluationoperator.AccessScope, error) {
-	scope, err := c.delegate.ResolveAccessScope(ctx, orgID, operatorUserID)
-	if err != nil {
-		return nil, err
+func (c testeeAccessChecker) ValidateTesteeStoreAccess(ctx context.Context, orgID, userID int64, testeeID uint64, resource, action string) error {
+	checker, ok := c.delegate.(actorAccessApp.StoreScopeAccess)
+	if !ok {
+		return fmt.Errorf("store scope access checker is not configured")
 	}
-	if scope == nil {
-		return nil, nil
-	}
-	return &evaluationoperator.AccessScope{
-		IsAdmin:     scope.IsAdmin,
-		ClinicianID: scope.ClinicianID,
-	}, nil
+	return checker.ValidateTesteeStoreAccess(ctx, orgID, userID, testeeID, resource, action)
 }
 
-func (c testeeAccessChecker) ValidateTesteeAccess(
-	ctx context.Context,
-	orgID int64,
-	operatorUserID int64,
-	testeeID uint64,
-) error {
-	return c.delegate.ValidateTesteeAccess(ctx, orgID, operatorUserID, testeeID)
-}
-
-func (c testeeAccessChecker) ListAccessibleTesteeIDs(
-	ctx context.Context,
-	orgID int64,
-	operatorUserID int64,
-) ([]uint64, error) {
-	return c.delegate.ListAccessibleTesteeIDs(ctx, orgID, operatorUserID)
+func (c testeeAccessChecker) ResolveStoreRange(ctx context.Context, orgID, userID int64, resource, action string) (appauthz.StoreRange, error) {
+	checker, ok := c.delegate.(actorAccessApp.StoreScopeAccess)
+	if !ok {
+		return appauthz.StoreRange{}, fmt.Errorf("store scope access checker is not configured")
+	}
+	return checker.ResolveStoreRange(ctx, orgID, userID, resource, action)
 }

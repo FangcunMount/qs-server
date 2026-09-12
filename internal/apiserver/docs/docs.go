@@ -3597,6 +3597,140 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/v1/operators/{id}/authorization-scope": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Operator"
+                ],
+                "summary": "查询运营人员角色数据范围",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Operator ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/response.OperatorScopeConfigurationResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/core.Response"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/core.Response"
+                        }
+                    }
+                }
+            },
+            "put": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Operator"
+                ],
+                "summary": "更新运营人员角色数据范围",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Operator ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "数据范围配置",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/request.ReplaceOperatorScopeRequest"
+                        }
+                    },
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/response.OperatorScopeUpdateResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/core.Response"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/core.Response"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/core.Response"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/operators/{id}/retirement": {
             "get": {
                 "produces": [
@@ -6304,7 +6438,7 @@ const docTemplate = `{
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/response.TesteeResponse"
+                                            "$ref": "#/definitions/response.TesteeUpdateResponse"
                                         }
                                     }
                                 }
@@ -14941,12 +15075,14 @@ const docTemplate = `{
             "enum": [
                 "participant",
                 "clinician",
-                "admin"
+                "admin",
+                "operator"
             ],
             "x-enum-varnames": [
                 "AudienceParticipant",
                 "AudienceClinician",
-                "AudienceAdmin"
+                "AudienceAdmin",
+                "AudienceOperator"
             ]
         },
         "profile.Definition": {
@@ -15548,7 +15684,7 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "roles": {
-                    "description": "期望授予的角色列表（IAM 启用时转成 assignment）",
+                    "description": "已退役：仅允许空列表；角色与范围通过 authorization-scope 配置",
                     "type": "array",
                     "items": {
                         "type": "string"
@@ -15821,6 +15957,23 @@ const docTemplate = `{
                 }
             }
         },
+        "request.OperatorScopeRole": {
+            "type": "object",
+            "properties": {
+                "kind": {
+                    "type": "string"
+                },
+                "role_name": {
+                    "type": "string"
+                },
+                "store_ids": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            }
+        },
         "request.OriginRefRequest": {
             "type": "object",
             "required": [
@@ -15842,6 +15995,24 @@ const docTemplate = `{
                     "type": "array",
                     "items": {
                         "type": "string"
+                    }
+                }
+            }
+        },
+        "request.ReplaceOperatorScopeRequest": {
+            "type": "object",
+            "properties": {
+                "expected_policy_version": {
+                    "type": "string"
+                },
+                "reason": {
+                    "type": "string"
+                },
+                "roles": {
+                    "description": "Pointer distinguishes an explicit empty replacement from an omitted field.",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/request.OperatorScopeRole"
                     }
                 }
             }
@@ -15978,7 +16149,7 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "roles": {
-                    "description": "角色列表",
+                    "description": "已退役：非 null 字段拒绝，请使用 authorization-scope",
                     "type": "array",
                     "items": {
                         "type": "string"
@@ -18153,6 +18324,89 @@ const docTemplate = `{
                 }
             }
         },
+        "response.OperatorAssignmentScopeResponse": {
+            "type": "object",
+            "properties": {
+                "assignment_id": {
+                    "type": "string"
+                },
+                "management_protection": {
+                    "type": "string"
+                },
+                "role_id": {
+                    "type": "string"
+                },
+                "role_name": {
+                    "type": "string"
+                },
+                "scope": {
+                    "description": "Null means unconfigured, never company-wide access.",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/response.OperatorDataScopeResponse"
+                        }
+                    ]
+                }
+            }
+        },
+        "response.OperatorDataScopeResponse": {
+            "type": "object",
+            "properties": {
+                "kind": {
+                    "type": "string",
+                    "enum": [
+                        "stores",
+                        "all_stores"
+                    ]
+                },
+                "org_id": {
+                    "type": "string"
+                },
+                "store_ids": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            }
+        },
+        "response.OperatorScopeConfigurationResponse": {
+            "type": "object",
+            "properties": {
+                "assignments": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/response.OperatorAssignmentScopeResponse"
+                    }
+                },
+                "operator_id": {
+                    "type": "string"
+                },
+                "policy_version": {
+                    "type": "string"
+                },
+                "protected_access": {
+                    "type": "boolean"
+                },
+                "unconfigured_assignments": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/response.OperatorAssignmentScopeResponse"
+                    }
+                }
+            }
+        },
+        "response.OperatorScopeUpdateResponse": {
+            "type": "object",
+            "properties": {
+                "policy_version": {
+                    "type": "string"
+                },
+                "projection_pending": {
+                    "type": "boolean"
+                }
+            }
+        },
         "response.PlanListResponse": {
             "type": "object",
             "properties": {
@@ -19219,6 +19473,17 @@ const docTemplate = `{
                 },
                 "version": {
                     "type": "integer"
+                }
+            }
+        },
+        "response.TesteeUpdateResponse": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "string"
+                },
+                "updated": {
+                    "type": "boolean"
                 }
             }
         },

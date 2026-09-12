@@ -44,3 +44,22 @@ func (a *AssignmentClient) ReplaceManaged(ctx context.Context, targetUserIDStr s
 		PolicyVersion: resp.GetPolicyVersion(), Changed: resp.GetChanged(),
 	}, nil
 }
+
+// ReplaceScoped uses the company-specific RPC; never falls back to legacy
+// replacement, which has no company boundary.
+func (a *AssignmentClient) ReplaceScoped(ctx context.Context, userID, orgID string, roles []*authzv4.ScopedRoleAssignment, expectedVersion int64, changedBy, reason string) (*ReplaceAssignmentsResult, error) {
+	if expectedVersion <= 0 {
+		return nil, fmt.Errorf("positive expected policy version required")
+	}
+	if a == nil || a.client == nil {
+		return nil, fmt.Errorf("iam assignment client not available")
+	}
+	resp, err := a.client.SDK().Authz().ReplaceScopedAssignments(ctx, &authzv4.ReplaceScopedAssignmentsRequest{ExpectedPolicyVersion: expectedVersion, Subject: authz.SubjectKey(userID), OrgId: orgID, Roles: roles, ChangedBy: changedBy, Reason: reason})
+	if err != nil {
+		return nil, err
+	}
+	if resp == nil || resp.PolicyVersion <= 0 {
+		return nil, fmt.Errorf("invalid scoped replacement result")
+	}
+	return &ReplaceAssignmentsResult{DirectRoles: append([]string(nil), resp.DirectRoles...), PolicyVersion: resp.PolicyVersion, Changed: resp.Changed}, nil
+}

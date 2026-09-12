@@ -2,7 +2,9 @@ package answersheet
 
 import (
 	"context"
+	actorctx "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/actorctx"
 	appauthz "github.com/FangcunMount/qs-server/internal/apiserver/application/authz"
+	"math"
 
 	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/answersheet"
@@ -15,6 +17,7 @@ import (
 // managementService 答卷管理服务实现
 // 行为者：管理员
 type managementService struct {
+	access           ManagementScopeAccess
 	repo             answersheet.Repository
 	reader           surveyreadmodel.AnswerSheetReader
 	identityResolver iambridge.IdentityResolver
@@ -37,6 +40,25 @@ func NewManagementService(
 	}
 }
 
+// ManagementScopeAccess is the Actor-owned current ownership boundary.
+type ManagementScopeAccess interface {
+	ValidateTesteeStoreAccess(context.Context, int64, int64, uint64, string, string) error
+	ListStoreScopedTesteeIDs(context.Context, int64, int64, string, string) ([]uint64, error)
+}
+
+func NewScopedManagementService(repo answersheet.Repository, reader surveyreadmodel.AnswerSheetReader, access ManagementScopeAccess, identity ...iambridge.IdentityResolver) AnswerSheetManagementService {
+	service := NewManagementService(repo, reader, identity...).(*managementService)
+	service.access = access
+	return service
+}
+func (s *managementService) managementActor(ctx context.Context, orgID uint64) (int64, int64, error) {
+	user := actorctx.GrantingUserID(ctx)
+	if orgID == 0 || orgID > math.MaxInt64 || user == 0 || user > math.MaxInt64 || s.access == nil {
+		return 0, 0, errors.WithCode(errorCode.ErrPermissionDenied, "scoped operator access required")
+	}
+	return int64(orgID), int64(user), nil
+}
+
 // GetByID 根据ID获取答卷详情
 func (s *managementService) GetByID(ctx context.Context, id uint64) (*AnswerSheetResult, error) {
 	// 1. 验证输入参数
@@ -44,6 +66,9 @@ func (s *managementService) GetByID(ctx context.Context, id uint64) (*AnswerShee
 		return nil, errors.WithCode(errorCode.ErrAnswerSheetInvalid, "答卷ID不能为空")
 	}
 	sheetID, err := answerSheetIDFromUint64("answersheet_id", id)
+	if id == 0 {
+		return nil, errors.WithCode(errorCode.ErrAnswerSheetInvalid, "答卷ID不能为空")
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -79,13 +104,29 @@ func (s *managementService) GetByIDInOrg(ctx context.Context, orgID, id uint64) 
 	if orgID == 0 {
 		return nil, errors.WithCode(errorCode.ErrPermissionDenied, "机构范围不能为空")
 	}
-	result, err := s.GetByID(ctx, id)
+	sheetID, err := answerSheetIDFromUint64("answersheet_id", id)
+	if id == 0 {
+		return nil, errors.WithCode(errorCode.ErrAnswerSheetInvalid, "答卷ID不能为空")
+	}
 	if err != nil {
 		return nil, err
 	}
-	if result == nil || result.OrgID != orgID {
+	sheet, err := s.repo.FindByID(ctx, sheetID)
+	if err != nil {
+		return nil, errors.WrapC(err, errorCode.ErrAnswerSheetNotFound, "获取答卷失败")
+	}
+	if sheet == nil || sheet.SubmissionContext().OrgID().Uint64() != orgID {
 		return nil, errors.WithCode(errorCode.ErrAnswerSheetNotFound, "答卷不存在")
 	}
+	org, user, err := s.managementActor(ctx, orgID)
+	if err != nil {
+		return nil, err
+	}
+	if err := s.access.ValidateTesteeStoreAccess(ctx, org, user, sheet.SubmissionContext().TesteeID().Uint64(), appauthz.AnswerSheetResource, "read"); err != nil {
+		return nil, err
+	}
+	result := toAnswerSheetResult(sheet)
+	s.resolveFillerName(ctx, result)
 	return result, nil
 }
 
@@ -98,6 +139,16 @@ func (s *managementService) List(ctx context.Context, dto ListAnswerSheetsDTO) (
 		return nil, err
 	}
 	filter := buildListFilter(dto)
+	org, user, err := s.managementActor(ctx, dto.OrgID)
+	if err != nil {
+		return nil, err
+	}
+	ids, err := s.access.ListStoreScopedTesteeIDs(ctx, org, user, appauthz.AnswerSheetResource, "list")
+	if err != nil {
+		return nil, err
+	}
+	filter.RestrictToStoreScope = true
+	filter.StoreScopedTesteeIDs = ids
 
 	// 3. 查询答卷摘要列表
 	sheets, err := s.reader.ListAnswerSheets(ctx, filter, surveyreadmodel.PageRequest{Page: dto.Page, PageSize: dto.PageSize})

@@ -21,7 +21,6 @@ import (
 	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
 	aiexplanationadministration "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/aiexplanation/administration"
 	interpretationcatalog "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/catalogreconcile"
-	interpretationclinician "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/clinician"
 	interpretationoperations "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/operations"
 	interpretationreporttemplate "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/reporttemplate"
 	reportqueryjourney "github.com/FangcunMount/qs-server/internal/apiserver/application/journey/reportquery"
@@ -117,6 +116,7 @@ type AssessmentModelDeps struct {
 }
 
 type ActorDeps struct {
+	OperatorScopeService          *operatorapp.ScopeService
 	OperatorRetirementService     *retirementApp.Service
 	TesteeStoreService            *testeeStoreApp.Service
 	StoreService                  *storeApp.Service
@@ -146,7 +146,6 @@ type InterpretationDeps struct {
 	AIWorkflowManagement        *bridge.EvaluationAdministration
 	ReportQueryJourney          reportqueryjourney.Service
 	ReportWaitJourney           reportwaitjourney.Service
-	ClinicianService            interpretationclinician.Service
 	OperationsService           interpretationoperations.Service
 	CatalogReconcile            interpretationcatalog.Service
 	ReportTemplates             interpretationreporttemplate.Service

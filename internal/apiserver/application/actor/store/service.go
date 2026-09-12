@@ -4,6 +4,7 @@ package store
 import (
 	"context"
 	"github.com/FangcunMount/component-base/pkg/errors"
+	"github.com/FangcunMount/qs-server/internal/apiserver/application/actor/actorctx"
 	authz "github.com/FangcunMount/qs-server/internal/apiserver/application/authz"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/transaction"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/store"
@@ -21,21 +22,36 @@ type Change struct {
 	ExpectedVersion   uint32
 	Reason, RequestID string
 }
+
+// CompanyScope verifies active company membership and the range paired with an action.
+type CompanyScope interface {
+	ResolveStoreRange(context.Context, int64, int64, string, string) (authz.StoreRange, error)
+}
 type Service struct {
-	repo port.Repository
-	tx   transaction.Runner
+	scope CompanyScope
+	repo  port.Repository
+	tx    transaction.Runner
 }
 
-func NewService(r port.Repository, tx transaction.Runner) *Service { return &Service{repo: r, tx: tx} }
-func authorize(ctx context.Context, a Actor) error {
-	s, ok := authz.FromContext(ctx)
-	if a.OrgID <= 0 || a.UserID <= 0 || !ok || s == nil || !s.IsQSAdmin() {
+func NewService(r port.Repository, tx transaction.Runner, scope CompanyScope) *Service {
+	return &Service{repo: r, tx: tx, scope: scope}
+}
+func (s *Service) authorize(ctx context.Context, a Actor, resource, action string) error {
+	snapshot, ok := authz.FromContext(ctx)
+	if s.scope == nil || a.OrgID <= 0 || a.UserID <= 0 || actorctx.OperatorOrgID(ctx) != a.OrgID || actorctx.GrantingUserID(ctx) != uint64(a.UserID) || !ok || snapshot == nil || !snapshot.IsQSAdmin() {
 		return errors.WithCode(code.ErrPermissionDenied, "company administrator permission required")
+	}
+	allowed, err := s.scope.ResolveStoreRange(ctx, a.OrgID, a.UserID, resource, action)
+	if err != nil {
+		return err
+	}
+	if !allowed.AllStores {
+		return errors.WithCode(code.ErrPermissionDenied, "headquarters company scope required")
 	}
 	return nil
 }
 func (s *Service) List(ctx context.Context, a Actor, f port.Filter) (port.Page, error) {
-	if err := authorize(ctx, a); err != nil {
+	if err := s.authorize(ctx, a, "qs:actor:collection:stores", "list"); err != nil {
 		return port.Page{}, err
 	}
 	if f.Page < 1 {
@@ -50,7 +66,7 @@ func (s *Service) List(ctx context.Context, a Actor, f port.Filter) (port.Page, 
 	return s.repo.List(ctx, a.OrgID, f)
 }
 func (s *Service) Get(ctx context.Context, a Actor, id uint64) (*port.Item, error) {
-	if err := authorize(ctx, a); err != nil {
+	if err := s.authorize(ctx, a, "qs:actor:collection:stores", "read"); err != nil {
 		return nil, err
 	}
 	v, err := s.repo.Get(ctx, a.OrgID, id)
@@ -64,7 +80,7 @@ func (s *Service) Get(ctx context.Context, a Actor, id uint64) (*port.Item, erro
 	return &port.Item{Store: v, ClinicianCount: n}, nil
 }
 func (s *Service) Create(ctx context.Context, a Actor, c, n, address string) (*domain.Store, error) {
-	if err := authorize(ctx, a); err != nil {
+	if err := s.authorize(ctx, a, "qs:actor:collection:stores", "create"); err != nil {
 		return nil, err
 	}
 	v, err := domain.New(meta.New().Uint64(), a.OrgID, c, n, address, a.UserID, time.Now())
@@ -74,7 +90,7 @@ func (s *Service) Create(ctx context.Context, a Actor, c, n, address string) (*d
 	return v, s.repo.Create(ctx, v)
 }
 func (s *Service) Update(ctx context.Context, a Actor, id uint64, version uint32, name, address string, active *bool) (*domain.Store, error) {
-	if err := authorize(ctx, a); err != nil {
+	if err := s.authorize(ctx, a, "qs:actor:collection:stores", "update"); err != nil {
 		return nil, err
 	}
 	if version == 0 {
@@ -109,7 +125,7 @@ func (s *Service) Update(ctx context.Context, a Actor, id uint64, version uint32
 	return result, err
 }
 func (s *Service) Assign(ctx context.Context, a Actor, id uint64, c Change) (*port.History, error) {
-	if err := authorize(ctx, a); err != nil {
+	if err := s.authorize(ctx, a, "qs:actor:collection:clinicians", "update"); err != nil {
 		return nil, err
 	}
 	c.Reason = strings.TrimSpace(c.Reason)
@@ -168,14 +184,14 @@ func (s *Service) Assign(ctx context.Context, a Actor, id uint64, c Change) (*po
 	return result, err
 }
 func (s *Service) History(ctx context.Context, a Actor, id uint64) ([]port.History, error) {
-	if err := authorize(ctx, a); err != nil {
+	if err := s.authorize(ctx, a, "qs:actor:collection:clinicians", "read"); err != nil {
 		return nil, err
 	}
 	return s.repo.History(ctx, a.OrgID, id)
 }
 
 func (s *Service) Progress(ctx context.Context, a Actor) (port.Progress, error) {
-	if err := authorize(ctx, a); err != nil {
+	if err := s.authorize(ctx, a, "qs:actor:collection:clinicians", "list"); err != nil {
 		return port.Progress{}, err
 	}
 	return s.repo.Progress(ctx, a.OrgID)

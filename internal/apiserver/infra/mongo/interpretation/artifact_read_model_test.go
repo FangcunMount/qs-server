@@ -37,3 +37,19 @@ func TestReportCatalogIndexesProtectScopeAndStableSort(t *testing.T) {
 		t.Fatalf("catalog indexes = %d, want 7", len(indexes))
 	}
 }
+
+func TestReportStoreRangeIsConjunctiveAndEmptyDenies(t *testing.T) {
+	org := int64(1)
+	requested := uint64(8)
+	for _, ids := range [][]uint64{{7}, nil} {
+		got := buildCatalogQuery(evaluationreadmodel.ReportFilter{OrgID: &org, TesteeID: &requested, RestrictToStoreScope: true, StoreScopedTesteeIDs: ids})
+		want := bson.M{"org_id": org, "testee_id": requested, "$and": bson.A{bson.M{"testee_id": bson.M{"$in": append([]uint64{}, ids...)}}}}
+		if !reflect.DeepEqual(got, want) {
+			t.Fatalf("scope replaced instead of intersected: %#v", got)
+		}
+	}
+	got := buildCatalogQuery(evaluationreadmodel.ReportFilter{RestrictToStoreScope: true, StoreScopedTesteeIDs: []uint64{7}})
+	if !reflect.DeepEqual(got["$and"], bson.A{bson.M{"testee_id": bson.M{"$in": []uint64{}}}}) {
+		t.Fatal("missing company accepted")
+	}
+}

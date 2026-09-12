@@ -2,6 +2,7 @@ package operator
 
 import (
 	"context"
+	apptransaction "github.com/FangcunMount/qs-server/internal/apiserver/application/transaction"
 	"testing"
 
 	"github.com/FangcunMount/component-base/pkg/errors"
@@ -89,7 +90,6 @@ func TestValidateRegisterDTORequiresPasswordForNewIAMAccount(t *testing.T) {
 		OrgID: 1,
 		Name:  "章依文",
 		Phone: "+8617700000001",
-		Roles: []string{"qs:assessment_operator"},
 	})
 	if err == nil || !errors.IsCode(err, code.ErrValidation) {
 		t.Fatalf("validateRegisterDTO() error = %v, want validation error", err)
@@ -173,4 +173,56 @@ func (r *fakeOperatorRepo) Delete(_ context.Context, id domain.ID) error {
 
 func (r *fakeOperatorRepo) Count(_ context.Context, _ int64) (int64, error) {
 	return int64(len(r.byUser)), nil
+}
+
+func TestRegisterRejectsRoleOnlyAssignmentBeforeIdentityOrLocalWrites(t *testing.T) {
+	repo := newFakeOperatorRepo()
+	service := newTestLifecycleService(repo)
+	service.authz = &operatorAuthzGatewayFake{}
+	_, err := service.Register(context.Background(), RegisterOperatorDTO{OrgID: 1, UserID: 10001, Name: "test", Roles: []string{"qs:assessment_operator"}, IsActive: true})
+	if err == nil || !errors.IsCode(err, code.ErrValidation) {
+		t.Fatalf("error=%v", err)
+	}
+	if len(repo.byUser) != 0 || repo.updates != 0 {
+		t.Fatal("registration rejection wrote local records")
+	}
+}
+
+func TestRegisterValidationAllowsIdentityWithoutRoles(t *testing.T) {
+	service := newTestLifecycleService(newFakeOperatorRepo())
+	if err := service.validateRegisterDTO(RegisterOperatorDTO{OrgID: 1, UserID: 10001, Name: "test", IsActive: true}); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestRegisterMembershipDoesNotReplaceExistingIAMAssignments(t *testing.T) {
+	ctx := context.Background()
+	repo := newFakeOperatorRepo()
+	service := newTestLifecycleService(repo)
+	gateway := &operatorAuthzGatewayFake{}
+	service.authz = gateway
+	service.uow = apptransaction.RunnerFunc(func(ctx context.Context, fn func(context.Context) error) error { return fn(ctx) })
+	dto := RegisterOperatorDTO{OrgID: 1, UserID: 10001, Name: "test", IsActive: true}
+	result, err := service.Register(ctx, dto)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if gateway.replaceCalls != 0 {
+		t.Fatal("registration changed IAM assignments")
+	}
+	if len(result.Roles) != 0 || !result.AuthzProjectionPending {
+		t.Fatalf("new projection=%+v", result)
+	}
+	op, err := repo.FindByUser(ctx, 1, 10001)
+	if err != nil {
+		t.Fatal(err)
+	}
+	op.ReplaceRolesProjection([]domain.Role{domain.RoleResultReviewer}, []domain.Role{domain.RoleResultReviewer}, 42, nil, false)
+	result, err = service.Register(ctx, dto)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if gateway.replaceCalls != 0 || len(result.Roles) != 1 || result.Roles[0] != string(domain.RoleResultReviewer) || result.AuthzPolicyVersion != 42 {
+		t.Fatalf("repeated registration replaced authorization: %+v", result)
+	}
 }

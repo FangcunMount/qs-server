@@ -572,7 +572,7 @@ func (t *Tool) Apply(ctx context.Context, id, fingerprint string, actor int64, m
 					}
 				}
 			}
-			_, e = app.NewService(t.repository, t.gateway).Execute(authz.WithSnapshot(ctx, administrator), app.Command{OrgID: c.OrgID, ActorID: actor, OperatorID: c.OperatorID, ExpectedVersion: c.Version, RequestID: id + "-" + fmt.Sprint(c.OperatorID), Reason: "retire clinician backend identity"})
+			_, e = app.NewMaintenanceService(t.repository, t.gateway).Execute(authz.WithSnapshot(ctx, administrator), app.Command{OrgID: c.OrgID, ActorID: actor, OperatorID: c.OperatorID, ExpectedVersion: c.Version, RequestID: id + "-" + fmt.Sprint(c.OperatorID), Reason: "retire clinician backend identity"})
 			if e != nil {
 				r.LastError = fmt.Sprintf("operator %d: %v", c.OperatorID, e)
 				_ = t.save(ctx, r, checksum)

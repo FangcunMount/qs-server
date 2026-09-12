@@ -45,7 +45,7 @@ func (s *queryService) GetProgress(ctx context.Context, actor Actor, id uint64) 
 	if err := appauthz.RequirePermission(ctx, appauthz.AssessmentResource, "read_progress"); err != nil {
 		return nil, err
 	}
-	a, err := s.loadAccessible(ctx, actor, id)
+	a, err := s.loadAccessible(ctx, actor, id, "read_progress")
 	if err != nil {
 		return nil, err
 	}
@@ -59,7 +59,7 @@ func (s *queryService) ListProgress(ctx context.Context, actor Actor, q ListQuer
 	if err := appauthz.RequirePermission(ctx, appauthz.AssessmentResource, "list_progress"); err != nil {
 		return nil, err
 	}
-	rows, total, page, size, err := s.listRows(ctx, actor, q)
+	rows, total, page, size, err := s.listRows(ctx, actor, q, "list_progress")
 	if err != nil {
 		return nil, err
 	}

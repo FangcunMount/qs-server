@@ -8,6 +8,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/FangcunMount/component-base/pkg/errors"
+	"github.com/FangcunMount/qs-server/internal/apiserver/application/actor/actorctx"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/authz"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/transaction"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/testeestore"
@@ -21,18 +22,31 @@ type Change struct {
 	ExpectedVersion   uint32
 	Reason, RequestID string
 }
+
+// CompanyScope checks active Operator membership and the action-specific company range.
+type CompanyScope interface {
+	ResolveStoreRange(context.Context, int64, int64, string, string) (authz.StoreRange, error)
+}
 type Service struct {
-	repo port.Repository
-	tx   transaction.Runner
+	scope CompanyScope
+	repo  port.Repository
+	tx    transaction.Runner
 }
 
-func NewService(repo port.Repository, tx transaction.Runner) *Service {
-	return &Service{repo: repo, tx: tx}
+func NewService(repo port.Repository, tx transaction.Runner, scope CompanyScope) *Service {
+	return &Service{repo: repo, tx: tx, scope: scope}
 }
-func authorize(ctx context.Context, actor Actor) error {
+func (s *Service) authorize(ctx context.Context, actor Actor, action string) error {
 	snapshot, ok := authz.FromContext(ctx)
-	if actor.OrgID <= 0 || actor.UserID <= 0 || !ok || snapshot == nil || !snapshot.IsQSAdmin() {
+	if s.scope == nil || actor.OrgID <= 0 || actor.UserID <= 0 || actorctx.OperatorOrgID(ctx) != actor.OrgID || actorctx.GrantingUserID(ctx) != uint64(actor.UserID) || !ok || snapshot == nil || !snapshot.IsQSAdmin() {
 		return errors.WithCode(code.ErrPermissionDenied, "company administrator permission required")
+	}
+	rangeForCompany, err := s.scope.ResolveStoreRange(ctx, actor.OrgID, actor.UserID, "qs:actor:collection:testees", action)
+	if err != nil {
+		return err
+	}
+	if !rangeForCompany.AllStores {
+		return errors.WithCode(code.ErrPermissionDenied, "headquarters company scope required")
 	}
 	return nil
 }
@@ -44,7 +58,7 @@ func (s *Service) Transfer(ctx context.Context, actor Actor, id uint64, change C
 	return s.change(ctx, actor, id, change, "transfer")
 }
 func (s *Service) change(ctx context.Context, actor Actor, id uint64, change Change, kind string) (*port.History, error) {
-	if err := authorize(ctx, actor); err != nil {
+	if err := s.authorize(ctx, actor, "update"); err != nil {
 		return nil, err
 	}
 	change.Reason, change.RequestID = strings.TrimSpace(change.Reason), strings.TrimSpace(change.RequestID)
@@ -101,7 +115,7 @@ func (s *Service) change(ctx context.Context, actor Actor, id uint64, change Cha
 }
 
 func (s *Service) History(ctx context.Context, actor Actor, id, before uint64, limit int) ([]port.History, error) {
-	if err := authorize(ctx, actor); err != nil {
+	if err := s.authorize(ctx, actor, "read"); err != nil {
 		return nil, err
 	}
 	if id == 0 {

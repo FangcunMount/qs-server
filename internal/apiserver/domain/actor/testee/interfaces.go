@@ -57,3 +57,9 @@ type Ownership struct {
 	StoreID *uint64
 	Version uint32
 }
+
+// LockedRepository serializes backend edits with ownership transfers. The
+// caller must hold a transaction; the lock lasts until its commit or rollback.
+type LockedRepository interface {
+	FindByIDForUpdate(context.Context, int64, ID) (*Testee, error)
+}

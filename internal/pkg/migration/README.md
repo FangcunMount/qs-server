@@ -17,7 +17,7 @@ qs-server 在 apiserver 启动阶段按配置执行 MySQL 与 MongoDB 向上迁�
 - MySQL：`NewMigrator(db, config)`；
 - MongoDB：`NewMongoMigrator(client, config)`；
 - dirty 状态会阻断继续迁移；
-- 当前目录末端版本为 MySQL `78`、MongoDB `33`。生产实际版本以数据库只读查询和[当前版本定档验收台账](../../../docs/00-总览/09-当前版本定档验收台账.md)为准；仓库目录版本不能单独证明生产已执行到该版本。
+- 当前目录末端版本为 MySQL `79`、MongoDB `33`。生产实际版本以数据库只读查询和[当前版本定档验收台账](../../../docs/00-总览/09-当前版本定档验收台账.md)为准；仓库目录版本不能单独证明生产已执行到该版本。
 
 ## 目录与职责
 
@@ -198,3 +198,23 @@ make docs-hygiene
 - [本地开发与配置约定](../../../docs/00-总览/06-本地开发与配置约定.md)
 - [配置与环境变量](../../../docs/04-接口与运维/05-配置与环境变量.md)
 - [部署与端口](../../../docs/04-接口与运维/06-部署与端口.md)
+
+## 已退役运营身份的显式恢复
+
+`cmd/operator-recover` 仅用于经过确认的维护操作，不是后台注册或启用接口。它恢复原 Operator ID，不恢复医生绑定、旧二维码或旧角色。后续角色和 Scope 分配必须独立完成。
+
+- `preflight`：读取当前身份、退出记录和 IAM 权限，输出确定性事实指纹，不写授权或身份数据。允许在干净的 MySQL 78 版、尚无恢复归档表时执行。
+- `apply`：要求已执行 79 版迁移、暂停人员及授权写入，并提交本次预演指纹。事务内保存原退出审计、恢复空角色身份、移除已归档退出的阻断记录。
+- `status`：校验恢复归档并报告 `pending` 或 `historical_completed`，同时输出当前 Operator 事实。历史完成不表示当前事实未变化，也不表示业务验收通过；重复 Apply 不覆盖后续变化。
+
+输入使用 `OPERATOR_RECOVERY_INPUT` 指向受限 JSON 文件，包含 `OrgID`、`ActorID`、`OperatorID`、`ExpectedVersion`、`ExpectedPolicyVersion`、`RequestID`、`Reason`。目标版本是退出完成后的版本；策略版本必须来自当次核实。报告路径由 `OPERATOR_RECOVERY_REPORT` 指定，必须是尚不存在的新文件，工具以 `0600` 创建。输入不接受未知字段或多个 JSON 对象。
+
+Apply 另需 `OPERATOR_RECOVERY_FINGERPRINT` 与 `OPERATOR_RECOVERY_MAINTENANCE=true`。维护标识是外部写入已暂停的确认，不会自动暂停服务，也不能将 QS 与 IAM 变成一个事务。运行日志只输出状态摘要；人员事实、指纹与错误详情保存到受限报告。
+
+79 版新增 `operator_recovery_archives`。归档包含恢复记录、原退出任务、退出前身份及恢复前身份的原始值和校验和。归档有数据时向下迁移会拒绝删除，必须先安排保留证据的结构恢复方案；普通回滚不得自动重新授予权限。
+
+对于已明确选择、与历史医生绑定清单无关的退出人员，使用 `operator-retire selected-preflight|selected-apply|selected-verify`。`OPERATOR_RETIRE_LAYOUT=final`，`OPERATOR_RETIRE_INPUT` 指向包含 `OrgID`、`ActorID`、`OperatorID`、`ExpectedVersion`、`RequestID`、`Reason` 的受限 JSON；报告仍使用 `OPERATOR_RETIRE_REPORT`。Apply 要求预演指纹及 `OPERATOR_RETIRE_MAINTENANCE=true`，调用统一退出用例，失败保持停用并按原任务恢复。Verify 同时检查当前 IAM 后台角色已清空、本地身份已停用并软删除，不能仅凭任务历史完成判定通过。每人独立保存退出任务及原始事实，不改写此前医生退役清单，也不修改医生、门店、受试者或二维码。
+
+对于任何公司都没有 Operator 记录、但仍有后台授权的用户，使用 `operator-retire orphan-preflight|orphan-apply|orphan-verify`。输入改为 `OrgID`、`ActorID`、`UserID`、`RequestID`、`Reason`，文件须为私有权限；公司用于校验总部操作人，目标用户必须在所有公司都没有 Operator，包括软删除历史。工具仅允许已确认的运营员、结果评估员和计划管理员标准角色，保留 `user` 自服务角色；发现其他权限或人员关联即停止。
+
+孤立授权的 Apply 同样要求真实写入暂停和预演指纹。指纹包含完整角色事实及策略版本，后续重新赋权不能重放旧计划。工具通过 IAM 正常管理接口撤权，不制造 Operator 或退出任务。报告保留撤销前角色及提交的策略版本；`already_unprivileged` 仅说明当前没有后台角色，不能当作历史执行归属或业务验收证明。失败、响应不确定或后续事实变化时，先用只读命令核对，不自动重新授权。

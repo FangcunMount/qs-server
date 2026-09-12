@@ -162,6 +162,13 @@ func (g *operatorAuthzGateway) LoadOperatorRoleProjection(ctx context.Context, o
 	if !g.IsEnabled() {
 		return iambridge.OperatorRoleProjection{}, fmt.Errorf("iam operator authorization gateway is not available")
 	}
+	if !g.fresh {
+		facts, err := g.LoadOperatorAssignmentFacts(ctx, userID)
+		if err != nil {
+			return iambridge.OperatorRoleProjection{}, err
+		}
+		return scopedOperatorProjection(orgID, facts)
+	}
 	load := g.snapshot.Load
 	if g.fresh {
 		load = g.snapshot.LoadAssignmentFacts

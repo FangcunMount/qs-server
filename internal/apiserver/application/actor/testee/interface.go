@@ -141,6 +141,7 @@ type UpdateTesteeProfileDTO struct {
 
 // ListTesteeDTO 列出受试者 DTO
 type ListTesteeDTO struct {
+	ProfileID             *uint64
 	StoreID               *uint64
 	UnassignedStore       bool
 	OrgID                 int64  // 机构ID

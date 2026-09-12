@@ -2,6 +2,11 @@ package plan
 
 import (
 	"context"
+	"github.com/FangcunMount/component-base/pkg/errors"
+	"github.com/FangcunMount/qs-server/internal/apiserver/application/actor/actorctx"
+	appauthz "github.com/FangcunMount/qs-server/internal/apiserver/application/authz"
+	"github.com/FangcunMount/qs-server/internal/pkg/code"
+	"math"
 	"time"
 )
 
@@ -67,16 +72,37 @@ type EnrollmentQueryService interface {
 	ListEnrollments(context.Context, EnrollmentQuery) (*EnrollmentPage, error)
 }
 
+type EnrollmentScopeChecker interface {
+	ValidateTesteeStoreAccess(context.Context, int64, int64, uint64, string, string) error
+}
+
 type enrollmentQueryService struct {
+	access  EnrollmentScopeChecker
 	store   EnrollmentQueryStore
 	catalog ScaleCatalog
 }
 
-func NewEnrollmentQueryService(store EnrollmentQueryStore, catalog ScaleCatalog) EnrollmentQueryService {
-	return &enrollmentQueryService{store: store, catalog: catalog}
+func NewEnrollmentQueryService(store EnrollmentQueryStore, catalog ScaleCatalog, access ...EnrollmentScopeChecker) EnrollmentQueryService {
+	var checker EnrollmentScopeChecker
+	if len(access) > 0 {
+		checker = access[0]
+	}
+	return &enrollmentQueryService{store: store, catalog: catalog, access: checker}
 }
 
 func (s *enrollmentQueryService) ListEnrollments(ctx context.Context, query EnrollmentQuery) (*EnrollmentPage, error) {
+	orgID := actorctx.OperatorOrgID(ctx)
+	userID := actorctx.GrantingUserID(ctx)
+	if orgID <= 0 || userID == 0 || userID > math.MaxInt64 || orgID != query.OrgID || query.TesteeID == 0 || s.access == nil {
+		return nil, errors.WithCode(code.ErrPermissionDenied, "trusted operator and enrollment scope are required")
+	}
+	if err := appauthz.RequirePermission(ctx, appauthz.EvaluationPlanTaskResource, "list"); err != nil {
+		return nil, err
+	}
+	if err := s.access.ValidateTesteeStoreAccess(ctx, orgID, int64(userID), query.TesteeID, appauthz.EvaluationPlanTaskResource, "list"); err != nil {
+		return nil, err
+	}
+
 	if query.Page < 1 {
 		query.Page = 1
 	}

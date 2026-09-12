@@ -2,6 +2,7 @@ package operator
 
 import (
 	"context"
+	evalerrors "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/apperrors"
 	"sort"
 	"time"
 )
@@ -52,7 +53,13 @@ func (s *scaleAnalysisService) GetScaleAnalysis(ctx context.Context, actor Actor
 			grouped[code] = trend
 		}
 		test := ScaleTest{AssessmentID: assessment.ID, TestDate: assessmentDate(assessment), TotalScore: floatPointerValue(assessment.TotalScore), RiskLevel: stringPointerValue(assessment.RiskLevel), Factors: []ScaleFactor{}}
-		if score, scoreErr := s.queries.GetScores(ctx, actor, assessment.ID); scoreErr == nil && score != nil {
+		score, scoreErr := s.queries.GetScores(ctx, actor, assessment.ID)
+		// A denied or failed read must not expose the summary already obtained
+		// from the list. Only a missing score record is an optional enrichment.
+		if scoreErr != nil && !evalerrors.IsAssessmentScoreNotFound(scoreErr) {
+			return nil, scoreErr
+		}
+		if scoreErr == nil && score != nil {
 			for _, factor := range score.FactorScores {
 				test.Factors = append(test.Factors, ScaleFactor{FactorCode: factor.FactorCode, FactorName: factor.FactorName, RawScore: factor.RawScore, RiskLevel: factor.RiskLevel})
 			}

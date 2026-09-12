@@ -3,6 +3,7 @@ package middleware
 import (
 	"context"
 	"fmt"
+	"github.com/FangcunMount/qs-server/internal/apiserver/application/actor/actorctx"
 	"net/http"
 
 	"github.com/FangcunMount/component-base/pkg/errors"
@@ -84,6 +85,7 @@ func ResolveOperatorOrgScopeMiddleware(checker operatorapp.ActiveOperatorChecker
 			return
 		}
 		httpauth.ApplyResolvedOrgScope(c, claims, orgID)
+		c.Request = c.Request.WithContext(actorctx.WithOperatorOrgID(c.Request.Context(), op.OrgID))
 		c.Set(CurrentOperatorKey, op)
 		c.Next()
 	}

@@ -5,10 +5,10 @@ import (
 	retirement "github.com/FangcunMount/qs-server/internal/apiserver/port/operatorretirement"
 
 	"github.com/FangcunMount/component-base/pkg/errors"
-	"github.com/FangcunMount/qs-server/internal/apiserver/application/actor/actorctx"
 	apptransaction "github.com/FangcunMount/qs-server/internal/apiserver/application/transaction"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/operator"
 	iambridge "github.com/FangcunMount/qs-server/internal/apiserver/port/iambridge"
+	"github.com/FangcunMount/qs-server/internal/pkg/code"
 )
 
 // authorizationService 操作者权限管理服务实现
@@ -43,44 +43,6 @@ func NewAuthorizationService(
 		uow:        uow,
 		authz:      authz,
 	}
-}
-
-func (s *authorizationService) replaceRoles(ctx context.Context, operatorID uint64, roleNames []string) error {
-	if err := s.requireOperatorAuthz(); err != nil {
-		return err
-	}
-	for _, roleName := range roleNames {
-		if err := s.validator.ValidateRole(domain.Role(roleName)); err != nil {
-			return err
-		}
-	}
-	targetOperatorID, err := operatorIDFromUint64("operator_id", operatorID)
-	if err != nil {
-		return err
-	}
-	op, err := s.repo.FindByID(ctx, targetOperatorID)
-	if err != nil {
-		return errors.Wrap(err, "failed to find operator")
-	}
-	committedVersion, err := s.authz.ReplaceManagedOperatorRoles(ctx, op.OrgID(), op.UserID(), roleNames,
-		actorctx.IAMGrantedBySubject(ctx), "replace operator direct roles")
-	if err != nil {
-		return errors.Wrap(err, "iam replace managed assignments")
-	}
-	projection, loadErr := s.authz.LoadOperatorRoleProjection(ctx, op.OrgID(), op.UserID())
-	if loadErr != nil || projection.PolicyVersion < committedVersion {
-		op.MarkAuthzProjectionPending()
-		_ = s.repo.Update(ctx, op)
-		return nil
-	}
-	return persistOperatorRoleProjection(ctx, s.repo, op, projection, false)
-}
-
-func (s *authorizationService) requireOperatorAuthz() error {
-	if s == nil || s.authz == nil || !s.authz.IsEnabled() {
-		return errors.New("IAM operator authorization gateway is required")
-	}
-	return nil
 }
 
 // Activate 激活操作者
@@ -134,7 +96,7 @@ func (s *authorizationService) mutate(ctx context.Context, id uint64, fn func(co
 	return s.gate.WithinMutation(ctx, op.UserID(), fn)
 }
 func (s *authorizationService) ReplaceRoles(ctx context.Context, id uint64, roles []string) error {
-	return s.mutate(ctx, id, func(locked context.Context) error { return s.replaceRoles(locked, id, roles) })
+	return errors.WithCode(code.ErrValidation, "role-only updates are retired; use authorization-scope with an explicit range and policy version")
 }
 func (s *authorizationService) Activate(ctx context.Context, id uint64) error {
 	return s.mutate(ctx, id, func(locked context.Context) error { return s.activate(locked, id) })

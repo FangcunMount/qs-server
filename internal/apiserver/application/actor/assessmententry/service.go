@@ -2,6 +2,7 @@ package assessmententry
 
 import (
 	"context"
+	"github.com/FangcunMount/qs-server/internal/apiserver/application/actor/actorctx"
 	ownership "github.com/FangcunMount/qs-server/internal/apiserver/port/testeestore"
 	"strconv"
 	"time"
@@ -19,18 +20,20 @@ import (
 )
 
 type service struct {
-	ownership     ownership.IntakeRepository
-	repo          domainAssessmentEntry.Repository
-	clinicianRepo domainClinician.Repository
-	relationRepo  domainRelation.Repository
-	testeeRepo    domainTestee.Repository
-	entryReader   actorreadmodel.AssessmentEntryReader
-	testeeFactory domainTestee.Factory
-	validator     domainAssessmentEntry.Validator
-	profileReader iambridge.ProfileReader
-	resolveLog    ResolveLogWriter
-	intakeLog     IntakeLogWriter
-	uow           apptransaction.Runner
+	managed         bool
+	managementScope ManagementScope
+	ownership       ownership.IntakeRepository
+	repo            domainAssessmentEntry.Repository
+	clinicianRepo   domainClinician.Repository
+	relationRepo    domainRelation.Repository
+	testeeRepo      domainTestee.Repository
+	entryReader     actorreadmodel.AssessmentEntryReader
+	testeeFactory   domainTestee.Factory
+	validator       domainAssessmentEntry.Validator
+	profileReader   iambridge.ProfileReader
+	resolveLog      ResolveLogWriter
+	intakeLog       IntakeLogWriter
+	uow             apptransaction.Runner
 }
 
 type intakeState struct {
@@ -81,7 +84,32 @@ func NewService(
 	}
 }
 
+func NewManagedService(
+	scope ManagementScope,
+	repo domainAssessmentEntry.Repository,
+	clinicianRepo domainClinician.Repository,
+	relationRepo domainRelation.Repository,
+	testeeRepo domainTestee.Repository,
+	testeeFactory domainTestee.Factory,
+	validator domainAssessmentEntry.Validator,
+	profileReader iambridge.ProfileReader,
+	resolveLog ResolveLogWriter,
+	intakeLog IntakeLogWriter,
+	uow apptransaction.Runner,
+	storeOwnership ownership.IntakeRepository,
+	entryReaders ...actorreadmodel.AssessmentEntryReader,
+) AssessmentEntryService {
+	s := NewService(repo, clinicianRepo, relationRepo, testeeRepo, testeeFactory, validator, profileReader, resolveLog, intakeLog, uow, storeOwnership, entryReaders...).(*service)
+	s.managed = true
+	s.managementScope = scope
+	return s
+}
+
 func (s *service) Create(ctx context.Context, dto CreateAssessmentEntryDTO) (*AssessmentEntryResult, error) {
+	if err := s.authorizeManagement(ctx, dto.OrgID, "update"); err != nil {
+		return nil, err
+	}
+
 	var result *domainAssessmentEntry.AssessmentEntry
 	clinicianID, err := clinicianIDFromUint64("clinician_id", dto.ClinicianID)
 	if err != nil {
@@ -140,6 +168,10 @@ func (s *service) Create(ctx context.Context, dto CreateAssessmentEntryDTO) (*As
 }
 
 func (s *service) GetByID(ctx context.Context, entryID uint64) (*AssessmentEntryResult, error) {
+	if err := s.authorizeManagement(ctx, actorctx.OperatorOrgID(ctx), "read"); err != nil {
+		return nil, err
+	}
+
 	targetEntryID, err := assessmentEntryIDFromUint64("entry_id", entryID)
 	if err != nil {
 		return nil, err
@@ -147,6 +179,9 @@ func (s *service) GetByID(ctx context.Context, entryID uint64) (*AssessmentEntry
 	item, err := s.repo.FindByID(ctx, targetEntryID)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to find assessment entry")
+	}
+	if s.managed && item.OrgID() != actorctx.OperatorOrgID(ctx) {
+		return nil, errors.WithCode(code.ErrUserNotFound, "entry not found in current company")
 	}
 	return toAssessmentEntryResult(item), nil
 }
@@ -160,6 +195,10 @@ func (s *service) Reactivate(ctx context.Context, entryID uint64) (*AssessmentEn
 }
 
 func (s *service) ListByClinician(ctx context.Context, dto ListAssessmentEntryDTO) (*AssessmentEntryListResult, error) {
+	if err := s.authorizeManagement(ctx, dto.OrgID, "list"); err != nil {
+		return nil, err
+	}
+
 	clinicianID, err := clinicianIDFromUint64("clinician_id", dto.ClinicianID)
 	if err != nil {
 		return nil, err
@@ -419,6 +458,10 @@ func (s *service) resolveEntry(
 }
 
 func (s *service) setActive(ctx context.Context, entryID uint64, active bool) (*AssessmentEntryResult, error) {
+	if err := s.authorizeManagement(ctx, actorctx.OperatorOrgID(ctx), "update"); err != nil {
+		return nil, err
+	}
+
 	var result *domainAssessmentEntry.AssessmentEntry
 	targetEntryID, err := assessmentEntryIDFromUint64("entry_id", entryID)
 	if err != nil {
@@ -429,6 +472,9 @@ func (s *service) setActive(ctx context.Context, entryID uint64, active bool) (*
 		item, err := s.repo.FindByID(txCtx, targetEntryID)
 		if err != nil {
 			return errors.Wrap(err, "failed to find assessment entry")
+		}
+		if s.managed && item.OrgID() != actorctx.OperatorOrgID(txCtx) {
+			return errors.WithCode(code.ErrUserNotFound, "entry not found in current company")
 		}
 		if _, err := s.clinicianRepo.FindByID(txCtx, item.ClinicianID()); err != nil {
 			return err

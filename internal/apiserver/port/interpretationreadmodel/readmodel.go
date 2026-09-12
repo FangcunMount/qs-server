@@ -67,12 +67,15 @@ func (p PageRequest) Limit() int {
 }
 
 type ReportFilter struct {
-	OrgID        *int64
-	TesteeID     *uint64
-	TesteeIDs    []uint64
-	HighRiskOnly bool
-	ModelCode    string
-	RiskLevel    *string
+	// Explicit range is conjunctive with all caller filters; empty denies all.
+	RestrictToStoreScope bool
+	StoreScopedTesteeIDs []uint64
+	OrgID                *int64
+	TesteeID             *uint64
+	TesteeIDs            []uint64
+	HighRiskOnly         bool
+	ModelCode            string
+	RiskLevel            *string
 }
 
 type ReportDimensionRow struct {

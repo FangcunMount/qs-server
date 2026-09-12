@@ -1,6 +1,7 @@
 package statistics
 
 import (
+	statisticsApp "github.com/FangcunMount/qs-server/internal/apiserver/application/statistics"
 	"time"
 
 	cachepolicy "github.com/FangcunMount/qs-server/internal/apiserver/cache/catalog"
@@ -13,13 +14,18 @@ type InstallHost interface {
 	SetStatisticsModule(*Module)
 }
 
-func InstallFrom(host InstallHost) error {
+func InstallFrom(host InstallHost, access ...statisticsApp.StatisticsScopeAccess) error {
+	var scopeAccess statisticsApp.StatisticsScopeAccess
+	if len(access) > 0 {
+		scopeAccess = access[0]
+	}
 	binding := compose.ResolveCacheCapability(host.CachePolicyProvider(), cachepolicy.CapabilityStatisticsQuery)
 	queryRedis := host.CacheClient(redisruntime.FamilyQuery)
 	if !binding.Enabled {
 		queryRedis = nil
 	}
 	module, err := Wire(Deps{
+		ScopeAccess:  scopeAccess,
 		MySQLDB:      host.MySQLDB(),
 		MongoDB:      host.MongoDB(),
 		RedisClient:  queryRedis,

@@ -2,6 +2,7 @@ package actor
 
 import (
 	"context"
+	dbctx "github.com/FangcunMount/qs-server/internal/pkg/database/mysql"
 	"strings"
 	"testing"
 
@@ -44,6 +45,26 @@ func TestOrdinaryTesteeUpdateCannotOverwriteStoreOwnership(t *testing.T) {
 	for _, field := range []string{"store_id", "store_version", "org_id", "created_at"} {
 		if strings.Contains(statement, "`"+field+"`=") {
 			t.Fatalf("ordinary update overwrites %s: %s", field, statement)
+		}
+	}
+}
+
+func TestBackendTesteeLookupRequiresTransactionAndLocksCompanyRow(t *testing.T) {
+	db := newDryRunActorDB(t).Session(&gorm.Session{DryRun: true, SkipDefaultTransaction: true})
+	repo := NewTesteeRepository(db).(testee.LockedRepository)
+	if _, err := repo.FindByIDForUpdate(context.Background(), 7, 3); err == nil {
+		t.Fatal("lookup must reject absent transaction")
+	}
+	var sql string
+	if err := db.Callback().Query().After("gorm:query").Register("capture_testee_lock", func(tx *gorm.DB) { sql = tx.Statement.SQL.String() }); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := repo.FindByIDForUpdate(dbctx.WithTx(context.Background(), db), 7, 3); err != nil {
+		t.Fatal(err)
+	}
+	for _, clause := range []string{"org_id = ?", "id = ?", "deleted_at IS NULL", "FOR UPDATE"} {
+		if !strings.Contains(sql, clause) {
+			t.Fatalf("locking query lacks %q: %s", clause, sql)
 		}
 	}
 }

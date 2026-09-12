@@ -8,6 +8,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/internal/pkg/database/mysql"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 // testeeRepository 受试者仓储实现
@@ -120,4 +121,25 @@ func (r *testeeRepository) FindCurrentOwnership(ctx context.Context, id testee.I
 		return testee.Ownership{}, translateError(err)
 	}
 	return testee.Ownership{OrgID: row.OrgID, StoreID: row.StoreID, Version: row.StoreVersion}, nil
+}
+
+var _ testee.LockedRepository = (*testeeRepository)(nil)
+
+func (r *testeeRepository) FindByIDForUpdate(ctx context.Context, orgID int64, id testee.ID) (*testee.Testee, error) {
+	tx, err := mysql.RequireTx(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if orgID <= 0 {
+		return nil, errors.WithCode(code.ErrPermissionDenied, "resolved company required")
+	}
+	var po TesteePO
+	err = tx.WithContext(ctx).Clauses(clause.Locking{Strength: "UPDATE"}).Where("org_id = ? AND id = ? AND deleted_at IS NULL", orgID, id.Uint64()).Take(&po).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, errors.WithCode(code.ErrUserNotFound, "testee not found in current company")
+	}
+	if err != nil {
+		return nil, err
+	}
+	return r.mapper.ToDomain(&po), nil
 }

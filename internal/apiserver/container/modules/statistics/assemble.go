@@ -26,6 +26,7 @@ type Module struct {
 }
 
 type Deps struct {
+	ScopeAccess  statisticsApp.StatisticsScopeAccess
 	MySQLDB      *gorm.DB
 	MongoDB      *mongo.Database
 	RedisClient  redis.UniversalClient
@@ -67,8 +68,8 @@ func New(deps Deps) (*Module, error) {
 	}
 
 	module := &Module{RunStore: statisticsInfra.NewRunStore(deps.MySQLDB)}
-	module.ReadService = statisticsApp.NewReadService(
-		statisticsInfra.NewReadStore(deps.MySQLDB, deps.MySQLLimiter),
+	module.ReadService = statisticsApp.NewScopedReadService(
+		statisticsInfra.NewReadStore(deps.MySQLDB, deps.MySQLLimiter), deps.ScopeAccess,
 		statisticsCache.NewQueryCache(deps.RedisClient, deps.QueryBuilder, deps.QueryTTL),
 	)
 	module.Coordinator = statisticsApp.NewCoordinator(

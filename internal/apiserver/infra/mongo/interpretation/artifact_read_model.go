@@ -192,6 +192,14 @@ func (r *reportReadModel) ListReports(ctx context.Context, filter readmodel.Repo
 
 func buildCatalogQuery(filter readmodel.ReportFilter) bson.M {
 	q := bson.M{}
+	if filter.RestrictToStoreScope {
+		ids := append([]uint64{}, filter.StoreScopedTesteeIDs...)
+		if filter.OrgID == nil || *filter.OrgID <= 0 {
+			ids = []uint64{}
+		}
+		q["$and"] = bson.A{bson.M{"testee_id": bson.M{"$in": ids}}}
+	}
+
 	if filter.OrgID != nil {
 		q["org_id"] = *filter.OrgID
 	}

@@ -115,11 +115,39 @@ jobs:
           QS_TESTEE_STORE_REQUIRE_MYSQL: 'true'
           QS_SERVER_TEST_MYSQL_DSN: 'root:root@tcp(127.0.0.1:3306)/mysql?parseTime=true'
         run: go test ./internal/apiserver/infra/mysql/actor/testeestore -count=1 -v
-      - name: Verify operator retirement atomicity
+      - name: Verify operator retirement and audited recovery atomicity
         env:
           QS_OPERATOR_RETIREMENT_REQUIRE_MYSQL: 'true'
           QS_SERVER_TEST_MYSQL_DSN: 'root:root@tcp(127.0.0.1:3306)/mysql?parseTime=true'
-        run: go test ./internal/apiserver/infra/mysql/actor/operatorretirement ./internal/apiserver/maintenance/operatorretire -count=1 -v
+        run: go test ./internal/apiserver/infra/mysql/actor/operatorretirement ./internal/apiserver/maintenance/operatorretire ./internal/apiserver/maintenance/operatorrecovery ./internal/apiserver/maintenance/operatorprepare -count=1 -v
+      - name: Verify scoped statistics on MySQL
+        env:
+          MYSQL_CONTAINER: ${{ job.services.mysql.id }}
+          QS_SCOPE_MYSQL_REQUIRED: '1'
+          QS_SCOPE_MYSQL_DSN: 'root:root@tcp(127.0.0.1:3306)/qs_scope_test_ci?parseTime=true&loc=UTC'
+        run: |
+          docker exec "$MYSQL_CONTAINER" mysql -uroot -proot -e 'CREATE DATABASE qs_scope_test_ci'
+          trap 'docker exec "$MYSQL_CONTAINER" mysql -uroot -proot -e "DROP DATABASE qs_scope_test_ci"' EXIT
+          go test ./internal/apiserver/infra/mysql/statistics -run '^TestScopedOverviewMySQL$' -count=1 -v
+      - name: Verify Actor activity persistence and current-read serialization
+        env:
+          MYSQL_CONTAINER: ${{ job.services.mysql.id }}
+          QS_SCOPE_MYSQL_REQUIRED: '1'
+          QS_SCOPE_MYSQL_DSN: 'root:root@tcp(127.0.0.1:3306)/qs_scope_test_edit?parseTime=true&loc=UTC'
+        run: |
+          docker exec "$MYSQL_CONTAINER" mysql -uroot -proot -e 'CREATE DATABASE qs_scope_test_edit'
+          trap 'docker exec "$MYSQL_CONTAINER" mysql -uroot -proot -e "DROP DATABASE qs_scope_test_edit"' EXIT
+          go test ./internal/apiserver/infra/mysql/actor -run '^Test(OperatorActivityRoundTrip|TesteeEditWaitsForTransfer|RelationLockReadsCurrentStateAfterConcurrentUnbind)MySQL$' -count=1 -v
+
+      - name: Verify plan enrollment ownership transaction
+        env:
+          MYSQL_CONTAINER: ${{ job.services.mysql.id }}
+          QS_SCOPE_MYSQL_REQUIRED: '1'
+          QS_SCOPE_MYSQL_DSN: 'root:root@tcp(127.0.0.1:3306)/qs_scope_test_enrollment?parseTime=true&loc=UTC'
+        run: |
+          docker exec "$MYSQL_CONTAINER" mysql -uroot -proot -e 'CREATE DATABASE qs_scope_test_enrollment'
+          trap 'docker exec "$MYSQL_CONTAINER" mysql -uroot -proot -e "DROP DATABASE qs_scope_test_enrollment"' EXIT
+          go test ./internal/apiserver/infra/mysql/plan -run '^TestPlanEnrollmentOwnershipConcurrencyMySQL$' -count=1 -v
 
   runtime-closure-e2e:
     name: Seeddata Retirement and Current Runtime E2E

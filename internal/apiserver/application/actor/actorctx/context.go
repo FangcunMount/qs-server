@@ -34,3 +34,18 @@ func IAMGrantedBySubject(ctx context.Context) string {
 	}
 	return authz.SubjectKey(strconv.FormatUint(uid, 10))
 }
+
+// OperatorOrgID is the company resolved from authenticated Operator membership.
+// It must never be populated from an unchecked request parameter.
+type operatorOrgKey struct{}
+
+func WithOperatorOrgID(ctx context.Context, orgID int64) context.Context {
+	return context.WithValue(ctx, operatorOrgKey{}, orgID)
+}
+func OperatorOrgID(ctx context.Context) int64 {
+	if ctx == nil {
+		return 0
+	}
+	value, _ := ctx.Value(operatorOrgKey{}).(int64)
+	return value
+}

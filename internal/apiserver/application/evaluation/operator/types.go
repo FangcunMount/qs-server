@@ -2,18 +2,13 @@ package operator
 
 import (
 	"context"
+	appauthz "github.com/FangcunMount/qs-server/internal/apiserver/application/authz"
 	"time"
 )
 
-type AccessScope struct {
-	IsAdmin     bool
-	ClinicianID *uint64
-}
-
 type AccessChecker interface {
-	ResolveAccessScope(context.Context, int64, int64) (*AccessScope, error)
-	ValidateTesteeAccess(context.Context, int64, int64, uint64) error
-	ListAccessibleTesteeIDs(context.Context, int64, int64) ([]uint64, error)
+	ResolveStoreRange(context.Context, int64, int64, string, string) (appauthz.StoreRange, error)
+	ValidateTesteeStoreAccess(context.Context, int64, int64, uint64, string, string) error
 }
 
 type ListQuery struct {
@@ -22,12 +17,6 @@ type ListQuery struct {
 	Status                string
 	AccessibleTesteeIDs   []uint64
 	RestrictToAccessScope bool
-}
-
-type TesteeListScope struct {
-	TesteeID            uint64
-	AccessibleTesteeIDs []uint64
-	Restricted          bool
 }
 
 type TrendQuery struct {
@@ -143,8 +132,6 @@ type RetryableFailedRunList struct {
 }
 
 type QueryService interface {
-	ValidateTesteeAccess(context.Context, Actor, uint64) error
-	ScopeTesteeList(context.Context, Actor, uint64) (TesteeListScope, error)
 	GetAssessment(context.Context, Actor, uint64) (*Assessment, error)
 	ListAssessments(context.Context, Actor, ListQuery) (*AssessmentList, error)
 	GetAssessmentOutcome(context.Context, Actor, uint64) (*OutcomeAssessment, error)

@@ -149,3 +149,30 @@ func mapAsBSONM(values map[string]any) bson.M {
 	}
 	return result
 }
+
+func TestAnswerSheetStoreScopeAppliesBeforePageAndCount(t *testing.T) {
+	filler := uint64(99)
+	for _, ids := range [][]uint64{{7, 8}, nil} {
+		filter := surveyreadmodel.AnswerSheetFilter{OrgID: 1, FillerID: &filler, RestrictToStoreScope: true, StoreScopedTesteeIDs: ids}
+		pipeline, err := answerSheetListPipeline(filter, surveyreadmodel.PageRequest{Page: 2, PageSize: 10})
+		if err != nil {
+			t.Fatal(err)
+		}
+		list := pipeline[0]["$match"].(bson.M)
+		count := answerSheetFilterToBSON(filter)
+		want := bson.M{"$in": append([]uint64{}, ids...)}
+		if !reflect.DeepEqual(list["testee_id"], want) || !reflect.DeepEqual(count["testee_id"], want) {
+			t.Fatalf("range missing list=%#v count=%#v", list, count)
+		}
+		if list["org_id"] != uint64(1) || count["org_id"] != uint64(1) {
+			t.Fatal("company missing")
+		}
+		if list["filler_id"] != int64(99) {
+			t.Fatal("caller filler constraint lost")
+		}
+	}
+	filter := surveyreadmodel.AnswerSheetFilter{RestrictToStoreScope: true, StoreScopedTesteeIDs: []uint64{7}}
+	if !reflect.DeepEqual(answerSheetFilterToBSON(filter)["testee_id"], bson.M{"$in": []uint64{}}) {
+		t.Fatal("missing company accepted")
+	}
+}

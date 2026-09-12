@@ -3059,11 +3059,13 @@ definitions:
     - participant
     - clinician
     - admin
+    - operator
     type: string
     x-enum-varnames:
     - AudienceParticipant
     - AudienceClinician
     - AudienceAdmin
+    - AudienceOperator
   profile.Definition:
     properties:
       eligibility:
@@ -3464,7 +3466,7 @@ definitions:
         description: 电话
         type: string
       roles:
-        description: 期望授予的角色列表（IAM 启用时转成 assignment）
+        description: 已退役：仅允许空列表；角色与范围通过 authorization-scope 配置
         items:
           type: string
         type: array
@@ -3648,6 +3650,17 @@ definitions:
     - raw_score_min
     - t_score
     type: object
+  request.OperatorScopeRole:
+    properties:
+      kind:
+        type: string
+      role_name:
+        type: string
+      store_ids:
+        items:
+          type: string
+        type: array
+    type: object
   request.OriginRefRequest:
     properties:
       id:
@@ -3662,6 +3675,19 @@ definitions:
       question_codes:
         items:
           type: string
+        type: array
+    type: object
+  request.ReplaceOperatorScopeRequest:
+    properties:
+      expected_policy_version:
+        type: string
+      reason:
+        type: string
+      roles:
+        description: Pointer distinguishes an explicit empty replacement from an omitted
+          field.
+        items:
+          $ref: '#/definitions/request.OperatorScopeRole'
         type: array
     type: object
   request.ResumePlanRequest:
@@ -3753,7 +3779,7 @@ definitions:
         description: 电话
         type: string
       roles:
-        description: 角色列表
+        description: 已退役：非 null 字段拒绝，请使用 authorization-scope
         items:
           type: string
         type: array
@@ -5211,6 +5237,59 @@ definitions:
       total:
         type: integer
     type: object
+  response.OperatorAssignmentScopeResponse:
+    properties:
+      assignment_id:
+        type: string
+      management_protection:
+        type: string
+      role_id:
+        type: string
+      role_name:
+        type: string
+      scope:
+        allOf:
+        - $ref: '#/definitions/response.OperatorDataScopeResponse'
+        description: Null means unconfigured, never company-wide access.
+    type: object
+  response.OperatorDataScopeResponse:
+    properties:
+      kind:
+        enum:
+        - stores
+        - all_stores
+        type: string
+      org_id:
+        type: string
+      store_ids:
+        items:
+          type: string
+        type: array
+    type: object
+  response.OperatorScopeConfigurationResponse:
+    properties:
+      assignments:
+        items:
+          $ref: '#/definitions/response.OperatorAssignmentScopeResponse'
+        type: array
+      operator_id:
+        type: string
+      policy_version:
+        type: string
+      protected_access:
+        type: boolean
+      unconfigured_assignments:
+        items:
+          $ref: '#/definitions/response.OperatorAssignmentScopeResponse'
+        type: array
+    type: object
+  response.OperatorScopeUpdateResponse:
+    properties:
+      policy_version:
+        type: string
+      projection_pending:
+        type: boolean
+    type: object
   response.PlanListResponse:
     properties:
       page:
@@ -5939,6 +6018,13 @@ definitions:
         type: string
       version:
         type: integer
+    type: object
+  response.TesteeUpdateResponse:
+    properties:
+      id:
+        type: string
+      updated:
+        type: boolean
     type: object
   response.TrendDataPoint:
     properties:
@@ -9663,6 +9749,89 @@ paths:
       summary: 更新员工
       tags:
       - Operator
+  /api/v1/operators/{id}/authorization-scope:
+    get:
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: Operator ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/response.OperatorScopeConfigurationResponse'
+              type: object
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/core.Response'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/core.Response'
+      summary: 查询运营人员角色数据范围
+      tags:
+      - Operator
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: Operator ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: 数据范围配置
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/request.ReplaceOperatorScopeRequest'
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/response.OperatorScopeUpdateResponse'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/core.Response'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/core.Response'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/core.Response'
+      summary: 更新运营人员角色数据范围
+      tags:
+      - Operator
   /api/v1/operators/{id}/retirement:
     get:
       parameters:
@@ -11312,7 +11481,7 @@ paths:
             - $ref: '#/definitions/core.Response'
             - properties:
                 data:
-                  $ref: '#/definitions/response.TesteeResponse'
+                  $ref: '#/definitions/response.TesteeUpdateResponse'
               type: object
       summary: 更新受试者
       tags:

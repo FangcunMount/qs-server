@@ -6,7 +6,6 @@ import (
 	"strings"
 
 	"github.com/FangcunMount/component-base/pkg/errors"
-	"github.com/FangcunMount/qs-server/internal/apiserver/application/actor/actorctx"
 	apptransaction "github.com/FangcunMount/qs-server/internal/apiserver/application/transaction"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/operator"
 	iambridge "github.com/FangcunMount/qs-server/internal/apiserver/port/iambridge"
@@ -65,7 +64,6 @@ func (s *lifecycleService) registerResolved(ctx context.Context, dto RegisterOpe
 		return nil, err
 	}
 	var result *domain.Operator
-	var created bool
 
 	err := s.uow.WithinTransaction(ctx, func(txCtx context.Context) error {
 		// 1. 验证参数
@@ -74,29 +72,16 @@ func (s *lifecycleService) registerResolved(ctx context.Context, dto RegisterOpe
 		}
 
 		// 3~5. 创建或更新本地 Operator 业务投影并持久化。
-		st, wasCreated, err := s.createAndSaveOperator(txCtx, dto, userID)
+		st, _, err := s.createAndSaveOperator(txCtx, dto, userID)
 		if err != nil {
 			return err
 		}
 		result = st
-		created = wasCreated
 		return nil
 	})
 
 	if err != nil {
 		return nil, err
-	}
-
-	if dto.IsActive {
-		if err := s.syncIAMRolesAfterRegister(ctx, result, dto.Roles); err != nil {
-			if created {
-				if rollbackErr := s.rollbackRegisteredOperator(ctx, result.ID()); rollbackErr != nil {
-					return nil, errors.Wrapf(rollbackErr, "iam role assignment after register failed and operator rollback failed: %v", err)
-				}
-				return nil, errors.Wrap(err, "iam role assignment after register; local operator rolled back")
-			}
-			return nil, errors.Wrap(err, "iam role assignment after ensure operator")
-		}
 	}
 
 	return toOperatorResult(result), nil
@@ -222,10 +207,8 @@ func (s *lifecycleService) validateRegisterDTO(dto RegisterOperatorDTO) error {
 	if err := s.validator.ValidateName(dto.Name, true); err != nil {
 		return err
 	}
-	for _, rn := range dto.Roles {
-		if err := s.validator.ValidateRole(domain.Role(rn)); err != nil {
-			return err
-		}
+	if len(dto.Roles) > 0 {
+		return errors.WithCode(code.ErrValidation, "create the operator without roles, then configure authorization-scope explicitly")
 	}
 	if dto.UserID == 0 {
 		if dto.Phone == "" {
@@ -321,6 +304,8 @@ func (s *lifecycleService) createAndSaveOperator(txCtx context.Context, dto Regi
 }
 
 func (s *lifecycleService) syncOperatorProjection(st *domain.Operator, dto RegisterOperatorDTO) error {
+	// Existing IAM assignments are retained; refresh only the company-aware projection.
+	st.MarkAuthzProjectionPending()
 	if err := s.editor.UpdateBasicInfo(st, &dto.Name); err != nil {
 		return err
 	}
@@ -341,27 +326,6 @@ func (s *lifecycleService) syncOperatorProjection(st *domain.Operator, dto Regis
 	return nil
 }
 
-func (s *lifecycleService) syncIAMRolesAfterRegister(ctx context.Context, op *domain.Operator, roleNames []string) error {
-	for _, rn := range roleNames {
-		role := domain.Role(rn)
-		if err := s.validator.ValidateRole(role); err != nil {
-			return err
-		}
-	}
-	committedVersion, err := s.authz.ReplaceManagedOperatorRoles(ctx, op.OrgID(), op.UserID(), roleNames,
-		actorctx.IAMGrantedBySubject(ctx), "register operator direct roles")
-	if err != nil {
-		return err
-	}
-	projection, loadErr := s.authz.LoadOperatorRoleProjection(ctx, op.OrgID(), op.UserID())
-	if loadErr != nil || projection.PolicyVersion < committedVersion {
-		op.MarkAuthzProjectionPending()
-		_ = s.repo.Update(ctx, op)
-		return nil
-	}
-	return persistOperatorRoleProjection(ctx, s.repo, op, projection, false)
-}
-
 func (s *lifecycleService) requireOperatorAuthz() error {
 	if s == nil || s.authz == nil || !s.authz.IsEnabled() {
 		return errors.New("IAM operator authorization gateway is required")
@@ -369,16 +333,8 @@ func (s *lifecycleService) requireOperatorAuthz() error {
 	return nil
 }
 
-func (s *lifecycleService) rollbackRegisteredOperator(ctx context.Context, id domain.ID) error {
-	return s.uow.WithinTransaction(ctx, func(txCtx context.Context) error {
-		if err := s.repo.Delete(txCtx, id); err != nil {
-			return errors.Wrap(err, "failed to rollback operator")
-		}
-		return nil
-	})
-}
-
-// Register holds the same user lock as retirement through local creation and IAM role assignment.
+// Register holds the retirement lock while creating identity and local membership.
+// Authorization is configured separately through ScopeService; registration never replaces IAM assignments.
 func (s *lifecycleService) Register(ctx context.Context, dto RegisterOperatorDTO) (*OperatorResult, error) {
 	if err := s.requireOperatorAuthz(); err != nil {
 		return nil, err

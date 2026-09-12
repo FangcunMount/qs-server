@@ -125,9 +125,9 @@ func TestQueryServiceListTaskWindowForwardsWindowFilters(t *testing.T) {
 		}},
 		windowHasMore: true,
 	}
-	service := NewQueryService(&planReadModelStub{}, reader, nil)
+	service := NewQueryService(&planReadModelStub{}, reader, nil, &taskWindowScope{ids: []uint64{3001, 3002}})
 
-	result, err := service.ListTaskWindow(context.Background(), ListTaskWindowDTO{
+	result, err := service.ListTaskWindow(enrollmentContext(), ListTaskWindowDTO{
 		OrgID:         1,
 		PlanID:        planAggregate.GetID().String(),
 		TesteeIDs:     []string{"3001", "3002"},

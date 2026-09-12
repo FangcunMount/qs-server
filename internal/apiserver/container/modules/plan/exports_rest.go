@@ -11,7 +11,7 @@ func (m *Module) ExportRESTDeps(testeeAccess actorAccessApp.TesteeAccessService)
 	if m == nil {
 		return deps
 	}
-	deps.CommandService = m.CommandService
+	deps.CommandService = m.OperatorCommandService
 	deps.QueryService = m.QueryService
 	deps.EnrollmentQueryService = m.EnrollmentQueryService
 	deps.TesteeAccessService = testeeAccess

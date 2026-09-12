@@ -265,7 +265,8 @@ func buildTaskListQuery(db *gorm.DB, filter planreadmodel.TaskFilter) *gorm.DB {
 	}
 	if filter.RestrictToAccessScope {
 		query = query.Where("testee_id IN ?", filter.AccessibleTesteeIDs)
-	} else if filter.TesteeID != nil {
+	}
+	if filter.TesteeID != nil {
 		query = query.Where("testee_id = ?", *filter.TesteeID)
 	}
 	if filter.Status != nil {

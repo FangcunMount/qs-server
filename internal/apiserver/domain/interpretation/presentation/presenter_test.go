@@ -21,3 +21,13 @@ func TestPresenterAppliesAudienceVisibility(t *testing.T) {
 		t.Fatalf("admin=%#v err=%v", admin, err)
 	}
 }
+
+func TestOperatorRetainsProfessionalSectionVisibility(t *testing.T) {
+	allowed, err := (Presenter{}).Allows(policy.AudienceOperator, SectionModelExtra)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if allowed {
+		t.Fatal("operator audience unexpectedly exposes model extra")
+	}
+}

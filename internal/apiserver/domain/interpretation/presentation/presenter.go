@@ -21,7 +21,7 @@ func (Presenter) Allows(audience policy.Audience, section Section) (bool, error)
 	switch audience {
 	case policy.AudienceParticipant, policy.AudienceAdmin:
 		return true, nil
-	case policy.AudienceClinician:
+	case policy.AudienceClinician, policy.AudienceOperator:
 		return false, nil
 	default:
 		return false, fmt.Errorf("unsupported report audience %q", audience)

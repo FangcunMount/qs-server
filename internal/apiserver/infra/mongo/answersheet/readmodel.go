@@ -73,6 +73,7 @@ func answerSheetListFilterToBSON(filter surveyreadmodel.AnswerSheetFilter) (bson
 			"deleted_at": nil,
 		}
 	}
+	applyAnswerSheetStoreScope(query, filter)
 	return query, nil
 }
 
@@ -107,6 +108,7 @@ func answerSheetFilterToBSON(filter surveyreadmodel.AnswerSheetFilter) bson.M {
 		query["end_time"] = filter.EndTime
 	}
 	query["deleted_at"] = nil
+	applyAnswerSheetStoreScope(query, filter)
 	return query
 }
 
@@ -166,4 +168,15 @@ func answerSheetRowFromPO(po *AnswerSheetSummaryPO) (surveyreadmodel.AnswerSheet
 		row.FilledAt = *po.FilledAt
 	}
 	return row, nil
+}
+
+func applyAnswerSheetStoreScope(query bson.M, filter surveyreadmodel.AnswerSheetFilter) {
+	if !filter.RestrictToStoreScope {
+		return
+	}
+	ids := append([]uint64{}, filter.StoreScopedTesteeIDs...)
+	if filter.OrgID == 0 {
+		ids = []uint64{}
+	}
+	query["testee_id"] = bson.M{"$in": ids}
 }

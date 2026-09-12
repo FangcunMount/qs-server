@@ -18,6 +18,7 @@ const (
 
 // Permission is a single exact AuthZ v3 resource/action capability.
 type Permission struct {
+	Scopes   []DataScope
 	Resource string
 	Action   string
 	Mode     AuthorizationMode
@@ -30,6 +31,7 @@ type AssignmentRoleFact struct {
 }
 
 type Snapshot struct {
+	ScopeContractVersion    uint32
 	AssignmentFacts         []AssignmentRoleFact
 	AssignmentFactsComplete bool
 	DirectRoles             []string

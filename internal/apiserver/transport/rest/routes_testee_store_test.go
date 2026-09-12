@@ -16,7 +16,7 @@ func TestTesteeStoreRoutesFailClosedWithoutIdentityDependencies(t *testing.T) {
 	rate := options.NewRateLimitOptions()
 	rate.Enabled = false
 	engine := gin.New()
-	NewRouter(Deps{RateLimit: rate, Actor: ActorDeps{TesteeStoreService: app.NewService(nil, nil)}}).RegisterRoutes(engine)
+	NewRouter(Deps{RateLimit: rate, Actor: ActorDeps{TesteeStoreService: app.NewService(nil, nil, nil)}}).RegisterRoutes(engine)
 	for _, tc := range []struct{ method, path string }{{http.MethodPut, "/api/v1/testees/10/store"}, {http.MethodPost, "/api/v1/testees/10/store-transfers"}, {http.MethodGet, "/api/v1/testees/10/store-history"}} {
 		recorder := httptest.NewRecorder()
 		req := httptest.NewRequest(tc.method, tc.path, strings.NewReader(`{"store_id":"2","expected_version":1,"reason":"test","request_id":"1"}`))

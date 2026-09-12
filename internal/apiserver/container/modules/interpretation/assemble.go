@@ -30,7 +30,6 @@ import (
 	interpretationautomation "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/automation"
 	interpretationexecution "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/automation/execution"
 	interpretationcatalog "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/catalogreconcile"
-	interpretationclinician "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/clinician"
 	interpretationoperations "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/operations"
 	interpretationparticipant "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/participant"
 	interpretationreadmission "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/readmission"
@@ -89,7 +88,6 @@ type Module struct {
 	projectionMapper            reportprojection.Mapper
 	participantService          interpretationparticipant.Service
 	administrationService       interpretationadmin.Service
-	clinicianService            interpretationclinician.Service
 	operationsService           interpretationoperations.Service
 	catalogReconcile            interpretationcatalog.Service
 	catalogAudit                interpretationcatalog.RunnerService
@@ -921,20 +919,6 @@ func (m *Module) AdministrationService() interpretationadmin.Service {
 		return nil
 	}
 	return m.administrationService
-}
-
-func (m *Module) BindClinicianAccess(access interpretationclinician.Access) error {
-	if m == nil || access == nil || m.reader == nil {
-		return errors.WithCode(code.ErrModuleInitializationFailed, "interpretation clinician service dependencies are not configured")
-	}
-	m.clinicianService = interpretationclinician.NewService(m.reader, access, m.projectionMapper)
-	return nil
-}
-func (m *Module) ClinicianService() interpretationclinician.Service {
-	if m == nil {
-		return nil
-	}
-	return m.clinicianService
 }
 
 func (m *Module) ParticipantService() interpretationparticipant.Service {

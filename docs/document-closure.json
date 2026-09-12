@@ -2,7 +2,7 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "7a1d0eedd3ca74ea85b9d7c6ba16344dee2cda24",
+    "sha": "e59231691f8f55cfb190267c8291b541e64c6292",
     "verified_on": "2026-09-12"
   },
   "status_policy": {
@@ -53,7 +53,7 @@
         "docs/_archive/**/*.md",
         "tmp/**/*.md"
       ],
-      "expected_count": 41,
+      "expected_count": 42,
       "budgeted": false
     }
   },
@@ -84,8 +84,8 @@
   "machine_contracts": {
     "migrations": {
       "mysql": {
-        "max_version": 78,
-        "version_count": 78
+        "max_version": 79,
+        "version_count": 79
       },
       "mongodb": {
         "max_version": 33,
@@ -2664,7 +2664,7 @@
       "path": "docs/02-业务模块/30-evaluation/20-核心设计-统一测评执行模型.md",
       "class": "primary",
       "owner": "evaluation",
-      "doc_status": "aligned",
+      "doc_status": "needs_review",
       "verified": {
         "source_sha": "118afee15d7ceeef01a5641fa5bd17d69ddc2c80",
         "verified_on": "2026-09-11"
@@ -2723,6 +2723,13 @@
           "severity": "medium",
           "summary": "Runtime closure, lease/capacity and current exact-SHA production evidence remain conditional.",
           "exit_criteria": "Run the named environment/operations/production checks and re-sign."
+        },
+        {
+          "id": "SCOPE-ROLLOUT-REVIEW",
+          "kind": "verification",
+          "severity": "high",
+          "summary": "Operator action/company/store Scope changes supersede the recorded source alignment; prior production evidence does not cover the new boundary.",
+          "exit_criteria": "Review the final Scope source and document query/write boundaries; record deployed versions and ordinary-role transfer/denial evidence before re-signing."
         }
       ]
     },
@@ -2850,7 +2857,7 @@
       "path": "docs/02-业务模块/30-evaluation/90-设计问题与重构清单.md",
       "class": "primary",
       "owner": "evaluation",
-      "doc_status": "aligned",
+      "doc_status": "needs_review",
       "verified": {
         "source_sha": "118afee15d7ceeef01a5641fa5bd17d69ddc2c80",
         "verified_on": "2026-09-11"
@@ -2909,6 +2916,13 @@
           "severity": "medium",
           "summary": "Runtime closure, lease/capacity and current exact-SHA production evidence remain conditional.",
           "exit_criteria": "Run the named environment/operations/production checks and re-sign."
+        },
+        {
+          "id": "SCOPE-ROLLOUT-REVIEW",
+          "kind": "verification",
+          "severity": "high",
+          "summary": "Operator action/company/store Scope changes supersede the recorded source alignment; prior production evidence does not cover the new boundary.",
+          "exit_criteria": "Review the final Scope source and document query/write boundaries; record deployed versions and ordinary-role transfer/denial evidence before re-signing."
         }
       ]
     },
@@ -2916,7 +2930,7 @@
       "path": "docs/02-业务模块/30-evaluation/README.md",
       "class": "primary",
       "owner": "evaluation",
-      "doc_status": "aligned",
+      "doc_status": "needs_review",
       "verified": {
         "source_sha": "118afee15d7ceeef01a5641fa5bd17d69ddc2c80",
         "verified_on": "2026-09-11"
@@ -2975,6 +2989,13 @@
           "severity": "medium",
           "summary": "Runtime closure, lease/capacity and current exact-SHA production evidence remain conditional.",
           "exit_criteria": "Run the named environment/operations/production checks and re-sign."
+        },
+        {
+          "id": "SCOPE-ROLLOUT-REVIEW",
+          "kind": "verification",
+          "severity": "high",
+          "summary": "Operator action/company/store Scope changes supersede the recorded source alignment; prior production evidence does not cover the new boundary.",
+          "exit_criteria": "Review the final Scope source and document query/write boundaries; record deployed versions and ordinary-role transfer/denial evidence before re-signing."
         }
       ]
     },
@@ -3984,7 +4005,7 @@
       "path": "docs/02-业务模块/60-plan/30-关键链路-计划创建、患者加入与终止.md",
       "class": "primary",
       "owner": "plan",
-      "doc_status": "aligned",
+      "doc_status": "needs_review",
       "verified": {
         "source_sha": "e9f085e308009fbfdeb6d188c1af91e85c19b103",
         "verified_on": "2026-08-20"
@@ -4035,6 +4056,13 @@
           "severity": "medium",
           "summary": "Transport parity, durable task-completion convergence, config commentary and current production evidence remain conditional.",
           "exit_criteria": "Close the named contract/operations/production gaps, then re-sign."
+        },
+        {
+          "id": "SCOPE-ROLLOUT-REVIEW",
+          "kind": "verification",
+          "severity": "high",
+          "summary": "Operator action/company/store Scope changes supersede the recorded source alignment; prior production evidence does not cover the new boundary.",
+          "exit_criteria": "Review the final Scope source and document query/write boundaries; record deployed versions and ordinary-role transfer/denial evidence before re-signing."
         }
       ]
     },
@@ -4072,7 +4100,7 @@
       "path": "docs/02-业务模块/60-plan/90-设计问题与重构清单.md",
       "class": "primary",
       "owner": "plan",
-      "doc_status": "aligned",
+      "doc_status": "needs_review",
       "verified": {
         "source_sha": "e9f085e308009fbfdeb6d188c1af91e85c19b103",
         "verified_on": "2026-08-20"
@@ -4123,6 +4151,13 @@
           "severity": "medium",
           "summary": "Transport parity, durable task-completion convergence, config commentary and current production evidence remain conditional.",
           "exit_criteria": "Close the named contract/operations/production gaps, then re-sign."
+        },
+        {
+          "id": "SCOPE-ROLLOUT-REVIEW",
+          "kind": "verification",
+          "severity": "high",
+          "summary": "Operator action/company/store Scope changes supersede the recorded source alignment; prior production evidence does not cover the new boundary.",
+          "exit_criteria": "Review the final Scope source and document query/write boundaries; record deployed versions and ordinary-role transfer/denial evidence before re-signing."
         }
       ]
     },
@@ -4130,7 +4165,7 @@
       "path": "docs/02-业务模块/60-plan/README.md",
       "class": "primary",
       "owner": "plan",
-      "doc_status": "aligned",
+      "doc_status": "needs_review",
       "verified": {
         "source_sha": "e9f085e308009fbfdeb6d188c1af91e85c19b103",
         "verified_on": "2026-08-20"
@@ -4181,6 +4216,13 @@
           "severity": "medium",
           "summary": "Transport parity, durable task-completion convergence, config commentary and current production evidence remain conditional.",
           "exit_criteria": "Close the named contract/operations/production gaps, then re-sign."
+        },
+        {
+          "id": "SCOPE-ROLLOUT-REVIEW",
+          "kind": "verification",
+          "severity": "high",
+          "summary": "Operator action/company/store Scope changes supersede the recorded source alignment; prior production evidence does not cover the new boundary.",
+          "exit_criteria": "Review the final Scope source and document query/write boundaries; record deployed versions and ordinary-role transfer/denial evidence before re-signing."
         }
       ]
     },
@@ -9566,6 +9608,45 @@
           "severity": "medium",
           "summary": "Local migration and rollback checks completed; committed-revision and production evidence pending.",
           "exit_criteria": "Verify release revision, private preflight, maintenance cutover and business acceptance."
+        }
+      ]
+    },
+    {
+      "path": "cmd/operator-prepare/README.md",
+      "class": "sidecar",
+      "owner": "runtime",
+      "doc_status": "needs_review",
+      "verified": {
+        "source_sha": null,
+        "verified_on": null
+      },
+      "fact_sources": [
+        {
+          "kind": "source",
+          "path": "cmd/operator-prepare/main.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/maintenance/operatorprepare/tool.go"
+        }
+      ],
+      "verification": [],
+      "production_evidence": {
+        "level": "none",
+        "refs": [],
+        "deployed_sha": null,
+        "observed_at": null,
+        "limitations": [
+          "Live read-only preflight passed; Operator creation and Scope activation are not yet executed."
+        ]
+      },
+      "gaps": [
+        {
+          "id": "OPERATOR-PREPARE-RELEASE",
+          "kind": "verification",
+          "severity": "medium",
+          "summary": "Local tests and live preflight passed; production preparation and release remain pending.",
+          "exit_criteria": "Verify private execution reports, inactive state, zero grants and coordinated Scope activation."
         }
       ]
     }

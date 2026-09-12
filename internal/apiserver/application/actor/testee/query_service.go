@@ -40,6 +40,9 @@ func (s *queryService) GetByID(ctx context.Context, testeeID uint64) (*TesteeRes
 		return nil, errors.Wrap(err, "failed to find testee")
 	}
 
+	if err := s.requireTesteeRange(ctx, testee); err != nil {
+		return nil, err
+	}
 	if err := s.enrichAssessmentSummaries(ctx, []*actorreadmodel.TesteeRow{testee}); err != nil {
 		return nil, errors.Wrap(err, "failed to read testee assessment summary")
 	}
@@ -56,6 +59,9 @@ func (s *queryService) FindByProfile(ctx context.Context, orgID int64, profileID
 		return nil, errors.Wrap(err, "failed to find testee by profile")
 	}
 
+	if err := s.requireTesteeRange(ctx, testee); err != nil {
+		return nil, err
+	}
 	if err := s.enrichAssessmentSummaries(ctx, []*actorreadmodel.TesteeRow{testee}); err != nil {
 		return nil, errors.Wrap(err, "failed to read testee assessment summary")
 	}
@@ -64,6 +70,11 @@ func (s *queryService) FindByProfile(ctx context.Context, orgID int64, profileID
 
 // ListTestees 列出受试者
 func (s *queryService) ListTestees(ctx context.Context, dto ListTesteeDTO) (*TesteeListResult, error) {
+	if dto.ProfileID != nil {
+		if _, err := testeeIDFromUint64("profile_id", *dto.ProfileID); err != nil {
+			return nil, err
+		}
+	}
 	if dto.StoreID != nil && (*dto.StoreID == 0 || dto.UnassignedStore) {
 		return nil, errors.WithCode(code.ErrInvalidArgument, "store_id and unassigned_store are mutually exclusive")
 	}
@@ -76,7 +87,8 @@ func (s *queryService) ListTestees(ctx context.Context, dto ListTesteeDTO) (*Tes
 	}
 
 	filter := actorreadmodel.TesteeFilter{
-		StoreID: dto.StoreID, UnassignedStore: dto.UnassignedStore,
+		ProfileID: dto.ProfileID,
+		StoreID:   dto.StoreID, UnassignedStore: dto.UnassignedStore,
 		OrgID:                 dto.OrgID,
 		Name:                  dto.Name,
 		KeyFocus:              dto.KeyFocus,
@@ -88,6 +100,16 @@ func (s *queryService) ListTestees(ctx context.Context, dto ListTesteeDTO) (*Tes
 		Limit:                 dto.Limit,
 	}
 
+	if !s.selfService {
+		snapshot, _ := appauthz.FromContext(ctx)
+		storeRange, err := snapshot.ResolveStoreRange(dto.OrgID, "qs:actor:collection:testees", "list")
+		if err != nil {
+			return nil, err
+		}
+		filter.RestrictToStoreScope = true
+		filter.AllAssignedStores = storeRange.AllStores
+		filter.AllowedStoreIDs = storeRange.StoreIDs
+	}
 	testees, err := s.reader.ListTestees(ctx, filter)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to list testees")
@@ -125,8 +147,12 @@ func (s *queryService) ListKeyFocus(ctx context.Context, orgID int64, offset, li
 	})
 }
 
-// ListByProfileIDs 根据多个用户档案ID查询受试者列表
+// ListByProfileIDs 供 Collection 在校验监护关系后按档案查询。
+// 后台查询必须使用携带公司与门店范围的 ListTestees。
 func (s *queryService) ListByProfileIDs(ctx context.Context, profileIDs []uint64, offset, limit int) (*TesteeListResult, error) {
+	if !s.selfService {
+		return nil, errors.WithCode(code.ErrPermissionDenied, "profile list is reserved for self-service")
+	}
 	if len(profileIDs) == 0 {
 		return &TesteeListResult{
 			Items:      []*TesteeResult{},
@@ -172,15 +198,23 @@ func (s *queryService) enrichAssessmentSummaryRows(ctx context.Context, rows []a
 }
 
 func (s *queryService) enrichAssessmentSummaries(ctx context.Context, rows []*actorreadmodel.TesteeRow) error {
-	if err := appauthz.RequirePermission(ctx, appauthz.AssessmentResource, "read"); err != nil && !s.selfService {
+	if !s.selfService {
+		snapshot, _ := appauthz.FromContext(ctx)
+		allowed := make([]*actorreadmodel.TesteeRow, 0, len(rows))
 		for _, row := range rows {
-			if row != nil {
-				row.LastRiskLevel = ""
-				row.TotalAssessments = 0
-				row.LastAssessmentAt = nil
+			if row == nil {
+				continue
+			}
+			// Clear persisted aggregates even when the reader is unavailable.
+			row.LastRiskLevel = ""
+			row.TotalAssessments = 0
+			row.LastAssessmentAt = nil
+			permitted, err := snapshot.ResolveStoreRange(row.OrgID, appauthz.AssessmentResource, "read")
+			if err == nil && permitted.Contains(row.StoreID) {
+				allowed = append(allowed, row)
 			}
 		}
-		return nil
+		rows = allowed
 	}
 	if s.summaryReader == nil || len(rows) == 0 {
 		return nil
@@ -223,6 +257,24 @@ func (s *queryService) enrichAssessmentSummaries(ctx context.Context, rows []*ac
 		row.TotalAssessments = summary.TotalEvaluated
 		row.LastAssessmentAt = summary.LastEvaluatedAt
 		row.LastRiskLevel = summary.RiskLevel
+	}
+	return nil
+}
+
+func (s *queryService) requireTesteeRange(ctx context.Context, row *actorreadmodel.TesteeRow) error {
+	if s.selfService {
+		return nil
+	}
+	if row == nil {
+		return errors.WithCode(code.ErrUserNotFound, "testee not found")
+	}
+	snapshot, _ := appauthz.FromContext(ctx)
+	permitted, err := snapshot.ResolveStoreRange(row.OrgID, "qs:actor:collection:testees", "read")
+	if err != nil {
+		return err
+	}
+	if !permitted.Contains(row.StoreID) {
+		return errors.WithCode(code.ErrPermissionDenied, "testee outside granted store range")
 	}
 	return nil
 }

@@ -3,6 +3,8 @@ package iamauth
 import (
 	"context"
 	"fmt"
+	sdkauthz "github.com/FangcunMount/iam/v5/pkg/sdk/authz"
+	"strconv"
 	"sync"
 	"time"
 
@@ -126,9 +128,15 @@ func (l *SnapshotLoader) Load(ctx context.Context, userIDStr string) (*authz.Sna
 		if err != nil {
 			return nil, err
 		}
+		if resp.GetScopeContractVersion() != 0 {
+			if err := sdkauthz.ValidateScopedSnapshot(resp); err != nil {
+				return nil, err
+			}
+		}
 		directRoles := append([]string(nil), resp.GetDirectRoles()...)
 		snap := &authz.Snapshot{
-			DirectRoles: directRoles,
+			ScopeContractVersion: resp.GetScopeContractVersion(),
+			DirectRoles:          directRoles,
 			// Independent role model: wire field retained; value equals direct roles.
 			EffectiveRoles: append([]string(nil), directRoles...),
 			AuthzVersion:   resp.GetPolicyVersion(),
@@ -146,11 +154,25 @@ func (l *SnapshotLoader) Load(ctx context.Context, userIDStr string) (*authz.Sna
 			if p == nil {
 				continue
 			}
-			snap.Permissions = append(snap.Permissions, authz.Permission{
-				Resource: p.GetResource(),
-				Action:   p.GetAction(),
-				Mode:     authz.AuthorizationMode(p.GetMode()),
-			})
+			permission := authz.Permission{Resource: p.GetResource(), Action: p.GetAction(), Mode: authz.AuthorizationMode(p.GetMode())}
+			for _, value := range p.GetScopes() {
+				// A legacy producer cannot establish a data range.
+				if snap.ScopeContractVersion != 1 {
+					break
+				}
+				org, _ := strconv.ParseInt(value.GetOrgId(), 10, 64)
+				kind := "stores"
+				if value.GetKind() == authzv4.DataScopeKind_ALL_STORES {
+					kind = "all_stores"
+				}
+				stores := make([]uint64, 0, len(value.GetStoreIds()))
+				for _, raw := range value.GetStoreIds() {
+					id, _ := strconv.ParseUint(raw, 10, 64)
+					stores = append(stores, id)
+				}
+				permission.Scopes = append(permission.Scopes, authz.DataScope{OrgID: org, Kind: kind, StoreIDs: stores})
+			}
+			snap.Permissions = append(snap.Permissions, permission)
 		}
 		if err := l.setCached(key, snap); err != nil {
 			return nil, err
@@ -211,4 +233,23 @@ func (l *SnapshotLoader) LoadAssignmentFacts(ctx context.Context, userID string)
 	}
 	l.globalVersion = snap.AuthzVersion
 	return snap, nil
+}
+
+// LoadScopedAssignmentFacts reads authoritative management facts without caching
+// or falling back to legacy role-only projections.
+func (l *SnapshotLoader) LoadScopedAssignmentFacts(ctx context.Context, userID string) (*authzv4.GetAuthorizationSnapshotResponse, error) {
+	if l == nil || l.client == nil || l.client.SDK() == nil {
+		return nil, fmt.Errorf("authorization loader unavailable")
+	}
+	resp, err := l.client.SDK().Authz().GetScopedAuthorizationSnapshot(ctx, &authzv4.GetAuthorizationSnapshotRequest{Subject: authz.SubjectKey(userID), AppName: l.opts.AppName, IncludeAssignmentFacts: true})
+	if err != nil {
+		return nil, err
+	}
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if resp.PolicyVersion < l.globalVersion {
+		return nil, fmt.Errorf("assignment scope facts older than observed policy version")
+	}
+	l.globalVersion = resp.PolicyVersion
+	return resp, nil
 }

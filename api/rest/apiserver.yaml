@@ -3668,6 +3668,125 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/core.ErrResponse'
+  /api/v1/operators/{id}/authorization-scope:
+    get:
+      tags:
+      - Operator
+      summary: 查询运营人员角色数据范围
+      operationId: 查询运营人员角色数据范围
+      description: 查询运营人员角色数据范围
+      parameters:
+      - type: string
+        description: Bearer 用户令牌
+        name: Authorization
+        in: header
+        required: true
+      - type: string
+        description: Operator ID
+        name: id
+        in: path
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/core.Response'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/response.OperatorScopeConfigurationResponse'
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.Response'
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.Response'
+        '401':
+          description: 认证失败或访问令牌无效
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '500':
+          description: 服务内部错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+    put:
+      tags:
+      - Operator
+      summary: 更新运营人员角色数据范围
+      operationId: 更新运营人员角色数据范围
+      description: 更新运营人员角色数据范围
+      parameters:
+      - type: string
+        description: Operator ID
+        name: id
+        in: path
+        required: true
+      - type: string
+        description: Bearer 用户令牌
+        name: Authorization
+        in: header
+        required: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/request.ReplaceOperatorScopeRequest'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/core.Response'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/response.OperatorScopeUpdateResponse'
+        '400':
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.Response'
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.Response'
+        '409':
+          description: Conflict
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.Response'
+        '401':
+          description: 认证失败或访问令牌无效
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '500':
+          description: 服务内部错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
   /api/v1/operators/{id}/retirement:
     get:
       tags:
@@ -6215,7 +6334,7 @@ paths:
                 - type: object
                   properties:
                     data:
-                      $ref: '#/components/schemas/response.TesteeResponse'
+                      $ref: '#/components/schemas/response.TesteeUpdateResponse'
         '401':
           description: 认证失败或访问令牌无效
           content:
@@ -13395,10 +13514,12 @@ components:
       - participant
       - clinician
       - admin
+      - operator
       x-enum-varnames:
       - AudienceParticipant
       - AudienceClinician
       - AudienceAdmin
+      - AudienceOperator
     profile.Definition:
       type: object
       properties:
@@ -13802,7 +13923,7 @@ components:
           description: 电话
           type: string
         roles:
-          description: 期望授予的角色列表（IAM 启用时转成 assignment）
+          description: 已退役：仅允许空列表；角色与范围通过 authorization-scope 配置
           type: array
           items:
             type: string
@@ -13983,6 +14104,17 @@ components:
           type: number
         t_score:
           type: number
+    request.OperatorScopeRole:
+      type: object
+      properties:
+        kind:
+          type: string
+        role_name:
+          type: string
+        store_ids:
+          type: array
+          items:
+            type: string
     request.OriginRefRequest:
       type: object
       required:
@@ -13999,6 +14131,19 @@ components:
           type: array
           items:
             type: string
+    request.ReplaceOperatorScopeRequest:
+      type: object
+      properties:
+        expected_policy_version:
+          type: string
+        reason:
+          type: string
+        roles:
+          description: Pointer distinguishes an explicit empty replacement from an
+            omitted field.
+          type: array
+          items:
+            $ref: '#/components/schemas/request.OperatorScopeRole'
     request.ResumePlanRequest:
       type: object
       properties:
@@ -14089,7 +14234,7 @@ components:
           description: 电话
           type: string
         roles:
-          description: 角色列表
+          description: 已退役：非 null 字段拒绝，请使用 authorization-scope
           type: array
           items:
             type: string
@@ -15546,6 +15691,59 @@ components:
           type: integer
         total:
           type: integer
+    response.OperatorAssignmentScopeResponse:
+      type: object
+      properties:
+        assignment_id:
+          type: string
+        management_protection:
+          type: string
+        role_id:
+          type: string
+        role_name:
+          type: string
+        scope:
+          description: Null means unconfigured, never company-wide access.
+          allOf:
+          - $ref: '#/components/schemas/response.OperatorDataScopeResponse'
+    response.OperatorDataScopeResponse:
+      type: object
+      properties:
+        kind:
+          type: string
+          enum:
+          - stores
+          - all_stores
+        org_id:
+          type: string
+        store_ids:
+          type: array
+          items:
+            type: string
+    response.OperatorScopeConfigurationResponse:
+      type: object
+      properties:
+        assignments:
+          type: array
+          items:
+            $ref: '#/components/schemas/response.OperatorAssignmentScopeResponse'
+        operator_id:
+          type: string
+        policy_version:
+          type: string
+        protected_access:
+          type: boolean
+        unconfigured_assignments:
+          type: array
+          items:
+            $ref: '#/components/schemas/response.OperatorAssignmentScopeResponse'
+    response.OperatorScopeUpdateResponse:
+      type: object
+      properties:
+        policy_version:
+          type: string
+        projection_pending:
+          type: boolean
     response.PlanListResponse:
       type: object
       properties:
@@ -16275,6 +16473,13 @@ components:
           example: ''
         version:
           type: integer
+    response.TesteeUpdateResponse:
+      type: object
+      properties:
+        id:
+          type: string
+        updated:
+          type: boolean
     response.TrendDataPoint:
       type: object
       properties:

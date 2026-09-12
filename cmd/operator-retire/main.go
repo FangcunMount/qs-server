@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/FangcunMount/component-base/pkg/database"
@@ -22,12 +23,12 @@ import (
 
 func main() {
 	if len(os.Args) < 2 {
-		fmt.Fprintln(os.Stderr, "usage: operator-retire preflight|apply|status|verify [QS config flags]; required environment: OPERATOR_RETIRE_ID, OPERATOR_RETIRE_LAYOUT, OPERATOR_RETIRE_REPORT; apply also requires OPERATOR_RETIRE_ACTOR_ID, OPERATOR_RETIRE_FINGERPRINT, OPERATOR_RETIRE_MAINTENANCE=true")
+		fmt.Fprintln(os.Stderr, "usage: operator-retire preflight|apply|status|verify [QS config flags]; selected-preflight|selected-apply|selected-verify and orphan-preflight|orphan-apply|orphan-verify use OPERATOR_RETIRE_INPUT; required environment: OPERATOR_RETIRE_ID, OPERATOR_RETIRE_LAYOUT, OPERATOR_RETIRE_REPORT; apply also requires OPERATOR_RETIRE_ACTOR_ID, OPERATOR_RETIRE_FINGERPRINT, OPERATOR_RETIRE_MAINTENANCE=true")
 		os.Exit(1)
 	}
 	action := os.Args[1]
 	switch action {
-	case "preflight", "apply", "status", "verify":
+	case "preflight", "apply", "status", "verify", "selected-preflight", "selected-apply", "selected-verify", "orphan-preflight", "orphan-apply", "orphan-verify":
 	default:
 		fmt.Fprintln(os.Stderr, "unknown retirement action")
 		os.Exit(1)
@@ -65,6 +66,12 @@ func main() {
 		tool, err := operatorretire.New(db, module.AuthzSnapshotLoader(), iam.NewOperatorRetirementAuthzGateway(iam.NewAuthzAssignmentClient(module.Client()), module.AuthzSnapshotLoader()), os.Getenv("OPERATOR_RETIRE_LAYOUT"))
 		if err != nil {
 			return err
+		}
+		if strings.HasPrefix(action, "orphan-") {
+			return runOrphan(ctx, tool, action, output)
+		}
+		if strings.HasPrefix(action, "selected-") {
+			return runSelected(ctx, tool, action, output)
 		}
 		id := os.Getenv("OPERATOR_RETIRE_ID")
 		actor, _ := strconv.ParseInt(os.Getenv("OPERATOR_RETIRE_ACTOR_ID"), 10, 64)

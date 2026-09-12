@@ -5,6 +5,8 @@ package administration
 import (
 	"context"
 	appauthz "github.com/FangcunMount/qs-server/internal/apiserver/application/authz"
+	"reflect"
+	"sort"
 
 	cberrors "github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/queryerror"
@@ -31,13 +33,15 @@ type ReportAccessDecision struct {
 }
 
 type ListScope struct {
-	OrgID               int64
-	TesteeID            uint64
-	AccessibleTesteeIDs []uint64
-	Restricted          bool
-	Audience            policy.Audience
-	IsAdmin             bool
-	DecisionSource      string
+	RestrictToStoreScope bool
+	StoreScopedTesteeIDs []uint64
+	OrgID                int64
+	TesteeID             uint64
+	AccessibleTesteeIDs  []uint64
+	Restricted           bool
+	Audience             policy.Audience
+	IsAdmin              bool
+	DecisionSource       string
 }
 
 type Report = reportprojection.Report
@@ -94,7 +98,18 @@ func (s *service) GetReport(ctx context.Context, actor Actor, query GetQuery) (*
 	if err != nil {
 		return nil, queryerror.MapReadError(err)
 	}
-	return s.projection.FromRow(ctx, *row, decision.Audience)
+	result, err := s.projection.FromRow(ctx, *row, decision.Audience)
+	if err != nil {
+		return nil, err
+	}
+	current, err := s.access.AuthorizeAssessment(ctx, actor, query.AssessmentID)
+	if err != nil {
+		return nil, err
+	}
+	if current != decision {
+		return nil, cberrors.WithCode(code.ErrConflict, "报告访问范围已变化，请刷新")
+	}
+	return result, nil
 }
 
 func (s *service) ListReports(ctx context.Context, actor Actor, query ListQuery) (*ListResult, error) {
@@ -119,7 +134,7 @@ func (s *service) ListReports(ctx context.Context, actor Actor, query ListQuery)
 	}); err != nil {
 		return nil, err
 	}
-	filter := interpretationreadmodel.ReportFilter{}
+	filter := interpretationreadmodel.ReportFilter{OrgID: &actor.OrgID, RestrictToStoreScope: scope.RestrictToStoreScope, StoreScopedTesteeIDs: scope.StoreScopedTesteeIDs}
 	switch {
 	case scope.TesteeID != 0:
 		filter.TesteeID = &scope.TesteeID
@@ -147,6 +162,13 @@ func (s *service) ListReports(ctx context.Context, actor Actor, query ListQuery)
 		}
 		items = append(items, item)
 	}
+	current, err := s.access.ScopeReports(ctx, actor, query.TesteeID)
+	if err != nil {
+		return nil, err
+	}
+	if !sameListScope(scope, current) {
+		return nil, cberrors.WithCode(code.ErrConflict, "报告访问范围已变化，请刷新")
+	}
 	totalInt := int(total)
 	return &ListResult{Items: items, Total: totalInt, Page: page, PageSize: pageSize, TotalPages: (totalInt + pageSize - 1) / pageSize}, nil
 }
@@ -163,7 +185,7 @@ func validateDecision(decision ReportAccessDecision) error {
 		if !decision.IsAdmin || decision.Restricted {
 			return cberrors.WithCode(code.ErrModuleInitializationFailed, "admin audience requires non-restricted admin decision")
 		}
-	case policy.AudienceClinician:
+	case policy.AudienceClinician, policy.AudienceOperator:
 		if decision.IsAdmin || !decision.Restricted {
 			return cberrors.WithCode(code.ErrModuleInitializationFailed, "clinician audience requires restricted non-admin decision")
 		}
@@ -188,4 +210,24 @@ func normalize(page, size int) (int, int) {
 func emptyList(q ListQuery) *ListResult {
 	p, s := normalize(q.Page, q.PageSize)
 	return &ListResult{Items: []*Report{}, Page: p, PageSize: s}
+}
+
+func sameListScope(a, b ListScope) bool {
+	canonical := func(ids []uint64) []uint64 {
+		seen := map[uint64]bool{}
+		for _, id := range ids {
+			seen[id] = true
+		}
+		result := make([]uint64, 0, len(seen))
+		for id := range seen {
+			result = append(result, id)
+		}
+		sort.Slice(result, func(i, j int) bool { return result[i] < result[j] })
+		return result
+	}
+	a.StoreScopedTesteeIDs = canonical(a.StoreScopedTesteeIDs)
+	b.StoreScopedTesteeIDs = canonical(b.StoreScopedTesteeIDs)
+	a.AccessibleTesteeIDs = canonical(a.AccessibleTesteeIDs)
+	b.AccessibleTesteeIDs = canonical(b.AccessibleTesteeIDs)
+	return reflect.DeepEqual(a, b)
 }

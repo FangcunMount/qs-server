@@ -29,7 +29,7 @@ func NewPlanEnrollmentQueryHandler(service planapp.EnrollmentQueryService, acces
 // @Success 200 {object} core.Response
 // @Router /api/v2/plans/testees/{testee_id}/enrollments [get]
 func (h *PlanEnrollmentQueryHandler) List(c *gin.Context) {
-	orgID, userID, err := h.RequireProtectedScope(c)
+	orgID, _, err := h.RequireProtectedScope(c)
 	if err != nil {
 		h.Error(c, err)
 		return
@@ -38,12 +38,6 @@ func (h *PlanEnrollmentQueryHandler) List(c *gin.Context) {
 	if err != nil || testeeID == 0 {
 		h.Error(c, errors.WithCode(code.ErrInvalidArgument, "invalid testee_id"))
 		return
-	}
-	if h.access != nil {
-		if err := h.access.ValidateTesteeAccess(c.Request.Context(), orgID, userID, testeeID); err != nil {
-			h.Error(c, err)
-			return
-		}
 	}
 	query := planapp.EnrollmentQuery{OrgID: orgID, TesteeID: testeeID, Status: c.Query("status"), Page: 1, PageSize: 20}
 	if query.Status != "" && query.Status != "active" && query.Status != "closed" && query.Status != "terminated" {

@@ -2,6 +2,7 @@ package answersheet
 
 import (
 	"context"
+	actorctx "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/actorctx"
 	appauthz "github.com/FangcunMount/qs-server/internal/apiserver/application/authz"
 	authztest "github.com/FangcunMount/qs-server/internal/apiserver/application/authz/testutil"
 	"math"
@@ -107,11 +108,12 @@ func TestManagementServiceListUsesReadModelFilter(t *testing.T) {
 	startTime := time.Date(2026, 4, 2, 0, 0, 0, 0, time.UTC)
 	reader := &answerSheetReaderStub{}
 	service := &managementService{
+		access: &sheetScopeStub{},
 		repo:   &managementRepoStub{},
 		reader: reader,
 	}
 
-	_, err := service.List(authztest.WithPermission(context.Background(), "qs:answersheet:collection:answersheets", "list"), ListAnswerSheetsDTO{
+	_, err := service.List(authztest.WithPermission(actorctx.WithGrantingUserID(context.Background(), 9), "qs:answersheet:collection:answersheets", "list"), ListAnswerSheetsDTO{
 		OrgID:             88,
 		QuestionnaireCode: "QNR-009",
 		FillerID:          &fillerID,
@@ -121,6 +123,9 @@ func TestManagementServiceListUsesReadModelFilter(t *testing.T) {
 	})
 	if err != nil {
 		t.Fatalf("List returned error: %v", err)
+	}
+	if !reader.listFilter.RestrictToStoreScope || !reader.countFilter.RestrictToStoreScope {
+		t.Fatal("store scope not forwarded")
 	}
 	if reader.listFilter.OrgID != 88 || reader.countFilter.OrgID != 88 {
 		t.Fatalf("captured org filters = list:%d count:%d, want 88", reader.listFilter.OrgID, reader.countFilter.OrgID)
@@ -134,8 +139,9 @@ func TestManagementServiceListUsesReadModelFilter(t *testing.T) {
 }
 
 type answerSheetReaderStub struct {
-	listFilter  surveyreadmodel.AnswerSheetFilter
-	countFilter surveyreadmodel.AnswerSheetFilter
+	listCalls, countCalls int
+	listFilter            surveyreadmodel.AnswerSheetFilter
+	countFilter           surveyreadmodel.AnswerSheetFilter
 }
 
 type answerSheetIdentityResolverStub struct {
@@ -149,11 +155,13 @@ func (s answerSheetIdentityResolverStub) ResolveUserNames(_ context.Context, _ [
 }
 
 func (s *answerSheetReaderStub) ListAnswerSheets(_ context.Context, filter surveyreadmodel.AnswerSheetFilter, _ surveyreadmodel.PageRequest) ([]surveyreadmodel.AnswerSheetSummaryRow, error) {
+	s.listCalls++
 	s.listFilter = filter
 	return []surveyreadmodel.AnswerSheetSummaryRow{}, nil
 }
 
 func (s *answerSheetReaderStub) CountAnswerSheets(_ context.Context, filter surveyreadmodel.AnswerSheetFilter) (int64, error) {
+	s.countCalls++
 	s.countFilter = filter
 	return 0, nil
 }
@@ -188,6 +196,7 @@ func TestManagementServiceGetByIDReturnsConvertedAnswerSheet(t *testing.T) {
 	}
 
 	service := &managementService{
+		access: &sheetScopeStub{},
 		repo: &managementRepoStub{
 			findByIDFunc: func(context.Context, meta.ID) (*domainanswersheet.AnswerSheet, error) {
 				return sheet, nil
@@ -216,13 +225,13 @@ func TestManagementServiceGetByIDReturnsConvertedAnswerSheet(t *testing.T) {
 		t.Fatalf("unexpected answers: %+v", result.Answers)
 	}
 	t.Run("business organization ownership remains enforced without authorization partition context", func(t *testing.T) {
-		if _, err := service.GetByIDInOrg(authztest.WithPermission(context.Background(), "qs:answersheet:collection:answersheets", "read"), 1, 12); err != nil {
+		if _, err := service.GetByIDInOrg(authztest.WithPermission(actorctx.WithGrantingUserID(context.Background(), 9), "qs:answersheet:collection:answersheets", "read"), 1, 12); err != nil {
 			t.Fatalf("GetByIDInOrg same org returned error: %v", err)
 		}
-		if _, err := service.GetByIDInOrg(authztest.WithPermission(context.Background(), "qs:answersheet:collection:answersheets", "read"), 2, 12); errors.ParseCoder(err).Code() != errorCode.ErrAnswerSheetNotFound {
+		if _, err := service.GetByIDInOrg(authztest.WithPermission(actorctx.WithGrantingUserID(context.Background(), 9), "qs:answersheet:collection:answersheets", "read"), 2, 12); errors.ParseCoder(err).Code() != errorCode.ErrAnswerSheetNotFound {
 			t.Fatalf("GetByIDInOrg cross org error = %v, want not found", err)
 		}
-		if _, err := service.GetByIDInOrg(authztest.WithPermission(context.Background(), "qs:answersheet:collection:answersheets", "read"), 0, 12); errors.ParseCoder(err).Code() != errorCode.ErrPermissionDenied {
+		if _, err := service.GetByIDInOrg(authztest.WithPermission(actorctx.WithGrantingUserID(context.Background(), 9), "qs:answersheet:collection:answersheets", "read"), 0, 12); errors.ParseCoder(err).Code() != errorCode.ErrPermissionDenied {
 			t.Fatalf("GetByIDInOrg missing org error = %v, want permission denied", err)
 		}
 	})
@@ -233,6 +242,7 @@ func TestManagementServiceDeleteDelegatesToRepository(t *testing.T) {
 
 	var deletedID meta.ID
 	service := &managementService{
+		access: &sheetScopeStub{},
 		repo: &managementRepoStub{
 			findByIDFunc: func(context.Context, meta.ID) (*domainanswersheet.AnswerSheet, error) {
 				return &domainanswersheet.AnswerSheet{}, nil
@@ -274,6 +284,7 @@ func TestManagementServiceDeleteWrapsMissingAnswerSheet(t *testing.T) {
 	t.Parallel()
 
 	service := &managementService{
+		access: &sheetScopeStub{},
 		repo: &managementRepoStub{
 			findByIDFunc: func(context.Context, meta.ID) (*domainanswersheet.AnswerSheet, error) {
 				return nil, errors.WithCode(errorCode.ErrAnswerSheetNotFound, "missing")
@@ -297,7 +308,8 @@ func TestManagementListRejectsRevokedOperatorBeforeReadingResults(t *testing.T) 
 		appauthz.WithSnapshot(context.Background(), &appauthz.Snapshot{DirectRoles: []string{"qs:result_reviewer"}, AuthzVersion: 42}),
 	} {
 		reader := &answerSheetReaderStub{}
-		service := &managementService{reader: reader}
+		service := &managementService{
+			access: &sheetScopeStub{}, reader: reader}
 		result, err := service.List(ctx, ListAnswerSheetsDTO{OrgID: 88, Page: 1, PageSize: 20})
 		if result != nil || err == nil || errors.ParseCoder(err).Code() != errorCode.ErrPermissionDenied {
 			t.Fatalf("revoked Operator result=%v error=%v", result, err)
@@ -305,5 +317,41 @@ func TestManagementListRejectsRevokedOperatorBeforeReadingResults(t *testing.T) 
 		if reader.listFilter.OrgID != 0 || reader.countFilter.OrgID != 0 {
 			t.Fatal("results or count read before authorization")
 		}
+	}
+}
+
+type sheetScopeStub struct {
+	err    error
+	action string
+}
+
+func (s *sheetScopeStub) ValidateTesteeStoreAccess(_ context.Context, _, _ int64, _ uint64, resource, action string) error {
+	if resource != appauthz.AnswerSheetResource {
+		return errors.New("wrong resource")
+	}
+	s.action = action
+	return s.err
+}
+func (s *sheetScopeStub) ListStoreScopedTesteeIDs(_ context.Context, _, _ int64, resource, action string) ([]uint64, error) {
+	if resource != appauthz.AnswerSheetResource {
+		return nil, errors.New("wrong resource")
+	}
+	s.action = action
+	return []uint64{8}, s.err
+}
+func TestManagementListRejectsScopeBeforeQuery(t *testing.T) {
+	access := &sheetScopeStub{err: errors.New("outside store scope")}
+	reader := &answerSheetReaderStub{}
+	service := &managementService{access: access, reader: reader}
+	ctx := authztest.WithPermission(actorctx.WithGrantingUserID(context.Background(), 9), appauthz.AnswerSheetResource, "list")
+	_, err := service.List(ctx, ListAnswerSheetsDTO{OrgID: 1, Page: 1, PageSize: 10})
+	if err == nil {
+		t.Fatal("scope denial ignored")
+	}
+	if reader.listCalls != 0 || reader.countCalls != 0 {
+		t.Fatal("denied scope queried answer sheets")
+	}
+	if access.action != "list" {
+		t.Fatal("incorrect action")
 	}
 }

@@ -2,6 +2,9 @@ package plan
 
 import (
 	"context"
+	"errors"
+	"github.com/FangcunMount/qs-server/internal/apiserver/application/actor/actorctx"
+	appauthz "github.com/FangcunMount/qs-server/internal/apiserver/application/authz"
 	"testing"
 )
 
@@ -34,9 +37,9 @@ func TestEnrollmentQueryProjectsRoundSummary(t *testing.T) {
 			{ID: 11, ScaleCode: "S-1", Status: "completed"},
 			{ID: 12, ScaleCode: "S-1", Status: "opened"},
 		},
-	}}}, enrollmentScaleCatalogStub{})
+	}}}, enrollmentScaleCatalogStub{}, enrollmentScopeStub{})
 
-	page, err := service.ListEnrollments(context.Background(), EnrollmentQuery{Page: 1, PageSize: 20})
+	page, err := service.ListEnrollments(enrollmentContext(), EnrollmentQuery{OrgID: 1, TesteeID: 3, Page: 1, PageSize: 20})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -46,5 +49,43 @@ func TestEnrollmentQueryProjectsRoundSummary(t *testing.T) {
 	}
 	if item.TaskCount != 2 || item.CompletedTaskCount != 1 || item.CompletionRate != 0.5 {
 		t.Fatalf("task summary = %+v", item)
+	}
+}
+
+type enrollmentScopeStub struct{ err error }
+
+func (s enrollmentScopeStub) ValidateTesteeStoreAccess(_ context.Context, org, user int64, testee uint64, resource, action string) error {
+	if org != 1 || user != 2 || testee != 3 || resource != appauthz.EvaluationPlanTaskResource || action != "list" {
+		return errors.New("wrong scope action")
+	}
+	return s.err
+}
+func enrollmentContext() context.Context {
+	ctx := actorctx.WithGrantingUserID(context.Background(), 2)
+	ctx = actorctx.WithOperatorOrgID(ctx, 1)
+	return appauthz.WithSnapshot(ctx, &appauthz.Snapshot{Permissions: []appauthz.Permission{{Resource: appauthz.EvaluationPlanTaskResource, Action: "list", Mode: appauthz.AuthorizationModeUnconditional}}})
+}
+func TestEnrollmentQueryRejectsBeforeReadingRecordsOrCount(t *testing.T) {
+	cases := []struct {
+		name   string
+		ctx    context.Context
+		access EnrollmentScopeChecker
+		org    int64
+	}{
+		{"missing actor", context.Background(), enrollmentScopeStub{}, 1},
+		{"missing checker", enrollmentContext(), nil, 1},
+		{"foreign company", enrollmentContext(), enrollmentScopeStub{}, 9},
+		{"outside store", enrollmentContext(), enrollmentScopeStub{err: errors.New("outside store")}, 1},
+		{"missing action", appauthz.WithSnapshot(enrollmentContext(), &appauthz.Snapshot{}), enrollmentScopeStub{}, 1},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			// Nil store/catalog panic if an unauthorized request reaches either read.
+			service := NewEnrollmentQueryService(nil, nil, tc.access)
+			result, err := service.ListEnrollments(tc.ctx, EnrollmentQuery{OrgID: tc.org, TesteeID: 3})
+			if err == nil || result != nil {
+				t.Fatalf("unauthorized result=%+v err=%v", result, err)
+			}
+		})
 	}
 }

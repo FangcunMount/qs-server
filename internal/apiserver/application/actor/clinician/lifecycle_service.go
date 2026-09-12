@@ -2,6 +2,8 @@ package clinician
 
 import (
 	"context"
+	"github.com/FangcunMount/qs-server/internal/apiserver/application/actor/actorctx"
+	"github.com/FangcunMount/qs-server/internal/pkg/code"
 
 	"github.com/FangcunMount/component-base/pkg/errors"
 	apptransaction "github.com/FangcunMount/qs-server/internal/apiserver/application/transaction"
@@ -9,9 +11,11 @@ import (
 )
 
 type lifecycleService struct {
-	repo      domainClinician.Repository
-	validator domainClinician.Validator
-	uow       apptransaction.Runner
+	operatorOnly bool
+	scope        SummaryScope
+	repo         domainClinician.Repository
+	validator    domainClinician.Validator
+	uow          apptransaction.Runner
 }
 
 // NewLifecycleService 创建从业者生命周期服务。
@@ -27,7 +31,20 @@ func NewLifecycleService(
 	}
 }
 
+func NewOperatorLifecycleService(repo domainClinician.Repository, validator domainClinician.Validator, tx apptransaction.Runner, scope SummaryScope) ClinicianLifecycleService {
+	s := NewLifecycleService(repo, validator, tx).(*lifecycleService)
+	s.operatorOnly = true
+	s.scope = scope
+	return s
+}
+
 func (s *lifecycleService) Register(ctx context.Context, dto RegisterClinicianDTO) (*ClinicianResult, error) {
+	if s.operatorOnly {
+		if err := authorizeHeadquarters(ctx, s.scope, dto.OrgID, "create"); err != nil {
+			return nil, err
+		}
+	}
+
 	var result *domainClinician.Clinician
 
 	err := s.uow.WithinTransaction(ctx, func(txCtx context.Context) error {
@@ -66,6 +83,12 @@ func (s *lifecycleService) Register(ctx context.Context, dto RegisterClinicianDT
 }
 
 func (s *lifecycleService) Update(ctx context.Context, dto UpdateClinicianDTO) (*ClinicianResult, error) {
+	if s.operatorOnly {
+		if err := authorizeHeadquarters(ctx, s.scope, actorctx.OperatorOrgID(ctx), "update"); err != nil {
+			return nil, err
+		}
+	}
+
 	var result *domainClinician.Clinician
 	clinicianID, err := clinicianIDFromUint64("clinician_id", dto.ClinicianID)
 	if err != nil {
@@ -78,6 +101,9 @@ func (s *lifecycleService) Update(ctx context.Context, dto UpdateClinicianDTO) (
 			return errors.Wrap(err, "failed to find clinician")
 		}
 
+		if s.operatorOnly && item.OrgID() != actorctx.OperatorOrgID(txCtx) {
+			return errors.WithCode(code.ErrUserNotFound, "clinician not found in current company")
+		}
 		if err := s.validator.ValidateName(dto.Name); err != nil {
 			return err
 		}
@@ -123,11 +149,26 @@ func (s *lifecycleService) Deactivate(ctx context.Context, clinicianID uint64) (
 }
 
 func (s *lifecycleService) Delete(ctx context.Context, clinicianID uint64) error {
+	if s.operatorOnly {
+		if err := authorizeHeadquarters(ctx, s.scope, actorctx.OperatorOrgID(ctx), "delete"); err != nil {
+			return err
+		}
+	}
+
 	targetClinicianID, err := clinicianIDFromUint64("clinician_id", clinicianID)
 	if err != nil {
 		return err
 	}
 	return s.uow.WithinTransaction(ctx, func(txCtx context.Context) error {
+		if s.operatorOnly {
+			item, err := s.repo.FindByID(txCtx, targetClinicianID)
+			if err != nil {
+				return err
+			}
+			if item.OrgID() != actorctx.OperatorOrgID(txCtx) {
+				return errors.WithCode(code.ErrUserNotFound, "clinician not found in current company")
+			}
+		}
 		if err := s.repo.Delete(txCtx, targetClinicianID); err != nil {
 			return errors.Wrap(err, "failed to delete clinician")
 		}
@@ -136,6 +177,12 @@ func (s *lifecycleService) Delete(ctx context.Context, clinicianID uint64) error
 }
 
 func (s *lifecycleService) setActive(ctx context.Context, clinicianID uint64, active bool) (*ClinicianResult, error) {
+	if s.operatorOnly {
+		if err := authorizeHeadquarters(ctx, s.scope, actorctx.OperatorOrgID(ctx), "update"); err != nil {
+			return nil, err
+		}
+	}
+
 	var result *domainClinician.Clinician
 	targetClinicianID, err := clinicianIDFromUint64("clinician_id", clinicianID)
 	if err != nil {
@@ -146,6 +193,9 @@ func (s *lifecycleService) setActive(ctx context.Context, clinicianID uint64, ac
 		item, err := s.repo.FindByID(txCtx, targetClinicianID)
 		if err != nil {
 			return errors.Wrap(err, "failed to find clinician")
+		}
+		if s.operatorOnly && item.OrgID() != actorctx.OperatorOrgID(txCtx) {
+			return errors.WithCode(code.ErrUserNotFound, "clinician not found in current company")
 		}
 		if active {
 			item.Activate()

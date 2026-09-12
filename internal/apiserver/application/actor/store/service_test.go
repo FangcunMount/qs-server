@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	stderrors "errors"
+	"github.com/FangcunMount/qs-server/internal/apiserver/application/actor/actorctx"
 	clinicianDomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/clinician"
 	"testing"
 	"time"
@@ -58,7 +59,7 @@ func (r *assignmentRepo) AppendHistory(_ context.Context, h *port.History) error
 	return nil
 }
 func adminContext() context.Context {
-	return authz.WithSnapshot(context.Background(), &authz.Snapshot{Permissions: []authz.Permission{{Resource: "qs:*:*:*", Action: "*", Mode: authz.AuthorizationModeUnconditional}}})
+	return authz.WithSnapshot(actorctx.WithGrantingUserID(actorctx.WithOperatorOrgID(context.Background(), 7), 9), &authz.Snapshot{ScopeContractVersion: 1, AuthzVersion: 1, Permissions: []authz.Permission{{Resource: "qs:*:*:*", Action: "*", Mode: authz.AuthorizationModeUnconditional, Scopes: []authz.DataScope{{OrgID: 7, Kind: "all_stores"}}}}})
 }
 func fixture(t *testing.T) (*Service, *assignmentRepo) {
 	t.Helper()
@@ -71,7 +72,7 @@ func fixture(t *testing.T) (*Service, *assignmentRepo) {
 	cl.RestoreStore(nil, 1)
 	r := &assignmentRepo{target: target, clinician: cl}
 	tx := transaction.RunnerFunc(func(ctx context.Context, fn func(context.Context) error) error { return fn(ctx) })
-	return NewService(r, tx), r
+	return NewService(r, tx, companyScope{}), r
 }
 func change() Change {
 	return Change{StoreID: 2, ExpectedVersion: 1, Reason: "配置门店", RequestID: "request-1"}
@@ -164,5 +165,100 @@ func TestAssignRejectsReusedRequestAndPropagatesAuditFailure(t *testing.T) {
 	r.failHistory = true
 	if h, err := s.Assign(adminContext(), Actor{7, 9}, 10, change()); err == nil || h != nil {
 		t.Fatal("audit failure reported as success")
+	}
+}
+
+type companyScope struct{}
+
+func (companyScope) ResolveStoreRange(ctx context.Context, org, user int64, resource, action string) (authz.StoreRange, error) {
+	snap, _ := authz.FromContext(ctx)
+	return snap.ResolveStoreRange(org, resource, action)
+}
+
+// A repository with only an embedded nil interface makes any unexpected read fail the test.
+func TestAllStoreManagementEntrypointsRejectInvalidCompanyScope(t *testing.T) {
+	calls := map[string]func(*Service, context.Context) error{
+		"list":   func(s *Service, c context.Context) error { _, e := s.List(c, Actor{7, 9}, port.Filter{}); return e },
+		"get":    func(s *Service, c context.Context) error { _, e := s.Get(c, Actor{7, 9}, 2); return e },
+		"create": func(s *Service, c context.Context) error { _, e := s.Create(c, Actor{7, 9}, "C", "C", ""); return e },
+		"update": func(s *Service, c context.Context) error {
+			_, e := s.Update(c, Actor{7, 9}, 2, 1, "B", "", nil)
+			return e
+		},
+		"assign":   func(s *Service, c context.Context) error { _, e := s.Assign(c, Actor{7, 9}, 10, change()); return e },
+		"history":  func(s *Service, c context.Context) error { _, e := s.History(c, Actor{7, 9}, 10); return e },
+		"progress": func(s *Service, c context.Context) error { _, e := s.Progress(c, Actor{7, 9}); return e },
+	}
+	for _, kind := range []string{"foreign company", "selected stores", "legacy", "missing resolver", "untrusted actor"} {
+		for name, call := range calls {
+			t.Run(kind+"/"+name, func(t *testing.T) {
+				s, r := fixture(t)
+				ctx := adminContext()
+				snap, _ := authz.FromContext(ctx)
+				switch kind {
+				case "foreign company":
+					snap.Permissions[0].Scopes[0].OrgID = 8
+				case "selected stores":
+					snap.Permissions[0].Scopes[0] = authz.DataScope{OrgID: 7, Kind: "stores", StoreIDs: []uint64{2}}
+				case "legacy":
+					snap.ScopeContractVersion = 0
+				case "missing resolver":
+					s.scope = nil
+				case "untrusted actor":
+					ctx = actorctx.WithGrantingUserID(ctx, 99)
+				}
+				if err := call(s, ctx); err == nil {
+					t.Fatal("unauthorized operation accepted")
+				}
+				if len(r.calls) != 0 || r.history != nil {
+					t.Fatal("denied operation reached persistence")
+				}
+			})
+		}
+	}
+}
+
+type recordingScope struct{ resource, action string }
+
+func (r *recordingScope) ResolveStoreRange(_ context.Context, org, user int64, resource, action string) (authz.StoreRange, error) {
+	r.resource, r.action = resource, action
+	if org != 7 || user != 9 {
+		panic("wrong authenticated actor")
+	}
+	return authz.StoreRange{}, stderrors.New("stop after recording authorization")
+}
+func TestStoreManagementChecksExactResourceAndAction(t *testing.T) {
+	cases := []struct {
+		name, resource, action string
+		call                   func(*Service) error
+	}{
+		{"list", "stores", "list", func(s *Service) error { _, e := s.List(adminContext(), Actor{7, 9}, port.Filter{}); return e }},
+		{"get", "stores", "read", func(s *Service) error { _, e := s.Get(adminContext(), Actor{7, 9}, 2); return e }},
+		{"create", "stores", "create", func(s *Service) error { _, e := s.Create(adminContext(), Actor{7, 9}, "C", "C", ""); return e }},
+		{"update", "stores", "update", func(s *Service) error { _, e := s.Update(adminContext(), Actor{7, 9}, 2, 1, "B", "", nil); return e }},
+		{"deactivate", "stores", "update", func(s *Service) error {
+			v := false
+			_, e := s.Update(adminContext(), Actor{7, 9}, 2, 1, "B", "", &v)
+			return e
+		}},
+		{"assign", "clinicians", "update", func(s *Service) error { _, e := s.Assign(adminContext(), Actor{7, 9}, 10, change()); return e }},
+		{"history", "clinicians", "read", func(s *Service) error { _, e := s.History(adminContext(), Actor{7, 9}, 10); return e }},
+		{"progress", "clinicians", "list", func(s *Service) error { _, e := s.Progress(adminContext(), Actor{7, 9}); return e }},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			s, repo := fixture(t)
+			scope := &recordingScope{}
+			s.scope = scope
+			if tc.call(s) == nil {
+				t.Fatal("authorization error ignored")
+			}
+			if scope.resource != "qs:actor:collection:"+tc.resource || scope.action != tc.action {
+				t.Fatalf("wrong permission: %s %s", scope.resource, scope.action)
+			}
+			if len(repo.calls) != 0 {
+				t.Fatal("authorization failure touched persistence")
+			}
+		})
 	}
 }

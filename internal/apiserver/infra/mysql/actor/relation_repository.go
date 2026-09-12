@@ -11,6 +11,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/database/mysql"
 	"github.com/FangcunMount/qs-server/internal/pkg/safeconv"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 type relationRepository struct {
@@ -79,13 +80,22 @@ func (r *relationRepository) FindActive(
 	return r.FindActiveByTypes(ctx, orgID, clinicianID, testeeID, []domain.RelationType{relationType})
 }
 
-func (r *relationRepository) FindActivePrimaryByTestee(
-	ctx context.Context,
-	orgID int64,
-	testeeID testee.ID,
-) (*domain.ClinicianTesteeRelation, error) {
+func (r *relationRepository) FindActivePrimaryByTestee(ctx context.Context, orgID int64, testeeID testee.ID) (*domain.ClinicianTesteeRelation, error) {
+	return r.findActivePrimaryByTestee(r.WithContext(ctx), ctx, orgID, testeeID)
+}
+func (r *relationRepository) FindActivePrimaryByTesteeForUpdate(ctx context.Context, orgID int64, testeeID testee.ID) (*domain.ClinicianTesteeRelation, error) {
+	tx, err := mysql.RequireTx(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if orgID <= 0 {
+		return nil, errors.WithCode(code.ErrPermissionDenied, "resolved company required")
+	}
+	return r.findActivePrimaryByTestee(tx.WithContext(ctx).Clauses(clause.Locking{Strength: "UPDATE"}), ctx, orgID, testeeID)
+}
+func (r *relationRepository) findActivePrimaryByTestee(queryDB *gorm.DB, ctx context.Context, orgID int64, testeeID testee.ID) (*domain.ClinicianTesteeRelation, error) {
 	var po ClinicianRelationPO
-	err := r.WithContext(ctx).
+	err := queryDB.
 		Where(
 			"org_id = ? AND testee_id = ? AND relation_type = ? AND is_active = ? AND deleted_at IS NULL",
 			orgID,
@@ -103,15 +113,22 @@ func (r *relationRepository) FindActivePrimaryByTestee(
 	return r.mapper.ToDomain(&po), nil
 }
 
-func (r *relationRepository) FindActiveByTypes(
-	ctx context.Context,
-	orgID int64,
-	clinicianID clinician.ID,
-	testeeID testee.ID,
-	relationTypes []domain.RelationType,
-) (*domain.ClinicianTesteeRelation, error) {
+func (r *relationRepository) FindActiveByTypes(ctx context.Context, orgID int64, clinicianID clinician.ID, testeeID testee.ID, relationTypes []domain.RelationType) (*domain.ClinicianTesteeRelation, error) {
+	return r.findActiveByTypes(r.WithContext(ctx), ctx, orgID, clinicianID, testeeID, relationTypes)
+}
+func (r *relationRepository) FindActiveByTypesForUpdate(ctx context.Context, orgID int64, clinicianID clinician.ID, testeeID testee.ID, relationTypes []domain.RelationType) (*domain.ClinicianTesteeRelation, error) {
+	tx, err := mysql.RequireTx(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if orgID <= 0 {
+		return nil, errors.WithCode(code.ErrPermissionDenied, "resolved company required")
+	}
+	return r.findActiveByTypes(tx.WithContext(ctx).Clauses(clause.Locking{Strength: "UPDATE"}), ctx, orgID, clinicianID, testeeID, relationTypes)
+}
+func (r *relationRepository) findActiveByTypes(queryDB *gorm.DB, ctx context.Context, orgID int64, clinicianID clinician.ID, testeeID testee.ID, relationTypes []domain.RelationType) (*domain.ClinicianTesteeRelation, error) {
 	var po ClinicianRelationPO
-	query := r.WithContext(ctx).
+	query := queryDB.
 		Where(
 			"org_id = ? AND clinician_id = ? AND testee_id = ? AND is_active = ? AND deleted_at IS NULL",
 			orgID,
@@ -280,3 +297,26 @@ func (r *relationRepository) ListActiveTesteeIDsByClinician(
 	}
 	return ids, nil
 }
+
+var _ domain.LockedRepository = (*relationRepository)(nil)
+
+func (r *relationRepository) FindByIDForUpdate(ctx context.Context, orgID int64, testeeID testee.ID, id domain.ID) (*domain.ClinicianTesteeRelation, error) {
+	tx, err := mysql.RequireTx(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if orgID <= 0 {
+		return nil, errors.WithCode(code.ErrPermissionDenied, "resolved company required")
+	}
+	var po ClinicianRelationPO
+	err = tx.WithContext(ctx).Clauses(clause.Locking{Strength: "UPDATE"}).Where("org_id = ? AND testee_id = ? AND id = ? AND deleted_at IS NULL", orgID, testeeID.Uint64(), id.Uint64()).Take(&po).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, errors.WithCode(code.ErrUserNotFound, "relation not found in current company")
+	}
+	if err != nil {
+		return nil, err
+	}
+	return r.mapper.ToDomain(&po), nil
+}
+
+var _ domain.AssignmentLockedRepository = (*relationRepository)(nil)

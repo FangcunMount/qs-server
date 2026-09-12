@@ -142,3 +142,73 @@ func (r *adminReader) ListReports(_ context.Context, f interpretationreadmodel.R
 	r.filter = f
 	return nil, 0, nil
 }
+
+func TestReportListForwardsExplicitStoreRangeIncludingEmpty(t *testing.T) {
+	for _, ids := range [][]uint64{{7, 8}, nil} {
+		reader := &adminReader{}
+		svc := NewService(reader, adminAccess{scope: ListScope{OrgID: 1, RestrictToStoreScope: true, StoreScopedTesteeIDs: ids, Audience: policy.AudienceOperator, DecisionSource: "store_scope"}})
+		ctx := authztest.WithPermission(context.Background(), "qs:evaluation:collection:reports", "list")
+		if _, err := svc.ListReports(ctx, Actor{OrgID: 1, OperatorUserID: 2}, ListQuery{}); err != nil {
+			t.Fatal(err)
+		}
+		if !reader.filter.RestrictToStoreScope || reader.filter.OrgID == nil || *reader.filter.OrgID != 1 || len(reader.filter.StoreScopedTesteeIDs) != len(ids) {
+			t.Fatalf("lost explicit scope: %+v", reader.filter)
+		}
+	}
+}
+
+type movingReportReader struct{ adminReader }
+
+func (r *movingReportReader) ListReports(_ context.Context, f interpretationreadmodel.ReportFilter, _ interpretationreadmodel.PageRequest) ([]interpretationreadmodel.ReportRow, int64, error) {
+	r.calls++
+	r.filter = f
+	return []interpretationreadmodel.ReportRow{{}}, 1, nil
+}
+
+type changingReportAccess struct {
+	calls int
+}
+
+func (a *changingReportAccess) ScopeReports(ctx context.Context, actor Actor, id uint64) (ListScope, error) {
+	a.calls++
+	result := ListScope{OrgID: actor.OrgID, Audience: policy.AudienceOperator, DecisionSource: "scope", RestrictToStoreScope: true, StoreScopedTesteeIDs: []uint64{7}}
+	if a.calls > 1 {
+		result.StoreScopedTesteeIDs = []uint64{8}
+	}
+	return result, nil
+}
+func (a *changingReportAccess) AuthorizeAssessment(context.Context, Actor, uint64) (ReportAccessDecision, error) {
+	a.calls++
+	if a.calls > 1 {
+		return ReportAccessDecision{}, errors.New("testee transferred")
+	}
+	return ReportAccessDecision{Audience: policy.AudienceOperator, Restricted: true, DecisionSource: "scope"}, nil
+}
+func TestReportListDoesNotReturnPageAfterOwnershipChanges(t *testing.T) {
+	access := &changingReportAccess{}
+	reader := &movingReportReader{}
+	service := NewService(reader, access)
+	result, err := service.ListReports(authztest.WithPermission(context.Background(), "qs:evaluation:collection:reports", "list"), Actor{OrgID: 1, OperatorUserID: 2}, ListQuery{})
+	if err == nil || result != nil || access.calls != 2 || reader.calls != 1 {
+		t.Fatalf("stale report page returned: %+v %v calls=%d", result, err, access.calls)
+	}
+}
+func TestReportDetailRechecksOwnershipBeforeReturningProjection(t *testing.T) {
+	access := &changingReportAccess{}
+	service := NewService(&adminReader{}, access)
+	result, err := service.GetReport(authztest.WithPermission(context.Background(), "qs:evaluation:collection:reports", "read"), Actor{OrgID: 1, OperatorUserID: 2}, GetQuery{AssessmentID: 3})
+	if err == nil || result != nil || access.calls != 2 {
+		t.Fatalf("transferred report returned: %+v %v", result, err)
+	}
+}
+func TestReportScopeComparisonIgnoresOnlySetOrder(t *testing.T) {
+	a := ListScope{OrgID: 1, RestrictToStoreScope: true, StoreScopedTesteeIDs: []uint64{8, 7, 7}}
+	b := ListScope{OrgID: 1, RestrictToStoreScope: true, StoreScopedTesteeIDs: []uint64{7, 8}}
+	if !sameListScope(a, b) {
+		t.Fatal("same scope rejected")
+	}
+	b.OrgID = 2
+	if sameListScope(a, b) {
+		t.Fatal("company boundary ignored")
+	}
+}

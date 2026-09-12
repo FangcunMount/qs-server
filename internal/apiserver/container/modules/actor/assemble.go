@@ -7,6 +7,7 @@ import (
 	retirementInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/actor/operatorretirement"
 	storeInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/actor/store"
 	testeeStoreInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/actor/testeestore"
+	"github.com/FangcunMount/qs-server/internal/apiserver/port/iambridge"
 	"gorm.io/gorm"
 
 	redis "github.com/redis/go-redis/v9"
@@ -38,28 +39,31 @@ import (
 
 // Module assembles actor application services.
 type Module struct {
-	OperatorRetirementService        *retirementApp.Service
-	TesteeStoreService               *testeeStoreApp.Service
-	StoreService                     *storeApp.Service
-	TesteeRegistrationService        testeeApp.TesteeRegistrationService
-	TesteeManagementService          testeeApp.TesteeManagementService
-	TesteeQueryService               testeeApp.TesteeQueryService
-	TesteeBackendQueryService        testeeApp.TesteeBackendQueryService
-	TesteeAssessmentAttentionService testeeApp.TesteeAssessmentAttentionService
+	OperatorScopeService               *operatorApp.ScopeService
+	OperatorRetirementService          *retirementApp.Service
+	TesteeStoreService                 *testeeStoreApp.Service
+	StoreService                       *storeApp.Service
+	TesteeRegistrationService          testeeApp.TesteeRegistrationService
+	TesteeManagementService            testeeApp.TesteeManagementService
+	SelfServiceTesteeManagementService testeeApp.TesteeManagementService
+	TesteeQueryService                 testeeApp.TesteeQueryService
+	TesteeBackendQueryService          testeeApp.TesteeBackendQueryService
+	TesteeAssessmentAttentionService   testeeApp.TesteeAssessmentAttentionService
 
-	OperatorLifecycleService         operatorApp.OperatorLifecycleService
-	OperatorAuthorizationService     operatorApp.OperatorAuthorizationService
-	OperatorQueryService             operatorApp.OperatorQueryService
-	ClinicianLifecycleService        clinicianApp.ClinicianLifecycleService
-	ClinicianQueryService            clinicianApp.ClinicianQueryService
-	ClinicianRelationshipService     clinicianApp.ClinicianRelationshipService
-	AssessmentEntryService           assessmentEntryApp.AssessmentEntryService
-	TesteeAccessService              actorAccessApp.TesteeAccessService
-	ActiveOperatorChecker            operatorApp.ActiveOperatorChecker
-	OperatorRoleProjectionUpdater    operatorApp.OperatorRoleProjectionUpdater
-	OperatorRoleProjectionReconciler operatorApp.OperatorRoleProjectionReconciler
-	ReadModel                        actorreadmodel.ReadModel
-	AssessmentSummaryReader          actorreadmodel.AssessmentSummaryReader
+	OperatorLifecycleService             operatorApp.OperatorLifecycleService
+	OperatorAuthorizationService         operatorApp.OperatorAuthorizationService
+	OperatorQueryService                 operatorApp.OperatorQueryService
+	ClinicianLifecycleService            clinicianApp.ClinicianLifecycleService
+	ClinicianQueryService                clinicianApp.ClinicianQueryService
+	ClinicianRelationshipService         clinicianApp.ClinicianRelationshipService
+	OperatorClinicianRelationshipService clinicianApp.ClinicianRelationshipService
+	AssessmentEntryService               assessmentEntryApp.AssessmentEntryService
+	TesteeAccessService                  actorAccessApp.TesteeAccessService
+	ActiveOperatorChecker                operatorApp.ActiveOperatorChecker
+	OperatorRoleProjectionUpdater        operatorApp.OperatorRoleProjectionUpdater
+	OperatorRoleProjectionReconciler     operatorApp.OperatorRoleProjectionReconciler
+	ReadModel                            actorreadmodel.ReadModel
+	AssessmentSummaryReader              actorreadmodel.AssessmentSummaryReader
 }
 
 // Deps defines explicit constructor dependencies for the actor module.
@@ -93,15 +97,12 @@ func New(deps Deps) (*Module, error) {
 		authzAssign = deps.OperatorAuthz.Assignment
 		authzSnap = deps.OperatorAuthz.Snapshot
 	}
-	authzSnapshotReader := iam.NewAuthzSnapshotReader(authzSnap)
 	operatorAuthzGateway := iam.NewOperatorAuthzGateway(authzAssign, authzSnap)
 	userDirectory := iam.NewUserDirectory(identitySvc)
 	accountRegistrar := iam.NewOperationAccountRegistrar(operationAccountSvc)
 	profileLinkDirectory := iam.NewProfileLinkDirectory(profileLinkSvc, identitySvc)
 
 	txRunner := modtx.NewMySQLRunner(mysqlDB)
-	module.StoreService = storeApp.NewService(storeInfra.NewRepository(mysqlDB), txRunner)
-	module.TesteeStoreService = testeeStoreApp.NewService(testeeStoreInfra.NewRepository(mysqlDB), txRunner)
 	mysqlOptions := mysql.BaseRepositoryOptions{Limiter: deps.MySQLLimiter}
 
 	baseTesteeRepo := actorInfra.NewTesteeRepository(mysqlDB, mysqlOptions)
@@ -114,8 +115,10 @@ func New(deps Deps) (*Module, error) {
 	}
 
 	retirementRepo := retirementInfra.NewRepository(mysqlDB)
-	module.OperatorRetirementService = retirementApp.NewService(retirementRepo, iam.NewOperatorRetirementAuthzGateway(authzAssign, authzSnap))
 	operatorRepo := actorInfra.NewGuardedOperatorRepository(mysqlDB, retirementRepo, mysqlOptions)
+	if gateway, ok := operatorAuthzGateway.(iambridge.OperatorScopeGateway); ok {
+		module.OperatorScopeService = operatorApp.NewScopeService(operatorRepo, gateway, operatorApp.ScopeWriteDependencies{Stores: storeInfra.NewRepository(mysqlDB), Gate: retirementRepo})
+	}
 	clinicianRepo := actorInfra.NewClinicianRepository(mysqlDB, mysqlOptions)
 	relationRepo := actorInfra.NewRelationRepository(mysqlDB, mysqlOptions)
 	assessmentEntryRepo := actorInfra.NewAssessmentEntryRepository(mysqlDB, mysqlOptions)
@@ -146,7 +149,7 @@ func New(deps Deps) (*Module, error) {
 		txRunner,
 		profileLinkSvc,
 	)
-	module.TesteeManagementService = testeeApp.NewManagementService(
+	module.SelfServiceTesteeManagementService = testeeApp.NewSelfServiceManagementService(
 		testeeRepo,
 		testeeEditor,
 		testeeBinder,
@@ -187,12 +190,10 @@ func New(deps Deps) (*Module, error) {
 	module.ActiveOperatorChecker = operatorApp.NewActiveOperatorChecker(actorReadModel)
 	module.OperatorRoleProjectionUpdater = operatorApp.NewRoleProjectionUpdater(operatorRepo, operatorAuthzGateway)
 	module.OperatorRoleProjectionReconciler = operatorApp.NewRoleProjectionReconciler(operatorRepo, operatorAuthzGateway)
-	module.ClinicianLifecycleService = clinicianApp.NewLifecycleService(
-		clinicianRepo,
-		clinicianValidator,
-		txRunner,
-	)
-	module.ClinicianQueryService = clinicianApp.NewQueryService(actorReadModel, actorReadModel, actorReadModel)
+
+	module.TesteeAccessService = actorAccessApp.NewTesteeAccessService(actorReadModel, actorReadModel)
+	module.ClinicianQueryService = clinicianApp.NewOperatorQueryService(actorReadModel, actorReadModel, actorReadModel, module.TesteeAccessService.(actorAccessApp.StoreScopeAccess))
+	module.ClinicianLifecycleService = clinicianApp.NewOperatorLifecycleService(clinicianRepo, clinicianValidator, txRunner, module.TesteeAccessService.(actorAccessApp.StoreScopeAccess))
 	module.ClinicianRelationshipService = clinicianApp.NewRelationshipServiceWithAssessmentSummary(
 		relationRepo,
 		clinicianRepo,
@@ -200,15 +201,15 @@ func New(deps Deps) (*Module, error) {
 		txRunner,
 		actorReadModel,
 		assessmentSummaryReader,
+		module.TesteeAccessService.(actorAccessApp.StoreScopeAccess),
 	)
-	module.TesteeAccessService = actorAccessApp.NewTesteeAccessService(
-		actorReadModel,
-		actorReadModel,
-		actorReadModel,
-		actorReadModel,
-		authzSnapshotReader,
-	)
-	module.AssessmentEntryService = assessmentEntryApp.NewService(
+	module.OperatorClinicianRelationshipService = clinicianApp.NewOperatorRelationshipService(relationRepo, clinicianRepo, testeeRepo, txRunner, actorReadModel, assessmentSummaryReader, module.TesteeAccessService.(actorAccessApp.StoreScopeAccess))
+	module.OperatorRetirementService = retirementApp.NewService(retirementRepo, iam.NewScopedOperatorRetirementAuthzGateway(operatorAuthzGateway), module.TesteeAccessService.(actorAccessApp.StoreScopeAccess))
+	module.StoreService = storeApp.NewService(storeInfra.NewRepository(mysqlDB), txRunner, module.TesteeAccessService.(actorAccessApp.StoreScopeAccess))
+	module.TesteeStoreService = testeeStoreApp.NewService(testeeStoreInfra.NewRepository(mysqlDB), txRunner, module.TesteeAccessService.(actorAccessApp.StoreScopeAccess))
+	module.TesteeManagementService = testeeApp.NewScopedManagementService(testeeRepo, testeeEditor, testeeBinder, txRunner, module.TesteeAccessService.(actorAccessApp.StoreScopeAccess))
+	module.AssessmentEntryService = assessmentEntryApp.NewManagedService(
+		module.TesteeAccessService.(actorAccessApp.StoreScopeAccess),
 		assessmentEntryRepo,
 		clinicianRepo,
 		relationRepo,

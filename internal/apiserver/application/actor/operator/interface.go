@@ -43,7 +43,7 @@ type OperatorLifecycleService interface {
 // 职责：角色分配、权限管理、账号启停用
 // 变更来源：IT部门的权限管理需求变化
 type OperatorAuthorizationService interface {
-	// ReplaceRoles atomically replaces only the QS-managed direct IAM roles.
+	// ReplaceRoles rejects retired role-only writes. Use ScopeService.Replace instead.
 	ReplaceRoles(ctx context.Context, operatorID uint64, roles []string) error
 
 	// Activate 激活操作者账号
@@ -91,7 +91,7 @@ type RegisterOperatorDTO struct {
 	Email    string   // 邮箱
 	Phone    string   // 手机号
 	Password string   // 初始密码（新建 IAM 运营账号时使用）
-	Roles    []string // 角色列表
+	Roles    []string // 兼容输入：非空即拒绝；新身份通过 ScopeService 独立配置授权
 	IsActive bool     // 是否激活
 }
 

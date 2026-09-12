@@ -12,7 +12,7 @@ func (m *Module) ExportGRPCDeps() grpctransport.ActorDeps {
 		return deps
 	}
 	deps.TesteeRegistrationService = m.TesteeRegistrationService
-	deps.TesteeManagementService = m.TesteeManagementService
+	deps.TesteeManagementService = m.SelfServiceTesteeManagementService
 	deps.TesteeQueryService = testeeApp.NewSelfServiceQueryServiceWithAssessmentSummary(m.ReadModel, m.AssessmentSummaryReader)
 	deps.ClinicianRelationshipService = m.ClinicianRelationshipService
 	deps.TesteeAssessmentAttentionService = m.TesteeAssessmentAttentionService

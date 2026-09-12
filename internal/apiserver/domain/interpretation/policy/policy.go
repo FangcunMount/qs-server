@@ -8,6 +8,7 @@ const (
 	AudienceParticipant Audience = "participant"
 	AudienceClinician   Audience = "clinician"
 	AudienceAdmin       Audience = "admin"
+	AudienceOperator    Audience = "operator"
 )
 
 // ReportProfile 标识报告呈现形态，用于 builder 路由的扩展键。

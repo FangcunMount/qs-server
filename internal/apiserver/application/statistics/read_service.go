@@ -184,9 +184,10 @@ type ReadStore interface {
 }
 
 type ReadService struct {
-	store ReadStore
-	cache ReadCache
-	now   func() time.Time
+	scopeAccess StatisticsScopeAccess
+	store       ReadStore
+	cache       ReadCache
+	now         func() time.Time
 }
 
 type ReadCache interface {
@@ -299,7 +300,7 @@ func (s *ReadService) Overview(ctx context.Context, orgID int64, filter QueryFil
 	if err != nil {
 		return nil, err
 	}
-	return s.overviewResolved(ctx, orgID, r, freshness, &permit)
+	return s.scopedOverview(ctx, orgID, r, freshness, permit)
 }
 
 func (s *ReadService) overviewResolved(ctx context.Context, orgID int64, r DateRange, freshness Freshness, permit *databaseReadPermit) (*Overview, error) {
@@ -330,34 +331,7 @@ func (s *ReadService) overviewResolved(ctx context.Context, orgID int64, r DateR
 			return nil, err
 		}
 	}
-	completedTasks := metrics.CompletedOnTimeCount + metrics.CompletedOverdueCount
-	overdueTasks := metrics.CompletedOverdueCount + metrics.UncompletedOverdueCount
-	completionRate, onTimeRate := float64(0), float64(0)
-	if metrics.DueTaskCount > 0 {
-		completionRate = float64(completedTasks) * 100 / float64(metrics.DueTaskCount)
-		onTimeRate = float64(metrics.CompletedOnTimeCount) * 100 / float64(metrics.DueTaskCount)
-	}
-	value := &Overview{
-		OrgID: orgID, TimeRange: r, Freshness: freshness, Metrics: metrics,
-		OrganizationOverview: domainstats.OrganizationOverview{
-			TesteeCount: metrics.TesteeCount, ClinicianCount: metrics.ClinicianCount, ActiveEntryCount: metrics.ActiveEntryCount,
-			AssessmentCount: metrics.AssessmentCount, ReportCount: metrics.ReportCount, ContentCount: metrics.ContentCount,
-			AnswerSheetSubmissionCount: metrics.AnswerSheetSubmissionCount,
-		},
-		AccessFunnel: domainstats.AccessFunnelStatistics{
-			Window: domainstats.AccessFunnelWindow{EntryOpenedCount: metrics.EntryOpenedCount, IntakeConfirmedCount: metrics.IntakeConfirmedCount, TesteeCreatedCount: metrics.TesteeCreatedCount, CareRelationshipEstablishedCount: metrics.CareRelationshipEstablishedCount},
-			Trend:  trends.Access,
-		},
-		AssessmentService: domainstats.AssessmentServiceStatistics{
-			Window: domainstats.AssessmentServiceWindow{AnswerSheetSubmittedCount: metrics.WindowAnswerSheetSubmittedCount, AssessmentCreatedCount: metrics.WindowAssessmentCreatedCount, ReportGeneratedCount: metrics.WindowReportGeneratedCount, AssessmentFailedCount: metrics.WindowAssessmentFailedCount},
-			Trend:  trends.Assessment,
-		},
-		DimensionAnalysis: domainstats.DimensionAnalysisSummary{ClinicianCount: metrics.ClinicianCount, EntryCount: metrics.EntryCount, ContentCount: metrics.ContentCount},
-		Plan: domainstats.PlanDomainStatistics{
-			Activity:    domainstats.PlanTaskActivityStatistics{Window: domainstats.PlanTaskActivityWindow{TaskCreatedCount: metrics.TaskCreatedCount, TaskOpenedCount: metrics.TaskOpenedCount, TaskCompletedCount: metrics.TaskCompletedCount, TaskExpiredCount: metrics.TaskExpiredCount, EnrolledTestees: trends.EnrolledTestees, ActiveTestees: metrics.ActiveEnrollmentCount}, Trend: trends.PlanActivity},
-			Fulfillment: domainstats.PlanTaskFulfillmentStatistics{Window: domainstats.PlanTaskFulfillmentWindow{PlannedTaskCount: metrics.PlannedTaskCount, DueTaskCount: metrics.DueTaskCount, CompletedTaskCount: completedTasks, OnTimeCompletedCount: metrics.CompletedOnTimeCount, OverdueTaskCount: overdueTasks, CompletionRate: completionRate, OnTimeCompletionRate: onTimeRate}, Trend: trends.PlanFulfillment},
-		},
-	}
+	value := buildOverview(orgID, r, freshness, metrics, trends)
 	s.cacheSet(ctx, orgID, key, value)
 	return value, nil
 }
@@ -411,18 +385,18 @@ func (s *ReadService) Clinicians(ctx context.Context, orgID int64, clinicianID *
 	}
 	page, size = normalizePage(page, size)
 	from, to := queryBounds(r)
-	key := cacheKey("clinicians", clinicianID, operatorUserID, r.Preset, r.From, r.To, page, size)
-	cached := &Page[ClinicianItem]{}
-	if hit, stale := s.cacheGet(ctx, orgID, key, cached); hit {
-		if stale {
-			cached.Freshness.IsStale = true
-		}
-		return cached, nil
+	stores, err := s.statisticsRange(ctx, orgID)
+	if err != nil {
+		return nil, err
+	}
+	reader, ok := s.store.(ScopedClinicianStore)
+	if !ok {
+		return nil, fmt.Errorf("scoped clinician statistics reader is not configured")
 	}
 	if err := ensurePublishedResults(permit.readable); err != nil {
 		return nil, err
 	}
-	items, total, err := s.store.ListClinicians(ctx, orgID, clinicianID, operatorUserID, from, to, page, size)
+	items, total, err := reader.ScopedClinicians(ctx, orgID, stores, clinicianID, operatorUserID, from, to, page, size)
 	if err != nil {
 		return nil, err
 	}
@@ -430,7 +404,6 @@ func (s *ReadService) Clinicians(ctx context.Context, orgID int64, clinicianID *
 		return nil, err
 	}
 	value := &Page[ClinicianItem]{Items: items, Total: total, Page: page, PageSize: size, TotalPages: int((total + int64(size) - 1) / int64(size)), TimeRange: r, Freshness: freshness}
-	s.cacheSet(ctx, orgID, key, value)
 	return value, nil
 }
 
@@ -444,18 +417,18 @@ func (s *ReadService) Entries(ctx context.Context, orgID int64, entryID, clinici
 	}
 	page, size = normalizePage(page, size)
 	from, to := queryBounds(r)
-	key := cacheKey("entries", entryID, clinicianID, active, r.Preset, r.From, r.To, page, size)
-	cached := &Page[EntryItem]{}
-	if hit, stale := s.cacheGet(ctx, orgID, key, cached); hit {
-		if stale {
-			cached.Freshness.IsStale = true
-		}
-		return cached, nil
+	stores, err := s.statisticsRange(ctx, orgID)
+	if err != nil {
+		return nil, err
+	}
+	reader, ok := s.store.(ScopedEntryStore)
+	if !ok {
+		return nil, fmt.Errorf("scoped entry statistics reader is not configured")
 	}
 	if err := ensurePublishedResults(permit.readable); err != nil {
 		return nil, err
 	}
-	items, total, err := s.store.ListEntries(ctx, orgID, entryID, clinicianID, active, from, to, page, size)
+	items, total, err := reader.ScopedEntries(ctx, orgID, stores, entryID, clinicianID, active, from, to, page, size)
 	if err != nil {
 		return nil, err
 	}
@@ -463,7 +436,6 @@ func (s *ReadService) Entries(ctx context.Context, orgID int64, entryID, clinici
 		return nil, err
 	}
 	value := &Page[EntryItem]{Items: items, Total: total, Page: page, PageSize: size, TotalPages: int((total + int64(size) - 1) / int64(size)), TimeRange: r, Freshness: freshness}
-	s.cacheSet(ctx, orgID, key, value)
 	return value, nil
 }
 
@@ -472,18 +444,18 @@ func (s *ReadService) Contents(ctx context.Context, orgID int64, refs []ContentR
 	if err != nil {
 		return nil, err
 	}
-	key := cacheKey("contents", refs)
-	cached := &ContentBatch{}
-	if hit, stale := s.cacheGet(ctx, orgID, key, cached); hit {
-		if stale {
-			cached.Freshness.IsStale = true
-		}
-		return cached, nil
+	scopedRefs, err := s.contentRanges(ctx, orgID, refs)
+	if err != nil {
+		return nil, err
+	}
+	reader, ok := s.store.(ScopedContentStore)
+	if !ok {
+		return nil, fmt.Errorf("scoped content statistics reader is not configured")
 	}
 	if err := ensurePublishedResults(permit.readable); err != nil {
 		return nil, err
 	}
-	items, err := s.store.ContentBatch(ctx, orgID, r.To, refs)
+	items, err := reader.ScopedContentBatch(ctx, orgID, r.To, scopedRefs)
 	if err != nil {
 		return nil, err
 	}
@@ -491,6 +463,36 @@ func (s *ReadService) Contents(ctx context.Context, orgID int64, refs []ContentR
 		return nil, err
 	}
 	value := &ContentBatch{Items: items, Freshness: freshness}
-	s.cacheSet(ctx, orgID, key, value)
 	return value, nil
+}
+
+func buildOverview(orgID int64, r DateRange, freshness Freshness, metrics OverviewMetrics, trends OverviewTrends) *Overview {
+	completedTasks := metrics.CompletedOnTimeCount + metrics.CompletedOverdueCount
+	overdueTasks := metrics.CompletedOverdueCount + metrics.UncompletedOverdueCount
+	completionRate, onTimeRate := float64(0), float64(0)
+	if metrics.DueTaskCount > 0 {
+		completionRate = float64(completedTasks) * 100 / float64(metrics.DueTaskCount)
+		onTimeRate = float64(metrics.CompletedOnTimeCount) * 100 / float64(metrics.DueTaskCount)
+	}
+	return &Overview{
+		OrgID: orgID, TimeRange: r, Freshness: freshness, Metrics: metrics,
+		OrganizationOverview: domainstats.OrganizationOverview{
+			TesteeCount: metrics.TesteeCount, ClinicianCount: metrics.ClinicianCount, ActiveEntryCount: metrics.ActiveEntryCount,
+			AssessmentCount: metrics.AssessmentCount, ReportCount: metrics.ReportCount, ContentCount: metrics.ContentCount,
+			AnswerSheetSubmissionCount: metrics.AnswerSheetSubmissionCount,
+		},
+		AccessFunnel: domainstats.AccessFunnelStatistics{
+			Window: domainstats.AccessFunnelWindow{EntryOpenedCount: metrics.EntryOpenedCount, IntakeConfirmedCount: metrics.IntakeConfirmedCount, TesteeCreatedCount: metrics.TesteeCreatedCount, CareRelationshipEstablishedCount: metrics.CareRelationshipEstablishedCount},
+			Trend:  trends.Access,
+		},
+		AssessmentService: domainstats.AssessmentServiceStatistics{
+			Window: domainstats.AssessmentServiceWindow{AnswerSheetSubmittedCount: metrics.WindowAnswerSheetSubmittedCount, AssessmentCreatedCount: metrics.WindowAssessmentCreatedCount, ReportGeneratedCount: metrics.WindowReportGeneratedCount, AssessmentFailedCount: metrics.WindowAssessmentFailedCount},
+			Trend:  trends.Assessment,
+		},
+		DimensionAnalysis: domainstats.DimensionAnalysisSummary{ClinicianCount: metrics.ClinicianCount, EntryCount: metrics.EntryCount, ContentCount: metrics.ContentCount},
+		Plan: domainstats.PlanDomainStatistics{
+			Activity:    domainstats.PlanTaskActivityStatistics{Window: domainstats.PlanTaskActivityWindow{TaskCreatedCount: metrics.TaskCreatedCount, TaskOpenedCount: metrics.TaskOpenedCount, TaskCompletedCount: metrics.TaskCompletedCount, TaskExpiredCount: metrics.TaskExpiredCount, EnrolledTestees: trends.EnrolledTestees, ActiveTestees: metrics.ActiveEnrollmentCount}, Trend: trends.PlanActivity},
+			Fulfillment: domainstats.PlanTaskFulfillmentStatistics{Window: domainstats.PlanTaskFulfillmentWindow{PlannedTaskCount: metrics.PlannedTaskCount, DueTaskCount: metrics.DueTaskCount, CompletedTaskCount: completedTasks, OnTimeCompletedCount: metrics.CompletedOnTimeCount, OverdueTaskCount: overdueTasks, CompletionRate: completionRate, OnTimeCompletionRate: onTimeRate}, Trend: trends.PlanFulfillment},
+		},
+	}
 }
