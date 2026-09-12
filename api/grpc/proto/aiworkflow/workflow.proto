@@ -353,3 +353,30 @@ message ProfileRegistrationReceipt {
  string command_id = 2;
  string receipt_json = 3;
 }
+
+// Rebind retained evaluation cases to immutable assets. A new Run and approval
+// are required; registration never copies a previous Run's evidence or verdict.
+service SuiteManagement {
+ rpc Register(SuiteRegisterCommand) returns (SuiteRegistrationReceipt);
+ rpc GetReceipt(SuiteRegistrationQuery) returns (SuiteRegistrationReceipt);
+}
+message SuiteRegisterCommand {
+ PublicationScope scope = 1;
+ string command_id = 2;
+ FrozenEvaluationRef source = 3;
+ string suite_id = 4;
+ string suite_version = 5;
+ PromptDraftSource profile = 6;
+ PromptDraftSource prompt = 7;
+ PromptDraftSource generation_route = 8;
+ string reason = 9;
+}
+message SuiteRegistrationQuery {
+ PublicationScope scope = 1;
+ string command_id = 2;
+}
+message SuiteRegistrationReceipt {
+ string schema_version = 1;
+ string command_id = 2;
+ string receipt_json = 3;
+}
