@@ -12,6 +12,10 @@ type FrozenEvaluationRef struct {
 	Fingerprint string `json:"fingerprint"`
 }
 
+func (r FrozenEvaluationRef) Valid() bool {
+	return frozenID.MatchString(r.ID) && frozenVersion.MatchString(r.Version) && frozenFingerprint.MatchString(r.Fingerprint)
+}
+
 // EvaluationRelease carries immutable references; qs-ai resolves and verifies each asset.
 type EvaluationRelease struct {
 	Suite                FrozenEvaluationRef `json:"suite"`

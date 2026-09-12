@@ -377,6 +377,25 @@ definitions:
       source:
         $ref: '#/definitions/aibridge.PromptDraftSource'
     type: object
+  aibridge.RegisterSuite:
+    properties:
+      command_id:
+        type: string
+      generation_route:
+        $ref: '#/definitions/aibridge.PromptDraftSource'
+      profile:
+        $ref: '#/definitions/aibridge.PromptDraftSource'
+      prompt:
+        $ref: '#/definitions/aibridge.PromptDraftSource'
+      reason:
+        type: string
+      source:
+        $ref: '#/definitions/aibridge.FrozenEvaluationRef'
+      suite_id:
+        type: string
+      suite_version:
+        type: string
+    type: object
   aibridge.RegisteredManifest:
     properties:
       generation_route:
@@ -430,6 +449,19 @@ definitions:
         type: string
       reason:
         type: string
+    type: object
+  aibridge.SuiteRegistrationReceipt:
+    properties:
+      command:
+        $ref: '#/definitions/aibridge.RegisterSuite'
+      manifest:
+        $ref: '#/definitions/aibridge.RegisteredManifest'
+      registered_at:
+        type: string
+      scope:
+        $ref: '#/definitions/aibridge.DraftScope'
+      suite:
+        $ref: '#/definitions/aibridge.FrozenEvaluationRef'
     type: object
   aibridge.UnknownResolution:
     properties:
@@ -15545,6 +15577,106 @@ paths:
       summary: 回退至历史 qs-ai 发布版本
       tags:
       - AI-Workflow-Publications
+  /internal/v2/interpretation/ai-workflow/suites/commands/{command_id}:
+    get:
+      description: 需要当前机构解读审计权限，仅原机构及原操作人可查询。不重发注册，不触发发布。
+      parameters:
+      - description: 原命令 UUID
+        in: path
+        name: command_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/aibridge.SuiteRegistrationReceipt'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+      summary: 查询 qs-ai Suite 注册原命令回执
+      tags:
+      - AI-Workflow-Suites
+  /internal/v2/interpretation/ai-workflow/suites/register:
+    post:
+      consumes:
+      - application/json
+      description: 需要当前机构 OrgAdmin 权限，组织和操作人来自认证上下文。注册保留案例并绑定配置，不代表评测批准或发布。超时后查询原
+        command_id，不自动重试。
+      parameters:
+      - description: 原案例来源、新套件版本和确认的资产引用
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/aibridge.RegisterSuite'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/aibridge.SuiteRegistrationReceipt'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+      summary: 注册 qs-ai 不可变 Suite 版本
+      tags:
+      - AI-Workflow-Suites
   /internal/v2/statistics/runs:
     get:
       responses:

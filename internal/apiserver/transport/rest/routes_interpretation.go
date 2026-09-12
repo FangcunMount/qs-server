@@ -80,6 +80,14 @@ func (r *Router) registerInterpretationInternalV2Routes(internalV2 *gin.RouterGr
 		read.GET("/commands/:command_id", publications.GetReceipt)
 	}
 
+	if r.deps.Interpretation.AIWorkflowSuites != nil {
+		suites := handler.NewAIWorkflowSuiteHandler(r.deps.Interpretation.AIWorkflowSuites)
+		write := internalV2.Group("/interpretation/ai-workflow/suites", restmiddleware.RequireCapabilityMiddleware(restmiddleware.CapabilityOrgAdmin))
+		read := internalV2.Group("/interpretation/ai-workflow/suites", restmiddleware.RequireCapabilityMiddleware(restmiddleware.CapabilityAuditInterpretation))
+		write.POST("/register", suites.Register)
+		read.GET("/commands/:command_id", suites.GetReceipt)
+	}
+
 	if r.deps.Interpretation.AIWorkflowProfiles != nil {
 		profiles := handler.NewAIWorkflowProfileHandler(r.deps.Interpretation.AIWorkflowProfiles)
 		write := internalV2.Group("/interpretation/ai-workflow/profiles", restmiddleware.RequireCapabilityMiddleware(restmiddleware.CapabilityOrgAdmin))

@@ -1427,3 +1427,149 @@ var ProfileManagement_ServiceDesc = grpc.ServiceDesc{
 	Streams:  []grpc.StreamDesc{},
 	Metadata: "aiworkflow/workflow.proto",
 }
+
+const (
+	SuiteManagement_Register_FullMethodName   = "/qsai.workflow.v1.SuiteManagement/Register"
+	SuiteManagement_GetReceipt_FullMethodName = "/qsai.workflow.v1.SuiteManagement/GetReceipt"
+)
+
+// SuiteManagementClient is the client API for SuiteManagement service.
+//
+// For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
+//
+// Rebind retained evaluation cases to immutable assets. A new Run and approval
+// are required; registration never copies a previous Run's evidence or verdict.
+type SuiteManagementClient interface {
+	Register(ctx context.Context, in *SuiteRegisterCommand, opts ...grpc.CallOption) (*SuiteRegistrationReceipt, error)
+	GetReceipt(ctx context.Context, in *SuiteRegistrationQuery, opts ...grpc.CallOption) (*SuiteRegistrationReceipt, error)
+}
+
+type suiteManagementClient struct {
+	cc grpc.ClientConnInterface
+}
+
+func NewSuiteManagementClient(cc grpc.ClientConnInterface) SuiteManagementClient {
+	return &suiteManagementClient{cc}
+}
+
+func (c *suiteManagementClient) Register(ctx context.Context, in *SuiteRegisterCommand, opts ...grpc.CallOption) (*SuiteRegistrationReceipt, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(SuiteRegistrationReceipt)
+	err := c.cc.Invoke(ctx, SuiteManagement_Register_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *suiteManagementClient) GetReceipt(ctx context.Context, in *SuiteRegistrationQuery, opts ...grpc.CallOption) (*SuiteRegistrationReceipt, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(SuiteRegistrationReceipt)
+	err := c.cc.Invoke(ctx, SuiteManagement_GetReceipt_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// SuiteManagementServer is the server API for SuiteManagement service.
+// All implementations must embed UnimplementedSuiteManagementServer
+// for forward compatibility.
+//
+// Rebind retained evaluation cases to immutable assets. A new Run and approval
+// are required; registration never copies a previous Run's evidence or verdict.
+type SuiteManagementServer interface {
+	Register(context.Context, *SuiteRegisterCommand) (*SuiteRegistrationReceipt, error)
+	GetReceipt(context.Context, *SuiteRegistrationQuery) (*SuiteRegistrationReceipt, error)
+	mustEmbedUnimplementedSuiteManagementServer()
+}
+
+// UnimplementedSuiteManagementServer must be embedded to have
+// forward compatible implementations.
+//
+// NOTE: this should be embedded by value instead of pointer to avoid a nil
+// pointer dereference when methods are called.
+type UnimplementedSuiteManagementServer struct{}
+
+func (UnimplementedSuiteManagementServer) Register(context.Context, *SuiteRegisterCommand) (*SuiteRegistrationReceipt, error) {
+	return nil, status.Error(codes.Unimplemented, "method Register not implemented")
+}
+func (UnimplementedSuiteManagementServer) GetReceipt(context.Context, *SuiteRegistrationQuery) (*SuiteRegistrationReceipt, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetReceipt not implemented")
+}
+func (UnimplementedSuiteManagementServer) mustEmbedUnimplementedSuiteManagementServer() {}
+func (UnimplementedSuiteManagementServer) testEmbeddedByValue()                         {}
+
+// UnsafeSuiteManagementServer may be embedded to opt out of forward compatibility for this service.
+// Use of this interface is not recommended, as added methods to SuiteManagementServer will
+// result in compilation errors.
+type UnsafeSuiteManagementServer interface {
+	mustEmbedUnimplementedSuiteManagementServer()
+}
+
+func RegisterSuiteManagementServer(s grpc.ServiceRegistrar, srv SuiteManagementServer) {
+	// If the following call panics, it indicates UnimplementedSuiteManagementServer was
+	// embedded by pointer and is nil.  This will cause panics if an
+	// unimplemented method is ever invoked, so we test this at initialization
+	// time to prevent it from happening at runtime later due to I/O.
+	if t, ok := srv.(interface{ testEmbeddedByValue() }); ok {
+		t.testEmbeddedByValue()
+	}
+	s.RegisterService(&SuiteManagement_ServiceDesc, srv)
+}
+
+func _SuiteManagement_Register_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SuiteRegisterCommand)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SuiteManagementServer).Register(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: SuiteManagement_Register_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SuiteManagementServer).Register(ctx, req.(*SuiteRegisterCommand))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _SuiteManagement_GetReceipt_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SuiteRegistrationQuery)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SuiteManagementServer).GetReceipt(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: SuiteManagement_GetReceipt_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SuiteManagementServer).GetReceipt(ctx, req.(*SuiteRegistrationQuery))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+// SuiteManagement_ServiceDesc is the grpc.ServiceDesc for SuiteManagement service.
+// It's only intended for direct use with grpc.RegisterService,
+// and not to be introspected or modified (even as a copy)
+var SuiteManagement_ServiceDesc = grpc.ServiceDesc{
+	ServiceName: "qsai.workflow.v1.SuiteManagement",
+	HandlerType: (*SuiteManagementServer)(nil),
+	Methods: []grpc.MethodDesc{
+		{
+			MethodName: "Register",
+			Handler:    _SuiteManagement_Register_Handler,
+		},
+		{
+			MethodName: "GetReceipt",
+			Handler:    _SuiteManagement_GetReceipt_Handler,
+		},
+	},
+	Streams:  []grpc.StreamDesc{},
+	Metadata: "aiworkflow/workflow.proto",
+}

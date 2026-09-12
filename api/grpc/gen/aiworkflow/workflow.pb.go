@@ -3520,6 +3520,226 @@ func (x *ProfileRegistrationReceipt) GetReceiptJson() string {
 	return ""
 }
 
+type SuiteRegisterCommand struct {
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	Scope           *PublicationScope      `protobuf:"bytes,1,opt,name=scope,proto3" json:"scope,omitempty"`
+	CommandId       string                 `protobuf:"bytes,2,opt,name=command_id,json=commandId,proto3" json:"command_id,omitempty"`
+	Source          *FrozenEvaluationRef   `protobuf:"bytes,3,opt,name=source,proto3" json:"source,omitempty"`
+	SuiteId         string                 `protobuf:"bytes,4,opt,name=suite_id,json=suiteId,proto3" json:"suite_id,omitempty"`
+	SuiteVersion    string                 `protobuf:"bytes,5,opt,name=suite_version,json=suiteVersion,proto3" json:"suite_version,omitempty"`
+	Profile         *PromptDraftSource     `protobuf:"bytes,6,opt,name=profile,proto3" json:"profile,omitempty"`
+	Prompt          *PromptDraftSource     `protobuf:"bytes,7,opt,name=prompt,proto3" json:"prompt,omitempty"`
+	GenerationRoute *PromptDraftSource     `protobuf:"bytes,8,opt,name=generation_route,json=generationRoute,proto3" json:"generation_route,omitempty"`
+	Reason          string                 `protobuf:"bytes,9,opt,name=reason,proto3" json:"reason,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *SuiteRegisterCommand) Reset() {
+	*x = SuiteRegisterCommand{}
+	mi := &file_aiworkflow_workflow_proto_msgTypes[48]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SuiteRegisterCommand) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SuiteRegisterCommand) ProtoMessage() {}
+
+func (x *SuiteRegisterCommand) ProtoReflect() protoreflect.Message {
+	mi := &file_aiworkflow_workflow_proto_msgTypes[48]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SuiteRegisterCommand.ProtoReflect.Descriptor instead.
+func (*SuiteRegisterCommand) Descriptor() ([]byte, []int) {
+	return file_aiworkflow_workflow_proto_rawDescGZIP(), []int{48}
+}
+
+func (x *SuiteRegisterCommand) GetScope() *PublicationScope {
+	if x != nil {
+		return x.Scope
+	}
+	return nil
+}
+
+func (x *SuiteRegisterCommand) GetCommandId() string {
+	if x != nil {
+		return x.CommandId
+	}
+	return ""
+}
+
+func (x *SuiteRegisterCommand) GetSource() *FrozenEvaluationRef {
+	if x != nil {
+		return x.Source
+	}
+	return nil
+}
+
+func (x *SuiteRegisterCommand) GetSuiteId() string {
+	if x != nil {
+		return x.SuiteId
+	}
+	return ""
+}
+
+func (x *SuiteRegisterCommand) GetSuiteVersion() string {
+	if x != nil {
+		return x.SuiteVersion
+	}
+	return ""
+}
+
+func (x *SuiteRegisterCommand) GetProfile() *PromptDraftSource {
+	if x != nil {
+		return x.Profile
+	}
+	return nil
+}
+
+func (x *SuiteRegisterCommand) GetPrompt() *PromptDraftSource {
+	if x != nil {
+		return x.Prompt
+	}
+	return nil
+}
+
+func (x *SuiteRegisterCommand) GetGenerationRoute() *PromptDraftSource {
+	if x != nil {
+		return x.GenerationRoute
+	}
+	return nil
+}
+
+func (x *SuiteRegisterCommand) GetReason() string {
+	if x != nil {
+		return x.Reason
+	}
+	return ""
+}
+
+type SuiteRegistrationQuery struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Scope         *PublicationScope      `protobuf:"bytes,1,opt,name=scope,proto3" json:"scope,omitempty"`
+	CommandId     string                 `protobuf:"bytes,2,opt,name=command_id,json=commandId,proto3" json:"command_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SuiteRegistrationQuery) Reset() {
+	*x = SuiteRegistrationQuery{}
+	mi := &file_aiworkflow_workflow_proto_msgTypes[49]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SuiteRegistrationQuery) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SuiteRegistrationQuery) ProtoMessage() {}
+
+func (x *SuiteRegistrationQuery) ProtoReflect() protoreflect.Message {
+	mi := &file_aiworkflow_workflow_proto_msgTypes[49]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SuiteRegistrationQuery.ProtoReflect.Descriptor instead.
+func (*SuiteRegistrationQuery) Descriptor() ([]byte, []int) {
+	return file_aiworkflow_workflow_proto_rawDescGZIP(), []int{49}
+}
+
+func (x *SuiteRegistrationQuery) GetScope() *PublicationScope {
+	if x != nil {
+		return x.Scope
+	}
+	return nil
+}
+
+func (x *SuiteRegistrationQuery) GetCommandId() string {
+	if x != nil {
+		return x.CommandId
+	}
+	return ""
+}
+
+type SuiteRegistrationReceipt struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	SchemaVersion string                 `protobuf:"bytes,1,opt,name=schema_version,json=schemaVersion,proto3" json:"schema_version,omitempty"`
+	CommandId     string                 `protobuf:"bytes,2,opt,name=command_id,json=commandId,proto3" json:"command_id,omitempty"`
+	ReceiptJson   string                 `protobuf:"bytes,3,opt,name=receipt_json,json=receiptJson,proto3" json:"receipt_json,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SuiteRegistrationReceipt) Reset() {
+	*x = SuiteRegistrationReceipt{}
+	mi := &file_aiworkflow_workflow_proto_msgTypes[50]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SuiteRegistrationReceipt) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SuiteRegistrationReceipt) ProtoMessage() {}
+
+func (x *SuiteRegistrationReceipt) ProtoReflect() protoreflect.Message {
+	mi := &file_aiworkflow_workflow_proto_msgTypes[50]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SuiteRegistrationReceipt.ProtoReflect.Descriptor instead.
+func (*SuiteRegistrationReceipt) Descriptor() ([]byte, []int) {
+	return file_aiworkflow_workflow_proto_rawDescGZIP(), []int{50}
+}
+
+func (x *SuiteRegistrationReceipt) GetSchemaVersion() string {
+	if x != nil {
+		return x.SchemaVersion
+	}
+	return ""
+}
+
+func (x *SuiteRegistrationReceipt) GetCommandId() string {
+	if x != nil {
+		return x.CommandId
+	}
+	return ""
+}
+
+func (x *SuiteRegistrationReceipt) GetReceiptJson() string {
+	if x != nil {
+		return x.ReceiptJson
+	}
+	return ""
+}
+
 var File_aiworkflow_workflow_proto protoreflect.FileDescriptor
 
 const file_aiworkflow_workflow_proto_rawDesc = "" +
@@ -3831,6 +4051,26 @@ const file_aiworkflow_workflow_proto_rawDesc = "" +
 	"\x0eschema_version\x18\x01 \x01(\tR\rschemaVersion\x12\x1d\n" +
 	"\n" +
 	"command_id\x18\x02 \x01(\tR\tcommandId\x12!\n" +
+	"\freceipt_json\x18\x03 \x01(\tR\vreceiptJson\"\xd2\x03\n" +
+	"\x14SuiteRegisterCommand\x128\n" +
+	"\x05scope\x18\x01 \x01(\v2\".qsai.workflow.v1.PublicationScopeR\x05scope\x12\x1d\n" +
+	"\n" +
+	"command_id\x18\x02 \x01(\tR\tcommandId\x12=\n" +
+	"\x06source\x18\x03 \x01(\v2%.qsai.workflow.v1.FrozenEvaluationRefR\x06source\x12\x19\n" +
+	"\bsuite_id\x18\x04 \x01(\tR\asuiteId\x12#\n" +
+	"\rsuite_version\x18\x05 \x01(\tR\fsuiteVersion\x12=\n" +
+	"\aprofile\x18\x06 \x01(\v2#.qsai.workflow.v1.PromptDraftSourceR\aprofile\x12;\n" +
+	"\x06prompt\x18\a \x01(\v2#.qsai.workflow.v1.PromptDraftSourceR\x06prompt\x12N\n" +
+	"\x10generation_route\x18\b \x01(\v2#.qsai.workflow.v1.PromptDraftSourceR\x0fgenerationRoute\x12\x16\n" +
+	"\x06reason\x18\t \x01(\tR\x06reason\"q\n" +
+	"\x16SuiteRegistrationQuery\x128\n" +
+	"\x05scope\x18\x01 \x01(\v2\".qsai.workflow.v1.PublicationScopeR\x05scope\x12\x1d\n" +
+	"\n" +
+	"command_id\x18\x02 \x01(\tR\tcommandId\"\x83\x01\n" +
+	"\x18SuiteRegistrationReceipt\x12%\n" +
+	"\x0eschema_version\x18\x01 \x01(\tR\rschemaVersion\x12\x1d\n" +
+	"\n" +
+	"command_id\x18\x02 \x01(\tR\tcommandId\x12!\n" +
 	"\freceipt_json\x18\x03 \x01(\tR\vreceiptJson2\x94\x01\n" +
 	"\bCommands\x12B\n" +
 	"\x05Start\x12\x1e.qsai.workflow.v1.StartCommand\x1a\x19.qsai.workflow.v1.Receipt\x12D\n" +
@@ -3866,7 +4106,11 @@ const file_aiworkflow_workflow_proto_rawDesc = "" +
 	"\x11ProfileManagement\x12b\n" +
 	"\bRegister\x12(.qsai.workflow.v1.ProfileRegisterCommand\x1a,.qsai.workflow.v1.ProfileRegistrationReceipt\x12f\n" +
 	"\n" +
-	"GetReceipt\x12*.qsai.workflow.v1.ProfileRegistrationQuery\x1a,.qsai.workflow.v1.ProfileRegistrationReceiptB;Z9github.com/FangcunMount/qs-server/api/grpc/gen/aiworkflowb\x06proto3"
+	"GetReceipt\x12*.qsai.workflow.v1.ProfileRegistrationQuery\x1a,.qsai.workflow.v1.ProfileRegistrationReceipt2\xd5\x01\n" +
+	"\x0fSuiteManagement\x12^\n" +
+	"\bRegister\x12&.qsai.workflow.v1.SuiteRegisterCommand\x1a*.qsai.workflow.v1.SuiteRegistrationReceipt\x12b\n" +
+	"\n" +
+	"GetReceipt\x12(.qsai.workflow.v1.SuiteRegistrationQuery\x1a*.qsai.workflow.v1.SuiteRegistrationReceiptB;Z9github.com/FangcunMount/qs-server/api/grpc/gen/aiworkflowb\x06proto3"
 
 var (
 	file_aiworkflow_workflow_proto_rawDescOnce sync.Once
@@ -3880,7 +4124,7 @@ func file_aiworkflow_workflow_proto_rawDescGZIP() []byte {
 	return file_aiworkflow_workflow_proto_rawDescData
 }
 
-var file_aiworkflow_workflow_proto_msgTypes = make([]protoimpl.MessageInfo, 48)
+var file_aiworkflow_workflow_proto_msgTypes = make([]protoimpl.MessageInfo, 51)
 var file_aiworkflow_workflow_proto_goTypes = []any{
 	(*Actor)(nil),                       // 0: qsai.workflow.v1.Actor
 	(*StartCommand)(nil),                // 1: qsai.workflow.v1.StartCommand
@@ -3930,6 +4174,9 @@ var file_aiworkflow_workflow_proto_goTypes = []any{
 	(*ProfileRegisterCommand)(nil),      // 45: qsai.workflow.v1.ProfileRegisterCommand
 	(*ProfileRegistrationQuery)(nil),    // 46: qsai.workflow.v1.ProfileRegistrationQuery
 	(*ProfileRegistrationReceipt)(nil),  // 47: qsai.workflow.v1.ProfileRegistrationReceipt
+	(*SuiteRegisterCommand)(nil),        // 48: qsai.workflow.v1.SuiteRegisterCommand
+	(*SuiteRegistrationQuery)(nil),      // 49: qsai.workflow.v1.SuiteRegistrationQuery
+	(*SuiteRegistrationReceipt)(nil),    // 50: qsai.workflow.v1.SuiteRegistrationReceipt
 }
 var file_aiworkflow_workflow_proto_depIdxs = []int32{
 	0,  // 0: qsai.workflow.v1.StartCommand.actor:type_name -> qsai.workflow.v1.Actor
@@ -3985,63 +4232,73 @@ var file_aiworkflow_workflow_proto_depIdxs = []int32{
 	38, // 50: qsai.workflow.v1.ProfileRegisterCommand.prompt:type_name -> qsai.workflow.v1.PromptDraftSource
 	38, // 51: qsai.workflow.v1.ProfileRegisterCommand.generation_route:type_name -> qsai.workflow.v1.PromptDraftSource
 	26, // 52: qsai.workflow.v1.ProfileRegistrationQuery.scope:type_name -> qsai.workflow.v1.PublicationScope
-	1,  // 53: qsai.workflow.v1.Commands.Start:input_type -> qsai.workflow.v1.StartCommand
-	2,  // 54: qsai.workflow.v1.Commands.Change:input_type -> qsai.workflow.v1.ChangeCommand
-	4,  // 55: qsai.workflow.v1.Results.Accept:input_type -> qsai.workflow.v1.StateEvent
-	25, // 56: qsai.workflow.v1.EvaluationManagement.Create:input_type -> qsai.workflow.v1.EvaluationCreateCommand
-	22, // 57: qsai.workflow.v1.EvaluationManagement.Start:input_type -> qsai.workflow.v1.EvaluationStartCommand
-	16, // 58: qsai.workflow.v1.EvaluationManagement.Get:input_type -> qsai.workflow.v1.EvaluationQuery
-	17, // 59: qsai.workflow.v1.EvaluationManagement.ResolveUnknown:input_type -> qsai.workflow.v1.UnknownResolutionCommand
-	21, // 60: qsai.workflow.v1.EvaluationManagement.Review:input_type -> qsai.workflow.v1.EvaluationReviewCommand
-	16, // 61: qsai.workflow.v1.EvaluationManagement.ListCandidates:input_type -> qsai.workflow.v1.EvaluationQuery
-	14, // 62: qsai.workflow.v1.EvaluationManagement.GetCandidate:input_type -> qsai.workflow.v1.EvaluationCandidateQuery
-	10, // 63: qsai.workflow.v1.EvaluationManagement.PreviewGates:input_type -> qsai.workflow.v1.EvaluationGateQuery
-	9,  // 64: qsai.workflow.v1.EvaluationManagement.Finalize:input_type -> qsai.workflow.v1.EvaluationFinalizeCommand
-	8,  // 65: qsai.workflow.v1.EvaluationManagement.ReopenReview:input_type -> qsai.workflow.v1.EvaluationReopenCommand
-	29, // 66: qsai.workflow.v1.PublicationManagement.Publish:input_type -> qsai.workflow.v1.PublicationPublishCommand
-	30, // 67: qsai.workflow.v1.PublicationManagement.Rollback:input_type -> qsai.workflow.v1.PublicationRollbackCommand
-	31, // 68: qsai.workflow.v1.PublicationManagement.Disable:input_type -> qsai.workflow.v1.PublicationDisableCommand
-	32, // 69: qsai.workflow.v1.PublicationManagement.Get:input_type -> qsai.workflow.v1.PublicationQuery
-	33, // 70: qsai.workflow.v1.PublicationManagement.GetReceipt:input_type -> qsai.workflow.v1.PublicationReceiptQuery
-	40, // 71: qsai.workflow.v1.PromptDraftManagement.Create:input_type -> qsai.workflow.v1.PromptDraftCreateCommand
-	41, // 72: qsai.workflow.v1.PromptDraftManagement.Revise:input_type -> qsai.workflow.v1.PromptDraftReviseCommand
-	42, // 73: qsai.workflow.v1.PromptDraftManagement.Get:input_type -> qsai.workflow.v1.PromptDraftQuery
-	43, // 74: qsai.workflow.v1.PromptDraftManagement.GetReceipt:input_type -> qsai.workflow.v1.PromptDraftReceiptQuery
-	36, // 75: qsai.workflow.v1.PromptDraftManagement.Freeze:input_type -> qsai.workflow.v1.PromptDraftFreezeCommand
-	43, // 76: qsai.workflow.v1.PromptDraftManagement.GetFreezeReceipt:input_type -> qsai.workflow.v1.PromptDraftReceiptQuery
-	45, // 77: qsai.workflow.v1.ProfileManagement.Register:input_type -> qsai.workflow.v1.ProfileRegisterCommand
-	46, // 78: qsai.workflow.v1.ProfileManagement.GetReceipt:input_type -> qsai.workflow.v1.ProfileRegistrationQuery
-	3,  // 79: qsai.workflow.v1.Commands.Start:output_type -> qsai.workflow.v1.Receipt
-	3,  // 80: qsai.workflow.v1.Commands.Change:output_type -> qsai.workflow.v1.Receipt
-	5,  // 81: qsai.workflow.v1.Results.Accept:output_type -> qsai.workflow.v1.Acknowledgement
-	18, // 82: qsai.workflow.v1.EvaluationManagement.Create:output_type -> qsai.workflow.v1.EvaluationState
-	18, // 83: qsai.workflow.v1.EvaluationManagement.Start:output_type -> qsai.workflow.v1.EvaluationState
-	18, // 84: qsai.workflow.v1.EvaluationManagement.Get:output_type -> qsai.workflow.v1.EvaluationState
-	18, // 85: qsai.workflow.v1.EvaluationManagement.ResolveUnknown:output_type -> qsai.workflow.v1.EvaluationState
-	18, // 86: qsai.workflow.v1.EvaluationManagement.Review:output_type -> qsai.workflow.v1.EvaluationState
-	13, // 87: qsai.workflow.v1.EvaluationManagement.ListCandidates:output_type -> qsai.workflow.v1.EvaluationCandidateIndex
-	15, // 88: qsai.workflow.v1.EvaluationManagement.GetCandidate:output_type -> qsai.workflow.v1.EvaluationCandidateEvidence
-	11, // 89: qsai.workflow.v1.EvaluationManagement.PreviewGates:output_type -> qsai.workflow.v1.EvaluationGatePreview
-	18, // 90: qsai.workflow.v1.EvaluationManagement.Finalize:output_type -> qsai.workflow.v1.EvaluationState
-	18, // 91: qsai.workflow.v1.EvaluationManagement.ReopenReview:output_type -> qsai.workflow.v1.EvaluationState
-	35, // 92: qsai.workflow.v1.PublicationManagement.Publish:output_type -> qsai.workflow.v1.PublicationReceipt
-	35, // 93: qsai.workflow.v1.PublicationManagement.Rollback:output_type -> qsai.workflow.v1.PublicationReceipt
-	35, // 94: qsai.workflow.v1.PublicationManagement.Disable:output_type -> qsai.workflow.v1.PublicationReceipt
-	34, // 95: qsai.workflow.v1.PublicationManagement.Get:output_type -> qsai.workflow.v1.PublicationState
-	35, // 96: qsai.workflow.v1.PublicationManagement.GetReceipt:output_type -> qsai.workflow.v1.PublicationReceipt
-	44, // 97: qsai.workflow.v1.PromptDraftManagement.Create:output_type -> qsai.workflow.v1.PromptDraftState
-	44, // 98: qsai.workflow.v1.PromptDraftManagement.Revise:output_type -> qsai.workflow.v1.PromptDraftState
-	44, // 99: qsai.workflow.v1.PromptDraftManagement.Get:output_type -> qsai.workflow.v1.PromptDraftState
-	44, // 100: qsai.workflow.v1.PromptDraftManagement.GetReceipt:output_type -> qsai.workflow.v1.PromptDraftState
-	37, // 101: qsai.workflow.v1.PromptDraftManagement.Freeze:output_type -> qsai.workflow.v1.PromptDraftFreezeReceipt
-	37, // 102: qsai.workflow.v1.PromptDraftManagement.GetFreezeReceipt:output_type -> qsai.workflow.v1.PromptDraftFreezeReceipt
-	47, // 103: qsai.workflow.v1.ProfileManagement.Register:output_type -> qsai.workflow.v1.ProfileRegistrationReceipt
-	47, // 104: qsai.workflow.v1.ProfileManagement.GetReceipt:output_type -> qsai.workflow.v1.ProfileRegistrationReceipt
-	79, // [79:105] is the sub-list for method output_type
-	53, // [53:79] is the sub-list for method input_type
-	53, // [53:53] is the sub-list for extension type_name
-	53, // [53:53] is the sub-list for extension extendee
-	0,  // [0:53] is the sub-list for field type_name
+	26, // 53: qsai.workflow.v1.SuiteRegisterCommand.scope:type_name -> qsai.workflow.v1.PublicationScope
+	23, // 54: qsai.workflow.v1.SuiteRegisterCommand.source:type_name -> qsai.workflow.v1.FrozenEvaluationRef
+	38, // 55: qsai.workflow.v1.SuiteRegisterCommand.profile:type_name -> qsai.workflow.v1.PromptDraftSource
+	38, // 56: qsai.workflow.v1.SuiteRegisterCommand.prompt:type_name -> qsai.workflow.v1.PromptDraftSource
+	38, // 57: qsai.workflow.v1.SuiteRegisterCommand.generation_route:type_name -> qsai.workflow.v1.PromptDraftSource
+	26, // 58: qsai.workflow.v1.SuiteRegistrationQuery.scope:type_name -> qsai.workflow.v1.PublicationScope
+	1,  // 59: qsai.workflow.v1.Commands.Start:input_type -> qsai.workflow.v1.StartCommand
+	2,  // 60: qsai.workflow.v1.Commands.Change:input_type -> qsai.workflow.v1.ChangeCommand
+	4,  // 61: qsai.workflow.v1.Results.Accept:input_type -> qsai.workflow.v1.StateEvent
+	25, // 62: qsai.workflow.v1.EvaluationManagement.Create:input_type -> qsai.workflow.v1.EvaluationCreateCommand
+	22, // 63: qsai.workflow.v1.EvaluationManagement.Start:input_type -> qsai.workflow.v1.EvaluationStartCommand
+	16, // 64: qsai.workflow.v1.EvaluationManagement.Get:input_type -> qsai.workflow.v1.EvaluationQuery
+	17, // 65: qsai.workflow.v1.EvaluationManagement.ResolveUnknown:input_type -> qsai.workflow.v1.UnknownResolutionCommand
+	21, // 66: qsai.workflow.v1.EvaluationManagement.Review:input_type -> qsai.workflow.v1.EvaluationReviewCommand
+	16, // 67: qsai.workflow.v1.EvaluationManagement.ListCandidates:input_type -> qsai.workflow.v1.EvaluationQuery
+	14, // 68: qsai.workflow.v1.EvaluationManagement.GetCandidate:input_type -> qsai.workflow.v1.EvaluationCandidateQuery
+	10, // 69: qsai.workflow.v1.EvaluationManagement.PreviewGates:input_type -> qsai.workflow.v1.EvaluationGateQuery
+	9,  // 70: qsai.workflow.v1.EvaluationManagement.Finalize:input_type -> qsai.workflow.v1.EvaluationFinalizeCommand
+	8,  // 71: qsai.workflow.v1.EvaluationManagement.ReopenReview:input_type -> qsai.workflow.v1.EvaluationReopenCommand
+	29, // 72: qsai.workflow.v1.PublicationManagement.Publish:input_type -> qsai.workflow.v1.PublicationPublishCommand
+	30, // 73: qsai.workflow.v1.PublicationManagement.Rollback:input_type -> qsai.workflow.v1.PublicationRollbackCommand
+	31, // 74: qsai.workflow.v1.PublicationManagement.Disable:input_type -> qsai.workflow.v1.PublicationDisableCommand
+	32, // 75: qsai.workflow.v1.PublicationManagement.Get:input_type -> qsai.workflow.v1.PublicationQuery
+	33, // 76: qsai.workflow.v1.PublicationManagement.GetReceipt:input_type -> qsai.workflow.v1.PublicationReceiptQuery
+	40, // 77: qsai.workflow.v1.PromptDraftManagement.Create:input_type -> qsai.workflow.v1.PromptDraftCreateCommand
+	41, // 78: qsai.workflow.v1.PromptDraftManagement.Revise:input_type -> qsai.workflow.v1.PromptDraftReviseCommand
+	42, // 79: qsai.workflow.v1.PromptDraftManagement.Get:input_type -> qsai.workflow.v1.PromptDraftQuery
+	43, // 80: qsai.workflow.v1.PromptDraftManagement.GetReceipt:input_type -> qsai.workflow.v1.PromptDraftReceiptQuery
+	36, // 81: qsai.workflow.v1.PromptDraftManagement.Freeze:input_type -> qsai.workflow.v1.PromptDraftFreezeCommand
+	43, // 82: qsai.workflow.v1.PromptDraftManagement.GetFreezeReceipt:input_type -> qsai.workflow.v1.PromptDraftReceiptQuery
+	45, // 83: qsai.workflow.v1.ProfileManagement.Register:input_type -> qsai.workflow.v1.ProfileRegisterCommand
+	46, // 84: qsai.workflow.v1.ProfileManagement.GetReceipt:input_type -> qsai.workflow.v1.ProfileRegistrationQuery
+	48, // 85: qsai.workflow.v1.SuiteManagement.Register:input_type -> qsai.workflow.v1.SuiteRegisterCommand
+	49, // 86: qsai.workflow.v1.SuiteManagement.GetReceipt:input_type -> qsai.workflow.v1.SuiteRegistrationQuery
+	3,  // 87: qsai.workflow.v1.Commands.Start:output_type -> qsai.workflow.v1.Receipt
+	3,  // 88: qsai.workflow.v1.Commands.Change:output_type -> qsai.workflow.v1.Receipt
+	5,  // 89: qsai.workflow.v1.Results.Accept:output_type -> qsai.workflow.v1.Acknowledgement
+	18, // 90: qsai.workflow.v1.EvaluationManagement.Create:output_type -> qsai.workflow.v1.EvaluationState
+	18, // 91: qsai.workflow.v1.EvaluationManagement.Start:output_type -> qsai.workflow.v1.EvaluationState
+	18, // 92: qsai.workflow.v1.EvaluationManagement.Get:output_type -> qsai.workflow.v1.EvaluationState
+	18, // 93: qsai.workflow.v1.EvaluationManagement.ResolveUnknown:output_type -> qsai.workflow.v1.EvaluationState
+	18, // 94: qsai.workflow.v1.EvaluationManagement.Review:output_type -> qsai.workflow.v1.EvaluationState
+	13, // 95: qsai.workflow.v1.EvaluationManagement.ListCandidates:output_type -> qsai.workflow.v1.EvaluationCandidateIndex
+	15, // 96: qsai.workflow.v1.EvaluationManagement.GetCandidate:output_type -> qsai.workflow.v1.EvaluationCandidateEvidence
+	11, // 97: qsai.workflow.v1.EvaluationManagement.PreviewGates:output_type -> qsai.workflow.v1.EvaluationGatePreview
+	18, // 98: qsai.workflow.v1.EvaluationManagement.Finalize:output_type -> qsai.workflow.v1.EvaluationState
+	18, // 99: qsai.workflow.v1.EvaluationManagement.ReopenReview:output_type -> qsai.workflow.v1.EvaluationState
+	35, // 100: qsai.workflow.v1.PublicationManagement.Publish:output_type -> qsai.workflow.v1.PublicationReceipt
+	35, // 101: qsai.workflow.v1.PublicationManagement.Rollback:output_type -> qsai.workflow.v1.PublicationReceipt
+	35, // 102: qsai.workflow.v1.PublicationManagement.Disable:output_type -> qsai.workflow.v1.PublicationReceipt
+	34, // 103: qsai.workflow.v1.PublicationManagement.Get:output_type -> qsai.workflow.v1.PublicationState
+	35, // 104: qsai.workflow.v1.PublicationManagement.GetReceipt:output_type -> qsai.workflow.v1.PublicationReceipt
+	44, // 105: qsai.workflow.v1.PromptDraftManagement.Create:output_type -> qsai.workflow.v1.PromptDraftState
+	44, // 106: qsai.workflow.v1.PromptDraftManagement.Revise:output_type -> qsai.workflow.v1.PromptDraftState
+	44, // 107: qsai.workflow.v1.PromptDraftManagement.Get:output_type -> qsai.workflow.v1.PromptDraftState
+	44, // 108: qsai.workflow.v1.PromptDraftManagement.GetReceipt:output_type -> qsai.workflow.v1.PromptDraftState
+	37, // 109: qsai.workflow.v1.PromptDraftManagement.Freeze:output_type -> qsai.workflow.v1.PromptDraftFreezeReceipt
+	37, // 110: qsai.workflow.v1.PromptDraftManagement.GetFreezeReceipt:output_type -> qsai.workflow.v1.PromptDraftFreezeReceipt
+	47, // 111: qsai.workflow.v1.ProfileManagement.Register:output_type -> qsai.workflow.v1.ProfileRegistrationReceipt
+	47, // 112: qsai.workflow.v1.ProfileManagement.GetReceipt:output_type -> qsai.workflow.v1.ProfileRegistrationReceipt
+	50, // 113: qsai.workflow.v1.SuiteManagement.Register:output_type -> qsai.workflow.v1.SuiteRegistrationReceipt
+	50, // 114: qsai.workflow.v1.SuiteManagement.GetReceipt:output_type -> qsai.workflow.v1.SuiteRegistrationReceipt
+	87, // [87:115] is the sub-list for method output_type
+	59, // [59:87] is the sub-list for method input_type
+	59, // [59:59] is the sub-list for extension type_name
+	59, // [59:59] is the sub-list for extension extendee
+	0,  // [0:59] is the sub-list for field type_name
 }
 
 func init() { file_aiworkflow_workflow_proto_init() }
@@ -4059,9 +4316,9 @@ func file_aiworkflow_workflow_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_aiworkflow_workflow_proto_rawDesc), len(file_aiworkflow_workflow_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   48,
+			NumMessages:   51,
 			NumExtensions: 0,
-			NumServices:   6,
+			NumServices:   7,
 		},
 		GoTypes:           file_aiworkflow_workflow_proto_goTypes,
 		DependencyIndexes: file_aiworkflow_workflow_proto_depIdxs,

@@ -23,6 +23,8 @@ tags:
   description: AI-Workflow-Prompt-Drafts
 - name: AI-Workflow-Publications
   description: AI-Workflow-Publications
+- name: AI-Workflow-Suites
+  description: AI-Workflow-Suites
 - name: Actor Store
   description: Actor Store
 - name: Actor Testee
@@ -11648,6 +11650,129 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/core.ErrResponse'
+  /internal/v2/interpretation/ai-workflow/suites/commands/{command_id}:
+    get:
+      tags:
+      - AI-Workflow-Suites
+      summary: 查询 qs-ai Suite 注册原命令回执
+      description: 需要当前机构解读审计权限，仅原机构及原操作人可查询。不重发注册，不触发发布。
+      operationId: 查询qsaiSuite注册原命令回执
+      parameters:
+      - type: string
+        description: 原命令 UUID
+        name: command_id
+        in: path
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/core.Response'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/aibridge.SuiteRegistrationReceipt'
+        '400':
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '409':
+          description: Conflict
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+  /internal/v2/interpretation/ai-workflow/suites/register:
+    post:
+      tags:
+      - AI-Workflow-Suites
+      summary: 注册 qs-ai 不可变 Suite 版本
+      description: 需要当前机构 OrgAdmin 权限，组织和操作人来自认证上下文。注册保留案例并绑定配置，不代表评测批准或发布。超时后查询原
+        command_id，不自动重试。
+      operationId: 注册qsai不可变Suite版本
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/aibridge.RegisterSuite'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/core.Response'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/aibridge.SuiteRegistrationReceipt'
+        '400':
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '409':
+          description: Conflict
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
   /internal/v2/statistics/runs:
     get:
       tags:
@@ -12249,6 +12374,25 @@ components:
           type: string
         source:
           $ref: '#/components/schemas/aibridge.PromptDraftSource'
+    aibridge.RegisterSuite:
+      type: object
+      properties:
+        command_id:
+          type: string
+        generation_route:
+          $ref: '#/components/schemas/aibridge.PromptDraftSource'
+        profile:
+          $ref: '#/components/schemas/aibridge.PromptDraftSource'
+        prompt:
+          $ref: '#/components/schemas/aibridge.PromptDraftSource'
+        reason:
+          type: string
+        source:
+          $ref: '#/components/schemas/aibridge.FrozenEvaluationRef'
+        suite_id:
+          type: string
+        suite_version:
+          type: string
     aibridge.RegisteredManifest:
       type: object
       properties:
@@ -12303,6 +12447,19 @@ components:
           type: string
         reason:
           type: string
+    aibridge.SuiteRegistrationReceipt:
+      type: object
+      properties:
+        command:
+          $ref: '#/components/schemas/aibridge.RegisterSuite'
+        manifest:
+          $ref: '#/components/schemas/aibridge.RegisteredManifest'
+        registered_at:
+          type: string
+        scope:
+          $ref: '#/components/schemas/aibridge.DraftScope'
+        suite:
+          $ref: '#/components/schemas/aibridge.FrozenEvaluationRef'
     aibridge.UnknownResolution:
       type: object
       properties:
