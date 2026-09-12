@@ -52,6 +52,14 @@ service EvaluationManagement {
  rpc PreviewGates(EvaluationGateQuery) returns (EvaluationGatePreview);
  // Recompute gates under CAS; this records approval/rejection, never publishes a release.
  rpc Finalize(EvaluationFinalizeCommand) returns (EvaluationState);
+ // Reopen eligible semantic-review signatures, preserving the complete previous round.
+ rpc ReopenReview(EvaluationReopenCommand) returns (EvaluationState);
+}
+message EvaluationReopenCommand {
+ EvaluationQuery scope = 1;
+ int64 expected_version = 2;
+ string reason = 3;
+ bool confirm = 4;
 }
 message EvaluationFinalizeCommand {
  EvaluationQuery scope = 1;
@@ -119,6 +127,8 @@ message EvaluationState {
  string reviews_json = 6;
  // Revalidated final gate, release identity, actor, reason, server time and version.
  string finalization_json = 7;
+ // At most three prior finalizations and review rounds, revalidated against original evidence.
+ string reopenings_json = 8;
 }
 
 message SemanticContradictionReview {

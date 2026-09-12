@@ -10700,6 +10700,95 @@ const docTemplate = `{
                 }
             }
         },
+        "/internal/v2/interpretation/ai-workflow/evaluations/{run_id}/reopen-review": {
+            "post": {
+                "description": "需要当前机构 OrgAdmin 权限、当前版本、理由和明确确认。AI 在事务内核对重开资格并保留旧审核和门槛，最多三轮；不调用模型或发布配置。超时后先回读状态，不自动重试。",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "AI-Workflow-Management"
+                ],
+                "summary": "重开 qs-ai 评测语义复核",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "评测 Run UUID",
+                        "name": "run_id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "重开确认",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/aibridge.EvaluationReopen"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/aibridge.EvaluationState"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/internal/v2/interpretation/ai-workflow/evaluations/{run_id}/result-unknown/resolve": {
             "post": {
                 "description": "需要当前机构 OrgAdmin 权限；组织和操作人取认证上下文。管理功能默认关闭。\n需确认重复调用和费用风险；超时后先查询状态，不自动重试。",
@@ -11323,6 +11412,20 @@ const docTemplate = `{
                 }
             }
         },
+        "aibridge.EvaluationReopen": {
+            "type": "object",
+            "properties": {
+                "confirm": {
+                    "type": "boolean"
+                },
+                "expected_version": {
+                    "type": "integer"
+                },
+                "reason": {
+                    "type": "string"
+                }
+            }
+        },
         "aibridge.EvaluationReview": {
             "type": "object",
             "properties": {
@@ -11361,6 +11464,12 @@ const docTemplate = `{
                     "type": "object"
                 },
                 "resolutions": {
+                    "type": "array",
+                    "items": {
+                        "type": "object"
+                    }
+                },
+                "review_reopenings": {
                     "type": "array",
                     "items": {
                         "type": "object"
