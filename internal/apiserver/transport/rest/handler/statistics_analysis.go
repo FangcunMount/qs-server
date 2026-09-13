@@ -5,6 +5,7 @@ import (
 	app "github.com/FangcunMount/qs-server/internal/apiserver/application/statistics"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/gin-gonic/gin"
+	"math"
 	"strconv"
 	"strings"
 )
@@ -106,7 +107,7 @@ func (h *StatisticsHandler) analysis(c *gin.Context, kind string) {
 	var active *bool
 	if raw, exists := c.GetQuery("clinician_id"); exists {
 		id, e := strconv.ParseUint(raw, 10, 64)
-		if e != nil || id == 0 {
+		if e != nil || id == 0 || id > math.MaxInt64 {
 			h.Error(c, errors.WithCode(code.ErrInvalidArgument, "invalid clinician_id"))
 			return
 		}

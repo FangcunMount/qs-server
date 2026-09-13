@@ -16,10 +16,14 @@ type scopedFulfillmentDay struct {
 func (s *ReadStore) scopedFulfillment(ctx context.Context, orgID int64, stores authz.StoreRange, from, to, cutoff time.Time) ([]scopedFulfillmentDay, error) {
 	facts := s.scopedFacts(ctx, orgID, stores, "statistics_plan_fact").Select("f.*")
 	var rows []scopedFulfillmentDay
-	err := s.db.WithContext(ctx).Raw(scopedFulfillmentSQL, facts, orgID, orgID, cutoff, from.Format("2006-01-02"), to.Format("2006-01-02")).Scan(&rows).Error
+	fromDate, toDate := from.Format("2006-01-02"), to.Format("2006-01-02")
+	err := s.db.WithContext(ctx).Raw(scopedFulfillmentSQL, facts, orgID, fromDate, toDate, fromDate, toDate, orgID, cutoff, fromDate, toDate).Scan(&rows).Error
 	return rows, err
 }
 
+// Resolve the latest revision before pruning dates. Any definition (even outside
+// the requested dates) excludes legacy fallback. The non-restrictive LIMIT keeps
+// MySQL from merging legacy_created and joining lifecycle rows before exclusion.
 const scopedFulfillmentSQL = `WITH scoped_plan_facts AS (?), schedule_ranked AS (
 		 SELECT org_id,plan_id,testee_id,task_id,schedule_revision,schedule_planned_at,schedule_due_at,
 		        ROW_NUMBER() OVER (PARTITION BY org_id,task_id ORDER BY schedule_revision DESC,id DESC) schedule_rank
@@ -28,6 +32,7 @@ const scopedFulfillmentSQL = `WITH scoped_plan_facts AS (?), schedule_ranked AS 
 		), latest_schedule AS (
 		 SELECT org_id,plan_id,testee_id,task_id,schedule_revision,schedule_planned_at,schedule_due_at
 		 FROM schedule_ranked WHERE schedule_rank=1
+         AND ((schedule_planned_at>=? AND schedule_planned_at<?) OR (schedule_due_at>=? AND schedule_due_at<?))
 		), latest_terminal AS (
 		 SELECT terminal.org_id,terminal.task_id,terminal.task_status,terminal.completed_at
 		 FROM scoped_plan_facts terminal
@@ -40,16 +45,20 @@ const scopedFulfillmentSQL = `WITH scoped_plan_facts AS (?), schedule_ranked AS 
 		        CASE WHEN terminal.task_status='canceled' THEN 1 ELSE 0 END canceled
 		 FROM latest_schedule schedule
 		 LEFT JOIN latest_terminal terminal ON terminal.org_id=schedule.org_id AND terminal.task_id=schedule.task_id
-		), legacy_tasks AS (
+		), legacy_created AS (
+         SELECT created.* FROM scoped_plan_facts created
+         WHERE created.org_id=? AND created.fact_type='task_created'
+          AND NOT EXISTS (SELECT 1 FROM scoped_plan_facts defined
+           WHERE defined.org_id=created.org_id AND defined.task_id=created.task_id AND defined.fact_type='task_schedule_defined')
+         LIMIT 9223372036854775807
+        ), legacy_tasks AS (
 		 SELECT created.org_id,created.plan_id,created.task_id,created.testee_id,MAX(created.planned_at) planned_at,
 		        COALESCE(MAX(CASE WHEN legacy.fact_type='task_due_defined' THEN legacy.due_at END),MAX(CASE WHEN legacy.fact_type<>'task_due_defined' THEN legacy.due_at END)) due_at,
 		        MAX(CASE WHEN legacy.fact_type='task_completed' THEN legacy.completed_at END) completed_at,
 		        MAX(CASE WHEN legacy.fact_type='task_canceled' THEN 1 ELSE 0 END) canceled
-		 FROM scoped_plan_facts created
+		 FROM legacy_created created
 		 LEFT JOIN scoped_plan_facts legacy ON legacy.org_id=created.org_id AND legacy.task_id=created.task_id
 		  AND legacy.fact_type IN ('task_created','task_opened','task_completed','task_expired','task_canceled','task_due_defined')
-		 LEFT JOIN latest_schedule schedule ON schedule.org_id=created.org_id AND schedule.task_id=created.task_id
-		 WHERE created.org_id=? AND created.fact_type='task_created' AND schedule.task_id IS NULL
 		 GROUP BY created.org_id,created.plan_id,created.task_id,created.testee_id
 		), tasks AS (
 		 SELECT * FROM schedule_tasks

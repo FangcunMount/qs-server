@@ -38,6 +38,8 @@ func TestScopedOverviewMySQL(t *testing.T) {
 	date := time.Date(2026, 9, 1, 0, 0, 0, 0, time.UTC)
 	require.NoError(t, db.Exec("INSERT INTO statistics_assessment_fact VALUES(1,1,1,NULL,'assessment_created',?,'Q','scale','S')", date).Error)
 	require.NoError(t, db.Exec("INSERT INTO statistics_plan_fact(id,org_id,testee_id,fact_type,stat_date,plan_id,task_id,schedule_revision,schedule_planned_at,schedule_due_at) VALUES(1,1,1,'task_schedule_defined',?,1,1,1,?,?)", date, date, date).Error)
+	// A latest revision moved out of the period cannot fall back to legacy dates.
+	require.NoError(t, db.Exec("INSERT INTO statistics_plan_fact(id,org_id,testee_id,fact_type,stat_date,plan_id,task_id,schedule_revision,planned_at,due_at,schedule_planned_at,schedule_due_at) VALUES(2,1,1,'task_created',?,1,2,0,?,?,NULL,NULL),(3,1,1,'task_schedule_defined',?,1,2,1,NULL,NULL,?,?),(4,1,1,'task_schedule_defined',?,1,2,2,NULL,NULL,?,?)", date, date, date, date, date, date, date, date.AddDate(0, 1, 0), date.AddDate(0, 1, 0)).Error)
 	store := NewReadStore(db, nil)
 	read := func(id uint64) {
 		t.Helper()

@@ -28,6 +28,12 @@ func TestScopedFulfillmentKeepsLatestScheduleAndCancellation(t *testing.T) {
 	insert(1, 11, 1, "task_schedule_terminal", "canceled", nil)
 	insert(1, 12, 0, "task_created", "", nil) // legacy task remains supported
 	insert(1, 12, 0, "task_completed", "completed", due.Add(time.Hour))
+	// A newer schedule outside the window must suppress both the old schedule
+	// and the in-window legacy task; date pruning happens after revision choice.
+	insert(1, 13, 0, "task_created", "", nil)
+	insert(1, 13, 1, "task_schedule_defined", "", nil)
+	insert(1, 13, 2, "task_schedule_defined", "", nil)
+	require.NoError(t, db.Exec("UPDATE statistics_plan_fact SET schedule_planned_at=?,schedule_due_at=? WHERE task_id=13 AND schedule_revision=2", date.AddDate(0, 1, 0), due.AddDate(0, 1, 0)).Error)
 	insert(2, 20, 1, "task_schedule_defined", "", nil)
 	store := NewReadStore(db, nil)
 	rows, err := store.scopedFulfillment(context.Background(), 1, authz.StoreRange{StoreIDs: []uint64{7}}, date, date.AddDate(0, 0, 1), date.AddDate(0, 0, 1))
