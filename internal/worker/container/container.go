@@ -8,8 +8,8 @@ import (
 
 	"github.com/FangcunMount/component-base/pkg/log"
 	"github.com/FangcunMount/qs-server/internal/pkg/attentionprojection"
-	"github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
-	"github.com/FangcunMount/qs-server/internal/pkg/eventing/runtime"
+	eventcatalog "github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
+	eventruntime "github.com/FangcunMount/qs-server/internal/pkg/eventing/runtime"
 	genericoptions "github.com/FangcunMount/qs-server/internal/pkg/options"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/keyspace"
@@ -53,7 +53,6 @@ type Container struct {
 	assessmentIntakeClient         *grpcclient.AssessmentIntakeClient
 	evaluationWorkerClient         *grpcclient.EvaluationWorkerClient
 	interpretationAutomationClient *grpcclient.InterpretationAutomationClient
-	aiExplanationAutomationClient  *grpcclient.AIExplanationAutomationClient
 
 	// 事件分发器
 	eventDispatcher *workereventing.Dispatcher
@@ -67,7 +66,6 @@ type ClientBundle struct {
 	AssessmentIntake         *grpcclient.AssessmentIntakeClient
 	EvaluationWorker         *grpcclient.EvaluationWorkerClient
 	InterpretationAutomation *grpcclient.InterpretationAutomationClient
-	AIExplanationAutomation  *grpcclient.AIExplanationAutomationClient
 }
 
 // NewContainer 创建新的容器
@@ -225,7 +223,7 @@ func (c *Container) Initialize() error {
 }
 
 func (c *Container) validateRuntimeClients() error {
-	if c.internalClient == nil || c.assessmentIntakeClient == nil || c.evaluationWorkerClient == nil || c.interpretationAutomationClient == nil || c.aiExplanationAutomationClient == nil {
+	if c.internalClient == nil || c.assessmentIntakeClient == nil || c.evaluationWorkerClient == nil || c.interpretationAutomationClient == nil {
 		return fmt.Errorf("worker gRPC actor clients are required")
 	}
 	return nil
@@ -243,7 +241,6 @@ func (c *Container) initEventDispatcher() error {
 		AssessmentIntakeClient:         c.assessmentIntakeClient,
 		EvaluationWorkerClient:         c.evaluationWorkerClient,
 		InterpretationAutomationClient: c.interpretationAutomationClient,
-		AIExplanationAutomationClient:  c.aiExplanationAutomationClient,
 		LockManager:                    lockManager(c.locks),
 		LockRunner:                     c.locks,
 		LockKeyBuilder:                 c.lockBuilder,
@@ -327,7 +324,6 @@ func (c *Container) InitializeRuntimeClients(bundle ClientBundle) {
 	c.assessmentIntakeClient = bundle.AssessmentIntake
 	c.evaluationWorkerClient = bundle.EvaluationWorker
 	c.interpretationAutomationClient = bundle.InterpretationAutomation
-	c.aiExplanationAutomationClient = bundle.AIExplanationAutomation
 }
 
 // ==================== Getters ====================

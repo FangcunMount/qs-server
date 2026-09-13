@@ -3,12 +3,14 @@ package aiexplanation
 import (
 	"context"
 	"errors"
-	aiport "github.com/FangcunMount/qs-server/internal/collection-server/port/aiexplanation"
 	"testing"
+
+	aiport "github.com/FangcunMount/qs-server/internal/collection-server/port/aiexplanation"
 )
 
 type workflowReadClient struct {
-	clientStub
+	aiport.Client
+	err    error
 	result *aiport.WorkflowResult
 	called bool
 }
@@ -36,7 +38,7 @@ func TestWorkflowReadPreservesCorrelationAndAccessErrors(t *testing.T) {
 		{name: "invalid id", request: "123", want: ErrInvalidRequest},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			client := &workflowReadClient{clientStub: clientStub{err: tc.err}, result: tc.result}
+			client := &workflowReadClient{err: tc.err, result: tc.result}
 			got, err := NewService(client).GetWorkflow(context.Background(), 7, 42, tc.request)
 			if !errors.Is(err, tc.want) || client.called != tc.called {
 				t.Fatalf("error=%v called=%v", err, client.called)
@@ -49,7 +51,8 @@ func TestWorkflowReadPreservesCorrelationAndAccessErrors(t *testing.T) {
 }
 
 type workflowSourceClient struct {
-	clientStub
+	aiport.Client
+	err    error
 	result *aiport.WorkflowSource
 }
 
@@ -83,7 +86,7 @@ func TestWorkflowSourceRejectsMalformedOrInapplicableProvenance(t *testing.T) {
 		})
 	}
 	denied := errors.New("denied")
-	if _, err := NewService(&workflowSourceClient{clientStub: clientStub{err: denied}}).GetWorkflowSource(context.Background(), 7, 42); !errors.Is(err, denied) {
+	if _, err := NewService(&workflowSourceClient{err: denied}).GetWorkflowSource(context.Background(), 7, 42); !errors.Is(err, denied) {
 		t.Fatal("authorization error hidden")
 	}
 }

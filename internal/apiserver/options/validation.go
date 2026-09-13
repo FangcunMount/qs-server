@@ -47,8 +47,6 @@ func (o *Options) Validate() []error {
 	errs = append(errs, validateEvaluationConsistencyAudit(o.EvaluationConsistencyAudit)...)
 	errs = append(errs, validateLeaseRecovery("evaluation_lease_recovery", o.EvaluationLeaseRecovery)...)
 	errs = append(errs, validateLeaseRecovery("interpretation_lease_recovery", o.InterpretationLeaseRecovery)...)
-	errs = append(errs, validateLeaseRecovery("ai_explanation_prompt_evaluation_lease_recovery", o.AIExplanationPromptEvaluationLeaseRecovery)...)
-	errs = append(errs, validateLeaseRecovery("ai_explanation_participant_lease_recovery", o.AIExplanationParticipantLeaseRecovery)...)
 	errs = append(errs, validateEvaluationMaintenanceLockIsolation(o)...)
 	errs = append(errs, validateReportCatalogAudit(o.ReportCatalogAudit)...)
 	errs = append(errs, validateMongoConsistencyAudit(o.MongoConsistencyAudit)...)
@@ -60,17 +58,9 @@ func (o *Options) Validate() []error {
 	if err := o.DelegatedSubject.Validate(); err != nil {
 		errs = append(errs, err)
 	}
-	errs = append(errs, o.AIExplanation.Validate()...)
-	if o.AIExplanationPromptEvaluationLeaseRecovery != nil && o.AIExplanationPromptEvaluationLeaseRecovery.Enable &&
-		(o.AIExplanation == nil || !o.AIExplanation.Enabled || !o.AIExplanation.Evaluation.Enabled) {
-		errs = append(errs, fmt.Errorf("ai_explanation_prompt_evaluation_lease_recovery requires ai_explanation.enabled and ai_explanation.evaluation.enabled"))
-	}
-	if o.AIExplanationParticipantLeaseRecovery != nil && o.AIExplanationParticipantLeaseRecovery.Enable &&
-		(o.AIExplanation == nil || !o.AIExplanation.Enabled || !o.AIExplanation.ParticipantEnabled) {
-		errs = append(errs, fmt.Errorf("ai_explanation_participant_lease_recovery requires ai_explanation.enabled and ai_explanation.participant_enabled"))
-	}
-	if o.AIExplanation != nil && o.AIExplanation.ParticipantEnabled && (o.DelegatedSubject == nil || !o.DelegatedSubject.Enabled) {
-		errs = append(errs, fmt.Errorf("delegated_subject.enabled must be true when ai_explanation.participant_enabled is true"))
+	errs = append(errs, o.AIWorkflow.Validate()...)
+	if o.AIWorkflow != nil && o.AIWorkflow.Enabled && (o.DelegatedSubject == nil || !o.DelegatedSubject.Enabled) {
+		errs = append(errs, fmt.Errorf("delegated_subject.enabled must be true when ai_workflow.enabled is true"))
 	}
 
 	errs = append(errs, redisruntime.ValidateRuntimeOptions(
@@ -341,8 +331,6 @@ func validateEvaluationMaintenanceLockIsolation(opts *Options) []error {
 	errs = append(errs, add("evaluation_consistency_audit", optionLockKey(opts.EvaluationConsistencyAudit), opts.EvaluationConsistencyAudit != nil && opts.EvaluationConsistencyAudit.Enable)...)
 	errs = append(errs, add("evaluation_lease_recovery", leaseRecoveryLockKey(opts.EvaluationLeaseRecovery), opts.EvaluationLeaseRecovery != nil && opts.EvaluationLeaseRecovery.Enable)...)
 	errs = append(errs, add("interpretation_lease_recovery", leaseRecoveryLockKey(opts.InterpretationLeaseRecovery), opts.InterpretationLeaseRecovery != nil && opts.InterpretationLeaseRecovery.Enable)...)
-	errs = append(errs, add("ai_explanation_prompt_evaluation_lease_recovery", leaseRecoveryLockKey(opts.AIExplanationPromptEvaluationLeaseRecovery), opts.AIExplanationPromptEvaluationLeaseRecovery != nil && opts.AIExplanationPromptEvaluationLeaseRecovery.Enable)...)
-	errs = append(errs, add("ai_explanation_participant_lease_recovery", leaseRecoveryLockKey(opts.AIExplanationParticipantLeaseRecovery), opts.AIExplanationParticipantLeaseRecovery != nil && opts.AIExplanationParticipantLeaseRecovery.Enable)...)
 	return errs
 }
 

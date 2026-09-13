@@ -17,15 +17,15 @@ import (
 
 // ManagerConfig gRPC 客户端管理器配置
 type ManagerConfig struct {
-	Endpoint             string        // apiserver gRPC 地址
-	Timeout              time.Duration // 普通请求超时时间
-	AIExplanationTimeout time.Duration // AI 解读与评测请求超时时间
-	DialTimeout          time.Duration // 连接超时时间
-	PoolSize             int           // 连接池大小（默认 1）
-	MaxRetries           int           // 最大重试次数
-	KeepaliveTime        time.Duration // Keepalive 时间
-	Insecure             bool          // 是否使用明文连接
-	TLS                  TLSConfig     // TLS 配置
+	Endpoint string        // apiserver gRPC 地址
+	Timeout  time.Duration // 普通请求超时时间
+	// AI 解读与评测请求超时时间
+	DialTimeout   time.Duration // 连接超时时间
+	PoolSize      int           // 连接池大小（默认 1）
+	MaxRetries    int           // 最大重试次数
+	KeepaliveTime time.Duration // Keepalive 时间
+	Insecure      bool          // 是否使用明文连接
+	TLS           TLSConfig     // TLS 配置
 }
 
 // TLSConfig TLS/mTLS 配置
@@ -51,8 +51,8 @@ type Manager struct {
 	assessmentIntakeClient         *AssessmentIntakeClient
 	evaluationWorkerClient         *EvaluationWorkerClient
 	interpretationAutomationClient *InterpretationAutomationClient
-	aiExplanationAutomationClient  *AIExplanationAutomationClient
-	planClient                     *PlanClient
+
+	planClient *PlanClient
 }
 
 // NewManager 创建 gRPC 客户端管理器
@@ -62,9 +62,6 @@ func NewManager(cfg *ManagerConfig) (*Manager, error) {
 	}
 	if cfg.Timeout <= 0 {
 		cfg.Timeout = 30 * time.Second
-	}
-	if cfg.AIExplanationTimeout <= 0 {
-		cfg.AIExplanationTimeout = 3 * time.Minute
 	}
 	if cfg.DialTimeout <= 0 {
 		cfg.DialTimeout = 5 * time.Second
@@ -174,11 +171,9 @@ func (m *Manager) RegisterClients() error {
 	m.assessmentIntakeClient = NewAssessmentIntakeClient(m)
 	m.evaluationWorkerClient = NewEvaluationWorkerClient(m)
 	m.interpretationAutomationClient = NewInterpretationAutomationClient(m)
-	m.aiExplanationAutomationClient = NewAIExplanationAutomationClient(m)
 	m.clients["assessmentIntake"] = m.assessmentIntakeClient
 	m.clients["evaluationWorker"] = m.evaluationWorkerClient
 	m.clients["interpretationAutomation"] = m.interpretationAutomationClient
-	m.clients["aiExplanationAutomation"] = m.aiExplanationAutomationClient
 
 	// 注册 PlanCommand 客户端
 	m.planClient = NewPlanClient(m)
@@ -203,9 +198,6 @@ func (m *Manager) EvaluationWorkerClient() *EvaluationWorkerClient { return m.ev
 func (m *Manager) InterpretationAutomationClient() *InterpretationAutomationClient {
 	return m.interpretationAutomationClient
 }
-func (m *Manager) AIExplanationAutomationClient() *AIExplanationAutomationClient {
-	return m.aiExplanationAutomationClient
-}
 
 // PlanClient 获取 plan 命令客户端
 func (m *Manager) PlanClient() *PlanClient {
@@ -227,11 +219,6 @@ func (m *Manager) Conn() *grpc.ClientConn {
 // Timeout 获取请求超时时间
 func (m *Manager) Timeout() time.Duration {
 	return m.config.Timeout
-}
-
-// AIExplanationTimeout 获取 AI 解读与评测请求超时时间。
-func (m *Manager) AIExplanationTimeout() time.Duration {
-	return m.config.AIExplanationTimeout
 }
 
 // Close 关闭所有连接

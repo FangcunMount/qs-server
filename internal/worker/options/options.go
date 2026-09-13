@@ -112,8 +112,7 @@ type GRPCOptions struct {
 	ApiserverAddr string `json:"apiserver_addr" mapstructure:"apiserver-addr"`
 	// RequestTimeout 普通 gRPC 请求超时时间。
 	RequestTimeout time.Duration `json:"request_timeout" mapstructure:"request-timeout"`
-	// AIExplanationTimeout AI 解读与评测请求超时时间。一次评测步骤可能顺序执行生成与独立模型裁判。
-	AIExplanationTimeout time.Duration `json:"ai_explanation_timeout" mapstructure:"ai-explanation-timeout"`
+
 	// Insecure 是否使用明文连接
 	Insecure bool `json:"insecure" mapstructure:"insecure"`
 	// TLS 配置
@@ -144,10 +143,9 @@ func NewOptions() *Options {
 		},
 		RetryGovernance: &RetryGovernanceOptions{AutomaticRetryEnabled: true, HoldReplay: &RetryPolicyOptions{MaxAttempts: 30, BaseDelay: 10 * time.Second, MaxDelay: time.Hour, JitterFraction: .2}},
 		GRPC: &GRPCOptions{
-			ApiserverAddr:        "localhost:9090",
-			RequestTimeout:       30 * time.Second,
-			AIExplanationTimeout: 3 * time.Minute,
-			Insecure:             true,
+			ApiserverAddr:  "localhost:9090",
+			RequestTimeout: 30 * time.Second,
+			Insecure:       true,
 		},
 		Worker: &WorkerOptions{
 			Concurrency:                        10,
@@ -239,8 +237,6 @@ func (o *Options) Flags() (fss cliflag.NamedFlagSets) {
 		"Apiserver gRPC service address")
 	grpcFS.DurationVar(&o.GRPC.RequestTimeout, "grpc.request-timeout", o.GRPC.RequestTimeout,
 		"Timeout for ordinary apiserver gRPC requests")
-	grpcFS.DurationVar(&o.GRPC.AIExplanationTimeout, "grpc.ai-explanation-timeout", o.GRPC.AIExplanationTimeout,
-		"Timeout for AI explanation generation and prompt evaluation requests")
 	grpcFS.BoolVar(&o.GRPC.Insecure, "grpc.insecure", o.GRPC.Insecure,
 		"Use insecure gRPC connection (plaintext, no TLS)")
 	grpcFS.StringVar(&o.GRPC.TLSCertFile, "grpc.tls-cert-file", o.GRPC.TLSCertFile,
@@ -326,8 +322,8 @@ func (o *Options) Validate() []error {
 	if o.Messaging != nil && o.Messaging.Provider == "nsq" {
 		if o.Messaging.NSQMessageTimeout <= 0 {
 			errs = append(errs, fmt.Errorf("messaging.nsq_message_timeout must be greater than 0"))
-		} else if o.GRPC != nil && o.Messaging.NSQMessageTimeout <= o.GRPC.AIExplanationTimeout {
-			errs = append(errs, fmt.Errorf("messaging.nsq_message_timeout must be greater than grpc.ai-explanation-timeout"))
+		} else if o.GRPC != nil && o.Messaging.NSQMessageTimeout <= o.GRPC.RequestTimeout {
+			errs = append(errs, fmt.Errorf("messaging.nsq_message_timeout must be greater than grpc.request-timeout"))
 		}
 	}
 	if o.RetryGovernance != nil && o.RetryGovernance.HoldReplay != nil {
@@ -385,11 +381,6 @@ func validateWorkerGRPC(opts *GRPCOptions) []error {
 	}
 	if opts.RequestTimeout <= 0 {
 		errs = append(errs, fmt.Errorf("grpc.request-timeout must be greater than 0"))
-	}
-	if opts.AIExplanationTimeout <= 0 {
-		errs = append(errs, fmt.Errorf("grpc.ai-explanation-timeout must be greater than 0"))
-	} else if opts.AIExplanationTimeout <= opts.RequestTimeout {
-		errs = append(errs, fmt.Errorf("grpc.ai-explanation-timeout must be greater than grpc.request-timeout"))
 	}
 	if opts.Insecure {
 		return errs

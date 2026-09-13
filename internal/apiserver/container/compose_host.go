@@ -89,11 +89,11 @@ func (c *Container) InterpretationRunLeaseDuration() time.Duration {
 	return c.systemGovernanceOptions.Retry.Lease.RunLeaseDuration()
 }
 
-func (c *Container) AIExplanationOptions() *apiserveroptions.AIExplanationOptions {
+func (c *Container) AIWorkflowOptions() *apiserveroptions.AIWorkflowOptions {
 	if c == nil {
 		return nil
 	}
-	return c.aiExplanationOptions
+	return c.aiWorkflowOptions
 }
 
 func (c *Container) PublishedReportTemplateCatalog() domainreporttemplate.Catalog {

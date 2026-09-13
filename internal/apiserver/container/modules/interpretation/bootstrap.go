@@ -22,7 +22,7 @@ type BootstrapInput struct {
 	ReportStatusConfig reportstatus.Config
 	OutboxProfile      appEventing.ProfileBinding
 	RunLeaseDuration   time.Duration
-	AIExplanation      *apiserveroptions.AIExplanationOptions
+	AIWorkflow         *apiserveroptions.AIWorkflowOptions
 }
 
 // Bootstrap assembles the report module from container integration inputs.

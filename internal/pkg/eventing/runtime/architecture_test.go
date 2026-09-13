@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
+	eventcatalog "github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
 )
 
 func TestEventSystemDoesNotImportRemovedEventConfig(t *testing.T) {
@@ -146,36 +146,6 @@ func durableOutboxEventTokens(t *testing.T, catalog *eventcatalog.Catalog) map[s
 			eventcatalog.InterpretationRetryRequested,
 			"InterpretationRetryRequested",
 			"NewInterpretationRetryRequestedEvent",
-		},
-		eventcatalog.AIExplanationRequested: {
-			eventcatalog.AIExplanationRequested,
-			"AIExplanationRequested",
-			"AIExplanationRequestedData",
-		},
-		eventcatalog.AIExplanationRetryRequested: {
-			eventcatalog.AIExplanationRetryRequested,
-			"RetryRequested",
-			"AIExplanationRetryRequestedData",
-		},
-		eventcatalog.AIExplanationLeaseRecoveryRequested: {
-			eventcatalog.AIExplanationLeaseRecoveryRequested,
-			"LeaseRecoveryRequested",
-			"AIExplanationLeaseRecoveryRequestedData",
-		},
-		eventcatalog.AIExplanationGenerated: {
-			eventcatalog.AIExplanationGenerated,
-			"AIExplanationGenerated",
-			"AIExplanationGeneratedData",
-		},
-		eventcatalog.AIExplanationFailed: {
-			eventcatalog.AIExplanationFailed,
-			"AIExplanationFailed",
-			"AIExplanationFailedData",
-		},
-		eventcatalog.AIExplanationPromptEvaluationStepRequested: {
-			eventcatalog.AIExplanationPromptEvaluationStepRequested,
-			"PromptEvaluationStepEvent",
-			"AIExplanationPromptEvaluationStepRequestedData",
 		},
 	}
 

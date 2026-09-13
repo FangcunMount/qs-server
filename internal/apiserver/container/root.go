@@ -10,7 +10,7 @@ import (
 
 	"github.com/FangcunMount/component-base/pkg/event"
 	systemgov "github.com/FangcunMount/qs-server/internal/apiserver/application/systemgovernance"
-	"github.com/FangcunMount/qs-server/internal/apiserver/cache/subsystem"
+	cachebootstrap "github.com/FangcunMount/qs-server/internal/apiserver/cache/subsystem"
 	eventsubsystem "github.com/FangcunMount/qs-server/internal/apiserver/eventing/subsystem"
 	objectstorageport "github.com/FangcunMount/qs-server/internal/apiserver/infra/objectstorage/port"
 	apiserveroptions "github.com/FangcunMount/qs-server/internal/apiserver/options"
@@ -44,7 +44,7 @@ type Container struct {
 	statisticsRepairWindowDays int
 	reportStatusConfig         reportstatus.Config
 	systemGovernanceOptions    *apiserveroptions.SystemGovernanceOptions
-	aiExplanationOptions       *apiserveroptions.AIExplanationOptions
+	aiWorkflowOptions          *apiserveroptions.AIWorkflowOptions
 	actionAuditStore           systemgov.ActionAuditStore
 	actionAuditRunner          *systemgov.ActionAuditRecoveryRunner
 	actionAuditCancel          context.CancelFunc
@@ -158,7 +158,7 @@ func NewContainerWithOptions(mysqlDB *gorm.DB, mongoDB *mongo.Database, redisCac
 	c.statisticsRepairWindowDays = opts.StatisticsRepairWindowDays
 	c.reportStatusConfig = reportstatus.ConfigFromOptions(opts.ReportStatus, opts.Signaling, "apiserver")
 	c.systemGovernanceOptions = opts.SystemGovernance
-	c.aiExplanationOptions = opts.AIExplanation
+	c.aiWorkflowOptions = opts.AIWorkflow
 	c.actionAuditStore = opts.ActionAuditStore
 	c.actionAuditRunner = opts.ActionAuditRunner
 	c.silent = opts.Silent

@@ -68,15 +68,13 @@ gRPC 服务按依赖是否完整进行注册。某个模块没有成功装配时
 
 事件子系统启动失败会阻止后续 scheduler 启动。这是合理的失败关闭：业务调度可能产生新事实和事件，不能在可靠事件基础设施没有准备好时继续推进。
 
-当前 scheduler manager 最多装配九个 runner：
+当前 scheduler manager 最多装配七个 runner：
 
 - `PlanRunner`：按 Plan 周期创建或更新待执行 Task；
 - `StatisticsSyncRunner`：按机构执行唯一 publish Run，编排 Collector、Projection、SyncRun、Cache Generation 与预热；
 - `EvaluationConsistencyAuditRunner`：按批次只读审计评分跨存储终态漂移，完成一轮全量扫描后等待下一周期；
 - `EvaluationLeaseRecoveryRunner`：短周期恢复 Evaluation 过期执行租约；
 - `InterpretationLeaseRecoveryRunner`：短周期恢复 Interpretation 过期执行租约；
-- `AIExplanationPromptEvaluationLeaseRecoveryRunner`：生产启用、dev 关闭，只为 AI Prompt 评测 v1/v2 中过期的 prepared checkpoint 持久化新唤醒事件；
-- `AIExplanationParticipantLeaseRecoveryRunner`：默认关闭，只为 Participant AI 解读的精确过期 Run lease 持久化新唤醒事件；
 - `ReportCatalogAuditRunner`：有界审计报告目录事实。
 - `MongoConsistencyAuditRunner`：按批次只读巡检 Mongo 跨集合一致性，并通过独立 checkpoint 推进七阶段扫描。
 

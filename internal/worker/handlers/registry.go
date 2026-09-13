@@ -61,10 +61,6 @@ type EvaluationWorkerClient interface {
 type InterpretationAutomationClient interface {
 	GenerateReportFromOutcome(context.Context, string) (*interpretationpb.GenerateReportFromAssessmentResponse, error)
 }
-type AIExplanationAutomationClient interface {
-	ExecuteAIExplanation(context.Context, *interpretationpb.ExecuteAIExplanationRequest) (*interpretationpb.ExecuteAIExplanationResponse, error)
-	ExecutePromptEvaluationStep(context.Context, *interpretationpb.ExecutePromptEvaluationStepRequest) (*interpretationpb.ExecutePromptEvaluationStepResponse, error)
-}
 
 // ReportStatusWriter projects report lifecycle states for client polling.
 // Its Redis-backed implementation is supplied by the worker composition root.
@@ -83,14 +79,14 @@ type Dependencies struct {
 	AssessmentIntakeClient         AssessmentIntakeClient
 	EvaluationWorkerClient         EvaluationWorkerClient
 	InterpretationAutomationClient InterpretationAutomationClient
-	AIExplanationAutomationClient  AIExplanationAutomationClient
-	LockManager                    locklease.Manager
-	LockRunner                     locklease.Runner
-	LockKeyBuilder                 *keyspace.Builder
-	Notifier                       port.TaskNotifier
-	ReportStatusReporter           ReportStatusWriter
-	AttentionProjector             *attentionprojection.Projector
-	DisableAutomaticRetry          bool
+
+	LockManager           locklease.Manager
+	LockRunner            locklease.Runner
+	LockKeyBuilder        *keyspace.Builder
+	Notifier              port.TaskNotifier
+	ReportStatusReporter  ReportStatusWriter
+	AttentionProjector    *attentionprojection.Projector
+	DisableAutomaticRetry bool
 }
 
 // HandlerFactory 处理器工厂函数

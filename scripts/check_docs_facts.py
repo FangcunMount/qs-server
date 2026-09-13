@@ -167,18 +167,6 @@ SCHEDULER_RUNNERS = (
         "interpretation_lease_recovery",
         "InterpretationLeaseRecovery",
     ),
-    (
-        "AIExplanationPromptEvaluationLeaseRecoveryRunner",
-        "AIExplanationPromptEvaluationLeaseRecovery",
-        "ai_explanation_prompt_evaluation_lease_recovery",
-        "AIExplanationPromptEvaluationLeaseRecovery",
-    ),
-    (
-        "AIExplanationParticipantLeaseRecoveryRunner",
-        "AIExplanationParticipantLeaseRecovery",
-        "ai_explanation_participant_lease_recovery",
-        "AIExplanationParticipantLeaseRecovery",
-    ),
     ("ReportCatalogAuditRunner", "ReportCatalogAudit", "report_catalog_audit", "ReportCatalogAudit"),
     ("MongoConsistencyAuditRunner", "MongoConsistencyAudit", "mongo_consistency_audit", "MongoConsistencyAudit"),
 )
@@ -189,7 +177,6 @@ EXPECTED_SCHEDULER_PRODUCTION_ENABLE = {
     if config_key
     in {
         "mongo_consistency_audit",
-        "ai_explanation_participant_lease_recovery",
     }
     else "true"
     for _, _, config_key, _ in SCHEDULER_RUNNERS
@@ -203,8 +190,6 @@ EXPECTED_LOCKLEASE_INVENTORY = (
     ("apiserver", "evaluation_consistency_audit", "leader", "30s", "auto"),
     ("apiserver", "evaluation_lease_recovery", "leader", "30s", "auto"),
     ("apiserver", "interpretation_lease_recovery", "leader", "30s", "auto"),
-    ("apiserver", "ai_explanation_prompt_evaluation_lease_recovery", "leader", "30s", "auto"),
-    ("apiserver", "ai_explanation_participant_lease_recovery", "leader", "30s", "auto"),
     ("apiserver", "report_catalog_audit", "leader", "30s", "auto"),
     ("apiserver", "mongo_consistency_audit", "leader", "30s", "auto"),
     ("worker", "attention_projection_reconcile", "leader", "30m", "auto"),
@@ -289,12 +274,6 @@ EXPECTED_EVENTS = {
     "interpretation.report.generated",
     "interpretation.report.failed",
     "interpretation.retry.requested",
-    "interpretation.ai_explanation.requested",
-    "interpretation.ai_explanation.retry.requested",
-    "interpretation.ai_explanation.lease_recovery.requested",
-    "interpretation.ai_explanation.generated",
-    "interpretation.ai_explanation.failed",
-    "interpretation.ai_explanation.prompt_evaluation.step_requested",
     "task.opened",
     "task.completed",
     "task.expired",

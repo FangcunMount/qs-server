@@ -22,10 +22,6 @@ func TestCollectionOpenAPIContractCoversKeyRoutes(t *testing.T) {
 	assertOpenAPIOperation(t, spec, "/assessments", "get")
 	assertOpenAPIOperation(t, spec, "/assessments/{id}/report", "get")
 	assertOpenAPIOperation(t, spec, "/assessments/{id}/wait-report", "get")
-	assertOpenAPIOperation(t, spec, "/assessments/{id}/ai-explanation/capability", "get")
-	assertOpenAPIOperation(t, spec, "/assessments/{id}/ai-explanations", "post")
-	assertOpenAPIOperation(t, spec, "/assessments/{id}/ai-explanations/{generation_id}", "get")
-	assertOpenAPIOperation(t, spec, "/ai-explanations/export", "get")
 	assertOpenAPIOperation(t, spec, "/questionnaires/{code}", "get")
 	assertOpenAPIOperation(t, spec, "/typology-assessment-sessions", "post")
 	assertOpenAPIOperation(t, spec, "/assessment-models", "get")
@@ -69,32 +65,6 @@ func TestCollectionOpenAPIUsesStringTesteeIDAndCurrentReportStatuses(t *testing.
 	status := data["properties"].(map[string]any)["status"].(map[string]any)
 	if !openAPIEnumEquals(status["enum"], "processing", "interpreted", "failed") {
 		t.Fatalf("websocket status enum = %v, want processing/interpreted/failed", status["enum"])
-	}
-}
-
-func TestCollectionOpenAPIAIExplanationLifecycleContract(t *testing.T) {
-	t.Parallel()
-
-	schemas := loadOpenAPIComponents(t, "../../../../api/rest/collection.yaml")
-	request := schemas["aiexplanation.Request"].(map[string]any)
-	focusAreas := request["properties"].(map[string]any)["focus_areas"].(map[string]any)
-	if focusAreas["maxItems"] != 3 {
-		t.Fatalf("AI explanation focus_areas maxItems = %v, want 3", focusAreas["maxItems"])
-	}
-
-	response := schemas["aiexplanation.Response"].(map[string]any)
-	properties := response["properties"].(map[string]any)
-	status := properties["status"].(map[string]any)
-	if !openAPIEnumEquals(status["enum"], "ready", "not_ready", "not_applicable", "pending", "generating", "generated", "failed") {
-		t.Fatalf("AI explanation status enum = %v", status["enum"])
-	}
-	reasonCode := properties["reason_code"].(map[string]any)
-	if !openAPIEnumEquals(reasonCode["enum"], "standard_report_not_ready", "feature_disabled", "source_not_supported", "profile_unresolved", "profile_mismatch", "not_applicable") {
-		t.Fatalf("AI explanation reason_code enum = %v", reasonCode["enum"])
-	}
-	sourceState := properties["source_state"].(map[string]any)
-	if !openAPIEnumEquals(sourceState["enum"], "current", "stale", "unavailable", "unknown") {
-		t.Fatalf("AI explanation source_state enum = %v", sourceState["enum"])
 	}
 }
 
@@ -258,7 +228,7 @@ func TestCollectionRESTRegistersMedicalAssessmentListRoute(t *testing.T) {
 	}
 }
 
-func TestCollectionRESTProtectsAllAIExplanationParticipantRoutes(t *testing.T) {
+func TestCollectionRESTDoesNotRegisterRetiredAIExplanationRoutes(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	c := mustNewCollectionContainer(t,
@@ -281,6 +251,39 @@ func TestCollectionRESTProtectsAllAIExplanationParticipantRoutes(t *testing.T) {
 		{method: http.MethodGet, path: "/api/v1/assessments/42/ai-explanation/capability?testee_id=7"},
 		{method: http.MethodPost, path: "/api/v1/assessments/42/ai-explanations?testee_id=7"},
 		{method: http.MethodGet, path: "/api/v1/assessments/42/ai-explanations/9001?testee_id=7"},
+	}
+	for _, testCase := range tests {
+		recorder := httptest.NewRecorder()
+		request := httptest.NewRequest(testCase.method, testCase.path, nil)
+		engine.ServeHTTP(recorder, request)
+		if recorder.Code != http.StatusNotFound {
+			t.Fatalf("%s %s status = %d, want 404; body=%s", testCase.method, testCase.path, recorder.Code, recorder.Body.String())
+		}
+	}
+}
+
+func TestCollectionRESTProtectsCurrentAIWorkflowRoutes(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	c := mustNewCollectionContainer(t,
+		options.NewOptions(),
+		nil,
+		nil,
+		observability.NewFamilyStatusRegistry("collection-server"),
+	)
+	if err := c.Initialize(); err != nil {
+		t.Fatal(err)
+	}
+	engine := gin.New()
+	NewRouter(c).RegisterRoutes(engine)
+
+	tests := []struct {
+		method string
+		path   string
+	}{
+		{method: http.MethodGet, path: "/api/v1/assessments/42/ai-workflows/source?testee_id=7"},
+		{method: http.MethodPost, path: "/api/v1/assessments/42/ai-workflows?testee_id=7"},
+		{method: http.MethodGet, path: "/api/v1/assessments/42/ai-workflows/a488863c-85df-45f5-aa3e-19574e27fda1?testee_id=7"},
 	}
 	for _, testCase := range tests {
 		recorder := httptest.NewRecorder()

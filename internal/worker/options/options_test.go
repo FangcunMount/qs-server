@@ -172,25 +172,7 @@ func TestOptionsValidateAcceptsCompleteSecureGRPCIdentity(t *testing.T) {
 	}
 }
 
-func TestOptionsDefaultAIExplanationTimeoutCoversSequentialProviderStages(t *testing.T) {
-	t.Parallel()
-
-	opts := NewOptions()
-	if opts.GRPC.RequestTimeout != 30*time.Second {
-		t.Fatalf("grpc request timeout = %s, want 30s", opts.GRPC.RequestTimeout)
-	}
-	if opts.GRPC.AIExplanationTimeout != 3*time.Minute {
-		t.Fatalf("AI explanation timeout = %s, want 3m", opts.GRPC.AIExplanationTimeout)
-	}
-	if opts.Messaging.NSQMessageTimeout != 4*time.Minute {
-		t.Fatalf("NSQ message timeout = %s, want 4m", opts.Messaging.NSQMessageTimeout)
-	}
-	if opts.Messaging.NSQMessageTimeout <= opts.GRPC.AIExplanationTimeout {
-		t.Fatalf("NSQ message timeout = %s, must exceed AI RPC timeout %s", opts.Messaging.NSQMessageTimeout, opts.GRPC.AIExplanationTimeout)
-	}
-}
-
-func TestOptionsRejectsNonPositiveOrNonDistinctAIExplanationTimeout(t *testing.T) {
+func TestOptionsRejectsNonPositiveRequestTimeout(t *testing.T) {
 	t.Parallel()
 
 	for _, testCase := range []struct {
@@ -199,8 +181,6 @@ func TestOptionsRejectsNonPositiveOrNonDistinctAIExplanationTimeout(t *testing.T
 		message string
 	}{
 		{name: "ordinary timeout", mutate: func(value *GRPCOptions) { value.RequestTimeout = 0 }, message: "grpc.request-timeout"},
-		{name: "AI timeout", mutate: func(value *GRPCOptions) { value.AIExplanationTimeout = 0 }, message: "grpc.ai-explanation-timeout"},
-		{name: "AI timeout not longer", mutate: func(value *GRPCOptions) { value.AIExplanationTimeout = value.RequestTimeout }, message: "must be greater than grpc.request-timeout"},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
 			opts := NewOptions()
@@ -212,10 +192,10 @@ func TestOptionsRejectsNonPositiveOrNonDistinctAIExplanationTimeout(t *testing.T
 	}
 }
 
-func TestOptionsRejectsNSQMessageTimeoutThatCannotCoverAIHandler(t *testing.T) {
+func TestOptionsRejectsNSQMessageTimeoutThatCannotCoverRequest(t *testing.T) {
 	t.Parallel()
 
-	for _, timeout := range []time.Duration{0, 3 * time.Minute} {
+	for _, timeout := range []time.Duration{0, NewOptions().GRPC.RequestTimeout} {
 		opts := NewOptions()
 		opts.Messaging.NSQMessageTimeout = timeout
 		if !containsWorkerValidationError(opts.Validate(), "messaging.nsq_message_timeout") {
@@ -226,14 +206,13 @@ func TestOptionsRejectsNSQMessageTimeoutThatCannotCoverAIHandler(t *testing.T) {
 
 func secureWorkerGRPCOptions() *GRPCOptions {
 	return &GRPCOptions{
-		ApiserverAddr:        "qs-apiserver:9090",
-		RequestTimeout:       30 * time.Second,
-		AIExplanationTimeout: 3 * time.Minute,
-		Insecure:             false,
-		TLSCAFile:            "/tmp/ca.crt",
-		TLSCertFile:          "/tmp/worker.crt",
-		TLSKeyFile:           "/tmp/worker.key",
-		TLSServerName:        "qs-apiserver.svc",
+		ApiserverAddr:  "qs-apiserver:9090",
+		RequestTimeout: 30 * time.Second,
+		Insecure:       false,
+		TLSCAFile:      "/tmp/ca.crt",
+		TLSCertFile:    "/tmp/worker.crt",
+		TLSKeyFile:     "/tmp/worker.key",
+		TLSServerName:  "qs-apiserver.svc",
 	}
 }
 

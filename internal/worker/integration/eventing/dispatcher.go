@@ -7,8 +7,8 @@ import (
 	"log/slog"
 
 	"github.com/FangcunMount/qs-server/internal/pkg/attentionprojection"
-	"github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
-	"github.com/FangcunMount/qs-server/internal/pkg/eventing/runtime"
+	eventcatalog "github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
+	eventruntime "github.com/FangcunMount/qs-server/internal/pkg/eventing/runtime"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/keyspace"
 	"github.com/FangcunMount/qs-server/internal/pkg/reportstatus"
 	"github.com/FangcunMount/qs-server/internal/pkg/resilience/locklease"
@@ -25,14 +25,14 @@ type HandlerDependencies struct {
 	AssessmentIntakeClient         handlers.AssessmentIntakeClient
 	EvaluationWorkerClient         handlers.EvaluationWorkerClient
 	InterpretationAutomationClient handlers.InterpretationAutomationClient
-	AIExplanationAutomationClient  handlers.AIExplanationAutomationClient
-	LockManager                    locklease.Manager
-	LockRunner                     locklease.Runner
-	LockKeyBuilder                 *keyspace.Builder
-	Notifier                       port.TaskNotifier
-	ReportStatusReporter           *reportstatus.Reporter
-	AttentionProjector             *attentionprojection.Projector
-	DisableAutomaticRetry          bool
+
+	LockManager           locklease.Manager
+	LockRunner            locklease.Runner
+	LockKeyBuilder        *keyspace.Builder
+	Notifier              port.TaskNotifier
+	ReportStatusReporter  *reportstatus.Reporter
+	AttentionProjector    *attentionprojection.Projector
+	DisableAutomaticRetry bool
 }
 
 // HandlerRegistry is the explicit worker handler factory catalog consumed by
@@ -134,7 +134,6 @@ func (d *Dispatcher) buildHandlerDependencies() *handlers.Dependencies {
 		AssessmentIntakeClient:         d.deps.AssessmentIntakeClient,
 		EvaluationWorkerClient:         d.deps.EvaluationWorkerClient,
 		InterpretationAutomationClient: d.deps.InterpretationAutomationClient,
-		AIExplanationAutomationClient:  d.deps.AIExplanationAutomationClient,
 		LockManager:                    d.deps.LockManager,
 		LockRunner:                     d.deps.LockRunner,
 		LockKeyBuilder:                 d.deps.LockKeyBuilder,

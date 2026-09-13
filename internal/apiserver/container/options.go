@@ -2,7 +2,7 @@ package container
 
 import (
 	systemgov "github.com/FangcunMount/qs-server/internal/apiserver/application/systemgovernance"
-	"github.com/FangcunMount/qs-server/internal/apiserver/cache/subsystem"
+	cachebootstrap "github.com/FangcunMount/qs-server/internal/apiserver/cache/subsystem"
 	eventsubsystem "github.com/FangcunMount/qs-server/internal/apiserver/eventing/subsystem"
 	apiserveroptions "github.com/FangcunMount/qs-server/internal/apiserver/options"
 	resiliencesubsystem "github.com/FangcunMount/qs-server/internal/apiserver/resilience/subsystem"
@@ -33,7 +33,7 @@ type ContainerOptions struct {
 	Silent bool
 	// SystemGovernance unified governance facade configuration.
 	SystemGovernance  *apiserveroptions.SystemGovernanceOptions
-	AIExplanation     *apiserveroptions.AIExplanationOptions
+	AIWorkflow        *apiserveroptions.AIWorkflowOptions
 	ActionAuditStore  systemgov.ActionAuditStore
 	ActionAuditRunner *systemgov.ActionAuditRecoveryRunner
 }

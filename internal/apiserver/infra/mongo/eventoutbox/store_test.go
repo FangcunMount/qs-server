@@ -10,7 +10,7 @@ import (
 	"github.com/FangcunMount/component-base/pkg/event"
 	"github.com/FangcunMount/component-base/pkg/eventcodec"
 	"github.com/FangcunMount/qs-server/internal/apiserver/outboxcore"
-	"github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
+	eventcatalog "github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 )
@@ -165,19 +165,10 @@ func TestPendingClaimQueriesPrioritizeMainlineEvents(t *testing.T) {
 	}
 	wantPriority := []string{
 		eventcatalog.AnswerSheetSubmitted,
-		eventcatalog.AIExplanationLeaseRecoveryRequested,
-		eventcatalog.AIExplanationRequested,
-		eventcatalog.AIExplanationRetryRequested,
 	}
 	assertEventTypeOperator(t, queries[0].filter, "$in", wantPriority)
 	wantP1 := []string{
 		eventcatalog.AnswerSheetSubmitted,
-		eventcatalog.AIExplanationLeaseRecoveryRequested,
-		eventcatalog.AIExplanationRequested,
-		eventcatalog.AIExplanationRetryRequested,
-		eventcatalog.AIExplanationFailed,
-		eventcatalog.AIExplanationGenerated,
-		eventcatalog.AIExplanationPromptEvaluationStepRequested,
 		eventcatalog.InterpretationReportFailed,
 		eventcatalog.InterpretationReportGenerated,
 		eventcatalog.InterpretationRetryRequested,

@@ -128,7 +128,6 @@ QS_APISERVER_OSS_ACCESS_KEY_SECRET=${OSS_ACCESS_KEY_SECRET}
 QS_APISERVER_OSS_SESSION_TOKEN=${OSS_SESSION_TOKEN:-}
 
 # The selected AI Provider credential is process-scoped and never stored in YAML.
-DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY:-}
 EOF
     ;;
   collection)

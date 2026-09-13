@@ -32,7 +32,6 @@ func (r *GRPCClientRegistry) ClientBundle() container.ClientBundle {
 		AssessmentIntake:         r.manager.AssessmentIntakeClient(),
 		EvaluationWorker:         r.manager.EvaluationWorkerClient(),
 		InterpretationAutomation: r.manager.InterpretationAutomationClient(),
-		AIExplanationAutomation:  r.manager.AIExplanationAutomationClient(),
 	}
 	log.Info("✅ Worker gRPC client bundle built")
 	return bundle
@@ -61,11 +60,10 @@ func (r *GRPCClientRegistry) internalClient() *grpcclient.InternalClient {
 // CreateGRPCClientManager 创建 gRPC 客户端管理器
 func CreateGRPCClientManager(cfg *config.GRPCConfig) (*grpcclient.Manager, error) {
 	manager, err := grpcclient.NewManager(&grpcclient.ManagerConfig{
-		Endpoint:             cfg.ApiserverAddr,
-		Timeout:              cfg.RequestTimeout,
-		AIExplanationTimeout: cfg.AIExplanationTimeout,
-		PoolSize:             1,
-		Insecure:             cfg.Insecure,
+		Endpoint: cfg.ApiserverAddr,
+		Timeout:  cfg.RequestTimeout,
+		PoolSize: 1,
+		Insecure: cfg.Insecure,
 		TLS: grpcclient.TLSConfig{
 			CAFile:     cfg.TLSCAFile,
 			CertFile:   cfg.TLSCertFile,

@@ -2,12 +2,13 @@ package rest
 
 import (
 	"fmt"
+	"net/http"
+	"time"
+
 	retirementApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/operatorretirement"
 	storeApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/store"
 	testeeStoreApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/testeestore"
 	bridge "github.com/FangcunMount/qs-server/internal/apiserver/application/aibridge"
-	"net/http"
-	"time"
 
 	auth "github.com/FangcunMount/iam/v5/pkg/sdk/auth/verifier"
 	actorAccessApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/access"
@@ -19,7 +20,6 @@ import (
 	codesapp "github.com/FangcunMount/qs-server/internal/apiserver/application/codes"
 	evaluationoperator "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/operator"
 	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
-	aiexplanationadministration "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/aiexplanation/administration"
 	interpretationcatalog "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/catalogreconcile"
 	interpretationoperations "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/operations"
 	interpretationreporttemplate "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/reporttemplate"
@@ -143,19 +143,18 @@ type EvaluationDeps struct {
 }
 
 type InterpretationDeps struct {
-	AIWorkflowParticipants      *bridge.ParticipantAdministration
-	AIWorkflowManagement        *bridge.EvaluationAdministration
-	AIWorkflowPublications      *bridge.PublicationAdministration
-	AIWorkflowPromptDrafts      *bridge.PromptDraftAdministration
-	AIWorkflowSuites            *bridge.SuiteAdministration
-	AIWorkflowAssets            *bridge.AssetCatalogAdministration
-	AIWorkflowProfiles          *bridge.ProfileAdministration
-	ReportQueryJourney          reportqueryjourney.Service
-	ReportWaitJourney           reportwaitjourney.Service
-	OperationsService           interpretationoperations.Service
-	CatalogReconcile            interpretationcatalog.Service
-	ReportTemplates             interpretationreporttemplate.Service
-	AIExplanationAdministration aiexplanationadministration.Service
+	AIWorkflowParticipants *bridge.ParticipantAdministration
+	AIWorkflowManagement   *bridge.EvaluationAdministration
+	AIWorkflowPublications *bridge.PublicationAdministration
+	AIWorkflowPromptDrafts *bridge.PromptDraftAdministration
+	AIWorkflowSuites       *bridge.SuiteAdministration
+	AIWorkflowAssets       *bridge.AssetCatalogAdministration
+	AIWorkflowProfiles     *bridge.ProfileAdministration
+	ReportQueryJourney     reportqueryjourney.Service
+	ReportWaitJourney      reportwaitjourney.Service
+	OperationsService      interpretationoperations.Service
+	CatalogReconcile       interpretationcatalog.Service
+	ReportTemplates        interpretationreporttemplate.Service
 }
 
 type PlanDeps struct {
