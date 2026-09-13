@@ -38,6 +38,8 @@ message EvidenceItem {
 
 // Trusted QS backend only. QS authorizes governance writes and candidate audit reads.
 service EvaluationManagement {
+ // Current organization daily reservation and active-run usage; read only.
+ rpc GetCapacity(PublicationScope) returns (EvaluationCapacitySnapshot);
  // Organization-scoped summary pages; never schedules work or authorizes mutations.
  rpc List(EvaluationCatalogQuery) returns (EvaluationCatalogPage);
  // Resolve all eleven immutable references and policy budgets; no creation or scheduling.
@@ -56,12 +58,49 @@ service EvaluationManagement {
  rpc Review(EvaluationReviewCommand) returns (EvaluationState);
  rpc ListCandidates(EvaluationQuery) returns (EvaluationCandidateIndex);
  rpc GetCandidate(EvaluationCandidateQuery) returns (EvaluationCandidateEvidence);
+ // Read original execution evidence, including failures without candidates. Never retries.
+ rpc ListExecutions(EvaluationExecutionQuery) returns (EvaluationExecutionPage);
+ rpc GetExecutionOutput(EvaluationExecutionQuery) returns (EvaluationExecutionOutput);
  // Read-only complete gate preview; does not approve the Run or publish a release.
  rpc PreviewGates(EvaluationGateQuery) returns (EvaluationGatePreview);
  // Recompute gates under CAS; this records approval/rejection, never publishes a release.
  rpc Finalize(EvaluationFinalizeCommand) returns (EvaluationState);
  // Reopen eligible semantic-review signatures, preserving the complete previous round.
  rpc ReopenReview(EvaluationReopenCommand) returns (EvaluationState);
+}
+message EvaluationExecutionQuery {
+ EvaluationQuery scope = 1;
+ int64 expected_version = 2;
+ string cursor = 3;
+ int32 limit = 4;
+ string execution_id = 5;
+}
+message EvaluationExecutionSummary {
+ string execution_id = 1;
+ string invocation_id = 2;
+ string kind = 3;
+ string case_id = 4;
+ int32 slot_ordinal = 5;
+ int32 execution_ordinal = 6;
+ string status = 7;
+ int64 raw_output_bytes = 8;
+ int64 normalized_output_bytes = 9;
+ string evidence_json = 10;
+}
+message EvaluationExecutionPage {
+ string run_id = 1;
+ int64 version = 2;
+ repeated EvaluationExecutionSummary executions = 3;
+ string next_cursor = 4;
+}
+message EvaluationExecutionOutput {
+ string run_id = 1;
+ int64 version = 2;
+ EvaluationExecutionSummary execution = 3;
+ bytes raw_output = 4;
+ bytes normalized_output = 5;
+ string raw_sha256 = 6;
+ string normalized_sha256 = 7;
 }
 message EvaluationPlanQuery {
  PublicationScope scope = 1;
@@ -540,4 +579,26 @@ message EvaluationSummary {
  int64 review_ready_candidates = 16;
  string last_cause = 17;
  string last_reason = 18;
+}
+
+message EvaluationCapacityReservation {
+ string run_id = 1;
+ int64 provider_calls = 2;
+ string requested_by = 3;
+ string reserved_at = 4;
+}
+message EvaluationCapacitySnapshot {
+ int64 organization_id = 1;
+ string budget_day = 2;
+ int64 daily_provider_calls = 3;
+ int64 reserved_provider_calls = 4;
+ int64 remaining_provider_calls = 5;
+ int64 full_run_provider_calls = 6;
+ int64 remaining_full_runs = 7;
+ int64 max_active_runs = 8;
+ int64 active_runs = 9;
+ int64 reservation_count = 10;
+ // Latest 100 receipts; totals include all reservations in the UTC day.
+ repeated EvaluationCapacityReservation reservations = 11;
+ bool reservations_truncated = 12;
 }

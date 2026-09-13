@@ -55,6 +55,7 @@ func (r *Router) registerInterpretationInternalRoutes(internalV1 *gin.RouterGrou
 func (r *Router) registerInterpretationInternalV2Routes(internalV2 *gin.RouterGroup) {
 	if r.deps.Interpretation.AIWorkflowManagement != nil {
 		management := handler.NewAIWorkflowManagementHandler(r.deps.Interpretation.AIWorkflowManagement)
+		internalV2.GET("/interpretation/ai-workflow/evaluation-capacity", restmiddleware.RequireCapabilityMiddleware(restmiddleware.CapabilityOrgAdmin), management.Capacity)
 		group := internalV2.Group("/interpretation/ai-workflow/evaluations", restmiddleware.RequireCapabilityMiddleware(restmiddleware.CapabilityOrgAdmin))
 		read := internalV2.Group("/interpretation/ai-workflow/evaluations", restmiddleware.RequireCapabilityMiddleware(restmiddleware.CapabilityAuditInterpretation))
 		read.POST("/prepare", management.Prepare)
@@ -64,6 +65,8 @@ func (r *Router) registerInterpretationInternalV2Routes(internalV2 *gin.RouterGr
 		read.GET("/:run_id/result-unknown", management.ListUnknowns)
 		read.GET("/:run_id/gates", management.PreviewGates)
 		read.GET("/:run_id/candidates/:candidate_id", management.GetCandidate)
+		read.GET("/:run_id/executions", management.ListExecutions)
+		read.GET("/:run_id/executions/:execution_id/output", management.GetExecutionOutput)
 		group.POST("/:run_id/start", management.Start)
 		group.POST("/:run_id/create", management.Create)
 		group.POST("/:run_id/reviews", management.Review)
