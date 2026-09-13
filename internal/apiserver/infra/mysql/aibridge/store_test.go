@@ -211,3 +211,36 @@ func TestCompleteArtifactReplaySourceBindingAndTerminalGuard(t *testing.T) {
 		t.Fatalf("old event replaced artifact: %v", err)
 	}
 }
+
+func TestRetryStateResumesOriginalRequestWithoutOldFailureOverwritingIt(t *testing.T) {
+	store, request := fixture(t)
+	ctx := context.Background()
+	if err := store.StageStart(ctx, request); err != nil {
+		t.Fatal(err)
+	}
+	failed := app.Event{EventID: uuid.NewString(), RequestID: request.RequestID, SessionID: uuid.NewString(), Actor: request.Actor, TesteeID: request.TesteeID, Version: 4, Status: "blocked", FailureCode: "provider_result_unknown"}
+	if err := store.Accept(ctx, failed); err != nil {
+		t.Fatal(err)
+	}
+	retry := failed
+	retry.EventID, retry.Version, retry.Status, retry.FailureCode = uuid.NewString(), 5, "queued", ""
+	if err := store.Accept(ctx, retry); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.Accept(ctx, failed); err != nil {
+		t.Fatal(err)
+	}
+	projection, err := store.Projection(ctx, request.RequestID)
+	if err != nil || projection.SessionID != failed.SessionID || projection.Version != 5 || projection.Status != "queued" || projection.FailureCode != "" {
+		t.Fatal(projection, err)
+	}
+	replacement := retry
+	replacement.EventID, replacement.SessionID, replacement.Version = uuid.NewString(), uuid.NewString(), 6
+	if err := store.Accept(ctx, replacement); !errors.Is(err, app.ErrConflict) {
+		t.Fatal("retry must not replace original session", err)
+	}
+	original, err := store.Original(ctx, request.RequestID)
+	if err != nil || original.RequestID != request.RequestID || original.Actor != request.Actor {
+		t.Fatal(original, err)
+	}
+}
