@@ -10589,6 +10589,144 @@ const docTemplate = `{
                 }
             }
         },
+        "/internal/v2/interpretation/ai-workflow/evaluation-capacity": {
+            "get": {
+                "description": "当前机构 OrgAdmin 权限；返回 UTC 日预算预留和活动任务占用。只读快照不保证下一次启动可用，启动在 AI 中原子检查。取消不退回日预算。",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "AI-Workflow-Management"
+                ],
+                "summary": "查询 qs-ai 评测容量",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/aibridge.EvaluationCapacity"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/internal/v2/interpretation/ai-workflow/evaluations": {
+            "get": {
+                "description": "复用当前机构解读审计权限，按状态和创建时间分页，仅返回摘要。组织及操作者取认证上下文；游标绑定机构和筛选，不授予写权限，也不返回模型原始输出。",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "AI-Workflow-Management"
+                ],
+                "summary": "查询 qs-ai 原生评测任务目录",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "requested/collecting/blocked/awaiting_review/approved/rejected/canceled",
+                        "name": "status",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "每页 1–100，默认 20",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "上一页游标，改变筛选时清空",
+                        "name": "cursor",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/aibridge.EvaluationCatalogPage"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/internal/v2/interpretation/ai-workflow/evaluations/prepare": {
             "post": {
                 "description": "只读操作，需要当前机构解读审计权限；组织及操作人取认证上下文。不创建 Run、不预约额度、不调用模型，预算不表示当前可用额度。创建和启动另需明确确认。",
@@ -11049,6 +11187,193 @@ const docTemplate = `{
                                     "properties": {
                                         "data": {
                                             "$ref": "#/definitions/aibridge.EvaluationState"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/internal/v2/interpretation/ai-workflow/evaluations/{run_id}/executions": {
+            "get": {
+                "description": "复用当前机构审计权限，读取指定任务版本的执行摘要，包含未形成候选的失败及未知结果。摘要不返回模型正文，不触发模型或恢复。",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "AI-Workflow-Management"
+                ],
+                "summary": "查询 qs-ai 任务的原执行记录",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "评测 Run UUID",
+                        "name": "run_id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "当前任务版本",
+                        "name": "expected_version",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "每页 1–50，默认 20",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "上一页游标",
+                        "name": "cursor",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/aibridge.ExecutionPage"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/internal/v2/interpretation/ai-workflow/evaluations/{run_id}/executions/{execution_id}/output": {
+            "get": {
+                "description": "当前机构审计权限与任务版本校验。raw_output/normalized_output 为 Base64 原始字节，附 SHA256；空正文不代表执行成功，不重试原调用。",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "AI-Workflow-Management"
+                ],
+                "summary": "读取 qs-ai 原执行输出及失败诊断",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "评测 Run UUID",
+                        "name": "run_id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "执行标识",
+                        "name": "execution_id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "当前任务版本",
+                        "name": "expected_version",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/aibridge.ExecutionOutput"
                                         }
                                     }
                                 }
@@ -11707,6 +12032,401 @@ const docTemplate = `{
                 }
             }
         },
+        "/internal/v2/interpretation/ai-workflow/participant-capacity": {
+            "get": {
+                "description": "当前机构 OrgAdmin 权限。三级额度和活动名额由 AI 计算；过滤参数只选择查询对象，不更改调用身份。查询不会启动或重试生成。",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "AI-Workflow-Management"
+                ],
+                "summary": "查询 qs-ai 参与者生成容量",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "可选的原参与者主体标识",
+                        "name": "subject_id",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "可选的原测评 ID",
+                        "name": "assessment_id",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/aibridge.ParticipantCapacity"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/internal/v2/interpretation/ai-workflow/participants/retry-commands/{command_id}": {
+            "get": {
+                "description": "当前机构 OrgAdmin 授权，仅原操作人可读取该命令；AI 仍复查原参与者当前访问权。不创建新的执行，404 不能证明在途原命令未提交。",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "AI-Workflow-Management"
+                ],
+                "summary": "查询原参与者重试命令回执",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "原重试命令 UUID",
+                        "name": "command_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/aibridge.Receipt"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/internal/v2/interpretation/ai-workflow/participants/{session_id}": {
+            "get": {
+                "description": "当前机构 OrgAdmin 权限，返回原请求、当前 Run、版本、失败分类与重试资格；不读取报告正文或发起调用。",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "AI-Workflow-Management"
+                ],
+                "summary": "查询 qs-ai 参与者当前执行",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "AI 会话 UUID",
+                        "name": "session_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/aibridge.ParticipantExecution"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/internal/v2/interpretation/ai-workflow/participants/{session_id}/retry": {
+            "post": {
+                "description": "当前机构 OrgAdmin 授权。要求原 Run/版本、稳定命令 UUID、理由和一次调用费用确认；未知结果需额外风险确认。AI 复查参与者当前权限，在同一事务预留新额度、保留原尝试并创建新 Run。超时只查询原命令，不自动重发。",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "AI-Workflow-Management"
+                ],
+                "summary": "显式重试 qs-ai 参与者解读",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "AI 会话 UUID",
+                        "name": "session_id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "重试确认",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/aibridge.ParticipantRetry"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/aibridge.Receipt"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "429": {
+                        "description": "Too Many Requests",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/internal/v2/interpretation/ai-workflow/profiles": {
+            "get": {
+                "description": "需要解读审计权限；状态来自 qs-ai 发布记录。迁入不代表发布，旧 QS 调试版本不要求迁入。游标绑定筛选，跨页不保证同一快照。",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "AI-Workflow-Profiles"
+                ],
+                "summary": "查询 qs-ai Profile 发布状态和迁入来源",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "精确 Profile 标识",
+                        "name": "identity",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "draft/published/disabled",
+                        "name": "status",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "每页 1–50，默认 20",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "上一页游标",
+                        "name": "cursor",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/aibridge.ProfileLifecyclePage"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/internal/v2/interpretation/ai-workflow/profiles/commands/{command_id}": {
             "get": {
                 "description": "需要当前机构解读审计权限，仅原机构及原操作人可查询。不重发注册，不触发发布。",
@@ -11739,6 +12459,90 @@ const docTemplate = `{
                                     "properties": {
                                         "data": {
                                             "$ref": "#/definitions/aibridge.ProfileRegistrationReceipt"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/internal/v2/interpretation/ai-workflow/profiles/lifecycle": {
+            "get": {
+                "description": "需要解读审计权限。共享配置只返回来源、不可变引用和发布状态，不返回操作人审计。状态不授予发布权限。",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "AI-Workflow-Profiles"
+                ],
+                "summary": "查询指定 qs-ai Profile 版本的当前发布状态",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "精确 Profile 标识",
+                        "name": "identity",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "精确 Profile 版本",
+                        "name": "version",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/aibridge.ProfileLifecycle"
                                         }
                                     }
                                 }
@@ -13643,6 +14447,81 @@ const docTemplate = `{
                 }
             }
         },
+        "aibridge.EvaluationCapacity": {
+            "type": "object",
+            "properties": {
+                "active_runs": {
+                    "type": "integer"
+                },
+                "budget_day": {
+                    "type": "string"
+                },
+                "daily_provider_calls": {
+                    "type": "integer"
+                },
+                "full_run_provider_calls": {
+                    "type": "integer"
+                },
+                "max_active_runs": {
+                    "type": "integer"
+                },
+                "organization_id": {
+                    "type": "integer"
+                },
+                "remaining_full_runs": {
+                    "type": "integer"
+                },
+                "remaining_provider_calls": {
+                    "type": "integer"
+                },
+                "reservation_count": {
+                    "type": "integer"
+                },
+                "reservations": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/aibridge.EvaluationCapacityReservation"
+                    }
+                },
+                "reservations_truncated": {
+                    "type": "boolean"
+                },
+                "reserved_provider_calls": {
+                    "type": "integer"
+                }
+            }
+        },
+        "aibridge.EvaluationCapacityReservation": {
+            "type": "object",
+            "properties": {
+                "provider_calls": {
+                    "type": "integer"
+                },
+                "requested_by": {
+                    "type": "string"
+                },
+                "reserved_at": {
+                    "type": "string"
+                },
+                "run_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "aibridge.EvaluationCatalogPage": {
+            "type": "object",
+            "properties": {
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/aibridge.EvaluationSummary"
+                    }
+                },
+                "next_cursor": {
+                    "type": "string"
+                }
+            }
+        },
         "aibridge.EvaluationCreate": {
             "type": "object",
             "properties": {
@@ -13896,6 +14775,65 @@ const docTemplate = `{
                 }
             }
         },
+        "aibridge.EvaluationSummary": {
+            "type": "object",
+            "properties": {
+                "accepted_candidates": {
+                    "type": "integer"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "last_cause": {
+                    "type": "string"
+                },
+                "last_reason": {
+                    "type": "string"
+                },
+                "organization_id": {
+                    "type": "integer"
+                },
+                "profile_id": {
+                    "type": "string"
+                },
+                "profile_version": {
+                    "type": "string"
+                },
+                "prompt_id": {
+                    "type": "string"
+                },
+                "prompt_version": {
+                    "type": "string"
+                },
+                "release_fingerprint": {
+                    "type": "string"
+                },
+                "requested_by": {
+                    "type": "string"
+                },
+                "required_candidates": {
+                    "type": "integer"
+                },
+                "review_count": {
+                    "type": "integer"
+                },
+                "review_ready_candidates": {
+                    "type": "integer"
+                },
+                "run_id": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "unresolved_result_unknown_count": {
+                    "type": "integer"
+                },
+                "version": {
+                    "type": "integer"
+                }
+            }
+        },
         "aibridge.EvaluationUnknownExecution": {
             "type": "object",
             "properties": {
@@ -13981,6 +14919,89 @@ const docTemplate = `{
                 }
             }
         },
+        "aibridge.ExecutionOutput": {
+            "type": "object",
+            "properties": {
+                "execution": {
+                    "$ref": "#/definitions/aibridge.ExecutionSummary"
+                },
+                "normalized_output": {
+                    "type": "string",
+                    "format": "byte"
+                },
+                "normalized_sha256": {
+                    "type": "string"
+                },
+                "raw_output": {
+                    "type": "string",
+                    "format": "byte"
+                },
+                "raw_sha256": {
+                    "type": "string"
+                },
+                "run_id": {
+                    "type": "string"
+                },
+                "version": {
+                    "type": "integer"
+                }
+            }
+        },
+        "aibridge.ExecutionPage": {
+            "type": "object",
+            "properties": {
+                "executions": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/aibridge.ExecutionSummary"
+                    }
+                },
+                "next_cursor": {
+                    "type": "string"
+                },
+                "run_id": {
+                    "type": "string"
+                },
+                "version": {
+                    "type": "integer"
+                }
+            }
+        },
+        "aibridge.ExecutionSummary": {
+            "type": "object",
+            "properties": {
+                "case_id": {
+                    "type": "string"
+                },
+                "evidence": {
+                    "type": "object"
+                },
+                "execution_id": {
+                    "type": "string"
+                },
+                "execution_ordinal": {
+                    "type": "integer"
+                },
+                "invocation_id": {
+                    "type": "string"
+                },
+                "kind": {
+                    "type": "string"
+                },
+                "normalized_output_bytes": {
+                    "type": "integer"
+                },
+                "raw_output_bytes": {
+                    "type": "integer"
+                },
+                "slot_ordinal": {
+                    "type": "integer"
+                },
+                "status": {
+                    "type": "string"
+                }
+            }
+        },
         "aibridge.FreezePromptDraft": {
             "type": "object",
             "properties": {
@@ -14045,6 +15066,250 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "validator_version": {
+                    "type": "string"
+                }
+            }
+        },
+        "aibridge.ParticipantCapacity": {
+            "type": "object",
+            "properties": {
+                "active_reservations": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/aibridge.ParticipantReservation"
+                    }
+                },
+                "active_truncated": {
+                    "type": "boolean"
+                },
+                "assessment": {
+                    "$ref": "#/definitions/aibridge.ParticipantCapacityUsage"
+                },
+                "budget_day": {
+                    "type": "string"
+                },
+                "daily_reservations": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/aibridge.ParticipantReservation"
+                    }
+                },
+                "daily_truncated": {
+                    "type": "boolean"
+                },
+                "organization": {
+                    "$ref": "#/definitions/aibridge.ParticipantCapacityUsage"
+                },
+                "organization_id": {
+                    "type": "integer"
+                },
+                "policy": {
+                    "$ref": "#/definitions/aibridge.ParticipantCapacityPolicy"
+                },
+                "subject": {
+                    "$ref": "#/definitions/aibridge.ParticipantCapacityUsage"
+                }
+            }
+        },
+        "aibridge.ParticipantCapacityPolicy": {
+            "type": "object",
+            "properties": {
+                "active_assessment": {
+                    "type": "integer"
+                },
+                "active_org": {
+                    "type": "integer"
+                },
+                "active_user": {
+                    "type": "integer"
+                },
+                "daily_assessment": {
+                    "type": "integer"
+                },
+                "daily_org": {
+                    "type": "integer"
+                },
+                "daily_user": {
+                    "type": "integer"
+                }
+            }
+        },
+        "aibridge.ParticipantCapacityUsage": {
+            "type": "object",
+            "properties": {
+                "active": {
+                    "type": "integer"
+                },
+                "active_remaining": {
+                    "type": "integer"
+                },
+                "daily_remaining": {
+                    "type": "integer"
+                },
+                "daily_reserved": {
+                    "type": "integer"
+                },
+                "identity": {
+                    "type": "string"
+                }
+            }
+        },
+        "aibridge.ParticipantExecution": {
+            "type": "object",
+            "properties": {
+                "assessment_ids": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "can_retry": {
+                    "type": "boolean"
+                },
+                "failure_code": {
+                    "type": "string"
+                },
+                "invocation_id": {
+                    "type": "string"
+                },
+                "model_call_status": {
+                    "type": "string"
+                },
+                "organization_id": {
+                    "type": "integer"
+                },
+                "request_id": {
+                    "type": "string"
+                },
+                "retry_provider_invocations": {
+                    "type": "integer"
+                },
+                "run_id": {
+                    "type": "string"
+                },
+                "session_id": {
+                    "type": "string"
+                },
+                "source_run_id": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "subject_id": {
+                    "type": "string"
+                },
+                "testee_id": {
+                    "type": "string"
+                },
+                "unknown_result_risk": {
+                    "type": "boolean"
+                },
+                "version": {
+                    "type": "integer"
+                }
+            }
+        },
+        "aibridge.ParticipantReservation": {
+            "type": "object",
+            "properties": {
+                "acquired_at": {
+                    "type": "string"
+                },
+                "active": {
+                    "type": "boolean"
+                },
+                "assessment_ids": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "budget_day": {
+                    "type": "string"
+                },
+                "reserved_at": {
+                    "type": "string"
+                },
+                "run_id": {
+                    "type": "string"
+                },
+                "session_id": {
+                    "type": "string"
+                },
+                "subject_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "aibridge.ParticipantRetry": {
+            "type": "object",
+            "properties": {
+                "accept_result_unknown_risk": {
+                    "type": "boolean"
+                },
+                "command_id": {
+                    "type": "string"
+                },
+                "confirm": {
+                    "type": "boolean"
+                },
+                "expected_provider_invocations": {
+                    "type": "integer"
+                },
+                "expected_run_id": {
+                    "type": "string"
+                },
+                "expected_version": {
+                    "type": "integer"
+                },
+                "reason": {
+                    "type": "string"
+                }
+            }
+        },
+        "aibridge.ProfileLifecycle": {
+            "type": "object",
+            "properties": {
+                "active_publication_id": {
+                    "type": "string"
+                },
+                "active_run_id": {
+                    "type": "string"
+                },
+                "imported_at": {
+                    "type": "string"
+                },
+                "inactive_reason": {
+                    "type": "string"
+                },
+                "reference": {
+                    "$ref": "#/definitions/aibridge.PromptDraftSource"
+                },
+                "selector_changed_at": {
+                    "type": "string"
+                },
+                "selector_version": {
+                    "type": "integer"
+                },
+                "source_ref": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                }
+            }
+        },
+        "aibridge.ProfileLifecyclePage": {
+            "type": "object",
+            "properties": {
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/aibridge.ProfileLifecycle"
+                    }
+                },
+                "next_cursor": {
                     "type": "string"
                 }
             }
@@ -14352,6 +15617,23 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "run_version": {
+                    "type": "integer"
+                }
+            }
+        },
+        "aibridge.Receipt": {
+            "type": "object",
+            "properties": {
+                "run_id": {
+                    "type": "string"
+                },
+                "session_id": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "version": {
                     "type": "integer"
                 }
             }

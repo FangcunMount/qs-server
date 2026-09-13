@@ -38,6 +38,8 @@ func (h *AIWorkflowManagementHandler) failure(c *gin.Context, err error) {
 		errorCode, message = code.ErrPageNotFound, "AI evaluation unavailable"
 	case errors.Is(err, app.ErrConflict), status.Code(err) == codes.Aborted:
 		errorCode, message = code.ErrConflict, "AI evaluation version or state changed"
+	case status.Code(err) == codes.ResourceExhausted && (status.Convert(err).Message() == "Evaluation capacity exhausted" || status.Convert(err).Message() == "participant_daily_capacity_exceeded"):
+		errorCode, message = code.ErrAIExplanationCapacityExceeded, "AI evaluation capacity exhausted; operation was not accepted"
 	case errors.Is(err, app.ErrManagementUnavailable):
 		errorCode, message = code.ErrUnsupportedOperation, "AI evaluation management disabled"
 	}

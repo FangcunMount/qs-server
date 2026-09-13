@@ -53,16 +53,29 @@ func (r *Router) registerInterpretationInternalRoutes(internalV1 *gin.RouterGrou
 // evaluation runtime. The v1 group above intentionally keeps historical Run
 // and Recheck queries but registers no v1 Prompt-evaluation mutation routes.
 func (r *Router) registerInterpretationInternalV2Routes(internalV2 *gin.RouterGroup) {
+	if r.deps.Interpretation.AIWorkflowParticipants != nil {
+		participants := handler.NewAIWorkflowParticipantHandler(r.deps.Interpretation.AIWorkflowParticipants)
+		internalV2.GET("/interpretation/ai-workflow/participant-capacity", restmiddleware.RequireCapabilityMiddleware(restmiddleware.CapabilityOrgAdmin), participants.Capacity)
+		group := internalV2.Group("/interpretation/ai-workflow/participants", restmiddleware.RequireCapabilityMiddleware(restmiddleware.CapabilityOrgAdmin))
+		group.GET("/retry-commands/:command_id", participants.RetryReceipt)
+		group.GET("/:session_id", participants.Get)
+		group.POST("/:session_id/retry", participants.Retry)
+	}
+
 	if r.deps.Interpretation.AIWorkflowManagement != nil {
 		management := handler.NewAIWorkflowManagementHandler(r.deps.Interpretation.AIWorkflowManagement)
+		internalV2.GET("/interpretation/ai-workflow/evaluation-capacity", restmiddleware.RequireCapabilityMiddleware(restmiddleware.CapabilityOrgAdmin), management.Capacity)
 		group := internalV2.Group("/interpretation/ai-workflow/evaluations", restmiddleware.RequireCapabilityMiddleware(restmiddleware.CapabilityOrgAdmin))
 		read := internalV2.Group("/interpretation/ai-workflow/evaluations", restmiddleware.RequireCapabilityMiddleware(restmiddleware.CapabilityAuditInterpretation))
 		read.POST("/prepare", management.Prepare)
+		read.GET("", management.List)
 		read.GET("/:run_id", management.Get)
 		read.GET("/:run_id/candidates", management.ListCandidates)
 		read.GET("/:run_id/result-unknown", management.ListUnknowns)
 		read.GET("/:run_id/gates", management.PreviewGates)
 		read.GET("/:run_id/candidates/:candidate_id", management.GetCandidate)
+		read.GET("/:run_id/executions", management.ListExecutions)
+		read.GET("/:run_id/executions/:execution_id/output", management.GetExecutionOutput)
 		group.POST("/:run_id/start", management.Start)
 		group.POST("/:run_id/create", management.Create)
 		group.POST("/:run_id/reviews", management.Review)
@@ -105,6 +118,8 @@ func (r *Router) registerInterpretationInternalV2Routes(internalV2 *gin.RouterGr
 		read := internalV2.Group("/interpretation/ai-workflow/profiles", restmiddleware.RequireCapabilityMiddleware(restmiddleware.CapabilityAuditInterpretation))
 		write.POST("/register", profiles.Register)
 		read.GET("/commands/:command_id", profiles.GetReceipt)
+		read.GET("", profiles.ListLifecycle)
+		read.GET("/lifecycle", profiles.GetLifecycle)
 	}
 
 	if r.deps.Interpretation.AIWorkflowPromptDrafts != nil {

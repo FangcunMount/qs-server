@@ -5,6 +5,7 @@ import (
 	"errors"
 	pb "github.com/FangcunMount/qs-server/api/grpc/gen/aiworkflow"
 	app "github.com/FangcunMount/qs-server/internal/apiserver/application/aibridge"
+	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/peer"
@@ -14,6 +15,10 @@ import (
 type Receiver struct {
 	pb.UnimplementedResultsServer
 	Service *app.Service
+}
+
+func (r *Receiver) RegisterService(server *grpc.Server) {
+	pb.RegisterResultsServer(server, r)
 }
 
 func (r *Receiver) Accept(ctx context.Context, e *pb.StateEvent) (*pb.Acknowledgement, error) {

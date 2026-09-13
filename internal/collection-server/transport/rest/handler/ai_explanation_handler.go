@@ -299,3 +299,36 @@ func (h *AIExplanationHandler) GetWorkflow(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, core.Response{Code: 0, Message: "success", Data: result})
 }
+
+// GetWorkflowSource returns the current report identity after participant authorization.
+// @Summary 查询新版 AI 工作流的当前报告来源
+// @Tags AI解读
+// @Produce json
+// @Param id path int true "测评ID"
+// @Param testee_id query int true "受试者ID"
+// @Success 200 {object} core.Response{data=app.WorkflowSource}
+// @Failure 400 {object} core.ErrResponse
+// @Failure 401 {object} core.ErrResponse
+// @Failure 403 {object} core.ErrResponse
+// @Failure 503 {object} core.ErrResponse
+// @Security BearerAuth
+// @Router /api/v1/assessments/{id}/ai-workflows/source [get]
+func (h *AIExplanationHandler) GetWorkflowSource(c *gin.Context) {
+	testeeID, assessmentID, ok := h.parseIdentity(c)
+	if !ok {
+		return
+	}
+	service, ok := h.service.(interface {
+		GetWorkflowSource(context.Context, uint64, uint64) (*app.WorkflowSource, error)
+	})
+	if !ok {
+		h.respondError(c, app.ErrUnavailable)
+		return
+	}
+	result, err := service.GetWorkflowSource(c.Request.Context(), testeeID, assessmentID)
+	if err != nil {
+		h.respondError(c, err)
+		return
+	}
+	h.Success(c, result)
+}

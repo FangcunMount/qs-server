@@ -45,6 +45,7 @@ type EvaluationState struct {
 	Cancellation                 *EvaluationCancellationReceipt `json:"cancellation,omitempty"`
 }
 type EvaluationGateway interface {
+	ListEvaluations(context.Context, DraftScope, EvaluationCatalogQuery) (EvaluationCatalogPage, error)
 	CancelEvaluation(context.Context, EvaluationScope, EvaluationCancel) (EvaluationState, error)
 	ListEvaluationUnknowns(context.Context, EvaluationScope, int64) (EvaluationUnknownIndex, error)
 	PrepareEvaluation(context.Context, DraftScope, EvaluationPlanQuery) (EvaluationPlan, error)

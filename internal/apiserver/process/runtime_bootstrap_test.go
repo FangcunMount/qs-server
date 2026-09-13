@@ -10,6 +10,7 @@ func TestRunRuntimeStageInvokesCacheEventsAndSchedulers(t *testing.T) {
 
 	var cacheCalled bool
 	var eventsCalled bool
+	var relayCalled bool
 	var schedulersCalled bool
 	output := &runtimeOutput{}
 
@@ -21,6 +22,7 @@ func TestRunRuntimeStageInvokesCacheEventsAndSchedulers(t *testing.T) {
 			eventsCalled = true
 			return nil
 		},
+		startAIWorkflowRelay: func() error { relayCalled = true; return nil },
 		startSchedulers: func(output *runtimeOutput) {
 			schedulersCalled = true
 			output.lifecycle.AddShutdownHook("stop schedulers", func() error { return nil })
@@ -32,7 +34,7 @@ func TestRunRuntimeStageInvokesCacheEventsAndSchedulers(t *testing.T) {
 	if !cacheCalled {
 		t.Fatal("cache subsystem was not started")
 	}
-	if !eventsCalled {
+	if !eventsCalled || !relayCalled {
 		t.Fatal("event subsystem was not started")
 	}
 	if !schedulersCalled {

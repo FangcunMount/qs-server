@@ -59,6 +59,7 @@ func TestGRPCProtoServicesHaveExplicitOwners(t *testing.T) {
 	// Shared contracts also describe external servers and independently hosted services.
 	// Pin each exception to its full name, contract path and concrete QS integration.
 	otherOwners := map[string]struct{ proto, source, call string }{
+		"qsai.workflow.v1.ParticipantManagement": {"aiworkflow/workflow.proto", "../../infra/aibridge/participant_management.go", "pb.NewParticipantManagementClient("},
 		"qsai.workflow.v1.SuiteManagement":       {"aiworkflow/workflow.proto", "../../infra/aibridge/suite_registration.go", "pb.NewSuiteManagementClient("},
 		"qsai.workflow.v1.AssetCatalog":          {"aiworkflow/workflow.proto", "../../infra/aibridge/asset_catalog.go", "pb.NewAssetCatalogClient("},
 		"qsai.workflow.v1.ProfileManagement":     {"aiworkflow/workflow.proto", "../../infra/aibridge/profile_registration.go", "pb.NewProfileManagementClient("},
@@ -66,7 +67,7 @@ func TestGRPCProtoServicesHaveExplicitOwners(t *testing.T) {
 		"qsai.workflow.v1.PromptDraftManagement": {"aiworkflow/workflow.proto", "../../infra/aibridge/prompt_draft.go", "pb.NewPromptDraftManagementClient("},
 		"qsai.workflow.v1.EvaluationManagement":  {"aiworkflow/workflow.proto", "../../infra/aibridge/evaluation.go", "pb.NewEvaluationManagementClient("},
 		"qsai.workflow.v1.Commands":              {"aiworkflow/workflow.proto", "../../infra/aibridge/client.go", "pb.NewCommandsClient("},
-		"qsai.workflow.v1.Results":               {"aiworkflow/workflow.proto", "../../../../cmd/qs-ai-bridge/main.go", "pb.RegisterResultsServer("},
+		"qsai.workflow.v1.Results":               {"aiworkflow/workflow.proto", "aibridge/results.go", "pb.RegisterResultsServer("},
 		"interpretation.AIWorkflowAccessService": {"interpretation/interpretation.proto", "service/ai_workflow_access.go", "pb.RegisterAIWorkflowAccessServiceServer("},
 	}
 	seenOwners := make(map[string]bool)

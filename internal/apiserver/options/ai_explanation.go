@@ -136,7 +136,9 @@ func (o *AIExplanationOptions) Validate() []error {
 	if o == nil {
 		return nil
 	}
-	if err := o.WorkflowManagement.Validate(); err != nil {
+	transport := o.WorkflowManagement
+	transport.Enabled = transport.Enabled || o.WorkflowEnabled
+	if err := transport.Validate(); err != nil {
 		return []error{err}
 	}
 	if !o.Enabled {

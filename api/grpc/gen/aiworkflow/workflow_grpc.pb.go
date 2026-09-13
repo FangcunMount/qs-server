@@ -261,6 +261,8 @@ var Results_ServiceDesc = grpc.ServiceDesc{
 }
 
 const (
+	EvaluationManagement_GetCapacity_FullMethodName           = "/qsai.workflow.v1.EvaluationManagement/GetCapacity"
+	EvaluationManagement_List_FullMethodName                  = "/qsai.workflow.v1.EvaluationManagement/List"
 	EvaluationManagement_Prepare_FullMethodName               = "/qsai.workflow.v1.EvaluationManagement/Prepare"
 	EvaluationManagement_Create_FullMethodName                = "/qsai.workflow.v1.EvaluationManagement/Create"
 	EvaluationManagement_Start_FullMethodName                 = "/qsai.workflow.v1.EvaluationManagement/Start"
@@ -271,6 +273,8 @@ const (
 	EvaluationManagement_Review_FullMethodName                = "/qsai.workflow.v1.EvaluationManagement/Review"
 	EvaluationManagement_ListCandidates_FullMethodName        = "/qsai.workflow.v1.EvaluationManagement/ListCandidates"
 	EvaluationManagement_GetCandidate_FullMethodName          = "/qsai.workflow.v1.EvaluationManagement/GetCandidate"
+	EvaluationManagement_ListExecutions_FullMethodName        = "/qsai.workflow.v1.EvaluationManagement/ListExecutions"
+	EvaluationManagement_GetExecutionOutput_FullMethodName    = "/qsai.workflow.v1.EvaluationManagement/GetExecutionOutput"
 	EvaluationManagement_PreviewGates_FullMethodName          = "/qsai.workflow.v1.EvaluationManagement/PreviewGates"
 	EvaluationManagement_Finalize_FullMethodName              = "/qsai.workflow.v1.EvaluationManagement/Finalize"
 	EvaluationManagement_ReopenReview_FullMethodName          = "/qsai.workflow.v1.EvaluationManagement/ReopenReview"
@@ -282,6 +286,10 @@ const (
 //
 // Trusted QS backend only. QS authorizes governance writes and candidate audit reads.
 type EvaluationManagementClient interface {
+	// Current organization daily reservation and active-run usage; read only.
+	GetCapacity(ctx context.Context, in *PublicationScope, opts ...grpc.CallOption) (*EvaluationCapacitySnapshot, error)
+	// Organization-scoped summary pages; never schedules work or authorizes mutations.
+	List(ctx context.Context, in *EvaluationCatalogQuery, opts ...grpc.CallOption) (*EvaluationCatalogPage, error)
 	// Resolve all eleven immutable references and policy budgets; no creation or scheduling.
 	Prepare(ctx context.Context, in *EvaluationPlanQuery, opts ...grpc.CallOption) (*EvaluationPlan, error)
 	// The caller reuses scope.run_id for retries of the identical creation request.
@@ -298,6 +306,9 @@ type EvaluationManagementClient interface {
 	Review(ctx context.Context, in *EvaluationReviewCommand, opts ...grpc.CallOption) (*EvaluationState, error)
 	ListCandidates(ctx context.Context, in *EvaluationQuery, opts ...grpc.CallOption) (*EvaluationCandidateIndex, error)
 	GetCandidate(ctx context.Context, in *EvaluationCandidateQuery, opts ...grpc.CallOption) (*EvaluationCandidateEvidence, error)
+	// Read original execution evidence, including failures without candidates. Never retries.
+	ListExecutions(ctx context.Context, in *EvaluationExecutionQuery, opts ...grpc.CallOption) (*EvaluationExecutionPage, error)
+	GetExecutionOutput(ctx context.Context, in *EvaluationExecutionQuery, opts ...grpc.CallOption) (*EvaluationExecutionOutput, error)
 	// Read-only complete gate preview; does not approve the Run or publish a release.
 	PreviewGates(ctx context.Context, in *EvaluationGateQuery, opts ...grpc.CallOption) (*EvaluationGatePreview, error)
 	// Recompute gates under CAS; this records approval/rejection, never publishes a release.
@@ -312,6 +323,26 @@ type evaluationManagementClient struct {
 
 func NewEvaluationManagementClient(cc grpc.ClientConnInterface) EvaluationManagementClient {
 	return &evaluationManagementClient{cc}
+}
+
+func (c *evaluationManagementClient) GetCapacity(ctx context.Context, in *PublicationScope, opts ...grpc.CallOption) (*EvaluationCapacitySnapshot, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(EvaluationCapacitySnapshot)
+	err := c.cc.Invoke(ctx, EvaluationManagement_GetCapacity_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *evaluationManagementClient) List(ctx context.Context, in *EvaluationCatalogQuery, opts ...grpc.CallOption) (*EvaluationCatalogPage, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(EvaluationCatalogPage)
+	err := c.cc.Invoke(ctx, EvaluationManagement_List_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
 }
 
 func (c *evaluationManagementClient) Prepare(ctx context.Context, in *EvaluationPlanQuery, opts ...grpc.CallOption) (*EvaluationPlan, error) {
@@ -414,6 +445,26 @@ func (c *evaluationManagementClient) GetCandidate(ctx context.Context, in *Evalu
 	return out, nil
 }
 
+func (c *evaluationManagementClient) ListExecutions(ctx context.Context, in *EvaluationExecutionQuery, opts ...grpc.CallOption) (*EvaluationExecutionPage, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(EvaluationExecutionPage)
+	err := c.cc.Invoke(ctx, EvaluationManagement_ListExecutions_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *evaluationManagementClient) GetExecutionOutput(ctx context.Context, in *EvaluationExecutionQuery, opts ...grpc.CallOption) (*EvaluationExecutionOutput, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(EvaluationExecutionOutput)
+	err := c.cc.Invoke(ctx, EvaluationManagement_GetExecutionOutput_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *evaluationManagementClient) PreviewGates(ctx context.Context, in *EvaluationGateQuery, opts ...grpc.CallOption) (*EvaluationGatePreview, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(EvaluationGatePreview)
@@ -450,6 +501,10 @@ func (c *evaluationManagementClient) ReopenReview(ctx context.Context, in *Evalu
 //
 // Trusted QS backend only. QS authorizes governance writes and candidate audit reads.
 type EvaluationManagementServer interface {
+	// Current organization daily reservation and active-run usage; read only.
+	GetCapacity(context.Context, *PublicationScope) (*EvaluationCapacitySnapshot, error)
+	// Organization-scoped summary pages; never schedules work or authorizes mutations.
+	List(context.Context, *EvaluationCatalogQuery) (*EvaluationCatalogPage, error)
 	// Resolve all eleven immutable references and policy budgets; no creation or scheduling.
 	Prepare(context.Context, *EvaluationPlanQuery) (*EvaluationPlan, error)
 	// The caller reuses scope.run_id for retries of the identical creation request.
@@ -466,6 +521,9 @@ type EvaluationManagementServer interface {
 	Review(context.Context, *EvaluationReviewCommand) (*EvaluationState, error)
 	ListCandidates(context.Context, *EvaluationQuery) (*EvaluationCandidateIndex, error)
 	GetCandidate(context.Context, *EvaluationCandidateQuery) (*EvaluationCandidateEvidence, error)
+	// Read original execution evidence, including failures without candidates. Never retries.
+	ListExecutions(context.Context, *EvaluationExecutionQuery) (*EvaluationExecutionPage, error)
+	GetExecutionOutput(context.Context, *EvaluationExecutionQuery) (*EvaluationExecutionOutput, error)
 	// Read-only complete gate preview; does not approve the Run or publish a release.
 	PreviewGates(context.Context, *EvaluationGateQuery) (*EvaluationGatePreview, error)
 	// Recompute gates under CAS; this records approval/rejection, never publishes a release.
@@ -482,6 +540,12 @@ type EvaluationManagementServer interface {
 // pointer dereference when methods are called.
 type UnimplementedEvaluationManagementServer struct{}
 
+func (UnimplementedEvaluationManagementServer) GetCapacity(context.Context, *PublicationScope) (*EvaluationCapacitySnapshot, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetCapacity not implemented")
+}
+func (UnimplementedEvaluationManagementServer) List(context.Context, *EvaluationCatalogQuery) (*EvaluationCatalogPage, error) {
+	return nil, status.Error(codes.Unimplemented, "method List not implemented")
+}
 func (UnimplementedEvaluationManagementServer) Prepare(context.Context, *EvaluationPlanQuery) (*EvaluationPlan, error) {
 	return nil, status.Error(codes.Unimplemented, "method Prepare not implemented")
 }
@@ -512,6 +576,12 @@ func (UnimplementedEvaluationManagementServer) ListCandidates(context.Context, *
 func (UnimplementedEvaluationManagementServer) GetCandidate(context.Context, *EvaluationCandidateQuery) (*EvaluationCandidateEvidence, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetCandidate not implemented")
 }
+func (UnimplementedEvaluationManagementServer) ListExecutions(context.Context, *EvaluationExecutionQuery) (*EvaluationExecutionPage, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListExecutions not implemented")
+}
+func (UnimplementedEvaluationManagementServer) GetExecutionOutput(context.Context, *EvaluationExecutionQuery) (*EvaluationExecutionOutput, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetExecutionOutput not implemented")
+}
 func (UnimplementedEvaluationManagementServer) PreviewGates(context.Context, *EvaluationGateQuery) (*EvaluationGatePreview, error) {
 	return nil, status.Error(codes.Unimplemented, "method PreviewGates not implemented")
 }
@@ -540,6 +610,42 @@ func RegisterEvaluationManagementServer(s grpc.ServiceRegistrar, srv EvaluationM
 		t.testEmbeddedByValue()
 	}
 	s.RegisterService(&EvaluationManagement_ServiceDesc, srv)
+}
+
+func _EvaluationManagement_GetCapacity_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(PublicationScope)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(EvaluationManagementServer).GetCapacity(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: EvaluationManagement_GetCapacity_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(EvaluationManagementServer).GetCapacity(ctx, req.(*PublicationScope))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _EvaluationManagement_List_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(EvaluationCatalogQuery)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(EvaluationManagementServer).List(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: EvaluationManagement_List_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(EvaluationManagementServer).List(ctx, req.(*EvaluationCatalogQuery))
+	}
+	return interceptor(ctx, in, info, handler)
 }
 
 func _EvaluationManagement_Prepare_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
@@ -722,6 +828,42 @@ func _EvaluationManagement_GetCandidate_Handler(srv interface{}, ctx context.Con
 	return interceptor(ctx, in, info, handler)
 }
 
+func _EvaluationManagement_ListExecutions_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(EvaluationExecutionQuery)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(EvaluationManagementServer).ListExecutions(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: EvaluationManagement_ListExecutions_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(EvaluationManagementServer).ListExecutions(ctx, req.(*EvaluationExecutionQuery))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _EvaluationManagement_GetExecutionOutput_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(EvaluationExecutionQuery)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(EvaluationManagementServer).GetExecutionOutput(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: EvaluationManagement_GetExecutionOutput_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(EvaluationManagementServer).GetExecutionOutput(ctx, req.(*EvaluationExecutionQuery))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _EvaluationManagement_PreviewGates_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(EvaluationGateQuery)
 	if err := dec(in); err != nil {
@@ -784,6 +926,14 @@ var EvaluationManagement_ServiceDesc = grpc.ServiceDesc{
 	HandlerType: (*EvaluationManagementServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
+			MethodName: "GetCapacity",
+			Handler:    _EvaluationManagement_GetCapacity_Handler,
+		},
+		{
+			MethodName: "List",
+			Handler:    _EvaluationManagement_List_Handler,
+		},
+		{
 			MethodName: "Prepare",
 			Handler:    _EvaluationManagement_Prepare_Handler,
 		},
@@ -822,6 +972,14 @@ var EvaluationManagement_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetCandidate",
 			Handler:    _EvaluationManagement_GetCandidate_Handler,
+		},
+		{
+			MethodName: "ListExecutions",
+			Handler:    _EvaluationManagement_ListExecutions_Handler,
+		},
+		{
+			MethodName: "GetExecutionOutput",
+			Handler:    _EvaluationManagement_GetExecutionOutput_Handler,
 		},
 		{
 			MethodName: "PreviewGates",
@@ -1525,8 +1683,10 @@ var PromptDraftManagement_ServiceDesc = grpc.ServiceDesc{
 }
 
 const (
-	ProfileManagement_Register_FullMethodName   = "/qsai.workflow.v1.ProfileManagement/Register"
-	ProfileManagement_GetReceipt_FullMethodName = "/qsai.workflow.v1.ProfileManagement/GetReceipt"
+	ProfileManagement_Register_FullMethodName      = "/qsai.workflow.v1.ProfileManagement/Register"
+	ProfileManagement_GetReceipt_FullMethodName    = "/qsai.workflow.v1.ProfileManagement/GetReceipt"
+	ProfileManagement_ListLifecycle_FullMethodName = "/qsai.workflow.v1.ProfileManagement/ListLifecycle"
+	ProfileManagement_GetLifecycle_FullMethodName  = "/qsai.workflow.v1.ProfileManagement/GetLifecycle"
 )
 
 // ProfileManagementClient is the client API for ProfileManagement service.
@@ -1538,6 +1698,8 @@ const (
 type ProfileManagementClient interface {
 	Register(ctx context.Context, in *ProfileRegisterCommand, opts ...grpc.CallOption) (*ProfileRegistrationReceipt, error)
 	GetReceipt(ctx context.Context, in *ProfileRegistrationQuery, opts ...grpc.CallOption) (*ProfileRegistrationReceipt, error)
+	ListLifecycle(ctx context.Context, in *ProfileLifecycleQuery, opts ...grpc.CallOption) (*AssetCatalogResponse, error)
+	GetLifecycle(ctx context.Context, in *ProfileLifecycleQuery, opts ...grpc.CallOption) (*AssetCatalogResponse, error)
 }
 
 type profileManagementClient struct {
@@ -1568,6 +1730,26 @@ func (c *profileManagementClient) GetReceipt(ctx context.Context, in *ProfileReg
 	return out, nil
 }
 
+func (c *profileManagementClient) ListLifecycle(ctx context.Context, in *ProfileLifecycleQuery, opts ...grpc.CallOption) (*AssetCatalogResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(AssetCatalogResponse)
+	err := c.cc.Invoke(ctx, ProfileManagement_ListLifecycle_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *profileManagementClient) GetLifecycle(ctx context.Context, in *ProfileLifecycleQuery, opts ...grpc.CallOption) (*AssetCatalogResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(AssetCatalogResponse)
+	err := c.cc.Invoke(ctx, ProfileManagement_GetLifecycle_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // ProfileManagementServer is the server API for ProfileManagement service.
 // All implementations must embed UnimplementedProfileManagementServer
 // for forward compatibility.
@@ -1577,6 +1759,8 @@ func (c *profileManagementClient) GetReceipt(ctx context.Context, in *ProfileReg
 type ProfileManagementServer interface {
 	Register(context.Context, *ProfileRegisterCommand) (*ProfileRegistrationReceipt, error)
 	GetReceipt(context.Context, *ProfileRegistrationQuery) (*ProfileRegistrationReceipt, error)
+	ListLifecycle(context.Context, *ProfileLifecycleQuery) (*AssetCatalogResponse, error)
+	GetLifecycle(context.Context, *ProfileLifecycleQuery) (*AssetCatalogResponse, error)
 	mustEmbedUnimplementedProfileManagementServer()
 }
 
@@ -1592,6 +1776,12 @@ func (UnimplementedProfileManagementServer) Register(context.Context, *ProfileRe
 }
 func (UnimplementedProfileManagementServer) GetReceipt(context.Context, *ProfileRegistrationQuery) (*ProfileRegistrationReceipt, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetReceipt not implemented")
+}
+func (UnimplementedProfileManagementServer) ListLifecycle(context.Context, *ProfileLifecycleQuery) (*AssetCatalogResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListLifecycle not implemented")
+}
+func (UnimplementedProfileManagementServer) GetLifecycle(context.Context, *ProfileLifecycleQuery) (*AssetCatalogResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetLifecycle not implemented")
 }
 func (UnimplementedProfileManagementServer) mustEmbedUnimplementedProfileManagementServer() {}
 func (UnimplementedProfileManagementServer) testEmbeddedByValue()                           {}
@@ -1650,6 +1840,42 @@ func _ProfileManagement_GetReceipt_Handler(srv interface{}, ctx context.Context,
 	return interceptor(ctx, in, info, handler)
 }
 
+func _ProfileManagement_ListLifecycle_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ProfileLifecycleQuery)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ProfileManagementServer).ListLifecycle(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ProfileManagement_ListLifecycle_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ProfileManagementServer).ListLifecycle(ctx, req.(*ProfileLifecycleQuery))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ProfileManagement_GetLifecycle_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ProfileLifecycleQuery)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ProfileManagementServer).GetLifecycle(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ProfileManagement_GetLifecycle_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ProfileManagementServer).GetLifecycle(ctx, req.(*ProfileLifecycleQuery))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // ProfileManagement_ServiceDesc is the grpc.ServiceDesc for ProfileManagement service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -1664,6 +1890,14 @@ var ProfileManagement_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetReceipt",
 			Handler:    _ProfileManagement_GetReceipt_Handler,
+		},
+		{
+			MethodName: "ListLifecycle",
+			Handler:    _ProfileManagement_ListLifecycle_Handler,
+		},
+		{
+			MethodName: "GetLifecycle",
+			Handler:    _ProfileManagement_GetLifecycle_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
@@ -1954,6 +2188,226 @@ var AssetCatalog_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "Get",
 			Handler:    _AssetCatalog_Get_Handler,
+		},
+	},
+	Streams:  []grpc.StreamDesc{},
+	Metadata: "aiworkflow/workflow.proto",
+}
+
+const (
+	ParticipantManagement_GetCapacity_FullMethodName     = "/qsai.workflow.v1.ParticipantManagement/GetCapacity"
+	ParticipantManagement_GetExecution_FullMethodName    = "/qsai.workflow.v1.ParticipantManagement/GetExecution"
+	ParticipantManagement_Retry_FullMethodName           = "/qsai.workflow.v1.ParticipantManagement/Retry"
+	ParticipantManagement_GetRetryReceipt_FullMethodName = "/qsai.workflow.v1.ParticipantManagement/GetRetryReceipt"
+)
+
+// ParticipantManagementClient is the client API for ParticipantManagement service.
+//
+// For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
+//
+// QS supplies current organization administrator authority over mTLS.
+type ParticipantManagementClient interface {
+	GetCapacity(ctx context.Context, in *ParticipantCapacityQuery, opts ...grpc.CallOption) (*ParticipantCapacitySnapshot, error)
+	GetExecution(ctx context.Context, in *ParticipantExecutionQuery, opts ...grpc.CallOption) (*ParticipantExecution, error)
+	Retry(ctx context.Context, in *ParticipantRetryCommand, opts ...grpc.CallOption) (*Receipt, error)
+	GetRetryReceipt(ctx context.Context, in *ParticipantRetryReceiptQuery, opts ...grpc.CallOption) (*Receipt, error)
+}
+
+type participantManagementClient struct {
+	cc grpc.ClientConnInterface
+}
+
+func NewParticipantManagementClient(cc grpc.ClientConnInterface) ParticipantManagementClient {
+	return &participantManagementClient{cc}
+}
+
+func (c *participantManagementClient) GetCapacity(ctx context.Context, in *ParticipantCapacityQuery, opts ...grpc.CallOption) (*ParticipantCapacitySnapshot, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ParticipantCapacitySnapshot)
+	err := c.cc.Invoke(ctx, ParticipantManagement_GetCapacity_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *participantManagementClient) GetExecution(ctx context.Context, in *ParticipantExecutionQuery, opts ...grpc.CallOption) (*ParticipantExecution, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ParticipantExecution)
+	err := c.cc.Invoke(ctx, ParticipantManagement_GetExecution_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *participantManagementClient) Retry(ctx context.Context, in *ParticipantRetryCommand, opts ...grpc.CallOption) (*Receipt, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(Receipt)
+	err := c.cc.Invoke(ctx, ParticipantManagement_Retry_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *participantManagementClient) GetRetryReceipt(ctx context.Context, in *ParticipantRetryReceiptQuery, opts ...grpc.CallOption) (*Receipt, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(Receipt)
+	err := c.cc.Invoke(ctx, ParticipantManagement_GetRetryReceipt_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// ParticipantManagementServer is the server API for ParticipantManagement service.
+// All implementations must embed UnimplementedParticipantManagementServer
+// for forward compatibility.
+//
+// QS supplies current organization administrator authority over mTLS.
+type ParticipantManagementServer interface {
+	GetCapacity(context.Context, *ParticipantCapacityQuery) (*ParticipantCapacitySnapshot, error)
+	GetExecution(context.Context, *ParticipantExecutionQuery) (*ParticipantExecution, error)
+	Retry(context.Context, *ParticipantRetryCommand) (*Receipt, error)
+	GetRetryReceipt(context.Context, *ParticipantRetryReceiptQuery) (*Receipt, error)
+	mustEmbedUnimplementedParticipantManagementServer()
+}
+
+// UnimplementedParticipantManagementServer must be embedded to have
+// forward compatible implementations.
+//
+// NOTE: this should be embedded by value instead of pointer to avoid a nil
+// pointer dereference when methods are called.
+type UnimplementedParticipantManagementServer struct{}
+
+func (UnimplementedParticipantManagementServer) GetCapacity(context.Context, *ParticipantCapacityQuery) (*ParticipantCapacitySnapshot, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetCapacity not implemented")
+}
+func (UnimplementedParticipantManagementServer) GetExecution(context.Context, *ParticipantExecutionQuery) (*ParticipantExecution, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetExecution not implemented")
+}
+func (UnimplementedParticipantManagementServer) Retry(context.Context, *ParticipantRetryCommand) (*Receipt, error) {
+	return nil, status.Error(codes.Unimplemented, "method Retry not implemented")
+}
+func (UnimplementedParticipantManagementServer) GetRetryReceipt(context.Context, *ParticipantRetryReceiptQuery) (*Receipt, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetRetryReceipt not implemented")
+}
+func (UnimplementedParticipantManagementServer) mustEmbedUnimplementedParticipantManagementServer() {}
+func (UnimplementedParticipantManagementServer) testEmbeddedByValue()                               {}
+
+// UnsafeParticipantManagementServer may be embedded to opt out of forward compatibility for this service.
+// Use of this interface is not recommended, as added methods to ParticipantManagementServer will
+// result in compilation errors.
+type UnsafeParticipantManagementServer interface {
+	mustEmbedUnimplementedParticipantManagementServer()
+}
+
+func RegisterParticipantManagementServer(s grpc.ServiceRegistrar, srv ParticipantManagementServer) {
+	// If the following call panics, it indicates UnimplementedParticipantManagementServer was
+	// embedded by pointer and is nil.  This will cause panics if an
+	// unimplemented method is ever invoked, so we test this at initialization
+	// time to prevent it from happening at runtime later due to I/O.
+	if t, ok := srv.(interface{ testEmbeddedByValue() }); ok {
+		t.testEmbeddedByValue()
+	}
+	s.RegisterService(&ParticipantManagement_ServiceDesc, srv)
+}
+
+func _ParticipantManagement_GetCapacity_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ParticipantCapacityQuery)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ParticipantManagementServer).GetCapacity(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ParticipantManagement_GetCapacity_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ParticipantManagementServer).GetCapacity(ctx, req.(*ParticipantCapacityQuery))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ParticipantManagement_GetExecution_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ParticipantExecutionQuery)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ParticipantManagementServer).GetExecution(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ParticipantManagement_GetExecution_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ParticipantManagementServer).GetExecution(ctx, req.(*ParticipantExecutionQuery))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ParticipantManagement_Retry_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ParticipantRetryCommand)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ParticipantManagementServer).Retry(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ParticipantManagement_Retry_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ParticipantManagementServer).Retry(ctx, req.(*ParticipantRetryCommand))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ParticipantManagement_GetRetryReceipt_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ParticipantRetryReceiptQuery)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ParticipantManagementServer).GetRetryReceipt(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ParticipantManagement_GetRetryReceipt_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ParticipantManagementServer).GetRetryReceipt(ctx, req.(*ParticipantRetryReceiptQuery))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+// ParticipantManagement_ServiceDesc is the grpc.ServiceDesc for ParticipantManagement service.
+// It's only intended for direct use with grpc.RegisterService,
+// and not to be introspected or modified (even as a copy)
+var ParticipantManagement_ServiceDesc = grpc.ServiceDesc{
+	ServiceName: "qsai.workflow.v1.ParticipantManagement",
+	HandlerType: (*ParticipantManagementServer)(nil),
+	Methods: []grpc.MethodDesc{
+		{
+			MethodName: "GetCapacity",
+			Handler:    _ParticipantManagement_GetCapacity_Handler,
+		},
+		{
+			MethodName: "GetExecution",
+			Handler:    _ParticipantManagement_GetExecution_Handler,
+		},
+		{
+			MethodName: "Retry",
+			Handler:    _ParticipantManagement_Retry_Handler,
+		},
+		{
+			MethodName: "GetRetryReceipt",
+			Handler:    _ParticipantManagement_GetRetryReceipt_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

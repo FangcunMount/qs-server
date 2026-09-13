@@ -34,6 +34,8 @@ type ProfileRegistrationReceipt struct {
 	RegisteredAt string             `json:"registered_at"`
 }
 type ProfileGateway interface {
+	ListProfileLifecycles(context.Context, DraftScope, ProfileLifecycleQuery) (ProfileLifecyclePage, error)
+	GetProfileLifecycle(context.Context, DraftScope, string, string) (ProfileLifecycle, error)
 	RegisterProfile(context.Context, DraftScope, RegisterProfile) (ProfileRegistrationReceipt, error)
 	GetProfileReceipt(context.Context, DraftScope, string) (ProfileRegistrationReceipt, error)
 }

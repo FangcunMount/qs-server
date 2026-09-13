@@ -38,6 +38,10 @@ message EvidenceItem {
 
 // Trusted QS backend only. QS authorizes governance writes and candidate audit reads.
 service EvaluationManagement {
+ // Current organization daily reservation and active-run usage; read only.
+ rpc GetCapacity(PublicationScope) returns (EvaluationCapacitySnapshot);
+ // Organization-scoped summary pages; never schedules work or authorizes mutations.
+ rpc List(EvaluationCatalogQuery) returns (EvaluationCatalogPage);
  // Resolve all eleven immutable references and policy budgets; no creation or scheduling.
  rpc Prepare(EvaluationPlanQuery) returns (EvaluationPlan);
  // The caller reuses scope.run_id for retries of the identical creation request.
@@ -54,12 +58,49 @@ service EvaluationManagement {
  rpc Review(EvaluationReviewCommand) returns (EvaluationState);
  rpc ListCandidates(EvaluationQuery) returns (EvaluationCandidateIndex);
  rpc GetCandidate(EvaluationCandidateQuery) returns (EvaluationCandidateEvidence);
+ // Read original execution evidence, including failures without candidates. Never retries.
+ rpc ListExecutions(EvaluationExecutionQuery) returns (EvaluationExecutionPage);
+ rpc GetExecutionOutput(EvaluationExecutionQuery) returns (EvaluationExecutionOutput);
  // Read-only complete gate preview; does not approve the Run or publish a release.
  rpc PreviewGates(EvaluationGateQuery) returns (EvaluationGatePreview);
  // Recompute gates under CAS; this records approval/rejection, never publishes a release.
  rpc Finalize(EvaluationFinalizeCommand) returns (EvaluationState);
  // Reopen eligible semantic-review signatures, preserving the complete previous round.
  rpc ReopenReview(EvaluationReopenCommand) returns (EvaluationState);
+}
+message EvaluationExecutionQuery {
+ EvaluationQuery scope = 1;
+ int64 expected_version = 2;
+ string cursor = 3;
+ int32 limit = 4;
+ string execution_id = 5;
+}
+message EvaluationExecutionSummary {
+ string execution_id = 1;
+ string invocation_id = 2;
+ string kind = 3;
+ string case_id = 4;
+ int32 slot_ordinal = 5;
+ int32 execution_ordinal = 6;
+ string status = 7;
+ int64 raw_output_bytes = 8;
+ int64 normalized_output_bytes = 9;
+ string evidence_json = 10;
+}
+message EvaluationExecutionPage {
+ string run_id = 1;
+ int64 version = 2;
+ repeated EvaluationExecutionSummary executions = 3;
+ string next_cursor = 4;
+}
+message EvaluationExecutionOutput {
+ string run_id = 1;
+ int64 version = 2;
+ EvaluationExecutionSummary execution = 3;
+ bytes raw_output = 4;
+ bytes normalized_output = 5;
+ string raw_sha256 = 6;
+ string normalized_sha256 = 7;
 }
 message EvaluationPlanQuery {
  PublicationScope scope = 1;
@@ -438,6 +479,8 @@ message PromptDraftFrozenVersion {
 service ProfileManagement {
  rpc Register(ProfileRegisterCommand) returns (ProfileRegistrationReceipt);
  rpc GetReceipt(ProfileRegistrationQuery) returns (ProfileRegistrationReceipt);
+ rpc ListLifecycle(ProfileLifecycleQuery) returns (AssetCatalogResponse);
+ rpc GetLifecycle(ProfileLifecycleQuery) returns (AssetCatalogResponse);
 }
 message ProfileRegisterCommand {
  PublicationScope scope = 1;
@@ -507,4 +550,148 @@ message AssetCatalogGetQuery {
 message AssetCatalogResponse {
   string schema_version = 1;
   string payload_json = 2;
+}
+
+message EvaluationCatalogQuery {
+ PublicationScope scope = 1;
+ string status = 2;
+ int32 limit = 3;
+ string cursor = 4;
+}
+message EvaluationCatalogPage {
+ repeated EvaluationSummary items = 1;
+ string next_cursor = 2;
+}
+message EvaluationSummary {
+ string run_id = 1;
+ int64 organization_id = 2;
+ int64 version = 3;
+ string status = 4;
+ string created_at = 5;
+ string requested_by = 6;
+ string profile_id = 7;
+ string profile_version = 8;
+ string prompt_id = 9;
+ string prompt_version = 10;
+ string release_fingerprint = 11;
+ int64 unresolved_result_unknown_count = 12;
+ int64 review_count = 13;
+ int64 required_candidates = 14;
+ int64 accepted_candidates = 15;
+ int64 review_ready_candidates = 16;
+ string last_cause = 17;
+ string last_reason = 18;
+}
+
+message EvaluationCapacityReservation {
+ string run_id = 1;
+ int64 provider_calls = 2;
+ string requested_by = 3;
+ string reserved_at = 4;
+}
+message EvaluationCapacitySnapshot {
+ int64 organization_id = 1;
+ string budget_day = 2;
+ int64 daily_provider_calls = 3;
+ int64 reserved_provider_calls = 4;
+ int64 remaining_provider_calls = 5;
+ int64 full_run_provider_calls = 6;
+ int64 remaining_full_runs = 7;
+ int64 max_active_runs = 8;
+ int64 active_runs = 9;
+ int64 reservation_count = 10;
+ // Latest 100 receipts; totals include all reservations in the UTC day.
+ repeated EvaluationCapacityReservation reservations = 11;
+ bool reservations_truncated = 12;
+}
+
+// QS supplies current organization administrator authority over mTLS.
+service ParticipantManagement {
+ rpc GetCapacity(ParticipantCapacityQuery) returns (ParticipantCapacitySnapshot);
+ rpc GetExecution(ParticipantExecutionQuery) returns (ParticipantExecution);
+ rpc Retry(ParticipantRetryCommand) returns (Receipt);
+ rpc GetRetryReceipt(ParticipantRetryReceiptQuery) returns (Receipt);
+}
+message ParticipantCapacityQuery {
+ PublicationScope scope = 1;
+ string subject_id = 2;
+ string assessment_id = 3;
+}
+message ParticipantCapacityPolicy {
+ int64 daily_org = 1;
+ int64 daily_user = 2;
+ int64 daily_assessment = 3;
+ int64 active_org = 4;
+ int64 active_user = 5;
+ int64 active_assessment = 6;
+}
+message ParticipantCapacityUsage {
+ string identity = 1;
+ int64 daily_reserved = 2;
+ int64 daily_remaining = 3;
+ int64 active = 4;
+ int64 active_remaining = 5;
+}
+message ParticipantReservation {
+ string run_id = 1;
+ string session_id = 2;
+ string subject_id = 3;
+ repeated string assessment_ids = 4;
+ string budget_day = 5;
+ string reserved_at = 6;
+ bool active = 7;
+ string acquired_at = 8;
+}
+message ParticipantCapacitySnapshot {
+ int64 organization_id = 1;
+ string budget_day = 2;
+ ParticipantCapacityPolicy policy = 3;
+ ParticipantCapacityUsage organization = 4;
+ ParticipantCapacityUsage subject = 5;
+ ParticipantCapacityUsage assessment = 6;
+ repeated ParticipantReservation daily_reservations = 7;
+ repeated ParticipantReservation active_reservations = 8;
+ bool daily_truncated = 9;
+ bool active_truncated = 10;
+}
+
+message ParticipantExecutionQuery { PublicationScope scope = 1; string session_id = 2; }
+message ParticipantRetryReceiptQuery { PublicationScope scope = 1; string command_id = 2; }
+message ParticipantRetryCommand {
+ PublicationScope scope = 1;
+ string session_id = 2;
+ string command_id = 3;
+ string expected_run_id = 4;
+ int64 expected_version = 5;
+ string reason = 6;
+ bool confirm = 7;
+ int64 expected_provider_invocations = 8;
+ bool accept_result_unknown_risk = 9;
+}
+message ParticipantExecution {
+ int64 organization_id = 1;
+ string session_id = 2;
+ string request_id = 3;
+ string run_id = 4;
+ int64 version = 5;
+ string status = 6;
+ string subject_id = 7;
+ string testee_id = 8;
+ repeated string assessment_ids = 9;
+ string failure_code = 10;
+ string model_call_status = 11;
+ string invocation_id = 12;
+ string source_run_id = 13;
+ bool can_retry = 14;
+ bool unknown_result_risk = 15;
+ int64 retry_provider_invocations = 16;
+}
+
+message ProfileLifecycleQuery {
+ PublicationScope scope = 1;
+ string identity = 2;
+ string version = 3;
+ string status = 4;
+ int32 limit = 5;
+ string cursor = 6;
 }

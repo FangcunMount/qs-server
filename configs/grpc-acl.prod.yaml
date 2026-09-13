@@ -28,6 +28,7 @@ services:
       - /interpretation.ParticipantReportService/GetAssessmentReport
       - /interpretation.ParticipantAIExplanationService/GetAIExplanationCapability
       - /interpretation.ParticipantAIExplanationService/GetAIWorkflow
+      - /interpretation.ParticipantAIExplanationService/GetAIWorkflowSource
       - /interpretation.ParticipantAIExplanationService/RequestAIWorkflow
       - /interpretation.ParticipantAIExplanationService/RequestAIExplanation
       - /interpretation.ParticipantAIExplanationService/GetAIExplanation
@@ -63,3 +64,4 @@ services:
     description: AI durable participant authorization recheck
     allowed_methods:
       - /interpretation.AIWorkflowAccessService/Authorize
+      - /qsai.workflow.v1.Results/Accept

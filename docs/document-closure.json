@@ -2,7 +2,7 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "63f7585eedc9d8bf01fdea66b457ec40c4df8b53",
+    "sha": "580fe060a70cd938f5dea6d6c71c44173243e693",
     "verified_on": "2026-09-13"
   },
   "status_policy": {
@@ -132,8 +132,8 @@
     "grpc": {
       "source": "api/grpc/proto",
       "proto_file_count": 8,
-      "service_count": 22,
-      "rpc_count": 95,
+      "service_count": 23,
+      "rpc_count": 106,
       "services": {
         "actor.ActorService": [
           "CreateTestee",
@@ -207,6 +207,7 @@
           "GenerateReportFromAssessment"
         ],
         "interpretation.ParticipantAIExplanationService": [
+          "GetAIWorkflowSource",
           "RequestAIWorkflow",
           "GetAIWorkflow",
           "GetAIExplanationCapability",
@@ -227,6 +228,8 @@
           "Change"
         ],
         "qsai.workflow.v1.EvaluationManagement": [
+          "GetCapacity",
+          "List",
           "Prepare",
           "Create",
           "Start",
@@ -237,13 +240,17 @@
           "Review",
           "ListCandidates",
           "GetCandidate",
+          "ListExecutions",
+          "GetExecutionOutput",
           "PreviewGates",
           "Finalize",
           "ReopenReview"
         ],
         "qsai.workflow.v1.ProfileManagement": [
           "Register",
-          "GetReceipt"
+          "GetReceipt",
+          "ListLifecycle",
+          "GetLifecycle"
         ],
         "qsai.workflow.v1.PromptDraftManagement": [
           "Create",
@@ -273,6 +280,12 @@
         "questionnaire.QuestionnaireService": [
           "GetQuestionnaire",
           "ListQuestionnaires"
+        ],
+        "qsai.workflow.v1.ParticipantManagement": [
+          "GetCapacity",
+          "GetExecution",
+          "Retry",
+          "GetRetryReceipt"
         ]
       }
     }

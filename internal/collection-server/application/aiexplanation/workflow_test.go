@@ -47,3 +47,43 @@ func TestWorkflowReadPreservesCorrelationAndAccessErrors(t *testing.T) {
 		})
 	}
 }
+
+type workflowSourceClient struct {
+	clientStub
+	result *aiport.WorkflowSource
+}
+
+func (c *workflowSourceClient) GetWorkflowSource(_ context.Context, testee, assessment uint64) (*aiport.WorkflowSource, error) {
+	if testee != 7 || assessment != 42 {
+		return nil, ErrInvalidRequest
+	}
+	return c.result, c.err
+}
+func TestWorkflowSourceRejectsMalformedOrInapplicableProvenance(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		result *aiport.WorkflowSource
+		valid  bool
+	}{
+		{"ready", &aiport.WorkflowSource{Status: "ready", ReportID: "18446744073709551615", SourceVersion: "standard-v1:101"}, true},
+		{"not ready", &aiport.WorkflowSource{Status: "not_ready"}, true},
+		{"not applicable", &aiport.WorkflowSource{Status: "not_applicable"}, true},
+		{"missing", nil, false},
+		{"zero ID", &aiport.WorkflowSource{Status: "ready", ReportID: "0", SourceVersion: "v1"}, false},
+		{"missing version", &aiport.WorkflowSource{Status: "ready", ReportID: "99"}, false},
+		{"unexpected state", &aiport.WorkflowSource{Status: "published"}, false},
+		{"inapplicable identity", &aiport.WorkflowSource{Status: "not_applicable", ReportID: "99"}, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			client := &workflowSourceClient{result: tc.result}
+			got, err := NewService(client).GetWorkflowSource(context.Background(), 7, 42)
+			if (err == nil) != tc.valid || tc.valid && got != tc.result {
+				t.Fatalf("got=%#v err=%v", got, err)
+			}
+		})
+	}
+	denied := errors.New("denied")
+	if _, err := NewService(&workflowSourceClient{clientStub: clientStub{err: denied}}).GetWorkflowSource(context.Background(), 7, 42); !errors.Is(err, denied) {
+		t.Fatal("authorization error hidden")
+	}
+}

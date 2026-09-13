@@ -30,6 +30,7 @@ import (
 	iaminfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
 	rulesetInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/ruleset"
 	rulesetport "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
+	bridgeTransport "github.com/FangcunMount/qs-server/internal/apiserver/transport/grpc/aibridge"
 	"github.com/FangcunMount/qs-server/internal/apiserver/transport/grpc/service"
 	"github.com/FangcunMount/qs-server/internal/pkg/delegatedsubject"
 	grpcpkg "github.com/FangcunMount/qs-server/internal/pkg/grpc"
@@ -91,6 +92,7 @@ type EvaluationDeps struct {
 }
 
 type InterpretationDeps struct {
+	AIWorkflowResults          *bridge.Service
 	CurrentAccess              *bridge.CurrentAccess
 	AutomationService          interpretationAutomation.Service
 	AIExplanationExecutor      aiExplanationExecution.Executor
@@ -147,6 +149,9 @@ func (r *Registry) RegisterServices() error {
 	}
 	if r.deps.Interpretation.CurrentAccess != nil {
 		r.server.RegisterService(&service.AIWorkflowAccessService{Access: r.deps.Interpretation.CurrentAccess})
+	}
+	if r.deps.Interpretation.AIWorkflowResults != nil {
+		r.server.RegisterService(&bridgeTransport.Receiver{Service: r.deps.Interpretation.AIWorkflowResults})
 	}
 	if err := r.registerParticipantAIExplanationService(); err != nil {
 		return err
