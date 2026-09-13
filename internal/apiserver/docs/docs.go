@@ -10748,6 +10748,95 @@ const docTemplate = `{
                 }
             }
         },
+        "/internal/v2/interpretation/ai-workflow/evaluations/{run_id}/cancel": {
+            "post": {
+                "description": "复用当前机构 OrgAdmin 权限，要求当前版本、理由、明确确认和 discard 决定。AI 在事务内判断取消资格并保留执行和审核历史；已派发或未知调用须先完成或处置。超时先回读原任务，不自动重试。",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "AI-Workflow-Management"
+                ],
+                "summary": "取消或废弃 qs-ai 评测",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "评测 Run UUID",
+                        "name": "run_id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "取消确认",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/aibridge.EvaluationCancel"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/aibridge.EvaluationState"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/internal/v2/interpretation/ai-workflow/evaluations/{run_id}/candidates": {
             "get": {
                 "description": "需要当前机构解读审计权限。列表最多 35 条，版本用于详情读取与审核；列表不代表质量通过。",
@@ -13438,6 +13527,67 @@ const docTemplate = `{
                 }
             }
         },
+        "aibridge.EvaluationCancel": {
+            "type": "object",
+            "properties": {
+                "confirm": {
+                    "type": "boolean"
+                },
+                "discard": {
+                    "type": "boolean"
+                },
+                "expected_version": {
+                    "type": "integer"
+                },
+                "reason": {
+                    "type": "string"
+                }
+            }
+        },
+        "aibridge.EvaluationCancellationReceipt": {
+            "type": "object",
+            "properties": {
+                "actor": {
+                    "type": "string"
+                },
+                "canceled_at": {
+                    "type": "string"
+                },
+                "discard": {
+                    "type": "boolean"
+                },
+                "execution_id": {
+                    "type": "string"
+                },
+                "invocation_id": {
+                    "type": "string"
+                },
+                "reason": {
+                    "type": "string"
+                },
+                "release_fingerprint": {
+                    "type": "string"
+                },
+                "run_id": {
+                    "type": "string"
+                },
+                "schema_version": {
+                    "type": "string"
+                },
+                "source_status": {
+                    "type": "string"
+                },
+                "source_version": {
+                    "type": "integer"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "version": {
+                    "type": "integer"
+                }
+            }
+        },
         "aibridge.EvaluationCandidateEvidence": {
             "type": "object",
             "properties": {
@@ -13702,6 +13852,9 @@ const docTemplate = `{
         "aibridge.EvaluationState": {
             "type": "object",
             "properties": {
+                "cancellation": {
+                    "$ref": "#/definitions/aibridge.EvaluationCancellationReceipt"
+                },
                 "creation": {
                     "$ref": "#/definitions/aibridge.EvaluationCreationReceipt"
                 },

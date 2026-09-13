@@ -264,6 +264,7 @@ const (
 	EvaluationManagement_Prepare_FullMethodName               = "/qsai.workflow.v1.EvaluationManagement/Prepare"
 	EvaluationManagement_Create_FullMethodName                = "/qsai.workflow.v1.EvaluationManagement/Create"
 	EvaluationManagement_Start_FullMethodName                 = "/qsai.workflow.v1.EvaluationManagement/Start"
+	EvaluationManagement_Cancel_FullMethodName                = "/qsai.workflow.v1.EvaluationManagement/Cancel"
 	EvaluationManagement_Get_FullMethodName                   = "/qsai.workflow.v1.EvaluationManagement/Get"
 	EvaluationManagement_ListUnknownExecutions_FullMethodName = "/qsai.workflow.v1.EvaluationManagement/ListUnknownExecutions"
 	EvaluationManagement_ResolveUnknown_FullMethodName        = "/qsai.workflow.v1.EvaluationManagement/ResolveUnknown"
@@ -287,6 +288,8 @@ type EvaluationManagementClient interface {
 	Create(ctx context.Context, in *EvaluationCreateCommand, opts ...grpc.CallOption) (*EvaluationState, error)
 	// Explicitly schedules an existing frozen requested Run; does not call a model inline.
 	Start(ctx context.Context, in *EvaluationStartCommand, opts ...grpc.CallOption) (*EvaluationState, error)
+	// Stop future work; dispatched/unknown calls must be completed or resolved first.
+	Cancel(ctx context.Context, in *EvaluationCancelCommand, opts ...grpc.CallOption) (*EvaluationState, error)
 	Get(ctx context.Context, in *EvaluationQuery, opts ...grpc.CallOption) (*EvaluationState, error)
 	// Read-only version-bound uncertain calls and frozen budget; never authorizes a retry.
 	ListUnknownExecutions(ctx context.Context, in *EvaluationUnknownQuery, opts ...grpc.CallOption) (*EvaluationUnknownIndex, error)
@@ -335,6 +338,16 @@ func (c *evaluationManagementClient) Start(ctx context.Context, in *EvaluationSt
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(EvaluationState)
 	err := c.cc.Invoke(ctx, EvaluationManagement_Start_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *evaluationManagementClient) Cancel(ctx context.Context, in *EvaluationCancelCommand, opts ...grpc.CallOption) (*EvaluationState, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(EvaluationState)
+	err := c.cc.Invoke(ctx, EvaluationManagement_Cancel_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -443,6 +456,8 @@ type EvaluationManagementServer interface {
 	Create(context.Context, *EvaluationCreateCommand) (*EvaluationState, error)
 	// Explicitly schedules an existing frozen requested Run; does not call a model inline.
 	Start(context.Context, *EvaluationStartCommand) (*EvaluationState, error)
+	// Stop future work; dispatched/unknown calls must be completed or resolved first.
+	Cancel(context.Context, *EvaluationCancelCommand) (*EvaluationState, error)
 	Get(context.Context, *EvaluationQuery) (*EvaluationState, error)
 	// Read-only version-bound uncertain calls and frozen budget; never authorizes a retry.
 	ListUnknownExecutions(context.Context, *EvaluationUnknownQuery) (*EvaluationUnknownIndex, error)
@@ -475,6 +490,9 @@ func (UnimplementedEvaluationManagementServer) Create(context.Context, *Evaluati
 }
 func (UnimplementedEvaluationManagementServer) Start(context.Context, *EvaluationStartCommand) (*EvaluationState, error) {
 	return nil, status.Error(codes.Unimplemented, "method Start not implemented")
+}
+func (UnimplementedEvaluationManagementServer) Cancel(context.Context, *EvaluationCancelCommand) (*EvaluationState, error) {
+	return nil, status.Error(codes.Unimplemented, "method Cancel not implemented")
 }
 func (UnimplementedEvaluationManagementServer) Get(context.Context, *EvaluationQuery) (*EvaluationState, error) {
 	return nil, status.Error(codes.Unimplemented, "method Get not implemented")
@@ -574,6 +592,24 @@ func _EvaluationManagement_Start_Handler(srv interface{}, ctx context.Context, d
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(EvaluationManagementServer).Start(ctx, req.(*EvaluationStartCommand))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _EvaluationManagement_Cancel_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(EvaluationCancelCommand)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(EvaluationManagementServer).Cancel(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: EvaluationManagement_Cancel_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(EvaluationManagementServer).Cancel(ctx, req.(*EvaluationCancelCommand))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -758,6 +794,10 @@ var EvaluationManagement_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "Start",
 			Handler:    _EvaluationManagement_Start_Handler,
+		},
+		{
+			MethodName: "Cancel",
+			Handler:    _EvaluationManagement_Cancel_Handler,
 		},
 		{
 			MethodName: "Get",

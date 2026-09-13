@@ -11,6 +11,8 @@ import (
 )
 
 type evaluationRPCStub struct {
+	cancelCommand     *pb.EvaluationCancelCommand
+	cancelState       *pb.EvaluationState
 	unknownQuery      *pb.EvaluationUnknownQuery
 	unknownIndex      *pb.EvaluationUnknownIndex
 	planQuery         *pb.EvaluationPlanQuery

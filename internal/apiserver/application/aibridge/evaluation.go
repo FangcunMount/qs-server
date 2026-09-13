@@ -32,17 +32,19 @@ type UnknownResolution struct {
 	AcknowledgedDuplicateCallAndCostRisk bool   `json:"acknowledged_duplicate_call_and_cost_risk"`
 }
 type EvaluationState struct {
-	RunID                        string                     `json:"run_id"`
-	Version                      int64                      `json:"version"`
-	Status                       string                     `json:"status"`
-	UnresolvedResultUnknownCount int64                      `json:"unresolved_result_unknown_count"`
-	Resolutions                  json.RawMessage            `json:"resolutions" swaggertype:"array,object"`
-	Reviews                      json.RawMessage            `json:"reviews" swaggertype:"array,object"`
-	Finalization                 json.RawMessage            `json:"finalization,omitempty" swaggertype:"object"`
-	ReviewReopenings             json.RawMessage            `json:"review_reopenings" swaggertype:"array,object"`
-	Creation                     *EvaluationCreationReceipt `json:"creation,omitempty"`
+	RunID                        string                         `json:"run_id"`
+	Version                      int64                          `json:"version"`
+	Status                       string                         `json:"status"`
+	UnresolvedResultUnknownCount int64                          `json:"unresolved_result_unknown_count"`
+	Resolutions                  json.RawMessage                `json:"resolutions" swaggertype:"array,object"`
+	Reviews                      json.RawMessage                `json:"reviews" swaggertype:"array,object"`
+	Finalization                 json.RawMessage                `json:"finalization,omitempty" swaggertype:"object"`
+	ReviewReopenings             json.RawMessage                `json:"review_reopenings" swaggertype:"array,object"`
+	Creation                     *EvaluationCreationReceipt     `json:"creation,omitempty"`
+	Cancellation                 *EvaluationCancellationReceipt `json:"cancellation,omitempty"`
 }
 type EvaluationGateway interface {
+	CancelEvaluation(context.Context, EvaluationScope, EvaluationCancel) (EvaluationState, error)
 	ListEvaluationUnknowns(context.Context, EvaluationScope, int64) (EvaluationUnknownIndex, error)
 	PrepareEvaluation(context.Context, DraftScope, EvaluationPlanQuery) (EvaluationPlan, error)
 	ReopenEvaluationReview(context.Context, EvaluationScope, EvaluationReopen) (EvaluationState, error)

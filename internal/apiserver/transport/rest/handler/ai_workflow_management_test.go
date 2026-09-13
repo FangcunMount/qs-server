@@ -14,6 +14,7 @@ import (
 )
 
 type managementGateway struct {
+	cancel   app.EvaluationCancel
 	reopen   app.EvaluationReopen
 	finalize app.EvaluationFinalize
 	review   app.EvaluationReview
