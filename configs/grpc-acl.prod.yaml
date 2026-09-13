@@ -64,3 +64,4 @@ services:
     description: AI durable participant authorization recheck
     allowed_methods:
       - /interpretation.AIWorkflowAccessService/Authorize
+      - /qsai.workflow.v1.Results/Accept

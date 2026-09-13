@@ -67,7 +67,7 @@ func TestGRPCProtoServicesHaveExplicitOwners(t *testing.T) {
 		"qsai.workflow.v1.PromptDraftManagement": {"aiworkflow/workflow.proto", "../../infra/aibridge/prompt_draft.go", "pb.NewPromptDraftManagementClient("},
 		"qsai.workflow.v1.EvaluationManagement":  {"aiworkflow/workflow.proto", "../../infra/aibridge/evaluation.go", "pb.NewEvaluationManagementClient("},
 		"qsai.workflow.v1.Commands":              {"aiworkflow/workflow.proto", "../../infra/aibridge/client.go", "pb.NewCommandsClient("},
-		"qsai.workflow.v1.Results":               {"aiworkflow/workflow.proto", "../../../../cmd/qs-ai-bridge/main.go", "pb.RegisterResultsServer("},
+		"qsai.workflow.v1.Results":               {"aiworkflow/workflow.proto", "aibridge/results.go", "pb.RegisterResultsServer("},
 		"interpretation.AIWorkflowAccessService": {"interpretation/interpretation.proto", "service/ai_workflow_access.go", "pb.RegisterAIWorkflowAccessServiceServer("},
 	}
 	seenOwners := make(map[string]bool)

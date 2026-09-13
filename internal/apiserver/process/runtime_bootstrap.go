@@ -10,10 +10,11 @@ import (
 )
 
 type runtimeStageDeps struct {
-	hasMongo        bool
-	startCache      func()
-	startEvents     func() error
-	startSchedulers func(*runtimeOutput)
+	hasMongo             bool
+	startCache           func()
+	startEvents          func() error
+	startAIWorkflowRelay func() error
+	startSchedulers      func(*runtimeOutput)
 }
 
 func logInitialization(hasMongo bool) {
@@ -40,6 +41,11 @@ func (s *server) buildRuntimeStageDeps(resources resourceOutput, containerOutput
 		deps.startEvents = func() error {
 			return containerOutput.container.StartEventSubsystem(context.Background())
 		}
+		if containerOutput.container.ReportModule != nil {
+			deps.startAIWorkflowRelay = func() error {
+				return containerOutput.container.ReportModule.StartAIWorkflowRelay(context.Background())
+			}
+		}
 	}
 
 	serverDeps := buildServerRuntimeDeps(containerOutput)
@@ -60,6 +66,11 @@ func runRuntimeStage(deps runtimeStageDeps, runtimeOutput *runtimeOutput) error 
 	}
 	if deps.startCache != nil {
 		deps.startCache()
+	}
+	if deps.startAIWorkflowRelay != nil {
+		if err := deps.startAIWorkflowRelay(); err != nil {
+			return err
+		}
 	}
 	if deps.startSchedulers != nil {
 		deps.startSchedulers(runtimeOutput)

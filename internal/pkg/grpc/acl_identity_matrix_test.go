@@ -17,6 +17,7 @@ import (
 
 	basegrpc "github.com/FangcunMount/component-base/pkg/grpc/interceptors"
 	actorpb "github.com/FangcunMount/qs-server/api/grpc/gen/actor"
+	aiworkflowpb "github.com/FangcunMount/qs-server/api/grpc/gen/aiworkflow"
 	answersheetpb "github.com/FangcunMount/qs-server/api/grpc/gen/answersheet"
 	assessmentmodelpb "github.com/FangcunMount/qs-server/api/grpc/gen/assessmentmodel"
 	evaluationpb "github.com/FangcunMount/qs-server/api/grpc/gen/evaluation"
@@ -65,6 +66,10 @@ func TestRegisteredUnaryRPCIdentityACLMatrix(t *testing.T) {
 			commonName: serviceidentity.WorkerCertificateCommonName,
 			allowed:    workergrpcclient.ACLAllowedMethods(),
 		},
+		{name: "canonical AI", commonName: "qs-ai.svc", allowed: []string{
+			"/interpretation.AIWorkflowAccessService/Authorize",
+			"/qsai.workflow.v1.Results/Accept",
+		}},
 		{name: "legacy collection", commonName: "qs-collection.svc"},
 		{name: "bare worker", commonName: serviceidentity.WorkerServiceID},
 		{name: "legacy worker", commonName: "worker.svc"},
@@ -120,6 +125,8 @@ func registeredUnaryRPCMethods(t *testing.T) []string {
 	t.Helper()
 
 	descriptors := []*gogrpc.ServiceDesc{
+		&aiworkflowpb.Results_ServiceDesc,
+		&interpretationpb.AIWorkflowAccessService_ServiceDesc,
 		&actorpb.ActorService_ServiceDesc,
 		&answersheetpb.AnswerSheetService_ServiceDesc,
 		&assessmentmodelpb.AssessmentModelCatalogService_ServiceDesc,

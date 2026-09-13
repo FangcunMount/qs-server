@@ -77,6 +77,8 @@ type Module struct {
 	aiAssets                    *bridge.AssetCatalogAdministration
 	aiProfiles                  *bridge.ProfileAdministration
 	aiManagementConnection      io.Closer
+	aiRelayCancel               context.CancelFunc
+	aiRelayDone                 chan struct{}
 	aiWorkflowEnabled           bool
 	aiWorkflow                  *bridge.Participant
 	aiCurrentAccess             *bridge.CurrentAccess
@@ -252,8 +254,9 @@ func New(deps Deps) (*Module, error) {
 		return nil, err
 	}
 
-	if deps.AIExplanation != nil && deps.AIExplanation.WorkflowManagement.Enabled {
+	if deps.AIExplanation != nil && (deps.AIExplanation.WorkflowManagement.Enabled || module.aiWorkflowEnabled) {
 		opts := deps.AIExplanation.WorkflowManagement
+		opts.Enabled = true
 		if err := opts.Validate(); err != nil {
 			return nil, err
 		}
@@ -261,13 +264,18 @@ func New(deps Deps) (*Module, error) {
 		if err != nil {
 			return nil, err
 		}
-		module.aiManagement = &bridge.EvaluationAdministration{Gateway: clients.Evaluation}
-		module.aiParticipants = &bridge.ParticipantAdministration{Gateway: clients.Participants}
-		module.aiPublications = &bridge.PublicationAdministration{Gateway: clients.Publications}
-		module.aiPromptDrafts = &bridge.PromptDraftAdministration{Gateway: clients.PromptDrafts}
-		module.aiProfiles = &bridge.ProfileAdministration{Gateway: clients.Profiles}
-		module.aiSuites = &bridge.SuiteAdministration{Gateway: clients.Suites}
-		module.aiAssets = &bridge.AssetCatalogAdministration{Gateway: clients.Assets}
+		if module.aiWorkflowEnabled {
+			module.aiBridge.Sender = clients.Commands
+		}
+		if deps.AIExplanation.WorkflowManagement.Enabled {
+			module.aiManagement = &bridge.EvaluationAdministration{Gateway: clients.Evaluation}
+			module.aiParticipants = &bridge.ParticipantAdministration{Gateway: clients.Participants}
+			module.aiPublications = &bridge.PublicationAdministration{Gateway: clients.Publications}
+			module.aiPromptDrafts = &bridge.PromptDraftAdministration{Gateway: clients.PromptDrafts}
+			module.aiProfiles = &bridge.ProfileAdministration{Gateway: clients.Profiles}
+			module.aiSuites = &bridge.SuiteAdministration{Gateway: clients.Suites}
+			module.aiAssets = &bridge.AssetCatalogAdministration{Gateway: clients.Assets}
+		}
 		module.aiManagementConnection = clients.Connection
 	}
 	return module, nil
@@ -964,6 +972,11 @@ func buildReportBuilderRegistry() (rendering.Registry, error) {
 
 // Cleanup releases module resources.
 func (m *Module) Cleanup() error {
+	if m != nil && m.aiRelayCancel != nil {
+		m.aiRelayCancel()
+		<-m.aiRelayDone
+		m.aiRelayCancel = nil
+	}
 	if m != nil && m.aiManagementConnection != nil {
 		return m.aiManagementConnection.Close()
 	}
