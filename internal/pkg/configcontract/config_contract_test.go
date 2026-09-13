@@ -297,7 +297,7 @@ func assertExactGRPCACLConfig(t *testing.T, configName string, data []byte) {
 		t.Fatalf("%s service rule count = %d, want 3", configName, len(aclConfig.Services))
 	}
 	expectedMethodsByIdentity := map[string][]string{
-		"qs-ai.svc": {"/interpretation.AIWorkflowAccessService/Authorize"},
+		"qs-ai.svc": {"/interpretation.AIWorkflowAccessService/Authorize", "/qsai.workflow.v1.Results/Accept"},
 		serviceidentity.CollectionServerCertificateCommonName: collectiongrpcclient.ACLAllowedMethods(),
 		serviceidentity.WorkerCertificateCommonName:           workergrpcclient.ACLAllowedMethods(),
 	}
