@@ -205,6 +205,10 @@ service PublicationManagement {
  rpc Get(PublicationQuery) returns (PublicationState);
  // Same authorized organization/operator that submitted the command; read-only.
  rpc GetReceipt(PublicationReceiptQuery) returns (PublicationReceipt);
+ // QS audit-authorized global configuration history; preserves original actors.
+ // These reads never replay commands or select an active publication.
+ rpc ListHistory(PublicationHistoryQuery) returns (PublicationHistoryPage);
+ rpc GetHistory(PublicationHistoryVersionQuery) returns (PublicationReceipt);
 }
 message PublicationScope {
  int64 organization_id = 1;
@@ -255,6 +259,22 @@ message PublicationQuery {
 message PublicationReceiptQuery {
  PublicationScope scope = 1;
  string command_id = 2;
+}
+message PublicationHistoryQuery {
+ PublicationScope scope = 1;
+ PublicationSelector selector = 2;
+ int64 before_version = 3; // Exclusive cursor; zero starts at the newest change.
+ int32 limit = 4; // Required range 1..20.
+}
+message PublicationHistoryVersionQuery {
+ PublicationScope scope = 1;
+ PublicationSelector selector = 2;
+ int64 version = 3;
+}
+message PublicationHistoryPage {
+ string schema_version = 1;
+ // qs-ai-publication-history/v1 summaries, no executable Prompt or Profile body.
+ string payload_json = 2;
 }
 message PublicationState {
  PublicationSelector selector = 1;

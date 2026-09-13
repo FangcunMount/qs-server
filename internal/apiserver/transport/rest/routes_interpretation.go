@@ -79,6 +79,8 @@ func (r *Router) registerInterpretationInternalV2Routes(internalV2 *gin.RouterGr
 		write.POST("/disable", publications.Disable)
 		read.GET("", publications.Get)
 		read.GET("/commands/:command_id", publications.GetReceipt)
+		read.GET("/history", publications.ListHistory)
+		read.GET("/history/:version", publications.GetHistory)
 	}
 
 	if r.deps.Interpretation.AIWorkflowAssets != nil {

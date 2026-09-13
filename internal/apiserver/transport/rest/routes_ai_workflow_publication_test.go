@@ -14,10 +14,12 @@ import (
 
 type publicationRouteGateway struct {
 	app.PublicationGateway
-	writes, reads int
-	scope         app.PublicationScope
-	selector      app.PublicationSelector
-	err           error
+	writes, reads  int
+	scope          app.PublicationScope
+	selector       app.PublicationSelector
+	err            error
+	historyQuery   app.PublicationHistoryQuery
+	historyVersion int64
 }
 
 func (g *publicationRouteGateway) DisablePublication(_ context.Context, s app.PublicationScope, c app.PublicationCommand) (app.PublicationReceipt, error) {

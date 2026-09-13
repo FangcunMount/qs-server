@@ -396,6 +396,46 @@ definitions:
       version:
         type: integer
     type: object
+  aibridge.PublicationHistoryEntry:
+    properties:
+      action:
+        type: string
+      actor:
+        type: string
+      changed_at:
+        type: string
+      command_id:
+        type: string
+      previous_publication_id:
+        type: string
+      profile_id:
+        type: string
+      profile_version:
+        type: string
+      publication_id:
+        type: string
+      reason:
+        type: string
+      run_id:
+        type: string
+      run_version:
+        type: integer
+      version:
+        type: integer
+    type: object
+  aibridge.PublicationHistoryPage:
+    properties:
+      entries:
+        items:
+          $ref: '#/definitions/aibridge.PublicationHistoryEntry'
+        type: array
+      next_before_version:
+        type: integer
+      schema_version:
+        type: string
+      selector:
+        $ref: '#/definitions/aibridge.PublicationSelector'
+    type: object
   aibridge.PublicationReceipt:
     properties:
       action:
@@ -16102,6 +16142,148 @@ paths:
           schema:
             $ref: '#/definitions/core.ErrResponse'
       summary: 停用当前选择器的 qs-ai 发布配置
+      tags:
+      - AI-Workflow-Publications
+  /internal/v2/interpretation/ai-workflow/publications/history:
+    get:
+      description: 需要当前解读审计权限；精确 selector、降序排他版本游标，保留原操作者。只读查询不重放命令，默认 limit=20、before_version=0。管理开关默认关闭。
+      parameters:
+      - description: participant
+        in: query
+        name: audience
+        required: true
+        type: string
+      - description: scale
+        in: query
+        name: model_kind
+        required: true
+        type: string
+      - description: score_range
+        in: query
+        name: decision_kind
+        required: true
+        type: string
+      - description: 测评编码
+        in: query
+        name: model_code
+        type: string
+      - description: 测评版本，需要编码
+        in: query
+        name: model_version
+        type: string
+      - description: 每页 1–20 条，默认 20
+        in: query
+        name: limit
+        type: integer
+      - description: 排他版本游标，0 从最新开始
+        in: query
+        name: before_version
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/aibridge.PublicationHistoryPage'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+      summary: 查询 qs-ai 配置发布历史
+      tags:
+      - AI-Workflow-Publications
+  /internal/v2/interpretation/ai-workflow/publications/history/{version}:
+    get:
+      description: 需要当前解读审计权限；按精确 selector 和版本读取原前后发布及审计，actor 保留原操作者。与原命令 GetReceipt
+        的操作者限制区分，不改变发布状态或授予回退权限。
+      parameters:
+      - description: 正历史版本
+        in: path
+        name: version
+        required: true
+        type: integer
+      - description: participant
+        in: query
+        name: audience
+        required: true
+        type: string
+      - description: scale
+        in: query
+        name: model_kind
+        required: true
+        type: string
+      - description: score_range
+        in: query
+        name: decision_kind
+        required: true
+        type: string
+      - description: 测评编码
+        in: query
+        name: model_code
+        type: string
+      - description: 测评版本，需要编码
+        in: query
+        name: model_version
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/aibridge.PublicationReceipt'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+      summary: 核对 qs-ai 历史发布版本的原始证据
       tags:
       - AI-Workflow-Publications
   /internal/v2/interpretation/ai-workflow/publications/publish:
