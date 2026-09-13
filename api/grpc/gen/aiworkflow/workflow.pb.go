@@ -1446,8 +1446,11 @@ type EvaluationState struct {
 	FinalizationJson string `protobuf:"bytes,7,opt,name=finalization_json,json=finalizationJson,proto3" json:"finalization_json,omitempty"`
 	// At most three prior finalizations and review rounds, revalidated against original evidence.
 	ReopeningsJson string `protobuf:"bytes,8,opt,name=reopenings_json,json=reopeningsJson,proto3" json:"reopenings_json,omitempty"`
-	unknownFields  protoimpl.UnknownFields
-	sizeCache      protoimpl.SizeCache
+	// Immutable creation receipt for read-only recovery, without executable asset bodies.
+	// qs-ai-evaluation-creation-receipt/v1; absent on older servers.
+	CreationJson  string `protobuf:"bytes,9,opt,name=creation_json,json=creationJson,proto3" json:"creation_json,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *EvaluationState) Reset() {
@@ -1532,6 +1535,13 @@ func (x *EvaluationState) GetFinalizationJson() string {
 func (x *EvaluationState) GetReopeningsJson() string {
 	if x != nil {
 		return x.ReopeningsJson
+	}
+	return ""
+}
+
+func (x *EvaluationState) GetCreationJson() string {
+	if x != nil {
+		return x.CreationJson
 	}
 	return ""
 }
@@ -4311,7 +4321,7 @@ const file_aiworkflow_workflow_proto_rawDesc = "" +
 	"\bdecision\x18\x04 \x01(\tR\bdecision\x12\x16\n" +
 	"\x06reason\x18\x05 \x01(\tR\x06reason\x12\x18\n" +
 	"\aconfirm\x18\x06 \x01(\bR\aconfirm\x12W\n" +
-	")acknowledged_duplicate_call_and_cost_risk\x18\a \x01(\bR$acknowledgedDuplicateCallAndCostRisk\"\xc5\x02\n" +
+	")acknowledged_duplicate_call_and_cost_risk\x18\a \x01(\bR$acknowledgedDuplicateCallAndCostRisk\"\xea\x02\n" +
 	"\x0fEvaluationState\x12\x15\n" +
 	"\x06run_id\x18\x01 \x01(\tR\x05runId\x12\x18\n" +
 	"\aversion\x18\x02 \x01(\x03R\aversion\x12\x16\n" +
@@ -4320,7 +4330,8 @@ const file_aiworkflow_workflow_proto_rawDesc = "" +
 	"\x10resolutions_json\x18\x05 \x01(\tR\x0fresolutionsJson\x12!\n" +
 	"\freviews_json\x18\x06 \x01(\tR\vreviewsJson\x12+\n" +
 	"\x11finalization_json\x18\a \x01(\tR\x10finalizationJson\x12'\n" +
-	"\x0freopenings_json\x18\b \x01(\tR\x0ereopeningsJson\"\xb1\x02\n" +
+	"\x0freopenings_json\x18\b \x01(\tR\x0ereopeningsJson\x12#\n" +
+	"\rcreation_json\x18\t \x01(\tR\fcreationJson\"\xb1\x02\n" +
 	"\x1bSemanticContradictionReview\x12%\n" +
 	"\x0epolicy_version\x18\x01 \x01(\tR\rpolicyVersion\x12!\n" +
 	"\fexecution_id\x18\x02 \x01(\tR\vexecutionId\x12-\n" +

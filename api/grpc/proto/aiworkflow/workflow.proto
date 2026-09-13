@@ -141,6 +141,9 @@ message EvaluationState {
  string finalization_json = 7;
  // At most three prior finalizations and review rounds, revalidated against original evidence.
  string reopenings_json = 8;
+ // Immutable creation receipt for read-only recovery, without executable asset bodies.
+ // qs-ai-evaluation-creation-receipt/v1; absent on older servers.
+ string creation_json = 9;
 }
 
 message SemanticContradictionReview {

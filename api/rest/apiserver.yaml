@@ -12359,6 +12359,23 @@ components:
           type: string
         release:
           $ref: '#/components/schemas/aibridge.EvaluationRelease'
+    aibridge.EvaluationCreationReceipt:
+      type: object
+      properties:
+        created_at:
+          type: string
+        release:
+          $ref: '#/components/schemas/aibridge.EvaluationRelease'
+        release_fingerprint:
+          type: string
+        request_reason:
+          type: string
+        requested_by:
+          type: string
+        run_id:
+          type: string
+        schema_version:
+          type: string
     aibridge.EvaluationFinalize:
       type: object
       properties:
@@ -12470,6 +12487,8 @@ components:
     aibridge.EvaluationState:
       type: object
       properties:
+        creation:
+          $ref: '#/components/schemas/aibridge.EvaluationCreationReceipt'
         finalization:
           type: object
         resolutions:
