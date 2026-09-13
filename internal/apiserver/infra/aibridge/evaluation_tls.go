@@ -30,6 +30,7 @@ func DialGovernanceClients(address, caFile, certFile, keyFile string) (*Evaluati
 }
 
 type GovernanceClients struct {
+	Participants *ParticipantClient
 	Assets       *AssetCatalogClient
 	Evaluation   *EvaluationClient
 	Publications *PublicationClient
@@ -57,5 +58,5 @@ func DialGovernance(address, caFile, certFile, keyFile string) (*GovernanceClien
 	if err != nil {
 		return nil, err
 	}
-	return &GovernanceClients{Assets: NewAssetCatalogClient(conn), Evaluation: NewEvaluationClient(conn), Publications: NewPublicationClient(conn), PromptDrafts: NewPromptDraftClient(conn), Suites: NewSuiteClient(conn), Profiles: NewProfileClient(conn), Connection: conn}, nil
+	return &GovernanceClients{Participants: NewParticipantClient(conn), Assets: NewAssetCatalogClient(conn), Evaluation: NewEvaluationClient(conn), Publications: NewPublicationClient(conn), PromptDrafts: NewPromptDraftClient(conn), Suites: NewSuiteClient(conn), Profiles: NewProfileClient(conn), Connection: conn}, nil
 }

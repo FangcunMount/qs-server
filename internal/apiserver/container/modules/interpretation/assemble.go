@@ -70,6 +70,7 @@ import (
 // Module assembles report read/query, builder-registry, and durable write capabilities.
 type Module struct {
 	aiManagement                *bridge.EvaluationAdministration
+	aiParticipants              *bridge.ParticipantAdministration
 	aiPublications              *bridge.PublicationAdministration
 	aiPromptDrafts              *bridge.PromptDraftAdministration
 	aiSuites                    *bridge.SuiteAdministration
@@ -261,6 +262,7 @@ func New(deps Deps) (*Module, error) {
 			return nil, err
 		}
 		module.aiManagement = &bridge.EvaluationAdministration{Gateway: clients.Evaluation}
+		module.aiParticipants = &bridge.ParticipantAdministration{Gateway: clients.Participants}
 		module.aiPublications = &bridge.PublicationAdministration{Gateway: clients.Publications}
 		module.aiPromptDrafts = &bridge.PromptDraftAdministration{Gateway: clients.PromptDrafts}
 		module.aiProfiles = &bridge.ProfileAdministration{Gateway: clients.Profiles}
@@ -1022,4 +1024,11 @@ func (m *Module) AIWorkflowAssets() *bridge.AssetCatalogAdministration {
 		return nil
 	}
 	return m.aiAssets
+}
+
+func (m *Module) AIWorkflowParticipants() *bridge.ParticipantAdministration {
+	if m == nil {
+		return nil
+	}
+	return m.aiParticipants
 }

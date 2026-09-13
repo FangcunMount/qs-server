@@ -2117,3 +2117,109 @@ var AssetCatalog_ServiceDesc = grpc.ServiceDesc{
 	Streams:  []grpc.StreamDesc{},
 	Metadata: "aiworkflow/workflow.proto",
 }
+
+const (
+	ParticipantManagement_GetCapacity_FullMethodName = "/qsai.workflow.v1.ParticipantManagement/GetCapacity"
+)
+
+// ParticipantManagementClient is the client API for ParticipantManagement service.
+//
+// For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
+//
+// QS supplies current organization administrator authority over mTLS.
+type ParticipantManagementClient interface {
+	GetCapacity(ctx context.Context, in *ParticipantCapacityQuery, opts ...grpc.CallOption) (*ParticipantCapacitySnapshot, error)
+}
+
+type participantManagementClient struct {
+	cc grpc.ClientConnInterface
+}
+
+func NewParticipantManagementClient(cc grpc.ClientConnInterface) ParticipantManagementClient {
+	return &participantManagementClient{cc}
+}
+
+func (c *participantManagementClient) GetCapacity(ctx context.Context, in *ParticipantCapacityQuery, opts ...grpc.CallOption) (*ParticipantCapacitySnapshot, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ParticipantCapacitySnapshot)
+	err := c.cc.Invoke(ctx, ParticipantManagement_GetCapacity_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// ParticipantManagementServer is the server API for ParticipantManagement service.
+// All implementations must embed UnimplementedParticipantManagementServer
+// for forward compatibility.
+//
+// QS supplies current organization administrator authority over mTLS.
+type ParticipantManagementServer interface {
+	GetCapacity(context.Context, *ParticipantCapacityQuery) (*ParticipantCapacitySnapshot, error)
+	mustEmbedUnimplementedParticipantManagementServer()
+}
+
+// UnimplementedParticipantManagementServer must be embedded to have
+// forward compatible implementations.
+//
+// NOTE: this should be embedded by value instead of pointer to avoid a nil
+// pointer dereference when methods are called.
+type UnimplementedParticipantManagementServer struct{}
+
+func (UnimplementedParticipantManagementServer) GetCapacity(context.Context, *ParticipantCapacityQuery) (*ParticipantCapacitySnapshot, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetCapacity not implemented")
+}
+func (UnimplementedParticipantManagementServer) mustEmbedUnimplementedParticipantManagementServer() {}
+func (UnimplementedParticipantManagementServer) testEmbeddedByValue()                               {}
+
+// UnsafeParticipantManagementServer may be embedded to opt out of forward compatibility for this service.
+// Use of this interface is not recommended, as added methods to ParticipantManagementServer will
+// result in compilation errors.
+type UnsafeParticipantManagementServer interface {
+	mustEmbedUnimplementedParticipantManagementServer()
+}
+
+func RegisterParticipantManagementServer(s grpc.ServiceRegistrar, srv ParticipantManagementServer) {
+	// If the following call panics, it indicates UnimplementedParticipantManagementServer was
+	// embedded by pointer and is nil.  This will cause panics if an
+	// unimplemented method is ever invoked, so we test this at initialization
+	// time to prevent it from happening at runtime later due to I/O.
+	if t, ok := srv.(interface{ testEmbeddedByValue() }); ok {
+		t.testEmbeddedByValue()
+	}
+	s.RegisterService(&ParticipantManagement_ServiceDesc, srv)
+}
+
+func _ParticipantManagement_GetCapacity_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ParticipantCapacityQuery)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ParticipantManagementServer).GetCapacity(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ParticipantManagement_GetCapacity_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ParticipantManagementServer).GetCapacity(ctx, req.(*ParticipantCapacityQuery))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+// ParticipantManagement_ServiceDesc is the grpc.ServiceDesc for ParticipantManagement service.
+// It's only intended for direct use with grpc.RegisterService,
+// and not to be introspected or modified (even as a copy)
+var ParticipantManagement_ServiceDesc = grpc.ServiceDesc{
+	ServiceName: "qsai.workflow.v1.ParticipantManagement",
+	HandlerType: (*ParticipantManagementServer)(nil),
+	Methods: []grpc.MethodDesc{
+		{
+			MethodName: "GetCapacity",
+			Handler:    _ParticipantManagement_GetCapacity_Handler,
+		},
+	},
+	Streams:  []grpc.StreamDesc{},
+	Metadata: "aiworkflow/workflow.proto",
+}

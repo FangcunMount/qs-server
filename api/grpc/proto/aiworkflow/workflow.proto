@@ -602,3 +602,50 @@ message EvaluationCapacitySnapshot {
  repeated EvaluationCapacityReservation reservations = 11;
  bool reservations_truncated = 12;
 }
+
+// QS supplies current organization administrator authority over mTLS.
+service ParticipantManagement {
+ rpc GetCapacity(ParticipantCapacityQuery) returns (ParticipantCapacitySnapshot);
+}
+message ParticipantCapacityQuery {
+ PublicationScope scope = 1;
+ string subject_id = 2;
+ string assessment_id = 3;
+}
+message ParticipantCapacityPolicy {
+ int64 daily_org = 1;
+ int64 daily_user = 2;
+ int64 daily_assessment = 3;
+ int64 active_org = 4;
+ int64 active_user = 5;
+ int64 active_assessment = 6;
+}
+message ParticipantCapacityUsage {
+ string identity = 1;
+ int64 daily_reserved = 2;
+ int64 daily_remaining = 3;
+ int64 active = 4;
+ int64 active_remaining = 5;
+}
+message ParticipantReservation {
+ string run_id = 1;
+ string session_id = 2;
+ string subject_id = 3;
+ repeated string assessment_ids = 4;
+ string budget_day = 5;
+ string reserved_at = 6;
+ bool active = 7;
+ string acquired_at = 8;
+}
+message ParticipantCapacitySnapshot {
+ int64 organization_id = 1;
+ string budget_day = 2;
+ ParticipantCapacityPolicy policy = 3;
+ ParticipantCapacityUsage organization = 4;
+ ParticipantCapacityUsage subject = 5;
+ ParticipantCapacityUsage assessment = 6;
+ repeated ParticipantReservation daily_reservations = 7;
+ repeated ParticipantReservation active_reservations = 8;
+ bool daily_truncated = 9;
+ bool active_truncated = 10;
+}

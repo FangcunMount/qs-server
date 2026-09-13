@@ -12032,6 +12032,76 @@ const docTemplate = `{
                 }
             }
         },
+        "/internal/v2/interpretation/ai-workflow/participant-capacity": {
+            "get": {
+                "description": "当前机构 OrgAdmin 权限。三级额度和活动名额由 AI 计算；过滤参数只选择查询对象，不更改调用身份。查询不会启动或重试生成。",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "AI-Workflow-Management"
+                ],
+                "summary": "查询 qs-ai 参与者生成容量",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "可选的原参与者主体标识",
+                        "name": "subject_id",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "可选的原测评 ID",
+                        "name": "assessment_id",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/aibridge.ParticipantCapacity"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/internal/v2/interpretation/ai-workflow/profiles/commands/{command_id}": {
             "get": {
                 "description": "需要当前机构解读审计权限，仅原机构及原操作人可查询。不重发注册，不触发发布。",
@@ -14587,6 +14657,122 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "validator_version": {
+                    "type": "string"
+                }
+            }
+        },
+        "aibridge.ParticipantCapacity": {
+            "type": "object",
+            "properties": {
+                "active_reservations": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/aibridge.ParticipantReservation"
+                    }
+                },
+                "active_truncated": {
+                    "type": "boolean"
+                },
+                "assessment": {
+                    "$ref": "#/definitions/aibridge.ParticipantCapacityUsage"
+                },
+                "budget_day": {
+                    "type": "string"
+                },
+                "daily_reservations": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/aibridge.ParticipantReservation"
+                    }
+                },
+                "daily_truncated": {
+                    "type": "boolean"
+                },
+                "organization": {
+                    "$ref": "#/definitions/aibridge.ParticipantCapacityUsage"
+                },
+                "organization_id": {
+                    "type": "integer"
+                },
+                "policy": {
+                    "$ref": "#/definitions/aibridge.ParticipantCapacityPolicy"
+                },
+                "subject": {
+                    "$ref": "#/definitions/aibridge.ParticipantCapacityUsage"
+                }
+            }
+        },
+        "aibridge.ParticipantCapacityPolicy": {
+            "type": "object",
+            "properties": {
+                "active_assessment": {
+                    "type": "integer"
+                },
+                "active_org": {
+                    "type": "integer"
+                },
+                "active_user": {
+                    "type": "integer"
+                },
+                "daily_assessment": {
+                    "type": "integer"
+                },
+                "daily_org": {
+                    "type": "integer"
+                },
+                "daily_user": {
+                    "type": "integer"
+                }
+            }
+        },
+        "aibridge.ParticipantCapacityUsage": {
+            "type": "object",
+            "properties": {
+                "active": {
+                    "type": "integer"
+                },
+                "active_remaining": {
+                    "type": "integer"
+                },
+                "daily_remaining": {
+                    "type": "integer"
+                },
+                "daily_reserved": {
+                    "type": "integer"
+                },
+                "identity": {
+                    "type": "string"
+                }
+            }
+        },
+        "aibridge.ParticipantReservation": {
+            "type": "object",
+            "properties": {
+                "acquired_at": {
+                    "type": "string"
+                },
+                "active": {
+                    "type": "boolean"
+                },
+                "assessment_ids": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "budget_day": {
+                    "type": "string"
+                },
+                "reserved_at": {
+                    "type": "string"
+                },
+                "run_id": {
+                    "type": "string"
+                },
+                "session_id": {
+                    "type": "string"
+                },
+                "subject_id": {
                     "type": "string"
                 }
             }
