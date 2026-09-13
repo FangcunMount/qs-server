@@ -11,6 +11,16 @@ import (
 )
 
 func (s *ReadStore) ScopedClinicians(ctx context.Context, orgID int64, stores authz.StoreRange, clinicianID *uint64, operatorUserID *int64, from, to time.Time, page, size int) ([]app.ClinicianItem, int64, error) {
+	return s.scopedClinicians(ctx, orgID, stores, clinicianID, operatorUserID, from, to, page, size, nil)
+}
+
+func (s *ReadStore) ScopedClinicianAnalysis(ctx context.Context, orgID int64, stores authz.StoreRange, from, to time.Time, page, size int) ([]app.ClinicianItem, int64, app.ClinicianSummary, error) {
+	var summary app.ClinicianSummary
+	items, total, err := s.scopedClinicians(ctx, orgID, stores, nil, nil, from, to, page, size, &summary)
+	return items, total, summary, err
+}
+
+func (s *ReadStore) scopedClinicians(ctx context.Context, orgID int64, stores authz.StoreRange, clinicianID *uint64, operatorUserID *int64, from, to time.Time, page, size int, summary *app.ClinicianSummary) ([]app.ClinicianItem, int64, error) {
 	if orgID <= 0 || page < 1 || size < 1 || size > 100 {
 		return nil, 0, fmt.Errorf("invalid scoped clinician query")
 	}
@@ -38,13 +48,31 @@ func (s *ReadStore) ScopedClinicians(ctx context.Context, orgID int64, stores au
 		owners := applyCurrentStoreRange(tx.Table("testee").Select("id").Where("org_id=? AND deleted_at IS NULL", orgID), "store_id", stores)
 		relations := tx.Table("clinician_relation").Where("org_id=? AND is_active=1 AND deleted_at IS NULL", orgID).Where("testee_id IN (?)", owners).Select(`clinician_id,COUNT(DISTINCT CASE WHEN relation_type='primary' THEN testee_id END) primary_testee_count,COUNT(DISTINCT CASE WHEN relation_type='attending' THEN testee_id END) attending_testee_count,COUNT(DISTINCT CASE WHEN relation_type='collaborator' THEN testee_id END) collaborator_testee_count,COUNT(DISTINCT testee_id) total_accessible_testees`).Group("clinician_id")
 		entries := tx.Table("assessment_entry").Where("org_id=? AND is_active=1 AND deleted_at IS NULL", orgID).Select("clinician_id,COUNT(*) active_entry_count").Group("clinician_id")
-		return base.Joins("LEFT JOIN (?) a ON a.clinician_id=c.id", access).Joins("LEFT JOIN (?) e ON e.clinician_id=c.id", assessments).Joins("LEFT JOIN (?) r ON r.clinician_id=c.id", relations).Joins("LEFT JOIN (?) en ON en.clinician_id=c.id", entries).Select(`c.id,c.name,c.department,c.title,c.clinician_type,c.is_active,
+		result := base.Joins("LEFT JOIN (?) a ON a.clinician_id=c.id", access).Joins("LEFT JOIN (?) e ON e.clinician_id=c.id", assessments).Joins("LEFT JOIN (?) r ON r.clinician_id=c.id", relations).Joins("LEFT JOIN (?) en ON en.clinician_id=c.id", entries).Select(`c.id,c.name,c.department,c.title,c.clinician_type,c.is_active,
  COALESCE(a.entry_opened_count,0) entry_opened_count,COALESCE(a.intake_confirmed_count,0) intake_confirmed_count,COALESCE(a.care_relationship_established_count,0) care_relationship_established_count,
  COALESCE(e.assessment_created_count,0) assessment_created_count,COALESCE(e.outcome_committed_count,0) outcome_committed_count,COALESCE(e.report_generated_count,0) report_generated_count,
- COALESCE(r.primary_testee_count,0) primary_testee_count,COALESCE(r.attending_testee_count,0) attending_testee_count,COALESCE(r.collaborator_testee_count,0) collaborator_testee_count,COALESCE(r.total_accessible_testees,0) total_accessible_testees,COALESCE(en.active_entry_count,0) active_entry_count`).Order("c.id").Offset((page - 1) * size).Limit(size).Scan(&items).Error
+ COALESCE(r.primary_testee_count,0) primary_testee_count,COALESCE(r.attending_testee_count,0) attending_testee_count,COALESCE(r.collaborator_testee_count,0) collaborator_testee_count,COALESCE(r.total_accessible_testees,0) total_accessible_testees,COALESCE(en.active_entry_count,0) active_entry_count`)
+		if summary != nil {
+			if err := tx.Table("(?) AS scoped_clinicians", result.Session(&gorm.Session{})).Select(`COUNT(*) clinician_count,COALESCE(SUM(is_active=1),0) active_clinician_count,COALESCE(SUM(intake_confirmed_count>0),0) clinicians_with_intake,COALESCE(SUM(intake_confirmed_count),0) intake_confirmed_count,COALESCE(SUM(report_generated_count),0) report_generated_count`).Scan(summary).Error; err != nil {
+				return err
+			}
+		}
+		return result.Order("c.id").Offset((page - 1) * size).Limit(size).Scan(&items).Error
 	}, &sql.TxOptions{Isolation: sql.LevelRepeatableRead, ReadOnly: true})
 	if err != nil {
 		return nil, 0, err
 	}
 	return items, total, nil
+}
+
+// ScopedAnalysisClinicianVisible validates an optional filter without loading professional details.
+func (s *ReadStore) ScopedAnalysisClinicianVisible(ctx context.Context, org int64, stores authz.StoreRange, id uint64) (bool, error) {
+	ctx, release, err := s.acquire(ctx)
+	if err != nil {
+		return false, err
+	}
+	defer release()
+	var count int64
+	err = applyCurrentStoreRange(s.db.WithContext(ctx).Table("clinician").Where("org_id=? AND id=? AND deleted_at IS NULL", org, id), "store_id", stores).Count(&count).Error
+	return count > 0, err
 }

@@ -121,7 +121,16 @@ func coversOperationWindow(windows []domain.InstantRange, requested domain.Insta
 	}
 	return false
 }
-func (s *ReadService) Operations(ctx context.Context, org int64, filter OperationsFilter) (*OperationsOverview, error) {
+
+type operationQuery struct {
+	reader            OperationsStore
+	stores            authz.StoreRange
+	requested, window domain.InstantRange
+	published         *Snapshot
+	population        []OperationStore
+}
+
+func (s *ReadService) prepareOperations(ctx context.Context, org int64, filter OperationsFilter) (*operationQuery, error) {
 	if err := authz.RequirePermission(ctx, OperationsResource, "read"); err != nil {
 		return nil, err
 	}
@@ -171,6 +180,15 @@ func (s *ReadService) Operations(ctx context.Context, org int64, filter Operatio
 	if err != nil {
 		return nil, err
 	}
+	return &operationQuery{reader: reader, stores: stores, requested: requested, window: window, published: published, population: population}, nil
+}
+
+func (s *ReadService) Operations(ctx context.Context, org int64, filter OperationsFilter) (*OperationsOverview, error) {
+	q, err := s.prepareOperations(ctx, org, filter)
+	if err != nil {
+		return nil, err
+	}
+	reader, stores, requested, window, published, population := q.reader, q.stores, q.requested, q.window, q.published, q.population
 	var activity []ActivityRow
 	key := cacheKey("operations-v1", published.VisibleRunID, stores, window.From, window.To)
 	hit, _ := s.cacheGet(ctx, org, key, &activity)

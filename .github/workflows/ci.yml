@@ -128,7 +128,7 @@ jobs:
         run: |
           docker exec "$MYSQL_CONTAINER" mysql -uroot -proot -e 'CREATE DATABASE qs_scope_test_ci'
           trap 'docker exec "$MYSQL_CONTAINER" mysql -uroot -proot -e "DROP DATABASE qs_scope_test_ci"' EXIT
-          go test ./internal/apiserver/infra/mysql/statistics -run '^TestScopedOverviewMySQL$' -count=1 -v
+          go test ./internal/apiserver/infra/mysql/statistics -run '^TestScoped(Overview|ClinicianAnalysis)MySQL$' -count=1 -v
       - name: Verify Actor activity persistence and current-read serialization
         env:
           MYSQL_CONTAINER: ${{ job.services.mysql.id }}

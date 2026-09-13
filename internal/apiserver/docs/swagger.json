@@ -7456,6 +7456,222 @@
                 }
             }
         },
+        "/api/v2/statistics/operations/analysis/clinicians": {
+            "get": {
+                "tags": [
+                    "Statistics"
+                ],
+                "summary": "当前门店临床人员分页与全范围汇总",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "上海日期，包含",
+                        "name": "from",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "上海日期，不包含",
+                        "name": "to",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "授权门店 ID 集合",
+                        "name": "store_ids",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "页码，默认 1",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "每页数量，默认 20，最多 100",
+                        "name": "page_size",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/statistics.AnalysisClinicianPage"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "503": {
+                        "description": "Service Unavailable",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v2/statistics/operations/analysis/entries": {
+            "get": {
+                "tags": [
+                    "Statistics"
+                ],
+                "summary": "当前门店入口统计，不包含二维码凭证",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "上海日期，包含",
+                        "name": "from",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "上海日期，不包含",
+                        "name": "to",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "授权门店 ID 集合",
+                        "name": "store_ids",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "页码，默认 1",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "每页数量，默认 20，最多 100",
+                        "name": "page_size",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "医生 ID",
+                        "name": "clinician_id",
+                        "in": "query"
+                    },
+                    {
+                        "type": "boolean",
+                        "description": "启用状态",
+                        "name": "is_active",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/statistics.AnalysisEntryPage"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "503": {
+                        "description": "Service Unavailable",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v2/statistics/operations/analysis/overview": {
+            "get": {
+                "tags": [
+                    "Statistics"
+                ],
+                "summary": "当前服务归属范围内的服务与计划统计",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "上海日期，包含",
+                        "name": "from",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "上海日期，不包含",
+                        "name": "to",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "门店字符串 ID，逗号分隔，必须为授权子集",
+                        "name": "store_ids",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/statistics.AnalysisOverview"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "503": {
+                        "description": "Service Unavailable",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v2/statistics/operations/overview": {
             "get": {
                 "tags": [
@@ -22772,6 +22988,274 @@
                 }
             }
         },
+        "statistics.AnalysisClinician": {
+            "type": "object",
+            "properties": {
+                "active_entry_count": {
+                    "type": "integer"
+                },
+                "assessment_created_count": {
+                    "type": "integer"
+                },
+                "attending_testee_count": {
+                    "type": "integer"
+                },
+                "care_relationship_established_count": {
+                    "type": "integer"
+                },
+                "clinician_type": {
+                    "type": "string"
+                },
+                "collaborator_testee_count": {
+                    "type": "integer"
+                },
+                "department": {
+                    "type": "string"
+                },
+                "entry_opened_count": {
+                    "type": "integer"
+                },
+                "id": {
+                    "type": "string",
+                    "example": ""
+                },
+                "intake_confirmed_count": {
+                    "type": "integer"
+                },
+                "is_active": {
+                    "type": "boolean"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "outcome_committed_count": {
+                    "type": "integer"
+                },
+                "primary_testee_count": {
+                    "type": "integer"
+                },
+                "report_generated_count": {
+                    "type": "integer"
+                },
+                "title": {
+                    "type": "string"
+                },
+                "total_accessible_testees": {
+                    "type": "integer"
+                }
+            }
+        },
+        "statistics.AnalysisClinicianPage": {
+            "type": "object",
+            "properties": {
+                "current_ownership_read_at": {
+                    "type": "string"
+                },
+                "data_through": {
+                    "type": "string"
+                },
+                "from": {
+                    "type": "string"
+                },
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/statistics.AnalysisClinician"
+                    }
+                },
+                "page": {
+                    "type": "integer"
+                },
+                "page_size": {
+                    "type": "integer"
+                },
+                "published_at": {
+                    "type": "string"
+                },
+                "published_version": {
+                    "type": "string",
+                    "example": ""
+                },
+                "scope": {
+                    "type": "string"
+                },
+                "stores": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/statistics.AnalysisStore"
+                    }
+                },
+                "summary": {
+                    "$ref": "#/definitions/statistics.ClinicianSummary"
+                },
+                "to_exclusive": {
+                    "type": "string"
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
+        "statistics.AnalysisEntry": {
+            "type": "object",
+            "properties": {
+                "assessment_created_count": {
+                    "type": "integer"
+                },
+                "clinician_id": {
+                    "type": "string",
+                    "example": ""
+                },
+                "clinician_name": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "entry_opened_count": {
+                    "type": "integer"
+                },
+                "expires_at": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string",
+                    "example": ""
+                },
+                "intake_confirmed_count": {
+                    "type": "integer"
+                },
+                "is_active": {
+                    "type": "boolean"
+                },
+                "outcome_committed_count": {
+                    "type": "integer"
+                },
+                "report_generated_count": {
+                    "type": "integer"
+                },
+                "target_code": {
+                    "type": "string"
+                },
+                "target_type": {
+                    "type": "string"
+                },
+                "target_version": {
+                    "type": "string"
+                }
+            }
+        },
+        "statistics.AnalysisEntryPage": {
+            "type": "object",
+            "properties": {
+                "current_ownership_read_at": {
+                    "type": "string"
+                },
+                "data_through": {
+                    "type": "string"
+                },
+                "from": {
+                    "type": "string"
+                },
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/statistics.AnalysisEntry"
+                    }
+                },
+                "page": {
+                    "type": "integer"
+                },
+                "page_size": {
+                    "type": "integer"
+                },
+                "published_at": {
+                    "type": "string"
+                },
+                "published_version": {
+                    "type": "string",
+                    "example": ""
+                },
+                "scope": {
+                    "type": "string"
+                },
+                "stores": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/statistics.AnalysisStore"
+                    }
+                },
+                "to_exclusive": {
+                    "type": "string"
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
+        "statistics.AnalysisOverview": {
+            "type": "object",
+            "properties": {
+                "access_funnel": {
+                    "$ref": "#/definitions/statistics.AccessFunnelStatistics"
+                },
+                "assessment_service": {
+                    "$ref": "#/definitions/statistics.AssessmentServiceStatistics"
+                },
+                "current_ownership_read_at": {
+                    "type": "string"
+                },
+                "data_through": {
+                    "type": "string"
+                },
+                "from": {
+                    "type": "string"
+                },
+                "organization_overview": {
+                    "$ref": "#/definitions/statistics.OrganizationOverview"
+                },
+                "plan": {
+                    "$ref": "#/definitions/statistics.PlanDomainStatistics"
+                },
+                "published_at": {
+                    "type": "string"
+                },
+                "published_version": {
+                    "type": "string",
+                    "example": ""
+                },
+                "scope": {
+                    "type": "string"
+                },
+                "stores": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/statistics.AnalysisStore"
+                    }
+                },
+                "to_exclusive": {
+                    "type": "string"
+                }
+            }
+        },
+        "statistics.AnalysisStore": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string",
+                    "example": ""
+                },
+                "is_active": {
+                    "type": "boolean"
+                },
+                "name": {
+                    "type": "string"
+                }
+            }
+        },
         "statistics.AssessmentServiceStatistics": {
             "type": "object",
             "properties": {
@@ -22881,6 +23365,26 @@
                     "type": "string"
                 },
                 "total_accessible_testees": {
+                    "type": "integer"
+                }
+            }
+        },
+        "statistics.ClinicianSummary": {
+            "type": "object",
+            "properties": {
+                "active_clinician_count": {
+                    "type": "integer"
+                },
+                "clinician_count": {
+                    "type": "integer"
+                },
+                "clinicians_with_intake": {
+                    "type": "integer"
+                },
+                "intake_confirmed_count": {
+                    "type": "integer"
+                },
+                "report_generated_count": {
                     "type": "integer"
                 }
             }

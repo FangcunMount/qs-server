@@ -6661,6 +6661,185 @@ definitions:
       submissions:
         type: integer
     type: object
+  statistics.AnalysisClinician:
+    properties:
+      active_entry_count:
+        type: integer
+      assessment_created_count:
+        type: integer
+      attending_testee_count:
+        type: integer
+      care_relationship_established_count:
+        type: integer
+      clinician_type:
+        type: string
+      collaborator_testee_count:
+        type: integer
+      department:
+        type: string
+      entry_opened_count:
+        type: integer
+      id:
+        example: ""
+        type: string
+      intake_confirmed_count:
+        type: integer
+      is_active:
+        type: boolean
+      name:
+        type: string
+      outcome_committed_count:
+        type: integer
+      primary_testee_count:
+        type: integer
+      report_generated_count:
+        type: integer
+      title:
+        type: string
+      total_accessible_testees:
+        type: integer
+    type: object
+  statistics.AnalysisClinicianPage:
+    properties:
+      current_ownership_read_at:
+        type: string
+      data_through:
+        type: string
+      from:
+        type: string
+      items:
+        items:
+          $ref: '#/definitions/statistics.AnalysisClinician'
+        type: array
+      page:
+        type: integer
+      page_size:
+        type: integer
+      published_at:
+        type: string
+      published_version:
+        example: ""
+        type: string
+      scope:
+        type: string
+      stores:
+        items:
+          $ref: '#/definitions/statistics.AnalysisStore'
+        type: array
+      summary:
+        $ref: '#/definitions/statistics.ClinicianSummary'
+      to_exclusive:
+        type: string
+      total:
+        type: integer
+    type: object
+  statistics.AnalysisEntry:
+    properties:
+      assessment_created_count:
+        type: integer
+      clinician_id:
+        example: ""
+        type: string
+      clinician_name:
+        type: string
+      created_at:
+        type: string
+      entry_opened_count:
+        type: integer
+      expires_at:
+        type: string
+      id:
+        example: ""
+        type: string
+      intake_confirmed_count:
+        type: integer
+      is_active:
+        type: boolean
+      outcome_committed_count:
+        type: integer
+      report_generated_count:
+        type: integer
+      target_code:
+        type: string
+      target_type:
+        type: string
+      target_version:
+        type: string
+    type: object
+  statistics.AnalysisEntryPage:
+    properties:
+      current_ownership_read_at:
+        type: string
+      data_through:
+        type: string
+      from:
+        type: string
+      items:
+        items:
+          $ref: '#/definitions/statistics.AnalysisEntry'
+        type: array
+      page:
+        type: integer
+      page_size:
+        type: integer
+      published_at:
+        type: string
+      published_version:
+        example: ""
+        type: string
+      scope:
+        type: string
+      stores:
+        items:
+          $ref: '#/definitions/statistics.AnalysisStore'
+        type: array
+      to_exclusive:
+        type: string
+      total:
+        type: integer
+    type: object
+  statistics.AnalysisOverview:
+    properties:
+      access_funnel:
+        $ref: '#/definitions/statistics.AccessFunnelStatistics'
+      assessment_service:
+        $ref: '#/definitions/statistics.AssessmentServiceStatistics'
+      current_ownership_read_at:
+        type: string
+      data_through:
+        type: string
+      from:
+        type: string
+      organization_overview:
+        $ref: '#/definitions/statistics.OrganizationOverview'
+      plan:
+        $ref: '#/definitions/statistics.PlanDomainStatistics'
+      published_at:
+        type: string
+      published_version:
+        example: ""
+        type: string
+      scope:
+        type: string
+      stores:
+        items:
+          $ref: '#/definitions/statistics.AnalysisStore'
+        type: array
+      to_exclusive:
+        type: string
+    type: object
+  statistics.AnalysisStore:
+    properties:
+      code:
+        type: string
+      id:
+        example: ""
+        type: string
+      is_active:
+        type: boolean
+      name:
+        type: string
+    type: object
   statistics.AssessmentServiceStatistics:
     properties:
       trend:
@@ -6733,6 +6912,19 @@ definitions:
       title:
         type: string
       total_accessible_testees:
+        type: integer
+    type: object
+  statistics.ClinicianSummary:
+    properties:
+      active_clinician_count:
+        type: integer
+      clinician_count:
+        type: integer
+      clinicians_with_intake:
+        type: integer
+      intake_confirmed_count:
+        type: integer
+      report_generated_count:
         type: integer
     type: object
   statistics.ContentBatch:
@@ -12764,6 +12956,138 @@ paths:
           schema:
             $ref: '#/definitions/core.ErrResponse'
       summary: 查询 Statistics 入口详情
+      tags:
+      - Statistics
+  /api/v2/statistics/operations/analysis/clinicians:
+    get:
+      parameters:
+      - description: 上海日期，包含
+        in: query
+        name: from
+        type: string
+      - description: 上海日期，不包含
+        in: query
+        name: to
+        type: string
+      - description: 授权门店 ID 集合
+        in: query
+        name: store_ids
+        type: string
+      - description: 页码，默认 1
+        in: query
+        name: page
+        type: integer
+      - description: 每页数量，默认 20，最多 100
+        in: query
+        name: page_size
+        type: integer
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/statistics.AnalysisClinicianPage'
+              type: object
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+      summary: 当前门店临床人员分页与全范围汇总
+      tags:
+      - Statistics
+  /api/v2/statistics/operations/analysis/entries:
+    get:
+      parameters:
+      - description: 上海日期，包含
+        in: query
+        name: from
+        type: string
+      - description: 上海日期，不包含
+        in: query
+        name: to
+        type: string
+      - description: 授权门店 ID 集合
+        in: query
+        name: store_ids
+        type: string
+      - description: 页码，默认 1
+        in: query
+        name: page
+        type: integer
+      - description: 每页数量，默认 20，最多 100
+        in: query
+        name: page_size
+        type: integer
+      - description: 医生 ID
+        in: query
+        name: clinician_id
+        type: string
+      - description: 启用状态
+        in: query
+        name: is_active
+        type: boolean
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/statistics.AnalysisEntryPage'
+              type: object
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+      summary: 当前门店入口统计，不包含二维码凭证
+      tags:
+      - Statistics
+  /api/v2/statistics/operations/analysis/overview:
+    get:
+      parameters:
+      - description: 上海日期，包含
+        in: query
+        name: from
+        type: string
+      - description: 上海日期，不包含
+        in: query
+        name: to
+        type: string
+      - description: 门店字符串 ID，逗号分隔，必须为授权子集
+        in: query
+        name: store_ids
+        type: string
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/statistics.AnalysisOverview'
+              type: object
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+      summary: 当前服务归属范围内的服务与计划统计
       tags:
       - Statistics
   /api/v2/statistics/operations/overview:

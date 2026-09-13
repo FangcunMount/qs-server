@@ -55,3 +55,45 @@ func TestScopedOverviewMySQL(t *testing.T) {
 	require.Zero(t, result.Trends.PlanFulfillment.Due[0].Count)
 	read(8)
 }
+
+func TestScopedClinicianAnalysisMySQL(t *testing.T) {
+	dsn := os.Getenv("QS_SCOPE_MYSQL_DSN")
+	if dsn == "" {
+		if os.Getenv("QS_SCOPE_MYSQL_REQUIRED") == "1" {
+			t.Fatal("QS_SCOPE_MYSQL_DSN is required")
+		}
+		t.Skip("isolated MySQL DSN not configured")
+	}
+	db, err := gorm.Open(mysql.Open(dsn), &gorm.Config{})
+	require.NoError(t, err)
+	conn, err := db.DB()
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = conn.Close() })
+	var name string
+	require.NoError(t, db.Raw("SELECT DATABASE()").Scan(&name).Error)
+	require.True(t, strings.HasPrefix(name, "qs_scope_test_"), "requires isolated database")
+	for _, table := range []string{"clinician", "testee", "assessment_entry", "clinician_relation", "statistics_access_fact", "statistics_assessment_fact"} {
+		require.NoError(t, db.Exec("DROP TABLE IF EXISTS "+table).Error)
+	}
+	createScopedClinicianFixture(t, db)
+	from := time.Date(2026, 9, 1, 0, 0, 0, 0, time.UTC)
+	require.NoError(t, db.Exec("INSERT INTO statistics_assessment_fact VALUES(1,10,1,20,'report_generated',?),(1,10,2,20,'report_generated',?)", from, from).Error)
+	reader := NewReadStore(db, nil)
+	items, total, summary, err := reader.ScopedClinicianAnalysis(context.Background(), 1, authz.StoreRange{StoreIDs: []uint64{7}}, from, from.AddDate(0, 0, 1), 1, 1)
+	require.NoError(t, err)
+	require.Len(t, items, 1)
+	require.EqualValues(t, 2, total)
+	require.EqualValues(t, 2, summary.ClinicianCount)
+	require.EqualValues(t, 1, summary.ReportGeneratedCount)
+	require.NoError(t, db.Exec("UPDATE clinician SET store_id=8 WHERE id=10").Error)
+	items, total, summary, err = reader.ScopedClinicianAnalysis(context.Background(), 1, authz.StoreRange{StoreIDs: []uint64{7}}, from, from.AddDate(0, 0, 1), 1, 1)
+	require.NoError(t, err)
+	require.Len(t, items, 1)
+	require.EqualValues(t, 11, items[0].ID)
+	require.EqualValues(t, 1, total)
+	require.Zero(t, summary.ReportGeneratedCount)
+	population, err := reader.scopedFacts(context.Background(), 1, authz.StoreRange{StoreIDs: []uint64{7}}, "statistics_assessment_fact").Rows()
+	require.NoError(t, err)
+	defer func() { require.NoError(t, population.Close()) }()
+	require.True(t, population.Next(), "subject history stays in original store after doctor transfer")
+}
