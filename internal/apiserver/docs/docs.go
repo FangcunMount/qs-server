@@ -11267,6 +11267,90 @@ const docTemplate = `{
                 }
             }
         },
+        "/internal/v2/interpretation/ai-workflow/evaluations/{run_id}/result-unknown": {
+            "get": {
+                "description": "需要当前机构解读审计权限及当前任务版本。返回原调用、失败阶段和预算，不返回模型正文；活动执行或版本变化返回冲突。允许替代仅为快照提示，处置时重新校验。",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "AI-Workflow-Management"
+                ],
+                "summary": "查询 qs-ai 未处置的未知调用明细",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "评测 Run UUID",
+                        "name": "run_id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "列表返回的 Run 版本",
+                        "name": "expected_version",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/aibridge.EvaluationUnknownIndex"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/internal/v2/interpretation/ai-workflow/evaluations/{run_id}/result-unknown/resolve": {
             "post": {
                 "description": "需要当前机构 OrgAdmin 权限；组织和操作人取认证上下文。管理功能默认关闭。\n需确认重复调用和费用风险；超时后先查询状态，不自动重试。",
@@ -13641,6 +13725,91 @@ const docTemplate = `{
                     "items": {
                         "type": "object"
                     }
+                },
+                "run_id": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "unresolved_result_unknown_count": {
+                    "type": "integer"
+                },
+                "version": {
+                    "type": "integer"
+                }
+            }
+        },
+        "aibridge.EvaluationUnknownExecution": {
+            "type": "object",
+            "properties": {
+                "candidate_id": {
+                    "type": "string"
+                },
+                "case_id": {
+                    "type": "string"
+                },
+                "execution_id": {
+                    "type": "string"
+                },
+                "execution_ordinal": {
+                    "type": "integer"
+                },
+                "failure_code": {
+                    "type": "string"
+                },
+                "failure_stage": {
+                    "type": "string"
+                },
+                "finished_at": {
+                    "type": "string"
+                },
+                "invocation_id": {
+                    "type": "string"
+                },
+                "kind": {
+                    "type": "string"
+                },
+                "provider_call_count": {
+                    "type": "integer"
+                },
+                "replacement_allowed": {
+                    "type": "boolean"
+                },
+                "slot_ordinal": {
+                    "type": "integer"
+                },
+                "stage_execution_count": {
+                    "type": "integer"
+                },
+                "stage_execution_limit": {
+                    "type": "integer"
+                },
+                "started_at": {
+                    "type": "string"
+                },
+                "target_execution_count": {
+                    "type": "integer"
+                },
+                "target_execution_limit": {
+                    "type": "integer"
+                }
+            }
+        },
+        "aibridge.EvaluationUnknownIndex": {
+            "type": "object",
+            "properties": {
+                "can_resolve": {
+                    "type": "boolean"
+                },
+                "executions": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/aibridge.EvaluationUnknownExecution"
+                    }
+                },
+                "release_fingerprint": {
+                    "type": "string"
                 },
                 "run_id": {
                     "type": "string"

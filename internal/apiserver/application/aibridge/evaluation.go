@@ -43,6 +43,7 @@ type EvaluationState struct {
 	Creation                     *EvaluationCreationReceipt `json:"creation,omitempty"`
 }
 type EvaluationGateway interface {
+	ListEvaluationUnknowns(context.Context, EvaluationScope, int64) (EvaluationUnknownIndex, error)
 	PrepareEvaluation(context.Context, DraftScope, EvaluationPlanQuery) (EvaluationPlan, error)
 	ReopenEvaluationReview(context.Context, EvaluationScope, EvaluationReopen) (EvaluationState, error)
 	FinalizeEvaluation(context.Context, EvaluationScope, EvaluationFinalize) (EvaluationState, error)

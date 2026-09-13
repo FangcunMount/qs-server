@@ -252,6 +252,62 @@ definitions:
       version:
         type: integer
     type: object
+  aibridge.EvaluationUnknownExecution:
+    properties:
+      candidate_id:
+        type: string
+      case_id:
+        type: string
+      execution_id:
+        type: string
+      execution_ordinal:
+        type: integer
+      failure_code:
+        type: string
+      failure_stage:
+        type: string
+      finished_at:
+        type: string
+      invocation_id:
+        type: string
+      kind:
+        type: string
+      provider_call_count:
+        type: integer
+      replacement_allowed:
+        type: boolean
+      slot_ordinal:
+        type: integer
+      stage_execution_count:
+        type: integer
+      stage_execution_limit:
+        type: integer
+      started_at:
+        type: string
+      target_execution_count:
+        type: integer
+      target_execution_limit:
+        type: integer
+    type: object
+  aibridge.EvaluationUnknownIndex:
+    properties:
+      can_resolve:
+        type: boolean
+      executions:
+        items:
+          $ref: '#/definitions/aibridge.EvaluationUnknownExecution'
+        type: array
+      release_fingerprint:
+        type: string
+      run_id:
+        type: string
+      status:
+        type: string
+      unresolved_result_unknown_count:
+        type: integer
+      version:
+        type: integer
+    type: object
   aibridge.FreezePromptDraft:
     properties:
       command_id:
@@ -15296,6 +15352,59 @@ paths:
           schema:
             $ref: '#/definitions/core.ErrResponse'
       summary: 重开 qs-ai 评测语义复核
+      tags:
+      - AI-Workflow-Management
+  /internal/v2/interpretation/ai-workflow/evaluations/{run_id}/result-unknown:
+    get:
+      description: 需要当前机构解读审计权限及当前任务版本。返回原调用、失败阶段和预算，不返回模型正文；活动执行或版本变化返回冲突。允许替代仅为快照提示，处置时重新校验。
+      parameters:
+      - description: 评测 Run UUID
+        in: path
+        name: run_id
+        required: true
+        type: string
+      - description: 列表返回的 Run 版本
+        in: query
+        name: expected_version
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/aibridge.EvaluationUnknownIndex'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+      summary: 查询 qs-ai 未处置的未知调用明细
       tags:
       - AI-Workflow-Management
   /internal/v2/interpretation/ai-workflow/evaluations/{run_id}/result-unknown/resolve:

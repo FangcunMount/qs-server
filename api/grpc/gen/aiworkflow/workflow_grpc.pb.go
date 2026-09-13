@@ -261,17 +261,18 @@ var Results_ServiceDesc = grpc.ServiceDesc{
 }
 
 const (
-	EvaluationManagement_Prepare_FullMethodName        = "/qsai.workflow.v1.EvaluationManagement/Prepare"
-	EvaluationManagement_Create_FullMethodName         = "/qsai.workflow.v1.EvaluationManagement/Create"
-	EvaluationManagement_Start_FullMethodName          = "/qsai.workflow.v1.EvaluationManagement/Start"
-	EvaluationManagement_Get_FullMethodName            = "/qsai.workflow.v1.EvaluationManagement/Get"
-	EvaluationManagement_ResolveUnknown_FullMethodName = "/qsai.workflow.v1.EvaluationManagement/ResolveUnknown"
-	EvaluationManagement_Review_FullMethodName         = "/qsai.workflow.v1.EvaluationManagement/Review"
-	EvaluationManagement_ListCandidates_FullMethodName = "/qsai.workflow.v1.EvaluationManagement/ListCandidates"
-	EvaluationManagement_GetCandidate_FullMethodName   = "/qsai.workflow.v1.EvaluationManagement/GetCandidate"
-	EvaluationManagement_PreviewGates_FullMethodName   = "/qsai.workflow.v1.EvaluationManagement/PreviewGates"
-	EvaluationManagement_Finalize_FullMethodName       = "/qsai.workflow.v1.EvaluationManagement/Finalize"
-	EvaluationManagement_ReopenReview_FullMethodName   = "/qsai.workflow.v1.EvaluationManagement/ReopenReview"
+	EvaluationManagement_Prepare_FullMethodName               = "/qsai.workflow.v1.EvaluationManagement/Prepare"
+	EvaluationManagement_Create_FullMethodName                = "/qsai.workflow.v1.EvaluationManagement/Create"
+	EvaluationManagement_Start_FullMethodName                 = "/qsai.workflow.v1.EvaluationManagement/Start"
+	EvaluationManagement_Get_FullMethodName                   = "/qsai.workflow.v1.EvaluationManagement/Get"
+	EvaluationManagement_ListUnknownExecutions_FullMethodName = "/qsai.workflow.v1.EvaluationManagement/ListUnknownExecutions"
+	EvaluationManagement_ResolveUnknown_FullMethodName        = "/qsai.workflow.v1.EvaluationManagement/ResolveUnknown"
+	EvaluationManagement_Review_FullMethodName                = "/qsai.workflow.v1.EvaluationManagement/Review"
+	EvaluationManagement_ListCandidates_FullMethodName        = "/qsai.workflow.v1.EvaluationManagement/ListCandidates"
+	EvaluationManagement_GetCandidate_FullMethodName          = "/qsai.workflow.v1.EvaluationManagement/GetCandidate"
+	EvaluationManagement_PreviewGates_FullMethodName          = "/qsai.workflow.v1.EvaluationManagement/PreviewGates"
+	EvaluationManagement_Finalize_FullMethodName              = "/qsai.workflow.v1.EvaluationManagement/Finalize"
+	EvaluationManagement_ReopenReview_FullMethodName          = "/qsai.workflow.v1.EvaluationManagement/ReopenReview"
 )
 
 // EvaluationManagementClient is the client API for EvaluationManagement service.
@@ -287,6 +288,8 @@ type EvaluationManagementClient interface {
 	// Explicitly schedules an existing frozen requested Run; does not call a model inline.
 	Start(ctx context.Context, in *EvaluationStartCommand, opts ...grpc.CallOption) (*EvaluationState, error)
 	Get(ctx context.Context, in *EvaluationQuery, opts ...grpc.CallOption) (*EvaluationState, error)
+	// Read-only version-bound uncertain calls and frozen budget; never authorizes a retry.
+	ListUnknownExecutions(ctx context.Context, in *EvaluationUnknownQuery, opts ...grpc.CallOption) (*EvaluationUnknownIndex, error)
 	ResolveUnknown(ctx context.Context, in *UnknownResolutionCommand, opts ...grpc.CallOption) (*EvaluationState, error)
 	// QS authorizes the selected review role; AI records the trusted operator and server time.
 	Review(ctx context.Context, in *EvaluationReviewCommand, opts ...grpc.CallOption) (*EvaluationState, error)
@@ -342,6 +345,16 @@ func (c *evaluationManagementClient) Get(ctx context.Context, in *EvaluationQuer
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(EvaluationState)
 	err := c.cc.Invoke(ctx, EvaluationManagement_Get_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *evaluationManagementClient) ListUnknownExecutions(ctx context.Context, in *EvaluationUnknownQuery, opts ...grpc.CallOption) (*EvaluationUnknownIndex, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(EvaluationUnknownIndex)
+	err := c.cc.Invoke(ctx, EvaluationManagement_ListUnknownExecutions_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -431,6 +444,8 @@ type EvaluationManagementServer interface {
 	// Explicitly schedules an existing frozen requested Run; does not call a model inline.
 	Start(context.Context, *EvaluationStartCommand) (*EvaluationState, error)
 	Get(context.Context, *EvaluationQuery) (*EvaluationState, error)
+	// Read-only version-bound uncertain calls and frozen budget; never authorizes a retry.
+	ListUnknownExecutions(context.Context, *EvaluationUnknownQuery) (*EvaluationUnknownIndex, error)
 	ResolveUnknown(context.Context, *UnknownResolutionCommand) (*EvaluationState, error)
 	// QS authorizes the selected review role; AI records the trusted operator and server time.
 	Review(context.Context, *EvaluationReviewCommand) (*EvaluationState, error)
@@ -463,6 +478,9 @@ func (UnimplementedEvaluationManagementServer) Start(context.Context, *Evaluatio
 }
 func (UnimplementedEvaluationManagementServer) Get(context.Context, *EvaluationQuery) (*EvaluationState, error) {
 	return nil, status.Error(codes.Unimplemented, "method Get not implemented")
+}
+func (UnimplementedEvaluationManagementServer) ListUnknownExecutions(context.Context, *EvaluationUnknownQuery) (*EvaluationUnknownIndex, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListUnknownExecutions not implemented")
 }
 func (UnimplementedEvaluationManagementServer) ResolveUnknown(context.Context, *UnknownResolutionCommand) (*EvaluationState, error) {
 	return nil, status.Error(codes.Unimplemented, "method ResolveUnknown not implemented")
@@ -574,6 +592,24 @@ func _EvaluationManagement_Get_Handler(srv interface{}, ctx context.Context, dec
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(EvaluationManagementServer).Get(ctx, req.(*EvaluationQuery))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _EvaluationManagement_ListUnknownExecutions_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(EvaluationUnknownQuery)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(EvaluationManagementServer).ListUnknownExecutions(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: EvaluationManagement_ListUnknownExecutions_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(EvaluationManagementServer).ListUnknownExecutions(ctx, req.(*EvaluationUnknownQuery))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -726,6 +762,10 @@ var EvaluationManagement_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "Get",
 			Handler:    _EvaluationManagement_Get_Handler,
+		},
+		{
+			MethodName: "ListUnknownExecutions",
+			Handler:    _EvaluationManagement_ListUnknownExecutions_Handler,
 		},
 		{
 			MethodName: "ResolveUnknown",
