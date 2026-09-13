@@ -39,8 +39,12 @@ func state(response *pb.EvaluationState, scope app.EvaluationScope) (app.Evaluat
 	if err != nil {
 		return app.EvaluationState{}, err
 	}
+	creation, err := evaluationCreation(response)
+	if err != nil {
+		return app.EvaluationState{}, err
+	}
 	return app.EvaluationState{RunID: response.RunId, Version: response.Version, Status: response.Status,
-		UnresolvedResultUnknownCount: response.UnresolvedResultUnknownCount, Resolutions: json.RawMessage(response.ResolutionsJson), Reviews: json.RawMessage(reviews), Finalization: final, ReviewReopenings: reopenings}, nil
+		UnresolvedResultUnknownCount: response.UnresolvedResultUnknownCount, Resolutions: json.RawMessage(response.ResolutionsJson), Reviews: json.RawMessage(reviews), Finalization: final, ReviewReopenings: reopenings, Creation: creation}, nil
 }
 func (c *EvaluationClient) GetEvaluation(ctx context.Context, scope app.EvaluationScope) (app.EvaluationState, error) {
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)

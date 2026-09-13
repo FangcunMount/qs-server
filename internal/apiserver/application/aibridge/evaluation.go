@@ -32,14 +32,15 @@ type UnknownResolution struct {
 	AcknowledgedDuplicateCallAndCostRisk bool   `json:"acknowledged_duplicate_call_and_cost_risk"`
 }
 type EvaluationState struct {
-	RunID                        string          `json:"run_id"`
-	Version                      int64           `json:"version"`
-	Status                       string          `json:"status"`
-	UnresolvedResultUnknownCount int64           `json:"unresolved_result_unknown_count"`
-	Resolutions                  json.RawMessage `json:"resolutions" swaggertype:"array,object"`
-	Reviews                      json.RawMessage `json:"reviews" swaggertype:"array,object"`
-	Finalization                 json.RawMessage `json:"finalization,omitempty" swaggertype:"object"`
-	ReviewReopenings             json.RawMessage `json:"review_reopenings" swaggertype:"array,object"`
+	RunID                        string                     `json:"run_id"`
+	Version                      int64                      `json:"version"`
+	Status                       string                     `json:"status"`
+	UnresolvedResultUnknownCount int64                      `json:"unresolved_result_unknown_count"`
+	Resolutions                  json.RawMessage            `json:"resolutions" swaggertype:"array,object"`
+	Reviews                      json.RawMessage            `json:"reviews" swaggertype:"array,object"`
+	Finalization                 json.RawMessage            `json:"finalization,omitempty" swaggertype:"object"`
+	ReviewReopenings             json.RawMessage            `json:"review_reopenings" swaggertype:"array,object"`
+	Creation                     *EvaluationCreationReceipt `json:"creation,omitempty"`
 }
 type EvaluationGateway interface {
 	PrepareEvaluation(context.Context, DraftScope, EvaluationPlanQuery) (EvaluationPlan, error)

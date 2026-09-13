@@ -2,7 +2,7 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "ef0d3e2ac7a7acac3c1cb4567f9d93e6743af033",
+    "sha": "f435141f43314f6668692af70c2fd5fae4dec352",
     "verified_on": "2026-09-13"
   },
   "status_policy": {
@@ -235,10 +235,27 @@
           "Finalize",
           "ReopenReview"
         ],
-        "qsai.workflow.v1.ProfileManagement": ["Register", "GetReceipt"],
-        "qsai.workflow.v1.SuiteManagement": ["Register", "GetReceipt"],
-        "qsai.workflow.v1.AssetCatalog": ["List", "Get"],
-        "qsai.workflow.v1.PromptDraftManagement": ["Create", "Revise", "Get", "GetLifecycle", "GetReceipt", "Freeze", "GetFreezeReceipt"],
+        "qsai.workflow.v1.ProfileManagement": [
+          "Register",
+          "GetReceipt"
+        ],
+        "qsai.workflow.v1.SuiteManagement": [
+          "Register",
+          "GetReceipt"
+        ],
+        "qsai.workflow.v1.AssetCatalog": [
+          "List",
+          "Get"
+        ],
+        "qsai.workflow.v1.PromptDraftManagement": [
+          "Create",
+          "Revise",
+          "Get",
+          "GetLifecycle",
+          "GetReceipt",
+          "Freeze",
+          "GetFreezeReceipt"
+        ],
         "qsai.workflow.v1.PublicationManagement": [
           "Publish",
           "Rollback",

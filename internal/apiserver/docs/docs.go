@@ -12988,6 +12988,32 @@ const docTemplate = `{
                 }
             }
         },
+        "aibridge.EvaluationCreationReceipt": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "string"
+                },
+                "release": {
+                    "$ref": "#/definitions/aibridge.EvaluationRelease"
+                },
+                "release_fingerprint": {
+                    "type": "string"
+                },
+                "request_reason": {
+                    "type": "string"
+                },
+                "requested_by": {
+                    "type": "string"
+                },
+                "run_id": {
+                    "type": "string"
+                },
+                "schema_version": {
+                    "type": "string"
+                }
+            }
+        },
         "aibridge.EvaluationFinalize": {
             "type": "object",
             "properties": {
@@ -13157,6 +13183,9 @@ const docTemplate = `{
         "aibridge.EvaluationState": {
             "type": "object",
             "properties": {
+                "creation": {
+                    "$ref": "#/definitions/aibridge.EvaluationCreationReceipt"
+                },
                 "finalization": {
                     "type": "object"
                 },

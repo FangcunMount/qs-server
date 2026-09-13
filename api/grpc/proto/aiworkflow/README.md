@@ -1,6 +1,6 @@
 # QS AI workflow contract
 
-Source: `FangcunMount/qs-ai`, commit `95615162b5011fd92969b83f6192d2ebdd79bf5b`, path `integrations/workflow/proto/workflow.proto`.
+Source: `FangcunMount/qs-ai`, commit `13f87089045daf1dbbc61a52a5aaeabd140cc343`, path `integrations/workflow/proto/workflow.proto`.
 
 This copy is byte-identical to the pinned source. qs-ai owns this contract; synchronize the source and regenerate both languages when changing it. Go generation uses `scripts/proto/generate.sh`. The runnable integration entry and limitations are documented in `cmd/qs-ai-bridge/README.md`.
 
@@ -17,3 +17,5 @@ AssetCatalog List/Get 提供共享不可变配置目录，复用解读审计授�
 GetLifecycle 读取当前草稿修订与冻结摘要，复用解读审计授权；不返回原冻结命令审计、不接受历史 revision。状态、修订、资产身份及时间不一致时拒绝响应。该只读快照不授予后续编辑权。
 
 EvaluationManagement.Prepare 复用审计授权，显式传递套件、生成路线与语义评测路线。AI 返回完整 11 项 release、整体指纹及策略预算；QS 核对原查询、完整引用、策略正文摘要和预算投影一致性，不重新计算质量门槛。REST 为 POST `/internal/v2/interpretation/ai-workflow/evaluations/prepare`，请求限 8 KiB、RPC 响应限 32 KiB、期限 5 秒且不自动重试。预算不表示机构可用额度，不创建任务或调用模型；Create/Start 仍分别要求管理员授权及明确确认。
+
+EvaluationState.creation_json 增量携带原始创建回执（qs-ai-evaluation-creation-receipt/v1）；QS 核对任务 ID、11 项引用及整体摘要、原作者/原因/带时区时间，再透出 creation。Create 还核对原请求的引用、操作者和原因；Get 不把当前查询人当作原创建人。空字段兼容旧 AI，但不构造可恢复凭证；不返回可执行资产正文，不重发创建或启动命令。

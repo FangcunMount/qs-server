@@ -2,8 +2,10 @@ package aibridge
 
 import (
 	"context"
+	"fmt"
 	pb "github.com/FangcunMount/qs-server/api/grpc/gen/aiworkflow"
 	app "github.com/FangcunMount/qs-server/internal/apiserver/application/aibridge"
+	"strings"
 	"time"
 )
 
@@ -32,5 +34,12 @@ func (c *EvaluationClient) CreateEvaluation(ctx context.Context, scope app.Evalu
 	if err != nil {
 		return app.EvaluationState{}, err
 	}
-	return state(response, scope)
+	result, err := state(response, scope)
+	if err != nil {
+		return app.EvaluationState{}, err
+	}
+	if receipt := result.Creation; receipt != nil && (receipt.Release != command.Release || receipt.RequestedBy != fmt.Sprintf("user:%d", scope.OperatorUserID) || receipt.RequestReason != strings.TrimSpace(command.Reason)) {
+		return app.EvaluationState{}, app.ErrConflict
+	}
+	return result, nil
 }
