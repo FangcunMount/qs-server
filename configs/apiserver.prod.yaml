@@ -128,7 +128,7 @@ delegated-subject:
 ai_explanation:
   # QS-delegated management only; independent of local model generation.
   workflow_management:
-    enabled: false
+    enabled: true
     address: "qs-ai-grpc:50061"
     ca_file: "/etc/qs-server/ssl/grpc/ca/ca-chain.crt"
     cert_file: "/etc/qs-server/ssl/grpc/server/qs-apiserver.crt"
