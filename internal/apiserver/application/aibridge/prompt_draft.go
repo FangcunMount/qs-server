@@ -101,6 +101,7 @@ type PromptDraftState struct {
 	SavedAt        string             `json:"saved_at"`
 }
 type PromptDraftGateway interface {
+	GetPromptDraftLifecycle(context.Context, DraftScope, string) (PromptDraftLifecycle, error)
 	FreezePromptDraft(context.Context, DraftScope, string, FreezePromptDraft) (FrozenPromptReceipt, error)
 	GetPromptFreezeReceipt(context.Context, DraftScope, string) (FrozenPromptReceipt, error)
 	CreatePromptDraft(context.Context, DraftScope, string, CreatePromptDraft) (PromptDraftState, error)

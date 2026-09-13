@@ -11403,6 +11403,67 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/core.ErrResponse'
+  /internal/v2/interpretation/ai-workflow/prompt-drafts/{draft_id}/lifecycle:
+    get:
+      tags:
+      - AI-Workflow-Prompt-Drafts
+      summary: 读取 qs-ai 草稿当前修订和冻结状态
+      description: 需要当前机构解读审计权限；不接受历史修订选择器，不返回他人冻结命令回执。读取不授权后续修改。
+      operationId: 读取qsai草稿当前修订和冻结状态
+      parameters:
+      - type: string
+        description: 草稿 UUID
+        name: draft_id
+        in: path
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/core.Response'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/aibridge.PromptDraftLifecycle'
+        '400':
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '409':
+          description: Conflict
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
   /internal/v2/interpretation/ai-workflow/prompt-drafts/{draft_id}/revisions:
     post:
       tags:
@@ -12406,6 +12467,17 @@ components:
           type: string
         task_template:
           type: string
+    aibridge.PromptDraftLifecycle:
+      type: object
+      properties:
+        draft:
+          $ref: '#/components/schemas/aibridge.PromptDraftState'
+        frozen:
+          $ref: '#/components/schemas/aibridge.PromptFrozenVersion'
+        schema_version:
+          type: string
+        status:
+          type: string
     aibridge.PromptDraftSource:
       type: object
       properties:
@@ -12442,6 +12514,15 @@ components:
           type: string
         template_id:
           type: string
+    aibridge.PromptFrozenVersion:
+      type: object
+      properties:
+        asset:
+          $ref: '#/components/schemas/aibridge.PromptDraftSource'
+        frozen_at:
+          type: string
+        revision:
+          type: integer
     aibridge.PublicationCommand:
       type: object
       properties:
