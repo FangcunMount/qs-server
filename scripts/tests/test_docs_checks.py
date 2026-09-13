@@ -27,7 +27,7 @@ class DocsFactsHelpersTest(unittest.TestCase):
         services, proto_file_count = check_docs_facts.grpc_inventory()
         self.assertEqual(proto_file_count, 8)
         self.assertEqual(len(services), 23)
-        self.assertEqual(sum(len(rpcs) for rpcs in services.values()), 100)
+        self.assertEqual(sum(len(rpcs) for rpcs in services.values()), 103)
         self.assertIn("List", services["qsai.workflow.v1.EvaluationManagement"])
         self.assertIn("GenerateReportFromAssessment", services["interpretation.InterpretationAutomationService"])
         self.assertIn("ExecutePromptEvaluationStep", services["interpretation.AIExplanationAutomationService"])

@@ -2,7 +2,7 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "08930e38eadd5a3617239fd1a1dae8755db6a96d",
+    "sha": "1860f70b0bf628badb62b6939f5e3433c31c1abc",
     "verified_on": "2026-09-13"
   },
   "status_policy": {
@@ -133,7 +133,7 @@
       "source": "api/grpc/proto",
       "proto_file_count": 8,
       "service_count": 23,
-      "rpc_count": 100,
+      "rpc_count": 103,
       "services": {
         "actor.ActorService": [
           "CreateTestee",
@@ -279,7 +279,10 @@
           "ListQuestionnaires"
         ],
         "qsai.workflow.v1.ParticipantManagement": [
-          "GetCapacity"
+          "GetCapacity",
+          "GetExecution",
+          "Retry",
+          "GetRetryReceipt"
         ]
       }
     }
