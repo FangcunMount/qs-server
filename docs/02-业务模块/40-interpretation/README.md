@@ -280,8 +280,8 @@ AssessmentID、TesteeID 和 OrgID 是报告关联事实，不是授权凭据。�
 | Worker 事件消费 | [`assessment_evaluated_handler.go`](../../../internal/worker/handlers/assessment_evaluated_handler.go)、[`report_handler.go`](../../../internal/worker/handlers/report_handler.go) |
 | 事件契约 | [`configs/events.yaml`](../../../configs/events.yaml) |
 | 模块装配 | [`container/modules/interpretation`](../../../internal/apiserver/container/modules/interpretation/) |
-| AI 解读机器契约与 Prompt | [`api/schema/interpretation`](../../../api/schema/interpretation/) |
-| AI 解读领域与应用 | [`domain/interpretation/aiexplanation`](../../../internal/apiserver/domain/interpretation/aiexplanation/)、[`application/interpretation/aiexplanation`](../../../internal/apiserver/application/interpretation/aiexplanation/) |
+| AI 结果契约与迁移基准 | [`api/schema/interpretation`](../../../api/schema/interpretation/) |
+| AI 桥接与标准事实 | [`application/aibridge`](../../../internal/apiserver/application/aibridge/)、[`reportsource`](../../../internal/apiserver/application/interpretation/reportsource/) |
 
 ```bash
 go test ./internal/apiserver/domain/interpretation/...
