@@ -1,8 +1,10 @@
 # QS AI workflow contract
 
-Source: `FangcunMount/qs-ai`, commit `a99827d9e032d20e13bc9db8e8c86f7d91403352`, path `integrations/workflow/proto/workflow.proto`.
+Source: `FangcunMount/qs-ai`, commit `b3de5913e70f669873f9f9ea5a04ffe64473f3ea`, path `integrations/workflow/proto/workflow.proto`.
 
 This copy is byte-identical to the pinned source. qs-ai owns this contract; synchronize the source and regenerate both languages when changing it. Go generation uses `scripts/proto/generate.sh`. The runnable integration entry and limitations are documented in `cmd/qs-ai-bridge/README.md`.
+
+EvaluationManagement.Cancel 通过 `POST /internal/v2/interpretation/ai-workflow/evaluations/{run_id}/cancel` 复用 OrgAdmin 和可信组织/操作者。要求 expected_version、reason、confirm 及有存在性检查的 discard；false 不能因零值而遗漏，true 表示废弃待审核任务。AI 决定状态、原调用与派发竞争是否允许取消，QS 只核对传输回执绑定。响应 cancellation 保存原/新版本、发布摘要、原作者及时间；Get 保留旧 AI 无该字段兼容，废弃后的复审历史按原版本校验。RPC 期限 5 秒、完整响应上限 4 MiB，不自动重试；超时先回读原任务核对原操作。治理开关关闭时不注册路由；本批代码与测试不代表真实账号验收或旧入口退役。
 
 PublicationManagement and PromptDraftManagement are served by qs-ai. QS provides authorized management proxies over one shared mTLS connection. Prompt drafts support create, revise, historical reads and original-command receipts; saving is not validation, asset freezing or publication. All management routes remain behind the disabled migration switch.
 

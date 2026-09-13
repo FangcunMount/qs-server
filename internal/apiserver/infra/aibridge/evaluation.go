@@ -35,16 +35,41 @@ func state(response *pb.EvaluationState, scope app.EvaluationScope) (app.Evaluat
 	if err != nil || (len(final) > 0 && len(history) != 70) {
 		return app.EvaluationState{}, app.ErrConflict
 	}
-	reopenings, err := reviewReopenings(response)
-	if err != nil {
-		return app.EvaluationState{}, err
-	}
 	creation, err := evaluationCreation(response)
 	if err != nil {
 		return app.EvaluationState{}, err
 	}
+	cancellation, err := evaluationCancellation(response, creation)
+	if err != nil {
+		return app.EvaluationState{}, err
+	}
+	reviewResponse := response
+	if cancellation != nil {
+		reviewResponse = &pb.EvaluationState{RunId: response.RunId, Version: cancellation.SourceVersion,
+			Status: cancellation.SourceStatus, ReopeningsJson: response.ReopeningsJson,
+			UnresolvedResultUnknownCount: response.UnresolvedResultUnknownCount}
+	}
+	reopenings, err := reviewReopenings(reviewResponse)
+	if err != nil {
+		return app.EvaluationState{}, err
+	}
+	if cancellation != nil {
+		var rounds []reviewReopeningReceipt
+		if json.Unmarshal(reopenings, &rounds) != nil {
+			return app.EvaluationState{}, app.ErrConflict
+		}
+		if len(rounds) > 0 {
+			last := rounds[len(rounds)-1]
+			var prior finalizationReceipt
+			opened, openErr := time.Parse(time.RFC3339Nano, last.ReopenedAt)
+			canceled, cancelErr := time.Parse(time.RFC3339Nano, cancellation.CanceledAt)
+			if json.Unmarshal(last.PreviousFinalization, &prior) != nil || prior.ReleaseFingerprint != cancellation.ReleaseFingerprint || openErr != nil || cancelErr != nil || canceled.Before(opened) {
+				return app.EvaluationState{}, app.ErrConflict
+			}
+		}
+	}
 	return app.EvaluationState{RunID: response.RunId, Version: response.Version, Status: response.Status,
-		UnresolvedResultUnknownCount: response.UnresolvedResultUnknownCount, Resolutions: json.RawMessage(response.ResolutionsJson), Reviews: json.RawMessage(reviews), Finalization: final, ReviewReopenings: reopenings, Creation: creation}, nil
+		UnresolvedResultUnknownCount: response.UnresolvedResultUnknownCount, Resolutions: json.RawMessage(response.ResolutionsJson), Reviews: json.RawMessage(reviews), Finalization: final, ReviewReopenings: reopenings, Creation: creation, Cancellation: cancellation}, nil
 }
 func (c *EvaluationClient) GetEvaluation(ctx context.Context, scope app.EvaluationScope) (app.EvaluationState, error) {
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)

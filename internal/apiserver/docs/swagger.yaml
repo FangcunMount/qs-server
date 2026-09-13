@@ -54,6 +54,46 @@ definitions:
       organization_id:
         type: integer
     type: object
+  aibridge.EvaluationCancel:
+    properties:
+      confirm:
+        type: boolean
+      discard:
+        type: boolean
+      expected_version:
+        type: integer
+      reason:
+        type: string
+    type: object
+  aibridge.EvaluationCancellationReceipt:
+    properties:
+      actor:
+        type: string
+      canceled_at:
+        type: string
+      discard:
+        type: boolean
+      execution_id:
+        type: string
+      invocation_id:
+        type: string
+      reason:
+        type: string
+      release_fingerprint:
+        type: string
+      run_id:
+        type: string
+      schema_version:
+        type: string
+      source_status:
+        type: string
+      source_version:
+        type: integer
+      status:
+        type: string
+      version:
+        type: integer
+    type: object
   aibridge.EvaluationCandidateEvidence:
     properties:
       candidate_id:
@@ -227,6 +267,8 @@ definitions:
     type: object
   aibridge.EvaluationState:
     properties:
+      cancellation:
+        $ref: '#/definitions/aibridge.EvaluationCancellationReceipt'
       creation:
         $ref: '#/definitions/aibridge.EvaluationCreationReceipt'
       finalization:
@@ -15025,6 +15067,62 @@ paths:
           schema:
             $ref: '#/definitions/core.ErrResponse'
       summary: 查询 qs-ai 评测状态
+      tags:
+      - AI-Workflow-Management
+  /internal/v2/interpretation/ai-workflow/evaluations/{run_id}/cancel:
+    post:
+      consumes:
+      - application/json
+      description: 复用当前机构 OrgAdmin 权限，要求当前版本、理由、明确确认和 discard 决定。AI 在事务内判断取消资格并保留执行和审核历史；已派发或未知调用须先完成或处置。超时先回读原任务，不自动重试。
+      parameters:
+      - description: 评测 Run UUID
+        in: path
+        name: run_id
+        required: true
+        type: string
+      - description: 取消确认
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/aibridge.EvaluationCancel'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/aibridge.EvaluationState'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+      summary: 取消或废弃 qs-ai 评测
       tags:
       - AI-Workflow-Management
   /internal/v2/interpretation/ai-workflow/evaluations/{run_id}/candidates:

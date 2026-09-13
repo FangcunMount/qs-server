@@ -44,6 +44,8 @@ service EvaluationManagement {
  rpc Create(EvaluationCreateCommand) returns (EvaluationState);
  // Explicitly schedules an existing frozen requested Run; does not call a model inline.
  rpc Start(EvaluationStartCommand) returns (EvaluationState);
+ // Stop future work; dispatched/unknown calls must be completed or resolved first.
+ rpc Cancel(EvaluationCancelCommand) returns (EvaluationState);
  rpc Get(EvaluationQuery) returns (EvaluationState);
  // Read-only version-bound uncertain calls and frozen budget; never authorizes a retry.
  rpc ListUnknownExecutions(EvaluationUnknownQuery) returns (EvaluationUnknownIndex);
@@ -74,6 +76,14 @@ message EvaluationReopenCommand {
  int64 expected_version = 2;
  string reason = 3;
  bool confirm = 4;
+}
+message EvaluationCancelCommand {
+ EvaluationQuery scope = 1;
+ int64 expected_version = 2;
+ string reason = 3;
+ bool confirm = 4;
+ // Explicit false for ordinary cancellation; true only to discard awaiting-review work.
+ optional bool discard = 5;
 }
 message EvaluationFinalizeCommand {
  EvaluationQuery scope = 1;
@@ -181,6 +191,8 @@ message EvaluationState {
  // Immutable creation receipt for read-only recovery, without executable asset bodies.
  // qs-ai-evaluation-creation-receipt/v1; absent on older servers.
  string creation_json = 9;
+ // Audited general cancellation, distinct from an unknown-call resolution.
+ string cancellation_json = 10;
 }
 
 message SemanticContradictionReview {
