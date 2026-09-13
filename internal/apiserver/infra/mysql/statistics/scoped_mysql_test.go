@@ -104,4 +104,8 @@ func TestScopedClinicianAnalysisMySQL(t *testing.T) {
 	require.NoError(t, err)
 	defer func() { require.NoError(t, population.Close()) }()
 	require.True(t, population.Next(), "subject history stays in original store after doctor transfer")
+	require.NoError(t, population.Close())
+	require.NoError(t, db.Exec("UPDATE clinician SET store_id=7 WHERE id=10").Error)
+	require.NoError(t, db.Exec("CREATE TABLE IF NOT EXISTS plan_enrollment(org_id INTEGER,testee_id INTEGER,status TEXT,deleted_at DATETIME)").Error)
+	assertAnalysisCacheRevision(t, db)
 }

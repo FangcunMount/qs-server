@@ -153,7 +153,9 @@ func (s *ReadService) AnalysisOverview(ctx context.Context, org int64, filter Op
 	if !ok {
 		return nil, fmt.Errorf("scoped overview reader unavailable")
 	}
-	data, err := reader.ScopedOverview(ctx, org, q.stores, q.window.From, q.window.To, domain.BusinessDate(q.published.AsOfDate).AddDate(0, 0, 1))
+	data, err := analysisCached(ctx, s, org, q, "overview", nil, func() (ScopedOverviewData, error) {
+		return reader.ScopedOverview(ctx, org, q.stores, q.window.From, q.window.To, domain.BusinessDate(q.published.AsOfDate).AddDate(0, 0, 1))
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -173,18 +175,25 @@ func (s *ReadService) AnalysisClinicians(ctx context.Context, org int64, filter 
 	if !ok {
 		return nil, fmt.Errorf("scoped clinician analysis reader unavailable")
 	}
-	rows, total, summary, err := reader.ScopedClinicianAnalysis(ctx, org, q.stores, q.window.From, q.window.To, page, size)
+	cached, err := analysisCached(ctx, s, org, q, "clinicians", []int{page, size}, func() (AnalysisClinicianPage, error) {
+		rows, total, summary, err := reader.ScopedClinicianAnalysis(ctx, org, q.stores, q.window.From, q.window.To, page, size)
+		if err != nil {
+			return AnalysisClinicianPage{}, err
+		}
+		items := make([]AnalysisClinician, 0, len(rows))
+		for _, v := range rows {
+			items = append(items, analysisClinician(v))
+		}
+		return AnalysisClinicianPage{Items: items, Total: total, Page: page, PageSize: size, Summary: summary}, nil
+	})
 	if err != nil {
 		return nil, err
 	}
 	if err = s.checkAnalysisPublication(ctx, org, q); err != nil {
 		return nil, err
 	}
-	items := make([]AnalysisClinician, 0, len(rows))
-	for _, v := range rows {
-		items = append(items, analysisClinician(v))
-	}
-	return &AnalysisClinicianPage{s.analysisMetadata(q), items, total, page, size, summary}, nil
+	cached.AnalysisMetadata = s.analysisMetadata(q)
+	return &cached, nil
 }
 func (s *ReadService) AnalysisEntries(ctx context.Context, org int64, filter OperationsFilter, clinicianID *uint64, active *bool, page, size int) (*AnalysisEntryPage, error) {
 	q, err := s.prepareAnalysis(ctx, org, filter)
@@ -209,16 +218,23 @@ func (s *ReadService) AnalysisEntries(ctx context.Context, org int64, filter Ope
 	if !ok {
 		return nil, fmt.Errorf("scoped entry reader unavailable")
 	}
-	rows, total, err := reader.ScopedEntries(ctx, org, q.stores, nil, clinicianID, active, q.window.From, q.window.To, page, size)
+	cached, err := analysisCached(ctx, s, org, q, "entries", []any{clinicianID, active, page, size}, func() (AnalysisEntryPage, error) {
+		rows, total, err := reader.ScopedEntries(ctx, org, q.stores, nil, clinicianID, active, q.window.From, q.window.To, page, size)
+		if err != nil {
+			return AnalysisEntryPage{}, err
+		}
+		items := make([]AnalysisEntry, 0, len(rows))
+		for _, v := range rows {
+			items = append(items, analysisEntry(v))
+		}
+		return AnalysisEntryPage{Items: items, Total: total, Page: page, PageSize: size}, nil
+	})
 	if err != nil {
 		return nil, err
 	}
 	if err = s.checkAnalysisPublication(ctx, org, q); err != nil {
 		return nil, err
 	}
-	items := make([]AnalysisEntry, 0, len(rows))
-	for _, v := range rows {
-		items = append(items, analysisEntry(v))
-	}
-	return &AnalysisEntryPage{s.analysisMetadata(q), items, total, page, size}, nil
+	cached.AnalysisMetadata = s.analysisMetadata(q)
+	return &cached, nil
 }

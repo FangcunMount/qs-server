@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	appauthz "github.com/FangcunMount/qs-server/internal/apiserver/application/authz"
+	"golang.org/x/sync/singleflight"
 	"strings"
 	"time"
 
@@ -184,10 +185,11 @@ type ReadStore interface {
 }
 
 type ReadService struct {
-	scopeAccess StatisticsScopeAccess
-	store       ReadStore
-	cache       ReadCache
-	now         func() time.Time
+	analysisFlights singleflight.Group
+	scopeAccess     StatisticsScopeAccess
+	store           ReadStore
+	cache           ReadCache
+	now             func() time.Time
 }
 
 type ReadCache interface {
