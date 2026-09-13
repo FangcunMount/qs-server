@@ -79,6 +79,8 @@ assert_package_contract() {
 
   test -s "$env_file"
   test -s "$package_archive"
+  test -f "$package_dir/scripts/cd/image-retention.py"
+  test -f "$package_dir/scripts/cd/image-retention.sh"
   test -x "$package_dir/scripts/cd/wait-worker-readiness.sh"
   test -x "$package_dir/scripts/cd/verify-worker-dependencies.sh"
   assert_absent "$env_file" "_REDIS_DB="
