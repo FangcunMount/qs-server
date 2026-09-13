@@ -33,7 +33,7 @@ class DocsFactsHelpersTest(unittest.TestCase):
         self.assertIn("SyncAssessmentAttention", services["internalapi.InternalService"])
         self.assertEqual(services["qsai.workflow.v1.Commands"], ["Start", "Change"])
         self.assertEqual(services["qsai.workflow.v1.Results"], ["Accept"])
-        self.assertEqual(services["qsai.workflow.v1.PublicationManagement"], ["Publish", "Rollback", "Disable", "Get", "GetReceipt"])
+        self.assertEqual(services["qsai.workflow.v1.PublicationManagement"], ["Publish", "Rollback", "Disable", "Get", "GetReceipt", "ListHistory", "GetHistory"])
         self.assertEqual(services["interpretation.AIWorkflowAccessService"], ["Authorize"])
 
     def test_migration_inventory_is_paired_and_current(self) -> None:
