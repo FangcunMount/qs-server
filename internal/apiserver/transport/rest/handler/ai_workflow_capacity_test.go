@@ -15,6 +15,7 @@ func TestCapacityDenialIsDistinctFromTransportOutcomeUnknown(t *testing.T) {
 		want    int
 	}{
 		{"Evaluation capacity exhausted", 429},
+		{"participant_daily_capacity_exceeded", 429},
 		{"grpc: received message larger than max", 500},
 	} {
 		w := httptest.NewRecorder()

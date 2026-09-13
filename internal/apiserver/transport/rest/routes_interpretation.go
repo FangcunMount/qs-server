@@ -56,6 +56,10 @@ func (r *Router) registerInterpretationInternalV2Routes(internalV2 *gin.RouterGr
 	if r.deps.Interpretation.AIWorkflowParticipants != nil {
 		participants := handler.NewAIWorkflowParticipantHandler(r.deps.Interpretation.AIWorkflowParticipants)
 		internalV2.GET("/interpretation/ai-workflow/participant-capacity", restmiddleware.RequireCapabilityMiddleware(restmiddleware.CapabilityOrgAdmin), participants.Capacity)
+		group := internalV2.Group("/interpretation/ai-workflow/participants", restmiddleware.RequireCapabilityMiddleware(restmiddleware.CapabilityOrgAdmin))
+		group.GET("/retry-commands/:command_id", participants.RetryReceipt)
+		group.GET("/:session_id", participants.Get)
+		group.POST("/:session_id/retry", participants.Retry)
 	}
 
 	if r.deps.Interpretation.AIWorkflowManagement != nil {

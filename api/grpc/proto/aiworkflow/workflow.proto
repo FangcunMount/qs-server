@@ -606,6 +606,9 @@ message EvaluationCapacitySnapshot {
 // QS supplies current organization administrator authority over mTLS.
 service ParticipantManagement {
  rpc GetCapacity(ParticipantCapacityQuery) returns (ParticipantCapacitySnapshot);
+ rpc GetExecution(ParticipantExecutionQuery) returns (ParticipantExecution);
+ rpc Retry(ParticipantRetryCommand) returns (Receipt);
+ rpc GetRetryReceipt(ParticipantRetryReceiptQuery) returns (Receipt);
 }
 message ParticipantCapacityQuery {
  PublicationScope scope = 1;
@@ -648,4 +651,36 @@ message ParticipantCapacitySnapshot {
  repeated ParticipantReservation active_reservations = 8;
  bool daily_truncated = 9;
  bool active_truncated = 10;
+}
+
+message ParticipantExecutionQuery { PublicationScope scope = 1; string session_id = 2; }
+message ParticipantRetryReceiptQuery { PublicationScope scope = 1; string command_id = 2; }
+message ParticipantRetryCommand {
+ PublicationScope scope = 1;
+ string session_id = 2;
+ string command_id = 3;
+ string expected_run_id = 4;
+ int64 expected_version = 5;
+ string reason = 6;
+ bool confirm = 7;
+ int64 expected_provider_invocations = 8;
+ bool accept_result_unknown_risk = 9;
+}
+message ParticipantExecution {
+ int64 organization_id = 1;
+ string session_id = 2;
+ string request_id = 3;
+ string run_id = 4;
+ int64 version = 5;
+ string status = 6;
+ string subject_id = 7;
+ string testee_id = 8;
+ repeated string assessment_ids = 9;
+ string failure_code = 10;
+ string model_call_status = 11;
+ string invocation_id = 12;
+ string source_run_id = 13;
+ bool can_retry = 14;
+ bool unknown_result_risk = 15;
+ int64 retry_provider_invocations = 16;
 }

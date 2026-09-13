@@ -2119,7 +2119,10 @@ var AssetCatalog_ServiceDesc = grpc.ServiceDesc{
 }
 
 const (
-	ParticipantManagement_GetCapacity_FullMethodName = "/qsai.workflow.v1.ParticipantManagement/GetCapacity"
+	ParticipantManagement_GetCapacity_FullMethodName     = "/qsai.workflow.v1.ParticipantManagement/GetCapacity"
+	ParticipantManagement_GetExecution_FullMethodName    = "/qsai.workflow.v1.ParticipantManagement/GetExecution"
+	ParticipantManagement_Retry_FullMethodName           = "/qsai.workflow.v1.ParticipantManagement/Retry"
+	ParticipantManagement_GetRetryReceipt_FullMethodName = "/qsai.workflow.v1.ParticipantManagement/GetRetryReceipt"
 )
 
 // ParticipantManagementClient is the client API for ParticipantManagement service.
@@ -2129,6 +2132,9 @@ const (
 // QS supplies current organization administrator authority over mTLS.
 type ParticipantManagementClient interface {
 	GetCapacity(ctx context.Context, in *ParticipantCapacityQuery, opts ...grpc.CallOption) (*ParticipantCapacitySnapshot, error)
+	GetExecution(ctx context.Context, in *ParticipantExecutionQuery, opts ...grpc.CallOption) (*ParticipantExecution, error)
+	Retry(ctx context.Context, in *ParticipantRetryCommand, opts ...grpc.CallOption) (*Receipt, error)
+	GetRetryReceipt(ctx context.Context, in *ParticipantRetryReceiptQuery, opts ...grpc.CallOption) (*Receipt, error)
 }
 
 type participantManagementClient struct {
@@ -2149,6 +2155,36 @@ func (c *participantManagementClient) GetCapacity(ctx context.Context, in *Parti
 	return out, nil
 }
 
+func (c *participantManagementClient) GetExecution(ctx context.Context, in *ParticipantExecutionQuery, opts ...grpc.CallOption) (*ParticipantExecution, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ParticipantExecution)
+	err := c.cc.Invoke(ctx, ParticipantManagement_GetExecution_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *participantManagementClient) Retry(ctx context.Context, in *ParticipantRetryCommand, opts ...grpc.CallOption) (*Receipt, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(Receipt)
+	err := c.cc.Invoke(ctx, ParticipantManagement_Retry_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *participantManagementClient) GetRetryReceipt(ctx context.Context, in *ParticipantRetryReceiptQuery, opts ...grpc.CallOption) (*Receipt, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(Receipt)
+	err := c.cc.Invoke(ctx, ParticipantManagement_GetRetryReceipt_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // ParticipantManagementServer is the server API for ParticipantManagement service.
 // All implementations must embed UnimplementedParticipantManagementServer
 // for forward compatibility.
@@ -2156,6 +2192,9 @@ func (c *participantManagementClient) GetCapacity(ctx context.Context, in *Parti
 // QS supplies current organization administrator authority over mTLS.
 type ParticipantManagementServer interface {
 	GetCapacity(context.Context, *ParticipantCapacityQuery) (*ParticipantCapacitySnapshot, error)
+	GetExecution(context.Context, *ParticipantExecutionQuery) (*ParticipantExecution, error)
+	Retry(context.Context, *ParticipantRetryCommand) (*Receipt, error)
+	GetRetryReceipt(context.Context, *ParticipantRetryReceiptQuery) (*Receipt, error)
 	mustEmbedUnimplementedParticipantManagementServer()
 }
 
@@ -2168,6 +2207,15 @@ type UnimplementedParticipantManagementServer struct{}
 
 func (UnimplementedParticipantManagementServer) GetCapacity(context.Context, *ParticipantCapacityQuery) (*ParticipantCapacitySnapshot, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetCapacity not implemented")
+}
+func (UnimplementedParticipantManagementServer) GetExecution(context.Context, *ParticipantExecutionQuery) (*ParticipantExecution, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetExecution not implemented")
+}
+func (UnimplementedParticipantManagementServer) Retry(context.Context, *ParticipantRetryCommand) (*Receipt, error) {
+	return nil, status.Error(codes.Unimplemented, "method Retry not implemented")
+}
+func (UnimplementedParticipantManagementServer) GetRetryReceipt(context.Context, *ParticipantRetryReceiptQuery) (*Receipt, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetRetryReceipt not implemented")
 }
 func (UnimplementedParticipantManagementServer) mustEmbedUnimplementedParticipantManagementServer() {}
 func (UnimplementedParticipantManagementServer) testEmbeddedByValue()                               {}
@@ -2208,6 +2256,60 @@ func _ParticipantManagement_GetCapacity_Handler(srv interface{}, ctx context.Con
 	return interceptor(ctx, in, info, handler)
 }
 
+func _ParticipantManagement_GetExecution_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ParticipantExecutionQuery)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ParticipantManagementServer).GetExecution(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ParticipantManagement_GetExecution_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ParticipantManagementServer).GetExecution(ctx, req.(*ParticipantExecutionQuery))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ParticipantManagement_Retry_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ParticipantRetryCommand)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ParticipantManagementServer).Retry(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ParticipantManagement_Retry_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ParticipantManagementServer).Retry(ctx, req.(*ParticipantRetryCommand))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ParticipantManagement_GetRetryReceipt_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ParticipantRetryReceiptQuery)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ParticipantManagementServer).GetRetryReceipt(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ParticipantManagement_GetRetryReceipt_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ParticipantManagementServer).GetRetryReceipt(ctx, req.(*ParticipantRetryReceiptQuery))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // ParticipantManagement_ServiceDesc is the grpc.ServiceDesc for ParticipantManagement service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -2218,6 +2320,18 @@ var ParticipantManagement_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetCapacity",
 			Handler:    _ParticipantManagement_GetCapacity_Handler,
+		},
+		{
+			MethodName: "GetExecution",
+			Handler:    _ParticipantManagement_GetExecution_Handler,
+		},
+		{
+			MethodName: "Retry",
+			Handler:    _ParticipantManagement_Retry_Handler,
+		},
+		{
+			MethodName: "GetRetryReceipt",
+			Handler:    _ParticipantManagement_GetRetryReceipt_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

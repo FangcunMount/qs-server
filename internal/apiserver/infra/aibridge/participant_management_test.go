@@ -12,6 +12,7 @@ import (
 )
 
 type participantCapacityRPC struct {
+	pb.ParticipantManagementClient
 	t        *testing.T
 	request  *pb.ParticipantCapacityQuery
 	response *pb.ParticipantCapacitySnapshot

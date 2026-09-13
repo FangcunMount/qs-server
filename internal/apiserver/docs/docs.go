@@ -12102,6 +12102,243 @@ const docTemplate = `{
                 }
             }
         },
+        "/internal/v2/interpretation/ai-workflow/participants/retry-commands/{command_id}": {
+            "get": {
+                "description": "当前机构 OrgAdmin 授权，仅原操作人可读取该命令；AI 仍复查原参与者当前访问权。不创建新的执行，404 不能证明在途原命令未提交。",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "AI-Workflow-Management"
+                ],
+                "summary": "查询原参与者重试命令回执",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "原重试命令 UUID",
+                        "name": "command_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/aibridge.Receipt"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/internal/v2/interpretation/ai-workflow/participants/{session_id}": {
+            "get": {
+                "description": "当前机构 OrgAdmin 权限，返回原请求、当前 Run、版本、失败分类与重试资格；不读取报告正文或发起调用。",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "AI-Workflow-Management"
+                ],
+                "summary": "查询 qs-ai 参与者当前执行",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "AI 会话 UUID",
+                        "name": "session_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/aibridge.ParticipantExecution"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/internal/v2/interpretation/ai-workflow/participants/{session_id}/retry": {
+            "post": {
+                "description": "当前机构 OrgAdmin 授权。要求原 Run/版本、稳定命令 UUID、理由和一次调用费用确认；未知结果需额外风险确认。AI 复查参与者当前权限，在同一事务预留新额度、保留原尝试并创建新 Run。超时只查询原命令，不自动重发。",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "AI-Workflow-Management"
+                ],
+                "summary": "显式重试 qs-ai 参与者解读",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "AI 会话 UUID",
+                        "name": "session_id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "重试确认",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/aibridge.ParticipantRetry"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/aibridge.Receipt"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "429": {
+                        "description": "Too Many Requests",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/internal/v2/interpretation/ai-workflow/profiles/commands/{command_id}": {
             "get": {
                 "description": "需要当前机构解读审计权限，仅原机构及原操作人可查询。不重发注册，不触发发布。",
@@ -14745,6 +14982,62 @@ const docTemplate = `{
                 }
             }
         },
+        "aibridge.ParticipantExecution": {
+            "type": "object",
+            "properties": {
+                "assessment_ids": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "can_retry": {
+                    "type": "boolean"
+                },
+                "failure_code": {
+                    "type": "string"
+                },
+                "invocation_id": {
+                    "type": "string"
+                },
+                "model_call_status": {
+                    "type": "string"
+                },
+                "organization_id": {
+                    "type": "integer"
+                },
+                "request_id": {
+                    "type": "string"
+                },
+                "retry_provider_invocations": {
+                    "type": "integer"
+                },
+                "run_id": {
+                    "type": "string"
+                },
+                "session_id": {
+                    "type": "string"
+                },
+                "source_run_id": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "subject_id": {
+                    "type": "string"
+                },
+                "testee_id": {
+                    "type": "string"
+                },
+                "unknown_result_risk": {
+                    "type": "boolean"
+                },
+                "version": {
+                    "type": "integer"
+                }
+            }
+        },
         "aibridge.ParticipantReservation": {
             "type": "object",
             "properties": {
@@ -14773,6 +15066,32 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "subject_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "aibridge.ParticipantRetry": {
+            "type": "object",
+            "properties": {
+                "accept_result_unknown_risk": {
+                    "type": "boolean"
+                },
+                "command_id": {
+                    "type": "string"
+                },
+                "confirm": {
+                    "type": "boolean"
+                },
+                "expected_provider_invocations": {
+                    "type": "integer"
+                },
+                "expected_run_id": {
+                    "type": "string"
+                },
+                "expected_version": {
+                    "type": "integer"
+                },
+                "reason": {
                     "type": "string"
                 }
             }
@@ -15080,6 +15399,23 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "run_version": {
+                    "type": "integer"
+                }
+            }
+        },
+        "aibridge.Receipt": {
+            "type": "object",
+            "properties": {
+                "run_id": {
+                    "type": "string"
+                },
+                "session_id": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "version": {
                     "type": "integer"
                 }
             }

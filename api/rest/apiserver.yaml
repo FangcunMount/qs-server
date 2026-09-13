@@ -11648,6 +11648,190 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/core.ErrResponse'
+  /internal/v2/interpretation/ai-workflow/participants/retry-commands/{command_id}:
+    get:
+      tags:
+      - AI-Workflow-Management
+      summary: 查询原参与者重试命令回执
+      description: 当前机构 OrgAdmin 授权，仅原操作人可读取该命令；AI 仍复查原参与者当前访问权。不创建新的执行，404 不能证明在途原命令未提交。
+      operationId: 查询原参与者重试命令回执
+      parameters:
+      - type: string
+        description: 原重试命令 UUID
+        name: command_id
+        in: path
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/core.Response'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/aibridge.Receipt'
+        '400':
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+  /internal/v2/interpretation/ai-workflow/participants/{session_id}:
+    get:
+      tags:
+      - AI-Workflow-Management
+      summary: 查询 qs-ai 参与者当前执行
+      description: 当前机构 OrgAdmin 权限，返回原请求、当前 Run、版本、失败分类与重试资格；不读取报告正文或发起调用。
+      operationId: 查询qsai参与者当前执行
+      parameters:
+      - type: string
+        description: AI 会话 UUID
+        name: session_id
+        in: path
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/core.Response'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/aibridge.ParticipantExecution'
+        '400':
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+  /internal/v2/interpretation/ai-workflow/participants/{session_id}/retry:
+    post:
+      tags:
+      - AI-Workflow-Management
+      summary: 显式重试 qs-ai 参与者解读
+      description: 当前机构 OrgAdmin 授权。要求原 Run/版本、稳定命令 UUID、理由和一次调用费用确认；未知结果需额外风险确认。AI
+        复查参与者当前权限，在同一事务预留新额度、保留原尝试并创建新 Run。超时只查询原命令，不自动重发。
+      operationId: 显式重试qsai参与者解读
+      parameters:
+      - type: string
+        description: AI 会话 UUID
+        name: session_id
+        in: path
+        required: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/aibridge.ParticipantRetry'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/core.Response'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/aibridge.Receipt'
+        '400':
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '409':
+          description: Conflict
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '429':
+          description: Too Many Requests
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
   /internal/v2/interpretation/ai-workflow/profiles/commands/{command_id}:
     get:
       tags:
@@ -13646,6 +13830,43 @@ components:
           type: integer
         identity:
           type: string
+    aibridge.ParticipantExecution:
+      type: object
+      properties:
+        assessment_ids:
+          type: array
+          items:
+            type: string
+        can_retry:
+          type: boolean
+        failure_code:
+          type: string
+        invocation_id:
+          type: string
+        model_call_status:
+          type: string
+        organization_id:
+          type: integer
+        request_id:
+          type: string
+        retry_provider_invocations:
+          type: integer
+        run_id:
+          type: string
+        session_id:
+          type: string
+        source_run_id:
+          type: string
+        status:
+          type: string
+        subject_id:
+          type: string
+        testee_id:
+          type: string
+        unknown_result_risk:
+          type: boolean
+        version:
+          type: integer
     aibridge.ParticipantReservation:
       type: object
       properties:
@@ -13666,6 +13887,23 @@ components:
         session_id:
           type: string
         subject_id:
+          type: string
+    aibridge.ParticipantRetry:
+      type: object
+      properties:
+        accept_result_unknown_risk:
+          type: boolean
+        command_id:
+          type: string
+        confirm:
+          type: boolean
+        expected_provider_invocations:
+          type: integer
+        expected_run_id:
+          type: string
+        expected_version:
+          type: integer
+        reason:
           type: string
     aibridge.ProfileRegistrationReceipt:
       type: object
@@ -13866,6 +14104,17 @@ components:
         run_id:
           type: string
         run_version:
+          type: integer
+    aibridge.Receipt:
+      type: object
+      properties:
+        run_id:
+          type: string
+        session_id:
+          type: string
+        status:
+          type: string
+        version:
           type: integer
     aibridge.RegisterProfile:
       type: object
