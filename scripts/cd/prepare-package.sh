@@ -47,6 +47,8 @@ cp -r configs "$PACKAGE_DIR/"
 cp build/docker/docker-compose.prod.yml "${PACKAGE_DIR}/docker-compose.prod.yml"
 cp \
   scripts/cd/image-metadata.sh \
+  scripts/cd/image-retention.py \
+  scripts/cd/image-retention.sh \
   scripts/cd/remote-deploy.sh \
   scripts/cd/wait-worker-readiness.sh \
   scripts/cd/verify-worker-dependencies.sh \

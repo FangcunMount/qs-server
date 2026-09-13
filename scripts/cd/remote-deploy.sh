@@ -8,6 +8,8 @@ export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin${PATH:
 SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 # shellcheck source=/dev/null
 . "$SCRIPT_DIR/image-metadata.sh"
+# shellcheck source=/dev/null
+. "$SCRIPT_DIR/image-retention.sh"
 
 : "${DOCKER_REGISTRY:?DOCKER_REGISTRY is required}"
 : "${DOCKER_REPOSITORY:?DOCKER_REPOSITORY is required}"
@@ -810,6 +812,7 @@ echo "Image tag: ${IMAGE_TAG}"
 echo "Deploy host: hostname=$(hostname) tailscale_ip=$(tailscale ip -4 2>/dev/null || true) primary_ip=$(hostname -I 2>/dev/null | awk '{print $1}') user=$(id -un)"
 echo "=========================================="
 
+acquire_image_deploy_lock
 prepare_dirs_and_backup
 extract_package
 sync_configs
@@ -839,8 +842,6 @@ case "$SERVICE" in
 esac
 
 cleanup_old_backups
-rm -rf "$DEPLOY_TMP"
-rm -f "$PKG_PATH"
 
 verify_running_image() {
   case "$SERVICE" in
@@ -862,6 +863,9 @@ verify_running_image() {
 }
 
 verify_running_image
+retain_successful_image "$(resolve_compose_image_ref)"
+rm -rf "$DEPLOY_TMP"
+rm -f "$PKG_PATH"
 
 echo "=========================================="
 echo "${CONTAINER_NAME} deployment completed"
