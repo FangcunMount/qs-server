@@ -14,6 +14,7 @@ import (
 )
 
 type profileRouteGateway struct {
+	app.ProfileGateway
 	calls int
 	scope app.DraftScope
 	err   error
@@ -106,5 +107,46 @@ func TestProfileMalformedRequestsAndSanitizedOutcome(t *testing.T) {
 		if w.Code != tc.http || g.calls != 1 || strings.Contains(w.Body.String(), "private endpoint") {
 			t.Fatal(w.Code, g.calls, w.Body.String())
 		}
+	}
+}
+
+func (g *profileRouteGateway) ListProfileLifecycles(_ context.Context, s app.DraftScope, _ app.ProfileLifecycleQuery) (app.ProfileLifecyclePage, error) {
+	g.calls++
+	g.scope = s
+	return app.ProfileLifecyclePage{Items: []app.ProfileLifecycle{}}, g.err
+}
+func (g *profileRouteGateway) GetProfileLifecycle(_ context.Context, s app.DraftScope, _, _ string) (app.ProfileLifecycle, error) {
+	g.calls++
+	g.scope = s
+	return app.ProfileLifecycle{}, g.err
+}
+func TestProfileLifecycleRoutesValidateQueriesBeforeGateway(t *testing.T) {
+	for _, query := range []string{"?limit=0", "?limit=51", "?limit=", "?status=wrong", "?status=draft&status=published", "?organization_id=99", "?cursor=bad", "/lifecycle?identity=p", "/lifecycle?identity=p&version=v1&status=draft"} {
+		g := &profileRouteGateway{}
+		w := httptest.NewRecorder()
+		profileRouter(g, true).ServeHTTP(w, httptest.NewRequest("GET", profileBase+query, nil))
+		if w.Code != 400 || g.calls != 0 {
+			t.Fatal(query, w.Code, g.calls)
+		}
+	}
+	for _, query := range []string{"?status=draft", "/lifecycle?identity=p%2Fchild&version=v1"} {
+		g := &profileRouteGateway{}
+		w := httptest.NewRecorder()
+		profileRouter(g, true).ServeHTTP(w, httptest.NewRequest("GET", profileBase+query, nil))
+		if w.Code != 200 || g.calls != 1 || g.scope.OrganizationID != 12 || g.scope.OperatorUserID != 34 {
+			t.Fatal(query, w.Code, g.scope)
+		}
+	}
+	g := &profileRouteGateway{}
+	service := &app.ProfileAdministration{Gateway: g}
+	scope := app.DraftScope{OrganizationID: 7, OperatorUserID: 42}
+	if _, err := service.ListLifecycle(context.Background(), scope, app.ProfileLifecycleQuery{}); !errors.Is(err, app.ErrGovernanceDenied) {
+		t.Fatal(err)
+	}
+	if _, err := service.GetLifecycle(context.Background(), scope, "p", "v1"); !errors.Is(err, app.ErrGovernanceDenied) {
+		t.Fatal(err)
+	}
+	if g.calls != 0 {
+		t.Fatal("unauthorized gateway call")
 	}
 }

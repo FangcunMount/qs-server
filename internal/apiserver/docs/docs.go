@@ -12339,6 +12339,94 @@ const docTemplate = `{
                 }
             }
         },
+        "/internal/v2/interpretation/ai-workflow/profiles": {
+            "get": {
+                "description": "需要解读审计权限；状态来自 qs-ai 发布记录。迁入不代表发布，旧 QS 调试版本不要求迁入。游标绑定筛选，跨页不保证同一快照。",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "AI-Workflow-Profiles"
+                ],
+                "summary": "查询 qs-ai Profile 发布状态和迁入来源",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "精确 Profile 标识",
+                        "name": "identity",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "draft/published/disabled",
+                        "name": "status",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "每页 1–50，默认 20",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "上一页游标",
+                        "name": "cursor",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/aibridge.ProfileLifecyclePage"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/internal/v2/interpretation/ai-workflow/profiles/commands/{command_id}": {
             "get": {
                 "description": "需要当前机构解读审计权限，仅原机构及原操作人可查询。不重发注册，不触发发布。",
@@ -12371,6 +12459,90 @@ const docTemplate = `{
                                     "properties": {
                                         "data": {
                                             "$ref": "#/definitions/aibridge.ProfileRegistrationReceipt"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/internal/v2/interpretation/ai-workflow/profiles/lifecycle": {
+            "get": {
+                "description": "需要解读审计权限。共享配置只返回来源、不可变引用和发布状态，不返回操作人审计。状态不授予发布权限。",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "AI-Workflow-Profiles"
+                ],
+                "summary": "查询指定 qs-ai Profile 版本的当前发布状态",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "精确 Profile 标识",
+                        "name": "identity",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "精确 Profile 版本",
+                        "name": "version",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/aibridge.ProfileLifecycle"
                                         }
                                     }
                                 }
@@ -15092,6 +15264,52 @@ const docTemplate = `{
                     "type": "integer"
                 },
                 "reason": {
+                    "type": "string"
+                }
+            }
+        },
+        "aibridge.ProfileLifecycle": {
+            "type": "object",
+            "properties": {
+                "active_publication_id": {
+                    "type": "string"
+                },
+                "active_run_id": {
+                    "type": "string"
+                },
+                "imported_at": {
+                    "type": "string"
+                },
+                "inactive_reason": {
+                    "type": "string"
+                },
+                "reference": {
+                    "$ref": "#/definitions/aibridge.PromptDraftSource"
+                },
+                "selector_changed_at": {
+                    "type": "string"
+                },
+                "selector_version": {
+                    "type": "integer"
+                },
+                "source_ref": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                }
+            }
+        },
+        "aibridge.ProfileLifecyclePage": {
+            "type": "object",
+            "properties": {
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/aibridge.ProfileLifecycle"
+                    }
+                },
+                "next_cursor": {
                     "type": "string"
                 }
             }

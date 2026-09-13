@@ -1683,8 +1683,10 @@ var PromptDraftManagement_ServiceDesc = grpc.ServiceDesc{
 }
 
 const (
-	ProfileManagement_Register_FullMethodName   = "/qsai.workflow.v1.ProfileManagement/Register"
-	ProfileManagement_GetReceipt_FullMethodName = "/qsai.workflow.v1.ProfileManagement/GetReceipt"
+	ProfileManagement_Register_FullMethodName      = "/qsai.workflow.v1.ProfileManagement/Register"
+	ProfileManagement_GetReceipt_FullMethodName    = "/qsai.workflow.v1.ProfileManagement/GetReceipt"
+	ProfileManagement_ListLifecycle_FullMethodName = "/qsai.workflow.v1.ProfileManagement/ListLifecycle"
+	ProfileManagement_GetLifecycle_FullMethodName  = "/qsai.workflow.v1.ProfileManagement/GetLifecycle"
 )
 
 // ProfileManagementClient is the client API for ProfileManagement service.
@@ -1696,6 +1698,8 @@ const (
 type ProfileManagementClient interface {
 	Register(ctx context.Context, in *ProfileRegisterCommand, opts ...grpc.CallOption) (*ProfileRegistrationReceipt, error)
 	GetReceipt(ctx context.Context, in *ProfileRegistrationQuery, opts ...grpc.CallOption) (*ProfileRegistrationReceipt, error)
+	ListLifecycle(ctx context.Context, in *ProfileLifecycleQuery, opts ...grpc.CallOption) (*AssetCatalogResponse, error)
+	GetLifecycle(ctx context.Context, in *ProfileLifecycleQuery, opts ...grpc.CallOption) (*AssetCatalogResponse, error)
 }
 
 type profileManagementClient struct {
@@ -1726,6 +1730,26 @@ func (c *profileManagementClient) GetReceipt(ctx context.Context, in *ProfileReg
 	return out, nil
 }
 
+func (c *profileManagementClient) ListLifecycle(ctx context.Context, in *ProfileLifecycleQuery, opts ...grpc.CallOption) (*AssetCatalogResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(AssetCatalogResponse)
+	err := c.cc.Invoke(ctx, ProfileManagement_ListLifecycle_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *profileManagementClient) GetLifecycle(ctx context.Context, in *ProfileLifecycleQuery, opts ...grpc.CallOption) (*AssetCatalogResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(AssetCatalogResponse)
+	err := c.cc.Invoke(ctx, ProfileManagement_GetLifecycle_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // ProfileManagementServer is the server API for ProfileManagement service.
 // All implementations must embed UnimplementedProfileManagementServer
 // for forward compatibility.
@@ -1735,6 +1759,8 @@ func (c *profileManagementClient) GetReceipt(ctx context.Context, in *ProfileReg
 type ProfileManagementServer interface {
 	Register(context.Context, *ProfileRegisterCommand) (*ProfileRegistrationReceipt, error)
 	GetReceipt(context.Context, *ProfileRegistrationQuery) (*ProfileRegistrationReceipt, error)
+	ListLifecycle(context.Context, *ProfileLifecycleQuery) (*AssetCatalogResponse, error)
+	GetLifecycle(context.Context, *ProfileLifecycleQuery) (*AssetCatalogResponse, error)
 	mustEmbedUnimplementedProfileManagementServer()
 }
 
@@ -1750,6 +1776,12 @@ func (UnimplementedProfileManagementServer) Register(context.Context, *ProfileRe
 }
 func (UnimplementedProfileManagementServer) GetReceipt(context.Context, *ProfileRegistrationQuery) (*ProfileRegistrationReceipt, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetReceipt not implemented")
+}
+func (UnimplementedProfileManagementServer) ListLifecycle(context.Context, *ProfileLifecycleQuery) (*AssetCatalogResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListLifecycle not implemented")
+}
+func (UnimplementedProfileManagementServer) GetLifecycle(context.Context, *ProfileLifecycleQuery) (*AssetCatalogResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetLifecycle not implemented")
 }
 func (UnimplementedProfileManagementServer) mustEmbedUnimplementedProfileManagementServer() {}
 func (UnimplementedProfileManagementServer) testEmbeddedByValue()                           {}
@@ -1808,6 +1840,42 @@ func _ProfileManagement_GetReceipt_Handler(srv interface{}, ctx context.Context,
 	return interceptor(ctx, in, info, handler)
 }
 
+func _ProfileManagement_ListLifecycle_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ProfileLifecycleQuery)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ProfileManagementServer).ListLifecycle(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ProfileManagement_ListLifecycle_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ProfileManagementServer).ListLifecycle(ctx, req.(*ProfileLifecycleQuery))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ProfileManagement_GetLifecycle_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ProfileLifecycleQuery)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ProfileManagementServer).GetLifecycle(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ProfileManagement_GetLifecycle_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ProfileManagementServer).GetLifecycle(ctx, req.(*ProfileLifecycleQuery))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // ProfileManagement_ServiceDesc is the grpc.ServiceDesc for ProfileManagement service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -1822,6 +1890,14 @@ var ProfileManagement_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetReceipt",
 			Handler:    _ProfileManagement_GetReceipt_Handler,
+		},
+		{
+			MethodName: "ListLifecycle",
+			Handler:    _ProfileManagement_ListLifecycle_Handler,
+		},
+		{
+			MethodName: "GetLifecycle",
+			Handler:    _ProfileManagement_GetLifecycle_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

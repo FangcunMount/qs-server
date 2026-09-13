@@ -479,6 +479,8 @@ message PromptDraftFrozenVersion {
 service ProfileManagement {
  rpc Register(ProfileRegisterCommand) returns (ProfileRegistrationReceipt);
  rpc GetReceipt(ProfileRegistrationQuery) returns (ProfileRegistrationReceipt);
+ rpc ListLifecycle(ProfileLifecycleQuery) returns (AssetCatalogResponse);
+ rpc GetLifecycle(ProfileLifecycleQuery) returns (AssetCatalogResponse);
 }
 message ProfileRegisterCommand {
  PublicationScope scope = 1;
@@ -683,4 +685,13 @@ message ParticipantExecution {
  bool can_retry = 14;
  bool unknown_result_risk = 15;
  int64 retry_provider_invocations = 16;
+}
+
+message ProfileLifecycleQuery {
+ PublicationScope scope = 1;
+ string identity = 2;
+ string version = 3;
+ string status = 4;
+ int32 limit = 5;
+ string cursor = 6;
 }

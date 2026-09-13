@@ -669,6 +669,36 @@ definitions:
       reason:
         type: string
     type: object
+  aibridge.ProfileLifecycle:
+    properties:
+      active_publication_id:
+        type: string
+      active_run_id:
+        type: string
+      imported_at:
+        type: string
+      inactive_reason:
+        type: string
+      reference:
+        $ref: '#/definitions/aibridge.PromptDraftSource'
+      selector_changed_at:
+        type: string
+      selector_version:
+        type: integer
+      source_ref:
+        type: string
+      status:
+        type: string
+    type: object
+  aibridge.ProfileLifecyclePage:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/aibridge.ProfileLifecycle'
+        type: array
+      next_cursor:
+        type: string
+    type: object
   aibridge.ProfileRegistrationReceipt:
     properties:
       command:
@@ -16408,6 +16438,61 @@ paths:
       summary: 查询原参与者重试命令回执
       tags:
       - AI-Workflow-Management
+  /internal/v2/interpretation/ai-workflow/profiles:
+    get:
+      description: 需要解读审计权限；状态来自 qs-ai 发布记录。迁入不代表发布，旧 QS 调试版本不要求迁入。游标绑定筛选，跨页不保证同一快照。
+      parameters:
+      - description: 精确 Profile 标识
+        in: query
+        name: identity
+        type: string
+      - description: draft/published/disabled
+        in: query
+        name: status
+        type: string
+      - description: 每页 1–50，默认 20
+        in: query
+        name: limit
+        type: integer
+      - description: 上一页游标
+        in: query
+        name: cursor
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/aibridge.ProfileLifecyclePage'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+      summary: 查询 qs-ai Profile 发布状态和迁入来源
+      tags:
+      - AI-Workflow-Profiles
   /internal/v2/interpretation/ai-workflow/profiles/commands/{command_id}:
     get:
       description: 需要当前机构解读审计权限，仅原机构及原操作人可查询。不重发注册，不触发发布。
@@ -16454,6 +16539,59 @@ paths:
           schema:
             $ref: '#/definitions/core.ErrResponse'
       summary: 查询 qs-ai Profile 注册原命令回执
+      tags:
+      - AI-Workflow-Profiles
+  /internal/v2/interpretation/ai-workflow/profiles/lifecycle:
+    get:
+      description: 需要解读审计权限。共享配置只返回来源、不可变引用和发布状态，不返回操作人审计。状态不授予发布权限。
+      parameters:
+      - description: 精确 Profile 标识
+        in: query
+        name: identity
+        required: true
+        type: string
+      - description: 精确 Profile 版本
+        in: query
+        name: version
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/aibridge.ProfileLifecycle'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+      summary: 查询指定 qs-ai Profile 版本的当前发布状态
       tags:
       - AI-Workflow-Profiles
   /internal/v2/interpretation/ai-workflow/profiles/register:

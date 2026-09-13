@@ -118,6 +118,8 @@ func (r *Router) registerInterpretationInternalV2Routes(internalV2 *gin.RouterGr
 		read := internalV2.Group("/interpretation/ai-workflow/profiles", restmiddleware.RequireCapabilityMiddleware(restmiddleware.CapabilityAuditInterpretation))
 		write.POST("/register", profiles.Register)
 		read.GET("/commands/:command_id", profiles.GetReceipt)
+		read.GET("", profiles.ListLifecycle)
+		read.GET("/lifecycle", profiles.GetLifecycle)
 	}
 
 	if r.deps.Interpretation.AIWorkflowPromptDrafts != nil {
