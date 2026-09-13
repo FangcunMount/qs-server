@@ -986,6 +986,7 @@ const (
 	PromptDraftManagement_Create_FullMethodName           = "/qsai.workflow.v1.PromptDraftManagement/Create"
 	PromptDraftManagement_Revise_FullMethodName           = "/qsai.workflow.v1.PromptDraftManagement/Revise"
 	PromptDraftManagement_Get_FullMethodName              = "/qsai.workflow.v1.PromptDraftManagement/Get"
+	PromptDraftManagement_GetLifecycle_FullMethodName     = "/qsai.workflow.v1.PromptDraftManagement/GetLifecycle"
 	PromptDraftManagement_GetReceipt_FullMethodName       = "/qsai.workflow.v1.PromptDraftManagement/GetReceipt"
 	PromptDraftManagement_Freeze_FullMethodName           = "/qsai.workflow.v1.PromptDraftManagement/Freeze"
 	PromptDraftManagement_GetFreezeReceipt_FullMethodName = "/qsai.workflow.v1.PromptDraftManagement/GetFreezeReceipt"
@@ -1001,6 +1002,9 @@ type PromptDraftManagementClient interface {
 	Create(ctx context.Context, in *PromptDraftCreateCommand, opts ...grpc.CallOption) (*PromptDraftState, error)
 	Revise(ctx context.Context, in *PromptDraftReviseCommand, opts ...grpc.CallOption) (*PromptDraftState, error)
 	Get(ctx context.Context, in *PromptDraftQuery, opts ...grpc.CallOption) (*PromptDraftState, error)
+	// Latest head and freeze state from one snapshot. Revision selectors are rejected.
+	// Read-only status does not grant a lease or authorize a later modification.
+	GetLifecycle(ctx context.Context, in *PromptDraftQuery, opts ...grpc.CallOption) (*PromptDraftLifecycle, error)
 	GetReceipt(ctx context.Context, in *PromptDraftReceiptQuery, opts ...grpc.CallOption) (*PromptDraftState, error)
 	// Freeze validated template syntax into a native immutable asset, not a release.
 	Freeze(ctx context.Context, in *PromptDraftFreezeCommand, opts ...grpc.CallOption) (*PromptDraftFreezeReceipt, error)
@@ -1039,6 +1043,16 @@ func (c *promptDraftManagementClient) Get(ctx context.Context, in *PromptDraftQu
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(PromptDraftState)
 	err := c.cc.Invoke(ctx, PromptDraftManagement_Get_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *promptDraftManagementClient) GetLifecycle(ctx context.Context, in *PromptDraftQuery, opts ...grpc.CallOption) (*PromptDraftLifecycle, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(PromptDraftLifecycle)
+	err := c.cc.Invoke(ctx, PromptDraftManagement_GetLifecycle_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -1085,6 +1099,9 @@ type PromptDraftManagementServer interface {
 	Create(context.Context, *PromptDraftCreateCommand) (*PromptDraftState, error)
 	Revise(context.Context, *PromptDraftReviseCommand) (*PromptDraftState, error)
 	Get(context.Context, *PromptDraftQuery) (*PromptDraftState, error)
+	// Latest head and freeze state from one snapshot. Revision selectors are rejected.
+	// Read-only status does not grant a lease or authorize a later modification.
+	GetLifecycle(context.Context, *PromptDraftQuery) (*PromptDraftLifecycle, error)
 	GetReceipt(context.Context, *PromptDraftReceiptQuery) (*PromptDraftState, error)
 	// Freeze validated template syntax into a native immutable asset, not a release.
 	Freeze(context.Context, *PromptDraftFreezeCommand) (*PromptDraftFreezeReceipt, error)
@@ -1107,6 +1124,9 @@ func (UnimplementedPromptDraftManagementServer) Revise(context.Context, *PromptD
 }
 func (UnimplementedPromptDraftManagementServer) Get(context.Context, *PromptDraftQuery) (*PromptDraftState, error) {
 	return nil, status.Error(codes.Unimplemented, "method Get not implemented")
+}
+func (UnimplementedPromptDraftManagementServer) GetLifecycle(context.Context, *PromptDraftQuery) (*PromptDraftLifecycle, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetLifecycle not implemented")
 }
 func (UnimplementedPromptDraftManagementServer) GetReceipt(context.Context, *PromptDraftReceiptQuery) (*PromptDraftState, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetReceipt not implemented")
@@ -1192,6 +1212,24 @@ func _PromptDraftManagement_Get_Handler(srv interface{}, ctx context.Context, de
 	return interceptor(ctx, in, info, handler)
 }
 
+func _PromptDraftManagement_GetLifecycle_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(PromptDraftQuery)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(PromptDraftManagementServer).GetLifecycle(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: PromptDraftManagement_GetLifecycle_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(PromptDraftManagementServer).GetLifecycle(ctx, req.(*PromptDraftQuery))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _PromptDraftManagement_GetReceipt_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(PromptDraftReceiptQuery)
 	if err := dec(in); err != nil {
@@ -1264,6 +1302,10 @@ var PromptDraftManagement_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "Get",
 			Handler:    _PromptDraftManagement_Get_Handler,
+		},
+		{
+			MethodName: "GetLifecycle",
+			Handler:    _PromptDraftManagement_GetLifecycle_Handler,
 		},
 		{
 			MethodName: "GetReceipt",

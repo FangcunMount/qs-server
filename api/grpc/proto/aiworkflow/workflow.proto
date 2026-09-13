@@ -265,6 +265,9 @@ service PromptDraftManagement {
  rpc Create(PromptDraftCreateCommand) returns (PromptDraftState);
  rpc Revise(PromptDraftReviseCommand) returns (PromptDraftState);
  rpc Get(PromptDraftQuery) returns (PromptDraftState);
+ // Latest head and freeze state from one snapshot. Revision selectors are rejected.
+ // Read-only status does not grant a lease or authorize a later modification.
+ rpc GetLifecycle(PromptDraftQuery) returns (PromptDraftLifecycle);
  rpc GetReceipt(PromptDraftReceiptQuery) returns (PromptDraftState);
  // Freeze validated template syntax into a native immutable asset, not a release.
  rpc Freeze(PromptDraftFreezeCommand) returns (PromptDraftFreezeReceipt);
@@ -327,6 +330,19 @@ message PromptDraftState {
  int64 revision = 3;
  // Complete immutable revision, original source and actor/time/reason audit.
  string snapshot_json = 4;
+}
+message PromptDraftLifecycle {
+ string schema_version = 1;
+ PromptDraftState draft = 2;
+ // Explicit editable or frozen; consumers must reject unknown status.
+ string status = 3;
+ // Present exactly when status is frozen. No original freeze command audit.
+ PromptDraftFrozenVersion frozen = 4;
+}
+message PromptDraftFrozenVersion {
+ PromptDraftSource asset = 1;
+ int64 revision = 2;
+ string frozen_at = 3;
 }
 
 // Register a validated immutable Profile; this does not approve or publish it.

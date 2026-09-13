@@ -269,6 +269,17 @@ definitions:
       task_template:
         type: string
     type: object
+  aibridge.PromptDraftLifecycle:
+    properties:
+      draft:
+        $ref: '#/definitions/aibridge.PromptDraftState'
+      frozen:
+        $ref: '#/definitions/aibridge.PromptFrozenVersion'
+      schema_version:
+        type: string
+      status:
+        type: string
+    type: object
   aibridge.PromptDraftSource:
     properties:
       content_sha256:
@@ -304,6 +315,15 @@ definitions:
         type: string
       template_id:
         type: string
+    type: object
+  aibridge.PromptFrozenVersion:
+    properties:
+      asset:
+        $ref: '#/definitions/aibridge.PromptDraftSource'
+      frozen_at:
+        type: string
+      revision:
+        type: integer
     type: object
   aibridge.PublicationCommand:
     properties:
@@ -15294,6 +15314,54 @@ paths:
           schema:
             $ref: '#/definitions/core.ErrResponse'
       summary: 校验语法并冻结 qs-ai 原生 Prompt 资产
+      tags:
+      - AI-Workflow-Prompt-Drafts
+  /internal/v2/interpretation/ai-workflow/prompt-drafts/{draft_id}/lifecycle:
+    get:
+      description: 需要当前机构解读审计权限；不接受历史修订选择器，不返回他人冻结命令回执。读取不授权后续修改。
+      parameters:
+      - description: 草稿 UUID
+        in: path
+        name: draft_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/aibridge.PromptDraftLifecycle'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+      summary: 读取 qs-ai 草稿当前修订和冻结状态
       tags:
       - AI-Workflow-Prompt-Drafts
   /internal/v2/interpretation/ai-workflow/prompt-drafts/{draft_id}/revisions:

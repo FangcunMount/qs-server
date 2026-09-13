@@ -11810,6 +11810,83 @@ const docTemplate = `{
                 }
             }
         },
+        "/internal/v2/interpretation/ai-workflow/prompt-drafts/{draft_id}/lifecycle": {
+            "get": {
+                "description": "需要当前机构解读审计权限；不接受历史修订选择器，不返回他人冻结命令回执。读取不授权后续修改。",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "AI-Workflow-Prompt-Drafts"
+                ],
+                "summary": "读取 qs-ai 草稿当前修订和冻结状态",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "草稿 UUID",
+                        "name": "draft_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/aibridge.PromptDraftLifecycle"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/internal/v2/interpretation/ai-workflow/prompt-drafts/{draft_id}/revisions": {
             "post": {
                 "description": "需要当前机构 OrgAdmin 权限；组织和操作人取认证上下文。保存不代表校验或发布。超时后查询原 command_id，不自动重试。",
@@ -13089,6 +13166,23 @@ const docTemplate = `{
                 }
             }
         },
+        "aibridge.PromptDraftLifecycle": {
+            "type": "object",
+            "properties": {
+                "draft": {
+                    "$ref": "#/definitions/aibridge.PromptDraftState"
+                },
+                "frozen": {
+                    "$ref": "#/definitions/aibridge.PromptFrozenVersion"
+                },
+                "schema_version": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                }
+            }
+        },
         "aibridge.PromptDraftSource": {
             "type": "object",
             "properties": {
@@ -13141,6 +13235,20 @@ const docTemplate = `{
                 },
                 "template_id": {
                     "type": "string"
+                }
+            }
+        },
+        "aibridge.PromptFrozenVersion": {
+            "type": "object",
+            "properties": {
+                "asset": {
+                    "$ref": "#/definitions/aibridge.PromptDraftSource"
+                },
+                "frozen_at": {
+                    "type": "string"
+                },
+                "revision": {
+                    "type": "integer"
                 }
             }
         },

@@ -44,6 +44,12 @@ func (g *draftRouteGateway) GetPromptDraftReceipt(_ context.Context, s app.Draft
 	return app.PromptDraftState{CommandID: id}, g.err
 }
 
+func (g *draftRouteGateway) GetPromptDraftLifecycle(_ context.Context, s app.DraftScope, id string) (app.PromptDraftLifecycle, error) {
+	g.calls++
+	g.scope = s
+	return app.PromptDraftLifecycle{SchemaVersion: "qs-ai-prompt-lifecycle/v1", Draft: app.PromptDraftState{DraftID: id}, Status: "editable"}, g.err
+}
+
 const draftRouteBase = "/internal/v2/interpretation/ai-workflow/prompt-drafts"
 
 func draftRouter(g *draftRouteGateway, admin bool) *gin.Engine {

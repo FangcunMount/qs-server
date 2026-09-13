@@ -2,7 +2,7 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "4f8efb6fac2242115d123102daa4902349d527a6",
+    "sha": "0dc807399352c095992829cf8fcb9039ce6762e4",
     "verified_on": "2026-09-13"
   },
   "status_policy": {
@@ -133,7 +133,7 @@
       "source": "api/grpc/proto",
       "proto_file_count": 8,
       "service_count": 22,
-      "rpc_count": 89,
+      "rpc_count": 90,
       "services": {
         "actor.ActorService": [
           "CreateTestee",
@@ -237,7 +237,7 @@
         "qsai.workflow.v1.ProfileManagement": ["Register", "GetReceipt"],
         "qsai.workflow.v1.SuiteManagement": ["Register", "GetReceipt"],
         "qsai.workflow.v1.AssetCatalog": ["List", "Get"],
-        "qsai.workflow.v1.PromptDraftManagement": ["Create", "Revise", "Get", "GetReceipt", "Freeze", "GetFreezeReceipt"],
+        "qsai.workflow.v1.PromptDraftManagement": ["Create", "Revise", "Get", "GetLifecycle", "GetReceipt", "Freeze", "GetFreezeReceipt"],
         "qsai.workflow.v1.PublicationManagement": [
           "Publish",
           "Rollback",
