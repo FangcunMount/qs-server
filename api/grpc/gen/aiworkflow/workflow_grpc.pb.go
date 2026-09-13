@@ -261,6 +261,7 @@ var Results_ServiceDesc = grpc.ServiceDesc{
 }
 
 const (
+	EvaluationManagement_Prepare_FullMethodName        = "/qsai.workflow.v1.EvaluationManagement/Prepare"
 	EvaluationManagement_Create_FullMethodName         = "/qsai.workflow.v1.EvaluationManagement/Create"
 	EvaluationManagement_Start_FullMethodName          = "/qsai.workflow.v1.EvaluationManagement/Start"
 	EvaluationManagement_Get_FullMethodName            = "/qsai.workflow.v1.EvaluationManagement/Get"
@@ -279,6 +280,8 @@ const (
 //
 // Trusted QS backend only. QS authorizes governance writes and candidate audit reads.
 type EvaluationManagementClient interface {
+	// Resolve all eleven immutable references and policy budgets; no creation or scheduling.
+	Prepare(ctx context.Context, in *EvaluationPlanQuery, opts ...grpc.CallOption) (*EvaluationPlan, error)
 	// The caller reuses scope.run_id for retries of the identical creation request.
 	Create(ctx context.Context, in *EvaluationCreateCommand, opts ...grpc.CallOption) (*EvaluationState, error)
 	// Explicitly schedules an existing frozen requested Run; does not call a model inline.
@@ -303,6 +306,16 @@ type evaluationManagementClient struct {
 
 func NewEvaluationManagementClient(cc grpc.ClientConnInterface) EvaluationManagementClient {
 	return &evaluationManagementClient{cc}
+}
+
+func (c *evaluationManagementClient) Prepare(ctx context.Context, in *EvaluationPlanQuery, opts ...grpc.CallOption) (*EvaluationPlan, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(EvaluationPlan)
+	err := c.cc.Invoke(ctx, EvaluationManagement_Prepare_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
 }
 
 func (c *evaluationManagementClient) Create(ctx context.Context, in *EvaluationCreateCommand, opts ...grpc.CallOption) (*EvaluationState, error) {
@@ -411,6 +424,8 @@ func (c *evaluationManagementClient) ReopenReview(ctx context.Context, in *Evalu
 //
 // Trusted QS backend only. QS authorizes governance writes and candidate audit reads.
 type EvaluationManagementServer interface {
+	// Resolve all eleven immutable references and policy budgets; no creation or scheduling.
+	Prepare(context.Context, *EvaluationPlanQuery) (*EvaluationPlan, error)
 	// The caller reuses scope.run_id for retries of the identical creation request.
 	Create(context.Context, *EvaluationCreateCommand) (*EvaluationState, error)
 	// Explicitly schedules an existing frozen requested Run; does not call a model inline.
@@ -437,6 +452,9 @@ type EvaluationManagementServer interface {
 // pointer dereference when methods are called.
 type UnimplementedEvaluationManagementServer struct{}
 
+func (UnimplementedEvaluationManagementServer) Prepare(context.Context, *EvaluationPlanQuery) (*EvaluationPlan, error) {
+	return nil, status.Error(codes.Unimplemented, "method Prepare not implemented")
+}
 func (UnimplementedEvaluationManagementServer) Create(context.Context, *EvaluationCreateCommand) (*EvaluationState, error) {
 	return nil, status.Error(codes.Unimplemented, "method Create not implemented")
 }
@@ -486,6 +504,24 @@ func RegisterEvaluationManagementServer(s grpc.ServiceRegistrar, srv EvaluationM
 		t.testEmbeddedByValue()
 	}
 	s.RegisterService(&EvaluationManagement_ServiceDesc, srv)
+}
+
+func _EvaluationManagement_Prepare_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(EvaluationPlanQuery)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(EvaluationManagementServer).Prepare(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: EvaluationManagement_Prepare_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(EvaluationManagementServer).Prepare(ctx, req.(*EvaluationPlanQuery))
+	}
+	return interceptor(ctx, in, info, handler)
 }
 
 func _EvaluationManagement_Create_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
@@ -675,6 +711,10 @@ var EvaluationManagement_ServiceDesc = grpc.ServiceDesc{
 	ServiceName: "qsai.workflow.v1.EvaluationManagement",
 	HandlerType: (*EvaluationManagementServer)(nil),
 	Methods: []grpc.MethodDesc{
+		{
+			MethodName: "Prepare",
+			Handler:    _EvaluationManagement_Prepare_Handler,
+		},
 		{
 			MethodName: "Create",
 			Handler:    _EvaluationManagement_Create_Handler,

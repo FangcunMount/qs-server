@@ -10297,6 +10297,67 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/core.ErrResponse'
+  /internal/v2/interpretation/ai-workflow/evaluations/prepare:
+    post:
+      tags:
+      - AI-Workflow-Management
+      summary: 准备 qs-ai 评测的完整版本清单与策略预算
+      description: 只读操作，需要当前机构解读审计权限；组织及操作人取认证上下文。不创建 Run、不预约额度、不调用模型，预算不表示当前可用额度。创建和启动另需明确确认。
+      operationId: 准备qsai评测的完整版本清单与策略预算
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/aibridge.EvaluationPlanQuery'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/core.Response'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/aibridge.EvaluationPlan'
+        '400':
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '409':
+          description: Conflict
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
   /internal/v2/interpretation/ai-workflow/evaluations/{run_id}:
     get:
       tags:
@@ -12320,6 +12381,38 @@ components:
           type: string
         version:
           type: integer
+    aibridge.EvaluationPlan:
+      type: object
+      properties:
+        candidate_count:
+          type: integer
+        candidates_per_case:
+          type: integer
+        execution_policy_json:
+          type: string
+        gate_policy_json:
+          type: string
+        generation_case_count:
+          type: integer
+        max_generation_invocations:
+          type: integer
+        max_semantic_invocations:
+          type: integer
+        preflight_case_count:
+          type: integer
+        release:
+          $ref: '#/components/schemas/aibridge.EvaluationRelease'
+        release_fingerprint:
+          type: string
+    aibridge.EvaluationPlanQuery:
+      type: object
+      properties:
+        generation_route:
+          $ref: '#/components/schemas/aibridge.FrozenEvaluationRef'
+        semantic_route:
+          $ref: '#/components/schemas/aibridge.FrozenEvaluationRef'
+        suite:
+          $ref: '#/components/schemas/aibridge.FrozenEvaluationRef'
     aibridge.EvaluationRelease:
       type: object
       properties:

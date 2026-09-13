@@ -21,6 +21,12 @@ type managementGateway struct {
 	scope    app.EvaluationScope
 }
 
+func (g *managementGateway) PrepareEvaluation(_ context.Context, s app.DraftScope, _ app.EvaluationPlanQuery) (app.EvaluationPlan, error) {
+	g.calls++
+	g.scope = app.EvaluationScope{OrganizationID: s.OrganizationID, OperatorUserID: s.OperatorUserID}
+	return app.EvaluationPlan{}, nil
+}
+
 func (g *managementGateway) GetEvaluation(_ context.Context, s app.EvaluationScope) (app.EvaluationState, error) {
 	g.calls++
 	g.scope = s

@@ -10373,6 +10373,88 @@ const docTemplate = `{
                 }
             }
         },
+        "/internal/v2/interpretation/ai-workflow/evaluations/prepare": {
+            "post": {
+                "description": "只读操作，需要当前机构解读审计权限；组织及操作人取认证上下文。不创建 Run、不预约额度、不调用模型，预算不表示当前可用额度。创建和启动另需明确确认。",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "AI-Workflow-Management"
+                ],
+                "summary": "准备 qs-ai 评测的完整版本清单与策略预算",
+                "parameters": [
+                    {
+                        "description": "确认的套件、生成路线和语义评测路线",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/aibridge.EvaluationPlanQuery"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/aibridge.EvaluationPlan"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/internal/v2/interpretation/ai-workflow/evaluations/{run_id}": {
             "get": {
                 "description": "需要当前机构解读审计权限；组织和操作人取认证上下文。管理功能默认关闭。",
@@ -12937,6 +13019,55 @@ const docTemplate = `{
                 },
                 "version": {
                     "type": "integer"
+                }
+            }
+        },
+        "aibridge.EvaluationPlan": {
+            "type": "object",
+            "properties": {
+                "candidate_count": {
+                    "type": "integer"
+                },
+                "candidates_per_case": {
+                    "type": "integer"
+                },
+                "execution_policy_json": {
+                    "type": "string"
+                },
+                "gate_policy_json": {
+                    "type": "string"
+                },
+                "generation_case_count": {
+                    "type": "integer"
+                },
+                "max_generation_invocations": {
+                    "type": "integer"
+                },
+                "max_semantic_invocations": {
+                    "type": "integer"
+                },
+                "preflight_case_count": {
+                    "type": "integer"
+                },
+                "release": {
+                    "$ref": "#/definitions/aibridge.EvaluationRelease"
+                },
+                "release_fingerprint": {
+                    "type": "string"
+                }
+            }
+        },
+        "aibridge.EvaluationPlanQuery": {
+            "type": "object",
+            "properties": {
+                "generation_route": {
+                    "$ref": "#/definitions/aibridge.FrozenEvaluationRef"
+                },
+                "semantic_route": {
+                    "$ref": "#/definitions/aibridge.FrozenEvaluationRef"
+                },
+                "suite": {
+                    "$ref": "#/definitions/aibridge.FrozenEvaluationRef"
                 }
             }
         },

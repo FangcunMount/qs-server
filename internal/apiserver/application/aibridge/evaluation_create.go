@@ -40,7 +40,7 @@ var frozenID = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9:._/-]{0,127}$`)
 var frozenVersion = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._/-]{0,127}$`)
 var frozenFingerprint = regexp.MustCompile(`^sha256:[0-9a-f]{64}$`)
 
-func (r EvaluationRelease) valid() bool {
+func (r EvaluationRelease) Valid() bool {
 	for _, ref := range []FrozenEvaluationRef{
 		r.Suite,
 		r.Prompt,
@@ -66,7 +66,7 @@ func (s *EvaluationAdministration) Create(ctx context.Context, scope EvaluationS
 		return EvaluationState{}, err
 	}
 	command.Reason = strings.TrimSpace(command.Reason)
-	if !command.Confirm || command.Reason == "" || len(command.Reason) > 1000 || strings.ContainsAny(command.Reason, "<>") || !command.Release.valid() {
+	if !command.Confirm || command.Reason == "" || len(command.Reason) > 1000 || strings.ContainsAny(command.Reason, "<>") || !command.Release.Valid() {
 		return EvaluationState{}, ErrInvalid
 	}
 	return s.Gateway.CreateEvaluation(ctx, scope, command)
