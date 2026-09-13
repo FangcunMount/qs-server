@@ -987,6 +987,68 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/core.ErrResponse'
+  /api/v1/assessments/{id}/ai-workflows/source:
+    get:
+      tags:
+      - AI解读
+      summary: 查询新版 AI 工作流的当前报告来源
+      security:
+      - BearerAuth: []
+      operationId: 查询新版AI工作流的当前报告来源
+      description: 查询新版 AI 工作流的当前报告来源
+      parameters:
+      - type: integer
+        description: 测评ID
+        name: id
+        in: path
+        required: true
+      - type: integer
+        description: 受试者ID
+        name: testee_id
+        in: query
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/core.Response'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/github_com_FangcunMount_qs-server_internal_collection-server_application_aiexplanation.WorkflowSource'
+        '400':
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '503':
+          description: Service Unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '500':
+          description: 服务内部错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
   /api/v1/assessments/{id}/ai-workflows/{request_id}:
     get:
       tags:
@@ -3684,6 +3746,15 @@ components:
           type: string
         version:
           type: integer
+    github_com_FangcunMount_qs-server_internal_collection-server_application_aiexplanation.WorkflowSource:
+      type: object
+      properties:
+        report_id:
+          type: string
+        source_version:
+          type: string
+        status:
+          type: string
     github_com_FangcunMount_qs-server_internal_collection-server_application_answersheet.Answer:
       type: object
       required:

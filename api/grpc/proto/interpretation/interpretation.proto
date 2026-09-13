@@ -15,6 +15,7 @@ service ParticipantReportService {
 // Standard report reads stay on ParticipantReportService and do not depend on
 // this service being configured or available.
 service ParticipantAIExplanationService {
+  rpc GetAIWorkflowSource(GetAIWorkflowSourceRequest) returns (AIWorkflowSource);
   rpc RequestAIWorkflow(RequestAIWorkflowRequest) returns (AIWorkflowAccepted);
   rpc GetAIWorkflow(GetAIWorkflowRequest) returns (AIWorkflowResult);
   rpc GetAIExplanationCapability(GetAIExplanationCapabilityRequest) returns (AIExplanationResponse);
@@ -315,4 +316,12 @@ message AIWorkflowResult {
   string artifact_id = 5;
   string report_id = 6;
   string source_version = 7;
+}
+
+// Current authorized report provenance only; no admission reservation or model call.
+message GetAIWorkflowSourceRequest { uint64 testee_id = 1; uint64 assessment_id = 2; }
+message AIWorkflowSource {
+  string status = 1; // ready, not_ready, not_applicable
+  string report_id = 2;
+  string source_version = 3;
 }

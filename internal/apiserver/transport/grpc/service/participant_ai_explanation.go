@@ -314,3 +314,25 @@ func toProtoAIWorkflowResult(requestID string, event *bridge.Event) (*interpreta
 	}
 	return result, nil
 }
+
+// GetAIWorkflowSource works independently of the retired legacy AI service.
+func (s *ParticipantAIExplanationService) GetAIWorkflowSource(ctx context.Context, request *interpretationpb.GetAIWorkflowSourceRequest) (*interpretationpb.AIWorkflowSource, error) {
+	if request == nil || request.TesteeId == 0 || request.AssessmentId == 0 {
+		return nil, status.Error(codes.InvalidArgument, "testee and assessment are required")
+	}
+	if s.Workflow == nil {
+		return nil, status.Error(codes.Unavailable, "AI workflow is not configured")
+	}
+	token, err := verifyDelegatedSubject(ctx, s.delegatedVerifier, request.TesteeId, delegatedsubject.PurposeAIExplanationCapability, true)
+	if err != nil {
+		return nil, err
+	}
+	result, err := s.Workflow.Source(ctx, bridge.Actor{OrgID: fmt.Sprint(token.OrgID), SubjectID: token.UserID}, request.TesteeId, request.AssessmentId)
+	if errors.Is(err, bridge.ErrInvalid) {
+		return nil, status.Error(codes.InvalidArgument, "invalid workflow source request")
+	}
+	if err != nil {
+		return nil, toAIExplanationGRPCError(err)
+	}
+	return &interpretationpb.AIWorkflowSource{Status: result.Status, ReportId: result.ReportID, SourceVersion: result.SourceVersion}, nil
+}

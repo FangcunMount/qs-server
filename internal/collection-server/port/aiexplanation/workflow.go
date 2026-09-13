@@ -26,3 +26,13 @@ type WorkflowResult struct {
 type WorkflowReader interface {
 	GetWorkflow(context.Context, uint64, uint64, string) (*WorkflowResult, error)
 }
+
+// WorkflowSource is authorized source readiness, not AI admission approval.
+type WorkflowSource struct {
+	Status        string `json:"status"`
+	ReportID      string `json:"report_id,omitempty"`
+	SourceVersion string `json:"source_version,omitempty"`
+}
+type WorkflowSourceReader interface {
+	GetWorkflowSource(context.Context, uint64, uint64) (*WorkflowSource, error)
+}

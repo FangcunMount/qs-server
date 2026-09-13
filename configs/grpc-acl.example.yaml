@@ -32,6 +32,7 @@ services:
       - /interpretation.ParticipantReportService/GetAssessmentReport
       - /interpretation.ParticipantAIExplanationService/GetAIExplanationCapability
       - /interpretation.ParticipantAIExplanationService/GetAIWorkflow
+      - /interpretation.ParticipantAIExplanationService/GetAIWorkflowSource
       - /interpretation.ParticipantAIExplanationService/RequestAIWorkflow
       - /interpretation.ParticipantAIExplanationService/RequestAIExplanation
       - /interpretation.ParticipantAIExplanationService/GetAIExplanation

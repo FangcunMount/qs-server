@@ -228,3 +228,20 @@ func (c *ParticipantAIExplanationClient) GetWorkflow(ctx context.Context, testee
 	}
 	return &aiport.WorkflowResult{RequestID: result.RequestId, Status: result.Status, Version: result.Version, Content: json.RawMessage(result.ContentJson), ArtifactID: result.ArtifactId, ReportID: result.ReportId, SourceVersion: result.SourceVersion}, nil
 }
+
+func (c *ParticipantAIExplanationClient) GetWorkflowSource(ctx context.Context, testeeID, assessmentID uint64) (*aiport.WorkflowSource, error) {
+	ctx, cancel := c.client.ContextWithTimeout(ctx)
+	defer cancel()
+	ctx, err := c.attachDelegatedSubject(ctx, testeeID, delegatedsubject.PurposeAIExplanationCapability)
+	if err != nil {
+		return nil, err
+	}
+	result, err := c.service.GetAIWorkflowSource(ctx, &interpretationpb.GetAIWorkflowSourceRequest{TesteeId: testeeID, AssessmentId: assessmentID})
+	if err != nil {
+		return nil, err
+	}
+	if result == nil {
+		return nil, fmt.Errorf("missing AI workflow source")
+	}
+	return &aiport.WorkflowSource{Status: result.Status, ReportID: result.ReportId, SourceVersion: result.SourceVersion}, nil
+}

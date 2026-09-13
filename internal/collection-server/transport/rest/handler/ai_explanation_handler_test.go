@@ -193,3 +193,23 @@ func TestWorkflowReadHandlerUsesParticipantAndRequestIdentity(t *testing.T) {
 		t.Fatalf("response=%d %s", recorder.Code, recorder.Body.String())
 	}
 }
+
+func (s *workflowHandlerStub) GetWorkflowSource(_ context.Context, testee, assessment uint64) (*app.WorkflowSource, error) {
+	s.called = true
+	if testee != 7 || assessment != 42 {
+		return nil, app.ErrInvalidRequest
+	}
+	return &app.WorkflowSource{Status: "ready", ReportID: "99", SourceVersion: "standard-v1:101"}, nil
+}
+func TestWorkflowSourceRouteReturnsProvenanceInsteadOfParsingSourceAsRequestID(t *testing.T) {
+	stub := &workflowHandlerStub{}
+	h := NewAIExplanationHandler(stub)
+	r := gin.New()
+	r.GET("/assessments/:id/ai-workflows/source", h.GetWorkflowSource)
+	r.GET("/assessments/:id/ai-workflows/:request_id", h.GetWorkflow)
+	recorder := httptest.NewRecorder()
+	r.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "/assessments/42/ai-workflows/source?testee_id=7", nil))
+	if !stub.called || recorder.Code != http.StatusOK || !strings.Contains(recorder.Body.String(), `"report_id":"99"`) || strings.Contains(recorder.Body.String(), "request_id") {
+		t.Fatalf("%d %s", recorder.Code, recorder.Body.String())
+	}
+}

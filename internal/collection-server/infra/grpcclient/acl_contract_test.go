@@ -22,8 +22,8 @@ func TestCollectionServerACLContract(t *testing.T) {
 	t.Parallel()
 
 	allowed := ACLAllowedMethods()
-	if len(allowed) != 32 {
-		t.Fatalf("ACLAllowedMethods() count = %d, want 32", len(allowed))
+	if len(allowed) != 33 {
+		t.Fatalf("ACLAllowedMethods() count = %d, want 33", len(allowed))
 	}
 	assertUniqueMethods(t, allowed)
 	assertExactMethods(t, allowed, discoverOutboundRPCMethods(t))

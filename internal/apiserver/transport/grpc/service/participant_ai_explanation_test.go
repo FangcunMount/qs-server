@@ -173,3 +173,25 @@ func TestWorkflowReadReturnsOnlyContentAndProvenance(t *testing.T) {
 		t.Fatal("internal provider identifier exposed")
 	}
 }
+
+func TestWorkflowSourceRequiresCorrectDelegationWithLegacyServiceAbsent(t *testing.T) {
+	options := &delegatedsubject.Options{Enabled: true, CurrentKey: "test-current-key", TTL: time.Minute}
+	signer, _ := delegatedsubject.NewSignerFromOptions(options)
+	verifier, _ := delegatedsubject.NewVerifierFromOptions(options)
+	service := NewParticipantAIExplanationService(nil, nil, verifier)
+	service.Workflow = &bridge.Participant{}
+	for _, purpose := range []string{delegatedsubject.PurposeAIExplanationRequest, delegatedsubject.PurposeAIExplanationGet} {
+		raw, _ := signer.Sign(delegatedsubject.SignInput{UserID: "42", TesteeID: 7, OrgID: 9, Purpose: purpose, TTL: time.Minute})
+		ctx := withMTLSWorkload(metadata.NewIncomingContext(context.Background(), metadata.Pairs(delegatedsubject.MetadataKey, raw)), serviceidentity.CollectionServerCertificateCommonName)
+		if _, err := service.GetAIWorkflowSource(ctx, &interpretationpb.GetAIWorkflowSourceRequest{TesteeId: 7, AssessmentId: 42}); status.Code(err) != codes.PermissionDenied {
+			t.Fatalf("wrong purpose accepted: %v", err)
+		}
+	}
+	if _, err := service.GetAIWorkflowSource(context.Background(), &interpretationpb.GetAIWorkflowSourceRequest{TesteeId: 7, AssessmentId: 42}); err == nil {
+		t.Fatal("missing workload/delegation accepted")
+	}
+	service.Workflow = nil
+	if _, err := service.GetAIWorkflowSource(context.Background(), &interpretationpb.GetAIWorkflowSourceRequest{TesteeId: 7, AssessmentId: 42}); status.Code(err) != codes.Unavailable {
+		t.Fatalf("disabled workflow: %v", err)
+	}
+}
