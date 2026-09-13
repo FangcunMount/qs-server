@@ -193,6 +193,10 @@ message EvaluationState {
  string creation_json = 9;
  // Audited general cancellation, distinct from an unknown-call resolution.
  string cancellation_json = 10;
+ // Qualification at this Run version, computed from the original evidence.
+ // Not authorization: ReopenReview rechecks scope, CAS and domain policy.
+ // Absent on older servers; false is an explicit ineligible result.
+ optional bool can_reopen_review = 11;
 }
 
 message SemanticContradictionReview {

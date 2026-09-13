@@ -69,7 +69,7 @@ func state(response *pb.EvaluationState, scope app.EvaluationScope) (app.Evaluat
 		}
 	}
 	return app.EvaluationState{RunID: response.RunId, Version: response.Version, Status: response.Status,
-		UnresolvedResultUnknownCount: response.UnresolvedResultUnknownCount, Resolutions: json.RawMessage(response.ResolutionsJson), Reviews: json.RawMessage(reviews), Finalization: final, ReviewReopenings: reopenings, Creation: creation, Cancellation: cancellation}, nil
+		UnresolvedResultUnknownCount: response.UnresolvedResultUnknownCount, Resolutions: json.RawMessage(response.ResolutionsJson), Reviews: json.RawMessage(reviews), Finalization: final, ReviewReopenings: reopenings, CanReopenReview: response.CanReopenReview, Creation: creation, Cancellation: cancellation}, nil
 }
 func (c *EvaluationClient) GetEvaluation(ctx context.Context, scope app.EvaluationScope) (app.EvaluationState, error) {
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)

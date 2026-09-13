@@ -25,14 +25,15 @@ type reviewReopeningReceipt struct {
 	ReopenedAt           string            `json:"reopened_at"`
 }
 
-// Verify transport bindings. AI remains responsible for rebuilding every old gate.
+// Verify audit identity, ordering and bounded transport data. Review counts,
+// eligible candidates, round limits and gate policy belong to AI.
 func reviewReopenings(response *pb.EvaluationState) (json.RawMessage, error) {
 	raw := response.ReopeningsJson
 	if raw == "" { // Compatibility with AI versions predating review reopening.
 		raw = "[]"
 	}
 	var history []reviewReopeningReceipt
-	if len(raw) > 2*1024*1024 || !utf8.ValidString(raw) || json.Unmarshal([]byte(raw), &history) != nil || history == nil || len(history) > 3 {
+	if len(raw) > 2*1024*1024 || !utf8.ValidString(raw) || json.Unmarshal([]byte(raw), &history) != nil || history == nil {
 		return nil, app.ErrConflict
 	}
 	var previousVersion, boundary int64
@@ -40,7 +41,7 @@ func reviewReopenings(response *pb.EvaluationState) (json.RawMessage, error) {
 	var fingerprint string
 	for i, entry := range history {
 		if entry.SourceVersion < 1 || entry.Version-1 != entry.SourceVersion || entry.Version > response.Version || entry.SourceVersion <= previousVersion ||
-			entry.TransitionCount < 1 || (i > 0 && entry.TransitionCount != boundary+2) || len(entry.PreviousReviews) != 70 || len(entry.CandidateIDs) < 1 || len(entry.CandidateIDs) > 35 ||
+			entry.TransitionCount < 1 || (i > 0 && entry.TransitionCount <= boundary) || entry.PreviousReviews == nil || entry.CandidateIDs == nil ||
 			strings.TrimSpace(entry.Reason) == "" || len(entry.Reason) > 1000 || strings.ContainsAny(entry.Reason, "<>") {
 			return nil, app.ErrConflict
 		}
@@ -55,12 +56,10 @@ func reviewReopenings(response *pb.EvaluationState) (json.RawMessage, error) {
 			}
 			seen[id] = true
 		}
-		archived := &pb.EvaluationState{RunId: response.RunId, Version: entry.SourceVersion, Status: "rejected", FinalizationJson: string(entry.PreviousFinalization)}
-		if _, err := finalization(archived); err != nil {
-			return nil, err
-		}
 		var final finalizationReceipt
-		if json.Unmarshal(entry.PreviousFinalization, &final) != nil {
+		if json.Unmarshal(entry.PreviousFinalization, &final) != nil || final.SchemaVersion != "qs-ai-evaluation-finalization/v1" || final.RunID != response.RunId ||
+			final.Version != entry.SourceVersion || final.SourceVersion < 1 || final.SourceVersion != final.Version-1 ||
+			!gateReleaseFingerprint.MatchString(final.ReleaseFingerprint) {
 			return nil, app.ErrConflict
 		}
 		openedAt, err := time.Parse(time.RFC3339Nano, entry.ReopenedAt)
@@ -71,7 +70,9 @@ func reviewReopenings(response *pb.EvaluationState) (json.RawMessage, error) {
 		previousVersion, boundary, previousTime, fingerprint = entry.Version, entry.TransitionCount, openedAt, final.ReleaseFingerprint
 	}
 	if len(history) > 0 {
-		if response.UnresolvedResultUnknownCount != 0 || (response.Status != "awaiting_review" && response.Status != "approved" && response.Status != "rejected") {
+		// Canceled histories must first be bound to the cancellation receipt's
+		// source version by state(); missing evidence cannot imply acceptance.
+		if response.Status == "canceled" {
 			return nil, app.ErrConflict
 		}
 		if response.FinalizationJson != "" {
