@@ -13018,6 +13018,8 @@ components:
     aibridge.EvaluationState:
       type: object
       properties:
+        can_reopen_review:
+          type: boolean
         cancellation:
           $ref: '#/components/schemas/aibridge.EvaluationCancellationReceipt'
         creation:

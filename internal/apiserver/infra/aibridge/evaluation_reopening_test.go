@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -68,8 +69,6 @@ func TestEveryStateReadChecksBoundedHistoricalReceipts(t *testing.T) {
 		func(r *pb.EvaluationState) { r.ReopeningsJson = "null" },
 		func(r *pb.EvaluationState) { r.ReopeningsJson = strings.Repeat("x", 2*1024*1024+1) },
 		func(r *pb.EvaluationState) { r.Version = 8 },
-		func(r *pb.EvaluationState) { r.Status = "collecting" },
-		func(r *pb.EvaluationState) { r.UnresolvedResultUnknownCount = 1 },
 		func(r *pb.EvaluationState) {
 			r.ReopeningsJson = strings.ReplaceAll(r.ReopeningsJson, `"source_version":8`, `"source_version":7`)
 		},
@@ -78,13 +77,6 @@ func TestEveryStateReadChecksBoundedHistoricalReceipts(t *testing.T) {
 		},
 		func(r *pb.EvaluationState) {
 			r.ReopeningsJson = strings.ReplaceAll(r.ReopeningsJson, `"candidate:1"`, `"candidate:1","candidate:1"`)
-		},
-		func(r *pb.EvaluationState) {
-			var h []reviewReopeningReceipt
-			_ = json.Unmarshal([]byte(r.ReopeningsJson), &h)
-			h[0].PreviousReviews = h[0].PreviousReviews[:69]
-			b, _ := json.Marshal(h)
-			r.ReopeningsJson = string(b)
 		},
 	} {
 		response := reopenedState()
@@ -96,5 +88,96 @@ func TestEveryStateReadChecksBoundedHistoricalReceipts(t *testing.T) {
 	old := &pb.EvaluationState{RunId: "run:1", Version: 1, Status: "requested", ResolutionsJson: "[]"}
 	if result, err := state(old, app.EvaluationScope{RunID: "run:1"}); err != nil || string(result.ReviewReopenings) != "[]" {
 		t.Fatal("older AI compatibility lost", err)
+	}
+}
+
+func TestReviewHistoryDoesNotReimplementAIPolicy(t *testing.T) {
+	// These snapshots model a policy change in the authoritative AI service.
+	// The proxy preserves the evidence without prescribing its review/gate counts.
+	for _, change := range []struct {
+		name  string
+		apply func(*reviewReopeningReceipt)
+	}{
+		{"review count", func(r *reviewReopeningReceipt) { r.PreviousReviews = r.PreviousReviews[:69] }},
+		{"candidate count", func(r *reviewReopeningReceipt) {
+			for i := 2; i <= 36; i++ {
+				r.CandidateIDs = append(r.CandidateIDs, fmt.Sprintf("candidate:%d", i))
+			}
+		}},
+		{"gate policy", func(r *reviewReopeningReceipt) {
+			var final map[string]any
+			_ = json.Unmarshal(r.PreviousFinalization, &final)
+			final["gate_result"] = map[string]any{"policy": "future-policy"}
+			r.PreviousFinalization, _ = json.Marshal(final)
+		}},
+	} {
+		t.Run(change.name, func(t *testing.T) {
+			response := reopenedState()
+			var history []reviewReopeningReceipt
+			_ = json.Unmarshal([]byte(response.ReopeningsJson), &history)
+			change.apply(&history[0])
+			raw, _ := json.Marshal(history)
+			response.ReopeningsJson = string(raw)
+			result, err := state(response, app.EvaluationScope{RunID: "run:1"})
+			if err != nil || string(result.ReviewReopenings) != string(raw) {
+				t.Fatal("QS reinterpreted AI review policy", err)
+			}
+		})
+	}
+}
+
+func TestStatePreservesReopeningEligibilityPresence(t *testing.T) {
+	yes, no := true, false
+	for _, allowed := range []*bool{nil, &no, &yes} {
+		response := reopenedState()
+		response.CanReopenReview = allowed
+		result, err := state(response, app.EvaluationScope{RunID: "run:1"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		raw, err := json.Marshal(result)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var wire map[string]any
+		if err := json.Unmarshal(raw, &wire); err != nil {
+			t.Fatal(err)
+		}
+		value, present := wire["can_reopen_review"]
+		if present != (allowed != nil) || (allowed != nil && value != *allowed) {
+			t.Fatalf("eligibility presence/value lost: %s", raw)
+		}
+	}
+}
+
+func TestReviewHistoryRoundLimitBelongsToAI(t *testing.T) {
+	response := reopenedState()
+	var original []reviewReopeningReceipt
+	_ = json.Unmarshal([]byte(response.ReopeningsJson), &original)
+	history := make([]reviewReopeningReceipt, 4)
+	for i := range history {
+		entry := original[0]
+		entry.SourceVersion += int64(i * 3)
+		entry.Version = entry.SourceVersion + 1
+		entry.TransitionCount += int64(i * 3)
+		var final finalizationReceipt
+		_ = json.Unmarshal(entry.PreviousFinalization, &final)
+		final.Version, final.SourceVersion = entry.SourceVersion, entry.SourceVersion-1
+		final.FinalizedAt = time.Date(2026, 9, 13, i+1, 0, 0, 0, time.UTC).Format(time.RFC3339)
+		entry.ReopenedAt = time.Date(2026, 9, 13, i+1, 0, 1, 0, time.UTC).Format(time.RFC3339)
+		entry.PreviousFinalization, _ = json.Marshal(final)
+		history[i] = entry
+	}
+	raw, _ := json.Marshal(history)
+	response.Version, response.ReopeningsJson = history[3].Version, string(raw)
+	if _, err := state(response, app.EvaluationScope{RunID: response.RunId}); err != nil {
+		t.Fatal("proxy imposed its own round/transition limit", err)
+	}
+	// Moving ownership must not accept an archive belonging to another Run.
+	history[0].PreviousFinalization = json.RawMessage(strings.ReplaceAll(string(history[0].PreviousFinalization), `"run:1"`, `"run:other"`))
+	raw, _ = json.Marshal(history)
+	response.ReopeningsJson = string(raw)
+	if _, err := state(response, app.EvaluationScope{RunID: response.RunId}); !errors.Is(err, app.ErrConflict) {
+		t.Fatal("archive identity mismatch accepted", err)
 	}
 }

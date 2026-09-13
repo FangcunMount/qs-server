@@ -13852,6 +13852,9 @@ const docTemplate = `{
         "aibridge.EvaluationState": {
             "type": "object",
             "properties": {
+                "can_reopen_review": {
+                    "type": "boolean"
+                },
                 "cancellation": {
                     "$ref": "#/definitions/aibridge.EvaluationCancellationReceipt"
                 },

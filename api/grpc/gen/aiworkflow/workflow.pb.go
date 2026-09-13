@@ -1847,8 +1847,12 @@ type EvaluationState struct {
 	CreationJson string `protobuf:"bytes,9,opt,name=creation_json,json=creationJson,proto3" json:"creation_json,omitempty"`
 	// Audited general cancellation, distinct from an unknown-call resolution.
 	CancellationJson string `protobuf:"bytes,10,opt,name=cancellation_json,json=cancellationJson,proto3" json:"cancellation_json,omitempty"`
-	unknownFields    protoimpl.UnknownFields
-	sizeCache        protoimpl.SizeCache
+	// Qualification at this Run version, computed from the original evidence.
+	// Not authorization: ReopenReview rechecks scope, CAS and domain policy.
+	// Absent on older servers; false is an explicit ineligible result.
+	CanReopenReview *bool `protobuf:"varint,11,opt,name=can_reopen_review,json=canReopenReview,proto3,oneof" json:"can_reopen_review,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
 }
 
 func (x *EvaluationState) Reset() {
@@ -1949,6 +1953,13 @@ func (x *EvaluationState) GetCancellationJson() string {
 		return x.CancellationJson
 	}
 	return ""
+}
+
+func (x *EvaluationState) GetCanReopenReview() bool {
+	if x != nil && x.CanReopenReview != nil {
+		return *x.CanReopenReview
+	}
+	return false
 }
 
 type SemanticContradictionReview struct {
@@ -4950,7 +4961,7 @@ const file_aiworkflow_workflow_proto_rawDesc = "" +
 	"canResolve\x12L\n" +
 	"\n" +
 	"executions\x18\a \x03(\v2,.qsai.workflow.v1.EvaluationUnknownExecutionR\n" +
-	"executions\"\x97\x03\n" +
+	"executions\"\xde\x03\n" +
 	"\x0fEvaluationState\x12\x15\n" +
 	"\x06run_id\x18\x01 \x01(\tR\x05runId\x12\x18\n" +
 	"\aversion\x18\x02 \x01(\x03R\aversion\x12\x16\n" +
@@ -4962,7 +4973,9 @@ const file_aiworkflow_workflow_proto_rawDesc = "" +
 	"\x0freopenings_json\x18\b \x01(\tR\x0ereopeningsJson\x12#\n" +
 	"\rcreation_json\x18\t \x01(\tR\fcreationJson\x12+\n" +
 	"\x11cancellation_json\x18\n" +
-	" \x01(\tR\x10cancellationJson\"\xb1\x02\n" +
+	" \x01(\tR\x10cancellationJson\x12/\n" +
+	"\x11can_reopen_review\x18\v \x01(\bH\x00R\x0fcanReopenReview\x88\x01\x01B\x14\n" +
+	"\x12_can_reopen_review\"\xb1\x02\n" +
 	"\x1bSemanticContradictionReview\x12%\n" +
 	"\x0epolicy_version\x18\x01 \x01(\tR\rpolicyVersion\x12!\n" +
 	"\fexecution_id\x18\x02 \x01(\tR\vexecutionId\x12-\n" +
@@ -5496,6 +5509,7 @@ func file_aiworkflow_workflow_proto_init() {
 	file_aiworkflow_workflow_proto_msgTypes[2].OneofWrappers = []any{}
 	file_aiworkflow_workflow_proto_msgTypes[11].OneofWrappers = []any{}
 	file_aiworkflow_workflow_proto_msgTypes[12].OneofWrappers = []any{}
+	file_aiworkflow_workflow_proto_msgTypes[24].OneofWrappers = []any{}
 	file_aiworkflow_workflow_proto_msgTypes[33].OneofWrappers = []any{}
 	file_aiworkflow_workflow_proto_msgTypes[51].OneofWrappers = []any{}
 	type x struct{}

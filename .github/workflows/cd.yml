@@ -118,6 +118,9 @@ jobs:
           ref: ${{ env.DEPLOY_SHA }}
           fetch-depth: 0
 
+      - name: Test deployment lock bootstrap
+        run: python3 scripts/cd/test_image_deploy_lock.py
+
       - name: Test image retention policy
         run: python3 scripts/cd/test_image_retention.py
 

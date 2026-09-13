@@ -40,6 +40,7 @@ type EvaluationState struct {
 	Reviews                      json.RawMessage                `json:"reviews" swaggertype:"array,object"`
 	Finalization                 json.RawMessage                `json:"finalization,omitempty" swaggertype:"object"`
 	ReviewReopenings             json.RawMessage                `json:"review_reopenings" swaggertype:"array,object"`
+	CanReopenReview              *bool                          `json:"can_reopen_review,omitempty"`
 	Creation                     *EvaluationCreationReceipt     `json:"creation,omitempty"`
 	Cancellation                 *EvaluationCancellationReceipt `json:"cancellation,omitempty"`
 }
