@@ -131,6 +131,15 @@ definitions:
       slot_ordinal:
         type: integer
     type: object
+  aibridge.EvaluationCatalogPage:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/aibridge.EvaluationSummary'
+        type: array
+      next_cursor:
+        type: string
+    type: object
   aibridge.EvaluationCreate:
     properties:
       confirm:
@@ -287,6 +296,45 @@ definitions:
         items:
           type: object
         type: array
+      run_id:
+        type: string
+      status:
+        type: string
+      unresolved_result_unknown_count:
+        type: integer
+      version:
+        type: integer
+    type: object
+  aibridge.EvaluationSummary:
+    properties:
+      accepted_candidates:
+        type: integer
+      created_at:
+        type: string
+      last_cause:
+        type: string
+      last_reason:
+        type: string
+      organization_id:
+        type: integer
+      profile_id:
+        type: string
+      profile_version:
+        type: string
+      prompt_id:
+        type: string
+      prompt_version:
+        type: string
+      release_fingerprint:
+        type: string
+      requested_by:
+        type: string
+      required_candidates:
+        type: integer
+      review_count:
+        type: integer
+      review_ready_candidates:
+        type: integer
       run_id:
         type: string
       status:
@@ -15023,6 +15071,57 @@ paths:
       summary: 查询 qs-ai 不可变资产原文
       tags:
       - AI-Workflow-Assets
+  /internal/v2/interpretation/ai-workflow/evaluations:
+    get:
+      description: 复用当前机构解读审计权限，按状态和创建时间分页，仅返回摘要。组织及操作者取认证上下文；游标绑定机构和筛选，不授予写权限，也不返回模型原始输出。
+      parameters:
+      - description: requested/collecting/blocked/awaiting_review/approved/rejected/canceled
+        in: query
+        name: status
+        type: string
+      - description: 每页 1–100，默认 20
+        in: query
+        name: limit
+        type: integer
+      - description: 上一页游标，改变筛选时清空
+        in: query
+        name: cursor
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/aibridge.EvaluationCatalogPage'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+      summary: 查询 qs-ai 原生评测任务目录
+      tags:
+      - AI-Workflow-Management
   /internal/v2/interpretation/ai-workflow/evaluations/{run_id}:
     get:
       description: 需要当前机构解读审计权限；组织和操作人取认证上下文。管理功能默认关闭。

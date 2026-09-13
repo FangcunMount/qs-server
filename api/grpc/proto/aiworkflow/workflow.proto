@@ -38,6 +38,8 @@ message EvidenceItem {
 
 // Trusted QS backend only. QS authorizes governance writes and candidate audit reads.
 service EvaluationManagement {
+ // Organization-scoped summary pages; never schedules work or authorizes mutations.
+ rpc List(EvaluationCatalogQuery) returns (EvaluationCatalogPage);
  // Resolve all eleven immutable references and policy budgets; no creation or scheduling.
  rpc Prepare(EvaluationPlanQuery) returns (EvaluationPlan);
  // The caller reuses scope.run_id for retries of the identical creation request.
@@ -507,4 +509,35 @@ message AssetCatalogGetQuery {
 message AssetCatalogResponse {
   string schema_version = 1;
   string payload_json = 2;
+}
+
+message EvaluationCatalogQuery {
+ PublicationScope scope = 1;
+ string status = 2;
+ int32 limit = 3;
+ string cursor = 4;
+}
+message EvaluationCatalogPage {
+ repeated EvaluationSummary items = 1;
+ string next_cursor = 2;
+}
+message EvaluationSummary {
+ string run_id = 1;
+ int64 organization_id = 2;
+ int64 version = 3;
+ string status = 4;
+ string created_at = 5;
+ string requested_by = 6;
+ string profile_id = 7;
+ string profile_version = 8;
+ string prompt_id = 9;
+ string prompt_version = 10;
+ string release_fingerprint = 11;
+ int64 unresolved_result_unknown_count = 12;
+ int64 review_count = 13;
+ int64 required_candidates = 14;
+ int64 accepted_candidates = 15;
+ int64 review_ready_candidates = 16;
+ string last_cause = 17;
+ string last_reason = 18;
 }
