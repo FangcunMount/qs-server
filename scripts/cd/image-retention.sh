@@ -1,14 +1,33 @@
 #!/usr/bin/env bash
 # Shared host lock: acquire BEFORE loading/pulling or replacing any image/container.
 # SUDO is the existing deploy wrapper (sudo or sudo_pw).
+# Publish a prepared inode with existing sudo permissions. The package directory
+# and retention directory must share a filesystem; failed initialization stops deploy.
+# A subshell keeps cleanup separate from the caller's deployment EXIT trap.
+initialize_image_deploy_lock() (
+  local directory="$1" lock temporary
+  lock="$directory/deploy.lock"
+  $SUDO mkdir -p "$directory" || exit 1
+  $SUDO chmod 0755 "$directory" || exit 1
+  if [ -e "$lock" ] || [ -L "$lock" ]; then
+    [ -f "$lock" ] && [ ! -L "$lock" ]
+    exit $?
+  fi
+  temporary="$(mktemp -d "$SCRIPT_DIR/.retention-lock.XXXXXX")" || exit 1
+  trap 'rm -rf -- "$temporary"' EXIT
+  : > "$temporary/lock" || exit 1
+  $SUDO chown root:root "$temporary/lock" || exit 1
+  $SUDO chmod 0666 "$temporary/lock" || exit 1
+  # No force: never replace an inode another process may already have locked.
+  if ! $SUDO ln -- "$temporary/lock" "$lock"; then
+    [ -f "$lock" ] && [ ! -L "$lock" ] || exit 1
+  fi
+)
+
 acquire_image_deploy_lock() {
   command -v python3 >/dev/null
   command -v flock >/dev/null
-  $SUDO mkdir -p /var/lib/fangcun-image-retention
-  $SUDO chmod 0755 /var/lib/fangcun-image-retention
-  # Do not replace/unlink the inode: all deployment users lock the same file.
-  $SUDO touch /var/lib/fangcun-image-retention/deploy.lock
-  $SUDO chmod 0666 /var/lib/fangcun-image-retention/deploy.lock
+  initialize_image_deploy_lock /var/lib/fangcun-image-retention || return 1
   exec 9<>/var/lib/fangcun-image-retention/deploy.lock
   flock -w 1800 9
   RETENTION_PREVIOUS_IDS=()

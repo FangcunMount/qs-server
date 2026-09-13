@@ -395,6 +395,9 @@ jobs:
       - name: Validate AI evaluation size audit contract
         run: bash scripts/cd/test-ai-evaluation-size-audit-workflow.sh
 
+      - name: Test deployment lock bootstrap
+        run: python3 scripts/cd/test_image_deploy_lock.py
+
       - name: Validate deployment shell scripts
         run: bash -n scripts/cd/*.sh
 

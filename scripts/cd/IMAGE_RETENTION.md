@@ -40,3 +40,11 @@ sudo python3 /path/to/image-retention.py --service SERVICE --image-ref REPOSITOR
 修改策略时同步 qs-server、iam、qs-operating-system、qs-ai 中的脚本和测试。
 本改动不安装定时任务，不调整远程镜像仓库策略，不清理发布目录或备份。
 合并并成功执行新版 CI/CD 后才在生产生效；本地测试通过不代表生产已接入。
+
+## 部署锁初始化兼容性
+
+Shell 入口使用已获准的 mkdir/chown/chmod/ln 初始化锁，不要求 sudo touch。
+候选文件在发布包目录内准备，通过不覆盖目标的硬链接发布；包目录与锁目录必须位于同一文件系统。
+已有锁保持 inode 和内容，竞争初始化复用获胜者；初始化失败则停止部署。临时文件自动清理。
+`python3 scripts/cd/test_image_deploy_lock.py` 验证命令权限边界、竞争与失败路径。
+镜像清理仍需单独的执行权限；清理助手被拒绝时只记录警告，不视为清理成功，也不因此回滚健康服务。
