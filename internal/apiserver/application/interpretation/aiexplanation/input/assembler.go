@@ -15,7 +15,7 @@ import (
 	"time"
 	"unicode/utf8"
 
-	appsource "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/aiexplanation/source"
+	appsource "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/reportsource"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/aiexplanation"
 	domaininput "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/aiexplanation/input"
 	domainprofile "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/aiexplanation/profile"

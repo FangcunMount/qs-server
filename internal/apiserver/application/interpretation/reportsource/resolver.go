@@ -1,6 +1,6 @@
-// Package source resolves the current immutable standard report and its
+// Package reportsource resolves the current immutable standard report and its
 // committed EvaluationOutcome for AI explanation input assembly.
-package source
+package reportsource
 
 import (
 	"context"

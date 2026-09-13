@@ -7,7 +7,7 @@ import (
 	"time"
 
 	appport "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/aiexplanation/port"
-	appsource "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/aiexplanation/source"
+	appsource "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/reportsource"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/aiexplanation"
 	domainartifact "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/aiexplanation/artifact"
 	domaingeneration "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/aiexplanation/generation"

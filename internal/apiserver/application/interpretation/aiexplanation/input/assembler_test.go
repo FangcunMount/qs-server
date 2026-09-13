@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	appsource "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/aiexplanation/source"
+	appsource "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/reportsource"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/aiexplanation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/aiexplanation/output"
 	domainprofile "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/aiexplanation/profile"
