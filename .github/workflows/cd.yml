@@ -118,6 +118,9 @@ jobs:
           ref: ${{ env.DEPLOY_SHA }}
           fetch-depth: 0
 
+      - name: Test image retention policy
+        run: python3 scripts/cd/test_image_retention.py
+
       - name: Resolve last completed full production deployment
         id: production_baseline
         if: github.event_name == 'workflow_run'
