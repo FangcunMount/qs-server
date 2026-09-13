@@ -31,7 +31,6 @@ func newAIExplanationTestContext(method, target, body string) (*httptest.Respons
 }
 
 type workflowHandlerStub struct {
-	aiExplanationService
 	called bool
 }
 
