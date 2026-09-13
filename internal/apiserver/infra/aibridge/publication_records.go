@@ -158,7 +158,15 @@ func publicationState(response *pb.PublicationState) (app.PublicationState, erro
 	return result, nil
 }
 func publicationReceipt(response *pb.PublicationReceipt, scope app.PublicationScope, commandID string) (app.PublicationReceipt, error) {
-	if response == nil || proto.Size(response) > 1024*1024 || response.CommandId != commandID || !app.ValidPublicationID(commandID) || response.Actor != fmt.Sprintf("user:%d", scope.OperatorUserID) || !validPublicationAudit(response.Actor, response.Reason, response.ChangedAt) {
+	if response == nil || response.Actor != fmt.Sprintf("user:%d", scope.OperatorUserID) {
+		return app.PublicationReceipt{}, app.ErrConflict
+	}
+	return decodePublicationReceipt(response, commandID)
+}
+
+// Decode retained evidence separately from original-operator command recovery.
+func decodePublicationReceipt(response *pb.PublicationReceipt, commandID string) (app.PublicationReceipt, error) {
+	if response == nil || proto.Size(response) > 1024*1024 || response.CommandId != commandID || !app.ValidPublicationID(commandID) || !validPublicationAudit(response.Actor, response.Reason, response.ChangedAt) {
 		return app.PublicationReceipt{}, app.ErrConflict
 	}
 	previous, err := publicationState(response.Previous)

@@ -27,13 +27,13 @@ class DocsFactsHelpersTest(unittest.TestCase):
         services, proto_file_count = check_docs_facts.grpc_inventory()
         self.assertEqual(proto_file_count, 8)
         self.assertEqual(len(services), 22)
-        self.assertEqual(sum(len(rpcs) for rpcs in services.values()), 91)
+        self.assertEqual(sum(len(rpcs) for rpcs in services.values()), 93)
         self.assertIn("GenerateReportFromAssessment", services["interpretation.InterpretationAutomationService"])
         self.assertIn("ExecutePromptEvaluationStep", services["interpretation.AIExplanationAutomationService"])
         self.assertIn("SyncAssessmentAttention", services["internalapi.InternalService"])
         self.assertEqual(services["qsai.workflow.v1.Commands"], ["Start", "Change"])
         self.assertEqual(services["qsai.workflow.v1.Results"], ["Accept"])
-        self.assertEqual(services["qsai.workflow.v1.PublicationManagement"], ["Publish", "Rollback", "Disable", "Get", "GetReceipt"])
+        self.assertEqual(services["qsai.workflow.v1.PublicationManagement"], ["Publish", "Rollback", "Disable", "Get", "GetReceipt", "ListHistory", "GetHistory"])
         self.assertEqual(services["interpretation.AIWorkflowAccessService"], ["Authorize"])
 
     def test_migration_inventory_is_paired_and_current(self) -> None:

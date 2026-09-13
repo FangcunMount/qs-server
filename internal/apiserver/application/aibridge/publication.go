@@ -80,6 +80,8 @@ type PublicationReceipt struct {
 	ChangedAt string           `json:"changed_at"`
 }
 type PublicationGateway interface {
+	ListPublicationHistory(context.Context, PublicationScope, PublicationHistoryQuery) (PublicationHistoryPage, error)
+	GetPublicationHistory(context.Context, PublicationScope, PublicationSelector, int64) (PublicationReceipt, error)
 	PublishConfiguration(context.Context, PublicationScope, PublishConfiguration) (PublicationReceipt, error)
 	RollbackPublication(context.Context, PublicationScope, RollbackPublication) (PublicationReceipt, error)
 	DisablePublication(context.Context, PublicationScope, PublicationCommand) (PublicationReceipt, error)

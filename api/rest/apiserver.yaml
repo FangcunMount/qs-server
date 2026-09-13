@@ -11980,6 +11980,172 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/core.ErrResponse'
+  /internal/v2/interpretation/ai-workflow/publications/history:
+    get:
+      tags:
+      - AI-Workflow-Publications
+      summary: 查询 qs-ai 配置发布历史
+      description: 需要当前解读审计权限；精确 selector、降序排他版本游标，保留原操作者。只读查询不重放命令，默认 limit=20、before_version=0。管理开关默认关闭。
+      operationId: 查询qsai配置发布历史
+      parameters:
+      - type: string
+        description: participant
+        name: audience
+        in: query
+        required: true
+      - type: string
+        description: scale
+        name: model_kind
+        in: query
+        required: true
+      - type: string
+        description: score_range
+        name: decision_kind
+        in: query
+        required: true
+      - type: string
+        description: 测评编码
+        name: model_code
+        in: query
+      - type: string
+        description: 测评版本，需要编码
+        name: model_version
+        in: query
+      - type: integer
+        description: 每页 1–20 条，默认 20
+        name: limit
+        in: query
+      - type: integer
+        description: 排他版本游标，0 从最新开始
+        name: before_version
+        in: query
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/core.Response'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/aibridge.PublicationHistoryPage'
+        '400':
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '409':
+          description: Conflict
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+  /internal/v2/interpretation/ai-workflow/publications/history/{version}:
+    get:
+      tags:
+      - AI-Workflow-Publications
+      summary: 核对 qs-ai 历史发布版本的原始证据
+      description: 需要当前解读审计权限；按精确 selector 和版本读取原前后发布及审计，actor 保留原操作者。与原命令 GetReceipt
+        的操作者限制区分，不改变发布状态或授予回退权限。
+      operationId: 核对qsai历史发布版本的原始证据
+      parameters:
+      - type: integer
+        description: 正历史版本
+        name: version
+        in: path
+        required: true
+      - type: string
+        description: participant
+        name: audience
+        in: query
+        required: true
+      - type: string
+        description: scale
+        name: model_kind
+        in: query
+        required: true
+      - type: string
+        description: score_range
+        name: decision_kind
+        in: query
+        required: true
+      - type: string
+        description: 测评编码
+        name: model_code
+        in: query
+      - type: string
+        description: 测评版本，需要编码
+        name: model_version
+        in: query
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/core.Response'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/aibridge.PublicationReceipt'
+        '400':
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '409':
+          description: Conflict
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
   /internal/v2/interpretation/ai-workflow/publications/publish:
     post:
       tags:
@@ -12847,6 +13013,46 @@ components:
           $ref: '#/components/schemas/aibridge.PublicationSelector'
         version:
           type: integer
+    aibridge.PublicationHistoryEntry:
+      type: object
+      properties:
+        action:
+          type: string
+        actor:
+          type: string
+        changed_at:
+          type: string
+        command_id:
+          type: string
+        previous_publication_id:
+          type: string
+        profile_id:
+          type: string
+        profile_version:
+          type: string
+        publication_id:
+          type: string
+        reason:
+          type: string
+        run_id:
+          type: string
+        run_version:
+          type: integer
+        version:
+          type: integer
+    aibridge.PublicationHistoryPage:
+      type: object
+      properties:
+        entries:
+          type: array
+          items:
+            $ref: '#/components/schemas/aibridge.PublicationHistoryEntry'
+        next_before_version:
+          type: integer
+        schema_version:
+          type: string
+        selector:
+          $ref: '#/components/schemas/aibridge.PublicationSelector'
     aibridge.PublicationReceipt:
       type: object
       properties:

@@ -761,11 +761,13 @@ var EvaluationManagement_ServiceDesc = grpc.ServiceDesc{
 }
 
 const (
-	PublicationManagement_Publish_FullMethodName    = "/qsai.workflow.v1.PublicationManagement/Publish"
-	PublicationManagement_Rollback_FullMethodName   = "/qsai.workflow.v1.PublicationManagement/Rollback"
-	PublicationManagement_Disable_FullMethodName    = "/qsai.workflow.v1.PublicationManagement/Disable"
-	PublicationManagement_Get_FullMethodName        = "/qsai.workflow.v1.PublicationManagement/Get"
-	PublicationManagement_GetReceipt_FullMethodName = "/qsai.workflow.v1.PublicationManagement/GetReceipt"
+	PublicationManagement_Publish_FullMethodName     = "/qsai.workflow.v1.PublicationManagement/Publish"
+	PublicationManagement_Rollback_FullMethodName    = "/qsai.workflow.v1.PublicationManagement/Rollback"
+	PublicationManagement_Disable_FullMethodName     = "/qsai.workflow.v1.PublicationManagement/Disable"
+	PublicationManagement_Get_FullMethodName         = "/qsai.workflow.v1.PublicationManagement/Get"
+	PublicationManagement_GetReceipt_FullMethodName  = "/qsai.workflow.v1.PublicationManagement/GetReceipt"
+	PublicationManagement_ListHistory_FullMethodName = "/qsai.workflow.v1.PublicationManagement/ListHistory"
+	PublicationManagement_GetHistory_FullMethodName  = "/qsai.workflow.v1.PublicationManagement/GetHistory"
 )
 
 // PublicationManagementClient is the client API for PublicationManagement service.
@@ -781,6 +783,10 @@ type PublicationManagementClient interface {
 	Get(ctx context.Context, in *PublicationQuery, opts ...grpc.CallOption) (*PublicationState, error)
 	// Same authorized organization/operator that submitted the command; read-only.
 	GetReceipt(ctx context.Context, in *PublicationReceiptQuery, opts ...grpc.CallOption) (*PublicationReceipt, error)
+	// QS audit-authorized global configuration history; preserves original actors.
+	// These reads never replay commands or select an active publication.
+	ListHistory(ctx context.Context, in *PublicationHistoryQuery, opts ...grpc.CallOption) (*PublicationHistoryPage, error)
+	GetHistory(ctx context.Context, in *PublicationHistoryVersionQuery, opts ...grpc.CallOption) (*PublicationReceipt, error)
 }
 
 type publicationManagementClient struct {
@@ -841,6 +847,26 @@ func (c *publicationManagementClient) GetReceipt(ctx context.Context, in *Public
 	return out, nil
 }
 
+func (c *publicationManagementClient) ListHistory(ctx context.Context, in *PublicationHistoryQuery, opts ...grpc.CallOption) (*PublicationHistoryPage, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(PublicationHistoryPage)
+	err := c.cc.Invoke(ctx, PublicationManagement_ListHistory_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *publicationManagementClient) GetHistory(ctx context.Context, in *PublicationHistoryVersionQuery, opts ...grpc.CallOption) (*PublicationReceipt, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(PublicationReceipt)
+	err := c.cc.Invoke(ctx, PublicationManagement_GetHistory_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // PublicationManagementServer is the server API for PublicationManagement service.
 // All implementations must embed UnimplementedPublicationManagementServer
 // for forward compatibility.
@@ -854,6 +880,10 @@ type PublicationManagementServer interface {
 	Get(context.Context, *PublicationQuery) (*PublicationState, error)
 	// Same authorized organization/operator that submitted the command; read-only.
 	GetReceipt(context.Context, *PublicationReceiptQuery) (*PublicationReceipt, error)
+	// QS audit-authorized global configuration history; preserves original actors.
+	// These reads never replay commands or select an active publication.
+	ListHistory(context.Context, *PublicationHistoryQuery) (*PublicationHistoryPage, error)
+	GetHistory(context.Context, *PublicationHistoryVersionQuery) (*PublicationReceipt, error)
 	mustEmbedUnimplementedPublicationManagementServer()
 }
 
@@ -878,6 +908,12 @@ func (UnimplementedPublicationManagementServer) Get(context.Context, *Publicatio
 }
 func (UnimplementedPublicationManagementServer) GetReceipt(context.Context, *PublicationReceiptQuery) (*PublicationReceipt, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetReceipt not implemented")
+}
+func (UnimplementedPublicationManagementServer) ListHistory(context.Context, *PublicationHistoryQuery) (*PublicationHistoryPage, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListHistory not implemented")
+}
+func (UnimplementedPublicationManagementServer) GetHistory(context.Context, *PublicationHistoryVersionQuery) (*PublicationReceipt, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetHistory not implemented")
 }
 func (UnimplementedPublicationManagementServer) mustEmbedUnimplementedPublicationManagementServer() {}
 func (UnimplementedPublicationManagementServer) testEmbeddedByValue()                               {}
@@ -990,6 +1026,42 @@ func _PublicationManagement_GetReceipt_Handler(srv interface{}, ctx context.Cont
 	return interceptor(ctx, in, info, handler)
 }
 
+func _PublicationManagement_ListHistory_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(PublicationHistoryQuery)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(PublicationManagementServer).ListHistory(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: PublicationManagement_ListHistory_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(PublicationManagementServer).ListHistory(ctx, req.(*PublicationHistoryQuery))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _PublicationManagement_GetHistory_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(PublicationHistoryVersionQuery)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(PublicationManagementServer).GetHistory(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: PublicationManagement_GetHistory_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(PublicationManagementServer).GetHistory(ctx, req.(*PublicationHistoryVersionQuery))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // PublicationManagement_ServiceDesc is the grpc.ServiceDesc for PublicationManagement service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -1016,6 +1088,14 @@ var PublicationManagement_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetReceipt",
 			Handler:    _PublicationManagement_GetReceipt_Handler,
+		},
+		{
+			MethodName: "ListHistory",
+			Handler:    _PublicationManagement_ListHistory_Handler,
+		},
+		{
+			MethodName: "GetHistory",
+			Handler:    _PublicationManagement_GetHistory_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
