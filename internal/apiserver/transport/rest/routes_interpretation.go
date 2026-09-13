@@ -60,6 +60,7 @@ func (r *Router) registerInterpretationInternalV2Routes(internalV2 *gin.RouterGr
 		read.POST("/prepare", management.Prepare)
 		read.GET("/:run_id", management.Get)
 		read.GET("/:run_id/candidates", management.ListCandidates)
+		read.GET("/:run_id/result-unknown", management.ListUnknowns)
 		read.GET("/:run_id/gates", management.PreviewGates)
 		read.GET("/:run_id/candidates/:candidate_id", management.GetCandidate)
 		group.POST("/:run_id/start", management.Start)

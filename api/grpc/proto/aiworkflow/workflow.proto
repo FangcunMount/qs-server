@@ -45,6 +45,8 @@ service EvaluationManagement {
  // Explicitly schedules an existing frozen requested Run; does not call a model inline.
  rpc Start(EvaluationStartCommand) returns (EvaluationState);
  rpc Get(EvaluationQuery) returns (EvaluationState);
+ // Read-only version-bound uncertain calls and frozen budget; never authorizes a retry.
+ rpc ListUnknownExecutions(EvaluationUnknownQuery) returns (EvaluationUnknownIndex);
  rpc ResolveUnknown(UnknownResolutionCommand) returns (EvaluationState);
  // QS authorizes the selected review role; AI records the trusted operator and server time.
  rpc Review(EvaluationReviewCommand) returns (EvaluationState);
@@ -127,6 +129,41 @@ message UnknownResolutionCommand {
  string reason = 5;
  bool confirm = 6;
  bool acknowledged_duplicate_call_and_cost_risk = 7;
+}
+message EvaluationUnknownQuery {
+ EvaluationQuery scope = 1;
+ int64 expected_version = 2;
+}
+message EvaluationUnknownExecution {
+ string execution_id = 1;
+ string invocation_id = 2;
+ string kind = 3;
+ string case_id = 4;
+ int32 slot_ordinal = 5;
+ // Empty for a generation call that never produced an accepted candidate.
+ string candidate_id = 6;
+ int32 execution_ordinal = 7;
+ string started_at = 8;
+ string finished_at = 9;
+ int32 provider_call_count = 10;
+ string failure_stage = 11;
+ string failure_code = 12;
+ int32 target_execution_count = 13;
+ int32 target_execution_limit = 14;
+ int32 stage_execution_count = 15;
+ int32 stage_execution_limit = 16;
+ // Eligibility at this version only; resolution and dispatch reservation recheck.
+ bool replacement_allowed = 17;
+}
+message EvaluationUnknownIndex {
+ string run_id = 1;
+ int64 version = 2;
+ string release_fingerprint = 3;
+ string status = 4;
+ int32 unresolved_result_unknown_count = 5;
+ bool can_resolve = 6;
+ // At most 140, no prompt, raw model output, credential or provider error body.
+ repeated EvaluationUnknownExecution executions = 7;
 }
 message EvaluationState {
  string run_id = 1;
