@@ -42,6 +42,7 @@ type EvaluationState struct {
 	ReviewReopenings             json.RawMessage `json:"review_reopenings" swaggertype:"array,object"`
 }
 type EvaluationGateway interface {
+	PrepareEvaluation(context.Context, DraftScope, EvaluationPlanQuery) (EvaluationPlan, error)
 	ReopenEvaluationReview(context.Context, EvaluationScope, EvaluationReopen) (EvaluationState, error)
 	FinalizeEvaluation(context.Context, EvaluationScope, EvaluationFinalize) (EvaluationState, error)
 	PreviewEvaluationGates(context.Context, EvaluationScope, int64) (EvaluationGatePreview, error)

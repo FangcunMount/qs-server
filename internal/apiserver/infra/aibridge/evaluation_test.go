@@ -11,6 +11,8 @@ import (
 )
 
 type evaluationRPCStub struct {
+	planQuery         *pb.EvaluationPlanQuery
+	planResponse      *pb.EvaluationPlan
 	reopenCommand     *pb.EvaluationReopenCommand
 	reopenState       *pb.EvaluationState
 	finalCommand      *pb.EvaluationFinalizeCommand

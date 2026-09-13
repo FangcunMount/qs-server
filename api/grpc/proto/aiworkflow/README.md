@@ -1,6 +1,6 @@
 # QS AI workflow contract
 
-Source: `FangcunMount/qs-ai`, commit `1ab78eba2051a7401d856ade8daf17205ddf9abe`, path `integrations/workflow/proto/workflow.proto`.
+Source: `FangcunMount/qs-ai`, commit `95615162b5011fd92969b83f6192d2ebdd79bf5b`, path `integrations/workflow/proto/workflow.proto`.
 
 This copy is byte-identical to the pinned source. qs-ai owns this contract; synchronize the source and regenerate both languages when changing it. Go generation uses `scripts/proto/generate.sh`. The runnable integration entry and limitations are documented in `cmd/qs-ai-bridge/README.md`.
 
@@ -15,3 +15,5 @@ SuiteManagement Register/GetReceipt 复用 QS OrgAdmin/解读审计授权，登�
 AssetCatalog List/Get 提供共享不可变配置目录，复用解读审计授权及 mTLS 连接。Go 校验分页顺序、筛选与游标、详情正文 SHA256；Prompt 源指纹与包摘要保持区分。目录不含命令审计和发布状态，不代表评测批准。
 
 GetLifecycle 读取当前草稿修订与冻结摘要，复用解读审计授权；不返回原冻结命令审计、不接受历史 revision。状态、修订、资产身份及时间不一致时拒绝响应。该只读快照不授予后续编辑权。
+
+EvaluationManagement.Prepare 复用审计授权，显式传递套件、生成路线与语义评测路线。AI 返回完整 11 项 release、整体指纹及策略预算；QS 核对原查询、完整引用、策略正文摘要和预算投影一致性，不重新计算质量门槛。REST 为 POST `/internal/v2/interpretation/ai-workflow/evaluations/prepare`，请求限 8 KiB、RPC 响应限 32 KiB、期限 5 秒且不自动重试。预算不表示机构可用额度，不创建任务或调用模型；Create/Start 仍分别要求管理员授权及明确确认。
