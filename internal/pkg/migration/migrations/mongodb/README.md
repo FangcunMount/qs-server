@@ -279,3 +279,19 @@ MongoDB 迁移文件使用 JSON 格式，包含 `db.runCommand` 操作数组：
 2. 迁移主要用于管理索引和 Schema 验证规则
 3. `_id` 索引由 MongoDB 自动创建和管理
 4. 回滚脚本使用 `"index": "*"` 删除所有非 `_id` 索引
+
+## M5 AI engine retirement (35)
+
+Version 35 is a separate post-cleanup release. Stop legacy producers and workers,
+archive and drain their six message types, then run the reviewed backup/restore
+and fixed-whitelist data cleanup before deploying this migration. Startup refuses
+any nonempty retired collection; it never removes live AI records. Empty databases
+run the historical creation migrations and finish with all nine namespaces absent.
+For an already-cleaned database the preparer supplies empty namespaces only for
+Mongo's drop commands; repeat startup at version 35 creates nothing.
+
+The empty down file is an irreversible-data marker, not a recovery operation.
+Do not downgrade the migration ledger or start an old-engine image after cleanup.
+Recovery requires restoring the reviewed backup and its indexes, validating the
+schema and references, then deliberately restoring a compatible application and
+migration state. Retain the backup for at least seven days after deletion.
