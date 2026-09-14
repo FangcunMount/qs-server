@@ -3,7 +3,6 @@ package service
 import (
 	"context"
 	"errors"
-	"fmt"
 	"math"
 	"strings"
 	"time"
@@ -25,6 +24,7 @@ import (
 
 type ParticipantAIExplanationService struct {
 	interpretationpb.UnimplementedParticipantAIExplanationServiceServer
+	CurrentAccess     *bridge.CurrentAccess
 	Workflow          *bridge.Participant
 	service           aiparticipant.Service
 	subjectExport     *aisubjectexport.Service
@@ -256,11 +256,11 @@ func (s *ParticipantAIExplanationService) RequestAIWorkflow(ctx context.Context,
 	if s.Workflow == nil {
 		return nil, status.Error(codes.FailedPrecondition, "AI workflow is not configured")
 	}
-	token, err := verifyDelegatedSubject(ctx, s.delegatedVerifier, request.TesteeId, delegatedsubject.PurposeAIExplanationRequest, true)
+	actor, err := s.workflowActor(ctx, request.TesteeId, request.AssessmentId, delegatedsubject.PurposeAIExplanationRequest)
 	if err != nil {
 		return nil, err
 	}
-	err = s.Workflow.Request(ctx, bridge.Actor{OrgID: fmt.Sprint(token.OrgID), SubjectID: token.UserID}, request.TesteeId, request.AssessmentId, request.ReportId, request.RequestId)
+	err = s.Workflow.Request(ctx, actor, request.TesteeId, request.AssessmentId, request.ReportId, request.RequestId)
 	if errors.Is(err, bridge.ErrInvalid) {
 		return nil, status.Error(codes.InvalidArgument, "invalid workflow request")
 	}
@@ -281,11 +281,11 @@ func (s *ParticipantAIExplanationService) GetAIWorkflow(ctx context.Context, req
 	if s.Workflow == nil {
 		return nil, status.Error(codes.FailedPrecondition, "AI workflow is not configured")
 	}
-	token, err := verifyDelegatedSubject(ctx, s.delegatedVerifier, request.TesteeId, delegatedsubject.PurposeAIExplanationGet, true)
+	actor, err := s.workflowActor(ctx, request.TesteeId, request.AssessmentId, delegatedsubject.PurposeAIExplanationGet)
 	if err != nil {
 		return nil, err
 	}
-	event, err := s.Workflow.Read(ctx, bridge.Actor{OrgID: fmt.Sprint(token.OrgID), SubjectID: token.UserID}, request.TesteeId, request.AssessmentId, request.RequestId)
+	event, err := s.Workflow.Read(ctx, actor, request.TesteeId, request.AssessmentId, request.RequestId)
 	if errors.Is(err, bridge.ErrNotFound) {
 		return nil, status.Error(codes.NotFound, "AI workflow not found")
 	}
@@ -323,11 +323,11 @@ func (s *ParticipantAIExplanationService) GetAIWorkflowSource(ctx context.Contex
 	if s.Workflow == nil {
 		return nil, status.Error(codes.Unavailable, "AI workflow is not configured")
 	}
-	token, err := verifyDelegatedSubject(ctx, s.delegatedVerifier, request.TesteeId, delegatedsubject.PurposeAIExplanationCapability, true)
+	actor, err := s.workflowActor(ctx, request.TesteeId, request.AssessmentId, delegatedsubject.PurposeAIExplanationCapability)
 	if err != nil {
 		return nil, err
 	}
-	result, err := s.Workflow.Source(ctx, bridge.Actor{OrgID: fmt.Sprint(token.OrgID), SubjectID: token.UserID}, request.TesteeId, request.AssessmentId)
+	result, err := s.Workflow.Source(ctx, actor, request.TesteeId, request.AssessmentId)
 	if errors.Is(err, bridge.ErrInvalid) {
 		return nil, status.Error(codes.InvalidArgument, "invalid workflow source request")
 	}
@@ -335,4 +335,27 @@ func (s *ParticipantAIExplanationService) GetAIWorkflowSource(ctx context.Contex
 		return nil, toAIExplanationGRPCError(err)
 	}
 	return &interpretationpb.AIWorkflowSource{Status: result.Status, ReportId: result.ReportID, SourceVersion: result.SourceVersion}, nil
+}
+
+// workflowActor verifies the delegation before deriving organization context from
+// the authorized QS testee. All participant workflow operations use this boundary.
+func (s *ParticipantAIExplanationService) workflowActor(ctx context.Context, testeeID, assessmentID uint64, purpose string) (bridge.Actor, error) {
+	token, err := verifyDelegatedSubject(ctx, s.delegatedVerifier, testeeID, purpose, true)
+	if err != nil {
+		return bridge.Actor{}, err
+	}
+	actor, err := s.CurrentAccess.ResolveParticipantActor(ctx, token.UserID, token.OrgID, testeeID, assessmentID)
+	if err != nil {
+		switch {
+		case errors.Is(err, bridge.ErrInvalid):
+			return bridge.Actor{}, status.Error(codes.InvalidArgument, "invalid workflow participant")
+		case errors.Is(err, bridge.ErrAccessDenied):
+			return bridge.Actor{}, status.Error(codes.PermissionDenied, "workflow access denied")
+		case errors.Is(err, bridge.ErrAccessUnavailable):
+			return bridge.Actor{}, status.Error(codes.Unavailable, "workflow authorization unavailable")
+		default:
+			return bridge.Actor{}, toAssessmentQueryGRPCError(err)
+		}
+	}
+	return actor, nil
 }
