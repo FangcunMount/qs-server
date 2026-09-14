@@ -123,16 +123,16 @@ delegated-subject:
   previous-key: ""
   ttl: 5m
 
-# 手动触发的 AI 解读独立于标准报告链路；API key 使用 Provider 对应的环境变量注入。
-# Profile v6 已发布，发布证据 Run 635983278800646702 已批准。
+# qs-ai 负责模型执行；QS 仅接单、授权、回传与管理代理。
 ai_workflow:
-  enabled: false # Open after current v6 production acceptance.
+  enabled: true # Published v6 generation and participant display verified.
   management:
     enabled: true
     address: "qs-ai-grpc:50061"
     ca_file: "/etc/qs-server/ssl/grpc/ca/ca-chain.crt"
     cert_file: "/etc/qs-server/ssl/grpc/server/qs-apiserver.crt"
     key_file: "/etc/qs-server/ssl/grpc/server/qs-apiserver.key"
+
 
 mysql:
   host: "127.0.0.1:3306"

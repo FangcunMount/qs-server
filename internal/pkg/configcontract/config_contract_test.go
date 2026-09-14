@@ -1217,8 +1217,8 @@ func TestAIWorkflowProductionConfigurationHasNoLegacyEngine(t *testing.T) {
 	if err := opts.AIWorkflow.Management.Validate(); err != nil {
 		t.Fatal(err)
 	}
-	if opts.AIWorkflow.Enabled {
-		t.Fatal("checked-in intake must wait for real v6 acceptance")
+	if !opts.AIWorkflow.Enabled {
+		t.Fatal("production intake must preserve the verified v6 workflow")
 	}
 	for _, name := range []string{"apiserver.prod.yaml", "apiserver.dev.yaml"} {
 		data, err := os.ReadFile(filepath.Join(repoRoot(t), "configs", name))
