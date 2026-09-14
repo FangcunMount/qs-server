@@ -2,7 +2,6 @@ package service
 
 import (
 	"context"
-	"fmt"
 	"testing"
 	"time"
 
@@ -107,7 +106,7 @@ func TestParticipantWorkflowWithoutLoginOrganization(t *testing.T) {
 					}
 				}
 				if status.Code(err) != want {
-					t.Fatal(fmt.Sprintf("got %v want %v", err, want))
+					t.Fatalf("got %v want %v", err, want)
 				}
 				if want != codes.OK && f.reads != 0 {
 					t.Fatal("denied actor reached workflow data")
