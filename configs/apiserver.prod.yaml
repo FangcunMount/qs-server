@@ -135,7 +135,7 @@ ai_explanation:
     key_file: "/etc/qs-server/ssl/grpc/server/qs-apiserver.key"
   enabled: true
   # 开放参与者手动生成；运行时仅匹配已发布 Profile，保留现有容量限制。
-  workflow_enabled: false # Enable after qs-ai command transport and relay are configured.
+  workflow_enabled: true # Published v6 and production execution/delivery are active.
   participant_enabled: true
   provider: "deepseek"
   # v7/v4 strict-tool 生产 Run 出现结构漂移与裁判请求拒绝，活动路由继续使用 Responses 线协议。

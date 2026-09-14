@@ -63,3 +63,29 @@ func (a *CurrentAccess) Authorize(ctx context.Context, actor Actor, testeeID str
 	}
 	return nil
 }
+
+// ResolveParticipantActor binds an authenticated participant to QS-owned business
+// context. A consumer login need not contain an organization claim. A supplied
+// organization must match; it is never replaced with a different organization.
+func (a *CurrentAccess) ResolveParticipantActor(ctx context.Context, subjectID string, claimedOrgID, testeeID, assessmentID uint64) (Actor, error) {
+	if subjectID == "" || len(subjectID) > 128 || testeeID == 0 || assessmentID == 0 {
+		return Actor{}, ErrInvalid
+	}
+	if a == nil || a.Testees == nil || a.Links == nil || a.Assessments == nil {
+		return Actor{}, ErrAccessUnavailable
+	}
+	testee, err := a.Testees.GetTestee(ctx, testeeID)
+	if err != nil {
+		return Actor{}, errors.Join(ErrAccessUnavailable, err)
+	}
+	if testee == nil || testee.ID != testeeID || testee.OrgID <= 0 || (claimedOrgID != 0 && claimedOrgID != uint64(testee.OrgID)) {
+		return Actor{}, ErrAccessDenied
+	}
+	actor := Actor{OrgID: strconv.FormatInt(testee.OrgID, 10), SubjectID: subjectID}
+	// Reuse the execution-time authority: current profile link and assessment
+	// ownership must both hold before this actor can reach any workflow operation.
+	if err := a.Authorize(ctx, actor, strconv.FormatUint(testeeID, 10), []string{strconv.FormatUint(assessmentID, 10)}); err != nil {
+		return Actor{}, err
+	}
+	return actor, nil
+}
