@@ -163,8 +163,8 @@ AI 不得给出诊断、病因、用药、治疗方案、风险重分类、危�
 | 调用方式 | 每个 Run 一次结构化 Provider 调用 |
 
 对应机器事实源是
-[AIExplanationInput v1](../../../api/schema/interpretation/ai-explanation-input-v1.schema.json)、[AIExplanationOutput v1](../../../api/schema/interpretation/ai-explanation-output-v1.schema.json)
-和 [AIExplanationProfile v1](../../../api/schema/interpretation/ai-explanation-profile-v1.schema.json)。
+[AIExplanationInput v1](https://github.com/FangcunMount/qs-server/blob/1ce436d7ec7c97a2647f3591eeddd9f7cab6aae6/api/schema/interpretation/ai-explanation-input-v1.schema.json)、[AIExplanationOutput v1](../../../api/schema/interpretation/ai-explanation-output-v1.schema.json)
+和 [AIExplanationProfile v1](https://github.com/FangcunMount/qs-server/blob/1ce436d7ec7c97a2647f3591eeddd9f7cab6aae6/api/schema/interpretation/ai-explanation-profile-v1.schema.json)。
 
 ### 2. v1 明确不做
 
@@ -391,7 +391,7 @@ model code + version 精确匹配
 
 同一优先级多个 published Profile 必须拒绝执行。发布后策略内容不可原地修改；新 Prompt、规则或路线需要新版本和新指纹。`disabled` 只阻止新生成，不破坏历史 Artifact 的审计。
 
-跨对象、运行时和错误分类规则见 [AI 解读契约验证矩阵](../../../api/schema/interpretation/ai-explanation-contract-validation-matrix.md)。
+跨对象、运行时和错误分类规则见 [AI 解读契约验证矩阵](https://github.com/FangcunMount/qs-server/blob/1ce436d7ec7c97a2647f3591eeddd9f7cab6aae6/api/schema/interpretation/ai-explanation-contract-validation-matrix.md)。
 
 ### 4. 发布治理契约
 
@@ -399,10 +399,10 @@ Input、Output、Profile 三份 v1 契约继续保持稳定；本轮问题不需
 
 | 机器契约 | 用途 | 是否发送给 Provider |
 | --- | --- | --- |
-| [AIExplanationEvaluationExecutionPolicy v1](../../../api/schema/interpretation/ai-explanation-evaluation-execution-policy-v1.schema.json) | 冻结 Slot 数、生成/裁判执行上限、可自动/人工处置的失败集合和最坏成本 | 否 |
-| [AIExplanationReleaseGatePolicy v1](../../../api/schema/interpretation/ai-explanation-release-gate-policy-v1.schema.json) | 冻结 G1～G5 阈值、分母和通过规则 | 否 |
-| [PromptEvaluationEvidence v2](../../../api/schema/interpretation/prompt-evaluation-evidence-v2.schema.json) | 持久化 Preflight、Slot、Generation Execution、Candidate、Semantic Execution、result-unknown resolution、Reviews 和 GateResult | 否 |
-| [AIExplanationFailureTaxonomy v1](../../../api/schema/interpretation/ai-explanation-failure-taxonomy-v1.schema.json) | 固化 stage、kind、code、retryable、result unknown 与 disposition | 否 |
+| [AIExplanationEvaluationExecutionPolicy v1](https://github.com/FangcunMount/qs-server/blob/1ce436d7ec7c97a2647f3591eeddd9f7cab6aae6/api/schema/interpretation/ai-explanation-evaluation-execution-policy-v1.schema.json) | 冻结 Slot 数、生成/裁判执行上限、可自动/人工处置的失败集合和最坏成本 | 否 |
+| [AIExplanationReleaseGatePolicy v1](https://github.com/FangcunMount/qs-server/blob/1ce436d7ec7c97a2647f3591eeddd9f7cab6aae6/api/schema/interpretation/ai-explanation-release-gate-policy-v1.schema.json) | 冻结 G1～G5 阈值、分母和通过规则 | 否 |
+| [PromptEvaluationEvidence v2](https://github.com/FangcunMount/qs-server/blob/1ce436d7ec7c97a2647f3591eeddd9f7cab6aae6/api/schema/interpretation/prompt-evaluation-evidence-v2.schema.json) | 持久化 Preflight、Slot、Generation Execution、Candidate、Semantic Execution、result-unknown resolution、Reviews 和 GateResult | 否 |
+| [AIExplanationFailureTaxonomy v1](https://github.com/FangcunMount/qs-server/blob/1ce436d7ec7c97a2647f3591eeddd9f7cab6aae6/api/schema/interpretation/ai-explanation-failure-taxonomy-v1.schema.json) | 固化 stage、kind、code、retryable、result unknown 与 disposition | 否 |
 
 四份 Schema、服务端嵌入访问器和契约编译测试均已落库。轻量 v2 已接入同一 Mongo 集合的独立 PO/Mapper/Repository、CAS Application Service、容量事务、Outbox 事件、Worker/gRPC 路由和分步 Runner；
 新管理写入口使用 `/internal/v2`，v1 评测 REST 只保留查询。生产 Run `635398770544095790` 已走完自动收集阶段并保留 4 次失败执行；形成 35 个 Candidate 不等于执行可靠性 Gate 通过，更不等于用户能力开放。
@@ -739,8 +739,8 @@ AI 解读使用独立 Mongo 集合保存 Generation、Run、Artifact、Profile�
 
 ### 1. Prompt 不是运行时随手拼接的字符串
 
-[Prompt Template v1](../../../api/schema/interpretation/ai-explanation-prompt-template-v1.md) 是历史只读版本；
-[Prompt Template v2](../../../api/schema/interpretation/ai-explanation-prompt-template-v2.md) 是当前待发布候选。
+[Prompt Template v1](https://github.com/FangcunMount/qs-server/blob/1ce436d7ec7c97a2647f3591eeddd9f7cab6aae6/api/schema/interpretation/ai-explanation-prompt-template-v1.md) 是历史只读版本；
+[Prompt Template v2](https://github.com/FangcunMount/qs-server/blob/1ce436d7ec7c97a2647f3591eeddd9f7cab6aae6/api/schema/interpretation/ai-explanation-prompt-template-v2.md) 是当前待发布候选。
 运行时使用编译期 `PromptPackage`：历史 Run 按冻结身份解析 v1，该变更发布后的新 Run 冻结 v2，不原地改变既有证据。测试会核对：
 
 - template ID 和 version；
@@ -851,7 +851,7 @@ Run `635398770544095790` 冻结 Prompt/Suite/Profile v2 与 v6/v3，通过 39 �
 
 ### 2. v2 样本规模与执行预算
 
-[Evaluation Cases v2](../../../api/schema/interpretation/ai-explanation-prompt-evaluation-cases-v2.json) 延续 v1 的固定样本范围；
+[Evaluation Cases v2](https://github.com/FangcunMount/qs-server/blob/1ce436d7ec7c97a2647f3591eeddd9f7cab6aae6/api/schema/interpretation/ai-explanation-prompt-evaluation-cases-v2.json) 延续 v1 的固定样本范围；
 v1 文件只用于历史 Run 解析：
 
 - 7 个生成 case；
@@ -1674,8 +1674,8 @@ token 只解决明确的截断问题。协议拒绝、内容契约不符合、�
 | 主题 | 事实源 |
 | --- | --- |
 | Input / Output / Profile | [机器契约目录](../../../api/schema/interpretation/) |
-| Prompt | [Prompt Template v2](../../../api/schema/interpretation/ai-explanation-prompt-template-v2.md)；[Prompt Template v1](../../../api/schema/interpretation/ai-explanation-prompt-template-v1.md) 仅用于历史 Run |
-| Prompt 评测 | [Prompt 验证矩阵](../../../api/schema/interpretation/ai-explanation-prompt-validation-matrix.md)、[Semantic Evaluator Prompt](../../../api/schema/interpretation/ai-explanation-semantic-evaluator-prompt-v1.md)、[evaluation application](../../../internal/apiserver/application/interpretation/aiexplanation/evaluation/) |
+| Prompt | [Prompt Template v2](https://github.com/FangcunMount/qs-server/blob/1ce436d7ec7c97a2647f3591eeddd9f7cab6aae6/api/schema/interpretation/ai-explanation-prompt-template-v2.md)；[Prompt Template v1](https://github.com/FangcunMount/qs-server/blob/1ce436d7ec7c97a2647f3591eeddd9f7cab6aae6/api/schema/interpretation/ai-explanation-prompt-template-v1.md) 仅用于历史 Run |
+| Prompt 评测 | [Prompt 验证矩阵](https://github.com/FangcunMount/qs-server/blob/1ce436d7ec7c97a2647f3591eeddd9f7cab6aae6/api/schema/interpretation/ai-explanation-prompt-validation-matrix.md)、[Semantic Evaluator Prompt](https://github.com/FangcunMount/qs-server/blob/1ce436d7ec7c97a2647f3591eeddd9f7cab6aae6/api/schema/interpretation/ai-explanation-semantic-evaluator-prompt-v1.md)、[evaluation application](../../../internal/apiserver/application/interpretation/aiexplanation/evaluation/) |
 | 领域模型 | [domain/interpretation/aiexplanation](../../../internal/apiserver/domain/interpretation/aiexplanation/) |
 | Application | [application/interpretation/aiexplanation](../../../internal/apiserver/application/interpretation/aiexplanation/) |
 | Provider / Prompt / Safety | [infra/aiexplanation](../../../internal/apiserver/infra/aiexplanation/) |
