@@ -244,3 +244,61 @@ func TestRetryStateResumesOriginalRequestWithoutOldFailureOverwritingIt(t *testi
 		t.Fatal(original, err)
 	}
 }
+
+func TestCommandsUseUTCWithNonUTCSessions(t *testing.T) {
+	for _, zone := range []string{"+00:00", "+08:00", "-05:00"} {
+		t.Run(zone, func(t *testing.T) {
+			store, request := fixture(t)
+			ctx := context.Background()
+			// Keep this fixture on the connection whose session timezone we set.
+			store.DB.SetMaxOpenConns(1)
+			if _, err := store.DB.ExecContext(ctx, "SET SESSION time_zone = ?", zone); err != nil {
+				t.Fatal(err)
+			}
+			if err := store.StageStart(ctx, request); err != nil {
+				t.Fatal(err)
+			}
+			assertDue := func(id string) {
+				t.Helper()
+				commands, err := store.Pending(ctx, 100)
+				if err != nil {
+					t.Fatal(err)
+				}
+				for _, command := range commands {
+					if command.ID == id {
+						return
+					}
+				}
+				t.Fatalf("new command %s is not immediately due in timezone %s", id, zone)
+			}
+			assertDue(request.RequestID)
+			if err := store.Retry(ctx, request.RequestID); err != nil {
+				t.Fatal(err)
+			}
+			var remainingMicroseconds int
+			var before, after string
+			const schedule = "SELECT DATE_FORMAT(available_at, '%Y-%m-%d %H:%i:%s.%f') FROM ai_bridge_commands WHERE command_id=?"
+			if err := store.DB.QueryRowContext(ctx, "SELECT TIMESTAMPDIFF(MICROSECOND,UTC_TIMESTAMP(6),available_at) FROM ai_bridge_commands WHERE command_id=?", request.RequestID).Scan(&remainingMicroseconds); err != nil || remainingMicroseconds <= 0 || remainingMicroseconds > 1_000_000 {
+				t.Fatalf("retry must use UTC and defer the command: remaining microseconds=%d err=%v", remainingMicroseconds, err)
+			}
+			if err := store.DB.QueryRowContext(ctx, schedule, request.RequestID).Scan(&before); err != nil {
+				t.Fatal(err)
+			}
+			if err := store.StageStart(ctx, request); err != nil {
+				t.Fatal(err)
+			}
+			if err := store.DB.QueryRowContext(ctx, schedule, request.RequestID).Scan(&after); err != nil || before != after {
+				t.Fatalf("duplicate admission changed retry schedule: before=%s after=%s err=%v", before, after, err)
+			}
+			sessionID := uuid.NewString()
+			if err := store.Acknowledge(ctx, app.Command{ID: request.RequestID, RequestID: request.RequestID}, app.Receipt{SessionID: sessionID, Version: 1}); err != nil {
+				t.Fatal(err)
+			}
+			change := app.Change{CommandID: uuid.NewString(), SessionID: sessionID, Actor: request.Actor, Action: "cancel", ExpectedVersion: 1}
+			if err := store.StageChange(ctx, request.RequestID, change); err != nil {
+				t.Fatal(err)
+			}
+			assertDue(change.CommandID)
+		})
+	}
+}

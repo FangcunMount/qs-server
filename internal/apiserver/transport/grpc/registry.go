@@ -253,6 +253,7 @@ func (r *Registry) registerParticipantAIExplanationService() error {
 		r.deps.Interpretation.DelegatedSubjectVerifier,
 	)
 	participantService.Workflow = r.deps.Interpretation.AIWorkflow
+	participantService.CurrentAccess = r.deps.Interpretation.CurrentAccess
 	r.server.RegisterService(participantService)
 	log.Info("   🤖 participant AI explanation service registered")
 	return nil

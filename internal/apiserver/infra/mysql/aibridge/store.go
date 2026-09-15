@@ -45,7 +45,9 @@ func (s *Store) StageStart(ctx context.Context, r app.Start) error {
 	return tx.Commit()
 }
 func stage(ctx context.Context, tx *sql.Tx, id, requestID, kind string, raw []byte, hash string) error {
-	_, err := tx.ExecContext(ctx, "INSERT INTO ai_bridge_commands(command_id,request_id,kind,payload,payload_hash) VALUES(?,?,?,?,?) ON DUPLICATE KEY UPDATE command_id=command_id", id, requestID, kind, raw, hash)
+	// available_at is a UTC DATETIME, like Pending and Retry. The database's
+	// CURRENT_TIMESTAMP default uses the session timezone (UTC+8 in production).
+	_, err := tx.ExecContext(ctx, "INSERT INTO ai_bridge_commands(command_id,request_id,kind,payload,payload_hash,available_at) VALUES(?,?,?,?,?,UTC_TIMESTAMP(6)) ON DUPLICATE KEY UPDATE command_id=command_id", id, requestID, kind, raw, hash)
 	if err != nil {
 		return err
 	}
