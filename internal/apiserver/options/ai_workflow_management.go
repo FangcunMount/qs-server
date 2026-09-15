@@ -23,7 +23,7 @@ func (o AIWorkflowManagementOptions) Validate() error {
 	host, port, err := net.SplitHostPort(o.Address)
 	number, portErr := strconv.Atoi(port)
 	if err != nil || host == "" || portErr != nil || number < 1 || number > 65535 || strings.TrimSpace(o.CAFile) == "" || strings.TrimSpace(o.CertFile) == "" || strings.TrimSpace(o.KeyFile) == "" {
-		return fmt.Errorf("ai_explanation.workflow_management requires address and mTLS CA/certificate/key files")
+		return fmt.Errorf("ai_workflow.management requires address and mTLS CA/certificate/key files")
 	}
 	return nil
 }

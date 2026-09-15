@@ -5,7 +5,7 @@ import (
 	"errors"
 	"strconv"
 
-	source "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/aiexplanation/source"
+	source "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/reportsource"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 

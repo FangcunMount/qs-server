@@ -8,7 +8,7 @@ import (
 	pb "github.com/FangcunMount/qs-server/api/grpc/gen/interpretation"
 	bridge "github.com/FangcunMount/qs-server/internal/apiserver/application/aibridge"
 	evaluationtestee "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/testee"
-	source "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/aiexplanation/source"
+	source "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/reportsource"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/actorreadmodel"
 	"github.com/FangcunMount/qs-server/internal/pkg/delegatedsubject"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
@@ -60,7 +60,7 @@ func TestParticipantWorkflowWithoutLoginOrganization(t *testing.T) {
 				signer, _ := delegatedsubject.NewSignerFromOptions(options)
 				verifier, _ := delegatedsubject.NewVerifierFromOptions(options)
 				f := &workflowParticipantFixture{allowed: scenario != "revoked"}
-				s := NewParticipantAIExplanationService(nil, nil, verifier)
+				s := NewParticipantAIExplanationService(verifier)
 				s.CurrentAccess = &bridge.CurrentAccess{Testees: f, Links: f, Assessments: f}
 				s.Workflow = &bridge.Participant{Access: f, Sources: f, Bridge: &bridge.Service{Store: f}}
 				purpose := map[string]string{"source": delegatedsubject.PurposeAIExplanationCapability, "request": delegatedsubject.PurposeAIExplanationRequest, "read": delegatedsubject.PurposeAIExplanationGet}[operation]
@@ -73,7 +73,7 @@ func TestParticipantWorkflowWithoutLoginOrganization(t *testing.T) {
 					org = 2
 					want = codes.PermissionDenied
 				case "wrong_purpose":
-					purpose = delegatedsubject.PurposeAIExplanationExport
+					purpose = delegatedsubject.PurposeGetAssessmentReport
 					want = codes.PermissionDenied
 				case "unconfigured":
 					s.CurrentAccess = nil

@@ -3,7 +3,7 @@ package interpretation
 import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/container/compose"
 	apiserveroptions "github.com/FangcunMount/qs-server/internal/apiserver/options"
-	"github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
+	eventcatalog "github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime"
 )
 
@@ -11,7 +11,7 @@ import (
 type InstallHost interface {
 	compose.Host
 	SetReportModule(*Module)
-	AIExplanationOptions() *apiserveroptions.AIExplanationOptions
+	AIWorkflowOptions() *apiserveroptions.AIWorkflowOptions
 }
 
 // InstallFrom wires and registers the report module using composition-root host inputs.
@@ -25,7 +25,7 @@ func InstallFrom(host InstallHost) error {
 		ReportStatusConfig: host.ReportStatusConfig(),
 		OutboxProfile:      host.EventProfile(eventcatalog.OutboxProfileMongoDomain),
 		RunLeaseDuration:   host.InterpretationRunLeaseDuration(),
-		AIExplanation:      host.AIExplanationOptions(),
+		AIWorkflow:         host.AIWorkflowOptions(),
 	})
 	if err != nil {
 		return err

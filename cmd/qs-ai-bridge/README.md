@@ -2,9 +2,9 @@
 
 本 CLI 保留用于隔离环境联调；正式参与者入口为 Collection `/api/v1/assessments/{id}/ai-workflows`。调用者必须来自已授权的业务用例；CLI 不提供终端用户认证。AI 执行、问题及状态权威由 qs-ai 持有，QS 只保存关联、命令 outbox、接收凭证和投影。
 
-生产使用 qs-apiserver 内置投递循环和成果接收接口，无需部署此 CLI 进程。`ai_explanation.workflow_enabled=true` 时，进程启动常驻投递，每批最多 20 条、单批截止 60 秒，空闲间隔 1 秒、数据库错误退避上限 30 秒；单次 gRPC 仍为 5 秒。关闭进程会取消并等待循环退出，再释放连接和数据库。命令标识、失败重试时间和确认继续使用原 outbox 协议，不重复创建请求。
+生产使用 qs-apiserver 内置投递循环和成果接收接口，无需部署此 CLI 进程。`ai_workflow.enabled=true` 时，进程启动常驻投递，每批最多 20 条、单批截止 60 秒，空闲间隔 1 秒、数据库错误退避上限 30 秒；单次 gRPC 仍为 5 秒。关闭进程会取消并等待循环退出，再释放连接和数据库。命令标识、失败重试时间和确认继续使用原 outbox 协议，不重复创建请求。
 
-投递与管理共用 `ai_explanation.workflow_management` 下的地址和 TLS 文件；即使管理开关关闭，参与者入口启用也必须配置这些连接参数。管理接口仍单独受 `workflow_management.enabled` 控制。生产文件已配置 `qs-ai-grpc:50061` 和现有 QS 服务证书路径，但两个开关均保持关闭，等待集中切换。
+投递与管理共用 `ai_workflow.management` 下的地址和 TLS 文件；即使管理开关关闭，参与者入口启用也必须配置这些连接参数。管理接口仍单独受 `management.enabled` 控制。生产文件已配置 `qs-ai-grpc:50061` 和现有 QS 服务证书路径，管理代理已启用，参与者入口仍保持关闭，等待真实 v6 闭环验收后集中切换。
 
 成果接收注册在正式 `qs-apiserver:9090`，精确 ACL 和接收器均只接受 `qs-ai.svc`。它不依赖旧 AI 总开关，也不随新准入开关关闭，以继续接收已被接受任务的成果。关闭旧 AI 时同时关闭旧 `participant_enabled`、`evaluation.enabled`；保留标准报告、权限和新链路。生产旧数据不删除。
 

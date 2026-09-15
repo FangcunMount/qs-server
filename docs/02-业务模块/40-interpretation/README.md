@@ -2,11 +2,7 @@
 
 > 状态：本篇已按当前源码重写。Interpretation 的生成生命周期、重试治理、查询模型与报告模板版本发布均已落地；历史路由已完成显式冻结，运行时对缺失身份执行 fail-closed。
 
-> AI 解读是本模块下用户流量关闭、治理与评测开启的独立发布候选能力：标准报告继续自动生成并保持唯一权威，Participant 未来可在报告可用后手动触发一次性 AI 补充解读。轻量 v2 编排与 v8/v5 Route 已部署；
-> 生产 Run `635426176763965998` 的 35 次生成和 35 次裁判均一次成功，G3 为 100%，但 G4 仅 23/35 Candidate 通过全部 hard assertions，因此仍不能发布。
-> 当前最小修复新增不可变 Prompt/Suite/Profile v4，修订必填来源字段、模式选择、情境整合与关注点组织；评测输入、断言和发布门槛保持，v4 尚待生产评测通过。多集合、增量审核和完整双运行时继续作为有证据触发的未来架构。
-> `participant_enabled=false`，首个 approved Evidence、生产 Profile、灰度和生产验收仍未完成，
-> 见[AI 解读核心设计](./25-核心设计-AI解读.md)及其中的[近期最小改造与架构分析](./25-核心设计-AI解读.md#十六近期最小改造与架构分析)。
+> AI 执行与治理由 qs-ai 负责；QS 保留标准报告来源、授权、可靠发起与结果接收、管理代理。旧引擎已从 M5 分支删除，生产验收与清库仍待完成，见 [AI 解读边界与退役状态](./25-核心设计-AI解读.md)。
 
 ## 1. 30 秒结论
 
@@ -284,8 +280,8 @@ AssessmentID、TesteeID 和 OrgID 是报告关联事实，不是授权凭据。�
 | Worker 事件消费 | [`assessment_evaluated_handler.go`](../../../internal/worker/handlers/assessment_evaluated_handler.go)、[`report_handler.go`](../../../internal/worker/handlers/report_handler.go) |
 | 事件契约 | [`configs/events.yaml`](../../../configs/events.yaml) |
 | 模块装配 | [`container/modules/interpretation`](../../../internal/apiserver/container/modules/interpretation/) |
-| AI 解读机器契约与 Prompt | [`api/schema/interpretation`](../../../api/schema/interpretation/) |
-| AI 解读领域与应用 | [`domain/interpretation/aiexplanation`](../../../internal/apiserver/domain/interpretation/aiexplanation/)、[`application/interpretation/aiexplanation`](../../../internal/apiserver/application/interpretation/aiexplanation/) |
+| AI 结果契约 | [`api/schema/interpretation`](../../../api/schema/interpretation/) |
+| AI 桥接与标准事实 | [`application/aibridge`](../../../internal/apiserver/application/aibridge/)、[`reportsource`](../../../internal/apiserver/application/interpretation/reportsource/) |
 
 ```bash
 go test ./internal/apiserver/domain/interpretation/...

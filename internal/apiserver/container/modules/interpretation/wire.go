@@ -22,7 +22,7 @@ type WireInput struct {
 	ReportStatusConfig reportstatus.Config
 	OutboxProfile      appEventing.ProfileBinding
 	RunLeaseDuration   time.Duration
-	AIExplanation      *apiserveroptions.AIExplanationOptions
+	AIWorkflow         *apiserveroptions.AIWorkflowOptions
 }
 
 // Wire builds and bootstraps the report module from composition inputs.

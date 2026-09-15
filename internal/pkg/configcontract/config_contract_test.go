@@ -35,9 +35,6 @@ func TestAPIServerDevProdConfigContracts(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			opts := apiserveroptions.NewOptions()
 			loadConfig(t, filepath.Join(repoRoot(t), "configs", name), opts)
-			if opts.AIExplanation != nil && opts.AIExplanation.Enabled {
-				opts.AIExplanation.APIKey = "config-contract-test-secret"
-			}
 			prepareDelegatedSubjectContract(t, name, opts.DelegatedSubject)
 			stubSecureTLSFiles(t, opts.SecureServing)
 			completeAndValidate(t, opts)
@@ -77,7 +74,6 @@ func TestAPIServerDevProdConfigContracts(t *testing.T) {
 			assertStatisticsCacheContract(t, name, opts.Cache)
 			assertIAMJWKSURLContract(t, "apiserver", name, opts.IAMOptions)
 			assertAPIServerGRPCTrustContract(t, name, opts)
-			assertAIExplanationProductionLongCallContract(t, name, opts)
 			assertEventCatalogLoads(t)
 		})
 	}
@@ -237,35 +233,6 @@ func assertAPIServerGRPCTrustContract(t *testing.T, configName string, opts *api
 	assertExactGRPCACLConfig(t, opts.GRPCOptions.ACL.ConfigFile, data)
 }
 
-func assertAIExplanationProductionLongCallContract(t *testing.T, configName string, opts *apiserveroptions.Options) {
-	t.Helper()
-	if !strings.Contains(configName, ".prod.") {
-		return
-	}
-	if opts == nil || opts.AIExplanation == nil || !opts.AIExplanation.Enabled || !opts.AIExplanation.Evaluation.Enabled {
-		t.Fatalf("%s AI explanation governance and evaluation must be enabled", configName)
-	}
-	ai := opts.AIExplanation
-	if ai.Timeout < 2*time.Minute || ai.Evaluation.Timeout < 2*time.Minute {
-		t.Fatalf("%s AI provider timeouts = %s/%s, want at least 2m", configName, ai.Timeout, ai.Evaluation.Timeout)
-	}
-	if ai.MaxOutputTokens < 8000 || ai.Evaluation.MaxOutputTokens < 8000 {
-		t.Fatalf("%s AI output token limits = %d/%d, want at least 8000", configName, ai.MaxOutputTokens, ai.Evaluation.MaxOutputTokens)
-	}
-	if ai.Evaluation.Capacity.DailyProviderInvocationBudgetPerOrg != 1024 {
-		t.Fatalf("%s AI evaluation daily Provider budget = %d, want approved production limit 1024", configName, ai.Evaluation.Capacity.DailyProviderInvocationBudgetPerOrg)
-	}
-	if ai.RunLeaseDuration <= ai.Timeout {
-		t.Fatalf("%s participant AI run lease = %s, must exceed the generation timeout", configName, ai.RunLeaseDuration)
-	}
-	if ai.Evaluation.AttemptLeaseDuration < ai.Timeout+ai.Evaluation.Timeout+time.Minute {
-		t.Fatalf("%s evaluation attempt lease = %s, must cover both Provider stages and commit grace", configName, ai.Evaluation.AttemptLeaseDuration)
-	}
-	if opts.GRPCOptions.MaxConnectionAge < time.Hour || opts.GRPCOptions.MaxConnectionAgeGrace < ai.Evaluation.AttemptLeaseDuration {
-		t.Fatalf("%s gRPC connection age/grace = %s/%s, must preserve an active AI evaluation attempt lease", configName, opts.GRPCOptions.MaxConnectionAge, opts.GRPCOptions.MaxConnectionAgeGrace)
-	}
-}
-
 func TestGRPCACLFilesMatchCanonicalClientContracts(t *testing.T) {
 	t.Parallel()
 
@@ -407,31 +374,14 @@ func TestWorkerDevProdConfigContracts(t *testing.T) {
 				t.Fatal("development attention projection reconcile must remain opt-in")
 			}
 			assertWorkerGRPCClientIdentityContract(t, name, opts.GRPC)
-			if name == "worker.prod.yaml" && opts.GRPC.AIExplanationTimeout < 5*time.Minute {
-				t.Fatalf("production worker AI explanation timeout = %s, want at least 5m", opts.GRPC.AIExplanationTimeout)
-			}
-			if opts.Messaging.Provider == "nsq" && opts.Messaging.NSQMessageTimeout <= opts.GRPC.AIExplanationTimeout {
-				t.Fatalf("%s NSQ message timeout = %s, must exceed AI RPC timeout %s", name, opts.Messaging.NSQMessageTimeout, opts.GRPC.AIExplanationTimeout)
+			if opts.Messaging.Provider == "nsq" && opts.Messaging.NSQMessageTimeout <= opts.GRPC.RequestTimeout {
+				t.Fatalf("%s NSQ message timeout = %s, must exceed RPC timeout %s", name, opts.Messaging.NSQMessageTimeout, opts.GRPC.RequestTimeout)
 			}
 			if workerEventConfigPath(cfg.Worker) != "configs/events.yaml" {
 				t.Fatalf("worker event config fallback = %q, want configs/events.yaml", workerEventConfigPath(cfg.Worker))
 			}
 			assertEventCatalogLoads(t)
 		})
-	}
-}
-
-func TestProductionAIExplanationTimeoutHierarchy(t *testing.T) {
-	apiOptions := apiserveroptions.NewOptions()
-	loadConfig(t, filepath.Join(repoRoot(t), "configs", "apiserver.prod.yaml"), apiOptions)
-	workerOptions := workeroptions.NewOptions()
-	loadConfig(t, filepath.Join(repoRoot(t), "configs", "worker.prod.yaml"), workerOptions)
-
-	attemptLease := apiOptions.AIExplanation.Evaluation.AttemptLeaseDuration
-	workerDeadline := workerOptions.GRPC.AIExplanationTimeout
-	messageTimeout := workerOptions.Messaging.NSQMessageTimeout
-	if attemptLease <= workerDeadline || messageTimeout <= workerDeadline {
-		t.Fatalf("production AI timeout hierarchy attempt lease/NSQ message/worker RPC = %s/%s/%s; both outer boundaries must exceed the worker RPC deadline", attemptLease, messageTimeout, workerDeadline)
 	}
 }
 
@@ -1254,5 +1204,35 @@ func repoRoot(t *testing.T) string {
 			t.Fatal("go.mod not found")
 		}
 		dir = parent
+	}
+}
+
+func TestAIWorkflowProductionConfigurationHasNoLegacyEngine(t *testing.T) {
+	path := filepath.Join(repoRoot(t), "configs", "apiserver.prod.yaml")
+	opts := apiserveroptions.NewOptions()
+	loadConfig(t, path, opts)
+	if opts.AIWorkflow == nil || !opts.AIWorkflow.Management.Enabled {
+		t.Fatal("production management proxy missing")
+	}
+	if err := opts.AIWorkflow.Management.Validate(); err != nil {
+		t.Fatal(err)
+	}
+	if !opts.AIWorkflow.Enabled {
+		t.Fatal("production intake must preserve the verified v6 workflow")
+	}
+	for _, name := range []string{"apiserver.prod.yaml", "apiserver.dev.yaml"} {
+		data, err := os.ReadFile(filepath.Join(repoRoot(t), "configs", name))
+		if err != nil {
+			t.Fatal(err)
+		}
+		var config map[string]any
+		if err := yaml.Unmarshal(data, &config); err != nil {
+			t.Fatal(err)
+		}
+		for _, key := range []string{"ai_explanation", "ai_explanation_participant_lease_recovery", "ai_explanation_prompt_evaluation_lease_recovery"} {
+			if _, found := config[key]; found {
+				t.Fatalf("%s retains retired config %s", name, key)
+			}
+		}
 	}
 }

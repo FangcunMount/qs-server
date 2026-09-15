@@ -24,7 +24,6 @@ const (
 	PurposeAIExplanationCapability = "participant_ai_explanation.capability"
 	PurposeAIExplanationRequest    = "participant_ai_explanation.request"
 	PurposeAIExplanationGet        = "participant_ai_explanation.get"
-	PurposeAIExplanationExport     = "participant_ai_explanation.export"
 
 	TrustedCallerQSCollection = serviceidentity.CollectionServerServiceID
 )

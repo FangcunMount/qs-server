@@ -69,7 +69,6 @@ retry_governance:
 grpc:
   apiserver-addr: "qs-apiserver:9090"  # Docker 容器服务名
   request-timeout: 30s
-  ai-explanation-timeout: 7m  # 覆盖 120s 生成、180s 独立裁判及服务端提交余量
   insecure: false
   tls-ca-file: "/etc/qs-server/ssl/grpc/ca/ca-chain.crt"
   tls-cert-file: "/etc/qs-server/ssl/grpc/server/qs-worker.crt"

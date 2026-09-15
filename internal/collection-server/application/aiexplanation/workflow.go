@@ -23,8 +23,8 @@ func (s *Service) RequestWorkflow(ctx context.Context, testeeID, assessmentID ui
 	if err != nil || reportID == 0 || strconv.FormatUint(reportID, 10) != request.ReportID {
 		return nil, ErrInvalidRequest
 	}
-	client, ok := s.client.(aiport.WorkflowClient)
-	if !ok {
+	client := s.client
+	if client == nil {
 		return nil, ErrUnavailable
 	}
 	result, err := client.RequestWorkflow(ctx, testeeID, assessmentID, reportID, request.RequestID)
@@ -44,8 +44,8 @@ func (s *Service) GetWorkflow(ctx context.Context, testeeID, assessmentID uint64
 	if err != nil || id.String() != requestID || id == uuid.Nil || testeeID == 0 || assessmentID == 0 {
 		return nil, ErrInvalidRequest
 	}
-	client, ok := s.client.(aiport.WorkflowReader)
-	if !ok {
+	client := s.client
+	if client == nil {
 		return nil, ErrUnavailable
 	}
 	result, err := client.GetWorkflow(ctx, testeeID, assessmentID, requestID)
@@ -64,8 +64,8 @@ func (s *Service) GetWorkflowSource(ctx context.Context, testeeID, assessmentID 
 	if testeeID == 0 || assessmentID == 0 {
 		return nil, ErrInvalidRequest
 	}
-	client, ok := s.client.(aiport.WorkflowSourceReader)
-	if !ok {
+	client := s.client
+	if client == nil {
 		return nil, ErrUnavailable
 	}
 	result, err := client.GetWorkflowSource(ctx, testeeID, assessmentID)

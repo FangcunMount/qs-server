@@ -2,8 +2,8 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "18709f393dab39ae1ed4e6fa2c22ffb47b11c96e",
-    "verified_on": "2026-09-14"
+    "sha": "1af442f5cac9408d12c2b5e6b837a74d936204ee",
+    "verified_on": "2026-09-15"
   },
   "status_policy": {
     "doc_status": [
@@ -53,7 +53,7 @@
         "docs/_archive/**/*.md",
         "tmp/**/*.md"
       ],
-      "expected_count": 44,
+      "expected_count": 33,
       "budgeted": false
     }
   },
@@ -94,7 +94,7 @@
     },
     "events": {
       "source": "configs/events.yaml",
-      "count": 20,
+      "count": 14,
       "names": [
         "answersheet.submitted",
         "assessment_model.changed",
@@ -102,12 +102,6 @@
         "evaluation.outcome.committed",
         "evaluation.requested",
         "evaluation.retry.requested",
-        "interpretation.ai_explanation.failed",
-        "interpretation.ai_explanation.generated",
-        "interpretation.ai_explanation.lease_recovery.requested",
-        "interpretation.ai_explanation.prompt_evaluation.step_requested",
-        "interpretation.ai_explanation.requested",
-        "interpretation.ai_explanation.retry.requested",
         "interpretation.report.failed",
         "interpretation.report.generated",
         "interpretation.retry.requested",
@@ -132,8 +126,8 @@
     "grpc": {
       "source": "api/grpc/proto",
       "proto_file_count": 8,
-      "service_count": 23,
-      "rpc_count": 106,
+      "service_count": 22,
+      "rpc_count": 100,
       "services": {
         "actor.ActorService": [
           "CreateTestee",
@@ -195,10 +189,6 @@
           "ExpireTask",
           "CancelTask"
         ],
-        "interpretation.AIExplanationAutomationService": [
-          "ExecuteAIExplanation",
-          "ExecutePromptEvaluationStep"
-        ],
         "interpretation.AIWorkflowAccessService": [
           "Authorize"
         ],
@@ -209,11 +199,7 @@
         "interpretation.ParticipantAIExplanationService": [
           "GetAIWorkflowSource",
           "RequestAIWorkflow",
-          "GetAIWorkflow",
-          "GetAIExplanationCapability",
-          "RequestAIExplanation",
-          "GetAIExplanation",
-          "ExportAIExplanations"
+          "GetAIWorkflow"
         ],
         "interpretation.ParticipantReportService": [
           "GetAssessmentReport",
@@ -409,421 +395,6 @@
           "severity": "medium",
           "summary": "Source and semantic review have not yet been recorded.",
           "exit_criteria": "Record fact sources and verification evidence, then update doc_status through review."
-        }
-      ]
-    },
-    {
-      "path": "api/schema/interpretation/ai-explanation-contract-validation-matrix.md",
-      "class": "sidecar",
-      "owner": "interpretation",
-      "doc_status": "planned",
-      "verified": {
-        "source_sha": null,
-        "verified_on": null
-      },
-      "fact_sources": [
-        {
-          "kind": "contract",
-          "path": "api/schema/interpretation/ai-explanation-input-v1.schema.json"
-        },
-        {
-          "kind": "contract",
-          "path": "api/schema/interpretation/ai-explanation-output-v1.schema.json"
-        },
-        {
-          "kind": "contract",
-          "path": "api/schema/interpretation/ai-explanation-profile-v1.schema.json"
-        },
-        {
-          "kind": "source",
-          "path": "internal/apiserver/domain/interpretation/aiexplanation/evaluation/**/*.go"
-        },
-        {
-          "kind": "source",
-          "path": "internal/apiserver/application/interpretation/aiexplanation/evaluation/**/*.go"
-        },
-        {
-          "kind": "source",
-          "path": "internal/apiserver/application/interpretation/aiexplanation/governance/**/*.go"
-        },
-        {
-          "kind": "source",
-          "path": "internal/apiserver/infra/mongo/interpretation/aiexplanation/**/*.go"
-        }
-      ],
-      "verification": [],
-      "production_evidence": {
-        "level": "none",
-        "refs": [],
-        "deployed_sha": null,
-        "observed_at": null,
-        "limitations": [
-          "The schemas are wired into the default-disabled AI explanation runtime, but no real provider, live Mongo, client, or production evidence exists."
-        ]
-      },
-      "gaps": [
-        {
-          "id": "DOC-CLOSURE-AI-EXPLANATION-CONTRACTS",
-          "kind": "verification",
-          "severity": "medium",
-          "summary": "The schema integration is implemented but has not been validated with a real provider or deployed environment.",
-          "exit_criteria": "Run the exact schemas through the selected provider/model, live persistence path and pre-production contract acceptance."
-        }
-      ]
-    },
-    {
-      "path": "api/schema/interpretation/ai-explanation-prompt-template-v1.md",
-      "class": "sidecar",
-      "owner": "interpretation",
-      "doc_status": "planned",
-      "verified": {
-        "source_sha": null,
-        "verified_on": null
-      },
-      "fact_sources": [
-        {
-          "kind": "contract",
-          "path": "api/schema/interpretation/ai-explanation-input-v1.schema.json"
-        },
-        {
-          "kind": "contract",
-          "path": "api/schema/interpretation/ai-explanation-output-v1.schema.json"
-        },
-        {
-          "kind": "contract",
-          "path": "api/schema/interpretation/ai-explanation-profile-v1.schema.json"
-        },
-        {
-          "kind": "source",
-          "path": "internal/apiserver/domain/interpretation/aiexplanation/evaluation/**/*.go"
-        },
-        {
-          "kind": "source",
-          "path": "internal/apiserver/application/interpretation/aiexplanation/evaluation/**/*.go"
-        },
-        {
-          "kind": "source",
-          "path": "internal/apiserver/application/interpretation/aiexplanation/governance/**/*.go"
-        },
-        {
-          "kind": "source",
-          "path": "internal/apiserver/infra/mongo/interpretation/aiexplanation/**/*.go"
-        }
-      ],
-      "verification": [],
-      "production_evidence": {
-        "level": "none",
-        "refs": [],
-        "deployed_sha": null,
-        "observed_at": null,
-        "limitations": [
-          "The prompt has not been evaluated against a provider or model."
-        ]
-      },
-      "gaps": [
-        {
-          "id": "DOC-CLOSURE-AI-EXPLANATION-PROMPT",
-          "kind": "verification",
-          "severity": "medium",
-          "summary": "The prompt package is designed but has no provider evaluation evidence.",
-          "exit_criteria": "Implement the evaluation runner and pass the prompt validation matrix for the exact Prompt, Profile and Provider Route combination."
-        }
-      ]
-    },
-    {
-      "path": "api/schema/interpretation/ai-explanation-prompt-template-v2.md",
-      "class": "sidecar",
-      "owner": "interpretation",
-      "doc_status": "planned",
-      "verified": {
-        "source_sha": null,
-        "verified_on": null
-      },
-      "fact_sources": [
-        {
-          "kind": "contract",
-          "path": "api/schema/interpretation/ai-explanation-input-v1.schema.json"
-        },
-        {
-          "kind": "contract",
-          "path": "api/schema/interpretation/ai-explanation-output-v1.schema.json"
-        },
-        {
-          "kind": "contract",
-          "path": "api/schema/interpretation/ai-explanation-profile-v1.schema.json"
-        },
-        {
-          "kind": "fixture",
-          "path": "api/schema/interpretation/ai-explanation-prompt-evaluation-cases-v2.json"
-        },
-        {
-          "kind": "source",
-          "path": "internal/apiserver/infra/aiexplanation/prompt/**/*.go"
-        },
-        {
-          "kind": "source",
-          "path": "internal/apiserver/application/interpretation/aiexplanation/evaluation/**/*.go"
-        }
-      ],
-      "verification": [],
-      "production_evidence": {
-        "level": "historical",
-        "refs": [
-          "api/schema/interpretation/ai-explanation-prompt-validation-matrix.md"
-        ],
-        "deployed_sha": null,
-        "observed_at": "2026-09-01",
-        "limitations": [
-          "Production v2 Runs completed real generation and semantic evaluation, but none passed all release gates."
-        ]
-      },
-      "gaps": [
-        {
-          "id": "DOC-CLOSURE-AI-EXPLANATION-PROMPT-V2",
-          "kind": "verification",
-          "severity": "medium",
-          "summary": "The v2 prompt package is a release candidate without approved production evidence.",
-          "exit_criteria": "Run the frozen v2 Prompt, Profile, Suite and Provider Route through 35 candidates, 35 semantic receipts, dual-role human review and an approved Gate."
-        }
-      ]
-    },
-    {
-      "path": "api/schema/interpretation/ai-explanation-prompt-template-v3.md",
-      "class": "sidecar",
-      "owner": "interpretation",
-      "doc_status": "planned",
-      "verified": {
-        "source_sha": null,
-        "verified_on": null
-      },
-      "fact_sources": [
-        {
-          "kind": "contract",
-          "path": "api/schema/interpretation/ai-explanation-input-v1.schema.json"
-        },
-        {
-          "kind": "contract",
-          "path": "api/schema/interpretation/ai-explanation-output-v1.schema.json"
-        },
-        {
-          "kind": "contract",
-          "path": "api/schema/interpretation/ai-explanation-profile-v1.schema.json"
-        },
-        {
-          "kind": "fixture",
-          "path": "api/schema/interpretation/ai-explanation-prompt-evaluation-cases-v3.json"
-        },
-        {
-          "kind": "source",
-          "path": "internal/apiserver/infra/aiexplanation/prompt/**/*.go"
-        },
-        {
-          "kind": "source",
-          "path": "internal/apiserver/application/interpretation/aiexplanation/evaluation/**/*.go"
-        }
-      ],
-      "verification": [],
-      "production_evidence": {
-        "level": "none",
-        "refs": [],
-        "deployed_sha": null,
-        "observed_at": null,
-        "limitations": [
-          "The v3 prompt package has contract and preflight tests but has not completed a production evaluation Run or dual-role human review."
-        ]
-      },
-      "gaps": [
-        {
-          "id": "DOC-CLOSURE-AI-EXPLANATION-PROMPT-V3",
-          "kind": "verification",
-          "severity": "medium",
-          "summary": "The v3 prompt package is a release candidate without approved production evidence.",
-          "exit_criteria": "Run the frozen v3 Prompt, Profile, Suite and Provider Route through 35 candidates, 35 semantic receipts, dual-role human review and an approved Gate."
-        }
-      ]
-    },
-    {
-      "path": "api/schema/interpretation/ai-explanation-prompt-template-v4.md",
-      "class": "sidecar",
-      "owner": "interpretation",
-      "doc_status": "planned",
-      "verified": {
-        "source_sha": null,
-        "verified_on": null
-      },
-      "fact_sources": [
-        {
-          "kind": "contract",
-          "path": "api/schema/interpretation/ai-explanation-input-v1.schema.json"
-        },
-        {
-          "kind": "contract",
-          "path": "api/schema/interpretation/ai-explanation-output-v1.schema.json"
-        },
-        {
-          "kind": "contract",
-          "path": "api/schema/interpretation/ai-explanation-profile-v1.schema.json"
-        },
-        {
-          "kind": "fixture",
-          "path": "api/schema/interpretation/ai-explanation-prompt-evaluation-cases-v4.json"
-        },
-        {
-          "kind": "source",
-          "path": "internal/apiserver/infra/aiexplanation/prompt/**/*.go"
-        },
-        {
-          "kind": "source",
-          "path": "internal/apiserver/application/interpretation/aiexplanation/evaluation/**/*.go"
-        }
-      ],
-      "verification": [],
-      "production_evidence": {
-        "level": "none",
-        "refs": [],
-        "deployed_sha": null,
-        "observed_at": null,
-        "limitations": [
-          "The v4 prompt package has contract and preflight tests but has not completed a production evaluation Run or dual-role human review."
-        ]
-      },
-      "gaps": [
-        {
-          "id": "DOC-CLOSURE-AI-EXPLANATION-PROMPT-V4",
-          "kind": "verification",
-          "severity": "medium",
-          "summary": "The v4 prompt package is a release candidate without approved production evidence.",
-          "exit_criteria": "Run the frozen v4 Prompt, Profile, Suite and Provider Route through 35 candidates, 35 semantic receipts, dual-role human review and an approved Gate."
-        }
-      ]
-    },
-    {
-      "path": "api/schema/interpretation/ai-explanation-semantic-evaluator-prompt-v1.md",
-      "class": "sidecar",
-      "owner": "interpretation",
-      "doc_status": "planned",
-      "verified": {
-        "source_sha": null,
-        "verified_on": null
-      },
-      "fact_sources": [
-        {
-          "kind": "contract",
-          "path": "api/schema/interpretation/ai-explanation-semantic-evaluation-output-v1.schema.json"
-        },
-        {
-          "kind": "fixture",
-          "path": "api/schema/interpretation/ai-explanation-prompt-evaluation-cases-v1.json"
-        },
-        {
-          "kind": "source",
-          "path": "internal/apiserver/infra/aiexplanation/semantic/**/*.go"
-        },
-        {
-          "kind": "source",
-          "path": "internal/apiserver/application/interpretation/aiexplanation/evaluation/**/*.go"
-        },
-        {
-          "kind": "source",
-          "path": "internal/apiserver/domain/interpretation/aiexplanation/evaluation/**/*.go"
-        }
-      ],
-      "verification": [],
-      "production_evidence": {
-        "level": "none",
-        "refs": [],
-        "deployed_sha": null,
-        "observed_at": null,
-        "limitations": [
-          "The executable semantic evaluator Prompt and strict output adapter have contract tests, but no real model-judge call or human release review has been executed."
-        ]
-      },
-      "gaps": [
-        {
-          "id": "DOC-CLOSURE-AI-EXPLANATION-SEMANTIC-EVALUATOR",
-          "kind": "verification",
-          "severity": "medium",
-          "summary": "The semantic evaluator has no real provider result or approved release evidence.",
-          "exit_criteria": "Run the frozen evaluator against all 35 generated candidates, retain matching provider receipts and complete dual-role human review."
-        }
-      ]
-    },
-    {
-      "path": "api/schema/interpretation/ai-explanation-prompt-validation-matrix.md",
-      "class": "sidecar",
-      "owner": "interpretation",
-      "doc_status": "planned",
-      "verified": {
-        "source_sha": null,
-        "verified_on": null
-      },
-      "fact_sources": [
-        {
-          "kind": "contract",
-          "path": "api/schema/interpretation/ai-explanation-prompt-template-v1.md"
-        },
-        {
-          "kind": "contract",
-          "path": "api/schema/interpretation/ai-explanation-prompt-template-v2.md"
-        },
-        {
-          "kind": "contract",
-          "path": "api/schema/interpretation/ai-explanation-prompt-template-v3.md"
-        },
-        {
-          "kind": "fixture",
-          "path": "api/schema/interpretation/ai-explanation-prompt-evaluation-cases-v1.json"
-        },
-        {
-          "kind": "fixture",
-          "path": "api/schema/interpretation/ai-explanation-prompt-evaluation-cases-v2.json"
-        },
-        {
-          "kind": "fixture",
-          "path": "api/schema/interpretation/ai-explanation-prompt-evaluation-cases-v3.json"
-        },
-        {
-          "kind": "contract",
-          "path": "api/schema/interpretation/ai-explanation-output-v1.schema.json"
-        },
-        {
-          "kind": "contract",
-          "path": "api/schema/interpretation/ai-explanation-profile-v1.schema.json"
-        },
-        {
-          "kind": "source",
-          "path": "internal/apiserver/domain/interpretation/aiexplanation/evaluation/**/*.go"
-        },
-        {
-          "kind": "source",
-          "path": "internal/apiserver/application/interpretation/aiexplanation/evaluation/**/*.go"
-        },
-        {
-          "kind": "source",
-          "path": "internal/apiserver/application/interpretation/aiexplanation/governance/**/*.go"
-        },
-        {
-          "kind": "source",
-          "path": "internal/apiserver/infra/mongo/interpretation/aiexplanation/**/*.go"
-        }
-      ],
-      "verification": [],
-      "production_evidence": {
-        "level": "none",
-        "refs": [],
-        "deployed_sha": null,
-        "observed_at": null,
-        "limitations": [
-          "Production frozen runs have executed real Provider generation and semantic-evaluator calls, but the latest reviewed route still has a technical output-schema failure; no complete 70-entry dual-role human review or approved report exists."
-        ]
-      },
-      "gaps": [
-        {
-          "id": "DOC-CLOSURE-AI-EXPLANATION-PROMPT-EVAL",
-          "kind": "verification",
-          "severity": "medium",
-          "summary": "Real Prompt evaluation runs have executed, but no technically clean 35+35 run, complete dual-role human review, or approved report exists.",
-          "exit_criteria": "Produce a complete evaluation report with 35 generation outputs, 35 semantic receipts, one preflight result, all hard gates and 70 dual-role human reviews."
         }
       ]
     },
@@ -3308,68 +2879,20 @@
       },
       "fact_sources": [
         {
-          "kind": "contract",
-          "path": "api/schema/interpretation/ai-explanation-input-v1.schema.json"
-        },
-        {
-          "kind": "contract",
-          "path": "api/schema/interpretation/ai-explanation-output-v1.schema.json"
-        },
-        {
-          "kind": "contract",
-          "path": "api/schema/interpretation/ai-explanation-profile-v1.schema.json"
-        },
-        {
-          "kind": "contract",
-          "path": "api/schema/interpretation/ai-explanation-prompt-template-v1.md"
-        },
-        {
-          "kind": "contract",
-          "path": "api/schema/interpretation/ai-explanation-prompt-template-v2.md"
-        },
-        {
-          "kind": "contract",
-          "path": "api/schema/interpretation/ai-explanation-prompt-template-v3.md"
+          "kind": "source",
+          "path": "internal/apiserver/application/aibridge/*.go"
         },
         {
           "kind": "source",
-          "path": "internal/apiserver/domain/interpretation/aiexplanation/**/*.go"
+          "path": "internal/apiserver/application/interpretation/reportsource/*.go"
         },
         {
           "kind": "source",
-          "path": "internal/apiserver/application/interpretation/aiexplanation/**/*.go"
+          "path": "internal/apiserver/options/ai_workflow*.go"
         },
         {
           "kind": "source",
-          "path": "internal/apiserver/infra/aiexplanation/**/*.go"
-        },
-        {
-          "kind": "source",
-          "path": "internal/apiserver/infra/mongo/interpretation/aiexplanation/**/*.go"
-        },
-        {
-          "kind": "source",
-          "path": "internal/apiserver/transport/**/*ai_explanation*.go"
-        },
-        {
-          "kind": "source",
-          "path": "internal/apiserver/container/modules/interpretation/*.go"
-        },
-        {
-          "kind": "source",
-          "path": "internal/collection-server/**/*ai_explanation*.go"
-        },
-        {
-          "kind": "source",
-          "path": "internal/collection-server/**/aiexplanation/**/*.go"
-        },
-        {
-          "kind": "source",
-          "path": "internal/worker/**/*ai_explanation*.go"
-        },
-        {
-          "kind": "source",
-          "path": "internal/pkg/migration/migrations/mongodb/0000*_ai_explanation*.json"
+          "path": "api/grpc/proto/interpretation/interpretation.proto"
         }
       ],
       "verification": [],
@@ -3379,16 +2902,16 @@
         "deployed_sha": null,
         "observed_at": null,
         "limitations": [
-          "AI explanation has contracts, runtime transport/event/worker wiring, OpenAI and DeepSeek adapters, immutable evaluation evidence, Profile governance, production governance deployment and multiple real Provider evaluations; the latest route still failed a technical hard gate, and no approved Run, published Profile or participant traffic exists."
+          "Code retirement only; production v6 acceptance and targeted database cleanup remain outstanding."
         ]
       },
       "gaps": [
         {
-          "id": "AI-EXPLANATION-DESIGN-CLOSURE",
+          "id": "M5-PRODUCTION-CLOSURE",
           "kind": "verification",
           "severity": "high",
-          "summary": "Contracts and production governance runtime exist, but the strict-tool release candidate has no deployed 35+35 result, approved evidence run, published Profile or participant acceptance.",
-          "exit_criteria": "Deploy the strict-tool Route revision, complete a technically clean real 35+35 evaluation and dual-role review, approve the immutable Run, publish the Profile, and finish participant acceptance before changing the production conclusion."
+          "summary": "Production acceptance, deployment and scoped cleanup are still required.",
+          "exit_criteria": "Verify real v6, drain retired events, deploy, back up and restore-test, clean explicit old objects, and reverify without a 24h wait."
         }
       ]
     },
@@ -3481,10 +3004,6 @@
         {
           "kind": "contract",
           "path": "api/schema/interpretation/ai-explanation-*.schema.json"
-        },
-        {
-          "kind": "source",
-          "path": "internal/apiserver/domain/interpretation/aiexplanation/**/*.go"
         }
       ],
       "verification": [],
@@ -3545,10 +3064,6 @@
         {
           "kind": "contract",
           "path": "api/schema/interpretation/ai-explanation-*.schema.json"
-        },
-        {
-          "kind": "source",
-          "path": "internal/apiserver/domain/interpretation/aiexplanation/**/*.go"
         }
       ],
       "verification": [],
@@ -8928,38 +8443,6 @@
       ]
     },
     {
-      "path": "scripts/oneoff/audit_ai_explanation_prompt_evaluation_size/README.md",
-      "class": "sidecar",
-      "owner": "tooling",
-      "doc_status": "needs_review",
-      "verified": {
-        "source_sha": null,
-        "verified_on": null
-      },
-      "fact_sources": [],
-      "verification": [],
-      "production_evidence": {
-        "level": "current",
-        "refs": [
-          "https://github.com/FangcunMount/qs-server/actions/runs/33443439888"
-        ],
-        "deployed_sha": "f6bb4c7e30728d4416547741c053ae837c1de23a",
-        "observed_at": "2026-08-31",
-        "limitations": [
-          "The production history contained 525 generation executions but no semantic execution sample, so the complete v2 projection remains unavailable."
-        ]
-      },
-      "gaps": [
-        {
-          "id": "DOC-CLOSURE-178",
-          "kind": "verification",
-          "severity": "medium",
-          "summary": "The production audit has no semantic execution sample for a complete v2 size projection.",
-          "exit_criteria": "After the first complete v2 run, repeat the read-only audit and review semantic output sizes and the single-document capacity decision."
-        }
-      ]
-    },
-    {
       "path": "scripts/oneoff/audit_norm_usage/README.md",
       "class": "sidecar",
       "owner": "tooling",
@@ -9406,167 +8889,6 @@
           "severity": "medium",
           "summary": "Source and semantic review have not yet been recorded.",
           "exit_criteria": "Record fact sources and verification evidence, then update doc_status through review."
-        }
-      ]
-    },
-    {
-      "path": "api/schema/interpretation/ai-explanation-prompt-template-v5.md",
-      "class": "sidecar",
-      "owner": "interpretation",
-      "doc_status": "planned",
-      "verified": {
-        "source_sha": null,
-        "verified_on": null
-      },
-      "fact_sources": [
-        {
-          "kind": "contract",
-          "path": "api/schema/interpretation/ai-explanation-input-v1.schema.json"
-        },
-        {
-          "kind": "contract",
-          "path": "api/schema/interpretation/ai-explanation-output-v1.schema.json"
-        },
-        {
-          "kind": "contract",
-          "path": "api/schema/interpretation/ai-explanation-profile-v1.schema.json"
-        },
-        {
-          "kind": "fixture",
-          "path": "api/schema/interpretation/ai-explanation-prompt-evaluation-cases-v5.json"
-        },
-        {
-          "kind": "source",
-          "path": "internal/apiserver/infra/aiexplanation/prompt/**/*.go"
-        },
-        {
-          "kind": "source",
-          "path": "internal/apiserver/application/interpretation/aiexplanation/evaluation/**/*.go"
-        }
-      ],
-      "verification": [],
-      "production_evidence": {
-        "level": "none",
-        "refs": [],
-        "deployed_sha": null,
-        "observed_at": null,
-        "limitations": [
-          "The v5 prompt package has contract and preflight tests but has not completed a production evaluation Run or dual-role human review."
-        ]
-      },
-      "gaps": [
-        {
-          "id": "DOC-CLOSURE-AI-EXPLANATION-PROMPT-V5",
-          "kind": "verification",
-          "severity": "medium",
-          "summary": "The v5 prompt package is a release candidate without approved production evidence.",
-          "exit_criteria": "Run the frozen v5 Prompt, Profile, Suite and Provider Route through 35 candidates, 35 semantic receipts, dual-role human review and an approved Gate."
-        }
-      ]
-    },
-    {
-      "path": "api/schema/interpretation/ai-explanation-prompt-template-v6.md",
-      "class": "sidecar",
-      "owner": "interpretation",
-      "doc_status": "planned",
-      "verified": {
-        "source_sha": null,
-        "verified_on": null
-      },
-      "fact_sources": [
-        {
-          "kind": "contract",
-          "path": "api/schema/interpretation/ai-explanation-input-v1.schema.json"
-        },
-        {
-          "kind": "contract",
-          "path": "api/schema/interpretation/ai-explanation-output-v1.schema.json"
-        },
-        {
-          "kind": "contract",
-          "path": "api/schema/interpretation/ai-explanation-profile-v1.schema.json"
-        },
-        {
-          "kind": "fixture",
-          "path": "api/schema/interpretation/ai-explanation-prompt-evaluation-cases-v6.json"
-        },
-        {
-          "kind": "source",
-          "path": "internal/apiserver/infra/aiexplanation/prompt/**/*.go"
-        },
-        {
-          "kind": "source",
-          "path": "internal/apiserver/application/interpretation/aiexplanation/evaluation/**/*.go"
-        }
-      ],
-      "verification": [],
-      "production_evidence": {
-        "level": "none",
-        "refs": [],
-        "deployed_sha": null,
-        "observed_at": null,
-        "limitations": [
-          "The v6 prompt package has contract and preflight tests but has not completed a production evaluation Run or dual-role human review."
-        ]
-      },
-      "gaps": [
-        {
-          "id": "DOC-CLOSURE-AI-EXPLANATION-PROMPT-V6",
-          "kind": "verification",
-          "severity": "medium",
-          "summary": "The v6 prompt package is a release candidate without approved production evidence.",
-          "exit_criteria": "Run the frozen v6 Prompt, Profile, Suite and Provider Route through 35 candidates, 35 semantic receipts, dual-role human review and an approved Gate."
-        }
-      ]
-    },
-    {
-      "path": "api/schema/interpretation/ai-explanation-semantic-evaluator-prompt-v2.md",
-      "class": "sidecar",
-      "owner": "interpretation",
-      "doc_status": "planned",
-      "verified": {
-        "source_sha": null,
-        "verified_on": null
-      },
-      "fact_sources": [
-        {
-          "kind": "contract",
-          "path": "api/schema/interpretation/ai-explanation-semantic-evaluation-output-v1.schema.json"
-        },
-        {
-          "kind": "fixture",
-          "path": "api/schema/interpretation/ai-explanation-prompt-evaluation-cases-v1.json"
-        },
-        {
-          "kind": "source",
-          "path": "internal/apiserver/infra/aiexplanation/semantic/**/*.go"
-        },
-        {
-          "kind": "source",
-          "path": "internal/apiserver/application/interpretation/aiexplanation/evaluation/**/*.go"
-        },
-        {
-          "kind": "source",
-          "path": "internal/apiserver/domain/interpretation/aiexplanation/evaluation/**/*.go"
-        }
-      ],
-      "verification": [],
-      "production_evidence": {
-        "level": "none",
-        "refs": [],
-        "deployed_sha": null,
-        "observed_at": null,
-        "limitations": [
-          "The executable semantic evaluator Prompt and strict output adapter have contract tests, but no real model-judge call or human release review has been executed."
-        ]
-      },
-      "gaps": [
-        {
-          "id": "DOC-CLOSURE-AI-EXPLANATION-SEMANTIC-EVALUATOR-V2",
-          "kind": "verification",
-          "severity": "medium",
-          "summary": "The semantic evaluator has no real provider result or approved release evidence.",
-          "exit_criteria": "Run the frozen evaluator against all 35 generated candidates, retain matching provider receipts and complete dual-role human review."
         }
       ]
     },

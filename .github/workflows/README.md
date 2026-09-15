@@ -46,7 +46,6 @@ CI for exact SHA
 ```bash
 go test -count=1 ./internal/pkg/configcontract
 bash scripts/cd/test-github-action-runtimes.sh
-bash scripts/cd/test-ai-evaluation-size-audit-workflow.sh
 bash scripts/cd/test-plan-services.sh
 bash scripts/cd/test-prepare-package.sh
 bash scripts/cd/test-production-compose-network-exposure.sh

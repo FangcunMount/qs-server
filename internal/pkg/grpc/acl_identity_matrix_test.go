@@ -136,7 +136,6 @@ func registeredUnaryRPCMethods(t *testing.T) []string {
 		&interpretationpb.ParticipantReportService_ServiceDesc,
 		&interpretationpb.ParticipantAIExplanationService_ServiceDesc,
 		&interpretationpb.InterpretationAutomationService_ServiceDesc,
-		&interpretationpb.AIExplanationAutomationService_ServiceDesc,
 		&internalpb.InternalService_ServiceDesc,
 		&internalpb.PlanCommandService_ServiceDesc,
 		&questionnairepb.QuestionnaireService_ServiceDesc,

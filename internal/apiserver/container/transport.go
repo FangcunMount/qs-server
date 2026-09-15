@@ -112,7 +112,6 @@ func (c *Container) BuildRESTDeps(rateCfg *options.RateLimitOptions) resttranspo
 		deps.Interpretation.ReportTemplates = c.ReportModule.ReportTemplateService()
 	}
 	if c.ReportModule != nil {
-		deps.Interpretation.AIExplanationAdministration = c.ReportModule.AIExplanationAdministration()
 		deps.Interpretation.AIWorkflowManagement = c.ReportModule.AIWorkflowManagement()
 		deps.Interpretation.AIWorkflowParticipants = c.ReportModule.AIWorkflowParticipants()
 		deps.Interpretation.AIWorkflowPublications = c.ReportModule.AIWorkflowPublications()
@@ -502,20 +501,19 @@ type ServerGRPCBootstrapDeps struct {
 // ServerRuntimeDeps describes the narrow container-owned dependencies needed by
 // background runtimes started from the apiserver process.
 type ServerRuntimeDeps struct {
-	LockBuilder                                 *keyspace.Builder
-	LockManager                                 locklease.Manager
-	LockRunner                                  locklease.Runner
-	OperatorRoleProjectionReconciler            operatorApp.OperatorRoleProjectionReconciler
-	WarmupCoordinator                           cachegovernance.WarmupCoordinator
-	PlanCommandService                          planApp.PlanCommandService
-	StatisticsCoordinator                       *statisticsApp.Coordinator
-	EvaluationConsistencyAuditService           evaluationScheduler.Service
-	EvaluationLeaseRecoverer                    evaluationScheduler.LeaseRecoverer
-	InterpretationLeaseRecoverer                evaluationScheduler.LeaseRecoverer
-	AIExplanationPromptEvaluationLeaseRecoverer evaluationScheduler.LeaseRecoverer
-	AIExplanationParticipantLeaseRecoverer      evaluationScheduler.LeaseRecoverer
-	ReportCatalogAuditService                   interpretationcatalog.RunnerService
-	MongoConsistencyAuditService                mongoconsistency.RunnerService
+	LockBuilder                       *keyspace.Builder
+	LockManager                       locklease.Manager
+	LockRunner                        locklease.Runner
+	OperatorRoleProjectionReconciler  operatorApp.OperatorRoleProjectionReconciler
+	WarmupCoordinator                 cachegovernance.WarmupCoordinator
+	PlanCommandService                planApp.PlanCommandService
+	StatisticsCoordinator             *statisticsApp.Coordinator
+	EvaluationConsistencyAuditService evaluationScheduler.Service
+	EvaluationLeaseRecoverer          evaluationScheduler.LeaseRecoverer
+	InterpretationLeaseRecoverer      evaluationScheduler.LeaseRecoverer
+
+	ReportCatalogAuditService    interpretationcatalog.RunnerService
+	MongoConsistencyAuditService mongoconsistency.RunnerService
 }
 
 func (c *Container) BuildServerGRPCBootstrapDeps() ServerGRPCBootstrapDeps {
@@ -559,8 +557,6 @@ func (c *Container) BuildServerRuntimeDeps() ServerRuntimeDeps {
 	if c.ReportModule != nil {
 		deps.ReportCatalogAuditService = c.ReportModule.CatalogAuditService()
 		deps.InterpretationLeaseRecoverer = c.ReportModule.LeaseRecoverer()
-		deps.AIExplanationPromptEvaluationLeaseRecoverer = c.ReportModule.AIExplanationPromptEvaluationLeaseRecoverer()
-		deps.AIExplanationParticipantLeaseRecoverer = c.ReportModule.AIExplanationParticipantLeaseRecoverer()
 	}
 	if c.EvaluationModule != nil {
 		deps.EvaluationConsistencyAuditService = c.EvaluationModule.ConsistencyAuditService
