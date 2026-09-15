@@ -2,7 +2,7 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "1af442f5cac9408d12c2b5e6b837a74d936204ee",
+    "sha": "cda78cb201ec90a9895c049cd86a910bc3d43c02",
     "verified_on": "2026-09-15"
   },
   "status_policy": {
@@ -88,8 +88,8 @@
         "version_count": 82
       },
       "mongodb": {
-        "max_version": 34,
-        "version_count": 34
+        "max_version": 35,
+        "version_count": 35
       }
     },
     "events": {
