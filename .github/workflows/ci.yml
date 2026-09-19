@@ -214,14 +214,14 @@ jobs:
             sleep 2
           done
 
-      - name: Run seeddata retirement migration integration tests
+      - name: Run retirement and retry persistence integration tests
         env:
           MYSQL_DSN: root:root@tcp(127.0.0.1:3306)/mysql?parseTime=true&multiStatements=true&loc=Asia%2FShanghai
           QS_SERVER_TEST_MONGO_URI: mongodb://127.0.0.1:27017/?replicaSet=rs0
           QS_SERVER_TEST_MONGO_DB_PREFIX: qs_retire_seeddata_test
         run: |
           go test -tags=integration \
-            -run '^TestRetire' \
+            -run '^TestRetire|^TestRetryGovernanceMySQLMigrationsUpDown$' \
             -count=1 -timeout=15m -v ./internal/pkg/migration
 
       - name: Verify answering starts and durable submission against real databases
