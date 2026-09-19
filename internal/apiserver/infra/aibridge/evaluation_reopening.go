@@ -29,9 +29,6 @@ type reviewReopeningReceipt struct {
 // eligible candidates, round limits and gate policy belong to AI.
 func reviewReopenings(response *pb.EvaluationState) (json.RawMessage, error) {
 	raw := response.ReopeningsJson
-	if raw == "" { // Compatibility with AI versions predating review reopening.
-		raw = "[]"
-	}
 	var history []reviewReopeningReceipt
 	if len(raw) > 2*1024*1024 || !utf8.ValidString(raw) || json.Unmarshal([]byte(raw), &history) != nil || history == nil {
 		return nil, app.ErrConflict

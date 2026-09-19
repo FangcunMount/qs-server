@@ -10,7 +10,7 @@
 | `sonar.yml` | SonarQube 分析 | 不替代 CI、部署或运行验收 |
 | `cd.yml` | 计划服务、构建/交付镜像、生成部署包、按依赖顺序部署、逐实例验证 | 成功结果必须记录 exact SHA、image digest、effective config 与环境 |
 | `ping-runner.yml` | 周期/手动执行目标环境连通与服务探针 | 只证明该时点、该检查项；不证明业务全链和数据一致性 |
-| `db-ops.yml` | 受保护的备份、恢复与只读数据盘点入口；`audit-ai-evaluation-size` 在生产网络内统计 Prompt Evaluation BSON/输出分布 | 写操作/恢复需要独立授权、备份和复验；尺寸审计只读、全量扫描且不输出凭据 |
+| `db-ops.yml` | 受保护的备份、恢复与只读数据盘点入口 | 写操作/恢复需要独立授权、备份和复验；不输出凭据 |
 | `attention-reconcile-audit.yml` | 受控 Attention reconciliation 审计 | 不得把 dry-run 自动升级为 apply |
 | `compatibility-observation.yml` | 只读兼容流量/指标观察 | 无指标、零值、无命中和证据缺失必须区分 |
 | `authz-production-matrix.yml` | 使用生产主体执行只读 IAM AuthZ v3 精确 12 项矩阵 | 覆盖角色与 origin、缺属性、错误属性类型及 force_retry；IAM 快照复核角色，不写角色或业务数据 |
@@ -37,7 +37,7 @@ CI for exact SHA
 
 - workflow input/Variable 只表达服务计划、环境和非敏感参数；数据库、Redis、JWT、委托 key、AI Provider API key、registry token、SSH key 与 TLS private key 必须来自受保护 Secret/目标主机。
 - `scripts/cd/prepare-package.sh` 在每个部署包内生成独立的 `config.prod.env`；日志只允许显示变量名和脱敏 endpoint，不得输出值。
-- `DEEPSEEK_API_KEY` 只注入 apiserver 部署包；不得进入 collection、worker、镜像 build args 或 GitHub Actions 日志。
+- QS 不再注入模型 API Key；模型凭据由 qs-ai 的部署管理，不得进入 QS 部署包、镜像 build args 或 GitHub Actions 日志。
 - 自动部署必须校验目标 SHA 没有被更新提交取代；手动部署仍须记录调用者、输入、environment 和审批。
 - self-hosted runner 的网络、SSH、Docker 权限和工具版本属于环境前置条件，不能写死为当前事实。
 

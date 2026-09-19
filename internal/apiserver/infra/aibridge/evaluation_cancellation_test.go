@@ -115,7 +115,7 @@ func TestCancellationReadPreservesOriginalActorAndChecksSourceBindings(t *testin
 	if _, err := state(response, app.EvaluationScope{RunID: response.RunId}); !errors.Is(err, app.ErrConflict) {
 		t.Fatal("canceled review history requires original cancellation evidence")
 	}
-	response = &pb.EvaluationState{RunId: "run:1", Version: 7, Status: "canceled", ResolutionsJson: "[]"}
+	response = &pb.EvaluationState{ReviewsJson: "[]", ReopeningsJson: "[]", RunId: "run:1", Version: 7, Status: "canceled", ResolutionsJson: "[]"}
 	if view, err := state(response, app.EvaluationScope{RunID: "run:1"}); err != nil || view.Cancellation != nil {
 		t.Fatal("older cancellation compatibility lost", err)
 	}

@@ -35,7 +35,7 @@ type evaluationRPCStub struct {
 }
 
 func (s *evaluationRPCStub) Get(ctx context.Context, r *pb.EvaluationQuery, _ ...grpc.CallOption) (*pb.EvaluationState, error) {
-	return &pb.EvaluationState{RunId: r.RunId, Version: 7, Status: "collecting", ResolutionsJson: "[]"}, nil
+	return &pb.EvaluationState{ReviewsJson: "[]", ReopeningsJson: "[]", RunId: r.RunId, Version: 7, Status: "collecting", ResolutionsJson: "[]"}, nil
 }
 func (s *evaluationRPCStub) ResolveUnknown(ctx context.Context, r *pb.UnknownResolutionCommand, _ ...grpc.CallOption) (*pb.EvaluationState, error) {
 	s.calls++

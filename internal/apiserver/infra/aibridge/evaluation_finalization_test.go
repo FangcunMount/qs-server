@@ -23,7 +23,7 @@ func (s *evaluationRPCStub) Finalize(ctx context.Context, command *pb.Evaluation
 }
 
 func finalState() *pb.EvaluationState {
-	response := &pb.EvaluationState{RunId: "run:1", Version: 8, Status: "rejected", ResolutionsJson: "[]"}
+	response := &pb.EvaluationState{ReviewsJson: "[]", ReopeningsJson: "[]", RunId: "run:1", Version: 8, Status: "rejected", ResolutionsJson: "[]"}
 	reviews := make([]map[string]string, 70)
 	for i := range reviews {
 		reviews[i] = map[string]string{}

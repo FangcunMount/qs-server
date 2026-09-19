@@ -66,6 +66,7 @@ func TestReopenForwardsOnceAndBindsAcceptedRound(t *testing.T) {
 
 func TestEveryStateReadChecksBoundedHistoricalReceipts(t *testing.T) {
 	for _, mutate := range []func(*pb.EvaluationState){
+		func(r *pb.EvaluationState) { r.ReopeningsJson = "" },
 		func(r *pb.EvaluationState) { r.ReopeningsJson = "null" },
 		func(r *pb.EvaluationState) { r.ReopeningsJson = strings.Repeat("x", 2*1024*1024+1) },
 		func(r *pb.EvaluationState) { r.Version = 8 },
@@ -85,9 +86,9 @@ func TestEveryStateReadChecksBoundedHistoricalReceipts(t *testing.T) {
 			t.Fatal("invalid history accepted", err)
 		}
 	}
-	old := &pb.EvaluationState{RunId: "run:1", Version: 1, Status: "requested", ResolutionsJson: "[]"}
+	old := &pb.EvaluationState{ReviewsJson: "[]", ReopeningsJson: "[]", RunId: "run:1", Version: 1, Status: "requested", ResolutionsJson: "[]"}
 	if result, err := state(old, app.EvaluationScope{RunID: "run:1"}); err != nil || string(result.ReviewReopenings) != "[]" {
-		t.Fatal("older AI compatibility lost", err)
+		t.Fatal("explicit empty reopening history rejected", err)
 	}
 }
 
