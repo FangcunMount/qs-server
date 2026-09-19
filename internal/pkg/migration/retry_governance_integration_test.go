@@ -12,7 +12,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
+	assessment "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
+	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 	"github.com/FangcunMount/qs-server/internal/pkg/mongodbtest"
+	"github.com/FangcunMount/qs-server/internal/pkg/retrygovernance"
 	drivermysql "github.com/go-sql-driver/mysql"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -73,6 +77,40 @@ INSERT INTO domain_event_outbox (event_id,aggregate_id,payload_json,status,attem
 	execSQLMigration(t, db, "000049_add_retry_governance.up.sql")
 	execSQLMigration(t, db, "000050_add_retry_event_hold.up.sql")
 	assertMySQLColumn(t, db, databaseName, "runtime_checkpoint", "retry_disposition", true)
+
+	// Use the real domain constructor and the schema's strict 64-character
+	// checkpoint/outbox fields: small synthetic request IDs missed this failure.
+	record, err := assessment.NewAssessment(1, testee.NewID(101),
+		assessment.NewQuestionnaireRefByCode(meta.NewCode("Q"), "1"),
+		assessment.NewAnswerSheetRef(meta.FromUint64(201)), assessment.NewAdhocOrigin(),
+		assessment.WithID(assessment.NewID(638017038744302126)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	requestID := "9fa91baf-8a9b-4ebf-9957-94f516b9d96e"
+	retry := assessment.NewEvaluationRetryRequestedEvent(record, 3, retrygovernance.AttemptOriginManual, requestID, time.Now())
+	if _, err := db.ExecContext(t.Context(), "UPDATE runtime_checkpoint SET retry_event_id=?,action_request_id=? WHERE assessment_id=1", retry.EventID(), requestID); err != nil {
+		t.Fatal(err)
+	}
+	body, err := json.Marshal(retry)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.ExecContext(t.Context(), "INSERT INTO domain_event_outbox (event_id,aggregate_id,payload_json,status) VALUES (?,?,?,'pending')", retry.EventID(), "638017038744302126", body); err != nil {
+		t.Fatal(err)
+	}
+	var persisted string
+	if err := db.QueryRowContext(t.Context(), "SELECT retry_event_id FROM runtime_checkpoint WHERE assessment_id=1").Scan(&persisted); err != nil {
+		t.Fatal(err)
+	}
+	if persisted != retry.EventID() {
+		t.Fatal("persisted retry identity changed")
+	}
+	repeated := assessment.NewEvaluationRetryRequestedEvent(record, 3, retrygovernance.AttemptOriginManual, requestID, time.Now().Add(time.Minute))
+	if _, err := db.ExecContext(t.Context(), "INSERT INTO domain_event_outbox (event_id,aggregate_id,payload_json,status) VALUES (?,?,?,'pending')", repeated.EventID(), "638017038744302126", body); err == nil {
+		t.Fatal("duplicate retry bypassed outbox uniqueness")
+	}
+
 	assertMySQLColumn(t, db, databaseName, "retry_event_hold", "claim_token", true)
 	if _, err := db.ExecContext(t.Context(), `INSERT INTO retry_event_hold
 (event_id,message_id,provider,topic_name,channel_name,payload_json,original_delivery_attempt,blocked_reason,blocked_at)

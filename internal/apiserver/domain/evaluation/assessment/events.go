@@ -1,6 +1,8 @@
 package assessment
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"strconv"
 	"time"
@@ -70,6 +72,12 @@ func NewEvaluationRetryRequestedEvent(a *Assessment, expectedAttempt int, origin
 	eventID := fmt.Sprintf("eval-retry:%d:%d:%s", a.ID(), expectedAttempt, origin)
 	if actionRequestID != "" {
 		eventID += ":" + actionRequestID
+	}
+	// Checkpoint and outbox identities are limited to 64 bytes. Hash the full
+	// key rather than truncate its request identity; keep existing short keys.
+	if len(eventID) > 64 {
+		sum := sha256.Sum256([]byte(eventID))
+		eventID = hex.EncodeToString(sum[:])
 	}
 	in := evaldomainevent.RequestedInput{
 		EventID: eventID,
