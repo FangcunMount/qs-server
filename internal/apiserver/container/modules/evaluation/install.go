@@ -41,7 +41,7 @@ func InstallFrom(host InstallHost) error {
 		MySQLLimiter:              host.MySQLLimiter(),
 		MongoLimiter:              host.MongoLimiter(),
 		TesteeAccessChecker:       NewTesteeAccessChecker(host.ActorPorts().TesteeAccess),
-		NormSubjectReader:         NewNormSubjectReader(host.ActorPorts().TesteeQuery),
+		NormSubjectReader:         NewNormSubjectReader(host.ActorPorts().TesteeReader),
 		SurveyRuntimeInfra:        host.SurveyRuntimeInfra(),
 		PublishedModelCatalog:     host.PublishedModelCatalog(),
 		RuntimeDescriptorRegistry: catalog.RuntimeDescriptorRegistry,
