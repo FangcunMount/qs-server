@@ -1,0 +1,29 @@
+[
+  {
+    "drop": "ai_explanation_generations"
+  },
+  {
+    "drop": "ai_explanation_runs"
+  },
+  {
+    "drop": "ai_explanation_artifacts"
+  },
+  {
+    "drop": "ai_explanation_profiles"
+  },
+  {
+    "drop": "ai_explanation_prompt_evaluations"
+  },
+  {
+    "drop": "ai_explanation_prompt_evaluation_rechecks"
+  },
+  {
+    "drop": "ai_explanation_prompt_evaluation_daily_budgets"
+  },
+  {
+    "drop": "ai_explanation_participant_daily_budgets"
+  },
+  {
+    "drop": "ai_explanation_participant_active_capacity"
+  }
+]

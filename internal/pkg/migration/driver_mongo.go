@@ -81,6 +81,9 @@ func (d *MongoDriver) PrepareRun(parent context.Context, config *Config, version
 	}
 	ctx, cancel := context.WithTimeout(parent, 30*time.Second)
 	defer cancel()
+	if err := d.prepareAIEngineRetirement(ctx, config.Database, versionBefore); err != nil {
+		return nil, err
+	}
 	if versionBefore < compatibilityRetirementVersion {
 		if err := d.ensureCompatibilityRetirementCollections(ctx, config.Database); err != nil {
 			return nil, err
