@@ -165,7 +165,7 @@ func (c *Container) ActorPorts() compose.ActorPorts {
 	ports := compose.ActorPorts{}
 	if c.ActorModule != nil {
 		ports.TesteeAccess = c.ActorModule.TesteeAccessService
-		ports.TesteeQuery = c.ActorModule.TesteeQueryService
+		ports.TesteeReader = c.ActorModule.ReadModel
 	}
 	return ports
 }
