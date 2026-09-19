@@ -52,16 +52,16 @@ func TestReviewPreservesBatchAndNeverRetriesUnknownResult(t *testing.T) {
 	}
 }
 
-func TestReviewHistoryRequiresBoundedArrayAndAcceptsOlderAIResponse(t *testing.T) {
+func TestReviewHistoryRequiresExplicitBoundedArray(t *testing.T) {
 	scope := app.EvaluationScope{RunID: "run:1"}
-	for _, raw := range []string{"null", "{}", "bad", "[" + strings.Repeat("{},", 70) + "{}]"} {
-		_, err := state(&pb.EvaluationState{RunId: scope.RunID, Version: 1, ResolutionsJson: "[]", ReviewsJson: raw}, scope)
+	for _, raw := range []string{"", "null", "{}", "bad", "[" + strings.Repeat("{},", 70) + "{}]"} {
+		_, err := state(&pb.EvaluationState{ReopeningsJson: "[]", RunId: scope.RunID, Version: 1, ResolutionsJson: "[]", ReviewsJson: raw}, scope)
 		if !errors.Is(err, app.ErrConflict) {
 			t.Fatal("invalid audit history accepted")
 		}
 	}
-	reply, err := state(&pb.EvaluationState{RunId: scope.RunID, Version: 1, ResolutionsJson: "[]"}, scope)
+	reply, err := state(&pb.EvaluationState{ReviewsJson: "[]", ReopeningsJson: "[]", RunId: scope.RunID, Version: 1, ResolutionsJson: "[]"}, scope)
 	if err != nil || string(reply.Reviews) != "[]" {
-		t.Fatal("old response incompatible")
+		t.Fatal("explicit empty history rejected")
 	}
 }

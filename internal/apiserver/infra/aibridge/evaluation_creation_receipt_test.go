@@ -19,7 +19,7 @@ func creationFixture() app.EvaluationCreationReceipt {
 
 func creationState(value app.EvaluationCreationReceipt) *pb.EvaluationState {
 	raw, _ := json.Marshal(value)
-	return &pb.EvaluationState{RunId: creationFixture().RunID, Version: 7, Status: "collecting", ResolutionsJson: "[]", CreationJson: string(raw)}
+	return &pb.EvaluationState{ReviewsJson: "[]", ReopeningsJson: "[]", RunId: creationFixture().RunID, Version: 7, Status: "collecting", ResolutionsJson: "[]", CreationJson: string(raw)}
 }
 
 func TestCreationRecoveryRetainsOriginalActorAndReferences(t *testing.T) {

@@ -24,9 +24,6 @@ func state(response *pb.EvaluationState, scope app.EvaluationScope) (app.Evaluat
 		return app.EvaluationState{}, app.ErrConflict
 	}
 	reviews := response.ReviewsJson
-	if reviews == "" { // Older AI versions do not expose review history yet.
-		reviews = "[]"
-	}
 	var history []json.RawMessage
 	if json.Unmarshal([]byte(reviews), &history) != nil || history == nil || len(history) > 70 {
 		return app.EvaluationState{}, app.ErrConflict

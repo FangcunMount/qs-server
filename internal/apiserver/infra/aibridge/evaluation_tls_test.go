@@ -37,7 +37,7 @@ func (s *tlsManagementServer) Get(ctx context.Context, r *pb.EvaluationQuery) (*
 	if !ok || len(info.State.VerifiedChains) == 0 || info.State.PeerCertificates[0].Subject.CommonName != "qs-apiserver.svc" {
 		s.t.Fatal("unverified QS workload")
 	}
-	return &pb.EvaluationState{RunId: r.RunId, Version: 1, Status: "blocked", ResolutionsJson: "[]"}, nil
+	return &pb.EvaluationState{ReviewsJson: "[]", ReopeningsJson: "[]", RunId: r.RunId, Version: 1, Status: "blocked", ResolutionsJson: "[]"}, nil
 }
 func TestEvaluationManagementConnectionUsesMutualTLSAndCloses(t *testing.T) {
 	caKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
