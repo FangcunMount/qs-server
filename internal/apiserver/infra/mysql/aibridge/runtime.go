@@ -153,22 +153,27 @@ func (s *Store) BackfillRuntimeIndexes(ctx context.Context, limit int) (int, err
 		return 0, err
 	}
 	defer tx.Rollback()
-	rows, err := tx.QueryContext(ctx, "SELECT request_id,payload FROM ai_bridge_requests WHERE organization_id IS NULL ORDER BY request_id LIMIT ? FOR UPDATE", limit)
+	rows, err := tx.QueryContext(ctx, "SELECT request_id,payload,request_hash FROM ai_bridge_requests WHERE organization_id IS NULL ORDER BY request_id LIMIT ? FOR UPDATE", limit)
 	if err != nil {
 		return 0, err
 	}
 	requests := []app.Start{}
 	for rows.Next() {
-		var id string
+		var id, storedHash string
 		var raw []byte
 		var r app.Start
-		if err = rows.Scan(&id, &raw); err != nil {
+		if err = rows.Scan(&id, &raw, &storedHash); err != nil {
 			rows.Close()
 			return 0, err
 		}
 		if json.Unmarshal(raw, &r) != nil || r.RequestID != id || !validExternal(r.Actor.OrgID) || !validExternal(r.TesteeID) || r.Actor.SubjectID == "" || len(r.Actor.SubjectID) > 128 || strings.ContainsRune(r.Actor.SubjectID, 0) || len(r.AssessmentIDs) == 0 {
 			rows.Close()
 			return 0, app.ErrInvalid
+		}
+		_, actualHash, hashErr := encode(r)
+		if hashErr != nil || actualHash != storedHash {
+			rows.Close()
+			return 0, app.ErrConflict
 		}
 		for _, a := range r.AssessmentIDs {
 			if !validExternal(a) {
