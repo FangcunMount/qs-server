@@ -28,7 +28,7 @@ func (s *Store) StageStart(ctx context.Context, r app.Start) error {
 		return err
 	}
 	defer func() { _ = tx.Rollback() }()
-	_, err = tx.ExecContext(ctx, "INSERT INTO ai_bridge_requests(request_id,request_hash,payload) VALUES(?,?,?) ON DUPLICATE KEY UPDATE request_id=request_id", r.RequestID, hash, raw)
+	_, err = tx.ExecContext(ctx, "INSERT INTO ai_bridge_requests(request_id,request_hash,payload,organization_id,subject_id,testee_id,created_at,updated_at) VALUES(?,?,?,?,?,?,UTC_TIMESTAMP(6),UTC_TIMESTAMP(6)) ON DUPLICATE KEY UPDATE request_id=request_id", r.RequestID, hash, raw, r.Actor.OrgID, r.Actor.SubjectID, r.TesteeID)
 	if err != nil {
 		return err
 	}
@@ -38,6 +38,11 @@ func (s *Store) StageStart(ctx context.Context, r app.Start) error {
 	}
 	if stored != hash {
 		return app.ErrConflict
+	}
+	for _, assessmentID := range r.AssessmentIDs {
+		if _, err = tx.ExecContext(ctx, "INSERT IGNORE INTO ai_bridge_request_assessments(request_id,assessment_id) VALUES(?,?)", r.RequestID, assessmentID); err != nil {
+			return err
+		}
 	}
 	if err = stage(ctx, tx, r.RequestID, r.RequestID, "start", raw, hash); err != nil {
 		return err
@@ -195,7 +200,7 @@ func (s *Store) Accept(ctx context.Context, e app.Event) error {
 		return err
 	}
 	if e.Version > version {
-		_, err = tx.ExecContext(ctx, "UPDATE ai_bridge_requests SET session_id=?,version=?,status=?,projection=? WHERE request_id=?", e.SessionID, e.Version, e.Status, raw, e.RequestID)
+		_, err = tx.ExecContext(ctx, "UPDATE ai_bridge_requests SET session_id=?,version=?,status=?,projection=?,updated_at=UTC_TIMESTAMP(6) WHERE request_id=?", e.SessionID, e.Version, e.Status, raw, e.RequestID)
 		if err != nil {
 			return err
 		}

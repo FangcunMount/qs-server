@@ -63,6 +63,7 @@ func TestGRPCProtoServicesHaveExplicitOwners(t *testing.T) {
 		"qsai.workflow.v1.SuiteManagement":       {"aiworkflow/workflow.proto", "../../infra/aibridge/suite_registration.go", "pb.NewSuiteManagementClient("},
 		"qsai.workflow.v1.SolutionManagement":    {"aiworkflow/workflow.proto", "../../infra/aibridge/solutions.go", "pb.NewSolutionManagementClient("},
 		"qsai.workflow.v1.SemanticPromptDrafts":  {"aiworkflow/workflow.proto", "../../infra/aibridge/semantic_drafts.go", "pb.NewSemanticPromptDraftsClient("},
+		"qsai.workflow.v1.RuntimeManagement":     {"aiworkflow/workflow.proto", "../../infra/aibridge/runtime.go", "pb.NewRuntimeManagementClient("},
 		"qsai.workflow.v1.QuotaManagement":       {"aiworkflow/workflow.proto", "../../infra/aibridge/quotas.go", "pb.NewQuotaManagementClient("},
 		"qsai.workflow.v1.AssetCatalog":          {"aiworkflow/workflow.proto", "../../infra/aibridge/asset_catalog.go", "pb.NewAssetCatalogClient("},
 		"qsai.workflow.v1.ProfileManagement":     {"aiworkflow/workflow.proto", "../../infra/aibridge/profile_registration.go", "pb.NewProfileManagementClient("},

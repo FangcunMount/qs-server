@@ -30,13 +30,14 @@ func main() {
 	}
 }
 func run() error {
-	mode := flag.String("mode", "", "stage-start, stage-change, relay, receive, projection")
+	mode := flag.String("mode", "", "stage-start, stage-change, relay, receive, projection, runtime-index-backfill")
 	address := flag.String("address", "", "bind address or AI target")
 	input := flag.String("input", "", "JSON command file")
 	id := flag.String("request-id", "", "business request ID")
 	ca := flag.String("ca", "", "CA file")
 	cert := flag.String("cert", "", "certificate")
 	key := flag.String("key", "", "private key")
+	batch := flag.Int("batch-size", 100, "runtime index backfill transaction size (1-500)")
 	flag.Parse()
 	ctx := context.Background()
 	db, err := sql.Open("mysql", os.Getenv("QS_AI_BRIDGE_DSN"))
@@ -47,6 +48,18 @@ func run() error {
 	db.SetMaxOpenConns(5)
 	s := &app.Service{Store: &store.Store{DB: db}}
 	switch *mode {
+	case "runtime-index-backfill":
+		for {
+			n, e := (&store.Store{DB: db}).BackfillRuntimeIndexes(ctx, *batch)
+			if e != nil {
+				return e
+			}
+			fmt.Printf("indexed=%d\n", n)
+			if n == 0 {
+				return nil
+			}
+		}
+
 	case "stage-start":
 		var r app.Start
 		if err = read(*input, &r); err != nil {

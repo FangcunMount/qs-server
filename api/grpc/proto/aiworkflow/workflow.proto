@@ -744,6 +744,21 @@ message QuotaResponse {
   string data_json = 2;
 }
 
+// Read-only runtime evidence. Does not renew leases or dispatch models.
+service RuntimeManagement {
+  rpc Health(RuntimeQuery) returns (RuntimeResponse);
+  rpc BatchGet(RuntimeQuery) returns (RuntimeResponse);
+  rpc Get(RuntimeQuery) returns (RuntimeResponse);
+}
+message RuntimeQuery {
+  PublicationScope scope = 1;
+  repeated string session_ids = 2;
+}
+message RuntimeResponse {
+  string schema_version = 1;
+  string data_json = 2;
+}
+
 // Judge drafts are organization-scoped editing state, never evaluation approval.
 service SemanticPromptDrafts {
   rpc Create(SemanticDraftWrite) returns (SemanticDraftResponse);

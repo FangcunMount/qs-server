@@ -56,6 +56,7 @@ type Module struct {
 	aiSuites               *bridge.SuiteAdministration
 	aiAssets               *bridge.AssetCatalogAdministration
 	aiSolutions            *bridge.SolutionAdministration
+	aiRuntime              *bridge.RuntimeAdministration
 	aiQuotas               *bridge.QuotaAdministration
 	aiSemanticDrafts       *bridge.SemanticDraftAdministration
 	aiProfiles             *bridge.ProfileAdministration
@@ -232,6 +233,7 @@ func New(deps Deps) (*Module, error) {
 			module.aiProfiles = &bridge.ProfileAdministration{Gateway: clients.Profiles}
 			module.aiSuites = &bridge.SuiteAdministration{Gateway: clients.Suites}
 			module.aiSolutions = &bridge.SolutionAdministration{Gateway: clients.Solutions}
+			module.aiRuntime = &bridge.RuntimeAdministration{Store: &bridgeStore.Store{DB: sqlDB}, Gateway: clients.Runtime}
 			module.aiQuotas = &bridge.QuotaAdministration{Gateway: clients.Quotas}
 			module.aiSemanticDrafts = &bridge.SemanticDraftAdministration{Gateway: clients.SemanticDrafts}
 			module.aiAssets = &bridge.AssetCatalogAdministration{Gateway: clients.Assets}
@@ -654,6 +656,13 @@ func (m *Module) AIWorkflowSolutions() *bridge.SolutionAdministration {
 		return nil
 	}
 	return m.aiSolutions
+}
+
+func (m *Module) AIWorkflowRuntime() *bridge.RuntimeAdministration {
+	if m == nil {
+		return nil
+	}
+	return m.aiRuntime
 }
 
 func (m *Module) AIWorkflowQuotas() *bridge.QuotaAdministration {
