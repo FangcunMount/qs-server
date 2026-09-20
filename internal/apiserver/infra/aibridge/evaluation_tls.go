@@ -60,7 +60,7 @@ func DialGovernance(address, caFile, certFile, keyFile string) (*GovernanceClien
 		return nil, fmt.Errorf("invalid QS evaluation CA")
 	}
 	config := &tls.Config{MinVersion: tls.VersionTLS13, Certificates: []tls.Certificate{pair}, RootCAs: pool}
-	conn, err := grpc.NewClient(address, grpc.WithTransportCredentials(credentials.NewTLS(config)), grpc.WithDisableRetry())
+	conn, err := grpc.NewClient(address, grpc.WithTransportCredentials(credentials.NewTLS(config)), grpc.WithDisableRetry(), grpc.WithChainUnaryInterceptor(correlateRPC))
 	if err != nil {
 		return nil, err
 	}
