@@ -144,6 +144,7 @@ type EvaluationDeps struct {
 
 type InterpretationDeps struct {
 	AIWorkflowRuntime      *bridge.RuntimeAdministration
+	AIWorkflowFlows        *bridge.FlowAdministration
 	AIWorkflowQuotas       *bridge.QuotaAdministration
 	AIWorkflowSolutions    *bridge.SolutionAdministration
 	AIWorkflowParticipants *bridge.ParticipantAdministration
