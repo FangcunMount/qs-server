@@ -3189,6 +3189,146 @@ var RuntimeManagement_ServiceDesc = grpc.ServiceDesc{
 }
 
 const (
+	FlowManagement_GetSolution_FullMethodName    = "/qsai.workflow.v1.FlowManagement/GetSolution"
+	FlowManagement_GetPublication_FullMethodName = "/qsai.workflow.v1.FlowManagement/GetPublication"
+)
+
+// FlowManagementClient is the client API for FlowManagement service.
+//
+// For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
+type FlowManagementClient interface {
+	GetSolution(ctx context.Context, in *FlowQuery, opts ...grpc.CallOption) (*SolutionResponse, error)
+	GetPublication(ctx context.Context, in *FlowQuery, opts ...grpc.CallOption) (*SolutionResponse, error)
+}
+
+type flowManagementClient struct {
+	cc grpc.ClientConnInterface
+}
+
+func NewFlowManagementClient(cc grpc.ClientConnInterface) FlowManagementClient {
+	return &flowManagementClient{cc}
+}
+
+func (c *flowManagementClient) GetSolution(ctx context.Context, in *FlowQuery, opts ...grpc.CallOption) (*SolutionResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(SolutionResponse)
+	err := c.cc.Invoke(ctx, FlowManagement_GetSolution_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *flowManagementClient) GetPublication(ctx context.Context, in *FlowQuery, opts ...grpc.CallOption) (*SolutionResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(SolutionResponse)
+	err := c.cc.Invoke(ctx, FlowManagement_GetPublication_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// FlowManagementServer is the server API for FlowManagement service.
+// All implementations must embed UnimplementedFlowManagementServer
+// for forward compatibility.
+type FlowManagementServer interface {
+	GetSolution(context.Context, *FlowQuery) (*SolutionResponse, error)
+	GetPublication(context.Context, *FlowQuery) (*SolutionResponse, error)
+	mustEmbedUnimplementedFlowManagementServer()
+}
+
+// UnimplementedFlowManagementServer must be embedded to have
+// forward compatible implementations.
+//
+// NOTE: this should be embedded by value instead of pointer to avoid a nil
+// pointer dereference when methods are called.
+type UnimplementedFlowManagementServer struct{}
+
+func (UnimplementedFlowManagementServer) GetSolution(context.Context, *FlowQuery) (*SolutionResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetSolution not implemented")
+}
+func (UnimplementedFlowManagementServer) GetPublication(context.Context, *FlowQuery) (*SolutionResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetPublication not implemented")
+}
+func (UnimplementedFlowManagementServer) mustEmbedUnimplementedFlowManagementServer() {}
+func (UnimplementedFlowManagementServer) testEmbeddedByValue()                        {}
+
+// UnsafeFlowManagementServer may be embedded to opt out of forward compatibility for this service.
+// Use of this interface is not recommended, as added methods to FlowManagementServer will
+// result in compilation errors.
+type UnsafeFlowManagementServer interface {
+	mustEmbedUnimplementedFlowManagementServer()
+}
+
+func RegisterFlowManagementServer(s grpc.ServiceRegistrar, srv FlowManagementServer) {
+	// If the following call panics, it indicates UnimplementedFlowManagementServer was
+	// embedded by pointer and is nil.  This will cause panics if an
+	// unimplemented method is ever invoked, so we test this at initialization
+	// time to prevent it from happening at runtime later due to I/O.
+	if t, ok := srv.(interface{ testEmbeddedByValue() }); ok {
+		t.testEmbeddedByValue()
+	}
+	s.RegisterService(&FlowManagement_ServiceDesc, srv)
+}
+
+func _FlowManagement_GetSolution_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(FlowQuery)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(FlowManagementServer).GetSolution(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: FlowManagement_GetSolution_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(FlowManagementServer).GetSolution(ctx, req.(*FlowQuery))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _FlowManagement_GetPublication_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(FlowQuery)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(FlowManagementServer).GetPublication(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: FlowManagement_GetPublication_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(FlowManagementServer).GetPublication(ctx, req.(*FlowQuery))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+// FlowManagement_ServiceDesc is the grpc.ServiceDesc for FlowManagement service.
+// It's only intended for direct use with grpc.RegisterService,
+// and not to be introspected or modified (even as a copy)
+var FlowManagement_ServiceDesc = grpc.ServiceDesc{
+	ServiceName: "qsai.workflow.v1.FlowManagement",
+	HandlerType: (*FlowManagementServer)(nil),
+	Methods: []grpc.MethodDesc{
+		{
+			MethodName: "GetSolution",
+			Handler:    _FlowManagement_GetSolution_Handler,
+		},
+		{
+			MethodName: "GetPublication",
+			Handler:    _FlowManagement_GetPublication_Handler,
+		},
+	},
+	Streams:  []grpc.StreamDesc{},
+	Metadata: "aiworkflow/workflow.proto",
+}
+
+const (
 	SemanticPromptDrafts_Create_FullMethodName     = "/qsai.workflow.v1.SemanticPromptDrafts/Create"
 	SemanticPromptDrafts_Get_FullMethodName        = "/qsai.workflow.v1.SemanticPromptDrafts/Get"
 	SemanticPromptDrafts_Revise_FullMethodName     = "/qsai.workflow.v1.SemanticPromptDrafts/Revise"

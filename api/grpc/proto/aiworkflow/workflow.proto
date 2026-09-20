@@ -762,6 +762,17 @@ message RuntimeResponse {
   string data_json = 2;
 }
 
+// Read-only descriptions. These never select or execute a workflow.
+message FlowQuery {
+  PublicationScope scope = 1;
+  string solution_id = 2;
+  string publication_id = 3;
+}
+service FlowManagement {
+  rpc GetSolution(FlowQuery) returns (SolutionResponse);
+  rpc GetPublication(FlowQuery) returns (SolutionResponse);
+}
+
 // Judge drafts are organization-scoped editing state, never evaluation approval.
 service SemanticPromptDrafts {
   rpc Create(SemanticDraftWrite) returns (SemanticDraftResponse);
