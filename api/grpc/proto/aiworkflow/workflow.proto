@@ -517,6 +517,9 @@ message SuiteRegisterCommand {
  PromptDraftSource prompt = 7;
  PromptDraftSource generation_route = 8;
  string reason = 9;
+ string case_edits_json = 10;
+ FrozenEvaluationRef semantic_prompt = 11;
+ int64 semantic_owner_organization_id = 12;
 }
 message SuiteRegistrationQuery {
  PublicationScope scope = 1;
