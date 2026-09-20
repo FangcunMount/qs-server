@@ -42,6 +42,7 @@ services:
       # 二维码存储目录
       - /data/image/qrcode:/data/image/qrcode:rw
     environment:
+      - QS_ENVIRONMENT=production
       - GOMEMLIMIT=3072MiB
       - GOMAXPROCS=4
     command: ["--config=/app/configs/apiserver.prod.yaml"]
