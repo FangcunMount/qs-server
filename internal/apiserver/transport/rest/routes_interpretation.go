@@ -34,6 +34,15 @@ func (r *Router) registerInterpretationInternalRoutes(internalV1 *gin.RouterGrou
 
 // registerInterpretationInternalV2Routes proxies qs-ai management through QS authorization.
 func (r *Router) registerInterpretationInternalV2Routes(internalV2 *gin.RouterGroup) {
+	if r.deps.Interpretation.AIWorkflowRuntime != nil {
+		runtime := handler.NewAIWorkflowRuntimeHandler(r.deps.Interpretation.AIWorkflowRuntime)
+		group := internalV2.Group("/interpretation/ai-workflow/runtime", restmiddleware.RequireCapabilityMiddleware(restmiddleware.CapabilityOrgAdmin))
+		group.GET("/health", runtime.Health)
+		group.GET("/requests/:request_id/timeline", runtime.Timeline)
+		group.GET("/requests", runtime.List)
+		group.GET("/requests/:request_id", runtime.Get)
+	}
+
 	if r.deps.Interpretation.AIWorkflowParticipants != nil {
 		participants := handler.NewAIWorkflowParticipantHandler(r.deps.Interpretation.AIWorkflowParticipants)
 		internalV2.GET("/interpretation/ai-workflow/participant-capacity", restmiddleware.RequireCapabilityMiddleware(restmiddleware.CapabilityOrgAdmin), participants.Capacity)

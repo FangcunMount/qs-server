@@ -3005,3 +3005,185 @@ var QuotaManagement_ServiceDesc = grpc.ServiceDesc{
 	Streams:  []grpc.StreamDesc{},
 	Metadata: "aiworkflow/workflow.proto",
 }
+
+const (
+	RuntimeManagement_Health_FullMethodName   = "/qsai.workflow.v1.RuntimeManagement/Health"
+	RuntimeManagement_BatchGet_FullMethodName = "/qsai.workflow.v1.RuntimeManagement/BatchGet"
+	RuntimeManagement_Get_FullMethodName      = "/qsai.workflow.v1.RuntimeManagement/Get"
+)
+
+// RuntimeManagementClient is the client API for RuntimeManagement service.
+//
+// For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
+//
+// Read-only runtime evidence. Does not renew leases or dispatch models.
+type RuntimeManagementClient interface {
+	Health(ctx context.Context, in *RuntimeQuery, opts ...grpc.CallOption) (*RuntimeResponse, error)
+	BatchGet(ctx context.Context, in *RuntimeQuery, opts ...grpc.CallOption) (*RuntimeResponse, error)
+	Get(ctx context.Context, in *RuntimeQuery, opts ...grpc.CallOption) (*RuntimeResponse, error)
+}
+
+type runtimeManagementClient struct {
+	cc grpc.ClientConnInterface
+}
+
+func NewRuntimeManagementClient(cc grpc.ClientConnInterface) RuntimeManagementClient {
+	return &runtimeManagementClient{cc}
+}
+
+func (c *runtimeManagementClient) Health(ctx context.Context, in *RuntimeQuery, opts ...grpc.CallOption) (*RuntimeResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(RuntimeResponse)
+	err := c.cc.Invoke(ctx, RuntimeManagement_Health_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *runtimeManagementClient) BatchGet(ctx context.Context, in *RuntimeQuery, opts ...grpc.CallOption) (*RuntimeResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(RuntimeResponse)
+	err := c.cc.Invoke(ctx, RuntimeManagement_BatchGet_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *runtimeManagementClient) Get(ctx context.Context, in *RuntimeQuery, opts ...grpc.CallOption) (*RuntimeResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(RuntimeResponse)
+	err := c.cc.Invoke(ctx, RuntimeManagement_Get_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// RuntimeManagementServer is the server API for RuntimeManagement service.
+// All implementations must embed UnimplementedRuntimeManagementServer
+// for forward compatibility.
+//
+// Read-only runtime evidence. Does not renew leases or dispatch models.
+type RuntimeManagementServer interface {
+	Health(context.Context, *RuntimeQuery) (*RuntimeResponse, error)
+	BatchGet(context.Context, *RuntimeQuery) (*RuntimeResponse, error)
+	Get(context.Context, *RuntimeQuery) (*RuntimeResponse, error)
+	mustEmbedUnimplementedRuntimeManagementServer()
+}
+
+// UnimplementedRuntimeManagementServer must be embedded to have
+// forward compatible implementations.
+//
+// NOTE: this should be embedded by value instead of pointer to avoid a nil
+// pointer dereference when methods are called.
+type UnimplementedRuntimeManagementServer struct{}
+
+func (UnimplementedRuntimeManagementServer) Health(context.Context, *RuntimeQuery) (*RuntimeResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method Health not implemented")
+}
+func (UnimplementedRuntimeManagementServer) BatchGet(context.Context, *RuntimeQuery) (*RuntimeResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method BatchGet not implemented")
+}
+func (UnimplementedRuntimeManagementServer) Get(context.Context, *RuntimeQuery) (*RuntimeResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method Get not implemented")
+}
+func (UnimplementedRuntimeManagementServer) mustEmbedUnimplementedRuntimeManagementServer() {}
+func (UnimplementedRuntimeManagementServer) testEmbeddedByValue()                           {}
+
+// UnsafeRuntimeManagementServer may be embedded to opt out of forward compatibility for this service.
+// Use of this interface is not recommended, as added methods to RuntimeManagementServer will
+// result in compilation errors.
+type UnsafeRuntimeManagementServer interface {
+	mustEmbedUnimplementedRuntimeManagementServer()
+}
+
+func RegisterRuntimeManagementServer(s grpc.ServiceRegistrar, srv RuntimeManagementServer) {
+	// If the following call panics, it indicates UnimplementedRuntimeManagementServer was
+	// embedded by pointer and is nil.  This will cause panics if an
+	// unimplemented method is ever invoked, so we test this at initialization
+	// time to prevent it from happening at runtime later due to I/O.
+	if t, ok := srv.(interface{ testEmbeddedByValue() }); ok {
+		t.testEmbeddedByValue()
+	}
+	s.RegisterService(&RuntimeManagement_ServiceDesc, srv)
+}
+
+func _RuntimeManagement_Health_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RuntimeQuery)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(RuntimeManagementServer).Health(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: RuntimeManagement_Health_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(RuntimeManagementServer).Health(ctx, req.(*RuntimeQuery))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _RuntimeManagement_BatchGet_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RuntimeQuery)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(RuntimeManagementServer).BatchGet(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: RuntimeManagement_BatchGet_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(RuntimeManagementServer).BatchGet(ctx, req.(*RuntimeQuery))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _RuntimeManagement_Get_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RuntimeQuery)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(RuntimeManagementServer).Get(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: RuntimeManagement_Get_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(RuntimeManagementServer).Get(ctx, req.(*RuntimeQuery))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+// RuntimeManagement_ServiceDesc is the grpc.ServiceDesc for RuntimeManagement service.
+// It's only intended for direct use with grpc.RegisterService,
+// and not to be introspected or modified (even as a copy)
+var RuntimeManagement_ServiceDesc = grpc.ServiceDesc{
+	ServiceName: "qsai.workflow.v1.RuntimeManagement",
+	HandlerType: (*RuntimeManagementServer)(nil),
+	Methods: []grpc.MethodDesc{
+		{
+			MethodName: "Health",
+			Handler:    _RuntimeManagement_Health_Handler,
+		},
+		{
+			MethodName: "BatchGet",
+			Handler:    _RuntimeManagement_BatchGet_Handler,
+		},
+		{
+			MethodName: "Get",
+			Handler:    _RuntimeManagement_Get_Handler,
+		},
+	},
+	Streams:  []grpc.StreamDesc{},
+	Metadata: "aiworkflow/workflow.proto",
+}

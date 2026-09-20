@@ -26,8 +26,8 @@ class DocsFactsHelpersTest(unittest.TestCase):
     def test_grpc_inventory_includes_multiline_and_deprecated_rpcs(self) -> None:
         services, proto_file_count = check_docs_facts.grpc_inventory()
         self.assertEqual(proto_file_count, 8)
-        self.assertEqual(len(services), 24)
-        self.assertEqual(sum(len(rpcs) for rpcs in services.values()), 112)
+        self.assertEqual(len(services), 25)
+        self.assertEqual(sum(len(rpcs) for rpcs in services.values()), 115)
         self.assertIn("List", services["qsai.workflow.v1.EvaluationManagement"])
         self.assertEqual(services["qsai.workflow.v1.SolutionManagement"], ["List", "Get", "GetReceipt", "GetModels", "Create", "Save", "Prepare"])
         self.assertIn("GenerateReportFromAssessment", services["interpretation.InterpretationAutomationService"])
@@ -41,7 +41,7 @@ class DocsFactsHelpersTest(unittest.TestCase):
     def test_migration_inventory_is_paired_and_current(self) -> None:
         inventory, issues = check_docs_facts.migration_inventory()
         self.assertEqual(issues, [])
-        self.assertEqual(inventory["mysql"], {"max_version": 82, "version_count": 82})
+        self.assertEqual(inventory["mysql"], {"max_version": 83, "version_count": 83})
         self.assertEqual(inventory["mongodb"], {"max_version": 35, "version_count": 35})
 
     def test_ledger_metadata_uses_named_fields(self) -> None:
