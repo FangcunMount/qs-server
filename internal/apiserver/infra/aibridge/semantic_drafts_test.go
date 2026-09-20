@@ -16,9 +16,8 @@ func TestSemanticDraftPayloadIsScopedAndTyped(t *testing.T) {
 		t.Fatal("cross-organization response accepted")
 	}
 	for _, value := range []string{`null`, `{}`, `{"draft":{"organization_id":12,"revision":1,"state":"editing"}}`} {
-		copy := *raw
-		copy.DataJson = value
-		if _, err := semanticDraftPayload(&copy, scope); err == nil {
+		copy := &pb.SemanticDraftResponse{SchemaVersion: raw.SchemaVersion, DataJson: value}
+		if _, err := semanticDraftPayload(copy, scope); err == nil {
 			t.Fatal(value)
 		}
 	}
