@@ -29,7 +29,9 @@ jobs:
       - name: Apply bridge schema to isolated test database
         env:
           MYSQL_CONTAINER: ${{ job.services.mysql.id }}
-        run: docker exec -i "$MYSQL_CONTAINER" mysql -uroot -pbridge_test_root qs_bridge_test < internal/pkg/migration/migrations/mysql/000072_ai_bridge_delivery.up.sql
+        run: |
+          docker exec -i "$MYSQL_CONTAINER" mysql -uroot -pbridge_test_root qs_bridge_test < internal/pkg/migration/migrations/mysql/000072_ai_bridge_delivery.up.sql
+          docker exec -i "$MYSQL_CONTAINER" mysql -uroot -pbridge_test_root qs_bridge_test < internal/pkg/migration/migrations/mysql/000083_ai_runtime_index.up.sql
       - name: Verify durable request and result transactions
         env:
           QS_AI_BRIDGE_TEST_DSN: 'root:bridge_test_root@tcp(127.0.0.1:3306)/qs_bridge_test?parseTime=true'
