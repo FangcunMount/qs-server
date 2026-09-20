@@ -39,12 +39,16 @@ func (c *SuiteClient) RegisterSuite(ctx context.Context, s app.DraftScope, comma
 	}
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
-	raw, err := c.RPC.Register(ctx, &pb.SuiteRegisterCommand{Scope: draftScope(s), CommandId: command.CommandID, Source: frozenRef(command.Source), SuiteId: command.SuiteID, SuiteVersion: command.SuiteVersion, Profile: profileReference(command.Profile), Prompt: profileReference(command.Prompt), GenerationRoute: profileReference(command.GenerationRoute), Reason: command.Reason}, grpc.MaxCallRecvMsgSize(32*1024))
+	var semantic *pb.FrozenEvaluationRef
+	if command.SemanticPrompt != nil {
+		semantic = frozenRef(*command.SemanticPrompt)
+	}
+	raw, err := c.RPC.Register(ctx, &pb.SuiteRegisterCommand{Scope: draftScope(s), CommandId: command.CommandID, Source: frozenRef(command.Source), SuiteId: command.SuiteID, SuiteVersion: command.SuiteVersion, Profile: profileReference(command.Profile), Prompt: profileReference(command.Prompt), GenerationRoute: profileReference(command.GenerationRoute), Reason: command.Reason, CaseEditsJson: command.CaseEditsJSON, SemanticPrompt: semantic, SemanticOwnerOrganizationId: command.SemanticOwnerOrganizationID}, grpc.MaxCallRecvMsgSize(32*1024))
 	if err != nil {
 		return app.SuiteRegistrationReceipt{}, err
 	}
 	receipt, err := suiteReceipt(raw, s, command.CommandID)
-	if err != nil || receipt.Command != command {
+	if err != nil || !receipt.Command.Equal(command) {
 		return app.SuiteRegistrationReceipt{}, app.ErrConflict
 	}
 	return receipt, nil

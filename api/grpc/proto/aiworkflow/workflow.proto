@@ -517,6 +517,9 @@ message SuiteRegisterCommand {
  PromptDraftSource prompt = 7;
  PromptDraftSource generation_route = 8;
  string reason = 9;
+ string case_edits_json = 10;
+ FrozenEvaluationRef semantic_prompt = 11;
+ int64 semantic_owner_organization_id = 12;
 }
 message SuiteRegistrationQuery {
  PublicationScope scope = 1;
@@ -768,4 +771,28 @@ message FlowQuery {
 service FlowManagement {
   rpc GetSolution(FlowQuery) returns (SolutionResponse);
   rpc GetPublication(FlowQuery) returns (SolutionResponse);
+}
+
+// Judge drafts are organization-scoped editing state, never evaluation approval.
+service SemanticPromptDrafts {
+  rpc Create(SemanticDraftWrite) returns (SemanticDraftResponse);
+  rpc Get(SemanticDraftQuery) returns (SemanticDraftResponse);
+  rpc Revise(SemanticDraftWrite) returns (SemanticDraftResponse);
+  rpc Validate(SemanticDraftQuery) returns (SemanticDraftResponse);
+  rpc Freeze(SemanticDraftWrite) returns (SemanticDraftResponse);
+  rpc GetReceipt(SemanticDraftQuery) returns (SemanticDraftResponse);
+}
+message SemanticDraftWrite {
+  PublicationScope scope = 1;
+  string command_json = 2;
+}
+message SemanticDraftQuery {
+  PublicationScope scope = 1;
+  string draft_id = 2;
+  int64 revision = 3;
+  string command_id = 4;
+}
+message SemanticDraftResponse {
+  string schema_version = 1;
+  string data_json = 2;
 }

@@ -115,3 +115,23 @@ func TestSuiteReceiptBindsScopeCommandDefinitionAndReferences(t *testing.T) {
 		}
 	}
 }
+
+func TestSuiteCommandComparesSemanticReferencesByValue(t *testing.T) {
+	command, _ := suiteFixture()
+	ref := command.Source
+	command.SemanticPrompt = &ref
+	other := command
+	separate := ref
+	other.SemanticPrompt = &separate
+	if !command.Equal(other) {
+		t.Fatal("equivalent decoded reference rejected")
+	}
+	separate.Version = "changed"
+	if command.Equal(other) {
+		t.Fatal("changed reference accepted")
+	}
+	other.SemanticPrompt = nil
+	if command.Equal(other) {
+		t.Fatal("missing reference accepted")
+	}
+}

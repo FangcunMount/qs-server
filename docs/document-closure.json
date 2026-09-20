@@ -2,7 +2,7 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "4aee46b8a1fe4ac5fb666eb01fbac1ef19c0a44c",
+    "sha": "96861cb56139968fcaefd407f8ff92025f3c7390",
     "verified_on": "2026-09-20"
   },
   "status_policy": {
@@ -126,8 +126,8 @@
     "grpc": {
       "source": "api/grpc/proto",
       "proto_file_count": 8,
-      "service_count": 25,
-      "rpc_count": 115,
+      "service_count": 26,
+      "rpc_count": 121,
       "services": {
         "actor.ActorService": [
           "CreateTestee",
@@ -261,6 +261,14 @@
           "GetReceipt",
           "ListHistory",
           "GetHistory"
+        ],
+        "qsai.workflow.v1.SemanticPromptDrafts": [
+          "Create",
+          "Get",
+          "Revise",
+          "Validate",
+          "Freeze",
+          "GetReceipt"
         ],
         "qsai.workflow.v1.QuotaManagement": [
           "Get",
