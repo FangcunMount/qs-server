@@ -120,6 +120,7 @@ func (c *Container) BuildRESTDeps(rateCfg *options.RateLimitOptions) resttranspo
 		deps.Interpretation.AIWorkflowSuites = c.ReportModule.AIWorkflowSuites()
 		deps.Interpretation.AIWorkflowRuntime = c.ReportModule.AIWorkflowRuntime()
 		deps.Interpretation.AIWorkflowSolutions = c.ReportModule.AIWorkflowSolutions()
+		deps.Interpretation.AIWorkflowQuotas = c.ReportModule.AIWorkflowQuotas()
 		deps.Interpretation.AIWorkflowAssets = c.ReportModule.AIWorkflowAssets()
 	}
 	if c.PlanModule != nil {
