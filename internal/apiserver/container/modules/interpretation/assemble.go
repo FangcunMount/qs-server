@@ -55,6 +55,7 @@ type Module struct {
 	aiPromptDrafts         *bridge.PromptDraftAdministration
 	aiSuites               *bridge.SuiteAdministration
 	aiAssets               *bridge.AssetCatalogAdministration
+	aiSolutions            *bridge.SolutionAdministration
 	aiProfiles             *bridge.ProfileAdministration
 	aiManagementConnection io.Closer
 	aiRelayCancel          context.CancelFunc
@@ -228,6 +229,7 @@ func New(deps Deps) (*Module, error) {
 			module.aiPromptDrafts = &bridge.PromptDraftAdministration{Gateway: clients.PromptDrafts}
 			module.aiProfiles = &bridge.ProfileAdministration{Gateway: clients.Profiles}
 			module.aiSuites = &bridge.SuiteAdministration{Gateway: clients.Suites}
+			module.aiSolutions = &bridge.SolutionAdministration{Gateway: clients.Solutions}
 			module.aiAssets = &bridge.AssetCatalogAdministration{Gateway: clients.Assets}
 		}
 		module.aiManagementConnection = clients.Connection
@@ -641,4 +643,11 @@ func (m *Module) AIWorkflowParticipants() *bridge.ParticipantAdministration {
 		return nil
 	}
 	return m.aiParticipants
+}
+
+func (m *Module) AIWorkflowSolutions() *bridge.SolutionAdministration {
+	if m == nil {
+		return nil
+	}
+	return m.aiSolutions
 }

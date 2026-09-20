@@ -695,3 +695,29 @@ message ProfileLifecycleQuery {
  int32 limit = 5;
  string cursor = 6;
 }
+
+// Product workspace: additive management API. Existing Run/review/publication services stay authoritative.
+service SolutionManagement {
+  rpc List(SolutionQuery) returns (SolutionResponse);
+  rpc Get(SolutionQuery) returns (SolutionResponse);
+  rpc GetReceipt(SolutionQuery) returns (SolutionResponse);
+  rpc GetModels(SolutionQuery) returns (SolutionResponse);
+  rpc Create(SolutionWrite) returns (SolutionResponse);
+  rpc Save(SolutionWrite) returns (SolutionResponse);
+  rpc Prepare(SolutionWrite) returns (SolutionResponse);
+}
+message SolutionQuery {
+  PublicationScope scope = 1;
+  string solution_id = 2;
+  string command_id = 3;
+  string cursor = 4;
+}
+message SolutionWrite {
+  PublicationScope scope = 1;
+  string solution_id = 2;
+  string command_json = 3;
+}
+message SolutionResponse {
+  string schema_version = 1;
+  string data_json = 2;
+}

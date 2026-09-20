@@ -79,6 +79,19 @@ func (r *Router) registerInterpretationInternalV2Routes(internalV2 *gin.RouterGr
 		read.GET("/history/:version", publications.GetHistory)
 	}
 
+	if r.deps.Interpretation.AIWorkflowSolutions != nil {
+		solutions := handler.NewAIWorkflowSolutionHandler(r.deps.Interpretation.AIWorkflowSolutions)
+		read := internalV2.Group("/interpretation/ai-workflow/solutions", restmiddleware.RequireCapabilityMiddleware(restmiddleware.CapabilityAuditInterpretation))
+		write := internalV2.Group("/interpretation/ai-workflow/solutions", restmiddleware.RequireCapabilityMiddleware(restmiddleware.CapabilityOrgAdmin))
+		read.GET("", solutions.Read("list"))
+		read.GET("/models", solutions.Read("models"))
+		read.GET("/commands/:command_id", solutions.Read("receipt"))
+		read.GET("/:solution_id", solutions.Read("get"))
+		write.POST("/:solution_id/create", solutions.Write("create"))
+		write.POST("/:solution_id/save", solutions.Write("save"))
+		write.POST("/:solution_id/prepare", solutions.Write("prepare"))
+	}
+
 	if r.deps.Interpretation.AIWorkflowAssets != nil {
 		catalog := handler.NewAIWorkflowCatalogHandler(r.deps.Interpretation.AIWorkflowAssets)
 		read := internalV2.Group("/interpretation/ai-workflow/assets", restmiddleware.RequireCapabilityMiddleware(restmiddleware.CapabilityAuditInterpretation))

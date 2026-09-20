@@ -2413,3 +2413,337 @@ var ParticipantManagement_ServiceDesc = grpc.ServiceDesc{
 	Streams:  []grpc.StreamDesc{},
 	Metadata: "aiworkflow/workflow.proto",
 }
+
+const (
+	SolutionManagement_List_FullMethodName       = "/qsai.workflow.v1.SolutionManagement/List"
+	SolutionManagement_Get_FullMethodName        = "/qsai.workflow.v1.SolutionManagement/Get"
+	SolutionManagement_GetReceipt_FullMethodName = "/qsai.workflow.v1.SolutionManagement/GetReceipt"
+	SolutionManagement_GetModels_FullMethodName  = "/qsai.workflow.v1.SolutionManagement/GetModels"
+	SolutionManagement_Create_FullMethodName     = "/qsai.workflow.v1.SolutionManagement/Create"
+	SolutionManagement_Save_FullMethodName       = "/qsai.workflow.v1.SolutionManagement/Save"
+	SolutionManagement_Prepare_FullMethodName    = "/qsai.workflow.v1.SolutionManagement/Prepare"
+)
+
+// SolutionManagementClient is the client API for SolutionManagement service.
+//
+// For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
+//
+// Product workspace: additive management API. Existing Run/review/publication services stay authoritative.
+type SolutionManagementClient interface {
+	List(ctx context.Context, in *SolutionQuery, opts ...grpc.CallOption) (*SolutionResponse, error)
+	Get(ctx context.Context, in *SolutionQuery, opts ...grpc.CallOption) (*SolutionResponse, error)
+	GetReceipt(ctx context.Context, in *SolutionQuery, opts ...grpc.CallOption) (*SolutionResponse, error)
+	GetModels(ctx context.Context, in *SolutionQuery, opts ...grpc.CallOption) (*SolutionResponse, error)
+	Create(ctx context.Context, in *SolutionWrite, opts ...grpc.CallOption) (*SolutionResponse, error)
+	Save(ctx context.Context, in *SolutionWrite, opts ...grpc.CallOption) (*SolutionResponse, error)
+	Prepare(ctx context.Context, in *SolutionWrite, opts ...grpc.CallOption) (*SolutionResponse, error)
+}
+
+type solutionManagementClient struct {
+	cc grpc.ClientConnInterface
+}
+
+func NewSolutionManagementClient(cc grpc.ClientConnInterface) SolutionManagementClient {
+	return &solutionManagementClient{cc}
+}
+
+func (c *solutionManagementClient) List(ctx context.Context, in *SolutionQuery, opts ...grpc.CallOption) (*SolutionResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(SolutionResponse)
+	err := c.cc.Invoke(ctx, SolutionManagement_List_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *solutionManagementClient) Get(ctx context.Context, in *SolutionQuery, opts ...grpc.CallOption) (*SolutionResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(SolutionResponse)
+	err := c.cc.Invoke(ctx, SolutionManagement_Get_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *solutionManagementClient) GetReceipt(ctx context.Context, in *SolutionQuery, opts ...grpc.CallOption) (*SolutionResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(SolutionResponse)
+	err := c.cc.Invoke(ctx, SolutionManagement_GetReceipt_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *solutionManagementClient) GetModels(ctx context.Context, in *SolutionQuery, opts ...grpc.CallOption) (*SolutionResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(SolutionResponse)
+	err := c.cc.Invoke(ctx, SolutionManagement_GetModels_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *solutionManagementClient) Create(ctx context.Context, in *SolutionWrite, opts ...grpc.CallOption) (*SolutionResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(SolutionResponse)
+	err := c.cc.Invoke(ctx, SolutionManagement_Create_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *solutionManagementClient) Save(ctx context.Context, in *SolutionWrite, opts ...grpc.CallOption) (*SolutionResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(SolutionResponse)
+	err := c.cc.Invoke(ctx, SolutionManagement_Save_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *solutionManagementClient) Prepare(ctx context.Context, in *SolutionWrite, opts ...grpc.CallOption) (*SolutionResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(SolutionResponse)
+	err := c.cc.Invoke(ctx, SolutionManagement_Prepare_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// SolutionManagementServer is the server API for SolutionManagement service.
+// All implementations must embed UnimplementedSolutionManagementServer
+// for forward compatibility.
+//
+// Product workspace: additive management API. Existing Run/review/publication services stay authoritative.
+type SolutionManagementServer interface {
+	List(context.Context, *SolutionQuery) (*SolutionResponse, error)
+	Get(context.Context, *SolutionQuery) (*SolutionResponse, error)
+	GetReceipt(context.Context, *SolutionQuery) (*SolutionResponse, error)
+	GetModels(context.Context, *SolutionQuery) (*SolutionResponse, error)
+	Create(context.Context, *SolutionWrite) (*SolutionResponse, error)
+	Save(context.Context, *SolutionWrite) (*SolutionResponse, error)
+	Prepare(context.Context, *SolutionWrite) (*SolutionResponse, error)
+	mustEmbedUnimplementedSolutionManagementServer()
+}
+
+// UnimplementedSolutionManagementServer must be embedded to have
+// forward compatible implementations.
+//
+// NOTE: this should be embedded by value instead of pointer to avoid a nil
+// pointer dereference when methods are called.
+type UnimplementedSolutionManagementServer struct{}
+
+func (UnimplementedSolutionManagementServer) List(context.Context, *SolutionQuery) (*SolutionResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method List not implemented")
+}
+func (UnimplementedSolutionManagementServer) Get(context.Context, *SolutionQuery) (*SolutionResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method Get not implemented")
+}
+func (UnimplementedSolutionManagementServer) GetReceipt(context.Context, *SolutionQuery) (*SolutionResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetReceipt not implemented")
+}
+func (UnimplementedSolutionManagementServer) GetModels(context.Context, *SolutionQuery) (*SolutionResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetModels not implemented")
+}
+func (UnimplementedSolutionManagementServer) Create(context.Context, *SolutionWrite) (*SolutionResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method Create not implemented")
+}
+func (UnimplementedSolutionManagementServer) Save(context.Context, *SolutionWrite) (*SolutionResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method Save not implemented")
+}
+func (UnimplementedSolutionManagementServer) Prepare(context.Context, *SolutionWrite) (*SolutionResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method Prepare not implemented")
+}
+func (UnimplementedSolutionManagementServer) mustEmbedUnimplementedSolutionManagementServer() {}
+func (UnimplementedSolutionManagementServer) testEmbeddedByValue()                            {}
+
+// UnsafeSolutionManagementServer may be embedded to opt out of forward compatibility for this service.
+// Use of this interface is not recommended, as added methods to SolutionManagementServer will
+// result in compilation errors.
+type UnsafeSolutionManagementServer interface {
+	mustEmbedUnimplementedSolutionManagementServer()
+}
+
+func RegisterSolutionManagementServer(s grpc.ServiceRegistrar, srv SolutionManagementServer) {
+	// If the following call panics, it indicates UnimplementedSolutionManagementServer was
+	// embedded by pointer and is nil.  This will cause panics if an
+	// unimplemented method is ever invoked, so we test this at initialization
+	// time to prevent it from happening at runtime later due to I/O.
+	if t, ok := srv.(interface{ testEmbeddedByValue() }); ok {
+		t.testEmbeddedByValue()
+	}
+	s.RegisterService(&SolutionManagement_ServiceDesc, srv)
+}
+
+func _SolutionManagement_List_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SolutionQuery)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SolutionManagementServer).List(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: SolutionManagement_List_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SolutionManagementServer).List(ctx, req.(*SolutionQuery))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _SolutionManagement_Get_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SolutionQuery)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SolutionManagementServer).Get(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: SolutionManagement_Get_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SolutionManagementServer).Get(ctx, req.(*SolutionQuery))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _SolutionManagement_GetReceipt_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SolutionQuery)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SolutionManagementServer).GetReceipt(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: SolutionManagement_GetReceipt_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SolutionManagementServer).GetReceipt(ctx, req.(*SolutionQuery))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _SolutionManagement_GetModels_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SolutionQuery)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SolutionManagementServer).GetModels(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: SolutionManagement_GetModels_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SolutionManagementServer).GetModels(ctx, req.(*SolutionQuery))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _SolutionManagement_Create_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SolutionWrite)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SolutionManagementServer).Create(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: SolutionManagement_Create_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SolutionManagementServer).Create(ctx, req.(*SolutionWrite))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _SolutionManagement_Save_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SolutionWrite)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SolutionManagementServer).Save(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: SolutionManagement_Save_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SolutionManagementServer).Save(ctx, req.(*SolutionWrite))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _SolutionManagement_Prepare_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SolutionWrite)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SolutionManagementServer).Prepare(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: SolutionManagement_Prepare_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SolutionManagementServer).Prepare(ctx, req.(*SolutionWrite))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+// SolutionManagement_ServiceDesc is the grpc.ServiceDesc for SolutionManagement service.
+// It's only intended for direct use with grpc.RegisterService,
+// and not to be introspected or modified (even as a copy)
+var SolutionManagement_ServiceDesc = grpc.ServiceDesc{
+	ServiceName: "qsai.workflow.v1.SolutionManagement",
+	HandlerType: (*SolutionManagementServer)(nil),
+	Methods: []grpc.MethodDesc{
+		{
+			MethodName: "List",
+			Handler:    _SolutionManagement_List_Handler,
+		},
+		{
+			MethodName: "Get",
+			Handler:    _SolutionManagement_Get_Handler,
+		},
+		{
+			MethodName: "GetReceipt",
+			Handler:    _SolutionManagement_GetReceipt_Handler,
+		},
+		{
+			MethodName: "GetModels",
+			Handler:    _SolutionManagement_GetModels_Handler,
+		},
+		{
+			MethodName: "Create",
+			Handler:    _SolutionManagement_Create_Handler,
+		},
+		{
+			MethodName: "Save",
+			Handler:    _SolutionManagement_Save_Handler,
+		},
+		{
+			MethodName: "Prepare",
+			Handler:    _SolutionManagement_Prepare_Handler,
+		},
+	},
+	Streams:  []grpc.StreamDesc{},
+	Metadata: "aiworkflow/workflow.proto",
+}
