@@ -3005,3 +3005,299 @@ var QuotaManagement_ServiceDesc = grpc.ServiceDesc{
 	Streams:  []grpc.StreamDesc{},
 	Metadata: "aiworkflow/workflow.proto",
 }
+
+const (
+	SemanticPromptDrafts_Create_FullMethodName     = "/qsai.workflow.v1.SemanticPromptDrafts/Create"
+	SemanticPromptDrafts_Get_FullMethodName        = "/qsai.workflow.v1.SemanticPromptDrafts/Get"
+	SemanticPromptDrafts_Revise_FullMethodName     = "/qsai.workflow.v1.SemanticPromptDrafts/Revise"
+	SemanticPromptDrafts_Validate_FullMethodName   = "/qsai.workflow.v1.SemanticPromptDrafts/Validate"
+	SemanticPromptDrafts_Freeze_FullMethodName     = "/qsai.workflow.v1.SemanticPromptDrafts/Freeze"
+	SemanticPromptDrafts_GetReceipt_FullMethodName = "/qsai.workflow.v1.SemanticPromptDrafts/GetReceipt"
+)
+
+// SemanticPromptDraftsClient is the client API for SemanticPromptDrafts service.
+//
+// For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
+//
+// Judge drafts are organization-scoped editing state, never evaluation approval.
+type SemanticPromptDraftsClient interface {
+	Create(ctx context.Context, in *SemanticDraftWrite, opts ...grpc.CallOption) (*SemanticDraftResponse, error)
+	Get(ctx context.Context, in *SemanticDraftQuery, opts ...grpc.CallOption) (*SemanticDraftResponse, error)
+	Revise(ctx context.Context, in *SemanticDraftWrite, opts ...grpc.CallOption) (*SemanticDraftResponse, error)
+	Validate(ctx context.Context, in *SemanticDraftQuery, opts ...grpc.CallOption) (*SemanticDraftResponse, error)
+	Freeze(ctx context.Context, in *SemanticDraftWrite, opts ...grpc.CallOption) (*SemanticDraftResponse, error)
+	GetReceipt(ctx context.Context, in *SemanticDraftQuery, opts ...grpc.CallOption) (*SemanticDraftResponse, error)
+}
+
+type semanticPromptDraftsClient struct {
+	cc grpc.ClientConnInterface
+}
+
+func NewSemanticPromptDraftsClient(cc grpc.ClientConnInterface) SemanticPromptDraftsClient {
+	return &semanticPromptDraftsClient{cc}
+}
+
+func (c *semanticPromptDraftsClient) Create(ctx context.Context, in *SemanticDraftWrite, opts ...grpc.CallOption) (*SemanticDraftResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(SemanticDraftResponse)
+	err := c.cc.Invoke(ctx, SemanticPromptDrafts_Create_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *semanticPromptDraftsClient) Get(ctx context.Context, in *SemanticDraftQuery, opts ...grpc.CallOption) (*SemanticDraftResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(SemanticDraftResponse)
+	err := c.cc.Invoke(ctx, SemanticPromptDrafts_Get_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *semanticPromptDraftsClient) Revise(ctx context.Context, in *SemanticDraftWrite, opts ...grpc.CallOption) (*SemanticDraftResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(SemanticDraftResponse)
+	err := c.cc.Invoke(ctx, SemanticPromptDrafts_Revise_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *semanticPromptDraftsClient) Validate(ctx context.Context, in *SemanticDraftQuery, opts ...grpc.CallOption) (*SemanticDraftResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(SemanticDraftResponse)
+	err := c.cc.Invoke(ctx, SemanticPromptDrafts_Validate_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *semanticPromptDraftsClient) Freeze(ctx context.Context, in *SemanticDraftWrite, opts ...grpc.CallOption) (*SemanticDraftResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(SemanticDraftResponse)
+	err := c.cc.Invoke(ctx, SemanticPromptDrafts_Freeze_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *semanticPromptDraftsClient) GetReceipt(ctx context.Context, in *SemanticDraftQuery, opts ...grpc.CallOption) (*SemanticDraftResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(SemanticDraftResponse)
+	err := c.cc.Invoke(ctx, SemanticPromptDrafts_GetReceipt_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// SemanticPromptDraftsServer is the server API for SemanticPromptDrafts service.
+// All implementations must embed UnimplementedSemanticPromptDraftsServer
+// for forward compatibility.
+//
+// Judge drafts are organization-scoped editing state, never evaluation approval.
+type SemanticPromptDraftsServer interface {
+	Create(context.Context, *SemanticDraftWrite) (*SemanticDraftResponse, error)
+	Get(context.Context, *SemanticDraftQuery) (*SemanticDraftResponse, error)
+	Revise(context.Context, *SemanticDraftWrite) (*SemanticDraftResponse, error)
+	Validate(context.Context, *SemanticDraftQuery) (*SemanticDraftResponse, error)
+	Freeze(context.Context, *SemanticDraftWrite) (*SemanticDraftResponse, error)
+	GetReceipt(context.Context, *SemanticDraftQuery) (*SemanticDraftResponse, error)
+	mustEmbedUnimplementedSemanticPromptDraftsServer()
+}
+
+// UnimplementedSemanticPromptDraftsServer must be embedded to have
+// forward compatible implementations.
+//
+// NOTE: this should be embedded by value instead of pointer to avoid a nil
+// pointer dereference when methods are called.
+type UnimplementedSemanticPromptDraftsServer struct{}
+
+func (UnimplementedSemanticPromptDraftsServer) Create(context.Context, *SemanticDraftWrite) (*SemanticDraftResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method Create not implemented")
+}
+func (UnimplementedSemanticPromptDraftsServer) Get(context.Context, *SemanticDraftQuery) (*SemanticDraftResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method Get not implemented")
+}
+func (UnimplementedSemanticPromptDraftsServer) Revise(context.Context, *SemanticDraftWrite) (*SemanticDraftResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method Revise not implemented")
+}
+func (UnimplementedSemanticPromptDraftsServer) Validate(context.Context, *SemanticDraftQuery) (*SemanticDraftResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method Validate not implemented")
+}
+func (UnimplementedSemanticPromptDraftsServer) Freeze(context.Context, *SemanticDraftWrite) (*SemanticDraftResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method Freeze not implemented")
+}
+func (UnimplementedSemanticPromptDraftsServer) GetReceipt(context.Context, *SemanticDraftQuery) (*SemanticDraftResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetReceipt not implemented")
+}
+func (UnimplementedSemanticPromptDraftsServer) mustEmbedUnimplementedSemanticPromptDraftsServer() {}
+func (UnimplementedSemanticPromptDraftsServer) testEmbeddedByValue()                              {}
+
+// UnsafeSemanticPromptDraftsServer may be embedded to opt out of forward compatibility for this service.
+// Use of this interface is not recommended, as added methods to SemanticPromptDraftsServer will
+// result in compilation errors.
+type UnsafeSemanticPromptDraftsServer interface {
+	mustEmbedUnimplementedSemanticPromptDraftsServer()
+}
+
+func RegisterSemanticPromptDraftsServer(s grpc.ServiceRegistrar, srv SemanticPromptDraftsServer) {
+	// If the following call panics, it indicates UnimplementedSemanticPromptDraftsServer was
+	// embedded by pointer and is nil.  This will cause panics if an
+	// unimplemented method is ever invoked, so we test this at initialization
+	// time to prevent it from happening at runtime later due to I/O.
+	if t, ok := srv.(interface{ testEmbeddedByValue() }); ok {
+		t.testEmbeddedByValue()
+	}
+	s.RegisterService(&SemanticPromptDrafts_ServiceDesc, srv)
+}
+
+func _SemanticPromptDrafts_Create_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SemanticDraftWrite)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SemanticPromptDraftsServer).Create(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: SemanticPromptDrafts_Create_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SemanticPromptDraftsServer).Create(ctx, req.(*SemanticDraftWrite))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _SemanticPromptDrafts_Get_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SemanticDraftQuery)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SemanticPromptDraftsServer).Get(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: SemanticPromptDrafts_Get_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SemanticPromptDraftsServer).Get(ctx, req.(*SemanticDraftQuery))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _SemanticPromptDrafts_Revise_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SemanticDraftWrite)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SemanticPromptDraftsServer).Revise(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: SemanticPromptDrafts_Revise_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SemanticPromptDraftsServer).Revise(ctx, req.(*SemanticDraftWrite))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _SemanticPromptDrafts_Validate_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SemanticDraftQuery)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SemanticPromptDraftsServer).Validate(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: SemanticPromptDrafts_Validate_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SemanticPromptDraftsServer).Validate(ctx, req.(*SemanticDraftQuery))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _SemanticPromptDrafts_Freeze_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SemanticDraftWrite)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SemanticPromptDraftsServer).Freeze(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: SemanticPromptDrafts_Freeze_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SemanticPromptDraftsServer).Freeze(ctx, req.(*SemanticDraftWrite))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _SemanticPromptDrafts_GetReceipt_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SemanticDraftQuery)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SemanticPromptDraftsServer).GetReceipt(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: SemanticPromptDrafts_GetReceipt_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SemanticPromptDraftsServer).GetReceipt(ctx, req.(*SemanticDraftQuery))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+// SemanticPromptDrafts_ServiceDesc is the grpc.ServiceDesc for SemanticPromptDrafts service.
+// It's only intended for direct use with grpc.RegisterService,
+// and not to be introspected or modified (even as a copy)
+var SemanticPromptDrafts_ServiceDesc = grpc.ServiceDesc{
+	ServiceName: "qsai.workflow.v1.SemanticPromptDrafts",
+	HandlerType: (*SemanticPromptDraftsServer)(nil),
+	Methods: []grpc.MethodDesc{
+		{
+			MethodName: "Create",
+			Handler:    _SemanticPromptDrafts_Create_Handler,
+		},
+		{
+			MethodName: "Get",
+			Handler:    _SemanticPromptDrafts_Get_Handler,
+		},
+		{
+			MethodName: "Revise",
+			Handler:    _SemanticPromptDrafts_Revise_Handler,
+		},
+		{
+			MethodName: "Validate",
+			Handler:    _SemanticPromptDrafts_Validate_Handler,
+		},
+		{
+			MethodName: "Freeze",
+			Handler:    _SemanticPromptDrafts_Freeze_Handler,
+		},
+		{
+			MethodName: "GetReceipt",
+			Handler:    _SemanticPromptDrafts_GetReceipt_Handler,
+		},
+	},
+	Streams:  []grpc.StreamDesc{},
+	Metadata: "aiworkflow/workflow.proto",
+}

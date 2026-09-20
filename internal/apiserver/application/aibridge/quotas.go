@@ -3,7 +3,6 @@ package aibridge
 import (
 	"context"
 	"encoding/json"
-	authz "github.com/FangcunMount/qs-server/internal/apiserver/application/authz"
 	"strconv"
 )
 
@@ -14,16 +13,8 @@ type QuotaGateway interface {
 type QuotaAdministration struct{ Gateway QuotaGateway }
 
 func (s *QuotaAdministration) authorize(ctx context.Context, scope DraftScope, write bool) error {
-	if scope.OrganizationID <= 0 || scope.OperatorUserID <= 0 {
-		return ErrInvalid
-	}
-	snapshot, ok := authz.FromContext(ctx)
-	capability := authz.CapabilityAuditInterpretation
-	if write {
-		capability = authz.CapabilityOrgAdmin
-	}
-	if !ok || !authz.DecideCapability(snapshot, capability).Allowed {
-		return ErrGovernanceDenied
+	if err := authorizeConfiguration(ctx, scope, write); err != nil {
+		return err
 	}
 	if s == nil || s.Gateway == nil {
 		return ErrManagementUnavailable
