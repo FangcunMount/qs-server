@@ -27,7 +27,7 @@ func (s *QuotaAdministration) Read(ctx context.Context, scope DraftScope, operat
 	}
 	var before int64
 	switch operation {
-	case "get":
+	case "get", "status":
 	case "receipt":
 		if !ValidPublicationID(id) {
 			return nil, ErrInvalid

@@ -119,3 +119,26 @@ func (h *AIWorkflowCatalogHandler) Get(c *gin.Context) {
 	}
 	h.Success(c, value)
 }
+
+func (h *AIWorkflowCatalogHandler) References(c *gin.Context) {
+	scope, ok := h.scope(c)
+	if !ok {
+		return
+	}
+	limit := 20
+	if raw := c.Query("limit"); raw != "" {
+		parsed, err := strconv.Atoi(raw)
+		if err != nil {
+			h.failure(c, app.ErrInvalid)
+			return
+		}
+		limit = parsed
+	}
+	query := app.PolicyReferencesQuery{Kind: c.Param("kind"), Reference: app.FrozenEvaluationRef{ID: c.Query("identity"), Version: c.Query("version"), Fingerprint: c.Query("fingerprint")}, UsageKind: c.Query("usage_kind"), Limit: limit, Cursor: c.Query("cursor")}
+	value, err := h.service.References(c.Request.Context(), scope, query)
+	if err != nil {
+		h.failure(c, err)
+		return
+	}
+	h.Success(c, value)
+}

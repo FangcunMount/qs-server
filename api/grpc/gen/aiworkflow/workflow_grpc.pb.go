@@ -2051,8 +2051,9 @@ var SuiteManagement_ServiceDesc = grpc.ServiceDesc{
 }
 
 const (
-	AssetCatalog_List_FullMethodName = "/qsai.workflow.v1.AssetCatalog/List"
-	AssetCatalog_Get_FullMethodName  = "/qsai.workflow.v1.AssetCatalog/Get"
+	AssetCatalog_References_FullMethodName = "/qsai.workflow.v1.AssetCatalog/References"
+	AssetCatalog_List_FullMethodName       = "/qsai.workflow.v1.AssetCatalog/List"
+	AssetCatalog_Get_FullMethodName        = "/qsai.workflow.v1.AssetCatalog/Get"
 )
 
 // AssetCatalogClient is the client API for AssetCatalog service.
@@ -2061,6 +2062,7 @@ const (
 //
 // Immutable shared definitions only; QS authorizes readers. No audit receipts or activation state.
 type AssetCatalogClient interface {
+	References(ctx context.Context, in *PolicyReferencesQuery, opts ...grpc.CallOption) (*AssetCatalogResponse, error)
 	List(ctx context.Context, in *AssetCatalogQuery, opts ...grpc.CallOption) (*AssetCatalogResponse, error)
 	Get(ctx context.Context, in *AssetCatalogGetQuery, opts ...grpc.CallOption) (*AssetCatalogResponse, error)
 }
@@ -2071,6 +2073,16 @@ type assetCatalogClient struct {
 
 func NewAssetCatalogClient(cc grpc.ClientConnInterface) AssetCatalogClient {
 	return &assetCatalogClient{cc}
+}
+
+func (c *assetCatalogClient) References(ctx context.Context, in *PolicyReferencesQuery, opts ...grpc.CallOption) (*AssetCatalogResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(AssetCatalogResponse)
+	err := c.cc.Invoke(ctx, AssetCatalog_References_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
 }
 
 func (c *assetCatalogClient) List(ctx context.Context, in *AssetCatalogQuery, opts ...grpc.CallOption) (*AssetCatalogResponse, error) {
@@ -2099,6 +2111,7 @@ func (c *assetCatalogClient) Get(ctx context.Context, in *AssetCatalogGetQuery, 
 //
 // Immutable shared definitions only; QS authorizes readers. No audit receipts or activation state.
 type AssetCatalogServer interface {
+	References(context.Context, *PolicyReferencesQuery) (*AssetCatalogResponse, error)
 	List(context.Context, *AssetCatalogQuery) (*AssetCatalogResponse, error)
 	Get(context.Context, *AssetCatalogGetQuery) (*AssetCatalogResponse, error)
 	mustEmbedUnimplementedAssetCatalogServer()
@@ -2111,6 +2124,9 @@ type AssetCatalogServer interface {
 // pointer dereference when methods are called.
 type UnimplementedAssetCatalogServer struct{}
 
+func (UnimplementedAssetCatalogServer) References(context.Context, *PolicyReferencesQuery) (*AssetCatalogResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method References not implemented")
+}
 func (UnimplementedAssetCatalogServer) List(context.Context, *AssetCatalogQuery) (*AssetCatalogResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method List not implemented")
 }
@@ -2136,6 +2152,24 @@ func RegisterAssetCatalogServer(s grpc.ServiceRegistrar, srv AssetCatalogServer)
 		t.testEmbeddedByValue()
 	}
 	s.RegisterService(&AssetCatalog_ServiceDesc, srv)
+}
+
+func _AssetCatalog_References_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(PolicyReferencesQuery)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AssetCatalogServer).References(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AssetCatalog_References_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AssetCatalogServer).References(ctx, req.(*PolicyReferencesQuery))
+	}
+	return interceptor(ctx, in, info, handler)
 }
 
 func _AssetCatalog_List_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
@@ -2181,6 +2215,10 @@ var AssetCatalog_ServiceDesc = grpc.ServiceDesc{
 	ServiceName: "qsai.workflow.v1.AssetCatalog",
 	HandlerType: (*AssetCatalogServer)(nil),
 	Methods: []grpc.MethodDesc{
+		{
+			MethodName: "References",
+			Handler:    _AssetCatalog_References_Handler,
+		},
 		{
 			MethodName: "List",
 			Handler:    _AssetCatalog_List_Handler,
@@ -2749,6 +2787,7 @@ var SolutionManagement_ServiceDesc = grpc.ServiceDesc{
 }
 
 const (
+	QuotaManagement_Status_FullMethodName     = "/qsai.workflow.v1.QuotaManagement/Status"
 	QuotaManagement_Get_FullMethodName        = "/qsai.workflow.v1.QuotaManagement/Get"
 	QuotaManagement_History_FullMethodName    = "/qsai.workflow.v1.QuotaManagement/History"
 	QuotaManagement_GetReceipt_FullMethodName = "/qsai.workflow.v1.QuotaManagement/GetReceipt"
@@ -2762,6 +2801,7 @@ const (
 //
 // Organization quota policy. Scope is asserted by the authorized QS workload.
 type QuotaManagementClient interface {
+	Status(ctx context.Context, in *QuotaQuery, opts ...grpc.CallOption) (*QuotaResponse, error)
 	Get(ctx context.Context, in *QuotaQuery, opts ...grpc.CallOption) (*QuotaResponse, error)
 	History(ctx context.Context, in *QuotaQuery, opts ...grpc.CallOption) (*QuotaResponse, error)
 	GetReceipt(ctx context.Context, in *QuotaQuery, opts ...grpc.CallOption) (*QuotaResponse, error)
@@ -2775,6 +2815,16 @@ type quotaManagementClient struct {
 
 func NewQuotaManagementClient(cc grpc.ClientConnInterface) QuotaManagementClient {
 	return &quotaManagementClient{cc}
+}
+
+func (c *quotaManagementClient) Status(ctx context.Context, in *QuotaQuery, opts ...grpc.CallOption) (*QuotaResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(QuotaResponse)
+	err := c.cc.Invoke(ctx, QuotaManagement_Status_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
 }
 
 func (c *quotaManagementClient) Get(ctx context.Context, in *QuotaQuery, opts ...grpc.CallOption) (*QuotaResponse, error) {
@@ -2833,6 +2883,7 @@ func (c *quotaManagementClient) Rollback(ctx context.Context, in *QuotaWrite, op
 //
 // Organization quota policy. Scope is asserted by the authorized QS workload.
 type QuotaManagementServer interface {
+	Status(context.Context, *QuotaQuery) (*QuotaResponse, error)
 	Get(context.Context, *QuotaQuery) (*QuotaResponse, error)
 	History(context.Context, *QuotaQuery) (*QuotaResponse, error)
 	GetReceipt(context.Context, *QuotaQuery) (*QuotaResponse, error)
@@ -2848,6 +2899,9 @@ type QuotaManagementServer interface {
 // pointer dereference when methods are called.
 type UnimplementedQuotaManagementServer struct{}
 
+func (UnimplementedQuotaManagementServer) Status(context.Context, *QuotaQuery) (*QuotaResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method Status not implemented")
+}
 func (UnimplementedQuotaManagementServer) Get(context.Context, *QuotaQuery) (*QuotaResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method Get not implemented")
 }
@@ -2882,6 +2936,24 @@ func RegisterQuotaManagementServer(s grpc.ServiceRegistrar, srv QuotaManagementS
 		t.testEmbeddedByValue()
 	}
 	s.RegisterService(&QuotaManagement_ServiceDesc, srv)
+}
+
+func _QuotaManagement_Status_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(QuotaQuery)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(QuotaManagementServer).Status(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: QuotaManagement_Status_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(QuotaManagementServer).Status(ctx, req.(*QuotaQuery))
+	}
+	return interceptor(ctx, in, info, handler)
 }
 
 func _QuotaManagement_Get_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
@@ -2981,6 +3053,10 @@ var QuotaManagement_ServiceDesc = grpc.ServiceDesc{
 	ServiceName: "qsai.workflow.v1.QuotaManagement",
 	HandlerType: (*QuotaManagementServer)(nil),
 	Methods: []grpc.MethodDesc{
+		{
+			MethodName: "Status",
+			Handler:    _QuotaManagement_Status_Handler,
+		},
 		{
 			MethodName: "Get",
 			Handler:    _QuotaManagement_Get_Handler,
