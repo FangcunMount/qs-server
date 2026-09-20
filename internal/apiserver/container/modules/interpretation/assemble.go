@@ -56,6 +56,7 @@ type Module struct {
 	aiSuites               *bridge.SuiteAdministration
 	aiAssets               *bridge.AssetCatalogAdministration
 	aiSolutions            *bridge.SolutionAdministration
+	aiQuotas               *bridge.QuotaAdministration
 	aiProfiles             *bridge.ProfileAdministration
 	aiManagementConnection io.Closer
 	aiRelayCancel          context.CancelFunc
@@ -230,6 +231,7 @@ func New(deps Deps) (*Module, error) {
 			module.aiProfiles = &bridge.ProfileAdministration{Gateway: clients.Profiles}
 			module.aiSuites = &bridge.SuiteAdministration{Gateway: clients.Suites}
 			module.aiSolutions = &bridge.SolutionAdministration{Gateway: clients.Solutions}
+			module.aiQuotas = &bridge.QuotaAdministration{Gateway: clients.Quotas}
 			module.aiAssets = &bridge.AssetCatalogAdministration{Gateway: clients.Assets}
 		}
 		module.aiManagementConnection = clients.Connection
@@ -650,4 +652,11 @@ func (m *Module) AIWorkflowSolutions() *bridge.SolutionAdministration {
 		return nil
 	}
 	return m.aiSolutions
+}
+
+func (m *Module) AIWorkflowQuotas() *bridge.QuotaAdministration {
+	if m == nil {
+		return nil
+	}
+	return m.aiQuotas
 }

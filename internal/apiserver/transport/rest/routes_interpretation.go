@@ -79,6 +79,16 @@ func (r *Router) registerInterpretationInternalV2Routes(internalV2 *gin.RouterGr
 		read.GET("/history/:version", publications.GetHistory)
 	}
 
+	if r.deps.Interpretation.AIWorkflowQuotas != nil {
+		quotas := handler.NewAIWorkflowQuotaHandler(r.deps.Interpretation.AIWorkflowQuotas)
+		read := internalV2.Group("/interpretation/ai-workflow/quotas", restmiddleware.RequireCapabilityMiddleware(restmiddleware.CapabilityAuditInterpretation))
+		write := internalV2.Group("/interpretation/ai-workflow/quotas", restmiddleware.RequireCapabilityMiddleware(restmiddleware.CapabilityOrgAdmin))
+		read.GET("", quotas.Read("get"))
+		read.GET("/history", quotas.Read("history"))
+		read.GET("/commands/:command_id", quotas.Read("receipt"))
+		write.POST("/update", quotas.Write("update"))
+		write.POST("/rollback", quotas.Write("rollback"))
+	}
 	if r.deps.Interpretation.AIWorkflowSolutions != nil {
 		solutions := handler.NewAIWorkflowSolutionHandler(r.deps.Interpretation.AIWorkflowSolutions)
 		read := internalV2.Group("/interpretation/ai-workflow/solutions", restmiddleware.RequireCapabilityMiddleware(restmiddleware.CapabilityAuditInterpretation))
