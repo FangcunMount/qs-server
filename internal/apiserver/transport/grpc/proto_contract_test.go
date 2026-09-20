@@ -61,6 +61,7 @@ func TestGRPCProtoServicesHaveExplicitOwners(t *testing.T) {
 	otherOwners := map[string]struct{ proto, source, call string }{
 		"qsai.workflow.v1.ParticipantManagement": {"aiworkflow/workflow.proto", "../../infra/aibridge/participant_management.go", "pb.NewParticipantManagementClient("},
 		"qsai.workflow.v1.SuiteManagement":       {"aiworkflow/workflow.proto", "../../infra/aibridge/suite_registration.go", "pb.NewSuiteManagementClient("},
+		"qsai.workflow.v1.SolutionManagement":    {"aiworkflow/workflow.proto", "../../infra/aibridge/solutions.go", "pb.NewSolutionManagementClient("},
 		"qsai.workflow.v1.AssetCatalog":          {"aiworkflow/workflow.proto", "../../infra/aibridge/asset_catalog.go", "pb.NewAssetCatalogClient("},
 		"qsai.workflow.v1.ProfileManagement":     {"aiworkflow/workflow.proto", "../../infra/aibridge/profile_registration.go", "pb.NewProfileManagementClient("},
 		"qsai.workflow.v1.PublicationManagement": {"aiworkflow/workflow.proto", "../../infra/aibridge/publication.go", "pb.NewPublicationManagementClient("},
