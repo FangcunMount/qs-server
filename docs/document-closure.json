@@ -2,7 +2,7 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "c70c3903b2b5fad3077aa186ce48d395770046f7",
+    "sha": "7d6cbc1882c377c848da07be0e7232e7ac9a72cb",
     "verified_on": "2026-09-20"
   },
   "status_policy": {
@@ -84,8 +84,8 @@
   "machine_contracts": {
     "migrations": {
       "mysql": {
-        "max_version": 82,
-        "version_count": 82
+        "max_version": 83,
+        "version_count": 83
       },
       "mongodb": {
         "max_version": 35,
@@ -126,8 +126,8 @@
     "grpc": {
       "source": "api/grpc/proto",
       "proto_file_count": 8,
-      "service_count": 24,
-      "rpc_count": 112,
+      "service_count": 25,
+      "rpc_count": 115,
       "services": {
         "actor.ActorService": [
           "CreateTestee",
@@ -288,6 +288,11 @@
         "questionnaire.QuestionnaireService": [
           "GetQuestionnaire",
           "ListQuestionnaires"
+        ],
+        "qsai.workflow.v1.RuntimeManagement": [
+          "Health",
+          "BatchGet",
+          "Get"
         ]
       }
     }
