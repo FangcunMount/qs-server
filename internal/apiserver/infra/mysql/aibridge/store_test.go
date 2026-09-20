@@ -103,6 +103,10 @@ func TestProjectionOutOfOrderDuplicateAndTerminalGuard(t *testing.T) {
 	if err = store.Accept(ctx, wrong); !errors.Is(err, app.ErrConflict) {
 		t.Fatalf("want actor guard: %v", err)
 	}
+	beforeAck, err := store.GetRuntime(ctx, 1, r.RequestID)
+	if err != nil {
+		t.Fatal(err)
+	}
 	commands, err := store.Pending(ctx, 20)
 	if err != nil {
 		t.Fatal(err)
@@ -113,6 +117,10 @@ func TestProjectionOutOfOrderDuplicateAndTerminalGuard(t *testing.T) {
 				t.Fatal(err)
 			}
 		}
+	}
+	afterAck, err := store.GetRuntime(ctx, 1, r.RequestID)
+	if err != nil || !beforeAck.UpdatedAt.Equal(*afterAck.UpdatedAt) {
+		t.Fatalf("late command acknowledgement changed projection receipt time: %v", err)
 	}
 	got, err = store.Projection(ctx, r.RequestID)
 	if err != nil || got.Version != 8 {

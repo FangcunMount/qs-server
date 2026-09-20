@@ -129,7 +129,7 @@ func (s *Store) Acknowledge(ctx context.Context, c app.Command, r app.Receipt) e
 	if bound.Valid && bound.String != r.SessionID {
 		return app.ErrConflict
 	}
-	if _, err = tx.ExecContext(ctx, "UPDATE ai_bridge_requests SET session_id=?,updated_at=UTC_TIMESTAMP(6) WHERE request_id=?", r.SessionID, c.RequestID); err != nil {
+	if _, err = tx.ExecContext(ctx, "UPDATE ai_bridge_requests SET session_id=? WHERE request_id=?", r.SessionID, c.RequestID); err != nil {
 		return err
 	}
 	if _, err = tx.ExecContext(ctx, "UPDATE ai_bridge_commands SET delivered=TRUE WHERE command_id=?", c.ID); err != nil {
