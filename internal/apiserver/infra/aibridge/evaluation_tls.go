@@ -30,18 +30,19 @@ func DialGovernanceClients(address, caFile, certFile, keyFile string) (*Evaluati
 }
 
 type GovernanceClients struct {
-	Runtime      *RuntimeClient
-	Solutions    *SolutionClient
-	Quotas       *QuotaClient
-	Commands     *Client
-	Participants *ParticipantClient
-	Assets       *AssetCatalogClient
-	Evaluation   *EvaluationClient
-	Publications *PublicationClient
-	PromptDrafts *PromptDraftClient
-	Suites       *SuiteClient
-	Profiles     *ProfileClient
-	Connection   io.Closer
+	Runtime        *RuntimeClient
+	SemanticDrafts *SemanticDraftClient
+	Solutions      *SolutionClient
+	Quotas         *QuotaClient
+	Commands       *Client
+	Participants   *ParticipantClient
+	Assets         *AssetCatalogClient
+	Evaluation     *EvaluationClient
+	Publications   *PublicationClient
+	PromptDrafts   *PromptDraftClient
+	Suites         *SuiteClient
+	Profiles       *ProfileClient
+	Connection     io.Closer
 }
 
 func DialGovernance(address, caFile, certFile, keyFile string) (*GovernanceClients, error) {
@@ -62,5 +63,5 @@ func DialGovernance(address, caFile, certFile, keyFile string) (*GovernanceClien
 	if err != nil {
 		return nil, err
 	}
-	return &GovernanceClients{Runtime: NewRuntimeClient(conn), Quotas: NewQuotaClient(conn), Solutions: NewSolutionClient(conn), Commands: New(conn), Participants: NewParticipantClient(conn), Assets: NewAssetCatalogClient(conn), Evaluation: NewEvaluationClient(conn), Publications: NewPublicationClient(conn), PromptDrafts: NewPromptDraftClient(conn), Suites: NewSuiteClient(conn), Profiles: NewProfileClient(conn), Connection: conn}, nil
+	return &GovernanceClients{Runtime: NewRuntimeClient(conn), SemanticDrafts: NewSemanticDraftClient(conn), Quotas: NewQuotaClient(conn), Solutions: NewSolutionClient(conn), Commands: New(conn), Participants: NewParticipantClient(conn), Assets: NewAssetCatalogClient(conn), Evaluation: NewEvaluationClient(conn), Publications: NewPublicationClient(conn), PromptDrafts: NewPromptDraftClient(conn), Suites: NewSuiteClient(conn), Profiles: NewProfileClient(conn), Connection: conn}, nil
 }

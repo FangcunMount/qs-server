@@ -143,21 +143,22 @@ type EvaluationDeps struct {
 }
 
 type InterpretationDeps struct {
-	AIWorkflowRuntime      *bridge.RuntimeAdministration
-	AIWorkflowQuotas       *bridge.QuotaAdministration
-	AIWorkflowSolutions    *bridge.SolutionAdministration
-	AIWorkflowParticipants *bridge.ParticipantAdministration
-	AIWorkflowManagement   *bridge.EvaluationAdministration
-	AIWorkflowPublications *bridge.PublicationAdministration
-	AIWorkflowPromptDrafts *bridge.PromptDraftAdministration
-	AIWorkflowSuites       *bridge.SuiteAdministration
-	AIWorkflowAssets       *bridge.AssetCatalogAdministration
-	AIWorkflowProfiles     *bridge.ProfileAdministration
-	ReportQueryJourney     reportqueryjourney.Service
-	ReportWaitJourney      reportwaitjourney.Service
-	OperationsService      interpretationoperations.Service
-	CatalogReconcile       interpretationcatalog.Service
-	ReportTemplates        interpretationreporttemplate.Service
+	AIWorkflowRuntime        *bridge.RuntimeAdministration
+	AIWorkflowQuotas         *bridge.QuotaAdministration
+	AIWorkflowSemanticDrafts *bridge.SemanticDraftAdministration
+	AIWorkflowSolutions      *bridge.SolutionAdministration
+	AIWorkflowParticipants   *bridge.ParticipantAdministration
+	AIWorkflowManagement     *bridge.EvaluationAdministration
+	AIWorkflowPublications   *bridge.PublicationAdministration
+	AIWorkflowPromptDrafts   *bridge.PromptDraftAdministration
+	AIWorkflowSuites         *bridge.SuiteAdministration
+	AIWorkflowAssets         *bridge.AssetCatalogAdministration
+	AIWorkflowProfiles       *bridge.ProfileAdministration
+	ReportQueryJourney       reportqueryjourney.Service
+	ReportWaitJourney        reportwaitjourney.Service
+	OperationsService        interpretationoperations.Service
+	CatalogReconcile         interpretationcatalog.Service
+	ReportTemplates          interpretationreporttemplate.Service
 }
 
 type PlanDeps struct {

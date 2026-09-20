@@ -758,3 +758,27 @@ message RuntimeResponse {
   string schema_version = 1;
   string data_json = 2;
 }
+
+// Judge drafts are organization-scoped editing state, never evaluation approval.
+service SemanticPromptDrafts {
+  rpc Create(SemanticDraftWrite) returns (SemanticDraftResponse);
+  rpc Get(SemanticDraftQuery) returns (SemanticDraftResponse);
+  rpc Revise(SemanticDraftWrite) returns (SemanticDraftResponse);
+  rpc Validate(SemanticDraftQuery) returns (SemanticDraftResponse);
+  rpc Freeze(SemanticDraftWrite) returns (SemanticDraftResponse);
+  rpc GetReceipt(SemanticDraftQuery) returns (SemanticDraftResponse);
+}
+message SemanticDraftWrite {
+  PublicationScope scope = 1;
+  string command_json = 2;
+}
+message SemanticDraftQuery {
+  PublicationScope scope = 1;
+  string draft_id = 2;
+  int64 revision = 3;
+  string command_id = 4;
+}
+message SemanticDraftResponse {
+  string schema_version = 1;
+  string data_json = 2;
+}

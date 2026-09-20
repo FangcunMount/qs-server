@@ -26,8 +26,8 @@ class DocsFactsHelpersTest(unittest.TestCase):
     def test_grpc_inventory_includes_multiline_and_deprecated_rpcs(self) -> None:
         services, proto_file_count = check_docs_facts.grpc_inventory()
         self.assertEqual(proto_file_count, 8)
-        self.assertEqual(len(services), 25)
-        self.assertEqual(sum(len(rpcs) for rpcs in services.values()), 115)
+        self.assertEqual(len(services), 26)
+        self.assertEqual(sum(len(rpcs) for rpcs in services.values()), 121)
         self.assertIn("List", services["qsai.workflow.v1.EvaluationManagement"])
         self.assertEqual(services["qsai.workflow.v1.SolutionManagement"], ["List", "Get", "GetReceipt", "GetModels", "Create", "Save", "Prepare"])
         self.assertIn("GenerateReportFromAssessment", services["interpretation.InterpretationAutomationService"])
