@@ -136,7 +136,7 @@ func TestRuntimeUTCDoesNotDependOnDriverLocation(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 	store := &Store{DB: db}
 	before := time.Now().UTC().Add(-time.Second)
 	if err = store.StageStart(ctx, r); err != nil {
