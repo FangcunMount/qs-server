@@ -2747,3 +2747,261 @@ var SolutionManagement_ServiceDesc = grpc.ServiceDesc{
 	Streams:  []grpc.StreamDesc{},
 	Metadata: "aiworkflow/workflow.proto",
 }
+
+const (
+	QuotaManagement_Get_FullMethodName        = "/qsai.workflow.v1.QuotaManagement/Get"
+	QuotaManagement_History_FullMethodName    = "/qsai.workflow.v1.QuotaManagement/History"
+	QuotaManagement_GetReceipt_FullMethodName = "/qsai.workflow.v1.QuotaManagement/GetReceipt"
+	QuotaManagement_Update_FullMethodName     = "/qsai.workflow.v1.QuotaManagement/Update"
+	QuotaManagement_Rollback_FullMethodName   = "/qsai.workflow.v1.QuotaManagement/Rollback"
+)
+
+// QuotaManagementClient is the client API for QuotaManagement service.
+//
+// For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
+//
+// Organization quota policy. Scope is asserted by the authorized QS workload.
+type QuotaManagementClient interface {
+	Get(ctx context.Context, in *QuotaQuery, opts ...grpc.CallOption) (*QuotaResponse, error)
+	History(ctx context.Context, in *QuotaQuery, opts ...grpc.CallOption) (*QuotaResponse, error)
+	GetReceipt(ctx context.Context, in *QuotaQuery, opts ...grpc.CallOption) (*QuotaResponse, error)
+	Update(ctx context.Context, in *QuotaWrite, opts ...grpc.CallOption) (*QuotaResponse, error)
+	Rollback(ctx context.Context, in *QuotaWrite, opts ...grpc.CallOption) (*QuotaResponse, error)
+}
+
+type quotaManagementClient struct {
+	cc grpc.ClientConnInterface
+}
+
+func NewQuotaManagementClient(cc grpc.ClientConnInterface) QuotaManagementClient {
+	return &quotaManagementClient{cc}
+}
+
+func (c *quotaManagementClient) Get(ctx context.Context, in *QuotaQuery, opts ...grpc.CallOption) (*QuotaResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(QuotaResponse)
+	err := c.cc.Invoke(ctx, QuotaManagement_Get_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *quotaManagementClient) History(ctx context.Context, in *QuotaQuery, opts ...grpc.CallOption) (*QuotaResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(QuotaResponse)
+	err := c.cc.Invoke(ctx, QuotaManagement_History_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *quotaManagementClient) GetReceipt(ctx context.Context, in *QuotaQuery, opts ...grpc.CallOption) (*QuotaResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(QuotaResponse)
+	err := c.cc.Invoke(ctx, QuotaManagement_GetReceipt_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *quotaManagementClient) Update(ctx context.Context, in *QuotaWrite, opts ...grpc.CallOption) (*QuotaResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(QuotaResponse)
+	err := c.cc.Invoke(ctx, QuotaManagement_Update_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *quotaManagementClient) Rollback(ctx context.Context, in *QuotaWrite, opts ...grpc.CallOption) (*QuotaResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(QuotaResponse)
+	err := c.cc.Invoke(ctx, QuotaManagement_Rollback_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// QuotaManagementServer is the server API for QuotaManagement service.
+// All implementations must embed UnimplementedQuotaManagementServer
+// for forward compatibility.
+//
+// Organization quota policy. Scope is asserted by the authorized QS workload.
+type QuotaManagementServer interface {
+	Get(context.Context, *QuotaQuery) (*QuotaResponse, error)
+	History(context.Context, *QuotaQuery) (*QuotaResponse, error)
+	GetReceipt(context.Context, *QuotaQuery) (*QuotaResponse, error)
+	Update(context.Context, *QuotaWrite) (*QuotaResponse, error)
+	Rollback(context.Context, *QuotaWrite) (*QuotaResponse, error)
+	mustEmbedUnimplementedQuotaManagementServer()
+}
+
+// UnimplementedQuotaManagementServer must be embedded to have
+// forward compatible implementations.
+//
+// NOTE: this should be embedded by value instead of pointer to avoid a nil
+// pointer dereference when methods are called.
+type UnimplementedQuotaManagementServer struct{}
+
+func (UnimplementedQuotaManagementServer) Get(context.Context, *QuotaQuery) (*QuotaResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method Get not implemented")
+}
+func (UnimplementedQuotaManagementServer) History(context.Context, *QuotaQuery) (*QuotaResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method History not implemented")
+}
+func (UnimplementedQuotaManagementServer) GetReceipt(context.Context, *QuotaQuery) (*QuotaResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetReceipt not implemented")
+}
+func (UnimplementedQuotaManagementServer) Update(context.Context, *QuotaWrite) (*QuotaResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method Update not implemented")
+}
+func (UnimplementedQuotaManagementServer) Rollback(context.Context, *QuotaWrite) (*QuotaResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method Rollback not implemented")
+}
+func (UnimplementedQuotaManagementServer) mustEmbedUnimplementedQuotaManagementServer() {}
+func (UnimplementedQuotaManagementServer) testEmbeddedByValue()                         {}
+
+// UnsafeQuotaManagementServer may be embedded to opt out of forward compatibility for this service.
+// Use of this interface is not recommended, as added methods to QuotaManagementServer will
+// result in compilation errors.
+type UnsafeQuotaManagementServer interface {
+	mustEmbedUnimplementedQuotaManagementServer()
+}
+
+func RegisterQuotaManagementServer(s grpc.ServiceRegistrar, srv QuotaManagementServer) {
+	// If the following call panics, it indicates UnimplementedQuotaManagementServer was
+	// embedded by pointer and is nil.  This will cause panics if an
+	// unimplemented method is ever invoked, so we test this at initialization
+	// time to prevent it from happening at runtime later due to I/O.
+	if t, ok := srv.(interface{ testEmbeddedByValue() }); ok {
+		t.testEmbeddedByValue()
+	}
+	s.RegisterService(&QuotaManagement_ServiceDesc, srv)
+}
+
+func _QuotaManagement_Get_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(QuotaQuery)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(QuotaManagementServer).Get(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: QuotaManagement_Get_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(QuotaManagementServer).Get(ctx, req.(*QuotaQuery))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _QuotaManagement_History_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(QuotaQuery)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(QuotaManagementServer).History(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: QuotaManagement_History_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(QuotaManagementServer).History(ctx, req.(*QuotaQuery))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _QuotaManagement_GetReceipt_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(QuotaQuery)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(QuotaManagementServer).GetReceipt(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: QuotaManagement_GetReceipt_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(QuotaManagementServer).GetReceipt(ctx, req.(*QuotaQuery))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _QuotaManagement_Update_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(QuotaWrite)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(QuotaManagementServer).Update(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: QuotaManagement_Update_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(QuotaManagementServer).Update(ctx, req.(*QuotaWrite))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _QuotaManagement_Rollback_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(QuotaWrite)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(QuotaManagementServer).Rollback(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: QuotaManagement_Rollback_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(QuotaManagementServer).Rollback(ctx, req.(*QuotaWrite))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+// QuotaManagement_ServiceDesc is the grpc.ServiceDesc for QuotaManagement service.
+// It's only intended for direct use with grpc.RegisterService,
+// and not to be introspected or modified (even as a copy)
+var QuotaManagement_ServiceDesc = grpc.ServiceDesc{
+	ServiceName: "qsai.workflow.v1.QuotaManagement",
+	HandlerType: (*QuotaManagementServer)(nil),
+	Methods: []grpc.MethodDesc{
+		{
+			MethodName: "Get",
+			Handler:    _QuotaManagement_Get_Handler,
+		},
+		{
+			MethodName: "History",
+			Handler:    _QuotaManagement_History_Handler,
+		},
+		{
+			MethodName: "GetReceipt",
+			Handler:    _QuotaManagement_GetReceipt_Handler,
+		},
+		{
+			MethodName: "Update",
+			Handler:    _QuotaManagement_Update_Handler,
+		},
+		{
+			MethodName: "Rollback",
+			Handler:    _QuotaManagement_Rollback_Handler,
+		},
+	},
+	Streams:  []grpc.StreamDesc{},
+	Metadata: "aiworkflow/workflow.proto",
+}

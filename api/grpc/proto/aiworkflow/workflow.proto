@@ -721,3 +721,25 @@ message SolutionResponse {
   string schema_version = 1;
   string data_json = 2;
 }
+
+// Organization quota policy. Scope is asserted by the authorized QS workload.
+service QuotaManagement {
+  rpc Get(QuotaQuery) returns (QuotaResponse);
+  rpc History(QuotaQuery) returns (QuotaResponse);
+  rpc GetReceipt(QuotaQuery) returns (QuotaResponse);
+  rpc Update(QuotaWrite) returns (QuotaResponse);
+  rpc Rollback(QuotaWrite) returns (QuotaResponse);
+}
+message QuotaQuery {
+  PublicationScope scope = 1;
+  string command_id = 2;
+  int64 before_revision = 3;
+}
+message QuotaWrite {
+  PublicationScope scope = 1;
+  string command_json = 2;
+}
+message QuotaResponse {
+  string schema_version = 1;
+  string data_json = 2;
+}
