@@ -125,7 +125,7 @@ func TestCatalogPageChecksKindFilterOrderAndBoundContinuation(t *testing.T) {
 	}
 }
 func TestCatalogDetailBindsOriginalBytesAndPromptSourceFingerprint(t *testing.T) {
-	for _, kind := range []string{"profile", "prompt", "route", "schema", "suite"} {
+	for _, kind := range []string{"profile", "prompt", "route", "schema", "suite", "execution_policy", "gate_policy"} {
 		for _, damage := range []string{"", "kind", "identity", "version", "content", "checksum", "fingerprint", "schema", "nil", "oversize"} {
 			t.Run(kind+"/"+damage, func(t *testing.T) {
 				value := catalogFixture(kind)

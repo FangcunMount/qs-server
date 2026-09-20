@@ -36,7 +36,7 @@ type AssetCatalogDetail struct {
 
 func ValidAssetKind(kind string) bool {
 	switch kind {
-	case "profile", "prompt", "route", "schema", "suite":
+	case "profile", "prompt", "route", "schema", "suite", "execution_policy", "gate_policy":
 		return true
 	}
 	return false
