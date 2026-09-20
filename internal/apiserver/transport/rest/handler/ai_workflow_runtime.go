@@ -26,7 +26,7 @@ func (h *AIWorkflowRuntimeHandler) List(c *gin.Context) {
 	if !ok {
 		return
 	}
-	q := app.RuntimeQuery{RequestID: c.Query("request_id"), SessionID: c.Query("session_id"), AssessmentID: c.Query("assessment_id"), TesteeID: c.Query("testee_id"), Status: c.Query("status"), Cursor: c.Query("cursor")}
+	q := app.RuntimeQuery{SubjectID: c.Query("subject_id"), RequestID: c.Query("request_id"), SessionID: c.Query("session_id"), AssessmentID: c.Query("assessment_id"), TesteeID: c.Query("testee_id"), Status: c.Query("status"), Cursor: c.Query("cursor")}
 	if v := c.Query("history"); v != "" {
 		if v != "true" && v != "false" {
 			h.failure(c, app.ErrInvalid)

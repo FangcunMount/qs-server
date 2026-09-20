@@ -12,7 +12,7 @@ import (
 	app "github.com/FangcunMount/qs-server/internal/apiserver/application/aibridge"
 )
 
-const runtimeSelect = `SELECT r.request_id,COALESCE(r.session_id,''),CAST(r.testee_id AS CHAR),r.status,r.version,r.created_at,r.updated_at,
+const runtimeSelect = `SELECT r.request_id,COALESCE(r.session_id,''),CAST(r.testee_id AS CHAR),r.status,r.version,DATE_FORMAT(r.created_at,'%Y-%m-%dT%H:%i:%s.%fZ'),DATE_FORMAT(r.updated_at,'%Y-%m-%dT%H:%i:%s.%fZ'),
  COALESCE((SELECT JSON_ARRAYAGG(CAST(a.assessment_id AS CHAR)) FROM ai_bridge_request_assessments a WHERE a.request_id=r.request_id),JSON_ARRAY()),
  (SELECT COUNT(*) FROM ai_bridge_commands c WHERE c.request_id=r.request_id AND c.delivered=FALSE),
  (SELECT COALESCE(SUM(c.attempts),0) FROM ai_bridge_commands c WHERE c.request_id=r.request_id)
@@ -23,7 +23,7 @@ type scanner interface{ Scan(...any) error }
 func runtimeRow(row scanner) (app.RuntimeRequest, error) {
 	var r app.RuntimeRequest
 	var ids []byte
-	var created, updated sql.NullTime
+	var created, updated sql.NullString
 	err := row.Scan(&r.RequestID, &r.SessionID, &r.TesteeID, &r.Status, &r.Version, &created, &updated, &ids, &r.CommandsPending, &r.CommandAttempts)
 	if err != nil {
 		return r, err
@@ -32,11 +32,17 @@ func runtimeRow(row scanner) (app.RuntimeRequest, error) {
 		return r, err
 	}
 	if created.Valid {
-		v := created.Time.UTC()
+		v, e := time.Parse(time.RFC3339Nano, created.String)
+		if e != nil {
+			return r, e
+		}
 		r.CreatedAt = &v
 	}
 	if updated.Valid {
-		v := updated.Time.UTC()
+		v, e := time.Parse(time.RFC3339Nano, updated.String)
+		if e != nil {
+			return r, e
+		}
 		r.UpdatedAt = &v
 	}
 	return r, nil
@@ -63,7 +69,7 @@ func (s *Store) ListRuntime(ctx context.Context, org int64, q app.RuntimeQuery) 
 		if err != nil || c.OrganizationID != org {
 			return page, app.ErrInvalid
 		}
-		if q.RequestID != c.Query.RequestID || q.SessionID != c.Query.SessionID || q.AssessmentID != c.Query.AssessmentID || q.TesteeID != c.Query.TesteeID || q.Status != c.Query.Status || q.History != c.Query.History || q.Limit != c.Query.Limit || (!q.Since.IsZero() && !q.Since.Equal(c.Query.Since)) || (!q.Until.IsZero() && !q.Until.Equal(c.Query.Until)) {
+		if q.RequestID != c.Query.RequestID || q.SessionID != c.Query.SessionID || q.AssessmentID != c.Query.AssessmentID || q.TesteeID != c.Query.TesteeID || q.SubjectID != c.Query.SubjectID || q.Status != c.Query.Status || q.History != c.Query.History || q.Limit != c.Query.Limit || (!q.Since.IsZero() && !q.Since.Equal(c.Query.Since)) || (!q.Until.IsZero() && !q.Until.Equal(c.Query.Until)) {
 			return page, app.ErrInvalid
 		}
 		q = c.Query
@@ -78,6 +84,9 @@ func (s *Store) ListRuntime(ctx context.Context, org int64, q app.RuntimeQuery) 
 	if q.SessionID != "" {
 		add(" AND r.session_id=?", q.SessionID)
 	}
+	if q.SubjectID != "" {
+		add(" AND r.subject_id=?", q.SubjectID)
+	}
 	if q.TesteeID != "" {
 		add(" AND r.testee_id=?", q.TesteeID)
 	}
@@ -91,17 +100,18 @@ func (s *Store) ListRuntime(ctx context.Context, org int64, q app.RuntimeQuery) 
 		sqlQuery += " AND r.created_at IS NULL"
 	}
 	if !q.Since.IsZero() {
-		add(" AND r.created_at>=?", q.Since.UTC())
+		add(" AND r.created_at>=?", q.Since.UTC().Format("2006-01-02 15:04:05.999999"))
 	}
 	if !q.Until.IsZero() {
-		add(" AND r.created_at<?", q.Until.UTC())
+		add(" AND r.created_at<?", q.Until.UTC().Format("2006-01-02 15:04:05.999999"))
 	}
 	if cursor != nil {
 		if cursor.CreatedAt == nil {
 			add(" AND r.created_at IS NULL AND r.request_id<?", cursor.RequestID)
 		} else {
 			sqlQuery += " AND (r.created_at<? OR (r.created_at=? AND r.request_id<?) OR r.created_at IS NULL)"
-			args = append(args, *cursor.CreatedAt, *cursor.CreatedAt, cursor.RequestID)
+			stamp := cursor.CreatedAt.UTC().Format("2006-01-02 15:04:05.999999")
+			args = append(args, stamp, stamp, cursor.RequestID)
 		}
 	}
 	sqlQuery += " ORDER BY r.created_at DESC,r.request_id DESC LIMIT ?"
@@ -133,6 +143,8 @@ func (s *Store) ListRuntime(ctx context.Context, org int64, q app.RuntimeQuery) 
 
 // BackfillRuntimeIndexes is bounded and resumable. It never invents historical timestamps.
 func (s *Store) BackfillRuntimeIndexes(ctx context.Context, limit int) (int, error) {
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
 	if limit < 1 || limit > 500 {
 		return 0, app.ErrInvalid
 	}

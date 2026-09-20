@@ -2,9 +2,11 @@ package aibridge
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	app "github.com/FangcunMount/qs-server/internal/apiserver/application/aibridge"
+	"os"
 	"testing"
 	"time"
 )
@@ -124,5 +126,28 @@ func TestRuntimeBackfillRejectsCorruptScopeWithoutPartialWrites(t *testing.T) {
 	var n int
 	if e := s.DB.QueryRow("SELECT COUNT(*) FROM ai_bridge_requests WHERE request_id IN (?,?) AND organization_id IS NULL", a.RequestID, b.RequestID).Scan(&n); e != nil || n != 2 {
 		t.Fatal(n, e)
+	}
+}
+
+func TestRuntimeUTCDoesNotDependOnDriverLocation(t *testing.T) {
+	original, r := fixture(t)
+	ctx := context.Background()
+	db, err := sql.Open("mysql", os.Getenv("QS_AI_BRIDGE_TEST_DSN")+"&loc=Asia%2FShanghai")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	store := &Store{DB: db}
+	before := time.Now().UTC().Add(-time.Second)
+	if err = store.StageStart(ctx, r); err != nil {
+		t.Fatal(err)
+	}
+	page, err := store.ListRuntime(ctx, 1, app.RuntimeQuery{Since: before, Until: time.Now().UTC().Add(time.Second)})
+	if err != nil || len(page.Items) != 1 || page.Items[0].CreatedAt.Before(before) {
+		t.Fatal(page, err)
+	}
+	correct, err := original.GetRuntime(ctx, 1, r.RequestID)
+	if err != nil || !correct.CreatedAt.Equal(*page.Items[0].CreatedAt) {
+		t.Fatal(correct, err)
 	}
 }

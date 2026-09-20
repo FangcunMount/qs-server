@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"sort"
+	"strings"
 	"time"
 
 	authz "github.com/FangcunMount/qs-server/internal/apiserver/application/authz"
@@ -16,6 +17,7 @@ type RuntimeQuery struct {
 	SessionID    string    `json:"session_id"`
 	AssessmentID string    `json:"assessment_id"`
 	TesteeID     string    `json:"testee_id"`
+	SubjectID    string    `json:"subject_id"`
 	Status       string    `json:"status"`
 	History      bool      `json:"history"`
 	Since        time.Time `json:"since"`
@@ -36,7 +38,7 @@ func (q *RuntimeQuery) Normalize(now time.Time) error {
 	if q.Limit == 0 {
 		q.Limit = 20
 	}
-	if q.Limit < 1 || q.Limit > 50 || len(q.Cursor) > 4096 {
+	if q.Limit < 1 || q.Limit > 50 || len(q.Cursor) > 4096 || len(q.SubjectID) > 128 || strings.ContainsAny(q.SubjectID, "\x00\n\r") {
 		return ErrInvalid
 	}
 	if (q.RequestID != "" && !validID(q.RequestID)) || (q.SessionID != "" && !validID(q.SessionID)) || (q.AssessmentID != "" && !validNumber(q.AssessmentID)) || (q.TesteeID != "" && !validNumber(q.TesteeID)) {
@@ -53,7 +55,7 @@ func (q *RuntimeQuery) Normalize(now time.Time) error {
 	if q.Cursor != "" {
 		return nil
 	} // original window is restored from the validated cursor
-	exact := q.RequestID != "" || q.SessionID != "" || q.AssessmentID != "" || q.TesteeID != ""
+	exact := q.RequestID != "" || q.SessionID != "" || q.AssessmentID != "" || q.TesteeID != "" || q.SubjectID != ""
 	if !q.History && !exact {
 		if q.Until.IsZero() {
 			q.Until = now.UTC()

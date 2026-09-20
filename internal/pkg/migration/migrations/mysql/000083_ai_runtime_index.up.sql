@@ -6,6 +6,7 @@ ALTER TABLE ai_bridge_requests
  ADD COLUMN updated_at DATETIME(6) NULL,
  ADD INDEX ix_ai_runtime_org_time (organization_id, created_at, request_id),
  ADD INDEX ix_ai_runtime_org_status (organization_id, status, created_at, request_id),
+ ADD INDEX ix_ai_runtime_org_subject (organization_id, subject_id, created_at, request_id),
  ADD INDEX ix_ai_runtime_org_testee (organization_id, testee_id, created_at, request_id);
 
 CREATE TABLE ai_bridge_request_assessments (
