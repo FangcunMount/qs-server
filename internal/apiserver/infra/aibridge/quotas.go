@@ -43,6 +43,8 @@ func (c *QuotaClient) ReadQuota(ctx context.Context, scope app.DraftScope, op, i
 	var raw *pb.QuotaResponse
 	var err error
 	switch op {
+	case "status":
+		raw, err = c.RPC.Status(ctx, q)
 	case "get":
 		raw, err = c.RPC.Get(ctx, q)
 	case "history":
@@ -54,6 +56,16 @@ func (c *QuotaClient) ReadQuota(ctx context.Context, scope app.DraftScope, op, i
 	}
 	if err != nil {
 		return nil, err
+	}
+	if op == "status" {
+		var value struct {
+			OrganizationID int64             `json:"organization_id"`
+			Categories     []json.RawMessage `json:"categories"`
+		}
+		if raw == nil || raw.SchemaVersion != "qs-ai-configuration-status/v1" || len(raw.DataJson) > 131072 || json.Unmarshal([]byte(raw.DataJson), &value) != nil || value.OrganizationID != scope.OrganizationID || len(value.Categories) == 0 {
+			return nil, app.ErrConflict
+		}
+		return json.RawMessage(raw.DataJson), nil
 	}
 	return quotaPayload(raw, op == "history")
 }

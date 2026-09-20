@@ -534,8 +534,17 @@ message SuiteRegistrationReceipt {
 
 // Immutable shared definitions only; QS authorizes readers. No audit receipts or activation state.
 service AssetCatalog {
+  rpc References(PolicyReferencesQuery) returns (AssetCatalogResponse);
   rpc List(AssetCatalogQuery) returns (AssetCatalogResponse);
   rpc Get(AssetCatalogGetQuery) returns (AssetCatalogResponse);
+}
+message PolicyReferencesQuery {
+ PublicationScope scope = 1;
+ string kind = 2;
+ FrozenEvaluationRef reference = 3;
+ string usage_kind = 4;
+ int32 limit = 5;
+ string cursor = 6;
 }
 message AssetCatalogQuery {
   PublicationScope scope = 1;
@@ -727,6 +736,7 @@ message SolutionResponse {
 
 // Organization quota policy. Scope is asserted by the authorized QS workload.
 service QuotaManagement {
+  rpc Status(QuotaQuery) returns (QuotaResponse);
   rpc Get(QuotaQuery) returns (QuotaResponse);
   rpc History(QuotaQuery) returns (QuotaResponse);
   rpc GetReceipt(QuotaQuery) returns (QuotaResponse);

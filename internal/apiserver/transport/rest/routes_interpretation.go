@@ -110,6 +110,7 @@ func (r *Router) registerInterpretationInternalV2Routes(internalV2 *gin.RouterGr
 		read := internalV2.Group("/interpretation/ai-workflow/quotas", restmiddleware.RequireCapabilityMiddleware(restmiddleware.CapabilityAuditInterpretation))
 		write := internalV2.Group("/interpretation/ai-workflow/quotas", restmiddleware.RequireCapabilityMiddleware(restmiddleware.CapabilityOrgAdmin))
 		read.GET("", quotas.Read("get"))
+		read.GET("/status", quotas.Read("status"))
 		read.GET("/history", quotas.Read("history"))
 		read.GET("/commands/:command_id", quotas.Read("receipt"))
 		write.POST("/update", quotas.Write("update"))
@@ -133,6 +134,7 @@ func (r *Router) registerInterpretationInternalV2Routes(internalV2 *gin.RouterGr
 		read := internalV2.Group("/interpretation/ai-workflow/assets", restmiddleware.RequireCapabilityMiddleware(restmiddleware.CapabilityAuditInterpretation))
 		read.GET("/:kind", catalog.List)
 		read.GET("/:kind/detail", catalog.Get)
+		read.GET("/:kind/references", catalog.References)
 	}
 	if r.deps.Interpretation.AIWorkflowSuites != nil {
 		suites := handler.NewAIWorkflowSuiteHandler(r.deps.Interpretation.AIWorkflowSuites)

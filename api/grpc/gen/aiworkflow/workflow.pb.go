@@ -4973,6 +4973,90 @@ func (x *SuiteRegistrationReceipt) GetReceiptJson() string {
 	return ""
 }
 
+type PolicyReferencesQuery struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Scope         *PublicationScope      `protobuf:"bytes,1,opt,name=scope,proto3" json:"scope,omitempty"`
+	Kind          string                 `protobuf:"bytes,2,opt,name=kind,proto3" json:"kind,omitempty"`
+	Reference     *FrozenEvaluationRef   `protobuf:"bytes,3,opt,name=reference,proto3" json:"reference,omitempty"`
+	UsageKind     string                 `protobuf:"bytes,4,opt,name=usage_kind,json=usageKind,proto3" json:"usage_kind,omitempty"`
+	Limit         int32                  `protobuf:"varint,5,opt,name=limit,proto3" json:"limit,omitempty"`
+	Cursor        string                 `protobuf:"bytes,6,opt,name=cursor,proto3" json:"cursor,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PolicyReferencesQuery) Reset() {
+	*x = PolicyReferencesQuery{}
+	mi := &file_aiworkflow_workflow_proto_msgTypes[66]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PolicyReferencesQuery) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PolicyReferencesQuery) ProtoMessage() {}
+
+func (x *PolicyReferencesQuery) ProtoReflect() protoreflect.Message {
+	mi := &file_aiworkflow_workflow_proto_msgTypes[66]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PolicyReferencesQuery.ProtoReflect.Descriptor instead.
+func (*PolicyReferencesQuery) Descriptor() ([]byte, []int) {
+	return file_aiworkflow_workflow_proto_rawDescGZIP(), []int{66}
+}
+
+func (x *PolicyReferencesQuery) GetScope() *PublicationScope {
+	if x != nil {
+		return x.Scope
+	}
+	return nil
+}
+
+func (x *PolicyReferencesQuery) GetKind() string {
+	if x != nil {
+		return x.Kind
+	}
+	return ""
+}
+
+func (x *PolicyReferencesQuery) GetReference() *FrozenEvaluationRef {
+	if x != nil {
+		return x.Reference
+	}
+	return nil
+}
+
+func (x *PolicyReferencesQuery) GetUsageKind() string {
+	if x != nil {
+		return x.UsageKind
+	}
+	return ""
+}
+
+func (x *PolicyReferencesQuery) GetLimit() int32 {
+	if x != nil {
+		return x.Limit
+	}
+	return 0
+}
+
+func (x *PolicyReferencesQuery) GetCursor() string {
+	if x != nil {
+		return x.Cursor
+	}
+	return ""
+}
+
 type AssetCatalogQuery struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Scope         *PublicationScope      `protobuf:"bytes,1,opt,name=scope,proto3" json:"scope,omitempty"`
@@ -4986,7 +5070,7 @@ type AssetCatalogQuery struct {
 
 func (x *AssetCatalogQuery) Reset() {
 	*x = AssetCatalogQuery{}
-	mi := &file_aiworkflow_workflow_proto_msgTypes[66]
+	mi := &file_aiworkflow_workflow_proto_msgTypes[67]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4998,7 +5082,7 @@ func (x *AssetCatalogQuery) String() string {
 func (*AssetCatalogQuery) ProtoMessage() {}
 
 func (x *AssetCatalogQuery) ProtoReflect() protoreflect.Message {
-	mi := &file_aiworkflow_workflow_proto_msgTypes[66]
+	mi := &file_aiworkflow_workflow_proto_msgTypes[67]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5011,7 +5095,7 @@ func (x *AssetCatalogQuery) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AssetCatalogQuery.ProtoReflect.Descriptor instead.
 func (*AssetCatalogQuery) Descriptor() ([]byte, []int) {
-	return file_aiworkflow_workflow_proto_rawDescGZIP(), []int{66}
+	return file_aiworkflow_workflow_proto_rawDescGZIP(), []int{67}
 }
 
 func (x *AssetCatalogQuery) GetScope() *PublicationScope {
@@ -5061,7 +5145,7 @@ type AssetCatalogGetQuery struct {
 
 func (x *AssetCatalogGetQuery) Reset() {
 	*x = AssetCatalogGetQuery{}
-	mi := &file_aiworkflow_workflow_proto_msgTypes[67]
+	mi := &file_aiworkflow_workflow_proto_msgTypes[68]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5073,7 +5157,7 @@ func (x *AssetCatalogGetQuery) String() string {
 func (*AssetCatalogGetQuery) ProtoMessage() {}
 
 func (x *AssetCatalogGetQuery) ProtoReflect() protoreflect.Message {
-	mi := &file_aiworkflow_workflow_proto_msgTypes[67]
+	mi := &file_aiworkflow_workflow_proto_msgTypes[68]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5086,7 +5170,7 @@ func (x *AssetCatalogGetQuery) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AssetCatalogGetQuery.ProtoReflect.Descriptor instead.
 func (*AssetCatalogGetQuery) Descriptor() ([]byte, []int) {
-	return file_aiworkflow_workflow_proto_rawDescGZIP(), []int{67}
+	return file_aiworkflow_workflow_proto_rawDescGZIP(), []int{68}
 }
 
 func (x *AssetCatalogGetQuery) GetScope() *PublicationScope {
@@ -5127,7 +5211,7 @@ type AssetCatalogResponse struct {
 
 func (x *AssetCatalogResponse) Reset() {
 	*x = AssetCatalogResponse{}
-	mi := &file_aiworkflow_workflow_proto_msgTypes[68]
+	mi := &file_aiworkflow_workflow_proto_msgTypes[69]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5139,7 +5223,7 @@ func (x *AssetCatalogResponse) String() string {
 func (*AssetCatalogResponse) ProtoMessage() {}
 
 func (x *AssetCatalogResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_aiworkflow_workflow_proto_msgTypes[68]
+	mi := &file_aiworkflow_workflow_proto_msgTypes[69]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5152,7 +5236,7 @@ func (x *AssetCatalogResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AssetCatalogResponse.ProtoReflect.Descriptor instead.
 func (*AssetCatalogResponse) Descriptor() ([]byte, []int) {
-	return file_aiworkflow_workflow_proto_rawDescGZIP(), []int{68}
+	return file_aiworkflow_workflow_proto_rawDescGZIP(), []int{69}
 }
 
 func (x *AssetCatalogResponse) GetSchemaVersion() string {
@@ -5181,7 +5265,7 @@ type EvaluationCatalogQuery struct {
 
 func (x *EvaluationCatalogQuery) Reset() {
 	*x = EvaluationCatalogQuery{}
-	mi := &file_aiworkflow_workflow_proto_msgTypes[69]
+	mi := &file_aiworkflow_workflow_proto_msgTypes[70]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5193,7 +5277,7 @@ func (x *EvaluationCatalogQuery) String() string {
 func (*EvaluationCatalogQuery) ProtoMessage() {}
 
 func (x *EvaluationCatalogQuery) ProtoReflect() protoreflect.Message {
-	mi := &file_aiworkflow_workflow_proto_msgTypes[69]
+	mi := &file_aiworkflow_workflow_proto_msgTypes[70]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5206,7 +5290,7 @@ func (x *EvaluationCatalogQuery) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use EvaluationCatalogQuery.ProtoReflect.Descriptor instead.
 func (*EvaluationCatalogQuery) Descriptor() ([]byte, []int) {
-	return file_aiworkflow_workflow_proto_rawDescGZIP(), []int{69}
+	return file_aiworkflow_workflow_proto_rawDescGZIP(), []int{70}
 }
 
 func (x *EvaluationCatalogQuery) GetScope() *PublicationScope {
@@ -5247,7 +5331,7 @@ type EvaluationCatalogPage struct {
 
 func (x *EvaluationCatalogPage) Reset() {
 	*x = EvaluationCatalogPage{}
-	mi := &file_aiworkflow_workflow_proto_msgTypes[70]
+	mi := &file_aiworkflow_workflow_proto_msgTypes[71]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5259,7 +5343,7 @@ func (x *EvaluationCatalogPage) String() string {
 func (*EvaluationCatalogPage) ProtoMessage() {}
 
 func (x *EvaluationCatalogPage) ProtoReflect() protoreflect.Message {
-	mi := &file_aiworkflow_workflow_proto_msgTypes[70]
+	mi := &file_aiworkflow_workflow_proto_msgTypes[71]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5272,7 +5356,7 @@ func (x *EvaluationCatalogPage) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use EvaluationCatalogPage.ProtoReflect.Descriptor instead.
 func (*EvaluationCatalogPage) Descriptor() ([]byte, []int) {
-	return file_aiworkflow_workflow_proto_rawDescGZIP(), []int{70}
+	return file_aiworkflow_workflow_proto_rawDescGZIP(), []int{71}
 }
 
 func (x *EvaluationCatalogPage) GetItems() []*EvaluationSummary {
@@ -5315,7 +5399,7 @@ type EvaluationSummary struct {
 
 func (x *EvaluationSummary) Reset() {
 	*x = EvaluationSummary{}
-	mi := &file_aiworkflow_workflow_proto_msgTypes[71]
+	mi := &file_aiworkflow_workflow_proto_msgTypes[72]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5327,7 +5411,7 @@ func (x *EvaluationSummary) String() string {
 func (*EvaluationSummary) ProtoMessage() {}
 
 func (x *EvaluationSummary) ProtoReflect() protoreflect.Message {
-	mi := &file_aiworkflow_workflow_proto_msgTypes[71]
+	mi := &file_aiworkflow_workflow_proto_msgTypes[72]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5340,7 +5424,7 @@ func (x *EvaluationSummary) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use EvaluationSummary.ProtoReflect.Descriptor instead.
 func (*EvaluationSummary) Descriptor() ([]byte, []int) {
-	return file_aiworkflow_workflow_proto_rawDescGZIP(), []int{71}
+	return file_aiworkflow_workflow_proto_rawDescGZIP(), []int{72}
 }
 
 func (x *EvaluationSummary) GetRunId() string {
@@ -5481,7 +5565,7 @@ type EvaluationCapacityReservation struct {
 
 func (x *EvaluationCapacityReservation) Reset() {
 	*x = EvaluationCapacityReservation{}
-	mi := &file_aiworkflow_workflow_proto_msgTypes[72]
+	mi := &file_aiworkflow_workflow_proto_msgTypes[73]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5493,7 +5577,7 @@ func (x *EvaluationCapacityReservation) String() string {
 func (*EvaluationCapacityReservation) ProtoMessage() {}
 
 func (x *EvaluationCapacityReservation) ProtoReflect() protoreflect.Message {
-	mi := &file_aiworkflow_workflow_proto_msgTypes[72]
+	mi := &file_aiworkflow_workflow_proto_msgTypes[73]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5506,7 +5590,7 @@ func (x *EvaluationCapacityReservation) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use EvaluationCapacityReservation.ProtoReflect.Descriptor instead.
 func (*EvaluationCapacityReservation) Descriptor() ([]byte, []int) {
-	return file_aiworkflow_workflow_proto_rawDescGZIP(), []int{72}
+	return file_aiworkflow_workflow_proto_rawDescGZIP(), []int{73}
 }
 
 func (x *EvaluationCapacityReservation) GetRunId() string {
@@ -5558,7 +5642,7 @@ type EvaluationCapacitySnapshot struct {
 
 func (x *EvaluationCapacitySnapshot) Reset() {
 	*x = EvaluationCapacitySnapshot{}
-	mi := &file_aiworkflow_workflow_proto_msgTypes[73]
+	mi := &file_aiworkflow_workflow_proto_msgTypes[74]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5570,7 +5654,7 @@ func (x *EvaluationCapacitySnapshot) String() string {
 func (*EvaluationCapacitySnapshot) ProtoMessage() {}
 
 func (x *EvaluationCapacitySnapshot) ProtoReflect() protoreflect.Message {
-	mi := &file_aiworkflow_workflow_proto_msgTypes[73]
+	mi := &file_aiworkflow_workflow_proto_msgTypes[74]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5583,7 +5667,7 @@ func (x *EvaluationCapacitySnapshot) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use EvaluationCapacitySnapshot.ProtoReflect.Descriptor instead.
 func (*EvaluationCapacitySnapshot) Descriptor() ([]byte, []int) {
-	return file_aiworkflow_workflow_proto_rawDescGZIP(), []int{73}
+	return file_aiworkflow_workflow_proto_rawDescGZIP(), []int{74}
 }
 
 func (x *EvaluationCapacitySnapshot) GetOrganizationId() int64 {
@@ -5681,7 +5765,7 @@ type ParticipantCapacityQuery struct {
 
 func (x *ParticipantCapacityQuery) Reset() {
 	*x = ParticipantCapacityQuery{}
-	mi := &file_aiworkflow_workflow_proto_msgTypes[74]
+	mi := &file_aiworkflow_workflow_proto_msgTypes[75]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5693,7 +5777,7 @@ func (x *ParticipantCapacityQuery) String() string {
 func (*ParticipantCapacityQuery) ProtoMessage() {}
 
 func (x *ParticipantCapacityQuery) ProtoReflect() protoreflect.Message {
-	mi := &file_aiworkflow_workflow_proto_msgTypes[74]
+	mi := &file_aiworkflow_workflow_proto_msgTypes[75]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5706,7 +5790,7 @@ func (x *ParticipantCapacityQuery) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ParticipantCapacityQuery.ProtoReflect.Descriptor instead.
 func (*ParticipantCapacityQuery) Descriptor() ([]byte, []int) {
-	return file_aiworkflow_workflow_proto_rawDescGZIP(), []int{74}
+	return file_aiworkflow_workflow_proto_rawDescGZIP(), []int{75}
 }
 
 func (x *ParticipantCapacityQuery) GetScope() *PublicationScope {
@@ -5744,7 +5828,7 @@ type ParticipantCapacityPolicy struct {
 
 func (x *ParticipantCapacityPolicy) Reset() {
 	*x = ParticipantCapacityPolicy{}
-	mi := &file_aiworkflow_workflow_proto_msgTypes[75]
+	mi := &file_aiworkflow_workflow_proto_msgTypes[76]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5756,7 +5840,7 @@ func (x *ParticipantCapacityPolicy) String() string {
 func (*ParticipantCapacityPolicy) ProtoMessage() {}
 
 func (x *ParticipantCapacityPolicy) ProtoReflect() protoreflect.Message {
-	mi := &file_aiworkflow_workflow_proto_msgTypes[75]
+	mi := &file_aiworkflow_workflow_proto_msgTypes[76]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5769,7 +5853,7 @@ func (x *ParticipantCapacityPolicy) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ParticipantCapacityPolicy.ProtoReflect.Descriptor instead.
 func (*ParticipantCapacityPolicy) Descriptor() ([]byte, []int) {
-	return file_aiworkflow_workflow_proto_rawDescGZIP(), []int{75}
+	return file_aiworkflow_workflow_proto_rawDescGZIP(), []int{76}
 }
 
 func (x *ParticipantCapacityPolicy) GetDailyOrg() int64 {
@@ -5827,7 +5911,7 @@ type ParticipantCapacityUsage struct {
 
 func (x *ParticipantCapacityUsage) Reset() {
 	*x = ParticipantCapacityUsage{}
-	mi := &file_aiworkflow_workflow_proto_msgTypes[76]
+	mi := &file_aiworkflow_workflow_proto_msgTypes[77]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5839,7 +5923,7 @@ func (x *ParticipantCapacityUsage) String() string {
 func (*ParticipantCapacityUsage) ProtoMessage() {}
 
 func (x *ParticipantCapacityUsage) ProtoReflect() protoreflect.Message {
-	mi := &file_aiworkflow_workflow_proto_msgTypes[76]
+	mi := &file_aiworkflow_workflow_proto_msgTypes[77]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5852,7 +5936,7 @@ func (x *ParticipantCapacityUsage) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ParticipantCapacityUsage.ProtoReflect.Descriptor instead.
 func (*ParticipantCapacityUsage) Descriptor() ([]byte, []int) {
-	return file_aiworkflow_workflow_proto_rawDescGZIP(), []int{76}
+	return file_aiworkflow_workflow_proto_rawDescGZIP(), []int{77}
 }
 
 func (x *ParticipantCapacityUsage) GetIdentity() string {
@@ -5906,7 +5990,7 @@ type ParticipantReservation struct {
 
 func (x *ParticipantReservation) Reset() {
 	*x = ParticipantReservation{}
-	mi := &file_aiworkflow_workflow_proto_msgTypes[77]
+	mi := &file_aiworkflow_workflow_proto_msgTypes[78]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5918,7 +6002,7 @@ func (x *ParticipantReservation) String() string {
 func (*ParticipantReservation) ProtoMessage() {}
 
 func (x *ParticipantReservation) ProtoReflect() protoreflect.Message {
-	mi := &file_aiworkflow_workflow_proto_msgTypes[77]
+	mi := &file_aiworkflow_workflow_proto_msgTypes[78]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5931,7 +6015,7 @@ func (x *ParticipantReservation) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ParticipantReservation.ProtoReflect.Descriptor instead.
 func (*ParticipantReservation) Descriptor() ([]byte, []int) {
-	return file_aiworkflow_workflow_proto_rawDescGZIP(), []int{77}
+	return file_aiworkflow_workflow_proto_rawDescGZIP(), []int{78}
 }
 
 func (x *ParticipantReservation) GetRunId() string {
@@ -6008,7 +6092,7 @@ type ParticipantCapacitySnapshot struct {
 
 func (x *ParticipantCapacitySnapshot) Reset() {
 	*x = ParticipantCapacitySnapshot{}
-	mi := &file_aiworkflow_workflow_proto_msgTypes[78]
+	mi := &file_aiworkflow_workflow_proto_msgTypes[79]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6020,7 +6104,7 @@ func (x *ParticipantCapacitySnapshot) String() string {
 func (*ParticipantCapacitySnapshot) ProtoMessage() {}
 
 func (x *ParticipantCapacitySnapshot) ProtoReflect() protoreflect.Message {
-	mi := &file_aiworkflow_workflow_proto_msgTypes[78]
+	mi := &file_aiworkflow_workflow_proto_msgTypes[79]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6033,7 +6117,7 @@ func (x *ParticipantCapacitySnapshot) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ParticipantCapacitySnapshot.ProtoReflect.Descriptor instead.
 func (*ParticipantCapacitySnapshot) Descriptor() ([]byte, []int) {
-	return file_aiworkflow_workflow_proto_rawDescGZIP(), []int{78}
+	return file_aiworkflow_workflow_proto_rawDescGZIP(), []int{79}
 }
 
 func (x *ParticipantCapacitySnapshot) GetOrganizationId() int64 {
@@ -6116,7 +6200,7 @@ type ParticipantExecutionQuery struct {
 
 func (x *ParticipantExecutionQuery) Reset() {
 	*x = ParticipantExecutionQuery{}
-	mi := &file_aiworkflow_workflow_proto_msgTypes[79]
+	mi := &file_aiworkflow_workflow_proto_msgTypes[80]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6128,7 +6212,7 @@ func (x *ParticipantExecutionQuery) String() string {
 func (*ParticipantExecutionQuery) ProtoMessage() {}
 
 func (x *ParticipantExecutionQuery) ProtoReflect() protoreflect.Message {
-	mi := &file_aiworkflow_workflow_proto_msgTypes[79]
+	mi := &file_aiworkflow_workflow_proto_msgTypes[80]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6141,7 +6225,7 @@ func (x *ParticipantExecutionQuery) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ParticipantExecutionQuery.ProtoReflect.Descriptor instead.
 func (*ParticipantExecutionQuery) Descriptor() ([]byte, []int) {
-	return file_aiworkflow_workflow_proto_rawDescGZIP(), []int{79}
+	return file_aiworkflow_workflow_proto_rawDescGZIP(), []int{80}
 }
 
 func (x *ParticipantExecutionQuery) GetScope() *PublicationScope {
@@ -6168,7 +6252,7 @@ type ParticipantRetryReceiptQuery struct {
 
 func (x *ParticipantRetryReceiptQuery) Reset() {
 	*x = ParticipantRetryReceiptQuery{}
-	mi := &file_aiworkflow_workflow_proto_msgTypes[80]
+	mi := &file_aiworkflow_workflow_proto_msgTypes[81]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6180,7 +6264,7 @@ func (x *ParticipantRetryReceiptQuery) String() string {
 func (*ParticipantRetryReceiptQuery) ProtoMessage() {}
 
 func (x *ParticipantRetryReceiptQuery) ProtoReflect() protoreflect.Message {
-	mi := &file_aiworkflow_workflow_proto_msgTypes[80]
+	mi := &file_aiworkflow_workflow_proto_msgTypes[81]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6193,7 +6277,7 @@ func (x *ParticipantRetryReceiptQuery) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ParticipantRetryReceiptQuery.ProtoReflect.Descriptor instead.
 func (*ParticipantRetryReceiptQuery) Descriptor() ([]byte, []int) {
-	return file_aiworkflow_workflow_proto_rawDescGZIP(), []int{80}
+	return file_aiworkflow_workflow_proto_rawDescGZIP(), []int{81}
 }
 
 func (x *ParticipantRetryReceiptQuery) GetScope() *PublicationScope {
@@ -6227,7 +6311,7 @@ type ParticipantRetryCommand struct {
 
 func (x *ParticipantRetryCommand) Reset() {
 	*x = ParticipantRetryCommand{}
-	mi := &file_aiworkflow_workflow_proto_msgTypes[81]
+	mi := &file_aiworkflow_workflow_proto_msgTypes[82]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6239,7 +6323,7 @@ func (x *ParticipantRetryCommand) String() string {
 func (*ParticipantRetryCommand) ProtoMessage() {}
 
 func (x *ParticipantRetryCommand) ProtoReflect() protoreflect.Message {
-	mi := &file_aiworkflow_workflow_proto_msgTypes[81]
+	mi := &file_aiworkflow_workflow_proto_msgTypes[82]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6252,7 +6336,7 @@ func (x *ParticipantRetryCommand) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ParticipantRetryCommand.ProtoReflect.Descriptor instead.
 func (*ParticipantRetryCommand) Descriptor() ([]byte, []int) {
-	return file_aiworkflow_workflow_proto_rawDescGZIP(), []int{81}
+	return file_aiworkflow_workflow_proto_rawDescGZIP(), []int{82}
 }
 
 func (x *ParticipantRetryCommand) GetScope() *PublicationScope {
@@ -6342,7 +6426,7 @@ type ParticipantExecution struct {
 
 func (x *ParticipantExecution) Reset() {
 	*x = ParticipantExecution{}
-	mi := &file_aiworkflow_workflow_proto_msgTypes[82]
+	mi := &file_aiworkflow_workflow_proto_msgTypes[83]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6354,7 +6438,7 @@ func (x *ParticipantExecution) String() string {
 func (*ParticipantExecution) ProtoMessage() {}
 
 func (x *ParticipantExecution) ProtoReflect() protoreflect.Message {
-	mi := &file_aiworkflow_workflow_proto_msgTypes[82]
+	mi := &file_aiworkflow_workflow_proto_msgTypes[83]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6367,7 +6451,7 @@ func (x *ParticipantExecution) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ParticipantExecution.ProtoReflect.Descriptor instead.
 func (*ParticipantExecution) Descriptor() ([]byte, []int) {
-	return file_aiworkflow_workflow_proto_rawDescGZIP(), []int{82}
+	return file_aiworkflow_workflow_proto_rawDescGZIP(), []int{83}
 }
 
 func (x *ParticipantExecution) GetOrganizationId() int64 {
@@ -6496,7 +6580,7 @@ type ProfileLifecycleQuery struct {
 
 func (x *ProfileLifecycleQuery) Reset() {
 	*x = ProfileLifecycleQuery{}
-	mi := &file_aiworkflow_workflow_proto_msgTypes[83]
+	mi := &file_aiworkflow_workflow_proto_msgTypes[84]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6508,7 +6592,7 @@ func (x *ProfileLifecycleQuery) String() string {
 func (*ProfileLifecycleQuery) ProtoMessage() {}
 
 func (x *ProfileLifecycleQuery) ProtoReflect() protoreflect.Message {
-	mi := &file_aiworkflow_workflow_proto_msgTypes[83]
+	mi := &file_aiworkflow_workflow_proto_msgTypes[84]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6521,7 +6605,7 @@ func (x *ProfileLifecycleQuery) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ProfileLifecycleQuery.ProtoReflect.Descriptor instead.
 func (*ProfileLifecycleQuery) Descriptor() ([]byte, []int) {
-	return file_aiworkflow_workflow_proto_rawDescGZIP(), []int{83}
+	return file_aiworkflow_workflow_proto_rawDescGZIP(), []int{84}
 }
 
 func (x *ProfileLifecycleQuery) GetScope() *PublicationScope {
@@ -6578,7 +6662,7 @@ type SolutionQuery struct {
 
 func (x *SolutionQuery) Reset() {
 	*x = SolutionQuery{}
-	mi := &file_aiworkflow_workflow_proto_msgTypes[84]
+	mi := &file_aiworkflow_workflow_proto_msgTypes[85]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6590,7 +6674,7 @@ func (x *SolutionQuery) String() string {
 func (*SolutionQuery) ProtoMessage() {}
 
 func (x *SolutionQuery) ProtoReflect() protoreflect.Message {
-	mi := &file_aiworkflow_workflow_proto_msgTypes[84]
+	mi := &file_aiworkflow_workflow_proto_msgTypes[85]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6603,7 +6687,7 @@ func (x *SolutionQuery) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SolutionQuery.ProtoReflect.Descriptor instead.
 func (*SolutionQuery) Descriptor() ([]byte, []int) {
-	return file_aiworkflow_workflow_proto_rawDescGZIP(), []int{84}
+	return file_aiworkflow_workflow_proto_rawDescGZIP(), []int{85}
 }
 
 func (x *SolutionQuery) GetScope() *PublicationScope {
@@ -6645,7 +6729,7 @@ type SolutionWrite struct {
 
 func (x *SolutionWrite) Reset() {
 	*x = SolutionWrite{}
-	mi := &file_aiworkflow_workflow_proto_msgTypes[85]
+	mi := &file_aiworkflow_workflow_proto_msgTypes[86]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6657,7 +6741,7 @@ func (x *SolutionWrite) String() string {
 func (*SolutionWrite) ProtoMessage() {}
 
 func (x *SolutionWrite) ProtoReflect() protoreflect.Message {
-	mi := &file_aiworkflow_workflow_proto_msgTypes[85]
+	mi := &file_aiworkflow_workflow_proto_msgTypes[86]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6670,7 +6754,7 @@ func (x *SolutionWrite) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SolutionWrite.ProtoReflect.Descriptor instead.
 func (*SolutionWrite) Descriptor() ([]byte, []int) {
-	return file_aiworkflow_workflow_proto_rawDescGZIP(), []int{85}
+	return file_aiworkflow_workflow_proto_rawDescGZIP(), []int{86}
 }
 
 func (x *SolutionWrite) GetScope() *PublicationScope {
@@ -6704,7 +6788,7 @@ type SolutionResponse struct {
 
 func (x *SolutionResponse) Reset() {
 	*x = SolutionResponse{}
-	mi := &file_aiworkflow_workflow_proto_msgTypes[86]
+	mi := &file_aiworkflow_workflow_proto_msgTypes[87]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6716,7 +6800,7 @@ func (x *SolutionResponse) String() string {
 func (*SolutionResponse) ProtoMessage() {}
 
 func (x *SolutionResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_aiworkflow_workflow_proto_msgTypes[86]
+	mi := &file_aiworkflow_workflow_proto_msgTypes[87]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6729,7 +6813,7 @@ func (x *SolutionResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SolutionResponse.ProtoReflect.Descriptor instead.
 func (*SolutionResponse) Descriptor() ([]byte, []int) {
-	return file_aiworkflow_workflow_proto_rawDescGZIP(), []int{86}
+	return file_aiworkflow_workflow_proto_rawDescGZIP(), []int{87}
 }
 
 func (x *SolutionResponse) GetSchemaVersion() string {
@@ -6757,7 +6841,7 @@ type QuotaQuery struct {
 
 func (x *QuotaQuery) Reset() {
 	*x = QuotaQuery{}
-	mi := &file_aiworkflow_workflow_proto_msgTypes[87]
+	mi := &file_aiworkflow_workflow_proto_msgTypes[88]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6769,7 +6853,7 @@ func (x *QuotaQuery) String() string {
 func (*QuotaQuery) ProtoMessage() {}
 
 func (x *QuotaQuery) ProtoReflect() protoreflect.Message {
-	mi := &file_aiworkflow_workflow_proto_msgTypes[87]
+	mi := &file_aiworkflow_workflow_proto_msgTypes[88]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6782,7 +6866,7 @@ func (x *QuotaQuery) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use QuotaQuery.ProtoReflect.Descriptor instead.
 func (*QuotaQuery) Descriptor() ([]byte, []int) {
-	return file_aiworkflow_workflow_proto_rawDescGZIP(), []int{87}
+	return file_aiworkflow_workflow_proto_rawDescGZIP(), []int{88}
 }
 
 func (x *QuotaQuery) GetScope() *PublicationScope {
@@ -6816,7 +6900,7 @@ type QuotaWrite struct {
 
 func (x *QuotaWrite) Reset() {
 	*x = QuotaWrite{}
-	mi := &file_aiworkflow_workflow_proto_msgTypes[88]
+	mi := &file_aiworkflow_workflow_proto_msgTypes[89]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6828,7 +6912,7 @@ func (x *QuotaWrite) String() string {
 func (*QuotaWrite) ProtoMessage() {}
 
 func (x *QuotaWrite) ProtoReflect() protoreflect.Message {
-	mi := &file_aiworkflow_workflow_proto_msgTypes[88]
+	mi := &file_aiworkflow_workflow_proto_msgTypes[89]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6841,7 +6925,7 @@ func (x *QuotaWrite) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use QuotaWrite.ProtoReflect.Descriptor instead.
 func (*QuotaWrite) Descriptor() ([]byte, []int) {
-	return file_aiworkflow_workflow_proto_rawDescGZIP(), []int{88}
+	return file_aiworkflow_workflow_proto_rawDescGZIP(), []int{89}
 }
 
 func (x *QuotaWrite) GetScope() *PublicationScope {
@@ -6868,7 +6952,7 @@ type QuotaResponse struct {
 
 func (x *QuotaResponse) Reset() {
 	*x = QuotaResponse{}
-	mi := &file_aiworkflow_workflow_proto_msgTypes[89]
+	mi := &file_aiworkflow_workflow_proto_msgTypes[90]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6880,7 +6964,7 @@ func (x *QuotaResponse) String() string {
 func (*QuotaResponse) ProtoMessage() {}
 
 func (x *QuotaResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_aiworkflow_workflow_proto_msgTypes[89]
+	mi := &file_aiworkflow_workflow_proto_msgTypes[90]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6893,7 +6977,7 @@ func (x *QuotaResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use QuotaResponse.ProtoReflect.Descriptor instead.
 func (*QuotaResponse) Descriptor() ([]byte, []int) {
-	return file_aiworkflow_workflow_proto_rawDescGZIP(), []int{89}
+	return file_aiworkflow_workflow_proto_rawDescGZIP(), []int{90}
 }
 
 func (x *QuotaResponse) GetSchemaVersion() string {
@@ -6920,7 +7004,7 @@ type RuntimeQuery struct {
 
 func (x *RuntimeQuery) Reset() {
 	*x = RuntimeQuery{}
-	mi := &file_aiworkflow_workflow_proto_msgTypes[90]
+	mi := &file_aiworkflow_workflow_proto_msgTypes[91]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6932,7 +7016,7 @@ func (x *RuntimeQuery) String() string {
 func (*RuntimeQuery) ProtoMessage() {}
 
 func (x *RuntimeQuery) ProtoReflect() protoreflect.Message {
-	mi := &file_aiworkflow_workflow_proto_msgTypes[90]
+	mi := &file_aiworkflow_workflow_proto_msgTypes[91]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6945,7 +7029,7 @@ func (x *RuntimeQuery) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RuntimeQuery.ProtoReflect.Descriptor instead.
 func (*RuntimeQuery) Descriptor() ([]byte, []int) {
-	return file_aiworkflow_workflow_proto_rawDescGZIP(), []int{90}
+	return file_aiworkflow_workflow_proto_rawDescGZIP(), []int{91}
 }
 
 func (x *RuntimeQuery) GetScope() *PublicationScope {
@@ -6972,7 +7056,7 @@ type RuntimeResponse struct {
 
 func (x *RuntimeResponse) Reset() {
 	*x = RuntimeResponse{}
-	mi := &file_aiworkflow_workflow_proto_msgTypes[91]
+	mi := &file_aiworkflow_workflow_proto_msgTypes[92]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6984,7 +7068,7 @@ func (x *RuntimeResponse) String() string {
 func (*RuntimeResponse) ProtoMessage() {}
 
 func (x *RuntimeResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_aiworkflow_workflow_proto_msgTypes[91]
+	mi := &file_aiworkflow_workflow_proto_msgTypes[92]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6997,7 +7081,7 @@ func (x *RuntimeResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RuntimeResponse.ProtoReflect.Descriptor instead.
 func (*RuntimeResponse) Descriptor() ([]byte, []int) {
-	return file_aiworkflow_workflow_proto_rawDescGZIP(), []int{91}
+	return file_aiworkflow_workflow_proto_rawDescGZIP(), []int{92}
 }
 
 func (x *RuntimeResponse) GetSchemaVersion() string {
@@ -7026,7 +7110,7 @@ type FlowQuery struct {
 
 func (x *FlowQuery) Reset() {
 	*x = FlowQuery{}
-	mi := &file_aiworkflow_workflow_proto_msgTypes[92]
+	mi := &file_aiworkflow_workflow_proto_msgTypes[93]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7038,7 +7122,7 @@ func (x *FlowQuery) String() string {
 func (*FlowQuery) ProtoMessage() {}
 
 func (x *FlowQuery) ProtoReflect() protoreflect.Message {
-	mi := &file_aiworkflow_workflow_proto_msgTypes[92]
+	mi := &file_aiworkflow_workflow_proto_msgTypes[93]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7051,7 +7135,7 @@ func (x *FlowQuery) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use FlowQuery.ProtoReflect.Descriptor instead.
 func (*FlowQuery) Descriptor() ([]byte, []int) {
-	return file_aiworkflow_workflow_proto_rawDescGZIP(), []int{92}
+	return file_aiworkflow_workflow_proto_rawDescGZIP(), []int{93}
 }
 
 func (x *FlowQuery) GetScope() *PublicationScope {
@@ -7085,7 +7169,7 @@ type SemanticDraftWrite struct {
 
 func (x *SemanticDraftWrite) Reset() {
 	*x = SemanticDraftWrite{}
-	mi := &file_aiworkflow_workflow_proto_msgTypes[93]
+	mi := &file_aiworkflow_workflow_proto_msgTypes[94]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7097,7 +7181,7 @@ func (x *SemanticDraftWrite) String() string {
 func (*SemanticDraftWrite) ProtoMessage() {}
 
 func (x *SemanticDraftWrite) ProtoReflect() protoreflect.Message {
-	mi := &file_aiworkflow_workflow_proto_msgTypes[93]
+	mi := &file_aiworkflow_workflow_proto_msgTypes[94]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7110,7 +7194,7 @@ func (x *SemanticDraftWrite) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SemanticDraftWrite.ProtoReflect.Descriptor instead.
 func (*SemanticDraftWrite) Descriptor() ([]byte, []int) {
-	return file_aiworkflow_workflow_proto_rawDescGZIP(), []int{93}
+	return file_aiworkflow_workflow_proto_rawDescGZIP(), []int{94}
 }
 
 func (x *SemanticDraftWrite) GetScope() *PublicationScope {
@@ -7139,7 +7223,7 @@ type SemanticDraftQuery struct {
 
 func (x *SemanticDraftQuery) Reset() {
 	*x = SemanticDraftQuery{}
-	mi := &file_aiworkflow_workflow_proto_msgTypes[94]
+	mi := &file_aiworkflow_workflow_proto_msgTypes[95]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7151,7 +7235,7 @@ func (x *SemanticDraftQuery) String() string {
 func (*SemanticDraftQuery) ProtoMessage() {}
 
 func (x *SemanticDraftQuery) ProtoReflect() protoreflect.Message {
-	mi := &file_aiworkflow_workflow_proto_msgTypes[94]
+	mi := &file_aiworkflow_workflow_proto_msgTypes[95]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7164,7 +7248,7 @@ func (x *SemanticDraftQuery) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SemanticDraftQuery.ProtoReflect.Descriptor instead.
 func (*SemanticDraftQuery) Descriptor() ([]byte, []int) {
-	return file_aiworkflow_workflow_proto_rawDescGZIP(), []int{94}
+	return file_aiworkflow_workflow_proto_rawDescGZIP(), []int{95}
 }
 
 func (x *SemanticDraftQuery) GetScope() *PublicationScope {
@@ -7205,7 +7289,7 @@ type SemanticDraftResponse struct {
 
 func (x *SemanticDraftResponse) Reset() {
 	*x = SemanticDraftResponse{}
-	mi := &file_aiworkflow_workflow_proto_msgTypes[95]
+	mi := &file_aiworkflow_workflow_proto_msgTypes[96]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7217,7 +7301,7 @@ func (x *SemanticDraftResponse) String() string {
 func (*SemanticDraftResponse) ProtoMessage() {}
 
 func (x *SemanticDraftResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_aiworkflow_workflow_proto_msgTypes[95]
+	mi := &file_aiworkflow_workflow_proto_msgTypes[96]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7230,7 +7314,7 @@ func (x *SemanticDraftResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SemanticDraftResponse.ProtoReflect.Descriptor instead.
 func (*SemanticDraftResponse) Descriptor() ([]byte, []int) {
-	return file_aiworkflow_workflow_proto_rawDescGZIP(), []int{95}
+	return file_aiworkflow_workflow_proto_rawDescGZIP(), []int{96}
 }
 
 func (x *SemanticDraftResponse) GetSchemaVersion() string {
@@ -7695,7 +7779,15 @@ const file_aiworkflow_workflow_proto_rawDesc = "" +
 	"\x0eschema_version\x18\x01 \x01(\tR\rschemaVersion\x12\x1d\n" +
 	"\n" +
 	"command_id\x18\x02 \x01(\tR\tcommandId\x12!\n" +
-	"\freceipt_json\x18\x03 \x01(\tR\vreceiptJson\"\xab\x01\n" +
+	"\freceipt_json\x18\x03 \x01(\tR\vreceiptJson\"\xf7\x01\n" +
+	"\x15PolicyReferencesQuery\x128\n" +
+	"\x05scope\x18\x01 \x01(\v2\".qsai.workflow.v1.PublicationScopeR\x05scope\x12\x12\n" +
+	"\x04kind\x18\x02 \x01(\tR\x04kind\x12C\n" +
+	"\treference\x18\x03 \x01(\v2%.qsai.workflow.v1.FrozenEvaluationRefR\treference\x12\x1d\n" +
+	"\n" +
+	"usage_kind\x18\x04 \x01(\tR\tusageKind\x12\x14\n" +
+	"\x05limit\x18\x05 \x01(\x05R\x05limit\x12\x16\n" +
+	"\x06cursor\x18\x06 \x01(\tR\x06cursor\"\xab\x01\n" +
 	"\x11AssetCatalogQuery\x128\n" +
 	"\x05scope\x18\x01 \x01(\v2\".qsai.workflow.v1.PublicationScopeR\x05scope\x12\x12\n" +
 	"\x04kind\x18\x02 \x01(\tR\x04kind\x12\x1a\n" +
@@ -7966,8 +8058,10 @@ const file_aiworkflow_workflow_proto_rawDesc = "" +
 	"\x0fSuiteManagement\x12^\n" +
 	"\bRegister\x12&.qsai.workflow.v1.SuiteRegisterCommand\x1a*.qsai.workflow.v1.SuiteRegistrationReceipt\x12b\n" +
 	"\n" +
-	"GetReceipt\x12(.qsai.workflow.v1.SuiteRegistrationQuery\x1a*.qsai.workflow.v1.SuiteRegistrationReceipt2\xba\x01\n" +
-	"\fAssetCatalog\x12S\n" +
+	"GetReceipt\x12(.qsai.workflow.v1.SuiteRegistrationQuery\x1a*.qsai.workflow.v1.SuiteRegistrationReceipt2\x99\x02\n" +
+	"\fAssetCatalog\x12]\n" +
+	"\n" +
+	"References\x12'.qsai.workflow.v1.PolicyReferencesQuery\x1a&.qsai.workflow.v1.AssetCatalogResponse\x12S\n" +
 	"\x04List\x12#.qsai.workflow.v1.AssetCatalogQuery\x1a&.qsai.workflow.v1.AssetCatalogResponse\x12U\n" +
 	"\x03Get\x12&.qsai.workflow.v1.AssetCatalogGetQuery\x1a&.qsai.workflow.v1.AssetCatalogResponse2\x93\x03\n" +
 	"\x15ParticipantManagement\x12h\n" +
@@ -7983,8 +8077,9 @@ const file_aiworkflow_workflow_proto_rawDesc = "" +
 	"\tGetModels\x12\x1f.qsai.workflow.v1.SolutionQuery\x1a\".qsai.workflow.v1.SolutionResponse\x12M\n" +
 	"\x06Create\x12\x1f.qsai.workflow.v1.SolutionWrite\x1a\".qsai.workflow.v1.SolutionResponse\x12K\n" +
 	"\x04Save\x12\x1f.qsai.workflow.v1.SolutionWrite\x1a\".qsai.workflow.v1.SolutionResponse\x12N\n" +
-	"\aPrepare\x12\x1f.qsai.workflow.v1.SolutionWrite\x1a\".qsai.workflow.v1.SolutionResponse2\x82\x03\n" +
-	"\x0fQuotaManagement\x12D\n" +
+	"\aPrepare\x12\x1f.qsai.workflow.v1.SolutionWrite\x1a\".qsai.workflow.v1.SolutionResponse2\xcb\x03\n" +
+	"\x0fQuotaManagement\x12G\n" +
+	"\x06Status\x12\x1c.qsai.workflow.v1.QuotaQuery\x1a\x1f.qsai.workflow.v1.QuotaResponse\x12D\n" +
 	"\x03Get\x12\x1c.qsai.workflow.v1.QuotaQuery\x1a\x1f.qsai.workflow.v1.QuotaResponse\x12H\n" +
 	"\aHistory\x12\x1c.qsai.workflow.v1.QuotaQuery\x1a\x1f.qsai.workflow.v1.QuotaResponse\x12K\n" +
 	"\n" +
@@ -8019,7 +8114,7 @@ func file_aiworkflow_workflow_proto_rawDescGZIP() []byte {
 	return file_aiworkflow_workflow_proto_rawDescData
 }
 
-var file_aiworkflow_workflow_proto_msgTypes = make([]protoimpl.MessageInfo, 96)
+var file_aiworkflow_workflow_proto_msgTypes = make([]protoimpl.MessageInfo, 97)
 var file_aiworkflow_workflow_proto_goTypes = []any{
 	(*Actor)(nil),                          // 0: qsai.workflow.v1.Actor
 	(*StartCommand)(nil),                   // 1: qsai.workflow.v1.StartCommand
@@ -8087,36 +8182,37 @@ var file_aiworkflow_workflow_proto_goTypes = []any{
 	(*SuiteRegisterCommand)(nil),           // 63: qsai.workflow.v1.SuiteRegisterCommand
 	(*SuiteRegistrationQuery)(nil),         // 64: qsai.workflow.v1.SuiteRegistrationQuery
 	(*SuiteRegistrationReceipt)(nil),       // 65: qsai.workflow.v1.SuiteRegistrationReceipt
-	(*AssetCatalogQuery)(nil),              // 66: qsai.workflow.v1.AssetCatalogQuery
-	(*AssetCatalogGetQuery)(nil),           // 67: qsai.workflow.v1.AssetCatalogGetQuery
-	(*AssetCatalogResponse)(nil),           // 68: qsai.workflow.v1.AssetCatalogResponse
-	(*EvaluationCatalogQuery)(nil),         // 69: qsai.workflow.v1.EvaluationCatalogQuery
-	(*EvaluationCatalogPage)(nil),          // 70: qsai.workflow.v1.EvaluationCatalogPage
-	(*EvaluationSummary)(nil),              // 71: qsai.workflow.v1.EvaluationSummary
-	(*EvaluationCapacityReservation)(nil),  // 72: qsai.workflow.v1.EvaluationCapacityReservation
-	(*EvaluationCapacitySnapshot)(nil),     // 73: qsai.workflow.v1.EvaluationCapacitySnapshot
-	(*ParticipantCapacityQuery)(nil),       // 74: qsai.workflow.v1.ParticipantCapacityQuery
-	(*ParticipantCapacityPolicy)(nil),      // 75: qsai.workflow.v1.ParticipantCapacityPolicy
-	(*ParticipantCapacityUsage)(nil),       // 76: qsai.workflow.v1.ParticipantCapacityUsage
-	(*ParticipantReservation)(nil),         // 77: qsai.workflow.v1.ParticipantReservation
-	(*ParticipantCapacitySnapshot)(nil),    // 78: qsai.workflow.v1.ParticipantCapacitySnapshot
-	(*ParticipantExecutionQuery)(nil),      // 79: qsai.workflow.v1.ParticipantExecutionQuery
-	(*ParticipantRetryReceiptQuery)(nil),   // 80: qsai.workflow.v1.ParticipantRetryReceiptQuery
-	(*ParticipantRetryCommand)(nil),        // 81: qsai.workflow.v1.ParticipantRetryCommand
-	(*ParticipantExecution)(nil),           // 82: qsai.workflow.v1.ParticipantExecution
-	(*ProfileLifecycleQuery)(nil),          // 83: qsai.workflow.v1.ProfileLifecycleQuery
-	(*SolutionQuery)(nil),                  // 84: qsai.workflow.v1.SolutionQuery
-	(*SolutionWrite)(nil),                  // 85: qsai.workflow.v1.SolutionWrite
-	(*SolutionResponse)(nil),               // 86: qsai.workflow.v1.SolutionResponse
-	(*QuotaQuery)(nil),                     // 87: qsai.workflow.v1.QuotaQuery
-	(*QuotaWrite)(nil),                     // 88: qsai.workflow.v1.QuotaWrite
-	(*QuotaResponse)(nil),                  // 89: qsai.workflow.v1.QuotaResponse
-	(*RuntimeQuery)(nil),                   // 90: qsai.workflow.v1.RuntimeQuery
-	(*RuntimeResponse)(nil),                // 91: qsai.workflow.v1.RuntimeResponse
-	(*FlowQuery)(nil),                      // 92: qsai.workflow.v1.FlowQuery
-	(*SemanticDraftWrite)(nil),             // 93: qsai.workflow.v1.SemanticDraftWrite
-	(*SemanticDraftQuery)(nil),             // 94: qsai.workflow.v1.SemanticDraftQuery
-	(*SemanticDraftResponse)(nil),          // 95: qsai.workflow.v1.SemanticDraftResponse
+	(*PolicyReferencesQuery)(nil),          // 66: qsai.workflow.v1.PolicyReferencesQuery
+	(*AssetCatalogQuery)(nil),              // 67: qsai.workflow.v1.AssetCatalogQuery
+	(*AssetCatalogGetQuery)(nil),           // 68: qsai.workflow.v1.AssetCatalogGetQuery
+	(*AssetCatalogResponse)(nil),           // 69: qsai.workflow.v1.AssetCatalogResponse
+	(*EvaluationCatalogQuery)(nil),         // 70: qsai.workflow.v1.EvaluationCatalogQuery
+	(*EvaluationCatalogPage)(nil),          // 71: qsai.workflow.v1.EvaluationCatalogPage
+	(*EvaluationSummary)(nil),              // 72: qsai.workflow.v1.EvaluationSummary
+	(*EvaluationCapacityReservation)(nil),  // 73: qsai.workflow.v1.EvaluationCapacityReservation
+	(*EvaluationCapacitySnapshot)(nil),     // 74: qsai.workflow.v1.EvaluationCapacitySnapshot
+	(*ParticipantCapacityQuery)(nil),       // 75: qsai.workflow.v1.ParticipantCapacityQuery
+	(*ParticipantCapacityPolicy)(nil),      // 76: qsai.workflow.v1.ParticipantCapacityPolicy
+	(*ParticipantCapacityUsage)(nil),       // 77: qsai.workflow.v1.ParticipantCapacityUsage
+	(*ParticipantReservation)(nil),         // 78: qsai.workflow.v1.ParticipantReservation
+	(*ParticipantCapacitySnapshot)(nil),    // 79: qsai.workflow.v1.ParticipantCapacitySnapshot
+	(*ParticipantExecutionQuery)(nil),      // 80: qsai.workflow.v1.ParticipantExecutionQuery
+	(*ParticipantRetryReceiptQuery)(nil),   // 81: qsai.workflow.v1.ParticipantRetryReceiptQuery
+	(*ParticipantRetryCommand)(nil),        // 82: qsai.workflow.v1.ParticipantRetryCommand
+	(*ParticipantExecution)(nil),           // 83: qsai.workflow.v1.ParticipantExecution
+	(*ProfileLifecycleQuery)(nil),          // 84: qsai.workflow.v1.ProfileLifecycleQuery
+	(*SolutionQuery)(nil),                  // 85: qsai.workflow.v1.SolutionQuery
+	(*SolutionWrite)(nil),                  // 86: qsai.workflow.v1.SolutionWrite
+	(*SolutionResponse)(nil),               // 87: qsai.workflow.v1.SolutionResponse
+	(*QuotaQuery)(nil),                     // 88: qsai.workflow.v1.QuotaQuery
+	(*QuotaWrite)(nil),                     // 89: qsai.workflow.v1.QuotaWrite
+	(*QuotaResponse)(nil),                  // 90: qsai.workflow.v1.QuotaResponse
+	(*RuntimeQuery)(nil),                   // 91: qsai.workflow.v1.RuntimeQuery
+	(*RuntimeResponse)(nil),                // 92: qsai.workflow.v1.RuntimeResponse
+	(*FlowQuery)(nil),                      // 93: qsai.workflow.v1.FlowQuery
+	(*SemanticDraftWrite)(nil),             // 94: qsai.workflow.v1.SemanticDraftWrite
+	(*SemanticDraftQuery)(nil),             // 95: qsai.workflow.v1.SemanticDraftQuery
+	(*SemanticDraftResponse)(nil),          // 96: qsai.workflow.v1.SemanticDraftResponse
 }
 var file_aiworkflow_workflow_proto_depIdxs = []int32{
 	0,   // 0: qsai.workflow.v1.StartCommand.actor:type_name -> qsai.workflow.v1.Actor
@@ -8196,173 +8292,179 @@ var file_aiworkflow_workflow_proto_depIdxs = []int32{
 	51,  // 74: qsai.workflow.v1.SuiteRegisterCommand.generation_route:type_name -> qsai.workflow.v1.PromptDraftSource
 	33,  // 75: qsai.workflow.v1.SuiteRegisterCommand.semantic_prompt:type_name -> qsai.workflow.v1.FrozenEvaluationRef
 	36,  // 76: qsai.workflow.v1.SuiteRegistrationQuery.scope:type_name -> qsai.workflow.v1.PublicationScope
-	36,  // 77: qsai.workflow.v1.AssetCatalogQuery.scope:type_name -> qsai.workflow.v1.PublicationScope
-	36,  // 78: qsai.workflow.v1.AssetCatalogGetQuery.scope:type_name -> qsai.workflow.v1.PublicationScope
-	36,  // 79: qsai.workflow.v1.EvaluationCatalogQuery.scope:type_name -> qsai.workflow.v1.PublicationScope
-	71,  // 80: qsai.workflow.v1.EvaluationCatalogPage.items:type_name -> qsai.workflow.v1.EvaluationSummary
-	72,  // 81: qsai.workflow.v1.EvaluationCapacitySnapshot.reservations:type_name -> qsai.workflow.v1.EvaluationCapacityReservation
-	36,  // 82: qsai.workflow.v1.ParticipantCapacityQuery.scope:type_name -> qsai.workflow.v1.PublicationScope
-	75,  // 83: qsai.workflow.v1.ParticipantCapacitySnapshot.policy:type_name -> qsai.workflow.v1.ParticipantCapacityPolicy
-	76,  // 84: qsai.workflow.v1.ParticipantCapacitySnapshot.organization:type_name -> qsai.workflow.v1.ParticipantCapacityUsage
-	76,  // 85: qsai.workflow.v1.ParticipantCapacitySnapshot.subject:type_name -> qsai.workflow.v1.ParticipantCapacityUsage
-	76,  // 86: qsai.workflow.v1.ParticipantCapacitySnapshot.assessment:type_name -> qsai.workflow.v1.ParticipantCapacityUsage
-	77,  // 87: qsai.workflow.v1.ParticipantCapacitySnapshot.daily_reservations:type_name -> qsai.workflow.v1.ParticipantReservation
-	77,  // 88: qsai.workflow.v1.ParticipantCapacitySnapshot.active_reservations:type_name -> qsai.workflow.v1.ParticipantReservation
-	36,  // 89: qsai.workflow.v1.ParticipantExecutionQuery.scope:type_name -> qsai.workflow.v1.PublicationScope
-	36,  // 90: qsai.workflow.v1.ParticipantRetryReceiptQuery.scope:type_name -> qsai.workflow.v1.PublicationScope
-	36,  // 91: qsai.workflow.v1.ParticipantRetryCommand.scope:type_name -> qsai.workflow.v1.PublicationScope
-	36,  // 92: qsai.workflow.v1.ProfileLifecycleQuery.scope:type_name -> qsai.workflow.v1.PublicationScope
-	36,  // 93: qsai.workflow.v1.SolutionQuery.scope:type_name -> qsai.workflow.v1.PublicationScope
-	36,  // 94: qsai.workflow.v1.SolutionWrite.scope:type_name -> qsai.workflow.v1.PublicationScope
-	36,  // 95: qsai.workflow.v1.QuotaQuery.scope:type_name -> qsai.workflow.v1.PublicationScope
-	36,  // 96: qsai.workflow.v1.QuotaWrite.scope:type_name -> qsai.workflow.v1.PublicationScope
-	36,  // 97: qsai.workflow.v1.RuntimeQuery.scope:type_name -> qsai.workflow.v1.PublicationScope
-	36,  // 98: qsai.workflow.v1.FlowQuery.scope:type_name -> qsai.workflow.v1.PublicationScope
-	36,  // 99: qsai.workflow.v1.SemanticDraftWrite.scope:type_name -> qsai.workflow.v1.PublicationScope
-	36,  // 100: qsai.workflow.v1.SemanticDraftQuery.scope:type_name -> qsai.workflow.v1.PublicationScope
-	1,   // 101: qsai.workflow.v1.Commands.Start:input_type -> qsai.workflow.v1.StartCommand
-	2,   // 102: qsai.workflow.v1.Commands.Change:input_type -> qsai.workflow.v1.ChangeCommand
-	4,   // 103: qsai.workflow.v1.Results.Accept:input_type -> qsai.workflow.v1.StateEvent
-	36,  // 104: qsai.workflow.v1.EvaluationManagement.GetCapacity:input_type -> qsai.workflow.v1.PublicationScope
-	69,  // 105: qsai.workflow.v1.EvaluationManagement.List:input_type -> qsai.workflow.v1.EvaluationCatalogQuery
-	12,  // 106: qsai.workflow.v1.EvaluationManagement.Prepare:input_type -> qsai.workflow.v1.EvaluationPlanQuery
-	35,  // 107: qsai.workflow.v1.EvaluationManagement.Create:input_type -> qsai.workflow.v1.EvaluationCreateCommand
-	32,  // 108: qsai.workflow.v1.EvaluationManagement.Start:input_type -> qsai.workflow.v1.EvaluationStartCommand
-	15,  // 109: qsai.workflow.v1.EvaluationManagement.Cancel:input_type -> qsai.workflow.v1.EvaluationCancelCommand
-	23,  // 110: qsai.workflow.v1.EvaluationManagement.Get:input_type -> qsai.workflow.v1.EvaluationQuery
-	25,  // 111: qsai.workflow.v1.EvaluationManagement.ListUnknownExecutions:input_type -> qsai.workflow.v1.EvaluationUnknownQuery
-	24,  // 112: qsai.workflow.v1.EvaluationManagement.ResolveUnknown:input_type -> qsai.workflow.v1.UnknownResolutionCommand
-	31,  // 113: qsai.workflow.v1.EvaluationManagement.Review:input_type -> qsai.workflow.v1.EvaluationReviewCommand
-	23,  // 114: qsai.workflow.v1.EvaluationManagement.ListCandidates:input_type -> qsai.workflow.v1.EvaluationQuery
-	21,  // 115: qsai.workflow.v1.EvaluationManagement.GetCandidate:input_type -> qsai.workflow.v1.EvaluationCandidateQuery
-	8,   // 116: qsai.workflow.v1.EvaluationManagement.ListExecutions:input_type -> qsai.workflow.v1.EvaluationExecutionQuery
-	8,   // 117: qsai.workflow.v1.EvaluationManagement.GetExecutionOutput:input_type -> qsai.workflow.v1.EvaluationExecutionQuery
-	17,  // 118: qsai.workflow.v1.EvaluationManagement.PreviewGates:input_type -> qsai.workflow.v1.EvaluationGateQuery
-	16,  // 119: qsai.workflow.v1.EvaluationManagement.Finalize:input_type -> qsai.workflow.v1.EvaluationFinalizeCommand
-	14,  // 120: qsai.workflow.v1.EvaluationManagement.ReopenReview:input_type -> qsai.workflow.v1.EvaluationReopenCommand
-	39,  // 121: qsai.workflow.v1.PublicationManagement.Publish:input_type -> qsai.workflow.v1.PublicationPublishCommand
-	40,  // 122: qsai.workflow.v1.PublicationManagement.Rollback:input_type -> qsai.workflow.v1.PublicationRollbackCommand
-	41,  // 123: qsai.workflow.v1.PublicationManagement.Disable:input_type -> qsai.workflow.v1.PublicationDisableCommand
-	42,  // 124: qsai.workflow.v1.PublicationManagement.Get:input_type -> qsai.workflow.v1.PublicationQuery
-	43,  // 125: qsai.workflow.v1.PublicationManagement.GetReceipt:input_type -> qsai.workflow.v1.PublicationReceiptQuery
-	44,  // 126: qsai.workflow.v1.PublicationManagement.ListHistory:input_type -> qsai.workflow.v1.PublicationHistoryQuery
-	45,  // 127: qsai.workflow.v1.PublicationManagement.GetHistory:input_type -> qsai.workflow.v1.PublicationHistoryVersionQuery
-	53,  // 128: qsai.workflow.v1.PromptDraftManagement.Create:input_type -> qsai.workflow.v1.PromptDraftCreateCommand
-	54,  // 129: qsai.workflow.v1.PromptDraftManagement.Revise:input_type -> qsai.workflow.v1.PromptDraftReviseCommand
-	55,  // 130: qsai.workflow.v1.PromptDraftManagement.Get:input_type -> qsai.workflow.v1.PromptDraftQuery
-	55,  // 131: qsai.workflow.v1.PromptDraftManagement.GetLifecycle:input_type -> qsai.workflow.v1.PromptDraftQuery
-	56,  // 132: qsai.workflow.v1.PromptDraftManagement.GetReceipt:input_type -> qsai.workflow.v1.PromptDraftReceiptQuery
-	49,  // 133: qsai.workflow.v1.PromptDraftManagement.Freeze:input_type -> qsai.workflow.v1.PromptDraftFreezeCommand
-	56,  // 134: qsai.workflow.v1.PromptDraftManagement.GetFreezeReceipt:input_type -> qsai.workflow.v1.PromptDraftReceiptQuery
-	60,  // 135: qsai.workflow.v1.ProfileManagement.Register:input_type -> qsai.workflow.v1.ProfileRegisterCommand
-	61,  // 136: qsai.workflow.v1.ProfileManagement.GetReceipt:input_type -> qsai.workflow.v1.ProfileRegistrationQuery
-	83,  // 137: qsai.workflow.v1.ProfileManagement.ListLifecycle:input_type -> qsai.workflow.v1.ProfileLifecycleQuery
-	83,  // 138: qsai.workflow.v1.ProfileManagement.GetLifecycle:input_type -> qsai.workflow.v1.ProfileLifecycleQuery
-	63,  // 139: qsai.workflow.v1.SuiteManagement.Register:input_type -> qsai.workflow.v1.SuiteRegisterCommand
-	64,  // 140: qsai.workflow.v1.SuiteManagement.GetReceipt:input_type -> qsai.workflow.v1.SuiteRegistrationQuery
-	66,  // 141: qsai.workflow.v1.AssetCatalog.List:input_type -> qsai.workflow.v1.AssetCatalogQuery
-	67,  // 142: qsai.workflow.v1.AssetCatalog.Get:input_type -> qsai.workflow.v1.AssetCatalogGetQuery
-	74,  // 143: qsai.workflow.v1.ParticipantManagement.GetCapacity:input_type -> qsai.workflow.v1.ParticipantCapacityQuery
-	79,  // 144: qsai.workflow.v1.ParticipantManagement.GetExecution:input_type -> qsai.workflow.v1.ParticipantExecutionQuery
-	81,  // 145: qsai.workflow.v1.ParticipantManagement.Retry:input_type -> qsai.workflow.v1.ParticipantRetryCommand
-	80,  // 146: qsai.workflow.v1.ParticipantManagement.GetRetryReceipt:input_type -> qsai.workflow.v1.ParticipantRetryReceiptQuery
-	84,  // 147: qsai.workflow.v1.SolutionManagement.List:input_type -> qsai.workflow.v1.SolutionQuery
-	84,  // 148: qsai.workflow.v1.SolutionManagement.Get:input_type -> qsai.workflow.v1.SolutionQuery
-	84,  // 149: qsai.workflow.v1.SolutionManagement.GetReceipt:input_type -> qsai.workflow.v1.SolutionQuery
-	84,  // 150: qsai.workflow.v1.SolutionManagement.GetModels:input_type -> qsai.workflow.v1.SolutionQuery
-	85,  // 151: qsai.workflow.v1.SolutionManagement.Create:input_type -> qsai.workflow.v1.SolutionWrite
-	85,  // 152: qsai.workflow.v1.SolutionManagement.Save:input_type -> qsai.workflow.v1.SolutionWrite
-	85,  // 153: qsai.workflow.v1.SolutionManagement.Prepare:input_type -> qsai.workflow.v1.SolutionWrite
-	87,  // 154: qsai.workflow.v1.QuotaManagement.Get:input_type -> qsai.workflow.v1.QuotaQuery
-	87,  // 155: qsai.workflow.v1.QuotaManagement.History:input_type -> qsai.workflow.v1.QuotaQuery
-	87,  // 156: qsai.workflow.v1.QuotaManagement.GetReceipt:input_type -> qsai.workflow.v1.QuotaQuery
-	88,  // 157: qsai.workflow.v1.QuotaManagement.Update:input_type -> qsai.workflow.v1.QuotaWrite
-	88,  // 158: qsai.workflow.v1.QuotaManagement.Rollback:input_type -> qsai.workflow.v1.QuotaWrite
-	90,  // 159: qsai.workflow.v1.RuntimeManagement.Health:input_type -> qsai.workflow.v1.RuntimeQuery
-	90,  // 160: qsai.workflow.v1.RuntimeManagement.BatchGet:input_type -> qsai.workflow.v1.RuntimeQuery
-	90,  // 161: qsai.workflow.v1.RuntimeManagement.Get:input_type -> qsai.workflow.v1.RuntimeQuery
-	92,  // 162: qsai.workflow.v1.FlowManagement.GetSolution:input_type -> qsai.workflow.v1.FlowQuery
-	92,  // 163: qsai.workflow.v1.FlowManagement.GetPublication:input_type -> qsai.workflow.v1.FlowQuery
-	93,  // 164: qsai.workflow.v1.SemanticPromptDrafts.Create:input_type -> qsai.workflow.v1.SemanticDraftWrite
-	94,  // 165: qsai.workflow.v1.SemanticPromptDrafts.Get:input_type -> qsai.workflow.v1.SemanticDraftQuery
-	93,  // 166: qsai.workflow.v1.SemanticPromptDrafts.Revise:input_type -> qsai.workflow.v1.SemanticDraftWrite
-	94,  // 167: qsai.workflow.v1.SemanticPromptDrafts.Validate:input_type -> qsai.workflow.v1.SemanticDraftQuery
-	93,  // 168: qsai.workflow.v1.SemanticPromptDrafts.Freeze:input_type -> qsai.workflow.v1.SemanticDraftWrite
-	94,  // 169: qsai.workflow.v1.SemanticPromptDrafts.GetReceipt:input_type -> qsai.workflow.v1.SemanticDraftQuery
-	3,   // 170: qsai.workflow.v1.Commands.Start:output_type -> qsai.workflow.v1.Receipt
-	3,   // 171: qsai.workflow.v1.Commands.Change:output_type -> qsai.workflow.v1.Receipt
-	5,   // 172: qsai.workflow.v1.Results.Accept:output_type -> qsai.workflow.v1.Acknowledgement
-	73,  // 173: qsai.workflow.v1.EvaluationManagement.GetCapacity:output_type -> qsai.workflow.v1.EvaluationCapacitySnapshot
-	70,  // 174: qsai.workflow.v1.EvaluationManagement.List:output_type -> qsai.workflow.v1.EvaluationCatalogPage
-	13,  // 175: qsai.workflow.v1.EvaluationManagement.Prepare:output_type -> qsai.workflow.v1.EvaluationPlan
-	28,  // 176: qsai.workflow.v1.EvaluationManagement.Create:output_type -> qsai.workflow.v1.EvaluationState
-	28,  // 177: qsai.workflow.v1.EvaluationManagement.Start:output_type -> qsai.workflow.v1.EvaluationState
-	28,  // 178: qsai.workflow.v1.EvaluationManagement.Cancel:output_type -> qsai.workflow.v1.EvaluationState
-	28,  // 179: qsai.workflow.v1.EvaluationManagement.Get:output_type -> qsai.workflow.v1.EvaluationState
-	27,  // 180: qsai.workflow.v1.EvaluationManagement.ListUnknownExecutions:output_type -> qsai.workflow.v1.EvaluationUnknownIndex
-	28,  // 181: qsai.workflow.v1.EvaluationManagement.ResolveUnknown:output_type -> qsai.workflow.v1.EvaluationState
-	28,  // 182: qsai.workflow.v1.EvaluationManagement.Review:output_type -> qsai.workflow.v1.EvaluationState
-	20,  // 183: qsai.workflow.v1.EvaluationManagement.ListCandidates:output_type -> qsai.workflow.v1.EvaluationCandidateIndex
-	22,  // 184: qsai.workflow.v1.EvaluationManagement.GetCandidate:output_type -> qsai.workflow.v1.EvaluationCandidateEvidence
-	10,  // 185: qsai.workflow.v1.EvaluationManagement.ListExecutions:output_type -> qsai.workflow.v1.EvaluationExecutionPage
-	11,  // 186: qsai.workflow.v1.EvaluationManagement.GetExecutionOutput:output_type -> qsai.workflow.v1.EvaluationExecutionOutput
-	18,  // 187: qsai.workflow.v1.EvaluationManagement.PreviewGates:output_type -> qsai.workflow.v1.EvaluationGatePreview
-	28,  // 188: qsai.workflow.v1.EvaluationManagement.Finalize:output_type -> qsai.workflow.v1.EvaluationState
-	28,  // 189: qsai.workflow.v1.EvaluationManagement.ReopenReview:output_type -> qsai.workflow.v1.EvaluationState
-	48,  // 190: qsai.workflow.v1.PublicationManagement.Publish:output_type -> qsai.workflow.v1.PublicationReceipt
-	48,  // 191: qsai.workflow.v1.PublicationManagement.Rollback:output_type -> qsai.workflow.v1.PublicationReceipt
-	48,  // 192: qsai.workflow.v1.PublicationManagement.Disable:output_type -> qsai.workflow.v1.PublicationReceipt
-	47,  // 193: qsai.workflow.v1.PublicationManagement.Get:output_type -> qsai.workflow.v1.PublicationState
-	48,  // 194: qsai.workflow.v1.PublicationManagement.GetReceipt:output_type -> qsai.workflow.v1.PublicationReceipt
-	46,  // 195: qsai.workflow.v1.PublicationManagement.ListHistory:output_type -> qsai.workflow.v1.PublicationHistoryPage
-	48,  // 196: qsai.workflow.v1.PublicationManagement.GetHistory:output_type -> qsai.workflow.v1.PublicationReceipt
-	57,  // 197: qsai.workflow.v1.PromptDraftManagement.Create:output_type -> qsai.workflow.v1.PromptDraftState
-	57,  // 198: qsai.workflow.v1.PromptDraftManagement.Revise:output_type -> qsai.workflow.v1.PromptDraftState
-	57,  // 199: qsai.workflow.v1.PromptDraftManagement.Get:output_type -> qsai.workflow.v1.PromptDraftState
-	58,  // 200: qsai.workflow.v1.PromptDraftManagement.GetLifecycle:output_type -> qsai.workflow.v1.PromptDraftLifecycle
-	57,  // 201: qsai.workflow.v1.PromptDraftManagement.GetReceipt:output_type -> qsai.workflow.v1.PromptDraftState
-	50,  // 202: qsai.workflow.v1.PromptDraftManagement.Freeze:output_type -> qsai.workflow.v1.PromptDraftFreezeReceipt
-	50,  // 203: qsai.workflow.v1.PromptDraftManagement.GetFreezeReceipt:output_type -> qsai.workflow.v1.PromptDraftFreezeReceipt
-	62,  // 204: qsai.workflow.v1.ProfileManagement.Register:output_type -> qsai.workflow.v1.ProfileRegistrationReceipt
-	62,  // 205: qsai.workflow.v1.ProfileManagement.GetReceipt:output_type -> qsai.workflow.v1.ProfileRegistrationReceipt
-	68,  // 206: qsai.workflow.v1.ProfileManagement.ListLifecycle:output_type -> qsai.workflow.v1.AssetCatalogResponse
-	68,  // 207: qsai.workflow.v1.ProfileManagement.GetLifecycle:output_type -> qsai.workflow.v1.AssetCatalogResponse
-	65,  // 208: qsai.workflow.v1.SuiteManagement.Register:output_type -> qsai.workflow.v1.SuiteRegistrationReceipt
-	65,  // 209: qsai.workflow.v1.SuiteManagement.GetReceipt:output_type -> qsai.workflow.v1.SuiteRegistrationReceipt
-	68,  // 210: qsai.workflow.v1.AssetCatalog.List:output_type -> qsai.workflow.v1.AssetCatalogResponse
-	68,  // 211: qsai.workflow.v1.AssetCatalog.Get:output_type -> qsai.workflow.v1.AssetCatalogResponse
-	78,  // 212: qsai.workflow.v1.ParticipantManagement.GetCapacity:output_type -> qsai.workflow.v1.ParticipantCapacitySnapshot
-	82,  // 213: qsai.workflow.v1.ParticipantManagement.GetExecution:output_type -> qsai.workflow.v1.ParticipantExecution
-	3,   // 214: qsai.workflow.v1.ParticipantManagement.Retry:output_type -> qsai.workflow.v1.Receipt
-	3,   // 215: qsai.workflow.v1.ParticipantManagement.GetRetryReceipt:output_type -> qsai.workflow.v1.Receipt
-	86,  // 216: qsai.workflow.v1.SolutionManagement.List:output_type -> qsai.workflow.v1.SolutionResponse
-	86,  // 217: qsai.workflow.v1.SolutionManagement.Get:output_type -> qsai.workflow.v1.SolutionResponse
-	86,  // 218: qsai.workflow.v1.SolutionManagement.GetReceipt:output_type -> qsai.workflow.v1.SolutionResponse
-	86,  // 219: qsai.workflow.v1.SolutionManagement.GetModels:output_type -> qsai.workflow.v1.SolutionResponse
-	86,  // 220: qsai.workflow.v1.SolutionManagement.Create:output_type -> qsai.workflow.v1.SolutionResponse
-	86,  // 221: qsai.workflow.v1.SolutionManagement.Save:output_type -> qsai.workflow.v1.SolutionResponse
-	86,  // 222: qsai.workflow.v1.SolutionManagement.Prepare:output_type -> qsai.workflow.v1.SolutionResponse
-	89,  // 223: qsai.workflow.v1.QuotaManagement.Get:output_type -> qsai.workflow.v1.QuotaResponse
-	89,  // 224: qsai.workflow.v1.QuotaManagement.History:output_type -> qsai.workflow.v1.QuotaResponse
-	89,  // 225: qsai.workflow.v1.QuotaManagement.GetReceipt:output_type -> qsai.workflow.v1.QuotaResponse
-	89,  // 226: qsai.workflow.v1.QuotaManagement.Update:output_type -> qsai.workflow.v1.QuotaResponse
-	89,  // 227: qsai.workflow.v1.QuotaManagement.Rollback:output_type -> qsai.workflow.v1.QuotaResponse
-	91,  // 228: qsai.workflow.v1.RuntimeManagement.Health:output_type -> qsai.workflow.v1.RuntimeResponse
-	91,  // 229: qsai.workflow.v1.RuntimeManagement.BatchGet:output_type -> qsai.workflow.v1.RuntimeResponse
-	91,  // 230: qsai.workflow.v1.RuntimeManagement.Get:output_type -> qsai.workflow.v1.RuntimeResponse
-	86,  // 231: qsai.workflow.v1.FlowManagement.GetSolution:output_type -> qsai.workflow.v1.SolutionResponse
-	86,  // 232: qsai.workflow.v1.FlowManagement.GetPublication:output_type -> qsai.workflow.v1.SolutionResponse
-	95,  // 233: qsai.workflow.v1.SemanticPromptDrafts.Create:output_type -> qsai.workflow.v1.SemanticDraftResponse
-	95,  // 234: qsai.workflow.v1.SemanticPromptDrafts.Get:output_type -> qsai.workflow.v1.SemanticDraftResponse
-	95,  // 235: qsai.workflow.v1.SemanticPromptDrafts.Revise:output_type -> qsai.workflow.v1.SemanticDraftResponse
-	95,  // 236: qsai.workflow.v1.SemanticPromptDrafts.Validate:output_type -> qsai.workflow.v1.SemanticDraftResponse
-	95,  // 237: qsai.workflow.v1.SemanticPromptDrafts.Freeze:output_type -> qsai.workflow.v1.SemanticDraftResponse
-	95,  // 238: qsai.workflow.v1.SemanticPromptDrafts.GetReceipt:output_type -> qsai.workflow.v1.SemanticDraftResponse
-	170, // [170:239] is the sub-list for method output_type
-	101, // [101:170] is the sub-list for method input_type
-	101, // [101:101] is the sub-list for extension type_name
-	101, // [101:101] is the sub-list for extension extendee
-	0,   // [0:101] is the sub-list for field type_name
+	36,  // 77: qsai.workflow.v1.PolicyReferencesQuery.scope:type_name -> qsai.workflow.v1.PublicationScope
+	33,  // 78: qsai.workflow.v1.PolicyReferencesQuery.reference:type_name -> qsai.workflow.v1.FrozenEvaluationRef
+	36,  // 79: qsai.workflow.v1.AssetCatalogQuery.scope:type_name -> qsai.workflow.v1.PublicationScope
+	36,  // 80: qsai.workflow.v1.AssetCatalogGetQuery.scope:type_name -> qsai.workflow.v1.PublicationScope
+	36,  // 81: qsai.workflow.v1.EvaluationCatalogQuery.scope:type_name -> qsai.workflow.v1.PublicationScope
+	72,  // 82: qsai.workflow.v1.EvaluationCatalogPage.items:type_name -> qsai.workflow.v1.EvaluationSummary
+	73,  // 83: qsai.workflow.v1.EvaluationCapacitySnapshot.reservations:type_name -> qsai.workflow.v1.EvaluationCapacityReservation
+	36,  // 84: qsai.workflow.v1.ParticipantCapacityQuery.scope:type_name -> qsai.workflow.v1.PublicationScope
+	76,  // 85: qsai.workflow.v1.ParticipantCapacitySnapshot.policy:type_name -> qsai.workflow.v1.ParticipantCapacityPolicy
+	77,  // 86: qsai.workflow.v1.ParticipantCapacitySnapshot.organization:type_name -> qsai.workflow.v1.ParticipantCapacityUsage
+	77,  // 87: qsai.workflow.v1.ParticipantCapacitySnapshot.subject:type_name -> qsai.workflow.v1.ParticipantCapacityUsage
+	77,  // 88: qsai.workflow.v1.ParticipantCapacitySnapshot.assessment:type_name -> qsai.workflow.v1.ParticipantCapacityUsage
+	78,  // 89: qsai.workflow.v1.ParticipantCapacitySnapshot.daily_reservations:type_name -> qsai.workflow.v1.ParticipantReservation
+	78,  // 90: qsai.workflow.v1.ParticipantCapacitySnapshot.active_reservations:type_name -> qsai.workflow.v1.ParticipantReservation
+	36,  // 91: qsai.workflow.v1.ParticipantExecutionQuery.scope:type_name -> qsai.workflow.v1.PublicationScope
+	36,  // 92: qsai.workflow.v1.ParticipantRetryReceiptQuery.scope:type_name -> qsai.workflow.v1.PublicationScope
+	36,  // 93: qsai.workflow.v1.ParticipantRetryCommand.scope:type_name -> qsai.workflow.v1.PublicationScope
+	36,  // 94: qsai.workflow.v1.ProfileLifecycleQuery.scope:type_name -> qsai.workflow.v1.PublicationScope
+	36,  // 95: qsai.workflow.v1.SolutionQuery.scope:type_name -> qsai.workflow.v1.PublicationScope
+	36,  // 96: qsai.workflow.v1.SolutionWrite.scope:type_name -> qsai.workflow.v1.PublicationScope
+	36,  // 97: qsai.workflow.v1.QuotaQuery.scope:type_name -> qsai.workflow.v1.PublicationScope
+	36,  // 98: qsai.workflow.v1.QuotaWrite.scope:type_name -> qsai.workflow.v1.PublicationScope
+	36,  // 99: qsai.workflow.v1.RuntimeQuery.scope:type_name -> qsai.workflow.v1.PublicationScope
+	36,  // 100: qsai.workflow.v1.FlowQuery.scope:type_name -> qsai.workflow.v1.PublicationScope
+	36,  // 101: qsai.workflow.v1.SemanticDraftWrite.scope:type_name -> qsai.workflow.v1.PublicationScope
+	36,  // 102: qsai.workflow.v1.SemanticDraftQuery.scope:type_name -> qsai.workflow.v1.PublicationScope
+	1,   // 103: qsai.workflow.v1.Commands.Start:input_type -> qsai.workflow.v1.StartCommand
+	2,   // 104: qsai.workflow.v1.Commands.Change:input_type -> qsai.workflow.v1.ChangeCommand
+	4,   // 105: qsai.workflow.v1.Results.Accept:input_type -> qsai.workflow.v1.StateEvent
+	36,  // 106: qsai.workflow.v1.EvaluationManagement.GetCapacity:input_type -> qsai.workflow.v1.PublicationScope
+	70,  // 107: qsai.workflow.v1.EvaluationManagement.List:input_type -> qsai.workflow.v1.EvaluationCatalogQuery
+	12,  // 108: qsai.workflow.v1.EvaluationManagement.Prepare:input_type -> qsai.workflow.v1.EvaluationPlanQuery
+	35,  // 109: qsai.workflow.v1.EvaluationManagement.Create:input_type -> qsai.workflow.v1.EvaluationCreateCommand
+	32,  // 110: qsai.workflow.v1.EvaluationManagement.Start:input_type -> qsai.workflow.v1.EvaluationStartCommand
+	15,  // 111: qsai.workflow.v1.EvaluationManagement.Cancel:input_type -> qsai.workflow.v1.EvaluationCancelCommand
+	23,  // 112: qsai.workflow.v1.EvaluationManagement.Get:input_type -> qsai.workflow.v1.EvaluationQuery
+	25,  // 113: qsai.workflow.v1.EvaluationManagement.ListUnknownExecutions:input_type -> qsai.workflow.v1.EvaluationUnknownQuery
+	24,  // 114: qsai.workflow.v1.EvaluationManagement.ResolveUnknown:input_type -> qsai.workflow.v1.UnknownResolutionCommand
+	31,  // 115: qsai.workflow.v1.EvaluationManagement.Review:input_type -> qsai.workflow.v1.EvaluationReviewCommand
+	23,  // 116: qsai.workflow.v1.EvaluationManagement.ListCandidates:input_type -> qsai.workflow.v1.EvaluationQuery
+	21,  // 117: qsai.workflow.v1.EvaluationManagement.GetCandidate:input_type -> qsai.workflow.v1.EvaluationCandidateQuery
+	8,   // 118: qsai.workflow.v1.EvaluationManagement.ListExecutions:input_type -> qsai.workflow.v1.EvaluationExecutionQuery
+	8,   // 119: qsai.workflow.v1.EvaluationManagement.GetExecutionOutput:input_type -> qsai.workflow.v1.EvaluationExecutionQuery
+	17,  // 120: qsai.workflow.v1.EvaluationManagement.PreviewGates:input_type -> qsai.workflow.v1.EvaluationGateQuery
+	16,  // 121: qsai.workflow.v1.EvaluationManagement.Finalize:input_type -> qsai.workflow.v1.EvaluationFinalizeCommand
+	14,  // 122: qsai.workflow.v1.EvaluationManagement.ReopenReview:input_type -> qsai.workflow.v1.EvaluationReopenCommand
+	39,  // 123: qsai.workflow.v1.PublicationManagement.Publish:input_type -> qsai.workflow.v1.PublicationPublishCommand
+	40,  // 124: qsai.workflow.v1.PublicationManagement.Rollback:input_type -> qsai.workflow.v1.PublicationRollbackCommand
+	41,  // 125: qsai.workflow.v1.PublicationManagement.Disable:input_type -> qsai.workflow.v1.PublicationDisableCommand
+	42,  // 126: qsai.workflow.v1.PublicationManagement.Get:input_type -> qsai.workflow.v1.PublicationQuery
+	43,  // 127: qsai.workflow.v1.PublicationManagement.GetReceipt:input_type -> qsai.workflow.v1.PublicationReceiptQuery
+	44,  // 128: qsai.workflow.v1.PublicationManagement.ListHistory:input_type -> qsai.workflow.v1.PublicationHistoryQuery
+	45,  // 129: qsai.workflow.v1.PublicationManagement.GetHistory:input_type -> qsai.workflow.v1.PublicationHistoryVersionQuery
+	53,  // 130: qsai.workflow.v1.PromptDraftManagement.Create:input_type -> qsai.workflow.v1.PromptDraftCreateCommand
+	54,  // 131: qsai.workflow.v1.PromptDraftManagement.Revise:input_type -> qsai.workflow.v1.PromptDraftReviseCommand
+	55,  // 132: qsai.workflow.v1.PromptDraftManagement.Get:input_type -> qsai.workflow.v1.PromptDraftQuery
+	55,  // 133: qsai.workflow.v1.PromptDraftManagement.GetLifecycle:input_type -> qsai.workflow.v1.PromptDraftQuery
+	56,  // 134: qsai.workflow.v1.PromptDraftManagement.GetReceipt:input_type -> qsai.workflow.v1.PromptDraftReceiptQuery
+	49,  // 135: qsai.workflow.v1.PromptDraftManagement.Freeze:input_type -> qsai.workflow.v1.PromptDraftFreezeCommand
+	56,  // 136: qsai.workflow.v1.PromptDraftManagement.GetFreezeReceipt:input_type -> qsai.workflow.v1.PromptDraftReceiptQuery
+	60,  // 137: qsai.workflow.v1.ProfileManagement.Register:input_type -> qsai.workflow.v1.ProfileRegisterCommand
+	61,  // 138: qsai.workflow.v1.ProfileManagement.GetReceipt:input_type -> qsai.workflow.v1.ProfileRegistrationQuery
+	84,  // 139: qsai.workflow.v1.ProfileManagement.ListLifecycle:input_type -> qsai.workflow.v1.ProfileLifecycleQuery
+	84,  // 140: qsai.workflow.v1.ProfileManagement.GetLifecycle:input_type -> qsai.workflow.v1.ProfileLifecycleQuery
+	63,  // 141: qsai.workflow.v1.SuiteManagement.Register:input_type -> qsai.workflow.v1.SuiteRegisterCommand
+	64,  // 142: qsai.workflow.v1.SuiteManagement.GetReceipt:input_type -> qsai.workflow.v1.SuiteRegistrationQuery
+	66,  // 143: qsai.workflow.v1.AssetCatalog.References:input_type -> qsai.workflow.v1.PolicyReferencesQuery
+	67,  // 144: qsai.workflow.v1.AssetCatalog.List:input_type -> qsai.workflow.v1.AssetCatalogQuery
+	68,  // 145: qsai.workflow.v1.AssetCatalog.Get:input_type -> qsai.workflow.v1.AssetCatalogGetQuery
+	75,  // 146: qsai.workflow.v1.ParticipantManagement.GetCapacity:input_type -> qsai.workflow.v1.ParticipantCapacityQuery
+	80,  // 147: qsai.workflow.v1.ParticipantManagement.GetExecution:input_type -> qsai.workflow.v1.ParticipantExecutionQuery
+	82,  // 148: qsai.workflow.v1.ParticipantManagement.Retry:input_type -> qsai.workflow.v1.ParticipantRetryCommand
+	81,  // 149: qsai.workflow.v1.ParticipantManagement.GetRetryReceipt:input_type -> qsai.workflow.v1.ParticipantRetryReceiptQuery
+	85,  // 150: qsai.workflow.v1.SolutionManagement.List:input_type -> qsai.workflow.v1.SolutionQuery
+	85,  // 151: qsai.workflow.v1.SolutionManagement.Get:input_type -> qsai.workflow.v1.SolutionQuery
+	85,  // 152: qsai.workflow.v1.SolutionManagement.GetReceipt:input_type -> qsai.workflow.v1.SolutionQuery
+	85,  // 153: qsai.workflow.v1.SolutionManagement.GetModels:input_type -> qsai.workflow.v1.SolutionQuery
+	86,  // 154: qsai.workflow.v1.SolutionManagement.Create:input_type -> qsai.workflow.v1.SolutionWrite
+	86,  // 155: qsai.workflow.v1.SolutionManagement.Save:input_type -> qsai.workflow.v1.SolutionWrite
+	86,  // 156: qsai.workflow.v1.SolutionManagement.Prepare:input_type -> qsai.workflow.v1.SolutionWrite
+	88,  // 157: qsai.workflow.v1.QuotaManagement.Status:input_type -> qsai.workflow.v1.QuotaQuery
+	88,  // 158: qsai.workflow.v1.QuotaManagement.Get:input_type -> qsai.workflow.v1.QuotaQuery
+	88,  // 159: qsai.workflow.v1.QuotaManagement.History:input_type -> qsai.workflow.v1.QuotaQuery
+	88,  // 160: qsai.workflow.v1.QuotaManagement.GetReceipt:input_type -> qsai.workflow.v1.QuotaQuery
+	89,  // 161: qsai.workflow.v1.QuotaManagement.Update:input_type -> qsai.workflow.v1.QuotaWrite
+	89,  // 162: qsai.workflow.v1.QuotaManagement.Rollback:input_type -> qsai.workflow.v1.QuotaWrite
+	91,  // 163: qsai.workflow.v1.RuntimeManagement.Health:input_type -> qsai.workflow.v1.RuntimeQuery
+	91,  // 164: qsai.workflow.v1.RuntimeManagement.BatchGet:input_type -> qsai.workflow.v1.RuntimeQuery
+	91,  // 165: qsai.workflow.v1.RuntimeManagement.Get:input_type -> qsai.workflow.v1.RuntimeQuery
+	93,  // 166: qsai.workflow.v1.FlowManagement.GetSolution:input_type -> qsai.workflow.v1.FlowQuery
+	93,  // 167: qsai.workflow.v1.FlowManagement.GetPublication:input_type -> qsai.workflow.v1.FlowQuery
+	94,  // 168: qsai.workflow.v1.SemanticPromptDrafts.Create:input_type -> qsai.workflow.v1.SemanticDraftWrite
+	95,  // 169: qsai.workflow.v1.SemanticPromptDrafts.Get:input_type -> qsai.workflow.v1.SemanticDraftQuery
+	94,  // 170: qsai.workflow.v1.SemanticPromptDrafts.Revise:input_type -> qsai.workflow.v1.SemanticDraftWrite
+	95,  // 171: qsai.workflow.v1.SemanticPromptDrafts.Validate:input_type -> qsai.workflow.v1.SemanticDraftQuery
+	94,  // 172: qsai.workflow.v1.SemanticPromptDrafts.Freeze:input_type -> qsai.workflow.v1.SemanticDraftWrite
+	95,  // 173: qsai.workflow.v1.SemanticPromptDrafts.GetReceipt:input_type -> qsai.workflow.v1.SemanticDraftQuery
+	3,   // 174: qsai.workflow.v1.Commands.Start:output_type -> qsai.workflow.v1.Receipt
+	3,   // 175: qsai.workflow.v1.Commands.Change:output_type -> qsai.workflow.v1.Receipt
+	5,   // 176: qsai.workflow.v1.Results.Accept:output_type -> qsai.workflow.v1.Acknowledgement
+	74,  // 177: qsai.workflow.v1.EvaluationManagement.GetCapacity:output_type -> qsai.workflow.v1.EvaluationCapacitySnapshot
+	71,  // 178: qsai.workflow.v1.EvaluationManagement.List:output_type -> qsai.workflow.v1.EvaluationCatalogPage
+	13,  // 179: qsai.workflow.v1.EvaluationManagement.Prepare:output_type -> qsai.workflow.v1.EvaluationPlan
+	28,  // 180: qsai.workflow.v1.EvaluationManagement.Create:output_type -> qsai.workflow.v1.EvaluationState
+	28,  // 181: qsai.workflow.v1.EvaluationManagement.Start:output_type -> qsai.workflow.v1.EvaluationState
+	28,  // 182: qsai.workflow.v1.EvaluationManagement.Cancel:output_type -> qsai.workflow.v1.EvaluationState
+	28,  // 183: qsai.workflow.v1.EvaluationManagement.Get:output_type -> qsai.workflow.v1.EvaluationState
+	27,  // 184: qsai.workflow.v1.EvaluationManagement.ListUnknownExecutions:output_type -> qsai.workflow.v1.EvaluationUnknownIndex
+	28,  // 185: qsai.workflow.v1.EvaluationManagement.ResolveUnknown:output_type -> qsai.workflow.v1.EvaluationState
+	28,  // 186: qsai.workflow.v1.EvaluationManagement.Review:output_type -> qsai.workflow.v1.EvaluationState
+	20,  // 187: qsai.workflow.v1.EvaluationManagement.ListCandidates:output_type -> qsai.workflow.v1.EvaluationCandidateIndex
+	22,  // 188: qsai.workflow.v1.EvaluationManagement.GetCandidate:output_type -> qsai.workflow.v1.EvaluationCandidateEvidence
+	10,  // 189: qsai.workflow.v1.EvaluationManagement.ListExecutions:output_type -> qsai.workflow.v1.EvaluationExecutionPage
+	11,  // 190: qsai.workflow.v1.EvaluationManagement.GetExecutionOutput:output_type -> qsai.workflow.v1.EvaluationExecutionOutput
+	18,  // 191: qsai.workflow.v1.EvaluationManagement.PreviewGates:output_type -> qsai.workflow.v1.EvaluationGatePreview
+	28,  // 192: qsai.workflow.v1.EvaluationManagement.Finalize:output_type -> qsai.workflow.v1.EvaluationState
+	28,  // 193: qsai.workflow.v1.EvaluationManagement.ReopenReview:output_type -> qsai.workflow.v1.EvaluationState
+	48,  // 194: qsai.workflow.v1.PublicationManagement.Publish:output_type -> qsai.workflow.v1.PublicationReceipt
+	48,  // 195: qsai.workflow.v1.PublicationManagement.Rollback:output_type -> qsai.workflow.v1.PublicationReceipt
+	48,  // 196: qsai.workflow.v1.PublicationManagement.Disable:output_type -> qsai.workflow.v1.PublicationReceipt
+	47,  // 197: qsai.workflow.v1.PublicationManagement.Get:output_type -> qsai.workflow.v1.PublicationState
+	48,  // 198: qsai.workflow.v1.PublicationManagement.GetReceipt:output_type -> qsai.workflow.v1.PublicationReceipt
+	46,  // 199: qsai.workflow.v1.PublicationManagement.ListHistory:output_type -> qsai.workflow.v1.PublicationHistoryPage
+	48,  // 200: qsai.workflow.v1.PublicationManagement.GetHistory:output_type -> qsai.workflow.v1.PublicationReceipt
+	57,  // 201: qsai.workflow.v1.PromptDraftManagement.Create:output_type -> qsai.workflow.v1.PromptDraftState
+	57,  // 202: qsai.workflow.v1.PromptDraftManagement.Revise:output_type -> qsai.workflow.v1.PromptDraftState
+	57,  // 203: qsai.workflow.v1.PromptDraftManagement.Get:output_type -> qsai.workflow.v1.PromptDraftState
+	58,  // 204: qsai.workflow.v1.PromptDraftManagement.GetLifecycle:output_type -> qsai.workflow.v1.PromptDraftLifecycle
+	57,  // 205: qsai.workflow.v1.PromptDraftManagement.GetReceipt:output_type -> qsai.workflow.v1.PromptDraftState
+	50,  // 206: qsai.workflow.v1.PromptDraftManagement.Freeze:output_type -> qsai.workflow.v1.PromptDraftFreezeReceipt
+	50,  // 207: qsai.workflow.v1.PromptDraftManagement.GetFreezeReceipt:output_type -> qsai.workflow.v1.PromptDraftFreezeReceipt
+	62,  // 208: qsai.workflow.v1.ProfileManagement.Register:output_type -> qsai.workflow.v1.ProfileRegistrationReceipt
+	62,  // 209: qsai.workflow.v1.ProfileManagement.GetReceipt:output_type -> qsai.workflow.v1.ProfileRegistrationReceipt
+	69,  // 210: qsai.workflow.v1.ProfileManagement.ListLifecycle:output_type -> qsai.workflow.v1.AssetCatalogResponse
+	69,  // 211: qsai.workflow.v1.ProfileManagement.GetLifecycle:output_type -> qsai.workflow.v1.AssetCatalogResponse
+	65,  // 212: qsai.workflow.v1.SuiteManagement.Register:output_type -> qsai.workflow.v1.SuiteRegistrationReceipt
+	65,  // 213: qsai.workflow.v1.SuiteManagement.GetReceipt:output_type -> qsai.workflow.v1.SuiteRegistrationReceipt
+	69,  // 214: qsai.workflow.v1.AssetCatalog.References:output_type -> qsai.workflow.v1.AssetCatalogResponse
+	69,  // 215: qsai.workflow.v1.AssetCatalog.List:output_type -> qsai.workflow.v1.AssetCatalogResponse
+	69,  // 216: qsai.workflow.v1.AssetCatalog.Get:output_type -> qsai.workflow.v1.AssetCatalogResponse
+	79,  // 217: qsai.workflow.v1.ParticipantManagement.GetCapacity:output_type -> qsai.workflow.v1.ParticipantCapacitySnapshot
+	83,  // 218: qsai.workflow.v1.ParticipantManagement.GetExecution:output_type -> qsai.workflow.v1.ParticipantExecution
+	3,   // 219: qsai.workflow.v1.ParticipantManagement.Retry:output_type -> qsai.workflow.v1.Receipt
+	3,   // 220: qsai.workflow.v1.ParticipantManagement.GetRetryReceipt:output_type -> qsai.workflow.v1.Receipt
+	87,  // 221: qsai.workflow.v1.SolutionManagement.List:output_type -> qsai.workflow.v1.SolutionResponse
+	87,  // 222: qsai.workflow.v1.SolutionManagement.Get:output_type -> qsai.workflow.v1.SolutionResponse
+	87,  // 223: qsai.workflow.v1.SolutionManagement.GetReceipt:output_type -> qsai.workflow.v1.SolutionResponse
+	87,  // 224: qsai.workflow.v1.SolutionManagement.GetModels:output_type -> qsai.workflow.v1.SolutionResponse
+	87,  // 225: qsai.workflow.v1.SolutionManagement.Create:output_type -> qsai.workflow.v1.SolutionResponse
+	87,  // 226: qsai.workflow.v1.SolutionManagement.Save:output_type -> qsai.workflow.v1.SolutionResponse
+	87,  // 227: qsai.workflow.v1.SolutionManagement.Prepare:output_type -> qsai.workflow.v1.SolutionResponse
+	90,  // 228: qsai.workflow.v1.QuotaManagement.Status:output_type -> qsai.workflow.v1.QuotaResponse
+	90,  // 229: qsai.workflow.v1.QuotaManagement.Get:output_type -> qsai.workflow.v1.QuotaResponse
+	90,  // 230: qsai.workflow.v1.QuotaManagement.History:output_type -> qsai.workflow.v1.QuotaResponse
+	90,  // 231: qsai.workflow.v1.QuotaManagement.GetReceipt:output_type -> qsai.workflow.v1.QuotaResponse
+	90,  // 232: qsai.workflow.v1.QuotaManagement.Update:output_type -> qsai.workflow.v1.QuotaResponse
+	90,  // 233: qsai.workflow.v1.QuotaManagement.Rollback:output_type -> qsai.workflow.v1.QuotaResponse
+	92,  // 234: qsai.workflow.v1.RuntimeManagement.Health:output_type -> qsai.workflow.v1.RuntimeResponse
+	92,  // 235: qsai.workflow.v1.RuntimeManagement.BatchGet:output_type -> qsai.workflow.v1.RuntimeResponse
+	92,  // 236: qsai.workflow.v1.RuntimeManagement.Get:output_type -> qsai.workflow.v1.RuntimeResponse
+	87,  // 237: qsai.workflow.v1.FlowManagement.GetSolution:output_type -> qsai.workflow.v1.SolutionResponse
+	87,  // 238: qsai.workflow.v1.FlowManagement.GetPublication:output_type -> qsai.workflow.v1.SolutionResponse
+	96,  // 239: qsai.workflow.v1.SemanticPromptDrafts.Create:output_type -> qsai.workflow.v1.SemanticDraftResponse
+	96,  // 240: qsai.workflow.v1.SemanticPromptDrafts.Get:output_type -> qsai.workflow.v1.SemanticDraftResponse
+	96,  // 241: qsai.workflow.v1.SemanticPromptDrafts.Revise:output_type -> qsai.workflow.v1.SemanticDraftResponse
+	96,  // 242: qsai.workflow.v1.SemanticPromptDrafts.Validate:output_type -> qsai.workflow.v1.SemanticDraftResponse
+	96,  // 243: qsai.workflow.v1.SemanticPromptDrafts.Freeze:output_type -> qsai.workflow.v1.SemanticDraftResponse
+	96,  // 244: qsai.workflow.v1.SemanticPromptDrafts.GetReceipt:output_type -> qsai.workflow.v1.SemanticDraftResponse
+	174, // [174:245] is the sub-list for method output_type
+	103, // [103:174] is the sub-list for method input_type
+	103, // [103:103] is the sub-list for extension type_name
+	103, // [103:103] is the sub-list for extension extendee
+	0,   // [0:103] is the sub-list for field type_name
 }
 
 func init() { file_aiworkflow_workflow_proto_init() }
@@ -8382,7 +8484,7 @@ func file_aiworkflow_workflow_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_aiworkflow_workflow_proto_rawDesc), len(file_aiworkflow_workflow_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   96,
+			NumMessages:   97,
 			NumExtensions: 0,
 			NumServices:   14,
 		},

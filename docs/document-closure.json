@@ -2,7 +2,7 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "eccaf4d15af4bfe2603ad1941ef377ba566136c8",
+    "sha": "1cf9f41ea5a4dac5cd8efa23e7a38dbe76c611a3",
     "verified_on": "2026-09-20"
   },
   "status_policy": {
@@ -127,7 +127,7 @@
       "source": "api/grpc/proto",
       "proto_file_count": 8,
       "service_count": 27,
-      "rpc_count": 123,
+      "rpc_count": 125,
       "services": {
         "actor.ActorService": [
           "CreateTestee",
@@ -206,6 +206,7 @@
           "ListMyReports"
         ],
         "qsai.workflow.v1.AssetCatalog": [
+          "References",
           "List",
           "Get"
         ],
@@ -267,6 +268,7 @@
           "GetHistory"
         ],
         "qsai.workflow.v1.QuotaManagement": [
+          "Status",
           "Get",
           "History",
           "GetReceipt",
