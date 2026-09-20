@@ -2,7 +2,7 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "96861cb56139968fcaefd407f8ff92025f3c7390",
+    "sha": "eccaf4d15af4bfe2603ad1941ef377ba566136c8",
     "verified_on": "2026-09-20"
   },
   "status_policy": {
@@ -126,8 +126,8 @@
     "grpc": {
       "source": "api/grpc/proto",
       "proto_file_count": 8,
-      "service_count": 26,
-      "rpc_count": 123,
+      "service_count": 27,
+      "rpc_count": 125,
       "services": {
         "actor.ActorService": [
           "CreateTestee",
@@ -233,6 +233,10 @@
           "Finalize",
           "ReopenReview"
         ],
+        "qsai.workflow.v1.FlowManagement": [
+          "GetSolution",
+          "GetPublication"
+        ],
         "qsai.workflow.v1.ParticipantManagement": [
           "GetCapacity",
           "GetExecution",
@@ -263,14 +267,6 @@
           "ListHistory",
           "GetHistory"
         ],
-        "qsai.workflow.v1.SemanticPromptDrafts": [
-          "Create",
-          "Get",
-          "Revise",
-          "Validate",
-          "Freeze",
-          "GetReceipt"
-        ],
         "qsai.workflow.v1.QuotaManagement": [
           "Status",
           "Get",
@@ -281,6 +277,19 @@
         ],
         "qsai.workflow.v1.Results": [
           "Accept"
+        ],
+        "qsai.workflow.v1.RuntimeManagement": [
+          "Health",
+          "BatchGet",
+          "Get"
+        ],
+        "qsai.workflow.v1.SemanticPromptDrafts": [
+          "Create",
+          "Get",
+          "Revise",
+          "Validate",
+          "Freeze",
+          "GetReceipt"
         ],
         "qsai.workflow.v1.SolutionManagement": [
           "List",
@@ -298,11 +307,6 @@
         "questionnaire.QuestionnaireService": [
           "GetQuestionnaire",
           "ListQuestionnaires"
-        ],
-        "qsai.workflow.v1.RuntimeManagement": [
-          "Health",
-          "BatchGet",
-          "Get"
         ]
       }
     }
