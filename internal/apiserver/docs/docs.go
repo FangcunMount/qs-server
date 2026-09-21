@@ -12889,6 +12889,35 @@ const docTemplate = `{
                 }
             }
         },
+        "aibridge.EvaluationCancelRequest": {
+            "type": "object",
+            "properties": {
+                "actor": {
+                    "type": "string"
+                },
+                "reason": {
+                    "type": "string"
+                },
+                "requested_at": {
+                    "type": "string"
+                },
+                "run_id": {
+                    "type": "string"
+                },
+                "schema_version": {
+                    "type": "string"
+                },
+                "source_version": {
+                    "type": "integer"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "version": {
+                    "type": "integer"
+                }
+            }
+        },
         "aibridge.EvaluationCancellationReceipt": {
             "type": "object",
             "properties": {
@@ -13272,8 +13301,17 @@ const docTemplate = `{
         "aibridge.EvaluationState": {
             "type": "object",
             "properties": {
+                "active_call_count": {
+                    "type": "integer"
+                },
                 "can_reopen_review": {
                     "type": "boolean"
+                },
+                "cancel_draining": {
+                    "type": "boolean"
+                },
+                "cancel_request": {
+                    "$ref": "#/definitions/aibridge.EvaluationCancelRequest"
                 },
                 "cancellation": {
                     "$ref": "#/definitions/aibridge.EvaluationCancellationReceipt"
@@ -13281,8 +13319,14 @@ const docTemplate = `{
                 "creation": {
                     "$ref": "#/definitions/aibridge.EvaluationCreationReceipt"
                 },
+                "execution_mode": {
+                    "type": "string"
+                },
                 "finalization": {
                     "type": "object"
+                },
+                "parallel_call_limit": {
+                    "type": "integer"
                 },
                 "resolutions": {
                     "type": "array",
@@ -14205,6 +14249,9 @@ const docTemplate = `{
         "aibridge.RegisterSuite": {
             "type": "object",
             "properties": {
+                "case_edits_json": {
+                    "type": "string"
+                },
                 "command_id": {
                     "type": "string"
                 },
@@ -14219,6 +14266,12 @@ const docTemplate = `{
                 },
                 "reason": {
                     "type": "string"
+                },
+                "semantic_owner_organization_id": {
+                    "type": "integer"
+                },
+                "semantic_prompt": {
+                    "$ref": "#/definitions/aibridge.FrozenEvaluationRef"
                 },
                 "source": {
                     "$ref": "#/definitions/aibridge.FrozenEvaluationRef"

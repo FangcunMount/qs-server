@@ -65,10 +65,43 @@ func (c *EvaluationClient) CancelEvaluation(ctx context.Context, scope app.Evalu
 	if err != nil {
 		return app.EvaluationState{}, err
 	}
+	if request := result.CancelRequest; request != nil {
+		if command.Discard == nil || *command.Discard || request.SourceVersion != command.ExpectedVersion || request.Actor != fmt.Sprintf("user:%d", scope.OperatorUserID) || request.Reason != command.Reason {
+			return app.EvaluationState{}, app.ErrConflict
+		}
+		return result, nil
+	}
 	receipt := result.Cancellation
 	if receipt == nil || command.Discard == nil || receipt.SourceVersion != command.ExpectedVersion ||
 		receipt.Actor != fmt.Sprintf("user:%d", scope.OperatorUserID) || receipt.Reason != command.Reason || *receipt.Discard != *command.Discard {
 		return app.EvaluationState{}, app.ErrConflict
 	}
 	return result, nil
+}
+
+func evaluationCancelRequest(response *pb.EvaluationState, creation *app.EvaluationCreationReceipt) (*app.EvaluationCancelRequest, error) {
+	raw := response.CancelRequestJson
+	if raw == "" {
+		if response.CancelDraining {
+			return nil, app.ErrConflict
+		}
+		return nil, nil
+	}
+	var r app.EvaluationCancelRequest
+	if len(raw) > 8192 || !utf8.ValidString(raw) || json.Unmarshal([]byte(raw), &r) != nil || creation == nil ||
+		r.SchemaVersion != "qs-ai-evaluation-cancel-request/v1" || r.RunID != response.RunId || r.SourceVersion < 1 ||
+		r.Version != r.SourceVersion+1 || r.Version > response.Version || r.Status != "cancel_requested" ||
+		r.Reason != strings.TrimSpace(r.Reason) || r.Reason == "" || len(r.Reason) > 1000 || strings.ContainsAny(r.Reason, "<>") {
+		return nil, app.ErrConflict
+	}
+	actor, err := strconv.ParseInt(strings.TrimPrefix(r.Actor, "user:"), 10, 64)
+	if err != nil || actor < 1 || r.Actor != fmt.Sprintf("user:%d", actor) {
+		return nil, app.ErrConflict
+	}
+	at, err := time.Parse(time.RFC3339Nano, r.RequestedAt)
+	created, createErr := time.Parse(time.RFC3339Nano, creation.CreatedAt)
+	if err != nil || createErr != nil || at.Before(created) || response.CancelDraining != (response.Status != "canceled") {
+		return nil, app.ErrConflict
+	}
+	return &r, nil
 }

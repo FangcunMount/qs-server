@@ -23,6 +23,9 @@ func state(response *pb.EvaluationState, scope app.EvaluationScope) (app.Evaluat
 	if response == nil || response.RunId != scope.RunID || response.Version < 1 || response.UnresolvedResultUnknownCount < 0 || !json.Valid([]byte(response.ResolutionsJson)) {
 		return app.EvaluationState{}, app.ErrConflict
 	}
+	if response.ExecutionMode != "" && ((response.ExecutionMode != "serial_v1" && response.ExecutionMode != "candidate_v2") || response.ActiveCallCount < 0 || response.ParallelCallLimit < 1 || response.ParallelCallLimit > 32) {
+		return app.EvaluationState{}, app.ErrConflict
+	}
 	reviews := response.ReviewsJson
 	var history []json.RawMessage
 	if json.Unmarshal([]byte(reviews), &history) != nil || history == nil || len(history) > 70 {
@@ -65,7 +68,13 @@ func state(response *pb.EvaluationState, scope app.EvaluationScope) (app.Evaluat
 			}
 		}
 	}
+	request, err := evaluationCancelRequest(response, creation)
+	if err != nil {
+		return app.EvaluationState{}, err
+	}
 	return app.EvaluationState{RunID: response.RunId, Version: response.Version, Status: response.Status,
+		ExecutionMode: response.ExecutionMode, ActiveCallCount: response.ActiveCallCount,
+		ParallelCallLimit: response.ParallelCallLimit, CancelDraining: response.CancelDraining, CancelRequest: request,
 		UnresolvedResultUnknownCount: response.UnresolvedResultUnknownCount, Resolutions: json.RawMessage(response.ResolutionsJson), Reviews: json.RawMessage(reviews), Finalization: final, ReviewReopenings: reopenings, CanReopenReview: response.CanReopenReview, Creation: creation, Cancellation: cancellation}, nil
 }
 func (c *EvaluationClient) GetEvaluation(ctx context.Context, scope app.EvaluationScope) (app.EvaluationState, error) {

@@ -120,3 +120,25 @@ func TestCancellationReadPreservesOriginalActorAndChecksSourceBindings(t *testin
 		t.Fatal("older cancellation compatibility lost", err)
 	}
 }
+
+func TestCancellationDrainRequestSurvivesLaterProjectionVersions(t *testing.T) {
+	response := creationState(creationFixture())
+	response.Version, response.Status, response.CancelDraining = 12, "collecting", true
+	response.ExecutionMode, response.ActiveCallCount, response.ParallelCallLimit = "candidate_v2", 2, 3
+	request := app.EvaluationCancelRequest{SchemaVersion: "qs-ai-evaluation-cancel-request/v1", RunID: response.RunId,
+		SourceVersion: 7, Version: 8, Status: "cancel_requested", Actor: "user:42", Reason: "停止后续工作", RequestedAt: "2026-09-13T02:00:00Z"}
+	raw, _ := json.Marshal(request)
+	response.CancelRequestJson = string(raw)
+	rpc := &evaluationRPCStub{t: t, cancelState: response}
+	client := &EvaluationClient{RPC: rpc}
+	discard := false
+	result, err := client.CancelEvaluation(context.Background(), app.EvaluationScope{RunID: response.RunId, OrganizationID: 7, OperatorUserID: 42},
+		app.EvaluationCancel{ExpectedVersion: 7, Reason: request.Reason, Confirm: true, Discard: &discard})
+	if err != nil || result.CancelRequest == nil || result.Cancellation != nil || !result.CancelDraining || result.ActiveCallCount != 2 {
+		t.Fatal(result, err)
+	}
+	response.CancelDraining = false
+	if _, err := state(response, app.EvaluationScope{RunID: response.RunId}); !errors.Is(err, app.ErrConflict) {
+		t.Fatal("inconsistent drain accepted", err)
+	}
+}
