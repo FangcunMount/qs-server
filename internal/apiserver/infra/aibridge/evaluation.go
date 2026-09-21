@@ -65,7 +65,13 @@ func state(response *pb.EvaluationState, scope app.EvaluationScope) (app.Evaluat
 			}
 		}
 	}
+	request, err := evaluationCancelRequest(response, creation)
+	if err != nil {
+		return app.EvaluationState{}, err
+	}
 	return app.EvaluationState{RunID: response.RunId, Version: response.Version, Status: response.Status,
+		ExecutionMode: response.ExecutionMode, ActiveCallCount: response.ActiveCallCount,
+		ParallelCallLimit: response.ParallelCallLimit, CancelDraining: response.CancelDraining, CancelRequest: request,
 		UnresolvedResultUnknownCount: response.UnresolvedResultUnknownCount, Resolutions: json.RawMessage(response.ResolutionsJson), Reviews: json.RawMessage(reviews), Finalization: final, ReviewReopenings: reopenings, CanReopenReview: response.CanReopenReview, Creation: creation, Cancellation: cancellation}, nil
 }
 func (c *EvaluationClient) GetEvaluation(ctx context.Context, scope app.EvaluationScope) (app.EvaluationState, error) {

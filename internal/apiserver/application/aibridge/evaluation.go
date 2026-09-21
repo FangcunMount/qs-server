@@ -31,7 +31,22 @@ type UnknownResolution struct {
 	Confirm                              bool   `json:"confirm"`
 	AcknowledgedDuplicateCallAndCostRisk bool   `json:"acknowledged_duplicate_call_and_cost_risk"`
 }
+type EvaluationCancelRequest struct {
+	SchemaVersion string `json:"schema_version"`
+	RunID         string `json:"run_id"`
+	SourceVersion int64  `json:"source_version"`
+	Version       int64  `json:"version"`
+	Status        string `json:"status"`
+	Actor         string `json:"actor"`
+	Reason        string `json:"reason"`
+	RequestedAt   string `json:"requested_at"`
+}
 type EvaluationState struct {
+	ExecutionMode                string                         `json:"execution_mode,omitempty"`
+	ActiveCallCount              int32                          `json:"active_call_count"`
+	ParallelCallLimit            int32                          `json:"parallel_call_limit"`
+	CancelDraining               bool                           `json:"cancel_draining"`
+	CancelRequest                *EvaluationCancelRequest       `json:"cancel_request,omitempty"`
 	RunID                        string                         `json:"run_id"`
 	Version                      int64                          `json:"version"`
 	Status                       string                         `json:"status"`

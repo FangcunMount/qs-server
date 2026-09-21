@@ -238,6 +238,11 @@ message EvaluationState {
  // Not authorization: ReopenReview rechecks scope, CAS and domain policy.
  // Absent on older servers; false is an explicit ineligible result.
  optional bool can_reopen_review = 11;
+ string execution_mode = 12;
+ int32 active_call_count = 13;
+ int32 parallel_call_limit = 14;
+ bool cancel_draining = 15;
+ string cancel_request_json = 16;
 }
 
 message SemanticContradictionReview {

@@ -2202,9 +2202,14 @@ type EvaluationState struct {
 	// Qualification at this Run version, computed from the original evidence.
 	// Not authorization: ReopenReview rechecks scope, CAS and domain policy.
 	// Absent on older servers; false is an explicit ineligible result.
-	CanReopenReview *bool `protobuf:"varint,11,opt,name=can_reopen_review,json=canReopenReview,proto3,oneof" json:"can_reopen_review,omitempty"`
-	unknownFields   protoimpl.UnknownFields
-	sizeCache       protoimpl.SizeCache
+	CanReopenReview   *bool  `protobuf:"varint,11,opt,name=can_reopen_review,json=canReopenReview,proto3,oneof" json:"can_reopen_review,omitempty"`
+	ExecutionMode     string `protobuf:"bytes,12,opt,name=execution_mode,json=executionMode,proto3" json:"execution_mode,omitempty"`
+	ActiveCallCount   int32  `protobuf:"varint,13,opt,name=active_call_count,json=activeCallCount,proto3" json:"active_call_count,omitempty"`
+	ParallelCallLimit int32  `protobuf:"varint,14,opt,name=parallel_call_limit,json=parallelCallLimit,proto3" json:"parallel_call_limit,omitempty"`
+	CancelDraining    bool   `protobuf:"varint,15,opt,name=cancel_draining,json=cancelDraining,proto3" json:"cancel_draining,omitempty"`
+	CancelRequestJson string `protobuf:"bytes,16,opt,name=cancel_request_json,json=cancelRequestJson,proto3" json:"cancel_request_json,omitempty"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
 }
 
 func (x *EvaluationState) Reset() {
@@ -2312,6 +2317,41 @@ func (x *EvaluationState) GetCanReopenReview() bool {
 		return *x.CanReopenReview
 	}
 	return false
+}
+
+func (x *EvaluationState) GetExecutionMode() string {
+	if x != nil {
+		return x.ExecutionMode
+	}
+	return ""
+}
+
+func (x *EvaluationState) GetActiveCallCount() int32 {
+	if x != nil {
+		return x.ActiveCallCount
+	}
+	return 0
+}
+
+func (x *EvaluationState) GetParallelCallLimit() int32 {
+	if x != nil {
+		return x.ParallelCallLimit
+	}
+	return 0
+}
+
+func (x *EvaluationState) GetCancelDraining() bool {
+	if x != nil {
+		return x.CancelDraining
+	}
+	return false
+}
+
+func (x *EvaluationState) GetCancelRequestJson() string {
+	if x != nil {
+		return x.CancelRequestJson
+	}
+	return ""
 }
 
 type SemanticContradictionReview struct {
@@ -7535,7 +7575,7 @@ const file_aiworkflow_workflow_proto_rawDesc = "" +
 	"canResolve\x12L\n" +
 	"\n" +
 	"executions\x18\a \x03(\v2,.qsai.workflow.v1.EvaluationUnknownExecutionR\n" +
-	"executions\"\xde\x03\n" +
+	"executions\"\xba\x05\n" +
 	"\x0fEvaluationState\x12\x15\n" +
 	"\x06run_id\x18\x01 \x01(\tR\x05runId\x12\x18\n" +
 	"\aversion\x18\x02 \x01(\x03R\aversion\x12\x16\n" +
@@ -7548,7 +7588,12 @@ const file_aiworkflow_workflow_proto_rawDesc = "" +
 	"\rcreation_json\x18\t \x01(\tR\fcreationJson\x12+\n" +
 	"\x11cancellation_json\x18\n" +
 	" \x01(\tR\x10cancellationJson\x12/\n" +
-	"\x11can_reopen_review\x18\v \x01(\bH\x00R\x0fcanReopenReview\x88\x01\x01B\x14\n" +
+	"\x11can_reopen_review\x18\v \x01(\bH\x00R\x0fcanReopenReview\x88\x01\x01\x12%\n" +
+	"\x0eexecution_mode\x18\f \x01(\tR\rexecutionMode\x12*\n" +
+	"\x11active_call_count\x18\r \x01(\x05R\x0factiveCallCount\x12.\n" +
+	"\x13parallel_call_limit\x18\x0e \x01(\x05R\x11parallelCallLimit\x12'\n" +
+	"\x0fcancel_draining\x18\x0f \x01(\bR\x0ecancelDraining\x12.\n" +
+	"\x13cancel_request_json\x18\x10 \x01(\tR\x11cancelRequestJsonB\x14\n" +
 	"\x12_can_reopen_review\"\xb1\x02\n" +
 	"\x1bSemanticContradictionReview\x12%\n" +
 	"\x0epolicy_version\x18\x01 \x01(\tR\rpolicyVersion\x12!\n" +
