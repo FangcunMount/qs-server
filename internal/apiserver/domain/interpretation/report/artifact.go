@@ -88,6 +88,9 @@ func RestoreInterpretReport(input InterpretReportInput) (*InterpretReport, error
 }
 
 func validateInterpretReportInput(input InterpretReportInput) error {
+	if err := ValidateMBTIPoleFacts(input.Content); err != nil {
+		return err
+	}
 	if input.ID.IsZero() || input.GenerationID.IsZero() || input.OutcomeID.IsZero() || input.InterpretationRunID.IsZero() {
 		return fmt.Errorf("report, generation, outcome and interpretation run ids are required")
 	}
@@ -185,6 +188,7 @@ func cloneDimensions(items []DimensionInterpret) []DimensionInterpret {
 	cloned := make([]DimensionInterpret, len(items))
 	for i, item := range items {
 		cloned[i] = item
+		cloned[i].poleFacts = clonePoleFacts(item.poleFacts)
 		if item.maxScore != nil {
 			max := *item.maxScore
 			cloned[i].maxScore = &max

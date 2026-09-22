@@ -11,6 +11,7 @@ import (
 const CurrentReportInputSchema uint = 3
 
 type reportInputEnvelope struct {
+	MBTIPoles            *MBTIPoleCatalog             `json:"mbti_poles,omitempty"`
 	SchemaVersion        uint                         `json:"schema_version"`
 	InterpretationAssets *interpretationassets.Assets `json:"InterpretationAssets"`
 	ModelRef             *ModelRef                    `json:"model_ref"`
@@ -22,17 +23,24 @@ type reportInputEnvelope struct {
 
 // MarshalReportInput emits only the current minimal, payload-free schema.
 func MarshalReportInput(opts ReportInputFreezeOptions) ([]byte, error) {
+	if RequiresMBTIPoleCatalog(opts.ModelRef) && opts.MBTIPoles == nil {
+		return nil, fmt.Errorf("new MBTI report input requires frozen pole catalog")
+	}
+	if err := validateMBTIPoleEnvelope(opts.ModelRef, opts.MBTIPoles); err != nil {
+		return nil, err
+	}
 	if !CanFreezeMinimalReportInput(opts) {
 		return nil, fmt.Errorf("report input schema %d freeze material is incomplete", CurrentReportInputSchema)
 	}
 	return json.Marshal(reportInputEnvelope{
-		SchemaVersion: CurrentReportInputSchema, InterpretationAssets: opts.Assets,
+		MBTIPoles: opts.MBTIPoles, SchemaVersion: CurrentReportInputSchema, InterpretationAssets: opts.Assets,
 		ModelRef: &opts.ModelRef, FactorCatalog: opts.FactorCatalog,
 		TypologySource: opts.TypologySource, TypologyRouting: opts.TypologyRouting, Norming: opts.Norming,
 	})
 }
 
 type decodedReportInput struct {
+	MBTIPoles            *MBTIPoleCatalog
 	InterpretationAssets *interpretationassets.Assets
 	ModelRef             ModelRef
 	FactorCatalog        []FactorCatalogEntry
@@ -58,8 +66,11 @@ func decodeReportInputBytes(data []byte) (decodedReportInput, error) {
 	if envelope.InterpretationAssets == nil || !envelope.InterpretationAssets.IsMaterialized() {
 		return decodedReportInput{}, fmt.Errorf("report input interpretation assets are required")
 	}
+	if err := validateMBTIPoleEnvelope(*envelope.ModelRef, envelope.MBTIPoles); err != nil {
+		return decodedReportInput{}, err
+	}
 	return decodedReportInput{
-		InterpretationAssets: envelope.InterpretationAssets, ModelRef: *envelope.ModelRef,
+		MBTIPoles: envelope.MBTIPoles, InterpretationAssets: envelope.InterpretationAssets, ModelRef: *envelope.ModelRef,
 		FactorCatalog: envelope.FactorCatalog, TypologySource: envelope.TypologySource,
 		TypologyRouting: envelope.TypologyRouting, Norming: envelope.Norming,
 	}, nil
@@ -74,5 +85,19 @@ func SnapshotFromReportInput(data []byte, model ModelRef) (*InputSnapshot, error
 	if model.Kind != "" && (model.Kind != decoded.ModelRef.Kind || model.Code != decoded.ModelRef.Code || model.Version != decoded.ModelRef.Version) {
 		return nil, fmt.Errorf("report input model_ref does not match outcome model")
 	}
+	if decoded.MBTIPoles != nil && model.Kind != "" && model.Algorithm != decoded.ModelRef.Algorithm {
+		return nil, fmt.Errorf("MBTI pole catalog algorithm does not match outcome model")
+	}
 	return snapshotFromMinimalReportInput(decoded.ModelRef, decoded)
+}
+
+// Absence is a legacy report input; it must never be synthesized from latest data.
+func validateMBTIPoleEnvelope(model ModelRef, poles *MBTIPoleCatalog) error {
+	if poles == nil {
+		return nil
+	}
+	if !RequiresMBTIPoleCatalog(model) {
+		return fmt.Errorf("MBTI pole catalog model identity mismatch")
+	}
+	return poles.Validate()
 }

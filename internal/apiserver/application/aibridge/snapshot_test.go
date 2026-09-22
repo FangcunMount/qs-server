@@ -95,7 +95,7 @@ func snapshotSource(t *testing.T, configured bool) *source.Current {
 	r, err := report.RestoreInterpretReport(report.InterpretReportInput{
 		ID: meta.FromUint64(99), GenerationID: meta.FromUint64(100), OutcomeID: meta.FromUint64(101), InterpretationRunID: meta.FromUint64(102),
 		Association: report.Association{OrgID: 1, AssessmentID: meta.FromUint64(42), TesteeID: 7}, ReportType: policy.ReportTypeStandard, TemplateVersion: policy.TemplateVersionCurrent,
-		ContentSchemaVersion: "standard-v1", BuilderIdentity: "test", GeneratedAt: time.Now(), Content: content,
+		ContentSchemaVersion: "standard-v1", BuilderIdentity: "test", GeneratedAt: time.Date(2026, 9, 22, 0, 0, 0, 0, time.UTC), Content: content,
 	})
 	if err != nil {
 		t.Fatal(err)

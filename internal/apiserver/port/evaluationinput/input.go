@@ -50,6 +50,7 @@ type InputRef struct {
 }
 
 type InputSnapshot struct {
+	MBTIPoles            *MBTIPoleCatalog `json:"MBTIPoles,omitempty"`
 	Model                *ModelSnapshot
 	ModelPayload         ModelPayload
 	AnswerSheet          *AnswerSheetSnapshot

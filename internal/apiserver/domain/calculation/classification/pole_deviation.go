@@ -5,6 +5,21 @@ package classification
 // When threshold is 0, the historical default 24 is used.
 // Contributions without OptionScores assume a 1..5 Likert option span.
 func PoleMaxDeviation(constant, threshold float64, contributions []AnswerContribution) float64 {
+	minScore, maxScore := PoleScoreRange(constant, contributions)
+	if threshold == 0 {
+		threshold = 24
+	}
+	left := threshold - minScore
+	right := maxScore - threshold
+	if left > right {
+		return left
+	}
+	return right
+}
+
+// PoleScoreRange exposes the same score bounds used by PoleMaxDeviation.
+// Report metadata uses these bounds without recomputing a subject's result.
+func PoleScoreRange(constant float64, contributions []AnswerContribution) (float64, float64) {
 	minScore := constant
 	maxScore := constant
 	for _, contribution := range contributions {
@@ -37,13 +52,5 @@ func PoleMaxDeviation(constant, threshold float64, contributions []AnswerContrib
 			maxScore += sign * 1
 		}
 	}
-	if threshold == 0 {
-		threshold = 24
-	}
-	left := threshold - minScore
-	right := maxScore - threshold
-	if left > right {
-		return left
-	}
-	return right
+	return minScore, maxScore
 }
