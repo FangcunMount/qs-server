@@ -38,4 +38,4 @@ case "$architecture" in aarch64|arm64) goarch=arm64;;x86_64|amd64) goarch=amd64;
 
 "${compose[@]}" exec -T mysql mysql -uroot -e 'CREATE DATABASE rm_qs_assessment_proof'
 "${compose[@]}" cp "$build_dir/proof" mysql:/tmp/assessment-proof
-"${compose[@]}" exec -T -e RM_QS_ASSESSMENT_DSN='root@tcp(127.0.0.1:3306)/rm_qs_assessment_proof?parseTime=true&loc=UTC' mysql /tmp/assessment-proof -test.run '^TestReliableMessagingAssessmentPersistence$' -test.v
+"${compose[@]}" exec -T -e RM_QS_ASSESSMENT_DSN='root@tcp(127.0.0.1:3306)/rm_qs_assessment_proof?parseTime=true&loc=UTC' mysql /tmp/assessment-proof -test.run '^TestReliableMessaging(AssessmentPersistence|ExecutionClaims)$' -test.v

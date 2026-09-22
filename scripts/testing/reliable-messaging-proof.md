@@ -27,3 +27,9 @@ The candidate adds a narrow PendingSubmissionRepository capability. The intake f
 The same real-MySQL test now asserts one winner, one conflict, one Assessment and one evaluation.requested. The actual Journey is re-entered twice after submission and returns the original Assessment without another transition/event; its AnswerSheet reader remains an explicit fixture. The trigger-induced event failure still leaves pending and no event, permitting later recovery. The initial reproduction is retained in commit 84a7d02ff, not as an accepted behavior assertion in the fixed test.
 
 This closes the demonstrated submission race in isolation, not the entire M2 consumer gate: full persisted AnswerSheet/Worker/gRPC/NSQ replay, downstream attempt accounting and production acceptance remain outstanding. The change is a host business correction required for reliable delivery, not an SDK-wide deduplication policy. Final approval and deployment remain separate.
+
+## Original durable execution claims
+
+`TestReliableMessagingExecutionClaims` exercises the original runtime_checkpoint repository against real MySQL with a current-PO schema fixture. Six concurrent duplicates cannot acquire an active attempt. Advancing the repository's explicit clock input reclaims the same run/attempt and preserves the frozen input reference; an old token cannot save after ownership transfer. A succeeded run cannot be claimed again. Ordinary or wrong-event replays of a failed run do not create another attempt; only the stored retry event and expected attempt authorize attempt 2, whose replay is again suppressed.
+
+This proves persisted claim and retry-authorization behavior, not model-call idempotency, natural elapsed-time recovery, clock-skew safety or full Worker/gRPC/NSQ replay. No model is called and no execution/recovery implementation is changed. A reclaimed run alone must not be interpreted as permission to resubmit an unknown external operation.
