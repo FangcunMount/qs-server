@@ -2,6 +2,7 @@ package evaluationinput
 
 import (
 	"encoding/json"
+	"fmt"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 )
@@ -32,6 +33,13 @@ func BuildFreezeOptionsFromSnapshot(input *InputSnapshot, modelRef ModelRef, dec
 	}
 	if def, ok := DefinitionV2FromSnapshot(input); ok {
 		opts.FactorCatalog = FactorCatalogFromDefinition(def.Measure)
+		if supportsMBTIPoles(modelRef) && decisionKind == modelcatalog.DecisionKindPoleComposition {
+			if input.Model == nil || input.Model.Kind != modelRef.Kind || input.Model.Code != modelRef.Code || input.Model.Version != modelRef.Version || input.Model.Algorithm != modelRef.Algorithm {
+				opts.poleFreezeError = fmt.Errorf("MBTI definition snapshot model identity mismatch")
+			} else {
+				opts.MBTIPoles, opts.poleFreezeError = freezeMBTIPoles(def)
+			}
+		}
 		family, _ := modelcatalog.AlgorithmFamilyFromDecisionKind(decisionKind)
 		if family == modelcatalog.AlgorithmFamilyFactorClassification && input.Model != nil && len(def.ReportMap.Sections) > 0 {
 			section := def.ReportMap.Sections[0]

@@ -189,6 +189,13 @@ func populateTypologyFacts(input *interpinput.InterpretationInput, execution *do
 	if execution == nil {
 		return fmt.Errorf("evaluation outcome is required")
 	}
+	if assets != nil && assets.MBTIPoles != nil {
+		fact, ok := evaluationfactcodec.ClassificationFactFromPayload(execution.Detail.Payload)
+		if !ok {
+			return fmt.Errorf("frozen MBTI poles require canonical classification facts")
+		}
+		return setPersonalityTypeFactsFromV2(input, execution, assets, fact)
+	}
 	if detail, ok := evaluationfactcodec.PersonalityTypeDetailFromPayload(execution.Detail.Payload); ok {
 		setPersonalityTypeFacts(input, detail)
 		return nil
@@ -235,6 +242,9 @@ func setPersonalityTypeFactsFromV2(input *interpinput.InterpretationInput, execu
 			RawScore: dimension.Score.Value, Preference: dimension.Preference,
 			Strength: strength, Level: levelCode,
 		})
+	}
+	if err := attachFrozenMBTIPoles(dimensions, execution, assets, fact.TypeCode); err != nil {
+		return err
 	}
 	input.PersonalityType = &interpinput.PersonalityTypeFacts{Detail: reporttypology.PersonalityTypeReportDetail{
 		TypeCode: fact.TypeCode, TypeName: configured.Name, OneLiner: configured.OneLiner,

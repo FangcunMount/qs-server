@@ -164,6 +164,7 @@ type PersonalityTypeRarityReport struct {
 }
 
 type PersonalityTypeDimensionReport struct {
+	PoleFacts  *report.PoleFacts `json:"PoleFacts,omitempty"`
 	Code       string
 	Name       string
 	LeftPole   string
@@ -218,12 +219,12 @@ func mechanismPersonalityDimensions(detail PersonalityTypeReportDetail, tmpl Per
 		if maxScore != nil {
 			dimensions = append(dimensions, report.NewDimensionInterpret(
 				report.FactorCode(dim.Code), name, dim.RawScore, maxScore, report.RiskLevelNone, description, "",
-			))
+			).WithPoleFacts(dim.PoleFacts))
 			continue
 		}
 		dimensions = append(dimensions, report.NewNeutralDimensionInterpret(
 			report.NewDimensionCode(dim.Code), kind, name, dim.RawScore, nil, nil, description, "",
-		))
+		).WithPoleFacts(dim.PoleFacts))
 	}
 	return dimensions
 }

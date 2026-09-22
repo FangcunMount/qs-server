@@ -38,6 +38,8 @@ type TypologyRoutingFreeze struct {
 
 // ReportInputFreezeOptions controls how evaluation report input is frozen at commit.
 type ReportInputFreezeOptions struct {
+	MBTIPoles       *MBTIPoleCatalog
+	poleFreezeError error
 	Assets          *interpretationassets.Assets
 	ModelRef        ModelRef
 	DecisionKind    modelcatalog.DecisionKind
@@ -198,6 +200,7 @@ func firstNonEmpty(values ...string) string {
 
 func snapshotFromMinimalReportInput(model ModelRef, decoded decodedReportInput) (*InputSnapshot, error) {
 	snapshot := &InputSnapshot{
+		MBTIPoles:            cloneMBTIPoles(decoded.MBTIPoles),
 		InterpretationAssets: decoded.InterpretationAssets,
 		TypologyRouting:      decoded.TypologyRouting,
 		FactorCatalog:        append([]FactorCatalogEntry(nil), decoded.FactorCatalog...),

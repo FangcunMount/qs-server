@@ -55,6 +55,7 @@ type reportBodyPO struct {
 
 // DimensionInterpretPO 维度解读持久化对象
 type DimensionInterpretPO struct {
+	PoleFacts      *PoleFactsPO     `bson:"pole_facts,omitempty" json:"pole_facts,omitempty"`
 	Kind           string           `bson:"kind,omitempty" json:"kind,omitempty"`
 	FactorCode     string           `bson:"factor_code" json:"factor_code"`
 	FactorName     string           `bson:"factor_name" json:"factor_name"`
@@ -139,4 +140,17 @@ type ModelRarityPO struct {
 	Percent float64 `bson:"percent,omitempty" json:"percent,omitempty"`
 	Label   string  `bson:"label,omitempty" json:"label,omitempty"`
 	OneInX  int     `bson:"one_in_x,omitempty" json:"one_in_x,omitempty"`
+}
+
+// PoleFactsPO is an additive, independently versioned report content extension.
+type PoleFactsPO struct {
+	SchemaVersion    string   `bson:"schema_version" json:"schema_version"`
+	LeftPole         string   `bson:"left_pole" json:"left_pole"`
+	RightPole        string   `bson:"right_pole" json:"right_pole"`
+	Preference       string   `bson:"preference" json:"preference"`
+	Strength         *float64 `bson:"strength" json:"strength"`
+	MinScore         *float64 `bson:"min_score" json:"min_score"`
+	MaxScore         *float64 `bson:"max_score" json:"max_score"`
+	Threshold        *float64 `bson:"threshold" json:"threshold"`
+	CompositionOrder *int     `bson:"composition_order" json:"composition_order"`
 }
