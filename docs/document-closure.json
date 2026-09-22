@@ -2,7 +2,7 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "d8dabbeef099f5b9871453f93047f3092e13d54c",
+    "sha": "a2b10c9172089ebd4e879e006ba9d6d662e5f901",
     "verified_on": "2026-09-22"
   },
   "status_policy": {
@@ -9147,7 +9147,7 @@
       "owner": "tooling",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": "d8dabbeef099f5b9871453f93047f3092e13d54c",
+        "source_sha": "a2b10c9172089ebd4e879e006ba9d6d662e5f901",
         "verified_on": "2026-09-22"
       },
       "fact_sources": [
@@ -9190,6 +9190,10 @@
         {
           "kind": "source",
           "path": "internal/apiserver/domain/evaluation/assessment/repository.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/container/internal/transaction/reliable_messaging_run_proof_test.go"
         }
       ],
       "verification": [],
@@ -9207,7 +9211,7 @@
           "id": "RM-M2-PROOF-REVIEW",
           "kind": "verification",
           "severity": "medium",
-          "summary": "Host conditional submission now passes real MySQL concurrency, event-write rollback and Journey reentry checks. Full Worker/gRPC/NSQ recovery, downstream attempt accounting and final review remain pending.",
+          "summary": "Local transaction, hold, atomic submission and original runtime-checkpoint claim/retry authorization proofs pass. Complete Worker/gRPC/NSQ recovery, external-operation receipt semantics and final review remain pending.",
           "exit_criteria": "Review the test-only bridge and its explicit limits; preserve independent rollout gates."
         }
       ]
