@@ -26,7 +26,7 @@ case "$architecture" in aarch64|arm64) goarch=arm64;;x86_64|amd64) goarch=amd64;
 (cd "$build_dir" && GOWORK=off go work init "$repo" "$sdk")
 (cd "$repo" && GOWORK="$build_dir/go.work" CGO_ENABLED=0 GOOS=linux GOARCH="$goarch" go test -c -tags=reliable_messaging -o "$build_dir/proof" ./internal/apiserver/container/internal/transaction)
 (cd "$repo" && GOWORK="$build_dir/go.work" CGO_ENABLED=0 GOOS=linux GOARCH="$goarch" go test -c -tags=reliable_messaging -o "$build_dir/hold-proof" ./internal/worker/integration/messaging)
-"${compose[@]}" up -d --wait --wait-timeout 180 mongo mysql
+"${compose[@]}" up -d --wait --wait-timeout 180 mongo mysql nsqd
 "${compose[@]}" exec -T mongo mongosh --quiet --file /dev/stdin < "$sdk/tests/integration/mongo-smoke.js"
 "${compose[@]}" cp "$build_dir/proof" mongo:/tmp/qs-proof
 "${compose[@]}" exec -T -e RM_QS_MONGO_URI='mongodb://mongo:27017/?replicaSet=rm-test' mongo /tmp/qs-proof -test.run '^TestReliableMessagingOriginalMongoRunner$' -test.v
@@ -39,3 +39,6 @@ case "$architecture" in aarch64|arm64) goarch=arm64;;x86_64|amd64) goarch=amd64;
 "${compose[@]}" exec -T mysql mysql -uroot -e 'CREATE DATABASE rm_qs_assessment_proof'
 "${compose[@]}" cp "$build_dir/proof" mysql:/tmp/assessment-proof
 "${compose[@]}" exec -T -e RM_QS_ASSESSMENT_DSN='root@tcp(127.0.0.1:3306)/rm_qs_assessment_proof?parseTime=true&loc=UTC' mysql /tmp/assessment-proof -test.run '^TestReliableMessaging(AssessmentPersistence|ExecutionClaims)$' -test.v
+
+"${compose[@]}" exec -T mysql mysql -uroot -e 'CREATE DATABASE rm_qs_redelivery_proof'
+"${compose[@]}" exec -T -e RM_QS_REDELIVERY_DSN='root@tcp(127.0.0.1:3306)/rm_qs_redelivery_proof?parseTime=true&loc=UTC' -e RM_QS_NSQ_TCP='nsqd:4150' -e RM_QS_NSQ_HTTP='http://nsqd:4151' mysql /tmp/assessment-proof -test.run '^TestReliableMessagingAnswerSheetFINLoss$' -test.v
