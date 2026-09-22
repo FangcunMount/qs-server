@@ -35,3 +35,7 @@ case "$architecture" in aarch64|arm64) goarch=arm64;;x86_64|amd64) goarch=amd64;
 "${compose[@]}" cp "$build_dir/hold-proof" mysql:/tmp/hold-proof
 "${compose[@]}" cp "$repo/internal/pkg/migration/migrations/mysql/000050_add_retry_event_hold.up.sql" mysql:/tmp/qs-retry-event-hold.sql
 "${compose[@]}" exec -T -e RM_QS_HOLD_DSN='root@tcp(127.0.0.1:3306)/rm_qs_hold_proof?parseTime=true&loc=UTC' mysql /tmp/hold-proof -test.run '^TestReliableMessagingDurableHold$' -test.v
+
+"${compose[@]}" exec -T mysql mysql -uroot -e 'CREATE DATABASE rm_qs_assessment_proof'
+"${compose[@]}" cp "$build_dir/proof" mysql:/tmp/assessment-proof
+"${compose[@]}" exec -T -e RM_QS_ASSESSMENT_DSN='root@tcp(127.0.0.1:3306)/rm_qs_assessment_proof?parseTime=true&loc=UTC' mysql /tmp/assessment-proof -test.run '^TestReliableMessagingAssessmentPersistence$' -test.v

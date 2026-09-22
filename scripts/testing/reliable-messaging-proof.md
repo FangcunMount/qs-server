@@ -11,3 +11,11 @@ Only a tagged proof and isolated runner are added. No execution/recovery file, p
 ## Durable failure-hold compatibility
 
 The runner now also starts isolated MySQL and executes `TestReliableMessagingDurableHold` using the exact existing 000050 migration. It exercises the real dispatch settlement handler and mysqlRetryEventHoldStore, with dispatcher pause and ACK failure deliberately injected at their boundaries. ACK observes the committed hold first; redelivery of the same broker message does not reset manual_required, replay count, frozen replay request or original bytes. A real MySQL trigger rejects the next hold: the handler returns an error/NACK instead of acknowledging an unpersisted message. Local proof passed against SDK d13ee10. This is failure-hold compatibility, not Assessment business idempotency or a network-level ACK-loss test.
+
+## Assessment persistence characterization: open consumer gate
+
+`TestReliableMessagingAssessmentPersistence` uses real MySQL 8.0.44, the original Assessment repository, intake service, NewMySQLRunner and historical Outbox. Model validation and current-PO schema construction are explicit fixtures; this is not a full Worker/gRPC/journey, production migration, or SDK consumer acceptance test.
+
+The unique answer-sheet constraint rejects a second creation and lookup retains the original Assessment ID. A real server-side trigger rejecting the event insert rolls back the pending-to-submitted status change. A deterministic barrier after two real pending reads then reproduces a baseline gap: both submissions succeed and persist two different `evaluation.requested` IDs for one Assessment. A later sequential submission is rejected without another event. The passing test characterizes this defect; it does not certify idempotency.
+
+M2 consumer gate remains open. Before QS cutover, protect the business transition with a host-owned conditional write/lock in the same transaction as the event, and prove loser behavior, durable event count, crash recovery and downstream handling. Message-ID deduplication alone cannot collapse two distinct events generated for the same transition. Do not add a generic SDK policy that silently discards legitimate business transitions. The original evaluation executor and qs-ai recovery files remain untouched.
