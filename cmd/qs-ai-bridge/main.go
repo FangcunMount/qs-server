@@ -10,6 +10,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"io"
 	"net"
 	"os"
 
@@ -24,12 +25,15 @@ import (
 )
 
 func main() {
-	if err := run(); err != nil {
+	// Keep machine-readable command results separate from asynchronous diagnostics.
+	output := os.Stdout
+	os.Stdout = os.Stderr
+	if err := run(output); err != nil {
 		fmt.Fprintln(os.Stderr, "AI bridge operation failed")
 		os.Exit(1)
 	}
 }
-func run() error {
+func run(output io.Writer) error {
 	mode := flag.String("mode", "", "stage-start, stage-change, relay, receive, projection, runtime-index-backfill")
 	address := flag.String("address", "", "bind address or AI target")
 	input := flag.String("input", "", "JSON command file")
@@ -54,7 +58,9 @@ func run() error {
 			if e != nil {
 				return e
 			}
-			fmt.Printf("indexed=%d\n", n)
+			if _, err := fmt.Fprintf(output, "indexed=%d\n", n); err != nil {
+				return err
+			}
 			if n == 0 {
 				return nil
 			}
@@ -77,7 +83,7 @@ func run() error {
 		if e != nil {
 			return e
 		}
-		return json.NewEncoder(os.Stdout).Encode(v)
+		return json.NewEncoder(output).Encode(v)
 	case "relay", "receive":
 		pair, e := tls.LoadX509KeyPair(*cert, *key)
 		if e != nil {
@@ -103,8 +109,8 @@ func run() error {
 			if e != nil {
 				return e
 			}
-			fmt.Println(n)
-			return nil
+			_, err := fmt.Fprintln(output, n)
+			return err
 		}
 		config.ClientCAs = pool
 		config.ClientAuth = tls.RequireAndVerifyClientCert
@@ -117,7 +123,10 @@ func run() error {
 		if e != nil {
 			return e
 		}
-		fmt.Println("LISTENING", listener.Addr().String())
+		if _, err := fmt.Fprintln(output, "LISTENING", listener.Addr().String()); err != nil {
+			_ = listener.Close()
+			return err
+		}
 		return server.Serve(listener)
 	default:
 		return fmt.Errorf("mode required")
