@@ -2,7 +2,7 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "a2b10c9172089ebd4e879e006ba9d6d662e5f901",
+    "sha": "996683a2e04bd86ec83d674584cf249cf69a8310",
     "verified_on": "2026-09-22"
   },
   "status_policy": {
@@ -9147,7 +9147,7 @@
       "owner": "tooling",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": "a2b10c9172089ebd4e879e006ba9d6d662e5f901",
+        "source_sha": "996683a2e04bd86ec83d674584cf249cf69a8310",
         "verified_on": "2026-09-22"
       },
       "fact_sources": [
@@ -9194,6 +9194,10 @@
         {
           "kind": "source",
           "path": "internal/apiserver/container/internal/transaction/reliable_messaging_run_proof_test.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/container/internal/transaction/reliable_messaging_redelivery_proof_test.go"
         }
       ],
       "verification": [],
@@ -9211,7 +9215,7 @@
           "id": "RM-M2-PROOF-REVIEW",
           "kind": "verification",
           "severity": "medium",
-          "summary": "Local transaction, hold, atomic submission and original runtime-checkpoint claim/retry authorization proofs pass. Complete Worker/gRPC/NSQ recovery, external-operation receipt semantics and final review remain pending.",
+          "summary": "Real NSQ FIN-loss redelivery now reaches the original Worker handler and loopback gRPC/Journey/MySQL intake without duplicate Assessment/event. AnswerSheet/model fixtures and direct go-nsq settlement remain explicit; full intake, external-operation receipts and final review remain pending.",
           "exit_criteria": "Review the test-only bridge and its explicit limits; preserve independent rollout gates."
         }
       ]
