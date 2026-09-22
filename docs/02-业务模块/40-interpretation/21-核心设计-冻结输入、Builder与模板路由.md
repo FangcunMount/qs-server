@@ -128,7 +128,7 @@ Interpretation 将该目录与 Outcome 中的原始分、偏好方向及精确�
 
 事实入口与验证：
 
-- [`mbti_poles.go`](../../../internal/apiserver/port/evaluationinput/mbti_poles.go)：原模型元数据冻结及校验。
+- [`report_input_freeze.go`](../../../internal/apiserver/application/evaluation/outcome/commit/report_input_freeze.go)：提交层组合原模型元数据与计算规则，冻结为中立输入契约。
 - [`mbti_poles.go`](../../../internal/apiserver/application/interpretation/automation/input/mbti_poles.go)：合并已提交的精确结果事实。
 - [`pole_facts.go`](../../../internal/apiserver/domain/interpretation/report/pole_facts.go)：报告不可变事实及一致性约束。
 - [`mbti_facts_test.go`](../../../internal/apiserver/infra/mongo/interpretation/mbti_facts_test.go)：脱敏基线从冻结输入、Builder 到 BSON 回读的回归；不代表生产验收。

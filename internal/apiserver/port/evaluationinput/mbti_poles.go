@@ -5,10 +5,7 @@ import (
 	"fmt"
 	"math"
 
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/calculation/classification"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/definition"
-	"github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/typology"
 )
 
 const MBTIPoleCatalogSchema = "mbti-pole-catalog/v1"
@@ -54,37 +51,9 @@ func (a *MBTIPoleAxis) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-func supportsMBTIPoles(model ModelRef) bool {
+// RequiresMBTIPoleCatalog identifies the exact supported immutable MBTI model.
+func RequiresMBTIPoleCatalog(model ModelRef) bool {
 	return model.Kind == EvaluationModelKindTypology && model.Code == "MBTI_OEJTS" && model.Version == "v64-report-202608-v1" && model.Algorithm == string(modelcatalog.AlgorithmPersonalityTypology)
-}
-
-func freezeMBTIPoles(def *definition.Definition) (*MBTIPoleCatalog, error) {
-	spec, err := typology.RuntimeSpecFromDefinition(def)
-	if err != nil {
-		return nil, err
-	}
-	if spec.Decision.Kind != modelcatalog.DecisionKindPoleComposition {
-		return nil, fmt.Errorf("MBTI pole decision is required")
-	}
-	catalog := &MBTIPoleCatalog{SchemaVersion: MBTIPoleCatalogSchema}
-	for _, code := range spec.FactorGraph.DecisionFactorOrder() {
-		dim, ok := spec.FactorGraph.Dimensions[code]
-		factor, found := spec.FactorGraph.Factors[code]
-		if !ok || !found || factor.Kind != typology.FactorSpecKindLeaf || len(factor.Contributions) == 0 {
-			return nil, fmt.Errorf("MBTI pole metadata is incomplete")
-		}
-		contributions := make([]classification.AnswerContribution, 0, len(factor.Contributions))
-		for _, c := range factor.Contributions {
-			contributions = append(contributions, classification.AnswerContribution{QuestionCode: c.QuestionCode, ScoringMode: classification.QuestionScoringMode(c.ScoringMode), Sign: c.Sign, Weight: c.Weight, OptionScores: c.OptionScores})
-		}
-		min, max := classification.PoleScoreRange(factor.Constant, contributions)
-		threshold := dim.Threshold
-		if threshold == 0 {
-			threshold = 24
-		} // Same historical boundary as the calculation layer.
-		catalog.Axes = append(catalog.Axes, MBTIPoleAxis{Code: code, Name: dim.Name, LeftPole: dim.LeftPole, RightPole: dim.RightPole, MinScore: min, MaxScore: max, Threshold: threshold})
-	}
-	return catalog, catalog.Validate()
 }
 
 func (c *MBTIPoleCatalog) Validate() error {

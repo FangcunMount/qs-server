@@ -1,10 +1,12 @@
-package evaluationinput
+package commit
 
 import (
 	"encoding/json"
 	"reflect"
 	"strings"
 	"testing"
+
+	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/conclusion"
@@ -14,8 +16,8 @@ import (
 )
 
 // Only model rules are reproduced here; no answers or live identifiers are used.
-func mbtiFreezeFixture() (*InputSnapshot, ModelRef) {
-	ref := ModelRef{Kind: EvaluationModelKindTypology, Algorithm: "personality_typology", Code: "MBTI_OEJTS", Version: "v64-report-202608-v1"}
+func mbtiFreezeFixture() (*evaluationinput.InputSnapshot, evaluationinput.ModelRef) {
+	ref := evaluationinput.ModelRef{Kind: evaluationinput.EvaluationModelKindTypology, Algorithm: "personality_typology", Code: "MBTI_OEJTS", Version: "v64-report-202608-v1"}
 	def := &definition.Definition{Measure: definition.MeasureSpec{FactorGraph: factor.FactorGraph{Roots: []string{"EI", "SN", "TF", "JP"}}}, ReportMap: definition.ReportMap{Sections: []definition.ReportSection{{Kind: "personality_type", AdapterKey: "personality_type", TemplateID: "mbti", TemplateVersion: "2026-08-v1"}}}}
 	td := conclusion.TypeDecision{Kind: modelcatalog.DecisionKindPoleComposition}
 	names := []string{"外向 / 内向", "实感 / 直觉", "思考 / 情感", "判断 / 感知"}
@@ -31,20 +33,20 @@ func mbtiFreezeFixture() (*InputSnapshot, ModelRef) {
 		td.Poles = append(td.Poles, conclusion.TypePole{FactorCode: code, LeftPole: left[i], RightPole: right[i], Threshold: 24})
 	}
 	def.Conclusions = []conclusion.Conclusion{conclusion.TypeConclusion{Decision: td}}
-	return &InputSnapshot{Model: &ModelSnapshot{Kind: ref.Kind, Algorithm: ref.Algorithm, Code: ref.Code, Version: ref.Version, DecisionKind: "pole_composition"}, DefinitionV2: def, InterpretationAssets: &interpretationassets.Assets{Outcomes: []interpretationassets.OutcomePresentation{{OutcomeCode: "ISFJ", Title: "守卫者"}}}}, ref
+	return &evaluationinput.InputSnapshot{Model: &evaluationinput.ModelSnapshot{Kind: ref.Kind, Algorithm: ref.Algorithm, Code: ref.Code, Version: ref.Version, DecisionKind: "pole_composition"}, DefinitionV2: def, InterpretationAssets: &interpretationassets.Assets{Outcomes: []interpretationassets.OutcomePresentation{{OutcomeCode: "ISFJ", Title: "守卫者"}}}}, ref
 }
 
 func TestMBTIPolesFreezeExactModelAndReplayWithoutRuntimePayload(t *testing.T) {
 	in, ref := mbtiFreezeFixture()
-	opts := BuildFreezeOptionsFromSnapshot(in, ref, modelcatalog.DecisionKindPoleComposition)
-	raw, err := MarshalReportInput(opts)
+	opts := mustMBTIOptions(t, in, ref)
+	raw, err := evaluationinput.MarshalReportInput(opts)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if strings.Contains(string(raw), "DefinitionV2") || strings.Contains(string(raw), "Contributions") || strings.Contains(string(raw), "AnswerSheet") {
 		t.Fatal("executable/answer payload retained")
 	}
-	restored, err := SnapshotFromReportInput(raw, ref)
+	restored, err := evaluationinput.SnapshotFromReportInput(raw, ref)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -58,7 +60,7 @@ func TestMBTIPolesFreezeExactModelAndReplayWithoutRuntimePayload(t *testing.T) {
 	}
 	// Changes to a currently loaded definition cannot change the stored projection.
 	in.DefinitionV2.Measure.Factors[0].Title = "new head"
-	again, err := SnapshotFromReportInput(raw, ref)
+	again, err := evaluationinput.SnapshotFromReportInput(raw, ref)
 	if err != nil || again.MBTIPoles.Axes[0].Name != "外向 / 内向" {
 		t.Fatal("frozen name changed", err)
 	}
@@ -66,8 +68,8 @@ func TestMBTIPolesFreezeExactModelAndReplayWithoutRuntimePayload(t *testing.T) {
 
 func TestMBTIPolesRejectCorruptOrCrossModelEnvelope(t *testing.T) {
 	in, ref := mbtiFreezeFixture()
-	opts := BuildFreezeOptionsFromSnapshot(in, ref, modelcatalog.DecisionKindPoleComposition)
-	raw, err := MarshalReportInput(opts)
+	opts := mustMBTIOptions(t, in, ref)
+	raw, err := evaluationinput.MarshalReportInput(opts)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -96,7 +98,7 @@ func TestMBTIPolesRejectCorruptOrCrossModelEnvelope(t *testing.T) {
 			}
 			change(v)
 			bad, _ := json.Marshal(v)
-			if _, err := SnapshotFromReportInput(bad, ModelRef{}); err == nil {
+			if _, err := evaluationinput.SnapshotFromReportInput(bad, evaluationinput.ModelRef{}); err == nil {
 				t.Fatal("accepted invalid facts")
 			}
 		})
@@ -105,8 +107,8 @@ func TestMBTIPolesRejectCorruptOrCrossModelEnvelope(t *testing.T) {
 
 func TestMBTIPolesLegacyAbsentIsNotBackfilledButNewWritesRequireIt(t *testing.T) {
 	in, ref := mbtiFreezeFixture()
-	opts := BuildFreezeOptionsFromSnapshot(in, ref, modelcatalog.DecisionKindPoleComposition)
-	raw, err := MarshalReportInput(opts)
+	opts := mustMBTIOptions(t, in, ref)
+	raw, err := evaluationinput.MarshalReportInput(opts)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -116,34 +118,42 @@ func TestMBTIPolesLegacyAbsentIsNotBackfilledButNewWritesRequireIt(t *testing.T)
 	}
 	delete(envelope, "mbti_poles")
 	legacy, _ := json.Marshal(envelope)
-	restored, err := SnapshotFromReportInput(legacy, ref)
+	restored, err := evaluationinput.SnapshotFromReportInput(legacy, ref)
 	if err != nil || restored.MBTIPoles != nil {
 		t.Fatal("legacy synthesized", err)
 	}
 	opts.MBTIPoles = nil
-	if _, err := MarshalReportInput(opts); err == nil {
+	if _, err := evaluationinput.MarshalReportInput(opts); err == nil {
 		t.Fatal("new write lost mandatory poles")
 	}
 	in.DefinitionV2 = nil
-	opts = BuildFreezeOptionsFromSnapshot(in, ref, modelcatalog.DecisionKindPoleComposition)
-	if _, err := MarshalReportInput(opts); err == nil {
+	if _, err := reportInputFreezeOptions(in, ref, modelcatalog.DecisionKindPoleComposition); err == nil {
 		t.Fatal("missing definition accepted")
 	}
 }
 
 func TestMBTIPolesRejectMismatchedFrozenSource(t *testing.T) {
 	in, ref := mbtiFreezeFixture()
-	raw, err := MarshalReportInput(BuildFreezeOptionsFromSnapshot(in, ref, modelcatalog.DecisionKindPoleComposition))
+	raw, err := evaluationinput.MarshalReportInput(mustMBTIOptions(t, in, ref))
 	if err != nil {
 		t.Fatal(err)
 	}
 	other := ref
 	other.Algorithm = "other"
-	if _, err := SnapshotFromReportInput(raw, other); err == nil {
+	if _, err := evaluationinput.SnapshotFromReportInput(raw, other); err == nil {
 		t.Fatal("accepted a different outcome algorithm")
 	}
 	in.Model.Version = "current-head"
-	if _, err := MarshalReportInput(BuildFreezeOptionsFromSnapshot(in, ref, modelcatalog.DecisionKindPoleComposition)); err == nil {
+	if _, err := reportInputFreezeOptions(in, ref, modelcatalog.DecisionKindPoleComposition); err == nil {
 		t.Fatal("accepted a different source model version")
 	}
+}
+
+func mustMBTIOptions(t *testing.T, in *evaluationinput.InputSnapshot, ref evaluationinput.ModelRef) evaluationinput.ReportInputFreezeOptions {
+	t.Helper()
+	opts, err := reportInputFreezeOptions(in, ref, modelcatalog.DecisionKindPoleComposition)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return opts
 }

@@ -23,11 +23,8 @@ type reportInputEnvelope struct {
 
 // MarshalReportInput emits only the current minimal, payload-free schema.
 func MarshalReportInput(opts ReportInputFreezeOptions) ([]byte, error) {
-	if supportsMBTIPoles(opts.ModelRef) && opts.MBTIPoles == nil {
+	if RequiresMBTIPoleCatalog(opts.ModelRef) && opts.MBTIPoles == nil {
 		return nil, fmt.Errorf("new MBTI report input requires frozen pole catalog")
-	}
-	if opts.poleFreezeError != nil {
-		return nil, fmt.Errorf("freeze MBTI poles: %w", opts.poleFreezeError)
 	}
 	if err := validateMBTIPoleEnvelope(opts.ModelRef, opts.MBTIPoles); err != nil {
 		return nil, err
@@ -99,7 +96,7 @@ func validateMBTIPoleEnvelope(model ModelRef, poles *MBTIPoleCatalog) error {
 	if poles == nil {
 		return nil
 	}
-	if !supportsMBTIPoles(model) {
+	if !RequiresMBTIPoleCatalog(model) {
 		return fmt.Errorf("MBTI pole catalog model identity mismatch")
 	}
 	return poles.Validate()

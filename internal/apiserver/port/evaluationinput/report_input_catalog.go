@@ -39,7 +39,6 @@ type TypologyRoutingFreeze struct {
 // ReportInputFreezeOptions controls how evaluation report input is frozen at commit.
 type ReportInputFreezeOptions struct {
 	MBTIPoles       *MBTIPoleCatalog
-	poleFreezeError error
 	Assets          *interpretationassets.Assets
 	ModelRef        ModelRef
 	DecisionKind    modelcatalog.DecisionKind

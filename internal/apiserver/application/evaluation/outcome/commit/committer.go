@@ -101,7 +101,10 @@ func (c *committer) Commit(ctx context.Context, request CommitRequest) (*domaino
 		Version:   request.Execution.ModelRef.Version(),
 		Title:     request.Execution.ModelRef.Title(),
 	}
-	opts := evaluationinput.BuildFreezeOptionsFromSnapshot(request.Input, modelRef, request.DescriptorKey.DecisionKind)
+	opts, err := reportInputFreezeOptions(request.Input, modelRef, request.DescriptorKey.DecisionKind)
+	if err != nil {
+		return nil, fmt.Errorf("freeze evaluation report input: %w", err)
+	}
 	reportInput, err := evaluationinput.MarshalReportInput(opts)
 	if err != nil {
 		return nil, fmt.Errorf("marshal evaluation report input: %w", err)
