@@ -2,7 +2,7 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "84a7d02ff4f815f013b45a7a29499505fce7e11b",
+    "sha": "d8dabbeef099f5b9871453f93047f3092e13d54c",
     "verified_on": "2026-09-22"
   },
   "status_policy": {
@@ -4466,8 +4466,8 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "df09c14c5ebdacc95f463af1b9a0ee55cff735d9",
-        "verified_on": "2026-08-20"
+        "source_sha": "d8dabbeef099f5b9871453f93047f3092e13d54c",
+        "verified_on": "2026-09-22"
       },
       "fact_sources": [
         {
@@ -4526,6 +4526,13 @@
           "result": "passed",
           "source_sha": "df09c14c5ebdacc95f463af1b9a0ee55cff735d9",
           "verified_on": "2026-08-21"
+        },
+        {
+          "kind": "command",
+          "command": "go test -race ./internal/apiserver/application/evaluation/intake ./internal/apiserver/infra/mysql/evaluation ./internal/apiserver/cache/evaluation ./internal/apiserver/application/journey/assessmentintake",
+          "result": "passed",
+          "source_sha": "d8dabbeef099f5b9871453f93047f3092e13d54c",
+          "verified_on": "2026-09-22"
         }
       ],
       "production_evidence": {
@@ -9140,7 +9147,7 @@
       "owner": "tooling",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": "84a7d02ff4f815f013b45a7a29499505fce7e11b",
+        "source_sha": "d8dabbeef099f5b9871453f93047f3092e13d54c",
         "verified_on": "2026-09-22"
       },
       "fact_sources": [
@@ -9163,6 +9170,26 @@
         {
           "kind": "source",
           "path": "internal/apiserver/container/internal/transaction/reliable_messaging_assessment_proof_test.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/application/evaluation/intake/finalizers.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/application/evaluation/intake/transactional_outbox.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/infra/mysql/evaluation/assessment_repository.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/cache/evaluation/assessment_detail.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/domain/evaluation/assessment/repository.go"
         }
       ],
       "verification": [],
@@ -9172,7 +9199,7 @@
         "deployed_sha": null,
         "observed_at": null,
         "limitations": [
-          "Test-only isolated M2 proof; no production wiring or module changes."
+          "Local isolated evidence and host submission fix candidate; not deployed or accepted for production."
         ]
       },
       "gaps": [
@@ -9180,7 +9207,7 @@
           "id": "RM-M2-PROOF-REVIEW",
           "kind": "verification",
           "severity": "medium",
-          "summary": "Local Mongo, durable-hold and Assessment persistence characterization passed; concurrent submissions reproduce two distinct events for one transition. Consumer idempotency acceptance, final review and cross-repository CI remain pending.",
+          "summary": "Host conditional submission now passes real MySQL concurrency, event-write rollback and Journey reentry checks. Full Worker/gRPC/NSQ recovery, downstream attempt accounting and final review remain pending.",
           "exit_criteria": "Review the test-only bridge and its explicit limits; preserve independent rollout gates."
         }
       ]
