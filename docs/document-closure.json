@@ -2,7 +2,7 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "996683a2e04bd86ec83d674584cf249cf69a8310",
+    "sha": "3ac71517f0ed04ab65f609060ca800497bc291a8",
     "verified_on": "2026-09-22"
   },
   "status_policy": {
@@ -4466,7 +4466,7 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "d8dabbeef099f5b9871453f93047f3092e13d54c",
+        "source_sha": "3ac71517f0ed04ab65f609060ca800497bc291a8",
         "verified_on": "2026-09-22"
       },
       "fact_sources": [
@@ -4531,7 +4531,7 @@
           "kind": "command",
           "command": "go test -race ./internal/apiserver/application/evaluation/intake ./internal/apiserver/infra/mysql/evaluation ./internal/apiserver/cache/evaluation ./internal/apiserver/application/journey/assessmentintake",
           "result": "passed",
-          "source_sha": "d8dabbeef099f5b9871453f93047f3092e13d54c",
+          "source_sha": "3ac71517f0ed04ab65f609060ca800497bc291a8",
           "verified_on": "2026-09-22"
         }
       ],
@@ -9147,7 +9147,7 @@
       "owner": "tooling",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": "996683a2e04bd86ec83d674584cf249cf69a8310",
+        "source_sha": "3ac71517f0ed04ab65f609060ca800497bc291a8",
         "verified_on": "2026-09-22"
       },
       "fact_sources": [
