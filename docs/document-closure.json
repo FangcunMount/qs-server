@@ -2,8 +2,8 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "8945e9240d27bd399d7d0f66510626c4b2c6a2fe",
-    "verified_on": "2026-09-21"
+    "sha": "996683a2e04bd86ec83d674584cf249cf69a8310",
+    "verified_on": "2026-09-22"
   },
   "status_policy": {
     "doc_status": [
@@ -53,7 +53,7 @@
         "docs/_archive/**/*.md",
         "tmp/**/*.md"
       ],
-      "expected_count": 33,
+      "expected_count": 34,
       "budgeted": false
     }
   },
@@ -4466,8 +4466,8 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "df09c14c5ebdacc95f463af1b9a0ee55cff735d9",
-        "verified_on": "2026-08-20"
+        "source_sha": "d8dabbeef099f5b9871453f93047f3092e13d54c",
+        "verified_on": "2026-09-22"
       },
       "fact_sources": [
         {
@@ -4526,6 +4526,13 @@
           "result": "passed",
           "source_sha": "df09c14c5ebdacc95f463af1b9a0ee55cff735d9",
           "verified_on": "2026-08-21"
+        },
+        {
+          "kind": "command",
+          "command": "go test -race ./internal/apiserver/application/evaluation/intake ./internal/apiserver/infra/mysql/evaluation ./internal/apiserver/cache/evaluation ./internal/apiserver/application/journey/assessmentintake",
+          "result": "passed",
+          "source_sha": "d8dabbeef099f5b9871453f93047f3092e13d54c",
+          "verified_on": "2026-09-22"
         }
       ],
       "production_evidence": {
@@ -9133,6 +9140,85 @@
         ]
       },
       "gaps": []
+    },
+    {
+      "path": "scripts/testing/reliable-messaging-proof.md",
+      "class": "sidecar",
+      "owner": "tooling",
+      "doc_status": "needs_review",
+      "verified": {
+        "source_sha": "996683a2e04bd86ec83d674584cf249cf69a8310",
+        "verified_on": "2026-09-22"
+      },
+      "fact_sources": [
+        {
+          "kind": "source",
+          "path": "scripts/testing/reliable-messaging-proof.sh"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/container/internal/transaction/reliable_messaging_proof_test.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/worker/integration/messaging/reliable_messaging_proof_test.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/pkg/migration/migrations/mysql/000050_add_retry_event_hold.up.sql"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/container/internal/transaction/reliable_messaging_assessment_proof_test.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/application/evaluation/intake/finalizers.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/application/evaluation/intake/transactional_outbox.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/infra/mysql/evaluation/assessment_repository.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/cache/evaluation/assessment_detail.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/domain/evaluation/assessment/repository.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/container/internal/transaction/reliable_messaging_run_proof_test.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/container/internal/transaction/reliable_messaging_redelivery_proof_test.go"
+        }
+      ],
+      "verification": [],
+      "production_evidence": {
+        "level": "not_applicable",
+        "refs": [],
+        "deployed_sha": null,
+        "observed_at": null,
+        "limitations": [
+          "Local isolated evidence and host submission fix candidate; not deployed or accepted for production."
+        ]
+      },
+      "gaps": [
+        {
+          "id": "RM-M2-PROOF-REVIEW",
+          "kind": "verification",
+          "severity": "medium",
+          "summary": "Real NSQ FIN-loss redelivery now reaches the original Worker handler and loopback gRPC/Journey/MySQL intake without duplicate Assessment/event. AnswerSheet/model fixtures and direct go-nsq settlement remain explicit; full intake, external-operation receipts and final review remain pending.",
+          "exit_criteria": "Review the test-only bridge and its explicit limits; preserve independent rollout gates."
+        }
+      ]
     }
   ],
   "initial_review_baseline": {

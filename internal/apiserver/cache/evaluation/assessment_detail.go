@@ -3,6 +3,7 @@ package evaluationcache
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 
 	evaluationtestee "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/testee"
 	"github.com/FangcunMount/qs-server/internal/apiserver/cache/catalog"
@@ -151,3 +152,19 @@ func (r *InvalidatingAssessmentRepository) Delete(ctx context.Context, id assess
 var _ evaluationtestee.AssessmentAccessCache = (*AssessmentCaches)(nil)
 var _ evaluationtestee.AssessmentDetailCache = (*AssessmentCaches)(nil)
 var _ assessment.Repository = (*InvalidatingAssessmentRepository)(nil)
+
+func (r *InvalidatingAssessmentRepository) SavePendingSubmission(ctx context.Context, value *assessment.Assessment) error {
+	submitter, ok := r.repo.(assessment.PendingSubmissionRepository)
+	if !ok {
+		return fmt.Errorf("assessment pending submission repository is required")
+	}
+	if err := submitter.SavePendingSubmission(ctx, value); err != nil {
+		return err
+	}
+	if value != nil {
+		r.caches.Evict(ctx, value.ID().Uint64())
+	}
+	return nil
+}
+
+var _ assessment.PendingSubmissionRepository = (*InvalidatingAssessmentRepository)(nil)

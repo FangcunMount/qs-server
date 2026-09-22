@@ -24,7 +24,7 @@ func (f assessmentCreateFinalizer) SaveAndStage(
 	req assessmentCreateSpec,
 	dto CreateCommand,
 ) error {
-	if err := saveAssessmentAndStageEvents(ctx, f.repo, f.txRunner, f.eventStager, a, f.postCommit); err != nil {
+	if err := saveAssessmentAndStageEvents(ctx, f.repo.Save, f.txRunner, f.eventStager, a, f.postCommit); err != nil {
 		return evalerrors.Database(err, "保存测评失败")
 	}
 	return nil
@@ -44,7 +44,11 @@ func (f assessmentSubmitFinalizer) SaveAndStage(ctx context.Context, a *domainAs
 	if submittedAt == nil {
 		return evalerrors.AssessmentSubmitFailed(domainAssessment.ErrInvalidArgument, "测评提交时间为空")
 	}
-	if err := saveAssessmentAndStageEvents(ctx, f.repo, f.txRunner, f.eventStager, a, f.postCommit); err != nil {
+	submitter, ok := f.repo.(domainAssessment.PendingSubmissionRepository)
+	if !ok {
+		return evalerrors.ModuleNotConfigured("assessment pending submission repository is required")
+	}
+	if err := saveAssessmentAndStageEvents(ctx, submitter.SavePendingSubmission, f.txRunner, f.eventStager, a, f.postCommit); err != nil {
 		return evalerrors.Database(err, "保存测评失败")
 	}
 	return nil

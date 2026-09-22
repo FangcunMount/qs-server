@@ -8,6 +8,8 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/internal/pkg/database/mysql"
+	"github.com/FangcunMount/qs-server/internal/pkg/meta"
+	"github.com/FangcunMount/qs-server/internal/pkg/middleware"
 	"gorm.io/gorm"
 )
 
@@ -115,3 +117,31 @@ func translateAssessmentError(err error) error {
 
 	return err
 }
+
+// SavePendingSubmission persists only the submission transition. Keeping the
+// predicate and event insert in the same host transaction fences stale readers.
+func (r *assessmentRepository) SavePendingSubmission(ctx context.Context, a *assessment.Assessment) error {
+	if a == nil || a.ID().IsZero() || a.Status() != assessment.StatusSubmitted || a.SubmittedAt() == nil {
+		return errors.WithCode(code.ErrInvalidArgument, "invalid pending submission")
+	}
+	tx, err := mysql.RequireTx(ctx)
+	if err != nil {
+		return err
+	}
+	updates := map[string]interface{}{"status": assessment.StatusSubmitted.String(), "submitted_at": a.SubmittedAt()}
+	if userID := middleware.GetUserIDFromContext(ctx); userID > 0 {
+		updates["updated_by"] = meta.FromUint64(userID)
+	}
+	result := tx.Model(&AssessmentPO{}).
+		Where("id = ? AND status = ? AND deleted_at IS NULL", a.ID().Uint64(), assessment.StatusPending.String()).
+		Updates(updates)
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected != 1 {
+		return errors.WithCode(code.ErrConflict, "assessment is no longer pending")
+	}
+	return nil
+}
+
+var _ assessment.PendingSubmissionRepository = (*assessmentRepository)(nil)

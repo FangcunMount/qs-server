@@ -123,3 +123,31 @@ func TestServiceRejectsBoundModelWhenValidatorIsMissing(t *testing.T) {
 }
 
 var _ domainassessment.Repository = (*intakeRepoStub)(nil)
+
+// This application stub does not prove concurrency; the real MySQL test does.
+func (r *intakeRepoStub) SavePendingSubmission(ctx context.Context, a *domainassessment.Assessment) error {
+	return r.Save(ctx, a)
+}
+
+// A repository decorator that drops the atomic capability must fail closed.
+type proofPlainRepository struct{ domainassessment.Repository }
+
+func TestSubmissionRejectsRepositoryWithoutAtomicCapability(t *testing.T) {
+	repo, tx, stager := &intakeRepoStub{}, &txStub{}, &stagerStub{}
+	service := NewService(proofPlainRepository{Repository: repo}, validatorStub{}, tx, stager)
+	kind, code, version := "scale", "MODEL-1", "1.0.0"
+	created, err := service.CreateForAnswerSheet(context.Background(), CreateCommand{
+		OrgID: 1, TesteeID: 2, AnswerSheetID: 3, QuestionnaireCode: "Q-001", QuestionnaireVersion: "v1", OriginType: "adhoc",
+		ModelKind: &kind, ModelCode: &code, ModelVersion: &version,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	beforeEvents := len(stager.types)
+	if _, err := service.SubmitForEvaluation(context.Background(), created.ID); err == nil {
+		t.Fatal("unsafe submission accepted")
+	}
+	if repo.saves != 1 || tx.calls != 1 || len(stager.types) != beforeEvents {
+		t.Fatal("unsupported submission fell back to ordinary Save")
+	}
+}
