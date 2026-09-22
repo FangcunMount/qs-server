@@ -37,6 +37,9 @@ func (p *Participant) Source(ctx context.Context, actor Actor, testeeID, assessm
 		return nil, source.ErrInconsistent
 	}
 	if _, err := reportSnapshot(current); err != nil {
+		if errors.Is(err, source.ErrNotApplicable) {
+			return &ParticipantSource{Status: "not_applicable"}, nil
+		}
 		return nil, err
 	}
 	return &ParticipantSource{Status: "ready", ReportID: r.ID().String(), SourceVersion: r.ContentSchemaVersion() + ":" + r.OutcomeID().String()}, nil

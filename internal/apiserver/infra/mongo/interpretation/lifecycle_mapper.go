@@ -240,6 +240,10 @@ func dimensionToPO(d domainreport.DimensionInterpret) DimensionInterpretPO {
 		RiskLevel: d.Severity(), Role: d.Role(), ParentCode: d.ParentCode(), HierarchyLevel: d.HierarchyLevel(), SortOrder: d.SortOrder(),
 		Description: d.Description(), Suggestion: d.Suggestion(),
 	}
+	if facts := d.PoleFacts(); facts != nil {
+		po.PoleFacts = &PoleFactsPO{SchemaVersion: facts.SchemaVersion, LeftPole: facts.LeftPole, RightPole: facts.RightPole, Preference: facts.Preference,
+			Strength: &facts.Strength, MinScore: &facts.MinScore, MaxScore: &facts.MaxScore, Threshold: &facts.Threshold, CompositionOrder: &facts.CompositionOrder}
+	}
 	po.Score = scoreValueToPO(domainreport.NewRawTotalScore(d.RawScore(), d.MaxScore()))
 	po.DerivedScores = scoreValuesToPO(d.DerivedScores())
 	po.Level = resultLevelToPO(d.Level())
@@ -264,6 +268,17 @@ func dimensionToDomain(po DimensionInterpretPO) domainreport.DimensionInterpret 
 		dimension = domainreport.NewNeutralDimensionInterpret(domainreport.NewDimensionCode(po.FactorCode), kind, po.FactorName, rawScore, maxScore, resultLevelToDomain(po.Level), po.Description, po.Suggestion)
 	} else {
 		dimension = domainreport.NewDimensionInterpret(domainreport.NewFactorCode(po.FactorCode), po.FactorName, rawScore, maxScore, risk, po.Description, po.Suggestion)
+	}
+	if po.PoleFacts != nil {
+		p := po.PoleFacts
+		facts := domainreport.PoleFacts{}
+		// A damaged extension remains present and invalid; never turn a missing
+		// numeric field into a legitimate zero or silently fall back to legacy.
+		if p.Strength != nil && p.MinScore != nil && p.MaxScore != nil && p.Threshold != nil && p.CompositionOrder != nil {
+			facts = domainreport.PoleFacts{SchemaVersion: p.SchemaVersion, LeftPole: p.LeftPole, RightPole: p.RightPole, Preference: p.Preference,
+				Strength: *p.Strength, MinScore: *p.MinScore, MaxScore: *p.MaxScore, Threshold: *p.Threshold, CompositionOrder: *p.CompositionOrder}
+		}
+		dimension = dimension.WithPoleFacts(&facts)
 	}
 	return dimension.WithScoreContext(scoreValuesToDomain(po.DerivedScores), resultLevelToDomain(po.Level), normReferenceToDomain(po.NormReference)).WithHierarchy(po.Role, po.ParentCode, po.HierarchyLevel, po.SortOrder)
 }

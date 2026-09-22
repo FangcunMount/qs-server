@@ -116,6 +116,25 @@ Outcome 可以保存总分、因子分、等级、类型编码和常模派生分
 
 这也是为什么生产适配器直接从 Outcome Record 构建 InterpretationInput，而不是恢复一个 Assessment 后再次调用 Evaluation 或 ModelCatalog。
 
+### 3.4 MBTI 四轴结构化事实
+
+`MBTI_OEJTS / v64-report-202608-v1` 的新 Outcome 在提交时从同一不可变 DefinitionV2 提取 `mbti-pole-catalog/v1`，作为 ReportInput schema 3 的可选扩展。冻结内容包括 EI、SN、TF、JP 的组合顺序、名称、两极、原始分范围及阈值；不保存答题或执行载荷，不在报告恢复时查询最新模型。
+
+Interpretation 将该目录与 Outcome 中的原始分、偏好方向及精确强度合并，写入报告维度的 `mbti-pole-facts/v1`。强度是偏好强度，不是置信度；展示文案的取整不影响结构化值。缺失值与合法零值分别处理，四轴缺失、重复、模型身份或类型方向冲突均拒绝构建；持久化扩展损坏也拒绝回读。Mongo 使用可选 `pole_facts` 字段，无需集合结构迁移。
+
+历史 ReportInput 或报告没有该扩展时保留原读取行为，不从描述反解析、不从最新模型补造，也不自动回填旧数据。`report-content/v1` 的原字段和量表路径保持原语义；新事实块以自身 schema 版本识别。
+
+AI bridge 对精确模型及完整四轴事实投影 `qs-report-snapshot/v2`：显式白名单保留来源、模型、类型、四轴与建议，不输出图片或稀有度。缺少事实的历史 MBTI 报告返回 `not_applicable`，不能退回量表快照或从文案补算；损坏事实明确失败。旧量表 `qs-report-snapshot/v1` 字节不变。
+
+本批属于 P1 可信事实与兼容读取；先部署 qs-ai 兼容版本，再发布 QS。qs-ai 当前生产准入仍拒绝人格 v2，直到 P2 的冻结执行、恢复和资产闭环通过。没有自动批准、发布、模型调用或历史数据补写。Go 投影测试导出的合成快照由 qs-ai CI 直接解码和组装，不能把该契约验证当作真实人格生成验收。
+
+事实入口与验证：
+
+- [`report_input_freeze.go`](../../../internal/apiserver/application/evaluation/outcome/commit/report_input_freeze.go)：提交层组合原模型元数据与计算规则，冻结为中立输入契约。
+- [`mbti_poles.go`](../../../internal/apiserver/application/interpretation/automation/input/mbti_poles.go)：合并已提交的精确结果事实。
+- [`pole_facts.go`](../../../internal/apiserver/domain/interpretation/report/pole_facts.go)：报告不可变事实及一致性约束。
+- [`mbti_facts_test.go`](../../../internal/apiserver/infra/mongo/interpretation/mbti_facts_test.go)：脱敏基线从冻结输入、Builder 到 BSON 回读的回归；不代表生产验收。
+
 ## 4. 三层输入模型
 
 ### 4.1 第一层：Outcome Record
