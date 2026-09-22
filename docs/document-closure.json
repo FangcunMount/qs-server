@@ -2,7 +2,7 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "7adb22d5b1e4e73d108918eb7a9995c6a8c93cbc",
+    "sha": "583739a896f2944eb094ce48879678ff95d85a2b",
     "verified_on": "2026-09-22"
   },
   "status_policy": {
@@ -9140,7 +9140,7 @@
       "owner": "tooling",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": "7adb22d5b1e4e73d108918eb7a9995c6a8c93cbc",
+        "source_sha": "583739a896f2944eb094ce48879678ff95d85a2b",
         "verified_on": "2026-09-22"
       },
       "fact_sources": [
@@ -9151,6 +9151,14 @@
         {
           "kind": "source",
           "path": "internal/apiserver/container/internal/transaction/reliable_messaging_proof_test.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/worker/integration/messaging/reliable_messaging_proof_test.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/pkg/migration/migrations/mysql/000050_add_retry_event_hold.up.sql"
         }
       ],
       "verification": [],
@@ -9168,7 +9176,7 @@
           "id": "RM-M2-PROOF-REVIEW",
           "kind": "verification",
           "severity": "medium",
-          "summary": "Local Mongo original-runner proof passed against SDK 42fa4c3; final review and cross-repository CI remain pending.",
+          "summary": "Local original Mongo runner and MySQL durable-hold proofs passed against SDK d13ee10; final review and cross-repository CI remain pending.",
           "exit_criteria": "Review the test-only bridge and its explicit limits; preserve independent rollout gates."
         }
       ]
