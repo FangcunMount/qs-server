@@ -21,6 +21,9 @@ func reportSnapshot(current *source.Current) ([]byte, error) {
 		return nil, source.ErrInconsistent
 	}
 	content := r.Content()
+	if content.Model.Code == "MBTI_OEJTS" || outcome.Model().Code == "MBTI_OEJTS" {
+		return mbtiReportSnapshot(current)
+	}
 	dimensions := content.Dimensions
 	if report.UsesFactorScoreVisibility(content.Model) {
 		if content.PresentationProfile == nil || !content.PresentationProfile.Configured() {
