@@ -23,7 +23,7 @@ type EventStager interface {
 // 场景：保存测评并阶段事件
 func saveAssessmentAndStageEvents(
 	ctx context.Context,
-	repo domainAssessment.Repository,
+	save func(context.Context, *domainAssessment.Assessment) error,
 	txRunner apptransaction.Runner,
 	stager EventStager,
 	a *domainAssessment.Assessment,
@@ -37,7 +37,7 @@ func saveAssessmentAndStageEvents(
 	}
 	var stagedEvents []event.DomainEvent
 	err := txRunner.WithinTransaction(ctx, func(txCtx context.Context) error {
-		if err := repo.Save(txCtx, a); err != nil {
+		if err := save(txCtx, a); err != nil {
 			return err
 		}
 		eventsToStage := make([]event.DomainEvent, 0, len(a.Events()))

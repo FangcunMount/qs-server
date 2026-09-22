@@ -105,3 +105,9 @@ func newDryRunAssessmentDB(t *testing.T) *gorm.DB {
 	}
 	return db
 }
+
+// The dry-run fixture only verifies application routing. Atomic transition
+// semantics are exercised by the tagged real-MySQL proof.
+func (r *persistedAssessmentRepository) SavePendingSubmission(ctx context.Context, a *domainassessment.Assessment) error {
+	return r.Save(ctx, a)
+}

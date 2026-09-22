@@ -37,3 +37,10 @@ type ScoreRepository interface {
 	// immutable EvaluationOutcome. It is not an independent score fact.
 	SaveProjectionFromOutcome(ctx context.Context, outcomeID meta.ID, assessmentDomain *Assessment, score *ScaleScoreProjection) error
 }
+
+// PendingSubmissionRepository atomically changes pending to submitted inside
+// the caller's transaction. A lost competition must return an error before
+// staging an event; it must never fall back to an unconditional Save.
+type PendingSubmissionRepository interface {
+	SavePendingSubmission(context.Context, *Assessment) error
+}

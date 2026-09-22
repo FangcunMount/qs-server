@@ -4,11 +4,18 @@ package transaction
 
 import (
 	"context"
+	cberrors "github.com/FangcunMount/component-base/pkg/errors"
+	journey "github.com/FangcunMount/qs-server/internal/apiserver/application/journey/assessmentintake"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor"
+	sheet "github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/answersheet"
+	errorcode "github.com/FangcunMount/qs-server/internal/pkg/code"
+	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 	"os"
 	"testing"
 	"time"
 
 	intake "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/intake"
+	assessmentcache "github.com/FangcunMount/qs-server/internal/apiserver/cache/evaluation"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	persistence "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/evaluation"
 	oldoutbox "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/eventoutbox"
@@ -48,7 +55,7 @@ events:
     handler: proof
 `))
 	require.NoError(t, err)
-	repo := persistence.NewAssessmentRepository(db)
+	repo := assessmentcache.NewInvalidatingAssessmentRepository(persistence.NewAssessmentRepository(db), nil)
 	runner := NewMySQLRunner(db)
 	stager := oldoutbox.NewStoreWithTopicResolver(db, catalog.NewCatalog(config))
 	service := intake.NewService(repo, proofModelValidator{}, runner, stager)
@@ -94,22 +101,43 @@ events:
 		}
 	}
 	close(barrier.release)
+	successes := 0
 	for range 2 {
-		require.NoError(t, <-results)
+		if resultErr := <-results; resultErr == nil {
+			successes++
+		} else {
+			require.True(t, cberrors.IsCode(resultErr, errorcode.ErrConflict), "unexpected competing error: %v", resultErr)
+		}
 	}
-	// Known baseline gap: two independent event identities are persisted for one
-	// business transition. This passing characterization is NOT an idempotency pass.
-	require.EqualValues(t, 2, countEvents(), "update characterization if host CAS protection is introduced")
+	require.Equal(t, 1, successes, "only the pending transition winner may commit")
+	// The losing conditional update rolls back before staging its distinct event.
+	require.EqualValues(t, 1, countEvents())
 	found, err = service.FindByAnswerSheetID(ctx, command.AnswerSheetID)
 	require.NoError(t, err)
 	require.Equal(t, "submitted", found.Status)
 	_, err = service.SubmitForEvaluation(ctx, created.ID)
 	require.Error(t, err, "sequential replay sees submitted and rejects a second transition")
-	require.EqualValues(t, 2, countEvents())
+	require.EqualValues(t, 1, countEvents())
+	// Re-enter the actual Journey after an uncertain prior response. Only its
+	// AnswerSheet reader is a fixture; the Assessment lookup is real MySQL.
+	submission, err := sheet.NewSubmissionContext(actor.NewFillerRef(4, actor.FillerTypeSelf), actor.NewTesteeRef(meta.FromUint64(2)), meta.FromUint64(1), "")
+	require.NoError(t, err)
+	questionnaire, err := sheet.NewQuestionnaireRef("Q-001", "v1", "proof")
+	require.NoError(t, err)
+	persisted := sheet.ReconstructWithSubmissionContext(meta.FromUint64(3), questionnaire, submission, nil, time.Now(), 0)
+	ensure := journey.NewService(nil, nil, nil, nil, service, nil, proofSubmissionReader{value: persisted})
+	for range 2 {
+		result, ensureErr := ensure.Ensure(ctx, journey.Command{OrgID: 1, TesteeID: 2, FillerID: 4, AnswerSheetID: 3, QuestionnaireCode: "Q-001", QuestionnaireVersion: "v1", Admission: &journey.Admission{Purpose: string(sheet.AdmissionPurposeAssessment), ModelKind: kind, ModelCode: code, ModelVersion: version}})
+		require.NoError(t, ensureErr)
+		require.Equal(t, created.ID, result.AssessmentID)
+		require.False(t, result.Created)
+		require.False(t, result.AutoSubmitted)
+	}
+	require.EqualValues(t, 1, countEvents())
 	var assessments int64
 	require.NoError(t, db.Model(&persistence.AssessmentPO{}).Count(&assessments).Error)
 	require.EqualValues(t, 1, assessments)
-	t.Log("baseline gap reproduced: one assessment, two evaluation.requested rows after concurrent pending reads; M2 consumer gate remains open")
+	t.Log("one assessment and one evaluation.requested survive concurrent pending reads; full consumer recovery gate remains open")
 }
 
 type proofModelValidator struct{}
@@ -140,4 +168,14 @@ func (r *proofPendingBarrier) FindByID(ctx context.Context, id domain.ID) (*doma
 	case <-ctx.Done():
 		return nil, ctx.Err()
 	}
+}
+
+func (r *proofPendingBarrier) SavePendingSubmission(ctx context.Context, a *domain.Assessment) error {
+	return r.Repository.(domain.PendingSubmissionRepository).SavePendingSubmission(ctx, a)
+}
+
+type proofSubmissionReader struct{ value *sheet.AnswerSheet }
+
+func (r proofSubmissionReader) FindByID(context.Context, meta.ID) (*sheet.AnswerSheet, error) {
+	return r.value, nil
 }
