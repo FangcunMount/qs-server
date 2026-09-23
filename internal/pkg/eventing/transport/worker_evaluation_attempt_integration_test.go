@@ -123,6 +123,7 @@ func TestWorkerDuplicateNSQEvaluationRequestKeepsOneDurableAttempt(t *testing.T)
 	t.Cleanup(func() { _ = subscriber.Close() })
 	if err := workermessaging.SubscribeHandlersWithOptions(workermessaging.SubscribeHandlersOptions{
 		ServiceName: channel, Logger: slog.New(slog.NewTextHandler(io.Discard, nil)), Runtime: runtime, Subscriber: subscriber,
+		UnknownRecorder: NewUnknownEventRecorder("nsq", recorder),
 	}); err != nil {
 		t.Fatal(err)
 	}

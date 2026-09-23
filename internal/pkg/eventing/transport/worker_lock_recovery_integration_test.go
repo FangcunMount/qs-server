@@ -128,7 +128,8 @@ func TestWorkerLockHolderExitRetriesBeforeAck(t *testing.T) {
 	}
 	t.Cleanup(func() { _ = subscriber.Close() })
 	if err := workermessaging.SubscribeHandlersWithOptions(workermessaging.SubscribeHandlersOptions{
-		ServiceName: channel, Logger: slog.Default(), Runtime: lockRecoveryRuntime{topic: topic, handler: handler}, Subscriber: subscriber, Observer: observer,
+		UnknownRecorder: NewUnknownEventRecorder("nsq", recorder),
+		ServiceName:     channel, Logger: slog.Default(), Runtime: lockRecoveryRuntime{topic: topic, handler: handler}, Subscriber: subscriber, Observer: observer,
 	}); err != nil {
 		t.Fatal(err)
 	}

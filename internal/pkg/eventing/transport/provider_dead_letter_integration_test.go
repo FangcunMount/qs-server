@@ -47,7 +47,8 @@ func (r *workerSettlementRuntime) DispatchEvent(_ context.Context, eventType str
 }
 
 type workerSettlementObserver struct {
-	unknownAcked atomic.Int32
+	unknownAcked         atomic.Int32
+	unknownPersistFailed atomic.Int32
 }
 
 func (*workerSettlementObserver) ObservePublish(context.Context, eventobservability.PublishEvent) {}
@@ -56,9 +57,12 @@ func (o *workerSettlementObserver) ObserveConsume(_ context.Context, event event
 	if event.Outcome == eventobservability.ConsumeOutcomeUnknownAcked {
 		o.unknownAcked.Add(1)
 	}
+	if event.Outcome == eventobservability.ConsumeOutcomeUnknownPersistFailed {
+		o.unknownPersistFailed.Add(1)
+	}
 }
 
-func TestWorkerSettlementThroughNSQPersistsPoisonAndExhaustion(t *testing.T) {
+func TestWorkerSettlementThroughNSQPersistsPoisonUnknownAndExhaustion(t *testing.T) {
 	if os.Getenv("MESSAGING_INTEGRATION") != "1" {
 		t.Skip("set MESSAGING_INTEGRATION=1 and start NSQ/MySQL integration services")
 	}
@@ -87,6 +91,7 @@ func TestWorkerSettlementThroughNSQPersistsPoisonAndExhaustion(t *testing.T) {
 	t.Cleanup(func() { _ = subscriber.Close() })
 	if err := workermessaging.SubscribeHandlersWithOptions(workermessaging.SubscribeHandlersOptions{
 		ServiceName: channel, Logger: slog.Default(), Runtime: runtime, Subscriber: subscriber, Observer: observer,
+		UnknownRecorder: NewUnknownEventRecorder("nsq", recorder),
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -116,7 +121,7 @@ func TestWorkerSettlementThroughNSQPersistsPoisonAndExhaustion(t *testing.T) {
 		if err := db.QueryRowContext(t.Context(), `SELECT COUNT(*) FROM event_delivery_dead_letter`).Scan(&deadLetters); err != nil {
 			t.Fatal(err)
 		}
-		if deadLetters == 2 && observer.unknownAcked.Load() == 1 {
+		if deadLetters == 3 && observer.unknownAcked.Load() == 1 {
 			break
 		}
 		select {
@@ -143,12 +148,14 @@ FROM event_delivery_dead_letter WHERE message_id=?`, test.id).Scan(&payload, &ca
 			t.Fatalf("dead letter %q: payload=%q cause=%q disposition=%q attempts=%d", test.id, payload, cause, disposition, attempts)
 		}
 	}
-	var unknownDeadLetters int
-	if err := db.QueryRowContext(t.Context(), `SELECT COUNT(*) FROM event_delivery_dead_letter WHERE message_id=?`, unknown.UUID).Scan(&unknownDeadLetters); err != nil {
+	var unknownEventID, unknownPayload, unknownCause, unknownDisposition string
+	var unknownAttempts int
+	if err := db.QueryRowContext(t.Context(), `SELECT event_id,payload_json,last_error,retry_disposition,delivery_attempts FROM event_delivery_dead_letter WHERE message_id=?`, unknown.UUID).
+		Scan(&unknownEventID, &unknownPayload, &unknownCause, &unknownDisposition, &unknownAttempts); err != nil {
 		t.Fatal(err)
 	}
-	if unknownDeadLetters != 0 || runtime.unknownCalls.Load() != 1 || runtime.failedCalls.Load() != 2 {
-		t.Fatalf("worker calls: unknown=%d failed=%d unknown_dead_letters=%d", runtime.unknownCalls.Load(), runtime.failedCalls.Load(), unknownDeadLetters)
+	if unknownEventID != "unknown-1" || unknownPayload != string(unknown.Payload) || unknownCause != "unknown event type: new.event" || unknownDisposition != "manual_required" || unknownAttempts != 1 || runtime.unknownCalls.Load() != 1 || runtime.failedCalls.Load() != 2 {
+		t.Fatalf("unknown audit: event=%q payload=%q cause=%q disposition=%q attempts=%d calls=%d/%d", unknownEventID, unknownPayload, unknownCause, unknownDisposition, unknownAttempts, runtime.unknownCalls.Load(), runtime.failedCalls.Load())
 	}
 }
 
@@ -242,6 +249,104 @@ delivery_attempts,payload_json,last_error,retry_disposition FROM event_delivery_
 	}
 	if row.MessageID != message.UUID || row.EventID != "transport-event-1" || row.OrgID != 7 || row.Provider != "nsq" || row.Topic != topic || row.Channel != channel || row.DeliveryAttempts != 2 || row.Payload != string(payload) || row.LastError != wantCause.Error() || row.Disposition != "manual_required" {
 		t.Fatalf("dead-letter row = %#v", row)
+	}
+}
+
+func TestWorkerUnknownEventWaitsForMySQLAuditRecovery(t *testing.T) {
+	if os.Getenv("MESSAGING_INTEGRATION") != "1" {
+		t.Skip("set MESSAGING_INTEGRATION=1 and start NSQ/MySQL integration services")
+	}
+	db := openIsolatedDeadLetterDatabase(t)
+	recorder, err := NewSQLDeadLetterRecorder(db)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.ExecContext(t.Context(), `DROP TABLE event_delivery_dead_letter`); err != nil {
+		t.Fatal(err)
+	}
+	failedWrites := make(chan error, 2)
+	wrappedRecorder := deadLetterRecorderFunc(func(ctx context.Context, record DeadLetterRecord) error {
+		writeErr := recorder.RecordDeadLetter(ctx, record)
+		if writeErr != nil {
+			select {
+			case failedWrites <- writeErr:
+			default:
+			}
+		}
+		return writeErr
+	})
+	topic := fmt.Sprintf("qs-worker-unknown-%d", time.Now().UnixNano())
+	channel := topic + "-worker"
+	cleanupNSQTopics(t, topic, nsqFailedHandoffTopic(topic, channel))
+	createNSQTopicAndChannel(t, topic, channel)
+	runtime := &workerSettlementRuntime{topic: topic}
+	observer := &workerSettlementObserver{}
+	subscriber, err := NewSubscriber(SubscriberConfig{
+		Provider: "nsq", NSQLookupdAddr: integrationEnv("NSQ_LOOKUPD_ADDR", "127.0.0.1:4161"), NSQMessageTimeout: time.Minute,
+	}, basemessaging.SubscriberOptions{
+		MaxInFlight: 1, MaxAttempts: 4,
+		RetryBackoff:         basemessaging.RetryBackoffOptions{BaseDelay: 500 * time.Millisecond, MaxDelay: 500 * time.Millisecond},
+		FailedMessageHandler: FailedMessageHandler(wrappedRecorder),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = subscriber.Close() })
+	if err := workermessaging.SubscribeHandlersWithOptions(workermessaging.SubscribeHandlersOptions{
+		ServiceName: channel, Logger: slog.Default(), Runtime: runtime, Subscriber: subscriber, Observer: observer,
+		UnknownRecorder: NewUnknownEventRecorder("nsq", wrappedRecorder),
+	}); err != nil {
+		t.Fatal(err)
+	}
+	publisher, err := cbnsq.NewPublisher(integrationEnv("NSQD_ADDR", "127.0.0.1:4150"), nsq.NewConfig())
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = publisher.Close() })
+	message := basemessaging.NewMessage("worker-unknown-outage-1", []byte(`{"id":"unknown-outage-1","data":{"org_id":501}}`))
+	message.Metadata["event_type"] = "future.event"
+	if err := publisher.PublishMessage(t.Context(), topic, message); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case writeErr := <-failedWrites:
+		if !strings.Contains(writeErr.Error(), "event_delivery_dead_letter") {
+			t.Fatalf("unexpected audit failure: %v", writeErr)
+		}
+	case <-time.After(20 * time.Second):
+		t.Fatal("timed out waiting for unknown-event audit failure")
+	}
+	if observer.unknownAcked.Load() != 0 {
+		t.Fatalf("unknown event confirmed before durable record: acked=%d", observer.unknownAcked.Load())
+	}
+	if err := createDeadLetterTable(t.Context(), db); err != nil {
+		t.Fatal(err)
+	}
+	deadline := time.NewTimer(20 * time.Second)
+	ticker := time.NewTicker(25 * time.Millisecond)
+	defer deadline.Stop()
+	defer ticker.Stop()
+	for {
+		var rows, attempts int
+		var cause string
+		err := db.QueryRowContext(t.Context(), `SELECT COUNT(*),COALESCE(MAX(delivery_attempts),0),COALESCE(MAX(last_error),'') FROM event_delivery_dead_letter WHERE message_id=?`, message.UUID).Scan(&rows, &attempts, &cause)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if rows == 1 && observer.unknownAcked.Load() == 1 {
+			if attempts < 2 || attempts >= 4 || cause != "unknown event type: future.event" {
+				t.Fatalf("recovered unknown audit: attempts=%d cause=%q", attempts, cause)
+			}
+			break
+		}
+		select {
+		case <-ticker.C:
+		case <-deadline.C:
+			t.Fatalf("unknown event audit did not recover: rows=%d acked=%d", rows, observer.unknownAcked.Load())
+		}
+	}
+	if runtime.unknownCalls.Load() < 2 || runtime.failedCalls.Load() != 0 || observer.unknownPersistFailed.Load() == 0 {
+		t.Fatalf("dispatch calls after audit recovery: unknown=%d failed=%d persist_failed=%d", runtime.unknownCalls.Load(), runtime.failedCalls.Load(), observer.unknownPersistFailed.Load())
 	}
 }
 

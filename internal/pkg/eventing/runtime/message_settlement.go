@@ -136,6 +136,16 @@ func (p MessageSettlementPolicy) AckUnknown(msg *messaging.Message) (eventobserv
 	return p.ack(msg, eventobservability.ConsumeOutcomeUnknownAcked, eventobservability.ConsumeOutcomeUnknownAckFailed)
 }
 
+// ReportUnknownPersistFailed leaves settlement to the transport. The original
+// delivery can only be ACKed after durable evidence exists.
+func (p MessageSettlementPolicy) ReportUnknownPersistFailed(msg *messaging.Message, eventType string, persistErr error) eventobservability.ConsumeOutcome {
+	p.logger.Error("failed to persist unknown event",
+		slog.String("channel", p.service), slog.String("topic", p.topic), slog.String("event_type", eventType),
+		slog.String("msg_id", msg.UUID), slog.String("error", persistErr.Error()))
+	p.observe(msg, eventType, eventobservability.ConsumeOutcomeUnknownPersistFailed)
+	return eventobservability.ConsumeOutcomeUnknownPersistFailed
+}
+
 func (p MessageSettlementPolicy) ack(msg *messaging.Message, successOutcome, failedOutcome eventobservability.ConsumeOutcome) (eventobservability.ConsumeOutcome, error) {
 	if ackErr := msg.Ack(); ackErr != nil {
 		eventType := eventTypeFromMessage(msg)

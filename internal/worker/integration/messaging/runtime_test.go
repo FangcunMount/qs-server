@@ -175,10 +175,11 @@ func TestSubscribeHandlersUsesNarrowSubscriptionRuntime(t *testing.T) {
 	subscriber := &fakeSubscriber{}
 
 	if err := SubscribeHandlersWithOptions(SubscribeHandlersOptions{
-		ServiceName: "worker-channel",
-		Logger:      testLogger(),
-		Runtime:     runtime,
-		Subscriber:  subscriber,
+		ServiceName:     "worker-channel",
+		Logger:          testLogger(),
+		Runtime:         runtime,
+		Subscriber:      subscriber,
+		UnknownRecorder: func(context.Context, *basemessaging.Message, string) error { return nil },
 	}); err != nil {
 		t.Fatalf("SubscribeHandlersWithOptions: %v", err)
 	}
@@ -190,6 +191,15 @@ func TestSubscribeHandlersUsesNarrowSubscriptionRuntime(t *testing.T) {
 	}
 	if subscriber.handler == nil {
 		t.Fatalf("handler = nil")
+	}
+}
+
+func TestSubscribeHandlersRequiresUnknownEventAudit(t *testing.T) {
+	runtime := &fakeSubscriptionRuntime{subs: []eventcatalog.TopicSubscription{{TopicName: "sample.topic"}}}
+	if err := SubscribeHandlersWithOptions(SubscribeHandlersOptions{
+		ServiceName: "worker-channel", Logger: testLogger(), Runtime: runtime, Subscriber: &fakeSubscriber{},
+	}); err == nil {
+		t.Fatal("Worker subscription accepted without unknown-event audit")
 	}
 }
 
@@ -379,15 +389,50 @@ func TestDispatchHandlerObservesUnknownAcked(t *testing.T) {
 	dispatcher := &fakeDispatcher{outcome: eventruntime.DispatchUnknown}
 	msg := basemessaging.NewMessage("msg-1", []byte(`{}`))
 	msg.Metadata["event_type"] = "metadata.event"
-	msg.SetAckFunc(func() error { return nil })
+	recorded, acked := false, false
+	msg.SetAckFunc(func() error {
+		if !recorded {
+			t.Fatal("unknown event acknowledged before durable record")
+		}
+		acked = true
+		return nil
+	})
 
-	handler := createDispatchHandlerWithObserver(testLogger(), dispatcher, "topic", "worker", observer)
+	handler := createDispatchHandlerWithObserverAndHoldAndUnknown(testLogger(), dispatcher, "topic", "worker", observer, nil, func(_ context.Context, got *basemessaging.Message, eventType string) error {
+		if got != msg || eventType != "metadata.event" {
+			t.Fatalf("unknown record identity: message=%p event=%q", got, eventType)
+		}
+		recorded = true
+		return nil
+	})
 	if err := handler(context.Background(), msg); err != nil {
 		t.Fatalf("handler: %v", err)
+	}
+	if !recorded || !acked {
+		t.Fatalf("recorded=%t acked=%t, want both", recorded, acked)
 	}
 
 	assertConsumeOutcome(t, observer, eventobservability.ConsumeOutcomeUnknownAcked)
 	assertConsumeDuration(t, observer, eventobservability.ConsumeOutcomeUnknownAcked)
+}
+
+func TestDispatchHandlerDoesNotAckUnknownWhenAuditFails(t *testing.T) {
+	observer := &consumeObserver{}
+	dispatcher := &fakeDispatcher{outcome: eventruntime.DispatchUnknown}
+	msg := basemessaging.NewMessage("msg-1", []byte(`{}`))
+	msg.Metadata["event_type"] = "metadata.event"
+	msg.SetAckFunc(func() error { t.Fatal("unknown event acknowledged without audit"); return nil })
+	msg.SetNackFunc(func() error { t.Fatal("handler settled before transport could NACK"); return nil })
+	wantErr := errors.New("audit unavailable")
+	handler := createDispatchHandlerWithObserverAndHoldAndUnknown(testLogger(), dispatcher, "topic", "worker", observer, nil, func(context.Context, *basemessaging.Message, string) error { return wantErr })
+	if err := handler(t.Context(), msg); !errors.Is(err, wantErr) {
+		t.Fatalf("handler error = %v, want audit failure", err)
+	}
+	if msg.IsSettled() {
+		t.Fatal("unknown event settled before transport retry")
+	}
+	assertConsumeOutcome(t, observer, eventobservability.ConsumeOutcomeUnknownPersistFailed)
+	assertConsumeDuration(t, observer, eventobservability.ConsumeOutcomeUnknownPersistFailed)
 }
 
 func TestDispatchHandlerObservesAckFailed(t *testing.T) {
