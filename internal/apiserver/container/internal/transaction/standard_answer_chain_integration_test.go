@@ -4,12 +4,14 @@ package transaction
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
 	"net"
 	"os"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -29,13 +31,20 @@ import (
 	grpcservice "github.com/FangcunMount/qs-server/internal/apiserver/transport/grpc/service"
 	eventcatalog "github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
 	eventruntime "github.com/FangcunMount/qs-server/internal/pkg/eventing/runtime"
+	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime"
+	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/keyspace"
+	"github.com/FangcunMount/qs-server/internal/pkg/resilience/locklease"
+	"github.com/FangcunMount/qs-server/internal/pkg/resilience/locklease/redisadapter"
+	locksubsystem "github.com/FangcunMount/qs-server/internal/pkg/resilience/locklease/subsystem"
 	"github.com/FangcunMount/qs-server/internal/worker/handlers"
 	"github.com/FangcunMount/reliable-messaging/relay"
 	sdkmongo "github.com/FangcunMount/reliable-messaging/storage/mongo"
 	sdkmysql "github.com/FangcunMount/reliable-messaging/storage/mysql"
 	sdknsq "github.com/FangcunMount/reliable-messaging/transport/nsq"
+	"github.com/alicebob/miniredis/v2"
 	mysqldriver "github.com/go-sql-driver/mysql"
 	"github.com/nsqio/go-nsq"
+	redis "github.com/redis/go-redis/v9"
 	"github.com/stretchr/testify/require"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -48,7 +57,8 @@ import (
 
 // A committed real AnswerSheet flows from the SDK Mongo row through NSQ's
 // original consumer and Worker handler to the real MySQL Assessment transition
-// and a second SDK row. A lost broker FIN redelivers the same message ID.
+// and a second SDK row. Lock contention and a lost broker FIN both redeliver
+// the same message ID without creating an extra Assessment or MySQL SDK row.
 func TestStandardAnswerSheetToAssessmentAcrossNSQ(t *testing.T) {
 	mongoURI, dsn, nsqAddress := os.Getenv("RM_QS_MONGO_URI"), os.Getenv("RM_QS_ASSESSMENT_DSN"), os.Getenv("RM_QS_NSQ_TCP")
 	parsed, err := mysqldriver.ParseDSN(dsn)
@@ -125,7 +135,13 @@ events:
 	ensure := journey.NewService(nil, nil, nil, nil, assessmentService, nil, sheetRepo)
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	require.NoError(t, err)
-	server := grpc.NewServer()
+	var ensureCalls atomic.Int32
+	server := grpc.NewServer(grpc.UnaryInterceptor(func(ctx context.Context, request any, info *grpc.UnaryServerInfo, next grpc.UnaryHandler) (any, error) {
+		if strings.HasSuffix(info.FullMethod, "/EnsureAssessment") {
+			ensureCalls.Add(1)
+		}
+		return next(ctx, request)
+	}))
 	grpcservice.NewAssessmentIntakeService(ensure, assessmentService, nil).RegisterService(server)
 	serverDone := make(chan error, 1)
 	go func() { serverDone <- server.Serve(listener) }()
@@ -133,13 +149,28 @@ events:
 	conn, err := grpc.NewClient(listener.Addr().String(), grpc.WithTransportCredentials(insecure.NewCredentials()))
 	require.NoError(t, err)
 	defer conn.Close()
+	mini := miniredis.RunT(t)
+	redisClient := redis.NewClient(&redis.Options{Addr: mini.Addr()})
+	defer redisClient.Close()
+	keys := keyspace.NewBuilderWithNamespace(keyspace.ComposeNamespace("m4-chain", "cache:lock"))
+	redisHandle := &redisruntime.Handle{Client: redisClient, Builder: keys}
+	lockManager := redisadapter.NewManager("worker", "lock_lease", redisHandle)
+	lockRunner := locksubsystem.New(locksubsystem.Options{Component: "worker", Handle: redisHandle, Manager: lockManager, RenewalEnabled: true})
+	capability, ok := locklease.Lookup(locklease.WorkloadAnswersheetProcessing)
+	require.True(t, ok)
+	holderLease, acquired, err := lockManager.AcquireSpec(ctx, capability.Spec, "answersheet:processing:90010003")
+	require.NoError(t, err)
+	require.True(t, acquired)
+	require.NotNil(t, holderLease)
 	handler, ok := handlers.NewRegistry().Create("answersheet_submitted_handler", &handlers.Dependencies{
 		Logger: slog.New(slog.NewTextHandler(io.Discard, nil)), AssessmentIntakeClient: proofIntakeGRPCClient{pb.NewAssessmentIntakeServiceClient(conn)},
+		LockManager: lockManager, LockRunner: lockRunner, LockKeyBuilder: keys,
 	})
 	require.True(t, ok)
 	config := nsq.NewConfig()
 	config.HeartbeatInterval, config.MsgTimeout = time.Second, time.Second
 	config.ReadTimeout, config.WriteTimeout = 3*time.Second, time.Second
+	config.DefaultRequeueDelay = time.Second
 	const topic, channel = "qs.evaluation.lifecycle", "rm-qs-standard-chain"
 	consumer, err := nsq.NewConsumer(topic, channel, config)
 	require.NoError(t, err)
@@ -149,7 +180,7 @@ events:
 		attempts uint16
 		err      error
 	}
-	delivered := make(chan delivery, 4)
+	delivered := make(chan delivery, 5)
 	consumer.AddHandler(nsq.HandlerFunc(func(raw *nsq.Message) error {
 		decoded, recognized, decodeErr := messaging.DecodeMessagePayload(raw.Body)
 		if decodeErr == nil && !recognized {
@@ -199,21 +230,28 @@ events:
 	go func() { relayDone <- forwarder.Run(relayCtx) }()
 	defer stopRelay()
 	var first nsq.MessageID
-	for i := range 2 {
+	for i := range 3 {
 		select {
 		case got := <-delivered:
-			require.NoError(t, got.err)
 			var assessments, events int64
 			require.NoError(t, mysqlDB.Model(&assessmentmysql.AssessmentPO{}).Count(&assessments).Error)
 			require.NoError(t, mysqlDB.Table("rm_outbox").Where("event_type=?", "evaluation.requested").Count(&events).Error)
-			require.EqualValues(t, 1, assessments)
-			require.EqualValues(t, 1, events)
 			if i == 0 {
+				require.True(t, errors.Is(got.err, handlers.ErrAnswerSheetProcessingInProgress), "first delivery must retry lock contention: %v", got.err)
+				require.Zero(t, assessments)
+				require.Zero(t, events)
+				require.Zero(t, ensureCalls.Load())
 				first = got.id
 				require.EqualValues(t, 1, got.attempts)
+				// The holder exits without release or a committed Assessment.
+				mini.FastForward(capability.Spec.DefaultTTL)
 			} else {
+				require.NoError(t, got.err)
+				require.EqualValues(t, 1, assessments)
+				require.EqualValues(t, 1, events)
 				require.Equal(t, first, got.id)
-				require.Greater(t, got.attempts, uint16(1))
+				require.EqualValues(t, i+1, got.attempts)
+				require.EqualValues(t, i, ensureCalls.Load())
 			}
 		case <-ctx.Done():
 			t.Fatal("standard AnswerSheet chain timed out", ctx.Err())
