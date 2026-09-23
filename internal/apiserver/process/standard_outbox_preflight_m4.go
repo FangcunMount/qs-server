@@ -15,11 +15,35 @@ import (
 // This is a shape/index preflight, not a substitute for M4-07 query-plan and
 // performance evidence or the M5 old-intent cutover audit.
 func preflightM4StandardStorage(ctx context.Context, opts eventsubsystem.Options, selected options.StandardOutboxOptions) error {
+	if !selected.Mongo && !selected.Assessment {
+		return nil
+	}
+	if opts.MySQLDB == nil {
+		return fmt.Errorf("M4 standard replay requires a MySQL governance audit database")
+	}
+	auditDB, err := opts.MySQLDB.DB()
+	if err != nil {
+		return fmt.Errorf("resolve M4 governance audit pool: %w", err)
+	}
+	auditRows, err := auditDB.QueryContext(ctx, `SELECT org_id,request_id,action_id,actor_user_id,component,target_instance,
+input_json,status,result_json,started_at,finished_at FROM system_governance_action_runs LIMIT 0`)
+	if err != nil {
+		return fmt.Errorf("M4 governance audit schema is incomplete: %w", err)
+	}
+	if err := auditRows.Close(); err != nil {
+		return fmt.Errorf("close M4 governance audit preflight query: %w", err)
+	}
+	var auditKeyCount int
+	if err := auditDB.QueryRowContext(ctx, `SELECT COUNT(*) FROM information_schema.statistics
+WHERE table_schema=DATABASE() AND table_name='system_governance_action_runs'
+AND index_name='uk_system_governance_action_runs_org_request' AND non_unique=0`).Scan(&auditKeyCount); err != nil {
+		return fmt.Errorf("inspect M4 governance audit request key: %w", err)
+	}
+	if auditKeyCount != 2 {
+		return fmt.Errorf("M4 governance audit requires the unique org/request key; found %d/2 columns", auditKeyCount)
+	}
 	if selected.Assessment {
-		db, err := opts.MySQLDB.DB()
-		if err != nil {
-			return fmt.Errorf("resolve M4 MySQL host pool: %w", err)
-		}
+		db := auditDB
 		for _, query := range []string{
 			"SELECT state,next_attempt_at,lease_until,version,attempt_count,failure_count,created_at,manual_replay_request_id FROM rm_outbox LIMIT 0",
 			"SELECT org_id,request_id,store_name,reason,input_hash FROM qs_rm_replay_requests LIMIT 0",

@@ -11,11 +11,16 @@ import (
 	"time"
 
 	"github.com/FangcunMount/component-base/pkg/event"
+	"github.com/FangcunMount/qs-server/internal/apiserver/application/actor/actorctx"
+	systemgov "github.com/FangcunMount/qs-server/internal/apiserver/application/systemgovernance"
 	"github.com/FangcunMount/qs-server/internal/apiserver/config"
+	platformmod "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/platform"
 	eventsubsystem "github.com/FangcunMount/qs-server/internal/apiserver/eventing/subsystem"
 	mongostandard "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/standardoutbox"
 	mysqlstandard "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/standardoutbox"
+	governanceinfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/systemgovernance"
 	"github.com/FangcunMount/qs-server/internal/apiserver/options"
+	outboxport "github.com/FangcunMount/qs-server/internal/apiserver/port/outbox"
 	qsmysql "github.com/FangcunMount/qs-server/internal/pkg/database/mysql"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
 	eventruntime "github.com/FangcunMount/qs-server/internal/pkg/eventing/runtime"
@@ -51,6 +56,10 @@ func TestM4ProcessBootstrapRunsSelectedStandardProfiles(t *testing.T) {
 	if migrationPath != "/tmp/m4-qs-bootstrap/mysql/000084_standard_reliable_outbox.up.sql" {
 		t.Fatal("copied invocation-owned standard MySQL migration required")
 	}
+	auditMigrationPath := os.Getenv("RM_QS_BOOTSTRAP_AUDIT_MIGRATION")
+	if auditMigrationPath != "/tmp/m4-qs-bootstrap/mysql/000048_add_system_governance_action_runs.up.sql" {
+		t.Fatal("copied invocation-owned governance audit migration required")
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	db, err := sql.Open("mysql", dsn)
@@ -61,7 +70,7 @@ func TestM4ProcessBootstrapRunsSelectedStandardProfiles(t *testing.T) {
 	if err := db.PingContext(ctx); err != nil {
 		t.Fatal(err)
 	}
-	for _, table := range []string{"qs_rm_replay_items", "qs_rm_replay_requests", "rm_outbox"} {
+	for _, table := range []string{"qs_rm_replay_items", "qs_rm_replay_requests", "rm_outbox", "system_governance_action_runs"} {
 		if _, err := db.ExecContext(ctx, "DROP TABLE IF EXISTS "+table); err != nil {
 			t.Fatal(err)
 		}
@@ -79,8 +88,15 @@ func TestM4ProcessBootstrapRunsSelectedStandardProfiles(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
+	auditDDL, err := os.ReadFile(auditMigrationPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.ExecContext(ctx, string(auditDDL)); err != nil {
+		t.Fatal(err)
+	}
 	defer func() {
-		for _, table := range []string{"qs_rm_replay_items", "qs_rm_replay_requests", "rm_outbox"} {
+		for _, table := range []string{"qs_rm_replay_items", "qs_rm_replay_requests", "rm_outbox", "system_governance_action_runs"} {
 			_, _ = db.ExecContext(context.Background(), "DROP TABLE IF EXISTS "+table)
 		}
 	}()
@@ -215,7 +231,117 @@ func TestM4ProcessBootstrapRunsSelectedStandardProfiles(t *testing.T) {
 		}
 		time.Sleep(100 * time.Millisecond)
 	}
+	// Exercise the actual platform facade with the status readers exported by
+	// process assembly. Direct ledger tests do not prove this runtime seam.
+	actionCtx := actorctx.WithGrantingUserID(ctx, 110004)
+	governance := platformmod.BuildRESTSystemGovernanceFacade(platformmod.RESTSystemGovernanceInput{
+		EventOutboxes: subsystem.Outboxes(), MySQLDB: gormDB, MongoDB: mongoDB,
+	})
+	if _, err := db.ExecContext(ctx, `UPDATE rm_outbox SET state='quarantined',last_error_code='publish_unknown',failure_count=30 WHERE message_id='m4-process-probe'`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := mongoDB.Collection("rm_outbox").UpdateOne(ctx, bson.M{"message_id": "m4-process-mongo-probe"},
+		bson.M{"$set": bson.M{"state": "quarantined", "last_error_code": "publish_unknown", "failure_count": int64(30)}}); err != nil {
+		t.Fatal(err)
+	}
+	var mysqlVersion, originalMySQLVersion uint64
+	if err := db.QueryRowContext(ctx, `SELECT version FROM rm_outbox WHERE message_id='m4-process-probe'`).Scan(&originalMySQLVersion); err != nil {
+		t.Fatal(err)
+	}
+	var mongoVersion, originalMongoVersion struct {
+		Version uint64 `bson:"version"`
+	}
+	if err := mongoDB.Collection("rm_outbox").FindOne(ctx, bson.M{"message_id": "m4-process-mongo-probe"}).Decode(&originalMongoVersion); err != nil {
+		t.Fatal(err)
+	}
+	for _, target := range []struct{ store, eventID string }{
+		{"assessment-mysql-outbox", "m4-process-probe"},
+		{"mongo-domain-events", "m4-process-mongo-probe"},
+	} {
+		request := systemgov.ActionRunRequest{
+			RequestID: "approve-" + target.eventID, Confirm: true,
+			Input: map[string]interface{}{
+				"store": target.store, "reason": "isolated operator review",
+				"targets": []interface{}{map[string]interface{}{"event_id": target.eventID, "expected_attempt_count": 30}},
+			},
+		}
+		approved, err := governance.RunAction(actionCtx, 501, "events.replay_pending", request)
+		if err != nil || approved == nil || approved.Result["authorized"] != 1 {
+			t.Fatalf("standard profile %s is not governable: result=%+v err=%v", target.store, approved, err)
+		}
+		prior, err := governance.RunAction(actionCtx, 501, "events.replay_pending", request)
+		if err != nil || prior == nil || prior.RequestID != approved.RequestID {
+			t.Fatalf("standard replay %s did not retain idempotent result: result=%+v err=%v", target.store, prior, err)
+		}
+		changed := request
+		changed.Input = map[string]interface{}{
+			"store": target.store, "reason": "changed approval",
+			"targets": []interface{}{map[string]interface{}{"event_id": target.eventID, "expected_attempt_count": 30}},
+		}
+		if _, err := governance.RunAction(actionCtx, 501, "events.replay_pending", changed); err == nil {
+			t.Fatalf("standard replay %s accepted changed approval input", target.store)
+		}
+		var auditStatus string
+		if err := db.QueryRowContext(ctx, `SELECT status FROM system_governance_action_runs WHERE org_id=501 AND request_id=?`,
+			request.RequestID).Scan(&auditStatus); err != nil || auditStatus != "ok" {
+			t.Fatalf("standard replay %s lacks completed audit: status=%s err=%v", target.store, auditStatus, err)
+		}
+	}
+	if err := db.QueryRowContext(ctx, `SELECT version FROM rm_outbox WHERE message_id='m4-process-probe'`).Scan(&mysqlVersion); err != nil || mysqlVersion != originalMySQLVersion+1 {
+		t.Fatalf("MySQL standard replay advanced unexpected number of times: version=%d err=%v", mysqlVersion, err)
+	}
+	if err := mongoDB.Collection("rm_outbox").FindOne(ctx, bson.M{"message_id": "m4-process-mongo-probe"}).Decode(&mongoVersion); err != nil || mongoVersion.Version != originalMongoVersion.Version+1 {
+		t.Fatalf("Mongo standard replay advanced unexpected number of times: version=%d err=%v", mongoVersion.Version, err)
+	}
+	// Simulate a process exit after authorization committed but before the
+	// MySQL action audit was completed. The facade must resolve, not reissue.
+	if _, err := db.ExecContext(ctx, `UPDATE rm_outbox SET state='quarantined',last_error_code='publish_unknown',failure_count=31 WHERE message_id='m4-process-probe'`); err != nil {
+		t.Fatal(err)
+	}
+	crashInput := map[string]interface{}{
+		"store": "assessment-mysql-outbox", "reason": "recover original approval",
+		"targets": []interface{}{map[string]interface{}{"event_id": "m4-process-probe", "expected_attempt_count": 31}},
+	}
+	crashAudit := systemgov.ActionAuditRecord{
+		OrgID: 501, RequestID: "approve-after-crash", ActionID: "events.replay_pending", ActorUserID: 110004,
+		Input: crashInput, StartedAt: time.Now(), Status: "running",
+	}
+	auditStore := governanceinfra.NewActionAuditStore(gormDB)
+	if prior, claimed, err := auditStore.Claim(actionCtx, crashAudit); err != nil || prior != nil || !claimed {
+		t.Fatalf("seed running governance audit: prior=%+v claimed=%t err=%v", prior, claimed, err)
+	}
+	var durable outboxport.DurableManualReplayAuthorizer
+	for _, outbox := range subsystem.Outboxes() {
+		if outbox.Name == "assessment-mysql-outbox" {
+			durable, _ = outbox.Reader.(outboxport.DurableManualReplayAuthorizer)
+		}
+	}
+	if durable == nil {
+		t.Fatal("selected MySQL profile did not export its durable replay owner")
+	}
+	if _, err := durable.AuthorizeManualReplayWithReason(actionCtx, 501, crashAudit.RequestID, "recover original approval",
+		[]outboxport.ManualReplayTarget{{EventID: "m4-process-probe", ExpectedAttemptCount: 31}}); err != nil {
+		t.Fatal(err)
+	}
+	recovered, err := governance.RunAction(actionCtx, 501, "events.replay_pending", systemgov.ActionRunRequest{
+		RequestID: crashAudit.RequestID, Confirm: true, Input: crashInput,
+	})
+	if err != nil || recovered == nil || recovered.Result["authorized"] != 1 {
+		t.Fatalf("committed authorization did not recover through facade: result=%+v err=%v", recovered, err)
+	}
+	if err := db.QueryRowContext(ctx, `SELECT version FROM rm_outbox WHERE message_id='m4-process-probe'`).Scan(&mysqlVersion); err != nil || mysqlVersion != originalMySQLVersion+2 {
+		t.Fatalf("recovery reauthorized or lost existing grant: version=%d err=%v", mysqlVersion, err)
+	}
 	if err := subsystem.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.ExecContext(ctx, "DROP TABLE system_governance_action_runs"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := buildResourceEventSubsystem(gormDB, mongoDB, nil, catalog, &fakePublisher{}, eventruntime.PublishModeMQ, nil, deps); err == nil || !strings.Contains(err.Error(), "M4 governance audit schema is incomplete") {
+		t.Fatalf("missing governance audit did not fail before candidate startup: %v", err)
+	}
+	if _, err := db.ExecContext(ctx, string(auditDDL)); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := db.ExecContext(ctx, "DROP TABLE rm_outbox"); err != nil {

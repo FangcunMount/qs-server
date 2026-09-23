@@ -10,12 +10,14 @@ import (
 	"time"
 
 	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
+	systemgov "github.com/FangcunMount/qs-server/internal/apiserver/application/systemgovernance"
 	"github.com/FangcunMount/qs-server/internal/apiserver/config"
 	"github.com/FangcunMount/qs-server/internal/apiserver/eventing/standardoutbox"
 	eventsubsystem "github.com/FangcunMount/qs-server/internal/apiserver/eventing/subsystem"
 	mongostandard "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/standardoutbox"
 	mysqlstandard "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/standardoutbox"
 	"github.com/FangcunMount/qs-server/internal/apiserver/options"
+	outboxport "github.com/FangcunMount/qs-server/internal/apiserver/port/outbox"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
 	eventruntime "github.com/FangcunMount/qs-server/internal/pkg/eventing/runtime"
 	"github.com/FangcunMount/reliable-messaging/outbox"
@@ -26,6 +28,15 @@ import (
 	sdknsq "github.com/FangcunMount/reliable-messaging/transport/nsq"
 	goNSQ "github.com/nsqio/go-nsq"
 )
+
+// standardGovernedStatusReader keeps one selected profile's status and
+// durable replay owner together when the subsystem exports its Outboxes.
+// Neither capability is exposed for an unselected legacy profile.
+type standardGovernedStatusReader struct {
+	outboxport.StatusReader
+	outboxport.DurableManualReplayAuthorizer
+	systemgov.PendingReplayResolver
+}
 
 // configuredEventSubsystem keeps the ordinary configuration on the existing
 // implementation. Each M4 opt-in replaces a whole writer/runner profile.
@@ -168,8 +179,14 @@ func buildM4StandardEventSubsystem(opts eventsubsystem.Options, cfg *config.Conf
 		if err != nil {
 			return nil, err
 		}
+		replay, err := mongostandard.NewReplayLedger(opts.MongoDB, "mongo-domain-events")
+		if err != nil {
+			return nil, err
+		}
 		profile, err := newProfile("mongo-domain-events", store, stager, standardoutbox.NewPostCommitWake(),
-			appEventing.NamedOutboxStatusReader{Name: "mongo-domain-events", Reader: status}, opts.Mongo)
+			appEventing.NamedOutboxStatusReader{Name: "mongo-domain-events", Reader: standardGovernedStatusReader{
+				StatusReader: status, DurableManualReplayAuthorizer: replay, PendingReplayResolver: replay,
+			}}, opts.Mongo)
 		if err != nil {
 			return nil, err
 		}
@@ -192,8 +209,14 @@ func buildM4StandardEventSubsystem(opts eventsubsystem.Options, cfg *config.Conf
 		if err != nil {
 			return nil, err
 		}
+		replay, err := mysqlstandard.NewReplayLedger(sqlDB, "assessment-mysql-outbox")
+		if err != nil {
+			return nil, err
+		}
 		profile, err := newProfile("assessment-mysql-outbox", store, stager, standardoutbox.NewPostCommitWake(),
-			appEventing.NamedOutboxStatusReader{Name: "assessment-mysql-outbox", Reader: status}, opts.Assessment)
+			appEventing.NamedOutboxStatusReader{Name: "assessment-mysql-outbox", Reader: standardGovernedStatusReader{
+				StatusReader: status, DurableManualReplayAuthorizer: replay, PendingReplayResolver: replay,
+			}}, opts.Assessment)
 		if err != nil {
 			return nil, err
 		}
