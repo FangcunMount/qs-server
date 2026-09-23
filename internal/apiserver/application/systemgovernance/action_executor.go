@@ -22,15 +22,16 @@ import (
 
 // ActionExecutor 运行enabled governance actions。
 type ActionExecutor struct {
-	registry       *ActionRegistry
-	governance     cachegovernance.Facade
-	reloader       CachePolicyReloader
-	resilience     control.Governor
-	audit          ActionAuditStore
-	eventReplays   map[string]outboxport.ManualReplayAuthorizer
-	deliveryReplay DeliveryReplayStore
-	eventPublisher event.EventPublisher
-	handlers       map[string]ActionHandler
+	registry            *ActionRegistry
+	governance          cachegovernance.Facade
+	reloader            CachePolicyReloader
+	resilience          control.Governor
+	audit               ActionAuditStore
+	eventReplays        map[string]outboxport.ManualReplayAuthorizer
+	durableEventReplays map[string]outboxport.DurableManualReplayAuthorizer
+	deliveryReplay      DeliveryReplayStore
+	eventPublisher      event.EventPublisher
+	handlers            map[string]ActionHandler
 }
 
 type ActionHandler func(context.Context, int64, string, map[string]interface{}) (map[string]interface{}, error)
@@ -38,6 +39,15 @@ type ActionHandler func(context.Context, int64, string, map[string]interface{}) 
 func (e *ActionExecutor) BindEventReplayStores(stores map[string]outboxport.ManualReplayAuthorizer) *ActionExecutor {
 	if e != nil {
 		e.eventReplays = stores
+	}
+	return e
+}
+
+// BindDurableEventReplayStores installs the new ledger-backed routes. Each
+// profile must have exactly one replay owner during a cutover.
+func (e *ActionExecutor) BindDurableEventReplayStores(stores map[string]outboxport.DurableManualReplayAuthorizer) *ActionExecutor {
+	if e != nil {
+		e.durableEventReplays = stores
 	}
 	return e
 }
@@ -118,6 +128,11 @@ func (e *ActionExecutor) Run(
 			return nil, errors.WithCode(code.ErrConflict, "request_id is already running")
 		}
 		defer func() {
+			if actionID == "events.replay_pending" && stderrors.Is(runErr, outboxport.ErrManualReplayOutcomeUnknown) {
+				// The DB may have committed after its acknowledgment was lost.
+				// Leave the audit running so the same request ID can be resolved.
+				return
+			}
 			audit.FinishedAt = time.Now()
 			audit.Status = actionAuditStatus(runResult, runErr)
 			audit.Result = runResult
@@ -222,16 +237,26 @@ func (e *ActionExecutor) runReplayPending(ctx context.Context, orgID int64, requ
 	if request.Store == "" || strings.TrimSpace(request.Reason) == "" || len(request.Targets) == 0 || len(request.Targets) > 100 {
 		return nil, errors.WithCode(code.ErrInvalidArgument, "store, reason and 1..100 targets are required")
 	}
-	store := e.eventReplays[request.Store]
-	if store == nil {
+	legacy := e.eventReplays[request.Store]
+	durable := e.durableEventReplays[request.Store]
+	if legacy == nil && durable == nil {
 		return nil, errors.WithCode(code.ErrInvalidArgument, "outbox store %s is not replayable", request.Store)
+	}
+	if legacy != nil && durable != nil {
+		return nil, errors.WithCode(code.ErrInternalServerError, "outbox store %s has two manual replay owners", request.Store)
 	}
 	for _, target := range request.Targets {
 		if target.EventID == "" || target.ExpectedAttemptCount < 1 {
 			return nil, errors.WithCode(code.ErrInvalidArgument, "event_id and positive expected_attempt_count are required")
 		}
 	}
-	results, err := store.AuthorizeManualReplay(ctx, orgID, requestID, request.Targets, time.Now())
+	var results []outboxport.ManualReplayResult
+	var err error
+	if durable != nil {
+		results, err = durable.AuthorizeManualReplayWithReason(ctx, orgID, requestID, request.Reason, request.Targets)
+	} else {
+		results, err = legacy.AuthorizeManualReplay(ctx, orgID, requestID, request.Targets, time.Now())
+	}
 	if err != nil {
 		return nil, err
 	}

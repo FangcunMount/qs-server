@@ -15,6 +15,7 @@ import (
 	governance "github.com/FangcunMount/qs-server/internal/apiserver/application/systemgovernance"
 	request "github.com/FangcunMount/qs-server/internal/apiserver/eventing/standardoutbox"
 	mysqlgovernance "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/systemgovernance"
+	outboxport "github.com/FangcunMount/qs-server/internal/apiserver/port/outbox"
 	"github.com/FangcunMount/reliable-messaging/message"
 	sdkmongo "github.com/FangcunMount/reliable-messaging/storage/mongo"
 	mysqldriver "github.com/go-sql-driver/mysql"
@@ -424,5 +425,40 @@ func TestStandardMongoReplayAuditCrashReconciliation(t *testing.T) {
 	must(err)
 	if count != 0 {
 		t.Fatal("unknown Mongo outcome created a second authorization")
+	}
+
+	_, err = outbox.UpdateOne(ctx, bson.M{"message_id": eventID}, bson.M{"$set": bson.M{
+		"state": "quarantined", "last_error_code": "publish_unknown", "failure_count": int64(31),
+	}})
+	must(err)
+	executor.BindDurableEventReplayStores(map[string]outboxport.DurableManualReplayAuthorizer{
+		"mongo-domain-events": ledger,
+	})
+	firstAction := governance.ActionRunRequest{
+		RequestID: "request-mongo-action-first", Confirm: true,
+		Input: map[string]interface{}{
+			"store": "mongo-domain-events", "reason": "approved after review",
+			"targets": []interface{}{map[string]interface{}{"event_id": eventID, "expected_attempt_count": 31}},
+		},
+	}
+	completed, err := executor.Run(auditCtx, 7, "events.replay_pending", firstAction)
+	if err != nil || completed == nil || completed.Result["authorized"] != 1 {
+		t.Fatalf("first durable Mongo action failed: result=%+v err=%v", completed, err)
+	}
+	resolved, found, err := ledger.Resolve(ctx, request.ReplayRequest{
+		OrgID: 7, RequestID: firstAction.RequestID, Store: "mongo-domain-events", Reason: "approved after review",
+		Targets: []request.ReplayTarget{{EventID: eventID, ExpectedFailureCount: 31}},
+	})
+	must(err)
+	if !found || len(resolved) != 1 || !resolved[0].Authorized {
+		t.Fatalf("Mongo action did not persist full approved request: found=%t items=%+v", found, resolved)
+	}
+	again, err = executor.Run(auditCtx, 7, "events.replay_pending", firstAction)
+	if err != nil || again == nil || again.RequestID != completed.RequestID {
+		t.Fatalf("first durable Mongo action not repeatable: result=%+v err=%v", again, err)
+	}
+	must(outbox.FindOne(ctx, bson.M{"message_id": eventID}).Decode(&row))
+	if row.Version != 2 {
+		t.Fatalf("repeated Mongo action advanced Outbox version: %d", row.Version)
 	}
 }

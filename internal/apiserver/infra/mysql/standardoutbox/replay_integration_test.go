@@ -14,6 +14,7 @@ import (
 	governance "github.com/FangcunMount/qs-server/internal/apiserver/application/systemgovernance"
 	request "github.com/FangcunMount/qs-server/internal/apiserver/eventing/standardoutbox"
 	mysqlgovernance "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/systemgovernance"
+	outboxport "github.com/FangcunMount/qs-server/internal/apiserver/port/outbox"
 	"github.com/FangcunMount/reliable-messaging/message"
 	sdkmysql "github.com/FangcunMount/reliable-messaging/storage/mysql"
 	mysqldriver "github.com/go-sql-driver/mysql"
@@ -322,5 +323,63 @@ func TestStandardMySQLReplayLedgerCrashAndRollback(t *testing.T) {
 	must(db.QueryRowContext(ctx, `SELECT COUNT(*) FROM qs_rm_replay_requests WHERE org_id=7 AND request_id=?`, missing.RequestID).Scan(&n))
 	if n != 0 {
 		t.Fatal("unknown outcome created a second authorization")
+	}
+
+	appendQuarantined("action-first", "org:7", "publish_unknown", 30)
+	executor.BindDurableEventReplayStores(map[string]outboxport.DurableManualReplayAuthorizer{
+		"assessment-mysql-outbox": ledger,
+	})
+	firstAction := governance.ActionRunRequest{
+		RequestID: "request-action-first", Confirm: true,
+		Input: map[string]interface{}{
+			"store": "assessment-mysql-outbox", "reason": "approved after review",
+			"targets": []interface{}{map[string]interface{}{"event_id": "action-first", "expected_attempt_count": 30}},
+		},
+	}
+	completed, err := executor.Run(auditCtx, 7, "events.replay_pending", firstAction)
+	if err != nil || completed == nil || completed.Result["authorized"] != 1 {
+		t.Fatalf("first durable action failed: result=%+v err=%v", completed, err)
+	}
+	resolved, found, err = ledger.Resolve(ctx, request.ReplayRequest{
+		OrgID: 7, RequestID: firstAction.RequestID, Store: "assessment-mysql-outbox", Reason: "approved after review",
+		Targets: []request.ReplayTarget{{EventID: "action-first", ExpectedFailureCount: 30}},
+	})
+	must(err)
+	if !found || len(resolved) != 1 || !resolved[0].Authorized {
+		t.Fatalf("action did not persist full approved request: found=%t items=%+v", found, resolved)
+	}
+	again, err = executor.Run(auditCtx, 7, "events.replay_pending", firstAction)
+	if err != nil || again == nil || again.RequestID != completed.RequestID {
+		t.Fatalf("first durable action not repeatable: result=%+v err=%v", again, err)
+	}
+	must(db.QueryRowContext(ctx, `SELECT version FROM rm_outbox WHERE message_id='action-first'`).Scan(&afterVersion))
+	if afterVersion != 1 {
+		t.Fatalf("repeated action advanced Outbox version: %d", afterVersion)
+	}
+
+	appendQuarantined("outcome-unknown", "org:7", "publish_unknown", 30)
+	_, err = db.ExecContext(ctx, `CREATE TRIGGER block_replay_item BEFORE INSERT ON qs_rm_replay_items
+ FOR EACH ROW BEGIN IF NEW.event_id='outcome-unknown' THEN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='controlled authorization failure'; END IF; END`)
+	must(err)
+	unknownAction := governance.ActionRunRequest{
+		RequestID: "request-outcome-unknown", Confirm: true,
+		Input: map[string]interface{}{
+			"store": "assessment-mysql-outbox", "reason": "reviewed",
+			"targets": []interface{}{map[string]interface{}{"event_id": "outcome-unknown", "expected_attempt_count": 30}},
+		},
+	}
+	if _, err := executor.Run(auditCtx, 7, "events.replay_pending", unknownAction); !errors.Is(err, outboxport.ErrManualReplayOutcomeUnknown) {
+		t.Fatalf("unresolved authorization was finalized: %v", err)
+	}
+	must(db.QueryRowContext(ctx, `SELECT status FROM system_governance_action_runs WHERE org_id=7 AND request_id=?`, unknownAction.RequestID).Scan(&status))
+	must(db.QueryRowContext(ctx, `SELECT state,version FROM rm_outbox WHERE message_id='outcome-unknown'`).Scan(&state, &afterVersion))
+	must(db.QueryRowContext(ctx, `SELECT COUNT(*) FROM qs_rm_replay_requests WHERE org_id=7 AND request_id=?`, unknownAction.RequestID).Scan(&n))
+	if status != "running" || state != "quarantined" || afterVersion != 0 || n != 0 {
+		t.Fatalf("unresolved action lost recovery boundary: audit=%s outbox=%s/%d ledger=%d", status, state, afterVersion, n)
+	}
+	_, err = db.ExecContext(ctx, "DROP TRIGGER block_replay_item")
+	must(err)
+	if _, err := executor.Run(auditCtx, 7, "events.replay_pending", unknownAction); err == nil {
+		t.Fatal("unknown-outcome request was blindly reauthorized after error cleared")
 	}
 }
