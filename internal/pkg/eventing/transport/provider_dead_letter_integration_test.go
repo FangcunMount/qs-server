@@ -303,6 +303,7 @@ func nsqFailedHandoffTopic(topic, channel string) string {
 func cleanupNSQTopics(t *testing.T, topics ...string) {
 	t.Helper()
 	httpAddress := integrationEnv("NSQD_HTTP_ADDR", "127.0.0.1:4151")
+	lookupAddress := integrationEnv("NSQ_LOOKUPD_ADDR", "127.0.0.1:4161")
 	t.Cleanup(func() {
 		for _, topic := range topics {
 			response, err := postNSQAdmin(httpAddress, "/topic/delete?topic="+url.QueryEscape(topic))
@@ -313,6 +314,15 @@ func cleanupNSQTopics(t *testing.T, topics ...string) {
 			_ = response.Body.Close()
 			if response.StatusCode != http.StatusNotFound && (response.StatusCode < 200 || response.StatusCode >= 300) {
 				t.Errorf("delete NSQ topic %q: status %s", topic, response.Status)
+			}
+			lookupResponse, lookupErr := postNSQAdmin(lookupAddress, "/topic/delete?topic="+url.QueryEscape(topic))
+			if lookupErr != nil {
+				t.Errorf("delete NSQ lookup registration %q: %v", topic, lookupErr)
+				continue
+			}
+			_ = lookupResponse.Body.Close()
+			if lookupResponse.StatusCode != http.StatusNotFound && (lookupResponse.StatusCode < 200 || lookupResponse.StatusCode >= 300) {
+				t.Errorf("delete NSQ lookup registration %q: status %s", topic, lookupResponse.Status)
 			}
 		}
 	})
