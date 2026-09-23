@@ -532,45 +532,6 @@ func TestM4ProcessBootstrapRunsSelectedStandardProfiles(t *testing.T) {
 	if err := mongoDB.Collection("rm_outbox").FindOne(ctx, bson.M{"message_id": "m4-process-mongo-probe"}).Decode(&mongoVersion); err != nil || mongoVersion.Version != originalMongoVersion.Version+1 {
 		t.Fatalf("Mongo standard replay advanced unexpected number of times: version=%d err=%v", mongoVersion.Version, err)
 	}
-	// Simulate a process exit after authorization committed but before the
-	// MySQL action audit was completed. The facade must resolve, not reissue.
-	if _, err := db.ExecContext(ctx, `UPDATE rm_outbox SET state='quarantined',last_error_code='publish_unknown',failure_count=31 WHERE message_id='m4-process-probe'`); err != nil {
-		t.Fatal(err)
-	}
-	crashInput := map[string]interface{}{
-		"store": "assessment-mysql-outbox", "reason": "recover original approval",
-		"targets": []interface{}{map[string]interface{}{"event_id": "m4-process-probe", "expected_attempt_count": 31}},
-	}
-	crashAudit := systemgov.ActionAuditRecord{
-		OrgID: 501, RequestID: "approve-after-crash", ActionID: "events.replay_pending", ActorUserID: 110004,
-		Input: crashInput, StartedAt: time.Now(), Status: "running",
-	}
-	auditStore := governanceinfra.NewActionAuditStore(gormDB)
-	if prior, claimed, err := auditStore.Claim(actionCtx, crashAudit); err != nil || prior != nil || !claimed {
-		t.Fatalf("seed running governance audit: prior=%+v claimed=%t err=%v", prior, claimed, err)
-	}
-	var durable outboxport.DurableManualReplayAuthorizer
-	for _, outbox := range subsystem.Outboxes() {
-		if outbox.Name == "assessment-mysql-outbox" {
-			durable, _ = outbox.Reader.(outboxport.DurableManualReplayAuthorizer)
-		}
-	}
-	if durable == nil {
-		t.Fatal("selected MySQL profile did not export its durable replay owner")
-	}
-	if _, err := durable.AuthorizeManualReplayWithReason(actionCtx, 501, crashAudit.RequestID, "recover original approval",
-		[]outboxport.ManualReplayTarget{{EventID: "m4-process-probe", ExpectedAttemptCount: 31}}); err != nil {
-		t.Fatal(err)
-	}
-	recovered, err := governance.RunAction(actionCtx, 501, "events.replay_pending", systemgov.ActionRunRequest{
-		RequestID: crashAudit.RequestID, Confirm: true, Input: crashInput,
-	})
-	if err != nil || recovered == nil || recovered.Result["authorized"] != 1 {
-		t.Fatalf("committed authorization did not recover through facade: result=%+v err=%v", recovered, err)
-	}
-	if err := db.QueryRowContext(ctx, `SELECT version FROM rm_outbox WHERE message_id='m4-process-probe'`).Scan(&mysqlVersion); err != nil || mysqlVersion != originalMySQLVersion+2 {
-		t.Fatalf("recovery reauthorized or lost existing grant: version=%d err=%v", mysqlVersion, err)
-	}
 	if err := host.Cleanup(); err != nil {
 		t.Fatal(err)
 	}
@@ -587,6 +548,75 @@ func TestM4ProcessBootstrapRunsSelectedStandardProfiles(t *testing.T) {
 			t.Fatalf("stopped standard profile reports healthy: %+v", profile)
 		}
 	}
+	// Execute the real governance action in a child OS process. Its test-only
+	// audit hook blocks after durable authorization, so killing that process
+	// leaves a genuine committed grant and a still-running MySQL audit.
+	for _, target := range []struct {
+		store, eventID, requestID string
+		originalVersion           uint64
+		quarantine                func() error
+		version                   func() (uint64, error)
+		ledgerCount               func() (int64, error)
+	}{
+		{"assessment-mysql-outbox", "m4-process-probe", "crash-mysql-process", originalMySQLVersion,
+			func() error {
+				_, err := db.ExecContext(ctx, `UPDATE rm_outbox SET state='quarantined',last_error_code='publish_unknown',failure_count=31 WHERE message_id='m4-process-probe'`)
+				return err
+			},
+			func() (uint64, error) {
+				var version uint64
+				err := db.QueryRowContext(ctx, `SELECT version FROM rm_outbox WHERE message_id='m4-process-probe'`).Scan(&version)
+				return version, err
+			},
+			func() (int64, error) {
+				var count int64
+				err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM qs_rm_replay_requests WHERE org_id=501 AND request_id='crash-mysql-process'`).Scan(&count)
+				return count, err
+			}},
+		{"mongo-domain-events", "m4-process-mongo-probe", "crash-mongo-process", originalMongoVersion.Version,
+			func() error {
+				_, err := mongoDB.Collection("rm_outbox").UpdateOne(ctx, bson.M{"message_id": "m4-process-mongo-probe"},
+					bson.M{"$set": bson.M{"state": "quarantined", "last_error_code": "publish_unknown", "failure_count": int64(31)}})
+				return err
+			},
+			func() (uint64, error) {
+				var row struct {
+					Version uint64 `bson:"version"`
+				}
+				err := mongoDB.Collection("rm_outbox").FindOne(ctx, bson.M{"message_id": "m4-process-mongo-probe"}).Decode(&row)
+				return row.Version, err
+			},
+			func() (int64, error) {
+				return mongoDB.Collection("qs_rm_replay_requests").CountDocuments(ctx, bson.M{"org_id": int64(501), "request_id": "crash-mongo-process"})
+			}},
+	} {
+		if err := target.quarantine(); err != nil {
+			t.Fatal(err)
+		}
+		runM4ReplayCrashChild(t, ctx, target.store, target.eventID, target.requestID)
+		var auditStatus string
+		if err := db.QueryRowContext(ctx, `SELECT status FROM system_governance_action_runs WHERE org_id=501 AND request_id=?`, target.requestID).
+			Scan(&auditStatus); err != nil || auditStatus != "running" {
+			t.Fatalf("killed %s process did not leave running audit: status=%s err=%v", target.store, auditStatus, err)
+		}
+		beforeRecovery, err := target.version()
+		if err != nil || beforeRecovery != target.originalVersion+2 {
+			t.Fatalf("killed %s process did not commit exactly one grant: version=%d err=%v", target.store, beforeRecovery, err)
+		}
+		if count, err := target.ledgerCount(); err != nil || count != 1 {
+			t.Fatalf("killed %s process lacks one durable replay request: count=%d err=%v", target.store, count, err)
+		}
+		runM4ReplayRecoveryChild(t, ctx, target.store, target.eventID, target.requestID)
+		if err := db.QueryRowContext(ctx, `SELECT status FROM system_governance_action_runs WHERE org_id=501 AND request_id=?`, target.requestID).
+			Scan(&auditStatus); err != nil || auditStatus != "ok" {
+			t.Fatalf("new %s process did not reconcile original audit: status=%s err=%v", target.store, auditStatus, err)
+		}
+		afterRecovery, err := target.version()
+		if err != nil || afterRecovery != beforeRecovery {
+			t.Fatalf("new %s process authorized twice: before=%d after=%d err=%v", target.store, beforeRecovery, afterRecovery, err)
+		}
+	}
+	auditStore := governanceinfra.NewActionAuditStore(gormDB)
 	// A missing ledger result is explicit pending review, not permission to
 	// execute the action again. A later committed result closes the same audit.
 	for _, target := range []struct {
