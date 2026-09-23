@@ -79,7 +79,7 @@ func TestM4ProcessBootstrapRunsSelectedStandardProfiles(t *testing.T) {
 	if auditIndexPath != "/tmp/m4-qs-bootstrap/mysql/000085_system_governance_pending_replay_index.up.sql" {
 		t.Fatal("copied invocation-owned pending replay audit index migration required")
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 180*time.Second)
 	defer cancel()
 	db, err := sql.Open("mysql", dsn)
 	if err != nil {
@@ -347,9 +347,62 @@ func TestM4ProcessBootstrapRunsSelectedStandardProfiles(t *testing.T) {
 		}
 		time.Sleep(100 * time.Millisecond)
 	}
+	// Keep the broker unavailable while both host transactions commit a bounded
+	// mixed-organization backlog. This exercises the running relays and NSQ
+	// producer after recovery, rather than only the Store's direct ClaimDue API.
+	const backlogPerStore = 64
+	mysqlBacklog := make([]event.DomainEvent, 0, backlogPerStore)
+	mongoBacklog := make([]event.DomainEvent, 0, backlogPerStore)
+	for i := 0; i < backlogPerStore; i++ {
+		orgID := 501
+		if i%2 != 0 {
+			orgID = 502
+		}
+		mysqlBacklog = append(mysqlBacklog, event.Event[map[string]any]{
+			BaseEvent: event.BaseEvent{ID: fmt.Sprintf("m4-backlog-mysql-%03d", i),
+				EventTypeValue: "evaluation.requested", AggregateTypeValue: "Assessment",
+				AggregateIDValue: fmt.Sprintf("%d", 1000+i), OccurredAtValue: time.Now()},
+			Data: map[string]any{"org_id": orgID},
+		})
+		mongoBacklog = append(mongoBacklog, event.Event[map[string]any]{
+			BaseEvent: event.BaseEvent{ID: fmt.Sprintf("m4-backlog-mongo-%03d", i),
+				EventTypeValue: "answersheet.submitted", AggregateTypeValue: "AnswerSheet",
+				AggregateIDValue: fmt.Sprintf("%d", 2000+i), OccurredAtValue: time.Now()},
+			Data: map[string]any{"org_id": orgID},
+		})
+	}
+	if err := qsmysql.NewUnitOfWork(gormDB).WithinTransaction(ctx, func(txCtx context.Context) error {
+		return binding.Stager.Stage(txCtx, mysqlBacklog...)
+	}); err != nil {
+		t.Fatal(err)
+	}
+	binding.PostCommit.AfterCommit(ctx, mysqlBacklog, time.Now())
+	if _, err := session.WithTransaction(ctx, func(txCtx mongo.SessionContext) (any, error) {
+		return nil, mongoBinding.Stager.Stage(txCtx, mongoBacklog...)
+	}); err != nil {
+		t.Fatal(err)
+	}
+	mongoBinding.PostCommit.AfterCommit(ctx, mongoBacklog, time.Now())
+	var mysqlCommitted, mysqlPremature int
+	if err := db.QueryRowContext(ctx, `SELECT COUNT(*),SUM(state='published') FROM rm_outbox WHERE message_id LIKE 'm4-backlog-mysql-%'`).
+		Scan(&mysqlCommitted, &mysqlPremature); err != nil {
+		t.Fatal(err)
+	}
+	mongoCommitted, err := mongoDB.Collection("rm_outbox").CountDocuments(ctx, bson.M{"message_id": bson.M{"$regex": "^m4-backlog-mongo-"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	mongoPremature, err := mongoDB.Collection("rm_outbox").CountDocuments(ctx, bson.M{"message_id": bson.M{"$regex": "^m4-backlog-mongo-"}, "state": "published"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if mysqlCommitted != backlogPerStore || mongoCommitted != backlogPerStore || mysqlPremature != 0 || mongoPremature != 0 {
+		t.Fatalf("backlog before NSQ recovery: mysql=%d published=%d mongo=%d published=%d",
+			mysqlCommitted, mysqlPremature, mongoCommitted, mongoPremature)
+	}
 	recoveryStarted := time.Now()
 	nsqProxy.SetAvailable(true)
-	recoveryDeadline := time.Now().Add(35 * time.Second)
+	recoveryDeadline := time.Now().Add(90 * time.Second)
 	for {
 		var mysqlState string
 		if err := db.QueryRowContext(ctx, "SELECT state FROM rm_outbox WHERE message_id=?", outageEvents[0].id).Scan(&mysqlState); err != nil {
@@ -361,12 +414,23 @@ func TestM4ProcessBootstrapRunsSelectedStandardProfiles(t *testing.T) {
 		if err := mongoDB.Collection("rm_outbox").FindOne(ctx, bson.M{"message_id": outageEvents[1].id}).Decode(&mongoState); err != nil {
 			t.Fatal(err)
 		}
-		if mysqlState == "published" && mongoState.State == "published" {
-			t.Logf("both standard profiles recovered after NSQ TCP outage in %s", time.Since(recoveryStarted))
+		var mysqlPublished int
+		if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM rm_outbox WHERE message_id LIKE 'm4-backlog-mysql-%' AND state='published'`).
+			Scan(&mysqlPublished); err != nil {
+			t.Fatal(err)
+		}
+		mongoPublished, err := mongoDB.Collection("rm_outbox").CountDocuments(ctx, bson.M{"message_id": bson.M{"$regex": "^m4-backlog-mongo-"}, "state": "published"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if mysqlState == "published" && mongoState.State == "published" && mysqlPublished == backlogPerStore && mongoPublished == backlogPerStore {
+			t.Logf("both standard profiles recovered after NSQ TCP outage in %s; backlog published mysql=%d mongo=%d",
+				time.Since(recoveryStarted), mysqlPublished, mongoPublished)
 			break
 		}
 		if time.Now().After(recoveryDeadline) {
-			t.Fatalf("standard profiles did not recover after NSQ returned: mysql=%s mongo=%s", mysqlState, mongoState.State)
+			t.Fatalf("standard profiles did not recover after NSQ returned: mysql=%s mongo=%s backlog published mysql=%d mongo=%d",
+				mysqlState, mongoState.State, mysqlPublished, mongoPublished)
 		}
 		time.Sleep(100 * time.Millisecond)
 	}
