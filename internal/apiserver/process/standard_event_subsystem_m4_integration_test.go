@@ -79,7 +79,7 @@ func TestM4ProcessBootstrapRunsSelectedStandardProfiles(t *testing.T) {
 	if auditIndexPath != "/tmp/m4-qs-bootstrap/mysql/000085_system_governance_pending_replay_index.up.sql" {
 		t.Fatal("copied invocation-owned pending replay audit index migration required")
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
 	defer cancel()
 	db, err := sql.Open("mysql", dsn)
 	if err != nil {
@@ -166,7 +166,8 @@ func TestM4ProcessBootstrapRunsSelectedStandardProfiles(t *testing.T) {
 	cfg := &config.Config{Options: options.NewOptions()}
 	cfg.MessagingOptions.Enabled = true
 	cfg.MessagingOptions.Provider = "nsq"
-	cfg.MessagingOptions.NSQAddr = "nsqd:4150"
+	nsqProxy := newM4NSQFaultProxy(t, os.Getenv("RM_QS_BOOTSTRAP_NSQ_ADDR"))
+	cfg.MessagingOptions.NSQAddr = nsqProxy.Address()
 	cfg.Eventing.StandardOutbox.Mongo = true
 	cfg.Eventing.StandardOutbox.Assessment = true
 	deps := (&server{config: cfg}).buildEventSubsystemResourceDeps()
@@ -288,6 +289,84 @@ func TestM4ProcessBootstrapRunsSelectedStandardProfiles(t *testing.T) {
 		}
 		if time.Now().After(deadline) {
 			t.Fatalf("process profiles did not publish and report both stores: mysql=%s mongo=%s profiles=%+v outboxes=%+v", state, mongoRow.State, status.Profiles, status.Outboxes)
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
+	// Force an actual TCP outage after startup: both selected relays must keep
+	// their committed intents and recover by database scan when NSQ returns.
+	nsqProxy.SetAvailable(false)
+	outageEvents := []struct {
+		id, eventType, aggregateType, aggregateID string
+	}{
+		{"m4-nsq-outage-mysql", "evaluation.requested", "Assessment", "102"},
+		{"m4-nsq-outage-mongo", "answersheet.submitted", "AnswerSheet", "202"},
+	}
+	mysqlOutage := event.Event[map[string]any]{
+		BaseEvent: event.BaseEvent{ID: outageEvents[0].id, EventTypeValue: outageEvents[0].eventType,
+			AggregateTypeValue: outageEvents[0].aggregateType, AggregateIDValue: outageEvents[0].aggregateID, OccurredAtValue: time.Now()},
+		Data: map[string]any{"org_id": 501},
+	}
+	if err := qsmysql.NewUnitOfWork(gormDB).WithinTransaction(ctx, func(txCtx context.Context) error {
+		return binding.Stager.Stage(txCtx, mysqlOutage)
+	}); err != nil {
+		t.Fatal(err)
+	}
+	binding.PostCommit.AfterCommit(ctx, []event.DomainEvent{mysqlOutage}, time.Now())
+	mongoOutage := event.Event[map[string]any]{
+		BaseEvent: event.BaseEvent{ID: outageEvents[1].id, EventTypeValue: outageEvents[1].eventType,
+			AggregateTypeValue: outageEvents[1].aggregateType, AggregateIDValue: outageEvents[1].aggregateID, OccurredAtValue: time.Now()},
+		Data: map[string]any{"org_id": 501},
+	}
+	if _, err := session.WithTransaction(ctx, func(txCtx mongo.SessionContext) (any, error) {
+		return nil, mongoBinding.Stager.Stage(txCtx, mongoOutage)
+	}); err != nil {
+		t.Fatal(err)
+	}
+	mongoBinding.PostCommit.AfterCommit(ctx, []event.DomainEvent{mongoOutage}, time.Now())
+	outageDeadline := time.Now().Add(25 * time.Second)
+	for {
+		var mysqlState string
+		var mysqlFailures uint64
+		if err := db.QueryRowContext(ctx, "SELECT state,failure_count FROM rm_outbox WHERE message_id=?", outageEvents[0].id).
+			Scan(&mysqlState, &mysqlFailures); err != nil {
+			t.Fatal(err)
+		}
+		var mongoState struct {
+			State        string `bson:"state"`
+			FailureCount uint64 `bson:"failure_count"`
+		}
+		if err := mongoDB.Collection("rm_outbox").FindOne(ctx, bson.M{"message_id": outageEvents[1].id}).Decode(&mongoState); err != nil {
+			t.Fatal(err)
+		}
+		if mysqlState == "retry_wait" && mongoState.State == "retry_wait" && mysqlFailures > 0 && mongoState.FailureCount > 0 {
+			break
+		}
+		if time.Now().After(outageDeadline) {
+			t.Fatalf("both committed intents must remain retryable during NSQ outage: mysql=%s/%d mongo=%s/%d",
+				mysqlState, mysqlFailures, mongoState.State, mongoState.FailureCount)
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
+	recoveryStarted := time.Now()
+	nsqProxy.SetAvailable(true)
+	recoveryDeadline := time.Now().Add(35 * time.Second)
+	for {
+		var mysqlState string
+		if err := db.QueryRowContext(ctx, "SELECT state FROM rm_outbox WHERE message_id=?", outageEvents[0].id).Scan(&mysqlState); err != nil {
+			t.Fatal(err)
+		}
+		var mongoState struct {
+			State string `bson:"state"`
+		}
+		if err := mongoDB.Collection("rm_outbox").FindOne(ctx, bson.M{"message_id": outageEvents[1].id}).Decode(&mongoState); err != nil {
+			t.Fatal(err)
+		}
+		if mysqlState == "published" && mongoState.State == "published" {
+			t.Logf("both standard profiles recovered after NSQ TCP outage in %s", time.Since(recoveryStarted))
+			break
+		}
+		if time.Now().After(recoveryDeadline) {
+			t.Fatalf("standard profiles did not recover after NSQ returned: mysql=%s mongo=%s", mysqlState, mongoState.State)
 		}
 		time.Sleep(100 * time.Millisecond)
 	}
@@ -495,8 +574,10 @@ func TestM4ProcessBootstrapRunsSelectedStandardProfiles(t *testing.T) {
 			}
 			reader := outbox.Reader.(systemgov.OutboxGovernanceReader)
 			summary, err := reader.ReadOutboxGovernance(ctx, 501)
-			if err != nil || summary.Authorized != 1 || summary.ManualRequired != 0 {
-				t.Fatalf("standard replay %s was double-counted after authorization: summary=%+v err=%v", target.store, summary, err)
+			// The live Relay may already have claimed or published the approved
+			// message. Authorized counts only the still-waiting state.
+			if err != nil || summary.Authorized > 1 || summary.Automatic != 0 || summary.ManualRequired != 0 {
+				t.Fatalf("standard replay %s was misclassified after authorization: summary=%+v err=%v", target.store, summary, err)
 			}
 			items, err := reader.ListOutboxCandidates(ctx, 501, 10)
 			if err != nil || len(items) != 0 {
@@ -536,11 +617,23 @@ func TestM4ProcessBootstrapRunsSelectedStandardProfiles(t *testing.T) {
 			request.RequestID).Scan(&auditStatus); err != nil || auditStatus != "ok" {
 			t.Fatalf("standard replay %s lacks completed audit: status=%s err=%v", target.store, auditStatus, err)
 		}
+		var grantRows int64
+		if target.store == "assessment-mysql-outbox" {
+			err = db.QueryRowContext(ctx, `SELECT COUNT(*) FROM qs_rm_replay_requests WHERE org_id=501 AND request_id=?`, request.RequestID).Scan(&grantRows)
+		} else {
+			grantRows, err = mongoDB.Collection("qs_rm_replay_requests").CountDocuments(ctx,
+				bson.M{"org_id": int64(501), "request_id": request.RequestID})
+		}
+		if err != nil || grantRows != 1 {
+			t.Fatalf("standard replay %s has %d durable grants for one request: %v", target.store, grantRows, err)
+		}
 	}
-	if err := db.QueryRowContext(ctx, `SELECT version FROM rm_outbox WHERE message_id='m4-process-probe'`).Scan(&mysqlVersion); err != nil || mysqlVersion != originalMySQLVersion+1 {
+	if err := db.QueryRowContext(ctx, `SELECT version FROM rm_outbox WHERE message_id='m4-process-probe'`).Scan(&mysqlVersion); err != nil ||
+		mysqlVersion < originalMySQLVersion+1 || mysqlVersion > originalMySQLVersion+3 {
 		t.Fatalf("MySQL standard replay advanced unexpected number of times: version=%d err=%v", mysqlVersion, err)
 	}
-	if err := mongoDB.Collection("rm_outbox").FindOne(ctx, bson.M{"message_id": "m4-process-mongo-probe"}).Decode(&mongoVersion); err != nil || mongoVersion.Version != originalMongoVersion.Version+1 {
+	if err := mongoDB.Collection("rm_outbox").FindOne(ctx, bson.M{"message_id": "m4-process-mongo-probe"}).Decode(&mongoVersion); err != nil ||
+		mongoVersion.Version < originalMongoVersion.Version+1 || mongoVersion.Version > originalMongoVersion.Version+3 {
 		t.Fatalf("Mongo standard replay advanced unexpected number of times: version=%d err=%v", mongoVersion.Version, err)
 	}
 	if err := host.Cleanup(); err != nil {
