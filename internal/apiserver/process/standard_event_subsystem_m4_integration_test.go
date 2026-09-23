@@ -7,6 +7,7 @@ import (
 	"database/sql"
 	"fmt"
 	"os"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -15,6 +16,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/actor/actorctx"
 	systemgov "github.com/FangcunMount/qs-server/internal/apiserver/application/systemgovernance"
 	"github.com/FangcunMount/qs-server/internal/apiserver/config"
+	"github.com/FangcunMount/qs-server/internal/apiserver/container"
 	platformmod "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/platform"
 	eventsubsystem "github.com/FangcunMount/qs-server/internal/apiserver/eventing/subsystem"
 	mongostandard "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/standardoutbox"
@@ -155,15 +157,45 @@ func TestM4ProcessBootstrapRunsSelectedStandardProfiles(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer subsystem.Close()
+	processServer := &server{config: cfg}
+	resilience, err := processServer.buildResilienceSubsystem(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	hostOptions := processServer.buildContainerOptions(containerOptionsInput{
+		eventSubsystem: subsystem, resilience: resilience,
+	})
+	hostOptions.Silent = true
+	host := container.NewContainerWithOptions(gormDB, mongoDB, nil, hostOptions)
+	hostClosed := false
+	defer func() {
+		if !hostClosed {
+			_ = host.Cleanup()
+		}
+	}()
+	initialized, err := bootstrapContainerStage(containerStageDeps{newContainer: func() *container.Container { return host }})
+	if err != nil {
+		t.Fatalf("initialize full apiserver container with selected standard profiles: %v", err)
+	}
+	if initialized.container != host || !host.IsInitialized() {
+		t.Fatal("process bootstrap did not initialize the selected runtime container")
+	}
+	for _, name := range []string{"survey", "interpretation", "modelcatalog", "actor", "evaluation", "plan", "statistics"} {
+		if !slices.Contains(host.GetLoadedModules(), name) {
+			t.Fatalf("full container omitted %s module: %v", name, host.GetLoadedModules())
+		}
+	}
 	if _, ok := subsystem.Profile(eventcatalog.OutboxProfileMongoDomain).Stager.(*mongostandard.Stager); !ok {
 		t.Fatal("Mongo process profile kept the old writer")
 	}
 	if _, ok := subsystem.Profile(eventcatalog.OutboxProfileAssessmentMySQL).Stager.(*mysqlstandard.Stager); !ok {
 		t.Fatal("MySQL process profile kept the old writer")
 	}
-	if err := subsystem.Start(ctx); err != nil {
+	if err := host.StartEventSubsystem(ctx); err != nil {
 		t.Fatal(err)
+	}
+	if err := host.HealthCheck(ctx); err != nil {
+		t.Fatalf("initialized container health check: %v", err)
 	}
 	evt := event.Event[map[string]any]{
 		BaseEvent: event.BaseEvent{
@@ -375,8 +407,21 @@ func TestM4ProcessBootstrapRunsSelectedStandardProfiles(t *testing.T) {
 	if err := db.QueryRowContext(ctx, `SELECT version FROM rm_outbox WHERE message_id='m4-process-probe'`).Scan(&mysqlVersion); err != nil || mysqlVersion != originalMySQLVersion+2 {
 		t.Fatalf("recovery reauthorized or lost existing grant: version=%d err=%v", mysqlVersion, err)
 	}
-	if err := subsystem.Close(); err != nil {
+	if err := host.Cleanup(); err != nil {
 		t.Fatal(err)
+	}
+	hostClosed = true
+	if host.IsInitialized() {
+		t.Fatal("container still reports initialized after cleanup")
+	}
+	stopped, err := subsystem.StatusService().GetStatus(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, profile := range stopped.Profiles {
+		if profile.RelayKind == "sdk" && (profile.Running || profile.ScanHealthy == nil || *profile.ScanHealthy) {
+			t.Fatalf("stopped standard profile reports healthy: %+v", profile)
+		}
 	}
 	// A missing ledger result is explicit pending review, not permission to
 	// execute the action again. A later committed result closes the same audit.
