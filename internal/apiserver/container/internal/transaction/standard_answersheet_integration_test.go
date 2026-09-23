@@ -12,6 +12,7 @@ import (
 
 	"github.com/FangcunMount/component-base/pkg/event"
 	appanswersheet "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/answersheet"
+	apptransaction "github.com/FangcunMount/qs-server/internal/apiserver/application/transaction"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor"
 	domainanswersheet "github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/answersheet"
 	domainquestionnaire "github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
@@ -142,6 +143,73 @@ events:
 	require.Zero(t, countStandardDocs(t, ctx, db.Collection("answersheets"), bson.M{"domain_id": uint64(90010002)}))
 	require.Zero(t, countStandardDocs(t, ctx, outbox, bson.M{"message_id": failedEventID}))
 	require.Equal(t, limiter.acquired, limiter.released)
+
+	// The database commit succeeds, but the caller loses its result and its
+	// request context. Acceptance must come from the original intent's durable
+	// AnswerSheet, not from submitting the transaction a second time.
+	unknownSheet := standardSubmissionSheet(t, 90010003, "committed but reply lost")
+	unknownEventID := unknownSheet.Events()[0].EventID()
+	unknownFingerprint, err := submitport.Fingerprint(unknownSheet)
+	require.NoError(t, err)
+	unknownMeta := appanswersheet.DurableSubmitMeta{
+		WriterID: 301, IdempotencyKey: "m4-commit-unknown", Fingerprint: unknownFingerprint,
+	}
+	requestCtx, cancelRequest := context.WithCancel(ctx)
+	defer cancelRequest()
+	unknownRunner := apptransaction.RunnerFunc(func(runCtx context.Context, fn func(context.Context) error) error {
+		if err := runner.WithinTransaction(runCtx, fn); err != nil {
+			return err
+		}
+		cancelRequest()
+		return standardSubmissionUnknownCommit{}
+	})
+	unknownStore := appanswersheet.NewTransactionalSubmissionDurableStore(unknownRunner, repo, stager, nil)
+	recovered, existed, err := unknownStore.CreateDurably(requestCtx, unknownSheet, unknownMeta)
+	require.NoError(t, err)
+	require.True(t, existed)
+	require.Equal(t, unknownSheet.ID(), recovered.ID())
+	require.EqualValues(t, 1, countStandardDocs(t, ctx, db.Collection("answersheets"), bson.M{"domain_id": uint64(90010003)}))
+	require.EqualValues(t, 1, countStandardDocs(t, ctx, outbox, bson.M{"message_id": unknownEventID}))
+	recovered, existed, err = durable.CreateDurably(ctx, unknownSheet, unknownMeta)
+	require.NoError(t, err)
+	require.True(t, existed)
+	require.Equal(t, unknownSheet.ID(), recovered.ID())
+	require.EqualValues(t, 1, countStandardDocs(t, ctx, outbox, bson.M{"message_id": unknownEventID}))
+
+	// An unknown result without a committed intent must not be acknowledged.
+	// A later retry with the same intent may then create exactly one pair.
+	uncommitted := standardSubmissionSheet(t, 90010004, "not committed")
+	uncommittedEventID := uncommitted.Events()[0].EventID()
+	uncommittedFingerprint, err := submitport.Fingerprint(uncommitted)
+	require.NoError(t, err)
+	uncommittedMeta := appanswersheet.DurableSubmitMeta{
+		WriterID: 301, IdempotencyKey: "m4-commit-absent", Fingerprint: uncommittedFingerprint,
+	}
+	noCommitRunner := apptransaction.RunnerFunc(func(context.Context, func(context.Context) error) error {
+		return standardSubmissionUnknownCommit{}
+	})
+	noCommitStore := appanswersheet.NewTransactionalSubmissionDurableStore(noCommitRunner, repo, stager, nil)
+	result, existed, err := noCommitStore.CreateDurably(ctx, uncommitted, uncommittedMeta)
+	require.Error(t, err)
+	require.Nil(t, result)
+	require.False(t, existed)
+	require.Zero(t, countStandardDocs(t, ctx, db.Collection("answersheets"), bson.M{"domain_id": uint64(90010004)}))
+	require.Zero(t, countStandardDocs(t, ctx, outbox, bson.M{"message_id": uncommittedEventID}))
+	result, existed, err = durable.CreateDurably(ctx, uncommitted, uncommittedMeta)
+	require.NoError(t, err)
+	require.False(t, existed)
+	require.Equal(t, uncommitted.ID(), result.ID())
+	require.EqualValues(t, 1, countStandardDocs(t, ctx, db.Collection("answersheets"), bson.M{"domain_id": uint64(90010004)}))
+	require.EqualValues(t, 1, countStandardDocs(t, ctx, outbox, bson.M{"message_id": uncommittedEventID}))
+	require.Equal(t, limiter.acquired, limiter.released)
+}
+
+type standardSubmissionUnknownCommit struct{}
+
+func (standardSubmissionUnknownCommit) Error() string { return "isolated unknown Mongo commit result" }
+
+func (standardSubmissionUnknownCommit) HasErrorLabel(label string) bool {
+	return label == "UnknownTransactionCommitResult"
 }
 
 func countStandardDocs(t *testing.T, ctx context.Context, coll *mongo.Collection, filter bson.M) int64 {
