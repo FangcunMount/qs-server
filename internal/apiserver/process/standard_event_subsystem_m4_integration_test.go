@@ -5,7 +5,10 @@ package process
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"slices"
 	"strings"
@@ -14,6 +17,8 @@ import (
 
 	"github.com/FangcunMount/component-base/pkg/event"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/actor/actorctx"
+	appauthz "github.com/FangcunMount/qs-server/internal/apiserver/application/authz"
+	appeventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
 	systemgov "github.com/FangcunMount/qs-server/internal/apiserver/application/systemgovernance"
 	"github.com/FangcunMount/qs-server/internal/apiserver/config"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container"
@@ -24,11 +29,14 @@ import (
 	governanceinfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/systemgovernance"
 	"github.com/FangcunMount/qs-server/internal/apiserver/options"
 	outboxport "github.com/FangcunMount/qs-server/internal/apiserver/port/outbox"
+	resttransport "github.com/FangcunMount/qs-server/internal/apiserver/transport/rest"
+	restmiddleware "github.com/FangcunMount/qs-server/internal/apiserver/transport/rest/middleware"
 	qsmysql "github.com/FangcunMount/qs-server/internal/pkg/database/mysql"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
 	eventruntime "github.com/FangcunMount/qs-server/internal/pkg/eventing/runtime"
 	sdkmongo "github.com/FangcunMount/reliable-messaging/storage/mongo"
 	sdkmysql "github.com/FangcunMount/reliable-messaging/storage/mysql"
+	"github.com/gin-gonic/gin"
 	mysqldriver "github.com/go-sql-driver/mysql"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -267,6 +275,63 @@ func TestM4ProcessBootstrapRunsSelectedStandardProfiles(t *testing.T) {
 			t.Fatalf("process profiles did not publish and report both stores: mysql=%s mongo=%s profiles=%+v outboxes=%+v", state, mongoRow.State, status.Profiles, status.Outboxes)
 		}
 		time.Sleep(100 * time.Millisecond)
+	}
+	// Register the production REST router against the initialized container's
+	// real status service. This isolated request supplies a trusted authorization
+	// snapshot; IAM token verification itself is outside this proof.
+	for _, path := range []string{"/tmp/m4-qs-bootstrap/api/rest", "/tmp/m4-qs-bootstrap/web/swagger-ui/swagger-ui-dist"} {
+		if err := os.MkdirAll(path, 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	originalDir, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chdir("/tmp/m4-qs-bootstrap"); err != nil {
+		t.Fatal(err)
+	}
+	defer os.Chdir(originalDir)
+	gin.SetMode(gin.TestMode)
+	httpEngine := gin.New()
+	httpEngine.Use(func(c *gin.Context) {
+		c.Set(restmiddleware.AuthzSnapshotKey, &appauthz.Snapshot{Permissions: []appauthz.Permission{{
+			Resource: "qs:*:*:*", Action: "*", Mode: appauthz.AuthorizationModeUnconditional,
+		}}})
+		c.Set(restmiddleware.UserIDKey, uint64(110004))
+		c.Set(restmiddleware.OrgIDKey, uint64(501))
+		c.Next()
+	})
+	resttransport.NewRouter(host.BuildRESTDeps(cfg.RateLimit)).RegisterRoutes(httpEngine)
+	response := httptest.NewRecorder()
+	httpEngine.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/internal/v1/events/status", nil))
+	if response.Code != http.StatusOK {
+		t.Fatalf("container-backed event HTTP status = %d, body=%s", response.Code, response.Body.String())
+	}
+	var httpStatus appeventing.StatusSnapshot
+	if err := json.Unmarshal(response.Body.Bytes(), &httpStatus); err != nil {
+		t.Fatal(err)
+	}
+	sdkProfiles, liveOutboxes := 0, 0
+	for _, profile := range httpStatus.Profiles {
+		if profile.RelayKind == "sdk" && profile.Running && profile.ScanHealthy != nil && *profile.ScanHealthy {
+			sdkProfiles++
+		}
+	}
+	for _, outbox := range httpStatus.Outboxes {
+		if !outbox.Degraded && len(outbox.Buckets) == 4 {
+			liveOutboxes++
+		}
+	}
+	if sdkProfiles != 2 || liveOutboxes != 2 {
+		t.Fatalf("HTTP status did not expose both standard profiles: profiles=%+v outboxes=%+v", httpStatus.Profiles, httpStatus.Outboxes)
+	}
+	untrustedEngine := gin.New()
+	resttransport.NewRouter(host.BuildRESTDeps(cfg.RateLimit)).RegisterRoutes(untrustedEngine)
+	untrustedResponse := httptest.NewRecorder()
+	untrustedEngine.ServeHTTP(untrustedResponse, httptest.NewRequest(http.MethodGet, "/internal/v1/events/status", nil))
+	if untrustedResponse.Code != http.StatusServiceUnavailable {
+		t.Fatalf("event status without IAM runtime or trusted identity = %d, want 503", untrustedResponse.Code)
 	}
 	// Exercise the actual platform facade with the status readers exported by
 	// process assembly. Direct ledger tests do not prove this runtime seam.
