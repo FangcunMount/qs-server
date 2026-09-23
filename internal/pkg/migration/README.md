@@ -17,7 +17,7 @@ qs-server 在 apiserver 启动阶段按配置执行 MySQL 与 MongoDB 向上迁�
 - MySQL：`NewMigrator(db, config)`；
 - MongoDB：`NewMongoMigrator(client, config)`；
 - dirty 状态会阻断继续迁移；
-- 当前 M4 隔离分支的目录末端版本为 MySQL `84`、MongoDB `36`；新版本只准备标准可靠消息结构，未代表生产已执行或启用。生产实际版本以数据库只读查询和[当前版本定档验收台账](../../../docs/00-总览/09-当前版本定档验收台账.md)为准；仓库目录版本不能单独证明生产已执行到该版本。
+- 当前目录末端版本为 MySQL `85`、MongoDB `36`；M4 隔离分支新增的版本只准备标准可靠消息结构与待核对审计查询索引，未代表生产已执行或启用。生产实际版本以数据库只读查询和[当前版本定档验收台账](../../../docs/00-总览/09-当前版本定档验收台账.md)为准；仓库目录版本不能单独证明生产已执行到该版本。
 
 ## 目录与职责
 
@@ -39,6 +39,8 @@ internal/pkg/migration/
 MySQL 和 MongoDB 各自维护独立的 `schema_migrations` 状态，版本号只在同一种后端内连续，不要求两个后端同步。
 
 M4 候选迁移 MySQL `84` 新建宿主 `rm_outbox`、`qs_rm_replay_requests`、`qs_rm_replay_items`；MongoDB `36` 为新 `rm_outbox` 和请求流水集合建索引。它们不迁移或删除旧 mock Outbox。MySQL down 只在三张新表都为空时删除结构；一旦写入新消息或授权证据，应用回退须保留兼容结构。Mongo down 保留集合、文档和索引，重新 up 可重复应用。正常 apiserver 启动只执行 up；这些 down 规则不构成生产回滚许可。
+
+MySQL `85` 只为现有 `system_governance_action_runs` 增加按组织、动作、状态与 ID 查询待核对记录的索引；down 只移除该索引，不删除审计数据。
 
 ## 启动时序
 
