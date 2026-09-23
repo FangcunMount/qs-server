@@ -15,8 +15,9 @@ type Participant struct {
 	Access interface {
 		AuthorizeOwnAssessment(context.Context, uint64, uint64) error
 	}
-	Sources source.Resolver
-	Bridge  *Service
+	Sources     source.Resolver
+	Bridge      *Service
+	Eligibility EligibilityReader
 }
 
 // Read checks current participant access even when the result was generated earlier.

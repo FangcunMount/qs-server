@@ -1823,6 +1823,7 @@ type AIWorkflowSource struct {
 	Status        string                 `protobuf:"bytes,1,opt,name=status,proto3" json:"status,omitempty"` // ready, not_ready, not_applicable
 	ReportId      string                 `protobuf:"bytes,2,opt,name=report_id,json=reportId,proto3" json:"report_id,omitempty"`
 	SourceVersion string                 `protobuf:"bytes,3,opt,name=source_version,json=sourceVersion,proto3" json:"source_version,omitempty"`
+	AiEligibility *AIEligibility         `protobuf:"bytes,4,opt,name=ai_eligibility,json=aiEligibility,proto3" json:"ai_eligibility,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1874,6 +1875,66 @@ func (x *AIWorkflowSource) GetReportId() string {
 func (x *AIWorkflowSource) GetSourceVersion() string {
 	if x != nil {
 		return x.SourceVersion
+	}
+	return ""
+}
+
+func (x *AIWorkflowSource) GetAiEligibility() *AIEligibility {
+	if x != nil {
+		return x.AiEligibility
+	}
+	return nil
+}
+
+// Current capability only; Start independently rechecks admission and capacity.
+type AIEligibility struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Status        string                 `protobuf:"bytes,1,opt,name=status,proto3" json:"status,omitempty"`
+	ReasonCode    string                 `protobuf:"bytes,2,opt,name=reason_code,json=reasonCode,proto3" json:"reason_code,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AIEligibility) Reset() {
+	*x = AIEligibility{}
+	mi := &file_interpretation_interpretation_proto_msgTypes[25]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AIEligibility) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AIEligibility) ProtoMessage() {}
+
+func (x *AIEligibility) ProtoReflect() protoreflect.Message {
+	mi := &file_interpretation_interpretation_proto_msgTypes[25]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AIEligibility.ProtoReflect.Descriptor instead.
+func (*AIEligibility) Descriptor() ([]byte, []int) {
+	return file_interpretation_interpretation_proto_rawDescGZIP(), []int{25}
+}
+
+func (x *AIEligibility) GetStatus() string {
+	if x != nil {
+		return x.Status
+	}
+	return ""
+}
+
+func (x *AIEligibility) GetReasonCode() string {
+	if x != nil {
+		return x.ReasonCode
 	}
 	return ""
 }
@@ -2056,11 +2117,16 @@ const file_interpretation_interpretation_proto_rawDesc = "" +
 	"\x0esource_version\x18\a \x01(\tR\rsourceVersion\"^\n" +
 	"\x1aGetAIWorkflowSourceRequest\x12\x1b\n" +
 	"\ttestee_id\x18\x01 \x01(\x04R\btesteeId\x12#\n" +
-	"\rassessment_id\x18\x02 \x01(\x04R\fassessmentId\"n\n" +
+	"\rassessment_id\x18\x02 \x01(\x04R\fassessmentId\"\xb4\x01\n" +
 	"\x10AIWorkflowSource\x12\x16\n" +
 	"\x06status\x18\x01 \x01(\tR\x06status\x12\x1b\n" +
 	"\treport_id\x18\x02 \x01(\tR\breportId\x12%\n" +
-	"\x0esource_version\x18\x03 \x01(\tR\rsourceVersion2\xe8\x01\n" +
+	"\x0esource_version\x18\x03 \x01(\tR\rsourceVersion\x12D\n" +
+	"\x0eai_eligibility\x18\x04 \x01(\v2\x1d.interpretation.AIEligibilityR\raiEligibility\"H\n" +
+	"\rAIEligibility\x12\x16\n" +
+	"\x06status\x18\x01 \x01(\tR\x06status\x12\x1f\n" +
+	"\vreason_code\x18\x02 \x01(\tR\n" +
+	"reasonCode2\xe8\x01\n" +
 	"\x18ParticipantReportService\x12n\n" +
 	"\x13GetAssessmentReport\x12*.interpretation.GetAssessmentReportRequest\x1a+.interpretation.GetAssessmentReportResponse\x12\\\n" +
 	"\rListMyReports\x12$.interpretation.ListMyReportsRequest\x1a%.interpretation.ListMyReportsResponse2\xc2\x02\n" +
@@ -2086,7 +2152,7 @@ func file_interpretation_interpretation_proto_rawDescGZIP() []byte {
 	return file_interpretation_interpretation_proto_rawDescData
 }
 
-var file_interpretation_interpretation_proto_msgTypes = make([]protoimpl.MessageInfo, 25)
+var file_interpretation_interpretation_proto_msgTypes = make([]protoimpl.MessageInfo, 26)
 var file_interpretation_interpretation_proto_goTypes = []any{
 	(*Suggestion)(nil),                           // 0: interpretation.Suggestion
 	(*NormReference)(nil),                        // 1: interpretation.NormReference
@@ -2113,48 +2179,50 @@ var file_interpretation_interpretation_proto_goTypes = []any{
 	(*AIWorkflowResult)(nil),                     // 22: interpretation.AIWorkflowResult
 	(*GetAIWorkflowSourceRequest)(nil),           // 23: interpretation.GetAIWorkflowSourceRequest
 	(*AIWorkflowSource)(nil),                     // 24: interpretation.AIWorkflowSource
-	(*evaluation.ScoreValue)(nil),                // 25: evaluation.ScoreValue
-	(*evaluation.ResultLevel)(nil),               // 26: evaluation.ResultLevel
-	(*evaluation.ModelIdentity)(nil),             // 27: evaluation.ModelIdentity
+	(*AIEligibility)(nil),                        // 25: interpretation.AIEligibility
+	(*evaluation.ScoreValue)(nil),                // 26: evaluation.ScoreValue
+	(*evaluation.ResultLevel)(nil),               // 27: evaluation.ResultLevel
+	(*evaluation.ModelIdentity)(nil),             // 28: evaluation.ModelIdentity
 }
 var file_interpretation_interpretation_proto_depIdxs = []int32{
-	25, // 0: interpretation.DimensionInterpret.derived_scores:type_name -> evaluation.ScoreValue
-	26, // 1: interpretation.DimensionInterpret.level:type_name -> evaluation.ResultLevel
+	26, // 0: interpretation.DimensionInterpret.derived_scores:type_name -> evaluation.ScoreValue
+	27, // 1: interpretation.DimensionInterpret.level:type_name -> evaluation.ResultLevel
 	1,  // 2: interpretation.DimensionInterpret.norm_reference:type_name -> interpretation.NormReference
 	3,  // 3: interpretation.ModelExtra.rarity:type_name -> interpretation.ModelRarity
 	2,  // 4: interpretation.AssessmentReport.dimensions:type_name -> interpretation.DimensionInterpret
 	0,  // 5: interpretation.AssessmentReport.suggestions:type_name -> interpretation.Suggestion
 	4,  // 6: interpretation.AssessmentReport.model_extra:type_name -> interpretation.ModelExtra
-	27, // 7: interpretation.AssessmentReport.model:type_name -> evaluation.ModelIdentity
-	25, // 8: interpretation.AssessmentReport.primary_score:type_name -> evaluation.ScoreValue
-	26, // 9: interpretation.AssessmentReport.level:type_name -> evaluation.ResultLevel
+	28, // 7: interpretation.AssessmentReport.model:type_name -> evaluation.ModelIdentity
+	26, // 8: interpretation.AssessmentReport.primary_score:type_name -> evaluation.ScoreValue
+	27, // 9: interpretation.AssessmentReport.level:type_name -> evaluation.ResultLevel
 	5,  // 10: interpretation.GetAssessmentReportResponse.report:type_name -> interpretation.AssessmentReport
 	5,  // 11: interpretation.ListMyReportsResponse.items:type_name -> interpretation.AssessmentReport
 	13, // 12: interpretation.AIExplanationIntegratedInsight.evidence_refs:type_name -> interpretation.AIExplanationEvidenceRef
 	13, // 13: interpretation.AIExplanationSuggestion.evidence_refs:type_name -> interpretation.AIExplanationEvidenceRef
 	14, // 14: interpretation.AIExplanationContent.integrated_insights:type_name -> interpretation.AIExplanationIntegratedInsight
 	15, // 15: interpretation.AIExplanationContent.suggestions:type_name -> interpretation.AIExplanationSuggestion
-	6,  // 16: interpretation.ParticipantReportService.GetAssessmentReport:input_type -> interpretation.GetAssessmentReportRequest
-	8,  // 17: interpretation.ParticipantReportService.ListMyReports:input_type -> interpretation.ListMyReportsRequest
-	23, // 18: interpretation.ParticipantAIExplanationService.GetAIWorkflowSource:input_type -> interpretation.GetAIWorkflowSourceRequest
-	17, // 19: interpretation.ParticipantAIExplanationService.RequestAIWorkflow:input_type -> interpretation.RequestAIWorkflowRequest
-	21, // 20: interpretation.ParticipantAIExplanationService.GetAIWorkflow:input_type -> interpretation.GetAIWorkflowRequest
-	11, // 21: interpretation.InterpretationAutomationService.GenerateReportFromOutcome:input_type -> interpretation.GenerateReportFromOutcomeRequest
-	10, // 22: interpretation.InterpretationAutomationService.GenerateReportFromAssessment:input_type -> interpretation.GenerateReportFromAssessmentRequest
-	19, // 23: interpretation.AIWorkflowAccessService.Authorize:input_type -> interpretation.AIWorkflowAccessRequest
-	7,  // 24: interpretation.ParticipantReportService.GetAssessmentReport:output_type -> interpretation.GetAssessmentReportResponse
-	9,  // 25: interpretation.ParticipantReportService.ListMyReports:output_type -> interpretation.ListMyReportsResponse
-	24, // 26: interpretation.ParticipantAIExplanationService.GetAIWorkflowSource:output_type -> interpretation.AIWorkflowSource
-	18, // 27: interpretation.ParticipantAIExplanationService.RequestAIWorkflow:output_type -> interpretation.AIWorkflowAccepted
-	22, // 28: interpretation.ParticipantAIExplanationService.GetAIWorkflow:output_type -> interpretation.AIWorkflowResult
-	12, // 29: interpretation.InterpretationAutomationService.GenerateReportFromOutcome:output_type -> interpretation.GenerateReportFromAssessmentResponse
-	12, // 30: interpretation.InterpretationAutomationService.GenerateReportFromAssessment:output_type -> interpretation.GenerateReportFromAssessmentResponse
-	20, // 31: interpretation.AIWorkflowAccessService.Authorize:output_type -> interpretation.AIWorkflowAccessResponse
-	24, // [24:32] is the sub-list for method output_type
-	16, // [16:24] is the sub-list for method input_type
-	16, // [16:16] is the sub-list for extension type_name
-	16, // [16:16] is the sub-list for extension extendee
-	0,  // [0:16] is the sub-list for field type_name
+	25, // 16: interpretation.AIWorkflowSource.ai_eligibility:type_name -> interpretation.AIEligibility
+	6,  // 17: interpretation.ParticipantReportService.GetAssessmentReport:input_type -> interpretation.GetAssessmentReportRequest
+	8,  // 18: interpretation.ParticipantReportService.ListMyReports:input_type -> interpretation.ListMyReportsRequest
+	23, // 19: interpretation.ParticipantAIExplanationService.GetAIWorkflowSource:input_type -> interpretation.GetAIWorkflowSourceRequest
+	17, // 20: interpretation.ParticipantAIExplanationService.RequestAIWorkflow:input_type -> interpretation.RequestAIWorkflowRequest
+	21, // 21: interpretation.ParticipantAIExplanationService.GetAIWorkflow:input_type -> interpretation.GetAIWorkflowRequest
+	11, // 22: interpretation.InterpretationAutomationService.GenerateReportFromOutcome:input_type -> interpretation.GenerateReportFromOutcomeRequest
+	10, // 23: interpretation.InterpretationAutomationService.GenerateReportFromAssessment:input_type -> interpretation.GenerateReportFromAssessmentRequest
+	19, // 24: interpretation.AIWorkflowAccessService.Authorize:input_type -> interpretation.AIWorkflowAccessRequest
+	7,  // 25: interpretation.ParticipantReportService.GetAssessmentReport:output_type -> interpretation.GetAssessmentReportResponse
+	9,  // 26: interpretation.ParticipantReportService.ListMyReports:output_type -> interpretation.ListMyReportsResponse
+	24, // 27: interpretation.ParticipantAIExplanationService.GetAIWorkflowSource:output_type -> interpretation.AIWorkflowSource
+	18, // 28: interpretation.ParticipantAIExplanationService.RequestAIWorkflow:output_type -> interpretation.AIWorkflowAccepted
+	22, // 29: interpretation.ParticipantAIExplanationService.GetAIWorkflow:output_type -> interpretation.AIWorkflowResult
+	12, // 30: interpretation.InterpretationAutomationService.GenerateReportFromOutcome:output_type -> interpretation.GenerateReportFromAssessmentResponse
+	12, // 31: interpretation.InterpretationAutomationService.GenerateReportFromAssessment:output_type -> interpretation.GenerateReportFromAssessmentResponse
+	20, // 32: interpretation.AIWorkflowAccessService.Authorize:output_type -> interpretation.AIWorkflowAccessResponse
+	25, // [25:33] is the sub-list for method output_type
+	17, // [17:25] is the sub-list for method input_type
+	17, // [17:17] is the sub-list for extension type_name
+	17, // [17:17] is the sub-list for extension extendee
+	0,  // [0:17] is the sub-list for field type_name
 }
 
 func init() { file_interpretation_interpretation_proto_init() }
@@ -2168,7 +2236,7 @@ func file_interpretation_interpretation_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_interpretation_interpretation_proto_rawDesc), len(file_interpretation_interpretation_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   25,
+			NumMessages:   26,
 			NumExtensions: 0,
 			NumServices:   4,
 		},

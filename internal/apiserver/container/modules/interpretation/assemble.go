@@ -68,6 +68,7 @@ type Module struct {
 	aiWorkflow             *bridge.Participant
 	aiCurrentAccess        *bridge.CurrentAccess
 	aiBridge               *bridge.Service
+	aiEligibility          bridge.EligibilityReader
 	reader                 evaluationreadmodel.ReportReader
 	reportCatalog          evaluationreadmodel.BatchReportMetadataReader
 	executionExecutor      interpretationexecution.Executor
@@ -225,6 +226,7 @@ func New(deps Deps) (*Module, error) {
 		}
 		if module.aiWorkflowEnabled {
 			module.aiBridge.Sender = clients.Commands
+			module.aiEligibility = clients.Commands
 		}
 		if deps.AIWorkflow.Management.Enabled {
 			module.aiManagement = &bridge.EvaluationAdministration{Gateway: clients.Evaluation}
@@ -527,7 +529,7 @@ func (m *Module) tryBindAIWorkflow() error {
 		if err != nil {
 			return err
 		}
-		m.aiWorkflow = &bridge.Participant{Access: m.participantAccess, Sources: resolver, Bridge: m.aiBridge}
+		m.aiWorkflow = &bridge.Participant{Access: m.participantAccess, Sources: resolver, Bridge: m.aiBridge, Eligibility: m.aiEligibility}
 	}
 
 	return nil

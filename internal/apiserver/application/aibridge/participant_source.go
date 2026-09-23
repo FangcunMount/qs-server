@@ -8,8 +8,11 @@ import (
 	"strconv"
 )
 
-// ParticipantSource describes current QS facts, not AI Profile eligibility or quota.
-type ParticipantSource struct{ Status, ReportID, SourceVersion string }
+// ParticipantSource keeps report readiness separate from AI capability and quota.
+type ParticipantSource struct {
+	Status, ReportID, SourceVersion string
+	AIEligibility                   *Eligibility
+}
 
 func (p *Participant) Source(ctx context.Context, actor Actor, testeeID, assessmentID uint64) (*ParticipantSource, error) {
 	if !validNumber(actor.OrgID) || actor.SubjectID == "" || len(actor.SubjectID) > 128 || testeeID == 0 || assessmentID == 0 || p == nil || p.Access == nil || p.Sources == nil {
@@ -36,11 +39,27 @@ func (p *Participant) Source(ctx context.Context, actor Actor, testeeID, assessm
 	if association.TesteeID != testeeID || association.AssessmentID.Uint64() != assessmentID || strconv.FormatInt(association.OrgID, 10) != actor.OrgID {
 		return nil, source.ErrInconsistent
 	}
-	if _, err := reportSnapshot(current); err != nil {
+	content, err := reportSnapshot(current)
+	if err != nil {
 		if errors.Is(err, source.ErrNotApplicable) {
 			return &ParticipantSource{Status: "not_applicable"}, nil
 		}
 		return nil, err
 	}
-	return &ParticipantSource{Status: "ready", ReportID: r.ID().String(), SourceVersion: r.ContentSchemaVersion() + ":" + r.OutcomeID().String()}, nil
+	if p.Eligibility == nil {
+		return nil, ErrAccessUnavailable
+	}
+	version := r.ContentSchemaVersion() + ":" + r.OutcomeID().String()
+	testee, assessment := strconv.FormatUint(testeeID, 10), strconv.FormatUint(assessmentID, 10)
+	capability, err := p.Eligibility.CheckEligibility(ctx, actor, testee, []string{assessment}, []EvidenceItem{{
+		AssessmentID: assessment, TesteeID: testee, ReportID: r.ID().String(), SourceVersion: version,
+		Facts: []Fact{{Ref: "standard_report", Value: string(content)}},
+	}})
+	if err != nil {
+		return nil, err
+	}
+	if !capability.Valid() {
+		return nil, ErrAccessUnavailable
+	}
+	return &ParticipantSource{Status: "ready", ReportID: r.ID().String(), SourceVersion: version, AIEligibility: capability}, nil
 }

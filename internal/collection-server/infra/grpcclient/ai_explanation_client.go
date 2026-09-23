@@ -81,5 +81,9 @@ func (c *ParticipantAIExplanationClient) GetWorkflowSource(ctx context.Context, 
 	if result == nil {
 		return nil, fmt.Errorf("missing AI workflow source")
 	}
-	return &aiport.WorkflowSource{Status: result.Status, ReportID: result.ReportId, SourceVersion: result.SourceVersion}, nil
+	response := &aiport.WorkflowSource{Status: result.Status, ReportID: result.ReportId, SourceVersion: result.SourceVersion}
+	if result.AiEligibility != nil {
+		response.AIEligibility = &aiport.WorkflowEligibility{Status: result.AiEligibility.Status, ReasonCode: result.AiEligibility.ReasonCode}
+	}
+	return response, nil
 }

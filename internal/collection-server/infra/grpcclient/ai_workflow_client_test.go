@@ -47,7 +47,7 @@ func (p *workflowRPCProbe) RequestAIWorkflow(ctx context.Context, req *pb.Reques
 }
 func (p *workflowRPCProbe) GetAIWorkflowSource(ctx context.Context, req *pb.GetAIWorkflowSourceRequest, _ ...grpc.CallOption) (*pb.AIWorkflowSource, error) {
 	p.check(ctx, req.TesteeId, req.AssessmentId, delegatedsubject.PurposeAIExplanationCapability)
-	return &pb.AIWorkflowSource{Status: "ready", ReportId: "18", SourceVersion: "sha256:source"}, nil
+	return &pb.AIWorkflowSource{Status: "ready", ReportId: "18", SourceVersion: "sha256:source", AiEligibility: &pb.AIEligibility{Status: "unavailable", ReasonCode: "publication_missing"}}, nil
 }
 func (p *workflowRPCProbe) GetAIWorkflow(ctx context.Context, req *pb.GetAIWorkflowRequest, _ ...grpc.CallOption) (*pb.AIWorkflowResult, error) {
 	p.check(ctx, req.TesteeId, req.AssessmentId, delegatedsubject.PurposeAIExplanationGet)
@@ -76,7 +76,7 @@ func TestWorkflowRPCPreservesDelegationAndRequestIdentity(t *testing.T) {
 		t.Fatalf("request: %#v %v", accepted, err)
 	}
 	source, err := client.GetWorkflowSource(ctx, 7, 42)
-	if err != nil || source.ReportID != "18" || source.SourceVersion != "sha256:source" {
+	if err != nil || source.ReportID != "18" || source.SourceVersion != "sha256:source" || source.AIEligibility == nil || source.AIEligibility.ReasonCode != "publication_missing" {
 		t.Fatalf("source: %#v %v", source, err)
 	}
 	result, err := client.GetWorkflow(ctx, 7, 42, requestID)

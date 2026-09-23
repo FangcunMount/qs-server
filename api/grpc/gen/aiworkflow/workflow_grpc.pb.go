@@ -19,14 +19,18 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	Commands_Start_FullMethodName  = "/qsai.workflow.v1.Commands/Start"
-	Commands_Change_FullMethodName = "/qsai.workflow.v1.Commands/Change"
+	Commands_CheckEligibility_FullMethodName = "/qsai.workflow.v1.Commands/CheckEligibility"
+	Commands_Start_FullMethodName            = "/qsai.workflow.v1.Commands/Start"
+	Commands_Change_FullMethodName           = "/qsai.workflow.v1.Commands/Change"
 )
 
 // CommandsClient is the client API for Commands service.
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type CommandsClient interface {
+	// QS-authorized immutable report only. No reservation, session or model call.
+	// A successful preflight is not an admission grant; Start checks again.
+	CheckEligibility(ctx context.Context, in *EligibilityQuery, opts ...grpc.CallOption) (*EligibilityStatus, error)
 	Start(ctx context.Context, in *StartCommand, opts ...grpc.CallOption) (*Receipt, error)
 	Change(ctx context.Context, in *ChangeCommand, opts ...grpc.CallOption) (*Receipt, error)
 }
@@ -37,6 +41,16 @@ type commandsClient struct {
 
 func NewCommandsClient(cc grpc.ClientConnInterface) CommandsClient {
 	return &commandsClient{cc}
+}
+
+func (c *commandsClient) CheckEligibility(ctx context.Context, in *EligibilityQuery, opts ...grpc.CallOption) (*EligibilityStatus, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(EligibilityStatus)
+	err := c.cc.Invoke(ctx, Commands_CheckEligibility_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
 }
 
 func (c *commandsClient) Start(ctx context.Context, in *StartCommand, opts ...grpc.CallOption) (*Receipt, error) {
@@ -63,6 +77,9 @@ func (c *commandsClient) Change(ctx context.Context, in *ChangeCommand, opts ...
 // All implementations must embed UnimplementedCommandsServer
 // for forward compatibility.
 type CommandsServer interface {
+	// QS-authorized immutable report only. No reservation, session or model call.
+	// A successful preflight is not an admission grant; Start checks again.
+	CheckEligibility(context.Context, *EligibilityQuery) (*EligibilityStatus, error)
 	Start(context.Context, *StartCommand) (*Receipt, error)
 	Change(context.Context, *ChangeCommand) (*Receipt, error)
 	mustEmbedUnimplementedCommandsServer()
@@ -75,6 +92,9 @@ type CommandsServer interface {
 // pointer dereference when methods are called.
 type UnimplementedCommandsServer struct{}
 
+func (UnimplementedCommandsServer) CheckEligibility(context.Context, *EligibilityQuery) (*EligibilityStatus, error) {
+	return nil, status.Error(codes.Unimplemented, "method CheckEligibility not implemented")
+}
 func (UnimplementedCommandsServer) Start(context.Context, *StartCommand) (*Receipt, error) {
 	return nil, status.Error(codes.Unimplemented, "method Start not implemented")
 }
@@ -100,6 +120,24 @@ func RegisterCommandsServer(s grpc.ServiceRegistrar, srv CommandsServer) {
 		t.testEmbeddedByValue()
 	}
 	s.RegisterService(&Commands_ServiceDesc, srv)
+}
+
+func _Commands_CheckEligibility_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(EligibilityQuery)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CommandsServer).CheckEligibility(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Commands_CheckEligibility_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CommandsServer).CheckEligibility(ctx, req.(*EligibilityQuery))
+	}
+	return interceptor(ctx, in, info, handler)
 }
 
 func _Commands_Start_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
@@ -145,6 +183,10 @@ var Commands_ServiceDesc = grpc.ServiceDesc{
 	ServiceName: "qsai.workflow.v1.Commands",
 	HandlerType: (*CommandsServer)(nil),
 	Methods: []grpc.MethodDesc{
+		{
+			MethodName: "CheckEligibility",
+			Handler:    _Commands_CheckEligibility_Handler,
+		},
 		{
 			MethodName: "Start",
 			Handler:    _Commands_Start_Handler,
