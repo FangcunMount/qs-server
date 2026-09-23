@@ -2,8 +2,11 @@ package systemgovernance
 
 import (
 	"context"
+	"errors"
 	"time"
 )
+
+var ErrActionAuditInputConflict = errors.New("governance request ID already binds different action, actor, or input")
 
 // ActionDescriptor 描述governance 命令 exposed 到 operators。
 type ActionDescriptor struct {
@@ -77,6 +80,13 @@ type ActionAuditReplay struct {
 type ActionAuditStore interface {
 	Claim(context.Context, ActionAuditRecord) (existing *ActionAuditReplay, claimed bool, err error)
 	Complete(context.Context, ActionAuditRecord) error
+}
+
+// RunningActionAuditReader returns the original running record only when the
+// retrying caller matches its action, actor, and complete redacted input.
+// Absence is not authorization to execute the action again.
+type RunningActionAuditReader interface {
+	LoadRunning(context.Context, ActionAuditRecord) (ActionAuditRecord, bool, error)
 }
 
 // ActionAuditFallbackStore persists only terminal replay data when the primary

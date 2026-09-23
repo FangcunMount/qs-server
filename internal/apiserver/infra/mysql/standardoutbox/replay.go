@@ -99,6 +99,44 @@ func (l *ReplayLedger) Authorize(ctx context.Context, input request.ReplayReques
 	return results, nil
 }
 
+// Resolve only reads a committed request and its ordered results. A missing
+// record remains unknown to the caller; it must not be treated as permission
+// to create a second request ID or replay the message blindly.
+func (l *ReplayLedger) Resolve(ctx context.Context, input request.ReplayRequest) ([]request.ReplayResult, bool, error) {
+	fingerprint, err := input.Fingerprint()
+	if err != nil {
+		return nil, false, err
+	}
+	if input.Store != l.storeName {
+		return nil, false, errors.New("replay request targets another Outbox profile")
+	}
+	tx, err := l.db.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelRepeatableRead, ReadOnly: true})
+	if err != nil {
+		return nil, false, err
+	}
+	defer tx.Rollback()
+	var storedHash []byte
+	err = tx.QueryRowContext(ctx, `SELECT input_hash FROM qs_rm_replay_requests
+ WHERE org_id=? AND request_id=?`, input.OrgID, input.RequestID).Scan(&storedHash)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, false, nil
+	}
+	if err != nil {
+		return nil, false, err
+	}
+	if !bytes.Equal(storedHash, fingerprint[:]) {
+		return nil, true, ErrReplayInputConflict
+	}
+	results, err := loadReplayResults(ctx, tx, input)
+	if err != nil {
+		return nil, true, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, true, err
+	}
+	return results, true, nil
+}
+
 func loadReplayResults(ctx context.Context, tx *sql.Tx, input request.ReplayRequest) ([]request.ReplayResult, error) {
 	rows, err := tx.QueryContext(ctx, `SELECT ordinal,event_id,expected_failure_count,authorized,reason
  FROM qs_rm_replay_items WHERE org_id=? AND request_id=? ORDER BY ordinal`, input.OrgID, input.RequestID)

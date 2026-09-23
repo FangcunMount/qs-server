@@ -100,6 +100,9 @@ func (e *ActionExecutor) Run(
 	if e.audit != nil {
 		existing, claimed, err := e.audit.Claim(ctx, audit)
 		if err != nil {
+			if stderrors.Is(err, ErrActionAuditInputConflict) {
+				return nil, errors.WithCode(code.ErrConflict, "request_id belongs to a different governance action input")
+			}
 			return nil, errors.WithCode(code.ErrInternalServerError, "claim governance audit: %s", err.Error())
 		}
 		if existing != nil {
@@ -205,14 +208,14 @@ func (e *ActionExecutor) runReplayDelivery(ctx context.Context, orgID int64, req
 	return map[string]interface{}{"replayed": len(results), "items": results}, nil
 }
 
-type replayPendingInput struct {
+type ReplayPendingInput struct {
 	Store   string                          `json:"store"`
 	Targets []outboxport.ManualReplayTarget `json:"targets"`
 	Reason  string                          `json:"reason"`
 }
 
 func (e *ActionExecutor) runReplayPending(ctx context.Context, orgID int64, requestID string, input map[string]interface{}) (map[string]interface{}, error) {
-	var request replayPendingInput
+	var request ReplayPendingInput
 	if err := decodeActionInput(input, &request); err != nil {
 		return nil, err
 	}

@@ -3,6 +3,7 @@ package systemgovernance
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"reflect"
 	"strings"
 	"time"
@@ -41,6 +42,40 @@ type actionAuditEnvelope struct {
 
 func NewActionAuditStore(db *gorm.DB) *ActionAuditStore { return &ActionAuditStore{db: db} }
 
+func (s *ActionAuditStore) LoadRunning(ctx context.Context, incoming app.ActionAuditRecord) (app.ActionAuditRecord, bool, error) {
+	var row actionRunPO
+	err := s.db.WithContext(ctx).Where("org_id = ? AND request_id = ?", incoming.OrgID, incoming.RequestID).Take(&row).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return app.ActionAuditRecord{}, false, nil
+	}
+	if err != nil {
+		return app.ActionAuditRecord{}, false, err
+	}
+	if row.Status != "running" {
+		return app.ActionAuditRecord{}, false, nil
+	}
+	inputJSON, err := json.Marshal(incoming.Input)
+	if err != nil {
+		return app.ActionAuditRecord{}, false, err
+	}
+	if row.ActionID != incoming.ActionID || row.ActorUserID != incoming.ActorUserID ||
+		row.Component != incoming.Component || row.TargetInstance != incoming.TargetInstance ||
+		!equalAuditJSON(row.InputJSON, string(inputJSON)) {
+		return app.ActionAuditRecord{}, false, app.ErrActionAuditInputConflict
+	}
+	decoder := json.NewDecoder(strings.NewReader(row.InputJSON))
+	decoder.UseNumber()
+	var input map[string]interface{}
+	if err := decoder.Decode(&input); err != nil {
+		return app.ActionAuditRecord{}, false, err
+	}
+	return app.ActionAuditRecord{
+		RequestID: row.RequestID, ActionID: row.ActionID, OrgID: row.OrgID,
+		ActorUserID: row.ActorUserID, Component: row.Component, TargetInstance: row.TargetInstance,
+		Input: input, StartedAt: row.StartedAt, Status: row.Status,
+	}, true, nil
+}
+
 func (s *ActionAuditStore) Claim(ctx context.Context, record app.ActionAuditRecord) (*app.ActionAuditReplay, bool, error) {
 	input, err := json.Marshal(record.Input)
 	if err != nil {
@@ -63,6 +98,11 @@ func (s *ActionAuditStore) Claim(ctx context.Context, record app.ActionAuditReco
 	var existing actionRunPO
 	if err := s.db.WithContext(ctx).Where("org_id = ? AND request_id = ?", record.OrgID, record.RequestID).Take(&existing).Error; err != nil {
 		return nil, false, err
+	}
+	if existing.ActionID != record.ActionID || existing.ActorUserID != record.ActorUserID ||
+		existing.Component != record.Component || existing.TargetInstance != record.TargetInstance ||
+		!equalAuditJSON(existing.InputJSON, string(input)) {
+		return nil, false, app.ErrActionAuditInputConflict
 	}
 	if existing.Status == "running" || existing.ResultJSON == "" {
 		return nil, false, nil

@@ -2,6 +2,7 @@ package systemgovernance
 
 import (
 	"context"
+	"errors"
 	app "github.com/FangcunMount/qs-server/internal/apiserver/application/systemgovernance"
 	mysqlDriver "gorm.io/driver/mysql"
 	"gorm.io/gorm"
@@ -59,6 +60,20 @@ func TestActionAuditLifecycleWithJSONColumns(t *testing.T) {
 			if e != nil || claimed || replay != nil {
 				t.Fatalf("running replay: %+v %v %v", replay, claimed, e)
 			}
+			original, found, e := store.LoadRunning(ctx, record)
+			if e != nil || !found || original.ActorUserID != record.ActorUserID || original.StartedAt.Sub(record.StartedAt).Abs() > time.Millisecond {
+				t.Fatalf("running audit did not return original record: %+v found=%t err=%v", original, found, e)
+			}
+			changed := record
+			changed.Input = map[string]interface{}{"resource_id": "changed"}
+			if _, found, e := store.LoadRunning(ctx, changed); found || !errors.Is(e, app.ErrActionAuditInputConflict) {
+				t.Fatalf("changed input reused running audit: found=%t err=%v", found, e)
+			}
+			changed = record
+			changed.ActorUserID++
+			if _, found, e := store.LoadRunning(ctx, changed); found || !errors.Is(e, app.ErrActionAuditInputConflict) {
+				t.Fatalf("changed actor reused running audit: found=%t err=%v", found, e)
+			}
 			record.Status = "succeeded"
 			if tc.failure != nil {
 				record.Status = "failed"
@@ -81,6 +96,14 @@ func TestActionAuditLifecycleWithJSONColumns(t *testing.T) {
 			}
 			if replay.ActionID != record.ActionID {
 				t.Fatalf("wrong replay action: %s", replay.ActionID)
+			}
+			changed = record
+			changed.Input = map[string]interface{}{"resource_id": "changed"}
+			if _, _, e := store.Claim(ctx, changed); !errors.Is(e, app.ErrActionAuditInputConflict) {
+				t.Fatalf("completed audit accepted changed input: %v", e)
+			}
+			if _, found, e := store.LoadRunning(ctx, record); e != nil || found {
+				t.Fatalf("completed action still appeared running: found=%t err=%v", found, e)
 			}
 		})
 	}

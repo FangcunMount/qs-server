@@ -121,6 +121,11 @@ func TestStandardMySQLReplayLedgerCrashAndRollback(t *testing.T) {
 	if len(results) != 1 || !results[0].Authorized {
 		t.Fatalf("second authorization: %+v", results)
 	}
+	resolved, found, err := ledger.Resolve(ctx, first)
+	must(err)
+	if !found || len(resolved) != 1 || !resolved[0].Authorized {
+		t.Fatalf("lost read-only first result: found=%t items=%+v", found, resolved)
+	}
 	replayed, err := ledger.Authorize(ctx, first)
 	must(err)
 	if len(replayed) != 1 || !replayed[0].Authorized {
@@ -139,6 +144,9 @@ func TestStandardMySQLReplayLedgerCrashAndRollback(t *testing.T) {
 	changed.Targets = []request.ReplayTarget{{EventID: "event-a", ExpectedFailureCount: 31}}
 	if _, err := ledger.Authorize(ctx, changed); !errors.Is(err, ErrReplayInputConflict) {
 		t.Fatalf("same request ID accepted changed target: %v", err)
+	}
+	if _, found, err := ledger.Resolve(ctx, changed); !found || !errors.Is(err, ErrReplayInputConflict) {
+		t.Fatalf("read-only lookup accepted changed target: found=%t err=%v", found, err)
 	}
 	appendQuarantined("other-org", "org:8", "publish_unknown", 30)
 	appendQuarantined("terminal", "org:7", "publish_rejected", 1)
