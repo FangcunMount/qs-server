@@ -41,13 +41,13 @@ func (s failAfterStandardStage) Stage(ctx context.Context, events ...event.Domai
 	return s.err
 }
 
-func standardSubmissionSheet(t *testing.T, id uint64, answer string) *domainanswersheet.AnswerSheet {
+func standardSubmissionSheet(t *testing.T, id uint64, answer string, admission ...domainanswersheet.Admission) *domainanswersheet.AnswerSheet {
 	t.Helper()
 	ref, err := domainanswersheet.NewQuestionnaireRef("QNR-M4", "1.0.0", "M4")
 	require.NoError(t, err)
 	submission, err := domainanswersheet.NewSubmissionContext(
 		actor.NewFillerRef(301, actor.FillerTypeSelf), actor.NewTesteeRef(meta.FromUint64(401)),
-		meta.FromUint64(501), "task-m4",
+		meta.FromUint64(501), "task-m4", admission...,
 	)
 	require.NoError(t, err)
 	value, err := domainanswersheet.NewAnswer(meta.NewCode("Q1"), domainquestionnaire.TypeText, domainanswersheet.NewStringValue(answer), 0)
