@@ -123,6 +123,7 @@ func TestM4ProcessBootstrapRunsSelectedStandardProfiles(t *testing.T) {
 	if _, err := mongoDB.Collection("rm_outbox").Indexes().CreateMany(ctx, []mongo.IndexModel{
 		{Keys: bson.D{{Key: "state", Value: 1}, {Key: "next_attempt_at", Value: 1}, {Key: "_id", Value: 1}}, Options: mongooptions.Index().SetName("ix_rm_outbox_due")},
 		{Keys: bson.D{{Key: "state", Value: 1}, {Key: "lease_until", Value: 1}, {Key: "_id", Value: 1}}, Options: mongooptions.Index().SetName("ix_rm_outbox_lease")},
+		{Keys: bson.D{{Key: "next_attempt_at", Value: 1}, {Key: "_id", Value: 1}}, Options: mongooptions.Index().SetName("ix_rm_outbox_active_due").SetPartialFilterExpression(bson.M{"state": bson.M{"$in": bson.A{"pending", "retry_wait", "publishing"}}})},
 		{Keys: bson.D{{Key: "message_id", Value: 1}}, Options: mongooptions.Index().SetName("ix_rm_outbox_message_id")},
 		{Keys: bson.D{{Key: "scope", Value: 1}, {Key: "state", Value: 1}, {Key: "last_error_code", Value: 1}, {Key: "updated_at", Value: -1}, {Key: "_id", Value: 1}}, Options: mongooptions.Index().SetName("ix_rm_outbox_scope_governance")},
 	}); err != nil {

@@ -11,6 +11,11 @@
         "name": "ix_rm_outbox_lease"
       },
       {
+        "key": { "next_attempt_at": 1, "_id": 1 },
+        "name": "ix_rm_outbox_active_due",
+        "partialFilterExpression": { "state": { "$in": ["pending", "retry_wait", "publishing"] } }
+      },
+      {
         "key": { "message_id": 1 },
         "name": "ix_rm_outbox_message_id"
       },

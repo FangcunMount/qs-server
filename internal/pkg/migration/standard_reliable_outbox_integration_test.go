@@ -150,7 +150,7 @@ func TestStandardReliableOutboxMongoMigrationRetainsCollectionsOnDowngrade(t *te
 		t.Fatalf("apply Mongo standard indexes: %v", err)
 	}
 	for collection, names := range map[string][]string{
-		"rm_outbox":             {"ix_rm_outbox_due", "ix_rm_outbox_lease", "ix_rm_outbox_message_id", "ix_rm_outbox_scope_governance"},
+		"rm_outbox":             {"ix_rm_outbox_due", "ix_rm_outbox_lease", "ix_rm_outbox_active_due", "ix_rm_outbox_message_id", "ix_rm_outbox_scope_governance"},
 		"qs_rm_replay_requests": {"ix_qs_rm_replay_requests_org_time"},
 	} {
 		cursor, err := db.Collection(collection).Indexes().List(t.Context())
@@ -196,7 +196,7 @@ func TestStandardReliableOutboxMongoColdStartReachesLatestIndexes(t *testing.T) 
 		t.Fatalf("cold-start Mongo standard indexes: version=%d changed=%t err=%v", version, changed, err)
 	}
 	for collection, indexName := range map[string]string{
-		"rm_outbox": "ix_rm_outbox_due", "qs_rm_replay_requests": "ix_qs_rm_replay_requests_org_time",
+		"rm_outbox": "ix_rm_outbox_active_due", "qs_rm_replay_requests": "ix_qs_rm_replay_requests_org_time",
 	} {
 		cursor, err := db.Collection(collection).Indexes().List(t.Context())
 		if err != nil {

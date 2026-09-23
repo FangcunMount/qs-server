@@ -73,7 +73,7 @@ AND index_name IN ('due_idx','lease_idx','ix_rm_outbox_message_id','ix_rm_outbox
 			collection string
 			indexes    []string
 		}{
-			{"rm_outbox", []string{"ix_rm_outbox_due", "ix_rm_outbox_lease", "ix_rm_outbox_message_id", "ix_rm_outbox_scope_governance"}},
+			{"rm_outbox", []string{"ix_rm_outbox_due", "ix_rm_outbox_lease", "ix_rm_outbox_active_due", "ix_rm_outbox_message_id", "ix_rm_outbox_scope_governance"}},
 			{"qs_rm_replay_requests", []string{"ix_qs_rm_replay_requests_org_time"}},
 		} {
 			if err := requireM4MongoIndexes(ctx, db.Collection(check.collection), check.indexes); err != nil {
