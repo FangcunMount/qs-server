@@ -39,6 +39,7 @@ if (!primary) throw new Error('replica set did not become primary');
 print('PASS isolated Mongo replica set');
 JS
 "${compose[@]}" exec -T mysql mysql -uroot -e 'CREATE DATABASE m4_qs_bootstrap'
+"${compose[@]}" exec -T mysql mysql -uroot -e 'CREATE DATABASE m4_qs_chain'
 
 architecture=$(docker info --format '{{.Architecture}}')
 case "$architecture" in
@@ -50,13 +51,27 @@ build_dir=$(mktemp -d "${TMPDIR:-/tmp}/$project-build.XXXXXX")
 (cd "$repo" && GOPROXY=https://proxy.golang.org,direct CGO_ENABLED=0 GOOS=linux GOARCH="$goarch" go test -c \
   -tags='reliable_messaging_m4,reliable_messaging_m4_integration' \
   -o "$build_dir/m4-process.test" ./internal/apiserver/process)
+(cd "$repo" && GOPROXY=https://proxy.golang.org,direct CGO_ENABLED=0 GOOS=linux GOARCH="$goarch" go test -c \
+  -tags='integration,reliable_messaging,reliable_messaging_m4,reliable_messaging_m4_integration' \
+  -o "$build_dir/m4-answer-chain.test" ./internal/apiserver/container/internal/transaction)
 
 "${compose[@]}" exec -T mysql mkdir -p /tmp/m4-qs-bootstrap/configs /tmp/m4-qs-bootstrap/mysql
 "${compose[@]}" cp "$build_dir/m4-process.test" mysql:/tmp/m4-qs-bootstrap/m4-process.test
+"${compose[@]}" cp "$build_dir/m4-answer-chain.test" mysql:/tmp/m4-qs-bootstrap/m4-answer-chain.test
 "${compose[@]}" cp "$repo/configs/events.yaml" mysql:/tmp/m4-qs-bootstrap/configs/events.yaml
 "${compose[@]}" cp "$repo/internal/pkg/migration/migrations/mysql/000084_standard_reliable_outbox.up.sql" mysql:/tmp/m4-qs-bootstrap/mysql/000084_standard_reliable_outbox.up.sql
 "${compose[@]}" cp "$repo/internal/pkg/migration/migrations/mysql/000048_add_system_governance_action_runs.up.sql" mysql:/tmp/m4-qs-bootstrap/mysql/000048_add_system_governance_action_runs.up.sql
 "${compose[@]}" cp "$repo/internal/pkg/migration/migrations/mysql/000085_system_governance_pending_replay_index.up.sql" mysql:/tmp/m4-qs-bootstrap/mysql/000085_system_governance_pending_replay_index.up.sql
+
+# The business-chain test subscribes to the production-shaped topic. Run it
+# before the sender-only fault proof, whose topic would otherwise hold messages
+# that the later subscription could mistake for the chain's own event.
+"${compose[@]}" exec -T \
+  -e RM_QS_MONGO_URI='mongodb://mongo:27017/?replicaSet=rm-test' \
+  -e RM_QS_ASSESSMENT_DSN='root@tcp(mysql:3306)/m4_qs_chain?parseTime=true&loc=UTC' \
+  -e RM_QS_NSQ_TCP='nsqd:4150' \
+  mysql /tmp/m4-qs-bootstrap/m4-answer-chain.test \
+    -test.run '^TestStandardAnswerSheetToAssessmentAcrossNSQ$' -test.count=1 -test.timeout=2m -test.v
 
 "${compose[@]}" exec -T \
   -e RM_QS_BOOTSTRAP_MYSQL_DSN='root@tcp(mysql:3306)/m4_qs_bootstrap?parseTime=true&loc=UTC' \
