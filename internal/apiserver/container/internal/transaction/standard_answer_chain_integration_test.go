@@ -20,6 +20,7 @@ import (
 	appanswersheet "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/answersheet"
 	assessmentcache "github.com/FangcunMount/qs-server/internal/apiserver/cache/evaluation"
 	domainanswersheet "github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/answersheet"
+	"github.com/FangcunMount/qs-server/internal/apiserver/eventing/standardoutbox"
 	mongoanswersheet "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/answersheet"
 	mongostandard "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/standardoutbox"
 	assessmentmysql "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/evaluation"
@@ -29,9 +30,9 @@ import (
 	eventcatalog "github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
 	eventruntime "github.com/FangcunMount/qs-server/internal/pkg/eventing/runtime"
 	"github.com/FangcunMount/qs-server/internal/worker/handlers"
+	"github.com/FangcunMount/reliable-messaging/relay"
 	sdkmongo "github.com/FangcunMount/reliable-messaging/storage/mongo"
 	sdkmysql "github.com/FangcunMount/reliable-messaging/storage/mysql"
-	"github.com/FangcunMount/reliable-messaging/transport"
 	sdknsq "github.com/FangcunMount/reliable-messaging/transport/nsq"
 	mysqldriver "github.com/go-sql-driver/mysql"
 	"github.com/nsqio/go-nsq"
@@ -186,12 +187,16 @@ events:
 	defer func() { require.NoError(t, publisher.Drain(ctx)) }()
 	mongoStore, err := sdkmongo.New(mongoOutbox)
 	require.NoError(t, err)
-	claims, err := mongoStore.ClaimDue(ctx, 1, time.Minute)
+	forwarder, err := relay.New(mongoStore, publisher, relay.Config{
+		Concurrency: 1, PollInterval: 50 * time.Millisecond, Lease: 5 * time.Second,
+		PublishTimeout: 2 * time.Second, WriteTimeout: time.Second,
+		Retry: standardoutbox.SDKRetryPolicy(), Observe: func(relay.Event) {},
+	})
 	require.NoError(t, err)
-	require.Len(t, claims, 1)
-	require.Equal(t, submittedID, claims[0].Message.Input().ID)
-	require.Equal(t, transport.Confirmed, publisher.Publish(ctx, claims[0].Message).Outcome)
-	require.NoError(t, mongoStore.Confirm(ctx, claims[0]))
+	relayCtx, stopRelay := context.WithCancel(ctx)
+	relayDone := make(chan error, 1)
+	go func() { relayDone <- forwarder.Run(relayCtx) }()
+	defer stopRelay()
 	var first nsq.MessageID
 	for i := range 2 {
 		select {
@@ -213,6 +218,15 @@ events:
 			t.Fatal("standard AnswerSheet chain timed out", ctx.Err())
 		}
 	}
+	stopRelay()
+	select {
+	case relayErr := <-relayDone:
+		require.NoError(t, relayErr)
+	case <-ctx.Done():
+		t.Fatal("standard Mongo relay did not drain", ctx.Err())
+	}
+	require.NoError(t, publisher.Drain(ctx))
+	require.EqualValues(t, 1, countStandardDocs(t, ctx, mongoOutbox, bson.M{"message_id": submittedID, "state": "published"}))
 	var assessment assessmentmysql.AssessmentPO
 	require.NoError(t, mysqlDB.Where("answer_sheet_id=?", uint64(90010003)).First(&assessment).Error)
 	require.Equal(t, "submitted", assessment.Status)
