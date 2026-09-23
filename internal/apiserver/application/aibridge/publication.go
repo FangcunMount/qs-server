@@ -21,7 +21,14 @@ type PublicationSelector struct {
 }
 
 func (s PublicationSelector) Valid() bool {
-	return s.Audience == "participant" && s.ModelKind == "scale" && s.DecisionKind == "score_range" &&
+	if s.Audience != "participant" {
+		return false
+	}
+	if s.ModelKind == "typology" {
+		return s.DecisionKind == "pole_composition" && s.ModelCode != nil && *s.ModelCode == "MBTI_OEJTS" &&
+			s.ModelVersion != nil && *s.ModelVersion == "v64-report-202608-v1"
+	}
+	return s.ModelKind == "scale" && s.DecisionKind == "score_range" &&
 		(s.ModelCode == nil || (strings.TrimSpace(*s.ModelCode) != "" && len(*s.ModelCode) <= 255 && utf8.ValidString(*s.ModelCode))) &&
 		(s.ModelVersion == nil || (s.ModelCode != nil && frozenVersion.MatchString(*s.ModelVersion)))
 }

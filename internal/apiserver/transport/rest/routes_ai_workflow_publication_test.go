@@ -104,6 +104,26 @@ func TestPublicationReadsAndExplicitEmptySelector(t *testing.T) {
 		t.Fatal("invalid query forwarded")
 	}
 }
+func TestPublicationReadsExactMBTISelector(t *testing.T) {
+	g := &publicationRouteGateway{}
+	e := publicationRouter(g, false)
+	query := "?audience=participant&model_kind=typology&decision_kind=pole_composition&model_code=MBTI_OEJTS&model_version=v64-report-202608-v1"
+	w := httptest.NewRecorder()
+	e.ServeHTTP(w, httptest.NewRequest("GET", publicationRouteBase+query, nil))
+	if w.Code != 200 || g.reads != 1 || g.selector.ModelVersion == nil || *g.selector.ModelVersion != "v64-report-202608-v1" {
+		t.Fatal("exact MBTI selector not forwarded", w.Code)
+	}
+	for _, invalid := range []string{
+		"?audience=participant&model_kind=typology&decision_kind=pole_composition&model_code=MBTI_OEJTS",
+		"?audience=participant&model_kind=typology&decision_kind=pole_composition&model_code=MBTI_OEJTS&model_version=v65",
+	} {
+		w = httptest.NewRecorder()
+		e.ServeHTTP(w, httptest.NewRequest("GET", publicationRouteBase+invalid, nil))
+		if w.Code != 400 || g.reads != 1 {
+			t.Fatal("invalid personality scope reached AI", w.Code, g.reads)
+		}
+	}
+}
 func TestPublicationTimeoutHasNoRetryAndSanitizedError(t *testing.T) {
 	for _, test := range []struct {
 		code codes.Code

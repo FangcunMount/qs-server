@@ -159,4 +159,8 @@ message AIWorkflowSource {
   string status = 1; // ready, not_ready, not_applicable
   string report_id = 2;
   string source_version = 3;
+  AIEligibility ai_eligibility = 4;
 }
+
+// Current capability only; Start independently rechecks admission and capacity.
+message AIEligibility { string status = 1; string reason_code = 2; }

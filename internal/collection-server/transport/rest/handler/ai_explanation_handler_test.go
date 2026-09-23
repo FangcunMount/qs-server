@@ -9,6 +9,7 @@ import (
 	"time"
 
 	app "github.com/FangcunMount/qs-server/internal/collection-server/application/aiexplanation"
+	aiport "github.com/FangcunMount/qs-server/internal/collection-server/port/aiexplanation"
 	"github.com/gin-gonic/gin"
 )
 
@@ -75,7 +76,7 @@ func (s *workflowHandlerStub) GetWorkflowSource(_ context.Context, testee, asses
 	if testee != 7 || assessment != 42 {
 		return nil, app.ErrInvalidRequest
 	}
-	return &app.WorkflowSource{Status: "ready", ReportID: "99", SourceVersion: "standard-v1:101"}, nil
+	return &app.WorkflowSource{Status: "ready", ReportID: "99", SourceVersion: "standard-v1:101", AIEligibility: &aiport.WorkflowEligibility{Status: "unavailable", ReasonCode: "publication_missing"}}, nil
 }
 func TestWorkflowSourceRouteReturnsProvenanceInsteadOfParsingSourceAsRequestID(t *testing.T) {
 	stub := &workflowHandlerStub{}
@@ -85,7 +86,7 @@ func TestWorkflowSourceRouteReturnsProvenanceInsteadOfParsingSourceAsRequestID(t
 	r.GET("/assessments/:id/ai-workflows/:request_id", h.GetWorkflow)
 	recorder := httptest.NewRecorder()
 	r.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "/assessments/42/ai-workflows/source?testee_id=7", nil))
-	if !stub.called || recorder.Code != http.StatusOK || !strings.Contains(recorder.Body.String(), `"report_id":"99"`) || strings.Contains(recorder.Body.String(), "request_id") {
+	if !stub.called || recorder.Code != http.StatusOK || !strings.Contains(recorder.Body.String(), `"report_id":"99"`) || strings.Contains(recorder.Body.String(), "request_id") || !strings.Contains(recorder.Body.String(), `"ai_eligibility":{"status":"unavailable","reason_code":"publication_missing"}`) {
 		t.Fatalf("%d %s", recorder.Code, recorder.Body.String())
 	}
 }

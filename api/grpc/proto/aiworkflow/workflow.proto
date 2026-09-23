@@ -2,6 +2,9 @@ syntax = "proto3";
 package qsai.workflow.v1;
 option go_package = "github.com/FangcunMount/qs-server/api/grpc/gen/aiworkflow";
 service Commands {
+ // QS-authorized immutable report only. No reservation, session or model call.
+ // A successful preflight is not an admission grant; Start checks again.
+ rpc CheckEligibility(EligibilityQuery) returns (EligibilityStatus);
  rpc Start(StartCommand) returns (Receipt);
  rpc Change(ChangeCommand) returns (Receipt);
 }
@@ -9,6 +12,11 @@ service Results {
  rpc Accept(StateEvent) returns (Acknowledgement);
 }
 message Actor { string org_id = 1; string subject_id = 2; }
+message EligibilityQuery {
+ Actor actor = 1; string testee_id = 2;
+ repeated string assessment_ids = 3; repeated EvidenceItem evidence = 4;
+}
+message EligibilityStatus { string status = 1; string reason_code = 2; }
 message StartCommand {
  string request_id = 1; Actor actor = 2; string testee_id = 3;
  repeated string assessment_ids = 4; string goal = 5;

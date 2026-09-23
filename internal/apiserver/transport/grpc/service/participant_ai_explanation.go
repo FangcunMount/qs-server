@@ -117,13 +117,23 @@ func (s *ParticipantAIExplanationService) GetAIWorkflowSource(ctx context.Contex
 		return nil, err
 	}
 	result, err := s.Workflow.Source(ctx, actor, request.TesteeId, request.AssessmentId)
+	if errors.Is(err, bridge.ErrAccessDenied) {
+		return nil, status.Error(codes.PermissionDenied, "AI eligibility access denied")
+	}
+	if errors.Is(err, bridge.ErrAccessUnavailable) {
+		return nil, status.Error(codes.Unavailable, "AI eligibility temporarily unavailable")
+	}
 	if errors.Is(err, bridge.ErrInvalid) {
 		return nil, status.Error(codes.InvalidArgument, "invalid workflow source request")
 	}
 	if err != nil {
 		return nil, toAIExplanationGRPCError(err)
 	}
-	return &interpretationpb.AIWorkflowSource{Status: result.Status, ReportId: result.ReportID, SourceVersion: result.SourceVersion}, nil
+	response := &interpretationpb.AIWorkflowSource{Status: result.Status, ReportId: result.ReportID, SourceVersion: result.SourceVersion}
+	if result.AIEligibility != nil {
+		response.AiEligibility = &interpretationpb.AIEligibility{Status: result.AIEligibility.Status, ReasonCode: result.AIEligibility.ReasonCode}
+	}
+	return response, nil
 }
 
 // workflowActor verifies the delegation before deriving organization context from

@@ -27,6 +27,23 @@ func publicationCommand() PublicationCommand {
 	v := int64(0)
 	return PublicationCommand{CommandID: "00000000-0000-4000-8000-000000000001", Expected: &PublicationExpectation{Selector: PublicationSelector{Audience: "participant", ModelKind: "scale", DecisionKind: "score_range"}, Version: &v}, Reason: "  核对原命令  ", Confirm: true}
 }
+func TestPublicationSelectorKeepsMBTIExactAndScaleCompatible(t *testing.T) {
+	code, version, wrongVersion := "MBTI_OEJTS", "v64-report-202608-v1", "v65"
+	selector := PublicationSelector{Audience: "participant", ModelKind: "typology", DecisionKind: "pole_composition", ModelCode: &code, ModelVersion: &version}
+	if !selector.Valid() || !(PublicationSelector{Audience: "participant", ModelKind: "scale", DecisionKind: "score_range"}).Valid() {
+		t.Fatal("known selectors rejected")
+	}
+	for _, invalid := range []PublicationSelector{
+		{Audience: "participant", ModelKind: "typology", DecisionKind: "pole_composition"},
+		{Audience: "participant", ModelKind: "typology", DecisionKind: "score_range", ModelCode: &code, ModelVersion: &version},
+		{Audience: "participant", ModelKind: "typology", DecisionKind: "pole_composition", ModelCode: &code},
+		{Audience: "participant", ModelKind: "typology", DecisionKind: "pole_composition", ModelCode: &code, ModelVersion: &wrongVersion},
+	} {
+		if invalid.Valid() {
+			t.Fatal("unsupported personality selector accepted", invalid)
+		}
+	}
+}
 func TestPublicationRequiresFreshPermissionAndIdentity(t *testing.T) {
 	g := &publicationGatewayStub{}
 	s := &PublicationAdministration{Gateway: g}
