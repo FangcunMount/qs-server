@@ -22,6 +22,7 @@ type stubSystemGovernanceFacade struct {
 	checkpoints *systemgov.CheckpointView
 	candidates  *systemgov.RetryCandidatePage
 	candidateFn func(int64, string, int) (*systemgov.RetryCandidatePage, error)
+	pendingFn   func(int64, string, int) (*systemgov.PendingReplayAuditPage, error)
 }
 
 func (s stubSystemGovernanceFacade) GetOverview(context.Context, string) (*systemgov.OverviewResponse, error) {
@@ -43,6 +44,46 @@ func (s stubSystemGovernanceFacade) ListRetryCandidates(_ context.Context, orgID
 		return s.candidates, nil
 	}
 	return &systemgov.RetryCandidatePage{}, nil
+}
+
+func (s stubSystemGovernanceFacade) ListPendingReplayAudits(_ context.Context, orgID int64, cursor string, limit int) (*systemgov.PendingReplayAuditPage, error) {
+	if s.pendingFn != nil {
+		return s.pendingFn(orgID, cursor, limit)
+	}
+	return &systemgov.PendingReplayAuditPage{}, nil
+}
+
+func TestSystemGovernancePendingReplayAuditsAreOrgScopedAndBounded(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	called := false
+	router := newRouterWithBudgets(Deps{SystemGovernanceFacade: stubSystemGovernanceFacade{pendingFn: func(orgID int64, cursor string, limit int) (*systemgov.PendingReplayAuditPage, error) {
+		called = true
+		if orgID != 88 || cursor != "12" || limit != 25 {
+			t.Fatalf("pending audit scope/page = %d/%q/%d", orgID, cursor, limit)
+		}
+		return &systemgov.PendingReplayAuditPage{Items: []systemgov.PendingReplayAudit{{RequestID: "original-id", Store: "assessment-mysql-outbox"}}}, nil
+	}}})
+	engine := gin.New()
+	engine.Use(orgAdminSnapshotMiddleware())
+	engine.Use(func(c *gin.Context) {
+		c.Set(restmiddleware.OrgIDKey, uint64(88))
+		c.Next()
+	})
+	router.registerSystemGovernanceInternalRoutes(engine.Group("/internal/v1"))
+	for path, wantStatus := range map[string]int{
+		"/internal/v1/system-governance/actions/pending-reconciliations?cursor=12&limit=25": http.StatusOK,
+		"/internal/v1/system-governance/actions/pending-reconciliations?cursor=bad":         http.StatusBadRequest,
+		"/internal/v1/system-governance/actions/pending-reconciliations?limit=101":          http.StatusBadRequest,
+	} {
+		response := httptest.NewRecorder()
+		engine.ServeHTTP(response, httptest.NewRequest(http.MethodGet, path, nil))
+		if response.Code != wantStatus {
+			t.Fatalf("pending audit route %s = %d, want %d", path, response.Code, wantStatus)
+		}
+	}
+	if !called {
+		t.Fatal("pending audit route did not reach the scoped reader")
+	}
 }
 
 func TestSystemGovernanceRetryCandidatesAreOrgScopedAndBounded(t *testing.T) {

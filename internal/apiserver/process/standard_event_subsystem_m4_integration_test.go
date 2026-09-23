@@ -75,6 +75,10 @@ func TestM4ProcessBootstrapRunsSelectedStandardProfiles(t *testing.T) {
 	if auditMigrationPath != "/tmp/m4-qs-bootstrap/mysql/000048_add_system_governance_action_runs.up.sql" {
 		t.Fatal("copied invocation-owned governance audit migration required")
 	}
+	auditIndexPath := os.Getenv("RM_QS_BOOTSTRAP_AUDIT_INDEX_MIGRATION")
+	if auditIndexPath != "/tmp/m4-qs-bootstrap/mysql/000085_system_governance_pending_replay_index.up.sql" {
+		t.Fatal("copied invocation-owned pending replay audit index migration required")
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	db, err := sql.Open("mysql", dsn)
@@ -108,6 +112,13 @@ func TestM4ProcessBootstrapRunsSelectedStandardProfiles(t *testing.T) {
 		t.Fatal(err)
 	}
 	if _, err := db.ExecContext(ctx, string(auditDDL)); err != nil {
+		t.Fatal(err)
+	}
+	auditIndexDDL, err := os.ReadFile(auditIndexPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.ExecContext(ctx, string(auditIndexDDL)); err != nil {
 		t.Fatal(err)
 	}
 	defer func() {
@@ -657,6 +668,26 @@ func TestM4ProcessBootstrapRunsSelectedStandardProfiles(t *testing.T) {
 		if err := db.QueryRowContext(ctx, `SELECT status,finished_at FROM system_governance_action_runs WHERE org_id=501 AND request_id=?`, audit.RequestID).
 			Scan(&status, &finished); err != nil || status != systemgov.ActionAuditStatusPendingReconciliation || finished.Valid {
 			t.Fatalf("unresolved %s audit is not pending: status=%s finished=%v err=%v", target.store, status, finished, err)
+		}
+		pendingRequest, err := http.NewRequestWithContext(ctx, http.MethodGet,
+			tcpServer.URL+"/internal/v1/system-governance/actions/pending-reconciliations?limit=10", nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		pendingResponse, err := (&http.Client{Timeout: 5 * time.Second}).Do(pendingRequest)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var pendingPayload struct {
+			Data systemgov.PendingReplayAuditPage `json:"data"`
+		}
+		decodeErr := json.NewDecoder(pendingResponse.Body).Decode(&pendingPayload)
+		_ = pendingResponse.Body.Close()
+		if decodeErr != nil || pendingResponse.StatusCode != http.StatusOK || len(pendingPayload.Data.Items) != 1 ||
+			pendingPayload.Data.Items[0].RequestID != audit.RequestID ||
+			pendingPayload.Data.Items[0].Store != target.store || pendingPayload.Data.Items[0].ActorUserID != "110004" {
+			t.Fatalf("pending %s audit absent from tenant-scoped HTTP list: status=%d page=%+v err=%v",
+				target.store, pendingResponse.StatusCode, pendingPayload.Data, decodeErr)
 		}
 		var authorizer outboxport.DurableManualReplayAuthorizer
 		for _, outbox := range subsystem.Outboxes() {

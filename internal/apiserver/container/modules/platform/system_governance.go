@@ -69,19 +69,24 @@ func BuildRESTSystemGovernanceFacade(in RESTSystemGovernanceInput) systemgov.Fac
 		BindDurableEventReplayStores(durableReplays).
 		BindDeliveryReplay(eventdelivery.NewStore(in.MySQLDB), in.EventPublisher).
 		BindActionHandlers(in.ActionHandlers)
+	var pendingReplayAuditReader systemgov.PendingReplayAuditReader
+	if in.MySQLDB != nil {
+		pendingReplayAuditReader = governanceinfra.NewActionAuditStore(in.MySQLDB)
+	}
 	return systemgov.NewFacade(systemgov.FacadeDeps{
-		EventStatusService:      in.EventStatusService,
-		EventTypeSources:        buildEventTypeSources(in.EventOutboxes),
-		CacheGovernance:         in.CacheGovernance,
-		CachePolicyReloader:     in.CachePolicyReloader,
-		LocalResilienceSnapshot: in.LocalResilienceSnapshot,
-		CheckpointReader:        NewCheckpointGovernanceReader(checkpoint.NewRepository(in.MySQLDB)),
-		Metrics:                 metrics,
-		Components:              components,
-		Registry:                registry,
-		Actions:                 actions,
-		RetryGovernanceReader:   retryReader,
-		RetryCandidateReader:    retryReader,
+		EventStatusService:       in.EventStatusService,
+		EventTypeSources:         buildEventTypeSources(in.EventOutboxes),
+		CacheGovernance:          in.CacheGovernance,
+		CachePolicyReloader:      in.CachePolicyReloader,
+		LocalResilienceSnapshot:  in.LocalResilienceSnapshot,
+		CheckpointReader:         NewCheckpointGovernanceReader(checkpoint.NewRepository(in.MySQLDB)),
+		Metrics:                  metrics,
+		Components:               components,
+		Registry:                 registry,
+		Actions:                  actions,
+		RetryGovernanceReader:    retryReader,
+		RetryCandidateReader:     retryReader,
+		PendingReplayAuditReader: pendingReplayAuditReader,
 	})
 }
 

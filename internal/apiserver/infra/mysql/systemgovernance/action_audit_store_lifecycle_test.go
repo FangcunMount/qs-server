@@ -38,6 +38,13 @@ func TestActionAuditLifecycleWithJSONColumns(t *testing.T) {
 	if e = db.Exec(strings.Replace(string(ddl), "CREATE TABLE", "CREATE TEMPORARY TABLE", 1)).Error; e != nil {
 		t.Fatal(e)
 	}
+	indexDDL, e := os.ReadFile("../../../../../internal/pkg/migration/migrations/mysql/000085_system_governance_pending_replay_index.up.sql")
+	if e != nil {
+		t.Fatal(e)
+	}
+	if e = db.Exec(string(indexDDL)).Error; e != nil {
+		t.Fatal(e)
+	}
 	ctx := context.Background()
 	store := NewActionAuditStore(db)
 	for _, tc := range []struct {
@@ -131,6 +138,35 @@ func TestActionAuditLifecycleWithJSONColumns(t *testing.T) {
 	if prior, claimed, err := store.Claim(ctx, ending); err != nil || prior != nil || claimed {
 		t.Fatalf("pending replay was reopened: prior=%+v claimed=%t err=%v", prior, claimed, err)
 	}
+	second := ending
+	second.RequestID = "pending-replay-second"
+	if prior, claimed, err := store.Claim(ctx, second); err != nil || prior != nil || !claimed {
+		t.Fatalf("claim second pending replay: prior=%+v claimed=%t err=%v", prior, claimed, err)
+	}
+	if err := store.MarkPending(ctx, second); err != nil {
+		t.Fatal(err)
+	}
+	otherOrg := ending
+	otherOrg.OrgID = 8
+	otherOrg.RequestID = "pending-other-org"
+	if prior, claimed, err := store.Claim(ctx, otherOrg); err != nil || prior != nil || !claimed {
+		t.Fatalf("claim other organization replay: prior=%+v claimed=%t err=%v", prior, claimed, err)
+	}
+	if err := store.MarkPending(ctx, otherOrg); err != nil {
+		t.Fatal(err)
+	}
+	firstPage, err := store.ListPendingReplayAudits(ctx, 7, "", 1)
+	if err != nil || len(firstPage.Items) != 1 || firstPage.Items[0].RequestID != second.RequestID ||
+		firstPage.Items[0].Store != "assessment-mysql-outbox" || firstPage.Items[0].ActorUserID != "110004" || firstPage.NextCursor == "" {
+		t.Fatalf("pending replay first page omitted original input or scope: page=%+v err=%v", firstPage, err)
+	}
+	secondPage, err := store.ListPendingReplayAudits(ctx, 7, firstPage.NextCursor, 1)
+	if err != nil || len(secondPage.Items) != 1 || secondPage.Items[0].RequestID != ending.RequestID || secondPage.NextCursor != "" {
+		t.Fatalf("pending replay cursor did not return second audit: page=%+v err=%v", secondPage, err)
+	}
+	if _, err := store.ListPendingReplayAudits(ctx, 7, "bad", 1); err == nil {
+		t.Fatal("pending replay reader accepted invalid cursor")
+	}
 	ending.Status = "ok"
 	ending.FinishedAt = time.Now()
 	ending.Result = &app.ActionRunResult{RequestID: ending.RequestID, ActionID: ending.ActionID, Status: "ok"}
@@ -139,5 +175,9 @@ func TestActionAuditLifecycleWithJSONColumns(t *testing.T) {
 	}
 	if prior, claimed, err := store.Claim(ctx, ending); err != nil || prior == nil || claimed {
 		t.Fatalf("resolved pending replay was not repeatable: prior=%+v claimed=%t err=%v", prior, claimed, err)
+	}
+	remaining, err := store.ListPendingReplayAudits(ctx, 7, "", 10)
+	if err != nil || len(remaining.Items) != 1 || remaining.Items[0].RequestID != second.RequestID {
+		t.Fatalf("resolved audit still appears pending or another tenant leaked: page=%+v err=%v", remaining, err)
 	}
 }

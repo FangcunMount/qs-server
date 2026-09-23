@@ -47,6 +47,26 @@ type ActionRunResult struct {
 	Result     map[string]interface{} `json:"result,omitempty"`
 }
 
+// PendingReplayAudit is an unresolved operator request. Input is the redacted
+// original action input; operators must reuse it with the same request ID.
+type PendingReplayAudit struct {
+	RequestID   string                 `json:"request_id"`
+	ActorUserID string                 `json:"actor_user_id"`
+	Store       string                 `json:"store"`
+	Input       map[string]interface{} `json:"input"`
+	StartedAt   time.Time              `json:"started_at"`
+	UpdatedAt   time.Time              `json:"updated_at"`
+}
+
+type PendingReplayAuditPage struct {
+	Items      []PendingReplayAudit `json:"items"`
+	NextCursor string               `json:"next_cursor,omitempty"`
+}
+
+type PendingReplayAuditReader interface {
+	ListPendingReplayAudits(context.Context, int64, string, int) (PendingReplayAuditPage, error)
+}
+
 // ActionAuditRecord is the persistence-neutral governance audit contract.
 // Input must already be redacted before it crosses this port.
 type ActionAuditRecord struct {
