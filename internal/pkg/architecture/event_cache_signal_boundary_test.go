@@ -61,16 +61,31 @@ func TestRemovedEventAndCacheSignalPathsDoNotReturn(t *testing.T) {
 
 func TestEventSubsystemHasSingleProductionCompositionRoot(t *testing.T) {
 	root := repoRoot(t)
-	want := "internal/apiserver/process/resource_bootstrap.go"
+	want := map[string]string{
+		"internal/apiserver/process/standard_event_subsystem_default.go": "//go:build !reliable_messaging_m4",
+		"internal/apiserver/process/standard_event_subsystem_m4.go":      "//go:build reliable_messaging_m4",
+	}
 	var found []string
 	walkGoFiles(t, filepath.Join(root, "internal", "apiserver"), func(file, text string) {
 		if strings.HasSuffix(file, "_test.go") || !strings.Contains(text, "eventsubsystem.New") {
 			return
 		}
-		found = append(found, filepath.ToSlash(mustRel(t, root, file)))
+		rel := filepath.ToSlash(mustRel(t, root, file))
+		tag, ok := want[rel]
+		if !ok || !strings.HasPrefix(text, tag) {
+			t.Fatalf("unexpected event subsystem owner or build constraint: %s", rel)
+		}
+		found = append(found, rel)
 	})
-	if len(found) != 1 || found[0] != want {
-		t.Fatalf("eventsubsystem.New production call sites = %v, want [%s]", found, want)
+	if len(found) != len(want) {
+		t.Fatalf("eventsubsystem.New build variants = %v, want %v", found, want)
+	}
+	bootstrap, err := os.ReadFile(filepath.Join(root, "internal", "apiserver", "process", "resource_bootstrap.go"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Count(string(bootstrap), "configuredEventSubsystem(s.config)") != 1 {
+		t.Fatal("resource bootstrap must select the event subsystem exactly once")
 	}
 }
 
