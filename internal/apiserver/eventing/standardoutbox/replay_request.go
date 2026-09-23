@@ -8,6 +8,11 @@ import (
 	"unicode/utf8"
 )
 
+var (
+	ErrReplayInputConflict = errors.New("replay request ID already binds different input")
+	ErrReplayLedgerCorrupt = errors.New("replay request has incomplete durable results")
+)
+
 // ReplayRequest is the complete business input bound to one manual replay
 // request ID. AuthorizedAt is intentionally absent: retries of a lost response
 // must recover the original result even when their local clocks differ.

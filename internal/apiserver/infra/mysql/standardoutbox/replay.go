@@ -15,8 +15,8 @@ import (
 )
 
 var (
-	ErrReplayInputConflict = errors.New("replay request ID already binds different input")
-	ErrReplayLedgerCorrupt = errors.New("replay request has incomplete durable results")
+	ErrReplayInputConflict = request.ErrReplayInputConflict
+	ErrReplayLedgerCorrupt = request.ErrReplayLedgerCorrupt
 )
 
 // ReplayLedger is scoped to the host business database and one named Outbox
