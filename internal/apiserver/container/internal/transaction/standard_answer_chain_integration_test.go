@@ -85,7 +85,8 @@ events:
 	mongoStager, err := mongostandard.NewStager(mongoOutbox, eventcatalog.NewCatalog(mongoCatalog), eventruntime.SourceAPIServer)
 	require.NoError(t, err)
 	mongoRunner := NewMongoRunner(mongoDB, MongoRunnerOptions{Boundary: "answersheet_submit_m4", Limiter: &transactionLimiterSpy{}})
-	durable := appanswersheet.NewTransactionalSubmissionDurableStore(mongoRunner, sheetRepo, mongoStager, nil)
+	postCommitWake := standardoutbox.NewPostCommitWake()
+	durable := appanswersheet.NewTransactionalSubmissionDurableStore(mongoRunner, sheetRepo, mongoStager, postCommitWake)
 	admission, err := domainanswersheet.NewAssessmentAdmission("QNR-M4", "1.0.0", "scale", "", "", "MODEL-1", "1.0.0", "M4")
 	require.NoError(t, err)
 	sheet := standardSubmissionSheet(t, 90010003, "through NSQ", admission)
@@ -188,7 +189,7 @@ events:
 	mongoStore, err := sdkmongo.New(mongoOutbox)
 	require.NoError(t, err)
 	forwarder, err := relay.New(mongoStore, publisher, relay.Config{
-		Concurrency: 1, PollInterval: 50 * time.Millisecond, Lease: 5 * time.Second,
+		Concurrency: 1, PollInterval: 50 * time.Millisecond, Lease: 5 * time.Second, Wake: postCommitWake.Wake(),
 		PublishTimeout: 2 * time.Second, WriteTimeout: time.Second,
 		Retry: standardoutbox.SDKRetryPolicy(), Observe: func(relay.Event) {},
 	})
