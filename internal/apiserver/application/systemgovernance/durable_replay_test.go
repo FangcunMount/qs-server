@@ -94,3 +94,17 @@ func TestReplayPendingUnknownCommitKeepsAuditOpen(t *testing.T) {
 		t.Fatalf("same request blindly reauthorized: err=%v calls=%d completes=%d", err, store.calls, audit.completes)
 	}
 }
+
+func TestReplayPendingRequiresClientRequestID(t *testing.T) {
+	store := &recordingDurableReplay{}
+	executor := NewActionExecutor(NewActionRegistry(), nil).
+		BindDurableEventReplayStores(map[string]outboxport.DurableManualReplayAuthorizer{"assessment-mysql-outbox": store})
+	_, err := executor.Run(context.Background(), 7, "events.replay_pending", ActionRunRequest{
+		Confirm: true,
+		Input: map[string]interface{}{"store": "assessment-mysql-outbox", "reason": "reviewed",
+			"targets": []interface{}{map[string]interface{}{"event_id": "event-1", "expected_attempt_count": 30}}},
+	})
+	if err == nil || store.calls != 0 {
+		t.Fatalf("manual replay without recoverable request identity was accepted: err=%v calls=%d", err, store.calls)
+	}
+}

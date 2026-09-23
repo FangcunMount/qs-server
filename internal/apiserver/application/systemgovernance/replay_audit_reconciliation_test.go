@@ -13,10 +13,18 @@ type fixedRunningAudit struct {
 	record ActionAuditRecord
 	found  bool
 	err    error
+	marks  *int
 }
 
 func (r fixedRunningAudit) LoadRunning(context.Context, ActionAuditRecord) (ActionAuditRecord, bool, error) {
 	return r.record, r.found, r.err
+}
+
+func (r fixedRunningAudit) MarkPending(context.Context, ActionAuditRecord) error {
+	if r.marks != nil {
+		*r.marks++
+	}
+	return nil
 }
 
 type fixedPendingResolver struct {
@@ -70,10 +78,11 @@ func TestRunningReplayAuditWithoutDurableResultStaysPending(t *testing.T) {
 	}
 	base := &memoryActionAudit{running: true, results: map[string]*ActionAuditReplay{}}
 	resolver := &fixedPendingResolver{found: false}
-	audit := NewReconcilingActionAuditStore(base, fixedRunningAudit{record: stored, found: true},
+	marks := 0
+	audit := NewReconcilingActionAuditStore(base, fixedRunningAudit{record: stored, found: true, marks: &marks},
 		map[string]PendingReplayResolver{"assessment-mysql-outbox": resolver})
 	prior, claimed, err := audit.Claim(context.Background(), stored)
-	if err != nil || prior != nil || claimed || base.completes != 0 || resolver.calls != 1 {
+	if !errors.Is(err, ErrActionAuditPendingReconciliation) || prior != nil || claimed || base.completes != 0 || resolver.calls != 1 || marks != 1 {
 		t.Fatalf("missing ledger incorrectly completed audit: prior=%+v claimed=%t err=%v", prior, claimed, err)
 	}
 	resolver.found = true

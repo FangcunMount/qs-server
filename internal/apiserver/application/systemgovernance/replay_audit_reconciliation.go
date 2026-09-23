@@ -58,11 +58,20 @@ func (s *ReconcilingActionAuditStore) Claim(ctx context.Context, record ActionAu
 	}
 	resolver := s.resolvers[input.Store]
 	if resolver == nil {
-		return nil, false, nil
+		if err := s.MarkPending(ctx, original); err != nil {
+			return nil, false, err
+		}
+		return nil, false, ErrActionAuditPendingReconciliation
 	}
 	items, exists, err := resolver.ResolvePending(ctx, original, input)
 	if err != nil || !exists {
-		return nil, false, err
+		if markErr := s.MarkPending(ctx, original); markErr != nil {
+			return nil, false, errors.Join(err, markErr)
+		}
+		if err != nil {
+			return nil, false, err
+		}
+		return nil, false, ErrActionAuditPendingReconciliation
 	}
 	if len(items) != len(input.Targets) {
 		return nil, false, errors.New("durable replay result count differs from audit input")
@@ -91,6 +100,19 @@ func (s *ReconcilingActionAuditStore) Claim(ctx context.Context, record ActionAu
 		return nil, false, err
 	}
 	return &ActionAuditReplay{ActionID: original.ActionID, Result: result}, false, nil
+}
+
+func (s *ReconcilingActionAuditStore) MarkPending(ctx context.Context, record ActionAuditRecord) error {
+	if s == nil {
+		return errors.New("governance audit store is unavailable")
+	}
+	if marker, ok := s.running.(PendingActionAuditMarker); ok {
+		return marker.MarkPending(ctx, record)
+	}
+	if marker, ok := s.base.(PendingActionAuditMarker); ok {
+		return marker.MarkPending(ctx, record)
+	}
+	return errors.New("governance pending audit marker is unavailable")
 }
 
 func (s *ReconcilingActionAuditStore) Complete(ctx context.Context, record ActionAuditRecord) error {

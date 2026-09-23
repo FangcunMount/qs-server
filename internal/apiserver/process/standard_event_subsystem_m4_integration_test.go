@@ -377,6 +377,70 @@ func TestM4ProcessBootstrapRunsSelectedStandardProfiles(t *testing.T) {
 	if err := subsystem.Close(); err != nil {
 		t.Fatal(err)
 	}
+	// A missing ledger result is explicit pending review, not permission to
+	// execute the action again. A later committed result closes the same audit.
+	for _, target := range []struct {
+		store, eventID string
+		quarantine     func() error
+	}{
+		{"assessment-mysql-outbox", "m4-process-probe", func() error {
+			_, err := db.ExecContext(ctx, `UPDATE rm_outbox SET state='quarantined',last_error_code='publish_unknown',failure_count=31 WHERE message_id='m4-process-probe'`)
+			return err
+		}},
+		{"mongo-domain-events", "m4-process-mongo-probe", func() error {
+			_, err := mongoDB.Collection("rm_outbox").UpdateOne(ctx, bson.M{"message_id": "m4-process-mongo-probe"}, bson.M{"$set": bson.M{
+				"state": "quarantined", "last_error_code": "publish_unknown", "failure_count": int64(31),
+			}})
+			return err
+		}},
+	} {
+		if err := target.quarantine(); err != nil {
+			t.Fatal(err)
+		}
+		input := map[string]interface{}{
+			"store": target.store, "reason": "late committed approval",
+			"targets": []interface{}{map[string]interface{}{"event_id": target.eventID, "expected_attempt_count": 31}},
+		}
+		audit := systemgov.ActionAuditRecord{
+			OrgID: 501, RequestID: "pending-" + target.eventID, ActionID: "events.replay_pending",
+			ActorUserID: 110004, Input: input, StartedAt: time.Now(), Status: "running",
+		}
+		if prior, claimed, err := auditStore.Claim(actionCtx, audit); err != nil || prior != nil || !claimed {
+			t.Fatalf("seed unresolved %s audit: prior=%+v claimed=%t err=%v", target.store, prior, claimed, err)
+		}
+		request := systemgov.ActionRunRequest{RequestID: audit.RequestID, Confirm: true, Input: input}
+		if _, err := governance.RunAction(actionCtx, 501, "events.replay_pending", request); err == nil {
+			t.Fatalf("unresolved %s action was accepted without a ledger", target.store)
+		}
+		var status string
+		var finished sql.NullTime
+		if err := db.QueryRowContext(ctx, `SELECT status,finished_at FROM system_governance_action_runs WHERE org_id=501 AND request_id=?`, audit.RequestID).
+			Scan(&status, &finished); err != nil || status != systemgov.ActionAuditStatusPendingReconciliation || finished.Valid {
+			t.Fatalf("unresolved %s audit is not pending: status=%s finished=%v err=%v", target.store, status, finished, err)
+		}
+		var authorizer outboxport.DurableManualReplayAuthorizer
+		for _, outbox := range subsystem.Outboxes() {
+			if outbox.Name == target.store {
+				authorizer, _ = outbox.Reader.(outboxport.DurableManualReplayAuthorizer)
+			}
+		}
+		if authorizer == nil {
+			t.Fatalf("missing durable %s authorizer", target.store)
+		}
+		items, err := authorizer.AuthorizeManualReplayWithReason(actionCtx, 501, audit.RequestID, "late committed approval",
+			[]outboxport.ManualReplayTarget{{EventID: target.eventID, ExpectedAttemptCount: 31}})
+		if err != nil || len(items) != 1 || !items[0].Authorized {
+			t.Fatalf("late %s authorization failed: items=%+v err=%v", target.store, items, err)
+		}
+		result, err := governance.RunAction(actionCtx, 501, "events.replay_pending", request)
+		if err != nil || result == nil || result.Result["authorized"] != 1 {
+			t.Fatalf("pending %s audit did not converge: result=%+v err=%v", target.store, result, err)
+		}
+		if err := db.QueryRowContext(ctx, `SELECT status FROM system_governance_action_runs WHERE org_id=501 AND request_id=?`, audit.RequestID).
+			Scan(&status); err != nil || status != "ok" {
+			t.Fatalf("pending %s audit did not finish: status=%s err=%v", target.store, status, err)
+		}
+	}
 	// A later SDK delivery failure starts a new automatic cycle. The prior
 	// approval remains in the ledger but must not hide that candidate.
 	mySQLStore, err := sdkmysql.New(db)

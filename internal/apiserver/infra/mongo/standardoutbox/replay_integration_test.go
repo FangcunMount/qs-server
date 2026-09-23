@@ -418,8 +418,8 @@ func TestStandardMongoReplayAuditCrashReconciliation(t *testing.T) {
 		t.Fatal("missing Mongo authorization was executed again")
 	}
 	must(auditDB.Raw("SELECT status FROM system_governance_action_runs WHERE org_id=7 AND request_id=?", missing.RequestID).Scan(&auditRow).Error)
-	if auditRow.Status != "running" {
-		t.Fatalf("unknown Mongo outcome was marked complete: %s", auditRow.Status)
+	if auditRow.Status != governance.ActionAuditStatusPendingReconciliation {
+		t.Fatalf("unknown Mongo outcome did not enter pending reconciliation: %s", auditRow.Status)
 	}
 	count, err := db.Collection("qs_rm_replay_requests").CountDocuments(ctx, bson.M{"request_id": missing.RequestID})
 	must(err)

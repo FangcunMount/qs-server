@@ -107,4 +107,37 @@ func TestActionAuditLifecycleWithJSONColumns(t *testing.T) {
 			}
 		})
 	}
+	ending := app.ActionAuditRecord{
+		RequestID: "pending-replay", ActionID: "events.replay_pending", OrgID: 7, ActorUserID: 110004,
+		Input: map[string]interface{}{"store": "assessment-mysql-outbox", "reason": "reviewed"}, StartedAt: time.Now(),
+	}
+	if prior, claimed, err := store.Claim(ctx, ending); err != nil || prior != nil || !claimed {
+		t.Fatalf("claim pending replay: prior=%+v claimed=%t err=%v", prior, claimed, err)
+	}
+	changed := ending
+	changed.Input = map[string]interface{}{"store": "another", "reason": "reviewed"}
+	if err := store.MarkPending(ctx, changed); !errors.Is(err, app.ErrActionAuditInputConflict) {
+		t.Fatalf("different replay input changed audit state: %v", err)
+	}
+	if err := store.MarkPending(ctx, ending); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.MarkPending(ctx, ending); err != nil {
+		t.Fatalf("marking same pending replay twice failed: %v", err)
+	}
+	if original, found, err := store.LoadRunning(ctx, ending); err != nil || !found || original.Status != app.ActionAuditStatusPendingReconciliation {
+		t.Fatalf("pending replay identity was lost: original=%+v found=%t err=%v", original, found, err)
+	}
+	if prior, claimed, err := store.Claim(ctx, ending); err != nil || prior != nil || claimed {
+		t.Fatalf("pending replay was reopened: prior=%+v claimed=%t err=%v", prior, claimed, err)
+	}
+	ending.Status = "ok"
+	ending.FinishedAt = time.Now()
+	ending.Result = &app.ActionRunResult{RequestID: ending.RequestID, ActionID: ending.ActionID, Status: "ok"}
+	if err := store.Complete(ctx, ending); err != nil {
+		t.Fatalf("late durable result did not close pending replay: %v", err)
+	}
+	if prior, claimed, err := store.Claim(ctx, ending); err != nil || prior == nil || claimed {
+		t.Fatalf("resolved pending replay was not repeatable: prior=%+v claimed=%t err=%v", prior, claimed, err)
+	}
 }

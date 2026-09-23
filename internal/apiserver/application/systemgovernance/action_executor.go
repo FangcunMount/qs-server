@@ -101,6 +101,9 @@ func (e *ActionExecutor) Run(
 	if descriptor.RequiresConfirmation && !req.Confirm {
 		return nil, errors.WithCode(code.ErrInvalidArgument, "action %s requires confirm=true", actionID)
 	}
+	if actionID == "events.replay_pending" && strings.TrimSpace(req.RequestID) == "" {
+		return nil, errors.WithCode(code.ErrInvalidArgument, "events.replay_pending requires a stable request_id")
+	}
 	startedAt := time.Now()
 	requestID := req.RequestID
 	if requestID == "" {
@@ -112,6 +115,9 @@ func (e *ActionExecutor) Run(
 		if err != nil {
 			if stderrors.Is(err, ErrActionAuditInputConflict) {
 				return nil, errors.WithCode(code.ErrConflict, "request_id belongs to a different governance action input")
+			}
+			if stderrors.Is(err, ErrActionAuditPendingReconciliation) {
+				return nil, errors.WithCode(code.ErrConflict, "request_id is pending reconciliation; retry only with the same request_id and input")
 			}
 			return nil, errors.WithCode(code.ErrInternalServerError, "claim governance audit: %s", err.Error())
 		}
@@ -130,7 +136,14 @@ func (e *ActionExecutor) Run(
 		defer func() {
 			if actionID == "events.replay_pending" && stderrors.Is(runErr, outboxport.ErrManualReplayOutcomeUnknown) {
 				// The DB may have committed after its acknowledgment was lost.
-				// Leave the audit running so the same request ID can be resolved.
+				// Make uncertainty visible while keeping the request ID unresolved.
+				if marker, ok := e.audit.(PendingActionAuditMarker); ok {
+					markCtx, cancelMark := context.WithTimeout(context.WithoutCancel(ctx), 6*time.Second)
+					defer cancelMark()
+					if err := marker.MarkPending(markCtx, audit); err != nil {
+						runErr = stderrors.Join(runErr, fmt.Errorf("persist pending replay audit: %w", err))
+					}
+				}
 				return
 			}
 			audit.FinishedAt = time.Now()

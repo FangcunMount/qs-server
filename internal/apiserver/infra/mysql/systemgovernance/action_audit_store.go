@@ -51,7 +51,7 @@ func (s *ActionAuditStore) LoadRunning(ctx context.Context, incoming app.ActionA
 	if err != nil {
 		return app.ActionAuditRecord{}, false, err
 	}
-	if row.Status != "running" {
+	if row.Status != "running" && row.Status != app.ActionAuditStatusPendingReconciliation {
 		return app.ActionAuditRecord{}, false, nil
 	}
 	inputJSON, err := json.Marshal(incoming.Input)
@@ -104,7 +104,7 @@ func (s *ActionAuditStore) Claim(ctx context.Context, record app.ActionAuditReco
 		!equalAuditJSON(existing.InputJSON, string(input)) {
 		return nil, false, app.ErrActionAuditInputConflict
 	}
-	if existing.Status == "running" || existing.ResultJSON == "" {
+	if existing.Status == "running" || existing.Status == app.ActionAuditStatusPendingReconciliation || existing.ResultJSON == "" {
 		return nil, false, nil
 	}
 	prior, err := decodeActionAuditReplay(existing.ResultJSON)
@@ -112,6 +112,36 @@ func (s *ActionAuditStore) Claim(ctx context.Context, record app.ActionAuditReco
 		prior.ActionID = existing.ActionID
 	}
 	return prior, false, err
+}
+
+func (s *ActionAuditStore) MarkPending(ctx context.Context, record app.ActionAuditRecord) error {
+	original, found, err := s.LoadRunning(ctx, record)
+	if err != nil {
+		return err
+	}
+	if !found {
+		return gorm.ErrRecordNotFound
+	}
+	if original.Status == app.ActionAuditStatusPendingReconciliation {
+		return nil
+	}
+	result := s.db.WithContext(ctx).Model(&actionRunPO{}).
+		Where("org_id = ? AND request_id = ? AND status = ?", record.OrgID, record.RequestID, "running").
+		Updates(map[string]interface{}{"status": app.ActionAuditStatusPendingReconciliation, "updated_at": time.Now()})
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 1 {
+		return nil
+	}
+	original, found, err = s.LoadRunning(ctx, record)
+	if err != nil {
+		return err
+	}
+	if found && original.Status == app.ActionAuditStatusPendingReconciliation {
+		return nil
+	}
+	return gorm.ErrRecordNotFound
 }
 
 func (s *ActionAuditStore) Complete(ctx context.Context, record app.ActionAuditRecord) error {
@@ -125,7 +155,8 @@ func (s *ActionAuditStore) Complete(ctx context.Context, record app.ActionAuditR
 		"finished_at": record.FinishedAt, "updated_at": time.Now(),
 	}
 	result := s.db.WithContext(ctx).Model(&actionRunPO{}).
-		Where("org_id = ? AND request_id = ? AND status = ?", record.OrgID, record.RequestID, "running").
+		Where("org_id = ? AND request_id = ? AND status IN ?", record.OrgID, record.RequestID,
+			[]string{"running", app.ActionAuditStatusPendingReconciliation}).
 		Updates(updates)
 	if result.Error != nil {
 		return result.Error
@@ -159,6 +190,7 @@ func decodeActionAuditReplay(raw string) (*app.ActionAuditReplay, error) {
 }
 
 var _ app.ActionAuditStore = (*ActionAuditStore)(nil)
+var _ app.PendingActionAuditMarker = (*ActionAuditStore)(nil)
 
 // MySQL JSON columns normalize whitespace and member order. Preserve numeric
 // precision while comparing the stored envelope with a repeated completion.

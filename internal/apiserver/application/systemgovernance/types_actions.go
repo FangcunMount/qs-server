@@ -7,6 +7,9 @@ import (
 )
 
 var ErrActionAuditInputConflict = errors.New("governance request ID already binds different action, actor, or input")
+var ErrActionAuditPendingReconciliation = errors.New("governance replay is pending reconciliation")
+
+const ActionAuditStatusPendingReconciliation = "pending_reconciliation"
 
 // ActionDescriptor 描述governance 命令 exposed 到 operators。
 type ActionDescriptor struct {
@@ -82,11 +85,17 @@ type ActionAuditStore interface {
 	Complete(context.Context, ActionAuditRecord) error
 }
 
-// RunningActionAuditReader returns the original running record only when the
+// RunningActionAuditReader returns the original unresolved record only when the
 // retrying caller matches its action, actor, and complete redacted input.
 // Absence is not authorization to execute the action again.
 type RunningActionAuditReader interface {
 	LoadRunning(context.Context, ActionAuditRecord) (ActionAuditRecord, bool, error)
+}
+
+// PendingActionAuditMarker records an uncertain replay without closing its
+// identity. Only a matching durable authorization can later complete it.
+type PendingActionAuditMarker interface {
+	MarkPending(context.Context, ActionAuditRecord) error
 }
 
 // ActionAuditFallbackStore persists only terminal replay data when the primary

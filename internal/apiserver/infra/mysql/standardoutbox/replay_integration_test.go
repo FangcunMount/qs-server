@@ -318,8 +318,8 @@ func TestStandardMySQLReplayLedgerCrashAndRollback(t *testing.T) {
 		t.Fatal("running audit without durable authorization was executed again")
 	}
 	must(db.QueryRowContext(ctx, `SELECT status FROM system_governance_action_runs WHERE org_id=7 AND request_id=?`, missing.RequestID).Scan(&status))
-	if status != "running" {
-		t.Fatalf("unknown outcome was marked complete: %s", status)
+	if status != governance.ActionAuditStatusPendingReconciliation {
+		t.Fatalf("unknown outcome did not enter pending reconciliation: %s", status)
 	}
 	must(db.QueryRowContext(ctx, `SELECT COUNT(*) FROM qs_rm_replay_requests WHERE org_id=7 AND request_id=?`, missing.RequestID).Scan(&n))
 	if n != 0 {
@@ -375,7 +375,7 @@ func TestStandardMySQLReplayLedgerCrashAndRollback(t *testing.T) {
 	must(db.QueryRowContext(ctx, `SELECT status FROM system_governance_action_runs WHERE org_id=7 AND request_id=?`, unknownAction.RequestID).Scan(&status))
 	must(db.QueryRowContext(ctx, `SELECT state,version FROM rm_outbox WHERE message_id='outcome-unknown'`).Scan(&state, &afterVersion))
 	must(db.QueryRowContext(ctx, `SELECT COUNT(*) FROM qs_rm_replay_requests WHERE org_id=7 AND request_id=?`, unknownAction.RequestID).Scan(&n))
-	if status != "running" || state != "quarantined" || afterVersion != 0 || n != 0 {
+	if status != governance.ActionAuditStatusPendingReconciliation || state != "quarantined" || afterVersion != 0 || n != 0 {
 		t.Fatalf("unresolved action lost recovery boundary: audit=%s outbox=%s/%d ledger=%d", status, state, afterVersion, n)
 	}
 	_, err = db.ExecContext(ctx, "DROP TRIGGER block_replay_item")
