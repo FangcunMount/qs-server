@@ -10,10 +10,15 @@ import (
 	"testing"
 	"time"
 
+	"github.com/FangcunMount/qs-server/internal/apiserver/application/actor/actorctx"
+	governance "github.com/FangcunMount/qs-server/internal/apiserver/application/systemgovernance"
 	request "github.com/FangcunMount/qs-server/internal/apiserver/eventing/standardoutbox"
+	mysqlgovernance "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/systemgovernance"
 	"github.com/FangcunMount/reliable-messaging/message"
 	sdkmysql "github.com/FangcunMount/reliable-messaging/storage/mysql"
 	mysqldriver "github.com/go-sql-driver/mysql"
+	gormmysql "gorm.io/driver/mysql"
+	"gorm.io/gorm"
 )
 
 // All tables are created only inside an explicitly named disposable database.
@@ -40,6 +45,7 @@ func TestStandardMySQLReplayLedgerCrashAndRollback(t *testing.T) {
 	must(db.PingContext(ctx))
 	for _, ddl := range []string{
 		"DROP TRIGGER IF EXISTS block_replay_item",
+		"DROP TABLE IF EXISTS system_governance_action_runs",
 		"DROP TABLE IF EXISTS qs_rm_replay_items",
 		"DROP TABLE IF EXISTS qs_rm_replay_requests",
 		"DROP TABLE IF EXISTS rm_outbox",
@@ -61,9 +67,14 @@ func TestStandardMySQLReplayLedgerCrashAndRollback(t *testing.T) {
 		_, err := db.ExecContext(ctx, ddl)
 		must(err)
 	}
+	auditDDL, err := os.ReadFile("../../../../../internal/pkg/migration/migrations/mysql/000048_add_system_governance_action_runs.up.sql")
+	must(err)
+	_, err = db.ExecContext(ctx, string(auditDDL))
+	must(err)
 	defer func() {
 		for _, ddl := range []string{
 			"DROP TRIGGER IF EXISTS block_replay_item",
+			"DROP TABLE IF EXISTS system_governance_action_runs",
 			"DROP TABLE IF EXISTS qs_rm_replay_items",
 			"DROP TABLE IF EXISTS qs_rm_replay_requests",
 			"DROP TABLE IF EXISTS rm_outbox",
@@ -224,5 +235,92 @@ func TestStandardMySQLReplayLedgerCrashAndRollback(t *testing.T) {
 	must(db.QueryRowContext(ctx, `SELECT version FROM rm_outbox WHERE message_id='concurrent'`).Scan(&version))
 	if version != 1 {
 		t.Fatalf("parallel replay authorized %d times", version)
+	}
+
+	// The authorization commits, but the process dies before completing its
+	// governance audit. A new executor must return the same durable result.
+	appendQuarantined("audit-crash", "org:7", "publish_unknown", 30)
+	auditDB, err := gorm.Open(gormmysql.Open(dsn), &gorm.Config{})
+	must(err)
+	auditPool, err := auditDB.DB()
+	must(err)
+	defer auditPool.Close()
+	auditStore := mysqlgovernance.NewActionAuditStore(auditDB)
+	auditCtx := actorctx.WithGrantingUserID(ctx, 110004)
+	input := map[string]interface{}{
+		"store": "assessment-mysql-outbox", "reason": "operator reviewed",
+		"targets": []interface{}{map[string]interface{}{"event_id": "audit-crash", "expected_attempt_count": 30}},
+	}
+	running := governance.ActionAuditRecord{
+		OrgID: 7, RequestID: "request-audit-crash", ActionID: "events.replay_pending",
+		ActorUserID: 110004, Input: input,
+		StartedAt: time.Now().In(time.FixedZone("UTC+8", 8*3600)), Status: "running",
+	}
+	prior, claimed, err := auditStore.Claim(auditCtx, running)
+	if err != nil || prior != nil || !claimed {
+		t.Fatalf("claim pre-crash audit: prior=%+v claimed=%t err=%v", prior, claimed, err)
+	}
+	crashRequest := request.ReplayRequest{
+		OrgID: 7, RequestID: running.RequestID, Store: "assessment-mysql-outbox", Reason: "operator reviewed",
+		Targets: []request.ReplayTarget{{EventID: "audit-crash", ExpectedFailureCount: 30}},
+	}
+	authorized, err := ledger.Authorize(auditCtx, crashRequest)
+	must(err)
+	if len(authorized) != 1 || !authorized[0].Authorized {
+		t.Fatalf("pre-crash authorization missing: %+v", authorized)
+	}
+	var beforeVersion uint64
+	must(db.QueryRowContext(ctx, `SELECT version FROM rm_outbox WHERE message_id='audit-crash'`).Scan(&beforeVersion))
+	reconciling := governance.NewReconcilingActionAuditStore(auditStore, auditStore,
+		map[string]governance.PendingReplayResolver{"assessment-mysql-outbox": ledger})
+	executor := governance.NewActionExecutorWithResilience(governance.NewActionRegistry(), nil, nil, nil, reconciling)
+	action := governance.ActionRunRequest{RequestID: running.RequestID, Confirm: true, Input: input}
+	recovered, err := executor.Run(auditCtx, 7, "events.replay_pending", action)
+	if err != nil || recovered == nil || recovered.Result["authorized"] != 1 ||
+		recovered.StartedAt.Sub(running.StartedAt).Abs() > time.Millisecond {
+		t.Fatalf("committed authorization not recovered: result=%+v err=%v", recovered, err)
+	}
+	var status string
+	var afterVersion uint64
+	must(db.QueryRowContext(ctx, `SELECT status FROM system_governance_action_runs WHERE org_id=7 AND request_id=?`, running.RequestID).Scan(&status))
+	must(db.QueryRowContext(ctx, `SELECT version FROM rm_outbox WHERE message_id='audit-crash'`).Scan(&afterVersion))
+	if status != "ok" || beforeVersion != 1 || afterVersion != beforeVersion {
+		t.Fatalf("crash recovery changed authorization: audit=%s version=%d->%d", status, beforeVersion, afterVersion)
+	}
+	again, err := executor.Run(auditCtx, 7, "events.replay_pending", action)
+	if err != nil || again == nil || again.RequestID != recovered.RequestID {
+		t.Fatalf("completed audit not idempotent: result=%+v err=%v", again, err)
+	}
+	changedAction := action
+	changedAction.Input = map[string]interface{}{
+		"store": "assessment-mysql-outbox", "reason": "different reason",
+		"targets": []interface{}{map[string]interface{}{"event_id": "audit-crash", "expected_attempt_count": 30}},
+	}
+	if _, err := executor.Run(auditCtx, 7, "events.replay_pending", changedAction); err == nil {
+		t.Fatal("completed audit accepted changed input")
+	}
+	must(db.QueryRowContext(ctx, `SELECT version FROM rm_outbox WHERE message_id='audit-crash'`).Scan(&afterVersion))
+	if afterVersion != beforeVersion {
+		t.Fatalf("recovery or conflicting retry authorized twice: %d->%d", beforeVersion, afterVersion)
+	}
+
+	missing := running
+	missing.RequestID = "request-audit-missing"
+	prior, claimed, err = auditStore.Claim(auditCtx, missing)
+	if err != nil || prior != nil || !claimed {
+		t.Fatalf("claim unknown-outcome audit: prior=%+v claimed=%t err=%v", prior, claimed, err)
+	}
+	missingAction := action
+	missingAction.RequestID = missing.RequestID
+	if _, err := executor.Run(auditCtx, 7, "events.replay_pending", missingAction); err == nil {
+		t.Fatal("running audit without durable authorization was executed again")
+	}
+	must(db.QueryRowContext(ctx, `SELECT status FROM system_governance_action_runs WHERE org_id=7 AND request_id=?`, missing.RequestID).Scan(&status))
+	if status != "running" {
+		t.Fatalf("unknown outcome was marked complete: %s", status)
+	}
+	must(db.QueryRowContext(ctx, `SELECT COUNT(*) FROM qs_rm_replay_requests WHERE org_id=7 AND request_id=?`, missing.RequestID).Scan(&n))
+	if n != 0 {
+		t.Fatal("unknown outcome created a second authorization")
 	}
 }

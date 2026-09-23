@@ -11,13 +11,19 @@ import (
 	"testing"
 	"time"
 
+	"github.com/FangcunMount/qs-server/internal/apiserver/application/actor/actorctx"
+	governance "github.com/FangcunMount/qs-server/internal/apiserver/application/systemgovernance"
 	request "github.com/FangcunMount/qs-server/internal/apiserver/eventing/standardoutbox"
+	mysqlgovernance "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/systemgovernance"
 	"github.com/FangcunMount/reliable-messaging/message"
 	sdkmongo "github.com/FangcunMount/reliable-messaging/storage/mongo"
+	mysqldriver "github.com/go-sql-driver/mysql"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/event"
 	driver "go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
+	gormmysql "gorm.io/driver/mysql"
+	"gorm.io/gorm"
 )
 
 func TestStandardMongoReplayLedgerCrashAndRollback(t *testing.T) {
@@ -288,5 +294,135 @@ func TestStandardMongoReplayLedgerCrashAndRollback(t *testing.T) {
 	must(err)
 	if !found || len(recovered) != 1 || !recovered[0].Authorized {
 		t.Fatalf("unknown commit left no durable result: found=%t items=%+v", found, recovered)
+	}
+}
+
+func TestStandardMongoReplayAuditCrashReconciliation(t *testing.T) {
+	uri := os.Getenv("RM_QS_REPLAY_MONGO_URI")
+	if !strings.HasPrefix(uri, "mongodb://mongo:27017/") || !strings.Contains(uri, "replicaSet=rm-test") {
+		t.Fatal("disposable rm-test replica-set Mongo URI required")
+	}
+	dsn := os.Getenv("RM_QS_REPLAY_AUDIT_MYSQL_DSN")
+	parsed, err := mysqldriver.ParseDSN(dsn)
+	if err != nil || parsed.Net != "tcp" || parsed.Addr != "mysql:3306" || parsed.DBName != "m4_qs_mongo_audit" {
+		t.Fatal("disposable m4_qs_mongo_audit MySQL required")
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	must := func(err error) {
+		t.Helper()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	client, err := driver.Connect(ctx, options.Client().ApplyURI(uri))
+	must(err)
+	defer client.Disconnect(context.Background())
+	db := client.Database("m4_qs_mongo_audit")
+	defer db.Drop(context.Background())
+	must(db.CreateCollection(ctx, "rm_outbox"))
+	must(db.CreateCollection(ctx, "qs_rm_replay_requests"))
+	outbox := db.Collection("rm_outbox")
+	_, err = outbox.Indexes().CreateMany(ctx, sdkmongo.Indexes())
+	must(err)
+	ledger, err := NewReplayLedger(db, "mongo-domain-events")
+	must(err)
+	const eventID = "mongo-audit-crash"
+	m, err := message.New(message.Input{
+		Producer: "qs-server", ID: eventID, Destination: "qs.evaluation.lifecycle",
+		EventType: "evaluation.requested", SchemaVersion: "v1", Scope: "org:7",
+		ContentType: "application/json", OccurredAt: "2026-09-23T10:00:00+08:00",
+		Payload: []byte(`{"event_id":"mongo-audit-crash"}`),
+	})
+	must(err)
+	session, err := client.StartSession()
+	must(err)
+	defer session.EndSession(ctx)
+	_, err = session.WithTransaction(ctx, func(sc driver.SessionContext) (interface{}, error) {
+		appender, err := sdkmongo.Bind(sc, outbox)
+		if err != nil {
+			return nil, err
+		}
+		return nil, appender.Append(m, time.Now().Add(-time.Minute))
+	})
+	must(err)
+	_, err = outbox.UpdateOne(ctx, bson.M{"message_id": eventID}, bson.M{"$set": bson.M{
+		"state": "quarantined", "last_error_code": "publish_unknown", "failure_count": int64(30),
+	}})
+	must(err)
+	auditDB, err := gorm.Open(gormmysql.Open(dsn), &gorm.Config{})
+	must(err)
+	auditPool, err := auditDB.DB()
+	must(err)
+	defer auditPool.Close()
+	must(auditDB.Exec("DROP TABLE IF EXISTS system_governance_action_runs").Error)
+	auditDDL, err := os.ReadFile("../../../../../internal/pkg/migration/migrations/mysql/000048_add_system_governance_action_runs.up.sql")
+	must(err)
+	must(auditDB.Exec(string(auditDDL)).Error)
+	defer auditDB.Exec("DROP TABLE IF EXISTS system_governance_action_runs")
+	auditStore := mysqlgovernance.NewActionAuditStore(auditDB)
+	auditCtx := actorctx.WithGrantingUserID(ctx, 110004)
+	input := map[string]interface{}{
+		"store": "mongo-domain-events", "reason": "operator reviewed",
+		"targets": []interface{}{map[string]interface{}{"event_id": eventID, "expected_attempt_count": 30}},
+	}
+	running := governance.ActionAuditRecord{
+		OrgID: 7, RequestID: "request-mongo-audit-crash", ActionID: "events.replay_pending",
+		ActorUserID: 110004, Input: input,
+		StartedAt: time.Now().In(time.FixedZone("UTC+8", 8*3600)), Status: "running",
+	}
+	prior, claimed, err := auditStore.Claim(auditCtx, running)
+	if err != nil || prior != nil || !claimed {
+		t.Fatalf("claim pre-crash audit: prior=%+v claimed=%t err=%v", prior, claimed, err)
+	}
+	authorized, err := ledger.Authorize(auditCtx, request.ReplayRequest{
+		OrgID: 7, RequestID: running.RequestID, Store: "mongo-domain-events", Reason: "operator reviewed",
+		Targets: []request.ReplayTarget{{EventID: eventID, ExpectedFailureCount: 30}},
+	})
+	must(err)
+	if len(authorized) != 1 || !authorized[0].Authorized {
+		t.Fatalf("pre-crash Mongo authorization missing: %+v", authorized)
+	}
+	reconciling := governance.NewReconcilingActionAuditStore(auditStore, auditStore,
+		map[string]governance.PendingReplayResolver{"mongo-domain-events": ledger})
+	executor := governance.NewActionExecutorWithResilience(governance.NewActionRegistry(), nil, nil, nil, reconciling)
+	action := governance.ActionRunRequest{RequestID: running.RequestID, Confirm: true, Input: input}
+	recovered, err := executor.Run(auditCtx, 7, "events.replay_pending", action)
+	if err != nil || recovered == nil || recovered.Result["authorized"] != 1 ||
+		recovered.StartedAt.Sub(running.StartedAt).Abs() > time.Millisecond {
+		t.Fatalf("committed Mongo authorization not recovered: result=%+v err=%v", recovered, err)
+	}
+	var auditRow struct{ Status string }
+	must(auditDB.Raw("SELECT status FROM system_governance_action_runs WHERE org_id=7 AND request_id=?", running.RequestID).Scan(&auditRow).Error)
+	var row struct {
+		Version uint64 `bson:"version"`
+	}
+	must(outbox.FindOne(ctx, bson.M{"message_id": eventID}).Decode(&row))
+	if auditRow.Status != "ok" || row.Version != 1 {
+		t.Fatalf("Mongo crash recovery changed authorization: audit=%s version=%d", auditRow.Status, row.Version)
+	}
+	again, err := executor.Run(auditCtx, 7, "events.replay_pending", action)
+	if err != nil || again == nil || again.RequestID != recovered.RequestID {
+		t.Fatalf("completed Mongo audit not idempotent: result=%+v err=%v", again, err)
+	}
+	missing := running
+	missing.RequestID = "request-mongo-audit-missing"
+	prior, claimed, err = auditStore.Claim(auditCtx, missing)
+	if err != nil || prior != nil || !claimed {
+		t.Fatalf("claim unknown-outcome audit: prior=%+v claimed=%t err=%v", prior, claimed, err)
+	}
+	missingAction := action
+	missingAction.RequestID = missing.RequestID
+	if _, err := executor.Run(auditCtx, 7, "events.replay_pending", missingAction); err == nil {
+		t.Fatal("missing Mongo authorization was executed again")
+	}
+	must(auditDB.Raw("SELECT status FROM system_governance_action_runs WHERE org_id=7 AND request_id=?", missing.RequestID).Scan(&auditRow).Error)
+	if auditRow.Status != "running" {
+		t.Fatalf("unknown Mongo outcome was marked complete: %s", auditRow.Status)
+	}
+	count, err := db.Collection("qs_rm_replay_requests").CountDocuments(ctx, bson.M{"request_id": missing.RequestID})
+	must(err)
+	if count != 0 {
+		t.Fatal("unknown Mongo outcome created a second authorization")
 	}
 }
