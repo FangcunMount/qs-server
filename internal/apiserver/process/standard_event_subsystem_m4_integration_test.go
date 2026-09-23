@@ -8,6 +8,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -310,6 +311,23 @@ func TestM4ProcessBootstrapRunsSelectedStandardProfiles(t *testing.T) {
 		c.Next()
 	})
 	resttransport.NewRouter(host.BuildRESTDeps(cfg.RateLimit)).RegisterRoutes(httpEngine)
+	lostReplyResults := make(chan int, 2)
+	tcpServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, request *http.Request) {
+		if request.Header.Get("X-M4-Drop-Reply") != "1" {
+			httpEngine.ServeHTTP(w, request)
+			return
+		}
+		// Complete the real route and durable approval, then close the TCP
+		// connection before returning any response bytes to the caller.
+		captured := httptest.NewRecorder()
+		httpEngine.ServeHTTP(captured, request)
+		lostReplyResults <- captured.Code
+		connection, _, err := w.(http.Hijacker).Hijack()
+		if err == nil {
+			_ = connection.Close()
+		}
+	}))
+	defer tcpServer.Close()
 	response := httptest.NewRecorder()
 	httpEngine.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/internal/v1/events/status", nil))
 	if response.Code != http.StatusOK {
@@ -403,11 +421,47 @@ func TestM4ProcessBootstrapRunsSelectedStandardProfiles(t *testing.T) {
 			t.Fatal(err)
 		}
 		runHTTP := func(payload []byte) *httptest.ResponseRecorder {
-			response := httptest.NewRecorder()
-			httpRequest := httptest.NewRequest(http.MethodPost, "/internal/v1/system-governance/actions/events.replay_pending/runs", bytes.NewReader(payload))
+			httpRequest, err := http.NewRequestWithContext(ctx, http.MethodPost,
+				tcpServer.URL+"/internal/v1/system-governance/actions/events.replay_pending/runs", bytes.NewReader(payload))
+			if err != nil {
+				t.Fatal(err)
+			}
 			httpRequest.Header.Set("Content-Type", "application/json")
-			httpEngine.ServeHTTP(response, httpRequest)
+			tcpResponse, err := (&http.Client{Timeout: 5 * time.Second}).Do(httpRequest)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer tcpResponse.Body.Close()
+			responseBody, err := io.ReadAll(tcpResponse.Body)
+			if err != nil {
+				t.Fatal(err)
+			}
+			response := httptest.NewRecorder()
+			response.Code = tcpResponse.StatusCode
+			_, _ = response.Body.Write(responseBody)
 			return response
+		}
+		lostReplyRequest, err := http.NewRequestWithContext(ctx, http.MethodPost,
+			tcpServer.URL+"/internal/v1/system-governance/actions/events.replay_pending/runs", bytes.NewReader(body))
+		if err != nil {
+			t.Fatal(err)
+		}
+		lostReplyRequest.Header.Set("Content-Type", "application/json")
+		lostReplyRequest.Header.Set("X-M4-Drop-Reply", "1")
+		lostReplyResponse, err := (&http.Client{Timeout: 5 * time.Second}).Do(lostReplyRequest)
+		if lostReplyResponse != nil {
+			_ = lostReplyResponse.Body.Close()
+		}
+		if err == nil {
+			t.Fatalf("standard profile %s unexpectedly received first approval reply", target.store)
+		}
+		select {
+		case status := <-lostReplyResults:
+			if status != http.StatusOK {
+				t.Fatalf("standard profile %s lost reply after failed approval status %d", target.store, status)
+			}
+		case <-ctx.Done():
+			t.Fatalf("standard profile %s lost-reply handler did not finish: %v", target.store, ctx.Err())
 		}
 		httpApproval := runHTTP(body)
 		if httpApproval.Code != http.StatusOK {
