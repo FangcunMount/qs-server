@@ -429,7 +429,15 @@ type OutboxRelayStoreOptions struct {
 }
 
 type EventingOptions struct {
-	Consumers *EventConsumerOptions `json:"consumers" mapstructure:"consumers"`
+	Consumers      *EventConsumerOptions  `json:"consumers" mapstructure:"consumers"`
+	StandardOutbox *StandardOutboxOptions `json:"standard_outbox" mapstructure:"standard_outbox"`
+}
+
+// StandardOutboxOptions keeps each business flow on exactly one outbox profile.
+// The M4 candidate build supports these opt-ins; ordinary builds reject them.
+type StandardOutboxOptions struct {
+	Mongo      bool `json:"mongo" mapstructure:"mongo"`
+	Assessment bool `json:"assessment" mapstructure:"assessment"`
 }
 
 type EventConsumerOptions struct {
@@ -442,18 +450,24 @@ type EventConsumerBindingOptions struct {
 }
 
 func NewEventingOptions() *EventingOptions {
-	return &EventingOptions{Consumers: &EventConsumerOptions{ModelCatalogHotRank: &EventConsumerBindingOptions{
+	return &EventingOptions{StandardOutbox: &StandardOutboxOptions{}, Consumers: &EventConsumerOptions{ModelCatalogHotRank: &EventConsumerBindingOptions{
 		Enabled: true, Channel: "qs-apiserver-modelcatalog-hot-rank-v1",
 	}}}
 }
 
 func (o *EventingOptions) AddFlags(fs *pflag.FlagSet) {
-	if o == nil || o.Consumers == nil || o.Consumers.ModelCatalogHotRank == nil {
+	if o == nil {
 		return
 	}
-	hotRank := o.Consumers.ModelCatalogHotRank
-	fs.BoolVar(&hotRank.Enabled, "eventing.consumer.modelcatalog-hot-rank.enabled", hotRank.Enabled, "Enable the independent modelcatalog hot-rank event consumer.")
-	fs.StringVar(&hotRank.Channel, "eventing.consumer.modelcatalog-hot-rank.channel", hotRank.Channel, "Stable MQ channel for the modelcatalog hot-rank projection.")
+	if o.Consumers != nil && o.Consumers.ModelCatalogHotRank != nil {
+		hotRank := o.Consumers.ModelCatalogHotRank
+		fs.BoolVar(&hotRank.Enabled, "eventing.consumer.modelcatalog-hot-rank.enabled", hotRank.Enabled, "Enable the independent modelcatalog hot-rank event consumer.")
+		fs.StringVar(&hotRank.Channel, "eventing.consumer.modelcatalog-hot-rank.channel", hotRank.Channel, "Stable MQ channel for the modelcatalog hot-rank projection.")
+	}
+	if o.StandardOutbox != nil {
+		fs.BoolVar(&o.StandardOutbox.Mongo, "eventing.standard-outbox.mongo", o.StandardOutbox.Mongo, "M4 candidate: use the standard Mongo outbox for the Mongo domain event flow.")
+		fs.BoolVar(&o.StandardOutbox.Assessment, "eventing.standard-outbox.assessment", o.StandardOutbox.Assessment, "M4 candidate: use the standard MySQL outbox for assessment events.")
+	}
 }
 
 func NewOutboxRelayOptions() *OutboxRelayOptions {

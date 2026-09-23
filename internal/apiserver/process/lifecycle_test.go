@@ -74,6 +74,10 @@ func TestRunProcessLifecycleDepsRunsInExpectedOrder(t *testing.T) {
 			},
 		},
 		resource: resourceLifecycleDeps{
+			closePublisher: func() error {
+				order = append(order, "publisher")
+				return nil
+			},
 			closeDatabase: func() error {
 				order = append(order, "database")
 				return nil
@@ -89,7 +93,7 @@ func TestRunProcessLifecycleDepsRunsInExpectedOrder(t *testing.T) {
 		},
 	})
 
-	want := []string{"http", "grpc", "authz", "container", "database"}
+	want := []string{"http", "grpc", "authz", "container", "publisher", "database"}
 	if !reflect.DeepEqual(order, want) {
 		t.Fatalf("lifecycle dep order = %#v, want %#v", order, want)
 	}
@@ -126,7 +130,8 @@ func TestBuildProcessLifecycleDepsUsesStageOutputs(t *testing.T) {
 
 	deps := buildLifecycleDeps(
 		resourceOutput{
-			handles: resourceHandles{dbManager: &bootstrap.DatabaseManager{}},
+			handles:   resourceHandles{dbManager: &bootstrap.DatabaseManager{}},
+			messaging: messagingOutput{mqPublisher: &fakePublisher{}},
 		},
 		containerOutput{},
 		integrationOutput{
@@ -141,6 +146,9 @@ func TestBuildProcessLifecycleDepsUsesStageOutputs(t *testing.T) {
 
 	if deps.resource.closeDatabase == nil {
 		t.Fatal("closeDatabase = nil, want value")
+	}
+	if deps.resource.closePublisher == nil {
+		t.Fatal("closePublisher = nil, want value")
 	}
 	if deps.container.stopAuthzSync == nil {
 		t.Fatal("stopAuthzSync = nil, want value")

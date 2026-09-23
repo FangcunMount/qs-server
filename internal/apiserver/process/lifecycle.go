@@ -11,7 +11,8 @@ import (
 )
 
 type resourceLifecycleDeps struct {
-	closeDatabase func() error
+	closePublisher func() error
+	closeDatabase  func() error
 }
 
 type containerLifecycleDeps struct {
@@ -60,6 +61,9 @@ func buildLifecycleDeps(resources resourceOutput, containerOutput containerOutpu
 	if resources.handles.dbManager != nil {
 		deps.resource.closeDatabase = resources.handles.dbManager.Close
 	}
+	if resources.messaging.mqPublisher != nil {
+		deps.resource.closePublisher = resources.messaging.mqPublisher.Close
+	}
 	if containerOutput.container != nil {
 		deps.container.containerCleanup = containerOutput.container.Cleanup
 	}
@@ -107,6 +111,13 @@ func runProcessLifecycleDeps(deps processLifecycleDeps) {
 	if deps.container.containerCleanup != nil {
 		if err := deps.container.containerCleanup(); err != nil {
 			log.Errorf("Failed to cleanup container resources: %v", err)
+		}
+	}
+	// The container first stops relays and drains SDK publishes. The original
+	// component-base publisher still owns its own NSQ connection and closes next.
+	if deps.resource.closePublisher != nil {
+		if err := deps.resource.closePublisher(); err != nil {
+			log.Errorf("Failed to close event publisher: %v", err)
 		}
 	}
 	if deps.resource.closeDatabase != nil {
