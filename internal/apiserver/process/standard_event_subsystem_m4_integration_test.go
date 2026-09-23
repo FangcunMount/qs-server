@@ -721,12 +721,11 @@ func TestM4ProcessBootstrapRunsSelectedStandardProfiles(t *testing.T) {
 	// leaves a genuine committed grant and a still-running MySQL audit.
 	for _, target := range []struct {
 		store, eventID, requestID string
-		originalVersion           uint64
 		quarantine                func() error
 		version                   func() (uint64, error)
 		ledgerCount               func() (int64, error)
 	}{
-		{"assessment-mysql-outbox", "m4-process-probe", "crash-mysql-process", originalMySQLVersion,
+		{"assessment-mysql-outbox", "m4-process-probe", "crash-mysql-process",
 			func() error {
 				_, err := db.ExecContext(ctx, `UPDATE rm_outbox SET state='quarantined',last_error_code='publish_unknown',failure_count=31 WHERE message_id='m4-process-probe'`)
 				return err
@@ -741,7 +740,7 @@ func TestM4ProcessBootstrapRunsSelectedStandardProfiles(t *testing.T) {
 				err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM qs_rm_replay_requests WHERE org_id=501 AND request_id='crash-mysql-process'`).Scan(&count)
 				return count, err
 			}},
-		{"mongo-domain-events", "m4-process-mongo-probe", "crash-mongo-process", originalMongoVersion.Version,
+		{"mongo-domain-events", "m4-process-mongo-probe", "crash-mongo-process",
 			func() error {
 				_, err := mongoDB.Collection("rm_outbox").UpdateOne(ctx, bson.M{"message_id": "m4-process-mongo-probe"},
 					bson.M{"$set": bson.M{"state": "quarantined", "last_error_code": "publish_unknown", "failure_count": int64(31)}})
@@ -761,6 +760,10 @@ func TestM4ProcessBootstrapRunsSelectedStandardProfiles(t *testing.T) {
 		if err := target.quarantine(); err != nil {
 			t.Fatal(err)
 		}
+		beforeCrash, err := target.version()
+		if err != nil {
+			t.Fatalf("read %s version before crash: %v", target.store, err)
+		}
 		runM4ReplayCrashChild(t, ctx, target.store, target.eventID, target.requestID)
 		var auditStatus string
 		if err := db.QueryRowContext(ctx, `SELECT status FROM system_governance_action_runs WHERE org_id=501 AND request_id=?`, target.requestID).
@@ -768,8 +771,8 @@ func TestM4ProcessBootstrapRunsSelectedStandardProfiles(t *testing.T) {
 			t.Fatalf("killed %s process did not leave running audit: status=%s err=%v", target.store, auditStatus, err)
 		}
 		beforeRecovery, err := target.version()
-		if err != nil || beforeRecovery != target.originalVersion+2 {
-			t.Fatalf("killed %s process did not commit exactly one grant: version=%d err=%v", target.store, beforeRecovery, err)
+		if err != nil || beforeRecovery != beforeCrash+1 {
+			t.Fatalf("killed %s process did not commit exactly one grant: before=%d after=%d err=%v", target.store, beforeCrash, beforeRecovery, err)
 		}
 		if count, err := target.ledgerCount(); err != nil || count != 1 {
 			t.Fatalf("killed %s process lacks one durable replay request: count=%d err=%v", target.store, count, err)
