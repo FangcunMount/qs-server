@@ -255,7 +255,7 @@ func TestHandleAnswerSheetSubmitted_AcceptsExistingAutoSubmittedAssessment(t *te
 	}
 }
 
-func TestHandleAnswerSheetSubmitted_DuplicateSkip(t *testing.T) {
+func TestHandleAnswerSheetSubmitted_LockContentionRetriesAfterHolderExit(t *testing.T) {
 	mr := miniredis.RunT(t)
 	redisClient := newAnswerSheetTestRedisClientWithAddr(t, mr.Addr())
 	client := &fakeWorkerInternalClient{}
@@ -268,8 +268,11 @@ func TestHandleAnswerSheetSubmitted_DuplicateSkip(t *testing.T) {
 	deps := newAnswerSheetHandlerTestDeps(client, redisClient)
 	handler := handleAnswerSheetSubmitted(deps)
 
-	if err := handler(context.Background(), "answersheet.submitted", mustBuildAnswerSheetSubmittedPayload(t, answerSheetID)); err != nil {
-		t.Fatalf("handler returned error: %v", err)
+	key := answerSheetProcessingLockKey(deps, answerSheetID)
+	mr.SetTTL(key, 5*time.Minute)
+	payload := mustBuildAnswerSheetSubmittedPayload(t, answerSheetID)
+	if err := handler(context.Background(), "answersheet.submitted", payload); !errors.Is(err, ErrAnswerSheetProcessingInProgress) {
+		t.Fatalf("contended handler error = %v, want retryable lock contention", err)
 	}
 
 	if client.calculateCalls != 0 {
@@ -278,8 +281,21 @@ func TestHandleAnswerSheetSubmitted_DuplicateSkip(t *testing.T) {
 	if client.createCalls != 0 {
 		t.Fatalf("expected no create calls, got %d", client.createCalls)
 	}
-	if !mr.Exists(answerSheetProcessingLockKey(deps, answerSheetID)) {
+	if !mr.Exists(key) {
 		t.Fatalf("expected duplicate lock key to remain set")
+	}
+	mr.FastForward(5 * time.Minute)
+	if err := handler(context.Background(), "answersheet.submitted", payload); err != nil {
+		t.Fatalf("redelivery after holder exit: %v", err)
+	}
+	if client.createCalls != 1 {
+		t.Fatalf("createCalls after lease expiry = %d, want 1", client.createCalls)
+	}
+	if err := handler(context.Background(), "answersheet.submitted", payload); err != nil {
+		t.Fatalf("durable duplicate after successful processing: %v", err)
+	}
+	if client.createCalls != 2 {
+		t.Fatalf("createCalls after durable duplicate = %d, want 2 idempotent intake checks", client.createCalls)
 	}
 }
 
@@ -422,7 +438,7 @@ func (r runnerStub) Run(ctx context.Context, workload locklease.WorkloadID, key 
 	return r.run(ctx, workload, key, ttl, body)
 }
 
-func TestHandleAnswerSheetSubmitted_DuplicateSkipUsesInjectedObserver(t *testing.T) {
+func TestHandleAnswerSheetSubmitted_LockContentionUsesInjectedObserver(t *testing.T) {
 	client := &fakeWorkerInternalClient{}
 	deps := newAnswerSheetHandlerTestDeps(client, newAnswerSheetTestRedisClient(t))
 	observer := &workerGateRecordingObserver{}
@@ -438,8 +454,8 @@ func TestHandleAnswerSheetSubmitted_DuplicateSkipUsesInjectedObserver(t *testing
 		},
 	})
 
-	if err := handler(context.Background(), "answersheet.submitted", mustBuildAnswerSheetSubmittedPayload(t, 902)); err != nil {
-		t.Fatalf("handler returned error: %v", err)
+	if err := handler(context.Background(), "answersheet.submitted", mustBuildAnswerSheetSubmittedPayload(t, 902)); !errors.Is(err, ErrAnswerSheetProcessingInProgress) {
+		t.Fatalf("handler error = %v, want retryable lock contention", err)
 	}
 	if client.calculateCalls != 0 {
 		t.Fatalf("expected no score calls, got %d", client.calculateCalls)
@@ -447,8 +463,26 @@ func TestHandleAnswerSheetSubmitted_DuplicateSkipUsesInjectedObserver(t *testing
 	if client.createCalls != 0 {
 		t.Fatalf("expected no create calls, got %d", client.createCalls)
 	}
-	if !observer.has(resilience.OutcomeDuplicateSkipped) {
-		t.Fatal("expected duplicate_skipped outcome")
+	if !observer.has(resilience.OutcomeLockContention) {
+		t.Fatal("expected lock_contention outcome")
+	}
+}
+
+func TestAnswerSheetRunnerContentionReturnsRetryableError(t *testing.T) {
+	bodyCalls := 0
+	deps := &Dependencies{
+		Logger: slog.New(slog.NewTextHandler(io.Discard, nil)),
+		LockRunner: runnerStub{run: func(context.Context, locklease.WorkloadID, string, time.Duration, func(context.Context) error) (locklease.RunResult, error) {
+			return locklease.RunResult{}, nil
+		}},
+	}
+	gate := newAnswerSheetDuplicateSuppressionGate(answerSheetProcessingGateHooks{})
+	err := gate.Run(context.Background(), deps, "event-contended", 42, func(context.Context) error {
+		bodyCalls++
+		return nil
+	})
+	if !errors.Is(err, ErrAnswerSheetProcessingInProgress) || bodyCalls != 0 {
+		t.Fatalf("Run() error = %v bodyCalls = %d, want contention and no business call", err, bodyCalls)
 	}
 }
 

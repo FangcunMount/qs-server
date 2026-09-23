@@ -85,6 +85,20 @@ func FailedMessageHandler(recorder DeadLetterRecorder) basemessaging.FailedMessa
 	}
 }
 
+// NewUnknownEventRecorder preserves an unsupported event before its Worker
+// delivery is acknowledged. A failed database write must leave it unsettled.
+func NewUnknownEventRecorder(provider string, recorder DeadLetterRecorder) func(context.Context, *basemessaging.Message, string) error {
+	return func(ctx context.Context, msg *basemessaging.Message, eventType string) error {
+		if recorder == nil || msg == nil || provider == "" || eventType == "" {
+			return fmt.Errorf("unknown-event audit store or identity is not configured")
+		}
+		return recorder.RecordDeadLetter(ctx, deadLetterRecord(
+			provider, msg.Topic, msg.Channel, max(int(msg.Attempts), 1), msg.UUID, msg.Payload,
+			"unknown event type: "+eventType,
+		))
+	}
+}
+
 func (r *SQLDeadLetterRecorder) RecordDeadLetter(ctx context.Context, record DeadLetterRecord) error {
 	if r == nil || r.db == nil {
 		return fmt.Errorf("dead-letter audit store is not configured")

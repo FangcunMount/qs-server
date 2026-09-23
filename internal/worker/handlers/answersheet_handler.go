@@ -19,10 +19,14 @@ import (
 type answerSheetProcessingGateMode string
 
 const (
-	answerSheetProcessingGateModeLocked        answerSheetProcessingGateMode = "locked"
-	answerSheetProcessingGateModeDuplicateSkip answerSheetProcessingGateMode = "duplicate_skip"
-	answerSheetProcessingGateModeDegraded      answerSheetProcessingGateMode = "degraded"
+	answerSheetProcessingGateModeLocked         answerSheetProcessingGateMode = "locked"
+	answerSheetProcessingGateModeContendedRetry answerSheetProcessingGateMode = "contended_retry"
+	answerSheetProcessingGateModeDegraded       answerSheetProcessingGateMode = "degraded"
 )
+
+// ErrAnswerSheetProcessingInProgress makes a contended best-effort lock a
+// transport retry, not proof that the other holder committed the assessment.
+var ErrAnswerSheetProcessingInProgress = errors.New("answersheet processing is in progress")
 
 type answerSheetProcessingGateHooks struct {
 	acquire  func(ctx context.Context, deps *Dependencies, answerSheetID uint64) (*locklease.Lease, bool, error)
@@ -166,14 +170,14 @@ func (g answerSheetDuplicateSuppressionGate) Run(
 			return err
 		}
 		if !result.Acquired {
-			g.observe(ctx, resilience.OutcomeDuplicateSkipped)
-			deps.Logger.Info("answersheet processing skipped as duplicate",
+			g.observe(ctx, resilience.OutcomeLockContention)
+			deps.Logger.Info("answersheet processing deferred for retry",
 				slog.String("event_id", eventID),
 				slog.String("answersheet_id", answerSheetIDStr),
 				slog.String("lock_key", lockKey),
-				slog.String("lock_mode", string(answerSheetProcessingGateModeDuplicateSkip)),
+				slog.String("lock_mode", string(answerSheetProcessingGateModeContendedRetry)),
 			)
-			return nil
+			return fmt.Errorf("%w: answersheet_id=%d", ErrAnswerSheetProcessingInProgress, answerSheetID)
 		}
 		if result.ReleaseErr != nil {
 			deps.Logger.Warn("failed to release answersheet processing gate",
@@ -214,14 +218,14 @@ func (g answerSheetDuplicateSuppressionGate) Run(
 		return fn(ctx)
 	}
 	if !acquired {
-		g.observe(ctx, resilience.OutcomeDuplicateSkipped)
-		deps.Logger.Info("answersheet processing skipped as duplicate",
+		g.observe(ctx, resilience.OutcomeLockContention)
+		deps.Logger.Info("answersheet processing deferred for retry",
 			slog.String("event_id", eventID),
 			slog.String("answersheet_id", answerSheetIDStr),
 			slog.String("lock_key", lockKey),
-			slog.String("lock_mode", string(answerSheetProcessingGateModeDuplicateSkip)),
+			slog.String("lock_mode", string(answerSheetProcessingGateModeContendedRetry)),
 		)
-		return nil
+		return fmt.Errorf("%w: answersheet_id=%d", ErrAnswerSheetProcessingInProgress, answerSheetID)
 	}
 
 	deps.Logger.Debug("answersheet processing gate acquired",

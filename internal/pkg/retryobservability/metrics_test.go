@@ -46,7 +46,7 @@ func TestOriginAndOutcomeLabelsStayBounded(t *testing.T) {
 	if got := normalizeOutcome("published"); got != OutcomeSuccess {
 		t.Fatalf("published outcome = %q", got)
 	}
-	if got := normalizeOutcome("unknown_acked"); got != OutcomeSuccess {
+	if got := normalizeOutcome("unknown_acked"); got != OutcomeFailure {
 		t.Fatalf("unknown_acked outcome = %q", got)
 	}
 	if got := normalizeOutcome("poison_acked"); got != OutcomeFailure {

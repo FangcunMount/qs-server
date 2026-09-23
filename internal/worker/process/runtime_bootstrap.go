@@ -68,11 +68,12 @@ func (s *server) initializeRuntime(resources resourceOutput, containerOutput con
 	output.messaging.holdStore = holdStore
 
 	if err := messagingintegration.SubscribeHandlersWithOptions(messagingintegration.SubscribeHandlersOptions{
-		ServiceName:  s.config.Worker.ServiceName,
-		Logger:       s.logger,
-		Runtime:      containerOutput.container,
-		Subscriber:   subscriber,
-		HoldRecorder: holdStore,
+		ServiceName:     s.config.Worker.ServiceName,
+		Logger:          s.logger,
+		Runtime:         containerOutput.container,
+		Subscriber:      subscriber,
+		HoldRecorder:    holdStore,
+		UnknownRecorder: eventtransport.NewUnknownEventRecorder(s.config.Messaging.Provider, deadLetterRecorder),
 	}); err != nil {
 		subscriber.Stop()
 		_ = subscriber.Close()

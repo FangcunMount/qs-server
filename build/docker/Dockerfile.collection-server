@@ -24,7 +24,7 @@ ARG BUILD_TIME
 ARG GIT_COMMIT
 ARG GIT_BRANCH=main
 
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build \
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -tags=reliable_messaging_m4 \
     -ldflags "-s -w \
     -X github.com/FangcunMount/qs-server/pkg/version.GitVersion=${VERSION} \
     -X github.com/FangcunMount/qs-server/pkg/version.GitCommit=${GIT_COMMIT} \

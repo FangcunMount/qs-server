@@ -1,0 +1,2 @@
+DROP INDEX idx_system_governance_replay_pending
+ON system_governance_action_runs;

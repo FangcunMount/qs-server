@@ -117,7 +117,7 @@ func (s *server) buildEventSubsystemResourceDeps() eventSubsystemResourceDeps {
 	}
 	mongoProfile, assessmentProfile := buildEventProfileOptions(s.config)
 	return eventSubsystemResourceDeps{
-		newSubsystem:           eventsubsystem.New,
+		newSubsystem:           configuredEventSubsystem(s.config),
 		buildSubscriberFactory: buildSubscriberFactory,
 		consumers:              buildEventConsumerOptions(s.config),
 		mongo:                  mongoProfile,
@@ -204,6 +204,12 @@ func prepareResources(deps resourceStageDeps) (resourceOutput, error) {
 	}
 	actionAuditStore, actionAuditRunner := buildActionAuditRuntime(mysqlDB, redisRuntime)
 	mqPublisher, publishMode := createMQPublisher(deps.mqPublisher)
+	prepared := false
+	defer func() {
+		if !prepared && mqPublisher != nil {
+			_ = mqPublisher.Close()
+		}
+	}()
 	eventCatalog, err := loadEventCatalog(deps.loadEventCatalog)
 	if err != nil {
 		return resourceOutput{}, err
@@ -239,6 +245,7 @@ func prepareResources(deps resourceStageDeps) (resourceOutput, error) {
 		})
 		output.containerInput = containerBootstrapInput{containerOptions: containerOptions}
 	}
+	prepared = true
 	return output, nil
 }
 

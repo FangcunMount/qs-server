@@ -81,3 +81,20 @@ func TestFailedMessageHandlerPreservesTransportEvidence(t *testing.T) {
 		t.Fatalf("record = %#v", recorder.record)
 	}
 }
+
+func TestUnknownEventRecorderPreservesPayloadAndRejectsMissingAudit(t *testing.T) {
+	recorder := &deadLetterRecorderStub{}
+	msg := basemessaging.NewMessage("message-2", []byte(`{"id":"event-2","data":{"org_id":501}}`))
+	msg.Topic, msg.Channel, msg.Attempts = "evaluation", "worker", 1
+	if err := NewUnknownEventRecorder("nsq", recorder)(t.Context(), msg, "future.event"); err != nil {
+		t.Fatal(err)
+	}
+	if recorder.record.MessageID != msg.UUID || recorder.record.EventID != "event-2" || recorder.record.OrgID == nil || *recorder.record.OrgID != 501 || recorder.record.Provider != "nsq" || recorder.record.LastError != "unknown event type: future.event" || string(recorder.record.Payload) != string(msg.Payload) {
+		t.Fatalf("unknown event record = %#v", recorder.record)
+	}
+	wantErr := errors.New("audit unavailable")
+	recorder.err = wantErr
+	if err := NewUnknownEventRecorder("nsq", recorder)(t.Context(), msg, "future.event"); !errors.Is(err, wantErr) {
+		t.Fatalf("audit error = %v, want unavailable", err)
+	}
+}

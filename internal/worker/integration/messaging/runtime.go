@@ -3,6 +3,7 @@ package messaging
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"time"
 
@@ -63,12 +64,13 @@ func EnsureTopics(cfg *config.MessagingConfig, logger *slog.Logger, source Topic
 }
 
 type SubscribeHandlersOptions struct {
-	ServiceName  string
-	Logger       *slog.Logger
-	Runtime      SubscriptionRuntime
-	Subscriber   basemessaging.Subscriber
-	Observer     eventobservability.Observer
-	HoldRecorder RetryEventHoldRecorder
+	ServiceName     string
+	Logger          *slog.Logger
+	Runtime         SubscriptionRuntime
+	Subscriber      basemessaging.Subscriber
+	Observer        eventobservability.Observer
+	HoldRecorder    RetryEventHoldRecorder
+	UnknownRecorder func(context.Context, *basemessaging.Message, string) error
 }
 
 func SubscribeHandlersWithOptions(opts SubscribeHandlersOptions) error {
@@ -82,11 +84,14 @@ func SubscribeHandlersWithOptions(opts SubscribeHandlersOptions) error {
 	if runtime == nil || subscriber == nil {
 		return nil
 	}
+	if opts.UnknownRecorder == nil {
+		return fmt.Errorf("unknown-event recorder is required before Worker subscription")
+	}
 
 	subscriptions := runtime.GetTopicSubscriptions()
 	for _, sub := range subscriptions {
 		topicName := sub.TopicName
-		msgHandler := createDispatchHandlerWithObserverAndHold(logger, runtime, topicName, serviceName, opts.Observer, opts.HoldRecorder)
+		msgHandler := createDispatchHandlerWithObserverAndHoldAndUnknown(logger, runtime, topicName, serviceName, opts.Observer, opts.HoldRecorder, opts.UnknownRecorder)
 		if err := subscriber.Subscribe(topicName, serviceName, msgHandler); err != nil {
 			logger.Error("failed to subscribe",
 				slog.String("topic", topicName),
@@ -112,6 +117,10 @@ func createDispatchHandlerWithObserver(logger *slog.Logger, dispatcher EventDisp
 }
 
 func createDispatchHandlerWithObserverAndHold(logger *slog.Logger, dispatcher EventDispatcher, topicName, serviceName string, observer eventobservability.Observer, holdRecorder RetryEventHoldRecorder) basemessaging.Handler {
+	return createDispatchHandlerWithObserverAndHoldAndUnknown(logger, dispatcher, topicName, serviceName, observer, holdRecorder, nil)
+}
+
+func createDispatchHandlerWithObserverAndHoldAndUnknown(logger *slog.Logger, dispatcher EventDispatcher, topicName, serviceName string, observer eventobservability.Observer, holdRecorder RetryEventHoldRecorder, unknownRecorder func(context.Context, *basemessaging.Message, string) error) basemessaging.Handler {
 	extractor := eventruntime.MessageEventExtractor{}
 	if logger == nil {
 		logger = slog.Default()
@@ -123,10 +132,7 @@ func createDispatchHandlerWithObserverAndHold(logger *slog.Logger, dispatcher Ev
 	return func(ctx context.Context, msg *basemessaging.Message) error {
 		eventType, err := extractor.Extract(msg)
 		if err != nil {
-			_, settleErr := settlement.NackInvalid(msg, err)
-			if settleErr != nil && !errors.Is(settleErr, err) {
-				return errors.Join(err, settleErr)
-			}
+			settlement.ReportInvalid(msg, err)
 			return err
 		}
 
@@ -139,18 +145,18 @@ func createDispatchHandlerWithObserverAndHold(logger *slog.Logger, dispatcher Ev
 			if errors.Is(err, eventruntime.ErrAutomaticRetryPaused) {
 				if holdRecorder == nil {
 					holdErr := errors.New("retry event hold recorder is not configured")
-					_, nackErr := settlement.NackHoldFailed(msg, eventType, holdErr)
-					return errors.Join(err, holdErr, nackErr)
+					settlement.ReportHoldFailed(msg, eventType, holdErr)
+					return errors.Join(err, holdErr)
 				}
 				if holdErr := holdRecorder.Hold(ctx, msg, eventType, err); holdErr != nil {
-					_, nackErr := settlement.NackHoldFailed(msg, eventType, holdErr)
-					return errors.Join(err, holdErr, nackErr)
+					settlement.ReportHoldFailed(msg, eventType, holdErr)
+					return errors.Join(err, holdErr)
 				}
 				outcome, ackErr := settlement.AckHeld(msg)
 				eventobservability.ObserveConsumeDuration(ctx, observer, eventobservability.ConsumeDurationEvent{Service: serviceName, Topic: topicName, EventType: eventType, Outcome: outcome, Duration: time.Since(startedAt)})
 				return ackErr
 			}
-			outcome := settlement.NackFailed(msg, eventType, err)
+			outcome := settlement.ReportFailed(msg, eventType, err)
 			elapsed := time.Since(startedAt)
 			eventobservability.ObserveConsumeDuration(ctx, observer, eventobservability.ConsumeDurationEvent{
 				Service:   serviceName,
@@ -170,6 +176,16 @@ func createDispatchHandlerWithObserverAndHold(logger *slog.Logger, dispatcher Ev
 
 		var outcome eventobservability.ConsumeOutcome
 		if result.Outcome == eventruntime.DispatchUnknown {
+			if unknownRecorder == nil {
+				err = fmt.Errorf("unknown-event recorder is not configured")
+			} else {
+				err = unknownRecorder(ctx, msg, eventType)
+			}
+			if err != nil {
+				outcome = settlement.ReportUnknownPersistFailed(msg, eventType, err)
+				eventobservability.ObserveConsumeDuration(ctx, observer, eventobservability.ConsumeDurationEvent{Service: serviceName, Topic: topicName, EventType: eventType, Outcome: outcome, Duration: time.Since(startedAt)})
+				return fmt.Errorf("persist unknown event type %q: %w", eventType, err)
+			}
 			outcome, err = settlement.AckUnknown(msg)
 		} else {
 			outcome, err = settlement.AckSuccess(msg)

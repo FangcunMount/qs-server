@@ -68,6 +68,16 @@ func (p MessageSettlementPolicy) NackInvalid(msg *messaging.Message, parseErr er
 	return eventobservability.ConsumeOutcomeDecodeNacked, parseErr
 }
 
+// ReportInvalid leaves the message unsettled so the transport can NACK with
+// the original handler error after the handler returns.
+func (p MessageSettlementPolicy) ReportInvalid(msg *messaging.Message, parseErr error) eventobservability.ConsumeOutcome {
+	p.logger.Warn("message missing event_type and payload parse failed",
+		slog.String("channel", p.service), slog.String("topic", p.topic), slog.String("msg_id", msg.UUID),
+		slog.Int("payload_bytes", len(msg.Payload)), slog.String("error", parseErr.Error()))
+	p.observe(msg, "", eventobservability.ConsumeOutcomeDecodeFailed)
+	return eventobservability.ConsumeOutcomeDecodeFailed
+}
+
 func (p MessageSettlementPolicy) AckHeld(msg *messaging.Message) (eventobservability.ConsumeOutcome, error) {
 	return p.ack(msg, eventobservability.ConsumeOutcomeHeld, eventobservability.ConsumeOutcomeHoldFailed)
 }
@@ -88,6 +98,15 @@ func (p MessageSettlementPolicy) NackHoldFailed(msg *messaging.Message, eventTyp
 	return outcome, nil
 }
 
+// ReportHoldFailed records the persistence failure before transport settlement.
+func (p MessageSettlementPolicy) ReportHoldFailed(msg *messaging.Message, eventType string, holdErr error) eventobservability.ConsumeOutcome {
+	p.logger.Error("failed to persist paused retry event hold",
+		slog.String("channel", p.service), slog.String("topic", p.topic), slog.String("event_type", eventType),
+		slog.String("msg_id", msg.UUID), slog.String("error", holdErr.Error()))
+	p.observe(msg, eventType, eventobservability.ConsumeOutcomeHoldFailed)
+	return eventobservability.ConsumeOutcomeHoldFailed
+}
+
 func (p MessageSettlementPolicy) NackFailed(msg *messaging.Message, eventType string, dispatchErr error) eventobservability.ConsumeOutcome {
 	p.logger.Error("failed to dispatch event", slog.String("channel", p.service), slog.String("topic", p.topic), slog.String("event_type", eventType), slog.String("msg_id", msg.UUID), slog.String("error", dispatchErr.Error()))
 	if nackErr := msg.Nack(); nackErr != nil {
@@ -101,12 +120,30 @@ func (p MessageSettlementPolicy) NackFailed(msg *messaging.Message, eventType st
 	return outcome
 }
 
+// ReportFailed leaves settlement to the transport, preserving dispatchErr in
+// terminal failed-message records.
+func (p MessageSettlementPolicy) ReportFailed(msg *messaging.Message, eventType string, dispatchErr error) eventobservability.ConsumeOutcome {
+	p.logger.Error("failed to dispatch event", slog.String("channel", p.service), slog.String("topic", p.topic), slog.String("event_type", eventType), slog.String("msg_id", msg.UUID), slog.String("error", dispatchErr.Error()))
+	p.observe(msg, eventType, eventobservability.ConsumeOutcomeDispatchFailed)
+	return eventobservability.ConsumeOutcomeDispatchFailed
+}
+
 func (p MessageSettlementPolicy) AckSuccess(msg *messaging.Message) (eventobservability.ConsumeOutcome, error) {
 	return p.ack(msg, eventobservability.ConsumeOutcomeAcked, eventobservability.ConsumeOutcomeAckFailed)
 }
 
 func (p MessageSettlementPolicy) AckUnknown(msg *messaging.Message) (eventobservability.ConsumeOutcome, error) {
 	return p.ack(msg, eventobservability.ConsumeOutcomeUnknownAcked, eventobservability.ConsumeOutcomeUnknownAckFailed)
+}
+
+// ReportUnknownPersistFailed leaves settlement to the transport. The original
+// delivery can only be ACKed after durable evidence exists.
+func (p MessageSettlementPolicy) ReportUnknownPersistFailed(msg *messaging.Message, eventType string, persistErr error) eventobservability.ConsumeOutcome {
+	p.logger.Error("failed to persist unknown event",
+		slog.String("channel", p.service), slog.String("topic", p.topic), slog.String("event_type", eventType),
+		slog.String("msg_id", msg.UUID), slog.String("error", persistErr.Error()))
+	p.observe(msg, eventType, eventobservability.ConsumeOutcomeUnknownPersistFailed)
+	return eventobservability.ConsumeOutcomeUnknownPersistFailed
 }
 
 func (p MessageSettlementPolicy) ack(msg *messaging.Message, successOutcome, failedOutcome eventobservability.ConsumeOutcome) (eventobservability.ConsumeOutcome, error) {

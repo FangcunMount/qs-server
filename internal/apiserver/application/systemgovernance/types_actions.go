@@ -2,8 +2,14 @@ package systemgovernance
 
 import (
 	"context"
+	"errors"
 	"time"
 )
+
+var ErrActionAuditInputConflict = errors.New("governance request ID already binds different action, actor, or input")
+var ErrActionAuditPendingReconciliation = errors.New("governance replay is pending reconciliation")
+
+const ActionAuditStatusPendingReconciliation = "pending_reconciliation"
 
 // ActionDescriptor 描述governance 命令 exposed 到 operators。
 type ActionDescriptor struct {
@@ -39,6 +45,26 @@ type ActionRunResult struct {
 	Status     string                 `json:"status"`
 	Message    string                 `json:"message,omitempty"`
 	Result     map[string]interface{} `json:"result,omitempty"`
+}
+
+// PendingReplayAudit is an unresolved operator request. Input is the redacted
+// original action input; operators must reuse it with the same request ID.
+type PendingReplayAudit struct {
+	RequestID   string                 `json:"request_id"`
+	ActorUserID string                 `json:"actor_user_id"`
+	Store       string                 `json:"store"`
+	Input       map[string]interface{} `json:"input"`
+	StartedAt   time.Time              `json:"started_at"`
+	UpdatedAt   time.Time              `json:"updated_at"`
+}
+
+type PendingReplayAuditPage struct {
+	Items      []PendingReplayAudit `json:"items"`
+	NextCursor string               `json:"next_cursor,omitempty"`
+}
+
+type PendingReplayAuditReader interface {
+	ListPendingReplayAudits(context.Context, int64, string, int) (PendingReplayAuditPage, error)
 }
 
 // ActionAuditRecord is the persistence-neutral governance audit contract.
@@ -77,6 +103,19 @@ type ActionAuditReplay struct {
 type ActionAuditStore interface {
 	Claim(context.Context, ActionAuditRecord) (existing *ActionAuditReplay, claimed bool, err error)
 	Complete(context.Context, ActionAuditRecord) error
+}
+
+// RunningActionAuditReader returns the original unresolved record only when the
+// retrying caller matches its action, actor, and complete redacted input.
+// Absence is not authorization to execute the action again.
+type RunningActionAuditReader interface {
+	LoadRunning(context.Context, ActionAuditRecord) (ActionAuditRecord, bool, error)
+}
+
+// PendingActionAuditMarker records an uncertain replay without closing its
+// identity. Only a matching durable authorization can later complete it.
+type PendingActionAuditMarker interface {
+	MarkPending(context.Context, ActionAuditRecord) error
 }
 
 // ActionAuditFallbackStore persists only terminal replay data when the primary

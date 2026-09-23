@@ -21,7 +21,7 @@ import (
 	"gorm.io/gorm"
 )
 
-type fakePublisher struct{}
+type fakePublisher struct{ onClose func() }
 
 func (*fakePublisher) Publish(_ context.Context, _ string, _ []byte) error { return nil }
 
@@ -29,7 +29,32 @@ func (*fakePublisher) PublishMessage(_ context.Context, _ string, _ *messaging.M
 	return nil
 }
 
-func (*fakePublisher) Close() error { return nil }
+func (p *fakePublisher) Close() error {
+	if p.onClose != nil {
+		p.onClose()
+	}
+	return nil
+}
+
+func TestPrepareResourcesClosesPublisherWhenEventSubsystemFails(t *testing.T) {
+	closed := false
+	_, err := prepareResources(resourceStageDeps{
+		mqPublisher: mqPublisherStageDeps{
+			enabled: true, provider: "nsq", newPublisher: func() (messaging.Publisher, error) {
+				return &fakePublisher{onClose: func() { closed = true }}, nil
+			},
+		},
+		loadEventCatalog: func() (*eventcatalog.Catalog, error) { return eventcatalog.NewCatalog(nil), nil },
+		eventSubsystem: eventSubsystemResourceDeps{
+			newSubsystem: func(eventsubsystem.Options) (*eventsubsystem.Subsystem, error) {
+				return nil, errors.New("controlled startup failure")
+			},
+		},
+	})
+	if err == nil || !closed {
+		t.Fatalf("resource failure leaked MQ publisher: err=%v closed=%t", err, closed)
+	}
+}
 
 func TestPrepareResourcesBuildsStageOutputFromDeps(t *testing.T) {
 	var mysqlDB gorm.DB

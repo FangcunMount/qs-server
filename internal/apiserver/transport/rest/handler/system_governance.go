@@ -48,6 +48,44 @@ func (h *SystemGovernanceHandler) RetryCandidates(c *gin.Context) {
 	h.Success(c, result)
 }
 
+// PendingReplayAudits lists unresolved replay requests without suggesting a
+// new authorization. The original actor must retry the same ID and input.
+// @Router /internal/v1/system-governance/actions/pending-reconciliations [get]
+func (h *SystemGovernanceHandler) PendingReplayAudits(c *gin.Context) {
+	if h.facade == nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"message": "system governance unavailable"})
+		return
+	}
+	orgID, err := h.RequireProtectedOrgID(c)
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+	limit := 50
+	if raw := c.Query("limit"); raw != "" {
+		parsed, parseErr := strconv.Atoi(raw)
+		if parseErr != nil || parsed < 1 || parsed > 100 {
+			c.JSON(http.StatusBadRequest, gin.H{"message": "limit must be between 1 and 100"})
+			return
+		}
+		limit = parsed
+	}
+	cursor := c.Query("cursor")
+	if cursor != "" {
+		parsed, parseErr := strconv.ParseUint(cursor, 10, 64)
+		if parseErr != nil || parsed == 0 {
+			c.JSON(http.StatusBadRequest, gin.H{"message": "invalid cursor"})
+			return
+		}
+	}
+	result, err := h.facade.ListPendingReplayAudits(c.Request.Context(), orgID, cursor, limit)
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+	h.Success(c, result)
+}
+
 // NewSystemGovernanceHandler creates a governance handler.
 func NewSystemGovernanceHandler(facade systemgov.Facade) *SystemGovernanceHandler {
 	return &SystemGovernanceHandler{
