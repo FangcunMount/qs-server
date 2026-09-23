@@ -74,6 +74,12 @@ type profileRuntime struct {
 	reconciler reconcilerRuntime
 	status     appEventing.NamedOutboxStatusReader
 	interval   time.Duration
+	// Candidate standard profiles replace the whole legacy writer/runner pair.
+	// These hooks stay nil for all existing profiles.
+	run           func(context.Context) error
+	drain         func(context.Context) error
+	drainTimeout  time.Duration
+	runtimeStatus func() appEventing.ProfileRuntimeStatus
 }
 
 type consumerRuntime struct {
@@ -111,6 +117,21 @@ var profileStartOrder = []eventcatalog.OutboxProfile{
 }
 
 func New(opts Options) (*Subsystem, error) {
+	s, err := newBase(opts)
+	if err != nil {
+		return nil, err
+	}
+	if err := s.buildMongoProfile(opts); err != nil {
+		return nil, err
+	}
+	if err := s.buildAssessmentProfile(opts); err != nil {
+		return nil, err
+	}
+	s.buildConsumers(opts.Consumers)
+	return s, nil
+}
+
+func newBase(opts Options) (*Subsystem, error) {
 	registry, err := eventcatalog.NewEffectiveRegistry(opts.Catalog, eventcatalog.DefaultSpecs())
 	if err != nil {
 		return nil, err
@@ -129,13 +150,6 @@ func New(opts Options) (*Subsystem, error) {
 		observer:  opts.Observer,
 		closeDone: make(chan struct{}),
 	}
-	if err := s.buildMongoProfile(opts); err != nil {
-		return nil, err
-	}
-	if err := s.buildAssessmentProfile(opts); err != nil {
-		return nil, err
-	}
-	s.buildConsumers(opts.Consumers)
 	return s, nil
 }
 
@@ -292,6 +306,10 @@ func (s *Subsystem) Start(parent context.Context) error {
 	}
 	if s.publisher.IsMQBacked() {
 		for _, profile := range profiles {
+			if profile.run != nil {
+				s.startProfileRun(ctx, profile)
+				continue
+			}
 			if profile.relay == nil {
 				continue
 			}
@@ -299,6 +317,16 @@ func (s *Subsystem) Start(parent context.Context) error {
 		}
 	}
 	return nil
+}
+
+func (s *Subsystem) startProfileRun(ctx context.Context, profile *profileRuntime) {
+	s.wg.Add(1)
+	go func() {
+		defer s.wg.Done()
+		if err := profile.run(ctx); err != nil && ctx.Err() == nil {
+			slog.Error("event profile runner exited", "profile", profile.name, "error", err)
+		}
+	}()
 }
 
 func (s *Subsystem) startConsumers(ctx context.Context) error {
@@ -402,6 +430,17 @@ func (s *Subsystem) Close() error {
 		cancel()
 	}
 	s.wg.Wait()
+	var closeErrors []error
+	for i := len(profiles) - 1; i >= 0; i-- {
+		if profiles[i].drain != nil {
+			drainCtx, cancelDrain := context.WithTimeout(context.Background(), profiles[i].drainTimeout)
+			err := profiles[i].drain(drainCtx)
+			cancelDrain()
+			if err != nil {
+				closeErrors = append(closeErrors, fmt.Errorf("drain event profile %s: %w", profiles[i].name, err))
+			}
+		}
+	}
 	for i := len(profiles) - 1; i >= 0; i-- {
 		profile := profiles[i]
 		if profile.reconciler != nil {
@@ -411,7 +450,6 @@ func (s *Subsystem) Close() error {
 			profile.immediate.Close()
 		}
 	}
-	var closeErrors []error
 	for i := len(consumers) - 1; i >= 0; i-- {
 		consumer := consumers[i]
 		if consumer.subscriber != nil {
@@ -498,10 +536,26 @@ func (s *Subsystem) runtimeStatusSnapshot() appEventing.RuntimeStatusSnapshot {
 		Consumers: make(map[string]appEventing.ConsumerRuntimeStatus, len(s.consumers)),
 	}
 	for profile, runtime := range s.profiles {
-		result.Profiles[profile] = appEventing.ProfileRuntimeStatus{
-			Running: s.started && !s.closed, RelayEnabled: runtime.relay != nil && s.publisher.IsMQBacked(),
-			ReconcilerEnabled: runtime.reconciler != nil, ImmediateEnabled: s.publisher.IsMQBacked(),
+		status := appEventing.ProfileRuntimeStatus{
+			Running: s.started && !s.closed, RelayEnabled: (runtime.relay != nil || runtime.run != nil) && s.publisher.IsMQBacked(),
+			ReconcilerEnabled: runtime.reconciler != nil, ImmediateEnabled: runtime.immediate != nil && s.publisher.IsMQBacked(),
 		}
+		if runtime.run != nil {
+			status.RelayKind = "sdk"
+			if runtime.runtimeStatus != nil {
+				actual := runtime.runtimeStatus()
+				status.Running = status.Running && actual.Running
+				status.ScanHealthy = actual.ScanHealthy
+				status.LastFailureKind = actual.LastFailureKind
+				if !status.Running && status.ScanHealthy != nil {
+					off := false
+					status.ScanHealthy = &off
+				}
+			}
+		} else if runtime.relay != nil {
+			status.RelayKind = "legacy"
+		}
+		result.Profiles[profile] = status
 	}
 	for id, consumer := range s.consumers {
 		result.Consumers[id] = appEventing.ConsumerRuntimeStatus{
