@@ -7,6 +7,7 @@ import (
 	"errors"
 	"os"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -26,6 +27,7 @@ import (
 	sdkmongo "github.com/FangcunMount/reliable-messaging/storage/mongo"
 	"github.com/stretchr/testify/require"
 	"go.mongodb.org/mongo-driver/bson"
+	mongoevent "go.mongodb.org/mongo-driver/event"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
@@ -202,6 +204,72 @@ events:
 	require.EqualValues(t, 1, countStandardDocs(t, ctx, db.Collection("answersheets"), bson.M{"domain_id": uint64(90010004)}))
 	require.EqualValues(t, 1, countStandardDocs(t, ctx, outbox, bson.M{"message_id": uncommittedEventID}))
 	require.Equal(t, limiter.acquired, limiter.released)
+
+	// The server returns a real UnknownTransactionCommitResult on the first
+	// commit reply. The driver must retry commit, not the AnswerSheet callback.
+	var commits, unknownReplies, inserts, updates atomic.Int32
+	monitor := &mongoevent.CommandMonitor{
+		Started: func(_ context.Context, evt *mongoevent.CommandStartedEvent) {
+			switch evt.CommandName {
+			case "commitTransaction":
+				commits.Add(1)
+			case "insert":
+				inserts.Add(1)
+			case "update":
+				updates.Add(1)
+			}
+		},
+		Succeeded: func(_ context.Context, evt *mongoevent.CommandSucceededEvent) {
+			if evt.CommandName == "commitTransaction" && evt.Reply.Lookup("writeConcernError").Type != 0 {
+				unknownReplies.Add(1)
+			}
+		},
+	}
+	monitoredClient, err := mongo.Connect(ctx, options.Client().ApplyURI(uri).SetMonitor(monitor))
+	require.NoError(t, err)
+	defer monitoredClient.Disconnect(context.Background())
+	monitoredDB := monitoredClient.Database(db.Name())
+	monitoredRepo, err := mongoanswersheet.NewRepository(monitoredDB)
+	require.NoError(t, err)
+	monitoredStager, err := mongostandard.NewStager(monitoredDB.Collection("rm_outbox"), eventcatalog.NewCatalog(config), eventruntime.SourceAPIServer)
+	require.NoError(t, err)
+	monitoredRunner := NewMongoRunner(monitoredDB, MongoRunnerOptions{Boundary: "answersheet_submit_m4_unknown", Limiter: &transactionLimiterSpy{}})
+	monitoredStore := appanswersheet.NewTransactionalSubmissionDurableStore(monitoredRunner, monitoredRepo, monitoredStager, nil)
+	admin := client.Database("admin")
+	require.NoError(t, admin.RunCommand(ctx, bson.D{
+		{Key: "configureFailPoint", Value: "failCommand"},
+		{Key: "mode", Value: bson.M{"times": 1}},
+		{Key: "data", Value: bson.M{
+			"failCommands":      bson.A{"commitTransaction"},
+			"writeConcernError": bson.M{"code": 64, "errmsg": "isolated unknown commit result"},
+			"errorLabels":       bson.A{"UnknownTransactionCommitResult"},
+		}},
+	}).Err())
+	driverUnknown := standardSubmissionSheet(t, 90010005, "driver commit retry")
+	driverUnknownEventID := driverUnknown.Events()[0].EventID()
+	driverUnknownFingerprint, err := submitport.Fingerprint(driverUnknown)
+	require.NoError(t, err)
+	driverUnknownMeta := appanswersheet.DurableSubmitMeta{
+		WriterID: 301, IdempotencyKey: "m4-driver-commit-unknown", Fingerprint: driverUnknownFingerprint,
+	}
+	result, existed, err = monitoredStore.CreateDurably(ctx, driverUnknown, driverUnknownMeta)
+	require.NoError(t, err)
+	require.False(t, existed)
+	require.Equal(t, driverUnknown.ID(), result.ID())
+	require.EqualValues(t, 2, commits.Load())
+	require.EqualValues(t, 1, unknownReplies.Load())
+	require.EqualValues(t, 1, inserts.Load())
+	require.EqualValues(t, 1, updates.Load())
+	require.EqualValues(t, 1, countStandardDocs(t, ctx, db.Collection("answersheets"), bson.M{"domain_id": uint64(90010005)}))
+	require.EqualValues(t, 1, countStandardDocs(t, ctx, outbox, bson.M{"message_id": driverUnknownEventID}))
+	result, existed, err = durable.CreateDurably(ctx, driverUnknown, driverUnknownMeta)
+	require.NoError(t, err)
+	require.True(t, existed)
+	require.Equal(t, driverUnknown.ID(), result.ID())
+	require.EqualValues(t, 1, countStandardDocs(t, ctx, outbox, bson.M{"message_id": driverUnknownEventID}))
+	require.NoError(t, admin.RunCommand(ctx, bson.D{
+		{Key: "configureFailPoint", Value: "failCommand"}, {Key: "mode", Value: "off"},
+	}).Err())
 }
 
 type standardSubmissionUnknownCommit struct{}
