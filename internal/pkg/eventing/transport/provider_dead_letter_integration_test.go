@@ -8,6 +8,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"os"
@@ -18,9 +19,140 @@ import (
 
 	basemessaging "github.com/FangcunMount/component-base/pkg/messaging"
 	cbnsq "github.com/FangcunMount/component-base/pkg/messaging/nsq"
+	eventcatalog "github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
+	eventobservability "github.com/FangcunMount/qs-server/internal/pkg/eventing/observe"
+	eventruntime "github.com/FangcunMount/qs-server/internal/pkg/eventing/runtime"
+	workermessaging "github.com/FangcunMount/qs-server/internal/worker/integration/messaging"
 	drivermysql "github.com/go-sql-driver/mysql"
 	"github.com/nsqio/go-nsq"
 )
+
+type workerSettlementRuntime struct {
+	topic        string
+	unknownCalls atomic.Int32
+	failedCalls  atomic.Int32
+}
+
+func (r *workerSettlementRuntime) GetTopicSubscriptions() []eventcatalog.TopicSubscription {
+	return []eventcatalog.TopicSubscription{{TopicName: r.topic, EventTypes: []string{"known.fail"}}}
+}
+
+func (r *workerSettlementRuntime) DispatchEvent(_ context.Context, eventType string, _ []byte) (eventruntime.DispatchResult, error) {
+	if eventType == "known.fail" {
+		r.failedCalls.Add(1)
+		return eventruntime.DispatchResult{}, errors.New("injected worker dispatch failure")
+	}
+	r.unknownCalls.Add(1)
+	return eventruntime.DispatchResult{Outcome: eventruntime.DispatchUnknown}, nil
+}
+
+type workerSettlementObserver struct {
+	unknownAcked atomic.Int32
+}
+
+func (*workerSettlementObserver) ObservePublish(context.Context, eventobservability.PublishEvent) {}
+func (*workerSettlementObserver) ObserveOutbox(context.Context, eventobservability.OutboxEvent)   {}
+func (o *workerSettlementObserver) ObserveConsume(_ context.Context, event eventobservability.ConsumeEvent) {
+	if event.Outcome == eventobservability.ConsumeOutcomeUnknownAcked {
+		o.unknownAcked.Add(1)
+	}
+}
+
+func TestWorkerSettlementThroughNSQPersistsPoisonAndExhaustion(t *testing.T) {
+	if os.Getenv("MESSAGING_INTEGRATION") != "1" {
+		t.Skip("set MESSAGING_INTEGRATION=1 and start NSQ/MySQL integration services")
+	}
+	db := openIsolatedDeadLetterDatabase(t)
+	recorder, err := NewSQLDeadLetterRecorder(db)
+	if err != nil {
+		t.Fatal(err)
+	}
+	topic := fmt.Sprintf("qs-worker-settlement-%d", time.Now().UnixNano())
+	channel := topic + "-worker"
+	cleanupNSQTopics(t, topic, nsqFailedHandoffTopic(topic, channel))
+	createNSQTopicAndChannel(t, topic, channel)
+
+	runtime := &workerSettlementRuntime{topic: topic}
+	observer := &workerSettlementObserver{}
+	subscriber, err := NewSubscriber(SubscriberConfig{
+		Provider: "nsq", NSQLookupdAddr: integrationEnv("NSQ_LOOKUPD_ADDR", "127.0.0.1:4161"), NSQMessageTimeout: time.Minute,
+	}, basemessaging.SubscriberOptions{
+		MaxInFlight: 1, MaxAttempts: 2,
+		RetryBackoff:         basemessaging.RetryBackoffOptions{BaseDelay: 10 * time.Millisecond, MaxDelay: 20 * time.Millisecond},
+		FailedMessageHandler: FailedMessageHandler(recorder),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = subscriber.Close() })
+	if err := workermessaging.SubscribeHandlersWithOptions(workermessaging.SubscribeHandlersOptions{
+		ServiceName: channel, Logger: slog.Default(), Runtime: runtime, Subscriber: subscriber, Observer: observer,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	publisher, err := cbnsq.NewPublisher(integrationEnv("NSQD_ADDR", "127.0.0.1:4150"), nsq.NewConfig())
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = publisher.Close() })
+
+	poison := basemessaging.NewMessage("worker-poison-1", []byte("not-json"))
+	unknown := basemessaging.NewMessage("worker-unknown-1", []byte(`{"id":"unknown-1"}`))
+	unknown.Metadata["event_type"] = "new.event"
+	failed := basemessaging.NewMessage("worker-failed-1", []byte(`{"id":"failed-1"}`))
+	failed.Metadata["event_type"] = "known.fail"
+	for _, message := range []*basemessaging.Message{poison, unknown, failed} {
+		if err := publisher.PublishMessage(t.Context(), topic, message); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	deadline := time.NewTimer(20 * time.Second)
+	ticker := time.NewTicker(25 * time.Millisecond)
+	defer deadline.Stop()
+	defer ticker.Stop()
+	for {
+		var deadLetters int
+		if err := db.QueryRowContext(t.Context(), `SELECT COUNT(*) FROM event_delivery_dead_letter`).Scan(&deadLetters); err != nil {
+			t.Fatal(err)
+		}
+		if deadLetters == 2 && observer.unknownAcked.Load() == 1 {
+			break
+		}
+		select {
+		case <-ticker.C:
+		case <-deadline.C:
+			t.Fatalf("worker settlement timed out: dead_letters=%d unknown_acked=%d", deadLetters, observer.unknownAcked.Load())
+		}
+	}
+	for _, test := range []struct {
+		id      string
+		payload string
+		cause   string
+	}{
+		// The Worker settles explicitly before returning its error, so the
+		// transport currently records this generic cause for both failures.
+		{poison.UUID, string(poison.Payload), "message nacked by handler"},
+		{failed.UUID, string(failed.Payload), "message nacked by handler"},
+	} {
+		var payload, cause, disposition string
+		var attempts int
+		if err := db.QueryRowContext(t.Context(), `SELECT payload_json,last_error,retry_disposition,delivery_attempts
+FROM event_delivery_dead_letter WHERE message_id=?`, test.id).Scan(&payload, &cause, &disposition, &attempts); err != nil {
+			t.Fatal(err)
+		}
+		if payload != test.payload || !strings.Contains(cause, test.cause) || disposition != "manual_required" || attempts != 2 {
+			t.Fatalf("dead letter %q: payload=%q cause=%q disposition=%q attempts=%d", test.id, payload, cause, disposition, attempts)
+		}
+	}
+	var unknownDeadLetters int
+	if err := db.QueryRowContext(t.Context(), `SELECT COUNT(*) FROM event_delivery_dead_letter WHERE message_id=?`, unknown.UUID).Scan(&unknownDeadLetters); err != nil {
+		t.Fatal(err)
+	}
+	if unknownDeadLetters != 0 || runtime.unknownCalls.Load() != 1 || runtime.failedCalls.Load() != 2 {
+		t.Fatalf("worker calls: unknown=%d failed=%d unknown_dead_letters=%d", runtime.unknownCalls.Load(), runtime.failedCalls.Load(), unknownDeadLetters)
+	}
+}
 
 func TestNSQDeliveryExhaustionPersistsMySQLDeadLetter(t *testing.T) {
 	if os.Getenv("MESSAGING_INTEGRATION") != "1" {
