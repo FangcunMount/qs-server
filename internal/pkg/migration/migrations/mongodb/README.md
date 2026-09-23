@@ -37,6 +37,10 @@ mongodb/
 | `ai_explanation_participant_daily_budgets` | Participant 每次 Provider attempt 的 UTC 日调用预留账本 | org+budget day unique、reservation generation+attempt unique（见 000028/000030） |
 | `ai_explanation_participant_active_capacity` | Participant Provider 执行的分布式活跃槽账本 | org unique、active generation/run unique（见 000029） |
 | `interpretation_catalog_repair_plans` | Catalog 修复 dry-run 快照 | dry_run_id unique、expires_at TTL（见 000019） |
+| `rm_outbox` | M4 候选标准可靠消息集合 | 到期领取、租约恢复、message_id 治理查询（见 000036） |
+| `qs_rm_replay_requests` | M4 候选人工重放完整请求和有序结果 | `_id` 稳定请求身份、org/created 查询（见 000036） |
+
+`000036_standard_reliable_outbox` 只建立新集合的物理索引，不读取、迁移或删除旧 mock Outbox。标准消息的 `_id` 由 producer、message_id、destination 组成，Mongo 自带唯一 `_id` 约束；`message_id` 查询索引不强行声明全局唯一，治理代码会拒绝多条命中。down 为保留数据的空操作，回退应用不得删除新消息；再次 up 的索引定义必须保持幂等。索引存在不证明实际领取吞吐或分租户读视图达到 M4 验收门槛。
 
 ## AI explanation runtime（000025）
 

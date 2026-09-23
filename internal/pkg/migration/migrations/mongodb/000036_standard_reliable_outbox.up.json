@@ -1,0 +1,28 @@
+[
+  {
+    "createIndexes": "rm_outbox",
+    "indexes": [
+      {
+        "key": { "state": 1, "next_attempt_at": 1, "_id": 1 },
+        "name": "ix_rm_outbox_due"
+      },
+      {
+        "key": { "state": 1, "lease_until": 1, "_id": 1 },
+        "name": "ix_rm_outbox_lease"
+      },
+      {
+        "key": { "message_id": 1 },
+        "name": "ix_rm_outbox_message_id"
+      }
+    ]
+  },
+  {
+    "createIndexes": "qs_rm_replay_requests",
+    "indexes": [
+      {
+        "key": { "org_id": 1, "created_at": 1, "_id": 1 },
+        "name": "ix_qs_rm_replay_requests_org_time"
+      }
+    ]
+  }
+]
