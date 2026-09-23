@@ -223,7 +223,9 @@ func (l *ReplayLedger) authorizeOne(sc driver.SessionContext, orgID int64, reque
 			"state": bson.M{"$literal": "retry_wait"}, "next_attempt_at": "$$NOW",
 			"claim_token": "$$REMOVE", "lease_until": "$$REMOVE",
 			"manual_replay_request_id": bson.M{"$literal": requestID},
+			"manual_replay_version":    bson.M{"$add": bson.A{"$version", 1}},
 			"version":                  bson.M{"$add": bson.A{"$version", 1}},
+			"updated_at":               "$$NOW",
 		}}}}
 		updated, err := l.outbox.UpdateOne(sc, filter, update)
 		if err != nil {

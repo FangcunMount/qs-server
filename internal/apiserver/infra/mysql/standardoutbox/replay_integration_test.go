@@ -52,6 +52,7 @@ func TestStandardMySQLReplayLedgerCrashAndRollback(t *testing.T) {
 		"DROP TABLE IF EXISTS rm_outbox",
 		sdkmysql.Schema,
 		"ALTER TABLE rm_outbox ADD COLUMN manual_replay_request_id VARBINARY(64) NULL",
+		"ALTER TABLE rm_outbox ADD COLUMN manual_replay_version BIGINT UNSIGNED NULL",
 		`CREATE TABLE qs_rm_replay_requests (
  org_id BIGINT NOT NULL, request_id VARBINARY(64) NOT NULL,
  store_name VARBINARY(64) NOT NULL, reason VARCHAR(1024) NOT NULL,

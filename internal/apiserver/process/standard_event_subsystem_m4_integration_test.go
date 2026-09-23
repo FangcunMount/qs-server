@@ -5,6 +5,7 @@ package process
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"os"
 	"strings"
 	"testing"
@@ -24,6 +25,8 @@ import (
 	qsmysql "github.com/FangcunMount/qs-server/internal/pkg/database/mysql"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
 	eventruntime "github.com/FangcunMount/qs-server/internal/pkg/eventing/runtime"
+	sdkmongo "github.com/FangcunMount/reliable-messaging/storage/mongo"
+	sdkmysql "github.com/FangcunMount/reliable-messaging/storage/mysql"
 	mysqldriver "github.com/go-sql-driver/mysql"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -121,6 +124,7 @@ func TestM4ProcessBootstrapRunsSelectedStandardProfiles(t *testing.T) {
 		{Keys: bson.D{{Key: "state", Value: 1}, {Key: "next_attempt_at", Value: 1}, {Key: "_id", Value: 1}}, Options: mongooptions.Index().SetName("ix_rm_outbox_due")},
 		{Keys: bson.D{{Key: "state", Value: 1}, {Key: "lease_until", Value: 1}, {Key: "_id", Value: 1}}, Options: mongooptions.Index().SetName("ix_rm_outbox_lease")},
 		{Keys: bson.D{{Key: "message_id", Value: 1}}, Options: mongooptions.Index().SetName("ix_rm_outbox_message_id")},
+		{Keys: bson.D{{Key: "scope", Value: 1}, {Key: "state", Value: 1}, {Key: "last_error_code", Value: 1}, {Key: "updated_at", Value: -1}, {Key: "_id", Value: 1}}, Options: mongooptions.Index().SetName("ix_rm_outbox_scope_governance")},
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -237,12 +241,36 @@ func TestM4ProcessBootstrapRunsSelectedStandardProfiles(t *testing.T) {
 	governance := platformmod.BuildRESTSystemGovernanceFacade(platformmod.RESTSystemGovernanceInput{
 		EventOutboxes: subsystem.Outboxes(), MySQLDB: gormDB, MongoDB: mongoDB,
 	})
-	if _, err := db.ExecContext(ctx, `UPDATE rm_outbox SET state='quarantined',last_error_code='publish_unknown',failure_count=30 WHERE message_id='m4-process-probe'`); err != nil {
+	if _, err := db.ExecContext(ctx, `UPDATE rm_outbox SET state='quarantined',last_error_code='publish_unknown',failure_count=30,updated_at=UTC_TIMESTAMP(6) WHERE message_id='m4-process-probe'`); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := mongoDB.Collection("rm_outbox").UpdateOne(ctx, bson.M{"message_id": "m4-process-mongo-probe"},
-		bson.M{"$set": bson.M{"state": "quarantined", "last_error_code": "publish_unknown", "failure_count": int64(30)}}); err != nil {
+		bson.M{"$set": bson.M{"state": "quarantined", "last_error_code": "publish_unknown", "failure_count": int64(30)},
+			"$currentDate": bson.M{"updated_at": true}}); err != nil {
 		t.Fatal(err)
+	}
+	for _, outbox := range subsystem.Outboxes() {
+		reader, ok := outbox.Reader.(systemgov.OutboxGovernanceReader)
+		if !ok {
+			t.Fatalf("selected profile %s lacks tenant-scoped governance view", outbox.Name)
+		}
+		summary, err := reader.ReadOutboxGovernance(ctx, 501)
+		if err != nil || summary.ManualRequired != 1 || summary.Automatic != 0 {
+			t.Fatalf("selected profile %s hid manual row: summary=%+v err=%v", outbox.Name, summary, err)
+		}
+		items, err := reader.ListOutboxCandidates(ctx, 501, 10)
+		if err != nil || len(items) != 1 || items[0].Store != outbox.Name || items[0].Attempt != 30 ||
+			items[0].Disposition != "manual_required" || items[0].UpdatedAt.IsZero() {
+			t.Fatalf("selected profile %s candidate view is incomplete: items=%+v err=%v", outbox.Name, items, err)
+		}
+		other, err := reader.ReadOutboxGovernance(ctx, 502)
+		if err != nil || other != (systemgov.OutboxGovernanceSummary{}) {
+			t.Fatalf("selected profile %s leaked another organization: summary=%+v err=%v", outbox.Name, other, err)
+		}
+		otherItems, err := reader.ListOutboxCandidates(ctx, 502, 10)
+		if err != nil || len(otherItems) != 0 {
+			t.Fatalf("selected profile %s leaked candidates to another organization: items=%+v err=%v", outbox.Name, otherItems, err)
+		}
 	}
 	var mysqlVersion, originalMySQLVersion uint64
 	if err := db.QueryRowContext(ctx, `SELECT version FROM rm_outbox WHERE message_id='m4-process-probe'`).Scan(&originalMySQLVersion); err != nil {
@@ -268,6 +296,20 @@ func TestM4ProcessBootstrapRunsSelectedStandardProfiles(t *testing.T) {
 		approved, err := governance.RunAction(actionCtx, 501, "events.replay_pending", request)
 		if err != nil || approved == nil || approved.Result["authorized"] != 1 {
 			t.Fatalf("standard profile %s is not governable: result=%+v err=%v", target.store, approved, err)
+		}
+		for _, outbox := range subsystem.Outboxes() {
+			if outbox.Name != target.store {
+				continue
+			}
+			reader := outbox.Reader.(systemgov.OutboxGovernanceReader)
+			summary, err := reader.ReadOutboxGovernance(ctx, 501)
+			if err != nil || summary.Authorized != 1 || summary.ManualRequired != 0 {
+				t.Fatalf("standard replay %s was double-counted after authorization: summary=%+v err=%v", target.store, summary, err)
+			}
+			items, err := reader.ListOutboxCandidates(ctx, 501, 10)
+			if err != nil || len(items) != 0 {
+				t.Fatalf("standard replay %s remained actionable after authorization: items=%+v err=%v", target.store, items, err)
+			}
 		}
 		prior, err := governance.RunAction(actionCtx, 501, "events.replay_pending", request)
 		if err != nil || prior == nil || prior.RequestID != approved.RequestID {
@@ -334,6 +376,53 @@ func TestM4ProcessBootstrapRunsSelectedStandardProfiles(t *testing.T) {
 	}
 	if err := subsystem.Close(); err != nil {
 		t.Fatal(err)
+	}
+	// A later SDK delivery failure starts a new automatic cycle. The prior
+	// approval remains in the ledger but must not hide that candidate.
+	mySQLStore, err := sdkmysql.New(db)
+	if err != nil {
+		t.Fatal(err)
+	}
+	mongoStore, err := sdkmongo.New(mongoDB.Collection("rm_outbox"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, target := range []struct {
+		store string
+		claim func() error
+	}{
+		{"assessment-mysql-outbox", func() error {
+			claims, err := mySQLStore.ClaimDue(ctx, 1, time.Minute)
+			if err != nil || len(claims) != 1 {
+				return fmt.Errorf("claim MySQL approved message: count=%d: %w", len(claims), err)
+			}
+			return mySQLStore.Retry(ctx, claims[0], time.Minute, "publish_unknown")
+		}},
+		{"mongo-domain-events", func() error {
+			claims, err := mongoStore.ClaimDue(ctx, 1, time.Minute)
+			if err != nil || len(claims) != 1 {
+				return fmt.Errorf("claim Mongo approved message: count=%d: %w", len(claims), err)
+			}
+			return mongoStore.Retry(ctx, claims[0], time.Minute, "publish_unknown")
+		}},
+	} {
+		if err := target.claim(); err != nil {
+			t.Fatal(err)
+		}
+		for _, outbox := range subsystem.Outboxes() {
+			if outbox.Name != target.store {
+				continue
+			}
+			reader := outbox.Reader.(systemgov.OutboxGovernanceReader)
+			summary, err := reader.ReadOutboxGovernance(ctx, 501)
+			if err != nil || summary.Automatic != 1 || summary.Authorized != 0 || summary.ManualRequired != 0 {
+				t.Fatalf("new automatic cycle %s was hidden by old authorization: summary=%+v err=%v", target.store, summary, err)
+			}
+			items, err := reader.ListOutboxCandidates(ctx, 501, 10)
+			if err != nil || len(items) != 1 || items[0].Disposition != "automatic" || items[0].ActionRequestID != "" {
+				t.Fatalf("new automatic cycle %s candidate is wrong: items=%+v err=%v", target.store, items, err)
+			}
+		}
 	}
 	if _, err := db.ExecContext(ctx, "DROP TABLE system_governance_action_runs"); err != nil {
 		t.Fatal(err)

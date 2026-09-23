@@ -22,11 +22,14 @@ CREATE TABLE rm_outbox (
   last_error_code VARCHAR(128) NOT NULL DEFAULT '',
   transport_confirmed_at DATETIME(6) NULL,
   manual_replay_request_id VARBINARY(64) NULL,
+  manual_replay_version BIGINT UNSIGNED NULL,
   created_at DATETIME(6) NOT NULL DEFAULT (UTC_TIMESTAMP(6)),
+  updated_at DATETIME(6) NOT NULL DEFAULT (UTC_TIMESTAMP(6)),
   UNIQUE KEY identity_key (producer,message_id,destination),
   KEY due_idx (state,next_attempt_at,id),
   KEY lease_idx (state,lease_until,id),
-  KEY ix_rm_outbox_message_id (message_id,id)
+  KEY ix_rm_outbox_message_id (message_id,id),
+  KEY ix_rm_outbox_scope_governance (scope,state,last_error_code,updated_at,id)
 ) ENGINE=InnoDB;
 
 -- The request header and all ordered results commit with the Outbox change.

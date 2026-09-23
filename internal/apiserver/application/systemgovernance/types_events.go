@@ -28,6 +28,8 @@ type RetryGovernanceSummary struct {
 	Terminal             int64 `json:"terminal"`
 	OutboxAutomatic      int64 `json:"outbox_automatic"`
 	OutboxManual         int64 `json:"outbox_manual_required"`
+	OutboxAuthorized     int64 `json:"outbox_authorized"`
+	OutboxTerminal       int64 `json:"outbox_terminal"`
 	BlockedRetryEvents   int64 `json:"blocked_retry_events"`
 	TransportDeadLetters int64 `json:"transport_dead_letters"`
 	HeldAutomatic        int64 `json:"held_automatic"`
@@ -58,6 +60,21 @@ type RetryCandidatePage struct {
 
 type RetryCandidateReader interface {
 	ListRetryCandidates(ctx context.Context, orgID int64, cursor string, limit int) (RetryCandidatePage, error)
+}
+
+// OutboxGovernanceReader is a profile-owned, tenant-scoped view of its active
+// Outbox. It must not merge selected standard rows with historical mock rows.
+type OutboxGovernanceReader interface {
+	ReadOutboxGovernance(context.Context, int64) (OutboxGovernanceSummary, error)
+	ListOutboxCandidates(context.Context, int64, int) ([]RetryCandidate, error)
+}
+
+type OutboxGovernanceSummary struct {
+	Automatic          int64
+	ManualRequired     int64
+	Authorized         int64
+	Terminal           int64
+	BlockedRetryEvents int64
 }
 
 // EventTypeStatusGroup 分组按事件类型 积压 行 用于 一个outbox 存储。

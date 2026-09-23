@@ -45,7 +45,7 @@ AND index_name='uk_system_governance_action_runs_org_request' AND non_unique=0`)
 	if selected.Assessment {
 		db := auditDB
 		for _, query := range []string{
-			"SELECT state,next_attempt_at,lease_until,version,attempt_count,failure_count,created_at,manual_replay_request_id FROM rm_outbox LIMIT 0",
+			"SELECT state,next_attempt_at,lease_until,version,attempt_count,failure_count,created_at,updated_at,manual_replay_request_id,manual_replay_version FROM rm_outbox LIMIT 0",
 			"SELECT org_id,request_id,store_name,reason,input_hash FROM qs_rm_replay_requests LIMIT 0",
 			"SELECT org_id,request_id,ordinal,event_id,expected_failure_count,authorized,reason FROM qs_rm_replay_items LIMIT 0",
 		} {
@@ -60,11 +60,11 @@ AND index_name='uk_system_governance_action_runs_org_request' AND non_unique=0`)
 		var indexCount int
 		if err := db.QueryRowContext(ctx, `SELECT COUNT(DISTINCT index_name) FROM information_schema.statistics
 WHERE table_schema=DATABASE() AND table_name='rm_outbox'
-AND index_name IN ('due_idx','lease_idx','ix_rm_outbox_message_id')`).Scan(&indexCount); err != nil {
+AND index_name IN ('due_idx','lease_idx','ix_rm_outbox_message_id','ix_rm_outbox_scope_governance')`).Scan(&indexCount); err != nil {
 			return fmt.Errorf("inspect M4 MySQL standard indexes: %w", err)
 		}
-		if indexCount != 3 {
-			return fmt.Errorf("M4 MySQL standard outbox requires due, lease and message indexes; found %d/3", indexCount)
+		if indexCount != 4 {
+			return fmt.Errorf("M4 MySQL standard outbox requires due, lease, message and governance indexes; found %d/4", indexCount)
 		}
 	}
 	if selected.Mongo {
@@ -73,7 +73,7 @@ AND index_name IN ('due_idx','lease_idx','ix_rm_outbox_message_id')`).Scan(&inde
 			collection string
 			indexes    []string
 		}{
-			{"rm_outbox", []string{"ix_rm_outbox_due", "ix_rm_outbox_lease", "ix_rm_outbox_message_id"}},
+			{"rm_outbox", []string{"ix_rm_outbox_due", "ix_rm_outbox_lease", "ix_rm_outbox_message_id", "ix_rm_outbox_scope_governance"}},
 			{"qs_rm_replay_requests", []string{"ix_qs_rm_replay_requests_org_time"}},
 		} {
 			if err := requireM4MongoIndexes(ctx, db.Collection(check.collection), check.indexes); err != nil {

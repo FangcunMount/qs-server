@@ -211,9 +211,9 @@ func authorizeOne(ctx context.Context, tx *sql.Tx, input request.ReplayRequest, 
 	default:
 		update, err := tx.ExecContext(ctx, `UPDATE rm_outbox
  SET state='retry_wait',next_attempt_at=UTC_TIMESTAMP(6),claim_token=NULL,lease_until=NULL,
- version=version+1,manual_replay_request_id=?
+ manual_replay_request_id=?,manual_replay_version=?,version=version+1,updated_at=UTC_TIMESTAMP(6)
  WHERE id=? AND scope=? AND state='quarantined' AND last_error_code='publish_unknown'
- AND failure_count=? AND version=?`, input.RequestID, row.id, row.scope, row.failures, row.version)
+ AND failure_count=? AND version=?`, input.RequestID, row.version+1, row.id, row.scope, row.failures, row.version)
 		if err != nil {
 			return result, err
 		}

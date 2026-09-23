@@ -13,6 +13,10 @@
       {
         "key": { "message_id": 1 },
         "name": "ix_rm_outbox_message_id"
+      },
+      {
+        "key": { "scope": 1, "state": 1, "last_error_code": 1, "updated_at": -1, "_id": 1 },
+        "name": "ix_rm_outbox_scope_governance"
       }
     ]
   },

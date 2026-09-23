@@ -36,6 +36,7 @@ type standardGovernedStatusReader struct {
 	outboxport.StatusReader
 	outboxport.DurableManualReplayAuthorizer
 	systemgov.PendingReplayResolver
+	systemgov.OutboxGovernanceReader
 }
 
 // configuredEventSubsystem keeps the ordinary configuration on the existing
@@ -186,6 +187,7 @@ func buildM4StandardEventSubsystem(opts eventsubsystem.Options, cfg *config.Conf
 		profile, err := newProfile("mongo-domain-events", store, stager, standardoutbox.NewPostCommitWake(),
 			appEventing.NamedOutboxStatusReader{Name: "mongo-domain-events", Reader: standardGovernedStatusReader{
 				StatusReader: status, DurableManualReplayAuthorizer: replay, PendingReplayResolver: replay,
+				OutboxGovernanceReader: status,
 			}}, opts.Mongo)
 		if err != nil {
 			return nil, err
@@ -216,6 +218,7 @@ func buildM4StandardEventSubsystem(opts eventsubsystem.Options, cfg *config.Conf
 		profile, err := newProfile("assessment-mysql-outbox", store, stager, standardoutbox.NewPostCommitWake(),
 			appEventing.NamedOutboxStatusReader{Name: "assessment-mysql-outbox", Reader: standardGovernedStatusReader{
 				StatusReader: status, DurableManualReplayAuthorizer: replay, PendingReplayResolver: replay,
+				OutboxGovernanceReader: status,
 			}}, opts.Assessment)
 		if err != nil {
 			return nil, err

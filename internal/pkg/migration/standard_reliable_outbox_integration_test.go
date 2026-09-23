@@ -124,7 +124,7 @@ func TestStandardReliableOutboxMySQLColdStartReachesLatestSchema(t *testing.T) {
 	if err != nil || !changed || version != latestEmbeddedMySQLMigrationVersion(t) {
 		t.Fatalf("cold-start MySQL standard schema: version=%d changed=%t err=%v", version, changed, err)
 	}
-	for _, column := range []string{"failure_count", "manual_replay_request_id"} {
+	for _, column := range []string{"failure_count", "manual_replay_request_id", "manual_replay_version", "updated_at"} {
 		var found int
 		if err := db.QueryRowContext(t.Context(), `SELECT COUNT(*) FROM information_schema.columns
  WHERE table_schema=DATABASE() AND table_name='rm_outbox' AND column_name=?`, column).Scan(&found); err != nil || found != 1 {
@@ -150,7 +150,7 @@ func TestStandardReliableOutboxMongoMigrationRetainsCollectionsOnDowngrade(t *te
 		t.Fatalf("apply Mongo standard indexes: %v", err)
 	}
 	for collection, names := range map[string][]string{
-		"rm_outbox":             {"ix_rm_outbox_due", "ix_rm_outbox_lease", "ix_rm_outbox_message_id"},
+		"rm_outbox":             {"ix_rm_outbox_due", "ix_rm_outbox_lease", "ix_rm_outbox_message_id", "ix_rm_outbox_scope_governance"},
 		"qs_rm_replay_requests": {"ix_qs_rm_replay_requests_org_time"},
 	} {
 		cursor, err := db.Collection(collection).Indexes().List(t.Context())

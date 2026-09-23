@@ -62,7 +62,8 @@ func BuildRESTSystemGovernanceFacade(in RESTSystemGovernanceInput) systemgov.Fac
 				auditStore, governanceinfra.NewActionAuditStore(in.MySQLDB), replayResolvers)
 		}
 	}
-	retryReader := retrygovinfra.NewReader(in.MySQLDB, in.MongoDB)
+	retryReader := retrygovinfra.NewReader(in.MySQLDB, in.MongoDB).
+		WithStandardOutboxes(buildStandardOutboxGovernanceReaders(in.EventOutboxes))
 	actions := systemgov.NewActionExecutorWithResilience(registry, in.CacheGovernance, in.CachePolicyReloader, in.ResilienceGovernor, auditStore).
 		BindEventReplayStores(buildEventReplayStores(in.EventOutboxes, retryReader)).
 		BindDurableEventReplayStores(durableReplays).
@@ -82,6 +83,19 @@ func BuildRESTSystemGovernanceFacade(in RESTSystemGovernanceInput) systemgov.Fac
 		RetryGovernanceReader:   retryReader,
 		RetryCandidateReader:    retryReader,
 	})
+}
+
+func buildStandardOutboxGovernanceReaders(outboxes []appEventing.NamedOutboxStatusReader) map[string]systemgov.OutboxGovernanceReader {
+	readers := map[string]systemgov.OutboxGovernanceReader{}
+	for _, outbox := range outboxes {
+		if outbox.Name == "" || outbox.Reader == nil {
+			continue
+		}
+		if reader, ok := outbox.Reader.(systemgov.OutboxGovernanceReader); ok {
+			readers[outbox.Name] = reader
+		}
+	}
+	return readers
 }
 
 // A durable owner without a recovery resolver is not executable. A committed
