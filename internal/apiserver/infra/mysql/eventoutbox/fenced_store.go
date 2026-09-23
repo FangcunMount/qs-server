@@ -55,7 +55,7 @@ func (s *FencedStore) ClaimDue(ctx context.Context, limit int, lease, legacyStal
 	if err != nil {
 		return nil, err
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 	var nowText string
 	if err := tx.QueryRowContext(ctx, "SELECT DATE_FORMAT("+fencedDBNow+", '%Y-%m-%d %H:%i:%s.%f')").Scan(&nowText); err != nil {
 		return nil, err
@@ -79,13 +79,11 @@ func (s *FencedStore) ClaimDue(ctx context.Context, limit int, lease, legacyStal
 	for rows.Next() {
 		var c FencedClaim
 		if err := rows.Scan(&c.RecordID, &c.EventID, &c.TopicName, &c.PayloadJSON, &c.FailureCount, &c.Version, &c.DeliveryCount); err != nil {
-			rows.Close()
-			return nil, err
+			return nil, errors.Join(err, rows.Close())
 		}
 		claims = append(claims, c)
 	}
-	err = rows.Err()
-	rows.Close()
+	err = errors.Join(rows.Err(), rows.Close())
 	if err != nil {
 		return nil, err
 	}
@@ -131,7 +129,7 @@ func (s *FencedStore) MarkFailedGoverned(ctx context.Context, c FencedClaim, rea
 	if err != nil {
 		return retrygovernance.Decision{}, err
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 	var nowText, token, leaseText, status, eventID string
 	var version uint64
 	var failures int
