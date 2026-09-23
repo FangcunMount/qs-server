@@ -10,7 +10,10 @@ import (
 	"github.com/FangcunMount/component-base/pkg/eventcodec"
 	"github.com/FangcunMount/component-base/pkg/eventmessaging"
 	"github.com/FangcunMount/component-base/pkg/messaging"
+	"github.com/FangcunMount/qs-server/internal/apiserver/eventing/standardoutbox"
+	"github.com/FangcunMount/qs-server/internal/apiserver/outboxcore"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
+	"github.com/FangcunMount/reliable-messaging/message"
 )
 
 // These are the existing QS producer and consumer codecs. An SDK publisher
@@ -21,13 +24,32 @@ func TestDurableEventWireCompatibility(t *testing.T) {
 		t.Fatal(err)
 	}
 	resolver := eventcatalog.NewCatalog(cfg)
-	for _, tc := range []struct {
+	cases := []struct {
 		typeName, aggregate string
 	}{
 		{"answersheet.submitted", "AnswerSheet"},
 		{"evaluation.requested", "Evaluation"},
-	} {
+		{"evaluation.retry.requested", "Evaluation"},
+		{"evaluation.outcome.committed", "Evaluation"},
+		{"evaluation.failed", "Evaluation"},
+		{"interpretation.report.generated", "Report"},
+		{"interpretation.report.failed", "Report"},
+		{"interpretation.retry.requested", "ReportGeneration"},
+	}
+	durable := make(map[string]bool)
+	for eventType, configured := range cfg.Events {
+		if configured.Delivery == eventcatalog.DeliveryClassDurableOutbox {
+			durable[eventType] = true
+		}
+	}
+	if len(durable) != len(cases) {
+		t.Fatalf("durable event inventory changed: catalog=%d protected=%d", len(durable), len(cases))
+	}
+	for _, tc := range cases {
 		t.Run(tc.typeName, func(t *testing.T) {
+			if !durable[tc.typeName] {
+				t.Fatalf("event %q is no longer configured as durable", tc.typeName)
+			}
 			topic, ok := resolver.GetTopicForEvent(tc.typeName)
 			if !ok || topic != "qs.evaluation.lifecycle" {
 				t.Fatalf("topic = %q, found = %v", topic, ok)
@@ -46,9 +68,49 @@ func TestDurableEventWireCompatibility(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
+			if _, recognized, err := messaging.DecodeMessagePayload(oldMessage.Payload); err != nil || recognized {
+				t.Fatalf("domain JSON alone unexpectedly carries transport identity: recognized=%v err=%v", recognized, err)
+			}
 			wire, err := messaging.EncodeMessagePayload(oldMessage)
 			if err != nil {
 				t.Fatal(err)
+			}
+			newWire, err := standardoutbox.EncodeWire(evt, SourceAPIServer)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !bytes.Equal(newWire, wire) {
+				t.Fatal("standard Outbox changed the original NSQ wire bytes")
+			}
+			// The SDK publisher emits Payload verbatim; durable content is the
+			// transport envelope, while SDK fields retain its stable identity.
+			intent, err := message.New(message.Input{
+				Producer: "qs-server", ID: evt.EventID(), Destination: topic,
+				EventType: tc.typeName, SchemaVersion: "1", Scope: "org:1",
+				ContentType: "application/json", OccurredAt: evt.OccurredAt().Format(time.RFC3339Nano), Payload: newWire,
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !bytes.Equal(intent.Input().Payload, wire) {
+				t.Fatal("SDK intent did not retain the original NSQ wire")
+			}
+			// The legacy Relay decodes the stored domain event and encodes it
+			// again before publishing. The new intent must match that path too.
+			stored, err := outboxcore.DecodePendingEvent(evt.EventID(), string(oldMessage.Payload))
+			if err != nil {
+				t.Fatal(err)
+			}
+			relayMessage, err := eventmessaging.BuildMessage(stored.Event, SourceAPIServer)
+			if err != nil {
+				t.Fatal(err)
+			}
+			relayWire, err := messaging.EncodeMessagePayload(relayMessage)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !bytes.Equal(newWire, relayWire) {
+				t.Fatal("standard Outbox changed the legacy Relay wire bytes")
 			}
 			decoded, recognized, err := messaging.DecodeMessagePayload(wire)
 			if err != nil || !recognized {
