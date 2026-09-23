@@ -3,6 +3,7 @@
 package process
 
 import (
+	"bytes"
 	"context"
 	"database/sql"
 	"encoding/json"
@@ -170,8 +171,10 @@ func TestM4ProcessBootstrapRunsSelectedStandardProfiles(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	actionAuditStore, actionAuditRunner := buildActionAuditRuntime(gormDB, nil)
 	hostOptions := processServer.buildContainerOptions(containerOptionsInput{
 		eventSubsystem: subsystem, resilience: resilience,
+		actionAuditStore: actionAuditStore, actionAuditRunner: actionAuditRunner,
 	})
 	hostOptions.Silent = true
 	host := container.NewContainerWithOptions(gormDB, mongoDB, nil, hostOptions)
@@ -295,11 +298,15 @@ func TestM4ProcessBootstrapRunsSelectedStandardProfiles(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	httpEngine := gin.New()
 	httpEngine.Use(func(c *gin.Context) {
-		c.Set(restmiddleware.AuthzSnapshotKey, &appauthz.Snapshot{Permissions: []appauthz.Permission{{
+		snapshot := &appauthz.Snapshot{Permissions: []appauthz.Permission{{
 			Resource: "qs:*:*:*", Action: "*", Mode: appauthz.AuthorizationModeUnconditional,
-		}}})
+		}}}
+		c.Set(restmiddleware.AuthzSnapshotKey, snapshot)
 		c.Set(restmiddleware.UserIDKey, uint64(110004))
 		c.Set(restmiddleware.OrgIDKey, uint64(501))
+		requestCtx := appauthz.WithSnapshot(c.Request.Context(), snapshot)
+		requestCtx = actorctx.WithGrantingUserID(requestCtx, 110004)
+		c.Request = c.Request.WithContext(requestCtx)
 		c.Next()
 	})
 	resttransport.NewRouter(host.BuildRESTDeps(cfg.RateLimit)).RegisterRoutes(httpEngine)
@@ -391,8 +398,30 @@ func TestM4ProcessBootstrapRunsSelectedStandardProfiles(t *testing.T) {
 				"targets": []interface{}{map[string]interface{}{"event_id": target.eventID, "expected_attempt_count": 30}},
 			},
 		}
+		body, err := json.Marshal(request)
+		if err != nil {
+			t.Fatal(err)
+		}
+		runHTTP := func(payload []byte) *httptest.ResponseRecorder {
+			response := httptest.NewRecorder()
+			httpRequest := httptest.NewRequest(http.MethodPost, "/internal/v1/system-governance/actions/events.replay_pending/runs", bytes.NewReader(payload))
+			httpRequest.Header.Set("Content-Type", "application/json")
+			httpEngine.ServeHTTP(response, httpRequest)
+			return response
+		}
+		httpApproval := runHTTP(body)
+		if httpApproval.Code != http.StatusOK {
+			t.Fatalf("standard profile %s HTTP replay = %d, body=%s", target.store, httpApproval.Code, httpApproval.Body.String())
+		}
+		var firstHTTP struct {
+			Data systemgov.ActionRunResult `json:"data"`
+		}
+		if err := json.Unmarshal(httpApproval.Body.Bytes(), &firstHTTP); err != nil || firstHTTP.Data.RequestID != request.RequestID ||
+			fmt.Sprint(firstHTTP.Data.Result["authorized"]) != "1" {
+			t.Fatalf("standard profile %s HTTP replay returned unexpected result: result=%+v err=%v", target.store, firstHTTP.Data, err)
+		}
 		approved, err := governance.RunAction(actionCtx, 501, "events.replay_pending", request)
-		if err != nil || approved == nil || approved.Result["authorized"] != 1 {
+		if err != nil || approved == nil || fmt.Sprint(approved.Result["authorized"]) != "1" {
 			t.Fatalf("standard profile %s is not governable: result=%+v err=%v", target.store, approved, err)
 		}
 		for _, outbox := range subsystem.Outboxes() {
@@ -413,6 +442,15 @@ func TestM4ProcessBootstrapRunsSelectedStandardProfiles(t *testing.T) {
 		if err != nil || prior == nil || prior.RequestID != approved.RequestID {
 			t.Fatalf("standard replay %s did not retain idempotent result: result=%+v err=%v", target.store, prior, err)
 		}
+		httpPrior := runHTTP(body)
+		var priorHTTP struct {
+			Data systemgov.ActionRunResult `json:"data"`
+		}
+		if err := json.Unmarshal(httpPrior.Body.Bytes(), &priorHTTP); err != nil || httpPrior.Code != http.StatusOK ||
+			priorHTTP.Data.RequestID != firstHTTP.Data.RequestID ||
+			fmt.Sprint(priorHTTP.Data.Result["authorized"]) != "1" {
+			t.Fatalf("standard replay %s HTTP retry changed original result: first=%s second=%s err=%v", target.store, httpApproval.Body.String(), httpPrior.Body.String(), err)
+		}
 		changed := request
 		changed.Input = map[string]interface{}{
 			"store": target.store, "reason": "changed approval",
@@ -420,6 +458,13 @@ func TestM4ProcessBootstrapRunsSelectedStandardProfiles(t *testing.T) {
 		}
 		if _, err := governance.RunAction(actionCtx, 501, "events.replay_pending", changed); err == nil {
 			t.Fatalf("standard replay %s accepted changed approval input", target.store)
+		}
+		changedBody, err := json.Marshal(changed)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if response := runHTTP(changedBody); response.Code == http.StatusOK {
+			t.Fatalf("standard replay %s HTTP accepted changed approval input: %s", target.store, response.Body.String())
 		}
 		var auditStatus string
 		if err := db.QueryRowContext(ctx, `SELECT status FROM system_governance_action_runs WHERE org_id=501 AND request_id=?`,
