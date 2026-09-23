@@ -135,6 +135,11 @@ func TestStandardMySQLReplayLedgerCrashAndRollback(t *testing.T) {
 	if _, err := ledger.Authorize(ctx, changed); !errors.Is(err, ErrReplayInputConflict) {
 		t.Fatalf("same request ID accepted changed input: %v", err)
 	}
+	changed = first
+	changed.Targets = []request.ReplayTarget{{EventID: "event-a", ExpectedFailureCount: 31}}
+	if _, err := ledger.Authorize(ctx, changed); !errors.Is(err, ErrReplayInputConflict) {
+		t.Fatalf("same request ID accepted changed target: %v", err)
+	}
 	appendQuarantined("other-org", "org:8", "publish_unknown", 30)
 	appendQuarantined("terminal", "org:7", "publish_rejected", 1)
 	denied := request.ReplayRequest{
