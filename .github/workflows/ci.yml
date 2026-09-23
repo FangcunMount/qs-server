@@ -44,6 +44,12 @@ jobs:
         run: |
           go test -tags=integration -run '^$' ./...
 
+      - name: Verify M4 standard Outbox build
+        run: |
+          go build -tags=reliable_messaging_m4 ./cmd/qs-apiserver ./cmd/collection-server ./cmd/qs-worker
+          go test -tags=reliable_messaging_m4 ./internal/apiserver/application/systemgovernance ./internal/apiserver/infra/mysql/systemgovernance ./internal/apiserver/transport/rest ./internal/apiserver/process
+          go vet -tags=reliable_messaging_m4 ./internal/apiserver/application/systemgovernance ./internal/apiserver/infra/mysql/systemgovernance ./internal/apiserver/transport/rest ./internal/apiserver/process
+
       - name: Generate coverage report
         run: |
           go tool cover -func=coverage.out
