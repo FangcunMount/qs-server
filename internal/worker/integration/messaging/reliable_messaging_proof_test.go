@@ -29,7 +29,7 @@ func TestReliableMessagingDurableHold(t *testing.T) {
 	db, err := sql.Open("mysql", dsn)
 	require.NoError(t, err)
 	defer db.Close()
-	schema, err := os.ReadFile("/tmp/qs-retry-event-hold.sql")
+	schema, err := os.ReadFile("../../../pkg/migration/migrations/mysql/000050_add_retry_event_hold.up.sql")
 	require.NoError(t, err)
 	_, err = db.ExecContext(ctx, string(schema))
 	require.NoError(t, err)
@@ -82,6 +82,8 @@ func TestReliableMessagingDurableHold(t *testing.T) {
 	failed.SetAckFunc(func() error { acked++; return nil })
 	failed.SetNackFunc(func() error { nacked++; return nil })
 	require.Error(t, handler(ctx, failed))
+	require.False(t, failed.IsSettled())
+	require.NoError(t, failed.Nack()) // the transport settles after the handler returns
 	require.Equal(t, 1, nacked)
 	require.Equal(t, 1, acked)
 	require.NoError(t, db.QueryRowContext(ctx, "SELECT COUNT(*) FROM retry_event_hold").Scan(&count))

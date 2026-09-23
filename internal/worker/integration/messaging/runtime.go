@@ -123,10 +123,7 @@ func createDispatchHandlerWithObserverAndHold(logger *slog.Logger, dispatcher Ev
 	return func(ctx context.Context, msg *basemessaging.Message) error {
 		eventType, err := extractor.Extract(msg)
 		if err != nil {
-			_, settleErr := settlement.NackInvalid(msg, err)
-			if settleErr != nil && !errors.Is(settleErr, err) {
-				return errors.Join(err, settleErr)
-			}
+			settlement.ReportInvalid(msg, err)
 			return err
 		}
 
@@ -139,18 +136,18 @@ func createDispatchHandlerWithObserverAndHold(logger *slog.Logger, dispatcher Ev
 			if errors.Is(err, eventruntime.ErrAutomaticRetryPaused) {
 				if holdRecorder == nil {
 					holdErr := errors.New("retry event hold recorder is not configured")
-					_, nackErr := settlement.NackHoldFailed(msg, eventType, holdErr)
-					return errors.Join(err, holdErr, nackErr)
+					settlement.ReportHoldFailed(msg, eventType, holdErr)
+					return errors.Join(err, holdErr)
 				}
 				if holdErr := holdRecorder.Hold(ctx, msg, eventType, err); holdErr != nil {
-					_, nackErr := settlement.NackHoldFailed(msg, eventType, holdErr)
-					return errors.Join(err, holdErr, nackErr)
+					settlement.ReportHoldFailed(msg, eventType, holdErr)
+					return errors.Join(err, holdErr)
 				}
 				outcome, ackErr := settlement.AckHeld(msg)
 				eventobservability.ObserveConsumeDuration(ctx, observer, eventobservability.ConsumeDurationEvent{Service: serviceName, Topic: topicName, EventType: eventType, Outcome: outcome, Duration: time.Since(startedAt)})
 				return ackErr
 			}
-			outcome := settlement.NackFailed(msg, eventType, err)
+			outcome := settlement.ReportFailed(msg, eventType, err)
 			elapsed := time.Since(startedAt)
 			eventobservability.ObserveConsumeDuration(ctx, observer, eventobservability.ConsumeDurationEvent{
 				Service:   serviceName,

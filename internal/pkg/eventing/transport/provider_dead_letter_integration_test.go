@@ -130,10 +130,8 @@ func TestWorkerSettlementThroughNSQPersistsPoisonAndExhaustion(t *testing.T) {
 		payload string
 		cause   string
 	}{
-		// The Worker settles explicitly before returning its error, so the
-		// transport currently records this generic cause for both failures.
-		{poison.UUID, string(poison.Payload), "message nacked by handler"},
-		{failed.UUID, string(failed.Payload), "message nacked by handler"},
+		{poison.UUID, string(poison.Payload), "failed to parse event envelope"},
+		{failed.UUID, string(failed.Payload), "injected worker dispatch failure"},
 	} {
 		var payload, cause, disposition string
 		var attempts int
