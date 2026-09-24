@@ -8,30 +8,30 @@ import (
 	"errors"
 	"io"
 	"log/slog"
-	"net"
 	"sync"
 	"testing"
 	"time"
 
 	"github.com/FangcunMount/component-base/pkg/eventcodec"
 	"github.com/FangcunMount/component-base/pkg/messaging"
-	interpretationpb "github.com/FangcunMount/qs-server/api/grpc/gen/interpretation"
 	automation "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/automation"
 	execution "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/automation/execution"
 	domaingeneration "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/generation"
+	interpinput "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/input"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/policy"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/rendering"
 	domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/report"
 	interpretationrun "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/run"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/interpretationassets"
 	evaluationfact "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationfact"
-	grpcservice "github.com/FangcunMount/qs-server/internal/apiserver/transport/grpc/service"
+	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
 	eventoutcome "github.com/FangcunMount/qs-server/internal/pkg/eventing/outcome"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 	"github.com/FangcunMount/qs-server/internal/pkg/retrygovernance"
 	"github.com/FangcunMount/qs-server/internal/worker/handlers"
 	"go.mongodb.org/mongo-driver/bson"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
-	"google.golang.org/grpc/test/bufconn"
 )
 
 func TestInterpretationGovernedRetryAuthorizationAndStandardIntentCommitTogether(t *testing.T) {
@@ -176,7 +176,7 @@ func TestInterpretationGovernedRetryAuthorizationAndStandardIntentCommitTogether
 	if origin := metadata.Get("x-retry-origin"); len(origin) != 1 || origin[0] != "manual" {
 		t.Fatalf("manual Worker lost origin: %v", metadata)
 	}
-	assertStandardRetryClaimOnceThroughGRPC(t, fixture, run.GenerationID(), decoded.Payload, command.ExpectedAttempt, retrygovernance.AttemptOriginManual)
+	assertStandardRetryClaimOnce(t, fixture, run.GenerationID(), decoded.Payload, command.ExpectedAttempt, retrygovernance.AttemptOriginManual)
 	if _, err := service.Authorize(t.Context(), command); err == nil {
 		t.Fatal("duplicate manual authorization succeeded")
 	}
@@ -245,13 +245,43 @@ func TestInterpretationGovernedRetryAuthorizationAndStandardIntentCommitTogether
 	if action := forceMetadata.Get("x-retry-action-request-id"); len(action) != 1 || action[0] != forceCommand.RequestID {
 		t.Fatalf("force Worker lost action request ID: %v", forceMetadata)
 	}
-	assertStandardRetryClaimOnceThroughGRPC(t, fixture, terminalRun.GenerationID(), forceWire.Payload, forceCommand.ExpectedAttempt, retrygovernance.AttemptOriginForce)
+	assertStandardRetryClaimOnce(t, fixture, terminalRun.GenerationID(), forceWire.Payload, forceCommand.ExpectedAttempt, retrygovernance.AttemptOriginForce)
 	assertMongoDocumentCount(t, fixture.db.Collection("rm_outbox"), bson.M{"event_type": eventcatalog.InterpretationRetryRequested}, 2)
+
+	fullRun, fullOutcomeID, fullAssessmentID := makeFailed(t, true, retrygovernance.DispositionManualRequired)
+	fullOutcome := standardRetryOutcome(t, fullOutcomeID, fullAssessmentID)
+	fullService := automation.NewGovernedRetryService(fixture.generations, fixture.runs, manualRetryOutcomeRepo{record: fullOutcome}, fixture.runner, stager)
+	fullCommand := command
+	fullCommand.GenerationID = fullRun.GenerationID()
+	fullCommand.RequestID = "m5-full-business-request"
+	fullAuthorized, err := fullService.Authorize(t.Context(), fullCommand)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var fullRow struct {
+		Payload []byte `bson:"payload"`
+	}
+	if err := fixture.db.Collection("rm_outbox").FindOne(t.Context(), bson.M{"message_id": fullAuthorized.RetryDecision().RetryEventID}).Decode(&fullRow); err != nil {
+		t.Fatal(err)
+	}
+	fullWire, recognized, err := messaging.DecodeMessagePayload(fullRow.Payload)
+	if err != nil || !recognized {
+		t.Fatalf("full business retry wire decode: recognized=%t err=%v", recognized, err)
+	}
+	if err := retryHandler(t.Context(), eventcatalog.InterpretationRetryRequested, fullWire.Payload); err != nil {
+		t.Fatal(err)
+	}
+	if workerAutomation.Count() != 3 {
+		t.Fatalf("full business retry Worker calls=%d, want 3 total", workerAutomation.Count())
+	}
+	assertStandardRetryFullBusinessOnce(t, fixture, committer, fullRun.GenerationID(), fullOutcome, fullWire.Payload, fullCommand.ExpectedAttempt)
+	assertMongoDocumentCount(t, fixture.db.Collection("rm_outbox"), bson.M{"event_type": eventcatalog.InterpretationReportGenerated}, 1)
 }
 
-func assertStandardRetryClaimOnceThroughGRPC(t *testing.T, fixture interpretationMongoFixture, generationID meta.ID, payload []byte, expectedAttempt int, origin retrygovernance.AttemptOrigin) {
+func assertStandardRetryClaimOnce(t *testing.T, fixture interpretationMongoFixture, generationID meta.ID, payload []byte, expectedAttempt int, origin retrygovernance.AttemptOrigin) {
 	t.Helper()
-	generation, err := fixture.generations.FindByID(t.Context(), generationID)
+	ctx := standardRetryAuthorizationContext(t, payload)
+	generation, err := fixture.generations.FindByID(ctx, generationID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -259,75 +289,150 @@ func assertStandardRetryClaimOnceThroughGRPC(t *testing.T, fixture interpretatio
 	if err != nil {
 		t.Fatal(err)
 	}
-	probe := &standardRetryStarterService{starter: starter, key: generation.Key()}
-	server := grpc.NewServer()
-	interpretationpb.RegisterInterpretationAutomationServiceServer(server, grpcservice.NewInterpretationAutomationService(probe))
-	listener := bufconn.Listen(1 << 20)
-	go func() { _ = server.Serve(listener) }()
-	t.Cleanup(func() { server.Stop(); _ = listener.Close() })
-	conn, err := grpc.NewClient("passthrough:///bufnet", grpc.WithContextDialer(func(context.Context, string) (net.Conn, error) {
-		return listener.Dial()
-	}), grpc.WithTransportCredentials(insecure.NewCredentials()))
+	request := execution.StartRequest{Key: generation.Key(), TraceID: "m5-governed-retry-proof"}
+	first, err := starter.Start(ctx, request)
+	if err != nil || first == nil || first.Status != execution.StartStatusStarted || first.Run == nil || first.Run.Attempt() != expectedAttempt+1 || first.Run.Origin() != origin {
+		t.Fatalf("first authorized retry claim=%+v err=%v", first, err)
+	}
+	again, err := starter.Start(ctx, request)
+	if err != nil || again == nil || again.Status != execution.StartStatusProcessing || again.Run == nil || again.Run.ID() != first.Run.ID() {
+		t.Fatalf("duplicate retry claim=%+v first=%+v err=%v", again, first, err)
+	}
+	latest, err := fixture.runs.FindLatestByGenerationID(ctx, generationID)
+	if err != nil || latest == nil || latest.ID() != first.Run.ID() || latest.Attempt() != expectedAttempt+1 {
+		t.Fatalf("persisted retry run=%+v first=%+v err=%v", latest, first, err)
+	}
+}
+
+func standardRetryAuthorizationContext(t *testing.T, payload []byte) context.Context {
+	t.Helper()
+	envelope, err := eventcodec.DecodeEnvelope(payload)
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { _ = conn.Close() })
-	workerClient := standardRetryGRPCClient{client: interpretationpb.NewInterpretationAutomationServiceClient(conn)}
-	workerDeps := &handlers.Dependencies{
-		Logger: slog.New(slog.NewTextHandler(io.Discard, nil)), InterpretationAutomationClient: workerClient,
-		DisableAutomaticRetry: true,
+	var data eventoutcome.InterpretationRetryRequestedPayload
+	if err := json.Unmarshal(envelope.Data, &data); err != nil {
+		t.Fatal(err)
 	}
-	retryHandler, ok := handlers.NewRegistry().Create("interpretation_retry_requested_handler", workerDeps)
-	if !ok {
-		t.Fatal("Worker retry.requested handler is missing")
+	origin := retrygovernance.AttemptOrigin(data.AttemptOrigin)
+	if !origin.IsValid() || data.ExpectedAttempt < 1 {
+		t.Fatalf("invalid retry authorization payload: %+v", data)
 	}
+	return retrygovernance.WithAuthorization(t.Context(), retrygovernance.Authorization{
+		EventID: envelope.ID, ExpectedAttempt: data.ExpectedAttempt, Origin: origin,
+		ActionRequestID: data.ActionRequestID, Mode: data.Mode,
+	})
+}
+
+func standardRetryOutcome(t *testing.T, outcomeID, assessmentID meta.ID) *evaluationfact.Record {
+	t.Helper()
+	reportInput, err := evaluationinput.MarshalReportInput(evaluationinput.ReportInputFreezeOptions{
+		Assets: &interpretationassets.Assets{ReportSpec: interpretationassets.ReportSpec{Sections: []interpretationassets.ReportSection{{
+			Code: "standard", Kind: "factor_scoring", TemplateID: "standard", TemplateVersion: "v1",
+		}}}},
+		ModelRef: evaluationinput.ModelRef{
+			Kind: evaluationinput.EvaluationModelKindScale, Algorithm: string(modelcatalog.AlgorithmScaleDefault),
+			Code: "SCALE-1", Version: "v1", Title: "Scale",
+		},
+		DecisionKind:  modelcatalog.DecisionKindScoreRange,
+		FactorCatalog: []evaluationinput.FactorCatalogEntry{{Code: "TOTAL", Title: "总分", IsTotalScore: true}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return evaluationfact.NewRecord(evaluationfact.NewRecordInput{
+		ID: outcomeID, OrgID: 1, AssessmentID: assessmentID, TesteeID: 8,
+		Model: evaluationfact.ModelIdentity{
+			Kind: modelcatalog.KindScale, Algorithm: modelcatalog.AlgorithmScaleDefault,
+			Code: "SCALE-1", Version: "v1", Title: "Scale",
+		},
+		Runtime:       evaluationfact.RuntimeIdentity{DecisionKind: modelcatalog.DecisionKindScoreRange},
+		SchemaVersion: 2, ReportInput: reportInput, EvaluatedAt: time.Now(),
+		Payload: []byte(`{"Primary":{"Kind":"raw_total","Value":12},"Level":{"Code":"low"},"Dimensions":[{"Code":"TOTAL","Role":"total","Score":{"Kind":"raw_total","Value":12},"Level":{"Code":"low"}}]}`),
+	})
+}
+
+func assertStandardRetryFullBusinessOnce(
+	t *testing.T, fixture interpretationMongoFixture, committer execution.InterpretationCommitter,
+	generationID meta.ID, outcome *evaluationfact.Record, payload []byte, expectedAttempt int,
+) {
+	t.Helper()
+	starter, err := execution.NewStarter(fixture.runner, fixture.generations, fixture.runs, fixture.reports, time.Minute)
+	if err != nil {
+		t.Fatal(err)
+	}
+	builder := &standardRetryBuilder{}
+	registry, err := rendering.NewRegistry(builder)
+	if err != nil {
+		t.Fatal(err)
+	}
+	executor, err := execution.NewExecutor(starter, registry, committer)
+	if err != nil {
+		t.Fatal(err)
+	}
+	service, err := automation.NewService(manualRetryOutcomeRepo{record: outcome}, executor)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx := standardRetryAuthorizationContext(t, payload)
+	command := automation.GenerateCommand{Actor: automation.TrustedServiceActor("m5-full-business-proof"), OutcomeID: outcome.ID()}
+	var first *automation.Result
 	for i := 0; i < 2; i++ {
-		if err := retryHandler(t.Context(), eventcatalog.InterpretationRetryRequested, payload); err != nil {
-			t.Fatalf("Worker to gRPC retry delivery %d: %v", i+1, err)
+		result, err := service.Generate(ctx, command)
+		if err != nil || result == nil || result.Status != automation.StatusGenerated {
+			t.Fatalf("full report retry delivery %d: result=%+v err=%v", i+1, result, err)
+		}
+		if i == 0 {
+			first = result
+		} else if result.RunID != first.RunID || result.ReportID != first.ReportID {
+			t.Fatalf("duplicate full report changed result: first=%+v again=%+v", first, result)
 		}
 	}
-	probe.mu.Lock()
-	claims := append([]*execution.StartResult(nil), probe.claims...)
-	probe.mu.Unlock()
-	if len(claims) != 2 || claims[0] == nil || claims[0].Status != execution.StartStatusStarted ||
-		claims[1] == nil || claims[1].Status != execution.StartStatusProcessing ||
-		claims[0].Run == nil || claims[1].Run == nil || claims[0].Run.ID() != claims[1].Run.ID() ||
-		claims[0].Run.Attempt() != expectedAttempt+1 || claims[0].Run.Origin() != origin {
-		t.Fatalf("Worker to gRPC retry claims=%+v, want started then same running Run from %s", claims, origin)
+	builder.mu.Lock()
+	buildCalls := builder.calls
+	builder.mu.Unlock()
+	if buildCalls != 1 {
+		t.Fatalf("duplicate retry invoked builder %d times, want 1", buildCalls)
 	}
 	latest, err := fixture.runs.FindLatestByGenerationID(t.Context(), generationID)
-	if err != nil || latest == nil || latest.ID() != claims[0].Run.ID() || latest.Attempt() != claims[0].Run.Attempt() {
-		t.Fatalf("persisted retry run=%+v first=%+v err=%v", latest, claims[0], err)
+	if err != nil || latest == nil || latest.ID() != first.RunID || latest.Attempt() != expectedAttempt+1 || latest.Status() != interpretationrun.StatusSucceeded {
+		t.Fatalf("full report retry run=%+v err=%v", latest, err)
+	}
+	generated, err := fixture.generations.FindByID(t.Context(), generationID)
+	if err != nil || generated == nil || generated.Status() != domaingeneration.StatusGenerated {
+		t.Fatalf("full report retry generation=%+v err=%v", generated, err)
 	}
 }
 
-type standardRetryStarterService struct {
-	starter execution.Starter
-	key     domaingeneration.Key
-	mu      sync.Mutex
-	claims  []*execution.StartResult
+type standardRetryBuilder struct {
+	mu    sync.Mutex
+	calls int
 }
 
-func (s *standardRetryStarterService) Generate(ctx context.Context, command automation.GenerateCommand) (*automation.Result, error) {
-	if command.OutcomeID != s.key.OutcomeID {
-		return nil, errors.New("Worker routed retry to a different outcome")
-	}
-	claim, err := s.starter.Start(ctx, execution.StartRequest{Key: s.key, TraceID: command.TraceID})
-	if err != nil {
-		return nil, err
-	}
-	s.mu.Lock()
-	s.claims = append(s.claims, claim)
-	s.mu.Unlock()
-	return &automation.Result{Status: automation.StatusProcessing, GenerationID: claim.Generation.ID(), RunID: claim.Run.ID(), AttemptOrigin: claim.Run.Origin()}, nil
+func (*standardRetryBuilder) ReportType() policy.ReportType { return policy.ReportTypeStandard }
+func (*standardRetryBuilder) TemplateVersion() policy.TemplateVersion {
+	return policy.TemplateVersion("v1")
 }
-
-type standardRetryGRPCClient struct {
-	client interpretationpb.InterpretationAutomationServiceClient
+func (*standardRetryBuilder) BuilderIdentity() string {
+	return domainreport.BuilderIdentityFactorScoring
 }
-
-func (c standardRetryGRPCClient) GenerateReportFromOutcome(ctx context.Context, outcomeID string) (*interpretationpb.GenerateReportFromAssessmentResponse, error) {
-	return c.client.GenerateReportFromOutcome(ctx, &interpretationpb.GenerateReportFromOutcomeRequest{OutcomeId: outcomeID})
+func (*standardRetryBuilder) ContentSchemaVersion() string { return "report-content/v1" }
+func (*standardRetryBuilder) MechanismKey() rendering.Key {
+	return rendering.Key{DecisionKind: modelcatalog.DecisionKindScoreRange, ReportType: policy.ReportTypeStandard}
+}
+func (b *standardRetryBuilder) Build(context.Context, interpinput.InterpretationInput) (*domainreport.Draft, error) {
+	b.mu.Lock()
+	b.calls++
+	b.mu.Unlock()
+	return domainreport.NewDraft(domainreport.Content{
+		Model:        domainreport.ModelIdentity{Kind: "scale", Code: "SCALE-1", Version: "v1", Title: "Scale"},
+		PrimaryScore: domainreport.NewRawTotalScore(12, nil),
+		Level:        domainreport.LevelFromRisk(domainreport.RiskLevelLow),
+		Conclusion:   "ok",
+		Dimensions: []domainreport.DimensionInterpret{
+			domainreport.NewDimensionInterpret(domainreport.NewFactorCode("TOTAL"), "总分", 12, nil, domainreport.RiskLevelLow, "ok", "ok"),
+		},
+	}), nil
 }
 
 type manualRetryOutcomeRepo struct{ record *evaluationfact.Record }
