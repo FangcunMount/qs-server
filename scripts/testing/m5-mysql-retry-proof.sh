@@ -26,7 +26,7 @@ trap cleanup EXIT
 trap 'exit 130' INT
 trap 'exit 143' TERM
 
-"${compose[@]}" up -d --wait --wait-timeout 180 mysql
+"${compose[@]}" up -d --wait --wait-timeout 180 mysql nsqd
 "${compose[@]}" exec -T mysql mysql -uroot -e 'CREATE DATABASE m5_qs_retry'
 "${compose[@]}" exec -T mysql mysql -uroot -e 'CREATE DATABASE m5_qs_outcome'
 
@@ -47,5 +47,6 @@ build_dir=$(mktemp -d "${TMPDIR:-/tmp}/$project-build.XXXXXX")
     -test.run '^TestM5StandardEvaluationFailureAndScheduledRetryTransaction$' -test.count=1 -test.timeout=2m -test.v
 "${compose[@]}" exec -T \
   -e RM_QS_M5_OUTCOME_DSN='root@tcp(mysql:3306)/m5_qs_outcome?parseTime=true&loc=UTC' \
+  -e RM_QS_NSQ_TCP='nsqd:4150' \
   mysql /tmp/m5-mysql-retry.test \
     -test.run '^TestM5StandardEvaluationOutcomeOriginalTransaction$' -test.count=1 -test.timeout=2m -test.v

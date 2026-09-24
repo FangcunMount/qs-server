@@ -5,12 +5,16 @@ package transaction
 import (
 	"context"
 	"encoding/json"
+	"fmt"
+	"io"
+	"log/slog"
 	"os"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/FangcunMount/component-base/pkg/messaging"
+	interpretationpb "github.com/FangcunMount/qs-server/api/grpc/gen/interpretation"
 	evaloutcome "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome"
 	outcomecommit "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome/commit"
 	outcomescoring "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome/scoring"
@@ -23,6 +27,7 @@ import (
 	modeldefinition "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/definition"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/factor"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/interpretationassets"
+	"github.com/FangcunMount/qs-server/internal/apiserver/eventing/standardoutbox"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/checkpoint"
 	assessmentmysql "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/evaluation"
 	mysqlstandard "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/standardoutbox"
@@ -32,21 +37,47 @@ import (
 	eventpayload "github.com/FangcunMount/qs-server/internal/pkg/eventing/payload"
 	eventruntime "github.com/FangcunMount/qs-server/internal/pkg/eventing/runtime"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
+	"github.com/FangcunMount/qs-server/internal/worker/handlers"
+	"github.com/FangcunMount/reliable-messaging/relay"
 	sdkmysql "github.com/FangcunMount/reliable-messaging/storage/mysql"
+	sdknsq "github.com/FangcunMount/reliable-messaging/transport/nsq"
 	mysqldriver "github.com/go-sql-driver/mysql"
+	"github.com/nsqio/go-nsq"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/grpc/metadata"
 	gormmysql "gorm.io/driver/mysql"
 	"gorm.io/gorm"
 )
+
+type outcomeReportCall struct {
+	OutcomeID string
+	EventID   string
+}
+
+type outcomeReportCallRecorder struct{ calls chan outcomeReportCall }
+
+func (r outcomeReportCallRecorder) GenerateReportFromOutcome(ctx context.Context, outcomeID string) (*interpretationpb.GenerateReportFromAssessmentResponse, error) {
+	values, _ := metadata.FromOutgoingContext(ctx)
+	call := outcomeReportCall{OutcomeID: outcomeID}
+	if eventIDs := values.Get("x-event-id"); len(eventIDs) == 1 {
+		call.EventID = eventIDs[0]
+	}
+	select {
+	case r.calls <- call:
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	}
+	return &interpretationpb.GenerateReportFromAssessmentResponse{Success: true, Status: "generated", ReportId: "test-report"}, nil
+}
 
 // A canonical Outcome, score projection, Assessment/Run completion and one
 // standard intent share the host MySQL transaction. Rejecting the intent must
 // leave the prior submitted Assessment and running claim recoverable.
 func TestM5StandardEvaluationOutcomeOriginalTransaction(t *testing.T) {
-	dsn := os.Getenv("RM_QS_M5_OUTCOME_DSN")
+	dsn, nsqAddress := os.Getenv("RM_QS_M5_OUTCOME_DSN"), os.Getenv("RM_QS_NSQ_TCP")
 	parsed, err := mysqldriver.ParseDSN(dsn)
-	if err != nil || parsed.Net != "tcp" || parsed.Addr != "mysql:3306" || parsed.DBName != "m5_qs_outcome" {
-		t.Fatal("disposable m5_qs_outcome MySQL required")
+	if err != nil || parsed.Net != "tcp" || parsed.Addr != "mysql:3306" || parsed.DBName != "m5_qs_outcome" || nsqAddress != "nsqd:4150" {
+		t.Fatal("disposable m5_qs_outcome MySQL and nsqd:4150 required")
 	}
 	ctx, cancel := context.WithTimeout(t.Context(), 45*time.Second)
 	defer cancel()
@@ -191,6 +222,92 @@ events:
 	require.Equal(t, firstRun.ID().String(), domainEvent.Data.EvaluationRunID)
 	require.NoError(t, store.Confirm(ctx, claims[0]))
 
+	// A second committed Outcome follows the SDK Relay and the original NSQ
+	// Worker handler. The recording report client observes the handoff only;
+	// report persistence and idempotency belong to a later business proof.
+	nsqConfig := nsq.NewConfig()
+	nsqConfig.HeartbeatInterval, nsqConfig.MsgTimeout = time.Second, 5*time.Second
+	nsqConfig.ReadTimeout, nsqConfig.WriteTimeout = 3*time.Second, time.Second
+	const topic = "qs.evaluation.lifecycle"
+	consumer, err := nsq.NewConsumer(topic, "rm-m5-outcome-worker", nsqConfig)
+	require.NoError(t, err)
+	consumer.SetLogger(nil, nsq.LogLevelError)
+	defer func() {
+		consumer.Stop()
+		select {
+		case <-consumer.StopChan:
+		case <-time.After(5 * time.Second):
+			t.Error("outcome consumer did not stop")
+		}
+	}()
+	reportCalls := make(chan outcomeReportCall, 2)
+	handler, ok := handlers.NewRegistry().Create("evaluation_outcome_committed_handler", &handlers.Dependencies{
+		Logger:                         slog.New(slog.NewTextHandler(io.Discard, nil)),
+		InterpretationAutomationClient: outcomeReportCallRecorder{calls: reportCalls},
+	})
+	require.True(t, ok)
+	deliveries := make(chan error, 2)
+	consumer.AddHandler(nsq.HandlerFunc(func(raw *nsq.Message) error {
+		wire, recognized, decodeErr := messaging.DecodeMessagePayload(raw.Body)
+		if decodeErr == nil && (!recognized || wire.Metadata["event_type"] != "evaluation.outcome.committed") {
+			decodeErr = fmt.Errorf("standard outcome wire lost original event type")
+		}
+		if decodeErr == nil {
+			decodeErr = handler(ctx, "evaluation.outcome.committed", wire.Payload)
+		}
+		select {
+		case deliveries <- decodeErr:
+		case <-ctx.Done():
+		}
+		return decodeErr
+	}))
+	require.NoError(t, consumer.ConnectToNSQD(nsqAddress))
+	producer, err := nsq.NewProducer(nsqAddress, nsqConfig)
+	require.NoError(t, err)
+	producer.SetLogger(nil, nsq.LogLevelError)
+	defer producer.Stop()
+	publisher, err := sdknsq.New(producer, map[string]string{topic: topic}, 1)
+	require.NoError(t, err)
+	defer func() { require.NoError(t, publisher.Drain(ctx)) }()
+	forwarder, err := relay.New(store, publisher, relay.Config{
+		Concurrency: 1, PollInterval: 50 * time.Millisecond, Lease: 5 * time.Second,
+		PublishTimeout: 2 * time.Second, WriteTimeout: time.Second,
+		Retry: standardoutbox.SDKRetryPolicy(), Observe: func(relay.Event) {},
+	})
+	require.NoError(t, err)
+	relayCtx, stopRelay := context.WithCancel(ctx)
+	relayDone := make(chan error, 1)
+	go func() { relayDone <- forwarder.Run(relayCtx) }()
+	defer func() {
+		stopRelay()
+		select {
+		case <-relayDone:
+		case <-time.After(5 * time.Second):
+			t.Error("outcome relay did not stop")
+		}
+	}()
+	third, thirdRun, thirdExecution := prepare(5003, 2003)
+	thirdCommitted, err := committer.Commit(ctx, request(third, &thirdRun, thirdExecution))
+	require.NoError(t, err)
+	var delivered outcomeReportCall
+	select {
+	case delivered = <-reportCalls:
+		require.Equal(t, thirdCommitted.ID().String(), delivered.OutcomeID)
+		require.NotEmpty(t, delivered.EventID)
+	case <-ctx.Done():
+		t.Fatal("Outcome did not reach original Worker report handler", ctx.Err())
+	}
+	select {
+	case deliveryErr := <-deliveries:
+		require.NoError(t, deliveryErr)
+	case <-ctx.Done():
+		t.Fatal("Outcome Worker did not finish NSQ delivery", ctx.Err())
+	}
+	require.Eventually(t, func() bool {
+		var publishedCount int64
+		return db.Table("rm_outbox").Where("message_id = ? AND event_type = ? AND state = ?", delivered.EventID, "evaluation.outcome.committed", "published").Count(&publishedCount).Error == nil && publishedCount == 1
+	}, 5*time.Second, 25*time.Millisecond)
+
 	second, secondRun, secondExecution := prepare(5002, 2002)
 	require.NoError(t, db.Exec(`CREATE TRIGGER rm_reject_m5_outcome BEFORE INSERT ON rm_outbox FOR EACH ROW SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'controlled outcome intent failure'`).Error)
 	defer db.Exec("DROP TRIGGER IF EXISTS rm_reject_m5_outcome")
@@ -209,5 +326,5 @@ events:
 	require.Equal(t, evalrun.StatusRunning, secondPersistedRun.Attempt().Status)
 	var outboxCount int64
 	require.NoError(t, db.Table("rm_outbox").Count(&outboxCount).Error)
-	require.EqualValues(t, 1, outboxCount, "the rejected second intent must leave no durable row")
+	require.EqualValues(t, 2, outboxCount, "the rejected second intent must leave no durable row")
 }
