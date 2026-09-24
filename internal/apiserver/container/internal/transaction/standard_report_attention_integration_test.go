@@ -10,6 +10,7 @@ import (
 	"log/slog"
 	"net"
 	"os"
+	"os/exec"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -393,19 +394,22 @@ func TestM5ReportAttentionReconcileReachesRealTesteeFact(t *testing.T) {
 	if err := workerSQL.Close(); err != nil {
 		t.Fatal(err)
 	}
+	recovery := exec.CommandContext(ctx, os.Args[0], "-test.run=^TestM5AttentionReconcileProcessChild$", "-test.v")
+	recovery.Env = append(os.Environ(),
+		"RM_QS_ATTENTION_CHILD_MODE=reconcile",
+		"RM_QS_ATTENTION_GRPC_ADDR="+listener.Addr().String(),
+		"RM_QS_ATTENTION_EVENT_ID="+eventID,
+	)
+	if output, err := recovery.CombinedOutput(); err != nil {
+		t.Fatalf("fresh attention recovery process failed: %v\n%s", err, output)
+	}
+	t.Log("attention ledger reconciled by a fresh OS process")
 	workerSQL, workerDB = openDB()
 	store, err = attentionprojection.NewMySQLStore(workerDB)
 	if err != nil {
 		t.Fatal(err)
 	}
 	projector = attentionprojection.NewProjector(store, m5AttentionSyncClient{client}, attentionprojection.DefaultMaxAttempts, logger)
-	reconciler, err := attentionprojection.NewReconciler(projector, m5AttentionLockRunner{}, 0, 10, logger)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if acquired, err := reconciler.RunOnce(ctx); err != nil || !acquired {
-		t.Fatalf("reconcile after connection restart: acquired=%t err=%v", acquired, err)
-	}
 	record, err = store.GetByEventID(ctx, eventID)
 	if err != nil || record.Status != attentionprojection.StatusSucceeded || calls.Load() != 2 {
 		t.Fatalf("recovered record=%+v calls=%d err=%v", record, calls.Load(), err)
@@ -424,5 +428,60 @@ func TestM5ReportAttentionReconcileReachesRealTesteeFact(t *testing.T) {
 	}
 	if calls.Load() != 2 {
 		t.Fatalf("duplicate event called API again: calls=%d", calls.Load())
+	}
+}
+
+// Invoked only by the parent test after the first Worker handler has ACKed an
+// event but left a durable failed attention projection in MySQL.
+func TestM5AttentionReconcileProcessChild(t *testing.T) {
+	if os.Getenv("RM_QS_ATTENTION_CHILD_MODE") == "" {
+		t.Skip("invoked only by the disposable M5 attention process test")
+	}
+	dsn := os.Getenv("RM_QS_ATTENTION_REAL_DSN")
+	parsed, err := mysqldriver.ParseDSN(dsn)
+	address := os.Getenv("RM_QS_ATTENTION_GRPC_ADDR")
+	host, _, addressErr := net.SplitHostPort(address)
+	eventID := os.Getenv("RM_QS_ATTENTION_EVENT_ID")
+	if os.Getenv("RM_QS_ATTENTION_CHILD_MODE") != "reconcile" || err != nil ||
+		parsed.Net != "tcp" || parsed.Addr != "mysql:3306" || parsed.DBName != "m5_qs_attention_real" ||
+		addressErr != nil || host != "127.0.0.1" || eventID == "" {
+		t.Fatal("attention process child requires the disposable MySQL and parent gRPC service")
+	}
+	ctx, cancel := context.WithTimeout(t.Context(), 20*time.Second)
+	defer cancel()
+	sqlDB, err := sql.Open("mysql", dsn)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer sqlDB.Close()
+	if err := sqlDB.PingContext(ctx); err != nil {
+		t.Fatal(err)
+	}
+	gormDB, err := gorm.Open(gormmysql.New(gormmysql.Config{Conn: sqlDB, SkipInitializeWithVersion: true}), &gorm.Config{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	store, err := attentionprojection.NewMySQLStore(gormDB)
+	if err != nil {
+		t.Fatal(err)
+	}
+	conn, err := grpc.NewClient(address, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer conn.Close()
+	client := m5AttentionClient{client: pb.NewInternalServiceClient(conn)}
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	projector := attentionprojection.NewProjector(store, m5AttentionSyncClient{client}, attentionprojection.DefaultMaxAttempts, logger)
+	reconciler, err := attentionprojection.NewReconciler(projector, m5AttentionLockRunner{}, 0, 10, logger)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if acquired, err := reconciler.RunOnce(ctx); err != nil || !acquired {
+		t.Fatalf("fresh process did not reconcile: acquired=%t err=%v", acquired, err)
+	}
+	record, err := store.GetByEventID(ctx, eventID)
+	if err != nil || record == nil || record.Status != attentionprojection.StatusSucceeded {
+		t.Fatalf("fresh process did not persist the original event: record=%+v err=%v", record, err)
 	}
 }
