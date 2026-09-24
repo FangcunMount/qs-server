@@ -974,6 +974,7 @@ func TestM4ProcessBootstrapRunsSelectedStandardProfiles(t *testing.T) {
 			}
 		}
 	}
+	proveM4RelayHotFairness(t, ctx, gormDB, mongoClient, mongoDB, catalog, cfg, nsqProxy)
 	if _, err := db.ExecContext(ctx, "DROP TABLE system_governance_action_runs"); err != nil {
 		t.Fatal(err)
 	}
