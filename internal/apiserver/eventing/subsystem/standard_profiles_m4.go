@@ -9,8 +9,14 @@ import (
 
 	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
 	"github.com/FangcunMount/qs-server/internal/apiserver/eventing/standardoutbox"
+	outboxport "github.com/FangcunMount/qs-server/internal/apiserver/port/outbox"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
 )
+
+// Keep the existing aggregate gauges current for SDK profiles. Per-type
+// status remains available from governance; the existing per-type gauge
+// reporter does not clear vanished label sets and would leave stale values.
+type standardAggregateStatusReader struct{ outboxport.StatusReader }
 
 // StandardProfile is a complete replacement for one legacy outbox profile.
 // Run is a supervised blocking call; Drain runs only after every profile Run
@@ -49,6 +55,8 @@ func NewWithStandardProfiles(opts Options, replacements map[eventcatalog.OutboxP
 		prepared[profile] = &profileRuntime{
 			name: name, binding: replacement.Binding, run: replacement.Supervisor.Run,
 			drain: replacement.Drain, drainTimeout: replacement.DrainTimeout,
+			statusReporter: appEventing.NewOutboxStatusReporter(name,
+				standardAggregateStatusReader{replacement.Status.Reader}, s.observer),
 			runtimeStatus: func() appEventing.ProfileRuntimeStatus {
 				snapshot := replacement.Supervisor.Snapshot()
 				healthy := snapshot.ScanHealthy

@@ -17,6 +17,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/eventing/standardoutbox"
 	outboxport "github.com/FangcunMount/qs-server/internal/apiserver/port/outbox"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
+	eventobservability "github.com/FangcunMount/qs-server/internal/pkg/eventing/observe"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventing/runtime"
 	"github.com/FangcunMount/reliable-messaging/relay"
 	_ "github.com/go-sql-driver/mysql"
@@ -37,7 +38,20 @@ func (candidatePostCommit) AfterCommit(context.Context, []event.DomainEvent, tim
 type candidateStatusReader struct{}
 
 func (candidateStatusReader) OutboxStatusSnapshot(_ context.Context, now time.Time) (outboxport.StatusSnapshot, error) {
-	return outboxport.StatusSnapshot{Store: "standard-mongo", GeneratedAt: now}, nil
+	return outboxport.StatusSnapshot{Store: "standard-mongo", GeneratedAt: now,
+		Buckets: []outboxport.StatusBucket{{Status: "pending", Count: 2}}}, nil
+}
+
+type candidateStatusObserver struct {
+	eventobservability.NopObserver
+	statuses chan eventobservability.OutboxStatusEvent
+}
+
+func (o candidateStatusObserver) ObserveOutboxStatus(_ context.Context, evt eventobservability.OutboxStatusEvent) {
+	select {
+	case o.statuses <- evt:
+	default:
+	}
 }
 
 type candidateRunner func(context.Context) error
@@ -59,6 +73,7 @@ func TestStandardProfileReplacesWholeLegacyRuntimeBeforeStart(t *testing.T) {
 		mu.Unlock()
 	}
 	started := make(chan struct{})
+	statusEvents := make(chan eventobservability.OutboxStatusEvent, 1)
 	stager := candidateStager{}
 	postCommit := candidatePostCommit{}
 	supervisor, err := standardoutbox.NewRelaySupervisor(standardoutbox.SupervisorOptions{
@@ -80,6 +95,7 @@ func TestStandardProfileReplacesWholeLegacyRuntimeBeforeStart(t *testing.T) {
 	s, err := NewWithStandardProfiles(Options{
 		Catalog: loadCatalog(t), MongoDB: client.Database("candidate"),
 		PublisherMode: eventruntime.PublishModeMQ, MQPublisher: fakePublisher{},
+		Observer:  candidateStatusObserver{statuses: statusEvents},
 		Consumers: map[string]ConsumerOptions{hotRankConsumerID: {Enabled: false}},
 	}, map[eventcatalog.OutboxProfile]StandardProfile{
 		eventcatalog.OutboxProfileMongoDomain: {
@@ -106,6 +122,14 @@ func TestStandardProfileReplacesWholeLegacyRuntimeBeforeStart(t *testing.T) {
 	case <-started:
 	case <-time.After(time.Second):
 		t.Fatal("candidate runner did not start")
+	}
+	select {
+	case observed := <-statusEvents:
+		if observed.Store != "standard-mongo" || observed.Status != "pending" || observed.Count != 2 {
+			t.Fatalf("SDK profile backlog metric = %+v", observed)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("SDK profile did not report its backlog after starting")
 	}
 	status, err := s.StatusService().GetStatus(t.Context())
 	if err != nil {
