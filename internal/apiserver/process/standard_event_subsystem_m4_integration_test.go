@@ -292,6 +292,61 @@ func TestM4ProcessBootstrapRunsSelectedStandardProfiles(t *testing.T) {
 		}
 		time.Sleep(100 * time.Millisecond)
 	}
+	// Both host transactions commit without calling PostCommit. The selected
+	// profiles have no Redis ready index, so only their periodic database scan
+	// can discover these intents and obtain an NSQ publish confirmation.
+	const missedWakeScanBound = 5 * time.Second
+	// Let the previous events' wake signals drain before introducing the two
+	// scan-only intents. The configured poll interval is 200 milliseconds.
+	time.Sleep(600 * time.Millisecond)
+	missedWakeMySQL := event.Event[map[string]any]{
+		BaseEvent: event.BaseEvent{
+			ID: "m4-scan-mysql-no-wake", EventTypeValue: "evaluation.requested", AggregateTypeValue: "Assessment",
+			AggregateIDValue: "103", OccurredAtValue: time.Now(),
+		},
+		Data: map[string]any{"org_id": 501},
+	}
+	missedWakeMongo := event.Event[map[string]any]{
+		BaseEvent: event.BaseEvent{
+			ID: "m4-scan-mongo-no-wake", EventTypeValue: "answersheet.submitted", AggregateTypeValue: "AnswerSheet",
+			AggregateIDValue: "203", OccurredAtValue: time.Now(),
+		},
+		Data: map[string]any{"org_id": 502},
+	}
+	if err := qsmysql.NewUnitOfWork(gormDB).WithinTransaction(ctx, func(txCtx context.Context) error {
+		return binding.Stager.Stage(txCtx, missedWakeMySQL)
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := session.WithTransaction(ctx, func(txCtx mongo.SessionContext) (any, error) {
+		return nil, mongoBinding.Stager.Stage(txCtx, missedWakeMongo)
+	}); err != nil {
+		t.Fatal(err)
+	}
+	missedWakeStarted := time.Now()
+	for {
+		var mysqlState string
+		if err := db.QueryRowContext(ctx, "SELECT state FROM rm_outbox WHERE message_id=?", missedWakeMySQL.ID).
+			Scan(&mysqlState); err != nil {
+			t.Fatal(err)
+		}
+		var mongoState struct {
+			State string `bson:"state"`
+		}
+		if err := mongoDB.Collection("rm_outbox").FindOne(ctx, bson.M{"message_id": missedWakeMongo.ID}).
+			Decode(&mongoState); err != nil {
+			t.Fatal(err)
+		}
+		if mysqlState == "published" && mongoState.State == "published" {
+			t.Logf("both standard profiles discovered committed intents without PostCommit wake in %s", time.Since(missedWakeStarted))
+			break
+		}
+		if time.Since(missedWakeStarted) > missedWakeScanBound {
+			t.Fatalf("periodic scans missed committed intents without PostCommit wake within %s: mysql=%s mongo=%s",
+				missedWakeScanBound, mysqlState, mongoState.State)
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
 	// Force an actual TCP outage after startup: both selected relays must keep
 	// their committed intents and recover by database scan when NSQ returns.
 	nsqProxy.SetAvailable(false)
