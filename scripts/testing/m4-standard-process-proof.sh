@@ -40,6 +40,7 @@ print('PASS isolated Mongo replica set');
 JS
 "${compose[@]}" exec -T mysql mysql -uroot -e 'CREATE DATABASE m4_qs_bootstrap'
 "${compose[@]}" exec -T mysql mysql -uroot -e 'CREATE DATABASE m4_qs_chain'
+"${compose[@]}" exec -T mysql mysql -uroot -e 'CREATE DATABASE m5_qs_mongo_only'
 
 architecture=$(docker info --format '{{.Architecture}}')
 case "$architecture" in
@@ -83,3 +84,12 @@ build_dir=$(mktemp -d "${TMPDIR:-/tmp}/$project-build.XXXXXX")
   -e RM_QS_BOOTSTRAP_AUDIT_INDEX_MIGRATION='/tmp/m4-qs-bootstrap/mysql/000085_system_governance_pending_replay_index.up.sql' \
   mysql /tmp/m4-qs-bootstrap/m4-process.test \
     -test.run '^TestM4ProcessBootstrapRunsSelectedStandardProfiles$' -test.count=1 -test.timeout=4m -test.v
+
+"${compose[@]}" exec -T \
+  -e RM_QS_MONGO_ONLY_MYSQL_DSN='root@tcp(mysql:3306)/m5_qs_mongo_only?parseTime=true&loc=UTC' \
+  -e RM_QS_BOOTSTRAP_MONGO_URI='mongodb://mongo:27017/?replicaSet=rm-test' \
+  -e RM_QS_BOOTSTRAP_NSQ_ADDR='nsqd:4150' \
+  -e RM_QS_BOOTSTRAP_CATALOG='/tmp/m4-qs-bootstrap/configs/events.yaml' \
+  -e RM_QS_BOOTSTRAP_AUDIT_MIGRATION='/tmp/m4-qs-bootstrap/mysql/000048_add_system_governance_action_runs.up.sql' \
+  mysql /tmp/m4-qs-bootstrap/m4-process.test \
+    -test.run '^TestM5MongoOnlyProcessKeepsLegacyMySQLAndHotRankSubscription$' -test.count=1 -test.timeout=2m -test.v
