@@ -241,6 +241,21 @@ func TestCurrentRuntimeClosure(t *testing.T) {
 	if err := evaluationHandler(t.Context(), eventcatalog.EvaluationRequested, evaluationMessage.Payload); err != nil {
 		t.Fatalf("consume evaluation.requested: %v", err)
 	}
+	// Broker delivery is at least once. Replaying the exact event through the
+	// original handler must not create another durable scoring attempt or fact.
+	evaluated, err := assessmentService.ResolveAssessmentByAnswerSheetID(t.Context(), &evaluationpb.ResolveAssessmentByAnswerSheetIDRequest{AnswerSheetId: answerResponse.GetId()})
+	if err != nil || evaluated.GetAssessmentStatus() != "evaluated" || evaluated.GetAssessmentId() == 0 {
+		t.Fatalf("resolve evaluated assessment before redelivery: response=%+v err=%v", evaluated, err)
+	}
+	assertRowCount(t, gormDB, "runtime_checkpoint", "scope = ? AND assessment_id = ?", 1, "evaluation_run", evaluated.GetAssessmentId())
+	assertRowCount(t, gormDB, "evaluation_outcome", "assessment_id = ?", 1, evaluated.GetAssessmentId())
+	assertRowCount(t, gormDB, "domain_event_outbox", "event_type = ?", 1, eventcatalog.EvaluationOutcomeCommitted)
+	if err := evaluationHandler(t.Context(), eventcatalog.EvaluationRequested, evaluationMessage.Payload); err != nil {
+		t.Fatalf("redeliver evaluation.requested: %v", err)
+	}
+	assertRowCount(t, gormDB, "runtime_checkpoint", "scope = ? AND assessment_id = ?", 1, "evaluation_run", evaluated.GetAssessmentId())
+	assertRowCount(t, gormDB, "evaluation_outcome", "assessment_id = ?", 1, evaluated.GetAssessmentId())
+	assertRowCount(t, gormDB, "domain_event_outbox", "event_type = ?", 1, eventcatalog.EvaluationOutcomeCommitted)
 	outcomeMessage := capture.Wait(t, eventcatalog.EvaluationOutcomeCommitted)
 	if err := outcomeHandler(t.Context(), eventcatalog.EvaluationOutcomeCommitted, outcomeMessage.Payload); err != nil {
 		t.Fatalf("consume evaluation.outcome.committed: %v", err)
