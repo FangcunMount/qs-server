@@ -9,8 +9,10 @@ import (
 	"testing"
 	"time"
 
+	appauthz "github.com/FangcunMount/qs-server/internal/apiserver/application/authz"
 	appexecute "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/execute"
 	appintake "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/intake"
+	appoperator "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/operator"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/checkpoint"
 	assessmentmysql "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/evaluation"
 	mysqlstandard "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/standardoutbox"
@@ -32,6 +34,27 @@ func (m5UnavailableInput) Resolve(context.Context, evaluationinput.InputRef) (*e
 	return nil, evaluationinput.NewDependencyResolveError(
 		evaluationinput.DependencyCategoryModelCatalog, errors.New("controlled outage"), "model catalog unavailable", "model catalog unavailable",
 	)
+}
+
+type m5TerminalInput struct{}
+
+func (m5TerminalInput) Resolve(context.Context, evaluationinput.InputRef) (*evaluationinput.InputSnapshot, error) {
+	return nil, evaluationinput.NewResolveError(
+		evaluationinput.FailureKindModelNotFound, errors.New("controlled missing model"), "model unavailable", "model unavailable",
+	)
+}
+
+type m5GovernedAccess struct{}
+
+func (m5GovernedAccess) ResolveStoreRange(context.Context, int64, int64, string, string) (appauthz.StoreRange, error) {
+	return appauthz.StoreRange{}, nil
+}
+
+func (m5GovernedAccess) ValidateTesteeStoreAccess(_ context.Context, orgID, userID int64, testeeID uint64, _, _ string) error {
+	if orgID != 1 || userID != 9 || testeeID != 2 {
+		return errors.New("controlled testee scope denial")
+	}
+	return nil
 }
 
 // A real failed Evaluation claim must persist its failure and scheduled retry
@@ -154,4 +177,113 @@ events:
 	var count int64
 	require.NoError(t, db.Table("rm_outbox").Count(&count).Error)
 	require.EqualValues(t, 4, count, "only two requested events and the first committed failure/retry pair remain")
+	require.NoError(t, db.Exec("DROP TRIGGER rm_reject_m5_retry").Error)
+
+	// Exhaust the bounded business retry policy inside this disposable process
+	// to exercise manual_required without waiting for three real model attempts.
+	originalBusiness, originalOutbox := retrygovernance.BusinessPolicy(), retrygovernance.OutboxPolicy()
+	limitedBusiness := originalBusiness
+	limitedBusiness.Version += "-m5-proof"
+	limitedBusiness.MaxAutomaticAttempts = 1
+	require.NoError(t, retrygovernance.ConfigurePolicies(limitedBusiness, originalOutbox))
+	t.Cleanup(func() { require.NoError(t, retrygovernance.ConfigurePolicies(originalBusiness, originalOutbox)) })
+
+	governed := appoperator.NewGovernedRetryService(assessmentRepo, runRepo, runner, stager, m5GovernedAccess{})
+	actor := appoperator.Actor{OrgID: 1, OperatorUserID: 9}
+	permissionContext := func(action string) context.Context {
+		return appauthz.WithSnapshot(ctx, &appauthz.Snapshot{Permissions: []appauthz.Permission{{
+			Resource: appauthz.AssessmentResource, Action: action, Mode: appauthz.AuthorizationModeUnconditional,
+		}}})
+	}
+	manualID := createSubmitted(603)
+	require.Error(t, engine.Evaluate(ctx, manualID))
+	manualRun, err := runRepo.FindLatestByAssessmentID(ctx, manualID)
+	require.NoError(t, err)
+	require.Equal(t, retrygovernance.DispositionManualRequired, manualRun.RetryDecision().Disposition)
+	manual := appoperator.GovernedRetryCommand{
+		AssessmentID: manualID, ExpectedAttempt: 1, Origin: retrygovernance.AttemptOriginManual,
+		RequestID: "m5-manual-1", Reason: "controlled retry", AuthorizationSubject: "user:9", AuthorizationAction: "retry",
+	}
+	countRows := func() int64 {
+		var value int64
+		require.NoError(t, db.Table("rm_outbox").Count(&value).Error)
+		return value
+	}
+	beforeManual := countRows()
+	_, err = governed.Authorize(ctx, actor, manual)
+	require.Error(t, err, "missing authorization snapshot must deny before the transaction")
+	_, err = governed.Authorize(permissionContext("retry"), appoperator.Actor{OrgID: 2, OperatorUserID: 9}, manual)
+	require.Error(t, err, "cross-organization request must be denied")
+	wrongAttempt := manual
+	wrongAttempt.ExpectedAttempt = 2
+	_, err = governed.Authorize(permissionContext("retry"), actor, wrongAttempt)
+	require.Error(t, err, "stale expected attempt must be denied")
+	require.Equal(t, beforeManual, countRows())
+
+	_, err = governed.Authorize(permissionContext("retry"), actor, manual)
+	require.NoError(t, err)
+	authorizedManual, err := runRepo.FindLatestByAssessmentID(ctx, manualID)
+	require.NoError(t, err)
+	manualDecision := authorizedManual.RetryDecision()
+	require.Equal(t, retrygovernance.DispositionAutomatic, manualDecision.Disposition)
+	require.Equal(t, manual.RequestID, manualDecision.ActionRequestID)
+	require.NotEmpty(t, manualDecision.RetryEventID)
+	var manualMessage struct {
+		EventType     string
+		NextAttemptAt time.Time
+	}
+	require.NoError(t, db.Table("rm_outbox").Select("event_type,next_attempt_at").Where("message_id = ?", manualDecision.RetryEventID).Take(&manualMessage).Error)
+	require.Equal(t, "evaluation.retry.requested", manualMessage.EventType)
+	require.WithinDuration(t, *manualDecision.NextAttemptAt, manualMessage.NextAttemptAt, 2*time.Millisecond)
+	require.Equal(t, beforeManual+1, countRows())
+	_, err = governed.Authorize(permissionContext("retry"), actor, manual)
+	require.Error(t, err, "repeating an already authorized request must not create another intent")
+	require.Equal(t, beforeManual+1, countRows())
+
+	rollbackID := createSubmitted(604)
+	require.Error(t, engine.Evaluate(ctx, rollbackID))
+	beforeRollback := countRows()
+	rollbackCommand := manual
+	rollbackCommand.AssessmentID, rollbackCommand.RequestID = rollbackID, "m5-manual-rollback"
+	require.NoError(t, db.Exec(`CREATE TRIGGER rm_reject_m5_retry BEFORE INSERT ON rm_outbox FOR EACH ROW BEGIN IF NEW.event_type = 'evaluation.retry.requested' THEN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'controlled governed insert failure'; END IF; END`).Error)
+	_, err = governed.Authorize(permissionContext("retry"), actor, rollbackCommand)
+	require.Error(t, err)
+	require.NoError(t, db.Exec("DROP TRIGGER rm_reject_m5_retry").Error)
+	require.Equal(t, beforeRollback, countRows())
+	rolledBackRun, err := runRepo.FindLatestByAssessmentID(ctx, rollbackID)
+	require.NoError(t, err)
+	require.Equal(t, retrygovernance.DispositionManualRequired, rolledBackRun.RetryDecision().Disposition)
+	require.Empty(t, rolledBackRun.RetryDecision().ActionRequestID)
+
+	terminalEngine := appexecute.NewEngine(assessmentRepo, m5TerminalInput{},
+		appexecute.WithRunRepository(runRepo), appexecute.WithTransactionalOutbox(runner, stager))
+	forceID := createSubmitted(605)
+	require.Error(t, terminalEngine.Evaluate(ctx, forceID))
+	terminalRun, err := runRepo.FindLatestByAssessmentID(ctx, forceID)
+	require.NoError(t, err)
+	require.Equal(t, retrygovernance.DispositionTerminal, terminalRun.RetryDecision().Disposition)
+	force := appoperator.GovernedRetryCommand{
+		AssessmentID: forceID, ExpectedAttempt: 1, Origin: retrygovernance.AttemptOriginForce,
+		RequestID: "m5-force-1", Reason: "controlled force", AuthorizationSubject: "user:9", AuthorizationAction: "force_retry",
+	}
+	beforeForce := countRows()
+	_, err = governed.Authorize(permissionContext("retry"), actor, force)
+	require.Error(t, err, "ordinary retry permission must not authorize force")
+	_, err = governed.Authorize(permissionContext("force_retry"), appoperator.Actor{OrgID: 2, OperatorUserID: 9}, force)
+	require.Error(t, err, "cross-organization force must be denied")
+	require.Equal(t, beforeForce, countRows())
+	_, err = governed.Authorize(permissionContext("force_retry"), actor, force)
+	require.NoError(t, err)
+	forcedRun, err := runRepo.FindLatestByAssessmentID(ctx, forceID)
+	require.NoError(t, err)
+	forceDecision := forcedRun.RetryDecision()
+	require.Equal(t, retrygovernance.DispositionAutomatic, forceDecision.Disposition)
+	require.Equal(t, force.RequestID, forceDecision.ActionRequestID)
+	var forceMessageID string
+	require.NoError(t, db.Table("rm_outbox").Select("message_id").Where("message_id = ? AND event_type = ?", forceDecision.RetryEventID, "evaluation.retry.requested").Scan(&forceMessageID).Error)
+	require.Equal(t, forceDecision.RetryEventID, forceMessageID)
+	require.Equal(t, beforeForce+1, countRows())
+	_, err = governed.Authorize(permissionContext("force_retry"), actor, force)
+	require.Error(t, err)
+	require.Equal(t, beforeForce+1, countRows())
 }
