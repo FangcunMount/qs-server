@@ -274,8 +274,31 @@ func TestInterpretationGovernedRetryAuthorizationAndStandardIntentCommitTogether
 	if workerAutomation.Count() != 3 {
 		t.Fatalf("full business retry Worker calls=%d, want 3 total", workerAutomation.Count())
 	}
-	assertStandardRetryFullBusinessOnce(t, fixture, committer, fullRun.GenerationID(), fullOutcome, fullWire.Payload, fullCommand.ExpectedAttempt)
+	assertStandardRetryFullBusinessOnce(t, fixture, committer, fullRun.GenerationID(), fullOutcome, fullWire.Payload, fullCommand.ExpectedAttempt, false)
 	assertMongoDocumentCount(t, fixture.db.Collection("rm_outbox"), bson.M{"event_type": eventcatalog.InterpretationReportGenerated}, 1)
+
+	lostRun, lostOutcomeID, lostAssessmentID := makeFailed(t, true, retrygovernance.DispositionManualRequired)
+	lostOutcome := standardRetryOutcome(t, lostOutcomeID, lostAssessmentID)
+	lostService := automation.NewGovernedRetryService(fixture.generations, fixture.runs, manualRetryOutcomeRepo{record: lostOutcome}, fixture.runner, stager)
+	lostCommand := command
+	lostCommand.GenerationID = lostRun.GenerationID()
+	lostCommand.RequestID = "m5-lost-commit-reply-request"
+	lostAuthorized, err := lostService.Authorize(t.Context(), lostCommand)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var lostRow struct {
+		Payload []byte `bson:"payload"`
+	}
+	if err := fixture.db.Collection("rm_outbox").FindOne(t.Context(), bson.M{"message_id": lostAuthorized.RetryDecision().RetryEventID}).Decode(&lostRow); err != nil {
+		t.Fatal(err)
+	}
+	lostWire, recognized, err := messaging.DecodeMessagePayload(lostRow.Payload)
+	if err != nil || !recognized {
+		t.Fatalf("lost reply retry wire decode: recognized=%t err=%v", recognized, err)
+	}
+	assertStandardRetryFullBusinessOnce(t, fixture, committer, lostRun.GenerationID(), lostOutcome, lostWire.Payload, lostCommand.ExpectedAttempt, true)
+	assertMongoDocumentCount(t, fixture.db.Collection("rm_outbox"), bson.M{"event_type": eventcatalog.InterpretationReportGenerated}, 2)
 }
 
 func assertStandardRetryClaimOnce(t *testing.T, fixture interpretationMongoFixture, generationID meta.ID, payload []byte, expectedAttempt int, origin retrygovernance.AttemptOrigin) {
@@ -354,7 +377,7 @@ func standardRetryOutcome(t *testing.T, outcomeID, assessmentID meta.ID) *evalua
 
 func assertStandardRetryFullBusinessOnce(
 	t *testing.T, fixture interpretationMongoFixture, committer execution.InterpretationCommitter,
-	generationID meta.ID, outcome *evaluationfact.Record, payload []byte, expectedAttempt int,
+	generationID meta.ID, outcome *evaluationfact.Record, payload []byte, expectedAttempt int, loseCommitReply bool,
 ) {
 	t.Helper()
 	starter, err := execution.NewStarter(fixture.runner, fixture.generations, fixture.runs, fixture.reports, time.Minute)
@@ -365,6 +388,9 @@ func assertStandardRetryFullBusinessOnce(
 	registry, err := rendering.NewRegistry(builder)
 	if err != nil {
 		t.Fatal(err)
+	}
+	if loseCommitReply {
+		committer = &standardRetryLostCommitReply{InterpretationCommitter: committer}
 	}
 	executor, err := execution.NewExecutor(starter, registry, committer)
 	if err != nil {
@@ -377,12 +403,27 @@ func assertStandardRetryFullBusinessOnce(
 	ctx := standardRetryAuthorizationContext(t, payload)
 	command := automation.GenerateCommand{Actor: automation.TrustedServiceActor("m5-full-business-proof"), OutcomeID: outcome.ID()}
 	var first *automation.Result
+	var committedReportID meta.ID
 	for i := 0; i < 2; i++ {
 		result, err := service.Generate(ctx, command)
+		if loseCommitReply && i == 0 {
+			if err == nil || result != nil {
+				t.Fatalf("lost commit reply must leave caller uncertain: result=%+v err=%v", result, err)
+			}
+			committed, findErr := fixture.generations.FindByID(t.Context(), generationID)
+			if findErr != nil || committed == nil || committed.Status() != domaingeneration.StatusGenerated || committed.ReportID().IsZero() {
+				t.Fatalf("lost reply did not leave a durable report: generation=%+v err=%v", committed, findErr)
+			}
+			committedReportID = committed.ReportID()
+			continue
+		}
 		if err != nil || result == nil || result.Status != automation.StatusGenerated {
 			t.Fatalf("full report retry delivery %d: result=%+v err=%v", i+1, result, err)
 		}
-		if i == 0 {
+		if loseCommitReply && result.ReportID != committedReportID {
+			t.Fatalf("retry after lost reply changed report: persisted=%s returned=%s", committedReportID, result.ReportID)
+		}
+		if first == nil {
 			first = result
 		} else if result.RunID != first.RunID || result.ReportID != first.ReportID {
 			t.Fatalf("duplicate full report changed result: first=%+v again=%+v", first, result)
@@ -402,6 +443,23 @@ func assertStandardRetryFullBusinessOnce(
 	if err != nil || generated == nil || generated.Status() != domaingeneration.StatusGenerated {
 		t.Fatalf("full report retry generation=%+v err=%v", generated, err)
 	}
+}
+
+type standardRetryLostCommitReply struct {
+	execution.InterpretationCommitter
+	lost bool
+}
+
+func (c *standardRetryLostCommitReply) CommitSuccess(ctx context.Context, request execution.CommitSuccessRequest) (*execution.CommitResult, error) {
+	result, err := c.InterpretationCommitter.CommitSuccess(ctx, request)
+	if err != nil {
+		return result, err
+	}
+	if !c.lost {
+		c.lost = true
+		return nil, errors.New("simulated reply loss after durable report commit")
+	}
+	return result, nil
 }
 
 type standardRetryBuilder struct {
