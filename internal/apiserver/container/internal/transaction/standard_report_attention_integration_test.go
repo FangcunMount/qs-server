@@ -33,13 +33,17 @@ import (
 	eventcatalog "github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
 	eventruntime "github.com/FangcunMount/qs-server/internal/pkg/eventing/runtime"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
+	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime"
+	"github.com/FangcunMount/qs-server/internal/pkg/reportstatus"
 	"github.com/FangcunMount/qs-server/internal/pkg/resilience/locklease"
 	"github.com/FangcunMount/qs-server/internal/worker/handlers"
 	"github.com/FangcunMount/reliable-messaging/relay"
 	sdkmongo "github.com/FangcunMount/reliable-messaging/storage/mongo"
 	sdknsq "github.com/FangcunMount/reliable-messaging/transport/nsq"
+	"github.com/alicebob/miniredis/v2"
 	mysqldriver "github.com/go-sql-driver/mysql"
 	"github.com/nsqio/go-nsq"
+	redis "github.com/redis/go-redis/v9"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
@@ -76,8 +80,9 @@ func (m5AttentionLockRunner) Run(ctx context.Context, _ locklease.WorkloadID, _ 
 }
 
 // A real report fact and its standard Mongo intent commit together, then the
-// event takes NSQ and the original Worker path. Its ACK can leave an attention
-// failure in MySQL; restart must persist the testee fact once through API gRPC.
+// event takes NSQ and the original Worker path. Redis shows the completed
+// report while its ACK leaves an attention failure in MySQL; restart must
+// persist the testee fact once through API gRPC.
 func TestM5ReportAttentionReconcileReachesRealTesteeFact(t *testing.T) {
 	dsn := os.Getenv("RM_QS_ATTENTION_REAL_DSN")
 	mongoURI, nsqAddress := os.Getenv("RM_QS_ATTENTION_MONGO_URI"), os.Getenv("RM_QS_NSQ_TCP")
@@ -154,6 +159,15 @@ func TestM5ReportAttentionReconcileReachesRealTesteeFact(t *testing.T) {
 	defer conn.Close()
 	client := m5AttentionClient{client: pb.NewInternalServiceClient(conn)}
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	statusRedis := miniredis.RunT(t)
+	statusClient := redis.NewClient(&redis.Options{Addr: statusRedis.Addr()})
+	defer statusClient.Close()
+	statusReporter, err := reportstatus.NewReporter(&redisruntime.Handle{
+		Namespace: "m5-report-attention", Client: statusClient,
+	}, reportstatus.Config{TTL: time.Hour, Service: "qs-worker"})
+	if err != nil {
+		t.Fatal(err)
+	}
 	workerSQL, workerDB := openDB()
 	defer func() { _ = workerSQL.Close() }()
 	store, err := attentionprojection.NewMySQLStore(workerDB)
@@ -162,7 +176,7 @@ func TestM5ReportAttentionReconcileReachesRealTesteeFact(t *testing.T) {
 	}
 	projector := attentionprojection.NewProjector(store, m5AttentionSyncClient{client}, attentionprojection.DefaultMaxAttempts, logger)
 	handler, ok := handlers.NewRegistry().Create("interpretation_report_generated_handler", &handlers.Dependencies{
-		Logger: logger, InternalClient: client, AttentionProjector: projector,
+		Logger: logger, InternalClient: client, AttentionProjector: projector, ReportStatusReporter: statusReporter,
 	})
 	if !ok {
 		t.Fatal("report generated handler absent from production registry")
@@ -217,9 +231,10 @@ func TestM5ReportAttentionReconcileReachesRealTesteeFact(t *testing.T) {
 		t.Fatalf("report run was not admitted: result=%+v err=%v", started, err)
 	}
 	completedAt := time.Now().UTC()
+	assessmentID := meta.New()
 	artifact, err := domainreport.NewInterpretReport(domainreport.InterpretReportInput{
 		ID: meta.New(), GenerationID: started.Generation.ID(), OutcomeID: key.OutcomeID, InterpretationRunID: started.Run.ID(),
-		Association: domainreport.Association{OrgID: 501, AssessmentID: meta.New(), TesteeID: testee.ID().Uint64()},
+		Association: domainreport.Association{OrgID: 501, AssessmentID: assessmentID, TesteeID: testee.ID().Uint64()},
 		ReportType:  policy.ReportTypeStandard, TemplateVersion: key.TemplateVersion,
 		BuilderIdentity: domainreport.BuilderIdentityFactorScoring, ContentSchemaVersion: domainreport.ContentSchemaVersionV1,
 		Content: domainreport.Content{
@@ -363,6 +378,10 @@ func TestM5ReportAttentionReconcileReachesRealTesteeFact(t *testing.T) {
 	if err := collection.FindOne(ctx, bson.M{"message_id": eventID}).Decode(&outboxState); err != nil || outboxState.State != "published" {
 		t.Fatalf("standard Mongo outbox state=%q err=%v", outboxState.State, err)
 	}
+	statusSnapshot, err := statusReporter.Cache().Get(ctx, assessmentID.String())
+	if err != nil || statusSnapshot == nil || statusSnapshot.Status != "completed" || statusSnapshot.ReportID != artifact.ID().String() {
+		t.Fatalf("Redis report completion: status=%+v err=%v", statusSnapshot, err)
+	}
 	record, err := store.GetByEventID(ctx, eventID)
 	if err != nil || record.Status != attentionprojection.StatusFailed || calls.Load() != 1 {
 		t.Fatalf("first delivery record=%+v calls=%d err=%v", record, calls.Load(), err)
@@ -395,7 +414,7 @@ func TestM5ReportAttentionReconcileReachesRealTesteeFact(t *testing.T) {
 		t.Fatalf("real testee attention fact absent: focused=%t err=%v", focused, err)
 	}
 	handler, ok = handlers.NewRegistry().Create("interpretation_report_generated_handler", &handlers.Dependencies{
-		Logger: logger, InternalClient: client, AttentionProjector: projector,
+		Logger: logger, InternalClient: client, AttentionProjector: projector, ReportStatusReporter: statusReporter,
 	})
 	if !ok {
 		t.Fatal("report generated handler absent after Worker reconstruction")
