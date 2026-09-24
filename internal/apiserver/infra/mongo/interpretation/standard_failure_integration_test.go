@@ -16,12 +16,14 @@ import (
 	"github.com/FangcunMount/component-base/pkg/event"
 	"github.com/FangcunMount/component-base/pkg/messaging"
 	interpretationpb "github.com/FangcunMount/qs-server/api/grpc/gen/interpretation"
+	appautomation "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/automation"
 	execution "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/automation/execution"
 	domaingeneration "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/generation"
 	domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/report"
 	interpretationrun "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/run"
 	"github.com/FangcunMount/qs-server/internal/apiserver/eventing/standardoutbox"
 	mongostandard "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/standardoutbox"
+	evaluationfact "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationfact"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
 	eventruntime "github.com/FangcunMount/qs-server/internal/pkg/eventing/runtime"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
@@ -389,6 +391,70 @@ func TestInterpretationReportEventsReachWorkerThroughStandardMongoAndNSQ(t *test
 	}
 	if projection.Completed() != 1 || automation.Count() != 1 {
 		t.Fatalf("report.generated effects: completed=%d generation calls=%d", projection.Completed(), automation.Count())
+	}
+
+	terminalGeneration, terminalRun := fixture.start(t)
+	terminalAssessmentID := meta.New()
+	terminal, err := committer.CommitFailure(ctx, execution.CommitFailureRequest{
+		Generation: terminalGeneration, Run: terminalRun, OutcomeID: terminalGeneration.Key().OutcomeID,
+		Association: domainreport.Association{OrgID: 1, AssessmentID: terminalAssessmentID, TesteeID: 8},
+		Failure: interpretationrun.Failure{
+			Kind: interpretationrun.FailureKindBuild, Code: "build_failed", SafeMessage: "failed", Retryable: false,
+		},
+		FailedAt: time.Now().Truncate(time.Millisecond),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if decision := terminal.Run.RetryDecision(); decision == nil || decision.Disposition != retrygovernance.DispositionTerminal {
+		t.Fatalf("terminal failure retry decision=%+v", decision)
+	}
+	select {
+	case got := <-deliveries:
+		if got.err != nil || got.eventType != eventcatalog.InterpretationReportFailed {
+			t.Fatalf("terminal report.failed delivery: %+v", got)
+		}
+	case <-ctx.Done():
+		t.Fatal("terminal report.failed not delivered", ctx.Err())
+	}
+	if automation.Count() != 1 {
+		t.Fatal("terminal failure invoked automatic generation")
+	}
+	forceOutcome := evaluationfact.NewRecord(evaluationfact.NewRecordInput{
+		ID: terminalGeneration.Key().OutcomeID, OrgID: 1, AssessmentID: terminalAssessmentID, TesteeID: 8,
+	})
+	forceService := appautomation.NewGovernedRetryService(
+		fixture.generations, fixture.runs, manualRetryOutcomeRepo{record: forceOutcome}, fixture.runner, stager,
+	)
+	const forceRequestID = "m5-force-nsq-request"
+	forced, err := forceService.Authorize(ctx, appautomation.GovernedRetryCommand{
+		OrgID: 1, GenerationID: terminalRun.GenerationID(), ExpectedAttempt: terminalRun.Attempt(),
+		Origin: retrygovernance.AttemptOriginForce, RequestID: forceRequestID, Reason: "operator review",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	forceDecision := forced.RetryDecision()
+	if forceDecision == nil || forceDecision.RetryEventID == "" || forceDecision.ActionRequestID != forceRequestID {
+		t.Fatalf("force authorization decision=%+v", forceDecision)
+	}
+	select {
+	case got := <-deliveries:
+		if got.err != nil || got.eventType != eventcatalog.InterpretationRetryRequested || got.messageID != forceDecision.RetryEventID {
+			t.Fatalf("force retry delivery: %+v", got)
+		}
+	case <-ctx.Done():
+		t.Fatal("force retry.requested not delivered", ctx.Err())
+	}
+	if automation.Count() != 2 {
+		t.Fatalf("force retry Worker calls=%d, want 2 total", automation.Count())
+	}
+	forceCall := automation.Last()
+	if got := forceCall.metadata.Get("x-retry-origin"); len(got) != 1 || got[0] != "force" {
+		t.Fatalf("force origin lost across NSQ: %v", forceCall.metadata)
+	}
+	if got := forceCall.metadata.Get("x-retry-action-request-id"); len(got) != 1 || got[0] != forceRequestID {
+		t.Fatalf("force request ID lost across NSQ: %v", forceCall.metadata)
 	}
 }
 
