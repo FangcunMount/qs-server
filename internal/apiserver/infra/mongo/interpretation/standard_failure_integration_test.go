@@ -23,19 +23,8 @@ import (
 )
 
 func TestInterpretationAutomaticFailureCommitsWithStandardMongoScheduledRetry(t *testing.T) {
-	_, db := mongodbtest.ReplicaSetDatabase(t)
-	fixture := newInterpretationMongoFixture(t, db)
-	if err := db.CreateCollection(t.Context(), "rm_outbox"); err != nil {
-		t.Fatal(err)
-	}
-	wire, err := eventcatalog.Load("../../../../../configs/events.yaml")
-	if err != nil {
-		t.Fatal(err)
-	}
-	stager, err := mongostandard.NewStager(db.Collection("rm_outbox"), eventcatalog.NewCatalog(wire), eventruntime.SourceAPIServer)
-	if err != nil {
-		t.Fatal(err)
-	}
+	fixture, stager := newStandardInterpretationFixture(t)
+	db := fixture.db
 	generation, run := fixture.start(t)
 	fixture.now = time.Now().Add(time.Second).Truncate(time.Millisecond)
 	committer, err := execution.NewInterpretationCommitter(
@@ -137,6 +126,55 @@ func TestInterpretationAutomaticFailureCommitsWithStandardMongoScheduledRetry(t 
 	if count != 2 {
 		t.Fatalf("aborted failure left %d standard intents; want prior 2", count)
 	}
+}
+
+func TestInterpretationSuccessCommitsReportWithStandardMongoIntent(t *testing.T) {
+	fixture, stager := newStandardInterpretationFixture(t)
+	generation, run := fixture.start(t)
+	at := time.Now().Add(time.Second).Truncate(time.Millisecond)
+	artifact := integrationArtifact(t, generation, run, at)
+	committer, err := execution.NewInterpretationCommitter(
+		fixture.runner, fixture.generations, fixture.runs, fixture.reports, stager, nil, fixture.catalog,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	result, err := committer.CommitSuccess(t.Context(), execution.CommitSuccessRequest{
+		Generation: generation, Run: run, InterpretReport: artifact,
+		BuilderIdentity:      domainreport.BuilderIdentityFactorScoring,
+		ContentSchemaVersion: domainreport.ContentSchemaVersionV1,
+		CompletedAt:          at,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Generation.Status() != domaingeneration.StatusGenerated || result.Run.Status() != interpretationrun.StatusSucceeded {
+		t.Fatalf("committed state generation=%s run=%s", result.Generation.Status(), result.Run.Status())
+	}
+	persistedReport, err := fixture.reports.FindByID(t.Context(), artifact.ID())
+	if err != nil || persistedReport == nil {
+		t.Fatalf("persisted report=%v err=%v", persistedReport, err)
+	}
+	assertMongoDocumentCount(t, fixture.db.Collection("rm_outbox"), bson.M{"event_type": eventcatalog.InterpretationReportGenerated}, 1)
+	assertMongoDocumentCount(t, fixture.db.Collection("domain_event_outbox"), bson.M{}, 0)
+}
+
+func newStandardInterpretationFixture(t *testing.T) (interpretationMongoFixture, *mongostandard.Stager) {
+	t.Helper()
+	_, db := mongodbtest.ReplicaSetDatabase(t)
+	fixture := newInterpretationMongoFixture(t, db)
+	if err := db.CreateCollection(t.Context(), "rm_outbox"); err != nil {
+		t.Fatal(err)
+	}
+	wire, err := eventcatalog.Load("../../../../../configs/events.yaml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	stager, err := mongostandard.NewStager(db.Collection("rm_outbox"), eventcatalog.NewCatalog(wire), eventruntime.SourceAPIServer)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return fixture, stager
 }
 
 type failAfterScheduledStage struct {
