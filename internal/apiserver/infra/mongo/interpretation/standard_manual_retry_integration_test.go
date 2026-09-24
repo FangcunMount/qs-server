@@ -8,6 +8,7 @@ import (
 	"errors"
 	"io"
 	"log/slog"
+	"strconv"
 	"testing"
 	"time"
 
@@ -24,6 +25,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/retrygovernance"
 	"github.com/FangcunMount/qs-server/internal/worker/handlers"
 	"go.mongodb.org/mongo-driver/bson"
+	"google.golang.org/grpc/metadata"
 )
 
 func TestInterpretationGovernedRetryAuthorizationAndStandardIntentCommitTogether(t *testing.T) {
@@ -168,6 +170,7 @@ func TestInterpretationGovernedRetryAuthorizationAndStandardIntentCommitTogether
 	if origin := metadata.Get("x-retry-origin"); len(origin) != 1 || origin[0] != "manual" {
 		t.Fatalf("manual Worker lost origin: %v", metadata)
 	}
+	assertStandardRetryClaimOnce(t, fixture, run.GenerationID(), metadata, retrygovernance.AttemptOriginManual)
 	if _, err := service.Authorize(t.Context(), command); err == nil {
 		t.Fatal("duplicate manual authorization succeeded")
 	}
@@ -236,7 +239,51 @@ func TestInterpretationGovernedRetryAuthorizationAndStandardIntentCommitTogether
 	if action := forceMetadata.Get("x-retry-action-request-id"); len(action) != 1 || action[0] != forceCommand.RequestID {
 		t.Fatalf("force Worker lost action request ID: %v", forceMetadata)
 	}
+	assertStandardRetryClaimOnce(t, fixture, terminalRun.GenerationID(), forceMetadata, retrygovernance.AttemptOriginForce)
 	assertMongoDocumentCount(t, fixture.db.Collection("rm_outbox"), bson.M{"event_type": eventcatalog.InterpretationRetryRequested}, 2)
+}
+
+func assertStandardRetryClaimOnce(t *testing.T, fixture interpretationMongoFixture, generationID meta.ID, wire metadata.MD, origin retrygovernance.AttemptOrigin) {
+	t.Helper()
+	values := func(key string) string {
+		items := wire.Get(key)
+		if len(items) != 1 {
+			t.Fatalf("Worker retry metadata %q = %v", key, items)
+		}
+		return items[0]
+	}
+	expectedAttempt, err := strconv.Atoi(values("x-retry-expected-attempt"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := values("x-retry-origin"); got != string(origin) {
+		t.Fatalf("retry origin=%q, want %q", got, origin)
+	}
+	ctx := retrygovernance.WithAuthorization(t.Context(), retrygovernance.Authorization{
+		EventID: values("x-retry-event-id"), ExpectedAttempt: expectedAttempt,
+		Origin: origin, ActionRequestID: values("x-retry-action-request-id"), Mode: values("x-retry-mode"),
+	})
+	generation, err := fixture.generations.FindByID(ctx, generationID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	starter, err := execution.NewStarter(fixture.runner, fixture.generations, fixture.runs, fixture.reports, time.Minute)
+	if err != nil {
+		t.Fatal(err)
+	}
+	request := execution.StartRequest{Key: generation.Key(), TraceID: "m5-governed-retry-proof"}
+	first, err := starter.Start(ctx, request)
+	if err != nil || first == nil || first.Status != execution.StartStatusStarted || first.Run == nil || first.Run.Attempt() != expectedAttempt+1 {
+		t.Fatalf("first authorized retry claim=%+v err=%v", first, err)
+	}
+	again, err := starter.Start(ctx, request)
+	if err != nil || again == nil || again.Status != execution.StartStatusProcessing || again.Run == nil || again.Run.ID() != first.Run.ID() {
+		t.Fatalf("duplicate retry claim=%+v first=%+v err=%v", again, first, err)
+	}
+	latest, err := fixture.runs.FindLatestByGenerationID(ctx, generationID)
+	if err != nil || latest == nil || latest.ID() != first.Run.ID() || latest.Attempt() != expectedAttempt+1 {
+		t.Fatalf("persisted retry run=%+v first=%+v err=%v", latest, first, err)
+	}
 }
 
 type manualRetryOutcomeRepo struct{ record *evaluationfact.Record }
