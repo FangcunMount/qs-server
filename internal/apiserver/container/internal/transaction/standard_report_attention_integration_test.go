@@ -5,7 +5,6 @@ package transaction
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
 	"fmt"
 	"io"
 	"log/slog"
@@ -16,18 +15,24 @@ import (
 	"testing"
 	"time"
 
-	"github.com/FangcunMount/component-base/pkg/event"
 	"github.com/FangcunMount/component-base/pkg/messaging"
 	pb "github.com/FangcunMount/qs-server/api/grpc/gen/internalapi"
 	appTestee "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/testee"
+	execution "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/automation/execution"
 	domainTestee "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
+	domaingeneration "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/generation"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/policy"
+	domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/report"
+	interpretationrun "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/run"
 	"github.com/FangcunMount/qs-server/internal/apiserver/eventing/standardoutbox"
+	mongointerpretation "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/interpretation"
 	mongostandard "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/standardoutbox"
 	actorMySQL "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/actor"
 	grpcservice "github.com/FangcunMount/qs-server/internal/apiserver/transport/grpc/service"
 	"github.com/FangcunMount/qs-server/internal/pkg/attentionprojection"
 	eventcatalog "github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
 	eventruntime "github.com/FangcunMount/qs-server/internal/pkg/eventing/runtime"
+	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 	"github.com/FangcunMount/qs-server/internal/pkg/resilience/locklease"
 	"github.com/FangcunMount/qs-server/internal/worker/handlers"
 	"github.com/FangcunMount/reliable-messaging/relay"
@@ -70,9 +75,9 @@ func (m5AttentionLockRunner) Run(ctx context.Context, _ locklease.WorkloadID, _ 
 	return locklease.RunResult{Acquired: true}, body(ctx)
 }
 
-// A synthetic report event takes the standard Mongo outbox, NSQ and original
-// Worker path. Its ACK can leave an attention failure in MySQL; restart must
-// reach the real API gRPC service and persist the testee fact once.
+// A real report fact and its standard Mongo intent commit together, then the
+// event takes NSQ and the original Worker path. Its ACK can leave an attention
+// failure in MySQL; restart must persist the testee fact once through API gRPC.
 func TestM5ReportAttentionReconcileReachesRealTesteeFact(t *testing.T) {
 	dsn := os.Getenv("RM_QS_ATTENTION_REAL_DSN")
 	mongoURI, nsqAddress := os.Getenv("RM_QS_ATTENTION_MONGO_URI"), os.Getenv("RM_QS_NSQ_TCP")
@@ -163,18 +168,6 @@ func TestM5ReportAttentionReconcileReachesRealTesteeFact(t *testing.T) {
 		t.Fatal("report generated handler absent from production registry")
 	}
 	firstHandler := handler
-	evt := event.New(eventcatalog.InterpretationReportGenerated, "ReportGeneration", "m5-generation", map[string]any{
-		"org_id": 501, "generation_id": "m5-generation", "run_id": "m5-run", "report_id": "m5-report",
-		"assessment_id": "123", "outcome_id": "456", "testee_id": testee.ID().Uint64(),
-		"attempt": 1, "report_type": "standard", "template_version": "v2", "builder_identity": "factor-scoring",
-		"content_schema_version": "report-content/v2", "model": map[string]any{"kind": "scale", "algorithm": "scale_default", "code": "SDS"},
-		"level": map[string]any{"code": "severe", "label": "severe", "severity": "high"}, "generated_at": time.Now().UTC(),
-	})
-	eventID := evt.EventID()
-	payload, err := json.Marshal(evt)
-	if err != nil {
-		t.Fatal(err)
-	}
 	mongoClient, err := mongo.Connect(ctx, options.Client().ApplyURI(mongoURI))
 	if err != nil {
 		t.Fatal(err)
@@ -197,17 +190,95 @@ func TestM5ReportAttentionReconcileReachesRealTesteeFact(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	session, err := mongoClient.StartSession()
+	generations, err := mongointerpretation.NewGenerationRepository(mongoDB)
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = session.WithTransaction(ctx, func(tx mongo.SessionContext) (any, error) {
-		return nil, stager.Stage(tx, evt)
+	runs, err := mongointerpretation.NewRunRepository(mongoDB)
+	if err != nil {
+		t.Fatal(err)
+	}
+	reports, err := mongointerpretation.NewReportRepository(mongoDB)
+	if err != nil {
+		t.Fatal(err)
+	}
+	reportCatalog, err := mongointerpretation.NewReportCatalogProjector(mongoDB)
+	if err != nil {
+		t.Fatal(err)
+	}
+	runner := NewMongoRunner(mongoDB, MongoRunnerOptions{Boundary: "m5_report_attention", Limiter: &transactionLimiterSpy{}})
+	starter, err := execution.NewStarter(runner, generations, runs, reports, time.Minute)
+	if err != nil {
+		t.Fatal(err)
+	}
+	key := domaingeneration.Key{OutcomeID: meta.New(), ReportType: policy.ReportTypeStandard, TemplateVersion: policy.TemplateVersion("v1")}
+	started, err := starter.Start(ctx, execution.StartRequest{Key: key, TraceID: "m5-attention-real"})
+	if err != nil || started == nil || started.Status != execution.StartStatusStarted {
+		t.Fatalf("report run was not admitted: result=%+v err=%v", started, err)
+	}
+	completedAt := time.Now().UTC()
+	artifact, err := domainreport.NewInterpretReport(domainreport.InterpretReportInput{
+		ID: meta.New(), GenerationID: started.Generation.ID(), OutcomeID: key.OutcomeID, InterpretationRunID: started.Run.ID(),
+		Association: domainreport.Association{OrgID: 501, AssessmentID: meta.New(), TesteeID: testee.ID().Uint64()},
+		ReportType:  policy.ReportTypeStandard, TemplateVersion: key.TemplateVersion,
+		BuilderIdentity: domainreport.BuilderIdentityFactorScoring, ContentSchemaVersion: domainreport.ContentSchemaVersionV1,
+		Content: domainreport.Content{
+			Model:        domainreport.ModelIdentity{Kind: "scale", Code: "SDS", Version: "v1"},
+			PrimaryScore: domainreport.NewRawTotalScore(80, nil), Level: domainreport.LevelFromRisk(domainreport.RiskLevelHigh),
+			Dimensions: []domainreport.DimensionInterpret{
+				domainreport.NewDimensionInterpret(domainreport.NewFactorCode("TOTAL"), "total", 80, nil, domainreport.RiskLevelHigh, "high", "follow up"),
+			},
+		},
+		GeneratedAt: completedAt,
 	})
-	session.EndSession(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
+	committer, err := execution.NewInterpretationCommitter(runner, generations, runs, reports, stager, nil, reportCatalog)
+	if err != nil {
+		t.Fatal(err)
+	}
+	committed, err := committer.CommitSuccess(ctx, execution.CommitSuccessRequest{
+		Generation: started.Generation, Run: started.Run, InterpretReport: artifact,
+		BuilderIdentity: artifact.BuilderIdentity(), ContentSchemaVersion: artifact.ContentSchemaVersion(), CompletedAt: completedAt,
+	})
+	if err != nil || committed == nil || committed.Generation.Status() != domaingeneration.StatusGenerated || committed.Run.Status() != interpretationrun.StatusSucceeded {
+		t.Fatalf("report fact and intent commit: result=%+v err=%v", committed, err)
+	}
+	persistedReport, err := reports.FindByID(ctx, artifact.ID())
+	if err != nil || persistedReport == nil {
+		t.Fatalf("committed report missing: report=%v err=%v", persistedReport, err)
+	}
+	persistedGeneration, err := generations.FindByID(ctx, started.Generation.ID())
+	if err != nil || persistedGeneration == nil || persistedGeneration.Status() != domaingeneration.StatusGenerated {
+		t.Fatalf("committed generation not generated: generation=%v err=%v", persistedGeneration, err)
+	}
+	persistedRun, err := runs.FindByID(ctx, started.Run.ID())
+	if err != nil || persistedRun == nil || persistedRun.Status() != interpretationrun.StatusSucceeded {
+		t.Fatalf("committed run not succeeded: run=%v err=%v", persistedRun, err)
+	}
+	intentCount, err := collection.CountDocuments(ctx, bson.M{"event_type": eventcatalog.InterpretationReportGenerated})
+	if err != nil || intentCount != 1 {
+		t.Fatalf("standard report intents=%d err=%v", intentCount, err)
+	}
+	legacyCount, err := mongoDB.Collection("domain_event_outbox").CountDocuments(ctx, bson.M{})
+	if err != nil || legacyCount != 0 {
+		t.Fatalf("legacy report intents=%d err=%v", legacyCount, err)
+	}
+	var outboxRow struct {
+		MessageID string `bson:"message_id"`
+		Payload   []byte `bson:"payload"`
+		State     string `bson:"state"`
+	}
+	if err := collection.FindOne(ctx, bson.M{"event_type": eventcatalog.InterpretationReportGenerated}).Decode(&outboxRow); err != nil || outboxRow.State != "pending" {
+		t.Fatalf("committed report intent=%+v err=%v", outboxRow, err)
+	}
+	eventID := outboxRow.MessageID
+	wire, recognized, err := messaging.DecodeMessagePayload(outboxRow.Payload)
+	if err != nil || !recognized || wire.UUID != eventID {
+		t.Fatalf("committed report wire identity: id=%s recognized=%t err=%v", eventID, recognized, err)
+	}
+	payload := wire.Payload
 	config := nsq.NewConfig()
 	config.HeartbeatInterval, config.MsgTimeout = time.Second, 10*time.Second
 	config.ReadTimeout, config.WriteTimeout = 3*time.Second, time.Second
