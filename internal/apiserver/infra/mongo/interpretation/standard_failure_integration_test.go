@@ -425,6 +425,7 @@ func (r *reportRetryCallRecorder) Last() reportRetryCall {
 type reportStatusCallRecorder struct {
 	count     int
 	completed int
+	temporary int
 }
 
 func (r *reportStatusCallRecorder) SetProcessing(context.Context, string, string, string) { r.count++ }
@@ -437,9 +438,11 @@ func (r *reportStatusCallRecorder) SetFailed(context.Context, string, string, st
 }
 func (r *reportStatusCallRecorder) SetTemporarilyUnavailable(context.Context, string, string, string, string) {
 	r.count++
+	r.temporary++
 }
 func (r *reportStatusCallRecorder) Count() int     { return r.count }
 func (r *reportStatusCallRecorder) Completed() int { return r.completed }
+func (r *reportStatusCallRecorder) Temporary() int { return r.temporary }
 
 func newStandardInterpretationFixture(t *testing.T) (interpretationMongoFixture, *mongostandard.Stager) {
 	t.Helper()
