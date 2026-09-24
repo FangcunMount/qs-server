@@ -54,5 +54,5 @@ build_dir=$(mktemp -d "${TMPDIR:-/tmp}/$project-build.XXXXXX")
   -e QS_SERVER_TEST_MONGO_DB_PREFIX='m5_report_contract' \
   -e RM_QS_NSQ_TCP='nsqd:4150' \
   mysql /tmp/m5-report.test \
-    -test.run '^TestInterpretation(ReportEventsReachWorkerThroughStandardMongoAndNSQ|GovernedRetryAuthorizationAndStandardIntentCommitTogether)$' \
+    -test.run '^TestInterpretation(ReportEventsReachWorkerThroughStandardMongoAndNSQ|GovernedRetryAuthorizationAndStandardIntentCommitTogether|StandardReportDriverUnknownCommitRetriesCommitOnly)$' \
     -test.count=1 -test.timeout=90s -test.v

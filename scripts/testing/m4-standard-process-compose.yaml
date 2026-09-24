@@ -12,7 +12,7 @@ services:
       retries: 60
   mongo:
     image: mongo@sha256:340c1c56fb10e95cf79ff547f8664b96bc6ead9909bc355238cbf865a9695a6f
-    command: [mongod, --replSet, rm-test, --bind_ip_all]
+    command: [mongod, --replSet, rm-test, --bind_ip_all, --setParameter, enableTestCommands=1]
     tmpfs:
       - /data/db:size=512m
     healthcheck:
