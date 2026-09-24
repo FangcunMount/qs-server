@@ -974,6 +974,7 @@ func TestM4ProcessBootstrapRunsSelectedStandardProfiles(t *testing.T) {
 			}
 		}
 	}
+	proveM4RollbackHandoff(t, gormDB, mongoClient, mongoDB, catalog, cfg)
 	if _, err := db.ExecContext(ctx, "DROP TABLE system_governance_action_runs"); err != nil {
 		t.Fatal(err)
 	}
