@@ -195,7 +195,9 @@ func TestM5MongoOnlyProcessKeepsLegacyMySQLAndHotRankSubscription(t *testing.T) 
 	subsystem.Profile(eventcatalog.OutboxProfileAssessmentMySQL).PostCommit.AfterCommit(ctx, []event.DomainEvent{assessment}, time.Now())
 	deadline := time.Now().Add(10 * time.Second)
 	for {
-		var mongoRow struct{ State string `bson:"state"` }
+		var mongoRow struct {
+			State string `bson:"state"`
+		}
 		var mysqlState string
 		if err := mongoDB.Collection("rm_outbox").FindOne(ctx, bson.M{"message_id": answer.EventID()}).Decode(&mongoRow); err != nil {
 			t.Fatal(err)
