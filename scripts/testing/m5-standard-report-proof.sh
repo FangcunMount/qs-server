@@ -78,7 +78,9 @@ build_dir=$(mktemp -d "${TMPDIR:-/tmp}/$project-build.XXXXXX")
 
 "${compose[@]}" exec -T \
   -e RM_QS_ATTENTION_REAL_DSN='root@tcp(mysql:3306)/m5_qs_attention_real?parseTime=true&loc=UTC' \
+  -e RM_QS_ATTENTION_MONGO_URI='mongodb://mongo:27017/?replicaSet=rm-test' \
+  -e RM_QS_NSQ_TCP='nsqd:4150' \
   -e RM_QS_ATTENTION_MIGRATION='/tmp/m5-attention/000068_migrate_interpretation_runtime_ledgers.up.sql' \
   mysql /tmp/m5-attention/m5-attention-real.test \
     -test.run '^TestM5ReportAttentionReconcileReachesRealTesteeFact$' \
-    -test.count=1 -test.timeout=45s -test.v
+    -test.count=1 -test.timeout=90s -test.v
