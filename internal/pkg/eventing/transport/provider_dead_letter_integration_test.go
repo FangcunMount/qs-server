@@ -252,7 +252,7 @@ delivery_attempts,payload_json,last_error,retry_disposition FROM event_delivery_
 	}
 }
 
-func TestWorkerUnknownEventWaitsForMySQLAuditRecovery(t *testing.T) {
+func TestWorkerUnknownEventRecoversAfterSubscriberRestart(t *testing.T) {
 	if os.Getenv("MESSAGING_INTEGRATION") != "1" {
 		t.Skip("set MESSAGING_INTEGRATION=1 and start NSQ/MySQL integration services")
 	}
@@ -281,13 +281,15 @@ func TestWorkerUnknownEventWaitsForMySQLAuditRecovery(t *testing.T) {
 	createNSQTopicAndChannel(t, topic, channel)
 	runtime := &workerSettlementRuntime{topic: topic}
 	observer := &workerSettlementObserver{}
-	subscriber, err := NewSubscriber(SubscriberConfig{
+	subscriberConfig := SubscriberConfig{
 		Provider: "nsq", NSQLookupdAddr: integrationEnv("NSQ_LOOKUPD_ADDR", "127.0.0.1:4161"), NSQMessageTimeout: time.Minute,
-	}, basemessaging.SubscriberOptions{
+	}
+	subscriberOptions := basemessaging.SubscriberOptions{
 		MaxInFlight: 1, MaxAttempts: 4,
 		RetryBackoff:         basemessaging.RetryBackoffOptions{BaseDelay: 500 * time.Millisecond, MaxDelay: 500 * time.Millisecond},
 		FailedMessageHandler: FailedMessageHandler(wrappedRecorder),
-	})
+	}
+	subscriber, err := NewSubscriber(subscriberConfig, subscriberOptions)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -319,7 +321,27 @@ func TestWorkerUnknownEventWaitsForMySQLAuditRecovery(t *testing.T) {
 	if observer.unknownAcked.Load() != 0 {
 		t.Fatalf("unknown event confirmed before durable record: acked=%d", observer.unknownAcked.Load())
 	}
+	// Stop the first subscriber while the message is still unconfirmed. The
+	// replacement must recover it from the same NSQ channel after MySQL returns.
+	if err := subscriber.Close(); err != nil {
+		t.Fatalf("stop failed Worker subscriber: %v", err)
+	}
+	if observer.unknownAcked.Load() != 0 {
+		t.Fatalf("failed Worker confirmed unknown event during shutdown: acked=%d", observer.unknownAcked.Load())
+	}
 	if err := createDeadLetterTable(t.Context(), db); err != nil {
+		t.Fatal(err)
+	}
+	restartedObserver := &workerSettlementObserver{}
+	restartedSubscriber, err := NewSubscriber(subscriberConfig, subscriberOptions)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = restartedSubscriber.Close() })
+	if err := workermessaging.SubscribeHandlersWithOptions(workermessaging.SubscribeHandlersOptions{
+		ServiceName: channel, Logger: slog.Default(), Runtime: runtime, Subscriber: restartedSubscriber, Observer: restartedObserver,
+		UnknownRecorder: NewUnknownEventRecorder("nsq", wrappedRecorder),
+	}); err != nil {
 		t.Fatal(err)
 	}
 	deadline := time.NewTimer(20 * time.Second)
@@ -333,7 +355,7 @@ func TestWorkerUnknownEventWaitsForMySQLAuditRecovery(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if rows == 1 && observer.unknownAcked.Load() == 1 {
+		if rows == 1 && restartedObserver.unknownAcked.Load() == 1 {
 			if attempts < 2 || attempts >= 4 || cause != "unknown event type: future.event" {
 				t.Fatalf("recovered unknown audit: attempts=%d cause=%q", attempts, cause)
 			}
@@ -342,7 +364,7 @@ func TestWorkerUnknownEventWaitsForMySQLAuditRecovery(t *testing.T) {
 		select {
 		case <-ticker.C:
 		case <-deadline.C:
-			t.Fatalf("unknown event audit did not recover: rows=%d acked=%d", rows, observer.unknownAcked.Load())
+			t.Fatalf("unknown event audit did not recover after Worker restart: rows=%d acked=%d", rows, restartedObserver.unknownAcked.Load())
 		}
 	}
 	if runtime.unknownCalls.Load() < 2 || runtime.failedCalls.Load() != 0 || observer.unknownPersistFailed.Load() == 0 {
