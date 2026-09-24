@@ -61,8 +61,9 @@ import (
 // A committed real AnswerSheet flows from the SDK Mongo row through NSQ's
 // original consumer and Worker handler to the real MySQL Assessment transition
 // and a second SDK row. The independent hot-rank channel projects the same
-// event once despite redelivery after a lost acknowledgement. Lock contention
-// and a lost broker FIN redeliver to the Worker without an extra Assessment.
+// event once despite a temporary Redis outage and a later lost acknowledgement.
+// Lock contention and a lost broker FIN redeliver to the Worker without an
+// extra Assessment.
 func TestStandardAnswerSheetToAssessmentAcrossNSQ(t *testing.T) {
 	mongoURI, dsn, nsqAddress := os.Getenv("RM_QS_MONGO_URI"), os.Getenv("RM_QS_ASSESSMENT_DSN"), os.Getenv("RM_QS_NSQ_TCP")
 	parsed, err := mysqldriver.ParseDSN(dsn)
@@ -203,12 +204,17 @@ events:
 		}
 		return decodeErr
 	}))
-	hotrankProjection := redishotrank.NewRedisScaleHotRankProjection(redisClient, keys)
+	// Keep the hot-rank Redis failure independent of the Worker's lock Redis.
+	hotrankMini := miniredis.RunT(t)
+	hotrankMini.SetError("LOADING hot-rank Redis temporarily unavailable")
+	hotrankRedisClient := redis.NewClient(&redis.Options{Addr: hotrankMini.Addr()})
+	defer hotrankRedisClient.Close()
+	hotrankProjection := redishotrank.NewRedisScaleHotRankProjection(hotrankRedisClient, keys)
 	hotrankHandler := apphotrank.NewEventConsumer(hotrankProjection)
 	hotrankConsumer, err := nsq.NewConsumer(topic, "qs-apiserver-modelcatalog-hot-rank-v1", config)
 	require.NoError(t, err)
 	hotrankConsumer.SetLogger(nil, nsq.LogLevelError)
-	hotrankDelivered := make(chan delivery, 2)
+	hotrankDelivered := make(chan delivery, 3)
 	var hotrankCalls atomic.Int32
 	hotrankConsumer.AddHandler(nsq.HandlerFunc(func(raw *nsq.Message) error {
 		decoded, recognized, handleErr := messaging.DecodeMessagePayload(raw.Body)
@@ -268,6 +274,16 @@ events:
 	relayDone := make(chan error, 1)
 	go func() { relayDone <- forwarder.Run(relayCtx) }()
 	defer stopRelay()
+	var firstHotrank nsq.MessageID
+	select {
+	case got := <-hotrankDelivered:
+		require.ErrorContains(t, got.err, "LOADING hot-rank Redis temporarily unavailable")
+		require.EqualValues(t, 1, got.attempts)
+		firstHotrank = got.id
+		hotrankMini.SetError("")
+	case <-ctx.Done():
+		t.Fatal("standard hot-rank Redis outage was not observed", ctx.Err())
+	}
 	var first nsq.MessageID
 	for i := range 3 {
 		select {
@@ -296,17 +312,15 @@ events:
 			t.Fatal("standard AnswerSheet chain timed out", ctx.Err())
 		}
 	}
-	var firstHotrank nsq.MessageID
-	for i := range 2 {
+	for i := 1; i < 3; i++ {
 		select {
 		case got := <-hotrankDelivered:
-			if i == 0 {
+			if i == 1 {
 				require.ErrorContains(t, got.err, "lost hot-rank acknowledgement")
-				firstHotrank = got.id
 			} else {
 				require.NoError(t, got.err)
-				require.Equal(t, firstHotrank, got.id)
 			}
+			require.Equal(t, firstHotrank, got.id)
 			require.EqualValues(t, i+1, got.attempts)
 		case <-ctx.Done():
 			t.Fatal("standard hot-rank projection timed out", ctx.Err())
