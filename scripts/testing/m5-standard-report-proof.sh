@@ -48,11 +48,16 @@ build_dir=$(mktemp -d "${TMPDIR:-/tmp}/$project-build.XXXXXX")
   -o "$build_dir/m5-report.test" ./internal/apiserver/infra/mongo/interpretation)
 "${compose[@]}" cp "$build_dir/m5-report.test" mysql:/tmp/m5-report.test
 "${compose[@]}" exec -T mysql mysql -uroot -e 'CREATE DATABASE m5_qs_attention'
+"${compose[@]}" exec -T mysql mysql -uroot -e 'CREATE DATABASE m5_qs_attention_real'
 (cd "$repo" && GOPROXY=https://proxy.golang.org,direct CGO_ENABLED=0 GOOS=linux GOARCH="$goarch" go test -c \
   -tags='reliable_messaging_m4_integration' \
   -o "$build_dir/m5-attention.test" ./internal/worker/handlers)
+(cd "$repo" && GOPROXY=https://proxy.golang.org,direct CGO_ENABLED=0 GOOS=linux GOARCH="$goarch" go test -c \
+  -tags='integration,reliable_messaging,reliable_messaging_m4,reliable_messaging_m4_integration' \
+  -o "$build_dir/m5-attention-real.test" ./internal/apiserver/container/internal/transaction)
 "${compose[@]}" exec -T mysql mkdir -p /tmp/m5-attention
 "${compose[@]}" cp "$build_dir/m5-attention.test" mysql:/tmp/m5-attention/m5-attention.test
+"${compose[@]}" cp "$build_dir/m5-attention-real.test" mysql:/tmp/m5-attention/m5-attention-real.test
 "${compose[@]}" cp "$repo/internal/pkg/migration/migrations/mysql/000068_migrate_interpretation_runtime_ledgers.up.sql" mysql:/tmp/m5-attention/000068_migrate_interpretation_runtime_ledgers.up.sql
 "${compose[@]}" exec -T mysql mkdir -p /configs
 "${compose[@]}" cp "$repo/configs/events.yaml" mysql:/configs/events.yaml
@@ -69,4 +74,11 @@ build_dir=$(mktemp -d "${TMPDIR:-/tmp}/$project-build.XXXXXX")
   -e RM_QS_ATTENTION_MIGRATION='/tmp/m5-attention/000068_migrate_interpretation_runtime_ledgers.up.sql' \
   mysql /tmp/m5-attention/m5-attention.test \
     -test.run '^TestM5ReportGeneratedAttentionRecoversFromDurableMySQLLedger$' \
+    -test.count=1 -test.timeout=45s -test.v
+
+"${compose[@]}" exec -T \
+  -e RM_QS_ATTENTION_REAL_DSN='root@tcp(mysql:3306)/m5_qs_attention_real?parseTime=true&loc=UTC' \
+  -e RM_QS_ATTENTION_MIGRATION='/tmp/m5-attention/000068_migrate_interpretation_runtime_ledgers.up.sql' \
+  mysql /tmp/m5-attention/m5-attention-real.test \
+    -test.run '^TestM5ReportAttentionReconcileReachesRealTesteeFact$' \
     -test.count=1 -test.timeout=45s -test.v
