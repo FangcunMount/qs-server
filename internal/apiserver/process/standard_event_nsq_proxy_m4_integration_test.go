@@ -14,11 +14,12 @@ import (
 // invocation-owned broker. An outage closes established connections and
 // refuses new ones; restoring it permits a fresh producer connection.
 type m4NSQFaultProxy struct {
-	listener  net.Listener
-	upstream  string
-	mu        sync.Mutex
-	available bool
-	active    map[*m4NSQProxyPair]struct{}
+	listener      net.Listener
+	upstream      string
+	mu            sync.Mutex
+	available     bool
+	active        map[*m4NSQProxyPair]struct{}
+	responseDelay time.Duration
 }
 
 type m4NSQProxyPair struct {
@@ -39,6 +40,14 @@ func newM4NSQFaultProxy(t *testing.T, upstream string) *m4NSQFaultProxy {
 }
 
 func (p *m4NSQFaultProxy) Address() string { return p.listener.Addr().String() }
+
+// SetResponseDelay makes the disposable broker confirmation path slower so a
+// process proof can observe fairness while a genuine pending backlog exists.
+func (p *m4NSQFaultProxy) SetResponseDelay(delay time.Duration) {
+	p.mu.Lock()
+	p.responseDelay = delay
+	p.mu.Unlock()
+}
 
 func (p *m4NSQFaultProxy) SetAvailable(available bool) {
 	p.mu.Lock()
@@ -95,11 +104,26 @@ func (p *m4NSQFaultProxy) forward(pair *m4NSQProxyPair) {
 		_, _ = io.Copy(pair.upstream, pair.downstream)
 		close(done)
 	}()
-	_, _ = io.Copy(pair.downstream, pair.upstream)
+	_, _ = io.Copy(&m4NSQDelayedWriter{proxy: p, target: pair.downstream}, pair.upstream)
 	_ = pair.downstream.Close()
 	_ = pair.upstream.Close()
 	<-done
 	p.mu.Lock()
 	delete(p.active, pair)
 	p.mu.Unlock()
+}
+
+type m4NSQDelayedWriter struct {
+	proxy  *m4NSQFaultProxy
+	target net.Conn
+}
+
+func (w *m4NSQDelayedWriter) Write(b []byte) (int, error) {
+	w.proxy.mu.Lock()
+	delay := w.proxy.responseDelay
+	w.proxy.mu.Unlock()
+	if delay > 0 {
+		time.Sleep(delay)
+	}
+	return w.target.Write(b)
 }
