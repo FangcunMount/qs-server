@@ -26,7 +26,7 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 )
 
-func TestInterpretationManualRetryAuthorizationAndStandardIntentCommitTogether(t *testing.T) {
+func TestInterpretationGovernedRetryAuthorizationAndStandardIntentCommitTogether(t *testing.T) {
 	originalBusiness, originalOutbox := retrygovernance.BusinessPolicy(), retrygovernance.OutboxPolicy()
 	proofPolicy := originalBusiness
 	proofPolicy.Version = "m5-manual-exhaustion-proof"
@@ -47,7 +47,7 @@ func TestInterpretationManualRetryAuthorizationAndStandardIntentCommitTogether(t
 	if err != nil {
 		t.Fatal(err)
 	}
-	makeFailed := func(t *testing.T) (*interpretationrun.InterpretationRun, meta.ID, meta.ID) {
+	makeFailed := func(t *testing.T, retryable bool, want retrygovernance.Disposition) (*interpretationrun.InterpretationRun, meta.ID, meta.ID) {
 		t.Helper()
 		generation, run := fixture.start(t)
 		assessmentID := meta.New()
@@ -55,20 +55,20 @@ func TestInterpretationManualRetryAuthorizationAndStandardIntentCommitTogether(t
 			Generation: generation, Run: run, OutcomeID: generation.Key().OutcomeID,
 			Association: domainreport.Association{OrgID: 1, AssessmentID: assessmentID, TesteeID: 8},
 			Failure: interpretationrun.Failure{
-				Kind: interpretationrun.FailureKindBuild, Code: "build_failed", SafeMessage: "failed", Retryable: true,
+				Kind: interpretationrun.FailureKindBuild, Code: "build_failed", SafeMessage: "failed", Retryable: retryable,
 			},
 			FailedAt: time.Now(),
 		})
 		if err != nil {
 			t.Fatal(err)
 		}
-		if decision := result.Run.RetryDecision(); decision == nil || decision.Disposition != retrygovernance.DispositionManualRequired {
-			t.Fatalf("exhausted retry decision = %+v", decision)
+		if decision := result.Run.RetryDecision(); decision == nil || decision.Disposition != want {
+			t.Fatalf("failure retry decision = %+v, want %s", decision, want)
 		}
 		return result.Run, generation.Key().OutcomeID, assessmentID
 	}
 
-	run, outcomeID, assessmentID := makeFailed(t)
+	run, outcomeID, assessmentID := makeFailed(t, true, retrygovernance.DispositionManualRequired)
 	assertMongoDocumentCount(t, fixture.db.Collection("rm_outbox"), bson.M{"event_type": eventcatalog.InterpretationRetryRequested}, 0)
 	var failedRow struct {
 		Payload []byte `bson:"payload"`
@@ -173,7 +173,7 @@ func TestInterpretationManualRetryAuthorizationAndStandardIntentCommitTogether(t
 	}
 	assertMongoDocumentCount(t, fixture.db.Collection("rm_outbox"), bson.M{"event_type": eventcatalog.InterpretationRetryRequested}, 1)
 
-	rollbackRun, rollbackOutcomeID, rollbackAssessmentID := makeFailed(t)
+	rollbackRun, rollbackOutcomeID, rollbackAssessmentID := makeFailed(t, true, retrygovernance.DispositionManualRequired)
 	rollbackOutcome := evaluationfact.NewRecord(evaluationfact.NewRecordInput{ID: rollbackOutcomeID, OrgID: 1, AssessmentID: rollbackAssessmentID, TesteeID: 8})
 	rollbackService := automation.NewGovernedRetryService(
 		fixture.generations, fixture.runs, manualRetryOutcomeRepo{record: rollbackOutcome}, fixture.runner,
@@ -194,6 +194,49 @@ func TestInterpretationManualRetryAuthorizationAndStandardIntentCommitTogether(t
 		t.Fatalf("failed staging left retry authority behind: %+v", rolledBack.RetryDecision())
 	}
 	assertMongoDocumentCount(t, fixture.db.Collection("rm_outbox"), bson.M{"event_type": eventcatalog.InterpretationRetryRequested}, 1)
+
+	terminalRun, terminalOutcomeID, terminalAssessmentID := makeFailed(t, false, retrygovernance.DispositionTerminal)
+	assertMongoDocumentCount(t, fixture.db.Collection("rm_outbox"), bson.M{"event_type": eventcatalog.InterpretationRetryRequested}, 1)
+	terminalOutcome := evaluationfact.NewRecord(evaluationfact.NewRecordInput{ID: terminalOutcomeID, OrgID: 1, AssessmentID: terminalAssessmentID, TesteeID: 8})
+	forceService := automation.NewGovernedRetryService(fixture.generations, fixture.runs, manualRetryOutcomeRepo{record: terminalOutcome}, fixture.runner, stager)
+	forceCommand := command
+	forceCommand.GenerationID = terminalRun.GenerationID()
+	forceCommand.ExpectedAttempt = terminalRun.Attempt()
+	forceCommand.Origin = retrygovernance.AttemptOriginForce
+	forceCommand.RequestID = "m5-force-request"
+	forced, err := forceService.Authorize(t.Context(), forceCommand)
+	if err != nil {
+		t.Fatal(err)
+	}
+	forceDecision := forced.RetryDecision()
+	if forceDecision == nil || forceDecision.Disposition != retrygovernance.DispositionAutomatic ||
+		forceDecision.RetryEventID == "" || forceDecision.ActionRequestID != forceCommand.RequestID {
+		t.Fatalf("force authorization decision = %+v", forceDecision)
+	}
+	var forceRow struct {
+		Payload []byte `bson:"payload"`
+	}
+	if err := fixture.db.Collection("rm_outbox").FindOne(t.Context(), bson.M{"message_id": forceDecision.RetryEventID}).Decode(&forceRow); err != nil {
+		t.Fatal(err)
+	}
+	forceWire, recognized, err := messaging.DecodeMessagePayload(forceRow.Payload)
+	if err != nil || !recognized {
+		t.Fatalf("force retry wire decode: recognized=%t err=%v", recognized, err)
+	}
+	if err := retryHandler(t.Context(), eventcatalog.InterpretationRetryRequested, forceWire.Payload); err != nil {
+		t.Fatal(err)
+	}
+	if workerAutomation.Count() != 2 {
+		t.Fatalf("force retry Worker calls=%d, want 2 total", workerAutomation.Count())
+	}
+	forceMetadata := workerAutomation.Last().metadata
+	if origin := forceMetadata.Get("x-retry-origin"); len(origin) != 1 || origin[0] != "force" {
+		t.Fatalf("force Worker lost origin: %v", forceMetadata)
+	}
+	if action := forceMetadata.Get("x-retry-action-request-id"); len(action) != 1 || action[0] != forceCommand.RequestID {
+		t.Fatalf("force Worker lost action request ID: %v", forceMetadata)
+	}
+	assertMongoDocumentCount(t, fixture.db.Collection("rm_outbox"), bson.M{"event_type": eventcatalog.InterpretationRetryRequested}, 2)
 }
 
 type manualRetryOutcomeRepo struct{ record *evaluationfact.Record }
