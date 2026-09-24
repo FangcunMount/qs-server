@@ -11,11 +11,16 @@ import (
 	mysqlActor "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/actor"
 	"io"
 	"log/slog"
+	"net"
 	"os"
 	"strconv"
 	"sync"
 	"testing"
 	"time"
+
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/metadata"
 
 	cbdatabase "github.com/FangcunMount/component-base/pkg/database"
 	"github.com/FangcunMount/component-base/pkg/messaging"
@@ -209,11 +214,39 @@ func TestCurrentRuntimeClosure(t *testing.T) {
 	assessmentService := grpcservice.NewAssessmentIntakeService(journey, grpcDeps.Evaluation.IntakeService, grpcDeps.Survey.AnswerSheetManagementService)
 	evaluationService := grpcservice.NewEvaluationWorkerService(grpcDeps.Evaluation.WorkerService)
 	interpretationService := grpcservice.NewInterpretationAutomationService(grpcDeps.Interpretation.AutomationService)
+	interpretationListener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	reportEventIDs := make(chan string, 2)
+	interpretationGRPC := grpc.NewServer(grpc.UnaryInterceptor(func(ctx context.Context, request any, info *grpc.UnaryServerInfo, next grpc.UnaryHandler) (any, error) {
+		incoming, _ := metadata.FromIncomingContext(ctx)
+		values := incoming.Get("x-event-id")
+		if len(values) == 1 {
+			reportEventIDs <- values[0]
+		}
+		return next(ctx, request)
+	}))
+	interpretationService.RegisterService(interpretationGRPC)
+	interpretationDone := make(chan error, 1)
+	go func() { interpretationDone <- interpretationGRPC.Serve(interpretationListener) }()
+	t.Cleanup(func() {
+		interpretationGRPC.Stop()
+		if err := <-interpretationDone; err != nil {
+			t.Errorf("stop Interpretation gRPC server: %v", err)
+		}
+	})
+	interpretationConn, err := grpc.NewClient(interpretationListener.Addr().String(), grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = interpretationConn.Close() })
+	reportClient := &lostReportResponseOnce{underlying: interpretationWorkerAdapter{client: interpretationpb.NewInterpretationAutomationServiceClient(interpretationConn)}}
 	workerDeps := &handlers.Dependencies{
 		Logger:                         slog.New(slog.NewTextHandler(io.Discard, nil)),
 		AssessmentIntakeClient:         assessmentService,
 		EvaluationWorkerClient:         evaluationWorkerAdapter{service: evaluationService},
-		InterpretationAutomationClient: interpretationWorkerAdapter{service: interpretationService},
+		InterpretationAutomationClient: reportClient,
 		ReportStatusReporter:           grpcDeps.Interpretation.ReportStatusReporter,
 		LockManager:                    workerLocks, LockRunner: workerLocks, LockKeyBuilder: workerLocks.Builder(),
 	}
@@ -257,8 +290,29 @@ func TestCurrentRuntimeClosure(t *testing.T) {
 	assertRowCount(t, gormDB, "evaluation_outcome", "assessment_id = ?", 1, evaluated.GetAssessmentId())
 	assertRowCount(t, gormDB, "domain_event_outbox", "event_type = ?", 1, eventcatalog.EvaluationOutcomeCommitted)
 	outcomeMessage := capture.Wait(t, eventcatalog.EvaluationOutcomeCommitted)
+	if err := outcomeHandler(t.Context(), eventcatalog.EvaluationOutcomeCommitted, outcomeMessage.Payload); err == nil {
+		t.Fatal("first outcome delivery must report the controlled lost gRPC response")
+	}
+	assertSingleCommittedReport(t, mongoDB)
 	if err := outcomeHandler(t.Context(), eventcatalog.EvaluationOutcomeCommitted, outcomeMessage.Payload); err != nil {
-		t.Fatalf("consume evaluation.outcome.committed: %v", err)
+		t.Fatalf("redeliver evaluation.outcome.committed after lost response: %v", err)
+	}
+	assertSingleCommittedReport(t, mongoDB)
+	if reportClient.first == nil || reportClient.second == nil ||
+		reportClient.first.GetGenerationId() != reportClient.second.GetGenerationId() ||
+		reportClient.first.GetRunId() != reportClient.second.GetRunId() ||
+		reportClient.first.GetReportId() != reportClient.second.GetReportId() {
+		t.Fatalf("report response identity changed after redelivery: first=%+v second=%+v", reportClient.first, reportClient.second)
+	}
+	for range 2 {
+		select {
+		case eventID := <-reportEventIDs:
+			if eventID != outcomeMessage.UUID {
+				t.Fatalf("Interpretation gRPC event ID=%q, want original %q", eventID, outcomeMessage.UUID)
+			}
+		case <-t.Context().Done():
+			t.Fatal("Interpretation gRPC did not receive original event ID", t.Context().Err())
+		}
 	}
 	reportMessage := capture.Wait(t, eventcatalog.InterpretationReportGenerated)
 	if err := reportHandler(t.Context(), eventcatalog.InterpretationReportGenerated, reportMessage.Payload); err != nil {
@@ -566,11 +620,46 @@ func (a evaluationWorkerAdapter) ExecuteEvaluation(ctx context.Context, assessme
 }
 
 type interpretationWorkerAdapter struct {
-	service *grpcservice.InterpretationAutomationService
+	client interpretationpb.InterpretationAutomationServiceClient
 }
 
 func (a interpretationWorkerAdapter) GenerateReportFromOutcome(ctx context.Context, outcomeID string) (*interpretationpb.GenerateReportFromAssessmentResponse, error) {
-	return a.service.GenerateReportFromOutcome(ctx, &interpretationpb.GenerateReportFromOutcomeRequest{OutcomeId: outcomeID})
+	return a.client.GenerateReportFromOutcome(ctx, &interpretationpb.GenerateReportFromOutcomeRequest{OutcomeId: outcomeID})
+}
+
+// Hide one successful gRPC response after the server has committed. The
+// Worker must retry the original event without creating a second report.
+type lostReportResponseOnce struct {
+	underlying interpretationWorkerAdapter
+	first      *interpretationpb.GenerateReportFromAssessmentResponse
+	second     *interpretationpb.GenerateReportFromAssessmentResponse
+}
+
+func (c *lostReportResponseOnce) GenerateReportFromOutcome(ctx context.Context, outcomeID string) (*interpretationpb.GenerateReportFromAssessmentResponse, error) {
+	response, err := c.underlying.GenerateReportFromOutcome(ctx, outcomeID)
+	if err != nil || response == nil || !response.Success {
+		return response, err
+	}
+	if c.first == nil {
+		c.first = response
+		return nil, fmt.Errorf("controlled lost report gRPC response after commit")
+	}
+	c.second = response
+	return response, nil
+}
+
+func assertSingleCommittedReport(t *testing.T, db *mongo.Database) {
+	t.Helper()
+	for _, collection := range []string{"report_generations", "interpretation_runs", "interpret_report_artifacts"} {
+		count, err := db.Collection(collection).CountDocuments(t.Context(), bson.M{})
+		if err != nil || count != 1 {
+			t.Fatalf("%s count=%d err=%v, want one durable report fact", collection, count, err)
+		}
+	}
+	count, err := db.Collection("domain_event_outbox").CountDocuments(t.Context(), bson.M{"event_type": eventcatalog.InterpretationReportGenerated})
+	if err != nil || count != 1 {
+		t.Fatalf("report generated outbox count=%d err=%v, want one", count, err)
+	}
 }
 
 func mustWorkerHandler(t *testing.T, registry *handlers.Registry, name string, deps *handlers.Dependencies) handlers.HandlerFunc {
