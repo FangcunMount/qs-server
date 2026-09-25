@@ -554,6 +554,47 @@ events:
 	forceEventID := forceAuthorized.RetryDecision().RetryEventID
 	require.NotEmpty(t, forceEventID)
 	assertGovernedDelivery(forceID, forceEventID, "force", force.RequestID)
+
+	// The status cache is an operational projection. If its TCP endpoint goes
+	// away after the business failure commits, the original handler still
+	// settles the message; the authoritative MySQL failure must remain intact.
+	outageID := createSubmitted(704)
+	statusRedis.Close()
+	require.Error(t, terminalEngine.Evaluate(ctx, outageID))
+	outageRun, err := runRepo.FindLatestByAssessmentID(ctx, outageID)
+	require.NoError(t, err)
+	require.Equal(t, retrygovernance.DispositionTerminal, outageRun.RetryDecision().Disposition)
+	outageMessageID := latestFailureMessageID()
+	var outageFirst, outageSecond m5FailedDelivery
+	for outageFirst.messageID != outageMessageID {
+		select {
+		case outageFirst = <-deliveries:
+		case <-ctx.Done():
+			t.Fatalf("failure delivery during Redis outage missing: %v", ctx.Err())
+		}
+	}
+	for outageSecond.messageID != outageMessageID {
+		select {
+		case outageSecond = <-deliveries:
+		case <-ctx.Done():
+			t.Fatalf("failure redelivery during Redis outage missing: %v", ctx.Err())
+		}
+	}
+	require.Equal(t, outageFirst.brokerID, outageSecond.brokerID)
+	require.EqualValues(t, 1, outageFirst.attempts)
+	require.Greater(t, outageSecond.attempts, outageFirst.attempts)
+	require.ErrorContains(t, outageFirst.err, "controlled lost consumer ACK")
+	require.NoError(t, outageSecond.err, "the status projection outage is best-effort")
+	require.Error(t, statusClient.Ping(ctx).Err(), "the Redis endpoint must actually be unavailable")
+	outageAssessment, err := assessmentRepo.FindByID(ctx, meta.FromUint64(outageID))
+	require.NoError(t, err)
+	require.True(t, outageAssessment.Status().IsFailed())
+	require.NoError(t, db.Table("runtime_checkpoint").Where("scope = ? AND assessment_id = ?", "evaluation_run", outageID).Count(&count).Error)
+	require.EqualValues(t, 1, count)
+	require.Eventually(t, func() bool {
+		var state string
+		return db.Table("rm_outbox").Select("state").Where("message_id = ?", outageMessageID).Scan(&state).Error == nil && state == "published"
+	}, 5*time.Second, 25*time.Millisecond)
 }
 
 func firstValue(md metadata.MD, key string) string {
