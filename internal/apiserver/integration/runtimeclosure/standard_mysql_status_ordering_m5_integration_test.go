@@ -27,6 +27,7 @@ import (
 	mysqlunit "github.com/FangcunMount/qs-server/internal/pkg/database/mysql"
 	eventcatalog "github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
 	servergrpc "github.com/FangcunMount/qs-server/internal/pkg/grpc"
+	"github.com/FangcunMount/qs-server/internal/pkg/reportstatus"
 	"github.com/FangcunMount/qs-server/internal/pkg/resilience/admission"
 	"github.com/FangcunMount/qs-server/internal/pkg/retrygovernance"
 	"github.com/FangcunMount/qs-server/internal/testutil/tlsfixture"
@@ -37,6 +38,20 @@ import (
 )
 
 type m5UnavailableRuntimeInput struct{}
+
+type m5UnavailableStatusCache struct{}
+
+func (m5UnavailableStatusCache) Get(context.Context, string) (*reportstatus.Snapshot, error) {
+	return nil, errors.New("controlled status cache unavailable")
+}
+
+func (m5UnavailableStatusCache) Set(context.Context, *reportstatus.Snapshot, time.Duration) error {
+	return errors.New("controlled status cache unavailable")
+}
+
+func (m5UnavailableStatusCache) SetIfHigherPriority(context.Context, *reportstatus.Snapshot, time.Duration) error {
+	return errors.New("controlled status cache unavailable")
+}
 
 func (m5UnavailableRuntimeInput) Resolve(context.Context, evaluationinput.InputRef) (*evaluationinput.InputSnapshot, error) {
 	return nil, evaluationinput.NewDependencyResolveError(
@@ -122,6 +137,13 @@ func TestM5OldFailureRedeliveryAfterDurableReportKeepsParticipantCompleted(t *te
 			require.NoError(t, err)
 			require.Equal(t, "completed", visible.Status,
 				fmt.Sprintf("real report is durable but old failure redelivery changed Collection status: %+v", visible))
+
+			unavailableWaiter := reportwait.NewService(query, m5UnavailableStatusCache{}, nil, nil, reportwait.DefaultConfig())
+			visibleWithoutCache, err := unavailableWaiter.GetStatus(t.Context(), testeeID, assessmentID)
+			require.NoError(t, err)
+			require.Equal(t, "completed", visibleWithoutCache.Status,
+				"a cache read error after old failure redelivery must not hide the durable report")
+			t.Logf("cache read error after old failure redelivery: participant status=%s", visibleWithoutCache.Status)
 		},
 	}
 	runCurrentRuntimeClosure(t, func(t *testing.T, opts subsystem.Options, db *sql.DB) (*subsystem.Subsystem, runtimeClosureDelivery, error) {
