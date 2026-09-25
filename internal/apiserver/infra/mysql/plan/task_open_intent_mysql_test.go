@@ -230,4 +230,38 @@ events:
 	require.NoError(t, db.Table("rm_outbox").Count(&rows).Error)
 	require.Equal(t, initialRows+3, rows)
 	require.Empty(t, legacyPublisher.events)
+
+	// The transaction can commit while its caller loses the success response.
+	// A retry is rejected, so the caller must inspect the authoritative Task;
+	// it cannot create another entry or reminder from the opened version.
+	unknownTask := newTask(5)
+	lostCommitResponse := errors.New("commit response lost after success")
+	unknownRunner := apptransaction.RunnerFunc(func(ctx context.Context, fn func(context.Context) error) error {
+		if txErr := uow.WithinTransaction(ctx, fn); txErr != nil {
+			return txErr
+		}
+		return lostCommitResponse
+	})
+	unknownService := appplan.NewTaskManagementServiceWithEnrollment(
+		repository, nil, nil, unknownRunner, &uniqueOpenEntryGenerator{}, legacyPublisher,
+		appEventing.ProfileBinding{Stager: stager},
+	)
+	_, err = unknownService.OpenTask(t.Context(), 501, unknownTask.GetID().String())
+	require.ErrorIs(t, err, lostCommitResponse)
+	committedTask, err := repository.FindByID(t.Context(), unknownTask.GetID())
+	require.NoError(t, err)
+	require.Equal(t, domainplan.TaskStatusOpened, committedTask.GetStatus())
+	require.NotEmpty(t, committedTask.GetEntryURL())
+	require.NoError(t, db.Table("rm_outbox").Count(&rows).Error)
+	require.Equal(t, initialRows+4, rows)
+	require.Empty(t, legacyPublisher.events)
+
+	_, err = service.OpenTask(t.Context(), 501, unknownTask.GetID().String())
+	require.Error(t, err, "an already-open Task must not be opened again")
+	retriedTask, err := repository.FindByID(t.Context(), unknownTask.GetID())
+	require.NoError(t, err)
+	require.Equal(t, committedTask.GetEntryURL(), retriedTask.GetEntryURL())
+	require.NoError(t, db.Table("rm_outbox").Count(&rows).Error)
+	require.Equal(t, initialRows+4, rows)
+	require.Empty(t, legacyPublisher.events)
 }
