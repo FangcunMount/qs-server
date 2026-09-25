@@ -21,13 +21,32 @@ func TestAuthorizeAssessmentDelegatesToAuthorizationRPC(t *testing.T) {
 	}
 }
 
+func TestRuntimeStatusReadPreservesFreshAttemptPhase(t *testing.T) {
+	client := &evaluationReaderStub{runtime: &AssessmentRuntimeStatusOutput{Attempt: 2, Status: "running"}}
+	reader := NewEvaluationBFFReader(client, nil, nil)
+	got, err := reader.GetMyAssessmentRunStatus(context.Background(), 11, 22)
+	if err != nil || got == nil || got.Attempt != 2 || got.Status != "running" {
+		t.Fatalf("runtime status = %+v, err = %v", got, err)
+	}
+	if client.runtimeCalls != 1 {
+		t.Fatalf("runtime calls = %d, want 1", client.runtimeCalls)
+	}
+}
+
 type evaluationReaderStub struct {
 	EvaluationReader
 	authorizeErr   error
 	authorizeCalls int
+	runtime        *AssessmentRuntimeStatusOutput
+	runtimeCalls   int
 }
 
 func (s *evaluationReaderStub) AuthorizeAssessment(context.Context, uint64, uint64) error {
 	s.authorizeCalls++
 	return s.authorizeErr
+}
+
+func (s *evaluationReaderStub) GetMyAssessmentRunStatus(context.Context, uint64, uint64) (*AssessmentRuntimeStatusOutput, error) {
+	s.runtimeCalls++
+	return s.runtime, nil
 }

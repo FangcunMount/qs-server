@@ -11,11 +11,16 @@ import (
 	mysqlActor "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/actor"
 	"io"
 	"log/slog"
+	"net"
 	"os"
 	"strconv"
 	"sync"
 	"testing"
 	"time"
+
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/metadata"
 
 	cbdatabase "github.com/FangcunMount/component-base/pkg/database"
 	"github.com/FangcunMount/component-base/pkg/messaging"
@@ -75,11 +80,37 @@ const (
 	runtimeVersion      = "1.0.0"
 )
 
+type runtimeClosureDelivery interface {
+	SetHandlers(map[string]handlers.HandlerFunc)
+	Wait(*testing.T, string) (*messaging.Message, error)
+	Covers(string) bool
+	UsesStandardMongo() bool
+}
+
+type runtimeClosureEventFactory func(*testing.T, eventsubsystem.Options, *sql.DB) (*eventsubsystem.Subsystem, runtimeClosureDelivery, error)
+
+type runtimeClosureScenario struct {
+	beforeEvaluation      func(*testing.T, uint64, *gorm.DB, *eventsubsystem.Subsystem)
+	afterReport           func(*testing.T, runtimeClosureDelivery, grpctransport.Deps, uint64, uint64)
+	skipReportWaitClosure bool
+}
+
 // TestCurrentRuntimeClosure exercises the ordinary, current-time path through
 // Actor, AssessmentEntry, Plan, AnswerSheet, Assessment, Evaluation,
 // Interpretation and report-wait using real application services,
 // repositories, durable outboxes and worker handlers.
 func TestCurrentRuntimeClosure(t *testing.T) {
+	runCurrentRuntimeClosure(t, func(_ *testing.T, opts eventsubsystem.Options, _ *sql.DB) (*eventsubsystem.Subsystem, runtimeClosureDelivery, error) {
+		subsystem, err := eventsubsystem.New(opts)
+		return subsystem, nil, err
+	})
+}
+
+func runCurrentRuntimeClosure(t *testing.T, eventFactory runtimeClosureEventFactory, scenarios ...runtimeClosureScenario) {
+	var scenario runtimeClosureScenario
+	if len(scenarios) > 0 {
+		scenario = scenarios[0]
+	}
 	mysqlDSN := os.Getenv("MYSQL_DSN")
 	if mysqlDSN == "" {
 		t.Fatal("MYSQL_DSN is required; the runtime closure test must not skip")
@@ -133,13 +164,13 @@ func TestCurrentRuntimeClosure(t *testing.T) {
 		t.Fatalf("load event catalog: %v", err)
 	}
 	capture := newCapturedMQPublisher()
-	eventing, err := eventsubsystem.New(eventsubsystem.Options{
+	eventing, delivery, err := eventFactory(t, eventsubsystem.Options{
 		MySQLDB: gormDB, MongoDB: mongoDB, OpsRedis: redisClient,
 		Catalog: eventcatalog.NewCatalog(events), MQPublisher: capture, PublisherMode: eventruntime.PublishModeMQ,
 		Mongo:      eventsubsystem.ProfileOptions{BatchSize: 20, PublishWorkers: 1, ImmediateMaxConcurrent: 1},
 		Assessment: eventsubsystem.ProfileOptions{BatchSize: 20, PublishWorkers: 1, ImmediateMaxConcurrent: 1},
 		Consumers:  map[string]eventsubsystem.ConsumerOptions{"modelcatalog.hot_rank_projection": {Enabled: false}},
-	})
+	}, sqlDB)
 	if err != nil {
 		t.Fatalf("build event subsystem: %v", err)
 	}
@@ -208,12 +239,63 @@ func TestCurrentRuntimeClosure(t *testing.T) {
 	)
 	assessmentService := grpcservice.NewAssessmentIntakeService(journey, grpcDeps.Evaluation.IntakeService, grpcDeps.Survey.AnswerSheetManagementService)
 	evaluationService := grpcservice.NewEvaluationWorkerService(grpcDeps.Evaluation.WorkerService)
+	var evaluationClient handlers.EvaluationWorkerClient = evaluationWorkerAdapter{service: evaluationService}
+	if scenario.beforeEvaluation != nil {
+		evaluationListener, listenErr := net.Listen("tcp", "127.0.0.1:0")
+		if listenErr != nil {
+			t.Fatal(listenErr)
+		}
+		evaluationGRPC := grpc.NewServer()
+		evaluationService.RegisterService(evaluationGRPC)
+		evaluationDone := make(chan error, 1)
+		go func() { evaluationDone <- evaluationGRPC.Serve(evaluationListener) }()
+		t.Cleanup(func() {
+			evaluationGRPC.Stop()
+			if stopErr := <-evaluationDone; stopErr != nil {
+				t.Errorf("stop Evaluation gRPC server: %v", stopErr)
+			}
+		})
+		evaluationConn, dialErr := grpc.NewClient(evaluationListener.Addr().String(), grpc.WithTransportCredentials(insecure.NewCredentials()))
+		if dialErr != nil {
+			t.Fatal(dialErr)
+		}
+		t.Cleanup(func() { _ = evaluationConn.Close() })
+		evaluationClient = runtimeEvaluationGRPCAdapter{client: evaluationpb.NewEvaluationWorkerServiceClient(evaluationConn)}
+	}
 	interpretationService := grpcservice.NewInterpretationAutomationService(grpcDeps.Interpretation.AutomationService)
+	interpretationListener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	reportEventIDs := make(chan string, 2)
+	interpretationGRPC := grpc.NewServer(grpc.UnaryInterceptor(func(ctx context.Context, request any, info *grpc.UnaryServerInfo, next grpc.UnaryHandler) (any, error) {
+		incoming, _ := metadata.FromIncomingContext(ctx)
+		values := incoming.Get("x-event-id")
+		if len(values) == 1 {
+			reportEventIDs <- values[0]
+		}
+		return next(ctx, request)
+	}))
+	interpretationService.RegisterService(interpretationGRPC)
+	interpretationDone := make(chan error, 1)
+	go func() { interpretationDone <- interpretationGRPC.Serve(interpretationListener) }()
+	t.Cleanup(func() {
+		interpretationGRPC.Stop()
+		if err := <-interpretationDone; err != nil {
+			t.Errorf("stop Interpretation gRPC server: %v", err)
+		}
+	})
+	interpretationConn, err := grpc.NewClient(interpretationListener.Addr().String(), grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = interpretationConn.Close() })
+	reportClient := &lostReportResponseOnce{underlying: interpretationWorkerAdapter{client: interpretationpb.NewInterpretationAutomationServiceClient(interpretationConn)}}
 	workerDeps := &handlers.Dependencies{
 		Logger:                         slog.New(slog.NewTextHandler(io.Discard, nil)),
 		AssessmentIntakeClient:         assessmentService,
-		EvaluationWorkerClient:         evaluationWorkerAdapter{service: evaluationService},
-		InterpretationAutomationClient: interpretationWorkerAdapter{service: interpretationService},
+		EvaluationWorkerClient:         evaluationClient,
+		InterpretationAutomationClient: reportClient,
 		ReportStatusReporter:           grpcDeps.Interpretation.ReportStatusReporter,
 		LockManager:                    workerLocks, LockRunner: workerLocks, LockKeyBuilder: workerLocks.Builder(),
 	}
@@ -222,6 +304,29 @@ func TestCurrentRuntimeClosure(t *testing.T) {
 	evaluationHandler := mustWorkerHandler(t, registry, "evaluation_requested_handler", workerDeps)
 	outcomeHandler := mustWorkerHandler(t, registry, "evaluation_outcome_committed_handler", workerDeps)
 	reportHandler := mustWorkerHandler(t, registry, "interpretation_report_generated_handler", workerDeps)
+	failureHandler := mustWorkerHandler(t, registry, "evaluation_failed_handler", workerDeps)
+	evaluationGate := make(chan struct{})
+	registeredEvaluationHandler := evaluationHandler
+	if scenario.beforeEvaluation != nil {
+		registeredEvaluationHandler = func(ctx context.Context, eventType string, payload []byte) error {
+			select {
+			case <-evaluationGate:
+			case <-ctx.Done():
+				return ctx.Err()
+			}
+			return evaluationHandler(ctx, eventType, payload)
+		}
+	}
+	if delivery != nil {
+		delivery.SetHandlers(map[string]handlers.HandlerFunc{
+			eventcatalog.AnswerSheetSubmitted:          answerHandler,
+			eventcatalog.EvaluationRequested:           registeredEvaluationHandler,
+			eventcatalog.EvaluationRetryRequested:      evaluationHandler,
+			eventcatalog.EvaluationFailed:              failureHandler,
+			eventcatalog.EvaluationOutcomeCommitted:    outcomeHandler,
+			eventcatalog.InterpretationReportGenerated: reportHandler,
+		})
+	}
 
 	request := &answersheetpb.SaveAnswerSheetRequest{
 		QuestionnaireCode: runtimeQuestionCode, QuestionnaireVersion: runtimeVersion,
@@ -233,13 +338,52 @@ func TestCurrentRuntimeClosure(t *testing.T) {
 	if err != nil || answerResponse.GetId() == 0 {
 		t.Fatalf("submit AnswerSheet: response=%+v err=%v", answerResponse, err)
 	}
-	answerMessage := capture.Wait(t, eventcatalog.AnswerSheetSubmitted)
-	if err := answerHandler(t.Context(), eventcatalog.AnswerSheetSubmitted, answerMessage.Payload); err != nil {
+	var answerMessage *messaging.Message
+	if delivery != nil && delivery.Covers(eventcatalog.AnswerSheetSubmitted) {
+		answerMessage, err = delivery.Wait(t, eventcatalog.AnswerSheetSubmitted)
+	} else {
+		answerMessage = capture.Wait(t, eventcatalog.AnswerSheetSubmitted)
+		err = answerHandler(t.Context(), eventcatalog.AnswerSheetSubmitted, answerMessage.Payload)
+	}
+	if err != nil {
 		t.Fatalf("consume answersheet.submitted: %v", err)
 	}
-	evaluationMessage := capture.Wait(t, eventcatalog.EvaluationRequested)
-	if err := evaluationHandler(t.Context(), eventcatalog.EvaluationRequested, evaluationMessage.Payload); err != nil {
+	if delivery != nil && delivery.UsesStandardMongo() {
+		assertStandardMongoIntentPublished(t, mongoDB, eventcatalog.AnswerSheetSubmitted)
+	}
+	if scenario.beforeEvaluation != nil {
+		ready, resolveErr := assessmentService.ResolveAssessmentByAnswerSheetID(t.Context(), &evaluationpb.ResolveAssessmentByAnswerSheetIDRequest{AnswerSheetId: answerResponse.GetId()})
+		if resolveErr != nil || ready.GetAssessmentId() == 0 {
+			t.Fatalf("resolve assessment before controlled failure: response=%+v err=%v", ready, resolveErr)
+		}
+		scenario.beforeEvaluation(t, ready.GetAssessmentId(), gormDB, eventing)
+		close(evaluationGate)
+	}
+	var evaluationMessage *messaging.Message
+	if delivery == nil {
+		evaluationMessage = capture.Wait(t, eventcatalog.EvaluationRequested)
+		err = evaluationHandler(t.Context(), eventcatalog.EvaluationRequested, evaluationMessage.Payload)
+	} else {
+		firstEvaluation, firstErr := delivery.Wait(t, eventcatalog.EvaluationRequested)
+		if firstErr == nil {
+			t.Fatal("first Evaluation delivery must report the controlled lost NSQ consumer ACK")
+		}
+		evaluationMessage, err = delivery.Wait(t, eventcatalog.EvaluationRequested)
+		if evaluationMessage.UUID != firstEvaluation.UUID {
+			t.Fatalf("Evaluation event ID changed on NSQ redelivery: first=%s second=%s",
+				firstEvaluation.UUID, evaluationMessage.UUID)
+		}
+	}
+	if err != nil {
 		t.Fatalf("consume evaluation.requested: %v", err)
+	}
+	if scenario.beforeEvaluation != nil {
+		if _, err := delivery.Wait(t, eventcatalog.EvaluationFailed); err != nil {
+			t.Fatalf("consume first evaluation.failed: %v", err)
+		}
+		if _, err := delivery.Wait(t, eventcatalog.EvaluationRetryRequested); err != nil {
+			t.Fatalf("consume authorized evaluation.retry.requested: %v", err)
+		}
 	}
 	// Broker delivery is at least once. Replaying the exact event through the
 	// original handler must not create another durable scoring attempt or fact.
@@ -247,22 +391,75 @@ func TestCurrentRuntimeClosure(t *testing.T) {
 	if err != nil || evaluated.GetAssessmentStatus() != "evaluated" || evaluated.GetAssessmentId() == 0 {
 		t.Fatalf("resolve evaluated assessment before redelivery: response=%+v err=%v", evaluated, err)
 	}
-	assertRowCount(t, gormDB, "runtime_checkpoint", "scope = ? AND assessment_id = ?", 1, "evaluation_run", evaluated.GetAssessmentId())
+	wantRuns := int64(1)
+	if scenario.beforeEvaluation != nil {
+		wantRuns = 2
+	}
+	assertRowCount(t, gormDB, "runtime_checkpoint", "scope = ? AND assessment_id = ?", wantRuns, "evaluation_run", evaluated.GetAssessmentId())
 	assertRowCount(t, gormDB, "evaluation_outcome", "assessment_id = ?", 1, evaluated.GetAssessmentId())
-	assertRowCount(t, gormDB, "domain_event_outbox", "event_type = ?", 1, eventcatalog.EvaluationOutcomeCommitted)
+	assertEvaluationIntentCount(t, gormDB, delivery != nil, eventcatalog.EvaluationOutcomeCommitted, 1)
 	if err := evaluationHandler(t.Context(), eventcatalog.EvaluationRequested, evaluationMessage.Payload); err != nil {
 		t.Fatalf("redeliver evaluation.requested: %v", err)
 	}
-	assertRowCount(t, gormDB, "runtime_checkpoint", "scope = ? AND assessment_id = ?", 1, "evaluation_run", evaluated.GetAssessmentId())
+	assertRowCount(t, gormDB, "runtime_checkpoint", "scope = ? AND assessment_id = ?", wantRuns, "evaluation_run", evaluated.GetAssessmentId())
 	assertRowCount(t, gormDB, "evaluation_outcome", "assessment_id = ?", 1, evaluated.GetAssessmentId())
-	assertRowCount(t, gormDB, "domain_event_outbox", "event_type = ?", 1, eventcatalog.EvaluationOutcomeCommitted)
-	outcomeMessage := capture.Wait(t, eventcatalog.EvaluationOutcomeCommitted)
-	if err := outcomeHandler(t.Context(), eventcatalog.EvaluationOutcomeCommitted, outcomeMessage.Payload); err != nil {
-		t.Fatalf("consume evaluation.outcome.committed: %v", err)
+	assertEvaluationIntentCount(t, gormDB, delivery != nil, eventcatalog.EvaluationOutcomeCommitted, 1)
+	var outcomeMessage *messaging.Message
+	if delivery == nil {
+		outcomeMessage = capture.Wait(t, eventcatalog.EvaluationOutcomeCommitted)
+		err = outcomeHandler(t.Context(), eventcatalog.EvaluationOutcomeCommitted, outcomeMessage.Payload)
+	} else {
+		outcomeMessage, err = delivery.Wait(t, eventcatalog.EvaluationOutcomeCommitted)
 	}
-	reportMessage := capture.Wait(t, eventcatalog.InterpretationReportGenerated)
-	if err := reportHandler(t.Context(), eventcatalog.InterpretationReportGenerated, reportMessage.Payload); err != nil {
+	if err == nil {
+		t.Fatal("first outcome delivery must report the controlled lost gRPC response")
+	}
+	assertSingleCommittedReport(t, mongoDB, delivery != nil && delivery.UsesStandardMongo())
+	if delivery == nil {
+		err = outcomeHandler(t.Context(), eventcatalog.EvaluationOutcomeCommitted, outcomeMessage.Payload)
+	} else {
+		var redelivered *messaging.Message
+		redelivered, err = delivery.Wait(t, eventcatalog.EvaluationOutcomeCommitted)
+		if redelivered.UUID != outcomeMessage.UUID {
+			t.Fatalf("Outcome event ID changed on NSQ redelivery: first=%s second=%s", outcomeMessage.UUID, redelivered.UUID)
+		}
+	}
+	if err != nil {
+		t.Fatalf("redeliver evaluation.outcome.committed after lost response: %v", err)
+	}
+	assertSingleCommittedReport(t, mongoDB, delivery != nil && delivery.UsesStandardMongo())
+	if reportClient.first == nil || reportClient.second == nil ||
+		reportClient.first.GetGenerationId() != reportClient.second.GetGenerationId() ||
+		reportClient.first.GetRunId() != reportClient.second.GetRunId() ||
+		reportClient.first.GetReportId() != reportClient.second.GetReportId() {
+		t.Fatalf("report response identity changed after redelivery: first=%+v second=%+v", reportClient.first, reportClient.second)
+	}
+	for range 2 {
+		select {
+		case eventID := <-reportEventIDs:
+			if eventID != outcomeMessage.UUID {
+				t.Fatalf("Interpretation gRPC event ID=%q, want original %q", eventID, outcomeMessage.UUID)
+			}
+		case <-t.Context().Done():
+			t.Fatal("Interpretation gRPC did not receive original event ID", t.Context().Err())
+		}
+	}
+	if delivery != nil {
+		assertStandardEvaluationPublished(t, gormDB, eventcatalog.EvaluationRequested)
+		assertStandardEvaluationPublished(t, gormDB, eventcatalog.EvaluationOutcomeCommitted)
+	}
+	var reportMessage *messaging.Message
+	if delivery != nil && delivery.Covers(eventcatalog.InterpretationReportGenerated) {
+		reportMessage, err = delivery.Wait(t, eventcatalog.InterpretationReportGenerated)
+	} else {
+		reportMessage = capture.Wait(t, eventcatalog.InterpretationReportGenerated)
+		err = reportHandler(t.Context(), eventcatalog.InterpretationReportGenerated, reportMessage.Payload)
+	}
+	if err != nil {
 		t.Fatalf("consume interpretation.report.generated: %v", err)
+	}
+	if delivery != nil && delivery.UsesStandardMongo() {
+		assertStandardMongoIntentPublished(t, mongoDB, eventcatalog.InterpretationReportGenerated)
 	}
 
 	replayed, err := answerService.SaveAnswerSheet(t.Context(), request)
@@ -273,10 +470,61 @@ func TestCurrentRuntimeClosure(t *testing.T) {
 	if err != nil || readiness.GetReadinessPhase() != "ready" || readiness.GetAssessmentStatus() != "evaluated" {
 		t.Fatalf("assessment readiness: response=%+v err=%v", readiness, err)
 	}
-	assertReportWaitClosure(t, grpcDeps, testeeID, readiness.GetAssessmentId())
+	if scenario.afterReport != nil {
+		scenario.afterReport(t, delivery, grpcDeps, testeeID, readiness.GetAssessmentId())
+	}
+	if !scenario.skipReportWaitClosure {
+		assertReportWaitClosure(t, grpcDeps, testeeID, readiness.GetAssessmentId())
+	}
 	assertCurrentRuntimeFacts(t, gormDB, mongoDB, orgID, testeeID, entryID, taskID, answerResponse.GetId(), readiness.GetAssessmentId(), startedAt)
 	testScanAfterConcurrentClinicianTransfer(t, c, gormDB, orgID, testeeID, entryID)
 	assertLegacyBusinessDateStatistics(t, c, gormDB, orgID, testeeID)
+}
+
+func assertEvaluationIntentCount(t *testing.T, db *gorm.DB, standard bool, eventType string, want int64) {
+	t.Helper()
+	if standard {
+		assertRowCount(t, db, "rm_outbox", "event_type = ?", want, eventType)
+		assertRowCount(t, db, "domain_event_outbox", "event_type = ?", 0, eventType)
+		return
+	}
+	assertRowCount(t, db, "domain_event_outbox", "event_type = ?", want, eventType)
+	assertRowCount(t, db, "rm_outbox", "event_type = ?", 0, eventType)
+}
+
+func assertStandardEvaluationPublished(t *testing.T, db *gorm.DB, eventType string) {
+	t.Helper()
+	deadline := time.Now().Add(5 * time.Second)
+	for time.Now().Before(deadline) {
+		var count int64
+		if err := db.Table("rm_outbox").Where("event_type = ? AND state = ?", eventType, "published").Count(&count).Error; err != nil {
+			t.Fatalf("read standard %s state: %v", eventType, err)
+		} else if count == 1 {
+			return
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	t.Fatalf("standard %s intent was not marked published after Worker delivery", eventType)
+}
+
+func assertStandardMongoIntentPublished(t *testing.T, db *mongo.Database, eventType string) {
+	t.Helper()
+	old, err := db.Collection("domain_event_outbox").CountDocuments(t.Context(), bson.M{"event_type": eventType})
+	if err != nil || old != 0 {
+		t.Fatalf("old Mongo %s intents=%d err=%v, want zero", eventType, old, err)
+	}
+	deadline := time.Now().Add(5 * time.Second)
+	for time.Now().Before(deadline) {
+		count, err := db.Collection("rm_outbox").CountDocuments(t.Context(), bson.M{"event_type": eventType, "state": "published"})
+		if err != nil {
+			t.Fatalf("read standard Mongo %s state: %v", eventType, err)
+		}
+		if count == 1 {
+			return
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	t.Fatalf("standard Mongo %s intent was not published after Worker delivery", eventType)
 }
 
 func createRuntimeActorAndEntry(t *testing.T, c *container.Container, grpcDeps grpctransport.Deps, orgID uint64) (uint64, uint64) {
@@ -337,6 +585,7 @@ func createRuntimeActorAndEntry(t *testing.T, c *container.Container, grpcDeps g
 
 type runtimeReportQuery struct {
 	assessments evaluationtesteeapp.Service
+	runs        *evaluationtesteeapp.RuntimeStatusReader
 	reports     interpretationparticipantapp.Service
 }
 
@@ -380,9 +629,20 @@ func (q runtimeReportQuery) GetAssessmentReport(ctx context.Context, testeeID, a
 	return &collectionevaluation.AssessmentReportResponse{AssessmentID: strconv.FormatUint(assessmentID, 10)}, nil
 }
 
+func (q runtimeReportQuery) GetMyAssessmentRunStatus(ctx context.Context, testeeID, assessmentID uint64) (*collectionevaluation.AssessmentRuntimeStatusResponse, error) {
+	if q.runs == nil {
+		return nil, fmt.Errorf("runtime status reader is not configured")
+	}
+	result, err := q.runs.Get(ctx, evaluationtesteeapp.Actor{TesteeID: testeeID}, assessmentID)
+	if err != nil || result == nil {
+		return nil, err
+	}
+	return &collectionevaluation.AssessmentRuntimeStatusResponse{Attempt: result.Attempt, Status: result.Status.String()}, nil
+}
+
 func assertReportWaitClosure(t *testing.T, grpcDeps grpctransport.Deps, testeeID, assessmentID uint64) {
 	t.Helper()
-	query := runtimeReportQuery{assessments: grpcDeps.Evaluation.TesteeService, reports: grpcDeps.Interpretation.ParticipantService}
+	query := runtimeReportQuery{assessments: grpcDeps.Evaluation.TesteeService, runs: grpcDeps.Evaluation.RuntimeStatusReader, reports: grpcDeps.Interpretation.ParticipantService}
 	cache := grpcDeps.Interpretation.ReportStatusReporter.Cache()
 	waiter := reportwait.NewService(query, cache, nil, nil, reportwait.DefaultConfig())
 	status, err := waiter.Wait(t.Context(), testeeID, assessmentID, time.Second)
@@ -561,16 +821,67 @@ type evaluationWorkerAdapter struct {
 	service *grpcservice.EvaluationWorkerService
 }
 
+type runtimeEvaluationGRPCAdapter struct {
+	client evaluationpb.EvaluationWorkerServiceClient
+}
+
+func (a runtimeEvaluationGRPCAdapter) ExecuteEvaluation(ctx context.Context, assessmentID uint64) (*evaluationpb.ExecuteEvaluationResponse, error) {
+	return a.client.ExecuteEvaluation(ctx, &evaluationpb.ExecuteEvaluationRequest{AssessmentId: assessmentID})
+}
+
 func (a evaluationWorkerAdapter) ExecuteEvaluation(ctx context.Context, assessmentID uint64) (*evaluationpb.ExecuteEvaluationResponse, error) {
 	return a.service.ExecuteEvaluation(ctx, &evaluationpb.ExecuteEvaluationRequest{AssessmentId: assessmentID})
 }
 
 type interpretationWorkerAdapter struct {
-	service *grpcservice.InterpretationAutomationService
+	client interpretationpb.InterpretationAutomationServiceClient
 }
 
 func (a interpretationWorkerAdapter) GenerateReportFromOutcome(ctx context.Context, outcomeID string) (*interpretationpb.GenerateReportFromAssessmentResponse, error) {
-	return a.service.GenerateReportFromOutcome(ctx, &interpretationpb.GenerateReportFromOutcomeRequest{OutcomeId: outcomeID})
+	return a.client.GenerateReportFromOutcome(ctx, &interpretationpb.GenerateReportFromOutcomeRequest{OutcomeId: outcomeID})
+}
+
+// Hide one successful gRPC response after the server has committed. The
+// Worker must retry the original event without creating a second report.
+type lostReportResponseOnce struct {
+	underlying interpretationWorkerAdapter
+	first      *interpretationpb.GenerateReportFromAssessmentResponse
+	second     *interpretationpb.GenerateReportFromAssessmentResponse
+}
+
+func (c *lostReportResponseOnce) GenerateReportFromOutcome(ctx context.Context, outcomeID string) (*interpretationpb.GenerateReportFromAssessmentResponse, error) {
+	response, err := c.underlying.GenerateReportFromOutcome(ctx, outcomeID)
+	if err != nil || response == nil || !response.Success {
+		return response, err
+	}
+	if c.first == nil {
+		c.first = response
+		return nil, fmt.Errorf("controlled lost report gRPC response after commit")
+	}
+	c.second = response
+	return response, nil
+}
+
+func assertSingleCommittedReport(t *testing.T, db *mongo.Database, standardMongo bool) {
+	t.Helper()
+	for _, collection := range []string{"report_generations", "interpretation_runs", "interpret_report_artifacts"} {
+		count, err := db.Collection(collection).CountDocuments(t.Context(), bson.M{})
+		if err != nil || count != 1 {
+			t.Fatalf("%s count=%d err=%v, want one durable report fact", collection, count, err)
+		}
+	}
+	outboxCollection, unusedCollection := "domain_event_outbox", "rm_outbox"
+	if standardMongo {
+		outboxCollection, unusedCollection = unusedCollection, outboxCollection
+	}
+	count, err := db.Collection(outboxCollection).CountDocuments(t.Context(), bson.M{"event_type": eventcatalog.InterpretationReportGenerated})
+	if err != nil || count != 1 {
+		t.Fatalf("%s report generated count=%d err=%v, want one", outboxCollection, count, err)
+	}
+	unused, err := db.Collection(unusedCollection).CountDocuments(t.Context(), bson.M{"event_type": eventcatalog.InterpretationReportGenerated})
+	if err != nil || unused != 0 {
+		t.Fatalf("%s report generated count=%d err=%v, want zero", unusedCollection, unused, err)
+	}
 }
 
 func mustWorkerHandler(t *testing.T, registry *handlers.Registry, name string, deps *handlers.Dependencies) handlers.HandlerFunc {

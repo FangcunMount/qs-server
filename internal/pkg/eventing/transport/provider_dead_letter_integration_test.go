@@ -22,6 +22,7 @@ import (
 	eventcatalog "github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
 	eventobservability "github.com/FangcunMount/qs-server/internal/pkg/eventing/observe"
 	eventruntime "github.com/FangcunMount/qs-server/internal/pkg/eventing/runtime"
+	genericoptions "github.com/FangcunMount/qs-server/internal/pkg/options"
 	workermessaging "github.com/FangcunMount/qs-server/internal/worker/integration/messaging"
 	drivermysql "github.com/go-sql-driver/mysql"
 	"github.com/nsqio/go-nsq"
@@ -177,6 +178,7 @@ func TestNSQDeliveryExhaustionPersistsMySQLDeadLetter(t *testing.T) {
 	createNSQTopicAndChannel(t, topic, channel)
 
 	var handlerCalls atomic.Int32
+	firstTransportID := make(chan string, 1)
 	options := basemessaging.SubscriberOptions{
 		MaxInFlight: 1,
 		MaxAttempts: 2,
@@ -192,8 +194,12 @@ func TestNSQDeliveryExhaustionPersistsMySQLDeadLetter(t *testing.T) {
 	}
 	t.Cleanup(func() { _ = subscriber.Close() })
 	wantCause := errors.New("qs-server transport integration handler failed")
-	if err := subscriber.Subscribe(topic, channel, func(context.Context, *basemessaging.Message) error {
+	if err := subscriber.Subscribe(topic, channel, func(_ context.Context, received *basemessaging.Message) error {
 		handlerCalls.Add(1)
+		select {
+		case firstTransportID <- received.TransportMessageID:
+		default:
+		}
 		return wantCause
 	}); err != nil {
 		t.Fatal(err)
@@ -211,16 +217,17 @@ func TestNSQDeliveryExhaustionPersistsMySQLDeadLetter(t *testing.T) {
 	}
 
 	type deadLetterRow struct {
-		MessageID        string
-		EventID          string
-		OrgID            int64
-		Provider         string
-		Topic            string
-		Channel          string
-		DeliveryAttempts int
-		Payload          string
-		LastError        string
-		Disposition      string
+		MessageID          string
+		TransportMessageID string
+		EventID            string
+		OrgID              int64
+		Provider           string
+		Topic              string
+		Channel            string
+		DeliveryAttempts   int
+		Payload            string
+		LastError          string
+		Disposition        string
 	}
 	var row deadLetterRow
 	deadline := time.NewTimer(20 * time.Second)
@@ -228,9 +235,9 @@ func TestNSQDeliveryExhaustionPersistsMySQLDeadLetter(t *testing.T) {
 	defer deadline.Stop()
 	defer ticker.Stop()
 	for {
-		err = db.QueryRowContext(t.Context(), `SELECT message_id,event_id,org_id,provider,topic_name,channel_name,
+		err = db.QueryRowContext(t.Context(), `SELECT message_id,transport_message_id,event_id,org_id,provider,topic_name,channel_name,
 delivery_attempts,payload_json,last_error,retry_disposition FROM event_delivery_dead_letter WHERE message_id=?`, message.UUID).
-			Scan(&row.MessageID, &row.EventID, &row.OrgID, &row.Provider, &row.Topic, &row.Channel, &row.DeliveryAttempts, &row.Payload, &row.LastError, &row.Disposition)
+			Scan(&row.MessageID, &row.TransportMessageID, &row.EventID, &row.OrgID, &row.Provider, &row.Topic, &row.Channel, &row.DeliveryAttempts, &row.Payload, &row.LastError, &row.Disposition)
 		if err == nil {
 			break
 		}
@@ -247,8 +254,48 @@ delivery_attempts,payload_json,last_error,retry_disposition FROM event_delivery_
 	if got := handlerCalls.Load(); got != 2 {
 		t.Fatalf("handler calls = %d, want 2", got)
 	}
-	if row.MessageID != message.UUID || row.EventID != "transport-event-1" || row.OrgID != 7 || row.Provider != "nsq" || row.Topic != topic || row.Channel != channel || row.DeliveryAttempts != 2 || row.Payload != string(payload) || row.LastError != wantCause.Error() || row.Disposition != "manual_required" {
+	if row.MessageID != message.UUID || row.TransportMessageID == "" || row.TransportMessageID != <-firstTransportID || row.EventID != "transport-event-1" || row.OrgID != 7 || row.Provider != "nsq" || row.Topic != topic || row.Channel != channel || row.DeliveryAttempts != 2 || row.Payload != string(payload) || row.LastError != wantCause.Error() || row.Disposition != "manual_required" {
 		t.Fatalf("dead-letter row = %#v", row)
+	}
+	if _, err := db.ExecContext(t.Context(), `UPDATE event_delivery_dead_letter
+SET retry_disposition='terminal',replay_request_id='replay-request-1' WHERE transport_message_id=?`, row.TransportMessageID); err != nil {
+		t.Fatal(err)
+	}
+	// A later publish with the same logical UUID receives a new NSQ ID. If it
+	// exhausts too, its failure must not be hidden behind the settled old row.
+	if err := publisher.PublishMessage(t.Context(), topic, message); err != nil {
+		t.Fatal(err)
+	}
+	replayDeadline := time.NewTimer(20 * time.Second)
+	defer replayDeadline.Stop()
+	for {
+		var count int
+		if err := db.QueryRowContext(t.Context(), `SELECT COUNT(*) FROM event_delivery_dead_letter WHERE message_id=?`, message.UUID).Scan(&count); err != nil {
+			t.Fatal(err)
+		}
+		if count == 2 {
+			break
+		}
+		select {
+		case <-ticker.C:
+		case <-replayDeadline.C:
+			t.Fatal("timed out waiting for a separate physical replay failure")
+		}
+	}
+	if got := handlerCalls.Load(); got != 4 {
+		t.Fatalf("handler calls after physical replay = %d, want 4", got)
+	}
+	var originalState, originalRequestID, newTransportID, newState string
+	if err := db.QueryRowContext(t.Context(), `SELECT retry_disposition,replay_request_id FROM event_delivery_dead_letter WHERE transport_message_id=?`, row.TransportMessageID).
+		Scan(&originalState, &originalRequestID); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.QueryRowContext(t.Context(), `SELECT transport_message_id,retry_disposition FROM event_delivery_dead_letter
+WHERE message_id=? AND transport_message_id<>?`, message.UUID, row.TransportMessageID).Scan(&newTransportID, &newState); err != nil {
+		t.Fatal(err)
+	}
+	if originalState != "terminal" || originalRequestID != "replay-request-1" || newTransportID == "" || newTransportID == row.TransportMessageID || newState != "manual_required" {
+		t.Fatalf("physical failures are not isolated: original=%s/%s new=%s/%s", originalState, originalRequestID, newTransportID, newState)
 	}
 }
 
@@ -480,6 +527,175 @@ func TestNSQFailedHandoffWaitsForMySQLRecoveryWithoutBusinessRetry(t *testing.T)
 	}
 }
 
+func TestDeadLetterRepeatedHandoffDoesNotReopenClaimedOrArchivedRow(t *testing.T) {
+	db := openIsolatedDeadLetterDatabase(t)
+	recorder, err := NewSQLDeadLetterRecorder(db)
+	if err != nil {
+		t.Fatal(err)
+	}
+	org7, org8 := int64(7), int64(8)
+	now := time.Now().UTC().Truncate(time.Millisecond)
+	for _, tc := range []struct {
+		name, disposition, requestID, priorError, wantError string
+		wantAttempts                                        int
+	}{
+		{name: "unclaimed_manual", disposition: "manual_required", priorError: "first failure", wantError: "later failure", wantAttempts: 9},
+		{name: "claimed", disposition: "automatic", requestID: "replay-1", priorError: "publish outcome unknown", wantError: "publish outcome unknown", wantAttempts: 8},
+		{name: "failed_replay", disposition: "manual_required", requestID: "replay-1", priorError: "payload decode failed", wantError: "payload decode failed", wantAttempts: 8},
+		{name: "completed", disposition: "terminal", requestID: "replay-1", priorError: "first failure", wantError: "first failure", wantAttempts: 8},
+		{name: "archived_mock", disposition: "archived_mock", priorError: "first failure", wantError: "first failure", wantAttempts: 8},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			record := DeadLetterRecord{
+				MessageID: tc.name, EventID: "event-7", OrgID: &org7,
+				Provider: "nsq", Topic: "qs.evaluation.lifecycle", Channel: "qs-worker",
+				DeliveryAttempts: 8, Payload: []byte(`{"id":"event-7","data":{"org_id":7}}`),
+				LastError: "first failure", FailedAt: now,
+			}
+			if err := recorder.RecordDeadLetter(t.Context(), record); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := db.ExecContext(t.Context(), `UPDATE event_delivery_dead_letter
+				SET retry_disposition=?, replay_request_id=?, last_error=? WHERE message_id=?`,
+				tc.disposition, nullableString(tc.requestID), tc.priorError, tc.name); err != nil {
+				t.Fatal(err)
+			}
+			// A repeated handoff with the same physical identity may refresh only
+			// an unclaimed manual row.
+			duplicate := record
+			duplicate.DeliveryAttempts = 9
+			duplicate.LastError = "later failure"
+			duplicate.FailedAt = now.Add(time.Second)
+			if err := recorder.RecordDeadLetter(t.Context(), duplicate); err != nil {
+				t.Fatal(err)
+			}
+			conflicting := duplicate
+			conflicting.EventID = "event-8"
+			conflicting.OrgID = &org8
+			conflicting.Payload = []byte(`{"id":"event-8","data":{"org_id":8}}`)
+			if err := recorder.RecordDeadLetter(t.Context(), conflicting); err == nil {
+				t.Fatal("different tenant or payload was silently accepted under one physical identity")
+			}
+			var eventID, payload, lastError, disposition, requestID string
+			var orgID int64
+			var attempts int
+			if err := db.QueryRowContext(t.Context(), `SELECT event_id,org_id,payload_json,delivery_attempts,
+				COALESCE(last_error,''),retry_disposition,COALESCE(replay_request_id,'')
+				FROM event_delivery_dead_letter WHERE message_id=?`, tc.name).
+				Scan(&eventID, &orgID, &payload, &attempts, &lastError, &disposition, &requestID); err != nil {
+				t.Fatal(err)
+			}
+			if eventID != record.EventID || orgID != org7 || payload != string(record.Payload) || attempts != tc.wantAttempts ||
+				lastError != tc.wantError || disposition != tc.disposition || requestID != tc.requestID {
+				t.Fatalf("duplicate handoff changed protected dead letter: event=%s org=%d payload=%s attempts=%d error=%s state=%s request=%s", eventID, orgID, payload, attempts, lastError, disposition, requestID)
+			}
+		})
+	}
+}
+
+func TestDeadLetterPhysicalReplayFailureGetsSeparateRow(t *testing.T) {
+	db := openIsolatedDeadLetterDatabase(t)
+	recorder, err := NewSQLDeadLetterRecorder(db)
+	if err != nil {
+		t.Fatal(err)
+	}
+	orgID := int64(7)
+	record := DeadLetterRecord{
+		MessageID: "stable-event-7", TransportMessageID: "original-nsq-id", EventID: "stable-event-7", OrgID: &orgID,
+		Provider: "nsq", Topic: "qs.evaluation.lifecycle", Channel: "qs-worker", DeliveryAttempts: 8,
+		Payload: []byte(`{"id":"stable-event-7","data":{"org_id":7}}`), LastError: "original delivery failed", FailedAt: time.Now(),
+	}
+	if err := recorder.RecordDeadLetter(t.Context(), record); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.ExecContext(t.Context(), `UPDATE event_delivery_dead_letter SET retry_disposition='terminal',replay_request_id='replay-7' WHERE transport_message_id=?`, record.TransportMessageID); err != nil {
+		t.Fatal(err)
+	}
+	replayFailure := record
+	replayFailure.TransportMessageID = "replayed-nsq-id"
+	replayFailure.LastError = "replayed delivery failed"
+	if err := recorder.RecordDeadLetter(t.Context(), replayFailure); err != nil {
+		t.Fatal(err)
+	}
+	if err := recorder.RecordDeadLetter(t.Context(), replayFailure); err != nil {
+		t.Fatal(err)
+	}
+	rows, err := db.QueryContext(t.Context(), `SELECT transport_message_id,retry_disposition,COALESCE(replay_request_id,''),last_error
+FROM event_delivery_dead_letter WHERE message_id=? ORDER BY id`, record.MessageID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer rows.Close()
+	for i, want := range []struct{ physical, disposition, requestID, cause string }{
+		{"original-nsq-id", "terminal", "replay-7", "original delivery failed"},
+		{"replayed-nsq-id", "manual_required", "", "replayed delivery failed"},
+	} {
+		if !rows.Next() {
+			t.Fatalf("missing failure occurrence %d", i)
+		}
+		var physical, disposition, requestID, cause string
+		if err := rows.Scan(&physical, &disposition, &requestID, &cause); err != nil {
+			t.Fatal(err)
+		}
+		if physical != want.physical || disposition != want.disposition || requestID != want.requestID || cause != want.cause {
+			t.Fatalf("failure occurrence %d = %q/%q/%q/%q, want %+v", i, physical, disposition, requestID, cause, want)
+		}
+	}
+	if rows.Next() {
+		t.Fatal("duplicate physical handoff created a third occurrence")
+	}
+	if err := rows.Err(); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestStandaloneDeadLetterRecorderUsesConfiguredUTCPlusEight(t *testing.T) {
+	db := openIsolatedDeadLetterDatabase(t)
+	var databaseName string
+	if err := db.QueryRowContext(t.Context(), "SELECT DATABASE()").Scan(&databaseName); err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := drivermysql.ParseDSN(os.Getenv("MYSQL_DSN"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	opts := genericoptions.NewMySQLOptions()
+	opts.Host, opts.Username, opts.Password, opts.Database = cfg.Addr, cfg.User, cfg.Passwd, databaseName
+	recorder, err := OpenMySQLDeadLetterRecorder(opts)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = recorder.Close() })
+	var sessionZone string
+	if err := recorder.db.QueryRowContext(t.Context(), "SELECT @@session.time_zone").Scan(&sessionZone); err != nil {
+		t.Fatal(err)
+	}
+	if sessionZone != "+08:00" {
+		t.Fatalf("dead-letter MySQL session time zone = %q, want +08:00", sessionZone)
+	}
+	shanghai, err := time.LoadLocation("Asia/Shanghai")
+	if err != nil {
+		t.Fatal(err)
+	}
+	failedAt := time.Date(2026, 9, 25, 23, 8, 9, 0, shanghai)
+	record := DeadLetterRecord{
+		MessageID: "timezone-event", TransportMessageID: "physical-timezone", EventID: "timezone-event",
+		Provider: "nsq", Topic: "topic", Channel: "channel", DeliveryAttempts: 8,
+		Payload: []byte(`{"id":"timezone-event"}`), LastError: "failed", FailedAt: failedAt,
+	}
+	if err := recorder.RecordDeadLetter(t.Context(), record); err != nil {
+		t.Fatal(err)
+	}
+	var storedAt string
+	if err := recorder.db.QueryRowContext(t.Context(), `SELECT DATE_FORMAT(failed_at,'%Y-%m-%d %H:%i:%s')
+FROM event_delivery_dead_letter WHERE message_id=?`, record.MessageID).Scan(&storedAt); err != nil {
+		t.Fatal(err)
+	}
+	if storedAt != "2026-09-25 23:08:09" {
+		t.Fatalf("dead-letter wall time = %q, want configured UTC+8", storedAt)
+	}
+}
+
 func openIsolatedDeadLetterDatabase(t *testing.T) *sql.DB {
 	t.Helper()
 	dsn := os.Getenv("MYSQL_DSN")
@@ -518,6 +734,7 @@ func createDeadLetterTable(ctx context.Context, db *sql.DB) error {
 	_, err := db.ExecContext(ctx, `CREATE TABLE event_delivery_dead_letter (
  id bigint unsigned NOT NULL AUTO_INCREMENT PRIMARY KEY,
  message_id varchar(128) NOT NULL,
+ transport_message_id varchar(64) NOT NULL DEFAULT '',
  event_id varchar(128) NULL,
  org_id bigint NULL,
  provider varchar(32) NOT NULL,
@@ -527,10 +744,12 @@ func createDeadLetterTable(ctx context.Context, db *sql.DB) error {
  payload_json longtext NOT NULL,
  last_error text NULL,
  retry_disposition varchar(32) NOT NULL,
+ replay_request_id varchar(64) NULL,
+ replayed_at datetime(3) NULL,
  failed_at datetime(3) NOT NULL,
  created_at datetime(3) NOT NULL,
  updated_at datetime(3) NOT NULL,
- UNIQUE KEY uq_delivery_identity (provider,topic_name,channel_name,message_id)
+ UNIQUE KEY uq_delivery_identity (provider,topic_name,channel_name,message_id,transport_message_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`)
 	return err
 }

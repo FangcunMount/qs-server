@@ -106,9 +106,6 @@ func handleEvaluationFailed(deps *Dependencies) HandlerFunc {
 			slog.String("reason", data.Reason),
 			slog.Time("failed_at", data.FailedAt),
 		)
-		if deps.InternalClient == nil {
-			return nil
-		}
 		assessmentID, err := safeconv.Int64ToUint64(data.AssessmentID)
 		if err != nil {
 			return fmt.Errorf("invalid assessment id in evaluation failed event: %w", err)

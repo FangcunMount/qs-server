@@ -23,17 +23,18 @@ type EventsView struct {
 }
 
 type RetryGovernanceSummary struct {
-	Automatic            int64 `json:"automatic"`
-	ManualRequired       int64 `json:"manual_required"`
-	Terminal             int64 `json:"terminal"`
-	OutboxAutomatic      int64 `json:"outbox_automatic"`
-	OutboxManual         int64 `json:"outbox_manual_required"`
-	OutboxAuthorized     int64 `json:"outbox_authorized"`
-	OutboxTerminal       int64 `json:"outbox_terminal"`
-	BlockedRetryEvents   int64 `json:"blocked_retry_events"`
-	TransportDeadLetters int64 `json:"transport_dead_letters"`
-	HeldAutomatic        int64 `json:"held_automatic"`
-	HeldManualRequired   int64 `json:"held_manual_required"`
+	Automatic                 int64 `json:"automatic"`
+	ManualRequired            int64 `json:"manual_required"`
+	Terminal                  int64 `json:"terminal"`
+	OutboxAutomatic           int64 `json:"outbox_automatic"`
+	OutboxManual              int64 `json:"outbox_manual_required"`
+	OutboxAuthorized          int64 `json:"outbox_authorized"`
+	OutboxTerminal            int64 `json:"outbox_terminal"`
+	BlockedRetryEvents        int64 `json:"blocked_retry_events"`
+	TransportDeadLetters      int64 `json:"transport_dead_letters"`
+	TransportReplayUnresolved int64 `json:"transport_replay_unresolved"`
+	HeldAutomatic             int64 `json:"held_automatic"`
+	HeldManualRequired        int64 `json:"held_manual_required"`
 }
 
 type RetryGovernanceReader interface {
@@ -41,16 +42,21 @@ type RetryGovernanceReader interface {
 }
 
 type RetryCandidate struct {
-	Kind            string     `json:"kind"`
-	Store           string     `json:"store"`
-	ResourceID      string     `json:"resource_id"`
-	Attempt         int        `json:"attempt"`
-	Disposition     string     `json:"retry_disposition"`
-	NextAttemptAt   *time.Time `json:"next_attempt_at,omitempty"`
-	RetryEventID    string     `json:"retry_event_id,omitempty"`
-	ActionRequestID string     `json:"action_request_id,omitempty"`
-	LastErrorKind   string     `json:"last_error_kind,omitempty"`
-	UpdatedAt       time.Time  `json:"updated_at"`
+	Kind               string     `json:"kind"`
+	Store              string     `json:"store"`
+	ResourceID         string     `json:"resource_id"`
+	Attempt            int        `json:"attempt"`
+	Disposition        string     `json:"retry_disposition"`
+	NextAttemptAt      *time.Time `json:"next_attempt_at,omitempty"`
+	RetryEventID       string     `json:"retry_event_id,omitempty"`
+	ActionRequestID    string     `json:"action_request_id,omitempty"`
+	EventID            string     `json:"event_id,omitempty"`
+	MessageID          string     `json:"message_id,omitempty"`
+	TransportMessageID string     `json:"transport_message_id,omitempty"`
+	TopicName          string     `json:"topic_name,omitempty"`
+	ChannelName        string     `json:"channel_name,omitempty"`
+	LastErrorKind      string     `json:"last_error_kind,omitempty"`
+	UpdatedAt          time.Time  `json:"updated_at"`
 }
 
 type RetryCandidatePage struct {

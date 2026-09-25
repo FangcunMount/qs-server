@@ -71,13 +71,14 @@ func TestFailedMessageHandlerPreservesTransportEvidence(t *testing.T) {
 	recorder := &deadLetterRecorderStub{}
 	handler := FailedMessageHandler(recorder)
 	message := basemessaging.NewMessage("message-1", []byte(`{"id":"event-1","data":{"org_id":7}}`))
+	message.TransportMessageID = "physical-nsq-1"
 	wantErr := errors.New("decode failed")
 	if err := handler(t.Context(), basemessaging.FailedMessage{
 		Provider: "nsq", Topic: "evaluation", Channel: "worker", Message: message, Attempts: 8, Cause: wantErr,
 	}); err != nil {
 		t.Fatal(err)
 	}
-	if recorder.record.MessageID != "message-1" || recorder.record.EventID != "event-1" || recorder.record.OrgID == nil || *recorder.record.OrgID != 7 || recorder.record.DeliveryAttempts != 8 || recorder.record.LastError != wantErr.Error() {
+	if recorder.record.MessageID != "message-1" || recorder.record.TransportMessageID != "physical-nsq-1" || recorder.record.EventID != "event-1" || recorder.record.OrgID == nil || *recorder.record.OrgID != 7 || recorder.record.DeliveryAttempts != 8 || recorder.record.LastError != wantErr.Error() {
 		t.Fatalf("record = %#v", recorder.record)
 	}
 }

@@ -18,7 +18,9 @@ type AuthorizedDelivery struct {
 }
 
 type DeliveryReplayStore interface {
+	ValidateReplayBatch(context.Context, int64, []DeliveryReplayTarget) error
 	AuthorizeReplay(context.Context, int64, string, []DeliveryReplayTarget, time.Time) ([]AuthorizedDelivery, error)
 	CompleteReplay(context.Context, uint64, string, time.Time) error
 	FailReplay(context.Context, uint64, string, string, time.Time) error
+	RecordReplayUncertain(context.Context, uint64, string, string, time.Time) error
 }
