@@ -76,10 +76,11 @@ type profileRuntime struct {
 	interval   time.Duration
 	// Candidate standard profiles replace the whole legacy writer/runner pair.
 	// These hooks stay nil for all existing profiles.
-	run           func(context.Context) error
-	drain         func(context.Context) error
-	drainTimeout  time.Duration
-	runtimeStatus func() appEventing.ProfileRuntimeStatus
+	run            func(context.Context) error
+	drain          func(context.Context) error
+	drainTimeout   time.Duration
+	runtimeStatus  func() appEventing.ProfileRuntimeStatus
+	statusReporter appEventing.OutboxStatusReporter
 }
 
 type consumerRuntime struct {
@@ -308,6 +309,9 @@ func (s *Subsystem) Start(parent context.Context) error {
 		for _, profile := range profiles {
 			if profile.run != nil {
 				s.startProfileRun(ctx, profile)
+				if profile.statusReporter != nil {
+					s.startProfileStatus(ctx, profile)
+				}
 				continue
 			}
 			if profile.relay == nil {
@@ -325,6 +329,24 @@ func (s *Subsystem) startProfileRun(ctx context.Context, profile *profileRuntime
 		defer s.wg.Done()
 		if err := profile.run(ctx); err != nil && ctx.Err() == nil {
 			slog.Error("event profile runner exited", "profile", profile.name, "error", err)
+		}
+	}()
+}
+
+func (s *Subsystem) startProfileStatus(ctx context.Context, profile *profileRuntime) {
+	s.wg.Add(1)
+	go func() {
+		defer s.wg.Done()
+		profile.statusReporter.ReportOutboxStatus(ctx)
+		ticker := time.NewTicker(30 * time.Second)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				profile.statusReporter.ReportOutboxStatus(ctx)
+			}
 		}
 	}()
 }

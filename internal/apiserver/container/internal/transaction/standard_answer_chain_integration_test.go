@@ -19,15 +19,18 @@ import (
 	pb "github.com/FangcunMount/qs-server/api/grpc/gen/evaluation"
 	appintake "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/intake"
 	journey "github.com/FangcunMount/qs-server/internal/apiserver/application/journey/assessmentintake"
+	apphotrank "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/hotrank"
 	appanswersheet "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/answersheet"
 	assessmentcache "github.com/FangcunMount/qs-server/internal/apiserver/cache/evaluation"
 	domainanswersheet "github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/answersheet"
 	"github.com/FangcunMount/qs-server/internal/apiserver/eventing/standardoutbox"
+	redishotrank "github.com/FangcunMount/qs-server/internal/apiserver/infra/modelcatalog/hotrank"
 	mongoanswersheet "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/answersheet"
 	mongostandard "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/standardoutbox"
 	assessmentmysql "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/evaluation"
 	mysqlstandard "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/standardoutbox"
 	submitport "github.com/FangcunMount/qs-server/internal/apiserver/port/answersheetsubmit"
+	hotrankport "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/hotrank"
 	grpcservice "github.com/FangcunMount/qs-server/internal/apiserver/transport/grpc/service"
 	eventcatalog "github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
 	eventruntime "github.com/FangcunMount/qs-server/internal/pkg/eventing/runtime"
@@ -57,8 +60,11 @@ import (
 
 // A committed real AnswerSheet flows from the SDK Mongo row through NSQ's
 // original consumer and Worker handler to the real MySQL Assessment transition
-// and a second SDK row. Lock contention and a lost broker FIN both redeliver
-// the same message ID without creating an extra Assessment or MySQL SDK row.
+// and a second SDK row. The independent hot-rank channel projects the same
+// event once despite a temporary Redis outage and a later lost acknowledgement.
+// Lock contention and a lost broker FIN redeliver to the Worker without an
+// extra Assessment. A later independent questionnaire submission also crosses
+// the same broker and Worker path without creating an Assessment.
 func TestStandardAnswerSheetToAssessmentAcrossNSQ(t *testing.T) {
 	mongoURI, dsn, nsqAddress := os.Getenv("RM_QS_MONGO_URI"), os.Getenv("RM_QS_ASSESSMENT_DSN"), os.Getenv("RM_QS_NSQ_TCP")
 	parsed, err := mysqldriver.ParseDSN(dsn)
@@ -101,6 +107,10 @@ events:
 	require.NoError(t, err)
 	sheet := standardSubmissionSheet(t, 90010003, "through NSQ", admission)
 	submittedID := sheet.Events()[0].EventID()
+	independentAdmission, err := domainanswersheet.NewIndependentAdmission("QNR-M4", "1.0.0")
+	require.NoError(t, err)
+	independentSheet := standardSubmissionSheet(t, 90010004, "independent questionnaire", independentAdmission)
+	independentID := independentSheet.Events()[0].EventID()
 	fingerprint, err := submitport.Fingerprint(sheet)
 	require.NoError(t, err)
 	_, existed, err := durable.CreateDurably(ctx, sheet, appanswersheet.DurableSubmitMeta{WriterID: 301, IdempotencyKey: "m4-chain", Fingerprint: fingerprint})
@@ -186,7 +196,7 @@ events:
 		if decodeErr == nil && !recognized {
 			decodeErr = fmt.Errorf("standard message lost original NSQ envelope")
 		}
-		if decodeErr == nil && (decoded.UUID != submittedID || decoded.Metadata["event_type"] != "answersheet.submitted") {
+		if decodeErr == nil && ((decoded.UUID != submittedID && decoded.UUID != independentID) || decoded.Metadata["event_type"] != "answersheet.submitted") {
 			decodeErr = fmt.Errorf("standard message changed AnswerSheet event identity")
 		}
 		if decodeErr == nil {
@@ -199,15 +209,55 @@ events:
 		}
 		return decodeErr
 	}))
+	// Keep the hot-rank Redis failure independent of the Worker's lock Redis.
+	hotrankMini := miniredis.RunT(t)
+	hotrankMini.SetError("LOADING hot-rank Redis temporarily unavailable")
+	hotrankRedisClient := redis.NewClient(&redis.Options{Addr: hotrankMini.Addr()})
+	defer hotrankRedisClient.Close()
+	hotrankProjection := redishotrank.NewRedisScaleHotRankProjection(hotrankRedisClient, keys)
+	hotrankHandler := apphotrank.NewEventConsumer(hotrankProjection)
+	hotrankConsumer, err := nsq.NewConsumer(topic, "qs-apiserver-modelcatalog-hot-rank-v1", config)
+	require.NoError(t, err)
+	hotrankConsumer.SetLogger(nil, nsq.LogLevelError)
+	hotrankDelivered := make(chan delivery, 3)
+	var hotrankCalls atomic.Int32
+	hotrankConsumer.AddHandler(nsq.HandlerFunc(func(raw *nsq.Message) error {
+		decoded, recognized, handleErr := messaging.DecodeMessagePayload(raw.Body)
+		if handleErr == nil && !recognized {
+			handleErr = fmt.Errorf("hot-rank channel lost original NSQ envelope")
+		}
+		if handleErr == nil && ((decoded.UUID != submittedID && decoded.UUID != independentID) || decoded.Metadata["event_type"] != "answersheet.submitted") {
+			handleErr = fmt.Errorf("hot-rank channel changed AnswerSheet event identity")
+		}
+		if handleErr == nil {
+			handleErr = hotrankHandler(ctx, "answersheet.submitted", decoded.Payload)
+		}
+		if handleErr == nil && hotrankCalls.Add(1) == 1 {
+			handleErr = fmt.Errorf("simulate lost hot-rank acknowledgement after projection")
+		}
+		select {
+		case hotrankDelivered <- delivery{id: raw.ID, attempts: raw.Attempts, err: handleErr}:
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+		return handleErr
+	}))
 	proxy, stopProxy := dropFirstFINProxy(t, ctx, nsqAddress)
 	defer stopProxy()
 	require.NoError(t, consumer.ConnectToNSQD(proxy))
+	require.NoError(t, hotrankConsumer.ConnectToNSQD(nsqAddress))
 	defer func() {
 		consumer.Stop()
+		hotrankConsumer.Stop()
 		select {
 		case <-consumer.StopChan:
 		case <-time.After(5 * time.Second):
 			t.Error("consumer did not stop")
+		}
+		select {
+		case <-hotrankConsumer.StopChan:
+		case <-time.After(5 * time.Second):
+			t.Error("hot-rank consumer did not stop")
 		}
 	}()
 	producer, err := nsq.NewProducer(nsqAddress, config)
@@ -229,6 +279,16 @@ events:
 	relayDone := make(chan error, 1)
 	go func() { relayDone <- forwarder.Run(relayCtx) }()
 	defer stopRelay()
+	var firstHotrank nsq.MessageID
+	select {
+	case got := <-hotrankDelivered:
+		require.ErrorContains(t, got.err, "LOADING hot-rank Redis temporarily unavailable")
+		require.EqualValues(t, 1, got.attempts)
+		firstHotrank = got.id
+		hotrankMini.SetError("")
+	case <-ctx.Done():
+		t.Fatal("standard hot-rank Redis outage was not observed", ctx.Err())
+	}
 	var first nsq.MessageID
 	for i := range 3 {
 		select {
@@ -257,6 +317,58 @@ events:
 			t.Fatal("standard AnswerSheet chain timed out", ctx.Err())
 		}
 	}
+	for i := 1; i < 3; i++ {
+		select {
+		case got := <-hotrankDelivered:
+			if i == 1 {
+				require.ErrorContains(t, got.err, "lost hot-rank acknowledgement")
+			} else {
+				require.NoError(t, got.err)
+			}
+			require.Equal(t, firstHotrank, got.id)
+			require.EqualValues(t, i+1, got.attempts)
+		case <-ctx.Done():
+			t.Fatal("standard hot-rank projection timed out", ctx.Err())
+		}
+	}
+	hotrankEntries, err := hotrankProjection.Top(ctx, hotrankport.Query{WindowDays: 1, Limit: 5})
+	require.NoError(t, err)
+	require.Len(t, hotrankEntries, 1)
+	require.Equal(t, "QNR-M4", hotrankEntries[0].QuestionnaireCode)
+	require.EqualValues(t, 1, hotrankEntries[0].Score)
+	independentFingerprint, err := submitport.Fingerprint(independentSheet)
+	require.NoError(t, err)
+	_, existed, err = durable.CreateDurably(ctx, independentSheet, appanswersheet.DurableSubmitMeta{
+		WriterID: 301, IdempotencyKey: "m4-chain-independent", Fingerprint: independentFingerprint,
+	})
+	require.NoError(t, err)
+	require.False(t, existed)
+	select {
+	case got := <-delivered:
+		require.NoError(t, got.err)
+		require.NotEqual(t, first, got.id)
+		require.EqualValues(t, 1, got.attempts)
+	case <-ctx.Done():
+		t.Fatal("independent questionnaire Worker delivery timed out", ctx.Err())
+	}
+	select {
+	case got := <-hotrankDelivered:
+		require.NoError(t, got.err)
+		require.NotEqual(t, firstHotrank, got.id)
+		require.EqualValues(t, 1, got.attempts)
+	case <-ctx.Done():
+		t.Fatal("independent questionnaire hot-rank delivery timed out", ctx.Err())
+	}
+	var totalAssessments, totalEvaluationIntents int64
+	require.NoError(t, mysqlDB.Model(&assessmentmysql.AssessmentPO{}).Count(&totalAssessments).Error)
+	require.NoError(t, mysqlDB.Table("rm_outbox").Where("event_type=?", "evaluation.requested").Count(&totalEvaluationIntents).Error)
+	require.EqualValues(t, 1, totalAssessments, "independent questionnaire must not create an Assessment")
+	require.EqualValues(t, 1, totalEvaluationIntents, "independent questionnaire must not request evaluation")
+	require.EqualValues(t, 2, countStandardDocs(t, ctx, mongoDB.Collection("answersheets"), bson.M{}))
+	hotrankEntries, err = hotrankProjection.Top(ctx, hotrankport.Query{WindowDays: 1, Limit: 5})
+	require.NoError(t, err)
+	require.Len(t, hotrankEntries, 1)
+	require.EqualValues(t, 2, hotrankEntries[0].Score)
 	stopRelay()
 	select {
 	case relayErr := <-relayDone:
@@ -266,6 +378,7 @@ events:
 	}
 	require.NoError(t, publisher.Drain(ctx))
 	require.EqualValues(t, 1, countStandardDocs(t, ctx, mongoOutbox, bson.M{"message_id": submittedID, "state": "published"}))
+	require.EqualValues(t, 1, countStandardDocs(t, ctx, mongoOutbox, bson.M{"message_id": independentID, "state": "published"}))
 	var assessment assessmentmysql.AssessmentPO
 	require.NoError(t, mysqlDB.Where("answer_sheet_id=?", uint64(90010003)).First(&assessment).Error)
 	require.Equal(t, "submitted", assessment.Status)

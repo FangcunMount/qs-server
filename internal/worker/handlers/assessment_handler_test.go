@@ -114,6 +114,19 @@ func TestHandleEvaluationFailedRejectsNegativeAssessmentID(t *testing.T) {
 	}
 }
 
+func TestHandleEvaluationFailedProjectsWithoutUnusedInternalClient(t *testing.T) {
+	reporter := &reportStatusWriterStub{}
+	deps := newAnswerSheetHandlerTestDeps(nil, nil)
+	deps.ReportStatusReporter = reporter
+	handler := handleEvaluationFailed(deps)
+	if err := handler(t.Context(), eventcatalog.EvaluationFailed, mustBuildEvaluationFailedPayload(t, 42)); err != nil {
+		t.Fatal(err)
+	}
+	if reporter.failedAssessmentID != "42" || reporter.failedReason != "evaluation_failed" {
+		t.Fatalf("failure projection: assessment=%q reason=%q", reporter.failedAssessmentID, reporter.failedReason)
+	}
+}
+
 type assessmentEvaluateClient struct {
 	fakeWorkerInternalClient
 	resp          *evalpb.ExecuteEvaluationResponse

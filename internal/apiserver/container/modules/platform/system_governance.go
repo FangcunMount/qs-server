@@ -70,23 +70,27 @@ func BuildRESTSystemGovernanceFacade(in RESTSystemGovernanceInput) systemgov.Fac
 		BindDeliveryReplay(eventdelivery.NewStore(in.MySQLDB), in.EventPublisher).
 		BindActionHandlers(in.ActionHandlers)
 	var pendingReplayAuditReader systemgov.PendingReplayAuditReader
+	var deliveryReplayReviewReader systemgov.DeliveryReplayReviewReader
 	if in.MySQLDB != nil {
-		pendingReplayAuditReader = governanceinfra.NewActionAuditStore(in.MySQLDB)
+		reader := governanceinfra.NewActionAuditStore(in.MySQLDB)
+		pendingReplayAuditReader = reader
+		deliveryReplayReviewReader = reader
 	}
 	return systemgov.NewFacade(systemgov.FacadeDeps{
-		EventStatusService:       in.EventStatusService,
-		EventTypeSources:         buildEventTypeSources(in.EventOutboxes),
-		CacheGovernance:          in.CacheGovernance,
-		CachePolicyReloader:      in.CachePolicyReloader,
-		LocalResilienceSnapshot:  in.LocalResilienceSnapshot,
-		CheckpointReader:         NewCheckpointGovernanceReader(checkpoint.NewRepository(in.MySQLDB)),
-		Metrics:                  metrics,
-		Components:               components,
-		Registry:                 registry,
-		Actions:                  actions,
-		RetryGovernanceReader:    retryReader,
-		RetryCandidateReader:     retryReader,
-		PendingReplayAuditReader: pendingReplayAuditReader,
+		EventStatusService:         in.EventStatusService,
+		EventTypeSources:           buildEventTypeSources(in.EventOutboxes),
+		CacheGovernance:            in.CacheGovernance,
+		CachePolicyReloader:        in.CachePolicyReloader,
+		LocalResilienceSnapshot:    in.LocalResilienceSnapshot,
+		CheckpointReader:           NewCheckpointGovernanceReader(checkpoint.NewRepository(in.MySQLDB)),
+		Metrics:                    metrics,
+		Components:                 components,
+		Registry:                   registry,
+		Actions:                    actions,
+		RetryGovernanceReader:      retryReader,
+		RetryCandidateReader:       retryReader,
+		PendingReplayAuditReader:   pendingReplayAuditReader,
+		DeliveryReplayReviewReader: deliveryReplayReviewReader,
 	})
 }
 
