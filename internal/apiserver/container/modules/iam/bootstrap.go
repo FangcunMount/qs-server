@@ -3,11 +3,13 @@ package iam
 import (
 	"context"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/FangcunMount/component-base/pkg/logger"
 	auth "github.com/FangcunMount/iam/v5/pkg/sdk/auth/verifier"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
+	"github.com/FangcunMount/qs-server/internal/pkg/iamauth"
 	"github.com/FangcunMount/qs-server/internal/pkg/options"
 	"github.com/FangcunMount/qs-server/internal/pkg/resilience/backpressure"
 )
@@ -22,6 +24,11 @@ type Module struct {
 	wechatAppService    *iam.WeChatAppService
 	authzSnapshotLoader *iam.AuthzSnapshotLoader
 	actionAuthzChecker  *iam.ActionAuthorizationChecker
+	authzVersionGuard   *iamauth.VersionGuard
+	guardPollInterval   time.Duration
+	guardMu             sync.Mutex
+	guardCancel         context.CancelFunc
+	guardDone           chan struct{}
 }
 
 type RuntimeOptions struct {
@@ -46,6 +53,11 @@ func NewWithRuntimeOptions(ctx context.Context, opts *options.IAMOptions, runtim
 	if err != nil {
 		return nil, fmt.Errorf("failed to create IAM client: %w", err)
 	}
+	guard, err := newAuthzVersionGuard(client, opts)
+	if err != nil {
+		_ = client.Close()
+		return nil, err
+	}
 
 	module := &Module{
 		client:              client,
@@ -54,8 +66,12 @@ func NewWithRuntimeOptions(ctx context.Context, opts *options.IAMOptions, runtim
 		operationAccountSvc: newIAMOperationAccountService(client),
 		profileLinkSvc:      newIAMProfileLinkService(client),
 		wechatAppService:    newIAMWeChatAppService(client),
-		authzSnapshotLoader: newIAMAuthzSnapshotLoader(client, opts),
+		authzSnapshotLoader: newIAMAuthzSnapshotLoader(client, opts, guard),
 		actionAuthzChecker:  iam.NewActionAuthorizationChecker(client),
+		authzVersionGuard:   guard,
+	}
+	if guard != nil {
+		module.guardPollInterval = opts.AuthzVersionGuard.PollInterval
 	}
 
 	logger.L(context.Background()).Infow("IAM module initialized successfully",
@@ -142,15 +158,66 @@ func newIAMWeChatAppService(client *iam.Client) *iam.WeChatAppService {
 	return service
 }
 
-func newIAMAuthzSnapshotLoader(client *iam.Client, opts *options.IAMOptions) *iam.AuthzSnapshotLoader {
+func newIAMAuthzSnapshotLoader(client *iam.Client, opts *options.IAMOptions, guard *iamauth.VersionGuard) *iam.AuthzSnapshotLoader {
 	if client == nil || !client.IsEnabled() || opts == nil || !opts.GRPCEnabled {
 		return nil
 	}
 	iamOpts := convertIAMOptions(opts)
 	return iam.NewAuthzSnapshotLoader(client, iam.AuthzSnapshotLoaderOptions{
-		AppName:  iamOpts.AuthzAppName,
-		CacheTTL: iamOpts.AuthzCacheTTL,
+		AppName:      iamOpts.AuthzAppName,
+		CacheTTL:     iamOpts.AuthzCacheTTL,
+		VersionGuard: guard,
 	})
+}
+
+type committedVersionReader struct {
+	client  *iam.Client
+	timeout time.Duration
+}
+
+func (r committedVersionReader) GetCommittedPolicyVersion(ctx context.Context) (int64, error) {
+	readCtx, cancel := context.WithTimeout(ctx, r.timeout)
+	defer cancel()
+	return r.client.SDK().Authz().GetCommittedPolicyVersion(readCtx)
+}
+
+func newAuthzVersionGuard(client *iam.Client, opts *options.IAMOptions) (*iamauth.VersionGuard, error) {
+	if opts == nil || opts.AuthzVersionGuard == nil || !opts.AuthzVersionGuard.Enabled {
+		return nil, nil
+	}
+	if client == nil || !client.IsEnabled() || client.SDK() == nil || !opts.GRPCEnabled {
+		return nil, fmt.Errorf("IAM committed authorization version guard requires an enabled gRPC client")
+	}
+	if errs := opts.AuthzVersionGuard.Validate(); len(errs) != 0 {
+		return nil, errs[0]
+	}
+	guard, err := iamauth.NewVersionGuard(committedVersionReader{
+		client: client, timeout: opts.AuthzVersionGuard.ReadTimeout,
+	}, opts.AuthzVersionGuard.MaxAge)
+	if err != nil {
+		return nil, err
+	}
+	return guard, nil
+}
+
+// StartAuthzVersionGuard refreshes the independent committed-version proof.
+// A failed refresh never extends the permission to use a cached snapshot.
+func (m *Module) StartAuthzVersionGuard() {
+	if m == nil || m.authzVersionGuard == nil {
+		return
+	}
+	m.guardMu.Lock()
+	defer m.guardMu.Unlock()
+	if m.guardCancel != nil {
+		return
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan struct{})
+	m.guardCancel, m.guardDone = cancel, done
+	go func() {
+		defer close(done)
+		_ = m.authzVersionGuard.Run(ctx, m.guardPollInterval)
+	}()
 }
 
 // Client 返回 IAM 客户端
@@ -241,6 +308,14 @@ func (m *Module) ValidateRequiredAuthzRuntime(ctx context.Context) error {
 
 // Close 关闭 IAM 模块
 func (m *Module) Close() error {
+	m.guardMu.Lock()
+	cancel, done := m.guardCancel, m.guardDone
+	m.guardCancel, m.guardDone = nil, nil
+	m.guardMu.Unlock()
+	if cancel != nil {
+		cancel()
+		<-done
+	}
 	// 关闭 TokenVerifier（停止 JWKS 后台刷新）
 	if m.tokenVerifier != nil {
 		m.tokenVerifier.Close()

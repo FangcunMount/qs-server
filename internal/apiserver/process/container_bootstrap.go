@@ -103,10 +103,16 @@ func bootstrapContainerStage(deps containerStageDeps) (containerOutput, error) {
 		if err := deps.initialize(output.container); err != nil {
 			return containerOutput{}, err
 		}
+		if output.container.IAMModule != nil {
+			output.container.IAMModule.StartAuthzVersionGuard()
+		}
 		return output, nil
 	}
 	if err := output.container.Initialize(); err != nil {
 		return containerOutput{}, err
+	}
+	if output.container.IAMModule != nil {
+		output.container.IAMModule.StartAuthzVersionGuard()
 	}
 	return output, nil
 }

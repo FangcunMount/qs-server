@@ -1,6 +1,7 @@
 package options
 
 import (
+	"fmt"
 	"strings"
 	"time"
 
@@ -39,6 +40,8 @@ type IAMOptions struct {
 
 	// Authz 版本同步订阅配置
 	AuthzSync *IAMAuthzSyncOptions `json:"authz-sync" mapstructure:"authz-sync"`
+	// Authz 已提交版本的独立核验；默认关闭，待 IAM 服务端发布后启用。
+	AuthzVersionGuard *IAMAuthzVersionGuardOptions `json:"authz-version-guard" mapstructure:"authz-version-guard"`
 }
 
 // IAMGRPCOptions IAM gRPC 连接配置
@@ -139,7 +142,8 @@ func NewIAMOptions() *IAMOptions {
 		AuthzAppName:  "qs",
 		AuthzCacheTTL: 30 * time.Second,
 
-		AuthzSync: NewIAMAuthzSyncOptions(),
+		AuthzSync:         NewIAMAuthzSyncOptions(),
+		AuthzVersionGuard: NewIAMAuthzVersionGuardOptions(),
 	}
 }
 
@@ -195,6 +199,13 @@ func (o *IAMOptions) Validate() []error {
 		o.AuthzSync = NewIAMAuthzSyncOptions()
 	}
 	errs = append(errs, o.AuthzSync.Validate()...)
+	if o.AuthzVersionGuard == nil {
+		o.AuthzVersionGuard = NewIAMAuthzVersionGuardOptions()
+	}
+	if o.AuthzVersionGuard.Enabled && !o.GRPCEnabled {
+		errs = append(errs, fmt.Errorf("iam.authz-version-guard requires IAM gRPC"))
+	}
+	errs = append(errs, o.AuthzVersionGuard.Validate()...)
 
 	return errs
 }
@@ -203,6 +214,9 @@ func (o *IAMOptions) Validate() []error {
 func (o *IAMOptions) AddFlags(fs *pflag.FlagSet) {
 	if o.AuthzSync == nil {
 		o.AuthzSync = NewIAMAuthzSyncOptions()
+	}
+	if o.AuthzVersionGuard == nil {
+		o.AuthzVersionGuard = NewIAMAuthzVersionGuardOptions()
 	}
 
 	// 功能开关
@@ -273,6 +287,14 @@ func (o *IAMOptions) AddFlags(fs *pflag.FlagSet) {
 		"IAM authorization snapshot app_name filter (e.g. qs)")
 	fs.DurationVar(&o.AuthzCacheTTL, "iam.authz.cache-ttl", o.AuthzCacheTTL,
 		"In-process TTL for GetAuthorizationSnapshot cache")
+	fs.BoolVar(&o.AuthzVersionGuard.Enabled, "iam.authz-version-guard.enabled", o.AuthzVersionGuard.Enabled,
+		"Require a bounded-age IAM committed policy version before using authorization snapshots")
+	fs.DurationVar(&o.AuthzVersionGuard.MaxAge, "iam.authz-version-guard.max-age", o.AuthzVersionGuard.MaxAge,
+		"Maximum age of a committed IAM policy-version proof (at most 10s)")
+	fs.DurationVar(&o.AuthzVersionGuard.PollInterval, "iam.authz-version-guard.poll-interval", o.AuthzVersionGuard.PollInterval,
+		"Periodic committed IAM policy-version refresh interval")
+	fs.DurationVar(&o.AuthzVersionGuard.ReadTimeout, "iam.authz-version-guard.read-timeout", o.AuthzVersionGuard.ReadTimeout,
+		"Timeout for each committed IAM policy-version read")
 
 	fs.BoolVar(&o.AuthzSync.Enabled, "iam.authz-sync.enabled", o.AuthzSync.Enabled,
 		"Enable IAM authz version topic subscription for local snapshot invalidation")
