@@ -178,7 +178,7 @@ CREATE TABLE domain_event_outbox (
 );
 CREATE TABLE event_delivery_dead_letter (
  id bigint unsigned AUTO_INCREMENT PRIMARY KEY, org_id bigint NULL,
- message_id varchar(128) NOT NULL, event_id varchar(64) NULL,
+ message_id varchar(128) NOT NULL, transport_message_id varchar(64) NOT NULL DEFAULT '', event_id varchar(64) NULL,
  topic_name varchar(128) NOT NULL, channel_name varchar(128) NOT NULL,
  delivery_attempts int NOT NULL, last_error text NULL, retry_disposition varchar(32) NOT NULL,
 	replay_request_id varchar(64) NULL,

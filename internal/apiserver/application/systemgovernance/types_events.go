@@ -42,20 +42,21 @@ type RetryGovernanceReader interface {
 }
 
 type RetryCandidate struct {
-	Kind            string     `json:"kind"`
-	Store           string     `json:"store"`
-	ResourceID      string     `json:"resource_id"`
-	Attempt         int        `json:"attempt"`
-	Disposition     string     `json:"retry_disposition"`
-	NextAttemptAt   *time.Time `json:"next_attempt_at,omitempty"`
-	RetryEventID    string     `json:"retry_event_id,omitempty"`
-	ActionRequestID string     `json:"action_request_id,omitempty"`
-	EventID         string     `json:"event_id,omitempty"`
-	MessageID       string     `json:"message_id,omitempty"`
-	TopicName       string     `json:"topic_name,omitempty"`
-	ChannelName     string     `json:"channel_name,omitempty"`
-	LastErrorKind   string     `json:"last_error_kind,omitempty"`
-	UpdatedAt       time.Time  `json:"updated_at"`
+	Kind               string     `json:"kind"`
+	Store              string     `json:"store"`
+	ResourceID         string     `json:"resource_id"`
+	Attempt            int        `json:"attempt"`
+	Disposition        string     `json:"retry_disposition"`
+	NextAttemptAt      *time.Time `json:"next_attempt_at,omitempty"`
+	RetryEventID       string     `json:"retry_event_id,omitempty"`
+	ActionRequestID    string     `json:"action_request_id,omitempty"`
+	EventID            string     `json:"event_id,omitempty"`
+	MessageID          string     `json:"message_id,omitempty"`
+	TransportMessageID string     `json:"transport_message_id,omitempty"`
+	TopicName          string     `json:"topic_name,omitempty"`
+	ChannelName        string     `json:"channel_name,omitempty"`
+	LastErrorKind      string     `json:"last_error_kind,omitempty"`
+	UpdatedAt          time.Time  `json:"updated_at"`
 }
 
 type RetryCandidatePage struct {
