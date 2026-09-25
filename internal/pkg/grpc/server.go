@@ -150,7 +150,9 @@ func buildUnaryInterceptors(
 
 	// 3. Logging（记录请求日志）
 	interceptorChain = append(interceptorChain,
-		basegrpc.LoggingInterceptor(NewComponentBaseLogger()))
+		basegrpc.LoggingInterceptor(NewComponentBaseLogger(),
+			// The legacy response contains recipient OpenIDs; the handler emits a safe summary.
+			basegrpc.WithLoggingSkipMethods("/internalapi.InternalService/SendTaskOpenedMiniProgramNotification")))
 
 	// 4. mTLS Identity（提取客户端身份）
 	if config.MTLS.Enabled {

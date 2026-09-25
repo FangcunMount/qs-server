@@ -2,7 +2,6 @@ package service
 
 import (
 	"context"
-	"strings"
 	"time"
 
 	"google.golang.org/grpc/codes"
@@ -139,7 +138,6 @@ func (flow notificationFlow) SendTaskOpenedMiniProgramNotification(
 		"sent_count", result.SentCount,
 		"skipped", result.Skipped,
 		"recipient_source", result.RecipientSource,
-		"recipient_open_ids", strings.Join(result.RecipientOpenIDs, ","),
 		"message", result.Message,
 	)
 
