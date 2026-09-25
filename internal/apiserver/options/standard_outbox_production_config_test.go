@@ -7,7 +7,7 @@ import (
 	"github.com/spf13/viper"
 )
 
-func TestProductionConfigSelectsOnlyMongoStandardOutbox(t *testing.T) {
+func TestProductionConfigKeepsStandardOutboxDisabledUntilCutover(t *testing.T) {
 	config := viper.New()
 	config.SetConfigFile(filepath.Join("..", "..", "..", "configs", "apiserver.prod.yaml"))
 	if err := config.ReadInConfig(); err != nil {
@@ -21,7 +21,7 @@ func TestProductionConfigSelectsOnlyMongoStandardOutbox(t *testing.T) {
 	if loaded.Eventing == nil || loaded.Eventing.StandardOutbox == nil {
 		t.Fatal("production eventing selection was not loaded")
 	}
-	if !loaded.Eventing.StandardOutbox.Mongo || loaded.Eventing.StandardOutbox.Assessment {
-		t.Fatalf("first batch must select Mongo only: %+v", loaded.Eventing.StandardOutbox)
+	if loaded.Eventing.StandardOutbox.Mongo || loaded.Eventing.StandardOutbox.Assessment {
+		t.Fatalf("preparation release must not enable a standard outbox profile: %+v", loaded.Eventing.StandardOutbox)
 	}
 }
