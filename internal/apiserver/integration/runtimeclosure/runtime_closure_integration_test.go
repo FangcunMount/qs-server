@@ -83,6 +83,8 @@ const (
 type runtimeClosureDelivery interface {
 	SetHandlers(map[string]handlers.HandlerFunc)
 	Wait(*testing.T, string) (*messaging.Message, error)
+	Covers(string) bool
+	UsesStandardMongo() bool
 }
 
 type runtimeClosureEventFactory func(*testing.T, eventsubsystem.Options, *sql.DB) (*eventsubsystem.Subsystem, runtimeClosureDelivery, error)
@@ -271,8 +273,10 @@ func runCurrentRuntimeClosure(t *testing.T, eventFactory runtimeClosureEventFact
 	reportHandler := mustWorkerHandler(t, registry, "interpretation_report_generated_handler", workerDeps)
 	if delivery != nil {
 		delivery.SetHandlers(map[string]handlers.HandlerFunc{
-			eventcatalog.EvaluationRequested:        evaluationHandler,
-			eventcatalog.EvaluationOutcomeCommitted: outcomeHandler,
+			eventcatalog.AnswerSheetSubmitted:          answerHandler,
+			eventcatalog.EvaluationRequested:           evaluationHandler,
+			eventcatalog.EvaluationOutcomeCommitted:    outcomeHandler,
+			eventcatalog.InterpretationReportGenerated: reportHandler,
 		})
 	}
 
@@ -286,9 +290,18 @@ func runCurrentRuntimeClosure(t *testing.T, eventFactory runtimeClosureEventFact
 	if err != nil || answerResponse.GetId() == 0 {
 		t.Fatalf("submit AnswerSheet: response=%+v err=%v", answerResponse, err)
 	}
-	answerMessage := capture.Wait(t, eventcatalog.AnswerSheetSubmitted)
-	if err := answerHandler(t.Context(), eventcatalog.AnswerSheetSubmitted, answerMessage.Payload); err != nil {
+	var answerMessage *messaging.Message
+	if delivery != nil && delivery.Covers(eventcatalog.AnswerSheetSubmitted) {
+		answerMessage, err = delivery.Wait(t, eventcatalog.AnswerSheetSubmitted)
+	} else {
+		answerMessage = capture.Wait(t, eventcatalog.AnswerSheetSubmitted)
+		err = answerHandler(t.Context(), eventcatalog.AnswerSheetSubmitted, answerMessage.Payload)
+	}
+	if err != nil {
 		t.Fatalf("consume answersheet.submitted: %v", err)
+	}
+	if delivery != nil && delivery.UsesStandardMongo() {
+		assertStandardMongoIntentPublished(t, mongoDB, eventcatalog.AnswerSheetSubmitted)
 	}
 	var evaluationMessage *messaging.Message
 	if delivery == nil {
@@ -325,7 +338,7 @@ func runCurrentRuntimeClosure(t *testing.T, eventFactory runtimeClosureEventFact
 	if err == nil {
 		t.Fatal("first outcome delivery must report the controlled lost gRPC response")
 	}
-	assertSingleCommittedReport(t, mongoDB)
+	assertSingleCommittedReport(t, mongoDB, delivery != nil && delivery.UsesStandardMongo())
 	if delivery == nil {
 		err = outcomeHandler(t.Context(), eventcatalog.EvaluationOutcomeCommitted, outcomeMessage.Payload)
 	} else {
@@ -338,7 +351,7 @@ func runCurrentRuntimeClosure(t *testing.T, eventFactory runtimeClosureEventFact
 	if err != nil {
 		t.Fatalf("redeliver evaluation.outcome.committed after lost response: %v", err)
 	}
-	assertSingleCommittedReport(t, mongoDB)
+	assertSingleCommittedReport(t, mongoDB, delivery != nil && delivery.UsesStandardMongo())
 	if reportClient.first == nil || reportClient.second == nil ||
 		reportClient.first.GetGenerationId() != reportClient.second.GetGenerationId() ||
 		reportClient.first.GetRunId() != reportClient.second.GetRunId() ||
@@ -359,9 +372,18 @@ func runCurrentRuntimeClosure(t *testing.T, eventFactory runtimeClosureEventFact
 		assertStandardEvaluationPublished(t, gormDB, eventcatalog.EvaluationRequested)
 		assertStandardEvaluationPublished(t, gormDB, eventcatalog.EvaluationOutcomeCommitted)
 	}
-	reportMessage := capture.Wait(t, eventcatalog.InterpretationReportGenerated)
-	if err := reportHandler(t.Context(), eventcatalog.InterpretationReportGenerated, reportMessage.Payload); err != nil {
+	var reportMessage *messaging.Message
+	if delivery != nil && delivery.Covers(eventcatalog.InterpretationReportGenerated) {
+		reportMessage, err = delivery.Wait(t, eventcatalog.InterpretationReportGenerated)
+	} else {
+		reportMessage = capture.Wait(t, eventcatalog.InterpretationReportGenerated)
+		err = reportHandler(t.Context(), eventcatalog.InterpretationReportGenerated, reportMessage.Payload)
+	}
+	if err != nil {
 		t.Fatalf("consume interpretation.report.generated: %v", err)
+	}
+	if delivery != nil && delivery.UsesStandardMongo() {
+		assertStandardMongoIntentPublished(t, mongoDB, eventcatalog.InterpretationReportGenerated)
 	}
 
 	replayed, err := answerService.SaveAnswerSheet(t.Context(), request)
@@ -402,6 +424,26 @@ func assertStandardEvaluationPublished(t *testing.T, db *gorm.DB, eventType stri
 		time.Sleep(20 * time.Millisecond)
 	}
 	t.Fatalf("standard %s intent was not marked published after Worker delivery", eventType)
+}
+
+func assertStandardMongoIntentPublished(t *testing.T, db *mongo.Database, eventType string) {
+	t.Helper()
+	old, err := db.Collection("domain_event_outbox").CountDocuments(t.Context(), bson.M{"event_type": eventType})
+	if err != nil || old != 0 {
+		t.Fatalf("old Mongo %s intents=%d err=%v, want zero", eventType, old, err)
+	}
+	deadline := time.Now().Add(5 * time.Second)
+	for time.Now().Before(deadline) {
+		count, err := db.Collection("rm_outbox").CountDocuments(t.Context(), bson.M{"event_type": eventType, "state": "published"})
+		if err != nil {
+			t.Fatalf("read standard Mongo %s state: %v", eventType, err)
+		}
+		if count == 1 {
+			return
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	t.Fatalf("standard Mongo %s intent was not published after Worker delivery", eventType)
 }
 
 func createRuntimeActorAndEntry(t *testing.T, c *container.Container, grpcDeps grpctransport.Deps, orgID uint64) (uint64, uint64) {
@@ -719,7 +761,7 @@ func (c *lostReportResponseOnce) GenerateReportFromOutcome(ctx context.Context, 
 	return response, nil
 }
 
-func assertSingleCommittedReport(t *testing.T, db *mongo.Database) {
+func assertSingleCommittedReport(t *testing.T, db *mongo.Database, standardMongo bool) {
 	t.Helper()
 	for _, collection := range []string{"report_generations", "interpretation_runs", "interpret_report_artifacts"} {
 		count, err := db.Collection(collection).CountDocuments(t.Context(), bson.M{})
@@ -727,9 +769,17 @@ func assertSingleCommittedReport(t *testing.T, db *mongo.Database) {
 			t.Fatalf("%s count=%d err=%v, want one durable report fact", collection, count, err)
 		}
 	}
-	count, err := db.Collection("domain_event_outbox").CountDocuments(t.Context(), bson.M{"event_type": eventcatalog.InterpretationReportGenerated})
+	outboxCollection, unusedCollection := "domain_event_outbox", "rm_outbox"
+	if standardMongo {
+		outboxCollection, unusedCollection = unusedCollection, outboxCollection
+	}
+	count, err := db.Collection(outboxCollection).CountDocuments(t.Context(), bson.M{"event_type": eventcatalog.InterpretationReportGenerated})
 	if err != nil || count != 1 {
-		t.Fatalf("report generated outbox count=%d err=%v, want one", count, err)
+		t.Fatalf("%s report generated count=%d err=%v, want one", outboxCollection, count, err)
+	}
+	unused, err := db.Collection(unusedCollection).CountDocuments(t.Context(), bson.M{"event_type": eventcatalog.InterpretationReportGenerated})
+	if err != nil || unused != 0 {
+		t.Fatalf("%s report generated count=%d err=%v, want zero", unusedCollection, unused, err)
 	}
 }
 
