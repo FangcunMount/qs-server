@@ -206,6 +206,9 @@ func (o *IAMOptions) Validate() []error {
 		errs = append(errs, fmt.Errorf("iam.authz-version-guard requires IAM gRPC"))
 	}
 	errs = append(errs, o.AuthzVersionGuard.Validate()...)
+	if o.AuthzSync.EphemeralNSQ && (!o.AuthzSync.Enabled || !o.AuthzVersionGuard.Enabled) {
+		errs = append(errs, fmt.Errorf("iam.authz-sync.ephemeral-nsq requires enabled authz sync and committed-version guard"))
+	}
 
 	return errs
 }
@@ -308,6 +311,8 @@ func (o *IAMOptions) AddFlags(fs *pflag.FlagSet) {
 		"Topic name used for IAM authz version notifications")
 	fs.StringVar(&o.AuthzSync.ChannelPrefix, "iam.authz-sync.channel-prefix", o.AuthzSync.ChannelPrefix,
 		"Channel prefix used to build per-instance IAM authz version sync subscriptions")
+	fs.BoolVar(&o.AuthzSync.EphemeralNSQ, "iam.authz-sync.ephemeral-nsq", o.AuthzSync.EphemeralNSQ,
+		"Use per-instance NSQ ephemeral channels with a shared durable failed-message handoff (requires committed-version guard)")
 	if o.AuthzSync.Delivery == nil {
 		o.AuthzSync.Delivery = NewTransportDeliveryOptions()
 	}

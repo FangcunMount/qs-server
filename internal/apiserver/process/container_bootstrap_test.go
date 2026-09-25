@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/FangcunMount/component-base/pkg/messaging"
@@ -119,5 +120,16 @@ func TestInitializeWeChatServicesNoopWithoutConfig(t *testing.T) {
 
 	if err := (&server{}).initializeWeChatServices(&container.Container{}); err != nil {
 		t.Fatalf("initializeWeChatServices() error = %v, want nil", err)
+	}
+}
+
+func TestAuthzVersionSubscriberIdentityKeepsSharedHandoffSeparateFromLegacy(t *testing.T) {
+	legacy, legacyGroup := authzVersionSubscriberIdentity("qs-authz-sync", false)
+	ephemeral, group := authzVersionSubscriberIdentity("qs-authz-sync", true)
+	if legacyGroup != "" || strings.HasSuffix(legacy, "#ephemeral") {
+		t.Fatalf("legacy subscription changed: %q / %q", legacy, legacyGroup)
+	}
+	if !strings.HasSuffix(ephemeral, "#ephemeral") || group != "qs-authz-sync-apiserver" {
+		t.Fatalf("ephemeral subscription lacks a stable handoff group: %q / %q", ephemeral, group)
 	}
 }

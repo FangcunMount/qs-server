@@ -537,6 +537,7 @@ iam:
     nsq-lookupd-addr: "nsqlookupd:4161" # NSQ Lookupd 地址: nsqlookupd:4161 (用于服务发现)
     topic: "iam.authz.version.v2"          # 主题: iam.authz.version.v2
     channel-prefix: "qs-authz-sync"     # 频道前缀: qs-authz-sync
+    ephemeral-nsq: false                # 十秒已提交版本栅栏验收后，另行受控启用临时业务 channel
 
   # gRPC 连接配置
   grpc:

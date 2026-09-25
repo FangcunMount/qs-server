@@ -16,6 +16,7 @@ type IAMAuthzSyncOptions struct {
 	RabbitMQURL    string                    `json:"rabbitmq_url" mapstructure:"rabbitmq-url"`
 	Topic          string                    `json:"topic" mapstructure:"topic"`
 	ChannelPrefix  string                    `json:"channel_prefix" mapstructure:"channel-prefix"`
+	EphemeralNSQ   bool                      `json:"ephemeral_nsq" mapstructure:"ephemeral-nsq"`
 	Delivery       *TransportDeliveryOptions `json:"delivery" mapstructure:"delivery"`
 }
 
@@ -39,6 +40,9 @@ func (o *IAMAuthzSyncOptions) Validate() []error {
 
 	errs := o.Delivery.Validate("iam.authz-sync.delivery")
 	if !o.Enabled {
+		if o.EphemeralNSQ {
+			errs = append(errs, fmt.Errorf("iam.authz-sync.ephemeral-nsq requires enabled authz sync"))
+		}
 		return errs
 	}
 	switch o.Provider {
@@ -47,6 +51,9 @@ func (o *IAMAuthzSyncOptions) Validate() []error {
 			errs = append(errs, fmt.Errorf("iam.authz-sync.nsq-lookupd-addr is required when using NSQ"))
 		}
 	case "rabbitmq":
+		if o.EphemeralNSQ {
+			errs = append(errs, fmt.Errorf("iam.authz-sync.ephemeral-nsq requires NSQ provider"))
+		}
 		if o.RabbitMQURL == "" {
 			errs = append(errs, fmt.Errorf("iam.authz-sync.rabbitmq-url is required when using RabbitMQ"))
 		}
