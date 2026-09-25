@@ -175,10 +175,11 @@ func TestSubscribeHandlersUsesNarrowSubscriptionRuntime(t *testing.T) {
 	subscriber := &fakeSubscriber{}
 
 	if err := SubscribeHandlersWithOptions(SubscribeHandlersOptions{
-		ServiceName: "worker-channel",
-		Logger:      testLogger(),
-		Runtime:     runtime,
-		Subscriber:  subscriber,
+		ServiceName:     "worker-channel",
+		Logger:          testLogger(),
+		Runtime:         runtime,
+		Subscriber:      subscriber,
+		UnknownRecorder: func(context.Context, *basemessaging.Message, string) error { return nil },
 	}); err != nil {
 		t.Fatalf("SubscribeHandlersWithOptions: %v", err)
 	}
@@ -193,7 +194,16 @@ func TestSubscribeHandlersUsesNarrowSubscriptionRuntime(t *testing.T) {
 	}
 }
 
-func TestDispatchHandlerNacksInvalidPayloadWithoutDispatch(t *testing.T) {
+func TestSubscribeHandlersRequiresUnknownEventAudit(t *testing.T) {
+	runtime := &fakeSubscriptionRuntime{subs: []eventcatalog.TopicSubscription{{TopicName: "sample.topic"}}}
+	if err := SubscribeHandlersWithOptions(SubscribeHandlersOptions{
+		ServiceName: "worker-channel", Logger: testLogger(), Runtime: runtime, Subscriber: &fakeSubscriber{},
+	}); err == nil {
+		t.Fatal("Worker subscription accepted without unknown-event audit")
+	}
+}
+
+func TestDispatchHandlerLeavesInvalidPayloadForTransportToNack(t *testing.T) {
 	dispatcher := &fakeDispatcher{}
 	msg := basemessaging.NewMessage("msg-1", []byte("not-json"))
 	nackCount := 0
@@ -210,12 +220,12 @@ func TestDispatchHandlerNacksInvalidPayloadWithoutDispatch(t *testing.T) {
 	if dispatcher.calls != 0 {
 		t.Fatalf("dispatch calls = %d, want 0", dispatcher.calls)
 	}
-	if nackCount != 1 {
-		t.Fatalf("nackCount = %d, want 1", nackCount)
+	if nackCount != 0 || msg.IsSettled() {
+		t.Fatalf("nackCount = %d settled = %t, want 0/false", nackCount, msg.IsSettled())
 	}
 }
 
-func TestDispatchHandlerObservesDecodeNacked(t *testing.T) {
+func TestDispatchHandlerObservesDecodeFailed(t *testing.T) {
 	observer := &consumeObserver{}
 	dispatcher := &fakeDispatcher{}
 	msg := basemessaging.NewMessage("msg-1", []byte("not-json"))
@@ -226,26 +236,27 @@ func TestDispatchHandlerObservesDecodeNacked(t *testing.T) {
 		t.Fatal("expected decode error")
 	}
 
-	assertConsumeOutcome(t, observer, eventobservability.ConsumeOutcomeDecodeNacked)
+	assertConsumeOutcome(t, observer, eventobservability.ConsumeOutcomeDecodeFailed)
 	assertNoConsumeDuration(t, observer)
 }
 
-func TestDispatchHandlerObservesDecodeNackFailed(t *testing.T) {
+func TestDispatchHandlerKeepsDecodeErrorWhenTransportNackWouldFail(t *testing.T) {
 	observer := &consumeObserver{}
 	dispatcher := &fakeDispatcher{}
 	msg := basemessaging.NewMessage("msg-1", []byte("not-json"))
-	msg.SetNackFunc(func() error { return errors.New("nack failed") })
+	nackErr := errors.New("nack failed")
+	msg.SetNackFunc(func() error { return nackErr })
 
 	handler := createDispatchHandlerWithObserver(testLogger(), dispatcher, "topic", "worker", observer)
-	if err := handler(context.Background(), msg); err == nil {
-		t.Fatal("expected decode/nack error")
+	if err := handler(context.Background(), msg); err == nil || errors.Is(err, nackErr) || msg.IsSettled() {
+		t.Fatalf("handler error = %v settled = %t, want original decode error and unsettled message", err, msg.IsSettled())
 	}
 
-	assertConsumeOutcome(t, observer, eventobservability.ConsumeOutcomeDecodeNackFailed)
+	assertConsumeOutcome(t, observer, eventobservability.ConsumeOutcomeDecodeFailed)
 	assertNoConsumeDuration(t, observer)
 }
 
-func TestDispatchHandlerNacksOnDispatchError(t *testing.T) {
+func TestDispatchHandlerReturnsDispatchErrorForTransportNack(t *testing.T) {
 	wantErr := errors.New("dispatch failed")
 	dispatcher := &fakeDispatcher{err: wantErr}
 	msg := basemessaging.NewMessage("msg-1", []byte(`{}`))
@@ -261,12 +272,12 @@ func TestDispatchHandlerNacksOnDispatchError(t *testing.T) {
 		t.Fatalf("handler error = %v, want %v", err, wantErr)
 	}
 
-	if nackCount != 1 {
-		t.Fatalf("nackCount = %d, want 1", nackCount)
+	if nackCount != 0 || msg.IsSettled() {
+		t.Fatalf("nackCount = %d settled = %t, want 0/false", nackCount, msg.IsSettled())
 	}
 }
 
-func TestDispatchHandlerObservesNacked(t *testing.T) {
+func TestDispatchHandlerObservesDispatchFailed(t *testing.T) {
 	observer := &consumeObserver{}
 	dispatcher := &fakeDispatcher{err: errors.New("dispatch failed")}
 	msg := basemessaging.NewMessage("msg-1", []byte(`{}`))
@@ -278,8 +289,8 @@ func TestDispatchHandlerObservesNacked(t *testing.T) {
 		t.Fatalf("handler should return dispatch error")
 	}
 
-	assertConsumeOutcome(t, observer, eventobservability.ConsumeOutcomeNacked)
-	assertConsumeDuration(t, observer, eventobservability.ConsumeOutcomeNacked)
+	assertConsumeOutcome(t, observer, eventobservability.ConsumeOutcomeDispatchFailed)
+	assertConsumeDuration(t, observer, eventobservability.ConsumeOutcomeDispatchFailed)
 }
 
 func TestDispatchHandlerAcksPausedEventOnlyAfterDurableHold(t *testing.T) {
@@ -302,7 +313,7 @@ func TestDispatchHandlerAcksPausedEventOnlyAfterDurableHold(t *testing.T) {
 	assertConsumeDuration(t, observer, eventobservability.ConsumeOutcomeHeld)
 }
 
-func TestDispatchHandlerNacksPausedEventWhenHoldFails(t *testing.T) {
+func TestDispatchHandlerLeavesPausedEventUnsettledWhenHoldFails(t *testing.T) {
 	observer := &consumeObserver{}
 	dispatcher := &fakeDispatcher{err: eventruntime.ErrAutomaticRetryPaused}
 	recorder := &fakeHoldRecorder{err: errors.New("mysql unavailable")}
@@ -315,14 +326,14 @@ func TestDispatchHandlerNacksPausedEventWhenHoldFails(t *testing.T) {
 	if err := handler(t.Context(), msg); err == nil {
 		t.Fatal("expected hold error")
 	}
-	if recorder.calls != 1 || nackCount != 1 {
-		t.Fatalf("hold calls=%d nack calls=%d, want 1/1", recorder.calls, nackCount)
+	if recorder.calls != 1 || nackCount != 0 || msg.IsSettled() {
+		t.Fatalf("hold calls=%d nack calls=%d settled=%t, want 1/0/false", recorder.calls, nackCount, msg.IsSettled())
 	}
 	assertConsumeOutcome(t, observer, eventobservability.ConsumeOutcomeHoldFailed)
 	assertNoConsumeDuration(t, observer)
 }
 
-func TestDispatchHandlerPropagatesNackErrorWhenHoldFails(t *testing.T) {
+func TestDispatchHandlerPreservesHoldErrorForTransportNack(t *testing.T) {
 	observer := &consumeObserver{}
 	dispatcher := &fakeDispatcher{err: eventruntime.ErrAutomaticRetryPaused}
 	holdErr := errors.New("mysql unavailable")
@@ -334,14 +345,14 @@ func TestDispatchHandlerPropagatesNackErrorWhenHoldFails(t *testing.T) {
 
 	handler := createDispatchHandlerWithObserverAndHold(testLogger(), dispatcher, "topic", "worker", observer, recorder)
 	err := handler(t.Context(), msg)
-	if !errors.Is(err, eventruntime.ErrAutomaticRetryPaused) || !errors.Is(err, holdErr) || !errors.Is(err, nackErr) {
-		t.Fatalf("handler error = %v, want paused, hold, and nack errors", err)
+	if !errors.Is(err, eventruntime.ErrAutomaticRetryPaused) || !errors.Is(err, holdErr) || errors.Is(err, nackErr) || msg.IsSettled() {
+		t.Fatalf("handler error = %v settled=%t, want paused and hold errors before transport settlement", err, msg.IsSettled())
 	}
 	assertConsumeOutcome(t, observer, eventobservability.ConsumeOutcomeHoldFailed)
 	assertNoConsumeDuration(t, observer)
 }
 
-func TestDispatchHandlerObservesNackFailed(t *testing.T) {
+func TestDispatchHandlerObservesFailureBeforeTransportSettlement(t *testing.T) {
 	observer := &consumeObserver{}
 	dispatcher := &fakeDispatcher{err: errors.New("dispatch failed")}
 	msg := basemessaging.NewMessage("msg-1", []byte(`{}`))
@@ -353,8 +364,8 @@ func TestDispatchHandlerObservesNackFailed(t *testing.T) {
 		t.Fatalf("handler should return dispatch error")
 	}
 
-	assertConsumeOutcome(t, observer, eventobservability.ConsumeOutcomeNackFailed)
-	assertConsumeDuration(t, observer, eventobservability.ConsumeOutcomeNackFailed)
+	assertConsumeOutcome(t, observer, eventobservability.ConsumeOutcomeDispatchFailed)
+	assertConsumeDuration(t, observer, eventobservability.ConsumeOutcomeDispatchFailed)
 }
 
 func TestDispatchHandlerObservesAcked(t *testing.T) {
@@ -378,15 +389,50 @@ func TestDispatchHandlerObservesUnknownAcked(t *testing.T) {
 	dispatcher := &fakeDispatcher{outcome: eventruntime.DispatchUnknown}
 	msg := basemessaging.NewMessage("msg-1", []byte(`{}`))
 	msg.Metadata["event_type"] = "metadata.event"
-	msg.SetAckFunc(func() error { return nil })
+	recorded, acked := false, false
+	msg.SetAckFunc(func() error {
+		if !recorded {
+			t.Fatal("unknown event acknowledged before durable record")
+		}
+		acked = true
+		return nil
+	})
 
-	handler := createDispatchHandlerWithObserver(testLogger(), dispatcher, "topic", "worker", observer)
+	handler := createDispatchHandlerWithObserverAndHoldAndUnknown(testLogger(), dispatcher, "topic", "worker", observer, nil, func(_ context.Context, got *basemessaging.Message, eventType string) error {
+		if got != msg || eventType != "metadata.event" {
+			t.Fatalf("unknown record identity: message=%p event=%q", got, eventType)
+		}
+		recorded = true
+		return nil
+	})
 	if err := handler(context.Background(), msg); err != nil {
 		t.Fatalf("handler: %v", err)
+	}
+	if !recorded || !acked {
+		t.Fatalf("recorded=%t acked=%t, want both", recorded, acked)
 	}
 
 	assertConsumeOutcome(t, observer, eventobservability.ConsumeOutcomeUnknownAcked)
 	assertConsumeDuration(t, observer, eventobservability.ConsumeOutcomeUnknownAcked)
+}
+
+func TestDispatchHandlerDoesNotAckUnknownWhenAuditFails(t *testing.T) {
+	observer := &consumeObserver{}
+	dispatcher := &fakeDispatcher{outcome: eventruntime.DispatchUnknown}
+	msg := basemessaging.NewMessage("msg-1", []byte(`{}`))
+	msg.Metadata["event_type"] = "metadata.event"
+	msg.SetAckFunc(func() error { t.Fatal("unknown event acknowledged without audit"); return nil })
+	msg.SetNackFunc(func() error { t.Fatal("handler settled before transport could NACK"); return nil })
+	wantErr := errors.New("audit unavailable")
+	handler := createDispatchHandlerWithObserverAndHoldAndUnknown(testLogger(), dispatcher, "topic", "worker", observer, nil, func(context.Context, *basemessaging.Message, string) error { return wantErr })
+	if err := handler(t.Context(), msg); !errors.Is(err, wantErr) {
+		t.Fatalf("handler error = %v, want audit failure", err)
+	}
+	if msg.IsSettled() {
+		t.Fatal("unknown event settled before transport retry")
+	}
+	assertConsumeOutcome(t, observer, eventobservability.ConsumeOutcomeUnknownPersistFailed)
+	assertConsumeDuration(t, observer, eventobservability.ConsumeOutcomeUnknownPersistFailed)
 }
 
 func TestDispatchHandlerObservesAckFailed(t *testing.T) {

@@ -159,6 +159,11 @@ type outboxCandidateRow struct {
 }
 
 func (r *Reader) appendMySQLOutboxCandidates(ctx context.Context, orgID int64, limit int, dst *[]app.RetryCandidate) error {
+	if standard := r.standardOutboxes["assessment-mysql-outbox"]; standard != nil {
+		items, err := standard.ListOutboxCandidates(ctx, orgID, limit)
+		*dst = append(*dst, items...)
+		return err
+	}
 	var rows []outboxCandidateRow
 	if err := r.mysql.WithContext(ctx).Raw(`SELECT event_id, attempt_count, retry_disposition disposition,
 next_attempt_at, last_error_kind, updated_at FROM domain_event_outbox
@@ -173,6 +178,11 @@ ORDER BY updated_at DESC LIMIT ?`, orgID, limit).Scan(&rows).Error; err != nil {
 }
 
 func (r *Reader) appendMongoOutboxCandidates(ctx context.Context, orgID int64, limit int, dst *[]app.RetryCandidate) error {
+	if standard := r.standardOutboxes["mongo-domain-events"]; standard != nil {
+		items, err := standard.ListOutboxCandidates(ctx, orgID, limit)
+		*dst = append(*dst, items...)
+		return err
+	}
 	findOpts := options.Find().SetSort(bson.D{{Key: "updated_at", Value: -1}}).SetLimit(int64(limit)).SetProjection(bson.M{"event_id": 1, "attempt_count": 1, "retry_disposition": 1, "next_attempt_at": 1, "last_error_kind": 1, "updated_at": 1})
 	cur, err := r.mongo.Collection("domain_event_outbox").Find(ctx, bson.M{"org_id": orgID, "status": "failed", "retry_disposition": bson.M{"$in": governedOutboxDispositions}}, findOpts)
 	if err != nil {

@@ -30,6 +30,9 @@ type ProfileRuntimeStatus struct {
 	RelayEnabled      bool
 	ReconcilerEnabled bool
 	ImmediateEnabled  bool
+	RelayKind         string
+	ScanHealthy       *bool
+	LastFailureKind   string
 }
 
 type ConsumerRuntimeStatus struct {
@@ -73,6 +76,9 @@ type ProfileSummary struct {
 	RelayEnabled        bool                       `json:"relay_enabled"`
 	ReconcilerEnabled   bool                       `json:"reconciler_enabled"`
 	ImmediateEnabled    bool                       `json:"immediate_enabled"`
+	RelayKind           string                     `json:"relay_kind,omitempty"`
+	ScanHealthy         *bool                      `json:"scan_healthy,omitempty"`
+	LastFailureKind     string                     `json:"last_failure_kind,omitempty"`
 }
 
 type ConsumerSummary struct {
@@ -154,6 +160,9 @@ func applyRuntimeStatus(snapshot *StatusSnapshot, runtime RuntimeStatusSnapshot)
 		snapshot.Profiles[i].RelayEnabled = status.RelayEnabled
 		snapshot.Profiles[i].ReconcilerEnabled = status.ReconcilerEnabled
 		snapshot.Profiles[i].ImmediateEnabled = status.ImmediateEnabled
+		snapshot.Profiles[i].RelayKind = status.RelayKind
+		snapshot.Profiles[i].ScanHealthy = status.ScanHealthy
+		snapshot.Profiles[i].LastFailureKind = status.LastFailureKind
 	}
 	for i := range snapshot.Consumers {
 		status := runtime.Consumers[snapshot.Consumers[i].ID]

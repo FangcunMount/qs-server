@@ -1,6 +1,9 @@
 package platform
 
 import (
+	"context"
+	"errors"
+
 	"github.com/FangcunMount/component-base/pkg/event"
 	cachegovernance "github.com/FangcunMount/qs-server/internal/apiserver/application/cachegovernance"
 	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
@@ -48,25 +51,84 @@ func BuildRESTSystemGovernanceFacade(in RESTSystemGovernanceInput) systemgov.Fac
 	if auditStore == nil {
 		auditStore = governanceinfra.NewActionAuditStore(in.MySQLDB)
 	}
-	retryReader := retrygovinfra.NewReader(in.MySQLDB, in.MongoDB)
+	durableReplays, replayResolvers := buildDurableEventReplayStores(in.EventOutboxes)
+	if len(durableReplays) > 0 {
+		if in.MySQLDB == nil {
+			// The standard replay ledger cannot run without a persistent
+			// governance audit, even when its Outbox lives in MongoDB.
+			auditStore = unavailableReplayAuditStore{}
+		} else {
+			auditStore = systemgov.NewReconcilingActionAuditStore(
+				auditStore, governanceinfra.NewActionAuditStore(in.MySQLDB), replayResolvers)
+		}
+	}
+	retryReader := retrygovinfra.NewReader(in.MySQLDB, in.MongoDB).
+		WithStandardOutboxes(buildStandardOutboxGovernanceReaders(in.EventOutboxes))
 	actions := systemgov.NewActionExecutorWithResilience(registry, in.CacheGovernance, in.CachePolicyReloader, in.ResilienceGovernor, auditStore).
 		BindEventReplayStores(buildEventReplayStores(in.EventOutboxes, retryReader)).
+		BindDurableEventReplayStores(durableReplays).
 		BindDeliveryReplay(eventdelivery.NewStore(in.MySQLDB), in.EventPublisher).
 		BindActionHandlers(in.ActionHandlers)
+	var pendingReplayAuditReader systemgov.PendingReplayAuditReader
+	if in.MySQLDB != nil {
+		pendingReplayAuditReader = governanceinfra.NewActionAuditStore(in.MySQLDB)
+	}
 	return systemgov.NewFacade(systemgov.FacadeDeps{
-		EventStatusService:      in.EventStatusService,
-		EventTypeSources:        buildEventTypeSources(in.EventOutboxes),
-		CacheGovernance:         in.CacheGovernance,
-		CachePolicyReloader:     in.CachePolicyReloader,
-		LocalResilienceSnapshot: in.LocalResilienceSnapshot,
-		CheckpointReader:        NewCheckpointGovernanceReader(checkpoint.NewRepository(in.MySQLDB)),
-		Metrics:                 metrics,
-		Components:              components,
-		Registry:                registry,
-		Actions:                 actions,
-		RetryGovernanceReader:   retryReader,
-		RetryCandidateReader:    retryReader,
+		EventStatusService:       in.EventStatusService,
+		EventTypeSources:         buildEventTypeSources(in.EventOutboxes),
+		CacheGovernance:          in.CacheGovernance,
+		CachePolicyReloader:      in.CachePolicyReloader,
+		LocalResilienceSnapshot:  in.LocalResilienceSnapshot,
+		CheckpointReader:         NewCheckpointGovernanceReader(checkpoint.NewRepository(in.MySQLDB)),
+		Metrics:                  metrics,
+		Components:               components,
+		Registry:                 registry,
+		Actions:                  actions,
+		RetryGovernanceReader:    retryReader,
+		RetryCandidateReader:     retryReader,
+		PendingReplayAuditReader: pendingReplayAuditReader,
 	})
+}
+
+func buildStandardOutboxGovernanceReaders(outboxes []appEventing.NamedOutboxStatusReader) map[string]systemgov.OutboxGovernanceReader {
+	readers := map[string]systemgov.OutboxGovernanceReader{}
+	for _, outbox := range outboxes {
+		if outbox.Name == "" || outbox.Reader == nil {
+			continue
+		}
+		if reader, ok := outbox.Reader.(systemgov.OutboxGovernanceReader); ok {
+			readers[outbox.Name] = reader
+		}
+	}
+	return readers
+}
+
+// A durable owner without a recovery resolver is not executable. A committed
+// authorization must always be recoverable by its original request identity.
+func buildDurableEventReplayStores(outboxes []appEventing.NamedOutboxStatusReader) (map[string]outboxport.DurableManualReplayAuthorizer, map[string]systemgov.PendingReplayResolver) {
+	stores := map[string]outboxport.DurableManualReplayAuthorizer{}
+	resolvers := map[string]systemgov.PendingReplayResolver{}
+	for _, outbox := range outboxes {
+		if outbox.Name == "" || outbox.Reader == nil {
+			continue
+		}
+		replay, hasReplay := outbox.Reader.(outboxport.DurableManualReplayAuthorizer)
+		resolver, hasResolver := outbox.Reader.(systemgov.PendingReplayResolver)
+		if hasReplay && hasResolver {
+			stores[outbox.Name], resolvers[outbox.Name] = replay, resolver
+		}
+	}
+	return stores, resolvers
+}
+
+type unavailableReplayAuditStore struct{}
+
+func (unavailableReplayAuditStore) Claim(context.Context, systemgov.ActionAuditRecord) (*systemgov.ActionAuditReplay, bool, error) {
+	return nil, false, errors.New("standard replay requires a persistent MySQL governance audit")
+}
+
+func (unavailableReplayAuditStore) Complete(context.Context, systemgov.ActionAuditRecord) error {
+	return errors.New("standard replay requires a persistent MySQL governance audit")
 }
 
 func buildEventReplayStores(outboxes []appEventing.NamedOutboxStatusReader, retryHold outboxport.ManualReplayAuthorizer) map[string]outboxport.ManualReplayAuthorizer {

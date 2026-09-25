@@ -16,6 +16,7 @@ type Facade interface {
 	GetOverview(ctx context.Context, window string) (*OverviewResponse, error)
 	GetEvents(ctx context.Context, orgID int64, window string) (*EventsView, error)
 	ListRetryCandidates(ctx context.Context, orgID int64, cursor string, limit int) (*RetryCandidatePage, error)
+	ListPendingReplayAudits(ctx context.Context, orgID int64, cursor string, limit int) (*PendingReplayAuditPage, error)
 	GetCache(ctx context.Context, window string) (*CacheView, error)
 	GetResilience(ctx context.Context, window string) (*ResilienceView, error)
 	GetCheckpoints(ctx context.Context, window string) (*CheckpointView, error)
@@ -31,18 +32,19 @@ type MetricsClient interface {
 
 // FacadeDeps 线缆s 治理数据源。
 type FacadeDeps struct {
-	EventStatusService      appEventing.StatusService
-	EventTypeSources        []EventTypeStatusSource
-	CacheGovernance         cachegovernance.Facade
-	LocalResilienceSnapshot func() resilience.RuntimeSnapshot
-	CheckpointReader        CheckpointStatusReader
-	Metrics                 MetricsClient
-	Components              *govcomponent.Adapter
-	Actions                 *ActionExecutor
-	Registry                *ActionRegistry
-	CachePolicyReloader     CachePolicyReloader
-	RetryGovernanceReader   RetryGovernanceReader
-	RetryCandidateReader    RetryCandidateReader
+	EventStatusService       appEventing.StatusService
+	EventTypeSources         []EventTypeStatusSource
+	CacheGovernance          cachegovernance.Facade
+	LocalResilienceSnapshot  func() resilience.RuntimeSnapshot
+	CheckpointReader         CheckpointStatusReader
+	Metrics                  MetricsClient
+	Components               *govcomponent.Adapter
+	Actions                  *ActionExecutor
+	Registry                 *ActionRegistry
+	CachePolicyReloader      CachePolicyReloader
+	RetryGovernanceReader    RetryGovernanceReader
+	RetryCandidateReader     RetryCandidateReader
+	PendingReplayAuditReader PendingReplayAuditReader
 }
 
 type facade struct {
@@ -122,6 +124,17 @@ func (f *facade) ListRetryCandidates(ctx context.Context, orgID int64, cursor st
 		return nil, errActionsUnavailable()
 	}
 	page, err := f.deps.RetryCandidateReader.ListRetryCandidates(ctx, orgID, cursor, limit)
+	if err != nil {
+		return nil, err
+	}
+	return &page, nil
+}
+
+func (f *facade) ListPendingReplayAudits(ctx context.Context, orgID int64, cursor string, limit int) (*PendingReplayAuditPage, error) {
+	if f == nil || f.deps.PendingReplayAuditReader == nil {
+		return nil, errActionsUnavailable()
+	}
+	page, err := f.deps.PendingReplayAuditReader.ListPendingReplayAudits(ctx, orgID, cursor, limit)
 	if err != nil {
 		return nil, err
 	}

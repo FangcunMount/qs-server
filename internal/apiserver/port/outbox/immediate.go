@@ -2,6 +2,7 @@ package outbox
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/FangcunMount/qs-server/internal/pkg/retrygovernance"
@@ -60,3 +61,15 @@ type ManualReplayResult struct {
 type ManualReplayAuthorizer interface {
 	AuthorizeManualReplay(ctx context.Context, orgID int64, requestID string, targets []ManualReplayTarget, authorizedAt time.Time) ([]ManualReplayResult, error)
 }
+
+// DurableManualReplayAuthorizer binds the operator's complete request to a
+// durable authorization ledger. The reason is part of request identity, so a
+// repeated request ID with changed approval input must be rejected.
+type DurableManualReplayAuthorizer interface {
+	AuthorizeManualReplayWithReason(ctx context.Context, orgID int64, requestID, reason string, targets []ManualReplayTarget) ([]ManualReplayResult, error)
+}
+
+// ErrManualReplayOutcomeUnknown means a durable authorization may have
+// committed despite an error. The governance audit must remain recoverable;
+// the caller must not complete it as failed or issue another request ID.
+var ErrManualReplayOutcomeUnknown = errors.New("manual replay outcome awaits durable reconciliation")

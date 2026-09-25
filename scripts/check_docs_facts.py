@@ -288,7 +288,7 @@ EXPECTED_SIGNALS = {
     "typology_model_cache_changed",
 }
 
-EXPECTED_MIGRATION_MAX = {"mysql": 83, "mongodb": 35}
+EXPECTED_MIGRATION_MAX = {"mysql": 85, "mongodb": 36}
 EXPECTED_DOC_STATUS = {"aligned", "drifted", "needs_review", "planned", "archive_candidate"}
 EXPECTED_OWNERS = {
     "overview",

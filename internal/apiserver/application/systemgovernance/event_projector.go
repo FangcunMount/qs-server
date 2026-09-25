@@ -90,12 +90,12 @@ func (e *EventDrainEvaluator) projectOutboxRow(
 	}
 	for _, bucket := range outbox.Buckets {
 		switch bucket.Status {
-		case "pending":
+		case "pending", "retry_wait":
 			row.PendingCount += bucket.Count
 			if bucket.OldestAgeSeconds > row.OldestPendingAgeSeconds {
 				row.OldestPendingAgeSeconds = bucket.OldestAgeSeconds
 			}
-		case "failed":
+		case "failed", "quarantined":
 			row.FailedCount += bucket.Count
 		case "publishing":
 			row.PublishingCount += bucket.Count
@@ -214,13 +214,13 @@ func (e *EventDrainEvaluator) projectEventTypeRows(
 			}
 		}
 		switch bucket.Status {
-		case "pending":
+		case "pending", "retry_wait":
 			row.PendingCount += bucket.Count
 			age := eventTypeAgeSeconds(bucket, evalAt)
 			if age > row.OldestAgeSeconds {
 				row.OldestAgeSeconds = age
 			}
-		case "failed":
+		case "failed", "quarantined":
 			row.FailedCount += bucket.Count
 			if bucket.Count > 0 {
 				row.Degraded = true

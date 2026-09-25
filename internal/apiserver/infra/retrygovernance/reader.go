@@ -11,8 +11,9 @@ import (
 )
 
 type Reader struct {
-	mysql *gorm.DB
-	mongo *mongo.Database
+	mysql            *gorm.DB
+	mongo            *mongo.Database
+	standardOutboxes map[string]app.OutboxGovernanceReader
 }
 
 type countRow struct {
@@ -22,6 +23,19 @@ type countRow struct {
 
 func NewReader(mysql *gorm.DB, mongoDB *mongo.Database) *Reader {
 	return &Reader{mysql: mysql, mongo: mongoDB}
+}
+
+// WithStandardOutboxes replaces only the selected profiles' historical
+// Outbox views. Business retry, delivery dead letters and holds remain owned
+// by their existing readers.
+func (r *Reader) WithStandardOutboxes(readers map[string]app.OutboxGovernanceReader) *Reader {
+	if r != nil {
+		r.standardOutboxes = make(map[string]app.OutboxGovernanceReader, len(readers))
+		for name, reader := range readers {
+			r.standardOutboxes[name] = reader
+		}
+	}
+	return r
 }
 
 func (r *Reader) ReadRetryGovernance(ctx context.Context, orgID int64) (app.RetryGovernanceSummary, error) {
@@ -69,27 +83,12 @@ GROUP BY rc.retry_disposition`, orgID).Scan(&evaluation).Error; err != nil {
 		addDisposition(&summary, row.Disposition, row.Count)
 	}
 
-	var mysqlOutbox []countRow
-	if err := r.mysql.WithContext(ctx).Raw("SELECT retry_disposition disposition, COUNT(*) count FROM domain_event_outbox WHERE org_id=? AND status='failed' GROUP BY retry_disposition", orgID).Scan(&mysqlOutbox).Error; err != nil {
+	if err := r.addOutboxGovernance(ctx, orgID, "assessment-mysql-outbox", &summary); err != nil {
 		return summary, err
 	}
-	addOutboxCounts(&summary, mysqlOutbox)
-	for _, disposition := range []string{"automatic", "manual_required"} {
-		count, err := r.mongo.Collection("domain_event_outbox").CountDocuments(ctx, bson.M{"org_id": orgID, "status": "failed", "retry_disposition": disposition})
-		if err != nil {
-			return summary, err
-		}
-		addOutbox(&summary, disposition, count)
-	}
-	blockedMongo, err := r.mongo.Collection("domain_event_outbox").CountDocuments(ctx, bson.M{"org_id": orgID, "status": "failed", "retry_disposition": "manual_required", "event_type": bson.M{"$in": []string{"evaluation.retry.requested", "interpretation.retry.requested"}}})
-	if err != nil {
+	if err := r.addOutboxGovernance(ctx, orgID, "mongo-domain-events", &summary); err != nil {
 		return summary, err
 	}
-	var blockedMySQL int64
-	if err := r.mysql.WithContext(ctx).Raw("SELECT COUNT(*) FROM domain_event_outbox WHERE org_id=? AND status='failed' AND retry_disposition='manual_required' AND event_type IN ('evaluation.retry.requested','interpretation.retry.requested')", orgID).Scan(&blockedMySQL).Error; err != nil {
-		return summary, err
-	}
-	summary.BlockedRetryEvents = blockedMySQL + blockedMongo
 	if err := r.mysql.WithContext(ctx).Raw("SELECT COUNT(*) FROM event_delivery_dead_letter WHERE org_id=? AND retry_disposition='manual_required'", orgID).Scan(&summary.TransportDeadLetters).Error; err != nil {
 		return summary, err
 	}
@@ -100,6 +99,47 @@ GROUP BY rc.retry_disposition`, orgID).Scan(&evaluation).Error; err != nil {
 		return summary, err
 	}
 	return summary, nil
+}
+
+func (r *Reader) addOutboxGovernance(ctx context.Context, orgID int64, name string, summary *app.RetryGovernanceSummary) error {
+	if standard := r.standardOutboxes[name]; standard != nil {
+		counts, err := standard.ReadOutboxGovernance(ctx, orgID)
+		if err != nil {
+			return err
+		}
+		summary.OutboxAutomatic += counts.Automatic
+		summary.OutboxManual += counts.ManualRequired
+		summary.OutboxAuthorized += counts.Authorized
+		summary.OutboxTerminal += counts.Terminal
+		summary.BlockedRetryEvents += counts.BlockedRetryEvents
+		return nil
+	}
+	if name == "assessment-mysql-outbox" {
+		var rows []countRow
+		if err := r.mysql.WithContext(ctx).Raw("SELECT retry_disposition disposition, COUNT(*) count FROM domain_event_outbox WHERE org_id=? AND status='failed' GROUP BY retry_disposition", orgID).Scan(&rows).Error; err != nil {
+			return err
+		}
+		addOutboxCounts(summary, rows)
+		var blocked int64
+		if err := r.mysql.WithContext(ctx).Raw("SELECT COUNT(*) FROM domain_event_outbox WHERE org_id=? AND status='failed' AND retry_disposition='manual_required' AND event_type IN ('evaluation.retry.requested','interpretation.retry.requested')", orgID).Scan(&blocked).Error; err != nil {
+			return err
+		}
+		summary.BlockedRetryEvents += blocked
+		return nil
+	}
+	for _, disposition := range []string{"automatic", "manual_required"} {
+		count, err := r.mongo.Collection("domain_event_outbox").CountDocuments(ctx, bson.M{"org_id": orgID, "status": "failed", "retry_disposition": disposition})
+		if err != nil {
+			return err
+		}
+		addOutbox(summary, disposition, count)
+	}
+	blocked, err := r.mongo.Collection("domain_event_outbox").CountDocuments(ctx, bson.M{"org_id": orgID, "status": "failed", "retry_disposition": "manual_required", "event_type": bson.M{"$in": []string{"evaluation.retry.requested", "interpretation.retry.requested"}}})
+	if err != nil {
+		return err
+	}
+	summary.BlockedRetryEvents += blocked
+	return nil
 }
 
 func addDispositionCounts(summary *app.RetryGovernanceSummary, rows []countRow) {

@@ -1,0 +1,37 @@
+services:
+  mysql:
+    image: mysql@sha256:f37951fc3753a6a22d6c7bf6978c5e5fefcf6f31814d98c582524f98eae52b21
+    environment:
+      MYSQL_ALLOW_EMPTY_PASSWORD: "yes"
+    tmpfs:
+      - /var/lib/mysql:size=1g
+    healthcheck:
+      test: [CMD-SHELL, "mysql --protocol=TCP -h127.0.0.1 -uroot -N -e 'SELECT 1' | grep -qx 1"]
+      interval: 2s
+      timeout: 5s
+      retries: 60
+  mongo:
+    image: mongo@sha256:340c1c56fb10e95cf79ff547f8664b96bc6ead9909bc355238cbf865a9695a6f
+    command: [mongod, --replSet, rm-test, --bind_ip_all]
+    tmpfs:
+      - /data/db:size=512m
+    healthcheck:
+      test: [CMD, mongosh, --quiet, --eval, "if (db.runCommand({ping:1}).ok !== 1) quit(1)"]
+      interval: 2s
+      timeout: 5s
+      retries: 60
+  nsqd:
+    image: nsqio/nsq@sha256:1a369c146af71bc95c25d54b375a2b98452478c1eaf4e85f8fcb01da20f2c78a
+    command: [/nsqd, --data-path=/data, --broadcast-address=nsqd, --mem-queue-size=3000, --sync-every=2500, --sync-timeout=2s]
+    volumes:
+      - nsq-data:/data
+    healthcheck:
+      test: [CMD-SHELL, "wget -qO- http://127.0.0.1:4151/ping | grep -qx OK"]
+      interval: 2s
+      timeout: 5s
+      retries: 60
+networks:
+  default:
+    internal: true
+volumes:
+  nsq-data: {}

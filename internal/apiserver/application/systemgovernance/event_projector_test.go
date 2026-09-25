@@ -93,3 +93,25 @@ func TestEventDrainProjectionFlagsPendingBacklogWarning(t *testing.T) {
 		t.Fatalf("signals = %#v, want one warning pending_stale signal", projection.Signals)
 	}
 }
+
+func TestEventDrainProjectionKeepsStandardRetryAndQuarantineVisible(t *testing.T) {
+	now := time.Date(2026, 9, 23, 10, 0, 0, 0, time.UTC)
+	oldest := now.Add(-20 * time.Minute)
+	projection := NewEventDrainEvaluator(nil).Evaluate(context.Background(), &appEventing.StatusSnapshot{
+		Outboxes: []appEventing.OutboxSummary{{
+			Name: "assessment-mysql-outbox", Store: "assessment-mysql-outbox",
+			Buckets: []outboxport.StatusBucket{
+				{Status: "retry_wait", Count: 2, OldestAgeSeconds: 1200},
+				{Status: "quarantined", Count: 1},
+			},
+		}},
+	}, []EventTypeStatusGroup{{Store: "assessment-mysql-outbox", Buckets: []outboxport.EventTypeStatusBucket{
+		{EventType: "evaluation.requested", Status: "retry_wait", Count: 2, OldestCreatedAt: &oldest},
+		{EventType: "evaluation.requested", Status: "quarantined", Count: 1},
+	}}}, "5m", now)
+	if projection.Summary.PendingCount != 2 || projection.Summary.FailedCount != 1 ||
+		len(projection.OutboxRows) != 1 || projection.OutboxRows[0].Severity != SeverityCritical ||
+		len(projection.EventTypeRows) != 1 || projection.EventTypeRows[0].FailedCount != 1 {
+		t.Fatalf("standard retry or quarantine disappeared from governance: %+v", projection)
+	}
+}

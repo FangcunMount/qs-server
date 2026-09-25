@@ -3,6 +3,7 @@ package systemgovernance
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"reflect"
 	"strings"
 	"time"
@@ -41,6 +42,40 @@ type actionAuditEnvelope struct {
 
 func NewActionAuditStore(db *gorm.DB) *ActionAuditStore { return &ActionAuditStore{db: db} }
 
+func (s *ActionAuditStore) LoadRunning(ctx context.Context, incoming app.ActionAuditRecord) (app.ActionAuditRecord, bool, error) {
+	var row actionRunPO
+	err := s.db.WithContext(ctx).Where("org_id = ? AND request_id = ?", incoming.OrgID, incoming.RequestID).Take(&row).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return app.ActionAuditRecord{}, false, nil
+	}
+	if err != nil {
+		return app.ActionAuditRecord{}, false, err
+	}
+	if row.Status != "running" && row.Status != app.ActionAuditStatusPendingReconciliation {
+		return app.ActionAuditRecord{}, false, nil
+	}
+	inputJSON, err := json.Marshal(incoming.Input)
+	if err != nil {
+		return app.ActionAuditRecord{}, false, err
+	}
+	if row.ActionID != incoming.ActionID || row.ActorUserID != incoming.ActorUserID ||
+		row.Component != incoming.Component || row.TargetInstance != incoming.TargetInstance ||
+		!equalAuditJSON(row.InputJSON, string(inputJSON)) {
+		return app.ActionAuditRecord{}, false, app.ErrActionAuditInputConflict
+	}
+	decoder := json.NewDecoder(strings.NewReader(row.InputJSON))
+	decoder.UseNumber()
+	var input map[string]interface{}
+	if err := decoder.Decode(&input); err != nil {
+		return app.ActionAuditRecord{}, false, err
+	}
+	return app.ActionAuditRecord{
+		RequestID: row.RequestID, ActionID: row.ActionID, OrgID: row.OrgID,
+		ActorUserID: row.ActorUserID, Component: row.Component, TargetInstance: row.TargetInstance,
+		Input: input, StartedAt: row.StartedAt, Status: row.Status,
+	}, true, nil
+}
+
 func (s *ActionAuditStore) Claim(ctx context.Context, record app.ActionAuditRecord) (*app.ActionAuditReplay, bool, error) {
 	input, err := json.Marshal(record.Input)
 	if err != nil {
@@ -64,7 +99,12 @@ func (s *ActionAuditStore) Claim(ctx context.Context, record app.ActionAuditReco
 	if err := s.db.WithContext(ctx).Where("org_id = ? AND request_id = ?", record.OrgID, record.RequestID).Take(&existing).Error; err != nil {
 		return nil, false, err
 	}
-	if existing.Status == "running" || existing.ResultJSON == "" {
+	if existing.ActionID != record.ActionID || existing.ActorUserID != record.ActorUserID ||
+		existing.Component != record.Component || existing.TargetInstance != record.TargetInstance ||
+		!equalAuditJSON(existing.InputJSON, string(input)) {
+		return nil, false, app.ErrActionAuditInputConflict
+	}
+	if existing.Status == "running" || existing.Status == app.ActionAuditStatusPendingReconciliation || existing.ResultJSON == "" {
 		return nil, false, nil
 	}
 	prior, err := decodeActionAuditReplay(existing.ResultJSON)
@@ -72,6 +112,36 @@ func (s *ActionAuditStore) Claim(ctx context.Context, record app.ActionAuditReco
 		prior.ActionID = existing.ActionID
 	}
 	return prior, false, err
+}
+
+func (s *ActionAuditStore) MarkPending(ctx context.Context, record app.ActionAuditRecord) error {
+	original, found, err := s.LoadRunning(ctx, record)
+	if err != nil {
+		return err
+	}
+	if !found {
+		return gorm.ErrRecordNotFound
+	}
+	if original.Status == app.ActionAuditStatusPendingReconciliation {
+		return nil
+	}
+	result := s.db.WithContext(ctx).Model(&actionRunPO{}).
+		Where("org_id = ? AND request_id = ? AND status = ?", record.OrgID, record.RequestID, "running").
+		Updates(map[string]interface{}{"status": app.ActionAuditStatusPendingReconciliation, "updated_at": time.Now()})
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 1 {
+		return nil
+	}
+	original, found, err = s.LoadRunning(ctx, record)
+	if err != nil {
+		return err
+	}
+	if found && original.Status == app.ActionAuditStatusPendingReconciliation {
+		return nil
+	}
+	return gorm.ErrRecordNotFound
 }
 
 func (s *ActionAuditStore) Complete(ctx context.Context, record app.ActionAuditRecord) error {
@@ -85,7 +155,8 @@ func (s *ActionAuditStore) Complete(ctx context.Context, record app.ActionAuditR
 		"finished_at": record.FinishedAt, "updated_at": time.Now(),
 	}
 	result := s.db.WithContext(ctx).Model(&actionRunPO{}).
-		Where("org_id = ? AND request_id = ? AND status = ?", record.OrgID, record.RequestID, "running").
+		Where("org_id = ? AND request_id = ? AND status IN ?", record.OrgID, record.RequestID,
+			[]string{"running", app.ActionAuditStatusPendingReconciliation}).
 		Updates(updates)
 	if result.Error != nil {
 		return result.Error
@@ -119,6 +190,7 @@ func decodeActionAuditReplay(raw string) (*app.ActionAuditReplay, error) {
 }
 
 var _ app.ActionAuditStore = (*ActionAuditStore)(nil)
+var _ app.PendingActionAuditMarker = (*ActionAuditStore)(nil)
 
 // MySQL JSON columns normalize whitespace and member order. Preserve numeric
 // precision while comparing the stored envelope with a repeated completion.
