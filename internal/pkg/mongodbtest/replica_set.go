@@ -6,6 +6,7 @@ package mongodbtest
 
 import (
 	"context"
+	"crypto/rand"
 	"fmt"
 	"os"
 	"regexp"
@@ -42,6 +43,13 @@ func ReplicaSetDatabase(t testing.TB) (*mongo.Client, *mongo.Database) {
 	if len(prefix) > 36 {
 		prefix = prefix[:36]
 	}
+	// Parallel tests can observe the same clock tick. A random suffix keeps one
+	// test's cleanup from dropping another test's still-active database.
+	var suffix [12]byte
+	if _, err := rand.Read(suffix[:]); err != nil {
+		t.Fatalf("allocate unique integration database: %v", err)
+	}
+	databaseName := fmt.Sprintf("%s_%x", prefix, suffix[:])
 
 	ctx, cancel := context.WithTimeout(t.Context(), 15*time.Second)
 	defer cancel()
@@ -65,7 +73,6 @@ func ReplicaSetDatabase(t testing.TB) (*mongo.Client, *mongo.Database) {
 		t.Fatal("integration Mongo is not a Replica Set (hello.setName is empty)")
 	}
 
-	databaseName := fmt.Sprintf("%s_%d", prefix, time.Now().UnixNano())
 	db := client.Database(databaseName)
 	t.Cleanup(func() {
 		cleanupCtx, cleanupCancel := context.WithTimeout(context.Background(), 15*time.Second)
