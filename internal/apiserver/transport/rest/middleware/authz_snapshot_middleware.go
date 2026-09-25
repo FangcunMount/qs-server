@@ -32,12 +32,13 @@ func AuthzSnapshotMiddleware(loader *iamauth.SnapshotLoader, updater operatorapp
 
 	return newAuthzSnapshotMiddleware(func(ctx context.Context, userID string) (*authz.Snapshot, error) {
 		return loader.Load(ctx, userID)
-	}, updater)
+	}, updater, loader.VerifySnapshot)
 }
 
 func newAuthzSnapshotMiddleware(
 	load func(ctx context.Context, userID string) (*authz.Snapshot, error),
 	updater operatorapp.OperatorRoleProjectionUpdater,
+	verify func(context.Context, *authz.Snapshot) error,
 ) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		if load == nil {
@@ -76,6 +77,13 @@ func newAuthzSnapshotMiddleware(
 						"error", err.Error(),
 					)
 				}
+			}
+		}
+		if verify != nil {
+			if err := verify(c.Request.Context(), snap); err != nil {
+				c.JSON(http.StatusServiceUnavailable, gin.H{"error": "authorization snapshot is no longer current"})
+				c.Abort()
+				return
 			}
 		}
 		c.Next()

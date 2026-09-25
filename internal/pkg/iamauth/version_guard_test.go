@@ -11,6 +11,7 @@ import (
 
 	authzv4 "github.com/FangcunMount/iam/v5/api/grpc/iam/authz/v4"
 	"github.com/FangcunMount/iam/v5/pkg/sdk"
+	authzapp "github.com/FangcunMount/qs-server/internal/apiserver/application/authz"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/test/bufconn"
@@ -208,6 +209,41 @@ func TestVersionGuardRefreshDiscoversRevocationBeforeExpiry(t *testing.T) {
 	}
 	if got, err := guard.Verify(context.Background()); err != nil || got != 41 {
 		t.Fatalf("periodic proof = %d, %v", got, err)
+	}
+}
+
+func TestSnapshotDecisionRechecksExpiredProofAndCommittedVersion(t *testing.T) {
+	clock := &guardClock{at: time.Now()}
+	version := int64(50)
+	unavailable := false
+	guard, err := NewVersionGuard(versionReaderFunc(func(context.Context) (int64, error) {
+		if unavailable {
+			return 0, errors.New("IAM unavailable")
+		}
+		return version, nil
+	}), 10*time.Second)
+	if err != nil {
+		t.Fatal(err)
+	}
+	guard.now = clock.now
+	if _, err := guard.Verify(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	loader := NewSnapshotLoader(nil, SnapshotLoaderOptions{VersionGuard: guard})
+	snapshot := &authzapp.Snapshot{AuthzVersion: version}
+	clock.advance(10 * time.Second) // Local work delayed the permission decision.
+	unavailable = true
+	if err := loader.VerifySnapshot(context.Background(), snapshot); err == nil {
+		t.Fatal("decision accepted an expired proof during IAM outage")
+	}
+	unavailable = false
+	version++
+	clock.advance(5 * time.Second) // Retry interval after the failed read.
+	if err := loader.VerifySnapshot(context.Background(), snapshot); err == nil {
+		t.Fatal("decision accepted a snapshot older than IAM's committed version")
+	}
+	if err := loader.VerifySnapshot(context.Background(), &authzapp.Snapshot{AuthzVersion: version}); err != nil {
+		t.Fatalf("current snapshot denied after proof recovery: %v", err)
 	}
 }
 

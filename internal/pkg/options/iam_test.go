@@ -2,7 +2,9 @@ package options
 
 import (
 	"errors"
+	"strings"
 	"testing"
+	"time"
 )
 
 func TestIAMOptionsValidateTokenProfile(t *testing.T) {
@@ -75,6 +77,42 @@ func TestIAMOptionsValidateTokenProfile(t *testing.T) {
 			if errs := opts.Validate(); !containsError(errs, tt.wantErr) {
 				t.Fatalf("Validate() errors = %v, want %v", errs, tt.wantErr)
 			}
+		})
+	}
+}
+
+func TestIAMAuthzVersionGuardRequiresBoundedProofAndPolling(t *testing.T) {
+	t.Parallel()
+
+	for _, tc := range []struct {
+		name   string
+		mutate func(*IAMOptions)
+		want   string
+	}{
+		{"valid defaults", func(*IAMOptions) {}, ""},
+		{"proof too old", func(o *IAMOptions) { o.AuthzVersionGuard.MaxAge = 11 * time.Second }, "max-age"},
+		{"poll not bounded", func(o *IAMOptions) { o.AuthzVersionGuard.PollInterval = 10 * time.Second }, "poll-interval"},
+		{"read not bounded", func(o *IAMOptions) { o.AuthzVersionGuard.ReadTimeout = 10 * time.Second }, "read-timeout"},
+		{"grpc unavailable", func(o *IAMOptions) { o.GRPCEnabled = false }, "requires IAM gRPC"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			opts := enabledIAMOptions()
+			opts.AuthzVersionGuard.Enabled = true
+			tc.mutate(opts)
+			errs := opts.Validate()
+			if tc.want == "" {
+				if len(errs) != 0 {
+					t.Fatalf("Validate() errors = %v, want none", errs)
+				}
+				return
+			}
+			for _, err := range errs {
+				if strings.Contains(err.Error(), tc.want) {
+					return
+				}
+			}
+			t.Fatalf("Validate() errors = %v, want %q", errs, tc.want)
 		})
 	}
 }
