@@ -308,7 +308,15 @@ func runCurrentRuntimeClosure(t *testing.T, eventFactory runtimeClosureEventFact
 		evaluationMessage = capture.Wait(t, eventcatalog.EvaluationRequested)
 		err = evaluationHandler(t.Context(), eventcatalog.EvaluationRequested, evaluationMessage.Payload)
 	} else {
+		firstEvaluation, firstErr := delivery.Wait(t, eventcatalog.EvaluationRequested)
+		if firstErr == nil {
+			t.Fatal("first Evaluation delivery must report the controlled lost NSQ consumer ACK")
+		}
 		evaluationMessage, err = delivery.Wait(t, eventcatalog.EvaluationRequested)
+		if evaluationMessage.UUID != firstEvaluation.UUID {
+			t.Fatalf("Evaluation event ID changed on NSQ redelivery: first=%s second=%s",
+				firstEvaluation.UUID, evaluationMessage.UUID)
+		}
 	}
 	if err != nil {
 		t.Fatalf("consume evaluation.requested: %v", err)

@@ -5,6 +5,7 @@ package runtimeclosure
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"os"
 	"sync"
@@ -36,13 +37,15 @@ type standardClosureResult struct {
 }
 
 type standardClosureDelivery struct {
-	mu                   sync.RWMutex
-	handlers             map[string]handlers.HandlerFunc
-	results              chan standardClosureResult
-	pending              map[string][]standardClosureResult
-	standardMongo        bool
-	firstOutcomeBrokerID *nsq.MessageID
-	lastOutcomeAttempts  uint16
+	mu                      sync.RWMutex
+	handlers                map[string]handlers.HandlerFunc
+	results                 chan standardClosureResult
+	pending                 map[string][]standardClosureResult
+	standardMongo           bool
+	firstEvaluationBrokerID *nsq.MessageID
+	lastEvaluationAttempts  uint16
+	firstOutcomeBrokerID    *nsq.MessageID
+	lastOutcomeAttempts     uint16
 }
 
 func (d *standardClosureDelivery) SetHandlers(registered map[string]handlers.HandlerFunc) {
@@ -81,6 +84,19 @@ func (d *standardClosureDelivery) Wait(t *testing.T, eventType string) (*messagi
 		}
 		if got.message == nil {
 			t.Fatalf("standard NSQ event=%q has no decoded message", got.eventType)
+		}
+		if eventType == eventcatalog.EvaluationRequested {
+			if d.firstEvaluationBrokerID == nil {
+				if got.attempts != 1 {
+					t.Fatalf("first Evaluation broker attempt=%d, want 1", got.attempts)
+				}
+				brokerID := got.brokerID
+				d.firstEvaluationBrokerID = &brokerID
+			} else if got.brokerID != *d.firstEvaluationBrokerID || got.attempts <= d.lastEvaluationAttempts {
+				t.Fatalf("Evaluation was republished instead of NSQ redelivery: first broker ID=%s, current=%s, attempts=%d after %d",
+					*d.firstEvaluationBrokerID, got.brokerID, got.attempts, d.lastEvaluationAttempts)
+			}
+			d.lastEvaluationAttempts = got.attempts
 		}
 		if eventType == eventcatalog.EvaluationOutcomeCommitted {
 			if d.firstOutcomeBrokerID == nil {
@@ -155,6 +171,9 @@ func newM5StandardEventSubsystem(t *testing.T, opts eventsubsystem.Options, sqlD
 			return fmt.Errorf("no current Worker handler for %s", eventType)
 		}
 		handleErr := handler(t.Context(), eventType, decoded.Payload)
+		if handleErr == nil && eventType == eventcatalog.EvaluationRequested && raw.Attempts == 1 {
+			handleErr = errors.New("controlled lost Evaluation consumer ACK")
+		}
 		select {
 		case delivery.results <- standardClosureResult{message: decoded, eventType: eventType, brokerID: raw.ID, attempts: raw.Attempts, err: handleErr}:
 		case <-t.Context().Done():
