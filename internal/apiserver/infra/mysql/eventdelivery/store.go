@@ -30,6 +30,38 @@ type Store struct{ db *gorm.DB }
 
 func NewStore(db *gorm.DB) *Store { return &Store{db: db} }
 
+// ValidateReplayBatch rejects already-invalid targets before any member of a
+// batch can be published. Each subsequent claim repeats the same check because
+// the rows may change between validation and delivery.
+func (s *Store) ValidateReplayBatch(ctx context.Context, orgID int64, targets []app.DeliveryReplayTarget) error {
+	if s == nil || s.db == nil || orgID <= 0 || len(targets) == 0 || len(targets) > 100 {
+		return fmt.Errorf("invalid delivery replay validation")
+	}
+	for _, target := range targets {
+		if target.ID == 0 || target.ExpectedDeliveryAttempts < 1 {
+			return fmt.Errorf("delivery dead-letter id and expected attempts are required")
+		}
+		var row deadLetterPO
+		if err := s.db.WithContext(ctx).First(&row, "id = ?", target.ID).Error; err != nil {
+			return err
+		}
+		if err := validateReplayRow(row, orgID, target); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func validateReplayRow(row deadLetterPO, orgID int64, target app.DeliveryReplayTarget) error {
+	if row.OrgID == nil || *row.OrgID != orgID {
+		return fmt.Errorf("delivery dead-letter %d is outside organization scope", target.ID)
+	}
+	if row.RetryDisposition != "manual_required" || row.DeliveryAttempts != target.ExpectedDeliveryAttempts {
+		return fmt.Errorf("delivery dead-letter %d replay state conflict", target.ID)
+	}
+	return nil
+}
+
 func (s *Store) AuthorizeReplay(ctx context.Context, orgID int64, requestID string, targets []app.DeliveryReplayTarget, now time.Time) ([]app.AuthorizedDelivery, error) {
 	if s == nil || s.db == nil || orgID <= 0 || requestID == "" || len(targets) == 0 || len(targets) > 100 {
 		return nil, fmt.Errorf("invalid delivery replay authorization")
@@ -44,11 +76,8 @@ func (s *Store) AuthorizeReplay(ctx context.Context, orgID int64, requestID stri
 			if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&row, "id = ?", target.ID).Error; err != nil {
 				return err
 			}
-			if row.OrgID == nil || *row.OrgID != orgID {
-				return fmt.Errorf("delivery dead-letter %d is outside organization scope", target.ID)
-			}
-			if row.RetryDisposition != "manual_required" || row.DeliveryAttempts != target.ExpectedDeliveryAttempts {
-				return fmt.Errorf("delivery dead-letter %d replay state conflict", target.ID)
+			if err := validateReplayRow(row, orgID, target); err != nil {
+				return err
 			}
 			if err := tx.Model(&deadLetterPO{}).Where("id = ?", row.ID).Updates(map[string]any{
 				"retry_disposition": "automatic", "replay_request_id": requestID, "updated_at": now,
@@ -88,6 +117,22 @@ func (s *Store) FailReplay(ctx context.Context, id uint64, requestID, lastError 
 	}
 	if result.RowsAffected != 1 {
 		return fmt.Errorf("delivery dead-letter %d replay failure conflict", id)
+	}
+	return nil
+}
+
+// RecordReplayUncertain preserves the claim when the broker or completion
+// result cannot be proven. An operator must reconcile the original event
+// before another replay is authorized.
+func (s *Store) RecordReplayUncertain(ctx context.Context, id uint64, requestID, lastError string, now time.Time) error {
+	result := s.db.WithContext(ctx).Model(&deadLetterPO{}).
+		Where("id = ? AND retry_disposition = 'automatic' AND replay_request_id = ?", id, requestID).
+		Updates(map[string]any{"last_error": lastError, "updated_at": now})
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected != 1 {
+		return fmt.Errorf("delivery dead-letter %d replay reconciliation conflict", id)
 	}
 	return nil
 }

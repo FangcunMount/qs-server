@@ -65,6 +65,14 @@ func TestGovernanceSummaryReconcilesWithOrganizationCandidates(t *testing.T) {
 	if got := counts[key{"transport_delivery", "manual_required"}]; got != summary.TransportDeadLetters {
 		t.Fatalf("transport summary=%d candidates=%d", summary.TransportDeadLetters, got)
 	}
+	if got := counts[key{"transport_delivery", "reconciliation_required"}]; got != summary.TransportReplayUnresolved || got != 1 {
+		t.Fatalf("unresolved replay summary=%d candidates=%d", summary.TransportReplayUnresolved, got)
+	}
+	for _, item := range page.Items {
+		if item.Kind == "transport_delivery" && item.Disposition == "reconciliation_required" && item.ActionRequestID != "batch-7" {
+			t.Fatalf("unresolved replay request leaked across organization: %#v", item)
+		}
+	}
 	if got := counts[key{"retry_hold", "automatic"}]; got != summary.HeldAutomatic {
 		t.Fatalf("held automatic summary=%d candidates=%d", summary.HeldAutomatic, got)
 	}
@@ -128,6 +136,7 @@ CREATE TABLE domain_event_outbox (
 CREATE TABLE event_delivery_dead_letter (
  id bigint unsigned AUTO_INCREMENT PRIMARY KEY, org_id bigint NULL,
  delivery_attempts int NOT NULL, last_error text NULL, retry_disposition varchar(32) NOT NULL,
+	replay_request_id varchar(64) NULL,
  updated_at datetime(3) NOT NULL
 );
 CREATE TABLE retry_event_hold (
@@ -175,12 +184,14 @@ INSERT INTO domain_event_outbox (event_id,org_id,event_type,status,retry_disposi
  ('org-8-outbox',8,'evaluation.retry.requested','failed','manual_required',30,?);
 INSERT INTO event_delivery_dead_letter (org_id,delivery_attempts,last_error,retry_disposition,updated_at) VALUES
  (7,8,'delivery failed','manual_required',?),(8,8,'delivery failed','manual_required',?);
+INSERT INTO event_delivery_dead_letter (org_id,delivery_attempts,last_error,retry_disposition,replay_request_id,updated_at) VALUES
+ (7,8,'publish outcome unknown','automatic','batch-7',?),(8,8,'publish outcome unknown','automatic','batch-8',?);
 INSERT INTO retry_event_hold (event_id,org_id,status,retry_disposition,replay_attempt_count,updated_at) VALUES
  ('hold-auto',7,'blocked','automatic',0,?),
  ('hold-manual',7,'failed','manual_required',30,?),
  ('hold-org-8',8,'blocked','automatic',0,?)`,
 		now.Add(-time.Hour), now, now, now, now,
-		now, now, now, now, now, now, now, now).Error; err != nil {
+		now, now, now, now, now, now, now, now, now, now).Error; err != nil {
 		t.Fatal(err)
 	}
 }

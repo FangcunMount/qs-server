@@ -23,17 +23,18 @@ type EventsView struct {
 }
 
 type RetryGovernanceSummary struct {
-	Automatic            int64 `json:"automatic"`
-	ManualRequired       int64 `json:"manual_required"`
-	Terminal             int64 `json:"terminal"`
-	OutboxAutomatic      int64 `json:"outbox_automatic"`
-	OutboxManual         int64 `json:"outbox_manual_required"`
-	OutboxAuthorized     int64 `json:"outbox_authorized"`
-	OutboxTerminal       int64 `json:"outbox_terminal"`
-	BlockedRetryEvents   int64 `json:"blocked_retry_events"`
-	TransportDeadLetters int64 `json:"transport_dead_letters"`
-	HeldAutomatic        int64 `json:"held_automatic"`
-	HeldManualRequired   int64 `json:"held_manual_required"`
+	Automatic                 int64 `json:"automatic"`
+	ManualRequired            int64 `json:"manual_required"`
+	Terminal                  int64 `json:"terminal"`
+	OutboxAutomatic           int64 `json:"outbox_automatic"`
+	OutboxManual              int64 `json:"outbox_manual_required"`
+	OutboxAuthorized          int64 `json:"outbox_authorized"`
+	OutboxTerminal            int64 `json:"outbox_terminal"`
+	BlockedRetryEvents        int64 `json:"blocked_retry_events"`
+	TransportDeadLetters      int64 `json:"transport_dead_letters"`
+	TransportReplayUnresolved int64 `json:"transport_replay_unresolved"`
+	HeldAutomatic             int64 `json:"held_automatic"`
+	HeldManualRequired        int64 `json:"held_manual_required"`
 }
 
 type RetryGovernanceReader interface {
