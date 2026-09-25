@@ -91,7 +91,7 @@ make docs-hygiene
 ```
 
 上述命令不包含带 `//go:build integration` 的 NSQ + MySQL terminal handoff 集成测试；该测试需要 `MESSAGING_INTEGRATION=1`、NSQ 和隔离 MySQL，
-本轮未运行，不能据此宣称真实 broker 终态交接已验收。
+2026-09-25 的 M5-04 候选已在本地真实 NSQ／一次性 MySQL 运行；该结果不在上述普通命令内，也不代表生产 broker 终态交接已验收。
 
 ## 学习检查
 

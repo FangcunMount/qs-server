@@ -84,8 +84,8 @@
   "machine_contracts": {
     "migrations": {
       "mysql": {
-        "max_version": 85,
-        "version_count": 85
+        "max_version": 86,
+        "version_count": 86
       },
       "mongodb": {
         "max_version": 36,
