@@ -52,6 +52,7 @@ build_dir=$(mktemp -d "${TMPDIR:-/tmp}/$project-build.XXXXXX")
   -o "$build_dir/runtimeclosure.test" ./internal/apiserver/integration/runtimeclosure)
 "${compose[@]}" exec -T mysql mkdir -p /tmp/m5-outcome/configs /tmp/m5-outcome/internal/apiserver/integration/runtimeclosure
 "${compose[@]}" cp "$repo/configs/events.yaml" mysql:/tmp/m5-outcome/configs/events.yaml
+"${compose[@]}" cp "$repo/configs/grpc-acl.prod.yaml" mysql:/tmp/m5-outcome/configs/grpc-acl.prod.yaml
 "${compose[@]}" cp "$build_dir/runtimeclosure.test" mysql:/tmp/m5-outcome/internal/apiserver/integration/runtimeclosure/runtimeclosure.test
 "${compose[@]}" exec -T -w /tmp/m5-outcome/internal/apiserver/integration/runtimeclosure \
   -e MYSQL_DSN='root@tcp(mysql:3306)/mysql?parseTime=true&multiStatements=true&loc=Asia%2FShanghai' \
@@ -59,4 +60,4 @@ build_dir=$(mktemp -d "${TMPDIR:-/tmp}/$project-build.XXXXXX")
   -e QS_SERVER_TEST_MONGO_DB_PREFIX='qs_m5_outcome_test' \
   -e QS_SERVER_TEST_REDIS_URL='redis://redis:6379/15' \
   -e RM_QS_M5_NSQ_TCP='nsqd:4150' \
-  mysql ./runtimeclosure.test -test.run '^TestM5(StandardMySQLOutcomeToReportAcrossNSQ|DualStandardProfilesCurrentBusinessClosure)$' -test.count=1 -test.timeout=15m -test.v
+  mysql ./runtimeclosure.test -test.run '^(TestM5StandardMySQLOutcomeToReportAcrossNSQ|TestM5DualStandardProfilesCurrentBusinessClosure|TestM5OldFailureRedeliveryAfterDurableReportKeepsParticipantCompleted)$' -test.count=1 -test.timeout=15m -test.v

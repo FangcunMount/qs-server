@@ -19,12 +19,13 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	TesteeEvaluationService_AuthorizeAssessment_FullMethodName = "/evaluation.TesteeEvaluationService/AuthorizeAssessment"
-	TesteeEvaluationService_GetMyAssessment_FullMethodName     = "/evaluation.TesteeEvaluationService/GetMyAssessment"
-	TesteeEvaluationService_ListMyAssessments_FullMethodName   = "/evaluation.TesteeEvaluationService/ListMyAssessments"
-	TesteeEvaluationService_GetAssessmentScores_FullMethodName = "/evaluation.TesteeEvaluationService/GetAssessmentScores"
-	TesteeEvaluationService_GetFactorTrend_FullMethodName      = "/evaluation.TesteeEvaluationService/GetFactorTrend"
-	TesteeEvaluationService_GetHighRiskFactors_FullMethodName  = "/evaluation.TesteeEvaluationService/GetHighRiskFactors"
+	TesteeEvaluationService_AuthorizeAssessment_FullMethodName      = "/evaluation.TesteeEvaluationService/AuthorizeAssessment"
+	TesteeEvaluationService_GetMyAssessment_FullMethodName          = "/evaluation.TesteeEvaluationService/GetMyAssessment"
+	TesteeEvaluationService_GetMyAssessmentRunStatus_FullMethodName = "/evaluation.TesteeEvaluationService/GetMyAssessmentRunStatus"
+	TesteeEvaluationService_ListMyAssessments_FullMethodName        = "/evaluation.TesteeEvaluationService/ListMyAssessments"
+	TesteeEvaluationService_GetAssessmentScores_FullMethodName      = "/evaluation.TesteeEvaluationService/GetAssessmentScores"
+	TesteeEvaluationService_GetFactorTrend_FullMethodName           = "/evaluation.TesteeEvaluationService/GetFactorTrend"
+	TesteeEvaluationService_GetHighRiskFactors_FullMethodName       = "/evaluation.TesteeEvaluationService/GetHighRiskFactors"
 )
 
 // TesteeEvaluationServiceClient is the client API for TesteeEvaluationService service.
@@ -37,6 +38,9 @@ type TesteeEvaluationServiceClient interface {
 	AuthorizeAssessment(ctx context.Context, in *AuthorizeAssessmentRequest, opts ...grpc.CallOption) (*AuthorizeAssessmentResponse, error)
 	// 获取我的测评详情（含 model/primary_score/level outcome 投影）
 	GetMyAssessment(ctx context.Context, in *GetMyAssessmentRequest, opts ...grpc.CallOption) (*GetMyAssessmentResponse, error)
+	// Fresh persisted execution phase after participant ownership validation.
+	// This excludes claim tokens, failure diagnostics and model input.
+	GetMyAssessmentRunStatus(ctx context.Context, in *GetMyAssessmentRunStatusRequest, opts ...grpc.CallOption) (*GetMyAssessmentRunStatusResponse, error)
 	// 获取我的测评列表（含 outcome 投影）
 	ListMyAssessments(ctx context.Context, in *ListMyAssessmentsRequest, opts ...grpc.CallOption) (*ListMyAssessmentsResponse, error)
 	GetAssessmentScores(ctx context.Context, in *GetAssessmentScoresRequest, opts ...grpc.CallOption) (*GetAssessmentScoresResponse, error)
@@ -66,6 +70,16 @@ func (c *testeeEvaluationServiceClient) GetMyAssessment(ctx context.Context, in 
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(GetMyAssessmentResponse)
 	err := c.cc.Invoke(ctx, TesteeEvaluationService_GetMyAssessment_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *testeeEvaluationServiceClient) GetMyAssessmentRunStatus(ctx context.Context, in *GetMyAssessmentRunStatusRequest, opts ...grpc.CallOption) (*GetMyAssessmentRunStatusResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetMyAssessmentRunStatusResponse)
+	err := c.cc.Invoke(ctx, TesteeEvaluationService_GetMyAssessmentRunStatus_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -122,6 +136,9 @@ type TesteeEvaluationServiceServer interface {
 	AuthorizeAssessment(context.Context, *AuthorizeAssessmentRequest) (*AuthorizeAssessmentResponse, error)
 	// 获取我的测评详情（含 model/primary_score/level outcome 投影）
 	GetMyAssessment(context.Context, *GetMyAssessmentRequest) (*GetMyAssessmentResponse, error)
+	// Fresh persisted execution phase after participant ownership validation.
+	// This excludes claim tokens, failure diagnostics and model input.
+	GetMyAssessmentRunStatus(context.Context, *GetMyAssessmentRunStatusRequest) (*GetMyAssessmentRunStatusResponse, error)
 	// 获取我的测评列表（含 outcome 投影）
 	ListMyAssessments(context.Context, *ListMyAssessmentsRequest) (*ListMyAssessmentsResponse, error)
 	GetAssessmentScores(context.Context, *GetAssessmentScoresRequest) (*GetAssessmentScoresResponse, error)
@@ -142,6 +159,9 @@ func (UnimplementedTesteeEvaluationServiceServer) AuthorizeAssessment(context.Co
 }
 func (UnimplementedTesteeEvaluationServiceServer) GetMyAssessment(context.Context, *GetMyAssessmentRequest) (*GetMyAssessmentResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetMyAssessment not implemented")
+}
+func (UnimplementedTesteeEvaluationServiceServer) GetMyAssessmentRunStatus(context.Context, *GetMyAssessmentRunStatusRequest) (*GetMyAssessmentRunStatusResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetMyAssessmentRunStatus not implemented")
 }
 func (UnimplementedTesteeEvaluationServiceServer) ListMyAssessments(context.Context, *ListMyAssessmentsRequest) (*ListMyAssessmentsResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ListMyAssessments not implemented")
@@ -209,6 +229,24 @@ func _TesteeEvaluationService_GetMyAssessment_Handler(srv interface{}, ctx conte
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(TesteeEvaluationServiceServer).GetMyAssessment(ctx, req.(*GetMyAssessmentRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _TesteeEvaluationService_GetMyAssessmentRunStatus_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetMyAssessmentRunStatusRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(TesteeEvaluationServiceServer).GetMyAssessmentRunStatus(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: TesteeEvaluationService_GetMyAssessmentRunStatus_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(TesteeEvaluationServiceServer).GetMyAssessmentRunStatus(ctx, req.(*GetMyAssessmentRunStatusRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -299,6 +337,10 @@ var TesteeEvaluationService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetMyAssessment",
 			Handler:    _TesteeEvaluationService_GetMyAssessment_Handler,
+		},
+		{
+			MethodName: "GetMyAssessmentRunStatus",
+			Handler:    _TesteeEvaluationService_GetMyAssessmentRunStatus_Handler,
 		},
 		{
 			MethodName: "ListMyAssessments",
