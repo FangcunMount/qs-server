@@ -2,7 +2,7 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "d3ac2645adecd629d285162abf0282d4ab9a75b6",
+    "sha": "a658d63c4fa8c71b7c016d5eed33f3063469a941",
     "verified_on": "2026-09-25"
   },
   "status_policy": {
@@ -84,8 +84,8 @@
   "machine_contracts": {
     "migrations": {
       "mysql": {
-        "max_version": 85,
-        "version_count": 85
+        "max_version": 86,
+        "version_count": 86
       },
       "mongodb": {
         "max_version": 36,
@@ -6418,7 +6418,7 @@
         "observed_at": null,
         "limitations": [
           "Repository source and non-cached tests are aligned for this document; no target-environment or current exact-SHA production evidence is attached.",
-          "The build-tagged NSQ plus MySQL terminal-handoff integration was not run in this review."
+          "The M5-04 candidate passed a local build-tagged NSQ plus disposable MySQL terminal-handoff run; target-environment and business-effect evidence is not attached."
         ]
       },
       "gaps": [
@@ -6649,8 +6649,8 @@
           "id": "EVENT-40-TERMINAL-INTEGRATION",
           "kind": "environment",
           "severity": "high",
-          "summary": "The current NSQ terminal handoff and MySQL recorder chain lacks a build-tagged real-broker integration run; RabbitMQ retry and DLQ topology remains a provider capability, not production proof.",
-          "exit_criteria": "Run the build-tagged NSQ plus MySQL terminal integration and separately validate any selected provider topology in the target environment."
+          "summary": "A local NSQ plus disposable MySQL terminal-handoff integration passed; the selected provider topology and business effect remain unverified in the target environment. RabbitMQ retry and DLQ topology remains a provider capability, not production proof.",
+          "exit_criteria": "Run the build-tagged NSQ plus MySQL terminal integration at the reviewed release SHA and separately validate the selected provider topology and business effect in the target environment."
         },
         {
           "id": "EVENT-40-PRODUCTION",
