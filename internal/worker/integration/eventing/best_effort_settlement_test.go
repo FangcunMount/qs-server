@@ -40,6 +40,26 @@ type failingTaskNotifier struct {
 	calls int
 }
 
+type unsuccessfulBestEffortClient struct {
+	handlers.InternalClient
+	calls int
+}
+
+func (c *unsuccessfulBestEffortClient) HandleQuestionnairePublishedPostActions(context.Context, string, string) (*pb.GenerateQuestionnaireQRCodeResponse, error) {
+	c.calls++
+	return &pb.GenerateQuestionnaireQRCodeResponse{Success: false, Message: "QR generation failed"}, nil
+}
+
+func (c *unsuccessfulBestEffortClient) HandleScalePublishedPostActions(context.Context, string) (*pb.GenerateScaleQRCodeResponse, error) {
+	c.calls++
+	return &pb.GenerateScaleQRCodeResponse{Success: false, Message: "QR generation failed"}, nil
+}
+
+func (c *unsuccessfulBestEffortClient) SendTaskOpenedMiniProgramNotification(context.Context, int64, string, uint64, string, time.Time) (*pb.SendTaskOpenedMiniProgramNotificationResponse, error) {
+	c.calls++
+	return &pb.SendTaskOpenedMiniProgramNotificationResponse{Success: false, Skipped: true, Message: "mini-program notification unavailable"}, nil
+}
+
 func (n *failingTaskNotifier) NotifyTaskCompleted(context.Context, port.NotificationMeta, port.TaskCompletedNotification) error {
 	n.calls++
 	return errors.New("notification gateway unavailable")
@@ -159,6 +179,44 @@ func TestBestEffortExternalFailureStillAcknowledgesOriginalEvent(t *testing.T) {
 			}
 			if len(observer.events) != 1 || observer.events[0].Outcome != eventobservability.ConsumeOutcomeAcked || observer.events[0].Service != "qs-worker" || observer.events[0].Topic != tc.topic {
 				t.Fatalf("consume outcomes = %#v, want one qs-worker ack", observer.events)
+			}
+		})
+	}
+}
+
+func TestBestEffortUnsuccessfulRPCResponseStillAcknowledgesOriginalEvent(t *testing.T) {
+	const occurredAt = "2026-09-25T00:00:00Z"
+	cases := []struct {
+		eventType string
+		topic     string
+		data      map[string]any
+	}{
+		{"questionnaire.changed", "qs.survey.lifecycle", map[string]any{"code": "Q-1", "version": "v1", "action": "published", "changed_at": occurredAt}},
+		{"assessment_model.changed", "qs.survey.lifecycle", map[string]any{"kind": "scale", "code": "S-1", "version": "v1", "action": "published", "changed_at": occurredAt}},
+		{"task.opened", "qs.plan.task", map[string]any{"task_id": "T-1", "plan_id": "P-1", "testee_id": "123", "entry_url": "https://example.test/entry", "open_at": occurredAt}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.eventType, func(t *testing.T) {
+			client := &unsuccessfulBestEffortClient{}
+			observer := &bestEffortConsumeObserver{}
+			subscriber := subscribeBestEffortHandlers(t, client, nil, observer)
+			payload, err := json.Marshal(map[string]any{
+				"id": "evt-unsuccessful", "eventType": tc.eventType, "occurredAt": occurredAt,
+				"aggregateType": "Test", "aggregateID": "1", "data": tc.data,
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			msg := basemessaging.NewMessage("broker-unsuccessful", payload)
+			msg.Metadata["event_type"] = tc.eventType
+			acks, nacks := 0, 0
+			msg.SetAckFunc(func() error { acks++; return nil })
+			msg.SetNackFunc(func() error { nacks++; return nil })
+			if err := subscriber.handlers[tc.topic](context.Background(), msg); err != nil {
+				t.Fatal(err)
+			}
+			if client.calls != 1 || acks != 1 || nacks != 0 || !msg.IsSettled() || len(observer.events) != 1 || observer.events[0].Outcome != eventobservability.ConsumeOutcomeAcked {
+				t.Fatalf("calls=%d acks=%d nacks=%d settled=%t outcomes=%+v", client.calls, acks, nacks, msg.IsSettled(), observer.events)
 			}
 		})
 	}
