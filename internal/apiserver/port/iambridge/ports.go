@@ -97,3 +97,27 @@ type MiniProgramRecipientResolver interface {
 	IsEnabled() bool
 	ResolveMiniProgramRecipients(ctx context.Context, profileID string) (*MiniProgramRecipients, error)
 }
+
+// MiniProgramRecipientCandidate is an IAM login identity linked to a Profile.
+// Relations are facts for the caller's product policy, not permission to send.
+type MiniProgramRecipientCandidate struct {
+	UserID          string
+	LoginIdentityID string
+	AppID           string
+	OpenID          string
+	Relations       []string
+}
+
+// MiniProgramLinkedUser exposes the active IAM link facts before any login
+// identity is fetched. The caller must apply the product's recipient policy.
+type MiniProgramLinkedUser struct {
+	UserID    string
+	Relations []string
+}
+
+// MiniProgramRecipientCandidateReader only reads AppID-scoped identities.
+// It neither selects eligible relations nor sends a notification.
+type MiniProgramRecipientCandidateReader interface {
+	ListLinkedUsers(ctx context.Context, profileID string) ([]MiniProgramLinkedUser, error)
+	ReadCandidates(ctx context.Context, profileID, appID string, selectedUserIDs []string) ([]MiniProgramRecipientCandidate, error)
+}
