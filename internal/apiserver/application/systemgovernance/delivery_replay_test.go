@@ -107,6 +107,71 @@ func TestActionExecutorDeliveryReplayPrevalidatesWholeBatch(t *testing.T) {
 	}
 }
 
+func TestActionExecutorDeliveryReplayKeepsClaimWhenCompletionWriteFails(t *testing.T) {
+	evt := event.New("evaluation.retry.requested", "Evaluation", "42", map[string]any{"org_id": int64(9)})
+	payload, err := json.Marshal(evt)
+	if err != nil {
+		t.Fatal(err)
+	}
+	store := &fakeDeliveryReplayStore{
+		authorized:  []AuthorizedDelivery{{ID: 7, EventID: evt.EventID(), PayloadJSON: string(payload)}},
+		completeErr: fmt.Errorf("completion write unavailable"),
+	}
+	publisher := &fakeDeliveryPublisher{}
+	executor := NewActionExecutor(NewActionRegistry(), &fakeStatisticsGovernance{}).BindDeliveryReplay(store, publisher)
+	_, err = executor.Run(t.Context(), 9, "events.replay_delivery", singleDeliveryReplayRequest("completion-write-failed"))
+	if err == nil || !strings.Contains(err.Error(), "完成状态待核对") {
+		t.Fatalf("completion write failure must remain uncertain: %v", err)
+	}
+	if publisher.publishCount != 1 || store.completedID != 7 || store.uncertainID != 7 || store.failedID != 0 {
+		t.Fatalf("published=%d completion=%d uncertain=%d failed=%d", publisher.publishCount, store.completedID, store.uncertainID, store.failedID)
+	}
+}
+
+func TestActionExecutorDeliveryReplayExposesFailureStateWriteError(t *testing.T) {
+	store := &fakeDeliveryReplayStore{
+		authorized: []AuthorizedDelivery{{ID: 7, EventID: "bad-event", PayloadJSON: "{"}},
+		failErr:    fmt.Errorf("failure state write unavailable"),
+	}
+	publisher := &fakeDeliveryPublisher{}
+	executor := NewActionExecutor(NewActionRegistry(), &fakeStatisticsGovernance{}).BindDeliveryReplay(store, publisher)
+	_, err := executor.Run(t.Context(), 9, "events.replay_delivery", singleDeliveryReplayRequest("failure-write-failed"))
+	if err == nil || !strings.Contains(err.Error(), "状态待核对") {
+		t.Fatalf("failed compensation must remain visible: %v", err)
+	}
+	if publisher.publishCount != 0 || store.failedID != 7 || store.uncertainID != 0 {
+		t.Fatalf("published=%d failure_attempt=%d uncertain=%d", publisher.publishCount, store.failedID, store.uncertainID)
+	}
+}
+
+func TestActionExecutorDeliveryReplaySettlesAfterCallerCancellation(t *testing.T) {
+	evt := event.New("evaluation.retry.requested", "Evaluation", "42", map[string]any{"org_id": int64(9)})
+	payload, err := json.Marshal(evt)
+	if err != nil {
+		t.Fatal(err)
+	}
+	store := &fakeDeliveryReplayStore{authorized: []AuthorizedDelivery{{ID: 7, EventID: evt.EventID(), PayloadJSON: string(payload)}}}
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+	publisher := &fakeDeliveryPublisher{afterPublish: cancel}
+	executor := NewActionExecutor(NewActionRegistry(), &fakeStatisticsGovernance{}).BindDeliveryReplay(store, publisher)
+	result, err := executor.Run(ctx, 9, "events.replay_delivery", singleDeliveryReplayRequest("caller-canceled"))
+	if err != nil || result == nil || result.Status != "ok" || store.completedID != 7 {
+		t.Fatalf("published event must settle after caller cancellation: result=%#v err=%v completion=%d", result, err, store.completedID)
+	}
+}
+
+func singleDeliveryReplayRequest(requestID string) ActionRunRequest {
+	return ActionRunRequest{
+		RequestID: requestID,
+		Confirm:   true,
+		Input: map[string]interface{}{
+			"reason":  "transport recovered",
+			"targets": []interface{}{map[string]interface{}{"id": 7, "expected_delivery_attempts": 8}},
+		},
+	}
+}
+
 type fakeDeliveryReplayStore struct {
 	authorized  []AuthorizedDelivery
 	orgID       int64
@@ -117,6 +182,8 @@ type fakeDeliveryReplayStore struct {
 	uncertainID uint64
 	claims      []uint64
 	validateErr error
+	completeErr error
+	failErr     error
 }
 
 func (s *fakeDeliveryReplayStore) ValidateReplayBatch(_ context.Context, _ int64, _ []DeliveryReplayTarget) error {
@@ -136,17 +203,26 @@ func (s *fakeDeliveryReplayStore) AuthorizeReplay(_ context.Context, orgID int64
 	}
 	return nil, fmt.Errorf("delivery %d missing", targets[0].ID)
 }
-func (s *fakeDeliveryReplayStore) CompleteReplay(_ context.Context, id uint64, _ string, _ time.Time) error {
+func (s *fakeDeliveryReplayStore) CompleteReplay(ctx context.Context, id uint64, _ string, _ time.Time) error {
 	s.completedID = id
-	return nil
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	return s.completeErr
 }
-func (s *fakeDeliveryReplayStore) FailReplay(_ context.Context, id uint64, _, _ string, _ time.Time) error {
+func (s *fakeDeliveryReplayStore) FailReplay(ctx context.Context, id uint64, _, _ string, _ time.Time) error {
 	s.failedID = id
-	return nil
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	return s.failErr
 }
 
-func (s *fakeDeliveryReplayStore) RecordReplayUncertain(_ context.Context, id uint64, _, _ string, _ time.Time) error {
+func (s *fakeDeliveryReplayStore) RecordReplayUncertain(ctx context.Context, id uint64, _, _ string, _ time.Time) error {
 	s.uncertainID = id
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -154,11 +230,15 @@ type fakeDeliveryPublisher struct {
 	eventID      string
 	publishCount int
 	failOn       int
+	afterPublish func()
 }
 
 func (p *fakeDeliveryPublisher) Publish(_ context.Context, evt event.DomainEvent) error {
 	p.publishCount++
 	p.eventID = evt.EventID()
+	if p.afterPublish != nil {
+		p.afterPublish()
+	}
 	if p.failOn == p.publishCount {
 		return fmt.Errorf("publish response lost")
 	}
