@@ -37,6 +37,11 @@ func (o *Options) Validate() []error {
 	}
 	if o.IAMOptions != nil && o.IAMOptions.AuthzSync != nil {
 		errs = append(errs, o.IAMOptions.AuthzSync.Delivery.Validate("iam.authz-sync.delivery")...)
+		if o.IAMOptions.AuthzSync.EphemeralNSQ {
+			if !o.IAMOptions.AuthzSync.Enabled || o.IAMOptions.AuthzSync.Provider != "nsq" || o.IAMOptions.AuthzVersionGuard == nil || !o.IAMOptions.AuthzVersionGuard.Enabled {
+				errs = append(errs, fmt.Errorf("iam.authz-sync.ephemeral-nsq requires enabled NSQ sync and committed-version guard"))
+			}
+		}
 	}
 	if o.IAMOptions != nil && o.IAMOptions.AuthzVersionGuard != nil {
 		if o.IAMOptions.AuthzVersionGuard.Enabled && (!o.IAMOptions.Enabled || !o.IAMOptions.GRPCEnabled) {

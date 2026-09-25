@@ -3577,9 +3577,9 @@ def priority_infrastructure_doc_contract_issues() -> list[Issue]:
                 )
 
     go_mod = (ROOT / "go.mod").read_text(encoding="utf-8")
-    # v0.6.10 adds an adapter-owned physical delivery ID but keeps the
-    # terminal handoff order and the old optional-field decode contract.
-    if not re.search(r"^\s*github\.com/FangcunMount/component-base\s+v0\.6\.10\s*$", go_mod, flags=re.M):
+    # v0.6.11 retains the physical delivery ID and terminal handoff order.
+    # Its shared handoff group is opt-in; the empty option keeps old naming.
+    if not re.search(r"^\s*github\.com/FangcunMount/component-base\s+v0\.6\.11\s*$", go_mod, flags=re.M):
         issues.append(
             Issue(
                 "priority-event-provider-dependency-drift",

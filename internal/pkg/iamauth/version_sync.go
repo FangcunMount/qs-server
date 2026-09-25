@@ -2,6 +2,8 @@ package iamauth
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -36,6 +38,19 @@ func DefaultVersionSyncChannel(serviceName string) string {
 	channel := fmt.Sprintf("%s-%s-%d", serviceName, host, os.Getpid())
 	channel = channelSanitizer.ReplaceAllString(channel, "-")
 	return strings.ToLower(channel)
+}
+
+// EphemeralVersionSyncChannel keeps a per-process NSQ subscription within the
+// protocol's 64-byte channel limit. Missed notifications are safe only when
+// the independent committed-version guard is enabled.
+func EphemeralVersionSyncChannel(serviceName string) string {
+	const suffix = "#ephemeral"
+	channel := DefaultVersionSyncChannel(serviceName)
+	if len(channel)+len(suffix) > 64 {
+		digest := sha256.Sum256([]byte(channel))
+		channel = channel[:64-len(suffix)-13] + "-" + hex.EncodeToString(digest[:6])
+	}
+	return channel + suffix
 }
 
 // SubscribeVersionChanges 订阅 IAM authz_version 通知，并将版本水位推进到本地 SnapshotLoader。

@@ -508,6 +508,17 @@ func TestOptionsValidateIAMCommittedVersionGuard(t *testing.T) {
 	}
 }
 
+func TestOptionsRejectsEphemeralNSQWithoutCommittedVersionGuard(t *testing.T) {
+	opts := NewOptions()
+	opts.IAMOptions.AuthzSync.EphemeralNSQ = true
+	for _, err := range opts.Validate() {
+		if strings.Contains(err.Error(), "ephemeral-nsq requires enabled NSQ sync and committed-version guard") {
+			return
+		}
+	}
+	t.Fatal("API startup options accepted ephemeral NSQ without a committed-version guard")
+}
+
 func TestOptionsValidateSystemGovernanceComponentDiscovery(t *testing.T) {
 	tests := []struct {
 		name   string

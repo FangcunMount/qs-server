@@ -28,3 +28,30 @@ func TestIAMAuthzSyncValidatesDeliveryWhileDisabled(t *testing.T) {
 		t.Fatalf("Validate() = %v, want delivery hard-cap error", errs)
 	}
 }
+
+func TestIAMAuthzSyncEphemeralRequiresEnabledNSQAndGuard(t *testing.T) {
+	options := NewIAMOptions()
+	options.Enabled = true
+	options.GRPCEnabled = true
+	options.AuthzSync.EphemeralNSQ = true
+	if !containsOptionError(options.Validate(), "requires enabled authz sync and committed-version guard") {
+		t.Fatal("ephemeral channel accepted without committed-version guard")
+	}
+	options.AuthzVersionGuard.Enabled = true
+	if containsOptionError(options.Validate(), "ephemeral-nsq") {
+		t.Fatal("valid guarded NSQ ephemeral channel was rejected")
+	}
+	options.AuthzSync.Provider = "rabbitmq"
+	if !containsOptionError(options.Validate(), "requires NSQ provider") {
+		t.Fatal("RabbitMQ provider accepted NSQ ephemeral channel")
+	}
+}
+
+func containsOptionError(errs []error, fragment string) bool {
+	for _, err := range errs {
+		if strings.Contains(err.Error(), fragment) {
+			return true
+		}
+	}
+	return false
+}

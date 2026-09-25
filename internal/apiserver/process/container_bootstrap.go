@@ -191,6 +191,12 @@ func (s *server) startAuthzVersionSync(c *container.Container, recorder eventtra
 		logger.L(context.Background()).Warnw("Failed to configure authz version subscriber", "component", "apiserver", "error", err.Error())
 		return nil
 	}
+	channelPrefix := authzSync.ChannelPrefix
+	if channelPrefix == "" {
+		channelPrefix = "qs-authz-sync"
+	}
+	channel, handoffGroup := authzVersionSubscriberIdentity(channelPrefix, authzSync.EphemeralNSQ)
+	options.FailedHandoffGroup = handoffGroup
 	subscriber, err := eventtransport.NewSubscriber(eventtransport.SubscriberConfig{
 		Provider: authzSync.Provider, NSQLookupdAddr: authzSync.NSQLookupdAddr, RabbitMQURL: authzSync.RabbitMQURL,
 	}, options)
@@ -202,11 +208,6 @@ func (s *server) startAuthzVersionSync(c *container.Container, recorder eventtra
 		return nil
 	}
 
-	channelPrefix := authzSync.ChannelPrefix
-	if channelPrefix == "" {
-		channelPrefix = "qs-authz-sync"
-	}
-	channel := iamauth.DefaultVersionSyncChannel(channelPrefix + "-apiserver")
 	if err := iamauth.SubscribeVersionChanges(context.Background(), subscriber, authzSync.Topic, channel, loader); err != nil {
 		_ = subscriber.Close()
 		logger.L(context.Background()).Warnw("Failed to subscribe IAM authz version sync",
@@ -218,4 +219,12 @@ func (s *server) startAuthzVersionSync(c *container.Container, recorder eventtra
 		return nil
 	}
 	return subscriber
+}
+
+func authzVersionSubscriberIdentity(prefix string, ephemeralNSQ bool) (channel, handoffGroup string) {
+	name := prefix + "-apiserver"
+	if ephemeralNSQ {
+		return iamauth.EphemeralVersionSyncChannel(name), strings.ToLower(strings.TrimSpace(prefix)) + "-apiserver"
+	}
+	return iamauth.DefaultVersionSyncChannel(name), ""
 }
