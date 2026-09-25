@@ -26,6 +26,7 @@ func notificationMetaFromEnvelope(env *EventEnvelope) port.NotificationMeta {
 }
 
 type taskNotificationCallbacks[T any] struct {
+	eventType           string
 	parseErrorLabel     string
 	logMessage          string
 	logFields           func(env *EventEnvelope, data *T) []any
@@ -92,6 +93,7 @@ func handleTaskOpened(deps *Dependencies) HandlerFunc {
 func handleTaskCompleted(deps *Dependencies) HandlerFunc {
 	return func(ctx context.Context, _ string, payload []byte) error {
 		return handleTaskNotificationEvent(ctx, deps, payload, taskNotificationCallbacks[eventpayload.TaskCompletedData]{
+			eventType:       "task.completed",
 			parseErrorLabel: "task completed event",
 			logMessage:      "processing task completed",
 			logFields: func(env *EventEnvelope, data *eventpayload.TaskCompletedData) []any {
@@ -150,10 +152,15 @@ func handleTaskExpired(deps *Dependencies) HandlerFunc {
 			return nil
 		}
 		if deps.Notifier == nil {
+			workerobservability.ObserveBestEffortSideEffect("task.expired", workerobservability.BestEffortNotConfigured)
+			deps.Logger.Warn("task expired notifier not configured", slog.String("event_id", env.ID), slog.String("task_id", data.TaskID))
 			return nil
 		}
 		if err := notifyTaskExpired(ctx, deps.Notifier, notificationMetaFromEnvelope(env), &data); err != nil {
-			deps.Logger.Warn("failed to notify task expired", slog.String("task_id", data.TaskID), slog.String("testee_id", data.TesteeID), slog.String("error", err.Error()))
+			workerobservability.ObserveBestEffortSideEffect("task.expired", workerobservability.BestEffortCallFailed)
+			deps.Logger.Warn("failed to notify task expired", slog.String("event_id", env.ID), slog.String("task_id", data.TaskID), slog.String("testee_id", data.TesteeID), slog.String("error", err.Error()))
+		} else {
+			workerobservability.ObserveBestEffortSideEffect("task.expired", workerobservability.BestEffortCallSucceeded)
 		}
 		return nil
 	}
@@ -161,6 +168,7 @@ func handleTaskExpired(deps *Dependencies) HandlerFunc {
 
 func handleTaskCanceled(deps *Dependencies) HandlerFunc {
 	return handleTimedTaskNotificationHandler(deps, taskTimedNotificationCallbacks[eventpayload.TaskCanceledData]{
+		eventType:        "task.canceled",
 		parseErrorLabel:  "task canceled event",
 		logMessage:       "processing task canceled",
 		timeFieldName:    "canceled_at",
@@ -220,19 +228,25 @@ func handleTaskNotificationEvent[T any](
 
 	deps.Logger.Info(callbacks.logMessage, callbacks.logFields(env, data)...)
 	if deps.Notifier == nil {
+		workerobservability.ObserveBestEffortSideEffect(callbacks.eventType, workerobservability.BestEffortNotConfigured)
+		deps.Logger.Warn("task notifier not configured", slog.String("event_id", env.ID), slog.String("event_type", callbacks.eventType))
 		return nil
 	}
 
 	if err := callbacks.notify(ctx, deps.Notifier, notificationMetaFromEnvelope(env), data); err != nil {
+		workerobservability.ObserveBestEffortSideEffect(callbacks.eventType, workerobservability.BestEffortCallFailed)
 		fields := callbacks.notifyFailureFields(data)
-		fields = append(fields, slog.String("error", err.Error()))
+		fields = append(fields, slog.String("event_id", env.ID), slog.String("error", err.Error()))
 		deps.Logger.Warn(callbacks.notifyFailureLog, fields...)
+	} else {
+		workerobservability.ObserveBestEffortSideEffect(callbacks.eventType, workerobservability.BestEffortCallSucceeded)
 	}
 
 	return nil
 }
 
 type taskTimedNotificationCallbacks[T any] struct {
+	eventType        string
 	parseErrorLabel  string
 	logMessage       string
 	timeFieldName    string
@@ -250,6 +264,7 @@ func handleTimedTaskNotificationHandler[T any](
 ) HandlerFunc {
 	return func(ctx context.Context, _ string, payload []byte) error {
 		return handleTaskNotificationEvent(ctx, deps, payload, taskNotificationCallbacks[T]{
+			eventType:       callbacks.eventType,
 			parseErrorLabel: callbacks.parseErrorLabel,
 			logMessage:      callbacks.logMessage,
 			logFields: func(env *EventEnvelope, data *T) []any {
