@@ -16,6 +16,7 @@ import (
 type fakeStatusCache struct {
 	snapshots map[string]*reportstatus.Snapshot
 	getErr    error
+	setErr    error
 	getCalls  int
 	setCalls  int
 }
@@ -33,6 +34,9 @@ func (f *fakeStatusCache) Get(_ context.Context, assessmentID string) (*reportst
 
 func (f *fakeStatusCache) Set(_ context.Context, snapshot *reportstatus.Snapshot, _ time.Duration) error {
 	f.setCalls++
+	if f.setErr != nil {
+		return f.setErr
+	}
 	if f.snapshots == nil {
 		f.snapshots = map[string]*reportstatus.Snapshot{}
 	}
@@ -395,5 +399,34 @@ func TestGetStatusAllowsOwnAssessmentWhenRedisUnavailable(t *testing.T) {
 	}
 	if cache.getCalls != 1 {
 		t.Fatalf("cache Get calls = %d, want 1", cache.getCalls)
+	}
+}
+
+func TestGetStatusRecoversDurableFailureWhenStatusProjectionIsUnavailableOrStale(t *testing.T) {
+	for _, tc := range []struct {
+		name  string
+		cache *fakeStatusCache
+	}{
+		{name: "redis unavailable", cache: &fakeStatusCache{getErr: errors.New("redis down"), setErr: errors.New("redis down")}},
+		{name: "stale processing snapshot", cache: &fakeStatusCache{snapshots: map[string]*reportstatus.Snapshot{
+			"99": {AssessmentID: "99", Status: "processing", Stage: "processing", UpdatedAt: time.Now().Add(-time.Minute)},
+		}}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			query := &fakeAssessmentQuery{result: &evaluation.AssessmentDetailResponse{
+				ID: "99", Status: "failed", FailureReason: "controlled failed evaluation",
+			}}
+			svc := NewService(query, tc.cache, nil, nil, DefaultConfig())
+			resp, err := svc.GetStatus(context.Background(), 1, 99)
+			if err != nil {
+				t.Fatalf("GetStatus: %v", err)
+			}
+			if resp.Status != "failed" || resp.Stage != "failed" || resp.Reason != "controlled failed evaluation" {
+				t.Fatalf("durable failure response = %#v", resp)
+			}
+			if query.getCalls != 1 || tc.cache.getCalls != 1 {
+				t.Fatalf("durable read calls = %d, cache reads = %d; want 1 each", query.getCalls, tc.cache.getCalls)
+			}
+		})
 	}
 }

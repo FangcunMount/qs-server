@@ -58,3 +58,7 @@ func standardState(value string) bool {
 	}
 	return false
 }
+
+// IsUnfinishedState keeps the host Mongo event-type reader aligned with the
+// standard status snapshot's accepted state set.
+func IsUnfinishedState(value string) bool { return standardState(value) }
