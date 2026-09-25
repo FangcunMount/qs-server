@@ -41,29 +41,51 @@ func NewAuthzSnapshotUnaryInterceptor(
 		if !hasOrg {
 			return nil, status.Errorf(codes.InvalidArgument, "organization scope is required for QS business routes")
 		}
-		snap, err := loader.Load(ctx, userIDStr)
-		if err != nil {
-			return nil, status.Errorf(codes.Unavailable, "failed to load authorization snapshot: %v", err)
-		}
-		if updater != nil {
-			orgIDInt, orgErr := safeconv.Uint64ToInt64(orgID)
-			userID, userErr := strconv.ParseInt(userIDStr, 10, 64)
-			if orgErr == nil && userErr == nil {
-				if err := updater.PersistFromSnapshotByUser(ctx, orgIDInt, userID, snap); err != nil {
-					logger.L(ctx).Warnw("failed to persist operator roles projection from IAM snapshot",
-						"org_id", orgIDInt,
-						"user_id", userID,
-						"error", err.Error(),
-					)
-				}
+		return invokeWithAuthorizationSnapshot(ctx, req, handler, userIDStr, orgID, loader.Load, loader.VerifySnapshot, updater)
+	}
+}
+
+// invokeWithAuthorizationSnapshot checks the same snapshot again immediately
+// before a user RPC enters its business handler. Role projection can take time
+// after Load and must not extend the lifetime of a stale authorization fact.
+func invokeWithAuthorizationSnapshot(
+	ctx context.Context,
+	req interface{},
+	handler grpcapi.UnaryHandler,
+	userIDStr string,
+	orgID uint64,
+	load func(context.Context, string) (*authz.Snapshot, error),
+	verify func(context.Context, *authz.Snapshot) error,
+	updater operatorapp.OperatorRoleProjectionUpdater,
+) (interface{}, error) {
+	if load == nil || verify == nil {
+		return nil, status.Error(codes.Unavailable, "authorization snapshot loader is unavailable")
+	}
+	snap, err := load(ctx, userIDStr)
+	if err != nil {
+		return nil, status.Errorf(codes.Unavailable, "failed to load authorization snapshot: %v", err)
+	}
+	if updater != nil {
+		orgIDInt, orgErr := safeconv.Uint64ToInt64(orgID)
+		userID, userErr := strconv.ParseInt(userIDStr, 10, 64)
+		if orgErr == nil && userErr == nil {
+			if err := updater.PersistFromSnapshotByUser(ctx, orgIDInt, userID, snap); err != nil {
+				logger.L(ctx).Warnw("failed to persist operator roles projection from IAM snapshot",
+					"org_id", orgIDInt,
+					"user_id", userID,
+					"error", err.Error(),
+				)
 			}
 		}
-		ctx = authz.WithSnapshot(ctx, snap)
-		if uid, err := strconv.ParseUint(userIDStr, 10, 64); err == nil {
-			ctx = actorctx.WithGrantingUserID(ctx, uid)
-		}
-		return handler(ctx, req)
 	}
+	ctx = authz.WithSnapshot(ctx, snap)
+	if uid, err := strconv.ParseUint(userIDStr, 10, 64); err == nil {
+		ctx = actorctx.WithGrantingUserID(ctx, uid)
+	}
+	if err := verify(ctx, snap); err != nil {
+		return nil, status.Error(codes.Unavailable, "authorization snapshot is no longer current")
+	}
+	return handler(ctx, req)
 }
 
 func grpcAuthzSnapshotSkipMethod(fullMethod string) bool {
