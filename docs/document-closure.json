@@ -2,7 +2,7 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "9d23c36bc58f2d1b1236b097b917816afa4c5721",
+    "sha": "312f159fe959fa2e8361dfa6f62a306c0f7d2fb9",
     "verified_on": "2026-09-26"
   },
   "status_policy": {
@@ -84,8 +84,8 @@
   "machine_contracts": {
     "migrations": {
       "mysql": {
-        "max_version": 85,
-        "version_count": 85
+        "max_version": 86,
+        "version_count": 86
       },
       "mongodb": {
         "max_version": 36,
