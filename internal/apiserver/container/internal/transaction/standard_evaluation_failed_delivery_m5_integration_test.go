@@ -16,8 +16,10 @@ import (
 
 	"github.com/FangcunMount/component-base/pkg/messaging"
 	evalpb "github.com/FangcunMount/qs-server/api/grpc/gen/evaluation"
+	appauthz "github.com/FangcunMount/qs-server/internal/apiserver/application/authz"
 	appexecute "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/execute"
 	appintake "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/intake"
+	appoperator "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/operator"
 	evalworker "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/worker"
 	"github.com/FangcunMount/qs-server/internal/apiserver/eventing/standardoutbox"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/checkpoint"
@@ -29,6 +31,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime"
 	"github.com/FangcunMount/qs-server/internal/pkg/reportstatus"
+	"github.com/FangcunMount/qs-server/internal/pkg/retrygovernance"
 	"github.com/FangcunMount/qs-server/internal/worker/handlers"
 	"github.com/FangcunMount/reliable-messaging/relay"
 	sdkmysql "github.com/FangcunMount/reliable-messaging/storage/mysql"
@@ -81,14 +84,14 @@ func (c m5EvaluationGRPCClient) ExecuteEvaluation(ctx context.Context, assessmen
 }
 
 type m5RetryMetadata struct {
-	eventID, expectedAttempt, origin, mode string
+	eventID, expectedAttempt, origin, mode, actionRequestID string
 }
 
 // The failed fact and standard intent are committed by the real Evaluation
 // finalizer. Relay publishes the original envelope to NSQ; losing the first
 // consumer ACK redelivers that same broker message to the original Worker
 // handler without starting another business attempt.
-func TestM5StandardEvaluationFailedProjectionAcrossNSQ(t *testing.T) {
+func TestM5StandardEvaluationFailureAndGovernedRetriesAcrossNSQ(t *testing.T) {
 	dsn := os.Getenv("RM_QS_M5_FAILED_DSN")
 	parsed, err := mysqldriver.ParseDSN(dsn)
 	if err != nil || parsed.Net != "tcp" || parsed.Addr != "mysql:3306" || parsed.DBName != "m5_qs_failed_delivery" {
@@ -98,7 +101,7 @@ func TestM5StandardEvaluationFailedProjectionAcrossNSQ(t *testing.T) {
 	if address != "nsqd:4150" {
 		t.Fatal("disposable nsqd:4150 required")
 	}
-	ctx, cancel := context.WithTimeout(t.Context(), 75*time.Second)
+	ctx, cancel := context.WithTimeout(t.Context(), 100*time.Second)
 	defer cancel()
 	db, err := gorm.Open(gormmysql.Open(dsn), &gorm.Config{})
 	require.NoError(t, err)
@@ -180,7 +183,7 @@ events:
 	reporter, err := reportstatus.NewReporter(statusHandle, reportstatus.Config{TTL: time.Hour, Service: "qs-worker"})
 	require.NoError(t, err)
 	projection := &m5FailedProjection{reporter: reporter}
-	metadataSeen := make(chan m5RetryMetadata, 2)
+	metadataSeen := make(chan m5RetryMetadata, 8)
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	require.NoError(t, err)
 	server := grpc.NewServer(grpc.UnaryInterceptor(func(ctx context.Context, request any, info *grpc.UnaryServerInfo, next grpc.UnaryHandler) (any, error) {
@@ -189,6 +192,7 @@ events:
 		case metadataSeen <- m5RetryMetadata{
 			eventID: firstValue(incoming, "x-retry-event-id"), expectedAttempt: firstValue(incoming, "x-retry-expected-attempt"),
 			origin: firstValue(incoming, "x-retry-origin"), mode: firstValue(incoming, "x-retry-mode"),
+			actionRequestID: firstValue(incoming, "x-retry-action-request-id"),
 		}:
 		case <-ctx.Done():
 		}
@@ -223,7 +227,7 @@ events:
 	require.NoError(t, err)
 	consumer.SetLogger(nil, nsq.LogLevelError)
 	deliveries := make(chan m5FailedDelivery, 2)
-	retryDeliveries := make(chan m5FailedDelivery, 2)
+	retryDeliveries := make(chan m5FailedDelivery, 8)
 	consumer.AddHandler(nsq.HandlerFunc(func(raw *nsq.Message) error {
 		decoded, recognized, decodeErr := messaging.DecodeMessagePayload(raw.Body)
 		if decodeErr != nil {
@@ -252,9 +256,11 @@ events:
 		if handleErr == nil && raw.Attempts == 1 {
 			handleErr = errors.New("controlled lost consumer ACK")
 		}
-		select {
-		case deliveries <- m5FailedDelivery{messageID: decoded.UUID, brokerID: raw.ID, attempts: raw.Attempts, err: handleErr}:
-		case <-ctx.Done():
+		if decoded.UUID == intent.MessageID {
+			select {
+			case deliveries <- m5FailedDelivery{messageID: decoded.UUID, brokerID: raw.ID, attempts: raw.Attempts, err: handleErr}:
+			case <-ctx.Done():
+			}
 		}
 		return handleErr
 	}))
@@ -380,6 +386,128 @@ events:
 		var state string
 		return db.Table("rm_outbox").Select("state").Where("message_id = ?", retryIntent.MessageID).Scan(&state).Error == nil && state == "published"
 	}, 5*time.Second, 25*time.Millisecond)
+
+	// Exercise the two operator-owned branches only after the automatic
+	// path has finished. The disposable policy is reduced to one automatic
+	// attempt so the original failed Run requires manual approval.
+	originalBusiness, originalOutbox := retrygovernance.BusinessPolicy(), retrygovernance.OutboxPolicy()
+	limitedBusiness := originalBusiness
+	limitedBusiness.Version += "-m5-governed-delivery"
+	limitedBusiness.MaxAutomaticAttempts = 1
+	require.NoError(t, retrygovernance.ConfigurePolicies(limitedBusiness, originalOutbox))
+	t.Cleanup(func() { require.NoError(t, retrygovernance.ConfigurePolicies(originalBusiness, originalOutbox)) })
+	createSubmitted := func(answerSheetID uint64) uint64 {
+		record, createErr := intake.CreateForAnswerSheet(ctx, appintake.CreateCommand{
+			OrgID: 1, TesteeID: 2, AnswerSheetID: answerSheetID,
+			QuestionnaireCode: "Q-001", QuestionnaireVersion: "v1", OriginType: "adhoc",
+			ModelKind: &kind, ModelCode: &code, ModelVersion: &version,
+		})
+		require.NoError(t, createErr)
+		_, submitErr := intake.SubmitForEvaluation(ctx, record.ID)
+		require.NoError(t, submitErr)
+		return record.ID
+	}
+	governed := appoperator.NewGovernedRetryService(assessmentRepo, runRepo, runner, stager, m5GovernedAccess{})
+	actor := appoperator.Actor{OrgID: 1, OperatorUserID: 9}
+	permissionContext := func(action string) context.Context {
+		return appauthz.WithSnapshot(ctx, &appauthz.Snapshot{Permissions: []appauthz.Permission{{
+			Resource: appauthz.AssessmentResource, Action: action, Mode: appauthz.AuthorizationModeUnconditional,
+		}}})
+	}
+	assertGovernedDelivery := func(assessmentID uint64, eventID, origin, actionRequestID string) {
+		t.Helper()
+		var first, second m5FailedDelivery
+		for first.messageID != eventID {
+			select {
+			case first = <-retryDeliveries:
+			case <-ctx.Done():
+				t.Fatalf("%s retry delivery missing: %v", origin, ctx.Err())
+			}
+		}
+		for second.messageID != eventID {
+			select {
+			case second = <-retryDeliveries:
+			case <-ctx.Done():
+				t.Fatalf("%s retry redelivery missing: %v", origin, ctx.Err())
+			}
+		}
+		require.Equal(t, first.brokerID, second.brokerID)
+		require.EqualValues(t, 1, first.attempts)
+		require.Greater(t, second.attempts, first.attempts)
+		require.ErrorContains(t, first.err, "controlled lost retry consumer ACK")
+		require.NoError(t, second.err)
+		seenCount := 0
+		for seenCount < 2 {
+			select {
+			case seen := <-metadataSeen:
+				if seen.eventID != eventID {
+					continue
+				}
+				require.Equal(t, "1", seen.expectedAttempt)
+				require.Equal(t, origin, seen.origin)
+				require.Equal(t, "next_attempt", seen.mode)
+				require.Equal(t, actionRequestID, seen.actionRequestID)
+				seenCount++
+			case <-ctx.Done():
+				t.Fatalf("%s gRPC authorization missing: %v", origin, ctx.Err())
+			}
+		}
+		latest, latestErr := runRepo.FindLatestByAssessmentID(ctx, assessmentID)
+		require.NoError(t, latestErr)
+		require.Equal(t, 2, latest.Attempt().Number)
+		require.Equal(t, "failed", latest.Attempt().Status.String())
+		require.Equal(t, retrygovernance.AttemptOrigin(origin), latest.Origin())
+		require.Equal(t, actionRequestID, latest.ActionRequestID())
+		require.Equal(t, retrygovernance.DispositionManualRequired, latest.RetryDecision().Disposition)
+		require.NoError(t, db.Table("runtime_checkpoint").Where("scope = ? AND assessment_id = ?", "evaluation_run", assessmentID).Count(&count).Error)
+		require.EqualValues(t, 2, count, "redelivery must not create an extra governed attempt")
+		require.Eventually(t, func() bool {
+			var state string
+			return db.Table("rm_outbox").Select("state").Where("message_id = ?", eventID).Scan(&state).Error == nil && state == "published"
+		}, 5*time.Second, 25*time.Millisecond)
+	}
+
+	manualID := createSubmitted(702)
+	require.Error(t, engine.Evaluate(ctx, manualID))
+	manualRun, err := runRepo.FindLatestByAssessmentID(ctx, manualID)
+	require.NoError(t, err)
+	require.Equal(t, retrygovernance.DispositionManualRequired, manualRun.RetryDecision().Disposition)
+	manual := appoperator.GovernedRetryCommand{
+		AssessmentID: manualID, ExpectedAttempt: 1, Origin: retrygovernance.AttemptOriginManual,
+		RequestID: "m5-manual-business-delivery", Reason: "controlled retry",
+		AuthorizationSubject: "user:9", AuthorizationAction: "retry",
+	}
+	_, err = governed.Authorize(ctx, actor, manual)
+	require.Error(t, err, "retry requires an authorization snapshot")
+	_, err = governed.Authorize(permissionContext("retry"), actor, manual)
+	require.NoError(t, err)
+	manualAuthorized, err := runRepo.FindLatestByAssessmentID(ctx, manualID)
+	require.NoError(t, err)
+	manualEventID := manualAuthorized.RetryDecision().RetryEventID
+	require.NotEmpty(t, manualEventID)
+	assertGovernedDelivery(manualID, manualEventID, "manual", manual.RequestID)
+
+	forceID := createSubmitted(703)
+	terminalEngine := appexecute.NewEngine(assessmentRepo, m5TerminalInput{},
+		appexecute.WithRunRepository(runRepo), appexecute.WithTransactionalOutbox(runner, stager))
+	require.Error(t, terminalEngine.Evaluate(ctx, forceID))
+	terminalRun, err := runRepo.FindLatestByAssessmentID(ctx, forceID)
+	require.NoError(t, err)
+	require.Equal(t, retrygovernance.DispositionTerminal, terminalRun.RetryDecision().Disposition)
+	force := appoperator.GovernedRetryCommand{
+		AssessmentID: forceID, ExpectedAttempt: 1, Origin: retrygovernance.AttemptOriginForce,
+		RequestID: "m5-force-business-delivery", Reason: "controlled force retry",
+		AuthorizationSubject: "user:9", AuthorizationAction: "force_retry",
+	}
+	_, err = governed.Authorize(permissionContext("retry"), actor, force)
+	require.Error(t, err, "ordinary retry permission cannot authorize force")
+	_, err = governed.Authorize(permissionContext("force_retry"), actor, force)
+	require.NoError(t, err)
+	forceAuthorized, err := runRepo.FindLatestByAssessmentID(ctx, forceID)
+	require.NoError(t, err)
+	forceEventID := forceAuthorized.RetryDecision().RetryEventID
+	require.NotEmpty(t, forceEventID)
+	assertGovernedDelivery(forceID, forceEventID, "force", force.RequestID)
 }
 
 func firstValue(md metadata.MD, key string) string {

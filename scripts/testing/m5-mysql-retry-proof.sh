@@ -55,4 +55,4 @@ build_dir=$(mktemp -d "${TMPDIR:-/tmp}/$project-build.XXXXXX")
   -e RM_QS_M5_FAILED_DSN='root@tcp(mysql:3306)/m5_qs_failed_delivery?parseTime=true&loc=Asia%2FShanghai' \
   -e RM_QS_M5_NSQ_TCP='nsqd:4150' \
   mysql /tmp/m5-mysql-retry.test \
-    -test.run '^TestM5StandardEvaluationFailedProjectionAcrossNSQ$' -test.count=1 -test.timeout=2m -test.v
+    -test.run '^TestM5StandardEvaluationFailureAndGovernedRetriesAcrossNSQ$' -test.count=1 -test.timeout=2m -test.v
