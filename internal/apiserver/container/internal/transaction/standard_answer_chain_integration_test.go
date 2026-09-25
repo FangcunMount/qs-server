@@ -63,7 +63,8 @@ import (
 // and a second SDK row. The independent hot-rank channel projects the same
 // event once despite a temporary Redis outage and a later lost acknowledgement.
 // Lock contention and a lost broker FIN redeliver to the Worker without an
-// extra Assessment.
+// extra Assessment. A later independent questionnaire submission also crosses
+// the same broker and Worker path without creating an Assessment.
 func TestStandardAnswerSheetToAssessmentAcrossNSQ(t *testing.T) {
 	mongoURI, dsn, nsqAddress := os.Getenv("RM_QS_MONGO_URI"), os.Getenv("RM_QS_ASSESSMENT_DSN"), os.Getenv("RM_QS_NSQ_TCP")
 	parsed, err := mysqldriver.ParseDSN(dsn)
@@ -106,6 +107,10 @@ events:
 	require.NoError(t, err)
 	sheet := standardSubmissionSheet(t, 90010003, "through NSQ", admission)
 	submittedID := sheet.Events()[0].EventID()
+	independentAdmission, err := domainanswersheet.NewIndependentAdmission("QNR-M4", "1.0.0")
+	require.NoError(t, err)
+	independentSheet := standardSubmissionSheet(t, 90010004, "independent questionnaire", independentAdmission)
+	independentID := independentSheet.Events()[0].EventID()
 	fingerprint, err := submitport.Fingerprint(sheet)
 	require.NoError(t, err)
 	_, existed, err := durable.CreateDurably(ctx, sheet, appanswersheet.DurableSubmitMeta{WriterID: 301, IdempotencyKey: "m4-chain", Fingerprint: fingerprint})
@@ -191,7 +196,7 @@ events:
 		if decodeErr == nil && !recognized {
 			decodeErr = fmt.Errorf("standard message lost original NSQ envelope")
 		}
-		if decodeErr == nil && (decoded.UUID != submittedID || decoded.Metadata["event_type"] != "answersheet.submitted") {
+		if decodeErr == nil && ((decoded.UUID != submittedID && decoded.UUID != independentID) || decoded.Metadata["event_type"] != "answersheet.submitted") {
 			decodeErr = fmt.Errorf("standard message changed AnswerSheet event identity")
 		}
 		if decodeErr == nil {
@@ -221,7 +226,7 @@ events:
 		if handleErr == nil && !recognized {
 			handleErr = fmt.Errorf("hot-rank channel lost original NSQ envelope")
 		}
-		if handleErr == nil && (decoded.UUID != submittedID || decoded.Metadata["event_type"] != "answersheet.submitted") {
+		if handleErr == nil && ((decoded.UUID != submittedID && decoded.UUID != independentID) || decoded.Metadata["event_type"] != "answersheet.submitted") {
 			handleErr = fmt.Errorf("hot-rank channel changed AnswerSheet event identity")
 		}
 		if handleErr == nil {
@@ -331,6 +336,39 @@ events:
 	require.Len(t, hotrankEntries, 1)
 	require.Equal(t, "QNR-M4", hotrankEntries[0].QuestionnaireCode)
 	require.EqualValues(t, 1, hotrankEntries[0].Score)
+	independentFingerprint, err := submitport.Fingerprint(independentSheet)
+	require.NoError(t, err)
+	_, existed, err = durable.CreateDurably(ctx, independentSheet, appanswersheet.DurableSubmitMeta{
+		WriterID: 301, IdempotencyKey: "m4-chain-independent", Fingerprint: independentFingerprint,
+	})
+	require.NoError(t, err)
+	require.False(t, existed)
+	select {
+	case got := <-delivered:
+		require.NoError(t, got.err)
+		require.NotEqual(t, first, got.id)
+		require.EqualValues(t, 1, got.attempts)
+	case <-ctx.Done():
+		t.Fatal("independent questionnaire Worker delivery timed out", ctx.Err())
+	}
+	select {
+	case got := <-hotrankDelivered:
+		require.NoError(t, got.err)
+		require.NotEqual(t, firstHotrank, got.id)
+		require.EqualValues(t, 1, got.attempts)
+	case <-ctx.Done():
+		t.Fatal("independent questionnaire hot-rank delivery timed out", ctx.Err())
+	}
+	var totalAssessments, totalEvaluationIntents int64
+	require.NoError(t, mysqlDB.Model(&assessmentmysql.AssessmentPO{}).Count(&totalAssessments).Error)
+	require.NoError(t, mysqlDB.Table("rm_outbox").Where("event_type=?", "evaluation.requested").Count(&totalEvaluationIntents).Error)
+	require.EqualValues(t, 1, totalAssessments, "independent questionnaire must not create an Assessment")
+	require.EqualValues(t, 1, totalEvaluationIntents, "independent questionnaire must not request evaluation")
+	require.EqualValues(t, 2, countStandardDocs(t, ctx, mongoDB.Collection("answersheets"), bson.M{}))
+	hotrankEntries, err = hotrankProjection.Top(ctx, hotrankport.Query{WindowDays: 1, Limit: 5})
+	require.NoError(t, err)
+	require.Len(t, hotrankEntries, 1)
+	require.EqualValues(t, 2, hotrankEntries[0].Score)
 	stopRelay()
 	select {
 	case relayErr := <-relayDone:
@@ -340,6 +378,7 @@ events:
 	}
 	require.NoError(t, publisher.Drain(ctx))
 	require.EqualValues(t, 1, countStandardDocs(t, ctx, mongoOutbox, bson.M{"message_id": submittedID, "state": "published"}))
+	require.EqualValues(t, 1, countStandardDocs(t, ctx, mongoOutbox, bson.M{"message_id": independentID, "state": "published"}))
 	var assessment assessmentmysql.AssessmentPO
 	require.NoError(t, mysqlDB.Where("answer_sheet_id=?", uint64(90010003)).First(&assessment).Error)
 	require.Equal(t, "submitted", assessment.Status)
