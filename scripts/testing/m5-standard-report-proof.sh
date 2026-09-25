@@ -82,5 +82,5 @@ build_dir=$(mktemp -d "${TMPDIR:-/tmp}/$project-build.XXXXXX")
   -e RM_QS_NSQ_TCP='nsqd:4150' \
   -e RM_QS_ATTENTION_MIGRATION='/tmp/m5-attention/000068_migrate_interpretation_runtime_ledgers.up.sql' \
   mysql /tmp/m5-attention/m5-attention-real.test \
-    -test.run '^TestM5(ReportAttentionReconcileReachesRealTesteeFact|MongoRollbackHoldsUntilStandardIntentsDrain)$' \
+    -test.run '^TestM5(ReportAttentionReconcileReachesRealTesteeFact|MongoRollbackHoldsUntilStandardIntentsDrain|StandardMongoAnswerSheetRecoversAfterRelayProcessKill)$' \
     -test.count=1 -test.timeout=90s -test.v
