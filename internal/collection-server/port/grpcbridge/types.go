@@ -12,6 +12,7 @@ type (
 	AnswerInput                       = grpcclient.AnswerInput
 	AnswerSheetOutput                 = grpcclient.AnswerSheetOutput
 	AssessmentDetailOutput            = grpcclient.AssessmentDetailOutput
+	AssessmentRuntimeStatusOutput     = grpcclient.AssessmentRuntimeStatusOutput
 	AssessmentReportOutput            = grpcclient.AssessmentReportOutput
 	AssessmentSummaryOutput           = grpcclient.AssessmentSummaryOutput
 	DimensionInterpretOutput          = grpcclient.DimensionInterpretOutput

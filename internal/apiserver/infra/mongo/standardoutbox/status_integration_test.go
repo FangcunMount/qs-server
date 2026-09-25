@@ -31,9 +31,12 @@ func TestStandardMongoStatusFailsClosedOnIncompleteRows(t *testing.T) {
 	collection := db.Collection("rm_outbox")
 	created := time.Date(2026, 9, 23, 2, 0, 0, 0, time.UTC)
 	for _, state := range []string{"pending", "retry_wait", "publishing", "quarantined", "published"} {
-		if _, err := collection.InsertOne(ctx, bson.M{"_id": state, "state": state, "created_at": created}); err != nil {
+		if _, err := collection.InsertOne(ctx, bson.M{"_id": state, "state": state, "event_type": "answersheet.submitted", "created_at": created}); err != nil {
 			t.Fatal(err)
 		}
+	}
+	if _, err := collection.InsertOne(ctx, bson.M{"_id": "second-type", "state": "pending", "event_type": "interpretation.report.generated", "created_at": created.Add(time.Hour)}); err != nil {
+		t.Fatal(err)
 	}
 	reader, err := NewStatusReader(collection)
 	if err != nil {
@@ -48,23 +51,63 @@ func TestStandardMongoStatusFailsClosedOnIncompleteRows(t *testing.T) {
 		t.Fatalf("unexpected buckets: %+v", snapshot)
 	}
 	for _, bucket := range snapshot.Buckets {
-		if bucket.Count != 1 || bucket.OldestCreatedAt == nil || !bucket.OldestCreatedAt.Equal(created) || bucket.OldestAgeSeconds != 7200 {
+		wantCount := int64(1)
+		if bucket.Status == "pending" {
+			wantCount = 2
+		}
+		if bucket.Count != wantCount || bucket.OldestCreatedAt == nil || !bucket.OldestCreatedAt.Equal(created) || bucket.OldestAgeSeconds != 7200 {
 			t.Fatalf("wrong state count or UTC age: %+v", bucket)
 		}
 	}
-	if _, err := collection.InsertOne(ctx, bson.M{"_id": "missing", "state": "pending"}); err != nil {
+	buckets, err := reader.OutboxStatusByEventType(ctx, observed)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(buckets) != 5 {
+		t.Fatalf("want five unfinished event type/state buckets, got %+v", buckets)
+	}
+	var seenSecond bool
+	for _, bucket := range buckets {
+		if bucket.Status == "published" || bucket.Count != 1 || bucket.OldestCreatedAt == nil {
+			t.Fatalf("published or invalid event type bucket: %+v", bucket)
+		}
+		if bucket.EventType == "interpretation.report.generated" {
+			seenSecond = bucket.Status == "pending" && bucket.OldestCreatedAt.Equal(created.Add(time.Hour))
+		} else if bucket.EventType != "answersheet.submitted" || !bucket.OldestCreatedAt.Equal(created) {
+			t.Fatalf("unexpected event type bucket: %+v", bucket)
+		}
+	}
+	if !seenSecond {
+		t.Fatal("second event type did not retain its own pending bucket")
+	}
+	if _, err := collection.InsertOne(ctx, bson.M{"_id": "missing-created", "state": "pending", "event_type": "answersheet.submitted"}); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := reader.OutboxStatusSnapshot(ctx, observed); err == nil {
 		t.Fatal("missing creation time was hidden")
 	}
-	if _, err := collection.DeleteOne(ctx, bson.M{"_id": "missing"}); err != nil {
+	if _, err := reader.OutboxStatusByEventType(ctx, observed); err == nil {
+		t.Fatal("missing creation time was hidden by event type status")
+	}
+	if _, err := collection.DeleteOne(ctx, bson.M{"_id": "missing-created"}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := collection.InsertOne(ctx, bson.M{"_id": "unknown", "state": "unexpected", "created_at": created}); err != nil {
+	if _, err := collection.InsertOne(ctx, bson.M{"_id": "missing-type", "state": "pending", "created_at": created}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := reader.OutboxStatusByEventType(ctx, observed); err == nil {
+		t.Fatal("missing event type was hidden")
+	}
+	if _, err := collection.DeleteOne(ctx, bson.M{"_id": "missing-type"}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := collection.InsertOne(ctx, bson.M{"_id": "unknown", "state": "unexpected", "event_type": "answersheet.submitted", "created_at": created}); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := reader.OutboxStatusSnapshot(ctx, observed); err == nil {
 		t.Fatal("unknown unfinished state was hidden")
+	}
+	if _, err := reader.OutboxStatusByEventType(ctx, observed); err == nil {
+		t.Fatal("unknown unfinished state was hidden by event type status")
 	}
 }

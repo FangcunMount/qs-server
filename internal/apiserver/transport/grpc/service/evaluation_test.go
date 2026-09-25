@@ -8,6 +8,7 @@ import (
 	pkgerrors "github.com/FangcunMount/component-base/pkg/errors"
 	pb "github.com/FangcunMount/qs-server/api/grpc/gen/evaluation"
 	evaluationtestee "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/testee"
+	evalrun "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/run"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -22,6 +23,28 @@ type testeeEvaluationServiceStub struct {
 	listErr          error
 	listActor        *evaluationtestee.Actor
 	listQuery        *evaluationtestee.ListQuery
+}
+
+type runtimeStatusReaderStub struct {
+	status *evaluationtestee.RuntimeStatus
+	err    error
+}
+
+func (s runtimeStatusReaderStub) Get(context.Context, evaluationtestee.Actor, uint64) (*evaluationtestee.RuntimeStatus, error) {
+	return s.status, s.err
+}
+
+func TestGetMyAssessmentRunStatusOnlyReturnsAttemptPhase(t *testing.T) {
+	svc := NewTesteeEvaluationService(testeeEvaluationServiceStub{})
+	svc.runtimeStatusReader = runtimeStatusReaderStub{status: &evaluationtestee.RuntimeStatus{Attempt: 2, Status: evalrun.StatusRunning}}
+	got, err := svc.GetMyAssessmentRunStatus(context.Background(), &pb.GetMyAssessmentRunStatusRequest{TesteeId: 7, AssessmentId: 42})
+	if err != nil || !got.GetExists() || got.GetAttempt() != 2 || got.GetStatus() != "running" {
+		t.Fatalf("runtime status = %+v, err = %v", got, err)
+	}
+	svc.runtimeStatusReader = runtimeStatusReaderStub{err: pkgerrors.WithCode(errorCode.ErrPermissionDenied, "foreign")}
+	if _, err := svc.GetMyAssessmentRunStatus(context.Background(), &pb.GetMyAssessmentRunStatusRequest{TesteeId: 8, AssessmentId: 42}); status.Code(err) != codes.PermissionDenied {
+		t.Fatalf("foreign status = %v, want PermissionDenied", err)
+	}
 }
 
 func (s testeeEvaluationServiceStub) AuthorizeAssessment(_ context.Context, actor evaluationtestee.Actor, id uint64) error {
