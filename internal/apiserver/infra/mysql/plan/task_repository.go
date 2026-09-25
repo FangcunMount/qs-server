@@ -9,6 +9,7 @@ import (
 	domainPlan "github.com/FangcunMount/qs-server/internal/apiserver/domain/plan"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/internal/pkg/database/mysql"
+	"github.com/FangcunMount/qs-server/internal/pkg/middleware"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
@@ -287,6 +288,35 @@ func (r *taskRepository) createAndSyncTask(ctx context.Context, po *AssessmentTa
 }
 
 func (r *taskRepository) updateAndSyncTask(ctx context.Context, po *AssessmentTaskPO, task *domainPlan.AssessmentTask) error {
+	if task.GetStatus() == domainPlan.TaskStatusOpened {
+		// The operator REST lock does not cover internal gRPC or scheduler calls.
+		// A stale pending Task must never overwrite a winner's entry URL and
+		// publish a second task.opened event.
+		updates := map[string]any{
+			"status":      po.Status,
+			"open_at":     po.OpenAt,
+			"expire_at":   po.ExpireAt,
+			"entry_token": po.EntryToken,
+			"entry_url":   po.EntryURL,
+			"updated_at":  time.Now().UTC(),
+			"version":     gorm.Expr("version + 1"),
+		}
+		if userID := middleware.GetUserIDFromContext(ctx); userID > 0 {
+			updates["updated_by"] = userID
+		}
+		result := r.WithContext(ctx).Model(&AssessmentTaskPO{}).
+			Where("id = ? AND org_id = ? AND status = ? AND schedule_revision = ? AND open_at IS NULL AND deleted_at IS NULL",
+				po.ID.Uint64(), po.OrgID, domainPlan.TaskStatusPending.String(), po.ScheduleRevision).
+			Updates(updates)
+		if result.Error != nil {
+			return translateTaskError(result.Error)
+		}
+		if result.RowsAffected != 1 {
+			return errors.WithCode(code.ErrConflict, "task opening lost pending-state race: task=%d revision=%d", po.ID.Uint64(), po.ScheduleRevision)
+		}
+		syncTaskPO(po, task, r.mapper)
+		return nil
+	}
 	return r.UpdateAndSync(ctx, po, func(saved *AssessmentTaskPO) {
 		syncTaskPO(saved, task, r.mapper)
 	})
