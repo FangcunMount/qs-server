@@ -52,3 +52,35 @@ func TestMySQLOutboxCandidatesExplainAutomaticAndManualSummary(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestDeliveryCandidatesExposeClaimedReplayForReconciliation(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = db.Close() }()
+	gormDB, err := gorm.Open(mysql.New(mysql.Config{Conn: db, SkipInitializeWithVersion: true}), &gorm.Config{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	now := time.Date(2026, 9, 25, 13, 0, 0, 0, time.UTC)
+	mock.ExpectQuery(regexp.QuoteMeta("retry_disposition='automatic' AND replay_request_id IS NOT NULL")).
+		WithArgs(int64(7), 10).
+		WillReturnRows(sqlmock.NewRows([]string{"id", "event_id", "message_id", "topic_name", "channel_name", "delivery_attempts", "last_error", "retry_disposition", "replay_request_id", "updated_at"}).
+			AddRow(21, "event-21", "message-21", "qs.evaluation.lifecycle", "qs-worker", 8, "publish outcome unknown", "automatic", "batch-7", now).
+			AddRow(22, nil, "message-22", "qs.report", "qs-worker", 8, "delivery failed", "manual_required", nil, now))
+	reader := &Reader{mysql: gormDB}
+	var items []app.RetryCandidate
+	if err := reader.appendDeliveryCandidates(t.Context(), 7, 10, &items); err != nil {
+		t.Fatal(err)
+	}
+	if len(items) != 2 || items[0].Disposition != "reconciliation_required" || items[0].ActionRequestID != "batch-7" || items[1].Disposition != "manual_required" {
+		t.Fatalf("delivery candidates = %#v", items)
+	}
+	if items[0].EventID != "event-21" || items[0].MessageID != "message-21" || items[0].TopicName != "qs.evaluation.lifecycle" || items[0].ChannelName != "qs-worker" || items[1].EventID != "" || items[1].MessageID != "message-22" {
+		t.Fatalf("delivery correlation fields = %#v", items)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatal(err)
+	}
+}

@@ -6537,6 +6537,43 @@ definitions:
           type: string
         type: object
     type: object
+  systemgovernance.DeliveryReplayReview:
+    properties:
+      actor_user_id:
+        type: string
+      request_id:
+        type: string
+      started_at:
+        type: string
+      status:
+        type: string
+      targets:
+        items:
+          $ref: '#/definitions/systemgovernance.DeliveryReplayReviewTarget'
+        type: array
+      targets_readable:
+        type: boolean
+      updated_at:
+        type: string
+    type: object
+  systemgovernance.DeliveryReplayReviewPage:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/systemgovernance.DeliveryReplayReview'
+        type: array
+      next_cursor:
+        type: string
+    type: object
+  systemgovernance.DeliveryReplayReviewTarget:
+    properties:
+      dead_letter_id:
+        type: integer
+      disposition:
+        type: string
+      linked_to_request:
+        type: boolean
+    type: object
   systemgovernance.Domain:
     enum:
     - events
@@ -6599,6 +6636,31 @@ definitions:
           $ref: '#/definitions/systemgovernance.Signal'
         type: array
       window:
+        type: string
+    type: object
+  systemgovernance.PendingReplayAudit:
+    properties:
+      actor_user_id:
+        type: string
+      input:
+        additionalProperties: true
+        type: object
+      request_id:
+        type: string
+      started_at:
+        type: string
+      store:
+        type: string
+      updated_at:
+        type: string
+    type: object
+  systemgovernance.PendingReplayAuditPage:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/systemgovernance.PendingReplayAudit'
+        type: array
+      next_cursor:
         type: string
     type: object
   systemgovernance.RegistryCapabilityRow:
@@ -6841,9 +6903,15 @@ definitions:
         type: string
       attempt:
         type: integer
+      channel_name:
+        type: string
+      event_id:
+        type: string
       kind:
         type: string
       last_error_kind:
+        type: string
+      message_id:
         type: string
       next_attempt_at:
         type: string
@@ -6854,6 +6922,8 @@ definitions:
       retry_event_id:
         type: string
       store:
+        type: string
+      topic_name:
         type: string
       updated_at:
         type: string
@@ -12349,6 +12419,80 @@ paths:
           schema:
             $ref: '#/definitions/core.ErrResponse'
       summary: 执行治理动作
+      tags:
+      - System-Governance
+  /internal/v1/system-governance/actions/delivery-replay-reviews:
+    get:
+      description: 仅列出当前机构超过五分钟仍未结案的传输重放审计及目标状态；不重新投递消息；仅 qs:admin 可访问
+      parameters:
+      - description: Bearer 用户令牌（或内部调用token）
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 分页游标
+        in: query
+        name: cursor
+        type: string
+      - default: 50
+        description: 每页条数，1-100
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/systemgovernance.DeliveryReplayReviewPage'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+      summary: 系统治理-待核对的传输重放审计
+      tags:
+      - System-Governance
+  /internal/v1/system-governance/actions/pending-reconciliations:
+    get:
+      description: 按当前组织列出结果未知的人工重放审批；仅 qs:admin 可访问。核对时须由原操作者沿用原请求编号与输入。
+      parameters:
+      - description: Bearer 用户令牌（或内部调用token）
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 上一页返回的数字 ID 游标
+        in: query
+        name: cursor
+        type: string
+      - default: 50
+        description: 每页条数，1-100
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/systemgovernance.PendingReplayAuditPage'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+      summary: 系统治理-待核对重放操作
       tags:
       - System-Governance
   /internal/v1/system-governance/cache:
