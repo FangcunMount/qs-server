@@ -83,9 +83,10 @@ type ActorDeps struct {
 }
 
 type EvaluationDeps struct {
-	IntakeService evaluationintake.Service
-	TesteeService evaluationtestee.Service
-	WorkerService evaluationworker.Service
+	IntakeService       evaluationintake.Service
+	TesteeService       evaluationtestee.Service
+	RuntimeStatusReader *evaluationtestee.RuntimeStatusReader
+	WorkerService       evaluationworker.Service
 }
 
 type InterpretationDeps struct {
@@ -232,7 +233,7 @@ func (r *Registry) registerEvaluationService() error {
 		r.deps.Interpretation.ReportStatusReporter,
 		r.deps.Survey.SubmissionReader,
 	)
-	r.server.RegisterService(service.NewTesteeEvaluationService(r.deps.Evaluation.TesteeService))
+	r.server.RegisterService(service.NewTesteeEvaluationService(r.deps.Evaluation.TesteeService, r.deps.Evaluation.RuntimeStatusReader))
 	r.server.RegisterService(service.NewParticipantReportService(r.deps.Interpretation.ParticipantService, r.deps.Interpretation.DelegatedSubjectVerifier))
 	assessmentIntakeService := service.NewAssessmentIntakeService(journey, r.deps.Evaluation.IntakeService, r.deps.Survey.AnswerSheetManagementService)
 	evaluationWorkerService := service.NewEvaluationWorkerService(r.deps.Evaluation.WorkerService)

@@ -16,11 +16,18 @@ import (
 // TesteeEvaluationService is the thin gRPC adapter for participant scoring queries.
 type TesteeEvaluationService struct {
 	pb.UnimplementedTesteeEvaluationServiceServer
-	testeeService evaluationtestee.Service
+	testeeService       evaluationtestee.Service
+	runtimeStatusReader interface {
+		Get(context.Context, evaluationtestee.Actor, uint64) (*evaluationtestee.RuntimeStatus, error)
+	}
 }
 
-func NewTesteeEvaluationService(testeeService evaluationtestee.Service) *TesteeEvaluationService {
-	return &TesteeEvaluationService{testeeService: testeeService}
+func NewTesteeEvaluationService(testeeService evaluationtestee.Service, runtimeStatusReader ...*evaluationtestee.RuntimeStatusReader) *TesteeEvaluationService {
+	svc := &TesteeEvaluationService{testeeService: testeeService}
+	if len(runtimeStatusReader) > 0 {
+		svc.runtimeStatusReader = runtimeStatusReader[0]
+	}
+	return svc
 }
 
 // RegisterService 注册 gRPC 服务
@@ -51,6 +58,29 @@ func (s *TesteeEvaluationService) GetMyAssessment(ctx context.Context, req *pb.G
 		return nil, toAssessmentQueryGRPCError(err)
 	}
 	return &pb.GetMyAssessmentResponse{Assessment: toProtoAssessmentDetailFromOutcome(result)}, nil
+}
+
+// GetMyAssessmentRunStatus returns only the fresh persisted attempt phase.
+// Ownership validation happens inside the reader before it touches run rows.
+func (s *TesteeEvaluationService) GetMyAssessmentRunStatus(ctx context.Context, req *pb.GetMyAssessmentRunStatusRequest) (*pb.GetMyAssessmentRunStatusResponse, error) {
+	if req.GetTesteeId() == 0 || req.GetAssessmentId() == 0 {
+		return nil, status.Error(codes.InvalidArgument, "testee_id 和 assessment_id 不能为空")
+	}
+	if s == nil || s.runtimeStatusReader == nil {
+		return nil, status.Error(codes.FailedPrecondition, "runtime status reader is not configured")
+	}
+	result, err := s.runtimeStatusReader.Get(ctx, evaluationtestee.Actor{TesteeID: req.GetTesteeId()}, req.GetAssessmentId())
+	if err != nil {
+		return nil, toAssessmentQueryGRPCError(err)
+	}
+	if result == nil {
+		return &pb.GetMyAssessmentRunStatusResponse{}, nil
+	}
+	return &pb.GetMyAssessmentRunStatusResponse{
+		Exists:  true,
+		Attempt: uint32(result.Attempt),
+		Status:  result.Status.String(),
+	}, nil
 }
 
 // ListMyAssessments 获取我的测评列表（含 outcome 投影）

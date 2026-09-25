@@ -13,6 +13,10 @@ service TesteeEvaluationService {
   // 获取我的测评详情（含 model/primary_score/level outcome 投影）
   rpc GetMyAssessment(GetMyAssessmentRequest) returns (GetMyAssessmentResponse);
 
+  // Fresh persisted execution phase after participant ownership validation.
+  // This excludes claim tokens, failure diagnostics and model input.
+  rpc GetMyAssessmentRunStatus(GetMyAssessmentRunStatusRequest) returns (GetMyAssessmentRunStatusResponse);
+
   // 获取我的测评列表（含 outcome 投影）
   rpc ListMyAssessments(ListMyAssessmentsRequest) returns (ListMyAssessmentsResponse);
 
@@ -136,6 +140,17 @@ message GetMyAssessmentRequest {
 
 message GetMyAssessmentResponse {
   AssessmentDetail assessment = 1;
+}
+
+message GetMyAssessmentRunStatusRequest {
+  uint64 testee_id = 1;
+  uint64 assessment_id = 2;
+}
+
+message GetMyAssessmentRunStatusResponse {
+  bool exists = 1;
+  uint32 attempt = 2;
+  string status = 3;
 }
 
 message ResolveAssessmentByAnswerSheetIDRequest {
