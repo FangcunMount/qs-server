@@ -139,7 +139,7 @@ func (r *SQLDeadLetterRecorder) RecordDeadLetter(ctx context.Context, record Dea
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 	if _, err := tx.ExecContext(ctx, `
 INSERT INTO event_delivery_dead_letter
   (message_id, transport_message_id, event_id, org_id, provider, topic_name, channel_name, delivery_attempts,
