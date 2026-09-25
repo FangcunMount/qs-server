@@ -72,7 +72,7 @@ build_dir=$(mktemp -d "${TMPDIR:-/tmp}/$project-build.XXXXXX")
   -e RM_QS_ASSESSMENT_DSN='root@tcp(mysql:3306)/m4_qs_chain?parseTime=true&loc=UTC' \
   -e RM_QS_NSQ_TCP='nsqd:4150' \
   mysql /tmp/m4-qs-bootstrap/m4-answer-chain.test \
-    -test.run '^TestStandardAnswerSheetToAssessmentAcrossNSQ$' -test.count=1 -test.timeout=2m -test.v
+    -test.run '^(TestStandardAnswerSheetToAssessmentAcrossNSQ|TestM5CollectionAdmissionReceiptFollowsStandardMongoCommit)$' -test.count=1 -test.timeout=2m -test.v
 
 "${compose[@]}" exec -T \
   -e RM_QS_BOOTSTRAP_MYSQL_DSN='root@tcp(mysql:3306)/m4_qs_bootstrap?parseTime=true&loc=UTC' \
