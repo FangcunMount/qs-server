@@ -503,10 +503,10 @@ messaging:
 # Redis 投影失败只会重试该 channel，不会阻断 answersheet Evaluation 主链。
 # 只有 MQ-backed publisher 可用时才实际订阅；logging/nop 模式 status 显示 disabled。
 eventing:
-  # M5 first batch code is staged. The Mongo profile covers answersheet.submitted
-  # and all three interpretation events; enable it only in the reviewed cutover.
+  # M5 first batch candidate: answersheet.submitted and all three interpretation
+  # events share this Mongo profile. Keep Assessment on the legacy MySQL path.
   standard_outbox:
-    mongo: false
+    mongo: true
     assessment: false
   consumers:
     modelcatalog-hot-rank:
