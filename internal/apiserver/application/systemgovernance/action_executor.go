@@ -126,6 +126,9 @@ func (e *ActionExecutor) Run(
 				return nil, errors.WithCode(code.ErrConflict, "request_id already belongs to action %s", existing.ActionID)
 			}
 			if existing.Error != nil {
+				if actionID == "events.replay_delivery" {
+					return nil, errors.WithMessage(errors.WithCode(existing.Error.Code, "%s", existing.Error.Message), existing.Error.Message)
+				}
 				return nil, errors.WithCode(existing.Error.Code, "%s", existing.Error.Message)
 			}
 			return existing.Result, nil
@@ -213,27 +216,71 @@ func (e *ActionExecutor) runReplayDelivery(ctx context.Context, orgID int64, req
 	if strings.TrimSpace(request.Reason) == "" || len(request.Targets) == 0 || len(request.Targets) > 100 {
 		return nil, errors.WithCode(code.ErrInvalidArgument, "reason and 1..100 targets are required")
 	}
-	authorized, err := e.deliveryReplay.AuthorizeReplay(ctx, orgID, requestID, request.Targets, time.Now())
-	if err != nil {
-		return nil, errors.WithCode(code.ErrConflict, "%s", err.Error())
-	}
-	results := make([]map[string]interface{}, 0, len(authorized))
-	for _, item := range authorized {
-		pending, decodeErr := outboxcore.DecodePendingEvent(item.EventID, item.PayloadJSON)
-		if decodeErr == nil {
-			decodeErr = e.eventPublisher.Publish(ctx, pending.Event)
+	seen := make(map[uint64]struct{}, len(request.Targets))
+	for _, target := range request.Targets {
+		if target.ID == 0 || target.ExpectedDeliveryAttempts < 1 {
+			return nil, errors.WithCode(code.ErrInvalidArgument, "delivery dead-letter id and expected attempts are required")
 		}
+		if _, duplicate := seen[target.ID]; duplicate {
+			return nil, errors.WithCode(code.ErrInvalidArgument, "duplicate delivery dead-letter id %d", target.ID)
+		}
+		seen[target.ID] = struct{}{}
+	}
+	if err := e.deliveryReplay.ValidateReplayBatch(ctx, orgID, request.Targets); err != nil {
+		return nil, errors.WithMessage(errors.WithCode(code.ErrConflict, "validate delivery replay batch: %s", err.Error()), "整批目标状态或组织范围不符，未开始重放")
+	}
+	results := make([]map[string]interface{}, 0, len(request.Targets))
+	for _, target := range request.Targets {
+		authorized, err := e.deliveryReplay.AuthorizeReplay(ctx, orgID, requestID, []DeliveryReplayTarget{target}, time.Now())
+		if err != nil {
+			return nil, deliveryReplayFailure(code.ErrConflict, len(results), target.ID, "状态已变化，请核对后处理", "authorization failed: "+err.Error())
+		}
+		if len(authorized) != 1 || authorized[0].ID != target.ID {
+			return nil, deliveryReplayFailure(code.ErrInternalServerError, len(results), target.ID, "授权结果异常，请核对后处理", "authorization returned unexpected result")
+		}
+		item := authorized[0]
+		pending, decodeErr := outboxcore.DecodePendingEvent(item.EventID, item.PayloadJSON)
 		now := time.Now()
 		if decodeErr != nil {
-			_ = e.deliveryReplay.FailReplay(ctx, item.ID, requestID, decodeErr.Error(), now)
-			return nil, errors.WithCode(code.ErrInternalServerError, "replay delivery %d: %s", item.ID, decodeErr.Error())
+			settleCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 6*time.Second)
+			failErr := e.deliveryReplay.FailReplay(settleCtx, item.ID, requestID, decodeErr.Error(), now)
+			cancel()
+			if failErr != nil {
+				return nil, deliveryReplayFailure(code.ErrInternalServerError, len(results), item.ID, "状态待核对，请勿再次重放", "decode failed: "+decodeErr.Error()+"; failure state update failed: "+failErr.Error())
+			}
+			return nil, deliveryReplayFailure(code.ErrInternalServerError, len(results), item.ID, "内容无法解析，仍需人工处理", "decode failed: "+decodeErr.Error())
 		}
-		if err := e.deliveryReplay.CompleteReplay(ctx, item.ID, requestID, now); err != nil {
-			return nil, errors.WithCode(code.ErrInternalServerError, "complete delivery replay %d: %s", item.ID, err.Error())
+		if err := e.eventPublisher.Publish(ctx, pending.Event); err != nil {
+			settleCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 6*time.Second)
+			recordErr := e.deliveryReplay.RecordReplayUncertain(settleCtx, item.ID, requestID, "publish outcome unknown: "+err.Error(), time.Now())
+			cancel()
+			if recordErr != nil {
+				return nil, deliveryReplayFailure(code.ErrInternalServerError, len(results), item.ID, "投递结果待核对，请勿再次重放", "publish outcome unknown: "+err.Error()+"; recording reconciliation failed: "+recordErr.Error())
+			}
+			return nil, deliveryReplayFailure(code.ErrInternalServerError, len(results), item.ID, "投递结果待核对，请勿再次重放", "publish outcome unknown: "+err.Error())
+		}
+		settleCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 6*time.Second)
+		err = e.deliveryReplay.CompleteReplay(settleCtx, item.ID, requestID, time.Now())
+		cancel()
+		if err != nil {
+			settleCtx, cancel = context.WithTimeout(context.WithoutCancel(ctx), 6*time.Second)
+			recordErr := e.deliveryReplay.RecordReplayUncertain(settleCtx, item.ID, requestID, "completion outcome unknown: "+err.Error(), time.Now())
+			cancel()
+			if recordErr != nil {
+				return nil, deliveryReplayFailure(code.ErrInternalServerError, len(results), item.ID, "完成状态待核对，请勿再次重放", "completion outcome unknown: "+err.Error()+"; recording reconciliation failed: "+recordErr.Error())
+			}
+			return nil, deliveryReplayFailure(code.ErrInternalServerError, len(results), item.ID, "完成状态待核对，请勿再次重放", "completion outcome unknown: "+err.Error())
 		}
 		results = append(results, map[string]interface{}{"id": item.ID, "event_id": pending.Event.EventID(), "replayed": true})
 	}
 	return map[string]interface{}{"replayed": len(results), "items": results}, nil
+}
+
+func deliveryReplayFailure(errorCode, completed int, id uint64, publicMessage, detail string) error {
+	return errors.WithMessagef(
+		errors.WithCode(errorCode, "delivery replay stopped after %d completed; item %d: %s", completed, id, detail),
+		"已完成 %d 条；记录 %d %s", completed, id, publicMessage,
+	)
 }
 
 type ReplayPendingInput struct {

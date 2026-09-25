@@ -23,6 +23,7 @@ const (
 type QueryService interface {
 	AuthorizeAssessment(ctx context.Context, testeeID, assessmentID uint64) error
 	GetMyAssessment(ctx context.Context, testeeID, assessmentID uint64) (*evaluation.AssessmentDetailResponse, error)
+	GetMyAssessmentRunStatus(ctx context.Context, testeeID, assessmentID uint64) (*evaluation.AssessmentRuntimeStatusResponse, error)
 	GetAssessmentReport(ctx context.Context, testeeID, assessmentID uint64) (*evaluation.AssessmentReportResponse, error)
 }
 
@@ -45,7 +46,8 @@ type Config struct {
 	RedisMissRetryWait time.Duration
 	// NonTerminalRefreshInterval bounds how long an in-flight Redis snapshot may
 	// hide a terminal report that is already durable in the read model. Terminal
-	// snapshots remain cache-only.
+	// completed snapshots remain cache-only; failure snapshots are reconciled
+	// with durable report and Evaluation attempt facts before returning.
 	NonTerminalRefreshInterval time.Duration
 }
 
@@ -178,12 +180,10 @@ func (s *Service) Wait(ctx context.Context, testeeID, assessmentID uint64, timeo
 			return pendingResponse("processing", "报告生成中", 3000), nil
 		case <-timer.C:
 			reportstatus.IncWaitTimeout()
-			reportstatus.IncWaitReportProcessing()
-			return s.processingFromCache(ctx, assessmentKey), nil
+			return s.statusAtTimeout(ctx, testeeID, assessmentID, assessmentKey)
 		case signal, ok := <-waitCh:
 			if !ok {
-				reportstatus.IncWaitReportProcessing()
-				return s.processingFromCache(ctx, assessmentKey), nil
+				return s.statusAtTimeout(ctx, testeeID, assessmentID, assessmentKey)
 			}
 			reportstatus.IncWaitReportSignalWakeup()
 			if signal.Status != "completed" && signal.Status != "failed" && signal.Status != "temporarily_unavailable" {
@@ -238,8 +238,7 @@ func (s *Service) waitByPolling(
 		}
 		if time.Now().After(deadline) {
 			reportstatus.IncWaitTimeout()
-			reportstatus.IncWaitReportProcessing()
-			return s.processingFromCache(ctx, assessmentKey), nil
+			return s.statusAtTimeout(ctx, testeeID, assessmentID, assessmentKey)
 		}
 		select {
 		case <-ctx.Done():
@@ -248,6 +247,18 @@ func (s *Service) waitByPolling(
 		case <-ticker.C:
 		}
 	}
+}
+
+func (s *Service) statusAtTimeout(ctx context.Context, testeeID, assessmentID uint64, assessmentKey string) (*evaluation.AssessmentStatusResponse, error) {
+	result, _, err := s.checkCurrentStatus(ctx, testeeID, assessmentID, assessmentKey)
+	if err != nil {
+		return nil, err
+	}
+	if result != nil {
+		return result, nil
+	}
+	reportstatus.IncWaitReportProcessing()
+	return pendingResponse("processing", "报告生成中", 3000), nil
 }
 
 func (s *Service) checkCurrentStatus(
@@ -266,6 +277,10 @@ func (s *Service) checkCurrentStatus(
 			reportstatus.IncWaitReportRedisHit()
 			resp := snapshotToResponse(snapshot)
 			if isTerminalStatus(snapshot.Status) {
+				if snapshot.Status != "completed" {
+					reportstatus.IncWaitReportDBFallback()
+					return s.loadStatusFromDBWithSnapshot(ctx, testeeID, assessmentID, assessmentKey, snapshot)
+				}
 				recordTerminalResponse(resp)
 				return resp, true, nil
 			}
@@ -308,6 +323,15 @@ func (s *Service) loadStatusFromDB(
 	testeeID, assessmentID uint64,
 	assessmentKey string,
 ) (*evaluation.AssessmentStatusResponse, bool, error) {
+	return s.loadStatusFromDBWithSnapshot(ctx, testeeID, assessmentID, assessmentKey, nil)
+}
+
+func (s *Service) loadStatusFromDBWithSnapshot(
+	ctx context.Context,
+	testeeID, assessmentID uint64,
+	assessmentKey string,
+	staleTerminal *reportstatus.Snapshot,
+) (*evaluation.AssessmentStatusResponse, bool, error) {
 	if s.query == nil {
 		return pendingResponse("queued", "报告排队生成中", 3000), false, nil
 	}
@@ -318,10 +342,13 @@ func (s *Service) loadStatusFromDB(
 	if result == nil {
 		return pendingResponse("queued", "报告排队生成中", 3000), false, nil
 	}
-	if result.Status == "evaluated" {
+	if result.Status == "evaluated" || result.Status == "failed" || staleTerminal != nil {
 		report, reportErr := s.query.GetAssessmentReport(ctx, testeeID, assessmentID)
 		if reportErr == nil && report != nil {
 			resp := completedResponse()
+			// The read model proves completion even when a stale failure or
+			// processing projection occupies Redis. The participant report
+			// projection does not carry ReportID for this cache repair.
 			s.cacheStatus(ctx, assessmentKey, resp)
 			recordTerminalResponse(resp)
 			return resp, true, nil
@@ -329,6 +356,31 @@ func (s *Service) loadStatusFromDB(
 		if reportErr != nil && status.Code(reportErr) != codes.NotFound {
 			return nil, false, reportErr
 		}
+	}
+
+	// A failed Assessment or old evaluation.failed projection can describe an
+	// earlier attempt. Only a fresh, persisted newer Run may move it back into
+	// an in-flight phase; broker arrival time and Redis UpdatedAt are not proof.
+	if result.Status == "failed" || (staleTerminal != nil && staleTerminal.Reason == "evaluation_failed") {
+		run, runErr := s.query.GetMyAssessmentRunStatus(ctx, testeeID, assessmentID)
+		if runErr != nil {
+			return nil, false, runErr
+		}
+		if run != nil {
+			switch run.Status {
+			case "pending", "running":
+				return pendingResponse("processing", "报告生成中", 3000), false, nil
+			case "succeeded":
+				return pendingResponse("interpreting", "报告生成中", 2000), false, nil
+			}
+		}
+	}
+	if staleTerminal != nil && staleTerminal.Reason != "evaluation_failed" {
+		resp := snapshotToResponse(staleTerminal)
+		recordTerminalResponse(resp)
+		return resp, true, nil
+	}
+	if result.Status == "evaluated" {
 		return pendingResponse("interpreting", "报告生成中", 2000), false, nil
 	}
 
@@ -353,21 +405,6 @@ func (s *Service) cacheStatus(ctx context.Context, assessmentKey string, resp *e
 		Reason:       resp.Reason,
 		UpdatedAt:    time.Now().UTC(),
 	}, s.cfg.StatusTTL)
-}
-
-func (s *Service) processingFromCache(ctx context.Context, assessmentKey string) *evaluation.AssessmentStatusResponse {
-	if s.cache == nil {
-		return pendingResponse("processing", "报告生成中", 3000)
-	}
-	snapshot, err := s.cache.Get(ctx, assessmentKey)
-	if err != nil || snapshot == nil {
-		return pendingResponse("processing", "报告生成中", 3000)
-	}
-	resp := snapshotToResponse(snapshot)
-	if resp.NextPollAfterMs == 0 && !isTerminalStatus(resp.Status) {
-		resp.NextPollAfterMs = nextPollAfterMs(resp.Stage, resp.Status)
-	}
-	return resp
 }
 
 func (s *Service) StartSignalWatcher(ctx context.Context) {

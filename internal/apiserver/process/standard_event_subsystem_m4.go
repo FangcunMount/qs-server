@@ -39,6 +39,13 @@ type standardGovernedStatusReader struct {
 	systemgov.OutboxGovernanceReader
 }
 
+// Only the Mongo standard reader currently supports per-event-type status.
+// Keep MySQL's unsupported interface absent rather than exposing a nil method.
+type standardGovernedEventTypeStatusReader struct {
+	standardGovernedStatusReader
+	outboxport.EventTypeStatusReader
+}
+
 // configuredEventSubsystem keeps the ordinary configuration on the existing
 // implementation. Each M4 opt-in replaces a whole writer/runner profile.
 func configuredEventSubsystem(cfg *config.Config) func(eventsubsystem.Options) (*eventsubsystem.Subsystem, error) {
@@ -185,9 +192,12 @@ func buildM4StandardEventSubsystem(opts eventsubsystem.Options, cfg *config.Conf
 			return nil, err
 		}
 		profile, err := newProfile("mongo-domain-events", store, stager, standardoutbox.NewPostCommitWake(),
-			appEventing.NamedOutboxStatusReader{Name: "mongo-domain-events", Reader: standardGovernedStatusReader{
-				StatusReader: status, DurableManualReplayAuthorizer: replay, PendingReplayResolver: replay,
-				OutboxGovernanceReader: status,
+			appEventing.NamedOutboxStatusReader{Name: "mongo-domain-events", Reader: standardGovernedEventTypeStatusReader{
+				standardGovernedStatusReader: standardGovernedStatusReader{
+					StatusReader: status, DurableManualReplayAuthorizer: replay, PendingReplayResolver: replay,
+					OutboxGovernanceReader: status,
+				},
+				EventTypeStatusReader: status,
 			}}, opts.Mongo)
 		if err != nil {
 			return nil, err
