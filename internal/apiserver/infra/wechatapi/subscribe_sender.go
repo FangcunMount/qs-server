@@ -3,6 +3,7 @@ package wechatapi
 import (
 	"context"
 	"fmt"
+	"strconv"
 
 	"github.com/silenceper/wechat/v2"
 	"github.com/silenceper/wechat/v2/cache"
@@ -14,7 +15,14 @@ import (
 
 // SubscribeSender 小程序订阅消息发送器实现。
 type SubscribeSender struct {
-	cache cache.Cache
+	cache     cache.Cache
+	newClient func(appID, appSecret string) (subscribeClient, error)
+}
+
+type subscribeClient interface {
+	Send(*miniSubscribe.Message) error
+	SendGetMsgID(*miniSubscribe.Message) (int64, error)
+	ListTemplates() (*miniSubscribe.TemplateList, error)
 }
 
 // NewSubscribeSender 创建小程序订阅消息发送器。
@@ -28,13 +36,36 @@ func (s *SubscribeSender) SendSubscribeMessage(_ context.Context, appID, appSecr
 	if err != nil {
 		return err
 	}
+	if err := subscribeClient.Send(subscribeMessage(msg)); err != nil {
+		return fmt.Errorf("send subscribe message: %w", err)
+	}
+	return nil
+}
 
+// SendSubscribeMessageWithReceipt returns the platform msgid when the response contains one.
+// The upstream library does not accept a context for the send call. In particular, a caller-side
+// timeout or lost response must be treated as an unknown outcome, not permission to resend.
+func (s *SubscribeSender) SendSubscribeMessageWithReceipt(_ context.Context, appID, appSecret string, msg wechatmini.SubscribeMessage) (wechatmini.SubscribeSendReceipt, error) {
+	subscribeClient, err := s.newSubscribeClient(appID, appSecret)
+	if err != nil {
+		return wechatmini.SubscribeSendReceipt{}, err
+	}
+	msgID, err := subscribeClient.SendGetMsgID(subscribeMessage(msg))
+	if err != nil {
+		return wechatmini.SubscribeSendReceipt{}, fmt.Errorf("send subscribe message with receipt: %w", err)
+	}
+	if msgID <= 0 {
+		return wechatmini.SubscribeSendReceipt{}, nil
+	}
+	return wechatmini.SubscribeSendReceipt{PlatformMessageID: strconv.FormatInt(msgID, 10)}, nil
+}
+
+func subscribeMessage(msg wechatmini.SubscribeMessage) *miniSubscribe.Message {
 	data := make(map[string]*miniSubscribe.DataItem, len(msg.Data))
 	for key, value := range msg.Data {
 		data[key] = &miniSubscribe.DataItem{Value: value}
 	}
-
-	req := &miniSubscribe.Message{
+	return &miniSubscribe.Message{
 		ToUser:           msg.ToUser,
 		TemplateID:       msg.TemplateID,
 		Page:             msg.Page,
@@ -42,10 +73,6 @@ func (s *SubscribeSender) SendSubscribeMessage(_ context.Context, appID, appSecr
 		MiniprogramState: msg.MiniProgramState,
 		Lang:             msg.Lang,
 	}
-	if err := subscribeClient.Send(req); err != nil {
-		return fmt.Errorf("send subscribe message: %w", err)
-	}
-	return nil
 }
 
 // ListTemplates 列出小程序订阅消息模板
@@ -71,9 +98,12 @@ func (s *SubscribeSender) ListTemplates(_ context.Context, appID, appSecret stri
 	return templates, nil
 }
 
-func (s *SubscribeSender) newSubscribeClient(appID, appSecret string) (*miniSubscribe.Subscribe, error) {
+func (s *SubscribeSender) newSubscribeClient(appID, appSecret string) (subscribeClient, error) {
 	if appID == "" || appSecret == "" {
 		return nil, fmt.Errorf("appID and appSecret cannot be empty")
+	}
+	if s.newClient != nil {
+		return s.newClient(appID, appSecret)
 	}
 
 	wc := wechat.NewWechat()
@@ -87,3 +117,4 @@ func (s *SubscribeSender) newSubscribeClient(appID, appSecret string) (*miniSubs
 }
 
 var _ wechatmini.MiniProgramSubscribeSender = (*SubscribeSender)(nil)
+var _ wechatmini.MiniProgramSubscribeReceiptSender = (*SubscribeSender)(nil)

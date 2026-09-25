@@ -40,3 +40,16 @@ type MiniProgramSubscribeSender interface {
 	SendSubscribeMessage(ctx context.Context, appID, appSecret string, msg SubscribeMessage) error
 	ListTemplates(ctx context.Context, appID, appSecret string) ([]SubscribeTemplate, error)
 }
+
+// SubscribeSendReceipt is evidence of the platform response, not proof that a user received the message.
+// An empty PlatformMessageID means the platform returned success without a usable msgid.
+type SubscribeSendReceipt struct {
+	PlatformMessageID string
+}
+
+// MiniProgramSubscribeReceiptSender is an additive contract for callers that persist send results.
+// A returned error does not establish that the platform did not accept the request: the response
+// may have been lost after the request was sent. Callers must not retry such results blindly.
+type MiniProgramSubscribeReceiptSender interface {
+	SendSubscribeMessageWithReceipt(ctx context.Context, appID, appSecret string, msg SubscribeMessage) (SubscribeSendReceipt, error)
+}
