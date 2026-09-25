@@ -80,11 +80,25 @@ const (
 	runtimeVersion      = "1.0.0"
 )
 
+type runtimeClosureDelivery interface {
+	SetHandlers(map[string]handlers.HandlerFunc)
+	Wait(*testing.T, string) (*messaging.Message, error)
+}
+
+type runtimeClosureEventFactory func(*testing.T, eventsubsystem.Options, *sql.DB) (*eventsubsystem.Subsystem, runtimeClosureDelivery, error)
+
 // TestCurrentRuntimeClosure exercises the ordinary, current-time path through
 // Actor, AssessmentEntry, Plan, AnswerSheet, Assessment, Evaluation,
 // Interpretation and report-wait using real application services,
 // repositories, durable outboxes and worker handlers.
 func TestCurrentRuntimeClosure(t *testing.T) {
+	runCurrentRuntimeClosure(t, func(_ *testing.T, opts eventsubsystem.Options, _ *sql.DB) (*eventsubsystem.Subsystem, runtimeClosureDelivery, error) {
+		subsystem, err := eventsubsystem.New(opts)
+		return subsystem, nil, err
+	})
+}
+
+func runCurrentRuntimeClosure(t *testing.T, eventFactory runtimeClosureEventFactory) {
 	mysqlDSN := os.Getenv("MYSQL_DSN")
 	if mysqlDSN == "" {
 		t.Fatal("MYSQL_DSN is required; the runtime closure test must not skip")
@@ -138,13 +152,13 @@ func TestCurrentRuntimeClosure(t *testing.T) {
 		t.Fatalf("load event catalog: %v", err)
 	}
 	capture := newCapturedMQPublisher()
-	eventing, err := eventsubsystem.New(eventsubsystem.Options{
+	eventing, delivery, err := eventFactory(t, eventsubsystem.Options{
 		MySQLDB: gormDB, MongoDB: mongoDB, OpsRedis: redisClient,
 		Catalog: eventcatalog.NewCatalog(events), MQPublisher: capture, PublisherMode: eventruntime.PublishModeMQ,
 		Mongo:      eventsubsystem.ProfileOptions{BatchSize: 20, PublishWorkers: 1, ImmediateMaxConcurrent: 1},
 		Assessment: eventsubsystem.ProfileOptions{BatchSize: 20, PublishWorkers: 1, ImmediateMaxConcurrent: 1},
 		Consumers:  map[string]eventsubsystem.ConsumerOptions{"modelcatalog.hot_rank_projection": {Enabled: false}},
-	})
+	}, sqlDB)
 	if err != nil {
 		t.Fatalf("build event subsystem: %v", err)
 	}
@@ -255,6 +269,12 @@ func TestCurrentRuntimeClosure(t *testing.T) {
 	evaluationHandler := mustWorkerHandler(t, registry, "evaluation_requested_handler", workerDeps)
 	outcomeHandler := mustWorkerHandler(t, registry, "evaluation_outcome_committed_handler", workerDeps)
 	reportHandler := mustWorkerHandler(t, registry, "interpretation_report_generated_handler", workerDeps)
+	if delivery != nil {
+		delivery.SetHandlers(map[string]handlers.HandlerFunc{
+			eventcatalog.EvaluationRequested:        evaluationHandler,
+			eventcatalog.EvaluationOutcomeCommitted: outcomeHandler,
+		})
+	}
 
 	request := &answersheetpb.SaveAnswerSheetRequest{
 		QuestionnaireCode: runtimeQuestionCode, QuestionnaireVersion: runtimeVersion,
@@ -270,8 +290,14 @@ func TestCurrentRuntimeClosure(t *testing.T) {
 	if err := answerHandler(t.Context(), eventcatalog.AnswerSheetSubmitted, answerMessage.Payload); err != nil {
 		t.Fatalf("consume answersheet.submitted: %v", err)
 	}
-	evaluationMessage := capture.Wait(t, eventcatalog.EvaluationRequested)
-	if err := evaluationHandler(t.Context(), eventcatalog.EvaluationRequested, evaluationMessage.Payload); err != nil {
+	var evaluationMessage *messaging.Message
+	if delivery == nil {
+		evaluationMessage = capture.Wait(t, eventcatalog.EvaluationRequested)
+		err = evaluationHandler(t.Context(), eventcatalog.EvaluationRequested, evaluationMessage.Payload)
+	} else {
+		evaluationMessage, err = delivery.Wait(t, eventcatalog.EvaluationRequested)
+	}
+	if err != nil {
 		t.Fatalf("consume evaluation.requested: %v", err)
 	}
 	// Broker delivery is at least once. Replaying the exact event through the
@@ -282,19 +308,34 @@ func TestCurrentRuntimeClosure(t *testing.T) {
 	}
 	assertRowCount(t, gormDB, "runtime_checkpoint", "scope = ? AND assessment_id = ?", 1, "evaluation_run", evaluated.GetAssessmentId())
 	assertRowCount(t, gormDB, "evaluation_outcome", "assessment_id = ?", 1, evaluated.GetAssessmentId())
-	assertRowCount(t, gormDB, "domain_event_outbox", "event_type = ?", 1, eventcatalog.EvaluationOutcomeCommitted)
+	assertEvaluationIntentCount(t, gormDB, delivery != nil, eventcatalog.EvaluationOutcomeCommitted, 1)
 	if err := evaluationHandler(t.Context(), eventcatalog.EvaluationRequested, evaluationMessage.Payload); err != nil {
 		t.Fatalf("redeliver evaluation.requested: %v", err)
 	}
 	assertRowCount(t, gormDB, "runtime_checkpoint", "scope = ? AND assessment_id = ?", 1, "evaluation_run", evaluated.GetAssessmentId())
 	assertRowCount(t, gormDB, "evaluation_outcome", "assessment_id = ?", 1, evaluated.GetAssessmentId())
-	assertRowCount(t, gormDB, "domain_event_outbox", "event_type = ?", 1, eventcatalog.EvaluationOutcomeCommitted)
-	outcomeMessage := capture.Wait(t, eventcatalog.EvaluationOutcomeCommitted)
-	if err := outcomeHandler(t.Context(), eventcatalog.EvaluationOutcomeCommitted, outcomeMessage.Payload); err == nil {
+	assertEvaluationIntentCount(t, gormDB, delivery != nil, eventcatalog.EvaluationOutcomeCommitted, 1)
+	var outcomeMessage *messaging.Message
+	if delivery == nil {
+		outcomeMessage = capture.Wait(t, eventcatalog.EvaluationOutcomeCommitted)
+		err = outcomeHandler(t.Context(), eventcatalog.EvaluationOutcomeCommitted, outcomeMessage.Payload)
+	} else {
+		outcomeMessage, err = delivery.Wait(t, eventcatalog.EvaluationOutcomeCommitted)
+	}
+	if err == nil {
 		t.Fatal("first outcome delivery must report the controlled lost gRPC response")
 	}
 	assertSingleCommittedReport(t, mongoDB)
-	if err := outcomeHandler(t.Context(), eventcatalog.EvaluationOutcomeCommitted, outcomeMessage.Payload); err != nil {
+	if delivery == nil {
+		err = outcomeHandler(t.Context(), eventcatalog.EvaluationOutcomeCommitted, outcomeMessage.Payload)
+	} else {
+		var redelivered *messaging.Message
+		redelivered, err = delivery.Wait(t, eventcatalog.EvaluationOutcomeCommitted)
+		if redelivered.UUID != outcomeMessage.UUID {
+			t.Fatalf("Outcome event ID changed on NSQ redelivery: first=%s second=%s", outcomeMessage.UUID, redelivered.UUID)
+		}
+	}
+	if err != nil {
 		t.Fatalf("redeliver evaluation.outcome.committed after lost response: %v", err)
 	}
 	assertSingleCommittedReport(t, mongoDB)
@@ -314,6 +355,10 @@ func TestCurrentRuntimeClosure(t *testing.T) {
 			t.Fatal("Interpretation gRPC did not receive original event ID", t.Context().Err())
 		}
 	}
+	if delivery != nil {
+		assertStandardEvaluationPublished(t, gormDB, eventcatalog.EvaluationRequested)
+		assertStandardEvaluationPublished(t, gormDB, eventcatalog.EvaluationOutcomeCommitted)
+	}
 	reportMessage := capture.Wait(t, eventcatalog.InterpretationReportGenerated)
 	if err := reportHandler(t.Context(), eventcatalog.InterpretationReportGenerated, reportMessage.Payload); err != nil {
 		t.Fatalf("consume interpretation.report.generated: %v", err)
@@ -331,6 +376,32 @@ func TestCurrentRuntimeClosure(t *testing.T) {
 	assertCurrentRuntimeFacts(t, gormDB, mongoDB, orgID, testeeID, entryID, taskID, answerResponse.GetId(), readiness.GetAssessmentId(), startedAt)
 	testScanAfterConcurrentClinicianTransfer(t, c, gormDB, orgID, testeeID, entryID)
 	assertLegacyBusinessDateStatistics(t, c, gormDB, orgID, testeeID)
+}
+
+func assertEvaluationIntentCount(t *testing.T, db *gorm.DB, standard bool, eventType string, want int64) {
+	t.Helper()
+	if standard {
+		assertRowCount(t, db, "rm_outbox", "event_type = ?", want, eventType)
+		assertRowCount(t, db, "domain_event_outbox", "event_type = ?", 0, eventType)
+		return
+	}
+	assertRowCount(t, db, "domain_event_outbox", "event_type = ?", want, eventType)
+	assertRowCount(t, db, "rm_outbox", "event_type = ?", 0, eventType)
+}
+
+func assertStandardEvaluationPublished(t *testing.T, db *gorm.DB, eventType string) {
+	t.Helper()
+	deadline := time.Now().Add(5 * time.Second)
+	for time.Now().Before(deadline) {
+		var count int64
+		if err := db.Table("rm_outbox").Where("event_type = ? AND state = ?", eventType, "published").Count(&count).Error; err != nil {
+			t.Fatalf("read standard %s state: %v", eventType, err)
+		} else if count == 1 {
+			return
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	t.Fatalf("standard %s intent was not marked published after Worker delivery", eventType)
 }
 
 func createRuntimeActorAndEntry(t *testing.T, c *container.Container, grpcDeps grpctransport.Deps, orgID uint64) (uint64, uint64) {
