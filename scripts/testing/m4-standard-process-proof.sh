@@ -40,6 +40,7 @@ print('PASS isolated Mongo replica set');
 JS
 "${compose[@]}" exec -T mysql mysql -uroot -e 'CREATE DATABASE m4_qs_bootstrap'
 "${compose[@]}" exec -T mysql mysql -uroot -e 'CREATE DATABASE m4_qs_chain'
+"${compose[@]}" exec -T mysql mysql -uroot -e 'CREATE DATABASE m5_qs_mongo_only'
 
 architecture=$(docker info --format '{{.Architecture}}')
 case "$architecture" in
@@ -59,6 +60,7 @@ build_dir=$(mktemp -d "${TMPDIR:-/tmp}/$project-build.XXXXXX")
 "${compose[@]}" cp "$build_dir/m4-process.test" mysql:/tmp/m4-qs-bootstrap/m4-process.test
 "${compose[@]}" cp "$build_dir/m4-answer-chain.test" mysql:/tmp/m4-qs-bootstrap/m4-answer-chain.test
 "${compose[@]}" cp "$repo/configs/events.yaml" mysql:/tmp/m4-qs-bootstrap/configs/events.yaml
+"${compose[@]}" cp "$repo/configs/grpc-acl.prod.yaml" mysql:/tmp/m4-qs-bootstrap/configs/grpc-acl.prod.yaml
 "${compose[@]}" cp "$repo/internal/pkg/migration/migrations/mysql/000084_standard_reliable_outbox.up.sql" mysql:/tmp/m4-qs-bootstrap/mysql/000084_standard_reliable_outbox.up.sql
 "${compose[@]}" cp "$repo/internal/pkg/migration/migrations/mysql/000048_add_system_governance_action_runs.up.sql" mysql:/tmp/m4-qs-bootstrap/mysql/000048_add_system_governance_action_runs.up.sql
 "${compose[@]}" cp "$repo/internal/pkg/migration/migrations/mysql/000085_system_governance_pending_replay_index.up.sql" mysql:/tmp/m4-qs-bootstrap/mysql/000085_system_governance_pending_replay_index.up.sql
@@ -68,10 +70,11 @@ build_dir=$(mktemp -d "${TMPDIR:-/tmp}/$project-build.XXXXXX")
 # that the later subscription could mistake for the chain's own event.
 "${compose[@]}" exec -T \
   -e RM_QS_MONGO_URI='mongodb://mongo:27017/?replicaSet=rm-test' \
+  -e RM_QS_GRPC_ACL_CONFIG='/tmp/m4-qs-bootstrap/configs/grpc-acl.prod.yaml' \
   -e RM_QS_ASSESSMENT_DSN='root@tcp(mysql:3306)/m4_qs_chain?parseTime=true&loc=UTC' \
   -e RM_QS_NSQ_TCP='nsqd:4150' \
   mysql /tmp/m4-qs-bootstrap/m4-answer-chain.test \
-    -test.run '^TestStandardAnswerSheetToAssessmentAcrossNSQ$' -test.count=1 -test.timeout=2m -test.v
+    -test.run '^(TestStandardAnswerSheetToAssessmentAcrossNSQ|TestM5CollectionAdmissionReceiptFollowsStandardMongoCommit)$' -test.count=1 -test.timeout=2m -test.v
 
 "${compose[@]}" exec -T \
   -e RM_QS_BOOTSTRAP_MYSQL_DSN='root@tcp(mysql:3306)/m4_qs_bootstrap?parseTime=true&loc=UTC' \
@@ -83,3 +86,12 @@ build_dir=$(mktemp -d "${TMPDIR:-/tmp}/$project-build.XXXXXX")
   -e RM_QS_BOOTSTRAP_AUDIT_INDEX_MIGRATION='/tmp/m4-qs-bootstrap/mysql/000085_system_governance_pending_replay_index.up.sql' \
   mysql /tmp/m4-qs-bootstrap/m4-process.test \
     -test.run '^TestM4ProcessBootstrapRunsSelectedStandardProfiles$' -test.count=1 -test.timeout=4m -test.v
+
+"${compose[@]}" exec -T \
+  -e RM_QS_MONGO_ONLY_MYSQL_DSN='root@tcp(mysql:3306)/m5_qs_mongo_only?parseTime=true&loc=UTC' \
+  -e RM_QS_BOOTSTRAP_MONGO_URI='mongodb://mongo:27017/?replicaSet=rm-test' \
+  -e RM_QS_BOOTSTRAP_NSQ_ADDR='nsqd:4150' \
+  -e RM_QS_BOOTSTRAP_CATALOG='/tmp/m4-qs-bootstrap/configs/events.yaml' \
+  -e RM_QS_BOOTSTRAP_AUDIT_MIGRATION='/tmp/m4-qs-bootstrap/mysql/000048_add_system_governance_action_runs.up.sql' \
+  mysql /tmp/m4-qs-bootstrap/m4-process.test \
+    -test.run '^TestM5MongoOnlyProcessKeepsLegacyMySQLAndHotRankSubscription$' -test.count=1 -test.timeout=2m -test.v

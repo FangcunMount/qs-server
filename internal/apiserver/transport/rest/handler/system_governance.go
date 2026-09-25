@@ -50,6 +50,15 @@ func (h *SystemGovernanceHandler) RetryCandidates(c *gin.Context) {
 
 // PendingReplayAudits lists unresolved replay requests without suggesting a
 // new authorization. The original actor must retry the same ID and input.
+// @Summary 系统治理-待核对重放操作
+// @Description 按当前组织列出结果未知的人工重放审批；仅 qs:admin 可访问。核对时须由原操作者沿用原请求编号与输入。
+// @Tags System-Governance
+// @Produce json
+// @Param Authorization header string true "Bearer 用户令牌（或内部调用token）"
+// @Param cursor query string false "上一页返回的数字 ID 游标"
+// @Param limit query int false "每页条数，1-100" default(50)
+// @Success 200 {object} core.Response{data=systemgovernance.PendingReplayAuditPage}
+// @Failure 400 {object} core.ErrResponse
 // @Router /internal/v1/system-governance/actions/pending-reconciliations [get]
 func (h *SystemGovernanceHandler) PendingReplayAudits(c *gin.Context) {
 	if h.facade == nil {
@@ -79,6 +88,53 @@ func (h *SystemGovernanceHandler) PendingReplayAudits(c *gin.Context) {
 		}
 	}
 	result, err := h.facade.ListPendingReplayAudits(c.Request.Context(), orgID, cursor, limit)
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+	h.Success(c, result)
+}
+
+// DeliveryReplayReviews lists old unfinished transport replay audits. The
+// response is read-only and does not imply that another publish is safe.
+// @Summary 系统治理-待核对的传输重放审计
+// @Description 仅列出当前机构超过五分钟仍未结案的传输重放审计及目标状态；不重新投递消息；仅 qs:admin 可访问
+// @Tags System-Governance
+// @Produce json
+// @Param Authorization header string true "Bearer 用户令牌（或内部调用token）"
+// @Param cursor query string false "分页游标"
+// @Param limit query int false "每页条数，1-100" default(50)
+// @Success 200 {object} core.Response{data=systemgovernance.DeliveryReplayReviewPage}
+// @Failure 400 {object} core.ErrResponse
+// @Router /internal/v1/system-governance/actions/delivery-replay-reviews [get]
+func (h *SystemGovernanceHandler) DeliveryReplayReviews(c *gin.Context) {
+	if h.facade == nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"message": "system governance unavailable"})
+		return
+	}
+	orgID, err := h.RequireProtectedOrgID(c)
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+	limit := 50
+	if raw := c.Query("limit"); raw != "" {
+		parsed, parseErr := strconv.Atoi(raw)
+		if parseErr != nil || parsed < 1 || parsed > 100 {
+			c.JSON(http.StatusBadRequest, gin.H{"message": "limit must be between 1 and 100"})
+			return
+		}
+		limit = parsed
+	}
+	cursor := c.Query("cursor")
+	if cursor != "" {
+		parsed, parseErr := strconv.ParseUint(cursor, 10, 64)
+		if parseErr != nil || parsed == 0 {
+			c.JSON(http.StatusBadRequest, gin.H{"message": "invalid cursor"})
+			return
+		}
+	}
+	result, err := h.facade.ListDeliveryReplayReviews(c.Request.Context(), orgID, cursor, limit)
 	if err != nil {
 		h.Error(c, err)
 		return

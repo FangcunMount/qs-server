@@ -235,6 +235,11 @@ type AssessmentDetailOutput struct {
 	FailureReason        string
 }
 
+type AssessmentRuntimeStatusOutput struct {
+	Attempt int
+	Status  string
+}
+
 type AssessmentSummaryOutput struct {
 	ID                   uint64
 	QuestionnaireCode    string
@@ -290,6 +295,23 @@ func (c *TesteeEvaluationClient) GetMyAssessment(ctx context.Context, testeeID, 
 		return nil, err
 	}
 	return convertAssessmentDetail(resp.GetAssessment()), nil
+}
+
+// GetMyAssessmentRunStatus reads the latest persisted attempt without using
+// the assessment detail cache.
+func (c *TesteeEvaluationClient) GetMyAssessmentRunStatus(ctx context.Context, testeeID, assessmentID uint64) (*AssessmentRuntimeStatusOutput, error) {
+	ctx, cancel := c.client.ContextWithTimeout(ctx)
+	defer cancel()
+	resp, err := c.grpcClient.GetMyAssessmentRunStatus(ctx, &pb.GetMyAssessmentRunStatusRequest{
+		TesteeId: testeeID, AssessmentId: assessmentID,
+	})
+	if err != nil {
+		return nil, err
+	}
+	if !resp.GetExists() {
+		return nil, nil
+	}
+	return &AssessmentRuntimeStatusOutput{Attempt: int(resp.GetAttempt()), Status: resp.GetStatus()}, nil
 }
 
 func (c *TesteeEvaluationClient) ListMyAssessments(

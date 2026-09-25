@@ -13,6 +13,8 @@ import (
 )
 
 type DeadLetterRecord struct {
+	// MessageID is the component-base message UUID. For enveloped domain events
+	// it is the EventID, not the physical NSQ broker message ID.
 	MessageID        string
 	EventID          string
 	OrgID            *int64
@@ -109,16 +111,21 @@ func (r *SQLDeadLetterRecorder) RecordDeadLetter(ctx context.Context, record Dea
 	if record.FailedAt.IsZero() {
 		record.FailedAt = time.Now()
 	}
+	// A replay keeps the logical message UUID. Repeated failed handoffs may
+	// therefore hit the same row after a claim or terminal resolution. Preserve
+	// those rows and their identity; only an unclaimed manual row can refresh
+	// its latest failure details.
 	_, err := r.db.ExecContext(ctx, `
 INSERT INTO event_delivery_dead_letter
   (message_id, event_id, org_id, provider, topic_name, channel_name, delivery_attempts,
    payload_json, last_error, retry_disposition, failed_at, created_at, updated_at)
 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'manual_required', ?, ?, ?)
 ON DUPLICATE KEY UPDATE
-  event_id = VALUES(event_id), org_id = VALUES(org_id),
-  delivery_attempts = GREATEST(delivery_attempts, VALUES(delivery_attempts)),
-  payload_json = VALUES(payload_json), last_error = VALUES(last_error),
-  retry_disposition = 'manual_required', failed_at = VALUES(failed_at), updated_at = VALUES(updated_at)`,
+  delivery_attempts = IF(replay_request_id IS NULL AND retry_disposition = 'manual_required',
+    GREATEST(delivery_attempts, VALUES(delivery_attempts)), delivery_attempts),
+  last_error = IF(replay_request_id IS NULL AND retry_disposition = 'manual_required', VALUES(last_error), last_error),
+  failed_at = IF(replay_request_id IS NULL AND retry_disposition = 'manual_required', VALUES(failed_at), failed_at),
+  updated_at = IF(replay_request_id IS NULL AND retry_disposition = 'manual_required', VALUES(updated_at), updated_at)`,
 		record.MessageID, nullableString(record.EventID), record.OrgID, record.Provider, record.Topic, record.Channel,
 		record.DeliveryAttempts, string(record.Payload), nullableString(record.LastError), record.FailedAt, record.FailedAt, record.FailedAt,
 	)

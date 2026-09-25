@@ -582,6 +582,27 @@ func TestM4ProcessBootstrapRunsSelectedStandardProfiles(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, outbox := range subsystem.Outboxes() {
+		if outbox.Name == "mongo-domain-events" {
+			typeReader, ok := outbox.Reader.(outboxport.EventTypeStatusReader)
+			if !ok {
+				t.Fatal("selected standard Mongo profile lacks event type status")
+			}
+			buckets, err := typeReader.OutboxStatusByEventType(ctx, time.Now())
+			if err != nil {
+				t.Fatal(err)
+			}
+			found := false
+			for _, bucket := range buckets {
+				if bucket.EventType == "answersheet.submitted" && bucket.Status == "quarantined" && bucket.Count == 1 {
+					found = true
+				}
+			}
+			if !found {
+				t.Fatalf("standard Mongo event type status omitted quarantined answer sheet: %+v", buckets)
+			}
+		} else if _, ok := outbox.Reader.(outboxport.EventTypeStatusReader); ok {
+			t.Fatalf("selected profile %s advertises unsupported event type status", outbox.Name)
+		}
 		reader, ok := outbox.Reader.(systemgov.OutboxGovernanceReader)
 		if !ok {
 			t.Fatalf("selected profile %s lacks tenant-scoped governance view", outbox.Name)
