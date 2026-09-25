@@ -90,6 +90,36 @@ jobs:
           QS_SERVER_TEST_MYSQL_DSN: 'root:root@tcp(127.0.0.1:3306)/action_audit_test?parseTime=true'
         run: go test ./internal/apiserver/infra/mysql/systemgovernance -run TestActionAuditLifecycleWithJSONColumns -count=1 -v
 
+  authz-guard-two-process-mysql:
+    name: AuthZ committed version two-process MySQL
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: qs_authz_guard_test
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -proot"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=20
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+      - name: Verify committed revocation across two QS authorization processes
+        env:
+          MYSQL_CONTAINER: ${{ job.services.mysql.id }}
+          QS_SERVER_TEST_IAM_VERSION_DSN: 'root:root@tcp(127.0.0.1:3306)/qs_authz_guard_test?parseTime=true&loc=Asia%2FShanghai'
+        run: |
+          docker exec "$MYSQL_CONTAINER" mysql -uroot -proot -e "SET GLOBAL time_zone='+08:00'"
+          go test -race -tags=integration ./internal/pkg/iamauth -run '^TestTwoProcessCommittedRevocationWithoutNotification$' -count=1 -v
+
   actor-store-mysql:
     name: Actor Store MySQL Transactions
     runs-on: ubuntu-latest
