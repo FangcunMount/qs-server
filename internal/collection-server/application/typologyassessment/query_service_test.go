@@ -35,6 +35,9 @@ func (f *fakeEvaluationReader) AuthorizeAssessment(context.Context, uint64, uint
 func (f *fakeEvaluationReader) GetMyAssessment(context.Context, uint64, uint64) (*evaluationapp.AssessmentDetailResponse, error) {
 	return f.detail, f.err
 }
+func (f *fakeEvaluationReader) GetMyAssessmentRunStatus(context.Context, uint64, uint64) (*evaluationapp.AssessmentRuntimeStatusResponse, error) {
+	return nil, f.err
+}
 
 func (f *fakeEvaluationReader) GetAssessmentScores(context.Context, uint64, uint64) ([]evaluationapp.FactorScoreResponse, error) {
 	return nil, nil

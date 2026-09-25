@@ -197,6 +197,21 @@ func (s *QueryService) GetAssessmentReport(ctx context.Context, testeeID, assess
 	}, "testee_id", testeeID, "assessment_id", assessmentID)
 }
 
+// GetMyAssessmentRunStatus bypasses the outcome detail cache. The apiserver
+// validates participant ownership before reading the current MySQL attempt.
+func (s *QueryService) GetMyAssessmentRunStatus(ctx context.Context, testeeID, assessmentID uint64) (*AssessmentRuntimeStatusResponse, error) {
+	if s == nil || s.evaluationClient == nil {
+		return nil, fmt.Errorf("evaluation runtime reader is not configured")
+	}
+	reader, ok := s.evaluationClient.(interface {
+		GetMyAssessmentRunStatus(context.Context, uint64, uint64) (*AssessmentRuntimeStatusResponse, error)
+	})
+	if !ok {
+		return nil, fmt.Errorf("evaluation runtime reader is not configured")
+	}
+	return reader.GetMyAssessmentRunStatus(ctx, testeeID, assessmentID)
+}
+
 // GetFactorTrend 获取因子得分趋势
 func (s *QueryService) GetFactorTrend(ctx context.Context, testeeID uint64, req *GetFactorTrendRequest) ([]TrendPointResponse, error) {
 	if req.Limit <= 0 {

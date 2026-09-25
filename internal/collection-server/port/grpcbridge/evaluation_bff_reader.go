@@ -2,6 +2,7 @@ package grpcbridge
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/evaluation"
 )
@@ -11,6 +12,21 @@ type EvaluationBFFReader struct {
 	evaluation EvaluationReader
 	reports    ParticipantReportReader
 	intake     AssessmentIntakeReader
+}
+
+func (r *EvaluationBFFReader) GetMyAssessmentRunStatus(ctx context.Context, testeeID, assessmentID uint64) (*evaluation.AssessmentRuntimeStatusResponse, error) {
+	if r == nil || r.evaluation == nil {
+		return nil, fmt.Errorf("evaluation runtime reader is not configured")
+	}
+	runtime, ok := r.evaluation.(EvaluationRuntimeReader)
+	if !ok {
+		return nil, fmt.Errorf("evaluation runtime reader is not configured")
+	}
+	out, err := runtime.GetMyAssessmentRunStatus(ctx, testeeID, assessmentID)
+	if err != nil || out == nil {
+		return nil, err
+	}
+	return &evaluation.AssessmentRuntimeStatusResponse{Attempt: out.Attempt, Status: out.Status}, nil
 }
 
 // NewEvaluationBFFReader 构造测评 BFF ACL 适配器。

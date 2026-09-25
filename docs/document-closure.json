@@ -2,8 +2,8 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "981ad7ccbe518ce32a24e61626a1a0cf4d850c3a",
-    "verified_on": "2026-09-25"
+    "sha": "9d23c36bc58f2d1b1236b097b917816afa4c5721",
+    "verified_on": "2026-09-26"
   },
   "status_policy": {
     "doc_status": [
@@ -84,8 +84,8 @@
   "machine_contracts": {
     "migrations": {
       "mysql": {
-        "max_version": 86,
-        "version_count": 86
+        "max_version": 85,
+        "version_count": 85
       },
       "mongodb": {
         "max_version": 36,
@@ -127,7 +127,7 @@
       "source": "api/grpc/proto",
       "proto_file_count": 8,
       "service_count": 27,
-      "rpc_count": 126,
+      "rpc_count": 127,
       "services": {
         "actor.ActorService": [
           "CreateTestee",
@@ -161,6 +161,7 @@
         "evaluation.TesteeEvaluationService": [
           "AuthorizeAssessment",
           "GetMyAssessment",
+          "GetMyAssessmentRunStatus",
           "ListMyAssessments",
           "GetAssessmentScores",
           "GetFactorTrend",
@@ -6418,7 +6419,7 @@
         "observed_at": null,
         "limitations": [
           "Repository source and non-cached tests are aligned for this document; no target-environment or current exact-SHA production evidence is attached.",
-          "The M5-04 candidate passed a local build-tagged NSQ plus disposable MySQL terminal-handoff run; target-environment and business-effect evidence is not attached."
+          "The build-tagged NSQ plus MySQL terminal-handoff integration was not run in this review."
         ]
       },
       "gaps": [
@@ -6649,8 +6650,8 @@
           "id": "EVENT-40-TERMINAL-INTEGRATION",
           "kind": "environment",
           "severity": "high",
-          "summary": "A local NSQ plus disposable MySQL terminal-handoff integration passed; the selected provider topology and business effect remain unverified in the target environment. RabbitMQ retry and DLQ topology remains a provider capability, not production proof.",
-          "exit_criteria": "Run the build-tagged NSQ plus MySQL terminal integration at the reviewed release SHA and separately validate the selected provider topology and business effect in the target environment."
+          "summary": "The current NSQ terminal handoff and MySQL recorder chain lacks a build-tagged real-broker integration run; RabbitMQ retry and DLQ topology remains a provider capability, not production proof.",
+          "exit_criteria": "Run the build-tagged NSQ plus MySQL terminal integration and separately validate any selected provider topology in the target environment."
         },
         {
           "id": "EVENT-40-PRODUCTION",

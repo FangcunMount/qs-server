@@ -12,7 +12,7 @@ services:
       retries: 60
   mongo:
     image: mongo@sha256:340c1c56fb10e95cf79ff547f8664b96bc6ead9909bc355238cbf865a9695a6f
-    command: [mongod, --replSet, rm-test, --bind_ip_all]
+    command: [mongod, --replSet, rm-test, --bind_ip_all, --setParameter, enableTestCommands=1]
     tmpfs:
       - /data/db:size=512m
     healthcheck:
@@ -22,11 +22,22 @@ services:
       retries: 60
   nsqd:
     image: nsqio/nsq@sha256:1a369c146af71bc95c25d54b375a2b98452478c1eaf4e85f8fcb01da20f2c78a
-    command: [/nsqd, --data-path=/data, --broadcast-address=nsqd, --mem-queue-size=3000, --sync-every=2500, --sync-timeout=2s]
+    command: [/nsqd, --data-path=/data, --broadcast-address=nsqd, --lookupd-tcp-address=nsqlookupd:4160, --mem-queue-size=3000, --sync-every=2500, --sync-timeout=2s]
+    depends_on:
+      nsqlookupd:
+        condition: service_healthy
     volumes:
       - nsq-data:/data
     healthcheck:
       test: [CMD-SHELL, "wget -qO- http://127.0.0.1:4151/ping | grep -qx OK"]
+      interval: 2s
+      timeout: 5s
+      retries: 60
+  nsqlookupd:
+    image: nsqio/nsq@sha256:1a369c146af71bc95c25d54b375a2b98452478c1eaf4e85f8fcb01da20f2c78a
+    command: [/nsqlookupd]
+    healthcheck:
+      test: [CMD-SHELL, "wget -qO- http://127.0.0.1:4161/ping | grep -qx OK"]
       interval: 2s
       timeout: 5s
       retries: 60
