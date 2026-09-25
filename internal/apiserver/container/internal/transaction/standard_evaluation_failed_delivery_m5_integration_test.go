@@ -8,18 +8,22 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"net"
 	"os"
 	"sync"
 	"testing"
 	"time"
 
 	"github.com/FangcunMount/component-base/pkg/messaging"
+	evalpb "github.com/FangcunMount/qs-server/api/grpc/gen/evaluation"
 	appexecute "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/execute"
 	appintake "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/intake"
+	evalworker "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/worker"
 	"github.com/FangcunMount/qs-server/internal/apiserver/eventing/standardoutbox"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/checkpoint"
 	assessmentmysql "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/evaluation"
 	mysqlstandard "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/standardoutbox"
+	grpcservice "github.com/FangcunMount/qs-server/internal/apiserver/transport/grpc/service"
 	eventcatalog "github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
 	eventruntime "github.com/FangcunMount/qs-server/internal/pkg/eventing/runtime"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
@@ -34,6 +38,9 @@ import (
 	"github.com/nsqio/go-nsq"
 	redis "github.com/redis/go-redis/v9"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/metadata"
 	gormmysql "gorm.io/driver/mysql"
 	"gorm.io/gorm"
 )
@@ -65,6 +72,18 @@ type m5FailedDelivery struct {
 	err       error
 }
 
+type m5EvaluationGRPCClient struct {
+	client evalpb.EvaluationWorkerServiceClient
+}
+
+func (c m5EvaluationGRPCClient) ExecuteEvaluation(ctx context.Context, assessmentID uint64) (*evalpb.ExecuteEvaluationResponse, error) {
+	return c.client.ExecuteEvaluation(ctx, &evalpb.ExecuteEvaluationRequest{AssessmentId: assessmentID})
+}
+
+type m5RetryMetadata struct {
+	eventID, expectedAttempt, origin, mode string
+}
+
 // The failed fact and standard intent are committed by the real Evaluation
 // finalizer. Relay publishes the original envelope to NSQ; losing the first
 // consumer ACK redelivers that same broker message to the original Worker
@@ -79,7 +98,7 @@ func TestM5StandardEvaluationFailedProjectionAcrossNSQ(t *testing.T) {
 	if address != "nsqd:4150" {
 		t.Fatal("disposable nsqd:4150 required")
 	}
-	ctx, cancel := context.WithTimeout(t.Context(), 35*time.Second)
+	ctx, cancel := context.WithTimeout(t.Context(), 75*time.Second)
 	defer cancel()
 	db, err := gorm.Open(gormmysql.Open(dsn), &gorm.Config{})
 	require.NoError(t, err)
@@ -139,10 +158,20 @@ events:
 	run, err := runRepo.FindLatestByAssessmentID(ctx, created.ID)
 	require.NoError(t, err)
 	require.Equal(t, "failed", run.Attempt().Status.String())
+	decision := run.RetryDecision()
+	require.NotNil(t, decision)
+	require.NotNil(t, decision.NextAttemptAt)
+	require.Greater(t, time.Until(*decision.NextAttemptAt), 15*time.Second)
+	require.NotEmpty(t, decision.RetryEventID)
 	var intent struct{ MessageID, State string }
 	require.NoError(t, db.Table("rm_outbox").Select("message_id,state").
 		Where("event_type = ?", eventcatalog.EvaluationFailed).Take(&intent).Error)
 	require.Equal(t, "pending", intent.State)
+	var retryIntent struct{ MessageID, State string }
+	require.NoError(t, db.Table("rm_outbox").Select("message_id,state").
+		Where("event_type = ?", eventcatalog.EvaluationRetryRequested).Take(&retryIntent).Error)
+	require.Equal(t, decision.RetryEventID, retryIntent.MessageID)
+	require.Equal(t, "pending", retryIntent.State)
 
 	statusRedis := miniredis.RunT(t)
 	statusClient := redis.NewClient(&redis.Options{Addr: statusRedis.Addr()})
@@ -151,9 +180,40 @@ events:
 	reporter, err := reportstatus.NewReporter(statusHandle, reportstatus.Config{TTL: time.Hour, Service: "qs-worker"})
 	require.NoError(t, err)
 	projection := &m5FailedProjection{reporter: reporter}
-	handler, ok := handlers.NewRegistry().Create("evaluation_failed_handler", &handlers.Dependencies{
-		Logger: slog.New(slog.NewTextHandler(io.Discard, nil)), ReportStatusReporter: projection,
+	metadataSeen := make(chan m5RetryMetadata, 2)
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+	server := grpc.NewServer(grpc.UnaryInterceptor(func(ctx context.Context, request any, info *grpc.UnaryServerInfo, next grpc.UnaryHandler) (any, error) {
+		incoming, _ := metadata.FromIncomingContext(ctx)
+		select {
+		case metadataSeen <- m5RetryMetadata{
+			eventID: firstValue(incoming, "x-retry-event-id"), expectedAttempt: firstValue(incoming, "x-retry-expected-attempt"),
+			origin: firstValue(incoming, "x-retry-origin"), mode: firstValue(incoming, "x-retry-mode"),
+		}:
+		case <-ctx.Done():
+		}
+		return next(ctx, request)
+	}))
+	grpcservice.NewEvaluationWorkerService(evalworker.NewService(engine, assessmentRepo, assessmentmysql.NewOutcomeRepository(db), runRepo)).RegisterService(server)
+	serverDone := make(chan error, 1)
+	go func() { serverDone <- server.Serve(listener) }()
+	t.Cleanup(func() {
+		server.Stop()
+		if err := <-serverDone; err != nil {
+			t.Errorf("stop Evaluation gRPC server: %v", err)
+		}
 	})
+	connection, err := grpc.NewClient(listener.Addr().String(), grpc.WithTransportCredentials(insecure.NewCredentials()))
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = connection.Close() })
+	workerDeps := &handlers.Dependencies{
+		Logger:                 slog.New(slog.NewTextHandler(io.Discard, nil)),
+		ReportStatusReporter:   projection,
+		EvaluationWorkerClient: m5EvaluationGRPCClient{client: evalpb.NewEvaluationWorkerServiceClient(connection)},
+	}
+	handler, ok := handlers.NewRegistry().Create("evaluation_failed_handler", workerDeps)
+	require.True(t, ok)
+	retryHandler, ok := handlers.NewRegistry().Create("evaluation_retry_requested_handler", workerDeps)
 	require.True(t, ok)
 	config := nsq.NewConfig()
 	config.HeartbeatInterval, config.MsgTimeout = time.Second, 5*time.Second
@@ -163,6 +223,7 @@ events:
 	require.NoError(t, err)
 	consumer.SetLogger(nil, nsq.LogLevelError)
 	deliveries := make(chan m5FailedDelivery, 2)
+	retryDeliveries := make(chan m5FailedDelivery, 2)
 	consumer.AddHandler(nsq.HandlerFunc(func(raw *nsq.Message) error {
 		decoded, recognized, decodeErr := messaging.DecodeMessagePayload(raw.Body)
 		if decodeErr != nil {
@@ -170,6 +231,17 @@ events:
 		}
 		if !recognized {
 			return errors.New("NSQ message has no original QS envelope")
+		}
+		if decoded.Metadata["event_type"] == eventcatalog.EvaluationRetryRequested {
+			handleErr := retryHandler(ctx, eventcatalog.EvaluationRetryRequested, decoded.Payload)
+			if handleErr == nil && raw.Attempts == 1 {
+				handleErr = errors.New("controlled lost retry consumer ACK")
+			}
+			select {
+			case retryDeliveries <- m5FailedDelivery{messageID: decoded.UUID, brokerID: raw.ID, attempts: raw.Attempts, err: handleErr}:
+			case <-ctx.Done():
+			}
+			return handleErr
 		}
 		if decoded.Metadata["event_type"] != eventcatalog.EvaluationFailed {
 			// The requested event was already executed directly above; this
@@ -264,4 +336,55 @@ events:
 		var state string
 		return db.Table("rm_outbox").Select("state").Where("message_id = ?", intent.MessageID).Scan(&state).Error == nil && state == "published"
 	}, 5*time.Second, 25*time.Millisecond)
+	// The original decision stays frozen. Relay itself waits for its persisted
+	// next_attempt_at, then the original Worker forwards authorization over
+	// actual gRPC before the MySQL claim can create attempt 2.
+	var firstRetry, secondRetry m5FailedDelivery
+	select {
+	case firstRetry = <-retryDeliveries:
+	case <-ctx.Done():
+		t.Fatalf("scheduled retry did not arrive: %v", ctx.Err())
+	}
+	require.False(t, time.Now().Before(decision.NextAttemptAt.Add(-200*time.Millisecond)),
+		"standard Relay must not deliver the authorized retry before its persisted due time")
+	select {
+	case secondRetry = <-retryDeliveries:
+	case <-ctx.Done():
+		t.Fatalf("retry redelivery did not arrive: %v", ctx.Err())
+	}
+	require.Equal(t, retryIntent.MessageID, firstRetry.messageID)
+	require.Equal(t, firstRetry.messageID, secondRetry.messageID)
+	require.Equal(t, firstRetry.brokerID, secondRetry.brokerID)
+	require.EqualValues(t, 1, firstRetry.attempts)
+	require.Greater(t, secondRetry.attempts, firstRetry.attempts)
+	require.ErrorContains(t, firstRetry.err, "controlled lost retry consumer ACK")
+	require.NoError(t, secondRetry.err)
+	for range 2 {
+		select {
+		case seen := <-metadataSeen:
+			require.Equal(t, retryIntent.MessageID, seen.eventID)
+			require.Equal(t, "1", seen.expectedAttempt)
+			require.Equal(t, "automatic", seen.origin)
+			require.Equal(t, "next_attempt", seen.mode)
+		case <-ctx.Done():
+			t.Fatalf("retry authorization did not reach gRPC: %v", ctx.Err())
+		}
+	}
+	retriedRun, err := runRepo.FindLatestByAssessmentID(ctx, created.ID)
+	require.NoError(t, err)
+	require.Equal(t, 2, retriedRun.Attempt().Number)
+	require.Equal(t, "failed", retriedRun.Attempt().Status.String())
+	require.NoError(t, db.Table("runtime_checkpoint").Where("scope = ? AND assessment_id = ?", "evaluation_run", created.ID).Count(&count).Error)
+	require.EqualValues(t, 2, count, "NSQ redelivery must not create attempt 3")
+	require.Eventually(t, func() bool {
+		var state string
+		return db.Table("rm_outbox").Select("state").Where("message_id = ?", retryIntent.MessageID).Scan(&state).Error == nil && state == "published"
+	}, 5*time.Second, 25*time.Millisecond)
+}
+
+func firstValue(md metadata.MD, key string) string {
+	if values := md.Get(key); len(values) > 0 {
+		return values[0]
+	}
+	return ""
 }
