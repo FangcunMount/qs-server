@@ -16,6 +16,26 @@ type commitPublishSpy struct {
 	inTx  bool
 }
 
+type failingCommitPublisher struct {
+	calls int
+	inTx  bool
+}
+
+func (p *failingCommitPublisher) Publish(ctx context.Context, _ event.DomainEvent) error {
+	p.calls++
+	_, p.inTx = gormuow.TxFromContext(ctx)
+	return errors.New("broker unavailable after commit")
+}
+
+func (p *failingCommitPublisher) PublishAll(ctx context.Context, events []event.DomainEvent) error {
+	for _, evt := range events {
+		if err := p.Publish(ctx, evt); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func (s *commitPublishSpy) Publish(ctx context.Context, _ event.DomainEvent) error {
 	s.calls++
 	_, s.inTx = gormuow.TxFromContext(ctx)
@@ -77,5 +97,42 @@ func TestPlanNotificationsWaitForOutermostCommit(t *testing.T) {
 		if err := mock.ExpectationsWereMet(); err != nil {
 			t.Fatal(err)
 		}
+	}
+}
+
+func TestPlanNotificationFailureAfterCommitDoesNotRollbackBusinessWrite(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = db.Close() }()
+	orm, err := gorm.Open(mysqlDriver.New(mysqlDriver.Config{Conn: db, SkipInitializeWithVersion: true}), &gorm.Config{DisableAutomaticPing: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	mock.ExpectBegin()
+	mock.ExpectExec("UPDATE assessment_task SET status").WithArgs("opened", 42).WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectCommit()
+
+	spy := &failingCommitPublisher{}
+	uow := gormuow.NewUnitOfWork(orm)
+	err = uow.WithinTransaction(context.Background(), func(ctx context.Context) error {
+		tx, ok := gormuow.TxFromContext(ctx)
+		if !ok {
+			return errors.New("business write has no active transaction")
+		}
+		if err := tx.Exec("UPDATE assessment_task SET status = ? WHERE id = ?", "opened", 42).Error; err != nil {
+			return err
+		}
+		return NewCommitPublisher(spy).Publish(ctx, nil)
+	})
+	if err != nil {
+		t.Fatalf("post-commit broker failure changed committed business result: %v", err)
+	}
+	if spy.calls != 1 || spy.inTx {
+		t.Fatalf("publisher calls = %d, inTx = %t; want one call outside the transaction", spy.calls, spy.inTx)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatal(err)
 	}
 }
