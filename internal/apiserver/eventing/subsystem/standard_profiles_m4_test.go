@@ -42,9 +42,23 @@ func (candidateStatusReader) OutboxStatusSnapshot(_ context.Context, now time.Ti
 		Buckets: []outboxport.StatusBucket{{Status: "pending", Count: 2}}}, nil
 }
 
+type candidateTypeStatusReader struct{ candidateStatusReader }
+
+func (candidateTypeStatusReader) OutboxStatusByEventType(context.Context, time.Time) ([]outboxport.EventTypeStatusBucket, error) {
+	return nil, nil
+}
+
 type candidateStatusObserver struct {
 	eventobservability.NopObserver
-	statuses chan eventobservability.OutboxStatusEvent
+	statuses     chan eventobservability.OutboxStatusEvent
+	typeStatuses chan eventobservability.OutboxEventTypeStatusEvent
+}
+
+func (o candidateStatusObserver) ObserveOutboxEventTypeStatus(_ context.Context, evt eventobservability.OutboxEventTypeStatusEvent) {
+	select {
+	case o.typeStatuses <- evt:
+	default:
+	}
 }
 
 func (o candidateStatusObserver) ObserveOutboxStatus(_ context.Context, evt eventobservability.OutboxStatusEvent) {
@@ -74,6 +88,7 @@ func TestStandardProfileReplacesWholeLegacyRuntimeBeforeStart(t *testing.T) {
 	}
 	started := make(chan struct{})
 	statusEvents := make(chan eventobservability.OutboxStatusEvent, 1)
+	typeStatusEvents := make(chan eventobservability.OutboxEventTypeStatusEvent, 16)
 	stager := candidateStager{}
 	postCommit := candidatePostCommit{}
 	supervisor, err := standardoutbox.NewRelaySupervisor(standardoutbox.SupervisorOptions{
@@ -95,14 +110,14 @@ func TestStandardProfileReplacesWholeLegacyRuntimeBeforeStart(t *testing.T) {
 	s, err := NewWithStandardProfiles(Options{
 		Catalog: loadCatalog(t), MongoDB: client.Database("candidate"),
 		PublisherMode: eventruntime.PublishModeMQ, MQPublisher: fakePublisher{},
-		Observer:  candidateStatusObserver{statuses: statusEvents},
+		Observer:  candidateStatusObserver{statuses: statusEvents, typeStatuses: typeStatusEvents},
 		Consumers: map[string]ConsumerOptions{hotRankConsumerID: {Enabled: false}},
 	}, map[eventcatalog.OutboxProfile]StandardProfile{
 		eventcatalog.OutboxProfileMongoDomain: {
 			Binding:    appEventing.ProfileBinding{Stager: stager, PostCommit: postCommit},
 			Supervisor: supervisor,
 			Drain:      func(context.Context) error { record("drain"); return nil }, DrainTimeout: time.Second,
-			Status: appEventing.NamedOutboxStatusReader{Name: "mongo-domain-events", Reader: candidateStatusReader{}},
+			Status: appEventing.NamedOutboxStatusReader{Name: "mongo-domain-events", Reader: candidateTypeStatusReader{}},
 		},
 	})
 	if err != nil {
@@ -130,6 +145,14 @@ func TestStandardProfileReplacesWholeLegacyRuntimeBeforeStart(t *testing.T) {
 		}
 	case <-time.After(time.Second):
 		t.Fatal("SDK profile did not report its backlog after starting")
+	}
+	select {
+	case observed := <-typeStatusEvents:
+		if observed.Store != "standard-mongo" || observed.EventType == "" || observed.Status != "pending" || observed.Count != 0 {
+			t.Fatalf("SDK profile did not seed an empty event-type bucket: %+v", observed)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("SDK profile did not seed event-type backlog labels after starting")
 	}
 	status, err := s.StatusService().GetStatus(t.Context())
 	if err != nil {
