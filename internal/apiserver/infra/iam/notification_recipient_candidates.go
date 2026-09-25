@@ -164,25 +164,26 @@ func (r *miniProgramRecipientCandidateReader) readActiveLinkRelations(
 	if err != nil {
 		return nil, fmt.Errorf("read profile links: %w", err)
 	}
+	if linked == nil {
+		return nil, fmt.Errorf("IAM returned no profile link response")
+	}
 	relations := make(map[string]map[string]struct{})
-	if linked != nil {
-		for _, edge := range linked.GetItems() {
-			if edge == nil || edge.ProfileLink == nil || edge.ProfileLink.GetRevokedAt() != nil {
-				continue
-			}
-			link := edge.ProfileLink
-			if link.GetProfileId() != "" && link.GetProfileId() != profileID {
-				return nil, fmt.Errorf("IAM returned a link for another profile")
-			}
-			userID := strings.TrimSpace(link.GetUserId())
-			if userID == "" {
-				continue
-			}
-			if relations[userID] == nil {
-				relations[userID] = make(map[string]struct{})
-			}
-			relations[userID][miniProgramLinkRelation(link.GetRelation())] = struct{}{}
+	for _, edge := range linked.GetItems() {
+		if edge == nil || edge.ProfileLink == nil || edge.ProfileLink.GetRevokedAt() != nil {
+			continue
 		}
+		link := edge.ProfileLink
+		if link.GetProfileId() != "" && link.GetProfileId() != profileID {
+			return nil, fmt.Errorf("IAM returned a link for another profile")
+		}
+		userID := strings.TrimSpace(link.GetUserId())
+		if userID == "" {
+			continue
+		}
+		if relations[userID] == nil {
+			relations[userID] = make(map[string]struct{})
+		}
+		relations[userID][miniProgramLinkRelation(link.GetRelation())] = struct{}{}
 	}
 	return relations, nil
 }

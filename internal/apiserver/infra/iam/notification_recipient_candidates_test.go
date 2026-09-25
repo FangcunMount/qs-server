@@ -116,6 +116,10 @@ func TestRecipientCandidatesKeepEmptyAndFailureDistinct(t *testing.T) {
 	if err != nil || len(candidates) != 0 || lookup.called != 0 {
 		t.Fatalf("empty active links must not call IAM recipient service: candidates=%v err=%v calls=%d", candidates, err, lookup.called)
 	}
+	links.response = nil
+	if _, err := reader.ListLinkedUsers(context.Background(), "42"); err == nil {
+		t.Fatal("missing IAM profile link response must not look like no linked users")
+	}
 	links.response = &identityv2.ListProfileLinksResponse{Items: []*identityv2.ProfileLinkEdge{
 		candidateLink("42", "99", identityv2.ProfileLinkRelation_PROFILE_LINK_RELATION_SELF),
 	}}
