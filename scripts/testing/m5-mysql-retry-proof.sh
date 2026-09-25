@@ -30,6 +30,7 @@ trap 'exit 143' TERM
 "${compose[@]}" exec -T mysql mysql -uroot -e 'CREATE DATABASE m5_qs_retry'
 "${compose[@]}" exec -T mysql mysql -uroot -e 'CREATE DATABASE m5_qs_outcome'
 "${compose[@]}" exec -T mysql mysql -uroot -e 'CREATE DATABASE m5_qs_failed_delivery'
+"${compose[@]}" exec -T mysql mysql -uroot -e 'CREATE DATABASE m5_qs_process'
 
 architecture=$(docker info --format '{{.Architecture}}')
 case "$architecture" in
@@ -56,3 +57,8 @@ build_dir=$(mktemp -d "${TMPDIR:-/tmp}/$project-build.XXXXXX")
   -e RM_QS_M5_NSQ_TCP='nsqd:4150' \
   mysql /tmp/m5-mysql-retry.test \
     -test.run '^TestM5StandardEvaluationFailureAndGovernedRetriesAcrossNSQ$' -test.count=1 -test.timeout=2m -test.v
+"${compose[@]}" exec -T \
+  -e RM_QS_M5_PROCESS_DSN='root@tcp(mysql:3306)/m5_qs_process?parseTime=true&loc=Asia%2FShanghai' \
+  -e RM_QS_M5_NSQ_TCP='nsqd:4150' \
+  mysql /tmp/m5-mysql-retry.test \
+    -test.run '^TestM5EvaluationRequestedRecoversAfterWorkerProcessKill$' -test.count=1 -test.timeout=2m -test.v
