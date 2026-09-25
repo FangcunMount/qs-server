@@ -6673,6 +6673,10 @@
       "fact_sources": [
         {
           "kind": "source",
+          "path": "internal/worker/observability/best_effort_side_effect_metrics.go"
+        },
+        {
+          "kind": "source",
           "path": "internal/pkg/eventing/observe/metrics.go"
         },
         {
