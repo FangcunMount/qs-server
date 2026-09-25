@@ -17,6 +17,8 @@ import (
 // eventoutbox collection or exposes message payloads.
 type StatusReader struct{ collection *mongo.Collection }
 
+var _ outboxport.EventTypeStatusReader = (*StatusReader)(nil)
+
 func NewStatusReader(collection *mongo.Collection) (*StatusReader, error) {
 	if collection == nil {
 		return nil, fmt.Errorf("standard Mongo status requires host collection")
@@ -64,4 +66,54 @@ func (r *StatusReader) OutboxStatusSnapshot(ctx context.Context, now time.Time) 
 		return outboxport.StatusSnapshot{}, err
 	}
 	return appstandard.BuildStatusSnapshot("mongo-domain-events", now, counts)
+}
+
+// OutboxStatusByEventType reports only unfinished standard intents. The
+// aggregation reads identity, state and age fields, never message payloads.
+func (r *StatusReader) OutboxStatusByEventType(ctx context.Context, _ time.Time) ([]outboxport.EventTypeStatusBucket, error) {
+	if r == nil || r.collection == nil {
+		return nil, fmt.Errorf("standard Mongo status reader is not configured")
+	}
+	pipeline := mongo.Pipeline{
+		{{Key: "$match", Value: bson.D{{Key: "state", Value: bson.D{{Key: "$ne", Value: "published"}}}}}},
+		{{Key: "$group", Value: bson.D{
+			{Key: "_id", Value: bson.D{{Key: "event_type", Value: "$event_type"}, {Key: "state", Value: "$state"}}},
+			{Key: "count", Value: bson.D{{Key: "$sum", Value: 1}}},
+			{Key: "oldest", Value: bson.D{{Key: "$min", Value: "$created_at"}}},
+			{Key: "invalid_created_at", Value: bson.D{{Key: "$sum", Value: bson.D{{Key: "$cond", Value: bson.A{
+				bson.D{{Key: "$eq", Value: bson.A{bson.D{{Key: "$type", Value: "$created_at"}}, "date"}}}, 0, 1,
+			}}}}}},
+		}}},
+	}
+	cursor, err := r.collection.Aggregate(ctx, pipeline)
+	if err != nil {
+		return nil, err
+	}
+	defer cursor.Close(ctx)
+	buckets := make([]outboxport.EventTypeStatusBucket, 0)
+	for cursor.Next(ctx) {
+		var row struct {
+			ID struct {
+				EventType string `bson:"event_type"`
+				State     string `bson:"state"`
+			} `bson:"_id"`
+			Count            int64      `bson:"count"`
+			Oldest           *time.Time `bson:"oldest"`
+			InvalidCreatedAt int64      `bson:"invalid_created_at"`
+		}
+		if err := cursor.Decode(&row); err != nil {
+			return nil, err
+		}
+		if row.ID.EventType == "" || !appstandard.IsUnfinishedState(row.ID.State) || row.Count <= 0 || row.InvalidCreatedAt != 0 || row.Oldest == nil || row.Oldest.IsZero() {
+			return nil, fmt.Errorf("invalid standard Mongo event type status row %q/%q", row.ID.EventType, row.ID.State)
+		}
+		oldest := *row.Oldest
+		buckets = append(buckets, outboxport.EventTypeStatusBucket{
+			EventType: row.ID.EventType, Status: row.ID.State, Count: row.Count, OldestCreatedAt: &oldest,
+		})
+	}
+	if err := cursor.Err(); err != nil {
+		return nil, err
+	}
+	return buckets, nil
 }

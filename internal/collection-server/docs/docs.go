@@ -2878,6 +2878,17 @@ const docTemplate = `{
         }
     },
     "definitions": {
+        "aiexplanation.WorkflowEligibility": {
+            "type": "object",
+            "properties": {
+                "reason_code": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                }
+            }
+        },
         "aiexplanation.WorkflowRequest": {
             "type": "object",
             "required": [
@@ -3817,6 +3828,9 @@ const docTemplate = `{
         "github_com_FangcunMount_qs-server_internal_collection-server_application_aiexplanation.WorkflowSource": {
             "type": "object",
             "properties": {
+                "ai_eligibility": {
+                    "$ref": "#/definitions/aiexplanation.WorkflowEligibility"
+                },
                 "report_id": {
                     "type": "string"
                 },

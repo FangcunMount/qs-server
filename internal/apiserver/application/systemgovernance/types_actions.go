@@ -67,6 +67,34 @@ type PendingReplayAuditReader interface {
 	ListPendingReplayAudits(context.Context, int64, string, int) (PendingReplayAuditPage, error)
 }
 
+// DeliveryReplayReview is a read-only view of a replay action whose audit has
+// remained unresolved. A missing or unclaimed target is never proof that the
+// message was not published.
+type DeliveryReplayReview struct {
+	RequestID       string                       `json:"request_id"`
+	ActorUserID     string                       `json:"actor_user_id"`
+	Status          string                       `json:"status"`
+	TargetsReadable bool                         `json:"targets_readable"`
+	Targets         []DeliveryReplayReviewTarget `json:"targets"`
+	StartedAt       time.Time                    `json:"started_at"`
+	UpdatedAt       time.Time                    `json:"updated_at"`
+}
+
+type DeliveryReplayReviewTarget struct {
+	DeadLetterID    uint64 `json:"dead_letter_id"`
+	Disposition     string `json:"disposition"`
+	LinkedToRequest bool   `json:"linked_to_request"`
+}
+
+type DeliveryReplayReviewPage struct {
+	Items      []DeliveryReplayReview `json:"items"`
+	NextCursor string                 `json:"next_cursor,omitempty"`
+}
+
+type DeliveryReplayReviewReader interface {
+	ListDeliveryReplayReviews(context.Context, int64, string, int) (DeliveryReplayReviewPage, error)
+}
+
 // ActionAuditRecord is the persistence-neutral governance audit contract.
 // Input must already be redacted before it crosses this port.
 type ActionAuditRecord struct {

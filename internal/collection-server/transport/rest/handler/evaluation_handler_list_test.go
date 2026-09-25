@@ -42,6 +42,9 @@ func (f *fakeEvaluationQueryService) GetHighRiskFactors(context.Context, uint64,
 func (f *fakeEvaluationQueryService) GetMyAssessment(context.Context, uint64, uint64) (*evaluation.AssessmentDetailResponse, error) {
 	return nil, nil
 }
+func (f *fakeEvaluationQueryService) GetMyAssessmentRunStatus(context.Context, uint64, uint64) (*evaluation.AssessmentRuntimeStatusResponse, error) {
+	return nil, nil
+}
 func (f *fakeEvaluationQueryService) GetAssessmentReport(ctx context.Context, testeeID, assessmentID uint64) (*evaluation.AssessmentReportResponse, error) {
 	if f.getAssessmentReport == nil {
 		panic("unexpected GetAssessmentReport call")
