@@ -20,6 +20,7 @@ services:
       - /questionnaire.QuestionnaireService/ListQuestionnaires
       - /evaluation.TesteeEvaluationService/AuthorizeAssessment
       - /evaluation.TesteeEvaluationService/GetMyAssessment
+      - /evaluation.TesteeEvaluationService/GetMyAssessmentRunStatus
       - /evaluation.TesteeEvaluationService/ListMyAssessments
       - /evaluation.TesteeEvaluationService/GetAssessmentScores
       - /evaluation.TesteeEvaluationService/GetFactorTrend

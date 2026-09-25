@@ -59,4 +59,4 @@ build_dir=$(mktemp -d "${TMPDIR:-/tmp}/$project-build.XXXXXX")
   -e QS_SERVER_TEST_MONGO_DB_PREFIX='qs_m5_outcome_test' \
   -e QS_SERVER_TEST_REDIS_URL='redis://redis:6379/15' \
   -e RM_QS_M5_NSQ_TCP='nsqd:4150' \
-  mysql ./runtimeclosure.test -test.run '^TestM5(StandardMySQLOutcomeToReportAcrossNSQ|DualStandardProfilesCurrentBusinessClosure)$' -test.count=1 -test.timeout=15m -test.v
+  mysql ./runtimeclosure.test -test.run '^(TestM5StandardMySQLOutcomeToReportAcrossNSQ|TestM5DualStandardProfilesCurrentBusinessClosure|TestM5OldFailureRedeliveryAfterDurableReportKeepsParticipantCompleted)$' -test.count=1 -test.timeout=15m -test.v

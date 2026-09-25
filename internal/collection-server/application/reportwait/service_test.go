@@ -54,6 +54,8 @@ type fakeAssessmentQuery struct {
 	report    *evaluation.AssessmentReportResponse
 	reportErr error
 	getCalls  int
+	run       *evaluation.AssessmentRuntimeStatusResponse
+	runErr    error
 }
 
 func (f *fakeAssessmentQuery) AuthorizeAssessment(context.Context, uint64, uint64) error {
@@ -73,6 +75,10 @@ func (f *fakeAssessmentQuery) GetMyAssessment(context.Context, uint64, uint64) (
 
 func (f *fakeAssessmentQuery) GetAssessmentReport(context.Context, uint64, uint64) (*evaluation.AssessmentReportResponse, error) {
 	return f.report, f.reportErr
+}
+
+func (f *fakeAssessmentQuery) GetMyAssessmentRunStatus(context.Context, uint64, uint64) (*evaluation.AssessmentRuntimeStatusResponse, error) {
+	return f.run, f.runErr
 }
 
 func TestToPublicAssessmentStatusMapsCompletedToInterpreted(t *testing.T) {
@@ -107,6 +113,74 @@ func TestGetStatusRedisHitTerminal(t *testing.T) {
 	}
 	if query.getCalls != 0 {
 		t.Fatalf("GetMyAssessment calls = %d, want 0 on status-cache hit", query.getCalls)
+	}
+}
+
+func TestOldEvaluationFailureCannotHideDurableReport(t *testing.T) {
+	query := &fakeAssessmentQuery{
+		result: &evaluation.AssessmentDetailResponse{ID: "42", Status: "failed", FailureReason: "old failure"},
+		report: &evaluation.AssessmentReportResponse{AssessmentID: "42"},
+		run:    &evaluation.AssessmentRuntimeStatusResponse{Attempt: 2, Status: "succeeded"},
+	}
+	cache := &fakeStatusCache{snapshots: map[string]*reportstatus.Snapshot{"42": {
+		AssessmentID: "42", Status: "failed", Stage: "failed", Reason: "evaluation_failed",
+		UpdatedAt: time.Now().UTC(),
+	}}}
+	got, err := NewService(query, cache, nil, nil, DefaultConfig()).GetStatus(context.Background(), 7, 42)
+	if err != nil || got == nil || got.Status != "completed" {
+		t.Fatalf("status after durable report = %+v, err = %v", got, err)
+	}
+	if query.getCalls != 1 {
+		t.Fatalf("durable assessment reads = %d, want 1", query.getCalls)
+	}
+}
+
+func TestOldEvaluationFailureCannotHidePersistedNewAttempt(t *testing.T) {
+	for _, phase := range []string{"pending", "running", "succeeded"} {
+		t.Run(phase, func(t *testing.T) {
+			query := &fakeAssessmentQuery{
+				result: &evaluation.AssessmentDetailResponse{ID: "42", Status: "failed", FailureReason: "old failure"},
+				run:    &evaluation.AssessmentRuntimeStatusResponse{Attempt: 2, Status: phase},
+			}
+			cache := &fakeStatusCache{snapshots: map[string]*reportstatus.Snapshot{"42": {
+				AssessmentID: "42", Status: "failed", Stage: "failed", Reason: "evaluation_failed",
+				UpdatedAt: time.Now().UTC(),
+			}}}
+			got, err := NewService(query, cache, nil, nil, DefaultConfig()).GetStatus(context.Background(), 7, 42)
+			if err != nil || got == nil || got.Status != "processing" || got.Stage == "failed" {
+				t.Fatalf("status for new %s attempt = %+v, err = %v", phase, got, err)
+			}
+		})
+	}
+}
+
+func TestWaitTimeoutDoesNotReturnOldFailureAfterNewAttempt(t *testing.T) {
+	query := &fakeAssessmentQuery{
+		result: &evaluation.AssessmentDetailResponse{ID: "42", Status: "failed"},
+		run:    &evaluation.AssessmentRuntimeStatusResponse{Attempt: 2, Status: "running"},
+	}
+	cache := &fakeStatusCache{snapshots: map[string]*reportstatus.Snapshot{"42": {
+		AssessmentID: "42", Status: "failed", Stage: "failed", Reason: "evaluation_failed",
+	}}}
+	cfg := DefaultConfig()
+	cfg.PollInterval = time.Millisecond
+	got, err := NewService(query, cache, nil, nil, cfg).Wait(context.Background(), 7, 42, 5*time.Millisecond)
+	if err != nil || got == nil || got.Status != "processing" {
+		t.Fatalf("wait timeout status = %+v, err = %v", got, err)
+	}
+}
+
+func TestFailedSnapshotDoesNotBecomeFinalWhenAuthorityUnavailable(t *testing.T) {
+	query := &fakeAssessmentQuery{
+		result: &evaluation.AssessmentDetailResponse{ID: "42", Status: "failed"},
+		runErr: errors.New("run database unavailable"),
+	}
+	cache := &fakeStatusCache{snapshots: map[string]*reportstatus.Snapshot{"42": {
+		AssessmentID: "42", Status: "failed", Stage: "failed", Reason: "evaluation_failed",
+	}}}
+	got, err := NewService(query, cache, nil, nil, DefaultConfig()).GetStatus(context.Background(), 7, 42)
+	if got != nil || err == nil {
+		t.Fatalf("status = %+v, err = %v; want authority error", got, err)
 	}
 }
 
