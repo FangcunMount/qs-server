@@ -18,6 +18,7 @@ type SnapshotLoaderOptions struct {
 	includeAssignmentFacts bool
 	AppName                string
 	CacheTTL               time.Duration
+	VersionGuard           *VersionGuard
 }
 
 // SnapshotLoader CurrentAuthzSnapshot：GetAuthorizationSnapshot + 进程内缓存 + authz_version 水位失效。
@@ -88,6 +89,9 @@ func (l *SnapshotLoader) ObserveAuthzVersion(version int64) {
 	if l == nil || version <= 0 {
 		return
 	}
+	if l.opts.VersionGuard != nil {
+		l.opts.VersionGuard.ObserveVersion(version)
+	}
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	if version <= l.globalVersion {
@@ -101,6 +105,30 @@ func (l *SnapshotLoader) ObserveAuthzVersion(version int64) {
 	}
 }
 
+func (l *SnapshotLoader) verifyVersion(ctx context.Context) error {
+	if l.opts.VersionGuard == nil {
+		return nil
+	}
+	version, err := l.opts.VersionGuard.Verify(ctx)
+	if err != nil {
+		return err
+	}
+	l.ObserveAuthzVersion(version)
+	return nil
+}
+
+func (l *SnapshotLoader) verifySnapshot(ctx context.Context, snap *authz.Snapshot) error {
+	if err := l.verifyVersion(ctx); err != nil {
+		return err
+	}
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if snap == nil || snap.AuthzVersion < l.globalVersion {
+		return fmt.Errorf("authorization snapshot is older than the verified policy version")
+	}
+	return nil
+}
+
 // Load 拉取授权快照。
 func (l *SnapshotLoader) Load(ctx context.Context, userIDStr string) (*authz.Snapshot, error) {
 	if l == nil || l.client == nil || !l.client.IsEnabled() || l.client.SDK() == nil {
@@ -109,9 +137,15 @@ func (l *SnapshotLoader) Load(ctx context.Context, userIDStr string) (*authz.Sna
 	if userIDStr == "" {
 		return nil, fmt.Errorf("user id is required")
 	}
+	if err := l.verifyVersion(ctx); err != nil {
+		return nil, err
+	}
 
 	key := cacheKey(userIDStr, l.opts.AppName)
 	if snap := l.getCached(key); snap != nil {
+		if err := l.verifySnapshot(ctx, snap); err != nil {
+			return nil, err
+		}
 		return snap, nil
 	}
 
@@ -182,7 +216,11 @@ func (l *SnapshotLoader) Load(ctx context.Context, userIDStr string) (*authz.Sna
 	if err != nil {
 		return nil, err
 	}
-	return v.(*authz.Snapshot), nil
+	snap := v.(*authz.Snapshot)
+	if err := l.verifySnapshot(ctx, snap); err != nil {
+		return nil, err
+	}
+	return snap, nil
 }
 
 // LoadFresh bypasses the process cache and in-flight cached reads for maintenance decisions.
@@ -203,6 +241,9 @@ func (l *SnapshotLoader) LoadFresh(ctx context.Context, userID string) (*authz.S
 	}
 	// Recheck the shared watermark after the remote read; a concurrent policy event must not be lost.
 	if err := l.setCached(cacheKey(userID, l.opts.AppName), snap); err != nil {
+		return nil, err
+	}
+	if err := l.verifySnapshot(ctx, snap); err != nil {
 		return nil, err
 	}
 	return snap, nil
@@ -226,6 +267,9 @@ func (l *SnapshotLoader) LoadAssignmentFacts(ctx context.Context, userID string)
 	if snap == nil || !snap.AssignmentFactsComplete || snap.AuthzVersion <= 0 {
 		return nil, fmt.Errorf("IAM does not provide complete assignment facts; retirement is unavailable")
 	}
+	if err := l.verifySnapshot(ctx, snap); err != nil {
+		return nil, err
+	}
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	if snap.AuthzVersion < l.globalVersion {
@@ -241,8 +285,14 @@ func (l *SnapshotLoader) LoadScopedAssignmentFacts(ctx context.Context, userID s
 	if l == nil || l.client == nil || l.client.SDK() == nil {
 		return nil, fmt.Errorf("authorization loader unavailable")
 	}
+	if err := l.verifyVersion(ctx); err != nil {
+		return nil, err
+	}
 	resp, err := l.client.SDK().Authz().GetScopedAuthorizationSnapshot(ctx, &authzv4.GetAuthorizationSnapshotRequest{Subject: authz.SubjectKey(userID), AppName: l.opts.AppName, IncludeAssignmentFacts: true})
 	if err != nil {
+		return nil, err
+	}
+	if err := l.verifyVersion(ctx); err != nil {
 		return nil, err
 	}
 	l.mu.Lock()
