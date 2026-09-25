@@ -1,0 +1,17 @@
+services:
+  nsqlookupd:
+    image: nsqio/nsq@sha256:1a369c146af71bc95c25d54b375a2b98452478c1eaf4e85f8fcb01da20f2c78a
+    command: [/nsqlookupd]
+  nsqd:
+    image: nsqio/nsq@sha256:1a369c146af71bc95c25d54b375a2b98452478c1eaf4e85f8fcb01da20f2c78a
+    command: [/nsqd, --data-path=/data, --broadcast-address=nsqd, --lookupd-tcp-address=nsqlookupd:4160]
+    tmpfs:
+      - /data:size=64m
+    healthcheck:
+      test: [CMD-SHELL, "wget -qO- http://127.0.0.1:4151/ping | grep -qx OK"]
+      interval: 2s
+      timeout: 5s
+      retries: 60
+networks:
+  default:
+    internal: true
