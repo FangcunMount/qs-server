@@ -50,6 +50,21 @@ func OpenMySQLDeadLetterRecorder(options *genericoptions.MySQLOptions) (*SQLDead
 	if options == nil || options.Host == "" || options.Database == "" {
 		return nil, fmt.Errorf("dead-letter audit store is not configured")
 	}
+	locationName := options.Location
+	if locationName == "" {
+		locationName = "Asia/Shanghai"
+	}
+	location, err := time.LoadLocation(locationName)
+	if err != nil {
+		return nil, fmt.Errorf("invalid dead-letter mysql location %q: %w", locationName, err)
+	}
+	sessionTimeZone := options.SessionTimeZone
+	if sessionTimeZone == "" {
+		sessionTimeZone = "+08:00"
+	}
+	if _, err := time.Parse("-07:00", sessionTimeZone); err != nil {
+		return nil, fmt.Errorf("invalid dead-letter mysql session time zone %q: %w", sessionTimeZone, err)
+	}
 	cfg := drivermysql.NewConfig()
 	cfg.Net = "tcp"
 	cfg.Addr = options.Host
@@ -57,6 +72,8 @@ func OpenMySQLDeadLetterRecorder(options *genericoptions.MySQLOptions) (*SQLDead
 	cfg.Passwd = options.Password
 	cfg.DBName = options.Database
 	cfg.ParseTime = true
+	cfg.Loc = location
+	cfg.Params = map[string]string{"time_zone": "'" + sessionTimeZone + "'"}
 	db, err := sql.Open("mysql", cfg.FormatDSN())
 	if err != nil {
 		return nil, fmt.Errorf("open dead-letter audit store: %w", err)

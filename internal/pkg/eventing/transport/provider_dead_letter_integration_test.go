@@ -22,6 +22,7 @@ import (
 	eventcatalog "github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
 	eventobservability "github.com/FangcunMount/qs-server/internal/pkg/eventing/observe"
 	eventruntime "github.com/FangcunMount/qs-server/internal/pkg/eventing/runtime"
+	genericoptions "github.com/FangcunMount/qs-server/internal/pkg/options"
 	workermessaging "github.com/FangcunMount/qs-server/internal/worker/integration/messaging"
 	drivermysql "github.com/go-sql-driver/mysql"
 	"github.com/nsqio/go-nsq"
@@ -645,6 +646,53 @@ FROM event_delivery_dead_letter WHERE message_id=? ORDER BY id`, record.MessageI
 	}
 	if err := rows.Err(); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestStandaloneDeadLetterRecorderUsesConfiguredUTCPlusEight(t *testing.T) {
+	db := openIsolatedDeadLetterDatabase(t)
+	var databaseName string
+	if err := db.QueryRowContext(t.Context(), "SELECT DATABASE()").Scan(&databaseName); err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := drivermysql.ParseDSN(os.Getenv("MYSQL_DSN"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	opts := genericoptions.NewMySQLOptions()
+	opts.Host, opts.Username, opts.Password, opts.Database = cfg.Addr, cfg.User, cfg.Passwd, databaseName
+	recorder, err := OpenMySQLDeadLetterRecorder(opts)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = recorder.Close() })
+	var sessionZone string
+	if err := recorder.db.QueryRowContext(t.Context(), "SELECT @@session.time_zone").Scan(&sessionZone); err != nil {
+		t.Fatal(err)
+	}
+	if sessionZone != "+08:00" {
+		t.Fatalf("dead-letter MySQL session time zone = %q, want +08:00", sessionZone)
+	}
+	shanghai, err := time.LoadLocation("Asia/Shanghai")
+	if err != nil {
+		t.Fatal(err)
+	}
+	failedAt := time.Date(2026, 9, 25, 23, 8, 9, 0, shanghai)
+	record := DeadLetterRecord{
+		MessageID: "timezone-event", TransportMessageID: "physical-timezone", EventID: "timezone-event",
+		Provider: "nsq", Topic: "topic", Channel: "channel", DeliveryAttempts: 8,
+		Payload: []byte(`{"id":"timezone-event"}`), LastError: "failed", FailedAt: failedAt,
+	}
+	if err := recorder.RecordDeadLetter(t.Context(), record); err != nil {
+		t.Fatal(err)
+	}
+	var storedAt string
+	if err := recorder.db.QueryRowContext(t.Context(), `SELECT DATE_FORMAT(failed_at,'%Y-%m-%d %H:%i:%s')
+FROM event_delivery_dead_letter WHERE message_id=?`, record.MessageID).Scan(&storedAt); err != nil {
+		t.Fatal(err)
+	}
+	if storedAt != "2026-09-25 23:08:09" {
+		t.Fatalf("dead-letter wall time = %q, want configured UTC+8", storedAt)
 	}
 }
 
