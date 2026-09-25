@@ -33,6 +33,7 @@ type standardClosureResult struct {
 	eventType string
 	brokerID  nsq.MessageID
 	attempts  uint16
+	handledAt time.Time
 	err       error
 }
 
@@ -42,10 +43,14 @@ type standardClosureDelivery struct {
 	results                 chan standardClosureResult
 	pending                 map[string][]standardClosureResult
 	standardMongo           bool
+	delayFirstFailure       bool
 	firstEvaluationBrokerID *nsq.MessageID
 	lastEvaluationAttempts  uint16
 	firstOutcomeBrokerID    *nsq.MessageID
 	lastOutcomeAttempts     uint16
+	firstFailureBrokerID    *nsq.MessageID
+	lastFailureAttempts     uint16
+	lastFailureHandledAt    time.Time
 }
 
 func (d *standardClosureDelivery) SetHandlers(registered map[string]handlers.HandlerFunc) {
@@ -57,7 +62,8 @@ func (d *standardClosureDelivery) SetHandlers(registered map[string]handlers.Han
 func (d *standardClosureDelivery) Covers(eventType string) bool {
 	if d.standardMongo {
 		return eventType == eventcatalog.AnswerSheetSubmitted || eventType == eventcatalog.InterpretationReportGenerated ||
-			eventType == eventcatalog.EvaluationRequested || eventType == eventcatalog.EvaluationOutcomeCommitted
+			eventType == eventcatalog.EvaluationRequested || eventType == eventcatalog.EvaluationOutcomeCommitted ||
+			(d.delayFirstFailure && (eventType == eventcatalog.EvaluationFailed || eventType == eventcatalog.EvaluationRetryRequested))
 	}
 	return eventType == eventcatalog.EvaluationRequested || eventType == eventcatalog.EvaluationOutcomeCommitted
 }
@@ -110,6 +116,19 @@ func (d *standardClosureDelivery) Wait(t *testing.T, eventType string) (*messagi
 			}
 			d.lastOutcomeAttempts = got.attempts
 		}
+		if eventType == eventcatalog.EvaluationFailed && d.delayFirstFailure {
+			if d.firstFailureBrokerID == nil {
+				if got.attempts != 1 {
+					t.Fatalf("first Failure broker attempt=%d, want 1", got.attempts)
+				}
+				brokerID := got.brokerID
+				d.firstFailureBrokerID = &brokerID
+			} else if got.brokerID != *d.firstFailureBrokerID || got.attempts <= d.lastFailureAttempts {
+				t.Fatalf("Failure was republished instead of NSQ redelivery: first broker ID=%s, current=%s, attempts=%d after %d", *d.firstFailureBrokerID, got.brokerID, got.attempts, d.lastFailureAttempts)
+			}
+			d.lastFailureAttempts = got.attempts
+			d.lastFailureHandledAt = got.handledAt
+		}
 		return got.message, got.err
 	}
 }
@@ -130,15 +149,15 @@ func TestM5DualStandardProfilesCurrentBusinessClosure(t *testing.T) {
 		t.Fatal("disposable nsqd:4150 required")
 	}
 	runCurrentRuntimeClosure(t, func(t *testing.T, opts eventsubsystem.Options, db *sql.DB) (*eventsubsystem.Subsystem, runtimeClosureDelivery, error) {
-		return newM5StandardEventSubsystem(t, opts, db, true)
+		return newM5StandardEventSubsystem(t, opts, db, true, false)
 	})
 }
 
 func newM5StandardMySQLEventSubsystem(t *testing.T, opts eventsubsystem.Options, sqlDB *sql.DB) (*eventsubsystem.Subsystem, runtimeClosureDelivery, error) {
-	return newM5StandardEventSubsystem(t, opts, sqlDB, false)
+	return newM5StandardEventSubsystem(t, opts, sqlDB, false, false)
 }
 
-func newM5StandardEventSubsystem(t *testing.T, opts eventsubsystem.Options, sqlDB *sql.DB, standardMongo bool) (*eventsubsystem.Subsystem, runtimeClosureDelivery, error) {
+func newM5StandardEventSubsystem(t *testing.T, opts eventsubsystem.Options, sqlDB *sql.DB, standardMongo, delayFirstFailure bool) (*eventsubsystem.Subsystem, runtimeClosureDelivery, error) {
 	const topic = "qs.evaluation.lifecycle"
 	address := os.Getenv("RM_QS_M5_NSQ_TCP")
 	config := nsq.NewConfig()
@@ -154,7 +173,7 @@ func newM5StandardEventSubsystem(t *testing.T, opts eventsubsystem.Options, sqlD
 		return nil, nil, err
 	}
 	consumer.SetLogger(nil, nsq.LogLevelError)
-	delivery := &standardClosureDelivery{results: make(chan standardClosureResult, 8), pending: make(map[string][]standardClosureResult), standardMongo: standardMongo}
+	delivery := &standardClosureDelivery{results: make(chan standardClosureResult, 16), pending: make(map[string][]standardClosureResult), standardMongo: standardMongo, delayFirstFailure: delayFirstFailure}
 	consumer.AddHandler(nsq.HandlerFunc(func(raw *nsq.Message) error {
 		decoded, recognized, decodeErr := messaging.DecodeMessagePayload(raw.Body)
 		if decodeErr != nil || !recognized {
@@ -171,11 +190,17 @@ func newM5StandardEventSubsystem(t *testing.T, opts eventsubsystem.Options, sqlD
 			return fmt.Errorf("no current Worker handler for %s", eventType)
 		}
 		handleErr := handler(t.Context(), eventType, decoded.Payload)
+		if handleErr == nil && delayFirstFailure && eventType == eventcatalog.EvaluationFailed && raw.Attempts == 1 {
+			// Keep the *same* broker message for a late physical redelivery.
+			// The test asserts that the new report is durable before attempt 2.
+			raw.DisableAutoResponse()
+			raw.RequeueWithoutBackoff(60 * time.Second)
+		}
 		if handleErr == nil && eventType == eventcatalog.EvaluationRequested && raw.Attempts == 1 {
 			handleErr = errors.New("controlled lost Evaluation consumer ACK")
 		}
 		select {
-		case delivery.results <- standardClosureResult{message: decoded, eventType: eventType, brokerID: raw.ID, attempts: raw.Attempts, err: handleErr}:
+		case delivery.results <- standardClosureResult{message: decoded, eventType: eventType, brokerID: raw.ID, attempts: raw.Attempts, handledAt: time.Now(), err: handleErr}:
 		case <-t.Context().Done():
 		}
 		return handleErr
