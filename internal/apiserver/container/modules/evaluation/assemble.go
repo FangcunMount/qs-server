@@ -47,6 +47,7 @@ import (
 type Module struct {
 	IntakeService            evaluationintake.Service
 	TesteeService            evaluationtestee.Service
+	RuntimeStatusReader      *evaluationtestee.RuntimeStatusReader
 	OperatorQuery            evaluationoperator.QueryService
 	GovernedRetry            evaluationoperator.GovernedRetryService
 	ScaleAnalysis            evaluationoperator.ScaleAnalysisService
@@ -210,6 +211,7 @@ func (m *Module) wireAssessmentApplications(normalized Deps, infra *evaluationIn
 	)
 	scoreFacts := evaluationoutcome.NewScoreFactReader(infra.outcomeRepo, infra.scoreProjectionReader)
 	m.TesteeService = evaluationtestee.NewServiceWithCaches(infra.assessmentRepo, infra.assessmentReader, scoreFacts, infra.assessmentAccessCache, infra.assessmentDetailCache)
+	m.RuntimeStatusReader = evaluationtestee.NewRuntimeStatusReader(m.TesteeService, infra.runRepo)
 	m.OperatorQuery = evaluationoperator.NewQueryService(infra.assessmentRepo, infra.assessmentReader, normalized.TesteeAccessChecker, scoreFacts, infra.runRepo)
 	m.GovernedRetry = evaluationoperator.NewGovernedRetryService(infra.assessmentRepo, infra.runRepo, infra.txRunner, infra.assessmentOutboxStore, normalized.TesteeAccessChecker)
 	m.ScaleAnalysis = evaluationoperator.NewScaleAnalysisService(m.OperatorQuery)

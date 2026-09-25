@@ -127,7 +127,7 @@
       "source": "api/grpc/proto",
       "proto_file_count": 8,
       "service_count": 27,
-      "rpc_count": 126,
+      "rpc_count": 127,
       "services": {
         "actor.ActorService": [
           "CreateTestee",
@@ -161,6 +161,7 @@
         "evaluation.TesteeEvaluationService": [
           "AuthorizeAssessment",
           "GetMyAssessment",
+          "GetMyAssessmentRunStatus",
           "ListMyAssessments",
           "GetAssessmentScores",
           "GetFactorTrend",

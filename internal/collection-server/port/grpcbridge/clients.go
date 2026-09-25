@@ -18,6 +18,10 @@ type EvaluationReader interface {
 	ListMyAssessments(ctx context.Context, testeeID uint64, status, scaleCode, riskLevel, dateFrom, dateTo, modelKind string, page, pageSize int32) (*ListAssessmentsOutput, error)
 	ListMyAssessmentsByModelKinds(ctx context.Context, testeeID uint64, status string, modelKinds []string, page, pageSize int32) (*ListAssessmentsOutput, error)
 }
+
+type EvaluationRuntimeReader interface {
+	GetMyAssessmentRunStatus(context.Context, uint64, uint64) (*AssessmentRuntimeStatusOutput, error)
+}
 type ParticipantReportReader interface {
 	GetAssessmentReport(context.Context, uint64, uint64) (*AssessmentReportOutput, error)
 }

@@ -119,6 +119,13 @@ type AssessmentStatusResponse struct {
 	UpdatedAt       int64    `json:"updated_at"` // Unix timestamp
 }
 
+// AssessmentRuntimeStatusResponse is the latest persisted Evaluation attempt.
+// It is an internal read-model input, not part of the public report-status JSON.
+type AssessmentRuntimeStatusResponse struct {
+	Attempt int
+	Status  string
+}
+
 // FactorScoreResponse 因子得分响应
 type FactorScoreResponse struct {
 	FactorCode   string  `json:"factor_code"`
