@@ -47,7 +47,6 @@ func handleTaskOpened(deps *Dependencies) HandlerFunc {
 			slog.String("task_id", data.TaskID),
 			slog.String("plan_id", data.PlanID),
 			slog.String("testee_id", data.TesteeID),
-			slog.String("entry_url", data.EntryURL),
 			slog.Time("open_at", data.OpenAt),
 		)
 

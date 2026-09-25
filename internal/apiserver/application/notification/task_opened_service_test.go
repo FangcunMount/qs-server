@@ -59,6 +59,7 @@ func (s *wechatAppLookupStub) ResolveWeChatAppConfig(context.Context, string) (*
 type senderStub struct {
 	templates []wechatmini.SubscribeTemplate
 	sent      []wechatmini.SubscribeMessage
+	sendErr   error
 }
 
 func (s *senderStub) SendSubscribeMessage(_ context.Context, appID, appSecret string, msg wechatmini.SubscribeMessage) error {
@@ -66,7 +67,7 @@ func (s *senderStub) SendSubscribeMessage(_ context.Context, appID, appSecret st
 		return fmt.Errorf("missing app config")
 	}
 	s.sent = append(s.sent, msg)
-	return nil
+	return s.sendErr
 }
 
 func (s *senderStub) ListTemplates(context.Context, string, string) ([]wechatmini.SubscribeTemplate, error) {
@@ -192,6 +193,40 @@ func TestSendTaskOpenedFallsBackToGuardians(t *testing.T) {
 		sender.sent[0].Data["character_string2"] != "2/4" ||
 		sender.sent[0].Data["thing3"] != "今天有 2 个任务未完成" {
 		t.Fatalf("expected template data to be populated: %#v", sender.sent[0].Data)
+	}
+}
+
+func TestSendTaskOpenedFailureDoesNotExposeRecipientOrEntryTokenInError(t *testing.T) {
+	profileID := uint64(1001)
+	planAggregate, task, tasks := buildTaskOpenedFixture(t, 12, 2, 4)
+	sender := &senderStub{
+		templates: []wechatmini.SubscribeTemplate{{
+			ID:      "tmpl-1",
+			Content: "计划名称\n{{thing5.DATA}}\n计划时间\n{{date1.DATA}}\n计划进展\n{{character_string2.DATA}}\n温馨提示\n{{thing3.DATA}}",
+		}},
+		sendErr: fmt.Errorf("send failed for openid-private with private-token"),
+	}
+	service := NewMiniProgramTaskNotificationService(
+		&testeeLookupStub{result: &testeeApp.TesteeResult{ID: 12, ProfileID: &profileID}},
+		&taskNotificationContextReaderStub{result: notificationContextFromFixture(planAggregate, task, tasks)},
+		&publishedTitleResolverStub{title: "儿童抑郁量表"},
+		&recipientResolverStub{enabled: true, recipients: &iambridge.MiniProgramRecipients{OpenIDs: []string{"openid-private"}, Source: "profile_link"}},
+		&wechatAppLookupStub{},
+		sender,
+		&Config{PagePath: "pages/questionnaire/index", AppID: "wx-app", AppSecret: "wx-secret", TaskOpenedTemplateID: "tmpl-1"},
+	)
+
+	result, err := service.SendTaskOpened(context.Background(), TaskOpenedDTO{
+		TaskID:   task.GetID().String(),
+		TesteeID: 12,
+		EntryURL: "https://collect.example.com/entry?token=private-token",
+		OpenAt:   time.Date(2026, 4, 3, 10, 30, 0, 0, time.Local),
+	})
+	if err == nil || result == nil || result.SentCount != 0 || len(sender.sent) != 1 {
+		t.Fatalf("expected one failed send, got result=%#v err=%v", result, err)
+	}
+	if strings.Contains(err.Error(), "openid-private") || strings.Contains(err.Error(), "private-token") {
+		t.Fatalf("send error exposed recipient or entry token")
 	}
 }
 
