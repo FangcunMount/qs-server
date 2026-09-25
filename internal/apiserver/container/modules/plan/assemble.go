@@ -36,6 +36,7 @@ type Module struct {
 	EnrollmentQueryService        planApp.EnrollmentQueryService
 	TaskAssessmentResolver        planApp.TaskAssessmentResolver
 	TaskNotificationContextReader planApp.TaskNotificationContextReader
+	TaskReminderStateReader       planApp.TaskReminderStateReader
 	FollowUpQueueReader           planreadmodel.FollowUpQueueReader
 
 	eventPublisher      event.EventPublisher
@@ -106,6 +107,7 @@ func New(deps Deps) (*Module, error) {
 	module.EnrollmentQueryService = planApp.NewEnrollmentQueryService(planInfra.NewEnrollmentReadStore(normalized.MySQLDB, normalized.MySQLLimiter), scaleCatalog, enrollmentAccess)
 	module.TaskAssessmentResolver = planApp.NewTaskAssessmentResolver(taskRepo)
 	module.TaskNotificationContextReader = planApp.NewTaskNotificationContextReader(taskRepo, planRepo)
+	module.TaskReminderStateReader = planApp.NewTaskReminderStateReader(taskRepo)
 
 	return module, nil
 }
