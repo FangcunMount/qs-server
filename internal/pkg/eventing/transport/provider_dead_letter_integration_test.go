@@ -480,6 +480,68 @@ func TestNSQFailedHandoffWaitsForMySQLRecoveryWithoutBusinessRetry(t *testing.T)
 	}
 }
 
+func TestDeadLetterRepeatedHandoffDoesNotReopenClaimedOrArchivedRow(t *testing.T) {
+	db := openIsolatedDeadLetterDatabase(t)
+	recorder, err := NewSQLDeadLetterRecorder(db)
+	if err != nil {
+		t.Fatal(err)
+	}
+	org7, org8 := int64(7), int64(8)
+	now := time.Now().UTC().Truncate(time.Millisecond)
+	for _, tc := range []struct {
+		name, disposition, requestID, priorError, wantError string
+		wantAttempts                                        int
+	}{
+		{name: "unclaimed_manual", disposition: "manual_required", priorError: "first failure", wantError: "later failure", wantAttempts: 9},
+		{name: "claimed", disposition: "automatic", requestID: "replay-1", priorError: "publish outcome unknown", wantError: "publish outcome unknown", wantAttempts: 8},
+		{name: "failed_replay", disposition: "manual_required", requestID: "replay-1", priorError: "payload decode failed", wantError: "payload decode failed", wantAttempts: 8},
+		{name: "completed", disposition: "terminal", requestID: "replay-1", priorError: "first failure", wantError: "first failure", wantAttempts: 8},
+		{name: "archived_mock", disposition: "archived_mock", priorError: "first failure", wantError: "first failure", wantAttempts: 8},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			record := DeadLetterRecord{
+				MessageID: tc.name, EventID: "event-7", OrgID: &org7,
+				Provider: "nsq", Topic: "qs.evaluation.lifecycle", Channel: "qs-worker",
+				DeliveryAttempts: 8, Payload: []byte(`{"id":"event-7","data":{"org_id":7}}`),
+				LastError: "first failure", FailedAt: now,
+			}
+			if err := recorder.RecordDeadLetter(t.Context(), record); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := db.ExecContext(t.Context(), `UPDATE event_delivery_dead_letter
+				SET retry_disposition=?, replay_request_id=?, last_error=? WHERE message_id=?`,
+				tc.disposition, nullableString(tc.requestID), tc.priorError, tc.name); err != nil {
+				t.Fatal(err)
+			}
+			// A repeated handoff (or a later replay with the same logical message
+			// UUID) must not replace the original tenant, payload, or claimed state.
+			duplicate := record
+			duplicate.EventID = "event-8"
+			duplicate.OrgID = &org8
+			duplicate.Payload = []byte(`{"id":"event-8","data":{"org_id":8}}`)
+			duplicate.DeliveryAttempts = 9
+			duplicate.LastError = "later failure"
+			duplicate.FailedAt = now.Add(time.Second)
+			if err := recorder.RecordDeadLetter(t.Context(), duplicate); err != nil {
+				t.Fatal(err)
+			}
+			var eventID, payload, lastError, disposition, requestID string
+			var orgID int64
+			var attempts int
+			if err := db.QueryRowContext(t.Context(), `SELECT event_id,org_id,payload_json,delivery_attempts,
+				COALESCE(last_error,''),retry_disposition,COALESCE(replay_request_id,'')
+				FROM event_delivery_dead_letter WHERE message_id=?`, tc.name).
+				Scan(&eventID, &orgID, &payload, &attempts, &lastError, &disposition, &requestID); err != nil {
+				t.Fatal(err)
+			}
+			if eventID != record.EventID || orgID != org7 || payload != string(record.Payload) || attempts != tc.wantAttempts ||
+				lastError != tc.wantError || disposition != tc.disposition || requestID != tc.requestID {
+				t.Fatalf("duplicate handoff changed protected dead letter: event=%s org=%d payload=%s attempts=%d error=%s state=%s request=%s", eventID, orgID, payload, attempts, lastError, disposition, requestID)
+			}
+		})
+	}
+}
+
 func openIsolatedDeadLetterDatabase(t *testing.T) *sql.DB {
 	t.Helper()
 	dsn := os.Getenv("MYSQL_DSN")
@@ -527,6 +589,8 @@ func createDeadLetterTable(ctx context.Context, db *sql.DB) error {
  payload_json longtext NOT NULL,
  last_error text NULL,
  retry_disposition varchar(32) NOT NULL,
+ replay_request_id varchar(64) NULL,
+ replayed_at datetime(3) NULL,
  failed_at datetime(3) NOT NULL,
  created_at datetime(3) NOT NULL,
  updated_at datetime(3) NOT NULL,

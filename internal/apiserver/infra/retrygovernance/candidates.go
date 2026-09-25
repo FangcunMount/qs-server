@@ -210,18 +210,36 @@ func (r *Reader) appendMongoOutboxCandidates(ctx context.Context, orgID int64, l
 func (r *Reader) appendDeliveryCandidates(ctx context.Context, orgID int64, limit int, dst *[]app.RetryCandidate) error {
 	var rows []struct {
 		ID               uint64
+		EventID          *string
+		MessageID        string
+		TopicName        string
+		ChannelName      string
 		DeliveryAttempts int
 		LastError        *string
+		RetryDisposition string
+		ReplayRequestID  *string
 		UpdatedAt        time.Time
 	}
-	if err := r.mysql.WithContext(ctx).Raw(`SELECT id, delivery_attempts, last_error, updated_at
-FROM event_delivery_dead_letter WHERE org_id=? AND retry_disposition='manual_required'
+	if err := r.mysql.WithContext(ctx).Raw(`SELECT id, event_id, message_id, topic_name, channel_name,
+ delivery_attempts, last_error, retry_disposition, replay_request_id, updated_at
+FROM event_delivery_dead_letter WHERE org_id=? AND (retry_disposition='manual_required'
+ OR (retry_disposition='automatic' AND replay_request_id IS NOT NULL))
 ORDER BY updated_at DESC LIMIT ?`, orgID, limit).Scan(&rows).Error; err != nil {
 		return err
 	}
 	for _, row := range rows {
 		last := valueOrEmpty(row.LastError)
-		*dst = append(*dst, app.RetryCandidate{Kind: "transport_delivery", Store: "mysql", ResourceID: strconv.FormatUint(row.ID, 10), Attempt: row.DeliveryAttempts, Disposition: "manual_required", LastErrorKind: last, UpdatedAt: row.UpdatedAt})
+		disposition := row.RetryDisposition
+		if disposition == "automatic" {
+			// This is an operator reconciliation item, not an automatic broker retry.
+			disposition = "reconciliation_required"
+		}
+		*dst = append(*dst, app.RetryCandidate{
+			Kind: "transport_delivery", Store: "mysql", ResourceID: strconv.FormatUint(row.ID, 10),
+			Attempt: row.DeliveryAttempts, Disposition: disposition, ActionRequestID: valueOrEmpty(row.ReplayRequestID),
+			EventID: valueOrEmpty(row.EventID), MessageID: row.MessageID, TopicName: row.TopicName, ChannelName: row.ChannelName,
+			LastErrorKind: last, UpdatedAt: row.UpdatedAt,
+		})
 	}
 	return nil
 }

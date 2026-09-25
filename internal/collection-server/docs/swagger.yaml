@@ -1,5 +1,12 @@
 basePath: /api/v1
 definitions:
+  aiexplanation.WorkflowEligibility:
+    properties:
+      reason_code:
+        type: string
+      status:
+        type: string
+    type: object
   aiexplanation.WorkflowRequest:
     properties:
       report_id:
@@ -629,6 +636,8 @@ definitions:
     type: object
   github_com_FangcunMount_qs-server_internal_collection-server_application_aiexplanation.WorkflowSource:
     properties:
+      ai_eligibility:
+        $ref: '#/definitions/aiexplanation.WorkflowEligibility'
       report_id:
         type: string
       source_version:
