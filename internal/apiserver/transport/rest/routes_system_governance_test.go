@@ -15,14 +15,15 @@ import (
 )
 
 type stubSystemGovernanceFacade struct {
-	overview    *systemgov.OverviewResponse
-	events      *systemgov.EventsView
-	cache       *systemgov.CacheView
-	resilience  *systemgov.ResilienceView
-	checkpoints *systemgov.CheckpointView
-	candidates  *systemgov.RetryCandidatePage
-	candidateFn func(int64, string, int) (*systemgov.RetryCandidatePage, error)
-	pendingFn   func(int64, string, int) (*systemgov.PendingReplayAuditPage, error)
+	overview         *systemgov.OverviewResponse
+	events           *systemgov.EventsView
+	cache            *systemgov.CacheView
+	resilience       *systemgov.ResilienceView
+	checkpoints      *systemgov.CheckpointView
+	candidates       *systemgov.RetryCandidatePage
+	candidateFn      func(int64, string, int) (*systemgov.RetryCandidatePage, error)
+	pendingFn        func(int64, string, int) (*systemgov.PendingReplayAuditPage, error)
+	deliveryReviewFn func(int64, string, int) (*systemgov.DeliveryReplayReviewPage, error)
 }
 
 func (s stubSystemGovernanceFacade) GetOverview(context.Context, string) (*systemgov.OverviewResponse, error) {
@@ -51,6 +52,13 @@ func (s stubSystemGovernanceFacade) ListPendingReplayAudits(_ context.Context, o
 		return s.pendingFn(orgID, cursor, limit)
 	}
 	return &systemgov.PendingReplayAuditPage{}, nil
+}
+
+func (s stubSystemGovernanceFacade) ListDeliveryReplayReviews(_ context.Context, orgID int64, cursor string, limit int) (*systemgov.DeliveryReplayReviewPage, error) {
+	if s.deliveryReviewFn != nil {
+		return s.deliveryReviewFn(orgID, cursor, limit)
+	}
+	return &systemgov.DeliveryReplayReviewPage{}, nil
 }
 
 func TestSystemGovernancePendingReplayAuditsAreOrgScopedAndBounded(t *testing.T) {
@@ -83,6 +91,39 @@ func TestSystemGovernancePendingReplayAuditsAreOrgScopedAndBounded(t *testing.T)
 	}
 	if !called {
 		t.Fatal("pending audit route did not reach the scoped reader")
+	}
+}
+
+func TestSystemGovernanceDeliveryReplayReviewsAreOrgScopedAndReadOnly(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	called := false
+	router := newRouterWithBudgets(Deps{SystemGovernanceFacade: stubSystemGovernanceFacade{deliveryReviewFn: func(orgID int64, cursor string, limit int) (*systemgov.DeliveryReplayReviewPage, error) {
+		called = true
+		if orgID != 88 || cursor != "12" || limit != 25 {
+			t.Fatalf("delivery review scope/page = %d/%q/%d", orgID, cursor, limit)
+		}
+		return &systemgov.DeliveryReplayReviewPage{Items: []systemgov.DeliveryReplayReview{{RequestID: "old-request", Status: "running"}}}, nil
+	}}})
+	engine := gin.New()
+	engine.Use(orgAdminSnapshotMiddleware())
+	engine.Use(func(c *gin.Context) {
+		c.Set(restmiddleware.OrgIDKey, uint64(88))
+		c.Next()
+	})
+	router.registerSystemGovernanceInternalRoutes(engine.Group("/internal/v1"))
+	for path, wantStatus := range map[string]int{
+		"/internal/v1/system-governance/actions/delivery-replay-reviews?cursor=12&limit=25": http.StatusOK,
+		"/internal/v1/system-governance/actions/delivery-replay-reviews?cursor=bad":         http.StatusBadRequest,
+		"/internal/v1/system-governance/actions/delivery-replay-reviews?limit=101":          http.StatusBadRequest,
+	} {
+		response := httptest.NewRecorder()
+		engine.ServeHTTP(response, httptest.NewRequest(http.MethodGet, path, nil))
+		if response.Code != wantStatus {
+			t.Fatalf("delivery review route %s = %d, want %d", path, response.Code, wantStatus)
+		}
+	}
+	if !called {
+		t.Fatal("delivery review route did not reach the scoped reader")
 	}
 }
 

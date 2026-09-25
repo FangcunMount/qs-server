@@ -92,6 +92,9 @@ GROUP BY rc.retry_disposition`, orgID).Scan(&evaluation).Error; err != nil {
 	if err := r.mysql.WithContext(ctx).Raw("SELECT COUNT(*) FROM event_delivery_dead_letter WHERE org_id=? AND retry_disposition='manual_required'", orgID).Scan(&summary.TransportDeadLetters).Error; err != nil {
 		return summary, err
 	}
+	if err := r.mysql.WithContext(ctx).Raw("SELECT COUNT(*) FROM event_delivery_dead_letter WHERE org_id=? AND retry_disposition='automatic' AND replay_request_id IS NOT NULL", orgID).Scan(&summary.TransportReplayUnresolved).Error; err != nil {
+		return summary, err
+	}
 	if err := r.mysql.WithContext(ctx).Raw("SELECT COUNT(*) FROM retry_event_hold WHERE org_id=? AND retry_disposition='automatic' AND status IN ('blocked','failed','replaying')", orgID).Scan(&summary.HeldAutomatic).Error; err != nil {
 		return summary, err
 	}

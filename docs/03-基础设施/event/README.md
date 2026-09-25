@@ -28,7 +28,7 @@ Event 模块负责把进程内已经发生的业务事实，按明确的可靠�
   独立 handoff consumer 随后调用 MySQL recorder。handoff 发布、消费或 recorder 失败会 requeue，并形成独立积压窗口；只有 recorder 成功后才能确认 `event_delivery_dead_letter` 已存在。
 - `evaluation.failed`、`interpretation.report.generated` 与 `interpretation.report.failed` 的 report-status Redis 写入/Signal 唤醒是 best-effort；
   Reporter 吞掉写入与通知错误，handler 可以最终 ACK。因此 ACK 不证明 report-status 投影或唤醒已成功。
-- 已持久化的 transport dead letter 由高风险治理动作 `events.replay_delivery` 做组织范围、带状态冲突检查的一次性人工重放。
+- 已持久化的 transport dead letter 由高风险治理动作 `events.replay_delivery` 做组织范围、带状态冲突检查的一次性人工重放；发布或完成结果未知时保留占用并列为待核对候选，不自动再次发送。
 - 系统提供的是可治理的 at-least-once，不提供 exactly-once、统一 event-id ledger、自动修复 poison payload 或 schema negotiation。
 
 ## 三种传播语义
