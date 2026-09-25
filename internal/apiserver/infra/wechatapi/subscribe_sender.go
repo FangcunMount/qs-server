@@ -55,7 +55,7 @@ func (s *SubscribeSender) SendSubscribeMessageWithReceipt(_ context.Context, app
 		return wechatmini.SubscribeSendReceipt{}, fmt.Errorf("send subscribe message with receipt: %w", err)
 	}
 	if msgID <= 0 {
-		return wechatmini.SubscribeSendReceipt{}, nil
+		return wechatmini.SubscribeSendReceipt{}, fmt.Errorf("send subscribe message with receipt: platform response has no usable msgid")
 	}
 	return wechatmini.SubscribeSendReceipt{PlatformMessageID: strconv.FormatInt(msgID, 10)}, nil
 }

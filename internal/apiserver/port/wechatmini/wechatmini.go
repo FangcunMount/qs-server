@@ -42,7 +42,7 @@ type MiniProgramSubscribeSender interface {
 }
 
 // SubscribeSendReceipt is evidence of the platform response, not proof that a user received the message.
-// An empty PlatformMessageID means the platform returned success without a usable msgid.
+// A successful call always has a usable PlatformMessageID.
 type SubscribeSendReceipt struct {
 	PlatformMessageID string
 }

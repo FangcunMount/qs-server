@@ -55,11 +55,11 @@ func TestSendSubscribeMessageWithReceiptPreservesPlatformID(t *testing.T) {
 	}
 }
 
-func TestSendSubscribeMessageWithReceiptDoesNotInventID(t *testing.T) {
+func TestSendSubscribeMessageWithReceiptWithoutIDIsUnknown(t *testing.T) {
 	client := &receiptClientStub{}
 	sender := &SubscribeSender{newClient: func(_, _ string) (subscribeClient, error) { return client, nil }}
 	receipt, err := sender.SendSubscribeMessageWithReceipt(context.Background(), "app", "secret", wechatmini.SubscribeMessage{})
-	if err != nil || receipt.PlatformMessageID != "" || client.receiptCalls != 1 {
+	if err == nil || receipt.PlatformMessageID != "" || client.receiptCalls != 1 || client.legacyCalls != 0 {
 		t.Fatalf("receipt=%+v, err=%v, receiptCalls=%d", receipt, err, client.receiptCalls)
 	}
 }
