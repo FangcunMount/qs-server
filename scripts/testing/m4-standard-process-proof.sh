@@ -60,6 +60,7 @@ build_dir=$(mktemp -d "${TMPDIR:-/tmp}/$project-build.XXXXXX")
 "${compose[@]}" cp "$build_dir/m4-process.test" mysql:/tmp/m4-qs-bootstrap/m4-process.test
 "${compose[@]}" cp "$build_dir/m4-answer-chain.test" mysql:/tmp/m4-qs-bootstrap/m4-answer-chain.test
 "${compose[@]}" cp "$repo/configs/events.yaml" mysql:/tmp/m4-qs-bootstrap/configs/events.yaml
+"${compose[@]}" cp "$repo/configs/grpc-acl.prod.yaml" mysql:/tmp/m4-qs-bootstrap/configs/grpc-acl.prod.yaml
 "${compose[@]}" cp "$repo/internal/pkg/migration/migrations/mysql/000084_standard_reliable_outbox.up.sql" mysql:/tmp/m4-qs-bootstrap/mysql/000084_standard_reliable_outbox.up.sql
 "${compose[@]}" cp "$repo/internal/pkg/migration/migrations/mysql/000048_add_system_governance_action_runs.up.sql" mysql:/tmp/m4-qs-bootstrap/mysql/000048_add_system_governance_action_runs.up.sql
 "${compose[@]}" cp "$repo/internal/pkg/migration/migrations/mysql/000085_system_governance_pending_replay_index.up.sql" mysql:/tmp/m4-qs-bootstrap/mysql/000085_system_governance_pending_replay_index.up.sql
@@ -69,6 +70,7 @@ build_dir=$(mktemp -d "${TMPDIR:-/tmp}/$project-build.XXXXXX")
 # that the later subscription could mistake for the chain's own event.
 "${compose[@]}" exec -T \
   -e RM_QS_MONGO_URI='mongodb://mongo:27017/?replicaSet=rm-test' \
+  -e RM_QS_GRPC_ACL_CONFIG='/tmp/m4-qs-bootstrap/configs/grpc-acl.prod.yaml' \
   -e RM_QS_ASSESSMENT_DSN='root@tcp(mysql:3306)/m4_qs_chain?parseTime=true&loc=UTC' \
   -e RM_QS_NSQ_TCP='nsqd:4150' \
   mysql /tmp/m4-qs-bootstrap/m4-answer-chain.test \

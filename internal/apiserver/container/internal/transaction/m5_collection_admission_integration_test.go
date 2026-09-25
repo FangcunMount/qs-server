@@ -7,6 +7,7 @@ import (
 	"errors"
 	"net"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"sync/atomic"
@@ -14,6 +15,7 @@ import (
 	"time"
 
 	"github.com/FangcunMount/component-base/pkg/event"
+	answersheetpb "github.com/FangcunMount/qs-server/api/grpc/gen/answersheet"
 	appanswersheet "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/answersheet"
 	domainanswersheet "github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/answersheet"
 	domainquestionnaire "github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
@@ -28,7 +30,10 @@ import (
 	collectionacl "github.com/FangcunMount/qs-server/internal/collection-server/port/acl"
 	eventcatalog "github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
 	eventruntime "github.com/FangcunMount/qs-server/internal/pkg/eventing/runtime"
+	servergrpc "github.com/FangcunMount/qs-server/internal/pkg/grpc"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
+	"github.com/FangcunMount/qs-server/internal/pkg/resilience/admission"
+	"github.com/FangcunMount/qs-server/internal/testutil/tlsfixture"
 	sdkmongo "github.com/FangcunMount/reliable-messaging/storage/mongo"
 	"github.com/stretchr/testify/require"
 	"go.mongodb.org/mongo-driver/bson"
@@ -36,7 +41,7 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/status"
 )
 
@@ -156,16 +161,40 @@ events:
 
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	require.NoError(t, err)
-	server := grpc.NewServer()
-	grpcservice.NewAnswerSheetService(apiService).RegisterService(server)
+	ca := tlsfixture.New(t)
+	serverPair := ca.Issue(t, "server.test", false)
+	aclFile := os.Getenv("RM_QS_GRPC_ACL_CONFIG")
+	if aclFile == "" {
+		aclFile = filepath.Join("..", "..", "..", "..", "..", "configs", "grpc-acl.prod.yaml")
+	}
+	server, err := servergrpc.NewServer(&servergrpc.Config{
+		TLSCertFile: serverPair.CertFile,
+		TLSKeyFile:  serverPair.KeyFile,
+		MTLS: servergrpc.MTLSConfig{
+			Enabled: true, CAFile: ca.CAFile, RequireClientCert: true,
+		},
+		ACL: servergrpc.ACLConfig{
+			Enabled:       true,
+			ConfigFile:    aclFile,
+			DefaultPolicy: "deny",
+		},
+	}, nil)
+	require.NoError(t, err)
+	grpcservice.NewAnswerSheetService(apiService).RegisterService(server.Server)
 	serverDone := make(chan error, 1)
 	go func() { serverDone <- server.Serve(listener) }()
 	defer func() { server.Stop(); require.NoError(t, <-serverDone) }()
-	baseClient, err := collectiongrpc.NewClient(&collectiongrpc.ClientConfig{Endpoint: listener.Addr().String(), Timeout: 5 * time.Second},
-		grpc.WithTransportCredentials(insecure.NewCredentials()))
+	valid := ca.Issue(t, "qs-collection-server.svc", false)
+	manager, err := collectiongrpc.NewManager(&collectiongrpc.ManagerConfig{
+		Endpoint: listener.Addr().String(), Timeout: 5 * time.Second,
+		InflightSemaphore: admission.NewChannelSemaphore(2),
+		TLSCertFile:       valid.CertFile, TLSKeyFile: valid.KeyFile,
+		TLSCAFile: ca.CAFile, TLSServerName: "server.test",
+	})
 	require.NoError(t, err)
-	defer baseClient.Close()
-	answerSheetClient := collectiongrpc.NewAnswerSheetClient(baseClient)
+	defer manager.Close()
+	require.NoError(t, manager.RegisterClients())
+	answerSheetClient := manager.AnswerSheetClient()
 	collectionService := collectionanswersheet.NewSubmissionService(
 		collectionacl.NewAnswerSheetBFFWriter(answerSheetClient),
 		collectionacl.NewAnswerSheetDurableResultReader(answerSheetClient), nil,
@@ -198,6 +227,15 @@ events:
 	repeated, err := collectionService.AcceptDurably(ctx, "request-repeat", 301, request)
 	require.NoError(t, err)
 	require.Equal(t, accepted.ID, repeated.ID)
+	require.EqualValues(t, 1, countStandardDocs(t, ctx, db.Collection("answersheets"), bson.M{}))
+	require.EqualValues(t, 1, countStandardDocs(t, ctx, outbox, bson.M{}))
+
+	unknown := ca.Issue(t, "unknown.svc", false)
+	unknownConn, err := grpc.NewClient(listener.Addr().String(), grpc.WithTransportCredentials(credentials.NewTLS(ca.Client(&unknown))))
+	require.NoError(t, err)
+	defer unknownConn.Close()
+	_, err = answersheetpb.NewAnswerSheetServiceClient(unknownConn).SaveAnswerSheet(ctx, &answersheetpb.SaveAnswerSheetRequest{})
+	require.Equal(t, codes.PermissionDenied, status.Code(err))
 	require.EqualValues(t, 1, countStandardDocs(t, ctx, db.Collection("answersheets"), bson.M{}))
 	require.EqualValues(t, 1, countStandardDocs(t, ctx, outbox, bson.M{}))
 }
