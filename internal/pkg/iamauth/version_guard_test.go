@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -69,7 +70,9 @@ func TestVersionGuardFailsClosedForOutageAndSlowResponse(t *testing.T) {
 	clock := &guardClock{at: time.Now()}
 	fail := false
 	slow := false
+	reads := 0
 	guard, err := NewVersionGuard(versionReaderFunc(func(context.Context) (int64, error) {
+		reads++
 		if fail {
 			return 0, errors.New("iam unavailable")
 		}
@@ -95,8 +98,12 @@ func TestVersionGuardFailsClosedForOutageAndSlowResponse(t *testing.T) {
 	}
 	fail = false
 	slow = true
+	clock.advance(5 * time.Second)
 	if _, err := guard.Verify(context.Background()); err == nil {
 		t.Fatal("slow read renewed a proof after its 10-second deadline")
+	}
+	if reads != 4 {
+		t.Fatalf("slow read was not exercised: reads = %d", reads)
 	}
 }
 
@@ -119,6 +126,9 @@ func TestVersionGuardNotificationAndRegressionNeverRenewProof(t *testing.T) {
 		t.Fatal("notification ahead of committed version was treated as proof")
 	}
 	version = 31
+	if err := guard.Refresh(context.Background()); err != nil {
+		t.Fatalf("periodic refresh must recover even during request cooldown: %v", err)
+	}
 	if got, err := guard.Verify(context.Background()); err != nil || got != 31 {
 		t.Fatalf("committed notification version = %d, %v", got, err)
 	}
@@ -129,6 +139,52 @@ func TestVersionGuardNotificationAndRegressionNeverRenewProof(t *testing.T) {
 	clock.advance(10 * time.Second)
 	if _, err := guard.Verify(context.Background()); err == nil {
 		t.Fatal("regressed reader allowed old permission after expiry")
+	}
+}
+
+func TestVersionGuardBoundsRetryTrafficDuringOutage(t *testing.T) {
+	clock := &guardClock{at: time.Now()}
+	var reads atomic.Int32
+	unavailable := false
+	guard, err := NewVersionGuard(versionReaderFunc(func(context.Context) (int64, error) {
+		reads.Add(1)
+		if unavailable {
+			return 0, errors.New("IAM unavailable")
+		}
+		return 42, nil
+	}), 10*time.Second)
+	if err != nil {
+		t.Fatal(err)
+	}
+	guard.now = clock.now
+	if _, err := guard.Verify(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	unavailable = true
+	clock.advance(10 * time.Second)
+	var callers sync.WaitGroup
+	denials := make(chan error, 100)
+	for range 100 {
+		callers.Add(1)
+		go func() {
+			defer callers.Done()
+			_, err := guard.Verify(context.Background())
+			denials <- err
+		}()
+	}
+	callers.Wait()
+	close(denials)
+	for err := range denials {
+		if err == nil {
+			t.Fatal("old permission passed during IAM outage")
+		}
+	}
+	if got := reads.Load(); got != 2 {
+		t.Fatalf("100 denied requests caused %d IAM reads, want 1 retry after initial proof", got)
+	}
+	clock.advance(5 * time.Second)
+	if _, err := guard.Verify(context.Background()); err == nil || reads.Load() != 3 {
+		t.Fatalf("retry after cooldown = %v, reads %d", err, reads.Load())
 	}
 }
 
