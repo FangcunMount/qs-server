@@ -7,6 +7,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"net"
 	"os"
 	"strconv"
 	"testing"
@@ -19,11 +20,19 @@ import (
 	assessmentmysql "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/evaluation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 	grpctransport "github.com/FangcunMount/qs-server/internal/apiserver/transport/grpc"
+	grpcservice "github.com/FangcunMount/qs-server/internal/apiserver/transport/grpc/service"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/reportwait"
+	collectionclient "github.com/FangcunMount/qs-server/internal/collection-server/infra/grpcclient"
+	"github.com/FangcunMount/qs-server/internal/collection-server/port/grpcbridge"
 	mysqlunit "github.com/FangcunMount/qs-server/internal/pkg/database/mysql"
 	eventcatalog "github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
+	servergrpc "github.com/FangcunMount/qs-server/internal/pkg/grpc"
+	"github.com/FangcunMount/qs-server/internal/pkg/resilience/admission"
 	"github.com/FangcunMount/qs-server/internal/pkg/retrygovernance"
+	"github.com/FangcunMount/qs-server/internal/testutil/tlsfixture"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	"gorm.io/gorm"
 )
 
@@ -76,7 +85,14 @@ func TestM5OldFailureRedeliveryAfterDurableReportKeepsParticipantCompleted(t *te
 			require.EqualValues(t, 1, failedCount)
 		},
 		afterReport: func(t *testing.T, delivery runtimeClosureDelivery, deps grpctransport.Deps, testeeID, assessmentID uint64) {
-			query := runtimeReportQuery{assessments: deps.Evaluation.TesteeService, reports: deps.Interpretation.ParticipantService}
+			query := newM5RuntimeStatusGRPCReader(t, deps)
+			run, err := query.GetMyAssessmentRunStatus(t.Context(), testeeID, assessmentID)
+			require.NoError(t, err)
+			require.NotNil(t, run)
+			require.Equal(t, 2, run.Attempt)
+			require.Equal(t, "succeeded", run.Status)
+			_, err = query.GetMyAssessmentRunStatus(t.Context(), testeeID+1, assessmentID)
+			require.Equal(t, codes.PermissionDenied, status.Code(err), "the participant may read only their own latest Run")
 			report, err := query.GetAssessmentReport(t.Context(), testeeID, assessmentID)
 			require.NoError(t, err)
 			require.NotNil(t, report, "the newer report must be a real Mongo fact")
@@ -97,6 +113,9 @@ func TestM5OldFailureRedeliveryAfterDurableReportKeepsParticipantCompleted(t *te
 				"old failure must be physically handled after the newer report is durable")
 			t.Logf("old failure event=%s broker=%s attempts=%d after report=%s", oldFailure.UUID,
 				physical.firstFailureBrokerID, physical.lastFailureAttempts, reportVerifiedAt.Format(time.RFC3339Nano))
+			runAfterRedelivery, err := query.GetMyAssessmentRunStatus(t.Context(), testeeID, assessmentID)
+			require.NoError(t, err)
+			require.Equal(t, run, runAfterRedelivery, "old failure delivery must not change the durable latest Run")
 
 			waiter := reportwait.NewService(query, cache, nil, nil, reportwait.DefaultConfig())
 			visible, err := waiter.GetStatus(t.Context(), testeeID, assessmentID)
@@ -108,4 +127,35 @@ func TestM5OldFailureRedeliveryAfterDurableReportKeepsParticipantCompleted(t *te
 	runCurrentRuntimeClosure(t, func(t *testing.T, opts subsystem.Options, db *sql.DB) (*subsystem.Subsystem, runtimeClosureDelivery, error) {
 		return newM5StandardEventSubsystem(t, opts, db, true, true)
 	}, scenario)
+}
+
+func newM5RuntimeStatusGRPCReader(t *testing.T, deps grpctransport.Deps) *grpcbridge.EvaluationBFFReader {
+	t.Helper()
+	ca := tlsfixture.New(t)
+	serverPair := ca.Issue(t, "server.test", false)
+	srv, err := servergrpc.NewServer(&servergrpc.Config{
+		TLSCertFile: serverPair.CertFile, TLSKeyFile: serverPair.KeyFile,
+		MTLS: servergrpc.MTLSConfig{Enabled: true, CAFile: ca.CAFile, RequireClientCert: true},
+		ACL:  servergrpc.ACLConfig{Enabled: true, ConfigFile: "../../../../configs/grpc-acl.prod.yaml", DefaultPolicy: "deny"},
+	}, nil)
+	require.NoError(t, err)
+	t.Cleanup(srv.Stop)
+	grpcservice.NewTesteeEvaluationService(deps.Evaluation.TesteeService, deps.Evaluation.RuntimeStatusReader).RegisterService(srv.Server)
+	grpcservice.NewParticipantReportService(deps.Interpretation.ParticipantService, deps.Interpretation.DelegatedSubjectVerifier).RegisterService(srv.Server)
+	lis, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = lis.Close() })
+	go func() { _ = srv.Serve(lis) }()
+
+	collectionPair := ca.Issue(t, "qs-collection-server.svc", false)
+	manager, err := collectionclient.NewManager(&collectionclient.ManagerConfig{
+		Endpoint: lis.Addr().String(), Timeout: time.Second,
+		InflightSemaphore: admission.NewChannelSemaphore(2),
+		TLSCertFile:       collectionPair.CertFile, TLSKeyFile: collectionPair.KeyFile,
+		TLSCAFile: ca.CAFile, TLSServerName: "server.test",
+	})
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = manager.Close() })
+	require.NoError(t, manager.RegisterClients())
+	return grpcbridge.NewEvaluationBFFReader(manager.TesteeEvaluationClient(), manager.ParticipantReportClient(), nil)
 }

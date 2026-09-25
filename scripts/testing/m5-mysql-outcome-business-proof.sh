@@ -52,6 +52,7 @@ build_dir=$(mktemp -d "${TMPDIR:-/tmp}/$project-build.XXXXXX")
   -o "$build_dir/runtimeclosure.test" ./internal/apiserver/integration/runtimeclosure)
 "${compose[@]}" exec -T mysql mkdir -p /tmp/m5-outcome/configs /tmp/m5-outcome/internal/apiserver/integration/runtimeclosure
 "${compose[@]}" cp "$repo/configs/events.yaml" mysql:/tmp/m5-outcome/configs/events.yaml
+"${compose[@]}" cp "$repo/configs/grpc-acl.prod.yaml" mysql:/tmp/m5-outcome/configs/grpc-acl.prod.yaml
 "${compose[@]}" cp "$build_dir/runtimeclosure.test" mysql:/tmp/m5-outcome/internal/apiserver/integration/runtimeclosure/runtimeclosure.test
 "${compose[@]}" exec -T -w /tmp/m5-outcome/internal/apiserver/integration/runtimeclosure \
   -e MYSQL_DSN='root@tcp(mysql:3306)/mysql?parseTime=true&multiStatements=true&loc=Asia%2FShanghai' \
