@@ -50,6 +50,10 @@ type RetryCandidate struct {
 	NextAttemptAt   *time.Time `json:"next_attempt_at,omitempty"`
 	RetryEventID    string     `json:"retry_event_id,omitempty"`
 	ActionRequestID string     `json:"action_request_id,omitempty"`
+	EventID         string     `json:"event_id,omitempty"`
+	MessageID       string     `json:"message_id,omitempty"`
+	TopicName       string     `json:"topic_name,omitempty"`
+	ChannelName     string     `json:"channel_name,omitempty"`
 	LastErrorKind   string     `json:"last_error_kind,omitempty"`
 	UpdatedAt       time.Time  `json:"updated_at"`
 }
