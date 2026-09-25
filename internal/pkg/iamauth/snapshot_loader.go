@@ -129,6 +129,15 @@ func (l *SnapshotLoader) verifySnapshot(ctx context.Context, snap *authz.Snapsho
 	return nil
 }
 
+// VerifySnapshot rechecks the proof and version at the authorization decision
+// boundary, after any work done between loading the snapshot and route admission.
+func (l *SnapshotLoader) VerifySnapshot(ctx context.Context, snap *authz.Snapshot) error {
+	if l == nil {
+		return fmt.Errorf("authorization loader unavailable")
+	}
+	return l.verifySnapshot(ctx, snap)
+}
+
 // Load 拉取授权快照。
 func (l *SnapshotLoader) Load(ctx context.Context, userIDStr string) (*authz.Snapshot, error) {
 	if l == nil || l.client == nil || !l.client.IsEnabled() || l.client.SDK() == nil {
