@@ -76,6 +76,47 @@ func TestGovernanceSummaryReconcilesWithOrganizationCandidates(t *testing.T) {
 	}
 }
 
+func TestArchivedMockDeliveryLeavesGovernanceWithoutHidingOtherOrganizations(t *testing.T) {
+	mysqlDB := openRetryGovernanceMySQL(t)
+	mongoDB := openRetryGovernanceMongo(t)
+	now := time.Now().UTC().Truncate(time.Millisecond)
+	seedRetryGovernanceMySQL(t, mysqlDB, now)
+	seedRetryGovernanceMongo(t, mongoDB, now)
+	result := mysqlDB.Exec("UPDATE event_delivery_dead_letter SET retry_disposition='archived_mock' WHERE org_id=? AND retry_disposition='manual_required'", 7)
+	if result.Error != nil || result.RowsAffected != 1 {
+		t.Fatalf("archive mock delivery affected=%d err=%v", result.RowsAffected, result.Error)
+	}
+	reader := NewReader(mysqlDB, mongoDB)
+	for _, check := range []struct {
+		orgID               int64
+		wantTransportManual int64
+	}{
+		{orgID: 7, wantTransportManual: 0},
+		{orgID: 8, wantTransportManual: 1},
+	} {
+		summary, err := reader.ReadRetryGovernance(t.Context(), check.orgID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if summary.TransportDeadLetters != check.wantTransportManual {
+			t.Fatalf("org=%d transport summary=%d, want %d", check.orgID, summary.TransportDeadLetters, check.wantTransportManual)
+		}
+		page, err := reader.ListRetryCandidates(t.Context(), check.orgID, "", 100)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var transportCandidates int64
+		for _, candidate := range page.Items {
+			if candidate.Kind == "transport_delivery" {
+				transportCandidates++
+			}
+		}
+		if transportCandidates != check.wantTransportManual {
+			t.Fatalf("org=%d transport candidates=%d, want %d", check.orgID, transportCandidates, check.wantTransportManual)
+		}
+	}
+}
+
 func openRetryGovernanceMySQL(t *testing.T) *gorm.DB {
 	t.Helper()
 	dsn := os.Getenv("MYSQL_DSN")

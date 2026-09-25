@@ -24,6 +24,7 @@ func ACLAllowedMethods() []string {
 
 		evaluationpb.TesteeEvaluationService_AuthorizeAssessment_FullMethodName,
 		evaluationpb.TesteeEvaluationService_GetMyAssessment_FullMethodName,
+		evaluationpb.TesteeEvaluationService_GetMyAssessmentRunStatus_FullMethodName,
 		evaluationpb.TesteeEvaluationService_ListMyAssessments_FullMethodName,
 		evaluationpb.TesteeEvaluationService_GetAssessmentScores_FullMethodName,
 		evaluationpb.TesteeEvaluationService_GetFactorTrend_FullMethodName,
