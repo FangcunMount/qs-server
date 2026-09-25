@@ -41,7 +41,7 @@ func TestGovernanceSummaryReconcilesWithOrganizationCandidates(t *testing.T) {
 	type key struct{ kind, disposition string }
 	counts := make(map[key]int64)
 	for _, item := range page.Items {
-		if item.ResourceID == "org-8-outbox" || item.ResourceID == "8001" || item.ResourceID == "8" || item.ResourceID == "hold-org-8" {
+		if item.ResourceID == "org-8-outbox" || item.ResourceID == "8001" || item.ResourceID == "8" || item.ResourceID == "hold-org-8" || item.EventID == "event-8" || item.MessageID == "message-8" || item.MessageID == "manual-8" {
 			t.Fatalf("organization 8 candidate leaked into organization 7: %#v", item)
 		}
 		counts[key{item.Kind, item.Disposition}]++
@@ -64,6 +64,16 @@ func TestGovernanceSummaryReconcilesWithOrganizationCandidates(t *testing.T) {
 	}
 	if got := counts[key{"transport_delivery", "manual_required"}]; got != summary.TransportDeadLetters {
 		t.Fatalf("transport summary=%d candidates=%d", summary.TransportDeadLetters, got)
+	}
+	if got := counts[key{"transport_delivery", "reconciliation_required"}]; got != summary.TransportReplayUnresolved || got != 1 {
+		t.Fatalf("unresolved replay summary=%d candidates=%d", summary.TransportReplayUnresolved, got)
+	}
+	for _, item := range page.Items {
+		if item.Kind == "transport_delivery" && item.Disposition == "reconciliation_required" {
+			if item.ActionRequestID != "batch-7" || item.EventID != "event-7" || item.MessageID != "message-7" || item.TopicName != "qs.evaluation.lifecycle" || item.ChannelName != "qs-worker" {
+				t.Fatalf("unresolved replay identity leaked or missing: %#v", item)
+			}
+		}
 	}
 	if got := counts[key{"retry_hold", "automatic"}]; got != summary.HeldAutomatic {
 		t.Fatalf("held automatic summary=%d candidates=%d", summary.HeldAutomatic, got)
@@ -168,7 +178,10 @@ CREATE TABLE domain_event_outbox (
 );
 CREATE TABLE event_delivery_dead_letter (
  id bigint unsigned AUTO_INCREMENT PRIMARY KEY, org_id bigint NULL,
+ message_id varchar(128) NOT NULL, event_id varchar(64) NULL,
+ topic_name varchar(128) NOT NULL, channel_name varchar(128) NOT NULL,
  delivery_attempts int NOT NULL, last_error text NULL, retry_disposition varchar(32) NOT NULL,
+	replay_request_id varchar(64) NULL,
  updated_at datetime(3) NOT NULL
 );
 CREATE TABLE retry_event_hold (
@@ -214,14 +227,18 @@ INSERT INTO domain_event_outbox (event_id,org_id,event_type,status,retry_disposi
  ('mysql-auto',7,'evaluation.retry.requested','failed','automatic',2,?),
  ('mysql-manual',7,'evaluation.retry.requested','failed','manual_required',30,?),
  ('org-8-outbox',8,'evaluation.retry.requested','failed','manual_required',30,?);
-INSERT INTO event_delivery_dead_letter (org_id,delivery_attempts,last_error,retry_disposition,updated_at) VALUES
- (7,8,'delivery failed','manual_required',?),(8,8,'delivery failed','manual_required',?);
+INSERT INTO event_delivery_dead_letter (org_id,message_id,event_id,topic_name,channel_name,delivery_attempts,last_error,retry_disposition,updated_at) VALUES
+ (7,'manual-7',NULL,'qs.report','qs-worker',8,'delivery failed','manual_required',?),
+ (8,'manual-8',NULL,'qs.report','qs-worker',8,'delivery failed','manual_required',?);
+INSERT INTO event_delivery_dead_letter (org_id,message_id,event_id,topic_name,channel_name,delivery_attempts,last_error,retry_disposition,replay_request_id,updated_at) VALUES
+ (7,'message-7','event-7','qs.evaluation.lifecycle','qs-worker',8,'publish outcome unknown','automatic','batch-7',?),
+ (8,'message-8','event-8','qs.evaluation.lifecycle','qs-worker',8,'publish outcome unknown','automatic','batch-8',?);
 INSERT INTO retry_event_hold (event_id,org_id,status,retry_disposition,replay_attempt_count,updated_at) VALUES
  ('hold-auto',7,'blocked','automatic',0,?),
  ('hold-manual',7,'failed','manual_required',30,?),
  ('hold-org-8',8,'blocked','automatic',0,?)`,
 		now.Add(-time.Hour), now, now, now, now,
-		now, now, now, now, now, now, now, now).Error; err != nil {
+		now, now, now, now, now, now, now, now, now, now).Error; err != nil {
 		t.Fatal(err)
 	}
 }

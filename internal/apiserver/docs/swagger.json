@@ -8587,6 +8587,126 @@
                 }
             }
         },
+        "/internal/v1/system-governance/actions/delivery-replay-reviews": {
+            "get": {
+                "description": "仅列出当前机构超过五分钟仍未结案的传输重放审计及目标状态；不重新投递消息；仅 qs:admin 可访问",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "System-Governance"
+                ],
+                "summary": "系统治理-待核对的传输重放审计",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌（或内部调用token）",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "分页游标",
+                        "name": "cursor",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 50,
+                        "description": "每页条数，1-100",
+                        "name": "limit",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/systemgovernance.DeliveryReplayReviewPage"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/internal/v1/system-governance/actions/pending-reconciliations": {
+            "get": {
+                "description": "按当前组织列出结果未知的人工重放审批；仅 qs:admin 可访问。核对时须由原操作者沿用原请求编号与输入。",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "System-Governance"
+                ],
+                "summary": "系统治理-待核对重放操作",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌（或内部调用token）",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "上一页返回的数字 ID 游标",
+                        "name": "cursor",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 50,
+                        "description": "每页条数，1-100",
+                        "name": "limit",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/systemgovernance.PendingReplayAuditPage"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/internal/v1/system-governance/actions/{action_id}/runs": {
             "post": {
                 "description": "执行已启用的缓存或韧性治理动作；韧性动作默认关闭，要求 confirm=true，并可通过 request_id 安全重试；仅 qs:admin 可访问",
@@ -22585,6 +22705,63 @@
                 }
             }
         },
+        "systemgovernance.DeliveryReplayReview": {
+            "type": "object",
+            "properties": {
+                "actor_user_id": {
+                    "type": "string"
+                },
+                "request_id": {
+                    "type": "string"
+                },
+                "started_at": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "targets": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/systemgovernance.DeliveryReplayReviewTarget"
+                    }
+                },
+                "targets_readable": {
+                    "type": "boolean"
+                },
+                "updated_at": {
+                    "type": "string"
+                }
+            }
+        },
+        "systemgovernance.DeliveryReplayReviewPage": {
+            "type": "object",
+            "properties": {
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/systemgovernance.DeliveryReplayReview"
+                    }
+                },
+                "next_cursor": {
+                    "type": "string"
+                }
+            }
+        },
+        "systemgovernance.DeliveryReplayReviewTarget": {
+            "type": "object",
+            "properties": {
+                "dead_letter_id": {
+                    "type": "integer"
+                },
+                "disposition": {
+                    "type": "string"
+                },
+                "linked_to_request": {
+                    "type": "boolean"
+                }
+            }
+        },
         "systemgovernance.Domain": {
             "type": "string",
             "enum": [
@@ -22675,6 +22852,44 @@
                     }
                 },
                 "window": {
+                    "type": "string"
+                }
+            }
+        },
+        "systemgovernance.PendingReplayAudit": {
+            "type": "object",
+            "properties": {
+                "actor_user_id": {
+                    "type": "string"
+                },
+                "input": {
+                    "type": "object",
+                    "additionalProperties": true
+                },
+                "request_id": {
+                    "type": "string"
+                },
+                "started_at": {
+                    "type": "string"
+                },
+                "store": {
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
+                }
+            }
+        },
+        "systemgovernance.PendingReplayAuditPage": {
+            "type": "object",
+            "properties": {
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/systemgovernance.PendingReplayAudit"
+                    }
+                },
+                "next_cursor": {
                     "type": "string"
                 }
             }
@@ -23043,10 +23258,19 @@
                 "attempt": {
                     "type": "integer"
                 },
+                "channel_name": {
+                    "type": "string"
+                },
+                "event_id": {
+                    "type": "string"
+                },
                 "kind": {
                     "type": "string"
                 },
                 "last_error_kind": {
+                    "type": "string"
+                },
+                "message_id": {
                     "type": "string"
                 },
                 "next_attempt_at": {
@@ -23062,6 +23286,9 @@
                     "type": "string"
                 },
                 "store": {
+                    "type": "string"
+                },
+                "topic_name": {
                     "type": "string"
                 },
                 "updated_at": {
