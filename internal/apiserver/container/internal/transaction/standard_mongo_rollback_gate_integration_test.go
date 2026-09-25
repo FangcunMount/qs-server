@@ -3,20 +3,27 @@
 package transaction
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"os"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/FangcunMount/component-base/pkg/event"
 	"github.com/FangcunMount/component-base/pkg/messaging"
+	appanswersheet "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/answersheet"
 	"github.com/FangcunMount/qs-server/internal/apiserver/eventing/standardoutbox"
+	eventsubsystem "github.com/FangcunMount/qs-server/internal/apiserver/eventing/subsystem"
+	mongoanswersheet "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/answersheet"
 	mongostandard "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/standardoutbox"
+	submitport "github.com/FangcunMount/qs-server/internal/apiserver/port/answersheetsubmit"
 	outboxport "github.com/FangcunMount/qs-server/internal/apiserver/port/outbox"
 	eventcatalog "github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
 	eventruntime "github.com/FangcunMount/qs-server/internal/pkg/eventing/runtime"
+	pkgoptions "github.com/FangcunMount/qs-server/internal/pkg/options"
 	"github.com/FangcunMount/reliable-messaging/relay"
 	sdkmongo "github.com/FangcunMount/reliable-messaging/storage/mongo"
 	"github.com/FangcunMount/reliable-messaging/transport"
@@ -35,7 +42,7 @@ func TestM5MongoRollbackHoldsUntilStandardIntentsDrain(t *testing.T) {
 	if !strings.HasPrefix(uri, "mongodb://mongo:27017/") || !strings.Contains(uri, "replicaSet=rm-test") || nsqAddress != "nsqd:4150" {
 		t.Fatal("disposable rm-test Mongo replica set and nsqd:4150 required")
 	}
-	ctx, cancel := context.WithTimeout(t.Context(), 45*time.Second)
+	ctx, cancel := context.WithTimeout(t.Context(), 70*time.Second)
 	defer cancel()
 	client, err := mongo.Connect(ctx, options.Client().ApplyURI(uri))
 	if err != nil {
@@ -66,6 +73,8 @@ func TestM5MongoRollbackHoldsUntilStandardIntentsDrain(t *testing.T) {
 		t.Fatal(err)
 	}
 	const topic = "qs.evaluation.lifecycle"
+	var legacyEventID atomic.Value
+	legacyEventID.Store("")
 	config := nsq.NewConfig()
 	config.HeartbeatInterval, config.MsgTimeout = time.Second, 10*time.Second
 	config.ReadTimeout, config.WriteTimeout = 3*time.Second, time.Second
@@ -80,15 +89,24 @@ func TestM5MongoRollbackHoldsUntilStandardIntentsDrain(t *testing.T) {
 	}
 	delivered := make(chan delivery, 16)
 	consumer.AddHandler(nsq.HandlerFunc(func(raw *nsq.Message) error {
-		wire, recognized, decodeErr := messaging.DecodeMessagePayload(raw.Body)
-		if decodeErr == nil && !recognized {
-			decodeErr = fmt.Errorf("standard NSQ envelope not recognized")
-		}
 		id := ""
-		if decodeErr == nil {
-			id = wire.UUID
-			if wire.Metadata["event_type"] != eventcatalog.AnswerSheetSubmitted {
-				decodeErr = fmt.Errorf("unexpected event type %q", wire.Metadata["event_type"])
+		var decodeErr error
+		legacyID := legacyEventID.Load().(string)
+		if legacyID != "" && bytes.Contains(raw.Body, []byte(legacyID)) {
+			// The old publisher keeps its original envelope. Check its stable
+			// event identity without imposing the SDK envelope on that path.
+			id = legacyID
+		} else {
+			wire, recognized, err := messaging.DecodeMessagePayload(raw.Body)
+			decodeErr = err
+			if decodeErr == nil && !recognized {
+				decodeErr = fmt.Errorf("standard NSQ envelope not recognized")
+			}
+			if decodeErr == nil {
+				id = wire.UUID
+				if wire.Metadata["event_type"] != eventcatalog.AnswerSheetSubmitted {
+					decodeErr = fmt.Errorf("unexpected event type %q", wire.Metadata["event_type"])
+				}
 			}
 		}
 		select {
@@ -303,5 +321,113 @@ func TestM5MongoRollbackHoldsUntilStandardIntentsDrain(t *testing.T) {
 	if err := db.Collection("qs_rm_replay_requests").FindOne(ctx, bson.M{"request_id": "m5-rollback-review"}).Err(); err != nil {
 		t.Fatalf("manual replay audit missing: %v", err)
 	}
-	t.Logf("standard drain verified before old Profile: states=%v deliveries=%v", readUnfinished(), seen)
+
+	// The old application Profile may start only after every standard intent
+	// has been settled. Submit a real AnswerSheet through the original Mongo
+	// transaction and its historical Writer/Relay, then inspect both stores.
+	messagingOptions := pkgoptions.NewMessagingOptions()
+	messagingOptions.Enabled = true
+	messagingOptions.NSQAddr = nsqAddress
+	legacyPublisher, err := messagingOptions.NewPublisher()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		if err := legacyPublisher.Close(); err != nil {
+			t.Errorf("close legacy publisher: %v", err)
+		}
+	}()
+	legacy, err := eventsubsystem.New(eventsubsystem.Options{
+		MongoDB: db, Catalog: eventcatalog.NewCatalog(catalog),
+		MQPublisher: legacyPublisher, PublisherMode: eventruntime.PublishModeMQ,
+		Mongo: eventsubsystem.ProfileOptions{Interval: 50 * time.Millisecond, BatchSize: 4,
+			PublishWorkers: 1, ImmediateMaxConcurrent: 1},
+		Consumers: map[string]eventsubsystem.ConsumerOptions{
+			"modelcatalog.hot_rank_projection": {Enabled: false},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		if err := legacy.Close(); err != nil {
+			t.Errorf("close legacy Profile: %v", err)
+		}
+	}()
+	profile := legacy.Profile(eventcatalog.OutboxProfileMongoDomain)
+	if profile.Stager == nil {
+		t.Fatal("old Mongo Profile has no historical writer")
+	}
+	sheets, err := mongoanswersheet.NewRepository(db)
+	if err != nil {
+		t.Fatal(err)
+	}
+	durable := appanswersheet.NewTransactionalSubmissionDurableStore(
+		NewMongoRunner(db, MongoRunnerOptions{Boundary: "m5_rollback_legacy_resume", Limiter: &transactionLimiterSpy{}}),
+		sheets, profile.Stager, profile.PostCommit,
+	)
+	sheet := standardSubmissionSheet(t, 90010006, "legacy resume")
+	legacyID := sheet.Events()[0].EventID()
+	legacyEventID.Store(legacyID)
+	fingerprint, err := submitport.Fingerprint(sheet)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := legacy.Start(ctx); err != nil {
+		t.Fatal(err)
+	}
+	metaInfo := appanswersheet.DurableSubmitMeta{
+		WriterID: 301, IdempotencyKey: "m5-rollback-legacy-resume", Fingerprint: fingerprint,
+	}
+	accepted, existed, err := durable.CreateDurably(ctx, sheet, metaInfo)
+	if err != nil || existed || accepted == nil || accepted.ID() != sheet.ID() {
+		t.Fatalf("old Profile AnswerSheet acceptance: sheet=%v existed=%v err=%v", accepted, existed, err)
+	}
+	repeated, existed, err := durable.CreateDurably(ctx, sheet, metaInfo)
+	if err != nil || !existed || repeated == nil || repeated.ID() != sheet.ID() {
+		t.Fatalf("old Profile duplicate acceptance: sheet=%v existed=%v err=%v", repeated, existed, err)
+	}
+	deadline := time.NewTimer(12 * time.Second)
+	defer deadline.Stop()
+	for {
+		select {
+		case got := <-delivered:
+			if got.err != nil {
+				t.Fatalf("old Profile NSQ delivery: %v", got.err)
+			}
+			seen[got.id]++
+		case <-time.After(25 * time.Millisecond):
+		}
+		var oldRow struct {
+			Status string `bson:"status"`
+		}
+		oldErr := db.Collection("domain_event_outbox").FindOne(ctx, bson.M{"event_id": legacyID}).Decode(&oldRow)
+		if oldErr == nil && oldRow.Status == "published" && seen[legacyID] >= 1 {
+			break
+		}
+		select {
+		case <-deadline.C:
+			t.Fatalf("old Profile did not resume: event=%s state=%+v err=%v delivered=%v", legacyID, oldRow, oldErr, seen)
+		default:
+		}
+	}
+	if n, err := db.Collection("answersheets").CountDocuments(ctx, bson.M{"domain_id": uint64(90010006)}); err != nil || n != 1 {
+		t.Fatalf("old Profile AnswerSheet fact count=%d err=%v", n, err)
+	}
+	if n, err := collection.CountDocuments(ctx, bson.M{"message_id": legacyID}); err != nil || n != 0 {
+		t.Fatalf("old Profile wrote standard intent count=%d err=%v", n, err)
+	}
+	if left := readUnfinished(); len(left) != 0 {
+		t.Fatalf("old Profile resumed with unfinished standard intents: %+v", left)
+	}
+	for consumer.Stats().MessagesFinished < 6 && ctx.Err() == nil {
+		time.Sleep(10 * time.Millisecond)
+	}
+	if consumer.Stats().MessagesFinished < 6 || seen[legacyID] < 1 {
+		t.Fatalf("old Profile FIN or event identity mismatch: finished=%d delivered=%v", consumer.Stats().MessagesFinished, seen)
+	}
+	if seen[unknownID] != 2 || seen[publishingID] != 1 || seen[pendingID] != 1 || seen[quarantineID] != 1 {
+		t.Fatalf("old Profile redelivered a settled standard identity: %+v", seen)
+	}
+	t.Logf("standard drain then old AnswerSheet resumed: states=%v deliveries=%v", readUnfinished(), seen)
 }
