@@ -283,6 +283,9 @@ func (c *Container) buildNotifier() port.TaskNotifier {
 		}
 		return gatewayNotifier
 	}
+	if c.opts.Notification.WebhookURL == "" {
+		return nil
+	}
 	return workernotifier.NewWebhookNotifier(
 		c.opts.Notification.WebhookURL,
 		time.Duration(c.opts.Notification.TimeoutMs)*time.Millisecond,
