@@ -46,9 +46,16 @@ func NewWithStandardProfiles(opts Options, replacements map[eventcatalog.OutboxP
 			replacement.Status.Name != name || replacement.Status.Reader == nil {
 			return nil, fmt.Errorf("standard profile %q is incomplete or unknown", profile)
 		}
+		events := s.registry.EventsByProfile(profile)
+		eventTypes := make([]string, 0, len(events))
+		for _, evt := range events {
+			eventTypes = append(eventTypes, evt.Type)
+		}
 		prepared[profile] = &profileRuntime{
 			name: name, binding: replacement.Binding, run: replacement.Supervisor.Run,
 			drain: replacement.Drain, drainTimeout: replacement.DrainTimeout,
+			statusReporter: appEventing.NewOutboxStatusReporterWithEventTypes(name,
+				replacement.Status.Reader, s.observer, eventTypes),
 			runtimeStatus: func() appEventing.ProfileRuntimeStatus {
 				snapshot := replacement.Supervisor.Snapshot()
 				healthy := snapshot.ScanHealthy
