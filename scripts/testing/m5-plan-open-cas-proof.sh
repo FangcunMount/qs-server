@@ -28,8 +28,8 @@ SQL
   cd "$repo_root"
   QS_M5_TASK_OPEN_MYSQL_REQUIRED=1 \
   QS_M5_TASK_OPEN_MYSQL_DSN="$test_user:$test_password@tcp(127.0.0.1:3306)/$database?parseTime=true&loc=UTC" \
-    go test ./internal/apiserver/infra/mysql/plan \
-      -run '^TestConcurrentTaskOpenHasOnePersistedEntryAndOneEventMySQL$' \
+    go test -tags reliable_messaging_m4 ./internal/apiserver/infra/mysql/plan \
+      -run '^(TestConcurrentTaskOpenHasOnePersistedEntryAndOneEventMySQL|TestTaskOpeningAndReminderIntentCommitTogetherMySQL)$' \
       -count=1 -v
   exit 0
 fi
@@ -73,6 +73,6 @@ fi
 cd "$repo_root"
 QS_M5_TASK_OPEN_MYSQL_REQUIRED=1 \
 QS_M5_TASK_OPEN_MYSQL_DSN="root:isolated-m5-open-cas@tcp(127.0.0.1:$port)/$database?parseTime=true&loc=UTC" \
-  go test ./internal/apiserver/infra/mysql/plan \
-    -run '^TestConcurrentTaskOpenHasOnePersistedEntryAndOneEventMySQL$' \
+  go test -tags reliable_messaging_m4 ./internal/apiserver/infra/mysql/plan \
+    -run '^(TestConcurrentTaskOpenHasOnePersistedEntryAndOneEventMySQL|TestTaskOpeningAndReminderIntentCommitTogetherMySQL)$' \
     -count=1 -v

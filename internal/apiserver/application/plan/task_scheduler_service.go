@@ -55,10 +55,14 @@ func NewTaskSchedulerServiceWithEnrollment(
 	txRunner apptransaction.Runner,
 	entryGenerator planentryport.Generator,
 	eventPublisher event.EventPublisher,
+	openedOutbox ...eventing.ProfileBinding,
 ) TaskSchedulerService {
 	service := NewTaskSchedulerService(taskRepo, planRepo, entryGenerator, eventPublisher).(*taskSchedulerService)
 	service.enrollmentRepo = enrollmentRepo
 	service.persistence = taskPersistence{tasks: taskRepo, enrollments: enrollmentRepo, tx: txRunner}
+	if len(openedOutbox) > 0 {
+		service.persistence.openedOutbox = openedOutbox[0]
+	}
 	return service
 }
 
@@ -188,7 +192,8 @@ func (s *taskSchedulerService) SchedulePendingTasks(ctx context.Context, orgID i
 		}
 
 		// 持久化任务
-		if err := s.persistence.save(ctx, task, false); err != nil {
+		staged, err := s.persistence.saveOpened(ctx, task)
+		if err != nil {
 			logger.L(ctx).Errorw("Failed to save opened task",
 				"action", "schedule_pending_tasks",
 				"task_id", task.GetID().String(),
@@ -198,14 +203,16 @@ func (s *taskSchedulerService) SchedulePendingTasks(ctx context.Context, orgID i
 			continue
 		}
 
-		eventing.PublishCollectedEvents(ctx, s.eventPublisher, task, nil, func(evt event.DomainEvent, err error) {
-			logger.L(ctx).Errorw("Failed to publish task event",
-				"action", "schedule_pending_tasks",
-				"task_id", task.GetID().String(),
-				"event_type", evt.EventType(),
-				"error", err.Error(),
-			)
-		})
+		if !staged {
+			eventing.PublishCollectedEvents(ctx, s.eventPublisher, task, nil, func(evt event.DomainEvent, err error) {
+				logger.L(ctx).Errorw("Failed to publish task event",
+					"action", "schedule_pending_tasks",
+					"task_id", task.GetID().String(),
+					"event_type", evt.EventType(),
+					"error", err.Error(),
+				)
+			})
+		}
 
 		openedTasks = append(openedTasks, task)
 	}

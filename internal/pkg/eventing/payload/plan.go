@@ -6,9 +6,22 @@ import "time"
 type TaskOpenedData struct {
 	TaskID   string    `json:"task_id"`
 	PlanID   string    `json:"plan_id"`
+	OrgID    int64     `json:"org_id"`
 	TesteeID string    `json:"testee_id"`
 	EntryURL string    `json:"entry_url"`
 	OpenAt   time.Time `json:"open_at"`
+}
+
+// TaskOpenedReminderRequestedData is a durable reminder reference. The entry
+// URL is read from the authoritative Task when handling the reminder, not
+// copied into the Outbox message.
+type TaskOpenedReminderRequestedData struct {
+	TaskID           string    `json:"task_id"`
+	PlanID           string    `json:"plan_id"`
+	OrgID            int64     `json:"org_id"`
+	TesteeID         string    `json:"testee_id"`
+	OpenAt           time.Time `json:"open_at"`
+	ScheduleRevision uint32    `json:"schedule_revision"`
 }
 
 // TaskCompletedData is the task completed event body.
