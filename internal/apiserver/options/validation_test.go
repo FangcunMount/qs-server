@@ -482,6 +482,32 @@ func TestOptionsValidateRetryHardCaps(t *testing.T) {
 	}
 }
 
+func TestOptionsValidateIAMCommittedVersionGuard(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		mutate func(*Options)
+		want   string
+	}{
+		{"IAM disabled", func(o *Options) { o.IAMOptions.AuthzVersionGuard.Enabled = true }, "requires enabled IAM gRPC"},
+		{"proof age exceeds ten seconds", func(o *Options) {
+			o.IAMOptions.Enabled = true
+			o.IAMOptions.AuthzVersionGuard.Enabled = true
+			o.IAMOptions.AuthzVersionGuard.MaxAge = 11 * time.Second
+		}, "max-age"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			o := NewOptions()
+			tc.mutate(o)
+			for _, err := range o.Validate() {
+				if strings.Contains(err.Error(), tc.want) {
+					return
+				}
+			}
+			t.Fatalf("Validate() did not report %q", tc.want)
+		})
+	}
+}
+
 func TestOptionsValidateSystemGovernanceComponentDiscovery(t *testing.T) {
 	tests := []struct {
 		name   string

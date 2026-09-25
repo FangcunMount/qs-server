@@ -1,10 +1,12 @@
 package handlers
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"io"
 	"log/slog"
+	"strings"
 	"testing"
 	"time"
 
@@ -55,6 +57,38 @@ func TestTaskOpenedDoesNotNotifyWebhookPayloads(t *testing.T) {
 	if len(notifier.completed) != 0 || len(notifier.expired) != 0 || len(notifier.canceled) != 0 {
 		t.Fatalf("expected no notifier call for task.opened, got completed=%d expired=%d canceled=%d",
 			len(notifier.completed), len(notifier.expired), len(notifier.canceled))
+	}
+}
+
+func TestTaskOpenedLogDoesNotExposeEntryToken(t *testing.T) {
+	const entryURL = "https://collect.example.com/entry?token=private-token"
+	var logs bytes.Buffer
+	deps := &Dependencies{Logger: slog.New(slog.NewTextHandler(&logs, nil))}
+	payload, err := json.Marshal(map[string]any{
+		"id":            "evt-opened",
+		"eventType":     "task.opened",
+		"occurredAt":    time.Date(2026, 4, 2, 11, 0, 0, 0, time.UTC),
+		"aggregateType": "AssessmentTask",
+		"aggregateID":   "task-1",
+		"data": map[string]any{
+			"task_id":   "task-1",
+			"plan_id":   "plan-1",
+			"testee_id": "testee-1",
+			"entry_url": entryURL,
+			"open_at":   time.Date(2026, 4, 2, 11, 0, 0, 0, time.UTC),
+		},
+	})
+	if err != nil {
+		t.Fatalf("marshal event: %v", err)
+	}
+	if err := handleTaskOpened(deps)(context.Background(), "task.opened", payload); err != nil {
+		t.Fatalf("handle task opened: %v", err)
+	}
+	if strings.Contains(logs.String(), entryURL) || strings.Contains(logs.String(), "private-token") {
+		t.Fatalf("task opened log exposed entry token")
+	}
+	if !strings.Contains(logs.String(), "evt-opened") {
+		t.Fatalf("task opened log lost event correlation")
 	}
 }
 

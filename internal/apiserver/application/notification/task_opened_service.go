@@ -152,13 +152,10 @@ func (s *taskOpenedService) SendTaskOpened(ctx context.Context, dto TaskOpenedDT
 		"template_id", result.TemplateID,
 		"recipient_source", source,
 		"recipient_count", len(recipients),
-		"recipient_open_ids", strings.Join(recipients, ","),
-		"page", page,
-		"template_data", fmt.Sprintf("%v", data),
 	)
 
 	var sent int
-	var sendErrs []string
+	var failed int
 	for _, openID := range recipients {
 		if err := s.sender.SendSubscribeMessage(ctx, appID, appSecret, wechatmini.SubscribeMessage{
 			ToUser:           openID,
@@ -173,11 +170,8 @@ func (s *taskOpenedService) SendTaskOpened(ctx context.Context, dto TaskOpenedDT
 				"task_id", dto.TaskID,
 				"testee_id", dto.TesteeID,
 				"template_id", result.TemplateID,
-				"recipient_open_id", openID,
-				"page", page,
-				"error", err.Error(),
 			)
-			sendErrs = append(sendErrs, fmt.Sprintf("%s: %v", openID, err))
+			failed++
 			continue
 		}
 		l.Infow("task.opened mini program notification delivered",
@@ -185,8 +179,6 @@ func (s *taskOpenedService) SendTaskOpened(ctx context.Context, dto TaskOpenedDT
 			"task_id", dto.TaskID,
 			"testee_id", dto.TesteeID,
 			"template_id", result.TemplateID,
-			"recipient_open_id", openID,
-			"page", page,
 		)
 		sent++
 	}
@@ -200,13 +192,12 @@ func (s *taskOpenedService) SendTaskOpened(ctx context.Context, dto TaskOpenedDT
 			"template_id", result.TemplateID,
 			"recipient_source", source,
 			"recipient_count", len(recipients),
-			"recipient_open_ids", strings.Join(recipients, ","),
-			"errors", strings.Join(sendErrs, "; "),
+			"failed_count", failed,
 		)
-		return result, fmt.Errorf("send task opened message failed: %s", strings.Join(sendErrs, "; "))
+		return result, fmt.Errorf("send task opened message failed for all %d recipients", failed)
 	}
-	if len(sendErrs) > 0 {
-		result.Message = "partial delivery: " + strings.Join(sendErrs, "; ")
+	if failed > 0 {
+		result.Message = fmt.Sprintf("partial delivery: %d of %d failed", failed, len(recipients))
 		l.Warnw("task.opened mini program notification partially delivered",
 			"action", "send_task_opened_miniprogram_notification",
 			"task_id", dto.TaskID,
@@ -215,8 +206,7 @@ func (s *taskOpenedService) SendTaskOpened(ctx context.Context, dto TaskOpenedDT
 			"recipient_source", source,
 			"recipient_count", len(recipients),
 			"sent_count", sent,
-			"recipient_open_ids", strings.Join(recipients, ","),
-			"errors", strings.Join(sendErrs, "; "),
+			"failed_count", failed,
 		)
 		return result, nil
 	}
@@ -228,7 +218,6 @@ func (s *taskOpenedService) SendTaskOpened(ctx context.Context, dto TaskOpenedDT
 		"recipient_source", source,
 		"recipient_count", len(recipients),
 		"sent_count", sent,
-		"recipient_open_ids", strings.Join(recipients, ","),
 	)
 	return result, nil
 }

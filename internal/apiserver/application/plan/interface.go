@@ -3,6 +3,8 @@ package plan
 import (
 	"context"
 	"time"
+
+	domainplan "github.com/FangcunMount/qs-server/internal/apiserver/domain/plan"
 )
 
 // ============= 按行为者组织的应用服务接口（Driving Ports）=============
@@ -194,4 +196,25 @@ type TaskNotificationContext struct {
 	Seq                        int
 	TotalTimes                 int
 	UnfinishedSameDayTaskCount int
+}
+
+// TaskReminderStateReader reads the current authoritative Task fact for a
+// durable opening reminder. It is separate from template-rendering context.
+type TaskReminderStateReader interface {
+	GetTaskReminderState(ctx context.Context, orgID int64, taskID string) (*TaskReminderState, error)
+}
+
+// TaskReminderState contains only facts needed to compare an opening intent
+// with the current Task before claiming a recipient delivery. EntryURL is a
+// bearer link and must not be copied into Outbox payloads or ordinary logs.
+type TaskReminderState struct {
+	TaskID           string
+	PlanID           string
+	OrgID            int64
+	TesteeID         string
+	Status           domainplan.TaskStatus
+	ScheduleRevision uint32
+	OpenAt           *time.Time
+	ExpireAt         *time.Time
+	EntryURL         string
 }

@@ -21,7 +21,8 @@ const (
 
 const (
 	// EventTypeTaskOpened 任务开放事件
-	EventTypeTaskOpened = eventcatalog.TaskOpened
+	EventTypeTaskOpened                  = eventcatalog.TaskOpened
+	EventTypeTaskOpenedReminderRequested = "task.opened.reminder.requested"
 	// EventTypeTaskCompleted 任务完成事件
 	EventTypeTaskCompleted = eventcatalog.TaskCompleted
 	// EventTypeTaskExpired 任务过期事件
@@ -49,6 +50,9 @@ type TaskCanceledData = eventpayload.TaskCanceledData
 // TaskOpenedEvent 任务开放事件
 type TaskOpenedEvent = event.Event[TaskOpenedData]
 
+// TaskOpenedReminderRequestedEvent is the durable reference to one opening.
+type TaskOpenedReminderRequestedEvent = event.Event[eventpayload.TaskOpenedReminderRequestedData]
+
 // TaskCompletedEvent 任务完成事件
 type TaskCompletedEvent = event.Event[TaskCompletedData]
 
@@ -64,6 +68,7 @@ type TaskCanceledEvent = event.Event[TaskCanceledData]
 func NewTaskOpenedEvent(
 	taskID AssessmentTaskID,
 	planID AssessmentPlanID,
+	orgID int64,
 	testeeID testee.ID,
 	entryURL string,
 	openAt time.Time,
@@ -75,11 +80,27 @@ func NewTaskOpenedEvent(
 		TaskOpenedData{
 			TaskID:   taskID.String(),
 			PlanID:   planID.String(),
+			OrgID:    orgID,
 			TesteeID: testeeID.String(),
 			EntryURL: entryURL,
 			OpenAt:   openAt,
 		},
 	)
+}
+
+// NewTaskOpenedReminderRequestedEvent keeps the original opening identity while
+// giving the durable reminder a distinct delivery contract from the legacy
+// best-effort task.opened event.
+func NewTaskOpenedReminderRequestedEvent(opened TaskOpenedEvent, scheduleRevision uint32) TaskOpenedReminderRequestedEvent {
+	base := opened.BaseEvent
+	base.EventTypeValue = EventTypeTaskOpenedReminderRequested
+	return TaskOpenedReminderRequestedEvent{
+		BaseEvent: base,
+		Data: eventpayload.TaskOpenedReminderRequestedData{
+			TaskID: opened.Data.TaskID, PlanID: opened.Data.PlanID, OrgID: opened.Data.OrgID,
+			TesteeID: opened.Data.TesteeID, OpenAt: opened.Data.OpenAt, ScheduleRevision: scheduleRevision,
+		},
+	}
 }
 
 // NewTaskCompletedEvent 创建任务完成事件

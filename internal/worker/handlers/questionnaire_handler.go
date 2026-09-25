@@ -5,6 +5,7 @@ import (
 	"log/slog"
 
 	"github.com/FangcunMount/qs-server/internal/pkg/eventing/payload"
+	workerobservability "github.com/FangcunMount/qs-server/internal/worker/observability"
 )
 
 func handleQuestionnaireChanged(deps *Dependencies) HandlerFunc {
@@ -23,9 +24,15 @@ func handleQuestionnaireChanged(deps *Dependencies) HandlerFunc {
 					slog.String("action", string(data.Action)),
 				}
 			},
+			onMissingClient: func(deps *Dependencies, env *EventEnvelope, data *eventpayload.QuestionnaireChangedData) {
+				workerobservability.ObserveBestEffortSideEffect("questionnaire.changed", workerobservability.BestEffortNotConfigured)
+				deps.Logger.Warn("questionnaire publish post-actions client not configured",
+					slog.String("event_id", env.ID), slog.String("code", data.Code), slog.String("version", data.Version))
+			},
 			onPublished: func(ctx context.Context, deps *Dependencies, env *EventEnvelope, data *eventpayload.QuestionnaireChangedData) error {
 				resp, err := deps.InternalClient.HandleQuestionnairePublishedPostActions(ctx, data.Code, data.Version)
 				if err != nil {
+					workerobservability.ObserveBestEffortSideEffect("questionnaire.changed", workerobservability.BestEffortCallFailed)
 					deps.Logger.Warn("failed to handle questionnaire publish post-actions",
 						slog.String("event_id", env.ID),
 						slog.String("code", data.Code),
@@ -34,7 +41,8 @@ func handleQuestionnaireChanged(deps *Dependencies) HandlerFunc {
 					)
 					return nil
 				}
-				if resp.Success {
+				if resp != nil && resp.Success {
+					workerobservability.ObserveBestEffortSideEffect("questionnaire.changed", workerobservability.BestEffortCallSucceeded)
 					deps.Logger.Info("questionnaire publish post-actions completed",
 						slog.String("event_id", env.ID),
 						slog.String("code", data.Code),
@@ -43,10 +51,15 @@ func handleQuestionnaireChanged(deps *Dependencies) HandlerFunc {
 					return nil
 				}
 
+				workerobservability.ObserveBestEffortSideEffect("questionnaire.changed", workerobservability.BestEffortResponseRejected)
+				message := "empty response"
+				if resp != nil {
+					message = resp.Message
+				}
 				deps.Logger.Warn("questionnaire publish post-actions failed",
 					slog.String("event_id", env.ID),
 					slog.String("code", data.Code),
-					slog.String("message", resp.Message),
+					slog.String("message", message),
 				)
 				return nil
 			},

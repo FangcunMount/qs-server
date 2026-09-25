@@ -52,7 +52,7 @@ func TestAuthzSnapshotMiddlewareStoresSnapshotInGinAndRequestContext(t *testing.
 	engine.Use(newAuthzSnapshotMiddleware(func(ctx context.Context, userID string) (*authzapp.Snapshot, error) {
 		gotUserID = userID
 		return snap, nil
-	}, nil))
+	}, nil, nil))
 	engine.GET("/check", func(c *gin.Context) {
 		if gotUserID != "701" {
 			t.Fatalf("loaded user %q", gotUserID)
@@ -95,7 +95,7 @@ func TestAuthzSnapshotMiddlewarePersistsProjectionWhenCurrentOperatorExists(t *t
 	})
 	engine.Use(newAuthzSnapshotMiddleware(func(ctx context.Context, userID string) (*authzapp.Snapshot, error) {
 		return snap, nil
-	}, updater))
+	}, updater, nil))
 	engine.GET("/check", func(c *gin.Context) {
 		c.Status(http.StatusNoContent)
 	})
@@ -133,7 +133,7 @@ func TestAuthzSnapshotMiddlewareUpdaterFailureDoesNotAbortRequest(t *testing.T) 
 	})
 	engine.Use(newAuthzSnapshotMiddleware(func(ctx context.Context, userID string) (*authzapp.Snapshot, error) {
 		return &authzapp.Snapshot{DirectRoles: []string{"qs:admin"}, EffectiveRoles: []string{"qs:admin"}}, nil
-	}, updater))
+	}, updater, nil))
 	engine.GET("/check", func(c *gin.Context) {
 		c.Status(http.StatusNoContent)
 	})
@@ -146,5 +146,60 @@ func TestAuthzSnapshotMiddlewareUpdaterFailureDoesNotAbortRequest(t *testing.T) 
 	}
 	if updater.calls != 1 {
 		t.Fatalf("updater calls = %d, want 1", updater.calls)
+	}
+}
+
+func TestAuthzSnapshotMiddlewareRechecksAfterRoleProjection(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	for _, fail := range []bool{false, true} {
+		name := "current proof"
+		if fail {
+			name = "stale proof"
+		}
+		t.Run(name, func(t *testing.T) {
+			snap := &authzapp.Snapshot{AuthzVersion: 7}
+			updater := &stubOperatorRoleProjectionUpdater{}
+			operator := &operatorapp.OperatorResult{ID: 801, OrgID: 88, UserID: 701, IsActive: true}
+			var verified, handlerCalled bool
+			engine := gin.New()
+			engine.Use(func(c *gin.Context) {
+				c.Set(UserIDStrKey, "701")
+				c.Set(UserIDKey, uint64(701))
+				c.Set(CurrentOperatorKey, operator)
+				c.Next()
+			})
+			engine.Use(newAuthzSnapshotMiddleware(func(context.Context, string) (*authzapp.Snapshot, error) {
+				return snap, nil
+			}, updater, func(_ context.Context, got *authzapp.Snapshot) error {
+				verified = true
+				if updater.calls != 1 || got != snap {
+					t.Fatalf("decision check ran before projection or received wrong snapshot")
+				}
+				if fail {
+					return errors.New("committed version advanced")
+				}
+				return nil
+			}))
+			engine.GET("/check", func(c *gin.Context) {
+				handlerCalled = true
+				c.Status(http.StatusNoContent)
+			})
+
+			rec := httptest.NewRecorder()
+			engine.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/check", nil))
+			if !verified {
+				t.Fatal("decision-time proof was not checked")
+			}
+			if fail {
+				if rec.Code != http.StatusServiceUnavailable || handlerCalled {
+					t.Fatalf("stale proof admitted request: status=%d handler=%v", rec.Code, handlerCalled)
+				}
+				return
+			}
+			if rec.Code != http.StatusNoContent || !handlerCalled {
+				t.Fatalf("current proof rejected request: status=%d handler=%v", rec.Code, handlerCalled)
+			}
+		})
 	}
 }

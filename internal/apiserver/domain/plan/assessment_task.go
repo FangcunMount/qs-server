@@ -249,6 +249,7 @@ func (t *AssessmentTask) open(entryToken string, entryURL string, openAt time.Ti
 	t.addEvent(NewTaskOpenedEvent(
 		t.id,
 		t.planID,
+		t.orgID,
 		t.testeeID,
 		t.entryURL,
 		openAt,
