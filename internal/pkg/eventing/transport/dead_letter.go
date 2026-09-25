@@ -15,16 +15,19 @@ import (
 type DeadLetterRecord struct {
 	// MessageID is the component-base message UUID. For enveloped domain events
 	// it is the EventID, not the physical NSQ broker message ID.
-	MessageID        string
-	EventID          string
-	OrgID            *int64
-	Provider         string
-	Topic            string
-	Channel          string
-	DeliveryAttempts int
-	Payload          []byte
-	LastError        string
-	FailedAt         time.Time
+	MessageID string
+	// TransportMessageID distinguishes physical broker deliveries of one
+	// logical message. Empty identifies an older handoff without this field.
+	TransportMessageID string
+	EventID            string
+	OrgID              *int64
+	Provider           string
+	Topic              string
+	Channel            string
+	DeliveryAttempts   int
+	Payload            []byte
+	LastError          string
+	FailedAt           time.Time
 }
 
 type DeadLetterRecorder interface {
@@ -82,7 +85,7 @@ func FailedMessageHandler(recorder DeadLetterRecorder) basemessaging.FailedMessa
 		}
 		return recorder.RecordDeadLetter(ctx, deadLetterRecord(
 			failed.Provider, failed.Topic, failed.Channel, failed.Attempts,
-			failed.Message.UUID, failed.Message.Payload, lastError,
+			failed.Message.UUID, failed.Message.TransportMessageID, failed.Message.Payload, lastError,
 		))
 	}
 }
@@ -95,7 +98,7 @@ func NewUnknownEventRecorder(provider string, recorder DeadLetterRecorder) func(
 			return fmt.Errorf("unknown-event audit store or identity is not configured")
 		}
 		return recorder.RecordDeadLetter(ctx, deadLetterRecord(
-			provider, msg.Topic, msg.Channel, max(int(msg.Attempts), 1), msg.UUID, msg.Payload,
+			provider, msg.Topic, msg.Channel, max(int(msg.Attempts), 1), msg.UUID, msg.TransportMessageID, msg.Payload,
 			"unknown event type: "+eventType,
 		))
 	}
@@ -105,36 +108,66 @@ func (r *SQLDeadLetterRecorder) RecordDeadLetter(ctx context.Context, record Dea
 	if r == nil || r.db == nil {
 		return fmt.Errorf("dead-letter audit store is not configured")
 	}
-	if record.MessageID == "" || record.Provider == "" || record.Topic == "" || record.Channel == "" || record.DeliveryAttempts < 1 {
+	if record.MessageID == "" || len(record.TransportMessageID) > 64 || record.Provider == "" || record.Topic == "" || record.Channel == "" || record.DeliveryAttempts < 1 {
 		return fmt.Errorf("invalid dead-letter record")
 	}
 	if record.FailedAt.IsZero() {
 		record.FailedAt = time.Now()
 	}
-	// A replay keeps the logical message UUID. Repeated failed handoffs may
-	// therefore hit the same row after a claim or terminal resolution. Preserve
-	// those rows and their identity; only an unclaimed manual row can refresh
-	// its latest failure details.
-	_, err := r.db.ExecContext(ctx, `
+	// The physical transport ID separates new replay deliveries while the
+	// empty value preserves deduplication for pre-upgrade failed handoffs.
+	// The transaction prevents an identity collision from silently ACKing a
+	// different tenant or payload under an existing failure row.
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	if _, err := tx.ExecContext(ctx, `
 INSERT INTO event_delivery_dead_letter
-  (message_id, event_id, org_id, provider, topic_name, channel_name, delivery_attempts,
+  (message_id, transport_message_id, event_id, org_id, provider, topic_name, channel_name, delivery_attempts,
    payload_json, last_error, retry_disposition, failed_at, created_at, updated_at)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'manual_required', ?, ?, ?)
-ON DUPLICATE KEY UPDATE
-  delivery_attempts = IF(replay_request_id IS NULL AND retry_disposition = 'manual_required',
-    GREATEST(delivery_attempts, VALUES(delivery_attempts)), delivery_attempts),
-  last_error = IF(replay_request_id IS NULL AND retry_disposition = 'manual_required', VALUES(last_error), last_error),
-  failed_at = IF(replay_request_id IS NULL AND retry_disposition = 'manual_required', VALUES(failed_at), failed_at),
-  updated_at = IF(replay_request_id IS NULL AND retry_disposition = 'manual_required', VALUES(updated_at), updated_at)`,
-		record.MessageID, nullableString(record.EventID), record.OrgID, record.Provider, record.Topic, record.Channel,
-		record.DeliveryAttempts, string(record.Payload), nullableString(record.LastError), record.FailedAt, record.FailedAt, record.FailedAt,
-	)
-	return err
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'manual_required', ?, ?, ?)
+ON DUPLICATE KEY UPDATE id=id`,
+		record.MessageID, record.TransportMessageID, nullableString(record.EventID), record.OrgID,
+		record.Provider, record.Topic, record.Channel, record.DeliveryAttempts, string(record.Payload),
+		nullableString(record.LastError), record.FailedAt, record.FailedAt, record.FailedAt,
+	); err != nil {
+		return err
+	}
+	var rowID uint64
+	var eventID sql.NullString
+	var orgID sql.NullInt64
+	var payload string
+	var disposition string
+	var replayRequestID sql.NullString
+	err = tx.QueryRowContext(ctx, `SELECT id,event_id,org_id,payload_json,retry_disposition,replay_request_id
+FROM event_delivery_dead_letter
+WHERE provider=? AND topic_name=? AND channel_name=? AND message_id=? AND transport_message_id=? FOR UPDATE`,
+		record.Provider, record.Topic, record.Channel, record.MessageID, record.TransportMessageID,
+	).Scan(&rowID, &eventID, &orgID, &payload, &disposition, &replayRequestID)
+	if err != nil {
+		return err
+	}
+	if eventID.String != record.EventID || eventID.Valid != (record.EventID != "") ||
+		orgID.Valid != (record.OrgID != nil) || (orgID.Valid && orgID.Int64 != *record.OrgID) ||
+		payload != string(record.Payload) {
+		return fmt.Errorf("dead-letter delivery identity conflicts with existing event, organization, or payload")
+	}
+	if disposition == "manual_required" && !replayRequestID.Valid {
+		if _, err := tx.ExecContext(ctx, `UPDATE event_delivery_dead_letter
+SET delivery_attempts=GREATEST(delivery_attempts,?), last_error=?, failed_at=?, updated_at=? WHERE id=?`,
+			record.DeliveryAttempts, nullableString(record.LastError), record.FailedAt, record.FailedAt, rowID,
+		); err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
 }
 
-func deadLetterRecord(provider, topic, channel string, attempts int, messageID string, payload []byte, lastError string) DeadLetterRecord {
+func deadLetterRecord(provider, topic, channel string, attempts int, messageID, transportMessageID string, payload []byte, lastError string) DeadLetterRecord {
 	record := DeadLetterRecord{
-		MessageID: messageID, Provider: provider, Topic: topic, Channel: channel,
+		MessageID: messageID, TransportMessageID: transportMessageID, Provider: provider, Topic: topic, Channel: channel,
 		DeliveryAttempts: attempts, Payload: append([]byte(nil), payload...), LastError: lastError, FailedAt: time.Now(),
 	}
 	var envelope struct {

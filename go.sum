@@ -6,6 +6,8 @@ github.com/DATA-DOG/go-sqlmock v1.5.2 h1:OcvFkGmslmlZibjAjaHm3L//6LiuBgolP7Oputl
 github.com/DATA-DOG/go-sqlmock v1.5.2/go.mod h1:88MAG/4G7SMwSE3CeA0ZKzrT5CiOU3OJ+JlNzwDqpNU=
 github.com/FangcunMount/component-base v0.6.9 h1:PCf48lmwJSpROvCtVvI2qQqTKYL8q19S/NWc/VHa2aQ=
 github.com/FangcunMount/component-base v0.6.9/go.mod h1:geIr3xPkOsDaGMbgKLoQNzkKp8OwAQ1AMaPojX4Bs14=
+github.com/FangcunMount/component-base v0.6.10-0.20260925145725-10c9c75607ac h1:Yxg8G6rvlbMgTS2IHOsV45+87LDe9dIzjVfBYSPMgoc=
+github.com/FangcunMount/component-base v0.6.10-0.20260925145725-10c9c75607ac/go.mod h1:geIr3xPkOsDaGMbgKLoQNzkKp8OwAQ1AMaPojX4Bs14=
 github.com/FangcunMount/iam/v5 v5.2.0 h1:3Ilr7Po9pyMyLSF6giwkMKQOygKpidFZFt46ievprhw=
 github.com/FangcunMount/iam/v5 v5.2.0/go.mod h1:pExB3fi3/bm3tiKJWis1oP/jIGSmXhy7Wcv7MAc8zeo=
 github.com/FangcunMount/reliable-messaging v0.1.0 h1:bKKRzCVBnQu/gzhSJxpQlX3pvGPO7ma0Y4hJ8vl1H90=
