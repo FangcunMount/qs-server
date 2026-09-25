@@ -226,7 +226,7 @@ events:
 	consumer, err := nsq.NewConsumer("qs.evaluation.lifecycle", "rm-m5-failed-delivery", config)
 	require.NoError(t, err)
 	consumer.SetLogger(nil, nsq.LogLevelError)
-	deliveries := make(chan m5FailedDelivery, 2)
+	deliveries := make(chan m5FailedDelivery, 16)
 	retryDeliveries := make(chan m5FailedDelivery, 8)
 	consumer.AddHandler(nsq.HandlerFunc(func(raw *nsq.Message) error {
 		decoded, recognized, decodeErr := messaging.DecodeMessagePayload(raw.Body)
@@ -256,11 +256,9 @@ events:
 		if handleErr == nil && raw.Attempts == 1 {
 			handleErr = errors.New("controlled lost consumer ACK")
 		}
-		if decoded.UUID == intent.MessageID {
-			select {
-			case deliveries <- m5FailedDelivery{messageID: decoded.UUID, brokerID: raw.ID, attempts: raw.Attempts, err: handleErr}:
-			case <-ctx.Done():
-			}
+		select {
+		case deliveries <- m5FailedDelivery{messageID: decoded.UUID, brokerID: raw.ID, attempts: raw.Attempts, err: handleErr}:
+		case <-ctx.Done():
 		}
 		return handleErr
 	}))
@@ -407,6 +405,50 @@ events:
 		require.NoError(t, submitErr)
 		return record.ID
 	}
+	latestFailureMessageID := func() string {
+		t.Helper()
+		var row struct{ MessageID string }
+		require.NoError(t, db.Table("rm_outbox").Select("message_id").
+			Where("event_type = ?", eventcatalog.EvaluationFailed).Order("id DESC").Take(&row).Error)
+		require.NotEmpty(t, row.MessageID)
+		return row.MessageID
+	}
+	assertFailedProjection := func(assessmentID uint64, messageID string) {
+		t.Helper()
+		var first, second m5FailedDelivery
+		for first.messageID != messageID {
+			select {
+			case first = <-deliveries:
+			case <-ctx.Done():
+				t.Fatalf("failure event %s missing: %v", messageID, ctx.Err())
+			}
+		}
+		for second.messageID != messageID {
+			select {
+			case second = <-deliveries:
+			case <-ctx.Done():
+				t.Fatalf("failure event %s redelivery missing: %v", messageID, ctx.Err())
+			}
+		}
+		require.Equal(t, first.brokerID, second.brokerID)
+		require.EqualValues(t, 1, first.attempts)
+		require.Greater(t, second.attempts, first.attempts)
+		require.ErrorContains(t, first.err, "controlled lost consumer ACK")
+		require.NoError(t, second.err)
+		snapshot, snapshotErr := reportstatus.NewCache(statusHandle).Get(ctx, fmt.Sprint(assessmentID))
+		require.NoError(t, snapshotErr)
+		require.NotNil(t, snapshot)
+		require.Equal(t, "failed", snapshot.Status)
+		require.Equal(t, "evaluation_failed", snapshot.Reason)
+		var attempts int64
+		require.NoError(t, db.Table("runtime_checkpoint").
+			Where("scope = ? AND assessment_id = ?", "evaluation_run", assessmentID).Count(&attempts).Error)
+		require.EqualValues(t, 1, attempts, "failure delivery cannot authorize another business attempt")
+		require.Eventually(t, func() bool {
+			var state string
+			return db.Table("rm_outbox").Select("state").Where("message_id = ?", messageID).Scan(&state).Error == nil && state == "published"
+		}, 5*time.Second, 25*time.Millisecond)
+	}
 	governed := appoperator.NewGovernedRetryService(assessmentRepo, runRepo, runner, stager, m5GovernedAccess{})
 	actor := appoperator.Actor{OrgID: 1, OperatorUserID: 9}
 	permissionContext := func(action string) context.Context {
@@ -472,6 +514,8 @@ events:
 	manualRun, err := runRepo.FindLatestByAssessmentID(ctx, manualID)
 	require.NoError(t, err)
 	require.Equal(t, retrygovernance.DispositionManualRequired, manualRun.RetryDecision().Disposition)
+	require.Empty(t, manualRun.RetryDecision().RetryEventID, "manual failure cannot self-schedule a business retry")
+	assertFailedProjection(manualID, latestFailureMessageID())
 	manual := appoperator.GovernedRetryCommand{
 		AssessmentID: manualID, ExpectedAttempt: 1, Origin: retrygovernance.AttemptOriginManual,
 		RequestID: "m5-manual-business-delivery", Reason: "controlled retry",
@@ -494,6 +538,8 @@ events:
 	terminalRun, err := runRepo.FindLatestByAssessmentID(ctx, forceID)
 	require.NoError(t, err)
 	require.Equal(t, retrygovernance.DispositionTerminal, terminalRun.RetryDecision().Disposition)
+	require.Empty(t, terminalRun.RetryDecision().RetryEventID, "terminal failure cannot self-schedule a business retry")
+	assertFailedProjection(forceID, latestFailureMessageID())
 	force := appoperator.GovernedRetryCommand{
 		AssessmentID: forceID, ExpectedAttempt: 1, Origin: retrygovernance.AttemptOriginForce,
 		RequestID: "m5-force-business-delivery", Reason: "controlled force retry",
