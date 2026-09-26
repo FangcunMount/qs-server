@@ -254,6 +254,74 @@ func TestReportReadModelFailsClosedOnArtifactAssociationMismatchAgainstMongo(t *
 	assertAssociationMismatchFailClosed(t, reader, ctx, catalogAssessment, testeeID, ReportCatalogSourceArtifact, reportDomainID, "SECRET_FOREIGN_BODY")
 }
 
+func TestCurrentReportMetadataCarriesVerifiedSourceIdentityAgainstMongo(t *testing.T) {
+	db := openEvaluationMongoContractDB(t)
+	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
+	defer cancel()
+	baseID := uint64(time.Now().UnixNano() / int64(time.Millisecond))
+	validAssessment, invalidAssessment := baseID+1, baseID+2
+	validReport, invalidReport := baseID+101, baseID+102
+	now := time.Now().UTC().Truncate(time.Millisecond)
+	valid := InterpretReportPO{
+		BaseDocument: base.BaseDocument{ID: primitive.NewObjectID(), DomainID: meta.FromUint64(validReport), CreatedAt: now, UpdatedAt: now},
+		OrgID:        7, AssessmentID: validAssessment, TesteeID: baseID + 1000,
+		OutcomeID: baseID + 201, GenerationID: baseID + 301, InterpretationRunID: baseID + 401,
+		GeneratedAt: now,
+	}
+	invalid := InterpretReportPO{
+		BaseDocument: base.BaseDocument{ID: primitive.NewObjectID(), DomainID: meta.FromUint64(invalidReport), CreatedAt: now, UpdatedAt: now},
+		OrgID:        8, AssessmentID: invalidAssessment, TesteeID: baseID + 2000,
+		OutcomeID: baseID + 202, GenerationID: baseID + 302, InterpretationRunID: baseID + 402,
+		GeneratedAt: now,
+	}
+	reports := db.Collection((InterpretReportPO{}).CollectionName())
+	catalog := db.Collection((ReportCatalogPO{}).CollectionName())
+	t.Cleanup(func() {
+		cleanupCtx, cleanupCancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cleanupCancel()
+		_, _ = reports.DeleteMany(cleanupCtx, bson.M{"_id": bson.M{"$in": []primitive.ObjectID{valid.ID, invalid.ID}}})
+		_, _ = catalog.DeleteMany(cleanupCtx, bson.M{"assessment_id": bson.M{"$in": []uint64{validAssessment, invalidAssessment}}})
+	})
+	if _, err := reports.InsertMany(ctx, []interface{}{valid, invalid}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := catalog.InsertMany(ctx, []interface{}{
+		ReportCatalogPO{
+			AssessmentID: validAssessment, OrgID: valid.OrgID, TesteeID: valid.TesteeID,
+			OutcomeID: valid.OutcomeID, GenerationID: valid.GenerationID,
+			SourceKind: ReportCatalogSourceArtifact, SourceID: validReport, SortAt: now, SortReportID: validReport,
+		},
+		ReportCatalogPO{
+			AssessmentID: invalidAssessment, OrgID: 7, TesteeID: invalid.TesteeID,
+			OutcomeID: invalid.OutcomeID, GenerationID: invalid.GenerationID,
+			SourceKind: ReportCatalogSourceArtifact, SourceID: invalidReport, SortAt: now, SortReportID: invalidReport,
+		},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	metadata, err := NewReportReadModel(db).GetCurrentReportMetadataByAssessmentIDs(ctx, []uint64{validAssessment, invalidAssessment, baseID + 3})
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := metadata[validAssessment]
+	if got.Status != evaluationreadmodel.CurrentReportMetadataFound || got.SourceID != validReport ||
+		got.OrgID != valid.OrgID || got.TesteeID != valid.TesteeID || got.OutcomeID != valid.OutcomeID ||
+		got.GenerationID != valid.GenerationID || got.RunID != valid.InterpretationRunID {
+		t.Fatalf("verified source identity = %+v", got)
+	}
+	row, err := NewReportReadModel(db).GetReportByAssessmentID(ctx, validAssessment)
+	if err != nil || row == nil || row.ReportID != validReport || row.AssessmentID != validAssessment {
+		t.Fatalf("participant report identity = %+v, %v", row, err)
+	}
+	if got := metadata[invalidAssessment]; got.Status != evaluationreadmodel.CurrentReportMetadataMismatch ||
+		got.OrgID != 0 || got.TesteeID != 0 || got.RunID != 0 {
+		t.Fatalf("mismatched source leaked trusted identity: %+v", got)
+	}
+	if got := metadata[baseID+3]; got.Status != evaluationreadmodel.CurrentReportMetadataMissing {
+		t.Fatalf("missing report metadata = %+v", got)
+	}
+}
+
 func assertAssociationMismatchFailClosed(
 	t *testing.T,
 	reader evaluationreadmodel.ReportReader,
