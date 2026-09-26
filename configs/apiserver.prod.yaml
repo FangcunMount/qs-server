@@ -530,6 +530,13 @@ iam:
   enable-tracing: true            # 启用 OpenTelemetry 链路追踪
   enable-metrics: true            # 启用 Prometheus 指标
 
+  # 即使 NSQ 通知断线，也每 5 秒读取 IAM 已提交策略版本；证明超过 10 秒时拒绝沿用旧授权。
+  authz-version-guard:
+    enabled: true
+    max-age: 10s
+    poll-interval: 5s
+    read-timeout: 2s
+
   # authz 规则通知
   authz-sync:                           # authz 规则同步配置 (authz 规则更新后，通过 NSQ 通知 apiserver 更新规则)
     enabled: true                       # 是否启用 authz 同步: true
