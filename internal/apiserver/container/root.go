@@ -50,8 +50,9 @@ type Container struct {
 	actionAuditCancel          context.CancelFunc
 
 	// 事件发布器（统一管理）
-	eventPublisher event.EventPublisher
-	eventSubsystem *eventsubsystem.Subsystem
+	eventPublisher            event.EventPublisher
+	eventSubsystem            *eventsubsystem.Subsystem
+	taskOpenedReminderEnabled bool
 
 	// 业务模块
 	SurveyModule          *SurveyModule          // Survey 模块（包含问卷和答卷子模块）
@@ -81,6 +82,7 @@ type Container struct {
 	QRCodeService                      qrcodeApp.QRCodeService                            // 小程序码生成服务（可选）
 	OutcomeImageService                modelcatalogApp.OutcomeImageService                // 类型学结果图片上传服务（可选）
 	MiniProgramTaskNotificationService notificationApp.MiniProgramTaskNotificationService // 小程序 task 消息服务（可选）
+	TaskOpenedReminderService          notificationApp.TaskOpenedReminderService
 
 	// 容器状态
 	initialized bool
@@ -142,6 +144,7 @@ func NewContainerWithOptions(mysqlDB *gorm.DB, mongoDB *mongo.Database, redisCac
 	configureRetryPolicies(opts.SystemGovernance)
 	c := newBaseContainer(mysqlDB, mongoDB, redisCache)
 	c.eventSubsystem = opts.EventSubsystem
+	c.taskOpenedReminderEnabled = opts.TaskOpenedReminderEnabled
 	c.cacheOptions = opts.Cache
 	c.cache = opts.CacheSubsystem
 	c.locks = opts.LockSubsystem

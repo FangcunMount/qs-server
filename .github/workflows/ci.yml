@@ -185,6 +185,16 @@ jobs:
           trap 'docker exec "$MYSQL_CONTAINER" mysql -uroot -proot -e "DROP DATABASE qs_scope_test_enrollment"' EXIT
           go test ./internal/apiserver/infra/mysql/plan -run '^TestPlanEnrollmentOwnershipConcurrencyMySQL$' -count=1 -v
 
+      - name: Verify durable reminder recipient-set freeze on MySQL
+        env:
+          MYSQL_CONTAINER: ${{ job.services.mysql.id }}
+          QS_M5_REMINDER_LEDGER_MYSQL_REQUIRED: '1'
+          QS_M5_REMINDER_LEDGER_MYSQL_DSN: 'root:root@tcp(127.0.0.1:3306)/qs_m5_reminder_ledger_test_ci?parseTime=true&loc=Asia%2FShanghai'
+        run: |
+          docker exec "$MYSQL_CONTAINER" mysql -uroot -proot -e 'CREATE DATABASE qs_m5_reminder_ledger_test_ci'
+          trap 'docker exec "$MYSQL_CONTAINER" mysql -uroot -proot -e "DROP DATABASE qs_m5_reminder_ledger_test_ci"' EXIT
+          go test ./internal/apiserver/infra/mysql/notification -run '^TestReminderBatchFreezesCompleteRecipientSetAcrossConsumers$' -count=1 -v
+
   runtime-closure-e2e:
     name: Seeddata Retirement and Current Runtime E2E
     runs-on: ubuntu-latest

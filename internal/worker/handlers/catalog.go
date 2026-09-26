@@ -36,6 +36,9 @@ func NewRegistry() *Registry {
 		"task_opened_handler": func(deps *Dependencies) HandlerFunc {
 			return handleTaskOpened(deps)
 		},
+		"task_opened_reminder_handler": func(deps *Dependencies) HandlerFunc {
+			return handleTaskOpenedReminder(deps)
+		},
 		"task_completed_handler": func(deps *Dependencies) HandlerFunc {
 			return handleTaskCompleted(deps)
 		},

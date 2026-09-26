@@ -7,9 +7,11 @@ import (
 	"strconv"
 	"time"
 
+	pb "github.com/FangcunMount/qs-server/api/grpc/gen/internalapi"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventing/payload"
 	workerobservability "github.com/FangcunMount/qs-server/internal/worker/observability"
 	"github.com/FangcunMount/qs-server/internal/worker/port"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 func notificationMetaFromEnvelope(env *EventEnvelope) port.NotificationMeta {
@@ -87,6 +89,32 @@ func handleTaskOpened(deps *Dependencies) HandlerFunc {
 		}
 
 		return nil
+	}
+}
+
+type taskOpenedReminderClient interface {
+	ProcessTaskOpenedReminder(context.Context, *pb.ProcessTaskOpenedReminderRequest) error
+}
+
+func handleTaskOpenedReminder(deps *Dependencies) HandlerFunc {
+	return func(ctx context.Context, _ string, raw []byte) error {
+		var data eventpayload.TaskOpenedReminderRequestedData
+		env, err := ParseEventData(raw, &data)
+		if err != nil {
+			return fmt.Errorf("parse task opened reminder event: %w", err)
+		}
+		client, ok := deps.InternalClient.(taskOpenedReminderClient)
+		if !ok || client == nil {
+			return fmt.Errorf("durable task reminder API client is unavailable")
+		}
+		if env.ID == "" || data.TaskID == "" || data.TesteeID == "" || data.OrgID <= 0 || data.OpenAt.IsZero() {
+			return fmt.Errorf("task opened reminder event is incomplete")
+		}
+		return client.ProcessTaskOpenedReminder(ctx, &pb.ProcessTaskOpenedReminderRequest{
+			OrgId: data.OrgID, TaskId: data.TaskID, TesteeId: data.TesteeID,
+			OpeningEventId: env.ID, ScheduleRevision: data.ScheduleRevision,
+			OpenAt: timestamppb.New(data.OpenAt),
+		})
 	}
 }
 

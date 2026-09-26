@@ -154,3 +154,31 @@ func (flow notificationFlow) SendTaskOpenedMiniProgramNotification(
 		Message:          result.Message,
 	}, nil
 }
+
+func (flow notificationFlow) ProcessTaskOpenedReminder(
+	ctx context.Context, req *pb.ProcessTaskOpenedReminderRequest,
+) (*pb.ProcessTaskOpenedReminderResponse, error) {
+	if req == nil || req.GetTaskId() == "" || req.GetTesteeId() == "" || req.GetOpeningEventId() == "" || req.GetOpenAt() == nil {
+		return nil, status.Error(codes.InvalidArgument, "complete task opening reminder reference is required")
+	}
+	orgID, err := requestPlanOrgID(ctx, req.GetOrgId())
+	if err != nil {
+		return nil, err
+	}
+	if flow.service.taskOpenedReminderService == nil {
+		return nil, status.Error(codes.Unavailable, "task reminder service is unavailable")
+	}
+	err = flow.service.taskOpenedReminderService.ProcessTaskOpenedReminder(ctx, notificationApp.TaskOpenedReminderRequest{
+		OpeningEventID: req.GetOpeningEventId(),
+		Intent: notificationApp.TaskOpenedReminderIntent{
+			OrgID: orgID, TaskID: req.GetTaskId(), TesteeID: req.GetTesteeId(),
+			ScheduleRevision: req.GetScheduleRevision(), OpenAt: req.GetOpenAt().AsTime(),
+		},
+	})
+	if err != nil {
+		logger.L(ctx).Warnw("durable task reminder remains pending",
+			"task_id", req.GetTaskId(), "opening_event_id", req.GetOpeningEventId(), "error", err.Error())
+		return nil, status.Error(codes.Unavailable, "task reminder processing is pending retry")
+	}
+	return &pb.ProcessTaskOpenedReminderResponse{Processed: true}, nil
+}

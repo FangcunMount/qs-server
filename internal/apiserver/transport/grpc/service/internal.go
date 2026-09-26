@@ -29,6 +29,7 @@ type InternalService struct {
 	qrCodeService surveyScaleQRCodeGenerator
 	// 小程序 task 消息服务（可选）
 	miniProgramTaskNotificationService notificationApp.MiniProgramTaskNotificationService
+	taskOpenedReminderService          notificationApp.TaskOpenedReminderService
 }
 
 type surveyScaleQRCodeGenerator interface {
@@ -50,8 +51,9 @@ func NewInternalService(
 	warmupCoordinator cachegovernance.WarmupCoordinator,
 	qrCodeService surveyScaleQRCodeGenerator,
 	miniProgramTaskNotificationService notificationApp.MiniProgramTaskNotificationService,
+	reminder ...notificationApp.TaskOpenedReminderService,
 ) *InternalService {
-	return &InternalService{
+	service := &InternalService{
 		assessmentAttentionService:         assessmentAttentionService,
 		operatorLifecycleService:           operatorLifecycleService,
 		operatorAuthService:                operatorAuthService,
@@ -61,6 +63,10 @@ func NewInternalService(
 		qrCodeService:                      qrCodeService,
 		miniProgramTaskNotificationService: miniProgramTaskNotificationService,
 	}
+	if len(reminder) > 0 {
+		service.taskOpenedReminderService = reminder[0]
+	}
+	return service
 }
 
 // RegisterService 注册 gRPC 服务
@@ -232,6 +238,12 @@ func (s *InternalService) SendTaskOpenedMiniProgramNotification(
 	req *pb.SendTaskOpenedMiniProgramNotificationRequest,
 ) (*pb.SendTaskOpenedMiniProgramNotificationResponse, error) {
 	return newNotificationFlow(s).SendTaskOpenedMiniProgramNotification(ctx, req)
+}
+
+func (s *InternalService) ProcessTaskOpenedReminder(
+	ctx context.Context, req *pb.ProcessTaskOpenedReminderRequest,
+) (*pb.ProcessTaskOpenedReminderResponse, error) {
+	return newNotificationFlow(s).ProcessTaskOpenedReminder(ctx, req)
 }
 
 // BootstrapOperator 自举首个操作者。

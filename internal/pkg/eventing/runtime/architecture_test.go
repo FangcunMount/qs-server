@@ -147,6 +147,11 @@ func durableOutboxEventTokens(t *testing.T, catalog *eventcatalog.Catalog) map[s
 			"InterpretationRetryRequested",
 			"NewInterpretationRetryRequestedEvent",
 		},
+		eventcatalog.TaskOpenedReminderRequested: {
+			eventcatalog.TaskOpenedReminderRequested,
+			"TaskOpenedReminderRequested",
+			"NewTaskOpenedReminderRequestedEvent",
+		},
 	}
 
 	cfg := catalog.Config()

@@ -10,6 +10,7 @@ import (
 	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/component-base/pkg/event"
 	actorAccessApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/access"
+	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
 	planApp "github.com/FangcunMount/qs-server/internal/apiserver/application/plan"
 	plancache "github.com/FangcunMount/qs-server/internal/apiserver/cache/plan"
 	modtx "github.com/FangcunMount/qs-server/internal/apiserver/container/internal/transaction"
@@ -56,6 +57,7 @@ type Deps struct {
 	Observer        *observability.ComponentObserver
 	MySQLLimiter    backpressure.Acquirer
 	TesteeAccess    actorAccessApp.TesteeAccessService
+	OpenedOutbox    appEventing.ProfileBinding
 }
 
 // New assembles the plan module.
@@ -91,8 +93,8 @@ func New(deps Deps) (*Module, error) {
 	}
 	lifecycleService := planApp.NewLifecycleServiceWithEnrollment(planRepo, taskRepo, scaleCatalog, lifecycleEnrollments, txRunner, module.eventPublisher)
 	enrollmentService := planApp.NewEnrollmentService(planRepo, taskRepo, enrollmentRepo, txRunner, module.eventPublisher)
-	taskSchedulerService := planApp.NewTaskSchedulerServiceWithEnrollment(taskRepo, planRepo, enrollmentRepo, txRunner, entryGenerator, module.eventPublisher)
-	taskManagementService := planApp.NewTaskManagementServiceWithEnrollment(taskRepo, planRepo, enrollmentRepo, txRunner, entryGenerator, module.eventPublisher)
+	taskSchedulerService := planApp.NewTaskSchedulerServiceWithEnrollment(taskRepo, planRepo, enrollmentRepo, txRunner, entryGenerator, module.eventPublisher, normalized.OpenedOutbox)
+	taskManagementService := planApp.NewTaskManagementServiceWithEnrollment(taskRepo, planRepo, enrollmentRepo, txRunner, entryGenerator, module.eventPublisher, normalized.OpenedOutbox)
 	module.CommandService = planApp.NewCommandService(
 		lifecycleService,
 		enrollmentService,

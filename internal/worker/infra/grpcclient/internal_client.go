@@ -135,3 +135,19 @@ func (c *InternalClient) SendTaskOpenedMiniProgramNotification(
 
 	return resp, nil
 }
+
+func (c *InternalClient) ProcessTaskOpenedReminder(
+	ctx context.Context, req *pb.ProcessTaskOpenedReminderRequest,
+) error {
+	timeout := c.manager.Timeout()
+	if timeout < 30*time.Second {
+		timeout = 30 * time.Second
+	}
+	ctx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+	_, err := c.client.ProcessTaskOpenedReminder(ctx, req)
+	if err != nil {
+		return fmt.Errorf("process durable task reminder: %w", err)
+	}
+	return nil
+}

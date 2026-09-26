@@ -25,16 +25,17 @@ func TestDurableEventWireCompatibility(t *testing.T) {
 	}
 	resolver := eventcatalog.NewCatalog(cfg)
 	cases := []struct {
-		typeName, aggregate string
+		typeName, aggregate, topic string
 	}{
-		{"answersheet.submitted", "AnswerSheet"},
-		{"evaluation.requested", "Evaluation"},
-		{"evaluation.retry.requested", "Evaluation"},
-		{"evaluation.outcome.committed", "Evaluation"},
-		{"evaluation.failed", "Evaluation"},
-		{"interpretation.report.generated", "Report"},
-		{"interpretation.report.failed", "Report"},
-		{"interpretation.retry.requested", "ReportGeneration"},
+		{"answersheet.submitted", "AnswerSheet", "qs.evaluation.lifecycle"},
+		{"evaluation.requested", "Evaluation", "qs.evaluation.lifecycle"},
+		{"evaluation.retry.requested", "Evaluation", "qs.evaluation.lifecycle"},
+		{"evaluation.outcome.committed", "Evaluation", "qs.evaluation.lifecycle"},
+		{"evaluation.failed", "Evaluation", "qs.evaluation.lifecycle"},
+		{"interpretation.report.generated", "Report", "qs.evaluation.lifecycle"},
+		{"interpretation.report.failed", "Report", "qs.evaluation.lifecycle"},
+		{"interpretation.retry.requested", "ReportGeneration", "qs.evaluation.lifecycle"},
+		{"task.opened.reminder.requested", "AssessmentTask", "qs.plan.task"},
 	}
 	durable := make(map[string]bool)
 	for eventType, configured := range cfg.Events {
@@ -51,7 +52,7 @@ func TestDurableEventWireCompatibility(t *testing.T) {
 				t.Fatalf("event %q is no longer configured as durable", tc.typeName)
 			}
 			topic, ok := resolver.GetTopicForEvent(tc.typeName)
-			if !ok || topic != "qs.evaluation.lifecycle" {
+			if !ok || topic != tc.topic {
 				t.Fatalf("topic = %q, found = %v", topic, ok)
 			}
 			evt := event.Event[map[string]any]{

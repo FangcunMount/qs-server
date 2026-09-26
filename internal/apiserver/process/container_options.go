@@ -40,6 +40,7 @@ func (s *server) buildContainerOptions(input containerOptionsInput) container.Co
 	}
 	return container.ContainerOptions{
 		EventSubsystem:             input.eventSubsystem,
+		TaskOpenedReminderEnabled:  s.config.Eventing != nil && s.config.Eventing.TaskOpenedReminder,
 		Cache:                      s.buildContainerCacheOptions(),
 		CacheSubsystem:             input.cacheSubsystem,
 		LockSubsystem:              locks,

@@ -2,7 +2,7 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "da865886d1441f705cbb12f3601dcfcb246b31fe",
+    "sha": "e118677abe187237d693365cd667f5d233fe0fa7",
     "verified_on": "2026-09-26"
   },
   "status_policy": {
@@ -84,8 +84,8 @@
   "machine_contracts": {
     "migrations": {
       "mysql": {
-        "max_version": 87,
-        "version_count": 87
+        "max_version": 88,
+        "version_count": 88
       },
       "mongodb": {
         "max_version": 36,
@@ -94,7 +94,7 @@
     },
     "events": {
       "source": "configs/events.yaml",
-      "count": 14,
+      "count": 15,
       "names": [
         "answersheet.submitted",
         "assessment_model.changed",
@@ -109,7 +109,8 @@
         "task.canceled",
         "task.completed",
         "task.expired",
-        "task.opened"
+        "task.opened",
+        "task.opened.reminder.requested"
       ]
     },
     "signals": {
@@ -127,7 +128,7 @@
       "source": "api/grpc/proto",
       "proto_file_count": 8,
       "service_count": 28,
-      "rpc_count": 128,
+      "rpc_count": 129,
       "services": {
         "actor.ActorService": [
           "CreateTestee",
@@ -174,6 +175,7 @@
           "GenerateScaleQRCode",
           "HandleScalePublishedPostActions",
           "SendTaskOpenedMiniProgramNotification",
+          "ProcessTaskOpenedReminder",
           "BootstrapOperator"
         ],
         "internalapi.PlanCommandService": [

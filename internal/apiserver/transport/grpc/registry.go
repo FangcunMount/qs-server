@@ -54,6 +54,7 @@ type Deps struct {
 	WarmupCoordinator                  cachegovernance.WarmupCoordinator
 	QRCodeService                      SurveyScaleQRCodeGenerator
 	MiniProgramTaskNotificationService notificationApp.MiniProgramTaskNotificationService
+	TaskOpenedReminderService          notificationApp.TaskOpenedReminderService
 }
 
 type SurveyScaleQRCodeGenerator interface {
@@ -291,6 +292,7 @@ func (r *Registry) registerInternalService() error {
 		r.deps.WarmupCoordinator,
 		r.deps.QRCodeService,
 		r.deps.MiniProgramTaskNotificationService,
+		r.deps.TaskOpenedReminderService,
 	)
 	r.server.RegisterService(internalService)
 	log.Info("   🔧 Internal service registered (for Worker)")

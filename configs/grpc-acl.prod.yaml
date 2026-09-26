@@ -54,6 +54,7 @@ services:
       - /internalapi.InternalService/HandleQuestionnairePublishedPostActions
       - /internalapi.InternalService/HandleScalePublishedPostActions
       - /internalapi.InternalService/SendTaskOpenedMiniProgramNotification
+      - /internalapi.InternalService/ProcessTaskOpenedReminder
 
   - service_name: qs-ai.svc
     enabled: true

@@ -1,9 +1,13 @@
 package plan
 
 import (
+	"fmt"
+
+	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
 	"github.com/FangcunMount/qs-server/internal/apiserver/cache/catalog"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container/compose"
 	modelcatalogport "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
+	eventcatalog "github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime"
 )
 
@@ -12,6 +16,7 @@ type InstallHost interface {
 	compose.Host
 	PublishedModelLister() modelcatalogport.PublishedModelLister
 	SetPlanModule(*Module)
+	TaskOpenedReminderEnabled() bool
 }
 
 // InstallFrom wires and registers the plan module using composition-root host inputs.
@@ -21,6 +26,13 @@ func InstallFrom(host InstallHost) error {
 	redisClient := host.CacheClient(redisruntime.FamilyObject)
 	if !binding.Enabled {
 		redisClient = nil
+	}
+	var openedOutbox appEventing.ProfileBinding
+	if host.TaskOpenedReminderEnabled() {
+		openedOutbox = host.EventProfile(eventcatalog.OutboxProfileAssessmentMySQL)
+		if openedOutbox.Stager == nil {
+			return fmt.Errorf("task opened reminder requires a MySQL outbox profile")
+		}
 	}
 	module, err := Wire(WireInput{
 		MySQLDB:         host.MySQLDB(),
@@ -33,6 +45,7 @@ func InstallFrom(host InstallHost) error {
 		Observer:        host.CacheObserver(),
 		MySQLLimiter:    host.MySQLLimiter(),
 		TesteeAccess:    host.ActorPorts().TesteeAccess,
+		OpenedOutbox:    openedOutbox,
 	})
 	if err != nil {
 		return err

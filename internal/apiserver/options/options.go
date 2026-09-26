@@ -429,8 +429,9 @@ type OutboxRelayStoreOptions struct {
 }
 
 type EventingOptions struct {
-	Consumers      *EventConsumerOptions  `json:"consumers" mapstructure:"consumers"`
-	StandardOutbox *StandardOutboxOptions `json:"standard_outbox" mapstructure:"standard_outbox"`
+	Consumers          *EventConsumerOptions  `json:"consumers" mapstructure:"consumers"`
+	StandardOutbox     *StandardOutboxOptions `json:"standard_outbox" mapstructure:"standard_outbox"`
+	TaskOpenedReminder bool                   `json:"task_opened_reminder" mapstructure:"task_opened_reminder"`
 }
 
 // StandardOutboxOptions keeps each business flow on exactly one outbox profile.
@@ -468,6 +469,7 @@ func (o *EventingOptions) AddFlags(fs *pflag.FlagSet) {
 		fs.BoolVar(&o.StandardOutbox.Mongo, "eventing.standard-outbox.mongo", o.StandardOutbox.Mongo, "M4 candidate: use the standard Mongo outbox for the Mongo domain event flow.")
 		fs.BoolVar(&o.StandardOutbox.Assessment, "eventing.standard-outbox.assessment", o.StandardOutbox.Assessment, "M4 candidate: use the standard MySQL outbox for assessment events.")
 	}
+	fs.BoolVar(&o.TaskOpenedReminder, "eventing.task-opened-reminder", o.TaskOpenedReminder, "Stage task opening and durable SELF reminder in one MySQL transaction.")
 }
 
 func NewOutboxRelayOptions() *OutboxRelayOptions {
