@@ -41,6 +41,40 @@ printf '%s\n' "$sync" | grep -Eq '^[[:space:]]*provider:[[:space:]]*"?nsq"?([[:s
 printf '%s\n' "$sync" | grep -Eq '^[[:space:]]*topic:[[:space:]]*"?iam\.authz\.version\.v2"?([[:space:]#]|$)'
 printf '%s\n' "$sync" | grep -Eq '^[[:space:]]*ephemeral-nsq:[[:space:]]*false([[:space:]#]|$)'
 
+# Report only the non-secret M5-05 feature flag. A default, mounted config or
+# environment override can each determine the value used by Viper. An explicit
+# command-line override is unexpected for this deployment and needs review.
+reminder_file=$(sudo -n docker exec "$container" awk '
+  /^eventing:/ { inside=1; next }
+  inside && /^[^ ]/ { exit }
+  inside && /^  task_opened_reminder:/ { print $2 }
+' "$config")
+[[ -n "$reminder_file" ]] || reminder_file=unset
+[[ "$reminder_file" =~ ^(true|false|unset)$ ]] || {
+  echo "invalid or duplicate task_opened_reminder config value" >&2
+  exit 1
+}
+reminder_env=$(sudo -n docker inspect "$container" | jq -r '
+  [.[0].Config.Env[]? | select(startswith("QS_APISERVER_EVENTING_TASK_OPENED_REMINDER=")) | split("=")[1]]
+  | if length == 0 then "unset" elif length == 1 then .[0] else "duplicate" end
+')
+[[ "$reminder_env" =~ ^(true|false|unset)$ ]] || {
+  echo "invalid or duplicate task_opened_reminder environment value" >&2
+  exit 1
+}
+reminder_flags=$(sudo -n docker inspect "$container" | jq -r '
+  [((.[0].Config.Entrypoint // []) + (.[0].Config.Cmd // []))[]
+   | select(. == "--eventing.task-opened-reminder" or startswith("--eventing.task-opened-reminder="))]
+  | length
+')
+[[ "$reminder_flags" == 0 ]] || {
+  echo "explicit task_opened_reminder command flag requires manual review" >&2
+  exit 1
+}
+reminder_effective=false
+[[ "$reminder_file" == unset ]] || reminder_effective=$reminder_file
+[[ "$reminder_env" == unset ]] || reminder_effective=$reminder_env
+
 timers=$(systemctl list-timers --all --no-legend --no-pager) || {
   echo "cannot inspect existing M5 recovery timers" >&2
   exit 1
@@ -50,3 +84,4 @@ active=$(printf '%s\n' "$timers" | grep -E 'rm-m5-.*(role-restore|channel-unpaus
 
 printf 'API image=%s state=%s health=%s hostname=%s\n' "$image" "$state" "$health" "$hostname"
 printf 'guard=enabled/10s/5s/2s authz_sync=NSQ/persistent recovery_tools=present prior_timers=none\n'
+printf 'task_opened_reminder file=%s env=%s effective=%s\n' "$reminder_file" "$reminder_env" "$reminder_effective"
