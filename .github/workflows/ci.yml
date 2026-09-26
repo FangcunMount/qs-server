@@ -88,7 +88,7 @@ jobs:
         env:
           QS_ACTION_AUDIT_REQUIRE_MYSQL: 'true'
           QS_SERVER_TEST_MYSQL_DSN: 'root:root@tcp(127.0.0.1:3306)/action_audit_test?parseTime=true'
-        run: go test ./internal/apiserver/infra/mysql/systemgovernance -run '^(TestActionAuditLifecycleWithJSONColumns|TestDeliveryReplayReviewsKeepStaleAuditsVisibleWithoutCrossOrgRows|TestDeliveryResolutionRequiresCompleteEvidenceAndCommitsAtomicallyMySQL)$' -count=1 -v
+        run: go test ./internal/apiserver/infra/mysql/systemgovernance -run '^(TestActionAuditLifecycleWithJSONColumns|TestDeliveryReplayReviewsKeepStaleAuditsVisibleWithoutCrossOrgRows|TestDeliveryResolutionRequiresCompleteEvidenceAndCommitsAtomicallyMySQL|TestDeliveryResolutionConcurrentOperatorsSettleOnceMySQL)$' -count=1 -v
       - name: Verify transport replay batch guard against MySQL
         env:
           MYSQL_DSN: 'root:root@tcp(127.0.0.1:3306)/mysql?parseTime=true&loc=Asia%2FShanghai'

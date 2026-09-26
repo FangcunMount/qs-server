@@ -2,12 +2,15 @@ package systemgovernance
 
 import (
 	"context"
+	"database/sql"
 	"errors"
+	"fmt"
 	"os"
 	"strings"
 	"testing"
 	"time"
 
+	drivermysql "github.com/go-sql-driver/mysql"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
 )
@@ -149,6 +152,159 @@ func TestDeliveryResolutionRequiresCompleteEvidenceAndCommitsAtomicallyMySQL(t *
 		t.Fatal("resolved dead letter must reject a second resolution")
 	}
 	assertResolutionState(t, db, deliveryResolutionDisposition, 1)
+}
+
+func TestDeliveryResolutionConcurrentOperatorsSettleOnceMySQL(t *testing.T) {
+	db := openConcurrentResolutionMySQL(t)
+	start := time.Now().Add(-10 * time.Minute)
+	original := actionRunPO{
+		RequestID: "original-1", ActionID: "events.replay_delivery", OrgID: 7,
+		ActorUserID: 11, InputJSON: `{"targets":[{"id":41,"expected_delivery_attempts":8}]}`,
+		Status: "failed", ResultJSON: "null", StartedAt: start,
+	}
+	if err := db.Create(&original).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Exec(`INSERT INTO event_delivery_dead_letter
+		(id,message_id,event_id,org_id,provider,topic_name,channel_name,delivery_attempts,payload_json,retry_disposition,replay_request_id,failed_at)
+		VALUES (41,'message-41','event-41',7,'nsq','topic','channel',8,'{"id":"event-41"}','automatic','original-1',?)`, start).Error; err != nil {
+		t.Fatal(err)
+	}
+	store := NewActionAuditStore(db)
+	req := DeliveryResolutionRequest{
+		OrgID: 7, ActorUserID: 22, RequestID: "resolution-1", OriginalReplayRequestID: "original-1",
+		DeadLetterID: 41, EventID: "event-41", ExpectedDeliveryAttempts: 8, Reason: "verified effects",
+	}
+	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
+	defer cancel()
+	firstVerifying := make(chan struct{})
+	releaseFirst := make(chan struct{})
+	defer func() {
+		select {
+		case <-releaseFirst:
+		default:
+			close(releaseFirst)
+		}
+	}()
+	firstResult := make(chan error, 1)
+	go func() {
+		firstResult <- store.ResolveDelivery(ctx, req, func(ctx context.Context, _ *gorm.DB, _ DeliveryResolutionSubject) (DeliveryResolutionEvidence, error) {
+			close(firstVerifying)
+			select {
+			case <-releaseFirst:
+				return DeliveryResolutionEvidence{Kind: "business_fact", Reference: "proof-41", AllEffectsConfirmed: true}, nil
+			case <-ctx.Done():
+				return DeliveryResolutionEvidence{}, ctx.Err()
+			}
+		})
+	}()
+	select {
+	case <-firstVerifying:
+	case <-ctx.Done():
+		t.Fatalf("first operator did not lock the delivery: %v", ctx.Err())
+	}
+	second := req
+	second.RequestID = "resolution-2"
+	secondVerifying := make(chan struct{}, 1)
+	secondResult := make(chan error, 1)
+	go func() {
+		secondResult <- store.ResolveDelivery(ctx, second, func(context.Context, *gorm.DB, DeliveryResolutionSubject) (DeliveryResolutionEvidence, error) {
+			secondVerifying <- struct{}{}
+			return DeliveryResolutionEvidence{Kind: "business_fact", Reference: "proof-41", AllEffectsConfirmed: true}, nil
+		})
+	}()
+	select {
+	case err := <-secondResult:
+		t.Fatalf("second operator completed while first held the row lock: %v", err)
+	case <-time.After(100 * time.Millisecond):
+	case <-ctx.Done():
+		t.Fatalf("concurrent resolution timed out before settlement: %v", ctx.Err())
+	}
+	close(releaseFirst)
+	select {
+	case err := <-firstResult:
+		if err != nil {
+			t.Fatalf("first operator failed: %v", err)
+		}
+	case <-ctx.Done():
+		t.Fatalf("first operator did not settle: %v", ctx.Err())
+	}
+	select {
+	case err := <-secondResult:
+		if err == nil {
+			t.Fatal("a distinct second request must not resolve an already settled delivery")
+		}
+	case <-ctx.Done():
+		t.Fatalf("second operator did not observe the settled delivery: %v", ctx.Err())
+	}
+	select {
+	case <-secondVerifying:
+		t.Fatal("second operator verified effects after the first resolution committed")
+	default:
+	}
+	assertResolutionState(t, db, deliveryResolutionDisposition, 1)
+	var originalAfter actionRunPO
+	if err := db.Where("id = ?", original.ID).Take(&originalAfter).Error; err != nil {
+		t.Fatal(err)
+	}
+	if originalAfter.Status != "failed" || originalAfter.ResultJSON != "null" {
+		t.Fatal("concurrent resolution rewrote the original replay audit")
+	}
+}
+
+func openConcurrentResolutionMySQL(t *testing.T) *gorm.DB {
+	t.Helper()
+	dsn := os.Getenv("QS_SERVER_TEST_MYSQL_DSN")
+	if dsn == "" {
+		if os.Getenv("QS_ACTION_AUDIT_REQUIRE_MYSQL") == "true" {
+			t.Fatal("QS_SERVER_TEST_MYSQL_DSN is required")
+		}
+		t.Skip("requires isolated MySQL")
+	}
+	cfg, err := drivermysql.ParseDSN(dsn)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cfg.DBName = ""
+	server, err := sql.Open("mysql", cfg.FormatDSN())
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = server.Close() })
+	databaseName := fmt.Sprintf("qs_delivery_resolution_%d", time.Now().UnixNano())
+	if _, err := server.ExecContext(t.Context(), "CREATE DATABASE `"+databaseName+"` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci"); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _, _ = server.ExecContext(context.Background(), "DROP DATABASE IF EXISTS `"+databaseName+"`") })
+	cfg.DBName = databaseName
+	cfg.ParseTime = true
+	db, err := gorm.Open(mysql.Open(cfg.FormatDSN()), &gorm.Config{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	pool, err := db.DB()
+	if err != nil {
+		t.Fatal(err)
+	}
+	pool.SetMaxOpenConns(4)
+	t.Cleanup(func() { _ = pool.Close() })
+	for _, path := range []string{
+		"../../../../../internal/pkg/migration/migrations/mysql/000048_add_system_governance_action_runs.up.sql",
+		"../../../../../internal/pkg/migration/migrations/mysql/000049_add_retry_governance.up.sql",
+	} {
+		ddl, readErr := os.ReadFile(path)
+		if readErr != nil {
+			t.Fatal(readErr)
+		}
+		source := string(ddl)
+		if strings.Contains(path, "000049") {
+			source = source[strings.Index(source, "CREATE TABLE `event_delivery_dead_letter`"):]
+		}
+		if err := db.Exec(source).Error; err != nil {
+			t.Fatal(err)
+		}
+	}
+	return db
 }
 
 func assertResolutionState(t *testing.T, db *gorm.DB, disposition string, auditCount int64) {
