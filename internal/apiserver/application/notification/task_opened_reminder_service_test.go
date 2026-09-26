@@ -51,6 +51,8 @@ type reminderDeliveryStub struct {
 	state        ReminderDeliveryState
 	beginCount   int
 	unknownCount int
+	unknownCode  string
+	onBegin      func()
 }
 
 func (s *reminderDeliveryStub) EnsurePending(context.Context, ReminderDeliveryKey, string, time.Time) (ReminderDelivery, error) {
@@ -66,14 +68,18 @@ func (s *reminderDeliveryStub) Claim(context.Context, ReminderDeliveryKey, time.
 func (s *reminderDeliveryStub) BeginExternalCall(context.Context, ReminderDeliveryKey, string, time.Time) (bool, error) {
 	s.beginCount++
 	s.state = ReminderSending
+	if s.onBegin != nil {
+		s.onBegin()
+	}
 	return true, nil
 }
 func (s *reminderDeliveryStub) Confirm(context.Context, ReminderDeliveryKey, string, string, time.Time) (bool, error) {
 	s.state = ReminderConfirmed
 	return true, nil
 }
-func (s *reminderDeliveryStub) MarkUnknown(context.Context, ReminderDeliveryKey, string, string, time.Time) (bool, error) {
+func (s *reminderDeliveryStub) MarkUnknown(_ context.Context, _ ReminderDeliveryKey, _, code string, _ time.Time) (bool, error) {
 	s.unknownCount++
+	s.unknownCode = code
 	s.state = ReminderManualRequired
 	return true, nil
 }
@@ -170,4 +176,43 @@ func TestDurableReminderSuppressesBeforeExternalCallAfterTaskCompletes(t *testin
 	require.True(t, batches.batch.Suppressed)
 	require.Equal(t, "task_not_opened", batches.batch.ResolutionCode)
 	require.Zero(t, receipts.calls)
+}
+
+func TestDurableReminderDoesNotCallPlatformWhenMarkerCrossesOneHourDeadline(t *testing.T) {
+	opened := time.Date(2026, 9, 26, 10, 0, 0, 0, time.FixedZone("UTC+8", 8*3600))
+	expires := opened.Add(24 * time.Hour)
+	reader := &reminderTaskReaderStub{state: &planApp.TaskReminderState{
+		OrgID: 7, TaskID: "task-1", TesteeID: "12", Status: planDomain.TaskStatusOpened,
+		ScheduleRevision: 3, OpenAt: &opened, ExpireAt: &expires,
+		EntryURL: "https://collect.example/entry?token=secret&task_id=task-1",
+	}}
+	profileID := uint64(1001)
+	identities := &reminderCandidateReaderStub{
+		linked: []iambridge.MiniProgramLinkedUser{{UserID: "self-user", Relations: []string{"self"}}},
+		candidates: []iambridge.MiniProgramRecipientCandidate{{
+			UserID: "self-user", LoginIdentityID: "self-identity", AppID: "wx-app",
+			OpenID: "self-openid", Relations: []string{"self"},
+		}},
+	}
+	current := opened.Add(59*time.Minute + 59*time.Second)
+	deliveries := &reminderDeliveryStub{onBegin: func() { current = opened.Add(time.Hour) }}
+	receipts := &receiptSenderStub{}
+	service := NewTaskOpenedReminderService(reader, &testeeLookupStub{result: &testeeApp.TesteeResult{
+		ID: 12, ProfileID: &profileID,
+	}}, identities, &reminderBatchStub{}, deliveries, &wechatAppLookupStub{},
+		&senderStub{templates: []wechatmini.SubscribeTemplate{{
+			ID: "tmpl-1", Content: "{{thing5.DATA}}{{date1.DATA}}{{character_string2.DATA}}{{thing3.DATA}}",
+		}}}, receipts, nil, nil,
+		&Config{AppID: "wx-app", AppSecret: "wx-secret", PagePath: "pages/task/index", TaskOpenedTemplateID: "tmpl-1"},
+	).(*taskOpenedReminderService)
+	service.now = func() time.Time { return current }
+	request := TaskOpenedReminderRequest{OpeningEventID: "event-1", Intent: TaskOpenedReminderIntent{
+		OrgID: 7, TaskID: "task-1", TesteeID: "12", ScheduleRevision: 3, OpenAt: opened,
+	}}
+	require.NoError(t, service.ProcessTaskOpenedReminder(context.Background(), request))
+	require.Zero(t, receipts.calls)
+	require.Equal(t, ReminderManualRequired, deliveries.state)
+	require.Equal(t, "deadline_after_call_marker", deliveries.unknownCode)
+	require.NoError(t, service.ProcessTaskOpenedReminder(context.Background(), request))
+	require.Zero(t, receipts.calls, "a late marker must never lead to a later automatic send")
 }

@@ -253,9 +253,22 @@ func (s *taskOpenedReminderService) deliverOne(
 	if !started {
 		return fmt.Errorf("reminder external call marker was not acquired")
 	}
-	receipt, sendErr := s.receipts.SendSubscribeMessageWithReceipt(ctx, batch.AppID, appSecret, message)
 	settleCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
 	defer cancel()
+	// Persisting the call marker can itself cross the deadline. The platform
+	// must not be called after that point. Keep the row for manual review: a
+	// process lost around this marker cannot safely infer an unsent outcome.
+	if !s.now().Before(intent.OpenAt.Add(TaskOpenedReminderWindow)) {
+		marked, markErr := s.deliveries.MarkUnknown(settleCtx, key, token, "deadline_after_call_marker", s.now())
+		if markErr != nil {
+			return markErr
+		}
+		if !marked {
+			return fmt.Errorf("expired reminder call marker could not be recorded")
+		}
+		return nil
+	}
+	receipt, sendErr := s.receipts.SendSubscribeMessageWithReceipt(ctx, batch.AppID, appSecret, message)
 	if sendErr != nil || receipt.PlatformMessageID == "" {
 		var marked bool
 		marked, err = s.deliveries.MarkUnknown(settleCtx, key, token, "platform_result_unknown", s.now())
