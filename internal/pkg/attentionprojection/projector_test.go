@@ -72,6 +72,34 @@ func TestProjectorDuplicateEventIsIdempotent(t *testing.T) {
 	}
 }
 
+func TestProjectorRejectsChangedIdentityAndPreservesSucceededEvidence(t *testing.T) {
+	store := NewMemoryStore()
+	client := &stubSyncClient{}
+	projector := NewProjector(store, client, DefaultMaxAttempts, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	input := PendingInput{
+		EventID: "evt-fixed", ReportID: "report-1", AssessmentID: "123",
+		TesteeID: 99, RiskLevel: "severe", MarkKeyFocus: true,
+	}
+	if err := projector.Project(context.Background(), input); err != nil {
+		t.Fatal(err)
+	}
+	changed := input
+	changed.ReportID = "report-2"
+	if err := projector.Project(context.Background(), changed); !errors.Is(err, ErrIdentityConflict) {
+		t.Fatalf("changed event identity error = %v, want ErrIdentityConflict", err)
+	}
+	if status, err := store.RecordFailure(context.Background(), input.EventID, "late failure", 1); err != nil || status != StatusSucceeded {
+		t.Fatalf("late failure status=%q err=%v, want succeeded", status, err)
+	}
+	record, err := store.GetByEventID(context.Background(), input.EventID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !matchesPendingInput(record, input) || record.Status != StatusSucceeded || record.Attempt != 0 || client.calls != 1 {
+		t.Fatalf("succeeded evidence changed: record=%+v rpc_calls=%d", record, client.calls)
+	}
+}
+
 func TestProjectorConvergesAfterReconcileRetry(t *testing.T) {
 	store := NewMemoryStore()
 	client := &stubSyncClient{err: errors.New("temporary outage")}

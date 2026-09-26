@@ -53,10 +53,8 @@ func (s *MySQLStore) EnsurePending(ctx context.Context, input PendingInput) (boo
 		Status: StatusPending, Attempt: 0, CreatedAt: now, UpdatedAt: now,
 	}
 	err := s.db.WithContext(ctx).Clauses(clause.OnConflict{
-		Columns: []clause.Column{{Name: "event_id"}},
-		DoUpdates: clause.AssignmentColumns([]string{
-			"report_id", "assessment_id", "testee_id", "risk_level", "mark_key_focus", "updated_at",
-		}),
+		Columns:   []clause.Column{{Name: "event_id"}},
+		DoNothing: true,
 	}).Create(&po).Error
 	if err != nil {
 		return false, fmt.Errorf("ensure attention projection pending: %w", err)
@@ -64,6 +62,9 @@ func (s *MySQLStore) EnsurePending(ctx context.Context, input PendingInput) (boo
 	record, err := s.GetByEventID(ctx, input.EventID)
 	if err != nil {
 		return false, err
+	}
+	if !matchesPendingInput(record, input) {
+		return false, fmt.Errorf("%w: event=%s", ErrIdentityConflict, input.EventID)
 	}
 	return record.Status == StatusSucceeded, nil
 }
@@ -99,6 +100,10 @@ func (s *MySQLStore) RecordFailure(ctx context.Context, eventID string, errMsg s
 				return fmt.Errorf("%w: event=%s", ErrNotFound, eventID)
 			}
 			return err
+		}
+		if po.Status == StatusSucceeded {
+			status = StatusSucceeded
+			return nil
 		}
 		attempt := po.Attempt + 1
 		status = StatusFailed

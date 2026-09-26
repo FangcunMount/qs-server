@@ -6,6 +6,7 @@ import (
 )
 
 var ErrNotFound = errors.New("attention projection not found")
+var ErrIdentityConflict = errors.New("attention projection event identity conflicts with persisted input")
 
 // Status is the durable attention projection lifecycle.
 type Status string
@@ -45,6 +46,13 @@ type PendingInput struct {
 	TesteeID     uint64
 	RiskLevel    string
 	MarkKeyFocus bool
+}
+
+func matchesPendingInput(record *Record, input PendingInput) bool {
+	return record != nil && record.EventID == input.EventID &&
+		record.ReportID == input.ReportID && record.AssessmentID == input.AssessmentID &&
+		record.TesteeID == input.TesteeID && record.RiskLevel == input.RiskLevel &&
+		record.MarkKeyFocus == input.MarkKeyFocus
 }
 
 // ReportFact is the immutable Interpretation artifact fact used to detect a

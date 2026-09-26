@@ -31,15 +31,12 @@ func (s *MemoryStore) EnsurePending(_ context.Context, input PendingInput) (bool
 
 	existing, ok := s.records[input.EventID]
 	if ok {
+		if !matchesPendingInput(existing, input) {
+			return false, fmt.Errorf("%w: event=%s", ErrIdentityConflict, input.EventID)
+		}
 		if existing.Status == StatusSucceeded {
 			return true, nil
 		}
-		existing.ReportID = input.ReportID
-		existing.AssessmentID = input.AssessmentID
-		existing.TesteeID = input.TesteeID
-		existing.RiskLevel = input.RiskLevel
-		existing.MarkKeyFocus = input.MarkKeyFocus
-		existing.UpdatedAt = s.now()
 		return false, nil
 	}
 
@@ -83,6 +80,9 @@ func (s *MemoryStore) RecordFailure(_ context.Context, eventID string, errMsg st
 	rec, ok := s.records[eventID]
 	if !ok {
 		return "", fmt.Errorf("attention projection not found: %s", eventID)
+	}
+	if rec.Status == StatusSucceeded {
+		return StatusSucceeded, nil
 	}
 	rec.Attempt++
 	rec.LastError = errMsg
