@@ -93,6 +93,15 @@ jobs:
         env:
           MYSQL_DSN: 'root:root@tcp(127.0.0.1:3306)/mysql?parseTime=true&loc=Asia%2FShanghai'
         run: go test -tags=integration ./internal/apiserver/infra/mysql/eventdelivery -run '^TestDeliveryReplayClaimsAreScopedAndUncertainClaimsAreNotResent$' -count=1 -v
+      - name: Verify attention projection evidence identity against MySQL
+        env:
+          MYSQL_CONTAINER: ${{ job.services.mysql.id }}
+          QS_ATTENTION_LEDGER_MYSQL_REQUIRED: '1'
+          QS_ATTENTION_LEDGER_MYSQL_DSN: 'root:root@tcp(127.0.0.1:3306)/attention_ledger_ci?parseTime=true&loc=Asia%2FShanghai'
+        run: |
+          docker exec "$MYSQL_CONTAINER" mysql -uroot -proot -e 'CREATE DATABASE attention_ledger_ci'
+          trap 'docker exec "$MYSQL_CONTAINER" mysql -uroot -proot -e "DROP DATABASE attention_ledger_ci"' EXIT
+          go test -tags=integration ./internal/pkg/attentionprojection -run '^TestAttentionProjectionEvidenceIdentityAndSuccessAreStableMySQL$' -count=1 -v
 
   authz-guard-two-process-mysql:
     name: AuthZ committed version two-process MySQL

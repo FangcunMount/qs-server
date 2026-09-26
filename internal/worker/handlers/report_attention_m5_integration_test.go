@@ -141,4 +141,19 @@ func TestM5ReportGeneratedAttentionRecoversFromDurableMySQLLedger(t *testing.T) 
 	if client.syncAssessmentAttentionCalls != 2 {
 		t.Fatalf("duplicate report event repeated successful attention RPC: calls=%d", client.syncAssessmentAttentionCalls)
 	}
+	changed := attentionprojection.PendingInput{
+		EventID: "evt-report-generated-outcome", ReportID: "different-report",
+		AssessmentID: record.AssessmentID, TesteeID: record.TesteeID,
+		RiskLevel: record.RiskLevel, MarkKeyFocus: record.MarkKeyFocus,
+	}
+	if _, err := store.EnsurePending(ctx, changed); !errors.Is(err, attentionprojection.ErrIdentityConflict) {
+		t.Fatalf("changed EventID identity error = %v, want conflict", err)
+	}
+	if status, err := store.RecordFailure(ctx, changed.EventID, "late failed RPC", 1); err != nil || status != attentionprojection.StatusSucceeded {
+		t.Fatalf("late failure status=%q err=%v, want succeeded", status, err)
+	}
+	record, err = store.GetByEventID(ctx, changed.EventID)
+	if err != nil || record.ReportID != "report-1" || record.Status != attentionprojection.StatusSucceeded || record.Attempt != 1 {
+		t.Fatalf("succeeded MySQL evidence changed: record=%+v err=%v", record, err)
+	}
 }
