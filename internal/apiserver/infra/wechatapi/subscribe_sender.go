@@ -1,14 +1,20 @@
 package wechatapi
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
+	"io"
+	"net/http"
+	"net/url"
 	"strconv"
 
 	"github.com/silenceper/wechat/v2"
 	"github.com/silenceper/wechat/v2/cache"
 	miniConfig "github.com/silenceper/wechat/v2/miniprogram/config"
 	miniSubscribe "github.com/silenceper/wechat/v2/miniprogram/subscribe"
+	"github.com/silenceper/wechat/v2/util"
 
 	wechatmini "github.com/FangcunMount/qs-server/internal/apiserver/port/wechatmini"
 )
@@ -17,12 +23,21 @@ import (
 type SubscribeSender struct {
 	cache     cache.Cache
 	newClient func(appID, appSecret string) (subscribeClient, error)
+	doRequest func(*http.Request) (*http.Response, error)
 }
 
 type subscribeClient interface {
 	Send(*miniSubscribe.Message) error
-	SendGetMsgID(*miniSubscribe.Message) (int64, error)
+	GetAccessTokenContext(context.Context) (string, error)
 	ListTemplates() (*miniSubscribe.TemplateList, error)
+}
+
+const subscribeSendURL = "https://api.weixin.qq.com/cgi-bin/message/subscribe/send"
+
+type subscribeSendResponse struct {
+	ErrCode *int64  `json:"errcode"`
+	ErrMsg  *string `json:"errmsg"`
+	MsgID   *int64  `json:"msgid"`
 }
 
 // NewSubscribeSender 创建小程序订阅消息发送器。
@@ -46,20 +61,61 @@ func (s *SubscribeSender) SendSubscribeMessage(_ context.Context, appID, appSecr
 // its msgid when present. The documented subscribe-message success response is
 // {"errcode":0,"errmsg":"ok"} without a msgid.
 // https://developers.weixin.qq.com/miniprogram/dev/server/API/mp-message-management/subscribe-message/api_sendmessage
-// The upstream library does not accept a context for the send call. In particular, a caller-side
-// timeout or lost response must be treated as an unknown outcome, not permission to resend.
-func (s *SubscribeSender) SendSubscribeMessageWithReceipt(_ context.Context, appID, appSecret string, msg wechatmini.SubscribeMessage) (wechatmini.SubscribeSendReceipt, error) {
+// The upstream SendGetMsgID method treats a missing errcode as zero. Read the
+// response directly so only an explicit platform success can confirm the send.
+// A timeout or lost response remains unknown, never permission to resend.
+func (s *SubscribeSender) SendSubscribeMessageWithReceipt(ctx context.Context, appID, appSecret string, msg wechatmini.SubscribeMessage) (wechatmini.SubscribeSendReceipt, error) {
 	subscribeClient, err := s.newSubscribeClient(appID, appSecret)
 	if err != nil {
 		return wechatmini.SubscribeSendReceipt{}, err
 	}
-	msgID, err := subscribeClient.SendGetMsgID(subscribeMessage(msg))
+	accessToken, err := subscribeClient.GetAccessTokenContext(ctx)
 	if err != nil {
-		return wechatmini.SubscribeSendReceipt{}, fmt.Errorf("send subscribe message with receipt: %w", err)
+		return wechatmini.SubscribeSendReceipt{}, fmt.Errorf("get subscribe message access token: %w", err)
+	}
+	endpoint := subscribeSendURL + "?access_token=" + url.QueryEscape(accessToken)
+	body, err := json.Marshal(subscribeMessage(msg))
+	if err != nil {
+		return wechatmini.SubscribeSendReceipt{}, fmt.Errorf("encode subscribe message: %w", err)
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(body))
+	if err != nil {
+		return wechatmini.SubscribeSendReceipt{}, fmt.Errorf("create subscribe request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json;charset=utf-8")
+	doRequest := s.doRequest
+	if doRequest == nil {
+		doRequest = util.DefaultHTTPClient.Do
+	}
+	response, err := doRequest(req)
+	if err != nil {
+		// HTTP errors may contain the request URL and its access token.
+		return wechatmini.SubscribeSendReceipt{}, fmt.Errorf("send subscribe request: response unavailable")
+	}
+	defer func() { _ = response.Body.Close() }()
+	if response.StatusCode != http.StatusOK {
+		return wechatmini.SubscribeSendReceipt{}, fmt.Errorf("send subscribe request: HTTP %d", response.StatusCode)
+	}
+	responseBody, err := io.ReadAll(io.LimitReader(response.Body, 64*1024+1))
+	if err != nil || len(responseBody) > 64*1024 {
+		return wechatmini.SubscribeSendReceipt{}, fmt.Errorf("read subscribe response: incomplete or too large")
+	}
+	var result subscribeSendResponse
+	if err := json.Unmarshal(responseBody, &result); err != nil || result.ErrCode == nil {
+		return wechatmini.SubscribeSendReceipt{}, fmt.Errorf("send subscribe request: missing or invalid errcode")
+	}
+	if *result.ErrCode != 0 {
+		return wechatmini.SubscribeSendReceipt{}, fmt.Errorf("send subscribe request: platform errcode=%d", *result.ErrCode)
+	}
+	if result.ErrMsg == nil || *result.ErrMsg != "ok" {
+		return wechatmini.SubscribeSendReceipt{}, fmt.Errorf("send subscribe request: missing or invalid success message")
 	}
 	receipt := wechatmini.SubscribeSendReceipt{Accepted: true}
-	if msgID > 0 {
-		receipt.PlatformMessageID = strconv.FormatInt(msgID, 10)
+	if result.MsgID != nil {
+		if *result.MsgID <= 0 {
+			return wechatmini.SubscribeSendReceipt{}, fmt.Errorf("send subscribe request: invalid msgid")
+		}
+		receipt.PlatformMessageID = strconv.FormatInt(*result.MsgID, 10)
 	}
 	return receipt, nil
 }
