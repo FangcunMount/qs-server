@@ -75,6 +75,7 @@ func (g *VersionGuard) Verify(ctx context.Context) (int64, error) {
 	cooldown := g.now().Before(g.retryAfter)
 	g.mu.Unlock()
 	if cooldown {
+		committedVersionProofRejected.WithLabelValues("retry_interval").Inc()
 		return 0, fmt.Errorf("committed policy version proof unavailable during retry interval")
 	}
 	result := g.reads.DoChan("committed-version", func() (any, error) {
@@ -94,11 +95,13 @@ func (g *VersionGuard) Verify(ctx context.Context) (int64, error) {
 		return 0, ctx.Err()
 	case read := <-result:
 		if read.Err != nil {
+			committedVersionProofRejected.WithLabelValues("read_or_retry_error").Inc()
 			return 0, read.Err
 		}
 		if version, ok := g.proof(); ok {
 			return version, nil
 		}
+		committedVersionProofRejected.WithLabelValues("expired_or_behind").Inc()
 		return 0, fmt.Errorf("committed policy version proof expired or is behind a notification")
 	}
 }
@@ -115,22 +118,29 @@ func (g *VersionGuard) Refresh(ctx context.Context) error {
 
 func (g *VersionGuard) read(ctx context.Context) (int64, error) {
 	started := g.now() // Start of the remote read, not the response time.
+	wallStarted := time.Now()
+	result := "success"
+	defer func() { observeCommittedVersionRead(result, time.Since(wallStarted)) }()
 	version, err := g.reader.GetCommittedPolicyVersion(ctx)
 	if err != nil {
+		result = "reader_error"
 		g.scheduleRetry()
 		return 0, fmt.Errorf("committed policy version read failed: %w", err)
 	}
 	if version <= 0 {
+		result = "invalid_version"
 		g.scheduleRetry()
 		return 0, fmt.Errorf("IAM returned an invalid committed policy version")
 	}
 	g.mu.Lock()
 	defer g.mu.Unlock()
 	if version < g.committed || version < g.observed {
+		result = "version_regression"
 		g.retryAfter = g.now().Add(g.retryInterval)
 		return 0, fmt.Errorf("IAM committed policy version is behind the observed watermark")
 	}
 	if !g.now().Before(started.Add(g.maxAge)) {
+		result = "stale_response"
 		g.retryAfter = g.now().Add(g.retryInterval)
 		return 0, fmt.Errorf("committed policy version proof expired during read")
 	}
@@ -139,6 +149,7 @@ func (g *VersionGuard) read(ctx context.Context) (int64, error) {
 		g.started = started
 	}
 	g.retryAfter = time.Time{}
+	committedVersionProofStart.Set(float64(g.started.UnixNano()) / float64(time.Second))
 	return g.committed, nil
 }
 
