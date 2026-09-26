@@ -41,7 +41,11 @@ printf '%s\n' "$sync" | grep -Eq '^[[:space:]]*provider:[[:space:]]*"?nsq"?([[:s
 printf '%s\n' "$sync" | grep -Eq '^[[:space:]]*topic:[[:space:]]*"?iam\.authz\.version\.v2"?([[:space:]#]|$)'
 printf '%s\n' "$sync" | grep -Eq '^[[:space:]]*ephemeral-nsq:[[:space:]]*false([[:space:]#]|$)'
 
-active=$(systemctl list-timers --all --no-legend --no-pager | grep -E 'rm-m5-.*(role-restore|channel-unpause)' || true)
+timers=$(systemctl list-timers --all --no-legend --no-pager) || {
+  echo "cannot inspect existing M5 recovery timers" >&2
+  exit 1
+}
+active=$(printf '%s\n' "$timers" | grep -E 'rm-m5-.*(role-restore|channel-unpause)' || true)
 [[ -z "$active" ]] || { echo "a prior M5 recovery timer already exists" >&2; exit 1; }
 
 printf 'API image=%s state=%s health=%s hostname=%s\n' "$image" "$state" "$health" "$hostname"

@@ -26,7 +26,11 @@ printf '%s\n' "$channels" | jq -e '.[0] | .paused == false and .client_count == 
 }
 channel=$(printf '%s\n' "$channels" | jq -r '.[0].channel_name')
 
-active=$(systemctl list-timers --all --no-legend --no-pager | grep -E 'rm-m5-.*(role-restore|channel-unpause)' || true)
+timers=$(systemctl list-timers --all --no-legend --no-pager) || {
+  echo "cannot inspect existing M5 recovery timers" >&2
+  exit 1
+}
+active=$(printf '%s\n' "$timers" | grep -E 'rm-m5-.*(role-restore|channel-unpause)' || true)
 [[ -z "$active" ]] || { echo "a prior M5 recovery timer already exists" >&2; exit 1; }
 
 printf 'NSQ health=%s channel=%s paused=false clients=1 depth=0 in_flight=0 deferred=0\n' \
