@@ -8823,6 +8823,66 @@ const docTemplate = `{
                 }
             }
         },
+        "/internal/v1/system-governance/actions/reminder-reviews": {
+            "get": {
+                "description": "按当前机构列出发送结果未知的任务开放提醒；只读，不自动补发；仅 qs:admin 可访问",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "System-Governance"
+                ],
+                "summary": "系统治理-待核对的任务开放提醒",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌（或内部调用token）",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "不透明分页游标",
+                        "name": "cursor",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 50,
+                        "description": "每页条数，1-100",
+                        "name": "limit",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/systemgovernance.ReminderReviewPage"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/internal/v1/system-governance/actions/{action_id}/runs": {
             "post": {
                 "description": "执行已启用的缓存或韧性治理动作；韧性动作默认关闭，要求 confirm=true，并可通过 request_id 安全重试；仅 qs:admin 可访问",
@@ -23174,6 +23234,52 @@ const docTemplate = `{
                             "type": "string"
                         }
                     }
+                }
+            }
+        },
+        "systemgovernance.ReminderReview": {
+            "type": "object",
+            "properties": {
+                "delivery_id": {
+                    "type": "integer"
+                },
+                "external_call_started_at": {
+                    "type": "string"
+                },
+                "opening_event_id": {
+                    "type": "string"
+                },
+                "resolution_code": {
+                    "type": "string"
+                },
+                "schedule_revision": {
+                    "type": "integer"
+                },
+                "state": {
+                    "type": "string"
+                },
+                "task_id": {
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
+                },
+                "user_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "systemgovernance.ReminderReviewPage": {
+            "type": "object",
+            "properties": {
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/systemgovernance.ReminderReview"
+                    }
+                },
+                "next_cursor": {
+                    "type": "string"
                 }
             }
         },

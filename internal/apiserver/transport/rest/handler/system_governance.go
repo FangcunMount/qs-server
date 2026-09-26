@@ -142,6 +142,41 @@ func (h *SystemGovernanceHandler) DeliveryReplayReviews(c *gin.Context) {
 	h.Success(c, result)
 }
 
+// ReminderReviews lists uncertain task-opened reminder sends for manual
+// reconciliation. This endpoint cannot authorize or trigger another send.
+// @Summary 系统治理-待核对的任务开放提醒
+// @Description 按当前机构列出发送结果未知的任务开放提醒；只读，不自动补发；仅 qs:admin 可访问
+// @Tags System-Governance
+// @Produce json
+// @Param Authorization header string true "Bearer 用户令牌（或内部调用token）"
+// @Param cursor query string false "不透明分页游标"
+// @Param limit query int false "每页条数，1-100" default(50)
+// @Success 200 {object} core.Response{data=systemgovernance.ReminderReviewPage}
+// @Failure 400 {object} core.ErrResponse
+// @Router /internal/v1/system-governance/actions/reminder-reviews [get]
+func (h *SystemGovernanceHandler) ReminderReviews(c *gin.Context) {
+	orgID, err := h.RequireProtectedOrgID(c)
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+	limit := 50
+	if raw := c.Query("limit"); raw != "" {
+		parsed, parseErr := strconv.Atoi(raw)
+		if parseErr != nil || parsed < 1 || parsed > 100 {
+			c.JSON(http.StatusBadRequest, gin.H{"message": "limit must be between 1 and 100"})
+			return
+		}
+		limit = parsed
+	}
+	result, err := h.facade.ListReminderReviews(c.Request.Context(), orgID, c.Query("cursor"), limit)
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+	h.Success(c, result)
+}
+
 // DeliveryResolutionHTTPRequest is the explicit operator command body. The
 // organization and actor are always taken from the protected request context.
 type DeliveryResolutionHTTPRequest struct {

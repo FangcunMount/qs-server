@@ -8797,6 +8797,64 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/core.ErrResponse'
+  /internal/v1/system-governance/actions/reminder-reviews:
+    get:
+      tags:
+      - System-Governance
+      summary: 系统治理-待核对的任务开放提醒
+      description: 按当前机构列出发送结果未知的任务开放提醒；只读，不自动补发；仅 qs:admin 可访问
+      operationId: 系统治理待核对的任务开放提醒
+      parameters:
+      - type: string
+        description: Bearer 用户令牌（或内部调用token）
+        name: Authorization
+        in: header
+        required: true
+      - type: string
+        description: 不透明分页游标
+        name: cursor
+        in: query
+      - type: integer
+        default: 50
+        description: 每页条数，1-100
+        name: limit
+        in: query
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/core.Response'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/systemgovernance.ReminderReviewPage'
+        '400':
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '401':
+          description: 认证失败或访问令牌无效
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '403':
+          description: 无权访问该资源
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '500':
+          description: 服务内部错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
   /internal/v1/system-governance/actions/{action_id}/runs:
     post:
       tags:
@@ -18947,6 +19005,36 @@ components:
             type: array
             items:
               type: string
+    systemgovernance.ReminderReview:
+      type: object
+      properties:
+        delivery_id:
+          type: integer
+        external_call_started_at:
+          type: string
+        opening_event_id:
+          type: string
+        resolution_code:
+          type: string
+        schedule_revision:
+          type: integer
+        state:
+          type: string
+        task_id:
+          type: string
+        updated_at:
+          type: string
+        user_id:
+          type: string
+    systemgovernance.ReminderReviewPage:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/systemgovernance.ReminderReview'
+        next_cursor:
+          type: string
     systemgovernance.ResilienceBackpressureRow:
       type: object
       properties:

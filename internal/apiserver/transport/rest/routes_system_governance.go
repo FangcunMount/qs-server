@@ -20,6 +20,7 @@ func (r *Router) registerSystemGovernanceInternalRoutes(internalV1 *gin.RouterGr
 	governance.GET("/actions", r.rateLimitedHandlers(rateLimitBudgetQuery, governanceHandler.Actions)...)
 	governance.GET("/actions/pending-reconciliations", r.rateLimitedHandlers(rateLimitBudgetQuery, governanceHandler.PendingReplayAudits)...)
 	governance.GET("/actions/delivery-replay-reviews", r.rateLimitedHandlers(rateLimitBudgetQuery, governanceHandler.DeliveryReplayReviews)...)
+	governance.GET("/actions/reminder-reviews", r.rateLimitedHandlers(rateLimitBudgetQuery, governanceHandler.ReminderReviews)...)
 	governance.POST("/actions/delivery-resolutions", r.rateLimitedHandlers(rateLimitBudgetSubmit, governanceHandler.ResolveDelivery)...)
 	governance.GET("/actions/delivery-resolutions/:request_id", r.rateLimitedHandlers(rateLimitBudgetQuery, governanceHandler.GetDeliveryResolution)...)
 	governance.POST("/actions/:action_id/runs", r.rateLimitedHandlers(rateLimitBudgetSubmit, governanceHandler.RunAction)...)
