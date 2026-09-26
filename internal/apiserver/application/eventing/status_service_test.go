@@ -166,6 +166,11 @@ func TestStatusServiceExportsCompleteEffectiveContract(t *testing.T) {
 			Type: eventcatalog.TaskOpened, Owner: "plan", Delivery: eventcatalog.DeliveryClassBestEffort,
 			Handler: "task_opened_handler", Idempotency: "notification-event-metadata", Settlement: eventcatalog.SettlementHandlerErrorNack,
 		},
+		eventcatalog.TaskOpenedReminderRequested: {
+			Type: eventcatalog.TaskOpenedReminderRequested, Owner: "plan", Delivery: eventcatalog.DeliveryClassDurableOutbox,
+			Profile: eventcatalog.OutboxProfileAssessmentMySQL, Immediate: true, Priority: eventcatalog.PriorityP1,
+			Handler: "task_opened_reminder_handler", Idempotency: "frozen-self-recipient-batch-and-delivery-ledger", Settlement: eventcatalog.SettlementHandlerErrorNack,
+		},
 		eventcatalog.TaskCompleted: {
 			Type: eventcatalog.TaskCompleted, Owner: "plan", Delivery: eventcatalog.DeliveryClassBestEffort,
 			Handler: "task_completed_handler", Idempotency: "notification-event-metadata", Settlement: eventcatalog.SettlementHandlerErrorNack,
@@ -200,7 +205,7 @@ func TestStatusServiceExportsCompleteEffectiveContract(t *testing.T) {
 		t.Fatalf("mongo profile = %#v", mongo)
 	}
 	mysql := profiles[eventcatalog.OutboxProfileAssessmentMySQL]
-	if mysql.EventCount != 4 || !slices.Equal(mysql.ImmediateEventTypes, []string{eventcatalog.EvaluationOutcomeCommitted, eventcatalog.EvaluationRequested}) || mysql.Running || !mysql.RelayEnabled || !mysql.ReconcilerEnabled || !mysql.ImmediateEnabled {
+	if mysql.EventCount != 5 || !slices.Equal(mysql.ImmediateEventTypes, []string{eventcatalog.EvaluationOutcomeCommitted, eventcatalog.EvaluationRequested, eventcatalog.TaskOpenedReminderRequested}) || mysql.Running || !mysql.RelayEnabled || !mysql.ReconcilerEnabled || !mysql.ImmediateEnabled {
 		t.Fatalf("assessment profile = %#v", mysql)
 	}
 
