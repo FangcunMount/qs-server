@@ -1122,6 +1122,17 @@ definitions:
       unavailable_count:
         type: integer
     type: object
+  planentry.Entry:
+    properties:
+      expiresAt:
+        type: string
+      scaleCode:
+        type: string
+      taskID:
+        type: string
+      testeeID:
+        type: string
+    type: object
   questionnaire.CalculationRuleResponse:
     properties:
       formula_type:
@@ -2693,6 +2704,42 @@ paths:
       summary: 长轮询等待行为能力测评报告
       tags:
       - 行为能力测评
+  /api/v1/plan-task-entries/{task_id}/{token}:
+    get:
+      parameters:
+      - description: 任务ID
+        in: path
+        name: task_id
+        required: true
+        type: string
+      - description: 入口令牌
+        in: path
+        name: token
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/planentry.Entry'
+              type: object
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+      summary: 解析当前用户的计划任务测评入口
+      tags:
+      - Plan-Entry
   /api/v1/public/info:
     get:
       description: 获取服务基本信息

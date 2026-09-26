@@ -10,6 +10,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/behaviorassessment"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/evaluation"
 	appmodelcatalog "github.com/FangcunMount/qs-server/internal/collection-server/application/modelcatalog"
+	"github.com/FangcunMount/qs-server/internal/collection-server/application/planentry"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/questionnaire"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/reportnotify"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/reportwait"
@@ -61,6 +62,7 @@ type Container struct {
 	assessmentIntakeClient         *grpcclient.AssessmentIntakeClient
 	actorClient                    *grpcclient.ActorClient
 	assessmentModelCatalogClient   *grpcclient.AssessmentModelCatalogClient
+	planEntryClient                *grpcclient.PlanEntryClient
 
 	// 应用层服务
 	submissionService                  *answersheet.SubmissionService
@@ -75,6 +77,7 @@ type Container struct {
 	typologySessionService             *typologysession.Service
 	testeeService                      *testee.Service
 	testeeAccessAuthorizer             *testeeaccess.Authorizer
+	planEntryService                   *planentry.Service
 	reportStatusReporter               *reportstatus.Reporter
 	reportNotifier                     reportnotify.Notifier
 	waitWatcherCancel                  context.CancelFunc
@@ -113,6 +116,7 @@ type ClientBundle struct {
 	AssessmentIntake         *grpcclient.AssessmentIntakeClient
 	Actor                    *grpcclient.ActorClient
 	AssessmentModelCatalog   *grpcclient.AssessmentModelCatalogClient
+	PlanEntry                *grpcclient.PlanEntryClient
 }
 
 func (c *Container) TesteeService() *testee.Service {
@@ -127,6 +131,13 @@ func (c *Container) TesteeAccessAuthorizer() *testeeaccess.Authorizer {
 		return nil
 	}
 	return c.testeeAccessAuthorizer
+}
+
+func (c *Container) PlanEntryService() *planentry.Service {
+	if c == nil {
+		return nil
+	}
+	return c.planEntryService
 }
 
 // NewContainer 创建新的容器
@@ -329,6 +340,7 @@ func (c *Container) initApplicationServices() {
 	c.typologySessionService = typologysession.NewService(c.typologyModelQueryService, c.questionnaireQueryService)
 	c.testeeService = testee.NewService(acl.NewTesteeActorAdapter(c.actorClient), profileLinkService, profileService)
 	c.testeeAccessAuthorizer = testeeaccess.NewAuthorizer(c.testeeService, profileLinkService)
+	c.planEntryService = planentry.NewService(c.planEntryClient, c.testeeAccessAuthorizer)
 	c.reportEventsHandler = c.buildReportEventsHandler()
 
 	log.Info("✅ Application services initialized")
@@ -595,6 +607,7 @@ func (c *Container) InitializeRuntimeClients(bundle ClientBundle) {
 	c.assessmentIntakeClient = bundle.AssessmentIntake
 	c.actorClient = bundle.Actor
 	c.assessmentModelCatalogClient = bundle.AssessmentModelCatalog
+	c.planEntryClient = bundle.PlanEntry
 }
 
 // ActorClient 获取 Actor 客户端

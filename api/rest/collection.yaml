@@ -17,6 +17,8 @@ tags:
   description: AI解读
 - name: AssessmentModelCatalog
   description: AssessmentModelCatalog
+- name: Plan-Entry
+  description: Plan-Entry
 - name: 受试者
   description: 受试者
 - name: 报告事件
@@ -1482,6 +1484,60 @@ paths:
                 $ref: '#/components/schemas/core.ErrResponse'
         '403':
           description: 无权访问该资源
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '500':
+          description: 服务内部错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+  /api/v1/plan-task-entries/{task_id}/{token}:
+    get:
+      tags:
+      - Plan-Entry
+      summary: 解析当前用户的计划任务测评入口
+      operationId: 解析当前用户的计划任务测评入口
+      description: 解析当前用户的计划任务测评入口
+      parameters:
+      - type: string
+        description: 任务ID
+        name: task_id
+        in: path
+        required: true
+      - type: string
+        description: 入口令牌
+        name: token
+        in: path
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/core.Response'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/planentry.Entry'
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '401':
+          description: 认证失败或访问令牌无效
           content:
             application/json:
               schema:
@@ -3715,6 +3771,17 @@ components:
           type: boolean
         unavailable_count:
           type: integer
+    planentry.Entry:
+      type: object
+      properties:
+        expiresAt:
+          type: string
+        scaleCode:
+          type: string
+        taskID:
+          type: string
+        testeeID:
+          type: string
     questionnaire.CalculationRuleResponse:
       type: object
       properties:

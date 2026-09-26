@@ -66,6 +66,25 @@ service PlanCommandService {
   rpc CancelTask(CancelTaskRequest) returns (CancelTaskResponse);
 }
 
+// Plan entry lookup is available only to the authenticated collection BFF.
+// The BFF must additionally prove the IAM User -> Testee relationship before
+// returning this result to a mini-program user.
+service PlanEntryService {
+  rpc ResolveTaskEntry(ResolveTaskEntryRequest) returns (ResolveTaskEntryResponse);
+}
+
+message ResolveTaskEntryRequest {
+  string task_id = 1;
+  string token = 2;
+}
+
+message ResolveTaskEntryResponse {
+  string task_id = 1;
+  string testee_id = 2;
+  string scale_code = 3;
+  string expires_at = 4;
+}
+
 // ==================== PlanCommandService ====================
 
 message PlanResultMessage {

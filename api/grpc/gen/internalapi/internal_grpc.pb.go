@@ -907,3 +907,113 @@ var PlanCommandService_ServiceDesc = grpc.ServiceDesc{
 	Streams:  []grpc.StreamDesc{},
 	Metadata: "internalapi/internal.proto",
 }
+
+const (
+	PlanEntryService_ResolveTaskEntry_FullMethodName = "/internalapi.PlanEntryService/ResolveTaskEntry"
+)
+
+// PlanEntryServiceClient is the client API for PlanEntryService service.
+//
+// For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
+//
+// Plan entry lookup is available only to the authenticated collection BFF.
+// The BFF must additionally prove the IAM User -> Testee relationship before
+// returning this result to a mini-program user.
+type PlanEntryServiceClient interface {
+	ResolveTaskEntry(ctx context.Context, in *ResolveTaskEntryRequest, opts ...grpc.CallOption) (*ResolveTaskEntryResponse, error)
+}
+
+type planEntryServiceClient struct {
+	cc grpc.ClientConnInterface
+}
+
+func NewPlanEntryServiceClient(cc grpc.ClientConnInterface) PlanEntryServiceClient {
+	return &planEntryServiceClient{cc}
+}
+
+func (c *planEntryServiceClient) ResolveTaskEntry(ctx context.Context, in *ResolveTaskEntryRequest, opts ...grpc.CallOption) (*ResolveTaskEntryResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ResolveTaskEntryResponse)
+	err := c.cc.Invoke(ctx, PlanEntryService_ResolveTaskEntry_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// PlanEntryServiceServer is the server API for PlanEntryService service.
+// All implementations must embed UnimplementedPlanEntryServiceServer
+// for forward compatibility.
+//
+// Plan entry lookup is available only to the authenticated collection BFF.
+// The BFF must additionally prove the IAM User -> Testee relationship before
+// returning this result to a mini-program user.
+type PlanEntryServiceServer interface {
+	ResolveTaskEntry(context.Context, *ResolveTaskEntryRequest) (*ResolveTaskEntryResponse, error)
+	mustEmbedUnimplementedPlanEntryServiceServer()
+}
+
+// UnimplementedPlanEntryServiceServer must be embedded to have
+// forward compatible implementations.
+//
+// NOTE: this should be embedded by value instead of pointer to avoid a nil
+// pointer dereference when methods are called.
+type UnimplementedPlanEntryServiceServer struct{}
+
+func (UnimplementedPlanEntryServiceServer) ResolveTaskEntry(context.Context, *ResolveTaskEntryRequest) (*ResolveTaskEntryResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ResolveTaskEntry not implemented")
+}
+func (UnimplementedPlanEntryServiceServer) mustEmbedUnimplementedPlanEntryServiceServer() {}
+func (UnimplementedPlanEntryServiceServer) testEmbeddedByValue()                          {}
+
+// UnsafePlanEntryServiceServer may be embedded to opt out of forward compatibility for this service.
+// Use of this interface is not recommended, as added methods to PlanEntryServiceServer will
+// result in compilation errors.
+type UnsafePlanEntryServiceServer interface {
+	mustEmbedUnimplementedPlanEntryServiceServer()
+}
+
+func RegisterPlanEntryServiceServer(s grpc.ServiceRegistrar, srv PlanEntryServiceServer) {
+	// If the following call panics, it indicates UnimplementedPlanEntryServiceServer was
+	// embedded by pointer and is nil.  This will cause panics if an
+	// unimplemented method is ever invoked, so we test this at initialization
+	// time to prevent it from happening at runtime later due to I/O.
+	if t, ok := srv.(interface{ testEmbeddedByValue() }); ok {
+		t.testEmbeddedByValue()
+	}
+	s.RegisterService(&PlanEntryService_ServiceDesc, srv)
+}
+
+func _PlanEntryService_ResolveTaskEntry_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ResolveTaskEntryRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(PlanEntryServiceServer).ResolveTaskEntry(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: PlanEntryService_ResolveTaskEntry_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(PlanEntryServiceServer).ResolveTaskEntry(ctx, req.(*ResolveTaskEntryRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+// PlanEntryService_ServiceDesc is the grpc.ServiceDesc for PlanEntryService service.
+// It's only intended for direct use with grpc.RegisterService,
+// and not to be introspected or modified (even as a copy)
+var PlanEntryService_ServiceDesc = grpc.ServiceDesc{
+	ServiceName: "internalapi.PlanEntryService",
+	HandlerType: (*PlanEntryServiceServer)(nil),
+	Methods: []grpc.MethodDesc{
+		{
+			MethodName: "ResolveTaskEntry",
+			Handler:    _PlanEntryService_ResolveTaskEntry_Handler,
+		},
+	},
+	Streams:  []grpc.StreamDesc{},
+	Metadata: "internalapi/internal.proto",
+}

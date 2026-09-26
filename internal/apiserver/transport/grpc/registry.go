@@ -108,6 +108,7 @@ type AssessmentModelCatalogDeps struct {
 type PlanDeps struct {
 	CommandService         planApp.PlanCommandService
 	TaskAssessmentResolver planApp.TaskAssessmentResolver
+	TaskEntryResolver      planApp.TaskEntryResolver
 }
 
 type IAMDeps struct {
@@ -157,6 +158,9 @@ func (r *Registry) RegisterServices() error {
 	}
 	if err := r.registerPlanCommandService(); err != nil {
 		return err
+	}
+	if r.deps.Plan.TaskEntryResolver != nil {
+		r.server.RegisterService(service.NewPlanEntryService(r.deps.Plan.TaskEntryResolver))
 	}
 
 	logger.L(context.Background()).Infow("All GRPC services registered successfully",
@@ -332,6 +336,9 @@ func (r *Registry) GetRegisteredServices() []string {
 	}
 	if r.deps.Plan.CommandService != nil {
 		services = append(services, "PlanCommandService")
+	}
+	if r.deps.Plan.TaskEntryResolver != nil {
+		services = append(services, "PlanEntryService")
 	}
 	if r.deps.Interpretation.AIWorkflow != nil && r.deps.Interpretation.DelegatedSubjectVerifier != nil && r.deps.Interpretation.DelegatedSubjectVerifier.Enabled() {
 		services = append(services, "ParticipantAIExplanationService")

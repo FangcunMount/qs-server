@@ -10,6 +10,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/collection-server/concurrency"
 	"github.com/FangcunMount/qs-server/internal/collection-server/container"
 	"github.com/FangcunMount/qs-server/internal/collection-server/options"
+	"github.com/FangcunMount/qs-server/internal/collection-server/transport/rest/handler"
 	collectionmiddleware "github.com/FangcunMount/qs-server/internal/collection-server/transport/rest/middleware"
 	pkgmiddleware "github.com/FangcunMount/qs-server/internal/pkg/middleware"
 	"github.com/FangcunMount/qs-server/internal/pkg/resilience/ratelimit"
@@ -96,6 +97,7 @@ func (r *Router) registerBusinessRoutes(engine *gin.Engine) {
 
 	// 答卷相关路由
 	r.registerAnswerSheetRoutes(api)
+	r.registerPlanEntryRoutes(api)
 
 	// 测评相关路由
 	r.registerEvaluationRoutes(api)
@@ -117,6 +119,15 @@ func (r *Router) registerBusinessRoutes(engine *gin.Engine) {
 
 	// WebSocket 报告事件推送
 	r.registerReportEventsRoutes(api)
+}
+
+func (r *Router) registerPlanEntryRoutes(api *gin.RouterGroup) {
+	service := r.container.PlanEntryService()
+	if service == nil {
+		return
+	}
+	h := handler.NewPlanEntryHandler(service)
+	api.GET("/plan-task-entries/:task_id/:token", r.queryHandlers(h.Resolve)...)
 }
 
 func (r *Router) applyIAMAuth(api *gin.RouterGroup, skip func(*gin.Context) bool) {

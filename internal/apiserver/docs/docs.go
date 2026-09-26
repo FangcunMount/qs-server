@@ -23294,6 +23294,9 @@ const docTemplate = `{
                 "topic_name": {
                     "type": "string"
                 },
+                "transport_message_id": {
+                    "type": "string"
+                },
                 "updated_at": {
                     "type": "string"
                 }

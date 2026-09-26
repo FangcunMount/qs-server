@@ -5,6 +5,7 @@ import (
 	answersheetpb "github.com/FangcunMount/qs-server/api/grpc/gen/answersheet"
 	assessmentmodelpb "github.com/FangcunMount/qs-server/api/grpc/gen/assessmentmodel"
 	evaluationpb "github.com/FangcunMount/qs-server/api/grpc/gen/evaluation"
+	internalpb "github.com/FangcunMount/qs-server/api/grpc/gen/internalapi"
 	interpretationpb "github.com/FangcunMount/qs-server/api/grpc/gen/interpretation"
 	questionnairepb "github.com/FangcunMount/qs-server/api/grpc/gen/questionnaire"
 )
@@ -48,5 +49,6 @@ func ACLAllowedMethods() []string {
 		assessmentmodelpb.AssessmentModelCatalogService_ListPublishedModels_FullMethodName,
 		assessmentmodelpb.AssessmentModelCatalogService_ListHotPublishedModels_FullMethodName,
 		assessmentmodelpb.AssessmentModelCatalogService_GetCatalogOptions_FullMethodName,
+		internalpb.PlanEntryService_ResolveTaskEntry_FullMethodName,
 	}
 }

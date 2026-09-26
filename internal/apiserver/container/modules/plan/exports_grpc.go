@@ -10,5 +10,6 @@ func (m *Module) ExportGRPCDeps() grpctransport.PlanDeps {
 	}
 	deps.CommandService = m.CommandService
 	deps.TaskAssessmentResolver = m.TaskAssessmentResolver
+	deps.TaskEntryResolver = m.TaskEntryResolver
 	return deps
 }

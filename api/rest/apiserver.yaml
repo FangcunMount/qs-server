@@ -18990,6 +18990,8 @@ components:
           type: string
         topic_name:
           type: string
+        transport_message_id:
+          type: string
         updated_at:
           type: string
     systemgovernance.RetryCandidatePage:

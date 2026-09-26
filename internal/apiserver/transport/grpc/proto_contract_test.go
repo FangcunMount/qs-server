@@ -88,6 +88,7 @@ func TestGRPCProtoServicesHaveExplicitOwners(t *testing.T) {
 		"InterpretationAutomationService": "NewInterpretationAutomationService",
 		"InternalService":                 "NewInternalService",
 		"PlanCommandService":              "NewPlanCommandService",
+		"PlanEntryService":                "NewPlanEntryService",
 		"QuestionnaireService":            "NewQuestionnaireService",
 	}
 
