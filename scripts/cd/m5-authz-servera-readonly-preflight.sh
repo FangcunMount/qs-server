@@ -63,7 +63,9 @@ reminder_env=$(sudo -n docker inspect "$container" | jq -r '
   exit 1
 }
 reminder_flags=$(sudo -n docker inspect "$container" | jq -r '
-  [.[0].Config.Cmd[]? | select(startswith("--eventing.task-opened-reminder"))] | length
+  [((.[0].Config.Entrypoint // []) + (.[0].Config.Cmd // []))[]
+   | select(. == "--eventing.task-opened-reminder" or startswith("--eventing.task-opened-reminder="))]
+  | length
 ')
 [[ "$reminder_flags" == 0 ]] || {
   echo "explicit task_opened_reminder command flag requires manual review" >&2
