@@ -178,9 +178,10 @@ func resolutionAuditSettled(original actionRunPO) bool {
 	switch original.Status {
 	case "failed", "timeout", app.ActionAuditStatusPendingReconciliation:
 		return true
-	case "running":
-		return original.StartedAt.Before(time.Now().Add(-deliveryReplayReviewAge))
 	default:
+		// A stale running row is visible for review, but age alone cannot
+		// prove that its original publisher has stopped. Resolve it only
+		// after a separate recovery step establishes a settled audit state.
 		return false
 	}
 }

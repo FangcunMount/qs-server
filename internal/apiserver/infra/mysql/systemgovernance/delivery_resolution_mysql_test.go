@@ -91,6 +91,15 @@ func TestDeliveryResolutionRequiresCompleteEvidenceAndCommitsAtomicallyMySQL(t *
 	if err := store.ResolveDelivery(t.Context(), wrongAttempts, full); err == nil {
 		t.Fatal("changed physical delivery attempts must not resolve")
 	}
+	if err := db.Model(&actionRunPO{}).Where("id = ?", original.ID).Update("status", "running").Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := store.ResolveDelivery(t.Context(), req, full); err == nil {
+		t.Fatal("old running audit may still own a live publisher")
+	}
+	if err := db.Model(&actionRunPO{}).Where("id = ?", original.ID).Update("status", "failed").Error; err != nil {
+		t.Fatal(err)
+	}
 	if err := db.Callback().Update().Before("gorm:update").Register("test:reject_delivery_resolution", func(tx *gorm.DB) {
 		if tx.Statement.Table == "event_delivery_dead_letter" {
 			tx.AddError(errors.New("injected settlement failure"))
