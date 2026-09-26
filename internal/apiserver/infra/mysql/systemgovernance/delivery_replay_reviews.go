@@ -24,8 +24,8 @@ type deliveryReplayTargetRow struct {
 	ReplayRequestID  *string `gorm:"column:replay_request_id"`
 }
 
-// ListDeliveryReplayReviews exposes old, unfinished replay audits together
-// with the current state of their targets. It never authorizes another send.
+// ListDeliveryReplayReviews exposes old, unfinished replay audits and failed
+// audits that still own an uncertain dead letter. It never authorizes a send.
 func (s *ActionAuditStore) ListDeliveryReplayReviews(ctx context.Context, orgID int64, cursor string, limit int) (app.DeliveryReplayReviewPage, error) {
 	if s == nil || s.db == nil || orgID <= 0 || limit < 1 || limit > 100 {
 		return app.DeliveryReplayReviewPage{}, fmt.Errorf("delivery replay review query requires a database, organization, and limit from 1 to 100")
@@ -38,9 +38,21 @@ func (s *ActionAuditStore) ListDeliveryReplayReviews(ctx context.Context, orgID 
 			return app.DeliveryReplayReviewPage{}, fmt.Errorf("invalid delivery replay review cursor")
 		}
 	}
+	// A publish/completion error finishes the action audit as failed while its
+	// dead letter remains claimed. Keep that original request visible, but do
+	// not bring back ordinary failures whose target is no longer uncertain.
 	query := s.db.WithContext(ctx).Model(&actionRunPO{}).
-		Where("org_id = ? AND action_id = ? AND status IN ? AND started_at < ?", orgID,
-			"events.replay_delivery", []string{"running", app.ActionAuditStatusPendingReconciliation}, time.Now().Add(-deliveryReplayReviewAge))
+		Where(`org_id = ? AND action_id = ? AND (
+			(status IN ? AND started_at < ?) OR
+			(status IN ? AND EXISTS (
+				SELECT 1 FROM event_delivery_dead_letter AS d
+				WHERE d.org_id = system_governance_action_runs.org_id
+					AND d.replay_request_id = system_governance_action_runs.request_id
+					AND d.retry_disposition = 'automatic'
+			))
+		)`, orgID, "events.replay_delivery",
+			[]string{"running", app.ActionAuditStatusPendingReconciliation}, time.Now().Add(-deliveryReplayReviewAge),
+			[]string{"failed", "timeout"})
 	if beforeID != 0 {
 		query = query.Where("id < ?", beforeID)
 	}
