@@ -124,6 +124,20 @@ func TestDeliveryResolutionRequiresCompleteEvidenceAndCommitsAtomicallyMySQL(t *
 		t.Fatal("failed settlement left a committed resolution audit")
 	}
 	assertResolutionState(t, db, "automatic", 0)
+	if err := db.Callback().Create().Before("gorm:create").Register("test:reject_resolution_audit", func(tx *gorm.DB) {
+		if tx.Statement.Table == "system_governance_action_runs" {
+			_ = tx.AddError(errors.New("injected resolution audit failure"))
+		}
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.ResolveDelivery(t.Context(), req, full); err == nil {
+		t.Fatal("audit insertion failure must keep the dead letter claimed for review")
+	}
+	if err := db.Callback().Create().Remove("test:reject_resolution_audit"); err != nil {
+		t.Fatal(err)
+	}
+	assertResolutionState(t, db, "automatic", 0)
 	result, err := store.ResolveDeliveryResult(t.Context(), req, full)
 	if err != nil {
 		t.Fatal(err)
