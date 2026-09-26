@@ -3,12 +3,13 @@ package systemgovernance
 import (
 	"context"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/outboxcore"
 )
 
-var errLegacyTaskOpenedReplay = errors.New("legacy task.opened needs task and recipient reconciliation; generic replay can resend an expired or duplicate external notification")
+var errBestEffortReplayNeedsReview = errors.New("best-effort event needs business-effect reconciliation before replay")
 
 // ValidateDeliveryReplaySafety runs before a whole batch is claimed. Malformed
 // payloads retain the existing per-item failure settlement in ActionExecutor.
@@ -21,8 +22,10 @@ func ValidateDeliveryReplaySafety(eventID, payloadJSON string) error {
 }
 
 func deliveryReplaySafetyError(eventType string) error {
-	if eventType == "task.opened" {
-		return errLegacyTaskOpenedReplay
+	switch eventType {
+	case "questionnaire.changed", "assessment_model.changed",
+		"task.opened", "task.completed", "task.expired", "task.canceled":
+		return fmt.Errorf("%w: %s", errBestEffortReplayNeedsReview, eventType)
 	}
 	return nil
 }

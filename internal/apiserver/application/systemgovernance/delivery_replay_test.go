@@ -39,22 +39,29 @@ func TestActionExecutorReplaysTransportDeadLetterWithOriginalEventID(t *testing.
 	}
 }
 
-func TestActionExecutorDoesNotReplayLegacyTaskOpenedNotification(t *testing.T) {
-	evt := event.New("task.opened", "AssessmentTask", "42", map[string]any{"org_id": int64(9)})
-	payload, err := json.Marshal(evt)
-	if err != nil {
-		t.Fatal(err)
-	}
-	store := &fakeDeliveryReplayStore{authorized: []AuthorizedDelivery{{ID: 7, EventID: evt.EventID(), PayloadJSON: string(payload)}}}
-	publisher := &fakeDeliveryPublisher{}
-	executor := NewActionExecutor(NewActionRegistry(), &fakeStatisticsGovernance{}).BindDeliveryReplay(store, publisher)
+func TestActionExecutorDoesNotReplayBestEffortExternalEffects(t *testing.T) {
+	for _, eventType := range []string{
+		"questionnaire.changed", "assessment_model.changed", "task.opened",
+		"task.completed", "task.expired", "task.canceled",
+	} {
+		t.Run(eventType, func(t *testing.T) {
+			evt := event.New(eventType, "Test", "42", map[string]any{"org_id": int64(9)})
+			payload, err := json.Marshal(evt)
+			if err != nil {
+				t.Fatal(err)
+			}
+			store := &fakeDeliveryReplayStore{authorized: []AuthorizedDelivery{{ID: 7, EventID: evt.EventID(), PayloadJSON: string(payload)}}}
+			publisher := &fakeDeliveryPublisher{}
+			executor := NewActionExecutor(NewActionRegistry(), &fakeStatisticsGovernance{}).BindDeliveryReplay(store, publisher)
 
-	_, err = executor.Run(t.Context(), 9, "events.replay_delivery", singleDeliveryReplayRequest("legacy-task-opened"))
-	if err == nil || !strings.Contains(err.Error(), "人工核对") {
-		t.Fatalf("legacy task.opened must require reconciliation: %v", err)
-	}
-	if publisher.publishCount != 0 || store.failedID != 7 || store.completedID != 0 {
-		t.Fatalf("legacy task.opened must not publish: publisher=%#v store=%#v", publisher, store)
+			_, err = executor.Run(t.Context(), 9, "events.replay_delivery", singleDeliveryReplayRequest("best-effort-review"))
+			if err == nil || !strings.Contains(err.Error(), "人工核对") {
+				t.Fatalf("%s must require reconciliation: %v", eventType, err)
+			}
+			if publisher.publishCount != 0 || store.failedID != 7 || store.completedID != 0 {
+				t.Fatalf("%s must not publish: publisher=%#v store=%#v", eventType, publisher, store)
+			}
+		})
 	}
 }
 
@@ -126,12 +133,12 @@ func TestActionExecutorDeliveryReplayPrevalidatesWholeBatch(t *testing.T) {
 	}
 }
 
-func TestActionExecutorLegacyTaskOpenedPreflightExplainsManualReconciliation(t *testing.T) {
-	store := &fakeDeliveryReplayStore{validateErr: fmt.Errorf("delivery 7: %w", errLegacyTaskOpenedReplay)}
+func TestActionExecutorBestEffortPreflightExplainsManualReconciliation(t *testing.T) {
+	store := &fakeDeliveryReplayStore{validateErr: fmt.Errorf("delivery 7: %w", errBestEffortReplayNeedsReview)}
 	executor := NewActionExecutor(NewActionRegistry(), &fakeStatisticsGovernance{}).BindDeliveryReplay(store, &fakeDeliveryPublisher{})
-	_, err := executor.Run(t.Context(), 9, "events.replay_delivery", singleDeliveryReplayRequest("legacy-preflight"))
-	if err == nil || !strings.Contains(err.Error(), "旧任务开放提醒需人工核对") || len(store.claims) != 0 {
-		t.Fatalf("legacy opening must be rejected before any claim with actionable message: err=%v claims=%v", err, store.claims)
+	_, err := executor.Run(t.Context(), 9, "events.replay_delivery", singleDeliveryReplayRequest("best-effort-preflight"))
+	if err == nil || !strings.Contains(err.Error(), "最佳努力事件需按业务事实人工核对") || len(store.claims) != 0 {
+		t.Fatalf("best-effort replay must be rejected before any claim with actionable message: err=%v claims=%v", err, store.claims)
 	}
 }
 

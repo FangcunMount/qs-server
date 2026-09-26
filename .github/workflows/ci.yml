@@ -89,6 +89,10 @@ jobs:
           QS_ACTION_AUDIT_REQUIRE_MYSQL: 'true'
           QS_SERVER_TEST_MYSQL_DSN: 'root:root@tcp(127.0.0.1:3306)/action_audit_test?parseTime=true'
         run: go test ./internal/apiserver/infra/mysql/systemgovernance -run TestActionAuditLifecycleWithJSONColumns -count=1 -v
+      - name: Verify transport replay batch guard against MySQL
+        env:
+          MYSQL_DSN: 'root:root@tcp(127.0.0.1:3306)/mysql?parseTime=true&loc=Asia%2FShanghai'
+        run: go test -tags=integration ./internal/apiserver/infra/mysql/eventdelivery -run '^TestDeliveryReplayClaimsAreScopedAndUncertainClaimsAreNotResent$' -count=1 -v
 
   authz-guard-two-process-mysql:
     name: AuthZ committed version two-process MySQL

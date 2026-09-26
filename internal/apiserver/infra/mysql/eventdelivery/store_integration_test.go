@@ -5,12 +5,14 @@ package eventdelivery
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
 	"testing"
 	"time"
 
+	"github.com/FangcunMount/component-base/pkg/event"
 	app "github.com/FangcunMount/qs-server/internal/apiserver/application/systemgovernance"
 	drivermysql "github.com/go-sql-driver/mysql"
 	gormmysql "gorm.io/driver/mysql"
@@ -40,6 +42,24 @@ func TestDeliveryReplayClaimsAreScopedAndUncertainClaimsAreNotResent(t *testing.
 	}
 	if err := store.ValidateReplayBatch(t.Context(), 7, []app.DeliveryReplayTarget{target(1), target(2)}); err != nil {
 		t.Fatal(err)
+	}
+	bestEffort := event.New("task.completed", "AssessmentTask", "42", map[string]any{"org_id": int64(7)})
+	bestEffortPayload, err := json.Marshal(bestEffort)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Exec(`INSERT INTO event_delivery_dead_letter
+		(id,message_id,event_id,org_id,delivery_attempts,payload_json,retry_disposition,updated_at)
+		VALUES (5,'m5',?,7,8,?,'manual_required',?)`, bestEffort.EventID(), string(bestEffortPayload), now).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := store.ValidateReplayBatch(t.Context(), 7, []app.DeliveryReplayTarget{target(1), target(5)}); err == nil {
+		t.Fatal("unsafe later target must reject the whole batch before any claim")
+	}
+	checkDisposition(t, db, 1, "manual_required", "", "")
+	checkDisposition(t, db, 5, "manual_required", "", "")
+	if _, err := store.AuthorizeReplay(t.Context(), 7, "unsafe-claim", []app.DeliveryReplayTarget{target(5)}, now); err == nil {
+		t.Fatal("locked claim must reject best-effort external effect")
 	}
 	claimed, err := store.AuthorizeReplay(t.Context(), 7, "replay-1", []app.DeliveryReplayTarget{target(1)}, now)
 	if err != nil || len(claimed) != 1 || claimed[0].EventID != "e1" {
