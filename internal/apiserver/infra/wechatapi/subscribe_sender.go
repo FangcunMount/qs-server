@@ -42,7 +42,10 @@ func (s *SubscribeSender) SendSubscribeMessage(_ context.Context, appID, appSecr
 	return nil
 }
 
-// SendSubscribeMessageWithReceipt returns the platform msgid when the response contains one.
+// SendSubscribeMessageWithReceipt records an accepted platform API response and
+// its msgid when present. The documented subscribe-message success response is
+// {"errcode":0,"errmsg":"ok"} without a msgid.
+// https://developers.weixin.qq.com/miniprogram/dev/server/API/mp-message-management/subscribe-message/api_sendmessage
 // The upstream library does not accept a context for the send call. In particular, a caller-side
 // timeout or lost response must be treated as an unknown outcome, not permission to resend.
 func (s *SubscribeSender) SendSubscribeMessageWithReceipt(_ context.Context, appID, appSecret string, msg wechatmini.SubscribeMessage) (wechatmini.SubscribeSendReceipt, error) {
@@ -54,10 +57,11 @@ func (s *SubscribeSender) SendSubscribeMessageWithReceipt(_ context.Context, app
 	if err != nil {
 		return wechatmini.SubscribeSendReceipt{}, fmt.Errorf("send subscribe message with receipt: %w", err)
 	}
-	if msgID <= 0 {
-		return wechatmini.SubscribeSendReceipt{}, fmt.Errorf("send subscribe message with receipt: platform response has no usable msgid")
+	receipt := wechatmini.SubscribeSendReceipt{Accepted: true}
+	if msgID > 0 {
+		receipt.PlatformMessageID = strconv.FormatInt(msgID, 10)
 	}
-	return wechatmini.SubscribeSendReceipt{PlatformMessageID: strconv.FormatInt(msgID, 10)}, nil
+	return receipt, nil
 }
 
 func subscribeMessage(msg wechatmini.SubscribeMessage) *miniSubscribe.Message {

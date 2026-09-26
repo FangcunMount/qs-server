@@ -122,13 +122,20 @@ func (s *ReminderDeliveryLedger) Confirm(
 	if err := s.validateClaim(key, token, now); err != nil {
 		return false, err
 	}
-	if err := validateIdentity(platformMessageID, 64, "platform message ID"); err != nil {
-		return false, err
+	var platformMessageIDValue any
+	resolutionCode := "platform_accepted_no_msgid"
+	if platformMessageID != "" {
+		if err := validateIdentity(platformMessageID, 64, "platform message ID"); err != nil {
+			return false, err
+		}
+		platformMessageIDValue = platformMessageID
+		resolutionCode = ""
 	}
 	return s.transition(ctx, key,
 		"state = ? AND claim_token = ? AND external_call_started_at IS NOT NULL AND platform_message_id IS NULL",
 		[]any{appnotification.ReminderSending, token},
-		map[string]any{"state": appnotification.ReminderConfirmed, "platform_message_id": platformMessageID, "updated_at": now},
+		map[string]any{"state": appnotification.ReminderConfirmed, "platform_message_id": platformMessageIDValue,
+			"resolution_code": resolutionCode, "updated_at": now},
 	)
 }
 

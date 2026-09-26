@@ -41,9 +41,11 @@ type MiniProgramSubscribeSender interface {
 	ListTemplates(ctx context.Context, appID, appSecret string) ([]SubscribeTemplate, error)
 }
 
-// SubscribeSendReceipt is evidence of the platform response, not proof that a user received the message.
-// A successful call always has a usable PlatformMessageID.
+// SubscribeSendReceipt is evidence of the platform API response, not proof that
+// a user received the message. The documented success response has errcode=0
+// but does not guarantee a msgid, so PlatformMessageID is optional.
 type SubscribeSendReceipt struct {
+	Accepted          bool
 	PlatformMessageID string
 }
 
