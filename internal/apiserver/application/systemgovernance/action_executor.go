@@ -228,8 +228,8 @@ func (e *ActionExecutor) runReplayDelivery(ctx context.Context, orgID int64, req
 	}
 	if err := e.deliveryReplay.ValidateReplayBatch(ctx, orgID, request.Targets); err != nil {
 		publicMessage := "整批目标状态或组织范围不符，未开始重放"
-		if stderrors.Is(err, errLegacyTaskOpenedReplay) {
-			publicMessage = "旧任务开放提醒需人工核对，整批未开始重放"
+		if stderrors.Is(err, errBestEffortReplayNeedsReview) {
+			publicMessage = "最佳努力事件需按业务事实人工核对，整批未开始重放"
 		}
 		return nil, errors.WithMessage(errors.WithCode(code.ErrConflict, "validate delivery replay batch: %s", err.Error()), publicMessage)
 	}
@@ -261,7 +261,7 @@ func (e *ActionExecutor) runReplayDelivery(ctx context.Context, orgID int64, req
 			if failErr != nil {
 				return nil, deliveryReplayFailure(code.ErrInternalServerError, len(results), item.ID, "状态待核对，请勿再次重放", "safety rejection: "+safetyErr.Error()+"; failure state update failed: "+failErr.Error())
 			}
-			return nil, deliveryReplayFailure(code.ErrConflict, len(results), item.ID, "旧任务开放提醒需人工核对，不可直接重放", safetyErr.Error())
+			return nil, deliveryReplayFailure(code.ErrConflict, len(results), item.ID, "最佳努力事件需人工核对，不可直接重放", safetyErr.Error())
 		}
 		if err := e.eventPublisher.Publish(ctx, pending.Event); err != nil {
 			settleCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 6*time.Second)
