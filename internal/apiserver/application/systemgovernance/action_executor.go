@@ -250,6 +250,15 @@ func (e *ActionExecutor) runReplayDelivery(ctx context.Context, orgID int64, req
 			}
 			return nil, deliveryReplayFailure(code.ErrInternalServerError, len(results), item.ID, "内容无法解析，仍需人工处理", "decode failed: "+decodeErr.Error())
 		}
+		if safetyErr := deliveryReplaySafetyError(pending.Event.EventType()); safetyErr != nil {
+			settleCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 6*time.Second)
+			failErr := e.deliveryReplay.FailReplay(settleCtx, item.ID, requestID, safetyErr.Error(), now)
+			cancel()
+			if failErr != nil {
+				return nil, deliveryReplayFailure(code.ErrInternalServerError, len(results), item.ID, "状态待核对，请勿再次重放", "safety rejection: "+safetyErr.Error()+"; failure state update failed: "+failErr.Error())
+			}
+			return nil, deliveryReplayFailure(code.ErrConflict, len(results), item.ID, "旧任务开放提醒需人工核对，不可直接重放", safetyErr.Error())
+		}
 		if err := e.eventPublisher.Publish(ctx, pending.Event); err != nil {
 			settleCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 6*time.Second)
 			recordErr := e.deliveryReplay.RecordReplayUncertain(settleCtx, item.ID, requestID, "publish outcome unknown: "+err.Error(), time.Now())
