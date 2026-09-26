@@ -138,6 +138,7 @@ func registeredUnaryRPCMethods(t *testing.T) []string {
 		&interpretationpb.InterpretationAutomationService_ServiceDesc,
 		&internalpb.InternalService_ServiceDesc,
 		&internalpb.PlanCommandService_ServiceDesc,
+		&internalpb.PlanEntryService_ServiceDesc,
 		&questionnairepb.QuestionnaireService_ServiceDesc,
 	}
 	methodSet := make(map[string]struct{})

@@ -61,6 +61,7 @@ type Manager struct {
 	assessmentIntakeClient         *AssessmentIntakeClient
 	actorClient                    *ActorClient
 	assessmentModelCatalogClient   *AssessmentModelCatalogClient
+	planEntryClient                *PlanEntryClient
 }
 
 // NewManager 创建 gRPC 客户端管理器
@@ -265,6 +266,8 @@ func (m *Manager) RegisterClients() error {
 
 	m.assessmentModelCatalogClient = NewAssessmentModelCatalogClient(baseClient)
 	m.clients["assessmentModelCatalog"] = m.assessmentModelCatalogClient
+	m.planEntryClient = NewPlanEntryClient(baseClient)
+	m.clients["planEntry"] = m.planEntryClient
 	log.Info("   📚 Assessment model catalog client registered")
 
 	log.Infof("✅ All gRPC clients registered (endpoint: %s)", m.config.Endpoint)
@@ -300,6 +303,8 @@ func (m *Manager) ActorClient() *ActorClient {
 func (m *Manager) AssessmentModelCatalogClient() *AssessmentModelCatalogClient {
 	return m.assessmentModelCatalogClient
 }
+
+func (m *Manager) PlanEntryClient() *PlanEntryClient { return m.planEntryClient }
 
 // GetClient 根据名称获取客户端
 func (m *Manager) GetClient(name string) interface{} {

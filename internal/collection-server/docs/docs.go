@@ -1673,6 +1673,65 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/v1/plan-task-entries/{task_id}/{token}": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Plan-Entry"
+                ],
+                "summary": "解析当前用户的计划任务测评入口",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "任务ID",
+                        "name": "task_id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "入口令牌",
+                        "name": "token",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/planentry.Entry"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/public/info": {
             "get": {
                 "description": "获取服务基本信息",
@@ -4563,6 +4622,23 @@ const docTemplate = `{
                 },
                 "unavailable_count": {
                     "type": "integer"
+                }
+            }
+        },
+        "planentry.Entry": {
+            "type": "object",
+            "properties": {
+                "expiresAt": {
+                    "type": "string"
+                },
+                "scaleCode": {
+                    "type": "string"
+                },
+                "taskID": {
+                    "type": "string"
+                },
+                "testeeID": {
+                    "type": "string"
                 }
             }
         },

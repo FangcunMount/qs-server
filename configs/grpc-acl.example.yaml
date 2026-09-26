@@ -45,6 +45,7 @@ services:
       - /assessmentmodel.AssessmentModelCatalogService/ListPublishedModels
       - /assessmentmodel.AssessmentModelCatalogService/ListHotPublishedModels
       - /assessmentmodel.AssessmentModelCatalogService/GetCatalogOptions
+      - /internalapi.PlanEntryService/ResolveTaskEntry
 
   - service_name: qs-worker.svc
     enabled: true
