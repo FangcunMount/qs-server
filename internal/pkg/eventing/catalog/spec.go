@@ -105,6 +105,7 @@ func DefaultSpecs() []EventSpec {
 		durableSpec(InterpretationReportFailed, "interpretation/report", OutboxProfileMongoDomain, false, PriorityP1, "terminal-failure-fact"),
 		durableSpec(InterpretationRetryRequested, "interpretation", OutboxProfileMongoDomain, false, PriorityP1, "generation-latest-run-retry-decision"),
 		bestEffortSpec(TaskOpened, "plan", "notification-event-metadata"),
+		durableSpec(TaskOpenedReminderRequested, "plan", OutboxProfileAssessmentMySQL, true, PriorityP1, "frozen-self-recipient-batch-and-delivery-ledger"),
 		bestEffortSpec(TaskCompleted, "plan", "notification-event-metadata"),
 		bestEffortSpec(TaskExpired, "plan", "notification-event-metadata"),
 		bestEffortSpec(TaskCanceled, "plan", "notification-event-metadata"),

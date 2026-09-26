@@ -25,6 +25,7 @@ const (
 	InternalService_GenerateScaleQRCode_FullMethodName                     = "/internalapi.InternalService/GenerateScaleQRCode"
 	InternalService_HandleScalePublishedPostActions_FullMethodName         = "/internalapi.InternalService/HandleScalePublishedPostActions"
 	InternalService_SendTaskOpenedMiniProgramNotification_FullMethodName   = "/internalapi.InternalService/SendTaskOpenedMiniProgramNotification"
+	InternalService_ProcessTaskOpenedReminder_FullMethodName               = "/internalapi.InternalService/ProcessTaskOpenedReminder"
 	InternalService_BootstrapOperator_FullMethodName                       = "/internalapi.InternalService/BootstrapOperator"
 )
 
@@ -53,6 +54,9 @@ type InternalServiceClient interface {
 	// 场景：worker 处理 task.opened 事件后调用
 	// 流程：解析收件人（本人优先，监护人兜底）并发送小程序订阅消息
 	SendTaskOpenedMiniProgramNotification(ctx context.Context, in *SendTaskOpenedMiniProgramNotificationRequest, opts ...grpc.CallOption) (*SendTaskOpenedMiniProgramNotificationResponse, error)
+	// Process one durable task opening reminder. The API owns the current Task,
+	// IAM recipient policy, per-recipient ledger, and external platform call.
+	ProcessTaskOpenedReminder(ctx context.Context, in *ProcessTaskOpenedReminderRequest, opts ...grpc.CallOption) (*ProcessTaskOpenedReminderResponse, error)
 	// 自举首个操作者
 	// 场景：seed/bootstrap 工具需要在尚无 active operator 的 org 中创建第一个 operator
 	// 流程：EnsureByUser 幂等建档，同步基础信息，必要时激活/停用，并从 IAM 快照回填本地角色投影
@@ -127,6 +131,16 @@ func (c *internalServiceClient) SendTaskOpenedMiniProgramNotification(ctx contex
 	return out, nil
 }
 
+func (c *internalServiceClient) ProcessTaskOpenedReminder(ctx context.Context, in *ProcessTaskOpenedReminderRequest, opts ...grpc.CallOption) (*ProcessTaskOpenedReminderResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ProcessTaskOpenedReminderResponse)
+	err := c.cc.Invoke(ctx, InternalService_ProcessTaskOpenedReminder_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *internalServiceClient) BootstrapOperator(ctx context.Context, in *BootstrapOperatorRequest, opts ...grpc.CallOption) (*BootstrapOperatorResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(BootstrapOperatorResponse)
@@ -162,6 +176,9 @@ type InternalServiceServer interface {
 	// 场景：worker 处理 task.opened 事件后调用
 	// 流程：解析收件人（本人优先，监护人兜底）并发送小程序订阅消息
 	SendTaskOpenedMiniProgramNotification(context.Context, *SendTaskOpenedMiniProgramNotificationRequest) (*SendTaskOpenedMiniProgramNotificationResponse, error)
+	// Process one durable task opening reminder. The API owns the current Task,
+	// IAM recipient policy, per-recipient ledger, and external platform call.
+	ProcessTaskOpenedReminder(context.Context, *ProcessTaskOpenedReminderRequest) (*ProcessTaskOpenedReminderResponse, error)
 	// 自举首个操作者
 	// 场景：seed/bootstrap 工具需要在尚无 active operator 的 org 中创建第一个 operator
 	// 流程：EnsureByUser 幂等建档，同步基础信息，必要时激活/停用，并从 IAM 快照回填本地角色投影
@@ -193,6 +210,9 @@ func (UnimplementedInternalServiceServer) HandleScalePublishedPostActions(contex
 }
 func (UnimplementedInternalServiceServer) SendTaskOpenedMiniProgramNotification(context.Context, *SendTaskOpenedMiniProgramNotificationRequest) (*SendTaskOpenedMiniProgramNotificationResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method SendTaskOpenedMiniProgramNotification not implemented")
+}
+func (UnimplementedInternalServiceServer) ProcessTaskOpenedReminder(context.Context, *ProcessTaskOpenedReminderRequest) (*ProcessTaskOpenedReminderResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ProcessTaskOpenedReminder not implemented")
 }
 func (UnimplementedInternalServiceServer) BootstrapOperator(context.Context, *BootstrapOperatorRequest) (*BootstrapOperatorResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method BootstrapOperator not implemented")
@@ -326,6 +346,24 @@ func _InternalService_SendTaskOpenedMiniProgramNotification_Handler(srv interfac
 	return interceptor(ctx, in, info, handler)
 }
 
+func _InternalService_ProcessTaskOpenedReminder_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ProcessTaskOpenedReminderRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(InternalServiceServer).ProcessTaskOpenedReminder(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: InternalService_ProcessTaskOpenedReminder_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(InternalServiceServer).ProcessTaskOpenedReminder(ctx, req.(*ProcessTaskOpenedReminderRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _InternalService_BootstrapOperator_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(BootstrapOperatorRequest)
 	if err := dec(in); err != nil {
@@ -374,6 +412,10 @@ var InternalService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "SendTaskOpenedMiniProgramNotification",
 			Handler:    _InternalService_SendTaskOpenedMiniProgramNotification_Handler,
+		},
+		{
+			MethodName: "ProcessTaskOpenedReminder",
+			Handler:    _InternalService_ProcessTaskOpenedReminder_Handler,
 		},
 		{
 			MethodName: "BootstrapOperator",

@@ -13,7 +13,8 @@ import (
 // ContainerOptions 容器配置选项。
 type ContainerOptions struct {
 	// EventSubsystem 是 resource stage 构造完成的唯一事件运行时。
-	EventSubsystem *eventsubsystem.Subsystem
+	EventSubsystem            *eventsubsystem.Subsystem
+	TaskOpenedReminderEnabled bool
 	// Cache 缓存控制选项
 	Cache ContainerCacheOptions
 	// CacheSubsystem cache 子系统组合根。

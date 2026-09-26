@@ -41,6 +41,11 @@ service InternalService {
   rpc SendTaskOpenedMiniProgramNotification(SendTaskOpenedMiniProgramNotificationRequest)
       returns (SendTaskOpenedMiniProgramNotificationResponse);
 
+  // Process one durable task opening reminder. The API owns the current Task,
+  // IAM recipient policy, per-recipient ledger, and external platform call.
+  rpc ProcessTaskOpenedReminder(ProcessTaskOpenedReminderRequest)
+      returns (ProcessTaskOpenedReminderResponse);
+
   // ==================== Operator Bootstrap 操作 ====================
 
   // 自举首个操作者
@@ -323,6 +328,21 @@ message SendTaskOpenedMiniProgramNotificationResponse {
   string recipient_source = 4;       // 收件人来源：testee / profile_link
   bool skipped = 5;                  // 是否跳过发送
   string message = 6;                // 描述信息
+}
+
+message ProcessTaskOpenedReminderRequest {
+  int64 org_id = 1;
+  string task_id = 2;
+  string testee_id = 3;
+  string opening_event_id = 4;
+  uint32 schedule_revision = 5;
+  google.protobuf.Timestamp open_at = 6;
+}
+
+message ProcessTaskOpenedReminderResponse {
+  // A successful RPC means local responsibilities were settled or retained
+  // for manual review, not that the recipient read the message.
+  bool processed = 1;
 }
 
 // ==================== BootstrapOperator ====================

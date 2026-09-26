@@ -2372,6 +2372,136 @@ func (x *SendTaskOpenedMiniProgramNotificationResponse) GetMessage() string {
 	return ""
 }
 
+type ProcessTaskOpenedReminderRequest struct {
+	state            protoimpl.MessageState `protogen:"open.v1"`
+	OrgId            int64                  `protobuf:"varint,1,opt,name=org_id,json=orgId,proto3" json:"org_id,omitempty"`
+	TaskId           string                 `protobuf:"bytes,2,opt,name=task_id,json=taskId,proto3" json:"task_id,omitempty"`
+	TesteeId         string                 `protobuf:"bytes,3,opt,name=testee_id,json=testeeId,proto3" json:"testee_id,omitempty"`
+	OpeningEventId   string                 `protobuf:"bytes,4,opt,name=opening_event_id,json=openingEventId,proto3" json:"opening_event_id,omitempty"`
+	ScheduleRevision uint32                 `protobuf:"varint,5,opt,name=schedule_revision,json=scheduleRevision,proto3" json:"schedule_revision,omitempty"`
+	OpenAt           *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=open_at,json=openAt,proto3" json:"open_at,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
+}
+
+func (x *ProcessTaskOpenedReminderRequest) Reset() {
+	*x = ProcessTaskOpenedReminderRequest{}
+	mi := &file_internalapi_internal_proto_msgTypes[38]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ProcessTaskOpenedReminderRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ProcessTaskOpenedReminderRequest) ProtoMessage() {}
+
+func (x *ProcessTaskOpenedReminderRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_internalapi_internal_proto_msgTypes[38]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ProcessTaskOpenedReminderRequest.ProtoReflect.Descriptor instead.
+func (*ProcessTaskOpenedReminderRequest) Descriptor() ([]byte, []int) {
+	return file_internalapi_internal_proto_rawDescGZIP(), []int{38}
+}
+
+func (x *ProcessTaskOpenedReminderRequest) GetOrgId() int64 {
+	if x != nil {
+		return x.OrgId
+	}
+	return 0
+}
+
+func (x *ProcessTaskOpenedReminderRequest) GetTaskId() string {
+	if x != nil {
+		return x.TaskId
+	}
+	return ""
+}
+
+func (x *ProcessTaskOpenedReminderRequest) GetTesteeId() string {
+	if x != nil {
+		return x.TesteeId
+	}
+	return ""
+}
+
+func (x *ProcessTaskOpenedReminderRequest) GetOpeningEventId() string {
+	if x != nil {
+		return x.OpeningEventId
+	}
+	return ""
+}
+
+func (x *ProcessTaskOpenedReminderRequest) GetScheduleRevision() uint32 {
+	if x != nil {
+		return x.ScheduleRevision
+	}
+	return 0
+}
+
+func (x *ProcessTaskOpenedReminderRequest) GetOpenAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.OpenAt
+	}
+	return nil
+}
+
+type ProcessTaskOpenedReminderResponse struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// A successful RPC means local responsibilities were settled or retained
+	// for manual review, not that the recipient read the message.
+	Processed     bool `protobuf:"varint,1,opt,name=processed,proto3" json:"processed,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ProcessTaskOpenedReminderResponse) Reset() {
+	*x = ProcessTaskOpenedReminderResponse{}
+	mi := &file_internalapi_internal_proto_msgTypes[39]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ProcessTaskOpenedReminderResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ProcessTaskOpenedReminderResponse) ProtoMessage() {}
+
+func (x *ProcessTaskOpenedReminderResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_internalapi_internal_proto_msgTypes[39]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ProcessTaskOpenedReminderResponse.ProtoReflect.Descriptor instead.
+func (*ProcessTaskOpenedReminderResponse) Descriptor() ([]byte, []int) {
+	return file_internalapi_internal_proto_rawDescGZIP(), []int{39}
+}
+
+func (x *ProcessTaskOpenedReminderResponse) GetProcessed() bool {
+	if x != nil {
+		return x.Processed
+	}
+	return false
+}
+
 type BootstrapOperatorRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	OrgId         int64                  `protobuf:"varint,1,opt,name=org_id,json=orgId,proto3" json:"org_id,omitempty"`          // 机构 ID
@@ -2386,7 +2516,7 @@ type BootstrapOperatorRequest struct {
 
 func (x *BootstrapOperatorRequest) Reset() {
 	*x = BootstrapOperatorRequest{}
-	mi := &file_internalapi_internal_proto_msgTypes[38]
+	mi := &file_internalapi_internal_proto_msgTypes[40]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2398,7 +2528,7 @@ func (x *BootstrapOperatorRequest) String() string {
 func (*BootstrapOperatorRequest) ProtoMessage() {}
 
 func (x *BootstrapOperatorRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_internalapi_internal_proto_msgTypes[38]
+	mi := &file_internalapi_internal_proto_msgTypes[40]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2411,7 +2541,7 @@ func (x *BootstrapOperatorRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BootstrapOperatorRequest.ProtoReflect.Descriptor instead.
 func (*BootstrapOperatorRequest) Descriptor() ([]byte, []int) {
-	return file_internalapi_internal_proto_rawDescGZIP(), []int{38}
+	return file_internalapi_internal_proto_rawDescGZIP(), []int{40}
 }
 
 func (x *BootstrapOperatorRequest) GetOrgId() int64 {
@@ -2468,7 +2598,7 @@ type BootstrapOperatorResponse struct {
 
 func (x *BootstrapOperatorResponse) Reset() {
 	*x = BootstrapOperatorResponse{}
-	mi := &file_internalapi_internal_proto_msgTypes[39]
+	mi := &file_internalapi_internal_proto_msgTypes[41]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2480,7 +2610,7 @@ func (x *BootstrapOperatorResponse) String() string {
 func (*BootstrapOperatorResponse) ProtoMessage() {}
 
 func (x *BootstrapOperatorResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_internalapi_internal_proto_msgTypes[39]
+	mi := &file_internalapi_internal_proto_msgTypes[41]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2493,7 +2623,7 @@ func (x *BootstrapOperatorResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BootstrapOperatorResponse.ProtoReflect.Descriptor instead.
 func (*BootstrapOperatorResponse) Descriptor() ([]byte, []int) {
-	return file_internalapi_internal_proto_rawDescGZIP(), []int{39}
+	return file_internalapi_internal_proto_rawDescGZIP(), []int{41}
 }
 
 func (x *BootstrapOperatorResponse) GetOperatorId() uint64 {
@@ -2721,7 +2851,16 @@ const file_internalapi_internal_proto_rawDesc = "" +
 	"\x12recipient_open_ids\x18\x03 \x03(\tR\x10recipientOpenIds\x12)\n" +
 	"\x10recipient_source\x18\x04 \x01(\tR\x0frecipientSource\x12\x18\n" +
 	"\askipped\x18\x05 \x01(\bR\askipped\x12\x18\n" +
-	"\amessage\x18\x06 \x01(\tR\amessage\"\xa7\x01\n" +
+	"\amessage\x18\x06 \x01(\tR\amessage\"\xfb\x01\n" +
+	" ProcessTaskOpenedReminderRequest\x12\x15\n" +
+	"\x06org_id\x18\x01 \x01(\x03R\x05orgId\x12\x17\n" +
+	"\atask_id\x18\x02 \x01(\tR\x06taskId\x12\x1b\n" +
+	"\ttestee_id\x18\x03 \x01(\tR\btesteeId\x12(\n" +
+	"\x10opening_event_id\x18\x04 \x01(\tR\x0eopeningEventId\x12+\n" +
+	"\x11schedule_revision\x18\x05 \x01(\rR\x10scheduleRevision\x123\n" +
+	"\aopen_at\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\x06openAt\"A\n" +
+	"!ProcessTaskOpenedReminderResponse\x12\x1c\n" +
+	"\tprocessed\x18\x01 \x01(\bR\tprocessed\"\xa7\x01\n" +
 	"\x18BootstrapOperatorRequest\x12\x15\n" +
 	"\x06org_id\x18\x01 \x01(\x03R\x05orgId\x12\x17\n" +
 	"\auser_id\x18\x02 \x01(\x03R\x06userId\x12\x12\n" +
@@ -2734,14 +2873,15 @@ const file_internalapi_internal_proto_rawDesc = "" +
 	"operatorId\x12\x18\n" +
 	"\acreated\x18\x02 \x01(\bR\acreated\x12\x18\n" +
 	"\amessage\x18\x03 \x01(\tR\amessage\x12\x14\n" +
-	"\x05roles\x18\x04 \x03(\tR\x05roles2\xfe\x06\n" +
+	"\x05roles\x18\x04 \x03(\tR\x05roles2\xfa\a\n" +
 	"\x0fInternalService\x12t\n" +
 	"\x17SyncAssessmentAttention\x12+.internalapi.SyncAssessmentAttentionRequest\x1a,.internalapi.SyncAssessmentAttentionResponse\x12\x80\x01\n" +
 	"\x1bGenerateQuestionnaireQRCode\x12/.internalapi.GenerateQuestionnaireQRCodeRequest\x1a0.internalapi.GenerateQuestionnaireQRCodeResponse\x12\x8c\x01\n" +
 	"'HandleQuestionnairePublishedPostActions\x12/.internalapi.GenerateQuestionnaireQRCodeRequest\x1a0.internalapi.GenerateQuestionnaireQRCodeResponse\x12h\n" +
 	"\x13GenerateScaleQRCode\x12'.internalapi.GenerateScaleQRCodeRequest\x1a(.internalapi.GenerateScaleQRCodeResponse\x12t\n" +
 	"\x1fHandleScalePublishedPostActions\x12'.internalapi.GenerateScaleQRCodeRequest\x1a(.internalapi.GenerateScaleQRCodeResponse\x12\x9e\x01\n" +
-	"%SendTaskOpenedMiniProgramNotification\x129.internalapi.SendTaskOpenedMiniProgramNotificationRequest\x1a:.internalapi.SendTaskOpenedMiniProgramNotificationResponse\x12b\n" +
+	"%SendTaskOpenedMiniProgramNotification\x129.internalapi.SendTaskOpenedMiniProgramNotificationRequest\x1a:.internalapi.SendTaskOpenedMiniProgramNotificationResponse\x12z\n" +
+	"\x19ProcessTaskOpenedReminder\x12-.internalapi.ProcessTaskOpenedReminderRequest\x1a..internalapi.ProcessTaskOpenedReminderResponse\x12b\n" +
 	"\x11BootstrapOperator\x12%.internalapi.BootstrapOperatorRequest\x1a&.internalapi.BootstrapOperatorResponse2\x84\b\n" +
 	"\x12PlanCommandService\x12M\n" +
 	"\n" +
@@ -2777,7 +2917,7 @@ func file_internalapi_internal_proto_rawDescGZIP() []byte {
 	return file_internalapi_internal_proto_rawDescData
 }
 
-var file_internalapi_internal_proto_msgTypes = make([]protoimpl.MessageInfo, 41)
+var file_internalapi_internal_proto_msgTypes = make([]protoimpl.MessageInfo, 43)
 var file_internalapi_internal_proto_goTypes = []any{
 	(*ResolveTaskEntryRequest)(nil),                       // 0: internalapi.ResolveTaskEntryRequest
 	(*ResolveTaskEntryResponse)(nil),                      // 1: internalapi.ResolveTaskEntryResponse
@@ -2817,16 +2957,18 @@ var file_internalapi_internal_proto_goTypes = []any{
 	(*GenerateScaleQRCodeResponse)(nil),                   // 35: internalapi.GenerateScaleQRCodeResponse
 	(*SendTaskOpenedMiniProgramNotificationRequest)(nil),  // 36: internalapi.SendTaskOpenedMiniProgramNotificationRequest
 	(*SendTaskOpenedMiniProgramNotificationResponse)(nil), // 37: internalapi.SendTaskOpenedMiniProgramNotificationResponse
-	(*BootstrapOperatorRequest)(nil),                      // 38: internalapi.BootstrapOperatorRequest
-	(*BootstrapOperatorResponse)(nil),                     // 39: internalapi.BootstrapOperatorResponse
-	nil,                                                   // 40: internalapi.ResumePlanRequest.TesteeStartDatesEntry
-	(*timestamppb.Timestamp)(nil),                         // 41: google.protobuf.Timestamp
+	(*ProcessTaskOpenedReminderRequest)(nil),              // 38: internalapi.ProcessTaskOpenedReminderRequest
+	(*ProcessTaskOpenedReminderResponse)(nil),             // 39: internalapi.ProcessTaskOpenedReminderResponse
+	(*BootstrapOperatorRequest)(nil),                      // 40: internalapi.BootstrapOperatorRequest
+	(*BootstrapOperatorResponse)(nil),                     // 41: internalapi.BootstrapOperatorResponse
+	nil,                                                   // 42: internalapi.ResumePlanRequest.TesteeStartDatesEntry
+	(*timestamppb.Timestamp)(nil),                         // 43: google.protobuf.Timestamp
 }
 var file_internalapi_internal_proto_depIdxs = []int32{
 	3,  // 0: internalapi.EnrollmentResultMessage.tasks:type_name -> internalapi.TaskResultMessage
 	2,  // 1: internalapi.CreatePlanResponse.plan:type_name -> internalapi.PlanResultMessage
 	2,  // 2: internalapi.PausePlanResponse.plan:type_name -> internalapi.PlanResultMessage
-	40, // 3: internalapi.ResumePlanRequest.testee_start_dates:type_name -> internalapi.ResumePlanRequest.TesteeStartDatesEntry
+	42, // 3: internalapi.ResumePlanRequest.testee_start_dates:type_name -> internalapi.ResumePlanRequest.TesteeStartDatesEntry
 	2,  // 4: internalapi.ResumePlanResponse.plan:type_name -> internalapi.PlanResultMessage
 	2,  // 5: internalapi.FinishPlanResponse.plan:type_name -> internalapi.PlanResultMessage
 	4,  // 6: internalapi.EnrollTesteeResponse.enrollment:type_name -> internalapi.EnrollmentResultMessage
@@ -2835,52 +2977,55 @@ var file_internalapi_internal_proto_depIdxs = []int32{
 	3,  // 9: internalapi.OpenTaskResponse.task:type_name -> internalapi.TaskResultMessage
 	3,  // 10: internalapi.CompleteTaskResponse.task:type_name -> internalapi.TaskResultMessage
 	3,  // 11: internalapi.ExpireTaskResponse.task:type_name -> internalapi.TaskResultMessage
-	41, // 12: internalapi.SendTaskOpenedMiniProgramNotificationRequest.open_at:type_name -> google.protobuf.Timestamp
-	30, // 13: internalapi.InternalService.SyncAssessmentAttention:input_type -> internalapi.SyncAssessmentAttentionRequest
-	32, // 14: internalapi.InternalService.GenerateQuestionnaireQRCode:input_type -> internalapi.GenerateQuestionnaireQRCodeRequest
-	32, // 15: internalapi.InternalService.HandleQuestionnairePublishedPostActions:input_type -> internalapi.GenerateQuestionnaireQRCodeRequest
-	34, // 16: internalapi.InternalService.GenerateScaleQRCode:input_type -> internalapi.GenerateScaleQRCodeRequest
-	34, // 17: internalapi.InternalService.HandleScalePublishedPostActions:input_type -> internalapi.GenerateScaleQRCodeRequest
-	36, // 18: internalapi.InternalService.SendTaskOpenedMiniProgramNotification:input_type -> internalapi.SendTaskOpenedMiniProgramNotificationRequest
-	38, // 19: internalapi.InternalService.BootstrapOperator:input_type -> internalapi.BootstrapOperatorRequest
-	6,  // 20: internalapi.PlanCommandService.CreatePlan:input_type -> internalapi.CreatePlanRequest
-	8,  // 21: internalapi.PlanCommandService.PausePlan:input_type -> internalapi.PausePlanRequest
-	10, // 22: internalapi.PlanCommandService.ResumePlan:input_type -> internalapi.ResumePlanRequest
-	12, // 23: internalapi.PlanCommandService.FinishPlan:input_type -> internalapi.FinishPlanRequest
-	14, // 24: internalapi.PlanCommandService.CancelPlan:input_type -> internalapi.CancelPlanRequest
-	16, // 25: internalapi.PlanCommandService.EnrollTestee:input_type -> internalapi.EnrollTesteeRequest
-	18, // 26: internalapi.PlanCommandService.TerminateEnrollment:input_type -> internalapi.TerminateEnrollmentRequest
-	20, // 27: internalapi.PlanCommandService.SchedulePendingTasks:input_type -> internalapi.SchedulePendingTasksRequest
-	22, // 28: internalapi.PlanCommandService.OpenTask:input_type -> internalapi.OpenTaskRequest
-	24, // 29: internalapi.PlanCommandService.CompleteTask:input_type -> internalapi.CompleteTaskRequest
-	26, // 30: internalapi.PlanCommandService.ExpireTask:input_type -> internalapi.ExpireTaskRequest
-	28, // 31: internalapi.PlanCommandService.CancelTask:input_type -> internalapi.CancelTaskRequest
-	0,  // 32: internalapi.PlanEntryService.ResolveTaskEntry:input_type -> internalapi.ResolveTaskEntryRequest
-	31, // 33: internalapi.InternalService.SyncAssessmentAttention:output_type -> internalapi.SyncAssessmentAttentionResponse
-	33, // 34: internalapi.InternalService.GenerateQuestionnaireQRCode:output_type -> internalapi.GenerateQuestionnaireQRCodeResponse
-	33, // 35: internalapi.InternalService.HandleQuestionnairePublishedPostActions:output_type -> internalapi.GenerateQuestionnaireQRCodeResponse
-	35, // 36: internalapi.InternalService.GenerateScaleQRCode:output_type -> internalapi.GenerateScaleQRCodeResponse
-	35, // 37: internalapi.InternalService.HandleScalePublishedPostActions:output_type -> internalapi.GenerateScaleQRCodeResponse
-	37, // 38: internalapi.InternalService.SendTaskOpenedMiniProgramNotification:output_type -> internalapi.SendTaskOpenedMiniProgramNotificationResponse
-	39, // 39: internalapi.InternalService.BootstrapOperator:output_type -> internalapi.BootstrapOperatorResponse
-	7,  // 40: internalapi.PlanCommandService.CreatePlan:output_type -> internalapi.CreatePlanResponse
-	9,  // 41: internalapi.PlanCommandService.PausePlan:output_type -> internalapi.PausePlanResponse
-	11, // 42: internalapi.PlanCommandService.ResumePlan:output_type -> internalapi.ResumePlanResponse
-	13, // 43: internalapi.PlanCommandService.FinishPlan:output_type -> internalapi.FinishPlanResponse
-	15, // 44: internalapi.PlanCommandService.CancelPlan:output_type -> internalapi.CancelPlanResponse
-	17, // 45: internalapi.PlanCommandService.EnrollTestee:output_type -> internalapi.EnrollTesteeResponse
-	19, // 46: internalapi.PlanCommandService.TerminateEnrollment:output_type -> internalapi.TerminateEnrollmentResponse
-	21, // 47: internalapi.PlanCommandService.SchedulePendingTasks:output_type -> internalapi.SchedulePendingTasksResponse
-	23, // 48: internalapi.PlanCommandService.OpenTask:output_type -> internalapi.OpenTaskResponse
-	25, // 49: internalapi.PlanCommandService.CompleteTask:output_type -> internalapi.CompleteTaskResponse
-	27, // 50: internalapi.PlanCommandService.ExpireTask:output_type -> internalapi.ExpireTaskResponse
-	29, // 51: internalapi.PlanCommandService.CancelTask:output_type -> internalapi.CancelTaskResponse
-	1,  // 52: internalapi.PlanEntryService.ResolveTaskEntry:output_type -> internalapi.ResolveTaskEntryResponse
-	33, // [33:53] is the sub-list for method output_type
-	13, // [13:33] is the sub-list for method input_type
-	13, // [13:13] is the sub-list for extension type_name
-	13, // [13:13] is the sub-list for extension extendee
-	0,  // [0:13] is the sub-list for field type_name
+	43, // 12: internalapi.SendTaskOpenedMiniProgramNotificationRequest.open_at:type_name -> google.protobuf.Timestamp
+	43, // 13: internalapi.ProcessTaskOpenedReminderRequest.open_at:type_name -> google.protobuf.Timestamp
+	30, // 14: internalapi.InternalService.SyncAssessmentAttention:input_type -> internalapi.SyncAssessmentAttentionRequest
+	32, // 15: internalapi.InternalService.GenerateQuestionnaireQRCode:input_type -> internalapi.GenerateQuestionnaireQRCodeRequest
+	32, // 16: internalapi.InternalService.HandleQuestionnairePublishedPostActions:input_type -> internalapi.GenerateQuestionnaireQRCodeRequest
+	34, // 17: internalapi.InternalService.GenerateScaleQRCode:input_type -> internalapi.GenerateScaleQRCodeRequest
+	34, // 18: internalapi.InternalService.HandleScalePublishedPostActions:input_type -> internalapi.GenerateScaleQRCodeRequest
+	36, // 19: internalapi.InternalService.SendTaskOpenedMiniProgramNotification:input_type -> internalapi.SendTaskOpenedMiniProgramNotificationRequest
+	38, // 20: internalapi.InternalService.ProcessTaskOpenedReminder:input_type -> internalapi.ProcessTaskOpenedReminderRequest
+	40, // 21: internalapi.InternalService.BootstrapOperator:input_type -> internalapi.BootstrapOperatorRequest
+	6,  // 22: internalapi.PlanCommandService.CreatePlan:input_type -> internalapi.CreatePlanRequest
+	8,  // 23: internalapi.PlanCommandService.PausePlan:input_type -> internalapi.PausePlanRequest
+	10, // 24: internalapi.PlanCommandService.ResumePlan:input_type -> internalapi.ResumePlanRequest
+	12, // 25: internalapi.PlanCommandService.FinishPlan:input_type -> internalapi.FinishPlanRequest
+	14, // 26: internalapi.PlanCommandService.CancelPlan:input_type -> internalapi.CancelPlanRequest
+	16, // 27: internalapi.PlanCommandService.EnrollTestee:input_type -> internalapi.EnrollTesteeRequest
+	18, // 28: internalapi.PlanCommandService.TerminateEnrollment:input_type -> internalapi.TerminateEnrollmentRequest
+	20, // 29: internalapi.PlanCommandService.SchedulePendingTasks:input_type -> internalapi.SchedulePendingTasksRequest
+	22, // 30: internalapi.PlanCommandService.OpenTask:input_type -> internalapi.OpenTaskRequest
+	24, // 31: internalapi.PlanCommandService.CompleteTask:input_type -> internalapi.CompleteTaskRequest
+	26, // 32: internalapi.PlanCommandService.ExpireTask:input_type -> internalapi.ExpireTaskRequest
+	28, // 33: internalapi.PlanCommandService.CancelTask:input_type -> internalapi.CancelTaskRequest
+	0,  // 34: internalapi.PlanEntryService.ResolveTaskEntry:input_type -> internalapi.ResolveTaskEntryRequest
+	31, // 35: internalapi.InternalService.SyncAssessmentAttention:output_type -> internalapi.SyncAssessmentAttentionResponse
+	33, // 36: internalapi.InternalService.GenerateQuestionnaireQRCode:output_type -> internalapi.GenerateQuestionnaireQRCodeResponse
+	33, // 37: internalapi.InternalService.HandleQuestionnairePublishedPostActions:output_type -> internalapi.GenerateQuestionnaireQRCodeResponse
+	35, // 38: internalapi.InternalService.GenerateScaleQRCode:output_type -> internalapi.GenerateScaleQRCodeResponse
+	35, // 39: internalapi.InternalService.HandleScalePublishedPostActions:output_type -> internalapi.GenerateScaleQRCodeResponse
+	37, // 40: internalapi.InternalService.SendTaskOpenedMiniProgramNotification:output_type -> internalapi.SendTaskOpenedMiniProgramNotificationResponse
+	39, // 41: internalapi.InternalService.ProcessTaskOpenedReminder:output_type -> internalapi.ProcessTaskOpenedReminderResponse
+	41, // 42: internalapi.InternalService.BootstrapOperator:output_type -> internalapi.BootstrapOperatorResponse
+	7,  // 43: internalapi.PlanCommandService.CreatePlan:output_type -> internalapi.CreatePlanResponse
+	9,  // 44: internalapi.PlanCommandService.PausePlan:output_type -> internalapi.PausePlanResponse
+	11, // 45: internalapi.PlanCommandService.ResumePlan:output_type -> internalapi.ResumePlanResponse
+	13, // 46: internalapi.PlanCommandService.FinishPlan:output_type -> internalapi.FinishPlanResponse
+	15, // 47: internalapi.PlanCommandService.CancelPlan:output_type -> internalapi.CancelPlanResponse
+	17, // 48: internalapi.PlanCommandService.EnrollTestee:output_type -> internalapi.EnrollTesteeResponse
+	19, // 49: internalapi.PlanCommandService.TerminateEnrollment:output_type -> internalapi.TerminateEnrollmentResponse
+	21, // 50: internalapi.PlanCommandService.SchedulePendingTasks:output_type -> internalapi.SchedulePendingTasksResponse
+	23, // 51: internalapi.PlanCommandService.OpenTask:output_type -> internalapi.OpenTaskResponse
+	25, // 52: internalapi.PlanCommandService.CompleteTask:output_type -> internalapi.CompleteTaskResponse
+	27, // 53: internalapi.PlanCommandService.ExpireTask:output_type -> internalapi.ExpireTaskResponse
+	29, // 54: internalapi.PlanCommandService.CancelTask:output_type -> internalapi.CancelTaskResponse
+	1,  // 55: internalapi.PlanEntryService.ResolveTaskEntry:output_type -> internalapi.ResolveTaskEntryResponse
+	35, // [35:56] is the sub-list for method output_type
+	14, // [14:35] is the sub-list for method input_type
+	14, // [14:14] is the sub-list for extension type_name
+	14, // [14:14] is the sub-list for extension extendee
+	0,  // [0:14] is the sub-list for field type_name
 }
 
 func init() { file_internalapi_internal_proto_init() }
@@ -2895,7 +3040,7 @@ func file_internalapi_internal_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_internalapi_internal_proto_rawDesc), len(file_internalapi_internal_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   41,
+			NumMessages:   43,
 			NumExtensions: 0,
 			NumServices:   3,
 		},

@@ -2,6 +2,7 @@ package process
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"time"
 
@@ -163,13 +164,16 @@ func (s *server) initializeWeChatServices(c *container.Container) error {
 		return err
 	}
 	if s.config.WeChatOptions == nil {
+		if c.TaskOpenedReminderEnabled() {
+			return fmt.Errorf("durable task reminder requires WeChat options")
+		}
 		return nil
 	}
 	if err := c.InitQRCodeService(s.config.WeChatOptions, s.config.OSSOptions); err != nil {
 		return err
 	}
 	c.InitMiniProgramTaskNotificationService(s.config.WeChatOptions)
-	return nil
+	return c.InitTaskOpenedReminderService(s.config.WeChatOptions)
 }
 
 func (s *server) startAuthzVersionSync(c *container.Container, recorder eventtransport.DeadLetterRecorder) messaging.Subscriber {

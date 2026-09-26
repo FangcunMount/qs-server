@@ -17,5 +17,6 @@ func ACLAllowedMethods() []string {
 		internalpb.InternalService_HandleQuestionnairePublishedPostActions_FullMethodName,
 		internalpb.InternalService_HandleScalePublishedPostActions_FullMethodName,
 		internalpb.InternalService_SendTaskOpenedMiniProgramNotification_FullMethodName,
+		internalpb.InternalService_ProcessTaskOpenedReminder_FullMethodName,
 	}
 }

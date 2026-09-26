@@ -405,10 +405,11 @@ func buildWarmPrompt(count int) string {
 }
 
 func formatTaskOpenedDate(openAt time.Time) string {
+	location := time.FixedZone("UTC+8", 8*60*60)
 	if openAt.IsZero() {
-		return time.Now().Local().Format("2006.01.02")
+		return time.Now().In(location).Format("2006.01.02")
 	}
-	return openAt.Local().Format("2006.01.02")
+	return openAt.In(location).Format("2006.01.02")
 }
 
 func (s *taskOpenedService) buildPagePath(entryURL string) string {

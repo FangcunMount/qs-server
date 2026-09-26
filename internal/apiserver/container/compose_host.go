@@ -61,6 +61,10 @@ func (c *Container) EventProfile(profile eventcatalog.OutboxProfile) appEventing
 	return c.eventSubsystem.Profile(profile)
 }
 
+func (c *Container) TaskOpenedReminderEnabled() bool {
+	return c != nil && c.taskOpenedReminderEnabled
+}
+
 func (c *Container) MySQLLimiter() backpressure.Acquirer {
 	if c == nil || c.resilience == nil {
 		return nil

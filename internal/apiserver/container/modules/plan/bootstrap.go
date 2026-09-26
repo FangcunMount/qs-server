@@ -7,6 +7,7 @@ import (
 
 	"github.com/FangcunMount/component-base/pkg/event"
 	actorAccessApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/access"
+	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
 	modelcatalogport "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 	sharedcache "github.com/FangcunMount/qs-server/internal/pkg/cache"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/keyspace"
@@ -26,6 +27,7 @@ type BootstrapInput struct {
 	Observer        *observability.ComponentObserver
 	MySQLLimiter    backpressure.Acquirer
 	TesteeAccess    actorAccessApp.TesteeAccessService
+	OpenedOutbox    appEventing.ProfileBinding
 }
 
 // Bootstrap assembles the plan module from container integration inputs.

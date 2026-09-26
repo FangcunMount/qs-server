@@ -112,6 +112,14 @@ events:
     description: "任务已开放"
     handler: task_opened_handler
 
+  task.opened.reminder.requested:
+    topic: task-lifecycle
+    delivery: durable_outbox
+    aggregate: AssessmentTask
+    domain: plan
+    description: "任务开放的逐收件主动提醒意图"
+    handler: task_opened_reminder_handler
+
   task.completed:
     topic: task-lifecycle
     delivery: best_effort

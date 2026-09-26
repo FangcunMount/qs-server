@@ -178,7 +178,7 @@ func TestEffectiveRegistryDerivesProfilePolicy(t *testing.T) {
 	if got := registry.ImmediateTypes(OutboxProfileMongoDomain); !slices.Equal(got, []string{AnswerSheetSubmitted}) {
 		t.Fatalf("mongo immediate types = %#v", got)
 	}
-	if got := registry.ImmediateTypes(OutboxProfileAssessmentMySQL); !slices.Equal(got, []string{EvaluationOutcomeCommitted, EvaluationRequested}) && !slices.Equal(got, []string{EvaluationRequested, EvaluationOutcomeCommitted}) {
+	if got := registry.ImmediateTypes(OutboxProfileAssessmentMySQL); !slices.Equal(got, []string{EvaluationOutcomeCommitted, EvaluationRequested, TaskOpenedReminderRequested}) {
 		t.Fatalf("mysql immediate types = %#v", got)
 	}
 	if got := registry.PriorityBucket(AnswerSheetSubmitted); got != string(PriorityP0) {

@@ -22,7 +22,7 @@ const (
 const (
 	// EventTypeTaskOpened 任务开放事件
 	EventTypeTaskOpened                  = eventcatalog.TaskOpened
-	EventTypeTaskOpenedReminderRequested = "task.opened.reminder.requested"
+	EventTypeTaskOpenedReminderRequested = eventcatalog.TaskOpenedReminderRequested
 	// EventTypeTaskCompleted 任务完成事件
 	EventTypeTaskCompleted = eventcatalog.TaskCompleted
 	// EventTypeTaskExpired 任务过期事件

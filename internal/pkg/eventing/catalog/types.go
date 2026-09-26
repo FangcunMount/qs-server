@@ -17,10 +17,11 @@ const (
 
 	AssessmentModelChanged = "assessment_model.changed"
 
-	TaskOpened    = "task.opened"
-	TaskCompleted = "task.completed"
-	TaskExpired   = "task.expired"
-	TaskCanceled  = "task.canceled"
+	TaskOpened                  = "task.opened"
+	TaskOpenedReminderRequested = "task.opened.reminder.requested"
+	TaskCompleted               = "task.completed"
+	TaskExpired                 = "task.expired"
+	TaskCanceled                = "task.canceled"
 )
 
 // EventTypes returns all event types known by code.
@@ -37,6 +38,7 @@ func EventTypes() []string {
 		InterpretationRetryRequested,
 		AssessmentModelChanged,
 		TaskOpened,
+		TaskOpenedReminderRequested,
 		TaskCompleted,
 		TaskExpired,
 		TaskCanceled,

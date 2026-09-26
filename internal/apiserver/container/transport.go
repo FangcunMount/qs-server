@@ -433,6 +433,7 @@ func (c *Container) BuildGRPCDeps(server *grpcpkg.Server) grpctransport.Deps {
 	deps.WarmupCoordinator = platformDeps.WarmupCoordinator
 	deps.QRCodeService = platformDeps.QRCodeService
 	deps.MiniProgramTaskNotificationService = platformDeps.MiniProgramTaskNotificationService
+	deps.TaskOpenedReminderService = c.TaskOpenedReminderService
 	deps.IAM = platformDeps.IAM
 	deps.PublishedModelCatalog = platformDeps.PublishedModelCatalog
 

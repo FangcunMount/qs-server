@@ -109,6 +109,7 @@ func TestCatalogDeliveryClass(t *testing.T) {
 		{QuestionnaireChanged, DeliveryClassBestEffort, false},
 		{AssessmentModelChanged, DeliveryClassBestEffort, false},
 		{TaskOpened, DeliveryClassBestEffort, false},
+		{TaskOpenedReminderRequested, DeliveryClassDurableOutbox, true},
 		{TaskCompleted, DeliveryClassBestEffort, false},
 		{TaskExpired, DeliveryClassBestEffort, false},
 		{TaskCanceled, DeliveryClassBestEffort, false},

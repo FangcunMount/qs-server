@@ -275,6 +275,7 @@ EXPECTED_EVENTS = {
     "interpretation.report.failed",
     "interpretation.retry.requested",
     "task.opened",
+    "task.opened.reminder.requested",
     "task.completed",
     "task.expired",
     "task.canceled",
@@ -288,7 +289,7 @@ EXPECTED_SIGNALS = {
     "typology_model_cache_changed",
 }
 
-EXPECTED_MIGRATION_MAX = {"mysql": 87, "mongodb": 36}
+EXPECTED_MIGRATION_MAX = {"mysql": 88, "mongodb": 36}
 EXPECTED_DOC_STATUS = {"aligned", "drifted", "needs_review", "planned", "archive_candidate"}
 EXPECTED_OWNERS = {
     "overview",
