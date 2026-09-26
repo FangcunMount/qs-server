@@ -92,7 +92,7 @@ func (s *SubscribeSender) SendSubscribeMessageWithReceipt(ctx context.Context, a
 		// HTTP errors may contain the request URL and its access token.
 		return wechatmini.SubscribeSendReceipt{}, fmt.Errorf("send subscribe request: response unavailable")
 	}
-	defer response.Body.Close()
+	defer func() { _ = response.Body.Close() }()
 	if response.StatusCode != http.StatusOK {
 		return wechatmini.SubscribeSendReceipt{}, fmt.Errorf("send subscribe request: HTTP %d", response.StatusCode)
 	}
