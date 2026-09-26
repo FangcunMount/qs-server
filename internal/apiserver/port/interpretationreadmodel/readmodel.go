@@ -102,6 +102,7 @@ type ReportSuggestionRow struct {
 }
 
 type ReportRow struct {
+	ReportID            uint64
 	AssessmentID        uint64
 	ModelName           string
 	ModelCode           string
@@ -128,11 +129,19 @@ const (
 )
 
 type CurrentReportMetadata struct {
-	AssessmentID     uint64
-	Status           CurrentReportMetadataStatus
-	CreatedAt        time.Time
-	SourceKind       string
-	SourceID         uint64
+	AssessmentID uint64
+	Status       CurrentReportMetadataStatus
+	CreatedAt    time.Time
+	SourceKind   string
+	SourceID     uint64
+	// These source-side identities are populated only after catalog/source
+	// association checks pass. They identify the exact current report for
+	// delivery-resolution evidence, not merely a catalog row with the same ID.
+	OrgID            int64
+	TesteeID         uint64
+	OutcomeID        uint64
+	GenerationID     uint64
+	RunID            uint64
 	MismatchedFields []string
 }
 

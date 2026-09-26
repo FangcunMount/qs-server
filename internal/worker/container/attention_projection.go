@@ -5,11 +5,14 @@ import (
 	"fmt"
 
 	pb "github.com/FangcunMount/qs-server/api/grpc/gen/internalapi"
-	"github.com/FangcunMount/qs-server/internal/worker/infra/grpcclient"
 )
 
+type attentionRPC interface {
+	SyncAssessmentAttention(context.Context, *pb.SyncAssessmentAttentionRequest) (*pb.SyncAssessmentAttentionResponse, error)
+}
+
 type internalAttentionSyncClient struct {
-	client *grpcclient.InternalClient
+	client attentionRPC
 }
 
 func (c *internalAttentionSyncClient) SyncAssessmentAttention(
@@ -21,10 +24,16 @@ func (c *internalAttentionSyncClient) SyncAssessmentAttention(
 	if c == nil || c.client == nil {
 		return fmt.Errorf("internal attention client is not configured")
 	}
-	_, err := c.client.SyncAssessmentAttention(ctx, &pb.SyncAssessmentAttentionRequest{
+	response, err := c.client.SyncAssessmentAttention(ctx, &pb.SyncAssessmentAttentionRequest{
 		TesteeId:     testeeID,
 		RiskLevel:    riskLevel,
 		MarkKeyFocus: markKeyFocus,
 	})
-	return err
+	if err != nil {
+		return err
+	}
+	if response == nil || !response.GetSuccess() {
+		return fmt.Errorf("attention sync was not accepted by the API")
+	}
+	return nil
 }

@@ -105,6 +105,11 @@ func (r *reportReadModel) GetCurrentReportMetadataByAssessmentIDs(ctx context.Co
 				item.MismatchedFields = fields
 			} else {
 				item.Status = readmodel.CurrentReportMetadataFound
+				item.OrgID = source.Association.OrgID
+				item.TesteeID = source.Association.TesteeID
+				item.OutcomeID = source.Association.OutcomeID
+				item.GenerationID = source.Association.GenerationID
+				item.RunID = source.RunID
 			}
 		}
 		result[entry.AssessmentID] = item
@@ -115,6 +120,7 @@ func (r *reportReadModel) GetCurrentReportMetadataByAssessmentIDs(ctx context.Co
 type catalogSourceMetadata struct {
 	Association CatalogSourceAssociation
 	CreatedAt   time.Time
+	RunID       uint64
 }
 
 func (r *reportReadModel) loadCatalogSourceMetadata(ctx context.Context, entries []ReportCatalogPO) (map[string]catalogSourceMetadata, error) {
@@ -130,13 +136,14 @@ func (r *reportReadModel) loadCatalogSourceMetadata(ctx context.Context, entries
 			ctx,
 			bson.M{"domain_id": bson.M{"$in": artifactIDs}, "deleted_at": nil},
 			options.Find().SetProjection(bson.M{
-				"domain_id":     1,
-				"assessment_id": 1,
-				"org_id":        1,
-				"testee_id":     1,
-				"outcome_id":    1,
-				"generation_id": 1,
-				"generated_at":  1,
+				"domain_id":             1,
+				"assessment_id":         1,
+				"org_id":                1,
+				"testee_id":             1,
+				"outcome_id":            1,
+				"generation_id":         1,
+				"interpretation_run_id": 1,
+				"generated_at":          1,
 			}),
 		)
 		if err != nil {
@@ -155,6 +162,7 @@ func (r *reportReadModel) loadCatalogSourceMetadata(ctx context.Context, entries
 					GenerationID: po.GenerationID, HasGenerationID: po.GenerationID != 0,
 				},
 				CreatedAt: po.GeneratedAt,
+				RunID:     po.InterpretationRunID,
 			}
 		}
 		if err := cursor.Err(); err != nil {
@@ -323,5 +331,7 @@ func interpretReportPOToReadRow(po *InterpretReportPO) readmodel.ReportRow {
 		return readmodel.ReportRow{}
 	}
 	body := &reportBodyPO{BaseDocument: base.BaseDocument{DomainID: meta.FromUint64(po.AssessmentID), CreatedAt: po.GeneratedAt}, ScaleName: po.ScaleName, ScaleCode: po.ScaleCode, Model: po.Model, PrimaryScore: po.PrimaryScore, Level: po.Level, TotalScore: po.TotalScore, RiskLevel: po.RiskLevel, Conclusion: po.Conclusion, Dimensions: po.Dimensions, Suggestions: po.Suggestions, ModelExtra: po.ModelExtra, PresentationProfile: po.PresentationProfile}
-	return projectReportBodyRow(body)
+	row := projectReportBodyRow(body)
+	row.ReportID = po.DomainID.Uint64()
+	return row
 }
