@@ -99,8 +99,9 @@ func (s *reminderDeliveryStub) ListNeedsReview(context.Context, int64, time.Time
 }
 
 type receiptSenderStub struct {
-	calls int
-	err   error
+	calls            int
+	err              error
+	withoutMessageID bool
 }
 
 func (s *receiptSenderStub) SendSubscribeMessageWithReceipt(_ context.Context, _, _ string, _ wechatmini.SubscribeMessage) (wechatmini.SubscribeSendReceipt, error) {
@@ -108,7 +109,11 @@ func (s *receiptSenderStub) SendSubscribeMessageWithReceipt(_ context.Context, _
 	if s.err != nil {
 		return wechatmini.SubscribeSendReceipt{}, s.err
 	}
-	return wechatmini.SubscribeSendReceipt{PlatformMessageID: "wechat-123"}, nil
+	receipt := wechatmini.SubscribeSendReceipt{Accepted: true}
+	if !s.withoutMessageID {
+		receipt.PlatformMessageID = "wechat-123"
+	}
+	return receipt, nil
 }
 
 func TestDurableReminderUnknownResultNeverSendsAgain(t *testing.T) {
@@ -152,6 +157,44 @@ func TestDurableReminderUnknownResultNeverSendsAgain(t *testing.T) {
 	require.Equal(t, 1, receipts.calls)
 	require.NoError(t, service.ProcessTaskOpenedReminder(context.Background(), request))
 	require.Equal(t, 1, receipts.calls, "unknown platform outcome must never be retried automatically")
+}
+
+func TestDurableReminderAcceptsPlatformSuccessWithoutMessageID(t *testing.T) {
+	opened := time.Date(2026, 9, 26, 10, 0, 0, 0, time.FixedZone("UTC+8", 8*3600))
+	expires := opened.Add(24 * time.Hour)
+	task := &reminderTaskReaderStub{state: &planApp.TaskReminderState{
+		OrgID: 7, TaskID: "task-1", TesteeID: "12", Status: planDomain.TaskStatusOpened,
+		ScheduleRevision: 3, OpenAt: &opened, ExpireAt: &expires,
+		EntryURL: "https://collect.example/entry?token=secret&task_id=task-1",
+	}}
+	profileID := uint64(1001)
+	identities := &reminderCandidateReaderStub{
+		linked: []iambridge.MiniProgramLinkedUser{{UserID: "self-user", Relations: []string{"self"}}},
+		candidates: []iambridge.MiniProgramRecipientCandidate{{
+			UserID: "self-user", LoginIdentityID: "self-identity", AppID: "wx-app",
+			OpenID: "self-openid", Relations: []string{"self"},
+		}},
+	}
+	deliveries := &reminderDeliveryStub{}
+	receipts := &receiptSenderStub{withoutMessageID: true}
+	service := NewTaskOpenedReminderService(task, &testeeLookupStub{result: &testeeApp.TesteeResult{
+		ID: 12, ProfileID: &profileID,
+	}}, identities, &reminderBatchStub{}, deliveries, &wechatAppLookupStub{},
+		&senderStub{templates: []wechatmini.SubscribeTemplate{{
+			ID: "tmpl-1", Content: "{{thing5.DATA}}{{date1.DATA}}{{character_string2.DATA}}{{thing3.DATA}}",
+		}}}, receipts, nil, nil,
+		&Config{AppID: "wx-app", AppSecret: "wx-secret", PagePath: "pages/task/index", TaskOpenedTemplateID: "tmpl-1"},
+	).(*taskOpenedReminderService)
+	service.now = func() time.Time { return opened.Add(time.Minute) }
+	request := TaskOpenedReminderRequest{OpeningEventID: "event-1", Intent: TaskOpenedReminderIntent{
+		OrgID: 7, TaskID: "task-1", TesteeID: "12", ScheduleRevision: 3, OpenAt: opened,
+	}}
+	require.NoError(t, service.ProcessTaskOpenedReminder(context.Background(), request))
+	require.Equal(t, ReminderConfirmed, deliveries.state)
+	require.Equal(t, 1, receipts.calls)
+	require.Zero(t, deliveries.unknownCount)
+	require.NoError(t, service.ProcessTaskOpenedReminder(context.Background(), request))
+	require.Equal(t, 1, receipts.calls, "accepted response must not cause another send")
 }
 
 func TestDurableReminderSuppressesBeforeExternalCallAfterTaskCompletes(t *testing.T) {

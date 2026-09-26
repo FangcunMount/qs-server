@@ -189,6 +189,27 @@ func TestReminderDeliveryLedgerSurvivesCompetingConsumersAndUnknownSend(t *testi
 	_, claimed, err = second.Claim(ctx, released, time.Minute, now.Add(2*time.Second))
 	require.NoError(t, err)
 	require.True(t, claimed, "a claim released before the external boundary is safe to retry")
+	acceptedWithoutID := base
+	acceptedWithoutID.LoginIdentityID = "identity-6"
+	_, err = first.EnsurePending(ctx, acceptedWithoutID, "user-6", now)
+	require.NoError(t, err)
+	acceptedToken, claimed, err := first.Claim(ctx, acceptedWithoutID, time.Minute, now)
+	require.NoError(t, err)
+	require.True(t, claimed)
+	started, err = first.BeginExternalCall(ctx, acceptedWithoutID, acceptedToken, now.Add(time.Second))
+	require.NoError(t, err)
+	require.True(t, started)
+	confirmed, err = second.Confirm(ctx, acceptedWithoutID, acceptedToken, "", now.Add(2*time.Second))
+	require.NoError(t, err)
+	require.True(t, confirmed)
+	delivery, err = first.Read(ctx, acceptedWithoutID)
+	require.NoError(t, err)
+	require.Equal(t, appnotification.ReminderConfirmed, delivery.State)
+	require.Empty(t, delivery.PlatformMessageID)
+	require.Equal(t, "platform_accepted_no_msgid", delivery.ResolutionCode)
+	_, claimed, err = first.Claim(ctx, acceptedWithoutID, time.Minute, now.Add(time.Hour))
+	require.NoError(t, err)
+	require.False(t, claimed, "an accepted response without msgid must not be sent again")
 	review, err := second.ListNeedsReview(ctx, 501, now.Add(10*time.Minute), 10)
 	require.NoError(t, err)
 	require.Len(t, review, 2)
@@ -217,13 +238,13 @@ func TestReminderDeliveryLedgerSurvivesCompetingConsumersAndUnknownSend(t *testi
 	require.ErrorContains(t, err, "identity conflict")
 	var total int64
 	require.NoError(t, firstDB.Table("task_opened_reminder_delivery").Count(&total).Error)
-	require.EqualValues(t, 5, total)
+	require.EqualValues(t, 6, total)
 	downPath := filepath.Join("..", "..", "..", "..", "pkg", "migration", "migrations", "mysql", "000087_task_opened_reminder_delivery.down.sql")
 	downSQL, err := os.ReadFile(downPath)
 	require.NoError(t, err)
 	require.ErrorContains(t, firstDB.Exec(string(downSQL)).Error, "manual review")
 	require.NoError(t, firstDB.Table("task_opened_reminder_delivery").Count(&total).Error)
-	require.EqualValues(t, 5, total, "application rollback must not delete reminder responsibilities")
+	require.EqualValues(t, 6, total, "application rollback must not delete reminder responsibilities")
 	var sensitiveColumns int64
 	require.NoError(t, firstDB.Raw(`SELECT COUNT(*) FROM information_schema.columns
 		WHERE table_schema = DATABASE() AND table_name = 'task_opened_reminder_delivery'

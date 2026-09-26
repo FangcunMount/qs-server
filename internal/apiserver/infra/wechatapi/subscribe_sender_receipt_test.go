@@ -45,7 +45,7 @@ func TestSendSubscribeMessageWithReceiptPreservesPlatformID(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if receipt.PlatformMessageID != "123456789" || client.receiptCalls != 1 || client.legacyCalls != 0 {
+	if !receipt.Accepted || receipt.PlatformMessageID != "123456789" || client.receiptCalls != 1 || client.legacyCalls != 0 {
 		t.Fatalf("receipt=%+v, receiptCalls=%d, legacyCalls=%d", receipt, client.receiptCalls, client.legacyCalls)
 	}
 	if client.message == nil || client.message.ToUser != message.ToUser || client.message.TemplateID != message.TemplateID ||
@@ -55,11 +55,11 @@ func TestSendSubscribeMessageWithReceiptPreservesPlatformID(t *testing.T) {
 	}
 }
 
-func TestSendSubscribeMessageWithReceiptWithoutIDIsUnknown(t *testing.T) {
+func TestSendSubscribeMessageWithReceiptAcceptsDocumentedSuccessWithoutID(t *testing.T) {
 	client := &receiptClientStub{}
 	sender := &SubscribeSender{newClient: func(_, _ string) (subscribeClient, error) { return client, nil }}
 	receipt, err := sender.SendSubscribeMessageWithReceipt(context.Background(), "app", "secret", wechatmini.SubscribeMessage{})
-	if err == nil || receipt.PlatformMessageID != "" || client.receiptCalls != 1 || client.legacyCalls != 0 {
+	if err != nil || !receipt.Accepted || receipt.PlatformMessageID != "" || client.receiptCalls != 1 || client.legacyCalls != 0 {
 		t.Fatalf("receipt=%+v, err=%v, receiptCalls=%d", receipt, err, client.receiptCalls)
 	}
 }
@@ -68,7 +68,7 @@ func TestSendSubscribeMessageWithReceiptReturnsErrorWithoutRetry(t *testing.T) {
 	client := &receiptClientStub{err: errors.New("response unavailable")}
 	sender := &SubscribeSender{newClient: func(_, _ string) (subscribeClient, error) { return client, nil }}
 	receipt, err := sender.SendSubscribeMessageWithReceipt(context.Background(), "app", "secret", wechatmini.SubscribeMessage{})
-	if !errors.Is(err, client.err) || receipt.PlatformMessageID != "" || client.receiptCalls != 1 || client.legacyCalls != 0 {
+	if !errors.Is(err, client.err) || receipt.Accepted || receipt.PlatformMessageID != "" || client.receiptCalls != 1 || client.legacyCalls != 0 {
 		t.Fatalf("receipt=%+v, err=%v, receiptCalls=%d, legacyCalls=%d", receipt, err, client.receiptCalls, client.legacyCalls)
 	}
 }

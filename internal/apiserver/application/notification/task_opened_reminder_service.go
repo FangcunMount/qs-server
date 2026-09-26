@@ -269,7 +269,7 @@ func (s *taskOpenedReminderService) deliverOne(
 		return nil
 	}
 	receipt, sendErr := s.receipts.SendSubscribeMessageWithReceipt(ctx, batch.AppID, appSecret, message)
-	if sendErr != nil || receipt.PlatformMessageID == "" {
+	if sendErr != nil || !receipt.Accepted {
 		var marked bool
 		marked, err = s.deliveries.MarkUnknown(settleCtx, key, token, "platform_result_unknown", s.now())
 		if err != nil {
