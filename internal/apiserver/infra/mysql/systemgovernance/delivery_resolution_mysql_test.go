@@ -102,7 +102,7 @@ func TestDeliveryResolutionRequiresCompleteEvidenceAndCommitsAtomicallyMySQL(t *
 	}
 	if err := db.Callback().Update().Before("gorm:update").Register("test:reject_delivery_resolution", func(tx *gorm.DB) {
 		if tx.Statement.Table == "event_delivery_dead_letter" {
-			tx.AddError(errors.New("injected settlement failure"))
+			_ = tx.AddError(errors.New("injected settlement failure"))
 		}
 	}); err != nil {
 		t.Fatal(err)
