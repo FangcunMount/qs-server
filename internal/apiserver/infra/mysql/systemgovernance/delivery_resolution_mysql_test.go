@@ -124,8 +124,13 @@ func TestDeliveryResolutionRequiresCompleteEvidenceAndCommitsAtomicallyMySQL(t *
 		t.Fatal("failed settlement left a committed resolution audit")
 	}
 	assertResolutionState(t, db, "automatic", 0)
-	if err := store.ResolveDelivery(t.Context(), req, full); err != nil {
+	result, err := store.ResolveDeliveryResult(t.Context(), req, full)
+	if err != nil {
 		t.Fatal(err)
+	}
+	if result == nil || result.RequestID != req.RequestID || result.ActionID != deliveryResolutionActionID ||
+		result.Result["evidence_reference"] != "proof-41" {
+		t.Fatalf("committed resolution result = %+v", result)
 	}
 	assertResolutionState(t, db, deliveryResolutionDisposition, 1)
 	var originalAfter actionRunPO
@@ -138,8 +143,12 @@ func TestDeliveryResolutionRequiresCompleteEvidenceAndCommitsAtomicallyMySQL(t *
 	verifyAgain := func(context.Context, *gorm.DB, DeliveryResolutionSubject) (DeliveryResolutionEvidence, error) {
 		return DeliveryResolutionEvidence{}, errors.New("idempotent retry must not verify or publish again")
 	}
-	if err := store.ResolveDelivery(t.Context(), req, verifyAgain); err != nil {
+	priorResult, err := store.ResolveDeliveryResult(t.Context(), req, verifyAgain)
+	if err != nil {
 		t.Fatalf("same resolution request must be idempotent: %v", err)
+	}
+	if priorResult == nil || priorResult.Result["evidence_reference"] != "proof-41" {
+		t.Fatalf("idempotent resolution lost committed evidence: %+v", priorResult)
 	}
 	changedInput := req
 	changedInput.Reason = "different reason"

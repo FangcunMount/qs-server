@@ -8650,6 +8650,119 @@ const docTemplate = `{
                 }
             }
         },
+        "/internal/v1/system-governance/actions/delivery-resolutions": {
+            "post": {
+                "description": "仅对具备完整业务事实验证器的报告生成事件结案；不投递消息；仅 qs:admin 可访问",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "System-Governance"
+                ],
+                "summary": "系统治理-核实传输死信的业务结果后结案",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌（或内部调用token）",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "description": "原操作与物理死信身份、稳定请求编号及确认",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handler.DeliveryResolutionHTTPRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/systemgovernance.ActionRunResult"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/internal/v1/system-governance/actions/delivery-resolutions/{request_id}": {
+            "get": {
+                "description": "查询同机构已提交的结案审计；只读，不重新核验或投递；仅 qs:admin 可访问",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "System-Governance"
+                ],
+                "summary": "系统治理-查询已核实传输死信结案回执",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌（或内部调用token）",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "结案请求编号",
+                        "name": "request_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/systemgovernance.ActionRunResult"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/internal/v1/system-governance/actions/pending-reconciliations": {
             "get": {
                 "description": "按当前组织列出结果未知的人工重放审批；仅 qs:admin 可访问。核对时须由原操作者沿用原请求编号与输入。",
@@ -15614,6 +15727,32 @@ const docTemplate = `{
                 },
                 "t_score": {
                     "type": "number"
+                }
+            }
+        },
+        "handler.DeliveryResolutionHTTPRequest": {
+            "type": "object",
+            "properties": {
+                "confirm": {
+                    "type": "boolean"
+                },
+                "dead_letter_id": {
+                    "type": "integer"
+                },
+                "event_id": {
+                    "type": "string"
+                },
+                "expected_delivery_attempts": {
+                    "type": "integer"
+                },
+                "original_replay_request_id": {
+                    "type": "string"
+                },
+                "reason": {
+                    "type": "string"
+                },
+                "request_id": {
+                    "type": "string"
                 }
             }
         },
@@ -22757,7 +22896,16 @@ const docTemplate = `{
                 "dead_letter_id": {
                     "type": "integer"
                 },
+                "delivery_attempts": {
+                    "type": "integer"
+                },
                 "disposition": {
+                    "type": "string"
+                },
+                "event_id": {
+                    "type": "string"
+                },
+                "event_type": {
                     "type": "string"
                 },
                 "linked_to_request": {

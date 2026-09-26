@@ -212,3 +212,10 @@ type ReportReader interface {
 	GetReportByAssessmentID(ctx context.Context, assessmentID uint64) (*ReportRow, error)
 	ListReports(ctx context.Context, filter ReportFilter, page PageRequest) ([]ReportRow, int64, error)
 }
+
+// ReportResolutionReader exposes both user-visible report and verified
+// catalog/source identity to the report-generated delivery verifier.
+type ReportResolutionReader interface {
+	ReportReader
+	BatchReportMetadataReader
+}

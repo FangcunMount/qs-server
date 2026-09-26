@@ -36,6 +36,18 @@ type ActionRunRequest struct {
 	Input     map[string]interface{} `json:"input,omitempty"`
 }
 
+// DeliveryResolutionRequest binds a separate, confirmed operator decision to
+// one previously claimed physical transport dead letter. It never publishes.
+type DeliveryResolutionRequest struct {
+	RequestID                string `json:"request_id"`
+	OriginalReplayRequestID  string `json:"original_replay_request_id"`
+	DeadLetterID             uint64 `json:"dead_letter_id"`
+	EventID                  string `json:"event_id"`
+	ExpectedDeliveryAttempts int    `json:"expected_delivery_attempts"`
+	Reason                   string `json:"reason"`
+	Confirm                  bool   `json:"confirm"`
+}
+
 // ActionRunResult 是结果 of executed governance 命令。
 type ActionRunResult struct {
 	RequestID  string                 `json:"request_id,omitempty"`
@@ -81,9 +93,12 @@ type DeliveryReplayReview struct {
 }
 
 type DeliveryReplayReviewTarget struct {
-	DeadLetterID    uint64 `json:"dead_letter_id"`
-	Disposition     string `json:"disposition"`
-	LinkedToRequest bool   `json:"linked_to_request"`
+	DeadLetterID     uint64 `json:"dead_letter_id"`
+	EventID          string `json:"event_id,omitempty"`
+	EventType        string `json:"event_type,omitempty"`
+	DeliveryAttempts int    `json:"delivery_attempts,omitempty"`
+	Disposition      string `json:"disposition"`
+	LinkedToRequest  bool   `json:"linked_to_request"`
 }
 
 type DeliveryReplayReviewPage struct {

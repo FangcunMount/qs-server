@@ -8,7 +8,9 @@ import (
 	"strings"
 	"time"
 
+	baseerrors "github.com/FangcunMount/component-base/pkg/errors"
 	app "github.com/FangcunMount/qs-server/internal/apiserver/application/systemgovernance"
+	"github.com/FangcunMount/qs-server/internal/pkg/code"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
@@ -75,14 +77,21 @@ type deliveryResolutionInput struct {
 }
 
 // ResolveDelivery atomically records a distinct resolution audit and removes
-// one proven dead letter from the replay queue. It is intentionally not wired
-// to the action registry until an all-effects verifier and operator flow exist.
+// one proven dead letter from the replay queue.
 func (s *ActionAuditStore) ResolveDelivery(ctx context.Context, req DeliveryResolutionRequest, verify DeliveryResolutionVerifier) error {
-	if s == nil || s.db == nil || verify == nil || req.OrgID <= 0 || req.DeadLetterID == 0 ||
+	_, err := s.ResolveDeliveryResult(ctx, req, verify)
+	return err
+}
+
+// ResolveDeliveryResult returns the committed audit result, including for an
+// exact retry of the same request ID. The result is never fabricated after a
+// transaction error or a partial business-effect check.
+func (s *ActionAuditStore) ResolveDeliveryResult(ctx context.Context, req DeliveryResolutionRequest, verify DeliveryResolutionVerifier) (*app.ActionRunResult, error) {
+	if s == nil || s.db == nil || verify == nil || req.OrgID <= 0 || req.ActorUserID == 0 || req.DeadLetterID == 0 ||
 		req.ExpectedDeliveryAttempts < 1 || req.RequestID == "" || req.RequestID == req.OriginalReplayRequestID ||
 		req.OriginalReplayRequestID == "" || req.EventID == "" || strings.TrimSpace(req.Reason) == "" ||
 		len(req.RequestID) > 64 || len(req.OriginalReplayRequestID) > 64 {
-		return fmt.Errorf("invalid or unverified delivery resolution request")
+		return nil, fmt.Errorf("invalid or unverified delivery resolution request")
 	}
 	input, err := json.Marshal(deliveryResolutionInput{
 		OriginalReplayRequestID: req.OriginalReplayRequestID,
@@ -90,9 +99,10 @@ func (s *ActionAuditStore) ResolveDelivery(ctx context.Context, req DeliveryReso
 		ExpectedDeliveryAttempts: req.ExpectedDeliveryAttempts, Reason: req.Reason,
 	})
 	if err != nil {
-		return err
+		return nil, err
 	}
-	return s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+	var result *app.ActionRunResult
+	err = s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var original actionRunPO
 		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
 			Where("org_id = ? AND request_id = ?", req.OrgID, req.OriginalReplayRequestID).
@@ -114,6 +124,11 @@ func (s *ActionAuditStore) ResolveDelivery(ctx context.Context, req DeliveryReso
 		if err == nil {
 			if prior.ActionID == deliveryResolutionActionID && prior.ActorUserID == req.ActorUserID &&
 				prior.Status == "succeeded" && equalAuditJSON(prior.InputJSON, string(input)) {
+				replay, decodeErr := decodeActionAuditReplay(prior.ResultJSON)
+				if decodeErr != nil || replay == nil || replay.Result == nil {
+					return fmt.Errorf("committed delivery resolution result is unreadable")
+				}
+				result = replay.Result
 				return nil
 			}
 			return fmt.Errorf("resolution request ID already belongs to another outcome")
@@ -139,7 +154,7 @@ func (s *ActionAuditStore) ResolveDelivery(ctx context.Context, req DeliveryReso
 			return fmt.Errorf("complete business-effect evidence is required")
 		}
 		now := time.Now().In(time.FixedZone("UTC+8", 8*60*60))
-		result := &app.ActionRunResult{
+		result = &app.ActionRunResult{
 			RequestID: req.RequestID, ActionID: deliveryResolutionActionID,
 			StartedAt: now, FinishedAt: now, Status: "succeeded",
 			Result: map[string]interface{}{
@@ -172,6 +187,33 @@ func (s *ActionAuditStore) ResolveDelivery(ctx context.Context, req DeliveryReso
 		}
 		return nil
 	})
+	if err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
+// LoadDeliveryResolution reads only a committed resolution receipt in the
+// caller's organization. It does not re-check facts or authorize another send.
+func (s *ActionAuditStore) LoadDeliveryResolution(ctx context.Context, orgID int64, requestID string) (*app.ActionRunResult, error) {
+	if s == nil || s.db == nil || orgID <= 0 || requestID == "" {
+		return nil, baseerrors.WithCode(code.ErrInvalidArgument, "resolution receipt requires organization and request_id")
+	}
+	var row actionRunPO
+	err := s.db.WithContext(ctx).Where("org_id = ? AND request_id = ? AND action_id = ? AND status = ?",
+		orgID, requestID, deliveryResolutionActionID, "succeeded").Take(&row).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, baseerrors.WithCode(code.ErrPageNotFound, "delivery resolution receipt unavailable")
+	}
+	if err != nil {
+		return nil, err
+	}
+	replay, err := decodeActionAuditReplay(row.ResultJSON)
+	if err != nil || replay == nil || replay.Result == nil || replay.Result.RequestID != requestID ||
+		replay.Result.ActionID != deliveryResolutionActionID {
+		return nil, fmt.Errorf("committed delivery resolution result is unreadable")
+	}
+	return replay.Result, nil
 }
 
 func resolutionAuditSettled(original actionRunPO) bool {

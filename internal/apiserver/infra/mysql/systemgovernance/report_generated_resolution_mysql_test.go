@@ -8,6 +8,7 @@ import (
 
 	"github.com/FangcunMount/component-base/pkg/event"
 	"github.com/FangcunMount/component-base/pkg/eventcodec"
+	app "github.com/FangcunMount/qs-server/internal/apiserver/application/systemgovernance"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/interpretationreadmodel"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventing/outcome"
 )
@@ -152,10 +153,33 @@ func TestReportGeneratedResolutionRequiresEveryDurableEffectMySQL(t *testing.T) 
 		t.Fatal(err)
 	}
 	assertResolutionState(t, db, "automatic", 0)
-	if err := store.ResolveDelivery(t.Context(), req, verify); err != nil {
+	resolver := NewReportGeneratedDeliveryResolver(db, reports)
+	governance := app.NewFacade(app.FacadeDeps{DeliveryResolver: resolver})
+	input := app.DeliveryResolutionRequest{
+		RequestID: req.RequestID, OriginalReplayRequestID: req.OriginalReplayRequestID,
+		DeadLetterID: req.DeadLetterID, EventID: req.EventID,
+		ExpectedDeliveryAttempts: req.ExpectedDeliveryAttempts, Reason: req.Reason, Confirm: true,
+	}
+	result, err := governance.ResolveDelivery(t.Context(), req.OrgID, req.ActorUserID, input)
+	if err != nil {
 		t.Fatalf("all exact durable effects should close the event: %v", err)
 	}
+	if result == nil || result.ActionID != deliveryResolutionActionID || result.Result["evidence_kind"] != "report_generated_current_fact_and_attention" {
+		t.Fatalf("report resolution lost committed evidence: %+v", result)
+	}
 	assertResolutionState(t, db, deliveryResolutionDisposition, 1)
+	if same, err := governance.ResolveDelivery(t.Context(), req.OrgID, req.ActorUserID, input); err != nil || same == nil || same.RequestID != result.RequestID {
+		t.Fatalf("same operator request should read committed result: %+v/%v", same, err)
+	}
+	if receipt, err := governance.GetDeliveryResolution(t.Context(), req.OrgID, req.RequestID); err != nil || receipt == nil || receipt.Result["evidence_reference"] == "" {
+		t.Fatalf("committed receipt was not readable: %+v/%v", receipt, err)
+	}
+	if _, err := governance.GetDeliveryResolution(t.Context(), 8, req.RequestID); err == nil {
+		t.Fatal("another organization read the resolution receipt")
+	}
+	if _, err := governance.GetDeliveryResolution(t.Context(), req.OrgID, req.OriginalReplayRequestID); err == nil {
+		t.Fatal("original replay audit was misrepresented as a resolution receipt")
+	}
 	var originalAfter actionRunPO
 	if err := db.Where("id = ?", original.ID).Take(&originalAfter).Error; err != nil {
 		t.Fatal(err)

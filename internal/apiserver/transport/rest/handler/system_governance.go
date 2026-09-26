@@ -142,6 +142,86 @@ func (h *SystemGovernanceHandler) DeliveryReplayReviews(c *gin.Context) {
 	h.Success(c, result)
 }
 
+// DeliveryResolutionHTTPRequest is the explicit operator command body. The
+// organization and actor are always taken from the protected request context.
+type DeliveryResolutionHTTPRequest struct {
+	RequestID                string `json:"request_id"`
+	OriginalReplayRequestID  string `json:"original_replay_request_id"`
+	DeadLetterID             uint64 `json:"dead_letter_id"`
+	EventID                  string `json:"event_id"`
+	ExpectedDeliveryAttempts int    `json:"expected_delivery_attempts"`
+	Reason                   string `json:"reason"`
+	Confirm                  bool   `json:"confirm"`
+}
+
+// ResolveDelivery records a separate, fact-verified resolution without
+// republishing. Its audit and dead-letter update share one MySQL transaction.
+// @Summary 系统治理-核实传输死信的业务结果后结案
+// @Description 仅对具备完整业务事实验证器的报告生成事件结案；不投递消息；仅 qs:admin 可访问
+// @Tags System-Governance
+// @Accept json
+// @Produce json
+// @Param Authorization header string true "Bearer 用户令牌（或内部调用token）"
+// @Param request body DeliveryResolutionHTTPRequest true "原操作与物理死信身份、稳定请求编号及确认"
+// @Success 200 {object} core.Response{data=systemgovernance.ActionRunResult}
+// @Failure 400 {object} core.ErrResponse
+// @Router /internal/v1/system-governance/actions/delivery-resolutions [post]
+func (h *SystemGovernanceHandler) ResolveDelivery(c *gin.Context) {
+	if h.facade == nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"message": "system governance unavailable"})
+		return
+	}
+	orgID, actorID, err := h.RequireProtectedScope(c)
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+	var body DeliveryResolutionHTTPRequest
+	if !h.bindJSON(c, &body) {
+		return
+	}
+	req := systemgov.DeliveryResolutionRequest{
+		RequestID: body.RequestID, OriginalReplayRequestID: body.OriginalReplayRequestID,
+		DeadLetterID: body.DeadLetterID, EventID: body.EventID,
+		ExpectedDeliveryAttempts: body.ExpectedDeliveryAttempts, Reason: body.Reason,
+		Confirm: body.Confirm,
+	}
+	result, err := h.facade.ResolveDelivery(c.Request.Context(), orgID, uint64(actorID), req)
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+	h.Success(c, result)
+}
+
+// GetDeliveryResolution retrieves a committed, organization-scoped receipt.
+// @Summary 系统治理-查询已核实传输死信结案回执
+// @Description 查询同机构已提交的结案审计；只读，不重新核验或投递；仅 qs:admin 可访问
+// @Tags System-Governance
+// @Produce json
+// @Param Authorization header string true "Bearer 用户令牌（或内部调用token）"
+// @Param request_id path string true "结案请求编号"
+// @Success 200 {object} core.Response{data=systemgovernance.ActionRunResult}
+// @Failure 404 {object} core.ErrResponse
+// @Router /internal/v1/system-governance/actions/delivery-resolutions/{request_id} [get]
+func (h *SystemGovernanceHandler) GetDeliveryResolution(c *gin.Context) {
+	if h.facade == nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"message": "system governance unavailable"})
+		return
+	}
+	orgID, err := h.RequireProtectedOrgID(c)
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+	result, err := h.facade.GetDeliveryResolution(c.Request.Context(), orgID, c.Param("request_id"))
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+	h.Success(c, result)
+}
+
 // NewSystemGovernanceHandler creates a governance handler.
 func NewSystemGovernanceHandler(facade systemgov.Facade) *SystemGovernanceHandler {
 	return &SystemGovernanceHandler{

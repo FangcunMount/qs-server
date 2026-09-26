@@ -20,6 +20,9 @@ type deliveryReplayTargetInput struct {
 
 type deliveryReplayTargetRow struct {
 	ID               uint64  `gorm:"column:id"`
+	EventID          *string `gorm:"column:event_id"`
+	EventType        *string `gorm:"column:event_type"`
+	DeliveryAttempts int     `gorm:"column:delivery_attempts"`
 	RetryDisposition string  `gorm:"column:retry_disposition"`
 	ReplayRequestID  *string `gorm:"column:replay_request_id"`
 }
@@ -106,7 +109,8 @@ func (s *ActionAuditStore) ListDeliveryReplayReviews(ctx context.Context, orgID 
 	}
 	var rows []deliveryReplayTargetRow
 	if err := s.db.WithContext(ctx).Table("event_delivery_dead_letter").
-		Select("id, retry_disposition, replay_request_id").
+		Select(`id, event_id, delivery_attempts, retry_disposition, replay_request_id,
+			IF(JSON_VALID(payload_json), JSON_UNQUOTE(JSON_EXTRACT(payload_json, '$.eventType')), NULL) AS event_type`).
 		Where("org_id = ? AND id IN ?", orgID, allIDs).Find(&rows).Error; err != nil {
 		return app.DeliveryReplayReviewPage{}, err
 	}
@@ -118,6 +122,13 @@ func (s *ActionAuditStore) ListDeliveryReplayReviews(ctx context.Context, orgID 
 		for j, target := range page.Items[i].Targets {
 			if row, exists := byID[target.DeadLetterID]; exists {
 				page.Items[i].Targets[j].Disposition = row.RetryDisposition
+				if row.EventID != nil {
+					page.Items[i].Targets[j].EventID = *row.EventID
+				}
+				if row.EventType != nil {
+					page.Items[i].Targets[j].EventType = *row.EventType
+				}
+				page.Items[i].Targets[j].DeliveryAttempts = row.DeliveryAttempts
 				page.Items[i].Targets[j].LinkedToRequest = row.ReplayRequestID != nil && *row.ReplayRequestID == page.Items[i].RequestID
 			}
 		}

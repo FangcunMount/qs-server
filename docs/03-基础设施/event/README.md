@@ -29,6 +29,7 @@ Event 模块负责把进程内已经发生的业务事实，按明确的可靠�
 - `evaluation.failed`、`interpretation.report.generated` 与 `interpretation.report.failed` 的 report-status Redis 写入/Signal 唤醒是 best-effort；
   Reporter 吞掉写入与通知错误，handler 可以最终 ACK。因此 ACK 不证明 report-status 投影或唤醒已成功。
 - 已持久化的 transport dead letter 由高风险治理动作 `events.replay_delivery` 做组织范围、带状态冲突检查的一次性人工重放；发布或完成结果未知时保留占用并列为待核对候选，不自动再次发送。即使操作审计已标记失败或超时，只要原操作仍关联自动占用的死信，待核对列表仍显示该操作供只读追查。`questionnaire.changed`、`assessment_model.changed` 与旧 `task.opened`、`task.completed`、`task.expired`、`task.canceled` 均可能触发无已证实收件端持久去重／回执的外部副作用，通用重放在整批预检和逐项占用时拒绝这六条最佳努力事件，交由人工按业务事实核对。新的持久 `task.opened.reminder.requested` 仍由独立逐收件账本和时限合同处理。
+- 对结果未知的报告生成死信，独立 `delivery-resolutions` 接口仅在原审计已结算、物理行仍由该操作占用，并且同一事件的测评、当前报告、参与者可读投影及关注结果全部核实后，才把结案审计与死信 `resolved_verified` 在一个 MySQL 事务中提交；不再次投递。相同结案请求编号可读取已提交回执，其他事件或证据不全均拒绝。生产人工结案仍须具体真实样本与权限验证，接口/测试存在不等于现场已验收。
 - 系统提供的是可治理的 at-least-once，不提供 exactly-once、统一 event-id ledger、自动修复 poison payload 或 schema negotiation。
 
 ## 三种传播语义

@@ -18,6 +18,8 @@ type Facade interface {
 	ListRetryCandidates(ctx context.Context, orgID int64, cursor string, limit int) (*RetryCandidatePage, error)
 	ListPendingReplayAudits(ctx context.Context, orgID int64, cursor string, limit int) (*PendingReplayAuditPage, error)
 	ListDeliveryReplayReviews(ctx context.Context, orgID int64, cursor string, limit int) (*DeliveryReplayReviewPage, error)
+	ResolveDelivery(ctx context.Context, orgID int64, actorUserID uint64, req DeliveryResolutionRequest) (*ActionRunResult, error)
+	GetDeliveryResolution(ctx context.Context, orgID int64, requestID string) (*ActionRunResult, error)
 	GetCache(ctx context.Context, window string) (*CacheView, error)
 	GetResilience(ctx context.Context, window string) (*ResilienceView, error)
 	GetCheckpoints(ctx context.Context, window string) (*CheckpointView, error)
@@ -47,6 +49,7 @@ type FacadeDeps struct {
 	RetryCandidateReader       RetryCandidateReader
 	PendingReplayAuditReader   PendingReplayAuditReader
 	DeliveryReplayReviewReader DeliveryReplayReviewReader
+	DeliveryResolver           DeliveryResolver
 }
 
 type facade struct {
