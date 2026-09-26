@@ -25,6 +25,7 @@ type stubSystemGovernanceFacade struct {
 	candidateFn       func(int64, string, int) (*systemgov.RetryCandidatePage, error)
 	pendingFn         func(int64, string, int) (*systemgov.PendingReplayAuditPage, error)
 	deliveryReviewFn  func(int64, string, int) (*systemgov.DeliveryReplayReviewPage, error)
+	reminderReviewFn  func(int64, string, int) (*systemgov.ReminderReviewPage, error)
 	deliveryResolveFn func(int64, uint64, systemgov.DeliveryResolutionRequest) (*systemgov.ActionRunResult, error)
 	deliveryReceiptFn func(int64, string) (*systemgov.ActionRunResult, error)
 }
@@ -62,6 +63,13 @@ func (s stubSystemGovernanceFacade) ListDeliveryReplayReviews(_ context.Context,
 		return s.deliveryReviewFn(orgID, cursor, limit)
 	}
 	return &systemgov.DeliveryReplayReviewPage{}, nil
+}
+
+func (s stubSystemGovernanceFacade) ListReminderReviews(_ context.Context, orgID int64, cursor string, limit int) (*systemgov.ReminderReviewPage, error) {
+	if s.reminderReviewFn != nil {
+		return s.reminderReviewFn(orgID, cursor, limit)
+	}
+	return &systemgov.ReminderReviewPage{}, nil
 }
 
 func (s stubSystemGovernanceFacade) ResolveDelivery(_ context.Context, orgID int64, actorUserID uint64, req systemgov.DeliveryResolutionRequest) (*systemgov.ActionRunResult, error) {
@@ -194,6 +202,47 @@ func TestSystemGovernanceDeliveryReplayReviewsAreOrgScopedAndReadOnly(t *testing
 	}
 	if !called {
 		t.Fatal("delivery review route did not reach the scoped reader")
+	}
+}
+
+func TestSystemGovernanceReminderReviewsAreOrgScopedAndReadOnly(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	called := false
+	router := newRouterWithBudgets(Deps{SystemGovernanceFacade: stubSystemGovernanceFacade{reminderReviewFn: func(orgID int64, cursor string, limit int) (*systemgov.ReminderReviewPage, error) {
+		called = true
+		if orgID != 88 || cursor != "next-page" || limit != 25 {
+			t.Fatalf("reminder review scope/page = %d/%q/%d", orgID, cursor, limit)
+		}
+		return &systemgov.ReminderReviewPage{Items: []systemgov.ReminderReview{{TaskID: "task-1", State: "manual_required"}}}, nil
+	}}})
+	engine := gin.New()
+	engine.Use(orgAdminSnapshotMiddleware())
+	engine.Use(func(c *gin.Context) {
+		c.Set(restmiddleware.OrgIDKey, uint64(88))
+		c.Next()
+	})
+	router.registerSystemGovernanceInternalRoutes(engine.Group("/internal/v1"))
+	path := "/internal/v1/system-governance/actions/reminder-reviews?cursor=next-page&limit=25"
+	response := httptest.NewRecorder()
+	engine.ServeHTTP(response, httptest.NewRequest(http.MethodGet, path, nil))
+	if response.Code != http.StatusOK || !called || !strings.Contains(response.Body.String(), "manual_required") {
+		t.Fatalf("reminder review status/called/body = %d/%v/%s", response.Code, called, response.Body.String())
+	}
+	if strings.Contains(response.Body.String(), "claim_token") || strings.Contains(response.Body.String(), "open_id") {
+		t.Fatalf("sensitive reminder fields escaped: %s", response.Body.String())
+	}
+	bad := httptest.NewRecorder()
+	engine.ServeHTTP(bad, httptest.NewRequest(http.MethodGet, "/internal/v1/system-governance/actions/reminder-reviews?limit=101", nil))
+	if bad.Code != http.StatusBadRequest {
+		t.Fatalf("unbounded reminder review status = %d", bad.Code)
+	}
+	denied := gin.New()
+	denied.Use(func(c *gin.Context) { c.Set(restmiddleware.OrgIDKey, uint64(88)); c.Next() })
+	router.registerSystemGovernanceInternalRoutes(denied.Group("/internal/v1"))
+	deniedResponse := httptest.NewRecorder()
+	denied.ServeHTTP(deniedResponse, httptest.NewRequest(http.MethodGet, path, nil))
+	if deniedResponse.Code == http.StatusOK {
+		t.Fatalf("missing org-admin grant read reminder reviews: %s", deniedResponse.Body.String())
 	}
 }
 

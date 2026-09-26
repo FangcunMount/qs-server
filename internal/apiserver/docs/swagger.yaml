@@ -6773,6 +6773,36 @@ definitions:
           type: array
         type: object
     type: object
+  systemgovernance.ReminderReview:
+    properties:
+      delivery_id:
+        type: integer
+      external_call_started_at:
+        type: string
+      opening_event_id:
+        type: string
+      resolution_code:
+        type: string
+      schedule_revision:
+        type: integer
+      state:
+        type: string
+      task_id:
+        type: string
+      updated_at:
+        type: string
+      user_id:
+        type: string
+    type: object
+  systemgovernance.ReminderReviewPage:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/systemgovernance.ReminderReview'
+        type: array
+      next_cursor:
+        type: string
+    type: object
   systemgovernance.ResilienceBackpressureRow:
     properties:
       component:
@@ -12588,6 +12618,43 @@ paths:
           schema:
             $ref: '#/definitions/core.ErrResponse'
       summary: 系统治理-待核对重放操作
+      tags:
+      - System-Governance
+  /internal/v1/system-governance/actions/reminder-reviews:
+    get:
+      description: 按当前机构列出发送结果未知的任务开放提醒；只读，不自动补发；仅 qs:admin 可访问
+      parameters:
+      - description: Bearer 用户令牌（或内部调用token）
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 不透明分页游标
+        in: query
+        name: cursor
+        type: string
+      - default: 50
+        description: 每页条数，1-100
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/systemgovernance.ReminderReviewPage'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+      summary: 系统治理-待核对的任务开放提醒
       tags:
       - System-Governance
   /internal/v1/system-governance/cache:

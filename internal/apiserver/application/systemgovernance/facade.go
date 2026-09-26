@@ -18,6 +18,7 @@ type Facade interface {
 	ListRetryCandidates(ctx context.Context, orgID int64, cursor string, limit int) (*RetryCandidatePage, error)
 	ListPendingReplayAudits(ctx context.Context, orgID int64, cursor string, limit int) (*PendingReplayAuditPage, error)
 	ListDeliveryReplayReviews(ctx context.Context, orgID int64, cursor string, limit int) (*DeliveryReplayReviewPage, error)
+	ListReminderReviews(ctx context.Context, orgID int64, cursor string, limit int) (*ReminderReviewPage, error)
 	ResolveDelivery(ctx context.Context, orgID int64, actorUserID uint64, req DeliveryResolutionRequest) (*ActionRunResult, error)
 	GetDeliveryResolution(ctx context.Context, orgID int64, requestID string) (*ActionRunResult, error)
 	GetCache(ctx context.Context, window string) (*CacheView, error)
@@ -49,6 +50,7 @@ type FacadeDeps struct {
 	RetryCandidateReader       RetryCandidateReader
 	PendingReplayAuditReader   PendingReplayAuditReader
 	DeliveryReplayReviewReader DeliveryReplayReviewReader
+	ReminderReviewReader       ReminderReviewReader
 	DeliveryResolver           DeliveryResolver
 }
 
@@ -151,6 +153,17 @@ func (f *facade) ListDeliveryReplayReviews(ctx context.Context, orgID int64, cur
 		return nil, errActionsUnavailable()
 	}
 	page, err := f.deps.DeliveryReplayReviewReader.ListDeliveryReplayReviews(ctx, orgID, cursor, limit)
+	if err != nil {
+		return nil, err
+	}
+	return &page, nil
+}
+
+func (f *facade) ListReminderReviews(ctx context.Context, orgID int64, cursor string, limit int) (*ReminderReviewPage, error) {
+	if f == nil || f.deps.ReminderReviewReader == nil {
+		return nil, errActionsUnavailable()
+	}
+	page, err := f.deps.ReminderReviewReader.ListReminderReviews(ctx, orgID, f.now().Add(-5*time.Minute), cursor, limit)
 	if err != nil {
 		return nil, err
 	}

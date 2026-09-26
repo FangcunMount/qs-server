@@ -12,6 +12,7 @@ import (
 	govprom "github.com/FangcunMount/qs-server/internal/apiserver/application/systemgovernance/prometheus"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/checkpoint"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/eventdelivery"
+	reminderinfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/notification"
 	governanceinfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/systemgovernance"
 	retrygovinfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/retrygovernance"
 	"github.com/FangcunMount/qs-server/internal/apiserver/options"
@@ -74,10 +75,12 @@ func BuildRESTSystemGovernanceFacade(in RESTSystemGovernanceInput) systemgov.Fac
 	var pendingReplayAuditReader systemgov.PendingReplayAuditReader
 	var deliveryReplayReviewReader systemgov.DeliveryReplayReviewReader
 	var deliveryResolver systemgov.DeliveryResolver
+	var reminderReviewReader systemgov.ReminderReviewReader
 	if in.MySQLDB != nil {
 		reader := governanceinfra.NewActionAuditStore(in.MySQLDB)
 		pendingReplayAuditReader = reader
 		deliveryReplayReviewReader = reader
+		reminderReviewReader = reminderinfra.NewReminderDeliveryLedger(in.MySQLDB)
 		if replay, found := registry.Get("events.replay_delivery"); found && replay.Enabled {
 			deliveryResolver = governanceinfra.NewReportGeneratedDeliveryResolver(in.MySQLDB, in.ReportResolutionReader)
 		}
@@ -97,6 +100,7 @@ func BuildRESTSystemGovernanceFacade(in RESTSystemGovernanceInput) systemgov.Fac
 		RetryCandidateReader:       retryReader,
 		PendingReplayAuditReader:   pendingReplayAuditReader,
 		DeliveryReplayReviewReader: deliveryReplayReviewReader,
+		ReminderReviewReader:       reminderReviewReader,
 		DeliveryResolver:           deliveryResolver,
 	})
 }
