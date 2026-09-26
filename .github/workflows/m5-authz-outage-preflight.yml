@@ -1,0 +1,43 @@
+name: M5 AuthZ Outage Read-only Preflight
+
+on:
+  workflow_dispatch:
+    inputs:
+      expected_api_sha:
+        description: Exact currently deployed QS API commit
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  servera:
+    name: API guard and recovery prerequisites (ServerA)
+    runs-on:
+      group: qlume
+      labels: [self-hosted, macOS, ARM64, ops]
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6
+      - name: Read-only API preflight
+        uses: appleboy/ssh-action@v1.2.2
+        env:
+          EXPECTED_API_SHA: ${{ inputs.expected_api_sha }}
+        with:
+          host: ${{ vars.SVRA_HOST }}
+          username: ${{ vars.SVRA_USERNAME }}
+          key: ${{ secrets.SVRA_SSH_KEY }}
+          port: ${{ vars.SVRA_SSH_PORT || 22 }}
+          fingerprint: ${{ vars.SVRA_SSH_FINGERPRINT }}
+          envs: EXPECTED_API_SHA
+          script_path: scripts/cd/m5-authz-servera-readonly-preflight.sh
+
+  serverd:
+    name: NSQ channel and recovery prerequisites (ServerD)
+    runs-on: ${{ vars.QS_DEPLOY_RUNNER || 'serverd' }}
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6
+      - name: Read-only NSQ preflight
+        run: bash scripts/cd/m5-authz-serverd-readonly-preflight.sh
