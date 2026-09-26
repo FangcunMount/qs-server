@@ -95,10 +95,10 @@ func (h *SystemGovernanceHandler) PendingReplayAudits(c *gin.Context) {
 	h.Success(c, result)
 }
 
-// DeliveryReplayReviews lists old unfinished transport replay audits. The
-// response is read-only and does not imply that another publish is safe.
+// DeliveryReplayReviews lists old unfinished audits and failed audits with
+// uncertain transport delivery. The response never authorizes another send.
 // @Summary 系统治理-待核对的传输重放审计
-// @Description 仅列出当前机构超过五分钟仍未结案的传输重放审计及目标状态；不重新投递消息；仅 qs:admin 可访问
+// @Description 列出当前机构超过五分钟仍未结案的审计，以及失败或超时但仍有关联待核对死信的传输重放审计；只读，不重新投递消息；仅 qs:admin 可访问
 // @Tags System-Governance
 // @Produce json
 // @Param Authorization header string true "Bearer 用户令牌（或内部调用token）"

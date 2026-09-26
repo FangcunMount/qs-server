@@ -84,11 +84,11 @@ jobs:
         with:
           go-version: ${{ env.GO_VERSION }}
           cache: true
-      - name: Verify claim completion and replay against JSON columns
+      - name: Verify action audit and delivery review against MySQL
         env:
           QS_ACTION_AUDIT_REQUIRE_MYSQL: 'true'
           QS_SERVER_TEST_MYSQL_DSN: 'root:root@tcp(127.0.0.1:3306)/action_audit_test?parseTime=true'
-        run: go test ./internal/apiserver/infra/mysql/systemgovernance -run TestActionAuditLifecycleWithJSONColumns -count=1 -v
+        run: go test ./internal/apiserver/infra/mysql/systemgovernance -run '^(TestActionAuditLifecycleWithJSONColumns|TestDeliveryReplayReviewsKeepStaleAuditsVisibleWithoutCrossOrgRows)$' -count=1 -v
       - name: Verify transport replay batch guard against MySQL
         env:
           MYSQL_DSN: 'root:root@tcp(127.0.0.1:3306)/mysql?parseTime=true&loc=Asia%2FShanghai'

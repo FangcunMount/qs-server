@@ -8576,7 +8576,8 @@ paths:
       tags:
       - System-Governance
       summary: 系统治理-待核对的传输重放审计
-      description: 仅列出当前机构超过五分钟仍未结案的传输重放审计及目标状态；不重新投递消息；仅 qs:admin 可访问
+      description: 列出当前机构超过五分钟仍未结案的审计，以及失败或超时但仍有关联待核对死信的传输重放审计；只读，不重新投递消息；仅 qs:admin
+        可访问
       operationId: 系统治理待核对的传输重放审计
       parameters:
       - type: string
