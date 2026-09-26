@@ -126,6 +126,15 @@ func TestActionExecutorDeliveryReplayPrevalidatesWholeBatch(t *testing.T) {
 	}
 }
 
+func TestActionExecutorLegacyTaskOpenedPreflightExplainsManualReconciliation(t *testing.T) {
+	store := &fakeDeliveryReplayStore{validateErr: fmt.Errorf("delivery 7: %w", errLegacyTaskOpenedReplay)}
+	executor := NewActionExecutor(NewActionRegistry(), &fakeStatisticsGovernance{}).BindDeliveryReplay(store, &fakeDeliveryPublisher{})
+	_, err := executor.Run(t.Context(), 9, "events.replay_delivery", singleDeliveryReplayRequest("legacy-preflight"))
+	if err == nil || !strings.Contains(err.Error(), "旧任务开放提醒需人工核对") || len(store.claims) != 0 {
+		t.Fatalf("legacy opening must be rejected before any claim with actionable message: err=%v claims=%v", err, store.claims)
+	}
+}
+
 func TestActionExecutorDeliveryReplayKeepsClaimWhenCompletionWriteFails(t *testing.T) {
 	evt := event.New("evaluation.retry.requested", "Evaluation", "42", map[string]any{"org_id": int64(9)})
 	payload, err := json.Marshal(evt)
