@@ -59,6 +59,13 @@ func validateReplayRow(row deadLetterPO, orgID int64, target app.DeliveryReplayT
 	if row.RetryDisposition != "manual_required" || row.DeliveryAttempts != target.ExpectedDeliveryAttempts {
 		return fmt.Errorf("delivery dead-letter %d replay state conflict", target.ID)
 	}
+	eventID := ""
+	if row.EventID != nil {
+		eventID = *row.EventID
+	}
+	if err := app.ValidateDeliveryReplaySafety(eventID, row.PayloadJSON); err != nil {
+		return fmt.Errorf("delivery dead-letter %d requires manual reconciliation: %w", target.ID, err)
+	}
 	return nil
 }
 

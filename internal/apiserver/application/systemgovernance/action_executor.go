@@ -227,7 +227,11 @@ func (e *ActionExecutor) runReplayDelivery(ctx context.Context, orgID int64, req
 		seen[target.ID] = struct{}{}
 	}
 	if err := e.deliveryReplay.ValidateReplayBatch(ctx, orgID, request.Targets); err != nil {
-		return nil, errors.WithMessage(errors.WithCode(code.ErrConflict, "validate delivery replay batch: %s", err.Error()), "整批目标状态或组织范围不符，未开始重放")
+		publicMessage := "整批目标状态或组织范围不符，未开始重放"
+		if stderrors.Is(err, errLegacyTaskOpenedReplay) {
+			publicMessage = "旧任务开放提醒需人工核对，整批未开始重放"
+		}
+		return nil, errors.WithMessage(errors.WithCode(code.ErrConflict, "validate delivery replay batch: %s", err.Error()), publicMessage)
 	}
 	results := make([]map[string]interface{}, 0, len(request.Targets))
 	for _, target := range request.Targets {
@@ -249,6 +253,15 @@ func (e *ActionExecutor) runReplayDelivery(ctx context.Context, orgID int64, req
 				return nil, deliveryReplayFailure(code.ErrInternalServerError, len(results), item.ID, "状态待核对，请勿再次重放", "decode failed: "+decodeErr.Error()+"; failure state update failed: "+failErr.Error())
 			}
 			return nil, deliveryReplayFailure(code.ErrInternalServerError, len(results), item.ID, "内容无法解析，仍需人工处理", "decode failed: "+decodeErr.Error())
+		}
+		if safetyErr := deliveryReplaySafetyError(pending.Event.EventType()); safetyErr != nil {
+			settleCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 6*time.Second)
+			failErr := e.deliveryReplay.FailReplay(settleCtx, item.ID, requestID, safetyErr.Error(), now)
+			cancel()
+			if failErr != nil {
+				return nil, deliveryReplayFailure(code.ErrInternalServerError, len(results), item.ID, "状态待核对，请勿再次重放", "safety rejection: "+safetyErr.Error()+"; failure state update failed: "+failErr.Error())
+			}
+			return nil, deliveryReplayFailure(code.ErrConflict, len(results), item.ID, "旧任务开放提醒需人工核对，不可直接重放", safetyErr.Error())
 		}
 		if err := e.eventPublisher.Publish(ctx, pending.Event); err != nil {
 			settleCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 6*time.Second)

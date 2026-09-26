@@ -2,8 +2,30 @@ package systemgovernance
 
 import (
 	"context"
+	"errors"
 	"time"
+
+	"github.com/FangcunMount/qs-server/internal/apiserver/outboxcore"
 )
+
+var errLegacyTaskOpenedReplay = errors.New("legacy task.opened needs task and recipient reconciliation; generic replay can resend an expired or duplicate external notification")
+
+// ValidateDeliveryReplaySafety runs before a whole batch is claimed. Malformed
+// payloads retain the existing per-item failure settlement in ActionExecutor.
+func ValidateDeliveryReplaySafety(eventID, payloadJSON string) error {
+	pending, err := outboxcore.DecodePendingEvent(eventID, payloadJSON)
+	if err != nil {
+		return nil
+	}
+	return deliveryReplaySafetyError(pending.Event.EventType())
+}
+
+func deliveryReplaySafetyError(eventType string) error {
+	if eventType == "task.opened" {
+		return errLegacyTaskOpenedReplay
+	}
+	return nil
+}
 
 type DeliveryReplayTarget struct {
 	ID                       uint64 `json:"id"`

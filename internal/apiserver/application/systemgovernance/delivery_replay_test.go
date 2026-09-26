@@ -39,6 +39,25 @@ func TestActionExecutorReplaysTransportDeadLetterWithOriginalEventID(t *testing.
 	}
 }
 
+func TestActionExecutorDoesNotReplayLegacyTaskOpenedNotification(t *testing.T) {
+	evt := event.New("task.opened", "AssessmentTask", "42", map[string]any{"org_id": int64(9)})
+	payload, err := json.Marshal(evt)
+	if err != nil {
+		t.Fatal(err)
+	}
+	store := &fakeDeliveryReplayStore{authorized: []AuthorizedDelivery{{ID: 7, EventID: evt.EventID(), PayloadJSON: string(payload)}}}
+	publisher := &fakeDeliveryPublisher{}
+	executor := NewActionExecutor(NewActionRegistry(), &fakeStatisticsGovernance{}).BindDeliveryReplay(store, publisher)
+
+	_, err = executor.Run(t.Context(), 9, "events.replay_delivery", singleDeliveryReplayRequest("legacy-task-opened"))
+	if err == nil || !strings.Contains(err.Error(), "人工核对") {
+		t.Fatalf("legacy task.opened must require reconciliation: %v", err)
+	}
+	if publisher.publishCount != 0 || store.failedID != 7 || store.completedID != 0 {
+		t.Fatalf("legacy task.opened must not publish: publisher=%#v store=%#v", publisher, store)
+	}
+}
+
 func TestActionExecutorDeliveryReplayLeavesUnattemptedBatchItemsManualOnUnknownPublish(t *testing.T) {
 	store := &fakeDeliveryReplayStore{}
 	targets := make([]interface{}, 0, 3)
@@ -104,6 +123,15 @@ func TestActionExecutorDeliveryReplayPrevalidatesWholeBatch(t *testing.T) {
 	})
 	if err == nil || len(store.claims) != 0 {
 		t.Fatalf("invalid later target must prevent earlier publish: err=%v claims=%v", err, store.claims)
+	}
+}
+
+func TestActionExecutorLegacyTaskOpenedPreflightExplainsManualReconciliation(t *testing.T) {
+	store := &fakeDeliveryReplayStore{validateErr: fmt.Errorf("delivery 7: %w", errLegacyTaskOpenedReplay)}
+	executor := NewActionExecutor(NewActionRegistry(), &fakeStatisticsGovernance{}).BindDeliveryReplay(store, &fakeDeliveryPublisher{})
+	_, err := executor.Run(t.Context(), 9, "events.replay_delivery", singleDeliveryReplayRequest("legacy-preflight"))
+	if err == nil || !strings.Contains(err.Error(), "旧任务开放提醒需人工核对") || len(store.claims) != 0 {
+		t.Fatalf("legacy opening must be rejected before any claim with actionable message: err=%v claims=%v", err, store.claims)
 	}
 }
 
