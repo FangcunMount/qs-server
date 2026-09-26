@@ -69,7 +69,7 @@ type Module struct {
 	aiCurrentAccess        *bridge.CurrentAccess
 	aiBridge               *bridge.Service
 	aiEligibility          bridge.EligibilityReader
-	reader                 evaluationreadmodel.ReportReader
+	reader                 evaluationreadmodel.ReportResolutionReader
 	reportCatalog          evaluationreadmodel.BatchReportMetadataReader
 	executionExecutor      interpretationexecution.Executor
 	generationRepo         *mongoEval.GenerationRepository
@@ -448,6 +448,13 @@ func (a catalogReconcileStoreAdapter) ApplyRepair(ctx context.Context, plan inte
 }
 
 func (m *Module) ReportReader() evaluationreadmodel.ReportReader {
+	if m == nil {
+		return nil
+	}
+	return m.reader
+}
+
+func (m *Module) ReportResolutionReader() evaluationreadmodel.ReportResolutionReader {
 	if m == nil {
 		return nil
 	}

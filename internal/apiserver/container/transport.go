@@ -42,6 +42,7 @@ import (
 	mysqlmongoconsistency "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/mongoconsistency"
 	"github.com/FangcunMount/qs-server/internal/apiserver/options"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationrun"
+	"github.com/FangcunMount/qs-server/internal/apiserver/port/interpretationreadmodel"
 	rulesetport "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 	grpctransport "github.com/FangcunMount/qs-server/internal/apiserver/transport/grpc"
 	resttransport "github.com/FangcunMount/qs-server/internal/apiserver/transport/rest"
@@ -156,6 +157,10 @@ func (c *Container) buildRESTSystemGovernanceFacade() systemgovApp.Facade {
 		c.WarmupCoordinator(),
 		c.CacheGovernanceStatusService(),
 	)
+	var resolutionReader interpretationreadmodel.ReportResolutionReader
+	if c.ReportModule != nil {
+		resolutionReader = c.ReportModule.ReportResolutionReader()
+	}
 	return platformmod.BuildRESTSystemGovernanceFacade(platformmod.RESTSystemGovernanceInput{
 		Options:                 c.systemGovernanceOptions,
 		EventStatusService:      eventStatus,
@@ -169,6 +174,7 @@ func (c *Container) buildRESTSystemGovernanceFacade() systemgovApp.Facade {
 		ActionAuditStore:        c.actionAuditStore,
 		ActionHandlers:          c.retryGovernanceActionHandlers(),
 		EventPublisher:          c.eventPublisher,
+		ReportResolutionReader:  resolutionReader,
 	})
 }
 

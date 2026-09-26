@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	systemgov "github.com/FangcunMount/qs-server/internal/apiserver/application/systemgovernance"
@@ -15,15 +16,17 @@ import (
 )
 
 type stubSystemGovernanceFacade struct {
-	overview         *systemgov.OverviewResponse
-	events           *systemgov.EventsView
-	cache            *systemgov.CacheView
-	resilience       *systemgov.ResilienceView
-	checkpoints      *systemgov.CheckpointView
-	candidates       *systemgov.RetryCandidatePage
-	candidateFn      func(int64, string, int) (*systemgov.RetryCandidatePage, error)
-	pendingFn        func(int64, string, int) (*systemgov.PendingReplayAuditPage, error)
-	deliveryReviewFn func(int64, string, int) (*systemgov.DeliveryReplayReviewPage, error)
+	overview          *systemgov.OverviewResponse
+	events            *systemgov.EventsView
+	cache             *systemgov.CacheView
+	resilience        *systemgov.ResilienceView
+	checkpoints       *systemgov.CheckpointView
+	candidates        *systemgov.RetryCandidatePage
+	candidateFn       func(int64, string, int) (*systemgov.RetryCandidatePage, error)
+	pendingFn         func(int64, string, int) (*systemgov.PendingReplayAuditPage, error)
+	deliveryReviewFn  func(int64, string, int) (*systemgov.DeliveryReplayReviewPage, error)
+	deliveryResolveFn func(int64, uint64, systemgov.DeliveryResolutionRequest) (*systemgov.ActionRunResult, error)
+	deliveryReceiptFn func(int64, string) (*systemgov.ActionRunResult, error)
 }
 
 func (s stubSystemGovernanceFacade) GetOverview(context.Context, string) (*systemgov.OverviewResponse, error) {
@@ -59,6 +62,73 @@ func (s stubSystemGovernanceFacade) ListDeliveryReplayReviews(_ context.Context,
 		return s.deliveryReviewFn(orgID, cursor, limit)
 	}
 	return &systemgov.DeliveryReplayReviewPage{}, nil
+}
+
+func (s stubSystemGovernanceFacade) ResolveDelivery(_ context.Context, orgID int64, actorUserID uint64, req systemgov.DeliveryResolutionRequest) (*systemgov.ActionRunResult, error) {
+	if s.deliveryResolveFn != nil {
+		return s.deliveryResolveFn(orgID, actorUserID, req)
+	}
+	return nil, nil
+}
+
+func (s stubSystemGovernanceFacade) GetDeliveryResolution(_ context.Context, orgID int64, requestID string) (*systemgov.ActionRunResult, error) {
+	if s.deliveryReceiptFn != nil {
+		return s.deliveryReceiptFn(orgID, requestID)
+	}
+	return nil, nil
+}
+
+func TestSystemGovernanceDeliveryResolutionUsesProtectedScopeAndDedicatedRoute(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	called := false
+	router := newRouterWithBudgets(Deps{SystemGovernanceFacade: stubSystemGovernanceFacade{deliveryResolveFn: func(orgID int64, actorID uint64, req systemgov.DeliveryResolutionRequest) (*systemgov.ActionRunResult, error) {
+		called = true
+		if orgID != 88 || actorID != 701 || !req.Confirm || req.RequestID != "resolution-1" || req.DeadLetterID != 41 || req.ExpectedDeliveryAttempts != 8 {
+			t.Fatalf("resolution scope/input = %d/%d/%+v", orgID, actorID, req)
+		}
+		return &systemgov.ActionRunResult{RequestID: req.RequestID, ActionID: "events.resolve_delivery", Status: "succeeded"}, nil
+	}, deliveryReceiptFn: func(orgID int64, requestID string) (*systemgov.ActionRunResult, error) {
+		if orgID != 88 || requestID != "resolution-1" {
+			t.Fatalf("receipt scope/request = %d/%q", orgID, requestID)
+		}
+		return &systemgov.ActionRunResult{RequestID: requestID, ActionID: "events.resolve_delivery", Status: "succeeded"}, nil
+	}}})
+	engine := gin.New()
+	engine.Use(orgAdminSnapshotMiddleware())
+	engine.Use(func(c *gin.Context) {
+		c.Set(restmiddleware.OrgIDKey, uint64(88))
+		c.Set(restmiddleware.UserIDKey, uint64(701))
+		c.Next()
+	})
+	router.registerSystemGovernanceInternalRoutes(engine.Group("/internal/v1"))
+	request := httptest.NewRequest(http.MethodPost, "/internal/v1/system-governance/actions/delivery-resolutions",
+		strings.NewReader(`{"request_id":"resolution-1","original_replay_request_id":"original-1","dead_letter_id":41,"event_id":"event-41","expected_delivery_attempts":8,"reason":"verified","confirm":true}`))
+	request.Header.Set("Content-Type", "application/json")
+	response := httptest.NewRecorder()
+	engine.ServeHTTP(response, request)
+	if response.Code != http.StatusOK || !called {
+		t.Fatalf("resolution status/called = %d/%v, body=%s", response.Code, called, response.Body.String())
+	}
+	receipt := httptest.NewRecorder()
+	engine.ServeHTTP(receipt, httptest.NewRequest(http.MethodGet, "/internal/v1/system-governance/actions/delivery-resolutions/resolution-1", nil))
+	if receipt.Code != http.StatusOK {
+		t.Fatalf("resolution receipt status = %d, body=%s", receipt.Code, receipt.Body.String())
+	}
+	denied := gin.New()
+	denied.Use(func(c *gin.Context) {
+		c.Set(restmiddleware.OrgIDKey, uint64(88))
+		c.Set(restmiddleware.UserIDKey, uint64(701))
+		c.Next()
+	})
+	router.registerSystemGovernanceInternalRoutes(denied.Group("/internal/v1"))
+	deniedRequest := httptest.NewRequest(http.MethodPost, "/internal/v1/system-governance/actions/delivery-resolutions",
+		strings.NewReader(`{"request_id":"resolution-2","confirm":true}`))
+	deniedRequest.Header.Set("Content-Type", "application/json")
+	deniedResponse := httptest.NewRecorder()
+	denied.ServeHTTP(deniedResponse, deniedRequest)
+	if deniedResponse.Code == http.StatusOK {
+		t.Fatalf("missing org-admin grant executed resolution: %s", deniedResponse.Body.String())
+	}
 }
 
 func TestSystemGovernancePendingReplayAuditsAreOrgScopedAndBounded(t *testing.T) {

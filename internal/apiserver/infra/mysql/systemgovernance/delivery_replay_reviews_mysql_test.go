@@ -78,9 +78,17 @@ func TestDeliveryReplayReviewsKeepStaleAuditsVisibleWithoutCrossOrgRows(t *testi
 		{5, 7, "automatic", "timeout-linked"},
 		{6, 7, "terminal", "failed-terminal"},
 	} {
+		var eventID any
+		payload := "{}"
+		attempts := 1
+		if row.id == 4 {
+			eventID = "report-event-4"
+			payload = `{"eventType":"interpretation.report.generated"}`
+			attempts = 8
+		}
 		if err := db.Exec(`INSERT INTO event_delivery_dead_letter
             (id,message_id,event_id,org_id,provider,topic_name,channel_name,delivery_attempts,payload_json,retry_disposition,replay_request_id,failed_at)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`, row.id, "msg-"+strconv.FormatUint(row.id, 10), nil, row.org, "nsq", "topic", "channel", 1, "{}", row.state, row.claim, old).Error; err != nil {
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`, row.id, "msg-"+strconv.FormatUint(row.id, 10), eventID, row.org, "nsq", "topic", "channel", attempts, payload, row.state, row.claim, old).Error; err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -94,7 +102,9 @@ func TestDeliveryReplayReviewsKeepStaleAuditsVisibleWithoutCrossOrgRows(t *testi
 		t.Fatalf("timed-out uncertain replay must be visible immediately: %+v", first.Items[0])
 	}
 	if first.Items[1].RequestID != "failed-linked" || first.Items[1].Status != "failed" || len(first.Items[1].Targets) != 1 ||
-		!first.Items[1].Targets[0].LinkedToRequest || first.Items[1].Targets[0].Disposition != "automatic" {
+		!first.Items[1].Targets[0].LinkedToRequest || first.Items[1].Targets[0].Disposition != "automatic" ||
+		first.Items[1].Targets[0].EventID != "report-event-4" || first.Items[1].Targets[0].DeliveryAttempts != 8 ||
+		first.Items[1].Targets[0].EventType != "interpretation.report.generated" {
 		t.Fatalf("failed uncertain replay must be visible immediately: %+v", first.Items[1])
 	}
 	second, err := store.ListDeliveryReplayReviews(context.Background(), 7, first.NextCursor, 2)

@@ -15,6 +15,7 @@ import (
 	governanceinfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/systemgovernance"
 	retrygovinfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/retrygovernance"
 	"github.com/FangcunMount/qs-server/internal/apiserver/options"
+	"github.com/FangcunMount/qs-server/internal/apiserver/port/interpretationreadmodel"
 	outboxport "github.com/FangcunMount/qs-server/internal/apiserver/port/outbox"
 	"github.com/FangcunMount/qs-server/internal/pkg/resilience"
 	"github.com/FangcunMount/qs-server/internal/pkg/resilience/control"
@@ -36,6 +37,7 @@ type RESTSystemGovernanceInput struct {
 	ActionAuditStore        systemgov.ActionAuditStore
 	ActionHandlers          map[string]systemgov.ActionHandler
 	EventPublisher          event.EventPublisher
+	ReportResolutionReader  interpretationreadmodel.ReportResolutionReader
 }
 
 // BuildRESTSystemGovernanceFacade assembles the unified governance facade.
@@ -71,10 +73,14 @@ func BuildRESTSystemGovernanceFacade(in RESTSystemGovernanceInput) systemgov.Fac
 		BindActionHandlers(in.ActionHandlers)
 	var pendingReplayAuditReader systemgov.PendingReplayAuditReader
 	var deliveryReplayReviewReader systemgov.DeliveryReplayReviewReader
+	var deliveryResolver systemgov.DeliveryResolver
 	if in.MySQLDB != nil {
 		reader := governanceinfra.NewActionAuditStore(in.MySQLDB)
 		pendingReplayAuditReader = reader
 		deliveryReplayReviewReader = reader
+		if replay, found := registry.Get("events.replay_delivery"); found && replay.Enabled {
+			deliveryResolver = governanceinfra.NewReportGeneratedDeliveryResolver(in.MySQLDB, in.ReportResolutionReader)
+		}
 	}
 	return systemgov.NewFacade(systemgov.FacadeDeps{
 		EventStatusService:         in.EventStatusService,
@@ -91,6 +97,7 @@ func BuildRESTSystemGovernanceFacade(in RESTSystemGovernanceInput) systemgov.Fac
 		RetryCandidateReader:       retryReader,
 		PendingReplayAuditReader:   pendingReplayAuditReader,
 		DeliveryReplayReviewReader: deliveryReplayReviewReader,
+		DeliveryResolver:           deliveryResolver,
 	})
 }
 
