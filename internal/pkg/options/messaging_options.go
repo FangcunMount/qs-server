@@ -19,8 +19,10 @@ type MessagingOptions struct {
 	Provider string `json:"provider" mapstructure:"provider"`
 
 	// NSQ 配置
-	NSQAddr        string `json:"nsq_addr" mapstructure:"nsq-addr"`
-	NSQLookupdAddr string `json:"nsq_lookupd_addr" mapstructure:"nsq-lookupd-addr"`
+	NSQAddr              string   `json:"nsq_addr" mapstructure:"nsq-addr"`
+	NSQLookupdAddr       string   `json:"nsq_lookupd_addr" mapstructure:"nsq-lookupd-addr"`
+	NSQDHTTPEndpoints    []string `json:"nsqd_http_endpoints" mapstructure:"nsqd-http-endpoints"`
+	PrimaryWorkerChannel string   `json:"primary_worker_channel" mapstructure:"primary-worker-channel"`
 
 	// RabbitMQ 配置
 	RabbitMQURL          string                    `json:"rabbitmq_url" mapstructure:"rabbitmq-url"`
@@ -65,6 +67,7 @@ func NewMessagingOptions() *MessagingOptions {
 		Provider:             "nsq",
 		NSQAddr:              "127.0.0.1:4150",
 		NSQLookupdAddr:       "127.0.0.1:4161",
+		PrimaryWorkerChannel: "qs-worker",
 		RabbitMQExchange:     "qs.events",
 		RabbitMQExchangeType: "topic",
 		Delivery:             NewTransportDeliveryOptions(),
@@ -81,6 +84,10 @@ func (o *MessagingOptions) AddFlags(fs *pflag.FlagSet) {
 		"NSQ daemon address for publishing")
 	fs.StringVar(&o.NSQLookupdAddr, "messaging.nsq-lookupd-addr", o.NSQLookupdAddr,
 		"NSQ lookupd address (optional for apiserver)")
+	fs.StringSliceVar(&o.NSQDHTTPEndpoints, "messaging.nsqd-http-endpoints", o.NSQDHTTPEndpoints,
+		"Explicit nsqd HTTP URLs for durable channel preparation")
+	fs.StringVar(&o.PrimaryWorkerChannel, "messaging.primary-worker-channel", o.PrimaryWorkerChannel,
+		"Durable channel used by the primary Worker consumers")
 	fs.StringVar(&o.RabbitMQURL, "messaging.rabbitmq-url", o.RabbitMQURL,
 		"RabbitMQ connection URL")
 	fs.StringVar(&o.RabbitMQExchange, "messaging.rabbitmq-exchange", o.RabbitMQExchange,
@@ -108,6 +115,9 @@ func (o *MessagingOptions) Validate() []error {
 	case "nsq":
 		if o.NSQAddr == "" {
 			errs = append(errs, fmt.Errorf("nsq-addr is required when using NSQ"))
+		}
+		if len(o.NSQDHTTPEndpoints) == 0 || o.PrimaryWorkerChannel == "" {
+			errs = append(errs, fmt.Errorf("explicit nsqd-http-endpoints and primary-worker-channel are required when using NSQ"))
 		}
 	case "rabbitmq":
 		if o.RabbitMQURL == "" {

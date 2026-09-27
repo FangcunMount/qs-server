@@ -2,7 +2,8 @@ package process
 
 import (
 	"context"
-	"log/slog"
+	"fmt"
+	"time"
 
 	eventtransport "github.com/FangcunMount/qs-server/internal/pkg/eventing/transport"
 	"github.com/FangcunMount/qs-server/internal/pkg/retrygovernance"
@@ -31,8 +32,14 @@ func (s *server) initializeRuntime(resources resourceOutput, containerOutput con
 	}
 
 	if s.config != nil && s.config.Messaging.Provider == "nsq" {
-		if err := messagingintegration.EnsureTopics(s.config.Messaging, s.logger, containerOutput.container); err != nil {
-			s.logger.Warn("topic creation failed (non-fatal)", slog.String("error", err.Error()))
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		err := messagingintegration.EnsureChannels(ctx, s.config.Messaging, s.config.Worker.ServiceName, containerOutput.container)
+		cancel()
+		if err != nil {
+			if output.observability.metricsServer != nil {
+				_ = output.observability.metricsServer.Shutdown(context.Background())
+			}
+			return runtimeOutput{}, fmt.Errorf("prepare Worker NSQ channels before consuming: %w", err)
 		}
 	}
 

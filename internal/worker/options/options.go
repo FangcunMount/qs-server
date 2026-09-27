@@ -60,6 +60,7 @@ type MessagingOptions struct {
 	// NSQ 配置
 	NSQAddr           string        `json:"nsq_addr" mapstructure:"nsq-addr"`
 	NSQLookupdAddr    string        `json:"nsq_lookupd_addr" mapstructure:"nsq-lookupd-addr"`
+	NSQDHTTPEndpoints []string      `json:"nsqd_http_endpoints" mapstructure:"nsqd-http-endpoints"`
 	NSQMessageTimeout time.Duration `json:"nsq_message_timeout" mapstructure:"nsq-message-timeout"`
 	// RabbitMQ 配置
 	RabbitMQURL string           `json:"rabbitmq_url" mapstructure:"rabbitmq_url"`
@@ -138,6 +139,7 @@ func NewOptions() *Options {
 			Provider:          "nsq",
 			NSQAddr:           "localhost:4150",
 			NSQLookupdAddr:    "localhost:4161",
+			NSQDHTTPEndpoints: []string{"http://localhost:4151"},
 			NSQMessageTimeout: 4 * time.Minute,
 			Delivery:          genericoptions.NewTransportDeliveryOptions(),
 		},
@@ -207,6 +209,8 @@ func (o *Options) Flags() (fss cliflag.NamedFlagSets) {
 		"NSQ daemon address")
 	messagingFS.StringVar(&o.Messaging.NSQLookupdAddr, "messaging.nsq-lookupd-addr", o.Messaging.NSQLookupdAddr,
 		"NSQ lookupd address")
+	messagingFS.StringSliceVar(&o.Messaging.NSQDHTTPEndpoints, "messaging.nsqd-http-endpoints", o.Messaging.NSQDHTTPEndpoints,
+		"Explicit nsqd HTTP URLs for durable channel preparation")
 	messagingFS.DurationVar(&o.Messaging.NSQMessageTimeout, "messaging.nsq-message-timeout", o.Messaging.NSQMessageTimeout,
 		"NSQ server-side message timeout; must cover the longest worker handler RPC")
 	messagingFS.StringVar(&o.Messaging.RabbitMQURL, "messaging.rabbitmq-url", o.Messaging.RabbitMQURL,
@@ -320,6 +324,9 @@ func (o *Options) Validate() []error {
 		}
 	}
 	if o.Messaging != nil && o.Messaging.Provider == "nsq" {
+		if len(o.Messaging.NSQDHTTPEndpoints) == 0 {
+			errs = append(errs, fmt.Errorf("messaging.nsqd-http-endpoints is required for NSQ channel preparation"))
+		}
 		if o.Messaging.NSQMessageTimeout <= 0 {
 			errs = append(errs, fmt.Errorf("messaging.nsq_message_timeout must be greater than 0"))
 		} else if o.GRPC != nil && o.Messaging.NSQMessageTimeout <= o.GRPC.RequestTimeout {

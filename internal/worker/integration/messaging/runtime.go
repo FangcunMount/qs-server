@@ -8,7 +8,6 @@ import (
 	"time"
 
 	basemessaging "github.com/FangcunMount/component-base/pkg/messaging"
-	cbnsq "github.com/FangcunMount/component-base/pkg/messaging/nsq"
 	cbrabbit "github.com/FangcunMount/component-base/pkg/messaging/rabbitmq"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventing/observe"
@@ -39,23 +38,19 @@ func CreatePublisher(cfg *config.MessagingConfig) (basemessaging.Publisher, erro
 	}
 }
 
-func EnsureTopics(cfg *config.MessagingConfig, logger *slog.Logger, source TopicSubscriptionSource) error {
+func EnsureChannels(ctx context.Context, cfg *config.MessagingConfig, serviceName string, source TopicSubscriptionSource) error {
 	if source == nil {
-		return nil
+		return fmt.Errorf("worker subscription catalog is required for NSQ channel preparation")
 	}
 	subscriptions := source.GetTopicSubscriptions()
-	topics := make([]string, 0, len(subscriptions))
+	channels := make([]messagingruntime.DurableChannel, 0, len(subscriptions))
 	for _, sub := range subscriptions {
-		topics = append(topics, sub.TopicName)
+		channels = append(channels, messagingruntime.DurableChannel{Topic: sub.TopicName, Channel: serviceName})
 	}
-
-	if len(topics) == 0 {
-		logger.Debug("No topics to create")
-		return nil
+	if len(channels) == 0 {
+		return fmt.Errorf("worker subscription catalog has no topics to prepare")
 	}
-
-	creator := cbnsq.NewTopicCreator(cfg.NSQAddr, logger)
-	return creator.EnsureTopics(topics)
+	return messagingruntime.EnsureNSQChannels(ctx, cfg.NSQDHTTPEndpoints, channels)
 }
 
 type SubscribeHandlersOptions struct {

@@ -3,6 +3,8 @@ package process
 import (
 	"context"
 	"errors"
+	"net/http"
+	"net/http/httptest"
 	"reflect"
 	"testing"
 
@@ -182,19 +184,86 @@ func TestInitializeRedisRuntimeReturnsSubsystemWhenRedisUnavailable(t *testing.T
 	}
 }
 
-func TestCreateMQPublisherFallsBackToLoggingModeOnPublisherError(t *testing.T) {
-	publisher, mode := createMQPublisher(mqPublisherStageDeps{
+func TestCreateMQPublisherFailsWhenEnabledPublisherCannotStart(t *testing.T) {
+	publisher, mode, err := createMQPublisher(mqPublisherStageDeps{
 		fallbackMode: eventruntime.PublishModeLogging,
 		enabled:      true,
 		provider:     "unsupported",
 		newPublisher: func() (messaging.Publisher, error) { return nil, errors.New("boom") },
 	})
 
-	if publisher != nil {
-		t.Fatalf("publisher = %#v, want nil on fallback", publisher)
+	if publisher != nil || err == nil {
+		t.Fatalf("publisher = %#v, err = %v, want startup failure", publisher, err)
 	}
-	if mode != eventruntime.PublishModeLogging {
-		t.Fatalf("publish mode = %q, want %q", mode, eventruntime.PublishModeLogging)
+	if mode == eventruntime.PublishModeLogging {
+		t.Fatalf("publish mode = %q, unexpectedly fell back to logging", mode)
+	}
+}
+
+func TestPrepareResourcesStopsBeforeEventSubsystemWhenChannelPreparationFails(t *testing.T) {
+	closed := false
+	built := false
+	_, err := prepareResources(resourceStageDeps{
+		mqPublisher: mqPublisherStageDeps{
+			enabled: true, provider: "nsq", newPublisher: func() (messaging.Publisher, error) {
+				return &fakePublisher{onClose: func() { closed = true }}, nil
+			},
+		},
+		loadEventCatalog: func() (*eventcatalog.Catalog, error) { return eventcatalog.NewCatalog(nil), nil },
+		prepareMQChannels: func(*eventcatalog.Catalog) error {
+			return errors.New("nsqd unavailable")
+		},
+		eventSubsystem: eventSubsystemResourceDeps{
+			newSubsystem: func(eventsubsystem.Options) (*eventsubsystem.Subsystem, error) {
+				built = true
+				return &eventsubsystem.Subsystem{}, nil
+			},
+		},
+	})
+	if err == nil || !closed || built {
+		t.Fatalf("unsafe bootstrap: err=%v, publisher closed=%t, event subsystem built=%t", err, closed, built)
+	}
+}
+
+func TestAPIChannelPreparationCreatesWorkerAndProjectionChannels(t *testing.T) {
+	created := make(map[string]bool)
+	nsqd := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			w.WriteHeader(http.StatusMethodNotAllowed)
+			return
+		}
+		topic := r.URL.Query().Get("topic")
+		switch r.URL.Path {
+		case "/topic/create":
+			created[topic] = true
+		case "/channel/create":
+			if !created[topic] {
+				t.Errorf("channel %s was created before its topic", r.URL.Query().Get("channel"))
+			}
+			created[topic+"/"+r.URL.Query().Get("channel")] = true
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer nsqd.Close()
+	options := apiserveroptions.NewOptions()
+	options.MessagingOptions.Enabled = true
+	options.MessagingOptions.NSQDHTTPEndpoints = []string{nsqd.URL}
+	options.Eventing.Consumers.ModelCatalogHotRank.Channel = "custom-projection-channel"
+	cfg, err := eventcatalog.Load("../../../configs/events.yaml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := (&server{config: &apiserverconfig.Config{Options: options}}).buildMQChannelPreparer()(eventcatalog.NewCatalog(cfg)); err != nil {
+		t.Fatal(err)
+	}
+	for _, topic := range []string{"qs.survey.lifecycle", "qs.evaluation.lifecycle", "qs.plan.task"} {
+		if !created[topic+"/qs-worker"] {
+			t.Errorf("primary Worker channel missing for %s", topic)
+		}
+	}
+	if !created["qs.evaluation.lifecycle/custom-projection-channel"] {
+		t.Error("API projection channel missing before serving")
 	}
 }
 

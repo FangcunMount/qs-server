@@ -3,6 +3,7 @@ package process
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/FangcunMount/component-base/pkg/logger"
 	"github.com/FangcunMount/component-base/pkg/messaging"
@@ -14,6 +15,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventing/runtime"
 	eventtransport "github.com/FangcunMount/qs-server/internal/pkg/eventing/transport"
+	"github.com/FangcunMount/qs-server/internal/pkg/messagingruntime"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/bootstrap"
 	"github.com/FangcunMount/qs-server/internal/pkg/resilience/backpressure"
@@ -29,6 +31,7 @@ type resourceStageDeps struct {
 	mqPublisher           mqPublisherStageDeps
 	eventSubsystem        eventSubsystemResourceDeps
 	loadEventCatalog      func() (*eventcatalog.Catalog, error)
+	prepareMQChannels     func(*eventcatalog.Catalog) error
 	buildResilience       func(*cacheplanebootstrap.RuntimeBundle) (*resiliencesubsystem.Subsystem, error)
 	buildContainerOptions func(containerOptionsInput) container.ContainerOptions
 }
@@ -74,6 +77,7 @@ func (s *server) buildResourceStageDeps() resourceStageDeps {
 		mqPublisher:           s.buildMQPublisherDeps(),
 		eventSubsystem:        s.buildEventSubsystemResourceDeps(),
 		loadEventCatalog:      loadDefaultEventCatalog,
+		prepareMQChannels:     s.buildMQChannelPreparer(),
 		buildResilience:       s.buildResilienceDeps(),
 		buildContainerOptions: s.buildContainerOptionsBuilder(),
 	}
@@ -182,6 +186,43 @@ func (s *server) buildMQPublisherDeps() mqPublisherStageDeps {
 	return deps
 }
 
+func (s *server) buildMQChannelPreparer() func(*eventcatalog.Catalog) error {
+	if s == nil || s.config == nil || s.config.MessagingOptions == nil {
+		return nil
+	}
+	options := s.config.MessagingOptions
+	if !options.Enabled || options.Provider != "nsq" {
+		return nil
+	}
+	consumerOptions := buildEventConsumerOptions(s.config)
+	return func(catalog *eventcatalog.Catalog) error {
+		registry, err := eventcatalog.NewEffectiveRegistry(catalog, eventcatalog.DefaultSpecs())
+		if err != nil {
+			return fmt.Errorf("resolve NSQ channel catalog: %w", err)
+		}
+		channels := make([]messagingruntime.DurableChannel, 0)
+		for _, subscription := range catalog.TopicSubscriptions() {
+			channels = append(channels, messagingruntime.DurableChannel{Topic: subscription.TopicName, Channel: options.PrimaryWorkerChannel})
+		}
+		for _, event := range registry.Snapshot() {
+			for _, consumer := range event.AdditionalConsumers {
+				if configured, ok := consumerOptions[consumer.ID]; ok {
+					if !configured.Enabled {
+						continue
+					}
+					if configured.Channel != "" {
+						consumer.Channel = configured.Channel
+					}
+				}
+				channels = append(channels, messagingruntime.DurableChannel{Topic: event.Topic, Channel: consumer.Channel})
+			}
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		return messagingruntime.EnsureNSQChannels(ctx, options.NSQDHTTPEndpoints, channels)
+	}
+}
+
 func (s *server) buildContainerOptionsBuilder() func(containerOptionsInput) container.ContainerOptions {
 	if s == nil || s.config == nil {
 		return nil
@@ -203,7 +244,10 @@ func prepareResources(deps resourceStageDeps) (resourceOutput, error) {
 		}
 	}
 	actionAuditStore, actionAuditRunner := buildActionAuditRuntime(mysqlDB, redisRuntime)
-	mqPublisher, publishMode := createMQPublisher(deps.mqPublisher)
+	mqPublisher, publishMode, err := createMQPublisher(deps.mqPublisher)
+	if err != nil {
+		return resourceOutput{}, err
+	}
 	prepared := false
 	defer func() {
 		if !prepared && mqPublisher != nil {
@@ -213,6 +257,11 @@ func prepareResources(deps resourceStageDeps) (resourceOutput, error) {
 	eventCatalog, err := loadEventCatalog(deps.loadEventCatalog)
 	if err != nil {
 		return resourceOutput{}, err
+	}
+	if deps.prepareMQChannels != nil {
+		if err := deps.prepareMQChannels(eventCatalog); err != nil {
+			return resourceOutput{}, fmt.Errorf("prepare MQ channels before serving: %w", err)
+		}
 	}
 	events, err := buildResourceEventSubsystem(mysqlDB, mongoDB, cacheSubsystem, eventCatalog, mqPublisher, publishMode, resilience, deps.eventSubsystem)
 	if err != nil {
@@ -328,24 +377,23 @@ func initializeRedisRuntime(deps redisRuntimeStageDeps) (redis.UniversalClient, 
 	return redisCache, redisRuntime, deps.buildSubsystem(redisRuntime)
 }
 
-func createMQPublisher(deps mqPublisherStageDeps) (messaging.Publisher, eventruntime.PublishMode) {
-	if !deps.enabled || deps.newPublisher == nil {
-		return nil, deps.fallbackMode
+func createMQPublisher(deps mqPublisherStageDeps) (messaging.Publisher, eventruntime.PublishMode, error) {
+	if !deps.enabled {
+		return nil, deps.fallbackMode, nil
+	}
+	if deps.newPublisher == nil {
+		return nil, "", fmt.Errorf("MQ publisher factory is required when messaging is enabled")
 	}
 
 	publisher, err := deps.newPublisher()
 	if err != nil {
-		logger.L(context.Background()).Warnw("Failed to create MQ publisher, falling back to logging mode",
-			"component", "apiserver",
-			"error", err.Error(),
-		)
-		return nil, deps.fallbackMode
+		return nil, "", fmt.Errorf("create MQ publisher: %w", err)
 	}
 	logger.L(context.Background()).Infow("MQ publisher created successfully",
 		"component", "apiserver",
 		"provider", deps.provider,
 	)
-	return publisher, eventruntime.PublishModeMQ
+	return publisher, eventruntime.PublishModeMQ, nil
 }
 
 func loadDefaultEventCatalog() (*eventcatalog.Catalog, error) {

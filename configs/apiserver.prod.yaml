@@ -498,6 +498,8 @@ messaging:
   # NSQ 配置（生产环境使用 Docker 服务名或实际地址）
   nsq-addr: "nsqd:4150"                 # NSQ 生产者地址: nsqd:4150 (Docker 网络内部)
   nsq-lookupd-addr: "nsqlookupd:4161"   # NSQ Lookupd 地址: nsqlookupd:4161 (用于服务发现)
+  nsqd-http-endpoints: ["http://nsqd:4151"] # 显式管理端点；首投前准备 topic/channel
+  primary-worker-channel: "qs-worker"   # 必须与 worker.prod.yaml service-name 一致
 
 # EventSubsystem 本地消费者。hot-rank 与主 worker 使用同一 Topic、不同 channel，
 # Redis 投影失败只会重试该 channel，不会阻断 answersheet Evaluation 主链。
