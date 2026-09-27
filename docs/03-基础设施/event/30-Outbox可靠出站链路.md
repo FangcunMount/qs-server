@@ -183,6 +183,7 @@ Reconciler 解决的是“Outbox 已提交但 post-commit enqueue 丢失”的�
 - Ports：`internal/apiserver/application/eventing`
 - Orchestration：`internal/apiserver/eventing/subsystem`
 - Shared relay core：`internal/apiserver/outboxcore`
+- M6 候选状态接口：`internal/apiserver/port/outbox` 使用 `reliable-messaging/outbox` 的状态快照形状；旧 core 在边界转换，旧三态与标准四态仍分别由各 Profile 读取，不因类型迁移改变重试或回退。
 - Mongo Store：`internal/apiserver/infra/mongo/eventoutbox`
 - MySQL Store：`internal/apiserver/infra/mysql/eventoutbox`
 - Ready-index：`internal/apiserver/infra/redis/outboxready`
