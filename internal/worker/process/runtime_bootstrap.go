@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	basemessaging "github.com/FangcunMount/component-base/pkg/messaging"
 	eventtransport "github.com/FangcunMount/qs-server/internal/pkg/eventing/transport"
 	"github.com/FangcunMount/qs-server/internal/pkg/retrygovernance"
 	messagingintegration "github.com/FangcunMount/qs-server/internal/worker/integration/messaging"
@@ -47,15 +48,27 @@ func (s *server) initializeRuntime(resources resourceOutput, containerOutput con
 	if err != nil {
 		return runtimeOutput{}, err
 	}
-	subscriberOptions, err := eventtransport.NewSubscriberOptions(s.workerMaxInFlight(), s.workerMaxDeliveryAttempts(), eventtransport.FailedMessageHandler(deadLetterRecorder))
-	if err != nil {
-		_ = deadLetterRecorder.Close()
-		return runtimeOutput{}, err
-	}
-	subscriber, err := eventtransport.NewSubscriber(eventtransport.SubscriberConfig{
+	subscriberConfig := eventtransport.SubscriberConfig{
 		Provider: s.config.Messaging.Provider, NSQLookupdAddr: s.config.Messaging.NSQLookupdAddr,
 		NSQMessageTimeout: s.config.Messaging.NSQMessageTimeout, RabbitMQURL: s.config.Messaging.RabbitMQURL,
-	}, subscriberOptions)
+	}
+	var subscriber workerSubscriber
+	var sdkSubscriber *eventtransport.SDKDeliverySubscriber
+	var legacySubscriber basemessaging.Subscriber
+	if subscriberConfig.Provider == "nsq" {
+		sdkSubscriber, err = eventtransport.NewSDKDeliverySubscriber(
+			subscriberConfig, s.workerMaxInFlight(), s.workerMaxDeliveryAttempts(),
+			eventtransport.SDKFailedHandoffHandler(deadLetterRecorder),
+		)
+		subscriber = sdkSubscriber
+	} else {
+		var options basemessaging.SubscriberOptions
+		options, err = eventtransport.NewSubscriberOptions(s.workerMaxInFlight(), s.workerMaxDeliveryAttempts(), eventtransport.FailedMessageHandler(deadLetterRecorder))
+		if err == nil {
+			legacySubscriber, err = eventtransport.NewSubscriber(subscriberConfig, options)
+			subscriber = legacySubscriber
+		}
+	}
 	if err != nil {
 		_ = deadLetterRecorder.Close()
 		if output.observability.metricsServer != nil {
@@ -74,14 +87,23 @@ func (s *server) initializeRuntime(resources resourceOutput, containerOutput con
 	}
 	output.messaging.holdStore = holdStore
 
-	if err := messagingintegration.SubscribeHandlersWithOptions(messagingintegration.SubscribeHandlersOptions{
-		ServiceName:     s.config.Worker.ServiceName,
-		Logger:          s.logger,
-		Runtime:         containerOutput.container,
-		Subscriber:      subscriber,
-		HoldRecorder:    holdStore,
-		UnknownRecorder: eventtransport.NewUnknownEventRecorder(s.config.Messaging.Provider, deadLetterRecorder),
-	}); err != nil {
+	var subscribeErr error
+	if sdkSubscriber != nil {
+		subscribeErr = messagingintegration.SubscribeSDKHandlersWithOptions(messagingintegration.SubscribeSDKHandlersOptions{
+			ServiceName: s.config.Worker.ServiceName, Logger: s.logger,
+			Runtime: containerOutput.container, Subscriber: sdkSubscriber,
+			HoldRecorder:    holdStore,
+			UnknownRecorder: eventtransport.NewDeliveryUnknownEventRecorder("nsq", deadLetterRecorder),
+		})
+	} else {
+		subscribeErr = messagingintegration.SubscribeHandlersWithOptions(messagingintegration.SubscribeHandlersOptions{
+			ServiceName: s.config.Worker.ServiceName, Logger: s.logger,
+			Runtime: containerOutput.container, Subscriber: legacySubscriber,
+			HoldRecorder:    holdStore,
+			UnknownRecorder: eventtransport.NewUnknownEventRecorder(s.config.Messaging.Provider, deadLetterRecorder),
+		})
+	}
+	if subscribeErr != nil {
 		subscriber.Stop()
 		_ = subscriber.Close()
 		_ = holdStore.Close()
@@ -89,7 +111,7 @@ func (s *server) initializeRuntime(resources resourceOutput, containerOutput con
 		if output.observability.metricsServer != nil {
 			_ = output.observability.metricsServer.Shutdown(context.Background())
 		}
-		return runtimeOutput{}, err
+		return runtimeOutput{}, subscribeErr
 	}
 	if s.config.RetryGovernance == nil || s.config.RetryGovernance.AutomaticRetryEnabled {
 		publisher, publishErr := messagingintegration.CreatePublisher(s.config.Messaging)

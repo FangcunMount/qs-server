@@ -42,5 +42,5 @@ build_dir=$(mktemp -d "${TMPDIR:-/tmp}/$project-build.XXXXXX")
   -e NSQD_HTTP_ADDR='nsqd:4151' \
   -e NSQ_LOOKUPD_ADDR='nsqlookupd:4161' \
   mysql /tmp/m4-worker-restart.test \
-    -test.run '^(TestPreparedNSQChannelRetainsFirstMessageBeforeSubscriberStarts|TestSDKNSQPublisherRetainsQSApplicationIdentity|TestSDKSubscriberRaisesIAMVersionWatermarkOnEphemeralChannel|TestWorkerSettlementThroughNSQPersistsPoisonUnknownAndExhaustion|TestWorkerUnknownEventRecoversAfterSubscriberRestart|TestWorkerUnknownEventRecoversAfterProcessKill|TestNSQFailedHandoffWaitsForMySQLRecoveryWithoutBusinessRetry)$' \
+    -test.run '^(TestPreparedNSQChannelRetainsFirstMessageBeforeSubscriberStarts|TestSDKNSQPublisherRetainsQSApplicationIdentity|TestSDKSubscriberRaisesIAMVersionWatermarkOnEphemeralChannel|TestWorkerSettlementThroughNSQPersistsPoisonUnknownAndExhaustion|TestSDKWorkerDeliveryPersistsPoisonUnknownAndExhaustion|TestWorkerUnknownEventRecoversAfterSubscriberRestart|TestWorkerUnknownEventRecoversAfterProcessKill|TestNSQFailedHandoffWaitsForMySQLRecoveryWithoutBusinessRetry)$' \
     -test.count=1 -test.timeout=3m -test.v

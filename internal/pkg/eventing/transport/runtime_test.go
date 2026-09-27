@@ -69,6 +69,24 @@ func TestNewNSQConfigPreservesDefaultAndAppliesExplicitMessageTimeout(t *testing
 	}
 }
 
+func TestSDKDeliverySubscriberRequiresDurableFailureHandlerWithoutConnecting(t *testing.T) {
+	config := SubscriberConfig{Provider: "nsq", NSQLookupdAddr: "127.0.0.1:4161"}
+	if _, err := NewSDKDeliverySubscriber(config, 1, 8, nil); err == nil {
+		t.Fatal("missing durable failure handler accepted")
+	}
+	failed := func(context.Context, legacy.FailedHandoff) error { return nil }
+	if _, err := NewSDKDeliverySubscriber(config, 1, 9, failed); err == nil {
+		t.Fatal("attempt budget above governance limit accepted")
+	}
+	subscriber, err := NewSDKDeliverySubscriber(config, 1, 8, failed)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := subscriber.Close(); err != nil {
+		t.Fatalf("close unused subscriber: %v", err)
+	}
+}
+
 func TestFailedMessageHandlerPreservesTransportEvidence(t *testing.T) {
 	recorder := &deadLetterRecorderStub{}
 	handler := FailedMessageHandler(recorder)

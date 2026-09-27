@@ -64,11 +64,16 @@ type observabilityOutput struct {
 }
 
 type messagingRuntimeOutput struct {
-	subscriber         messaging.Subscriber
+	subscriber         workerSubscriber
 	publisher          messaging.Publisher
 	holdReplayer       *messagingintegration.RetryEventHoldReplayer
 	deadLetterRecorder *eventtransport.SQLDeadLetterRecorder
 	holdStore          io.Closer
+}
+
+type workerSubscriber interface {
+	Stop()
+	Close() error
 }
 
 type runtimeOutput struct {
