@@ -253,6 +253,15 @@ func NewRetryEventHoldReplayer(store retryEventHoldStore, publisher basemessagin
 	return &RetryEventHoldReplayer{store: store, publisher: publisher, interval: 5 * time.Second, lease: time.Minute, done: make(chan struct{}), observer: eventobservability.DefaultObserver()}
 }
 
+// NewSDKRetryEventHoldReplayer uses the native NSQ wire port. A failed or
+// unknown publish retains the original held-event identity for recovery.
+func NewSDKRetryEventHoldReplayer(store retryEventHoldStore, publisher WirePublisher) (*RetryEventHoldReplayer, error) {
+	if publisher == nil {
+		return nil, fmt.Errorf("NSQ retry hold wire publisher is required")
+	}
+	return &RetryEventHoldReplayer{store: store, wirePublisher: publisher, interval: 5 * time.Second, lease: time.Minute, done: make(chan struct{}), observer: eventobservability.DefaultObserver()}, nil
+}
+
 // NewRetryEventHoldReplayerForProvider requires the native wire port for NSQ.
 // RabbitMQ keeps its historical Publisher until its support decision is made.
 func NewRetryEventHoldReplayerForProvider(store retryEventHoldStore, publisher basemessaging.Publisher, provider string) (*RetryEventHoldReplayer, error) {
@@ -266,7 +275,7 @@ func NewRetryEventHoldReplayerForProvider(store retryEventHoldStore, publisher b
 	if !ok {
 		return nil, fmt.Errorf("NSQ retry hold publisher must support complete wire publishing")
 	}
-	return &RetryEventHoldReplayer{store: store, wirePublisher: wirePublisher, interval: 5 * time.Second, lease: time.Minute, done: make(chan struct{}), observer: eventobservability.DefaultObserver()}, nil
+	return NewSDKRetryEventHoldReplayer(store, wirePublisher)
 }
 
 func (r *RetryEventHoldReplayer) Start() {

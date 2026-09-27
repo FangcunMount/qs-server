@@ -41,12 +41,12 @@ func TestRetryHoldReplayerUsesRealNSQWire(t *testing.T) {
 			t.Error("retry hold proof consumer did not stop")
 		}
 	}()
-	publisher, err := messagingruntime.NewSDKNSQPublisher(address)
+	publisher, err := messagingruntime.NewSDKNSQWirePublisher(address)
 	require.NoError(t, err)
 	defer func() { require.NoError(t, publisher.Close()) }()
 	item := &heldEvent{ID: 1, EventID: "original-event", MessageID: "original-message", Topic: topic, Payload: []byte(`{"id":"original-event","eventType":"evaluation.retry.requested"}`), ClaimToken: "proof-claim"}
 	store := &holdStoreStub{items: []*heldEvent{item}}
-	replayer, err := NewRetryEventHoldReplayerForProvider(store, publisher, "nsq")
+	replayer, err := NewSDKRetryEventHoldReplayer(store, publisher)
 	require.NoError(t, err)
 	require.NoError(t, replayer.RunOnce(ctx, time.Now()))
 	require.Equal(t, 1, store.replayed)

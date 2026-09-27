@@ -3,6 +3,7 @@ package process
 import (
 	"context"
 	"fmt"
+	"io"
 	"time"
 
 	basemessaging "github.com/FangcunMount/component-base/pkg/messaging"
@@ -114,22 +115,33 @@ func (s *server) initializeRuntime(resources resourceOutput, containerOutput con
 		return runtimeOutput{}, subscribeErr
 	}
 	if s.config.RetryGovernance == nil || s.config.RetryGovernance.AutomaticRetryEnabled {
-		publisher, publishErr := messagingintegration.CreatePublisher(s.config.Messaging)
+		var publisher io.Closer
+		var holdReplayer *messagingintegration.RetryEventHoldReplayer
+		var publishErr error
+		if s.config.Messaging.Provider == "nsq" {
+			var wirePublisher messagingintegration.WirePublisherCloser
+			wirePublisher, publishErr = messagingintegration.CreateSDKWirePublisher(s.config.Messaging)
+			if publishErr == nil {
+				publisher = wirePublisher
+				holdReplayer, publishErr = messagingintegration.NewSDKRetryEventHoldReplayer(holdStore, wirePublisher)
+			}
+		} else {
+			var legacyPublisher basemessaging.Publisher
+			legacyPublisher, publishErr = messagingintegration.CreatePublisher(s.config.Messaging)
+			if publishErr == nil {
+				publisher = legacyPublisher
+				holdReplayer = messagingintegration.NewRetryEventHoldReplayer(holdStore, legacyPublisher)
+			}
+		}
 		if publishErr != nil {
+			if publisher != nil {
+				_ = publisher.Close()
+			}
 			subscriber.Stop()
 			_ = subscriber.Close()
 			_ = holdStore.Close()
 			_ = deadLetterRecorder.Close()
 			return runtimeOutput{}, publishErr
-		}
-		holdReplayer, replayErr := messagingintegration.NewRetryEventHoldReplayerForProvider(holdStore, publisher, s.config.Messaging.Provider)
-		if replayErr != nil {
-			_ = publisher.Close()
-			subscriber.Stop()
-			_ = subscriber.Close()
-			_ = holdStore.Close()
-			_ = deadLetterRecorder.Close()
-			return runtimeOutput{}, replayErr
 		}
 		output.messaging.publisher = publisher
 		output.messaging.holdReplayer = holdReplayer

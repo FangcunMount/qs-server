@@ -34,8 +34,20 @@ func CreatePublisher(cfg *config.MessagingConfig) (basemessaging.Publisher, erro
 	case "rabbitmq":
 		return cbrabbit.NewPublisher(cfg.RabbitMQURL)
 	default:
-		return messagingruntime.NewSDKNSQPublisher(cfg.NSQAddr)
+		return nil, fmt.Errorf("legacy publisher is unsupported for provider %q; use the native NSQ wire publisher", cfg.Provider)
 	}
+}
+
+type WirePublisherCloser interface {
+	WirePublisher
+	Close() error
+}
+
+func CreateSDKWirePublisher(cfg *config.MessagingConfig) (WirePublisherCloser, error) {
+	if cfg == nil || cfg.Provider != "nsq" {
+		return nil, fmt.Errorf("native wire publisher requires NSQ provider")
+	}
+	return messagingruntime.NewSDKNSQWirePublisher(cfg.NSQAddr)
 }
 
 func EnsureChannels(ctx context.Context, cfg *config.MessagingConfig, serviceName string, source TopicSubscriptionSource) error {

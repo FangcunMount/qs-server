@@ -144,11 +144,23 @@ func (*publisherStub) Close() error { return nil }
 
 type legacyOnlyPublisher struct{ basemessaging.Publisher }
 
+type wireOnlyPublisher struct {
+	topic  string
+	bodies [][]byte
+	err    error
+}
+
+func (p *wireOnlyPublisher) PublishWire(_ context.Context, topic string, body []byte) error {
+	p.topic = topic
+	p.bodies = append(p.bodies, append([]byte(nil), body...))
+	return p.err
+}
+
 func TestRetryEventHoldNSQReplayUsesOriginalSDKWireIdentity(t *testing.T) {
 	item := &heldEvent{ID: 1, EventID: "event-1", MessageID: "message-1", Topic: "evaluation", Payload: []byte(`{"id":"event-1","eventType":"evaluation.retry.requested"}`), ClaimToken: "claim-1"}
 	store := &holdStoreStub{items: []*heldEvent{item}}
-	publisher := &publisherStub{}
-	replayer, err := NewRetryEventHoldReplayerForProvider(store, publisher, "nsq")
+	publisher := &wireOnlyPublisher{}
+	replayer, err := NewSDKRetryEventHoldReplayer(store, publisher)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -159,8 +171,8 @@ func TestRetryEventHoldNSQReplayUsesOriginalSDKWireIdentity(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if publisher.topic != item.Topic || publisher.message != nil || len(publisher.wireBodies) != 1 || !bytes.Equal(publisher.wireBodies[0], want) || store.replayed != 1 {
-		t.Fatalf("wire replay changed original identity or payload: topic=%q legacy=%v wire=%q replayed=%d", publisher.topic, publisher.message, publisher.wireBodies, store.replayed)
+	if publisher.topic != item.Topic || len(publisher.bodies) != 1 || !bytes.Equal(publisher.bodies[0], want) || store.replayed != 1 {
+		t.Fatalf("wire replay changed original identity or payload: topic=%q wire=%q replayed=%d", publisher.topic, publisher.bodies, store.replayed)
 	}
 }
 
@@ -170,15 +182,15 @@ func TestRetryEventHoldNSQRequiresWirePortAndRetainsUnknown(t *testing.T) {
 	}
 	item := &heldEvent{ID: 1, EventID: "event-1", MessageID: "message-1", Topic: "evaluation", Payload: []byte(`{"id":"event-1"}`), ClaimToken: "claim-1"}
 	store := &holdStoreStub{items: []*heldEvent{item}}
-	publisher := &publisherStub{err: errors.New("publish outcome unknown")}
-	replayer, err := NewRetryEventHoldReplayerForProvider(store, publisher, "nsq")
+	publisher := &wireOnlyPublisher{err: errors.New("publish outcome unknown")}
+	replayer, err := NewSDKRetryEventHoldReplayer(store, publisher)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if err := replayer.RunOnce(t.Context(), time.Now()); err != nil {
 		t.Fatal(err)
 	}
-	if store.replayed != 0 || store.replayFailures != 1 || publisher.message != nil || len(publisher.wireBodies) != 1 {
+	if store.replayed != 0 || store.replayFailures != 1 || len(publisher.bodies) != 1 {
 		t.Fatalf("unknown publish was not retained: store=%#v publisher=%#v", store, publisher)
 	}
 }
