@@ -1,4 +1,4 @@
-package eventvalue
+package event
 
 import (
 	"bytes"

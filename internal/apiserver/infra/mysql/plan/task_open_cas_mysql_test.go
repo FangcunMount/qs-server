@@ -11,12 +11,12 @@ import (
 	"time"
 
 	baseerrors "github.com/FangcunMount/component-base/pkg/errors"
-	"github.com/FangcunMount/component-base/pkg/event"
 	appplan "github.com/FangcunMount/qs-server/internal/apiserver/application/plan"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	domainplan "github.com/FangcunMount/qs-server/internal/apiserver/domain/plan"
 	mysqlplan "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/plan"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
+	"github.com/FangcunMount/qs-server/internal/pkg/event"
 	"github.com/stretchr/testify/require"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"

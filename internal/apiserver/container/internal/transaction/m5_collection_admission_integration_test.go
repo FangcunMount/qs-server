@@ -14,7 +14,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/FangcunMount/component-base/pkg/event"
 	answersheetpb "github.com/FangcunMount/qs-server/api/grpc/gen/answersheet"
 	appanswersheet "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/answersheet"
 	domainanswersheet "github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/answersheet"
@@ -28,6 +27,7 @@ import (
 	collectionquestionnaire "github.com/FangcunMount/qs-server/internal/collection-server/application/questionnaire"
 	collectiongrpc "github.com/FangcunMount/qs-server/internal/collection-server/infra/grpcclient"
 	collectionacl "github.com/FangcunMount/qs-server/internal/collection-server/port/acl"
+	"github.com/FangcunMount/qs-server/internal/pkg/event"
 	eventcatalog "github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
 	eventruntime "github.com/FangcunMount/qs-server/internal/pkg/eventing/runtime"
 	servergrpc "github.com/FangcunMount/qs-server/internal/pkg/grpc"

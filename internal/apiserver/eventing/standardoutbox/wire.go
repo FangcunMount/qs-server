@@ -1,7 +1,7 @@
 package standardoutbox
 
 import (
-	"github.com/FangcunMount/component-base/pkg/event"
+	"github.com/FangcunMount/qs-server/internal/pkg/event"
 	domainwire "github.com/FangcunMount/reliable-messaging/wire/domain"
 	"github.com/FangcunMount/reliable-messaging/wire/legacy"
 )

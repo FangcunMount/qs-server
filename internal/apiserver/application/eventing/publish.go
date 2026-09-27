@@ -3,7 +3,7 @@ package eventing
 import (
 	"context"
 
-	"github.com/FangcunMount/component-base/pkg/event"
+	"github.com/FangcunMount/qs-server/internal/pkg/event"
 )
 
 // Source 表示在应用层暂存领域事件的对象。

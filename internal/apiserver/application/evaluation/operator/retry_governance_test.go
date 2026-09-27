@@ -11,11 +11,11 @@ import (
 	evalrun "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/run"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 
-	"github.com/FangcunMount/component-base/pkg/event"
 	appauthz "github.com/FangcunMount/qs-server/internal/apiserver/application/authz"
 	txapp "github.com/FangcunMount/qs-server/internal/apiserver/application/transaction"
 	assessment "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	run "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationrun"
+	"github.com/FangcunMount/qs-server/internal/pkg/event"
 	"github.com/FangcunMount/qs-server/internal/pkg/retrygovernance"
 )
 

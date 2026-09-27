@@ -10,7 +10,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	evaldomainevent "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/event"
 	evalrun "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/run"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/eventvalue"
+	"github.com/FangcunMount/qs-server/internal/pkg/event"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventing/payload"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 	"github.com/FangcunMount/qs-server/internal/pkg/retrygovernance"
@@ -31,9 +31,9 @@ type EvaluationRequestedData = eventpayload.EvaluationRequestedData
 type EvaluationFailedData = eventpayload.EvaluationFailedData
 type EvaluationOutcomeCommittedData = eventpayload.EvaluationOutcomeCommittedData
 
-type EvaluationRequestedEvent = eventvalue.Event[EvaluationRequestedData]
-type EvaluationFailedEvent = eventvalue.Event[EvaluationFailedData]
-type EvaluationOutcomeCommittedEvent = eventvalue.Event[EvaluationOutcomeCommittedData]
+type EvaluationRequestedEvent = event.Event[EvaluationRequestedData]
+type EvaluationFailedEvent = event.Event[EvaluationFailedData]
+type EvaluationOutcomeCommittedEvent = event.Event[EvaluationOutcomeCommittedData]
 
 func NewEvaluationRequestedEvent(
 	orgID int64,

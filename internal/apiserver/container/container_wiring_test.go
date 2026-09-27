@@ -3,7 +3,6 @@ package container
 import (
 	"testing"
 
-	"github.com/FangcunMount/component-base/pkg/event"
 	planApp "github.com/FangcunMount/qs-server/internal/apiserver/application/plan"
 	appQuestionnaire "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"
 	"github.com/FangcunMount/qs-server/internal/apiserver/cache/catalog"
@@ -16,6 +15,7 @@ import (
 	eventsubsystem "github.com/FangcunMount/qs-server/internal/apiserver/eventing/subsystem"
 	iaminfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
 	sharedcache "github.com/FangcunMount/qs-server/internal/pkg/cache"
+	"github.com/FangcunMount/qs-server/internal/pkg/event"
 	"github.com/FangcunMount/qs-server/internal/pkg/options"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime"
 	redis "github.com/redis/go-redis/v9"

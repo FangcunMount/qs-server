@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/eventvalue"
+	"github.com/FangcunMount/qs-server/internal/pkg/event"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventing/payload"
 	"github.com/google/uuid"
@@ -31,7 +31,7 @@ const (
 type QuestionnaireChangedData = eventpayload.QuestionnaireChangedData
 
 // QuestionnaireChangedEvent 问卷生命周期变化事件
-type QuestionnaireChangedEvent = eventvalue.Event[QuestionnaireChangedData]
+type QuestionnaireChangedEvent = event.Event[QuestionnaireChangedData]
 
 // LifecycleEventMetadata fixes the event identity before a Mongo transaction
 // callback starts. Mongo may execute that callback more than once, so creating
@@ -75,7 +75,7 @@ func NewQuestionnaireChangedEvent(
 	action ChangeAction,
 	changedAt time.Time,
 ) QuestionnaireChangedEvent {
-	return eventvalue.New(EventTypeChanged, AggregateType, code,
+	return event.New(EventTypeChanged, AggregateType, code,
 		QuestionnaireChangedData{
 			Code:      code,
 			Version:   version,
@@ -94,7 +94,7 @@ func newQuestionnaireChangedEventWithMetadata(
 	action ChangeAction,
 ) QuestionnaireChangedEvent {
 	return QuestionnaireChangedEvent{
-		BaseEvent: eventvalue.BaseEvent{
+		BaseEvent: event.BaseEvent{
 			ID:                 metadata.EventID,
 			EventTypeValue:     EventTypeChanged,
 			OccurredAtValue:    metadata.OccurredAt,

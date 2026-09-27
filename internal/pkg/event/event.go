@@ -1,12 +1,38 @@
-// Package eventvalue owns QS business-event values independently of message
-// transport, persistence and subscription contracts.
-package eventvalue
+// Package event owns QS business-event values and host dispatch ports.
+// Broker transport, persistence and subscription contracts belong elsewhere.
+package event
 
 import (
+	"context"
 	"time"
 
 	"github.com/google/uuid"
 )
+
+// DomainEvent is the business fact shared across QS aggregates and workflows.
+type DomainEvent interface {
+	EventID() string
+	EventType() string
+	OccurredAt() time.Time
+	AggregateType() string
+	AggregateID() string
+}
+
+// Publisher is the host's domain-event dispatch port, not an MQ producer.
+type Publisher interface {
+	Publish(context.Context, DomainEvent) error
+	PublishAll(context.Context, []DomainEvent) error
+}
+
+type EventPublisher = Publisher
+
+type NopEventPublisher struct{}
+
+func NewNopEventPublisher() *NopEventPublisher { return &NopEventPublisher{} }
+
+func (*NopEventPublisher) Publish(context.Context, DomainEvent) error { return nil }
+
+func (*NopEventPublisher) PublishAll(context.Context, []DomainEvent) error { return nil }
 
 // BaseEvent keeps the historical business-event JSON fields and method names.
 type BaseEvent struct {

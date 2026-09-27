@@ -13,7 +13,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/FangcunMount/component-base/pkg/event"
 	"github.com/FangcunMount/component-base/pkg/messaging"
 	interpretationpb "github.com/FangcunMount/qs-server/api/grpc/gen/interpretation"
 	appautomation "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/automation"
@@ -24,6 +23,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/eventing/standardoutbox"
 	mongostandard "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/standardoutbox"
 	evaluationfact "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationfact"
+	"github.com/FangcunMount/qs-server/internal/pkg/event"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
 	eventruntime "github.com/FangcunMount/qs-server/internal/pkg/eventing/runtime"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"

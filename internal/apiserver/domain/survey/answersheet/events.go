@@ -3,7 +3,7 @@ package answersheet
 import (
 	"fmt"
 
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/eventvalue"
+	"github.com/FangcunMount/qs-server/internal/pkg/event"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventing/payload"
 	"github.com/FangcunMount/qs-server/internal/pkg/safeconv"
@@ -28,7 +28,7 @@ type AnswerSheetSubmittedData = eventpayload.AnswerSheetSubmittedData
 // ==================== 事件类型别名 ====================
 
 // AnswerSheetSubmittedEvent 答卷已提交事件
-type AnswerSheetSubmittedEvent = eventvalue.Event[AnswerSheetSubmittedData]
+type AnswerSheetSubmittedEvent = event.Event[AnswerSheetSubmittedData]
 
 // ==================== 事件构造函数 ====================
 
@@ -59,7 +59,7 @@ func NewAnswerSheetSubmittedEvent(sheet *AnswerSheet) AnswerSheetSubmittedEvent 
 		panic(fmt.Errorf("answersheet org id: %w", err))
 	}
 
-	return eventvalue.New(EventTypeSubmitted, AggregateType, sheet.ID().String(),
+	return event.New(EventTypeSubmitted, AggregateType, sheet.ID().String(),
 		AnswerSheetSubmittedData{
 			AnswerSheetID:        sheet.ID().String(),
 			QuestionnaireCode:    code,

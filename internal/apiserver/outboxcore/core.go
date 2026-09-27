@@ -5,8 +5,10 @@ import (
 	"fmt"
 	"time"
 
+	baseevent "github.com/FangcunMount/component-base/pkg/event"
 	base "github.com/FangcunMount/component-base/pkg/outboxcore"
 	outboxport "github.com/FangcunMount/qs-server/internal/apiserver/port/outbox"
+	"github.com/FangcunMount/qs-server/internal/pkg/event"
 	eventcatalog "github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
 )
 
@@ -39,7 +41,15 @@ const (
 
 type Record = base.Record
 type StatusObservation = base.StatusObservation
-type BuildRecordsOptions = base.BuildRecordsOptions
+
+// BuildRecordsOptions keeps QS domain-event interfaces outside the legacy
+// component-base core. The adapter below is retired with the old Outbox path.
+type BuildRecordsOptions struct {
+	Events   []event.DomainEvent
+	Resolver eventcatalog.TopicResolver
+	Encoder  func(event.DomainEvent) ([]byte, error)
+	Now      time.Time
+}
 type PublishedTransition = base.PublishedTransition
 type FailedTransition = base.FailedTransition
 
@@ -64,7 +74,21 @@ func BuildRecords(opts BuildRecordsOptions) ([]Record, error) {
 			}
 		}
 	}
-	return base.BuildRecords(opts)
+	legacyEvents := make([]baseevent.DomainEvent, len(opts.Events))
+	for i, evt := range opts.Events {
+		legacyEvents[i] = evt
+	}
+	legacyOpts := base.BuildRecordsOptions{
+		Events:   legacyEvents,
+		Resolver: opts.Resolver,
+		Now:      opts.Now,
+	}
+	if opts.Encoder != nil {
+		legacyOpts.Encoder = func(evt baseevent.DomainEvent) ([]byte, error) {
+			return opts.Encoder(evt)
+		}
+	}
+	return base.BuildRecords(legacyOpts)
 }
 
 func BuildStatusSnapshot(store string, now time.Time, observations []StatusObservation) outboxport.StatusSnapshot {

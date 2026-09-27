@@ -17,7 +17,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/FangcunMount/component-base/pkg/event"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/actor/actorctx"
 	appauthz "github.com/FangcunMount/qs-server/internal/apiserver/application/authz"
 	appeventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
@@ -34,6 +33,7 @@ import (
 	resttransport "github.com/FangcunMount/qs-server/internal/apiserver/transport/rest"
 	restmiddleware "github.com/FangcunMount/qs-server/internal/apiserver/transport/rest/middleware"
 	qsmysql "github.com/FangcunMount/qs-server/internal/pkg/database/mysql"
+	"github.com/FangcunMount/qs-server/internal/pkg/event"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
 	eventruntime "github.com/FangcunMount/qs-server/internal/pkg/eventing/runtime"
 	sdkmongo "github.com/FangcunMount/reliable-messaging/storage/mongo"

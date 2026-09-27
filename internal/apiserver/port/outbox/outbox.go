@@ -4,8 +4,8 @@ import (
 	"context"
 	"time"
 
-	"github.com/FangcunMount/component-base/pkg/event"
 	base "github.com/FangcunMount/component-base/pkg/outbox"
+	"github.com/FangcunMount/qs-server/internal/pkg/event"
 )
 
 // ScheduledStager stores durable events that must not be claimed before dueAt.

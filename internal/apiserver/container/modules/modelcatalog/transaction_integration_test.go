@@ -9,7 +9,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/FangcunMount/component-base/pkg/event"
 	appmodelcatalog "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog"
 	appbinding "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/binding"
 	appdefinition "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/definition"
@@ -25,6 +24,7 @@ import (
 	modelrepo "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/modelcatalog"
 	questionnairerepo "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/questionnaire"
 	modelport "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
+	"github.com/FangcunMount/qs-server/internal/pkg/event"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 	"github.com/FangcunMount/qs-server/internal/pkg/mongodbtest"
 	"github.com/FangcunMount/qs-server/internal/pkg/resilience/backpressure"

@@ -5,8 +5,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/FangcunMount/component-base/pkg/event"
 	app "github.com/FangcunMount/qs-server/internal/apiserver/application/systemgovernance"
+	"github.com/FangcunMount/qs-server/internal/pkg/event"
 )
 
 func TestValidateReplayRowBlocksBestEffortExternalEffectsBeforeClaim(t *testing.T) {

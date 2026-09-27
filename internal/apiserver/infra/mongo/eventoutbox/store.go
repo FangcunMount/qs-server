@@ -7,10 +7,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/FangcunMount/component-base/pkg/event"
 	basemongo "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo"
 	"github.com/FangcunMount/qs-server/internal/apiserver/outboxcore"
 	outboxport "github.com/FangcunMount/qs-server/internal/apiserver/port/outbox"
+	"github.com/FangcunMount/qs-server/internal/pkg/event"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/resilience/backpressure"
 	"github.com/FangcunMount/qs-server/internal/pkg/retrygovernance"

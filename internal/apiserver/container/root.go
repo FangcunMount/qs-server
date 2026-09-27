@@ -8,7 +8,6 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 	"gorm.io/gorm"
 
-	"github.com/FangcunMount/component-base/pkg/event"
 	systemgov "github.com/FangcunMount/qs-server/internal/apiserver/application/systemgovernance"
 	cachebootstrap "github.com/FangcunMount/qs-server/internal/apiserver/cache/subsystem"
 	eventsubsystem "github.com/FangcunMount/qs-server/internal/apiserver/eventing/subsystem"
@@ -17,6 +16,7 @@ import (
 	wechatmini "github.com/FangcunMount/qs-server/internal/apiserver/port/wechatmini"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/workbenchreadmodel"
 	resiliencesubsystem "github.com/FangcunMount/qs-server/internal/apiserver/resilience/subsystem"
+	"github.com/FangcunMount/qs-server/internal/pkg/event"
 	"github.com/FangcunMount/qs-server/internal/pkg/reportstatus"
 	locksubsystem "github.com/FangcunMount/qs-server/internal/pkg/resilience/locklease/subsystem"
 	"github.com/FangcunMount/qs-server/internal/pkg/retrygovernance"

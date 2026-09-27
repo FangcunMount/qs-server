@@ -5,7 +5,7 @@ import (
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/eventvalue"
+	"github.com/FangcunMount/qs-server/internal/pkg/event"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventing/payload"
 )
@@ -48,19 +48,19 @@ type TaskCanceledData = eventpayload.TaskCanceledData
 // ==================== 事件类型别名 ====================
 
 // TaskOpenedEvent 任务开放事件
-type TaskOpenedEvent = eventvalue.Event[TaskOpenedData]
+type TaskOpenedEvent = event.Event[TaskOpenedData]
 
 // TaskOpenedReminderRequestedEvent is the durable reference to one opening.
-type TaskOpenedReminderRequestedEvent = eventvalue.Event[eventpayload.TaskOpenedReminderRequestedData]
+type TaskOpenedReminderRequestedEvent = event.Event[eventpayload.TaskOpenedReminderRequestedData]
 
 // TaskCompletedEvent 任务完成事件
-type TaskCompletedEvent = eventvalue.Event[TaskCompletedData]
+type TaskCompletedEvent = event.Event[TaskCompletedData]
 
 // TaskExpiredEvent 任务过期事件
-type TaskExpiredEvent = eventvalue.Event[TaskExpiredData]
+type TaskExpiredEvent = event.Event[TaskExpiredData]
 
 // TaskCanceledEvent 任务取消事件
-type TaskCanceledEvent = eventvalue.Event[TaskCanceledData]
+type TaskCanceledEvent = event.Event[TaskCanceledData]
 
 // ==================== 事件构造函数 ====================
 
@@ -73,7 +73,7 @@ func NewTaskOpenedEvent(
 	entryURL string,
 	openAt time.Time,
 ) TaskOpenedEvent {
-	return eventvalue.New(
+	return event.New(
 		EventTypeTaskOpened,
 		AggregateTypeTask,
 		taskID.String(),
@@ -111,7 +111,7 @@ func NewTaskCompletedEvent(
 	assessmentID assessment.ID,
 	completedAt time.Time,
 ) TaskCompletedEvent {
-	return eventvalue.New(
+	return event.New(
 		EventTypeTaskCompleted,
 		AggregateTypeTask,
 		taskID.String(),
@@ -133,7 +133,7 @@ func NewTaskExpiredEvent(
 	expiredAt time.Time,
 	reason TaskExpirationReason,
 ) TaskExpiredEvent {
-	return eventvalue.New(
+	return event.New(
 		EventTypeTaskExpired,
 		AggregateTypeTask,
 		taskID.String(),
@@ -154,7 +154,7 @@ func NewTaskCanceledEvent(
 	testeeID testee.ID,
 	canceledAt time.Time,
 ) TaskCanceledEvent {
-	return eventvalue.New(
+	return event.New(
 		EventTypeTaskCanceled,
 		AggregateTypeTask,
 		taskID.String(),

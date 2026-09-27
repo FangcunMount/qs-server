@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/FangcunMount/component-base/pkg/event"
+	"github.com/FangcunMount/qs-server/internal/pkg/event"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
 )
 
@@ -94,6 +94,31 @@ func TestBuildRecordsRejectsBestEffortEvent(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "best_effort") {
 		t.Fatalf("error = %v, want delivery class", err)
+	}
+}
+
+func TestBuildRecordsPreservesCustomEncoderAcrossLegacyBoundary(t *testing.T) {
+	evt := event.New("sample.created", "Sample", "sample-1", map[string]string{"id": "sample-1"})
+	called := false
+	records, err := BuildRecords(BuildRecordsOptions{
+		Events: []event.DomainEvent{evt},
+		Resolver: fakeResolver{
+			topics:     map[string]string{"sample.created": "sample.topic"},
+			deliveries: map[string]eventcatalog.DeliveryClass{"sample.created": eventcatalog.DeliveryClassDurableOutbox},
+		},
+		Encoder: func(got event.DomainEvent) ([]byte, error) {
+			called = true
+			if got.EventID() != evt.EventID() {
+				t.Fatalf("encoded event ID = %q, want %q", got.EventID(), evt.EventID())
+			}
+			return []byte(`{"encoded":"custom"}`), nil
+		},
+	})
+	if err != nil {
+		t.Fatalf("BuildRecords: %v", err)
+	}
+	if !called || len(records) != 1 || records[0].PayloadJSON != `{"encoded":"custom"}` {
+		t.Fatalf("custom encoder not preserved: called=%v, records=%#v", called, records)
 	}
 }
 

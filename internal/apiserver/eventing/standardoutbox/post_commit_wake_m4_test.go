@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/FangcunMount/component-base/pkg/event"
+	"github.com/FangcunMount/qs-server/internal/pkg/event"
 )
 
 func TestPostCommitWakeSignalsCommittedEventsWithoutBlocking(t *testing.T) {

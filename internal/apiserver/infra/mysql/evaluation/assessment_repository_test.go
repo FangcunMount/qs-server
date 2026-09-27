@@ -5,9 +5,9 @@ import (
 	"database/sql"
 	"testing"
 
-	"github.com/FangcunMount/component-base/pkg/event"
 	evaluationintake "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/intake"
 	domainassessment "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
+	"github.com/FangcunMount/qs-server/internal/pkg/event"
 	_ "github.com/go-sql-driver/mysql"
 	mysqlDriver "gorm.io/driver/mysql"
 	"gorm.io/gorm"
