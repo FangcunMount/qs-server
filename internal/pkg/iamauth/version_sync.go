@@ -12,6 +12,7 @@ import (
 
 	"github.com/FangcunMount/component-base/pkg/logger"
 	"github.com/FangcunMount/component-base/pkg/messaging"
+	rmtransport "github.com/FangcunMount/reliable-messaging/transport"
 )
 
 const (
@@ -64,34 +65,10 @@ func SubscribeVersionChanges(
 	if subscriber == nil || loader == nil {
 		return nil
 	}
-	if topic == "" {
-		topic = DefaultVersionTopic
-	}
-	if channel == "" {
-		channel = DefaultVersionSyncChannel("qs-authz-sync")
-	}
+	topic, channel = versionSyncRoute(topic, channel)
 
 	handler := func(msgCtx context.Context, msg *messaging.Message) error {
-		var change VersionChangeMessage
-		if err := json.Unmarshal(msg.Payload, &change); err != nil {
-			logger.L(msgCtx).Warnw("failed to decode IAM authz version message",
-				"topic", topic,
-				"error", err.Error(),
-			)
-			return nil
-		}
-		if change.Version <= 0 {
-			logger.L(msgCtx).Warnw("ignored invalid IAM authz version message",
-				"topic", topic,
-				"version", change.Version,
-			)
-			return nil
-		}
-		loader.ObserveAuthzVersion(change.Version)
-		logger.L(msgCtx).Debugw("applied IAM authz version watermark",
-			"topic", topic,
-			"version", change.Version,
-		)
+		applyVersionChange(msgCtx, topic, loader, msg.Payload)
 		return nil
 	}
 
@@ -103,4 +80,62 @@ func SubscribeVersionChanges(
 		"channel", channel,
 	)
 	return nil
+}
+
+type SDKVersionSubscriber interface {
+	Subscribe(string, string, rmtransport.Handler) error
+}
+
+// SubscribeVersionChangesSDK consumes IAM version notifications as native SDK
+// deliveries. The committed-version guard remains the independent freshness
+// authority when NSQ is disconnected; malformed notifications are ACKed as in
+// the prior path and cannot advance the watermark.
+func SubscribeVersionChangesSDK(
+	ctx context.Context,
+	subscriber SDKVersionSubscriber,
+	topic, channel string,
+	loader *SnapshotLoader,
+) error {
+	if subscriber == nil || loader == nil {
+		return nil
+	}
+	topic, channel = versionSyncRoute(topic, channel)
+	if err := subscriber.Subscribe(topic, channel, func(msgCtx context.Context, delivery rmtransport.Delivery) error {
+		if delivery == nil {
+			return fmt.Errorf("IAM authz version delivery is nil")
+		}
+		applyVersionChange(msgCtx, topic, loader, delivery.Message().Payload)
+		return delivery.Ack()
+	}); err != nil {
+		return err
+	}
+	logger.L(ctx).Infow("subscribed IAM authz version sync",
+		"topic", topic,
+		"channel", channel,
+	)
+	return nil
+}
+
+func versionSyncRoute(topic, channel string) (string, string) {
+	if topic == "" {
+		topic = DefaultVersionTopic
+	}
+	if channel == "" {
+		channel = DefaultVersionSyncChannel("qs-authz-sync")
+	}
+	return topic, channel
+}
+
+func applyVersionChange(ctx context.Context, topic string, loader *SnapshotLoader, payload []byte) {
+	var change VersionChangeMessage
+	if err := json.Unmarshal(payload, &change); err != nil {
+		logger.L(ctx).Warnw("failed to decode IAM authz version message", "topic", topic, "error", err.Error())
+		return
+	}
+	if change.Version <= 0 {
+		logger.L(ctx).Warnw("ignored invalid IAM authz version message", "topic", topic, "version", change.Version)
+		return
+	}
+	loader.ObserveAuthzVersion(change.Version)
+	logger.L(ctx).Debugw("applied IAM authz version watermark", "topic", topic, "version", change.Version)
 }

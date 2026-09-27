@@ -42,6 +42,7 @@ func NewSDKDeliverySubscriber(
 	inner, err := rmnsq.NewSubscriber(rmnsq.SubscriberConfig{
 		LookupdAddresses: []string{config.NSQLookupdAddr}, Driver: driverConfig,
 		MaxInFlight: maxInFlight, MaxAttempts: uint16(maxAttempts),
+		FailedHandoffGroup: config.FailedHandoffGroup,
 		Retry: rmnsq.Backoff{
 			BaseDelay: DefaultRetryBaseDelay, MaxDelay: DefaultRetryMaxDelay,
 			JitterFraction: DefaultRetryJitter,

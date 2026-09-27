@@ -10,7 +10,6 @@ import (
 	"testing"
 	"time"
 
-	basemessaging "github.com/FangcunMount/component-base/pkg/messaging"
 	cbnsq "github.com/FangcunMount/component-base/pkg/messaging/nsq"
 	"github.com/FangcunMount/qs-server/internal/pkg/iamauth"
 	"github.com/FangcunMount/reliable-messaging/wire/legacy"
@@ -40,19 +39,18 @@ func TestSDKSubscriberRaisesIAMVersionWatermarkOnEphemeralChannel(t *testing.T) 
 		t.Fatalf("initial IAM committed version proof = %d, %v", version, err)
 	}
 	loader := iamauth.NewSnapshotLoader(nil, iamauth.SnapshotLoaderOptions{VersionGuard: guard})
-	subscriber, err := NewSubscriber(SubscriberConfig{
-		Provider: "nsq", NSQLookupdAddr: integrationEnv("NSQ_LOOKUPD_ADDR", "127.0.0.1:4161"),
-	}, basemessaging.SubscriberOptions{
-		MaxInFlight: 1, MaxAttempts: 2, FailedHandoffGroup: group,
-		FailedMessageHandler: func(_ context.Context, failed basemessaging.FailedMessage) error {
+	subscriber, err := NewSDKDeliverySubscriber(SubscriberConfig{
+		Provider: "nsq", NSQLookupdAddr: integrationEnv("NSQ_LOOKUPD_ADDR", "127.0.0.1:4161"), FailedHandoffGroup: group,
+	}, 1, 2,
+		func(_ context.Context, failed legacy.FailedHandoff) error {
 			return fmt.Errorf("unexpected IAM version failed handoff for %s", failed.Topic)
 		},
-	})
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { subscriber.Stop(); _ = subscriber.Close() })
-	if err := iamauth.SubscribeVersionChanges(t.Context(), subscriber, topic, channel, loader); err != nil {
+	if err := iamauth.SubscribeVersionChangesSDK(t.Context(), subscriber, topic, channel, loader); err != nil {
 		t.Fatal(err)
 	}
 

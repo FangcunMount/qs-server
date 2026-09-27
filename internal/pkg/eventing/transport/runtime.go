@@ -21,10 +21,11 @@ const (
 )
 
 type SubscriberConfig struct {
-	Provider          string
-	NSQLookupdAddr    string
-	NSQMessageTimeout time.Duration
-	RabbitMQURL       string
+	Provider           string
+	NSQLookupdAddr     string
+	NSQMessageTimeout  time.Duration
+	FailedHandoffGroup string
+	RabbitMQURL        string
 }
 
 func NewSubscriberOptions(maxInFlight, maxAttempts int, failedHandler basemessaging.FailedMessageHandler) (basemessaging.SubscriberOptions, error) {

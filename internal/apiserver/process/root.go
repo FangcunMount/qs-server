@@ -66,7 +66,12 @@ type containerOutput struct {
 }
 
 type integrationOutput struct {
-	authzVersionSubscriber messaging.Subscriber
+	authzVersionSubscriber notificationSubscriber
+}
+
+type notificationSubscriber interface {
+	Stop()
+	Close() error
 }
 
 type transportOutput struct {
