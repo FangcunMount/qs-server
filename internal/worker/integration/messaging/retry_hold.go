@@ -16,11 +16,16 @@ import (
 	eventobservability "github.com/FangcunMount/qs-server/internal/pkg/eventing/observe"
 	genericoptions "github.com/FangcunMount/qs-server/internal/pkg/options"
 	"github.com/FangcunMount/qs-server/internal/pkg/retrygovernance"
+	rmtransport "github.com/FangcunMount/reliable-messaging/transport"
 	domainwire "github.com/FangcunMount/reliable-messaging/wire/domain"
 )
 
 type RetryEventHoldRecorder interface {
 	Hold(context.Context, *basemessaging.Message, string, error) error
+}
+
+type DeliveryRetryEventHoldRecorder interface {
+	HoldDelivery(context.Context, rmtransport.Received, string, error) error
 }
 
 type mysqlRetryEventHoldStore struct {
@@ -66,12 +71,24 @@ func NewMySQLRetryEventHoldStore(options *genericoptions.MySQLOptions, provider 
 }
 
 func (s *mysqlRetryEventHoldStore) Hold(ctx context.Context, message *basemessaging.Message, eventType string, cause error) error {
-	if s == nil || s.db == nil || message == nil || message.UUID == "" || message.Topic == "" || message.Channel == "" {
+	if message == nil {
+		return fmt.Errorf("invalid retry event hold")
+	}
+	return s.HoldDelivery(ctx, rmtransport.Received{
+		ID: message.UUID, Topic: message.Topic, Channel: message.Channel,
+		Payload: message.Payload, Attempts: message.Attempts,
+	}, eventType, cause)
+}
+
+// HoldDelivery writes the SDK delivery using the same table, identity and
+// retry policy as the older Message path; success permits an explicit Ack.
+func (s *mysqlRetryEventHoldStore) HoldDelivery(ctx context.Context, message rmtransport.Received, eventType string, cause error) error {
+	if s == nil || s.db == nil || message.ID == "" || message.Topic == "" || message.Channel == "" {
 		return fmt.Errorf("invalid retry event hold")
 	}
 	eventID, orgID := retryEventIdentity(message.Payload)
 	if eventID == "" {
-		eventID = message.UUID
+		eventID = message.ID
 	}
 	reason := "automatic retry paused"
 	if cause != nil {
@@ -89,7 +106,7 @@ INSERT INTO retry_event_hold
 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'blocked', 'automatic', 0, ?, ?, ?)
 ON DUPLICATE KEY UPDATE
   id=LAST_INSERT_ID(id)`,
-		eventID, message.UUID, orgID, s.provider, message.Topic, message.Channel, string(message.Payload),
+		eventID, message.ID, orgID, s.provider, message.Topic, message.Channel, string(message.Payload),
 		max(int(message.Attempts), 1), reason, now, now, now, now,
 	)
 	_ = eventType // event type remains inside the canonical payload/metadata.

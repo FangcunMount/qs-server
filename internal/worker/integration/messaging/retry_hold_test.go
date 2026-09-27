@@ -10,6 +10,7 @@ import (
 	"github.com/DATA-DOG/go-sqlmock"
 	basemessaging "github.com/FangcunMount/component-base/pkg/messaging"
 	"github.com/FangcunMount/qs-server/internal/pkg/retrygovernance"
+	rmtransport "github.com/FangcunMount/reliable-messaging/transport"
 )
 
 func TestRetryEventHoldDuplicateIsStatePreservingNoop(t *testing.T) {
@@ -29,6 +30,38 @@ func TestRetryEventHoldDuplicateIsStatePreservingNoop(t *testing.T) {
 		WillReturnResult(sqlmock.NewResult(42, 0))
 	if err := store.Hold(t.Context(), message, "evaluation.retry.requested", nil); err != nil {
 		t.Fatal(err)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestRetryEventHoldDeliveryKeepsApplicationIdentityAndFailure(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = db.Close() }()
+	store := &mysqlRetryEventHoldStore{db: db, provider: "nsq", policy: retrygovernance.DefaultOutboxPolicy}
+	delivery := rmtransport.Received{
+		ID: "app-1", TransportID: "physical-1", Topic: "evaluation", Channel: "qs-worker",
+		Payload: []byte(`{"id":"event-1","data":{"org_id":7}}`), Attempts: 3,
+	}
+	mock.ExpectExec(regexp.QuoteMeta("ON DUPLICATE KEY UPDATE id=LAST_INSERT_ID(id)")).
+		WithArgs("event-1", "app-1", int64(7), "nsq", "evaluation", "qs-worker", string(delivery.Payload), 3, "automatic retry paused", sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg()).
+		WillReturnResult(sqlmock.NewResult(42, 0))
+	if err := store.HoldDelivery(t.Context(), delivery, "evaluation.retry.requested", nil); err != nil {
+		t.Fatal(err)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatal(err)
+	}
+	wantErr := errors.New("mysql unavailable")
+	mock.ExpectExec(regexp.QuoteMeta("ON DUPLICATE KEY UPDATE id=LAST_INSERT_ID(id)")).
+		WithArgs("event-1", "app-1", int64(7), "nsq", "evaluation", "qs-worker", string(delivery.Payload), 3, "automatic retry paused", sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg()).
+		WillReturnError(wantErr)
+	if err := store.HoldDelivery(t.Context(), delivery, "evaluation.retry.requested", nil); !errors.Is(err, wantErr) {
+		t.Fatalf("hold error = %v, want %v", err, wantErr)
 	}
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Fatal(err)
