@@ -12,8 +12,11 @@ import (
 
 	basemessaging "github.com/FangcunMount/component-base/pkg/messaging"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventing/runtime"
+	genericoptions "github.com/FangcunMount/qs-server/internal/pkg/options"
 	"github.com/FangcunMount/qs-server/internal/pkg/retrygovernance"
 	"github.com/FangcunMount/reliable-messaging/message"
+	rmtransport "github.com/FangcunMount/reliable-messaging/transport"
+	drivermysql "github.com/go-sql-driver/mysql"
 	"github.com/stretchr/testify/require"
 )
 
@@ -75,6 +78,31 @@ func TestReliableMessagingDurableHold(t *testing.T) {
 	require.Equal(t, "manual_required", disposition)
 	require.Equal(t, 7, attempts)
 	require.Equal(t, "frozen-request", request)
+	// The independently opened hold connection must use the same +08:00 wall
+	// clock for Go-written lease times and MySQL-generated audit timestamps.
+	parsedDSN, err := drivermysql.ParseDSN(dsn)
+	require.NoError(t, err)
+	configuredHold, err := NewMySQLRetryEventHoldStore(&genericoptions.MySQLOptions{
+		Host: parsedDSN.Addr, Username: parsedDSN.User, Password: parsedDSN.Passwd, Database: parsedDSN.DBName,
+		Location: "Asia/Shanghai", SessionTimeZone: "+08:00",
+	}, "nsq")
+	require.NoError(t, err)
+	defer configuredHold.Close()
+	var sessionTimeZone string
+	require.NoError(t, configuredHold.db.QueryRowContext(ctx, "SELECT @@session.time_zone").Scan(&sessionTimeZone))
+	require.Equal(t, "+08:00", sessionTimeZone)
+	require.NoError(t, configuredHold.HoldDelivery(ctx, rmtransport.Received{
+		ID: "timezone-check", Topic: "evaluation", Channel: "proof-worker",
+		Payload: []byte(`{"id":"timezone-check","data":{"org_id":7}}`), Attempts: 1,
+	}, "evaluation.retry.requested", nil))
+	var blockedAt, createdAt time.Time
+	require.NoError(t, configuredHold.db.QueryRowContext(ctx,
+		"SELECT blocked_at, created_at FROM retry_event_hold WHERE message_id='timezone-check'").Scan(&blockedAt, &createdAt))
+	require.Equal(t, "Asia/Shanghai", blockedAt.Location().String())
+	require.Equal(t, "Asia/Shanghai", createdAt.Location().String())
+	require.WithinDuration(t, blockedAt, createdAt, 3*time.Second)
+	_, err = configuredHold.db.ExecContext(ctx, "DELETE FROM retry_event_hold WHERE message_id='timezone-check'")
+	require.NoError(t, err)
 	_, err = db.ExecContext(ctx, `CREATE TRIGGER reject_hold BEFORE INSERT ON retry_event_hold FOR EACH ROW SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='isolated hold unavailable'`)
 	require.NoError(t, err)
 	nacked := 0

@@ -46,6 +46,21 @@ func NewMySQLRetryEventHoldStore(options *genericoptions.MySQLOptions, provider 
 	if options == nil || options.Host == "" || options.Database == "" || provider == "" {
 		return nil, fmt.Errorf("retry event hold store is not configured")
 	}
+	locationName := options.Location
+	if locationName == "" {
+		locationName = "Asia/Shanghai"
+	}
+	location, err := time.LoadLocation(locationName)
+	if err != nil {
+		return nil, fmt.Errorf("invalid retry hold mysql location %q: %w", locationName, err)
+	}
+	sessionTimeZone := options.SessionTimeZone
+	if sessionTimeZone == "" {
+		sessionTimeZone = "+08:00"
+	}
+	if _, err := time.Parse("-07:00", sessionTimeZone); err != nil {
+		return nil, fmt.Errorf("invalid retry hold mysql session time zone %q: %w", sessionTimeZone, err)
+	}
 	cfg := drivermysql.NewConfig()
 	cfg.Net = "tcp"
 	cfg.Addr = options.Host
@@ -53,6 +68,8 @@ func NewMySQLRetryEventHoldStore(options *genericoptions.MySQLOptions, provider 
 	cfg.Passwd = options.Password
 	cfg.DBName = options.Database
 	cfg.ParseTime = true
+	cfg.Loc = location
+	cfg.Params = map[string]string{"time_zone": "'" + sessionTimeZone + "'"}
 	db, err := sql.Open("mysql", cfg.FormatDSN())
 	if err != nil {
 		return nil, fmt.Errorf("open retry event hold store: %w", err)
