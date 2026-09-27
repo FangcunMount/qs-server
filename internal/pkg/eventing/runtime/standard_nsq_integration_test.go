@@ -52,11 +52,9 @@ func TestDirectEventWireThroughRealNSQ(t *testing.T) {
 			t.Error("direct event consumer did not stop")
 		}
 	}()
-	publisher, err := messagingruntime.NewSDKNSQPublisher(address)
+	publisher, err := messagingruntime.NewSDKNSQWirePublisher(address)
 	require.NoError(t, err)
 	defer func() { require.NoError(t, publisher.Close()) }()
-	wirePublisher, ok := publisher.(WirePublisher)
-	require.True(t, ok, "NSQ publisher lost direct wire capability")
 	evt := event.Event[map[string]any]{
 		BaseEvent: event.BaseEvent{
 			ID: "qs-m6-direct-event", EventTypeValue: "evaluation.requested",
@@ -66,7 +64,7 @@ func TestDirectEventWireThroughRealNSQ(t *testing.T) {
 		Data: map[string]any{"org_id": 1, "assessment_id": 1},
 	}
 	route := NewRoutingPublisher(RoutingPublisherOptions{
-		TopicResolver: directTopicResolver(topic), MQPublisher: publisher, WirePublisher: wirePublisher,
+		TopicResolver: directTopicResolver(topic), WirePublisher: publisher,
 		Mode: PublishModeMQ, Source: SourceAPIServer,
 	})
 	require.NoError(t, route.Publish(ctx, evt))

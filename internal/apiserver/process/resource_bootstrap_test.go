@@ -25,6 +25,16 @@ import (
 
 type fakePublisher struct{ onClose func() }
 
+type fakeWirePublisher struct{ onClose func() }
+
+func (*fakeWirePublisher) PublishWire(context.Context, string, []byte) error { return nil }
+func (p *fakeWirePublisher) Close() error {
+	if p.onClose != nil {
+		p.onClose()
+	}
+	return nil
+}
+
 func (*fakePublisher) PublishWire(context.Context, string, []byte) error { return nil }
 
 type legacyOnlyPublisher struct{ closed bool }
@@ -42,6 +52,64 @@ func TestCreateMQPublisherRejectsNSQWithoutWirePortAndClosesIt(t *testing.T) {
 	})
 	if publisher != nil || mode == eventruntime.PublishModeMQ || err == nil || !legacy.closed {
 		t.Fatalf("NSQ publisher contract: publisher=%#v mode=%q err=%v closed=%t", publisher, mode, err, legacy.closed)
+	}
+}
+
+func TestAPISelectsNativeNSQWireFactory(t *testing.T) {
+	cfg := &apiserverconfig.Config{Options: apiserveroptions.NewOptions()}
+	cfg.MessagingOptions.Enabled = true
+	cfg.MessagingOptions.Provider = "nsq"
+	deps := (&server{config: cfg}).buildMQPublisherDeps()
+	if deps.newWirePublisher == nil || deps.newPublisher != nil {
+		t.Fatalf("NSQ should use the native wire factory: %+v", deps)
+	}
+	cfg.MessagingOptions.Provider = "rabbitmq"
+	deps = (&server{config: cfg}).buildMQPublisherDeps()
+	if deps.newWirePublisher != nil || deps.newPublisher == nil {
+		t.Fatalf("RabbitMQ should retain its legacy publisher factory: %+v", deps)
+	}
+}
+
+func TestPrepareResourcesPassesNativeNSQWirePortAndClosesOnFailure(t *testing.T) {
+	wire := &fakeWirePublisher{}
+	var options eventsubsystem.Options
+	got, err := prepareResources(resourceStageDeps{
+		mqPublisher: mqPublisherStageDeps{
+			enabled: true, provider: "nsq",
+			newWirePublisher: func() (wirePublisherResource, error) { return wire, nil },
+		},
+		loadEventCatalog: func() (*eventcatalog.Catalog, error) { return eventcatalog.NewCatalog(nil), nil },
+		eventSubsystem: eventSubsystemResourceDeps{
+			newSubsystem: func(input eventsubsystem.Options) (*eventsubsystem.Subsystem, error) {
+				options = input
+				return &eventsubsystem.Subsystem{}, nil
+			},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.messaging.mqPublisher != nil || got.messaging.wirePublisher != wire ||
+		got.messaging.closePublisher == nil || got.messaging.publishMode != eventruntime.PublishModeMQ ||
+		options.MQPublisher != nil || options.WirePublisher != wire {
+		t.Fatalf("native NSQ publisher was not passed directly: messaging=%+v options=%+v", got.messaging, options)
+	}
+	closed := false
+	wire.onClose = func() { closed = true }
+	if err := got.messaging.closePublisher(); err != nil || !closed {
+		t.Fatalf("native NSQ publisher close: err=%v closed=%t", err, closed)
+	}
+
+	closed = false
+	_, err = prepareResources(resourceStageDeps{
+		mqPublisher: mqPublisherStageDeps{
+			enabled: true, provider: "nsq",
+			newWirePublisher: func() (wirePublisherResource, error) { return wire, nil },
+		},
+		loadEventCatalog: func() (*eventcatalog.Catalog, error) { return nil, errors.New("catalog unavailable") },
+	})
+	if err == nil || !closed {
+		t.Fatalf("startup failure leaked native NSQ publisher: err=%v closed=%t", err, closed)
 	}
 }
 

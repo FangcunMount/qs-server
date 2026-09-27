@@ -41,8 +41,10 @@ type resourceHandles struct {
 }
 
 type messagingOutput struct {
-	mqPublisher messaging.Publisher
-	publishMode eventruntime.PublishMode
+	mqPublisher    messaging.Publisher
+	wirePublisher  eventruntime.WirePublisher
+	closePublisher func() error
+	publishMode    eventruntime.PublishMode
 }
 
 type cacheRuntimeOutput struct {
