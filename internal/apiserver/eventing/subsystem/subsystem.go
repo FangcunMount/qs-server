@@ -68,6 +68,7 @@ type Options struct {
 	OpsRedis             redis.UniversalClient
 	Catalog              *eventcatalog.Catalog
 	MQPublisher          messaging.Publisher
+	WirePublisher        eventruntime.WirePublisher
 	PublisherMode        eventruntime.PublishMode
 	MySQLLimiter         backpressure.Acquirer
 	MongoLimiter         backpressure.Acquirer
@@ -156,7 +157,7 @@ func newBase(opts Options) (*Subsystem, error) {
 		opts.Observer = eventobservability.DefaultObserver()
 	}
 	publisher := eventruntime.NewRoutingPublisher(eventruntime.RoutingPublisherOptions{
-		Catalog: opts.Catalog, MQPublisher: opts.MQPublisher, Mode: opts.PublisherMode,
+		Catalog: opts.Catalog, MQPublisher: opts.MQPublisher, WirePublisher: opts.WirePublisher, Mode: opts.PublisherMode,
 		Source: eventruntime.SourceAPIServer, Observer: opts.Observer,
 	})
 	s := &Subsystem{

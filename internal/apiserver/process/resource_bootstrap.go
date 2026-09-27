@@ -363,9 +363,13 @@ func buildResourceEventSubsystem(
 			return nil, err
 		}
 	}
+	var wirePublisher eventruntime.WirePublisher
+	if candidate, ok := mqPublisher.(eventruntime.WirePublisher); ok {
+		wirePublisher = candidate
+	}
 	return deps.newSubsystem(eventsubsystem.Options{
 		MySQLDB: mysqlDB, MongoDB: mongoDB, OpsRedis: opsRedis,
-		Catalog: catalog, MQPublisher: mqPublisher, PublisherMode: publishMode,
+		Catalog: catalog, MQPublisher: mqPublisher, WirePublisher: wirePublisher, PublisherMode: publishMode,
 		MySQLLimiter: mysqlLimiter, MongoLimiter: mongoLimiter,
 		Mongo: deps.mongo, Assessment: deps.assessment,
 		SubscriberFactory: subscriberFactory, SDKSubscriberFactory: sdkSubscriberFactory, Consumers: deps.consumers,
@@ -423,6 +427,15 @@ func createMQPublisher(deps mqPublisherStageDeps) (messaging.Publisher, eventrun
 	publisher, err := deps.newPublisher()
 	if err != nil {
 		return nil, "", fmt.Errorf("create MQ publisher: %w", err)
+	}
+	if publisher == nil {
+		return nil, "", fmt.Errorf("MQ publisher factory returned nil")
+	}
+	if deps.provider == "nsq" {
+		if _, ok := publisher.(eventruntime.WirePublisher); !ok {
+			_ = publisher.Close()
+			return nil, "", fmt.Errorf("NSQ publisher must support complete wire publishing")
+		}
 	}
 	logger.L(context.Background()).Infow("MQ publisher created successfully",
 		"component", "apiserver",

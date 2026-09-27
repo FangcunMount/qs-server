@@ -48,6 +48,12 @@ func NewSDKNSQPublisher(address string) (basemessaging.Publisher, error) {
 }
 
 func (p *sdkNSQPublisher) Publish(ctx context.Context, topic string, body []byte) error {
+	return p.PublishWire(ctx, topic, body)
+}
+
+// PublishWire sends the caller's complete NSQ wire envelope without building
+// or mutating a component-base Message. Unknown retains the original identity.
+func (p *sdkNSQPublisher) PublishWire(ctx context.Context, topic string, body []byte) error {
 	return classifyNSQPublish(topic, p.publisher.PublishRaw(ctx, topic, body))
 }
 

@@ -25,6 +25,26 @@ import (
 
 type fakePublisher struct{ onClose func() }
 
+func (*fakePublisher) PublishWire(context.Context, string, []byte) error { return nil }
+
+type legacyOnlyPublisher struct{ closed bool }
+
+func (*legacyOnlyPublisher) Publish(context.Context, string, []byte) error { return nil }
+func (*legacyOnlyPublisher) PublishMessage(context.Context, string, *messaging.Message) error {
+	return nil
+}
+func (p *legacyOnlyPublisher) Close() error { p.closed = true; return nil }
+
+func TestCreateMQPublisherRejectsNSQWithoutWirePortAndClosesIt(t *testing.T) {
+	legacy := &legacyOnlyPublisher{}
+	publisher, mode, err := createMQPublisher(mqPublisherStageDeps{
+		enabled: true, provider: "nsq", newPublisher: func() (messaging.Publisher, error) { return legacy, nil },
+	})
+	if publisher != nil || mode == eventruntime.PublishModeMQ || err == nil || !legacy.closed {
+		t.Fatalf("NSQ publisher contract: publisher=%#v mode=%q err=%v closed=%t", publisher, mode, err, legacy.closed)
+	}
+}
+
 func TestAPIProjectionSelectsSDKSubscriberForNSQAndLegacyForRabbitMQ(t *testing.T) {
 	for _, item := range []struct {
 		provider string
