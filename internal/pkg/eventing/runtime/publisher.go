@@ -5,11 +5,11 @@ import (
 	"fmt"
 
 	"github.com/FangcunMount/component-base/pkg/event"
-	"github.com/FangcunMount/component-base/pkg/eventmessaging"
 	"github.com/FangcunMount/component-base/pkg/logger"
 	"github.com/FangcunMount/component-base/pkg/messaging"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventing/observe"
+	domainwire "github.com/FangcunMount/reliable-messaging/wire/domain"
 )
 
 // RoutingPublisher routes domain events to topics described by an event catalog.
@@ -147,11 +147,13 @@ func (p *RoutingPublisher) publishToMQ(ctx context.Context, topicName string, ev
 		return nil
 	}
 
-	msg, err := eventmessaging.BuildMessage(evt, p.source)
+	payload, err := domainwire.EncodeEvent(evt)
 	if err != nil {
 		p.observe(ctx, topicName, evt.EventType(), eventobservability.PublishOutcomeEncodeFailed)
 		return err
 	}
+	msg := messaging.NewMessage(evt.EventID(), payload)
+	msg.Metadata = domainwire.MetadataFromEvent(evt, p.source)
 
 	if err := p.mqPublisher.PublishMessage(ctx, topicName, msg); err != nil {
 		p.observe(ctx, topicName, evt.EventType(), eventobservability.PublishOutcomeMQFailed)

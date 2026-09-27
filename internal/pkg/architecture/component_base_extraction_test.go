@@ -62,11 +62,11 @@ func TestExtractedProcessRuntimePackageHasNoLocalGoFiles(t *testing.T) {
 	}
 }
 
-func TestSharedTransactionEventAndOutboxPackagesUseComponentBase(t *testing.T) {
+func TestSharedTransactionEventAndOutboxPackagesUseApprovedOwners(t *testing.T) {
 	root := repoRoot(t)
 	requiredByFile := map[string]string{
 		"internal/pkg/database/mysql/uow.go":         "github.com/FangcunMount/component-base/pkg/uow/gorm",
-		"internal/pkg/eventing/runtime/publisher.go": "github.com/FangcunMount/component-base/pkg/eventmessaging",
+		"internal/pkg/eventing/runtime/publisher.go": "github.com/FangcunMount/reliable-messaging/wire/domain",
 		"internal/apiserver/port/outbox/outbox.go":   "github.com/FangcunMount/component-base/pkg/outbox",
 		"internal/apiserver/outboxcore/core.go":      "github.com/FangcunMount/component-base/pkg/outboxcore",
 	}
@@ -84,7 +84,7 @@ func TestSharedTransactionEventAndOutboxPackagesUseComponentBase(t *testing.T) {
 			}
 		}
 		if !found {
-			t.Fatalf("%s must import extracted component-base package %s", rel, required)
+			t.Fatalf("%s must import approved shared package %s", rel, required)
 		}
 	}
 }

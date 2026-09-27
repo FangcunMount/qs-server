@@ -12,11 +12,11 @@ import (
 	drivermysql "github.com/go-sql-driver/mysql"
 	"github.com/google/uuid"
 
-	"github.com/FangcunMount/component-base/pkg/eventcodec"
 	basemessaging "github.com/FangcunMount/component-base/pkg/messaging"
 	eventobservability "github.com/FangcunMount/qs-server/internal/pkg/eventing/observe"
 	genericoptions "github.com/FangcunMount/qs-server/internal/pkg/options"
 	"github.com/FangcunMount/qs-server/internal/pkg/retrygovernance"
+	domainwire "github.com/FangcunMount/reliable-messaging/wire/domain"
 )
 
 type RetryEventHoldRecorder interface {
@@ -277,7 +277,7 @@ func (r *RetryEventHoldReplayer) observe(ctx context.Context, item *heldEvent, o
 		return
 	}
 	eventType := ""
-	if envelope, err := eventcodec.DecodeEnvelope(item.Payload); err == nil {
+	if envelope, err := domainwire.DecodeEnvelope(item.Payload); err == nil {
 		eventType = envelope.EventType
 	}
 	r.observer.ObserveConsume(ctx, eventobservability.ConsumeEvent{Service: "retry-hold-replayer", Topic: item.Topic, EventType: eventType, Outcome: outcome, Attempts: item.ReplayAttemptCount + 1})
