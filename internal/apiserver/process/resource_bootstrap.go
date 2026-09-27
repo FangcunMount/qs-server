@@ -7,6 +7,7 @@ import (
 
 	"github.com/FangcunMount/component-base/pkg/logger"
 	"github.com/FangcunMount/component-base/pkg/messaging"
+	cbrabbit "github.com/FangcunMount/component-base/pkg/messaging/rabbitmq"
 	bootstrap "github.com/FangcunMount/qs-server/internal/apiserver/bootstrap"
 	"github.com/FangcunMount/qs-server/internal/apiserver/cache/subsystem"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container"
@@ -221,7 +222,12 @@ func (s *server) buildMQPublisherDeps() mqPublisherStageDeps {
 				return messagingruntime.NewSDKNSQWirePublisher(options.NSQAddr)
 			}
 		} else {
-			deps.newPublisher = options.NewPublisher
+			deps.newPublisher = func() (messaging.Publisher, error) {
+				if options.Provider != "rabbitmq" {
+					return nil, fmt.Errorf("unsupported messaging provider: %s", options.Provider)
+				}
+				return cbrabbit.NewPublisher(options.RabbitMQURL)
+			}
 		}
 	}
 	return deps

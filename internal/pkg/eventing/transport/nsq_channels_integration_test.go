@@ -11,6 +11,7 @@ import (
 
 	basemessaging "github.com/FangcunMount/component-base/pkg/messaging"
 	"github.com/FangcunMount/qs-server/internal/pkg/messagingruntime"
+	"github.com/FangcunMount/reliable-messaging/wire/legacy"
 )
 
 func TestPreparedNSQChannelRetainsFirstMessageBeforeSubscriberStarts(t *testing.T) {
@@ -23,13 +24,17 @@ func TestPreparedNSQChannelRetainsFirstMessageBeforeSubscriberStarts(t *testing.
 	if err := messagingruntime.EnsureNSQChannels(t.Context(), []string{"http://" + integrationEnv("NSQD_HTTP_ADDR", "127.0.0.1:4151")}, []messagingruntime.DurableChannel{{Topic: topic, Channel: channel}}); err != nil {
 		t.Fatal(err)
 	}
-	publisher, err := messagingruntime.NewSDKNSQPublisher(integrationEnv("NSQD_ADDR", "127.0.0.1:4150"))
+	publisher, err := messagingruntime.NewSDKNSQWirePublisher(integrationEnv("NSQD_ADDR", "127.0.0.1:4150"))
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = publisher.Close() })
 	original := basemessaging.NewMessage("first-application-event", []byte(`{"id":"first-application-event"}`))
-	if err := publisher.PublishMessage(t.Context(), topic, original); err != nil {
+	wire, err := legacy.Encode(legacy.Envelope{UUID: original.UUID, Metadata: original.Metadata, Payload: original.Payload}, legacy.Revision2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := publisher.PublishWire(t.Context(), topic, wire); err != nil {
 		t.Fatal(err)
 	}
 

@@ -11,6 +11,7 @@ import (
 
 	basemessaging "github.com/FangcunMount/component-base/pkg/messaging"
 	"github.com/FangcunMount/qs-server/internal/pkg/messagingruntime"
+	"github.com/FangcunMount/reliable-messaging/wire/legacy"
 )
 
 func TestSDKNSQPublisherRetainsQSApplicationIdentity(t *testing.T) {
@@ -42,14 +43,18 @@ func TestSDKNSQPublisherRetainsQSApplicationIdentity(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	publisher, err := messagingruntime.NewSDKNSQPublisher(integrationEnv("NSQD_ADDR", "127.0.0.1:4150"))
+	publisher, err := messagingruntime.NewSDKNSQWirePublisher(integrationEnv("NSQD_ADDR", "127.0.0.1:4150"))
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = publisher.Close() })
 	original := basemessaging.NewMessage("qs-event-identity-1", []byte(`{"id":"qs-event-identity-1"}`))
 	original.Metadata["event_type"] = "assessment.requested"
-	if err := publisher.PublishMessage(t.Context(), topic, original); err != nil {
+	wire, err := legacy.Encode(legacy.Envelope{UUID: original.UUID, Metadata: original.Metadata, Payload: original.Payload}, legacy.Revision2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := publisher.PublishWire(t.Context(), topic, wire); err != nil {
 		t.Fatal(err)
 	}
 	select {

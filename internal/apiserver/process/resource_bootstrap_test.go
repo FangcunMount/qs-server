@@ -68,6 +68,14 @@ func TestAPISelectsNativeNSQWireFactory(t *testing.T) {
 	if deps.newWirePublisher != nil || deps.newPublisher == nil {
 		t.Fatalf("RabbitMQ should retain its legacy publisher factory: %+v", deps)
 	}
+	cfg.MessagingOptions.Provider = "unsupported"
+	deps = (&server{config: cfg}).buildMQPublisherDeps()
+	if deps.newPublisher == nil {
+		t.Fatal("unsupported provider must fail through the publisher factory")
+	}
+	if _, err := deps.newPublisher(); err == nil {
+		t.Fatal("unsupported provider was accepted")
+	}
 }
 
 func TestPrepareResourcesPassesNativeNSQWirePortAndClosesOnFailure(t *testing.T) {

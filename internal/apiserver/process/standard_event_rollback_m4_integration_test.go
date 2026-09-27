@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/FangcunMount/component-base/pkg/messaging"
+	cbnsq "github.com/FangcunMount/component-base/pkg/messaging/nsq"
 	"github.com/FangcunMount/qs-server/internal/apiserver/config"
 	eventsubsystem "github.com/FangcunMount/qs-server/internal/apiserver/eventing/subsystem"
 	legacyoutbox "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/eventoutbox"
@@ -87,7 +88,7 @@ func proveM4RollbackHandoff(t *testing.T, db *gorm.DB, mongoClient *mongo.Client
 	}
 	newLegacy := func() (*eventsubsystem.Subsystem, messaging.Publisher) {
 		t.Helper()
-		publisher, err := cfg.MessagingOptions.NewPublisher()
+		publisher, err := cbnsq.NewPublisher(cfg.MessagingOptions.NSQAddr, goNSQ.NewConfig())
 		if err != nil {
 			t.Fatal(err)
 		}

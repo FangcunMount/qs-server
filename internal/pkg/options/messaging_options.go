@@ -3,9 +3,6 @@ package options
 import (
 	"fmt"
 
-	"github.com/FangcunMount/component-base/pkg/messaging"
-	"github.com/FangcunMount/component-base/pkg/messaging/rabbitmq"
-	"github.com/FangcunMount/qs-server/internal/pkg/messagingruntime"
 	"github.com/FangcunMount/qs-server/internal/pkg/retrygovernance"
 	"github.com/spf13/pflag"
 )
@@ -128,21 +125,4 @@ func (o *MessagingOptions) Validate() []error {
 	}
 
 	return errs
-}
-
-// NewPublisher 创建消息队列发布器
-func (o *MessagingOptions) NewPublisher() (messaging.Publisher, error) {
-	if !o.Enabled {
-		return nil, fmt.Errorf("messaging is not enabled")
-	}
-
-	switch o.Provider {
-	case "nsq":
-		return messagingruntime.NewSDKNSQPublisher(o.NSQAddr)
-	case "rabbitmq":
-		// 创建 RabbitMQ Publisher
-		return rabbitmq.NewPublisher(o.RabbitMQURL)
-	default:
-		return nil, fmt.Errorf("unsupported messaging provider: %s", o.Provider)
-	}
 }
