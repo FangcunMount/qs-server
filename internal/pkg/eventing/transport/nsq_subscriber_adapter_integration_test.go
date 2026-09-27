@@ -1,3 +1,5 @@
+//go:build integration
+
 package transport
 
 import (
@@ -12,6 +14,28 @@ import (
 	rmnsq "github.com/FangcunMount/reliable-messaging/transport/nsq"
 	"github.com/FangcunMount/reliable-messaging/wire/legacy"
 )
+
+// newHistoricalNSQSubscriber retains the former SDK-to-component-base bridge
+// for historical wire and recovery tests. Production NSQ subscribers use the
+// SDK delivery port directly.
+func newHistoricalNSQSubscriber(config SubscriberConfig, options basemessaging.SubscriberOptions) (basemessaging.Subscriber, error) {
+	if config.Provider != "nsq" || options.MaxAttempts < 1 || options.FailedMessageHandler == nil {
+		return nil, errors.New("historical NSQ subscriber requires bounded options and durable failure handler")
+	}
+	driver, err := newNSQConfig(config.NSQMessageTimeout)
+	if err != nil {
+		return nil, err
+	}
+	return newNSQSubscriber(rmnsq.SubscriberConfig{
+		LookupdAddresses: []string{config.NSQLookupdAddr}, Driver: driver,
+		MaxInFlight: options.MaxInFlight, MaxAttempts: uint16(options.MaxAttempts),
+		Retry: rmnsq.Backoff{
+			BaseDelay: options.RetryBackoff.BaseDelay, MaxDelay: options.RetryBackoff.MaxDelay,
+			JitterFraction: options.RetryBackoff.JitterFraction,
+		},
+		FailedHandoffGroup: options.FailedHandoffGroup,
+	}, options.FailedMessageHandler)
+}
 
 // nsqSubscriberAdapter keeps the existing QS business handler contract while
 // the SDK owns NSQ receipt, retry and terminal handoff. The business handler,

@@ -24,7 +24,7 @@ func TestSDKNSQPublisherRetainsQSApplicationIdentity(t *testing.T) {
 	createNSQTopicAndChannel(t, topic, channel)
 
 	received := make(chan *basemessaging.Message, 1)
-	subscriber, err := NewSubscriber(SubscriberConfig{
+	subscriber, err := newHistoricalNSQSubscriber(SubscriberConfig{
 		Provider: "nsq", NSQLookupdAddr: integrationEnv("NSQ_LOOKUPD_ADDR", "127.0.0.1:4161"),
 	}, basemessaging.SubscriberOptions{
 		MaxInFlight: 1, MaxAttempts: 2,

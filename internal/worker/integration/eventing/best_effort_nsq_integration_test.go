@@ -20,6 +20,8 @@ import (
 	eventtransport "github.com/FangcunMount/qs-server/internal/pkg/eventing/transport"
 	"github.com/FangcunMount/qs-server/internal/worker/handlers"
 	workermessaging "github.com/FangcunMount/qs-server/internal/worker/integration/messaging"
+	rmtransport "github.com/FangcunMount/reliable-messaging/transport"
+	"github.com/FangcunMount/reliable-messaging/wire/legacy"
 	"github.com/nsqio/go-nsq"
 )
 
@@ -141,23 +143,19 @@ func TestBestEffortExternalFailureFinishesRealNSQDelivery(t *testing.T) {
 		}
 	}
 	var terminal atomic.Int32
-	options, err := eventtransport.NewSubscriberOptions(1, 2, func(context.Context, basemessaging.FailedMessage) error {
+	subscriber, err := eventtransport.NewSDKDeliverySubscriber(eventtransport.SubscriberConfig{
+		Provider: "nsq", NSQLookupdAddr: lookupAddress, NSQMessageTimeout: 2 * time.Second,
+	}, 1, 2, func(context.Context, legacy.FailedHandoff) error {
 		terminal.Add(1)
 		return nil
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	subscriber, err := eventtransport.NewSubscriber(eventtransport.SubscriberConfig{
-		Provider: "nsq", NSQLookupdAddr: lookupAddress, NSQMessageTimeout: 2 * time.Second,
-	}, options)
-	if err != nil {
-		t.Fatal(err)
-	}
 	defer func() { subscriber.Stop(); _ = subscriber.Close() }()
-	if err := workermessaging.SubscribeHandlersWithOptions(workermessaging.SubscribeHandlersOptions{
+	if err := workermessaging.SubscribeSDKHandlersWithOptions(workermessaging.SubscribeSDKHandlersOptions{
 		ServiceName: channelName, Logger: logger, Runtime: dispatcher, Subscriber: subscriber, Observer: observer,
-		UnknownRecorder: func(context.Context, *basemessaging.Message, string) error { return nil },
+		UnknownRecorder: func(context.Context, rmtransport.Received, string) error { return nil },
 	}); err != nil {
 		t.Fatal(err)
 	}

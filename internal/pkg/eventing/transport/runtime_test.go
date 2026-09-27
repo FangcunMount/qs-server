@@ -47,6 +47,16 @@ func TestNewSubscriberOptionsRejectsMissingTerminalHandlerAndHardCap(t *testing.
 	}
 }
 
+func TestLegacySubscriberRejectsNSQProvider(t *testing.T) {
+	options := basemessaging.SubscriberOptions{
+		MaxAttempts:          1,
+		FailedMessageHandler: func(context.Context, basemessaging.FailedMessage) error { return nil },
+	}
+	if _, err := NewSubscriber(SubscriberConfig{Provider: "nsq", NSQLookupdAddr: "127.0.0.1:4161"}, options); err == nil {
+		t.Fatal("legacy subscriber accepted NSQ instead of requiring the SDK delivery port")
+	}
+}
+
 func TestNewNSQConfigPreservesDefaultAndAppliesExplicitMessageTimeout(t *testing.T) {
 	t.Parallel()
 
