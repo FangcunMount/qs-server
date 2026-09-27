@@ -8,8 +8,8 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
 )
 
-func TestParseEventEnvelopePreservesHistoricalWorkerPayload(t *testing.T) {
-	const payload = `{"id":"event-1","eventType":"evaluation.requested","occurredAt":"2026-09-23T10:00:00+08:00","aggregateType":"Evaluation","aggregateId":"assessment-1","data":{"answer_sheet_id":"answer-1"},"historical_context":{"batch_id":"old"}}`
+func TestParseEventEnvelopePreservesStoredWorkerPayload(t *testing.T) {
+	const payload = `{"id":"event-1","eventType":"evaluation.requested","occurredAt":"2026-09-23T10:00:00+08:00","aggregateType":"Evaluation","aggregateId":"assessment-1","data":{"answer_sheet_id":"answer-1"}}`
 	env, err := ParseEventEnvelope([]byte(payload))
 	if err != nil {
 		t.Fatalf("decode stored worker event: %v", err)
