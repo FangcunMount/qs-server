@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/FangcunMount/component-base/pkg/event"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/eventvalue"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventing/outcome"
 )
 
@@ -14,11 +14,11 @@ const (
 )
 
 type ReportGeneratedOutcomeData = eventoutcome.ReportGeneratedPayload
-type ReportGeneratedOutcomeEvent = event.Event[ReportGeneratedOutcomeData]
+type ReportGeneratedOutcomeEvent = eventvalue.Event[ReportGeneratedOutcomeData]
 type ReportFailedOutcomeData = eventoutcome.ReportFailedPayload
-type ReportFailedOutcomeEvent = event.Event[ReportFailedOutcomeData]
+type ReportFailedOutcomeEvent = eventvalue.Event[ReportFailedOutcomeData]
 type InterpretationRetryRequestedData = eventoutcome.InterpretationRetryRequestedPayload
-type InterpretationRetryRequestedEvent = event.Event[InterpretationRetryRequestedData]
+type InterpretationRetryRequestedEvent = eventvalue.Event[InterpretationRetryRequestedData]
 
 // ReportGeneratedEventInput captures the complete immutable trace of a
 // generated report. GenerationID, rather than InterpretReport ID, is the aggregate
@@ -43,7 +43,7 @@ type ReportGeneratedEventInput struct {
 }
 
 func NewInterpretationReportGeneratedEvent(input ReportGeneratedEventInput) ReportGeneratedOutcomeEvent {
-	return event.New(EventTypeReportGeneratedOutcome, AggregateType, input.GenerationID,
+	return eventvalue.New(EventTypeReportGeneratedOutcome, AggregateType, input.GenerationID,
 		ReportGeneratedOutcomeData{
 			OrgID: input.OrgID, GenerationID: input.GenerationID, RunID: input.RunID, ReportID: input.ReportID,
 			AssessmentID: input.AssessmentID, OutcomeID: input.OutcomeID, TesteeID: input.TesteeID, Attempt: input.Attempt,
@@ -73,7 +73,7 @@ type ReportFailedEventInput struct {
 }
 
 func NewInterpretationReportFailedEvent(input ReportFailedEventInput) ReportFailedOutcomeEvent {
-	return event.New(EventTypeReportFailedOutcome, AggregateType, input.GenerationID,
+	return eventvalue.New(EventTypeReportFailedOutcome, AggregateType, input.GenerationID,
 		ReportFailedOutcomeData{
 			OrgID: input.OrgID, GenerationID: input.GenerationID, RunID: input.RunID, AssessmentID: input.AssessmentID,
 			OutcomeID: input.OutcomeID, TesteeID: input.TesteeID, Attempt: input.Attempt, ReportType: input.ReportType,
@@ -110,7 +110,7 @@ func NewInterpretationRetryRequestedEvent(input RetryRequestedEventInput) Interp
 	if input.ActionRequestID != "" {
 		eventID += ":" + input.ActionRequestID
 	}
-	return InterpretationRetryRequestedEvent{BaseEvent: event.BaseEvent{
+	return InterpretationRetryRequestedEvent{BaseEvent: eventvalue.BaseEvent{
 		ID: eventID, EventTypeValue: EventTypeRetryRequested, OccurredAtValue: input.RequestedAt,
 		AggregateTypeValue: AggregateType, AggregateIDValue: input.GenerationID,
 	}, Data: InterpretationRetryRequestedData{

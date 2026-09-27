@@ -8,6 +8,7 @@ import (
 
 	"github.com/FangcunMount/component-base/pkg/event"
 	"github.com/FangcunMount/component-base/pkg/logger"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/eventvalue"
 	"github.com/FangcunMount/qs-server/internal/apiserver/outboxcore"
 	outboxport "github.com/FangcunMount/qs-server/internal/apiserver/port/outbox"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventing/observe"
@@ -361,7 +362,7 @@ func (r *outboxRelay) claimDueEvents(ctx context.Context, now time.Time) ([]outb
 func pendingEventForFailure(failure outboxport.FailedMark) outboxport.PendingEvent {
 	pending := outboxport.PendingEvent{EventID: failure.EventID}
 	if failure.EventType != "" {
-		pending.Event = event.New(failure.EventType, "", failure.EventID, struct{}{})
+		pending.Event = eventvalue.New(failure.EventType, "", failure.EventID, struct{}{})
 	}
 	return pending
 }

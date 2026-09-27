@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/FangcunMount/component-base/pkg/event"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/eventvalue"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventing/payload"
 )
@@ -35,12 +36,12 @@ type OutcomeCommittedData = eventpayload.EvaluationOutcomeCommittedData
 
 // ==================== 事件类型别名 ====================
 
-type RequestedEvent = event.Event[RequestedData]
+type RequestedEvent = eventvalue.Event[RequestedData]
 
 // FailedEvent 测评失败事件
-type FailedEvent = event.Event[FailedData]
+type FailedEvent = eventvalue.Event[FailedData]
 
-type OutcomeCommittedEvent = event.Event[OutcomeCommittedData]
+type OutcomeCommittedEvent = eventvalue.Event[OutcomeCommittedData]
 
 // RequestedInput 测评请求输入
 type RequestedInput struct {
@@ -90,9 +91,9 @@ func newRequestedEvent(eventType string, in RequestedInput) RequestedEvent {
 		Mode:              in.Mode,
 	}
 	if in.EventID == "" {
-		return event.New(eventType, AggregateType, strconv.FormatInt(in.AssessmentID, 10), data)
+		return eventvalue.New(eventType, AggregateType, strconv.FormatInt(in.AssessmentID, 10), data)
 	}
-	return RequestedEvent{BaseEvent: event.BaseEvent{
+	return RequestedEvent{BaseEvent: eventvalue.BaseEvent{
 		ID: in.EventID, EventTypeValue: eventType, OccurredAtValue: in.RequestedAt,
 		AggregateTypeValue: AggregateType, AggregateIDValue: strconv.FormatInt(in.AssessmentID, 10),
 	}, Data: data}
@@ -106,7 +107,7 @@ func NewFailedEvent(
 	reason string,
 	failedAt time.Time,
 ) FailedEvent {
-	return event.New(TypeFailed, AggregateType, strconv.FormatInt(assessmentID, 10),
+	return eventvalue.New(TypeFailed, AggregateType, strconv.FormatInt(assessmentID, 10),
 		FailedData{
 			OrgID:        orgID,
 			AssessmentID: assessmentID,
@@ -126,7 +127,7 @@ func NewOutcomeCommittedEvent(
 	evaluationRunID string,
 	committedAt time.Time,
 ) OutcomeCommittedEvent {
-	return event.New(TypeOutcomeCommitted, AggregateType, strconv.FormatInt(assessmentID, 10),
+	return eventvalue.New(TypeOutcomeCommitted, AggregateType, strconv.FormatInt(assessmentID, 10),
 		OutcomeCommittedData{
 			OrgID:           orgID,
 			AssessmentID:    assessmentID,

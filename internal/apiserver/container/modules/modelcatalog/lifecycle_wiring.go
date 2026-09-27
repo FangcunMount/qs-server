@@ -10,6 +10,7 @@ import (
 	appbinding "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/binding"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/lifecycle"
 	quesApp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/eventvalue"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/questionnairecatalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
@@ -91,7 +92,7 @@ func publishAssessmentModelLifecycleEffect(ctx context.Context, deps Deps, model
 	}
 	if deps.Lifecycle.EventPublisher != nil {
 		if changeAction, ok := assessmentModelChangeAction(action); ok {
-			evt := event.New(eventcatalog.AssessmentModelChanged, "AssessmentModel", model.Code, eventpayload.AssessmentModelChangedData{
+			evt := eventvalue.New(eventcatalog.AssessmentModelChanged, "AssessmentModel", model.Code, eventpayload.AssessmentModelChangedData{
 				Kind:      string(model.Kind),
 				Code:      model.Code,
 				Version:   fmt.Sprintf("v%d", model.Revision()),
