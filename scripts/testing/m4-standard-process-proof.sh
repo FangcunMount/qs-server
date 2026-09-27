@@ -57,11 +57,14 @@ build_dir=$(mktemp -d "${TMPDIR:-/tmp}/$project-build.XXXXXX")
   -o "$build_dir/m4-answer-chain.test" ./internal/apiserver/container/internal/transaction)
 (cd "$repo" && GOPROXY=https://proxy.golang.org,direct CGO_ENABLED=0 GOOS=linux GOARCH="$goarch" go test -c \
   -tags=reliable_messaging -o "$build_dir/m6-direct-wire.test" ./internal/pkg/eventing/runtime)
+(cd "$repo" && GOPROXY=https://proxy.golang.org,direct CGO_ENABLED=0 GOOS=linux GOARCH="$goarch" go test -c \
+  -tags=reliable_messaging -o "$build_dir/m6-worker-hold-wire.test" ./internal/worker/integration/messaging)
 
 "${compose[@]}" exec -T mysql mkdir -p /tmp/m4-qs-bootstrap/configs /tmp/m4-qs-bootstrap/mysql
 "${compose[@]}" cp "$build_dir/m4-process.test" mysql:/tmp/m4-qs-bootstrap/m4-process.test
 "${compose[@]}" cp "$build_dir/m4-answer-chain.test" mysql:/tmp/m4-qs-bootstrap/m4-answer-chain.test
 "${compose[@]}" cp "$build_dir/m6-direct-wire.test" mysql:/tmp/m4-qs-bootstrap/m6-direct-wire.test
+"${compose[@]}" cp "$build_dir/m6-worker-hold-wire.test" mysql:/tmp/m4-qs-bootstrap/m6-worker-hold-wire.test
 "${compose[@]}" cp "$repo/configs/events.yaml" mysql:/tmp/m4-qs-bootstrap/configs/events.yaml
 "${compose[@]}" cp "$repo/configs/grpc-acl.prod.yaml" mysql:/tmp/m4-qs-bootstrap/configs/grpc-acl.prod.yaml
 "${compose[@]}" cp "$repo/internal/pkg/migration/migrations/mysql/000084_standard_reliable_outbox.up.sql" mysql:/tmp/m4-qs-bootstrap/mysql/000084_standard_reliable_outbox.up.sql
@@ -73,6 +76,8 @@ build_dir=$(mktemp -d "${TMPDIR:-/tmp}/$project-build.XXXXXX")
 # that the later subscription could mistake for the chain's own event.
 "${compose[@]}" exec -T -e RM_QS_NSQ_TCP='nsqd:4150' mysql /tmp/m4-qs-bootstrap/m6-direct-wire.test \
   -test.run '^TestDirectEventWireThroughRealNSQ$' -test.count=1 -test.timeout=1m -test.v
+"${compose[@]}" exec -T -e RM_QS_NSQ_TCP='nsqd:4150' mysql /tmp/m4-qs-bootstrap/m6-worker-hold-wire.test \
+  -test.run '^TestRetryHoldReplayerUsesRealNSQWire$' -test.count=1 -test.timeout=1m -test.v
 "${compose[@]}" exec -T \
   -e RM_QS_MONGO_URI='mongodb://mongo:27017/?replicaSet=rm-test' \
   -e RM_QS_GRPC_ACL_CONFIG='/tmp/m4-qs-bootstrap/configs/grpc-acl.prod.yaml' \

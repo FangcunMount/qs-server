@@ -122,8 +122,17 @@ func (s *server) initializeRuntime(resources resourceOutput, containerOutput con
 			_ = deadLetterRecorder.Close()
 			return runtimeOutput{}, publishErr
 		}
+		holdReplayer, replayErr := messagingintegration.NewRetryEventHoldReplayerForProvider(holdStore, publisher, s.config.Messaging.Provider)
+		if replayErr != nil {
+			_ = publisher.Close()
+			subscriber.Stop()
+			_ = subscriber.Close()
+			_ = holdStore.Close()
+			_ = deadLetterRecorder.Close()
+			return runtimeOutput{}, replayErr
+		}
 		output.messaging.publisher = publisher
-		output.messaging.holdReplayer = messagingintegration.NewRetryEventHoldReplayer(holdStore, publisher)
+		output.messaging.holdReplayer = holdReplayer
 		output.messaging.holdReplayer.Start()
 	}
 
