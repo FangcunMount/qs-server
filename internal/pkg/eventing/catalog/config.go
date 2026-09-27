@@ -2,7 +2,7 @@
 // event catalog runtime from component-base.
 package eventcatalog
 
-import base "github.com/FangcunMount/component-base/pkg/eventcatalog"
+import base "github.com/FangcunMount/reliable-messaging/catalog"
 
 type Config = base.Config
 type TopicConfig = base.TopicConfig

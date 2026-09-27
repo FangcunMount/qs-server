@@ -2,10 +2,12 @@ package outboxcore
 
 import (
 	"encoding/json"
+	"fmt"
 	"time"
 
 	base "github.com/FangcunMount/component-base/pkg/outboxcore"
 	outboxport "github.com/FangcunMount/qs-server/internal/apiserver/port/outbox"
+	eventcatalog "github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
 )
 
 // OrgIDFromPayloadJSON extracts the optional organization scope from the
@@ -46,6 +48,22 @@ func UnfinishedStatuses() []string {
 }
 
 func BuildRecords(opts BuildRecordsOptions) ([]Record, error) {
+	// The old core recognizes only component-base's DeliveryClassResolver.
+	// Preserve its durable-only guard while the host catalog uses the SDK type.
+	if resolver, ok := opts.Resolver.(eventcatalog.DeliveryClassResolver); ok {
+		for _, evt := range opts.Events {
+			if _, found := opts.Resolver.GetTopicForEvent(evt.EventType()); !found {
+				continue // preserve the old core's unknown-topic error
+			}
+			delivery, found := resolver.GetDeliveryClass(evt.EventType())
+			if !found {
+				return nil, fmt.Errorf("event %q has no delivery class", evt.EventType())
+			}
+			if delivery != eventcatalog.DeliveryClassDurableOutbox {
+				return nil, fmt.Errorf("event %q delivery class %q cannot be staged to outbox", evt.EventType(), delivery)
+			}
+		}
+	}
 	return base.BuildRecords(opts)
 }
 

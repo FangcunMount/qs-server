@@ -6,7 +6,7 @@ require (
 	github.com/DATA-DOG/go-sqlmock v1.5.2
 	github.com/FangcunMount/component-base v0.6.11
 	github.com/FangcunMount/iam/v5 v5.4.0
-	github.com/FangcunMount/reliable-messaging v0.2.2-0.20260927080052-dbdb73e5c3b7
+	github.com/FangcunMount/reliable-messaging v0.2.2-0.20260927100603-c1dd7d8a1194
 	github.com/alicebob/miniredis/v2 v2.30.0
 	github.com/aliyun/alibabacloud-oss-go-sdk-v2 v1.4.1
 	github.com/coder/websocket v1.8.15

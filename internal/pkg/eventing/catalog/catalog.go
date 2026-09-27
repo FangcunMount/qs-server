@@ -1,6 +1,6 @@
 package eventcatalog
 
-import base "github.com/FangcunMount/component-base/pkg/eventcatalog"
+import base "github.com/FangcunMount/reliable-messaging/catalog"
 
 type Catalog = base.Catalog
 type TopicResolver = base.TopicResolver
