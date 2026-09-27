@@ -25,6 +25,27 @@ import (
 
 type fakePublisher struct{ onClose func() }
 
+func TestAPIProjectionSelectsSDKSubscriberForNSQAndLegacyForRabbitMQ(t *testing.T) {
+	for _, item := range []struct {
+		provider string
+		wantSDK  bool
+	}{
+		{provider: "nsq", wantSDK: true},
+		{provider: "rabbitmq", wantSDK: false},
+	} {
+		t.Run(item.provider, func(t *testing.T) {
+			cfg := &apiserverconfig.Config{Options: apiserveroptions.NewOptions()}
+			cfg.MessagingOptions.Enabled = true
+			cfg.MessagingOptions.Provider = item.provider
+			deps := (&server{config: cfg}).buildEventSubsystemResourceDeps()
+			if (deps.buildSDKSubscriberFactory != nil) != item.wantSDK || (deps.buildSubscriberFactory != nil) == item.wantSDK {
+				t.Fatalf("subscriber factories for %s: SDK=%t legacy=%t", item.provider,
+					deps.buildSDKSubscriberFactory != nil, deps.buildSubscriberFactory != nil)
+			}
+		})
+	}
+}
+
 func (*fakePublisher) Publish(_ context.Context, _ string, _ []byte) error { return nil }
 
 func (*fakePublisher) PublishMessage(_ context.Context, _ string, _ *messaging.Message) error {
