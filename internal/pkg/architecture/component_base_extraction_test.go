@@ -67,7 +67,7 @@ func TestSharedTransactionEventAndOutboxPackagesUseApprovedOwners(t *testing.T) 
 	requiredByFile := map[string]string{
 		"internal/pkg/database/mysql/uow.go":         "github.com/FangcunMount/component-base/pkg/uow/gorm",
 		"internal/pkg/eventing/runtime/publisher.go": "github.com/FangcunMount/reliable-messaging/wire/domain",
-		"internal/apiserver/port/outbox/outbox.go":   "github.com/FangcunMount/component-base/pkg/outbox",
+		"internal/apiserver/port/outbox/outbox.go":   "github.com/FangcunMount/reliable-messaging/outbox",
 		"internal/apiserver/outboxcore/core.go":      "github.com/FangcunMount/component-base/pkg/outboxcore",
 	}
 
@@ -85,6 +85,18 @@ func TestSharedTransactionEventAndOutboxPackagesUseApprovedOwners(t *testing.T) 
 		}
 		if !found {
 			t.Fatalf("%s must import approved shared package %s", rel, required)
+		}
+	}
+
+	// The host status API must not inherit the legacy component-base type even
+	// while the old Outbox core remains available for the rollback window.
+	file, err := parser.ParseFile(token.NewFileSet(), filepath.Join(root, "internal/apiserver/port/outbox/outbox.go"), nil, parser.ImportsOnly)
+	if err != nil {
+		t.Fatalf("parse outbox port: %v", err)
+	}
+	for _, imported := range file.Imports {
+		if strings.Trim(imported.Path.Value, `"`) == "github.com/FangcunMount/component-base/pkg/outbox" {
+			t.Fatal("host outbox status port must not import component-base/pkg/outbox")
 		}
 	}
 }

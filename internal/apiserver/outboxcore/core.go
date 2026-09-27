@@ -92,7 +92,15 @@ func BuildRecords(opts BuildRecordsOptions) ([]Record, error) {
 }
 
 func BuildStatusSnapshot(store string, now time.Time, observations []StatusObservation) outboxport.StatusSnapshot {
-	return base.BuildStatusSnapshot(store, now, observations)
+	legacy := base.BuildStatusSnapshot(store, now, observations)
+	buckets := make([]outboxport.StatusBucket, len(legacy.Buckets))
+	for i, bucket := range legacy.Buckets {
+		buckets[i] = outboxport.StatusBucket{
+			Status: bucket.Status, Count: bucket.Count,
+			OldestCreatedAt: bucket.OldestCreatedAt, OldestAgeSeconds: bucket.OldestAgeSeconds,
+		}
+	}
+	return outboxport.StatusSnapshot{Store: legacy.Store, GeneratedAt: legacy.GeneratedAt, Buckets: buckets}
 }
 
 func DecodePendingEvent(eventID, payloadJSON string) (outboxport.PendingEvent, error) {
