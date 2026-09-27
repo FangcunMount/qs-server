@@ -1,0 +1,32 @@
+name: M5 AuthZ rollback image availability
+
+on:
+  pull_request:
+    paths:
+      - .github/workflows/m5-authz-rollback-image-readonly.yml
+
+permissions:
+  contents: read
+  packages: read
+
+jobs:
+  rollback-image:
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Authenticate to GHCR with read-only package scope
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Pull the pinned rollback API image for linux/amd64
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          image=ghcr.io/fangcunmount/qs-apiserver:b75c8b03db373f2a2624029026d5375e0375b20a
+          docker pull --platform linux/amd64 "$image" >/dev/null
+          actual=$(docker image inspect "$image" --format '{{.Os}}/{{.Architecture}}')
+          test "$actual" = linux/amd64
+          printf 'rollback_image=%s platform=%s pullable=true\n' "$image" "$actual"
