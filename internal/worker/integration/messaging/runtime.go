@@ -15,7 +15,6 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/eventing/runtime"
 	"github.com/FangcunMount/qs-server/internal/pkg/messagingruntime"
 	"github.com/FangcunMount/qs-server/internal/worker/config"
-	"github.com/nsqio/go-nsq"
 )
 
 type TopicSubscriptionSource interface {
@@ -36,11 +35,7 @@ func CreatePublisher(cfg *config.MessagingConfig) (basemessaging.Publisher, erro
 	case "rabbitmq":
 		return cbrabbit.NewPublisher(cfg.RabbitMQURL)
 	default:
-		publisher, err := cbnsq.NewPublisher(cfg.NSQAddr, nsq.NewConfig())
-		if err != nil {
-			return nil, err
-		}
-		return messagingruntime.WrapNSQReconnectPublisher(publisher), nil
+		return messagingruntime.NewSDKNSQPublisher(cfg.NSQAddr)
 	}
 }
 
