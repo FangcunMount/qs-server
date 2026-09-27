@@ -7,10 +7,10 @@ import (
 	"time"
 
 	basemessaging "github.com/FangcunMount/component-base/pkg/messaging"
-	cbnsq "github.com/FangcunMount/component-base/pkg/messaging/nsq"
 	cbrabbit "github.com/FangcunMount/component-base/pkg/messaging/rabbitmq"
 	eventobservability "github.com/FangcunMount/qs-server/internal/pkg/eventing/observe"
 	"github.com/FangcunMount/qs-server/internal/pkg/retrygovernance"
+	rmnsq "github.com/FangcunMount/reliable-messaging/transport/nsq"
 	"github.com/nsqio/go-nsq"
 )
 
@@ -52,7 +52,15 @@ func NewSubscriber(config SubscriberConfig, options basemessaging.SubscriberOpti
 		if err != nil {
 			return nil, err
 		}
-		return cbnsq.NewSubscriberWithOptions([]string{config.NSQLookupdAddr}, nsqConfig, options)
+		return newNSQSubscriber(rmnsq.SubscriberConfig{
+			LookupdAddresses: []string{config.NSQLookupdAddr}, Driver: nsqConfig,
+			MaxInFlight: options.MaxInFlight, MaxAttempts: uint16(options.MaxAttempts),
+			Retry: rmnsq.Backoff{
+				BaseDelay: options.RetryBackoff.BaseDelay, MaxDelay: options.RetryBackoff.MaxDelay,
+				JitterFraction: options.RetryBackoff.JitterFraction,
+			},
+			FailedHandoffGroup: options.FailedHandoffGroup,
+		}, options.FailedMessageHandler)
 	case "rabbitmq":
 		return cbrabbit.NewSubscriberWithOptions(config.RabbitMQURL, options)
 	default:
