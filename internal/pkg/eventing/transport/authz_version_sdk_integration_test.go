@@ -14,7 +14,6 @@ import (
 
 	cbnsq "github.com/FangcunMount/component-base/pkg/messaging/nsq"
 	"github.com/FangcunMount/qs-server/internal/pkg/iamauth"
-	rmtransport "github.com/FangcunMount/reliable-messaging/transport"
 	"github.com/FangcunMount/reliable-messaging/wire/legacy"
 	"github.com/nsqio/go-nsq"
 )
@@ -89,8 +88,21 @@ func TestSDKAuthzEphemeralChannelLifecycleAcrossSubscriberReplacements(t *testin
 	channels := []string{"qs-authz-first#ephemeral", "qs-authz-second#ephemeral"}
 	cleanupNSQTopics(t, topic, failureTopic)
 	createNSQTopicAndChannel(t, topic, channels[0])
+	publisher, err := cbnsq.NewPublisher(integrationEnv("NSQD_ADDR", "127.0.0.1:4150"), nsq.NewConfig())
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = publisher.Close() })
 
 	for _, channel := range channels {
+		guard, err := iamauth.NewVersionGuard(committedVersionOneReader{}, time.Minute)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := guard.Verify(t.Context()); err != nil {
+			t.Fatal(err)
+		}
+		loader := iamauth.NewSnapshotLoader(nil, iamauth.SnapshotLoaderOptions{VersionGuard: guard})
 		subscriber, err := NewSDKDeliverySubscriber(SubscriberConfig{
 			Provider: "nsq", NSQLookupdAddr: integrationEnv("NSQ_LOOKUPD_ADDR", "127.0.0.1:4161"), FailedHandoffGroup: group,
 		}, 1, 2, func(context.Context, legacy.FailedHandoff) error { return nil })
@@ -98,12 +110,26 @@ func TestSDKAuthzEphemeralChannelLifecycleAcrossSubscriberReplacements(t *testin
 			t.Fatal(err)
 		}
 		t.Cleanup(func() { _ = subscriber.Close() })
-		if err := subscriber.Subscribe(topic, channel, func(_ context.Context, delivery rmtransport.Delivery) error {
-			return delivery.Ack()
-		}); err != nil {
+		if err := iamauth.SubscribeVersionChangesSDK(t.Context(), subscriber, topic, channel, loader); err != nil {
 			t.Fatal(err)
 		}
 		waitForSDKAuthzChannelState(t, topic, failureTopic, channel, true)
+		if err := publisher.Publish(t.Context(), topic, []byte(`{"version":2}`)); err != nil {
+			t.Fatal(err)
+		}
+		deadline := time.Now().Add(5 * time.Second)
+		observed := false
+		for time.Now().Before(deadline) {
+			_, err := guard.Verify(t.Context())
+			if err != nil && strings.Contains(err.Error(), "behind the observed watermark") {
+				observed = true
+				break
+			}
+			time.Sleep(20 * time.Millisecond)
+		}
+		if !observed {
+			t.Fatal("replacement subscriber did not apply IAM authorization version")
+		}
 		if err := subscriber.Close(); err != nil {
 			t.Fatal(err)
 		}
