@@ -1,0 +1,56 @@
+name: QS M6 Worker image handoff isolation
+
+on:
+  pull_request:
+    paths:
+      - .github/workflows/reliable-messaging-m6-qs-image-handoff.yml
+      - scripts/testing/m6-qs-worker-image-*.yaml
+      - scripts/testing/m6-qs-worker-image-handoff.sh
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  worker-image-handoff:
+    runs-on: ubuntu-latest
+    timeout-minutes: 50
+    steps:
+      - name: Checkout the reviewed harness
+        uses: actions/checkout@v6
+        with:
+          path: harness
+      - name: Checkout the current production Worker source
+        uses: actions/checkout@v6
+        with:
+          ref: 7ca541afc24d13187c5b894a249126eabc009ae2
+          path: current
+      - name: Checkout the retained fallback Worker source
+        uses: actions/checkout@v6
+        with:
+          ref: 7c0c919e621d3cc93cb82dca668bd6077f7a1446
+          path: fallback
+      - name: Verify source identities
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          test "$(git -C current rev-parse HEAD)" = 7ca541afc24d13187c5b894a249126eabc009ae2
+          test "$(git -C fallback rev-parse HEAD)" = 7c0c919e621d3cc93cb82dca668bd6077f7a1446
+      - name: Build actual Worker process images without publication
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          docker build -f current/build/docker/Dockerfile.qs-worker \
+            --label org.opencontainers.image.revision=7ca541afc24d13187c5b894a249126eabc009ae2 \
+            --build-arg GIT_COMMIT=7ca541afc24d13187c5b894a249126eabc009ae2 \
+            -t qs-m6-current:7ca541af current
+          docker build -f fallback/build/docker/Dockerfile.qs-worker \
+            --label org.opencontainers.image.revision=7c0c919e621d3cc93cb82dca668bd6077f7a1446 \
+            --build-arg GIT_COMMIT=7c0c919e621d3cc93cb82dca668bd6077f7a1446 \
+            -t qs-m6-fallback:7c0c919e fallback
+      - name: Handoff fallback to current and back on disposable dependencies
+        shell: bash
+        run: |
+          bash harness/scripts/testing/m6-qs-worker-image-handoff.sh \
+            "$GITHUB_WORKSPACE/harness" "$GITHUB_WORKSPACE/current" \
+            qs-m6-current:7ca541af qs-m6-fallback:7c0c919e
