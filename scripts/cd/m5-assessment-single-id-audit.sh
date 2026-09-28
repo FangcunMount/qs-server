@@ -22,3 +22,5 @@ echo 'EVALUATION_OUTCOME'
 query "SELECT id,evaluation_run_id,model_kind,model_code,model_version,evaluated_at FROM evaluation_outcome WHERE assessment_id=${ASSESSMENT_ID} LIMIT 1"
 echo 'LEGACY_MYSQL_OUTBOX'
 query "SELECT event_id,event_type,status,attempt_count,created_at,published_at FROM domain_event_outbox WHERE aggregate_id='${ASSESSMENT_ID}' ORDER BY id DESC LIMIT 30"
+echo 'STANDARD_MYSQL_OUTBOX'
+query "SELECT CAST(message_id AS CHAR),event_type,state,attempt_count,last_error_code,created_at,transport_confirmed_at FROM rm_outbox WHERE event_type IN ('evaluation.requested','evaluation.retry.requested','evaluation.outcome.committed','evaluation.failed') AND JSON_UNQUOTE(JSON_EXTRACT(CAST(FROM_BASE64(JSON_UNQUOTE(JSON_EXTRACT(CAST(payload AS CHAR CHARACTER SET utf8mb4), '$.payload'))) AS CHAR CHARACTER SET utf8mb4), '$.data.assessment_id'))='${ASSESSMENT_ID}' ORDER BY id LIMIT 20"
