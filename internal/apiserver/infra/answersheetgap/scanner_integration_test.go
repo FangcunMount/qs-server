@@ -4,6 +4,7 @@ package answersheetgap
 
 import (
 	"context"
+	"database/sql"
 	"os"
 	"strings"
 	"testing"
@@ -87,6 +88,21 @@ func TestScanPageFindsPublishedAnswerSheetMissingAssessment(t *testing.T) {
 	}
 	if len(page.Findings) != 1 || page.Findings[0].Disposition != Missing || page.Findings[0].EventID != sheet.DurableAcceptance.EventID || !page.Exhausted {
 		t.Fatalf("published original with no Assessment should be missing: %+v", page)
+	}
+	readOnly := mysqlDB.WithContext(ctx).Begin(&sql.TxOptions{ReadOnly: true})
+	if readOnly.Error != nil {
+		t.Fatal(readOnly.Error)
+	}
+	readOnlyScanner, err := New(mongoDB, readOnly)
+	if err != nil {
+		t.Fatal(err)
+	}
+	readOnlyPage, err := readOnlyScanner.ScanPage(ctx, 0, sheet.DomainID, time.Now().Add(-10*time.Second), 10)
+	if err != nil || len(readOnlyPage.Findings) != 1 || readOnlyPage.Findings[0].Disposition != Missing {
+		t.Fatalf("read-only transaction should classify the same confirmed gap: page=%+v err=%v", readOnlyPage, err)
+	}
+	if err := readOnly.Rollback().Error; err != nil {
+		t.Fatal(err)
 	}
 	if err := mysqlDB.Exec("INSERT INTO assessment(id,org_id,answer_sheet_id) VALUES (?,?,?)", uint64(801), sheet.OrgID, sheet.DomainID).Error; err != nil {
 		t.Fatal(err)
