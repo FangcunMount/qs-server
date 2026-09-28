@@ -9,6 +9,7 @@ import (
 	"net"
 	"os"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -215,6 +216,37 @@ func TestQS03PostConfirmRecover(t *testing.T) {
 		AssessmentIntakeClient: proofIntakeGRPCClient{pb.NewAssessmentIntakeServiceClient(conn)},
 	})
 	require.True(t, ok)
+	// Race two recovery invocations without the normal Redis processing lock.
+	// A loser may return an error requiring effect recheck, but the host must
+	// not create a second Assessment or downstream evaluation intent. Both
+	// should succeed when retried after the winning transaction commits.
+	start := make(chan struct{})
+	results := make(chan error, 2)
+	var running sync.WaitGroup
+	for range 2 {
+		running.Add(1)
+		go func() {
+			defer running.Done()
+			<-start
+			results <- handler(ctx, "answersheet.submitted", wire.Payload)
+		}()
+	}
+	close(start)
+	running.Wait()
+	close(results)
+	concurrentErrors := 0
+	for err := range results {
+		if err != nil {
+			concurrentErrors++
+			t.Logf("concurrent recovery requires effect recheck: %v", err)
+		}
+	}
+	require.Less(t, concurrentErrors, 2, "at least one concurrent recovery must complete")
+	var afterRaceAssessments, afterRaceIntents int64
+	require.NoError(t, mysqlDB.Table("assessment").Where("answer_sheet_id=?", qs03ProofSheetID).Count(&afterRaceAssessments).Error)
+	require.NoError(t, mysqlDB.Table("rm_outbox").Where("event_type=?", "evaluation.requested").Count(&afterRaceIntents).Error)
+	require.EqualValues(t, 1, afterRaceAssessments)
+	require.EqualValues(t, 1, afterRaceIntents)
 	require.NoError(t, handler(ctx, "answersheet.submitted", wire.Payload))
 	require.NoError(t, handler(ctx, "answersheet.submitted", wire.Payload))
 	var assessments []assessmentmysql.AssessmentPO
@@ -234,5 +266,5 @@ func TestQS03PostConfirmRecover(t *testing.T) {
 	require.Equal(t, answersheetgap.Present, page.Findings[0].Disposition)
 	require.EqualValues(t, assessments[0].ID, page.Findings[0].AssessmentID)
 	require.EqualValues(t, 1, countStandardDocs(t, ctx, mongoDB.Collection("rm_outbox"), bson.M{"message_id": stored.MessageID, "state": "published", "attempt_count": stored.AttemptCount}))
-	t.Logf("recovered original_event_id=%s assessment_id=%d evaluation_intents=1", stored.MessageID, assessments[0].ID)
+	t.Logf("recovered original_event_id=%s assessment_id=%d evaluation_intents=1 concurrent_errors=%d", stored.MessageID, assessments[0].ID, concurrentErrors)
 }
