@@ -3,6 +3,7 @@
 发布脚本在目标服务器取得共享锁，然后执行镜像导入/拉取、容器更新和现有验证。
 验证成功后调用 `image-retention.py --apply`；清理失败输出 warning，不将健康发布回滚。
 工作流会先执行 `python3 scripts/cd/test_image_retention.py`。
+若发布环境提供 `SUDO_PASSWORD`，整个发布流程统一使用带密码的非交互 sudo，避免仅凭 `sudo -n true` 的缓存或特定命令授权误判后续镜像清理权限。未配置密码时仍走原有免密 sudo 路径；密码选择由 `test_sudo_selection.py` 在隔离替身中验证。
 
 ## 保留规则
 
