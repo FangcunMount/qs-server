@@ -7,7 +7,6 @@ import (
 
 	"github.com/FangcunMount/component-base/pkg/logger"
 	"github.com/FangcunMount/component-base/pkg/messaging"
-	cbrabbit "github.com/FangcunMount/component-base/pkg/messaging/rabbitmq"
 	bootstrap "github.com/FangcunMount/qs-server/internal/apiserver/bootstrap"
 	"github.com/FangcunMount/qs-server/internal/apiserver/cache/subsystem"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container"
@@ -136,21 +135,6 @@ func (s *server) buildEventSubsystemResourceDeps() eventSubsystemResourceDeps {
 						s.config.MessagingOptions.Delivery.EffectiveMaxAttempts(), eventtransport.SDKFailedHandoffHandler(recorder))
 				}, nil
 			}
-		} else {
-			buildSubscriberFactory = func(mysqlDB *gorm.DB) (eventsubsystem.SubscriberFactory, error) {
-				recorder, err := recorderFor(mysqlDB)
-				if err != nil {
-					return nil, err
-				}
-				options, err := eventtransport.NewSubscriberOptions(0, s.config.MessagingOptions.Delivery.EffectiveMaxAttempts(), eventtransport.FailedMessageHandler(recorder))
-				if err != nil {
-					return nil, err
-				}
-				config := eventtransport.SubscriberConfig{
-					Provider: s.config.MessagingOptions.Provider, NSQLookupdAddr: s.config.MessagingOptions.NSQLookupdAddr, RabbitMQURL: s.config.MessagingOptions.RabbitMQURL,
-				}
-				return func() (messaging.Subscriber, error) { return eventtransport.NewSubscriber(config, options) }, nil
-			}
 		}
 	}
 	mongoProfile, assessmentProfile := buildEventProfileOptions(s.config)
@@ -220,13 +204,6 @@ func (s *server) buildMQPublisherDeps() mqPublisherStageDeps {
 		if options.Provider == "nsq" {
 			deps.newWirePublisher = func() (wirePublisherResource, error) {
 				return messagingruntime.NewSDKNSQWirePublisher(options.NSQAddr)
-			}
-		} else {
-			deps.newPublisher = func() (messaging.Publisher, error) {
-				if options.Provider != "rabbitmq" {
-					return nil, fmt.Errorf("unsupported messaging provider: %s", options.Provider)
-				}
-				return cbrabbit.NewPublisher(options.RabbitMQURL)
 			}
 		}
 	}

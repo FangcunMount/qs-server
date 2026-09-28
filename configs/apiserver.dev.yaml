@@ -480,7 +480,7 @@ messaging:
   # 是否启用消息队列（false 则使用 logging 模式）
   enabled: true
   
-  # 消息队列提供者: nsq, rabbitmq
+  # 当前仅支持 NSQ
   provider: nsq
   
   # NSQ 配置（开发环境默认）

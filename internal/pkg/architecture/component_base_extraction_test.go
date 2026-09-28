@@ -100,9 +100,9 @@ func TestSharedTransactionEventAndOutboxPackagesUseApprovedOwners(t *testing.T) 
 	}
 }
 
-// These imports belong to the still-supported RabbitMQ and old Outbox rollback
-// paths. Removing an entry is allowed; adding a new dependency on the retiring
-// component-base message packages is not.
+// These imports remain only for the old Outbox rollback and message bridge.
+// Removing an entry is allowed; adding a dependency on the retiring component-base
+// message packages, including RabbitMQ, is not.
 func TestComponentBaseMessageImportsStayWithinRollbackAllowlist(t *testing.T) {
 	root := repoRoot(t)
 	const base = "github.com/FangcunMount/component-base/pkg/"
@@ -114,23 +114,14 @@ func TestComponentBaseMessageImportsStayWithinRollbackAllowlist(t *testing.T) {
 		"internal/apiserver/outboxcore/core.go": {
 			base + "event": true, base + "outboxcore": true,
 		},
-		"internal/apiserver/process/container_bootstrap.go": {base + "messaging": true},
-		"internal/apiserver/process/resource_bootstrap.go": {
-			base + "messaging": true, base + "messaging/rabbitmq": true,
-		},
+		"internal/apiserver/process/resource_bootstrap.go":    {base + "messaging": true},
 		"internal/apiserver/process/root.go":                  {base + "messaging": true},
 		"internal/pkg/eventing/runtime/message_settlement.go": {base + "messaging": true},
 		"internal/pkg/eventing/runtime/publisher.go":          {base + "messaging": true},
 		"internal/pkg/eventing/transport/dead_letter.go":      {base + "messaging": true},
-		"internal/pkg/eventing/transport/runtime.go": {
-			base + "messaging": true, base + "messaging/rabbitmq": true,
-		},
 		"internal/pkg/iamauth/version_sync.go":                {base + "messaging": true},
 		"internal/worker/integration/messaging/retry_hold.go": {base + "messaging": true},
-		"internal/worker/integration/messaging/runtime.go": {
-			base + "messaging": true, base + "messaging/rabbitmq": true,
-		},
-		"internal/worker/process/runtime_bootstrap.go": {base + "messaging": true},
+		"internal/worker/integration/messaging/runtime.go":    {base + "messaging": true},
 	}
 
 	err := filepath.WalkDir(filepath.Join(root, "internal"), func(path string, entry os.DirEntry, err error) error {

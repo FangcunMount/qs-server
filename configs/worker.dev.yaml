@@ -41,17 +41,15 @@ worker:
 # ============================================================
 # 2. 消息队列配置
 # ============================================================
-# NSQ 或 RabbitMQ 消息队列配置（开发环境）
+# NSQ 消息队列配置（开发环境）
 
 messaging:
-  provider: nsq               # 消息队列提供者: nsq, rabbitmq
+  provider: nsq               # 当前仅支持 NSQ
   # NSQ 配置（开发环境默认）
   nsq-addr: "127.0.0.1:4150"           # NSQ Daemon 地址
   nsq-lookupd-addr: "127.0.0.1:4161"   # NSQ Lookupd 地址
   nsqd-http-endpoints: ["http://127.0.0.1:4151"]
   nsq-message-timeout: 4m
-  # RabbitMQ 配置（可选）
-  rabbitmq-url: "amqp://guest:guest@localhost:5672/"
   delivery:
     enable: true
     max-attempts: 8

@@ -65,16 +65,11 @@ func TestAPISelectsNativeNSQWireFactory(t *testing.T) {
 	}
 	cfg.MessagingOptions.Provider = "rabbitmq"
 	deps = (&server{config: cfg}).buildMQPublisherDeps()
-	if deps.newWirePublisher != nil || deps.newPublisher == nil {
-		t.Fatalf("RabbitMQ should retain its legacy publisher factory: %+v", deps)
+	if deps.newWirePublisher != nil || deps.newPublisher != nil {
+		t.Fatalf("retired RabbitMQ provider still has a publisher factory: %+v", deps)
 	}
-	cfg.MessagingOptions.Provider = "unsupported"
-	deps = (&server{config: cfg}).buildMQPublisherDeps()
-	if deps.newPublisher == nil {
-		t.Fatal("unsupported provider must fail through the publisher factory")
-	}
-	if _, err := deps.newPublisher(); err == nil {
-		t.Fatal("unsupported provider was accepted")
+	if _, _, err := createMQPublisher(deps); err == nil {
+		t.Fatal("retired provider reached a usable publisher")
 	}
 }
 
@@ -121,7 +116,7 @@ func TestPrepareResourcesPassesNativeNSQWirePortAndClosesOnFailure(t *testing.T)
 	}
 }
 
-func TestAPIProjectionSelectsSDKSubscriberForNSQAndLegacyForRabbitMQ(t *testing.T) {
+func TestAPIProjectionOnlySelectsSDKSubscriberForNSQ(t *testing.T) {
 	for _, item := range []struct {
 		provider string
 		wantSDK  bool
@@ -134,7 +129,7 @@ func TestAPIProjectionSelectsSDKSubscriberForNSQAndLegacyForRabbitMQ(t *testing.
 			cfg.MessagingOptions.Enabled = true
 			cfg.MessagingOptions.Provider = item.provider
 			deps := (&server{config: cfg}).buildEventSubsystemResourceDeps()
-			if (deps.buildSDKSubscriberFactory != nil) != item.wantSDK || (deps.buildSubscriberFactory != nil) == item.wantSDK {
+			if (deps.buildSDKSubscriberFactory != nil) != item.wantSDK || deps.buildSubscriberFactory != nil {
 				t.Fatalf("subscriber factories for %s: SDK=%t legacy=%t", item.provider,
 					deps.buildSDKSubscriberFactory != nil, deps.buildSubscriberFactory != nil)
 			}

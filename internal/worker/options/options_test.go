@@ -6,6 +6,14 @@ import (
 	"time"
 )
 
+func TestOptionsRejectRetiredRabbitMQProvider(t *testing.T) {
+	opts := NewOptions()
+	opts.Messaging.Provider = "rabbitmq"
+	if !containsWorkerValidationError(opts.Validate(), "supported: nsq") {
+		t.Fatal("Worker accepted RabbitMQ despite NSQ-only support")
+	}
+}
+
 func TestOptionsValidateLockProfileReference(t *testing.T) {
 	opts := NewOptions()
 	opts.RedisProfiles["sdk_cache"] = opts.Redis

@@ -8,7 +8,6 @@ import (
 	"time"
 
 	basemessaging "github.com/FangcunMount/component-base/pkg/messaging"
-	cbrabbit "github.com/FangcunMount/component-base/pkg/messaging/rabbitmq"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventing/observe"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventing/runtime"
@@ -27,15 +26,6 @@ type EventDispatcher interface {
 type SubscriptionRuntime interface {
 	TopicSubscriptionSource
 	EventDispatcher
-}
-
-func CreatePublisher(cfg *config.MessagingConfig) (basemessaging.Publisher, error) {
-	switch cfg.Provider {
-	case "rabbitmq":
-		return cbrabbit.NewPublisher(cfg.RabbitMQURL)
-	default:
-		return nil, fmt.Errorf("legacy publisher is unsupported for provider %q; use the native NSQ wire publisher", cfg.Provider)
-	}
 }
 
 type WirePublisherCloser interface {
