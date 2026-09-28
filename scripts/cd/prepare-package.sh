@@ -49,6 +49,7 @@ cp \
   scripts/cd/image-metadata.sh \
   scripts/cd/image-retention.py \
   scripts/cd/image-retention.sh \
+  scripts/cd/sudo-selection.sh \
   scripts/cd/remote-deploy.sh \
   scripts/cd/wait-worker-readiness.sh \
   scripts/cd/verify-worker-dependencies.sh \
