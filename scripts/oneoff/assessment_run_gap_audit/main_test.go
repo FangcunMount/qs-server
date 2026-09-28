@@ -24,6 +24,20 @@ func TestPublicOutputDoesNotExposeAssessmentIDs(t *testing.T) {
 	}
 }
 
+func TestPrivateOutputKeepsLargeIDsExact(t *testing.T) {
+	id := uint64(639343386469347886)
+	result := report{AfterID: id - 1, UpperID: id, NextAfterID: id, Scanned: 1, Complete: true,
+		Counts: map[string]int{"candidate_never_claimed": 1}, CandidateIDs: []uint64{id}}
+	var output bytes.Buffer
+	if err := encodeReport(&output, result, true); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(output.String(), `"candidate_ids":["639343386469347886"]`) ||
+		!strings.Contains(output.String(), `"next_after_id":"639343386469347886"`) {
+		t.Fatalf("private IDs lost precision: %s", output.String())
+	}
+}
+
 func TestScanDistinguishesNeverClaimedFromClaimedAndCompleted(t *testing.T) {
 	db, mock, err := sqlmock.New()
 	if err != nil {

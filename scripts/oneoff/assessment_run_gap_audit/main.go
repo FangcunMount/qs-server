@@ -12,6 +12,7 @@ import (
 	"io"
 	"math"
 	"os"
+	"strconv"
 	"time"
 
 	_ "github.com/go-sql-driver/mysql"
@@ -56,6 +57,17 @@ type publicReport struct {
 	Counts          map[string]int `json:"counts"`
 }
 
+type privateReport struct {
+	AfterID         string         `json:"after_id"`
+	UpperID         string         `json:"upper_id"`
+	NextAfterID     string         `json:"next_after_id"`
+	SubmittedBefore time.Time      `json:"submitted_before"`
+	Scanned         int            `json:"scanned"`
+	Complete        bool           `json:"complete"`
+	Counts          map[string]int `json:"counts"`
+	CandidateIDs    []string       `json:"candidate_ids,omitempty"`
+}
+
 func main() { os.Exit(runCLI(context.Background(), os.Args[1:], os.Stdin, os.Stdout, os.Stderr)) }
 
 func runCLI(parent context.Context, args []string, stdin io.Reader, stdout, stderr io.Writer) int {
@@ -96,7 +108,19 @@ func runCLI(parent context.Context, args []string, stdin io.Reader, stdout, stde
 
 func encodeReport(output io.Writer, result report, includeIDs bool) error {
 	if includeIDs {
-		return json.NewEncoder(output).Encode(result)
+		private := privateReport{
+			AfterID:         strconv.FormatUint(result.AfterID, 10),
+			UpperID:         strconv.FormatUint(result.UpperID, 10),
+			NextAfterID:     strconv.FormatUint(result.NextAfterID, 10),
+			SubmittedBefore: result.SubmittedBefore,
+			Scanned:         result.Scanned,
+			Complete:        result.Complete,
+			Counts:          result.Counts,
+		}
+		for _, id := range result.CandidateIDs {
+			private.CandidateIDs = append(private.CandidateIDs, strconv.FormatUint(id, 10))
+		}
+		return json.NewEncoder(output).Encode(private)
 	}
 	return json.NewEncoder(output).Encode(publicReport{
 		SubmittedBefore: result.SubmittedBefore,
