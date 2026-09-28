@@ -23,8 +23,9 @@ const query = `SELECT a.id, a.status,
   COALESCE(a.submitted_at <= ?, 0),
   a.evaluation_model_kind IS NOT NULL AND a.evaluation_model_kind <> ''
     AND a.evaluation_model_code IS NOT NULL AND a.evaluation_model_code <> '',
+  -- Any historical claim, including a soft-deleted row, rules out "never claimed".
   EXISTS (SELECT 1 FROM runtime_checkpoint rc
-    WHERE rc.assessment_id = a.id AND rc.scope = 'evaluation_run' AND rc.deleted_at IS NULL)
+    WHERE rc.assessment_id = a.id AND rc.scope = 'evaluation_run')
 FROM assessment a
 WHERE a.id > ? AND a.id <= ? AND a.deleted_at IS NULL
 ORDER BY a.id LIMIT ?`
