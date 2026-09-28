@@ -182,12 +182,14 @@ func TestQS03PostConfirmRecover(t *testing.T) {
 	require.Equal(t, sheet.DurableAcceptance.EventID, page.Findings[0].EventID)
 	require.Equal(t, answersheetgap.Missing, page.Findings[0].Disposition)
 	var stored struct {
-		MessageID string `bson:"message_id"`
-		State     string `bson:"state"`
-		Payload   []byte `bson:"payload"`
+		MessageID    string `bson:"message_id"`
+		State        string `bson:"state"`
+		AttemptCount uint64 `bson:"attempt_count"`
+		Payload      []byte `bson:"payload"`
 	}
 	require.NoError(t, mongoDB.Collection("rm_outbox").FindOne(ctx, bson.M{"message_id": sheet.DurableAcceptance.EventID}).Decode(&stored))
 	require.Equal(t, "published", stored.State)
+	require.EqualValues(t, 1, stored.AttemptCount)
 	wire, recognized, err := legacy.Decode(stored.Payload)
 	require.NoError(t, err)
 	require.True(t, recognized)
@@ -230,7 +232,7 @@ func TestQS03PostConfirmRecover(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, page.Findings, 1)
 	require.Equal(t, answersheetgap.Present, page.Findings[0].Disposition)
-	require.Equal(t, assessments[0].ID, page.Findings[0].AssessmentID)
-	require.EqualValues(t, 1, countStandardDocs(t, ctx, mongoDB.Collection("rm_outbox"), bson.M{"message_id": stored.MessageID, "state": "published"}))
+	require.EqualValues(t, assessments[0].ID, page.Findings[0].AssessmentID)
+	require.EqualValues(t, 1, countStandardDocs(t, ctx, mongoDB.Collection("rm_outbox"), bson.M{"message_id": stored.MessageID, "state": "published", "attempt_count": stored.AttemptCount}))
 	t.Logf("recovered original_event_id=%s assessment_id=%d evaluation_intents=1", stored.MessageID, assessments[0].ID)
 }
