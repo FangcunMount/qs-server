@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/FangcunMount/component-base/pkg/messaging"
 	"github.com/FangcunMount/reliable-messaging/message"
+	"github.com/FangcunMount/reliable-messaging/wire/legacy"
 )
 
 func TestValidateOriginalRejectsChangedFrozenAdmissionEvenWithValidFingerprint(t *testing.T) {
@@ -78,9 +78,8 @@ func makeWire(t *testing.T, sheet sheetRow, modelCode string) []byte {
 	if err != nil {
 		t.Fatal(err)
 	}
-	wire := messaging.NewMessage(sheet.DurableAcceptance.EventID, env)
-	wire.Metadata["event_type"] = eventType
-	encoded, err := messaging.EncodeMessagePayload(wire)
+	wire := legacy.Envelope{UUID: sheet.DurableAcceptance.EventID, Metadata: map[string]string{"event_type": eventType}, Payload: env}
+	encoded, err := legacy.Encode(wire, legacy.Revision2)
 	if err != nil {
 		t.Fatal(err)
 	}

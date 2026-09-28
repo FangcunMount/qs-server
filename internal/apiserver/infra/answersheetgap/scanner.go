@@ -10,10 +10,10 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/FangcunMount/component-base/pkg/eventcodec"
-	"github.com/FangcunMount/component-base/pkg/messaging"
 	payload "github.com/FangcunMount/qs-server/internal/pkg/eventing/payload"
 	"github.com/FangcunMount/reliable-messaging/message"
+	"github.com/FangcunMount/reliable-messaging/wire/domain"
+	"github.com/FangcunMount/reliable-messaging/wire/legacy"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
@@ -223,11 +223,11 @@ func validateOriginal(sheet sheetRow, row outboxRow) error {
 	if !bytes.Equal(hash[:], row.Fingerprint) {
 		return fmt.Errorf("immutable outbox fingerprint mismatch")
 	}
-	wire, recognized, err := messaging.DecodeMessagePayload(row.Payload)
+	wire, recognized, err := legacy.Decode(row.Payload)
 	if err != nil || !recognized {
 		return fmt.Errorf("original message wire is invalid")
 	}
-	env, err := eventcodec.DecodeEnvelope(wire.Payload)
+	env, err := domain.DecodeEnvelope(wire.Payload)
 	if err != nil {
 		return err
 	}
