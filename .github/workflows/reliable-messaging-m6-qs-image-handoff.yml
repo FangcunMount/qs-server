@@ -13,7 +13,43 @@ permissions:
   packages: read
 
 jobs:
+  retain-running-worker-images:
+    if: github.event_name == 'pull_request' && github.event.pull_request.number == 216
+    runs-on: ${{ vars.QS_DEPLOY_RUNNER || 'serverd' }}
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Preserve the exact cached Worker images under unique recovery tags
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -Eeuo pipefail
+          current_id=sha256:58591b32d052f49fc0d798a7c6874a846ba97db7707111b78eb1db686d4348c0
+          fallback_id=sha256:2b3e426a876431235d4b0717e7046b22ca2da074d9785735325500083f6a26c3
+          current=ghcr.io/fangcunmount/qs-worker:7ca541afc24d13187c5b894a249126eabc009ae2
+          fallback=ghcr.io/fangcunmount/qs-worker:7c0c919e621d3cc93cb82dca668bd6077f7a1446
+          test "$(docker image inspect "$current" --format '{{.Id}}')" = "$current_id"
+          test "$(docker image inspect "$fallback" --format '{{.Id}}')" = "$fallback_id"
+          running=$(docker ps --filter label=com.docker.compose.project=qs-worker --filter label=com.docker.compose.service=runtime --filter status=running --format '{{.Image}} {{.ID}}')
+          test "$(printf '%s\n' "$running" | sed '/^$/d' | wc -l | tr -d ' ')" = 3
+          while read -r image container; do
+            test "$(docker inspect "$container" --format '{{.Image}}')" = "$current_id"
+          done <<<"$running"
+          trap 'docker logout ghcr.io >/dev/null 2>&1 || true' EXIT
+          echo "$GH_TOKEN" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin >/dev/null
+          current_recovery=ghcr.io/fangcunmount/qs-worker:m6-rollback-58591b32d052f49fc0d798a7c6874a846ba97db7707111b78eb1db686d4348c0
+          fallback_recovery=ghcr.io/fangcunmount/qs-worker:m6-rollback-2b3e426a876431235d4b0717e7046b22ca2da074d9785735325500083f6a26c3
+          docker tag "$current" "$current_recovery"
+          docker tag "$fallback" "$fallback_recovery"
+          docker push "$current_recovery"
+          docker push "$fallback_recovery"
+          printf 'retained current image ID: %s\nretained fallback image ID: %s\n' "$current_id" "$fallback_id"
+
   worker-image-handoff:
+    needs: retain-running-worker-images
     runs-on: ubuntu-latest
     timeout-minutes: 50
     steps:
@@ -39,8 +75,8 @@ jobs:
           set -Eeuo pipefail
           trap 'docker logout ghcr.io >/dev/null 2>&1 || true' EXIT
           echo "$GH_TOKEN" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin >/dev/null
-          current=ghcr.io/fangcunmount/qs-worker@sha256:58591b32d052f49fc0d798a7c6874a846ba97db7707111b78eb1db686d4348c0
-          fallback=ghcr.io/fangcunmount/qs-worker@sha256:2b3e426a876431235d4b0717e7046b22ca2da074d9785735325500083f6a26c3
+          current=ghcr.io/fangcunmount/qs-worker:m6-rollback-58591b32d052f49fc0d798a7c6874a846ba97db7707111b78eb1db686d4348c0
+          fallback=ghcr.io/fangcunmount/qs-worker:m6-rollback-2b3e426a876431235d4b0717e7046b22ca2da074d9785735325500083f6a26c3
           docker pull --platform linux/amd64 "$current" >/dev/null
           docker pull --platform linux/amd64 "$fallback" >/dev/null
           current_id=$(docker image inspect "$current" --format '{{.Id}}')
@@ -53,5 +89,5 @@ jobs:
         run: |
           bash harness/scripts/testing/m6-qs-worker-image-handoff.sh \
             "$GITHUB_WORKSPACE/harness" "$GITHUB_WORKSPACE/current" \
-            ghcr.io/fangcunmount/qs-worker@sha256:58591b32d052f49fc0d798a7c6874a846ba97db7707111b78eb1db686d4348c0 \
-            ghcr.io/fangcunmount/qs-worker@sha256:2b3e426a876431235d4b0717e7046b22ca2da074d9785735325500083f6a26c3
+            ghcr.io/fangcunmount/qs-worker:m6-rollback-58591b32d052f49fc0d798a7c6874a846ba97db7707111b78eb1db686d4348c0 \
+            ghcr.io/fangcunmount/qs-worker:m6-rollback-2b3e426a876431235d4b0717e7046b22ca2da074d9785735325500083f6a26c3
