@@ -13,26 +13,6 @@ permissions:
   packages: read
 
 jobs:
-  deployed-image-identity:
-    name: Read-only deployed Worker identity (serverD)
-    runs-on:
-      group: qlume
-      labels: [self-hosted, macOS, ARM64, ops]
-    timeout-minutes: 5
-    steps:
-      - name: Inspect the current and retained fallback images
-        uses: appleboy/ssh-action@v1.2.2
-        with:
-          host: ${{ vars.SVRD_HOST }}
-          username: root
-          key: ${{ secrets.SVR_MINI_SSH_KEY || secrets.SVRD_SSH_KEY || secrets.SVRA_SSH_KEY }}
-          port: ${{ vars.SVRD_SSH_PORT || 22 }}
-          script: |
-            set -eu
-            uname -m
-            docker image inspect ghcr.io/fangcunmount/qs-worker:7ca541afc24d13187c5b894a249126eabc009ae2 --format 'current {{.Os}}/{{.Architecture}} {{.Id}} {{index .Config.Labels "org.opencontainers.image.revision"}}'
-            docker image inspect ghcr.io/fangcunmount/qs-worker:7c0c919e621d3cc93cb82dca668bd6077f7a1446 --format 'fallback {{.Os}}/{{.Architecture}} {{.Id}} {{index .Config.Labels "org.opencontainers.image.revision"}}'
-            docker inspect qs-worker-runtime-1 --format 'running {{.Image}}'
   worker-image-handoff:
     runs-on: ubuntu-latest
     timeout-minutes: 50
@@ -59,8 +39,8 @@ jobs:
           set -Eeuo pipefail
           trap 'docker logout ghcr.io >/dev/null 2>&1 || true' EXIT
           echo "$GH_TOKEN" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin >/dev/null
-          current=ghcr.io/fangcunmount/qs-worker:7ca541afc24d13187c5b894a249126eabc009ae2
-          fallback=ghcr.io/fangcunmount/qs-worker:7c0c919e621d3cc93cb82dca668bd6077f7a1446
+          current=ghcr.io/fangcunmount/qs-worker@sha256:58591b32d052f49fc0d798a7c6874a846ba97db7707111b78eb1db686d4348c0
+          fallback=ghcr.io/fangcunmount/qs-worker@sha256:2b3e426a876431235d4b0717e7046b22ca2da074d9785735325500083f6a26c3
           docker pull --platform linux/amd64 "$current" >/dev/null
           docker pull --platform linux/amd64 "$fallback" >/dev/null
           current_id=$(docker image inspect "$current" --format '{{.Id}}')
@@ -73,5 +53,5 @@ jobs:
         run: |
           bash harness/scripts/testing/m6-qs-worker-image-handoff.sh \
             "$GITHUB_WORKSPACE/harness" "$GITHUB_WORKSPACE/current" \
-            ghcr.io/fangcunmount/qs-worker:7ca541afc24d13187c5b894a249126eabc009ae2 \
-            ghcr.io/fangcunmount/qs-worker:7c0c919e621d3cc93cb82dca668bd6077f7a1446
+            ghcr.io/fangcunmount/qs-worker@sha256:58591b32d052f49fc0d798a7c6874a846ba97db7707111b78eb1db686d4348c0 \
+            ghcr.io/fangcunmount/qs-worker@sha256:2b3e426a876431235d4b0717e7046b22ca2da074d9785735325500083f6a26c3

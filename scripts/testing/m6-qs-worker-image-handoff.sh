@@ -8,12 +8,10 @@ harness=${1:?Usage: handoff.sh HARNESS CURRENT_SOURCE CURRENT_IMAGE FALLBACK_IMA
 current_source=${2:?Usage: handoff.sh HARNESS CURRENT_SOURCE CURRENT_IMAGE FALLBACK_IMAGE}
 current_image=${3:?Usage: handoff.sh HARNESS CURRENT_SOURCE CURRENT_IMAGE FALLBACK_IMAGE}
 fallback_image=${4:?Usage: handoff.sh HARNESS CURRENT_SOURCE CURRENT_IMAGE FALLBACK_IMAGE}
-current_sha=7ca541afc24d13187c5b894a249126eabc009ae2
-fallback_sha=7c0c919e621d3cc93cb82dca668bd6077f7a1446
 [[ "$harness" = /* && -f "$harness/scripts/testing/m6-qs-worker-image-compose.yaml" ]]
 [[ "$current_source" = /* && -f "$current_source/internal/pkg/migration/migrations/mysql/000049_add_retry_governance.up.sql" ]]
-[[ $(docker image inspect "$current_image" --format '{{.Os}}/{{.Architecture}} {{.Config.User}} {{index .Config.Labels "org.opencontainers.image.revision"}}') == "linux/amd64 www $current_sha" ]]
-[[ $(docker image inspect "$fallback_image" --format '{{.Os}}/{{.Architecture}} {{.Config.User}} {{index .Config.Labels "org.opencontainers.image.revision"}}') == "linux/amd64 www $fallback_sha" ]]
+[[ $(docker image inspect "$current_image" --format '{{.Os}}/{{.Architecture}} {{.Config.User}} {{.Id}}') == "linux/amd64 www sha256:58591b32d052f49fc0d798a7c6874a846ba97db7707111b78eb1db686d4348c0" ]]
+[[ $(docker image inspect "$fallback_image" --format '{{.Os}}/{{.Architecture}} {{.Config.User}} {{.Id}}') == "linux/amd64 www sha256:2b3e426a876431235d4b0717e7046b22ca2da074d9785735325500083f6a26c3" ]]
 
 project="qs-m6-image-${GITHUB_RUN_ID:-local}-$$"
 worker="${project}-worker"
