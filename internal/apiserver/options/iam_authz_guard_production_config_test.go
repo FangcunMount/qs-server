@@ -8,7 +8,7 @@ import (
 	"github.com/spf13/viper"
 )
 
-func TestProductionConfigEnablesCommittedAuthzVersionGuard(t *testing.T) {
+func TestProductionConfigPairsEphemeralAuthzNSQWithCommittedVersionGuard(t *testing.T) {
 	config := viper.New()
 	config.SetConfigFile(filepath.Join("..", "..", "..", "configs", "apiserver.prod.yaml"))
 	if err := config.ReadInConfig(); err != nil {
@@ -26,10 +26,14 @@ func TestProductionConfigEnablesCommittedAuthzVersionGuard(t *testing.T) {
 	if !guard.Enabled || guard.MaxAge != 10*time.Second || guard.PollInterval != 5*time.Second || guard.ReadTimeout != 2*time.Second {
 		t.Fatalf("production IAM committed-version guard = %+v", guard)
 	}
-	if loaded.IAMOptions.AuthzSync == nil || loaded.IAMOptions.AuthzSync.EphemeralNSQ {
-		t.Fatal("ephemeral NSQ must remain disabled for the guard rollout")
+	sync := loaded.IAMOptions.AuthzSync
+	if sync == nil || !sync.Enabled || sync.Provider != "nsq" || !sync.EphemeralNSQ {
+		t.Fatalf("production authorization NSQ channel is not ephemeral: %+v", sync)
 	}
 	if errs := guard.Validate(); len(errs) != 0 {
 		t.Fatalf("production IAM guard options invalid: %v", errs)
+	}
+	if errs := sync.Validate(); len(errs) != 0 {
+		t.Fatalf("production IAM authorization sync options invalid: %v", errs)
 	}
 }
