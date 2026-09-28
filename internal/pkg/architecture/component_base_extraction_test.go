@@ -118,8 +118,6 @@ func TestComponentBaseMessageImportsStayWithinRollbackAllowlist(t *testing.T) {
 		"internal/apiserver/process/root.go":                  {base + "messaging": true},
 		"internal/pkg/eventing/runtime/message_settlement.go": {base + "messaging": true},
 		"internal/pkg/eventing/runtime/publisher.go":          {base + "messaging": true},
-		"internal/pkg/eventing/transport/dead_letter.go":      {base + "messaging": true},
-		"internal/pkg/iamauth/version_sync.go":                {base + "messaging": true},
 		"internal/worker/integration/messaging/retry_hold.go": {base + "messaging": true},
 		"internal/worker/integration/messaging/runtime.go":    {base + "messaging": true},
 	}
