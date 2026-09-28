@@ -11,6 +11,10 @@ on:
         description: Exact assessment ID for read-only production reconciliation
         required: false
         type: string
+      answersheet_id:
+        description: Exact answer sheet ID observed from the assessment row
+        required: false
+        type: string
       check_mode:
         description: Run the existing before-cutover preflight or read-only after-cutover check
         required: false
@@ -158,3 +162,20 @@ jobs:
           fingerprint: ${{ vars.SVRA_SSH_FINGERPRINT }}
           envs: ASSESSMENT_ID,MYSQL_HOST,MYSQL_PORT,MYSQL_USERNAME,MYSQL_PASSWORD,MYSQL_DATABASE
           script_path: scripts/cd/m5-assessment-single-id-audit.sh
+      - name: Reconcile matching Mongo answer and durable message
+        uses: appleboy/ssh-action@v1.2.2
+        env:
+          ANSWER_SHEET_ID: ${{ inputs.answersheet_id }}
+          MONGODB_HOST: ${{ secrets.MONGODB_HOST }}
+          MONGODB_PORT: ${{ secrets.MONGODB_PORT || 27017 }}
+          MONGODB_USERNAME: ${{ secrets.MONGODB_USERNAME }}
+          MONGODB_PASSWORD: ${{ secrets.MONGODB_PASSWORD }}
+          MONGODB_DBNAME: ${{ secrets.MONGODB_DBNAME }}
+        with:
+          host: ${{ vars.SVRA_HOST }}
+          username: ${{ vars.SVRA_USERNAME }}
+          key: ${{ secrets.SVRA_SSH_KEY }}
+          port: ${{ vars.SVRA_SSH_PORT || 22 }}
+          fingerprint: ${{ vars.SVRA_SSH_FINGERPRINT }}
+          envs: ANSWER_SHEET_ID,MONGODB_HOST,MONGODB_PORT,MONGODB_USERNAME,MONGODB_PASSWORD,MONGODB_DBNAME
+          script_path: scripts/cd/m5-answersheet-single-id-audit.sh

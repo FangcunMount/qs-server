@@ -17,7 +17,7 @@ query() {
 echo 'ASSESSMENT'
 query "SELECT id,org_id,answer_sheet_id,status,evaluation_model_kind,evaluation_model_code,evaluation_model_version,submitted_at,evaluated_at,failed_at,created_at FROM assessment WHERE id=${ASSESSMENT_ID} AND deleted_at IS NULL LIMIT 1"
 echo 'EVALUATION_RUNS'
-query "SELECT run_id,attempt_no,status,error_code,retryable,started_at,finished_at FROM evaluation_run WHERE assessment_id=${ASSESSMENT_ID} ORDER BY attempt_no LIMIT 20"
+query "SELECT resource_id,attempt_no,status,error_code,retryable,started_at,finished_at FROM runtime_checkpoint WHERE scope='evaluation_run' AND assessment_id=${ASSESSMENT_ID} AND deleted_at IS NULL ORDER BY attempt_no LIMIT 20"
 echo 'EVALUATION_OUTCOME'
 query "SELECT id,evaluation_run_id,model_kind,model_code,model_version,evaluated_at FROM evaluation_outcome WHERE assessment_id=${ASSESSMENT_ID} LIMIT 1"
 echo 'LEGACY_MYSQL_OUTBOX'
