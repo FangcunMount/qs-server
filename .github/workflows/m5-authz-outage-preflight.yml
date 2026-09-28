@@ -22,6 +22,7 @@ on:
           - inspect-role-sudo
           - inspect-role-root
           - resume-prepare-role-window
+          - inspect-role-http
 
 permissions:
   contents: read
@@ -78,7 +79,7 @@ jobs:
         run: bash scripts/cd/m5-authz-ephemeral-postcheck-servera.sh serverD
 
   role_window:
-    if: inputs.check_mode == 'prepare-role-window' || inputs.check_mode == 'resume-prepare-role-window' || inputs.check_mode == 'revoke-role-window' || inputs.check_mode == 'inspect-role-window' || inputs.check_mode == 'cleanup-role-window' || inputs.check_mode == 'inspect-role-sudo' || inputs.check_mode == 'inspect-role-root'
+    if: inputs.check_mode == 'prepare-role-window' || inputs.check_mode == 'resume-prepare-role-window' || inputs.check_mode == 'revoke-role-window' || inputs.check_mode == 'inspect-role-window' || inputs.check_mode == 'inspect-role-http' || inputs.check_mode == 'cleanup-role-window' || inputs.check_mode == 'inspect-role-sudo' || inputs.check_mode == 'inspect-role-root'
     name: Scoped Qingdao role verification (ServerA)
     runs-on:
       group: qlume

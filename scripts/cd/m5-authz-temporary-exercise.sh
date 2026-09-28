@@ -94,6 +94,20 @@ UNIT
     run_tool inspect | jq '{time,policy_version,roles,assignment_scopes}'
     sudo -n systemctl list-timers --all --no-legend --no-pager | grep -E 'rm-m5-.*role-restore' || true
     ;;
+  inspect-role-http)
+    assert_original
+    sudo -n journalctl -u "${unit}.service" --since '2026-09-28 21:47:00' --no-pager -o cat | grep -E 'original role facts restored|Started|Finished|Failed' || true
+    sudo -n docker exec nginx tail -n 20000 /data/log/nginx/access.log | awk '
+      /"GET \/api\/v1\/evaluations\/assessment-progress/ {
+        if (match($0, /\[[^]]+\]/)) {
+          stamp=substr($0,RSTART+1,RLENGTH-2)
+          split($0,quotes,"\"")
+          split(quotes[3],after," ")
+          if (stamp ~ /28\/Sep\/2026:21:4[7-9]:/) print stamp,after[2]
+        }
+      }
+    ' | tail -n 50
+    ;;
   cleanup-role-window)
     assert_original
     sudo -n systemctl stop "${unit}.timer"
