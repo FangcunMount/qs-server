@@ -46,22 +46,11 @@ awk '/^CREATE TABLE `event_delivery_dead_letter` / { copy=1 } copy { print }' \
   < "$current_source/internal/pkg/migration/migrations/mysql/000086_dead_letter_transport_identity.up.sql"
 
 network="${project}_default"
-nsqd_port=$("${compose[@]}" port nsqd 4151 | awk -F: '{print $NF}')
-[[ "$nsqd_port" =~ ^[0-9]+$ ]]
+nsqd_container=$("${compose[@]}" ps -q nsqd)
+[[ -n "$nsqd_container" ]]
 channel_clients() {
-  NSQD_HTTP_PORT="$nsqd_port" python3 - <<'PY'
-import json, os, urllib.request
-url = f'http://127.0.0.1:{os.environ["NSQD_HTTP_PORT"]}/stats?format=json'
-with urllib.request.urlopen(url, timeout=2) as response:
-    stats = json.load(response)
-for topic in stats.get("topics", []):
-    if topic.get("topic_name") == "qs.plan.task":
-        for channel in topic.get("channels", []):
-            if channel.get("channel_name") == "qs-worker":
-                print(len(channel.get("clients", [])))
-                raise SystemExit(0)
-print(0)
-PY
+  docker exec "$nsqd_container" wget -qO- 'http://127.0.0.1:4151/stats?format=json' |
+    python3 -c 'import json,sys; s=json.load(sys.stdin); print(sum(len(c.get("clients", [])) for t in s.get("topics", []) if t.get("topic_name") == "qs.plan.task" for c in t.get("channels", []) if c.get("channel_name") == "qs-worker"))'
 }
 start_worker() {
   local image=$1
@@ -93,9 +82,9 @@ stop_worker() {
 }
 
 publish_unknown() {
-  local id=$1
-  NSQD_HTTP_PORT="$nsqd_port" MESSAGE_ID="$id" python3 - <<'PY'
-import base64, json, os, urllib.request
+  local id=$1 wire response
+  wire=$(MESSAGE_ID="$id" python3 - <<'PY'
+import base64, json, os
 event = {"id": os.environ["MESSAGE_ID"], "eventType": "m6.image.unknown", "data": {}}
 wire = {
     "type": "component-base.messaging.message.v1",
@@ -103,11 +92,12 @@ wire = {
     "metadata": {"event_type": "m6.image.unknown"},
     "payload": base64.b64encode(json.dumps(event, separators=(",", ":")).encode()).decode(),
 }
-url = f'http://127.0.0.1:{os.environ["NSQD_HTTP_PORT"]}/pub?topic=qs.plan.task'
-request = urllib.request.Request(url, json.dumps(wire, separators=(",", ":")).encode(), method="POST")
-with urllib.request.urlopen(request, timeout=5) as response:
-    assert response.status == 200 and response.read() == b"OK"
+print(json.dumps(wire, separators=(",", ":")))
 PY
+)
+  response=$(docker exec "$nsqd_container" wget -qO- --post-data "$wire" \
+    'http://127.0.0.1:4151/pub?topic=qs.plan.task')
+  [[ "$response" == OK ]]
 }
 wait_audit() {
   local id=$1 row
