@@ -1,4 +1,4 @@
-name: QS M6 Worker image handoff isolation
+name: QS M6 published Worker image handoff isolation
 
 on:
   pull_request:
@@ -10,6 +10,7 @@ on:
 
 permissions:
   contents: read
+  packages: read
 
 jobs:
   worker-image-handoff:
@@ -25,32 +26,28 @@ jobs:
         with:
           ref: 7ca541afc24d13187c5b894a249126eabc009ae2
           path: current
-      - name: Checkout the retained fallback Worker source
-        uses: actions/checkout@v6
-        with:
-          ref: 7c0c919e621d3cc93cb82dca668bd6077f7a1446
-          path: fallback
       - name: Verify source identities
         shell: bash
         run: |
           set -Eeuo pipefail
           test "$(git -C current rev-parse HEAD)" = 7ca541afc24d13187c5b894a249126eabc009ae2
-          test "$(git -C fallback rev-parse HEAD)" = 7c0c919e621d3cc93cb82dca668bd6077f7a1446
-      - name: Build actual Worker process images without publication
+      - name: Pull the retained published Worker images
         shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -Eeuo pipefail
-          docker build -f current/build/docker/Dockerfile.qs-worker \
-            --label org.opencontainers.image.revision=7ca541afc24d13187c5b894a249126eabc009ae2 \
-            --build-arg GIT_COMMIT=7ca541afc24d13187c5b894a249126eabc009ae2 \
-            -t qs-m6-current:7ca541af current
-          docker build -f fallback/build/docker/Dockerfile.qs-worker \
-            --label org.opencontainers.image.revision=7c0c919e621d3cc93cb82dca668bd6077f7a1446 \
-            --build-arg GIT_COMMIT=7c0c919e621d3cc93cb82dca668bd6077f7a1446 \
-            -t qs-m6-fallback:7c0c919e fallback
+          echo "$GH_TOKEN" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin >/dev/null
+          current=ghcr.io/fangcunmount/qs-worker:7ca541afc24d13187c5b894a249126eabc009ae2
+          fallback=ghcr.io/fangcunmount/qs-worker:7c0c919e621d3cc93cb82dca668bd6077f7a1446
+          docker pull --platform linux/amd64 "$current" >/dev/null
+          docker pull --platform linux/amd64 "$fallback" >/dev/null
+          test "$(docker image inspect "$current" --format '{{.Id}}')" = sha256:58591b32d052f49fc0d798a7c6874a846ba97db7707111b78eb1db686d4348c0
+          test "$(docker image inspect "$fallback" --format '{{.Id}}')" = sha256:2b3e426a876431235d4b0717e7046b22ca2da074d9785735325500083f6a26c3
       - name: Handoff fallback to current and back on disposable dependencies
         shell: bash
         run: |
           bash harness/scripts/testing/m6-qs-worker-image-handoff.sh \
             "$GITHUB_WORKSPACE/harness" "$GITHUB_WORKSPACE/current" \
-            qs-m6-current:7ca541af qs-m6-fallback:7c0c919e
+            ghcr.io/fangcunmount/qs-worker:7ca541afc24d13187c5b894a249126eabc009ae2 \
+            ghcr.io/fangcunmount/qs-worker:7c0c919e621d3cc93cb82dca668bd6077f7a1446

@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-# Real Worker processes, built from exact production/fallback source commits,
-# exchange one durable NSQ channel on disposable databases. The probe is an
+# Real published Worker processes, with exact production/fallback image IDs
+# verified by the caller, exchange one durable NSQ channel on disposable databases. The probe is an
 # unknown event: both versions must persist its original identity before ACK.
 harness=${1:?Usage: handoff.sh HARNESS CURRENT_SOURCE CURRENT_IMAGE FALLBACK_IMAGE}
 current_source=${2:?Usage: handoff.sh HARNESS CURRENT_SOURCE CURRENT_IMAGE FALLBACK_IMAGE}
