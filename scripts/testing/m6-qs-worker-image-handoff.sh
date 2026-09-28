@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-# Real published Worker processes, with exact production/fallback image IDs
+# Real published Worker processes, with exact production/fallback registry digests
 # verified by the caller, exchange one durable NSQ channel on disposable databases. The probe is an
 # unknown event: both versions must persist its original identity before ACK.
 harness=${1:?Usage: handoff.sh HARNESS CURRENT_SOURCE CURRENT_IMAGE FALLBACK_IMAGE}
@@ -10,8 +10,10 @@ current_image=${3:?Usage: handoff.sh HARNESS CURRENT_SOURCE CURRENT_IMAGE FALLBA
 fallback_image=${4:?Usage: handoff.sh HARNESS CURRENT_SOURCE CURRENT_IMAGE FALLBACK_IMAGE}
 [[ "$harness" = /* && -f "$harness/scripts/testing/m6-qs-worker-image-compose.yaml" ]]
 [[ "$current_source" = /* && -f "$current_source/internal/pkg/migration/migrations/mysql/000049_add_retry_governance.up.sql" ]]
-[[ $(docker image inspect "$current_image" --format '{{.Os}}/{{.Architecture}} {{.Config.User}} {{.Id}}') == "linux/amd64 www sha256:58591b32d052f49fc0d798a7c6874a846ba97db7707111b78eb1db686d4348c0" ]]
-[[ $(docker image inspect "$fallback_image" --format '{{.Os}}/{{.Architecture}} {{.Config.User}} {{.Id}}') == "linux/amd64 www sha256:2b3e426a876431235d4b0717e7046b22ca2da074d9785735325500083f6a26c3" ]]
+[[ $(docker image inspect "$current_image" --format '{{.Os}}/{{.Architecture}} {{.Config.User}}') == "linux/amd64 www" ]]
+[[ $(docker image inspect "$fallback_image" --format '{{.Os}}/{{.Architecture}} {{.Config.User}}') == "linux/amd64 www" ]]
+docker image inspect "$current_image" --format '{{range .RepoDigests}}{{println .}}{{end}}' | grep -Fqx ghcr.io/fangcunmount/qs-worker@sha256:58591b32d052f49fc0d798a7c6874a846ba97db7707111b78eb1db686d4348c0
+docker image inspect "$fallback_image" --format '{{range .RepoDigests}}{{println .}}{{end}}' | grep -Fqx ghcr.io/fangcunmount/qs-worker@sha256:2b3e426a876431235d4b0717e7046b22ca2da074d9785735325500083f6a26c3
 
 project="qs-m6-image-${GITHUB_RUN_ID:-local}-$$"
 worker="${project}-worker"
