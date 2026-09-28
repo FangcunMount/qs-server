@@ -217,9 +217,9 @@ jobs:
       - uses: actions/checkout@v6
       - uses: appleboy/ssh-action@v1.2.2
         with:
-          host: ${{ vars.SVRD_HOST }}
+          host: ${{ vars.SVRD_PUBLIC_HOST || secrets.SVRD_PUBLIC_HOST || vars.SVRD_HOST }}
           username: ${{ vars.SVRD_USERNAME || vars.SVRA_USERNAME }}
-          key: ${{ secrets.SVRD_SSH_KEY || secrets.SVRA_SSH_KEY }}
+          key: ${{ secrets.SVR_MINI_SSH_KEY || secrets.SVRD_SSH_KEY || secrets.SVRA_SSH_KEY }}
           port: ${{ vars.SVRD_SSH_PORT || vars.SVRA_SSH_PORT || 22 }}
           fingerprint: ${{ vars.SVRD_SSH_FINGERPRINT }}
           script_path: scripts/cd/m5-mysql-cutover-nsq-readonly.sh
