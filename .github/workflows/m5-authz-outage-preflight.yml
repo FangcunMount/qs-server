@@ -15,12 +15,17 @@ on:
         options:
           - before
           - after
+          - prepare-role-window
+          - revoke-role-window
+          - inspect-role-window
+          - cleanup-role-window
 
 permissions:
   contents: read
 
 jobs:
   servera:
+    if: inputs.check_mode == 'before' || inputs.check_mode == 'after'
     name: API guard and recovery prerequisites (ServerA)
     runs-on:
       group: qlume
@@ -56,6 +61,7 @@ jobs:
           script_path: scripts/cd/m5-authz-ephemeral-postcheck-servera.sh
 
   serverd:
+    if: inputs.check_mode == 'before' || inputs.check_mode == 'after'
     name: NSQ channel and recovery prerequisites (ServerD)
     runs-on: ${{ vars.QS_DEPLOY_RUNNER || 'serverd' }}
     timeout-minutes: 5
@@ -67,3 +73,55 @@ jobs:
       - name: Read-only NSQ postcheck
         if: inputs.check_mode == 'after'
         run: bash scripts/cd/m5-authz-ephemeral-postcheck-servera.sh serverD
+
+  role_window:
+    if: inputs.check_mode == 'prepare-role-window' || inputs.check_mode == 'revoke-role-window' || inputs.check_mode == 'inspect-role-window' || inputs.check_mode == 'cleanup-role-window'
+    name: Scoped Qingdao role verification (ServerA)
+    runs-on:
+      group: qlume
+      labels: [self-hosted, macOS, ARM64, ops]
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        if: inputs.check_mode == 'prepare-role-window'
+        with:
+          go-version-file: go.mod
+      - name: Build fixed-scope recovery tool
+        if: inputs.check_mode == 'prepare-role-window'
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          test "$(shasum -a 256 scripts/cd/m5-authz-temporary-tool.go | awk '{print $1}')" = 7c623d23edb9b8ef266bfc357616b4c02483f282eaad364f2c7b58f5bdcfe453
+          GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -trimpath -o scripts/cd/m5-authz-temporary-tool-linux scripts/cd/m5-authz-temporary-tool.go
+          sha=$(shasum -a 256 scripts/cd/m5-authz-temporary-tool-linux | awk '{print $1}')
+          sed "s/^expected=.*/expected=$sha/" scripts/cd/m5-authz-temporary-restore.sh > scripts/cd/m5-authz-temporary-restore-live.sh
+          chmod 0700 scripts/cd/m5-authz-temporary-tool-linux scripts/cd/m5-authz-temporary-restore-live.sh
+      - name: Stage recovery materials
+        if: inputs.check_mode == 'prepare-role-window'
+        uses: appleboy/scp-action@v1.0.0
+        with:
+          host: ${{ vars.SVRA_HOST }}
+          username: ${{ vars.SVRA_USERNAME }}
+          key: ${{ secrets.SVRA_SSH_KEY }}
+          port: ${{ vars.SVRA_SSH_PORT || 22 }}
+          fingerprint: ${{ vars.SVRA_SSH_FINGERPRINT }}
+          source: scripts/cd/m5-authz-temporary-tool-linux,scripts/cd/m5-authz-temporary-restore-live.sh
+          target: /tmp/rm-m5-20260928-stage
+          strip_components: 2
+          overwrite: true
+      - name: Execute exact role-window phase
+        uses: appleboy/ssh-action@v1.2.2
+        env:
+          EXPECTED_API_SHA: ${{ inputs.expected_api_sha }}
+          ROLE_WINDOW_MODE: ${{ inputs.check_mode }}
+          ROLE_WINDOW_RUN_ID: ${{ github.run_id }}
+        with:
+          host: ${{ vars.SVRA_HOST }}
+          username: ${{ vars.SVRA_USERNAME }}
+          key: ${{ secrets.SVRA_SSH_KEY }}
+          port: ${{ vars.SVRA_SSH_PORT || 22 }}
+          fingerprint: ${{ vars.SVRA_SSH_FINGERPRINT }}
+          envs: EXPECTED_API_SHA,ROLE_WINDOW_MODE,ROLE_WINDOW_RUN_ID
+          command_timeout: 4m
+          script_path: scripts/cd/m5-authz-temporary-exercise.sh
