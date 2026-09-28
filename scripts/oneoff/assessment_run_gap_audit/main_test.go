@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"regexp"
 	"strings"
@@ -9,6 +10,19 @@ import (
 
 	"github.com/DATA-DOG/go-sqlmock"
 )
+
+func TestPublicOutputDoesNotExposeAssessmentIDs(t *testing.T) {
+	result := report{AfterID: 100, UpperID: 104, NextAfterID: 101, Scanned: 1, Complete: true,
+		Counts: map[string]int{"candidate_never_claimed": 1}, CandidateIDs: []uint64{101}}
+	var output bytes.Buffer
+	if err := encodeReport(&output, result, false); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(output.String(), "101") || strings.Contains(output.String(), "100") || strings.Contains(output.String(), "104") ||
+		!strings.Contains(output.String(), "candidate_never_claimed") {
+		t.Fatalf("unsafe public output: %s", output.String())
+	}
+}
 
 func TestScanDistinguishesNeverClaimedFromClaimedAndCompleted(t *testing.T) {
 	db, mock, err := sqlmock.New()

@@ -49,6 +49,13 @@ type report struct {
 	CandidateIDs    []uint64       `json:"candidate_ids,omitempty"`
 }
 
+type publicReport struct {
+	SubmittedBefore time.Time      `json:"submitted_before"`
+	Scanned         int            `json:"scanned"`
+	Complete        bool           `json:"complete"`
+	Counts          map[string]int `json:"counts"`
+}
+
 func main() { os.Exit(runCLI(context.Background(), os.Args[1:], os.Stdin, os.Stdout, os.Stderr)) }
 
 func runCLI(parent context.Context, args []string, stdin io.Reader, stdout, stderr io.Writer) int {
@@ -74,7 +81,7 @@ func runCLI(parent context.Context, args []string, stdin io.Reader, stdout, stde
 		_, _ = fmt.Fprintln(stderr, "assessment run gap audit: read failed")
 		return 1
 	}
-	if err := json.NewEncoder(stdout).Encode(result); err != nil {
+	if err := encodeReport(stdout, result, cfg.includeIDs); err != nil {
 		_, _ = fmt.Fprintln(stderr, "assessment run gap audit: output failed")
 		return 1
 	}
@@ -85,6 +92,18 @@ func runCLI(parent context.Context, args []string, stdin io.Reader, stdout, stde
 		return 2
 	}
 	return 0
+}
+
+func encodeReport(output io.Writer, result report, includeIDs bool) error {
+	if includeIDs {
+		return json.NewEncoder(output).Encode(result)
+	}
+	return json.NewEncoder(output).Encode(publicReport{
+		SubmittedBefore: result.SubmittedBefore,
+		Scanned:         result.Scanned,
+		Complete:        result.Complete,
+		Counts:          result.Counts,
+	})
 }
 
 func parseConfig(args []string, stdin io.Reader, stderr io.Writer) (config, error) {
