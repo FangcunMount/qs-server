@@ -209,8 +209,17 @@ jobs:
   mysql_cutover_nsq:
     if: inputs.check_mode == 'preflight-mysql-cutover'
     name: Read-only assessment NSQ channel waterline
-    runs-on: ${{ vars.QS_DEPLOY_RUNNER || 'serverd' }}
-    timeout-minutes: 3
+    runs-on:
+      group: qlume
+      labels: [self-hosted, macOS, ARM64, ops]
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@v6
-      - run: bash scripts/cd/m5-mysql-cutover-nsq-readonly.sh
+      - uses: appleboy/ssh-action@v1.2.2
+        with:
+          host: ${{ vars.SVRD_HOST }}
+          username: ${{ vars.SVRD_USERNAME || vars.SVRA_USERNAME }}
+          key: ${{ secrets.SVRD_SSH_KEY || secrets.SVRA_SSH_KEY }}
+          port: ${{ vars.SVRD_SSH_PORT || vars.SVRA_SSH_PORT || 22 }}
+          fingerprint: ${{ vars.SVRD_SSH_FINGERPRINT }}
+          script_path: scripts/cd/m5-mysql-cutover-nsq-readonly.sh
