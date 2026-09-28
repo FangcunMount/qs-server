@@ -35,6 +35,12 @@ func TestScanPageFindsPublishedAnswerSheetMissingAssessment(t *testing.T) {
 	}
 	mongoDB := mongoClient.Database("rm_qs03_gap_test")
 	defer mongoDB.Drop(context.Background())
+	if _, err := mongoDB.Collection("answersheets").Indexes().CreateOne(ctx, mongo.IndexModel{
+		Keys:    bson.D{{Key: "durable_acceptance.schema_version", Value: 1}, {Key: "deleted_at", Value: 1}, {Key: "domain_id", Value: 1}},
+		Options: options.Index().SetName("idx_answersheet_durable_audit"),
+	}); err != nil {
+		t.Fatal(err)
+	}
 	mysqlDB, err := gorm.Open(mysql.Open(mysqlDSN), &gorm.Config{})
 	if err != nil {
 		t.Fatal(err)

@@ -113,7 +113,7 @@ func (s *Scanner) ScanPage(ctx context.Context, afterID, upperID uint64, accepte
 		"deleted_at":                        nil,
 		"domain_id":                         bson.M{"$gt": afterID, "$lte": upperID},
 	}
-	cur, err := s.mongo.Collection("answersheets").Find(ctx, filter, options.Find().SetSort(bson.D{{Key: "domain_id", Value: 1}}).SetLimit(int64(limit)).SetProjection(bson.M{
+	cur, err := s.mongo.Collection("answersheets").Find(ctx, filter, options.Find().SetHint("idx_answersheet_durable_audit").SetSort(bson.D{{Key: "domain_id", Value: 1}}).SetLimit(int64(limit)).SetProjection(bson.M{
 		"domain_id": 1, "org_id": 1, "testee_id": 1, "filler_id": 1,
 		"questionnaire_code": 1, "questionnaire_version": 1, "task_id": 1,
 		"admission": 1, "durable_acceptance": 1,

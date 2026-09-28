@@ -154,13 +154,17 @@ func requireAuditIndex(ctx context.Context, collection *mongo.Collection) error 
 	defer cursor.Close(ctx)
 	for cursor.Next(ctx) {
 		var row struct {
-			Name string `bson:"name"`
-			Key  bson.D `bson:"key"`
+			Name                    string `bson:"name"`
+			Key                     bson.D `bson:"key"`
+			PartialFilterExpression bson.M `bson:"partialFilterExpression"`
+			Sparse                  bool   `bson:"sparse"`
+			Hidden                  bool   `bson:"hidden"`
 		}
 		if err := cursor.Decode(&row); err != nil {
 			return err
 		}
-		if row.Name == "idx_answersheet_durable_audit" && matchesAuditIndexKeys(row.Key) {
+		if row.Name == "idx_answersheet_durable_audit" && matchesAuditIndexKeys(row.Key) &&
+			len(row.PartialFilterExpression) == 0 && !row.Sparse && !row.Hidden {
 			return nil
 		}
 	}
