@@ -18,7 +18,7 @@ go build -o "$audit_binary" ./scripts/oneoff/answersheet_gap_audit
   --batch-size=100 --max-sheets=1000 --timeout=2m
 ```
 
-示例 ID 和时间仅展示参数格式，不能当生产水位或宽限期使用。生产执行前须先从业务事实确定上界、宽限期和只读账号；一次输出包含固定区间、截止时间、每条原事件 ID、分类和 `next_after_id`。扫描达到 `max-sheets` 时 `complete=false`，应沿用原上界和截止时间续扫，不能把部分结果写成全量无缺口。
+示例 ID 和时间仅展示参数格式，不能当生产水位或宽限期使用。生产执行前须先从业务事实确定上界、宽限期和只读账号，并确认 `answersheets` 上已有键序为 `durable_acceptance.schema_version, deleted_at, domain_id` 的 `idx_answersheet_durable_audit`；命令会在该索引缺失、键序不匹配或无法核验时停止。一次输出包含固定区间、截止时间、每条原事件 ID、分类和 `next_after_id`。扫描达到 `max-sheets` 时 `complete=false`，应沿用原上界和截止时间续扫，不能把部分结果写成全量无缺口。
 
 退出码：`0` 表示该固定区间完整且无需关注，`2` 表示完整但存在 `missing_confirmed`、`delivery_pending`、`unknown` 或 `manual_required`，`3` 表示达到预算但尚未扫完，`1` 表示参数、连接、扫描或输出失败。`assessment_present` 只证明测评行存在，不证明后续评估、报告或通知成功；`missing_confirmed` 是人工核对候选，**不是自动重投授权**。任何跨库读错误都不能当作效果缺失。
 

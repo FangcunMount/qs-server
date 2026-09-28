@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/answersheetgap"
+	"go.mongodb.org/mongo-driver/bson"
 )
 
 type scannerStep struct {
@@ -104,5 +105,25 @@ func TestParseConfigRequiresExplicitFixedCutoffAndWindow(t *testing.T) {
 	}
 	if _, _, err := parseConfig(append(args, "--upper-id=10"), io.Discard); err == nil {
 		t.Fatal("empty ID window must fail")
+	}
+}
+
+func TestMatchesAuditIndexKeysRejectsAbsentOrChangedIndex(t *testing.T) {
+	keys := bson.D{
+		{Key: "durable_acceptance.schema_version", Value: int32(1)},
+		{Key: "deleted_at", Value: int32(1)},
+		{Key: "domain_id", Value: int32(1)},
+	}
+	if !matchesAuditIndexKeys(keys) {
+		t.Fatal("expected the deployed audit index key order to match")
+	}
+	for _, changed := range []bson.D{
+		keys[:2],
+		{{Key: "domain_id", Value: int32(1)}, keys[0], keys[1]},
+		{{Key: keys[0].Key, Value: int32(-1)}, keys[1], keys[2]},
+	} {
+		if matchesAuditIndexKeys(changed) {
+			t.Fatalf("unsafe audit index was accepted: %v", changed)
+		}
 	}
 }

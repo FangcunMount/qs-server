@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/answersheetgap"
+	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	gormmysql "gorm.io/driver/mysql"
@@ -70,6 +71,10 @@ func runCLI(parent context.Context, args []string, stdout, stderr io.Writer) int
 	defer func() { _ = client.Disconnect(context.Background()) }()
 	if err := client.Ping(ctx, nil); err != nil {
 		fmt.Fprintln(stderr, "answersheet gap audit: ping Mongo failed")
+		return 1
+	}
+	if err := requireAuditIndex(ctx, client.Database(cfg.mongoDB).Collection("answersheets")); err != nil {
+		fmt.Fprintln(stderr, "answersheet gap audit: required answersheet audit index is missing or unreadable")
 		return 1
 	}
 	db, err := gorm.Open(gormmysql.Open(cfg.mysqlDSN), &gorm.Config{Logger: logger.Default.LogMode(logger.Silent)})
@@ -137,6 +142,60 @@ func parseConfig(args []string, stderr io.Writer) (config, time.Time, error) {
 		return config{}, time.Time{}, fmt.Errorf("--accepted-before must be an explicit, non-future RFC3339 time")
 	}
 	return cfg, cutoff, nil
+}
+
+var auditIndexKeys = []string{"durable_acceptance.schema_version", "deleted_at", "domain_id"}
+
+func requireAuditIndex(ctx context.Context, collection *mongo.Collection) error {
+	cursor, err := collection.Indexes().List(ctx)
+	if err != nil {
+		return err
+	}
+	defer cursor.Close(ctx)
+	for cursor.Next(ctx) {
+		var row struct {
+			Name string `bson:"name"`
+			Key  bson.D `bson:"key"`
+		}
+		if err := cursor.Decode(&row); err != nil {
+			return err
+		}
+		if row.Name == "idx_answersheet_durable_audit" && matchesAuditIndexKeys(row.Key) {
+			return nil
+		}
+	}
+	if err := cursor.Err(); err != nil {
+		return err
+	}
+	return fmt.Errorf("required answersheet audit index is absent or has incompatible keys")
+}
+
+func matchesAuditIndexKeys(keys bson.D) bool {
+	if len(keys) != len(auditIndexKeys) {
+		return false
+	}
+	for i, field := range auditIndexKeys {
+		if keys[i].Key != field {
+			return false
+		}
+		switch value := keys[i].Value.(type) {
+		case int32:
+			if value != 1 {
+				return false
+			}
+		case int64:
+			if value != 1 {
+				return false
+			}
+		case int:
+			if value != 1 {
+				return false
+			}
+		default:
+			return false
+		}
+	}
+	return true
 }
 
 func scanWindow(ctx context.Context, scanner pageScanner, cfg config, cutoff time.Time) (report, error) {
