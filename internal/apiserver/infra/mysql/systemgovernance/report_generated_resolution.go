@@ -7,13 +7,13 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/FangcunMount/component-base/pkg/eventcodec"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/reportprojection"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/policy"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/interpretationreadmodel"
 	"github.com/FangcunMount/qs-server/internal/pkg/attentionprojection"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventing/outcome"
+	domainwire "github.com/FangcunMount/reliable-messaging/wire/domain"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
@@ -33,7 +33,7 @@ func NewReportGeneratedResolutionVerifier(reports ReportGeneratedResolutionReade
 		if reports == nil || tx == nil {
 			return DeliveryResolutionEvidence{}, fmt.Errorf("report and MySQL evidence readers are required")
 		}
-		env, err := eventcodec.DecodeEnvelope([]byte(subject.PayloadJSON))
+		env, err := domainwire.DecodeEnvelope([]byte(subject.PayloadJSON))
 		if err != nil {
 			return DeliveryResolutionEvidence{}, fmt.Errorf("decode report event: %w", err)
 		}

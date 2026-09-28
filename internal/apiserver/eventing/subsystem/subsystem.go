@@ -9,17 +9,19 @@ import (
 	"sync"
 	"time"
 
-	"github.com/FangcunMount/component-base/pkg/event"
 	"github.com/FangcunMount/component-base/pkg/logger"
 	"github.com/FangcunMount/component-base/pkg/messaging"
 	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
 	mongoEventOutbox "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/eventoutbox"
 	mysqlEventOutbox "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/eventoutbox"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/redis/outboxready"
+	"github.com/FangcunMount/qs-server/internal/pkg/event"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventing/observe"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventing/runtime"
 	"github.com/FangcunMount/qs-server/internal/pkg/resilience/backpressure"
+	rmtransport "github.com/FangcunMount/reliable-messaging/transport"
+	domainwire "github.com/FangcunMount/reliable-messaging/wire/domain"
 	redis "github.com/redis/go-redis/v9"
 	"go.mongodb.org/mongo-driver/mongo"
 	"gorm.io/gorm"
@@ -27,6 +29,17 @@ import (
 
 type ConsumerHandler func(context.Context, string, []byte) error
 type SubscriberFactory func() (messaging.Subscriber, error)
+type SDKSubscriber interface {
+	Subscribe(string, string, rmtransport.Handler) error
+	Stop()
+	Close() error
+}
+type SDKSubscriberFactory func() (SDKSubscriber, error)
+
+type consumerSubscriber interface {
+	Stop()
+	Close() error
+}
 
 type ConsumerOptions struct {
 	Enabled bool
@@ -50,19 +63,21 @@ type immediateRuntime interface {
 }
 
 type Options struct {
-	MySQLDB           *gorm.DB
-	MongoDB           *mongo.Database
-	OpsRedis          redis.UniversalClient
-	Catalog           *eventcatalog.Catalog
-	MQPublisher       messaging.Publisher
-	PublisherMode     eventruntime.PublishMode
-	MySQLLimiter      backpressure.Acquirer
-	MongoLimiter      backpressure.Acquirer
-	Mongo             ProfileOptions
-	Assessment        ProfileOptions
-	SubscriberFactory SubscriberFactory
-	Consumers         map[string]ConsumerOptions
-	Observer          eventobservability.Observer
+	MySQLDB              *gorm.DB
+	MongoDB              *mongo.Database
+	OpsRedis             redis.UniversalClient
+	Catalog              *eventcatalog.Catalog
+	MQPublisher          messaging.Publisher
+	WirePublisher        eventruntime.WirePublisher
+	PublisherMode        eventruntime.PublishMode
+	MySQLLimiter         backpressure.Acquirer
+	MongoLimiter         backpressure.Acquirer
+	Mongo                ProfileOptions
+	Assessment           ProfileOptions
+	SubscriberFactory    SubscriberFactory
+	SDKSubscriberFactory SDKSubscriberFactory
+	Consumers            map[string]ConsumerOptions
+	Observer             eventobservability.Observer
 }
 
 type profileRuntime struct {
@@ -89,27 +104,28 @@ type consumerRuntime struct {
 	topic      string
 	enabled    bool
 	handler    ConsumerHandler
-	subscriber messaging.Subscriber
+	subscriber consumerSubscriber
 	healthy    bool
 	lastError  string
 }
 
 type Subsystem struct {
-	mu                sync.Mutex
-	catalog           *eventcatalog.Catalog
-	registry          *eventcatalog.EffectiveRegistry
-	publisher         *eventruntime.RoutingPublisher
-	profiles          map[eventcatalog.OutboxProfile]*profileRuntime
-	consumers         map[string]*consumerRuntime
-	subscriberFactory SubscriberFactory
-	observer          eventobservability.Observer
-	started           bool
-	closed            bool
-	cancel            context.CancelFunc
-	wg                sync.WaitGroup
-	closeStarted      bool
-	closeDone         chan struct{}
-	closeErr          error
+	mu                   sync.Mutex
+	catalog              *eventcatalog.Catalog
+	registry             *eventcatalog.EffectiveRegistry
+	publisher            *eventruntime.RoutingPublisher
+	profiles             map[eventcatalog.OutboxProfile]*profileRuntime
+	consumers            map[string]*consumerRuntime
+	subscriberFactory    SubscriberFactory
+	sdkSubscriberFactory SDKSubscriberFactory
+	observer             eventobservability.Observer
+	started              bool
+	closed               bool
+	cancel               context.CancelFunc
+	wg                   sync.WaitGroup
+	closeStarted         bool
+	closeDone            chan struct{}
+	closeErr             error
 }
 
 var profileStartOrder = []eventcatalog.OutboxProfile{
@@ -141,15 +157,16 @@ func newBase(opts Options) (*Subsystem, error) {
 		opts.Observer = eventobservability.DefaultObserver()
 	}
 	publisher := eventruntime.NewRoutingPublisher(eventruntime.RoutingPublisherOptions{
-		Catalog: opts.Catalog, MQPublisher: opts.MQPublisher, Mode: opts.PublisherMode,
+		Catalog: opts.Catalog, MQPublisher: opts.MQPublisher, WirePublisher: opts.WirePublisher, Mode: opts.PublisherMode,
 		Source: eventruntime.SourceAPIServer, Observer: opts.Observer,
 	})
 	s := &Subsystem{
 		catalog: opts.Catalog, registry: registry, publisher: publisher,
 		profiles:  make(map[eventcatalog.OutboxProfile]*profileRuntime),
 		consumers: make(map[string]*consumerRuntime), subscriberFactory: opts.SubscriberFactory,
-		observer:  opts.Observer,
-		closeDone: make(chan struct{}),
+		sdkSubscriberFactory: opts.SDKSubscriberFactory,
+		observer:             opts.Observer,
+		closeDone:            make(chan struct{}),
 	}
 	return s, nil
 }
@@ -352,7 +369,7 @@ func (s *Subsystem) startProfileStatus(ctx context.Context, profile *profileRunt
 }
 
 func (s *Subsystem) startConsumers(ctx context.Context) error {
-	if s.subscriberFactory == nil && s.hasEnabledConsumers() {
+	if s.subscriberFactory == nil && s.sdkSubscriberFactory == nil && s.hasEnabledConsumers() {
 		return fmt.Errorf("event consumer subscriber factory is not configured")
 	}
 	for _, id := range s.orderedConsumerIDs() {
@@ -360,15 +377,41 @@ func (s *Subsystem) startConsumers(ctx context.Context) error {
 		if !s.consumerEnabled(consumer) {
 			continue
 		}
-		subscriber, err := s.subscriberFactory()
+		var subscriber consumerSubscriber
+		var subscribe func() error
+		var err error
+		if s.sdkSubscriberFactory != nil {
+			var sdkSubscriber SDKSubscriber
+			sdkSubscriber, err = s.sdkSubscriberFactory()
+			if err == nil {
+				subscriber = sdkSubscriber
+				subscribe = func() error {
+					return sdkSubscriber.Subscribe(consumer.topic, consumer.spec.Channel, s.consumerSDKMessageHandler(consumer))
+				}
+			}
+		} else {
+			var legacySubscriber messaging.Subscriber
+			legacySubscriber, err = s.subscriberFactory()
+			if err == nil {
+				subscriber = legacySubscriber
+				subscribe = func() error {
+					return legacySubscriber.Subscribe(consumer.topic, consumer.spec.Channel, s.consumerMessageHandler(consumer))
+				}
+			}
+		}
 		if err != nil {
+			s.setConsumerError(consumer, err)
+			return fmt.Errorf("create subscriber for %s: %w", consumer.spec.ID, err)
+		}
+		if subscriber == nil {
+			err = errors.New("event consumer subscriber factory returned nil")
 			s.setConsumerError(consumer, err)
 			return fmt.Errorf("create subscriber for %s: %w", consumer.spec.ID, err)
 		}
 		s.mu.Lock()
 		consumer.subscriber = subscriber
 		s.mu.Unlock()
-		if err := subscriber.Subscribe(consumer.topic, consumer.spec.Channel, s.consumerMessageHandler(consumer)); err != nil {
+		if err := subscribe(); err != nil {
 			s.setConsumerError(consumer, err)
 			return fmt.Errorf("subscribe consumer %s: %w", consumer.spec.ID, err)
 		}
@@ -376,6 +419,56 @@ func (s *Subsystem) startConsumers(ctx context.Context) error {
 		logger.L(ctx).Infow("event projection consumer started", "consumer", consumer.spec.ID, "topic", consumer.topic, "channel", consumer.spec.Channel)
 	}
 	return nil
+}
+
+func (s *Subsystem) consumerSDKMessageHandler(consumer *consumerRuntime) rmtransport.Handler {
+	observe := func(ctx context.Context, msg rmtransport.Received, eventType string, outcome eventobservability.ConsumeOutcome) {
+		s.observer.ObserveConsume(ctx, eventobservability.ConsumeEvent{
+			Service: consumer.spec.ID, Topic: consumer.topic, EventType: eventType,
+			Outcome: outcome, Attempts: max(int(msg.Attempts), 1),
+		})
+	}
+	ack := func(ctx context.Context, delivery rmtransport.Delivery, msg rmtransport.Received, eventType string, success, failure eventobservability.ConsumeOutcome) error {
+		if err := delivery.Ack(); err != nil {
+			slog.Warn("failed to ack event projection delivery", "consumer", consumer.spec.ID, "topic", consumer.topic, "msg_id", msg.ID, "error", err)
+			observe(ctx, msg, eventType, failure)
+			return err
+		}
+		observe(ctx, msg, eventType, success)
+		return nil
+	}
+	return func(ctx context.Context, delivery rmtransport.Delivery) error {
+		if delivery == nil {
+			return errors.New("event projection SDK delivery is nil")
+		}
+		msg := delivery.Message()
+		eventType := msg.Metadata["event_type"]
+		if eventType == "" {
+			envelope, err := domainwire.DecodeEnvelope(msg.Payload)
+			if err != nil {
+				slog.Warn("event projection delivery missing event_type", "consumer", consumer.spec.ID, "topic", consumer.topic, "msg_id", msg.ID, "error", err)
+				observe(ctx, msg, "", eventobservability.ConsumeOutcomeDecodeFailed)
+				return err
+			}
+			eventType = envelope.EventType
+			if eventType == "" {
+				slog.Warn("event projection delivery has empty event_type", "consumer", consumer.spec.ID, "topic", consumer.topic, "msg_id", msg.ID)
+				observe(ctx, msg, "", eventobservability.ConsumeOutcomeDecodeFailed)
+				return errors.New("event envelope has no event_type")
+			}
+		}
+		if eventType != consumer.eventType {
+			return ack(ctx, delivery, msg, eventType, eventobservability.ConsumeOutcomeUnknownAcked, eventobservability.ConsumeOutcomeUnknownAckFailed)
+		}
+		if err := consumer.handler(ctx, eventType, msg.Payload); err != nil {
+			s.setConsumerError(consumer, err)
+			slog.Error("failed to dispatch event projection", "consumer", consumer.spec.ID, "topic", consumer.topic, "event_type", eventType, "msg_id", msg.ID, "error", err)
+			observe(ctx, msg, eventType, eventobservability.ConsumeOutcomeDispatchFailed)
+			return err
+		}
+		s.setConsumerHealthy(consumer)
+		return ack(ctx, delivery, msg, eventType, eventobservability.ConsumeOutcomeAcked, eventobservability.ConsumeOutcomeAckFailed)
+	}
 }
 
 func (s *Subsystem) consumerMessageHandler(consumer *consumerRuntime) messaging.Handler {

@@ -8,14 +8,11 @@ import (
 	"time"
 
 	basemessaging "github.com/FangcunMount/component-base/pkg/messaging"
-	cbnsq "github.com/FangcunMount/component-base/pkg/messaging/nsq"
-	cbrabbit "github.com/FangcunMount/component-base/pkg/messaging/rabbitmq"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventing/observe"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventing/runtime"
 	"github.com/FangcunMount/qs-server/internal/pkg/messagingruntime"
 	"github.com/FangcunMount/qs-server/internal/worker/config"
-	"github.com/nsqio/go-nsq"
 )
 
 type TopicSubscriptionSource interface {
@@ -31,36 +28,31 @@ type SubscriptionRuntime interface {
 	EventDispatcher
 }
 
-func CreatePublisher(cfg *config.MessagingConfig) (basemessaging.Publisher, error) {
-	switch cfg.Provider {
-	case "rabbitmq":
-		return cbrabbit.NewPublisher(cfg.RabbitMQURL)
-	default:
-		publisher, err := cbnsq.NewPublisher(cfg.NSQAddr, nsq.NewConfig())
-		if err != nil {
-			return nil, err
-		}
-		return messagingruntime.WrapNSQReconnectPublisher(publisher), nil
-	}
+type WirePublisherCloser interface {
+	WirePublisher
+	Close() error
 }
 
-func EnsureTopics(cfg *config.MessagingConfig, logger *slog.Logger, source TopicSubscriptionSource) error {
+func CreateSDKWirePublisher(cfg *config.MessagingConfig) (WirePublisherCloser, error) {
+	if cfg == nil || cfg.Provider != "nsq" {
+		return nil, fmt.Errorf("native wire publisher requires NSQ provider")
+	}
+	return messagingruntime.NewSDKNSQWirePublisher(cfg.NSQAddr)
+}
+
+func EnsureChannels(ctx context.Context, cfg *config.MessagingConfig, serviceName string, source TopicSubscriptionSource) error {
 	if source == nil {
-		return nil
+		return fmt.Errorf("worker subscription catalog is required for NSQ channel preparation")
 	}
 	subscriptions := source.GetTopicSubscriptions()
-	topics := make([]string, 0, len(subscriptions))
+	channels := make([]messagingruntime.DurableChannel, 0, len(subscriptions))
 	for _, sub := range subscriptions {
-		topics = append(topics, sub.TopicName)
+		channels = append(channels, messagingruntime.DurableChannel{Topic: sub.TopicName, Channel: serviceName})
 	}
-
-	if len(topics) == 0 {
-		logger.Debug("No topics to create")
-		return nil
+	if len(channels) == 0 {
+		return fmt.Errorf("worker subscription catalog has no topics to prepare")
 	}
-
-	creator := cbnsq.NewTopicCreator(cfg.NSQAddr, logger)
-	return creator.EnsureTopics(topics)
+	return messagingruntime.EnsureNSQChannels(ctx, cfg.NSQDHTTPEndpoints, channels)
 }
 
 type SubscribeHandlersOptions struct {

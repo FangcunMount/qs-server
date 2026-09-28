@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/FangcunMount/component-base/pkg/event"
+	"github.com/FangcunMount/qs-server/internal/pkg/event"
 )
 
 // ReadyIndex 是best-effort Redis ZSet 调度器 用于 待处理 outbox 事件。

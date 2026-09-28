@@ -4,8 +4,8 @@ import (
 	"context"
 	"time"
 
-	"github.com/FangcunMount/component-base/pkg/event"
-	base "github.com/FangcunMount/component-base/pkg/outbox"
+	"github.com/FangcunMount/qs-server/internal/pkg/event"
+	rmoutbox "github.com/FangcunMount/reliable-messaging/outbox"
 )
 
 // ScheduledStager stores durable events that must not be claimed before dueAt.
@@ -24,9 +24,12 @@ type Store interface {
 	MarkEventPublished(ctx context.Context, eventID string, publishedAt time.Time) error
 	MarkEventFailed(ctx context.Context, eventID, lastError string, nextAttemptAt time.Time) error
 }
-type StatusBucket = base.StatusBucket
-type StatusSnapshot = base.StatusSnapshot
-type StatusReader = base.StatusReader
+
+// The public status shape belongs to the SDK. The legacy core is converted at
+// the old-profile boundary; the standard profile reports its own states.
+type StatusBucket = rmoutbox.StatusBucket
+type StatusSnapshot = rmoutbox.StatusSnapshot
+type StatusReader = rmoutbox.StatusReader
 
 // PendingEventRefLister lists pending outbox rows for reconciliation.
 type PendingEventRefLister interface {

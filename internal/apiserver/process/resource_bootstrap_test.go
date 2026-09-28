@@ -3,6 +3,8 @@ package process
 import (
 	"context"
 	"errors"
+	"net/http"
+	"net/http/httptest"
 	"reflect"
 	"testing"
 
@@ -22,6 +24,118 @@ import (
 )
 
 type fakePublisher struct{ onClose func() }
+
+type fakeWirePublisher struct{ onClose func() }
+
+func (*fakeWirePublisher) PublishWire(context.Context, string, []byte) error { return nil }
+func (p *fakeWirePublisher) Close() error {
+	if p.onClose != nil {
+		p.onClose()
+	}
+	return nil
+}
+
+func (*fakePublisher) PublishWire(context.Context, string, []byte) error { return nil }
+
+type legacyOnlyPublisher struct{ closed bool }
+
+func (*legacyOnlyPublisher) Publish(context.Context, string, []byte) error { return nil }
+func (*legacyOnlyPublisher) PublishMessage(context.Context, string, *messaging.Message) error {
+	return nil
+}
+func (p *legacyOnlyPublisher) Close() error { p.closed = true; return nil }
+
+func TestCreateMQPublisherRejectsNSQWithoutWirePortAndClosesIt(t *testing.T) {
+	legacy := &legacyOnlyPublisher{}
+	publisher, mode, err := createMQPublisher(mqPublisherStageDeps{
+		enabled: true, provider: "nsq", newPublisher: func() (messaging.Publisher, error) { return legacy, nil },
+	})
+	if publisher != nil || mode == eventruntime.PublishModeMQ || err == nil || !legacy.closed {
+		t.Fatalf("NSQ publisher contract: publisher=%#v mode=%q err=%v closed=%t", publisher, mode, err, legacy.closed)
+	}
+}
+
+func TestAPISelectsNativeNSQWireFactory(t *testing.T) {
+	cfg := &apiserverconfig.Config{Options: apiserveroptions.NewOptions()}
+	cfg.MessagingOptions.Enabled = true
+	cfg.MessagingOptions.Provider = "nsq"
+	deps := (&server{config: cfg}).buildMQPublisherDeps()
+	if deps.newWirePublisher == nil || deps.newPublisher != nil {
+		t.Fatalf("NSQ should use the native wire factory: %+v", deps)
+	}
+	cfg.MessagingOptions.Provider = "rabbitmq"
+	deps = (&server{config: cfg}).buildMQPublisherDeps()
+	if deps.newWirePublisher != nil || deps.newPublisher != nil {
+		t.Fatalf("retired RabbitMQ provider still has a publisher factory: %+v", deps)
+	}
+	if _, _, err := createMQPublisher(deps); err == nil {
+		t.Fatal("retired provider reached a usable publisher")
+	}
+}
+
+func TestPrepareResourcesPassesNativeNSQWirePortAndClosesOnFailure(t *testing.T) {
+	wire := &fakeWirePublisher{}
+	var options eventsubsystem.Options
+	got, err := prepareResources(resourceStageDeps{
+		mqPublisher: mqPublisherStageDeps{
+			enabled: true, provider: "nsq",
+			newWirePublisher: func() (wirePublisherResource, error) { return wire, nil },
+		},
+		loadEventCatalog: func() (*eventcatalog.Catalog, error) { return eventcatalog.NewCatalog(nil), nil },
+		eventSubsystem: eventSubsystemResourceDeps{
+			newSubsystem: func(input eventsubsystem.Options) (*eventsubsystem.Subsystem, error) {
+				options = input
+				return &eventsubsystem.Subsystem{}, nil
+			},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.messaging.mqPublisher != nil || got.messaging.wirePublisher != wire ||
+		got.messaging.closePublisher == nil || got.messaging.publishMode != eventruntime.PublishModeMQ ||
+		options.MQPublisher != nil || options.WirePublisher != wire {
+		t.Fatalf("native NSQ publisher was not passed directly: messaging=%+v options=%+v", got.messaging, options)
+	}
+	closed := false
+	wire.onClose = func() { closed = true }
+	if err := got.messaging.closePublisher(); err != nil || !closed {
+		t.Fatalf("native NSQ publisher close: err=%v closed=%t", err, closed)
+	}
+
+	closed = false
+	_, err = prepareResources(resourceStageDeps{
+		mqPublisher: mqPublisherStageDeps{
+			enabled: true, provider: "nsq",
+			newWirePublisher: func() (wirePublisherResource, error) { return wire, nil },
+		},
+		loadEventCatalog: func() (*eventcatalog.Catalog, error) { return nil, errors.New("catalog unavailable") },
+	})
+	if err == nil || !closed {
+		t.Fatalf("startup failure leaked native NSQ publisher: err=%v closed=%t", err, closed)
+	}
+}
+
+func TestAPIProjectionOnlySelectsSDKSubscriberForNSQ(t *testing.T) {
+	for _, item := range []struct {
+		provider string
+		wantSDK  bool
+	}{
+		{provider: "nsq", wantSDK: true},
+		{provider: "rabbitmq", wantSDK: false},
+	} {
+		t.Run(item.provider, func(t *testing.T) {
+			cfg := &apiserverconfig.Config{Options: apiserveroptions.NewOptions()}
+			cfg.MessagingOptions.Enabled = true
+			cfg.MessagingOptions.Provider = item.provider
+			deps := (&server{config: cfg}).buildEventSubsystemResourceDeps()
+			if (deps.buildSDKSubscriberFactory != nil) != item.wantSDK || deps.buildSubscriberFactory != nil {
+				t.Fatalf("subscriber factories for %s: SDK=%t legacy=%t", item.provider,
+					deps.buildSDKSubscriberFactory != nil, deps.buildSubscriberFactory != nil)
+			}
+		})
+	}
+}
 
 func (*fakePublisher) Publish(_ context.Context, _ string, _ []byte) error { return nil }
 
@@ -182,19 +296,86 @@ func TestInitializeRedisRuntimeReturnsSubsystemWhenRedisUnavailable(t *testing.T
 	}
 }
 
-func TestCreateMQPublisherFallsBackToLoggingModeOnPublisherError(t *testing.T) {
-	publisher, mode := createMQPublisher(mqPublisherStageDeps{
+func TestCreateMQPublisherFailsWhenEnabledPublisherCannotStart(t *testing.T) {
+	publisher, mode, err := createMQPublisher(mqPublisherStageDeps{
 		fallbackMode: eventruntime.PublishModeLogging,
 		enabled:      true,
 		provider:     "unsupported",
 		newPublisher: func() (messaging.Publisher, error) { return nil, errors.New("boom") },
 	})
 
-	if publisher != nil {
-		t.Fatalf("publisher = %#v, want nil on fallback", publisher)
+	if publisher != nil || err == nil {
+		t.Fatalf("publisher = %#v, err = %v, want startup failure", publisher, err)
 	}
-	if mode != eventruntime.PublishModeLogging {
-		t.Fatalf("publish mode = %q, want %q", mode, eventruntime.PublishModeLogging)
+	if mode == eventruntime.PublishModeLogging {
+		t.Fatalf("publish mode = %q, unexpectedly fell back to logging", mode)
+	}
+}
+
+func TestPrepareResourcesStopsBeforeEventSubsystemWhenChannelPreparationFails(t *testing.T) {
+	closed := false
+	built := false
+	_, err := prepareResources(resourceStageDeps{
+		mqPublisher: mqPublisherStageDeps{
+			enabled: true, provider: "nsq", newPublisher: func() (messaging.Publisher, error) {
+				return &fakePublisher{onClose: func() { closed = true }}, nil
+			},
+		},
+		loadEventCatalog: func() (*eventcatalog.Catalog, error) { return eventcatalog.NewCatalog(nil), nil },
+		prepareMQChannels: func(*eventcatalog.Catalog) error {
+			return errors.New("nsqd unavailable")
+		},
+		eventSubsystem: eventSubsystemResourceDeps{
+			newSubsystem: func(eventsubsystem.Options) (*eventsubsystem.Subsystem, error) {
+				built = true
+				return &eventsubsystem.Subsystem{}, nil
+			},
+		},
+	})
+	if err == nil || !closed || built {
+		t.Fatalf("unsafe bootstrap: err=%v, publisher closed=%t, event subsystem built=%t", err, closed, built)
+	}
+}
+
+func TestAPIChannelPreparationCreatesWorkerAndProjectionChannels(t *testing.T) {
+	created := make(map[string]bool)
+	nsqd := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			w.WriteHeader(http.StatusMethodNotAllowed)
+			return
+		}
+		topic := r.URL.Query().Get("topic")
+		switch r.URL.Path {
+		case "/topic/create":
+			created[topic] = true
+		case "/channel/create":
+			if !created[topic] {
+				t.Errorf("channel %s was created before its topic", r.URL.Query().Get("channel"))
+			}
+			created[topic+"/"+r.URL.Query().Get("channel")] = true
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer nsqd.Close()
+	options := apiserveroptions.NewOptions()
+	options.MessagingOptions.Enabled = true
+	options.MessagingOptions.NSQDHTTPEndpoints = []string{nsqd.URL}
+	options.Eventing.Consumers.ModelCatalogHotRank.Channel = "custom-projection-channel"
+	cfg, err := eventcatalog.Load("../../../configs/events.yaml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := (&server{config: &apiserverconfig.Config{Options: options}}).buildMQChannelPreparer()(eventcatalog.NewCatalog(cfg)); err != nil {
+		t.Fatal(err)
+	}
+	for _, topic := range []string{"qs.survey.lifecycle", "qs.evaluation.lifecycle", "qs.plan.task"} {
+		if !created[topic+"/qs-worker"] {
+			t.Errorf("primary Worker channel missing for %s", topic)
+		}
+	}
+	if !created["qs.evaluation.lifecycle/custom-projection-channel"] {
+		t.Error("API projection channel missing before serving")
 	}
 }
 

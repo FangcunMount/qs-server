@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/FangcunMount/component-base/pkg/event"
 	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
 	apptransaction "github.com/FangcunMount/qs-server/internal/apiserver/application/transaction"
 	domaininterpretation "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
@@ -13,6 +12,7 @@ import (
 	domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/report"
 	interpretationrun "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/run"
 	outboxport "github.com/FangcunMount/qs-server/internal/apiserver/port/outbox"
+	"github.com/FangcunMount/qs-server/internal/pkg/event"
 	eventoutcome "github.com/FangcunMount/qs-server/internal/pkg/eventing/outcome"
 	"github.com/FangcunMount/qs-server/internal/pkg/retrygovernance"
 )

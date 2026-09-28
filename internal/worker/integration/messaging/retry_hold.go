@@ -12,15 +12,21 @@ import (
 	drivermysql "github.com/go-sql-driver/mysql"
 	"github.com/google/uuid"
 
-	"github.com/FangcunMount/component-base/pkg/eventcodec"
 	basemessaging "github.com/FangcunMount/component-base/pkg/messaging"
 	eventobservability "github.com/FangcunMount/qs-server/internal/pkg/eventing/observe"
 	genericoptions "github.com/FangcunMount/qs-server/internal/pkg/options"
 	"github.com/FangcunMount/qs-server/internal/pkg/retrygovernance"
+	rmtransport "github.com/FangcunMount/reliable-messaging/transport"
+	domainwire "github.com/FangcunMount/reliable-messaging/wire/domain"
+	"github.com/FangcunMount/reliable-messaging/wire/legacy"
 )
 
 type RetryEventHoldRecorder interface {
 	Hold(context.Context, *basemessaging.Message, string, error) error
+}
+
+type DeliveryRetryEventHoldRecorder interface {
+	HoldDelivery(context.Context, rmtransport.Received, string, error) error
 }
 
 type mysqlRetryEventHoldStore struct {
@@ -40,6 +46,21 @@ func NewMySQLRetryEventHoldStore(options *genericoptions.MySQLOptions, provider 
 	if options == nil || options.Host == "" || options.Database == "" || provider == "" {
 		return nil, fmt.Errorf("retry event hold store is not configured")
 	}
+	locationName := options.Location
+	if locationName == "" {
+		locationName = "Asia/Shanghai"
+	}
+	location, err := time.LoadLocation(locationName)
+	if err != nil {
+		return nil, fmt.Errorf("invalid retry hold mysql location %q: %w", locationName, err)
+	}
+	sessionTimeZone := options.SessionTimeZone
+	if sessionTimeZone == "" {
+		sessionTimeZone = "+08:00"
+	}
+	if _, err := time.Parse("-07:00", sessionTimeZone); err != nil {
+		return nil, fmt.Errorf("invalid retry hold mysql session time zone %q: %w", sessionTimeZone, err)
+	}
 	cfg := drivermysql.NewConfig()
 	cfg.Net = "tcp"
 	cfg.Addr = options.Host
@@ -47,6 +68,8 @@ func NewMySQLRetryEventHoldStore(options *genericoptions.MySQLOptions, provider 
 	cfg.Passwd = options.Password
 	cfg.DBName = options.Database
 	cfg.ParseTime = true
+	cfg.Loc = location
+	cfg.Params = map[string]string{"time_zone": "'" + sessionTimeZone + "'"}
 	db, err := sql.Open("mysql", cfg.FormatDSN())
 	if err != nil {
 		return nil, fmt.Errorf("open retry event hold store: %w", err)
@@ -66,12 +89,24 @@ func NewMySQLRetryEventHoldStore(options *genericoptions.MySQLOptions, provider 
 }
 
 func (s *mysqlRetryEventHoldStore) Hold(ctx context.Context, message *basemessaging.Message, eventType string, cause error) error {
-	if s == nil || s.db == nil || message == nil || message.UUID == "" || message.Topic == "" || message.Channel == "" {
+	if message == nil {
+		return fmt.Errorf("invalid retry event hold")
+	}
+	return s.HoldDelivery(ctx, rmtransport.Received{
+		ID: message.UUID, Topic: message.Topic, Channel: message.Channel,
+		Payload: message.Payload, Attempts: message.Attempts,
+	}, eventType, cause)
+}
+
+// HoldDelivery writes the SDK delivery using the same table, identity and
+// retry policy as the older Message path; success permits an explicit Ack.
+func (s *mysqlRetryEventHoldStore) HoldDelivery(ctx context.Context, message rmtransport.Received, eventType string, cause error) error {
+	if s == nil || s.db == nil || message.ID == "" || message.Topic == "" || message.Channel == "" {
 		return fmt.Errorf("invalid retry event hold")
 	}
 	eventID, orgID := retryEventIdentity(message.Payload)
 	if eventID == "" {
-		eventID = message.UUID
+		eventID = message.ID
 	}
 	reason := "automatic retry paused"
 	if cause != nil {
@@ -89,7 +124,7 @@ INSERT INTO retry_event_hold
 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'blocked', 'automatic', 0, ?, ?, ?)
 ON DUPLICATE KEY UPDATE
   id=LAST_INSERT_ID(id)`,
-		eventID, message.UUID, orgID, s.provider, message.Topic, message.Channel, string(message.Payload),
+		eventID, message.ID, orgID, s.provider, message.Topic, message.Channel, string(message.Payload),
 		max(int(message.Attempts), 1), reason, now, now, now, now,
 	)
 	_ = eventType // event type remains inside the canonical payload/metadata.
@@ -215,18 +250,28 @@ func retryEventIdentity(payload []byte) (string, any) {
 }
 
 type RetryEventHoldReplayer struct {
-	store     retryEventHoldStore
-	publisher basemessaging.Publisher
-	interval  time.Duration
-	lease     time.Duration
-	cancel    context.CancelFunc
-	done      chan struct{}
-	stopOnce  sync.Once
-	observer  eventobservability.Observer
+	store         retryEventHoldStore
+	wirePublisher WirePublisher
+	interval      time.Duration
+	lease         time.Duration
+	cancel        context.CancelFunc
+	done          chan struct{}
+	stopOnce      sync.Once
+	observer      eventobservability.Observer
 }
 
-func NewRetryEventHoldReplayer(store retryEventHoldStore, publisher basemessaging.Publisher) *RetryEventHoldReplayer {
-	return &RetryEventHoldReplayer{store: store, publisher: publisher, interval: 5 * time.Second, lease: time.Minute, done: make(chan struct{}), observer: eventobservability.DefaultObserver()}
+// WirePublisher sends the complete NSQ envelope through the SDK-backed runtime.
+type WirePublisher interface {
+	PublishWire(context.Context, string, []byte) error
+}
+
+// NewSDKRetryEventHoldReplayer uses the native NSQ wire port. A failed or
+// unknown publish retains the original held-event identity for recovery.
+func NewSDKRetryEventHoldReplayer(store retryEventHoldStore, publisher WirePublisher) (*RetryEventHoldReplayer, error) {
+	if publisher == nil {
+		return nil, fmt.Errorf("NSQ retry hold wire publisher is required")
+	}
+	return &RetryEventHoldReplayer{store: store, wirePublisher: publisher, interval: 5 * time.Second, lease: time.Minute, done: make(chan struct{}), observer: eventobservability.DefaultObserver()}, nil
 }
 
 func (r *RetryEventHoldReplayer) Start() {
@@ -249,7 +294,7 @@ func (r *RetryEventHoldReplayer) Start() {
 }
 
 func (r *RetryEventHoldReplayer) RunOnce(ctx context.Context, now time.Time) error {
-	if r == nil || r.store == nil || r.publisher == nil {
+	if r == nil || r.store == nil || r.wirePublisher == nil {
 		return fmt.Errorf("retry hold replayer is not configured")
 	}
 	for {
@@ -257,8 +302,7 @@ func (r *RetryEventHoldReplayer) RunOnce(ctx context.Context, now time.Time) err
 		if err != nil || item == nil {
 			return err
 		}
-		message := basemessaging.NewMessage(item.MessageID, item.Payload)
-		if err := r.publisher.PublishMessage(ctx, item.Topic, message); err != nil {
+		if err := r.publishHeldEvent(ctx, item); err != nil {
 			r.observe(ctx, item, eventobservability.ConsumeOutcomeHoldReplayFailed)
 			if markErr := r.store.markReplayFailed(ctx, item, err, now); markErr != nil {
 				return errors.Join(err, markErr)
@@ -272,12 +316,20 @@ func (r *RetryEventHoldReplayer) RunOnce(ctx context.Context, now time.Time) err
 	}
 }
 
+func (r *RetryEventHoldReplayer) publishHeldEvent(ctx context.Context, item *heldEvent) error {
+	body, err := legacy.Encode(legacy.Envelope{UUID: item.MessageID, Payload: item.Payload}, legacy.Revision2)
+	if err != nil {
+		return err
+	}
+	return r.wirePublisher.PublishWire(ctx, item.Topic, body)
+}
+
 func (r *RetryEventHoldReplayer) observe(ctx context.Context, item *heldEvent, outcome eventobservability.ConsumeOutcome) {
 	if r == nil || r.observer == nil || item == nil {
 		return
 	}
 	eventType := ""
-	if envelope, err := eventcodec.DecodeEnvelope(item.Payload); err == nil {
+	if envelope, err := domainwire.DecodeEnvelope(item.Payload); err == nil {
 		eventType = envelope.EventType
 	}
 	r.observer.ObserveConsume(ctx, eventobservability.ConsumeEvent{Service: "retry-hold-replayer", Topic: item.Topic, EventType: eventType, Outcome: outcome, Attempts: item.ReplayAttemptCount + 1})

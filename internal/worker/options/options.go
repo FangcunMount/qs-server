@@ -55,15 +55,14 @@ type MetricsOptions struct {
 
 // MessagingOptions 消息队列配置
 type MessagingOptions struct {
-	// Provider 消息队列提供者 (nsq, rabbitmq)
+	// Provider 消息队列提供者；v1.0 仅支持 NSQ。
 	Provider string `json:"provider" mapstructure:"provider"`
 	// NSQ 配置
-	NSQAddr           string        `json:"nsq_addr" mapstructure:"nsq-addr"`
-	NSQLookupdAddr    string        `json:"nsq_lookupd_addr" mapstructure:"nsq-lookupd-addr"`
-	NSQMessageTimeout time.Duration `json:"nsq_message_timeout" mapstructure:"nsq-message-timeout"`
-	// RabbitMQ 配置
-	RabbitMQURL string           `json:"rabbitmq_url" mapstructure:"rabbitmq_url"`
-	Delivery    *DeliveryOptions `json:"delivery" mapstructure:"delivery"`
+	NSQAddr           string           `json:"nsq_addr" mapstructure:"nsq-addr"`
+	NSQLookupdAddr    string           `json:"nsq_lookupd_addr" mapstructure:"nsq-lookupd-addr"`
+	NSQDHTTPEndpoints []string         `json:"nsqd_http_endpoints" mapstructure:"nsqd-http-endpoints"`
+	NSQMessageTimeout time.Duration    `json:"nsq_message_timeout" mapstructure:"nsq-message-timeout"`
+	Delivery          *DeliveryOptions `json:"delivery" mapstructure:"delivery"`
 }
 
 type DeliveryOptions = genericoptions.TransportDeliveryOptions
@@ -138,6 +137,7 @@ func NewOptions() *Options {
 			Provider:          "nsq",
 			NSQAddr:           "localhost:4150",
 			NSQLookupdAddr:    "localhost:4161",
+			NSQDHTTPEndpoints: []string{"http://localhost:4151"},
 			NSQMessageTimeout: 4 * time.Minute,
 			Delivery:          genericoptions.NewTransportDeliveryOptions(),
 		},
@@ -202,15 +202,15 @@ func (o *Options) Flags() (fss cliflag.NamedFlagSets) {
 	// Messaging flags
 	messagingFS := fss.FlagSet("messaging")
 	messagingFS.StringVar(&o.Messaging.Provider, "messaging.provider", o.Messaging.Provider,
-		"Message queue provider (nsq, rabbitmq)")
+		"Message queue provider (nsq)")
 	messagingFS.StringVar(&o.Messaging.NSQAddr, "messaging.nsq-addr", o.Messaging.NSQAddr,
 		"NSQ daemon address")
 	messagingFS.StringVar(&o.Messaging.NSQLookupdAddr, "messaging.nsq-lookupd-addr", o.Messaging.NSQLookupdAddr,
 		"NSQ lookupd address")
+	messagingFS.StringSliceVar(&o.Messaging.NSQDHTTPEndpoints, "messaging.nsqd-http-endpoints", o.Messaging.NSQDHTTPEndpoints,
+		"Explicit nsqd HTTP URLs for durable channel preparation")
 	messagingFS.DurationVar(&o.Messaging.NSQMessageTimeout, "messaging.nsq-message-timeout", o.Messaging.NSQMessageTimeout,
 		"NSQ server-side message timeout; must cover the longest worker handler RPC")
-	messagingFS.StringVar(&o.Messaging.RabbitMQURL, "messaging.rabbitmq-url", o.Messaging.RabbitMQURL,
-		"RabbitMQ connection URL")
 	if o.Messaging.Delivery == nil {
 		o.Messaging.Delivery = genericoptions.NewTransportDeliveryOptions()
 	}
@@ -319,7 +319,13 @@ func (o *Options) Validate() []error {
 			errs = append(errs, fmt.Errorf("messaging.delivery.max_attempts must be between 1 and %d", retrygovernance.HardMaxDeliveryAttempts))
 		}
 	}
+	if o.Messaging != nil && o.Messaging.Provider != "nsq" {
+		errs = append(errs, fmt.Errorf("unsupported messaging provider: %s (supported: nsq)", o.Messaging.Provider))
+	}
 	if o.Messaging != nil && o.Messaging.Provider == "nsq" {
+		if len(o.Messaging.NSQDHTTPEndpoints) == 0 {
+			errs = append(errs, fmt.Errorf("messaging.nsqd-http-endpoints is required for NSQ channel preparation"))
+		}
 		if o.Messaging.NSQMessageTimeout <= 0 {
 			errs = append(errs, fmt.Errorf("messaging.nsq_message_timeout must be greater than 0"))
 		} else if o.GRPC != nil && o.Messaging.NSQMessageTimeout <= o.GRPC.RequestTimeout {

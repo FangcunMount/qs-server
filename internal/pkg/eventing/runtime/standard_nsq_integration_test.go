@@ -5,20 +5,78 @@ package eventruntime
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"os"
 	"testing"
 	"time"
 
-	"github.com/FangcunMount/component-base/pkg/event"
 	"github.com/FangcunMount/component-base/pkg/eventcodec"
 	"github.com/FangcunMount/component-base/pkg/messaging"
 	"github.com/FangcunMount/qs-server/internal/apiserver/eventing/standardoutbox"
+	"github.com/FangcunMount/qs-server/internal/pkg/event"
+	"github.com/FangcunMount/qs-server/internal/pkg/messagingruntime"
 	"github.com/FangcunMount/reliable-messaging/message"
 	"github.com/FangcunMount/reliable-messaging/transport"
 	sdknsq "github.com/FangcunMount/reliable-messaging/transport/nsq"
 	driver "github.com/nsqio/go-nsq"
 	"github.com/stretchr/testify/require"
 )
+
+type directTopicResolver string
+
+func (r directTopicResolver) GetTopicForEvent(string) (string, bool) { return string(r), true }
+
+func TestDirectEventWireThroughRealNSQ(t *testing.T) {
+	address := os.Getenv("RM_QS_NSQ_TCP")
+	if address != "nsqd:4150" {
+		t.Fatal("disposable nsqd:4150 required")
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+	topic := fmt.Sprintf("qs-m6-direct-%d", time.Now().UnixNano())
+	cfg := driver.NewConfig()
+	consumer, err := driver.NewConsumer(topic, "wire-proof", cfg)
+	require.NoError(t, err)
+	consumer.SetLogger(nil, driver.LogLevelError)
+	received := make(chan []byte, 1)
+	consumer.AddHandler(driver.HandlerFunc(func(raw *driver.Message) error {
+		received <- append([]byte(nil), raw.Body...)
+		return nil
+	}))
+	require.NoError(t, consumer.ConnectToNSQD(address))
+	defer func() {
+		consumer.Stop()
+		select {
+		case <-consumer.StopChan:
+		case <-time.After(5 * time.Second):
+			t.Error("direct event consumer did not stop")
+		}
+	}()
+	publisher, err := messagingruntime.NewSDKNSQWirePublisher(address)
+	require.NoError(t, err)
+	defer func() { require.NoError(t, publisher.Close()) }()
+	evt := event.Event[map[string]any]{
+		BaseEvent: event.BaseEvent{
+			ID: "qs-m6-direct-event", EventTypeValue: "evaluation.requested",
+			OccurredAtValue:    time.Date(2026, 9, 27, 12, 0, 0, 0, time.FixedZone("UTC+8", 8*3600)),
+			AggregateTypeValue: "Evaluation", AggregateIDValue: "assessment-1",
+		},
+		Data: map[string]any{"org_id": 1, "assessment_id": 1},
+	}
+	route := NewRoutingPublisher(RoutingPublisherOptions{
+		TopicResolver: directTopicResolver(topic), WirePublisher: publisher,
+		Mode: PublishModeMQ, Source: SourceAPIServer,
+	})
+	require.NoError(t, route.Publish(ctx, evt))
+	want, err := standardoutbox.EncodeWire(evt, SourceAPIServer)
+	require.NoError(t, err)
+	select {
+	case raw := <-received:
+		require.True(t, bytes.Equal(want, raw), "direct API event changed original NSQ wire bytes")
+	case <-ctx.Done():
+		t.Fatal("direct API event did not reach NSQ", ctx.Err())
+	}
+}
 
 func TestStandardWireThroughRealNSQ(t *testing.T) {
 	address := os.Getenv("RM_QS_NSQ_TCP")

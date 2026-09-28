@@ -79,7 +79,7 @@ func TestWorkerSettlementThroughNSQPersistsPoisonUnknownAndExhaustion(t *testing
 
 	runtime := &workerSettlementRuntime{topic: topic}
 	observer := &workerSettlementObserver{}
-	subscriber, err := NewSubscriber(SubscriberConfig{
+	subscriber, err := newHistoricalNSQSubscriber(SubscriberConfig{
 		Provider: "nsq", NSQLookupdAddr: integrationEnv("NSQ_LOOKUPD_ADDR", "127.0.0.1:4161"), NSQMessageTimeout: time.Minute,
 	}, basemessaging.SubscriberOptions{
 		MaxInFlight: 1, MaxAttempts: 2,
@@ -188,7 +188,7 @@ func TestNSQDeliveryExhaustionPersistsMySQLDeadLetter(t *testing.T) {
 		},
 		FailedMessageHandler: FailedMessageHandler(recorder),
 	}
-	subscriber, err := NewSubscriber(SubscriberConfig{Provider: "nsq", NSQLookupdAddr: lookupd, NSQMessageTimeout: time.Minute}, options)
+	subscriber, err := newHistoricalNSQSubscriber(SubscriberConfig{Provider: "nsq", NSQLookupdAddr: lookupd, NSQMessageTimeout: time.Minute}, options)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -336,7 +336,7 @@ func TestWorkerUnknownEventRecoversAfterSubscriberRestart(t *testing.T) {
 		RetryBackoff:         basemessaging.RetryBackoffOptions{BaseDelay: 500 * time.Millisecond, MaxDelay: 500 * time.Millisecond},
 		FailedMessageHandler: FailedMessageHandler(wrappedRecorder),
 	}
-	subscriber, err := NewSubscriber(subscriberConfig, subscriberOptions)
+	subscriber, err := newHistoricalNSQSubscriber(subscriberConfig, subscriberOptions)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -380,7 +380,7 @@ func TestWorkerUnknownEventRecoversAfterSubscriberRestart(t *testing.T) {
 		t.Fatal(err)
 	}
 	restartedObserver := &workerSettlementObserver{}
-	restartedSubscriber, err := NewSubscriber(subscriberConfig, subscriberOptions)
+	restartedSubscriber, err := newHistoricalNSQSubscriber(subscriberConfig, subscriberOptions)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -446,7 +446,7 @@ func TestNSQFailedHandoffWaitsForMySQLRecoveryWithoutBusinessRetry(t *testing.T)
 	failedWrites := make(chan error, 4)
 	var businessCalls atomic.Int32
 	var auditCalls atomic.Int32
-	subscriber, err := NewSubscriber(SubscriberConfig{
+	subscriber, err := newHistoricalNSQSubscriber(SubscriberConfig{
 		Provider: "nsq", NSQLookupdAddr: integrationEnv("NSQ_LOOKUPD_ADDR", "127.0.0.1:4161"), NSQMessageTimeout: time.Minute,
 	}, basemessaging.SubscriberOptions{
 		MaxInFlight: 1, MaxAttempts: 2,

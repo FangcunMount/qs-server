@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/FangcunMount/component-base/pkg/errors"
-	"github.com/FangcunMount/component-base/pkg/event"
 	"github.com/FangcunMount/component-base/pkg/logger"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
 	apptransaction "github.com/FangcunMount/qs-server/internal/apiserver/application/transaction"
@@ -13,6 +12,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/plan"
 	planentryport "github.com/FangcunMount/qs-server/internal/apiserver/port/planentry"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
+	"github.com/FangcunMount/qs-server/internal/pkg/event"
 )
 
 // taskManagementService 任务管理服务实现

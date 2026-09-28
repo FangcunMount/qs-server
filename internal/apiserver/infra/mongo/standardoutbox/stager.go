@@ -7,9 +7,9 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/FangcunMount/component-base/pkg/event"
 	"github.com/FangcunMount/qs-server/internal/apiserver/eventing/standardoutbox"
 	outboxport "github.com/FangcunMount/qs-server/internal/apiserver/port/outbox"
+	"github.com/FangcunMount/qs-server/internal/pkg/event"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
 	sdkmongo "github.com/FangcunMount/reliable-messaging/storage/mongo"
 	"go.mongodb.org/mongo-driver/mongo"

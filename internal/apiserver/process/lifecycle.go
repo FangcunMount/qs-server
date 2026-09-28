@@ -61,7 +61,9 @@ func buildLifecycleDeps(resources resourceOutput, containerOutput containerOutpu
 	if resources.handles.dbManager != nil {
 		deps.resource.closeDatabase = resources.handles.dbManager.Close
 	}
-	if resources.messaging.mqPublisher != nil {
+	if resources.messaging.closePublisher != nil {
+		deps.resource.closePublisher = resources.messaging.closePublisher
+	} else if resources.messaging.mqPublisher != nil {
 		deps.resource.closePublisher = resources.messaging.mqPublisher.Close
 	}
 	if containerOutput.container != nil {
@@ -113,8 +115,8 @@ func runProcessLifecycleDeps(deps processLifecycleDeps) {
 			log.Errorf("Failed to cleanup container resources: %v", err)
 		}
 	}
-	// The container first stops relays and drains SDK publishes. The original
-	// component-base publisher still owns its own NSQ connection and closes next.
+	// The container first stops relays and drains standard Outbox publishes.
+	// The direct SDK NSQ event producer closes next.
 	if deps.resource.closePublisher != nil {
 		if err := deps.resource.closePublisher(); err != nil {
 			log.Errorf("Failed to close event publisher: %v", err)

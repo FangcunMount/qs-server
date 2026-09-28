@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/FangcunMount/component-base/pkg/logger"
-	"github.com/FangcunMount/component-base/pkg/messaging"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container"
 	eventtransport "github.com/FangcunMount/qs-server/internal/pkg/eventing/transport"
 	iamauth "github.com/FangcunMount/qs-server/internal/pkg/iamauth"
@@ -25,7 +24,7 @@ type integrationStageDeps struct {
 	container             *container.Container
 	initializeWeChat      func(*container.Container) error
 	deadLetterRecorder    eventtransport.DeadLetterRecorder
-	startAuthzVersionSync func(*container.Container, eventtransport.DeadLetterRecorder) messaging.Subscriber
+	startAuthzVersionSync func(*container.Container, eventtransport.DeadLetterRecorder) notificationSubscriber
 }
 
 func (s *server) initializeContainer(resources resourceOutput) (containerOutput, error) {
@@ -176,7 +175,7 @@ func (s *server) initializeWeChatServices(c *container.Container) error {
 	return c.InitTaskOpenedReminderService(s.config.WeChatOptions)
 }
 
-func (s *server) startAuthzVersionSync(c *container.Container, recorder eventtransport.DeadLetterRecorder) messaging.Subscriber {
+func (s *server) startAuthzVersionSync(c *container.Container, recorder eventtransport.DeadLetterRecorder) notificationSubscriber {
 	if s == nil || s.config == nil || c == nil || c.IAMModule == nil {
 		return nil
 	}
@@ -190,39 +189,33 @@ func (s *server) startAuthzVersionSync(c *container.Container, recorder eventtra
 		logger.L(context.Background()).Warnw("IAM authz version subscriber requires durable dead-letter audit", "component", "apiserver")
 		return nil
 	}
-	options, err := eventtransport.NewSubscriberOptions(0, authzSync.Delivery.EffectiveMaxAttempts(), eventtransport.FailedMessageHandler(recorder))
-	if err != nil {
-		logger.L(context.Background()).Warnw("Failed to configure authz version subscriber", "component", "apiserver", "error", err.Error())
-		return nil
-	}
 	channelPrefix := authzSync.ChannelPrefix
 	if channelPrefix == "" {
 		channelPrefix = "qs-authz-sync"
 	}
 	channel, handoffGroup := authzVersionSubscriberIdentity(channelPrefix, authzSync.EphemeralNSQ)
-	options.FailedHandoffGroup = handoffGroup
-	subscriber, err := eventtransport.NewSubscriber(eventtransport.SubscriberConfig{
-		Provider: authzSync.Provider, NSQLookupdAddr: authzSync.NSQLookupdAddr, RabbitMQURL: authzSync.RabbitMQURL,
-	}, options)
+	subscriberConfig := eventtransport.SubscriberConfig{
+		Provider: authzSync.Provider, NSQLookupdAddr: authzSync.NSQLookupdAddr,
+		FailedHandoffGroup: handoffGroup,
+	}
+	sdkSubscriber, err := eventtransport.NewSDKDeliverySubscriber(
+		subscriberConfig, 0, authzSync.Delivery.EffectiveMaxAttempts(), eventtransport.SDKFailedHandoffHandler(recorder),
+	)
+	if err == nil {
+		err = iamauth.SubscribeVersionChangesSDK(context.Background(), sdkSubscriber, authzSync.Topic, channel, loader)
+	}
 	if err != nil {
+		if sdkSubscriber != nil {
+			sdkSubscriber.Stop()
+			_ = sdkSubscriber.Close()
+		}
 		logger.L(context.Background()).Warnw("Failed to create authz version subscriber",
 			"component", "apiserver",
 			"error", err.Error(),
 		)
 		return nil
 	}
-
-	if err := iamauth.SubscribeVersionChanges(context.Background(), subscriber, authzSync.Topic, channel, loader); err != nil {
-		_ = subscriber.Close()
-		logger.L(context.Background()).Warnw("Failed to subscribe IAM authz version sync",
-			"component", "apiserver",
-			"error", err.Error(),
-			"channel", channel,
-			"topic", authzSync.Topic,
-		)
-		return nil
-	}
-	return subscriber
+	return sdkSubscriber
 }
 
 func authzVersionSubscriberIdentity(prefix string, ephemeralNSQ bool) (channel, handoffGroup string) {

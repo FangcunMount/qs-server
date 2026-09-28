@@ -2,8 +2,8 @@ package plan
 
 import (
 	"context"
-	"github.com/FangcunMount/component-base/pkg/event"
 	gormuow "github.com/FangcunMount/component-base/pkg/uow/gorm"
+	"github.com/FangcunMount/qs-server/internal/pkg/event"
 )
 
 // NewCommitPublisher defers plan notifications until the outermost MySQL

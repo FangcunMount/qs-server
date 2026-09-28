@@ -65,7 +65,7 @@ func configuredEventSubsystem(cfg *config.Config) func(eventsubsystem.Options) (
 func buildM4StandardEventSubsystem(opts eventsubsystem.Options, cfg *config.Config, selected options.StandardOutboxOptions) (*eventsubsystem.Subsystem, error) {
 	if cfg == nil || cfg.MessagingOptions == nil || !cfg.MessagingOptions.Enabled ||
 		cfg.MessagingOptions.Provider != "nsq" || cfg.MessagingOptions.NSQAddr == "" ||
-		opts.MQPublisher == nil || opts.PublisherMode != eventruntime.PublishModeMQ {
+		(opts.MQPublisher == nil && opts.WirePublisher == nil) || opts.PublisherMode != eventruntime.PublishModeMQ {
 		return nil, errors.New("M4 standard outbox requires a live NSQ-backed messaging configuration")
 	}
 	if selected.Mongo && opts.MongoDB == nil || selected.Assessment && opts.MySQLDB == nil {

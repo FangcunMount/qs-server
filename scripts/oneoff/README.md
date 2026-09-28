@@ -24,6 +24,7 @@
 | `audit_evaluation_p1_evidence.sql` | Evaluation P1 证据查询 | 否 |
 | `audit_evaluation_p2_evidence.sql` | Evaluation P2 证据查询 | 否 |
 | `observe_outbox_by_event_type` | Outbox 事件类型观测 | 否 |
+| `answersheet_gap_audit` | 固定答卷 ID 窗口、接单截止时间与索引的跨 Mongo／MySQL 测评效果缺口核查；仅处理新持久接单标记，结果不授权自动重投 | 否 |
 | `cleanup_orphaned_assessment_documents` | **blocked / audit-only**：只允许 dry-run 对账缺少 MySQL Assessment 引用的 Mongo AnswerSheet 候选；候选结果不是删除授权 | 否；禁止 `--apply` |
 
 

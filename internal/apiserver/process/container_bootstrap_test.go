@@ -7,7 +7,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/FangcunMount/component-base/pkg/messaging"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container"
 	eventtransport "github.com/FangcunMount/qs-server/internal/pkg/eventing/transport"
 )
@@ -96,7 +95,7 @@ func TestBootstrapIntegrationStageInitializesWeChatAndAuthzSync(t *testing.T) {
 			order = append(order, "wechat")
 			return nil
 		},
-		startAuthzVersionSync: func(c *container.Container, _ eventtransport.DeadLetterRecorder) messaging.Subscriber {
+		startAuthzVersionSync: func(c *container.Container, _ eventtransport.DeadLetterRecorder) notificationSubscriber {
 			if c != containerOutput.container {
 				t.Fatalf("authz container = %#v, want %#v", c, containerOutput.container)
 			}

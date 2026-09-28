@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 
-	"github.com/FangcunMount/component-base/pkg/event"
 	cachegovernance "github.com/FangcunMount/qs-server/internal/apiserver/application/cachegovernance"
 	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
 	systemgov "github.com/FangcunMount/qs-server/internal/apiserver/application/systemgovernance"
@@ -18,6 +17,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/options"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/interpretationreadmodel"
 	outboxport "github.com/FangcunMount/qs-server/internal/apiserver/port/outbox"
+	"github.com/FangcunMount/qs-server/internal/pkg/event"
 	"github.com/FangcunMount/qs-server/internal/pkg/resilience"
 	"github.com/FangcunMount/qs-server/internal/pkg/resilience/control"
 	"go.mongodb.org/mongo-driver/mongo"

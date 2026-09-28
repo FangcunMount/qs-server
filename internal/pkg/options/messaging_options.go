@@ -3,10 +3,6 @@ package options
 import (
 	"fmt"
 
-	"github.com/FangcunMount/component-base/pkg/messaging"
-	"github.com/FangcunMount/component-base/pkg/messaging/nsq"
-	"github.com/FangcunMount/component-base/pkg/messaging/rabbitmq"
-	"github.com/FangcunMount/qs-server/internal/pkg/messagingruntime"
 	"github.com/FangcunMount/qs-server/internal/pkg/retrygovernance"
 	"github.com/spf13/pflag"
 )
@@ -16,18 +12,16 @@ type MessagingOptions struct {
 	// Enabled 是否启用消息队列
 	Enabled bool `json:"enabled" mapstructure:"enabled"`
 
-	// Provider 消息队列提供者 (nsq, rabbitmq)
+	// Provider 消息队列提供者；v1.0 仅支持 NSQ。
 	Provider string `json:"provider" mapstructure:"provider"`
 
 	// NSQ 配置
-	NSQAddr        string `json:"nsq_addr" mapstructure:"nsq-addr"`
-	NSQLookupdAddr string `json:"nsq_lookupd_addr" mapstructure:"nsq-lookupd-addr"`
+	NSQAddr              string   `json:"nsq_addr" mapstructure:"nsq-addr"`
+	NSQLookupdAddr       string   `json:"nsq_lookupd_addr" mapstructure:"nsq-lookupd-addr"`
+	NSQDHTTPEndpoints    []string `json:"nsqd_http_endpoints" mapstructure:"nsqd-http-endpoints"`
+	PrimaryWorkerChannel string   `json:"primary_worker_channel" mapstructure:"primary-worker-channel"`
 
-	// RabbitMQ 配置
-	RabbitMQURL          string                    `json:"rabbitmq_url" mapstructure:"rabbitmq-url"`
-	RabbitMQExchange     string                    `json:"rabbitmq_exchange" mapstructure:"rabbitmq-exchange"`
-	RabbitMQExchangeType string                    `json:"rabbitmq_exchange_type" mapstructure:"rabbitmq-exchange-type"`
-	Delivery             *TransportDeliveryOptions `json:"delivery" mapstructure:"delivery"`
+	Delivery *TransportDeliveryOptions `json:"delivery" mapstructure:"delivery"`
 }
 
 type TransportDeliveryOptions struct {
@@ -66,8 +60,7 @@ func NewMessagingOptions() *MessagingOptions {
 		Provider:             "nsq",
 		NSQAddr:              "127.0.0.1:4150",
 		NSQLookupdAddr:       "127.0.0.1:4161",
-		RabbitMQExchange:     "qs.events",
-		RabbitMQExchangeType: "topic",
+		PrimaryWorkerChannel: "qs-worker",
 		Delivery:             NewTransportDeliveryOptions(),
 	}
 }
@@ -77,17 +70,15 @@ func (o *MessagingOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.BoolVar(&o.Enabled, "messaging.enabled", o.Enabled,
 		"Enable message queue for event publishing")
 	fs.StringVar(&o.Provider, "messaging.provider", o.Provider,
-		"Message queue provider (nsq, rabbitmq)")
+		"Message queue provider (nsq)")
 	fs.StringVar(&o.NSQAddr, "messaging.nsq-addr", o.NSQAddr,
 		"NSQ daemon address for publishing")
 	fs.StringVar(&o.NSQLookupdAddr, "messaging.nsq-lookupd-addr", o.NSQLookupdAddr,
 		"NSQ lookupd address (optional for apiserver)")
-	fs.StringVar(&o.RabbitMQURL, "messaging.rabbitmq-url", o.RabbitMQURL,
-		"RabbitMQ connection URL")
-	fs.StringVar(&o.RabbitMQExchange, "messaging.rabbitmq-exchange", o.RabbitMQExchange,
-		"RabbitMQ exchange name")
-	fs.StringVar(&o.RabbitMQExchangeType, "messaging.rabbitmq-exchange-type", o.RabbitMQExchangeType,
-		"RabbitMQ exchange type (direct, topic, fanout)")
+	fs.StringSliceVar(&o.NSQDHTTPEndpoints, "messaging.nsqd-http-endpoints", o.NSQDHTTPEndpoints,
+		"Explicit nsqd HTTP URLs for durable channel preparation")
+	fs.StringVar(&o.PrimaryWorkerChannel, "messaging.primary-worker-channel", o.PrimaryWorkerChannel,
+		"Durable channel used by the primary Worker consumers")
 	if o.Delivery == nil {
 		o.Delivery = NewTransportDeliveryOptions()
 	}
@@ -100,44 +91,22 @@ func (o *MessagingOptions) AddFlags(fs *pflag.FlagSet) {
 // Validate 验证配置
 func (o *MessagingOptions) Validate() []error {
 	errs := o.Delivery.Validate("messaging.delivery")
+	if o.Provider != "nsq" {
+		errs = append(errs, fmt.Errorf("unsupported messaging provider: %s (supported: nsq)", o.Provider))
+	}
 
 	if !o.Enabled {
 		return errs
 	}
 
-	switch o.Provider {
-	case "nsq":
+	if o.Provider == "nsq" {
 		if o.NSQAddr == "" {
 			errs = append(errs, fmt.Errorf("nsq-addr is required when using NSQ"))
 		}
-	case "rabbitmq":
-		if o.RabbitMQURL == "" {
-			errs = append(errs, fmt.Errorf("rabbitmq-url is required when using RabbitMQ"))
+		if len(o.NSQDHTTPEndpoints) == 0 || o.PrimaryWorkerChannel == "" {
+			errs = append(errs, fmt.Errorf("explicit nsqd-http-endpoints and primary-worker-channel are required when using NSQ"))
 		}
-	default:
-		errs = append(errs, fmt.Errorf("unsupported messaging provider: %s (supported: nsq, rabbitmq)", o.Provider))
 	}
 
 	return errs
-}
-
-// NewPublisher 创建消息队列发布器
-func (o *MessagingOptions) NewPublisher() (messaging.Publisher, error) {
-	if !o.Enabled {
-		return nil, fmt.Errorf("messaging is not enabled")
-	}
-
-	switch o.Provider {
-	case "nsq":
-		publisher, err := nsq.NewPublisher(o.NSQAddr, nil)
-		if err != nil {
-			return nil, err
-		}
-		return messagingruntime.WrapNSQReconnectPublisher(publisher), nil
-	case "rabbitmq":
-		// 创建 RabbitMQ Publisher
-		return rabbitmq.NewPublisher(o.RabbitMQURL)
-	default:
-		return nil, fmt.Errorf("unsupported messaging provider: %s", o.Provider)
-	}
 }

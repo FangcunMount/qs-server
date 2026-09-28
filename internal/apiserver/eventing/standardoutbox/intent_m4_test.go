@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/FangcunMount/component-base/pkg/event"
+	"github.com/FangcunMount/qs-server/internal/pkg/event"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
 )
 
@@ -17,9 +17,16 @@ func TestPrepareIntentsCoversCurrentDurableCatalog(t *testing.T) {
 		t.Fatal(err)
 	}
 	resolver := eventcatalog.NewCatalog(cfg)
-	cases := []string{
-		"answersheet.submitted", "evaluation.requested", "evaluation.retry.requested", "evaluation.outcome.committed",
-		"evaluation.failed", "interpretation.report.generated", "interpretation.report.failed", "interpretation.retry.requested",
+	cases := []struct{ eventType, topic string }{
+		{"answersheet.submitted", "qs.evaluation.lifecycle"},
+		{"evaluation.requested", "qs.evaluation.lifecycle"},
+		{"evaluation.retry.requested", "qs.evaluation.lifecycle"},
+		{"evaluation.outcome.committed", "qs.evaluation.lifecycle"},
+		{"evaluation.failed", "qs.evaluation.lifecycle"},
+		{"interpretation.report.generated", "qs.evaluation.lifecycle"},
+		{"interpretation.report.failed", "qs.evaluation.lifecycle"},
+		{"interpretation.retry.requested", "qs.evaluation.lifecycle"},
+		{"task.opened.reminder.requested", "qs.plan.task"},
 	}
 	var durableCount int
 	for _, spec := range cfg.Events {
@@ -30,11 +37,11 @@ func TestPrepareIntentsCoversCurrentDurableCatalog(t *testing.T) {
 	if durableCount != len(cases) {
 		t.Fatalf("durable catalog changed: configured=%d protected=%d", durableCount, len(cases))
 	}
-	for _, eventType := range cases {
-		t.Run(eventType, func(t *testing.T) {
+	for _, tc := range cases {
+		t.Run(tc.eventType, func(t *testing.T) {
 			evt := event.Event[map[string]any]{
 				BaseEvent: event.BaseEvent{
-					ID: "stable-" + eventType, EventTypeValue: eventType, AggregateTypeValue: "Proof", AggregateIDValue: "1",
+					ID: "stable-" + tc.eventType, EventTypeValue: tc.eventType, AggregateTypeValue: "Proof", AggregateIDValue: "1",
 					OccurredAtValue: time.Date(2026, 9, 23, 2, 0, 0, 0, time.UTC),
 				},
 				Data: map[string]any{"org_id": 501},
@@ -48,7 +55,7 @@ func TestPrepareIntentsCoversCurrentDurableCatalog(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if input.ID != evt.EventID() || input.EventType != eventType || input.Scope != "org:501" || input.Destination != "qs.evaluation.lifecycle" ||
+			if input.ID != evt.EventID() || input.EventType != tc.eventType || input.Scope != "org:501" || input.Destination != tc.topic ||
 				input.OccurredAt != "2026-09-23T10:00:00+08:00" || !bytes.Equal(input.Payload, wire) {
 				t.Fatalf("standard intent changed catalog, identity, scope, UTC+8 time or wire: %+v", input)
 			}

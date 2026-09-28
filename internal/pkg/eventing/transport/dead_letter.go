@@ -9,6 +9,8 @@ import (
 
 	basemessaging "github.com/FangcunMount/component-base/pkg/messaging"
 	genericoptions "github.com/FangcunMount/qs-server/internal/pkg/options"
+	rmtransport "github.com/FangcunMount/reliable-messaging/transport"
+	"github.com/FangcunMount/reliable-messaging/wire/legacy"
 	drivermysql "github.com/go-sql-driver/mysql"
 )
 
@@ -107,6 +109,20 @@ func FailedMessageHandler(recorder DeadLetterRecorder) basemessaging.FailedMessa
 	}
 }
 
+// SDKFailedHandoffHandler persists the SDK terminal handoff before NSQ may
+// acknowledge its failure-channel delivery. A failed write must be returned.
+func SDKFailedHandoffHandler(recorder DeadLetterRecorder) func(context.Context, legacy.FailedHandoff) error {
+	return func(ctx context.Context, failed legacy.FailedHandoff) error {
+		if recorder == nil || failed.UUID == "" || failed.Topic == "" || failed.Channel == "" || failed.Attempts < 1 || failed.Cause == "" {
+			return fmt.Errorf("dead-letter audit store is not configured")
+		}
+		return recorder.RecordDeadLetter(ctx, deadLetterRecord(
+			"nsq", failed.Topic, failed.Channel, failed.Attempts,
+			failed.UUID, failed.TransportMessageID, failed.Payload, failed.Cause,
+		))
+	}
+}
+
 // NewUnknownEventRecorder preserves an unsupported event before its Worker
 // delivery is acknowledged. A failed database write must leave it unsettled.
 func NewUnknownEventRecorder(provider string, recorder DeadLetterRecorder) func(context.Context, *basemessaging.Message, string) error {
@@ -116,6 +132,21 @@ func NewUnknownEventRecorder(provider string, recorder DeadLetterRecorder) func(
 		}
 		return recorder.RecordDeadLetter(ctx, deadLetterRecord(
 			provider, msg.Topic, msg.Channel, max(int(msg.Attempts), 1), msg.UUID, msg.TransportMessageID, msg.Payload,
+			"unknown event type: "+eventType,
+		))
+	}
+}
+
+// NewDeliveryUnknownEventRecorder records an unsupported SDK delivery before
+// the business handler acknowledges it. The application and physical IDs stay
+// separate so redelivery and audit deduplication keep their original meaning.
+func NewDeliveryUnknownEventRecorder(provider string, recorder DeadLetterRecorder) func(context.Context, rmtransport.Received, string) error {
+	return func(ctx context.Context, msg rmtransport.Received, eventType string) error {
+		if recorder == nil || msg.ID == "" || provider == "" || eventType == "" {
+			return fmt.Errorf("unknown-event audit store or identity is not configured")
+		}
+		return recorder.RecordDeadLetter(ctx, deadLetterRecord(
+			provider, msg.Topic, msg.Channel, max(int(msg.Attempts), 1), msg.ID, msg.TransportID, msg.Payload,
 			"unknown event type: "+eventType,
 		))
 	}

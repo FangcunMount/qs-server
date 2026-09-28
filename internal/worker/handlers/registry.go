@@ -10,7 +10,6 @@ import (
 	"sort"
 	"time"
 
-	"github.com/FangcunMount/component-base/pkg/eventcodec"
 	evalpb "github.com/FangcunMount/qs-server/api/grpc/gen/evaluation"
 	pb "github.com/FangcunMount/qs-server/api/grpc/gen/internalapi"
 	interpretationpb "github.com/FangcunMount/qs-server/api/grpc/gen/interpretation"
@@ -20,6 +19,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/resilience/locklease"
 	"github.com/FangcunMount/qs-server/internal/worker/infra/grpcclient"
 	"github.com/FangcunMount/qs-server/internal/worker/port"
+	domainwire "github.com/FangcunMount/reliable-messaging/wire/domain"
 )
 
 var ErrAutomaticRetryPaused = eventruntime.ErrAutomaticRetryPaused
@@ -146,11 +146,11 @@ func (r *Registry) Create(name string, deps *Dependencies) (HandlerFunc, bool) {
 // ==================== 事件消息解析 ====================
 
 // EventEnvelope 事件信封结构。
-type EventEnvelope = eventcodec.Envelope
+type EventEnvelope = domainwire.Envelope
 
 // ParseEventEnvelope 解析事件信封
 func ParseEventEnvelope(payload []byte) (*EventEnvelope, error) {
-	return eventcodec.DecodeEnvelope(payload)
+	return domainwire.DecodeEnvelope(payload)
 }
 
 // ParseEventData 解析事件业务数据到指定类型
