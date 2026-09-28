@@ -35,7 +35,7 @@ jobs:
           test "$(docker image inspect "$fallback" --format '{{.Id}}')" = "$fallback_id"
           running=$(docker ps --filter label=com.docker.compose.project=qs-worker --filter label=com.docker.compose.service=runtime --filter status=running --format '{{.Image}} {{.ID}}')
           test "$(printf '%s\n' "$running" | sed '/^$/d' | wc -l | tr -d ' ')" = 3
-          while read -r image container; do
+          while read -r _ container; do
             test "$(docker inspect "$container" --format '{{.Image}}')" = "$current_id"
           done <<<"$running"
           trap 'docker logout ghcr.io >/dev/null 2>&1 || true' EXIT
