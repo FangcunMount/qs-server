@@ -83,19 +83,15 @@ jobs:
     timeout-minutes: 8
     steps:
       - uses: actions/checkout@v6
-      - uses: actions/setup-go@v6
-        if: inputs.check_mode == 'prepare-role-window'
-        with:
-          go-version-file: go.mod
-      - name: Build fixed-scope recovery tool
+      - name: Verify fixed-scope recovery tool
         if: inputs.check_mode == 'prepare-role-window'
         shell: bash
         run: |
           set -Eeuo pipefail
           test "$(shasum -a 256 scripts/cd/m5-authz-temporary-tool.go | awk '{print $1}')" = 7c623d23edb9b8ef266bfc357616b4c02483f282eaad364f2c7b58f5bdcfe453
-          GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -trimpath -o scripts/cd/m5-authz-temporary-tool-linux scripts/cd/m5-authz-temporary-tool.go
-          sha=$(shasum -a 256 scripts/cd/m5-authz-temporary-tool-linux | awk '{print $1}')
-          sed "s/^expected=.*/expected=$sha/" scripts/cd/m5-authz-temporary-restore.sh > scripts/cd/m5-authz-temporary-restore-live.sh
+          test "$(shasum -a 256 scripts/cd/m5-authz-temporary-tool-linux | awk '{print $1}')" = 824defd5012780be40eccfcfc45ec2f7f2ce7708707a9d14c2af98012ce93bdb
+          test "$(shasum -a 256 scripts/cd/m5-authz-temporary-restore.sh | awk '{print $1}')" = ef0402574908374e8191799376b2f556c426c7247f422f9ce4f53e78160d81cb
+          cp scripts/cd/m5-authz-temporary-restore.sh scripts/cd/m5-authz-temporary-restore-live.sh
           chmod 0700 scripts/cd/m5-authz-temporary-tool-linux scripts/cd/m5-authz-temporary-restore-live.sh
       - name: Stage recovery materials
         if: inputs.check_mode == 'prepare-role-window'
