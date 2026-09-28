@@ -5,6 +5,7 @@ package transaction
 import (
 	"context"
 	"os"
+	"strconv"
 	"testing"
 	"time"
 
@@ -14,6 +15,7 @@ import (
 	assessmentmysql "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/evaluation"
 	mysqlstandard "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/standardoutbox"
 	errorcode "github.com/FangcunMount/qs-server/internal/pkg/code"
+	"github.com/FangcunMount/qs-server/internal/pkg/event"
 	eventcatalog "github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
 	eventruntime "github.com/FangcunMount/qs-server/internal/pkg/eventing/runtime"
 	sdkmysql "github.com/FangcunMount/reliable-messaging/storage/mysql"
@@ -142,6 +144,14 @@ events:
 	require.Equal(t, created.ID, refAssessmentID)
 	require.EqualValues(t, 1, refOrgID)
 	require.Equal(t, claims[0].Message.Input().ID, refEventID)
+	foreignScope := event.New(eventcatalog.EvaluationRequested, "Evaluation", strconv.FormatUint(created.ID, 10), map[string]any{"org_id": 999})
+	require.Error(t, runner.WithinTransaction(ctx, func(txCtx context.Context) error {
+		return stager.Stage(txCtx, foreignScope)
+	}))
+	require.NoError(t, db.Table("rm_outbox").Count(&n).Error)
+	require.EqualValues(t, 1, n)
+	require.NoError(t, db.Table("qs_rm_evaluation_request_ref").Count(&n).Error)
+	require.EqualValues(t, 1, n)
 	require.NoError(t, store.Confirm(ctx, claims[0]))
 	found, err = service.FindByAnswerSheetID(ctx, command.AnswerSheetID)
 	require.NoError(t, err)

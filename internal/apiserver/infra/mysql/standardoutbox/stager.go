@@ -93,9 +93,15 @@ func stageEvaluationRequestRef(ctx context.Context, tx *gorm.DB, evt event.Domai
 	if err != nil || orgID <= 0 {
 		return fmt.Errorf("invalid evaluation request organization scope")
 	}
-	if err := tx.WithContext(ctx).Exec(`INSERT INTO qs_rm_evaluation_request_ref
- (event_id,assessment_id,org_id) VALUES (?,?,?)`, eventID, assessmentID, orgID).Error; err != nil {
+	insert := tx.WithContext(ctx).Exec(`INSERT INTO qs_rm_evaluation_request_ref
+	(event_id,assessment_id,org_id)
+	SELECT ?,id,org_id FROM assessment
+	WHERE id=? AND org_id=? AND status='submitted' AND deleted_at IS NULL`, eventID, assessmentID, orgID)
+	if err := insert.Error; err != nil {
 		return fmt.Errorf("stage evaluation request identity: %w", err)
+	}
+	if insert.RowsAffected != 1 {
+		return fmt.Errorf("evaluation request assessment identity is not submitted in its organization")
 	}
 	return nil
 }
