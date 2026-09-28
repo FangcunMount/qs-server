@@ -11,7 +11,6 @@ import (
 	"strings"
 
 	"github.com/FangcunMount/component-base/pkg/logger"
-	"github.com/FangcunMount/component-base/pkg/messaging"
 	rmtransport "github.com/FangcunMount/reliable-messaging/transport"
 )
 
@@ -52,34 +51,6 @@ func EphemeralVersionSyncChannel(serviceName string) string {
 		channel = channel[:64-len(suffix)-13] + "-" + hex.EncodeToString(digest[:6])
 	}
 	return channel + suffix
-}
-
-// SubscribeVersionChanges 订阅 IAM authz_version 通知，并将版本水位推进到本地 SnapshotLoader。
-func SubscribeVersionChanges(
-	ctx context.Context,
-	subscriber messaging.Subscriber,
-	topic string,
-	channel string,
-	loader *SnapshotLoader,
-) error {
-	if subscriber == nil || loader == nil {
-		return nil
-	}
-	topic, channel = versionSyncRoute(topic, channel)
-
-	handler := func(msgCtx context.Context, msg *messaging.Message) error {
-		applyVersionChange(msgCtx, topic, loader, msg.Payload)
-		return nil
-	}
-
-	if err := subscriber.Subscribe(topic, channel, handler); err != nil {
-		return err
-	}
-	logger.L(ctx).Infow("subscribed IAM authz version sync",
-		"topic", topic,
-		"channel", channel,
-	)
-	return nil
 }
 
 type SDKVersionSubscriber interface {

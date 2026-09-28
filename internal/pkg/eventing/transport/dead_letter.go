@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"time"
 
-	basemessaging "github.com/FangcunMount/component-base/pkg/messaging"
 	genericoptions "github.com/FangcunMount/qs-server/internal/pkg/options"
 	rmtransport "github.com/FangcunMount/reliable-messaging/transport"
 	"github.com/FangcunMount/reliable-messaging/wire/legacy"
@@ -15,7 +14,7 @@ import (
 )
 
 type DeadLetterRecord struct {
-	// MessageID is the component-base message UUID. For enveloped domain events
+	// MessageID is the logical application UUID. For enveloped domain events
 	// it is the EventID, not the physical NSQ broker message ID.
 	MessageID string
 	// TransportMessageID distinguishes physical broker deliveries of one
@@ -93,22 +92,6 @@ func (r *SQLDeadLetterRecorder) Close() error {
 	return r.db.Close()
 }
 
-func FailedMessageHandler(recorder DeadLetterRecorder) basemessaging.FailedMessageHandler {
-	return func(ctx context.Context, failed basemessaging.FailedMessage) error {
-		if recorder == nil || failed.Message == nil {
-			return fmt.Errorf("dead-letter audit store is not configured")
-		}
-		lastError := "transport delivery exhausted"
-		if failed.Cause != nil {
-			lastError = failed.Cause.Error()
-		}
-		return recorder.RecordDeadLetter(ctx, deadLetterRecord(
-			failed.Provider, failed.Topic, failed.Channel, failed.Attempts,
-			failed.Message.UUID, failed.Message.TransportMessageID, failed.Message.Payload, lastError,
-		))
-	}
-}
-
 // SDKFailedHandoffHandler persists the SDK terminal handoff before NSQ may
 // acknowledge its failure-channel delivery. A failed write must be returned.
 func SDKFailedHandoffHandler(recorder DeadLetterRecorder) func(context.Context, legacy.FailedHandoff) error {
@@ -119,20 +102,6 @@ func SDKFailedHandoffHandler(recorder DeadLetterRecorder) func(context.Context, 
 		return recorder.RecordDeadLetter(ctx, deadLetterRecord(
 			"nsq", failed.Topic, failed.Channel, failed.Attempts,
 			failed.UUID, failed.TransportMessageID, failed.Payload, failed.Cause,
-		))
-	}
-}
-
-// NewUnknownEventRecorder preserves an unsupported event before its Worker
-// delivery is acknowledged. A failed database write must leave it unsettled.
-func NewUnknownEventRecorder(provider string, recorder DeadLetterRecorder) func(context.Context, *basemessaging.Message, string) error {
-	return func(ctx context.Context, msg *basemessaging.Message, eventType string) error {
-		if recorder == nil || msg == nil || provider == "" || eventType == "" {
-			return fmt.Errorf("unknown-event audit store or identity is not configured")
-		}
-		return recorder.RecordDeadLetter(ctx, deadLetterRecord(
-			provider, msg.Topic, msg.Channel, max(int(msg.Attempts), 1), msg.UUID, msg.TransportMessageID, msg.Payload,
-			"unknown event type: "+eventType,
 		))
 	}
 }
