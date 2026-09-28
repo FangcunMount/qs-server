@@ -35,7 +35,7 @@ if not re.fullmatch(r"[0-9]{1,20}", run_id):
 if not all(re.fullmatch(r"[0-9]{1,20}", value) for value in (raw_after, raw_upper)):
     fail("invalid_id_bounds")
 after_id, upper_id = int(raw_after), int(raw_upper)
-if not 0 <= after_id < upper_id <= 2**64 - 1:
+if not 0 <= after_id < upper_id <= 2**63 - 1:
     fail("invalid_id_bounds")
 if not re.fullmatch(r"(?:[1-9]|1[0-9]|20)", raw_pages):
     fail("invalid_page_limit")

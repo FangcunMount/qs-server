@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"io"
+	"math"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -106,6 +108,14 @@ func TestParseConfigRequiresExplicitFixedCutoffAndWindow(t *testing.T) {
 	}
 	if _, _, err := parseConfig(append(args, "--upper-id=10"), io.Discard); err == nil {
 		t.Fatal("empty ID window must fail")
+	}
+	tooLarge := append(append([]string{}, args...), "--upper-id="+strconv.FormatUint(math.MaxUint64, 10))
+	if _, _, err := parseConfig(tooLarge, io.Discard); err == nil {
+		t.Fatal("Mongo BSON cannot encode a bound above MaxInt64")
+	}
+	largestValid := append(append([]string{}, args...), "--upper-id="+strconv.FormatUint(math.MaxInt64, 10))
+	if _, _, err := parseConfig(largestValid, io.Discard); err != nil {
+		t.Fatalf("MaxInt64 bound must remain usable: %v", err)
 	}
 }
 
