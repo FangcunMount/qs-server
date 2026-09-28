@@ -13,6 +13,7 @@ health=$(sudo -n docker inspect "$container" --format '{{.State.Health.Status}}'
 
 tool=/root/rm-m5-authz-tool-linux
 restore=/root/rm-m5-role-restore.sh
+unit=rm-m5-20260928-role-restore
 inside=/tmp/rm-m5-authz-tool
 endpoint=iam-apiserver:9090
 ca=/etc/qs-server/ssl/grpc/ca/ca-chain.crt
@@ -36,15 +37,35 @@ case "$ROLE_WINDOW_MODE" in
     sudo -n -l || true
     ls -lh /tmp/rm-m5-20260928-stage/m5-authz-temporary-tool-linux /tmp/rm-m5-20260928-stage/m5-authz-temporary-restore-live.sh
     ;;
-  prepare-role-window)
+  prepare-role-window|resume-prepare-role-window)
     [[ -f /tmp/rm-m5-20260928-stage/m5-authz-temporary-tool-linux ]] || fail 'staged tool missing'
     [[ -f /tmp/rm-m5-20260928-stage/m5-authz-temporary-restore-live.sh ]] || fail 'staged restore missing'
     ! sudo -n systemctl list-timers --all --no-legend --no-pager | grep -Eq 'rm-m5-.*role-restore' || fail 'existing role recovery timer'
     sudo -n install -o root -g root -m 0700 /tmp/rm-m5-20260928-stage/m5-authz-temporary-tool-linux "$tool"
     sudo -n install -o root -g root -m 0700 /tmp/rm-m5-20260928-stage/m5-authz-temporary-restore-live.sh "$restore"
-    expected=$(sudo -n awk -F= '/^expected=/{print $2}' "$restore")
+    expected=824defd5012780be40eccfcfc45ec2f7f2ce7708707a9d14c2af98012ce93bdb
     actual=$(sudo -n sha256sum "$tool" | awk '{print $1}')
     [[ "$actual" == "$expected" ]] || fail 'installed tool hash mismatch'
+    cat >/tmp/rm-m5-20260928-role-restore.service <<'UNIT'
+[Unit]
+Description=One-time QS M5-06 Qingdao test role restoration
+[Service]
+Type=oneshot
+User=root
+ExecStart=/bin/sh /root/rm-m5-role-restore.sh --execute
+TimeoutStartSec=11min
+UNIT
+    cat >/tmp/rm-m5-20260928-role-restore.timer <<'UNIT'
+[Unit]
+Description=One-time QS M5-06 Qingdao test role restoration timer
+[Timer]
+OnActiveSec=90s
+AccuracySec=1s
+Unit=rm-m5-20260928-role-restore.service
+UNIT
+    sudo -n install -o root -g root -m 0644 /tmp/rm-m5-20260928-role-restore.service "/run/systemd/system/${unit}.service"
+    sudo -n install -o root -g root -m 0644 /tmp/rm-m5-20260928-role-restore.timer "/run/systemd/system/${unit}.timer"
+    sudo -n systemctl daemon-reload
     sudo -n docker cp "$tool" "$container:$inside"
     sudo -n docker exec -u 0 "$container" chown 2000:2000 "$inside"
     sudo -n docker exec -u 0 "$container" chmod 0700 "$inside"
@@ -53,14 +74,13 @@ case "$ROLE_WINDOW_MODE" in
     echo 'PASS role recovery files installed, original roles inspected, revoke planned; no mutation'
     ;;
   revoke-role-window)
-    expected=$(sudo -n awk -F= '/^expected=/{print $2}' "$restore")
+    expected=824defd5012780be40eccfcfc45ec2f7f2ce7708707a9d14c2af98012ce93bdb
     actual=$(sudo -n sha256sum "$tool" | awk '{print $1}')
     [[ "$actual" == "$expected" ]] || fail 'installed tool hash mismatch'
     ! sudo -n systemctl list-timers --all --no-legend --no-pager | grep -Eq 'rm-m5-.*role-restore' || fail 'existing role recovery timer'
     assert_original
     run_tool plan-revoke >/dev/null
-    unit="rm-m5-${ROLE_WINDOW_RUN_ID}-role-restore"
-    sudo -n systemd-run --unit="$unit" --on-active=90s --collect /bin/sh "$restore" --execute
+    sudo -n systemctl start "${unit}.timer"
     sudo -n systemctl is-active "${unit}.timer" | grep -Fxq active || fail 'role recovery timer not active; stop without revoking'
     echo "RECOVERY_TIMER_ACTIVE unit=$unit time=$(date --iso-8601=seconds)"
     run_tool revoke || {
@@ -76,9 +96,12 @@ case "$ROLE_WINDOW_MODE" in
     ;;
   cleanup-role-window)
     assert_original
-    ! sudo -n systemctl list-timers --all --no-legend --no-pager | grep -Eq 'rm-m5-.*role-restore' || fail 'recovery timer still active'
-    sudo -n rm -f "$tool" "$restore"
+    sudo -n systemctl stop "${unit}.timer"
+    sudo -n systemctl is-active "${unit}.service" | grep -Fxq inactive || fail 'recovery service still active'
     sudo -n docker exec -u 0 "$container" rm -f "$inside"
+    sudo -n mkdir -p /dev/shm/rm-m5-20260928-cleanup
+    sudo -n rsync -a --remove-source-files "$tool" "$restore" "/run/systemd/system/${unit}.service" "/run/systemd/system/${unit}.timer" /dev/shm/rm-m5-20260928-cleanup/
+    sudo -n systemctl daemon-reload
     rm -f /tmp/rm-m5-20260928-stage/m5-authz-temporary-tool-linux /tmp/rm-m5-20260928-stage/m5-authz-temporary-restore-live.sh
     echo 'PASS original scoped roles restored; temporary recovery files removed'
     ;;
