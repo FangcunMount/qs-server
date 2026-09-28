@@ -37,6 +37,7 @@ on:
           - inspect-role-http
           - audit-assessment
           - preflight-mysql-cutover
+          - postcheck-mysql-cutover
 
 permissions:
   contents: read
@@ -141,7 +142,7 @@ jobs:
           script_path: scripts/cd/m5-authz-temporary-exercise.sh
 
   assessment_audit:
-    if: inputs.check_mode == 'audit-assessment' || inputs.check_mode == 'preflight-mysql-cutover'
+    if: inputs.check_mode == 'audit-assessment' || inputs.check_mode == 'preflight-mysql-cutover' || inputs.check_mode == 'postcheck-mysql-cutover'
     name: Read-only assessment identity and MySQL chain
     runs-on:
       group: qlume
@@ -205,9 +206,27 @@ jobs:
           fingerprint: ${{ vars.SVRA_SSH_FINGERPRINT }}
           envs: MYSQL_HOST,MYSQL_PORT,MYSQL_USERNAME,MYSQL_PASSWORD,MYSQL_DATABASE
           script_path: scripts/cd/m5-mysql-cutover-readonly-preflight.sh
+      - name: Read-only MySQL cutover postcheck
+        if: inputs.check_mode == 'postcheck-mysql-cutover'
+        uses: appleboy/ssh-action@v1.2.2
+        env:
+          EXPECTED_API_SHA: ${{ inputs.expected_api_sha }}
+          MYSQL_HOST: ${{ secrets.MYSQL_HOST }}
+          MYSQL_PORT: ${{ secrets.MYSQL_PORT || 3306 }}
+          MYSQL_USERNAME: ${{ secrets.MYSQL_USERNAME }}
+          MYSQL_PASSWORD: ${{ secrets.MYSQL_PASSWORD }}
+          MYSQL_DATABASE: ${{ secrets.MYSQL_DATABASE != '' && secrets.MYSQL_DATABASE || secrets.MYSQL_DBNAME }}
+        with:
+          host: ${{ vars.SVRA_HOST }}
+          username: ${{ vars.SVRA_USERNAME }}
+          key: ${{ secrets.SVRA_SSH_KEY }}
+          port: ${{ vars.SVRA_SSH_PORT || 22 }}
+          fingerprint: ${{ vars.SVRA_SSH_FINGERPRINT }}
+          envs: EXPECTED_API_SHA,MYSQL_HOST,MYSQL_PORT,MYSQL_USERNAME,MYSQL_PASSWORD,MYSQL_DATABASE
+          script_path: scripts/cd/m5-mysql-cutover-readonly-postcheck.sh
 
   mysql_cutover_nsq:
-    if: inputs.check_mode == 'preflight-mysql-cutover'
+    if: inputs.check_mode == 'preflight-mysql-cutover' || inputs.check_mode == 'postcheck-mysql-cutover'
     name: Read-only assessment NSQ channel waterline
     runs-on:
       group: qlume
