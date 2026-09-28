@@ -131,5 +131,9 @@ events:
 	require.NoError(t, publisher.Drain(ctx))
 	require.NoError(t, db.Table("runtime_checkpoint").Where("scope = ? AND assessment_id = ?", "evaluation_run", created.ID).Count(&runCount).Error)
 	require.Zero(t, runCount)
+	inspection, err := mysqlstandard.InspectOriginalRequest(ctx, sqlDB, 1, created.ID, time.Now().Add(time.Hour))
+	require.NoError(t, err)
+	require.Equal(t, "candidate_never_claimed", inspection.State)
+	require.Equal(t, messageID, inspection.EventID)
 	t.Logf("assessment_id=%d outbox=published run_count=0", created.ID)
 }
