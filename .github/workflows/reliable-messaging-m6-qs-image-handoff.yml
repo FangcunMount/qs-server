@@ -13,6 +13,26 @@ permissions:
   packages: read
 
 jobs:
+  deployed-image-identity:
+    name: Read-only deployed Worker identity (serverD)
+    runs-on:
+      group: qlume
+      labels: [self-hosted, macOS, ARM64, ops]
+    timeout-minutes: 5
+    steps:
+      - name: Inspect the current and retained fallback images
+        uses: appleboy/ssh-action@v1.2.2
+        with:
+          host: ${{ vars.SVRD_HOST }}
+          username: root
+          key: ${{ secrets.SVR_MINI_SSH_KEY || secrets.SVRD_SSH_KEY || secrets.SVRA_SSH_KEY }}
+          port: ${{ vars.SVRD_SSH_PORT || 22 }}
+          script: |
+            set -eu
+            uname -m
+            docker image inspect ghcr.io/fangcunmount/qs-worker:7ca541afc24d13187c5b894a249126eabc009ae2 --format 'current {{.Os}}/{{.Architecture}} {{.Id}} {{index .Config.Labels "org.opencontainers.image.revision"}}'
+            docker image inspect ghcr.io/fangcunmount/qs-worker:7c0c919e621d3cc93cb82dca668bd6077f7a1446 --format 'fallback {{.Os}}/{{.Architecture}} {{.Id}} {{index .Config.Labels "org.opencontainers.image.revision"}}'
+            docker inspect qs-worker-runtime-1 --format 'running {{.Image}}'
   worker-image-handoff:
     runs-on: ubuntu-latest
     timeout-minutes: 50
