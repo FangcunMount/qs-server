@@ -7,8 +7,8 @@
 ```sh
 qs-answersheet-gap-audit \
   --after-id 0 \
-  --upper-id 639343386217689646 \
-  --accepted-before 2026-09-28T15:00:00Z \
+  --upper-id 1000000 \
+  --accepted-before 2026-01-01T00:00:00Z \
   --page-size 100 --max-pages 1
 ```
 
