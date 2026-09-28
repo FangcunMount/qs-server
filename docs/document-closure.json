@@ -9125,8 +9125,8 @@
       "owner": "tooling",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "63f7585eedc9d8bf01fdea66b457ec40c4df8b53",
-        "verified_on": "2026-09-13"
+        "source_sha": "3e63c4fce25bc08cc6a31e584848d3d13ee3b6d8",
+        "verified_on": "2026-09-28"
       },
       "fact_sources": [
         {
@@ -9140,6 +9140,10 @@
         {
           "kind": "source",
           "path": "scripts/cd/remote-deploy.sh"
+        },
+        {
+          "kind": "source",
+          "path": "scripts/cd/sudo-selection.sh"
         }
       ],
       "verification": [
@@ -9149,6 +9153,13 @@
           "result": "passed",
           "source_sha": "4add2a571f5e269c2ed55cd50d6d604bc09a6510",
           "verified_on": "2026-09-13"
+        },
+        {
+          "kind": "command",
+          "command": "python3 scripts/cd/test_sudo_selection.py",
+          "result": "passed",
+          "source_sha": "3e63c4fce25bc08cc6a31e584848d3d13ee3b6d8",
+          "verified_on": "2026-09-28"
         }
       ],
       "production_evidence": {

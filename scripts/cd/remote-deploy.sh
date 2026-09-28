@@ -10,6 +10,8 @@ SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 . "$SCRIPT_DIR/image-metadata.sh"
 # shellcheck source=/dev/null
 . "$SCRIPT_DIR/image-retention.sh"
+# shellcheck source=/dev/null
+. "$SCRIPT_DIR/sudo-selection.sh"
 
 : "${DOCKER_REGISTRY:?DOCKER_REGISTRY is required}"
 : "${DOCKER_REPOSITORY:?DOCKER_REPOSITORY is required}"
@@ -30,20 +32,7 @@ case "$IMAGE_TAG" in
     ;;
 esac
 
-if sudo -n true 2>/dev/null; then
-  SUDO="sudo"
-  echo "Using passwordless sudo."
-else
-  if [ -z "${SUDO_PASSWORD:-}" ]; then
-    echo "sudo needs password. Provide SUDO_PASSWORD or configure NOPASSWD." >&2
-    exit 1
-  fi
-  sudo_pw() { sudo -S "$@" <<<"$SUDO_PASSWORD"; }
-  export -f sudo_pw
-  SUDO="sudo_pw"
-  $SUDO -v || true
-  echo "Using sudo with password."
-fi
+select_deploy_sudo
 
 if [ "$SUDO" = "sudo_pw" ]; then
   SUDO_ASKPASS_SCRIPT="$(mktemp)"
