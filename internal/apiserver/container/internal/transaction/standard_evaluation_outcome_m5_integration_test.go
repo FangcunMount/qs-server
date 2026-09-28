@@ -92,6 +92,7 @@ func TestM5StandardEvaluationOutcomeOriginalTransaction(t *testing.T) {
 	))
 	_, err = sqlDB.ExecContext(ctx, sdkmysql.Schema)
 	require.NoError(t, err)
+	require.NoError(t, createEvaluationRequestRefTable(ctx, sqlDB))
 	config, err := eventcatalog.Parse([]byte(`version: "1"
 topics:
   evaluation:

@@ -5,6 +5,8 @@ package standardoutbox
 import (
 	"context"
 	"fmt"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/eventing/standardoutbox"
@@ -12,6 +14,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/event"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
 	sdkmysql "github.com/FangcunMount/reliable-messaging/storage/mysql"
+	"gorm.io/gorm"
 )
 
 // Stager writes standard messages only through the host's existing GORM
@@ -58,7 +61,7 @@ func (s *Stager) stageAt(ctx context.Context, dueAt time.Time, events []event.Do
 	if err != nil {
 		return err
 	}
-	for _, item := range prepared {
+	for index, item := range prepared {
 		when := item.DueAt
 		if !dueAt.IsZero() {
 			when = dueAt
@@ -66,6 +69,33 @@ func (s *Stager) stageAt(ctx context.Context, dueAt time.Time, events []event.Do
 		if err := appender.Append(ctx, item.Message, when); err != nil {
 			return err
 		}
+		if item.Message.Input().EventType == eventcatalog.EvaluationRequested {
+			if err := stageEvaluationRequestRef(ctx, tx, events[index], item.Message.Input().ID, item.Message.Input().Scope); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+// stageEvaluationRequestRef preserves the original event identity in the
+// same business transaction as the Assessment and SDK Outbox append. A later
+// recovery may look up candidates by Assessment ID without searching payloads.
+func stageEvaluationRequestRef(ctx context.Context, tx *gorm.DB, evt event.DomainEvent, eventID, scope string) error {
+	if evt.AggregateType() != "Evaluation" || evt.EventID() != eventID || !strings.HasPrefix(scope, "org:") {
+		return fmt.Errorf("invalid evaluation request identity")
+	}
+	assessmentID, err := strconv.ParseUint(evt.AggregateID(), 10, 64)
+	if err != nil || assessmentID == 0 {
+		return fmt.Errorf("invalid evaluation request assessment ID")
+	}
+	orgID, err := strconv.ParseInt(strings.TrimPrefix(scope, "org:"), 10, 64)
+	if err != nil || orgID <= 0 {
+		return fmt.Errorf("invalid evaluation request organization scope")
+	}
+	if err := tx.WithContext(ctx).Exec(`INSERT INTO qs_rm_evaluation_request_ref
+ (event_id,assessment_id,org_id) VALUES (?,?,?)`, eventID, assessmentID, orgID).Error; err != nil {
+		return fmt.Errorf("stage evaluation request identity: %w", err)
 	}
 	return nil
 }

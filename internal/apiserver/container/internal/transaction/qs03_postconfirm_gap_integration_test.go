@@ -127,6 +127,7 @@ func TestQS03PostConfirmSeed(t *testing.T) {
 	require.NoError(t, err)
 	_, err = sqlDB.ExecContext(ctx, sdkmysql.Schema)
 	require.NoError(t, err)
+	require.NoError(t, createEvaluationRequestRefTable(ctx, sqlDB))
 	var assessments int64
 	require.NoError(t, mysqlDB.Table("assessment").Count(&assessments).Error)
 	require.Zero(t, assessments)

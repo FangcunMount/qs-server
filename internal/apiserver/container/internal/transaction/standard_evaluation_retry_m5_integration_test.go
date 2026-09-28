@@ -76,6 +76,7 @@ func TestM5StandardEvaluationFailureAndScheduledRetryTransaction(t *testing.T) {
 	require.NoError(t, db.AutoMigrate(&assessmentmysql.AssessmentPO{}, &checkpoint.RuntimeCheckpointPO{}))
 	_, err = sqlDB.ExecContext(ctx, sdkmysql.Schema)
 	require.NoError(t, err)
+	require.NoError(t, createEvaluationRequestRefTable(ctx, sqlDB))
 
 	config, err := eventcatalog.Parse([]byte(`version: "1"
 topics:
