@@ -14,4 +14,4 @@ qs-answersheet-gap-audit \
   --page-size 100 --max-pages 1
 ```
 
-标准输出唯一 JSON 只包含固定输入水位、扫描数、各分类计数和下一页游标，不暴露业务 ID。若需要逐项核对，可增加 `--detail-report /absolute/new/path.json`，命令以 `0600` 创建全新文件并最多记录 20 条需处理的答卷／原事件 ID；不要把该文件上传到公开 CI 日志或工件。`complete=false` 表示页数上限先到，不能把本次输出当成全区间零缺口；下一轮以 `next_after_id` 继续，保持同一上界和时间截点。`missing_confirmed` 只说明应有 Assessment 尚未观察到，仍需按原事实复查后由授权的宿主恢复流程处理；`unknown`、`manual_required` 不可自动重发。退出非零或无 JSON 均表示本次审计无效。扫描不会核对独立热度投影、已存在测评后的执行／报告效果或外部模型调用。
+命令标准输出唯一 JSON 包含固定输入水位、扫描数、分类计数和下一页游标；游标是答卷 ID，**不得原样写入公开日志**。生产工作流只公开分类汇总，隐藏三个 ID 水位，并在 `complete=false` 时失败；需要继续分页时由有权限的运维人员在私有环境使用游标。若需要逐项核对，可增加 `--detail-report /absolute/new/path.json`，命令以 `0600` 创建全新文件并最多记录 20 条需处理的答卷／原事件 ID；不要把该文件上传到公开 CI 日志或工件。`missing_confirmed` 只说明应有 Assessment 尚未观察到，仍需按原事实复查后由授权的宿主恢复流程处理；`unknown`、`manual_required` 不可自动重发。退出非零或无 JSON 均表示本次审计无效。扫描不会核对独立热度投影、已存在测评后的执行／报告效果或外部模型调用。
