@@ -217,9 +217,8 @@ func TestQS03PostConfirmRecover(t *testing.T) {
 	})
 	require.True(t, ok)
 	// Race two recovery invocations without the normal Redis processing lock.
-	// A loser may return an error requiring effect recheck, but the host must
-	// not create a second Assessment or downstream evaluation intent. Both
-	// should succeed when retried after the winning transaction commits.
+	// A loser must recognize the winning committed submission. Neither call
+	// may create a second Assessment or downstream evaluation intent.
 	start := make(chan struct{})
 	results := make(chan error, 2)
 	var running sync.WaitGroup
@@ -238,10 +237,10 @@ func TestQS03PostConfirmRecover(t *testing.T) {
 	for err := range results {
 		if err != nil {
 			concurrentErrors++
-			t.Logf("concurrent recovery requires effect recheck: %v", err)
+			t.Logf("concurrent recovery failed: %v", err)
 		}
 	}
-	require.Less(t, concurrentErrors, 2, "at least one concurrent recovery must complete")
+	require.Zero(t, concurrentErrors, "both concurrent recoveries must converge")
 	var afterRaceAssessments, afterRaceIntents int64
 	require.NoError(t, mysqlDB.Table("assessment").Where("answer_sheet_id=?", qs03ProofSheetID).Count(&afterRaceAssessments).Error)
 	require.NoError(t, mysqlDB.Table("rm_outbox").Where("event_type=?", "evaluation.requested").Count(&afterRaceIntents).Error)
