@@ -111,12 +111,13 @@ UNIT
   cleanup-role-window)
     assert_original
     sudo -n systemctl stop "${unit}.timer"
-    sudo -n systemctl is-active "${unit}.service" | grep -Fxq inactive || fail 'recovery service still active'
+    service_state=$(sudo -n systemctl is-active "${unit}.service" || true)
+    [[ "$service_state" == inactive ]] || fail "recovery service not safely inactive: $service_state"
     sudo -n docker exec -u 0 "$container" rm -f "$inside"
     sudo -n mkdir -p /dev/shm/rm-m5-20260928-cleanup
     sudo -n rsync -a --remove-source-files "$tool" "$restore" "/run/systemd/system/${unit}.service" "/run/systemd/system/${unit}.timer" /dev/shm/rm-m5-20260928-cleanup/
     sudo -n systemctl daemon-reload
-    rm -f /tmp/rm-m5-20260928-stage/m5-authz-temporary-tool-linux /tmp/rm-m5-20260928-stage/m5-authz-temporary-restore-live.sh
+    rm -f /tmp/rm-m5-20260928-stage/m5-authz-temporary-tool-linux /tmp/rm-m5-20260928-stage/m5-authz-temporary-restore-live.sh /tmp/rm-m5-20260928-role-restore.service /tmp/rm-m5-20260928-role-restore.timer
     echo 'PASS original scoped roles restored; temporary recovery files removed'
     ;;
   *) fail 'unsupported role-window phase' ;;
