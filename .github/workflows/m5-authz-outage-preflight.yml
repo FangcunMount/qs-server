@@ -7,6 +7,14 @@ on:
         description: Exact currently deployed QS API commit
         required: true
         type: string
+      check_mode:
+        description: Run the existing before-cutover preflight or read-only after-cutover check
+        required: false
+        type: choice
+        default: before
+        options:
+          - before
+          - after
 
 permissions:
   contents: read
@@ -21,6 +29,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - name: Read-only API preflight
+        if: inputs.check_mode != 'after'
         uses: appleboy/ssh-action@v1.2.2
         env:
           EXPECTED_API_SHA: ${{ inputs.expected_api_sha }}
@@ -32,6 +41,19 @@ jobs:
           fingerprint: ${{ vars.SVRA_SSH_FINGERPRINT }}
           envs: EXPECTED_API_SHA
           script_path: scripts/cd/m5-authz-servera-readonly-preflight.sh
+      - name: Read-only API postcheck
+        if: inputs.check_mode == 'after'
+        uses: appleboy/ssh-action@v1.2.2
+        env:
+          EXPECTED_API_SHA: ${{ inputs.expected_api_sha }}
+        with:
+          host: ${{ vars.SVRA_HOST }}
+          username: ${{ vars.SVRA_USERNAME }}
+          key: ${{ secrets.SVRA_SSH_KEY }}
+          port: ${{ vars.SVRA_SSH_PORT || 22 }}
+          fingerprint: ${{ vars.SVRA_SSH_FINGERPRINT }}
+          envs: EXPECTED_API_SHA
+          script_path: scripts/cd/m5-authz-ephemeral-postcheck-servera.sh
 
   serverd:
     name: NSQ channel and recovery prerequisites (ServerD)
@@ -40,4 +62,8 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - name: Read-only NSQ preflight
+        if: inputs.check_mode != 'after'
         run: bash scripts/cd/m5-authz-serverd-readonly-preflight.sh
+      - name: Read-only NSQ postcheck
+        if: inputs.check_mode == 'after'
+        run: bash scripts/cd/m5-authz-ephemeral-postcheck-servera.sh serverD
