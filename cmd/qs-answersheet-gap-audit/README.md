@@ -4,6 +4,8 @@
 
 运行前必须提供 `RM_QS_GAP_READ_ONLY=1`、`RM_QS_GAP_MYSQL_DSN`、`RM_QS_GAP_MONGO_URI`、`RM_QS_GAP_MONGO_DB` 环境变量；连接值不要放到命令行或日志。显式指定 `--after-id`（独占）、`--upper-id`（包含）和至少早于当前十分钟的 `--accepted-before`（RFC3339）。每次最多 20 页、每页最多 500 条。建议由有只读数据库权限的运维身份运行。
 
+生产一次性工作流 `M6 QS-03 AnswerSheet Gap Read-only Audit` 从健康 API 容器读取现行连接配置，在独立、只读文件系统的临时容器内运行本命令。工作流通过标准输入传入连接 JSON（`--connections-stdin`），不把凭据放入命令行、日志或工件；仍必须显式提供 `RM_QS_GAP_READ_ONLY=1`。生产运行只输出分类计数，不生成逐项 ID 文件。工作流输入中的 API 镜像 SHA、答卷 ID 水位和时间截点必须与现场核对一致；发现确认缺口、未知或人工处理项时工作流失败并保留汇总，不自动修复。
+
 ```sh
 qs-answersheet-gap-audit \
   --after-id 0 \

@@ -9,6 +9,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"time"
@@ -40,6 +41,12 @@ type report struct {
 	Counts         map[string]int `json:"counts"`
 }
 
+type connectionInput struct {
+	MySQLDSN    string `json:"mysql_dsn"`
+	MongoURI    string `json:"mongo_uri"`
+	MongoDBName string `json:"mongo_db_name"`
+}
+
 func main() {
 	if err := run(); err != nil {
 		// Connection errors can include endpoint details. Only emit a fixed
@@ -53,12 +60,14 @@ func run() error {
 	var afterID, upperID uint64
 	var acceptedBeforeRaw, detailReport string
 	var pageSize, maxPages int
+	var connectionsStdin bool
 	flag.Uint64Var(&afterID, "after-id", 0, "exclusive AnswerSheet ID cursor")
 	flag.Uint64Var(&upperID, "upper-id", 0, "inclusive fixed AnswerSheet ID upper bound")
 	flag.StringVar(&acceptedBeforeRaw, "accepted-before", "", "inclusive RFC3339 acceptance cutoff")
 	flag.StringVar(&detailReport, "detail-report", "", "new restricted JSON file for up to 20 actionable IDs")
 	flag.IntVar(&pageSize, "page-size", 100, "rows per page, 1..500")
 	flag.IntVar(&maxPages, "max-pages", 1, "maximum pages, 1..20")
+	flag.BoolVar(&connectionsStdin, "connections-stdin", false, "read connection JSON from stdin instead of environment")
 	flag.Parse()
 	if flag.NArg() != 0 || upperID == 0 || upperID <= afterID || pageSize < 1 || pageSize > 500 || maxPages < 1 || maxPages > 20 || os.Getenv("RM_QS_GAP_READ_ONLY") != "1" {
 		return errors.New("invalid_bounds")
@@ -74,6 +83,19 @@ func run() error {
 	mysqlDSN := os.Getenv("RM_QS_GAP_MYSQL_DSN")
 	mongoURI := os.Getenv("RM_QS_GAP_MONGO_URI")
 	mongoDBName := os.Getenv("RM_QS_GAP_MONGO_DB")
+	if connectionsStdin {
+		decoder := json.NewDecoder(io.LimitReader(os.Stdin, 16385))
+		decoder.DisallowUnknownFields()
+		var input connectionInput
+		if err := decoder.Decode(&input); err != nil {
+			return errors.New("invalid_connection_input")
+		}
+		var trailing any
+		if err := decoder.Decode(&trailing); err != io.EOF {
+			return errors.New("invalid_connection_input")
+		}
+		mysqlDSN, mongoURI, mongoDBName = input.MySQLDSN, input.MongoURI, input.MongoDBName
+	}
 	parsed, err := mysqldriver.ParseDSN(mysqlDSN)
 	if err != nil || parsed.DBName == "" || mongoURI == "" || mongoDBName == "" {
 		return errors.New("invalid_connections")

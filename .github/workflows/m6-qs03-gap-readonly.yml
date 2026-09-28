@@ -1,0 +1,79 @@
+name: M6 QS-03 AnswerSheet Gap Read-only Audit
+
+on:
+  workflow_dispatch:
+    inputs:
+      expected_api_sha:
+        description: Exact healthy production QS API image commit
+        required: true
+        type: string
+      after_id:
+        description: Exclusive AnswerSheet ID lower bound
+        required: true
+        type: string
+      upper_id:
+        description: Inclusive fixed AnswerSheet ID upper bound
+        required: true
+        type: string
+      accepted_before:
+        description: UTC RFC3339 cutoff, at least ten minutes old
+        required: true
+        type: string
+      max_pages:
+        description: Maximum pages of 100 AnswerSheets, 1 to 20
+        required: true
+        default: '1'
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    name: Bounded cross-store audit without repair
+    runs-on:
+      group: qlume
+      labels: [self-hosted, macOS, ARM64, ops]
+    environment: production
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+      - name: Build immutable Linux audit binary
+        id: build
+        run: |
+          set -Eeuo pipefail
+          binary="qs-answersheet-gap-audit-${GITHUB_RUN_ID}"
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -o "$binary" ./cmd/qs-answersheet-gap-audit
+          echo "sha256=$(shasum -a 256 "$binary" | awk '{print $1}')" >> "$GITHUB_OUTPUT"
+      - name: Upload audit binary to serverA
+        uses: appleboy/scp-action@v1.0.0
+        with:
+          host: ${{ vars.SVRA_HOST }}
+          username: ${{ vars.SVRA_USERNAME }}
+          key: ${{ secrets.SVRA_SSH_KEY }}
+          port: ${{ vars.SVRA_SSH_PORT || 22 }}
+          fingerprint: ${{ vars.SVRA_SSH_FINGERPRINT }}
+          source: qs-answersheet-gap-audit-${{ github.run_id }}
+          target: /tmp
+      - name: Scan accepted AnswerSheets on serverA
+        uses: appleboy/ssh-action@v1.2.2
+        env:
+          EXPECTED_API_SHA: ${{ inputs.expected_api_sha }}
+          AFTER_ID: ${{ inputs.after_id }}
+          UPPER_ID: ${{ inputs.upper_id }}
+          ACCEPTED_BEFORE: ${{ inputs.accepted_before }}
+          MAX_PAGES: ${{ inputs.max_pages }}
+          AUDIT_RUN_ID: ${{ github.run_id }}
+          EXPECTED_BINARY_SHA256: ${{ steps.build.outputs.sha256 }}
+        with:
+          host: ${{ vars.SVRA_HOST }}
+          username: ${{ vars.SVRA_USERNAME }}
+          key: ${{ secrets.SVRA_SSH_KEY }}
+          port: ${{ vars.SVRA_SSH_PORT || 22 }}
+          fingerprint: ${{ vars.SVRA_SSH_FINGERPRINT }}
+          command_timeout: 5m
+          envs: EXPECTED_API_SHA,AFTER_ID,UPPER_ID,ACCEPTED_BEFORE,MAX_PAGES,AUDIT_RUN_ID,EXPECTED_BINARY_SHA256
+          script_path: scripts/cd/m6-qs03-gap-readonly.sh
