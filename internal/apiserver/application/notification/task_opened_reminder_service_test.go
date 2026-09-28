@@ -14,9 +14,15 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-type reminderTaskReaderStub struct{ state *planApp.TaskReminderState }
+type reminderTaskReaderStub struct {
+	state *planApp.TaskReminderState
+	err   error
+}
 
 func (s *reminderTaskReaderStub) GetTaskReminderState(context.Context, int64, string) (*planApp.TaskReminderState, error) {
+	if s.err != nil {
+		return nil, s.err
+	}
 	return s.state, nil
 }
 
@@ -258,4 +264,57 @@ func TestDurableReminderDoesNotCallPlatformWhenMarkerCrossesOneHourDeadline(t *t
 	require.Equal(t, "deadline_after_call_marker", deliveries.unknownCode)
 	require.NoError(t, service.ProcessTaskOpenedReminder(context.Background(), request))
 	require.Zero(t, receipts.calls, "a late marker must never lead to a later automatic send")
+}
+
+func TestDurableReminderDoesNotCallPlatformWhenTaskChangesDuringCallMarker(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		change   func(*reminderTaskReaderStub)
+		wantCode string
+	}{
+		{"completed", func(reader *reminderTaskReaderStub) {
+			reader.state.Status = planDomain.TaskStatusCompleted
+		}, "task_changed_after_call_marker"},
+		{"unreadable", func(reader *reminderTaskReaderStub) {
+			reader.err = errors.New("task read unavailable")
+		}, "task_state_unknown_after_call_marker"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			opened := time.Date(2026, 9, 26, 10, 0, 0, 0, time.FixedZone("UTC+8", 8*3600))
+			expires := opened.Add(24 * time.Hour)
+			reader := &reminderTaskReaderStub{state: &planApp.TaskReminderState{
+				OrgID: 7, TaskID: "task-1", TesteeID: "12", Status: planDomain.TaskStatusOpened,
+				ScheduleRevision: 3, OpenAt: &opened, ExpireAt: &expires,
+				EntryURL: "https://collect.example/entry?token=secret&task_id=task-1",
+			}}
+			profileID := uint64(1001)
+			identities := &reminderCandidateReaderStub{
+				linked: []iambridge.MiniProgramLinkedUser{{UserID: "self-user", Relations: []string{"self"}}},
+				candidates: []iambridge.MiniProgramRecipientCandidate{{
+					UserID: "self-user", LoginIdentityID: "self-identity", AppID: "wx-app",
+					OpenID: "self-openid", Relations: []string{"self"},
+				}},
+			}
+			deliveries := &reminderDeliveryStub{onBegin: func() { tc.change(reader) }}
+			receipts := &receiptSenderStub{}
+			service := NewTaskOpenedReminderService(reader, &testeeLookupStub{result: &testeeApp.TesteeResult{
+				ID: 12, ProfileID: &profileID,
+			}}, identities, &reminderBatchStub{}, deliveries, &wechatAppLookupStub{},
+				&senderStub{templates: []wechatmini.SubscribeTemplate{{
+					ID: "tmpl-1", Content: "{{thing5.DATA}}{{date1.DATA}}{{character_string2.DATA}}{{thing3.DATA}}",
+				}}}, receipts, nil, nil,
+				&Config{AppID: "wx-app", AppSecret: "wx-secret", PagePath: "pages/task/index", TaskOpenedTemplateID: "tmpl-1"},
+			).(*taskOpenedReminderService)
+			service.now = func() time.Time { return opened.Add(time.Minute) }
+			request := TaskOpenedReminderRequest{OpeningEventID: "event-1", Intent: TaskOpenedReminderIntent{
+				OrgID: 7, TaskID: "task-1", TesteeID: "12", ScheduleRevision: 3, OpenAt: opened,
+			}}
+			require.NoError(t, service.ProcessTaskOpenedReminder(context.Background(), request))
+			require.Zero(t, receipts.calls, "a Task change must not start an external send")
+			require.Equal(t, ReminderManualRequired, deliveries.state)
+			require.Equal(t, tc.wantCode, deliveries.unknownCode)
+			require.NoError(t, service.ProcessTaskOpenedReminder(context.Background(), request))
+			require.Zero(t, receipts.calls, "a marked unknown result must not be sent automatically")
+		})
+	}
 }
