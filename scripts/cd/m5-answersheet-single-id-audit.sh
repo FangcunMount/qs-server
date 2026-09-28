@@ -70,8 +70,13 @@ const candidates = targetDB.rm_outbox.find(
 ).limit(101).toArray()
 if (candidates.length > 100) throw new Error("report event audit budget exceeded")
 const matched = candidates.filter(row => {
-  const body = Buffer.from(row.payload.buffer).toString("utf8")
-  return body.includes(process.env.ASSESSMENT_ID)
+  const wire = JSON.parse(Buffer.from(row.payload.buffer).toString("utf8"))
+  if (wire.type !== "component-base.messaging.message.v1" || !wire.payload)
+    throw new Error("unexpected report event wire envelope")
+  const domain = JSON.parse(Buffer.from(wire.payload, "base64").toString("utf8"))
+  if (domain.eventType !== "interpretation.report.generated")
+    throw new Error("unexpected report domain event type")
+  return String(domain.data?.assessment_id) === process.env.ASSESSMENT_ID
 }).map(({payload, ...metadata}) => metadata)
 print("MATCHED_STANDARD_REPORT_EVENTS")
 printjson({candidate_count: candidates.length, matched})
