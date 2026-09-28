@@ -5,7 +5,11 @@ on:
     inputs:
       expected_api_sha:
         description: Exact currently deployed QS API commit
-        required: true
+        required: false
+        type: string
+      assessment_id:
+        description: Exact assessment ID for read-only production reconciliation
+        required: false
         type: string
       check_mode:
         description: Run the existing before-cutover preflight or read-only after-cutover check
@@ -23,6 +27,7 @@ on:
           - inspect-role-root
           - resume-prepare-role-window
           - inspect-role-http
+          - audit-assessment
 
 permissions:
   contents: read
@@ -125,3 +130,31 @@ jobs:
           envs: EXPECTED_API_SHA,ROLE_WINDOW_MODE,ROLE_WINDOW_RUN_ID
           command_timeout: 4m
           script_path: scripts/cd/m5-authz-temporary-exercise.sh
+
+  assessment_audit:
+    if: inputs.check_mode == 'audit-assessment'
+    name: Read-only assessment identity and MySQL chain
+    runs-on:
+      group: qlume
+      labels: [self-hosted, macOS, ARM64, ops]
+    timeout-minutes: 5
+    environment: production
+    steps:
+      - uses: actions/checkout@v6
+      - name: Reconcile one exact assessment ID
+        uses: appleboy/ssh-action@v1.2.2
+        env:
+          ASSESSMENT_ID: ${{ inputs.assessment_id }}
+          MYSQL_HOST: ${{ secrets.MYSQL_HOST }}
+          MYSQL_PORT: ${{ secrets.MYSQL_PORT || 3306 }}
+          MYSQL_USERNAME: ${{ secrets.MYSQL_USERNAME }}
+          MYSQL_PASSWORD: ${{ secrets.MYSQL_PASSWORD }}
+          MYSQL_DATABASE: ${{ secrets.MYSQL_DATABASE != '' && secrets.MYSQL_DATABASE || secrets.MYSQL_DBNAME }}
+        with:
+          host: ${{ vars.SVRA_HOST }}
+          username: ${{ vars.SVRA_USERNAME }}
+          key: ${{ secrets.SVRA_SSH_KEY }}
+          port: ${{ vars.SVRA_SSH_PORT || 22 }}
+          fingerprint: ${{ vars.SVRA_SSH_FINGERPRINT }}
+          envs: ASSESSMENT_ID,MYSQL_HOST,MYSQL_PORT,MYSQL_USERNAME,MYSQL_PASSWORD,MYSQL_DATABASE
+          script_path: scripts/cd/m5-assessment-single-id-audit.sh
