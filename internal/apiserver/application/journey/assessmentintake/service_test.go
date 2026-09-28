@@ -5,6 +5,7 @@ import (
 	"errors"
 	"reflect"
 	"testing"
+	"time"
 
 	cberrors "github.com/FangcunMount/component-base/pkg/errors"
 	evalerrors "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/apperrors"
@@ -33,6 +34,7 @@ type intakeStub struct {
 	findErr       error
 	createErr     error
 	submitErr     error
+	afterSubmit   *evaluationintake.Assessment
 	submitted     bool
 	lastCreateCmd evaluationintake.CreateCommand
 }
@@ -55,7 +57,44 @@ func (s *intakeStub) CreateForAnswerSheet(_ context.Context, cmd evaluationintak
 func (s *intakeStub) SubmitForEvaluation(context.Context, uint64) (*evaluationintake.Assessment, error) {
 	s.submitted = true
 	*s.calls = append(*s.calls, "submit")
+	if s.afterSubmit != nil {
+		s.existing = s.afterSubmit
+	}
 	return s.created, s.submitErr
+}
+
+func TestSubmitPendingBoundAssessmentRechecksConcurrentEffect(t *testing.T) {
+	now := time.Now()
+	item := &evaluationintake.Assessment{ID: 91, OrgID: 9, AnswerSheetID: 3, Status: "pending"}
+	committed := &evaluationintake.Assessment{ID: 91, OrgID: 9, AnswerSheetID: 3, Status: "submitted", SubmittedAt: &now}
+	for _, tt := range []struct {
+		name         string
+		afterSubmit  *evaluationintake.Assessment
+		findErr      error
+		wantResolved bool
+	}{
+		{name: "matching committed effect", afterSubmit: committed, wantResolved: true},
+		{name: "evaluation already completed", afterSubmit: &evaluationintake.Assessment{ID: 91, OrgID: 9, AnswerSheetID: 3, Status: "evaluated", SubmittedAt: &now}, wantResolved: true},
+		{name: "still pending", afterSubmit: item},
+		{name: "wrong assessment", afterSubmit: &evaluationintake.Assessment{ID: 92, OrgID: 9, AnswerSheetID: 3, Status: "submitted", SubmittedAt: &now}},
+		{name: "wrong organization", afterSubmit: &evaluationintake.Assessment{ID: 91, OrgID: 10, AnswerSheetID: 3, Status: "submitted", SubmittedAt: &now}},
+		{name: "unknown status", afterSubmit: &evaluationintake.Assessment{ID: 91, OrgID: 9, AnswerSheetID: 3, Status: "unknown", SubmittedAt: &now}},
+		{name: "missing submission timestamp", afterSubmit: &evaluationintake.Assessment{ID: 91, OrgID: 9, AnswerSheetID: 3, Status: "submitted"}},
+		{name: "effect recheck failed", findErr: evalerrors.Database(errors.New("database unavailable"), "查询测评失败")},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			calls := []string{}
+			intake := &intakeStub{calls: &calls, submitErr: errors.New("raced pending transition"), afterSubmit: tt.afterSubmit, findErr: tt.findErr}
+			svc := &service{intake: intake}
+			autoSubmitted, err := svc.submitPendingBoundAssessment(context.Background(), Command{OrgID: 9, AnswerSheetID: 3}, item, true)
+			if (err == nil) != tt.wantResolved || autoSubmitted {
+				t.Fatalf("resolved=%t autoSubmitted=%t error=%v", err == nil, autoSubmitted, err)
+			}
+			if !reflect.DeepEqual(calls, []string{"submit", "find"}) {
+				t.Fatalf("calls = %v, want effect recheck after failed submit", calls)
+			}
+		})
+	}
 }
 
 type bindingStub struct {
@@ -268,7 +307,7 @@ func TestEnsureReturnsAutoSubmitFailureAfterCreation(t *testing.T) {
 	if result != nil {
 		t.Fatalf("result = %#v, want nil", result)
 	}
-	if !intake.submitted || !reflect.DeepEqual(calls, []string{"score", "find", "create", "submit"}) {
+	if !intake.submitted || !reflect.DeepEqual(calls, []string{"score", "find", "create", "submit", "find"}) {
 		t.Fatalf("calls = %v, submitted = %v", calls, intake.submitted)
 	}
 }

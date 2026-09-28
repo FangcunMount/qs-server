@@ -309,6 +309,27 @@ func (s *service) submitPendingBoundAssessment(ctx context.Context, command Comm
 	}
 
 	if _, err := s.intake.SubmitForEvaluation(ctx, item.ID); err != nil {
+		// Another consumer can commit the same pending->submitted transition
+		// while this call is submitting. Only accept the raced result when the
+		// exact original Assessment now has a durable submission timestamp;
+		// a failed recheck or a still-pending row must remain retryable.
+		current, findErr := s.intake.FindByAnswerSheetID(ctx, command.AnswerSheetID)
+		committedStatus := current != nil && (current.Status == domainassessment.StatusSubmitted.String() ||
+			current.Status == domainassessment.StatusEvaluated.String() ||
+			current.Status == domainassessment.StatusFailed.String())
+		if findErr == nil && current != nil && current.ID == item.ID &&
+			current.OrgID == command.OrgID && current.AnswerSheetID == command.AnswerSheetID &&
+			current.ConductingContext.Equal(item.ConductingContext) &&
+			committedStatus && current.SubmittedAt != nil {
+			logger.L(ctx).Infow("测评并发提交已由另一请求完成，复用已提交结果",
+				"action", "ensure_assessment",
+				"answersheet_id", command.AnswerSheetID,
+				"assessment_id", item.ID,
+				"assessment_status", current.Status,
+				"result", "concurrent_submit_hit",
+			)
+			return false, nil
+		}
 		logger.L(ctx).Errorw("测评自动提交失败",
 			"action", "ensure_assessment",
 			"answersheet_id", command.AnswerSheetID,
