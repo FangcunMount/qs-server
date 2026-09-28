@@ -14,6 +14,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"math"
 	"os"
 	"time"
 
@@ -168,7 +169,7 @@ func parseConfigFrom(args []string, stderr io.Writer, stdin io.Reader) (config, 
 		cfg.mongoURI, cfg.mongoDB, cfg.mysqlDSN = input.MongoURI, input.MongoDB, input.MySQLDSN
 	}
 	if flags.NArg() != 0 || cfg.mongoURI == "" || cfg.mongoDB == "" || cfg.mysqlDSN == "" ||
-		cfg.afterID >= cfg.upperID || cfg.batchSize < 1 || cfg.batchSize > 500 ||
+		cfg.afterID >= cfg.upperID || cfg.upperID > math.MaxInt64 || cfg.batchSize < 1 || cfg.batchSize > 500 ||
 		cfg.maxSheets < 1 || cfg.maxSheets > 10000 || cfg.timeout < time.Second || cfg.timeout > 30*time.Minute {
 		return config{}, time.Time{}, fmt.Errorf("explicit database connections, a nonempty ID window, and bounded scan options are required")
 	}
