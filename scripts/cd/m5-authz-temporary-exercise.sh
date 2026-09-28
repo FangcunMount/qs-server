@@ -29,6 +29,10 @@ assert_original() {
 }
 
 case "$ROLE_WINDOW_MODE" in
+  inspect-role-sudo)
+    sudo -n -l || true
+    ls -lh /tmp/rm-m5-20260928-stage/m5-authz-temporary-tool-linux /tmp/rm-m5-20260928-stage/m5-authz-temporary-restore-live.sh
+    ;;
   prepare-role-window)
     [[ -f /tmp/rm-m5-20260928-stage/m5-authz-temporary-tool-linux ]] || fail 'staged tool missing'
     [[ -f /tmp/rm-m5-20260928-stage/m5-authz-temporary-restore-live.sh ]] || fail 'staged restore missing'
