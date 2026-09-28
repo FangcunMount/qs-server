@@ -205,3 +205,12 @@ jobs:
           fingerprint: ${{ vars.SVRA_SSH_FINGERPRINT }}
           envs: MYSQL_HOST,MYSQL_PORT,MYSQL_USERNAME,MYSQL_PASSWORD,MYSQL_DATABASE
           script_path: scripts/cd/m5-mysql-cutover-readonly-preflight.sh
+
+  mysql_cutover_nsq:
+    if: inputs.check_mode == 'preflight-mysql-cutover'
+    name: Read-only assessment NSQ channel waterline
+    runs-on: ${{ vars.QS_DEPLOY_RUNNER || 'serverd' }}
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v6
+      - run: bash scripts/cd/m5-mysql-cutover-nsq-readonly.sh
