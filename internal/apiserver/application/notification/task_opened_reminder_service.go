@@ -268,6 +268,25 @@ func (s *taskOpenedReminderService) deliverOne(
 		}
 		return nil
 	}
+	// The Task can change while the durable call marker is being written.
+	// Once marked sending, the ledger must not be released as unsent: a process
+	// loss at this boundary has an unknown outcome. Recheck before invoking the
+	// platform and leave any invalid or unreadable Task for manual review.
+	current, currentDecision, currentErr := s.currentDecision(ctx, intent)
+	if currentErr != nil || currentDecision.SuppressCode != "" || current.EntryURL != latest.EntryURL {
+		code := "task_changed_after_call_marker"
+		if currentErr != nil {
+			code = "task_state_unknown_after_call_marker"
+		}
+		marked, markErr := s.deliveries.MarkUnknown(settleCtx, key, token, code, s.now())
+		if markErr != nil {
+			return markErr
+		}
+		if !marked {
+			return fmt.Errorf("reminder task result after call marker could not be recorded")
+		}
+		return nil
+	}
 	receipt, sendErr := s.receipts.SendSubscribeMessageWithReceipt(ctx, batch.AppID, appSecret, message)
 	if sendErr != nil || !receipt.Accepted {
 		var marked bool
