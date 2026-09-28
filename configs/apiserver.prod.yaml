@@ -493,7 +493,7 @@ mongodb:
 # ----------------------------------------------------------------------------
 messaging:
   enabled: true                        # 启用消息队列发布: true
-  provider: nsq                        # 消息队列类型: nsq 或 rabbitmq (生产环境建议使用 nsq, 优先使用 nsq)
+  provider: nsq                        # 当前仅支持 NSQ
 
   # NSQ 配置（生产环境使用 Docker 服务名或实际地址）
   nsq-addr: "nsqd:4150"                 # NSQ 生产者地址: nsqd:4150 (Docker 网络内部)
@@ -542,7 +542,7 @@ iam:
   # authz 规则通知
   authz-sync:                           # authz 规则同步配置 (authz 规则更新后，通过 NSQ 通知 apiserver 更新规则)
     enabled: true                       # 是否启用 authz 同步: true
-    provider: "nsq"                     # 消息队列类型: nsq 或 rabbitmq (生产环境建议使用 nsq)
+    provider: "nsq"                     # 当前仅支持 NSQ
     nsq-lookupd-addr: "nsqlookupd:4161" # NSQ Lookupd 地址: nsqlookupd:4161 (用于服务发现)
     topic: "iam.authz.version.v2"          # 主题: iam.authz.version.v2
     channel-prefix: "qs-authz-sync"     # 频道前缀: qs-authz-sync

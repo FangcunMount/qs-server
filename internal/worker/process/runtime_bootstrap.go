@@ -6,7 +6,6 @@ import (
 	"io"
 	"time"
 
-	basemessaging "github.com/FangcunMount/component-base/pkg/messaging"
 	eventtransport "github.com/FangcunMount/qs-server/internal/pkg/eventing/transport"
 	"github.com/FangcunMount/qs-server/internal/pkg/retrygovernance"
 	messagingintegration "github.com/FangcunMount/qs-server/internal/worker/integration/messaging"
@@ -51,25 +50,12 @@ func (s *server) initializeRuntime(resources resourceOutput, containerOutput con
 	}
 	subscriberConfig := eventtransport.SubscriberConfig{
 		Provider: s.config.Messaging.Provider, NSQLookupdAddr: s.config.Messaging.NSQLookupdAddr,
-		NSQMessageTimeout: s.config.Messaging.NSQMessageTimeout, RabbitMQURL: s.config.Messaging.RabbitMQURL,
+		NSQMessageTimeout: s.config.Messaging.NSQMessageTimeout,
 	}
-	var subscriber workerSubscriber
-	var sdkSubscriber *eventtransport.SDKDeliverySubscriber
-	var legacySubscriber basemessaging.Subscriber
-	if subscriberConfig.Provider == "nsq" {
-		sdkSubscriber, err = eventtransport.NewSDKDeliverySubscriber(
-			subscriberConfig, s.workerMaxInFlight(), s.workerMaxDeliveryAttempts(),
-			eventtransport.SDKFailedHandoffHandler(deadLetterRecorder),
-		)
-		subscriber = sdkSubscriber
-	} else {
-		var options basemessaging.SubscriberOptions
-		options, err = eventtransport.NewSubscriberOptions(s.workerMaxInFlight(), s.workerMaxDeliveryAttempts(), eventtransport.FailedMessageHandler(deadLetterRecorder))
-		if err == nil {
-			legacySubscriber, err = eventtransport.NewSubscriber(subscriberConfig, options)
-			subscriber = legacySubscriber
-		}
-	}
+	subscriber, err := eventtransport.NewSDKDeliverySubscriber(
+		subscriberConfig, s.workerMaxInFlight(), s.workerMaxDeliveryAttempts(),
+		eventtransport.SDKFailedHandoffHandler(deadLetterRecorder),
+	)
 	if err != nil {
 		_ = deadLetterRecorder.Close()
 		if output.observability.metricsServer != nil {
@@ -88,22 +74,12 @@ func (s *server) initializeRuntime(resources resourceOutput, containerOutput con
 	}
 	output.messaging.holdStore = holdStore
 
-	var subscribeErr error
-	if sdkSubscriber != nil {
-		subscribeErr = messagingintegration.SubscribeSDKHandlersWithOptions(messagingintegration.SubscribeSDKHandlersOptions{
-			ServiceName: s.config.Worker.ServiceName, Logger: s.logger,
-			Runtime: containerOutput.container, Subscriber: sdkSubscriber,
-			HoldRecorder:    holdStore,
-			UnknownRecorder: eventtransport.NewDeliveryUnknownEventRecorder("nsq", deadLetterRecorder),
-		})
-	} else {
-		subscribeErr = messagingintegration.SubscribeHandlersWithOptions(messagingintegration.SubscribeHandlersOptions{
-			ServiceName: s.config.Worker.ServiceName, Logger: s.logger,
-			Runtime: containerOutput.container, Subscriber: legacySubscriber,
-			HoldRecorder:    holdStore,
-			UnknownRecorder: eventtransport.NewUnknownEventRecorder(s.config.Messaging.Provider, deadLetterRecorder),
-		})
-	}
+	subscribeErr := messagingintegration.SubscribeSDKHandlersWithOptions(messagingintegration.SubscribeSDKHandlersOptions{
+		ServiceName: s.config.Worker.ServiceName, Logger: s.logger,
+		Runtime: containerOutput.container, Subscriber: subscriber,
+		HoldRecorder:    holdStore,
+		UnknownRecorder: eventtransport.NewDeliveryUnknownEventRecorder("nsq", deadLetterRecorder),
+	})
 	if subscribeErr != nil {
 		subscriber.Stop()
 		_ = subscriber.Close()
@@ -117,21 +93,10 @@ func (s *server) initializeRuntime(resources resourceOutput, containerOutput con
 	if s.config.RetryGovernance == nil || s.config.RetryGovernance.AutomaticRetryEnabled {
 		var publisher io.Closer
 		var holdReplayer *messagingintegration.RetryEventHoldReplayer
-		var publishErr error
-		if s.config.Messaging.Provider == "nsq" {
-			var wirePublisher messagingintegration.WirePublisherCloser
-			wirePublisher, publishErr = messagingintegration.CreateSDKWirePublisher(s.config.Messaging)
-			if publishErr == nil {
-				publisher = wirePublisher
-				holdReplayer, publishErr = messagingintegration.NewSDKRetryEventHoldReplayer(holdStore, wirePublisher)
-			}
-		} else {
-			var legacyPublisher basemessaging.Publisher
-			legacyPublisher, publishErr = messagingintegration.CreatePublisher(s.config.Messaging)
-			if publishErr == nil {
-				publisher = legacyPublisher
-				holdReplayer = messagingintegration.NewRetryEventHoldReplayer(holdStore, legacyPublisher)
-			}
+		wirePublisher, publishErr := messagingintegration.CreateSDKWirePublisher(s.config.Messaging)
+		if publishErr == nil {
+			publisher = wirePublisher
+			holdReplayer, publishErr = messagingintegration.NewSDKRetryEventHoldReplayer(holdStore, wirePublisher)
 		}
 		if publishErr != nil {
 			if publisher != nil {

@@ -116,7 +116,7 @@ func runProcessLifecycleDeps(deps processLifecycleDeps) {
 		}
 	}
 	// The container first stops relays and drains standard Outbox publishes.
-	// The direct event producer closes next (SDK for NSQ, legacy for RabbitMQ).
+	// The direct SDK NSQ event producer closes next.
 	if deps.resource.closePublisher != nil {
 		if err := deps.resource.closePublisher(); err != nil {
 			log.Errorf("Failed to close event publisher: %v", err)

@@ -251,7 +251,6 @@ func retryEventIdentity(payload []byte) (string, any) {
 
 type RetryEventHoldReplayer struct {
 	store         retryEventHoldStore
-	publisher     basemessaging.Publisher
 	wirePublisher WirePublisher
 	interval      time.Duration
 	lease         time.Duration
@@ -266,10 +265,6 @@ type WirePublisher interface {
 	PublishWire(context.Context, string, []byte) error
 }
 
-func NewRetryEventHoldReplayer(store retryEventHoldStore, publisher basemessaging.Publisher) *RetryEventHoldReplayer {
-	return &RetryEventHoldReplayer{store: store, publisher: publisher, interval: 5 * time.Second, lease: time.Minute, done: make(chan struct{}), observer: eventobservability.DefaultObserver()}
-}
-
 // NewSDKRetryEventHoldReplayer uses the native NSQ wire port. A failed or
 // unknown publish retains the original held-event identity for recovery.
 func NewSDKRetryEventHoldReplayer(store retryEventHoldStore, publisher WirePublisher) (*RetryEventHoldReplayer, error) {
@@ -277,22 +272,6 @@ func NewSDKRetryEventHoldReplayer(store retryEventHoldStore, publisher WirePubli
 		return nil, fmt.Errorf("NSQ retry hold wire publisher is required")
 	}
 	return &RetryEventHoldReplayer{store: store, wirePublisher: publisher, interval: 5 * time.Second, lease: time.Minute, done: make(chan struct{}), observer: eventobservability.DefaultObserver()}, nil
-}
-
-// NewRetryEventHoldReplayerForProvider requires the native wire port for NSQ.
-// RabbitMQ keeps its historical Publisher until its support decision is made.
-func NewRetryEventHoldReplayerForProvider(store retryEventHoldStore, publisher basemessaging.Publisher, provider string) (*RetryEventHoldReplayer, error) {
-	if publisher == nil {
-		return nil, fmt.Errorf("retry hold publisher is required")
-	}
-	if provider != "nsq" {
-		return NewRetryEventHoldReplayer(store, publisher), nil
-	}
-	wirePublisher, ok := publisher.(WirePublisher)
-	if !ok {
-		return nil, fmt.Errorf("NSQ retry hold publisher must support complete wire publishing")
-	}
-	return NewSDKRetryEventHoldReplayer(store, wirePublisher)
 }
 
 func (r *RetryEventHoldReplayer) Start() {
@@ -315,7 +294,7 @@ func (r *RetryEventHoldReplayer) Start() {
 }
 
 func (r *RetryEventHoldReplayer) RunOnce(ctx context.Context, now time.Time) error {
-	if r == nil || r.store == nil || (r.publisher == nil && r.wirePublisher == nil) {
+	if r == nil || r.store == nil || r.wirePublisher == nil {
 		return fmt.Errorf("retry hold replayer is not configured")
 	}
 	for {
@@ -338,14 +317,11 @@ func (r *RetryEventHoldReplayer) RunOnce(ctx context.Context, now time.Time) err
 }
 
 func (r *RetryEventHoldReplayer) publishHeldEvent(ctx context.Context, item *heldEvent) error {
-	if r.wirePublisher != nil {
-		body, err := legacy.Encode(legacy.Envelope{UUID: item.MessageID, Payload: item.Payload}, legacy.Revision2)
-		if err != nil {
-			return err
-		}
-		return r.wirePublisher.PublishWire(ctx, item.Topic, body)
+	body, err := legacy.Encode(legacy.Envelope{UUID: item.MessageID, Payload: item.Payload}, legacy.Revision2)
+	if err != nil {
+		return err
 	}
-	return r.publisher.PublishMessage(ctx, item.Topic, basemessaging.NewMessage(item.MessageID, item.Payload))
+	return r.wirePublisher.PublishWire(ctx, item.Topic, body)
 }
 
 func (r *RetryEventHoldReplayer) observe(ctx context.Context, item *heldEvent, outcome eventobservability.ConsumeOutcome) {

@@ -302,11 +302,9 @@ func (o *IAMOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.BoolVar(&o.AuthzSync.Enabled, "iam.authz-sync.enabled", o.AuthzSync.Enabled,
 		"Enable IAM authz version topic subscription for local snapshot invalidation")
 	fs.StringVar(&o.AuthzSync.Provider, "iam.authz-sync.provider", o.AuthzSync.Provider,
-		"Message queue provider for IAM authz version sync (nsq, rabbitmq)")
+		"Message queue provider for IAM authz version sync (nsq)")
 	fs.StringVar(&o.AuthzSync.NSQLookupdAddr, "iam.authz-sync.nsq-lookupd-addr", o.AuthzSync.NSQLookupdAddr,
 		"NSQ lookupd address for IAM authz version sync")
-	fs.StringVar(&o.AuthzSync.RabbitMQURL, "iam.authz-sync.rabbitmq-url", o.AuthzSync.RabbitMQURL,
-		"RabbitMQ connection URL for IAM authz version sync")
 	fs.StringVar(&o.AuthzSync.Topic, "iam.authz-sync.topic", o.AuthzSync.Topic,
 		"Topic name used for IAM authz version notifications")
 	fs.StringVar(&o.AuthzSync.ChannelPrefix, "iam.authz-sync.channel-prefix", o.AuthzSync.ChannelPrefix,

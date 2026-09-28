@@ -40,16 +40,15 @@ worker:
 # ============================================================
 # 2. 消息队列配置
 # ============================================================
-# NSQ 或 RabbitMQ 消息队列配置
+# NSQ 消息队列配置
 
 messaging:
-  provider: nsq  # 消息队列提供者: nsq, rabbitmq
+  provider: nsq  # 当前仅支持 NSQ
   nsq-addr: "nsqd:4150"
   nsq-lookupd-addr: "nsqlookupd:4161"
   nsqd-http-endpoints: ["http://nsqd:4151"] # 显式管理端点；订阅前准备持久 channel
   # 长于 AI gRPC deadline，避免 NSQ 在仍执行 Provider 调用时重复投递。
   nsq-message-timeout: 9m
-  rabbitmq-url: "amqp://guest:guest@127.0.0.1:5672/"
   delivery:
     enable: true
     max-attempts: 8

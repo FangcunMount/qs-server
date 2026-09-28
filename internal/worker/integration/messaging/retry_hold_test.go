@@ -123,27 +123,6 @@ func (s *holdStoreStub) markReplayFailed(context.Context, *heldEvent, error, tim
 	return nil
 }
 
-type publisherStub struct {
-	topic      string
-	message    *basemessaging.Message
-	wireBodies [][]byte
-	err        error
-}
-
-func (p *publisherStub) Publish(context.Context, string, []byte) error { return p.err }
-func (p *publisherStub) PublishMessage(_ context.Context, topic string, message *basemessaging.Message) error {
-	p.topic, p.message = topic, message
-	return p.err
-}
-func (p *publisherStub) PublishWire(_ context.Context, topic string, body []byte) error {
-	p.topic = topic
-	p.wireBodies = append(p.wireBodies, append([]byte(nil), body...))
-	return p.err
-}
-func (*publisherStub) Close() error { return nil }
-
-type legacyOnlyPublisher struct{ basemessaging.Publisher }
-
 type wireOnlyPublisher struct {
 	topic  string
 	bodies [][]byte
@@ -177,8 +156,8 @@ func TestRetryEventHoldNSQReplayUsesOriginalSDKWireIdentity(t *testing.T) {
 }
 
 func TestRetryEventHoldNSQRequiresWirePortAndRetainsUnknown(t *testing.T) {
-	if _, err := NewRetryEventHoldReplayerForProvider(&holdStoreStub{}, legacyOnlyPublisher{&publisherStub{}}, "nsq"); err == nil {
-		t.Fatal("NSQ publisher without SDK wire port was accepted")
+	if _, err := NewSDKRetryEventHoldReplayer(&holdStoreStub{}, nil); err == nil {
+		t.Fatal("missing NSQ wire publisher was accepted")
 	}
 	item := &heldEvent{ID: 1, EventID: "event-1", MessageID: "message-1", Topic: "evaluation", Payload: []byte(`{"id":"event-1"}`), ClaimToken: "claim-1"}
 	store := &holdStoreStub{items: []*heldEvent{item}}
@@ -192,33 +171,5 @@ func TestRetryEventHoldNSQRequiresWirePortAndRetainsUnknown(t *testing.T) {
 	}
 	if store.replayed != 0 || store.replayFailures != 1 || len(publisher.bodies) != 1 {
 		t.Fatalf("unknown publish was not retained: store=%#v publisher=%#v", store, publisher)
-	}
-}
-
-func TestRetryEventHoldReplayerPreservesMessageIdentity(t *testing.T) {
-	item := &heldEvent{ID: 1, EventID: "event-1", MessageID: "message-1", Topic: "evaluation", Payload: []byte(`{"id":"event-1","eventType":"evaluation.retry.requested"}`), ClaimToken: "claim-1"}
-	store := &holdStoreStub{items: []*heldEvent{item}}
-	publisher := &publisherStub{}
-	replayer := NewRetryEventHoldReplayer(store, publisher)
-	if err := replayer.RunOnce(t.Context(), time.Date(2026, 7, 19, 1, 0, 0, 0, time.UTC)); err != nil {
-		t.Fatal(err)
-	}
-	if store.claimed != 1 || store.replayed != 1 || store.replayFailures != 0 {
-		t.Fatalf("store state=%#v", store)
-	}
-	if publisher.topic != item.Topic || publisher.message == nil || publisher.message.UUID != item.MessageID || string(publisher.message.Payload) != string(item.Payload) {
-		t.Fatalf("published topic/message=%q %#v", publisher.topic, publisher.message)
-	}
-}
-
-func TestRetryEventHoldReplayerPersistsPublishFailure(t *testing.T) {
-	store := &holdStoreStub{items: []*heldEvent{{ID: 1, EventID: "event-1", MessageID: "message-1", Topic: "evaluation", Payload: []byte(`{}`)}}}
-	publisher := &publisherStub{err: errors.New("mq unavailable")}
-	replayer := NewRetryEventHoldReplayer(store, publisher)
-	if err := replayer.RunOnce(t.Context(), time.Now()); err != nil {
-		t.Fatal(err)
-	}
-	if store.replayed != 0 || store.replayFailures != 1 {
-		t.Fatalf("store state=%#v", store)
 	}
 }

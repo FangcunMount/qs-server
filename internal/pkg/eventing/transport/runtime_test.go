@@ -21,42 +21,6 @@ func (s *deadLetterRecorderStub) RecordDeadLetter(_ context.Context, record Dead
 	return s.err
 }
 
-func TestNewSubscriberOptionsLocksGovernedTransportPolicy(t *testing.T) {
-	handler := func(context.Context, basemessaging.FailedMessage) error { return nil }
-	options, err := NewSubscriberOptions(17, 8, handler)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if options.MaxInFlight != 17 || options.MaxAttempts != 8 || options.FailedMessageHandler == nil {
-		t.Fatalf("options = %#v", options)
-	}
-	if options.RetryBackoff.BaseDelay != 30*time.Second || options.RetryBackoff.MaxDelay != 5*time.Minute || options.RetryBackoff.JitterFraction != 0.2 {
-		t.Fatalf("retry backoff = %#v", options.RetryBackoff)
-	}
-}
-
-func TestNewSubscriberOptionsRejectsMissingTerminalHandlerAndHardCap(t *testing.T) {
-	if _, err := NewSubscriberOptions(1, 8, nil); err == nil {
-		t.Fatal("missing failed-message handler accepted")
-	}
-	handler := func(context.Context, basemessaging.FailedMessage) error { return nil }
-	for _, attempts := range []int{0, 9} {
-		if _, err := NewSubscriberOptions(1, attempts, handler); err == nil {
-			t.Fatalf("attempts %d accepted", attempts)
-		}
-	}
-}
-
-func TestLegacySubscriberRejectsNSQProvider(t *testing.T) {
-	options := basemessaging.SubscriberOptions{
-		MaxAttempts:          1,
-		FailedMessageHandler: func(context.Context, basemessaging.FailedMessage) error { return nil },
-	}
-	if _, err := NewSubscriber(SubscriberConfig{Provider: "nsq", NSQLookupdAddr: "127.0.0.1:4161"}, options); err == nil {
-		t.Fatal("legacy subscriber accepted NSQ instead of requiring the SDK delivery port")
-	}
-}
-
 func TestNewNSQConfigPreservesDefaultAndAppliesExplicitMessageTimeout(t *testing.T) {
 	t.Parallel()
 

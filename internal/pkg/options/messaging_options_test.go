@@ -42,8 +42,17 @@ func TestIAMAuthzSyncEphemeralRequiresEnabledNSQAndGuard(t *testing.T) {
 		t.Fatal("valid guarded NSQ ephemeral channel was rejected")
 	}
 	options.AuthzSync.Provider = "rabbitmq"
-	if !containsOptionError(options.Validate(), "requires NSQ provider") {
-		t.Fatal("RabbitMQ provider accepted NSQ ephemeral channel")
+	if !containsOptionError(options.Validate(), "supported: nsq") {
+		t.Fatal("RabbitMQ provider accepted despite NSQ-only support")
+	}
+}
+
+func TestMessagingRejectsRetiredRabbitMQProvider(t *testing.T) {
+	options := NewMessagingOptions()
+	options.Enabled = true
+	options.Provider = "rabbitmq"
+	if !containsOptionError(options.Validate(), "supported: nsq") {
+		t.Fatal("RabbitMQ provider accepted despite NSQ-only support")
 	}
 }
 
