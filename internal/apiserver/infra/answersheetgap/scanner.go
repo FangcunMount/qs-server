@@ -38,11 +38,11 @@ const (
 )
 
 type Finding struct {
-	AnswerSheetID uint64
-	EventID       string
-	Disposition   Disposition
-	Reason        string
-	AssessmentID  uint64
+	AnswerSheetID uint64      `json:"answer_sheet_id"`
+	EventID       string      `json:"event_id"`
+	Disposition   Disposition `json:"disposition"`
+	Reason        string      `json:"reason,omitempty"`
+	AssessmentID  uint64      `json:"assessment_id,omitempty"`
 }
 
 type Page struct {
