@@ -15,6 +15,10 @@ on:
         description: Exact answer sheet ID observed from the assessment row
         required: false
         type: string
+      outcome_id:
+        description: Exact outcome ID observed from the assessment row
+        required: false
+        type: string
       check_mode:
         description: Run the existing before-cutover preflight or read-only after-cutover check
         required: false
@@ -166,6 +170,8 @@ jobs:
         uses: appleboy/ssh-action@v1.2.2
         env:
           ANSWER_SHEET_ID: ${{ inputs.answersheet_id }}
+          ASSESSMENT_ID: ${{ inputs.assessment_id }}
+          OUTCOME_ID: ${{ inputs.outcome_id }}
           MONGODB_HOST: ${{ secrets.MONGODB_HOST }}
           MONGODB_PORT: ${{ secrets.MONGODB_PORT || 27017 }}
           MONGODB_USERNAME: ${{ secrets.MONGODB_USERNAME }}
@@ -177,5 +183,5 @@ jobs:
           key: ${{ secrets.SVRA_SSH_KEY }}
           port: ${{ vars.SVRA_SSH_PORT || 22 }}
           fingerprint: ${{ vars.SVRA_SSH_FINGERPRINT }}
-          envs: ANSWER_SHEET_ID,MONGODB_HOST,MONGODB_PORT,MONGODB_USERNAME,MONGODB_PASSWORD,MONGODB_DBNAME
+          envs: ANSWER_SHEET_ID,ASSESSMENT_ID,OUTCOME_ID,MONGODB_HOST,MONGODB_PORT,MONGODB_USERNAME,MONGODB_PASSWORD,MONGODB_DBNAME
           script_path: scripts/cd/m5-answersheet-single-id-audit.sh
