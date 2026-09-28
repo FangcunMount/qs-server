@@ -36,6 +36,7 @@ on:
           - resume-prepare-role-window
           - inspect-role-http
           - audit-assessment
+          - preflight-mysql-cutover
 
 permissions:
   contents: read
@@ -140,7 +141,7 @@ jobs:
           script_path: scripts/cd/m5-authz-temporary-exercise.sh
 
   assessment_audit:
-    if: inputs.check_mode == 'audit-assessment'
+    if: inputs.check_mode == 'audit-assessment' || inputs.check_mode == 'preflight-mysql-cutover'
     name: Read-only assessment identity and MySQL chain
     runs-on:
       group: qlume
@@ -150,6 +151,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - name: Reconcile one exact assessment ID
+        if: inputs.check_mode == 'audit-assessment'
         uses: appleboy/ssh-action@v1.2.2
         env:
           ASSESSMENT_ID: ${{ inputs.assessment_id }}
@@ -167,6 +169,7 @@ jobs:
           envs: ASSESSMENT_ID,MYSQL_HOST,MYSQL_PORT,MYSQL_USERNAME,MYSQL_PASSWORD,MYSQL_DATABASE
           script_path: scripts/cd/m5-assessment-single-id-audit.sh
       - name: Reconcile matching Mongo answer and durable message
+        if: inputs.check_mode == 'audit-assessment'
         uses: appleboy/ssh-action@v1.2.2
         env:
           ANSWER_SHEET_ID: ${{ inputs.answersheet_id }}
@@ -185,3 +188,20 @@ jobs:
           fingerprint: ${{ vars.SVRA_SSH_FINGERPRINT }}
           envs: ANSWER_SHEET_ID,ASSESSMENT_ID,OUTCOME_ID,MONGODB_HOST,MONGODB_PORT,MONGODB_USERNAME,MONGODB_PASSWORD,MONGODB_DBNAME
           script_path: scripts/cd/m5-answersheet-single-id-audit.sh
+      - name: Read-only MySQL cutover waterline
+        if: inputs.check_mode == 'preflight-mysql-cutover'
+        uses: appleboy/ssh-action@v1.2.2
+        env:
+          MYSQL_HOST: ${{ secrets.MYSQL_HOST }}
+          MYSQL_PORT: ${{ secrets.MYSQL_PORT || 3306 }}
+          MYSQL_USERNAME: ${{ secrets.MYSQL_USERNAME }}
+          MYSQL_PASSWORD: ${{ secrets.MYSQL_PASSWORD }}
+          MYSQL_DATABASE: ${{ secrets.MYSQL_DATABASE != '' && secrets.MYSQL_DATABASE || secrets.MYSQL_DBNAME }}
+        with:
+          host: ${{ vars.SVRA_HOST }}
+          username: ${{ vars.SVRA_USERNAME }}
+          key: ${{ secrets.SVRA_SSH_KEY }}
+          port: ${{ vars.SVRA_SSH_PORT || 22 }}
+          fingerprint: ${{ vars.SVRA_SSH_FINGERPRINT }}
+          envs: MYSQL_HOST,MYSQL_PORT,MYSQL_USERNAME,MYSQL_PASSWORD,MYSQL_DATABASE
+          script_path: scripts/cd/m5-mysql-cutover-readonly-preflight.sh
