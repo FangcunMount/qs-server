@@ -121,7 +121,7 @@ func (s *Scanner) ScanPage(ctx context.Context, afterID, upperID uint64, accepte
 	if err != nil {
 		return Page{}, fmt.Errorf("scan accepted answersheets: %w", err)
 	}
-	defer cur.Close(ctx)
+	defer func() { _ = cur.Close(ctx) }()
 	var sheets []sheetRow
 	if err := cur.All(ctx, &sheets); err != nil {
 		return Page{}, fmt.Errorf("decode accepted answersheets: %w", err)

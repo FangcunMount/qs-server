@@ -58,52 +58,52 @@ func main() { os.Exit(runCLI(context.Background(), os.Args[1:], os.Stdout, os.St
 func runCLI(parent context.Context, args []string, stdout, stderr io.Writer) int {
 	cfg, cutoff, err := parseConfig(args, stderr)
 	if err != nil {
-		fmt.Fprintf(stderr, "answersheet gap audit: %v\n", err)
+		writeDiagnostic(stderr, "answersheet gap audit: %v\n", err)
 		return 1
 	}
 	ctx, cancel := context.WithTimeout(parent, cfg.timeout)
 	defer cancel()
 	client, err := mongo.Connect(ctx, options.Client().ApplyURI(cfg.mongoURI))
 	if err != nil {
-		fmt.Fprintln(stderr, "answersheet gap audit: connect Mongo failed; check URI and server availability")
+		writeDiagnostic(stderr, "answersheet gap audit: connect Mongo failed; check URI and server availability\n")
 		return 1
 	}
 	defer func() { _ = client.Disconnect(context.Background()) }()
 	if err := client.Ping(ctx, nil); err != nil {
-		fmt.Fprintln(stderr, "answersheet gap audit: ping Mongo failed")
+		writeDiagnostic(stderr, "answersheet gap audit: ping Mongo failed\n")
 		return 1
 	}
 	if err := requireAuditIndex(ctx, client.Database(cfg.mongoDB).Collection("answersheets")); err != nil {
-		fmt.Fprintln(stderr, "answersheet gap audit: required answersheet audit index is missing or unreadable")
+		writeDiagnostic(stderr, "answersheet gap audit: required answersheet audit index is missing or unreadable\n")
 		return 1
 	}
 	db, err := gorm.Open(gormmysql.Open(cfg.mysqlDSN), &gorm.Config{Logger: logger.Default.LogMode(logger.Silent)})
 	if err != nil {
-		fmt.Fprintln(stderr, "answersheet gap audit: connect MySQL failed; check DSN and server availability")
+		writeDiagnostic(stderr, "answersheet gap audit: connect MySQL failed; check DSN and server availability\n")
 		return 1
 	}
 	sqlDB, err := db.DB()
 	if err != nil {
-		fmt.Fprintf(stderr, "answersheet gap audit: open MySQL connection: %v\n", err)
+		writeDiagnostic(stderr, "answersheet gap audit: open MySQL connection: %v\n", err)
 		return 1
 	}
-	defer sqlDB.Close()
+	defer func() { _ = sqlDB.Close() }()
 	if err := sqlDB.PingContext(ctx); err != nil {
-		fmt.Fprintln(stderr, "answersheet gap audit: ping MySQL failed")
+		writeDiagnostic(stderr, "answersheet gap audit: ping MySQL failed\n")
 		return 1
 	}
 	scanner, err := answersheetgap.New(client.Database(cfg.mongoDB), db)
 	if err != nil {
-		fmt.Fprintf(stderr, "answersheet gap audit: configure scanner: %v\n", err)
+		writeDiagnostic(stderr, "answersheet gap audit: configure scanner: %v\n", err)
 		return 1
 	}
 	result, err := scanWindow(ctx, scanner, cfg, cutoff)
 	if err != nil {
-		fmt.Fprintf(stderr, "answersheet gap audit: scan failed: %v\n", err)
+		writeDiagnostic(stderr, "answersheet gap audit: scan failed: %v\n", err)
 		return 1
 	}
 	if err := json.NewEncoder(stdout).Encode(result); err != nil {
-		fmt.Fprintf(stderr, "answersheet gap audit: encode report: %v\n", err)
+		writeDiagnostic(stderr, "answersheet gap audit: encode report: %v\n", err)
 		return 1
 	}
 	if !result.Complete {
@@ -114,6 +114,11 @@ func runCLI(parent context.Context, args []string, stdout, stderr io.Writer) int
 		return 2
 	}
 	return 0
+}
+
+// A failed diagnostic write cannot be recovered after the command has failed.
+func writeDiagnostic(stderr io.Writer, format string, args ...any) {
+	_, _ = fmt.Fprintf(stderr, format, args...)
 }
 
 func parseConfig(args []string, stderr io.Writer) (config, time.Time, error) {
@@ -151,7 +156,7 @@ func requireAuditIndex(ctx context.Context, collection *mongo.Collection) error 
 	if err != nil {
 		return err
 	}
-	defer cursor.Close(ctx)
+	defer func() { _ = cursor.Close(ctx) }()
 	for cursor.Next(ctx) {
 		var row struct {
 			Name                    string `bson:"name"`
