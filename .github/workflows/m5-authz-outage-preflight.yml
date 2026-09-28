@@ -20,6 +20,7 @@ on:
           - inspect-role-window
           - cleanup-role-window
           - inspect-role-sudo
+          - inspect-role-root
 
 permissions:
   contents: read
@@ -76,7 +77,7 @@ jobs:
         run: bash scripts/cd/m5-authz-ephemeral-postcheck-servera.sh serverD
 
   role_window:
-    if: inputs.check_mode == 'prepare-role-window' || inputs.check_mode == 'revoke-role-window' || inputs.check_mode == 'inspect-role-window' || inputs.check_mode == 'cleanup-role-window' || inputs.check_mode == 'inspect-role-sudo'
+    if: inputs.check_mode == 'prepare-role-window' || inputs.check_mode == 'revoke-role-window' || inputs.check_mode == 'inspect-role-window' || inputs.check_mode == 'cleanup-role-window' || inputs.check_mode == 'inspect-role-sudo' || inputs.check_mode == 'inspect-role-root'
     name: Scoped Qingdao role verification (ServerA)
     runs-on:
       group: qlume
@@ -115,7 +116,7 @@ jobs:
           ROLE_WINDOW_RUN_ID: ${{ github.run_id }}
         with:
           host: ${{ vars.SVRA_HOST }}
-          username: ${{ vars.SVRA_USERNAME }}
+          username: ${{ inputs.check_mode == 'inspect-role-root' && 'root' || vars.SVRA_USERNAME }}
           key: ${{ secrets.SVRA_SSH_KEY }}
           port: ${{ vars.SVRA_SSH_PORT || 22 }}
           fingerprint: ${{ vars.SVRA_SSH_FINGERPRINT }}
