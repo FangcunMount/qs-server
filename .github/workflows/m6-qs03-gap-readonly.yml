@@ -46,7 +46,7 @@ jobs:
         run: |
           set -Eeuo pipefail
           binary="qs-answersheet-gap-audit-${GITHUB_RUN_ID}"
-          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -o "$binary" ./cmd/qs-answersheet-gap-audit
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -o "$binary" ./scripts/oneoff/answersheet_gap_audit
           echo "sha256=$(shasum -a 256 "$binary" | awk '{print $1}')" >> "$GITHUB_OUTPUT"
       - name: Upload audit binary to serverA
         uses: appleboy/scp-action@v1.0.0

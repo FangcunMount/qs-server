@@ -102,12 +102,12 @@ try:
     command += [
         "--entrypoint", "/audit", "mongo:7.0",
         "--after-id", str(after_id), "--upper-id", str(upper_id),
-        "--accepted-before", cutoff_raw, "--page-size", "100", "--max-pages", raw_pages,
+        "--accepted-before", cutoff_raw, "--batch-size", "100", "--max-sheets", str(int(raw_pages) * 100),
         "--connections-stdin",
     ]
-    credentials = json.dumps({"mysql_dsn": mysql_dsn, "mongo_uri": mongo_uri, "mongo_db_name": mongo_db})
+    credentials = json.dumps({"mysql_dsn": mysql_dsn, "mongo_uri": mongo_uri, "mongo_db": mongo_db})
     result = run(command, input_text=credentials, timeout=180)
-    if result.returncode != 0:
+    if result.returncode not in (0, 2, 3):
         fail("scanner_nonzero")
     try:
         report = json.loads(result.stdout)
@@ -122,8 +122,7 @@ try:
     if not isinstance(counts, dict) or not set(counts).issubset(allowed) or any(not isinstance(value, int) or value < 0 for value in counts.values()):
         fail("scanner_categories_invalid")
     public_summary = {
-        "accepted_before_utc": report.get("accepted_before_utc"),
-        "pages": report.get("pages"),
+        "accepted_before": report.get("accepted_before"),
         "scanned": report["scanned"],
         "complete": report["complete"],
         "counts": counts,
@@ -131,8 +130,10 @@ try:
     print("QS-03 read-only audit: " + json.dumps(public_summary, sort_keys=True))
     if not report["complete"]:
         fail("audit_incomplete_private_cursor_required")
-    if any(counts.get(name, 0) for name in ("missing_confirmed", "unknown", "manual_required")):
+    if any(counts.get(name, 0) for name in ("missing_confirmed", "delivery_pending", "unknown", "manual_required")):
         fail("actionable_gap_detected")
+    if result.returncode != 0:
+        fail("scanner_status_mismatch")
 finally:
     try:
         os.remove(binary)

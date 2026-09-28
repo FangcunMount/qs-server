@@ -9,6 +9,7 @@ package main
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -92,7 +93,13 @@ func runCLI(parent context.Context, args []string, stdout, stderr io.Writer) int
 		writeDiagnostic(stderr, "answersheet gap audit: ping MySQL failed\n")
 		return 1
 	}
-	scanner, err := answersheetgap.New(client.Database(cfg.mongoDB), db)
+	readOnly := db.WithContext(ctx).Begin(&sql.TxOptions{ReadOnly: true})
+	if readOnly.Error != nil {
+		writeDiagnostic(stderr, "answersheet gap audit: begin MySQL read-only transaction failed\n")
+		return 1
+	}
+	defer func() { _ = readOnly.Rollback().Error }()
+	scanner, err := answersheetgap.New(client.Database(cfg.mongoDB), readOnly)
 	if err != nil {
 		writeDiagnostic(stderr, "answersheet gap audit: configure scanner: %v\n", err)
 		return 1
@@ -122,7 +129,12 @@ func writeDiagnostic(stderr io.Writer, format string, args ...any) {
 }
 
 func parseConfig(args []string, stderr io.Writer) (config, time.Time, error) {
+	return parseConfigFrom(args, stderr, os.Stdin)
+}
+
+func parseConfigFrom(args []string, stderr io.Writer, stdin io.Reader) (config, time.Time, error) {
 	var cfg config
+	var connectionsStdin bool
 	flags := flag.NewFlagSet("answersheet_gap_audit", flag.ContinueOnError)
 	flags.SetOutput(stderr)
 	flags.StringVar(&cfg.mongoURI, "mongo-uri", os.Getenv("MONGO_URI"), "MongoDB URI (or MONGO_URI)")
@@ -134,8 +146,26 @@ func parseConfig(args []string, stderr io.Writer) (config, time.Time, error) {
 	flags.IntVar(&cfg.batchSize, "batch-size", 100, "maximum answer sheets per page (1-500)")
 	flags.IntVar(&cfg.maxSheets, "max-sheets", 1000, "maximum answer sheets in this invocation (1-10000)")
 	flags.DurationVar(&cfg.timeout, "timeout", 2*time.Minute, "overall deadline (1s-30m)")
+	flags.BoolVar(&connectionsStdin, "connections-stdin", false, "read connection JSON from stdin instead of environment")
 	if err := flags.Parse(args); err != nil {
 		return config{}, time.Time{}, err
+	}
+	if connectionsStdin {
+		var input struct {
+			MongoURI string `json:"mongo_uri"`
+			MongoDB  string `json:"mongo_db"`
+			MySQLDSN string `json:"mysql_dsn"`
+		}
+		decoder := json.NewDecoder(io.LimitReader(stdin, 16385))
+		decoder.DisallowUnknownFields()
+		if err := decoder.Decode(&input); err != nil {
+			return config{}, time.Time{}, fmt.Errorf("invalid connection input")
+		}
+		var trailing any
+		if err := decoder.Decode(&trailing); err != io.EOF {
+			return config{}, time.Time{}, fmt.Errorf("invalid connection input")
+		}
+		cfg.mongoURI, cfg.mongoDB, cfg.mysqlDSN = input.MongoURI, input.MongoDB, input.MySQLDSN
 	}
 	if flags.NArg() != 0 || cfg.mongoURI == "" || cfg.mongoDB == "" || cfg.mysqlDSN == "" ||
 		cfg.afterID >= cfg.upperID || cfg.batchSize < 1 || cfg.batchSize > 500 ||

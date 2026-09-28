@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"io"
+	"strings"
 	"testing"
 	"time"
 
@@ -105,6 +106,24 @@ func TestParseConfigRequiresExplicitFixedCutoffAndWindow(t *testing.T) {
 	}
 	if _, _, err := parseConfig(append(args, "--upper-id=10"), io.Discard); err == nil {
 		t.Fatal("empty ID window must fail")
+	}
+}
+
+func TestParseConfigReadsPrivateConnectionsFromStdin(t *testing.T) {
+	t.Setenv("MONGO_URI", "")
+	t.Setenv("MONGO_DB", "")
+	t.Setenv("MYSQL_DSN", "")
+	args := []string{
+		"--connections-stdin", "--after-id=10", "--upper-id=20",
+		"--accepted-before=2026-09-28T12:00:00+08:00",
+	}
+	input := `{"mongo_uri":"mongodb://localhost","mongo_db":"qs","mysql_dsn":"user@tcp(localhost:3306)/qs"}`
+	cfg, _, err := parseConfigFrom(args, io.Discard, strings.NewReader(input))
+	if err != nil || cfg.mongoURI != "mongodb://localhost" || cfg.mongoDB != "qs" || cfg.mysqlDSN != "user@tcp(localhost:3306)/qs" {
+		t.Fatalf("stdin connections were not accepted: %v", err)
+	}
+	if _, _, err := parseConfigFrom(args, io.Discard, strings.NewReader(input+input)); err == nil {
+		t.Fatal("trailing connection input must fail")
 	}
 }
 
