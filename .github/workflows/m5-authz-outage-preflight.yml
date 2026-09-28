@@ -36,6 +36,7 @@ on:
           - resume-prepare-role-window
           - inspect-role-http
           - audit-assessment
+          - audit-assessment-mysql
           - preflight-mysql-cutover
           - postcheck-mysql-cutover
 
@@ -142,7 +143,7 @@ jobs:
           script_path: scripts/cd/m5-authz-temporary-exercise.sh
 
   assessment_audit:
-    if: inputs.check_mode == 'audit-assessment' || inputs.check_mode == 'preflight-mysql-cutover' || inputs.check_mode == 'postcheck-mysql-cutover'
+    if: inputs.check_mode == 'audit-assessment' || inputs.check_mode == 'audit-assessment-mysql' || inputs.check_mode == 'preflight-mysql-cutover' || inputs.check_mode == 'postcheck-mysql-cutover'
     name: Read-only assessment identity and MySQL chain
     runs-on:
       group: qlume
@@ -152,7 +153,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - name: Reconcile one exact assessment ID
-        if: inputs.check_mode == 'audit-assessment'
+        if: inputs.check_mode == 'audit-assessment' || inputs.check_mode == 'audit-assessment-mysql'
         uses: appleboy/ssh-action@v1.2.2
         env:
           ASSESSMENT_ID: ${{ inputs.assessment_id }}
