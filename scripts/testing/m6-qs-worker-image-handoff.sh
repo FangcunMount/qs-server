@@ -57,7 +57,7 @@ start_worker() {
   docker run -d --name "$worker" --network "$network" \
     -e QS_WORKER_MYSQL_HOST=mysql:3306 \
     -e QS_WORKER_MYSQL_USERNAME=root \
-    -e QS_WORKER_MONGODB_URL=mongodb://mongo:27017 \
+    -e QS_WORKER_MONGODB_URL=mongodb://mongo:27017/questionnaire_scale \
     -e QS_WORKER_REDIS_HOST=redis \
     -e QS_WORKER_GRPC_INSECURE=true \
     -e QS_WORKER_WORKER_CONCURRENCY=1 \
