@@ -5,9 +5,9 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/FangcunMount/component-base/pkg/eventcodec"
 	domainAnswerSheet "github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/answersheet"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/hotrank"
+	domainwire "github.com/FangcunMount/reliable-messaging/wire/domain"
 )
 
 // NewEventConsumer 创建事件消费者，用于将答案卡提交事件投影为提交事实
@@ -22,7 +22,7 @@ func NewEventConsumer(projection hotrank.Projection) func(context.Context, strin
 		}
 
 		// 解码事件
-		env, err := eventcodec.DecodeEnvelope(payload)
+		env, err := domainwire.DecodeEnvelope(payload)
 		if err != nil {
 			return err
 		}

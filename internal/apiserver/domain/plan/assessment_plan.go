@@ -3,7 +3,7 @@ package plan
 import (
 	"time"
 
-	"github.com/FangcunMount/component-base/pkg/event"
+	"github.com/FangcunMount/qs-server/internal/pkg/event"
 )
 
 // AssessmentPlan 测评计划聚合根

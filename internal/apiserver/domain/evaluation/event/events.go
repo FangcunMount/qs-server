@@ -4,7 +4,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/FangcunMount/component-base/pkg/event"
+	"github.com/FangcunMount/qs-server/internal/pkg/event"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventing/payload"
 )

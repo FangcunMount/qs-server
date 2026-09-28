@@ -10,7 +10,6 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 
 	"github.com/FangcunMount/component-base/pkg/errors"
-	"github.com/FangcunMount/component-base/pkg/event"
 	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
 	modelcatalogApp "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog"
 	asApp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/answersheet"
@@ -27,6 +26,7 @@ import (
 	rulesetport "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/surveyreadmodel"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
+	"github.com/FangcunMount/qs-server/internal/pkg/event"
 	"github.com/FangcunMount/qs-server/internal/pkg/resilience/backpressure"
 	"gorm.io/gorm"
 )

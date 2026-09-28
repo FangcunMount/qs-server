@@ -110,7 +110,7 @@ func TestWorkerDuplicateNSQEvaluationRequestKeepsOneDurableAttempt(t *testing.T)
 	if err != nil {
 		t.Fatal(err)
 	}
-	subscriber, err := NewSubscriber(SubscriberConfig{
+	subscriber, err := newHistoricalNSQSubscriber(SubscriberConfig{
 		Provider: "nsq", NSQLookupdAddr: integrationEnv("NSQ_LOOKUPD_ADDR", "127.0.0.1:4161"), NSQMessageTimeout: time.Minute,
 	}, basemessaging.SubscriberOptions{
 		MaxInFlight: 1, MaxAttempts: 2,

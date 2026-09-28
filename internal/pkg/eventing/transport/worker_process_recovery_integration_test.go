@@ -159,7 +159,7 @@ func TestWorkerUnknownEventProcessChild(t *testing.T) {
 		})
 	}
 	observer := &workerSettlementObserver{}
-	subscriber, err := NewSubscriber(SubscriberConfig{
+	subscriber, err := newHistoricalNSQSubscriber(SubscriberConfig{
 		Provider: "nsq", NSQLookupdAddr: "nsqlookupd:4161", NSQMessageTimeout: 5 * time.Second,
 	}, basemessaging.SubscriberOptions{
 		MaxInFlight: 1, MaxAttempts: 5,

@@ -41,8 +41,10 @@ type resourceHandles struct {
 }
 
 type messagingOutput struct {
-	mqPublisher messaging.Publisher
-	publishMode eventruntime.PublishMode
+	mqPublisher    messaging.Publisher
+	wirePublisher  eventruntime.WirePublisher
+	closePublisher func() error
+	publishMode    eventruntime.PublishMode
 }
 
 type cacheRuntimeOutput struct {
@@ -66,7 +68,12 @@ type containerOutput struct {
 }
 
 type integrationOutput struct {
-	authzVersionSubscriber messaging.Subscriber
+	authzVersionSubscriber notificationSubscriber
+}
+
+type notificationSubscriber interface {
+	Stop()
+	Close() error
 }
 
 type transportOutput struct {

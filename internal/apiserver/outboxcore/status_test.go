@@ -1,11 +1,30 @@
 package outboxcore
 
 import (
+	"encoding/json"
 	"testing"
 	"time"
 
+	base "github.com/FangcunMount/component-base/pkg/outboxcore"
 	outboxport "github.com/FangcunMount/qs-server/internal/apiserver/port/outbox"
 )
+
+func TestHostStatusContractPreservesLegacySnapshotJSON(t *testing.T) {
+	now := time.Date(2026, 9, 28, 10, 0, 0, 0, time.FixedZone("UTC+8", 8*60*60))
+	oldest := now.Add(-90 * time.Second)
+	observations := []StatusObservation{{Status: StatusPending, Count: 2, OldestCreatedAt: &oldest}}
+	got, err := json.Marshal(BuildStatusSnapshot("mongo", now, observations))
+	if err != nil {
+		t.Fatal(err)
+	}
+	want, err := json.Marshal(base.BuildStatusSnapshot("mongo", now, observations))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(got) != string(want) {
+		t.Fatalf("legacy status JSON changed:\n got %s\nwant %s", got, want)
+	}
+}
 
 func TestBuildStatusSnapshotReturnsCanonicalUnfinishedBuckets(t *testing.T) {
 	now := time.Date(2026, 4, 25, 12, 0, 0, 0, time.UTC)

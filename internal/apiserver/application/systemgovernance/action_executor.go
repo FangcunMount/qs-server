@@ -9,13 +9,13 @@ import (
 	"time"
 
 	"github.com/FangcunMount/component-base/pkg/errors"
-	"github.com/FangcunMount/component-base/pkg/event"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/actor/actorctx"
 	cachegovernance "github.com/FangcunMount/qs-server/internal/apiserver/application/cachegovernance"
 	cachemodel "github.com/FangcunMount/qs-server/internal/apiserver/cache/governance/model"
 	"github.com/FangcunMount/qs-server/internal/apiserver/outboxcore"
 	outboxport "github.com/FangcunMount/qs-server/internal/apiserver/port/outbox"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
+	"github.com/FangcunMount/qs-server/internal/pkg/event"
 	"github.com/FangcunMount/qs-server/internal/pkg/resilience/control"
 	uuid "github.com/satori/go.uuid"
 )

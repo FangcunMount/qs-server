@@ -40,7 +40,7 @@ func TestEventSystemDoesNotImportRemovedEventConfig(t *testing.T) {
 		}
 		if strings.HasPrefix(rel, "internal/worker/integration/messaging/") &&
 			strings.Contains(text, workerHandlersImportPath()) {
-			t.Fatalf("%s must use eventcodec instead of worker/handlers", rel)
+			t.Fatalf("%s must use wire/domain instead of worker/handlers", rel)
 		}
 		if !strings.HasPrefix(rel, "internal/worker/handlers/") &&
 			usesLegacyWorkerHandlerRegistry(text) {

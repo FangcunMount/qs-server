@@ -11,7 +11,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/FangcunMount/component-base/pkg/event"
 	appanswersheet "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/answersheet"
 	apptransaction "github.com/FangcunMount/qs-server/internal/apiserver/application/transaction"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor"
@@ -21,6 +20,7 @@ import (
 	mongoanswersheet "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/answersheet"
 	mongostandard "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/standardoutbox"
 	submitport "github.com/FangcunMount/qs-server/internal/apiserver/port/answersheetsubmit"
+	"github.com/FangcunMount/qs-server/internal/pkg/event"
 	eventcatalog "github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
 	eventruntime "github.com/FangcunMount/qs-server/internal/pkg/eventing/runtime"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"

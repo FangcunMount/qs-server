@@ -3,9 +3,11 @@ package process
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/FangcunMount/component-base/pkg/logger"
 	"github.com/FangcunMount/component-base/pkg/messaging"
+	cbrabbit "github.com/FangcunMount/component-base/pkg/messaging/rabbitmq"
 	bootstrap "github.com/FangcunMount/qs-server/internal/apiserver/bootstrap"
 	"github.com/FangcunMount/qs-server/internal/apiserver/cache/subsystem"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container"
@@ -14,6 +16,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventing/runtime"
 	eventtransport "github.com/FangcunMount/qs-server/internal/pkg/eventing/transport"
+	"github.com/FangcunMount/qs-server/internal/pkg/messagingruntime"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/bootstrap"
 	"github.com/FangcunMount/qs-server/internal/pkg/resilience/backpressure"
@@ -29,17 +32,26 @@ type resourceStageDeps struct {
 	mqPublisher           mqPublisherStageDeps
 	eventSubsystem        eventSubsystemResourceDeps
 	loadEventCatalog      func() (*eventcatalog.Catalog, error)
+	prepareMQChannels     func(*eventcatalog.Catalog) error
 	buildResilience       func(*cacheplanebootstrap.RuntimeBundle) (*resiliencesubsystem.Subsystem, error)
 	buildContainerOptions func(containerOptionsInput) container.ContainerOptions
 }
 
 type eventSubsystemResourceDeps struct {
-	newSubsystem           func(eventsubsystem.Options) (*eventsubsystem.Subsystem, error)
-	subscriberFactory      eventsubsystem.SubscriberFactory
-	buildSubscriberFactory func(*gorm.DB) (eventsubsystem.SubscriberFactory, error)
-	consumers              map[string]eventsubsystem.ConsumerOptions
-	mongo                  eventsubsystem.ProfileOptions
-	assessment             eventsubsystem.ProfileOptions
+	newSubsystem              func(eventsubsystem.Options) (*eventsubsystem.Subsystem, error)
+	subscriberFactory         eventsubsystem.SubscriberFactory
+	buildSubscriberFactory    func(*gorm.DB) (eventsubsystem.SubscriberFactory, error)
+	sdkSubscriberFactory      eventsubsystem.SDKSubscriberFactory
+	buildSDKSubscriberFactory func(*gorm.DB) (eventsubsystem.SDKSubscriberFactory, error)
+	consumers                 map[string]eventsubsystem.ConsumerOptions
+	mongo                     eventsubsystem.ProfileOptions
+	assessment                eventsubsystem.ProfileOptions
+	wirePublisher             eventruntime.WirePublisher
+}
+
+type wirePublisherResource interface {
+	eventruntime.WirePublisher
+	Close() error
 }
 
 type databaseResourceDeps struct {
@@ -55,10 +67,11 @@ type redisRuntimeStageDeps struct {
 }
 
 type mqPublisherStageDeps struct {
-	fallbackMode eventruntime.PublishMode
-	enabled      bool
-	provider     string
-	newPublisher func() (messaging.Publisher, error)
+	fallbackMode     eventruntime.PublishMode
+	enabled          bool
+	provider         string
+	newPublisher     func() (messaging.Publisher, error)
+	newWirePublisher func() (wirePublisherResource, error)
 }
 
 func (s *server) buildResourceStageDeps() resourceStageDeps {
@@ -74,6 +87,7 @@ func (s *server) buildResourceStageDeps() resourceStageDeps {
 		mqPublisher:           s.buildMQPublisherDeps(),
 		eventSubsystem:        s.buildEventSubsystemResourceDeps(),
 		loadEventCatalog:      loadDefaultEventCatalog,
+		prepareMQChannels:     s.buildMQChannelPreparer(),
 		buildResilience:       s.buildResilienceDeps(),
 		buildContainerOptions: s.buildContainerOptionsBuilder(),
 	}
@@ -92,8 +106,9 @@ func (s *server) buildEventSubsystemResourceDeps() eventSubsystemResourceDeps {
 		return eventSubsystemResourceDeps{}
 	}
 	var buildSubscriberFactory func(*gorm.DB) (eventsubsystem.SubscriberFactory, error)
+	var buildSDKSubscriberFactory func(*gorm.DB) (eventsubsystem.SDKSubscriberFactory, error)
 	if s.config.MessagingOptions != nil && s.config.MessagingOptions.Enabled {
-		buildSubscriberFactory = func(mysqlDB *gorm.DB) (eventsubsystem.SubscriberFactory, error) {
+		recorderFor := func(mysqlDB *gorm.DB) (*eventtransport.SQLDeadLetterRecorder, error) {
 			if mysqlDB == nil {
 				return nil, fmt.Errorf("event delivery dead-letter database is not configured")
 			}
@@ -105,23 +120,47 @@ func (s *server) buildEventSubsystemResourceDeps() eventSubsystemResourceDeps {
 			if err != nil {
 				return nil, err
 			}
-			options, err := eventtransport.NewSubscriberOptions(0, s.config.MessagingOptions.Delivery.EffectiveMaxAttempts(), eventtransport.FailedMessageHandler(recorder))
-			if err != nil {
-				return nil, err
+			return recorder, nil
+		}
+		if s.config.MessagingOptions.Provider == "nsq" {
+			buildSDKSubscriberFactory = func(mysqlDB *gorm.DB) (eventsubsystem.SDKSubscriberFactory, error) {
+				recorder, err := recorderFor(mysqlDB)
+				if err != nil {
+					return nil, err
+				}
+				config := eventtransport.SubscriberConfig{
+					Provider: "nsq", NSQLookupdAddr: s.config.MessagingOptions.NSQLookupdAddr,
+				}
+				return func() (eventsubsystem.SDKSubscriber, error) {
+					return eventtransport.NewSDKDeliverySubscriber(config, 0,
+						s.config.MessagingOptions.Delivery.EffectiveMaxAttempts(), eventtransport.SDKFailedHandoffHandler(recorder))
+				}, nil
 			}
-			config := eventtransport.SubscriberConfig{
-				Provider: s.config.MessagingOptions.Provider, NSQLookupdAddr: s.config.MessagingOptions.NSQLookupdAddr, RabbitMQURL: s.config.MessagingOptions.RabbitMQURL,
+		} else {
+			buildSubscriberFactory = func(mysqlDB *gorm.DB) (eventsubsystem.SubscriberFactory, error) {
+				recorder, err := recorderFor(mysqlDB)
+				if err != nil {
+					return nil, err
+				}
+				options, err := eventtransport.NewSubscriberOptions(0, s.config.MessagingOptions.Delivery.EffectiveMaxAttempts(), eventtransport.FailedMessageHandler(recorder))
+				if err != nil {
+					return nil, err
+				}
+				config := eventtransport.SubscriberConfig{
+					Provider: s.config.MessagingOptions.Provider, NSQLookupdAddr: s.config.MessagingOptions.NSQLookupdAddr, RabbitMQURL: s.config.MessagingOptions.RabbitMQURL,
+				}
+				return func() (messaging.Subscriber, error) { return eventtransport.NewSubscriber(config, options) }, nil
 			}
-			return func() (messaging.Subscriber, error) { return eventtransport.NewSubscriber(config, options) }, nil
 		}
 	}
 	mongoProfile, assessmentProfile := buildEventProfileOptions(s.config)
 	return eventSubsystemResourceDeps{
-		newSubsystem:           configuredEventSubsystem(s.config),
-		buildSubscriberFactory: buildSubscriberFactory,
-		consumers:              buildEventConsumerOptions(s.config),
-		mongo:                  mongoProfile,
-		assessment:             assessmentProfile,
+		newSubsystem:              configuredEventSubsystem(s.config),
+		buildSubscriberFactory:    buildSubscriberFactory,
+		buildSDKSubscriberFactory: buildSDKSubscriberFactory,
+		consumers:                 buildEventConsumerOptions(s.config),
+		mongo:                     mongoProfile,
+		assessment:                assessmentProfile,
 	}
 }
 
@@ -175,11 +214,60 @@ func (s *server) buildMQPublisherDeps() mqPublisherStageDeps {
 		fallbackMode: eventruntime.PublishModeFromEnv(s.config.GenericServerRunOptions.Mode),
 	}
 	if s.config.MessagingOptions != nil {
-		deps.enabled = s.config.MessagingOptions.Enabled
-		deps.provider = s.config.MessagingOptions.Provider
-		deps.newPublisher = s.config.MessagingOptions.NewPublisher
+		options := s.config.MessagingOptions
+		deps.enabled = options.Enabled
+		deps.provider = options.Provider
+		if options.Provider == "nsq" {
+			deps.newWirePublisher = func() (wirePublisherResource, error) {
+				return messagingruntime.NewSDKNSQWirePublisher(options.NSQAddr)
+			}
+		} else {
+			deps.newPublisher = func() (messaging.Publisher, error) {
+				if options.Provider != "rabbitmq" {
+					return nil, fmt.Errorf("unsupported messaging provider: %s", options.Provider)
+				}
+				return cbrabbit.NewPublisher(options.RabbitMQURL)
+			}
+		}
 	}
 	return deps
+}
+
+func (s *server) buildMQChannelPreparer() func(*eventcatalog.Catalog) error {
+	if s == nil || s.config == nil || s.config.MessagingOptions == nil {
+		return nil
+	}
+	options := s.config.MessagingOptions
+	if !options.Enabled || options.Provider != "nsq" {
+		return nil
+	}
+	consumerOptions := buildEventConsumerOptions(s.config)
+	return func(catalog *eventcatalog.Catalog) error {
+		registry, err := eventcatalog.NewEffectiveRegistry(catalog, eventcatalog.DefaultSpecs())
+		if err != nil {
+			return fmt.Errorf("resolve NSQ channel catalog: %w", err)
+		}
+		channels := make([]messagingruntime.DurableChannel, 0)
+		for _, subscription := range catalog.TopicSubscriptions() {
+			channels = append(channels, messagingruntime.DurableChannel{Topic: subscription.TopicName, Channel: options.PrimaryWorkerChannel})
+		}
+		for _, event := range registry.Snapshot() {
+			for _, consumer := range event.AdditionalConsumers {
+				if configured, ok := consumerOptions[consumer.ID]; ok {
+					if !configured.Enabled {
+						continue
+					}
+					if configured.Channel != "" {
+						consumer.Channel = configured.Channel
+					}
+				}
+				channels = append(channels, messagingruntime.DurableChannel{Topic: event.Topic, Channel: consumer.Channel})
+			}
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		return messagingruntime.EnsureNSQChannels(ctx, options.NSQDHTTPEndpoints, channels)
+	}
 }
 
 func (s *server) buildContainerOptionsBuilder() func(containerOptionsInput) container.ContainerOptions {
@@ -203,17 +291,42 @@ func prepareResources(deps resourceStageDeps) (resourceOutput, error) {
 		}
 	}
 	actionAuditStore, actionAuditRunner := buildActionAuditRuntime(mysqlDB, redisRuntime)
-	mqPublisher, publishMode := createMQPublisher(deps.mqPublisher)
+	var mqPublisher messaging.Publisher
+	var wirePublisher wirePublisherResource
+	var closePublisher func() error
+	var publishMode eventruntime.PublishMode
+	if deps.mqPublisher.enabled && deps.mqPublisher.provider == "nsq" && deps.mqPublisher.newWirePublisher != nil {
+		wirePublisher, err = createNSQWirePublisher(deps.mqPublisher)
+		if err != nil {
+			return resourceOutput{}, err
+		}
+		closePublisher = wirePublisher.Close
+		publishMode = eventruntime.PublishModeMQ
+	} else {
+		mqPublisher, publishMode, err = createMQPublisher(deps.mqPublisher)
+		if err != nil {
+			return resourceOutput{}, err
+		}
+		if mqPublisher != nil {
+			closePublisher = mqPublisher.Close
+		}
+	}
 	prepared := false
 	defer func() {
-		if !prepared && mqPublisher != nil {
-			_ = mqPublisher.Close()
+		if !prepared && closePublisher != nil {
+			_ = closePublisher()
 		}
 	}()
 	eventCatalog, err := loadEventCatalog(deps.loadEventCatalog)
 	if err != nil {
 		return resourceOutput{}, err
 	}
+	if deps.prepareMQChannels != nil {
+		if err := deps.prepareMQChannels(eventCatalog); err != nil {
+			return resourceOutput{}, fmt.Errorf("prepare MQ channels before serving: %w", err)
+		}
+	}
+	deps.eventSubsystem.wirePublisher = wirePublisher
 	events, err := buildResourceEventSubsystem(mysqlDB, mongoDB, cacheSubsystem, eventCatalog, mqPublisher, publishMode, resilience, deps.eventSubsystem)
 	if err != nil {
 		return resourceOutput{}, err
@@ -227,8 +340,10 @@ func prepareResources(deps resourceStageDeps) (resourceOutput, error) {
 			redisCache: redisCache,
 		},
 		messaging: messagingOutput{
-			mqPublisher: mqPublisher,
-			publishMode: publishMode,
+			mqPublisher:    mqPublisher,
+			wirePublisher:  wirePublisher,
+			closePublisher: closePublisher,
+			publishMode:    publishMode,
 		},
 		cacheRuntime: cacheRuntimeOutput{
 			redisRuntime:   redisRuntime,
@@ -279,12 +394,26 @@ func buildResourceEventSubsystem(
 			return nil, err
 		}
 	}
+	sdkSubscriberFactory := deps.sdkSubscriberFactory
+	if deps.buildSDKSubscriberFactory != nil {
+		var err error
+		sdkSubscriberFactory, err = deps.buildSDKSubscriberFactory(mysqlDB)
+		if err != nil {
+			return nil, err
+		}
+	}
+	wirePublisher := deps.wirePublisher
+	if wirePublisher == nil {
+		if candidate, ok := mqPublisher.(eventruntime.WirePublisher); ok {
+			wirePublisher = candidate
+		}
+	}
 	return deps.newSubsystem(eventsubsystem.Options{
 		MySQLDB: mysqlDB, MongoDB: mongoDB, OpsRedis: opsRedis,
-		Catalog: catalog, MQPublisher: mqPublisher, PublisherMode: publishMode,
+		Catalog: catalog, MQPublisher: mqPublisher, WirePublisher: wirePublisher, PublisherMode: publishMode,
 		MySQLLimiter: mysqlLimiter, MongoLimiter: mongoLimiter,
 		Mongo: deps.mongo, Assessment: deps.assessment,
-		SubscriberFactory: subscriberFactory, Consumers: deps.consumers,
+		SubscriberFactory: subscriberFactory, SDKSubscriberFactory: sdkSubscriberFactory, Consumers: deps.consumers,
 	})
 }
 
@@ -328,24 +457,48 @@ func initializeRedisRuntime(deps redisRuntimeStageDeps) (redis.UniversalClient, 
 	return redisCache, redisRuntime, deps.buildSubsystem(redisRuntime)
 }
 
-func createMQPublisher(deps mqPublisherStageDeps) (messaging.Publisher, eventruntime.PublishMode) {
-	if !deps.enabled || deps.newPublisher == nil {
-		return nil, deps.fallbackMode
+func createMQPublisher(deps mqPublisherStageDeps) (messaging.Publisher, eventruntime.PublishMode, error) {
+	if !deps.enabled {
+		return nil, deps.fallbackMode, nil
+	}
+	if deps.newPublisher == nil {
+		return nil, "", fmt.Errorf("MQ publisher factory is required when messaging is enabled")
 	}
 
 	publisher, err := deps.newPublisher()
 	if err != nil {
-		logger.L(context.Background()).Warnw("Failed to create MQ publisher, falling back to logging mode",
-			"component", "apiserver",
-			"error", err.Error(),
-		)
-		return nil, deps.fallbackMode
+		return nil, "", fmt.Errorf("create MQ publisher: %w", err)
+	}
+	if publisher == nil {
+		return nil, "", fmt.Errorf("MQ publisher factory returned nil")
+	}
+	if deps.provider == "nsq" {
+		if _, ok := publisher.(eventruntime.WirePublisher); !ok {
+			_ = publisher.Close()
+			return nil, "", fmt.Errorf("NSQ publisher must support complete wire publishing")
+		}
 	}
 	logger.L(context.Background()).Infow("MQ publisher created successfully",
 		"component", "apiserver",
 		"provider", deps.provider,
 	)
-	return publisher, eventruntime.PublishModeMQ
+	return publisher, eventruntime.PublishModeMQ, nil
+}
+
+func createNSQWirePublisher(deps mqPublisherStageDeps) (wirePublisherResource, error) {
+	if deps.newWirePublisher == nil {
+		return nil, fmt.Errorf("NSQ wire publisher factory is required")
+	}
+	publisher, err := deps.newWirePublisher()
+	if err != nil {
+		return nil, fmt.Errorf("create NSQ wire publisher: %w", err)
+	}
+	if publisher == nil {
+		return nil, fmt.Errorf("NSQ wire publisher factory returned nil")
+	}
+	logger.L(context.Background()).Infow("MQ publisher created successfully",
+		"component", "apiserver", "provider", "nsq")
+	return publisher, nil
 }
 
 func loadDefaultEventCatalog() (*eventcatalog.Catalog, error) {

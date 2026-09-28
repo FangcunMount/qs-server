@@ -6,7 +6,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/FangcunMount/component-base/pkg/event"
+	"github.com/FangcunMount/qs-server/internal/pkg/event"
 )
 
 // PostCommitWake accelerates the SDK's next scan after a host transaction

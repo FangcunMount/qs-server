@@ -5,11 +5,11 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/FangcunMount/component-base/pkg/event"
 	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
 	apptransaction "github.com/FangcunMount/qs-server/internal/apiserver/application/transaction"
 	domainplan "github.com/FangcunMount/qs-server/internal/apiserver/domain/plan"
 	"github.com/FangcunMount/qs-server/internal/pkg/database/mysql"
+	"github.com/FangcunMount/qs-server/internal/pkg/event"
 )
 
 // taskPersistence keeps a task terminal transition and its Enrollment close check

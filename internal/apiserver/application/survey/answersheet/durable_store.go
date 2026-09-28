@@ -4,11 +4,11 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/FangcunMount/component-base/pkg/event"
 	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
 	apptransaction "github.com/FangcunMount/qs-server/internal/apiserver/application/transaction"
 	domainAnswerSheet "github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/answersheet"
 	submitport "github.com/FangcunMount/qs-server/internal/apiserver/port/answersheetsubmit"
+	"github.com/FangcunMount/qs-server/internal/pkg/event"
 )
 
 // DurableSubmitMeta 携带application-等级 持久化 write 元数据。

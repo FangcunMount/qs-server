@@ -7,10 +7,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/FangcunMount/component-base/pkg/event"
 	domainAnswerSheet "github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/answersheet"
 	mongoBase "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo"
 	submitport "github.com/FangcunMount/qs-server/internal/apiserver/port/answersheetsubmit"
+	"github.com/FangcunMount/qs-server/internal/pkg/event"
 	"github.com/FangcunMount/qs-server/internal/pkg/safeconv"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"

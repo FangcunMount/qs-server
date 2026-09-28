@@ -7,7 +7,6 @@ import (
 	"time"
 
 	basemessaging "github.com/FangcunMount/component-base/pkg/messaging"
-	cbnsq "github.com/FangcunMount/component-base/pkg/messaging/nsq"
 	cbrabbit "github.com/FangcunMount/component-base/pkg/messaging/rabbitmq"
 	eventobservability "github.com/FangcunMount/qs-server/internal/pkg/eventing/observe"
 	"github.com/FangcunMount/qs-server/internal/pkg/retrygovernance"
@@ -21,10 +20,11 @@ const (
 )
 
 type SubscriberConfig struct {
-	Provider          string
-	NSQLookupdAddr    string
-	NSQMessageTimeout time.Duration
-	RabbitMQURL       string
+	Provider           string
+	NSQLookupdAddr     string
+	NSQMessageTimeout  time.Duration
+	FailedHandoffGroup string
+	RabbitMQURL        string
 }
 
 func NewSubscriberOptions(maxInFlight, maxAttempts int, failedHandler basemessaging.FailedMessageHandler) (basemessaging.SubscriberOptions, error) {
@@ -47,16 +47,10 @@ func NewSubscriber(config SubscriberConfig, options basemessaging.SubscriberOpti
 		return nil, fmt.Errorf("bounded transport subscriber options are required")
 	}
 	switch config.Provider {
-	case "nsq":
-		nsqConfig, err := newNSQConfig(config.NSQMessageTimeout)
-		if err != nil {
-			return nil, err
-		}
-		return cbnsq.NewSubscriberWithOptions([]string{config.NSQLookupdAddr}, nsqConfig, options)
 	case "rabbitmq":
 		return cbrabbit.NewSubscriberWithOptions(config.RabbitMQURL, options)
 	default:
-		return nil, fmt.Errorf("unsupported messaging provider: %s", config.Provider)
+		return nil, fmt.Errorf("legacy subscriber does not support messaging provider %q", config.Provider)
 	}
 }
 

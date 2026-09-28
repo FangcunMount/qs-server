@@ -5,16 +5,58 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/FangcunMount/component-base/pkg/event"
 	"github.com/FangcunMount/component-base/pkg/messaging"
+	"github.com/FangcunMount/qs-server/internal/pkg/event"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventing/observe"
+	"github.com/FangcunMount/reliable-messaging/wire/legacy"
 )
 
 type capturedPublisher struct {
 	topic string
 	msg   *messaging.Message
 	err   error
+}
+
+type capturedWirePublisher struct {
+	topic  string
+	bodies [][]byte
+	err    error
+}
+
+func (p *capturedWirePublisher) PublishWire(_ context.Context, topic string, body []byte) error {
+	p.topic = topic
+	p.bodies = append(p.bodies, append([]byte(nil), body...))
+	return p.err
+}
+
+func TestRoutingPublisherSDKWireMatchesLegacyEnvelopeAndRetainsIdentityOnUnknown(t *testing.T) {
+	evt := event.New(eventcatalog.AnswerSheetSubmitted, "AnswerSheet", "sheet-1", map[string]string{"id": "sheet-1"})
+	old := &capturedPublisher{}
+	legacyRoute := NewRoutingPublisher(RoutingPublisherOptions{
+		Catalog: loadEventCatalog(t), MQPublisher: old, Source: "unit-test", Mode: PublishModeMQ,
+	})
+	if err := legacyRoute.Publish(t.Context(), evt); err != nil {
+		t.Fatal(err)
+	}
+	want, err := legacy.Encode(legacy.Envelope{UUID: old.msg.UUID, Metadata: old.msg.Metadata, Payload: old.msg.Payload}, legacy.Revision2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	wire := &capturedWirePublisher{}
+	legacyFallback := &capturedPublisher{}
+	route := NewRoutingPublisher(RoutingPublisherOptions{
+		Catalog: loadEventCatalog(t), MQPublisher: legacyFallback, WirePublisher: wire,
+		Source: "unit-test", Mode: PublishModeMQ,
+	})
+	if err := route.Publish(t.Context(), evt); err != nil || wire.topic != old.topic || len(wire.bodies) != 1 || string(wire.bodies[0]) != string(want) || legacyFallback.msg != nil {
+		t.Fatalf("SDK wire publish: err=%v topic=%q bodies=%d identical=%t", err, wire.topic, len(wire.bodies), len(wire.bodies) == 1 && string(wire.bodies[0]) == string(want))
+	}
+	wantErr := errors.New("publish confirmation unknown")
+	wire.err = wantErr
+	if err := route.Publish(t.Context(), evt); !errors.Is(err, wantErr) || len(wire.bodies) != 2 || string(wire.bodies[1]) != string(want) {
+		t.Fatalf("unknown publish: err=%v bodies=%d identity retained=%t", err, len(wire.bodies), len(wire.bodies) == 2 && string(wire.bodies[1]) == string(want))
+	}
 }
 
 func (p *capturedPublisher) Publish(_ context.Context, _ string, _ []byte) error { return nil }

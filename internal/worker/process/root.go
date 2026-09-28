@@ -4,7 +4,6 @@ import (
 	"io"
 	"log/slog"
 
-	"github.com/FangcunMount/component-base/pkg/messaging"
 	"github.com/FangcunMount/component-base/pkg/shutdown"
 	"github.com/FangcunMount/component-base/pkg/shutdown/shutdownmanagers/posixsignal"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
@@ -64,11 +63,16 @@ type observabilityOutput struct {
 }
 
 type messagingRuntimeOutput struct {
-	subscriber         messaging.Subscriber
-	publisher          messaging.Publisher
+	subscriber         workerSubscriber
+	publisher          io.Closer
 	holdReplayer       *messagingintegration.RetryEventHoldReplayer
 	deadLetterRecorder *eventtransport.SQLDeadLetterRecorder
 	holdStore          io.Closer
+}
+
+type workerSubscriber interface {
+	Stop()
+	Close() error
 }
 
 type runtimeOutput struct {

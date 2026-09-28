@@ -12,8 +12,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/FangcunMount/component-base/pkg/event"
 	"github.com/FangcunMount/component-base/pkg/messaging"
+	cbnsq "github.com/FangcunMount/component-base/pkg/messaging/nsq"
 	appanswersheet "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/answersheet"
 	"github.com/FangcunMount/qs-server/internal/apiserver/eventing/standardoutbox"
 	eventsubsystem "github.com/FangcunMount/qs-server/internal/apiserver/eventing/subsystem"
@@ -21,9 +21,9 @@ import (
 	mongostandard "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/standardoutbox"
 	submitport "github.com/FangcunMount/qs-server/internal/apiserver/port/answersheetsubmit"
 	outboxport "github.com/FangcunMount/qs-server/internal/apiserver/port/outbox"
+	"github.com/FangcunMount/qs-server/internal/pkg/event"
 	eventcatalog "github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
 	eventruntime "github.com/FangcunMount/qs-server/internal/pkg/eventing/runtime"
-	pkgoptions "github.com/FangcunMount/qs-server/internal/pkg/options"
 	"github.com/FangcunMount/reliable-messaging/relay"
 	sdkmongo "github.com/FangcunMount/reliable-messaging/storage/mongo"
 	"github.com/FangcunMount/reliable-messaging/transport"
@@ -325,10 +325,7 @@ func TestM5MongoRollbackHoldsUntilStandardIntentsDrain(t *testing.T) {
 	// The old application Profile may start only after every standard intent
 	// has been settled. Submit a real AnswerSheet through the original Mongo
 	// transaction and its historical Writer/Relay, then inspect both stores.
-	messagingOptions := pkgoptions.NewMessagingOptions()
-	messagingOptions.Enabled = true
-	messagingOptions.NSQAddr = nsqAddress
-	legacyPublisher, err := messagingOptions.NewPublisher()
+	legacyPublisher, err := cbnsq.NewPublisher(nsqAddress, nsq.NewConfig())
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -6,10 +6,10 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/FangcunMount/component-base/pkg/event"
 	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
 	domainAnswerSheet "github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/answersheet"
 	submitport "github.com/FangcunMount/qs-server/internal/apiserver/port/answersheetsubmit"
+	"github.com/FangcunMount/qs-server/internal/pkg/event"
 )
 
 type transactionalSubmissionDurableStore struct {

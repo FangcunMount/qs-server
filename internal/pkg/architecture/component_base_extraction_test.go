@@ -62,13 +62,12 @@ func TestExtractedProcessRuntimePackageHasNoLocalGoFiles(t *testing.T) {
 	}
 }
 
-func TestSharedTransactionEventAndOutboxPackagesUseComponentBase(t *testing.T) {
+func TestSharedTransactionEventAndOutboxPackagesUseApprovedOwners(t *testing.T) {
 	root := repoRoot(t)
 	requiredByFile := map[string]string{
 		"internal/pkg/database/mysql/uow.go":         "github.com/FangcunMount/component-base/pkg/uow/gorm",
-		"internal/pkg/eventing/runtime/publisher.go": "github.com/FangcunMount/component-base/pkg/eventmessaging",
-		"internal/apiserver/port/outbox/outbox.go":   "github.com/FangcunMount/component-base/pkg/outbox",
-		"internal/apiserver/outboxcore/core.go":      "github.com/FangcunMount/component-base/pkg/outboxcore",
+		"internal/pkg/eventing/runtime/publisher.go": "github.com/FangcunMount/reliable-messaging/wire/domain",
+		"internal/apiserver/port/outbox/outbox.go":   "github.com/FangcunMount/reliable-messaging/outbox",
 	}
 
 	for rel, required := range requiredByFile {
@@ -84,7 +83,84 @@ func TestSharedTransactionEventAndOutboxPackagesUseComponentBase(t *testing.T) {
 			}
 		}
 		if !found {
-			t.Fatalf("%s must import extracted component-base package %s", rel, required)
+			t.Fatalf("%s must import approved shared package %s", rel, required)
 		}
+	}
+
+	// The host status API must not inherit the legacy component-base type even
+	// while the old Outbox core remains available for the rollback window.
+	file, err := parser.ParseFile(token.NewFileSet(), filepath.Join(root, "internal/apiserver/port/outbox/outbox.go"), nil, parser.ImportsOnly)
+	if err != nil {
+		t.Fatalf("parse outbox port: %v", err)
+	}
+	for _, imported := range file.Imports {
+		if strings.Trim(imported.Path.Value, `"`) == "github.com/FangcunMount/component-base/pkg/outbox" {
+			t.Fatal("host outbox status port must not import component-base/pkg/outbox")
+		}
+	}
+}
+
+// These imports belong to the still-supported RabbitMQ and old Outbox rollback
+// paths. Removing an entry is allowed; adding a new dependency on the retiring
+// component-base message packages is not.
+func TestComponentBaseMessageImportsStayWithinRollbackAllowlist(t *testing.T) {
+	root := repoRoot(t)
+	const base = "github.com/FangcunMount/component-base/pkg/"
+	messagePackages := []string{
+		"event", "eventcatalog", "eventcodec", "eventmessaging", "messaging", "outbox", "outboxcore",
+	}
+	allowed := map[string]map[string]bool{
+		"internal/apiserver/eventing/subsystem/subsystem.go": {base + "messaging": true},
+		"internal/apiserver/outboxcore/core.go": {
+			base + "event": true, base + "outboxcore": true,
+		},
+		"internal/apiserver/process/container_bootstrap.go": {base + "messaging": true},
+		"internal/apiserver/process/resource_bootstrap.go": {
+			base + "messaging": true, base + "messaging/rabbitmq": true,
+		},
+		"internal/apiserver/process/root.go":                  {base + "messaging": true},
+		"internal/pkg/eventing/runtime/message_settlement.go": {base + "messaging": true},
+		"internal/pkg/eventing/runtime/publisher.go":          {base + "messaging": true},
+		"internal/pkg/eventing/transport/dead_letter.go":      {base + "messaging": true},
+		"internal/pkg/eventing/transport/runtime.go": {
+			base + "messaging": true, base + "messaging/rabbitmq": true,
+		},
+		"internal/pkg/iamauth/version_sync.go":                {base + "messaging": true},
+		"internal/worker/integration/messaging/retry_hold.go": {base + "messaging": true},
+		"internal/worker/integration/messaging/runtime.go": {
+			base + "messaging": true, base + "messaging/rabbitmq": true,
+		},
+		"internal/worker/process/runtime_bootstrap.go": {base + "messaging": true},
+	}
+
+	err := filepath.WalkDir(filepath.Join(root, "internal"), func(path string, entry os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if entry.IsDir() || filepath.Ext(path) != ".go" || strings.HasSuffix(path, "_test.go") {
+			return nil
+		}
+		file, err := parser.ParseFile(token.NewFileSet(), path, nil, parser.ImportsOnly)
+		if err != nil {
+			return err
+		}
+		rel := filepath.ToSlash(mustRel(t, root, path))
+		for _, imported := range file.Imports {
+			importPath := strings.Trim(imported.Path.Value, `"`)
+			for _, pkg := range messagePackages {
+				prefix := base + pkg
+				if importPath != prefix && !strings.HasPrefix(importPath, prefix+"/") {
+					continue
+				}
+				if !allowed[rel][importPath] {
+					t.Errorf("%s adds retiring component-base message import %s", rel, importPath)
+				}
+				break
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("walk internal: %v", err)
 	}
 }

@@ -5,9 +5,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/FangcunMount/component-base/pkg/event"
 	"github.com/FangcunMount/component-base/pkg/eventcodec"
 	"github.com/FangcunMount/component-base/pkg/eventmessaging"
+	"github.com/FangcunMount/qs-server/internal/pkg/event"
 )
 
 type samplePayload struct {

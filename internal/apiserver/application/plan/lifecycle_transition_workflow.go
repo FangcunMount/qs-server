@@ -6,12 +6,12 @@ import (
 	"time"
 
 	"github.com/FangcunMount/component-base/pkg/errors"
-	"github.com/FangcunMount/component-base/pkg/event"
 	"github.com/FangcunMount/component-base/pkg/logger"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
 	apptransaction "github.com/FangcunMount/qs-server/internal/apiserver/application/transaction"
 	domainPlan "github.com/FangcunMount/qs-server/internal/apiserver/domain/plan"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
+	"github.com/FangcunMount/qs-server/internal/pkg/event"
 )
 
 type planTransitionSpec struct {

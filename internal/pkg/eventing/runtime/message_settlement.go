@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"log/slog"
 
-	"github.com/FangcunMount/component-base/pkg/eventcodec"
 	"github.com/FangcunMount/component-base/pkg/messaging"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventing/observe"
+	domainwire "github.com/FangcunMount/reliable-messaging/wire/domain"
 )
 
 // ErrAutomaticRetryPaused marks a business retry event that must be durably
@@ -26,7 +26,7 @@ func (MessageEventExtractor) Extract(msg *messaging.Message) (string, error) {
 	if eventType := msg.Metadata["event_type"]; eventType != "" {
 		return eventType, nil
 	}
-	env, err := eventcodec.DecodeEnvelope(msg.Payload)
+	env, err := domainwire.DecodeEnvelope(msg.Payload)
 	if err != nil {
 		return "", err
 	}

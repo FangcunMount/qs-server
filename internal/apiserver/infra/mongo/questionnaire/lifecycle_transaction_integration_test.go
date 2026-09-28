@@ -9,11 +9,11 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/FangcunMount/component-base/pkg/event"
 	appquestionnaire "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"
 	apptransaction "github.com/FangcunMount/qs-server/internal/apiserver/application/transaction"
 	domainquestionnaire "github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
 	mongoquestionnaire "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/questionnaire"
+	"github.com/FangcunMount/qs-server/internal/pkg/event"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 	"github.com/FangcunMount/qs-server/internal/pkg/mongodbtest"
 	"go.mongodb.org/mongo-driver/bson"

@@ -3,7 +3,7 @@ package eventing
 import (
 	"context"
 
-	"github.com/FangcunMount/component-base/pkg/event"
+	"github.com/FangcunMount/qs-server/internal/pkg/event"
 )
 
 type EventStager interface {
