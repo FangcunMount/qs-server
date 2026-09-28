@@ -19,6 +19,37 @@ def run(args, *, input_text=None, timeout=15):
     return subprocess.run(args, input=input_text, text=True, capture_output=True, timeout=timeout)
 
 
+def scanner_failure_category(stderr, exit_code):
+    # The driver may include endpoints or credentials in its diagnostics.
+    # Report only fixed categories after inspecting stderr in memory.
+    known = (
+        ("invalid connection input", "connection_input"),
+        ("explicit database connections", "connection_input"),
+        ("connect Mongo failed", "mongo_connect"),
+        ("ping Mongo failed", "mongo_ping"),
+        ("required answersheet audit index", "audit_index"),
+        ("connect MySQL failed", "mysql_connect"),
+        ("ping MySQL failed", "mysql_ping"),
+        ("begin MySQL read-only transaction failed", "mysql_read_only_transaction"),
+        ("scan failed: scan accepted answersheets", "mongo_scan"),
+        ("scan failed: decode accepted answersheets", "mongo_decode"),
+        ("scan failed: query assessment effects", "mysql_effect_query"),
+        ("scan failed:", "business_scan"),
+        ("No such image", "audit_image_missing"),
+        ("Unable to find image", "audit_image_missing"),
+        ("pull access denied", "audit_image_missing"),
+        ("permission denied", "docker_permission"),
+        ("read-only file system", "container_filesystem"),
+        ("OCI runtime", "container_start"),
+    )
+    for marker, category in known:
+        if marker in stderr:
+            return category
+    if exit_code in (125, 126, 127):
+        return "container_start"
+    return "unclassified"
+
+
 expected = os.environ.get("EXPECTED_API_SHA", "")
 binary_sha = os.environ.get("EXPECTED_BINARY_SHA256", "")
 run_id = os.environ.get("AUDIT_RUN_ID", "")
@@ -108,7 +139,7 @@ try:
     credentials = json.dumps({"mysql_dsn": mysql_dsn, "mongo_uri": mongo_uri, "mongo_db": mongo_db})
     result = run(command, input_text=credentials, timeout=180)
     if result.returncode not in (0, 2, 3):
-        fail("scanner_nonzero")
+        fail("scanner_nonzero_" + scanner_failure_category(result.stderr, result.returncode))
     try:
         report = json.loads(result.stdout)
     except json.JSONDecodeError:
