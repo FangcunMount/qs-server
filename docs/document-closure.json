@@ -2,7 +2,7 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "7315bd38f7e54849ff0768a269ed617363656bbe",
+    "sha": "11ee4669299e3034401ffe3c91562e0af7881790",
     "verified_on": "2026-09-29"
   },
   "status_policy": {
@@ -53,7 +53,7 @@
         "docs/_archive/**/*.md",
         "tmp/**/*.md"
       ],
-      "expected_count": 36,
+      "expected_count": 35,
       "budgeted": false
     }
   },
@@ -9077,45 +9077,6 @@
           "severity": "medium",
           "summary": "Local migration and rollback checks completed; committed-revision and production evidence pending.",
           "exit_criteria": "Verify release revision, private preflight, maintenance cutover and business acceptance."
-        }
-      ]
-    },
-    {
-      "path": "cmd/qs-answersheet-gap-audit/README.md",
-      "class": "sidecar",
-      "owner": "runtime",
-      "doc_status": "needs_review",
-      "verified": {
-        "source_sha": null,
-        "verified_on": null
-      },
-      "fact_sources": [
-        {
-          "kind": "source",
-          "path": "cmd/qs-answersheet-gap-audit/main.go"
-        },
-        {
-          "kind": "source",
-          "path": "internal/apiserver/infra/answersheetgap/scanner.go"
-        }
-      ],
-      "verification": [],
-      "production_evidence": {
-        "level": "none",
-        "refs": [],
-        "deployed_sha": null,
-        "observed_at": null,
-        "limitations": [
-          "The read-only CLI is not yet wired to a production operation or recovery action."
-        ]
-      },
-      "gaps": [
-        {
-          "id": "QS03-GAP-AUDIT-OPERATION",
-          "kind": "verification",
-          "severity": "high",
-          "summary": "The bounded read-only scan is implemented, but production waterline, execution and follow-up ownership remain open.",
-          "exit_criteria": "Run the bounded scan on production with private detail handling, verify source-to-effect findings and assign safe recovery responsibility."
         }
       ]
     },
