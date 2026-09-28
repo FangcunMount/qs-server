@@ -2,7 +2,7 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "b334e9ac0cd27a6fa30989f72d15ddd9f5221b5b",
+    "sha": "37784311537fd6c21375c14ece9cb548517e74ea",
     "verified_on": "2026-09-28"
   },
   "status_policy": {
@@ -53,7 +53,7 @@
         "docs/_archive/**/*.md",
         "tmp/**/*.md"
       ],
-      "expected_count": 34,
+      "expected_count": 35,
       "budgeted": false
     }
   },
@@ -8532,6 +8532,36 @@
           "severity": "medium",
           "summary": "Source and semantic review have not yet been recorded.",
           "exit_criteria": "Record fact sources and verification evidence, then update doc_status through review."
+        }
+      ]
+    },
+    {
+      "path": "scripts/oneoff/answersheet_gap_audit/README.md",
+      "class": "sidecar",
+      "owner": "tooling",
+      "doc_status": "needs_review",
+      "verified": {
+        "source_sha": null,
+        "verified_on": null
+      },
+      "fact_sources": [],
+      "verification": [],
+      "production_evidence": {
+        "level": "none",
+        "refs": [],
+        "deployed_sha": null,
+        "observed_at": null,
+        "limitations": [
+          "No per-document production evidence has been recorded in this initial skeleton."
+        ]
+      },
+      "gaps": [
+        {
+          "id": "DOC-CLOSURE-QS03-AUDIT",
+          "kind": "verification",
+          "severity": "medium",
+          "summary": "Production scope and operational evidence have not been recorded.",
+          "exit_criteria": "Review a fixed production window and retain read-only output before promoting the audit."
         }
       ]
     },
