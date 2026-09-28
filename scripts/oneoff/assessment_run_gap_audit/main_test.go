@@ -15,7 +15,7 @@ func TestScanDistinguishesNeverClaimedFromClaimedAndCompleted(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 	cutoff := time.Date(2026, 9, 28, 20, 0, 0, 0, time.UTC)
 	mock.ExpectBegin()
 	mock.ExpectQuery(regexp.QuoteMeta(query)).
@@ -45,7 +45,7 @@ func TestScanStopsAtBudget(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 	mock.ExpectBegin()
 	mock.ExpectQuery(regexp.QuoteMeta(query)).WithArgs("2026-09-29 04:00:00", uint64(100), uint64(103), 2).
 		WillReturnRows(sqlmock.NewRows([]string{"id", "status", "has_submitted_at", "matured", "has_model", "has_run"}).

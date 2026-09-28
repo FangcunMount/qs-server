@@ -64,7 +64,7 @@ func runCLI(parent context.Context, args []string, stdin io.Reader, stdout, stde
 		_, _ = fmt.Fprintln(stderr, "assessment run gap audit: database open failed")
 		return 1
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 	if err := db.PingContext(ctx); err != nil {
 		_, _ = fmt.Fprintln(stderr, "assessment run gap audit: database unavailable")
 		return 1
@@ -139,14 +139,14 @@ func scan(ctx context.Context, db *sql.DB, cfg config) (report, error) {
 	if err != nil {
 		return report{}, err
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 	// Assessment timestamps are stored as UTC+8 wall-clock DATETIME values.
 	cutoffWall := cfg.cutoff.In(time.FixedZone("UTC+8", 8*60*60)).Format("2006-01-02 15:04:05")
 	rows, err := tx.QueryContext(ctx, query, cutoffWall, cfg.afterID, cfg.upperID, cfg.maxRows+1)
 	if err != nil {
 		return report{}, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	for rows.Next() {
 		var id uint64
 		var status string
