@@ -92,4 +92,17 @@ func TestScanPageFindsPublishedAnswerSheetMissingAssessment(t *testing.T) {
 	if len(page.Findings) != 1 || page.Findings[0].Disposition != Present || page.Findings[0].AssessmentID != 801 {
 		t.Fatalf("persisted Assessment should close the original gap: %+v", page)
 	}
+	if err := mysqlDB.Exec("DELETE FROM assessment WHERE answer_sheet_id=?", sheet.DomainID).Error; err != nil {
+		t.Fatal(err)
+	}
+	if _, err := mongoDB.Collection("rm_outbox").UpdateOne(ctx, bson.M{"_id": id}, bson.M{"$set": bson.M{"state": "pending"}}); err != nil {
+		t.Fatal(err)
+	}
+	page, err = scanner.ScanPage(ctx, 0, sheet.DomainID, time.Now().Add(-10*time.Second), 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(page.Findings) != 1 || page.Findings[0].Disposition != DeliveryPending {
+		t.Fatalf("unconfirmed original delivery must not become a confirmed gap: %+v", page)
+	}
 }
