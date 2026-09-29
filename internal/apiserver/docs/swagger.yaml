@@ -6618,6 +6618,43 @@ definitions:
       signal_count:
         type: integer
     type: object
+  systemgovernance.GapRecoveryDecision:
+    properties:
+      authorized:
+        type: boolean
+      code:
+        type: string
+      outbox_version_after:
+        type: integer
+      outbox_version_before:
+        type: integer
+    type: object
+  systemgovernance.GapRecoveryRequest:
+    properties:
+      assessment_id:
+        type: integer
+      confirm:
+        type: boolean
+      event_id:
+        type: string
+      expected_version:
+        type: integer
+      reason:
+        type: string
+      request_id:
+        type: string
+      submitted_before:
+        type: string
+    type: object
+  systemgovernance.GapRecoverySummary:
+    properties:
+      authorized:
+        type: integer
+      denied:
+        type: integer
+      waiting_relay:
+        type: integer
+    type: object
   systemgovernance.MetricEvidence:
     properties:
       available:
@@ -12581,6 +12618,102 @@ paths:
           schema:
             $ref: '#/definitions/core.ErrResponse'
       summary: 系统治理-查询已核实传输死信结案回执
+      tags:
+      - System-Governance
+  /internal/v1/system-governance/actions/gap-recoveries:
+    post:
+      consumes:
+      - application/json
+      description: 仅在显式启用时可用；同请求编号与完整输入可安全重试，结果未知先查询原请求。仅 qs:admin 可访问。
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 原事件身份、预期版本、宽限截点、理由及确认
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/systemgovernance.GapRecoveryRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/systemgovernance.GapRecoveryDecision'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+      summary: 系统治理-授权恢复未接单的原测评消息
+      tags:
+      - System-Governance
+  /internal/v1/system-governance/actions/gap-recoveries/resolve:
+    post:
+      consumes:
+      - application/json
+      description: 只读核对同机构、同操作者、同请求编号与输入的持久决定；仅 qs:admin 可访问。
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 原操作的完整输入
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/systemgovernance.GapRecoveryRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/systemgovernance.GapRecoveryDecision'
+              type: object
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+      summary: 系统治理-核对原测评消息恢复决定
+      tags:
+      - System-Governance
+  /internal/v1/system-governance/actions/gap-recoveries/summary:
+    get:
+      description: 按当前机构读取持久批准／拒绝总数和仍待 Relay 的原消息数；仅 qs:admin 可访问。
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/systemgovernance.GapRecoverySummary'
+              type: object
+      summary: 系统治理-原测评消息恢复审核汇总
       tags:
       - System-Governance
   /internal/v1/system-governance/actions/pending-reconciliations:
