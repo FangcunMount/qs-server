@@ -10,7 +10,6 @@ import (
 	"testing"
 	"time"
 
-	basemessaging "github.com/FangcunMount/component-base/pkg/messaging"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventing/runtime"
 	genericoptions "github.com/FangcunMount/qs-server/internal/pkg/options"
 	"github.com/FangcunMount/qs-server/internal/pkg/retrygovernance"
@@ -19,6 +18,34 @@ import (
 	drivermysql "github.com/go-sql-driver/mysql"
 	"github.com/stretchr/testify/require"
 )
+
+type proofDelivery struct {
+	message rmtransport.Received
+	ack     func() error
+	nack    func(error) error
+	settled bool
+}
+
+func (d *proofDelivery) Message() rmtransport.Received { return d.message }
+func (d *proofDelivery) Ack() error {
+	if d.ack != nil {
+		if err := d.ack(); err != nil {
+			return err
+		}
+	}
+	d.settled = true
+	return nil
+}
+func (d *proofDelivery) Nack(cause error) error {
+	if d.nack != nil {
+		if err := d.nack(cause); err != nil {
+			return err
+		}
+	}
+	d.settled = true
+	return nil
+}
+func (d *proofDelivery) Settled() bool { return d.settled }
 
 // Actual settlement + hold persistence, with dispatcher/ACK failures injected
 // at their boundaries. This is not Assessment domain idempotency acceptance.
@@ -38,42 +65,41 @@ func TestReliableMessagingDurableHold(t *testing.T) {
 	require.NoError(t, err)
 	hold := &mysqlRetryEventHoldStore{db: db, provider: "nsq", policy: retrygovernance.DefaultOutboxPolicy}
 	dispatcher := &fakeDispatcher{err: eventruntime.ErrAutomaticRetryPaused}
-	handler := createDispatchHandlerWithObserverAndHold(testLogger(), dispatcher, "evaluation", "proof-worker", nil, hold)
+	handler := createSDKDispatchHandler(testLogger(), dispatcher, "evaluation", "proof-worker", nil, hold, nil)
 	intent, err := message.New(message.Input{Producer: "qs-server", ID: "stable-event", Destination: "evaluation", EventType: "evaluation.retry.requested", SchemaVersion: "v1", Scope: "7", ContentType: "application/json", OccurredAt: "2026-09-22T00:00:00Z", Payload: []byte(`{"id":"stable-event","eventType":"evaluation.retry.requested","occurredAt":"2026-09-22T00:00:00Z","aggregateType":"Assessment","aggregateID":"7","data":{"org_id":7},"extension":{"preserve":true}}`)})
 	require.NoError(t, err)
-	fresh := func(id string) *basemessaging.Message {
-		m := basemessaging.NewMessage(id, intent.Input().Payload)
-		m.Topic = "evaluation"
-		m.Channel = "proof-worker"
-		m.Attempts = 3
-		return m
+	fresh := func(id string) *proofDelivery {
+		return &proofDelivery{message: rmtransport.Received{
+			ID: id, Topic: "evaluation", Channel: "proof-worker", Attempts: 3,
+			Payload: intent.Input().Payload, Metadata: map[string]string{"event_type": "evaluation.retry.requested"},
+		}}
 	}
 	ackLost := errors.New("injected lost ACK")
 	first := fresh("original-nsq-delivery")
-	first.SetAckFunc(func() error {
+	first.ack = func() error {
 		var n int
-		if err := db.QueryRowContext(ctx, "SELECT COUNT(*) FROM retry_event_hold WHERE message_id=?", first.UUID).Scan(&n); err != nil {
+		if err := db.QueryRowContext(ctx, "SELECT COUNT(*) FROM retry_event_hold WHERE message_id=?", first.message.ID).Scan(&n); err != nil {
 			return err
 		}
 		if n != 1 {
 			return errors.New("ACK before durable hold")
 		}
 		return ackLost
-	})
+	}
 	require.ErrorIs(t, handler(ctx, first), ackLost)
 	// Governance changes after the first hold must survive broker redelivery.
-	_, err = db.ExecContext(ctx, "UPDATE retry_event_hold SET retry_disposition='manual_required',replay_attempt_count=7,manual_replay_request_id='frozen-request' WHERE message_id=?", first.UUID)
+	_, err = db.ExecContext(ctx, "UPDATE retry_event_hold SET retry_disposition='manual_required',replay_attempt_count=7,manual_replay_request_id='frozen-request' WHERE message_id=?", first.message.ID)
 	require.NoError(t, err)
 	acked := 0
-	duplicate := fresh(first.UUID)
-	duplicate.SetAckFunc(func() error { acked++; return nil })
+	duplicate := fresh(first.message.ID)
+	duplicate.ack = func() error { acked++; return nil }
 	require.NoError(t, handler(ctx, duplicate))
 	require.Equal(t, 1, acked)
 	var count, attempts int
 	var payload, disposition, request string
 	require.NoError(t, db.QueryRowContext(ctx, "SELECT COUNT(*) FROM retry_event_hold").Scan(&count))
 	require.Equal(t, 1, count)
-	require.NoError(t, db.QueryRowContext(ctx, "SELECT payload_json,retry_disposition,replay_attempt_count,manual_replay_request_id FROM retry_event_hold WHERE message_id=?", first.UUID).Scan(&payload, &disposition, &attempts, &request))
+	require.NoError(t, db.QueryRowContext(ctx, "SELECT payload_json,retry_disposition,replay_attempt_count,manual_replay_request_id FROM retry_event_hold WHERE message_id=?", first.message.ID).Scan(&payload, &disposition, &attempts, &request))
 	require.Equal(t, string(intent.Input().Payload), payload)
 	require.Equal(t, "manual_required", disposition)
 	require.Equal(t, 7, attempts)
@@ -107,11 +133,11 @@ func TestReliableMessagingDurableHold(t *testing.T) {
 	require.NoError(t, err)
 	nacked := 0
 	failed := fresh("new-nsq-delivery")
-	failed.SetAckFunc(func() error { acked++; return nil })
-	failed.SetNackFunc(func() error { nacked++; return nil })
+	failed.ack = func() error { acked++; return nil }
+	failed.nack = func(error) error { nacked++; return nil }
 	require.Error(t, handler(ctx, failed))
-	require.False(t, failed.IsSettled())
-	require.NoError(t, failed.Nack()) // the transport settles after the handler returns
+	require.False(t, failed.Settled())
+	require.NoError(t, failed.Nack(errors.New("hold unavailable"))) // the transport settles after the handler returns
 	require.Equal(t, 1, nacked)
 	require.Equal(t, 1, acked)
 	require.NoError(t, db.QueryRowContext(ctx, "SELECT COUNT(*) FROM retry_event_hold").Scan(&count))

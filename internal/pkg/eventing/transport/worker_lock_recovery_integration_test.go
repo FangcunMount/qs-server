@@ -116,19 +116,15 @@ func TestWorkerLockHolderExitRetriesBeforeAck(t *testing.T) {
 	cleanupNSQTopics(t, topic, nsqFailedHandoffTopic(topic, channel))
 	createNSQTopicAndChannel(t, topic, channel)
 	observer := &lockRecoveryObserver{events: make(chan eventobservability.ConsumeEvent, 8)}
-	subscriber, err := newHistoricalNSQSubscriber(SubscriberConfig{
+	subscriber, err := newFastSDKWorkerSubscriber(SubscriberConfig{
 		Provider: "nsq", NSQLookupdAddr: integrationEnv("NSQ_LOOKUPD_ADDR", "127.0.0.1:4161"), NSQMessageTimeout: time.Minute,
-	}, basemessaging.SubscriberOptions{
-		MaxInFlight: 1, MaxAttempts: 3,
-		RetryBackoff:         basemessaging.RetryBackoffOptions{BaseDelay: 10 * time.Millisecond, MaxDelay: 20 * time.Millisecond},
-		FailedMessageHandler: FailedMessageHandler(recorder),
-	})
+	}, 3, 20*time.Millisecond, recorder)
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = subscriber.Close() })
-	if err := workermessaging.SubscribeHandlersWithOptions(workermessaging.SubscribeHandlersOptions{
-		UnknownRecorder: NewUnknownEventRecorder("nsq", recorder),
+	if err := workermessaging.SubscribeSDKHandlersWithOptions(workermessaging.SubscribeSDKHandlersOptions{
+		UnknownRecorder: NewDeliveryUnknownEventRecorder("nsq", recorder),
 		ServiceName:     channel, Logger: slog.Default(), Runtime: lockRecoveryRuntime{topic: topic, handler: handler}, Subscriber: subscriber, Observer: observer,
 	}); err != nil {
 		t.Fatal(err)

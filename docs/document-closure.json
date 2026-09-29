@@ -6396,7 +6396,7 @@
         },
         {
           "kind": "source",
-          "path": "internal/pkg/eventing/runtime/message_settlement.go"
+          "path": "internal/worker/integration/messaging/runtime_sdk.go"
         },
         {
           "kind": "source",
@@ -6626,7 +6626,7 @@
         },
         {
           "kind": "source",
-          "path": "internal/pkg/eventing/runtime/message_settlement.go"
+          "path": "internal/worker/integration/messaging/runtime_sdk.go"
         },
         {
           "kind": "source",
@@ -6934,7 +6934,7 @@
         },
         {
           "kind": "source",
-          "path": "internal/pkg/eventing/runtime/message_settlement.go"
+          "path": "internal/worker/integration/messaging/runtime_sdk.go"
         },
         {
           "kind": "source",

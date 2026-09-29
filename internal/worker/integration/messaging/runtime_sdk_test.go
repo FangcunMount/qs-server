@@ -5,6 +5,7 @@ import (
 	"errors"
 	"testing"
 
+	eventcatalog "github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
 	eventobservability "github.com/FangcunMount/qs-server/internal/pkg/eventing/observe"
 	eventruntime "github.com/FangcunMount/qs-server/internal/pkg/eventing/runtime"
 	rmtransport "github.com/FangcunMount/reliable-messaging/transport"
@@ -32,6 +33,45 @@ type sdkHoldStub struct {
 	calls int
 	got   rmtransport.Received
 	err   error
+}
+
+type capturedSDKSubscriber struct {
+	topic, channel string
+	handler        rmtransport.Handler
+}
+
+func (s *capturedSDKSubscriber) Subscribe(topic, channel string, handler rmtransport.Handler) error {
+	s.topic, s.channel, s.handler = topic, channel, handler
+	return nil
+}
+
+func TestSDKWorkerSubscriptionRequiresAuditAndUsesCatalog(t *testing.T) {
+	runtime := &fakeSubscriptionRuntime{subs: []eventcatalog.TopicSubscription{{TopicName: "sample.topic", EventTypes: []string{"sample.created"}}}}
+	subscriber := &capturedSDKSubscriber{}
+	options := SubscribeSDKHandlersOptions{ServiceName: "worker-channel", Runtime: runtime, Subscriber: subscriber}
+	if err := SubscribeSDKHandlersWithOptions(options); err == nil {
+		t.Fatal("Worker accepted a subscription without durable unknown-event audit")
+	}
+	options.UnknownRecorder = func(context.Context, rmtransport.Received, string) error { return nil }
+	if err := SubscribeSDKHandlersWithOptions(options); err != nil {
+		t.Fatal(err)
+	}
+	if subscriber.topic != "sample.topic" || subscriber.channel != "worker-channel" || subscriber.handler == nil {
+		t.Fatalf("subscription: topic=%q channel=%q handler=%v", subscriber.topic, subscriber.channel, subscriber.handler != nil)
+	}
+}
+
+func TestSDKWorkerDeliveryFallsBackToCanonicalEnvelope(t *testing.T) {
+	dispatcher := &fakeDispatcher{}
+	delivery := &sdkDeliveryStub{message: rmtransport.Received{
+		ID: "app-envelope", Payload: []byte(`{"id":"app-envelope","eventType":"payload.event"}`),
+	}}
+	if err := createSDKDispatchHandler(testLogger(), dispatcher, "topic", "worker", &consumeObserver{}, nil, nil)(t.Context(), delivery); err != nil {
+		t.Fatal(err)
+	}
+	if dispatcher.eventType != "payload.event" || delivery.ackCount != 1 {
+		t.Fatalf("envelope fallback: event=%q ack=%d", dispatcher.eventType, delivery.ackCount)
+	}
 }
 
 func (h *sdkHoldStub) HoldDelivery(_ context.Context, msg rmtransport.Received, _ string, _ error) error {

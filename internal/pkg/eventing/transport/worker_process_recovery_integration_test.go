@@ -159,21 +159,17 @@ func TestWorkerUnknownEventProcessChild(t *testing.T) {
 		})
 	}
 	observer := &workerSettlementObserver{}
-	subscriber, err := newHistoricalNSQSubscriber(SubscriberConfig{
+	subscriber, err := newFastSDKWorkerSubscriber(SubscriberConfig{
 		Provider: "nsq", NSQLookupdAddr: "nsqlookupd:4161", NSQMessageTimeout: 5 * time.Second,
-	}, basemessaging.SubscriberOptions{
-		MaxInFlight: 1, MaxAttempts: 5,
-		RetryBackoff:         basemessaging.RetryBackoffOptions{BaseDelay: 500 * time.Millisecond, MaxDelay: 500 * time.Millisecond},
-		FailedMessageHandler: FailedMessageHandler(recorder),
-	})
+	}, 5, 500*time.Millisecond, recorder)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer subscriber.Close()
-	if err := workermessaging.SubscribeHandlersWithOptions(workermessaging.SubscribeHandlersOptions{
+	if err := workermessaging.SubscribeSDKHandlersWithOptions(workermessaging.SubscribeSDKHandlersOptions{
 		ServiceName: channel, Logger: slog.Default(), Runtime: &workerSettlementRuntime{topic: topic},
 		Subscriber: subscriber, Observer: observer,
-		UnknownRecorder: NewUnknownEventRecorder("nsq", unknownRecorder),
+		UnknownRecorder: NewDeliveryUnknownEventRecorder("nsq", unknownRecorder),
 	}); err != nil {
 		t.Fatal(err)
 	}
