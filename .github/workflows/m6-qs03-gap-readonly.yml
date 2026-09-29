@@ -41,6 +41,9 @@ jobs:
       - uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
+          # This one-shot audit only builds a binary. Cache upload can outlive
+          # the production scan and consume the job's bounded time budget.
+          cache: false
       - name: Build immutable Linux audit binary
         id: build
         run: |
