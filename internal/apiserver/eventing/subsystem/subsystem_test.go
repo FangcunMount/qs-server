@@ -17,6 +17,7 @@ const hotRankConsumerID = "modelcatalog.hot_rank_projection"
 
 type fakePublisher struct{}
 
+func (fakePublisher) PublishWire(context.Context, string, []byte) error                { return nil }
 func (fakePublisher) Publish(context.Context, string, []byte) error                    { return nil }
 func (fakePublisher) PublishMessage(context.Context, string, *messaging.Message) error { return nil }
 func (fakePublisher) Close() error                                                     { return nil }
@@ -99,7 +100,7 @@ func loadCatalog(t *testing.T) *eventcatalog.Catalog {
 }
 
 func TestSubsystemRequiresEnabledConsumerBindingBeforeStart(t *testing.T) {
-	s, err := New(Options{Catalog: loadCatalog(t), PublisherMode: eventruntime.PublishModeMQ, MQPublisher: fakePublisher{}})
+	s, err := New(Options{Catalog: loadCatalog(t), PublisherMode: eventruntime.PublishModeMQ, WirePublisher: fakePublisher{}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -111,7 +112,7 @@ func TestSubsystemRequiresEnabledConsumerBindingBeforeStart(t *testing.T) {
 func TestSubsystemStartCloseAreIdempotentAndSettleProjectionMessages(t *testing.T) {
 	subscriber := &fakeSubscriber{}
 	s, err := New(Options{
-		Catalog: loadCatalog(t), PublisherMode: eventruntime.PublishModeMQ, MQPublisher: fakePublisher{},
+		Catalog: loadCatalog(t), PublisherMode: eventruntime.PublishModeMQ, WirePublisher: fakePublisher{},
 		SubscriberFactory: func() (messaging.Subscriber, error) { return subscriber, nil },
 	})
 	if err != nil {
@@ -158,7 +159,7 @@ func TestSubsystemStartCloseAreIdempotentAndSettleProjectionMessages(t *testing.
 func TestProjectionHandlerFailureNacksOnlyItsMessage(t *testing.T) {
 	subscriber := &fakeSubscriber{}
 	s, err := New(Options{
-		Catalog: loadCatalog(t), PublisherMode: eventruntime.PublishModeMQ, MQPublisher: fakePublisher{},
+		Catalog: loadCatalog(t), PublisherMode: eventruntime.PublishModeMQ, WirePublisher: fakePublisher{},
 		SubscriberFactory: func() (messaging.Subscriber, error) { return subscriber, nil },
 	})
 	if err != nil {
@@ -188,7 +189,7 @@ func TestProjectionHandlerFailureNacksOnlyItsMessage(t *testing.T) {
 func TestProjectionDecodeFailureNacksMessage(t *testing.T) {
 	subscriber := &fakeSubscriber{}
 	s, err := New(Options{
-		Catalog: loadCatalog(t), PublisherMode: eventruntime.PublishModeMQ, MQPublisher: fakePublisher{},
+		Catalog: loadCatalog(t), PublisherMode: eventruntime.PublishModeMQ, WirePublisher: fakePublisher{},
 		SubscriberFactory: func() (messaging.Subscriber, error) { return subscriber, nil },
 	})
 	if err != nil {
@@ -220,7 +221,7 @@ func TestProjectionDecodeFailureNacksMessage(t *testing.T) {
 func TestProjectionDecodeFailureReturnsNackError(t *testing.T) {
 	subscriber := &fakeSubscriber{}
 	s, err := New(Options{
-		Catalog: loadCatalog(t), PublisherMode: eventruntime.PublishModeMQ, MQPublisher: fakePublisher{},
+		Catalog: loadCatalog(t), PublisherMode: eventruntime.PublishModeMQ, WirePublisher: fakePublisher{},
 		SubscriberFactory: func() (messaging.Subscriber, error) { return subscriber, nil },
 	})
 	if err != nil {
@@ -284,7 +285,7 @@ func TestSubsystemStartsLifecycleInPhasesAndClosesProfilesInReverseOrder(t *test
 	mongoRelay := &fakeRelay{name: "mongo", recorder: recorder, started: make(chan struct{})}
 	assessmentRelay := &fakeRelay{name: "assessment", recorder: recorder, started: make(chan struct{})}
 	s, err := New(Options{
-		Catalog: loadCatalog(t), PublisherMode: eventruntime.PublishModeMQ, MQPublisher: fakePublisher{},
+		Catalog: loadCatalog(t), PublisherMode: eventruntime.PublishModeMQ, WirePublisher: fakePublisher{},
 		Consumers: map[string]ConsumerOptions{hotRankConsumerID: {Enabled: false}},
 	})
 	if err != nil {

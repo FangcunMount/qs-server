@@ -5,18 +5,11 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/FangcunMount/component-base/pkg/messaging"
 	"github.com/FangcunMount/qs-server/internal/pkg/event"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventing/observe"
 	"github.com/FangcunMount/reliable-messaging/wire/legacy"
 )
-
-type capturedPublisher struct {
-	topic string
-	msg   *messaging.Message
-	err   error
-}
 
 type capturedWirePublisher struct {
 	topic  string
@@ -30,44 +23,26 @@ func (p *capturedWirePublisher) PublishWire(_ context.Context, topic string, bod
 	return p.err
 }
 
-func TestRoutingPublisherSDKWireMatchesLegacyEnvelopeAndRetainsIdentityOnUnknown(t *testing.T) {
+func TestRoutingPublisherSDKWireRetainsIdentityOnUnknown(t *testing.T) {
 	evt := event.New(eventcatalog.AnswerSheetSubmitted, "AnswerSheet", "sheet-1", map[string]string{"id": "sheet-1"})
-	old := &capturedPublisher{}
-	legacyRoute := NewRoutingPublisher(RoutingPublisherOptions{
-		Catalog: loadEventCatalog(t), MQPublisher: old, Source: "unit-test", Mode: PublishModeMQ,
-	})
-	if err := legacyRoute.Publish(t.Context(), evt); err != nil {
-		t.Fatal(err)
-	}
-	want, err := legacy.Encode(legacy.Envelope{UUID: old.msg.UUID, Metadata: old.msg.Metadata, Payload: old.msg.Payload}, legacy.Revision2)
-	if err != nil {
-		t.Fatal(err)
-	}
 	wire := &capturedWirePublisher{}
-	legacyFallback := &capturedPublisher{}
 	route := NewRoutingPublisher(RoutingPublisherOptions{
-		Catalog: loadEventCatalog(t), MQPublisher: legacyFallback, WirePublisher: wire,
+		Catalog: loadEventCatalog(t), WirePublisher: wire,
 		Source: "unit-test", Mode: PublishModeMQ,
 	})
-	if err := route.Publish(t.Context(), evt); err != nil || wire.topic != old.topic || len(wire.bodies) != 1 || string(wire.bodies[0]) != string(want) || legacyFallback.msg != nil {
-		t.Fatalf("SDK wire publish: err=%v topic=%q bodies=%d identical=%t", err, wire.topic, len(wire.bodies), len(wire.bodies) == 1 && string(wire.bodies[0]) == string(want))
+	if err := route.Publish(t.Context(), evt); err != nil || wire.topic == "" || len(wire.bodies) != 1 {
+		t.Fatalf("SDK wire publish: err=%v topic=%q bodies=%d", err, wire.topic, len(wire.bodies))
+	}
+	envelope, recognized, err := legacy.Decode(wire.bodies[0])
+	if err != nil || !recognized || envelope.UUID != evt.EventID() || envelope.Metadata["event_type"] != evt.EventType() || envelope.Metadata["source"] != "unit-test" || len(envelope.Payload) == 0 {
+		t.Fatalf("SDK wire identity: envelope=%+v recognized=%t err=%v", envelope, recognized, err)
 	}
 	wantErr := errors.New("publish confirmation unknown")
 	wire.err = wantErr
-	if err := route.Publish(t.Context(), evt); !errors.Is(err, wantErr) || len(wire.bodies) != 2 || string(wire.bodies[1]) != string(want) {
-		t.Fatalf("unknown publish: err=%v bodies=%d identity retained=%t", err, len(wire.bodies), len(wire.bodies) == 2 && string(wire.bodies[1]) == string(want))
+	if err := route.Publish(t.Context(), evt); !errors.Is(err, wantErr) || len(wire.bodies) != 2 || string(wire.bodies[1]) != string(wire.bodies[0]) {
+		t.Fatalf("unknown publish: err=%v bodies=%d identity retained=%t", err, len(wire.bodies), len(wire.bodies) == 2 && string(wire.bodies[1]) == string(wire.bodies[0]))
 	}
 }
-
-func (p *capturedPublisher) Publish(_ context.Context, _ string, _ []byte) error { return nil }
-
-func (p *capturedPublisher) PublishMessage(_ context.Context, topic string, msg *messaging.Message) error {
-	p.topic = topic
-	p.msg = msg
-	return p.err
-}
-
-func (p *capturedPublisher) Close() error { return nil }
 
 type publishObserver struct {
 	events []eventobservability.PublishEvent
@@ -85,13 +60,13 @@ func TestRoutingPublisherUsesExplicitCatalogAndMetadata(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Load events.yaml: %v", err)
 	}
-	mq := &capturedPublisher{}
+	mq := &capturedWirePublisher{}
 	publisher := NewRoutingPublisher(RoutingPublisherOptions{
-		Catalog:     eventcatalog.NewCatalog(cfg),
-		MQPublisher: mq,
-		Observer:    &publishObserver{},
-		Source:      "unit-test",
-		Mode:        PublishModeMQ,
+		Catalog:       eventcatalog.NewCatalog(cfg),
+		WirePublisher: mq,
+		Observer:      &publishObserver{},
+		Source:        "unit-test",
+		Mode:          PublishModeMQ,
 	})
 	evt := event.New(eventcatalog.AnswerSheetSubmitted, "AnswerSheet", "sheet-1", map[string]string{"id": "sheet-1"})
 
@@ -101,17 +76,12 @@ func TestRoutingPublisherUsesExplicitCatalogAndMetadata(t *testing.T) {
 	if mq.topic == "" {
 		t.Fatalf("topic was not captured")
 	}
-	if mq.msg == nil {
-		t.Fatalf("message was not captured")
+	if len(mq.bodies) != 1 {
+		t.Fatalf("wire bodies = %d, want 1", len(mq.bodies))
 	}
-	if mq.msg.Metadata["event_type"] != eventcatalog.AnswerSheetSubmitted {
-		t.Fatalf("event_type metadata = %q", mq.msg.Metadata["event_type"])
-	}
-	if mq.msg.Metadata["source"] != "unit-test" {
-		t.Fatalf("source metadata = %q", mq.msg.Metadata["source"])
-	}
-	if len(mq.msg.Payload) == 0 {
-		t.Fatalf("payload is empty")
+	envelope, recognized, err := legacy.Decode(mq.bodies[0])
+	if err != nil || !recognized || envelope.Metadata["event_type"] != eventcatalog.AnswerSheetSubmitted || envelope.Metadata["source"] != "unit-test" || len(envelope.Payload) == 0 {
+		t.Fatalf("wire metadata: envelope=%+v recognized=%t err=%v", envelope, recognized, err)
 	}
 }
 
@@ -120,12 +90,12 @@ func TestRoutingPublisherAllowsDurableOutboxEventForRelayPublish(t *testing.T) {
 	if !catalog.IsDurableOutbox(eventcatalog.AnswerSheetSubmitted) {
 		t.Fatalf("%q must be configured as durable_outbox for this contract test", eventcatalog.AnswerSheetSubmitted)
 	}
-	mq := &capturedPublisher{}
+	mq := &capturedWirePublisher{}
 	publisher := NewRoutingPublisher(RoutingPublisherOptions{
-		Catalog:     catalog,
-		MQPublisher: mq,
-		Source:      "outbox-relay",
-		Mode:        PublishModeMQ,
+		Catalog:       catalog,
+		WirePublisher: mq,
+		Source:        "outbox-relay",
+		Mode:          PublishModeMQ,
 	})
 	evt := event.New(eventcatalog.AnswerSheetSubmitted, "AnswerSheet", "sheet-1", map[string]string{"id": "sheet-1"})
 
@@ -135,19 +105,23 @@ func TestRoutingPublisherAllowsDurableOutboxEventForRelayPublish(t *testing.T) {
 	if mq.topic == "" {
 		t.Fatalf("durable outbox event was not routed to MQ")
 	}
-	if mq.msg == nil || mq.msg.Metadata["event_type"] != eventcatalog.AnswerSheetSubmitted {
-		t.Fatalf("published message metadata = %#v", mq.msg)
+	if len(mq.bodies) != 1 {
+		t.Fatalf("published wire messages = %d, want 1", len(mq.bodies))
+	}
+	envelope, recognized, err := legacy.Decode(mq.bodies[0])
+	if err != nil || !recognized || envelope.Metadata["event_type"] != eventcatalog.AnswerSheetSubmitted {
+		t.Fatalf("published wire metadata: envelope=%+v recognized=%t err=%v", envelope, recognized, err)
 	}
 }
 
 func TestRoutingPublisherObservesMQPublished(t *testing.T) {
 	observer := &publishObserver{}
 	publisher := NewRoutingPublisher(RoutingPublisherOptions{
-		Catalog:     loadEventCatalog(t),
-		MQPublisher: &capturedPublisher{},
-		Observer:    observer,
-		Source:      "unit-test",
-		Mode:        PublishModeMQ,
+		Catalog:       loadEventCatalog(t),
+		WirePublisher: &capturedWirePublisher{},
+		Observer:      observer,
+		Source:        "unit-test",
+		Mode:          PublishModeMQ,
 	})
 
 	err := publisher.Publish(context.Background(), event.New(eventcatalog.AnswerSheetSubmitted, "AnswerSheet", "sheet-1", struct{}{}))
@@ -221,10 +195,10 @@ func TestRoutingPublisherObservesUnknownEvent(t *testing.T) {
 func TestRoutingPublisherObservesEncodeFailed(t *testing.T) {
 	observer := &publishObserver{}
 	publisher := NewRoutingPublisher(RoutingPublisherOptions{
-		Catalog:     loadEventCatalog(t),
-		MQPublisher: &capturedPublisher{},
-		Observer:    observer,
-		Mode:        PublishModeMQ,
+		Catalog:       loadEventCatalog(t),
+		WirePublisher: &capturedWirePublisher{},
+		Observer:      observer,
+		Mode:          PublishModeMQ,
 	})
 
 	err := publisher.Publish(context.Background(), event.New(eventcatalog.AnswerSheetSubmitted, "AnswerSheet", "sheet-1", map[string]any{
@@ -240,10 +214,10 @@ func TestRoutingPublisherObservesMQFailed(t *testing.T) {
 	wantErr := errors.New("mq failed")
 	observer := &publishObserver{}
 	publisher := NewRoutingPublisher(RoutingPublisherOptions{
-		Catalog:     loadEventCatalog(t),
-		MQPublisher: &capturedPublisher{err: wantErr},
-		Observer:    observer,
-		Mode:        PublishModeMQ,
+		Catalog:       loadEventCatalog(t),
+		WirePublisher: &capturedWirePublisher{err: wantErr},
+		Observer:      observer,
+		Mode:          PublishModeMQ,
 	})
 
 	err := publisher.Publish(context.Background(), event.New(eventcatalog.AnswerSheetSubmitted, "AnswerSheet", "sheet-1", struct{}{}))

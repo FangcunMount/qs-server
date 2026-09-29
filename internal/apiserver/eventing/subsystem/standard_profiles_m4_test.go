@@ -109,7 +109,7 @@ func TestStandardProfileReplacesWholeLegacyRuntimeBeforeStart(t *testing.T) {
 	}
 	s, err := NewWithStandardProfiles(Options{
 		Catalog: loadCatalog(t), MongoDB: client.Database("candidate"),
-		PublisherMode: eventruntime.PublishModeMQ, MQPublisher: fakePublisher{},
+		PublisherMode: eventruntime.PublishModeMQ, WirePublisher: fakePublisher{},
 		Observer:  candidateStatusObserver{statuses: statusEvents, typeStatuses: typeStatusEvents},
 		Consumers: map[string]ConsumerOptions{hotRankConsumerID: {Enabled: false}},
 	}, map[eventcatalog.OutboxProfile]StandardProfile{
@@ -211,7 +211,7 @@ func TestMongoOnlyStandardProfileKeepsLegacyAssessmentAndHotRankConsumer(t *test
 	subscriber := &fakeSubscriber{}
 	s, err := NewWithStandardProfiles(Options{
 		Catalog: loadCatalog(t), MongoDB: client.Database("candidate"), MySQLDB: mysqlDB,
-		PublisherMode: eventruntime.PublishModeMQ, MQPublisher: fakePublisher{},
+		PublisherMode: eventruntime.PublishModeMQ, WirePublisher: fakePublisher{},
 		SubscriberFactory: func() (messaging.Subscriber, error) { return subscriber, nil },
 		Consumers: map[string]ConsumerOptions{hotRankConsumerID: {
 			Enabled: true, Channel: "qs-apiserver-modelcatalog-hot-rank-v1",
@@ -257,7 +257,7 @@ func TestStandardProfileFailsClosedWhenIncomplete(t *testing.T) {
 	}
 	_, err = NewWithStandardProfiles(Options{
 		Catalog: loadCatalog(t), MongoDB: client.Database("candidate"),
-		PublisherMode: eventruntime.PublishModeMQ, MQPublisher: fakePublisher{},
+		PublisherMode: eventruntime.PublishModeMQ, WirePublisher: fakePublisher{},
 	}, map[eventcatalog.OutboxProfile]StandardProfile{
 		eventcatalog.OutboxProfileMongoDomain: {
 			Binding: appEventing.ProfileBinding{Stager: candidateStager{}, PostCommit: candidatePostCommit{}},

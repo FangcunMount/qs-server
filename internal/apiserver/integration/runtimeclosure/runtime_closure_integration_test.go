@@ -66,6 +66,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/keyspace"
 	locksubsystem "github.com/FangcunMount/qs-server/internal/pkg/resilience/locklease/subsystem"
 	"github.com/FangcunMount/qs-server/internal/worker/handlers"
+	sdklegacy "github.com/FangcunMount/reliable-messaging/wire/legacy"
 	drivermysql "github.com/go-sql-driver/mysql"
 	redis "github.com/redis/go-redis/v9"
 	"go.mongodb.org/mongo-driver/bson"
@@ -167,7 +168,7 @@ func runCurrentRuntimeClosure(t *testing.T, eventFactory runtimeClosureEventFact
 	capture := newCapturedMQPublisher()
 	eventing, delivery, err := eventFactory(t, eventsubsystem.Options{
 		MySQLDB: gormDB, MongoDB: mongoDB, OpsRedis: redisClient,
-		Catalog: eventcatalog.NewCatalog(events), MQPublisher: capture, PublisherMode: eventruntime.PublishModeMQ,
+		Catalog: eventcatalog.NewCatalog(events), WirePublisher: capture, PublisherMode: eventruntime.PublishModeMQ,
 		Mongo:      eventsubsystem.ProfileOptions{BatchSize: 20, PublishWorkers: 1, ImmediateMaxConcurrent: 1},
 		Assessment: eventsubsystem.ProfileOptions{BatchSize: 20, PublishWorkers: 1, ImmediateMaxConcurrent: 1},
 		Consumers:  map[string]eventsubsystem.ConsumerOptions{"modelcatalog.hot_rank_projection": {Enabled: false}},
@@ -902,6 +903,16 @@ type capturedMQPublisher struct {
 func newCapturedMQPublisher() *capturedMQPublisher                           { return &capturedMQPublisher{} }
 func (p *capturedMQPublisher) Publish(context.Context, string, []byte) error { return nil }
 func (p *capturedMQPublisher) Close() error                                  { return nil }
+func (p *capturedMQPublisher) PublishWire(ctx context.Context, topic string, wire []byte) error {
+	envelope, recognized, err := sdklegacy.Decode(wire)
+	if err != nil {
+		return err
+	}
+	if !recognized {
+		return fmt.Errorf("runtime closure publisher received an unrecognized wire envelope")
+	}
+	return p.PublishMessage(ctx, topic, &messaging.Message{UUID: envelope.UUID, Metadata: envelope.Metadata, Payload: envelope.Payload})
+}
 func (p *capturedMQPublisher) PublishMessage(_ context.Context, topic string, message *messaging.Message) error {
 	copyMessage := &messaging.Message{UUID: message.UUID, Topic: topic, Payload: append([]byte(nil), message.Payload...), Metadata: make(map[string]string, len(message.Metadata))}
 	for key, value := range message.Metadata {

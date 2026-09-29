@@ -76,7 +76,7 @@ func TestPrepareResourcesPassesNativeNSQWirePortAndClosesOnFailure(t *testing.T)
 	}
 	if got.messaging.wirePublisher != wire ||
 		got.messaging.closePublisher == nil || got.messaging.publishMode != eventruntime.PublishModeMQ ||
-		options.MQPublisher != nil || options.WirePublisher != wire {
+		options.WirePublisher != wire {
 		t.Fatalf("native NSQ publisher was not passed directly: messaging=%+v options=%+v", got.messaging, options)
 	}
 	closed := false
@@ -243,7 +243,7 @@ func TestPrepareResourcesBuildsStageOutputFromDeps(t *testing.T) {
 	if buildOptionsInput.cacheSubsystem != subsystem || buildOptionsInput.eventSubsystem != events || buildOptionsInput.resilience != resilience {
 		t.Fatalf("buildContainerOptions input mismatch: %#v", buildOptionsInput)
 	}
-	if eventOptions.MySQLDB != &mysqlDB || eventOptions.MongoDB != &mongoDB || eventOptions.Catalog != catalog || eventOptions.MQPublisher != nil || eventOptions.WirePublisher != publisher {
+	if eventOptions.MySQLDB != &mysqlDB || eventOptions.MongoDB != &mongoDB || eventOptions.Catalog != catalog || eventOptions.WirePublisher != publisher {
 		t.Fatalf("event subsystem options mismatch: %#v", eventOptions)
 	}
 	if eventOptions.MySQLLimiter != resilience.Backpressure("mysql") || eventOptions.MongoLimiter != resilience.Backpressure("mongo") {
@@ -297,7 +297,7 @@ func TestPrepareResourcesPreservesFallbackModeWhenMessagingDisabled(t *testing.T
 			mqPublisher: mqPublisherStageDeps{fallbackMode: mode},
 			eventSubsystem: eventSubsystemResourceDeps{
 				newSubsystem: func(opts eventsubsystem.Options) (*eventsubsystem.Subsystem, error) {
-					if opts.PublisherMode != mode || opts.MQPublisher != nil || opts.WirePublisher != nil {
+					if opts.PublisherMode != mode || opts.WirePublisher != nil {
 						t.Fatalf("disabled messaging options = %+v, want mode %q without publisher", opts, mode)
 					}
 					return &eventsubsystem.Subsystem{}, nil

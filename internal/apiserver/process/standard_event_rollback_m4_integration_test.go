@@ -11,8 +11,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/FangcunMount/component-base/pkg/messaging"
-	cbnsq "github.com/FangcunMount/component-base/pkg/messaging/nsq"
 	"github.com/FangcunMount/qs-server/internal/apiserver/config"
 	eventsubsystem "github.com/FangcunMount/qs-server/internal/apiserver/eventing/subsystem"
 	legacyoutbox "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/eventoutbox"
@@ -20,6 +18,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/event"
 	eventcatalog "github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
 	eventruntime "github.com/FangcunMount/qs-server/internal/pkg/eventing/runtime"
+	"github.com/FangcunMount/qs-server/internal/pkg/messagingruntime"
 	goNSQ "github.com/nsqio/go-nsq"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -66,10 +65,10 @@ func proveM4RollbackHandoff(t *testing.T, db *gorm.DB, mongoClient *mongo.Client
 		t.Fatal(err)
 	}
 
-	baseOptions := func(publisher messaging.Publisher) eventsubsystem.Options {
+	baseOptions := func(publisher eventruntime.WirePublisher) eventsubsystem.Options {
 		return eventsubsystem.Options{
 			MySQLDB: db, MongoDB: mongoDB, Catalog: catalog,
-			MQPublisher: publisher, PublisherMode: eventruntime.PublishModeMQ,
+			WirePublisher: publisher, PublisherMode: eventruntime.PublishModeMQ,
 			Mongo: eventsubsystem.ProfileOptions{Interval: 100 * time.Millisecond, BatchSize: 4,
 				PublishWorkers: 2, ImmediateMaxConcurrent: 2},
 			Assessment: eventsubsystem.ProfileOptions{Interval: 100 * time.Millisecond, BatchSize: 4,
@@ -86,9 +85,9 @@ func proveM4RollbackHandoff(t *testing.T, db *gorm.DB, mongoClient *mongo.Client
 		}
 		return candidate
 	}
-	newLegacy := func() (*eventsubsystem.Subsystem, messaging.Publisher) {
+	newLegacy := func() (*eventsubsystem.Subsystem, wirePublisherResource) {
 		t.Helper()
-		publisher, err := cbnsq.NewPublisher(cfg.MessagingOptions.NSQAddr, goNSQ.NewConfig())
+		publisher, err := messagingruntime.NewSDKNSQWirePublisher(cfg.MessagingOptions.NSQAddr)
 		if err != nil {
 			t.Fatal(err)
 		}

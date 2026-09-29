@@ -59,13 +59,12 @@ func configuredEventSubsystem(cfg *config.Config) func(eventsubsystem.Options) (
 	}
 }
 
-// buildM4StandardEventSubsystem runs only inside the candidate build. It
-// explicitly owns one additional go-nsq producer; SDK adapters borrow it and
-// the two selected profiles share one bounded publisher and drain boundary.
+// buildM4StandardEventSubsystem gives the selected profiles one SDK-owned NSQ
+// producer and a shared bounded shutdown boundary.
 func buildM4StandardEventSubsystem(opts eventsubsystem.Options, cfg *config.Config, selected options.StandardOutboxOptions) (*eventsubsystem.Subsystem, error) {
 	if cfg == nil || cfg.MessagingOptions == nil || !cfg.MessagingOptions.Enabled ||
 		cfg.MessagingOptions.Provider != "nsq" || cfg.MessagingOptions.NSQAddr == "" ||
-		(opts.MQPublisher == nil && opts.WirePublisher == nil) || opts.PublisherMode != eventruntime.PublishModeMQ {
+		opts.WirePublisher == nil || opts.PublisherMode != eventruntime.PublishModeMQ {
 		return nil, errors.New("M4 standard outbox requires a live NSQ-backed messaging configuration")
 	}
 	if selected.Mongo && opts.MongoDB == nil || selected.Assessment && opts.MySQLDB == nil {
@@ -113,36 +112,35 @@ func buildM4StandardEventSubsystem(opts eventsubsystem.Options, cfg *config.Conf
 	producerConfig.HeartbeatInterval = 5 * time.Second
 	producerConfig.ReadTimeout = 15 * time.Second
 	producerConfig.WriteTimeout = 10 * time.Second
-	producer, err := goNSQ.NewProducer(cfg.MessagingOptions.NSQAddr, producerConfig)
+	publisher, err := sdknsq.NewManagedPublisher(sdknsq.ManagedPublisherConfig{
+		Address: cfg.MessagingOptions.NSQAddr, Driver: producerConfig,
+		Routes: routes, MaxInFlight: concurrency,
+	})
 	if err != nil {
-		return nil, fmt.Errorf("create M4 host NSQ producer: %w", err)
+		return nil, fmt.Errorf("create M4 SDK NSQ publisher: %w", err)
 	}
 	owned := true
 	defer func() {
 		if owned {
-			producer.Stop()
+			publisher.Interrupt()
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			_ = publisher.Close(ctx)
 		}
 	}()
-	if err := producer.Ping(); err != nil {
-		return nil, fmt.Errorf("connect M4 host NSQ producer: %w", err)
-	}
-	publisher, err := sdknsq.New(producer, routes, concurrency)
-	if err != nil {
-		return nil, err
-	}
 	var drainOnce sync.Once
 	var drainErr error
 	drain := func(ctx context.Context) error {
 		drainOnce.Do(func() {
-			drainErr = publisher.Drain(ctx)
-			producer.Stop()
+			drainErr = publisher.Close(ctx)
 			if drainErr != nil {
-				// A driver call may outlive its SDK publish deadline. Stop the
-				// producer, then verify that its in-flight call has actually left.
+				// A driver call may outlive its SDK publish deadline. Interrupt
+				// it, then verify that its in-flight call has actually left.
+				publisher.Interrupt()
 				finishCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 				defer cancel()
-				if err := publisher.Drain(finishCtx); err != nil {
-					drainErr = errors.Join(drainErr, fmt.Errorf("M4 NSQ producer did not finish after stop: %w", err))
+				if err := publisher.Close(finishCtx); err != nil {
+					drainErr = errors.Join(drainErr, fmt.Errorf("M4 NSQ publisher did not finish after interrupt: %w", err))
 				}
 			}
 		})
@@ -243,4 +241,4 @@ func buildM4StandardEventSubsystem(opts eventsubsystem.Options, cfg *config.Conf
 	return subsystem, nil
 }
 
-var _ sdktransport.Publisher = (*sdknsq.Publisher)(nil)
+var _ sdktransport.Publisher = (*sdknsq.ManagedPublisher)(nil)

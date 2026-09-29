@@ -56,7 +56,7 @@ func proveM4RelayHotFairness(t *testing.T, parent context.Context, gormDB *gorm.
 	selected := *cfg.Eventing.StandardOutbox
 	runtime, err := buildM4StandardEventSubsystem(eventsubsystem.Options{
 		MySQLDB: gormDB, MongoDB: mongoDB, Catalog: catalog,
-		MQPublisher: &fakePublisher{}, PublisherMode: eventruntime.PublishModeMQ,
+		WirePublisher: &fakePublisher{}, PublisherMode: eventruntime.PublishModeMQ,
 		Mongo: profile, Assessment: profile,
 		Consumers: map[string]eventsubsystem.ConsumerOptions{"modelcatalog.hot_rank_projection": {Enabled: false}},
 	}, cfg, selected)

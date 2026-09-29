@@ -51,7 +51,7 @@ func TestSDKProjectionSubscriberSettlesOnlyAfterHandlerSuccess(t *testing.T) {
 	subscriber := &projectionSDKSubscriberStub{}
 	observer := &projectionSDKObserverStub{}
 	s, err := New(Options{
-		Catalog: loadCatalog(t), PublisherMode: eventruntime.PublishModeMQ, MQPublisher: fakePublisher{},
+		Catalog: loadCatalog(t), PublisherMode: eventruntime.PublishModeMQ, WirePublisher: fakePublisher{},
 		SDKSubscriberFactory: func() (SDKSubscriber, error) { return subscriber, nil }, Observer: observer,
 	})
 	if err != nil {
