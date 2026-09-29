@@ -97,8 +97,9 @@ func TestM4ReplayCrashChild(t *testing.T) {
 	deps.buildSubscriberFactory = nil
 	deps.buildSDKSubscriberFactory = nil
 	deps.consumers = map[string]eventsubsystem.ConsumerOptions{"modelcatalog.hot_rank_projection": {Enabled: false}}
+	deps.wirePublisher = &fakePublisher{}
 	subsystem, err := buildResourceEventSubsystem(gormDB, mongoDB, nil, eventcatalog.NewCatalog(wire),
-		&fakePublisher{}, eventruntime.PublishModeMQ, nil, deps)
+		eventruntime.PublishModeMQ, nil, deps)
 	if err != nil {
 		t.Fatal(err)
 	}
