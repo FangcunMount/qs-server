@@ -1,0 +1,44 @@
+name: M5 AuthZ Ephemeral Read-only Postcheck
+
+on:
+  workflow_dispatch:
+    inputs:
+      expected_api_sha:
+        description: Exact currently deployed QS API commit
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  servera:
+    name: API image and authorization guard (ServerA)
+    runs-on:
+      group: qlume
+      labels: [self-hosted, macOS, ARM64, ops]
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6
+      - name: Read-only ephemeral API postcheck
+        uses: appleboy/ssh-action@v1.2.2
+        env:
+          EXPECTED_API_SHA: ${{ inputs.expected_api_sha }}
+          POSTCHECK_HOST: serverA
+        with:
+          host: ${{ vars.SVRA_HOST }}
+          username: ${{ vars.SVRA_USERNAME }}
+          key: ${{ secrets.SVRA_SSH_KEY }}
+          port: ${{ vars.SVRA_SSH_PORT || 22 }}
+          fingerprint: ${{ vars.SVRA_SSH_FINGERPRINT }}
+          envs: EXPECTED_API_SHA,POSTCHECK_HOST
+          script_path: scripts/cd/m5-authz-ephemeral-postcheck.sh
+
+  serverd:
+    name: Online IAM and QS channels (ServerD)
+    runs-on: ${{ vars.QS_DEPLOY_RUNNER || 'serverd' }}
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6
+      - name: Read-only ephemeral NSQ postcheck
+        run: bash scripts/cd/m5-authz-ephemeral-postcheck.sh serverD
