@@ -77,6 +77,7 @@ func BuildRESTSystemGovernanceFacade(in RESTSystemGovernanceInput) systemgov.Fac
 	var deliveryResolver systemgov.DeliveryResolver
 	var reminderReviewReader systemgov.ReminderReviewReader
 	var gapRecoveryStore systemgov.GapRecoveryStore
+	gapRecoveryEnabled := false
 	if in.MySQLDB != nil {
 		reader := governanceinfra.NewActionAuditStore(in.MySQLDB)
 		pendingReplayAuditReader = reader
@@ -85,10 +86,13 @@ func BuildRESTSystemGovernanceFacade(in RESTSystemGovernanceInput) systemgov.Fac
 		if replay, found := registry.Get("events.replay_delivery"); found && replay.Enabled {
 			deliveryResolver = governanceinfra.NewReportGeneratedDeliveryResolver(in.MySQLDB, in.ReportResolutionReader)
 		}
+		// Receipt lookup must survive disabling the write switch or rolling
+		// back the standard profile after an unknown authorization response.
+		gapRecoveryStore = buildGapRecoveryStore(in.MySQLDB)
 		if in.Options != nil && in.Options.Retry != nil && in.Options.Retry.GapRecoveryEnabled {
 			for _, outbox := range in.EventOutboxes {
 				if outbox.Name == "assessment-mysql-outbox" && outbox.Reader != nil {
-					gapRecoveryStore = buildGapRecoveryStore(in.MySQLDB)
+					gapRecoveryEnabled = true
 					break
 				}
 			}
@@ -112,6 +116,7 @@ func BuildRESTSystemGovernanceFacade(in RESTSystemGovernanceInput) systemgov.Fac
 		ReminderReviewReader:       reminderReviewReader,
 		DeliveryResolver:           deliveryResolver,
 		GapRecoveryStore:           gapRecoveryStore,
+		GapRecoveryEnabled:         gapRecoveryEnabled,
 	})
 }
 

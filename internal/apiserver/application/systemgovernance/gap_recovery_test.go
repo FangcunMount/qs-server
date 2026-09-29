@@ -32,7 +32,15 @@ func TestGapRecoveryFailsClosedWithoutStoreOrConfirmation(t *testing.T) {
 		t.Fatal("disabled recovery resolved")
 	}
 	probe := &gapRecoveryStoreProbe{}
-	facade := NewFacade(FacadeDeps{GapRecoveryStore: probe})
+	readOnly := NewFacade(FacadeDeps{GapRecoveryStore: probe})
+	if _, err := readOnly.AuthorizeGapRecovery(ctx, 88, 701, req); err == nil || probe.calls != 0 {
+		t.Fatal("disabled write switch reached storage")
+	}
+	if decision, found, err := readOnly.ResolveGapRecovery(ctx, 88, 701, req); err != nil || !found || decision == nil || probe.calls != 1 {
+		t.Fatalf("disabled write switch lost original receipt: decision=%+v found=%v err=%v calls=%d", decision, found, err, probe.calls)
+	}
+	probe.calls = 0
+	facade := NewFacade(FacadeDeps{GapRecoveryStore: probe, GapRecoveryEnabled: true})
 	if _, err := facade.AuthorizeGapRecovery(ctx, 88, 701, req); err == nil || probe.calls != 0 {
 		t.Fatal("unconfirmed recovery reached storage")
 	}

@@ -55,6 +55,7 @@ type FacadeDeps struct {
 	ReminderReviewReader       ReminderReviewReader
 	DeliveryResolver           DeliveryResolver
 	GapRecoveryStore           GapRecoveryStore
+	GapRecoveryEnabled         bool
 }
 
 type facade struct {

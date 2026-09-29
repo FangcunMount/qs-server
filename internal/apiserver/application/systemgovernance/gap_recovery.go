@@ -47,7 +47,7 @@ func validateGapRecoveryRequest(orgID int64, actorUserID uint64, req GapRecovery
 }
 
 func (f *facade) AuthorizeGapRecovery(ctx context.Context, orgID int64, actorUserID uint64, req GapRecoveryRequest) (*GapRecoveryDecision, error) {
-	if f == nil || f.deps.GapRecoveryStore == nil {
+	if f == nil || f.deps.GapRecoveryStore == nil || !f.deps.GapRecoveryEnabled {
 		return nil, errActionsUnavailable()
 	}
 	if err := validateGapRecoveryRequest(orgID, actorUserID, req); err != nil {
