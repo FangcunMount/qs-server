@@ -111,9 +111,9 @@ func TestAPIProjectionOnlySelectsSDKSubscriberForNSQ(t *testing.T) {
 			cfg.MessagingOptions.Enabled = true
 			cfg.MessagingOptions.Provider = item.provider
 			deps := (&server{config: cfg}).buildEventSubsystemResourceDeps()
-			if (deps.buildSDKSubscriberFactory != nil) != item.wantSDK || deps.buildSubscriberFactory != nil {
-				t.Fatalf("subscriber factories for %s: SDK=%t legacy=%t", item.provider,
-					deps.buildSDKSubscriberFactory != nil, deps.buildSubscriberFactory != nil)
+			if (deps.buildSDKSubscriberFactory != nil) != item.wantSDK {
+				t.Fatalf("SDK subscriber factory for %s: got %t want %t", item.provider,
+					deps.buildSDKSubscriberFactory != nil, item.wantSDK)
 			}
 		})
 	}

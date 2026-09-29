@@ -94,7 +94,6 @@ func TestM4ReplayCrashChild(t *testing.T) {
 	cfg.Eventing.StandardOutbox.Mongo = true
 	cfg.Eventing.StandardOutbox.Assessment = true
 	deps := (&server{config: cfg}).buildEventSubsystemResourceDeps()
-	deps.buildSubscriberFactory = nil
 	deps.buildSDKSubscriberFactory = nil
 	deps.consumers = map[string]eventsubsystem.ConsumerOptions{"modelcatalog.hot_rank_projection": {Enabled: false}}
 	deps.wirePublisher = &fakePublisher{}

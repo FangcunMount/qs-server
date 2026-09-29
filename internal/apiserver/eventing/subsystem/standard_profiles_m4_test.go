@@ -11,7 +11,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/FangcunMount/component-base/pkg/messaging"
 	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
 	"github.com/FangcunMount/qs-server/internal/apiserver/eventing/standardoutbox"
 	outboxport "github.com/FangcunMount/qs-server/internal/apiserver/port/outbox"
@@ -208,11 +207,11 @@ func TestMongoOnlyStandardProfileKeepsLegacyAssessmentAndHotRankConsumer(t *test
 	if err != nil {
 		t.Fatal(err)
 	}
-	subscriber := &fakeSubscriber{}
+	subscriber := &projectionSDKSubscriberStub{}
 	s, err := NewWithStandardProfiles(Options{
 		Catalog: loadCatalog(t), MongoDB: client.Database("candidate"), MySQLDB: mysqlDB,
 		PublisherMode: eventruntime.PublishModeMQ, WirePublisher: fakePublisher{},
-		SubscriberFactory: func() (messaging.Subscriber, error) { return subscriber, nil },
+		SDKSubscriberFactory: func() (SDKSubscriber, error) { return subscriber, nil },
 		Consumers: map[string]ConsumerOptions{hotRankConsumerID: {
 			Enabled: true, Channel: "qs-apiserver-modelcatalog-hot-rank-v1",
 		}},

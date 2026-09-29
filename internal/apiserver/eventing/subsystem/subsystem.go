@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/FangcunMount/component-base/pkg/logger"
-	"github.com/FangcunMount/component-base/pkg/messaging"
 	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
 	mongoEventOutbox "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/eventoutbox"
 	mysqlEventOutbox "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/eventoutbox"
@@ -28,7 +27,6 @@ import (
 )
 
 type ConsumerHandler func(context.Context, string, []byte) error
-type SubscriberFactory func() (messaging.Subscriber, error)
 type SDKSubscriber interface {
 	Subscribe(string, string, rmtransport.Handler) error
 	Stop()
@@ -73,7 +71,6 @@ type Options struct {
 	MongoLimiter         backpressure.Acquirer
 	Mongo                ProfileOptions
 	Assessment           ProfileOptions
-	SubscriberFactory    SubscriberFactory
 	SDKSubscriberFactory SDKSubscriberFactory
 	Consumers            map[string]ConsumerOptions
 	Observer             eventobservability.Observer
@@ -115,7 +112,6 @@ type Subsystem struct {
 	publisher            *eventruntime.RoutingPublisher
 	profiles             map[eventcatalog.OutboxProfile]*profileRuntime
 	consumers            map[string]*consumerRuntime
-	subscriberFactory    SubscriberFactory
 	sdkSubscriberFactory SDKSubscriberFactory
 	observer             eventobservability.Observer
 	started              bool
@@ -161,8 +157,8 @@ func newBase(opts Options) (*Subsystem, error) {
 	})
 	s := &Subsystem{
 		catalog: opts.Catalog, registry: registry, publisher: publisher,
-		profiles:  make(map[eventcatalog.OutboxProfile]*profileRuntime),
-		consumers: make(map[string]*consumerRuntime), subscriberFactory: opts.SubscriberFactory,
+		profiles:             make(map[eventcatalog.OutboxProfile]*profileRuntime),
+		consumers:            make(map[string]*consumerRuntime),
 		sdkSubscriberFactory: opts.SDKSubscriberFactory,
 		observer:             opts.Observer,
 		closeDone:            make(chan struct{}),
@@ -368,7 +364,7 @@ func (s *Subsystem) startProfileStatus(ctx context.Context, profile *profileRunt
 }
 
 func (s *Subsystem) startConsumers(ctx context.Context) error {
-	if s.subscriberFactory == nil && s.sdkSubscriberFactory == nil && s.hasEnabledConsumers() {
+	if s.sdkSubscriberFactory == nil && s.hasEnabledConsumers() {
 		return fmt.Errorf("event consumer subscriber factory is not configured")
 	}
 	for _, id := range s.orderedConsumerIDs() {
@@ -376,28 +372,7 @@ func (s *Subsystem) startConsumers(ctx context.Context) error {
 		if !s.consumerEnabled(consumer) {
 			continue
 		}
-		var subscriber consumerSubscriber
-		var subscribe func() error
-		var err error
-		if s.sdkSubscriberFactory != nil {
-			var sdkSubscriber SDKSubscriber
-			sdkSubscriber, err = s.sdkSubscriberFactory()
-			if err == nil {
-				subscriber = sdkSubscriber
-				subscribe = func() error {
-					return sdkSubscriber.Subscribe(consumer.topic, consumer.spec.Channel, s.consumerSDKMessageHandler(consumer))
-				}
-			}
-		} else {
-			var legacySubscriber messaging.Subscriber
-			legacySubscriber, err = s.subscriberFactory()
-			if err == nil {
-				subscriber = legacySubscriber
-				subscribe = func() error {
-					return legacySubscriber.Subscribe(consumer.topic, consumer.spec.Channel, s.consumerMessageHandler(consumer))
-				}
-			}
-		}
+		subscriber, err := s.sdkSubscriberFactory()
 		if err != nil {
 			s.setConsumerError(consumer, err)
 			return fmt.Errorf("create subscriber for %s: %w", consumer.spec.ID, err)
@@ -410,7 +385,7 @@ func (s *Subsystem) startConsumers(ctx context.Context) error {
 		s.mu.Lock()
 		consumer.subscriber = subscriber
 		s.mu.Unlock()
-		if err := subscribe(); err != nil {
+		if err := subscriber.Subscribe(consumer.topic, consumer.spec.Channel, s.consumerSDKMessageHandler(consumer)); err != nil {
 			s.setConsumerError(consumer, err)
 			return fmt.Errorf("subscribe consumer %s: %w", consumer.spec.ID, err)
 		}
@@ -467,30 +442,6 @@ func (s *Subsystem) consumerSDKMessageHandler(consumer *consumerRuntime) rmtrans
 		}
 		s.setConsumerHealthy(consumer)
 		return ack(ctx, delivery, msg, eventType, eventobservability.ConsumeOutcomeAcked, eventobservability.ConsumeOutcomeAckFailed)
-	}
-}
-
-func (s *Subsystem) consumerMessageHandler(consumer *consumerRuntime) messaging.Handler {
-	extractor := eventruntime.MessageEventExtractor{}
-	settlement := eventruntime.NewMessageSettlementPolicy(slog.Default(), consumer.spec.ID, consumer.topic, s.observer)
-	return func(ctx context.Context, msg *messaging.Message) error {
-		eventType, err := extractor.Extract(msg)
-		if err != nil {
-			_, nackErr := settlement.NackInvalid(msg, err)
-			return nackErr
-		}
-		if eventType != consumer.eventType {
-			_, err := settlement.AckUnknown(msg)
-			return err
-		}
-		if err := consumer.handler(ctx, eventType, msg.Payload); err != nil {
-			s.setConsumerError(consumer, err)
-			settlement.NackFailed(msg, eventType, err)
-			return err
-		}
-		s.setConsumerHealthy(consumer)
-		_, err = settlement.AckSuccess(msg)
-		return err
 	}
 }
 
