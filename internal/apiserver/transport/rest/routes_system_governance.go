@@ -21,6 +21,7 @@ func (r *Router) registerSystemGovernanceInternalRoutes(internalV1 *gin.RouterGr
 	governance.GET("/actions/pending-reconciliations", r.rateLimitedHandlers(rateLimitBudgetQuery, governanceHandler.PendingReplayAudits)...)
 	governance.GET("/actions/delivery-replay-reviews", r.rateLimitedHandlers(rateLimitBudgetQuery, governanceHandler.DeliveryReplayReviews)...)
 	governance.GET("/actions/reminder-reviews", r.rateLimitedHandlers(rateLimitBudgetQuery, governanceHandler.ReminderReviews)...)
+	governance.GET("/actions/gap-recoveries/summary", r.rateLimitedHandlers(rateLimitBudgetQuery, governanceHandler.GetGapRecoverySummary)...)
 	governance.POST("/actions/gap-recoveries", r.rateLimitedHandlers(rateLimitBudgetSubmit, governanceHandler.AuthorizeGapRecovery)...)
 	governance.POST("/actions/gap-recoveries/resolve", r.rateLimitedHandlers(rateLimitBudgetQuery, governanceHandler.ResolveGapRecovery)...)
 	governance.POST("/actions/delivery-resolutions", r.rateLimitedHandlers(rateLimitBudgetSubmit, governanceHandler.ResolveDelivery)...)

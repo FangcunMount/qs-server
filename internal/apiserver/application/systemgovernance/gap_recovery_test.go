@@ -18,6 +18,10 @@ func (p *gapRecoveryStoreProbe) ResolveGapRecovery(_ context.Context, _ int64, _
 	return &GapRecoveryDecision{Authorized: true, Code: "authorized"}, true, nil
 }
 
+func (p *gapRecoveryStoreProbe) ReadGapRecoverySummary(_ context.Context, _ int64) (GapRecoverySummary, error) {
+	return GapRecoverySummary{Authorized: 1, Denied: 2, WaitingRelay: 1}, nil
+}
+
 func TestGapRecoveryFailsClosedWithoutStoreOrConfirmation(t *testing.T) {
 	req := GapRecoveryRequest{
 		RequestID: "recovery-1", AssessmentID: 42, EventID: "original-event",
@@ -31,6 +35,9 @@ func TestGapRecoveryFailsClosedWithoutStoreOrConfirmation(t *testing.T) {
 	if _, _, err := disabled.ResolveGapRecovery(ctx, 88, 701, req); err == nil {
 		t.Fatal("disabled recovery resolved")
 	}
+	if _, err := disabled.GetGapRecoverySummary(ctx, 88); err == nil {
+		t.Fatal("unconfigured recovery ledger presented empty summary")
+	}
 	probe := &gapRecoveryStoreProbe{}
 	readOnly := NewFacade(FacadeDeps{GapRecoveryStore: probe})
 	if _, err := readOnly.AuthorizeGapRecovery(ctx, 88, 701, req); err == nil || probe.calls != 0 {
@@ -38,6 +45,12 @@ func TestGapRecoveryFailsClosedWithoutStoreOrConfirmation(t *testing.T) {
 	}
 	if decision, found, err := readOnly.ResolveGapRecovery(ctx, 88, 701, req); err != nil || !found || decision == nil || probe.calls != 1 {
 		t.Fatalf("disabled write switch lost original receipt: decision=%+v found=%v err=%v calls=%d", decision, found, err, probe.calls)
+	}
+	if summary, err := readOnly.GetGapRecoverySummary(ctx, 88); err != nil || summary.Authorized != 1 || summary.Denied != 2 || summary.WaitingRelay != 1 {
+		t.Fatalf("disabled write switch lost reviewed decisions: summary=%+v err=%v", summary, err)
+	}
+	if _, err := readOnly.GetGapRecoverySummary(ctx, 0); err == nil {
+		t.Fatal("unscoped recovery summary reached storage")
 	}
 	probe.calls = 0
 	facade := NewFacade(FacadeDeps{GapRecoveryStore: probe, GapRecoveryEnabled: true})

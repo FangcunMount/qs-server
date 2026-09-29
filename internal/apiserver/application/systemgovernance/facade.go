@@ -23,6 +23,7 @@ type Facade interface {
 	GetDeliveryResolution(ctx context.Context, orgID int64, requestID string) (*ActionRunResult, error)
 	AuthorizeGapRecovery(ctx context.Context, orgID int64, actorUserID uint64, req GapRecoveryRequest) (*GapRecoveryDecision, error)
 	ResolveGapRecovery(ctx context.Context, orgID int64, actorUserID uint64, req GapRecoveryRequest) (*GapRecoveryDecision, bool, error)
+	GetGapRecoverySummary(ctx context.Context, orgID int64) (GapRecoverySummary, error)
 	GetCache(ctx context.Context, window string) (*CacheView, error)
 	GetResilience(ctx context.Context, window string) (*ResilienceView, error)
 	GetCheckpoints(ctx context.Context, window string) (*CheckpointView, error)

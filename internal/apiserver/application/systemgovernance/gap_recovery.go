@@ -28,11 +28,21 @@ type GapRecoveryDecision struct {
 	OutboxVersionAfter  uint64 `json:"outbox_version_after,omitempty"`
 }
 
+// GapRecoverySummary separates reviewed original-message recovery decisions
+// from the generic Outbox manual-replay count. Authorized and Denied are
+// durable totals; WaitingRelay is a current subset of Authorized.
+type GapRecoverySummary struct {
+	Authorized   int64 `json:"authorized"`
+	Denied       int64 `json:"denied"`
+	WaitingRelay int64 `json:"waiting_relay"`
+}
+
 // GapRecoveryStore commits the host request ledger and original Outbox
 // requeue in one transaction. It must not publish directly.
 type GapRecoveryStore interface {
 	AuthorizeGapRecovery(context.Context, int64, uint64, GapRecoveryRequest) (*GapRecoveryDecision, error)
 	ResolveGapRecovery(context.Context, int64, uint64, GapRecoveryRequest) (*GapRecoveryDecision, bool, error)
+	ReadGapRecoverySummary(context.Context, int64) (GapRecoverySummary, error)
 }
 
 func validateGapRecoveryRequest(orgID int64, actorUserID uint64, req GapRecoveryRequest) error {
@@ -69,4 +79,14 @@ func (f *facade) ResolveGapRecovery(ctx context.Context, orgID int64, actorUserI
 		return nil, false, err
 	}
 	return f.deps.GapRecoveryStore.ResolveGapRecovery(ctx, orgID, actorUserID, req)
+}
+
+func (f *facade) GetGapRecoverySummary(ctx context.Context, orgID int64) (GapRecoverySummary, error) {
+	if f == nil || f.deps.GapRecoveryStore == nil {
+		return GapRecoverySummary{}, errActionsUnavailable()
+	}
+	if orgID <= 0 {
+		return GapRecoverySummary{}, errors.WithCode(code.ErrInvalidArgument, "organization is required")
+	}
+	return f.deps.GapRecoveryStore.ReadGapRecoverySummary(ctx, orgID)
 }

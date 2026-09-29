@@ -208,6 +208,12 @@ events:
 	require.Equal(t, "authorized", result.Code)
 	require.Equal(t, originalVersion, result.OutboxVersionBefore)
 	require.Equal(t, originalVersion+1, result.OutboxVersionAfter)
+	reviewSummary, err := ledger.ReadSummary(ctx, int64(command.OrgID))
+	require.NoError(t, err)
+	require.Equal(t, mysqlstandard.GapRecoverySummary{Authorized: 1, Denied: 1, WaitingRelay: 1}, reviewSummary)
+	otherReviewSummary, err := ledger.ReadSummary(ctx, 999)
+	require.NoError(t, err)
+	require.Equal(t, mysqlstandard.GapRecoverySummary{}, otherReviewSummary)
 	var state, manualRequestID string
 	var versionAfter uint64
 	var payloadAfter []byte
@@ -243,6 +249,9 @@ events:
 	require.NoError(t, err)
 	require.False(t, denied.Authorized)
 	require.Equal(t, "ever_claimed", denied.Code)
+	reviewSummary, err = ledger.ReadSummary(ctx, int64(command.OrgID))
+	require.NoError(t, err)
+	require.Equal(t, mysqlstandard.GapRecoverySummary{Authorized: 1, Denied: 2, WaitingRelay: 1}, reviewSummary)
 	require.NoError(t, sqlDB.QueryRowContext(ctx, `SELECT state,version FROM rm_outbox WHERE message_id=?`, refEventID).Scan(&state, &versionAfter))
 	require.Equal(t, "retry_wait", state)
 	require.Equal(t, originalVersion+1, versionAfter)
@@ -284,4 +293,20 @@ events:
 	case <-time.After(5 * time.Second):
 		t.Fatal("first Claim did not resume after gap lock commit")
 	}
+	// The old Outbox counter intentionally includes both authorizations. The
+	// dedicated review ledger must not count a separate ordinary manual replay
+	// as an original-message gap recovery.
+	_, err = sqlDB.ExecContext(ctx, `INSERT INTO rm_outbox
+		(producer,message_id,destination,event_type,schema_version,scope,content_type,occurred_at,payload,fingerprint,state,next_attempt_at,version,manual_replay_request_id,manual_replay_version)
+		SELECT producer,'ordinary-manual-event',destination,event_type,schema_version,scope,content_type,occurred_at,payload,fingerprint,'retry_wait',next_attempt_at,version,'ordinary-review',version
+		FROM rm_outbox WHERE message_id=?`, refEventID)
+	require.NoError(t, err)
+	statusReader, err := mysqlstandard.NewStatusReader(sqlDB)
+	require.NoError(t, err)
+	legacyCombined, err := statusReader.ReadOutboxGovernance(ctx, int64(command.OrgID))
+	require.NoError(t, err)
+	require.EqualValues(t, 2, legacyCombined.Authorized)
+	reviewSummary, err = ledger.ReadSummary(ctx, int64(command.OrgID))
+	require.NoError(t, err)
+	require.Equal(t, mysqlstandard.GapRecoverySummary{Authorized: 1, Denied: 2, WaitingRelay: 1}, reviewSummary)
 }

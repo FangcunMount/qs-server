@@ -43,6 +43,12 @@ type GapRecoveryResult struct {
 	OutboxVersionAfter  uint64
 }
 
+type GapRecoverySummary struct {
+	Authorized   int64
+	Denied       int64
+	WaitingRelay int64
+}
+
 type GapRecoveryLedger struct{ db *sql.DB }
 
 func NewGapRecoveryLedger(db *sql.DB) (*GapRecoveryLedger, error) {
@@ -50,6 +56,39 @@ func NewGapRecoveryLedger(db *sql.DB) (*GapRecoveryLedger, error) {
 		return nil, errors.New("gap recovery requires host database")
 	}
 	return &GapRecoveryLedger{db: db}, nil
+}
+
+// ReadSummary is tenant-scoped and deliberately separate from the standard
+// Outbox governance reader: older standard profiles do not have migration 90.
+// The durable decision totals include completed requests; WaitingRelay only
+// counts the still-current authorized Outbox version awaiting SDK Relay.
+func (l *GapRecoveryLedger) ReadSummary(ctx context.Context, orgID int64) (GapRecoverySummary, error) {
+	var result GapRecoverySummary
+	if l == nil || l.db == nil || orgID <= 0 {
+		return result, errors.New("gap recovery summary requires host database and organization")
+	}
+	var incomplete int64
+	err := l.db.QueryRowContext(ctx, `SELECT
+	COALESCE(SUM(result_code<>'' AND authorized=1),0),
+	COALESCE(SUM(result_code<>'' AND authorized=0),0),
+	COALESCE(SUM(result_code=''),0),
+	(SELECT COUNT(*) FROM qs_rm_gap_recovery_request AS pending
+	 WHERE pending.org_id=? AND pending.authorized=1 AND EXISTS (
+	   SELECT 1 FROM rm_outbox AS o WHERE o.message_id=pending.event_id
+	   AND o.scope=CONCAT('org:',pending.org_id)
+	   AND o.producer='qs-server' AND o.event_type='evaluation.requested'
+	   AND o.manual_replay_request_id=pending.request_id
+	   AND o.manual_replay_version=pending.outbox_version_after
+	   AND o.version=pending.outbox_version_after AND o.state='retry_wait'))
+	FROM qs_rm_gap_recovery_request WHERE org_id=?`, orgID, orgID).
+		Scan(&result.Authorized, &result.Denied, &incomplete, &result.WaitingRelay)
+	if err != nil {
+		return GapRecoverySummary{}, err
+	}
+	if incomplete != 0 {
+		return GapRecoverySummary{}, ErrGapRecoveryLedgerCorrupt
+	}
+	return result, nil
 }
 
 func (r GapRecoveryRequest) fingerprint() ([32]byte, string, error) {

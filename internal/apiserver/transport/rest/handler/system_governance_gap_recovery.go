@@ -7,6 +7,34 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+// GetGapRecoverySummary reads the host review ledger independently of the
+// generic Outbox manual-replay counters. It remains available when new
+// recovery authorization is switched off.
+// @Summary 系统治理-原测评消息恢复审核汇总
+// @Description 按当前机构读取持久批准／拒绝总数和仍待 Relay 的原消息数；仅 qs:admin 可访问。
+// @Tags System-Governance
+// @Produce json
+// @Param Authorization header string true "Bearer 用户令牌"
+// @Success 200 {object} core.Response{data=systemgovernance.GapRecoverySummary}
+// @Router /internal/v1/system-governance/actions/gap-recoveries/summary [get]
+func (h *SystemGovernanceHandler) GetGapRecoverySummary(c *gin.Context) {
+	if h.facade == nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"message": "system governance unavailable"})
+		return
+	}
+	orgID, _, err := h.RequireProtectedScope(c)
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+	result, err := h.facade.GetGapRecoverySummary(c.Request.Context(), orgID)
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+	h.Success(c, result)
+}
+
 // AuthorizeGapRecovery records one reviewed recovery of the original event.
 // It cannot generate a new event or send to NSQ directly.
 // @Summary 系统治理-授权恢复未接单的原测评消息

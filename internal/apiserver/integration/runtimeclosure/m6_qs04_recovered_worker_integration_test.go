@@ -117,6 +117,9 @@ func TestM6QS04RecoveredOriginalHasOneWorkerEffect(t *testing.T) {
 			require.Equal(t, "published", unchangedState)
 			require.Equal(t, attempts, unchangedAttempts)
 			require.Equal(t, version, unchangedVersion)
+			reviewSummary, err := ledger.ReadSummary(t.Context(), originalOrgID)
+			require.NoError(t, err)
+			require.Equal(t, mysqlstandard.GapRecoverySummary{Authorized: 1, Denied: 1, WaitingRelay: 0}, reviewSummary)
 			// Restore this disposable fixture before the common closure checks
 			// that all business dates belong to the current runtime window.
 			require.NoError(t, db.Exec(`UPDATE assessment SET submitted_at=? WHERE id=?`, originalSubmittedAt, assessmentID).Error)

@@ -71,3 +71,13 @@ func (s gapRecoveryStore) ResolveGapRecovery(ctx context.Context, orgID int64, a
 	}
 	return gapRecoveryDecision(result), true, nil
 }
+
+func (s gapRecoveryStore) ReadGapRecoverySummary(ctx context.Context, orgID int64) (systemgov.GapRecoverySummary, error) {
+	result, err := s.ledger.ReadSummary(ctx, orgID)
+	if err != nil {
+		return systemgov.GapRecoverySummary{}, err
+	}
+	return systemgov.GapRecoverySummary{
+		Authorized: result.Authorized, Denied: result.Denied, WaitingRelay: result.WaitingRelay,
+	}, nil
+}
