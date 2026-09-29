@@ -51,6 +51,21 @@ type standardClosureDelivery struct {
 	firstFailureBrokerID    *nsq.MessageID
 	lastFailureAttempts     uint16
 	lastFailureHandledAt    time.Time
+	startConsumer           func() error
+	connectOnce             sync.Once
+	connectErr              error
+	consumerConnected       bool
+}
+
+func (d *standardClosureDelivery) Connect() error {
+	if d == nil || d.startConsumer == nil {
+		return fmt.Errorf("standard closure consumer is not configured")
+	}
+	d.connectOnce.Do(func() {
+		d.connectErr = d.startConsumer()
+		d.consumerConnected = d.connectErr == nil
+	})
+	return d.connectErr
 }
 
 func (d *standardClosureDelivery) SetHandlers(registered map[string]handlers.HandlerFunc) {
@@ -158,6 +173,10 @@ func newM5StandardMySQLEventSubsystem(t *testing.T, opts eventsubsystem.Options,
 }
 
 func newM5StandardEventSubsystem(t *testing.T, opts eventsubsystem.Options, sqlDB *sql.DB, standardMongo, delayFirstFailure bool) (*eventsubsystem.Subsystem, runtimeClosureDelivery, error) {
+	return newM5StandardEventSubsystemControlled(t, opts, sqlDB, standardMongo, delayFirstFailure, false)
+}
+
+func newM5StandardEventSubsystemControlled(t *testing.T, opts eventsubsystem.Options, sqlDB *sql.DB, standardMongo, delayFirstFailure, delayConsumer bool) (*eventsubsystem.Subsystem, runtimeClosureDelivery, error) {
 	const topic = "qs.evaluation.lifecycle"
 	address := os.Getenv("RM_QS_M5_NSQ_TCP")
 	config := nsq.NewConfig()
@@ -167,6 +186,9 @@ func newM5StandardEventSubsystem(t *testing.T, opts eventsubsystem.Options, sqlD
 	channel := "rm-m5-current-business-closure"
 	if standardMongo {
 		channel = "rm-m5-dual-business-closure"
+	}
+	if delayConsumer {
+		channel = "rm-m6-qs04-business-recovery"
 	}
 	consumer, err := nsq.NewConsumer(topic, channel, config)
 	if err != nil {
@@ -205,12 +227,18 @@ func newM5StandardEventSubsystem(t *testing.T, opts eventsubsystem.Options, sqlD
 		}
 		return handleErr
 	}))
-	if err := consumer.ConnectToNSQD(address); err != nil {
-		consumer.Stop()
-		return nil, nil, err
+	delivery.startConsumer = func() error { return consumer.ConnectToNSQD(address) }
+	if !delayConsumer {
+		if err := delivery.Connect(); err != nil {
+			consumer.Stop()
+			return nil, nil, err
+		}
 	}
 	t.Cleanup(func() {
 		consumer.Stop()
+		if !delivery.consumerConnected {
+			return
+		}
 		select {
 		case <-consumer.StopChan:
 		case <-time.After(5 * time.Second):

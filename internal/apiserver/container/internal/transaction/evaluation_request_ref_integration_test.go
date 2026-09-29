@@ -16,3 +16,12 @@ func createEvaluationRequestRefTable(ctx context.Context, db *sql.DB) error {
 	_, err = db.ExecContext(ctx, string(ddl))
 	return err
 }
+
+func createGapRecoveryRequestTable(ctx context.Context, db *sql.DB) error {
+	ddl, err := os.ReadFile("../../../../pkg/migration/migrations/mysql/000090_qs_gap_recovery_request.up.sql")
+	if err != nil {
+		return err
+	}
+	_, err = db.ExecContext(ctx, string(ddl))
+	return err
+}
