@@ -74,6 +74,7 @@ func TestM5OldFailureRedeliveryAfterDurableReportKeepsParticipantCompleted(t *te
 	t.Cleanup(func() { require.NoError(t, retrygovernance.ConfigurePolicies(originalBusiness, originalOutbox)) })
 
 	scenario := runtimeClosureScenario{
+		expectEvaluationRetry: true,
 		skipReportWaitClosure: true,
 		beforeEvaluation: func(t *testing.T, assessmentID uint64, db *gorm.DB, events *subsystem.Subsystem) {
 			binding := events.Profile(eventcatalog.OutboxProfileAssessmentMySQL)
