@@ -84,3 +84,33 @@ func TestPrepareIntentsRejectsMissingScopeAndBestEffort(t *testing.T) {
 		}
 	}
 }
+
+func TestPrepareIntentsKeepsOneDueTimeForTransactionBatch(t *testing.T) {
+	cfg, err := eventcatalog.Load("../../../../configs/events.yaml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	occurredAt := time.Date(2026, 9, 23, 2, 0, 0, 0, time.UTC)
+	events := []event.DomainEvent{
+		event.Event[map[string]any]{BaseEvent: event.BaseEvent{
+			ID: "batch-1", EventTypeValue: eventcatalog.AnswerSheetSubmitted,
+			AggregateTypeValue: "AnswerSheet", AggregateIDValue: "101", OccurredAtValue: occurredAt,
+		}, Data: map[string]any{"org_id": 501}},
+		event.Event[map[string]any]{BaseEvent: event.BaseEvent{
+			ID: "batch-2", EventTypeValue: eventcatalog.AnswerSheetSubmitted,
+			AggregateTypeValue: "AnswerSheet", AggregateIDValue: "102", OccurredAtValue: occurredAt,
+		}, Data: map[string]any{"org_id": 502}},
+	}
+	started := time.Now()
+	prepared, err := PrepareIntents(events, eventcatalog.NewCatalog(cfg), "api-server")
+	finished := time.Now()
+	if err != nil || len(prepared) != 2 {
+		t.Fatalf("PrepareIntents() = %d, %v", len(prepared), err)
+	}
+	if !prepared[0].DueAt.Equal(prepared[1].DueAt) || prepared[0].DueAt.Before(started) || prepared[0].DueAt.After(finished) {
+		t.Fatalf("batch due times = %s, %s; call window [%s, %s]", prepared[0].DueAt, prepared[1].DueAt, started, finished)
+	}
+	if prepared[0].Message.Input().Scope != "org:501" || prepared[1].Message.Input().Scope != "org:502" {
+		t.Fatalf("batch scopes = %q, %q", prepared[0].Message.Input().Scope, prepared[1].Message.Input().Scope)
+	}
+}
