@@ -21,6 +21,8 @@ type Facade interface {
 	ListReminderReviews(ctx context.Context, orgID int64, cursor string, limit int) (*ReminderReviewPage, error)
 	ResolveDelivery(ctx context.Context, orgID int64, actorUserID uint64, req DeliveryResolutionRequest) (*ActionRunResult, error)
 	GetDeliveryResolution(ctx context.Context, orgID int64, requestID string) (*ActionRunResult, error)
+	AuthorizeGapRecovery(ctx context.Context, orgID int64, actorUserID uint64, req GapRecoveryRequest) (*GapRecoveryDecision, error)
+	ResolveGapRecovery(ctx context.Context, orgID int64, actorUserID uint64, req GapRecoveryRequest) (*GapRecoveryDecision, bool, error)
 	GetCache(ctx context.Context, window string) (*CacheView, error)
 	GetResilience(ctx context.Context, window string) (*ResilienceView, error)
 	GetCheckpoints(ctx context.Context, window string) (*CheckpointView, error)
@@ -52,6 +54,7 @@ type FacadeDeps struct {
 	DeliveryReplayReviewReader DeliveryReplayReviewReader
 	ReminderReviewReader       ReminderReviewReader
 	DeliveryResolver           DeliveryResolver
+	GapRecoveryStore           GapRecoveryStore
 }
 
 type facade struct {
