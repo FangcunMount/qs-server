@@ -44,10 +44,7 @@ func TestStandardAssessmentOriginalTransaction(t *testing.T) {
 	require.NoError(t, db.AutoMigrate(&assessmentmysql.AssessmentPO{}))
 	_, err = sqlDB.ExecContext(ctx, sdkmysql.Schema)
 	require.NoError(t, err)
-	_, err = sqlDB.ExecContext(ctx, `ALTER TABLE rm_outbox
-		ADD COLUMN manual_replay_request_id VARBINARY(64) NULL,
-		ADD COLUMN manual_replay_version BIGINT UNSIGNED NULL,
-		ADD KEY ix_rm_outbox_message_id (message_id,id)`)
+	_, err = sqlDB.ExecContext(ctx, `ALTER TABLE rm_outbox ADD KEY ix_rm_outbox_message_id (message_id,id)`)
 	require.NoError(t, err)
 	require.NoError(t, createEvaluationRequestRefTable(ctx, sqlDB))
 	require.NoError(t, createGapRecoveryRequestTable(ctx, sqlDB))

@@ -11,8 +11,11 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"strconv"
 	"strings"
 	"time"
+
+	mysqlstore "github.com/FangcunMount/reliable-messaging/storage/mysql"
 )
 
 var (
@@ -216,15 +219,21 @@ func authorizeGapOne(ctx context.Context, tx *sql.Tx, input GapRecoveryRequest) 
 	if hasRun {
 		return denied("ever_claimed")
 	}
-	outboxRows, err := tx.QueryContext(ctx, `SELECT id,version FROM rm_outbox FORCE INDEX (ix_rm_outbox_message_id)
+	outboxRows, err := tx.QueryContext(ctx, `SELECT id,version,fingerprint FROM rm_outbox FORCE INDEX (ix_rm_outbox_message_id)
 	WHERE message_id=? FOR UPDATE`, input.EventID)
 	if err != nil {
 		return GapRecoveryResult{}, err
 	}
-	var found []struct{ id, version uint64 }
+	var found []struct {
+		id, version uint64
+		fingerprint []byte
+	}
 	for outboxRows.Next() {
-		var row struct{ id, version uint64 }
-		if err := outboxRows.Scan(&row.id, &row.version); err != nil {
+		var row struct {
+			id, version uint64
+			fingerprint []byte
+		}
+		if err := outboxRows.Scan(&row.id, &row.version, &row.fingerprint); err != nil {
 			_ = outboxRows.Close()
 			return GapRecoveryResult{}, err
 		}
@@ -261,22 +270,23 @@ func authorizeGapOne(ctx context.Context, tx *sql.Tx, input GapRecoveryRequest) 
 		}
 		return denied("identity_mismatch")
 	}
-	update, err := tx.ExecContext(ctx, `UPDATE rm_outbox SET state='retry_wait',next_attempt_at=UTC_TIMESTAMP(6),
-	claim_token=NULL,lease_until=NULL,manual_replay_request_id=?,manual_replay_version=?,
-	version=version+1,updated_at=UTC_TIMESTAMP(6)
-	WHERE id=? AND state='published' AND transport_confirmed_at IS NOT NULL AND version=?`,
-		input.RequestID, found[0].version+1, found[0].id, found[0].version)
+	if len(found[0].fingerprint) != 32 {
+		return denied("fingerprint_missing")
+	}
+	var fingerprint [32]byte
+	copy(fingerprint[:], found[0].fingerprint)
+	appender, err := mysqlstore.Bind(tx)
 	if err != nil {
 		return GapRecoveryResult{}, err
 	}
-	n, err := update.RowsAffected()
+	after, err := appender.RequeueConfirmed(ctx, mysqlstore.ConfirmedRequeue{
+		RecordID: strconv.FormatUint(found[0].id, 10), ExpectedVersion: found[0].version,
+		ExpectedFingerprint: fingerprint, RequestID: input.RequestID,
+	})
 	if err != nil {
 		return GapRecoveryResult{}, err
 	}
-	if n != 1 {
-		return GapRecoveryResult{}, errors.New("locked original Outbox changed during gap recovery")
-	}
-	return GapRecoveryResult{Authorized: true, Code: "authorized", OutboxVersionBefore: found[0].version, OutboxVersionAfter: found[0].version + 1}, nil
+	return GapRecoveryResult{Authorized: true, Code: "authorized", OutboxVersionBefore: found[0].version, OutboxVersionAfter: after}, nil
 }
 
 // Resolve reads a committed decision after a lost or unknown client response.
