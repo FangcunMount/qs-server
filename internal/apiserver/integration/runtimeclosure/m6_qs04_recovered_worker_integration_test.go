@@ -36,6 +36,7 @@ func TestM6QS04RecoveredOriginalHasOneWorkerEffect(t *testing.T) {
 	prepareQS04Channel(t)
 	var delivery *standardClosureDelivery
 	var originalEventID string
+	var originalOrgID int64
 	var recoveredQS04DB *gorm.DB
 	var originalSubmittedAt time.Time
 	scenario := runtimeClosureScenario{
@@ -45,6 +46,7 @@ func TestM6QS04RecoveredOriginalHasOneWorkerEffect(t *testing.T) {
 			require.NoError(t, err)
 			var orgID int64
 			require.NoError(t, sqlDB.QueryRowContext(t.Context(), `SELECT org_id FROM assessment WHERE id=? AND status='submitted'`, assessmentID).Scan(&orgID))
+			originalOrgID = orgID
 			require.NoError(t, sqlDB.QueryRowContext(t.Context(), `SELECT event_id FROM qs_rm_evaluation_request_ref WHERE assessment_id=?`, assessmentID).Scan(&originalEventID))
 			require.Eventually(t, func() bool {
 				var state string
@@ -87,17 +89,38 @@ func TestM6QS04RecoveredOriginalHasOneWorkerEffect(t *testing.T) {
 			db := recoveredQS04DB
 			var eventID, state string
 			var attempts int
-			require.NoError(t, db.Raw(`SELECT message_id,state,attempt_count FROM rm_outbox WHERE message_id=?`, originalEventID).
-				Row().Scan(&eventID, &state, &attempts))
+			var version uint64
+			require.NoError(t, db.Raw(`SELECT message_id,state,attempt_count,version FROM rm_outbox WHERE message_id=?`, originalEventID).
+				Row().Scan(&eventID, &state, &attempts, &version))
 			require.Equal(t, originalEventID, eventID)
 			require.Equal(t, "published", state)
 			require.Equal(t, 2, attempts)
 			assertRowCount(t, db, "runtime_checkpoint", "scope='evaluation_run' AND assessment_id=?", 1, assessmentID)
 			assertRowCount(t, db, "evaluation_outcome", "assessment_id=?", 1, assessmentID)
+			sqlDB, err := db.DB()
+			require.NoError(t, err)
+			ledger, err := mysqlstandard.NewGapRecoveryLedger(sqlDB)
+			require.NoError(t, err)
+			denied, err := ledger.Authorize(t.Context(), mysqlstandard.GapRecoveryRequest{
+				OrgID: originalOrgID, ActorID: 99, RequestID: "m6-qs04-after-worker-claim-denied",
+				AssessmentID: assessmentID, EventID: originalEventID, ExpectedVersion: version,
+				Reason: "verify already claimed original cannot be resent", SubmittedBefore: time.Now().Add(-10 * time.Minute),
+			})
+			require.NoError(t, err)
+			require.False(t, denied.Authorized)
+			require.Equal(t, "ever_claimed", denied.Code)
+			var unchangedState string
+			var unchangedAttempts int
+			var unchangedVersion uint64
+			require.NoError(t, db.Raw(`SELECT state,attempt_count,version FROM rm_outbox WHERE message_id=?`, originalEventID).
+				Row().Scan(&unchangedState, &unchangedAttempts, &unchangedVersion))
+			require.Equal(t, "published", unchangedState)
+			require.Equal(t, attempts, unchangedAttempts)
+			require.Equal(t, version, unchangedVersion)
 			// Restore this disposable fixture before the common closure checks
 			// that all business dates belong to the current runtime window.
 			require.NoError(t, db.Exec(`UPDATE assessment SET submitted_at=? WHERE id=?`, originalSubmittedAt, assessmentID).Error)
-			t.Logf("QS-04 original event=%s relay_attempts=%d Run=1 Outcome=1", eventID, attempts)
+			t.Logf("QS-04 original event=%s relay_attempts=%d Run=1 Outcome=1 later_recovery=%s", eventID, attempts, denied.Code)
 		},
 	}
 	runCurrentRuntimeClosure(t, func(t *testing.T, opts eventsubsystem.Options, sqlDB *sql.DB) (*eventsubsystem.Subsystem, runtimeClosureDelivery, error) {
