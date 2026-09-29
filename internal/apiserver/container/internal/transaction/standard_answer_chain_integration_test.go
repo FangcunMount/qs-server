@@ -126,6 +126,7 @@ events:
 	require.NoError(t, mysqlDB.AutoMigrate(&assessmentmysql.AssessmentPO{}))
 	_, err = sqlDB.ExecContext(ctx, sdkmysql.Schema)
 	require.NoError(t, err)
+	require.NoError(t, createEvaluationRequestRefTable(ctx, sqlDB))
 	mysqlCatalog, err := eventcatalog.Parse([]byte(`version: "1"
 topics:
   evaluation:

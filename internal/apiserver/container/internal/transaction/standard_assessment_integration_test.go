@@ -5,6 +5,7 @@ package transaction
 import (
 	"context"
 	"os"
+	"strconv"
 	"testing"
 	"time"
 
@@ -14,6 +15,7 @@ import (
 	assessmentmysql "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/evaluation"
 	mysqlstandard "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/standardoutbox"
 	errorcode "github.com/FangcunMount/qs-server/internal/pkg/code"
+	"github.com/FangcunMount/qs-server/internal/pkg/event"
 	eventcatalog "github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
 	eventruntime "github.com/FangcunMount/qs-server/internal/pkg/eventing/runtime"
 	sdkmysql "github.com/FangcunMount/reliable-messaging/storage/mysql"
@@ -39,6 +41,7 @@ func TestStandardAssessmentOriginalTransaction(t *testing.T) {
 	require.NoError(t, db.AutoMigrate(&assessmentmysql.AssessmentPO{}))
 	_, err = sqlDB.ExecContext(ctx, sdkmysql.Schema)
 	require.NoError(t, err)
+	require.NoError(t, createEvaluationRequestRefTable(ctx, sqlDB))
 	config, err := eventcatalog.Parse([]byte(`version: "1"
 topics:
   evaluation:
@@ -76,7 +79,27 @@ events:
 	require.Equal(t, "pending", found.Status)
 	require.NoError(t, db.Table("rm_outbox").Count(&n).Error)
 	require.Zero(t, n)
+	require.NoError(t, db.Table("qs_rm_evaluation_request_ref").Count(&n).Error)
+	require.Zero(t, n)
 	require.NoError(t, db.Exec("DROP TRIGGER rm_reject_standard_event").Error)
+
+	// The identity index is part of the same transaction, not a best-effort
+	// follow-up. Its failure must roll back the Assessment and SDK Outbox too.
+	rejectedCommand := command
+	rejectedCommand.AnswerSheetID = 4
+	rejected, err := service.CreateForAnswerSheet(ctx, rejectedCommand)
+	require.NoError(t, err)
+	require.NoError(t, db.Exec(`CREATE TRIGGER rm_reject_request_ref BEFORE INSERT ON qs_rm_evaluation_request_ref FOR EACH ROW SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'proof request identity write failure'`).Error)
+	_, err = service.SubmitForEvaluation(ctx, rejected.ID)
+	require.Error(t, err)
+	found, err = service.FindByAnswerSheetID(ctx, rejectedCommand.AnswerSheetID)
+	require.NoError(t, err)
+	require.Equal(t, "pending", found.Status)
+	require.NoError(t, db.Table("rm_outbox").Count(&n).Error)
+	require.Zero(t, n)
+	require.NoError(t, db.Table("qs_rm_evaluation_request_ref").Count(&n).Error)
+	require.Zero(t, n)
+	require.NoError(t, db.Exec("DROP TRIGGER rm_reject_request_ref").Error)
 
 	barrier := &proofPendingBarrier{Repository: repo, arrived: make(chan struct{}, 2), release: make(chan struct{})}
 	concurrent := appintake.NewService(barrier, proofModelValidator{}, runner, stager)
@@ -103,6 +126,8 @@ events:
 	require.Equal(t, 1, successes)
 	require.NoError(t, db.Table("rm_outbox").Count(&n).Error)
 	require.EqualValues(t, 1, n)
+	require.NoError(t, db.Table("qs_rm_evaluation_request_ref").Count(&n).Error)
+	require.EqualValues(t, 1, n)
 	store, err := sdkmysql.New(sqlDB)
 	require.NoError(t, err)
 	claims, err := store.ClaimDue(ctx, 2, time.Minute)
@@ -111,6 +136,22 @@ events:
 	require.Equal(t, "evaluation.requested", claims[0].Message.Input().EventType)
 	require.Equal(t, "org:1", claims[0].Message.Input().Scope)
 	require.Equal(t, "qs.evaluation.lifecycle", claims[0].Message.Input().Destination)
+	var refAssessmentID uint64
+	var refOrgID int64
+	var refEventID string
+	require.NoError(t, sqlDB.QueryRowContext(ctx, `SELECT assessment_id,org_id,event_id FROM qs_rm_evaluation_request_ref WHERE assessment_id=?`, created.ID).
+		Scan(&refAssessmentID, &refOrgID, &refEventID))
+	require.Equal(t, created.ID, refAssessmentID)
+	require.EqualValues(t, 1, refOrgID)
+	require.Equal(t, claims[0].Message.Input().ID, refEventID)
+	foreignScope := event.New(eventcatalog.EvaluationRequested, "Evaluation", strconv.FormatUint(created.ID, 10), map[string]any{"org_id": 999})
+	require.Error(t, runner.WithinTransaction(ctx, func(txCtx context.Context) error {
+		return stager.Stage(txCtx, foreignScope)
+	}))
+	require.NoError(t, db.Table("rm_outbox").Count(&n).Error)
+	require.EqualValues(t, 1, n)
+	require.NoError(t, db.Table("qs_rm_evaluation_request_ref").Count(&n).Error)
+	require.EqualValues(t, 1, n)
 	require.NoError(t, store.Confirm(ctx, claims[0]))
 	found, err = service.FindByAnswerSheetID(ctx, command.AnswerSheetID)
 	require.NoError(t, err)
