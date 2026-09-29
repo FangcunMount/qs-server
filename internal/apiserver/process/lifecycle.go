@@ -63,8 +63,6 @@ func buildLifecycleDeps(resources resourceOutput, containerOutput containerOutpu
 	}
 	if resources.messaging.closePublisher != nil {
 		deps.resource.closePublisher = resources.messaging.closePublisher
-	} else if resources.messaging.mqPublisher != nil {
-		deps.resource.closePublisher = resources.messaging.mqPublisher.Close
 	}
 	if containerOutput.container != nil {
 		deps.container.containerCleanup = containerOutput.container.Cleanup

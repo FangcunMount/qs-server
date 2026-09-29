@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/FangcunMount/component-base/pkg/logger"
-	"github.com/FangcunMount/component-base/pkg/messaging"
 	bootstrap "github.com/FangcunMount/qs-server/internal/apiserver/bootstrap"
 	"github.com/FangcunMount/qs-server/internal/apiserver/cache/subsystem"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container"
@@ -69,7 +68,6 @@ type mqPublisherStageDeps struct {
 	fallbackMode     eventruntime.PublishMode
 	enabled          bool
 	provider         string
-	newPublisher     func() (messaging.Publisher, error)
 	newWirePublisher func() (wirePublisherResource, error)
 }
 
@@ -268,25 +266,19 @@ func prepareResources(deps resourceStageDeps) (resourceOutput, error) {
 		}
 	}
 	actionAuditStore, actionAuditRunner := buildActionAuditRuntime(mysqlDB, redisRuntime)
-	var mqPublisher messaging.Publisher
 	var wirePublisher wirePublisherResource
 	var closePublisher func() error
-	var publishMode eventruntime.PublishMode
-	if deps.mqPublisher.enabled && deps.mqPublisher.provider == "nsq" && deps.mqPublisher.newWirePublisher != nil {
+	publishMode := deps.mqPublisher.fallbackMode
+	if deps.mqPublisher.enabled {
+		if deps.mqPublisher.provider != "nsq" || deps.mqPublisher.newWirePublisher == nil {
+			return resourceOutput{}, fmt.Errorf("NSQ wire publisher factory is required when messaging is enabled")
+		}
 		wirePublisher, err = createNSQWirePublisher(deps.mqPublisher)
 		if err != nil {
 			return resourceOutput{}, err
 		}
 		closePublisher = wirePublisher.Close
 		publishMode = eventruntime.PublishModeMQ
-	} else {
-		mqPublisher, publishMode, err = createMQPublisher(deps.mqPublisher)
-		if err != nil {
-			return resourceOutput{}, err
-		}
-		if mqPublisher != nil {
-			closePublisher = mqPublisher.Close
-		}
 	}
 	prepared := false
 	defer func() {
@@ -304,7 +296,7 @@ func prepareResources(deps resourceStageDeps) (resourceOutput, error) {
 		}
 	}
 	deps.eventSubsystem.wirePublisher = wirePublisher
-	events, err := buildResourceEventSubsystem(mysqlDB, mongoDB, cacheSubsystem, eventCatalog, mqPublisher, publishMode, resilience, deps.eventSubsystem)
+	events, err := buildResourceEventSubsystem(mysqlDB, mongoDB, cacheSubsystem, eventCatalog, publishMode, resilience, deps.eventSubsystem)
 	if err != nil {
 		return resourceOutput{}, err
 	}
@@ -317,7 +309,6 @@ func prepareResources(deps resourceStageDeps) (resourceOutput, error) {
 			redisCache: redisCache,
 		},
 		messaging: messagingOutput{
-			mqPublisher:    mqPublisher,
 			wirePublisher:  wirePublisher,
 			closePublisher: closePublisher,
 			publishMode:    publishMode,
@@ -346,7 +337,6 @@ func buildResourceEventSubsystem(
 	mongoDB *mongo.Database,
 	cacheSubsystem *cachebootstrap.Subsystem,
 	catalog *eventcatalog.Catalog,
-	mqPublisher messaging.Publisher,
 	publishMode eventruntime.PublishMode,
 	resilience *resiliencesubsystem.Subsystem,
 	deps eventSubsystemResourceDeps,
@@ -379,15 +369,9 @@ func buildResourceEventSubsystem(
 			return nil, err
 		}
 	}
-	wirePublisher := deps.wirePublisher
-	if wirePublisher == nil {
-		if candidate, ok := mqPublisher.(eventruntime.WirePublisher); ok {
-			wirePublisher = candidate
-		}
-	}
 	return deps.newSubsystem(eventsubsystem.Options{
 		MySQLDB: mysqlDB, MongoDB: mongoDB, OpsRedis: opsRedis,
-		Catalog: catalog, MQPublisher: mqPublisher, WirePublisher: wirePublisher, PublisherMode: publishMode,
+		Catalog: catalog, WirePublisher: deps.wirePublisher, PublisherMode: publishMode,
 		MySQLLimiter: mysqlLimiter, MongoLimiter: mongoLimiter,
 		Mongo: deps.mongo, Assessment: deps.assessment,
 		SubscriberFactory: subscriberFactory, SDKSubscriberFactory: sdkSubscriberFactory, Consumers: deps.consumers,
@@ -432,34 +416,6 @@ func initializeRedisRuntime(deps redisRuntimeStageDeps) (redis.UniversalClient, 
 		return redisCache, redisRuntime, nil
 	}
 	return redisCache, redisRuntime, deps.buildSubsystem(redisRuntime)
-}
-
-func createMQPublisher(deps mqPublisherStageDeps) (messaging.Publisher, eventruntime.PublishMode, error) {
-	if !deps.enabled {
-		return nil, deps.fallbackMode, nil
-	}
-	if deps.newPublisher == nil {
-		return nil, "", fmt.Errorf("MQ publisher factory is required when messaging is enabled")
-	}
-
-	publisher, err := deps.newPublisher()
-	if err != nil {
-		return nil, "", fmt.Errorf("create MQ publisher: %w", err)
-	}
-	if publisher == nil {
-		return nil, "", fmt.Errorf("MQ publisher factory returned nil")
-	}
-	if deps.provider == "nsq" {
-		if _, ok := publisher.(eventruntime.WirePublisher); !ok {
-			_ = publisher.Close()
-			return nil, "", fmt.Errorf("NSQ publisher must support complete wire publishing")
-		}
-	}
-	logger.L(context.Background()).Infow("MQ publisher created successfully",
-		"component", "apiserver",
-		"provider", deps.provider,
-	)
-	return publisher, eventruntime.PublishModeMQ, nil
 }
 
 func createNSQWirePublisher(deps mqPublisherStageDeps) (wirePublisherResource, error) {

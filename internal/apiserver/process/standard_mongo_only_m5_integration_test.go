@@ -113,8 +113,9 @@ func TestM5MongoOnlyProcessKeepsLegacyMySQLAndHotRankSubscription(t *testing.T) 
 	deps := (&server{config: cfg}).buildEventSubsystemResourceDeps()
 	deps.mongo = eventsubsystem.ProfileOptions{Interval: 100 * time.Millisecond, PublishWorkers: 2}
 	deps.assessment = eventsubsystem.ProfileOptions{Interval: 100 * time.Millisecond, BatchSize: 20, PublishWorkers: 2}
+	deps.wirePublisher = &fakePublisher{}
 	subsystem, err := buildResourceEventSubsystem(gormDB, mongoDB, nil, eventcatalog.NewCatalog(wire),
-		&fakePublisher{}, eventruntime.PublishModeMQ, nil, deps)
+		eventruntime.PublishModeMQ, nil, deps)
 	if err != nil {
 		t.Fatal(err)
 	}

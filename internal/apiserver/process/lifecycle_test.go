@@ -131,7 +131,7 @@ func TestBuildProcessLifecycleDepsUsesStageOutputs(t *testing.T) {
 	deps := buildLifecycleDeps(
 		resourceOutput{
 			handles:   resourceHandles{dbManager: &bootstrap.DatabaseManager{}},
-			messaging: messagingOutput{mqPublisher: &fakePublisher{}},
+			messaging: messagingOutput{closePublisher: (&fakeWirePublisher{}).Close},
 		},
 		containerOutput{},
 		integrationOutput{

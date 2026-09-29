@@ -1,7 +1,6 @@
 package process
 
 import (
-	"github.com/FangcunMount/component-base/pkg/messaging"
 	"github.com/FangcunMount/component-base/pkg/processruntime"
 	"github.com/FangcunMount/component-base/pkg/shutdown"
 	"github.com/FangcunMount/component-base/pkg/shutdown/shutdownmanagers/posixsignal"
@@ -41,7 +40,6 @@ type resourceHandles struct {
 }
 
 type messagingOutput struct {
-	mqPublisher    messaging.Publisher
 	wirePublisher  eventruntime.WirePublisher
 	closePublisher func() error
 	publishMode    eventruntime.PublishMode

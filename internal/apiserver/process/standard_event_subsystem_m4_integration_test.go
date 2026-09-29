@@ -176,7 +176,8 @@ func TestM4ProcessBootstrapRunsSelectedStandardProfiles(t *testing.T) {
 	deps.mongo = eventsubsystem.ProfileOptions{Interval: 200 * time.Millisecond, PublishWorkers: 2}
 	deps.assessment = eventsubsystem.ProfileOptions{Interval: 200 * time.Millisecond, PublishWorkers: 2}
 	deps.consumers = map[string]eventsubsystem.ConsumerOptions{"modelcatalog.hot_rank_projection": {Enabled: false}}
-	subsystem, err := buildResourceEventSubsystem(gormDB, mongoDB, nil, catalog, &fakePublisher{}, eventruntime.PublishModeMQ, nil, deps)
+	deps.wirePublisher = &fakePublisher{}
+	subsystem, err := buildResourceEventSubsystem(gormDB, mongoDB, nil, catalog, eventruntime.PublishModeMQ, nil, deps)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1001,7 +1002,7 @@ func TestM4ProcessBootstrapRunsSelectedStandardProfiles(t *testing.T) {
 	if _, err := db.ExecContext(ctx, "DROP TABLE system_governance_action_runs"); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := buildResourceEventSubsystem(gormDB, mongoDB, nil, catalog, &fakePublisher{}, eventruntime.PublishModeMQ, nil, deps); err == nil || !strings.Contains(err.Error(), "M4 governance audit schema is incomplete") {
+	if _, err := buildResourceEventSubsystem(gormDB, mongoDB, nil, catalog, eventruntime.PublishModeMQ, nil, deps); err == nil || !strings.Contains(err.Error(), "M4 governance audit schema is incomplete") {
 		t.Fatalf("missing governance audit did not fail before candidate startup: %v", err)
 	}
 	if _, err := db.ExecContext(ctx, string(auditDDL)); err != nil {
@@ -1010,7 +1011,7 @@ func TestM4ProcessBootstrapRunsSelectedStandardProfiles(t *testing.T) {
 	if _, err := db.ExecContext(ctx, "DROP TABLE rm_outbox"); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := buildResourceEventSubsystem(gormDB, mongoDB, nil, catalog, &fakePublisher{}, eventruntime.PublishModeMQ, nil, deps); err == nil || !strings.Contains(err.Error(), "M4 MySQL standard schema is incomplete") {
+	if _, err := buildResourceEventSubsystem(gormDB, mongoDB, nil, catalog, eventruntime.PublishModeMQ, nil, deps); err == nil || !strings.Contains(err.Error(), "M4 MySQL standard schema is incomplete") {
 		t.Fatalf("missing standard table did not fail before candidate startup: %v", err)
 	}
 }
