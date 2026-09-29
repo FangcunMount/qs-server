@@ -42,6 +42,13 @@ func TestStandardAssessmentOriginalTransaction(t *testing.T) {
 	_, err = sqlDB.ExecContext(ctx, sdkmysql.Schema)
 	require.NoError(t, err)
 	require.NoError(t, createEvaluationRequestRefTable(ctx, sqlDB))
+	_, err = sqlDB.ExecContext(ctx, `CREATE TABLE runtime_checkpoint (
+		id BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
+		assessment_id BIGINT UNSIGNED NOT NULL,
+		scope VARCHAR(64) NOT NULL,
+		deleted_at DATETIME(3) NULL,
+		KEY idx_runtime_checkpoint_assessment_id (assessment_id)) ENGINE=InnoDB`)
+	require.NoError(t, err)
 	config, err := eventcatalog.Parse([]byte(`version: "1"
 topics:
   evaluation:
@@ -156,4 +163,15 @@ events:
 	found, err = service.FindByAnswerSheetID(ctx, command.AnswerSheetID)
 	require.NoError(t, err)
 	require.Equal(t, "submitted", found.Status)
+	inspection, err := mysqlstandard.InspectOriginalRequest(ctx, sqlDB, int64(command.OrgID), created.ID, time.Now().Add(time.Hour))
+	require.NoError(t, err)
+	require.Equal(t, "candidate_never_claimed", inspection.State)
+	require.Equal(t, refEventID, inspection.EventID)
+	_, err = sqlDB.ExecContext(ctx, `INSERT INTO runtime_checkpoint (assessment_id,scope,deleted_at)
+		VALUES (?,'evaluation_run',UTC_TIMESTAMP(3))`, created.ID)
+	require.NoError(t, err)
+	inspection, err = mysqlstandard.InspectOriginalRequest(ctx, sqlDB, int64(command.OrgID), created.ID, time.Now().Add(time.Hour))
+	require.NoError(t, err)
+	require.Equal(t, "manual_required", inspection.State)
+	require.Equal(t, "ever_claimed", inspection.Reason)
 }
