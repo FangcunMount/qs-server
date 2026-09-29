@@ -36,9 +36,23 @@ jobs:
 
   serverd:
     name: Online IAM and QS channels (ServerD)
-    runs-on: ${{ vars.QS_DEPLOY_RUNNER || 'serverd' }}
+    # The serverD runner's GitHub checkout can fail before the NSQ read runs.
+    # Use the existing Mac mini -> serverD deploy SSH path for this read-only check.
+    runs-on:
+      group: qlume
+      labels: [self-hosted, macOS, ARM64, ops]
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v6
       - name: Read-only ephemeral NSQ postcheck
-        run: bash scripts/cd/m5-authz-ephemeral-postcheck.sh serverD
+        uses: appleboy/ssh-action@v1.2.2
+        env:
+          POSTCHECK_HOST: serverD
+        with:
+          host: ${{ vars.SVRD_HOST }}
+          username: ${{ vars.SVRD_USERNAME || vars.SVRA_USERNAME }}
+          key: ${{ secrets.SVR_MINI_SSH_KEY || secrets.SVRD_SSH_KEY || secrets.SVRA_SSH_KEY }}
+          port: ${{ vars.SVRD_SSH_PORT || 22 }}
+          fingerprint: ${{ vars.SVRD_SSH_FINGERPRINT }}
+          envs: POSTCHECK_HOST
+          script_path: scripts/cd/m5-authz-ephemeral-postcheck.sh
