@@ -28,6 +28,9 @@ type stubSystemGovernanceFacade struct {
 	reminderReviewFn  func(int64, string, int) (*systemgov.ReminderReviewPage, error)
 	deliveryResolveFn func(int64, uint64, systemgov.DeliveryResolutionRequest) (*systemgov.ActionRunResult, error)
 	deliveryReceiptFn func(int64, string) (*systemgov.ActionRunResult, error)
+	gapAuthorizeFn    func(int64, uint64, systemgov.GapRecoveryRequest) (*systemgov.GapRecoveryDecision, error)
+	gapResolveFn      func(int64, uint64, systemgov.GapRecoveryRequest) (*systemgov.GapRecoveryDecision, bool, error)
+	gapSummaryFn      func(int64) (systemgov.GapRecoverySummary, error)
 }
 
 func (s stubSystemGovernanceFacade) GetOverview(context.Context, string) (*systemgov.OverviewResponse, error) {
@@ -84,6 +87,103 @@ func (s stubSystemGovernanceFacade) GetDeliveryResolution(_ context.Context, org
 		return s.deliveryReceiptFn(orgID, requestID)
 	}
 	return nil, nil
+}
+
+func (s stubSystemGovernanceFacade) AuthorizeGapRecovery(_ context.Context, orgID int64, actorID uint64, req systemgov.GapRecoveryRequest) (*systemgov.GapRecoveryDecision, error) {
+	if s.gapAuthorizeFn != nil {
+		return s.gapAuthorizeFn(orgID, actorID, req)
+	}
+	return nil, nil
+}
+
+func (s stubSystemGovernanceFacade) ResolveGapRecovery(_ context.Context, orgID int64, actorID uint64, req systemgov.GapRecoveryRequest) (*systemgov.GapRecoveryDecision, bool, error) {
+	if s.gapResolveFn != nil {
+		return s.gapResolveFn(orgID, actorID, req)
+	}
+	return nil, false, nil
+}
+
+func (s stubSystemGovernanceFacade) GetGapRecoverySummary(_ context.Context, orgID int64) (systemgov.GapRecoverySummary, error) {
+	if s.gapSummaryFn != nil {
+		return s.gapSummaryFn(orgID)
+	}
+	return systemgov.GapRecoverySummary{}, nil
+}
+
+func TestSystemGovernanceGapRecoveryUsesProtectedScopeAndOriginalInput(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	const body = `{"request_id":"recovery-1","assessment_id":42,"event_id":"original-event","expected_version":3,"reason":"reviewed transport gap","submitted_before":"2026-09-28T20:00:00+08:00","confirm":true,"org_id":999,"actor_id":999}`
+	authorizeCalls, resolveCalls, summaryCalls := 0, 0, 0
+	router := newRouterWithBudgets(Deps{SystemGovernanceFacade: stubSystemGovernanceFacade{
+		gapAuthorizeFn: func(orgID int64, actorID uint64, req systemgov.GapRecoveryRequest) (*systemgov.GapRecoveryDecision, error) {
+			authorizeCalls++
+			if orgID != 88 || actorID != 701 || req.RequestID != "recovery-1" || req.AssessmentID != 42 || req.EventID != "original-event" || !req.Confirm {
+				t.Fatalf("gap recovery scope/input = %d/%d/%+v", orgID, actorID, req)
+			}
+			return &systemgov.GapRecoveryDecision{Authorized: true, Code: "authorized", OutboxVersionAfter: 4}, nil
+		},
+		gapResolveFn: func(orgID int64, actorID uint64, req systemgov.GapRecoveryRequest) (*systemgov.GapRecoveryDecision, bool, error) {
+			resolveCalls++
+			if orgID != 88 || actorID != 701 || req.RequestID != "recovery-1" || req.EventID != "original-event" {
+				t.Fatalf("gap recovery resolution scope/input = %d/%d/%+v", orgID, actorID, req)
+			}
+			return &systemgov.GapRecoveryDecision{Authorized: true, Code: "authorized", OutboxVersionAfter: 4}, true, nil
+		},
+		gapSummaryFn: func(orgID int64) (systemgov.GapRecoverySummary, error) {
+			summaryCalls++
+			if orgID != 88 {
+				t.Fatalf("gap recovery summary leaked org=%d", orgID)
+			}
+			return systemgov.GapRecoverySummary{Authorized: 1, Denied: 2, WaitingRelay: 1}, nil
+		},
+	}})
+	engine := gin.New()
+	engine.Use(orgAdminSnapshotMiddleware())
+	engine.Use(func(c *gin.Context) {
+		c.Set(restmiddleware.OrgIDKey, uint64(88))
+		c.Set(restmiddleware.UserIDKey, uint64(701))
+		c.Next()
+	})
+	router.registerSystemGovernanceInternalRoutes(engine.Group("/internal/v1"))
+	for _, path := range []string{
+		"/internal/v1/system-governance/actions/gap-recoveries",
+		"/internal/v1/system-governance/actions/gap-recoveries/resolve",
+	} {
+		request := httptest.NewRequest(http.MethodPost, path, strings.NewReader(body))
+		request.Header.Set("Content-Type", "application/json")
+		response := httptest.NewRecorder()
+		engine.ServeHTTP(response, request)
+		if response.Code != http.StatusOK {
+			t.Fatalf("gap recovery route %s = %d: %s", path, response.Code, response.Body.String())
+		}
+	}
+	summaryResponse := httptest.NewRecorder()
+	engine.ServeHTTP(summaryResponse, httptest.NewRequest(http.MethodGet, "/internal/v1/system-governance/actions/gap-recoveries/summary", nil))
+	if summaryResponse.Code != http.StatusOK || !strings.Contains(summaryResponse.Body.String(), `"waiting_relay":1`) {
+		t.Fatalf("gap recovery summary = %d: %s", summaryResponse.Code, summaryResponse.Body.String())
+	}
+	if authorizeCalls != 1 || resolveCalls != 1 || summaryCalls != 1 {
+		t.Fatalf("authorize/resolve/summary calls = %d/%d/%d", authorizeCalls, resolveCalls, summaryCalls)
+	}
+	denied := gin.New()
+	denied.Use(func(c *gin.Context) {
+		c.Set(restmiddleware.OrgIDKey, uint64(88))
+		c.Set(restmiddleware.UserIDKey, uint64(701))
+		c.Next()
+	})
+	router.registerSystemGovernanceInternalRoutes(denied.Group("/internal/v1"))
+	request := httptest.NewRequest(http.MethodPost, "/internal/v1/system-governance/actions/gap-recoveries", strings.NewReader(body))
+	request.Header.Set("Content-Type", "application/json")
+	response := httptest.NewRecorder()
+	denied.ServeHTTP(response, request)
+	if response.Code == http.StatusOK || authorizeCalls != 1 {
+		t.Fatalf("missing org-admin grant ran recovery: %d/%d", response.Code, authorizeCalls)
+	}
+	deniedSummary := httptest.NewRecorder()
+	denied.ServeHTTP(deniedSummary, httptest.NewRequest(http.MethodGet, "/internal/v1/system-governance/actions/gap-recoveries/summary", nil))
+	if deniedSummary.Code == http.StatusOK || summaryCalls != 1 {
+		t.Fatalf("missing org-admin grant read recovery summary: %d/%d", deniedSummary.Code, summaryCalls)
+	}
 }
 
 func TestSystemGovernanceDeliveryResolutionUsesProtectedScopeAndDedicatedRoute(t *testing.T) {

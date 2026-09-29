@@ -91,6 +91,7 @@ type runtimeClosureEventFactory func(*testing.T, eventsubsystem.Options, *sql.DB
 
 type runtimeClosureScenario struct {
 	beforeEvaluation      func(*testing.T, uint64, *gorm.DB, *eventsubsystem.Subsystem)
+	expectEvaluationRetry bool
 	afterReport           func(*testing.T, runtimeClosureDelivery, grpctransport.Deps, uint64, uint64)
 	skipReportWaitClosure bool
 }
@@ -377,7 +378,7 @@ func runCurrentRuntimeClosure(t *testing.T, eventFactory runtimeClosureEventFact
 	if err != nil {
 		t.Fatalf("consume evaluation.requested: %v", err)
 	}
-	if scenario.beforeEvaluation != nil {
+	if scenario.expectEvaluationRetry {
 		if _, err := delivery.Wait(t, eventcatalog.EvaluationFailed); err != nil {
 			t.Fatalf("consume first evaluation.failed: %v", err)
 		}
@@ -392,7 +393,7 @@ func runCurrentRuntimeClosure(t *testing.T, eventFactory runtimeClosureEventFact
 		t.Fatalf("resolve evaluated assessment before redelivery: response=%+v err=%v", evaluated, err)
 	}
 	wantRuns := int64(1)
-	if scenario.beforeEvaluation != nil {
+	if scenario.expectEvaluationRetry {
 		wantRuns = 2
 	}
 	assertRowCount(t, gormDB, "runtime_checkpoint", "scope = ? AND assessment_id = ?", wantRuns, "evaluation_run", evaluated.GetAssessmentId())

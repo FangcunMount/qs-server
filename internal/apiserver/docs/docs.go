@@ -8763,6 +8763,165 @@ const docTemplate = `{
                 }
             }
         },
+        "/internal/v1/system-governance/actions/gap-recoveries": {
+            "post": {
+                "description": "仅在显式启用时可用；同请求编号与完整输入可安全重试，结果未知先查询原请求。仅 qs:admin 可访问。",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "System-Governance"
+                ],
+                "summary": "系统治理-授权恢复未接单的原测评消息",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "description": "原事件身份、预期版本、宽限截点、理由及确认",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/systemgovernance.GapRecoveryRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/systemgovernance.GapRecoveryDecision"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/internal/v1/system-governance/actions/gap-recoveries/resolve": {
+            "post": {
+                "description": "只读核对同机构、同操作者、同请求编号与输入的持久决定；仅 qs:admin 可访问。",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "System-Governance"
+                ],
+                "summary": "系统治理-核对原测评消息恢复决定",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "description": "原操作的完整输入",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/systemgovernance.GapRecoveryRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/systemgovernance.GapRecoveryDecision"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/internal/v1/system-governance/actions/gap-recoveries/summary": {
+            "get": {
+                "description": "按当前机构读取持久批准／拒绝总数和仍待 Relay 的原消息数；仅 qs:admin 可访问。",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "System-Governance"
+                ],
+                "summary": "系统治理-原测评消息恢复审核汇总",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/systemgovernance.GapRecoverySummary"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
         "/internal/v1/system-governance/actions/pending-reconciliations": {
             "get": {
                 "description": "按当前组织列出结果未知的人工重放审批；仅 qs:admin 可访问。核对时须由原操作者沿用原请求编号与输入。",
@@ -22997,6 +23156,63 @@ const docTemplate = `{
                     "$ref": "#/definitions/systemgovernance.Severity"
                 },
                 "signal_count": {
+                    "type": "integer"
+                }
+            }
+        },
+        "systemgovernance.GapRecoveryDecision": {
+            "type": "object",
+            "properties": {
+                "authorized": {
+                    "type": "boolean"
+                },
+                "code": {
+                    "type": "string"
+                },
+                "outbox_version_after": {
+                    "type": "integer"
+                },
+                "outbox_version_before": {
+                    "type": "integer"
+                }
+            }
+        },
+        "systemgovernance.GapRecoveryRequest": {
+            "type": "object",
+            "properties": {
+                "assessment_id": {
+                    "type": "integer"
+                },
+                "confirm": {
+                    "type": "boolean"
+                },
+                "event_id": {
+                    "type": "string"
+                },
+                "expected_version": {
+                    "type": "integer"
+                },
+                "reason": {
+                    "type": "string"
+                },
+                "request_id": {
+                    "type": "string"
+                },
+                "submitted_before": {
+                    "type": "string"
+                }
+            }
+        },
+        "systemgovernance.GapRecoverySummary": {
+            "type": "object",
+            "properties": {
+                "authorized": {
+                    "type": "integer"
+                },
+                "denied": {
+                    "type": "integer"
+                },
+                "waiting_relay": {
                     "type": "integer"
                 }
             }

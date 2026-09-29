@@ -94,6 +94,7 @@ exit_code=$(docker inspect -f '{{.State.ExitCode}}' "$nsq_name")
 printf 'broker_forced_exit=%s\n' "$exit_code"
 [[ $exit_code == 137 ]]
 docker start "$nsq_name" >/dev/null
+export RM_QS04_NSQ_TCP="$(docker port "$nsq_name" 4150/tcp)"
 nsq_http="http://$(docker port "$nsq_name" 4151/tcp)"
 for attempt in {1..30}; do
   if [[ $(curl -fsS --connect-timeout 1 --max-time 2 "${nsq_http}/ping" 2>/dev/null) == OK ]]; then break; fi
@@ -130,4 +131,11 @@ final_state=$(docker exec -e MYSQL_PWD "$mysql_name" mysql -uroot -N -B -D m6_qs
   -e "SELECT a.status, (SELECT COUNT(*) FROM runtime_checkpoint rc WHERE rc.scope='evaluation_run' AND rc.assessment_id=a.id), (SELECT COUNT(*) FROM rm_outbox o WHERE o.event_type='evaluation.requested' AND o.state='published' AND o.attempt_count=1) FROM assessment a WHERE a.id=${assessment_id}")
 printf 'business_outbox_run_state=%s\n' "$final_state"
 [[ "$final_state" == $'submitted\t0\t1' ]]
-printf 'result=isolated_postconfirm_never_claimed_detected resources=removed_on_exit\n'
+go test -tags 'integration reliable_messaging reliable_messaging_m4 reliable_messaging_m4_integration' \
+  ./internal/apiserver/container/internal/transaction -run '^TestQS04PostConfirmRecoverAndClaim$' -count=1 -v
+capture after_recovery
+recovered_state=$(docker exec -e MYSQL_PWD "$mysql_name" mysql -uroot -N -B -D m6_qs04_postconfirm \
+  -e "SELECT a.status, (SELECT COUNT(*) FROM runtime_checkpoint rc WHERE rc.scope='evaluation_run' AND rc.assessment_id=a.id), (SELECT COUNT(*) FROM rm_outbox o WHERE o.event_type='evaluation.requested' AND o.state='published' AND o.attempt_count=2) FROM assessment a WHERE a.id=${assessment_id}")
+printf 'recovered_business_outbox_run_state=%s\n' "$recovered_state"
+[[ "$recovered_state" == $'submitted\t1\t1' ]]
+printf 'result=isolated_postconfirm_original_redelivered_once_claimed resources=removed_on_exit\n'
