@@ -24,7 +24,7 @@ func TestInspectOriginalRequestNeverClaimedWithVerifiedWire(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 	mock.ExpectBegin()
 	mockOriginalAssessment(mock, false)
 	mock.ExpectQuery("FROM qs_rm_evaluation_request_ref").WithArgs(originalAssessmentID).
@@ -49,7 +49,7 @@ func TestInspectOriginalRequestSoftDeletedRunBlocksRecovery(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 	mock.ExpectBegin()
 	// The SQL EXISTS deliberately has no deleted_at predicate. Even a deleted
 	// historical Run makes this a previously claimed request.
@@ -72,7 +72,7 @@ func TestInspectOriginalRequestAmbiguousReferenceBlocksRecovery(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 	mock.ExpectBegin()
 	mockOriginalAssessment(mock, false)
 	mock.ExpectQuery("FROM qs_rm_evaluation_request_ref").WithArgs(originalAssessmentID).
