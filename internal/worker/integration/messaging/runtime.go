@@ -13,6 +13,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/eventing/runtime"
 	"github.com/FangcunMount/qs-server/internal/pkg/messagingruntime"
 	"github.com/FangcunMount/qs-server/internal/worker/config"
+	rmtransport "github.com/FangcunMount/reliable-messaging/transport"
 )
 
 type TopicSubscriptionSource interface {
@@ -61,7 +62,7 @@ type SubscribeHandlersOptions struct {
 	Runtime         SubscriptionRuntime
 	Subscriber      basemessaging.Subscriber
 	Observer        eventobservability.Observer
-	HoldRecorder    RetryEventHoldRecorder
+	HoldRecorder    DeliveryRetryEventHoldRecorder
 	UnknownRecorder func(context.Context, *basemessaging.Message, string) error
 }
 
@@ -108,11 +109,11 @@ func createDispatchHandlerWithObserver(logger *slog.Logger, dispatcher EventDisp
 	return createDispatchHandlerWithObserverAndHold(logger, dispatcher, topicName, serviceName, observer, nil)
 }
 
-func createDispatchHandlerWithObserverAndHold(logger *slog.Logger, dispatcher EventDispatcher, topicName, serviceName string, observer eventobservability.Observer, holdRecorder RetryEventHoldRecorder) basemessaging.Handler {
+func createDispatchHandlerWithObserverAndHold(logger *slog.Logger, dispatcher EventDispatcher, topicName, serviceName string, observer eventobservability.Observer, holdRecorder DeliveryRetryEventHoldRecorder) basemessaging.Handler {
 	return createDispatchHandlerWithObserverAndHoldAndUnknown(logger, dispatcher, topicName, serviceName, observer, holdRecorder, nil)
 }
 
-func createDispatchHandlerWithObserverAndHoldAndUnknown(logger *slog.Logger, dispatcher EventDispatcher, topicName, serviceName string, observer eventobservability.Observer, holdRecorder RetryEventHoldRecorder, unknownRecorder func(context.Context, *basemessaging.Message, string) error) basemessaging.Handler {
+func createDispatchHandlerWithObserverAndHoldAndUnknown(logger *slog.Logger, dispatcher EventDispatcher, topicName, serviceName string, observer eventobservability.Observer, holdRecorder DeliveryRetryEventHoldRecorder, unknownRecorder func(context.Context, *basemessaging.Message, string) error) basemessaging.Handler {
 	extractor := eventruntime.MessageEventExtractor{}
 	if logger == nil {
 		logger = slog.Default()
@@ -140,7 +141,10 @@ func createDispatchHandlerWithObserverAndHoldAndUnknown(logger *slog.Logger, dis
 					settlement.ReportHoldFailed(msg, eventType, holdErr)
 					return errors.Join(err, holdErr)
 				}
-				if holdErr := holdRecorder.Hold(ctx, msg, eventType, err); holdErr != nil {
+				if holdErr := holdRecorder.HoldDelivery(ctx, rmtransport.Received{
+					ID: msg.UUID, Topic: msg.Topic, Channel: msg.Channel,
+					Payload: msg.Payload, Attempts: msg.Attempts,
+				}, eventType, err); holdErr != nil {
 					settlement.ReportHoldFailed(msg, eventType, holdErr)
 					return errors.Join(err, holdErr)
 				}

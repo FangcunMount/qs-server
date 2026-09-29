@@ -12,7 +12,6 @@ import (
 	drivermysql "github.com/go-sql-driver/mysql"
 	"github.com/google/uuid"
 
-	basemessaging "github.com/FangcunMount/component-base/pkg/messaging"
 	eventobservability "github.com/FangcunMount/qs-server/internal/pkg/eventing/observe"
 	genericoptions "github.com/FangcunMount/qs-server/internal/pkg/options"
 	"github.com/FangcunMount/qs-server/internal/pkg/retrygovernance"
@@ -20,10 +19,6 @@ import (
 	domainwire "github.com/FangcunMount/reliable-messaging/wire/domain"
 	"github.com/FangcunMount/reliable-messaging/wire/legacy"
 )
-
-type RetryEventHoldRecorder interface {
-	Hold(context.Context, *basemessaging.Message, string, error) error
-}
 
 type DeliveryRetryEventHoldRecorder interface {
 	HoldDelivery(context.Context, rmtransport.Received, string, error) error
@@ -88,18 +83,8 @@ func NewMySQLRetryEventHoldStore(options *genericoptions.MySQLOptions, provider 
 	return &mysqlRetryEventHoldStore{db: db, provider: provider, policy: policy}, nil
 }
 
-func (s *mysqlRetryEventHoldStore) Hold(ctx context.Context, message *basemessaging.Message, eventType string, cause error) error {
-	if message == nil {
-		return fmt.Errorf("invalid retry event hold")
-	}
-	return s.HoldDelivery(ctx, rmtransport.Received{
-		ID: message.UUID, Topic: message.Topic, Channel: message.Channel,
-		Payload: message.Payload, Attempts: message.Attempts,
-	}, eventType, cause)
-}
-
-// HoldDelivery writes the SDK delivery using the same table, identity and
-// retry policy as the older Message path; success permits an explicit Ack.
+// HoldDelivery writes the SDK delivery using the existing table, identity and
+// retry policy; success permits an explicit Ack.
 func (s *mysqlRetryEventHoldStore) HoldDelivery(ctx context.Context, message rmtransport.Received, eventType string, cause error) error {
 	if s == nil || s.db == nil || message.ID == "" || message.Topic == "" || message.Channel == "" {
 		return fmt.Errorf("invalid retry event hold")

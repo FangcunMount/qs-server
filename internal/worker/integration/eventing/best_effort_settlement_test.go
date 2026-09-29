@@ -7,13 +7,13 @@ import (
 	"testing"
 	"time"
 
-	basemessaging "github.com/FangcunMount/component-base/pkg/messaging"
 	pb "github.com/FangcunMount/qs-server/api/grpc/gen/internalapi"
 	eventcatalog "github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
 	eventobservability "github.com/FangcunMount/qs-server/internal/pkg/eventing/observe"
 	"github.com/FangcunMount/qs-server/internal/worker/handlers"
 	workermessaging "github.com/FangcunMount/qs-server/internal/worker/integration/messaging"
 	"github.com/FangcunMount/qs-server/internal/worker/port"
+	rmtransport "github.com/FangcunMount/reliable-messaging/transport"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
@@ -100,26 +100,33 @@ func (n *failingTaskNotifier) NotifyTaskCanceled(context.Context, port.Notificat
 }
 
 type capturedBestEffortSubscriber struct {
-	handlers map[string]basemessaging.Handler
+	handlers map[string]rmtransport.Handler
 }
 
-func (s *capturedBestEffortSubscriber) Subscribe(topic, _ string, handler basemessaging.Handler) error {
+func (s *capturedBestEffortSubscriber) Subscribe(topic, _ string, handler rmtransport.Handler) error {
 	if s.handlers == nil {
-		s.handlers = make(map[string]basemessaging.Handler)
+		s.handlers = make(map[string]rmtransport.Handler)
 	}
 	s.handlers[topic] = handler
 	return nil
 }
 
-func (s *capturedBestEffortSubscriber) SubscribeWithMiddleware(topic, channel string, handler basemessaging.Handler, middlewares ...basemessaging.Middleware) error {
-	for i := len(middlewares) - 1; i >= 0; i-- {
-		handler = middlewares[i](handler)
-	}
-	return s.Subscribe(topic, channel, handler)
+type bestEffortDelivery struct {
+	message rmtransport.Received
+	acks    int
+	nacks   int
 }
 
-func (*capturedBestEffortSubscriber) Stop()        {}
-func (*capturedBestEffortSubscriber) Close() error { return nil }
+func (d *bestEffortDelivery) Message() rmtransport.Received { return d.message }
+func (d *bestEffortDelivery) Ack() error {
+	d.acks++
+	return nil
+}
+func (d *bestEffortDelivery) Nack(error) error {
+	d.nacks++
+	return nil
+}
+func (d *bestEffortDelivery) Settled() bool { return d.acks+d.nacks > 0 }
 
 type bestEffortConsumeObserver struct {
 	events []eventobservability.ConsumeEvent
@@ -145,9 +152,9 @@ func subscribeBestEffortHandlers(t *testing.T, client handlers.InternalClient, n
 		t.Fatal(err)
 	}
 	subscriber := &capturedBestEffortSubscriber{}
-	if err := workermessaging.SubscribeHandlersWithOptions(workermessaging.SubscribeHandlersOptions{
+	if err := workermessaging.SubscribeSDKHandlersWithOptions(workermessaging.SubscribeSDKHandlersOptions{
 		ServiceName: "qs-worker", Logger: logger, Runtime: dispatcher, Subscriber: subscriber, Observer: observer,
-		UnknownRecorder: func(context.Context, *basemessaging.Message, string) error { return nil },
+		UnknownRecorder: func(context.Context, rmtransport.Received, string) error { return nil },
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -188,19 +195,17 @@ func TestBestEffortExternalFailureStillAcknowledgesOriginalEvent(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			msg := basemessaging.NewMessage("broker-msg-1", payload)
-			msg.Metadata["event_type"] = tc.eventType
-			acks, nacks := 0, 0
-			msg.SetAckFunc(func() error { acks++; return nil })
-			msg.SetNackFunc(func() error { nacks++; return nil })
-			if err := consume(context.Background(), msg); err != nil {
+			delivery := &bestEffortDelivery{message: rmtransport.Received{
+				ID: "broker-msg-1", Payload: payload, Metadata: map[string]string{"event_type": tc.eventType},
+			}}
+			if err := consume(context.Background(), delivery); err != nil {
 				t.Fatalf("best-effort external failure changed transport result: %v", err)
 			}
 			if calls := client.calls + notifier.calls; calls != 1 {
 				t.Fatalf("external calls = %d, want one failed call", calls)
 			}
-			if acks != 1 || nacks != 0 || !msg.IsSettled() {
-				t.Fatalf("acks=%d nacks=%d settled=%t, want one ack and no nack", acks, nacks, msg.IsSettled())
+			if delivery.acks != 1 || delivery.nacks != 0 || !delivery.Settled() {
+				t.Fatalf("acks=%d nacks=%d settled=%t, want one ack and no nack", delivery.acks, delivery.nacks, delivery.Settled())
 			}
 			if len(observer.events) != 1 || observer.events[0].Outcome != eventobservability.ConsumeOutcomeAcked || observer.events[0].Service != "qs-worker" || observer.events[0].Topic != tc.topic {
 				t.Fatalf("consume outcomes = %#v, want one qs-worker ack", observer.events)
@@ -238,16 +243,14 @@ func TestBestEffortUnsuccessfulRPCResponseStillAcknowledgesOriginalEvent(t *test
 			if err != nil {
 				t.Fatal(err)
 			}
-			msg := basemessaging.NewMessage("broker-unsuccessful", payload)
-			msg.Metadata["event_type"] = tc.eventType
-			acks, nacks := 0, 0
-			msg.SetAckFunc(func() error { acks++; return nil })
-			msg.SetNackFunc(func() error { nacks++; return nil })
-			if err := subscriber.handlers[tc.topic](context.Background(), msg); err != nil {
+			delivery := &bestEffortDelivery{message: rmtransport.Received{
+				ID: "broker-unsuccessful", Payload: payload, Metadata: map[string]string{"event_type": tc.eventType},
+			}}
+			if err := subscriber.handlers[tc.topic](context.Background(), delivery); err != nil {
 				t.Fatal(err)
 			}
-			if client.calls != 1 || acks != 1 || nacks != 0 || !msg.IsSettled() || len(observer.events) != 1 || observer.events[0].Outcome != eventobservability.ConsumeOutcomeAcked {
-				t.Fatalf("calls=%d acks=%d nacks=%d settled=%t outcomes=%+v", client.calls, acks, nacks, msg.IsSettled(), observer.events)
+			if client.calls != 1 || delivery.acks != 1 || delivery.nacks != 0 || !delivery.Settled() || len(observer.events) != 1 || observer.events[0].Outcome != eventobservability.ConsumeOutcomeAcked {
+				t.Fatalf("calls=%d acks=%d nacks=%d settled=%t outcomes=%+v", client.calls, delivery.acks, delivery.nacks, delivery.Settled(), observer.events)
 			}
 			if tc.eventType != "task.opened" {
 				if got := bestEffortSideEffectCount(t, tc.eventType, "response_rejected") - before; got != 1 {
@@ -286,16 +289,14 @@ func TestBestEffortMissingDependencyIsVisibleWithoutRetry(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			message := basemessaging.NewMessage("broker-unconfigured", payload)
-			message.Metadata["event_type"] = tc.eventType
-			acks, nacks := 0, 0
-			message.SetAckFunc(func() error { acks++; return nil })
-			message.SetNackFunc(func() error { nacks++; return nil })
-			if err := subscriber.handlers[tc.topic](context.Background(), message); err != nil {
+			delivery := &bestEffortDelivery{message: rmtransport.Received{
+				ID: "broker-unconfigured", Payload: payload, Metadata: map[string]string{"event_type": tc.eventType},
+			}}
+			if err := subscriber.handlers[tc.topic](context.Background(), delivery); err != nil {
 				t.Fatal(err)
 			}
-			if acks != 1 || nacks != 0 || !message.IsSettled() || len(observer.events) != 1 || observer.events[0].Outcome != eventobservability.ConsumeOutcomeAcked {
-				t.Fatalf("acks=%d nacks=%d settled=%t outcomes=%+v", acks, nacks, message.IsSettled(), observer.events)
+			if delivery.acks != 1 || delivery.nacks != 0 || !delivery.Settled() || len(observer.events) != 1 || observer.events[0].Outcome != eventobservability.ConsumeOutcomeAcked {
+				t.Fatalf("acks=%d nacks=%d settled=%t outcomes=%+v", delivery.acks, delivery.nacks, delivery.Settled(), observer.events)
 			}
 			if got := bestEffortSideEffectCount(t, tc.eventType, "not_configured") - before; got != tc.wantDelta {
 				t.Fatalf("unconfigured side-effect observations = %v, want %v", got, tc.wantDelta)

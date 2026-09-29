@@ -14,6 +14,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/eventing/observe"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventing/runtime"
 	workerconfig "github.com/FangcunMount/qs-server/internal/worker/config"
+	rmtransport "github.com/FangcunMount/reliable-messaging/transport"
 )
 
 type fakeDispatcher struct {
@@ -110,7 +111,7 @@ type fakeHoldRecorder struct {
 	err   error
 }
 
-func (r *fakeHoldRecorder) Hold(context.Context, *basemessaging.Message, string, error) error {
+func (r *fakeHoldRecorder) HoldDelivery(context.Context, rmtransport.Received, string, error) error {
 	r.calls++
 	return r.err
 }
