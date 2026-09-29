@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	"github.com/FangcunMount/component-base/pkg/logger"
-	"github.com/FangcunMount/component-base/pkg/messaging"
 	"github.com/FangcunMount/qs-server/internal/pkg/event"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventing/observe"
@@ -22,7 +21,6 @@ type WirePublisher interface {
 // RoutingPublisher routes domain events to topics described by an event catalog.
 type RoutingPublisher struct {
 	topicResolver eventcatalog.TopicResolver
-	mqPublisher   messaging.Publisher
 	wirePublisher WirePublisher
 	observer      eventobservability.Observer
 	source        string
@@ -57,7 +55,6 @@ func PublishModeFromEnv(env string) PublishMode {
 type RoutingPublisherOptions struct {
 	Catalog       *eventcatalog.Catalog
 	TopicResolver eventcatalog.TopicResolver
-	MQPublisher   messaging.Publisher
 	WirePublisher WirePublisher
 	Observer      eventobservability.Observer
 	Source        string
@@ -85,7 +82,6 @@ func NewRoutingPublisher(opts RoutingPublisherOptions) *RoutingPublisher {
 	}
 	return &RoutingPublisher{
 		topicResolver: resolver,
-		mqPublisher:   opts.MQPublisher,
 		wirePublisher: opts.WirePublisher,
 		observer:      observer,
 		source:        opts.Source,
@@ -95,7 +91,7 @@ func NewRoutingPublisher(opts RoutingPublisherOptions) *RoutingPublisher {
 
 // IsMQBacked reports whether this publisher can durably dispatch events to MQ.
 func (p *RoutingPublisher) IsMQBacked() bool {
-	return p != nil && p.mode == PublishModeMQ && (p.mqPublisher != nil || p.wirePublisher != nil)
+	return p != nil && p.mode == PublishModeMQ && p.wirePublisher != nil
 }
 
 // Publish publishes one event to its configured topic.
@@ -147,7 +143,7 @@ func (p *RoutingPublisher) PublishAll(ctx context.Context, events []event.Domain
 }
 
 func (p *RoutingPublisher) publishToMQ(ctx context.Context, topicName string, evt event.DomainEvent) error {
-	if p.mqPublisher == nil && p.wirePublisher == nil {
+	if p.wirePublisher == nil {
 		logger.L(ctx).Warnw("MQ publisher is nil, falling back to logging",
 			"event_type", evt.EventType(),
 			"topic", topicName,
@@ -163,19 +159,12 @@ func (p *RoutingPublisher) publishToMQ(ctx context.Context, topicName string, ev
 		return err
 	}
 	metadata := domainwire.MetadataFromEvent(evt, p.source)
-	var publishErr error
-	if p.wirePublisher != nil {
-		wire, err := legacy.Encode(legacy.Envelope{UUID: evt.EventID(), Metadata: metadata, Payload: payload}, legacy.Revision2)
-		if err != nil {
-			p.observe(ctx, topicName, evt.EventType(), eventobservability.PublishOutcomeEncodeFailed)
-			return err
-		}
-		publishErr = p.wirePublisher.PublishWire(ctx, topicName, wire)
-	} else {
-		msg := messaging.NewMessage(evt.EventID(), payload)
-		msg.Metadata = metadata
-		publishErr = p.mqPublisher.PublishMessage(ctx, topicName, msg)
+	wire, err := legacy.Encode(legacy.Envelope{UUID: evt.EventID(), Metadata: metadata, Payload: payload}, legacy.Revision2)
+	if err != nil {
+		p.observe(ctx, topicName, evt.EventType(), eventobservability.PublishOutcomeEncodeFailed)
+		return err
 	}
+	publishErr := p.wirePublisher.PublishWire(ctx, topicName, wire)
 	if publishErr != nil {
 		p.observe(ctx, topicName, evt.EventType(), eventobservability.PublishOutcomeMQFailed)
 		logger.L(ctx).Errorw("failed to publish event to topic",

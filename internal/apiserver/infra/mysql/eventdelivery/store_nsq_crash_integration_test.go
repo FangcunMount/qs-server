@@ -14,11 +14,11 @@ import (
 	"time"
 
 	basemessaging "github.com/FangcunMount/component-base/pkg/messaging"
-	cbnsq "github.com/FangcunMount/component-base/pkg/messaging/nsq"
 	app "github.com/FangcunMount/qs-server/internal/apiserver/application/systemgovernance"
 	"github.com/FangcunMount/qs-server/internal/pkg/event"
 	eventcatalog "github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
 	eventruntime "github.com/FangcunMount/qs-server/internal/pkg/eventing/runtime"
+	"github.com/FangcunMount/qs-server/internal/pkg/messagingruntime"
 	drivermysql "github.com/go-sql-driver/mysql"
 	"github.com/nsqio/go-nsq"
 	gormmysql "gorm.io/driver/mysql"
@@ -160,7 +160,7 @@ func replayNSQAction(requestID string) app.ActionRunRequest {
 
 func newReplayNSQPublisher(t *testing.T, address, topic string) event.EventPublisher {
 	t.Helper()
-	mq, err := cbnsq.NewPublisher(address, nsq.NewConfig())
+	mq, err := messagingruntime.NewSDKNSQWirePublisher(address)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -170,7 +170,7 @@ func newReplayNSQPublisher(t *testing.T, address, topic string) event.EventPubli
 		Events: map[string]eventcatalog.EventConfig{"evaluation.retry.requested": {Topic: "replay"}},
 	})
 	return eventruntime.NewRoutingPublisher(eventruntime.RoutingPublisherOptions{
-		Catalog: catalog, MQPublisher: mq, Mode: eventruntime.PublishModeMQ,
+		Catalog: catalog, WirePublisher: mq, Mode: eventruntime.PublishModeMQ,
 	})
 }
 

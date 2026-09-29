@@ -13,7 +13,6 @@ import (
 	"time"
 
 	"github.com/FangcunMount/component-base/pkg/messaging"
-	cbnsq "github.com/FangcunMount/component-base/pkg/messaging/nsq"
 	appanswersheet "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/answersheet"
 	"github.com/FangcunMount/qs-server/internal/apiserver/eventing/standardoutbox"
 	eventsubsystem "github.com/FangcunMount/qs-server/internal/apiserver/eventing/subsystem"
@@ -24,6 +23,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/event"
 	eventcatalog "github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
 	eventruntime "github.com/FangcunMount/qs-server/internal/pkg/eventing/runtime"
+	"github.com/FangcunMount/qs-server/internal/pkg/messagingruntime"
 	"github.com/FangcunMount/reliable-messaging/relay"
 	sdkmongo "github.com/FangcunMount/reliable-messaging/storage/mongo"
 	"github.com/FangcunMount/reliable-messaging/transport"
@@ -325,7 +325,7 @@ func TestM5MongoRollbackHoldsUntilStandardIntentsDrain(t *testing.T) {
 	// The old application Profile may start only after every standard intent
 	// has been settled. Submit a real AnswerSheet through the original Mongo
 	// transaction and its historical Writer/Relay, then inspect both stores.
-	legacyPublisher, err := cbnsq.NewPublisher(nsqAddress, nsq.NewConfig())
+	legacyPublisher, err := messagingruntime.NewSDKNSQWirePublisher(nsqAddress)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -336,7 +336,7 @@ func TestM5MongoRollbackHoldsUntilStandardIntentsDrain(t *testing.T) {
 	}()
 	legacy, err := eventsubsystem.New(eventsubsystem.Options{
 		MongoDB: db, Catalog: eventcatalog.NewCatalog(catalog),
-		MQPublisher: legacyPublisher, PublisherMode: eventruntime.PublishModeMQ,
+		WirePublisher: legacyPublisher, PublisherMode: eventruntime.PublishModeMQ,
 		Mongo: eventsubsystem.ProfileOptions{Interval: 50 * time.Millisecond, BatchSize: 4,
 			PublishWorkers: 1, ImmediateMaxConcurrent: 1},
 		Consumers: map[string]eventsubsystem.ConsumerOptions{
