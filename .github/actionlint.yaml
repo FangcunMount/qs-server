@@ -28,6 +28,7 @@ config-variables:
   - SVRD_PUBLIC_HOST
   - SVRD_USERNAME
   - SVRD_SSH_PORT
+  - SVRD_SSH_FINGERPRINT
   - DOCS_VERIFY
 
 config-secrets:
