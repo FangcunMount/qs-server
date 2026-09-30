@@ -43,6 +43,8 @@ build_dir=$(mktemp -d "${TMPDIR:-/tmp}/$project-build.XXXXXX")
   -tags='integration,reliable_messaging,reliable_messaging_m4,reliable_messaging_m5' \
   -o "$build_dir/m5-mysql-retry.test" ./internal/apiserver/container/internal/transaction)
 "${compose[@]}" cp "$build_dir/m5-mysql-retry.test" mysql:/tmp/m5-mysql-retry.test
+"${compose[@]}" exec -T mysql mkdir -p /pkg/migration/migrations/mysql
+"${compose[@]}" cp "$repo/internal/pkg/migration/migrations/mysql/000089_qs_evaluation_request_ref.up.sql" mysql:/pkg/migration/migrations/mysql/000089_qs_evaluation_request_ref.up.sql
 "${compose[@]}" exec -T \
   -e RM_QS_M5_MYSQL_DSN='root@tcp(mysql:3306)/m5_qs_retry?parseTime=true&loc=UTC' \
   mysql /tmp/m5-mysql-retry.test \

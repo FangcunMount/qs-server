@@ -37,13 +37,20 @@ type Executor interface {
 	Execute(ctx context.Context, input interpinput.InterpretationInput, traceID string) (*ExecuteResult, error)
 }
 
+// BuildFailureGate is an optional, scoped acceptance probe. A true result
+// fails only the claimed report attempt before the real builder is invoked.
+type BuildFailureGate interface {
+	TryFail(ctx context.Context, input interpinput.InterpretationInput, run *interpretationrun.InterpretationRun) (bool, error)
+}
+
 type executor struct {
-	starter       Starter
-	builders      rendering.Registry
-	committer     InterpretationCommitter
-	now           func() time.Time
-	newID         func() meta.ID
-	logBuildError func(context.Context, string, error, *domaingeneration.ReportGeneration, *interpretationrun.InterpretationRun, rendering.Builder)
+	starter          Starter
+	builders         rendering.Registry
+	committer        InterpretationCommitter
+	buildFailureGate BuildFailureGate
+	now              func() time.Time
+	newID            func() meta.ID
+	logBuildError    func(context.Context, string, error, *domaingeneration.ReportGeneration, *interpretationrun.InterpretationRun, rendering.Builder)
 }
 
 func NewExecutor(
@@ -58,6 +65,20 @@ func NewExecutor(
 		starter: starter, builders: builders, committer: committer, now: time.Now, newID: meta.New,
 		logBuildError: logBuildFailure,
 	}, nil
+}
+
+// NewExecutorWithBuildFailureGate is used only when an explicitly scoped
+// acceptance probe has been configured. The ordinary constructor has no gate.
+func NewExecutorWithBuildFailureGate(starter Starter, builders rendering.Registry, committer InterpretationCommitter, gate BuildFailureGate) (Executor, error) {
+	if gate == nil {
+		return nil, fmt.Errorf("build failure gate is required")
+	}
+	service, err := NewExecutor(starter, builders, committer)
+	if err != nil {
+		return nil, err
+	}
+	service.(*executor).buildFailureGate = gate
+	return service, nil
 }
 
 func (e *executor) Execute(ctx context.Context, input interpinput.InterpretationInput, traceID string) (*ExecuteResult, error) {
@@ -126,6 +147,22 @@ func (e *executor) buildAndCommit(ctx context.Context, input interpinput.Interpr
 		return nil, e.fail(ctx, generationRecord, runRecord, input, interpretationrun.Failure{Kind: interpretationrun.FailureKindTemplate, Code: "builder_not_found", SafeMessage: "报告生成器未配置", Retryable: false})
 	}
 	builderIdentity = builder.BuilderIdentity()
+	if e.buildFailureGate != nil {
+		fail, err := e.buildFailureGate.TryFail(ctx, input, runRecord)
+		if err != nil {
+			return nil, fmt.Errorf("claim controlled report failure: %w", err)
+		}
+		if fail {
+			logger.L(ctx).Warnw("controlled report build failure claimed",
+				"assessment_id", input.Association.AssessmentID.String(),
+				"outcome_id", input.OutcomeID.String(),
+				"run_id", runRecord.ID().String(),
+			)
+			return nil, e.fail(ctx, generationRecord, runRecord, input, interpretationrun.Failure{
+				Kind: interpretationrun.FailureKindBuild, Code: "controlled_build_failure", SafeMessage: "报告生成失败", Retryable: true,
+			})
+		}
+	}
 	buildStartedAt := time.Now()
 	draft, err := builder.Build(ctx, input)
 	if err != nil {

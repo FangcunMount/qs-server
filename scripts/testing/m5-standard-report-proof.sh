@@ -46,7 +46,11 @@ build_dir=$(mktemp -d "${TMPDIR:-/tmp}/$project-build.XXXXXX")
 (cd "$repo" && GOPROXY=https://proxy.golang.org,direct CGO_ENABLED=0 GOOS=linux GOARCH="$goarch" go test -c \
   -tags='integration,reliable_messaging_m4' \
   -o "$build_dir/m5-report.test" ./internal/apiserver/infra/mongo/interpretation)
+(cd "$repo" && GOPROXY=https://proxy.golang.org,direct CGO_ENABLED=0 GOOS=linux GOARCH="$goarch" go test -c \
+  -tags='integration,reliable_messaging_m4' \
+  -o "$build_dir/m5-evaluation-gate.test" ./internal/apiserver/infra/mongo/evaluation)
 "${compose[@]}" cp "$build_dir/m5-report.test" mysql:/tmp/m5-report.test
+"${compose[@]}" cp "$build_dir/m5-evaluation-gate.test" mysql:/tmp/m5-evaluation-gate.test
 "${compose[@]}" exec -T mysql mysql -uroot -e 'CREATE DATABASE m5_qs_attention'
 "${compose[@]}" exec -T mysql mysql -uroot -e 'CREATE DATABASE m5_qs_attention_real'
 (cd "$repo" && GOPROXY=https://proxy.golang.org,direct CGO_ENABLED=0 GOOS=linux GOARCH="$goarch" go test -c \
@@ -66,7 +70,14 @@ build_dir=$(mktemp -d "${TMPDIR:-/tmp}/$project-build.XXXXXX")
   -e QS_SERVER_TEST_MONGO_DB_PREFIX='m5_report_contract' \
   -e RM_QS_NSQ_TCP='nsqd:4150' \
   mysql /tmp/m5-report.test \
-    -test.run '^TestInterpretation(ReportEventsReachWorkerThroughStandardMongoAndNSQ|GovernedRetryAuthorizationAndStandardIntentCommitTogether|StandardDriverUnknownCommitRetriesCommitOnly)$' \
+    -test.run '^TestInterpretation(AcceptanceFailureGateClaimsOnlyOnceInRealMongo|ReportEventsReachWorkerThroughStandardMongoAndNSQ|GovernedRetryAuthorizationAndStandardIntentCommitTogether|StandardDriverUnknownCommitRetriesCommitOnly)$' \
+    -test.count=1 -test.timeout=90s -test.v
+
+"${compose[@]}" exec -T \
+  -e QS_SERVER_TEST_MONGO_URI='mongodb://mongo:27017/?replicaSet=rm-test' \
+  -e QS_SERVER_TEST_MONGO_DB_PREFIX='m5_evaluation_gate_contract' \
+  mysql /tmp/m5-evaluation-gate.test \
+    -test.run '^TestEvaluationAcceptanceFailureGateClaimsOnlyOnceInRealMongo$' \
     -test.count=1 -test.timeout=90s -test.v
 
 "${compose[@]}" exec -T \

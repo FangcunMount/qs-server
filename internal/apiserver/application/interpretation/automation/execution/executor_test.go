@@ -25,6 +25,13 @@ type executorBuilder struct {
 	draft *report.Draft
 }
 
+type controlledFailureGateStub struct{ calls int }
+
+func (g *controlledFailureGateStub) TryFail(_ context.Context, _ interpinput.InterpretationInput, run *interpretationrun.InterpretationRun) (bool, error) {
+	g.calls++
+	return run.Attempt() == 1, nil
+}
+
 func (*executorBuilder) ReportType() policy.ReportType           { return policy.ReportTypeStandard }
 func (*executorBuilder) TemplateVersion() policy.TemplateVersion { return policy.TemplateVersionV1 }
 func (*executorBuilder) BuilderIdentity() string                 { return report.BuilderIdentityFactorScoring }
@@ -129,6 +136,45 @@ func TestExecutorCommitsReportRunGenerationAndEvents(t *testing.T) {
 	}
 	if builder.calls != 1 || len(stager.events) != 1 || len(gens.items) != 1 {
 		t.Fatalf("duplicate rebuilt builder=%d events=%d gens=%d", builder.calls, len(stager.events), len(gens.items))
+	}
+}
+
+func TestExecutorControlledFailureUsesOriginalOutcomeForAuthorizedRetry(t *testing.T) {
+	builder := &executorBuilder{}
+	service, _, runs, reports, stager, _ := newExecutorFixture(t, builder)
+	gate := &controlledFailureGateStub{}
+	service.buildFailureGate = gate
+	input := executorInput()
+	_, err := service.Execute(context.Background(), input, "initial")
+	failed, ok := FailureFrom(err)
+	if !ok || failed.Failure.Code != "controlled_build_failure" || !failed.Failure.Retryable ||
+		failed.Decision == nil || failed.Decision.RetryEventID == "" {
+		t.Fatalf("controlled first attempt = %#v, %v", failed, err)
+	}
+	if builder.calls != 0 || len(reports.items) != 0 || len(stager.events) != 1 || len(stager.scheduled) != 1 {
+		t.Fatalf("builder=%d reports=%d events=%d scheduled=%d", builder.calls, len(reports.items), len(stager.events), len(stager.scheduled))
+	}
+	blocked, err := service.Execute(context.Background(), input, "unapproved")
+	if err != nil || blocked.Status != ExecuteStatusBlocked || builder.calls != 0 {
+		t.Fatalf("unapproved retry = %#v, %v; builder=%d", blocked, err, builder.calls)
+	}
+	next := *failed.Decision.NextAttemptAt
+	service.now = func() time.Time { return next }
+	service.starter.(*starter).now = func() time.Time { return next }
+	ctx := retrygovernance.WithAuthorization(context.Background(), retrygovernance.Authorization{
+		EventID: failed.Decision.RetryEventID, ExpectedAttempt: 1, Origin: retrygovernance.AttemptOriginAutomatic,
+	})
+	result, err := service.Execute(ctx, input, "authorized")
+	if err != nil || result.InterpretReport == nil {
+		t.Fatalf("authorized retry = %#v, %v", result, err)
+	}
+	run, err := runs.FindByID(ctx, result.InterpretReport.InterpretationRunID())
+	if err != nil || run.Attempt() != 2 || builder.calls != 1 || gate.calls != 2 || len(reports.items) != 1 {
+		t.Fatalf("run=%#v err=%v builder=%d gate=%d reports=%d", run, err, builder.calls, gate.calls, len(reports.items))
+	}
+	_, err = service.Execute(ctx, input, "duplicate")
+	if err != nil || builder.calls != 1 || len(reports.items) != 1 {
+		t.Fatalf("duplicate rebuilt: err=%v builder=%d reports=%d", err, builder.calls, len(reports.items))
 	}
 }
 

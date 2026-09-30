@@ -18,9 +18,11 @@ import (
 	appautomation "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/automation"
 	execution "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/automation/execution"
 	domaingeneration "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/generation"
+	interpinput "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/input"
 	domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/report"
 	interpretationrun "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/run"
 	"github.com/FangcunMount/qs-server/internal/apiserver/eventing/standardoutbox"
+	mongoEval "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/interpretation"
 	mongostandard "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/standardoutbox"
 	evaluationfact "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationfact"
 	"github.com/FangcunMount/qs-server/internal/pkg/event"
@@ -37,6 +39,41 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 	"google.golang.org/grpc/metadata"
 )
+
+func TestInterpretationAcceptanceFailureGateClaimsOnlyOnceInRealMongo(t *testing.T) {
+	fixture, _ := newStandardInterpretationFixture(t)
+	generation, run := fixture.start(t)
+	now := time.Now()
+	scope := mongoEval.AcceptanceFailureScope{
+		Token: meta.New().String(), OrgID: 1, TesteeID: 8, ModelCode: "controlled-model",
+		StartsAt: now.Add(-time.Minute), ExpiresAt: now.Add(time.Minute),
+	}
+	input := interpinput.InterpretationInput{
+		OutcomeID:   generation.Key().OutcomeID,
+		Association: domainreport.Association{OrgID: 1, TesteeID: 8, AssessmentID: meta.New()},
+		Model:       domainreport.ModelIdentity{Code: scope.ModelCode},
+	}
+	claims := fixture.db.Collection("interpretation_acceptance_failure_claims")
+	first, err := mongoEval.NewAcceptanceFailureGate(claims, scope)
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := mongoEval.NewAcceptanceFailureGate(claims, scope)
+	if err != nil {
+		t.Fatal(err)
+	}
+	claimed, err := first.TryFail(t.Context(), input, run)
+	if err != nil || !claimed {
+		t.Fatalf("first claim=%t err=%v", claimed, err)
+	}
+	claimed, err = second.TryFail(t.Context(), input, run)
+	if err != nil || claimed {
+		t.Fatalf("restarted gate claim=%t err=%v", claimed, err)
+	}
+	if count, err := claims.CountDocuments(t.Context(), bson.M{}); err != nil || count != 1 {
+		t.Fatalf("persisted claims=%d err=%v", count, err)
+	}
+}
 
 func TestInterpretationAutomaticFailureCommitsWithStandardMongoScheduledRetry(t *testing.T) {
 	fixture, stager := newStandardInterpretationFixture(t)
