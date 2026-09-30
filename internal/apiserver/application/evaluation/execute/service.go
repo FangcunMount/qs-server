@@ -259,14 +259,6 @@ func (s *service) Evaluate(ctx context.Context, assessmentID uint64) error {
 		algorithmFamily = family
 	}
 
-	l.Infow("开始执行评估器",
-		"assessment_id", assessmentID,
-		"evaluation_run", evaluationRun.String(),
-		"evaluation_run_id", evaluationRun.ID().String(),
-		"model_key", resolved.ExecutionIdentity.String(),
-		"runtime_descriptor_key", resolved.DescriptorKey.String(),
-		"model_code", evaluationModelCode(a, input),
-	)
 	if s.preExecutionGate != nil {
 		fail, gateErr := s.preExecutionGate.TryFail(ctx, a, input, &evaluationRun)
 		if gateErr != nil {
@@ -283,6 +275,14 @@ func (s *service) Evaluate(ctx context.Context, assessmentID uint64) error {
 			}, cause)
 		}
 	}
+	l.Infow("开始执行评估器",
+		"assessment_id", assessmentID,
+		"evaluation_run", evaluationRun.String(),
+		"evaluation_run_id", evaluationRun.ID().String(),
+		"model_key", resolved.ExecutionIdentity.String(),
+		"runtime_descriptor_key", resolved.DescriptorKey.String(),
+		"model_code", evaluationModelCode(a, input),
+	)
 
 	evaluationOutcome, err := s.runtimeResolver.ExecuteResolved(ctx, resolved, a, input)
 	if err != nil {
