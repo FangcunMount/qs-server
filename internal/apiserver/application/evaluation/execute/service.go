@@ -41,6 +41,14 @@ type service struct {
 	runRepo             evaluationrun.Repository
 	runLease            time.Duration
 	evaluationCommitter outcomecommit.Committer
+	preExecutionGate    PreExecutionFailureGate
+}
+
+// PreExecutionFailureGate is an optional, scoped acceptance probe. It runs
+// only after a durable run and frozen input have been claimed, before the
+// evaluator (and any external model call) begins.
+type PreExecutionFailureGate interface {
+	TryFail(context.Context, *assessment.Assessment, *evaluationinput.InputSnapshot, *evalrun.EvaluationRun) (bool, error)
 }
 
 // EventStager 事件暂存器
@@ -84,6 +92,10 @@ func WithEvaluationCommitter(committer outcomecommit.Committer) EngineOption {
 	return func(s *service) {
 		s.evaluationCommitter = committer
 	}
+}
+
+func WithPreExecutionFailureGate(gate PreExecutionFailureGate) EngineOption {
+	return func(s *service) { s.preExecutionGate = gate }
 }
 
 // NewEngine creates the Evaluation engine. Production assembly must configure
@@ -255,6 +267,22 @@ func (s *service) Evaluate(ctx context.Context, assessmentID uint64) error {
 		"runtime_descriptor_key", resolved.DescriptorKey.String(),
 		"model_code", evaluationModelCode(a, input),
 	)
+	if s.preExecutionGate != nil {
+		fail, gateErr := s.preExecutionGate.TryFail(ctx, a, input, &evaluationRun)
+		if gateErr != nil {
+			return fmt.Errorf("claim controlled evaluation failure: %w", gateErr)
+		}
+		if fail {
+			l.Warnw("controlled evaluation failure claimed",
+				"assessment_id", assessmentID,
+				"evaluation_run_id", evaluationRun.ID().String(),
+			)
+			cause := fmt.Errorf("controlled evaluation failure before model execution")
+			return s.finalizeEvaluationFailure(ctx, a, &evaluationRun, "测评执行失败", evalrun.Failure{
+				Kind: evalrun.FailureKindDependency, Message: "controlled_evaluation_failure", Retryable: true,
+			}, cause)
+		}
+	}
 
 	evaluationOutcome, err := s.runtimeResolver.ExecuteResolved(ctx, resolved, a, input)
 	if err != nil {

@@ -91,6 +91,7 @@ func Wire(in WireInput) (WireResult, error) {
 
 	module, err := Bootstrap(BootstrapInput{
 		MySQLDB:                    in.MySQLDB,
+		MongoDB:                    in.MongoDB,
 		InputResolver:              inputResolver,
 		ScaleCatalog:               scaleCatalog,
 		EventPublisher:             in.EventPublisher,

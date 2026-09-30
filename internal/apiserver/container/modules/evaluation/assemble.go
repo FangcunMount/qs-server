@@ -1,6 +1,9 @@
 package evaluation
 
 import (
+	"fmt"
+
+	"go.mongodb.org/mongo-driver/mongo"
 	"gorm.io/gorm"
 
 	redis "github.com/redis/go-redis/v9"
@@ -63,6 +66,7 @@ type Module struct {
 // Deps defines explicit constructor dependencies for the evaluation module.
 type Deps struct {
 	MySQLDB                    *gorm.DB
+	MongoDB                    *mongo.Database
 	InputResolver              evaluationinput.Resolver
 	ScaleCatalog               evaluationinput.ScaleCatalog
 	EventPublisher             event.EventPublisher
@@ -153,6 +157,10 @@ func newEvaluationInfra(normalized Deps) (*evaluationInfra, error) {
 
 func (m *Module) wireEvaluationEngine(normalized Deps, infra *evaluationInfra) error {
 	if normalized.InputResolver != nil {
+		failureGate, err := evaluationFailureGateFromEnv(normalized.MongoDB)
+		if err != nil {
+			return fmt.Errorf("evaluation acceptance failure gate: %w", err)
+		}
 		wiringDeps := WiringDeps{ScaleScorer: ruleengine.NewScaleFactorScorer()}
 		if normalized.RuntimeDescriptorRegistry != nil {
 			if err := evalruntime.AttachNativePipelines(normalized.RuntimeDescriptorRegistry, evalruntime.NativePipelineDeps{
@@ -174,14 +182,20 @@ func (m *Module) wireEvaluationEngine(normalized Deps, infra *evaluationInfra) e
 			infra.assessmentOutboxStore,
 			infra.postCommit,
 		)
-		engine := execute.NewEngine(
-			infra.assessmentRepo,
-			normalized.InputResolver,
+		engineOptions := []execute.EngineOption{
 			execute.WithTransactionalOutbox(infra.txRunner, infra.assessmentOutboxStore),
 			execute.WithPostCommitDispatcher(infra.postCommit),
 			execute.WithRuntimeDescriptorRegistry(normalized.RuntimeDescriptorRegistry),
 			execute.WithRunRepository(infra.runRepo),
 			execute.WithEvaluationCommitter(evaluationCommitter),
+		}
+		if failureGate != nil {
+			engineOptions = append(engineOptions, execute.WithPreExecutionFailureGate(failureGate))
+		}
+		engine := execute.NewEngine(
+			infra.assessmentRepo,
+			normalized.InputResolver,
+			engineOptions...,
 		)
 		m.WorkerService = evaluationworker.NewService(engine, infra.assessmentRepo, infra.outcomeRepo, infra.runRepo)
 		if reader, ok := infra.runRepo.(evaluationrun.ExpiredLeaseReader); ok {
