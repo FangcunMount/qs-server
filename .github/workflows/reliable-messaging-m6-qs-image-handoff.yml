@@ -6,6 +6,8 @@ on:
       - .github/workflows/reliable-messaging-m6-qs-image-handoff.yml
       - scripts/testing/m6-qs-worker-image-*.yaml
       - scripts/testing/m6-qs-worker-image-handoff.sh
+      - scripts/testing/m6-qs-api-image-*.yaml
+      - scripts/testing/m6-qs-api-image-schema90-handoff.sh
   workflow_dispatch:
 
 permissions:
@@ -13,6 +15,7 @@ permissions:
 
 jobs:
   worker-image-handoff:
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 50
     steps:
@@ -54,3 +57,32 @@ jobs:
           bash harness/scripts/testing/m6-qs-worker-image-handoff.sh \
             "$GITHUB_WORKSPACE/harness" "$GITHUB_WORKSPACE/current" \
             qs-m6-current:7ca541af qs-m6-fallback:7c0c919e
+
+  api-schema90-image-handoff:
+    if: github.event_name == 'workflow_dispatch' && github.ref_name == 'codex/m6-03-qs-schema90-fallback'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout isolated harness
+        uses: actions/checkout@v6
+        with:
+          path: harness
+      - name: Login to GHCR for exact published images
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+      - name: Pull production and fallback API manifests by digest
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          docker pull --platform linux/amd64 ghcr.io/fangcunmount/qs-apiserver@sha256:7780576e0933c4d6ac14801a0456712ab176a563e25fe9a8fa794907d520b053
+          docker pull --platform linux/amd64 ghcr.io/fangcunmount/qs-apiserver@sha256:8d26be7461300148bb11a82c1130305f3ba8103cbbfe2c384a5c3970714dbefc
+      - name: Run API schema 90/36 image handoff
+        shell: bash
+        run: |
+          bash harness/scripts/testing/m6-qs-api-image-schema90-handoff.sh \
+            "$GITHUB_WORKSPACE/harness" \
+            ghcr.io/fangcunmount/qs-apiserver@sha256:7780576e0933c4d6ac14801a0456712ab176a563e25fe9a8fa794907d520b053 \
+            ghcr.io/fangcunmount/qs-apiserver@sha256:8d26be7461300148bb11a82c1130305f3ba8103cbbfe2c384a5c3970714dbefc
