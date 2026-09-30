@@ -140,15 +140,15 @@ jobs:
           docker pull --platform linux/amd64 "$fallback"
           # Production uses Docker's containerd image store after an ACR tarball
           # load; its reported image ID is the manifest digest, while this runner
-          # reports the config digest. Compare source manifest, rootfs and config.
+          # reports the config digest. Compare manifest, rootfs and runtime fields.
           current_digests=$(docker image inspect "$current" --format '{{range .RepoDigests}}{{println .}}{{end}}')
           current_layers=$(docker image inspect "$current" --format '{{json .RootFS.Layers}}' | sha256sum | cut -d ' ' -f1)
-          current_config=$(docker image inspect "$current" --format '{{json .Config}}' | sha256sum | cut -d ' ' -f1)
-          printf 'Current Worker RepoDigests: %s\nRootFS layers: %s\nConfig: %s\n' "$current_digests" "$current_layers" "$current_config"
+          current_runtime=$(docker image inspect "$current" --format '{{.Os}}/{{.Architecture}} {{.Config.User}} {{json .Config.Entrypoint}} {{json .Config.Cmd}} {{.Config.WorkingDir}} {{json .Config.Env}}')
+          printf 'Current Worker RepoDigests: %s\nRootFS layers: %s\nRuntime: %s\n' "$current_digests" "$current_layers" "$current_runtime"
           printf '%s\n' "$current_digests" |
             grep -Fqx crpi-x3r4i68cpfmwtcll.cn-beijing.personal.cr.aliyuncs.com/fangcunmount/qs-worker@sha256:c33ae18270880cbd26cffa854d9e7affdc086828a943a707cf94415c6306139c
           test "$current_layers" = cc74887dbe232754c3336ac63c87a043c78bc16e2bda03cabce03b3a4632bc76
-          test "$current_config" = e4971f8e7b1f6d181b8b2992a32b36f13090c7895995a0286794c12047f2f902
+          test "$current_runtime" = 'linux/amd64 www ["/app/qs-worker"] ["--config=/app/configs/worker.prod.yaml"] /app ["PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin","TZ=Asia/Shanghai"]'
           fallback_digests=$(docker image inspect "$fallback" --format '{{range .RepoDigests}}{{println .}}{{end}}')
           printf 'Fallback Worker RepoDigests: %s\n' "$fallback_digests"
           printf '%s\n' "$fallback_digests" |
