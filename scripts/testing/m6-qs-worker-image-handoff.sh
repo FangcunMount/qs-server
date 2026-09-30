@@ -16,7 +16,7 @@ verify_image() {
   local image=$1 expected_sha=$2 identity
   identity=$(docker image inspect "$image" --format '{{.Os}}/{{.Architecture}} {{.Config.User}} {{index .Config.Labels "org.opencontainers.image.revision"}}')
   if [[ "$expected_sha" == - ]]; then
-    # Published images have no revision label; the caller verifies RepoDigest.
+    # Published images have no revision label; the caller pins image identity.
     [[ "$identity" == 'linux/amd64 www ' ]]
   else
     [[ "$identity" == "linux/amd64 www $expected_sha" ]]
