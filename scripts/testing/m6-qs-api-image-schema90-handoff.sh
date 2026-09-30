@@ -2,8 +2,8 @@
 set -Eeuo pipefail
 
 # Start the actual published API images in both directions on disposable
-# MySQL/Mongo/Redis/NSQ. This checks process and schema compatibility only;
-# no business event is submitted by this harness.
+# MySQL/Mongo/Redis/NSQ. In addition to transport handoff, exercise the
+# original AI result ID through the real mTLS gRPC receiver in all three phases.
 harness=${1:?Usage: handoff.sh HARNESS CURRENT_IMAGE FALLBACK_IMAGE}
 current_image=${2:?Usage: handoff.sh HARNESS CURRENT_IMAGE FALLBACK_IMAGE}
 fallback_image=${3:?Usage: handoff.sh HARNESS CURRENT_IMAGE FALLBACK_IMAGE}
@@ -12,8 +12,13 @@ fallback_image=${3:?Usage: handoff.sh HARNESS CURRENT_IMAGE FALLBACK_IMAGE}
 project="qs-m6-api-image-${GITHUB_RUN_ID:-local}-$$"
 api="${project}-api"
 compose=(docker compose --project-name "$project" --file "$harness/scripts/testing/m6-qs-worker-image-compose.yaml")
-config="$harness/scripts/testing/m6-qs-api-image-schema90.yaml"
+base_config="$harness/scripts/testing/m6-qs-api-image-schema90.yaml"
 network="${project}_default"
+probe_dir=$(mktemp -d)
+chmod 755 "$probe_dir"
+config="$probe_dir/apiserver.yaml"
+cert_dir="$probe_dir/certs"
+probe="$probe_dir/ai-result-probe"
 
 cleanup() {
   result=$?
@@ -24,11 +29,51 @@ cleanup() {
   fi
   docker rm -f "$api" >/dev/null 2>&1 || true
   "${compose[@]}" down --volumes --remove-orphans --timeout 10 >/dev/null || result=1
+  python3 - "$probe_dir" <<'PY' || result=1
+import pathlib, shutil, sys
+shutil.rmtree(pathlib.Path(sys.argv[1]))
+PY
   exit "$result"
 }
 trap cleanup EXIT
 trap 'exit 130' INT
 trap 'exit 143' TERM
+
+(
+  cd "$harness"
+  GOWORK=off CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
+    go build -o "$probe" ./scripts/testing/m6_api_ai_result_probe
+)
+"$probe" -mode certgen -cert-dir "$cert_dir"
+python3 - "$base_config" "$config" <<'PY'
+import pathlib, sys
+source = pathlib.Path(sys.argv[1]).read_text()
+old = "grpc:\n  bind-port: 0\n"
+if source.count(old) != 1:
+    raise SystemExit("isolation gRPC config changed")
+grpc = """grpc:
+  bind-address: 0.0.0.0
+  bind-port: 9090
+  insecure: false
+  tls-cert-file: /tmp/m6-certs/server.pem
+  tls-key-file: /tmp/m6-certs/server.key
+  mtls:
+    enabled: true
+    ca-file: /tmp/m6-certs/ca.pem
+    require-client-cert: true
+    allowed-cns: [qs-ai.svc]
+    allowed-ous: [QS]
+    min-tls-version: "1.3"
+  auth:
+    enabled: false
+  acl:
+    enabled: true
+    config-file: /tmp/m6-certs/acl.yaml
+    default-policy: deny
+"""
+pathlib.Path(sys.argv[2]).write_text(source.replace(old, grpc))
+PY
+chmod 644 "$config"
 
 "${compose[@]}" up -d --wait --wait-timeout 180
 "${compose[@]}" exec -T mysql mysql -uroot -e 'CREATE DATABASE qs'
@@ -54,6 +99,7 @@ start_api() {
   [[ $(docker image inspect "$image" --format '{{.Os}}/{{.Architecture}} {{.Config.User}}') == 'linux/amd64 www' ]]
   docker run -d --name "$api" --network "$network" \
     -v "$config:/tmp/apiserver.isolation.yaml:ro" \
+    -v "$cert_dir:/tmp/m6-certs:ro" -v "$probe:/tmp/m6-ai-probe:ro" \
     "$image" --config /tmp/apiserver.isolation.yaml \
     --cache.policy-file=/app/configs/cache/apiserver.dev.yaml >/dev/null
   for _ in {1..90}; do
@@ -72,6 +118,11 @@ start_api() {
   done
   echo "$phase API did not become healthy" >&2
   return 1
+}
+
+probe_exec() {
+  docker exec -e 'QS_AI_BRIDGE_DSN=root@tcp(mysql:3306)/qs?parseTime=true' \
+    "$api" /tmp/m6-ai-probe -mode "$1" -cert-dir /tmp/m6-certs
 }
 
 stop_api() {
@@ -167,16 +218,24 @@ wait_confirmed() {
 
 id_prefix="m6-api-${GITHUB_RUN_ID:-local}-$$"
 start_api "$current_image" current_first
+probe_exec stage
+probe_exec send
+probe_exec assert
 stop_api
 seed_pending "${id_prefix}-fallback"
 start_api "$fallback_image" fallback
 wait_confirmed "${id_prefix}-fallback" 1
+probe_exec send
+probe_exec reject-conflict
+probe_exec assert
 stop_api
 seed_pending "${id_prefix}-current"
 start_api "$current_image" current_return
 wait_confirmed "${id_prefix}-current" 2
+probe_exec send
+probe_exec assert
 original=$("${compose[@]}" exec -T mysql mysql -uroot --batch --skip-column-names \
   -e "SELECT state,attempt_count FROM qs.rm_outbox WHERE message_id='${id_prefix}-fallback'")
 [[ "$original" == $'published\t1' ]]
 stop_api
-printf 'API image handoff: current -> fallback -> current healthy; two original MySQL IDs, two NSQ publishes, no repeat\n'
+printf 'API image handoff: current -> fallback -> current healthy; two original MySQL IDs, two NSQ publishes; original AI result accepted once across three image phases\n'

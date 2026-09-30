@@ -8,6 +8,7 @@ on:
       - scripts/testing/m6-qs-worker-image-handoff.sh
       - scripts/testing/m6-qs-api-image-*.yaml
       - scripts/testing/m6-qs-api-image-schema90-handoff.sh
+      - scripts/testing/m6_api_ai_result_probe/**
   workflow_dispatch:
     inputs:
       target:
@@ -66,7 +67,7 @@ jobs:
             qs-m6-current:f3abaf2d qs-m6-fallback:7c0c919e
 
   api-schema90-image-handoff:
-    if: github.event_name == 'workflow_dispatch' && github.ref_name == 'main' && inputs.target == 'api'
+    if: github.event_name == 'pull_request' || (github.event_name == 'workflow_dispatch' && github.ref_name == 'main' && inputs.target == 'api')
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
@@ -74,6 +75,10 @@ jobs:
         uses: actions/checkout@v6
         with:
           path: harness
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.25.12'
+          cache-dependency-path: harness/go.sum
       - name: Login to GHCR for exact published images
         uses: docker/login-action@v4
         with:
