@@ -1,0 +1,58 @@
+app:
+  name: qs-apiserver
+  mode: test
+server:
+  mode: test
+insecure:
+  bind-address: 0.0.0.0
+  bind-port: 8080
+secure:
+  bind-port: 0
+grpc:
+  bind-port: 0
+mysql:
+  host: mysql:3306
+  username: root
+  password: ""
+  database: qs
+  location: Asia/Shanghai
+  session-time-zone: "+08:00"
+migration:
+  enabled: true
+  database: qs
+redis:
+  host: redis
+  port: 6379
+mongodb:
+  host: mongo:27017
+  database: qs
+messaging:
+  enabled: true
+  provider: nsq
+  nsq-addr: nsqd:4150
+  nsq-lookupd-addr: nsqlookupd:4161
+  nsqd-http-endpoints: ["http://nsqd:4151"]
+  primary-worker-channel: qs-worker
+eventing:
+  standard_outbox:
+    mongo: true
+    assessment: true
+  consumers:
+    modelcatalog-hot-rank:
+      enabled: false
+iam:
+  enabled: false
+statistics-sync:
+  enable: false
+plan-scheduler:
+  enable: false
+evaluation-consistency-audit:
+  enable: false
+evaluation-lease-recovery:
+  enable: false
+interpretation-lease-recovery:
+  enable: false
+report-catalog-audit:
+  enable: false
+mongo-consistency-audit:
+  enable: false
