@@ -37,8 +37,6 @@ type resourceStageDeps struct {
 
 type eventSubsystemResourceDeps struct {
 	newSubsystem              func(eventsubsystem.Options) (*eventsubsystem.Subsystem, error)
-	subscriberFactory         eventsubsystem.SubscriberFactory
-	buildSubscriberFactory    func(*gorm.DB) (eventsubsystem.SubscriberFactory, error)
 	sdkSubscriberFactory      eventsubsystem.SDKSubscriberFactory
 	buildSDKSubscriberFactory func(*gorm.DB) (eventsubsystem.SDKSubscriberFactory, error)
 	consumers                 map[string]eventsubsystem.ConsumerOptions
@@ -102,7 +100,6 @@ func (s *server) buildEventSubsystemResourceDeps() eventSubsystemResourceDeps {
 	if s == nil || s.config == nil {
 		return eventSubsystemResourceDeps{}
 	}
-	var buildSubscriberFactory func(*gorm.DB) (eventsubsystem.SubscriberFactory, error)
 	var buildSDKSubscriberFactory func(*gorm.DB) (eventsubsystem.SDKSubscriberFactory, error)
 	if s.config.MessagingOptions != nil && s.config.MessagingOptions.Enabled {
 		recorderFor := func(mysqlDB *gorm.DB) (*eventtransport.SQLDeadLetterRecorder, error) {
@@ -138,7 +135,6 @@ func (s *server) buildEventSubsystemResourceDeps() eventSubsystemResourceDeps {
 	mongoProfile, assessmentProfile := buildEventProfileOptions(s.config)
 	return eventSubsystemResourceDeps{
 		newSubsystem:              configuredEventSubsystem(s.config),
-		buildSubscriberFactory:    buildSubscriberFactory,
 		buildSDKSubscriberFactory: buildSDKSubscriberFactory,
 		consumers:                 buildEventConsumerOptions(s.config),
 		mongo:                     mongoProfile,
@@ -353,14 +349,6 @@ func buildResourceEventSubsystem(
 		mysqlLimiter = resilience.Backpressure("mysql")
 		mongoLimiter = resilience.Backpressure("mongo")
 	}
-	subscriberFactory := deps.subscriberFactory
-	if deps.buildSubscriberFactory != nil {
-		var err error
-		subscriberFactory, err = deps.buildSubscriberFactory(mysqlDB)
-		if err != nil {
-			return nil, err
-		}
-	}
 	sdkSubscriberFactory := deps.sdkSubscriberFactory
 	if deps.buildSDKSubscriberFactory != nil {
 		var err error
@@ -374,7 +362,7 @@ func buildResourceEventSubsystem(
 		Catalog: catalog, WirePublisher: deps.wirePublisher, PublisherMode: publishMode,
 		MySQLLimiter: mysqlLimiter, MongoLimiter: mongoLimiter,
 		Mongo: deps.mongo, Assessment: deps.assessment,
-		SubscriberFactory: subscriberFactory, SDKSubscriberFactory: sdkSubscriberFactory, Consumers: deps.consumers,
+		SDKSubscriberFactory: sdkSubscriberFactory, Consumers: deps.consumers,
 	})
 }
 

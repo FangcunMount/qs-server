@@ -171,8 +171,7 @@ func TestM4ProcessBootstrapRunsSelectedStandardProfiles(t *testing.T) {
 	cfg.Eventing.StandardOutbox.Mongo = true
 	cfg.Eventing.StandardOutbox.Assessment = true
 	deps := (&server{config: cfg}).buildEventSubsystemResourceDeps()
-	deps.buildSubscriberFactory = nil // No projection subscriber in this sender-side proof.
-	deps.buildSDKSubscriberFactory = nil
+	deps.buildSDKSubscriberFactory = nil // No projection subscriber in this sender-side proof.
 	deps.mongo = eventsubsystem.ProfileOptions{Interval: 200 * time.Millisecond, PublishWorkers: 2}
 	deps.assessment = eventsubsystem.ProfileOptions{Interval: 200 * time.Millisecond, PublishWorkers: 2}
 	deps.consumers = map[string]eventsubsystem.ConsumerOptions{"modelcatalog.hot_rank_projection": {Enabled: false}}

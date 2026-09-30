@@ -8,35 +8,29 @@ import (
 	"testing"
 	"time"
 
-	"github.com/FangcunMount/component-base/pkg/messaging"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventing/runtime"
+	rmtransport "github.com/FangcunMount/reliable-messaging/transport"
 )
 
 const hotRankConsumerID = "modelcatalog.hot_rank_projection"
 
 type fakePublisher struct{}
 
-func (fakePublisher) PublishWire(context.Context, string, []byte) error                { return nil }
-func (fakePublisher) Publish(context.Context, string, []byte) error                    { return nil }
-func (fakePublisher) PublishMessage(context.Context, string, *messaging.Message) error { return nil }
-func (fakePublisher) Close() error                                                     { return nil }
+func (fakePublisher) PublishWire(context.Context, string, []byte) error { return nil }
 
 type fakeSubscriber struct {
 	topic    string
 	channel  string
-	handler  messaging.Handler
+	handler  rmtransport.Handler
 	stops    int
 	closes   int
 	closeErr error
 }
 
-func (s *fakeSubscriber) Subscribe(topic, channel string, handler messaging.Handler) error {
+func (s *fakeSubscriber) Subscribe(topic, channel string, handler rmtransport.Handler) error {
 	s.topic, s.channel, s.handler = topic, channel, handler
 	return nil
-}
-func (s *fakeSubscriber) SubscribeWithMiddleware(topic, channel string, handler messaging.Handler, _ ...messaging.Middleware) error {
-	return s.Subscribe(topic, channel, handler)
 }
 func (s *fakeSubscriber) Stop()        { s.stops++ }
 func (s *fakeSubscriber) Close() error { s.closes++; return s.closeErr }
@@ -113,7 +107,7 @@ func TestSubsystemStartCloseAreIdempotentAndSettleProjectionMessages(t *testing.
 	subscriber := &fakeSubscriber{}
 	s, err := New(Options{
 		Catalog: loadCatalog(t), PublisherMode: eventruntime.PublishModeMQ, WirePublisher: fakePublisher{},
-		SubscriberFactory: func() (messaging.Subscriber, error) { return subscriber, nil },
+		SDKSubscriberFactory: func() (SDKSubscriber, error) { return subscriber, nil },
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -134,14 +128,14 @@ func TestSubsystemStartCloseAreIdempotentAndSettleProjectionMessages(t *testing.
 		t.Fatalf("subscription = topic %q channel %q handler %v", subscriber.topic, subscriber.channel, subscriber.handler != nil)
 	}
 
-	var acked bool
-	msg := messaging.NewMessage("event-1", []byte(`{"event_type":"answersheet.submitted"}`))
-	msg.Metadata["event_type"] = eventcatalog.AnswerSheetSubmitted
-	msg.SetAckFunc(func() error { acked = true; return nil })
-	if err := subscriber.handler(t.Context(), msg); err != nil {
+	delivery := &projectionSDKDeliveryStub{message: rmtransport.Received{
+		ID: "event-1", Metadata: map[string]string{"event_type": eventcatalog.AnswerSheetSubmitted},
+		Payload: []byte(`{"event_type":"answersheet.submitted"}`),
+	}}
+	if err := subscriber.handler(t.Context(), delivery); err != nil {
 		t.Fatalf("handled message: %v", err)
 	}
-	if !acked {
+	if delivery.acks != 1 {
 		t.Fatal("handled message was not ACKed")
 	}
 
@@ -153,93 +147,6 @@ func TestSubsystemStartCloseAreIdempotentAndSettleProjectionMessages(t *testing.
 	}
 	if subscriber.stops != 1 || subscriber.closes != 1 {
 		t.Fatalf("subscriber lifecycle stops=%d closes=%d", subscriber.stops, subscriber.closes)
-	}
-}
-
-func TestProjectionHandlerFailureNacksOnlyItsMessage(t *testing.T) {
-	subscriber := &fakeSubscriber{}
-	s, err := New(Options{
-		Catalog: loadCatalog(t), PublisherMode: eventruntime.PublishModeMQ, WirePublisher: fakePublisher{},
-		SubscriberFactory: func() (messaging.Subscriber, error) { return subscriber, nil },
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	wantErr := errors.New("redis unavailable")
-	if err := s.RegisterConsumer(hotRankConsumerID, func(context.Context, string, []byte) error { return wantErr }); err != nil {
-		t.Fatal(err)
-	}
-	if err := s.Start(t.Context()); err != nil {
-		t.Fatal(err)
-	}
-	defer func() { _ = s.Close() }()
-
-	var nacked bool
-	msg := messaging.NewMessage("event-2", nil)
-	msg.Metadata["event_type"] = eventcatalog.AnswerSheetSubmitted
-	msg.SetNackFunc(func() error { nacked = true; return nil })
-	if err := subscriber.handler(t.Context(), msg); !errors.Is(err, wantErr) {
-		t.Fatalf("handler error = %v, want %v", err, wantErr)
-	}
-	if !nacked {
-		t.Fatal("handler failure was not NACKed")
-	}
-}
-
-func TestProjectionDecodeFailureNacksMessage(t *testing.T) {
-	subscriber := &fakeSubscriber{}
-	s, err := New(Options{
-		Catalog: loadCatalog(t), PublisherMode: eventruntime.PublishModeMQ, WirePublisher: fakePublisher{},
-		SubscriberFactory: func() (messaging.Subscriber, error) { return subscriber, nil },
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := s.RegisterConsumer(hotRankConsumerID, func(context.Context, string, []byte) error {
-		t.Fatal("projection handler must not run for an invalid envelope")
-		return nil
-	}); err != nil {
-		t.Fatal(err)
-	}
-	if err := s.Start(t.Context()); err != nil {
-		t.Fatal(err)
-	}
-	defer func() { _ = s.Close() }()
-
-	var acked, nacked bool
-	msg := messaging.NewMessage("invalid-event", []byte(`{"not":"an-envelope"}`))
-	msg.SetAckFunc(func() error { acked = true; return nil })
-	msg.SetNackFunc(func() error { nacked = true; return nil })
-	if err := subscriber.handler(t.Context(), msg); err == nil {
-		t.Fatal("invalid envelope error = nil")
-	}
-	if acked || !nacked {
-		t.Fatalf("settlement acked=%v nacked=%v, want false/true", acked, nacked)
-	}
-}
-
-func TestProjectionDecodeFailureReturnsNackError(t *testing.T) {
-	subscriber := &fakeSubscriber{}
-	s, err := New(Options{
-		Catalog: loadCatalog(t), PublisherMode: eventruntime.PublishModeMQ, WirePublisher: fakePublisher{},
-		SubscriberFactory: func() (messaging.Subscriber, error) { return subscriber, nil },
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := s.RegisterConsumer(hotRankConsumerID, func(context.Context, string, []byte) error { return nil }); err != nil {
-		t.Fatal(err)
-	}
-	if err := s.Start(t.Context()); err != nil {
-		t.Fatal(err)
-	}
-	defer func() { _ = s.Close() }()
-
-	wantErr := errors.New("nack unavailable")
-	msg := messaging.NewMessage("invalid-event", []byte(`{}`))
-	msg.SetNackFunc(func() error { return wantErr })
-	if err := subscriber.handler(t.Context(), msg); !errors.Is(err, wantErr) {
-		t.Fatalf("handler error = %v, want %v", err, wantErr)
 	}
 }
 
