@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/DATA-DOG/go-sqlmock"
-	basemessaging "github.com/FangcunMount/component-base/pkg/messaging"
 	"github.com/FangcunMount/qs-server/internal/pkg/retrygovernance"
 	rmtransport "github.com/FangcunMount/reliable-messaging/transport"
 	"github.com/FangcunMount/reliable-messaging/wire/legacy"
@@ -22,15 +21,15 @@ func TestRetryEventHoldDuplicateIsStatePreservingNoop(t *testing.T) {
 	}
 	defer func() { _ = db.Close() }()
 	store := &mysqlRetryEventHoldStore{db: db, provider: "nsq", policy: retrygovernance.DefaultOutboxPolicy}
-	message := basemessaging.NewMessage("message-1", []byte(`{"id":"event-1","data":{"org_id":7}}`))
-	message.Topic = "evaluation"
-	message.Channel = "qs-worker"
-	message.Attempts = 3
+	message := rmtransport.Received{
+		ID: "message-1", Topic: "evaluation", Channel: "qs-worker",
+		Payload: []byte(`{"id":"event-1","data":{"org_id":7}}`), Attempts: 3,
+	}
 
 	mock.ExpectExec(regexp.QuoteMeta("ON DUPLICATE KEY UPDATE id=LAST_INSERT_ID(id)")).
 		WithArgs("event-1", "message-1", int64(7), "nsq", "evaluation", "qs-worker", string(message.Payload), 3, "automatic retry paused", sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg()).
 		WillReturnResult(sqlmock.NewResult(42, 0))
-	if err := store.Hold(t.Context(), message, "evaluation.retry.requested", nil); err != nil {
+	if err := store.HoldDelivery(t.Context(), message, "evaluation.retry.requested", nil); err != nil {
 		t.Fatal(err)
 	}
 	if err := mock.ExpectationsWereMet(); err != nil {
@@ -146,7 +145,7 @@ func TestRetryEventHoldNSQReplayUsesOriginalSDKWireIdentity(t *testing.T) {
 	if err := replayer.RunOnce(t.Context(), time.Date(2026, 7, 19, 1, 0, 0, 0, time.UTC)); err != nil {
 		t.Fatal(err)
 	}
-	want, err := legacy.Encode(legacy.Envelope{UUID: item.MessageID, Metadata: basemessaging.NewMessage(item.MessageID, item.Payload).Metadata, Payload: item.Payload}, legacy.Revision2)
+	want, err := legacy.Encode(legacy.Envelope{UUID: item.MessageID, Metadata: map[string]string{}, Payload: item.Payload}, legacy.Revision2)
 	if err != nil {
 		t.Fatal(err)
 	}

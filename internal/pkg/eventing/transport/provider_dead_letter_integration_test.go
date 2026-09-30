@@ -79,20 +79,16 @@ func TestWorkerSettlementThroughNSQPersistsPoisonUnknownAndExhaustion(t *testing
 
 	runtime := &workerSettlementRuntime{topic: topic}
 	observer := &workerSettlementObserver{}
-	subscriber, err := newHistoricalNSQSubscriber(SubscriberConfig{
+	subscriber, err := newFastSDKWorkerSubscriber(SubscriberConfig{
 		Provider: "nsq", NSQLookupdAddr: integrationEnv("NSQ_LOOKUPD_ADDR", "127.0.0.1:4161"), NSQMessageTimeout: time.Minute,
-	}, basemessaging.SubscriberOptions{
-		MaxInFlight: 1, MaxAttempts: 2,
-		RetryBackoff:         basemessaging.RetryBackoffOptions{BaseDelay: 10 * time.Millisecond, MaxDelay: 20 * time.Millisecond},
-		FailedMessageHandler: FailedMessageHandler(recorder),
-	})
+	}, 2, 20*time.Millisecond, recorder)
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = subscriber.Close() })
-	if err := workermessaging.SubscribeHandlersWithOptions(workermessaging.SubscribeHandlersOptions{
+	if err := workermessaging.SubscribeSDKHandlersWithOptions(workermessaging.SubscribeSDKHandlersOptions{
 		ServiceName: channel, Logger: slog.Default(), Runtime: runtime, Subscriber: subscriber, Observer: observer,
-		UnknownRecorder: NewUnknownEventRecorder("nsq", recorder),
+		UnknownRecorder: NewDeliveryUnknownEventRecorder("nsq", recorder),
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -331,19 +327,14 @@ func TestWorkerUnknownEventRecoversAfterSubscriberRestart(t *testing.T) {
 	subscriberConfig := SubscriberConfig{
 		Provider: "nsq", NSQLookupdAddr: integrationEnv("NSQ_LOOKUPD_ADDR", "127.0.0.1:4161"), NSQMessageTimeout: time.Minute,
 	}
-	subscriberOptions := basemessaging.SubscriberOptions{
-		MaxInFlight: 1, MaxAttempts: 4,
-		RetryBackoff:         basemessaging.RetryBackoffOptions{BaseDelay: 500 * time.Millisecond, MaxDelay: 500 * time.Millisecond},
-		FailedMessageHandler: FailedMessageHandler(wrappedRecorder),
-	}
-	subscriber, err := newHistoricalNSQSubscriber(subscriberConfig, subscriberOptions)
+	subscriber, err := newFastSDKWorkerSubscriber(subscriberConfig, 4, 500*time.Millisecond, wrappedRecorder)
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = subscriber.Close() })
-	if err := workermessaging.SubscribeHandlersWithOptions(workermessaging.SubscribeHandlersOptions{
+	if err := workermessaging.SubscribeSDKHandlersWithOptions(workermessaging.SubscribeSDKHandlersOptions{
 		ServiceName: channel, Logger: slog.Default(), Runtime: runtime, Subscriber: subscriber, Observer: observer,
-		UnknownRecorder: NewUnknownEventRecorder("nsq", wrappedRecorder),
+		UnknownRecorder: NewDeliveryUnknownEventRecorder("nsq", wrappedRecorder),
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -380,14 +371,14 @@ func TestWorkerUnknownEventRecoversAfterSubscriberRestart(t *testing.T) {
 		t.Fatal(err)
 	}
 	restartedObserver := &workerSettlementObserver{}
-	restartedSubscriber, err := newHistoricalNSQSubscriber(subscriberConfig, subscriberOptions)
+	restartedSubscriber, err := newFastSDKWorkerSubscriber(subscriberConfig, 4, 500*time.Millisecond, wrappedRecorder)
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = restartedSubscriber.Close() })
-	if err := workermessaging.SubscribeHandlersWithOptions(workermessaging.SubscribeHandlersOptions{
+	if err := workermessaging.SubscribeSDKHandlersWithOptions(workermessaging.SubscribeSDKHandlersOptions{
 		ServiceName: channel, Logger: slog.Default(), Runtime: runtime, Subscriber: restartedSubscriber, Observer: restartedObserver,
-		UnknownRecorder: NewUnknownEventRecorder("nsq", wrappedRecorder),
+		UnknownRecorder: NewDeliveryUnknownEventRecorder("nsq", wrappedRecorder),
 	}); err != nil {
 		t.Fatal(err)
 	}

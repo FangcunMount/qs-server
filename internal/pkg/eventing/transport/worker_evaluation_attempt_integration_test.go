@@ -110,20 +110,16 @@ func TestWorkerDuplicateNSQEvaluationRequestKeepsOneDurableAttempt(t *testing.T)
 	if err != nil {
 		t.Fatal(err)
 	}
-	subscriber, err := newHistoricalNSQSubscriber(SubscriberConfig{
+	subscriber, err := NewSDKDeliverySubscriber(SubscriberConfig{
 		Provider: "nsq", NSQLookupdAddr: integrationEnv("NSQ_LOOKUPD_ADDR", "127.0.0.1:4161"), NSQMessageTimeout: time.Minute,
-	}, basemessaging.SubscriberOptions{
-		MaxInFlight: 1, MaxAttempts: 2,
-		RetryBackoff:         basemessaging.RetryBackoffOptions{BaseDelay: 100 * time.Millisecond, MaxDelay: 100 * time.Millisecond},
-		FailedMessageHandler: FailedMessageHandler(recorder),
-	})
+	}, 1, 2, SDKFailedHandoffHandler(recorder))
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = subscriber.Close() })
-	if err := workermessaging.SubscribeHandlersWithOptions(workermessaging.SubscribeHandlersOptions{
+	if err := workermessaging.SubscribeSDKHandlersWithOptions(workermessaging.SubscribeSDKHandlersOptions{
 		ServiceName: channel, Logger: slog.New(slog.NewTextHandler(io.Discard, nil)), Runtime: runtime, Subscriber: subscriber,
-		UnknownRecorder: NewUnknownEventRecorder("nsq", recorder),
+		UnknownRecorder: NewDeliveryUnknownEventRecorder("nsq", recorder),
 	}); err != nil {
 		t.Fatal(err)
 	}
