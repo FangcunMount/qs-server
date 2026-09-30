@@ -8,12 +8,22 @@ harness=${1:?Usage: handoff.sh HARNESS CURRENT_SOURCE CURRENT_IMAGE FALLBACK_IMA
 current_source=${2:?Usage: handoff.sh HARNESS CURRENT_SOURCE CURRENT_IMAGE FALLBACK_IMAGE}
 current_image=${3:?Usage: handoff.sh HARNESS CURRENT_SOURCE CURRENT_IMAGE FALLBACK_IMAGE}
 fallback_image=${4:?Usage: handoff.sh HARNESS CURRENT_SOURCE CURRENT_IMAGE FALLBACK_IMAGE}
-current_sha=7ca541afc24d13187c5b894a249126eabc009ae2
-fallback_sha=7c0c919e621d3cc93cb82dca668bd6077f7a1446
+current_sha=${5:-7ca541afc24d13187c5b894a249126eabc009ae2}
+fallback_sha=${6:-7c0c919e621d3cc93cb82dca668bd6077f7a1446}
 [[ "$harness" = /* && -f "$harness/scripts/testing/m6-qs-worker-image-compose.yaml" ]]
 [[ "$current_source" = /* && -f "$current_source/internal/pkg/migration/migrations/mysql/000049_add_retry_governance.up.sql" ]]
-[[ $(docker image inspect "$current_image" --format '{{.Os}}/{{.Architecture}} {{.Config.User}} {{index .Config.Labels "org.opencontainers.image.revision"}}') == "linux/amd64 www $current_sha" ]]
-[[ $(docker image inspect "$fallback_image" --format '{{.Os}}/{{.Architecture}} {{.Config.User}} {{index .Config.Labels "org.opencontainers.image.revision"}}') == "linux/amd64 www $fallback_sha" ]]
+verify_image() {
+  local image=$1 expected_sha=$2 identity
+  identity=$(docker image inspect "$image" --format '{{.Os}}/{{.Architecture}} {{.Config.User}} {{index .Config.Labels "org.opencontainers.image.revision"}}')
+  if [[ "$expected_sha" == - ]]; then
+    # Published images have no revision label; the caller verifies RepoDigest.
+    [[ "$identity" == 'linux/amd64 www ' ]]
+  else
+    [[ "$identity" == "linux/amd64 www $expected_sha" ]]
+  fi
+}
+verify_image "$current_image" "$current_sha"
+verify_image "$fallback_image" "$fallback_sha"
 
 project="qs-m6-image-${GITHUB_RUN_ID:-local}-$$"
 worker="${project}-worker"

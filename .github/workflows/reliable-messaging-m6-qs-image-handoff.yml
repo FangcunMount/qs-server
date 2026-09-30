@@ -9,6 +9,12 @@ on:
       - scripts/testing/m6-qs-api-image-*.yaml
       - scripts/testing/m6-qs-api-image-schema90-handoff.sh
   workflow_dispatch:
+    inputs:
+      target:
+        description: Published image handoff to verify
+        required: true
+        type: choice
+        options: [api, worker]
 
 permissions:
   contents: read
@@ -60,7 +66,7 @@ jobs:
             qs-m6-current:7ca541af qs-m6-fallback:7c0c919e
 
   api-schema90-image-handoff:
-    if: github.event_name == 'workflow_dispatch' && github.ref_name == 'codex/m6-03-qs-schema90-fallback'
+    if: github.event_name == 'workflow_dispatch' && github.ref_name == 'codex/m6-03-qs-schema90-fallback' && inputs.target == 'api'
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
@@ -93,3 +99,46 @@ jobs:
             "$GITHUB_WORKSPACE/harness" \
             ghcr.io/fangcunmount/qs-apiserver:f3abaf2d184e598d5191c1d3ccf9cdbdbc3a116c \
             ghcr.io/fangcunmount/qs-apiserver@sha256:8d26be7461300148bb11a82c1130305f3ba8103cbbfe2c384a5c3970714dbefc
+
+  worker-published-image-handoff:
+    if: github.event_name == 'workflow_dispatch' && github.ref_name == 'codex/m6-03-qs-schema90-fallback' && inputs.target == 'worker'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout isolated harness
+        uses: actions/checkout@v6
+        with:
+          path: harness
+      - name: Checkout current production Worker source
+        uses: actions/checkout@v6
+        with:
+          ref: f3abaf2d184e598d5191c1d3ccf9cdbdbc3a116c
+          path: current
+      - name: Verify current source identity
+        run: test "$(git -C current rev-parse HEAD)" = f3abaf2d184e598d5191c1d3ccf9cdbdbc3a116c
+      - name: Login to GHCR for exact published images
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+      - name: Pull current and retained fallback Worker images
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          current=ghcr.io/fangcunmount/qs-worker:f3abaf2d184e598d5191c1d3ccf9cdbdbc3a116c
+          fallback=ghcr.io/fangcunmount/qs-worker:m6-rollback-2b3e426a876431235d4b0717e7046b22ca2da074d9785735325500083f6a26c3
+          docker pull --platform linux/amd64 "$current"
+          docker pull --platform linux/amd64 "$fallback"
+          docker image inspect "$current" --format '{{range .RepoDigests}}{{println .}}{{end}}' |
+            grep -Fqx ghcr.io/fangcunmount/qs-worker@sha256:c33ae18270880cbd26cffa854d9e7affdc086828a943a707cf94415c6306139c
+          docker image inspect "$fallback" --format '{{range .RepoDigests}}{{println .}}{{end}}' |
+            grep -Fqx ghcr.io/fangcunmount/qs-worker@sha256:2b3e426a876431235d4b0717e7046b22ca2da074d9785735325500083f6a26c3
+      - name: Handoff durable unknown-event audit across Worker images
+        shell: bash
+        run: |
+          bash harness/scripts/testing/m6-qs-worker-image-handoff.sh \
+            "$GITHUB_WORKSPACE/harness" "$GITHUB_WORKSPACE/current" \
+            ghcr.io/fangcunmount/qs-worker:f3abaf2d184e598d5191c1d3ccf9cdbdbc3a116c \
+            ghcr.io/fangcunmount/qs-worker:m6-rollback-2b3e426a876431235d4b0717e7046b22ca2da074d9785735325500083f6a26c3 \
+            - -
