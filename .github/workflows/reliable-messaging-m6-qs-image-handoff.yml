@@ -73,16 +73,23 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ github.token }}
-      - name: Pull production and fallback API manifests by digest
+      - name: Pull production-tagged and fallback API images
         shell: bash
         run: |
           set -Eeuo pipefail
-          docker pull --platform linux/amd64 ghcr.io/fangcunmount/qs-apiserver@sha256:7780576e0933c4d6ac14801a0456712ab176a563e25fe9a8fa794907d520b053
+          current=ghcr.io/fangcunmount/qs-apiserver:3aafe46e32fd82f7819c10fe883c79aea091163c
+          docker pull --platform linux/amd64 "$current"
+          # Compare all decompressed layer identities to the running serverA image.
+          # Its historic RepoDigest is no longer directly retrievable from GHCR.
+          expected=ffe3a161f2b89f4bcc70abfd49d2d722b9eb40fae182cd9824f445c7b7294bf9
+          actual=$(docker image inspect "$current" --format '{{json .RootFS.Layers}}' | sha256sum | cut -d ' ' -f1)
+          test "$actual" = "$expected"
+          printf 'production layer identity: %s\n' "$actual"
           docker pull --platform linux/amd64 ghcr.io/fangcunmount/qs-apiserver@sha256:8d26be7461300148bb11a82c1130305f3ba8103cbbfe2c384a5c3970714dbefc
       - name: Run API schema 90/36 image handoff
         shell: bash
         run: |
           bash harness/scripts/testing/m6-qs-api-image-schema90-handoff.sh \
             "$GITHUB_WORKSPACE/harness" \
-            ghcr.io/fangcunmount/qs-apiserver@sha256:7780576e0933c4d6ac14801a0456712ab176a563e25fe9a8fa794907d520b053 \
+            ghcr.io/fangcunmount/qs-apiserver:3aafe46e32fd82f7819c10fe883c79aea091163c \
             ghcr.io/fangcunmount/qs-apiserver@sha256:8d26be7461300148bb11a82c1130305f3ba8103cbbfe2c384a5c3970714dbefc
