@@ -2,7 +2,7 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "2cb1b077c17208a7ae031bc3d84ba9c40845632f",
+    "sha": "6e366916ff5e2088996709f900fbc6232f98e6b7",
     "verified_on": "2026-10-01"
   },
   "status_policy": {
@@ -53,7 +53,7 @@
         "docs/_archive/**/*.md",
         "tmp/**/*.md"
       ],
-      "expected_count": 36,
+      "expected_count": 37,
       "budgeted": false
     }
   },
@@ -8592,6 +8592,36 @@
           "severity": "medium",
           "summary": "Production read-only scope and operational evidence are still pending.",
           "exit_criteria": "Run a fixed post-cutover window and retain its aggregate output before promotion."
+        }
+      ]
+    },
+    {
+      "path": "scripts/oneoff/interpretation_retry_gap_audit/README.md",
+      "class": "sidecar",
+      "owner": "tooling",
+      "doc_status": "needs_review",
+      "verified": {
+        "source_sha": null,
+        "verified_on": null
+      },
+      "fact_sources": [],
+      "verification": [],
+      "production_evidence": {
+        "level": "none",
+        "refs": [],
+        "deployed_sha": null,
+        "observed_at": null,
+        "limitations": [
+          "Only one fixed 500-Run production range has been read; no real broker-loss retry gap or recovery was validated."
+        ]
+      },
+      "gaps": [
+        {
+          "id": "DOC-CLOSURE-QS10-AUDIT",
+          "kind": "verification",
+          "severity": "medium",
+          "summary": "Full relevant range and a real suspected delivery gap remain unverified.",
+          "exit_criteria": "Review bounded per-ID findings and verify any recovery against the original retry decision without a blind model call."
         }
       ]
     },
