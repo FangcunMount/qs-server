@@ -52,6 +52,12 @@ func TestAcceptanceFailureGateClaimsOnlyOneMatchingPreModelAttempt(t *testing.T)
 	if err := run.Start(now); err != nil {
 		t.Fatal(err)
 	}
+	if claimed, err := gate.TryFail(t.Context(), a, input, &run); err != nil || claimed || store.count != 0 {
+		t.Fatalf("unfrozen run claimed=%t err=%v inserts=%d", claimed, err, store.count)
+	}
+	if err := run.AttachInputSnapshot("frozen-input-ref"); err != nil {
+		t.Fatal(err)
+	}
 	twins := []*AcceptanceFailureGate{gate, {claims: store, scope: scope, now: gate.now}}
 	results := make(chan bool, len(twins))
 	for _, candidate := range twins {

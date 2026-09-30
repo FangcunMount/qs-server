@@ -69,7 +69,7 @@ func (g *AcceptanceFailureGate) TryFail(ctx context.Context, a *assessment.Asses
 	now := g.now()
 	if now.Before(g.scope.StartsAt) || !now.Before(g.scope.ExpiresAt) ||
 		run.Attempt().Number != 1 || run.Origin() != retrygovernance.AttemptOriginInitial ||
-		a.ID().IsZero() || a.OrgID() != g.scope.OrgID || a.TesteeID().Uint64() != g.scope.TesteeID ||
+		run.InputSnapshotRef() == "" || a.ID().IsZero() || a.OrgID() != g.scope.OrgID || a.TesteeID().Uint64() != g.scope.TesteeID ||
 		input.Model.Code != g.scope.ModelCode {
 		return false, nil
 	}

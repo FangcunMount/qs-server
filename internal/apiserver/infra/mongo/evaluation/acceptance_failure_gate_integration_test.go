@@ -34,6 +34,9 @@ func TestEvaluationAcceptanceFailureGateClaimsOnlyOnceInRealMongo(t *testing.T) 
 	if err := run.Start(now); err != nil {
 		t.Fatal(err)
 	}
+	if err := run.AttachInputSnapshot("frozen-input-ref"); err != nil {
+		t.Fatal(err)
+	}
 	claims := db.Collection("evaluation_acceptance_failure_claims")
 	first, err := NewAcceptanceFailureGate(claims, scope)
 	if err != nil {
