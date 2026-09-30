@@ -20,7 +20,7 @@ func acceptanceFailureGateFromEnv(db *mongo.Database) (interpretationexecution.B
 		return nil, nil
 	}
 	if db == nil {
-		return nil, fmt.Errorf("Mongo database is required")
+		return nil, fmt.Errorf("mongo database is required")
 	}
 	scope, err := parseAcceptanceFailureScope(raw)
 	if err != nil {
