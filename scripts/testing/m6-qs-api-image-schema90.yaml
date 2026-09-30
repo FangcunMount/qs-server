@@ -34,7 +34,7 @@ messaging:
   nsqd-http-endpoints: ["http://nsqd:4151"]
   primary-worker-channel: qs-worker
 eventing:
-  standard-outbox:
+  standard_outbox:
     mongo: true
     assessment: true
   consumers:
