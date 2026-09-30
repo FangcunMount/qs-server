@@ -83,6 +83,8 @@ topic=m6.api.handoff
 nsqd_container=$("${compose[@]}" ps -q nsqd)
 [[ -n "$nsqd_container" ]]
 docker exec "$nsqd_container" wget -qO- --post-data '' \
+  "http://127.0.0.1:4151/topic/create?topic=${topic}" >/dev/null
+docker exec "$nsqd_container" wget -qO- --post-data '' \
   "http://127.0.0.1:4151/channel/create?topic=${topic}&channel=m6-api-proof" >/dev/null
 
 seed_pending() {
