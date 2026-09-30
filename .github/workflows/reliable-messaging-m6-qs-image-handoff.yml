@@ -104,6 +104,8 @@ jobs:
     if: github.event_name == 'workflow_dispatch' && github.ref_name == 'codex/m6-03-qs-schema90-fallback' && inputs.target == 'worker'
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    environment:
+      name: production
     steps:
       - name: Checkout isolated harness
         uses: actions/checkout@v6
@@ -122,17 +124,22 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ github.token }}
+      - name: Login to ACR for deployed Worker image
+        uses: docker/login-action@v4
+        with:
+          registry: ${{ secrets.ALIYUN_ACR_REGISTRY }}
+          username: ${{ secrets.ALIYUN_ACR_USERNAME }}
+          password: ${{ secrets.ALIYUN_ACR_PASSWORD }}
       - name: Pull current and retained fallback Worker images
         shell: bash
         run: |
           set -Eeuo pipefail
-          current=ghcr.io/fangcunmount/qs-worker:f3abaf2d184e598d5191c1d3ccf9cdbdbc3a116c
+          current=crpi-x3r4i68cpfmwtcll.cn-beijing.personal.cr.aliyuncs.com/fangcunmount/qs-worker:f3abaf2d184e598d5191c1d3ccf9cdbdbc3a116c
           fallback=ghcr.io/fangcunmount/qs-worker:m6-rollback-2b3e426a876431235d4b0717e7046b22ca2da074d9785735325500083f6a26c3
           docker pull --platform linux/amd64 "$current"
           docker pull --platform linux/amd64 "$fallback"
-          # The production tarball came from ACR. Registry manifest digests can
-          # differ across registries, so compare the Docker image/config ID that
-          # the three running Worker containers actually reference.
+          # Production loads an ACR export tarball; compare its image/config ID
+          # with what the three running Worker containers actually reference.
           current_id=$(docker image inspect "$current" --format '{{.Id}}')
           echo "Current Worker image ID: $current_id"
           test "$current_id" = sha256:c33ae18270880cbd26cffa854d9e7affdc086828a943a707cf94415c6306139c
@@ -145,6 +152,6 @@ jobs:
         run: |
           bash harness/scripts/testing/m6-qs-worker-image-handoff.sh \
             "$GITHUB_WORKSPACE/harness" "$GITHUB_WORKSPACE/current" \
-            ghcr.io/fangcunmount/qs-worker:f3abaf2d184e598d5191c1d3ccf9cdbdbc3a116c \
+            crpi-x3r4i68cpfmwtcll.cn-beijing.personal.cr.aliyuncs.com/fangcunmount/qs-worker:f3abaf2d184e598d5191c1d3ccf9cdbdbc3a116c \
             ghcr.io/fangcunmount/qs-worker:m6-rollback-2b3e426a876431235d4b0717e7046b22ca2da074d9785735325500083f6a26c3 \
             - -
