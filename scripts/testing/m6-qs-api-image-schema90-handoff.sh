@@ -119,6 +119,32 @@ topic_count() {
     python3 -c 'import json,sys; data=json.load(sys.stdin); print(next((t["message_count"] for t in data["topics"] if t["topic_name"]=="m6.api.handoff"), -1))'
 }
 
+# Keep only metadata and a recomputed immutable-content comparison in CI logs.
+# The SQL row remains in the disposable database until cleanup; never print
+# its payload or any connection configuration.
+diagnose_row() {
+  local id=$1
+  "${compose[@]}" exec -T mysql mysql -uroot qs --batch --raw --skip-column-names \
+    -e "SELECT state,last_error_code,attempt_count,failure_count,HEX(producer),HEX(message_id),HEX(destination),HEX(event_type),HEX(schema_version),HEX(scope),HEX(content_type),HEX(occurred_at),HEX(payload),HEX(fingerprint) FROM rm_outbox WHERE message_id='$id'" |
+    python3 -c '
+import hashlib, struct, sys
+line = sys.stdin.read().rstrip("\n")
+values = line.split("\t")
+if len(values) != 14:
+    raise SystemExit("probe diagnostic row shape mismatch")
+state, code, attempts, failures = values[:4]
+parts = [bytes.fromhex(value) for value in values[4:13]]
+stored = bytes.fromhex(values[13])
+digest = hashlib.sha256(b"rm-fingerprint-draft-v1\x00")
+for part in parts:
+    digest.update(struct.pack(">Q", len(part)))
+    digest.update(part)
+print("probe diagnostic: state=%s code=%s attempts=%s failures=%s fingerprint_match=%s field_lengths=%s" %
+      (state, code or "<empty>", attempts, failures, digest.digest() == stored,
+       ",".join(str(len(part)) for part in parts)))
+'
+}
+
 wait_confirmed() {
   local id=$1 expected_count=$2 row count
   for _ in {1..60}; do
@@ -129,10 +155,11 @@ wait_confirmed() {
       printf 'original=%s state=published attempts=1 nsq_topic_messages=%s\n' "$id" "$count"
       return 0
     fi
-    [[ "$row" != quarantined* ]] || { echo "Quarantined $id" >&2; return 1; }
+    [[ "$row" != quarantined* ]] || { echo "Quarantined $id" >&2; diagnose_row "$id"; return 1; }
     sleep 1
   done
   echo "No single confirmed delivery for $id: row=$row topic_count=$count" >&2
+  diagnose_row "$id"
   return 1
 }
 
