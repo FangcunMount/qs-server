@@ -78,11 +78,10 @@ jobs:
         shell: bash
         run: |
           set -Eeuo pipefail
-          current=ghcr.io/fangcunmount/qs-apiserver:202309ddd29e60a2f368fa09116d9218058ba0d8
+          current=ghcr.io/fangcunmount/qs-apiserver:f3abaf2d184e598d5191c1d3ccf9cdbdbc3a116c
           docker pull --platform linux/amd64 "$current"
-          # Compare all decompressed layer identities to the running serverA image.
-          # Its historic RepoDigest is no longer directly retrievable from GHCR.
-          expected=6f2118e9a0cda2ae1d6dcf29d96285eb9cd90470a12345bbc268c0a61a3a813d
+          # Compare all decompressed layer identities to the current running serverA image.
+          expected=5b976257857daec70238ca9d96e97876479ded6f08d0dd47b1152cce235fad78
           actual=$(docker image inspect "$current" --format '{{json .RootFS.Layers}}' | sha256sum | cut -d ' ' -f1)
           test "$actual" = "$expected"
           printf 'production layer identity: %s\n' "$actual"
@@ -92,5 +91,5 @@ jobs:
         run: |
           bash harness/scripts/testing/m6-qs-api-image-schema90-handoff.sh \
             "$GITHUB_WORKSPACE/harness" \
-            ghcr.io/fangcunmount/qs-apiserver:202309ddd29e60a2f368fa09116d9218058ba0d8 \
+            ghcr.io/fangcunmount/qs-apiserver:f3abaf2d184e598d5191c1d3ccf9cdbdbc3a116c \
             ghcr.io/fangcunmount/qs-apiserver@sha256:8d26be7461300148bb11a82c1130305f3ba8103cbbfe2c384a5c3970714dbefc
