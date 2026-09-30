@@ -231,6 +231,7 @@ jobs:
       contents: read
     if: |
       always() &&
+      github.ref_name != 'codex/m6-03-qs-schema90-fallback' &&
       vars.PRODUCTION_DEPLOY_PAUSED != 'true' &&
       needs.docker.result == 'success' &&
       needs.plan.outputs.apiserver == 'true'
@@ -353,6 +354,7 @@ jobs:
       contents: read
     if: |
       always() &&
+      github.ref_name != 'codex/m6-03-qs-schema90-fallback' &&
       vars.PRODUCTION_DEPLOY_PAUSED != 'true' &&
       needs.docker.result == 'success' &&
       (needs.plan.outputs.apiserver != 'true' || needs.deploy-apiserver.result == 'success') &&
@@ -461,6 +463,7 @@ jobs:
       contents: read
     if: |
       always() &&
+      github.ref_name != 'codex/m6-03-qs-schema90-fallback' &&
       vars.PRODUCTION_DEPLOY_PAUSED != 'true' &&
       needs.docker.result == 'success' &&
       (needs.plan.outputs.apiserver != 'true' || needs.deploy-apiserver.result == 'success') &&
