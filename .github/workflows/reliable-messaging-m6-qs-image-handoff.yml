@@ -126,7 +126,7 @@ jobs:
         shell: bash
         run: |
           set -Eeuo pipefail
-          current=ghcr.io/fangcunmount/qs-worker:f3abaf2d184e598d5191c1d3ccf9cdbdbc3a116c
+          current=ghcr.io/fangcunmount/qs-worker@sha256:c33ae18270880cbd26cffa854d9e7affdc086828a943a707cf94415c6306139c
           fallback=ghcr.io/fangcunmount/qs-worker:m6-rollback-2b3e426a876431235d4b0717e7046b22ca2da074d9785735325500083f6a26c3
           docker pull --platform linux/amd64 "$current"
           docker pull --platform linux/amd64 "$fallback"
@@ -139,6 +139,6 @@ jobs:
         run: |
           bash harness/scripts/testing/m6-qs-worker-image-handoff.sh \
             "$GITHUB_WORKSPACE/harness" "$GITHUB_WORKSPACE/current" \
-            ghcr.io/fangcunmount/qs-worker:f3abaf2d184e598d5191c1d3ccf9cdbdbc3a116c \
+            ghcr.io/fangcunmount/qs-worker@sha256:c33ae18270880cbd26cffa854d9e7affdc086828a943a707cf94415c6306139c \
             ghcr.io/fangcunmount/qs-worker:m6-rollback-2b3e426a876431235d4b0717e7046b22ca2da074d9785735325500083f6a26c3 \
             - -
