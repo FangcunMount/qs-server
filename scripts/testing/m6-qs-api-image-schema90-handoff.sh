@@ -79,10 +79,73 @@ stop_api() {
   docker rm "$api" >/dev/null
 }
 
+topic=m6.api.handoff
+nsqd_container=$("${compose[@]}" ps -q nsqd)
+[[ -n "$nsqd_container" ]]
+docker exec "$nsqd_container" wget -qO- --post-data '' \
+  "http://127.0.0.1:4151/channel/create?topic=${topic}&channel=m6-api-proof" >/dev/null
+
+seed_pending() {
+  local id=$1
+  M6_PROBE_ID="$id" python3 - <<'PY' | "${compose[@]}" exec -T mysql mysql -uroot qs
+import datetime
+import hashlib
+import json
+import os
+import struct
+
+event_id = os.environ["M6_PROBE_ID"]
+occurred = datetime.datetime.now(datetime.timezone.utc).isoformat().replace("+00:00", "Z")
+payload = json.dumps({"probe_id": event_id}, separators=(",", ":")).encode()
+fields = ["qs-server", event_id, "m6.api.handoff", "m6.api.handoff", "v1", "org:1", "application/json", occurred]
+parts = [field.encode() for field in fields] + [payload]
+digest = hashlib.sha256(b"rm-fingerprint-draft-v1\x00")
+for part in parts:
+    digest.update(struct.pack(">Q", len(part)))
+    digest.update(part)
+values = ["X'" + part.hex() + "'" for part in parts]
+values.append("X'" + digest.hexdigest() + "'")
+values.append("UTC_TIMESTAMP(6)")
+print("INSERT INTO rm_outbox ")
+print("(producer,message_id,destination,event_type,schema_version,scope,content_type,occurred_at,payload,fingerprint,next_attempt_at)")
+print("VALUES (" + ",".join(values) + ");")
+PY
+}
+
+topic_count() {
+  docker exec "$nsqd_container" wget -qO- 'http://127.0.0.1:4151/stats?format=json' |
+    python3 -c 'import json,sys; data=json.load(sys.stdin); print(next((t["message_count"] for t in data["topics"] if t["topic_name"]=="m6.api.handoff"), -1))'
+}
+
+wait_confirmed() {
+  local id=$1 expected_count=$2 row count
+  for _ in {1..60}; do
+    row=$("${compose[@]}" exec -T mysql mysql -uroot --batch --skip-column-names \
+      -e "SELECT state,attempt_count FROM qs.rm_outbox WHERE message_id='$id'" 2>/dev/null || true)
+    count=$(topic_count 2>/dev/null || true)
+    if [[ "$row" == $'published\t1' && "$count" == "$expected_count" ]]; then
+      printf 'original=%s state=published attempts=1 nsq_topic_messages=%s\n' "$id" "$count"
+      return 0
+    fi
+    [[ "$row" != quarantined* ]] || { echo "Quarantined $id" >&2; return 1; }
+    sleep 1
+  done
+  echo "No single confirmed delivery for $id: row=$row topic_count=$count" >&2
+  return 1
+}
+
+id_prefix="m6-api-${GITHUB_RUN_ID:-local}-$$"
 start_api "$current_image" current_first
 stop_api
+seed_pending "${id_prefix}-fallback"
 start_api "$fallback_image" fallback
+wait_confirmed "${id_prefix}-fallback" 1
 stop_api
+seed_pending "${id_prefix}-current"
 start_api "$current_image" current_return
+wait_confirmed "${id_prefix}-current" 2
+original=$("${compose[@]}" exec -T mysql mysql -uroot --batch --skip-column-names \
+  -e "SELECT state,attempt_count FROM qs.rm_outbox WHERE message_id='${id_prefix}-fallback'")
+[[ "$original" == $'published\t1' ]]
 stop_api
-printf 'API image handoff: current -> fallback -> current processes healthy on one disposable schema 90/36\n'
+printf 'API image handoff: current -> fallback -> current healthy; two original MySQL IDs, two NSQ publishes, no repeat\n'
