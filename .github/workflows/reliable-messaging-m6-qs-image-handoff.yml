@@ -133,9 +133,12 @@ jobs:
           # The production tarball came from ACR. Registry manifest digests can
           # differ across registries, so compare the Docker image/config ID that
           # the three running Worker containers actually reference.
-          test "$(docker image inspect "$current" --format '{{.Id}}')" = \
-            sha256:c33ae18270880cbd26cffa854d9e7affdc086828a943a707cf94415c6306139c
-          docker image inspect "$fallback" --format '{{range .RepoDigests}}{{println .}}{{end}}' |
+          current_id=$(docker image inspect "$current" --format '{{.Id}}')
+          echo "Current Worker image ID: $current_id"
+          test "$current_id" = sha256:c33ae18270880cbd26cffa854d9e7affdc086828a943a707cf94415c6306139c
+          fallback_digests=$(docker image inspect "$fallback" --format '{{range .RepoDigests}}{{println .}}{{end}}')
+          printf 'Fallback Worker RepoDigests: %s\n' "$fallback_digests"
+          printf '%s\n' "$fallback_digests" |
             grep -Fqx ghcr.io/fangcunmount/qs-worker@sha256:2b3e426a876431235d4b0717e7046b22ca2da074d9785735325500083f6a26c3
       - name: Handoff durable unknown-event audit across Worker images
         shell: bash
