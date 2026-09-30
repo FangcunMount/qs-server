@@ -79,7 +79,9 @@ stop_api() {
   docker rm "$api" >/dev/null
 }
 
-topic=m6.api.handoff
+# Use a route owned by the standard Assessment Outbox. The synthetic event
+# type remains a transport-only probe; it is not a business-effect assertion.
+topic=qs.evaluation.lifecycle
 nsqd_container=$("${compose[@]}" ps -q nsqd)
 [[ -n "$nsqd_container" ]]
 docker exec "$nsqd_container" wget -qO- --post-data '' \
@@ -99,7 +101,7 @@ import struct
 event_id = os.environ["M6_PROBE_ID"]
 occurred = datetime.datetime.now(datetime.timezone.utc).isoformat().replace("+00:00", "Z")
 payload = json.dumps({"probe_id": event_id}, separators=(",", ":")).encode()
-fields = ["qs-server", event_id, "m6.api.handoff", "m6.api.handoff", "v1", "org:1", "application/json", occurred]
+fields = ["qs-server", event_id, "qs.evaluation.lifecycle", "m6.api.handoff", "v1", "org:1", "application/json", occurred]
 parts = [field.encode() for field in fields] + [payload]
 digest = hashlib.sha256(b"rm-fingerprint-draft-v1\x00")
 for part in parts:
@@ -116,7 +118,7 @@ PY
 
 topic_count() {
   docker exec "$nsqd_container" wget -qO- 'http://127.0.0.1:4151/stats?format=json' |
-    python3 -c 'import json,sys; data=json.load(sys.stdin); print(next((t["message_count"] for t in data["topics"] if t["topic_name"]=="m6.api.handoff"), -1))'
+    python3 -c 'import json,sys; data=json.load(sys.stdin); print(next((t["message_count"] for t in data["topics"] if t["topic_name"]=="qs.evaluation.lifecycle"), -1))'
 }
 
 # Keep only metadata and a recomputed immutable-content comparison in CI logs.
