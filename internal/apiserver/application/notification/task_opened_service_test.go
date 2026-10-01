@@ -185,7 +185,7 @@ func TestSendTaskOpenedFallsBackToGuardians(t *testing.T) {
 	if sender.sent[0].ToUser != "openid-guardian" {
 		t.Fatalf("unexpected recipient: %#v", sender.sent[0])
 	}
-	if got := sender.sent[0].Page; !strings.HasPrefix(got, "pages/questionnaire/index?") || !strings.Contains(got, "token=abc123") || !strings.Contains(got, "task_id="+task.GetID().String()) {
+	if got := sender.sent[0].Page; !strings.HasPrefix(got, "pages/assessment/fill/index?") || strings.Contains(got, "token=") || !strings.Contains(got, "task_id="+task.GetID().String()) {
 		t.Fatalf("unexpected page path: %s", got)
 	}
 	if sender.sent[0].Data["thing5"] != "儿童抑郁量表" ||

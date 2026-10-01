@@ -2,12 +2,11 @@ package plan
 
 import (
 	"context"
-	"fmt"
+	urlpkg "net/url"
 
 	"github.com/FangcunMount/component-base/pkg/logger"
 	planDomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/plan"
 	planentryport "github.com/FangcunMount/qs-server/internal/apiserver/port/planentry"
-	"github.com/google/uuid"
 )
 
 // entryGenerator 入口生成器实现
@@ -29,15 +28,19 @@ func (g *entryGenerator) GenerateEntry(ctx context.Context, task *planDomain.Ass
 	logger.L(ctx).Infow("Generating entry for task",
 		"infra_action", "generate_entry",
 		"task_id", taskID,
-		"base_url", g.baseURL,
 	)
 
-	// 1. 生成唯一令牌
-	token = uuid.New().String()
-
-	// 2. 生成入口URL
-	// 格式：{baseURL}?token={token}&task_id={task_id}
-	url = fmt.Sprintf("%s?token=%s&task_id=%s", g.baseURL, token, task.GetID().String())
+	// Task IDs locate tasks; login and active profile relationships authorize access.
+	token = ""
+	base, parseErr := urlpkg.Parse(g.baseURL)
+	if parseErr != nil {
+		return "", "", parseErr
+	}
+	query := urlpkg.Values{}
+	query.Set("task_id", taskID)
+	base.RawQuery = query.Encode()
+	base.Fragment = ""
+	url = base.String()
 
 	logger.L(ctx).Infow("Entry generated successfully",
 		"infra_action", "generate_entry",

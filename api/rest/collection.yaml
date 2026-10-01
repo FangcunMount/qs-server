@@ -1494,7 +1494,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/core.ErrResponse'
-  /api/v1/plan-task-entries/{task_id}/{token}:
+  /api/v1/plan-task-entries/{task_id}:
     get:
       tags:
       - Plan-Entry
@@ -1505,11 +1505,6 @@ paths:
       - type: string
         description: 任务ID
         name: task_id
-        in: path
-        required: true
-      - type: string
-        description: 入口令牌
-        name: token
         in: path
         required: true
       responses:
@@ -1532,6 +1527,98 @@ paths:
                 $ref: '#/components/schemas/core.ErrResponse'
         '404':
           description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '401':
+          description: 认证失败或访问令牌无效
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '500':
+          description: 服务内部错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+  /api/v1/plan-task-entries/{task_id}/{token}:
+    get:
+      tags:
+      - Plan-Entry
+      summary: 兼容旧计划任务入口
+      operationId: 兼容旧计划任务入口
+      description: 兼容旧计划任务入口
+      parameters:
+      - type: string
+        description: 任务ID
+        name: task_id
+        in: path
+        required: true
+      - type: string
+        description: 历史入口参数，忽略且不授权
+        name: token
+        in: path
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/core.Response'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/planentry.Entry'
+        '401':
+          description: 认证失败或访问令牌无效
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '403':
+          description: 无权访问该资源
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '500':
+          description: 服务内部错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+  /api/v1/plan-tasks:
+    get:
+      tags:
+      - Plan-Entry
+      summary: 查询当前用户指定档案的待填写任务
+      operationId: 查询当前用户指定档案的待填写任务
+      description: 查询当前用户指定档案的待填写任务
+      parameters:
+      - type: string
+        description: 档案ID
+        name: testee_id
+        in: query
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.Response'
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '503':
+          description: Service Unavailable
           content:
             application/json:
               schema:
@@ -3774,13 +3861,31 @@ components:
     planentry.Entry:
       type: object
       properties:
-        expiresAt:
+        can_start:
+          type: boolean
+        due_at:
           type: string
-        scaleCode:
+        expires_at:
           type: string
-        taskID:
+        model_version:
           type: string
-        testeeID:
+        open_at:
+          type: string
+        plan_id:
+          type: string
+        q:
+          type: string
+        questionnaire_version:
+          type: string
+        scale_code:
+          type: string
+        status:
+          type: string
+        task_id:
+          type: string
+        testee_id:
+          type: string
+        title:
           type: string
     questionnaire.CalculationRuleResponse:
       type: object
