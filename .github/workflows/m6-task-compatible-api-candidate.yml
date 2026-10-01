@@ -1,0 +1,91 @@
+name: M6 Task-compatible API candidate
+
+on:
+  push:
+    branches: [codex/m6-api-fallback-task-compat]
+
+permissions:
+  contents: read
+  packages: read
+
+jobs:
+  candidate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 50
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          path: candidate
+      - uses: actions/checkout@v6
+        with:
+          ref: 66af0cb6cee63022eb7926277ee99e59ab6e7de8
+          path: harness
+      - uses: actions/setup-go@v6
+        with:
+          go-version: '1.25.12'
+          cache-dependency-path: candidate/go.sum
+      - name: Check retained schema and deployed Task source
+        working-directory: candidate
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          git fetch --no-tags origin 8017d6eb5f5816c6c2c778c587717d0c9a536a0f bb219880927be37da9a94ae7be3d76fbfcab07ac
+          git diff --exit-code 8017d6eb5f5816c6c2c778c587717d0c9a536a0f -- go.mod go.sum internal/pkg/migration/migrations
+          git diff --exit-code bb219880927be37da9a94ae7be3d76fbfcab07ac -- \
+            api/grpc/proto/internalapi api/grpc/gen/internalapi \
+            internal/collection-server \
+            internal/apiserver/transport/grpc/service/plan_entry.go
+          make docs-check
+          go test ./internal/apiserver/application/plan \
+            ./internal/apiserver/infra/mysql/answersheetattribution \
+            ./internal/apiserver/infra/plan \
+            ./internal/apiserver/transport/grpc/service \
+            ./internal/collection-server/application/planentry \
+            ./internal/collection-server/transport/rest/handler \
+            ./internal/collection-server/infra/grpcclient -count=1
+      - name: Build candidate without registry publication
+        working-directory: candidate
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          docker build --platform linux/amd64 \
+            -f build/docker/Dockerfile.qs-apiserver \
+            --build-arg GIT_COMMIT="$GITHUB_SHA" \
+            --build-arg GIT_BRANCH=codex/m6-api-fallback-task-compat \
+            --label "org.opencontainers.image.revision=$GITHUB_SHA" \
+            -t "qs-m6-task-api:$GITHUB_SHA" .
+          test "$(docker image inspect "qs-m6-task-api:$GITHUB_SHA" --format '{{.Os}}/{{.Architecture}} {{.Config.User}}')" = 'linux/amd64 www'
+      - name: Login for reading current published API
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+      - name: Verify current image and isolated AI result handoff
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          current=ghcr.io/fangcunmount/qs-apiserver:672950465f887293e33690915cbf3a32416ccd09
+          docker pull --platform linux/amd64 "$current"
+          expected=57149f1c06b2860905a2b31cd0f4de27f8e0f7e781a6db7e95c9aeb89521b37a
+          actual=$(docker image inspect "$current" --format '{{json .RootFS.Layers}}' | sha256sum | cut -d ' ' -f1)
+          test "$actual" = "$expected"
+          bash harness/scripts/testing/m6-qs-api-image-schema90-handoff.sh \
+            "$GITHUB_WORKSPACE/harness" "$current" "qs-m6-task-api:$GITHUB_SHA"
+      - name: Archive verified candidate
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          mkdir -p artifact
+          docker image inspect "qs-m6-task-api:$GITHUB_SHA" \
+            --format '{{json .}}' > artifact/image-identity.json
+          docker save "qs-m6-task-api:$GITHUB_SHA" | gzip -1 > artifact/qs-m6-task-api.tar.gz
+          (cd artifact && sha256sum qs-m6-task-api.tar.gz > qs-m6-task-api.tar.gz.sha256)
+          printf '%s\n' "$GITHUB_SHA" > artifact/source-sha.txt
+      - uses: actions/upload-artifact@v7
+        with:
+          name: qs-m6-task-api-${{ github.run_id }}
+          path: artifact/
+          if-no-files-found: error
+          retention-days: 14
