@@ -69,6 +69,26 @@ func TestTaskOpenedReminderStopsWhenCurrentTaskOrOneHourWindowChanges(t *testing
 	require.Error(t, err, "missing entry must not produce an unusable reminder")
 }
 
+func TestTaskOpenedReminderMatchesPersistedMillisecondOpening(t *testing.T) {
+	// The event retains nanoseconds, while assessment_task.open_at is DATETIME(3).
+	opened := time.Date(2026, 10, 1, 8, 46, 3, 743056448, time.FixedZone("UTC+8", 8*3600))
+	persisted := opened.Truncate(time.Millisecond)
+	expires := opened.Add(24 * time.Hour)
+	intent := TaskOpenedReminderIntent{OrgID: 1, TaskID: "task-1", TesteeID: "testee-1", ScheduleRevision: 1, OpenAt: opened}
+	state := &planApp.TaskReminderState{OrgID: 1, TaskID: "task-1", TesteeID: "testee-1", Status: planDomain.TaskStatusOpened,
+		ScheduleRevision: 1, OpenAt: &persisted, ExpireAt: &expires, EntryURL: "https://example.invalid/entry"}
+
+	decision, err := EvaluateTaskOpenedReminder(intent, state, opened.Add(time.Minute))
+	require.NoError(t, err)
+	require.Empty(t, decision.SuppressCode)
+
+	differentOpening := persisted.Add(time.Millisecond)
+	state.OpenAt = &differentOpening
+	decision, err = EvaluateTaskOpenedReminder(intent, state, opened.Add(time.Minute))
+	require.NoError(t, err)
+	require.Equal(t, "opening_changed", decision.SuppressCode)
+}
+
 func TestTaskOpenedReminderDateUsesUTCPlusEight(t *testing.T) {
 	openedUTC := time.Date(2026, 9, 25, 16, 30, 0, 0, time.UTC)
 	require.Equal(t, "2026.09.26", formatTaskOpenedDate(openedUTC))

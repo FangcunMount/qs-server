@@ -46,7 +46,9 @@ func EvaluateTaskOpenedReminder(
 	if task.OrgID != intent.OrgID || task.TaskID != intent.TaskID || task.TesteeID != intent.TesteeID {
 		return ReminderTaskDecision{}, fmt.Errorf("current task does not match reminder scope")
 	}
-	if task.ScheduleRevision != intent.ScheduleRevision || task.OpenAt == nil || !task.OpenAt.Equal(intent.OpenAt) {
+	// assessment_task.open_at is DATETIME(3); the committed event can retain
+	// sub-millisecond precision that the persisted task cannot represent.
+	if task.ScheduleRevision != intent.ScheduleRevision || task.OpenAt == nil || !task.OpenAt.Equal(intent.OpenAt.Truncate(time.Millisecond)) {
 		return ReminderTaskDecision{SuppressCode: "opening_changed"}, nil
 	}
 	if task.Status != planDomain.TaskStatusOpened {
