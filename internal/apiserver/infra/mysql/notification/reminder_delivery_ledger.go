@@ -131,11 +131,27 @@ func (s *ReminderDeliveryLedger) Confirm(
 		platformMessageIDValue = platformMessageID
 		resolutionCode = ""
 	}
-	return s.transition(ctx, key,
+	changed, err := s.transition(ctx, key,
 		"state = ? AND claim_token = ? AND external_call_started_at IS NOT NULL AND platform_message_id IS NULL",
 		[]any{appnotification.ReminderSending, token},
 		map[string]any{"state": appnotification.ReminderConfirmed, "platform_message_id": platformMessageIDValue,
 			"resolution_code": resolutionCode, "updated_at": now},
+	)
+	if err != nil || changed {
+		return changed, err
+	}
+	// Manual unknown closure stops future attempts, not an already-started call.
+	// Preserve a late platform fact only from the original claimant; retain the
+	// reviewed state and immutable manual audit. Changing the code fences repeats
+	// even when the platform accepted without a message ID.
+	lateCode := "manual_unknown_no_resend_late_confirmed"
+	if platformMessageID == "" {
+		lateCode = "manual_unknown_no_resend_late_accepted_no_msgid"
+	}
+	return s.transition(ctx, key,
+		"state = ? AND claim_token = ? AND external_call_started_at IS NOT NULL AND platform_message_id IS NULL AND resolution_code = ?",
+		[]any{appnotification.ReminderReviewed, token, "manual_unknown_no_resend"},
+		map[string]any{"platform_message_id": platformMessageIDValue, "resolution_code": lateCode, "updated_at": now},
 	)
 }
 

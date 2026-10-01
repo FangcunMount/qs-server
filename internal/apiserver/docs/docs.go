@@ -8982,6 +8982,119 @@ const docTemplate = `{
                 }
             }
         },
+        "/internal/v1/system-governance/actions/reminder-resolutions": {
+            "post": {
+                "description": "机构管理员记录原提醒的人工发现，不补发、不伪造平台确认；发送中仅允许明确知晓原调用可能完成的未知结案",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "System-Governance"
+                ],
+                "summary": "系统治理-记录提醒人工核对结果",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "description": "原责任身份、核验说明与确认",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/systemgovernance.ReminderResolutionRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/systemgovernance.ActionRunResult"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/internal/v1/system-governance/actions/reminder-resolutions/{request_id}": {
+            "get": {
+                "description": "仅当前机构的原操作者可查询已提交回执；查询不发送提醒",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "System-Governance"
+                ],
+                "summary": "系统治理-查询提醒人工核对回执",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "原结案请求编号",
+                        "name": "request_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/systemgovernance.ActionRunResult"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/internal/v1/system-governance/actions/reminder-reviews": {
             "get": {
                 "description": "按当前机构列出发送结果未知的任务开放提醒；只读，不自动补发；仅 qs:admin 可访问",
@@ -23450,6 +23563,41 @@ const docTemplate = `{
                             "type": "string"
                         }
                     }
+                }
+            }
+        },
+        "systemgovernance.ReminderResolutionRequest": {
+            "type": "object",
+            "properties": {
+                "acknowledge_original_call_may_complete": {
+                    "type": "boolean"
+                },
+                "confirm": {
+                    "type": "boolean"
+                },
+                "delivery_id": {
+                    "type": "integer"
+                },
+                "evidence_reference": {
+                    "type": "string"
+                },
+                "expected_updated_at": {
+                    "type": "string"
+                },
+                "finding": {
+                    "type": "string"
+                },
+                "opening_event_id": {
+                    "type": "string"
+                },
+                "reason": {
+                    "type": "string"
+                },
+                "request_id": {
+                    "type": "string"
+                },
+                "task_id": {
+                    "type": "string"
                 }
             }
         },

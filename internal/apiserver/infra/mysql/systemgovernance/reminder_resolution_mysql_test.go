@@ -96,4 +96,78 @@ func TestReminderResolutionAtomicAndNoResendMySQL(t *testing.T) {
 	_, claimed, err := ledger.NewReminderDeliveryLedger(db).Claim(t.Context(), key, time.Minute, now.Add(time.Hour))
 	require.NoError(t, err)
 	require.False(t, claimed)
+	// Exercise both settlement orders with the real sender and real SQL rows.
+	sender := ledger.NewReminderDeliveryLedger(db)
+	for _, messageID := range []string{"late-platform-id", ""} {
+		suffix := "with-id"
+		if messageID == "" {
+			suffix = "without-id"
+		}
+		lateKey := key
+		lateKey.TaskID = "late-" + suffix
+		lateKey.OpeningEventID = "late-event-" + suffix
+		_, err := sender.EnsurePending(t.Context(), lateKey, "user-1", now)
+		require.NoError(t, err)
+		token, claimed, err := sender.Claim(t.Context(), lateKey, time.Minute, now)
+		require.NoError(t, err)
+		require.True(t, claimed)
+		started, err := sender.BeginExternalCall(t.Context(), lateKey, token, now.Add(time.Second))
+		require.NoError(t, err)
+		require.True(t, started)
+		var current reminderResolutionRow
+		require.NoError(t, db.Where("task_id = ?", lateKey.TaskID).Take(&current).Error)
+		review := app.ReminderResolutionRequest{RequestID: "review-" + suffix, DeliveryID: current.ID, TaskID: lateKey.TaskID, OpeningEventID: lateKey.OpeningEventID, ExpectedUpdatedAt: current.UpdatedAt, Finding: "unknown_no_resend", EvidenceReference: "interrupted-call-review", Reason: "original call may finish; no resend", Confirm: true}
+		_, err = store.ResolveReminder(t.Context(), 7, 11, review)
+		require.Error(t, err) // no acknowledgment
+		review.AcknowledgeOriginalCallMayComplete = true
+		invalid := review
+		invalid.Finding = "recipient_received"
+		_, err = store.ResolveReminder(t.Context(), 7, 11, invalid)
+		require.Error(t, err) // cannot invent success for an in-flight call
+		receipt, err := store.ResolveReminder(t.Context(), 7, 11, review)
+		require.NoError(t, err)
+		require.Equal(t, true, receipt.Result["original_call_may_complete"])
+		confirmed, err := sender.Confirm(t.Context(), lateKey, "wrong-token", messageID, now.Add(2*time.Second))
+		require.NoError(t, err)
+		require.False(t, confirmed)
+		confirmed, err = sender.Confirm(t.Context(), lateKey, token, messageID, now.Add(3*time.Second))
+		require.NoError(t, err)
+		require.True(t, confirmed)
+		delivery, err := sender.Read(t.Context(), lateKey)
+		require.NoError(t, err)
+		require.Equal(t, notification.ReminderReviewed, delivery.State)
+		require.Equal(t, messageID, delivery.PlatformMessageID)
+		require.Contains(t, delivery.ResolutionCode, "late_")
+		confirmed, err = sender.Confirm(t.Context(), lateKey, token, messageID, now.Add(4*time.Second))
+		require.NoError(t, err)
+		require.False(t, confirmed)
+		_, claimed, err = sender.Claim(t.Context(), lateKey, time.Minute, now.Add(time.Hour))
+		require.NoError(t, err)
+		require.False(t, claimed)
+		replay, err := store.ResolveReminder(t.Context(), 7, 11, review)
+		require.NoError(t, err)
+		require.Equal(t, receipt.RequestID, replay.RequestID)
+		require.Equal(t, "unknown_no_resend", replay.Result["finding"])
+	}
+	beforeKey := key
+	beforeKey.TaskID = "platform-first"
+	beforeKey.OpeningEventID = "platform-first-event"
+	_, err = sender.EnsurePending(t.Context(), beforeKey, "user-1", now)
+	require.NoError(t, err)
+	token, claimed, err := sender.Claim(t.Context(), beforeKey, time.Minute, now)
+	require.NoError(t, err)
+	require.True(t, claimed)
+	started, err := sender.BeginExternalCall(t.Context(), beforeKey, token, now.Add(time.Second))
+	require.NoError(t, err)
+	require.True(t, started)
+	var before reminderResolutionRow
+	require.NoError(t, db.Where("task_id = ?", beforeKey.TaskID).Take(&before).Error)
+	confirmed, err := sender.Confirm(t.Context(), beforeKey, token, "first-response", now.Add(2*time.Second))
+	require.NoError(t, err)
+	require.True(t, confirmed)
+	_, err = store.ResolveReminder(t.Context(), 7, 11, app.ReminderResolutionRequest{RequestID: "review-platform-first", DeliveryID: before.ID, TaskID: beforeKey.TaskID, OpeningEventID: beforeKey.OpeningEventID, ExpectedUpdatedAt: before.UpdatedAt, Finding: "unknown_no_resend", EvidenceReference: "stale-view", Reason: "must reject stale view", Confirm: true, AcknowledgeOriginalCallMayComplete: true})
+	require.Error(t, err)
+	require.NoError(t, db.Model(&actionRunPO{}).Where("request_id = ?", "review-platform-first").Count(&audits).Error)
+	require.Zero(t, audits)
+
 }

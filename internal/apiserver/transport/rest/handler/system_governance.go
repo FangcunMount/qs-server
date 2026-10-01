@@ -432,6 +432,16 @@ func (h *SystemGovernanceHandler) bindJSON(c *gin.Context, req interface{}) bool
 }
 
 // ResolveReminder records an operator finding without calling the platform.
+// @Summary 系统治理-记录提醒人工核对结果
+// @Description 机构管理员记录原提醒的人工发现，不补发、不伪造平台确认；发送中仅允许明确知晓原调用可能完成的未知结案
+// @Tags System-Governance
+// @Accept json
+// @Produce json
+// @Param Authorization header string true "Bearer 用户令牌"
+// @Param request body systemgovernance.ReminderResolutionRequest true "原责任身份、核验说明与确认"
+// @Success 200 {object} core.Response{data=systemgovernance.ActionRunResult}
+// @Failure 400 {object} core.ErrResponse
+// @Router /internal/v1/system-governance/actions/reminder-resolutions [post]
 func (h *SystemGovernanceHandler) ResolveReminder(c *gin.Context) {
 	orgID, actorID, err := h.RequireProtectedScope(c)
 	if err != nil {
@@ -451,6 +461,15 @@ func (h *SystemGovernanceHandler) ResolveReminder(c *gin.Context) {
 }
 
 // GetReminderResolution reads only the original operator's committed receipt.
+// @Summary 系统治理-查询提醒人工核对回执
+// @Description 仅当前机构的原操作者可查询已提交回执；查询不发送提醒
+// @Tags System-Governance
+// @Produce json
+// @Param Authorization header string true "Bearer 用户令牌"
+// @Param request_id path string true "原结案请求编号"
+// @Success 200 {object} core.Response{data=systemgovernance.ActionRunResult}
+// @Failure 400 {object} core.ErrResponse
+// @Router /internal/v1/system-governance/actions/reminder-resolutions/{request_id} [get]
 func (h *SystemGovernanceHandler) GetReminderResolution(c *gin.Context) {
 	orgID, actorID, err := h.RequireProtectedScope(c)
 	if err != nil {
