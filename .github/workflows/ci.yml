@@ -218,6 +218,7 @@ jobs:
           docker exec "$MYSQL_CONTAINER" mysql -uroot -proot -e 'CREATE DATABASE qs_m5_reminder_resolution_test_ci'
           trap 'docker exec "$MYSQL_CONTAINER" mysql -uroot -proot -e "DROP DATABASE qs_m5_reminder_resolution_test_ci"' EXIT
           go test ./internal/apiserver/infra/mysql/systemgovernance -run '^TestReminderResolutionAtomicAndNoResendMySQL$' -count=1 -v
+          go test ./internal/apiserver/transport/rest -run '^TestReminderResolutionHTTPReceiptMySQL$' -count=1 -v
 
   runtime-closure-e2e:
     name: Seeddata Retirement and Current Runtime E2E
