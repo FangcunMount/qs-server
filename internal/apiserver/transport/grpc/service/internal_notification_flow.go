@@ -10,6 +10,7 @@ import (
 	"github.com/FangcunMount/component-base/pkg/logger"
 	pb "github.com/FangcunMount/qs-server/api/grpc/gen/internalapi"
 	notificationApp "github.com/FangcunMount/qs-server/internal/apiserver/application/notification"
+	qrcodeApp "github.com/FangcunMount/qs-server/internal/apiserver/application/qrcode"
 )
 
 type notificationFlow struct {
@@ -31,7 +32,7 @@ func (flow notificationFlow) HandleQuestionnairePublishedPostActions(
 	ctx context.Context,
 	req *pb.GenerateQuestionnaireQRCodeRequest,
 ) (*pb.GenerateQuestionnaireQRCodeResponse, error) {
-	resp, err := flow.service.generateQuestionnaireQRCode(ctx, req)
+	resp, err := flow.service.generateQuestionnaireQRCode(qrcodeApp.WithPublishedPostAction(ctx), req)
 	if err != nil {
 		return nil, err
 	}
@@ -58,7 +59,7 @@ func (flow notificationFlow) HandleScalePublishedPostActions(
 	ctx context.Context,
 	req *pb.GenerateScaleQRCodeRequest,
 ) (*pb.GenerateScaleQRCodeResponse, error) {
-	resp, err := flow.service.generateScaleQRCode(ctx, req)
+	resp, err := flow.service.generateScaleQRCode(qrcodeApp.WithPublishedPostAction(ctx), req)
 	if err != nil {
 		return nil, err
 	}

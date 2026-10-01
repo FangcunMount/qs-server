@@ -6,6 +6,7 @@ import (
 	planApp "github.com/FangcunMount/qs-server/internal/apiserver/application/plan"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container/compose"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
+	qrcodeinfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/qrcode"
 	"github.com/FangcunMount/qs-server/internal/pkg/options"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime"
 )
@@ -53,6 +54,10 @@ func InitQRCodeServiceFrom(host InstallHost, wechatOptions *options.WeChatOption
 		WeChatOptions:    wechatOptions,
 		OSSOptions:       ossOptions,
 	})
+	if err != nil {
+		return err
+	}
+	result.State.QRCodeService, err = qrcodeinfra.WrapAcceptanceFailureFromEnv(result.State.QRCodeService, host.MongoDB())
 	if err != nil {
 		return err
 	}
