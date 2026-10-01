@@ -2,6 +2,11 @@
 set -euo pipefail
 
 repo=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)
+test_name=${QS_M5_BEST_EFFORT_TEST:-TestBestEffortExternalFailureFinishesRealNSQDelivery}
+case "$test_name" in
+  TestBestEffortExternalFailureFinishesRealNSQDelivery|TestBestEffortUnconfiguredTaskNotificationsFinishRealNSQDelivery) ;;
+  *) echo "Unsupported bounded M5 NSQ proof test" >&2; exit 1 ;;
+esac
 project="qs-m5-best-effort-$(date +%s)-$$-${RANDOM}"
 compose=(docker compose --project-name "$project" --file "$repo/scripts/testing/m5-best-effort-nsq-compose.yaml")
 context=$(docker context show)
@@ -40,5 +45,5 @@ build_dir=$(mktemp -d "${TMPDIR:-/tmp}/$project-build.XXXXXX")
   -e QS_M5_BEST_EFFORT_NSQ=1 \
   -e QS_M5_EVENTS_CONFIG=/tmp/events.yaml \
   nsqd /tmp/m5-best-effort-nsq.test \
-    -test.run '^TestBestEffortExternalFailureFinishesRealNSQDelivery$' \
+    -test.run "^${test_name}$" \
     -test.count=1 -test.timeout=1m -test.v
