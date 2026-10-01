@@ -64,7 +64,9 @@ jobs:
         run: |
           bash harness/scripts/testing/m6-qs-worker-image-handoff.sh \
             "$GITHUB_WORKSPACE/harness" "$GITHUB_WORKSPACE/current" \
-            qs-m6-current:2e106d08 qs-m6-fallback:7c0c919e
+            qs-m6-current:2e106d08 qs-m6-fallback:7c0c919e \
+            2e106d085406a83ec7ec52f060cba926d084a410 \
+            7c0c919e621d3cc93cb82dca668bd6077f7a1446
 
   api-schema90-image-handoff:
     if: github.event_name == 'pull_request' || (github.event_name == 'workflow_dispatch' && github.ref_name == 'main' && inputs.target == 'api')
@@ -175,7 +177,7 @@ jobs:
             gzip > qs-m6-worker-fallback.tar.gz
           sha256sum qs-m6-worker-fallback.tar.gz > qs-m6-worker-fallback.tar.gz.sha256
       - name: Retain verified fallback archive for two days
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: qs-m6-worker-fallback-${{ github.run_id }}
           path: |
