@@ -13,6 +13,8 @@ import (
 
 // Facade 是unified system governance entry point。
 type Facade interface {
+	ResolveReminder(context.Context, int64, uint64, ReminderResolutionRequest) (*ActionRunResult, error)
+	GetReminderResolution(context.Context, int64, uint64, string) (*ActionRunResult, error)
 	GetOverview(ctx context.Context, window string) (*OverviewResponse, error)
 	GetEvents(ctx context.Context, orgID int64, window string) (*EventsView, error)
 	ListRetryCandidates(ctx context.Context, orgID int64, cursor string, limit int) (*RetryCandidatePage, error)
@@ -54,6 +56,7 @@ type FacadeDeps struct {
 	PendingReplayAuditReader   PendingReplayAuditReader
 	DeliveryReplayReviewReader DeliveryReplayReviewReader
 	ReminderReviewReader       ReminderReviewReader
+	ReminderResolver           ReminderResolver
 	DeliveryResolver           DeliveryResolver
 	GapRecoveryStore           GapRecoveryStore
 	GapRecoveryEnabled         bool

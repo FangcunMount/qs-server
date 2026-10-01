@@ -76,6 +76,7 @@ func BuildRESTSystemGovernanceFacade(in RESTSystemGovernanceInput) systemgov.Fac
 	var deliveryReplayReviewReader systemgov.DeliveryReplayReviewReader
 	var deliveryResolver systemgov.DeliveryResolver
 	var reminderReviewReader systemgov.ReminderReviewReader
+	var reminderResolver systemgov.ReminderResolver
 	var gapRecoveryStore systemgov.GapRecoveryStore
 	gapRecoveryEnabled := false
 	if in.MySQLDB != nil {
@@ -83,6 +84,7 @@ func BuildRESTSystemGovernanceFacade(in RESTSystemGovernanceInput) systemgov.Fac
 		pendingReplayAuditReader = reader
 		deliveryReplayReviewReader = reader
 		reminderReviewReader = reminderinfra.NewReminderDeliveryLedger(in.MySQLDB)
+		reminderResolver = reader
 		if replay, found := registry.Get("events.replay_delivery"); found && replay.Enabled {
 			deliveryResolver = governanceinfra.NewReportGeneratedDeliveryResolver(in.MySQLDB, in.ReportResolutionReader)
 		}
@@ -114,6 +116,7 @@ func BuildRESTSystemGovernanceFacade(in RESTSystemGovernanceInput) systemgov.Fac
 		PendingReplayAuditReader:   pendingReplayAuditReader,
 		DeliveryReplayReviewReader: deliveryReplayReviewReader,
 		ReminderReviewReader:       reminderReviewReader,
+		ReminderResolver:           reminderResolver,
 		DeliveryResolver:           deliveryResolver,
 		GapRecoveryStore:           gapRecoveryStore,
 		GapRecoveryEnabled:         gapRecoveryEnabled,

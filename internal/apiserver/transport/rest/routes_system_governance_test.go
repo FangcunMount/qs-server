@@ -25,6 +25,8 @@ type stubSystemGovernanceFacade struct {
 	candidateFn       func(int64, string, int) (*systemgov.RetryCandidatePage, error)
 	pendingFn         func(int64, string, int) (*systemgov.PendingReplayAuditPage, error)
 	deliveryReviewFn  func(int64, string, int) (*systemgov.DeliveryReplayReviewPage, error)
+	reminderResolveFn func(int64, uint64, systemgov.ReminderResolutionRequest) (*systemgov.ActionRunResult, error)
+	reminderReceiptFn func(int64, uint64, string) (*systemgov.ActionRunResult, error)
 	reminderReviewFn  func(int64, string, int) (*systemgov.ReminderReviewPage, error)
 	deliveryResolveFn func(int64, uint64, systemgov.DeliveryResolutionRequest) (*systemgov.ActionRunResult, error)
 	deliveryReceiptFn func(int64, string) (*systemgov.ActionRunResult, error)
@@ -730,5 +732,55 @@ func TestSystemGovernanceResilienceRouteReturnsAdditivePressureFields(t *testing
 	}
 	if len(payload.Data.CapabilityRows) != 1 || payload.Data.CapabilityRows[0].Kind != "rate_limit" {
 		t.Fatalf("capability_rows = %+v, want rate_limit row", payload.Data.CapabilityRows)
+	}
+}
+
+func (s stubSystemGovernanceFacade) ResolveReminder(_ context.Context, org int64, actor uint64, req systemgov.ReminderResolutionRequest) (*systemgov.ActionRunResult, error) {
+	if s.reminderResolveFn != nil {
+		return s.reminderResolveFn(org, actor, req)
+	}
+	return nil, nil
+}
+func (s stubSystemGovernanceFacade) GetReminderResolution(_ context.Context, org int64, actor uint64, id string) (*systemgov.ActionRunResult, error) {
+	if s.reminderReceiptFn != nil {
+		return s.reminderReceiptFn(org, actor, id)
+	}
+	return nil, nil
+}
+
+func TestReminderResolutionUsesProtectedScope(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	calls := 0
+	router := newRouterWithBudgets(Deps{SystemGovernanceFacade: stubSystemGovernanceFacade{reminderResolveFn: func(org int64, actor uint64, req systemgov.ReminderResolutionRequest) (*systemgov.ActionRunResult, error) {
+		calls++
+		if org != 88 || actor != 701 || req.DeliveryID != 42 || req.OpeningEventID != "event-1" || !req.Confirm {
+			t.Fatalf("wrong scoped request %d/%d/%+v", org, actor, req)
+		}
+		return &systemgov.ActionRunResult{RequestID: req.RequestID, Status: "succeeded"}, nil
+	}}})
+	for _, allowed := range []bool{true, false} {
+		engine := gin.New()
+		if allowed {
+			engine.Use(orgAdminSnapshotMiddleware())
+		}
+		engine.Use(func(c *gin.Context) {
+			c.Set(restmiddleware.OrgIDKey, uint64(88))
+			c.Set(restmiddleware.UserIDKey, uint64(701))
+			c.Next()
+		})
+		router.registerSystemGovernanceInternalRoutes(engine.Group("/internal/v1"))
+		request := httptest.NewRequest(http.MethodPost, "/internal/v1/system-governance/actions/reminder-resolutions", strings.NewReader(`{"request_id":"review-1","delivery_id":42,"opening_event_id":"event-1","org_id":999,"actor_id":999,"confirm":true}`))
+		request.Header.Set("Content-Type", "application/json")
+		response := httptest.NewRecorder()
+		engine.ServeHTTP(response, request)
+		if allowed && response.Code != 200 {
+			t.Fatalf("allowed request: %d %s", response.Code, response.Body)
+		}
+		if !allowed && response.Code != 403 {
+			t.Fatalf("unprivileged request: %d", response.Code)
+		}
+	}
+	if calls != 1 {
+		t.Fatalf("resolution calls %d", calls)
 	}
 }
