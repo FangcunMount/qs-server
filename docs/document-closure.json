@@ -2,7 +2,7 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "fc77fe5d2605389abd749a59bd3876e45ec93e75",
+    "sha": "48ad696eb2b7a21b26482a344132bbe77aa77d17",
     "verified_on": "2026-10-01"
   },
   "status_policy": {
@@ -4474,8 +4474,8 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "3ac71517f0ed04ab65f609060ca800497bc291a8",
-        "verified_on": "2026-09-22"
+        "source_sha": "48ad696eb2b7a21b26482a344132bbe77aa77d17",
+        "verified_on": "2026-10-01"
       },
       "fact_sources": [
         {
