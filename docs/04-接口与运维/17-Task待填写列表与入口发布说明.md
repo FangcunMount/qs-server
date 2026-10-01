@@ -43,7 +43,7 @@ Task/Plan 当前没有独立的创建时模型版本快照；已有版本冻结�
 
 ## 发布与业务验收步骤
 
-1. 先确定已授权的测试环境、新服务端版本及可消耗的真实测试 Task。服务端需同步 apiserver、collection 及 collection 证书允许的 ListParticipantTasks ACL；没有新增数据库迁移。生产部署须在本会话另获明确授权，并按现有部署 Runbook 准备 exact SHA、镜像 digest、回滚版本和兼容窗口。
+1. 先确定已授权的测试环境、新服务端版本及可消耗的真实测试 Task。服务端需同步 apiserver、collection 及 collection 证书允许的 ListParticipantTasks ACL；没有新增数据库迁移。2026-10-01 用户指定先保持 PRODUCTION_DEPLOY_PAUSED=true，仅合并与发布准备；确认协调窗口后再解除暂停，并按现有部署 Runbook 准备 exact SHA、镜像 digest、回滚版本和兼容窗口。
 2. 微信开发者工具单独导入本功能 worktree 的 dist，保留另一会话当前项目。确认接口指向测试环境；正式小程序上传与发布由用户完成。
 3. 登录测试用户，在首页选择其有效家庭档案，从待填写列表进入 opened 测试 Task。核对名称、计划编号、开放／截止；网络请求只有 TaskID 定位，正常 Authorization 登录凭证继续存在。
 4. 完成作答并提交，记录 task_id、answering_start_id、answer_sheet_id 和 assessment_id。等异步处理完成后从服务端核对 assessment 的 plan／task 来源及原模型版本；查询 assessment_task 的 status、assessment_id、completed_at，要求 completed 且关联相同 assessment。返回首页，列表应移除此任务。
@@ -62,3 +62,9 @@ WHERE id = <测试TaskID> AND deleted_at IS NULL;
 ```
 
 在记录中保留必要 ID 与版本，隐藏登录凭证、openid、个人资料及答案内容。本说明不授权生产部署或历史通知重发。
+
+## 本轮复核与发布准备（2026-10-01）
+
+服务端 PR #248，小程序 PR #8。再次运行服务端相关回归和小程序完整 verify:frontend 通过。复核补齐开始／提交来源准入中的 enrollment 机构、档案、计划一致性校验，避免绕过入口直接请求准入。两个主工作区与其他验收 worktree 保持原状态。生产部署暂停保持不变，未上传或发布小程序。
+
+小程序构建目录为 `/Users/yangshujie/.codex/worktrees/task-inbox-id-entry/qs-collection-system/dist`。仅合并不改变线上接口；新客户端 Task 功能需待 apiserver 与 collection 同步部署后验收，不应提前正式发布。协调窗口应先准备用户可发布的小程序版本，再切换服务端和发布客户端；按现有提醒控制保持外发关闭直至新版可用，历史未知／已发送结果不重试。不得自行解除另一会话设置的生产暂停或改动提醒控制。
