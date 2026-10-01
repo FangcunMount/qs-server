@@ -70,23 +70,35 @@ func TestTaskOpenedReminderStopsWhenCurrentTaskOrOneHourWindowChanges(t *testing
 }
 
 func TestTaskOpenedReminderMatchesPersistedMillisecondOpening(t *testing.T) {
-	// The event retains nanoseconds, while assessment_task.open_at is DATETIME(3).
-	opened := time.Date(2026, 10, 1, 8, 46, 3, 743056448, time.FixedZone("UTC+8", 8*3600))
-	persisted := opened.Truncate(time.Millisecond)
-	expires := opened.Add(24 * time.Hour)
-	intent := TaskOpenedReminderIntent{OrgID: 1, TaskID: "task-1", TesteeID: "testee-1", ScheduleRevision: 1, OpenAt: opened}
-	state := &planApp.TaskReminderState{OrgID: 1, TaskID: "task-1", TesteeID: "testee-1", Status: planDomain.TaskStatusOpened,
-		ScheduleRevision: 1, OpenAt: &persisted, ExpireAt: &expires, EntryURL: "https://example.invalid/entry"}
+	// MySQL DATETIME(3) rounds, including across a second boundary; the event
+	// retains the original nanoseconds from before the Task was persisted.
+	for _, tc := range []struct {
+		name       string
+		nanosecond int
+		persisted  time.Time
+	}{
+		{name: "round down", nanosecond: 743056448, persisted: time.Date(2026, 10, 1, 8, 46, 3, 743000000, time.FixedZone("UTC+8", 8*3600))},
+		{name: "round up", nanosecond: 236779138, persisted: time.Date(2026, 10, 1, 8, 46, 3, 237000000, time.FixedZone("UTC+8", 8*3600))},
+		{name: "next second", nanosecond: 999779138, persisted: time.Date(2026, 10, 1, 8, 46, 4, 0, time.FixedZone("UTC+8", 8*3600))},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			opened := time.Date(2026, 10, 1, 8, 46, 3, tc.nanosecond, time.FixedZone("UTC+8", 8*3600))
+			expires := opened.Add(24 * time.Hour)
+			intent := TaskOpenedReminderIntent{OrgID: 1, TaskID: "task-1", TesteeID: "testee-1", ScheduleRevision: 1, OpenAt: opened}
+			state := &planApp.TaskReminderState{OrgID: 1, TaskID: "task-1", TesteeID: "testee-1", Status: planDomain.TaskStatusOpened,
+				ScheduleRevision: 1, OpenAt: &tc.persisted, ExpireAt: &expires, EntryURL: "https://example.invalid/entry"}
 
-	decision, err := EvaluateTaskOpenedReminder(intent, state, opened.Add(time.Minute))
-	require.NoError(t, err)
-	require.Empty(t, decision.SuppressCode)
+			decision, err := EvaluateTaskOpenedReminder(intent, state, opened.Add(time.Minute))
+			require.NoError(t, err)
+			require.Empty(t, decision.SuppressCode)
 
-	differentOpening := persisted.Add(time.Millisecond)
-	state.OpenAt = &differentOpening
-	decision, err = EvaluateTaskOpenedReminder(intent, state, opened.Add(time.Minute))
-	require.NoError(t, err)
-	require.Equal(t, "opening_changed", decision.SuppressCode)
+			differentOpening := tc.persisted.Add(time.Millisecond)
+			state.OpenAt = &differentOpening
+			decision, err = EvaluateTaskOpenedReminder(intent, state, opened.Add(time.Minute))
+			require.NoError(t, err)
+			require.Equal(t, "opening_changed", decision.SuppressCode)
+		})
+	}
 }
 
 func TestTaskOpenedReminderDateUsesUTCPlusEight(t *testing.T) {
