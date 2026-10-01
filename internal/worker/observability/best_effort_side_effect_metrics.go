@@ -3,6 +3,7 @@ package observability
 import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
+	"time"
 )
 
 type BestEffortSideEffectResult string
@@ -19,6 +20,14 @@ var bestEffortSideEffectTotal = promauto.NewCounterVec(prometheus.CounterOpts{
 	Help: "Best-effort Worker side-effect call outcomes; success is not final recipient delivery.",
 }, []string{"event_type", "result"})
 
+// A counter first scraped after a failure starts at one: increase cannot infer
+// that unseen increment. A timestamp exposes the first failure without needing
+// a preceding zero sample. Neither metric establishes final recipient delivery.
+var bestEffortLastFailure = promauto.NewGaugeVec(prometheus.GaugeOpts{
+	Namespace: "qs", Subsystem: "worker", Name: "best_effort_side_effect_last_failure_timestamp_seconds",
+	Help: "Unix timestamp of the latest bounded best-effort failure or missing side-effect configuration.",
+}, []string{"event_type", "result"})
+
 // ObserveBestEffortSideEffect accepts only the five approved event streams and
 // bounded outcomes. Event IDs and recipient details belong in logs, never labels.
 func ObserveBestEffortSideEffect(eventType string, result BestEffortSideEffectResult) {
@@ -33,4 +42,7 @@ func ObserveBestEffortSideEffect(eventType string, result BestEffortSideEffectRe
 		return
 	}
 	bestEffortSideEffectTotal.WithLabelValues(eventType, string(result)).Inc()
+	if result != BestEffortCallSucceeded {
+		bestEffortLastFailure.WithLabelValues(eventType, string(result)).Set(float64(time.Now().Unix()))
+	}
 }
