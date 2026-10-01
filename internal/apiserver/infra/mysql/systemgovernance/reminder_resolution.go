@@ -8,7 +8,9 @@ import (
 	"strings"
 	"time"
 
+	baseerrors "github.com/FangcunMount/component-base/pkg/errors"
 	app "github.com/FangcunMount/qs-server/internal/apiserver/application/systemgovernance"
+	"github.com/FangcunMount/qs-server/internal/pkg/code"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
@@ -33,20 +35,20 @@ func (reminderResolutionRow) TableName() string { return "task_opened_reminder_d
 // Only manual_required is eligible: an age alone cannot settle a sending row.
 func (s *ActionAuditStore) ResolveReminder(ctx context.Context, orgID int64, actorID uint64, req app.ReminderResolutionRequest) (*app.ActionRunResult, error) {
 	if s == nil || s.db == nil || orgID <= 0 || actorID == 0 || !req.Confirm || req.DeliveryID == 0 || req.ExpectedUpdatedAt.IsZero() {
-		return nil, fmt.Errorf("confirmed scoped reminder identity is required")
+		return nil, baseerrors.WithCode(code.ErrInvalidArgument, "confirmed scoped reminder identity is required")
 	}
 	for _, value := range []string{req.RequestID, req.TaskID, req.OpeningEventID} {
 		if strings.TrimSpace(value) == "" || len(value) > 64 {
-			return nil, fmt.Errorf("invalid reminder resolution identity")
+			return nil, baseerrors.WithCode(code.ErrInvalidArgument, "invalid reminder resolution identity")
 		}
 	}
 	if strings.TrimSpace(req.Reason) == "" || len(req.Reason) > 2000 || strings.TrimSpace(req.EvidenceReference) == "" || len(req.EvidenceReference) > 255 {
-		return nil, fmt.Errorf("bounded reason and evidence reference are required")
+		return nil, baseerrors.WithCode(code.ErrInvalidArgument, "bounded reason and evidence reference are required")
 	}
 	switch req.Finding {
 	case "recipient_received", "platform_rejected", "unknown_no_resend":
 	default:
-		return nil, fmt.Errorf("invalid manual finding")
+		return nil, baseerrors.WithCode(code.ErrInvalidArgument, "invalid manual finding")
 	}
 	input, err := json.Marshal(req)
 	if err != nil {
@@ -62,7 +64,7 @@ func (s *ActionAuditStore) ResolveReminder(ctx context.Context, orgID int64, act
 		err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("org_id = ? AND request_id = ?", orgID, req.RequestID).Take(&prior).Error
 		if err == nil {
 			if prior.ActionID != reminderResolutionActionID || prior.ActorUserID != actorID || prior.Status != "succeeded" || !equalAuditJSON(prior.InputJSON, string(input)) {
-				return fmt.Errorf("resolution request identity conflict")
+				return baseerrors.WithCode(code.ErrConflict, "resolution request identity conflict")
 			}
 			replay, err := decodeActionAuditReplay(prior.ResultJSON)
 			if err != nil || replay == nil || replay.Result == nil {
@@ -75,7 +77,7 @@ func (s *ActionAuditStore) ResolveReminder(ctx context.Context, orgID int64, act
 			return err
 		}
 		if row.TaskID != req.TaskID || row.OpeningEventID != req.OpeningEventID || row.State != "manual_required" || row.ExternalCallStartedAt == nil || !row.UpdatedAt.Equal(req.ExpectedUpdatedAt) {
-			return fmt.Errorf("reminder identity or expected state changed")
+			return baseerrors.WithCode(code.ErrConflict, "reminder identity or expected state changed")
 		}
 		now := time.Now().In(time.FixedZone("UTC+8", 8*3600))
 		result = &app.ActionRunResult{RequestID: req.RequestID, ActionID: reminderResolutionActionID, Status: "succeeded", StartedAt: now, FinishedAt: now, Result: map[string]interface{}{
@@ -94,7 +96,7 @@ func (s *ActionAuditStore) ResolveReminder(ctx context.Context, orgID int64, act
 			return update.Error
 		}
 		if update.RowsAffected != 1 {
-			return fmt.Errorf("reminder resolution conflict")
+			return baseerrors.WithCode(code.ErrConflict, "reminder resolution conflict")
 		}
 		return nil
 	})
@@ -108,10 +110,13 @@ func (s *ActionAuditStore) ResolveReminder(ctx context.Context, orgID int64, act
 // It neither changes the ledger nor authorizes another platform call.
 func (s *ActionAuditStore) LoadReminderResolution(ctx context.Context, orgID int64, actorID uint64, requestID string) (*app.ActionRunResult, error) {
 	if s == nil || s.db == nil || orgID <= 0 || actorID == 0 || strings.TrimSpace(requestID) == "" || len(requestID) > 64 {
-		return nil, fmt.Errorf("scoped reminder receipt identity is required")
+		return nil, baseerrors.WithCode(code.ErrInvalidArgument, "scoped reminder receipt identity is required")
 	}
 	var row actionRunPO
 	if err := s.db.WithContext(ctx).Where("org_id = ? AND actor_user_id = ? AND request_id = ? AND action_id = ? AND status = ?", orgID, actorID, requestID, reminderResolutionActionID, "succeeded").Take(&row).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, baseerrors.WithCode(code.ErrPageNotFound, "reminder resolution receipt unavailable")
+		}
 		return nil, err
 	}
 	replay, err := decodeActionAuditReplay(row.ResultJSON)

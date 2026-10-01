@@ -12,6 +12,8 @@ func (r *Router) registerSystemGovernanceInternalRoutes(internalV1 *gin.RouterGr
 	}
 	governanceHandler := handler.NewSystemGovernanceHandler(r.deps.SystemGovernanceFacade)
 	governance := internalV1.Group("/system-governance", restmiddleware.RequireCapabilityMiddleware(restmiddleware.CapabilityOrgAdmin))
+	governance.POST("/actions/reminder-resolutions", r.rateLimitedHandlers(rateLimitBudgetSubmit, governanceHandler.ResolveReminder)...)
+	governance.GET("/actions/reminder-resolutions/:request_id", r.rateLimitedHandlers(rateLimitBudgetQuery, governanceHandler.GetReminderResolution)...)
 	governance.GET("/overview", r.rateLimitedHandlers(rateLimitBudgetQuery, governanceHandler.Overview)...)
 	governance.GET("/events", r.rateLimitedHandlers(rateLimitBudgetQuery, governanceHandler.Events)...)
 	governance.GET("/events/retry-candidates", r.rateLimitedHandlers(rateLimitBudgetQuery, governanceHandler.RetryCandidates)...)

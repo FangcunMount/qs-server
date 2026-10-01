@@ -430,3 +430,37 @@ func (h *SystemGovernanceHandler) bindJSON(c *gin.Context, req interface{}) bool
 	}
 	return true
 }
+
+// ResolveReminder records an operator finding without calling the platform.
+func (h *SystemGovernanceHandler) ResolveReminder(c *gin.Context) {
+	orgID, actorID, err := h.RequireProtectedScope(c)
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+	var req systemgov.ReminderResolutionRequest
+	if !h.bindJSON(c, &req) {
+		return
+	}
+	result, err := h.facade.ResolveReminder(c.Request.Context(), orgID, uint64(actorID), req)
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+	h.Success(c, result)
+}
+
+// GetReminderResolution reads only the original operator's committed receipt.
+func (h *SystemGovernanceHandler) GetReminderResolution(c *gin.Context) {
+	orgID, actorID, err := h.RequireProtectedScope(c)
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+	result, err := h.facade.GetReminderResolution(c.Request.Context(), orgID, uint64(actorID), c.Param("request_id"))
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+	h.Success(c, result)
+}
