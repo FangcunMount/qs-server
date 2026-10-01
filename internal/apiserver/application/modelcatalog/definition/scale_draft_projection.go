@@ -11,8 +11,11 @@ func InitializeScaleDefinition(model *domain.AssessmentModel, now time.Time) err
 	if model == nil || model.Kind != domain.KindScale {
 		return nil
 	}
+	// An empty authoring draft has no risk conclusion yet. Runtime materialization
+	// belongs to publication, after the operator has authored the definition.
 	model.DefinitionV2 = &domain.Definition{}
-	return RefreshScaleDraftProjectionAt(model, now)
+	model.UpdatedAt = now
+	return nil
 }
 
 // RefreshScaleDraftProjection validates the draft DefinitionV2 runtime materialization.

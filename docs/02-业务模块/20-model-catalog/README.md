@@ -71,6 +71,8 @@ Decision               必需
 InterpretationAssets   按报告需求校验
 ```
 
+创建阶段允许初始化空的 Scale 定义作为编辑草稿，不预造风险结论，也不在初始化时执行发布投影。发布验证仍要求真实风险结论、完整配置与运行时投影通过；空草稿不能进入运行链路。
+
 因此，只有 Factor 而没有 Decision 的配置不能发布为测评模型。如果业务只需要收集答案或展示问卷的单题基础分数，应使用独立 Questionnaire，而不是创建一个不完整的 `AssessmentModel`。
 
 ModelCatalog 不是 Calculation、Evaluation 或 Interpretation。它负责维护和发布模型规范；Calculation 实现无状态算法；Evaluation 选择能力、编排执行并保存结果；Interpretation 解释稳定结果事实。
