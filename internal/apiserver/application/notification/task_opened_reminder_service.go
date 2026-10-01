@@ -121,7 +121,7 @@ func (s *taskOpenedReminderService) freezeOpening(
 	if decision.SuppressCode != "" {
 		return s.batches.SuppressEmpty(ctx, key, appID, s.config.TaskOpenedTemplateID, decision.SuppressCode, s.now())
 	}
-	testee, profileID, err := s.currentTestee(ctx, intent.TesteeID)
+	testee, profileID, err := s.currentTestee(ctx, intent.OrgID, intent.TesteeID)
 	if err != nil {
 		return ReminderBatch{}, err
 	}
@@ -192,7 +192,7 @@ func (s *taskOpenedReminderService) deliverOne(
 	if decision.SuppressCode != "" {
 		return unsent(decision.SuppressCode)
 	}
-	_, profileID, err := s.currentTestee(ctx, intent.TesteeID)
+	_, profileID, err := s.currentTestee(ctx, intent.OrgID, intent.TesteeID)
 	if err != nil {
 		_ = unsent("")
 		return err
@@ -323,7 +323,7 @@ func (s *taskOpenedReminderService) currentDecision(
 }
 
 func (s *taskOpenedReminderService) currentTestee(
-	ctx context.Context, testeeID string,
+	ctx context.Context, orgID int64, testeeID string,
 ) (*testeeApp.TesteeResult, string, error) {
 	id, err := strconv.ParseUint(testeeID, 10, 64)
 	if err != nil {
@@ -335,6 +335,9 @@ func (s *taskOpenedReminderService) currentTestee(
 	}
 	if testee == nil {
 		return nil, "", fmt.Errorf("reminder testee is unavailable")
+	}
+	if testee.ID != id || testee.OrgID != orgID {
+		return nil, "", fmt.Errorf("reminder testee does not belong to the opening organization")
 	}
 	if testee.ProfileID == nil {
 		return testee, "", nil

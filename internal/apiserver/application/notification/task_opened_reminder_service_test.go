@@ -147,7 +147,7 @@ func TestDurableReminderUnknownResultNeverSendsAgain(t *testing.T) {
 		ID: "tmpl-1", Content: "{{thing5.DATA}}{{date1.DATA}}{{character_string2.DATA}}{{thing3.DATA}}",
 	}}}
 	service := NewTaskOpenedReminderService(task, &testeeLookupStub{result: &testeeApp.TesteeResult{
-		ID: 12, ProfileID: &profileID,
+		ID: 12, OrgID: 7, ProfileID: &profileID,
 	}}, identities, batches, deliveries, &wechatAppLookupStub{}, templates, receipts, nil, nil,
 		&Config{AppID: "wx-app", AppSecret: "wx-secret", PagePath: "pages/task/index", TaskOpenedTemplateID: "tmpl-1"},
 	).(*taskOpenedReminderService)
@@ -184,7 +184,7 @@ func TestDurableReminderAcceptsPlatformSuccessWithoutMessageID(t *testing.T) {
 	deliveries := &reminderDeliveryStub{}
 	receipts := &receiptSenderStub{withoutMessageID: true}
 	service := NewTaskOpenedReminderService(task, &testeeLookupStub{result: &testeeApp.TesteeResult{
-		ID: 12, ProfileID: &profileID,
+		ID: 12, OrgID: 7, ProfileID: &profileID,
 	}}, identities, &reminderBatchStub{}, deliveries, &wechatAppLookupStub{},
 		&senderStub{templates: []wechatmini.SubscribeTemplate{{
 			ID: "tmpl-1", Content: "{{thing5.DATA}}{{date1.DATA}}{{character_string2.DATA}}{{thing3.DATA}}",
@@ -247,7 +247,7 @@ func TestDurableReminderDoesNotCallPlatformWhenMarkerCrossesOneHourDeadline(t *t
 	deliveries := &reminderDeliveryStub{onBegin: func() { current = opened.Add(time.Hour) }}
 	receipts := &receiptSenderStub{}
 	service := NewTaskOpenedReminderService(reader, &testeeLookupStub{result: &testeeApp.TesteeResult{
-		ID: 12, ProfileID: &profileID,
+		ID: 12, OrgID: 7, ProfileID: &profileID,
 	}}, identities, &reminderBatchStub{}, deliveries, &wechatAppLookupStub{},
 		&senderStub{templates: []wechatmini.SubscribeTemplate{{
 			ID: "tmpl-1", Content: "{{thing5.DATA}}{{date1.DATA}}{{character_string2.DATA}}{{thing3.DATA}}",
@@ -264,6 +264,14 @@ func TestDurableReminderDoesNotCallPlatformWhenMarkerCrossesOneHourDeadline(t *t
 	require.Equal(t, "deadline_after_call_marker", deliveries.unknownCode)
 	require.NoError(t, service.ProcessTaskOpenedReminder(context.Background(), request))
 	require.Zero(t, receipts.calls, "a late marker must never lead to a later automatic send")
+}
+
+func TestDurableReminderRejectsTesteeFromAnotherOrganization(t *testing.T) {
+	service := &taskOpenedReminderService{testees: &testeeLookupStub{result: &testeeApp.TesteeResult{
+		ID: 12, OrgID: 8,
+	}}}
+	_, _, err := service.currentTestee(context.Background(), 7, "12")
+	require.ErrorContains(t, err, "opening organization")
 }
 
 func TestDurableReminderDoesNotCallPlatformWhenTaskChangesDuringCallMarker(t *testing.T) {
@@ -298,7 +306,7 @@ func TestDurableReminderDoesNotCallPlatformWhenTaskChangesDuringCallMarker(t *te
 			deliveries := &reminderDeliveryStub{onBegin: func() { tc.change(reader) }}
 			receipts := &receiptSenderStub{}
 			service := NewTaskOpenedReminderService(reader, &testeeLookupStub{result: &testeeApp.TesteeResult{
-				ID: 12, ProfileID: &profileID,
+				ID: 12, OrgID: 7, ProfileID: &profileID,
 			}}, identities, &reminderBatchStub{}, deliveries, &wechatAppLookupStub{},
 				&senderStub{templates: []wechatmini.SubscribeTemplate{{
 					ID: "tmpl-1", Content: "{{thing5.DATA}}{{date1.DATA}}{{character_string2.DATA}}{{thing3.DATA}}",

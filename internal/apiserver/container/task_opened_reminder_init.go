@@ -44,7 +44,7 @@ func (c *Container) buildTaskOpenedReminderService(
 ) (notificationApp.TaskOpenedReminderService, error) {
 	if c.PlanModule == nil || c.PlanModule.TaskReminderStateReader == nil || c.mysqlDB == nil ||
 		c.IAMModule == nil || !c.IAMModule.IsEnabled() || c.SubscribeSender == nil || wechatOptions == nil ||
-		c.TesteeQuery() == nil {
+		c.ActorModule == nil || c.ActorModule.ReadModel == nil {
 		return nil, fmt.Errorf("durable task reminder dependencies are unavailable")
 	}
 	receipts, ok := c.SubscribeSender.(wechatmini.MiniProgramSubscribeReceiptSender)
@@ -64,7 +64,7 @@ func (c *Container) buildTaskOpenedReminderService(
 		return nil, fmt.Errorf("durable task reminder requires a resolvable WeChat AppID and secret")
 	}
 	return notificationApp.NewTaskOpenedReminderService(
-		c.PlanModule.TaskReminderStateReader, c.TesteeQuery(), identities,
+		c.PlanModule.TaskReminderStateReader, reminderTesteeLookup{reader: c.ActorModule.ReadModel}, identities,
 		mysqlnotification.NewReminderBatchLedger(c.mysqlDB),
 		mysqlnotification.NewReminderDeliveryLedger(c.mysqlDB),
 		c.WeChatAppService(), c.SubscribeSender, receipts,
