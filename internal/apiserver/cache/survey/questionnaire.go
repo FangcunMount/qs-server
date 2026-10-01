@@ -220,6 +220,12 @@ func (r *CachedQuestionnaireRepository) loadWithCache(
 	key string,
 	fallback func(context.Context) (*domainQuestionnaire.Questionnaire, error),
 ) (*domainQuestionnaire.Questionnaire, error) {
+	// Redis holds committed state only. Session reads must observe Mongo's
+	// transaction snapshot and its own writes; read-through could also cache an
+	// uncommitted result that is later rolled back.
+	if mongo.SessionFromContext(ctx) != nil {
+		return fallback(ctx)
+	}
 	return adapterkit.ReadThroughObject(ctx, adapterkit.ObjectReadThroughOptions[domainQuestionnaire.Questionnaire]{
 		PolicyKey:      cachepolicy.CapabilitySurveyQuestionnaire,
 		CacheKey:       key,

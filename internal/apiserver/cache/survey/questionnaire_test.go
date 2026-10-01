@@ -8,6 +8,8 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/cache/catalog"
 	"github.com/alicebob/miniredis/v2"
 	redis "github.com/redis/go-redis/v9"
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 
 	domainQuestionnaire "github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
 	sharedcache "github.com/FangcunMount/qs-server/internal/pkg/cache"
@@ -358,4 +360,81 @@ func waitFor(t *testing.T, fn func() bool) {
 func hasRedisKey(t *testing.T, client redis.UniversalClient, key string) bool {
 	t.Helper()
 	return client.Exists(context.Background(), key).Val() > 0
+}
+
+// A paired release must observe its own Mongo writes, not the Redis draft or
+// negative entry created before the transaction. No session read may populate
+// Redis with state that could subsequently roll back.
+func TestQuestionnaireSessionReadsBypassSharedCache(t *testing.T) {
+	client, err := mongo.Connect(t.Context(), options.Client())
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = client.Disconnect(context.Background()) })
+	session, err := client.StartSession()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer session.EndSession(context.Background())
+	txCtx := mongo.NewSessionContext(t.Context(), session)
+	for _, kind := range []string{"head", "published", "version"} {
+		for _, negative := range []bool{false, true} {
+			t.Run(kind+map[bool]string{false: "_stale", true: "_negative"}[negative], func(t *testing.T) {
+				cached, mr, repo, cleanup := newQuestionnaireCacheTestRepo(t)
+				defer cleanup()
+				committed := newTestQuestionnaire(t, "Q-001", "1.0.1", domainQuestionnaire.RecordRoleHead, false)
+				fresh := newTestQuestionnaire(t, "Q-001", "2.0.0", domainQuestionnaire.RecordRolePublishedSnapshot, true)
+				key := cached.headKey("Q-001")
+				read := func(ctx context.Context) (*domainQuestionnaire.Questionnaire, error) {
+					return cached.FindByCode(ctx, "Q-001")
+				}
+				switch kind {
+				case "head":
+					repo.head["Q-001"] = fresh
+				case "published":
+					key = cached.publishedKey("Q-001")
+					repo.published["Q-001"] = fresh
+					read = func(ctx context.Context) (*domainQuestionnaire.Questionnaire, error) {
+						return cached.FindPublishedByCode(ctx, "Q-001")
+					}
+				case "version":
+					key = cached.versionKey("Q-001", "2.0.0")
+					repo.versioned["Q-001:2.0.0"] = fresh
+					read = func(ctx context.Context) (*domainQuestionnaire.Questionnaire, error) {
+						return cached.FindByCodeVersion(ctx, "Q-001", "2.0.0")
+					}
+				}
+
+				if negative {
+					if err := cached.store.SetNegative(t.Context(), key, sharedcache.Policy{Negative: sharedcache.PolicySwitchEnabled}); err != nil {
+						t.Fatal(err)
+					}
+				} else if err := cached.setCache(t.Context(), key, committed); err != nil {
+					t.Fatal(err)
+				}
+				before, err := mr.Get(key)
+				if err != nil {
+					t.Fatal(err)
+				}
+				got, err := read(txCtx)
+				if err != nil || got == nil || got.GetVersion().String() != "2.0.0" || !got.IsPublished() {
+					t.Fatalf("session read = %#v, %v; want newly published 2.0.0", got, err)
+				}
+				after, err := mr.Get(key)
+				if err != nil || after != before {
+					t.Fatalf("session changed shared cache: %v", err)
+				}
+				got, err = read(t.Context())
+				if err != nil {
+					t.Fatal(err)
+				}
+				if negative && got != nil {
+					t.Fatal("non-session negative cache lost")
+				}
+				if !negative && (got == nil || got.GetVersion().String() != "1.0.1") {
+					t.Fatal("non-session committed cache lost")
+				}
+			})
+		}
+	}
 }
