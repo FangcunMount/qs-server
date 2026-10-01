@@ -13,16 +13,14 @@ import (
 	"testing"
 	"time"
 
-	basemessaging "github.com/FangcunMount/component-base/pkg/messaging"
-	cbnsq "github.com/FangcunMount/component-base/pkg/messaging/nsq"
 	eventcatalog "github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
 	eventobservability "github.com/FangcunMount/qs-server/internal/pkg/eventing/observe"
 	eventtransport "github.com/FangcunMount/qs-server/internal/pkg/eventing/transport"
+	"github.com/FangcunMount/qs-server/internal/pkg/messagingruntime"
 	"github.com/FangcunMount/qs-server/internal/worker/handlers"
 	workermessaging "github.com/FangcunMount/qs-server/internal/worker/integration/messaging"
 	rmtransport "github.com/FangcunMount/reliable-messaging/transport"
 	"github.com/FangcunMount/reliable-messaging/wire/legacy"
-	"github.com/nsqio/go-nsq"
 )
 
 type brokerBestEffortObserver struct {
@@ -104,6 +102,16 @@ func waitBestEffortLookupdTopic(ctx context.Context, client *http.Client, topicN
 }
 
 func TestBestEffortExternalFailureFinishesRealNSQDelivery(t *testing.T) {
+	runBestEffortRealNSQDelivery(t, true)
+}
+
+// The current product contract leaves optional terminal Task notifications
+// unconfigured. Broker FIN must not imply a successful external notification.
+func TestBestEffortUnconfiguredTaskNotificationsFinishRealNSQDelivery(t *testing.T) {
+	runBestEffortRealNSQDelivery(t, false)
+}
+
+func runBestEffortRealNSQDelivery(t *testing.T, notificationsConfigured bool) {
 	if os.Getenv("QS_M5_BEST_EFFORT_NSQ") != "1" {
 		t.Skip("requires the disposable M5-05 NSQ stack")
 	}
@@ -124,7 +132,11 @@ func TestBestEffortExternalFailureFinishesRealNSQDelivery(t *testing.T) {
 	client := &failingBestEffortClient{}
 	notifier := &failingTaskNotifier{}
 	observer := &brokerBestEffortObserver{consumed: make(chan eventobservability.ConsumeEvent, 6)}
-	dispatcher := NewDispatcher(logger, &HandlerDependencies{Logger: logger, InternalClient: client, Notifier: notifier}, handlers.NewRegistry())
+	deps := &HandlerDependencies{Logger: logger, InternalClient: client}
+	if notificationsConfigured {
+		deps.Notifier = notifier
+	}
+	dispatcher := NewDispatcher(logger, deps, handlers.NewRegistry())
 	if err := dispatcher.Initialize(eventcatalog.NewCatalog(cfg)); err != nil {
 		t.Fatal(err)
 	}
@@ -134,7 +146,11 @@ func TestBestEffortExternalFailureFinishesRealNSQDelivery(t *testing.T) {
 	for _, subscription := range subscriptions {
 		topics = append(topics, subscription.TopicName)
 	}
-	if err := cbnsq.NewTopicCreator(nsqdAddress, logger).EnsureTopics(topics); err != nil {
+	channels := make([]messagingruntime.DurableChannel, 0, len(topics))
+	for _, topic := range topics {
+		channels = append(channels, messagingruntime.DurableChannel{Topic: topic, Channel: channelName})
+	}
+	if err := messagingruntime.EnsureNSQChannels(ctx, []string{statsEndpoint}, channels); err != nil {
 		t.Fatal(err)
 	}
 	for _, topic := range topics {
@@ -159,7 +175,7 @@ func TestBestEffortExternalFailureFinishesRealNSQDelivery(t *testing.T) {
 	}); err != nil {
 		t.Fatal(err)
 	}
-	publisher, err := cbnsq.NewPublisher(nsqdAddress, nsq.NewConfig())
+	publisher, err := messagingruntime.NewSDKNSQWirePublisher(nsqdAddress)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -177,7 +193,14 @@ func TestBestEffortExternalFailureFinishesRealNSQDelivery(t *testing.T) {
 		{"task.expired", "qs.plan.task", map[string]any{"task_id": "T-1", "plan_id": "P-1", "testee_id": "123", "reason": "entry_timeout", "expired_at": occurredAt}},
 		{"task.canceled", "qs.plan.task", map[string]any{"task_id": "T-1", "plan_id": "P-1", "testee_id": "123", "canceled_at": occurredAt}},
 	}
+	if !notificationsConfigured {
+		// task.opened has a separate durable reminder contract and is not one
+		// of the five optional post-actions under test.
+		cases = append(cases[:2], cases[3:]...)
+	}
 	for i, tc := range cases {
+		beforeNotConfigured := bestEffortSideEffectCount(t, tc.eventType, "not_configured")
+		beforeSuccess := bestEffortSideEffectCount(t, tc.eventType, "call_succeeded")
 		payload, err := json.Marshal(map[string]any{
 			"id": fmt.Sprintf("m5-05-%d", i), "eventType": tc.eventType, "occurredAt": occurredAt,
 			"aggregateType": "Test", "aggregateID": "1", "data": tc.data,
@@ -185,9 +208,11 @@ func TestBestEffortExternalFailureFinishesRealNSQDelivery(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		message := basemessaging.NewMessage(fmt.Sprintf("m5-05-%d", i), payload)
-		message.Metadata["event_type"] = tc.eventType
-		if err := publisher.PublishMessage(ctx, tc.topic, message); err != nil {
+		wire, err := legacy.Encode(legacy.Envelope{UUID: fmt.Sprintf("m5-05-%d", i), Payload: payload, Metadata: map[string]string{"event_type": tc.eventType}}, legacy.Revision2)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := publisher.PublishWire(ctx, tc.topic, wire); err != nil {
 			t.Fatalf("publish %s: %v", tc.eventType, err)
 		}
 		select {
@@ -198,12 +223,31 @@ func TestBestEffortExternalFailureFinishesRealNSQDelivery(t *testing.T) {
 		case <-ctx.Done():
 			t.Fatalf("wait for %s: %v", tc.eventType, ctx.Err())
 		}
+		if !notificationsConfigured && i >= 2 {
+			if got := bestEffortSideEffectCount(t, tc.eventType, "not_configured") - beforeNotConfigured; got != 1 {
+				t.Fatalf("%s not_configured delta=%v, want 1", tc.eventType, got)
+			}
+			if got := bestEffortSideEffectCount(t, tc.eventType, "call_succeeded") - beforeSuccess; got != 0 {
+				t.Fatalf("%s falsely recorded sending success", tc.eventType)
+			}
+		}
 	}
-	if calls := client.calls + notifier.calls; calls != len(cases) {
-		t.Fatalf("external calls = %d, want %d", calls, len(cases))
+	wantCalls := len(cases)
+	if !notificationsConfigured {
+		wantCalls = 2
+		if notifier.calls != 0 {
+			t.Fatal("unconfigured Task notifier was called")
+		}
 	}
-	t.Logf("six external calls failed under the original Worker handlers; all six first deliveries were acknowledged")
-	expected := map[string]int64{"qs.survey.lifecycle": 2, "qs.plan.task": 4}
+	if calls := client.calls + notifier.calls; calls != wantCalls {
+		t.Fatalf("external calls = %d, want %d", calls, wantCalls)
+	}
+	t.Logf("notifications_configured=%t external_calls=%d first_attempt_ACKs=%d", notificationsConfigured, wantCalls, len(cases))
+	taskCount := int64(4)
+	if !notificationsConfigured {
+		taskCount = 3
+	}
+	expected := map[string]int64{"qs.survey.lifecycle": 2, "qs.plan.task": taskCount}
 	for topic, want := range expected {
 		for {
 			stats, err := bestEffortChannelStats(ctx, statsClient, statsEndpoint, topic, channelName)
