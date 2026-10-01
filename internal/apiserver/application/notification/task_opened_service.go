@@ -413,25 +413,18 @@ func formatTaskOpenedDate(openAt time.Time) string {
 }
 
 func (s *taskOpenedService) buildPagePath(entryURL string) string {
-	pagePath := strings.TrimSpace(s.config.PagePath)
-	if pagePath == "" {
-		return ""
-	}
-
+	pagePath := "pages/assessment/fill/index"
 	u, err := url.Parse(entryURL)
 	if err != nil {
-		return pagePath
+		return ""
 	}
 	q := u.Query()
 	pageQuery := url.Values{}
-	if token := q.Get("token"); token != "" {
-		pageQuery.Set("token", token)
-	}
 	if taskID := q.Get("task_id"); taskID != "" {
 		pageQuery.Set("task_id", taskID)
 	}
 	if len(pageQuery) == 0 {
-		return pagePath
+		return ""
 	}
 	return pagePath + "?" + pageQuery.Encode()
 }

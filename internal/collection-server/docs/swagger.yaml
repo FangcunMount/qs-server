@@ -1124,13 +1124,31 @@ definitions:
     type: object
   planentry.Entry:
     properties:
-      expiresAt:
+      can_start:
+        type: boolean
+      due_at:
         type: string
-      scaleCode:
+      expires_at:
         type: string
-      taskID:
+      model_version:
         type: string
-      testeeID:
+      open_at:
+        type: string
+      plan_id:
+        type: string
+      q:
+        type: string
+      questionnaire_version:
+        type: string
+      scale_code:
+        type: string
+      status:
+        type: string
+      task_id:
+        type: string
+      testee_id:
+        type: string
+      title:
         type: string
     type: object
   questionnaire.CalculationRuleResponse:
@@ -2704,17 +2722,12 @@ paths:
       summary: 长轮询等待行为能力测评报告
       tags:
       - 行为能力测评
-  /api/v1/plan-task-entries/{task_id}/{token}:
+  /api/v1/plan-task-entries/{task_id}:
     get:
       parameters:
       - description: 任务ID
         in: path
         name: task_id
-        required: true
-        type: string
-      - description: 入口令牌
-        in: path
-        name: token
         required: true
         type: string
       produces:
@@ -2738,6 +2751,60 @@ paths:
           schema:
             $ref: '#/definitions/core.ErrResponse'
       summary: 解析当前用户的计划任务测评入口
+      tags:
+      - Plan-Entry
+  /api/v1/plan-task-entries/{task_id}/{token}:
+    get:
+      parameters:
+      - description: 任务ID
+        in: path
+        name: task_id
+        required: true
+        type: string
+      - description: 历史入口参数，忽略且不授权
+        in: path
+        name: token
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/planentry.Entry'
+              type: object
+      summary: 兼容旧计划任务入口
+      tags:
+      - Plan-Entry
+  /api/v1/plan-tasks:
+    get:
+      parameters:
+      - description: 档案ID
+        in: query
+        name: testee_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/core.Response'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+      summary: 查询当前用户指定档案的待填写任务
       tags:
       - Plan-Entry
   /api/v1/public/info:

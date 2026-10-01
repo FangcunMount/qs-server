@@ -50,5 +50,6 @@ func ACLAllowedMethods() []string {
 		assessmentmodelpb.AssessmentModelCatalogService_ListHotPublishedModels_FullMethodName,
 		assessmentmodelpb.AssessmentModelCatalogService_GetCatalogOptions_FullMethodName,
 		internalpb.PlanEntryService_ResolveTaskEntry_FullMethodName,
+		internalpb.PlanEntryService_ListParticipantTasks_FullMethodName,
 	}
 }

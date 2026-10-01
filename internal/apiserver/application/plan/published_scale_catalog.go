@@ -2,6 +2,8 @@ package plan
 
 import (
 	"context"
+	"github.com/FangcunMount/component-base/pkg/errors"
+	"github.com/FangcunMount/qs-server/internal/pkg/code"
 
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	modelcatalogport "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
@@ -58,4 +60,17 @@ func (c publishedScaleCatalog) ResolveTitles(ctx context.Context, codes []string
 		titles[code] = c.ResolveTitle(ctx, code)
 	}
 	return titles
+}
+
+// ResolveTaskContent pins the published model's exact question binding for
+// this entry. Start and submit still validate and freeze the authoritative admission.
+func (c publishedScaleCatalog) ResolveTaskContent(ctx context.Context, modelCode string) (string, string, string, error) {
+	model, err := c.published.FindPublishedModelByCode(ctx, domain.KindScale, modelCode)
+	if err != nil {
+		return "", "", "", err
+	}
+	if model == nil || model.QuestionnaireCode == "" || model.QuestionnaireVersion == "" {
+		return "", "", "", errors.WithCode(code.ErrPageNotFound, "task questionnaire binding unavailable")
+	}
+	return model.QuestionnaireCode, model.QuestionnaireVersion, model.Version, nil
 }

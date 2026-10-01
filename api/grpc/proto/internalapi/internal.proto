@@ -76,11 +76,12 @@ service PlanCommandService {
 // returning this result to a mini-program user.
 service PlanEntryService {
   rpc ResolveTaskEntry(ResolveTaskEntryRequest) returns (ResolveTaskEntryResponse);
+  rpc ListParticipantTasks(ListParticipantTasksRequest) returns (ListParticipantTasksResponse);
 }
 
 message ResolveTaskEntryRequest {
   string task_id = 1;
-  string token = 2;
+  string token = 2 [deprecated = true]; // Legacy locator only; never authorization.
 }
 
 message ResolveTaskEntryResponse {
@@ -88,7 +89,18 @@ message ResolveTaskEntryResponse {
   string testee_id = 2;
   string scale_code = 3;
   string expires_at = 4;
+  string plan_id = 5;
+  string title = 6;
+  string open_at = 7;
+  string due_at = 8;
+  string task_status = 9;
+  bool can_start = 10;
+  string questionnaire_code = 11;
+  string questionnaire_version = 12;
+  string model_version = 13;
 }
+message ListParticipantTasksRequest { string testee_id = 1; }
+message ListParticipantTasksResponse { repeated ResolveTaskEntryResponse items = 1; }
 
 // ==================== PlanCommandService ====================
 

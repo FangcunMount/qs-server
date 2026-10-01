@@ -11,10 +11,19 @@ import (
 var ErrInvalidEntry = errors.New("plan task entry not found")
 
 type Entry struct {
-	TaskID    string
-	TesteeID  string
-	ScaleCode string
-	ExpiresAt string
+	TaskID               string `json:"task_id"`
+	TesteeID             string `json:"testee_id"`
+	ScaleCode            string `json:"scale_code"`
+	ExpiresAt            string `json:"expires_at"`
+	PlanID               string `json:"plan_id"`
+	Title                string `json:"title"`
+	OpenAt               string `json:"open_at"`
+	DueAt                string `json:"due_at"`
+	Status               string `json:"status"`
+	CanStart             bool   `json:"can_start"`
+	QuestionnaireCode    string `json:"q"`
+	QuestionnaireVersion string `json:"questionnaire_version"`
+	ModelVersion         string `json:"model_version"`
 }
 
 type Reader interface {
@@ -58,4 +67,36 @@ func (s *Service) Resolve(ctx context.Context, userID, taskID, token string) (*E
 		return nil, err
 	}
 	return entry, nil
+}
+
+func (s *Service) List(ctx context.Context, userID, testeeID string) ([]*Entry, error) {
+	if s == nil || s.reader == nil || s.access == nil {
+		return nil, testeeaccess.ErrAccessUnavailable
+	}
+	id, err := strconv.ParseUint(testeeID, 10, 64)
+	if err != nil || id == 0 || userID == "" {
+		return nil, testeeaccess.ErrAccessDenied
+	}
+	if err := s.access.Authorize(ctx, userID, id); err != nil {
+		return nil, err
+	}
+	reader, ok := s.reader.(interface {
+		ListParticipantTasks(context.Context, string) ([]*Entry, error)
+	})
+	if !ok {
+		return nil, testeeaccess.ErrAccessUnavailable
+	}
+	entries, err := reader.ListParticipantTasks(ctx, testeeID)
+	if err != nil {
+		return nil, err
+	}
+	for _, entry := range entries {
+		if entry == nil || entry.TesteeID != testeeID {
+			return nil, testeeaccess.ErrAccessUnavailable
+		}
+	}
+	if err := s.access.Authorize(ctx, userID, id); err != nil {
+		return nil, err
+	}
+	return entries, nil
 }

@@ -109,7 +109,7 @@ func New(deps Deps) (*Module, error) {
 	module.QueryService = planApp.NewQueryService(planReadModel, planReadModel, scaleCatalog, enrollmentAccess)
 	module.EnrollmentQueryService = planApp.NewEnrollmentQueryService(planInfra.NewEnrollmentReadStore(normalized.MySQLDB, normalized.MySQLLimiter), scaleCatalog, enrollmentAccess)
 	module.TaskAssessmentResolver = planApp.NewTaskAssessmentResolver(taskRepo)
-	module.TaskEntryResolver = planApp.NewTaskEntryResolver(taskRepo, scaleCatalog)
+	module.TaskEntryResolver = planApp.NewTaskEntryResolver(taskRepo, scaleCatalog, enrollmentRepo)
 	module.TaskNotificationContextReader = planApp.NewTaskNotificationContextReader(taskRepo, planRepo)
 	module.TaskReminderStateReader = planApp.NewTaskReminderStateReader(taskRepo)
 

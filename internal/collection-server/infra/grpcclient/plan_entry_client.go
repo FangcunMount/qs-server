@@ -28,8 +28,22 @@ func (c *PlanEntryClient) ResolveTaskEntry(ctx context.Context, taskID, token st
 	if err != nil {
 		return nil, err
 	}
-	return &planentry.Entry{
-		TaskID: result.GetTaskId(), TesteeID: result.GetTesteeId(),
-		ScaleCode: result.GetScaleCode(), ExpiresAt: result.GetExpiresAt(),
-	}, nil
+	return participantEntry(result), nil
+}
+
+func participantEntry(result *pb.ResolveTaskEntryResponse) *planentry.Entry {
+	return &planentry.Entry{TaskID: result.GetTaskId(), TesteeID: result.GetTesteeId(), ScaleCode: result.GetScaleCode(), ExpiresAt: result.GetExpiresAt(), PlanID: result.GetPlanId(), Title: result.GetTitle(), OpenAt: result.GetOpenAt(), DueAt: result.GetDueAt(), Status: result.GetTaskStatus(), CanStart: result.GetCanStart(), QuestionnaireCode: result.GetQuestionnaireCode(), QuestionnaireVersion: result.GetQuestionnaireVersion(), ModelVersion: result.GetModelVersion()}
+}
+func (c *PlanEntryClient) ListParticipantTasks(ctx context.Context, testeeID string) ([]*planentry.Entry, error) {
+	ctx, cancel := c.client.ContextWithTimeout(ctx)
+	defer cancel()
+	response, err := c.grpcClient.ListParticipantTasks(ctx, &pb.ListParticipantTasksRequest{TesteeId: testeeID})
+	if err != nil {
+		return nil, err
+	}
+	entries := make([]*planentry.Entry, 0, len(response.GetItems()))
+	for _, entry := range response.GetItems() {
+		entries = append(entries, participantEntry(entry))
+	}
+	return entries, nil
 }

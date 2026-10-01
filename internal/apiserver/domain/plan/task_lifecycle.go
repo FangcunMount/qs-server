@@ -50,9 +50,6 @@ func (l *TaskLifecycle) OpenAt(ctx context.Context, task *AssessmentTask, entryT
 	}
 
 	// 2. 验证参数
-	if entryToken == "" {
-		return errors.WithCode(code.ErrInvalidArgument, "入口令牌不能为空")
-	}
 	if entryURL == "" {
 		return errors.WithCode(code.ErrInvalidArgument, "入口URL不能为空")
 	}

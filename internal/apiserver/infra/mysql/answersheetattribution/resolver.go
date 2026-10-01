@@ -107,6 +107,9 @@ type planTaskRow struct {
 	ScaleCode        string
 	TaskStatus       string
 	EnrollmentStatus string
+	OpenAt           *time.Time
+	ExpireAt         *time.Time
+	AssessmentID     *uint64
 }
 
 func (r *Resolver) resolvePlanTask(ctx context.Context, request attributionport.ResolveRequest) (domainanswersheet.AttributionSnapshot, error) {
@@ -117,18 +120,15 @@ func (r *Resolver) resolvePlanTask(ctx context.Context, request attributionport.
 	var row planTaskRow
 	err = r.db.WithContext(ctx).Raw(`
 		SELECT t.id, t.org_id, t.testee_id, t.plan_id, t.enrollment_id, t.scale_code,
-		       t.status AS task_status, e.status AS enrollment_status
+		       t.status AS task_status, e.status AS enrollment_status, t.open_at, t.expire_at, t.assessment_id
 		FROM assessment_task t
 		JOIN plan_enrollment e ON e.id = t.enrollment_id AND e.deleted_at IS NULL
 		WHERE t.id = ? AND t.org_id = ? AND t.testee_id = ? AND t.deleted_at IS NULL`, id, request.OrgID, request.TesteeID).Scan(&row).Error
 	if err != nil {
 		return domainanswersheet.AttributionSnapshot{}, err
 	}
-	if row.ID == 0 || row.TaskStatus != "opened" || row.EnrollmentStatus != "active" {
-		return domainanswersheet.AttributionSnapshot{}, fmt.Errorf("plan task is unavailable")
-	}
-	if !request.Admission.RequiresAssessment() || row.ScaleCode != request.Admission.ModelCode() {
-		return domainanswersheet.AttributionSnapshot{}, fmt.Errorf("plan task content does not match submitted assessment")
+	if err := validatePlanTask(row, request, r.now()); err != nil {
+		return domainanswersheet.AttributionSnapshot{}, err
 	}
 	clinicianID, err := r.resolvePrimaryClinician(ctx, request.OrgID, request.TesteeID)
 	if err != nil {
@@ -188,4 +188,14 @@ func parseOriginID(raw string) (uint64, error) {
 		return 0, fmt.Errorf("invalid origin id")
 	}
 	return id, nil
+}
+
+func validatePlanTask(row planTaskRow, request attributionport.ResolveRequest, now time.Time) error {
+	if row.ID == 0 || row.OrgID <= 0 || uint64(row.OrgID) != request.OrgID || row.TesteeID != request.TesteeID || row.TaskStatus != "opened" || row.EnrollmentStatus != "active" || row.OpenAt == nil || now.Before(*row.OpenAt) || row.ExpireAt == nil || !now.Before(*row.ExpireAt) || row.AssessmentID != nil {
+		return fmt.Errorf("plan task is unavailable")
+	}
+	if !request.Admission.RequiresAssessment() || row.ScaleCode != request.Admission.ModelCode() {
+		return fmt.Errorf("plan task content does not match submitted assessment")
+	}
+	return nil
 }
