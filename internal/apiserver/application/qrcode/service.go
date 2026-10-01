@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"net/url"
 
 	"github.com/FangcunMount/component-base/pkg/logger"
 	iambridge "github.com/FangcunMount/qs-server/internal/apiserver/port/iambridge"
@@ -136,12 +137,12 @@ func (s *service) GenerateQuestionnaireQRCode(ctx context.Context, code, version
 	}
 
 	// 构建 scene 参数：前端填写页实际消费 q，v 仅作为附加信息保留
-	// scene 最大 32 个字符，只能包含字母、数字、下划线
+	// scene 最大 32 个字符。
 	scene := fmt.Sprintf("q=%s&v=%s", code, version)
 	if len(scene) > 32 {
 		// 如果超过 32 字符，仅保留前端必需的 q 参数
 		scene = fmt.Sprintf("q=%s", code)
-		l.Warnw("scene 参数超过 32 字符，仅保留问卷编码",
+		l.Warnw("scene 参数超过 32 字符，优先保留问卷编码；必要时使用完整页面路径",
 			"code", code,
 			"version", version,
 			"original_scene", fmt.Sprintf("q=%s&v=%s", code, version),
@@ -149,17 +150,7 @@ func (s *service) GenerateQuestionnaireQRCode(ctx context.Context, code, version
 	}
 
 	// 调用基础设施层生成小程序码
-	reader, err := s.qrCodeGen.GenerateUnlimitedQRCode(
-		ctx,
-		appID,
-		appSecret,
-		scene,
-		s.config.PagePath,
-		430,   // 默认宽度
-		false, // 自动配色
-		nil,   // 线条颜色
-		false, // 是否透明
-	)
+	reader, err := s.generateEntryQRCode(ctx, appID, appSecret, scene, url.Values{"q": {code}, "v": {version}})
 	if err != nil {
 		l.Errorw("生成问卷小程序码失败",
 			"action", "generate_questionnaire_qrcode",
@@ -229,30 +220,9 @@ func (s *service) GenerateScaleQRCode(ctx context.Context, code string) (string,
 		return "", fmt.Errorf("获取微信应用配置失败: %w", err)
 	}
 
-	// 构建 scene 参数：包含量表编码
-	// scene 最大 32 个字符，只能包含字母、数字、下划线
+	// Keep the required q parameter intact; raw-code scenes are not understood by the fill page.
 	scene := fmt.Sprintf("q=%s", code)
-	if len(scene) > 32 {
-		// 如果超过 32 字符，只使用编码
-		scene = code
-		l.Warnw("scene 参数超过 32 字符，仅使用编码",
-			"code", code,
-			"original_scene", fmt.Sprintf("scale=%s", code),
-		)
-	}
-
-	// 调用基础设施层生成小程序码
-	reader, err := s.qrCodeGen.GenerateUnlimitedQRCode(
-		ctx,
-		appID,
-		appSecret,
-		scene,
-		s.config.PagePath,
-		430,   // 默认宽度
-		false, // 自动配色
-		nil,   // 线条颜色
-		false, // 是否透明
-	)
+	reader, err := s.generateEntryQRCode(ctx, appID, appSecret, scene, url.Values{"q": {code}})
 	if err != nil {
 		l.Errorw("生成量表小程序码失败",
 			"action", "generate_scale_qrcode",
@@ -428,4 +398,13 @@ func (s *service) persistQRCode(ctx context.Context, fileName string, data []byt
 		return "", fmt.Errorf("二维码存储未配置")
 	}
 	return s.imageStore.StorePNG(ctx, fileName, data)
+}
+
+// generateEntryQRCode chooses the API before any external call. An uncertain
+// result is returned directly, never retried through a different QR API.
+func (s *service) generateEntryQRCode(ctx context.Context, appID, appSecret, scene string, params url.Values) (io.Reader, error) {
+	if len(scene) <= 32 {
+		return s.qrCodeGen.GenerateUnlimitedQRCode(ctx, appID, appSecret, scene, s.config.PagePath, 430, false, nil, false)
+	}
+	return s.qrCodeGen.GenerateQRCode(ctx, appID, appSecret, s.config.PagePath+"?"+params.Encode(), 430)
 }
