@@ -21,6 +21,7 @@ import (
 	workermessaging "github.com/FangcunMount/qs-server/internal/worker/integration/messaging"
 	rmtransport "github.com/FangcunMount/reliable-messaging/transport"
 	"github.com/FangcunMount/reliable-messaging/wire/legacy"
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 type brokerBestEffortObserver struct {
@@ -197,8 +198,14 @@ func runBestEffortRealNSQDelivery(t *testing.T, notificationsConfigured bool) {
 		// task.opened has a separate durable reminder contract and is not one
 		// of the five optional post-actions under test.
 		cases = append(cases[:2], cases[3:]...)
+		cases = append(cases, struct {
+			eventType string
+			topic     string
+			data      map[string]any
+		}{"task.expired", "qs.plan.task", map[string]any{"task_id": "T-missed", "plan_id": "P-missed", "testee_id": "123", "reason": "missed_open_window", "expired_at": occurredAt}})
 	}
 	for i, tc := range cases {
+		beforeSuppressed := missedWindowSuppressionCount(t)
 		beforeNotConfigured := bestEffortSideEffectCount(t, tc.eventType, "not_configured")
 		beforeSuccess := bestEffortSideEffectCount(t, tc.eventType, "call_succeeded")
 		payload, err := json.Marshal(map[string]any{
@@ -224,8 +231,15 @@ func runBestEffortRealNSQDelivery(t *testing.T, notificationsConfigured bool) {
 			t.Fatalf("wait for %s: %v", tc.eventType, ctx.Err())
 		}
 		if !notificationsConfigured && i >= 2 {
-			if got := bestEffortSideEffectCount(t, tc.eventType, "not_configured") - beforeNotConfigured; got != 1 {
-				t.Fatalf("%s not_configured delta=%v, want 1", tc.eventType, got)
+			wantNotConfigured := float64(1)
+			if tc.data["reason"] == "missed_open_window" {
+				wantNotConfigured = 0
+				if got := missedWindowSuppressionCount(t) - beforeSuppressed; got != 1 {
+					t.Fatalf("missed window suppression delta=%v, want 1", got)
+				}
+			}
+			if got := bestEffortSideEffectCount(t, tc.eventType, "not_configured") - beforeNotConfigured; got != wantNotConfigured {
+				t.Fatalf("%s not_configured delta=%v, want %v", tc.eventType, got, wantNotConfigured)
 			}
 			if got := bestEffortSideEffectCount(t, tc.eventType, "call_succeeded") - beforeSuccess; got != 0 {
 				t.Fatalf("%s falsely recorded sending success", tc.eventType)
@@ -244,9 +258,6 @@ func runBestEffortRealNSQDelivery(t *testing.T, notificationsConfigured bool) {
 	}
 	t.Logf("notifications_configured=%t external_calls=%d first_attempt_ACKs=%d", notificationsConfigured, wantCalls, len(cases))
 	taskCount := int64(4)
-	if !notificationsConfigured {
-		taskCount = 3
-	}
 	expected := map[string]int64{"qs.survey.lifecycle": 2, "qs.plan.task": taskCount}
 	for topic, want := range expected {
 		for {
@@ -276,4 +287,27 @@ func runBestEffortRealNSQDelivery(t *testing.T, notificationsConfigured bool) {
 	if terminal.Load() != 0 {
 		t.Fatalf("terminal handoffs = %d, want zero", terminal.Load())
 	}
+}
+
+func missedWindowSuppressionCount(t *testing.T) float64 {
+	t.Helper()
+	families, err := prometheus.DefaultGatherer.Gather()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, family := range families {
+		if family.GetName() != "qs_worker_task_expiration_notification_total" {
+			continue
+		}
+		for _, metric := range family.GetMetric() {
+			labels := map[string]string{}
+			for _, label := range metric.GetLabel() {
+				labels[label.GetName()] = label.GetValue()
+			}
+			if labels["reason"] == "missed_open_window" && labels["result"] == "suppressed" {
+				return metric.GetCounter().GetValue()
+			}
+		}
+	}
+	return 0
 }
