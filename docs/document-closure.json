@@ -2,7 +2,7 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "1582e1900f1aca302a8ac872ed8852a8be02a4cb",
+    "sha": "096a2376422304fb0f4389f1cb9e2168a98c2d3d",
     "verified_on": "2026-10-01"
   },
   "status_policy": {
@@ -128,7 +128,7 @@
       "source": "api/grpc/proto",
       "proto_file_count": 8,
       "service_count": 28,
-      "rpc_count": 129,
+      "rpc_count": 130,
       "services": {
         "actor.ActorService": [
           "CreateTestee",
@@ -193,7 +193,8 @@
           "CancelTask"
         ],
         "internalapi.PlanEntryService": [
-          "ResolveTaskEntry"
+          "ResolveTaskEntry",
+          "ListParticipantTasks"
         ],
         "interpretation.AIWorkflowAccessService": [
           "Authorize"
