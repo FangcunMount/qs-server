@@ -14,6 +14,7 @@ import (
 	baseerrors "github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/component-base/pkg/messaging"
 	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
+	notificationApp "github.com/FangcunMount/qs-server/internal/apiserver/application/notification"
 	appplan "github.com/FangcunMount/qs-server/internal/apiserver/application/plan"
 	apptransaction "github.com/FangcunMount/qs-server/internal/apiserver/application/transaction"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
@@ -57,6 +58,9 @@ func TestTaskOpeningAndReminderIntentCommitTogetherMySQL(t *testing.T) {
 	require.NoError(t, db.Raw("SELECT DATABASE()").Scan(&database).Error)
 	require.True(t, strings.HasPrefix(database, "qs_m5_task_open_test_"), "disposable database required")
 	require.NoError(t, db.AutoMigrate(&mysqlplan.AssessmentTaskPO{}))
+	// Match the production migration's DATETIME(3), regardless of GORM's
+	// default precision in this disposable schema.
+	require.NoError(t, db.Exec("ALTER TABLE assessment_task MODIFY open_at DATETIME(3) NULL").Error)
 	_, err = sqlDB.ExecContext(t.Context(), sdkmysql.Schema)
 	require.NoError(t, err)
 
@@ -76,6 +80,26 @@ events:
 	stager, err := mysqlstandard.NewStager(eventcatalog.NewCatalog(config), eventruntime.SourceAPIServer)
 	require.NoError(t, err)
 	repository := mysqlplan.NewTaskRepository(db)
+	precisionLocation, err := time.LoadLocation("Asia/Shanghai")
+	require.NoError(t, err)
+	preciseOpenAt := time.Date(2026, 10, 1, 9, 46, 31, 236779138, precisionLocation)
+	precisionTask := domainplan.NewAssessmentTaskAt(domainplan.NewAssessmentPlanID(), 99, 501,
+		testee.NewID(21), "scale", preciseOpenAt.Add(-time.Minute), preciseOpenAt.Add(-time.Minute))
+	require.NoError(t, domainplan.NewTaskLifecycle().OpenAt(t.Context(), precisionTask,
+		"test-entry", "https://example.invalid/entry", preciseOpenAt))
+	require.NoError(t, repository.Save(t.Context(), precisionTask))
+	precisionState, err := appplan.NewTaskReminderStateReader(repository).GetTaskReminderState(
+		t.Context(), 501, precisionTask.GetID().String())
+	require.NoError(t, err)
+	require.NotNil(t, precisionState.OpenAt)
+	require.True(t, precisionState.OpenAt.Equal(preciseOpenAt.Round(time.Millisecond)),
+		"the current Task must retain the event's rounded instant after MySQL persistence")
+	precisionDecision, err := notificationApp.EvaluateTaskOpenedReminder(notificationApp.TaskOpenedReminderIntent{
+		OrgID: 501, TaskID: precisionState.TaskID, TesteeID: precisionState.TesteeID,
+		ScheduleRevision: precisionState.ScheduleRevision, OpenAt: preciseOpenAt,
+	}, precisionState, preciseOpenAt.Add(time.Minute))
+	require.NoError(t, err)
+	require.Empty(t, precisionDecision.SuppressCode)
 	uow := mysql.NewUnitOfWork(db)
 	runner := apptransaction.RunnerFunc(func(ctx context.Context, fn func(context.Context) error) error {
 		return uow.WithinTransaction(ctx, fn)
