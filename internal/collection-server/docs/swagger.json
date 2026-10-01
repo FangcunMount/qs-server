@@ -1670,7 +1670,7 @@
                 }
             }
         },
-        "/api/v1/plan-task-entries/{task_id}/{token}": {
+        "/api/v1/plan-task-entries/{task_id}": {
             "get": {
                 "produces": [
                     "application/json"
@@ -1684,13 +1684,6 @@
                         "type": "string",
                         "description": "任务ID",
                         "name": "task_id",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "入口令牌",
-                        "name": "token",
                         "in": "path",
                         "required": true
                     }
@@ -1722,6 +1715,93 @@
                     },
                     "404": {
                         "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/plan-task-entries/{task_id}/{token}": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Plan-Entry"
+                ],
+                "summary": "兼容旧计划任务入口",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "任务ID",
+                        "name": "task_id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "历史入口参数，忽略且不授权",
+                        "name": "token",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/planentry.Entry"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/plan-tasks": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Plan-Entry"
+                ],
+                "summary": "查询当前用户指定档案的待填写任务",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "档案ID",
+                        "name": "testee_id",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/core.Response"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "503": {
+                        "description": "Service Unavailable",
                         "schema": {
                             "$ref": "#/definitions/core.ErrResponse"
                         }
@@ -4625,16 +4705,43 @@
         "planentry.Entry": {
             "type": "object",
             "properties": {
-                "expiresAt": {
+                "can_start": {
+                    "type": "boolean"
+                },
+                "due_at": {
                     "type": "string"
                 },
-                "scaleCode": {
+                "expires_at": {
                     "type": "string"
                 },
-                "taskID": {
+                "model_version": {
                     "type": "string"
                 },
-                "testeeID": {
+                "open_at": {
+                    "type": "string"
+                },
+                "plan_id": {
+                    "type": "string"
+                },
+                "q": {
+                    "type": "string"
+                },
+                "questionnaire_version": {
+                    "type": "string"
+                },
+                "scale_code": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "task_id": {
+                    "type": "string"
+                },
+                "testee_id": {
+                    "type": "string"
+                },
+                "title": {
                     "type": "string"
                 }
             }

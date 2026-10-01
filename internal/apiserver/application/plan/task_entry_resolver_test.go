@@ -48,7 +48,7 @@ func taskForEntryTest(at time.Time, status domainplan.TaskStatus, token string) 
 	return task
 }
 
-func TestTaskEntryResolverRequiresCurrentTaskAndExactToken(t *testing.T) {
+func TestTaskEntryResolverRequiresCurrentTaskWithLegacyTokenIgnored(t *testing.T) {
 	at := time.Date(2026, 9, 26, 9, 0, 0, 0, time.FixedZone("UTC+8", 8*3600))
 	token := uuid.NewString()
 	task := taskForEntryTest(at, domainplan.TaskStatusOpened, token)
@@ -57,7 +57,7 @@ func TestTaskEntryResolverRequiresCurrentTaskAndExactToken(t *testing.T) {
 	resolver := NewTaskEntryResolver(repo, scales).(*taskEntryResolver)
 	resolver.now = func() time.Time { return at }
 
-	got, err := resolver.ResolveTaskEntry(context.Background(), task.GetID().String(), token)
+	got, err := resolver.ResolveTaskEntry(context.Background(), task.GetID().String(), "")
 	if err != nil || got == nil || got.TaskID != task.GetID().String() || got.TesteeID != "31" ||
 		got.ScaleCode != "scale-1" || !got.ExpireAt.Equal(*task.GetExpireAt()) {
 		t.Fatalf("resolved current task = (%#v, %v)", got, err)
@@ -69,7 +69,8 @@ func TestTaskEntryResolverRequiresCurrentTaskAndExactToken(t *testing.T) {
 		status domainplan.TaskStatus
 		now    time.Time
 	}{
-		{"wrong token", task.GetID().String(), uuid.NewString(), domainplan.TaskStatusOpened, at},
+		{"pending", task.GetID().String(), token, domainplan.TaskStatusPending, at},
+		{"future open", task.GetID().String(), token, domainplan.TaskStatusOpened, at.Add(-time.Hour)},
 		{"bad task ID", "not-an-id", token, domainplan.TaskStatusOpened, at},
 		{"canceled", task.GetID().String(), token, domainplan.TaskStatusCanceled, at},
 		{"completed", task.GetID().String(), token, domainplan.TaskStatusCompleted, at},
@@ -108,5 +109,62 @@ func TestTaskEntryResolverDistinguishesUnpublishedFromUnavailableCatalog(t *test
 	repo.err = want
 	if _, err := resolver.ResolveTaskEntry(context.Background(), task.GetID().String(), token); !stderrors.Is(err, want) {
 		t.Fatalf("task storage failure was converted into expiration: %v", err)
+	}
+}
+
+func TestTaskEntryIgnoresLegacyToken(t *testing.T) {
+	at := time.Now()
+	task := taskForEntryTest(at, domainplan.TaskStatusOpened, "old-secret")
+	resolver := NewTaskEntryResolver(&taskEntryRepoStub{task: task}, &taskEntryScaleStub{published: true})
+	for _, token := range []string{"", "old-secret", "untrusted", "ae_doctor"} {
+		got, err := resolver.ResolveTaskEntry(t.Context(), task.GetID().String(), token)
+		if err != nil || got.TaskID != task.GetID().String() {
+			t.Fatalf("legacy locator %q: %v", token, err)
+		}
+	}
+}
+
+type participantTasksStub struct {
+	taskEntryRepoStub
+	tasks []*domainplan.AssessmentTask
+}
+
+func (r *participantTasksStub) FindByTesteeID(context.Context, testee.ID) ([]*domainplan.AssessmentTask, error) {
+	return r.tasks, r.err
+}
+func TestParticipantTaskListFiltersTerminalAndTimeBoundaries(t *testing.T) {
+	at := time.Now()
+	opened := taskForEntryTest(at, domainplan.TaskStatusOpened, "")
+	pending := taskForEntryTest(at, domainplan.TaskStatusPending, "")
+	expired := taskForEntryTest(at.Add(-2*time.Hour), domainplan.TaskStatusOpened, "")
+	completed := taskForEntryTest(at, domainplan.TaskStatusCompleted, "")
+	canceled := taskForEntryTest(at, domainplan.TaskStatusCanceled, "")
+	resolver := NewTaskEntryResolver(&participantTasksStub{tasks: []*domainplan.AssessmentTask{opened, pending, expired, completed, canceled}}, &taskEntryScaleStub{published: true}).(*taskEntryResolver)
+	resolver.now = func() time.Time { return at }
+	got, err := resolver.ListParticipantTasks(t.Context(), "31")
+	if err != nil || len(got) != 2 || !got[0].CanStart || got[1].CanStart || got[0].PlanID == "" || got[0].DueAt.IsZero() {
+		t.Fatalf("task list %#v, %v", got, err)
+	}
+}
+
+func TestTaskEntryRequiresItsActiveEnrollment(t *testing.T) {
+	at := time.Now()
+	task := taskForEntryTest(at, domainplan.TaskStatusOpened, "")
+	good := domainplan.NewEnrollment(task.GetOrgID(), task.GetPlanID(), task.GetTesteeID(), 1, at, at)
+	task.AssignEnrollment(good.ID())
+	for name, enrollment := range map[string]*domainplan.Enrollment{
+		"valid":           good,
+		"missing":         nil,
+		"foreign profile": domainplan.NewEnrollment(task.GetOrgID(), task.GetPlanID(), testee.NewID(99), 1, at, at),
+		"foreign org":     domainplan.NewEnrollment(99, task.GetPlanID(), task.GetTesteeID(), 1, at, at),
+		"foreign plan":    domainplan.NewEnrollment(task.GetOrgID(), domainplan.NewAssessmentPlanID(), task.GetTesteeID(), 1, at, at),
+	} {
+		t.Run(name, func(t *testing.T) {
+			resolver := NewTaskEntryResolver(&taskEntryRepoStub{task: task}, &taskEntryScaleStub{published: true}, &enrollmentRepoStub{active: enrollment})
+			_, err := resolver.ResolveTaskEntry(t.Context(), task.GetID().String(), "")
+			if (err == nil) != (name == "valid") {
+				t.Fatalf("enrollment scope: %v", err)
+			}
+		})
 	}
 }

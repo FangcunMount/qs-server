@@ -127,7 +127,9 @@ func (r *Router) registerPlanEntryRoutes(api *gin.RouterGroup) {
 		return
 	}
 	h := handler.NewPlanEntryHandler(service)
-	api.GET("/plan-task-entries/:task_id/:token", r.queryHandlers(h.Resolve)...)
+	api.GET("/plan-tasks", r.queryHandlers(h.List)...)
+	api.GET("/plan-task-entries/:task_id", r.queryHandlers(h.Resolve)...)
+	api.GET("/plan-task-entries/:task_id/:token", r.queryHandlers(h.ResolveLegacy)...)
 }
 
 func (r *Router) applyIAMAuth(api *gin.RouterGroup, skip func(*gin.Context) bool) {

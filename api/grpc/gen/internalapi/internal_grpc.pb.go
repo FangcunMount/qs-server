@@ -951,7 +951,8 @@ var PlanCommandService_ServiceDesc = grpc.ServiceDesc{
 }
 
 const (
-	PlanEntryService_ResolveTaskEntry_FullMethodName = "/internalapi.PlanEntryService/ResolveTaskEntry"
+	PlanEntryService_ResolveTaskEntry_FullMethodName     = "/internalapi.PlanEntryService/ResolveTaskEntry"
+	PlanEntryService_ListParticipantTasks_FullMethodName = "/internalapi.PlanEntryService/ListParticipantTasks"
 )
 
 // PlanEntryServiceClient is the client API for PlanEntryService service.
@@ -963,6 +964,7 @@ const (
 // returning this result to a mini-program user.
 type PlanEntryServiceClient interface {
 	ResolveTaskEntry(ctx context.Context, in *ResolveTaskEntryRequest, opts ...grpc.CallOption) (*ResolveTaskEntryResponse, error)
+	ListParticipantTasks(ctx context.Context, in *ListParticipantTasksRequest, opts ...grpc.CallOption) (*ListParticipantTasksResponse, error)
 }
 
 type planEntryServiceClient struct {
@@ -983,6 +985,16 @@ func (c *planEntryServiceClient) ResolveTaskEntry(ctx context.Context, in *Resol
 	return out, nil
 }
 
+func (c *planEntryServiceClient) ListParticipantTasks(ctx context.Context, in *ListParticipantTasksRequest, opts ...grpc.CallOption) (*ListParticipantTasksResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListParticipantTasksResponse)
+	err := c.cc.Invoke(ctx, PlanEntryService_ListParticipantTasks_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // PlanEntryServiceServer is the server API for PlanEntryService service.
 // All implementations must embed UnimplementedPlanEntryServiceServer
 // for forward compatibility.
@@ -992,6 +1004,7 @@ func (c *planEntryServiceClient) ResolveTaskEntry(ctx context.Context, in *Resol
 // returning this result to a mini-program user.
 type PlanEntryServiceServer interface {
 	ResolveTaskEntry(context.Context, *ResolveTaskEntryRequest) (*ResolveTaskEntryResponse, error)
+	ListParticipantTasks(context.Context, *ListParticipantTasksRequest) (*ListParticipantTasksResponse, error)
 	mustEmbedUnimplementedPlanEntryServiceServer()
 }
 
@@ -1004,6 +1017,9 @@ type UnimplementedPlanEntryServiceServer struct{}
 
 func (UnimplementedPlanEntryServiceServer) ResolveTaskEntry(context.Context, *ResolveTaskEntryRequest) (*ResolveTaskEntryResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ResolveTaskEntry not implemented")
+}
+func (UnimplementedPlanEntryServiceServer) ListParticipantTasks(context.Context, *ListParticipantTasksRequest) (*ListParticipantTasksResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListParticipantTasks not implemented")
 }
 func (UnimplementedPlanEntryServiceServer) mustEmbedUnimplementedPlanEntryServiceServer() {}
 func (UnimplementedPlanEntryServiceServer) testEmbeddedByValue()                          {}
@@ -1044,6 +1060,24 @@ func _PlanEntryService_ResolveTaskEntry_Handler(srv interface{}, ctx context.Con
 	return interceptor(ctx, in, info, handler)
 }
 
+func _PlanEntryService_ListParticipantTasks_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListParticipantTasksRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(PlanEntryServiceServer).ListParticipantTasks(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: PlanEntryService_ListParticipantTasks_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(PlanEntryServiceServer).ListParticipantTasks(ctx, req.(*ListParticipantTasksRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // PlanEntryService_ServiceDesc is the grpc.ServiceDesc for PlanEntryService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -1054,6 +1088,10 @@ var PlanEntryService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ResolveTaskEntry",
 			Handler:    _PlanEntryService_ResolveTaskEntry_Handler,
+		},
+		{
+			MethodName: "ListParticipantTasks",
+			Handler:    _PlanEntryService_ListParticipantTasks_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
