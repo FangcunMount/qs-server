@@ -48,9 +48,14 @@ func WrapAcceptanceFailureFromEnv(service app.QRCodeService, db *mongo.Database)
 	if !configured {
 		return service, nil
 	}
-	scope, err := parseFailureScope(raw, time.Now())
+	now := time.Now()
+	scope, err := parseFailureScope(raw, now)
 	if err != nil {
 		return nil, err
+	}
+	// A valid expired probe must not turn a later normal restart into an outage.
+	if !scope.ExpiresAt.After(now) {
+		return service, nil
 	}
 	if service == nil || db == nil {
 		return nil, fmt.Errorf("QR acceptance probe requires QR service and Mongo database")
@@ -71,8 +76,8 @@ func parseFailureScope(raw string, now time.Time) (FailureScope, error) {
 	if len(s.Token) < 16 || len(s.Token) > 80 || strings.Trim(s.Token, "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-") != "" {
 		return s, fmt.Errorf("QR acceptance token must be 16-80 alphanumeric/hyphen characters")
 	}
-	if s.StartsAt.IsZero() || s.ExpiresAt.IsZero() || !s.StartsAt.Before(s.ExpiresAt) || s.ExpiresAt.Sub(s.StartsAt) > 10*time.Minute || !s.ExpiresAt.After(now) || s.ExpiresAt.After(now.Add(10*time.Minute)) {
-		return s, fmt.Errorf("QR acceptance window must be active/upcoming and at most ten minutes")
+	if s.StartsAt.IsZero() || s.ExpiresAt.IsZero() || !s.StartsAt.Before(s.ExpiresAt) || s.ExpiresAt.Sub(s.StartsAt) > 10*time.Minute || s.ExpiresAt.After(now.Add(10*time.Minute)) {
+		return s, fmt.Errorf("QR acceptance window must be ordered, at most ten minutes and not more than ten minutes ahead")
 	}
 	if len(s.Targets) < 1 || len(s.Targets) > 2 {
 		return s, fmt.Errorf("QR acceptance requires one or two exact targets")

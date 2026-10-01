@@ -121,3 +121,18 @@ func TestUnconfiguredProbePreservesOriginalService(t *testing.T) {
 		t.Fatal("absent configuration must retain original service without database")
 	}
 }
+
+func TestExpiredValidConfigDoesNotPreventRestart(t *testing.T) {
+	t.Setenv(AcceptanceFailureEnv, "")
+	now := time.Now()
+	scope := testScope(now)
+	scope.StartsAt = now.Add(-2 * time.Minute)
+	scope.ExpiresAt = now.Add(-time.Minute)
+	raw, _ := json.Marshal(scope)
+	t.Setenv(AcceptanceFailureEnv, string(raw))
+	qr := &recordingQR{}
+	got, err := WrapAcceptanceFailureFromEnv(qr, nil)
+	if err != nil || got != qr {
+		t.Fatalf("expired valid config must disable itself without blocking service restart: %v", err)
+	}
+}
