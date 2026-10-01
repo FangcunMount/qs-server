@@ -208,6 +208,17 @@ jobs:
           trap 'docker exec "$MYSQL_CONTAINER" mysql -uroot -proot -e "DROP DATABASE qs_m5_reminder_ledger_test_ci"' EXIT
           go test ./internal/apiserver/infra/mysql/notification -run '^TestReminder(BatchFreezesCompleteRecipientSetAcrossConsumers|DeliveryLedgerSurvivesCompetingConsumersAndUnknownSend)$' -count=1 -v
 
+
+      - name: Verify reminder manual resolution transaction on MySQL
+        env:
+          MYSQL_CONTAINER: ${{ job.services.mysql.id }}
+          QS_REMINDER_RESOLUTION_MYSQL_REQUIRED: '1'
+          QS_REMINDER_RESOLUTION_MYSQL_DSN: 'root:root@tcp(127.0.0.1:3306)/qs_m5_reminder_resolution_test_ci?parseTime=true&loc=Asia%2FShanghai'
+        run: |
+          docker exec "$MYSQL_CONTAINER" mysql -uroot -proot -e 'CREATE DATABASE qs_m5_reminder_resolution_test_ci'
+          trap 'docker exec "$MYSQL_CONTAINER" mysql -uroot -proot -e "DROP DATABASE qs_m5_reminder_resolution_test_ci"' EXIT
+          go test ./internal/apiserver/infra/mysql/systemgovernance -run '^TestReminderResolutionAtomicAndNoResendMySQL$' -count=1 -v
+
   runtime-closure-e2e:
     name: Seeddata Retirement and Current Runtime E2E
     runs-on: ubuntu-latest

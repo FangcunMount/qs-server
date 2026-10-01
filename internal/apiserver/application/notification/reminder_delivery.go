@@ -27,6 +27,8 @@ const (
 	ReminderConfirmed      ReminderDeliveryState = "confirmed"
 	ReminderManualRequired ReminderDeliveryState = "manual_required"
 	ReminderSuppressed     ReminderDeliveryState = "suppressed"
+	// Reviewed records a manual finding; it is not platform confirmation.
+	ReminderReviewed ReminderDeliveryState = "reviewed"
 )
 
 // ReminderDelivery records platform acceptance, not recipient reading.
