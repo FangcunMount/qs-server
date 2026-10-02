@@ -64,7 +64,10 @@ func (c *ParticipantAIExplanationClient) GetWorkflow(ctx context.Context, testee
 	if result.ContentJson != "" && !json.Valid([]byte(result.ContentJson)) {
 		return nil, fmt.Errorf("invalid AI workflow content")
 	}
-	return &aiport.WorkflowResult{RequestID: result.RequestId, Status: result.Status, Version: result.Version, Content: json.RawMessage(result.ContentJson), ArtifactID: result.ArtifactId, ReportID: result.ReportId, SourceVersion: result.SourceVersion}, nil
+	if result.ReferenceMaterialJson != "" && !json.Valid([]byte(result.ReferenceMaterialJson)) {
+		return nil, fmt.Errorf("invalid AI workflow references")
+	}
+	return &aiport.WorkflowResult{RequestID: result.RequestId, Status: result.Status, Version: result.Version, Content: json.RawMessage(result.ContentJson), ArtifactID: result.ArtifactId, ReportID: result.ReportId, SourceVersion: result.SourceVersion, ReferenceMaterial: json.RawMessage(result.ReferenceMaterialJson), ReferenceMaterialFingerprint: result.ReferenceMaterialFingerprint}, nil
 }
 
 func (c *ParticipantAIExplanationClient) GetWorkflowSource(ctx context.Context, testeeID, assessmentID uint64) (*aiport.WorkflowSource, error) {
