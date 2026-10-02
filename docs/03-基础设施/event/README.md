@@ -108,3 +108,9 @@ make docs-hygiene
 6. `events.replay_pending` 与 `events.replay_delivery` 分别恢复哪一层事实？
 7. 什么时候应该新增独立 channel，什么时候仍应留在一个 handler 的事务内？
 8. Signal 丢失为什么是设计语义，而不是尚未补齐的可靠性缺陷？
+
+### 标准 Outbox 的完整配置边界
+
+生产构建的标准 Outbox 入口要求每个已提供的宿主数据库都有完整标准 Profile：有 Mongo 数据库时必须选择 Mongo 标准 Profile，有 MySQL 数据库时必须选择测评标准 Profile。缺少配置会在存储预检和发布资源创建之前报错；子系统也会独立校验全部绑定，不再为缺失的 Profile 自动创建旧 Outbox 链路。只有单个宿主数据库的调用者仍可使用对应的单 Profile。
+
+这项源码边界不表示旧存储包已经删除，也不证明生产部署或业务验收完成。尚保留的旧构造入口与固定旧镜像回退责任须按退役计划单独处理；回退使用已核验的旧镜像和原配置。
