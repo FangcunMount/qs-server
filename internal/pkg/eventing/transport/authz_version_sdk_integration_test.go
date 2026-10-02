@@ -10,10 +10,9 @@ import (
 	"testing"
 	"time"
 
-	cbnsq "github.com/FangcunMount/component-base/pkg/messaging/nsq"
 	"github.com/FangcunMount/qs-server/internal/pkg/iamauth"
+	"github.com/FangcunMount/qs-server/internal/pkg/messagingruntime"
 	"github.com/FangcunMount/reliable-messaging/wire/legacy"
-	"github.com/nsqio/go-nsq"
 )
 
 type committedVersionOneReader struct{}
@@ -54,12 +53,12 @@ func TestSDKSubscriberRaisesIAMVersionWatermarkOnEphemeralChannel(t *testing.T) 
 		t.Fatal(err)
 	}
 
-	publisher, err := cbnsq.NewPublisher(integrationEnv("NSQD_ADDR", "127.0.0.1:4150"), nsq.NewConfig())
+	publisher, err := messagingruntime.NewSDKNSQWirePublisher(integrationEnv("NSQD_ADDR", "127.0.0.1:4150"))
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = publisher.Close() })
-	if err := publisher.Publish(t.Context(), topic, []byte(`{"version":2}`)); err != nil {
+	if err := publisher.PublishWire(t.Context(), topic, []byte(`{"version":2}`)); err != nil {
 		t.Fatal(err)
 	}
 	deadline := time.Now().Add(5 * time.Second)

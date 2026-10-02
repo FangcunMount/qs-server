@@ -13,18 +13,17 @@ import (
 	"testing"
 	"time"
 
-	basemessaging "github.com/FangcunMount/component-base/pkg/messaging"
-	cbnsq "github.com/FangcunMount/component-base/pkg/messaging/nsq"
 	pb "github.com/FangcunMount/qs-server/api/grpc/gen/evaluation"
 	evalrun "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/run"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/checkpoint"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationrun"
 	eventcatalog "github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
 	eventruntime "github.com/FangcunMount/qs-server/internal/pkg/eventing/runtime"
+	"github.com/FangcunMount/qs-server/internal/pkg/messagingruntime"
 	"github.com/FangcunMount/qs-server/internal/worker/handlers"
 	workermessaging "github.com/FangcunMount/qs-server/internal/worker/integration/messaging"
+	"github.com/FangcunMount/reliable-messaging/wire/legacy"
 	"github.com/google/uuid"
-	"github.com/nsqio/go-nsq"
 	gormmysql "gorm.io/driver/mysql"
 	"gorm.io/gorm"
 )
@@ -123,7 +122,7 @@ func TestWorkerDuplicateNSQEvaluationRequestKeepsOneDurableAttempt(t *testing.T)
 	}); err != nil {
 		t.Fatal(err)
 	}
-	publisher, err := cbnsq.NewPublisher(integrationEnv("NSQD_ADDR", "127.0.0.1:4150"), nsq.NewConfig())
+	publisher, err := messagingruntime.NewSDKNSQWirePublisher(integrationEnv("NSQD_ADDR", "127.0.0.1:4150"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -141,10 +140,10 @@ func TestWorkerDuplicateNSQEvaluationRequestKeepsOneDurableAttempt(t *testing.T)
 	if err != nil {
 		t.Fatal(err)
 	}
-	message := basemessaging.NewMessage("evaluation-requested-90020001", payload)
+	message := legacy.Envelope{UUID: "evaluation-requested-90020001", Payload: payload, Metadata: map[string]string{}}
 	message.Metadata["event_type"] = eventcatalog.EvaluationRequested
 	for i := range 2 {
-		if err := publisher.PublishMessage(t.Context(), topic, message); err != nil {
+		if err := publishSDKTestEnvelope(t.Context(), publisher, topic, message); err != nil {
 			t.Fatal(err)
 		}
 		select {

@@ -6,7 +6,6 @@ import (
 	"testing"
 	"time"
 
-	basemessaging "github.com/FangcunMount/component-base/pkg/messaging"
 	rmtransport "github.com/FangcunMount/reliable-messaging/transport"
 	"github.com/FangcunMount/reliable-messaging/wire/legacy"
 )
@@ -61,39 +60,6 @@ func TestSDKDeliverySubscriberRequiresDurableFailureHandlerWithoutConnecting(t *
 	}
 }
 
-func TestFailedMessageHandlerPreservesTransportEvidence(t *testing.T) {
-	recorder := &deadLetterRecorderStub{}
-	handler := FailedMessageHandler(recorder)
-	message := basemessaging.NewMessage("message-1", []byte(`{"id":"event-1","data":{"org_id":7}}`))
-	message.TransportMessageID = "physical-nsq-1"
-	wantErr := errors.New("decode failed")
-	if err := handler(t.Context(), basemessaging.FailedMessage{
-		Provider: "nsq", Topic: "evaluation", Channel: "worker", Message: message, Attempts: 8, Cause: wantErr,
-	}); err != nil {
-		t.Fatal(err)
-	}
-	if recorder.record.MessageID != "message-1" || recorder.record.TransportMessageID != "physical-nsq-1" || recorder.record.EventID != "event-1" || recorder.record.OrgID == nil || *recorder.record.OrgID != 7 || recorder.record.DeliveryAttempts != 8 || recorder.record.LastError != wantErr.Error() {
-		t.Fatalf("record = %#v", recorder.record)
-	}
-}
-
-func TestUnknownEventRecorderPreservesPayloadAndRejectsMissingAudit(t *testing.T) {
-	recorder := &deadLetterRecorderStub{}
-	msg := basemessaging.NewMessage("message-2", []byte(`{"id":"event-2","data":{"org_id":501}}`))
-	msg.Topic, msg.Channel, msg.Attempts = "evaluation", "worker", 1
-	if err := NewUnknownEventRecorder("nsq", recorder)(t.Context(), msg, "future.event"); err != nil {
-		t.Fatal(err)
-	}
-	if recorder.record.MessageID != msg.UUID || recorder.record.EventID != "event-2" || recorder.record.OrgID == nil || *recorder.record.OrgID != 501 || recorder.record.Provider != "nsq" || recorder.record.LastError != "unknown event type: future.event" || string(recorder.record.Payload) != string(msg.Payload) {
-		t.Fatalf("unknown event record = %#v", recorder.record)
-	}
-	wantErr := errors.New("audit unavailable")
-	recorder.err = wantErr
-	if err := NewUnknownEventRecorder("nsq", recorder)(t.Context(), msg, "future.event"); !errors.Is(err, wantErr) {
-		t.Fatalf("audit error = %v, want unavailable", err)
-	}
-}
-
 func TestSDKFailedHandoffAndUnknownDeliveryKeepBothMessageIdentities(t *testing.T) {
 	recorder := &deadLetterRecorderStub{}
 	handoff := legacy.FailedHandoff{
@@ -113,7 +79,7 @@ func TestSDKFailedHandoffAndUnknownDeliveryKeepBothMessageIdentities(t *testing.
 	if err := NewDeliveryUnknownEventRecorder("nsq", recorder)(t.Context(), received, "future.event"); err != nil {
 		t.Fatal(err)
 	}
-	if got := recorder.record; got.MessageID != "app-2" || got.TransportMessageID != "physical-2" || got.EventID != "event-2" || got.DeliveryAttempts != 2 || got.LastError != "unknown event type: future.event" {
+	if got := recorder.record; got.MessageID != "app-2" || got.TransportMessageID != "physical-2" || got.EventID != "event-2" || got.DeliveryAttempts != 2 || got.LastError != "unknown event type: future.event" || got.Provider != "nsq" || got.OrgID == nil || *got.OrgID != 9 || string(got.Payload) != string(received.Payload) {
 		t.Fatalf("SDK unknown audit = %#v", got)
 	}
 	wantErr := errors.New("audit unavailable")
