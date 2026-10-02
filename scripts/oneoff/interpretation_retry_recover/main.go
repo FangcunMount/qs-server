@@ -183,9 +183,10 @@ func runCLI(parent context.Context, args []string, stdout, stderr io.Writer) int
 	}
 	result := publisher.Publish(ctx, plan.message)
 	outcome := "unknown"
-	if result.Outcome == transport.Confirmed {
+	switch result.Outcome {
+	case transport.Confirmed:
 		outcome = "confirmed"
-	} else if result.Outcome == transport.Rejected {
+	case transport.Rejected:
 		outcome = "rejected"
 	}
 	receipt := operationReceipt{RequestID: cfg.requestID, EventID: plan.EventID, TransportOutcome: outcome, RecordedAt: time.Now().In(time.FixedZone("UTC+8", 8*3600))}
