@@ -2,6 +2,7 @@ package grpcclient
 
 import (
 	"context"
+	"os"
 	"testing"
 	"time"
 
@@ -17,6 +18,7 @@ type workflowRPCProbe struct {
 	verifier       *delegatedsubject.Verifier
 	calls          int
 	invalidContent bool
+	content        string
 }
 
 func (p *workflowRPCProbe) check(ctx context.Context, testeeID, assessmentID uint64, purpose string) {
@@ -52,6 +54,9 @@ func (p *workflowRPCProbe) GetAIWorkflowSource(ctx context.Context, req *pb.GetA
 func (p *workflowRPCProbe) GetAIWorkflow(ctx context.Context, req *pb.GetAIWorkflowRequest, _ ...grpc.CallOption) (*pb.AIWorkflowResult, error) {
 	p.check(ctx, req.TesteeId, req.AssessmentId, delegatedsubject.PurposeAIExplanationGet)
 	content := `{"summary":"ready"}`
+	if p.content != "" {
+		content = p.content
+	}
 	if p.invalidContent {
 		content = "invalid json"
 	}
@@ -82,6 +87,15 @@ func TestWorkflowRPCPreservesDelegationAndRequestIdentity(t *testing.T) {
 	result, err := client.GetWorkflow(ctx, 7, 42, requestID)
 	if err != nil || result.RequestID != requestID || result.Version != 3 || result.SourceVersion != source.SourceVersion {
 		t.Fatalf("result: %#v %v", result, err)
+	}
+	content, err := os.ReadFile("../../../pkg/contract/testdata/mbti-three-topic-output.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	probe.content = string(content)
+	result, err = client.GetWorkflow(ctx, 7, 42, requestID)
+	if err != nil || string(result.Content) != string(content) {
+		t.Fatalf("three-topic JSON changed during Collection transport: %v", err)
 	}
 	probe.invalidContent = true
 	if _, err = client.GetWorkflow(ctx, 7, 42, requestID); err == nil {

@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -82,6 +83,30 @@ func TestWorkflowReadReturnsOnlyContentAndProvenance(t *testing.T) {
 	}
 	if result.ContentJson != content || result.ArtifactId != id || result.ReportId != "99" || result.SourceVersion != "report-v1:101" || result.Version != 5 {
 		t.Fatalf("result=%v", result)
+	}
+	if strings.Contains(result.String(), "private-provider-request") {
+		t.Fatal("internal provider identifier exposed")
+	}
+}
+
+func TestWorkflowReadPreservesThreeTopicContent(t *testing.T) {
+	const id = "00000000-0000-4000-8000-000000000001"
+	content, err := os.ReadFile("../../../../pkg/contract/testdata/mbti-three-topic-output.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	digest := "sha256:" + strings.Repeat("a", 64)
+	artifact := bridge.Artifact{ID: id, SessionID: id, RunID: id, EvidenceSetID: id, InvocationID: id, EvidenceFingerprint: strings.Repeat("a", 64), ProviderRequestID: "private-provider-request", ContentJSON: string(content), ContentFingerprint: fmt.Sprintf("sha256:%x", sha256.Sum256(content)), InputFingerprint: digest, ProfileID: "profile", ProfileVersion: "three-topic-v1", ProfileFingerprint: digest, PromptFingerprint: digest, RouteFingerprint: digest, OutputValidatorVersion: "qs-ai-output-mbti-three-topic/v1", SafetyValidatorVersion: "v1", AssessmentID: "42", ReportID: "99", SourceVersion: "report-v1:101", SchemaVersion: "qs-ai-artifact/v1"}
+	raw, err := json.Marshal(artifact)
+	if err != nil {
+		t.Fatal(err)
+	}
+	result, err := toProtoAIWorkflowResult(id, &bridge.Event{SessionID: id, Status: "completed", Version: 5, ArtifactJSON: string(raw)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.ContentJson != string(content) || result.ArtifactId != id || result.ReportId != "99" || result.SourceVersion != "report-v1:101" {
+		t.Fatal("new content or original report provenance changed")
 	}
 	if strings.Contains(result.String(), "private-provider-request") {
 		t.Fatal("internal provider identifier exposed")

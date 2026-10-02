@@ -91,7 +91,17 @@ func ValidateArtifact(e Event) (*Artifact, error) {
 	var content struct {
 		SchemaVersion string `json:"schema_version"`
 	}
-	if json.Unmarshal([]byte(a.ContentJSON), &content) != nil || content.SchemaVersion != "ai-explanation-output/v1" {
+	if json.Unmarshal([]byte(a.ContentJSON), &content) != nil {
+		return nil, ErrInvalid
+	}
+	switch content.SchemaVersion {
+	case "ai-explanation-output/v1":
+		// Preserve the legacy envelope/read contract, including historical receipts.
+	case "ai-explanation-output/v2":
+		if err := validateMBTIOutput(a.ContentJSON, a.OutputValidatorVersion); err != nil {
+			return nil, err
+		}
+	default:
 		return nil, ErrInvalid
 	}
 	return &a, nil
