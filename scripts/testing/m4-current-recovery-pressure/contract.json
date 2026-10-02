@@ -50,12 +50,12 @@
     "internal/apiserver/container/internal/transaction/m4_07_mysql_command_metrics_test.go": "f4437be97b85b248867f04de42e6ae7639bf2f0f1653981a71b02572d5cc3da5",
     "internal/apiserver/container/internal/transaction/m4_07_mysql_commit_observer_test.go": "45f96bf95880b9bec7f6b0148e95091b1fbe4c2298402283dfc41a20244a95d2",
     "internal/apiserver/container/internal/transaction/m4_07_nsq_fault_proxy_test.go": "46b5747bc0e346f5c89522ee261397fb23765ab297cfde592a7aa430aa661312",
-    "internal/apiserver/container/internal/transaction/m4_new_answer_chain_integration_test.go": "5ce5815d20ebc189cd9160e0edde85e191dc09f7f5f614adff761b18d2b8e625",
-    "internal/apiserver/container/internal/transaction/m4_new_assessment_chain_integration_test.go": "127c74bb9c1a3f9b4fca4a42487acd6e52f03e60cc437661fd47943abf739fbf",
+    "internal/apiserver/container/internal/transaction/m4_new_answer_chain_integration_test.go": "7c54e97f381a08b6675fe55f2bc6d0a440f127c89e2f2a50c9eb761a3c865612",
+    "internal/apiserver/container/internal/transaction/m4_new_assessment_chain_integration_test.go": "3291674e52d5c3e5f801d859b8b59dbee000b66fce456050352e325ad6cb5064",
     "internal/apiserver/domain/survey/answersheet/m4_07_event_id_proof.go": "249bb6778e82fd086d4bb2b3219e067e31fb10a9c85b08188d4fba9fe6c80d6a",
     "scripts/testing/m4-07-new-chain-compose.yaml": "97822cbd545398363465ce864ecf7af06a2a57360ba6b10e7aca8f6ae7b22302",
-    "scripts/testing/m4-07-new-chain-proof.sh": "532ea90a82f80ea0838105a6851cee0933e72f4b7afab65e07316e46f46f3fe5",
-    "scripts/testing/m4-07-sample-resources.sh": "79eb56a36110f776bebeb9ea0824488a7faed982e534a8855a6eade6b2eb5d16"
+    "scripts/testing/m4-07-new-chain-proof.sh": "692a94790b551ebe978def76f708a05a87ab0b3d0ea7623aff2ca32ccf2c747b",
+    "scripts/testing/m4-07-sample-resources.sh": "9175c4fc9473a4fd6c27deb34855695a5999fc2f71e96d4c749f272ed6427034"
   },
   "schema_preflight": {
     "batch_count": 16,
@@ -65,5 +65,10 @@
   },
   "required_schema_migration": "internal/pkg/migration/migrations/mysql/000089_qs_evaluation_request_ref.up.sql",
   "required_schema_migration_sha256": "6b61245d3713f3a18ffdc887453709182358426f5305932602d4e06cd2ffeb69",
-  "refrozen_at": "2026-10-03T07:28:24.172451+08:00"
+  "refrozen_at": "2026-10-03T07:53:05.333688+08:00",
+  "load_generator_location": "separate disposable driver container; same original NSQ image reused; same VM and unmodified DB service images/budgets",
+  "load_generator_cpu_or_memory_caps": false,
+  "required_driver_sampling": "record independent client image, CPU, memory and uncapped resources; never combine client CPU with mysqld or hide total VM cost",
+  "diagnostic_order_change": "record complete immutable identities and observed original duration before applying unchanged 120s assertion; no post-hoc duration reset",
+  "original_colocated_result_retained": "37077828799: candidate answer71.244s and all case gates pass; assessment68.437s but combined MySQL/client CPU159.75% fails150%; not reclassified as pass"
 }

@@ -39,6 +39,15 @@ capture() {
 
 while :; do
   at=$(TZ=Asia/Shanghai date '+%Y-%m-%dT%H:%M:%S%z')
+  driver="${project}-driver-1"
+  if driver_id=$(docker ps -q --filter "name=^/${driver}$") && [[ -n "$driver_id" ]]; then
+    if [[ ! -s "$output_dir/driver-container.json" ]]; then
+      docker inspect --format '{{json .}}' "$driver_id" |
+        jq -c '{name:.Name,image:.Image,nano_cpus:.HostConfig.NanoCpus,memory_limit_bytes:.HostConfig.Memory}' > "$output_dir/driver-container.json"
+    fi
+    capture docker stats --no-stream --format '{{json .}}' "$driver_id" |
+      while IFS= read -r row; do printf '%s\t%s\n' "$at" "$row"; done >> "$output_dir/driver-stats.jsonl"
+  fi
   capture docker stats --no-stream --format '{{json .}}' "$mysql_id" "$mongo_id" "$nsqd_id" |
     while IFS= read -r row; do printf '%s\t%s\n' "$at" "$row"; done >> "$output_dir/docker-stats.jsonl"
   capture "${compose[@]}" exec -T mysql mysql -uroot --batch --raw --skip-column-names \

@@ -414,9 +414,10 @@ func TestM407NewAnswerSheetBatchThroughStandardProfile(t *testing.T) {
 		}
 		t.Logf("m4_07_fault stream=new_mongo phase=delivery_reconciled unique=%d broker_channel_messages=%d repeat_handler_successes=%d nsq_requeue=%d nsq_timeout=%d", batchCount, stats.MessageCount, received-batchCount, stats.RequeueCount, stats.TimeoutCount)
 	}
+	var observedDrainDuration time.Duration
 	if outageAfter > 0 {
-		require.LessOrEqual(t, time.Since(recoveryStarted), 120*time.Second)
-		t.Logf("m4_07_fault stream=new_mongo phase=drained committed=%d published=%d recovery_ms=%d", batchCount, batchCount, time.Since(recoveryStarted).Milliseconds())
+		observedDrainDuration = time.Since(recoveryStarted)
+		t.Logf("m4_07_fault stream=new_mongo phase=drained committed=%d published=%d recovery_ms=%d", batchCount, batchCount, observedDrainDuration.Milliseconds())
 	}
 	if mongoOutageAfter > 0 {
 		require.LessOrEqual(t, time.Since(recoveryStarted), 120*time.Second)
@@ -450,6 +451,10 @@ func TestM407NewAnswerSheetBatchThroughStandardProfile(t *testing.T) {
 	t.Logf("standard full chain batch diagnostic: count=%d spacing=%s submit_return_rate_per_sec=%.3f manifest_sha256=%x nsq_delivery=%d nsq_fin_samples=%d nsq_e2e_percentiles_ns=%v nsq_requeue=%d nsq_timeout=%d max_submit_return_to_worker_handler=%s", batchCount, spacing, submitRate, manifest.Sum(nil), stats.MessageCount, stats.E2EProcessingLatency.Count, stats.E2EProcessingLatency.Percentiles, stats.RequeueCount, stats.TimeoutCount, maxHandlerLag)
 	if commandMetrics != nil {
 		require.NoError(t, commandMetrics.Save(commandMetricsPath))
+	}
+	// Preserve the original duration gate while printing complete identity evidence on failure.
+	if outageAfter > 0 {
+		require.LessOrEqual(t, observedDrainDuration, 120*time.Second)
 	}
 }
 

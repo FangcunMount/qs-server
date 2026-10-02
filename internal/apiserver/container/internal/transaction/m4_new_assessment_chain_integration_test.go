@@ -353,9 +353,10 @@ func TestM407NewAssessmentBatchThroughStandardProfile(t *testing.T) {
 		}
 	}
 	stats := waitM407NSQDrain(t, ctx, topic, channel, expectedDeliveries)
+	var observedDrainDuration time.Duration
 	if outageAfter > 0 {
-		require.LessOrEqual(t, time.Since(recoveryStarted), 120*time.Second)
-		t.Logf("m4_07_fault stream=new_mysql phase=drained committed=%d published=%d recovery_ms=%d", batchCount, batchCount, time.Since(recoveryStarted).Milliseconds())
+		observedDrainDuration = time.Since(recoveryStarted)
+		t.Logf("m4_07_fault stream=new_mysql phase=drained committed=%d published=%d recovery_ms=%d", batchCount, batchCount, observedDrainDuration.Milliseconds())
 	} else if mysqlOutageAfter > 0 {
 		require.LessOrEqual(t, time.Since(mysqlRecoveryStarted), 120*time.Second)
 		t.Logf("m4_07_fault stream=new_mysql phase=mysql_recovered committed=%d published=%d recovery_ms=%d", batchCount, batchCount, time.Since(mysqlRecoveryStarted).Milliseconds())
@@ -382,6 +383,10 @@ func TestM407NewAssessmentBatchThroughStandardProfile(t *testing.T) {
 		submitRate = float64(batchCount-1) / submitReturnedAt[created[batchCount-1]].Sub(submitReturnedAt[created[0]]).Seconds()
 	}
 	t.Logf("standard MySQL business-key batch diagnostic: count=%d spacing=%s submit_return_rate_per_sec=%.3f manifest_sha256=%x unique_event_ids=%d nsq_delivery=%d nsq_fin_samples=%d nsq_e2e_percentiles_ns=%v nsq_requeue=%d nsq_timeout=%d execution_stub_calls=%d", batchCount, spacing, submitRate, manifest.Sum(nil), len(seenEvents), stats.MessageCount, stats.E2EProcessingLatency.Count, stats.E2EProcessingLatency.Percentiles, stats.RequeueCount, stats.TimeoutCount, expectedDeliveries)
+	// Preserve the original duration gate while printing complete identity evidence on failure.
+	if outageAfter > 0 {
+		require.LessOrEqual(t, observedDrainDuration, 120*time.Second)
+	}
 }
 
 type m407ObservedSDKPublisher struct {

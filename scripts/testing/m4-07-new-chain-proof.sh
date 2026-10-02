@@ -7,6 +7,8 @@ project="qs-m4-07-new-$(date +%s)-$$-${RANDOM}"
 compose=(docker compose --project-name "$project" --file "$repo/scripts/testing/m4-07-new-chain-compose.yaml")
 stream=${RM_QS_M407_STREAM:-both}
 mysql_command_dir=${RM_QS_M407_MYSQL_COMMAND_DIR:-}
+driver="${project}-driver-1"
+driver_image='nsqio/nsq@sha256:1a369c146af71bc95c25d54b375a2b98452478c1eaf4e85f8fcb01da20f2c78a'
 if [[ -n "$mysql_command_dir" ]]; then
   [[ "$stream" == assessment && "$mysql_command_dir" == /* && ! -e "$mysql_command_dir" ]] || {
     echo 'RM_QS_M407_MYSQL_COMMAND_DIR requires assessment stream and a new absolute directory' >&2
@@ -38,6 +40,10 @@ fi
 cleanup() {
   result=$?
   trap - EXIT
+  # Only this runner's deterministic disposable client name; never a DB service.
+  if docker container inspect "$driver" >/dev/null 2>&1; then
+    docker rm -f "$driver" >/dev/null || result=1
+  fi
   if [[ -n ${sampler_pid:-} ]]; then
     if kill -0 "$sampler_pid" 2>/dev/null; then
       kill "$sampler_pid" 2>/dev/null || true
@@ -91,7 +97,10 @@ binary=/tmp/qs-m4-07-new-chain.test
 (cd "$repo" && GOPROXY=https://proxy.golang.org,direct CGO_ENABLED=0 GOOS=linux GOARCH="$goarch" go test -c \
   -tags='integration,reliable_messaging,reliable_messaging_m4,reliable_messaging_m4_integration,m4_07_new_chain' \
   -o "$binary" ./internal/apiserver/container/internal/transaction)
-"${compose[@]}" cp "$binary" mysql:/tmp/m4-07-new-chain.test
+# Separate the load generator from mysqld. Keep the same VM and database
+# images/budgets, record the client independently, and retain every resource
+# threshold. Optional command outputs remain on this host through a test-only
+# mount; no production credential or host directory is shared.
 metrics_dir=${RM_QS_M407_METRICS_DIR:-}
 if [[ -n "$metrics_dir" ]]; then
   [[ "$metrics_dir" == /* && ! -e "$metrics_dir" ]] || {
@@ -133,7 +142,16 @@ if [[ -n "$mysql_command_dir" ]]; then
   mkdir -p "$mysql_command_dir"
   mysql_command_path=/tmp/m4-07/mysql-outbox-commands.jsonl
 fi
-"${compose[@]}" exec -T \
+if [[ -n "$command_dir" || -n "$mysql_command_dir" ]]; then
+  echo 'separate-client pressure runner does not accept optional command-output mounts' >&2
+  exit 1
+fi
+docker run --rm --pull never --name "$driver" \
+  --network "${project}_default" \
+  --entrypoint /tmp/m4-07-new-chain.test \
+  --mount "type=bind,source=$binary,target=/tmp/m4-07-new-chain.test,readonly" \
+  --mount "type=bind,source=$repo/configs/events.yaml,target=/tmp/m4-07/configs/events.yaml,readonly" \
+  -e TZ=Asia/Shanghai \
   -e RM_QS_MONGO_URI='mongodb://mongo:27017/?replicaSet=rm-test' \
   -e RM_QS_ASSESSMENT_DSN='root@tcp(mysql:3306)/m4_qs_new_chain?parseTime=true&loc=UTC' \
   -e RM_QS_NSQ_TCP='nsqd:4150' \
@@ -147,7 +165,7 @@ fi
   -e RM_QS_M407_KEEP_MONGO_PROFILE="$keep_profile" \
   -e RM_QS_M407_COMMAND_METRICS="$command_path" \
   -e RM_QS_M407_MYSQL_COMMAND_METRICS="$mysql_command_path" \
-  mysql /tmp/m4-07-new-chain.test \
+  "$driver_image" \
     -test.run "$test_pattern" -test.count=1 -test.timeout=30m -test.v
 if [[ -n "$mysql_command_dir" ]]; then
   "${compose[@]}" cp mysql:/tmp/m4-07/mysql-outbox-commands.jsonl "$mysql_command_dir/outbox-commands.jsonl"
