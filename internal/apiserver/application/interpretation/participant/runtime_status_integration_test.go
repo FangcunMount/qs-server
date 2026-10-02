@@ -212,7 +212,7 @@ func TestPersistentReportRuntimeReadbackWithoutFailureNotification(t *testing.T)
 	t.Cleanup(func() { _ = base.Close() })
 	client := grpcclient.NewParticipantReportClient(base, signer)
 	bff := grpcbridge.NewEvaluationBFFReader(nil, client, nil)
-	ctx := context.WithValue(t.Context(), middleware.UserClaimsContextKey{}, &middleware.UserClaims{UserID: "proof-user", OrgID: "1"})
+	ctx := context.WithValue(t.Context(), middleware.UserClaimsContextKey{}, &middleware.UserClaims{UserID: "42", OrgID: "1"})
 	original, outboxPolicy := retrygovernance.BusinessPolicy(), retrygovernance.OutboxPolicy()
 	proof := original
 	proof.MaxAutomaticAttempts = 1

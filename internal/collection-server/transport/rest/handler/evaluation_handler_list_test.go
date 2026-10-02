@@ -159,3 +159,7 @@ func TestEvaluationHandlerGetAssessmentReportReturnsInterpretation(t *testing.T)
 		t.Fatalf("dimensions = %#v, want interpretation and suggestion", resp.Data.Dimensions)
 	}
 }
+
+func (f *fakeEvaluationQueryService) GetAssessmentReportStatus(context.Context, uint64, uint64) (*evaluation.ReportRuntimeStatusResponse, error) {
+	return nil, nil
+}
