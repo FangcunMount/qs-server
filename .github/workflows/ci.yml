@@ -430,6 +430,49 @@ jobs:
           fi
           grep -q -- '--- PASS: TestAttentionFactRecoveryAfterActualNSQConfirmationLoss' "${RUNNER_TEMP}/attention-recovery.log"
 
+      - name: Verify original-authority report retry recovery after broker loss
+        env:
+          M6_HOTRANK_MONGO_URI: mongodb://127.0.0.1:27017/?replicaSet=rs0&directConnection=true
+        run: |
+          set -euo pipefail
+          # Use a fresh owned broker: prior Attention proof leaves a channel,
+          # while this fault requires confirmed messages still in topic memory.
+          M6_HOTRANK_OWNER="$(python3 -c 'import uuid; print(uuid.uuid4())')"
+          export M6_HOTRANK_OWNER
+          export M6_HOTRANK_NSQ_CONTAINER="m6-hotrank-${M6_HOTRANK_OWNER}-nsq"
+          nsq_volume="${M6_HOTRANK_NSQ_CONTAINER}-data"
+          owner_label="m6-hotrank-proof-owner=${M6_HOTRANK_OWNER}"
+          cleanup() {
+            if docker container inspect "$M6_HOTRANK_NSQ_CONTAINER" >/dev/null 2>&1; then
+              test "$(docker inspect --format '{{index .Config.Labels "m6-hotrank-proof-owner"}}' "$M6_HOTRANK_NSQ_CONTAINER")" = "$M6_HOTRANK_OWNER"
+              docker rm -f "$M6_HOTRANK_NSQ_CONTAINER"
+            fi
+            if docker volume inspect "$nsq_volume" >/dev/null 2>&1; then
+              test "$(docker volume inspect --format '{{index .Labels "m6-hotrank-proof-owner"}}' "$nsq_volume")" = "$M6_HOTRANK_OWNER"
+              docker volume rm "$nsq_volume"
+            fi
+          }
+          trap cleanup EXIT
+          docker volume create --label "$owner_label" "$nsq_volume"
+          docker run -d --name "$M6_HOTRANK_NSQ_CONTAINER" --label "$owner_label" \
+            --memory 128m --cpus 0.5 --volume "$nsq_volume:/data" \
+            -p 127.0.0.1::4150 -p 127.0.0.1::4151 \
+            nsqio/nsq@sha256:1a369c146af71bc95c25d54b375a2b98452478c1eaf4e85f8fcb01da20f2c78a \
+            /nsqd --data-path=/data --mem-queue-size=1000 --sync-every=1000 --sync-timeout=1h --broadcast-address=127.0.0.1
+          tcp_port="$(docker inspect --format '{{(index (index .NetworkSettings.Ports "4150/tcp") 0).HostPort}}' "$M6_HOTRANK_NSQ_CONTAINER")"
+          http_port="$(docker inspect --format '{{(index (index .NetworkSettings.Ports "4151/tcp") 0).HostPort}}' "$M6_HOTRANK_NSQ_CONTAINER")"
+          export M6_HOTRANK_NSQ_ADDRESS="127.0.0.1:${tcp_port}"
+          export M6_HOTRANK_NSQ_HTTP="http://127.0.0.1:${http_port}"
+          export M6_RETRY_RECOVERY_TOOL="${RUNNER_TEMP}/interpretation-retry-recover"
+          go build -o "$M6_RETRY_RECOVERY_TOOL" ./scripts/oneoff/interpretation_retry_recover
+          go test -tags='integration reliable_messaging_m4' -run '^TestOriginalReportRetryRecoveryAfterActualNSQConfirmationLoss$' \
+            -count=1 -timeout=2m -v ./internal/apiserver/integration/runtimeclosure | tee "${RUNNER_TEMP}/original-retry-recovery.log"
+          if grep -q -- '--- SKIP:' "${RUNNER_TEMP}/original-retry-recovery.log"; then
+            echo 'Actual original-authority retry recovery proof unexpectedly skipped' >&2
+            exit 1
+          fi
+          grep -q -- '--- PASS: TestOriginalReportRetryRecoveryAfterActualNSQConfirmationLoss' "${RUNNER_TEMP}/original-retry-recovery.log"
+
       - name: Stop Mongo Replica Set
         if: always()
         run: docker stop qs-runtime-closure-e2e-mongo || true
