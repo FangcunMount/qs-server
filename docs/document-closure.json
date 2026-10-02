@@ -2,7 +2,7 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "aa2f58ff6c070581f0a88af2f1acae2d0feb9c97",
+    "sha": "be1b397a4a324e9bb865bd7e3143f5c9522626bd",
     "verified_on": "2026-10-02"
   },
   "status_policy": {
@@ -128,7 +128,7 @@
       "source": "api/grpc/proto",
       "proto_file_count": 8,
       "service_count": 28,
-      "rpc_count": 130,
+      "rpc_count": 131,
       "services": {
         "actor.ActorService": [
           "CreateTestee",
@@ -210,6 +210,7 @@
         ],
         "interpretation.ParticipantReportService": [
           "GetAssessmentReport",
+          "GetAssessmentReportStatus",
           "ListMyReports"
         ],
         "qsai.workflow.v1.AssetCatalog": [
