@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/FangcunMount/qs-server/internal/apiserver/outboxcore"
+	eventruntime "github.com/FangcunMount/qs-server/internal/pkg/eventing/runtime"
 )
 
 var errBestEffortReplayNeedsReview = errors.New("best-effort event needs business-effect reconciliation before replay")
@@ -14,11 +14,11 @@ var errBestEffortReplayNeedsReview = errors.New("best-effort event needs busines
 // ValidateDeliveryReplaySafety runs before a whole batch is claimed. Malformed
 // payloads retain the existing per-item failure settlement in ActionExecutor.
 func ValidateDeliveryReplaySafety(eventID, payloadJSON string) error {
-	pending, err := outboxcore.DecodePendingEvent(eventID, payloadJSON)
+	evt, err := eventruntime.DecodeDomainEvent([]byte(payloadJSON))
 	if err != nil {
 		return nil
 	}
-	return deliveryReplaySafetyError(pending.Event.EventType())
+	return deliveryReplaySafetyError(evt.EventType())
 }
 
 func deliveryReplaySafetyError(eventType string) error {

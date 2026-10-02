@@ -10,6 +10,7 @@ import (
 	outboxport "github.com/FangcunMount/qs-server/internal/apiserver/port/outbox"
 	"github.com/FangcunMount/qs-server/internal/pkg/event"
 	eventcatalog "github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
+	eventruntime "github.com/FangcunMount/qs-server/internal/pkg/eventing/runtime"
 )
 
 // OrgIDFromPayloadJSON extracts the optional organization scope from the
@@ -104,11 +105,11 @@ func BuildStatusSnapshot(store string, now time.Time, observations []StatusObser
 }
 
 func DecodePendingEvent(eventID, payloadJSON string) (outboxport.PendingEvent, error) {
-	pending, err := base.DecodePendingEvent(eventID, payloadJSON)
+	evt, err := eventruntime.DecodeDomainEvent([]byte(payloadJSON))
 	if err != nil {
 		return outboxport.PendingEvent{}, err
 	}
-	return outboxport.PendingEvent{EventID: pending.EventID, Event: pending.Event}, nil
+	return outboxport.PendingEvent{EventID: eventID, Event: evt}, nil
 }
 
 func NewPublishedTransition(publishedAt time.Time) PublishedTransition {
