@@ -26,6 +26,8 @@ func (r *Router) registerSystemGovernanceInternalRoutes(internalV1 *gin.RouterGr
 	governance.GET("/actions/gap-recoveries/summary", r.rateLimitedHandlers(rateLimitBudgetQuery, governanceHandler.GetGapRecoverySummary)...)
 	governance.POST("/actions/gap-recoveries", r.rateLimitedHandlers(rateLimitBudgetSubmit, governanceHandler.AuthorizeGapRecovery)...)
 	governance.POST("/actions/gap-recoveries/resolve", r.rateLimitedHandlers(rateLimitBudgetQuery, governanceHandler.ResolveGapRecovery)...)
+	governance.POST("/actions/reminder-gap-recoveries", r.rateLimitedHandlers(rateLimitBudgetSubmit, governanceHandler.AuthorizeReminderGapRecovery)...)
+	governance.POST("/actions/reminder-gap-recoveries/resolve", r.rateLimitedHandlers(rateLimitBudgetQuery, governanceHandler.ResolveReminderGapRecovery)...)
 	governance.POST("/actions/delivery-resolutions", r.rateLimitedHandlers(rateLimitBudgetSubmit, governanceHandler.ResolveDelivery)...)
 	governance.GET("/actions/delivery-resolutions/:request_id", r.rateLimitedHandlers(rateLimitBudgetQuery, governanceHandler.GetDeliveryResolution)...)
 	governance.POST("/actions/:action_id/runs", r.rateLimitedHandlers(rateLimitBudgetSubmit, governanceHandler.RunAction)...)

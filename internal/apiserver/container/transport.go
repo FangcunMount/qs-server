@@ -162,19 +162,20 @@ func (c *Container) buildRESTSystemGovernanceFacade() systemgovApp.Facade {
 		resolutionReader = c.ReportModule.ReportResolutionReader()
 	}
 	return platformmod.BuildRESTSystemGovernanceFacade(platformmod.RESTSystemGovernanceInput{
-		Options:                 c.systemGovernanceOptions,
-		EventStatusService:      eventStatus,
-		EventOutboxes:           outboxes,
-		CacheGovernance:         cacheGovernance,
-		CachePolicyReloader:     c.CachePolicyReloader(),
-		MySQLDB:                 c.mysqlDB,
-		MongoDB:                 c.mongoDB,
-		ResilienceGovernor:      c.resilience,
-		LocalResilienceSnapshot: c.localResilienceSnapshot(),
-		ActionAuditStore:        c.actionAuditStore,
-		ActionHandlers:          c.retryGovernanceActionHandlers(),
-		EventPublisher:          c.eventPublisher,
-		ReportResolutionReader:  resolutionReader,
+		Options:                   c.systemGovernanceOptions,
+		EventStatusService:        eventStatus,
+		EventOutboxes:             outboxes,
+		CacheGovernance:           cacheGovernance,
+		CachePolicyReloader:       c.CachePolicyReloader(),
+		MySQLDB:                   c.mysqlDB,
+		MongoDB:                   c.mongoDB,
+		ResilienceGovernor:        c.resilience,
+		LocalResilienceSnapshot:   c.localResilienceSnapshot(),
+		ActionAuditStore:          c.actionAuditStore,
+		ActionHandlers:            c.retryGovernanceActionHandlers(),
+		EventPublisher:            c.eventPublisher,
+		ReportResolutionReader:    resolutionReader,
+		TaskOpenedReminderEnabled: c.TaskOpenedReminderEnabled(),
 	})
 }
 

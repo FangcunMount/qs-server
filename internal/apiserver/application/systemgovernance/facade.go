@@ -60,6 +60,8 @@ type FacadeDeps struct {
 	DeliveryResolver           DeliveryResolver
 	GapRecoveryStore           GapRecoveryStore
 	GapRecoveryEnabled         bool
+	ReminderGapRecovery        ReminderGapRecovery
+	ReminderGapRecoveryEnabled bool
 }
 
 type facade struct {
