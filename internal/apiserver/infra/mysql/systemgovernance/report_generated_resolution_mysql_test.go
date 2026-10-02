@@ -6,11 +6,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/FangcunMount/component-base/pkg/eventcodec"
 	app "github.com/FangcunMount/qs-server/internal/apiserver/application/systemgovernance"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/interpretationreadmodel"
 	"github.com/FangcunMount/qs-server/internal/pkg/event"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventing/outcome"
+	domainwire "github.com/FangcunMount/reliable-messaging/wire/domain"
 )
 
 type reportResolutionMetadataStub struct {
@@ -50,7 +50,7 @@ func TestReportGeneratedResolutionRequiresEveryDurableEffectMySQL(t *testing.T) 
 		Level: &eventoutcome.ResultLevel{Code: "high", Severity: "high"},
 	}
 	evt := event.New("interpretation.report.generated", "InterpretationGeneration", data.GenerationID, data)
-	payload, err := eventcodec.EncodeDomainEvent(evt)
+	payload, err := domainwire.EncodeEvent(evt)
 	if err != nil {
 		t.Fatal(err)
 	}

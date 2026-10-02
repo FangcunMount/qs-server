@@ -10,10 +10,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/FangcunMount/component-base/pkg/eventcodec"
 	"github.com/FangcunMount/qs-server/internal/pkg/event"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
 	"github.com/FangcunMount/qs-server/internal/worker/handlers"
+	domainwire "github.com/FangcunMount/reliable-messaging/wire/domain"
 )
 
 type fakeHandlerRegistry struct {
@@ -249,7 +249,7 @@ func sampleCatalog(handlerName string) *eventcatalog.Catalog {
 
 func sampleEventPayload(t *testing.T) []byte {
 	t.Helper()
-	payload, err := eventcodec.EncodeDomainEvent(event.Event[map[string]string]{
+	payload, err := domainwire.EncodeEvent(event.Event[map[string]string]{
 		BaseEvent: event.BaseEvent{
 			ID:                 "evt-1",
 			EventTypeValue:     "sample.created",

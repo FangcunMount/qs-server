@@ -123,6 +123,7 @@ func TestInterpretationAutomaticFailureCommitsWithStandardMongoScheduledRetry(t 
 	if count != 2 {
 		t.Fatalf("standard Mongo intents=%d, want failure and scheduled retry", count)
 	}
+	fixture.assertStandardIntentCount(t, generation.ID().String(), 2)
 	for _, eventType := range []string{eventcatalog.InterpretationReportFailed, eventcatalog.InterpretationRetryRequested} {
 		var row struct {
 			MessageID     string    `bson:"message_id"`
@@ -551,9 +552,6 @@ func newStandardInterpretationFixture(t *testing.T) (interpretationMongoFixture,
 	t.Helper()
 	_, db := mongodbtest.ReplicaSetDatabase(t)
 	fixture := newInterpretationMongoFixture(t, db)
-	if err := db.CreateCollection(t.Context(), "rm_outbox"); err != nil {
-		t.Fatal(err)
-	}
 	wire, err := eventcatalog.Load("../../../../../configs/events.yaml")
 	if err != nil {
 		t.Fatal(err)
