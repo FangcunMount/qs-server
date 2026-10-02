@@ -108,3 +108,11 @@ python3 scripts/check_docs_hygiene.py
 python3 scripts/check_docs_facts.py
 git diff --check
 ```
+
+### Attention 确认后丢失恢复验证
+
+`internal/apiserver/integration/runtimeclosure/attention_fact_broker_loss_integration_test.go`
+使用真实 Mongo 报告事务、SDK Relay 和独立 NSQ，确认后实际强杀 broker；随后以原报告清单／摘要和真实 Redis 租约调用现有 `FactReconciler`，经真实 API gRPC／MySQL恢复重点关注事实。
+重复恢复和晚到原消息验证业务 UPDATE 仅一次；恢复派生事件与原事件仍各有账本，允许两次 RPC，不宣称单行账本或 exactly-once。
+本场不改变生产配置、不调用模型或微信。现役人工恢复入口仍是 Worker 的 `attention-projection-reconcile-*` 开关、固定 ReportIDs／Fingerprint，以及 `scripts/cd/audit-attention-reconcile-dry-run.sh` 的 dry-run／apply 有界核对。
+生产范围、先 dry-run 后 apply、恢复原配置与未知结果不盲重发的门槛不变。

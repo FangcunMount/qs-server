@@ -370,10 +370,12 @@ jobs:
             -run '^TestCurrentRuntimeClosure$' \
             -count=1 -timeout=15m -v ./internal/apiserver/integration/runtimeclosure
 
-      - name: Verify hot-rank original-source recovery after broker loss
+      - name: Verify hot-rank and attention original-source recovery after broker loss
         env:
           M6_HOTRANK_MONGO_URI: mongodb://127.0.0.1:27017/?replicaSet=rs0&directConnection=true
           M6_HOTRANK_REDIS_ADDRESS: 127.0.0.1:6379
+          MYSQL_CONTAINER: ${{ job.services.mysql.id }}
+          M6_ATTENTION_MYSQL_DSN: root:root@tcp(127.0.0.1:3306)/m6_attention_test?parseTime=true&loc=Asia%2FShanghai
         run: |
           set -euo pipefail
           M6_HOTRANK_OWNER="$(python3 -c 'import uuid; print(uuid.uuid4())')"
@@ -390,8 +392,10 @@ jobs:
               test "$(docker volume inspect --format '{{index .Labels "m6-hotrank-proof-owner"}}' "$nsq_volume")" = "$M6_HOTRANK_OWNER"
               docker volume rm "$nsq_volume"
             fi
+            docker exec "$MYSQL_CONTAINER" mysql -uroot -proot -e 'DROP DATABASE IF EXISTS m6_attention_test'
           }
           trap cleanup EXIT
+          docker exec "$MYSQL_CONTAINER" mysql -uroot -proot -e 'CREATE DATABASE m6_attention_test'
           docker volume create --label "$owner_label" "$nsq_volume"
           docker run -d --name "$M6_HOTRANK_NSQ_CONTAINER" --label "$owner_label" \
             --memory 128m --cpus 0.5 --volume "$nsq_volume:/data" \
@@ -411,6 +415,20 @@ jobs:
             exit 1
           fi
           grep -q -- '--- PASS: TestHotRankDayRecoveryAfterActualNSQConfirmationLoss' "${RUNNER_TEMP}/hotrank-recovery.log"
+          # Run after the hot-rank proof: Attention creates a real channel,
+          # while the hot-rank loss fixture intentionally starts without one.
+          # The same-container restart may allocate new ephemeral host ports.
+          tcp_port="$(docker inspect --format '{{(index (index .NetworkSettings.Ports "4150/tcp") 0).HostPort}}' "$M6_HOTRANK_NSQ_CONTAINER")"
+          http_port="$(docker inspect --format '{{(index (index .NetworkSettings.Ports "4151/tcp") 0).HostPort}}' "$M6_HOTRANK_NSQ_CONTAINER")"
+          export M6_HOTRANK_NSQ_ADDRESS="127.0.0.1:${tcp_port}"
+          export M6_HOTRANK_NSQ_HTTP="http://127.0.0.1:${http_port}"
+          go test -tags='integration reliable_messaging_m4' -run '^TestAttentionFactRecoveryAfterActualNSQConfirmationLoss$' \
+            -count=1 -timeout=2m -v ./internal/apiserver/integration/runtimeclosure | tee "${RUNNER_TEMP}/attention-recovery.log"
+          if grep -q -- '--- SKIP:' "${RUNNER_TEMP}/attention-recovery.log"; then
+            echo 'Actual attention recovery proof unexpectedly skipped' >&2
+            exit 1
+          fi
+          grep -q -- '--- PASS: TestAttentionFactRecoveryAfterActualNSQConfirmationLoss' "${RUNNER_TEMP}/attention-recovery.log"
 
       - name: Stop Mongo Replica Set
         if: always()
