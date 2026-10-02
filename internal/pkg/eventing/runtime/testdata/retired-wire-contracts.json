@@ -1,0 +1,184 @@
+{
+  "Source": "96fc4df42f6af9f6ce22e2184394b1a07df2ffdd/component-base@v0.6.11",
+  "Wires": {
+    "answersheet.submitted": {
+      "Payload": "{\"id\":\"stable-event-id\",\"eventType\":\"answersheet.submitted\",\"occurredAt\":\"2026-09-23T10:00:00+08:00\",\"aggregateType\":\"AnswerSheet\",\"aggregateID\":\"aggregate-1\",\"data\":{\"answer_sheet_id\":\"answer-1\",\"org_id\":1}}",
+      "Wire": "{\"type\":\"component-base.messaging.message.v1\",\"schema_revision\":2,\"uuid\":\"stable-event-id\",\"metadata\":{\"aggregate_id\":\"aggregate-1\",\"aggregate_type\":\"AnswerSheet\",\"event_type\":\"answersheet.submitted\",\"occurred_at\":\"2026-09-23T10:00:00.000+08:00\",\"source\":\"api-server\"},\"payload\":\"eyJpZCI6InN0YWJsZS1ldmVudC1pZCIsImV2ZW50VHlwZSI6ImFuc3dlcnNoZWV0LnN1Ym1pdHRlZCIsIm9jY3VycmVkQXQiOiIyMDI2LTA5LTIzVDEwOjAwOjAwKzA4OjAwIiwiYWdncmVnYXRlVHlwZSI6IkFuc3dlclNoZWV0IiwiYWdncmVnYXRlSUQiOiJhZ2dyZWdhdGUtMSIsImRhdGEiOnsiYW5zd2VyX3NoZWV0X2lkIjoiYW5zd2VyLTEiLCJvcmdfaWQiOjF9fQ==\",\"checksum\":\"1464511524012455b5b9c92623763ee8196a857936898a4ce560c4f91e7ec3a5\"}",
+      "RelayWire": "{\"type\":\"component-base.messaging.message.v1\",\"schema_revision\":2,\"uuid\":\"stable-event-id\",\"metadata\":{\"aggregate_id\":\"aggregate-1\",\"aggregate_type\":\"AnswerSheet\",\"event_type\":\"answersheet.submitted\",\"occurred_at\":\"2026-09-23T10:00:00.000+08:00\",\"source\":\"api-server\"},\"payload\":\"eyJpZCI6InN0YWJsZS1ldmVudC1pZCIsImV2ZW50VHlwZSI6ImFuc3dlcnNoZWV0LnN1Ym1pdHRlZCIsIm9jY3VycmVkQXQiOiIyMDI2LTA5LTIzVDEwOjAwOjAwKzA4OjAwIiwiYWdncmVnYXRlVHlwZSI6IkFuc3dlclNoZWV0IiwiYWdncmVnYXRlSUQiOiJhZ2dyZWdhdGUtMSIsImRhdGEiOnsiYW5zd2VyX3NoZWV0X2lkIjoiYW5zd2VyLTEiLCJvcmdfaWQiOjF9fQ==\",\"checksum\":\"1464511524012455b5b9c92623763ee8196a857936898a4ce560c4f91e7ec3a5\"}"
+    },
+    "assessment_model.changed": {
+      "Payload": "{\"id\":\"best-effort-stable-id\",\"eventType\":\"assessment_model.changed\",\"occurredAt\":\"2026-09-23T10:00:00+08:00\",\"aggregateType\":\"AssessmentModel\",\"aggregateID\":\"aggregate-1\",\"data\":{\"org_id\":1,\"revision\":\"v2\"}}",
+      "Wire": "{\"type\":\"component-base.messaging.message.v1\",\"schema_revision\":2,\"uuid\":\"best-effort-stable-id\",\"metadata\":{\"aggregate_id\":\"aggregate-1\",\"aggregate_type\":\"AssessmentModel\",\"event_type\":\"assessment_model.changed\",\"occurred_at\":\"2026-09-23T10:00:00.000+08:00\",\"source\":\"api-server\"},\"payload\":\"eyJpZCI6ImJlc3QtZWZmb3J0LXN0YWJsZS1pZCIsImV2ZW50VHlwZSI6ImFzc2Vzc21lbnRfbW9kZWwuY2hhbmdlZCIsIm9jY3VycmVkQXQiOiIyMDI2LTA5LTIzVDEwOjAwOjAwKzA4OjAwIiwiYWdncmVnYXRlVHlwZSI6IkFzc2Vzc21lbnRNb2RlbCIsImFnZ3JlZ2F0ZUlEIjoiYWdncmVnYXRlLTEiLCJkYXRhIjp7Im9yZ19pZCI6MSwicmV2aXNpb24iOiJ2MiJ9fQ==\",\"checksum\":\"6aec0b87b5a9e663181b716a570fa4af072248e3db0f2bd18a3cb21808f676eb\"}",
+      "RelayWire": "{\"type\":\"component-base.messaging.message.v1\",\"schema_revision\":2,\"uuid\":\"best-effort-stable-id\",\"metadata\":{\"aggregate_id\":\"aggregate-1\",\"aggregate_type\":\"AssessmentModel\",\"event_type\":\"assessment_model.changed\",\"occurred_at\":\"2026-09-23T10:00:00.000+08:00\",\"source\":\"api-server\"},\"payload\":\"eyJpZCI6ImJlc3QtZWZmb3J0LXN0YWJsZS1pZCIsImV2ZW50VHlwZSI6ImFzc2Vzc21lbnRfbW9kZWwuY2hhbmdlZCIsIm9jY3VycmVkQXQiOiIyMDI2LTA5LTIzVDEwOjAwOjAwKzA4OjAwIiwiYWdncmVnYXRlVHlwZSI6IkFzc2Vzc21lbnRNb2RlbCIsImFnZ3JlZ2F0ZUlEIjoiYWdncmVnYXRlLTEiLCJkYXRhIjp7Im9yZ19pZCI6MSwicmV2aXNpb24iOiJ2MiJ9fQ==\",\"checksum\":\"6aec0b87b5a9e663181b716a570fa4af072248e3db0f2bd18a3cb21808f676eb\"}"
+    },
+    "evaluation.failed": {
+      "Payload": "{\"id\":\"stable-event-id\",\"eventType\":\"evaluation.failed\",\"occurredAt\":\"2026-09-23T10:00:00+08:00\",\"aggregateType\":\"Evaluation\",\"aggregateID\":\"aggregate-1\",\"data\":{\"answer_sheet_id\":\"answer-1\",\"org_id\":1}}",
+      "Wire": "{\"type\":\"component-base.messaging.message.v1\",\"schema_revision\":2,\"uuid\":\"stable-event-id\",\"metadata\":{\"aggregate_id\":\"aggregate-1\",\"aggregate_type\":\"Evaluation\",\"event_type\":\"evaluation.failed\",\"occurred_at\":\"2026-09-23T10:00:00.000+08:00\",\"source\":\"api-server\"},\"payload\":\"eyJpZCI6InN0YWJsZS1ldmVudC1pZCIsImV2ZW50VHlwZSI6ImV2YWx1YXRpb24uZmFpbGVkIiwib2NjdXJyZWRBdCI6IjIwMjYtMDktMjNUMTA6MDA6MDArMDg6MDAiLCJhZ2dyZWdhdGVUeXBlIjoiRXZhbHVhdGlvbiIsImFnZ3JlZ2F0ZUlEIjoiYWdncmVnYXRlLTEiLCJkYXRhIjp7ImFuc3dlcl9zaGVldF9pZCI6ImFuc3dlci0xIiwib3JnX2lkIjoxfX0=\",\"checksum\":\"66076da1552f0177fdfff269d262309aecab86de3134e3d7f7cb8cf24ee173f1\"}",
+      "RelayWire": "{\"type\":\"component-base.messaging.message.v1\",\"schema_revision\":2,\"uuid\":\"stable-event-id\",\"metadata\":{\"aggregate_id\":\"aggregate-1\",\"aggregate_type\":\"Evaluation\",\"event_type\":\"evaluation.failed\",\"occurred_at\":\"2026-09-23T10:00:00.000+08:00\",\"source\":\"api-server\"},\"payload\":\"eyJpZCI6InN0YWJsZS1ldmVudC1pZCIsImV2ZW50VHlwZSI6ImV2YWx1YXRpb24uZmFpbGVkIiwib2NjdXJyZWRBdCI6IjIwMjYtMDktMjNUMTA6MDA6MDArMDg6MDAiLCJhZ2dyZWdhdGVUeXBlIjoiRXZhbHVhdGlvbiIsImFnZ3JlZ2F0ZUlEIjoiYWdncmVnYXRlLTEiLCJkYXRhIjp7ImFuc3dlcl9zaGVldF9pZCI6ImFuc3dlci0xIiwib3JnX2lkIjoxfX0=\",\"checksum\":\"66076da1552f0177fdfff269d262309aecab86de3134e3d7f7cb8cf24ee173f1\"}"
+    },
+    "evaluation.outcome.committed": {
+      "Payload": "{\"id\":\"stable-event-id\",\"eventType\":\"evaluation.outcome.committed\",\"occurredAt\":\"2026-09-23T10:00:00+08:00\",\"aggregateType\":\"Evaluation\",\"aggregateID\":\"aggregate-1\",\"data\":{\"answer_sheet_id\":\"answer-1\",\"org_id\":1}}",
+      "Wire": "{\"type\":\"component-base.messaging.message.v1\",\"schema_revision\":2,\"uuid\":\"stable-event-id\",\"metadata\":{\"aggregate_id\":\"aggregate-1\",\"aggregate_type\":\"Evaluation\",\"event_type\":\"evaluation.outcome.committed\",\"occurred_at\":\"2026-09-23T10:00:00.000+08:00\",\"source\":\"api-server\"},\"payload\":\"eyJpZCI6InN0YWJsZS1ldmVudC1pZCIsImV2ZW50VHlwZSI6ImV2YWx1YXRpb24ub3V0Y29tZS5jb21taXR0ZWQiLCJvY2N1cnJlZEF0IjoiMjAyNi0wOS0yM1QxMDowMDowMCswODowMCIsImFnZ3JlZ2F0ZVR5cGUiOiJFdmFsdWF0aW9uIiwiYWdncmVnYXRlSUQiOiJhZ2dyZWdhdGUtMSIsImRhdGEiOnsiYW5zd2VyX3NoZWV0X2lkIjoiYW5zd2VyLTEiLCJvcmdfaWQiOjF9fQ==\",\"checksum\":\"04acd46f9d1e18e10f663e4e4b0684373aea3b713f5e837704cec7d8e07618a0\"}",
+      "RelayWire": "{\"type\":\"component-base.messaging.message.v1\",\"schema_revision\":2,\"uuid\":\"stable-event-id\",\"metadata\":{\"aggregate_id\":\"aggregate-1\",\"aggregate_type\":\"Evaluation\",\"event_type\":\"evaluation.outcome.committed\",\"occurred_at\":\"2026-09-23T10:00:00.000+08:00\",\"source\":\"api-server\"},\"payload\":\"eyJpZCI6InN0YWJsZS1ldmVudC1pZCIsImV2ZW50VHlwZSI6ImV2YWx1YXRpb24ub3V0Y29tZS5jb21taXR0ZWQiLCJvY2N1cnJlZEF0IjoiMjAyNi0wOS0yM1QxMDowMDowMCswODowMCIsImFnZ3JlZ2F0ZVR5cGUiOiJFdmFsdWF0aW9uIiwiYWdncmVnYXRlSUQiOiJhZ2dyZWdhdGUtMSIsImRhdGEiOnsiYW5zd2VyX3NoZWV0X2lkIjoiYW5zd2VyLTEiLCJvcmdfaWQiOjF9fQ==\",\"checksum\":\"04acd46f9d1e18e10f663e4e4b0684373aea3b713f5e837704cec7d8e07618a0\"}"
+    },
+    "evaluation.requested": {
+      "Payload": "{\"id\":\"stable-event-id\",\"eventType\":\"evaluation.requested\",\"occurredAt\":\"2026-09-23T10:00:00+08:00\",\"aggregateType\":\"Evaluation\",\"aggregateID\":\"aggregate-1\",\"data\":{\"answer_sheet_id\":\"answer-1\",\"org_id\":1}}",
+      "Wire": "{\"type\":\"component-base.messaging.message.v1\",\"schema_revision\":2,\"uuid\":\"stable-event-id\",\"metadata\":{\"aggregate_id\":\"aggregate-1\",\"aggregate_type\":\"Evaluation\",\"event_type\":\"evaluation.requested\",\"occurred_at\":\"2026-09-23T10:00:00.000+08:00\",\"source\":\"api-server\"},\"payload\":\"eyJpZCI6InN0YWJsZS1ldmVudC1pZCIsImV2ZW50VHlwZSI6ImV2YWx1YXRpb24ucmVxdWVzdGVkIiwib2NjdXJyZWRBdCI6IjIwMjYtMDktMjNUMTA6MDA6MDArMDg6MDAiLCJhZ2dyZWdhdGVUeXBlIjoiRXZhbHVhdGlvbiIsImFnZ3JlZ2F0ZUlEIjoiYWdncmVnYXRlLTEiLCJkYXRhIjp7ImFuc3dlcl9zaGVldF9pZCI6ImFuc3dlci0xIiwib3JnX2lkIjoxfX0=\",\"checksum\":\"6afbdc2e5e2bbc1986e6c092cc909a26cf1d06a2d9cca69c70bc7e3a45693513\"}",
+      "RelayWire": "{\"type\":\"component-base.messaging.message.v1\",\"schema_revision\":2,\"uuid\":\"stable-event-id\",\"metadata\":{\"aggregate_id\":\"aggregate-1\",\"aggregate_type\":\"Evaluation\",\"event_type\":\"evaluation.requested\",\"occurred_at\":\"2026-09-23T10:00:00.000+08:00\",\"source\":\"api-server\"},\"payload\":\"eyJpZCI6InN0YWJsZS1ldmVudC1pZCIsImV2ZW50VHlwZSI6ImV2YWx1YXRpb24ucmVxdWVzdGVkIiwib2NjdXJyZWRBdCI6IjIwMjYtMDktMjNUMTA6MDA6MDArMDg6MDAiLCJhZ2dyZWdhdGVUeXBlIjoiRXZhbHVhdGlvbiIsImFnZ3JlZ2F0ZUlEIjoiYWdncmVnYXRlLTEiLCJkYXRhIjp7ImFuc3dlcl9zaGVldF9pZCI6ImFuc3dlci0xIiwib3JnX2lkIjoxfX0=\",\"checksum\":\"6afbdc2e5e2bbc1986e6c092cc909a26cf1d06a2d9cca69c70bc7e3a45693513\"}"
+    },
+    "evaluation.retry.requested": {
+      "Payload": "{\"id\":\"stable-event-id\",\"eventType\":\"evaluation.retry.requested\",\"occurredAt\":\"2026-09-23T10:00:00+08:00\",\"aggregateType\":\"Evaluation\",\"aggregateID\":\"aggregate-1\",\"data\":{\"answer_sheet_id\":\"answer-1\",\"org_id\":1}}",
+      "Wire": "{\"type\":\"component-base.messaging.message.v1\",\"schema_revision\":2,\"uuid\":\"stable-event-id\",\"metadata\":{\"aggregate_id\":\"aggregate-1\",\"aggregate_type\":\"Evaluation\",\"event_type\":\"evaluation.retry.requested\",\"occurred_at\":\"2026-09-23T10:00:00.000+08:00\",\"source\":\"api-server\"},\"payload\":\"eyJpZCI6InN0YWJsZS1ldmVudC1pZCIsImV2ZW50VHlwZSI6ImV2YWx1YXRpb24ucmV0cnkucmVxdWVzdGVkIiwib2NjdXJyZWRBdCI6IjIwMjYtMDktMjNUMTA6MDA6MDArMDg6MDAiLCJhZ2dyZWdhdGVUeXBlIjoiRXZhbHVhdGlvbiIsImFnZ3JlZ2F0ZUlEIjoiYWdncmVnYXRlLTEiLCJkYXRhIjp7ImFuc3dlcl9zaGVldF9pZCI6ImFuc3dlci0xIiwib3JnX2lkIjoxfX0=\",\"checksum\":\"a13d62a4f3da026c4333ddd412e05bc8972f816ad57e048d33955178d7b8c745\"}",
+      "RelayWire": "{\"type\":\"component-base.messaging.message.v1\",\"schema_revision\":2,\"uuid\":\"stable-event-id\",\"metadata\":{\"aggregate_id\":\"aggregate-1\",\"aggregate_type\":\"Evaluation\",\"event_type\":\"evaluation.retry.requested\",\"occurred_at\":\"2026-09-23T10:00:00.000+08:00\",\"source\":\"api-server\"},\"payload\":\"eyJpZCI6InN0YWJsZS1ldmVudC1pZCIsImV2ZW50VHlwZSI6ImV2YWx1YXRpb24ucmV0cnkucmVxdWVzdGVkIiwib2NjdXJyZWRBdCI6IjIwMjYtMDktMjNUMTA6MDA6MDArMDg6MDAiLCJhZ2dyZWdhdGVUeXBlIjoiRXZhbHVhdGlvbiIsImFnZ3JlZ2F0ZUlEIjoiYWdncmVnYXRlLTEiLCJkYXRhIjp7ImFuc3dlcl9zaGVldF9pZCI6ImFuc3dlci0xIiwib3JnX2lkIjoxfX0=\",\"checksum\":\"a13d62a4f3da026c4333ddd412e05bc8972f816ad57e048d33955178d7b8c745\"}"
+    },
+    "interpretation.report.failed": {
+      "Payload": "{\"id\":\"stable-event-id\",\"eventType\":\"interpretation.report.failed\",\"occurredAt\":\"2026-09-23T10:00:00+08:00\",\"aggregateType\":\"Report\",\"aggregateID\":\"aggregate-1\",\"data\":{\"answer_sheet_id\":\"answer-1\",\"org_id\":1}}",
+      "Wire": "{\"type\":\"component-base.messaging.message.v1\",\"schema_revision\":2,\"uuid\":\"stable-event-id\",\"metadata\":{\"aggregate_id\":\"aggregate-1\",\"aggregate_type\":\"Report\",\"event_type\":\"interpretation.report.failed\",\"occurred_at\":\"2026-09-23T10:00:00.000+08:00\",\"source\":\"api-server\"},\"payload\":\"eyJpZCI6InN0YWJsZS1ldmVudC1pZCIsImV2ZW50VHlwZSI6ImludGVycHJldGF0aW9uLnJlcG9ydC5mYWlsZWQiLCJvY2N1cnJlZEF0IjoiMjAyNi0wOS0yM1QxMDowMDowMCswODowMCIsImFnZ3JlZ2F0ZVR5cGUiOiJSZXBvcnQiLCJhZ2dyZWdhdGVJRCI6ImFnZ3JlZ2F0ZS0xIiwiZGF0YSI6eyJhbnN3ZXJfc2hlZXRfaWQiOiJhbnN3ZXItMSIsIm9yZ19pZCI6MX19\",\"checksum\":\"ea7a1db8a3763cbb3594c670810f67c682f552f70ba470eed5109d8e7f9170b7\"}",
+      "RelayWire": "{\"type\":\"component-base.messaging.message.v1\",\"schema_revision\":2,\"uuid\":\"stable-event-id\",\"metadata\":{\"aggregate_id\":\"aggregate-1\",\"aggregate_type\":\"Report\",\"event_type\":\"interpretation.report.failed\",\"occurred_at\":\"2026-09-23T10:00:00.000+08:00\",\"source\":\"api-server\"},\"payload\":\"eyJpZCI6InN0YWJsZS1ldmVudC1pZCIsImV2ZW50VHlwZSI6ImludGVycHJldGF0aW9uLnJlcG9ydC5mYWlsZWQiLCJvY2N1cnJlZEF0IjoiMjAyNi0wOS0yM1QxMDowMDowMCswODowMCIsImFnZ3JlZ2F0ZVR5cGUiOiJSZXBvcnQiLCJhZ2dyZWdhdGVJRCI6ImFnZ3JlZ2F0ZS0xIiwiZGF0YSI6eyJhbnN3ZXJfc2hlZXRfaWQiOiJhbnN3ZXItMSIsIm9yZ19pZCI6MX19\",\"checksum\":\"ea7a1db8a3763cbb3594c670810f67c682f552f70ba470eed5109d8e7f9170b7\"}"
+    },
+    "interpretation.report.generated": {
+      "Payload": "{\"id\":\"stable-event-id\",\"eventType\":\"interpretation.report.generated\",\"occurredAt\":\"2026-09-23T10:00:00+08:00\",\"aggregateType\":\"Report\",\"aggregateID\":\"aggregate-1\",\"data\":{\"answer_sheet_id\":\"answer-1\",\"org_id\":1}}",
+      "Wire": "{\"type\":\"component-base.messaging.message.v1\",\"schema_revision\":2,\"uuid\":\"stable-event-id\",\"metadata\":{\"aggregate_id\":\"aggregate-1\",\"aggregate_type\":\"Report\",\"event_type\":\"interpretation.report.generated\",\"occurred_at\":\"2026-09-23T10:00:00.000+08:00\",\"source\":\"api-server\"},\"payload\":\"eyJpZCI6InN0YWJsZS1ldmVudC1pZCIsImV2ZW50VHlwZSI6ImludGVycHJldGF0aW9uLnJlcG9ydC5nZW5lcmF0ZWQiLCJvY2N1cnJlZEF0IjoiMjAyNi0wOS0yM1QxMDowMDowMCswODowMCIsImFnZ3JlZ2F0ZVR5cGUiOiJSZXBvcnQiLCJhZ2dyZWdhdGVJRCI6ImFnZ3JlZ2F0ZS0xIiwiZGF0YSI6eyJhbnN3ZXJfc2hlZXRfaWQiOiJhbnN3ZXItMSIsIm9yZ19pZCI6MX19\",\"checksum\":\"7da5d048d85aac155cc6620cf88091b19660803c9a1d82d34af8f66d4e250f08\"}",
+      "RelayWire": "{\"type\":\"component-base.messaging.message.v1\",\"schema_revision\":2,\"uuid\":\"stable-event-id\",\"metadata\":{\"aggregate_id\":\"aggregate-1\",\"aggregate_type\":\"Report\",\"event_type\":\"interpretation.report.generated\",\"occurred_at\":\"2026-09-23T10:00:00.000+08:00\",\"source\":\"api-server\"},\"payload\":\"eyJpZCI6InN0YWJsZS1ldmVudC1pZCIsImV2ZW50VHlwZSI6ImludGVycHJldGF0aW9uLnJlcG9ydC5nZW5lcmF0ZWQiLCJvY2N1cnJlZEF0IjoiMjAyNi0wOS0yM1QxMDowMDowMCswODowMCIsImFnZ3JlZ2F0ZVR5cGUiOiJSZXBvcnQiLCJhZ2dyZWdhdGVJRCI6ImFnZ3JlZ2F0ZS0xIiwiZGF0YSI6eyJhbnN3ZXJfc2hlZXRfaWQiOiJhbnN3ZXItMSIsIm9yZ19pZCI6MX19\",\"checksum\":\"7da5d048d85aac155cc6620cf88091b19660803c9a1d82d34af8f66d4e250f08\"}"
+    },
+    "interpretation.retry.requested": {
+      "Payload": "{\"id\":\"stable-event-id\",\"eventType\":\"interpretation.retry.requested\",\"occurredAt\":\"2026-09-23T10:00:00+08:00\",\"aggregateType\":\"ReportGeneration\",\"aggregateID\":\"aggregate-1\",\"data\":{\"answer_sheet_id\":\"answer-1\",\"org_id\":1}}",
+      "Wire": "{\"type\":\"component-base.messaging.message.v1\",\"schema_revision\":2,\"uuid\":\"stable-event-id\",\"metadata\":{\"aggregate_id\":\"aggregate-1\",\"aggregate_type\":\"ReportGeneration\",\"event_type\":\"interpretation.retry.requested\",\"occurred_at\":\"2026-09-23T10:00:00.000+08:00\",\"source\":\"api-server\"},\"payload\":\"eyJpZCI6InN0YWJsZS1ldmVudC1pZCIsImV2ZW50VHlwZSI6ImludGVycHJldGF0aW9uLnJldHJ5LnJlcXVlc3RlZCIsIm9jY3VycmVkQXQiOiIyMDI2LTA5LTIzVDEwOjAwOjAwKzA4OjAwIiwiYWdncmVnYXRlVHlwZSI6IlJlcG9ydEdlbmVyYXRpb24iLCJhZ2dyZWdhdGVJRCI6ImFnZ3JlZ2F0ZS0xIiwiZGF0YSI6eyJhbnN3ZXJfc2hlZXRfaWQiOiJhbnN3ZXItMSIsIm9yZ19pZCI6MX19\",\"checksum\":\"dfd2d7a1f91b289dfced59bd46c43acebd37e4f000a4f14be55c6d5769d2319b\"}",
+      "RelayWire": "{\"type\":\"component-base.messaging.message.v1\",\"schema_revision\":2,\"uuid\":\"stable-event-id\",\"metadata\":{\"aggregate_id\":\"aggregate-1\",\"aggregate_type\":\"ReportGeneration\",\"event_type\":\"interpretation.retry.requested\",\"occurred_at\":\"2026-09-23T10:00:00.000+08:00\",\"source\":\"api-server\"},\"payload\":\"eyJpZCI6InN0YWJsZS1ldmVudC1pZCIsImV2ZW50VHlwZSI6ImludGVycHJldGF0aW9uLnJldHJ5LnJlcXVlc3RlZCIsIm9jY3VycmVkQXQiOiIyMDI2LTA5LTIzVDEwOjAwOjAwKzA4OjAwIiwiYWdncmVnYXRlVHlwZSI6IlJlcG9ydEdlbmVyYXRpb24iLCJhZ2dyZWdhdGVJRCI6ImFnZ3JlZ2F0ZS0xIiwiZGF0YSI6eyJhbnN3ZXJfc2hlZXRfaWQiOiJhbnN3ZXItMSIsIm9yZ19pZCI6MX19\",\"checksum\":\"dfd2d7a1f91b289dfced59bd46c43acebd37e4f000a4f14be55c6d5769d2319b\"}"
+    },
+    "questionnaire.changed": {
+      "Payload": "{\"id\":\"best-effort-stable-id\",\"eventType\":\"questionnaire.changed\",\"occurredAt\":\"2026-09-23T10:00:00+08:00\",\"aggregateType\":\"Questionnaire\",\"aggregateID\":\"aggregate-1\",\"data\":{\"org_id\":1,\"revision\":\"v2\"}}",
+      "Wire": "{\"type\":\"component-base.messaging.message.v1\",\"schema_revision\":2,\"uuid\":\"best-effort-stable-id\",\"metadata\":{\"aggregate_id\":\"aggregate-1\",\"aggregate_type\":\"Questionnaire\",\"event_type\":\"questionnaire.changed\",\"occurred_at\":\"2026-09-23T10:00:00.000+08:00\",\"source\":\"api-server\"},\"payload\":\"eyJpZCI6ImJlc3QtZWZmb3J0LXN0YWJsZS1pZCIsImV2ZW50VHlwZSI6InF1ZXN0aW9ubmFpcmUuY2hhbmdlZCIsIm9jY3VycmVkQXQiOiIyMDI2LTA5LTIzVDEwOjAwOjAwKzA4OjAwIiwiYWdncmVnYXRlVHlwZSI6IlF1ZXN0aW9ubmFpcmUiLCJhZ2dyZWdhdGVJRCI6ImFnZ3JlZ2F0ZS0xIiwiZGF0YSI6eyJvcmdfaWQiOjEsInJldmlzaW9uIjoidjIifX0=\",\"checksum\":\"80ca325a86d50b67fee046ee4d5d7fe94092ecf5bea80cd632a1b765e6e5d1cf\"}",
+      "RelayWire": "{\"type\":\"component-base.messaging.message.v1\",\"schema_revision\":2,\"uuid\":\"best-effort-stable-id\",\"metadata\":{\"aggregate_id\":\"aggregate-1\",\"aggregate_type\":\"Questionnaire\",\"event_type\":\"questionnaire.changed\",\"occurred_at\":\"2026-09-23T10:00:00.000+08:00\",\"source\":\"api-server\"},\"payload\":\"eyJpZCI6ImJlc3QtZWZmb3J0LXN0YWJsZS1pZCIsImV2ZW50VHlwZSI6InF1ZXN0aW9ubmFpcmUuY2hhbmdlZCIsIm9jY3VycmVkQXQiOiIyMDI2LTA5LTIzVDEwOjAwOjAwKzA4OjAwIiwiYWdncmVnYXRlVHlwZSI6IlF1ZXN0aW9ubmFpcmUiLCJhZ2dyZWdhdGVJRCI6ImFnZ3JlZ2F0ZS0xIiwiZGF0YSI6eyJvcmdfaWQiOjEsInJldmlzaW9uIjoidjIifX0=\",\"checksum\":\"80ca325a86d50b67fee046ee4d5d7fe94092ecf5bea80cd632a1b765e6e5d1cf\"}"
+    },
+    "task.canceled": {
+      "Payload": "{\"id\":\"best-effort-stable-id\",\"eventType\":\"task.canceled\",\"occurredAt\":\"2026-09-23T10:00:00+08:00\",\"aggregateType\":\"AssessmentTask\",\"aggregateID\":\"aggregate-1\",\"data\":{\"org_id\":1,\"revision\":\"v2\"}}",
+      "Wire": "{\"type\":\"component-base.messaging.message.v1\",\"schema_revision\":2,\"uuid\":\"best-effort-stable-id\",\"metadata\":{\"aggregate_id\":\"aggregate-1\",\"aggregate_type\":\"AssessmentTask\",\"event_type\":\"task.canceled\",\"occurred_at\":\"2026-09-23T10:00:00.000+08:00\",\"source\":\"api-server\"},\"payload\":\"eyJpZCI6ImJlc3QtZWZmb3J0LXN0YWJsZS1pZCIsImV2ZW50VHlwZSI6InRhc2suY2FuY2VsZWQiLCJvY2N1cnJlZEF0IjoiMjAyNi0wOS0yM1QxMDowMDowMCswODowMCIsImFnZ3JlZ2F0ZVR5cGUiOiJBc3Nlc3NtZW50VGFzayIsImFnZ3JlZ2F0ZUlEIjoiYWdncmVnYXRlLTEiLCJkYXRhIjp7Im9yZ19pZCI6MSwicmV2aXNpb24iOiJ2MiJ9fQ==\",\"checksum\":\"bef01c1207ac27a21725237771bd7a50d0eb50f543ad24d9a0d59e3995134e39\"}",
+      "RelayWire": "{\"type\":\"component-base.messaging.message.v1\",\"schema_revision\":2,\"uuid\":\"best-effort-stable-id\",\"metadata\":{\"aggregate_id\":\"aggregate-1\",\"aggregate_type\":\"AssessmentTask\",\"event_type\":\"task.canceled\",\"occurred_at\":\"2026-09-23T10:00:00.000+08:00\",\"source\":\"api-server\"},\"payload\":\"eyJpZCI6ImJlc3QtZWZmb3J0LXN0YWJsZS1pZCIsImV2ZW50VHlwZSI6InRhc2suY2FuY2VsZWQiLCJvY2N1cnJlZEF0IjoiMjAyNi0wOS0yM1QxMDowMDowMCswODowMCIsImFnZ3JlZ2F0ZVR5cGUiOiJBc3Nlc3NtZW50VGFzayIsImFnZ3JlZ2F0ZUlEIjoiYWdncmVnYXRlLTEiLCJkYXRhIjp7Im9yZ19pZCI6MSwicmV2aXNpb24iOiJ2MiJ9fQ==\",\"checksum\":\"bef01c1207ac27a21725237771bd7a50d0eb50f543ad24d9a0d59e3995134e39\"}"
+    },
+    "task.completed": {
+      "Payload": "{\"id\":\"best-effort-stable-id\",\"eventType\":\"task.completed\",\"occurredAt\":\"2026-09-23T10:00:00+08:00\",\"aggregateType\":\"AssessmentTask\",\"aggregateID\":\"aggregate-1\",\"data\":{\"org_id\":1,\"revision\":\"v2\"}}",
+      "Wire": "{\"type\":\"component-base.messaging.message.v1\",\"schema_revision\":2,\"uuid\":\"best-effort-stable-id\",\"metadata\":{\"aggregate_id\":\"aggregate-1\",\"aggregate_type\":\"AssessmentTask\",\"event_type\":\"task.completed\",\"occurred_at\":\"2026-09-23T10:00:00.000+08:00\",\"source\":\"api-server\"},\"payload\":\"eyJpZCI6ImJlc3QtZWZmb3J0LXN0YWJsZS1pZCIsImV2ZW50VHlwZSI6InRhc2suY29tcGxldGVkIiwib2NjdXJyZWRBdCI6IjIwMjYtMDktMjNUMTA6MDA6MDArMDg6MDAiLCJhZ2dyZWdhdGVUeXBlIjoiQXNzZXNzbWVudFRhc2siLCJhZ2dyZWdhdGVJRCI6ImFnZ3JlZ2F0ZS0xIiwiZGF0YSI6eyJvcmdfaWQiOjEsInJldmlzaW9uIjoidjIifX0=\",\"checksum\":\"9b18a263c635ec4da2a6a28db61e001a2ac8a0308f2951c16abf78d89a13772c\"}",
+      "RelayWire": "{\"type\":\"component-base.messaging.message.v1\",\"schema_revision\":2,\"uuid\":\"best-effort-stable-id\",\"metadata\":{\"aggregate_id\":\"aggregate-1\",\"aggregate_type\":\"AssessmentTask\",\"event_type\":\"task.completed\",\"occurred_at\":\"2026-09-23T10:00:00.000+08:00\",\"source\":\"api-server\"},\"payload\":\"eyJpZCI6ImJlc3QtZWZmb3J0LXN0YWJsZS1pZCIsImV2ZW50VHlwZSI6InRhc2suY29tcGxldGVkIiwib2NjdXJyZWRBdCI6IjIwMjYtMDktMjNUMTA6MDA6MDArMDg6MDAiLCJhZ2dyZWdhdGVUeXBlIjoiQXNzZXNzbWVudFRhc2siLCJhZ2dyZWdhdGVJRCI6ImFnZ3JlZ2F0ZS0xIiwiZGF0YSI6eyJvcmdfaWQiOjEsInJldmlzaW9uIjoidjIifX0=\",\"checksum\":\"9b18a263c635ec4da2a6a28db61e001a2ac8a0308f2951c16abf78d89a13772c\"}"
+    },
+    "task.expired": {
+      "Payload": "{\"id\":\"best-effort-stable-id\",\"eventType\":\"task.expired\",\"occurredAt\":\"2026-09-23T10:00:00+08:00\",\"aggregateType\":\"AssessmentTask\",\"aggregateID\":\"aggregate-1\",\"data\":{\"org_id\":1,\"revision\":\"v2\"}}",
+      "Wire": "{\"type\":\"component-base.messaging.message.v1\",\"schema_revision\":2,\"uuid\":\"best-effort-stable-id\",\"metadata\":{\"aggregate_id\":\"aggregate-1\",\"aggregate_type\":\"AssessmentTask\",\"event_type\":\"task.expired\",\"occurred_at\":\"2026-09-23T10:00:00.000+08:00\",\"source\":\"api-server\"},\"payload\":\"eyJpZCI6ImJlc3QtZWZmb3J0LXN0YWJsZS1pZCIsImV2ZW50VHlwZSI6InRhc2suZXhwaXJlZCIsIm9jY3VycmVkQXQiOiIyMDI2LTA5LTIzVDEwOjAwOjAwKzA4OjAwIiwiYWdncmVnYXRlVHlwZSI6IkFzc2Vzc21lbnRUYXNrIiwiYWdncmVnYXRlSUQiOiJhZ2dyZWdhdGUtMSIsImRhdGEiOnsib3JnX2lkIjoxLCJyZXZpc2lvbiI6InYyIn19\",\"checksum\":\"e59baedb37417ad381f831be0eab084a7e7cef4a4ce11a18c0b40fe0fa4cd9df\"}",
+      "RelayWire": "{\"type\":\"component-base.messaging.message.v1\",\"schema_revision\":2,\"uuid\":\"best-effort-stable-id\",\"metadata\":{\"aggregate_id\":\"aggregate-1\",\"aggregate_type\":\"AssessmentTask\",\"event_type\":\"task.expired\",\"occurred_at\":\"2026-09-23T10:00:00.000+08:00\",\"source\":\"api-server\"},\"payload\":\"eyJpZCI6ImJlc3QtZWZmb3J0LXN0YWJsZS1pZCIsImV2ZW50VHlwZSI6InRhc2suZXhwaXJlZCIsIm9jY3VycmVkQXQiOiIyMDI2LTA5LTIzVDEwOjAwOjAwKzA4OjAwIiwiYWdncmVnYXRlVHlwZSI6IkFzc2Vzc21lbnRUYXNrIiwiYWdncmVnYXRlSUQiOiJhZ2dyZWdhdGUtMSIsImRhdGEiOnsib3JnX2lkIjoxLCJyZXZpc2lvbiI6InYyIn19\",\"checksum\":\"e59baedb37417ad381f831be0eab084a7e7cef4a4ce11a18c0b40fe0fa4cd9df\"}"
+    },
+    "task.opened": {
+      "Payload": "{\"id\":\"best-effort-stable-id\",\"eventType\":\"task.opened\",\"occurredAt\":\"2026-09-23T10:00:00+08:00\",\"aggregateType\":\"AssessmentTask\",\"aggregateID\":\"aggregate-1\",\"data\":{\"org_id\":1,\"revision\":\"v2\"}}",
+      "Wire": "{\"type\":\"component-base.messaging.message.v1\",\"schema_revision\":2,\"uuid\":\"best-effort-stable-id\",\"metadata\":{\"aggregate_id\":\"aggregate-1\",\"aggregate_type\":\"AssessmentTask\",\"event_type\":\"task.opened\",\"occurred_at\":\"2026-09-23T10:00:00.000+08:00\",\"source\":\"api-server\"},\"payload\":\"eyJpZCI6ImJlc3QtZWZmb3J0LXN0YWJsZS1pZCIsImV2ZW50VHlwZSI6InRhc2sub3BlbmVkIiwib2NjdXJyZWRBdCI6IjIwMjYtMDktMjNUMTA6MDA6MDArMDg6MDAiLCJhZ2dyZWdhdGVUeXBlIjoiQXNzZXNzbWVudFRhc2siLCJhZ2dyZWdhdGVJRCI6ImFnZ3JlZ2F0ZS0xIiwiZGF0YSI6eyJvcmdfaWQiOjEsInJldmlzaW9uIjoidjIifX0=\",\"checksum\":\"95db6fc2af508c40980bd73d0fb4e648b4ee5e76a64f21aab3207e98cfba2066\"}",
+      "RelayWire": "{\"type\":\"component-base.messaging.message.v1\",\"schema_revision\":2,\"uuid\":\"best-effort-stable-id\",\"metadata\":{\"aggregate_id\":\"aggregate-1\",\"aggregate_type\":\"AssessmentTask\",\"event_type\":\"task.opened\",\"occurred_at\":\"2026-09-23T10:00:00.000+08:00\",\"source\":\"api-server\"},\"payload\":\"eyJpZCI6ImJlc3QtZWZmb3J0LXN0YWJsZS1pZCIsImV2ZW50VHlwZSI6InRhc2sub3BlbmVkIiwib2NjdXJyZWRBdCI6IjIwMjYtMDktMjNUMTA6MDA6MDArMDg6MDAiLCJhZ2dyZWdhdGVUeXBlIjoiQXNzZXNzbWVudFRhc2siLCJhZ2dyZWdhdGVJRCI6ImFnZ3JlZ2F0ZS0xIiwiZGF0YSI6eyJvcmdfaWQiOjEsInJldmlzaW9uIjoidjIifX0=\",\"checksum\":\"95db6fc2af508c40980bd73d0fb4e648b4ee5e76a64f21aab3207e98cfba2066\"}"
+    },
+    "task.opened.reminder.requested": {
+      "Payload": "{\"id\":\"stable-event-id\",\"eventType\":\"task.opened.reminder.requested\",\"occurredAt\":\"2026-09-23T10:00:00+08:00\",\"aggregateType\":\"AssessmentTask\",\"aggregateID\":\"aggregate-1\",\"data\":{\"answer_sheet_id\":\"answer-1\",\"org_id\":1}}",
+      "Wire": "{\"type\":\"component-base.messaging.message.v1\",\"schema_revision\":2,\"uuid\":\"stable-event-id\",\"metadata\":{\"aggregate_id\":\"aggregate-1\",\"aggregate_type\":\"AssessmentTask\",\"event_type\":\"task.opened.reminder.requested\",\"occurred_at\":\"2026-09-23T10:00:00.000+08:00\",\"source\":\"api-server\"},\"payload\":\"eyJpZCI6InN0YWJsZS1ldmVudC1pZCIsImV2ZW50VHlwZSI6InRhc2sub3BlbmVkLnJlbWluZGVyLnJlcXVlc3RlZCIsIm9jY3VycmVkQXQiOiIyMDI2LTA5LTIzVDEwOjAwOjAwKzA4OjAwIiwiYWdncmVnYXRlVHlwZSI6IkFzc2Vzc21lbnRUYXNrIiwiYWdncmVnYXRlSUQiOiJhZ2dyZWdhdGUtMSIsImRhdGEiOnsiYW5zd2VyX3NoZWV0X2lkIjoiYW5zd2VyLTEiLCJvcmdfaWQiOjF9fQ==\",\"checksum\":\"94009fbe0fa2d17534edf333ae4e64c40fcd84398452153be5143a8f318f3123\"}",
+      "RelayWire": "{\"type\":\"component-base.messaging.message.v1\",\"schema_revision\":2,\"uuid\":\"stable-event-id\",\"metadata\":{\"aggregate_id\":\"aggregate-1\",\"aggregate_type\":\"AssessmentTask\",\"event_type\":\"task.opened.reminder.requested\",\"occurred_at\":\"2026-09-23T10:00:00.000+08:00\",\"source\":\"api-server\"},\"payload\":\"eyJpZCI6InN0YWJsZS1ldmVudC1pZCIsImV2ZW50VHlwZSI6InRhc2sub3BlbmVkLnJlbWluZGVyLnJlcXVlc3RlZCIsIm9jY3VycmVkQXQiOiIyMDI2LTA5LTIzVDEwOjAwOjAwKzA4OjAwIiwiYWdncmVnYXRlVHlwZSI6IkFzc2Vzc21lbnRUYXNrIiwiYWdncmVnYXRlSUQiOiJhZ2dyZWdhdGUtMSIsImRhdGEiOnsiYW5zd2VyX3NoZWV0X2lkIjoiYW5zd2VyLTEiLCJvcmdfaWQiOjF9fQ==\",\"checksum\":\"94009fbe0fa2d17534edf333ae4e64c40fcd84398452153be5143a8f318f3123\"}"
+    }
+  },
+  "Decoders": {
+    "array envelope": {
+      "Input": "[]",
+      "Value": "",
+      "Metadata": null,
+      "Error": "failed to parse event envelope: json: cannot unmarshal array into Go value of type eventcodec.Envelope"
+    },
+    "empty envelope": {
+      "Input": "{}",
+      "Value": "{\"id\":\"\",\"eventType\":\"\",\"occurredAt\":\"0001-01-01T00:00:00Z\",\"aggregateType\":\"\",\"aggregateID\":\"\",\"data\":null}",
+      "Metadata": {
+        "aggregate_id": "",
+        "aggregate_type": "",
+        "event_type": "",
+        "occurred_at": "0001-01-01T00:00:00.000Z",
+        "source": "api-server"
+      },
+      "Error": ""
+    },
+    "empty payload": {
+      "Input": "",
+      "Value": "",
+      "Metadata": null,
+      "Error": "failed to parse event envelope: unexpected end of JSON input"
+    },
+    "invalid JSON": {
+      "Input": "{not-json",
+      "Value": "",
+      "Metadata": null,
+      "Error": "failed to parse event envelope: invalid character 'n' looking for beginning of object key string"
+    },
+    "invalid date": {
+      "Input": "{\"occurredAt\":\"not-a-date\"}",
+      "Value": "",
+      "Metadata": null,
+      "Error": "failed to parse event envelope: parsing time \"not-a-date\" as \"2006-01-02T15:04:05Z07:00\": cannot parse \"not-a-date\" as \"2006\""
+    },
+    "missing data": {
+      "Input": "{\"id\":\"original-id\"}",
+      "Value": "{\"id\":\"original-id\",\"eventType\":\"\",\"occurredAt\":\"0001-01-01T00:00:00Z\",\"aggregateType\":\"\",\"aggregateID\":\"\",\"data\":null}",
+      "Metadata": {
+        "aggregate_id": "",
+        "aggregate_type": "",
+        "event_type": "",
+        "occurred_at": "0001-01-01T00:00:00.000Z",
+        "source": "api-server"
+      },
+      "Error": ""
+    },
+    "null data": {
+      "Input": "{\"id\":\"original-id\",\"data\":null}",
+      "Value": "{\"id\":\"original-id\",\"eventType\":\"\",\"occurredAt\":\"0001-01-01T00:00:00Z\",\"aggregateType\":\"\",\"aggregateID\":\"\",\"data\":null}",
+      "Metadata": {
+        "aggregate_id": "",
+        "aggregate_type": "",
+        "event_type": "",
+        "occurred_at": "0001-01-01T00:00:00.000Z",
+        "source": "api-server"
+      },
+      "Error": ""
+    },
+    "null envelope": {
+      "Input": "null",
+      "Value": "{\"id\":\"\",\"eventType\":\"\",\"occurredAt\":\"0001-01-01T00:00:00Z\",\"aggregateType\":\"\",\"aggregateID\":\"\",\"data\":null}",
+      "Metadata": {
+        "aggregate_id": "",
+        "aggregate_type": "",
+        "event_type": "",
+        "occurred_at": "0001-01-01T00:00:00.000Z",
+        "source": "api-server"
+      },
+      "Error": ""
+    },
+    "precise identifiers and UTC+8": {
+      "Input": "{\"id\":\"original-id\",\"eventType\":\"evaluation.retry.requested\",\"occurredAt\":\"2026-10-02T10:01:02.123456789+08:00\",\"aggregateType\":\"Evaluation\",\"aggregateID\":\"639678084915671598\",\"data\":{\"org_id\":639678084915671598,\"nested\":[true,null,\"中文\"]}}",
+      "Value": "{\"id\":\"original-id\",\"eventType\":\"evaluation.retry.requested\",\"occurredAt\":\"2026-10-02T10:01:02.123456789+08:00\",\"aggregateType\":\"Evaluation\",\"aggregateID\":\"639678084915671598\",\"data\":{\"org_id\":639678084915671598,\"nested\":[true,null,\"中文\"]}}",
+      "Metadata": {
+        "aggregate_id": "639678084915671598",
+        "aggregate_type": "Evaluation",
+        "event_type": "evaluation.retry.requested",
+        "occurred_at": "2026-10-02T10:01:02.123+08:00",
+        "source": "api-server"
+      },
+      "Error": ""
+    },
+    "unknown fields": {
+      "Input": "{\"id\":\"original-id\",\"eventType\":\"future.event\",\"extra\":\"historically ignored\",\"data\":{\"new_field\":\"kept\"}}",
+      "Value": "{\"id\":\"original-id\",\"eventType\":\"future.event\",\"occurredAt\":\"0001-01-01T00:00:00Z\",\"aggregateType\":\"\",\"aggregateID\":\"\",\"data\":{\"new_field\":\"kept\"}}",
+      "Metadata": {
+        "aggregate_id": "",
+        "aggregate_type": "",
+        "event_type": "future.event",
+        "occurred_at": "0001-01-01T00:00:00.000Z",
+        "source": "api-server"
+      },
+      "Error": ""
+    },
+    "wrong field type": {
+      "Input": "{\"id\":123}",
+      "Value": "",
+      "Metadata": null,
+      "Error": "failed to parse event envelope: json: cannot unmarshal number into Go struct field Envelope.id of type string"
+    }
+  }
+}
