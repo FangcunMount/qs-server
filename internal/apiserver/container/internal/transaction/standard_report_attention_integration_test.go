@@ -16,7 +16,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/FangcunMount/component-base/pkg/messaging"
 	pb "github.com/FangcunMount/qs-server/api/grpc/gen/internalapi"
 	appTestee "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/testee"
 	execution "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/automation/execution"
@@ -41,6 +40,7 @@ import (
 	"github.com/FangcunMount/reliable-messaging/relay"
 	sdkmongo "github.com/FangcunMount/reliable-messaging/storage/mongo"
 	sdknsq "github.com/FangcunMount/reliable-messaging/transport/nsq"
+	legacywire "github.com/FangcunMount/reliable-messaging/wire/legacy"
 	"github.com/alicebob/miniredis/v2"
 	mysqldriver "github.com/go-sql-driver/mysql"
 	"github.com/nsqio/go-nsq"
@@ -290,7 +290,7 @@ func TestM5ReportAttentionReconcileReachesRealTesteeFact(t *testing.T) {
 		t.Fatalf("committed report intent=%+v err=%v", outboxRow, err)
 	}
 	eventID := outboxRow.MessageID
-	wire, recognized, err := messaging.DecodeMessagePayload(outboxRow.Payload)
+	wire, recognized, err := legacywire.Decode(outboxRow.Payload)
 	if err != nil || !recognized || wire.UUID != eventID {
 		t.Fatalf("committed report wire identity: id=%s recognized=%t err=%v", eventID, recognized, err)
 	}
@@ -306,7 +306,7 @@ func TestM5ReportAttentionReconcileReachesRealTesteeFact(t *testing.T) {
 	consumer.SetLogger(nil, nsq.LogLevelError)
 	deliveries := make(chan error, 1)
 	consumer.AddHandler(nsq.HandlerFunc(func(raw *nsq.Message) error {
-		decoded, recognized, deliveryErr := messaging.DecodeMessagePayload(raw.Body)
+		decoded, recognized, deliveryErr := legacywire.Decode(raw.Body)
 		if deliveryErr == nil && (!recognized || decoded.UUID != eventID || decoded.Metadata["event_type"] != eventcatalog.InterpretationReportGenerated) {
 			deliveryErr = fmt.Errorf("standard report event lost its original NSQ identity")
 		}

@@ -16,7 +16,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/FangcunMount/component-base/pkg/messaging"
 	appanswersheet "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/answersheet"
 	"github.com/FangcunMount/qs-server/internal/apiserver/eventing/standardoutbox"
 	mongoanswersheet "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/answersheet"
@@ -28,6 +27,7 @@ import (
 	"github.com/FangcunMount/reliable-messaging/relay"
 	sdkmongo "github.com/FangcunMount/reliable-messaging/storage/mongo"
 	sdknsq "github.com/FangcunMount/reliable-messaging/transport/nsq"
+	legacywire "github.com/FangcunMount/reliable-messaging/wire/legacy"
 	"github.com/nsqio/go-nsq"
 	"github.com/stretchr/testify/require"
 	"go.mongodb.org/mongo-driver/bson"
@@ -189,7 +189,7 @@ func TestM5StandardMongoAnswerSheetRecoversAfterRelayProcessKill(t *testing.T) {
 	consumer.SetLogger(nil, nsq.LogLevelError)
 	delivered := make(chan string, 2)
 	consumer.AddHandler(nsq.HandlerFunc(func(raw *nsq.Message) error {
-		msg, recognized, decodeErr := messaging.DecodeMessagePayload(raw.Body)
+		msg, recognized, decodeErr := legacywire.Decode(raw.Body)
 		if decodeErr != nil {
 			return decodeErr
 		}

@@ -13,7 +13,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/FangcunMount/component-base/pkg/messaging"
 	interpretationpb "github.com/FangcunMount/qs-server/api/grpc/gen/interpretation"
 	evaloutcome "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome"
 	outcomecommit "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome/commit"
@@ -41,6 +40,7 @@ import (
 	"github.com/FangcunMount/reliable-messaging/relay"
 	sdkmysql "github.com/FangcunMount/reliable-messaging/storage/mysql"
 	sdknsq "github.com/FangcunMount/reliable-messaging/transport/nsq"
+	legacywire "github.com/FangcunMount/reliable-messaging/wire/legacy"
 	mysqldriver "github.com/go-sql-driver/mysql"
 	"github.com/nsqio/go-nsq"
 	"github.com/stretchr/testify/require"
@@ -208,7 +208,7 @@ events:
 	require.Equal(t, "evaluation.outcome.committed", messageInput.EventType)
 	require.Equal(t, "org:1", messageInput.Scope)
 	require.Equal(t, "qs.evaluation.lifecycle", messageInput.Destination)
-	decoded, recognized, err := messaging.DecodeMessagePayload(messageInput.Payload)
+	decoded, recognized, err := legacywire.Decode(messageInput.Payload)
 	require.NoError(t, err)
 	require.True(t, recognized)
 	require.Equal(t, messageInput.ID, decoded.UUID)
@@ -249,7 +249,7 @@ events:
 	require.True(t, ok)
 	deliveries := make(chan error, 2)
 	consumer.AddHandler(nsq.HandlerFunc(func(raw *nsq.Message) error {
-		wire, recognized, decodeErr := messaging.DecodeMessagePayload(raw.Body)
+		wire, recognized, decodeErr := legacywire.Decode(raw.Body)
 		if decodeErr == nil && (!recognized || wire.Metadata["event_type"] != "evaluation.outcome.committed") {
 			decodeErr = fmt.Errorf("standard outcome wire lost original event type")
 		}

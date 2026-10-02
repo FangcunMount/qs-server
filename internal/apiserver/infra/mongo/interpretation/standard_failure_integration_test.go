@@ -13,7 +13,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/FangcunMount/component-base/pkg/messaging"
 	interpretationpb "github.com/FangcunMount/qs-server/api/grpc/gen/interpretation"
 	appautomation "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/automation"
 	execution "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/automation/execution"
@@ -35,6 +34,7 @@ import (
 	"github.com/FangcunMount/reliable-messaging/relay"
 	sdkmongo "github.com/FangcunMount/reliable-messaging/storage/mongo"
 	sdknsq "github.com/FangcunMount/reliable-messaging/transport/nsq"
+	legacywire "github.com/FangcunMount/reliable-messaging/wire/legacy"
 	"github.com/nsqio/go-nsq"
 	"go.mongodb.org/mongo-driver/bson"
 	"google.golang.org/grpc/metadata"
@@ -273,7 +273,7 @@ func TestInterpretationReportEventsReachWorkerThroughStandardMongoAndNSQ(t *test
 	}
 	deliveries := make(chan delivery, 4)
 	consumer.AddHandler(nsq.HandlerFunc(func(raw *nsq.Message) error {
-		decoded, recognized, decodeErr := messaging.DecodeMessagePayload(raw.Body)
+		decoded, recognized, decodeErr := legacywire.Decode(raw.Body)
 		if decodeErr == nil && !recognized {
 			decodeErr = errors.New("standard NSQ envelope not recognized")
 		}

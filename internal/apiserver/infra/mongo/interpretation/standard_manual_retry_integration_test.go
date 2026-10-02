@@ -12,8 +12,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/FangcunMount/component-base/pkg/eventcodec"
-	"github.com/FangcunMount/component-base/pkg/messaging"
 	automation "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/automation"
 	execution "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/automation/execution"
 	domaingeneration "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/generation"
@@ -31,6 +29,8 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 	"github.com/FangcunMount/qs-server/internal/pkg/retrygovernance"
 	"github.com/FangcunMount/qs-server/internal/worker/handlers"
+	domainwire "github.com/FangcunMount/reliable-messaging/wire/domain"
+	legacywire "github.com/FangcunMount/reliable-messaging/wire/legacy"
 	"go.mongodb.org/mongo-driver/bson"
 )
 
@@ -84,7 +84,7 @@ func TestInterpretationGovernedRetryAuthorizationAndStandardIntentCommitTogether
 	if err := fixture.db.Collection("rm_outbox").FindOne(t.Context(), bson.M{"event_type": eventcatalog.InterpretationReportFailed}).Decode(&failedRow); err != nil {
 		t.Fatal(err)
 	}
-	failedWire, recognized, err := messaging.DecodeMessagePayload(failedRow.Payload)
+	failedWire, recognized, err := legacywire.Decode(failedRow.Payload)
 	if err != nil || !recognized {
 		t.Fatalf("failed event wire decode: recognized=%t err=%v", recognized, err)
 	}
@@ -143,11 +143,11 @@ func TestInterpretationGovernedRetryAuthorizationAndStandardIntentCommitTogether
 	if row.MessageID != decision.RetryEventID || !row.NextAttemptAt.Equal(decision.NextAttemptAt.UTC().Truncate(time.Millisecond)) {
 		t.Fatalf("manual retry intent = %+v; decision = %+v", row, decision)
 	}
-	decoded, recognized, err := messaging.DecodeMessagePayload(row.Payload)
+	decoded, recognized, err := legacywire.Decode(row.Payload)
 	if err != nil || !recognized {
 		t.Fatalf("standard message envelope decode: recognized=%t err=%v", recognized, err)
 	}
-	envelope, err := eventcodec.DecodeEnvelope(decoded.Payload)
+	envelope, err := domainwire.DecodeEnvelope(decoded.Payload)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -228,7 +228,7 @@ func TestInterpretationGovernedRetryAuthorizationAndStandardIntentCommitTogether
 	if err := fixture.db.Collection("rm_outbox").FindOne(t.Context(), bson.M{"message_id": forceDecision.RetryEventID}).Decode(&forceRow); err != nil {
 		t.Fatal(err)
 	}
-	forceWire, recognized, err := messaging.DecodeMessagePayload(forceRow.Payload)
+	forceWire, recognized, err := legacywire.Decode(forceRow.Payload)
 	if err != nil || !recognized {
 		t.Fatalf("force retry wire decode: recognized=%t err=%v", recognized, err)
 	}
@@ -264,7 +264,7 @@ func TestInterpretationGovernedRetryAuthorizationAndStandardIntentCommitTogether
 	if err := fixture.db.Collection("rm_outbox").FindOne(t.Context(), bson.M{"message_id": fullAuthorized.RetryDecision().RetryEventID}).Decode(&fullRow); err != nil {
 		t.Fatal(err)
 	}
-	fullWire, recognized, err := messaging.DecodeMessagePayload(fullRow.Payload)
+	fullWire, recognized, err := legacywire.Decode(fullRow.Payload)
 	if err != nil || !recognized {
 		t.Fatalf("full business retry wire decode: recognized=%t err=%v", recognized, err)
 	}
@@ -293,7 +293,7 @@ func TestInterpretationGovernedRetryAuthorizationAndStandardIntentCommitTogether
 	if err := fixture.db.Collection("rm_outbox").FindOne(t.Context(), bson.M{"message_id": lostAuthorized.RetryDecision().RetryEventID}).Decode(&lostRow); err != nil {
 		t.Fatal(err)
 	}
-	lostWire, recognized, err := messaging.DecodeMessagePayload(lostRow.Payload)
+	lostWire, recognized, err := legacywire.Decode(lostRow.Payload)
 	if err != nil || !recognized {
 		t.Fatalf("lost reply retry wire decode: recognized=%t err=%v", recognized, err)
 	}
@@ -329,7 +329,7 @@ func assertStandardRetryClaimOnce(t *testing.T, fixture interpretationMongoFixtu
 
 func standardRetryAuthorizationContext(t *testing.T, payload []byte) context.Context {
 	t.Helper()
-	envelope, err := eventcodec.DecodeEnvelope(payload)
+	envelope, err := domainwire.DecodeEnvelope(payload)
 	if err != nil {
 		t.Fatal(err)
 	}

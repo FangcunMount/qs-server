@@ -15,7 +15,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/FangcunMount/component-base/pkg/messaging"
 	pb "github.com/FangcunMount/qs-server/api/grpc/gen/evaluation"
 	appintake "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/intake"
 	journey "github.com/FangcunMount/qs-server/internal/apiserver/application/journey/assessmentintake"
@@ -44,6 +43,7 @@ import (
 	sdkmongo "github.com/FangcunMount/reliable-messaging/storage/mongo"
 	sdkmysql "github.com/FangcunMount/reliable-messaging/storage/mysql"
 	sdknsq "github.com/FangcunMount/reliable-messaging/transport/nsq"
+	legacywire "github.com/FangcunMount/reliable-messaging/wire/legacy"
 	"github.com/alicebob/miniredis/v2"
 	mysqldriver "github.com/go-sql-driver/mysql"
 	"github.com/nsqio/go-nsq"
@@ -193,7 +193,7 @@ events:
 	}
 	delivered := make(chan delivery, 5)
 	consumer.AddHandler(nsq.HandlerFunc(func(raw *nsq.Message) error {
-		decoded, recognized, decodeErr := messaging.DecodeMessagePayload(raw.Body)
+		decoded, recognized, decodeErr := legacywire.Decode(raw.Body)
 		if decodeErr == nil && !recognized {
 			decodeErr = fmt.Errorf("standard message lost original NSQ envelope")
 		}
@@ -223,7 +223,7 @@ events:
 	hotrankDelivered := make(chan delivery, 3)
 	var hotrankCalls atomic.Int32
 	hotrankConsumer.AddHandler(nsq.HandlerFunc(func(raw *nsq.Message) error {
-		decoded, recognized, handleErr := messaging.DecodeMessagePayload(raw.Body)
+		decoded, recognized, handleErr := legacywire.Decode(raw.Body)
 		if handleErr == nil && !recognized {
 			handleErr = fmt.Errorf("hot-rank channel lost original NSQ envelope")
 		}
