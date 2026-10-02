@@ -11,13 +11,10 @@ import (
 
 	"github.com/FangcunMount/component-base/pkg/logger"
 	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
-	mongoEventOutbox "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/eventoutbox"
-	mysqlEventOutbox "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/eventoutbox"
-	"github.com/FangcunMount/qs-server/internal/apiserver/infra/redis/outboxready"
 	"github.com/FangcunMount/qs-server/internal/pkg/event"
-	"github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
-	"github.com/FangcunMount/qs-server/internal/pkg/eventing/observe"
-	"github.com/FangcunMount/qs-server/internal/pkg/eventing/runtime"
+	eventcatalog "github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
+	eventobservability "github.com/FangcunMount/qs-server/internal/pkg/eventing/observe"
+	eventruntime "github.com/FangcunMount/qs-server/internal/pkg/eventing/runtime"
 	"github.com/FangcunMount/qs-server/internal/pkg/resilience/backpressure"
 	rmtransport "github.com/FangcunMount/reliable-messaging/transport"
 	domainwire "github.com/FangcunMount/reliable-messaging/wire/domain"
@@ -51,15 +48,6 @@ type ProfileOptions struct {
 	ImmediateMaxConcurrent int
 }
 
-type reconcilerRuntime interface {
-	Start(context.Context)
-	Close()
-}
-
-type immediateRuntime interface {
-	Close()
-}
-
 type Options struct {
 	MySQLDB              *gorm.DB
 	MongoDB              *mongo.Database
@@ -77,16 +65,10 @@ type Options struct {
 }
 
 type profileRuntime struct {
-	name       string
-	binding    appEventing.ProfileBinding
-	relay      appEventing.OutboxRelay
-	immediate  immediateRuntime
-	readyIndex *outboxready.Index
-	reconciler reconcilerRuntime
-	status     appEventing.NamedOutboxStatusReader
-	interval   time.Duration
-	// Candidate standard profiles replace the whole legacy writer/runner pair.
-	// These hooks stay nil for all existing profiles.
+	name    string
+	binding appEventing.ProfileBinding
+	status  appEventing.NamedOutboxStatusReader
+	// SDK profiles own execution; the host owns bindings and shutdown ordering.
 	run            func(context.Context) error
 	drain          func(context.Context) error
 	drainTimeout   time.Duration
@@ -128,15 +110,13 @@ var profileStartOrder = []eventcatalog.OutboxProfile{
 	eventcatalog.OutboxProfileAssessmentMySQL,
 }
 
+// New constructs consumer-only wiring. Durable profiles require the SDK constructor.
 func New(opts Options) (*Subsystem, error) {
+	if opts.MongoDB != nil || opts.MySQLDB != nil {
+		return nil, errors.New("durable host databases require standard SDK profiles")
+	}
 	s, err := newBase(opts)
 	if err != nil {
-		return nil, err
-	}
-	if err := s.buildMongoProfile(opts); err != nil {
-		return nil, err
-	}
-	if err := s.buildAssessmentProfile(opts); err != nil {
 		return nil, err
 	}
 	s.buildConsumers(opts.Consumers)
@@ -164,66 +144,6 @@ func newBase(opts Options) (*Subsystem, error) {
 		closeDone:            make(chan struct{}),
 	}
 	return s, nil
-}
-
-func (s *Subsystem) buildMongoProfile(opts Options) error {
-	if opts.MongoDB == nil {
-		return nil
-	}
-	storeOpts := []mongoEventOutbox.StoreOption{mongoEventOutbox.WithPriorityTiers(s.registry.PriorityTiers(eventcatalog.OutboxProfileMongoDomain))}
-	if opts.MongoLimiter != nil {
-		storeOpts = append(storeOpts, mongoEventOutbox.WithLimiter(opts.MongoLimiter))
-	}
-	store, err := mongoEventOutbox.NewStoreWithTopicResolver(opts.MongoDB, s.catalog, storeOpts...)
-	if err != nil {
-		return err
-	}
-	ready := outboxready.NewIndexWithRegistry(opts.OpsRedis, outboxready.StoreMongoDomainEvents, s.registry)
-	attemptTracker := appEventing.NewOutboxAttemptTracker()
-	immediate := appEventing.NewImmediateDispatcher(appEventing.ImmediateDispatcherOptions{
-		Name: "mongo-domain-events", Store: store, Publisher: s.publisher, Observer: s.observer,
-		Enabled: true, RequireDurablePublisher: true, MaxConcurrent: opts.Mongo.ImmediateMaxConcurrent,
-		ReadyIndex: ready, ImmediateEventTypes: s.registry.ImmediateTypes(eventcatalog.OutboxProfileMongoDomain), AttemptTracker: attemptTracker,
-	})
-	relay := appEventing.NewOutboxRelayWithOptions(appEventing.OutboxRelayOptions{
-		Name: "mongo-domain-events", Store: store, Publisher: s.publisher, Observer: s.observer,
-		BatchSize: opts.Mongo.BatchSize, PublishWorkers: opts.Mongo.PublishWorkers,
-		RequireDurablePublisher: true, ReadyIndex: ready, ReadyBuckets: s.registry.ReadyIndexBuckets(), AttemptTracker: attemptTracker,
-	})
-	s.profiles[eventcatalog.OutboxProfileMongoDomain] = &profileRuntime{
-		name: "mongo-domain-events", binding: appEventing.ProfileBinding{Stager: store, PostCommit: immediate},
-		relay: relay, immediate: immediate, readyIndex: ready, reconciler: outboxready.NewReconciler(ready, store, 0),
-		status:   appEventing.NamedOutboxStatusReader{Name: "mongo-domain-events", Reader: store},
-		interval: normalizedInterval(opts.Mongo.Interval, 500*time.Millisecond),
-	}
-	return nil
-}
-
-func (s *Subsystem) buildAssessmentProfile(opts Options) error {
-	if opts.MySQLDB == nil {
-		return nil
-	}
-	store := mysqlEventOutbox.NewStoreWithTopicResolver(opts.MySQLDB, s.catalog,
-		mysqlEventOutbox.WithPriorityTiers(s.registry.PriorityTiers(eventcatalog.OutboxProfileAssessmentMySQL)))
-	ready := outboxready.NewIndexWithRegistry(opts.OpsRedis, outboxready.StoreAssessmentMySQLOutbox, s.registry)
-	attemptTracker := appEventing.NewOutboxAttemptTracker()
-	immediate := appEventing.NewImmediateDispatcher(appEventing.ImmediateDispatcherOptions{
-		Name: "assessment-mysql-outbox", Store: store, Publisher: s.publisher, Observer: s.observer,
-		Enabled: true, RequireDurablePublisher: true, MaxConcurrent: opts.Assessment.ImmediateMaxConcurrent,
-		ReadyIndex: ready, ImmediateEventTypes: s.registry.ImmediateTypes(eventcatalog.OutboxProfileAssessmentMySQL), AttemptTracker: attemptTracker,
-	})
-	relay := appEventing.NewOutboxRelayWithOptions(appEventing.OutboxRelayOptions{
-		Name: "assessment-mysql-outbox", Store: store, Publisher: s.publisher, Observer: s.observer,
-		BatchSize: opts.Assessment.BatchSize, PublishWorkers: opts.Assessment.PublishWorkers,
-		RequireDurablePublisher: true, ReadyIndex: ready, ReadyBuckets: s.registry.ReadyIndexBuckets(), AttemptTracker: attemptTracker,
-	})
-	s.profiles[eventcatalog.OutboxProfileAssessmentMySQL] = &profileRuntime{
-		name: "assessment-mysql-outbox", binding: appEventing.ProfileBinding{Stager: store, PostCommit: immediate},
-		relay: relay, immediate: immediate, readyIndex: ready, reconciler: outboxready.NewReconciler(ready, store, 0),
-		status:   appEventing.NamedOutboxStatusReader{Name: "assessment-mysql-outbox", Reader: store},
-		interval: normalizedInterval(opts.Assessment.Interval, 500*time.Millisecond),
-	}
-	return nil
 }
 
 func (s *Subsystem) buildConsumers(options map[string]ConsumerOptions) {
@@ -312,11 +232,6 @@ func (s *Subsystem) Start(parent context.Context) error {
 		}
 	}
 	profiles := s.orderedProfiles()
-	for _, profile := range profiles {
-		if profile.reconciler != nil {
-			profile.reconciler.Start(ctx)
-		}
-	}
 	if s.publisher.IsMQBacked() {
 		for _, profile := range profiles {
 			if profile.run != nil {
@@ -326,10 +241,7 @@ func (s *Subsystem) Start(parent context.Context) error {
 				}
 				continue
 			}
-			if profile.relay == nil {
-				continue
-			}
-			s.startRelay(ctx, profile)
+
 		}
 	}
 	return nil
@@ -445,25 +357,6 @@ func (s *Subsystem) consumerSDKMessageHandler(consumer *consumerRuntime) rmtrans
 	}
 }
 
-func (s *Subsystem) startRelay(ctx context.Context, profile *profileRuntime) {
-	s.wg.Add(1)
-	go func() {
-		defer s.wg.Done()
-		ticker := time.NewTicker(profile.interval)
-		defer ticker.Stop()
-		for {
-			if err := profile.relay.DispatchDue(ctx); err != nil && ctx.Err() == nil {
-				slog.Warn("event outbox relay failed", "profile", profile.name, "error", err)
-			}
-			select {
-			case <-ctx.Done():
-				return
-			case <-ticker.C:
-			}
-		}
-	}()
-}
-
 func (s *Subsystem) Close() error {
 	if s == nil {
 		return nil
@@ -504,15 +397,6 @@ func (s *Subsystem) Close() error {
 			if err != nil {
 				closeErrors = append(closeErrors, fmt.Errorf("drain event profile %s: %w", profiles[i].name, err))
 			}
-		}
-	}
-	for i := len(profiles) - 1; i >= 0; i-- {
-		profile := profiles[i]
-		if profile.reconciler != nil {
-			profile.reconciler.Close()
-		}
-		if profile.immediate != nil {
-			profile.immediate.Close()
 		}
 	}
 	for i := len(consumers) - 1; i >= 0; i-- {
@@ -602,8 +486,8 @@ func (s *Subsystem) runtimeStatusSnapshot() appEventing.RuntimeStatusSnapshot {
 	}
 	for profile, runtime := range s.profiles {
 		status := appEventing.ProfileRuntimeStatus{
-			Running: s.started && !s.closed, RelayEnabled: (runtime.relay != nil || runtime.run != nil) && s.publisher.IsMQBacked(),
-			ReconcilerEnabled: runtime.reconciler != nil, ImmediateEnabled: runtime.immediate != nil && s.publisher.IsMQBacked(),
+			Running: s.started && !s.closed, RelayEnabled: (runtime.run != nil) && s.publisher.IsMQBacked(),
+			ReconcilerEnabled: false, ImmediateEnabled: false,
 		}
 		if runtime.run != nil {
 			status.RelayKind = "sdk"
@@ -617,8 +501,7 @@ func (s *Subsystem) runtimeStatusSnapshot() appEventing.RuntimeStatusSnapshot {
 					status.ScanHealthy = &off
 				}
 			}
-		} else if runtime.relay != nil {
-			status.RelayKind = "legacy"
+
 		}
 		result.Profiles[profile] = status
 	}

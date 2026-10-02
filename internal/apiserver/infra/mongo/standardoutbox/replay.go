@@ -1,5 +1,3 @@
-//go:build reliable_messaging_m4
-
 // Package standardoutbox owns QS-specific governance for the SDK Mongo collection.
 // The standard Outbox and replay ledger remain in the host business database.
 package standardoutbox

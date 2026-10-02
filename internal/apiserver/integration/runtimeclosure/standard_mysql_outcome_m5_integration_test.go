@@ -149,7 +149,7 @@ func (d *standardClosureDelivery) Wait(t *testing.T, eventType string) (*messagi
 }
 
 // The same current-time business closure as the legacy baseline now selects
-// the standard MySQL profile. The report response is hidden once after a real
+// the standard MySQL profile alongside the required standard Mongo profile. The report response is hidden once after a real
 // gRPC/Mongo commit; NSQ redelivers the original Outcome to the original
 // Worker, which must reuse the one durable report and generated-report intent.
 func TestM5StandardMySQLOutcomeToReportAcrossNSQ(t *testing.T) {
@@ -169,7 +169,7 @@ func TestM5DualStandardProfilesCurrentBusinessClosure(t *testing.T) {
 }
 
 func newM5StandardMySQLEventSubsystem(t *testing.T, opts eventsubsystem.Options, sqlDB *sql.DB) (*eventsubsystem.Subsystem, runtimeClosureDelivery, error) {
-	return newM5StandardEventSubsystem(t, opts, sqlDB, false, false)
+	return newM5StandardEventSubsystem(t, opts, sqlDB, true, false)
 }
 
 func newM5StandardEventSubsystem(t *testing.T, opts eventsubsystem.Options, sqlDB *sql.DB, standardMongo, delayFirstFailure bool) (*eventsubsystem.Subsystem, runtimeClosureDelivery, error) {

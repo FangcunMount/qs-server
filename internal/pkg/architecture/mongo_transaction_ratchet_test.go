@@ -120,21 +120,23 @@ func TestTransactionalMongoRepositoriesDoNotBypassAdmissionPrimitives(t *testing
 	}
 }
 
-func TestMongoOutboxTransactionalStageUsesSessionAwareAdmissionPrimitive(t *testing.T) {
+func TestMongoOutboxTransactionalStageBindsOriginalSessionToSDK(t *testing.T) {
 	root := repoRoot(t)
-	path := filepath.Join(root, "internal/apiserver/infra/mongo/eventoutbox/store.go")
+	path := filepath.Join(root, "internal/apiserver/infra/mongo/standardoutbox/stager.go")
 	raw, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatal(err)
 	}
 	text := string(raw)
-	for _, raw := range []string{"s.coll.InsertMany(txCtx", "s.coll.InsertMany(ctx"} {
-		if strings.Contains(text, raw) {
-			t.Fatalf("%s bypasses session-aware transaction write primitive with %q", mustRel(t, root, path), raw)
+	for _, token := range []string{"StartSession(", "WithTransaction(", ".InsertMany(", ".InsertOne("} {
+		if strings.Contains(text, token) {
+			t.Fatalf("%s reintroduces host persistence %q", mustRel(t, root, path), token)
 		}
 	}
-	if !strings.Contains(text, "s.transactionWrites.InsertMany(") {
-		t.Fatalf("%s does not route transactional staging through BaseRepository", mustRel(t, root, path))
+	for _, token := range []string{"ctx.(mongo.SessionContext)", "sdkmongo.Bind(txCtx, s.collection)", "appender.Append(item.Message, when)"} {
+		if !strings.Contains(text, token) {
+			t.Fatalf("%s lost original transaction binding %q", mustRel(t, root, path), token)
+		}
 	}
 }
 

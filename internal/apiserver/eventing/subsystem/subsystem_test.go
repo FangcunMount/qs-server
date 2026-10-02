@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
-	"github.com/FangcunMount/qs-server/internal/pkg/eventing/runtime"
+	eventcatalog "github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
+	eventruntime "github.com/FangcunMount/qs-server/internal/pkg/eventing/runtime"
 	rmtransport "github.com/FangcunMount/reliable-messaging/transport"
 )
 
@@ -52,36 +52,22 @@ func (r *lifecycleRecorder) snapshot() []string {
 	return append([]string(nil), r.calls...)
 }
 
-type fakeReconciler struct {
-	name     string
-	recorder *lifecycleRecorder
-}
-
-func (r *fakeReconciler) Start(context.Context) { r.recorder.add("reconciler.start." + r.name) }
-func (r *fakeReconciler) Close()                { r.recorder.add("reconciler.close." + r.name) }
-
-type fakeImmediate struct {
-	name     string
-	recorder *lifecycleRecorder
-}
-
-func (i *fakeImmediate) Close() { i.recorder.add("immediate.close." + i.name) }
-
-type fakeRelay struct {
+type fakeRunner struct {
 	name     string
 	recorder *lifecycleRecorder
 	started  chan struct{}
-	once     sync.Once
 }
 
-func (r *fakeRelay) DispatchDue(ctx context.Context) error {
-	r.once.Do(func() {
-		r.recorder.add("relay.start." + r.name)
-		close(r.started)
-	})
+func (r *fakeRunner) Run(ctx context.Context) error {
+	r.recorder.add("run.start." + r.name)
+	close(r.started)
 	<-ctx.Done()
-	r.recorder.add("relay.stop." + r.name)
-	return ctx.Err()
+	r.recorder.add("run.stop." + r.name)
+	return nil
+}
+func (r *fakeRunner) Drain(context.Context) error {
+	r.recorder.add("drain." + r.name)
+	return nil
 }
 
 func loadCatalog(t *testing.T) *eventcatalog.Catalog {
@@ -152,16 +138,14 @@ func TestSubsystemStartCloseAreIdempotentAndSettleProjectionMessages(t *testing.
 
 func TestLoggingModeReportsProjectionConsumerDisabled(t *testing.T) {
 	recorder := &lifecycleRecorder{}
-	relay := &fakeRelay{name: "mongo", recorder: recorder, started: make(chan struct{})}
+	relay := &fakeRunner{name: "mongo", recorder: recorder, started: make(chan struct{})}
 	s, err := New(Options{Catalog: loadCatalog(t), PublisherMode: eventruntime.PublishModeLogging})
 	if err != nil {
 		t.Fatal(err)
 	}
 	s.profiles[eventcatalog.OutboxProfileMongoDomain] = &profileRuntime{
-		name:       "mongo",
-		relay:      relay,
-		reconciler: &fakeReconciler{name: "mongo", recorder: recorder},
-		interval:   time.Hour,
+		name: "mongo",
+		run:  relay.Run,
 	}
 	if err := s.Start(t.Context()); err != nil {
 		t.Fatalf("logging Start(): %v", err)
@@ -189,8 +173,8 @@ func TestLoggingModeReportsProjectionConsumerDisabled(t *testing.T) {
 
 func TestSubsystemStartsLifecycleInPhasesAndClosesProfilesInReverseOrder(t *testing.T) {
 	recorder := &lifecycleRecorder{}
-	mongoRelay := &fakeRelay{name: "mongo", recorder: recorder, started: make(chan struct{})}
-	assessmentRelay := &fakeRelay{name: "assessment", recorder: recorder, started: make(chan struct{})}
+	mongoRelay := &fakeRunner{name: "mongo", recorder: recorder, started: make(chan struct{})}
+	assessmentRelay := &fakeRunner{name: "assessment", recorder: recorder, started: make(chan struct{})}
 	s, err := New(Options{
 		Catalog: loadCatalog(t), PublisherMode: eventruntime.PublishModeMQ, WirePublisher: fakePublisher{},
 		Consumers: map[string]ConsumerOptions{hotRankConsumerID: {Enabled: false}},
@@ -199,16 +183,10 @@ func TestSubsystemStartsLifecycleInPhasesAndClosesProfilesInReverseOrder(t *test
 		t.Fatal(err)
 	}
 	s.profiles[eventcatalog.OutboxProfileMongoDomain] = &profileRuntime{
-		name: "mongo", relay: mongoRelay,
-		reconciler: &fakeReconciler{name: "mongo", recorder: recorder},
-		immediate:  &fakeImmediate{name: "mongo", recorder: recorder},
-		interval:   time.Hour,
+		name: "mongo", run: mongoRelay.Run, drain: mongoRelay.Drain, drainTimeout: time.Second,
 	}
 	s.profiles[eventcatalog.OutboxProfileAssessmentMySQL] = &profileRuntime{
-		name: "assessment", relay: assessmentRelay,
-		reconciler: &fakeReconciler{name: "assessment", recorder: recorder},
-		immediate:  &fakeImmediate{name: "assessment", recorder: recorder},
-		interval:   time.Hour,
+		name: "assessment", run: assessmentRelay.Run, drain: assessmentRelay.Drain, drainTimeout: time.Second,
 	}
 
 	if err := s.Start(t.Context()); err != nil {
@@ -217,11 +195,8 @@ func TestSubsystemStartsLifecycleInPhasesAndClosesProfilesInReverseOrder(t *test
 	<-mongoRelay.started
 	<-assessmentRelay.started
 	started := recorder.snapshot()
-	if len(started) < 4 || !reflect.DeepEqual(started[:2], []string{
-		"reconciler.start.mongo",
-		"reconciler.start.assessment",
-	}) {
-		t.Fatalf("start lifecycle = %v, want all reconcilers in profile order before relays", started)
+	if len(started) != 2 {
+		t.Fatalf("SDK runners did not both start: %v", started)
 	}
 
 	if err := s.Close(); err != nil {
@@ -234,11 +209,11 @@ func TestSubsystemStartsLifecycleInPhasesAndClosesProfilesInReverseOrder(t *test
 		}
 	}
 	closed := recorder.snapshot()
+	if len(closed) != 6 {
+		t.Fatalf("runners must stop before both drains: %v", closed)
+	}
 	wantSuffix := []string{
-		"reconciler.close.assessment",
-		"immediate.close.assessment",
-		"reconciler.close.mongo",
-		"immediate.close.mongo",
+		"drain.assessment", "drain.mongo",
 	}
 	if len(closed) < len(wantSuffix) || !reflect.DeepEqual(closed[len(closed)-len(wantSuffix):], wantSuffix) {
 		t.Fatalf("close lifecycle = %v, want suffix %v", closed, wantSuffix)

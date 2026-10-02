@@ -6,9 +6,6 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	actorctx "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/actorctx"
-	operatorDomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/operator"
-	mysqlActor "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/actor"
 	"io"
 	"log/slog"
 	"net"
@@ -17,6 +14,10 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	actorctx "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/actorctx"
+	operatorDomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/operator"
+	mysqlActor "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/actor"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -102,10 +103,7 @@ type runtimeClosureScenario struct {
 // Interpretation and report-wait using real application services,
 // repositories, durable outboxes and worker handlers.
 func TestCurrentRuntimeClosure(t *testing.T) {
-	runCurrentRuntimeClosure(t, func(_ *testing.T, opts eventsubsystem.Options, _ *sql.DB) (*eventsubsystem.Subsystem, runtimeClosureDelivery, error) {
-		subsystem, err := eventsubsystem.New(opts)
-		return subsystem, nil, err
-	})
+	runCurrentRuntimeClosure(t, newCapturedStandardEventSubsystem)
 }
 
 func runCurrentRuntimeClosure(t *testing.T, eventFactory runtimeClosureEventFactory, scenarios ...runtimeClosureScenario) {
@@ -350,9 +348,7 @@ func runCurrentRuntimeClosure(t *testing.T, eventFactory runtimeClosureEventFact
 	if err != nil {
 		t.Fatalf("consume answersheet.submitted: %v", err)
 	}
-	if delivery != nil && delivery.UsesStandardMongo() {
-		assertStandardMongoIntentPublished(t, mongoDB, eventcatalog.AnswerSheetSubmitted)
-	}
+	assertStandardMongoIntentPublished(t, mongoDB, eventcatalog.AnswerSheetSubmitted)
 	if scenario.beforeEvaluation != nil {
 		ready, resolveErr := assessmentService.ResolveAssessmentByAnswerSheetID(t.Context(), &evaluationpb.ResolveAssessmentByAnswerSheetIDRequest{AnswerSheetId: answerResponse.GetId()})
 		if resolveErr != nil || ready.GetAssessmentId() == 0 {
@@ -399,13 +395,13 @@ func runCurrentRuntimeClosure(t *testing.T, eventFactory runtimeClosureEventFact
 	}
 	assertRowCount(t, gormDB, "runtime_checkpoint", "scope = ? AND assessment_id = ?", wantRuns, "evaluation_run", evaluated.GetAssessmentId())
 	assertRowCount(t, gormDB, "evaluation_outcome", "assessment_id = ?", 1, evaluated.GetAssessmentId())
-	assertEvaluationIntentCount(t, gormDB, delivery != nil, eventcatalog.EvaluationOutcomeCommitted, 1)
+	assertEvaluationIntentCount(t, gormDB, true, eventcatalog.EvaluationOutcomeCommitted, 1)
 	if err := evaluationHandler(t.Context(), eventcatalog.EvaluationRequested, evaluationMessage.Payload); err != nil {
 		t.Fatalf("redeliver evaluation.requested: %v", err)
 	}
 	assertRowCount(t, gormDB, "runtime_checkpoint", "scope = ? AND assessment_id = ?", wantRuns, "evaluation_run", evaluated.GetAssessmentId())
 	assertRowCount(t, gormDB, "evaluation_outcome", "assessment_id = ?", 1, evaluated.GetAssessmentId())
-	assertEvaluationIntentCount(t, gormDB, delivery != nil, eventcatalog.EvaluationOutcomeCommitted, 1)
+	assertEvaluationIntentCount(t, gormDB, true, eventcatalog.EvaluationOutcomeCommitted, 1)
 	var outcomeMessage *messaging.Message
 	if delivery == nil {
 		outcomeMessage = capture.Wait(t, eventcatalog.EvaluationOutcomeCommitted)
@@ -416,7 +412,7 @@ func runCurrentRuntimeClosure(t *testing.T, eventFactory runtimeClosureEventFact
 	if err == nil {
 		t.Fatal("first outcome delivery must report the controlled lost gRPC response")
 	}
-	assertSingleCommittedReport(t, mongoDB, delivery != nil && delivery.UsesStandardMongo())
+	assertSingleCommittedReport(t, mongoDB, true)
 	if delivery == nil {
 		err = outcomeHandler(t.Context(), eventcatalog.EvaluationOutcomeCommitted, outcomeMessage.Payload)
 	} else {
@@ -429,7 +425,7 @@ func runCurrentRuntimeClosure(t *testing.T, eventFactory runtimeClosureEventFact
 	if err != nil {
 		t.Fatalf("redeliver evaluation.outcome.committed after lost response: %v", err)
 	}
-	assertSingleCommittedReport(t, mongoDB, delivery != nil && delivery.UsesStandardMongo())
+	assertSingleCommittedReport(t, mongoDB, true)
 	if reportClient.first == nil || reportClient.second == nil ||
 		reportClient.first.GetGenerationId() != reportClient.second.GetGenerationId() ||
 		reportClient.first.GetRunId() != reportClient.second.GetRunId() ||
@@ -460,9 +456,7 @@ func runCurrentRuntimeClosure(t *testing.T, eventFactory runtimeClosureEventFact
 	if err != nil {
 		t.Fatalf("consume interpretation.report.generated: %v", err)
 	}
-	if delivery != nil && delivery.UsesStandardMongo() {
-		assertStandardMongoIntentPublished(t, mongoDB, eventcatalog.InterpretationReportGenerated)
-	}
+	assertStandardMongoIntentPublished(t, mongoDB, eventcatalog.InterpretationReportGenerated)
 
 	replayed, err := answerService.SaveAnswerSheet(t.Context(), request)
 	if err != nil || replayed.GetId() != answerResponse.GetId() {

@@ -1,5 +1,3 @@
-//go:build reliable_messaging_m4
-
 package process
 
 import (
