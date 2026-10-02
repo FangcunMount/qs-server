@@ -1,0 +1,6 @@
+[
+  {
+    "dropIndexes": "answersheets",
+    "index": "idx_answersheet_hotrank_day"
+  }
+]

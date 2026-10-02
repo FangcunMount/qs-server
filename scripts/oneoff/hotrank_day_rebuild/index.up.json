@@ -1,0 +1,11 @@
+[
+  {
+    "createIndexes": "answersheets",
+    "indexes": [
+      {
+        "key": { "filled_at": 1, "domain_id": 1 },
+        "name": "idx_answersheet_hotrank_day"
+      }
+    ]
+  }
+]

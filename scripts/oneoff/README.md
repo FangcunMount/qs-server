@@ -43,6 +43,7 @@ AnswerSheet、提交幂等/Outbox 以及下游 Outcome/Report 的反向引用审
 | `cleanup_perf_testee_data` | 按显式 Testee ID dry-run、备份并且只清理 `origin_type=adhoc` 临时测评数据 |
 | `select_seeddata_duplicate_testees` | 只读识别 seeddata 重试产生的重复 Testee，并生成显式 Testee/Profile 清单 |
 | `rebuild_statistics` | 通过受保护 Run API 执行 validate、repair 或 publish |
+| `hotrank_day_rebuild` | 以完整 UTC+8 日的答卷受理事实及原 Outbox 摘要重建绝对计数和去重集；默认只读，写入须审计、同日租约和批准的完整源摘要 |
 | `repair_stranded_plan_tasks` | 审计、修复、验证及 CAS 回滚历史 stale pending 与 Task due_at |
 | `enroll_testees_after_date.py` | 按时间范围补录受试者关系 |
 | `govern_interpretation_presentation_profiles` | 以不可变 Artifact dimensions 和受保护 manifest 治理历史 presentation profile |
@@ -61,6 +62,43 @@ AnswerSheet、提交幂等/Outbox 以及下游 Outcome/Report 的反向引用审
 
 这两个 seed 只能用于问卷版本与内置映射完全一致的全新环境，不能覆盖现有 Model、
 Questionnaire 或 Norm。生产修复必须从当前发布快照导出真实映射，经校验后走正常导入和发布链路。
+
+## 热度日榜原事实恢复
+
+`hotrank_day_rebuild` 是 QS 的业务投影恢复工具，不会重排 Outbox、调用模型或发送微信。
+仅恢复保留窗口内的完整 UTC+8 日；不接受账号、机构或指定事件子集。
+使用同一 Mongo 主节点快照读取答卷元数据及对应原标准 Outbox，包含软删除的既有提交；
+所有原 UUID、作用域、冻结问卷版本、时间和消息摘要必须匹配。
+每日最多 1000 条；超过预算、遇到无持久受理标记的历史行、缺原消息或摘要冲突时整日拒绝，
+不能把分页或排除未知旧行的结果当完整源。旧 mock 另行隔离，不通过增量补计数处理。
+
+运行顺序如下（命令中的所有标识与摘要都须来自本轮核对）：
+
+1. 从已部署且支持同日恢复锁的 API 版本构建工具；核对生产全部热度写入者均已支持该锁。
+   旧 API 忽略恢复锁，回退到旧版前必须结束或等待当前锁到期，不能同时运行重建。
+2. 运行 `hotrank_day_rebuild --mode index-spec`，只读检查专用非 partial／非 sparse 的
+   `(filled_at,domain_id)` 索引与 `fingerprint`。缺该索引时只允许单独执行 `prepare-index`；
+   它不会改变 `schema_migrations`，不会在普通服务启动中隐式创建索引。
+   `index.down.json` 只删除该索引，是独立核验并授权的撤销参考，不由工具自动执行。
+3. 私有连接 JSON 通过 stdin 提供，禁止放入 argv 或公开日志；字段为 `mongo_uri`、
+   `mongo_db`、`redis_address`、显式 `redis_db`（0–15）、`redis_namespace`；可选 Redis
+   用户／密码及 `redis_tls`／`redis_server_name`。必须与现役 API 的 Mongo、Redis DB 和 namespace 一致。
+4. 必要时执行 `--mode prepare-index --day YYYYMMDD --request-id 原UUID --operator 值守身份
+   --expected-fingerprint 索引摘要 --audit-dir 既有私有绝对目录`；目录权限 0700，记录 0600。
+5. 默认 `--day YYYYMMDD` 为只读 `inspect`，保存完整事实数、绝对计数和源摘要。
+6. 执行 `--mode apply --day YYYYMMDD --request-id 本次原UUID --operator 值守身份
+   --expected-fingerprint 批准的源摘要 --audit-dir 私有目录`。先 fsync 操作意图，再取得同日
+   60 秒租约，重新捕获完整源。源变化即停止；25 秒命令超时，无自动重试 Redis 写请求。
+   实时消费者在锁内返回原事件重试，不写去重键；绝对日榜、原事件去重键与 Redis 回执一起写入。
+7. 保存本地 `UUID.intent.json`、`UUID.confirmed.json` 与标准输出回执。
+   连接信息只作为不含凭据的目标指纹，不写入审计。任何回应丢失或本地确认写失败，都先用
+   `--mode receipt --day YYYYMMDD --request-id 同一UUID` 查询原回执；使用同一请求及参数重试
+   只返回原结果，不覆盖随后产生的新计数。若 Redis 回执也丢失，按本地原意图和权威源人工核对，
+   不清除去重键、不新造请求、不盲目增加计数。
+
+重建是受控的完整日投影替换。Lua 提供命令间隔离，不保证任意 Redis 运行时故障回滚；
+输入／类型预检会在首次写入前拒绝冲突。存储故障后仍须查询原回执并复核完整投影。
+只读与索引创建权限、重建写权限须由运维账号按现有授权使用，不新增公开修复 HTTP 入口。
 
 ## 仓库验证
 
