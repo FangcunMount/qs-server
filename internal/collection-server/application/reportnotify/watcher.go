@@ -5,9 +5,9 @@ import (
 	"time"
 
 	"github.com/FangcunMount/component-base/pkg/logger"
-	"github.com/FangcunMount/component-base/pkg/signaling"
-	signalredis "github.com/FangcunMount/component-base/pkg/signaling/redis"
 	"github.com/FangcunMount/qs-server/internal/pkg/reportstatus"
+	"github.com/FangcunMount/reliable-messaging/signaling"
+	signalredis "github.com/FangcunMount/reliable-messaging/signaling/redis"
 )
 
 const watcherService = "collection-server"
