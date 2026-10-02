@@ -129,7 +129,7 @@ func TestEventingSharedPackagesKeepDependencyDirection(t *testing.T) {
 func TestCacheSignalContractStaysTransportAgnostic(t *testing.T) {
 	root := repoRoot(t)
 	forbiddenImports := []string{
-		"github.com/FangcunMount/component-base/pkg/signaling",
+		"github.com/FangcunMount/reliable-messaging/signaling",
 		"github.com/FangcunMount/qs-server/internal/pkg/redisruntime",
 		"github.com/FangcunMount/qs-server/internal/pkg/options",
 		"github.com/FangcunMount/qs-server/internal/pkg/reportstatus",

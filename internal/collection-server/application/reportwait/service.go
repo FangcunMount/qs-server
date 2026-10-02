@@ -6,11 +6,11 @@ import (
 	"time"
 
 	"github.com/FangcunMount/component-base/pkg/logger"
-	signalredis "github.com/FangcunMount/component-base/pkg/signaling/redis"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/evaluation"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/reportnotify"
 	appreportstatus "github.com/FangcunMount/qs-server/internal/collection-server/application/reportstatus"
 	"github.com/FangcunMount/qs-server/internal/pkg/reportstatus"
+	signalredis "github.com/FangcunMount/reliable-messaging/signaling/redis"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )

@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/FangcunMount/component-base/pkg/log"
-	signalredis "github.com/FangcunMount/component-base/pkg/signaling/redis"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/answersheet"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/evaluation"
 	appmodelcatalog "github.com/FangcunMount/qs-server/internal/collection-server/application/modelcatalog"
@@ -23,6 +22,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/collection-server/transport/ws"
 	genericoptions "github.com/FangcunMount/qs-server/internal/pkg/options"
 	"github.com/FangcunMount/qs-server/internal/pkg/reportstatus"
+	signalredis "github.com/FangcunMount/reliable-messaging/signaling/redis"
 )
 
 type submitRuntime struct {
