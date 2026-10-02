@@ -368,3 +368,67 @@ func TestDurableReminderClassifiesSuccessRejectionAndUnknownWithoutResend(t *tes
 		})
 	}
 }
+
+// Template lookup is an external dependency and can outlive the first IAM
+// eligibility read. Recheck the frozen identity before persisting a send marker.
+type recipientChangeDuringTemplateLookup struct {
+	*senderStub
+	change func()
+}
+
+func (s recipientChangeDuringTemplateLookup) ListTemplates(ctx context.Context, appID, secret string) ([]wechatmini.SubscribeTemplate, error) {
+	s.change()
+	return s.senderStub.ListTemplates(ctx, appID, secret)
+}
+
+func TestDurableReminderRechecksFrozenRecipientAfterTemplatePreparation(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		change  func(*reminderCandidateReaderStub)
+		want    ReminderDeliveryState
+		wantErr bool
+	}{
+		{"self_revoked", func(r *reminderCandidateReaderStub) { r.linked = nil }, ReminderSuppressed, false},
+		{"identity_disabled", func(r *reminderCandidateReaderStub) { r.candidates = nil }, ReminderSuppressed, false},
+		{"iam_unavailable", func(r *reminderCandidateReaderStub) { r.readErr = errors.New("IAM temporarily unavailable") }, ReminderPending, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			opened := time.Now().Add(-time.Minute).Round(time.Millisecond)
+			expires := opened.Add(24 * time.Hour)
+			task := &reminderTaskReaderStub{state: &planApp.TaskReminderState{OrgID: 7, TaskID: "task-1", TesteeID: "12", Status: planDomain.TaskStatusOpened, ScheduleRevision: 3, OpenAt: &opened, ExpireAt: &expires, EntryURL: "/pages/task/index?task_id=task-1"}}
+			profile := uint64(1001)
+			identities := &reminderCandidateReaderStub{linked: []iambridge.MiniProgramLinkedUser{{UserID: "self-user", Relations: []string{"self"}}}, candidates: []iambridge.MiniProgramRecipientCandidate{{UserID: "self-user", LoginIdentityID: "self-identity", AppID: "wx-app", OpenID: "fixture-openid", Relations: []string{"self"}}}}
+			batch := &reminderBatchStub{}
+			ledger := &reminderDeliveryStub{}
+			receipts := &receiptSenderStub{}
+			changed := false
+			templates := recipientChangeDuringTemplateLookup{senderStub: &senderStub{templates: []wechatmini.SubscribeTemplate{{ID: "tmpl-1", Content: "{{thing5.DATA}}{{date1.DATA}}{{character_string2.DATA}}{{thing3.DATA}}"}}}, change: func() {
+				if !changed {
+					changed = true
+					tc.change(identities)
+				}
+			}}
+			service := NewTaskOpenedReminderService(task, &testeeLookupStub{result: &testeeApp.TesteeResult{ID: 12, OrgID: 7, ProfileID: &profile}}, identities, batch, ledger, nil, templates, receipts, nil, nil, &Config{AppID: "wx-app", AppSecret: "fixture-only", PagePath: "pages/task/index", TaskOpenedTemplateID: "tmpl-1"})
+			request := TaskOpenedReminderRequest{OpeningEventID: "original-event", Intent: TaskOpenedReminderIntent{OrgID: 7, TaskID: "task-1", TesteeID: "12", ScheduleRevision: 3, OpenAt: opened}}
+			err := service.ProcessTaskOpenedReminder(t.Context(), request)
+			if tc.wantErr {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+			}
+			require.Zero(t, receipts.calls, "stale or unavailable IAM qualification must not send")
+			require.Zero(t, ledger.beginCount, "no external-call marker before final eligibility")
+			require.Equal(t, tc.want, ledger.state)
+			require.Equal(t, []ReminderRecipientIdentity{{UserID: "self-user", LoginIdentityID: "self-identity"}}, batch.batch.Recipients, "do not expand or rewrite the frozen recipient set")
+			if tc.wantErr {
+				identities.readErr = nil
+				identities.linked = append(identities.linked, iambridge.MiniProgramLinkedUser{UserID: "new-user", Relations: []string{"self"}})
+				identities.candidates = append(identities.candidates, iambridge.MiniProgramRecipientCandidate{UserID: "new-user", LoginIdentityID: "new-identity", AppID: "wx-app", OpenID: "new-fixture-openid", Relations: []string{"self"}})
+				require.NoError(t, service.ProcessTaskOpenedReminder(t.Context(), request))
+				require.Equal(t, 1, receipts.calls, "only the original frozen recipient resumes after IAM recovery")
+				require.Equal(t, ReminderConfirmed, ledger.state)
+			}
+
+		})
+	}
+}

@@ -192,28 +192,13 @@ func (s *taskOpenedReminderService) deliverOne(
 	if decision.SuppressCode != "" {
 		return unsent(decision.SuppressCode)
 	}
-	_, profileID, err := s.currentTestee(ctx, intent.OrgID, intent.TesteeID)
+	openID, suppressCode, err := s.currentRecipientOpenID(ctx, intent, batch, recipient)
 	if err != nil {
 		_ = unsent("")
 		return err
 	}
-	if profileID == "" {
-		return unsent("profile_missing")
-	}
-	candidates, err := ResolveSelfRecipientCandidates(ctx, s.identities, profileID, batch.AppID)
-	if err != nil {
-		_ = unsent("")
-		return err
-	}
-	var openID string
-	for _, candidate := range candidates {
-		if candidate.UserID == recipient.UserID && candidate.LoginIdentityID == recipient.LoginIdentityID {
-			openID = candidate.OpenID
-			break
-		}
-	}
-	if openID == "" {
-		return unsent("identity_no_longer_self")
+	if suppressCode != "" {
+		return unsent(suppressCode)
 	}
 	spec, err := renderer.loadTemplateSpec(ctx, batch.AppID, appSecret, batch.TemplateID)
 	if err != nil {
@@ -231,6 +216,17 @@ func (s *taskOpenedReminderService) deliverOne(
 	if message.Page == "" {
 		_ = unsent("")
 		return fmt.Errorf("reminder mini-program page path is missing")
+	}
+	// Template and rendering dependencies can outlive the first IAM read.
+	// Recheck only the frozen recipient; an outage leaves unsent responsibility
+	// retryable, while revoked qualification suppresses it before a call marker.
+	message.ToUser, suppressCode, err = s.currentRecipientOpenID(ctx, intent, batch, recipient)
+	if err != nil {
+		_ = unsent("")
+		return err
+	}
+	if suppressCode != "" {
+		return unsent(suppressCode)
 	}
 	// Template/IAM work may have delayed the send or changed the Task. Perform
 	// the final Task check immediately before crossing the external boundary.
@@ -321,6 +317,28 @@ func (s *taskOpenedReminderService) deliverOne(
 		return fmt.Errorf("reminder platform receipt could not be confirmed")
 	}
 	return nil
+}
+
+func (s *taskOpenedReminderService) currentRecipientOpenID(
+	ctx context.Context, intent TaskOpenedReminderIntent, batch ReminderBatch, recipient ReminderRecipientIdentity,
+) (string, string, error) {
+	_, profileID, err := s.currentTestee(ctx, intent.OrgID, intent.TesteeID)
+	if err != nil {
+		return "", "", err
+	}
+	if profileID == "" {
+		return "", "profile_missing", nil
+	}
+	candidates, err := ResolveSelfRecipientCandidates(ctx, s.identities, profileID, batch.AppID)
+	if err != nil {
+		return "", "", err
+	}
+	for _, candidate := range candidates {
+		if candidate.UserID == recipient.UserID && candidate.LoginIdentityID == recipient.LoginIdentityID {
+			return candidate.OpenID, "", nil
+		}
+	}
+	return "", "identity_no_longer_self", nil
 }
 
 func (s *taskOpenedReminderService) currentDecision(
