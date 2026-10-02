@@ -376,7 +376,8 @@ jobs:
           M6_HOTRANK_REDIS_ADDRESS: 127.0.0.1:6379
         run: |
           set -euo pipefail
-          export M6_HOTRANK_OWNER="$(python3 -c 'import uuid; print(uuid.uuid4())')"
+          M6_HOTRANK_OWNER="$(python3 -c 'import uuid; print(uuid.uuid4())')"
+          export M6_HOTRANK_OWNER
           export M6_HOTRANK_NSQ_CONTAINER="m6-hotrank-${M6_HOTRANK_OWNER}-nsq"
           nsq_volume="${M6_HOTRANK_NSQ_CONTAINER}-data"
           owner_label="m6-hotrank-proof-owner=${M6_HOTRANK_OWNER}"
@@ -405,7 +406,10 @@ jobs:
           go build -o "$M6_HOTRANK_TOOL" ./scripts/oneoff/hotrank_day_rebuild
           go test -tags='integration reliable_messaging_m4' -run '^TestHotRankDayRecoveryAfterActualNSQConfirmationLoss$' \
             -count=1 -timeout=2m -v ./internal/apiserver/integration/runtimeclosure | tee "${RUNNER_TEMP}/hotrank-recovery.log"
-          ! grep -q -- '--- SKIP:' "${RUNNER_TEMP}/hotrank-recovery.log"
+          if grep -q -- '--- SKIP:' "${RUNNER_TEMP}/hotrank-recovery.log"; then
+            echo 'Actual hot-rank recovery proof unexpectedly skipped' >&2
+            exit 1
+          fi
           grep -q -- '--- PASS: TestHotRankDayRecoveryAfterActualNSQConfirmationLoss' "${RUNNER_TEMP}/hotrank-recovery.log"
 
       - name: Stop Mongo Replica Set
