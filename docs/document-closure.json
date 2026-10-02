@@ -2,7 +2,7 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "dce4598a40664d1111f914eb2d2277243f9cb758",
+    "sha": "a02931131da362ba48915fe458b1e90d40651b36",
     "verified_on": "2026-10-02"
   },
   "status_policy": {
@@ -53,7 +53,7 @@
         "docs/_archive/**/*.md",
         "tmp/**/*.md"
       ],
-      "expected_count": 37,
+      "expected_count": 38,
       "budgeted": false
     }
   },
@@ -9342,6 +9342,45 @@
           "exit_criteria": "Review the test-only bridge and its explicit limits; preserve independent rollout gates."
         }
       ]
+    },
+    {
+      "path": "internal/pkg/eventing/runtime/testdata/README.md",
+      "class": "sidecar",
+      "owner": "infra",
+      "doc_status": "aligned",
+      "verified": {
+        "source_sha": "a02931131da362ba48915fe458b1e90d40651b36",
+        "verified_on": "2026-10-02"
+      },
+      "fact_sources": [
+        {
+          "kind": "source",
+          "path": "scripts/testing/capture-retired-wire-contracts.sh"
+        },
+        {
+          "kind": "source",
+          "path": "internal/pkg/eventing/runtime/retired_wire_fixture_test.go"
+        }
+      ],
+      "verification": [
+        {
+          "kind": "command",
+          "command": "go test -race ./internal/pkg/eventing/runtime",
+          "result": "passed",
+          "source_sha": "a02931131da362ba48915fe458b1e90d40651b36",
+          "verified_on": "2026-10-02"
+        }
+      ],
+      "production_evidence": {
+        "level": "none",
+        "refs": [],
+        "deployed_sha": null,
+        "observed_at": null,
+        "limitations": [
+          "Synthetic immutable wire fixtures do not prove production delivery or recovery."
+        ]
+      },
+      "gaps": []
     }
   ],
   "initial_review_baseline": {
