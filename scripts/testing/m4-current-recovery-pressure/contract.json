@@ -1,0 +1,59 @@
+{
+  "frozen_at": "2026-10-03T07:20:47.716932+08:00",
+  "scope": "Current QS baseline and recovery candidate; sustained NSQ publisher TCP outage, actual current SDK, not production/model capacity",
+  "old_head": "33248f27e5c2ed8d38655d3a886caba1772d3ef1",
+  "new_head": "374899420a9aa39b4fd711717e41a1c67497c0a8",
+  "sdk": "v0.3.0-m6.4",
+  "fixture_original_head": "a1bdea0feaae2a69e2ccdad53d449a5bbc2ef3c7",
+  "fixture_adaptations": [
+    "SDK legacy envelope value decoder replaces retired component-base message pointer decoder",
+    "current SDK wire publisher supplies current routing publisher port",
+    "removed retired legacy profile options from fixture assembly",
+    "runner seals each declared current runtime base; production runtime untouched by overlay"
+  ],
+  "batch_count": 2600,
+  "spacing_ms": 120,
+  "nsq_outage_after": 1300,
+  "minimum_input_span_seconds": 300,
+  "minimum_input_rate_per_second": 7,
+  "minimum_complete_samples": 20,
+  "minimum_sampling_span_seconds": 280,
+  "maximum_sampling_gap_seconds": 20,
+  "maximum_recovery_seconds": 120,
+  "cpu_max_percent_mysql_and_mongo": 150,
+  "memory_max_bytes_mysql_and_mongo": 1610612736,
+  "mysql_connections_max": 32,
+  "mysql_row_lock_waits_delta_max": 50,
+  "mongo_connections_max": 32,
+  "expected_before_recovery": {
+    "committed": 2600,
+    "published": 1300,
+    "durable_backlog": 1300
+  },
+  "expected_final": {
+    "unique_business_keys": 2600,
+    "unique_event_ids": 2600,
+    "published": 2600,
+    "NSQ_FIN": 2600,
+    "active_depth_inflight_deferred": 0
+  },
+  "same_runner_per_stream": true,
+  "fresh_disposable_dependencies_each_side": true,
+  "no_cpu_caps_or_budget_changes": true,
+  "runtime_guard": "tracked runtime remains exactly old_head/new_head; overlay hash and exact untracked allowlist checked before and after",
+  "effects": "answer: original current business transaction / Worker handler / gRPC / unique assessment and followup intent; assessment: original current Intake / handler with recording execution client, not model outcome",
+  "no_production_mutation": true,
+  "proof_does_not_close_all_M4_M5_M6": true,
+  "overlay_sha256": {
+    "internal/apiserver/container/internal/transaction/m4_07_mongo_command_metrics_test.go": "816b1f279e85dab3d9d82e29169d70bc374278e9f31efd74212b6ff9ed767632",
+    "internal/apiserver/container/internal/transaction/m4_07_mysql_command_metrics_test.go": "f4437be97b85b248867f04de42e6ae7639bf2f0f1653981a71b02572d5cc3da5",
+    "internal/apiserver/container/internal/transaction/m4_07_mysql_commit_observer_test.go": "45f96bf95880b9bec7f6b0148e95091b1fbe4c2298402283dfc41a20244a95d2",
+    "internal/apiserver/container/internal/transaction/m4_07_nsq_fault_proxy_test.go": "46b5747bc0e346f5c89522ee261397fb23765ab297cfde592a7aa430aa661312",
+    "internal/apiserver/container/internal/transaction/m4_new_answer_chain_integration_test.go": "5ce5815d20ebc189cd9160e0edde85e191dc09f7f5f614adff761b18d2b8e625",
+    "internal/apiserver/container/internal/transaction/m4_new_assessment_chain_integration_test.go": "127c74bb9c1a3f9b4fca4a42487acd6e52f03e60cc437661fd47943abf739fbf",
+    "internal/apiserver/domain/survey/answersheet/m4_07_event_id_proof.go": "249bb6778e82fd086d4bb2b3219e067e31fb10a9c85b08188d4fba9fe6c80d6a",
+    "scripts/testing/m4-07-new-chain-compose.yaml": "97822cbd545398363465ce864ecf7af06a2a57360ba6b10e7aca8f6ae7b22302",
+    "scripts/testing/m4-07-new-chain-proof.sh": "a25a4e633cbd840cb7832f54fac5b89649ab6e08ffceb49222e477222605d2a5",
+    "scripts/testing/m4-07-sample-resources.sh": "79eb56a36110f776bebeb9ea0824488a7faed982e534a8855a6eade6b2eb5d16"
+  }
+}

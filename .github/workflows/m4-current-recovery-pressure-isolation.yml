@@ -1,0 +1,102 @@
+name: M4 current recovery pressure isolation
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  pressure:
+    name: Current recovery pressure ${{ matrix.stream }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        stream: [answer, assessment]
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          path: harness
+          fetch-depth: 0
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.25.12'
+          cache-dependency-path: harness/go.sum
+      - name: Materialize sealed current runtimes and workload
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          mkdir -p proof
+          cp harness/scripts/testing/m4-current-recovery-pressure/contract.json proof/contract.json
+          printf '%s\n' "$GITHUB_SHA" > proof/harness-head.txt
+          python3 - <<'PYSEAL'
+          import json,hashlib,subprocess,shutil
+          from pathlib import Path
+          c=json.loads(Path('proof/contract.json').read_text())
+          for n,h in c['overlay_sha256'].items():
+              assert hashlib.sha256((Path('harness')/n).read_bytes()).hexdigest()==h,n
+          for side in ('old','new'):
+              head=c[side+'_head']
+              subprocess.run(['git','-C','harness','worktree','add','--detach',str(Path(side).resolve()),head],check=True)
+              for n in c['overlay_sha256']:
+                  target=Path(side)/n
+                  assert not target.exists(),n
+                  target.parent.mkdir(parents=True,exist_ok=True)
+                  shutil.copy2(Path('harness')/n,target)
+              Path('proof',side+'-source-head.txt').write_text(head+'\n')
+          PYSEAL
+      - name: Run baseline then candidate fixed sustained outage
+        shell: bash
+        env:
+          RM_QS_M407_STREAM: ${{ matrix.stream }}
+          RM_QS_M407_BATCH_COUNT: '2600'
+          RM_QS_M407_SPACING_MS: '120'
+          RM_QS_M407_NSQ_OUTAGE_AFTER: '1300'
+          TZ: Asia/Shanghai
+        run: |
+          set -Eeuo pipefail
+          combined=0
+          for side in old new; do
+            export RM_QS_M407_RUNTIME_BASE=$(cat "$GITHUB_WORKSPACE/proof/$side-source-head.txt")
+            export RM_QS_M407_METRICS_DIR="$GITHUB_WORKSPACE/proof/$side-${{ matrix.stream }}-metrics"
+            git -C "$side" diff --exit-code
+            (cd "$side" && go list -m github.com/FangcunMount/reliable-messaging) > "proof/$side-sdk.txt"
+            grep -qx 'github.com/FangcunMount/reliable-messaging v0.3.0-m6.4' "proof/$side-sdk.txt"
+            set +e
+            bash "$GITHUB_WORKSPACE/$side/scripts/testing/m4-07-new-chain-proof.sh" > "$GITHUB_WORKSPACE/proof/$side-${{ matrix.stream }}.log" 2>&1
+            result=$?
+            set -e
+            printf '%s\n' "$result" > "proof/$side-${{ matrix.stream }}.exit-code"
+            tail -n 8 "proof/$side-${{ matrix.stream }}.log"
+            if test "$result" != 0; then combined=1; fi
+          done
+          exit "$combined"
+      - name: Always verify runtime and disposable cleanup
+        if: always()
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          mkdir -p proof
+          docker ps -a --format '{{.Names}}' | grep '^qs-m4-07-' > proof/remaining-containers.txt || true
+          docker volume ls --format '{{.Name}}' | grep '^qs-m4-07-' > proof/remaining-volumes.txt || true
+          docker network ls --format '{{.Name}}' | grep '^qs-m4-07-' > proof/remaining-networks.txt || true
+          python3 - <<'PYCHECK'
+          import json,hashlib,subprocess
+          from pathlib import Path
+          c=json.loads(Path('proof/contract.json').read_text())
+          for side in ('old','new'):
+              subprocess.run(['git','-C',side,'diff','--exit-code'],check=True)
+              assert subprocess.check_output(['git','-C',side,'rev-parse','HEAD'],text=True).strip()==c[side+'_head']
+              untracked=subprocess.check_output(['git','-C',side,'ls-files','--others','--exclude-standard'],text=True).splitlines()
+              assert sorted(untracked)==sorted(c['overlay_sha256']),untracked
+              for n,h in c['overlay_sha256'].items():
+                  assert hashlib.sha256((Path(side)/n).read_bytes()).hexdigest()==h,(side,n)
+              Path('proof',side+'-runtime-and-overlay-verified.txt').write_text('verified\n')
+          for n in ('remaining-containers.txt','remaining-volumes.txt','remaining-networks.txt'):
+              assert Path('proof',n).stat().st_size==0,n
+          PYCHECK
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: m4-current-recovery-pressure-${{ matrix.stream }}
+          path: proof/
+          if-no-files-found: error
