@@ -162,7 +162,7 @@ func TestPersistentReportRuntimeReadbackWithoutFailureNotification(t *testing.T)
 	if err := mdb.CreateCollection(t.Context(), "rm_outbox"); err != nil {
 		t.Fatal(err)
 	}
-	wire, err := catalog.Load("../../../../../../configs/events.yaml")
+	wire, err := catalog.Load("../../../../../configs/events.yaml")
 	if err != nil {
 		t.Fatal(err)
 	}
