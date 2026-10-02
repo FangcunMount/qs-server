@@ -26,7 +26,8 @@ type StandardProfile struct {
 // NewWithStandardProfiles selects each profile before any consumer or relay
 // starts. A selected profile has no legacy immediate dispatcher, relay or
 // Redis reconciler, so the same business flow has one writer and one runner.
-// This candidate entry point is absent from normal builds.
+// Every available host database requires a complete standard binding; a
+// missing binding is a configuration error and never selects a legacy writer.
 func NewWithStandardProfiles(opts Options, replacements map[eventcatalog.OutboxProfile]StandardProfile) (*Subsystem, error) {
 	if len(replacements) == 0 {
 		return nil, fmt.Errorf("at least one standard profile is required")
@@ -66,15 +67,16 @@ func NewWithStandardProfiles(opts Options, replacements map[eventcatalog.OutboxP
 			status: replacement.Status,
 		}
 	}
-	if standard, ok := prepared[eventcatalog.OutboxProfileMongoDomain]; ok {
-		s.profiles[eventcatalog.OutboxProfileMongoDomain] = standard
-	} else if err := s.buildMongoProfile(opts); err != nil {
-		return nil, err
-	}
-	if standard, ok := prepared[eventcatalog.OutboxProfileAssessmentMySQL]; ok {
-		s.profiles[eventcatalog.OutboxProfileAssessmentMySQL] = standard
-	} else if err := s.buildAssessmentProfile(opts); err != nil {
-		return nil, err
+	for _, profile := range profileStartOrder {
+		_, available := standardProfileName(profile, opts)
+		if !available {
+			continue
+		}
+		standard, ok := prepared[profile]
+		if !ok {
+			return nil, fmt.Errorf("standard profile %q is required for its host database", profile)
+		}
+		s.profiles[profile] = standard
 	}
 	s.buildConsumers(opts.Consumers)
 	return s, nil

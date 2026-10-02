@@ -7,6 +7,7 @@ import (
 	"database/sql"
 	"errors"
 	"reflect"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -183,7 +184,7 @@ func TestStandardProfileReplacesWholeLegacyRuntimeBeforeStart(t *testing.T) {
 	}
 }
 
-func TestMongoOnlyStandardProfileKeepsLegacyAssessmentAndHotRankConsumer(t *testing.T) {
+func TestBothStandardProfilesKeepHotRankConsumer(t *testing.T) {
 	client, err := mongo.NewClient(options.Client().ApplyURI("mongodb://127.0.0.1:1"))
 	if err != nil {
 		t.Fatal(err)
@@ -221,6 +222,11 @@ func TestMongoOnlyStandardProfileKeepsLegacyAssessmentAndHotRankConsumer(t *test
 			Supervisor: supervisor, Drain: func(context.Context) error { return nil }, DrainTimeout: time.Second,
 			Status: appEventing.NamedOutboxStatusReader{Name: "mongo-domain-events", Reader: candidateStatusReader{}},
 		},
+		eventcatalog.OutboxProfileAssessmentMySQL: {
+			Binding:    appEventing.ProfileBinding{Stager: candidateStager{}, PostCommit: candidatePostCommit{}},
+			Supervisor: supervisor, Drain: func(context.Context) error { return nil }, DrainTimeout: time.Second,
+			Status: appEventing.NamedOutboxStatusReader{Name: "assessment-mysql-outbox", Reader: candidateStatusReader{}},
+		},
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -230,16 +236,12 @@ func TestMongoOnlyStandardProfileKeepsLegacyAssessmentAndHotRankConsumer(t *test
 		t.Fatalf("Mongo replacement retained a legacy runner: %+v", mongoProfile)
 	}
 	assessmentProfile := s.profiles[eventcatalog.OutboxProfileAssessmentMySQL]
-	if assessmentProfile.run != nil || assessmentProfile.relay == nil || assessmentProfile.immediate == nil || assessmentProfile.reconciler == nil {
-		t.Fatalf("unselected MySQL profile was replaced: %+v", assessmentProfile)
+	if assessmentProfile.run == nil || assessmentProfile.relay != nil || assessmentProfile.immediate != nil || assessmentProfile.reconciler != nil {
+		t.Fatalf("MySQL replacement retained a legacy runner: %+v", assessmentProfile)
 	}
 	if err := s.RegisterConsumer(hotRankConsumerID, func(context.Context, string, []byte) error { return nil }); err != nil {
 		t.Fatal(err)
 	}
-	// This test needs no live MySQL: the existing relay's presence is asserted
-	// above, while the start below verifies the independent subscriber wiring.
-	assessmentProfile.relay = nil
-	assessmentProfile.reconciler = nil
 	if err := s.Start(t.Context()); err != nil {
 		t.Fatal(err)
 	}
@@ -280,5 +282,47 @@ func TestStandardProfileDrainHasBoundedContext(t *testing.T) {
 	}
 	if err := s.Close(); !errors.Is(err, context.DeadlineExceeded) {
 		t.Fatalf("Close() error = %v, want bounded drain deadline", err)
+	}
+}
+
+// Missing standard bindings must fail before constructing a legacy store or
+// starting any runner. These database handles deliberately cannot do I/O.
+func TestStandardProfilesRejectMissingDatabaseBinding(t *testing.T) {
+	client, err := mongo.NewClient(options.Client().ApplyURI("mongodb://127.0.0.1:1"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	supervisor, err := standardoutbox.NewRelaySupervisor(standardoutbox.SupervisorOptions{
+		Name: "missing-profile", InitialBackoff: time.Millisecond, MaxBackoff: time.Second,
+		NewRelay: func(relay.Observer) (standardoutbox.RelayRunner, error) {
+			return candidateRunner(func(context.Context) error { t.Error("runner started before validation"); return nil }), nil
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, missing := range []eventcatalog.OutboxProfile{eventcatalog.OutboxProfileMongoDomain, eventcatalog.OutboxProfileAssessmentMySQL} {
+		t.Run(string(missing), func(t *testing.T) {
+			present := eventcatalog.OutboxProfileMongoDomain
+			name := "mongo-domain-events"
+			if missing == present {
+				present = eventcatalog.OutboxProfileAssessmentMySQL
+				name = "assessment-mysql-outbox"
+			}
+			s, err := NewWithStandardProfiles(Options{
+				Catalog: loadCatalog(t), MongoDB: client.Database("no_io"), MySQLDB: &gorm.DB{},
+				PublisherMode: eventruntime.PublishModeMQ, WirePublisher: fakePublisher{},
+			}, map[eventcatalog.OutboxProfile]StandardProfile{present: {
+				Binding:    appEventing.ProfileBinding{Stager: candidateStager{}, PostCommit: candidatePostCommit{}},
+				Supervisor: supervisor, Drain: func(context.Context) error { t.Error("unexpected drain"); return nil }, DrainTimeout: time.Second,
+				Status: appEventing.NamedOutboxStatusReader{Name: name, Reader: candidateStatusReader{}},
+			}})
+			if err == nil || s != nil {
+				t.Fatalf("missing %s accepted: subsystem=%v error=%v", missing, s, err)
+			}
+			if !strings.Contains(err.Error(), string(missing)) {
+				t.Fatalf("error does not identify missing profile: %v", err)
+			}
+		})
 	}
 }

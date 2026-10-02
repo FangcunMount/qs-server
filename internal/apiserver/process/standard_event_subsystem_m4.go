@@ -70,6 +70,14 @@ func buildM4StandardEventSubsystem(opts eventsubsystem.Options, cfg *config.Conf
 	if selected.Mongo && opts.MongoDB == nil || selected.Assessment && opts.MySQLDB == nil {
 		return nil, errors.New("M4 standard outbox requires its host database")
 	}
+	// Retirement forbids a mixed standard/legacy writer set. Validate before
+	// storage preflight or acquiring the shared publisher resource.
+	if opts.MongoDB != nil && !selected.Mongo {
+		return nil, errors.New("standard Mongo outbox is required for its host database")
+	}
+	if opts.MySQLDB != nil && !selected.Assessment {
+		return nil, errors.New("standard assessment outbox is required for its host database")
+	}
 	registry, err := eventcatalog.NewEffectiveRegistry(opts.Catalog, eventcatalog.DefaultSpecs())
 	if err != nil {
 		return nil, err
