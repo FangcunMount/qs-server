@@ -3578,13 +3578,17 @@ def priority_infrastructure_doc_contract_issues() -> list[Issue]:
                 )
 
     go_mod = (ROOT / "go.mod").read_text(encoding="utf-8")
-    # v0.6.11 retains the physical delivery ID and terminal handoff order.
-    # Its shared handoff group is opt-in; the empty option keeps old naming.
-    if not re.search(r"^\s*github\.com/FangcunMount/component-base\s+v0\.6\.11\s*$", go_mod, flags=re.M):
+    # The current subscriber and terminal handoff belong to the fixed SDK.
+    # component-base v0.7.0 has no messaging packages; the old v0.6.11
+    # contract is exercised only by independently built historical fixtures.
+    if not (
+        re.search(r"^\s*github\.com/FangcunMount/reliable-messaging\s+v0\.3\.0-m6\.3\s*$", go_mod, flags=re.M)
+        and re.search(r"^\s*github\.com/FangcunMount/component-base\s+v0\.7\.0\s*$", go_mod, flags=re.M)
+    ):
         issues.append(
             Issue(
                 "priority-event-provider-dependency-drift",
-                "component-base version changed; re-audit terminal handoff before updating the docs",
+                "SDK/retired component version changed; re-audit terminal handoff before updating the docs",
             )
         )
 
