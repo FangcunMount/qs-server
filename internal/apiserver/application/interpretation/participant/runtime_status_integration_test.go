@@ -11,6 +11,7 @@ import (
 	"time"
 
 	basegrpc "github.com/FangcunMount/component-base/pkg/grpc/interceptors"
+	evalerrors "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/apperrors"
 	evaloutcome "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome"
 	automation "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/automation"
 	execution "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/automation/execution"
@@ -77,7 +78,7 @@ func (a sqlRuntimeOwnership) AuthorizeOwnAssessment(ctx context.Context, testee,
 		return e
 	}
 	if v == nil || v.TesteeID() != testee {
-		return status.Error(codes.PermissionDenied, "not owned")
+		return evalerrors.PermissionDenied("not owned")
 	}
 	return nil
 }
