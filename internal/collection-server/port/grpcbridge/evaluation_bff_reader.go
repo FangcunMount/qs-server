@@ -133,3 +133,18 @@ func (r *EvaluationBFFReader) ResolveAssessmentReadiness(ctx context.Context, an
 	}
 	return r.intake.ResolveAssessmentByAnswerSheetID(ctx, answerSheetID)
 }
+
+func (r *EvaluationBFFReader) GetAssessmentReportStatus(ctx context.Context, testeeID, assessmentID uint64) (*evaluation.ReportRuntimeStatusResponse, error) {
+	if r == nil || r.reports == nil {
+		return nil, fmt.Errorf("report runtime reader is not configured")
+	}
+	reader, ok := r.reports.(ParticipantReportRuntimeReader)
+	if !ok {
+		return nil, fmt.Errorf("report runtime reader is not configured")
+	}
+	out, err := reader.GetAssessmentReportStatus(ctx, testeeID, assessmentID)
+	if err != nil || out == nil {
+		return nil, err
+	}
+	return &evaluation.ReportRuntimeStatusResponse{Attempt: out.Attempt, Status: out.Status, RetryDisposition: out.RetryDisposition}, nil
+}

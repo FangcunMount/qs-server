@@ -670,6 +670,74 @@ func (x *GetAssessmentReportResponse) GetReport() *AssessmentReport {
 	return nil
 }
 
+type GetAssessmentReportStatusResponse struct {
+	state            protoimpl.MessageState `protogen:"open.v1"`
+	Exists           bool                   `protobuf:"varint,1,opt,name=exists,proto3" json:"exists,omitempty"`
+	Status           string                 `protobuf:"bytes,2,opt,name=status,proto3" json:"status,omitempty"`
+	Attempt          int32                  `protobuf:"varint,3,opt,name=attempt,proto3" json:"attempt,omitempty"`
+	RetryDisposition string                 `protobuf:"bytes,4,opt,name=retry_disposition,json=retryDisposition,proto3" json:"retry_disposition,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
+}
+
+func (x *GetAssessmentReportStatusResponse) Reset() {
+	*x = GetAssessmentReportStatusResponse{}
+	mi := &file_interpretation_interpretation_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetAssessmentReportStatusResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetAssessmentReportStatusResponse) ProtoMessage() {}
+
+func (x *GetAssessmentReportStatusResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_interpretation_interpretation_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetAssessmentReportStatusResponse.ProtoReflect.Descriptor instead.
+func (*GetAssessmentReportStatusResponse) Descriptor() ([]byte, []int) {
+	return file_interpretation_interpretation_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *GetAssessmentReportStatusResponse) GetExists() bool {
+	if x != nil {
+		return x.Exists
+	}
+	return false
+}
+
+func (x *GetAssessmentReportStatusResponse) GetStatus() string {
+	if x != nil {
+		return x.Status
+	}
+	return ""
+}
+
+func (x *GetAssessmentReportStatusResponse) GetAttempt() int32 {
+	if x != nil {
+		return x.Attempt
+	}
+	return 0
+}
+
+func (x *GetAssessmentReportStatusResponse) GetRetryDisposition() string {
+	if x != nil {
+		return x.RetryDisposition
+	}
+	return ""
+}
+
 type ListMyReportsRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	TesteeId      uint64                 `protobuf:"varint,1,opt,name=testee_id,json=testeeId,proto3" json:"testee_id,omitempty"`
@@ -681,7 +749,7 @@ type ListMyReportsRequest struct {
 
 func (x *ListMyReportsRequest) Reset() {
 	*x = ListMyReportsRequest{}
-	mi := &file_interpretation_interpretation_proto_msgTypes[8]
+	mi := &file_interpretation_interpretation_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -693,7 +761,7 @@ func (x *ListMyReportsRequest) String() string {
 func (*ListMyReportsRequest) ProtoMessage() {}
 
 func (x *ListMyReportsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_interpretation_interpretation_proto_msgTypes[8]
+	mi := &file_interpretation_interpretation_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -706,7 +774,7 @@ func (x *ListMyReportsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListMyReportsRequest.ProtoReflect.Descriptor instead.
 func (*ListMyReportsRequest) Descriptor() ([]byte, []int) {
-	return file_interpretation_interpretation_proto_rawDescGZIP(), []int{8}
+	return file_interpretation_interpretation_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *ListMyReportsRequest) GetTesteeId() uint64 {
@@ -743,7 +811,7 @@ type ListMyReportsResponse struct {
 
 func (x *ListMyReportsResponse) Reset() {
 	*x = ListMyReportsResponse{}
-	mi := &file_interpretation_interpretation_proto_msgTypes[9]
+	mi := &file_interpretation_interpretation_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -755,7 +823,7 @@ func (x *ListMyReportsResponse) String() string {
 func (*ListMyReportsResponse) ProtoMessage() {}
 
 func (x *ListMyReportsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_interpretation_interpretation_proto_msgTypes[9]
+	mi := &file_interpretation_interpretation_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -768,7 +836,7 @@ func (x *ListMyReportsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListMyReportsResponse.ProtoReflect.Descriptor instead.
 func (*ListMyReportsResponse) Descriptor() ([]byte, []int) {
-	return file_interpretation_interpretation_proto_rawDescGZIP(), []int{9}
+	return file_interpretation_interpretation_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *ListMyReportsResponse) GetItems() []*AssessmentReport {
@@ -816,7 +884,7 @@ type GenerateReportFromAssessmentRequest struct {
 
 func (x *GenerateReportFromAssessmentRequest) Reset() {
 	*x = GenerateReportFromAssessmentRequest{}
-	mi := &file_interpretation_interpretation_proto_msgTypes[10]
+	mi := &file_interpretation_interpretation_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -828,7 +896,7 @@ func (x *GenerateReportFromAssessmentRequest) String() string {
 func (*GenerateReportFromAssessmentRequest) ProtoMessage() {}
 
 func (x *GenerateReportFromAssessmentRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_interpretation_interpretation_proto_msgTypes[10]
+	mi := &file_interpretation_interpretation_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -841,7 +909,7 @@ func (x *GenerateReportFromAssessmentRequest) ProtoReflect() protoreflect.Messag
 
 // Deprecated: Use GenerateReportFromAssessmentRequest.ProtoReflect.Descriptor instead.
 func (*GenerateReportFromAssessmentRequest) Descriptor() ([]byte, []int) {
-	return file_interpretation_interpretation_proto_rawDescGZIP(), []int{10}
+	return file_interpretation_interpretation_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *GenerateReportFromAssessmentRequest) GetAssessmentId() uint64 {
@@ -867,7 +935,7 @@ type GenerateReportFromOutcomeRequest struct {
 
 func (x *GenerateReportFromOutcomeRequest) Reset() {
 	*x = GenerateReportFromOutcomeRequest{}
-	mi := &file_interpretation_interpretation_proto_msgTypes[11]
+	mi := &file_interpretation_interpretation_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -879,7 +947,7 @@ func (x *GenerateReportFromOutcomeRequest) String() string {
 func (*GenerateReportFromOutcomeRequest) ProtoMessage() {}
 
 func (x *GenerateReportFromOutcomeRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_interpretation_interpretation_proto_msgTypes[11]
+	mi := &file_interpretation_interpretation_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -892,7 +960,7 @@ func (x *GenerateReportFromOutcomeRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GenerateReportFromOutcomeRequest.ProtoReflect.Descriptor instead.
 func (*GenerateReportFromOutcomeRequest) Descriptor() ([]byte, []int) {
-	return file_interpretation_interpretation_proto_rawDescGZIP(), []int{11}
+	return file_interpretation_interpretation_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *GenerateReportFromOutcomeRequest) GetOutcomeId() string {
@@ -927,7 +995,7 @@ type GenerateReportFromAssessmentResponse struct {
 
 func (x *GenerateReportFromAssessmentResponse) Reset() {
 	*x = GenerateReportFromAssessmentResponse{}
-	mi := &file_interpretation_interpretation_proto_msgTypes[12]
+	mi := &file_interpretation_interpretation_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -939,7 +1007,7 @@ func (x *GenerateReportFromAssessmentResponse) String() string {
 func (*GenerateReportFromAssessmentResponse) ProtoMessage() {}
 
 func (x *GenerateReportFromAssessmentResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_interpretation_interpretation_proto_msgTypes[12]
+	mi := &file_interpretation_interpretation_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -952,7 +1020,7 @@ func (x *GenerateReportFromAssessmentResponse) ProtoReflect() protoreflect.Messa
 
 // Deprecated: Use GenerateReportFromAssessmentResponse.ProtoReflect.Descriptor instead.
 func (*GenerateReportFromAssessmentResponse) Descriptor() ([]byte, []int) {
-	return file_interpretation_interpretation_proto_rawDescGZIP(), []int{12}
+	return file_interpretation_interpretation_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *GenerateReportFromAssessmentResponse) GetSuccess() bool {
@@ -1084,7 +1152,7 @@ type AIExplanationEvidenceRef struct {
 
 func (x *AIExplanationEvidenceRef) Reset() {
 	*x = AIExplanationEvidenceRef{}
-	mi := &file_interpretation_interpretation_proto_msgTypes[13]
+	mi := &file_interpretation_interpretation_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1096,7 +1164,7 @@ func (x *AIExplanationEvidenceRef) String() string {
 func (*AIExplanationEvidenceRef) ProtoMessage() {}
 
 func (x *AIExplanationEvidenceRef) ProtoReflect() protoreflect.Message {
-	mi := &file_interpretation_interpretation_proto_msgTypes[13]
+	mi := &file_interpretation_interpretation_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1109,7 +1177,7 @@ func (x *AIExplanationEvidenceRef) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AIExplanationEvidenceRef.ProtoReflect.Descriptor instead.
 func (*AIExplanationEvidenceRef) Descriptor() ([]byte, []int) {
-	return file_interpretation_interpretation_proto_rawDescGZIP(), []int{13}
+	return file_interpretation_interpretation_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *AIExplanationEvidenceRef) GetKind() string {
@@ -1139,7 +1207,7 @@ type AIExplanationIntegratedInsight struct {
 
 func (x *AIExplanationIntegratedInsight) Reset() {
 	*x = AIExplanationIntegratedInsight{}
-	mi := &file_interpretation_interpretation_proto_msgTypes[14]
+	mi := &file_interpretation_interpretation_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1151,7 +1219,7 @@ func (x *AIExplanationIntegratedInsight) String() string {
 func (*AIExplanationIntegratedInsight) ProtoMessage() {}
 
 func (x *AIExplanationIntegratedInsight) ProtoReflect() protoreflect.Message {
-	mi := &file_interpretation_interpretation_proto_msgTypes[14]
+	mi := &file_interpretation_interpretation_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1164,7 +1232,7 @@ func (x *AIExplanationIntegratedInsight) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AIExplanationIntegratedInsight.ProtoReflect.Descriptor instead.
 func (*AIExplanationIntegratedInsight) Descriptor() ([]byte, []int) {
-	return file_interpretation_interpretation_proto_rawDescGZIP(), []int{14}
+	return file_interpretation_interpretation_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *AIExplanationIntegratedInsight) GetKind() string {
@@ -1219,7 +1287,7 @@ type AIExplanationSuggestion struct {
 
 func (x *AIExplanationSuggestion) Reset() {
 	*x = AIExplanationSuggestion{}
-	mi := &file_interpretation_interpretation_proto_msgTypes[15]
+	mi := &file_interpretation_interpretation_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1231,7 +1299,7 @@ func (x *AIExplanationSuggestion) String() string {
 func (*AIExplanationSuggestion) ProtoMessage() {}
 
 func (x *AIExplanationSuggestion) ProtoReflect() protoreflect.Message {
-	mi := &file_interpretation_interpretation_proto_msgTypes[15]
+	mi := &file_interpretation_interpretation_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1244,7 +1312,7 @@ func (x *AIExplanationSuggestion) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AIExplanationSuggestion.ProtoReflect.Descriptor instead.
 func (*AIExplanationSuggestion) Descriptor() ([]byte, []int) {
-	return file_interpretation_interpretation_proto_rawDescGZIP(), []int{15}
+	return file_interpretation_interpretation_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *AIExplanationSuggestion) GetOrigin() string {
@@ -1323,7 +1391,7 @@ type AIExplanationContent struct {
 
 func (x *AIExplanationContent) Reset() {
 	*x = AIExplanationContent{}
-	mi := &file_interpretation_interpretation_proto_msgTypes[16]
+	mi := &file_interpretation_interpretation_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1335,7 +1403,7 @@ func (x *AIExplanationContent) String() string {
 func (*AIExplanationContent) ProtoMessage() {}
 
 func (x *AIExplanationContent) ProtoReflect() protoreflect.Message {
-	mi := &file_interpretation_interpretation_proto_msgTypes[16]
+	mi := &file_interpretation_interpretation_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1348,7 +1416,7 @@ func (x *AIExplanationContent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AIExplanationContent.ProtoReflect.Descriptor instead.
 func (*AIExplanationContent) Descriptor() ([]byte, []int) {
-	return file_interpretation_interpretation_proto_rawDescGZIP(), []int{16}
+	return file_interpretation_interpretation_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *AIExplanationContent) GetSchemaVersion() string {
@@ -1399,7 +1467,7 @@ type RequestAIWorkflowRequest struct {
 
 func (x *RequestAIWorkflowRequest) Reset() {
 	*x = RequestAIWorkflowRequest{}
-	mi := &file_interpretation_interpretation_proto_msgTypes[17]
+	mi := &file_interpretation_interpretation_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1411,7 +1479,7 @@ func (x *RequestAIWorkflowRequest) String() string {
 func (*RequestAIWorkflowRequest) ProtoMessage() {}
 
 func (x *RequestAIWorkflowRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_interpretation_interpretation_proto_msgTypes[17]
+	mi := &file_interpretation_interpretation_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1424,7 +1492,7 @@ func (x *RequestAIWorkflowRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RequestAIWorkflowRequest.ProtoReflect.Descriptor instead.
 func (*RequestAIWorkflowRequest) Descriptor() ([]byte, []int) {
-	return file_interpretation_interpretation_proto_rawDescGZIP(), []int{17}
+	return file_interpretation_interpretation_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *RequestAIWorkflowRequest) GetTesteeId() uint64 {
@@ -1465,7 +1533,7 @@ type AIWorkflowAccepted struct {
 
 func (x *AIWorkflowAccepted) Reset() {
 	*x = AIWorkflowAccepted{}
-	mi := &file_interpretation_interpretation_proto_msgTypes[18]
+	mi := &file_interpretation_interpretation_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1477,7 +1545,7 @@ func (x *AIWorkflowAccepted) String() string {
 func (*AIWorkflowAccepted) ProtoMessage() {}
 
 func (x *AIWorkflowAccepted) ProtoReflect() protoreflect.Message {
-	mi := &file_interpretation_interpretation_proto_msgTypes[18]
+	mi := &file_interpretation_interpretation_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1490,7 +1558,7 @@ func (x *AIWorkflowAccepted) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AIWorkflowAccepted.ProtoReflect.Descriptor instead.
 func (*AIWorkflowAccepted) Descriptor() ([]byte, []int) {
-	return file_interpretation_interpretation_proto_rawDescGZIP(), []int{18}
+	return file_interpretation_interpretation_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *AIWorkflowAccepted) GetRequestId() string {
@@ -1519,7 +1587,7 @@ type AIWorkflowAccessRequest struct {
 
 func (x *AIWorkflowAccessRequest) Reset() {
 	*x = AIWorkflowAccessRequest{}
-	mi := &file_interpretation_interpretation_proto_msgTypes[19]
+	mi := &file_interpretation_interpretation_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1531,7 +1599,7 @@ func (x *AIWorkflowAccessRequest) String() string {
 func (*AIWorkflowAccessRequest) ProtoMessage() {}
 
 func (x *AIWorkflowAccessRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_interpretation_interpretation_proto_msgTypes[19]
+	mi := &file_interpretation_interpretation_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1544,7 +1612,7 @@ func (x *AIWorkflowAccessRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AIWorkflowAccessRequest.ProtoReflect.Descriptor instead.
 func (*AIWorkflowAccessRequest) Descriptor() ([]byte, []int) {
-	return file_interpretation_interpretation_proto_rawDescGZIP(), []int{19}
+	return file_interpretation_interpretation_proto_rawDescGZIP(), []int{20}
 }
 
 func (x *AIWorkflowAccessRequest) GetOrgId() string {
@@ -1583,7 +1651,7 @@ type AIWorkflowAccessResponse struct {
 
 func (x *AIWorkflowAccessResponse) Reset() {
 	*x = AIWorkflowAccessResponse{}
-	mi := &file_interpretation_interpretation_proto_msgTypes[20]
+	mi := &file_interpretation_interpretation_proto_msgTypes[21]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1595,7 +1663,7 @@ func (x *AIWorkflowAccessResponse) String() string {
 func (*AIWorkflowAccessResponse) ProtoMessage() {}
 
 func (x *AIWorkflowAccessResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_interpretation_interpretation_proto_msgTypes[20]
+	mi := &file_interpretation_interpretation_proto_msgTypes[21]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1608,7 +1676,7 @@ func (x *AIWorkflowAccessResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AIWorkflowAccessResponse.ProtoReflect.Descriptor instead.
 func (*AIWorkflowAccessResponse) Descriptor() ([]byte, []int) {
-	return file_interpretation_interpretation_proto_rawDescGZIP(), []int{20}
+	return file_interpretation_interpretation_proto_rawDescGZIP(), []int{21}
 }
 
 // Reads the current QS projection after participant authorization. No legacy generation ID.
@@ -1623,7 +1691,7 @@ type GetAIWorkflowRequest struct {
 
 func (x *GetAIWorkflowRequest) Reset() {
 	*x = GetAIWorkflowRequest{}
-	mi := &file_interpretation_interpretation_proto_msgTypes[21]
+	mi := &file_interpretation_interpretation_proto_msgTypes[22]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1635,7 +1703,7 @@ func (x *GetAIWorkflowRequest) String() string {
 func (*GetAIWorkflowRequest) ProtoMessage() {}
 
 func (x *GetAIWorkflowRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_interpretation_interpretation_proto_msgTypes[21]
+	mi := &file_interpretation_interpretation_proto_msgTypes[22]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1648,7 +1716,7 @@ func (x *GetAIWorkflowRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetAIWorkflowRequest.ProtoReflect.Descriptor instead.
 func (*GetAIWorkflowRequest) Descriptor() ([]byte, []int) {
-	return file_interpretation_interpretation_proto_rawDescGZIP(), []int{21}
+	return file_interpretation_interpretation_proto_rawDescGZIP(), []int{22}
 }
 
 func (x *GetAIWorkflowRequest) GetTesteeId() uint64 {
@@ -1691,7 +1759,7 @@ type AIWorkflowResult struct {
 
 func (x *AIWorkflowResult) Reset() {
 	*x = AIWorkflowResult{}
-	mi := &file_interpretation_interpretation_proto_msgTypes[22]
+	mi := &file_interpretation_interpretation_proto_msgTypes[23]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1703,7 +1771,7 @@ func (x *AIWorkflowResult) String() string {
 func (*AIWorkflowResult) ProtoMessage() {}
 
 func (x *AIWorkflowResult) ProtoReflect() protoreflect.Message {
-	mi := &file_interpretation_interpretation_proto_msgTypes[22]
+	mi := &file_interpretation_interpretation_proto_msgTypes[23]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1716,7 +1784,7 @@ func (x *AIWorkflowResult) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AIWorkflowResult.ProtoReflect.Descriptor instead.
 func (*AIWorkflowResult) Descriptor() ([]byte, []int) {
-	return file_interpretation_interpretation_proto_rawDescGZIP(), []int{22}
+	return file_interpretation_interpretation_proto_rawDescGZIP(), []int{23}
 }
 
 func (x *AIWorkflowResult) GetRequestId() string {
@@ -1793,7 +1861,7 @@ type GetAIWorkflowSourceRequest struct {
 
 func (x *GetAIWorkflowSourceRequest) Reset() {
 	*x = GetAIWorkflowSourceRequest{}
-	mi := &file_interpretation_interpretation_proto_msgTypes[23]
+	mi := &file_interpretation_interpretation_proto_msgTypes[24]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1805,7 +1873,7 @@ func (x *GetAIWorkflowSourceRequest) String() string {
 func (*GetAIWorkflowSourceRequest) ProtoMessage() {}
 
 func (x *GetAIWorkflowSourceRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_interpretation_interpretation_proto_msgTypes[23]
+	mi := &file_interpretation_interpretation_proto_msgTypes[24]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1818,7 +1886,7 @@ func (x *GetAIWorkflowSourceRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetAIWorkflowSourceRequest.ProtoReflect.Descriptor instead.
 func (*GetAIWorkflowSourceRequest) Descriptor() ([]byte, []int) {
-	return file_interpretation_interpretation_proto_rawDescGZIP(), []int{23}
+	return file_interpretation_interpretation_proto_rawDescGZIP(), []int{24}
 }
 
 func (x *GetAIWorkflowSourceRequest) GetTesteeId() uint64 {
@@ -1847,7 +1915,7 @@ type AIWorkflowSource struct {
 
 func (x *AIWorkflowSource) Reset() {
 	*x = AIWorkflowSource{}
-	mi := &file_interpretation_interpretation_proto_msgTypes[24]
+	mi := &file_interpretation_interpretation_proto_msgTypes[25]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1859,7 +1927,7 @@ func (x *AIWorkflowSource) String() string {
 func (*AIWorkflowSource) ProtoMessage() {}
 
 func (x *AIWorkflowSource) ProtoReflect() protoreflect.Message {
-	mi := &file_interpretation_interpretation_proto_msgTypes[24]
+	mi := &file_interpretation_interpretation_proto_msgTypes[25]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1872,7 +1940,7 @@ func (x *AIWorkflowSource) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AIWorkflowSource.ProtoReflect.Descriptor instead.
 func (*AIWorkflowSource) Descriptor() ([]byte, []int) {
-	return file_interpretation_interpretation_proto_rawDescGZIP(), []int{24}
+	return file_interpretation_interpretation_proto_rawDescGZIP(), []int{25}
 }
 
 func (x *AIWorkflowSource) GetStatus() string {
@@ -1914,7 +1982,7 @@ type AIEligibility struct {
 
 func (x *AIEligibility) Reset() {
 	*x = AIEligibility{}
-	mi := &file_interpretation_interpretation_proto_msgTypes[25]
+	mi := &file_interpretation_interpretation_proto_msgTypes[26]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1926,7 +1994,7 @@ func (x *AIEligibility) String() string {
 func (*AIEligibility) ProtoMessage() {}
 
 func (x *AIEligibility) ProtoReflect() protoreflect.Message {
-	mi := &file_interpretation_interpretation_proto_msgTypes[25]
+	mi := &file_interpretation_interpretation_proto_msgTypes[26]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1939,7 +2007,7 @@ func (x *AIEligibility) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AIEligibility.ProtoReflect.Descriptor instead.
 func (*AIEligibility) Descriptor() ([]byte, []int) {
-	return file_interpretation_interpretation_proto_rawDescGZIP(), []int{25}
+	return file_interpretation_interpretation_proto_rawDescGZIP(), []int{26}
 }
 
 func (x *AIEligibility) GetStatus() string {
@@ -2037,7 +2105,12 @@ const file_interpretation_interpretation_proto_rawDesc = "" +
 	"\rassessment_id\x18\x01 \x01(\x04R\fassessmentId\x12\x1b\n" +
 	"\ttestee_id\x18\x02 \x01(\x04R\btesteeId\"W\n" +
 	"\x1bGetAssessmentReportResponse\x128\n" +
-	"\x06report\x18\x01 \x01(\v2 .interpretation.AssessmentReportR\x06report\"d\n" +
+	"\x06report\x18\x01 \x01(\v2 .interpretation.AssessmentReportR\x06report\"\x9a\x01\n" +
+	"!GetAssessmentReportStatusResponse\x12\x16\n" +
+	"\x06exists\x18\x01 \x01(\bR\x06exists\x12\x16\n" +
+	"\x06status\x18\x02 \x01(\tR\x06status\x12\x18\n" +
+	"\aattempt\x18\x03 \x01(\x05R\aattempt\x12+\n" +
+	"\x11retry_disposition\x18\x04 \x01(\tR\x10retryDisposition\"d\n" +
 	"\x14ListMyReportsRequest\x12\x1b\n" +
 	"\ttestee_id\x18\x01 \x01(\x04R\btesteeId\x12\x12\n" +
 	"\x04page\x18\x02 \x01(\x05R\x04page\x12\x1b\n" +
@@ -2145,9 +2218,10 @@ const file_interpretation_interpretation_proto_rawDesc = "" +
 	"\rAIEligibility\x12\x16\n" +
 	"\x06status\x18\x01 \x01(\tR\x06status\x12\x1f\n" +
 	"\vreason_code\x18\x02 \x01(\tR\n" +
-	"reasonCode2\xe8\x01\n" +
+	"reasonCode2\xe4\x02\n" +
 	"\x18ParticipantReportService\x12n\n" +
-	"\x13GetAssessmentReport\x12*.interpretation.GetAssessmentReportRequest\x1a+.interpretation.GetAssessmentReportResponse\x12\\\n" +
+	"\x13GetAssessmentReport\x12*.interpretation.GetAssessmentReportRequest\x1a+.interpretation.GetAssessmentReportResponse\x12z\n" +
+	"\x19GetAssessmentReportStatus\x12*.interpretation.GetAssessmentReportRequest\x1a1.interpretation.GetAssessmentReportStatusResponse\x12\\\n" +
 	"\rListMyReports\x12$.interpretation.ListMyReportsRequest\x1a%.interpretation.ListMyReportsResponse2\xc2\x02\n" +
 	"\x1fParticipantAIExplanationService\x12c\n" +
 	"\x13GetAIWorkflowSource\x12*.interpretation.GetAIWorkflowSourceRequest\x1a .interpretation.AIWorkflowSource\x12a\n" +
@@ -2171,7 +2245,7 @@ func file_interpretation_interpretation_proto_rawDescGZIP() []byte {
 	return file_interpretation_interpretation_proto_rawDescData
 }
 
-var file_interpretation_interpretation_proto_msgTypes = make([]protoimpl.MessageInfo, 26)
+var file_interpretation_interpretation_proto_msgTypes = make([]protoimpl.MessageInfo, 27)
 var file_interpretation_interpretation_proto_goTypes = []any{
 	(*Suggestion)(nil),                           // 0: interpretation.Suggestion
 	(*NormReference)(nil),                        // 1: interpretation.NormReference
@@ -2181,64 +2255,67 @@ var file_interpretation_interpretation_proto_goTypes = []any{
 	(*AssessmentReport)(nil),                     // 5: interpretation.AssessmentReport
 	(*GetAssessmentReportRequest)(nil),           // 6: interpretation.GetAssessmentReportRequest
 	(*GetAssessmentReportResponse)(nil),          // 7: interpretation.GetAssessmentReportResponse
-	(*ListMyReportsRequest)(nil),                 // 8: interpretation.ListMyReportsRequest
-	(*ListMyReportsResponse)(nil),                // 9: interpretation.ListMyReportsResponse
-	(*GenerateReportFromAssessmentRequest)(nil),  // 10: interpretation.GenerateReportFromAssessmentRequest
-	(*GenerateReportFromOutcomeRequest)(nil),     // 11: interpretation.GenerateReportFromOutcomeRequest
-	(*GenerateReportFromAssessmentResponse)(nil), // 12: interpretation.GenerateReportFromAssessmentResponse
-	(*AIExplanationEvidenceRef)(nil),             // 13: interpretation.AIExplanationEvidenceRef
-	(*AIExplanationIntegratedInsight)(nil),       // 14: interpretation.AIExplanationIntegratedInsight
-	(*AIExplanationSuggestion)(nil),              // 15: interpretation.AIExplanationSuggestion
-	(*AIExplanationContent)(nil),                 // 16: interpretation.AIExplanationContent
-	(*RequestAIWorkflowRequest)(nil),             // 17: interpretation.RequestAIWorkflowRequest
-	(*AIWorkflowAccepted)(nil),                   // 18: interpretation.AIWorkflowAccepted
-	(*AIWorkflowAccessRequest)(nil),              // 19: interpretation.AIWorkflowAccessRequest
-	(*AIWorkflowAccessResponse)(nil),             // 20: interpretation.AIWorkflowAccessResponse
-	(*GetAIWorkflowRequest)(nil),                 // 21: interpretation.GetAIWorkflowRequest
-	(*AIWorkflowResult)(nil),                     // 22: interpretation.AIWorkflowResult
-	(*GetAIWorkflowSourceRequest)(nil),           // 23: interpretation.GetAIWorkflowSourceRequest
-	(*AIWorkflowSource)(nil),                     // 24: interpretation.AIWorkflowSource
-	(*AIEligibility)(nil),                        // 25: interpretation.AIEligibility
-	(*evaluation.ScoreValue)(nil),                // 26: evaluation.ScoreValue
-	(*evaluation.ResultLevel)(nil),               // 27: evaluation.ResultLevel
-	(*evaluation.ModelIdentity)(nil),             // 28: evaluation.ModelIdentity
+	(*GetAssessmentReportStatusResponse)(nil),    // 8: interpretation.GetAssessmentReportStatusResponse
+	(*ListMyReportsRequest)(nil),                 // 9: interpretation.ListMyReportsRequest
+	(*ListMyReportsResponse)(nil),                // 10: interpretation.ListMyReportsResponse
+	(*GenerateReportFromAssessmentRequest)(nil),  // 11: interpretation.GenerateReportFromAssessmentRequest
+	(*GenerateReportFromOutcomeRequest)(nil),     // 12: interpretation.GenerateReportFromOutcomeRequest
+	(*GenerateReportFromAssessmentResponse)(nil), // 13: interpretation.GenerateReportFromAssessmentResponse
+	(*AIExplanationEvidenceRef)(nil),             // 14: interpretation.AIExplanationEvidenceRef
+	(*AIExplanationIntegratedInsight)(nil),       // 15: interpretation.AIExplanationIntegratedInsight
+	(*AIExplanationSuggestion)(nil),              // 16: interpretation.AIExplanationSuggestion
+	(*AIExplanationContent)(nil),                 // 17: interpretation.AIExplanationContent
+	(*RequestAIWorkflowRequest)(nil),             // 18: interpretation.RequestAIWorkflowRequest
+	(*AIWorkflowAccepted)(nil),                   // 19: interpretation.AIWorkflowAccepted
+	(*AIWorkflowAccessRequest)(nil),              // 20: interpretation.AIWorkflowAccessRequest
+	(*AIWorkflowAccessResponse)(nil),             // 21: interpretation.AIWorkflowAccessResponse
+	(*GetAIWorkflowRequest)(nil),                 // 22: interpretation.GetAIWorkflowRequest
+	(*AIWorkflowResult)(nil),                     // 23: interpretation.AIWorkflowResult
+	(*GetAIWorkflowSourceRequest)(nil),           // 24: interpretation.GetAIWorkflowSourceRequest
+	(*AIWorkflowSource)(nil),                     // 25: interpretation.AIWorkflowSource
+	(*AIEligibility)(nil),                        // 26: interpretation.AIEligibility
+	(*evaluation.ScoreValue)(nil),                // 27: evaluation.ScoreValue
+	(*evaluation.ResultLevel)(nil),               // 28: evaluation.ResultLevel
+	(*evaluation.ModelIdentity)(nil),             // 29: evaluation.ModelIdentity
 }
 var file_interpretation_interpretation_proto_depIdxs = []int32{
-	26, // 0: interpretation.DimensionInterpret.derived_scores:type_name -> evaluation.ScoreValue
-	27, // 1: interpretation.DimensionInterpret.level:type_name -> evaluation.ResultLevel
+	27, // 0: interpretation.DimensionInterpret.derived_scores:type_name -> evaluation.ScoreValue
+	28, // 1: interpretation.DimensionInterpret.level:type_name -> evaluation.ResultLevel
 	1,  // 2: interpretation.DimensionInterpret.norm_reference:type_name -> interpretation.NormReference
 	3,  // 3: interpretation.ModelExtra.rarity:type_name -> interpretation.ModelRarity
 	2,  // 4: interpretation.AssessmentReport.dimensions:type_name -> interpretation.DimensionInterpret
 	0,  // 5: interpretation.AssessmentReport.suggestions:type_name -> interpretation.Suggestion
 	4,  // 6: interpretation.AssessmentReport.model_extra:type_name -> interpretation.ModelExtra
-	28, // 7: interpretation.AssessmentReport.model:type_name -> evaluation.ModelIdentity
-	26, // 8: interpretation.AssessmentReport.primary_score:type_name -> evaluation.ScoreValue
-	27, // 9: interpretation.AssessmentReport.level:type_name -> evaluation.ResultLevel
+	29, // 7: interpretation.AssessmentReport.model:type_name -> evaluation.ModelIdentity
+	27, // 8: interpretation.AssessmentReport.primary_score:type_name -> evaluation.ScoreValue
+	28, // 9: interpretation.AssessmentReport.level:type_name -> evaluation.ResultLevel
 	5,  // 10: interpretation.GetAssessmentReportResponse.report:type_name -> interpretation.AssessmentReport
 	5,  // 11: interpretation.ListMyReportsResponse.items:type_name -> interpretation.AssessmentReport
-	13, // 12: interpretation.AIExplanationIntegratedInsight.evidence_refs:type_name -> interpretation.AIExplanationEvidenceRef
-	13, // 13: interpretation.AIExplanationSuggestion.evidence_refs:type_name -> interpretation.AIExplanationEvidenceRef
-	14, // 14: interpretation.AIExplanationContent.integrated_insights:type_name -> interpretation.AIExplanationIntegratedInsight
-	15, // 15: interpretation.AIExplanationContent.suggestions:type_name -> interpretation.AIExplanationSuggestion
-	25, // 16: interpretation.AIWorkflowSource.ai_eligibility:type_name -> interpretation.AIEligibility
+	14, // 12: interpretation.AIExplanationIntegratedInsight.evidence_refs:type_name -> interpretation.AIExplanationEvidenceRef
+	14, // 13: interpretation.AIExplanationSuggestion.evidence_refs:type_name -> interpretation.AIExplanationEvidenceRef
+	15, // 14: interpretation.AIExplanationContent.integrated_insights:type_name -> interpretation.AIExplanationIntegratedInsight
+	16, // 15: interpretation.AIExplanationContent.suggestions:type_name -> interpretation.AIExplanationSuggestion
+	26, // 16: interpretation.AIWorkflowSource.ai_eligibility:type_name -> interpretation.AIEligibility
 	6,  // 17: interpretation.ParticipantReportService.GetAssessmentReport:input_type -> interpretation.GetAssessmentReportRequest
-	8,  // 18: interpretation.ParticipantReportService.ListMyReports:input_type -> interpretation.ListMyReportsRequest
-	23, // 19: interpretation.ParticipantAIExplanationService.GetAIWorkflowSource:input_type -> interpretation.GetAIWorkflowSourceRequest
-	17, // 20: interpretation.ParticipantAIExplanationService.RequestAIWorkflow:input_type -> interpretation.RequestAIWorkflowRequest
-	21, // 21: interpretation.ParticipantAIExplanationService.GetAIWorkflow:input_type -> interpretation.GetAIWorkflowRequest
-	11, // 22: interpretation.InterpretationAutomationService.GenerateReportFromOutcome:input_type -> interpretation.GenerateReportFromOutcomeRequest
-	10, // 23: interpretation.InterpretationAutomationService.GenerateReportFromAssessment:input_type -> interpretation.GenerateReportFromAssessmentRequest
-	19, // 24: interpretation.AIWorkflowAccessService.Authorize:input_type -> interpretation.AIWorkflowAccessRequest
-	7,  // 25: interpretation.ParticipantReportService.GetAssessmentReport:output_type -> interpretation.GetAssessmentReportResponse
-	9,  // 26: interpretation.ParticipantReportService.ListMyReports:output_type -> interpretation.ListMyReportsResponse
-	24, // 27: interpretation.ParticipantAIExplanationService.GetAIWorkflowSource:output_type -> interpretation.AIWorkflowSource
-	18, // 28: interpretation.ParticipantAIExplanationService.RequestAIWorkflow:output_type -> interpretation.AIWorkflowAccepted
-	22, // 29: interpretation.ParticipantAIExplanationService.GetAIWorkflow:output_type -> interpretation.AIWorkflowResult
-	12, // 30: interpretation.InterpretationAutomationService.GenerateReportFromOutcome:output_type -> interpretation.GenerateReportFromAssessmentResponse
-	12, // 31: interpretation.InterpretationAutomationService.GenerateReportFromAssessment:output_type -> interpretation.GenerateReportFromAssessmentResponse
-	20, // 32: interpretation.AIWorkflowAccessService.Authorize:output_type -> interpretation.AIWorkflowAccessResponse
-	25, // [25:33] is the sub-list for method output_type
-	17, // [17:25] is the sub-list for method input_type
+	6,  // 18: interpretation.ParticipantReportService.GetAssessmentReportStatus:input_type -> interpretation.GetAssessmentReportRequest
+	9,  // 19: interpretation.ParticipantReportService.ListMyReports:input_type -> interpretation.ListMyReportsRequest
+	24, // 20: interpretation.ParticipantAIExplanationService.GetAIWorkflowSource:input_type -> interpretation.GetAIWorkflowSourceRequest
+	18, // 21: interpretation.ParticipantAIExplanationService.RequestAIWorkflow:input_type -> interpretation.RequestAIWorkflowRequest
+	22, // 22: interpretation.ParticipantAIExplanationService.GetAIWorkflow:input_type -> interpretation.GetAIWorkflowRequest
+	12, // 23: interpretation.InterpretationAutomationService.GenerateReportFromOutcome:input_type -> interpretation.GenerateReportFromOutcomeRequest
+	11, // 24: interpretation.InterpretationAutomationService.GenerateReportFromAssessment:input_type -> interpretation.GenerateReportFromAssessmentRequest
+	20, // 25: interpretation.AIWorkflowAccessService.Authorize:input_type -> interpretation.AIWorkflowAccessRequest
+	7,  // 26: interpretation.ParticipantReportService.GetAssessmentReport:output_type -> interpretation.GetAssessmentReportResponse
+	8,  // 27: interpretation.ParticipantReportService.GetAssessmentReportStatus:output_type -> interpretation.GetAssessmentReportStatusResponse
+	10, // 28: interpretation.ParticipantReportService.ListMyReports:output_type -> interpretation.ListMyReportsResponse
+	25, // 29: interpretation.ParticipantAIExplanationService.GetAIWorkflowSource:output_type -> interpretation.AIWorkflowSource
+	19, // 30: interpretation.ParticipantAIExplanationService.RequestAIWorkflow:output_type -> interpretation.AIWorkflowAccepted
+	23, // 31: interpretation.ParticipantAIExplanationService.GetAIWorkflow:output_type -> interpretation.AIWorkflowResult
+	13, // 32: interpretation.InterpretationAutomationService.GenerateReportFromOutcome:output_type -> interpretation.GenerateReportFromAssessmentResponse
+	13, // 33: interpretation.InterpretationAutomationService.GenerateReportFromAssessment:output_type -> interpretation.GenerateReportFromAssessmentResponse
+	21, // 34: interpretation.AIWorkflowAccessService.Authorize:output_type -> interpretation.AIWorkflowAccessResponse
+	26, // [26:35] is the sub-list for method output_type
+	17, // [17:26] is the sub-list for method input_type
 	17, // [17:17] is the sub-list for extension type_name
 	17, // [17:17] is the sub-list for extension extendee
 	0,  // [0:17] is the sub-list for field type_name
@@ -2255,7 +2332,7 @@ func file_interpretation_interpretation_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_interpretation_interpretation_proto_rawDesc), len(file_interpretation_interpretation_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   26,
+			NumMessages:   27,
 			NumExtensions: 0,
 			NumServices:   4,
 		},

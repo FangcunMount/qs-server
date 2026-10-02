@@ -81,6 +81,7 @@ type Module struct {
 	automationService      interpretationautomation.Service
 	projectionMapper       reportprojection.Mapper
 	participantService     interpretationparticipant.Service
+	participantRuntime     interpretationparticipant.RuntimeQuery
 	administrationService  interpretationadmin.Service
 	operationsService      interpretationoperations.Service
 	catalogReconcile       interpretationcatalog.Service
@@ -279,6 +280,7 @@ func (m *Module) BindOutcomeRepository(repo domainoutcome.Repository) error {
 	m.governedRetryService = interpretationautomation.NewGovernedRetryService(m.generationRepo, m.runRepo, repo, m.txRunner, m.eventStager)
 	m.leaseRecoverer = interpretationautomation.NewLeaseRecoverer(m.runRepo, m.generationRepo, m.automationService)
 	m.aiOutcomeRepo = repo
+	m.bindParticipantRuntime()
 	if err := m.tryBindAIWorkflow(); err != nil {
 		return err
 	}
@@ -536,7 +538,14 @@ func (m *Module) BindParticipantAccess(access interpretationparticipant.Access) 
 	}
 	m.participantService = interpretationparticipant.NewService(m.reader, access, m.projectionMapper)
 	m.participantAccess = access
+	m.bindParticipantRuntime()
 	return m.tryBindAIWorkflow()
+}
+
+func (m *Module) bindParticipantRuntime() {
+	if m != nil && m.participantAccess != nil && m.aiOutcomeRepo != nil && m.generationRepo != nil && m.runRepo != nil {
+		m.participantRuntime = interpretationparticipant.NewRuntimeStatusReader(m.participantAccess, m.aiOutcomeRepo, m.generationRepo, m.runRepo)
+	}
 }
 
 func (m *Module) tryBindAIWorkflow() error {

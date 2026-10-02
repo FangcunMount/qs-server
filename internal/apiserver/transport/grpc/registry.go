@@ -98,6 +98,7 @@ type InterpretationDeps struct {
 	AIWorkflow *bridge.Participant
 
 	ParticipantService       interpretationParticipant.Service
+	ParticipantRuntime       interpretationParticipant.RuntimeQuery
 	ReportStatusReporter     *reportstatus.Reporter
 	DelegatedSubjectVerifier *delegatedsubject.Verifier
 }
@@ -223,6 +224,7 @@ func (r *Registry) registerEvaluationService() error {
 		r.deps.Evaluation.TesteeService == nil ||
 		r.deps.Evaluation.WorkerService == nil ||
 		r.deps.Interpretation.ParticipantService == nil ||
+		r.deps.Interpretation.ParticipantRuntime == nil ||
 		r.deps.Interpretation.AutomationService == nil ||
 		r.deps.Survey.AnswerSheetScoringService == nil {
 		log.Warn("EvaluationModule is not initialized, skipping evaluation service registration")
@@ -239,7 +241,7 @@ func (r *Registry) registerEvaluationService() error {
 		r.deps.Survey.SubmissionReader,
 	)
 	r.server.RegisterService(service.NewTesteeEvaluationService(r.deps.Evaluation.TesteeService, r.deps.Evaluation.RuntimeStatusReader))
-	r.server.RegisterService(service.NewParticipantReportService(r.deps.Interpretation.ParticipantService, r.deps.Interpretation.DelegatedSubjectVerifier))
+	r.server.RegisterService(service.NewParticipantReportService(r.deps.Interpretation.ParticipantService, r.deps.Interpretation.DelegatedSubjectVerifier, r.deps.Interpretation.ParticipantRuntime))
 	assessmentIntakeService := service.NewAssessmentIntakeService(journey, r.deps.Evaluation.IntakeService, r.deps.Survey.AnswerSheetManagementService)
 	evaluationWorkerService := service.NewEvaluationWorkerService(r.deps.Evaluation.WorkerService)
 	interpretationAutomationService := service.NewInterpretationAutomationService(r.deps.Interpretation.AutomationService)
@@ -333,6 +335,7 @@ func (r *Registry) GetRegisteredServices() []string {
 	if r.deps.Evaluation.IntakeService != nil &&
 		r.deps.Evaluation.TesteeService != nil &&
 		r.deps.Interpretation.ParticipantService != nil &&
+		r.deps.Interpretation.ParticipantRuntime != nil &&
 		r.deps.Evaluation.WorkerService != nil {
 		services = append(services, "TesteeEvaluationService", "AssessmentIntakeService", "EvaluationWorkerService", "ParticipantReportService", "InterpretationAutomationService")
 	}

@@ -16,10 +16,39 @@ type ParticipantReportService struct {
 	pb.UnimplementedParticipantReportServiceServer
 	service           participant.Service
 	delegatedVerifier *delegatedsubject.Verifier
+	runtime           participant.RuntimeQuery
 }
 
-func NewParticipantReportService(service participant.Service, delegatedVerifier *delegatedsubject.Verifier) *ParticipantReportService {
-	return &ParticipantReportService{service: service, delegatedVerifier: delegatedVerifier}
+func NewParticipantReportService(service participant.Service, delegatedVerifier *delegatedsubject.Verifier, runtime ...participant.RuntimeQuery) *ParticipantReportService {
+	s := &ParticipantReportService{service: service, delegatedVerifier: delegatedVerifier}
+	if len(runtime) > 0 {
+		s.runtime = runtime[0]
+	}
+	return s
+}
+
+func (s *ParticipantReportService) GetAssessmentReportStatus(ctx context.Context, req *pb.GetAssessmentReportRequest) (*pb.GetAssessmentReportStatusResponse, error) {
+	if req == nil || req.TesteeId == 0 || req.AssessmentId == 0 {
+		return nil, status.Error(codes.InvalidArgument, "testee_id 和 assessment_id 不能为空")
+	}
+	if err := s.authorizeDelegatedSubject(ctx, req.TesteeId, delegatedsubject.PurposeGetAssessmentReportStatus); err != nil {
+		return nil, err
+	}
+	if s.runtime == nil {
+		return nil, status.Error(codes.FailedPrecondition, "participant report runtime reader is not configured")
+	}
+	result, err := s.runtime.Get(ctx, participant.Actor{TesteeID: req.TesteeId}, req.AssessmentId)
+	if err != nil {
+		return nil, toAssessmentQueryGRPCError(err)
+	}
+	if result == nil {
+		return &pb.GetAssessmentReportStatusResponse{}, nil
+	}
+	attempt, err := protoInt32FromInt("attempt", result.Attempt)
+	if err != nil {
+		return nil, err
+	}
+	return &pb.GetAssessmentReportStatusResponse{Exists: true, Status: result.Status, Attempt: attempt, RetryDisposition: string(result.RetryDisposition)}, nil
 }
 
 func (s *ParticipantReportService) RegisterService(server *grpc.Server) {

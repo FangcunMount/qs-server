@@ -236,3 +236,7 @@ func TestQueryServiceGetReportStatusInterpretedEnrichesModel(t *testing.T) {
 		t.Fatalf("expected enriched model, got %+v", status.Model)
 	}
 }
+
+func (f *fakeEvaluationReader) GetAssessmentReportStatus(context.Context, uint64, uint64) (*evaluationapp.ReportRuntimeStatusResponse, error) {
+	return nil, f.err
+}

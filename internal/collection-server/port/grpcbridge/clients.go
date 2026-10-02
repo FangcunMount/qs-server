@@ -22,6 +22,9 @@ type EvaluationReader interface {
 type EvaluationRuntimeReader interface {
 	GetMyAssessmentRunStatus(context.Context, uint64, uint64) (*AssessmentRuntimeStatusOutput, error)
 }
+type ParticipantReportRuntimeReader interface {
+	GetAssessmentReportStatus(context.Context, uint64, uint64) (*ReportRuntimeStatusOutput, error)
+}
 type ParticipantReportReader interface {
 	GetAssessmentReport(context.Context, uint64, uint64) (*AssessmentReportOutput, error)
 }

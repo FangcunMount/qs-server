@@ -385,6 +385,13 @@ func (c *TesteeEvaluationClient) ListMyAssessmentsByModelKinds(
 	}, nil
 }
 
+// ReportRuntimeStatusOutput is a sanitized persistent Interpretation status.
+type ReportRuntimeStatusOutput struct {
+	Attempt          int
+	Status           string
+	RetryDisposition string
+}
+
 type ParticipantReportClient struct {
 	client       *Client
 	reportClient interpretationpb.ParticipantReportServiceClient
@@ -423,6 +430,23 @@ func (c *ParticipantReportClient) GetAssessmentReport(ctx context.Context, teste
 		return nil, err
 	}
 	return convertAssessmentReport(resp.GetReport()), nil
+}
+
+func (c *ParticipantReportClient) GetAssessmentReportStatus(ctx context.Context, testeeID, assessmentID uint64) (*ReportRuntimeStatusOutput, error) {
+	ctx, cancel := c.client.ContextWithTimeout(ctx)
+	defer cancel()
+	ctx, err := c.attachDelegatedSubject(ctx, testeeID, delegatedsubject.PurposeGetAssessmentReportStatus)
+	if err != nil {
+		return nil, err
+	}
+	resp, err := c.reportClient.GetAssessmentReportStatus(ctx, &interpretationpb.GetAssessmentReportRequest{AssessmentId: assessmentID, TesteeId: testeeID})
+	if err != nil {
+		return nil, err
+	}
+	if !resp.GetExists() {
+		return nil, nil
+	}
+	return &ReportRuntimeStatusOutput{Attempt: int(resp.GetAttempt()), Status: resp.GetStatus(), RetryDisposition: resp.GetRetryDisposition()}, nil
 }
 
 // ResolveAssessmentByAnswerSheetID resolves the asynchronous Assessment for the readiness contract.

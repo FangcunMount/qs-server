@@ -19,8 +19,9 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	ParticipantReportService_GetAssessmentReport_FullMethodName = "/interpretation.ParticipantReportService/GetAssessmentReport"
-	ParticipantReportService_ListMyReports_FullMethodName       = "/interpretation.ParticipantReportService/ListMyReports"
+	ParticipantReportService_GetAssessmentReport_FullMethodName       = "/interpretation.ParticipantReportService/GetAssessmentReport"
+	ParticipantReportService_GetAssessmentReportStatus_FullMethodName = "/interpretation.ParticipantReportService/GetAssessmentReportStatus"
+	ParticipantReportService_ListMyReports_FullMethodName             = "/interpretation.ParticipantReportService/ListMyReports"
 )
 
 // ParticipantReportServiceClient is the client API for ParticipantReportService service.
@@ -28,6 +29,9 @@ const (
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type ParticipantReportServiceClient interface {
 	GetAssessmentReport(ctx context.Context, in *GetAssessmentReportRequest, opts ...grpc.CallOption) (*GetAssessmentReportResponse, error)
+	// Read-only current standard report attempt, bound to the original frozen
+	// outcome/template. Never initiates generation or authorizes a retry.
+	GetAssessmentReportStatus(ctx context.Context, in *GetAssessmentReportRequest, opts ...grpc.CallOption) (*GetAssessmentReportStatusResponse, error)
 	ListMyReports(ctx context.Context, in *ListMyReportsRequest, opts ...grpc.CallOption) (*ListMyReportsResponse, error)
 }
 
@@ -49,6 +53,16 @@ func (c *participantReportServiceClient) GetAssessmentReport(ctx context.Context
 	return out, nil
 }
 
+func (c *participantReportServiceClient) GetAssessmentReportStatus(ctx context.Context, in *GetAssessmentReportRequest, opts ...grpc.CallOption) (*GetAssessmentReportStatusResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetAssessmentReportStatusResponse)
+	err := c.cc.Invoke(ctx, ParticipantReportService_GetAssessmentReportStatus_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *participantReportServiceClient) ListMyReports(ctx context.Context, in *ListMyReportsRequest, opts ...grpc.CallOption) (*ListMyReportsResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(ListMyReportsResponse)
@@ -64,6 +78,9 @@ func (c *participantReportServiceClient) ListMyReports(ctx context.Context, in *
 // for forward compatibility.
 type ParticipantReportServiceServer interface {
 	GetAssessmentReport(context.Context, *GetAssessmentReportRequest) (*GetAssessmentReportResponse, error)
+	// Read-only current standard report attempt, bound to the original frozen
+	// outcome/template. Never initiates generation or authorizes a retry.
+	GetAssessmentReportStatus(context.Context, *GetAssessmentReportRequest) (*GetAssessmentReportStatusResponse, error)
 	ListMyReports(context.Context, *ListMyReportsRequest) (*ListMyReportsResponse, error)
 	mustEmbedUnimplementedParticipantReportServiceServer()
 }
@@ -77,6 +94,9 @@ type UnimplementedParticipantReportServiceServer struct{}
 
 func (UnimplementedParticipantReportServiceServer) GetAssessmentReport(context.Context, *GetAssessmentReportRequest) (*GetAssessmentReportResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetAssessmentReport not implemented")
+}
+func (UnimplementedParticipantReportServiceServer) GetAssessmentReportStatus(context.Context, *GetAssessmentReportRequest) (*GetAssessmentReportStatusResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetAssessmentReportStatus not implemented")
 }
 func (UnimplementedParticipantReportServiceServer) ListMyReports(context.Context, *ListMyReportsRequest) (*ListMyReportsResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ListMyReports not implemented")
@@ -121,6 +141,24 @@ func _ParticipantReportService_GetAssessmentReport_Handler(srv interface{}, ctx 
 	return interceptor(ctx, in, info, handler)
 }
 
+func _ParticipantReportService_GetAssessmentReportStatus_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetAssessmentReportRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ParticipantReportServiceServer).GetAssessmentReportStatus(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ParticipantReportService_GetAssessmentReportStatus_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ParticipantReportServiceServer).GetAssessmentReportStatus(ctx, req.(*GetAssessmentReportRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _ParticipantReportService_ListMyReports_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(ListMyReportsRequest)
 	if err := dec(in); err != nil {
@@ -149,6 +187,10 @@ var ParticipantReportService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetAssessmentReport",
 			Handler:    _ParticipantReportService_GetAssessmentReport_Handler,
+		},
+		{
+			MethodName: "GetAssessmentReportStatus",
+			Handler:    _ParticipantReportService_GetAssessmentReportStatus_Handler,
 		},
 		{
 			MethodName: "ListMyReports",

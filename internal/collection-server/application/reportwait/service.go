@@ -24,6 +24,7 @@ type QueryService interface {
 	AuthorizeAssessment(ctx context.Context, testeeID, assessmentID uint64) error
 	GetMyAssessment(ctx context.Context, testeeID, assessmentID uint64) (*evaluation.AssessmentDetailResponse, error)
 	GetMyAssessmentRunStatus(ctx context.Context, testeeID, assessmentID uint64) (*evaluation.AssessmentRuntimeStatusResponse, error)
+	GetAssessmentReportStatus(ctx context.Context, testeeID, assessmentID uint64) (*evaluation.ReportRuntimeStatusResponse, error)
 	GetAssessmentReport(ctx context.Context, testeeID, assessmentID uint64) (*evaluation.AssessmentReportResponse, error)
 }
 
@@ -358,6 +359,7 @@ func (s *Service) loadStatusFromDBWithSnapshot(
 		}
 	}
 
+	reportStage := result.Status == "evaluated" || (staleTerminal != nil && staleTerminal.Reason != "evaluation_failed")
 	// A failed Assessment or old evaluation.failed projection can describe an
 	// earlier attempt. Only a fresh, persisted newer Run may move it back into
 	// an in-flight phase; broker arrival time and Redis UpdatedAt are not proof.
@@ -371,8 +373,31 @@ func (s *Service) loadStatusFromDBWithSnapshot(
 			case "pending", "running":
 				return pendingResponse("processing", "报告生成中", 3000), false, nil
 			case "succeeded":
-				return pendingResponse("interpreting", "报告生成中", 2000), false, nil
+				reportStage = true
 			}
+		}
+	}
+	// Failure notifications are hints. When a report is absent, read the current
+	// frozen Generation/latest Run instead of trusting an old terminal hint or
+	// waiting forever after notification loss. A succeeded Run alone is not a
+	// participant report: the durable report read above remains completion proof.
+	if reportStage {
+		runtime, runtimeErr := s.query.GetAssessmentReportStatus(ctx, testeeID, assessmentID)
+		if runtimeErr != nil {
+			return nil, false, runtimeErr
+		}
+		if runtime != nil {
+			resp, terminal, err := fromReportRuntime(runtime)
+			if err != nil {
+				return nil, false, err
+			}
+			if terminal {
+				s.cacheStatus(ctx, assessmentKey, resp)
+				recordTerminalResponse(resp)
+			}
+			// Do not blindly overwrite a concurrent completed cache entry with a
+			// processing snapshot; every terminal hint is rechecked on the next poll.
+			return resp, terminal, nil
 		}
 	}
 	if staleTerminal != nil && staleTerminal.Reason != "evaluation_failed" {
@@ -380,7 +405,7 @@ func (s *Service) loadStatusFromDBWithSnapshot(
 		recordTerminalResponse(resp)
 		return resp, true, nil
 	}
-	if result.Status == "evaluated" {
+	if reportStage {
 		return pendingResponse("interpreting", "报告生成中", 2000), false, nil
 	}
 
@@ -545,4 +570,21 @@ func nextPollAfterMs(stage, status string) int {
 
 func isTerminalStatus(status string) bool {
 	return status == "completed" || status == "failed" || status == "temporarily_unavailable"
+}
+
+func fromReportRuntime(runtime *evaluation.ReportRuntimeStatusResponse) (*evaluation.AssessmentStatusResponse, bool, error) {
+	switch runtime.Status {
+	case "pending", "running", "succeeded":
+		return pendingResponse("interpreting", "报告生成中", 2000), false, nil
+	case "failed":
+		switch runtime.RetryDisposition {
+		case "automatic":
+			return pendingResponse("interpreting", "报告生成中", 2000), false, nil
+		case "manual_required":
+			return &evaluation.AssessmentStatusResponse{Status: "temporarily_unavailable", Stage: "temporarily_unavailable", Reason: "waiting_manual_action", Message: "报告暂不可用，等待人工处理", UpdatedAt: time.Now().Unix()}, true, nil
+		case "terminal":
+			return &evaluation.AssessmentStatusResponse{Status: "failed", Stage: "failed", Reason: "interpretation_report_failed", Message: "报告生成失败", UpdatedAt: time.Now().Unix()}, true, nil
+		}
+	}
+	return nil, false, fmt.Errorf("invalid persistent report runtime status")
 }
