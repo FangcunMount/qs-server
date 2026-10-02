@@ -1,5 +1,3 @@
-//go:build reliable_messaging_m4
-
 package process
 
 import (
@@ -46,12 +44,14 @@ type standardGovernedEventTypeStatusReader struct {
 	outboxport.EventTypeStatusReader
 }
 
-// configuredEventSubsystem keeps the ordinary configuration on the existing
-// implementation. Each M4 opt-in replaces a whole writer/runner profile.
+// configuredEventSubsystem accepts only standard profiles. Retired configuration
+// must not silently recreate legacy writers; rollback uses a retained image.
 func configuredEventSubsystem(cfg *config.Config) func(eventsubsystem.Options) (*eventsubsystem.Subsystem, error) {
-	if cfg == nil || cfg.Eventing == nil || cfg.Eventing.StandardOutbox == nil ||
+	if cfg == nil || cfg.Options == nil || cfg.Eventing == nil || cfg.Eventing.StandardOutbox == nil ||
 		(!cfg.Eventing.StandardOutbox.Mongo && !cfg.Eventing.StandardOutbox.Assessment) {
-		return eventsubsystem.New
+		return func(eventsubsystem.Options) (*eventsubsystem.Subsystem, error) {
+			return nil, errors.New("legacy outbox configuration is retired; enable standard profiles or use the retained rollback image")
+		}
 	}
 	selected := *cfg.Eventing.StandardOutbox
 	return func(opts eventsubsystem.Options) (*eventsubsystem.Subsystem, error) {
@@ -97,8 +97,7 @@ func buildM4StandardEventSubsystem(opts eventsubsystem.Options, cfg *config.Conf
 	if err := preflightM4StandardStorage(preflightCtx, opts, selected); err != nil {
 		return nil, err
 	}
-	// These are candidate bounds; M4-07 must measure throughput and recovery
-	// before any release. The old profile remains available for unselected flows.
+	// Keep the measured standard-profile publish and shutdown bounds.
 	const (
 		lease          = 30 * time.Second
 		publishTimeout = 10 * time.Second

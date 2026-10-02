@@ -1,0 +1,65 @@
+{
+  "source_commit": "96fc4df42f6af9f6ce22e2184394b1a07df2ffdd",
+  "retired_files": [
+    "internal/apiserver/application/eventing/attempt_tracker.go",
+    "internal/apiserver/application/eventing/attempt_tracker_test.go",
+    "internal/apiserver/application/eventing/immediate.go",
+    "internal/apiserver/application/eventing/immediate_test.go",
+    "internal/apiserver/application/eventing/outbox.go",
+    "internal/apiserver/application/eventing/outbox_test.go",
+    "internal/apiserver/application/eventing/ready_index.go",
+    "internal/apiserver/container/internal/transaction/standard_mongo_rollback_gate_integration_test.go",
+    "internal/apiserver/container/modules/platform/gap_recovery_disabled.go",
+    "internal/apiserver/infra/mongo/eventoutbox/batch_claim.go",
+    "internal/apiserver/infra/mongo/eventoutbox/claim_by_id.go",
+    "internal/apiserver/infra/mongo/eventoutbox/immediate.go",
+    "internal/apiserver/infra/mongo/eventoutbox/limiter.go",
+    "internal/apiserver/infra/mongo/eventoutbox/limiter_test.go",
+    "internal/apiserver/infra/mongo/eventoutbox/manual_replay.go",
+    "internal/apiserver/infra/mongo/eventoutbox/pending_refs.go",
+    "internal/apiserver/infra/mongo/eventoutbox/status_by_type.go",
+    "internal/apiserver/infra/mongo/eventoutbox/store.go",
+    "internal/apiserver/infra/mongo/eventoutbox/store_batch_claim_integration_test.go",
+    "internal/apiserver/infra/mongo/eventoutbox/store_test.go",
+    "internal/apiserver/infra/mysql/eventoutbox/claim_by_id.go",
+    "internal/apiserver/infra/mysql/eventoutbox/fenced_store.go",
+    "internal/apiserver/infra/mysql/eventoutbox/fenced_store_integration_test.go",
+    "internal/apiserver/infra/mysql/eventoutbox/immediate.go",
+    "internal/apiserver/infra/mysql/eventoutbox/manual_replay.go",
+    "internal/apiserver/infra/mysql/eventoutbox/pending_refs.go",
+    "internal/apiserver/infra/mysql/eventoutbox/standard_bridge_integration_test.go",
+    "internal/apiserver/infra/mysql/eventoutbox/status_by_type.go",
+    "internal/apiserver/infra/mysql/eventoutbox/store.go",
+    "internal/apiserver/infra/mysql/eventoutbox/store_contract_test.go",
+    "internal/apiserver/infra/mysql/eventoutbox/store_test.go",
+    "internal/apiserver/infra/redis/outboxready/index.go",
+    "internal/apiserver/infra/redis/outboxready/index_test.go",
+    "internal/apiserver/infra/redis/outboxready/reconciler.go",
+    "internal/apiserver/infra/redis/outboxready/score.go",
+    "internal/apiserver/infra/redis/outboxready/score_test.go",
+    "internal/apiserver/outboxcore/core.go",
+    "internal/apiserver/outboxcore/core_test.go",
+    "internal/apiserver/outboxcore/status_test.go",
+    "internal/apiserver/process/standard_event_rollback_m4_integration_test.go",
+    "internal/apiserver/process/standard_event_subsystem_default.go",
+    "internal/apiserver/process/standard_event_subsystem_default_test.go",
+    "internal/apiserver/process/standard_mongo_only_m5_integration_test.go"
+  ],
+  "runner": "scripts/testing/run-retired-outbox-contracts.sh",
+  "current_path": "SDK standard profiles only",
+  "limits": "Historical contracts execute against their immutable source, not the current SDK or production.",
+  "retired_symbols": [
+    {
+      "file": "internal/apiserver/container/internal/transaction/reliable_messaging_proof_test.go",
+      "test": "TestReliableMessagingOriginalMongoRunner"
+    },
+    {
+      "file": "internal/apiserver/container/internal/transaction/reliable_messaging_assessment_proof_test.go",
+      "test": "TestReliableMessagingAssessmentPersistence"
+    },
+    {
+      "file": "internal/apiserver/container/internal/transaction/reliable_messaging_redelivery_proof_test.go",
+      "test": "TestReliableMessagingAnswerSheetFINLoss"
+    }
+  ]
+}

@@ -103,24 +103,13 @@ func TestSharedTransactionEventAndOutboxPackagesUseApprovedOwners(t *testing.T) 
 // These imports remain only for the old Outbox rollback and message bridge.
 // Removing an entry is allowed; adding a dependency on the retiring component-base
 // message packages, including RabbitMQ, is not.
-func TestComponentBaseMessageImportsStayWithinRollbackAllowlist(t *testing.T) {
+func TestComponentBaseMessageImportsAreRetired(t *testing.T) {
 	root := repoRoot(t)
 	const base = "github.com/FangcunMount/component-base/pkg/"
 	messagePackages := []string{
 		"event", "eventcatalog", "eventcodec", "eventmessaging", "messaging", "outbox", "outboxcore",
 	}
-	allowed := map[string]map[string]bool{
-		"internal/apiserver/eventing/subsystem/subsystem.go": {base + "messaging": true},
-		"internal/apiserver/outboxcore/core.go": {
-			base + "event": true, base + "outboxcore": true,
-		},
-		"internal/apiserver/process/resource_bootstrap.go":    {base + "messaging": true},
-		"internal/apiserver/process/root.go":                  {base + "messaging": true},
-		"internal/pkg/eventing/runtime/message_settlement.go": {base + "messaging": true},
-		"internal/pkg/eventing/runtime/publisher.go":          {base + "messaging": true},
-		"internal/worker/integration/messaging/retry_hold.go": {base + "messaging": true},
-		"internal/worker/integration/messaging/runtime.go":    {base + "messaging": true},
-	}
+	allowed := map[string]map[string]bool{}
 
 	err := filepath.WalkDir(filepath.Join(root, "internal"), func(path string, entry os.DirEntry, err error) error {
 		if err != nil {

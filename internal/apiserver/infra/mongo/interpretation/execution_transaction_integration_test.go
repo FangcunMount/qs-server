@@ -15,11 +15,12 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/policy"
 	domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/report"
 	interpretationrun "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/run"
-	mongoeventoutbox "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/eventoutbox"
 	mongointerpretation "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/interpretation"
+	mongostandard "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/standardoutbox"
 	"github.com/FangcunMount/qs-server/internal/pkg/event"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 	"github.com/FangcunMount/qs-server/internal/pkg/mongodbtest"
+	sdklegacy "github.com/FangcunMount/reliable-messaging/wire/legacy"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 )
@@ -120,7 +121,7 @@ type interpretationMongoFixture struct {
 	runs        *mongointerpretation.RunRepository
 	reports     *mongointerpretation.ReportRepository
 	catalog     *mongointerpretation.ReportCatalogProjector
-	outbox      *mongoeventoutbox.Store
+	outbox      *mongostandard.Stager
 	now         time.Time
 }
 
@@ -142,7 +143,10 @@ func newInterpretationMongoFixture(t *testing.T, db *mongo.Database) interpretat
 	if err != nil {
 		t.Fatal(err)
 	}
-	outbox, err := mongoeventoutbox.NewStoreWithTopicResolver(db, interpretationTopicResolver{})
+	if err := db.CreateCollection(t.Context(), "rm_outbox"); err != nil {
+		t.Fatal(err)
+	}
+	outbox, err := mongostandard.NewStager(db.Collection("rm_outbox"), interpretationTopicResolver{}, "qs-apiserver")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -189,7 +193,41 @@ func (f interpretationMongoFixture) assertRunningAndNoOutbox(t *testing.T, gener
 	if persistedGeneration.Status() != domaingeneration.StatusGenerating || persistedRun.Status() != interpretationrun.StatusRunning {
 		t.Fatalf("persisted state = generation:%s run:%s, want generating/running", persistedGeneration.Status(), persistedRun.Status())
 	}
-	assertMongoDocumentCount(t, f.db.Collection("domain_event_outbox"), bson.M{"aggregate_id": generation.ID().String()}, 0)
+	f.assertStandardIntentCount(t, generation.ID().String(), 0)
+	assertMongoDocumentCount(t, f.db.Collection("domain_event_outbox"), bson.M{}, 0)
+}
+
+// Standard rows keep aggregate identity inside the original wire metadata,
+// rather than the old Store's top-level aggregate_id column.
+func (f interpretationMongoFixture) assertStandardIntentCount(t *testing.T, generationID string, want int) {
+	t.Helper()
+	cursor, err := f.db.Collection("rm_outbox").Find(t.Context(), bson.M{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer cursor.Close(t.Context())
+	count := 0
+	for cursor.Next(t.Context()) {
+		var row struct {
+			Payload []byte `bson:"payload"`
+		}
+		if err := cursor.Decode(&row); err != nil {
+			t.Fatal(err)
+		}
+		wire, recognized, err := sdklegacy.Decode(row.Payload)
+		if err != nil || !recognized {
+			t.Fatalf("invalid original standard wire: recognized=%v err=%v", recognized, err)
+		}
+		if wire.Metadata["aggregate_id"] == generationID {
+			count++
+		}
+	}
+	if err := cursor.Err(); err != nil {
+		t.Fatal(err)
+	}
+	if count != want {
+		t.Fatalf("standard intents for generation %s = %d, want %d", generationID, count, want)
+	}
 }
 
 type faultGenerationRepo struct {
@@ -241,7 +279,7 @@ func (p faultCatalogProjector) ProjectCurrent(ctx context.Context, report *domai
 }
 
 type faultEventStager struct {
-	inner *mongoeventoutbox.Store
+	inner *mongostandard.Stager
 	fault string
 }
 

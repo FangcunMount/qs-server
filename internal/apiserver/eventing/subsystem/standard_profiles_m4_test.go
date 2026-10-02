@@ -1,5 +1,3 @@
-//go:build reliable_messaging_m4
-
 package subsystem
 
 import (
@@ -16,9 +14,9 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/eventing/standardoutbox"
 	outboxport "github.com/FangcunMount/qs-server/internal/apiserver/port/outbox"
 	"github.com/FangcunMount/qs-server/internal/pkg/event"
-	"github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
+	eventcatalog "github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
 	eventobservability "github.com/FangcunMount/qs-server/internal/pkg/eventing/observe"
-	"github.com/FangcunMount/qs-server/internal/pkg/eventing/runtime"
+	eventruntime "github.com/FangcunMount/qs-server/internal/pkg/eventing/runtime"
 	"github.com/FangcunMount/reliable-messaging/relay"
 	_ "github.com/go-sql-driver/mysql"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -127,7 +125,7 @@ func TestStandardProfileReplacesWholeLegacyRuntimeBeforeStart(t *testing.T) {
 	if profile.Stager != stager || profile.PostCommit != postCommit {
 		t.Fatal("standard profile did not replace the legacy writer and post-commit path")
 	}
-	if runtime := s.profiles[eventcatalog.OutboxProfileMongoDomain]; runtime.relay != nil || runtime.immediate != nil || runtime.reconciler != nil || runtime.readyIndex != nil {
+	if runtime := s.profiles[eventcatalog.OutboxProfileMongoDomain]; runtime.run == nil || runtime.drain == nil {
 		t.Fatalf("legacy executor survived profile replacement: %+v", runtime)
 	}
 	if err := s.Start(t.Context()); err != nil {
@@ -232,11 +230,11 @@ func TestBothStandardProfilesKeepHotRankConsumer(t *testing.T) {
 		t.Fatal(err)
 	}
 	mongoProfile := s.profiles[eventcatalog.OutboxProfileMongoDomain]
-	if mongoProfile.run == nil || mongoProfile.relay != nil || mongoProfile.immediate != nil || mongoProfile.reconciler != nil {
+	if mongoProfile.run == nil || mongoProfile.drain == nil {
 		t.Fatalf("Mongo replacement retained a legacy runner: %+v", mongoProfile)
 	}
 	assessmentProfile := s.profiles[eventcatalog.OutboxProfileAssessmentMySQL]
-	if assessmentProfile.run == nil || assessmentProfile.relay != nil || assessmentProfile.immediate != nil || assessmentProfile.reconciler != nil {
+	if assessmentProfile.run == nil || assessmentProfile.drain == nil {
 		t.Fatalf("MySQL replacement retained a legacy runner: %+v", assessmentProfile)
 	}
 	if err := s.RegisterConsumer(hotRankConsumerID, func(context.Context, string, []byte) error { return nil }); err != nil {

@@ -127,7 +127,7 @@ func TestM6QS04RecoveredOriginalHasOneWorkerEffect(t *testing.T) {
 		},
 	}
 	runCurrentRuntimeClosure(t, func(t *testing.T, opts eventsubsystem.Options, sqlDB *sql.DB) (*eventsubsystem.Subsystem, runtimeClosureDelivery, error) {
-		subsystem, d, err := newM5StandardEventSubsystemControlled(t, opts, sqlDB, false, false, true)
+		subsystem, d, err := newM5StandardEventSubsystemControlled(t, opts, sqlDB, true, false, true)
 		if err == nil {
 			delivery = d.(*standardClosureDelivery)
 		}
