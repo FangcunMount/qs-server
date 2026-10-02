@@ -4,19 +4,12 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/FangcunMount/component-base/pkg/messaging"
 	bootstrap "github.com/FangcunMount/qs-server/internal/worker/bootstrap"
 	observability "github.com/FangcunMount/qs-server/internal/worker/observability"
 )
 
 type workerFakeSubscriber struct {
 	order *[]string
-}
-
-func (s *workerFakeSubscriber) Subscribe(string, string, messaging.Handler) error { return nil }
-
-func (s *workerFakeSubscriber) SubscribeWithMiddleware(string, string, messaging.Handler, ...messaging.Middleware) error {
-	return nil
 }
 
 func (s *workerFakeSubscriber) Stop() {
