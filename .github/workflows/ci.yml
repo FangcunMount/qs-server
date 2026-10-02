@@ -214,11 +214,13 @@ jobs:
           MYSQL_CONTAINER: ${{ job.services.mysql.id }}
           QS_REMINDER_RESOLUTION_MYSQL_REQUIRED: '1'
           QS_REMINDER_RESOLUTION_MYSQL_DSN: 'root:root@tcp(127.0.0.1:3306)/qs_m5_reminder_resolution_test_ci?parseTime=true&loc=Asia%2FShanghai'
+          QS_DELIVERY_REPLAY_HTTP_MYSQL_REQUIRED: '1'
+          QS_DELIVERY_REPLAY_HTTP_MYSQL_DSN: 'root:root@tcp(127.0.0.1:3306)/qs_m5_delivery_http_test_ci?parseTime=true&loc=Asia%2FShanghai'
         run: |
-          docker exec "$MYSQL_CONTAINER" mysql -uroot -proot -e 'CREATE DATABASE qs_m5_reminder_resolution_test_ci'
-          trap 'docker exec "$MYSQL_CONTAINER" mysql -uroot -proot -e "DROP DATABASE qs_m5_reminder_resolution_test_ci"' EXIT
+          docker exec "$MYSQL_CONTAINER" mysql -uroot -proot -e 'CREATE DATABASE qs_m5_reminder_resolution_test_ci; CREATE DATABASE qs_m5_delivery_http_test_ci'
+          trap 'docker exec "$MYSQL_CONTAINER" mysql -uroot -proot -e "DROP DATABASE qs_m5_reminder_resolution_test_ci; DROP DATABASE qs_m5_delivery_http_test_ci"' EXIT
           go test ./internal/apiserver/infra/mysql/systemgovernance -run '^TestReminderResolutionAtomicAndNoResendMySQL$' -count=1 -v
-          go test ./internal/apiserver/transport/rest -run '^TestReminderResolutionHTTPReceiptMySQL$' -count=1 -v
+          go test ./internal/apiserver/transport/rest -run '^(TestReminderResolutionHTTPReceiptMySQL|TestDeliveryReplayHTTPAuditMySQL)$' -count=1 -v
 
   runtime-closure-e2e:
     name: Seeddata Retirement and Current Runtime E2E
