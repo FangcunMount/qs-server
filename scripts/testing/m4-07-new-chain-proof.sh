@@ -9,6 +9,10 @@ stream=${RM_QS_M407_STREAM:-both}
 mysql_command_dir=${RM_QS_M407_MYSQL_COMMAND_DIR:-}
 driver="${project}-driver-1"
 driver_image='nsqio/nsq@sha256:1a369c146af71bc95c25d54b375a2b98452478c1eaf4e85f8fcb01da20f2c78a'
+timezone_zip="$(go env GOROOT)/lib/time/zoneinfo.zip"
+[[ -s "$timezone_zip" ]] || { echo 'pinned Go timezone database is required' >&2; exit 1; }
+timezone_hash=$(sha256sum "$timezone_zip" | cut -d ' ' -f 1)
+printf 'timezone_database_sha256=%s source=pinned-Go-lib-time-zoneinfo.zip\n' "$timezone_hash"
 if [[ -n "$mysql_command_dir" ]]; then
   [[ "$stream" == assessment && "$mysql_command_dir" == /* && ! -e "$mysql_command_dir" ]] || {
     echo 'RM_QS_M407_MYSQL_COMMAND_DIR requires assessment stream and a new absolute directory' >&2
@@ -151,7 +155,9 @@ docker run --rm --pull never --name "$driver" \
   --entrypoint /tmp/m4-07-new-chain.test \
   --mount "type=bind,source=$binary,target=/tmp/m4-07-new-chain.test,readonly" \
   --mount "type=bind,source=$repo/configs/events.yaml,target=/tmp/m4-07/configs/events.yaml,readonly" \
+  --mount "type=bind,source=$timezone_zip,target=/tmp/m4-07/zoneinfo.zip,readonly" \
   -e TZ=Asia/Shanghai \
+  -e ZONEINFO=/tmp/m4-07/zoneinfo.zip \
   -e RM_QS_MONGO_URI='mongodb://mongo:27017/?replicaSet=rm-test' \
   -e RM_QS_ASSESSMENT_DSN='root@tcp(mysql:3306)/m4_qs_new_chain?parseTime=true&loc=UTC' \
   -e RM_QS_NSQ_TCP='nsqd:4150' \

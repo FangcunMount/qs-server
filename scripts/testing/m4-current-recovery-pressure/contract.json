@@ -54,7 +54,7 @@
     "internal/apiserver/container/internal/transaction/m4_new_assessment_chain_integration_test.go": "3291674e52d5c3e5f801d859b8b59dbee000b66fce456050352e325ad6cb5064",
     "internal/apiserver/domain/survey/answersheet/m4_07_event_id_proof.go": "249bb6778e82fd086d4bb2b3219e067e31fb10a9c85b08188d4fba9fe6c80d6a",
     "scripts/testing/m4-07-new-chain-compose.yaml": "97822cbd545398363465ce864ecf7af06a2a57360ba6b10e7aca8f6ae7b22302",
-    "scripts/testing/m4-07-new-chain-proof.sh": "692a94790b551ebe978def76f708a05a87ab0b3d0ea7623aff2ca32ccf2c747b",
+    "scripts/testing/m4-07-new-chain-proof.sh": "166242f9f8023cf2f8f1f2a6833b628151f29aa256c9556869d533e6da4e11a0",
     "scripts/testing/m4-07-sample-resources.sh": "9175c4fc9473a4fd6c27deb34855695a5999fc2f71e96d4c749f272ed6427034"
   },
   "schema_preflight": {
@@ -65,10 +65,11 @@
   },
   "required_schema_migration": "internal/pkg/migration/migrations/mysql/000089_qs_evaluation_request_ref.up.sql",
   "required_schema_migration_sha256": "6b61245d3713f3a18ffdc887453709182358426f5305932602d4e06cd2ffeb69",
-  "refrozen_at": "2026-10-03T07:53:05.333688+08:00",
+  "refrozen_at": "2026-10-03T07:57:17.668398+08:00",
   "load_generator_location": "separate disposable driver container; same original NSQ image reused; same VM and unmodified DB service images/budgets",
   "load_generator_cpu_or_memory_caps": false,
   "required_driver_sampling": "record independent client image, CPU, memory and uncapped resources; never combine client CPU with mysqld or hide total VM cost",
   "diagnostic_order_change": "record complete immutable identities and observed original duration before applying unchanged 120s assertion; no post-hoc duration reset",
-  "original_colocated_result_retained": "37077828799: candidate answer71.244s and all case gates pass; assessment68.437s but combined MySQL/client CPU159.75% fails150%; not reclassified as pass"
+  "original_colocated_result_retained": "37077828799: candidate answer71.244s and all case gates pass; assessment68.437s but combined MySQL/client CPU159.75% fails150%; not reclassified as pass",
+  "driver_timezone": "TZ=Asia/Shanghai; ZONEINFO points to readonly pinned Go1.25.12 lib/time/zoneinfo.zip, hash printed before launch"
 }
