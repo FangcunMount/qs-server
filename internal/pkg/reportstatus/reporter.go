@@ -7,9 +7,9 @@ import (
 
 	"github.com/FangcunMount/component-base/pkg/log"
 	"github.com/FangcunMount/component-base/pkg/logger"
-	"github.com/FangcunMount/component-base/pkg/signaling"
-	signalredis "github.com/FangcunMount/component-base/pkg/signaling/redis"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime"
+	"github.com/FangcunMount/reliable-messaging/signaling"
+	signalredis "github.com/FangcunMount/reliable-messaging/signaling/redis"
 )
 
 // Reporter best-effort 写入 Redis 状态并发送唤醒信号。

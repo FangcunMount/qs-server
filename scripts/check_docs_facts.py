@@ -3579,11 +3579,11 @@ def priority_infrastructure_doc_contract_issues() -> list[Issue]:
 
     go_mod = (ROOT / "go.mod").read_text(encoding="utf-8")
     # The current subscriber and terminal handoff belong to the fixed SDK.
-    # component-base v0.7.0 has no messaging packages; the old v0.6.11
+    # component-base v0.8.0 has no messaging/signaling packages; the old v0.6.11
     # contract is exercised only by independently built historical fixtures.
     if not (
-        re.search(r"^\s*github\.com/FangcunMount/reliable-messaging\s+v0\.3\.0-m6\.3\s*$", go_mod, flags=re.M)
-        and re.search(r"^\s*github\.com/FangcunMount/component-base\s+v0\.7\.0\s*$", go_mod, flags=re.M)
+        re.search(r"^\s*github\.com/FangcunMount/reliable-messaging\s+v0\.3\.0-m6\.4\s*$", go_mod, flags=re.M)
+        and re.search(r"^\s*github\.com/FangcunMount/component-base\s+v0\.8\.0\s*$", go_mod, flags=re.M)
     ):
         issues.append(
             Issue(

@@ -365,7 +365,7 @@ class InfrastructureParserTest(unittest.TestCase):
     def test_event_current_sdk_version_drift_requires_handoff_review(self) -> None:
         issues = self.issues_after_mutation(
             check_docs_facts.ROOT / "go.mod",
-            "github.com/FangcunMount/reliable-messaging v0.3.0-m6.3",
+            "github.com/FangcunMount/reliable-messaging v0.3.0-m6.4",
             "github.com/FangcunMount/reliable-messaging v0.3.0-m6.2",
             check_docs_facts.priority_infrastructure_doc_contract_issues,
         )

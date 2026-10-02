@@ -3,8 +3,8 @@ package reportstatus
 import (
 	"fmt"
 
-	"github.com/FangcunMount/component-base/pkg/signaling"
-	signalredis "github.com/FangcunMount/component-base/pkg/signaling/redis"
+	"github.com/FangcunMount/reliable-messaging/signaling"
+	signalredis "github.com/FangcunMount/reliable-messaging/signaling/redis"
 	goredis "github.com/redis/go-redis/v9"
 )
 

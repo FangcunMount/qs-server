@@ -5,8 +5,8 @@ import (
 	"strings"
 
 	"github.com/FangcunMount/component-base/pkg/logger"
-	signalredis "github.com/FangcunMount/component-base/pkg/signaling/redis"
 	"github.com/FangcunMount/qs-server/internal/pkg/cache/signal"
+	signalredis "github.com/FangcunMount/reliable-messaging/signaling/redis"
 )
 
 // StartCacheSignalWatcher 订阅缓存失效信令并触发本地预热。

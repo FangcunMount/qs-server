@@ -5,11 +5,11 @@ import (
 	"time"
 
 	"github.com/FangcunMount/component-base/pkg/logger"
-	"github.com/FangcunMount/component-base/pkg/signaling"
-	signalredis "github.com/FangcunMount/component-base/pkg/signaling/redis"
 	cachegov "github.com/FangcunMount/qs-server/internal/apiserver/cache/governance"
 	cacheobserve "github.com/FangcunMount/qs-server/internal/pkg/cache/observe"
 	cachesignal "github.com/FangcunMount/qs-server/internal/pkg/cache/signal"
+	"github.com/FangcunMount/reliable-messaging/signaling"
+	signalredis "github.com/FangcunMount/reliable-messaging/signaling/redis"
 	redis "github.com/redis/go-redis/v9"
 )
 
