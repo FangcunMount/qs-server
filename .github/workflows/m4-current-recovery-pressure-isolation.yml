@@ -46,6 +46,21 @@ jobs:
                   shutil.copy2(Path('harness')/n,target)
               Path('proof',side+'-source-head.txt').write_text(head+'\n')
           PYSEAL
+      - name: Check current schema and business fixture on disposable dependencies
+        shell: bash
+        env:
+          RM_QS_M407_STREAM: ${{ matrix.stream }}
+          RM_QS_M407_BATCH_COUNT: '16'
+          RM_QS_M407_SPACING_MS: '0'
+          RM_QS_M407_NSQ_OUTAGE_AFTER: '0'
+          TZ: Asia/Shanghai
+        run: |
+          set -Eeuo pipefail
+          for side in old new; do
+            export RM_QS_M407_RUNTIME_BASE=$(cat "$GITHUB_WORKSPACE/proof/$side-source-head.txt")
+            bash "$GITHUB_WORKSPACE/$side/scripts/testing/m4-07-new-chain-proof.sh" > "$GITHUB_WORKSPACE/proof/$side-${{ matrix.stream }}-schema-preflight.log" 2>&1
+            tail -n 5 "$GITHUB_WORKSPACE/proof/$side-${{ matrix.stream }}-schema-preflight.log"
+          done
       - name: Run baseline then candidate fixed sustained outage
         shell: bash
         env:

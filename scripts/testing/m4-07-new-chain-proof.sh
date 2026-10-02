@@ -71,6 +71,13 @@ if (!primary) throw new Error('replica set did not become primary');
 JS
 "${compose[@]}" exec -T mysql mysql -uroot -e 'CREATE DATABASE m4_qs_new_chain'
 "${compose[@]}" exec -T mysql mysql -uroot -e 'CREATE DATABASE m4_qs_new_assessment'
+# The current host stages original evaluation identity in its transaction.
+# Apply the exact current production migration to each disposable database;
+# missing this table rolls back every request before the pressure phase.
+for database in m4_qs_new_chain m4_qs_new_assessment; do
+  "${compose[@]}" exec -T mysql mysql -uroot "$database" < \
+    "$repo/internal/pkg/migration/migrations/mysql/000089_qs_evaluation_request_ref.up.sql"
+done
 "${compose[@]}" exec -T mysql mkdir -p /tmp/m4-07/configs
 "${compose[@]}" cp "$repo/configs/events.yaml" mysql:/tmp/m4-07/configs/events.yaml
 
