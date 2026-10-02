@@ -10,14 +10,14 @@ import (
 	"testing"
 	"time"
 
-	"github.com/FangcunMount/component-base/pkg/eventcodec"
-	"github.com/FangcunMount/component-base/pkg/messaging"
 	"github.com/FangcunMount/qs-server/internal/apiserver/eventing/standardoutbox"
 	"github.com/FangcunMount/qs-server/internal/pkg/event"
 	"github.com/FangcunMount/qs-server/internal/pkg/messagingruntime"
 	"github.com/FangcunMount/reliable-messaging/message"
 	"github.com/FangcunMount/reliable-messaging/transport"
 	sdknsq "github.com/FangcunMount/reliable-messaging/transport/nsq"
+	domainwire "github.com/FangcunMount/reliable-messaging/wire/domain"
+	legacywire "github.com/FangcunMount/reliable-messaging/wire/legacy"
 	driver "github.com/nsqio/go-nsq"
 	"github.com/stretchr/testify/require"
 )
@@ -135,14 +135,14 @@ func TestStandardWireThroughRealNSQ(t *testing.T) {
 	select {
 	case raw := <-received:
 		require.True(t, bytes.Equal(wire, raw), "NSQ changed standard intent wire bytes")
-		decoded, recognized, err := messaging.DecodeMessagePayload(raw)
+		decoded, recognized, err := legacywire.Decode(raw)
 		require.NoError(t, err)
 		require.True(t, recognized)
 		require.Equal(t, evt.EventID(), decoded.UUID)
 		require.Equal(t, evt.EventType(), decoded.Metadata["event_type"])
 		require.Equal(t, SourceAPIServer, decoded.Metadata["source"])
 		require.Equal(t, "2026-09-23T10:00:00.000+08:00", decoded.Metadata["occurred_at"])
-		envelope, err := eventcodec.DecodeEnvelope(decoded.Payload)
+		envelope, err := domainwire.DecodeEnvelope(decoded.Payload)
 		require.NoError(t, err)
 		require.Equal(t, evt.EventID(), envelope.ID)
 		require.Equal(t, evt.EventType(), envelope.EventType)

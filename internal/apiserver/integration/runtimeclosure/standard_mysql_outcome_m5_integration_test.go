@@ -12,7 +12,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/FangcunMount/component-base/pkg/messaging"
 	appeventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
 	"github.com/FangcunMount/qs-server/internal/apiserver/eventing/standardoutbox"
 	eventsubsystem "github.com/FangcunMount/qs-server/internal/apiserver/eventing/subsystem"
@@ -24,12 +23,14 @@ import (
 	"github.com/FangcunMount/reliable-messaging/relay"
 	sdkmongo "github.com/FangcunMount/reliable-messaging/storage/mongo"
 	sdkmysql "github.com/FangcunMount/reliable-messaging/storage/mysql"
+	rmtransport "github.com/FangcunMount/reliable-messaging/transport"
 	sdknsq "github.com/FangcunMount/reliable-messaging/transport/nsq"
+	legacywire "github.com/FangcunMount/reliable-messaging/wire/legacy"
 	"github.com/nsqio/go-nsq"
 )
 
 type standardClosureResult struct {
-	message   *messaging.Message
+	message   *rmtransport.Received
 	eventType string
 	brokerID  nsq.MessageID
 	attempts  uint16
@@ -85,7 +86,7 @@ func (d *standardClosureDelivery) Covers(eventType string) bool {
 
 func (d *standardClosureDelivery) UsesStandardMongo() bool { return d.standardMongo }
 
-func (d *standardClosureDelivery) Wait(t *testing.T, eventType string) (*messaging.Message, error) {
+func (d *standardClosureDelivery) Wait(t *testing.T, eventType string) (*rmtransport.Received, error) {
 	t.Helper()
 	for {
 		var got standardClosureResult
@@ -197,7 +198,7 @@ func newM5StandardEventSubsystemControlled(t *testing.T, opts eventsubsystem.Opt
 	consumer.SetLogger(nil, nsq.LogLevelError)
 	delivery := &standardClosureDelivery{results: make(chan standardClosureResult, 16), pending: make(map[string][]standardClosureResult), standardMongo: standardMongo, delayFirstFailure: delayFirstFailure}
 	consumer.AddHandler(nsq.HandlerFunc(func(raw *nsq.Message) error {
-		decoded, recognized, decodeErr := messaging.DecodeMessagePayload(raw.Body)
+		decoded, recognized, decodeErr := legacywire.Decode(raw.Body)
 		if decodeErr != nil || !recognized {
 			if decodeErr == nil {
 				decodeErr = fmt.Errorf("standard MySQL message has no original QS envelope")
@@ -222,7 +223,7 @@ func newM5StandardEventSubsystemControlled(t *testing.T, opts eventsubsystem.Opt
 			handleErr = errors.New("controlled lost Evaluation consumer ACK")
 		}
 		select {
-		case delivery.results <- standardClosureResult{message: decoded, eventType: eventType, brokerID: raw.ID, attempts: raw.Attempts, handledAt: time.Now(), err: handleErr}:
+		case delivery.results <- standardClosureResult{message: &rmtransport.Received{ID: decoded.UUID, TransportID: string(raw.ID[:]), Topic: topic, Channel: channel, Metadata: decoded.Metadata, Payload: decoded.Payload, Attempts: raw.Attempts, Timestamp: raw.Timestamp}, eventType: eventType, brokerID: raw.ID, attempts: raw.Attempts, handledAt: time.Now(), err: handleErr}:
 		case <-t.Context().Done():
 		}
 		return handleErr

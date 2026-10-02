@@ -24,7 +24,6 @@ import (
 	"google.golang.org/grpc/metadata"
 
 	cbdatabase "github.com/FangcunMount/component-base/pkg/database"
-	"github.com/FangcunMount/component-base/pkg/messaging"
 	actorpb "github.com/FangcunMount/qs-server/api/grpc/gen/actor"
 	answersheetpb "github.com/FangcunMount/qs-server/api/grpc/gen/answersheet"
 	evaluationpb "github.com/FangcunMount/qs-server/api/grpc/gen/evaluation"
@@ -67,6 +66,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/keyspace"
 	locksubsystem "github.com/FangcunMount/qs-server/internal/pkg/resilience/locklease/subsystem"
 	"github.com/FangcunMount/qs-server/internal/worker/handlers"
+	rmtransport "github.com/FangcunMount/reliable-messaging/transport"
 	sdklegacy "github.com/FangcunMount/reliable-messaging/wire/legacy"
 	drivermysql "github.com/go-sql-driver/mysql"
 	redis "github.com/redis/go-redis/v9"
@@ -84,7 +84,7 @@ const (
 
 type runtimeClosureDelivery interface {
 	SetHandlers(map[string]handlers.HandlerFunc)
-	Wait(*testing.T, string) (*messaging.Message, error)
+	Wait(*testing.T, string) (*rmtransport.Received, error)
 	Covers(string) bool
 	UsesStandardMongo() bool
 }
@@ -338,7 +338,7 @@ func runCurrentRuntimeClosure(t *testing.T, eventFactory runtimeClosureEventFact
 	if err != nil || answerResponse.GetId() == 0 {
 		t.Fatalf("submit AnswerSheet: response=%+v err=%v", answerResponse, err)
 	}
-	var answerMessage *messaging.Message
+	var answerMessage *rmtransport.Received
 	if delivery != nil && delivery.Covers(eventcatalog.AnswerSheetSubmitted) {
 		answerMessage, err = delivery.Wait(t, eventcatalog.AnswerSheetSubmitted)
 	} else {
@@ -357,7 +357,7 @@ func runCurrentRuntimeClosure(t *testing.T, eventFactory runtimeClosureEventFact
 		scenario.beforeEvaluation(t, ready.GetAssessmentId(), gormDB, eventing)
 		close(evaluationGate)
 	}
-	var evaluationMessage *messaging.Message
+	var evaluationMessage *rmtransport.Received
 	if delivery == nil {
 		evaluationMessage = capture.Wait(t, eventcatalog.EvaluationRequested)
 		err = evaluationHandler(t.Context(), eventcatalog.EvaluationRequested, evaluationMessage.Payload)
@@ -367,9 +367,9 @@ func runCurrentRuntimeClosure(t *testing.T, eventFactory runtimeClosureEventFact
 			t.Fatal("first Evaluation delivery must report the controlled lost NSQ consumer ACK")
 		}
 		evaluationMessage, err = delivery.Wait(t, eventcatalog.EvaluationRequested)
-		if evaluationMessage.UUID != firstEvaluation.UUID {
+		if evaluationMessage.ID != firstEvaluation.ID {
 			t.Fatalf("Evaluation event ID changed on NSQ redelivery: first=%s second=%s",
-				firstEvaluation.UUID, evaluationMessage.UUID)
+				firstEvaluation.ID, evaluationMessage.ID)
 		}
 	}
 	if err != nil {
@@ -402,7 +402,7 @@ func runCurrentRuntimeClosure(t *testing.T, eventFactory runtimeClosureEventFact
 	assertRowCount(t, gormDB, "runtime_checkpoint", "scope = ? AND assessment_id = ?", wantRuns, "evaluation_run", evaluated.GetAssessmentId())
 	assertRowCount(t, gormDB, "evaluation_outcome", "assessment_id = ?", 1, evaluated.GetAssessmentId())
 	assertEvaluationIntentCount(t, gormDB, true, eventcatalog.EvaluationOutcomeCommitted, 1)
-	var outcomeMessage *messaging.Message
+	var outcomeMessage *rmtransport.Received
 	if delivery == nil {
 		outcomeMessage = capture.Wait(t, eventcatalog.EvaluationOutcomeCommitted)
 		err = outcomeHandler(t.Context(), eventcatalog.EvaluationOutcomeCommitted, outcomeMessage.Payload)
@@ -416,10 +416,10 @@ func runCurrentRuntimeClosure(t *testing.T, eventFactory runtimeClosureEventFact
 	if delivery == nil {
 		err = outcomeHandler(t.Context(), eventcatalog.EvaluationOutcomeCommitted, outcomeMessage.Payload)
 	} else {
-		var redelivered *messaging.Message
+		var redelivered *rmtransport.Received
 		redelivered, err = delivery.Wait(t, eventcatalog.EvaluationOutcomeCommitted)
-		if redelivered.UUID != outcomeMessage.UUID {
-			t.Fatalf("Outcome event ID changed on NSQ redelivery: first=%s second=%s", outcomeMessage.UUID, redelivered.UUID)
+		if redelivered.ID != outcomeMessage.ID {
+			t.Fatalf("Outcome event ID changed on NSQ redelivery: first=%s second=%s", outcomeMessage.ID, redelivered.ID)
 		}
 	}
 	if err != nil {
@@ -435,8 +435,8 @@ func runCurrentRuntimeClosure(t *testing.T, eventFactory runtimeClosureEventFact
 	for range 2 {
 		select {
 		case eventID := <-reportEventIDs:
-			if eventID != outcomeMessage.UUID {
-				t.Fatalf("Interpretation gRPC event ID=%q, want original %q", eventID, outcomeMessage.UUID)
+			if eventID != outcomeMessage.ID {
+				t.Fatalf("Interpretation gRPC event ID=%q, want original %q", eventID, outcomeMessage.ID)
 			}
 		case <-t.Context().Done():
 			t.Fatal("Interpretation gRPC did not receive original event ID", t.Context().Err())
@@ -446,7 +446,7 @@ func runCurrentRuntimeClosure(t *testing.T, eventFactory runtimeClosureEventFact
 		assertStandardEvaluationPublished(t, gormDB, eventcatalog.EvaluationRequested)
 		assertStandardEvaluationPublished(t, gormDB, eventcatalog.EvaluationOutcomeCommitted)
 	}
-	var reportMessage *messaging.Message
+	var reportMessage *rmtransport.Received
 	if delivery != nil && delivery.Covers(eventcatalog.InterpretationReportGenerated) {
 		reportMessage, err = delivery.Wait(t, eventcatalog.InterpretationReportGenerated)
 	} else {
@@ -891,13 +891,12 @@ func mustWorkerHandler(t *testing.T, registry *handlers.Registry, name string, d
 
 type capturedMQPublisher struct {
 	mu       sync.Mutex
-	messages []*messaging.Message
+	messages []*rmtransport.Received
 }
 
-func newCapturedMQPublisher() *capturedMQPublisher                           { return &capturedMQPublisher{} }
-func (p *capturedMQPublisher) Publish(context.Context, string, []byte) error { return nil }
-func (p *capturedMQPublisher) Close() error                                  { return nil }
-func (p *capturedMQPublisher) PublishWire(ctx context.Context, topic string, wire []byte) error {
+func newCapturedMQPublisher() *capturedMQPublisher { return &capturedMQPublisher{} }
+func (p *capturedMQPublisher) Close() error        { return nil }
+func (p *capturedMQPublisher) PublishWire(_ context.Context, topic string, wire []byte) error {
 	envelope, recognized, err := sdklegacy.Decode(wire)
 	if err != nil {
 		return err
@@ -905,11 +904,8 @@ func (p *capturedMQPublisher) PublishWire(ctx context.Context, topic string, wir
 	if !recognized {
 		return fmt.Errorf("runtime closure publisher received an unrecognized wire envelope")
 	}
-	return p.PublishMessage(ctx, topic, &messaging.Message{UUID: envelope.UUID, Metadata: envelope.Metadata, Payload: envelope.Payload})
-}
-func (p *capturedMQPublisher) PublishMessage(_ context.Context, topic string, message *messaging.Message) error {
-	copyMessage := &messaging.Message{UUID: message.UUID, Topic: topic, Payload: append([]byte(nil), message.Payload...), Metadata: make(map[string]string, len(message.Metadata))}
-	for key, value := range message.Metadata {
+	copyMessage := &rmtransport.Received{ID: envelope.UUID, Topic: topic, Payload: append([]byte(nil), envelope.Payload...), Metadata: make(map[string]string, len(envelope.Metadata))}
+	for key, value := range envelope.Metadata {
 		copyMessage.Metadata[key] = value
 	}
 	p.mu.Lock()
@@ -917,7 +913,7 @@ func (p *capturedMQPublisher) PublishMessage(_ context.Context, topic string, me
 	p.mu.Unlock()
 	return nil
 }
-func (p *capturedMQPublisher) Wait(t *testing.T, eventType string) *messaging.Message {
+func (p *capturedMQPublisher) Wait(t *testing.T, eventType string) *rmtransport.Received {
 	t.Helper()
 	deadline := time.Now().Add(10 * time.Second)
 	for time.Now().Before(deadline) {

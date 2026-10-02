@@ -121,13 +121,13 @@ func TestM5OldFailureRedeliveryAfterDurableReportKeepsParticipantCompleted(t *te
 
 			oldFailure, err := delivery.Wait(t, eventcatalog.EvaluationFailed)
 			require.NoError(t, err)
-			require.NotEmpty(t, oldFailure.UUID)
+			require.NotEmpty(t, oldFailure.ID)
 			physical, ok := delivery.(*standardClosureDelivery)
 			require.True(t, ok)
 			require.Greater(t, physical.lastFailureAttempts, uint16(1))
 			require.True(t, physical.lastFailureHandledAt.After(reportVerifiedAt),
 				"old failure must be physically handled after the newer report is durable")
-			t.Logf("old failure event=%s broker=%s attempts=%d after report=%s", oldFailure.UUID,
+			t.Logf("old failure event=%s broker=%s attempts=%d after report=%s", oldFailure.ID,
 				physical.firstFailureBrokerID, physical.lastFailureAttempts, reportVerifiedAt.Format(time.RFC3339Nano))
 			runAfterRedelivery, err := query.GetMyAssessmentRunStatus(t.Context(), testeeID, assessmentID)
 			require.NoError(t, err)
