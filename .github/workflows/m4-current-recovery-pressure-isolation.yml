@@ -1,6 +1,8 @@
 name: M4 current recovery pressure isolation
 on:
   workflow_dispatch:
+  push:
+    branches: [codex/m4-current-recovery-pressure]
 permissions:
   contents: read
 jobs:
