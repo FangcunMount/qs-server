@@ -1,0 +1,268 @@
+{
+  "schema_version": "ai-explanation-output/v2",
+  "scene_contract_version": "mbti-single-assessment/v2",
+  "summary": {
+    "content": "本次结果为 ISFJ；这是本次四轴偏好结果。",
+    "basis": "report_fact",
+    "evidence_refs": [
+      {
+        "kind": "model_result",
+        "ref": "model_result"
+      }
+    ]
+  },
+  "sections": [
+    {
+      "topic": "personality",
+      "insights": [
+        {
+          "title": "参考含义",
+          "content": "本条仅展示参考内容引用结构，不构成真实个体解读。",
+          "basis": "general_reference",
+          "evidence_refs": [
+            {
+              "kind": "model_result",
+              "ref": "model_result"
+            },
+            {
+              "kind": "dimension",
+              "ref": "dimension:EI"
+            }
+          ],
+          "reference_refs": [
+            "reference:personality.introversion"
+          ]
+        },
+        {
+          "title": "探索应用",
+          "content": "本条仅展示需要实际体验核对的应用结构。",
+          "basis": "exploration",
+          "evidence_refs": [
+            {
+              "kind": "model_result",
+              "ref": "model_result"
+            },
+            {
+              "kind": "dimension",
+              "ref": "dimension:EI"
+            }
+          ],
+          "reference_refs": [
+            "reference:personality.introversion"
+          ]
+        }
+      ],
+      "reflection_questions": [
+        {
+          "question": "在这个主题的真实经历中，哪些情况符合或不符合参考描述？",
+          "basis": "exploration",
+          "evidence_refs": [
+            {
+              "kind": "model_result",
+              "ref": "model_result"
+            },
+            {
+              "kind": "dimension",
+              "ref": "dimension:EI"
+            }
+          ],
+          "reference_refs": [
+            "reference:personality.introversion"
+          ]
+        }
+      ],
+      "actions": [
+        {
+          "title": "自愿核对",
+          "goal": "将参考解释与真实体验比较。",
+          "steps": [
+            "选择一件相关经历，记录符合与不符合的地方。"
+          ],
+          "basis": "exploration",
+          "evidence_refs": [
+            {
+              "kind": "model_result",
+              "ref": "model_result"
+            },
+            {
+              "kind": "dimension",
+              "ref": "dimension:EI"
+            }
+          ],
+          "reference_refs": [
+            "reference:personality.introversion"
+          ]
+        }
+      ]
+    },
+    {
+      "topic": "career",
+      "insights": [
+        {
+          "title": "参考含义",
+          "content": "本条仅展示参考内容引用结构，不构成真实个体解读。",
+          "basis": "general_reference",
+          "evidence_refs": [
+            {
+              "kind": "model_result",
+              "ref": "model_result"
+            },
+            {
+              "kind": "dimension",
+              "ref": "dimension:EI"
+            }
+          ],
+          "reference_refs": [
+            "reference:career.introversion"
+          ]
+        },
+        {
+          "title": "探索应用",
+          "content": "本条仅展示需要实际体验核对的应用结构。",
+          "basis": "exploration",
+          "evidence_refs": [
+            {
+              "kind": "model_result",
+              "ref": "model_result"
+            },
+            {
+              "kind": "dimension",
+              "ref": "dimension:EI"
+            }
+          ],
+          "reference_refs": [
+            "reference:career.introversion"
+          ]
+        }
+      ],
+      "reflection_questions": [
+        {
+          "question": "在这个主题的真实经历中，哪些情况符合或不符合参考描述？",
+          "basis": "exploration",
+          "evidence_refs": [
+            {
+              "kind": "model_result",
+              "ref": "model_result"
+            },
+            {
+              "kind": "dimension",
+              "ref": "dimension:EI"
+            }
+          ],
+          "reference_refs": [
+            "reference:career.introversion"
+          ]
+        }
+      ],
+      "actions": [
+        {
+          "title": "自愿核对",
+          "goal": "将参考解释与真实体验比较。",
+          "steps": [
+            "选择一件相关经历，记录符合与不符合的地方。"
+          ],
+          "basis": "exploration",
+          "evidence_refs": [
+            {
+              "kind": "model_result",
+              "ref": "model_result"
+            },
+            {
+              "kind": "dimension",
+              "ref": "dimension:EI"
+            }
+          ],
+          "reference_refs": [
+            "reference:career.introversion"
+          ]
+        }
+      ]
+    },
+    {
+      "topic": "relationships",
+      "insights": [
+        {
+          "title": "参考含义",
+          "content": "本条仅展示参考内容引用结构，不构成真实个体解读。",
+          "basis": "general_reference",
+          "evidence_refs": [
+            {
+              "kind": "model_result",
+              "ref": "model_result"
+            },
+            {
+              "kind": "dimension",
+              "ref": "dimension:EI"
+            }
+          ],
+          "reference_refs": [
+            "reference:relationships.introversion"
+          ]
+        },
+        {
+          "title": "探索应用",
+          "content": "本条仅展示需要实际体验核对的应用结构。",
+          "basis": "exploration",
+          "evidence_refs": [
+            {
+              "kind": "model_result",
+              "ref": "model_result"
+            },
+            {
+              "kind": "dimension",
+              "ref": "dimension:EI"
+            }
+          ],
+          "reference_refs": [
+            "reference:relationships.introversion"
+          ]
+        }
+      ],
+      "reflection_questions": [
+        {
+          "question": "在这个主题的真实经历中，哪些情况符合或不符合参考描述？",
+          "basis": "exploration",
+          "evidence_refs": [
+            {
+              "kind": "model_result",
+              "ref": "model_result"
+            },
+            {
+              "kind": "dimension",
+              "ref": "dimension:EI"
+            }
+          ],
+          "reference_refs": [
+            "reference:relationships.introversion"
+          ]
+        }
+      ],
+      "actions": [
+        {
+          "title": "自愿核对",
+          "goal": "将参考解释与真实体验比较。",
+          "steps": [
+            "选择一件相关经历，记录符合与不符合的地方。"
+          ],
+          "basis": "exploration",
+          "evidence_refs": [
+            {
+              "kind": "model_result",
+              "ref": "model_result"
+            },
+            {
+              "kind": "dimension",
+              "ref": "dimension:EI"
+            }
+          ],
+          "reference_refs": [
+            "reference:relationships.introversion"
+          ]
+        }
+      ]
+    }
+  ],
+  "limitations": [
+    "本文件为合成契约示例，未经过质量审核，不用于真实解读。"
+  ]
+}
