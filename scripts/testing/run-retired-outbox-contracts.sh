@@ -6,8 +6,8 @@ source_commit=96fc4df42f6af9f6ce22e2184394b1a07df2ffdd
 [[ $(git -C "$repo" rev-parse "$source_commit^{commit}") == "$source_commit" ]] || exit 1
 kind=${1:-unit}
 case "$kind" in
- unit|original-mongo|original-mysql|fin-loss|profile-handoff|mongo-drain|mongo-only) ;;
- *) echo 'Usage: run-retired-outbox-contracts.sh unit|original-mongo|original-mysql|fin-loss|profile-handoff|mongo-drain|mongo-only' >&2; exit 2;;
+ transport-unit|unit|original-mongo|original-mysql|fin-loss|profile-handoff|mongo-drain|mongo-only) ;;
+ *) echo 'Usage: run-retired-outbox-contracts.sh transport-unit|unit|original-mongo|original-mysql|fin-loss|profile-handoff|mongo-drain|mongo-only' >&2; exit 2;;
 esac
 snapshot=$(mktemp -d "${TMPDIR:-/tmp}/qs-retired-outbox-test.XXXXXX")
 trap 'rm -rf -- "$snapshot"' EXIT
@@ -18,6 +18,8 @@ echo "Historical source: $source_commit; case: $kind"
 cd "$snapshot"
 export GOWORK=off
 case "$kind" in
+ transport-unit)
+  go test -count=1 -run '^Test(FailedMessageHandlerPreservesTransportEvidence|UnknownEventRecorderPreservesPayloadAndRejectsMissingAudit)$' -v ./internal/pkg/eventing/transport ;;
  unit)
   go test -count=1 ./internal/apiserver/outboxcore ./internal/apiserver/application/eventing ./internal/apiserver/infra/mysql/eventoutbox ./internal/apiserver/infra/mongo/eventoutbox ./internal/apiserver/infra/redis/outboxready ;;
  original-mongo)

@@ -19,6 +19,10 @@ type fastSDKWorkerSubscriber struct {
 }
 
 func newFastSDKWorkerSubscriber(config SubscriberConfig, attempts int, delay time.Duration, recorder DeadLetterRecorder) (*fastSDKWorkerSubscriber, error) {
+	return newFastSDKWorkerSubscriberWithRetry(config, attempts, rmnsq.Backoff{BaseDelay: delay, MaxDelay: delay}, recorder)
+}
+
+func newFastSDKWorkerSubscriberWithRetry(config SubscriberConfig, attempts int, retry rmnsq.Backoff, recorder DeadLetterRecorder) (*fastSDKWorkerSubscriber, error) {
 	driver, err := newNSQConfig(config.NSQMessageTimeout)
 	if err != nil {
 		return nil, err
@@ -26,7 +30,7 @@ func newFastSDKWorkerSubscriber(config SubscriberConfig, attempts int, delay tim
 	inner, err := rmnsq.NewSubscriber(rmnsq.SubscriberConfig{
 		LookupdAddresses: []string{config.NSQLookupdAddr}, Driver: driver,
 		MaxInFlight: 1, MaxAttempts: uint16(attempts),
-		Retry:              rmnsq.Backoff{BaseDelay: delay, MaxDelay: delay},
+		Retry:              retry,
 		FailedHandoffGroup: config.FailedHandoffGroup,
 	})
 	if err != nil {
@@ -43,4 +47,14 @@ func (s *fastSDKWorkerSubscriber) Close() error {
 	ctx, cancel := context.WithTimeout(context.Background(), 35*time.Second)
 	defer cancel()
 	return s.inner.Close(ctx)
+}
+
+func publishSDKTestEnvelope(ctx context.Context, publisher interface {
+	PublishWire(context.Context, string, []byte) error
+}, topic string, envelope legacy.Envelope) error {
+	wire, err := legacy.Encode(envelope, legacy.Revision2)
+	if err != nil {
+		return err
+	}
+	return publisher.PublishWire(ctx, topic, wire)
 }
