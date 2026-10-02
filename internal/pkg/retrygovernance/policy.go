@@ -84,12 +84,14 @@ var DefaultBusinessPolicy = Policy{
 	MaxDelay:             5 * time.Minute,
 }
 
-// DefaultOutboxPolicy bounds automatic durable publish attempts.
+// DefaultOutboxPolicy bounds automatic durable publish attempts. Its delay
+// ceiling leaves time to drain committed messages within the recovery window;
+// the business-run policy and the 30-attempt publish budget remain separate.
 var DefaultOutboxPolicy = Policy{
-	Version:              "outbox-publish-retry/v1",
+	Version:              "outbox-publish-retry/v2",
 	MaxAutomaticAttempts: 30,
 	BaseDelay:            10 * time.Second,
-	MaxDelay:             time.Hour,
+	MaxDelay:             time.Minute,
 	JitterFraction:       0.20,
 }
 

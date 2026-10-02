@@ -419,7 +419,7 @@ system_governance:
     outbox:
       max_automatic_attempts: 30
       base_delay: 10s
-      max_delay: 1h
+      max_delay: 1m
       jitter_fraction: 0.2
   # 生产默认关闭；上线时按动态限流、队列、Leader 让权顺序逐项启用。
   resilience:

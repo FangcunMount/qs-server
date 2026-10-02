@@ -4,10 +4,19 @@ import (
 	"io"
 	"log/slog"
 	"testing"
+	"time"
 
 	workerconfig "github.com/FangcunMount/qs-server/internal/worker/config"
 	workeroptions "github.com/FangcunMount/qs-server/internal/worker/options"
 )
+
+func TestHoldReplayFallbackRetainsIndependentRetryPolicy(t *testing.T) {
+	policy := (&server{}).holdReplayPolicy()
+	if policy.Version != "retry-hold-publish/v1" || policy.MaxAutomaticAttempts != 30 ||
+		policy.BaseDelay != 10*time.Second || policy.MaxDelay != time.Hour || policy.JitterFraction != 0.20 {
+		t.Fatalf("Hold fallback inherited Outbox scheduling: %+v", policy)
+	}
+}
 
 func TestWorkerMaxDeliveryAttemptsAndHardCap(t *testing.T) {
 	tests := []struct {

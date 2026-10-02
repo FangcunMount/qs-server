@@ -408,7 +408,7 @@ system_governance:
     outbox:
       max_automatic_attempts: 30
       base_delay: 10s
-      max_delay: 1h
+      max_delay: 1m
       jitter_fraction: 0.2
   # 高风险韧性动作默认关闭，开发环境按动作显式启用。
   resilience:

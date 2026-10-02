@@ -1,6 +1,7 @@
 package retrygovernance
 
 import (
+	"fmt"
 	"testing"
 	"time"
 )
@@ -124,5 +125,34 @@ func TestConfigurePoliciesRejectsHardCapViolation(t *testing.T) {
 	outbox.MaxAutomaticAttempts = HardMaxOutboxAttempts + 1
 	if err := ConfigurePolicies(DefaultBusinessPolicy, outbox); err == nil {
 		t.Fatal("expected outbox hard-cap validation error")
+	}
+}
+
+// A recovered broker must not leave committed intents asleep behind the old
+// hour-long backoff. This bounds scheduling only; the pressure proof measures
+// actual delivery/consumer drain separately.
+func TestOutboxRecoveryBackoffDoesNotSleepThroughDrainWindow(t *testing.T) {
+	now := time.Date(2026, 10, 3, 7, 0, 0, 0, time.FixedZone("UTC+8", 8*3600))
+	for i := 0; i < 500; i++ {
+		for attempt := 1; attempt < HardMaxOutboxAttempts; attempt++ {
+			d := DefaultOutboxPolicy.DecideFailureForKey(true, attempt, now, fmt.Sprintf("recover-%d", i))
+			if d.Disposition != DispositionAutomatic || d.NextAttemptAt == nil {
+				t.Fatalf("attempt %d lost automatic recovery: %#v", attempt, d)
+			}
+			if delay := d.NextAttemptAt.Sub(now); delay <= 0 || delay > 72*time.Second {
+				t.Fatalf("attempt %d wait %s leaves no bounded drain time", attempt, delay)
+			}
+			if d.MaxAutomaticAttempts != 30 || d.RemainingAutomaticAttempts != 30-attempt {
+				t.Fatalf("publish budget changed: %#v", d)
+			}
+		}
+	}
+	exhausted := DefaultOutboxPolicy.DecideFailureForKey(true, 30, now, "recover-0")
+	if exhausted.Disposition != DispositionManualRequired || exhausted.NextAttemptAt != nil {
+		t.Fatalf("exhausted intent reopened: %#v", exhausted)
+	}
+	terminal := DefaultOutboxPolicy.DecideFailureForKey(false, 1, now, "recover-0")
+	if terminal.Disposition != DispositionTerminal || terminal.NextAttemptAt != nil {
+		t.Fatalf("terminal intent scheduled again: %#v", terminal)
 	}
 }
