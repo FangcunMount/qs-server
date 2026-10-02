@@ -417,6 +417,11 @@ jobs:
           grep -q -- '--- PASS: TestHotRankDayRecoveryAfterActualNSQConfirmationLoss' "${RUNNER_TEMP}/hotrank-recovery.log"
           # Run after the hot-rank proof: Attention creates a real channel,
           # while the hot-rank loss fixture intentionally starts without one.
+          # The same-container restart may allocate new ephemeral host ports.
+          tcp_port="$(docker inspect --format '{{(index (index .NetworkSettings.Ports "4150/tcp") 0).HostPort}}' "$M6_HOTRANK_NSQ_CONTAINER")"
+          http_port="$(docker inspect --format '{{(index (index .NetworkSettings.Ports "4151/tcp") 0).HostPort}}' "$M6_HOTRANK_NSQ_CONTAINER")"
+          export M6_HOTRANK_NSQ_ADDRESS="127.0.0.1:${tcp_port}"
+          export M6_HOTRANK_NSQ_HTTP="http://127.0.0.1:${http_port}"
           go test -tags='integration reliable_messaging_m4' -run '^TestAttentionFactRecoveryAfterActualNSQConfirmationLoss$' \
             -count=1 -timeout=2m -v ./internal/apiserver/integration/runtimeclosure | tee "${RUNNER_TEMP}/attention-recovery.log"
           if grep -q -- '--- SKIP:' "${RUNNER_TEMP}/attention-recovery.log"; then
