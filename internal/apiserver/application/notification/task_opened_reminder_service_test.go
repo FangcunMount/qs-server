@@ -3,6 +3,7 @@ package notification
 import (
 	"context"
 	"errors"
+	"fmt"
 	"testing"
 	"time"
 
@@ -83,6 +84,11 @@ func (s *reminderDeliveryStub) Confirm(context.Context, ReminderDeliveryKey, str
 	s.state = ReminderConfirmed
 	return true, nil
 }
+func (s *reminderDeliveryStub) Reject(_ context.Context, _ ReminderDeliveryKey, _ string, code int64, _ time.Time) (bool, error) {
+	s.state = ReminderRejected
+	s.unknownCode = fmt.Sprintf("platform_rejected_%d", code)
+	return true, nil
+}
 func (s *reminderDeliveryStub) MarkUnknown(_ context.Context, _ ReminderDeliveryKey, _, code string, _ time.Time) (bool, error) {
 	s.unknownCount++
 	s.unknownCode = code
@@ -105,15 +111,19 @@ func (s *reminderDeliveryStub) ListNeedsReview(context.Context, int64, time.Time
 }
 
 type receiptSenderStub struct {
-	calls            int
-	err              error
-	withoutMessageID bool
+	calls             int
+	err               error
+	withoutMessageID  bool
+	platformErrorCode int64
 }
 
 func (s *receiptSenderStub) SendSubscribeMessageWithReceipt(_ context.Context, _, _ string, _ wechatmini.SubscribeMessage) (wechatmini.SubscribeSendReceipt, error) {
 	s.calls++
 	if s.err != nil {
 		return wechatmini.SubscribeSendReceipt{}, s.err
+	}
+	if s.platformErrorCode != 0 {
+		return wechatmini.SubscribeSendReceipt{PlatformErrorCode: s.platformErrorCode}, nil
 	}
 	receipt := wechatmini.SubscribeSendReceipt{Accepted: true}
 	if !s.withoutMessageID {
@@ -323,6 +333,38 @@ func TestDurableReminderDoesNotCallPlatformWhenTaskChangesDuringCallMarker(t *te
 			require.Equal(t, tc.wantCode, deliveries.unknownCode)
 			require.NoError(t, service.ProcessTaskOpenedReminder(context.Background(), request))
 			require.Zero(t, receipts.calls, "a marked unknown result must not be sent automatically")
+		})
+	}
+}
+
+func TestDurableReminderClassifiesSuccessRejectionAndUnknownWithoutResend(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		err    error
+		code   int64
+		want   ReminderDeliveryState
+		reason string
+	}{
+		{name: "accepted", want: ReminderConfirmed},
+		{name: "explicit_rejection", code: 43101, want: ReminderRejected, reason: "platform_rejected_43101"},
+		{name: "lost_reply", err: errors.New("response lost"), want: ReminderManualRequired, reason: "platform_result_unknown"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			opened := time.Now().Add(-time.Minute).Round(time.Millisecond)
+			expires := opened.Add(24 * time.Hour)
+			reader := &reminderTaskReaderStub{state: &planApp.TaskReminderState{OrgID: 7, TaskID: "task-1", TesteeID: "12", Status: planDomain.TaskStatusOpened, ScheduleRevision: 3, OpenAt: &opened, ExpireAt: &expires, EntryURL: "/pages/task/index?task_id=task-1"}}
+			profile := uint64(1001)
+			identities := &reminderCandidateReaderStub{linked: []iambridge.MiniProgramLinkedUser{{UserID: "self-user", Relations: []string{"self"}}}, candidates: []iambridge.MiniProgramRecipientCandidate{{UserID: "self-user", LoginIdentityID: "self-identity", AppID: "wx-app", OpenID: "fixture-openid", Relations: []string{"self"}}}}
+			ledger := &reminderDeliveryStub{}
+			sender := &receiptSenderStub{err: tc.err, platformErrorCode: tc.code}
+			service := NewTaskOpenedReminderService(reader, &testeeLookupStub{result: &testeeApp.TesteeResult{ID: 12, OrgID: 7, ProfileID: &profile}}, identities, &reminderBatchStub{}, ledger, nil, &senderStub{templates: []wechatmini.SubscribeTemplate{{ID: "tmpl-1", Content: "{{thing5.DATA}}{{date1.DATA}}{{character_string2.DATA}}{{thing3.DATA}}"}}}, sender, nil, nil, &Config{AppID: "wx-app", AppSecret: "fixture-only", TaskOpenedTemplateID: "tmpl-1", PagePath: "pages/task/index"})
+			req := TaskOpenedReminderRequest{OpeningEventID: "original-event", Intent: TaskOpenedReminderIntent{OrgID: 7, TaskID: "task-1", TesteeID: "12", ScheduleRevision: 3, OpenAt: opened}}
+			require.NoError(t, service.ProcessTaskOpenedReminder(t.Context(), req))
+			require.Equal(t, tc.want, ledger.state)
+			require.Equal(t, tc.reason, ledger.unknownCode)
+			require.NoError(t, service.ProcessTaskOpenedReminder(t.Context(), req))
+			require.Equal(t, 1, sender.calls)
+			require.Equal(t, 1, ledger.beginCount)
 		})
 	}
 }

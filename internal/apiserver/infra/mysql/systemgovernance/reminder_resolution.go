@@ -77,15 +77,18 @@ func (s *ActionAuditStore) ResolveReminder(ctx context.Context, orgID int64, act
 		if !errors.Is(err, gorm.ErrRecordNotFound) {
 			return err
 		}
-		if row.TaskID != req.TaskID || row.OpeningEventID != req.OpeningEventID || (row.State != "manual_required" && row.State != "sending") || row.ExternalCallStartedAt == nil || !row.UpdatedAt.Equal(req.ExpectedUpdatedAt) {
+		if row.TaskID != req.TaskID || row.OpeningEventID != req.OpeningEventID || (row.State != "manual_required" && row.State != "sending" && row.State != "rejected") || row.ExternalCallStartedAt == nil || !row.UpdatedAt.Equal(req.ExpectedUpdatedAt) {
 			return baseerrors.WithCode(code.ErrConflict, "reminder identity or expected state changed")
+		}
+		if row.State == "rejected" && req.Finding != "platform_rejected" {
+			return baseerrors.WithCode(code.ErrConflict, "explicit platform rejection must not be relabeled as unknown or success")
 		}
 		if row.State == "sending" && (req.Finding != "unknown_no_resend" || !req.AcknowledgeOriginalCallMayComplete) {
 			return baseerrors.WithCode(code.ErrConflict, "original call may still complete; only acknowledged unknown closure is permitted")
 		}
 		now := time.Now().In(time.FixedZone("UTC+8", 8*3600))
 		result = &app.ActionRunResult{RequestID: req.RequestID, ActionID: reminderResolutionActionID, Status: "succeeded", StartedAt: now, FinishedAt: now, Result: map[string]interface{}{
-			"delivery_id": req.DeliveryID, "task_id": req.TaskID, "opening_event_id": req.OpeningEventID, "finding": req.Finding, "evidence_reference": req.EvidenceReference, "delivery_state": "reviewed", "automatic_resend": false, "original_call_may_complete": row.State == "sending",
+			"delivery_id": req.DeliveryID, "task_id": req.TaskID, "opening_event_id": req.OpeningEventID, "finding": req.Finding, "evidence_reference": req.EvidenceReference, "delivery_state": "reviewed", "automatic_resend": false, "original_call_may_complete": row.State == "sending", "original_resolution_code": row.ResolutionCode,
 		}}
 		encoded, err := json.Marshal(actionAuditEnvelope{SchemaVersion: 2, Result: result})
 		if err != nil {
@@ -95,7 +98,11 @@ func (s *ActionAuditStore) ResolveReminder(ctx context.Context, orgID int64, act
 		if err := tx.Create(&audit).Error; err != nil {
 			return fmt.Errorf("persist reminder resolution audit: %w", err)
 		}
-		update := tx.Model(&reminderResolutionRow{}).Where("id = ? AND org_id = ? AND state = ? AND updated_at = ?", row.ID, orgID, row.State, row.UpdatedAt).Updates(map[string]interface{}{"state": "reviewed", "resolution_code": "manual_" + req.Finding, "updated_at": now})
+		resolutionCode := "manual_" + req.Finding
+		if row.State == "rejected" {
+			resolutionCode = "manual_" + row.ResolutionCode
+		}
+		update := tx.Model(&reminderResolutionRow{}).Where("id = ? AND org_id = ? AND state = ? AND updated_at = ?", row.ID, orgID, row.State, row.UpdatedAt).Updates(map[string]interface{}{"state": "reviewed", "resolution_code": resolutionCode, "updated_at": now})
 		if update.Error != nil {
 			return update.Error
 		}

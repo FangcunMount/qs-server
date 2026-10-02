@@ -170,4 +170,36 @@ func TestReminderResolutionAtomicAndNoResendMySQL(t *testing.T) {
 	require.NoError(t, db.Model(&actionRunPO{}).Where("request_id = ?", "review-platform-first").Count(&audits).Error)
 	require.Zero(t, audits)
 
+	rejectedKey := key
+	rejectedKey.TaskID, rejectedKey.OpeningEventID = "rejected-task", "rejected-event"
+	_, err = sender.EnsurePending(t.Context(), rejectedKey, "user-1", now)
+	require.NoError(t, err)
+	token, claimed, err = sender.Claim(t.Context(), rejectedKey, time.Minute, now)
+	require.NoError(t, err)
+	require.True(t, claimed)
+	started, err = sender.BeginExternalCall(t.Context(), rejectedKey, token, now.Add(time.Second))
+	require.NoError(t, err)
+	require.True(t, started)
+	rejectedRecorded, err := sender.Reject(t.Context(), rejectedKey, token, 43101, now.Add(2*time.Second))
+	require.NoError(t, err)
+	require.True(t, rejectedRecorded)
+	var rejectedRow reminderResolutionRow
+	require.NoError(t, db.Where("task_id = ?", rejectedKey.TaskID).Take(&rejectedRow).Error)
+	rejectionReview := app.ReminderResolutionRequest{RequestID: "review-rejected", DeliveryID: rejectedRow.ID, TaskID: rejectedRow.TaskID, OpeningEventID: rejectedRow.OpeningEventID, ExpectedUpdatedAt: rejectedRow.UpdatedAt, Finding: "unknown_no_resend", EvidenceReference: "recorded-platform-errcode", Reason: "acknowledge explicit rejection without resending", Confirm: true}
+	_, err = store.ResolveReminder(t.Context(), 7, 11, rejectionReview)
+	require.Error(t, err, "must not relabel an explicit platform error")
+	rejectionReview.Finding = "platform_rejected"
+	rejectionReceipt, err := store.ResolveReminder(t.Context(), 7, 11, rejectionReview)
+	require.NoError(t, err)
+	require.Equal(t, "platform_rejected_43101", rejectionReceipt.Result["original_resolution_code"])
+	require.NoError(t, db.Where("id = ?", rejectedRow.ID).Take(&rejectedRow).Error)
+	require.Equal(t, "reviewed", rejectedRow.State)
+	require.Equal(t, "manual_platform_rejected_43101", rejectedRow.ResolutionCode)
+	_, claimed, err = sender.Claim(t.Context(), rejectedKey, time.Minute, now.Add(time.Hour))
+	require.NoError(t, err)
+	require.False(t, claimed)
+	replayReceipt, err := store.ResolveReminder(t.Context(), 7, 11, rejectionReview)
+	require.NoError(t, err)
+	require.Equal(t, rejectionReceipt.RequestID, replayReceipt.RequestID)
+
 }

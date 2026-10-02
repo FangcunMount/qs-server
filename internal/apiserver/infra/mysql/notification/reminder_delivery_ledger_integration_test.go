@@ -250,4 +250,49 @@ func TestReminderDeliveryLedgerSurvivesCompetingConsumersAndUnknownSend(t *testi
 		WHERE table_schema = DATABASE() AND table_name = 'task_opened_reminder_delivery'
 		AND column_name IN ('open_id','entry_url','access_token')`).Scan(&sensitiveColumns).Error)
 	require.Zero(t, sensitiveColumns)
+	// An explicit error response is distinct from unknown, never reclaimable,
+	// and remains visible to scoped governance without changing the original ID.
+	rejected := base
+	rejected.LoginIdentityID = "identity-rejected"
+	_, err = first.EnsurePending(ctx, rejected, "user-rejected", now)
+	require.NoError(t, err)
+	rejectionToken, claimed, err := first.Claim(ctx, rejected, time.Minute, now)
+	require.NoError(t, err)
+	require.True(t, claimed)
+	started, err = first.BeginExternalCall(ctx, rejected, rejectionToken, now.Add(time.Second))
+	require.NoError(t, err)
+	require.True(t, started)
+	_, err = first.Reject(ctx, rejected, rejectionToken, 0, now.Add(2*time.Second))
+	require.Error(t, err)
+	recorded, err := second.Reject(ctx, rejected, "not-the-claimant", 43101, now.Add(2*time.Second))
+	require.NoError(t, err)
+	require.False(t, recorded)
+	recorded, err = first.Reject(ctx, rejected, rejectionToken, 43101, now.Add(2*time.Second))
+	require.NoError(t, err)
+	require.True(t, recorded)
+	recorded, err = second.MarkUnknown(ctx, rejected, rejectionToken, "response_lost", now.Add(3*time.Second))
+	require.NoError(t, err)
+	require.False(t, recorded)
+	confirmed, err = second.Confirm(ctx, rejected, rejectionToken, "conflicting-success", now.Add(3*time.Second))
+	require.NoError(t, err)
+	require.False(t, confirmed)
+	_, claimed, err = second.Claim(ctx, rejected, time.Minute, now.Add(time.Hour))
+	require.NoError(t, err)
+	require.False(t, claimed)
+	row, err := second.Read(ctx, rejected)
+	require.NoError(t, err)
+	require.Equal(t, appnotification.ReminderRejected, row.State)
+	require.Equal(t, "platform_rejected_43101", row.ResolutionCode)
+	require.NotNil(t, row.ExternalCallStartedAt)
+	page, err := second.ListReminderReviews(ctx, 501, now.Add(time.Hour), "", 10)
+	require.NoError(t, err)
+	foundRejected := false
+	for _, item := range page.Items {
+		if item.State == "rejected" {
+			foundRejected = true
+			require.Equal(t, "platform_rejected_43101", item.ResolutionCode)
+		}
+	}
+	require.True(t, foundRejected)
+
 }

@@ -105,7 +105,7 @@ func (s *SubscribeSender) SendSubscribeMessageWithReceipt(ctx context.Context, a
 		return wechatmini.SubscribeSendReceipt{}, fmt.Errorf("send subscribe request: missing or invalid errcode")
 	}
 	if *result.ErrCode != 0 {
-		return wechatmini.SubscribeSendReceipt{}, fmt.Errorf("send subscribe request: platform errcode=%d", *result.ErrCode)
+		return wechatmini.SubscribeSendReceipt{PlatformErrorCode: *result.ErrCode}, nil
 	}
 	if result.ErrMsg == nil || *result.ErrMsg != "ok" {
 		return wechatmini.SubscribeSendReceipt{}, fmt.Errorf("send subscribe request: missing or invalid success message")

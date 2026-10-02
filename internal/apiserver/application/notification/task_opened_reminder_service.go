@@ -288,7 +288,19 @@ func (s *taskOpenedReminderService) deliverOne(
 		return nil
 	}
 	receipt, sendErr := s.receipts.SendSubscribeMessageWithReceipt(ctx, batch.AppID, appSecret, message)
-	if sendErr != nil || !receipt.Accepted {
+	if sendErr == nil && !receipt.Accepted && receipt.PlatformErrorCode != 0 {
+		recorded, err := s.deliveries.Reject(settleCtx, key, token, receipt.PlatformErrorCode, s.now())
+		if err != nil {
+			return err
+		}
+		if !recorded {
+			return fmt.Errorf("platform rejection could not be recorded")
+		}
+		logger.L(ctx).Warnw("task reminder platform explicitly rejected request",
+			"task_id", intent.TaskID, "opening_event_id", batchKey.OpeningEventID, "platform_errcode", receipt.PlatformErrorCode)
+		return nil
+	}
+	if sendErr != nil || !receipt.Accepted || receipt.PlatformErrorCode != 0 {
 		var marked bool
 		marked, err = s.deliveries.MarkUnknown(settleCtx, key, token, "platform_result_unknown", s.now())
 		if err != nil {

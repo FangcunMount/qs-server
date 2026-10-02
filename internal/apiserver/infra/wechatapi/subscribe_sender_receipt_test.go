@@ -65,7 +65,6 @@ func TestSendSubscribeMessageWithReceiptRejectsAmbiguousResponsesWithoutRetry(t 
 		{"missing errmsg", http.StatusOK, `{"errcode":0}`},
 		{"invalid errmsg", http.StatusOK, `{"errcode":0,"errmsg":"unknown"}`},
 		{"invalid msgid", http.StatusOK, `{"errcode":0,"errmsg":"ok","msgid":0}`},
-		{"platform rejection", http.StatusOK, `{"errcode":43101,"errmsg":"user refuse"}`},
 		{"malformed", http.StatusOK, `{`},
 		{"HTTP failure", http.StatusBadGateway, `{"errcode":0,"errmsg":"ok"}`},
 	} {
@@ -109,5 +108,20 @@ func TestLegacySubscribeSendKeepsItsOwnCall(t *testing.T) {
 	}
 	if client.legacyCalls != 1 {
 		t.Fatalf("legacyCalls=%d", client.legacyCalls)
+	}
+}
+
+func TestSendSubscribeMessageWithReceiptPreservesExplicitPlatformRejection(t *testing.T) {
+	calls := 0
+	sender := &SubscribeSender{
+		newClient: func(_, _ string) (subscribeClient, error) { return &receiptClientStub{}, nil },
+		doRequest: func(*http.Request) (*http.Response, error) {
+			calls++
+			return receiptResponse(http.StatusOK, `{"errcode":43101,"errmsg":"user refuse"}`), nil
+		},
+	}
+	receipt, err := sender.SendSubscribeMessageWithReceipt(context.Background(), "app", "secret", wechatmini.SubscribeMessage{})
+	if err != nil || receipt.Accepted || receipt.PlatformErrorCode != 43101 || receipt.PlatformMessageID != "" || calls != 1 {
+		t.Fatalf("receipt=%+v err=%v calls=%d", receipt, err, calls)
 	}
 }
