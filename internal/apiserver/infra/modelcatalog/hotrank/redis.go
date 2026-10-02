@@ -14,7 +14,12 @@ import (
 
 const defaultScaleHotRankRetention = 400 * 24 * time.Hour
 
+var hotRankTimezone = time.FixedZone("UTC+8", 8*60*60)
+
 var projectScaleHotSubmissionScript = redis.NewScript(`
+if redis.call("EXISTS", KEYS[3]) == 1 then
+	return -1
+end
 if redis.call("EXISTS", KEYS[1]) == 1 then
 	return 0
 end
@@ -70,8 +75,15 @@ func (r *RedisScaleHotRankProjection) ProjectSubmission(ctx context.Context, fac
 		ttlSeconds = int64(defaultScaleHotRankRetention.Seconds())
 	}
 	processedKey := r.keys.BuildScaleHotProjectedKey(eventID)
-	dailyKey := r.keys.BuildScaleHotDailyKey(submittedAt.Local().Format("20060102"))
-	return projectScaleHotSubmissionScript.Run(ctx, r.client, []string{processedKey, dailyKey}, ttlSeconds, questionnaireCode).Err()
+	dailyKey := r.keys.BuildScaleHotDailyKey(submittedAt.In(hotRankTimezone).Format("20060102"))
+	result, err := projectScaleHotSubmissionScript.Run(ctx, r.client, []string{processedKey, dailyKey, dailyKey + ":rebuild-lock"}, ttlSeconds, questionnaireCode).Int64()
+	if err != nil {
+		return err
+	}
+	if result == -1 {
+		return ErrRebuildInProgress
+	}
+	return nil
 }
 
 func (r *RedisScaleHotRankProjection) Top(ctx context.Context, query hotrank.Query) ([]hotrank.Entry, error) {
@@ -93,7 +105,7 @@ func (r *RedisScaleHotRankProjection) Top(ctx context.Context, query hotrank.Que
 		return hotRankItemsFromZ(values), nil
 	}
 
-	token := fmt.Sprintf("%s:%d", r.now().Local().Format("20060102"), windowDays)
+	token := fmt.Sprintf("%s:%d", r.now().In(hotRankTimezone).Format("20060102"), windowDays)
 	dest := r.keys.BuildScaleHotWindowKey(token)
 	if err := r.client.ZUnionStore(ctx, dest, &redis.ZStore{
 		Keys:      keys,
@@ -111,7 +123,7 @@ func (r *RedisScaleHotRankProjection) Top(ctx context.Context, query hotrank.Que
 }
 
 func (r *RedisScaleHotRankProjection) windowKeys(windowDays int) []string {
-	now := r.now().Local()
+	now := r.now().In(hotRankTimezone)
 	keys := make([]string, 0, windowDays)
 	for i := 0; i < windowDays; i++ {
 		day := now.AddDate(0, 0, -i).Format("20060102")
