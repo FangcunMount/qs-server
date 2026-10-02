@@ -10,7 +10,6 @@ import (
 	"github.com/FangcunMount/component-base/pkg/eventmessaging"
 	"github.com/FangcunMount/component-base/pkg/messaging"
 	"github.com/FangcunMount/qs-server/internal/apiserver/eventing/standardoutbox"
-	"github.com/FangcunMount/qs-server/internal/apiserver/outboxcore"
 	"github.com/FangcunMount/qs-server/internal/pkg/event"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
 	"github.com/FangcunMount/reliable-messaging/message"
@@ -98,11 +97,11 @@ func TestDurableEventWireCompatibility(t *testing.T) {
 			}
 			// The legacy Relay decodes the stored domain event and encodes it
 			// again before publishing. The new intent must match that path too.
-			stored, err := outboxcore.DecodePendingEvent(evt.EventID(), string(oldMessage.Payload))
+			stored, err := DecodeDomainEvent(oldMessage.Payload)
 			if err != nil {
 				t.Fatal(err)
 			}
-			relayMessage, err := eventmessaging.BuildMessage(stored.Event, SourceAPIServer)
+			relayMessage, err := eventmessaging.BuildMessage(stored, SourceAPIServer)
 			if err != nil {
 				t.Fatal(err)
 			}

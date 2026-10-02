@@ -59,11 +59,13 @@ Event 模块负责把进程内已经发生的业务事实，按明确的可靠�
 
 文档与实现冲突时，按以下顺序判断：
 
-1. wire contract 与基础抽象：`component-base/pkg/event`、`eventcodec`、`eventmessaging`。
+1. QS 业务事件值：`internal/pkg/event`；通用 wire：`reliable-messaging/wire/domain`、`wire/legacy`。
 2. 事件路由清单：[`configs/events.yaml`](../../../configs/events.yaml)。
 3. 工程契约：`internal/pkg/eventing/catalog` 中的 `EventSpec` 与 `EffectiveRegistry`。
 4. 运行时行为：`internal/apiserver/eventing/subsystem`、Outbox Store/relay、worker eventing。
 5. 本目录文档。
+
+持久死信重放与旧 Relay 的历史领域信封由 `internal/pkg/eventing/runtime/decoder.go` 复用 SDK 解析，再映射为 QS 自有业务事件值；未知发布或完成结果仍进入人工核对。旧 Outbox 状态／存储桥和回退入口尚未退役，不能据此认定 `component-base` 已退出消息领域。
 
 `EffectiveRegistry` 在启动时合并 YAML 与代码契约并做严格校验；[Event 契约与演进](./20-事件契约与演进.md)中的矩阵还有同步测试保护。因此，文档矩阵不是手工维护的旁路清单。
 

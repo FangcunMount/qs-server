@@ -12,10 +12,10 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/actor/actorctx"
 	cachegovernance "github.com/FangcunMount/qs-server/internal/apiserver/application/cachegovernance"
 	cachemodel "github.com/FangcunMount/qs-server/internal/apiserver/cache/governance/model"
-	"github.com/FangcunMount/qs-server/internal/apiserver/outboxcore"
 	outboxport "github.com/FangcunMount/qs-server/internal/apiserver/port/outbox"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/internal/pkg/event"
+	eventruntime "github.com/FangcunMount/qs-server/internal/pkg/eventing/runtime"
 	"github.com/FangcunMount/qs-server/internal/pkg/resilience/control"
 	uuid "github.com/satori/go.uuid"
 )
@@ -243,7 +243,7 @@ func (e *ActionExecutor) runReplayDelivery(ctx context.Context, orgID int64, req
 			return nil, deliveryReplayFailure(code.ErrInternalServerError, len(results), target.ID, "授权结果异常，请核对后处理", "authorization returned unexpected result")
 		}
 		item := authorized[0]
-		pending, decodeErr := outboxcore.DecodePendingEvent(item.EventID, item.PayloadJSON)
+		evt, decodeErr := eventruntime.DecodeDomainEvent([]byte(item.PayloadJSON))
 		now := time.Now()
 		if decodeErr != nil {
 			settleCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 6*time.Second)
@@ -254,7 +254,7 @@ func (e *ActionExecutor) runReplayDelivery(ctx context.Context, orgID int64, req
 			}
 			return nil, deliveryReplayFailure(code.ErrInternalServerError, len(results), item.ID, "内容无法解析，仍需人工处理", "decode failed: "+decodeErr.Error())
 		}
-		if safetyErr := deliveryReplaySafetyError(pending.Event.EventType()); safetyErr != nil {
+		if safetyErr := deliveryReplaySafetyError(evt.EventType()); safetyErr != nil {
 			settleCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 6*time.Second)
 			failErr := e.deliveryReplay.FailReplay(settleCtx, item.ID, requestID, safetyErr.Error(), now)
 			cancel()
@@ -263,7 +263,7 @@ func (e *ActionExecutor) runReplayDelivery(ctx context.Context, orgID int64, req
 			}
 			return nil, deliveryReplayFailure(code.ErrConflict, len(results), item.ID, "最佳努力事件需人工核对，不可直接重放", safetyErr.Error())
 		}
-		if err := e.eventPublisher.Publish(ctx, pending.Event); err != nil {
+		if err := e.eventPublisher.Publish(ctx, evt); err != nil {
 			settleCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 6*time.Second)
 			recordErr := e.deliveryReplay.RecordReplayUncertain(settleCtx, item.ID, requestID, "publish outcome unknown: "+err.Error(), time.Now())
 			cancel()
@@ -284,7 +284,7 @@ func (e *ActionExecutor) runReplayDelivery(ctx context.Context, orgID int64, req
 			}
 			return nil, deliveryReplayFailure(code.ErrInternalServerError, len(results), item.ID, "完成状态待核对，请勿再次重放", "completion outcome unknown: "+err.Error())
 		}
-		results = append(results, map[string]interface{}{"id": item.ID, "event_id": pending.Event.EventID(), "replayed": true})
+		results = append(results, map[string]interface{}{"id": item.ID, "event_id": evt.EventID(), "replayed": true})
 	}
 	return map[string]interface{}{"replayed": len(results), "items": results}, nil
 }
