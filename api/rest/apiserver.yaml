@@ -8950,6 +8950,116 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/core.ErrResponse'
+  /internal/v1/system-governance/actions/reminder-gap-recoveries:
+    post:
+      tags:
+      - System-Governance
+      summary: 系统治理-授权恢复缺收件批次的原任务提醒
+      description: 仅 qs:admin；需要恢复及提醒开关同时开启。仅重排原消息，不直接发送微信；已有收件责任拒绝恢复。
+      operationId: 系统治理授权恢复缺收件批次的原任务提醒
+      parameters:
+      - type: string
+        description: Bearer 用户令牌
+        name: Authorization
+        in: header
+        required: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/systemgovernance.ReminderGapRecoveryRequest'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/core.Response'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/systemgovernance.ActionRunResult'
+        '400':
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '401':
+          description: 认证失败或访问令牌无效
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '403':
+          description: 无权访问该资源
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '500':
+          description: 服务内部错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+  /internal/v1/system-governance/actions/reminder-gap-recoveries/resolve:
+    post:
+      tags:
+      - System-Governance
+      summary: 系统治理-核对原任务提醒恢复回执
+      description: 只读匹配同机构、操作者和完整原输入；回执缺失不授权另建请求。
+      operationId: 系统治理核对原任务提醒恢复回执
+      parameters:
+      - type: string
+        description: Bearer 用户令牌
+        name: Authorization
+        in: header
+        required: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/systemgovernance.ReminderGapRecoveryRequest'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/core.Response'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/systemgovernance.ActionRunResult'
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '401':
+          description: 认证失败或访问令牌无效
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '403':
+          description: 无权访问该资源
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '500':
+          description: 服务内部错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
   /internal/v1/system-governance/actions/reminder-resolutions:
     post:
       tags:
@@ -19304,6 +19414,25 @@ components:
             type: array
             items:
               type: string
+    systemgovernance.ReminderGapRecoveryRequest:
+      type: object
+      properties:
+        confirm:
+          type: boolean
+        evidence_reference:
+          type: string
+        expected_version:
+          type: integer
+        opened_before:
+          type: string
+        opening_event_id:
+          type: string
+        reason:
+          type: string
+        request_id:
+          type: string
+        task_id:
+          type: string
     systemgovernance.ReminderResolutionRequest:
       type: object
       properties:

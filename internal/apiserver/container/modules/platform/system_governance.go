@@ -26,19 +26,20 @@ import (
 
 // RESTSystemGovernanceInput collects dependencies for the governance facade.
 type RESTSystemGovernanceInput struct {
-	Options                 *options.SystemGovernanceOptions
-	EventStatusService      appEventing.StatusService
-	EventOutboxes           []appEventing.NamedOutboxStatusReader
-	CacheGovernance         cachegovernance.Facade
-	CachePolicyReloader     systemgov.CachePolicyReloader
-	LocalResilienceSnapshot func() resilience.RuntimeSnapshot
-	MySQLDB                 *gorm.DB
-	MongoDB                 *mongo.Database
-	ResilienceGovernor      control.Governor
-	ActionAuditStore        systemgov.ActionAuditStore
-	ActionHandlers          map[string]systemgov.ActionHandler
-	EventPublisher          event.EventPublisher
-	ReportResolutionReader  interpretationreadmodel.ReportResolutionReader
+	Options                   *options.SystemGovernanceOptions
+	EventStatusService        appEventing.StatusService
+	EventOutboxes             []appEventing.NamedOutboxStatusReader
+	CacheGovernance           cachegovernance.Facade
+	CachePolicyReloader       systemgov.CachePolicyReloader
+	LocalResilienceSnapshot   func() resilience.RuntimeSnapshot
+	MySQLDB                   *gorm.DB
+	MongoDB                   *mongo.Database
+	ResilienceGovernor        control.Governor
+	ActionAuditStore          systemgov.ActionAuditStore
+	ActionHandlers            map[string]systemgov.ActionHandler
+	EventPublisher            event.EventPublisher
+	ReportResolutionReader    interpretationreadmodel.ReportResolutionReader
+	TaskOpenedReminderEnabled bool
 }
 
 // BuildRESTSystemGovernanceFacade assembles the unified governance facade.
@@ -78,6 +79,7 @@ func BuildRESTSystemGovernanceFacade(in RESTSystemGovernanceInput) systemgov.Fac
 	var reminderReviewReader systemgov.ReminderReviewReader
 	var reminderResolver systemgov.ReminderResolver
 	var gapRecoveryStore systemgov.GapRecoveryStore
+	var reminderGapRecovery systemgov.ReminderGapRecovery
 	gapRecoveryEnabled := false
 	if in.MySQLDB != nil {
 		reader := governanceinfra.NewActionAuditStore(in.MySQLDB)
@@ -85,6 +87,7 @@ func BuildRESTSystemGovernanceFacade(in RESTSystemGovernanceInput) systemgov.Fac
 		deliveryReplayReviewReader = reader
 		reminderReviewReader = reminderinfra.NewReminderDeliveryLedger(in.MySQLDB)
 		reminderResolver = reader
+		reminderGapRecovery = reader
 		if replay, found := registry.Get("events.replay_delivery"); found && replay.Enabled {
 			deliveryResolver = governanceinfra.NewReportGeneratedDeliveryResolver(in.MySQLDB, in.ReportResolutionReader)
 		}
@@ -120,6 +123,8 @@ func BuildRESTSystemGovernanceFacade(in RESTSystemGovernanceInput) systemgov.Fac
 		DeliveryResolver:           deliveryResolver,
 		GapRecoveryStore:           gapRecoveryStore,
 		GapRecoveryEnabled:         gapRecoveryEnabled,
+		ReminderGapRecovery:        reminderGapRecovery,
+		ReminderGapRecoveryEnabled: gapRecoveryEnabled && in.TaskOpenedReminderEnabled,
 	})
 }
 
