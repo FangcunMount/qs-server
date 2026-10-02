@@ -146,11 +146,7 @@ func runCLI(parent context.Context, args []string, stdout, stderr io.Writer) int
 		_, _ = fmt.Fprintln(stderr, "original retry recovery: explicit reviewed NSQ address required")
 		return 1
 	}
-	driverConfig := driver.NewConfig()
-	driverConfig.DialTimeout = 2 * time.Second
-	driverConfig.ReadTimeout = 3 * time.Second
-	driverConfig.WriteTimeout = 3 * time.Second
-	producer, err := driver.NewProducer(address, driverConfig)
+	producer, err := newRecoveryProducer(address)
 	if err != nil {
 		_, _ = fmt.Fprintln(stderr, "original retry recovery: NSQ producer configuration invalid")
 		return 1
@@ -204,4 +200,15 @@ func runCLI(parent context.Context, args []string, stdout, stderr io.Writer) int
 		return 2
 	}
 	return 0
+}
+
+func newRecoveryProducer(address string) (*driver.Producer, error) {
+	cfg := driver.NewConfig()
+	cfg.DialTimeout = 2 * time.Second
+	// go-nsq validates the shared config even for producers. Its default
+	// heartbeat is 30s and would invalidate the bounded 3s read timeout.
+	cfg.HeartbeatInterval = time.Second
+	cfg.ReadTimeout = 3 * time.Second
+	cfg.WriteTimeout = 3 * time.Second
+	return driver.NewProducer(address, cfg)
 }

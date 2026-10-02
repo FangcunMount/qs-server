@@ -186,3 +186,13 @@ func TestApplyRequiresExplicitExternalResultReviewAndExactSource(t *testing.T) {
 		t.Fatal("inspect disclosed payload or report content")
 	}
 }
+
+func TestRecoveryProducerAcceptsItsBoundedDriverConfiguration(t *testing.T) {
+	// NewProducer validates without connecting. This catches the real shared
+	// heartbeat/read-timeout conflict observed by the owned NSQ proof.
+	p, err := newRecoveryProducer("127.0.0.1:9")
+	if err != nil {
+		t.Fatal(err)
+	}
+	p.Stop()
+}

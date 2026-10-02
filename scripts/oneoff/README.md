@@ -116,3 +116,34 @@ git diff --check
 重复恢复和晚到原消息验证业务 UPDATE 仅一次；恢复派生事件与原事件仍各有账本，允许两次 RPC，不宣称单行账本或 exactly-once。
 本场不改变生产配置、不调用模型或微信。现役人工恢复入口仍是 Worker 的 `attention-projection-reconcile-*` 开关、固定 ReportIDs／Fingerprint，以及 `scripts/cd/audit-attention-reconcile-dry-run.sh` 的 dry-run／apply 有界核对。
 生产范围、先 dry-run 后 apply、恢复原配置与未知结果不盲重发的门槛不变。
+
+### 原授权报告重试通知恢复
+
+`interpretation_retry_recover` 是人工操作工具，默认只读 `inspect`。它仅补投已有原事务中的
+`interpretation.retry.requested`，不调用 `Authorize`、不新造请求／attempt，也不改标准 Outbox
+的 published 状态。仅限仍失败、原授权已到期、没有任何后续 attempt（含软删除）的原 Run。
+原组织、Generation／Outcome、原授权来源／action_request_id／attempt、完整信封与 SDK 指纹
+必须一致；source fingerprint 同时绑定原冻结模板版本。
+
+1. 在指定恢复主机以现有运维身份构建／安装 `interpretation-retry-recover`，固定一个私有
+   0700 审计目录。保留 0600 审计文件和所属主机；不得通过换主机、目录或 request 绕过原记录。
+2. 连接配置只通过现役 `QS_APISERVER_MONGODB_*` 环境，或 `MONGO_URI`／`MONGO_DB` 提供。
+   apply 另要求显式核对 `M6_RETRY_NSQ_ADDRESS`；不在参数、日志或审计中放凭据。
+3. `--run-id 原RunID --org-id 组织ID` 默认只读，保存输出的 `source_fingerprint` 和原身份。
+   只读发现不能代替操作授权；必须核实消息丢失且没有未知模型调用被重放。
+4. 经核对后执行 `--mode apply --run-id 原RunID --org-id 组织ID
+   --source-fingerprint 原摘要 --request-id 本次操作UUID --operator 值守身份 --reason 核对结论
+   --external-result-reviewed --audit-dir 固定目录`。timeout／unknown 原业务结果拒绝补投；
+   即便是其它失败，仍要求外部结果核对，不能把布尔声明当作模型回执。
+5. 发送前先持久化原消息 reservation 与本次 intent，并重新捕获原事务；源改变即停。
+   这是单次人工入口：原消息存在 reservation 后不会自动再次发送。PUB OK 仅写传输 confirmed，
+   不代表报告完成；最终通过现有 Generation／Run／报告查询按原身份核对业务结果。
+6. 任何超时、unknown、审计回执写失败或缺失，使用
+   `--mode reconcile --request-id 本次操作UUID --audit-dir 固定目录` 查询本地原审计。
+   该模式不连 broker、不补投，缺回执仍未知；它不是自动修复或业务完成查询。
+   即使确认返回后再次丢失，也必须保留原记录并人工核对，不建立新请求绕过单次限制。
+
+`original_retry_recovery_integration_test.go` 用真实 Mongo 原事务、SDK Relay、独立 NSQ
+确认后 SIGKILL 和实际工具，验证原通知恢复与正常 Worker 重复消费后的唯一 Run／报告。
+冻结 Outcome 读取端口、内容构建器与客户端到应用服务的桥接为隔离夹具；不冒充真实 MySQL、
+RPC／mTLS 或模型调用证明。CI 以新建所属 broker 避免旧 channel 干扰，要求实际 PASS、禁止 SKIP。
