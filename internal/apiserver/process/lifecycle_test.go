@@ -6,7 +6,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/FangcunMount/component-base/pkg/messaging"
 	"github.com/FangcunMount/component-base/pkg/processruntime"
 	"github.com/FangcunMount/component-base/pkg/shutdown"
 	bootstrap "github.com/FangcunMount/qs-server/internal/apiserver/bootstrap"
@@ -101,12 +100,6 @@ func TestRunProcessLifecycleDepsRunsInExpectedOrder(t *testing.T) {
 
 type fakeSubscriber struct {
 	order *[]string
-}
-
-func (s *fakeSubscriber) Subscribe(string, string, messaging.Handler) error { return nil }
-
-func (s *fakeSubscriber) SubscribeWithMiddleware(string, string, messaging.Handler, ...messaging.Middleware) error {
-	return nil
 }
 
 func (s *fakeSubscriber) Stop() {

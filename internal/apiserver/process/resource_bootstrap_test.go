@@ -8,7 +8,6 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/FangcunMount/component-base/pkg/messaging"
 	"github.com/FangcunMount/qs-server/internal/apiserver/cache/subsystem"
 	apiserverconfig "github.com/FangcunMount/qs-server/internal/apiserver/config"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container"
@@ -117,12 +116,6 @@ func TestAPIProjectionOnlySelectsSDKSubscriberForNSQ(t *testing.T) {
 			}
 		})
 	}
-}
-
-func (*fakePublisher) Publish(_ context.Context, _ string, _ []byte) error { return nil }
-
-func (*fakePublisher) PublishMessage(_ context.Context, _ string, _ *messaging.Message) error {
-	return nil
 }
 
 func (p *fakePublisher) Close() error {
