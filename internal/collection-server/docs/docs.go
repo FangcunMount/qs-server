@@ -3947,6 +3947,12 @@ const docTemplate = `{
                 "content": {
                     "type": "object"
                 },
+                "reference_material": {
+                    "type": "object"
+                },
+                "reference_material_fingerprint": {
+                    "type": "string"
+                },
                 "report_id": {
                     "type": "string"
                 },

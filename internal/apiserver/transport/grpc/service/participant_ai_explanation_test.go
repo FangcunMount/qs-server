@@ -134,3 +134,24 @@ func TestWorkflowSourceRequiresCorrectDelegationWithLegacyServiceAbsent(t *testi
 		t.Fatalf("disabled workflow: %v", err)
 	}
 }
+
+func TestWorkflowReadPreservesOriginalFrozenReferences(t *testing.T) {
+	raw, err := os.ReadFile("../../../../pkg/contract/testdata/mbti-three-topic-artifact.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var artifact bridge.Artifact
+	if err = json.Unmarshal(raw, &artifact); err != nil {
+		t.Fatal(err)
+	}
+	result, err := toProtoAIWorkflowResult("request", &bridge.Event{SessionID: artifact.SessionID, Status: "completed", ArtifactJSON: string(raw)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.ReferenceMaterialJson != artifact.ReferenceMaterialJSON || result.ReferenceMaterialFingerprint != artifact.ReferenceMaterialFingerprint || result.ContentJson != artifact.ContentJSON {
+		t.Fatal("source/body/fingerprint changed in projection")
+	}
+	if strings.Contains(result.String(), "provider_request_id") {
+		t.Fatal("internal metadata exposed")
+	}
+}

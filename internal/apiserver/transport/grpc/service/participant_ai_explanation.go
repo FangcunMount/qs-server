@@ -100,6 +100,8 @@ func toProtoAIWorkflowResult(requestID string, event *bridge.Event) (*interpreta
 	if artifact != nil {
 		result.ContentJson, result.ArtifactId = artifact.ContentJSON, artifact.ID
 		result.ReportId, result.SourceVersion = artifact.ReportID, artifact.SourceVersion
+		result.ReferenceMaterialJson = artifact.ReferenceMaterialJSON
+		result.ReferenceMaterialFingerprint = artifact.ReferenceMaterialFingerprint
 	}
 	return result, nil
 }
