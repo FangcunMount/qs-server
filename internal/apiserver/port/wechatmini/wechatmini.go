@@ -45,7 +45,10 @@ type MiniProgramSubscribeSender interface {
 // a user received the message. The documented success response has errcode=0
 // but does not guarantee a msgid, so PlatformMessageID is optional.
 type SubscribeSendReceipt struct {
-	Accepted          bool
+	Accepted bool
+	// Nonzero only for a complete HTTP 200 platform response with explicit errcode.
+	// This is never permission to resend and must not accompany a transport error.
+	PlatformErrorCode int64
 	PlatformMessageID string
 }
 

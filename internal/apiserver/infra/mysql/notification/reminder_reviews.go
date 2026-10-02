@@ -22,8 +22,8 @@ func (s *ReminderDeliveryLedger) ListReminderReviews(
 		return systemgov.ReminderReviewPage{}, fmt.Errorf("reminder review requires a database, organization, cutoff, and limit from 1 to 100")
 	}
 	query := s.db.WithContext(ctx).Model(&reminderDeliveryPO{}).Where(
-		"org_id = ? AND ((state = ? AND updated_at <= ?) OR state = ?)",
-		orgID, appnotification.ReminderSending, sendingOlderThan, appnotification.ReminderManualRequired,
+		"org_id = ? AND ((state = ? AND updated_at <= ?) OR state IN ?)",
+		orgID, appnotification.ReminderSending, sendingOlderThan, []appnotification.ReminderDeliveryState{appnotification.ReminderManualRequired, appnotification.ReminderRejected},
 	)
 	if cursor != "" {
 		updatedAt, id, err := parseReminderReviewCursor(cursor)

@@ -155,6 +155,22 @@ func (s *ReminderDeliveryLedger) Confirm(
 	)
 }
 
+// Reject preserves an explicit platform error without treating it as a lost reply.
+// The original claimant alone may record it; rejected rows never become sendable.
+func (s *ReminderDeliveryLedger) Reject(ctx context.Context, key appnotification.ReminderDeliveryKey, token string, platformErrorCode int64, now time.Time) (bool, error) {
+	if err := s.validateClaim(key, token, now); err != nil {
+		return false, err
+	}
+	if platformErrorCode == 0 {
+		return false, fmt.Errorf("nonzero platform error code required")
+	}
+	return s.transition(ctx, key,
+		"state = ? AND claim_token = ? AND external_call_started_at IS NOT NULL",
+		[]any{appnotification.ReminderSending, token},
+		map[string]any{"state": appnotification.ReminderRejected, "resolution_code": fmt.Sprintf("platform_rejected_%d", platformErrorCode), "updated_at": now},
+	)
+}
+
 func (s *ReminderDeliveryLedger) MarkUnknown(
 	ctx context.Context, key appnotification.ReminderDeliveryKey, token, resolutionCode string, now time.Time,
 ) (bool, error) {
@@ -223,8 +239,8 @@ func (s *ReminderDeliveryLedger) ListNeedsReview(
 	}
 	var rows []reminderDeliveryPO
 	err := s.db.WithContext(ctx).Where(
-		"org_id = ? AND ((state = ? AND updated_at <= ?) OR state = ?)",
-		orgID, appnotification.ReminderSending, sendingOlderThan, appnotification.ReminderManualRequired,
+		"org_id = ? AND ((state = ? AND updated_at <= ?) OR state IN ?)",
+		orgID, appnotification.ReminderSending, sendingOlderThan, []appnotification.ReminderDeliveryState{appnotification.ReminderManualRequired, appnotification.ReminderRejected},
 	).Order("updated_at ASC, id ASC").Limit(limit).Find(&rows).Error
 	if err != nil {
 		return nil, fmt.Errorf("list reminder deliveries needing review: %w", err)

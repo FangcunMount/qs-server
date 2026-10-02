@@ -25,6 +25,7 @@ const (
 	ReminderClaimed        ReminderDeliveryState = "claimed"
 	ReminderSending        ReminderDeliveryState = "sending"
 	ReminderConfirmed      ReminderDeliveryState = "confirmed"
+	ReminderRejected       ReminderDeliveryState = "rejected"
 	ReminderManualRequired ReminderDeliveryState = "manual_required"
 	ReminderSuppressed     ReminderDeliveryState = "suppressed"
 	// Reviewed records a manual finding; it is not platform confirmation.
@@ -53,6 +54,7 @@ type ReminderDeliveryLedger interface {
 	Claim(ctx context.Context, key ReminderDeliveryKey, lease time.Duration, now time.Time) (token string, claimed bool, err error)
 	BeginExternalCall(ctx context.Context, key ReminderDeliveryKey, token string, now time.Time) (bool, error)
 	Confirm(ctx context.Context, key ReminderDeliveryKey, token, platformMessageID string, now time.Time) (bool, error)
+	Reject(ctx context.Context, key ReminderDeliveryKey, token string, platformErrorCode int64, now time.Time) (bool, error)
 	MarkUnknown(ctx context.Context, key ReminderDeliveryKey, token, resolutionCode string, now time.Time) (bool, error)
 	ReleaseUnsent(ctx context.Context, key ReminderDeliveryKey, token string, now time.Time) (bool, error)
 	SuppressUnsent(ctx context.Context, key ReminderDeliveryKey, token, resolutionCode string, now time.Time) (bool, error)
