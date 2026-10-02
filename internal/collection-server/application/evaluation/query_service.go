@@ -267,3 +267,18 @@ func isNilValue(v any) bool {
 		return false
 	}
 }
+
+// GetAssessmentReportStatus bypasses ephemeral report/outcome caches. Ownership
+// and frozen Generation identity are checked by the apiserver read use case.
+func (s *QueryService) GetAssessmentReportStatus(ctx context.Context, testeeID, assessmentID uint64) (*ReportRuntimeStatusResponse, error) {
+	if s == nil || s.evaluationClient == nil {
+		return nil, fmt.Errorf("report runtime reader is not configured")
+	}
+	reader, ok := s.evaluationClient.(interface {
+		GetAssessmentReportStatus(context.Context, uint64, uint64) (*ReportRuntimeStatusResponse, error)
+	})
+	if !ok {
+		return nil, fmt.Errorf("report runtime reader is not configured")
+	}
+	return reader.GetAssessmentReportStatus(ctx, testeeID, assessmentID)
+}

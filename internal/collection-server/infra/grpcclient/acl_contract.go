@@ -33,6 +33,7 @@ func ACLAllowedMethods() []string {
 		evaluationpb.AssessmentIntakeService_ResolveAssessmentByAnswerSheetID_FullMethodName,
 
 		interpretationpb.ParticipantReportService_GetAssessmentReport_FullMethodName,
+		interpretationpb.ParticipantReportService_GetAssessmentReportStatus_FullMethodName,
 		interpretationpb.ParticipantAIExplanationService_RequestAIWorkflow_FullMethodName,
 		interpretationpb.ParticipantAIExplanationService_GetAIWorkflow_FullMethodName,
 		interpretationpb.ParticipantAIExplanationService_GetAIWorkflowSource_FullMethodName,

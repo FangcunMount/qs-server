@@ -8,6 +8,9 @@ import "evaluation/evaluation.proto";
 
 service ParticipantReportService {
   rpc GetAssessmentReport(GetAssessmentReportRequest) returns (GetAssessmentReportResponse);
+  // Read-only current standard report attempt, bound to the original frozen
+  // outcome/template. Never initiates generation or authorizes a retry.
+  rpc GetAssessmentReportStatus(GetAssessmentReportRequest) returns (GetAssessmentReportStatusResponse);
   rpc ListMyReports(ListMyReportsRequest) returns (ListMyReportsResponse);
 }
 
@@ -61,6 +64,12 @@ message AssessmentReport {
 }
 message GetAssessmentReportRequest { uint64 assessment_id = 1; uint64 testee_id = 2; }
 message GetAssessmentReportResponse { AssessmentReport report = 1; }
+message GetAssessmentReportStatusResponse {
+  bool exists = 1;
+  string status = 2;
+  int32 attempt = 3;
+  string retry_disposition = 4;
+}
 message ListMyReportsRequest { uint64 testee_id = 1; int32 page = 2; int32 page_size = 3; }
 message ListMyReportsResponse {
   repeated AssessmentReport items = 1; int32 total = 2; int32 page = 3;

@@ -583,6 +583,7 @@ type runtimeReportQuery struct {
 	assessments evaluationtesteeapp.Service
 	runs        *evaluationtesteeapp.RuntimeStatusReader
 	reports     interpretationparticipantapp.Service
+	reportRuns  interpretationparticipantapp.RuntimeQuery
 }
 
 func (q runtimeReportQuery) AuthorizeAssessment(ctx context.Context, testeeID, assessmentID uint64) error {
@@ -636,9 +637,20 @@ func (q runtimeReportQuery) GetMyAssessmentRunStatus(ctx context.Context, testee
 	return &collectionevaluation.AssessmentRuntimeStatusResponse{Attempt: result.Attempt, Status: result.Status.String()}, nil
 }
 
+func (q runtimeReportQuery) GetAssessmentReportStatus(ctx context.Context, testeeID, assessmentID uint64) (*collectionevaluation.ReportRuntimeStatusResponse, error) {
+	if q.reportRuns == nil {
+		return nil, fmt.Errorf("report runtime status reader is not configured")
+	}
+	result, err := q.reportRuns.Get(ctx, interpretationparticipantapp.Actor{TesteeID: testeeID}, assessmentID)
+	if err != nil || result == nil {
+		return nil, err
+	}
+	return &collectionevaluation.ReportRuntimeStatusResponse{Attempt: result.Attempt, Status: result.Status, RetryDisposition: string(result.RetryDisposition)}, nil
+}
+
 func assertReportWaitClosure(t *testing.T, grpcDeps grpctransport.Deps, testeeID, assessmentID uint64) {
 	t.Helper()
-	query := runtimeReportQuery{assessments: grpcDeps.Evaluation.TesteeService, runs: grpcDeps.Evaluation.RuntimeStatusReader, reports: grpcDeps.Interpretation.ParticipantService}
+	query := runtimeReportQuery{assessments: grpcDeps.Evaluation.TesteeService, runs: grpcDeps.Evaluation.RuntimeStatusReader, reports: grpcDeps.Interpretation.ParticipantService, reportRuns: grpcDeps.Interpretation.ParticipantRuntime}
 	cache := grpcDeps.Interpretation.ReportStatusReporter.Cache()
 	waiter := reportwait.NewService(query, cache, nil, nil, reportwait.DefaultConfig())
 	status, err := waiter.Wait(t.Context(), testeeID, assessmentID, time.Second)

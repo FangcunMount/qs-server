@@ -13,6 +13,7 @@ func (m *Module) ExportGRPCDeps() grpctransport.InterpretationDeps {
 	deps := grpctransport.InterpretationDeps{
 		AutomationService:    m.AutomationService(),
 		ParticipantService:   m.ParticipantService(),
+		ParticipantRuntime:   m.participantRuntime,
 		ReportStatusReporter: m.ReportStatusReporter,
 	}
 	deps.CurrentAccess = m.aiCurrentAccess

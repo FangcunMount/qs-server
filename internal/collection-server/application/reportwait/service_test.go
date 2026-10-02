@@ -49,13 +49,16 @@ func (f *fakeStatusCache) SetIfHigherPriority(ctx context.Context, snapshot *rep
 }
 
 type fakeAssessmentQuery struct {
-	result    *evaluation.AssessmentDetailResponse
-	err       error
-	report    *evaluation.AssessmentReportResponse
-	reportErr error
-	getCalls  int
-	run       *evaluation.AssessmentRuntimeStatusResponse
-	runErr    error
+	result             *evaluation.AssessmentDetailResponse
+	err                error
+	report             *evaluation.AssessmentReportResponse
+	reportErr          error
+	getCalls           int
+	run                *evaluation.AssessmentRuntimeStatusResponse
+	runErr             error
+	reportRuntime      *evaluation.ReportRuntimeStatusResponse
+	reportRuntimeErr   error
+	reportRuntimeCalls int
 }
 
 func (f *fakeAssessmentQuery) AuthorizeAssessment(context.Context, uint64, uint64) error {
@@ -79,6 +82,11 @@ func (f *fakeAssessmentQuery) GetAssessmentReport(context.Context, uint64, uint6
 
 func (f *fakeAssessmentQuery) GetMyAssessmentRunStatus(context.Context, uint64, uint64) (*evaluation.AssessmentRuntimeStatusResponse, error) {
 	return f.run, f.runErr
+}
+
+func (f *fakeAssessmentQuery) GetAssessmentReportStatus(context.Context, uint64, uint64) (*evaluation.ReportRuntimeStatusResponse, error) {
+	f.reportRuntimeCalls++
+	return f.reportRuntime, f.reportRuntimeErr
 }
 
 func TestToPublicAssessmentStatusMapsCompletedToInterpreted(t *testing.T) {
@@ -502,5 +510,53 @@ func TestGetStatusRecoversDurableFailureWhenStatusProjectionIsUnavailableOrStale
 				t.Fatalf("durable read calls = %d, cache reads = %d; want 1 each", query.getCalls, tc.cache.getCalls)
 			}
 		})
+	}
+}
+
+func TestPersistentReportFailureSurvivesMissingNotificationAndCache(t *testing.T) {
+	for _, tc := range []struct{ disposition, status, reason string }{
+		{"manual_required", "temporarily_unavailable", "waiting_manual_action"},
+		{"terminal", "failed", "interpretation_report_failed"},
+		{"automatic", "processing", ""},
+	} {
+		t.Run(tc.disposition, func(t *testing.T) {
+			query := &fakeAssessmentQuery{result: &evaluation.AssessmentDetailResponse{ID: "42", Status: "evaluated"}, reportRuntime: &evaluation.ReportRuntimeStatusResponse{Attempt: 1, Status: "failed", RetryDisposition: tc.disposition}}
+			got, err := NewService(query, &fakeStatusCache{}, nil, nil, DefaultConfig()).GetStatus(t.Context(), 7, 42)
+			if err != nil || got == nil || got.Status != tc.status || got.Reason != tc.reason || query.reportRuntimeCalls != 1 {
+				t.Fatalf("failure without hint got=%+v err=%v reads=%d", got, err, query.reportRuntimeCalls)
+			}
+		})
+	}
+}
+func TestNewReportRunOverridesOldInterpretationFailure(t *testing.T) {
+	for _, phase := range []string{"pending", "running", "succeeded"} {
+		t.Run(phase, func(t *testing.T) {
+			query := &fakeAssessmentQuery{result: &evaluation.AssessmentDetailResponse{ID: "42", Status: "evaluated"}, reportRuntime: &evaluation.ReportRuntimeStatusResponse{Attempt: 2, Status: phase}}
+			cache := &fakeStatusCache{snapshots: map[string]*reportstatus.Snapshot{"42": {AssessmentID: "42", Status: "failed", Stage: "failed", Reason: "interpretation_report_failed"}}}
+			got, err := NewService(query, cache, nil, nil, DefaultConfig()).GetStatus(t.Context(), 7, 42)
+			if err != nil || got == nil || got.Status != "processing" || got.Stage != "interpreting" {
+				t.Fatalf("new attempt=%s got=%+v err=%v", phase, got, err)
+			}
+		})
+	}
+}
+func TestPersistedReportWinsFailureAndReadFailureIsNotTerminal(t *testing.T) {
+	query := &fakeAssessmentQuery{result: &evaluation.AssessmentDetailResponse{ID: "42", Status: "evaluated"}, report: &evaluation.AssessmentReportResponse{AssessmentID: "42"}, reportRuntimeErr: errors.New("mongo unavailable")}
+	got, err := NewService(query, &fakeStatusCache{}, nil, nil, DefaultConfig()).GetStatus(t.Context(), 7, 42)
+	if err != nil || got == nil || got.Status != "completed" || query.reportRuntimeCalls != 0 {
+		t.Fatalf("report fact got=%+v err=%v reads=%d", got, err, query.reportRuntimeCalls)
+	}
+	query.report = nil
+	got, err = NewService(query, &fakeStatusCache{}, nil, nil, DefaultConfig()).GetStatus(t.Context(), 7, 42)
+	if !errors.Is(err, query.reportRuntimeErr) || got != nil {
+		t.Fatalf("read error became terminal: got=%+v err=%v", got, err)
+	}
+}
+func TestEvaluationSuccessStillReadsInterpretationFailure(t *testing.T) {
+	query := &fakeAssessmentQuery{result: &evaluation.AssessmentDetailResponse{ID: "42", Status: "failed"}, run: &evaluation.AssessmentRuntimeStatusResponse{Attempt: 2, Status: "succeeded"}, reportRuntime: &evaluation.ReportRuntimeStatusResponse{Attempt: 1, Status: "failed", RetryDisposition: "manual_required"}}
+	cache := &fakeStatusCache{snapshots: map[string]*reportstatus.Snapshot{"42": {AssessmentID: "42", Status: "failed", Reason: "evaluation_failed"}}}
+	got, err := NewService(query, cache, nil, nil, DefaultConfig()).GetStatus(t.Context(), 7, 42)
+	if err != nil || got == nil || got.Status != "temporarily_unavailable" || got.Reason != "waiting_manual_action" {
+		t.Fatalf("interpretation failure hidden by evaluation success: got=%+v err=%v", got, err)
 	}
 }

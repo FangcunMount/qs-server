@@ -256,3 +256,10 @@ type GetFactorTrendRequest struct {
 	FactorCode string `form:"factor_code" binding:"required"`
 	Limit      int32  `form:"limit"`
 }
+
+// ReportRuntimeStatusResponse reads Interpretation without exposing diagnostics or retry authority.
+type ReportRuntimeStatusResponse struct {
+	Attempt          int
+	Status           string
+	RetryDisposition string
+}

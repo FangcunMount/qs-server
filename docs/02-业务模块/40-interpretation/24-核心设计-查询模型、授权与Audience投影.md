@@ -1,5 +1,7 @@
 # 核心设计：查询模型、授权与 Audience 投影
 
+> 2026-10-02 M6 收口候选补正：Participant 新增只读 `GetAssessmentReportStatus(testee_id, assessment_id)`，Collection 使用独立签名 purpose 和精确 method ACL。归属校验通过后，按原 Outcome 的冻结 ReportType／TemplateVersion 查唯一 Generation，再读其 LatestRunID；最多两轮复核 Outcome 内容身份与 Generation 版本。返回仅含 exists、status、attempt、retry_disposition，无模型输入、失败详情、接单或重试权限。报告缺失时，Collection 据持久状态区分自动恢复、人工处理、终止失败；新授权 Run 可覆盖旧失败提示，succeeded Run 单独不能证明报告可见。此处描述候选源码，不代表已部署或 M6 整项验收；下文旧的“仅包装 GetAssessmentReport”以本补正为准。
+
 > 状态：本文已按当前源码重写。Participant、Clinician、Administration 与 Operations 查询用例、授权先于正文读取的主链路、Catalog 分页查询和最小 Audience 投影已落地；
 > 患者端 gRPC 信任边界、Administration 角色语义、Catalog 关联复验与完整章节级可见性仍有明确缺口。
 

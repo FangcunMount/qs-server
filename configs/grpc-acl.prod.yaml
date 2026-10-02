@@ -27,6 +27,7 @@ services:
       - /evaluation.TesteeEvaluationService/GetHighRiskFactors
       - /evaluation.AssessmentIntakeService/ResolveAssessmentByAnswerSheetID
       - /interpretation.ParticipantReportService/GetAssessmentReport
+      - /interpretation.ParticipantReportService/GetAssessmentReportStatus
       - /interpretation.ParticipantAIExplanationService/GetAIWorkflow
       - /interpretation.ParticipantAIExplanationService/GetAIWorkflowSource
       - /interpretation.ParticipantAIExplanationService/RequestAIWorkflow
