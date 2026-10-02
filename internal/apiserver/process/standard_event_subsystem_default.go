@@ -10,11 +10,13 @@ import (
 )
 
 func configuredEventSubsystem(cfg *config.Config) func(eventsubsystem.Options) (*eventsubsystem.Subsystem, error) {
-	if cfg != nil && cfg.Eventing != nil && cfg.Eventing.StandardOutbox != nil &&
+	if cfg != nil && cfg.Options != nil && cfg.Eventing != nil && cfg.Eventing.StandardOutbox != nil &&
 		(cfg.Eventing.StandardOutbox.Mongo || cfg.Eventing.StandardOutbox.Assessment) {
 		return func(eventsubsystem.Options) (*eventsubsystem.Subsystem, error) {
 			return nil, fmt.Errorf("standard outbox profile requires the reviewed M4 candidate build")
 		}
 	}
-	return eventsubsystem.New
+	return func(eventsubsystem.Options) (*eventsubsystem.Subsystem, error) {
+		return nil, fmt.Errorf("legacy outbox configuration is retired; use the standard-profile build or the retained rollback image")
+	}
 }

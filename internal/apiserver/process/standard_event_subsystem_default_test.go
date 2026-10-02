@@ -19,3 +19,11 @@ func TestOrdinaryBuildRejectsStandardOutboxSelection(t *testing.T) {
 		t.Fatalf("ordinary build silently accepted M4 profile: %v", err)
 	}
 }
+
+func TestOrdinaryBuildCannotReactivateLegacyOutbox(t *testing.T) {
+	cfg := &config.Config{Options: options.NewOptions()}
+	subsystem, err := configuredEventSubsystem(cfg)(eventsubsystem.Options{})
+	if subsystem != nil || err == nil || !strings.Contains(err.Error(), "legacy outbox configuration is retired") {
+		t.Fatalf("ordinary build reactivated legacy outbox: subsystem=%v err=%v", subsystem, err)
+	}
+}
