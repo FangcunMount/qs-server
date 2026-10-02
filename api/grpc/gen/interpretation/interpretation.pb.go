@@ -1677,13 +1677,16 @@ type AIWorkflowResult struct {
 	RequestId string                 `protobuf:"bytes,1,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
 	Status    string                 `protobuf:"bytes,2,opt,name=status,proto3" json:"status,omitempty"`
 	Version   int64                  `protobuf:"varint,3,opt,name=version,proto3" json:"version,omitempty"`
-	// Validated ai-explanation-output/v1 JSON; only present for completed workflows.
+	// Validated versioned explanation JSON; only present for completed workflows.
 	ContentJson   string `protobuf:"bytes,4,opt,name=content_json,json=contentJson,proto3" json:"content_json,omitempty"`
 	ArtifactId    string `protobuf:"bytes,5,opt,name=artifact_id,json=artifactId,proto3" json:"artifact_id,omitempty"`
 	ReportId      string `protobuf:"bytes,6,opt,name=report_id,json=reportId,proto3" json:"report_id,omitempty"`
 	SourceVersion string `protobuf:"bytes,7,opt,name=source_version,json=sourceVersion,proto3" json:"source_version,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	// Original selected references from the frozen input, not model-authored sources.
+	ReferenceMaterialJson        string `protobuf:"bytes,8,opt,name=reference_material_json,json=referenceMaterialJson,proto3" json:"reference_material_json,omitempty"`
+	ReferenceMaterialFingerprint string `protobuf:"bytes,9,opt,name=reference_material_fingerprint,json=referenceMaterialFingerprint,proto3" json:"reference_material_fingerprint,omitempty"`
+	unknownFields                protoimpl.UnknownFields
+	sizeCache                    protoimpl.SizeCache
 }
 
 func (x *AIWorkflowResult) Reset() {
@@ -1761,6 +1764,20 @@ func (x *AIWorkflowResult) GetReportId() string {
 func (x *AIWorkflowResult) GetSourceVersion() string {
 	if x != nil {
 		return x.SourceVersion
+	}
+	return ""
+}
+
+func (x *AIWorkflowResult) GetReferenceMaterialJson() string {
+	if x != nil {
+		return x.ReferenceMaterialJson
+	}
+	return ""
+}
+
+func (x *AIWorkflowResult) GetReferenceMaterialFingerprint() string {
+	if x != nil {
+		return x.ReferenceMaterialFingerprint
 	}
 	return ""
 }
@@ -2104,7 +2121,7 @@ const file_interpretation_interpretation_proto_rawDesc = "" +
 	"\ttestee_id\x18\x01 \x01(\x04R\btesteeId\x12#\n" +
 	"\rassessment_id\x18\x02 \x01(\x04R\fassessmentId\x12\x1d\n" +
 	"\n" +
-	"request_id\x18\x03 \x01(\tR\trequestId\"\xeb\x01\n" +
+	"request_id\x18\x03 \x01(\tR\trequestId\"\xe9\x02\n" +
 	"\x10AIWorkflowResult\x12\x1d\n" +
 	"\n" +
 	"request_id\x18\x01 \x01(\tR\trequestId\x12\x16\n" +
@@ -2114,7 +2131,9 @@ const file_interpretation_interpretation_proto_rawDesc = "" +
 	"\vartifact_id\x18\x05 \x01(\tR\n" +
 	"artifactId\x12\x1b\n" +
 	"\treport_id\x18\x06 \x01(\tR\breportId\x12%\n" +
-	"\x0esource_version\x18\a \x01(\tR\rsourceVersion\"^\n" +
+	"\x0esource_version\x18\a \x01(\tR\rsourceVersion\x126\n" +
+	"\x17reference_material_json\x18\b \x01(\tR\x15referenceMaterialJson\x12D\n" +
+	"\x1ereference_material_fingerprint\x18\t \x01(\tR\x1creferenceMaterialFingerprint\"^\n" +
 	"\x1aGetAIWorkflowSourceRequest\x12\x1b\n" +
 	"\ttestee_id\x18\x01 \x01(\x04R\btesteeId\x12#\n" +
 	"\rassessment_id\x18\x02 \x01(\x04R\fassessmentId\"\xb4\x01\n" +

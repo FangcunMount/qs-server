@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -88,6 +89,30 @@ func TestWorkflowReadReturnsOnlyContentAndProvenance(t *testing.T) {
 	}
 }
 
+func TestWorkflowReadPreservesThreeTopicContent(t *testing.T) {
+	const id = "00000000-0000-4000-8000-000000000001"
+	content, err := os.ReadFile("../../../../pkg/contract/testdata/mbti-three-topic-output.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	digest := "sha256:" + strings.Repeat("a", 64)
+	artifact := bridge.Artifact{ID: id, SessionID: id, RunID: id, EvidenceSetID: id, InvocationID: id, EvidenceFingerprint: strings.Repeat("a", 64), ProviderRequestID: "private-provider-request", ContentJSON: string(content), ContentFingerprint: fmt.Sprintf("sha256:%x", sha256.Sum256(content)), InputFingerprint: digest, ProfileID: "profile", ProfileVersion: "three-topic-v1", ProfileFingerprint: digest, PromptFingerprint: digest, RouteFingerprint: digest, OutputValidatorVersion: "qs-ai-output-mbti-three-topic/v1", SafetyValidatorVersion: "v1", AssessmentID: "42", ReportID: "99", SourceVersion: "report-v1:101", SchemaVersion: "qs-ai-artifact/v1"}
+	raw, err := json.Marshal(artifact)
+	if err != nil {
+		t.Fatal(err)
+	}
+	result, err := toProtoAIWorkflowResult(id, &bridge.Event{SessionID: id, Status: "completed", Version: 5, ArtifactJSON: string(raw)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.ContentJson != string(content) || result.ArtifactId != id || result.ReportId != "99" || result.SourceVersion != "report-v1:101" {
+		t.Fatal("new content or original report provenance changed")
+	}
+	if strings.Contains(result.String(), "private-provider-request") {
+		t.Fatal("internal provider identifier exposed")
+	}
+}
+
 func TestWorkflowSourceRequiresCorrectDelegationWithLegacyServiceAbsent(t *testing.T) {
 	options := &delegatedsubject.Options{Enabled: true, CurrentKey: "test-current-key", TTL: time.Minute}
 	signer, _ := delegatedsubject.NewSignerFromOptions(options)
@@ -107,5 +132,26 @@ func TestWorkflowSourceRequiresCorrectDelegationWithLegacyServiceAbsent(t *testi
 	service.Workflow = nil
 	if _, err := service.GetAIWorkflowSource(context.Background(), &interpretationpb.GetAIWorkflowSourceRequest{TesteeId: 7, AssessmentId: 42}); status.Code(err) != codes.Unavailable {
 		t.Fatalf("disabled workflow: %v", err)
+	}
+}
+
+func TestWorkflowReadPreservesOriginalFrozenReferences(t *testing.T) {
+	raw, err := os.ReadFile("../../../../pkg/contract/testdata/mbti-three-topic-artifact.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var artifact bridge.Artifact
+	if err = json.Unmarshal(raw, &artifact); err != nil {
+		t.Fatal(err)
+	}
+	result, err := toProtoAIWorkflowResult("request", &bridge.Event{SessionID: artifact.SessionID, Status: "completed", ArtifactJSON: string(raw)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.ReferenceMaterialJson != artifact.ReferenceMaterialJSON || result.ReferenceMaterialFingerprint != artifact.ReferenceMaterialFingerprint || result.ContentJson != artifact.ContentJSON {
+		t.Fatal("source/body/fingerprint changed in projection")
+	}
+	if strings.Contains(result.String(), "provider_request_id") {
+		t.Fatal("internal metadata exposed")
 	}
 }

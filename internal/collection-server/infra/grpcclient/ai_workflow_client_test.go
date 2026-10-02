@@ -2,6 +2,8 @@ package grpcclient
 
 import (
 	"context"
+	"encoding/json"
+	"os"
 	"testing"
 	"time"
 
@@ -13,10 +15,13 @@ import (
 )
 
 type workflowRPCProbe struct {
-	t              *testing.T
-	verifier       *delegatedsubject.Verifier
-	calls          int
-	invalidContent bool
+	t                    *testing.T
+	verifier             *delegatedsubject.Verifier
+	calls                int
+	invalidContent       bool
+	content              string
+	referenceMaterial    string
+	referenceFingerprint string
 }
 
 func (p *workflowRPCProbe) check(ctx context.Context, testeeID, assessmentID uint64, purpose string) {
@@ -52,10 +57,13 @@ func (p *workflowRPCProbe) GetAIWorkflowSource(ctx context.Context, req *pb.GetA
 func (p *workflowRPCProbe) GetAIWorkflow(ctx context.Context, req *pb.GetAIWorkflowRequest, _ ...grpc.CallOption) (*pb.AIWorkflowResult, error) {
 	p.check(ctx, req.TesteeId, req.AssessmentId, delegatedsubject.PurposeAIExplanationGet)
 	content := `{"summary":"ready"}`
+	if p.content != "" {
+		content = p.content
+	}
 	if p.invalidContent {
 		content = "invalid json"
 	}
-	return &pb.AIWorkflowResult{RequestId: req.RequestId, Status: "completed", Version: 3, ContentJson: content, ReportId: "18", SourceVersion: "sha256:source"}, nil
+	return &pb.AIWorkflowResult{RequestId: req.RequestId, Status: "completed", Version: 3, ContentJson: content, ReportId: "18", SourceVersion: "sha256:source", ReferenceMaterialJson: p.referenceMaterial, ReferenceMaterialFingerprint: p.referenceFingerprint}, nil
 }
 func TestWorkflowRPCPreservesDelegationAndRequestIdentity(t *testing.T) {
 	opts := &delegatedsubject.Options{Enabled: true, CurrentKey: "workflow-client-test-key", TTL: time.Minute}
@@ -83,6 +91,36 @@ func TestWorkflowRPCPreservesDelegationAndRequestIdentity(t *testing.T) {
 	if err != nil || result.RequestID != requestID || result.Version != 3 || result.SourceVersion != source.SourceVersion {
 		t.Fatalf("result: %#v %v", result, err)
 	}
+	content, err := os.ReadFile("../../../pkg/contract/testdata/mbti-three-topic-output.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	probe.content = string(content)
+	result, err = client.GetWorkflow(ctx, 7, 42, requestID)
+	if err != nil || string(result.Content) != string(content) {
+		t.Fatalf("three-topic JSON changed during Collection transport: %v", err)
+	}
+	artifactJSON, err := os.ReadFile("../../../pkg/contract/testdata/mbti-three-topic-artifact.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var artifact struct {
+		ReferenceMaterial    string `json:"reference_material_json"`
+		ReferenceFingerprint string `json:"reference_material_fingerprint"`
+	}
+	if err = json.Unmarshal(artifactJSON, &artifact); err != nil {
+		t.Fatal(err)
+	}
+	probe.referenceMaterial, probe.referenceFingerprint = artifact.ReferenceMaterial, artifact.ReferenceFingerprint
+	result, err = client.GetWorkflow(ctx, 7, 42, requestID)
+	if err != nil || string(result.ReferenceMaterial) != artifact.ReferenceMaterial || result.ReferenceMaterialFingerprint != artifact.ReferenceFingerprint {
+		t.Fatal("references changed in Collection projection")
+	}
+	probe.referenceMaterial = "broken"
+	if _, err = client.GetWorkflow(ctx, 7, 42, requestID); err == nil {
+		t.Fatal("corrupt reference JSON accepted")
+	}
+	probe.referenceMaterial = ""
 	probe.invalidContent = true
 	if _, err = client.GetWorkflow(ctx, 7, 42, requestID); err == nil {
 		t.Fatal("invalid result JSON accepted")

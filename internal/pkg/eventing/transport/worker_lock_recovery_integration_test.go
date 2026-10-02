@@ -12,12 +12,11 @@ import (
 	"testing"
 	"time"
 
-	basemessaging "github.com/FangcunMount/component-base/pkg/messaging"
-	cbnsq "github.com/FangcunMount/component-base/pkg/messaging/nsq"
 	evalpb "github.com/FangcunMount/qs-server/api/grpc/gen/evaluation"
 	eventcatalog "github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
 	eventobservability "github.com/FangcunMount/qs-server/internal/pkg/eventing/observe"
 	eventruntime "github.com/FangcunMount/qs-server/internal/pkg/eventing/runtime"
+	"github.com/FangcunMount/qs-server/internal/pkg/messagingruntime"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/keyspace"
 	"github.com/FangcunMount/qs-server/internal/pkg/resilience/locklease"
@@ -25,8 +24,8 @@ import (
 	locksubsystem "github.com/FangcunMount/qs-server/internal/pkg/resilience/locklease/subsystem"
 	"github.com/FangcunMount/qs-server/internal/worker/handlers"
 	workermessaging "github.com/FangcunMount/qs-server/internal/worker/integration/messaging"
+	"github.com/FangcunMount/reliable-messaging/wire/legacy"
 	"github.com/alicebob/miniredis/v2"
-	"github.com/nsqio/go-nsq"
 	redis "github.com/redis/go-redis/v9"
 )
 
@@ -129,15 +128,15 @@ func TestWorkerLockHolderExitRetriesBeforeAck(t *testing.T) {
 	}); err != nil {
 		t.Fatal(err)
 	}
-	publisher, err := cbnsq.NewPublisher(integrationEnv("NSQD_ADDR", "127.0.0.1:4150"), nsq.NewConfig())
+	publisher, err := messagingruntime.NewSDKNSQWirePublisher(integrationEnv("NSQD_ADDR", "127.0.0.1:4150"))
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = publisher.Close() })
 	payload := []byte(`{"id":"lock-recovery-event","eventType":"answersheet.submitted","occurredAt":"2026-09-23T00:00:00Z","aggregateType":"AnswerSheet","aggregateID":"456","data":{"answersheet_id":"456","questionnaire_code":"Q-001","questionnaire_version":"v1","org_id":1,"testee_id":2,"filler_id":4,"admission":{"purpose":"assessment","model_kind":"scale","model_code":"MODEL-1","model_version":"1.0.0"}}}`)
-	message := basemessaging.NewMessage("lock-recovery-event", payload)
+	message := legacy.Envelope{UUID: "lock-recovery-event", Payload: payload, Metadata: map[string]string{}}
 	message.Metadata["event_type"] = "answersheet.submitted"
-	if err := publisher.PublishMessage(t.Context(), topic, message); err != nil {
+	if err := publishSDKTestEnvelope(t.Context(), publisher, topic, message); err != nil {
 		t.Fatal(err)
 	}
 	first := waitWorkerConsumeOutcome(t, observer.events, eventobservability.ConsumeOutcomeDispatchFailed)
@@ -149,7 +148,7 @@ func TestWorkerLockHolderExitRetriesBeforeAck(t *testing.T) {
 	if second.Attempts < 2 || intake.calls.Load() != 1 {
 		t.Fatalf("recovered delivery: attempts=%d intakeCalls=%d, want at least 2/1", second.Attempts, intake.calls.Load())
 	}
-	if err := publisher.PublishMessage(t.Context(), topic, message); err != nil {
+	if err := publishSDKTestEnvelope(t.Context(), publisher, topic, message); err != nil {
 		t.Fatal(err)
 	}
 	waitWorkerConsumeOutcome(t, observer.events, eventobservability.ConsumeOutcomeAcked)

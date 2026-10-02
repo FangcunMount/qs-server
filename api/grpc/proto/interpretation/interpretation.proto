@@ -146,11 +146,14 @@ message AIWorkflowResult {
   string request_id = 1;
   string status = 2;
   int64 version = 3;
-  // Validated ai-explanation-output/v1 JSON; only present for completed workflows.
+  // Validated versioned explanation JSON; only present for completed workflows.
   string content_json = 4;
   string artifact_id = 5;
   string report_id = 6;
   string source_version = 7;
+  // Original selected references from the frozen input, not model-authored sources.
+  string reference_material_json = 8;
+  string reference_material_fingerprint = 9;
 }
 
 // Current authorized report provenance only; no admission reservation or model call.

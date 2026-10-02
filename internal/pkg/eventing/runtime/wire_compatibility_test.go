@@ -6,13 +6,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/FangcunMount/component-base/pkg/eventcodec"
-	"github.com/FangcunMount/component-base/pkg/eventmessaging"
-	"github.com/FangcunMount/component-base/pkg/messaging"
 	"github.com/FangcunMount/qs-server/internal/apiserver/eventing/standardoutbox"
 	"github.com/FangcunMount/qs-server/internal/pkg/event"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
 	"github.com/FangcunMount/reliable-messaging/message"
+	domainwire "github.com/FangcunMount/reliable-messaging/wire/domain"
+	"github.com/FangcunMount/reliable-messaging/wire/legacy"
 )
 
 // These are the existing QS producer and consumer codecs. An SDK publisher
@@ -23,6 +22,7 @@ func TestDurableEventWireCompatibility(t *testing.T) {
 		t.Fatal(err)
 	}
 	resolver := eventcatalog.NewCatalog(cfg)
+	wires, _ := retiredWireContracts(t)
 	cases := []struct {
 		typeName, aggregate, topic string
 	}{
@@ -64,16 +64,13 @@ func TestDurableEventWireCompatibility(t *testing.T) {
 				},
 				Data: map[string]any{"org_id": 1, "answer_sheet_id": "answer-1"},
 			}
-			oldMessage, err := eventmessaging.BuildMessage(evt, SourceAPIServer)
-			if err != nil {
-				t.Fatal(err)
+			old, found := wires[tc.typeName]
+			if !found {
+				t.Fatal("missing historical wire")
 			}
-			if _, recognized, err := messaging.DecodeMessagePayload(oldMessage.Payload); err != nil || recognized {
+			wire := []byte(old.Wire)
+			if _, recognized, err := legacy.Decode([]byte(old.Payload)); err != nil || recognized {
 				t.Fatalf("domain JSON alone unexpectedly carries transport identity: recognized=%v err=%v", recognized, err)
-			}
-			wire, err := messaging.EncodeMessagePayload(oldMessage)
-			if err != nil {
-				t.Fatal(err)
 			}
 			newWire, err := standardoutbox.EncodeWire(evt, SourceAPIServer)
 			if err != nil {
@@ -95,34 +92,22 @@ func TestDurableEventWireCompatibility(t *testing.T) {
 			if !bytes.Equal(intent.Input().Payload, wire) {
 				t.Fatal("SDK intent did not retain the original NSQ wire")
 			}
-			// The legacy Relay decodes the stored domain event and encodes it
-			// again before publishing. The new intent must match that path too.
-			stored, err := DecodeDomainEvent(oldMessage.Payload)
-			if err != nil {
-				t.Fatal(err)
-			}
-			relayMessage, err := eventmessaging.BuildMessage(stored, SourceAPIServer)
-			if err != nil {
-				t.Fatal(err)
-			}
-			relayWire, err := messaging.EncodeMessagePayload(relayMessage)
-			if err != nil {
-				t.Fatal(err)
-			}
-			if !bytes.Equal(newWire, relayWire) {
+			// Relay bytes were captured by decoding and re-encoding with the
+			// immutable old codec, rather than the current SDK under test.
+			if !bytes.Equal(newWire, []byte(old.RelayWire)) {
 				t.Fatal("standard Outbox changed the legacy Relay wire bytes")
 			}
-			decoded, recognized, err := messaging.DecodeMessagePayload(wire)
+			decoded, recognized, err := legacy.Decode(wire)
 			if err != nil || !recognized {
 				t.Fatalf("transport decode: recognized=%v err=%v", recognized, err)
 			}
 			if decoded.UUID != evt.EventID() || decoded.Metadata["event_type"] != tc.typeName || decoded.Metadata["source"] != SourceAPIServer || decoded.Metadata["aggregate_id"] != evt.AggregateID() || decoded.Metadata["occurred_at"] != "2026-09-23T10:00:00.000+08:00" {
 				t.Fatalf("identity or metadata changed: UUID=%q metadata=%v", decoded.UUID, decoded.Metadata)
 			}
-			if !bytes.Equal(decoded.Payload, oldMessage.Payload) {
+			if !bytes.Equal(decoded.Payload, []byte(old.Payload)) {
 				t.Fatal("transport changed the original domain envelope bytes")
 			}
-			workerEnvelope, err := eventcodec.DecodeEnvelope(decoded.Payload)
+			workerEnvelope, err := domainwire.DecodeEnvelope(decoded.Payload)
 			if err != nil {
 				t.Fatal(err)
 			}

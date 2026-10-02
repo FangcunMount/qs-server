@@ -13,12 +13,12 @@ import (
 	"testing"
 	"time"
 
-	basemessaging "github.com/FangcunMount/component-base/pkg/messaging"
 	app "github.com/FangcunMount/qs-server/internal/apiserver/application/systemgovernance"
 	"github.com/FangcunMount/qs-server/internal/pkg/event"
 	eventcatalog "github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
 	eventruntime "github.com/FangcunMount/qs-server/internal/pkg/eventing/runtime"
 	"github.com/FangcunMount/qs-server/internal/pkg/messagingruntime"
+	legacywire "github.com/FangcunMount/reliable-messaging/wire/legacy"
 	drivermysql "github.com/go-sql-driver/mysql"
 	"github.com/nsqio/go-nsq"
 	gormmysql "gorm.io/driver/mysql"
@@ -130,7 +130,7 @@ func TestDeliveryReplayPublishedEventSurvivesProcessExitWithoutResend(t *testing
 	t.Cleanup(func() { consumer.Stop(); <-consumer.StopChan })
 	select {
 	case body := <-received:
-		message, ok, err := basemessaging.DecodeMessagePayload(body)
+		message, ok, err := legacywire.Decode(body)
 		if err != nil || !ok || message.UUID != evt.EventID() {
 			t.Fatalf("broker event identity = %#v, envelope=%t, error=%v; want %s", message, ok, err, evt.EventID())
 		}

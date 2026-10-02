@@ -28,7 +28,7 @@ TTL、下一次 Signal 或主动查询继续兜底
 - `internal/pkg/signalcatalog` 保存稳定名称常量，并通过测试与清单同步。
 - Cache Signal payload 位于 `internal/pkg/cache/signal`，保持 transport-agnostic。
 - Report status Signal contract 位于 `internal/pkg/reportstatus`。
-- Redis transport 使用 component-base signaling 包和 `redis.UniversalClient`。
+- Redis transport 使用 `reliable-messaging/signaling` 与 `signaling/redis` 包和 `redis.UniversalClient`。
 - 顶层配置继续使用 `signaling.redis` 的 enabled、prefix、channel、buffer 等选项。
 
 Signal 名称、SignalKey、JSON payload、prefix/channel 解析属于兼容契约。改变 Go 包所有权不能改变 Redis wire 行为。
@@ -51,7 +51,7 @@ Signal 名称、SignalKey、JSON payload、prefix/channel 解析属于兼容契�
 
 CacheSubsystem 持有：
 
-- component-base Redis Signaler。
+- SDK Redis Signaler。
 - 业务窄接口 `SignalNotifier`。
 - Cache watchers。
 - Start/Close 和重复启动保护。
@@ -65,7 +65,7 @@ collection CacheSubsystem 使用自己的 Redis ops handle 构造 watchers，收
 
 ### Report status
 
-Report status signaling 使用 component-base UniversalClient Signaler，自行管理专属状态刷新语义，不借用 CacheSubsystem 配置对象。
+Report status signaling 使用 SDK UniversalClient Signaler，自行管理专属状态刷新语义，不借用 CacheSubsystem 配置对象。
 
 ## 5. 失败语义
 

@@ -1,5 +1,3 @@
-//go:build reliable_messaging_m4
-
 // Package standardoutbox owns QS-specific governance for the SDK MySQL table.
 // It does not change the shared SDK or construct database schema at runtime.
 package standardoutbox

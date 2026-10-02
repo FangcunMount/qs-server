@@ -383,8 +383,8 @@ INFRASTRUCTURE_REQUIRED_SOURCE_SCOPES = {
         "report_status_reporter": ("internal/pkg/reportstatus/reporter.go",),
         "report_status_cache": ("internal/pkg/reportstatus/cache.go",),
         "delivery_replay": ("internal/apiserver/application/systemgovernance/delivery_replay.go",),
-        "mysql_outbox_store": ("internal/apiserver/infra/mysql/eventoutbox/store.go",),
-        "mongo_outbox_store": ("internal/apiserver/infra/mongo/eventoutbox/store.go",),
+        "mysql_outbox_store": ("internal/apiserver/infra/mysql/standardoutbox/stager.go",),
+        "mongo_outbox_store": ("internal/apiserver/infra/mongo/standardoutbox/stager.go",),
         "outbox_atomicity": ("internal/pkg/architecture/uow_outbox_ratchet_test.go",),
     },
     "cache_redis_signal": {
@@ -3454,11 +3454,11 @@ def priority_infrastructure_doc_contract_issues() -> list[Issue]:
             "apiserver published-model L1 当前仅导出原始 Prometheus 指标",
         ),
         EVENT_OUTBOX_DOC: (
-            "publish success + mark failed",
-            "MarkEvent(s)Published",
-            "Outbox 行仍保持 `publishing`",
-            "stale-claim recovery",
-            "不会立即改写为 retry 状态",
+            "MQ 接收但发布结算未持久化",
+            "租约恢复可能再次投递",
+            "消费者必须幂等",
+            "没有业务事务时必须拒绝暂存",
+            "当前源码不提供旧 Outbox 的配置回退",
         ),
         EVENT_CONTRACT_DOC: (
             "当前共享代码缺口：report-status best-effort 写入不参与 settlement",
@@ -3578,13 +3578,17 @@ def priority_infrastructure_doc_contract_issues() -> list[Issue]:
                 )
 
     go_mod = (ROOT / "go.mod").read_text(encoding="utf-8")
-    # v0.6.11 retains the physical delivery ID and terminal handoff order.
-    # Its shared handoff group is opt-in; the empty option keeps old naming.
-    if not re.search(r"^\s*github\.com/FangcunMount/component-base\s+v0\.6\.11\s*$", go_mod, flags=re.M):
+    # The current subscriber and terminal handoff belong to the fixed SDK.
+    # component-base v0.8.0 has no messaging/signaling packages; the old v0.6.11
+    # contract is exercised only by independently built historical fixtures.
+    if not (
+        re.search(r"^\s*github\.com/FangcunMount/reliable-messaging\s+v0\.3\.0-m6\.4\s*$", go_mod, flags=re.M)
+        and re.search(r"^\s*github\.com/FangcunMount/component-base\s+v0\.8\.0\s*$", go_mod, flags=re.M)
+    ):
         issues.append(
             Issue(
                 "priority-event-provider-dependency-drift",
-                "component-base version changed; re-audit terminal handoff before updating the docs",
+                "SDK/retired component version changed; re-audit terminal handoff before updating the docs",
             )
         )
 

@@ -75,6 +75,10 @@ func TestRemovedEventCompatibilitySymbolsDoNotReturn(t *testing.T) {
 	}
 	for rel, forbidden := range checks {
 		data, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(rel)))
+		if os.IsNotExist(err) {
+			// Fully deleted compatibility files cannot reintroduce symbols.
+			continue
+		}
 		if err != nil {
 			t.Fatalf("read %s: %v", rel, err)
 		}

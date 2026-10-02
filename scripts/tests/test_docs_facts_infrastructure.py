@@ -362,6 +362,15 @@ class InfrastructureParserTest(unittest.TestCase):
         )
         self.assertIn("priority-infrastructure-doc-drift", {issue.kind for issue in issues})
 
+    def test_event_current_sdk_version_drift_requires_handoff_review(self) -> None:
+        issues = self.issues_after_mutation(
+            check_docs_facts.ROOT / "go.mod",
+            "github.com/FangcunMount/reliable-messaging v0.3.0-m6.4",
+            "github.com/FangcunMount/reliable-messaging v0.3.0-m6.2",
+            check_docs_facts.priority_infrastructure_doc_contract_issues,
+        )
+        self.assertIn("priority-event-provider-dependency-drift", {issue.kind for issue in issues})
+
     def test_event_terminal_handoff_simplification_is_rejected(self) -> None:
         issues = self.issues_after_mutation(
             check_docs_facts.EVENT_MQ_DOC,

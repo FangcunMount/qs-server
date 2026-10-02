@@ -15,13 +15,15 @@ type WorkflowClient interface {
 
 // WorkflowResult exposes content and source provenance, not the internal execution envelope.
 type WorkflowResult struct {
-	RequestID     string          `json:"request_id"`
-	Status        string          `json:"status"`
-	Version       int64           `json:"version"`
-	Content       json.RawMessage `json:"content,omitempty" swaggertype:"object"`
-	ArtifactID    string          `json:"artifact_id,omitempty"`
-	ReportID      string          `json:"report_id,omitempty"`
-	SourceVersion string          `json:"source_version,omitempty"`
+	RequestID                    string          `json:"request_id"`
+	Status                       string          `json:"status"`
+	Version                      int64           `json:"version"`
+	Content                      json.RawMessage `json:"content,omitempty" swaggertype:"object"`
+	ArtifactID                   string          `json:"artifact_id,omitempty"`
+	ReportID                     string          `json:"report_id,omitempty"`
+	SourceVersion                string          `json:"source_version,omitempty"`
+	ReferenceMaterial            json.RawMessage `json:"reference_material,omitempty" swaggertype:"object"`
+	ReferenceMaterialFingerprint string          `json:"reference_material_fingerprint,omitempty"`
 }
 type WorkflowReader interface {
 	GetWorkflow(context.Context, uint64, uint64, string) (*WorkflowResult, error)

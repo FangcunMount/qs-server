@@ -17,15 +17,16 @@ import (
 	"testing"
 	"time"
 
-	basemessaging "github.com/FangcunMount/component-base/pkg/messaging"
-	cbnsq "github.com/FangcunMount/component-base/pkg/messaging/nsq"
 	eventcatalog "github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
 	eventobservability "github.com/FangcunMount/qs-server/internal/pkg/eventing/observe"
 	eventruntime "github.com/FangcunMount/qs-server/internal/pkg/eventing/runtime"
+	"github.com/FangcunMount/qs-server/internal/pkg/messagingruntime"
 	genericoptions "github.com/FangcunMount/qs-server/internal/pkg/options"
 	workermessaging "github.com/FangcunMount/qs-server/internal/worker/integration/messaging"
+	rmtransport "github.com/FangcunMount/reliable-messaging/transport"
+	rmnsq "github.com/FangcunMount/reliable-messaging/transport/nsq"
+	"github.com/FangcunMount/reliable-messaging/wire/legacy"
 	drivermysql "github.com/go-sql-driver/mysql"
-	"github.com/nsqio/go-nsq"
 )
 
 type workerSettlementRuntime struct {
@@ -92,19 +93,19 @@ func TestWorkerSettlementThroughNSQPersistsPoisonUnknownAndExhaustion(t *testing
 	}); err != nil {
 		t.Fatal(err)
 	}
-	publisher, err := cbnsq.NewPublisher(integrationEnv("NSQD_ADDR", "127.0.0.1:4150"), nsq.NewConfig())
+	publisher, err := messagingruntime.NewSDKNSQWirePublisher(integrationEnv("NSQD_ADDR", "127.0.0.1:4150"))
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = publisher.Close() })
 
-	poison := basemessaging.NewMessage("worker-poison-1", []byte("not-json"))
-	unknown := basemessaging.NewMessage("worker-unknown-1", []byte(`{"id":"unknown-1"}`))
+	poison := legacy.Envelope{UUID: "worker-poison-1", Payload: []byte("not-json"), Metadata: map[string]string{}}
+	unknown := legacy.Envelope{UUID: "worker-unknown-1", Payload: []byte(`{"id":"unknown-1"}`), Metadata: map[string]string{}}
 	unknown.Metadata["event_type"] = "new.event"
-	failed := basemessaging.NewMessage("worker-failed-1", []byte(`{"id":"failed-1"}`))
+	failed := legacy.Envelope{UUID: "worker-failed-1", Payload: []byte(`{"id":"failed-1"}`), Metadata: map[string]string{}}
 	failed.Metadata["event_type"] = "known.fail"
-	for _, message := range []*basemessaging.Message{poison, unknown, failed} {
-		if err := publisher.PublishMessage(t.Context(), topic, message); err != nil {
+	for _, message := range []legacy.Envelope{poison, unknown, failed} {
+		if err := publishSDKTestEnvelope(t.Context(), publisher, topic, message); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -175,25 +176,18 @@ func TestNSQDeliveryExhaustionPersistsMySQLDeadLetter(t *testing.T) {
 
 	var handlerCalls atomic.Int32
 	firstTransportID := make(chan string, 1)
-	options := basemessaging.SubscriberOptions{
-		MaxInFlight: 1,
-		MaxAttempts: 2,
-		RetryBackoff: basemessaging.RetryBackoffOptions{
-			BaseDelay: 10 * time.Millisecond,
-			MaxDelay:  20 * time.Millisecond,
-		},
-		FailedMessageHandler: FailedMessageHandler(recorder),
-	}
-	subscriber, err := newHistoricalNSQSubscriber(SubscriberConfig{Provider: "nsq", NSQLookupdAddr: lookupd, NSQMessageTimeout: time.Minute}, options)
+	subscriber, err := newFastSDKWorkerSubscriberWithRetry(SubscriberConfig{Provider: "nsq", NSQLookupdAddr: lookupd, NSQMessageTimeout: time.Minute}, 2,
+		rmnsq.Backoff{BaseDelay: 10 * time.Millisecond, MaxDelay: 20 * time.Millisecond}, recorder)
+
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = subscriber.Close() })
 	wantCause := errors.New("qs-server transport integration handler failed")
-	if err := subscriber.Subscribe(topic, channel, func(_ context.Context, received *basemessaging.Message) error {
+	if err := subscriber.Subscribe(topic, channel, func(_ context.Context, delivery rmtransport.Delivery) error {
 		handlerCalls.Add(1)
 		select {
-		case firstTransportID <- received.TransportMessageID:
+		case firstTransportID <- delivery.Message().TransportID:
 		default:
 		}
 		return wantCause
@@ -201,14 +195,14 @@ func TestNSQDeliveryExhaustionPersistsMySQLDeadLetter(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	publisher, err := cbnsq.NewPublisher(nsqdAddress, nsq.NewConfig())
+	publisher, err := messagingruntime.NewSDKNSQWirePublisher(nsqdAddress)
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = publisher.Close() })
 	payload := []byte(`{"id":"transport-event-1","data":{"org_id":7}}`)
-	message := basemessaging.NewMessage("transport-message-1", payload)
-	if err := publisher.PublishMessage(t.Context(), topic, message); err != nil {
+	message := legacy.Envelope{UUID: "transport-message-1", Payload: payload, Metadata: map[string]string{}}
+	if err := publishSDKTestEnvelope(t.Context(), publisher, topic, message); err != nil {
 		t.Fatal(err)
 	}
 
@@ -259,7 +253,7 @@ SET retry_disposition='terminal',replay_request_id='replay-request-1' WHERE tran
 	}
 	// A later publish with the same logical UUID receives a new NSQ ID. If it
 	// exhausts too, its failure must not be hidden behind the settled old row.
-	if err := publisher.PublishMessage(t.Context(), topic, message); err != nil {
+	if err := publishSDKTestEnvelope(t.Context(), publisher, topic, message); err != nil {
 		t.Fatal(err)
 	}
 	replayDeadline := time.NewTimer(20 * time.Second)
@@ -338,14 +332,14 @@ func TestWorkerUnknownEventRecoversAfterSubscriberRestart(t *testing.T) {
 	}); err != nil {
 		t.Fatal(err)
 	}
-	publisher, err := cbnsq.NewPublisher(integrationEnv("NSQD_ADDR", "127.0.0.1:4150"), nsq.NewConfig())
+	publisher, err := messagingruntime.NewSDKNSQWirePublisher(integrationEnv("NSQD_ADDR", "127.0.0.1:4150"))
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = publisher.Close() })
-	message := basemessaging.NewMessage("worker-unknown-outage-1", []byte(`{"id":"unknown-outage-1","data":{"org_id":501}}`))
+	message := legacy.Envelope{UUID: "worker-unknown-outage-1", Payload: []byte(`{"id":"unknown-outage-1","data":{"org_id":501}}`), Metadata: map[string]string{}}
 	message.Metadata["event_type"] = "future.event"
-	if err := publisher.PublishMessage(t.Context(), topic, message); err != nil {
+	if err := publishSDKTestEnvelope(t.Context(), publisher, topic, message); err != nil {
 		t.Fatal(err)
 	}
 	select {
@@ -437,40 +431,37 @@ func TestNSQFailedHandoffWaitsForMySQLRecoveryWithoutBusinessRetry(t *testing.T)
 	failedWrites := make(chan error, 4)
 	var businessCalls atomic.Int32
 	var auditCalls atomic.Int32
-	subscriber, err := newHistoricalNSQSubscriber(SubscriberConfig{
+	subscriber, err := newFastSDKWorkerSubscriberWithRetry(SubscriberConfig{
 		Provider: "nsq", NSQLookupdAddr: integrationEnv("NSQ_LOOKUPD_ADDR", "127.0.0.1:4161"), NSQMessageTimeout: time.Minute,
-	}, basemessaging.SubscriberOptions{
-		MaxInFlight: 1, MaxAttempts: 2,
-		RetryBackoff: basemessaging.RetryBackoffOptions{BaseDelay: 100 * time.Millisecond, MaxDelay: 100 * time.Millisecond},
-		FailedMessageHandler: FailedMessageHandler(deadLetterRecorderFunc(func(ctx context.Context, record DeadLetterRecord) error {
-			auditCalls.Add(1)
-			writeErr := recorder.RecordDeadLetter(ctx, record)
-			if writeErr != nil {
-				select {
-				case failedWrites <- writeErr:
-				default:
-				}
+	}, 2, rmnsq.Backoff{BaseDelay: 100 * time.Millisecond, MaxDelay: 100 * time.Millisecond}, deadLetterRecorderFunc(func(ctx context.Context, record DeadLetterRecord) error {
+		auditCalls.Add(1)
+		writeErr := recorder.RecordDeadLetter(ctx, record)
+		if writeErr != nil {
+			select {
+			case failedWrites <- writeErr:
+			default:
 			}
-			return writeErr
-		})),
-	})
+		}
+		return writeErr
+	}))
+
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = subscriber.Close() })
-	if err := subscriber.Subscribe(topic, channel, func(context.Context, *basemessaging.Message) error {
+	if err := subscriber.Subscribe(topic, channel, func(context.Context, rmtransport.Delivery) error {
 		businessCalls.Add(1)
 		return errors.New("injected business failure before audit outage")
 	}); err != nil {
 		t.Fatal(err)
 	}
-	publisher, err := cbnsq.NewPublisher(integrationEnv("NSQD_ADDR", "127.0.0.1:4150"), nsq.NewConfig())
+	publisher, err := messagingruntime.NewSDKNSQWirePublisher(integrationEnv("NSQD_ADDR", "127.0.0.1:4150"))
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = publisher.Close() })
-	message := basemessaging.NewMessage("worker-handoff-outage-1", []byte(`{"id":"handoff-1","data":{"org_id":501}}`))
-	if err := publisher.PublishMessage(t.Context(), topic, message); err != nil {
+	message := legacy.Envelope{UUID: "worker-handoff-outage-1", Payload: []byte(`{"id":"handoff-1","data":{"org_id":501}}`), Metadata: map[string]string{}}
+	if err := publishSDKTestEnvelope(t.Context(), publisher, topic, message); err != nil {
 		t.Fatal(err)
 	}
 	select {

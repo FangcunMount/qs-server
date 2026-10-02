@@ -5,8 +5,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/FangcunMount/component-base/pkg/eventmessaging"
-	"github.com/FangcunMount/component-base/pkg/messaging"
 	"github.com/FangcunMount/qs-server/internal/pkg/event"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
 	domainwire "github.com/FangcunMount/reliable-messaging/wire/domain"
@@ -38,6 +36,7 @@ func TestBestEffortEventWireCompatibility(t *testing.T) {
 		t.Fatalf("event inventory changed: best_effort=%d protected=%d total=%d", bestEffortCount, len(cases), len(cfg.Events))
 	}
 	resolver := eventcatalog.NewCatalog(cfg)
+	wires, _ := retiredWireContracts(t)
 	for _, tc := range cases {
 		t.Run(tc.eventType, func(t *testing.T) {
 			if cfg.Events[tc.eventType].Delivery != eventcatalog.DeliveryClassBestEffort {
@@ -54,19 +53,15 @@ func TestBestEffortEventWireCompatibility(t *testing.T) {
 				},
 				Data: map[string]any{"org_id": 1, "revision": "v2"},
 			}
-			oldMessage, err := eventmessaging.BuildMessage(evt, SourceAPIServer)
-			if err != nil {
-				t.Fatal(err)
-			}
-			oldWire, err := messaging.EncodeMessagePayload(oldMessage)
-			if err != nil {
-				t.Fatal(err)
+			old, found := wires[tc.eventType]
+			if !found {
+				t.Fatal("missing historical wire")
 			}
 			newPayload, err := domainwire.EncodeEvent(evt)
 			if err != nil {
 				t.Fatal(err)
 			}
-			if !bytes.Equal(newPayload, oldMessage.Payload) {
+			if !bytes.Equal(newPayload, []byte(old.Payload)) {
 				t.Fatal("SDK changed the direct event JSON bytes")
 			}
 			newWire, err := legacy.Encode(legacy.Envelope{
@@ -76,7 +71,7 @@ func TestBestEffortEventWireCompatibility(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if !bytes.Equal(newWire, oldWire) {
+			if !bytes.Equal(newWire, []byte(old.Wire)) {
 				t.Fatal("SDK changed the direct NSQ wire bytes")
 			}
 			decoded, recognized, err := legacy.Decode(newWire)

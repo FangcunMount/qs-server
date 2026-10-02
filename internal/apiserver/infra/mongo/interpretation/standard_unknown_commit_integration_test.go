@@ -54,9 +54,6 @@ func TestInterpretationStandardDriverUnknownCommitRetriesCommitOnly(t *testing.T
 	defer monitoredClient.Disconnect(context.Background())
 	monitoredDB := monitoredClient.Database(db.Name())
 	fixture := newInterpretationMongoFixture(t, monitoredDB)
-	if err := monitoredDB.CreateCollection(ctx, "rm_outbox"); err != nil {
-		t.Fatal(err)
-	}
 	wire, err := eventcatalog.Load("../../../../../configs/events.yaml")
 	if err != nil {
 		t.Fatal(err)

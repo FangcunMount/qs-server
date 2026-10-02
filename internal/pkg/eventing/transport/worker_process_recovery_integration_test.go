@@ -17,11 +17,10 @@ import (
 	"testing"
 	"time"
 
-	basemessaging "github.com/FangcunMount/component-base/pkg/messaging"
-	cbnsq "github.com/FangcunMount/component-base/pkg/messaging/nsq"
+	"github.com/FangcunMount/qs-server/internal/pkg/messagingruntime"
 	workermessaging "github.com/FangcunMount/qs-server/internal/worker/integration/messaging"
+	"github.com/FangcunMount/reliable-messaging/wire/legacy"
 	drivermysql "github.com/go-sql-driver/mysql"
-	"github.com/nsqio/go-nsq"
 )
 
 // This test uses two independent OS processes against a disposable MySQL/NSQ
@@ -72,14 +71,14 @@ func TestWorkerUnknownEventRecoversAfterProcessKill(t *testing.T) {
 	t.Cleanup(func() { _ = crash.Process.Kill() })
 	waitForWorkerProcessMarker(t, readyMarker, crashDone)
 
-	publisher, err := cbnsq.NewPublisher(integrationEnv("NSQD_ADDR", "127.0.0.1:4150"), nsq.NewConfig())
+	publisher, err := messagingruntime.NewSDKNSQWirePublisher(integrationEnv("NSQD_ADDR", "127.0.0.1:4150"))
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = publisher.Close() })
-	message := basemessaging.NewMessage("worker-process-unknown-1", []byte(`{"id":"process-unknown-1","data":{"org_id":501}}`))
+	message := legacy.Envelope{UUID: "worker-process-unknown-1", Payload: []byte(`{"id":"process-unknown-1","data":{"org_id":501}}`), Metadata: map[string]string{}}
 	message.Metadata["event_type"] = "future.event"
-	if err := publisher.PublishMessage(t.Context(), topic, message); err != nil {
+	if err := publishSDKTestEnvelope(t.Context(), publisher, topic, message); err != nil {
 		t.Fatal(err)
 	}
 	waitForWorkerProcessMarker(t, blockedMarker, crashDone)

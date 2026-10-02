@@ -61,10 +61,7 @@ func TestRemovedEventAndCacheSignalPathsDoNotReturn(t *testing.T) {
 
 func TestEventSubsystemHasSingleProductionCompositionRoot(t *testing.T) {
 	root := repoRoot(t)
-	want := map[string]string{
-		"internal/apiserver/process/standard_event_subsystem_default.go": "//go:build !reliable_messaging_m4",
-		"internal/apiserver/process/standard_event_subsystem_m4.go":      "//go:build reliable_messaging_m4",
-	}
+	want := map[string]string{"internal/apiserver/process/standard_event_subsystem_m4.go": ""}
 	var found []string
 	walkGoFiles(t, filepath.Join(root, "internal", "apiserver"), func(file, text string) {
 		if strings.HasSuffix(file, "_test.go") || !strings.Contains(text, "eventsubsystem.New") {
@@ -72,7 +69,7 @@ func TestEventSubsystemHasSingleProductionCompositionRoot(t *testing.T) {
 		}
 		rel := filepath.ToSlash(mustRel(t, root, file))
 		tag, ok := want[rel]
-		if !ok || !strings.HasPrefix(text, tag) {
+		if !ok || !strings.HasPrefix(text, tag) || strings.Contains(text, "//go:build") {
 			t.Fatalf("unexpected event subsystem owner or build constraint: %s", rel)
 		}
 		found = append(found, rel)
@@ -132,7 +129,7 @@ func TestEventingSharedPackagesKeepDependencyDirection(t *testing.T) {
 func TestCacheSignalContractStaysTransportAgnostic(t *testing.T) {
 	root := repoRoot(t)
 	forbiddenImports := []string{
-		"github.com/FangcunMount/component-base/pkg/signaling",
+		"github.com/FangcunMount/reliable-messaging/signaling",
 		"github.com/FangcunMount/qs-server/internal/pkg/redisruntime",
 		"github.com/FangcunMount/qs-server/internal/pkg/options",
 		"github.com/FangcunMount/qs-server/internal/pkg/reportstatus",

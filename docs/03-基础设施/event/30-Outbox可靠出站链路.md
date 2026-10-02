@@ -1,198 +1,69 @@
 # Outbox 可靠出站链路
 
-## 1. Outbox 解决什么问题
+## 1. 当前实现与边界
 
-业务数据库提交成功、MQ 发布失败时，如果只在事务后直接 Publish，业务事实会永久缺少对应事件。Transactional Outbox 把“业务事实”和“待发送事件”写入同一个本地事务，消除这个提交缝隙。
+QS 使用 reliable-messaging SDK 的标准 Outbox 和 Relay。业务服务仍负责在原业务事务中暂存事件、选择业务 Topic、处理消费者幂等和人工治理；SDK 负责标准存储、claim、发布结算和租约恢复。组件不会消除跨数据库或外部副作用的一致性问题。
 
-```text
-业务事务
-  ├─ 写业务事实
-  └─ Stage Outbox(pending)
-          │
-          ├─ rollback：二者一起回滚
-          └─ commit：二者一起成为事实
-                         │
-                 AfterCommit（无错误返回）
-                  ├─ ready-index enqueue
-                  └─ immediate async try（仅声明为 immediate）
-                         │
-                   relay 持续兜底
-```
-
-Outbox 保证的是事件事实不会因进程退出或 MQ 短暂不可用而消失，不保证消费者只收到一次。
-
-## 2. Profile 与运行时所有权
-
-EventSubsystem 拥有两个 profile：
-
-| Profile | Store | 事件范围 |
+| Profile | 权威存储 | 业务事件 |
 | --- | --- | --- |
-| `mongo_domain_events` | Mongo `domain_event_outbox` | `answersheet.submitted`、Interpretation 报告生成/失败/重试授权 |
-| `assessment_mysql_events` | MySQL `domain_event_outbox` | Evaluation 请求/重试授权/结果提交/失败 |
+| `mongo_domain_events` | Mongo `rm_outbox` | 答卷提交、报告生成／失败／重试授权 |
+| `assessment_mysql_events` | MySQL `rm_outbox` | 测评请求／重试授权／结果／失败，以及启用后的任务开放意图 |
 
-每个 profile 构造且只构造一个：
+配置必须启用已挂载数据库对应的标准 Profile，缺失绑定或禁用标准 Profile 时启动失败。当前源码不提供旧 Outbox 的配置回退；部署回退使用经过核对的旧镜像，并遵守对应数据版本的恢复约束。源码实现不代表生产已更新，生产版本见发布与验收记录。
 
-- Outbox Store。
-- Redis ready-index。
-- ImmediateDispatcher。
-- Ready-index reconciler。
-- Relay。
-
-Mongo collection、MySQL table、Topic 和业务事务边界属于兼容不变量。业务模块不拥有这些 runtime，也不能从 repository 导出 Store/relay/status 兼容代理。
-
-## 3. 业务模块只依赖 ProfileBinding
-
-```go
-type ProfileBinding struct {
-    Stager     EventStager
-    PostCommit PostCommitDispatcher
-}
-
-type PostCommitDispatcher interface {
-    AfterCommit(ctx context.Context, events []event.DomainEvent, readyAt time.Time)
-}
-```
-
-职责边界：
-
-- `Stager` 只能在活跃业务事务内调用。
-- Mongo staging 要求 `mongo.SessionContext`；MySQL staging 要求 context 中存在 `*sql.Tx`。
-- 没有事务 context 时必须失败，禁止偷偷降级为独立写 Outbox。
-- `AfterCommit` 只在 commit 成功后调用，每批事件通知一次。
-- `AfterCommit` 没有错误返回。此时业务事务已经提交，返回错误不能创造“调用方还能回滚”的错觉。
-
-rollback 路径不调用 post-commit；即使 post-commit 内部 ready-index 或 immediate 失败，Outbox 的 pending 事实仍然存在。
-
-## 4. Outbox 状态机
+## 2. 事务提交与投递
 
 ```text
-pending ──claim──────────────────────────────────> publishing
-failed + automatic ──到期 claim─────────────────> publishing
-publishing ──publish success + mark success──────> published
-publishing ──publish failed──────────────────────> failed + automatic
-publishing ──publish failed 且预算耗尽───────────> failed + manual_required
-publishing ──publish success + mark failed───────> publishing（陈旧 claim）
-publishing（陈旧 claim）──stale recovery + claim─> publishing（新 claim）
-failed + manual_required ──events.replay_pending─> failed + automatic
+原业务事务：业务事实 + SDK Appender.Append
+        ├─ rollback：两者一起回滚
+        └─ commit：两者同时持久化
+                    ↓
+            AfterCommit 唤醒 Relay
+                    ↓
+            SDK 扫描、claim、发布和结算
+                    ↓
+            消费者按业务事实处理幂等
 ```
 
-核心状态为 `pending`、`publishing`、`published`、`failed`。
+Mongo adapter 通过 `sdkmongo.Bind` 使用原 `mongo.SessionContext`；MySQL adapter 通过 `sdkmysql.BindGORM` 使用原 GORM 事务。没有业务事务时必须拒绝暂存，不另开事务兜底。
 
-- Store 原子 claim，避免同一时刻多个 worker 同时取得同一行。
-- publish 失败会进入 governed failure 决策并记录 `failed`、下一次时间或 `manual_required`。
-- MQ publish 已成功但 `MarkEvent(s)Published` 失败时，只记录 `mark_published_failed` 观测结果，Outbox 行仍保持 `publishing`；
-  它依赖 stale-claim recovery 重新进入候选，不会立即改写为 retry 状态。
-- 到期且 `retry_disposition=automatic` 的 failed，以及陈旧 publishing，会重新进入候选集合。
-- Outbox 默认最多进行 30 次自动发布尝试，使用 10 秒起步、1 小时封顶、20% deterministic jitter 的退避；代码硬上限也是 30，部署配置只能下调。
-- 预算耗尽后保留 `failed + manual_required`，不再被 relay 自动 claim。组织管理员必须通过高风险动作 `events.replay_pending`，携带 store、event ID 和预期 attempt count 授权一次重放；
-  状态已变化时拒绝授权。
+`ProfileBinding` 保留 `Stager` 和 `PostCommit` 两个业务端口。`AfterCommit` 没有错误返回，只在成功提交后调用；唤醒丢失仍可通过 SDK 数据库轮询恢复。当前链路不依赖旧 Redis ready-index、ImmediateDispatcher 或 reconciler。
 
-如果 MQ 已经接收消息、进程却在 mark published 前退出，同一事件可能再次发布。这是标准 at-least-once 窗口，不能用 Store 状态推导 exactly-once。
+## 3. 失败与恢复
 
-## 5. PostCommit：ready-index 与 immediate
+标准未完成状态为 `pending`、`retry_wait`、`publishing` 和 `quarantined`；发送结算成功后为 `published`。SDK Store 使用 claim／租约及结算校验保护并发更新；失败或结果未知按照治理策略安排后续处理，预算耗尽进入持久待处置状态。具体失败分类与退避由 `SDKRetryPolicy` 和业务治理策略决定。
 
-事务提交后，dispatcher 按以下顺序执行：
+| 失败位置 | 处理边界 |
+| --- | --- |
+| 业务事务回滚 | 业务事实和事件均不提交 |
+| 提交后唤醒丢失 | SDK 数据库轮询发现持久意图 |
+| MQ 不可用 | 保留未完成意图，执行有界重试 |
+| MQ 接收但发布结算未持久化 | 租约恢复可能再次投递；消费者必须幂等 |
+| 自动预算耗尽 | 保留待人工处置事实，按原事件身份授权治理 |
+| 不可逆外部调用结果未知 | 保留回执／人工核对，不据此盲目重发外部调用 |
 
-1. 尽力把本批全部事件写入 ready-index。
-2. 对 Registry 标记为 immediate 的事件异步尝试 MQ。
+Outbox 提供至少一次投递。`published` 只证明发送结算，不证明消费者业务完成；原消息重投、业务幂等和报告回执仍需分别核验。
 
-### Ready-index
+## 4. 生命周期和状态
 
-ready-index 是 Redis ZSet 加速层，不是事件事实来源。key 按 store 和 priority bucket 隔离：
+`EventSubsystem` 组装 SDK Profile 与消费者，启动消费者和各 Profile Supervisor；关闭时取消运行任务并等待退出，再执行发布器 drain。状态接口保留业务端口，标准状态快照使用 SDK 形状。消费者独立维护业务消费结果和死信事实。
 
-```text
-outbox:ready:<store>:p0
-outbox:ready:<store>:p1
-outbox:ready:<store>:p2
-```
+当前没有 Mongo／MySQL 分布式事务、全局 exactly-once 或统一外部副作用去重账本。业务幂等继续遵循[事件契约与演进](./20-事件契约与演进.md)。
 
-relay 优先消费 ready-index 给出的 ID，同时保留数据库轮询。Redis 写入或读取失败不会删除 Outbox，也不会阻止数据库扫描恢复。
+## 5. 代码与验证
 
-### Immediate
-
-ImmediateDispatcher 只在 RoutingPublisher 明确 `IsMQBacked() == true` 时启用。logging、nop 或 MQ publisher 缺失时：
-
-- durable 事件不会被伪装成已发布。
-- Outbox 保持 pending，等待真正的 MQ-backed relay。
-- best-effort direct logging/nop 行为不受影响。
-
-immediate 有独立并发上限和单次超时。成功时按合法状态迁移标记 published；失败时只记录观测结果，不改变 Outbox 作为最终事实的地位。
-
-## 6. Relay 与优先级
-
-Relay 的工作循环：
-
-1. 从 Registry 派生的 priority tiers 取得 claim 策略。
-2. 优先尝试 ready-index 中已提交事件 ID。
-3. 对数据库执行轮询兜底，claim pending、到期 failed 和 stale publishing。
-4. 编码并发布 MQ message。
-5. MQ publish 失败时记录 governed failure 与下一次时间；publish 成功后尝试标记 published，mark 失败则保持 `publishing` 并等待 stale-claim recovery。
-
-当前层级顺序是：
-
-1. p0。
-2. p0 + p1。
-3. fallback all，覆盖 p2 或未命中的候选。
-
-Priority 仅影响 claim 顺序，不改变事件 delivery、重试语义或 handler 结算。Store 和 ready-index 不得维护独立的默认 P0/P1 切片。
-
-具体 interval、batch size、workers、immediate workers 属于部署调优参数，继续使用 `outbox_relay.mongo.*` 和 `outbox_relay.assessment.*`，不在文档中固化生产数值。
-
-## 7. Reconciler
-
-ready-index 是 best-effort，因此 EventSubsystem 为每个 profile 启动 reconciler，周期性从数据库列出仍需投递的事件引用并回填 ZSet。
-
-Reconciler 解决的是“Outbox 已提交但 post-commit enqueue 丢失”的加速索引缺口。它不取代 relay 的数据库兜底，也不改变 Outbox 状态。
-
-## 8. 失败场景与结算
-
-| 失败位置 | Outbox 事实 | 系统行为 | 是否会丢 durable event |
-| --- | --- | --- | --- |
-| 业务事务 rollback | 未提交 | 事实与 Outbox 一起回滚 | 不产生事件 |
-| ready-index enqueue 失败 | pending 已提交 | 记录失败，relay DB 扫描/reconciler 回填 | 否 |
-| immediate publish 失败 | pending/可重试状态 | relay 后续重试 | 否 |
-| MQ 不可用 | backlog 增长 | relay 重试；logging/nop 不标记 published | 否 |
-| MQ 成功、mark published 失败 | 保持 `publishing` | 记录 `mark_published_failed`；stale-claim recovery 后重新 claim 并可能重复发布 | 不丢，但可能重复 |
-| Redis ready-index 不可用 | Outbox 不变 | DB polling 继续工作 | 否 |
-| Store 读取失败 | Outbox 不变 | status/relay 记录错误并下轮重试 | 否 |
-| 自动发布预算耗尽 | `failed + manual_required` | 停止自动 claim，等待 `events.replay_pending` | 否，但事件尚未投递 |
-
-## 9. 保证边界
-
-提供：
-
-- 单数据库内业务事实 + Outbox 原子提交。
-- MQ 故障期间可积压，恢复后继续 relay。
-- ready-index 丢失时数据库可恢复。
-- immediate 与 relay 共享合法 Store 状态迁移。
-- 自动发布重试有界；耗尽后保留可审计、可做冲突检查的人工处置状态。
-- 可观测 backlog、oldest age、publish/mark 失败。
-
-不提供：
-
-- 跨 Mongo/MySQL 原子事务。
-- exactly-once。
-- 对不可逆外部副作用的统一 inbox/dedup record。
-- 把 Outbox 失败复制到另一张“Outbox DLQ”表；`failed + manual_required` 本身就是待处置事实。
-- 无审批的批量无限重放或对永久错误的自动修复。
-
-消费者必须按[Event 契约与演进](./20-事件契约与演进.md)中的逐事件策略实现幂等。
-
-## 10. 代码与验证
-
-- Ports：`internal/apiserver/application/eventing`
-- Orchestration：`internal/apiserver/eventing/subsystem`
-- Shared relay core：`internal/apiserver/outboxcore`
-- M6 候选状态接口：`internal/apiserver/port/outbox` 使用 `reliable-messaging/outbox` 的状态快照形状；旧 core 在边界转换，旧三态与标准四态仍分别由各 Profile 读取，不因类型迁移改变重试或回退。
-- Mongo Store：`internal/apiserver/infra/mongo/eventoutbox`
-- MySQL Store：`internal/apiserver/infra/mysql/eventoutbox`
-- Ready-index：`internal/apiserver/infra/redis/outboxready`
+- 业务端口：`internal/apiserver/application/eventing`
+- 组装：`internal/apiserver/eventing/subsystem`
+- SDK 适配与 Supervisor：`internal/apiserver/eventing/standardoutbox`
+- Mongo 原事务适配：`internal/apiserver/infra/mongo/standardoutbox`
+- MySQL 原事务适配：`internal/apiserver/infra/mysql/standardoutbox`
+- SDK 核心：`github.com/FangcunMount/reliable-messaging/{outbox,relay,storage}`
 
 ```bash
 go test -count=1 ./internal/apiserver/application/eventing \
   ./internal/apiserver/eventing/subsystem \
-  ./internal/apiserver/outboxcore \
-  ./internal/apiserver/infra/mongo/eventoutbox \
-  ./internal/apiserver/infra/mysql/eventoutbox \
-  ./internal/apiserver/infra/redis/outboxready
+  ./internal/apiserver/eventing/standardoutbox \
+  ./internal/pkg/architecture
 ```
+
+旧 core／Store／ready-index 及历史混合 Profile 合同从固定旧提交运行，入口为 `scripts/testing/run-retired-outbox-contracts.sh`，清单为 `docs/retired-outbox-contracts.json`。历史合同只能证明固定旧实现的行为，不能替代当前 SDK 的集成验收。删除源码不删除生产历史行、索引、NSQ channel 或回退镜像。

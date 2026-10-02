@@ -5,10 +5,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/FangcunMount/component-base/pkg/eventcodec"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/hotrank"
 	"github.com/FangcunMount/qs-server/internal/pkg/event"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
+	domainwire "github.com/FangcunMount/reliable-messaging/wire/domain"
 )
 
 type projectionCapture struct{ facts []hotrank.SubmissionFact }
@@ -25,7 +25,7 @@ func TestEventConsumerProjectsAnswerSheetSubmitted(t *testing.T) {
 		BaseEvent: event.BaseEvent{ID: "evt-1", EventTypeValue: eventcatalog.AnswerSheetSubmitted, OccurredAtValue: occurredAt, AggregateTypeValue: "AnswerSheet", AggregateIDValue: "42"},
 		Data:      map[string]any{"questionnaire_code": "Q-1", "submitted_at": occurredAt},
 	}
-	payload, err := eventcodec.EncodeDomainEvent(evt)
+	payload, err := domainwire.EncodeEvent(evt)
 	if err != nil {
 		t.Fatal(err)
 	}

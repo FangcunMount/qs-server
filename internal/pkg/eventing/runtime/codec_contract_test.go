@@ -5,9 +5,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/FangcunMount/component-base/pkg/eventcodec"
-	"github.com/FangcunMount/component-base/pkg/eventmessaging"
 	"github.com/FangcunMount/qs-server/internal/pkg/event"
+	domainwire "github.com/FangcunMount/reliable-messaging/wire/domain"
+	"github.com/FangcunMount/reliable-messaging/wire/legacy"
 )
 
 type samplePayload struct {
@@ -17,12 +17,12 @@ type samplePayload struct {
 func TestDomainEventJSONRoundTrip(t *testing.T) {
 	evt := event.New("sample.created", "Sample", "sample-1", samplePayload{Value: "ok"})
 
-	payload, err := eventcodec.EncodeDomainEvent(evt)
+	payload, err := domainwire.EncodeEvent(evt)
 	if err != nil {
 		t.Fatalf("EncodeDomainEvent: %v", err)
 	}
 
-	env, err := eventcodec.DecodeEnvelope(payload)
+	env, err := domainwire.DecodeEnvelope(payload)
 	if err != nil {
 		t.Fatalf("DecodeEnvelope: %v", err)
 	}
@@ -37,7 +37,7 @@ func TestDomainEventJSONRoundTrip(t *testing.T) {
 		t.Fatalf("decoded data = %q, want ok", data.Value)
 	}
 
-	decoded, err := eventcodec.DecodeDomainEvent(payload)
+	decoded, err := DecodeDomainEvent(payload)
 	if err != nil {
 		t.Fatalf("DecodeDomainEvent: %v", err)
 	}
@@ -58,10 +58,11 @@ func TestBuildMessageMetadata(t *testing.T) {
 		Data: samplePayload{Value: "ok"},
 	}
 
-	msg, err := eventmessaging.BuildMessage(evt, "unit-test")
+	payload, err := domainwire.EncodeEvent(evt)
 	if err != nil {
-		t.Fatalf("BuildMessage: %v", err)
+		t.Fatalf("EncodeEvent: %v", err)
 	}
+	msg := legacy.Envelope{UUID: evt.EventID(), Payload: payload, Metadata: domainwire.MetadataFromEvent(evt, "unit-test")}
 	if msg.UUID != "evt-1" {
 		t.Fatalf("message UUID = %q, want evt-1", msg.UUID)
 	}

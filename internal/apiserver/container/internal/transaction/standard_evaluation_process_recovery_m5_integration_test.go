@@ -18,7 +18,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/FangcunMount/component-base/pkg/messaging"
 	evalpb "github.com/FangcunMount/qs-server/api/grpc/gen/evaluation"
 	appexecute "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/execute"
 	appintake "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/intake"
@@ -36,6 +35,7 @@ import (
 	"github.com/FangcunMount/reliable-messaging/relay"
 	sdkmysql "github.com/FangcunMount/reliable-messaging/storage/mysql"
 	sdknsq "github.com/FangcunMount/reliable-messaging/transport/nsq"
+	legacywire "github.com/FangcunMount/reliable-messaging/wire/legacy"
 	mysqldriver "github.com/go-sql-driver/mysql"
 	"github.com/nsqio/go-nsq"
 	"github.com/stretchr/testify/require"
@@ -261,7 +261,7 @@ func TestM5EvaluationRequestedProcessChild(t *testing.T) {
 	require.NoError(t, err)
 	consumer.SetLogger(nil, nsq.LogLevelError)
 	consumer.AddHandler(nsq.HandlerFunc(func(raw *nsq.Message) error {
-		decoded, recognized, decodeErr := messaging.DecodeMessagePayload(raw.Body)
+		decoded, recognized, decodeErr := legacywire.Decode(raw.Body)
 		if decodeErr != nil || !recognized {
 			return fmt.Errorf("decode original QS envelope: recognized=%t: %w", recognized, decodeErr)
 		}

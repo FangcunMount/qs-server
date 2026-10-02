@@ -1,5 +1,3 @@
-//go:build reliable_messaging_m4
-
 package plan_test
 
 import (
@@ -12,7 +10,6 @@ import (
 	"time"
 
 	baseerrors "github.com/FangcunMount/component-base/pkg/errors"
-	"github.com/FangcunMount/component-base/pkg/messaging"
 	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
 	notificationApp "github.com/FangcunMount/qs-server/internal/apiserver/application/notification"
 	appplan "github.com/FangcunMount/qs-server/internal/apiserver/application/plan"
@@ -27,6 +24,7 @@ import (
 	eventcatalog "github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
 	eventruntime "github.com/FangcunMount/qs-server/internal/pkg/eventing/runtime"
 	sdkmysql "github.com/FangcunMount/reliable-messaging/storage/mysql"
+	legacywire "github.com/FangcunMount/reliable-messaging/wire/legacy"
 	"github.com/stretchr/testify/require"
 	gormmysql "gorm.io/driver/mysql"
 	"gorm.io/gorm"
@@ -166,7 +164,7 @@ events:
 	require.NotEmpty(t, rawID)
 	require.Equal(t, "qs.plan.task", string(rawDestination))
 	require.Equal(t, "org:501", string(rawScope))
-	decoded, recognized, err := messaging.DecodeMessagePayload(rawPayload)
+	decoded, recognized, err := legacywire.Decode(rawPayload)
 	require.NoError(t, err)
 	require.True(t, recognized)
 	require.Equal(t, string(rawID), decoded.UUID)

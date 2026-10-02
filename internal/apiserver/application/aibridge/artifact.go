@@ -12,27 +12,29 @@ import (
 // Artifact is the versioned result envelope owned by qs-ai. QS checks transport
 // integrity and request correlation; it does not rerun AI generation rules.
 type Artifact struct {
-	ID                     string `json:"id"`
-	SessionID              string `json:"session_id"`
-	RunID                  string `json:"run_id"`
-	EvidenceSetID          string `json:"evidence_set_id"`
-	EvidenceFingerprint    string `json:"evidence_fingerprint"`
-	InvocationID           string `json:"invocation_id"`
-	ProviderRequestID      string `json:"provider_request_id"`
-	ContentJSON            string `json:"content_json"`
-	ContentFingerprint     string `json:"content_fingerprint"`
-	InputFingerprint       string `json:"input_fingerprint"`
-	ProfileID              string `json:"profile_id"`
-	ProfileVersion         string `json:"profile_version"`
-	ProfileFingerprint     string `json:"profile_fingerprint"`
-	PromptFingerprint      string `json:"prompt_fingerprint"`
-	RouteFingerprint       string `json:"route_fingerprint"`
-	OutputValidatorVersion string `json:"output_validator_version"`
-	SafetyValidatorVersion string `json:"safety_validator_version"`
-	AssessmentID           string `json:"assessment_id"`
-	ReportID               string `json:"report_id"`
-	SourceVersion          string `json:"source_version"`
-	SchemaVersion          string `json:"schema_version"`
+	ID                           string `json:"id"`
+	SessionID                    string `json:"session_id"`
+	RunID                        string `json:"run_id"`
+	EvidenceSetID                string `json:"evidence_set_id"`
+	EvidenceFingerprint          string `json:"evidence_fingerprint"`
+	InvocationID                 string `json:"invocation_id"`
+	ProviderRequestID            string `json:"provider_request_id"`
+	ContentJSON                  string `json:"content_json"`
+	ContentFingerprint           string `json:"content_fingerprint"`
+	InputFingerprint             string `json:"input_fingerprint"`
+	ProfileID                    string `json:"profile_id"`
+	ProfileVersion               string `json:"profile_version"`
+	ProfileFingerprint           string `json:"profile_fingerprint"`
+	PromptFingerprint            string `json:"prompt_fingerprint"`
+	RouteFingerprint             string `json:"route_fingerprint"`
+	OutputValidatorVersion       string `json:"output_validator_version"`
+	SafetyValidatorVersion       string `json:"safety_validator_version"`
+	AssessmentID                 string `json:"assessment_id"`
+	ReportID                     string `json:"report_id"`
+	SourceVersion                string `json:"source_version"`
+	SchemaVersion                string `json:"schema_version"`
+	ReferenceMaterialJSON        string `json:"reference_material_json,omitempty"`
+	ReferenceMaterialFingerprint string `json:"reference_material_fingerprint,omitempty"`
 }
 
 func digest(s string, prefixed bool) bool {
@@ -68,7 +70,7 @@ func ValidateArtifact(e Event) (*Artifact, error) {
 	if err := dec.Decode(new(any)); err != io.EOF {
 		return nil, ErrInvalid
 	}
-	if a.SchemaVersion != "qs-ai-artifact/v1" || a.SessionID != e.SessionID || !validID(a.ID) || !validID(a.RunID) || !validID(a.EvidenceSetID) || !validID(a.InvocationID) || !validNumber(a.AssessmentID) || !validNumber(a.ReportID) {
+	if (a.SchemaVersion != "qs-ai-artifact/v1" && a.SchemaVersion != "qs-ai-artifact/v2") || a.SessionID != e.SessionID || !validID(a.ID) || !validID(a.RunID) || !validID(a.EvidenceSetID) || !validID(a.InvocationID) || !validNumber(a.AssessmentID) || !validNumber(a.ReportID) {
 		return nil, ErrInvalid
 	}
 	if !digest(a.EvidenceFingerprint, false) {
@@ -91,7 +93,24 @@ func ValidateArtifact(e Event) (*Artifact, error) {
 	var content struct {
 		SchemaVersion string `json:"schema_version"`
 	}
-	if json.Unmarshal([]byte(a.ContentJSON), &content) != nil || content.SchemaVersion != "ai-explanation-output/v1" {
+	if json.Unmarshal([]byte(a.ContentJSON), &content) != nil {
+		return nil, ErrInvalid
+	}
+	switch content.SchemaVersion {
+	case "ai-explanation-output/v1":
+		// Preserve the legacy envelope/read contract, including historical receipts.
+	case "ai-explanation-output/v2":
+		if err := validateMBTIOutput(a.ContentJSON, a.OutputValidatorVersion); err != nil {
+			return nil, err
+		}
+	default:
+		return nil, ErrInvalid
+	}
+	if a.SchemaVersion == "qs-ai-artifact/v2" {
+		if content.SchemaVersion != "ai-explanation-output/v2" || validateMBTIReferences(a) != nil {
+			return nil, ErrInvalid
+		}
+	} else if a.ReferenceMaterialJSON != "" || a.ReferenceMaterialFingerprint != "" {
 		return nil, ErrInvalid
 	}
 	return &a, nil

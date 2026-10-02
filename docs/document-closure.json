@@ -2,7 +2,7 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "80aeb38c46cb70f739f983ed48a02e979f665cfc",
+    "sha": "7165a7647a27d3a0c349dbfd17dc9a87d0dee0f1",
     "verified_on": "2026-10-02"
   },
   "status_policy": {
@@ -53,7 +53,7 @@
         "docs/_archive/**/*.md",
         "tmp/**/*.md"
       ],
-      "expected_count": 37,
+      "expected_count": 38,
       "budgeted": false
     }
   },
@@ -4582,8 +4582,8 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "df09c14c5ebdacc95f463af1b9a0ee55cff735d9",
-        "verified_on": "2026-08-20"
+        "source_sha": "4f74b23cb64314dc59a39a5aa724c329ce27d1ba",
+        "verified_on": "2026-10-02"
       },
       "fact_sources": [
         {
@@ -4650,6 +4650,13 @@
           "result": "passed",
           "source_sha": "df09c14c5ebdacc95f463af1b9a0ee55cff735d9",
           "verified_on": "2026-08-21"
+        },
+        {
+          "kind": "command",
+          "command": "go test -race ./internal/pkg/reportstatus ./internal/pkg/architecture ./internal/apiserver/cache/subsystem ./internal/apiserver/cache/governance ./internal/collection-server/cache ./internal/collection-server/application/reportnotify ./internal/collection-server/application/reportwait",
+          "result": "passed",
+          "source_sha": "4f74b23cb64314dc59a39a5aa724c329ce27d1ba",
+          "verified_on": "2026-10-02"
         }
       ],
       "production_evidence": {
@@ -4883,8 +4890,8 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "df09c14c5ebdacc95f463af1b9a0ee55cff735d9",
-        "verified_on": "2026-08-20"
+        "source_sha": "4f74b23cb64314dc59a39a5aa724c329ce27d1ba",
+        "verified_on": "2026-10-02"
       },
       "fact_sources": [
         {
@@ -4928,6 +4935,13 @@
           "result": "matched",
           "source_sha": "df09c14c5ebdacc95f463af1b9a0ee55cff735d9",
           "verified_on": "2026-08-20"
+        },
+        {
+          "kind": "command",
+          "command": "go test -race ./internal/pkg/reportstatus ./internal/pkg/architecture ./internal/apiserver/cache/subsystem ./internal/apiserver/cache/governance ./internal/collection-server/cache ./internal/collection-server/application/reportnotify ./internal/collection-server/application/reportwait",
+          "result": "passed",
+          "source_sha": "4f74b23cb64314dc59a39a5aa724c329ce27d1ba",
+          "verified_on": "2026-10-02"
         }
       ],
       "production_evidence": {
@@ -5125,8 +5139,8 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "df09c14c5ebdacc95f463af1b9a0ee55cff735d9",
-        "verified_on": "2026-08-20"
+        "source_sha": "4f74b23cb64314dc59a39a5aa724c329ce27d1ba",
+        "verified_on": "2026-10-02"
       },
       "fact_sources": [
         {
@@ -5177,6 +5191,13 @@
           "result": "passed",
           "source_sha": "df09c14c5ebdacc95f463af1b9a0ee55cff735d9",
           "verified_on": "2026-08-20"
+        },
+        {
+          "kind": "command",
+          "command": "go test -race ./internal/pkg/reportstatus ./internal/pkg/architecture ./internal/apiserver/cache/subsystem ./internal/apiserver/cache/governance ./internal/collection-server/cache ./internal/collection-server/application/reportnotify ./internal/collection-server/application/reportwait",
+          "result": "passed",
+          "source_sha": "4f74b23cb64314dc59a39a5aa724c329ce27d1ba",
+          "verified_on": "2026-10-02"
         }
       ],
       "production_evidence": {
@@ -5448,11 +5469,11 @@
         },
         {
           "kind": "source",
-          "path": "internal/apiserver/infra/mongo/eventoutbox/limiter.go"
+          "path": "internal/apiserver/resilience/subsystem/subsystem.go"
         },
         {
           "kind": "source",
-          "path": "internal/apiserver/infra/mysql/eventoutbox/store.go"
+          "path": "internal/apiserver/infra/mysql/standardoutbox/stager.go"
         },
         {
           "kind": "source",
@@ -5486,7 +5507,7 @@
       "verification": [
         {
           "kind": "command",
-          "command": "go test -count=1 ./internal/pkg/resilience/backpressure ./internal/apiserver/resilience/subsystem ./internal/apiserver/infra/mongo ./internal/apiserver/infra/iam ./internal/apiserver/infra/mysql/eventoutbox ./internal/apiserver/options ./internal/pkg/configcontract",
+          "command": "go test -count=1 ./internal/pkg/resilience/backpressure ./internal/apiserver/resilience/subsystem ./internal/apiserver/infra/mongo ./internal/apiserver/infra/iam ./internal/apiserver/infra/mysql/standardoutbox ./internal/apiserver/options ./internal/pkg/configcontract",
           "result": "passed",
           "source_sha": "df09c14c5ebdacc95f463af1b9a0ee55cff735d9",
           "verified_on": "2026-08-21"
@@ -6214,11 +6235,11 @@
         },
         {
           "kind": "source",
-          "path": "internal/apiserver/infra/mysql/eventoutbox/**/*.go"
+          "path": "internal/apiserver/infra/mysql/standardoutbox/**/*.go"
         },
         {
           "kind": "source",
-          "path": "internal/apiserver/infra/mongo/eventoutbox/**/*.go"
+          "path": "internal/apiserver/infra/mongo/standardoutbox/**/*.go"
         },
         {
           "kind": "source",
@@ -6393,7 +6414,7 @@
       "fact_sources": [
         {
           "kind": "source",
-          "path": "internal/apiserver/application/eventing/outbox.go"
+          "path": "internal/apiserver/eventing/standardoutbox/supervisor_m4.go"
         },
         {
           "kind": "source",
@@ -6540,46 +6561,46 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "504067f177bcfab821c0faf59b0a96da8d7c0c9b",
-        "verified_on": "2026-09-27"
+        "source_sha": "dce4598a40664d1111f914eb2d2277243f9cb758",
+        "verified_on": "2026-10-02"
       },
       "fact_sources": [
         {
           "kind": "source",
-          "path": "internal/apiserver/application/eventing/outbox.go"
+          "path": "internal/apiserver/eventing/standardoutbox/supervisor_m4.go"
         },
         {
           "kind": "source",
-          "path": "internal/apiserver/application/eventing/immediate.go"
+          "path": "internal/apiserver/eventing/standardoutbox/post_commit_wake_m4.go"
         },
         {
           "kind": "source",
-          "path": "internal/apiserver/application/eventing/ready_index.go"
+          "path": "internal/apiserver/eventing/standardoutbox/post_commit_wake_m4.go"
         },
         {
           "kind": "source",
-          "path": "internal/apiserver/infra/mongo/eventoutbox/store.go"
+          "path": "internal/apiserver/infra/mongo/standardoutbox/stager.go"
         },
         {
           "kind": "source",
-          "path": "internal/apiserver/infra/mysql/eventoutbox/store.go"
+          "path": "internal/apiserver/infra/mysql/standardoutbox/stager.go"
         },
         {
           "kind": "source",
-          "path": "internal/apiserver/infra/redis/outboxready/reconciler.go"
+          "path": "internal/apiserver/eventing/standardoutbox/supervisor_m4.go"
         }
       ],
       "verification": [
         {
           "kind": "command",
-          "command": "go test -count=1 ./internal/apiserver/application/eventing ./internal/apiserver/eventing/subsystem ./internal/apiserver/outboxcore ./internal/apiserver/infra/mongo/eventoutbox ./internal/apiserver/infra/mysql/eventoutbox ./internal/apiserver/infra/redis/outboxready",
+          "command": "go test -count=1 ./internal/apiserver/application/eventing ./internal/apiserver/eventing/subsystem ./internal/apiserver/infra/mongo/standardoutbox ./internal/apiserver/infra/mysql/standardoutbox",
           "result": "passed",
           "source_sha": "f74eca77a01d9ed83cfed6c3affa5275227d34eb",
           "verified_on": "2026-09-27"
         },
         {
           "kind": "command",
-          "command": "go test -count=1 ./internal/apiserver/application/eventing ./internal/apiserver/eventing/subsystem ./internal/apiserver/outboxcore ./internal/apiserver/infra/mongo/eventoutbox ./internal/apiserver/infra/mysql/eventoutbox ./internal/apiserver/infra/redis/outboxready",
+          "command": "go test -count=1 ./internal/apiserver/application/eventing ./internal/apiserver/eventing/subsystem ./internal/apiserver/infra/mongo/standardoutbox ./internal/apiserver/infra/mysql/standardoutbox",
           "result": "passed",
           "source_sha": "504067f177bcfab821c0faf59b0a96da8d7c0c9b",
           "verified_on": "2026-09-27"
@@ -6761,8 +6782,8 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "df09c14c5ebdacc95f463af1b9a0ee55cff735d9",
-        "verified_on": "2026-08-21"
+        "source_sha": "4f74b23cb64314dc59a39a5aa724c329ce27d1ba",
+        "verified_on": "2026-10-02"
       },
       "fact_sources": [
         {
@@ -6797,6 +6818,13 @@
           "result": "passed",
           "source_sha": "df09c14c5ebdacc95f463af1b9a0ee55cff735d9",
           "verified_on": "2026-08-21"
+        },
+        {
+          "kind": "command",
+          "command": "go test -race ./internal/pkg/reportstatus ./internal/pkg/architecture ./internal/apiserver/cache/subsystem ./internal/apiserver/cache/governance ./internal/collection-server/cache ./internal/collection-server/application/reportnotify ./internal/collection-server/application/reportwait",
+          "result": "passed",
+          "source_sha": "4f74b23cb64314dc59a39a5aa724c329ce27d1ba",
+          "verified_on": "2026-10-02"
         }
       ],
       "production_evidence": {
@@ -6870,7 +6898,7 @@
       "verification": [
         {
           "kind": "command",
-          "command": "go test -count=1 ./internal/pkg/eventing/... ./internal/pkg/signalcatalog ./internal/pkg/architecture ./internal/apiserver/application/eventing ./internal/apiserver/eventing/subsystem ./internal/apiserver/outboxcore ./internal/apiserver/infra/mongo/eventoutbox ./internal/apiserver/infra/mysql/eventoutbox ./internal/apiserver/infra/redis/outboxready ./internal/worker/integration/eventing ./internal/worker/integration/messaging ./internal/worker/handlers ./internal/apiserver/infra/mysql/eventdelivery ./internal/apiserver/application/systemgovernance",
+          "command": "go test -count=1 ./internal/pkg/eventing/... ./internal/pkg/signalcatalog ./internal/pkg/architecture ./internal/apiserver/application/eventing ./internal/apiserver/eventing/subsystem ./internal/apiserver/infra/mongo/standardoutbox ./internal/apiserver/infra/mysql/standardoutbox ./internal/worker/integration/eventing ./internal/worker/integration/messaging ./internal/worker/handlers ./internal/apiserver/infra/mysql/eventdelivery ./internal/apiserver/application/systemgovernance",
           "result": "passed",
           "source_sha": "df09c14c5ebdacc95f463af1b9a0ee55cff735d9",
           "verified_on": "2026-08-21"
@@ -6931,7 +6959,7 @@
         },
         {
           "kind": "source",
-          "path": "internal/apiserver/application/eventing/outbox.go"
+          "path": "internal/apiserver/eventing/standardoutbox/supervisor_m4.go"
         },
         {
           "kind": "source",
@@ -6965,7 +6993,7 @@
       "verification": [
         {
           "kind": "command",
-          "command": "go test -count=1 ./internal/pkg/eventing/... ./internal/pkg/signalcatalog ./internal/pkg/architecture ./internal/apiserver/application/eventing ./internal/apiserver/eventing/subsystem ./internal/apiserver/outboxcore ./internal/apiserver/infra/mongo/eventoutbox ./internal/apiserver/infra/mysql/eventoutbox ./internal/apiserver/infra/redis/outboxready ./internal/worker/integration/eventing ./internal/worker/integration/messaging ./internal/worker/handlers ./internal/apiserver/infra/mysql/eventdelivery ./internal/apiserver/application/systemgovernance",
+          "command": "go test -count=1 ./internal/pkg/eventing/... ./internal/pkg/signalcatalog ./internal/pkg/architecture ./internal/apiserver/application/eventing ./internal/apiserver/eventing/subsystem ./internal/apiserver/infra/mongo/standardoutbox ./internal/apiserver/infra/mysql/standardoutbox ./internal/worker/integration/eventing ./internal/worker/integration/messaging ./internal/worker/handlers ./internal/apiserver/infra/mysql/eventdelivery ./internal/apiserver/application/systemgovernance",
           "result": "passed",
           "source_sha": "df09c14c5ebdacc95f463af1b9a0ee55cff735d9",
           "verified_on": "2026-08-21"
@@ -9342,6 +9370,45 @@
           "exit_criteria": "Review the test-only bridge and its explicit limits; preserve independent rollout gates."
         }
       ]
+    },
+    {
+      "path": "internal/pkg/eventing/runtime/testdata/README.md",
+      "class": "sidecar",
+      "owner": "infra",
+      "doc_status": "aligned",
+      "verified": {
+        "source_sha": "a02931131da362ba48915fe458b1e90d40651b36",
+        "verified_on": "2026-10-02"
+      },
+      "fact_sources": [
+        {
+          "kind": "source",
+          "path": "scripts/testing/capture-retired-wire-contracts.sh"
+        },
+        {
+          "kind": "source",
+          "path": "internal/pkg/eventing/runtime/retired_wire_fixture_test.go"
+        }
+      ],
+      "verification": [
+        {
+          "kind": "command",
+          "command": "go test -race ./internal/pkg/eventing/runtime",
+          "result": "passed",
+          "source_sha": "a02931131da362ba48915fe458b1e90d40651b36",
+          "verified_on": "2026-10-02"
+        }
+      ],
+      "production_evidence": {
+        "level": "none",
+        "refs": [],
+        "deployed_sha": null,
+        "observed_at": null,
+        "limitations": [
+          "Synthetic immutable wire fixtures do not prove production delivery or recovery."
+        ]
+      },
+      "gaps": []
     }
   ],
   "initial_review_baseline": {
@@ -12657,11 +12724,11 @@
           },
           {
             "kind": "source",
-            "path": "internal/apiserver/infra/mysql/eventoutbox/**/*.go"
+            "path": "internal/apiserver/infra/mysql/standardoutbox/**/*.go"
           },
           {
             "kind": "source",
-            "path": "internal/apiserver/infra/mongo/eventoutbox/**/*.go"
+            "path": "internal/apiserver/infra/mongo/standardoutbox/**/*.go"
           },
           {
             "kind": "source",
@@ -12679,7 +12746,7 @@
         "non_cached_tests": [
           {
             "kind": "command",
-            "command": "go test -count=1 ./internal/pkg/migration ./internal/apiserver/container/internal/transaction ./internal/apiserver/infra/mongo/eventoutbox ./internal/apiserver/infra/mysql/eventoutbox",
+            "command": "go test -count=1 ./internal/pkg/migration ./internal/apiserver/container/internal/transaction ./internal/apiserver/infra/mongo/standardoutbox ./internal/apiserver/infra/mysql/standardoutbox",
             "result": "passed",
             "source_sha": "df09c14c5ebdacc95f463af1b9a0ee55cff735d9",
             "verified_on": "2026-08-20"
@@ -12844,7 +12911,7 @@
             "evidence": [
               {
                 "kind": "command",
-                "command": "go test -count=1 ./internal/pkg/migration ./internal/apiserver/container/internal/transaction ./internal/apiserver/infra/mongo/eventoutbox ./internal/apiserver/infra/mysql/eventoutbox",
+                "command": "go test -count=1 ./internal/pkg/migration ./internal/apiserver/container/internal/transaction ./internal/apiserver/infra/mongo/standardoutbox ./internal/apiserver/infra/mysql/standardoutbox",
                 "result": "passed",
                 "source_sha": "df09c14c5ebdacc95f463af1b9a0ee55cff735d9",
                 "verified_on": "2026-08-20"
@@ -12971,15 +13038,15 @@
           },
           {
             "kind": "source",
-            "path": "internal/apiserver/infra/mysql/eventoutbox/**/*.go"
+            "path": "internal/apiserver/infra/mysql/standardoutbox/**/*.go"
           },
           {
             "kind": "source",
-            "path": "internal/apiserver/infra/mongo/eventoutbox/**/*.go"
+            "path": "internal/apiserver/infra/mongo/standardoutbox/**/*.go"
           },
           {
             "kind": "source",
-            "path": "internal/apiserver/outboxcore/**/*.go"
+            "path": "internal/apiserver/eventing/standardoutbox/**/*.go"
           },
           {
             "kind": "source",

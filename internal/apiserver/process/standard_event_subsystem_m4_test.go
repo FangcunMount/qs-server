@@ -1,5 +1,3 @@
-//go:build reliable_messaging_m4
-
 package process
 
 import (
@@ -9,21 +7,36 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/config"
 	eventsubsystem "github.com/FangcunMount/qs-server/internal/apiserver/eventing/subsystem"
 	"github.com/FangcunMount/qs-server/internal/apiserver/options"
-	"github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
 )
 
-func TestCandidateBuildKeepsLegacySubsystemWhenStandardOutboxDisabled(t *testing.T) {
-	wire, err := eventcatalog.Load("../../../configs/events.yaml")
-	if err != nil {
-		t.Fatal(err)
+func TestStandardBuildRejectsRetiredLegacyConfiguration(t *testing.T) {
+	cases := []struct {
+		name   string
+		config *config.Config
+	}{
+		{"missing_config", nil},
+		{"missing_options", &config.Config{}},
+		{"missing_eventing", &config.Config{Options: options.NewOptions()}},
+		{"missing_selection", &config.Config{Options: options.NewOptions()}},
 	}
-	cfg := &config.Config{Options: options.NewOptions()}
-	subsystem, err := configuredEventSubsystem(cfg)(eventsubsystem.Options{Catalog: eventcatalog.NewCatalog(wire)})
-	if err != nil {
-		t.Fatalf("disabled standard outbox unexpectedly requires MQ or database preflight: %v", err)
-	}
-	if subsystem == nil {
-		t.Fatal("disabled standard outbox did not construct the existing event subsystem")
+	cases[2].config.Eventing = nil
+	cases[3].config.Eventing.StandardOutbox = nil
+	cases = append(cases, struct {
+		name   string
+		config *config.Config
+	}{"disabled_profiles", &config.Config{Options: options.NewOptions()}})
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			// No catalog or database is provided: rejection must precede all
+			// old-store construction, storage preflight and publisher ownership.
+			subsystem, err := configuredEventSubsystem(tc.config)(eventsubsystem.Options{})
+			if err == nil || !strings.Contains(err.Error(), "legacy outbox configuration is retired") {
+				t.Fatalf("retired selection was not rejected before I/O: subsystem=%v err=%v", subsystem, err)
+			}
+			if subsystem != nil {
+				t.Fatal("retired selection constructed a subsystem")
+			}
+		})
 	}
 }
 
