@@ -4,8 +4,8 @@ github.com/Azure/go-ansiterm v0.0.0-20250102033503-faa5f7b0171c h1:udKWzYgxTojEK
 github.com/Azure/go-ansiterm v0.0.0-20250102033503-faa5f7b0171c/go.mod h1:xomTg63KZ2rFqZQzSB4Vz2SUXa1BpHTVz9L5PTmPC4E=
 github.com/DATA-DOG/go-sqlmock v1.5.2 h1:OcvFkGmslmlZibjAjaHm3L//6LiuBgolP7OputlJIzU=
 github.com/DATA-DOG/go-sqlmock v1.5.2/go.mod h1:88MAG/4G7SMwSE3CeA0ZKzrT5CiOU3OJ+JlNzwDqpNU=
-github.com/FangcunMount/component-base v0.6.11 h1:t1B9I2nS8LsItuU+o+VHJR+w3pJT7QkBTZ6G85EQonE=
-github.com/FangcunMount/component-base v0.6.11/go.mod h1:geIr3xPkOsDaGMbgKLoQNzkKp8OwAQ1AMaPojX4Bs14=
+github.com/FangcunMount/component-base v0.7.0 h1:fbiXQAxVh1qjaetKpltPrd7A88EL7X9krItIRvXvv7A=
+github.com/FangcunMount/component-base v0.7.0/go.mod h1:VlabonZfbVBzUuhH7/9DXu0M46G2cwE+YChaToeeOlA=
 github.com/FangcunMount/iam/v5 v5.4.0 h1:B4W9oauGBPVQdPaYpqyJbHxNlP2FqRnRQFpisbz+QZA=
 github.com/FangcunMount/iam/v5 v5.4.0/go.mod h1:q+KOBZACNjY7D47STwU0HBcymOVKIJkzg+FN9RLCOr8=
 github.com/FangcunMount/reliable-messaging v0.3.0-m6.3 h1:tuhPPABl5/PGfCicMpy/qSqtzXZcCcucn7h6q5E7bPQ=
