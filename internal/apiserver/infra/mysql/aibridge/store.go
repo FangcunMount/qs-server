@@ -155,11 +155,32 @@ func (s *Store) Accept(ctx context.Context, e app.Event) error {
 		return err
 	}
 	defer func() { _ = tx.Rollback() }()
+	if err := acceptPreparedInTransaction(ctx, tx, e, artifact, raw, hash); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
+// acceptInTransaction borrows the MQ receiver's transaction; business projection,
+// Inbox and final acknowledgement are committed by that one caller.
+func acceptInTransaction(ctx context.Context, tx *sql.Tx, e app.Event) error {
+	artifact, err := app.ValidateArtifact(e)
+	if err != nil {
+		return err
+	}
+	raw, hash, err := encode(e)
+	if err != nil {
+		return err
+	}
+	return acceptPreparedInTransaction(ctx, tx, e, artifact, raw, hash)
+}
+
+func acceptPreparedInTransaction(ctx context.Context, tx *sql.Tx, e app.Event, artifact *app.Artifact, raw []byte, hash string) error {
 	var original []byte
 	var bound sql.NullString
 	var version int64
 	var state string
-	err = tx.QueryRowContext(ctx, "SELECT payload,session_id,version,status FROM ai_bridge_requests WHERE request_id=? FOR UPDATE", e.RequestID).Scan(&original, &bound, &version, &state)
+	err := tx.QueryRowContext(ctx, "SELECT payload,session_id,version,status FROM ai_bridge_requests WHERE request_id=? FOR UPDATE", e.RequestID).Scan(&original, &bound, &version, &state)
 	if errors.Is(err, sql.ErrNoRows) {
 		return app.ErrNotFound
 	}
@@ -188,7 +209,7 @@ func (s *Store) Accept(ctx context.Context, e app.Event) error {
 		if oldHash != hash {
 			return app.ErrConflict
 		}
-		return tx.Commit()
+		return nil
 	}
 	if !errors.Is(err, sql.ErrNoRows) {
 		return err
@@ -205,7 +226,7 @@ func (s *Store) Accept(ctx context.Context, e app.Event) error {
 			return err
 		}
 	}
-	return tx.Commit()
+	return nil
 }
 func (s *Store) Projection(ctx context.Context, id string) (*app.Event, error) {
 	var raw []byte

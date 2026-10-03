@@ -9,9 +9,13 @@ permissions:
 jobs:
   delivery:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        mysql: ['8.0.36', '8.4']
     services:
       mysql:
-        image: mysql:8.4
+        image: mysql:${{ matrix.mysql }}
         env:
           MYSQL_ROOT_PASSWORD: bridge_test_root
           MYSQL_DATABASE: qs_bridge_test
@@ -32,7 +36,19 @@ jobs:
         run: |
           docker exec -i "$MYSQL_CONTAINER" mysql -uroot -pbridge_test_root qs_bridge_test < internal/pkg/migration/migrations/mysql/000072_ai_bridge_delivery.up.sql
           docker exec -i "$MYSQL_CONTAINER" mysql -uroot -pbridge_test_root qs_bridge_test < internal/pkg/migration/migrations/mysql/000083_ai_runtime_index.up.sql
+          docker exec -i "$MYSQL_CONTAINER" mysql -uroot -pbridge_test_root qs_bridge_test < internal/pkg/migration/migrations/mysql/000091_ai_messaging.up.sql
       - name: Verify durable request and result transactions
         env:
           QS_AI_BRIDGE_TEST_DSN: 'root:bridge_test_root@tcp(127.0.0.1:3306)/qs_bridge_test?parseTime=true'
-        run: go test -count=1 -race ./internal/apiserver/application/aibridge ./internal/apiserver/infra/mysql/aibridge ./internal/apiserver/infra/aibridge ./internal/apiserver/transport/grpc/aibridge ./cmd/qs-ai-bridge
+          QS_AI_MQ_TEST_DSN: 'root:bridge_test_root@tcp(127.0.0.1:3306)/qs_bridge_test?parseTime=true'
+          GOWORK: 'off'
+        run: |
+          mkdir -p artifacts
+          go test -tags=integration -count=1 -race -json ./internal/apiserver/application/aibridge ./internal/apiserver/infra/mysql/aibridge ./internal/apiserver/infra/aibridge ./internal/apiserver/transport/grpc/aibridge ./cmd/qs-ai-bridge > artifacts/ai-mq-tests.json
+          python3 scripts/testing/ai-mq-report.py artifacts/ai-mq-tests.json
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: ai-mq-mysql-${{ matrix.mysql }}
+          path: artifacts/ai-mq-tests.json
+          if-no-files-found: error

@@ -1,0 +1,111 @@
+syntax = "proto3";
+package qsai.workflow.v1;
+option go_package = "github.com/FangcunMount/qs-server/api/grpc/gen/aiworkflow";
+
+import "aiworkflow/workflow.proto";
+
+// MQ transport contract. No model execution or retry authorization is defined here.
+// The existing workflow RPCs and their field numbers are unchanged.
+enum MessagingKind {
+  MESSAGING_KIND_UNSPECIFIED = 0;
+  START = 1;
+  CHANGE = 2;
+  PARTICIPANT_RETRY = 3;
+  EVALUATION_START = 4;
+  EVALUATION_CANCEL = 5;
+  COMMAND_RECEIPT = 6;
+  INTERPRETATION_STATE = 7;
+  EVALUATION_STATE = 8;
+  EVENT_ACKNOWLEDGEMENT = 9;
+}
+
+// Serialize body once. body_sha256 covers those exact bytes, not re-encoded JSON.
+// The JOSE context must match producer, destination, actual topic and message_id.
+message MessagingEnvelope {
+  string schema_version = 1; // qs-ai-messaging/v1
+  string producer = 2;
+  string destination = 3;
+  string message_id = 4;
+  MessagingKind kind = 5;
+  string aggregate_key = 6;
+  string correlation_command_id = 7;
+  string body_sha256 = 8;
+  uint64 body_length = 9;
+  oneof body {
+    bytes inline_body = 10;
+    MessagePayloadReference payload_reference = 11;
+  }
+  // Preserve an existing business timestamp verbatim; absent legacy timestamps stay absent.
+  string original_occurred_at = 12;
+}
+
+// A reference contains no arbitrary endpoint. Destination resolves only configured mTLS clients.
+message MessagePayloadReference {
+  string producer = 1;
+  string destination = 2;
+  string message_id = 3;
+  string body_sha256 = 4;
+  uint64 body_length = 5;
+  string organization_id = 6;
+}
+
+message MessagingBody {
+  oneof value {
+    StartCommand start = 1;
+    ChangeCommand change = 2;
+    ParticipantRetryCommand participant_retry = 3;
+    EvaluationStartCommand evaluation_start = 4;
+    EvaluationCancelCommand evaluation_cancel = 5;
+    MessagingCommandReceipt command_receipt = 6;
+    StateEvent interpretation_state = 7;
+    EvaluationRuntimeState evaluation_state = 8;
+    MessagingEventAcknowledgement event_acknowledgement = 9;
+  }
+}
+
+enum MessagingDecision {
+  MESSAGING_DECISION_UNSPECIFIED = 0;
+  ACCEPTED = 1;
+  REJECTED = 2;
+  // Technical hold is not business rejection or authorization to execute again.
+  HELD = 3;
+}
+message MessagingCommandReceipt {
+  string command_id = 1;
+  string command_body_sha256 = 2;
+  MessagingDecision decision = 3;
+  string code = 4;
+  int32 grpc_status_code = 5;
+  oneof original_receipt {
+    Receipt workflow_receipt = 6;
+    EvaluationState evaluation_receipt = 7;
+  }
+}
+
+// A durable aggregate snapshot, never a token stream, checkpoint or execution instruction.
+message EvaluationRuntimeState {
+  string run_id = 1;
+  string organization_id = 2;
+  int64 version = 3;
+  uint64 event_sequence = 4;
+  string status = 5;
+  string release_fingerprint = 6;
+}
+
+message MessagingEventAcknowledgement {
+  string event_id = 1;
+  string event_body_sha256 = 2;
+  MessagingKind event_kind = 3;
+  // STORED includes idempotent duplicate acceptance. HELD does not confirm delivery.
+  enum Outcome { OUTCOME_UNSPECIFIED = 0; STORED = 1; TECHNICALLY_HELD = 2; }
+  Outcome outcome = 4;
+}
+
+// Read-only oversized body access. Authorize the workload and exact stored reference.
+service MessagePayloads {
+  rpc Get(MessagePayloadReference) returns (MessagePayload);
+}
+message MessagePayload {
+  MessagePayloadReference reference = 1;
+  bytes body = 2;
+}

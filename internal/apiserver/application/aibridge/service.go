@@ -142,7 +142,9 @@ func (s *Service) Relay(ctx context.Context) (int, error) {
 	}
 	return sent, nil
 }
-func (s *Service) Accept(ctx context.Context, event Event) error {
+
+// ValidateEvent is shared by gRPC and authenticated MQ before host persistence.
+func ValidateEvent(event Event) error {
 	if !validID(event.EventID) || !validID(event.RequestID) || !validID(event.SessionID) || event.Version < 1 {
 		return ErrInvalid
 	}
@@ -155,6 +157,12 @@ func (s *Service) Accept(ctx context.Context, event Event) error {
 		return ErrInvalid
 	}
 	if _, err := ValidateArtifact(event); err != nil {
+		return err
+	}
+	return nil
+}
+func (s *Service) Accept(ctx context.Context, event Event) error {
+	if err := ValidateEvent(event); err != nil {
 		return err
 	}
 	return s.Store.Accept(ctx, event)

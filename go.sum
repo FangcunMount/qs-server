@@ -10,6 +10,8 @@ github.com/FangcunMount/iam/v5 v5.4.0 h1:B4W9oauGBPVQdPaYpqyJbHxNlP2FqRnRQFpisbz
 github.com/FangcunMount/iam/v5 v5.4.0/go.mod h1:q+KOBZACNjY7D47STwU0HBcymOVKIJkzg+FN9RLCOr8=
 github.com/FangcunMount/reliable-messaging v0.3.0-m6.4 h1:Zzm4qptHmiH0FAObG+dZ9WQbHpAfD53ETK8gXTUT+yc=
 github.com/FangcunMount/reliable-messaging v0.3.0-m6.4/go.mod h1:OvzCe+D+vggU/cJsACCBeAsH3lzLQfhzdPRE8Ia/yvY=
+github.com/FangcunMount/reliable-messaging v0.3.0-m6.4.0.20261003065525-9f16fa30dc43 h1:0OOKtVxmI2HfWrkoOHyJatDY0LLF7QhKM7cQtpwg7eQ=
+github.com/FangcunMount/reliable-messaging v0.3.0-m6.4.0.20261003065525-9f16fa30dc43/go.mod h1:MWhbXwJbsauqlqIXm0mD0JixLO7lOpPwTLdVuzclBnc=
 github.com/KyleBanks/depth v1.2.1 h1:5h8fQADFrWtarTdtDudMmGsC7GPbOAu6RVB3ffsVFHc=
 github.com/KyleBanks/depth v1.2.1/go.mod h1:jzSb9d0L43HxTQfT+oSA1EEp2q+ne2uh6XgeJcm8brE=
 github.com/Microsoft/go-winio v0.6.2 h1:F2VQgta7ecxGYO8k3ZZz3RS8fVIXVxONVUPlNERoyfY=
@@ -97,6 +99,8 @@ github.com/gin-contrib/sse v1.1.0/go.mod h1:hxRZ5gVpWMT7Z0B0gSNYqqsSCNIJMjzvm6fq
 github.com/gin-gonic/gin v1.7.0/go.mod h1:jD2toBW3GZUr5UMcdrwQA10I7RuaFOl/SGeDjXkfUtY=
 github.com/gin-gonic/gin v1.11.0 h1:OW/6PLjyusp2PPXtyxKHU0RbX6I/l28FTdDlae5ueWk=
 github.com/gin-gonic/gin v1.11.0/go.mod h1:+iq/FyxlGzII0KHiBGjuNn4UNENUlKbGlNmc+W50Dls=
+github.com/go-jose/go-jose/v4 v4.1.5 h1:RjgjO2LOtWOJKUC5wpwY9LR3B3vwVAz6JS2YHfYU6eA=
+github.com/go-jose/go-jose/v4 v4.1.5/go.mod h1:x4oUasVrzR7071A4TnHLGSPpNOm2a21K9Kf04k1rs08=
 github.com/go-logr/logr v0.1.0/go.mod h1:ixOQHD9gLJUVQQ2ZOR7zLEifBX6tGkNJF4QyIY7sIas=
 github.com/go-logr/logr v1.4.3 h1:CjnDlHq8ikf6E492q6eKboGOC0T8CDaOvkHCIg8idEI=
 github.com/go-logr/logr v1.4.3/go.mod h1:9T104GzyrTigFIr8wt5mBrctHMim0Nb2HLGrmQ40KvY=
