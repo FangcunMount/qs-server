@@ -2,7 +2,7 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "912f7963a364e8dcc9f04d69b2308d14c7140103",
+    "sha": "6913948d78f843239056ab7fd2a7dd1fd153efa6",
     "verified_on": "2026-10-04"
   },
   "status_policy": {
@@ -9244,8 +9244,8 @@
       "owner": "tooling",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "3e63c4fce25bc08cc6a31e584848d3d13ee3b6d8",
-        "verified_on": "2026-09-28"
+        "source_sha": "6913948d78f843239056ab7fd2a7dd1fd153efa6",
+        "verified_on": "2026-10-04"
       },
       "fact_sources": [
         {
@@ -9263,6 +9263,10 @@
         {
           "kind": "source",
           "path": "scripts/cd/sudo-selection.sh"
+        },
+        {
+          "kind": "source",
+          "path": "scripts/cd/ai-messaging-release.py"
         }
       ],
       "verification": [
@@ -9279,6 +9283,27 @@
           "result": "passed",
           "source_sha": "3e63c4fce25bc08cc6a31e584848d3d13ee3b6d8",
           "verified_on": "2026-09-28"
+        },
+        {
+          "kind": "command",
+          "command": "python3 scripts/cd/test_image_retention.py",
+          "result": "passed",
+          "source_sha": "6913948d78f843239056ab7fd2a7dd1fd153efa6",
+          "verified_on": "2026-10-04"
+        },
+        {
+          "kind": "command",
+          "command": "python3 scripts/cd/test_sudo_selection.py",
+          "result": "passed",
+          "source_sha": "6913948d78f843239056ab7fd2a7dd1fd153efa6",
+          "verified_on": "2026-10-04"
+        },
+        {
+          "kind": "command",
+          "command": "python3 scripts/cd/test_ai_messaging_release.py",
+          "result": "passed",
+          "source_sha": "6913948d78f843239056ab7fd2a7dd1fd153efa6",
+          "verified_on": "2026-10-04"
         }
       ],
       "production_evidence": {
