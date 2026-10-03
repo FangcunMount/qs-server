@@ -1,0 +1,30 @@
+name: M4 sustained actual Confirm and native successful Outcomes
+on:
+  workflow_dispatch:
+  push:
+    branches: [codex/m4-confirm-claim-candidate]
+permissions:
+  contents: read
+jobs:
+  sustained-confirm:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.25.12'
+          cache: true
+      - name: Run fixed workload, actual Confirm fault and original native scoring
+        run: bash scripts/testing/m4-confirm-pressure-native.sh
+      - name: Retain original source, results, resources and cleanup
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: m4-confirm-sustained-native
+          path: acceptance-artifact/
+          retention-days: 14
+          if-no-files-found: error
+          include-hidden-files: true

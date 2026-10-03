@@ -1,0 +1,37 @@
+{
+  "runtime_head": "e4406fd2fc6bb82ea5b871a021faf2659dc61a06",
+  "sdk": "v0.3.0-m6.4",
+  "count": 2600,
+  "spacing_ms": 120,
+  "prefix": 1300,
+  "input_span_min_seconds": 300,
+  "input_rate_min": 7,
+  "actual_confirm_fault_min_seconds": 156,
+  "actual_dropped_packet_span_min_seconds": 150,
+  "actual_dropped_packets_min": 101,
+  "recovery_max_seconds": 120,
+  "resource_complete_groups_min": 20,
+  "resource_complete_span_min_seconds": 280,
+  "resource_complete_gap_max_seconds": 20,
+  "mysql_cpu_max_percent": 150,
+  "mysql_memory_max_bytes": 1610612736,
+  "mysql_connections_max": 32,
+  "mysql_row_lock_waits_delta_max": 50,
+  "source": "candidate initial Run claim unique-insert arbitration; otherwise original Store/Relay/native subscriber/Worker/gRPC/default native scoring/SQL Outcome committer; isolated frozen input only",
+  "fault": "drop actual Confirm COM_QUERY before DB forwarding while remaining1300 original submissions continue; business DB remains writable",
+  "identity": "2600 original Assessment/Run/attempt/Outcome/result-intent each;5200 logical messages; all accepted transport bodies and decoded deliveries match original stored envelope; no new resolver call/attempt on physical duplicates",
+  "recovery_clock": "all2600 already submitted when actual forwarding restored; complete original responsibilities + native channel drain within120s; never reset after collection",
+  "resources": "uncapped separate driver; actual MySQL/nsqd/lookupd/driver complete groups + MySQL global status and NSQD stats; no Mongo path in this native scoring fixture",
+  "not_proven": [
+    "entire MySQL service outage",
+    "pressure fallback",
+    "external model/report",
+    "production60/180s or representative capacity",
+    "current production without candidate first-claim fix"
+  ],
+  "formal_acceptance_closed": false,
+  "runtime_first_claim_sha256": {
+    "repository.go": "64ff4f49ceb5e1153c4058b17761507008a448733235115e618448d0ed489a84",
+    "first_claim_integration_test.go": "d4800641b0c0159dfbcbf955b49d8f8e490c1cf1b8cdc0580e738fefa9cdb5aa"
+  }
+}
