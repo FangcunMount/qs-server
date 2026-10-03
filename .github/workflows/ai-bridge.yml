@@ -69,10 +69,52 @@ jobs:
           go test -count=1 -race -json ./internal/apiserver/container/modules/interpretation ./internal/apiserver/options ./internal/apiserver/transport/grpc/service ./internal/collection-server/transport/rest/handler -run '^TestMQ' >> artifacts/ai-mq-tests.json
           go test -count=1 -race -json ./internal/apiserver/transport/grpc ./internal/collection-server/infra/grpcclient ./internal/collection-server/application/aiexplanation ./internal/collection-server/transport/rest >> artifacts/ai-mq-tests.json
           go build ./cmd/qs-apiserver ./cmd/collection-server ./cmd/qs-ai-bridge
+          go build ./scripts/testing/ai-mq-process
           python3 scripts/testing/ai-mq-report.py artifacts/ai-mq-tests.json
       - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: ai-mq-mysql-${{ matrix.mysql }}
           path: artifacts/ai-mq-tests.json
+          if-no-files-found: error
+  images:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        service: [qs-apiserver, collection-server]
+    steps:
+      - uses: actions/checkout@v6
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: build/docker/Dockerfile.${{ matrix.service }}
+          platforms: linux/amd64
+          build-args: |
+            GIT_COMMIT=${{ github.sha }}
+            GIT_BRANCH=${{ github.ref_name }}
+            VERSION=mq-candidate
+          load: true
+          tags: qs-mq-${{ matrix.service }}:ci
+          cache-from: type=gha,scope=qs-ai-mq-${{ matrix.service }}
+          cache-to: type=gha,mode=max,scope=qs-ai-mq-${{ matrix.service }}
+      - name: Verify standard image without publication or production startup
+        env:
+          SERVICE: ${{ matrix.service }}
+        run: |
+          mkdir -p artifacts
+          docker run --rm --network none --read-only --entrypoint sh "qs-mq-$SERVICE:ci" -c 'test "$(id -u)" != "0" && test "$TZ" = Asia/Shanghai && test -x /app/'"$SERVICE"
+          docker image inspect "qs-mq-$SERVICE:ci" > "artifacts/$SERVICE-image.json"
+          python3 - <<'PY'
+          import json, os
+          from pathlib import Path
+          service = os.environ['SERVICE']
+          p = Path('artifacts') / f'{service}-source.json'
+          p.write_text(json.dumps({'source_sha': os.environ['GITHUB_SHA'], 'service': service, 'dockerfile': f'build/docker/Dockerfile.{service}', 'runtime_health': 'not_verified', 'production': False}))
+          PY
+      - uses: actions/upload-artifact@v7
+        with:
+          name: ai-mq-image-${{ matrix.service }}
+          path: artifacts/
           if-no-files-found: error
