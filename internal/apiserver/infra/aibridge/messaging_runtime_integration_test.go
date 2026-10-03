@@ -188,6 +188,11 @@ func TestMQRuntimeNSQCommitDuplicateRearmAndStopBorrowedPool(t *testing.T) {
 		var stage string
 		return db.QueryRow("SELECT stage FROM ai_messaging_outbox WHERE message_id=?", ackID).Scan(&stage) == nil && stage == "confirmed"
 	})
+	var firstConfirmed time.Time
+	var failureAttempts int
+	if e = db.QueryRow("SELECT attempts,confirmed_at FROM ai_messaging_outbox WHERE message_id=?", ackID).Scan(&failureAttempts, &firstConfirmed); e != nil {
+		t.Fatal(e)
+	}
 	stop(r)
 	if e = db.Ping(); e != nil {
 		t.Fatal("runtime closed host pool")
@@ -200,9 +205,14 @@ func TestMQRuntimeNSQCommitDuplicateRearmAndStopBorrowedPool(t *testing.T) {
 	if e = producer.Publish(app.EventsTopic, m.Wire); e != nil {
 		t.Fatal(e)
 	}
+	// Successful final ACK publication is a settlement fact, not a failure.
+	// Require this exact record's second PUB settlement and unchanged budget;
+	// unrelated Topic traffic or a duplicate FIN cannot satisfy the predicate.
 	await(func() bool {
 		var attempts int
-		return db.QueryRow("SELECT attempts FROM ai_messaging_outbox WHERE message_id=?", ackID).Scan(&attempts) == nil && attempts >= 2
+		var confirmed time.Time
+		var stage string
+		return db.QueryRow("SELECT attempts,stage,confirmed_at FROM ai_messaging_outbox WHERE message_id=?", ackID).Scan(&attempts, &stage, &confirmed) == nil && attempts == failureAttempts && stage == "confirmed" && confirmed.After(firstConfirmed)
 	})
 	var duplicateWire []byte
 	var duplicateID string
