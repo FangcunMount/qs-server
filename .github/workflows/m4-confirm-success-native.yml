@@ -1,0 +1,27 @@
+name: M4 actual SQL Confirm native successful Outcome isolation
+on:
+  workflow_dispatch:
+  push:
+    branches: [codex/m4-confirm-success-native]
+permissions:
+  contents: read
+jobs:
+  original-confirm-writeback:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.25.12'
+          cache: true
+      - name: Run original components on disposable MySQL and NSQ
+        run: bash scripts/testing/m4-confirm-success-native.sh
+      - name: Retain actual result and exact probe source
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: m4-confirm-native-success-proof
+          path: acceptance-artifact/
+          retention-days: 14
+          if-no-files-found: error
