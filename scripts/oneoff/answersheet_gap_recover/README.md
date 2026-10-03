@@ -10,9 +10,9 @@
 
 ## 操作
 
-1. `inspect --answersheet-id=... --org-id=... --accepted-before=<RFC3339>` 读取原 Mongo 主节点快照及 MySQL。只接受同原事件 ID、机构、冻结准入、问卷／模型版本、填写人、原 payload 摘要、确认事实和预期索引一致的标准已接单答卷。任何已存在测评，包括软删除记录，拒绝修复。
-2. `apply` 使用上述固定参数和 inspect 返回的 `--source-fingerprint`，加 `--audit-dir`、唯一 `--request-id`、`--operator`、`--reason`、`--external-result-reviewed`。在任何效果调用之前独占写入原事件预留及操作意图并 fsync；随后再次读取源，变化则停止。
-3. `reconcile --audit-dir=... --request-id=...` 只读本地原操作，不连数据库或 RPC、不再次执行。缺回执／unknown 都需按原答卷核对 MySQL 权威效果，禁止自动重试。
+1. `--mode=inspect --answersheet-id=... --org-id=... --accepted-before=<RFC3339>` 读取原 Mongo 主节点快照及 MySQL。只接受同原事件 ID、机构、冻结准入、问卷／模型版本、填写人、原 payload 摘要、确认事实和预期索引一致的标准已接单答卷。任何已存在测评，包括软删除记录，拒绝修复。
+2. `--mode=apply` 使用上述固定参数和 inspect 返回的 `--source-fingerprint`，加 `--audit-dir`、唯一 `--request-id`、`--operator`、`--reason`、`--external-result-reviewed`。在任何效果调用之前独占写入原事件预留及操作意图并 fsync；随后再次读取源，变化则停止。
+3. `--mode=reconcile --audit-dir=... --request-id=...` 只读本地原操作，不连数据库或 RPC、不再次执行。缺回执／unknown 都需按原答卷核对 MySQL 权威效果，禁止自动重试。
 
 默认整体期限 30 秒，允许 1 秒至 2 分钟。退出 0 是 inspect 成功，或 RPC 返回已有／新建 Assessment ID，或该操作本地回执为 accepted；**它不是报告完成、生产时限或整个 M6 验收**。退出 1 是输入／源／配置拒绝；退出 2 是预留后源变化、效果结果未知、回执持久化失败或未决对账。apply 回执 `transport_outcome=not_sent`，`effect_outcome=accepted|unknown`，保留原事件及 Assessment ID，`business_completion_proven=false`。
 

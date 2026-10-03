@@ -2,7 +2,7 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "e4406fd2fc6bb82ea5b871a021faf2659dc61a06",
+    "sha": "06bb4f895a935bfdf152fb0e7c67034f7ce0ab0e",
     "verified_on": "2026-10-03"
   },
   "status_policy": {
@@ -53,7 +53,7 @@
         "docs/_archive/**/*.md",
         "tmp/**/*.md"
       ],
-      "expected_count": 38,
+      "expected_count": 39,
       "budgeted": false
     }
   },
@@ -9406,6 +9406,57 @@
         ]
       },
       "gaps": []
+    },
+    {
+      "path": "scripts/oneoff/answersheet_gap_recover/README.md",
+      "class": "sidecar",
+      "owner": "tooling",
+      "doc_status": "needs_review",
+      "verified": {
+        "source_sha": "06bb4f895a935bfdf152fb0e7c67034f7ce0ab0e",
+        "verified_on": "2026-10-03"
+      },
+      "fact_sources": [
+        {
+          "kind": "source",
+          "path": "scripts/oneoff/answersheet_gap_recover/main.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/infra/answersheetgap/recovery.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/maintenance/recoveryjournal/journal.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/container/internal/transaction/qs03_operator_recovery_integration_test.go"
+        },
+        {
+          "kind": "source",
+          "path": "scripts/testing/m6-qs03-original-recovery-proof.sh"
+        }
+      ],
+      "verification": [],
+      "production_evidence": {
+        "level": "none",
+        "refs": [],
+        "deployed_sha": null,
+        "observed_at": null,
+        "limitations": [
+          "Actual isolated broker-loss / original effect recovery passed; precise final CI and designated-host installation are pending. No production recovery invocation or acceptance is claimed."
+        ]
+      },
+      "gaps": [
+        {
+          "id": "DOC-CLOSURE-QS03-ORIGINAL-EFFECT",
+          "kind": "verification",
+          "severity": "medium",
+          "summary": "Finish precise final CI and fixed-host tool delivery; retain the original operation journal and production scope before any controlled recovery.",
+          "exit_criteria": "Record precise final source / CI and installation evidence, then review operational scope separately from full M6 acceptance."
+        }
+      ]
     }
   ],
   "initial_review_baseline": {
