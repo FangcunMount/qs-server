@@ -162,7 +162,7 @@ func TestOriginalEffectsPostConfirmSeed(t *testing.T) {
 	claim, err := runs.Claim(ctx, evaluationrun.ClaimRequest{AssessmentID: reportID, Token: "original-outcome", ClaimedAt: now, LeaseUntil: now.Add(time.Minute)})
 	require.NoError(t, err)
 	require.True(t, claim.Claimed)
-	require.NoError(t, claim.Run.AttachInputSnapshot("frozen-original-input"))
+	require.NoError(t, claim.Run.AttachInputSnapshot("isn:v2:"+strings.Repeat("a", 64)))
 	require.NoError(t, runs.SaveClaimed(ctx, claim.Run))
 	result := domainoutcome.NewExecution(evaloutcome.ModelRefFromAssessment(*record.EvaluationModelRef()), domainoutcome.Summary{PrimaryLabel: "low"}, domainoutcome.Detail{Kind: modelcatalog.KindScale})
 	result.Primary = &domainoutcome.ScoreValue{Kind: domainoutcome.ScoreKindRawTotal, Value: 12}

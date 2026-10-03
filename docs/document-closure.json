@@ -2,7 +2,7 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "74330df2adab43d789680b2da4cbf234e8284c15",
+    "sha": "52b8ed90258982fad5987347efc479e3f245fb51",
     "verified_on": "2026-10-03"
   },
   "status_policy": {
@@ -9455,6 +9455,57 @@
           "severity": "medium",
           "summary": "Finish precise final CI and fixed-host tool delivery; retain the original operation journal and production scope before any controlled recovery.",
           "exit_criteria": "Record precise final source / CI and installation evidence, then review operational scope separately from full M6 acceptance."
+        }
+      ]
+    },
+    {
+      "path": "scripts/oneoff/effect_gap_recover/README.md",
+      "class": "sidecar",
+      "owner": "tooling",
+      "doc_status": "needs_review",
+      "verified": {
+        "source_sha": "52b8ed90258982fad5987347efc479e3f245fb51",
+        "verified_on": "2026-10-03"
+      },
+      "fact_sources": [
+        {
+          "kind": "source",
+          "path": "scripts/oneoff/effect_gap_recover/main.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/maintenance/originaleffect/source.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/maintenance/recoveryjournal/journal.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/container/internal/transaction/original_effect_recovery_integration_test.go"
+        },
+        {
+          "kind": "source",
+          "path": "scripts/testing/m6-original-effects-recovery-proof.sh"
+        }
+      ],
+      "verification": [],
+      "production_evidence": {
+        "level": "none",
+        "refs": [],
+        "deployed_sha": null,
+        "observed_at": null,
+        "limitations": [
+          "Source eligibility, unknown-result journal and normal Worker mapping have local unit/race evidence. Actual isolated fault proof, exact CI and fixed-host delivery are pending. No production repair or full M6 acceptance claimed."
+        ]
+      },
+      "gaps": [
+        {
+          "id": "DOC-CLOSURE-ORIGINAL-EFFECT-RECOVERY",
+          "kind": "verification",
+          "severity": "medium",
+          "summary": "Finish exact-source real broker-loss proof, CI and fixed-host delivery for QS-05/06; do not treat accepted Run/Generation as completed business result.",
+          "exit_criteria": "Record actual original-event/authority, frozen-input, receipt, late-delivery and source-unchanged proof, then deliver on designated host with retained journal."
         }
       ]
     }
