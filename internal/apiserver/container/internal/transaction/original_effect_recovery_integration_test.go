@@ -265,7 +265,8 @@ func TestOriginalEffectsRecoveryAfterActualBrokerLoss(t *testing.T) {
 	require.NoError(t, err)
 	assessments := evaluation.NewAssessmentRepository(db)
 	runs := checkpoint.NewRunRepository(db)
-	engine := appexecute.NewEngine(assessments, m5TerminalInput{}, appexecute.WithRunRepository(runs), appexecute.WithTransactionalOutbox(NewMySQLRunner(db), stager))
+	input := &effectReadbackInput{}
+	engine := appexecute.NewEngine(assessments, input, appexecute.WithRunRepository(runs), appexecute.WithTransactionalOutbox(NewMySQLRunner(db), stager))
 	gens, err := mongoreport.NewGenerationRepository(mdb)
 	require.NoError(t, err)
 	iruns, err := mongoreport.NewRunRepository(mdb)
@@ -306,6 +307,7 @@ func TestOriginalEffectsRecoveryAfterActualBrokerLoss(t *testing.T) {
 	grpcservice.NewInterpretationAutomationService(reportService).RegisterService(server.Server)
 	lis, err := net.Listen("tcp", "127.0.0.1:0")
 	require.NoError(t, err)
+	input.probe = newEffectFailureReadback(t, db, mdb, server, ca, lis.Addr().String(), gens, iruns)
 	go func() { _ = server.Serve(lis) }()
 	env := append(os.Environ(), "MYSQL_DSN="+os.Getenv("RM_EFFECT_MYSQL_DSN"), "MONGO_URI="+os.Getenv("RM_EFFECT_MONGO_URI"), "MONGO_DB="+effectProofDB, "M6_EFFECT_GRPC_ENDPOINT="+lis.Addr().String(), "M6_EFFECT_CA_FILE="+ca.CAFile, "M6_EFFECT_CERT_FILE="+worker.CertFile, "M6_EFFECT_KEY_FILE="+worker.KeyFile, "M6_EFFECT_SERVER_NAME=server.test")
 	runCLI := func(want int, args ...string) []byte {
@@ -351,6 +353,9 @@ func TestOriginalEffectsRecoveryAfterActualBrokerLoss(t *testing.T) {
 		require.NoError(t, json.Unmarshal(runCLI(0, scope...), &plan))
 		require.Equal(t, row.MessageID, plan.EventID)
 		runCLI(1, append(scope, "--org-id=2")...)
+		if row.EventType == originaleffect.EvaluationRetry {
+			require.NoError(t, input.probe.check(ctx, plan.AssessmentID, "failed", 1))
+		}
 		if row.EventType == originaleffect.ReportInitial {
 			reportPlan = plan
 			require.Equal(t, "factor", plan.TemplateID)
@@ -382,10 +387,16 @@ func TestOriginalEffectsRecoveryAfterActualBrokerLoss(t *testing.T) {
 		runCLI(1, scope...)
 	}
 	require.EqualValues(t, 1, builder.calls.Load())
+	input.probe.mu.Lock()
+	probeErr, probeChecks := input.probe.err, input.probe.checks
+	input.probe.mu.Unlock()
+	require.NoError(t, probeErr)
+	require.Equal(t, 2, probeChecks)
+	t.Log("lost evaluation.failed hint: actual Collection/mTLS/ACL failure read, stale failure reconciled against running successor; foreign Testee denied; SQL/Run/intent facts unchanged by reads")
 	effectAssertBroker(t, 0, 0)
 	manager, err := grpcclient.NewManager(&grpcclient.ManagerConfig{Endpoint: lis.Addr().String(), Timeout: 10 * time.Second, TLS: grpcclient.TLSConfig{CAFile: ca.CAFile, CertFile: worker.CertFile, KeyFile: worker.KeyFile, ServerName: "server.test"}})
 	require.NoError(t, err)
-	defer manager.Close()
+	defer func() { _ = manager.Close() }()
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 	dispatcher := workereventing.NewDispatcher(logger, &workereventing.HandlerDependencies{Logger: logger, EvaluationWorkerClient: grpcclient.NewEvaluationWorkerClient(manager), InterpretationAutomationClient: grpcclient.NewInterpretationAutomationClient(manager)}, handlers.NewRegistry())
 	cfg, err := catalog.Parse([]byte("version: '1'\ntopics:\n  evaluation:\n    name: qs.evaluation.lifecycle\nevents:\n  evaluation.retry.requested:\n    topic: evaluation\n    delivery: durable_outbox\n    aggregate: Evaluation\n    domain: evaluation\n    handler: evaluation_requested_handler\n  evaluation.outcome.committed:\n    topic: evaluation\n    delivery: durable_outbox\n    aggregate: Evaluation\n    domain: evaluation\n    handler: evaluation_outcome_committed_handler\n"))
@@ -460,7 +471,7 @@ func effectAssertBroker(t *testing.T, published, finished int64) {
 		if err != nil {
 			return false
 		}
-		defer response.Body.Close()
+		defer func() { _ = response.Body.Close() }()
 		body, err := io.ReadAll(io.LimitReader(response.Body, 64*1024))
 		if err != nil || response.StatusCode != http.StatusOK {
 			return false
