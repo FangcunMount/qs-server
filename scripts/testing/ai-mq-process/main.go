@@ -34,7 +34,8 @@ func main() {
 }
 
 func run() error {
-	mode := flag.String("mode", "runtime", "runtime or stage-cancel")
+	mode := flag.String("mode", "runtime", "runtime, stage-cancel or stage-history")
+	input := flag.String("input", "", "disposable historical request fixture")
 	config := flag.String("config", "", "disposable local configuration file")
 	id := flag.String("id", "", "original command UUID")
 	agg := flag.String("aggregate", "", "original run UUID")
@@ -60,6 +61,27 @@ func run() error {
 	}
 	defer db.Close()
 	db.SetMaxOpenConns(5)
+	if *mode == "stage-history" {
+		// This setup models a previously accepted request. It does not claim
+		// production authorization or model execution acceptance.
+		var fixture struct {
+			Request app.Start
+			Receipt app.Receipt
+		}
+		raw, err := os.ReadFile(*input)
+		if err != nil {
+			return err
+		}
+		if err = json.Unmarshal(raw, &fixture); err != nil {
+			return err
+		}
+		original := &store.Store{DB: db}
+		service := &app.Service{Store: original}
+		if err = service.Start(context.Background(), fixture.Request); err != nil {
+			return err
+		}
+		return original.Acknowledge(context.Background(), app.Command{ID: fixture.Request.RequestID, RequestID: fixture.Request.RequestID}, fixture.Receipt)
+	}
 	s := store.NewMessagingStore()
 	seal := func(k pb.MessagingKind, id, agg, org, at string, b *pb.MessagingBody) (*app.PreparedMessaging, error) {
 		if at == "" {
