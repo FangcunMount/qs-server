@@ -53,7 +53,7 @@
         "docs/_archive/**/*.md",
         "tmp/**/*.md"
       ],
-      "expected_count": 39,
+      "expected_count": 40,
       "budgeted": false
     }
   },
