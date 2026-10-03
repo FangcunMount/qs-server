@@ -3,6 +3,8 @@ package aibridge
 import (
 	"context"
 	"database/sql"
+	"errors"
+	"strconv"
 	"time"
 
 	pb "github.com/FangcunMount/qs-server/api/grpc/gen/aiworkflow"
@@ -75,4 +77,53 @@ func (s *MessagingCommandStore) stageCommand(ctx context.Context, kind pb.Messag
 // invokes Service.Relay. Host lifecycle must choose the MQ step explicitly.
 func (s *MessagingCommandStore) Pending(context.Context, int) ([]app.Command, error) {
 	return nil, app.ErrManagementUnavailable
+}
+
+// SubmitParticipantRetry preserves the original request aggregate. The host
+// authenticates the operator before calling; qs-ai decides current eligibility
+// and rechecks participant access in its original admission transaction.
+func (s *MessagingCommandStore) SubmitParticipantRetry(ctx context.Context, scope app.DraftScope, sessionID string, command app.ParticipantRetry) error {
+	if s == nil || s.Store == nil || s.DB == nil {
+		return app.ErrManagementUnavailable
+	}
+	var requestID string
+	err := s.DB.QueryRowContext(ctx, "SELECT request_id FROM ai_bridge_requests WHERE session_id=? AND organization_id=?", sessionID, scope.OrganizationID).Scan(&requestID)
+	if errors.Is(err, sql.ErrNoRows) {
+		return app.ErrNotFound
+	}
+	if err != nil {
+		return err
+	}
+	body := &pb.MessagingBody{Value: &pb.MessagingBody_ParticipantRetry{ParticipantRetry: &pb.ParticipantRetryCommand{
+		Scope: &pb.PublicationScope{OrganizationId: scope.OrganizationID, OperatorUserId: scope.OperatorUserID}, SessionId: sessionID, CommandId: command.CommandID, ExpectedRunId: command.ExpectedRunID, ExpectedVersion: command.ExpectedVersion, Reason: command.Reason, Confirm: command.Confirm, ExpectedProviderInvocations: command.ExpectedProviderInvocations, AcceptResultUnknownRisk: command.AcceptResultUnknownRisk,
+	}}}
+	return s.stageCommand(ctx, pb.MessagingKind_PARTICIPANT_RETRY, command.CommandID, requestID, app.OperationScope{OrganizationID: strconv.FormatInt(scope.OrganizationID, 10), SubjectID: strconv.FormatInt(scope.OperatorUserID, 10), ResourceID: sessionID}, body, nil)
+}
+
+func (s *MessagingCommandStore) SubmitEvaluationStart(ctx context.Context, scope app.EvaluationScope, commandID string, command app.EvaluationStart) error {
+	body := &pb.MessagingBody{Value: &pb.MessagingBody_EvaluationStart{EvaluationStart: &pb.EvaluationStartCommand{
+		Scope: &pb.EvaluationQuery{OrganizationId: scope.OrganizationID, OperatorUserId: scope.OperatorUserID, RunId: scope.RunID}, ExpectedVersion: command.ExpectedVersion, Reason: command.Reason, Confirm: command.Confirm,
+	}}}
+	return s.stageCommand(ctx, pb.MessagingKind_EVALUATION_START, commandID, scope.RunID, app.OperationScope{OrganizationID: strconv.FormatInt(scope.OrganizationID, 10), SubjectID: strconv.FormatInt(scope.OperatorUserID, 10), ResourceID: scope.RunID}, body, nil)
+}
+
+func (s *MessagingCommandStore) SubmitEvaluationCancel(ctx context.Context, scope app.EvaluationScope, commandID string, command app.EvaluationCancel) error {
+	body := &pb.MessagingBody{Value: &pb.MessagingBody_EvaluationCancel{EvaluationCancel: &pb.EvaluationCancelCommand{
+		Scope: &pb.EvaluationQuery{OrganizationId: scope.OrganizationID, OperatorUserId: scope.OperatorUserID, RunId: scope.RunID}, ExpectedVersion: command.ExpectedVersion, Reason: command.Reason, Confirm: command.Confirm, Discard: command.Discard,
+	}}}
+	return s.stageCommand(ctx, pb.MessagingKind_EVALUATION_CANCEL, commandID, scope.RunID, app.OperationScope{OrganizationID: strconv.FormatInt(scope.OrganizationID, 10), SubjectID: strconv.FormatInt(scope.OperatorUserID, 10), ResourceID: scope.RunID}, body, nil)
+}
+
+func (s *MessagingCommandStore) ReadOperation(ctx context.Context, scope app.OperationScope, id string) (app.MessagingOperation, error) {
+	if s == nil || s.Store == nil || s.DB == nil || s.Messaging == nil {
+		return app.MessagingOperation{}, app.ErrManagementUnavailable
+	}
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+	tx, err := s.DB.BeginTx(ctx, &sql.TxOptions{ReadOnly: true})
+	if err != nil {
+		return app.MessagingOperation{}, err
+	}
+	defer func() { _ = tx.Rollback() }()
+	return s.Messaging.Operation(ctx, tx, scope, id)
 }

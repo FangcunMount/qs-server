@@ -149,6 +149,7 @@ type InterpretationDeps struct {
 	AIWorkflowSemanticDrafts *bridge.SemanticDraftAdministration
 	AIWorkflowSolutions      *bridge.SolutionAdministration
 	AIWorkflowParticipants   *bridge.ParticipantAdministration
+	AIWorkflowOperations     *bridge.OperationAdministration
 	AIWorkflowManagement     *bridge.EvaluationAdministration
 	AIWorkflowPublications   *bridge.PublicationAdministration
 	AIWorkflowPromptDrafts   *bridge.PromptDraftAdministration

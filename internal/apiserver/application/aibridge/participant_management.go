@@ -53,7 +53,10 @@ type ParticipantManagementGateway interface {
 	RetryParticipant(context.Context, DraftScope, string, ParticipantRetry) (Receipt, error)
 	GetParticipantRetryReceipt(context.Context, DraftScope, string) (Receipt, error)
 }
-type ParticipantAdministration struct{ Gateway ParticipantManagementGateway }
+type ParticipantAdministration struct {
+	Gateway  ParticipantManagementGateway
+	Messages RuntimeCommandSubmitter
+}
 
 func (s *ParticipantAdministration) Capacity(ctx context.Context, scope DraftScope, query ParticipantCapacityQuery) (ParticipantCapacity, error) {
 	if scope.OrganizationID <= 0 || scope.OperatorUserID <= 0 || len(query.SubjectID) > 128 || !utf8.ValidString(query.SubjectID) ||

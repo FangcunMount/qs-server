@@ -7,6 +7,7 @@ import (
 )
 
 type EvaluationCancel struct {
+	CommandID       string `json:"command_id"`
 	ExpectedVersion int64  `json:"expected_version"`
 	Reason          string `json:"reason"`
 	Confirm         bool   `json:"confirm"`
@@ -33,9 +34,17 @@ func (s *EvaluationAdministration) Cancel(ctx context.Context, scope EvaluationS
 	if err := s.authorize(ctx, scope); err != nil {
 		return EvaluationState{}, err
 	}
-	command.Reason = strings.TrimSpace(command.Reason)
-	if command.ExpectedVersion < 1 || command.ExpectedVersion == math.MaxInt64 || !command.Confirm || command.Discard == nil || command.Reason == "" || len(command.Reason) > 1000 || strings.ContainsAny(command.Reason, "<>") {
-		return EvaluationState{}, ErrInvalid
+	command, err := normalizeEvaluationCancel(command)
+	if err != nil {
+		return EvaluationState{}, err
 	}
 	return s.Gateway.CancelEvaluation(ctx, scope, command)
+}
+
+func normalizeEvaluationCancel(command EvaluationCancel) (EvaluationCancel, error) {
+	command.Reason = strings.TrimSpace(command.Reason)
+	if command.ExpectedVersion < 1 || command.ExpectedVersion == math.MaxInt64 || !command.Confirm || command.Discard == nil || command.Reason == "" || len(command.Reason) > 1000 || strings.ContainsAny(command.Reason, "<>") {
+		return command, ErrInvalid
+	}
+	return command, nil
 }

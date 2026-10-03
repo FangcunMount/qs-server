@@ -11,6 +11,7 @@ import (
 	pb "github.com/FangcunMount/qs-server/api/grpc/gen/aiworkflow"
 	app "github.com/FangcunMount/qs-server/internal/apiserver/application/aibridge"
 	"github.com/google/uuid"
+	"google.golang.org/protobuf/proto"
 )
 
 func (f *mqFixture) commandStore(calls *int) *MessagingCommandStore {
@@ -98,5 +99,61 @@ func TestMQSubmissionSealFailureRollsBackRequestAndOperation(t *testing.T) {
 		if count != 0 {
 			t.Fatal("orphan message", table)
 		}
+	}
+}
+
+func TestMQManagementFamiliesUseOriginalAggregateAndSingleWire(t *testing.T) {
+	f := newMQFixture(t)
+	f.request.Actor.OrgID = "1"
+	f.scope.OrganizationID = "1"
+	calls := 0
+	store := f.commandStore(&calls)
+	mustMQ(t, store.StageStart(context.Background(), f.request))
+	_, err := f.db.Exec("UPDATE ai_bridge_requests SET session_id=? WHERE request_id=?", f.session, f.request.RequestID)
+	mustMQ(t, err)
+	retry := app.ParticipantRetry{CommandID: uuid.NewString(), ExpectedRunID: f.run, ExpectedVersion: 4, Reason: "explicit retry", Confirm: true, ExpectedProviderInvocations: 1}
+	start := app.EvaluationStart{CommandID: uuid.NewString(), ExpectedVersion: 2, Reason: "frozen run", Confirm: true}
+	discard := false
+	cancel := app.EvaluationCancel{CommandID: uuid.NewString(), ExpectedVersion: 3, Reason: "cancel original", Confirm: true, Discard: &discard}
+	for _, scenario := range []struct {
+		id, aggregate, resource string
+		kind                    pb.MessagingKind
+		submit                  func() error
+	}{
+		{retry.CommandID, f.request.RequestID, f.session, pb.MessagingKind_PARTICIPANT_RETRY, func() error {
+			return store.SubmitParticipantRetry(context.Background(), app.DraftScope{OrganizationID: 1, OperatorUserID: 42}, f.session, retry)
+		}},
+		{start.CommandID, f.run, f.run, pb.MessagingKind_EVALUATION_START, func() error {
+			return store.SubmitEvaluationStart(context.Background(), app.EvaluationScope{OrganizationID: 1, OperatorUserID: 42, RunID: f.run}, start.CommandID, start)
+		}},
+		{cancel.CommandID, f.run, f.run, pb.MessagingKind_EVALUATION_CANCEL, func() error {
+			return store.SubmitEvaluationCancel(context.Background(), app.EvaluationScope{OrganizationID: 1, OperatorUserID: 42, RunID: f.run}, cancel.CommandID, cancel)
+		}},
+	} {
+		mustMQ(t, scenario.submit())
+		mustMQ(t, scenario.submit())
+		var aggregate string
+		var kind int
+		var raw []byte
+		mustMQ(t, f.db.QueryRow("SELECT aggregate_key,kind,body FROM ai_messaging_outbox WHERE message_id=?", scenario.id).Scan(&aggregate, &kind, &raw))
+		if aggregate != scenario.aggregate || kind != int(scenario.kind) {
+			t.Fatal("original aggregate/kind lost", aggregate, kind)
+		}
+		body := new(pb.MessagingBody)
+		mustMQ(t, proto.Unmarshal(raw, body))
+		if scenario.kind == pb.MessagingKind_EVALUATION_CANCEL && (body.GetEvaluationCancel().Discard == nil || *body.GetEvaluationCancel().Discard) {
+			t.Fatal("explicit false discarded")
+		}
+		op, err := store.ReadOperation(context.Background(), app.OperationScope{OrganizationID: "1", SubjectID: "42"}, scenario.id)
+		mustMQ(t, err)
+		if op.OperationID != scenario.id || op.ResourceID != scenario.resource || op.Status != "submitted" {
+			t.Fatal("operation original identity lost", op)
+		}
+		if _, err = store.ReadOperation(context.Background(), app.OperationScope{OrganizationID: "2", SubjectID: "42"}, scenario.id); !errors.Is(err, app.ErrNotFound) {
+			t.Fatal("wrong org read command", err)
+		}
+	}
+	if calls != 4 {
+		t.Fatal("repeated command resealed", calls)
 	}
 }

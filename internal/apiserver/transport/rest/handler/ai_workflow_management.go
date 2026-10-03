@@ -132,6 +132,14 @@ func (h *AIWorkflowManagementHandler) Start(c *gin.Context) {
 	if err := h.BindJSON(c, &command); err != nil {
 		return
 	}
+	if h.service.Messages != nil {
+		if err := h.service.SubmitStart(c.Request.Context(), scope, command); err != nil {
+			h.failure(c, err)
+			return
+		}
+		submittedCommand(c, command.CommandID)
+		return
+	}
 	value, err := h.service.Start(c.Request.Context(), scope, command)
 	if err != nil {
 		h.failure(c, err)

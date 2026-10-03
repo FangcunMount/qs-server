@@ -5,6 +5,7 @@ package aibridge
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
 	"database/sql"
 	"errors"
 	"testing"
@@ -32,7 +33,7 @@ func TestMQRelayBrokerAcceptanceRetainsOriginalWire(t *testing.T) {
 	relay, err := NewMessagingRelay(f.db, f.store.Outbox, mqPublisherFunc(func(ctx context.Context, topic string, wire []byte) transport.Result {
 		calls++
 		if topic != "qs.ai.commands.v1" || !bytes.Equal(wire, original) {
-			t.Fatal("original wire changed")
+			t.Fatalf("unexpected persisted publish: call=%d topic=%s original=%x actual=%x", calls, topic, sha256.Sum256(original), sha256.Sum256(wire))
 		}
 		deadline, ok := ctx.Deadline()
 		if !ok || time.Until(deadline) > 5*time.Second {

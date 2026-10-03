@@ -45,7 +45,8 @@ jobs:
           GOWORK: 'off'
         run: |
           mkdir -p artifacts
-          go test -tags=integration -count=1 -race -json ./internal/apiserver/application/aibridge ./internal/apiserver/infra/mysql/aibridge ./internal/apiserver/infra/aibridge ./internal/apiserver/transport/grpc/aibridge ./cmd/qs-ai-bridge > artifacts/ai-mq-tests.json
+          go test -p 1 -tags=integration -count=1 -race -json ./internal/apiserver/application/aibridge ./internal/apiserver/infra/mysql/aibridge ./internal/apiserver/infra/aibridge ./internal/apiserver/transport/grpc/aibridge ./cmd/qs-ai-bridge > artifacts/ai-mq-tests.json
+          go test -count=1 -race -json ./internal/apiserver/transport/rest/handler ./internal/apiserver/transport/rest -run '^TestMQ' >> artifacts/ai-mq-tests.json
           python3 scripts/testing/ai-mq-report.py artifacts/ai-mq-tests.json
       - uses: actions/upload-artifact@v7
         if: always()
