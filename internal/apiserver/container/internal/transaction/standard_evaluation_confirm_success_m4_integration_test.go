@@ -11,6 +11,7 @@ import (
 	"io"
 	"log/slog"
 	"net"
+	"net/http"
 	"os"
 	"strings"
 	"sync"
@@ -272,6 +273,26 @@ events:
 			defer func() { require.NoError(t, subscriber.Close()) }()
 			const topic = "qs.evaluation.lifecycle"
 			channel := "m4-confirm-" + mode
+			// Prepare only this invocation's isolated native NSQ topic/channel before
+			// subscriber lookup; do not spend the business deadline on absent topology.
+			httpClient := &http.Client{Timeout: time.Second}
+			for _, endpoint := range []string{"http://nsqd:4151/topic/create?topic=" + topic, "http://nsqd:4151/channel/create?topic=" + topic + "&channel=" + channel} {
+				response, err := httpClient.Post(endpoint, "application/octet-stream", nil)
+				require.NoError(t, err)
+				response.Body.Close()
+				require.Equal(t, http.StatusOK, response.StatusCode)
+			}
+			require.Eventually(t, func() bool {
+				response, err := httpClient.Get("http://nsqlookupd:4161/lookup?topic=" + topic)
+				if err != nil {
+					return false
+				}
+				defer response.Body.Close()
+				var lookup struct {
+					Producers []json.RawMessage `json:"producers"`
+				}
+				return response.StatusCode == http.StatusOK && json.NewDecoder(response.Body).Decode(&lookup) == nil && len(lookup.Producers) == 1
+			}, 10*time.Second, 50*time.Millisecond)
 			require.NoError(t, subscriber.Subscribe(topic, channel, func(ctx context.Context, delivery rmtransport.Delivery) error {
 				msg := delivery.Message()
 				if msg.Metadata["event_type"] == eventcatalog.EvaluationRequested {
@@ -313,8 +334,8 @@ events:
 				}
 			}})
 			require.NoError(t, err)
-			kind, code, version := "scale", "MODEL-1", "1.0.0"
-			created, err := intake.CreateForAnswerSheet(ctx, appintake.CreateCommand{OrgID: 1, TesteeID: 2, AnswerSheetID: 1705, QuestionnaireCode: "Q-001", QuestionnaireVersion: "v1", OriginType: "adhoc", ModelKind: &kind, ModelCode: &code, ModelVersion: &version})
+			kind, code, version, algorithm := "scale", "MODEL-1", "1.0.0", string(modelcatalog.AlgorithmScaleDefault)
+			created, err := intake.CreateForAnswerSheet(ctx, appintake.CreateCommand{OrgID: 1, TesteeID: 2, AnswerSheetID: 1705, QuestionnaireCode: "Q-001", QuestionnaireVersion: "v1", OriginType: "adhoc", ModelKind: &kind, ModelCode: &code, ModelVersion: &version, ModelAlgorithm: &algorithm})
 			require.NoError(t, err)
 			_, err = intake.SubmitForEvaluation(ctx, created.ID)
 			require.NoError(t, err)
