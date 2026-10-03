@@ -453,29 +453,54 @@ func effectAssertBroker(t *testing.T, published, finished int64) {
 	t.Helper()
 	address := os.Getenv("RM_EFFECT_NSQ_HTTP")
 	require.True(t, strings.HasPrefix(address, "http://127.0.0.1:"))
+	var lastStats []byte
+	defer func() { t.Logf("NSQ target-channel statistics: %s", lastStats) }()
 	require.Eventually(t, func() bool {
 		response, err := (&http.Client{Timeout: time.Second}).Get(address + "/stats?format=json&topic=qs.evaluation.lifecycle")
 		if err != nil {
 			return false
 		}
 		defer response.Body.Close()
+		body, err := io.ReadAll(io.LimitReader(response.Body, 64*1024))
+		if err != nil || response.StatusCode != http.StatusOK {
+			return false
+		}
+		lastStats = body
 		var stats struct {
 			Topics []struct {
-				MessageCount int64 `json:"message_count"`
+				TopicName    string `json:"topic_name"`
+				MessageCount int64  `json:"message_count"`
 				Channels     []struct {
-					ChannelName     string `json:"channel_name"`
-					Depth, Requeues int64
-					InFlight        int64 `json:"in_flight_count"`
-					FinishCount     int64 `json:"finish_count"`
+					ChannelName string `json:"channel_name"`
+					Depth       int64  `json:"depth"`
+					Backend     int64  `json:"backend_depth"`
+					Deferred    int64  `json:"deferred_count"`
+					Requeues    int64  `json:"requeue_count"`
+					InFlight    int64  `json:"in_flight_count"`
+					Clients     []struct {
+						FinishCount int64 `json:"finish_count"`
+					} `json:"clients"`
 				} `json:"channels"`
 			} `json:"topics"`
 		}
-		if json.NewDecoder(response.Body).Decode(&stats) != nil || len(stats.Topics) != 1 || stats.Topics[0].MessageCount != published {
+		if json.Unmarshal(body, &stats) != nil {
 			return false
 		}
-		for _, c := range stats.Topics[0].Channels {
-			if c.ChannelName == effectProofChannel {
-				return c.Depth == 0 && c.InFlight == 0 && c.FinishCount == finished
+		for _, topic := range stats.Topics {
+			if topic.TopicName != "qs.evaluation.lifecycle" || topic.MessageCount != published {
+				continue
+			}
+			for _, c := range topic.Channels {
+				if c.ChannelName != effectProofChannel {
+					continue
+				}
+				// NSQD exposes FIN on each connected client, not the channel.
+				// Read it before subscriber shutdown removes the client counters.
+				var total int64
+				for _, client := range c.Clients {
+					total += client.FinishCount
+				}
+				return c.Depth == 0 && c.Backend == 0 && c.Deferred == 0 && c.Requeues == 0 && c.InFlight == 0 && total == finished
 			}
 		}
 		return false

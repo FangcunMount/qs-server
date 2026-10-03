@@ -145,7 +145,13 @@ done
 [[ $(curl -fsS --connect-timeout 1 --max-time 2 "${nsq_http}/ping") == OK ]]
 capture after_restart
 export RM_EFFECT_NSQ_HTTP="$nsq_http"
-go test -tags 'integration reliable_messaging reliable_messaging_m4 reliable_messaging_m4_integration reliable_messaging_m5' \
-  ./internal/apiserver/container/internal/transaction -run '^TestOriginalEffectsRecoveryAfterActualBrokerLoss$' -count=1 -timeout=3m -v
+if go test -tags 'integration reliable_messaging reliable_messaging_m4 reliable_messaging_m4_integration reliable_messaging_m5' \
+  ./internal/apiserver/container/internal/transaction -run '^TestOriginalEffectsRecoveryAfterActualBrokerLoss$' -count=1 -timeout=3m -v; then
+  curl -fsS --connect-timeout 1 --max-time 3 "${nsq_http}/stats?format=json" > "${output}-after_test-raw-stats.json"
+else
+  result=$?
+  curl -fsS --connect-timeout 1 --max-time 3 "${nsq_http}/stats?format=json" > "${output}-failed_test-raw-stats.json" || true
+  exit "$result"
+fi
 capture after_recovery
 printf 'result=isolated_original_effect_recovered recovery_pub=0 late_originals=4\n'
