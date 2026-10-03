@@ -200,7 +200,7 @@ func TestReportAcceptanceRequiresOriginalOutcomeEventAndDurableIDs(t *testing.T)
 func TestBoundedInitialMySQLHandshakeLeavesNoReservation(t *testing.T) {
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	require.NoError(t, err)
-	defer listener.Close()
+	defer func() { _ = listener.Close() }()
 	accepted := make(chan struct{})
 	go func() {
 		connection, err := listener.Accept()
@@ -208,7 +208,7 @@ func TestBoundedInitialMySQLHandshakeLeavesNoReservation(t *testing.T) {
 			return
 		}
 		close(accepted)
-		defer connection.Close()
+		defer func() { _ = connection.Close() }()
 		_, _ = io.Copy(io.Discard, connection)
 	}()
 	t.Setenv("MYSQL_DSN", "root:test@tcp("+listener.Addr().String()+")/isolated?parseTime=true")
