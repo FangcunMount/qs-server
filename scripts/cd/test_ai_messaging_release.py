@@ -156,6 +156,7 @@ class MQReleaseTests(unittest.TestCase):
         with patch.object(module, 'command', return_value=b'{}') as command:
             module.offline(IMAGE, ['--source-sha'])
         args = command.call_args.args[0]
+        self.assertEqual(args[args.index('--platform') + 1], 'linux/amd64')
         self.assertEqual(args[args.index('--network') + 1], 'none')
         self.assertIn('--read-only', args)
         self.assertEqual(args[args.index('--cap-drop') + 1], 'ALL')

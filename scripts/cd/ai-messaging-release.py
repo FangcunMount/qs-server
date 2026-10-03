@@ -62,7 +62,7 @@ def command(args):
 
 
 def offline(image, args, mounts=()):
-    run = ['docker', 'run', '--rm', '--network', 'none', '--read-only',
+    run = ['docker', 'run', '--rm', '--platform', 'linux/amd64', '--network', 'none', '--read-only',
            '--cap-drop', 'ALL', '--security-opt', 'no-new-privileges',
            '--entrypoint', '/app/qs-ai-messaging-preflight']
     for source, target, readonly in mounts:
