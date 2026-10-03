@@ -3,6 +3,7 @@ package aibridge
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -10,6 +11,8 @@ import (
 	app "github.com/FangcunMount/qs-server/internal/apiserver/application/aibridge"
 	"github.com/google/uuid"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -28,9 +31,13 @@ func TestMessagingPayloadReferenceAndExactBody(t *testing.T) {
 	}
 	ref := &pb.MessagePayloadReference{Producer: e.Producer, Destination: e.Destination, MessageId: id, BodySha256: e.BodySha256, BodyLength: e.BodyLength, OrganizationId: body.GetEvaluationState().OrganizationId}
 	e.Body = &pb.MessagingEnvelope_PayloadReference{PayloadReference: ref}
-	for _, scenario := range []string{"original", "wrong_org", "wrong_length", "wrong_bytes", "unavailable", "nil_response"} {
+	for _, scenario := range []string{"original", "wrong_org", "wrong_length", "wrong_bytes", "unavailable", "workload_denied", "nil_response"} {
 		t.Run(scenario, func(t *testing.T) {
-			client := &MessagingPayloadClient{RPC: payloadRPCFunc(func(ctx context.Context, r *pb.MessagePayloadReference, _ ...grpc.CallOption) (*pb.MessagePayload, error) {
+			var observed []string
+			client := &MessagingPayloadClient{Observe: func(ctx context.Context, kind string) error {
+				observed = append(observed, kind)
+				return errors.New("private audit DSN")
+			}, RPC: payloadRPCFunc(func(ctx context.Context, r *pb.MessagePayloadReference, _ ...grpc.CallOption) (*pb.MessagePayload, error) {
 				deadline, ok := ctx.Deadline()
 				if !ok || time.Until(deadline) > 5*time.Second {
 					t.Fatal("unbounded payload read")
@@ -40,6 +47,9 @@ func TestMessagingPayloadReferenceAndExactBody(t *testing.T) {
 				}
 				if scenario == "unavailable" {
 					return nil, errors.New("sensitive transport details")
+				}
+				if scenario == "workload_denied" {
+					return nil, status.Error(codes.PermissionDenied, "private workload")
 				}
 				if scenario == "nil_response" {
 					return nil, nil
@@ -66,6 +76,22 @@ func TestMessagingPayloadReferenceAndExactBody(t *testing.T) {
 				}
 			} else if err == nil {
 				t.Fatal("invalid response accepted")
+			}
+			if scenario == "original" {
+				if len(observed) != 0 {
+					t.Fatal("successful read counted as failure")
+				}
+			} else {
+				expected := "payload_fetch_reference_mismatch"
+				if scenario == "unavailable" {
+					expected = "payload_fetch_unavailable"
+				}
+				if scenario == "workload_denied" {
+					expected = "payload_fetch_workload_denied"
+				}
+				if len(observed) != 1 || observed[0] != expected || strings.Contains(err.Error(), "private") {
+					t.Fatal("audit masked original sanitized failure or retained untrusted category", observed, err)
+				}
 			}
 		})
 	}

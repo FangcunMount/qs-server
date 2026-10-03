@@ -36,7 +36,7 @@ func TestMQSnapshotCommittedStateWithoutSettlementOrInventedHistory(t *testing.T
 			t.Error(err)
 		}
 	}()
-	for _, table := range []string{"ai_messaging_outbox", "ai_messaging_inbox", "ai_messaging_quarantine"} {
+	for _, table := range []string{"ai_messaging_outbox", "ai_messaging_inbox", "ai_messaging_quarantine", "ai_messaging_observations"} {
 		_, err = source.Exec("CREATE TABLE `" + name + "`." + table + " LIKE `" + sourceSchema + "`." + table)
 		mustMQ(t, err)
 	}

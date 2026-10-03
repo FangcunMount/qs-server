@@ -35,6 +35,9 @@ func (m *Module) configureAIMessaging(o opts.AIWorkflowMessagingOptions, db *sql
 		return app.ProtectMessaging(k, id, agg, "", org, original, b, keys.Signing, keys.Recipient)
 	}
 	s := store.NewMessagingStore()
+	c.Payloads.Observe = func(ctx context.Context, kind string) error {
+		return store.RecordPayloadObservation(ctx, db, kind)
+	}
 	commands := &store.MessagingCommandStore{Store: &store.Store{DB: db}, Messaging: s, Seal: seal}
 	receiver := &store.MessagingEventReceiver{DB: db, Store: s, Keys: keys.Ring, Bodies: c.Payloads, Seal: seal}
 	runtime, err := client.NewMessagingRuntime(o, db, s, receiver)

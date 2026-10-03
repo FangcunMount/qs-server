@@ -42,6 +42,15 @@ func TestMQPayloadMTLSTrustAndExactStoredReference(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = db.Close() })
+	observation := func(kind string) uint64 {
+		t.Helper()
+		var count uint64
+		if err := db.QueryRow("SELECT recorded_count FROM ai_messaging_observations WHERE kind=?", kind).Scan(&count); err != nil {
+			t.Fatal(err)
+		}
+		return count
+	}
+	referenceBefore, workloadBefore := observation("payload_serve_reference_mismatch"), observation("payload_serve_workload_denied")
 	id := uuid.NewString()
 	scope := app.OperationScope{OrganizationID: "1", SubjectID: "42", ResourceID: id}
 	defer func() {
@@ -143,6 +152,9 @@ func TestMQPayloadMTLSTrustAndExactStoredReference(t *testing.T) {
 	}
 	if _, err := client("other-workload.svc", 4).Get(ctx, ref); status.Code(err) != codes.PermissionDenied {
 		t.Fatalf("wrong workload accepted: %v", err)
+	}
+	if observation("payload_serve_reference_mismatch") != referenceBefore+3 || observation("payload_serve_workload_denied") != workloadBefore+1 {
+		t.Fatal("real mTLS rejection did not persist bounded technical facts")
 	}
 	if err = db.Ping(); err != nil {
 		t.Fatal("borrowed host pool closed")

@@ -17,6 +17,15 @@ type messagingCollector struct {
 
 func newMessagingCollector(db *sql.DB) *messagingCollector {
 	descriptions := map[string]string{
+		"observations_history_complete":                 "Recorded observations do not reconstruct missing history.",
+		"observations_recording_since_epoch_seconds":    "UTC recording start of durable observation coverage.",
+		"recorded_duplicate_event":                      "Committed duplicate event observations since installation.",
+		"recorded_payload_fetch_unavailable":            "Durably recorded failed remote reference reads.",
+		"recorded_payload_fetch_reference_mismatch":     "Durably recorded fetched reference mismatches.",
+		"recorded_payload_fetch_workload_denied":        "Durably recorded remote workload refusals.",
+		"recorded_payload_serve_reference_mismatch":     "Durably recorded local reference mismatches.",
+		"recorded_payload_serve_workload_denied":        "Durably recorded local workload refusals.",
+		"recorded_payload_serve_storage_unavailable":    "Durably recorded local storage failures.",
 		"observation_available":                         "Whether the complete committed MQ state snapshot is available.",
 		"staged_messages":                               "Staged messages including future retry availability.",
 		"due_messages":                                  "Due staged or awaiting-receipt rows; not ordering eligibility.",

@@ -5,6 +5,10 @@ import sys
 from pathlib import Path
 
 required = {
+    "TestMQRuntimeMissingTechnicalCoverageRefusesBeforeTransport",
+    "TestMQDuplicateObservationSharesAckTransactionAndOriginalProjection",
+    "TestMQPayloadObservationCommitsOnlyTechnicalFactAndPreservesReadTransaction",
+    "TestMQTechnicalRecordingCoverageAndSchemaFailureAreExplicit",
     "TestMQSnapshotCommittedStateWithoutSettlementOrInventedHistory",
     "TestMQObservationFailureDoesNotReportEmptyQueue",
     "TestMQOriginalUTF8BytesSurviveNormalHostCharset",

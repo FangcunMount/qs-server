@@ -45,7 +45,12 @@ func MessagingSnapshot(ctx context.Context, db *sql.DB) (map[string]float64, err
 		}
 		values["quarantine_"+code+"_records"] = n
 	}
-	values["duplicate_observations_available"] = 0
-	values["payload_error_observations_available"] = 0
+	technical, err := collectTechnicalObservations(ctx, tx)
+	if err != nil {
+		return nil, err
+	}
+	for kind, value := range technical {
+		values[kind] = value
+	}
 	return values, nil
 }

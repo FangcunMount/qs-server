@@ -234,7 +234,10 @@ func (s *MessagingStore) receiveEvent(ctx context.Context, tx *sql.Tx, e *pb.Mes
 		if err = tx.QueryRowContext(ctx, "SELECT body_sha256 FROM ai_messaging_outbox WHERE producer='qs-server' AND destination='qs-ai' AND message_id=?", storedAck).Scan(&hash); err != nil {
 			return err
 		}
-		return s.Outbox.RearmAck(ctx, tx, durable.Identity{Producer: "qs-server", Destination: "qs-ai", MessageID: storedAck}, hash)
+		if err = s.Outbox.RearmAck(ctx, tx, durable.Identity{Producer: "qs-server", Destination: "qs-ai", MessageID: storedAck}, hash); err != nil {
+			return err
+		}
+		return RecordMessagingObservation(ctx, tx, "duplicate_event")
 	}
 	var org string
 	if held {

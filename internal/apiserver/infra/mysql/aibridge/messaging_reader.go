@@ -22,3 +22,8 @@ func (s *MessagingReader) ReadMessagePayload(ctx context.Context, ref *pb.Messag
 	defer func() { _ = tx.Rollback() }()
 	return s.Store.Payload(ctx, tx, ref, workload)
 }
+
+// ObserveMessagePayloadFailure does not reuse or commit the body-read transaction.
+func (s *MessagingReader) ObserveMessagePayloadFailure(ctx context.Context, kind string) error {
+	return RecordPayloadObservation(ctx, s.DB, kind)
+}
