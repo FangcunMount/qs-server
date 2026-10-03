@@ -5,6 +5,13 @@ import sys
 from pathlib import Path
 
 required = {
+    "TestMQAdmissionClosedRejectsEveryNewFamilyWithoutRows",
+    "TestMQAdmissionClosedReplaysEveryOriginalFamilyWithoutResealing",
+    "TestMQAdmissionCloseWaitsForOriginalCommitOrRollback",
+    "TestMQAdmissionStorageAndCancellationRemainUncertain",
+    "TestMQAdmissionOperatorRevisionAndCancelledClose",
+    "TestMQPublicMaintenanceIsDefinitiveWithoutCapacityReset",
+    "TestMQDelegatedMaintenanceKeepsAuthorizationAndUnknownFailureDistinct",
     "TestMQAuditSnapshotPreservesHistoryAndSurfacesAmbiguousOwnership",
     "TestMQAuditMissingSchemaAndBoundsFailClosed",
     "TestMQAuditSnapshotTransactionActuallyRejectsWrites",

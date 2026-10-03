@@ -145,6 +145,25 @@ func operationScopeMatches(e *pb.MessagingEnvelope, b *pb.MessagingBody, scope a
 	return err == nil && parsedOrg > 0 && strconv.FormatUint(parsedOrg, 10) == org && idErr == nil && id.String() == resource && org == scope.OrganizationID && subject == scope.SubjectID && resource == scope.ResourceID
 }
 
+// existingOperation reads immutable submission fields, without reserving a
+// missing ID (which would introduce cross-aggregate gap-lock deadlocks). Racing
+// open-gate submissions are still serialized and validated by StageOperation.
+func (s *MessagingStore) existingOperation(ctx context.Context, tx *sql.Tx, e *pb.MessagingEnvelope, scope app.OperationScope) (bool, error) {
+	var hash, org, subject, resource, aggregate string
+	var kind int32
+	err := tx.QueryRowContext(ctx, "SELECT body_sha256,CAST(organization_id AS CHAR),subject_id,resource_id,aggregate_key,kind FROM ai_messaging_operations WHERE command_id=?", e.MessageId).Scan(&hash, &org, &subject, &resource, &aggregate, &kind)
+	if errors.Is(err, sql.ErrNoRows) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	if hash != e.BodySha256 || org != scope.OrganizationID || subject != scope.SubjectID || resource != scope.ResourceID || aggregate != e.AggregateKey || kind != int32(e.Kind) {
+		return false, app.ErrConflict
+	}
+	return true, nil
+}
+
 // Operation returns only an operation owned by the trusted organization/subject.
 // Wider admin/audit access must use the host's separate authorization boundary.
 func (s *MessagingStore) Operation(ctx context.Context, tx *sql.Tx, scope app.OperationScope, id string) (app.MessagingOperation, error) {

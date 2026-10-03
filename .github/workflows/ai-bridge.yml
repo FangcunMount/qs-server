@@ -55,6 +55,7 @@ jobs:
           docker exec -i "$MYSQL_CONTAINER" mysql -uroot -pbridge_test_root qs_bridge_test < internal/pkg/migration/migrations/mysql/000091_ai_messaging.up.sql
           docker exec -i "$MYSQL_CONTAINER" mysql -uroot -pbridge_test_root qs_bridge_test < internal/pkg/migration/migrations/mysql/000092_ai_messaging_failures.up.sql
           docker exec -i "$MYSQL_CONTAINER" mysql -uroot -pbridge_test_root qs_bridge_test < internal/pkg/migration/migrations/mysql/000093_ai_messaging_legacy_commands.up.sql
+          docker exec -i "$MYSQL_CONTAINER" mysql -uroot -pbridge_test_root qs_bridge_test < internal/pkg/migration/migrations/mysql/000094_ai_messaging_admission.up.sql
       - name: Verify durable request and result transactions
         env:
           QS_AI_BRIDGE_TEST_DSN: 'root:bridge_test_root@tcp(127.0.0.1:3306)/qs_bridge_test?parseTime=true'
@@ -71,6 +72,7 @@ jobs:
           go test -tags=integration -count=1 -race -json ./cmd/qs-ai-messaging-audit >> artifacts/ai-mq-tests.json
           go build ./cmd/qs-apiserver ./cmd/collection-server ./cmd/qs-ai-bridge
           go build -ldflags "-X main.sourceSHA=${{ github.sha }}" -o artifacts/qs-ai-messaging-audit ./cmd/qs-ai-messaging-audit
+          go build -ldflags "-X main.sourceSHA=${{ github.sha }}" -o artifacts/qs-ai-messaging-control ./cmd/qs-ai-messaging-control
           go build ./scripts/testing/ai-mq-process
           python3 scripts/testing/ai-mq-report.py artifacts/ai-mq-tests.json
       - uses: actions/upload-artifact@v7
@@ -80,6 +82,7 @@ jobs:
           path: |
             artifacts/ai-mq-tests.json
             artifacts/qs-ai-messaging-audit
+            artifacts/qs-ai-messaging-control
           if-no-files-found: error
   images:
     runs-on: ubuntu-latest

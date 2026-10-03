@@ -10,6 +10,7 @@ import (
 	"time"
 
 	app "github.com/FangcunMount/qs-server/internal/collection-server/application/aiexplanation"
+	"github.com/FangcunMount/qs-server/internal/pkg/aicommand"
 	"github.com/FangcunMount/qs-server/internal/pkg/resilience/ratelimit"
 	"github.com/FangcunMount/qs-server/pkg/core"
 	"github.com/gin-gonic/gin"
@@ -67,6 +68,10 @@ func (h *AIExplanationHandler) respondError(c *gin.Context, err error) {
 	case codes.FailedPrecondition, codes.Aborted, codes.AlreadyExists:
 		h.ConflictResponse(c, "AI explanation request cannot be completed", nil)
 	case codes.ResourceExhausted:
+		if grpcstatus.Convert(err).Message() == aicommand.AdmissionClosedReason {
+			c.JSON(http.StatusTooManyRequests, core.ErrResponse{Code: http.StatusTooManyRequests, Message: aicommand.AdmissionClosedReason})
+			return // reopening is an operator decision, not a daily capacity reset
+		}
 		ratelimit.ApplyRetryAfterSeconds(c.Writer.Header(), secondsUntilNextUTCDate(time.Now()))
 		c.JSON(http.StatusTooManyRequests, core.ErrResponse{Code: http.StatusTooManyRequests, Message: "AI explanation daily capacity exceeded"})
 	case codes.Unavailable, codes.DeadlineExceeded:

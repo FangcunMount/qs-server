@@ -275,6 +275,9 @@ func (r *MessagingRuntime) preflightStorage(ctx context.Context) error {
 		return errors.New("AI MQ storage unavailable")
 	}
 	defer func() { _ = tx.Rollback() }()
+	if _, err := (store.MessagingAdmission{}).Inspect(ctx, tx); err != nil {
+		return errors.New("AI MQ required runtime admission gate unavailable")
+	}
 	for _, query := range []string{"SELECT next_sequence FROM ai_messaging_aggregates LIMIT 0", "SELECT event_sequence FROM ai_messaging_evaluation_states LIMIT 0", "SELECT outcome FROM ai_messaging_inbox LIMIT 0", "SELECT wire,attempts FROM ai_messaging_failures LIMIT 0", "SELECT stage,wire FROM ai_messaging_outbox LIMIT 0", "SELECT decision FROM ai_messaging_operations LIMIT 0", "SELECT wire_sha256 FROM ai_messaging_quarantine LIMIT 0"} {
 		rows, e := tx.QueryContext(ctx, query)
 		if e != nil {

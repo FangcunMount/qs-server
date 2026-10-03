@@ -28,6 +28,9 @@ const (
 
 	// ErrAIExplanationCapacityExceeded - 429: organization concurrency or daily Provider budget exhausted.
 	ErrAIExplanationCapacityExceeded
+
+	// ErrAIRuntimeAdmissionClosed - 429: local maintenance refused new submission.
+	ErrAIRuntimeAdmissionClosed
 )
 
 func init() {
@@ -40,4 +43,5 @@ func init() {
 	register(ErrInterpretReportConsistency, 500, "report temporarily unavailable")
 	register(ErrInterpretCatalogAuditNotReady, 503, "catalog_audit_not_ready")
 	register(ErrAIExplanationCapacityExceeded, 429, "ai_explanation_capacity_exceeded")
+	register(ErrAIRuntimeAdmissionClosed, 429, "ai_runtime_admission_closed")
 }

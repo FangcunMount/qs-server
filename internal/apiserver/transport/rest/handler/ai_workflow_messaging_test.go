@@ -45,11 +45,14 @@ func TestMQHTTP202MeansQSCommitAndUsesOriginalCommandIdentity(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	id := "00000000-0000-4000-8000-000000000005"
 	for _, kind := range []string{"start", "cancel", "retry"} {
-		for _, scenario := range []string{"submitted", "missing_id", "revoked", "storage_failed"} {
+		for _, scenario := range []string{"submitted", "missing_id", "revoked", "storage_failed", "maintenance"} {
 			t.Run(kind+"/"+scenario, func(t *testing.T) {
 				commands := &mqHTTPCommands{}
 				if scenario == "storage_failed" {
 					commands.err = errors.New("secret driver detail")
+				}
+				if scenario == "maintenance" {
+					commands.err = app.ErrRuntimeAdmissionClosed
 				}
 				gateway := &managementGateway{}
 				evaluation := NewAIWorkflowManagementHandler(&app.EvaluationAdministration{Gateway: gateway, Messages: commands})
@@ -87,12 +90,17 @@ func TestMQHTTP202MeansQSCommitAndUsesOriginalCommandIdentity(t *testing.T) {
 					expected, calls = 403, 0
 				case "storage_failed":
 					expected = 500
+				case "maintenance":
+					expected = 429
 				}
 				if w.Code != expected || commands.calls != calls || gateway.calls != 0 {
 					t.Fatalf("status=%d submit=%d grpc=%d", w.Code, commands.calls, gateway.calls)
 				}
 				if strings.Contains(w.Body.String(), "secret driver detail") {
 					t.Fatal("driver details leaked")
+				}
+				if scenario == "maintenance" && (!strings.Contains(w.Body.String(), app.RuntimeAdmissionClosedReason) || strings.Contains(w.Body.String(), `"status":"submitted"`)) {
+					t.Fatal("maintenance refusal confused with submitted operation", w.Body.String())
 				}
 				if scenario == "submitted" {
 					var response struct {

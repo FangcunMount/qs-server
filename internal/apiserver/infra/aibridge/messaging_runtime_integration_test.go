@@ -42,6 +42,41 @@ func TestMQRuntimeNSQCommitDuplicateRearmAndStopBorrowedPool(t *testing.T) {
 	if e = db.Ping(); e != nil {
 		t.Fatal(e)
 	}
+	// A maintenance closure refuses new commands, but must keep original event
+	// receiving and final-ACK publication alive for drain and reconciliation.
+	gateTx, e := db.BeginTx(t.Context(), nil)
+	if e != nil {
+		t.Fatal(e)
+	}
+	gate := store.MessagingAdmission{}
+	gateBefore, e := gate.Inspect(t.Context(), gateTx)
+	if e != nil {
+		_ = gateTx.Rollback()
+		t.Fatal(e)
+	}
+	gateClosed, e := gate.Set(t.Context(), gateTx, true, gateBefore.Revision)
+	if e != nil {
+		_ = gateTx.Rollback()
+		t.Fatal(e)
+	}
+	if e = gateTx.Commit(); e != nil {
+		t.Fatal(e)
+	}
+	t.Cleanup(func() {
+		tx, err := db.BeginTx(context.Background(), nil)
+		if err != nil {
+			t.Error(err)
+			return
+		}
+		defer func() { _ = tx.Rollback() }()
+		_, err = gate.Set(context.Background(), tx, gateBefore.Closed, gateClosed.Revision)
+		if err == nil {
+			err = tx.Commit()
+		}
+		if err != nil {
+			t.Error(err)
+		}
+	})
 	// Only isolated fixture provisioning mutates topology. Runtime startup is read-only.
 	for topic, channel := range map[string]string{app.CommandsTopic: "qs-ai.commands.v1", app.EventsTopic: "qs-server.ai-events.v1", app.AcksTopic: "qs-ai.acks.v1"} {
 		for name, ch := range map[string]string{topic: channel, legacy.FailedHandoffTopic(topic, channel): legacy.FailedHandoffChannel} {

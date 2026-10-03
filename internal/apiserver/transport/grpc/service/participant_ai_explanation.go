@@ -50,6 +50,9 @@ func (s *ParticipantAIExplanationService) RequestAIWorkflow(ctx context.Context,
 		return nil, err
 	}
 	err = s.Workflow.Request(ctx, actor, request.TesteeId, request.AssessmentId, request.ReportId, request.RequestId)
+	if errors.Is(err, bridge.ErrRuntimeAdmissionClosed) {
+		return nil, status.Error(codes.ResourceExhausted, bridge.RuntimeAdmissionClosedReason)
+	}
 	if errors.Is(err, bridge.ErrInvalid) {
 		return nil, status.Error(codes.InvalidArgument, "invalid workflow request")
 	}

@@ -45,6 +45,11 @@ func newMQFixture(t *testing.T) *mqFixture {
 	if err = db.Ping(); err != nil {
 		t.Fatal(err)
 	}
+	// Disposable test databases open admission explicitly; production migration
+	// starts closed and must be opened only by the reviewed host operator tool.
+	if _, err = db.Exec("UPDATE ai_messaging_admission SET closed=FALSE WHERE singleton=1"); err != nil {
+		t.Fatal(err)
+	}
 	f := &mqFixture{t: t, db: db, store: NewMessagingStore(), session: uuid.NewString(), run: uuid.NewString()}
 	f.request = app.Start{RequestID: uuid.NewString(), Actor: app.Actor{OrgID: "18446744073709551615", SubjectID: "42"}, TesteeID: "7", AssessmentIDs: []string{"9"}, Goal: "真实原事务：中文"}
 	f.scope = app.OperationScope{OrganizationID: f.request.Actor.OrgID, SubjectID: "42", ResourceID: f.request.RequestID}

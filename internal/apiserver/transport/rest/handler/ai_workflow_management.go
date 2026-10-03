@@ -30,6 +30,8 @@ func (h *AIWorkflowManagementHandler) scope(c *gin.Context) (app.EvaluationScope
 func (h *AIWorkflowManagementHandler) failure(c *gin.Context, err error) {
 	errorCode, message := code.ErrUnknown, "AI evaluation outcome unknown; read current state before deciding again"
 	switch {
+	case errors.Is(err, app.ErrRuntimeAdmissionClosed):
+		errorCode, message = code.ErrAIRuntimeAdmissionClosed, app.RuntimeAdmissionClosedReason
 	case errors.Is(err, app.ErrInvalid), status.Code(err) == codes.InvalidArgument:
 		errorCode, message = code.ErrInvalidArgument, "Invalid AI evaluation operation"
 	case errors.Is(err, app.ErrGovernanceDenied), status.Code(err) == codes.PermissionDenied:

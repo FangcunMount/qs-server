@@ -26,7 +26,7 @@ The collection service uses the existing delegated read-only `GetAIWorkflow` RPC
 
 Local tests cover real MySQL 8.0.36/8.4 and NSQ 1.3.0 at the 262144-byte limit, original-wire retention, duplicate confirmation, lifecycle recreation, cancellation, transaction rollback, persistent technical budget and participant scope. Lifecycle recreation is not a process-kill proof. Original Go M0–M6 acceptance fixtures are not changed or executed by this batch.
 
-Still required: additive migration/history handoff, separate-process dual-end fault/lost-receipt/lost-final-confirmation/Broker-loss tests, large referenced bodies through the real mTLS endpoints, real browser behavior, final normal images, compatible MQ rollback, and production business samples.
+Existing isolated evidence covers separate-process command/receipt/final-ACK loss after PUB, Broker and both-process kills, a 128 KiB protected reference through real mTLS, and real browser original-intent behavior against a synthetic HTTP backend. The process helper proves the original transport runtime, not a full QS host. Required remainder: full normal QS host health and each command family's accepted/refused/duplicate chain, reviewed historical inventory and apply tool, genuinely compatible MQ version rollback, final assets and production natural business samples. See the independent R1–R7 execution ledger; none of these tests is production acceptance.
 
 The production review must explicitly include the read-only `/qsai.workflow.v1.MessagePayloads/Get` permission for the qs-ai workload, host key/network/topology mounts and schema ownership. Existing production ACL/configuration has not been edited; local mTLS service tests do not prove production ACL readiness. Host main merge/automatic deployment requires separate review. SDK prerelease approval is not host production authorization.
 
@@ -52,3 +52,15 @@ qs-ai-messaging-audit -limit 1000 > mq-database-inventory.json
 移交后旧 command.delivered 不复用为归属标志；核查区分旧来源与新 MQ 记录。关联须匹配首次 source hash/kind/request 与新正文 hash，否则保持未验证。delivered 历史不重置。样本截断明确为 incomplete，必须补齐清单后审核。缺 MQ 表显示为未安装；表存在不能证明迁移 head、Broker 拓扑、密钥、权限或业务就绪。所有这些仍需独立现场证据。
 
 真实 MySQL 门禁验证数据库强制拒绝只读事务中的 UPDATE、原记录/预算不变、宿主池仍可用、历史与未知顺序如实呈现、移交 hash 冲突不冒充有效归属、缺 schema 与截断均不能当成完整清单。测试仅创建和删除带随机 ID 的专属一次性数据库。
+
+## 统一运行类维护门禁
+
+迁移094只新增宿主数据库单行 `ai_messaging_admission`，初始 **closed=true / revision=0**。MQ 正常启动要求表和行存在，但门禁关闭不停止已提交消息的 Relay、接收或 ACK。配置 `ai_workflow.enabled` 的旧参与者入口开关不能代替该统一维护门禁。
+
+Start、Change、参与者 Retry、评测 Start/Cancel 在同一条 `MessagingCommandStore.stageCommand` 中，先借原提交事务取得门禁共享行锁，再核对不可变原操作。新操作仅在开放时继续原业务写入、操作与 Outbox；锁保持至原事务提交/回滚。关闭者持有同一行的排他锁，因此成功提交关闭后，先进入的提交已经结束，后来的新操作不能越过门禁。没有缓存、第二个调度器或独立服务。
+
+关闭后的同身份/内容/组织/操作人/资源/聚合/消息族操作返回原操作，不执行今天的版本/状态验证或重封装；当前调用权限仍在应用入口重检。内容/主体冲突依然拒绝。查询不受门禁影响。新操作明确 HTTP429：`AI runtime command admission is closed for maintenance; operation was not submitted`，无操作或Outbox；该关闭原因与 AI 容量/版本业务拒绝不同。公共同步委托 RPC 保留原通道，将固定关闭原因映射 ResourceExhausted 再由 collection 返回429，无每日容量 Retry-After。DB不可用、缺表/行或锁等待取消都保持不确定错误，不能冒充确定未提交。
+
+新增宿主维护工具 `cmd/qs-ai-messaging-control`，显式环境 `QS_AI_MESSAGING_CONTROL_DSN`，动作 `-action inspect|close|open`；变更必须传 `-expected-revision <已审核当前版本>`。inspect 用只读事务；close/open 用宿主事务，30秒有界等待，成功输出仅在提交后。旧revision拒绝，失败输出不含DSN/底层错误；遇不确定提交结果先inspect，不能猜测关闭已完成或重复开门。工具只操作门禁，不安装schema、不迁移、不连Broker、不触发模型。audit继续永久只读，无公开维护HTTPAPI。
+
+生产开门仍需完整审核和现场 prerequisites。本批候选开发不授权主线合并/自动部署/切换，不执行down迁移。真实风险测试覆盖五族关闭/原幂等wire和时间、当前投影变化后复用原Change、关闭等待MySQL实际共享锁后原提交/回滚、取消/缺行无孤儿记录、旧revision及宿主池继续可用。

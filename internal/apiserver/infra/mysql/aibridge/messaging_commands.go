@@ -52,6 +52,23 @@ func (s *MessagingCommandStore) stageCommand(ctx context.Context, kind pb.Messag
 		return err
 	}
 	defer func() { _ = tx.Rollback() }()
+	// Acquire the shared gate lock before any business write, then check immutable
+	// identities. A closed gate still permits the original operation to be read
+	// and returned; current authorization has already run in the host application.
+	admission, err := (MessagingAdmission{}).Read(ctx, tx)
+	if err != nil {
+		return err
+	}
+	exists, err := s.Messaging.existingOperation(ctx, tx, envelope, scope)
+	if err != nil {
+		return err
+	}
+	if exists {
+		return tx.Commit()
+	}
+	if admission.Closed {
+		return app.ErrRuntimeAdmissionClosed
+	}
 	if original != nil {
 		if err = original(tx); err != nil {
 			return err
