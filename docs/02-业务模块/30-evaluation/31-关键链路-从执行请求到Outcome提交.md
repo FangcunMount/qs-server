@@ -403,7 +403,9 @@ Engine 为每次进入生成新的 UUID claim token，并提交：
 
 ### 8.2 Repository 在事务里做什么
 
-`runtime_checkpoint` Repository 使用 MySQL transaction 和 `SELECT ... FOR UPDATE` 锁定该 Assessment 的 latest Run：
+首次接单先非锁定查询 latest Run。若不存在，Repository 直接插入原身份的 claimed first attempt，由原唯一键仲裁并发；不会先对不存在的索引范围执行 `FOR UPDATE`，避免不同 Assessment 的插入相互等待间隙锁。仅唯一键竞争（1062）转入原锁定路径，其他数据库错误直接返回，不新增业务 attempt。
+
+已有 Run 或首次插入竞争失败时，Repository 使用原 MySQL transaction 和 `SELECT ... FOR UPDATE` 重新锁定该 Assessment 的 latest Run，核对租约及授权：
 
 | latest Run | 条件 | 结果 |
 | --- | --- | --- |
