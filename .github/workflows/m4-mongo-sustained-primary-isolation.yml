@@ -1,0 +1,109 @@
+name: M4 Mongo sustained primary loss isolation
+on:
+  workflow_dispatch:
+  push:
+    branches: [codex/m4-mongo-sustained-primary]
+permissions:
+  contents: read
+jobs:
+  primary-loss:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          path: harness
+          fetch-depth: 0
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.25.12'
+          cache-dependency-path: harness/go.sum
+      - name: Bind deployed source and immutable workload
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          mkdir proof
+          cp harness/scripts/testing/m4-mongo-sustained-primary/contract.json proof/contract.json
+          printf '%s\n' "$GITHUB_SHA" > proof/harness-head.txt
+          python3 - <<'PY'
+          import json,hashlib,subprocess,shutil
+          from pathlib import Path
+          c=json.loads(Path('proof/contract.json').read_text())
+          subprocess.run(['git','-C','harness','worktree','add','--detach',str(Path('runtime').resolve()),c['runtime_head']],check=True)
+          for n,h in c['overlay_sha256'].items():
+              assert hashlib.sha256((Path('harness')/n).read_bytes()).hexdigest()==h,n
+              target=Path('runtime')/n
+              assert not target.exists(),n
+              target.parent.mkdir(parents=True,exist_ok=True)
+              shutil.copy2(Path('harness')/n,target)
+          Path('proof/runtime-head.txt').write_text(c['runtime_head']+'\n')
+          PY
+          git -C harness bundle create "$GITHUB_WORKSPACE/proof/harness-source.bundle" HEAD ^374899420a9aa39b4fd711717e41a1c67497c0a8
+          git -C harness bundle verify "$GITHUB_WORKSPACE/proof/harness-source.bundle"
+          (cd runtime && go list -m github.com/FangcunMount/reliable-messaging) > proof/runtime-sdk.txt
+          grep -qx 'github.com/FangcunMount/reliable-messaging v0.3.0-m6.4' proof/runtime-sdk.txt
+      - name: Validate three-member setup through original business path
+        shell: bash
+        env:
+          RM_QS_M407_STREAM: answer
+          RM_QS_M407_RUNTIME_BASE: 308a0d966529ffab80f3b600f464a90c8d2a3bf1
+          RM_QS_M407_BATCH_COUNT: '16'
+          RM_QS_M407_SPACING_MS: '0'
+          RM_QS_M407_PRIMARY_LOSS_AFTER: '0'
+          TZ: Asia/Shanghai
+        run: |
+          set -Eeuo pipefail
+          bash runtime/scripts/testing/m4-07-new-chain-proof.sh > proof/schema-preflight.log 2>&1
+          tail -n 8 proof/schema-preflight.log
+      - name: Run original request during actual no-primary interval
+        shell: bash
+        env:
+          RM_QS_M407_STREAM: answer
+          RM_QS_M407_RUNTIME_BASE: 308a0d966529ffab80f3b600f464a90c8d2a3bf1
+          RM_QS_M407_BATCH_COUNT: '2600'
+          RM_QS_M407_SPACING_MS: '120'
+          RM_QS_M407_PRIMARY_LOSS_AFTER: '1300'
+          TZ: Asia/Shanghai
+        run: |
+          set -Eeuo pipefail
+          export RM_QS_M407_METRICS_DIR="$GITHUB_WORKSPACE/proof/metrics"
+          set +e
+          bash runtime/scripts/testing/m4-07-new-chain-proof.sh > proof/primary-loss.log 2>&1
+          result=$?
+          set -e
+          printf '%s\n' "$result" > proof/primary-loss.exit-code
+          tail -n 12 proof/primary-loss.log
+          exit "$result"
+      - name: Verify actual roles, workload and all-member resources
+        if: always()
+        shell: bash
+        run: python3 harness/scripts/testing/m4-mongo-sustained-primary/verify.py proof
+      - name: Always verify source and scoped disposable cleanup
+        if: always()
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          mkdir -p proof
+          docker ps -a --format '{{.Names}}' | grep '^qs-m4-07-' > proof/remaining-containers.txt || true
+          docker volume ls --format '{{.Name}}' | grep '^qs-m4-07-' > proof/remaining-volumes.txt || true
+          docker network ls --format '{{.Name}}' | grep '^qs-m4-07-' > proof/remaining-networks.txt || true
+          python3 - <<'PY'
+          import json,hashlib,subprocess
+          from pathlib import Path
+          c=json.loads(Path('proof/contract.json').read_text())
+          assert subprocess.check_output(['git','-C','runtime','rev-parse','HEAD'],text=True).strip()==c['runtime_head']
+          subprocess.run(['git','-C','runtime','diff','--exit-code'],check=True)
+          untracked=subprocess.check_output(['git','-C','runtime','ls-files','--others','--exclude-standard'],text=True).splitlines()
+          assert sorted(untracked)==sorted(c['overlay_sha256']),untracked
+          for n,h in c['overlay_sha256'].items():
+              assert hashlib.sha256((Path('runtime')/n).read_bytes()).hexdigest()==h,n
+          for n in ['remaining-containers.txt','remaining-volumes.txt','remaining-networks.txt']:
+              assert Path('proof',n).stat().st_size==0,n
+          Path('proof/source-cleanup-verified.txt').write_text('verified\n')
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: m4-mongo-sustained-primary
+          path: proof/
+          if-no-files-found: error

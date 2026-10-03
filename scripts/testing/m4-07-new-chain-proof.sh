@@ -6,6 +6,9 @@ baseline=${RM_QS_M407_RUNTIME_BASE:?frozen runtime base required}
 project="qs-m4-07-new-$(date +%s)-$$-${RANDOM}"
 compose=(docker compose --project-name "$project" --file "$repo/scripts/testing/m4-07-new-chain-compose.yaml")
 stream=${RM_QS_M407_STREAM:-both}
+primary_loss_after=${RM_QS_M407_PRIMARY_LOSS_AFTER:-0}
+[[ "$stream" == answer ]] || { echo "primary-loss runner requires answer stream" >&2; exit 1; }
+compose=(docker compose --project-name "$project" --file "$repo/scripts/testing/m4-07-mongo-primary-compose.yaml")
 mysql_command_dir=${RM_QS_M407_MYSQL_COMMAND_DIR:-}
 driver="${project}-driver-1"
 driver_image='nsqio/nsq@sha256:1a369c146af71bc95c25d54b375a2b98452478c1eaf4e85f8fcb01da20f2c78a'
@@ -30,7 +33,7 @@ if ! git -C "$repo" merge-base --is-ancestor "$baseline" HEAD; then
   echo "M4-07 standard-chain proof requires the frozen current recovery candidate baseline" >&2
   exit 1
 fi
-if ! git -C "$repo" diff --quiet "$baseline" -- ':!internal/apiserver/container/internal/transaction/m4_new_answer_chain_integration_test.go' ':!internal/apiserver/container/internal/transaction/m4_07_mongo_command_metrics_test.go' ':!internal/apiserver/container/internal/transaction/m4_new_assessment_chain_integration_test.go' ':!internal/apiserver/container/internal/transaction/m4_07_mysql_command_metrics_test.go' ':!internal/apiserver/container/internal/transaction/m4_07_mysql_commit_observer_test.go' ':!internal/apiserver/container/internal/transaction/m4_07_nsq_fault_proxy_test.go' ':!internal/apiserver/domain/survey/answersheet/m4_07_event_id_proof.go' ':!scripts/testing/m4-07-new-chain-compose.yaml' ':!scripts/testing/m4-07-new-chain-proof.sh' ':!scripts/testing/m4-07-sample-resources.sh'; then
+if ! git -C "$repo" diff --quiet "$baseline" -- ':!internal/apiserver/container/internal/transaction/m4_new_answer_chain_integration_test.go' ':!internal/apiserver/container/internal/transaction/m4_07_mongo_command_metrics_test.go' ':!internal/apiserver/container/internal/transaction/m4_new_assessment_chain_integration_test.go' ':!internal/apiserver/container/internal/transaction/m4_07_mysql_command_metrics_test.go' ':!internal/apiserver/container/internal/transaction/m4_07_mysql_commit_observer_test.go' ':!internal/apiserver/container/internal/transaction/m4_07_nsq_fault_proxy_test.go' ':!internal/apiserver/domain/survey/answersheet/m4_07_event_id_proof.go' ':!scripts/testing/m4-07-new-chain-compose.yaml' ':!scripts/testing/m4-07-mongo-primary-compose.yaml' ':!internal/apiserver/container/internal/transaction/m4_07_primary_loss_test.go' ':!scripts/testing/m4-07-new-chain-proof.sh' ':!scripts/testing/m4-07-sample-resources.sh'; then
   echo "Current business runtime differs from frozen recovery candidate" >&2
   exit 1
 fi
@@ -70,14 +73,17 @@ trap 'exit 143' TERM
 
 "${compose[@]}" up -d --wait --wait-timeout 180
 "${compose[@]}" exec -T mongo mongosh --quiet --file /dev/stdin <<'JS'
-const result = rs.initiate({_id: 'rm-test', members: [{_id: 0, host: 'mongo:27017'}]});
+const result = rs.initiate({_id:'rm-test',members:[{_id:0,host:'mongo:27017',priority:2},{_id:1,host:'mongo2:27017',priority:1},{_id:2,host:'mongo3:27017',priority:1}]});
 if (result.ok !== 1) throw new Error('replica set initiation failed');
-let primary = false;
-for (let i = 0; i < 60; i++) {
-  if (db.hello().isWritablePrimary) { primary = true; break; }
+let healthy = false;
+for (let i = 0; i < 120; i++) {
+  if (db.hello().isWritablePrimary) {
+    const states = rs.status().members.map(m => m.stateStr);
+    if (states.filter(s => s === 'PRIMARY').length === 1 && states.filter(s => s === 'SECONDARY').length === 2) { healthy = true; break; }
+  }
   sleep(500);
 }
-if (!primary) throw new Error('replica set did not become primary');
+if (!healthy) throw new Error('three-member replica set did not settle');
 JS
 "${compose[@]}" exec -T mysql mysql -uroot -e 'CREATE DATABASE m4_qs_new_chain'
 "${compose[@]}" exec -T mysql mysql -uroot -e 'CREATE DATABASE m4_qs_new_assessment'
@@ -165,6 +171,7 @@ docker run --rm --pull never --name "$driver" \
   -e RM_QS_M407_BATCH_COUNT="${RM_QS_M407_BATCH_COUNT:-16}" \
   -e RM_QS_M407_NSQ_OUTAGE_AFTER="${RM_QS_M407_NSQ_OUTAGE_AFTER:-0}" \
   -e RM_QS_M407_MYSQL_OUTAGE_AFTER="${RM_QS_M407_MYSQL_OUTAGE_AFTER:-0}" \
+  -e RM_QS_M407_PRIMARY_LOSS_AFTER="$primary_loss_after" \
   -e RM_QS_M407_MONGO_OUTAGE_AFTER="${RM_QS_M407_MONGO_OUTAGE_AFTER:-0}" \
   -e RM_QS_M407_LOST_CONFIRM="${RM_QS_M407_LOST_CONFIRM:-0}" \
   -e RM_QS_M407_SPACING_MS="${RM_QS_M407_SPACING_MS:-0}" \

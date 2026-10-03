@@ -67,6 +67,19 @@ func TestM407NewAnswerSheetBatchThroughStandardProfile(t *testing.T) {
 	outageAfter := m407NSQOutageAfter(t, batchCount)
 	mongoOutageAfter := m407MongoOutageAfter(t, batchCount)
 	lostConfirm := os.Getenv("RM_QS_M407_LOST_CONFIRM") == "1"
+	primaryAfter := 0
+	if raw := os.Getenv("RM_QS_M407_PRIMARY_LOSS_AFTER"); raw != "" {
+		var parseErr error
+		primaryAfter, parseErr = strconv.Atoi(raw)
+		require.NoError(t, parseErr)
+		require.GreaterOrEqual(t, primaryAfter, 0)
+		require.Less(t, primaryAfter, batchCount)
+	}
+	if primaryAfter > 0 {
+		require.Zero(t, outageAfter)
+		require.Zero(t, mongoOutageAfter)
+		require.False(t, lostConfirm)
+	}
 	require.False(t, outageAfter > 0 && mongoOutageAfter > 0, "faults must be isolated")
 	if lostConfirm {
 		require.Equal(t, 1, batchCount)
@@ -74,7 +87,7 @@ func TestM407NewAnswerSheetBatchThroughStandardProfile(t *testing.T) {
 		require.Zero(t, mongoOutageAfter)
 	}
 	runTimeout := m407RunTimeout(batchCount, spacing)
-	if outageAfter > 0 || mongoOutageAfter > 0 || lostConfirm {
+	if outageAfter > 0 || mongoOutageAfter > 0 || primaryAfter > 0 || lostConfirm {
 		runTimeout += 2 * time.Minute
 	}
 	const firstSheetID uint64 = 90010003
@@ -161,6 +174,7 @@ func TestM407NewAnswerSheetBatchThroughStandardProfile(t *testing.T) {
 		consumer.ChangeMaxInFlight(1)
 	}
 	handlerSuccess := make(chan m407Handled, batchCount*2)
+	var successfulIDs sync.Map
 	consumer.AddHandler(nsq.HandlerFunc(func(raw *nsq.Message) error {
 		decoded, recognized, decodeErr := legacywire.Decode(raw.Body)
 		expected := false
@@ -174,6 +188,7 @@ func TestM407NewAnswerSheetBatchThroughStandardProfile(t *testing.T) {
 			decodeErr = handler(ctx, "answersheet.submitted", decoded.Payload)
 		}
 		if decodeErr == nil {
+			successfulIDs.Store(decoded.UUID, true)
 			select {
 			case handlerSuccess <- m407Handled{EventID: decoded.UUID, BrokerAt: time.Unix(0, raw.Timestamp), At: time.Now()}:
 			default:
@@ -264,6 +279,13 @@ func TestM407NewAnswerSheetBatchThroughStandardProfile(t *testing.T) {
 	manifest := sha256.New()
 	returnedAt := make(map[string]time.Time, batchCount)
 	var recoveryStarted time.Time
+	var primaryLoss *m407PrimaryLoss
+	var overlapStarted, overlapReturned time.Time
+	type prefixResult struct {
+		at  time.Time
+		err error
+	}
+	prefixDone := make(chan prefixResult, 1)
 	for i := range batchCount {
 		sheetID := firstSheetID + uint64(i)
 		submittedAt := fixedAt.Add(time.Duration(i) * time.Second)
@@ -293,12 +315,61 @@ func TestM407NewAnswerSheetBatchThroughStandardProfile(t *testing.T) {
 			}, 10*time.Second, 20*time.Millisecond)
 			t.Logf("m4_07_fault stream=new_mongo phase=mongo_reconnected rejected_sheet=%d committed_prefix=%d", sheetID, mongoOutageAfter)
 		}
+		if primaryAfter > 0 && i == primaryAfter {
+			require.Eventually(t, func() bool {
+				return countStandardDocs(t, ctx, mongoOutbox, bson.M{"state": "published"}) == int64(primaryAfter)
+			}, 20*time.Second, 20*time.Millisecond)
+			primaryLoss, err = beginM407PrimaryLoss(ctx)
+			require.NoError(t, err)
+			defer primaryLoss.close()
+			overlapStarted = time.Now()
+			t.Logf("m4_primary_loss phase=request_started old_primary=%s no_primary_at=%s request_at=%s sheet_id=%d event_id=%s", primaryLoss.oldPrimary, m407FormatTime(primaryLoss.started), m407FormatTime(overlapStarted), sheetID, eventID)
+		}
 		_, existed, err := durable.CreateDurably(ctx, sheet, appanswersheet.DurableSubmitMeta{
 			WriterID: 301, IdempotencyKey: fmt.Sprintf("m4-07-chain-%d", sheetID), Fingerprint: fingerprint,
 		})
 		require.NoError(t, err)
 		require.False(t, existed)
 		returnedAt[eventID] = time.Now()
+		if primaryAfter > 0 && i == primaryAfter {
+			overlapReturned = returnedAt[eventID]
+			// The only call above is the original request; there is no fixture retry.
+			require.Eventually(t, func() bool { at, _ := primaryLoss.election(); return !at.IsZero() }, 5*time.Second, 100*time.Millisecond)
+			electedAt, elected := primaryLoss.election()
+			require.NotEqual(t, primaryLoss.oldPrimary, elected)
+			require.GreaterOrEqual(t, overlapReturned.Sub(overlapStarted), 10*time.Second)
+			t.Logf("m4_primary_loss phase=request_returned event_id=%s request_at=%s returned_at=%s elected_at=%s new_primary=%s original_call_count=1", eventID, m407FormatTime(overlapStarted), m407FormatTime(overlapReturned), m407FormatTime(electedAt), elected)
+			go func() {
+				deadline := primaryLoss.started.Add(120 * time.Second)
+				for time.Now().Before(deadline) {
+					allHandled := true
+					for j := 0; j <= primaryAfter; j++ {
+						if _, ok := successfulIDs.Load(m407AnswerEventID(firstSheetID + uint64(j))); !ok {
+							allHandled = false
+							break
+						}
+					}
+					var count int64
+					err := mysqlDB.WithContext(ctx).Model(&assessmentmysql.AssessmentPO{}).Where("answer_sheet_id >= ? AND answer_sheet_id <= ?", firstSheetID, firstSheetID+uint64(primaryAfter)).Count(&count).Error
+					var row struct {
+						State string `bson:"state"`
+					}
+					mongoErr := mongoOutbox.FindOne(ctx, bson.M{"message_id": eventID}).Decode(&row)
+					if allHandled && err == nil && mongoErr == nil && row.State == "published" && count == int64(primaryAfter+1) {
+						prefixDone <- prefixResult{at: time.Now()}
+						return
+					}
+					select {
+					case <-ctx.Done():
+						prefixDone <- prefixResult{err: ctx.Err()}
+						return
+					case <-time.After(200 * time.Millisecond):
+					}
+				}
+				prefixDone <- prefixResult{err: fmt.Errorf("pre-fault prefix and overlapping request did not recover within original 120s")}
+			}()
+		}
+
 		if outageAfter > 0 && i+1 == outageAfter {
 			require.Eventually(t, func() bool {
 				return countStandardDocs(t, ctx, mongoOutbox, bson.M{"state": "published"}) == int64(outageAfter)
@@ -357,7 +428,7 @@ func TestM407NewAnswerSheetBatchThroughStandardProfile(t *testing.T) {
 		select {
 		case result := <-handlerSuccess:
 			received++
-			if _, duplicate := handled[result.EventID]; duplicate && !lostConfirm && mongoOutageAfter == 0 {
+			if _, duplicate := handled[result.EventID]; duplicate && !lostConfirm && mongoOutageAfter == 0 && primaryAfter == 0 {
 				t.Fatalf("standard chain handled event %s twice", result.EventID)
 			} else if !duplicate {
 				handled[result.EventID] = result
@@ -392,7 +463,7 @@ func TestM407NewAnswerSheetBatchThroughStandardProfile(t *testing.T) {
 		require.Equal(t, firstSheetID+uint64(i), sheetID)
 	}
 	var stats m407ChannelStats
-	if mongoOutageAfter > 0 {
+	if mongoOutageAfter > 0 || primaryAfter > 0 {
 		// A lost database writeback can cause another physical delivery.
 		// Accept extras only after NSQ has FINed every channel message; the
 		// persisted Assessment and next Outbox must remain one each.
@@ -400,7 +471,7 @@ func TestM407NewAnswerSheetBatchThroughStandardProfile(t *testing.T) {
 	} else {
 		stats = waitM407NSQDrain(t, ctx, topic, channel, expectedDeliveries)
 	}
-	if mongoOutageAfter > 0 {
+	if mongoOutageAfter > 0 || primaryAfter > 0 {
 		for received < int(stats.MessageCount) {
 			select {
 			case result := <-handlerSuccess:
@@ -451,6 +522,20 @@ func TestM407NewAnswerSheetBatchThroughStandardProfile(t *testing.T) {
 	t.Logf("standard full chain batch diagnostic: count=%d spacing=%s submit_return_rate_per_sec=%.3f manifest_sha256=%x nsq_delivery=%d nsq_fin_samples=%d nsq_e2e_percentiles_ns=%v nsq_requeue=%d nsq_timeout=%d max_submit_return_to_worker_handler=%s", batchCount, spacing, submitRate, manifest.Sum(nil), stats.MessageCount, stats.E2EProcessingLatency.Count, stats.E2EProcessingLatency.Percentiles, stats.RequeueCount, stats.TimeoutCount, maxHandlerLag)
 	if commandMetrics != nil {
 		require.NoError(t, commandMetrics.Save(commandMetricsPath))
+	}
+	if primaryAfter > 0 {
+		var prefix prefixResult
+		select {
+		case prefix = <-prefixDone:
+		case <-ctx.Done():
+			t.Fatal("prefix recovery observation missing", ctx.Err())
+		}
+		t.Logf("m4_primary_loss phase=roles timeline=%s", primaryLoss.timeline())
+		require.NoError(t, prefix.err)
+		electedAt, _ := primaryLoss.election()
+		require.LessOrEqual(t, prefix.at.Sub(primaryLoss.started), 120*time.Second)
+		require.LessOrEqual(t, prefix.at.Sub(electedAt), 120*time.Second)
+		t.Logf("m4_primary_loss phase=prefix_recovered original_call_count=1 prefix=%d event_id=%s no_primary_at=%s request_started_at=%s request_returned_at=%s elected_at=%s prefix_recovered_at=%s fault_to_prefix_ms=%d restored_to_prefix_ms=%d continued_input_total=%d", primaryAfter+1, m407AnswerEventID(firstSheetID+uint64(primaryAfter)), m407FormatTime(primaryLoss.started), m407FormatTime(overlapStarted), m407FormatTime(overlapReturned), m407FormatTime(electedAt), m407FormatTime(prefix.at), prefix.at.Sub(primaryLoss.started).Milliseconds(), prefix.at.Sub(electedAt).Milliseconds(), batchCount)
 	}
 	// Preserve the original duration gate while printing complete identity evidence on failure.
 	if outageAfter > 0 {
