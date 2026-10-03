@@ -2,7 +2,7 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "a69c9b6e0684dae619e9f82af65c74c527ab1b2d",
+    "sha": "0e58ea85e57a4d8eea0a40489d0f9f55ba013491",
     "verified_on": "2026-10-04"
   },
   "status_policy": {
@@ -53,7 +53,7 @@
         "docs/_archive/**/*.md",
         "tmp/**/*.md"
       ],
-      "expected_count": 41,
+      "expected_count": 42,
       "budgeted": false
     }
   },
@@ -9244,7 +9244,7 @@
       "owner": "tooling",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "a69c9b6e0684dae619e9f82af65c74c527ab1b2d",
+        "source_sha": "0e58ea85e57a4d8eea0a40489d0f9f55ba013491",
         "verified_on": "2026-10-04"
       },
       "fact_sources": [
@@ -9317,6 +9317,13 @@
           "command": "python3 scripts/cd/test_ai_messaging_release.py",
           "result": "passed",
           "source_sha": "a69c9b6e0684dae619e9f82af65c74c527ab1b2d",
+          "verified_on": "2026-10-04"
+        },
+        {
+          "kind": "command",
+          "command": "python3 scripts/cd/test_ai_messaging_release.py",
+          "result": "passed",
+          "source_sha": "0e58ea85e57a4d8eea0a40489d0f9f55ba013491",
           "verified_on": "2026-10-04"
         }
       ],
@@ -9580,6 +9587,45 @@
           "exit_criteria": "Bind final assets, review current production inventory and verify controlled handoff and MQ-compatible rollback."
         }
       ]
+    },
+    {
+      "path": "scripts/cd/README-AI-MQ-PREFLIGHT.md",
+      "class": "sidecar",
+      "owner": "tooling",
+      "doc_status": "aligned",
+      "verified": {
+        "source_sha": "0e58ea85e57a4d8eea0a40489d0f9f55ba013491",
+        "verified_on": "2026-10-04"
+      },
+      "fact_sources": [
+        {
+          "kind": "source",
+          "path": "scripts/cd/remote-deploy.sh"
+        },
+        {
+          "kind": "source",
+          "path": "scripts/cd/ai-messaging-release.py"
+        }
+      ],
+      "verification": [
+        {
+          "kind": "command",
+          "command": "python3 scripts/cd/test_ai_messaging_release.py",
+          "result": "passed",
+          "source_sha": "0e58ea85e57a4d8eea0a40489d0f9f55ba013491",
+          "verified_on": "2026-10-04"
+        }
+      ],
+      "production_evidence": {
+        "level": "none",
+        "refs": [],
+        "deployed_sha": null,
+        "observed_at": null,
+        "limitations": [
+          "Host tool provisioning is not final source deployment or MQ business acceptance."
+        ]
+      },
+      "gaps": []
     }
   ],
   "initial_review_baseline": {
