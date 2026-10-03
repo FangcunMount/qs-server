@@ -29,19 +29,12 @@ func (s *MessagingCommandStore) StageStart(ctx context.Context, r app.Start) err
 	if err != nil {
 		return err
 	}
-	body := &pb.MessagingBody{Value: &pb.MessagingBody_Start{Start: &pb.StartCommand{RequestId: r.RequestID, Actor: &pb.Actor{OrgId: r.Actor.OrgID, SubjectId: r.Actor.SubjectID}, TesteeId: r.TesteeID, AssessmentIds: r.AssessmentIDs, Goal: r.Goal}}}
-	for _, e := range r.Evidence {
-		item := &pb.EvidenceItem{AssessmentId: e.AssessmentID, TesteeId: e.TesteeID, ReportId: e.ReportID, SourceVersion: e.SourceVersion}
-		for _, f := range e.Facts {
-			item.Facts = append(item.Facts, &pb.Fact{Ref: f.Ref, Value: f.Value})
-		}
-		body.GetStart().Evidence = append(body.GetStart().Evidence, item)
-	}
+	body := startMessagingBody(r)
 	return s.stageCommand(ctx, pb.MessagingKind_START, r.RequestID, r.RequestID, app.OperationScope{OrganizationID: r.Actor.OrgID, SubjectID: r.Actor.SubjectID, ResourceID: r.RequestID}, body, func(tx *sql.Tx) error { return persistStart(ctx, tx, r, raw, hash) })
 }
 
 func (s *MessagingCommandStore) StageChange(ctx context.Context, requestID string, r app.Change) error {
-	body := &pb.MessagingBody{Value: &pb.MessagingBody_Change{Change: &pb.ChangeCommand{CommandId: r.CommandID, SessionId: r.SessionID, Actor: &pb.Actor{OrgId: r.Actor.OrgID, SubjectId: r.Actor.SubjectID}, Action: r.Action, ExpectedVersion: r.ExpectedVersion, QuestionId: r.QuestionID, Answer: r.Answer, Skip: r.Skip}}}
+	body := changeMessagingBody(r)
 	return s.stageCommand(ctx, pb.MessagingKind_CHANGE, r.CommandID, requestID, app.OperationScope{OrganizationID: r.Actor.OrgID, SubjectID: r.Actor.SubjectID, ResourceID: r.SessionID}, body, func(tx *sql.Tx) error { return validateChange(ctx, tx, requestID, r) })
 }
 
@@ -148,4 +141,21 @@ func (s *MessagingCommandStore) ReadRequestOperation(ctx context.Context, scope 
 		return app.MessagingOperation{}, err
 	}
 	return s.Messaging.Operation(ctx, tx, scope, id)
+}
+
+func startMessagingBody(r app.Start) *pb.MessagingBody {
+	body := &pb.MessagingBody{Value: &pb.MessagingBody_Start{Start: &pb.StartCommand{RequestId: r.RequestID, Actor: &pb.Actor{OrgId: r.Actor.OrgID, SubjectId: r.Actor.SubjectID}, TesteeId: r.TesteeID, AssessmentIds: r.AssessmentIDs, Goal: r.Goal}}}
+	for _, e := range r.Evidence {
+		item := &pb.EvidenceItem{AssessmentId: e.AssessmentID, TesteeId: e.TesteeID, ReportId: e.ReportID, SourceVersion: e.SourceVersion}
+		for _, f := range e.Facts {
+			item.Facts = append(item.Facts, &pb.Fact{Ref: f.Ref, Value: f.Value})
+		}
+		body.GetStart().Evidence = append(body.GetStart().Evidence, item)
+	}
+	return body
+}
+
+func changeMessagingBody(r app.Change) *pb.MessagingBody {
+	body := &pb.MessagingBody{Value: &pb.MessagingBody_Change{Change: &pb.ChangeCommand{CommandId: r.CommandID, SessionId: r.SessionID, Actor: &pb.Actor{OrgId: r.Actor.OrgID, SubjectId: r.Actor.SubjectID}, Action: r.Action, ExpectedVersion: r.ExpectedVersion, QuestionId: r.QuestionID, Answer: r.Answer, Skip: r.Skip}}}
+	return body
 }

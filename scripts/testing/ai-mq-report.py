@@ -5,6 +5,10 @@ import sys
 from pathlib import Path
 
 required = {
+    "TestMQLegacyHandoffValidatesFirstSourceBeforeNullableIndexBackfill",
+    "TestMQLegacyHandoffAtomicIdentityBudgetAndOriginalTime",
+    "TestMQLegacyHandoffPreservesDeliveredAndExhaustedHistory",
+    "TestMQLegacyHandoffRefusesInventedOrderAndPreservesUnknownChangeTime",
     "TestMQParticipantClosedIntakeRetainsReadAndOriginalDuplicate",
     "TestMQReceiverBudgetSurvivesRepublishAndRestartWithoutProjection",
     "TestMQPhysicalFailureCannotApplyEventOrInventLogicalBudget",

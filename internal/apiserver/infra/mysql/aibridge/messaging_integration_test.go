@@ -57,6 +57,9 @@ func newMQFixture(t *testing.T) *mqFixture {
 	}
 	f.qsSign, f.qsCrypt, f.aiSign, f.aiCrypt = key("qs-sign"), key("qs-crypt"), key("ai-sign"), key("ai-crypt")
 	t.Cleanup(func() {
+		if _, err := db.Exec("DELETE FROM ai_messaging_legacy_commands WHERE request_id=?", f.request.RequestID); err != nil {
+			t.Error(err)
+		}
 		for _, aggregate := range []string{f.request.RequestID, f.run} {
 			for _, table := range []string{"ai_messaging_inbox", "ai_messaging_operations", "ai_messaging_outbox", "ai_messaging_aggregates", "ai_messaging_failures"} {
 				if _, err := db.Exec("DELETE FROM "+table+" WHERE aggregate_key=?", aggregate); err != nil {
