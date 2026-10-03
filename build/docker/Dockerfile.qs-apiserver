@@ -57,6 +57,13 @@ RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build \
 # Internal bridge is shipped for controlled activation; it is not the image entrypoint.
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -o /build/bin/qs-ai-bridge ./cmd/qs-ai-bridge
 
+# Explicit, offline/maintenance entrypoints; the normal server entrypoint is unchanged.
+RUN for command in audit control handoff preflight; do \
+    CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath \
+    -ldflags "-s -w -X main.sourceSHA=${GIT_COMMIT}" \
+    -o "/build/bin/qs-ai-messaging-${command}" "./cmd/qs-ai-messaging-${command}"; \
+    done
+
 FROM alpine:3.21
 
 # 安装必要的运行时依赖
@@ -77,6 +84,7 @@ WORKDIR /app
 # 从构建阶段复制二进制文件
 COPY --from=builder --chown=www:www /build/bin/qs-apiserver /app/qs-apiserver
 COPY --from=builder --chown=www:www /build/bin/qs-ai-bridge /app/qs-ai-bridge
+COPY --from=builder --chown=www:www /build/bin/qs-ai-messaging-* /app/
 COPY --from=builder --chown=www:www /build/bin/qs-authz-matrix /app/qs-authz-matrix
 COPY --from=builder --chown=www:www /build/bin/qs-authz-matrix-provision /app/qs-authz-matrix-provision
 

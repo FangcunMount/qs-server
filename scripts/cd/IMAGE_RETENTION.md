@@ -49,3 +49,7 @@ Shell 入口使用已获准的 mkdir/chown/chmod/ln 初始化锁，不要求 sud
 已有锁保持 inode 和内容，竞争初始化复用获胜者；初始化失败则停止部署。临时文件自动清理。
 `python3 scripts/cd/test_image_deploy_lock.py` 验证命令权限边界、竞争与失败路径。
 镜像清理仍需单独的执行权限；清理助手被拒绝时只记录警告，不视为清理成功，也不因此回滚健康服务。
+
+## QS AI MQ 兼容回退资产
+
+QS apiserver 的 MQ 发布预检在原共享锁内执行，并将其保留的 MQ 发布版本镜像 ID 追加到现有 `--protect-image-id` 列表。固定配置与逐文件密钥映射保存在独立版本目录，不被临时发布包清理。该增量只保护经本宿主保留的回退资产；镜像选择、删除预算、其他服务策略及 shared retention 实现不改变。`test_ai_messaging_release.py` 验证原绑定复用、配置漂移拒绝、密钥失败和回退镜像保护；实际服务器切换仍需独立证据。

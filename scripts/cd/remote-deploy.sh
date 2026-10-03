@@ -24,6 +24,9 @@ APP_GID="${WWW_GID}"
 IMAGE_TAG="${IMAGE_TAG:-latest}"
 COLLECTION_COMPOSE_PROJECT="${COLLECTION_COMPOSE_PROJECT:-qs-collection}"
 WORKER_COMPOSE_PROJECT="${WORKER_COMPOSE_PROJECT:-qs-worker}"
+MQ_COMPOSE_OVERRIDE=""
+MQ_IMAGE_ID=""
+MQ_IMAGE_SELECTED=0
 
 case "$IMAGE_TAG" in
   ""|*[!A-Za-z0-9_.-]*)
@@ -558,11 +561,20 @@ docker_compose_pull() {
 
 deploy_http_service() {
   cd "/opt/qs-server/${CONTAINER_NAME}"
-  docker_compose_pull -f "$DEPLOY_TMP/docker-compose.prod.yml"
+  local -a compose_args=(-f "$DEPLOY_TMP/docker-compose.prod.yml")
+  if [ -n "$MQ_COMPOSE_OVERRIDE" ]; then
+    compose_args+=(-f "$MQ_COMPOSE_OVERRIDE")
+  fi
+  docker_compose_pull "${compose_args[@]}"
 
+  if [ -n "$MQ_COMPOSE_OVERRIDE" ]; then
+    # Persistent, fail-closed ownership guard; a future missing binding or old
+    # image must not silently reactivate the original gRPC writer.
+    $SUDO touch /opt/qs-server/qs-apiserver/ai-mq-releases/required
+  fi
   stop_single_container
   # shellcheck disable=SC2046
-  docker_compose -f "$DEPLOY_TMP/docker-compose.prod.yml" up -d $(compose_up_pull_never_flag) "$COMPOSE_SERVICE"
+  docker_compose "${compose_args[@]}" up -d $(compose_up_pull_never_flag) "$COMPOSE_SERVICE"
 
   echo "Waiting for service to be ready (in-container health check)..."
   local attempts=0
@@ -804,6 +816,25 @@ echo "=========================================="
 acquire_image_deploy_lock
 prepare_dirs_and_backup
 extract_package
+# Optional on first installation; mandatory once MQ ownership was established.
+# Preflight is offline and occurs BEFORE source config sync or stopping old QS.
+if [ "$SERVICE" = "apiserver" ] && {
+  $SUDO test -e /data/infra/qs-server-messaging/current.json ||
+  $SUDO test -e /opt/qs-server/qs-apiserver/ai-mq-releases/required;
+}; then
+  select_image
+  MQ_IMAGE_SELECTED=1
+  docker_compose_pull -f "$DEPLOY_TMP/docker-compose.prod.yml"
+  $SUDO python3 "$DEPLOY_TMP/scripts/cd/ai-messaging-release.py" \
+    --image "$(resolve_compose_image_ref)" \
+    --base-config "$DEPLOY_TMP/configs/apiserver.prod.yaml" \
+    --uid "$APP_UID" --gid "$APP_GID" > "$DEPLOY_TMP/ai-mq-preflight.json"
+  MQ_COMPOSE_OVERRIDE="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["compose_file"])' "$DEPLOY_TMP/ai-mq-preflight.json")"
+  MQ_IMAGE_ID="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["image_id"])' "$DEPLOY_TMP/ai-mq-preflight.json")"
+  while IFS= read -r mq_retained_image; do
+    RETENTION_PREVIOUS_IDS+=(--protect-image-id "$mq_retained_image")
+  done < <(python3 -c 'import json,sys; print("\n".join(json.load(open(sys.argv[1]))["protected_image_ids"]))' "$DEPLOY_TMP/ai-mq-preflight.json")
+fi
 sync_configs
 ensure_networks
 
@@ -812,7 +843,7 @@ case "$SERVICE" in
     setup_apiserver_paths
     setup_apiserver_web_tls
     setup_grpc_certs qs-apiserver qs-apiserver.svc
-    select_image
+    if [ "$MQ_IMAGE_SELECTED" != "1" ]; then select_image; fi
     deploy_http_service
     ;;
   collection)
@@ -840,6 +871,15 @@ verify_running_image() {
   esac
 
   local running_image
+  if [ -n "$MQ_IMAGE_ID" ]; then
+    running_image="$($SUDO docker inspect "$CONTAINER_NAME" --format '{{.Image}}')"
+    if [ "$running_image" != "$MQ_IMAGE_ID" ]; then
+      echo "MQ deployment image identity verification failed" >&2
+      exit 1
+    fi
+    echo "MQ deployment uses the preflighted immutable image and frozen binding"
+    return 0
+  fi
   running_image="$($SUDO docker inspect "$CONTAINER_NAME" --format '{{.Config.Image}}' 2>/dev/null || true)"
   echo "Running image: ${running_image}"
   case "$running_image" in

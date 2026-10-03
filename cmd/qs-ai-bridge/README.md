@@ -92,3 +92,13 @@ MQ运行Start成功时在原Prometheus注册器登记pull collector，完成Stop
 ## 隔离 CLI 与正式入口
 
 `qs-ai-bridge` 仅保留隔离联调和原历史数据读取，不提供用户认证。正常消息生命周期由 qs-apiserver 宿主装配；迁移完成后不能把旧 CLI relay 当作生产降级写路径。原业务契约继续来自 `api/grpc/proto/aiworkflow/workflow.proto`，新增消息契约来自 `messaging.proto`。维护清单、门禁与移交分别由同镜像中的 `qs-ai-messaging-audit`、`qs-ai-messaging-control`、`qs-ai-messaging-handoff` 执行，默认服务入口不改变。
+
+## MQ 发布绑定与离线预检
+
+正常 qs-apiserver 镜像现在包含 audit/control/handoff/preflight 四个维护入口，默认入口仍为 qs-apiserver。`qs-ai-messaging-preflight` 显式运行：`--source-sha` 仅输出完整构建提交；`--binding` 校验固定 `/run/qs-server-jose` 角色、kid、P-256、公私钥、用途及权限；可同时指定 `--base-config` 和 `--output-config`，只替换 ai_workflow.messaging，拒绝覆盖已存在文件，不读取环境凭证，不连接数据库、Broker 或模型。
+
+首发由受控操作准备 `/data/infra/qs-server-messaging/current.json` 的非秘密绑定描述及 `versions/<binding_revision>/` 下的独立密钥。密钥和描述不进入仓库、镜像或工作流变量。原角色 kid 可无版本后缀，轮换保留旧解密／验签映射，不重封装历史 wire。
+
+发布包携带 `scripts/cd/ai-messaging-release.py`；仅 apiserver 目标在绑定存在或已建立 MQ required 标记时使用。在共享部署锁内先拉取固定镜像、以该镜像非 root 用户离线预检，再同步原配置和停止旧容器。配置、原绑定、公开指纹、精确镜像 ID 及 Compose 覆盖文件保留在 `/opt/qs-server/qs-apiserver/ai-mq-releases/<完整源码SHA>/`；覆盖文件固定镜像 ID、MQ 配置文件和逐文件只读密钥挂载，其他服务及原 TLS／凭证装配沿用宿主原配置。
+
+相同版本或回退复用其冻结绑定，当前指针不覆盖已有版本。原源码配置、镜像、冻结文件或密钥指纹漂移拒绝；缺密钥或旧不兼容镜像在停止旧实例前失败。建立 required 标记后不恢复旧 gRPC 写路径。保留的 MQ 版本镜像通过既有 `--protect-image-id` 机制保护，未增加清理策略。维护窗口、schema、关闭准入、数据移交和真实业务对账由独立切换流程完成，离线预检及容器健康均不能代替它们。

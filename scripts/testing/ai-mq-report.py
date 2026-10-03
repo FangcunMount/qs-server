@@ -5,6 +5,10 @@ import sys
 from pathlib import Path
 
 required = {
+    "TestMQBindingRejectsAmbiguousOrOutOfScopeInputs",
+    "TestMQBindingRenderKeepsOriginalConfigAndDoesNotReadEnvironment",
+    "TestMQBindingKeyPathsKeepHistoricalRoleIDsWithoutResealing",
+    "TestMQBindingRefusesKeyMetadataPermissionsAndAmbiguity",
     "TestMQHandoffDryRunPreservesSourceAndReplayWire",
     "TestMQHandoffReviewAndMaintenanceDriftRefuseBeforeWrite",
     "TestMQHandoffStopsPartialBatchAtFirstDrift",

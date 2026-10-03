@@ -64,3 +64,4 @@ services:
     allowed_methods:
       - /interpretation.AIWorkflowAccessService/Authorize
       - /qsai.workflow.v1.Results/Accept
+      - /qsai.workflow.v1.MessagePayloads/Get
