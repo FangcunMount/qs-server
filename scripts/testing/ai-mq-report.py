@@ -16,6 +16,8 @@ required = {
     "TestMQRelayCancellationAndOverlapPreservePending",
     "TestMQRelayPersistentBudgetAndBoundedUnknown",
     "TestMessagingPayloadReferenceAndExactBody",
+    "TestMQSubmissionSharesOriginalRequestAndAvoidsLegacyDelivery",
+    "TestMQSubmissionSealFailureRollsBackRequestAndOperation",
 }
 rows = [json.loads(line) for line in Path(sys.argv[1]).read_text().splitlines() if line]
 if not rows:
