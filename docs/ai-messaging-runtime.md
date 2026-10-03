@@ -79,3 +79,14 @@ Start、Change、参与者 Retry、评测 Start/Cancel 在同一条 `MessagingCo
 消息外围对已有请求、历史命令和结果投影的 JSON 参数显式使用 `CONVERT(CAST(? AS BINARY) USING utf8mb4)`，对 JSON 查询、历史移交与索引回填使用二进制结果读取。原 JSON 的 UTF-8 字节在进入数据库 JSON 解释前不经过连接字符集转换，读取仍由原业务解码器处理。首次业务 hash、protobuf body、签名和 wire 不重建；JSON 数据库自身的表示规范化规则不改变。没有 SET NAMES、额外池、连接配置或 schema 修改。
 
 必要存储回归必须显式协商宿主的三字节字符集并检查未被适配器更改，覆盖含 emoji/补充平面字符的原接单与历史回答、合法128KiB结果、原hash、重复复用ACK、ACK失败时投影与Inbox共同回滚。正常镜像中失败到技术挂起的旧隔离样本保留原身份、wire与预算；修复验证使用独立合成样本，不重置挂起样本或授予新模型调用。
+
+
+## R2-04 持久状态观测首批
+
+MQ运行Start成功时在原Prometheus注册器登记pull collector，完成Stop后注销；构造/Describe不读库、不注册、不连接网络，没有observer任务或第二个调度器。MQ关闭不注册此命名空间，不能把不存在当零积压。每次scrape借用宿主原池，2秒总context/每SQL1秒、REPEATABLE READ+READ ONLY，读取后rollback，不领取/提交/确认/关闭池。
+
+固定qs_server_ai_mq_* gauges区分staged（含未来重试）、due（不是按序可领取）、awaiting_receipt（等待业务决定）、Outboxheld与Inboxheld；创建年龄clamp未来到0。四种quarantine保留分类记录为gauge，不把attempts的8次上限称终生counter。所有查询不读身份、正文、wire或密钥，注册器与renderer只认固定描述，无高基数标签；存储失败只给observation_available=0，不输出部分/旧值或空队列。
+
+当前完整重复次数与payload读取失败分类事实尚未持久记录，相应observations_available=0，不提供伪造次数。技术事实账/独立增量迁移以及AI组织Runtime.Health增量仍开放，R2-04不关闭。正常metrics证明和生命周期注册/注销必须分别取证；collector存在不等于业务已确认。
+
+定向真实MySQL测试使用随机独立测试schema，仅创建同结构状态表，不启动消息消费者/模型。验证未提交不可见、提交/rollback、writer持锁时reader不等待/不结算、未来时间clamp、技术保留记录是gauge、后续查询缺表不泄漏已读部分值和宿主池可用。原实际NSQ运行/停止/借用池回归保护新增注册生命周期，不重复GoM0～M6套件。

@@ -18,6 +18,7 @@ import (
 	sdk "github.com/FangcunMount/reliable-messaging/transport/nsq"
 	"github.com/FangcunMount/reliable-messaging/wire/legacy"
 	driver "github.com/nsqio/go-nsq"
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 // MessagingRuntime replaces the old host relay; New creates no clients or work.
@@ -38,6 +39,7 @@ type MessagingRuntime struct {
 	httpTransport              *http.Transport
 	relayCancel, handlerCancel context.CancelFunc
 	relayDone                  chan struct{}
+	observations               *messagingCollector
 }
 type rawMessagingKey struct{}
 type fixedHandoff struct {
@@ -177,6 +179,11 @@ func (r *MessagingRuntime) Start(ctx context.Context) (resultErr error) {
 	if err != nil {
 		return err
 	}
+	observations := newMessagingCollector(r.DB)
+	if err = prometheus.DefaultRegisterer.Register(observations); err != nil {
+		return errors.New("AI MQ observation registration unavailable")
+	}
+	r.observations = observations
 	relayCtx, relayCancel := context.WithCancel(ctx)
 	r.relayCancel = relayCancel
 	r.relayDone = make(chan struct{})
@@ -258,6 +265,10 @@ func (r *MessagingRuntime) stop(ctx context.Context) error {
 	}
 	if r.httpTransport != nil {
 		r.httpTransport.CloseIdleConnections()
+	}
+	if r.observations != nil {
+		prometheus.DefaultRegisterer.Unregister(r.observations)
+		r.observations = nil
 	}
 	r.started = false
 	r.stopping = false
