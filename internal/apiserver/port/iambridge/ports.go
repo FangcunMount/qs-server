@@ -50,14 +50,6 @@ type OperationAccountRegistrar interface {
 	RegisterOperationAccount(ctx context.Context, input OperationAccountRegistration) (*OperationAccountRegistrationResult, error)
 }
 
-type AuthzSnapshot interface {
-	IsQSAdmin() bool
-}
-
-type AuthzSnapshotReader interface {
-	LoadAuthzSnapshot(ctx context.Context, orgID, userID int64) (AuthzSnapshot, error)
-}
-
 type OperatorAuthzGateway interface {
 	IsEnabled() bool
 	ReplaceManagedOperatorRoles(ctx context.Context, orgID, userID int64, roleNames []string, changedBy, reason string) (int64, error)

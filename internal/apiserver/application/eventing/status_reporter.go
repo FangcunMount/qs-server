@@ -34,11 +34,6 @@ type eventTypeStatusKey struct {
 	status    string
 }
 
-// NewOutboxStatusReporter 创建best-effort 指标桥接器 用于 一个outbox 存储。
-func NewOutboxStatusReporter(name string, reader outboxport.StatusReader, observer eventobservability.Observer) OutboxStatusReporter {
-	return newOutboxStatusReporter(name, reader, observer, time.Now)
-}
-
 // NewOutboxStatusReporterWithEventTypes seeds zero-valued series for a standard
 // profile, so an event type with no backlog is observable from the first scrape.
 func NewOutboxStatusReporterWithEventTypes(name string, reader outboxport.StatusReader, observer eventobservability.Observer, eventTypes []string) OutboxStatusReporter {

@@ -67,25 +67,6 @@ func LifecycleEventMetadataFromContext(ctx context.Context) (LifecycleEventMetad
 	return metadata, ok && metadata.EventID != "" && !metadata.OccurredAt.IsZero()
 }
 
-// NewQuestionnaireChangedEvent 创建问卷生命周期变化事件
-func NewQuestionnaireChangedEvent(
-	code string,
-	version string,
-	title string,
-	action ChangeAction,
-	changedAt time.Time,
-) QuestionnaireChangedEvent {
-	return event.New(EventTypeChanged, AggregateType, code,
-		QuestionnaireChangedData{
-			Code:      code,
-			Version:   version,
-			Title:     title,
-			Action:    action,
-			ChangedAt: changedAt,
-		},
-	)
-}
-
 func newQuestionnaireChangedEventWithMetadata(
 	metadata LifecycleEventMetadata,
 	code string,

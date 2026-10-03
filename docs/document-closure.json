@@ -2854,10 +2854,6 @@
         },
         {
           "kind": "source",
-          "path": "internal/apiserver/application/interpretation/clinician/**/*.go"
-        },
-        {
-          "kind": "source",
           "path": "internal/apiserver/application/interpretation/operations/**/*.go"
         },
         {

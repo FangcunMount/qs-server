@@ -219,19 +219,6 @@ func loadOpenAPIComponents(t *testing.T, path string) map[string]any {
 	return root.Components.Schemas
 }
 
-func openAPISchemaProperties(t *testing.T, schemas map[string]any, name string) map[string]any {
-	t.Helper()
-	schema, ok := schemas[name].(map[string]any)
-	if !ok {
-		t.Fatalf("missing OpenAPI schema %s", name)
-	}
-	properties, ok := schema["properties"].(map[string]any)
-	if !ok {
-		t.Fatalf("OpenAPI schema %s has no properties", name)
-	}
-	return properties
-}
-
 func assertOpenAPIOperation(t *testing.T, spec openAPISpec, path, method string) {
 	t.Helper()
 	if path != "/health" && path != "/ping" && !strings.HasPrefix(path, "/api/") && !strings.HasPrefix(path, "/internal/") {
