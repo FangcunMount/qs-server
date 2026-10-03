@@ -12,6 +12,8 @@ github.com/FangcunMount/reliable-messaging v0.3.0-m6.4 h1:Zzm4qptHmiH0FAObG+dZ9W
 github.com/FangcunMount/reliable-messaging v0.3.0-m6.4/go.mod h1:OvzCe+D+vggU/cJsACCBeAsH3lzLQfhzdPRE8Ia/yvY=
 github.com/FangcunMount/reliable-messaging v0.3.0-m6.4.0.20261003065525-9f16fa30dc43 h1:0OOKtVxmI2HfWrkoOHyJatDY0LLF7QhKM7cQtpwg7eQ=
 github.com/FangcunMount/reliable-messaging v0.3.0-m6.4.0.20261003065525-9f16fa30dc43/go.mod h1:MWhbXwJbsauqlqIXm0mD0JixLO7lOpPwTLdVuzclBnc=
+github.com/FangcunMount/reliable-messaging v0.3.0-mq-ai.1 h1:+yO7+jqkH4wZtxUVak9+V3lRueaiMZoID35kvTwKnzc=
+github.com/FangcunMount/reliable-messaging v0.3.0-mq-ai.1/go.mod h1:MWhbXwJbsauqlqIXm0mD0JixLO7lOpPwTLdVuzclBnc=
 github.com/KyleBanks/depth v1.2.1 h1:5h8fQADFrWtarTdtDudMmGsC7GPbOAu6RVB3ffsVFHc=
 github.com/KyleBanks/depth v1.2.1/go.mod h1:jzSb9d0L43HxTQfT+oSA1EEp2q+ne2uh6XgeJcm8brE=
 github.com/Microsoft/go-winio v0.6.2 h1:F2VQgta7ecxGYO8k3ZZz3RS8fVIXVxONVUPlNERoyfY=
