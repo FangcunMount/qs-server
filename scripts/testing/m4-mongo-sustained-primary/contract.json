@@ -37,7 +37,7 @@
   "original_primary_fixture_head": "ed7385caf07f58ed1c11bab023d459a84667b199",
   "no_production_mutation": true,
   "formal_acceptance_closed": false,
-  "frozen_at": "2026-10-03T09:58:34.907012+08:00",
+  "frozen_at": "2026-10-03T10:10:29.450475+08:00",
   "overlay_sha256": {
     "internal/apiserver/container/internal/transaction/m4_07_mongo_command_metrics_test.go": "816b1f279e85dab3d9d82e29169d70bc374278e9f31efd74212b6ff9ed767632",
     "internal/apiserver/container/internal/transaction/m4_07_mysql_command_metrics_test.go": "f4437be97b85b248867f04de42e6ae7639bf2f0f1653981a71b02572d5cc3da5",
@@ -47,9 +47,10 @@
     "internal/apiserver/container/internal/transaction/m4_new_assessment_chain_integration_test.go": "3291674e52d5c3e5f801d859b8b59dbee000b66fce456050352e325ad6cb5064",
     "internal/apiserver/domain/survey/answersheet/m4_07_event_id_proof.go": "249bb6778e82fd086d4bb2b3219e067e31fb10a9c85b08188d4fba9fe6c80d6a",
     "scripts/testing/m4-07-new-chain-compose.yaml": "97822cbd545398363465ce864ecf7af06a2a57360ba6b10e7aca8f6ae7b22302",
-    "scripts/testing/m4-07-new-chain-proof.sh": "52666c7e33b59a9c9000d451d8c4174297ec1674cf6eb7ef9b5c4a56c39c6057",
+    "scripts/testing/m4-07-new-chain-proof.sh": "11dbc75a98451eee717f5ce3dde9d691f0a241f0f7399c396327b97361895dc6",
     "scripts/testing/m4-07-sample-resources.sh": "d42980857d70fcbd791a0639b4c38b43f8f1083783e956770ce065efe7ad4b17",
     "internal/apiserver/container/internal/transaction/m4_07_primary_loss_test.go": "2649faa71a6b5ce8b1f30b45630b66410a28da412156fd357c8d5cdd44e53935",
     "scripts/testing/m4-07-mongo-primary-compose.yaml": "35782bafe0082bdd9b716cc81f783d97b17b65cf2b0c987e9a31829628a543b0"
-  }
+  },
+  "revision_reason": "37088256232 actual business PASS, resource sampler used old one-member Compose and failed before collection; only bind sampler to actual three-member Compose. Original failure preserved, original gates unchanged."
 }

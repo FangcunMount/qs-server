@@ -118,7 +118,7 @@ if [[ -n "$metrics_dir" ]]; then
     exit 1
   }
   mkdir -p "$(dirname "$metrics_dir")"
-  bash "$repo/scripts/testing/m4-07-sample-resources.sh" "$project" "$repo/scripts/testing/m4-07-new-chain-compose.yaml" "$metrics_dir" new "$stream" 2>"$metrics_dir.sampler.err" &
+  bash "$repo/scripts/testing/m4-07-sample-resources.sh" "$project" "$repo/scripts/testing/m4-07-mongo-primary-compose.yaml" "$metrics_dir" new "$stream" 2>"$metrics_dir.sampler.err" &
   sampler_pid=$!
 fi
 profile_dir=${RM_QS_M407_MONGO_PROFILE_DIR:-}
