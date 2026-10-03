@@ -64,3 +64,10 @@ Start、Change、参与者 Retry、评测 Start/Cancel 在同一条 `MessagingCo
 新增宿主维护工具 `cmd/qs-ai-messaging-control`，显式环境 `QS_AI_MESSAGING_CONTROL_DSN`，动作 `-action inspect|close|open`；变更必须传 `-expected-revision <已审核当前版本>`。inspect 用只读事务；close/open 用宿主事务，30秒有界等待，成功输出仅在提交后。旧revision拒绝，失败输出不含DSN/底层错误；遇不确定提交结果先inspect，不能猜测关闭已完成或重复开门。工具只操作门禁，不安装schema、不迁移、不连Broker、不触发模型。audit继续永久只读，无公开维护HTTPAPI。
 
 生产开门仍需完整审核和现场 prerequisites。本批候选开发不授权主线合并/自动部署/切换，不执行down迁移。真实风险测试覆盖五族关闭/原幂等wire和时间、当前投影变化后复用原Change、关闭等待MySQL实际共享锁后原提交/回滚、取消/缺行无孤儿记录、旧revision及宿主池继续可用。
+
+
+## 正常宿主配置解码
+
+正常启动使用 Viper，而隔离进程 helper 直接读取 JSON。Viper 会把 `127.0.0.1:4150` 和 `qs.encrypt.v1` 内的点拆成配置树；直接解码到字符串映射会失败。MQ 选项仅对 NSQD、解密信任和 AI 签名信任三种本地映射接收该树，在宿主 `Options.Complete` 中恢复完整字面键，再沿原 Validate/KeyID/目标检查。不改变通用配置加载器、SDK Go 接口或 wire，不读取密钥或连接网络；直接 JSON / 构造选项保持原映射形态。非字符串叶值、空分支及歧义拒绝，不将数字或列表转为可信密钥路径。沿现有 Viper 规则使用一致的小写本地 kid，并与 JWK 的固定 kid 精确一致。
+
+正常镜像启动与配置加载的回归必须独立于 helper 证据；配置失败、IAM 关闭的部分探针以及镜像静态检查都不能关闭完整宿主权限验收。
