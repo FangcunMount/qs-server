@@ -78,6 +78,31 @@ func TestMQOriginalUTF8BytesSurviveNormalHostCharset(t *testing.T) {
 	if roundtrip.Answer == nil || *roundtrip.Answer != answer {
 		t.Fatal("retained original answer changed")
 	}
+	// A reviewed historical transfer must decode the same first Unicode source,
+	// retain its original hash and reuse its wire on repeated apply.
+	handoffSeals := 0
+	handoff := handoffFixture(f, &handoffSeals)
+	for i := 0; i < 2; i++ {
+		mustMQ(t, f.tx(func(tx *sql.Tx) error {
+			moved, err := handoff.StageSingle(context.Background(), tx, change.CommandID)
+			if err == nil && moved != (i == 0) {
+				return errors.New("historical Unicode transfer did not preserve first ownership")
+			}
+			return err
+		}))
+	}
+	if handoffSeals != 1 {
+		t.Fatal("historical duplicate resealed", handoffSeals)
+	}
+	_, changeHash, err := encode(change)
+	mustMQ(t, err)
+	var source []byte
+	mustMQ(t, db.QueryRow("SELECT source_payload,source_payload_hash FROM ai_messaging_legacy_commands WHERE command_id=?", change.CommandID).Scan(&source, &storedHash))
+	var transferred app.Change
+	mustMQ(t, json.Unmarshal(source, &transferred))
+	if transferred.Answer == nil || *transferred.Answer != answer || storedHash != changeHash {
+		t.Fatal("historical first source changed")
+	}
 
 	content, _ := json.Marshal(map[string]string{"schema_version": "ai-explanation-output/v1", "text": strings.Repeat("边界🙂", 11000)})
 	sum := sha256.Sum256(content)
