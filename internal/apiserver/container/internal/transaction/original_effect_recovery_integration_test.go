@@ -396,7 +396,7 @@ func TestOriginalEffectsRecoveryAfterActualBrokerLoss(t *testing.T) {
 	effectAssertBroker(t, 0, 0)
 	manager, err := grpcclient.NewManager(&grpcclient.ManagerConfig{Endpoint: lis.Addr().String(), Timeout: 10 * time.Second, TLS: grpcclient.TLSConfig{CAFile: ca.CAFile, CertFile: worker.CertFile, KeyFile: worker.KeyFile, ServerName: "server.test"}})
 	require.NoError(t, err)
-	defer manager.Close()
+	defer func() { _ = manager.Close() }()
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 	dispatcher := workereventing.NewDispatcher(logger, &workereventing.HandlerDependencies{Logger: logger, EvaluationWorkerClient: grpcclient.NewEvaluationWorkerClient(manager), InterpretationAutomationClient: grpcclient.NewInterpretationAutomationClient(manager)}, handlers.NewRegistry())
 	cfg, err := catalog.Parse([]byte("version: '1'\ntopics:\n  evaluation:\n    name: qs.evaluation.lifecycle\nevents:\n  evaluation.retry.requested:\n    topic: evaluation\n    delivery: durable_outbox\n    aggregate: Evaluation\n    domain: evaluation\n    handler: evaluation_requested_handler\n  evaluation.outcome.committed:\n    topic: evaluation\n    delivery: durable_outbox\n    aggregate: Evaluation\n    domain: evaluation\n    handler: evaluation_outcome_committed_handler\n"))
@@ -471,7 +471,7 @@ func effectAssertBroker(t *testing.T, published, finished int64) {
 		if err != nil {
 			return false
 		}
-		defer response.Body.Close()
+		defer func() { _ = response.Body.Close() }()
 		body, err := io.ReadAll(io.LimitReader(response.Body, 64*1024))
 		if err != nil || response.StatusCode != http.StatusOK {
 			return false
