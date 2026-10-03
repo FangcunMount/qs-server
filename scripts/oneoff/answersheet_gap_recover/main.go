@@ -139,7 +139,11 @@ func runCLI(parent context.Context, args []string, stdout, stderr io.Writer) int
 	if err != nil {
 		return 1
 	}
-	defer sqlDB.Close()
+	defer func() {
+		if err := sqlDB.Close(); err != nil {
+			_, _ = fmt.Fprintln(stderr, "answersheet recovery: database close failed; retain original operation")
+		}
+	}()
 	sqlDB.SetMaxOpenConns(1)
 	sqlDB.SetMaxIdleConns(1)
 	scanner, err := answersheetgap.New(client.Database(dbName), db)
@@ -171,7 +175,11 @@ func runCLI(parent context.Context, args []string, stdout, stderr io.Writer) int
 		_, _ = fmt.Fprintln(stderr, "answersheet recovery: secure client unavailable")
 		return 1
 	}
-	defer manager.Close()
+	defer func() {
+		if err := manager.Close(); err != nil {
+			_, _ = fmt.Fprintln(stderr, "answersheet recovery: client close failed; retain original operation")
+		}
+	}()
 	return applyOriginal(ctx, scanner, workerEffect{grpcclient.NewAssessmentIntakeClient(manager)}, cfg, plan, stdout, stderr)
 }
 
