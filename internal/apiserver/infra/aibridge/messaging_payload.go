@@ -38,7 +38,7 @@ func (c *MessagingPayloadClient) Read(ctx context.Context, envelope *pb.Messagin
 	ref = proto.Clone(ref).(*pb.MessagePayloadReference)
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
-	response, err := c.RPC.Get(ctx, ref, grpc.MaxCallRecvMsgSize(app.MaxMessagingBody+2048))
+	response, err := c.RPC.Get(ctx, proto.Clone(ref).(*pb.MessagePayloadReference), grpc.MaxCallRecvMsgSize(app.MaxMessagingBody+2048))
 	if err != nil {
 		return nil, app.ErrManagementUnavailable
 	}

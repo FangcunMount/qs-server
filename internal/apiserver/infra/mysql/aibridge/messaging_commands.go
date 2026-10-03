@@ -127,3 +127,25 @@ func (s *MessagingCommandStore) ReadOperation(ctx context.Context, scope app.Ope
 	defer func() { _ = tx.Rollback() }()
 	return s.Messaging.Operation(ctx, tx, scope, id)
 }
+
+func (s *MessagingCommandStore) ReadRequestOperation(ctx context.Context, scope app.OperationScope, requestID, id string) (app.MessagingOperation, error) {
+	if s == nil || s.DB == nil || s.Messaging == nil {
+		return app.MessagingOperation{}, app.ErrManagementUnavailable
+	}
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+	tx, err := s.DB.BeginTx(ctx, &sql.TxOptions{ReadOnly: true})
+	if err != nil {
+		return app.MessagingOperation{}, err
+	}
+	defer func() { _ = tx.Rollback() }()
+	var found string
+	err = tx.QueryRowContext(ctx, `SELECT message_id FROM ai_messaging_outbox WHERE producer='qs-server' AND destination='qs-ai' AND message_id=? AND aggregate_key=? AND kind IN (?,?)`, id, requestID, pb.MessagingKind_START, pb.MessagingKind_CHANGE).Scan(&found)
+	if errors.Is(err, sql.ErrNoRows) {
+		return app.MessagingOperation{}, app.ErrNotFound
+	}
+	if err != nil {
+		return app.MessagingOperation{}, err
+	}
+	return s.Messaging.Operation(ctx, tx, scope, id)
+}

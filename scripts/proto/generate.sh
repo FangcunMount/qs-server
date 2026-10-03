@@ -21,6 +21,7 @@ generate "${PROTO_PATH}/questionnaire/questionnaire.proto"
 generate "${PROTO_PATH}/actor/actor.proto"
 generate "${PROTO_PATH}/evaluation/evaluation.proto"
 generate "${PROTO_PATH}/interpretation/interpretation.proto"
+generate "${PROTO_PATH}/interpretation/messaging.proto"
 generate "${PROTO_PATH}/internalapi/internal.proto"
 generate "${PROTO_PATH}/assessmentmodel/assessment_model_catalog.proto"
 

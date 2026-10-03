@@ -5,6 +5,7 @@ package interpretation;
 option go_package = "github.com/FangcunMount/qs-server/api/grpc/gen/interpretation";
 
 import "evaluation/evaluation.proto";
+import "interpretation/messaging.proto";
 
 service ParticipantReportService {
   rpc GetAssessmentReport(GetAssessmentReportRequest) returns (GetAssessmentReportResponse);
@@ -150,6 +151,8 @@ message GetAIWorkflowRequest {
   uint64 testee_id = 1;
   uint64 assessment_id = 2;
   string request_id = 3;
+  // Optional original command identity selects the authorized operation view.
+  string command_id = 4;
 }
 message AIWorkflowResult {
   string request_id = 1;
@@ -163,6 +166,7 @@ message AIWorkflowResult {
   // Original selected references from the frozen input, not model-authored sources.
   string reference_material_json = 8;
   string reference_material_fingerprint = 9;
+  ParticipantOperation operation = 10;
 }
 
 // Current authorized report provenance only; no admission reservation or model call.

@@ -1673,6 +1673,96 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/v1/interpretation/ai-workflow/operations/{command_id}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "AI解读"
+                ],
+                "summary": "查询本人 AI 工作流命令的持久操作状态",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "原命令UUID",
+                        "name": "command_id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "原请求UUID",
+                        "name": "request_id",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "受试者ID",
+                        "name": "testee_id",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "测评ID",
+                        "name": "assessment_id",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/github_com_FangcunMount_qs-server_internal_collection-server_application_aiexplanation.WorkflowOperation"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "503": {
+                        "description": "Service Unavailable",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/plan-task-entries/{task_id}": {
             "get": {
                 "produces": [
@@ -3930,10 +4020,51 @@ const docTemplate = `{
         "github_com_FangcunMount_qs-server_internal_collection-server_application_aiexplanation.WorkflowAccepted": {
             "type": "object",
             "properties": {
+                "command_id": {
+                    "type": "string"
+                },
+                "operation_id": {
+                    "type": "string"
+                },
                 "request_id": {
                     "type": "string"
                 },
                 "status": {
+                    "type": "string"
+                },
+                "status_url": {
+                    "type": "string"
+                }
+            }
+        },
+        "github_com_FangcunMount_qs-server_internal_collection-server_application_aiexplanation.WorkflowOperation": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "string"
+                },
+                "command_id": {
+                    "type": "string"
+                },
+                "decision": {
+                    "type": "string"
+                },
+                "operation_id": {
+                    "type": "string"
+                },
+                "receipt": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "resource_id": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "transport_status": {
                     "type": "string"
                 }
             }

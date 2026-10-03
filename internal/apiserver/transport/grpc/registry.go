@@ -92,6 +92,7 @@ type EvaluationDeps struct {
 
 type InterpretationDeps struct {
 	AIWorkflowResults *bridge.Service
+	AIMessagePayloads bridgeTransport.PayloadReader
 	CurrentAccess     *bridge.CurrentAccess
 	AutomationService interpretationAutomation.Service
 
@@ -145,6 +146,9 @@ func (r *Registry) RegisterServices() error {
 	}
 	if r.deps.Interpretation.CurrentAccess != nil {
 		r.server.RegisterService(&service.AIWorkflowAccessService{Access: r.deps.Interpretation.CurrentAccess})
+	}
+	if r.deps.Interpretation.AIMessagePayloads != nil {
+		r.server.RegisterService(&bridgeTransport.MessagePayloads{Reader: r.deps.Interpretation.AIMessagePayloads})
 	}
 	if r.deps.Interpretation.AIWorkflowResults != nil {
 		r.server.RegisterService(&bridgeTransport.Receiver{Service: r.deps.Interpretation.AIWorkflowResults})

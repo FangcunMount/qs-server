@@ -183,6 +183,10 @@ func (s *MessagingStore) Operation(ctx context.Context, tx *sql.Tx, scope app.Op
 // sealAck is called once, after the business write; duplicate delivery rearms the
 // exact persisted final ACK without reapplying business effects.
 func (s *MessagingStore) ReceiveEvent(ctx context.Context, tx *sql.Tx, e *pb.MessagingEnvelope, raw, wire []byte, sealAck func(string, string) (*app.PreparedMessaging, error)) error {
+	return s.receiveEvent(ctx, tx, e, raw, wire, false, sealAck)
+}
+
+func (s *MessagingStore) receiveEvent(ctx context.Context, tx *sql.Tx, e *pb.MessagingEnvelope, raw, wire []byte, held bool, sealAck func(string, string) (*app.PreparedMessaging, error)) error {
 	if tx == nil || e == nil || sealAck == nil || len(wire) == 0 || len(wire) > 262144 || e.Producer != "qs-ai" || e.Destination != "qs-server" || e.Kind < pb.MessagingKind_COMMAND_RECEIPT || e.Kind > pb.MessagingKind_EVALUATION_STATE {
 		return app.ErrMessagingContract
 	}
@@ -213,7 +217,12 @@ func (s *MessagingStore) ReceiveEvent(ctx context.Context, tx *sql.Tx, e *pb.Mes
 		}
 		return s.Outbox.RearmAck(ctx, tx, durable.Identity{Producer: "qs-server", Destination: "qs-ai", MessageID: storedAck}, hash)
 	}
-	org, err := s.applyEvent(ctx, tx, e, body, raw)
+	var org string
+	if held {
+		org, err = s.heldEventOrganization(ctx, tx, e, body)
+	} else {
+		org, err = s.applyEvent(ctx, tx, e, body, raw)
+	}
 	if err != nil {
 		return err
 	}
@@ -232,7 +241,14 @@ func (s *MessagingStore) ReceiveEvent(ctx context.Context, tx *sql.Tx, e *pb.Mes
 		return err
 	}
 	a := ackBody.GetEventAcknowledgement()
-	if a.EventId != e.MessageId || a.EventBodySha256 != e.BodySha256 || a.EventKind != e.Kind || a.Outcome != pb.MessagingEventAcknowledgement_STORED {
+	outcome := pb.MessagingEventAcknowledgement_STORED
+	if held {
+		outcome = pb.MessagingEventAcknowledgement_TECHNICALLY_HELD
+		if _, err = tx.ExecContext(ctx, "UPDATE ai_messaging_inbox SET outcome='held' WHERE producer=? AND message_id=?", e.Producer, e.MessageId); err != nil {
+			return err
+		}
+	}
+	if a.EventId != e.MessageId || a.EventBodySha256 != e.BodySha256 || a.EventKind != e.Kind || a.Outcome != outcome {
 		return app.ErrConflict
 	}
 	return s.put(ctx, tx, ack, org, 1, false, false)
@@ -349,10 +365,14 @@ func (s *MessagingStore) applyReceipt(ctx context.Context, tx *sql.Tx, e *pb.Mes
 // Quarantine persists only a sanitized classification and exact raw bytes/hash.
 // It never inserts a trusted Inbox identity or affects a model/task.
 func (s *MessagingStore) Quarantine(ctx context.Context, tx *sql.Tx, wire []byte, code string) error {
-	if tx == nil || (code != "authentication_failed" && code != "identity_conflict" && code != "technical_budget_exhausted") || len(wire) > 262144 {
+	if tx == nil || (code != "authentication_failed" && code != "identity_conflict" && code != "technical_budget_exhausted" && code != "failed_delivery") {
 		return app.ErrInvalid
 	}
-	_, err := tx.ExecContext(ctx, `INSERT INTO ai_messaging_quarantine(wire_sha256,wire,code,attempts,first_seen_at,last_seen_at) VALUES(?,?,?,1,UTC_TIMESTAMP(6),UTC_TIMESTAMP(6)) ON DUPLICATE KEY UPDATE attempts=attempts+1,last_seen_at=UTC_TIMESTAMP(6)`, messagingHash(wire), wire, code)
+	hash := messagingHash(wire)
+	if len(wire) > 262144 {
+		wire = []byte{}
+	} // retain full wire hash without oversized bytes
+	_, err := tx.ExecContext(ctx, `INSERT INTO ai_messaging_quarantine(wire_sha256,wire,code,attempts,first_seen_at,last_seen_at) VALUES(?,?,?,1,UTC_TIMESTAMP(6),UTC_TIMESTAMP(6)) ON DUPLICATE KEY UPDATE attempts=attempts+1,last_seen_at=UTC_TIMESTAMP(6)`, hash, wire, code)
 	return err
 }
 

@@ -5,6 +5,20 @@ import sys
 from pathlib import Path
 
 required = {
+    "TestMQParticipantClosedIntakeRetainsReadAndOriginalDuplicate",
+    "TestMQReceiverBudgetSurvivesRepublishAndRestartWithoutProjection",
+    "TestMQPhysicalFailureCannotApplyEventOrInventLogicalBudget",
+    "TestMQReceiverCommitAndCancellationCannotBeBrokerAcknowledged",
+    "TestMQRuntimeNSQCommitDuplicateRearmAndStopBorrowedPool",
+    "TestMQKeyRolesRotationAndLocalTrustMapping",
+    "TestMQTopologyPreflightReadsAllBusinessAndFailureChannels",
+    "TestMQModuleReplacesLegacyRelayAndResultIngressWhileIntakeClosed",
+    "TestMQOptionsRequireFixedEndpointsAndLocalTrust",
+    "TestMQParticipantOperationRequiresCurrentAccessAndOriginalRequest",
+    "TestMQDelegatedOperationUsesCurrentParticipantAuthorizationWithoutNewACL",
+    "TestMQPublic202ReturnsOriginalIdentityAndReadOnlyStatusURL",
+    "TestMQParticipantOperationCannotCrossAggregateOrActor",
+
     "TestMQOperationOriginalTransactionIdentityAndSingleSeal",
     "TestMQPendingRequiresDurableDecisionAndHeldBlocksNext",
     "TestMQReceiptLostAckDuplicateAndLateReceiptDoNotRegress",

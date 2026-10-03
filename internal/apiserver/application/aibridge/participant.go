@@ -12,7 +12,8 @@ import (
 // Participant accepts only the actor established by the existing delegated QS boundary.
 // QS owns authorization; the AI receives an immutable, authorized report snapshot.
 type Participant struct {
-	Access interface {
+	IntakeClosed bool
+	Access       interface {
 		AuthorizeOwnAssessment(context.Context, uint64, uint64) error
 	}
 	Sources     source.Resolver
@@ -23,18 +24,9 @@ type Participant struct {
 // Read checks current participant access even when the result was generated earlier.
 // A nil projection means the durable request exists but no AI state has arrived yet.
 func (p *Participant) Read(ctx context.Context, actor Actor, testeeID, assessmentID uint64, requestID string) (*Event, error) {
-	if !validID(requestID) || !validNumber(actor.OrgID) || actor.SubjectID == "" || len(actor.SubjectID) > 128 || testeeID == 0 || assessmentID == 0 || p.Access == nil || p.Bridge == nil || p.Bridge.Store == nil {
-		return nil, ErrInvalid
-	}
-	if err := p.Access.AuthorizeOwnAssessment(ctx, testeeID, assessmentID); err != nil {
-		return nil, err
-	}
-	request, err := p.Bridge.Store.Original(ctx, requestID)
+	request, err := p.ownedRequest(ctx, actor, testeeID, assessmentID, requestID)
 	if err != nil {
 		return nil, err
-	}
-	if request == nil || request.Actor != actor || request.TesteeID != strconv.FormatUint(testeeID, 10) || len(request.AssessmentIDs) != 1 || request.AssessmentIDs[0] != strconv.FormatUint(assessmentID, 10) {
-		return nil, ErrNotFound
 	}
 	event, err := p.Bridge.Store.Projection(ctx, requestID)
 	if err != nil || event == nil {
@@ -66,6 +58,9 @@ func (p *Participant) Request(ctx context.Context, actor Actor, testeeID, assess
 	if !errors.Is(err, ErrNotFound) {
 		return err
 	}
+	if p.IntakeClosed {
+		return ErrManagementUnavailable
+	}
 	current, err := p.Sources.ResolveCurrent(ctx, meta.FromUint64(assessmentID))
 	if err != nil {
 		return err
@@ -93,4 +88,48 @@ func (p *Participant) Request(ctx context.Context, actor Actor, testeeID, assess
 			SourceVersion: report.ContentSchemaVersion() + ":" + report.OutcomeID().String(),
 			Facts:         []Fact{{Ref: "standard_report", Value: string(content)}}}},
 	})
+}
+
+func (p *Participant) ownedRequest(ctx context.Context, actor Actor, testeeID, assessmentID uint64, requestID string) (*Start, error) {
+	if p == nil || !validID(requestID) || !validNumber(actor.OrgID) || actor.SubjectID == "" || len(actor.SubjectID) > 128 || testeeID == 0 || assessmentID == 0 || p.Access == nil || p.Bridge == nil || p.Bridge.Store == nil {
+		return nil, ErrInvalid
+	}
+	if err := p.Access.AuthorizeOwnAssessment(ctx, testeeID, assessmentID); err != nil {
+		return nil, err
+	}
+	request, err := p.Bridge.Store.Original(ctx, requestID)
+	if err != nil {
+		return nil, err
+	}
+	if request == nil || request.RequestID != requestID || request.Actor != actor || request.TesteeID != strconv.FormatUint(testeeID, 10) || len(request.AssessmentIDs) != 1 || request.AssessmentIDs[0] != strconv.FormatUint(assessmentID, 10) {
+		return nil, ErrNotFound
+	}
+	return request, nil
+}
+
+// ReadOperation checks current access and the original frozen request before any
+// operation lookup. Another request owned by the same actor is still inaccessible.
+func (p *Participant) ReadOperation(ctx context.Context, actor Actor, testeeID, assessmentID uint64, requestID, commandID string) (MessagingOperation, error) {
+	if !validID(commandID) {
+		return MessagingOperation{}, ErrInvalid
+	}
+	if _, err := p.ownedRequest(ctx, actor, testeeID, assessmentID, requestID); err != nil {
+		return MessagingOperation{}, err
+	}
+	reader, ok := p.Bridge.Store.(interface {
+		ReadRequestOperation(context.Context, OperationScope, string, string) (MessagingOperation, error)
+	})
+	if !ok {
+		return MessagingOperation{}, ErrManagementUnavailable
+	}
+	return reader.ReadRequestOperation(ctx, OperationScope{OrganizationID: actor.OrgID, SubjectID: actor.SubjectID}, requestID, commandID)
+}
+func (p *Participant) MessagingEnabled() bool {
+	if p == nil || p.Bridge == nil {
+		return false
+	}
+	_, ok := p.Bridge.Store.(interface {
+		ReadRequestOperation(context.Context, OperationScope, string, string) (MessagingOperation, error)
+	})
+	return ok
 }

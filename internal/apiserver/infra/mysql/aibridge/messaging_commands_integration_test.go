@@ -157,3 +157,33 @@ func TestMQManagementFamiliesUseOriginalAggregateAndSingleWire(t *testing.T) {
 		t.Fatal("repeated command resealed", calls)
 	}
 }
+
+func TestMQParticipantOperationCannotCrossAggregateOrActor(t *testing.T) {
+	f := newMQFixture(t)
+	calls := 0
+	s := f.commandStore(&calls)
+	mustMQ(t, s.StageStart(t.Context(), f.request))
+	o, e := s.ReadRequestOperation(t.Context(), f.scope, f.request.RequestID, f.request.RequestID)
+	mustMQ(t, e)
+	if o.Status != "submitted" {
+		t.Fatal("publication mistaken for decision")
+	}
+	for _, scenario := range []string{"aggregate", "organization", "subject"} {
+		t.Run(scenario, func(t *testing.T) {
+			scope := f.scope
+			aggregate := f.request.RequestID
+			switch scenario {
+			case "aggregate":
+				aggregate = uuid.NewString()
+			case "organization":
+				scope.OrganizationID = "1"
+			case "subject":
+				scope.SubjectID = "other"
+			}
+			_, e := s.ReadRequestOperation(t.Context(), scope, aggregate, f.request.RequestID)
+			if !errors.Is(e, app.ErrNotFound) {
+				t.Fatalf("cross-scope=%v", e)
+			}
+		})
+	}
+}

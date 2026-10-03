@@ -1,0 +1,15 @@
+syntax = "proto3";
+package interpretation;
+option go_package = "github.com/FangcunMount/qs-server/api/grpc/gen/interpretation";
+
+// Operation view carried by the existing delegated read-only workflow RPC.
+message ParticipantOperation {
+  string operation_id = 1;
+  string command_id = 2;
+  string status = 3;
+  string transport_status = 4;
+  string decision = 5;
+  string code = 6;
+  string resource_id = 7;
+  bytes receipt_json = 8;
+}

@@ -31,6 +31,21 @@ jobs:
         with:
           go-version: '1.25.12'
           cache: true
+      - name: Start isolated NSQ with the production message size limit
+        run: |
+          docker run -d --name qs-ai-mq-ci-nsq --memory=128m --cpus=1 -p 4150:4150 -p 4151:4151 nsqio/nsq:v1.3.0 /nsqd --max-msg-size=262144 --mem-queue-size=3000
+          python3 - <<'PYREADY'
+          import time, urllib.request
+          for attempt in range(30):
+              try:
+                  with urllib.request.urlopen('http://127.0.0.1:4151/ping', timeout=1) as response:
+                      if response.status == 200:
+                          break
+              except Exception:
+                  time.sleep(1)
+          else:
+              raise SystemExit('required isolated NSQ is not ready')
+          PYREADY
       - name: Apply bridge schema to isolated test database
         env:
           MYSQL_CONTAINER: ${{ job.services.mysql.id }}
@@ -38,15 +53,21 @@ jobs:
           docker exec -i "$MYSQL_CONTAINER" mysql -uroot -pbridge_test_root qs_bridge_test < internal/pkg/migration/migrations/mysql/000072_ai_bridge_delivery.up.sql
           docker exec -i "$MYSQL_CONTAINER" mysql -uroot -pbridge_test_root qs_bridge_test < internal/pkg/migration/migrations/mysql/000083_ai_runtime_index.up.sql
           docker exec -i "$MYSQL_CONTAINER" mysql -uroot -pbridge_test_root qs_bridge_test < internal/pkg/migration/migrations/mysql/000091_ai_messaging.up.sql
+          docker exec -i "$MYSQL_CONTAINER" mysql -uroot -pbridge_test_root qs_bridge_test < internal/pkg/migration/migrations/mysql/000092_ai_messaging_failures.up.sql
       - name: Verify durable request and result transactions
         env:
           QS_AI_BRIDGE_TEST_DSN: 'root:bridge_test_root@tcp(127.0.0.1:3306)/qs_bridge_test?parseTime=true'
           QS_AI_MQ_TEST_DSN: 'root:bridge_test_root@tcp(127.0.0.1:3306)/qs_bridge_test?parseTime=true'
+          QS_AI_MQ_NSQD: '127.0.0.1:4150'
+          QS_AI_MQ_NSQD_HTTP: 'http://127.0.0.1:4151'
           GOWORK: 'off'
         run: |
           mkdir -p artifacts
-          go test -p 1 -tags=integration -count=1 -race -json ./internal/apiserver/application/aibridge ./internal/apiserver/infra/mysql/aibridge ./internal/apiserver/infra/aibridge ./internal/apiserver/transport/grpc/aibridge ./cmd/qs-ai-bridge > artifacts/ai-mq-tests.json
+          go test -p 1 -tags=integration -count=1 -race -json ./internal/apiserver/application/aibridge ./internal/apiserver/infra/mysql/aibridge ./internal/apiserver/infra/aibridge ./internal/apiserver/transport/grpc/aibridge > artifacts/ai-mq-tests.json
           go test -count=1 -race -json ./internal/apiserver/transport/rest/handler ./internal/apiserver/transport/rest -run '^TestMQ' >> artifacts/ai-mq-tests.json
+          go test -count=1 -race -json ./internal/apiserver/container/modules/interpretation ./internal/apiserver/options ./internal/apiserver/transport/grpc/service ./internal/collection-server/transport/rest/handler -run '^TestMQ' >> artifacts/ai-mq-tests.json
+          go test -count=1 -race -json ./internal/apiserver/transport/grpc ./internal/collection-server/infra/grpcclient ./internal/collection-server/application/aiexplanation ./internal/collection-server/transport/rest >> artifacts/ai-mq-tests.json
+          go build ./cmd/qs-apiserver ./cmd/collection-server ./cmd/qs-ai-bridge
           python3 scripts/testing/ai-mq-report.py artifacts/ai-mq-tests.json
       - uses: actions/upload-artifact@v7
         if: always()

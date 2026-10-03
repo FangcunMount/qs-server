@@ -90,3 +90,24 @@ func (c *ParticipantAIExplanationClient) GetWorkflowSource(ctx context.Context, 
 	}
 	return response, nil
 }
+
+func (c *ParticipantAIExplanationClient) GetWorkflowOperation(ctx context.Context, testeeID, assessmentID uint64, requestID, commandID string) (*aiport.WorkflowOperation, error) {
+	ctx, cancel := c.client.ContextWithTimeout(ctx)
+	defer cancel()
+	ctx, err := c.attachDelegatedSubject(ctx, testeeID, delegatedsubject.PurposeAIExplanationGet)
+	if err != nil {
+		return nil, err
+	}
+	result, err := c.service.GetAIWorkflow(ctx, &interpretationpb.GetAIWorkflowRequest{TesteeId: testeeID, AssessmentId: assessmentID, RequestId: requestID, CommandId: commandID})
+	if err != nil {
+		return nil, err
+	}
+	if result == nil || result.RequestId != requestID || result.Operation == nil {
+		return nil, fmt.Errorf("invalid operation response")
+	}
+	o := result.Operation
+	if len(o.ReceiptJson) > 0 && !json.Valid(o.ReceiptJson) {
+		return nil, fmt.Errorf("invalid operation response")
+	}
+	return &aiport.WorkflowOperation{OperationID: o.OperationId, CommandID: o.CommandId, Status: o.Status, TransportStatus: o.TransportStatus, Decision: o.Decision, Code: o.Code, ResourceID: o.ResourceId, Receipt: append([]byte(nil), o.ReceiptJson...)}, nil
+}

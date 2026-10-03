@@ -6,8 +6,11 @@ import (
 )
 
 type WorkflowAccepted struct {
-	RequestID string `json:"request_id"`
-	Status    string `json:"status"`
+	RequestID   string `json:"request_id"`
+	OperationID string `json:"operation_id,omitempty"`
+	CommandID   string `json:"command_id,omitempty"`
+	StatusURL   string `json:"status_url,omitempty"`
+	Status      string `json:"status"`
 }
 type WorkflowClient interface {
 	RequestWorkflow(context.Context, uint64, uint64, uint64, string) (*WorkflowAccepted, error)
@@ -42,4 +45,18 @@ type WorkflowEligibility struct {
 }
 type WorkflowSourceReader interface {
 	GetWorkflowSource(context.Context, uint64, uint64) (*WorkflowSource, error)
+}
+
+type WorkflowOperation struct {
+	OperationID     string          `json:"operation_id"`
+	CommandID       string          `json:"command_id"`
+	Status          string          `json:"status"`
+	TransportStatus string          `json:"transport_status"`
+	Decision        string          `json:"decision,omitempty"`
+	Code            string          `json:"code,omitempty"`
+	ResourceID      string          `json:"resource_id"`
+	Receipt         json.RawMessage `json:"receipt,omitempty"`
+}
+type WorkflowOperationReader interface {
+	GetWorkflowOperation(context.Context, uint64, uint64, string, string) (*WorkflowOperation, error)
 }

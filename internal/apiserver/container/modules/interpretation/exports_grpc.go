@@ -19,7 +19,10 @@ func (m *Module) ExportGRPCDeps() grpctransport.InterpretationDeps {
 	deps.CurrentAccess = m.aiCurrentAccess
 	deps.AIWorkflow = m.aiWorkflow
 	// Continue accepting already committed AI results even while new intake is closed.
-	deps.AIWorkflowResults = m.aiBridge
+	if m.aiMessagingRuntime == nil {
+		deps.AIWorkflowResults = m.aiBridge
+	}
+	deps.AIMessagePayloads = m.aiMessagingReader
 	return deps
 }
 

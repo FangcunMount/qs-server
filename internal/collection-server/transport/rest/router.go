@@ -369,6 +369,8 @@ func (r *Router) registerEvaluationRoutes(api *gin.RouterGroup) {
 	rateCfg := ensureRateLimitOptions(r.container.RateLimitOptions())
 	reportIdentity := collectionmiddleware.TesteeAccessMiddleware(r.container.TesteeAccessAuthorizer(), "testee_id")
 
+	api.GET("/interpretation/ai-workflow/operations/:command_id", append([]gin.HandlerFunc{reportIdentity}, r.rateLimitedQueryHandlers(
+		r.container.RateLimitBackend(), "query", rateCfg, rateCfg.QueryGlobalQPS, rateCfg.QueryGlobalBurst, rateCfg.QueryUserQPS, rateCfg.QueryUserBurst, aiExplanationHandler.GetOperation)...)...)
 	assessments := api.Group("/assessments")
 	{
 		assessments.Use(reportIdentity)
