@@ -5,6 +5,8 @@ import sys
 from pathlib import Path
 
 required = {
+    "TestMQFinalAckRepeatedSuccessRetainsBudgetAndOriginalProjection",
+    "TestMQHeldFinalAckDuplicateCannotRenewBudgetOrPublish",
     "TestMQBindingRejectsAmbiguousOrOutOfScopeInputs",
     "TestMQBindingRenderKeepsOriginalConfigAndDoesNotReadEnvironment",
     "TestMQBindingKeyPathsKeepHistoricalRoleIDsWithoutResealing",
