@@ -193,8 +193,7 @@ Builder 不创建 Report ID，不推进生命周期，不提交事务；它只�
 | 行为人 | 当前用例 | 授权语义 |
 | --- | --- | --- |
 | Participant | 查看自己的报告和列表 | 必须是受试者本人拥有的 Assessment |
-| Clinician | 查看获授权患者的报告 | 需要机构、医生和患者关系授权 |
-| Administration | 在机构或限定患者范围查询 | 需要机构范围或可访问受试者集合 |
+| Administration | 在当前报告 action 与门店范围查询 | 详情和列表先授权、后读取，再按 admin/operator 投影 |
 | Operations | 查看 Generation、Run 和历史 Report | 需要明确的机构级审计授权 |
 
 查询身份不进入 ReportGeneration 幂等键。当前系统先生成一份 canonical Report，再在读取阶段应用 Audience 可见性投影。
@@ -241,7 +240,7 @@ AssessmentID、TesteeID 和 OrgID 是报告关联事实，不是授权凭据。�
 | 自动、人工和强制重试治理 | 已实现 | RetryDecision、`interpretation.retry.requested` 和授权上下文已落地 |
 | 成功/失败可靠提交 | 已实现 | Generation、Run、Report、Catalog 和 Outbox 使用 MongoDB 事务提交 |
 | 四类报告 Builder | 已实现 | factor scoring、norm profile、task performance、typology |
-| 多行为人查询 | 已实现 | participant、clinician、administration、operations |
+| 多行为人查询 | 已实现 | participant、administration、operations；旧 clinician 独立查询已退役，受限投影策略保留 |
 | 报告模板版本发布 | 已实现 | 5 个 TemplateID 的历史版与当前版共 10 个 release；ModelCatalog、Outcome 和 Artifact 路由已显式冻结 |
 | 成品自包含 Builder 与 ContentSchema 来源 | 已实现 | Artifact 持久化精确来源，提交器校验与实际 Builder 一致；历史成品已完成等价补齐 |
 | AI 解读 | 治理已启用 / 用户流量关闭 / v2 受控验证 | 标准报告之上的手动、一次性补充能力；当前 Run 已补齐 35 个 Candidate/35 份裁判证据，但 4/39 次生成契约失败使 G3 必然不通过；待发布 DeepSeek Responses Schema 兼容修复并新建 Run 验证 |

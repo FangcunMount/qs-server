@@ -38,11 +38,6 @@ type MultiOptions struct {
 	Hot        Options
 }
 
-// NewMultiCache 创建多桶 catalog L1。
-func NewMultiCache[TDetail, TList, TCategories, THot any](opts Options, hooks MultiHooks[TDetail, TList, TCategories, THot]) *MultiCache[TDetail, TList, TCategories, THot] {
-	return NewMultiCacheWithOptions(MultiOptions{Detail: opts, List: opts, Categories: opts, Hot: opts}, hooks)
-}
-
 func NewMultiCacheWithOptions[TDetail, TList, TCategories, THot any](opts MultiOptions, hooks MultiHooks[TDetail, TList, TCategories, THot]) *MultiCache[TDetail, TList, TCategories, THot] {
 	opts.Detail = opts.Detail.withDefaults(defaultTTL, 256)
 	opts.List = opts.List.withDefaults(defaultTTL, 256)

@@ -2,7 +2,7 @@
 
 > 2026-10-02 M6 收口候选补正：Participant 新增只读 `GetAssessmentReportStatus(testee_id, assessment_id)`，Collection 使用独立签名 purpose 和精确 method ACL。归属校验通过后，按原 Outcome 的冻结 ReportType／TemplateVersion 查唯一 Generation，再读其 LatestRunID；最多两轮复核 Outcome 内容身份与 Generation 版本。返回仅含 exists、status、attempt、retry_disposition，无模型输入、失败详情、接单或重试权限。报告缺失时，Collection 据持久状态区分自动恢复、人工处理、终止失败；新授权 Run 可覆盖旧失败提示，succeeded Run 单独不能证明报告可见。此处描述候选源码，不代表已部署或 M6 整项验收；下文旧的“仅包装 GetAssessmentReport”以本补正为准。
 
-> 状态：本文已按当前源码重写。Participant、Clinician、Administration 与 Operations 查询用例、授权先于正文读取的主链路、Catalog 分页查询和最小 Audience 投影已落地；
+> 状态：本文已按当前源码重写。Participant、Administration 与 Operations 查询用例、授权先于正文读取的主链路、Catalog 分页查询和最小 Audience 投影已落地；
 > 患者端 gRPC 信任边界、Administration 角色语义、Catalog 关联复验与完整章节级可见性仍有明确缺口。
 
 ## 1. 本文回答
@@ -11,9 +11,9 @@
 
 1. 为什么报告关联了 OrgID、AssessmentID 和 TesteeID，仍然不能直接返回；
 2. 身份认证、资源授权、查询范围和 Audience 投影有什么区别；
-3. 患者、家长、医生、运营管理员和内部运维如何映射到四类应用用例；
+3. 患者、家长、医生、运营管理员和内部运维如何映射到当前查询用例；
 4. Participant 查自己的报告时，collection-server、IAM ProfileLink 和 apiserver 各负责什么；
-5. Clinician 为什么要同时校验机构、Operator、Clinician 绑定、照护关系和 Assessment 归属；
+5. 旧 Clinician 入口如何退役，后台报告如何按当前 Operator 与门店范围授权；
 6. Administration 列表怎样区分全机构范围、指定 Testee 和受限 Testee 集合；
 7. Operations 为什么不走业务报告 DTO，而是查 Generation / Run / Artifact 审计证据；
 8. `report_query_catalog` 怎样完成筛选、排序、分页和正文定位；
@@ -45,8 +45,8 @@ Audience + Transport Projection
 | 层 | 关键问题 | 当前主要实现 |
 | --- | --- | --- |
 | 认证 | 调用者是谁 | IAM JWT、HTTP protected scope、gRPC mTLS |
-| 授权 | 是否能读目标资源 | ProfileLink、Assessment ownership、Operator/Clinician 绑定、Testee relation、IAM capability |
-| 范围 | 列表中哪些资源可见 | TesteeID、AccessibleTesteeIDs 或 OrgID 过滤 |
+| 授权 | 是否能读目标资源 | ProfileLink、Assessment ownership、active Operator、Testee 门店归属、IAM action scope |
+| 范围 | 列表中哪些资源可见 | TesteeID、StoreScopedTesteeIDs 与 OrgID 过滤 |
 | 读模型 | 哪份正文是当前报告 | `report_query_catalog -> artifact` |
 | Audience 投影 | 授权后还需隐藏什么 | 当前仅对 `ModelExtra` 显式决策 |
 | Transport 投影 | REST / gRPC 如何表达内容 | participant gRPC 保留富结构；当前 apiserver REST 仍是较窄的兼容 DTO |
@@ -75,8 +75,8 @@ Audience + Transport Projection
 - 当前 IAM User 是否持有 Testee Profile 的 active link；
 - 这个 Assessment 是否属于指定 Testee；
 - 当前 Operator 是否属于当前 Org 且仍活跃；
-- 当前 Operator 是管理员，还是绑定的活跃 Clinician；
-- Clinician 与 Testee 是否存在活跃访问关系；
+- 当前 IAM snapshot 是否允许对应报告 action，Testee 当前门店是否在授权范围内；
+- 当前 IAM snapshot 决定 AudienceAdmin 或 AudienceOperator；
 - Operations 是否具有 `audit_interpretation` capability。
 
 授权是业务关系判断，不应由 Catalog 文档里的 TesteeID 自行替代。
@@ -87,9 +87,8 @@ Audience + Transport Projection
 
 ```text
 Participant       -> TesteeID = actor.TesteeID
-Clinician         -> TesteeID = explicitly authorized testee
-Restricted staff  -> TesteeID IN AccessibleTesteeIDs
-Administrator     -> OrgID = actor.OrgID
+Backstage         -> OrgID + explicit store-scoped TesteeIDs
+Specified testee  -> verify current store scope, then TesteeID
 ```
 
 范围计算必须在查询之前完成，不能先取全机构报告，再在内存中删除无权数据。
@@ -100,6 +99,7 @@ Audience 是内容可见性角色，当前值为：
 
 - `participant`；
 - `clinician`；
+- `operator`；
 - `admin`。
 
 它不是 IAM JWT 中的 `aud` claim，也不是 Operator role。应用服务在已完成资源授权后，明确传入一个 Audience，Presenter 据此删除不可见章节。
@@ -110,13 +110,12 @@ Audience 是内容可见性角色，当前值为：
 
 如果不区分这两层，“旧 REST DTO 忘了输出字段”很容易被误认为“业务刻意隐藏字段”，之后一次 DTO 补全反而可能意外暴露内容。
 
-## 4. 四类查询用例与真实业务角色
+## 4. 当前查询用例与真实业务角色
 
 | 应用用例 | Actor 身份 | 业务使用者 | 主要查询内容 | Audience |
 | --- | --- | --- | --- | --- |
 | Participant | TesteeID | 患者，或持有受试者 ProfileLink 的家长 | 自己/孩子的当前报告 | participant |
-| Clinician | OrgID + OperatorUserID + TesteeID | 当前机构的医生或其他临床人员 | 获授权受试者的当前报告 | clinician |
-| Administration | OrgID + OperatorUserID + scope | 管理后台及业务工作台 | 指定受试者、可访问受试者集合或机构报告 | admin |
+| Administration | OrgID + OperatorUserID + scope | 管理后台及业务工作台 | 按 action 门店范围查询指定受试者或报告列表 | admin / operator，由授权决策决定 |
 | Operations | OrgID + OperatorUserID + audit capability | 内部运维和审计人员 | Generation、Run、失败、重试和 Artifact 元数据 | 无，不返回业务正文 |
 
 “Participant”不应被简单翻译为“患者本人”。在儿童测评中，家长可以作为实际小程序用户读取孩子的报告。当前 collection-server 通过 IAM User 到 Testee Profile 的 active link
@@ -143,7 +142,7 @@ flowchart TD
 - 详情：先对 Assessment 或 Testee + Assessment 做具体授权，再按 AssessmentID 查 Catalog；
 - 列表：先将行为人权限转为 TesteeID / TesteeIDs / OrgID，再将过滤器下推到 Catalog。
 
-当前 Participant、Clinician 和 Administration 应用服务都有“authorize before reader”的单元测试，保证拒绝时不会调用报告 Reader。
+当前 Participant 和 Administration 应用服务都有“authorize before reader”的单元测试，保证拒绝时不会调用报告 Reader。
 
 ## 6. ReportReader 与 Catalog 的查询契约
 
@@ -171,7 +170,7 @@ ListReports(filter, page)
 | RiskLevel | 按精确风险等级筛选 |
 | HighRiskOnly | 筛选 `high / severe` |
 
-当前 Participant / Clinician / Administration 的报告列表公开 DTO 只暴露 TesteeID 与分页，ModelCode 和 RiskLevel 主要供工作台、统计或其他内部读模型使用。
+当前 Participant / Administration 的报告列表公开 DTO 只暴露 TesteeID 与分页，ModelCode 和 RiskLevel 主要供工作台、统计或其他内部读模型使用。
 
 ### 6.3 分页与加载
 
@@ -271,81 +270,42 @@ sequenceDiagram
 
 这使 `ListMyReports` 对可信 gRPC 调用者的要求更高：如果调用者可任意传 TesteeID，它可以直接枚举某个存在 Testee 的当前报告。
 
-## 8. Clinician：医生查看获授权受试者报告
+## 8. Clinician 入口退役与可见性策略
 
-### 8.1 已退役的 REST 入口
+旧医生报告 REST 入口已退役：
 
 ```text
 GET /api/v1/clinicians/me/testees/{testee_id}/reports
 GET /api/v1/clinicians/me/testees/{testee_id}/reports/{assessment_id}
 ```
 
-上述医生后台入口已随 Operator 身份退役，所有请求直接返回 `410 Gone`，不再执行身份、授权或业务查询。以下授权链保留为退役前设计说明，不能作为当前运营后台的接入方式。
+这些请求通过退役路由直接返回 `410 Gone`。独立 clinician 报告应用服务没有生产装配，已于 2026-10-03 删除；
+原有授权先于读取和受限投影测试由 Administration 的详情、列表测试承接。
 
-### 8.2 受试者授权链
-
-```mermaid
-flowchart TD
-    Actor["OrgID + OperatorUserID"]
-    Operator["当前 Org 中的 active Operator"]
-    Snapshot["IAM authz snapshot"]
-    Admin{"qs:admin？"}
-    Clinician["绑定 active Clinician"]
-    Testee["Testee 属于当前 Org"]
-    Relation["active access-grant relation"]
-    Allowed["允许读取受试者范围"]
-
-    Actor --> Operator --> Snapshot --> Admin
-    Admin -- 是 --> Testee --> Allowed
-    Admin -- 否 --> Clinician --> Testee --> Relation --> Allowed
-```
-
-授予访问权的关系类型包括：
-
-- assigned；
-- primary；
-- attending；
-- collaborator。
-
-creator 只表示来源，不授予报告访问权。
-
-### 8.3 详情还要验证 Assessment 归属
-
-Clinician 可以访问 Testee 不等于可以读客户端传入的任意 AssessmentID。详情用例先：
-
-1. `ValidateTesteeAccess(OrgID, OperatorUserID, TesteeID)`；
-2. `AuthorizeAssessment(TesteeID, AssessmentID)`；
-3. `GetReportByAssessmentID(AssessmentID)`；
-4. `AudienceClinician` 投影。
-
-第 2 步防止使用一个已授权 TesteeID 搭配其他人的 AssessmentID。
-
-### 8.4 列表只查明确指定的 Testee
-
-Clinician 专用列表不支持“看我所有患者报告”的无参数全量查询。它要求明确 TesteeID，先验证关系，再将 TesteeID 下推到 Catalog。这限制了误查范围，也与医生在当前患者上下文中查看报告的产品语义一致。
+`AudienceClinician` 仍是内容可见性策略，和 `AudienceOperator` 一样隐藏 ModelExtra。它不授予资源访问权，
+也不代表存在可用的医生专用查询入口。当前后台装配以 IAM 快照和门店范围决定访问，见下一节。
 
 ## 9. Administration：机构与受限工作台查询
 
-### 9.1 Administration 不等于只允许 qs:admin
+### 9.1 当前授权与 Audience 决策
 
-`administration.Service` 的 Actor 是 `OrgID + OperatorUserID`。它委托 Evaluation Operator Query 计算 Testee 范围，因此当前实际可以处理：
+`administration.Service` 的 Actor 是 `OrgID + OperatorUserID`。详情经 Evaluation 的
+`AuthorizeAssessmentResource` 校验报告 `read` action、当前 Assessment 归属和受试者门店范围；
+列表经 Actor 的 `StoreScopeAccess` 校验 `list` action 与当前 Testee 门店归属。
 
-- qs:admin：查整个当前机构；
-- 绑定 Clinician 的 Operator：只查有活跃关系的 Testee；
-- 明确传入 TesteeID：先对该 Testee 做访问校验。
+正式 Access 装配根据受信任 IAM 快照选择 Audience：QS 管理员为 `AudienceAdmin`，其他后台 Operator 为
+`AudienceOperator`。范围计算和可见性决策分别执行，管理员 Audience 也不能绕过已计算的查询范围。
 
-所以包名中的 administration 更接近“受保护的后台报告查询”，而不是一个已由 capability 强制为管理员的用例。
+### 9.2 当前列表范围
 
-### 9.2 范围决策表
-
-| ScopeReports 结果 | Catalog Filter | 含义 |
+| 请求 | Catalog Filter | 含义 |
 | --- | --- | --- |
-| TesteeID != 0 | `testee_id = X` | 已验证指定受试者 |
-| Restricted=true 且 IDs 为空 | 不访问 Reader，直接返回空列表 | 受限人员目前没有可访问 Testee |
-| Restricted=true 且 IDs 非空 | `testee_id IN (...)` | 受限受试者集合 |
-| Restricted=false | `org_id = current org` | 机构管理员范围 |
+| 指定 TesteeID | 当前 OrgID、指定 TesteeID、显式门店范围 | 查询前验证该 Testee 当前门店归属 |
+| 未指定 TesteeID | 当前 OrgID、RestrictToStoreScope=true、StoreScopedTesteeIDs | 仅返回当前门店权限允许的受试者报告 |
+| 门店范围为空 | 显式空范围 | 不退化为无过滤的机构查询 |
 
-“受限且空集合”必须在应用层直接返回空列表。如果将空 `TesteeIDs` 传给底层并被当成“没有过滤条件”，就会退化为全库查询。当前实现已显式防住这个边界。
+应用服务仍支持 Access 返回受限 TesteeIDs 的读模型契约，但正式装配使用门店 scope。
+详情和列表在投影完成后重新验证访问决策，防止读取期间归属或权限变化。
 
 ### 9.3 当前 REST 入口
 
@@ -358,7 +318,7 @@ GET /api/v2/evaluations/reports
 
 这些路由使用 ReportQuery Journey 将 Evaluation Assessment 查询与 Interpretation 报告查询组合，最终委托 Administration Service 完成授权和报告读取。
 
-当前路由只要已建立 protected scope 就可进入，没有另外挂载 `org_admin` 或“读报告” capability。真正范围由 Operator Query 及 Actor TesteeAccess 决定。
+应用服务在报告 Reader 前要求 `qs:evaluation:collection:reports` 的 `read` 或 `list` 权限；资源范围由 Evaluation 与 Actor 的当前门店检查决定。
 
 ## 10. Operations：查生命周期，不查业务正文
 
@@ -411,7 +371,7 @@ SectionModelExtra = "model_extra"
 | Audience | ModelExtra |
 | --- | --- |
 | participant | 可见 |
-| clinician | 不可见 |
+| clinician / operator | 不可见 |
 | admin | 可见 |
 
 其他内容——Model、PrimaryScore、Level、Conclusion、Dimensions 和 Suggestions——在应用投影层目前对三类 Audience 都原样保留。
@@ -520,11 +480,11 @@ Journey 先通过 Evaluation Operator Query 获得已授权 Assessment，然后�
 ### 14.1 已有代码保护
 
 1. Participant 详情在报告 Reader 之前验证 Assessment 属于 Testee。
-2. Clinician 详情在 Reader 之前同时验证 Testee 访问权和 Assessment 归属。
-3. Clinician 非管理员时，必须是活跃 Operator、绑定活跃 Clinician，且与 Testee 存在活跃授权关系。
+2. Administration 详情在 Reader 前验证报告 action、Assessment 与受试者当前门店范围。
+3. 后台访问要求当前机构的活跃 Operator 与受信任 IAM 授权快照；旧医生入口返回 410。
 4. Testee 必须属于 Actor 当前 Org。
 5. Administration 受限空集合直接返回空列表，不退化为全库查询。
-6. Participant、Clinician 和 Administration 业务报告都先授权、后加载报告正文。
+6. Participant 和 Administration 业务报告都先授权、后加载报告正文。
 7. Operations 同时校验当前 Org 与 audit capability。
 8. 未知 Audience 和未知 Section 不会默认开放。
 9. Catalog 查询只加载当前页正文，悬空 Source 不会被静默忽略。
@@ -558,14 +518,13 @@ Journey 先通过 Evaluation Operator Query 获得已授权 Assessment，然后�
 
 只启用 gRPC JWT 但仍不将 UserID 绑定 TesteeID，不能单独解决这个问题。
 
-### 15.2 Administration Audience 与真实行为人可能不一致
+### 15.2 Audience 决策与实际入口
 
-Administration 允许受限 Clinician Operator 查可访问 Testee，但在生成应用 Report 时无条件传入 `AudienceAdmin`。同一个 Clinician 走专用路由时却使用 `AudienceClinician`。
+Administration 已使用 Access 返回的 Audience，不再按包名无条件指定 `AudienceAdmin`。
+当前装配区分 admin/operator；独立 clinician 查询实现已退出。
 
-当前 apiserver REST DTO 会对两者都删掉 ModelExtra，所以尚未通过该 REST 响应直接暴露差异。但应用层已经存在潜在绕过：如果未来 REST DTO 补全 ModelExtra，
-同一 Clinician 可能通过 generic evaluation route 看到专用 clinician route 明确隐藏的内容。
-
-正确方向是让 scope 决策同时返回 Audience，或将真正只服务管理员的路由用 capability 限定。
+受限 clinician/operator 与 admin 的 ModelExtra 可见性由实际 Administration 详情、列表的表驱动测试保护。
+新增敏感章节或新接入方仍需扩展可见性矩阵，不能把当前有限章节测试当成完整业务验收。
 
 ### 15.3 Audience 策略过于粗粒度，且业务根据不清晰
 
@@ -668,15 +627,15 @@ flowchart LR
 
 这样可以避免当前“一个 Access 返回 scope，另一行代码手工选 Audience”的偏移。但这不意味着必须马上引入通用 ABAC 引擎；当前可以先用显式值对象和策略测试收敛。
 
-## 17. 一个具体例子：家长与医生查看同一份报告
+## 17. 一个具体例子：家长与后台 Operator 查看同一份报告
 
 假设：
 
 - 儿童 TesteeID = 3001；
 - 家长 IAM UserID = U-88，对 Testee Profile 有 active link；
 - AssessmentID = 5001，属于 Testee 3001；
-- 医生 OperatorUserID = 7001，在 Org 9 绑定活跃 Clinician；
-- Clinician 与 Testee 3001 存在 active attending relation；
+- 后台 OperatorUserID = 7001，在 Org 9 处于 active 状态；
+- Testee 3001 当前门店属于该 Operator 的报告 read 范围；
 - Catalog 将 Assessment 5001 指向 Artifact 9001。
 
 家长链路：
@@ -690,15 +649,15 @@ U-88 JWT
   -> gRPC rich report, ModelExtra visible
 ```
 
-医生链路：
+后台链路：
 
 ```text
 Org 9 + Operator 7001
-  -> active Operator and Clinician binding
-  -> active attending relation to Testee 3001
+  -> active Operator and trusted IAM snapshot
+  -> reports read action and current Testee store scope
   -> Assessment 5001 belongs to Testee 3001
   -> Catalog 5001 -> Artifact 9001
-  -> AudienceClinician
+  -> AudienceOperator
   -> ModelExtra removed
   -> current REST compatibility DTO removes additional rich fields
 ```
@@ -709,7 +668,7 @@ Org 9 + Operator 7001
 
 ### 18.1 报告中已经有 TesteeID，为什么查询前还要读 Assessment 或 Actor 关系？
 
-TesteeID 是资源关联，不是当前调用者的授权证据。授权需要验证 IAM User/ProfileLink、Assessment ownership、Operator/Clinician 绑定和活跃关系。
+TesteeID 是资源关联，不是当前调用者的授权证据。授权需要验证 IAM User/ProfileLink、Assessment ownership、当前活跃 Operator、报告 action 与 Testee 门店范围。
 如果仅比对客户端传入 TesteeID 和报告 TesteeID，客户端可以同时伪造两者。
 
 ### 18.2 为什么不把授权逻辑写进 Mongo ReportReader？
@@ -718,15 +677,15 @@ ReportReader 是持久化无关的读边界，它不应该理解 HTTP context、
 
 ### 18.3 Audience 是 RBAC 吗？
 
-不是完整 RBAC。当前 Audience 只是报告内容投影的读者类别。资源授权仍由 ProfileLink、Assessment ownership、Operator scope、Clinician relation 和 IAM capability 决定。
+不是完整 RBAC。当前 Audience 只是报告内容投影的读者类别。资源授权仍由 ProfileLink、Assessment ownership、当前 Operator 门店范围和 IAM action scope 决定。
 
 ### 18.4 为什么只保存一份 Canonical Report？
 
 因为患者和医生看到的业务核心应该来自同一 Outcome 与同一生成成品。不同读者的差异是展示和可见性问题，不应导致同一测评产生三套可能漂移的结果。
 
-### 18.5 当前医生和管理员真的看到不同报告吗？
+### 18.5 当前后台 Operator 和管理员真的看到不同报告吗？
 
-应用层上，AudienceClinician 会删除 ModelExtra，AudienceAdmin 保留。但当前 apiserver REST DTO 本身不输出 ModelExtra，因此当前 REST 响应上这个差异看不出来。
+应用层上，AudienceOperator 隐藏 ModelExtra，AudienceAdmin 保留；AudienceClinician 的保留策略同样隐藏。但当前 apiserver REST DTO 本身不输出 ModelExtra，因此当前 REST 响应上这个差异看不出来。
 患者 gRPC / collection BFF 契约会输出 ModelExtra。
 
 ### 18.6 为什么 Operations 不直接返回报告正文？
@@ -738,7 +697,7 @@ Operations 的任务是回答生命周期、失败原因、重试决策和版本
 | 主题 | 事实源 |
 | --- | --- |
 | Participant 查询用例 | `internal/apiserver/application/interpretation/participant/service.go` |
-| Clinician 查询用例 | `internal/apiserver/application/interpretation/clinician/service.go` |
+| 受限后台投影验证 | `internal/apiserver/application/interpretation/administration/service_test.go` |
 | Administration 查询用例 | `internal/apiserver/application/interpretation/administration/service.go` |
 | Operations 审计用例 | `internal/apiserver/application/interpretation/operations/service.go` |
 | Audience 枚举 | `internal/apiserver/domain/interpretation/policy/policy.go` |
@@ -746,15 +705,15 @@ Operations 的任务是回答生命周期、失败原因、重试决策和版本
 | 统一应用 Report 投影 | `internal/apiserver/application/interpretation/reportprojection/mapper.go` |
 | ReportRow 契约 | `internal/apiserver/port/interpretationreadmodel/readmodel.go` |
 | Catalog 查询和正文加载 | `internal/apiserver/infra/mongo/interpretation/artifact_read_model.go` |
-| Participant / Clinician / Administration Access 装配 | `internal/apiserver/container/module_init.go` |
+| Participant / Administration Access 装配 | `internal/apiserver/container/module_init.go` |
 | Operations capability 适配 | `internal/apiserver/container/modules/interpretation/assemble.go` |
-| Clinician-Testee 访问规则 | `internal/apiserver/application/actor/access/service.go` |
+| 当前门店范围访问规则 | `internal/apiserver/application/actor/access/store_scope.go` |
 | 授权关系类型 | `internal/apiserver/domain/actor/relation/types.go` |
 | Assessment ownership | `internal/apiserver/application/evaluation/testee/service.go` |
 | Administration scope 计算 | `internal/apiserver/application/evaluation/operator/service.go` |
 | Evaluation + Interpretation 组合状态 | `internal/apiserver/application/journey/reportquery/service.go` |
 | Participant gRPC | `internal/apiserver/transport/grpc/service/participant_report.go` |
-| Clinician / Operations REST | `internal/apiserver/transport/rest/handler/interpretation_actor.go` |
+| Operations REST | `internal/apiserver/transport/rest/handler/interpretation_actor.go` |
 | REST 报告 DTO | `internal/apiserver/transport/rest/response/evaluation.go` |
 | collection-server ProfileLink 校验 | `internal/collection-server/transport/rest/middleware/iam_middleware.go` |
 | collection-server gRPC Client | `internal/collection-server/infra/grpcclient/evaluation_client.go` |
@@ -768,7 +727,6 @@ Operations 的任务是回答生命周期、失败原因、重试决策和版本
 
 ```bash
 go test ./internal/apiserver/application/interpretation/participant
-go test ./internal/apiserver/application/interpretation/clinician
 go test ./internal/apiserver/application/interpretation/administration
 go test ./internal/apiserver/application/interpretation/operations
 go test ./internal/apiserver/domain/interpretation/presentation
@@ -786,7 +744,7 @@ go test ./internal/pkg/configcontract -run GRPCACL
 
 - 授权失败时 ReportReader 一次都不能被调用；
 - Testee 和 Assessment 交叉伪造时必须拒绝；
-- Clinician 没有 active relation 或跨 Org 时必须拒绝；
+- 后台 Operator 越过报告 action、门店范围或跨 Org 时必须拒绝；
 - creator relation 不能授予报告访问权；
 - 受限空 Testee 集合不得触发无范围 Catalog 查询；
 - Operations 跨 Org 或缺少 audit capability 时必须拒绝；

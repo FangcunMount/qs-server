@@ -5,14 +5,11 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
-	"strconv"
 	"strings"
 	"testing"
 
 	"github.com/santhosh-tekuri/jsonschema/v6"
 )
-
-const draft202012Schema = "https://json-schema.org/draft/2020-12/schema"
 
 func TestAIExplanationOutputCannotAddScoresOrClassifications(t *testing.T) {
 	t.Parallel()
@@ -91,53 +88,6 @@ func cloneJSONObject(t *testing.T, value map[string]any) map[string]any {
 	return cloned
 }
 
-func assertionTypesAt(t *testing.T, object map[string]any, key string) map[string]bool {
-	t.Helper()
-	rawAssertions, ok := object[key].([]any)
-	if !ok {
-		t.Fatalf("%s = %T, want array", key, object[key])
-	}
-	types := make(map[string]bool, len(rawAssertions))
-	for index, rawAssertion := range rawAssertions {
-		assertion, ok := rawAssertion.(map[string]any)
-		if !ok {
-			t.Fatalf("%s[%d] = %T, want object", key, index, rawAssertion)
-		}
-		assertionType, ok := assertion["type"].(string)
-		if !ok || assertionType == "" {
-			t.Fatalf("%s[%d].type = %#v, want non-empty string", key, index, assertion["type"])
-		}
-		types[assertionType] = true
-	}
-	return types
-}
-
-func assertObjectTreeHasNoKey(t *testing.T, value any, forbidden, path string) {
-	t.Helper()
-	switch typed := value.(type) {
-	case map[string]any:
-		if _, ok := typed[forbidden]; ok {
-			t.Errorf("%s contains forbidden key %q", path, forbidden)
-		}
-		for key, child := range typed {
-			assertObjectTreeHasNoKey(t, child, forbidden, path+"."+key)
-		}
-	case []any:
-		for index, child := range typed {
-			assertObjectTreeHasNoKey(t, child, forbidden, path+"["+strconv.Itoa(index)+"]")
-		}
-	}
-}
-
-func sortedKeys(values map[string]bool) []string {
-	keys := make([]string, 0, len(values))
-	for key := range values {
-		keys = append(keys, key)
-	}
-	sort.Strings(keys)
-	return keys
-}
-
 func objectAt(t *testing.T, root map[string]any, path ...string) map[string]any {
 	t.Helper()
 	current := root
@@ -153,22 +103,6 @@ func objectAt(t *testing.T, root map[string]any, path ...string) map[string]any 
 		current = next
 	}
 	return current
-}
-
-func assertStringValue(t *testing.T, object map[string]any, key, want string) {
-	t.Helper()
-	got, ok := object[key].(string)
-	if !ok || got != want {
-		t.Fatalf("%s = %#v, want %q", key, object[key], want)
-	}
-}
-
-func assertBoolValue(t *testing.T, object map[string]any, key string, want bool) {
-	t.Helper()
-	got, ok := object[key].(bool)
-	if !ok || got != want {
-		t.Fatalf("%s = %#v, want %t", key, object[key], want)
-	}
 }
 
 func assertNumberValue(t *testing.T, object map[string]any, key string, want float64) {
@@ -198,76 +132,5 @@ func assertRequiredFields(t *testing.T, object map[string]any, want []string) {
 	sort.Strings(want)
 	if strings.Join(got, "\x00") != strings.Join(want, "\x00") {
 		t.Fatalf("required = %v, want %v", got, want)
-	}
-}
-
-func assertStringEnum(t *testing.T, object map[string]any, want []string) {
-	t.Helper()
-	raw, ok := object["enum"].([]any)
-	if !ok {
-		t.Fatalf("enum = %T, want array", object["enum"])
-	}
-	got := make([]string, 0, len(raw))
-	for _, item := range raw {
-		value, ok := item.(string)
-		if !ok {
-			t.Fatalf("enum item = %T, want string", item)
-		}
-		got = append(got, value)
-	}
-	sort.Strings(got)
-	want = append([]string(nil), want...)
-	sort.Strings(want)
-	if strings.Join(got, "\x00") != strings.Join(want, "\x00") {
-		t.Fatalf("enum = %v, want %v", got, want)
-	}
-}
-
-func assertExactPropertyNames(t *testing.T, object map[string]any, want []string) {
-	t.Helper()
-	properties := objectAt(t, object, "properties")
-	got := make([]string, 0, len(properties))
-	for name := range properties {
-		got = append(got, name)
-	}
-	sort.Strings(got)
-	want = append([]string(nil), want...)
-	sort.Strings(want)
-	if strings.Join(got, "\x00") != strings.Join(want, "\x00") {
-		t.Fatalf("properties = %v, want %v", got, want)
-	}
-}
-
-func assertExactObjectKeys(t *testing.T, object map[string]any, want []string) {
-	t.Helper()
-	got := make([]string, 0, len(object))
-	for name := range object {
-		got = append(got, name)
-	}
-	sort.Strings(got)
-	want = append([]string(nil), want...)
-	sort.Strings(want)
-	if strings.Join(got, "\x00") != strings.Join(want, "\x00") {
-		t.Fatalf("object keys = %v, want %v", got, want)
-	}
-}
-
-func assertAllTypedObjectsAreStrict(t *testing.T, value any, path string) {
-	t.Helper()
-	switch typed := value.(type) {
-	case map[string]any:
-		if typed["type"] == "object" {
-			strict, ok := typed["additionalProperties"].(bool)
-			if !ok || strict {
-				t.Errorf("%s: typed object must declare additionalProperties=false", path)
-			}
-		}
-		for key, child := range typed {
-			assertAllTypedObjectsAreStrict(t, child, path+"."+key)
-		}
-	case []any:
-		for index, child := range typed {
-			assertAllTypedObjectsAreStrict(t, child, path+"["+strconv.Itoa(index)+"]")
-		}
 	}
 }

@@ -162,13 +162,6 @@ func (s *Subsystem) buildConsumers(options map[string]ConsumerOptions) {
 	}
 }
 
-func normalizedInterval(value, fallback time.Duration) time.Duration {
-	if value <= 0 {
-		return fallback
-	}
-	return value
-}
-
 func (s *Subsystem) Catalog() *eventcatalog.Catalog            { return s.catalog }
 func (s *Subsystem) Registry() *eventcatalog.EffectiveRegistry { return s.registry }
 func (s *Subsystem) Publisher() event.EventPublisher           { return s.publisher }

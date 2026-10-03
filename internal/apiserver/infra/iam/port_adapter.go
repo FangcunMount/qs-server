@@ -111,24 +111,6 @@ func (r *operationAccountRegistrar) RegisterOperationAccount(ctx context.Context
 	}, nil
 }
 
-type authzSnapshotReader struct {
-	loader *AuthzSnapshotLoader
-}
-
-func NewAuthzSnapshotReader(loader *AuthzSnapshotLoader) iambridge.AuthzSnapshotReader {
-	if loader == nil {
-		return nil
-	}
-	return &authzSnapshotReader{loader: loader}
-}
-
-func (r *authzSnapshotReader) LoadAuthzSnapshot(ctx context.Context, orgID, userID int64) (iambridge.AuthzSnapshot, error) {
-	if r == nil || r.loader == nil {
-		return nil, fmt.Errorf("iam authorization snapshot loader is not available")
-	}
-	return r.loader.Load(ctx, strconv.FormatInt(userID, 10))
-}
-
 type operatorAuthzGateway struct {
 	fresh      bool
 	assignment *AuthzAssignmentClient

@@ -58,41 +58,53 @@ func TestListUsesOrganizationScopeForAdministrator(t *testing.T) {
 	}
 }
 
-func TestRestrictedClinicianAdministrationHidesModelExtra(t *testing.T) {
-	r := &adminReader{row: interpretationreadmodel.ReportRow{
-		ModelExtra: &interpretationreadmodel.ReportModelExtraRow{TypeCode: "secret"},
-	}}
-	s := NewService(r, adminAccess{decision: ReportAccessDecision{
-		Audience:       policy.AudienceClinician,
-		IsAdmin:        false,
-		Restricted:     true,
-		DecisionSource: "test",
-	}}, reportprojection.Mapper{})
-	result, err := s.GetReport(authztest.WithPermission(context.Background(), "qs:evaluation:collection:reports", "read"), Actor{OrgID: 1, OperatorUserID: 2}, GetQuery{AssessmentID: 3})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if result.ModelExtra != nil {
-		t.Fatal("restricted clinician administration view exposed model extra")
+// The registered Administration service owns backstage projection. A restricted
+// audience must never inherit administrator visibility, in detail or lists.
+func TestReportAudienceDecisionControlsDetailAndList(t *testing.T) {
+	for _, audience := range []policy.Audience{policy.AudienceClinician, policy.AudienceOperator, policy.AudienceAdmin} {
+		t.Run(string(audience), func(t *testing.T) {
+			isAdmin := audience == policy.AudienceAdmin
+			row := interpretationreadmodel.ReportRow{AssessmentID: 3, ModelExtra: &interpretationreadmodel.ReportModelExtraRow{TypeCode: "secret"}}
+			r := &adminReader{row: row, rows: []interpretationreadmodel.ReportRow{row}}
+			s := NewService(r, adminAccess{
+				decision: ReportAccessDecision{Audience: audience, IsAdmin: isAdmin, Restricted: !isAdmin, DecisionSource: "test"},
+				scope:    ListScope{OrgID: 1, TesteeID: 7, Audience: audience, IsAdmin: isAdmin, DecisionSource: "test"},
+			})
+			ctx := authztest.WithPermission(context.Background(), "qs:evaluation:collection:reports", "read")
+			detail, err := s.GetReport(ctx, Actor{OrgID: 1, OperatorUserID: 2}, GetQuery{AssessmentID: 3})
+			if err != nil {
+				t.Fatal(err)
+			}
+			list, err := s.ListReports(authztest.WithPermission(context.Background(), "qs:evaluation:collection:reports", "list"), Actor{OrgID: 1, OperatorUserID: 2}, ListQuery{TesteeID: 7})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(list.Items) != 1 {
+				t.Fatalf("items=%#v", list.Items)
+			}
+			for _, report := range []*Report{detail, list.Items[0]} {
+				if isAdmin {
+					if report.ModelExtra == nil || report.ModelExtra.TypeCode != "secret" {
+						t.Fatalf("admin lost model extra: %#v", report.ModelExtra)
+					}
+				} else if report.ModelExtra != nil {
+					t.Fatalf("restricted audience %s exposed model extra", audience)
+				}
+			}
+			if r.filter.TesteeID == nil || *r.filter.TesteeID != 7 || r.filter.OrgID == nil || *r.filter.OrgID != 1 {
+				t.Fatalf("scope lost: %#v", r.filter)
+			}
+		})
 	}
 }
 
-func TestAdminAdministrationKeepsModelExtra(t *testing.T) {
-	r := &adminReader{row: interpretationreadmodel.ReportRow{
-		ModelExtra: &interpretationreadmodel.ReportModelExtraRow{TypeCode: "secret"},
-	}}
-	s := NewService(r, adminAccess{decision: ReportAccessDecision{
-		Audience:       policy.AudienceAdmin,
-		IsAdmin:        true,
-		Restricted:     false,
-		DecisionSource: "test",
-	}}, reportprojection.Mapper{})
-	result, err := s.GetReport(authztest.WithPermission(context.Background(), "qs:evaluation:collection:reports", "read"), Actor{OrgID: 1, OperatorUserID: 2}, GetQuery{AssessmentID: 3})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if result.ModelExtra == nil || result.ModelExtra.TypeCode != "secret" {
-		t.Fatalf("admin administration view lost model extra: %#v", result.ModelExtra)
+func TestListAuthorizesBeforeRead(t *testing.T) {
+	denied := errors.New("denied")
+	r := &adminReader{}
+	s := NewService(r, adminAccess{err: denied})
+	result, err := s.ListReports(authztest.WithPermission(context.Background(), "qs:evaluation:collection:reports", "list"), Actor{OrgID: 1, OperatorUserID: 2}, ListQuery{TesteeID: 7})
+	if !errors.Is(err, denied) || result != nil || r.calls != 0 {
+		t.Fatalf("read before authorization: result=%+v err=%v reads=%d", result, err, r.calls)
 	}
 }
 
@@ -118,6 +130,9 @@ func (a adminAccess) AuthorizeAssessment(context.Context, Actor, uint64) (Report
 }
 
 func (a adminAccess) ScopeReports(context.Context, Actor, uint64) (ListScope, error) {
+	if a.err != nil {
+		return ListScope{}, a.err
+	}
 	scope := a.scope
 	if scope.Audience == "" {
 		scope.Audience = policy.AudienceAdmin
@@ -131,6 +146,7 @@ type adminReader struct {
 	calls  int
 	filter interpretationreadmodel.ReportFilter
 	row    interpretationreadmodel.ReportRow
+	rows   []interpretationreadmodel.ReportRow
 }
 
 func (r *adminReader) GetReportByAssessmentID(context.Context, uint64) (*interpretationreadmodel.ReportRow, error) {
@@ -139,8 +155,9 @@ func (r *adminReader) GetReportByAssessmentID(context.Context, uint64) (*interpr
 	return &row, nil
 }
 func (r *adminReader) ListReports(_ context.Context, f interpretationreadmodel.ReportFilter, _ interpretationreadmodel.PageRequest) ([]interpretationreadmodel.ReportRow, int64, error) {
+	r.calls++
 	r.filter = f
-	return nil, 0, nil
+	return r.rows, int64(len(r.rows)), nil
 }
 
 func TestReportListForwardsExplicitStoreRangeIncludingEmpty(t *testing.T) {
