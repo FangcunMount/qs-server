@@ -147,3 +147,7 @@ git diff --check
 确认后 SIGKILL 和实际工具，验证原通知恢复与正常 Worker 重复消费后的唯一 Run／报告。
 冻结 Outcome 读取端口、内容构建器与客户端到应用服务的桥接为隔离夹具；不冒充真实 MySQL、
 RPC／mTLS 或模型调用证明。CI 以新建所属 broker 避免旧 channel 干扰，要求实际 PASS、禁止 SKIP。
+
+## 原评估重试／报告首次接单缺口
+
+[effect_gap_recover](effect_gap_recover/README.md)沿原标准确认意图和原授权核对单个业务缺口；持久预留后通过正常Worker mTLS入口调用一次，不广播NSQ、不批量重置、不替换冻结输入。未知结果／缺回执禁止换原操作身份重试。
