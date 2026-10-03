@@ -29,6 +29,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/maintenance/recoveryjournal"
 	grpcservice "github.com/FangcunMount/qs-server/internal/apiserver/transport/grpc/service"
 	eventcatalog "github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
+	eventruntime "github.com/FangcunMount/qs-server/internal/pkg/eventing/runtime"
 	servergrpc "github.com/FangcunMount/qs-server/internal/pkg/grpc"
 	"github.com/FangcunMount/qs-server/internal/testutil/tlsfixture"
 	"github.com/FangcunMount/qs-server/internal/worker/handlers"
@@ -89,7 +90,7 @@ func TestQS03OperatorRecoveryAfterBrokerLoss(t *testing.T) {
 	require.True(t, recognized)
 	sheetRepo, err := mongoanswersheet.NewRepository(mongoDB)
 	require.NoError(t, err)
-	stager, err := mysqlstandard.NewStager(qs03Catalog(t, "evaluation.requested"), "qs-apiserver")
+	stager, err := mysqlstandard.NewStager(qs03Catalog(t, "evaluation.requested"), eventruntime.SourceAPIServer)
 	require.NoError(t, err)
 	intake := appintake.NewService(assessmentcache.NewInvalidatingAssessmentRepository(assessmentmysql.NewAssessmentRepository(mysqlDB), nil), proofModelValidator{}, NewMySQLRunner(mysqlDB), stager)
 	ensure := journey.NewService(nil, nil, nil, nil, intake, nil, sheetRepo)
