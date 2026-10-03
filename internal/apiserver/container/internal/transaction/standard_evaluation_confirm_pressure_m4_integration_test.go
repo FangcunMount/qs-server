@@ -158,7 +158,36 @@ func TestM4ConfirmSustainedSQLAndSuccessfulOutcomes(t *testing.T) {
 	sqlDB, err := db.DB()
 	require.NoError(t, err)
 	defer sqlDB.Close()
-	require.NoError(t, db.AutoMigrate(&assessmentmysql.AssessmentPO{}, &checkpoint.RuntimeCheckpointPO{}, &assessmentmysql.EvaluationOutcomePO{}, &assessmentmysql.AssessmentScorePO{}))
+	// RuntimeCheckpointPO's AutoMigrate index tags are not the production
+	// migration indexes. Use the original schema rather than tune locking,
+	// transaction isolation or consumer concurrency for the pressure fixture.
+	for _, migration := range []struct{ name, statement string }{
+		{"000040_merge_runtime_checkpoint.up.sql", "CREATE TABLE IF NOT EXISTS `runtime_checkpoint`"},
+		{"000046_add_evaluation_run_claim_lease.up.sql", "ALTER TABLE `runtime_checkpoint`"},
+		{"000049_add_retry_governance.up.sql", "ALTER TABLE `runtime_checkpoint`"},
+	} {
+		source, e := os.ReadFile("../../../../pkg/migration/migrations/mysql/" + migration.name)
+		require.NoError(t, e)
+		start := strings.Index(string(source), migration.statement)
+		require.GreaterOrEqual(t, start, 0)
+		statement := string(source)[start:]
+		end := strings.Index(statement, ";")
+		require.GreaterOrEqual(t, end, 0)
+		require.NoError(t, db.Exec(statement[:end+1]).Error)
+	}
+	var indexes []struct {
+		Name    string `gorm:"column:name"`
+		Columns string `gorm:"column:columns"`
+	}
+	require.NoError(t, db.Raw("SELECT INDEX_NAME AS name, GROUP_CONCAT(COLUMN_NAME ORDER BY SEQ_IN_INDEX) AS columns FROM information_schema.statistics WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='runtime_checkpoint' GROUP BY INDEX_NAME ORDER BY INDEX_NAME").Scan(&indexes).Error)
+	indexColumns := make(map[string]string)
+	for _, index := range indexes {
+		indexColumns[index.Name] = index.Columns
+	}
+	require.Equal(t, "scope,status", indexColumns["idx_runtime_checkpoint_scope_status"])
+	require.Equal(t, "scope,status,lease_expires_at", indexColumns["idx_runtime_checkpoint_claim"])
+	require.Equal(t, "scope,status,retry_disposition,next_attempt_at", indexColumns["idx_runtime_checkpoint_retry_due"])
+	require.NoError(t, db.AutoMigrate(&assessmentmysql.AssessmentPO{}, &assessmentmysql.EvaluationOutcomePO{}, &assessmentmysql.AssessmentScorePO{}))
 	_, err = sqlDB.ExecContext(ctx, sdkmysql.Schema)
 	require.NoError(t, err)
 	require.NoError(t, createEvaluationRequestRefTable(ctx, sqlDB))

@@ -25,7 +25,14 @@ go list -m github.com/FangcunMount/reliable-messaging > acceptance-artifact/runt
 grep -qx 'github.com/FangcunMount/reliable-messaging v0.3.0-m6.4' acceptance-artifact/runtime-sdk.txt
 cp scripts/testing/m4-confirm-pressure-contract.json acceptance-artifact/contract.json
 project="qs-m4-confirm-pressure-${GITHUB_RUN_ID:-local}-$$"
-compose=(docker compose --project-name "$project" --file scripts/testing/m4-evaluation-duplicate-compose.yaml --file scripts/testing/m5-mysql-outcome-business-compose.yaml)
+python3 - <<'PY' > acceptance-artifact/nsq-observation-override.json
+import json
+print(json.dumps({"services": {"nsqd": {"command": [
+ "/nsqd", "--data-path=/data", "--broadcast-address=nsqd",
+ "--lookupd-tcp-address=nsqlookupd:4160", "--mem-queue-size=3000",
+ "--e2e-processing-latency-percentile=0.5,0.95,0.99"]}}}))
+PY
+compose=(docker compose --project-name "$project" --file scripts/testing/m4-evaluation-duplicate-compose.yaml --file scripts/testing/m5-mysql-outcome-business-compose.yaml --file acceptance-artifact/nsq-observation-override.json)
 sampler_pid=''
 cleanup() {
  result=$?; trap - EXIT
@@ -54,7 +61,9 @@ trap 'exit 143' TERM
 "${compose[@]}" exec -T mysql mysql -uroot -e 'CREATE DATABASE m4_qs_confirm'
 CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go test -c -tags='integration,reliable_messaging,reliable_messaging_m4,reliable_messaging_m5,reliable_messaging_m4_integration' -o acceptance-artifact/transaction.test ./internal/apiserver/container/internal/transaction
 mkdir -p acceptance-artifact/internal/apiserver/container/internal/transaction acceptance-artifact/internal/pkg/migration/migrations/mysql
-cp internal/pkg/migration/migrations/mysql/000089_qs_evaluation_request_ref.up.sql acceptance-artifact/internal/pkg/migration/migrations/mysql/
+for migration in 000040_merge_runtime_checkpoint 000046_add_evaluation_run_claim_lease 000049_add_retry_governance 000089_qs_evaluation_request_ref; do
+ cp "internal/pkg/migration/migrations/mysql/${migration}.up.sql" acceptance-artifact/internal/pkg/migration/migrations/mysql/
+done
 docker create --name "${project}-driver-1" --user "$(id -u):$(id -g)" --label "com.docker.compose.project=$project" --network "${project}_default" \
  --entrypoint /tmp/acceptance/transaction.test --workdir /tmp/acceptance/internal/apiserver/container/internal/transaction \
  --mount "type=bind,src=$repo/acceptance-artifact,dst=/tmp/acceptance" \
@@ -64,8 +73,16 @@ docker create --name "${project}-driver-1" --user "$(id -u):$(id -g)" --label "c
  nsqio/nsq@sha256:1a369c146af71bc95c25d54b375a2b98452478c1eaf4e85f8fcb01da20f2c78a \
  -test.run '^TestM4ConfirmSustainedSQLAndSuccessfulOutcomes$' -test.count=1 -test.timeout=10m -test.v > acceptance-artifact/driver-id.txt
 bash scripts/testing/m4-confirm-pressure-sample.sh "$project" "$repo/acceptance-artifact/metrics" > acceptance-artifact/metrics/sampler.log 2>&1 & sampler_pid=$!
-docker start -a "${project}-driver-1" 2>&1 | tee acceptance-artifact/execution.log
-[[ $(docker inspect --format '{{.State.ExitCode}}' "${project}-driver-1") == 0 ]]
+if docker start -a "${project}-driver-1" 2>&1 | tee acceptance-artifact/execution.log; then
+ attach_exit=0
+else
+ attach_exit=$?
+fi
+driver_exit=$(docker inspect --format '{{.State.ExitCode}}' "${project}-driver-1")
+"${compose[@]}" exec -T mysql mysql -uroot --batch --raw \
+ -e "SELECT @@transaction_isolation; SHOW CREATE TABLE m4_qs_confirm_pressure.runtime_checkpoint; SHOW INDEX FROM m4_qs_confirm_pressure.runtime_checkpoint; SELECT status,COUNT(*) FROM m4_qs_confirm_pressure.runtime_checkpoint GROUP BY status; SELECT COUNT(*) FROM m4_qs_confirm_pressure.evaluation_outcome; SHOW ENGINE INNODB STATUS" > acceptance-artifact/runtime-sql-diagnostic.tsv
+printf '{"attach_exit":%d,"driver_exit":%d}\n' "$attach_exit" "$driver_exit" > acceptance-artifact/driver-terminal.json
+[[ "$attach_exit" == 0 && "$driver_exit" == 0 ]]
 touch acceptance-artifact/metrics/stop
 wait "$sampler_pid"; sampler_pid=''
 python3 scripts/testing/m4-confirm-pressure-verify.py acceptance-artifact
