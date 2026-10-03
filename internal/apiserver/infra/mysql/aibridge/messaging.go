@@ -355,3 +355,28 @@ func (s *MessagingStore) Quarantine(ctx context.Context, tx *sql.Tx, wire []byte
 	_, err := tx.ExecContext(ctx, `INSERT INTO ai_messaging_quarantine(wire_sha256,wire,code,attempts,first_seen_at,last_seen_at) VALUES(?,?,?,1,UTC_TIMESTAMP(6),UTC_TIMESTAMP(6)) ON DUPLICATE KEY UPDATE attempts=attempts+1,last_seen_at=UTC_TIMESTAMP(6)`, messagingHash(wire), wire, code)
 	return err
 }
+
+// Payload reads only the exact retained reference for the authenticated workload.
+// It does not trust a caller-supplied organization or body hash as authorization.
+func (s *MessagingStore) Payload(ctx context.Context, tx *sql.Tx, r *pb.MessagePayloadReference, workload string) ([]byte, error) {
+	if tx == nil || r == nil || workload != "qs-ai" || r.Producer != "qs-server" || r.Destination != workload || r.BodyLength == 0 || r.BodyLength > app.MaxMessagingBody {
+		return nil, app.ErrConflict
+	}
+	org, orgErr := strconv.ParseUint(r.OrganizationId, 10, 64)
+	id, idErr := uuid.Parse(r.MessageId)
+	if orgErr != nil || org == 0 || strconv.FormatUint(org, 10) != r.OrganizationId || idErr != nil || id.String() != r.MessageId {
+		return nil, app.ErrConflict
+	}
+	var raw []byte
+	err := tx.QueryRowContext(ctx, "SELECT body FROM ai_messaging_outbox WHERE producer=? AND destination=? AND message_id=? AND organization_id=? AND body_sha256=?", r.Producer, r.Destination, r.MessageId, org, r.BodySha256).Scan(&raw)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, app.ErrNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	if uint64(len(raw)) != r.BodyLength || messagingHash(raw) != r.BodySha256 {
+		return nil, app.ErrConflict
+	}
+	return raw, nil
+}
