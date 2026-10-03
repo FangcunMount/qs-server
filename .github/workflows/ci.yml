@@ -802,3 +802,23 @@ jobs:
           path: ${{ runner.temp }}/qs03-original-effect-proof
           if-no-files-found: error
           retention-days: 14
+
+  original-effects-recovery:
+    name: QS-05/06 original business effects after actual broker loss
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+      - name: Prove original grant and frozen initial report via actual operator command
+        run: bash scripts/testing/m6-original-effects-recovery-proof.sh "${RUNNER_TEMP}/original-effects-proof"
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: original-effects-proof
+          path: ${{ runner.temp }}/original-effects-proof
+          if-no-files-found: error
+          retention-days: 14

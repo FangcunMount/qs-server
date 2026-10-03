@@ -32,10 +32,14 @@ type Receipt struct {
 	RecordedAt               time.Time `json:"recorded_at"`
 	EffectOutcome            string    `json:"effect_outcome,omitempty"`
 	AssessmentID             uint64    `json:"assessment_id,omitempty"`
+	RunID                    string    `json:"run_id,omitempty"`
+	GenerationID             string    `json:"generation_id,omitempty"`
+	OutcomeID                string    `json:"outcome_id,omitempty"`
 }
 
-// Reservation and intent are exclusive and fsynced before PUB. A missing
-// receipt or Unknown never causes another PUB, even with a different request.
+// Reservation and intent are exclusive and fsynced before an external effect.
+// A missing receipt or Unknown never causes another effect, even with a
+// different request.
 // This single-use operator journal is not a distributed consumer ledger. Its
 // private directory must remain on the designated recovery host and be kept
 // for future reconciliation; an operator must not bypass it with a new path.
