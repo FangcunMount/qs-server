@@ -5,6 +5,9 @@ import sys
 from pathlib import Path
 
 required = {
+    "TestMQAuditSnapshotPreservesHistoryAndSurfacesAmbiguousOwnership",
+    "TestMQAuditMissingSchemaAndBoundsFailClosed",
+    "TestMQAuditSnapshotTransactionActuallyRejectsWrites",
     "TestMQLegacyHandoffValidatesFirstSourceBeforeNullableIndexBackfill",
     "TestMQLegacyHandoffAtomicIdentityBudgetAndOriginalTime",
     "TestMQLegacyHandoffPreservesDeliveredAndExhaustedHistory",

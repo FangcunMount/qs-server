@@ -68,14 +68,18 @@ jobs:
           go test -count=1 -race -json ./internal/apiserver/transport/rest/handler ./internal/apiserver/transport/rest -run '^TestMQ' >> artifacts/ai-mq-tests.json
           go test -count=1 -race -json ./internal/apiserver/container/modules/interpretation ./internal/apiserver/options ./internal/apiserver/transport/grpc/service ./internal/collection-server/transport/rest/handler -run '^TestMQ' >> artifacts/ai-mq-tests.json
           go test -count=1 -race -json ./internal/apiserver/transport/grpc ./internal/collection-server/infra/grpcclient ./internal/collection-server/application/aiexplanation ./internal/collection-server/transport/rest >> artifacts/ai-mq-tests.json
+          go test -tags=integration -count=1 -race -json ./cmd/qs-ai-messaging-audit >> artifacts/ai-mq-tests.json
           go build ./cmd/qs-apiserver ./cmd/collection-server ./cmd/qs-ai-bridge
+          go build -ldflags "-X main.sourceSHA=${{ github.sha }}" -o artifacts/qs-ai-messaging-audit ./cmd/qs-ai-messaging-audit
           go build ./scripts/testing/ai-mq-process
           python3 scripts/testing/ai-mq-report.py artifacts/ai-mq-tests.json
       - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: ai-mq-mysql-${{ matrix.mysql }}
-          path: artifacts/ai-mq-tests.json
+          path: |
+            artifacts/ai-mq-tests.json
+            artifacts/qs-ai-messaging-audit
           if-no-files-found: error
   images:
     runs-on: ubuntu-latest

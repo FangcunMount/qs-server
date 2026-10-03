@@ -37,3 +37,18 @@ Migration 093 adds immutable source evidence. `MessagingLegacyHandoff.StageSingl
 Old Start identity uses request_id; old answer/cancel identities use command_id. Known UTC request creation time is represented in UTC+8 with original precision. A Change has no stored original submission time, so its envelope retains an empty value instead of using retry available_at or the migration clock. Previous attempts and retry availability are carried forward; an exhausted historical budget is technically held and does not receive new retries. Already delivered history is not requeued. Duplicate handoff reuses first wire with no resealing.
 
 An aggregate with multiple unowned pending commands is refused: the old schema does not retain sufficient immutable commit ordering. Such rows stay untouched in the maintenance inventory until an explicit ordering/evidence disposition is reviewed. This API therefore does not claim universal historical migration completion. The maintenance transaction must roll back on any error; the API does not commit, create a transaction or close resources. Compatible runtime ownership disables the old scanner; switching off MQ is not a rollback to old gRPC writes.
+
+## 切换前只读数据库清单
+
+`cmd/qs-ai-messaging-audit` 是维护核查工具，不是消息服务。仅借用显式 DSN 建立宿主拥有的连接，用 MySQL READ ONLY / REPEATABLE READ 事务执行固定 SELECT；不加载密钥、不连接 NSQ、不记录正文、不执行迁移/移交/重投/清理或模型调用。二进制由独立 AI bridge CI 构建并记录源码 SHA。
+
+```sh
+# 凭据在操作环境中安全设置，不把实际 DSN 写进材料或命令参数。
+qs-ai-messaging-audit -limit 1000 > mq-database-inventory.json
+```
+
+连接从 `QS_AI_MESSAGING_AUDIT_DSN` 获取；构建时通过 `-ldflags '-X main.sourceSHA=<精确提交>'` 固定来源。输出含原 command/request ID、已存正文 hash、原重试预算/UTC available_at、移交关联、新 Outbox 状态统计、Inbox/隔离/失败账本数量。available_at 与展示排序不充当业务提交顺序。多个未移交待投命令的同聚合标为 `unknown_commit_order_requires_review`；单条也只标为待原事务验证，不自动宣称可安全移交。
+
+移交后旧 command.delivered 不复用为归属标志；核查区分旧来源与新 MQ 记录。关联须匹配首次 source hash/kind/request 与新正文 hash，否则保持未验证。delivered 历史不重置。样本截断明确为 incomplete，必须补齐清单后审核。缺 MQ 表显示为未安装；表存在不能证明迁移 head、Broker 拓扑、密钥、权限或业务就绪。所有这些仍需独立现场证据。
+
+真实 MySQL 门禁验证数据库强制拒绝只读事务中的 UPDATE、原记录/预算不变、宿主池仍可用、历史与未知顺序如实呈现、移交 hash 冲突不冒充有效归属、缺 schema 与截断均不能当成完整清单。测试仅创建和删除带随机 ID 的专属一次性数据库。
