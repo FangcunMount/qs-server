@@ -6,6 +6,7 @@ import json
 import os
 from pathlib import Path
 import tempfile
+import subprocess
 import unittest
 from unittest.mock import patch
 
@@ -174,6 +175,55 @@ class MQReleaseTests(unittest.TestCase):
         self.assertEqual(args[args.index('--entrypoint') + 1], '/app/qs-ai-messaging-preflight')
         self.assertNotIn('--env-file', args)
         self.assertNotIn('--env', args)
+
+    def test_mq_deploy_uses_reviewed_root_owned_tool_not_uploaded_python(self):
+        text = Path(__file__).with_name('remote-deploy.sh').read_text()
+        self.assertNotIn('$SUDO python3 "$DEPLOY_TMP/scripts/cd/ai-messaging-release.py"', text)
+        self.assertIn('ai-mq-tools/${mq_tool_digest}.py', text)
+        self.assertIn('[ -L "$mq_tool" ]', text)
+        self.assertIn("stat -c '%u:%a' \"$mq_tool\"", text)
+        self.assertIn('!= "0:555"', text)
+        self.assertIn('!= "$mq_tool_digest"', text)
+        self.assertLess(text.index('refusing replacement'), text.index('$SUDO python3 "$mq_tool"'))
+
+    def test_mq_reviewed_tool_guard_refuses_missing_tampered_writable_foreign_and_symlink_tools(self):
+        text = Path(__file__).with_name('remote-deploy.sh').read_text()
+        body = text[text.index('  mq_tool_digest='):text.index('  MQ_COMPOSE_OVERRIDE=')]
+        body = body.replace('/opt/qs-server/qs-apiserver/ai-mq-tools', str(self.root / 'tools'))
+        upload = self.root / 'upload'
+        (upload / 'scripts/cd').mkdir(parents=True)
+        script = upload / 'scripts/cd/ai-messaging-release.py'
+        script.write_text('import json; print(json.dumps({"preflight":"passed"}))\n')
+        expected = hashlib.sha256(script.read_bytes()).hexdigest()
+        tools = self.root / 'tools'
+        tools.mkdir()
+        tool = tools / (expected + '.py')
+        for risk, identity in [('missing', '0:555'), ('tampered', '0:555'),
+                ('writable', '0:755'), ('foreign', '1002:555'), ('symlink', '0:555'),
+                ('reviewed', '0:555')]:
+            with self.subTest(risk=risk):
+                if tool.exists() or tool.is_symlink():
+                    tool.unlink()
+                if risk == 'symlink':
+                    tool.symlink_to(script)
+                elif risk != 'missing':
+                    tool.write_bytes(script.read_bytes() + (b'#changed' if risk == 'tampered' else b''))
+                environment = dict(os.environ, DEPLOY_TMP=str(upload), TOOL_IDENTITY=identity)
+                shell = '''set -e
+stat() { printf '%s\\n' "$TOOL_IDENTITY"; }
+run_reviewed() { printf 'called\\n' > "$DEPLOY_TMP/invoked"; "$@"; }
+resolve_compose_image_ref() { printf 'sha256:reviewed\\n'; }
+SUDO=run_reviewed
+APP_UID=2000
+APP_GID=2000
+''' + body
+                invoked = upload / 'invoked'
+                if invoked.exists():
+                    invoked.unlink()
+                result = subprocess.run(['bash', '-c', shell], env=environment,
+                        capture_output=True, text=True, timeout=10)
+                self.assertEqual(result.returncode == 0, risk == 'reviewed', result.stderr)
+                self.assertEqual(invoked.exists(), risk == 'reviewed')
 
     def test_mq_preflight_precedes_config_sync_and_stop_without_changing_default_flow(self):
         text = Path(__file__).with_name('remote-deploy.sh').read_text()

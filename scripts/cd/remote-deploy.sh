@@ -825,7 +825,17 @@ if [ "$SERVICE" = "apiserver" ] && {
   select_image
   MQ_IMAGE_SELECTED=1
   docker_compose_pull -f "$DEPLOY_TMP/docker-compose.prod.yml"
-  $SUDO python3 "$DEPLOY_TMP/scripts/cd/ai-messaging-release.py" \
+  # serverA permits reviewed deployment tools, not arbitrary root Python from
+  # a writable upload directory. Provision this exact tool before deployment.
+  mq_tool_digest="$(sha256sum "$DEPLOY_TMP/scripts/cd/ai-messaging-release.py" | awk '{print $1}')"
+  mq_tool="/opt/qs-server/qs-apiserver/ai-mq-tools/${mq_tool_digest}.py"
+  if [ ! -f "$mq_tool" ] || [ -L "$mq_tool" ] ||
+    [ "$(stat -c '%u:%a' "$mq_tool")" != "0:555" ] ||
+    [ "$(sha256sum "$mq_tool" | awk '{print $1}')" != "$mq_tool_digest" ]; then
+    echo "Reviewed immutable MQ preflight tool is unavailable; refusing replacement." >&2
+    exit 1
+  fi
+  $SUDO python3 "$mq_tool" \
     --image "$(resolve_compose_image_ref)" \
     --base-config "$DEPLOY_TMP/configs/apiserver.prod.yaml" \
     --uid "$APP_UID" --gid "$APP_GID" > "$DEPLOY_TMP/ai-mq-preflight.json"
