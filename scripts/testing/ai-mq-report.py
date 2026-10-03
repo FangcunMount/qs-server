@@ -5,6 +5,17 @@ import sys
 from pathlib import Path
 
 required = {
+    "TestMQHandoffDryRunPreservesSourceAndReplayWire",
+    "TestMQHandoffReviewAndMaintenanceDriftRefuseBeforeWrite",
+    "TestMQHandoffStopsPartialBatchAtFirstDrift",
+    "TestMQHandoffStorageFailureRollsBackWholeRow",
+    "TestMQHandoffRetainsDeliveredExhaustedAndUnknownTime",
+    "TestMQHandoffGlobalAmbiguousHistoryAndBoundsRefuse",
+    "TestMQHandoffRetainedWireCorruptionIsNotSuccessfulReplay",
+    "TestMQAuditReportsSchemaAndRetainedBodyMetadataWithoutExport",
+    "TestMQHandoffProcessCrashBeforeAndAfterCommit",
+    "TestMQHandoffCLIRefusesAmbiguousOrTruncatedReviewDocuments",
+    "TestMQHandoffCLIReadsExplicitIdentityListWithoutMutation",
     "TestMQRuntimeMissingTechnicalCoverageRefusesBeforeTransport",
     "TestMQDuplicateObservationSharesAckTransactionAndOriginalProjection",
     "TestMQPayloadObservationCommitsOnlyTechnicalFactAndPreservesReadTransaction",

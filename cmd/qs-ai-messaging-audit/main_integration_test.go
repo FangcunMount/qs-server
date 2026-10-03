@@ -62,7 +62,7 @@ func auditDatabase(t *testing.T, mq bool) *sql.DB {
 	})
 	migrations := []string{"000072_ai_bridge_delivery", "000083_ai_runtime_index"}
 	if mq {
-		migrations = append(migrations, "000091_ai_messaging", "000092_ai_messaging_failures", "000093_ai_messaging_legacy_commands")
+		migrations = append(migrations, "000091_ai_messaging", "000092_ai_messaging_failures", "000093_ai_messaging_legacy_commands", "000094_ai_messaging_admission", "000095_ai_messaging_observations")
 	}
 	for _, migration := range migrations {
 		body, err := os.ReadFile(filepath.Join("..", "..", "internal", "pkg", "migration", "migrations", "mysql", migration+".up.sql"))
@@ -202,6 +202,74 @@ func TestMQAuditSnapshotTransactionActuallyRejectsWrites(t *testing.T) {
 	mustAudit(t, db.QueryRow("SELECT attempts FROM ai_bridge_commands WHERE command_id=?", r.RequestID).Scan(&attempts))
 	if attempts != 0 {
 		t.Fatal("audit modified original retry budget")
+	}
+	mustAudit(t, db.Ping())
+}
+
+func TestMQAuditReportsSchemaAndRetainedBodyMetadataWithoutExport(t *testing.T) {
+	db := auditDatabase(t, true)
+	missing := auditRead(t, db, 100)
+	if !missing.MQTablesPresent || missing.SchemaHeadPresent || missing.SchemaHead != nil || missing.SchemaDirty != nil {
+		t.Fatal("table presence claimed an unobserved migration head")
+	}
+	_, err := db.Exec("CREATE TABLE schema_migrations(version BIGINT NOT NULL PRIMARY KEY,dirty BOOLEAN NOT NULL); INSERT INTO schema_migrations VALUES(95,FALSE)")
+	mustAudit(t, err)
+	private := strings.Repeat("private Unicode 消息🙂", 3000)
+	// Metadata-only storage fixture: this audit must not interpret/decrypt the
+	// encrypted wire or claim the fixture is a valid transferable message.
+	insert := `INSERT INTO ai_messaging_outbox(producer,destination,message_id,body_sha256,body,wire,wire_sha256,kind,organization_id,topic,aggregate_key,aggregate_sequence,ordered,requires_receipt,stage,attempts,available_at,created_at) VALUES('qs-server','qs-ai',?,?,?, ?,?,1,1,'qs.ai.commands.v1',?,18446744073709551615,TRUE,TRUE,?,8,NOW(6),NOW(6))`
+	for _, stage := range []string{"confirmed", "held", "awaiting_receipt"} {
+		id := uuid.NewString()
+		body := []byte("short private body")
+		if stage == "confirmed" {
+			body = []byte(private)
+		}
+		_, err = db.Exec(insert, id, strings.Repeat("a", 64), body, []byte("opaque private wire"), strings.Repeat("b", 64), id, stage)
+		mustAudit(t, err)
+	}
+	s := auditRead(t, db, 100)
+	if !s.SchemaHeadPresent || s.SchemaHead == nil || *s.SchemaHead != 95 || s.SchemaDirty == nil || *s.SchemaDirty || s.UnconfirmedMessages != 2 || s.RetainedReferenceBodies != 1 || len(s.MessageSamples) != 3 || s.MessageSamplesTruncated {
+		t.Fatal("missing schema, retained reference or unconfirmed metadata")
+	}
+	refs := 0
+	for _, row := range s.MessageSamples {
+		if row.Sequence != ^uint64(0) || row.Attempts != 8 {
+			t.Fatal("identity ordering integer or failure budget lost")
+		}
+		if row.BodyReference {
+			refs++
+			if row.Stage != "confirmed" {
+				t.Fatal("reference retention misreported")
+			}
+		}
+	}
+	if refs != 1 {
+		t.Fatal("confirmed retained reference hidden")
+	}
+	raw, err := json.Marshal(s)
+	mustAudit(t, err)
+	for _, sensitive := range []string{private, "short private body", "opaque private wire"} {
+		if strings.Contains(string(raw), sensitive) {
+			t.Fatal("audit exported protected body or wire")
+		}
+	}
+	if !strings.Contains(string(raw), `"aggregate_sequence":"18446744073709551615"`) {
+		t.Fatal("JSON precision lost")
+	}
+	bounded := auditRead(t, db, 1)
+	if !bounded.MessageSamplesTruncated || len(bounded.MessageSamples) != 1 || bounded.UnconfirmedMessages != 2 || bounded.RetainedReferenceBodies != 1 {
+		t.Fatal("bounded sample concealed full inventory counts")
+	}
+	_, err = db.Exec("UPDATE schema_migrations SET dirty=TRUE")
+	mustAudit(t, err)
+	dirty := auditRead(t, db, 100)
+	if dirty.SchemaDirty == nil || !*dirty.SchemaDirty {
+		t.Fatal("dirty schema reported clean")
+	}
+	var n int
+	mustAudit(t, db.QueryRow("SELECT COUNT(*) FROM ai_messaging_outbox WHERE attempts=8").Scan(&n))
+	if n != 3 {
+		t.Fatal("read-only audit changed durable budget")
 	}
 	mustAudit(t, db.Ping())
 }
