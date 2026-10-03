@@ -33,7 +33,7 @@ func (h *MessagingLegacyHandoff) StageSingle(ctx context.Context, tx *sql.Tx, id
 	var attempts int
 	var delivered bool
 	var available time.Time
-	err := tx.QueryRowContext(ctx, `SELECT request_id,kind,payload,payload_hash,attempts,delivered,available_at FROM ai_bridge_commands WHERE command_id=? FOR UPDATE`, id).Scan(&requestID, &kind, &source, &sourceHash, &attempts, &delivered, &available)
+	err := tx.QueryRowContext(ctx, `SELECT request_id,kind,CAST(payload AS BINARY),payload_hash,attempts,delivered,available_at FROM ai_bridge_commands WHERE command_id=? FOR UPDATE`, id).Scan(&requestID, &kind, &source, &sourceHash, &attempts, &delivered, &available)
 	if errors.Is(err, sql.ErrNoRows) {
 		return false, app.ErrNotFound
 	}
@@ -66,7 +66,7 @@ func (h *MessagingLegacyHandoff) StageSingle(ctx context.Context, tx *sql.Tx, id
 	var requestHash string
 	var created sql.NullTime
 	var indexedOrg, indexedSubject, indexedTestee sql.NullString
-	if err = tx.QueryRowContext(ctx, "SELECT payload,request_hash,created_at,CAST(organization_id AS CHAR),subject_id,CAST(testee_id AS CHAR) FROM ai_bridge_requests WHERE request_id=? FOR UPDATE", requestID).Scan(&original, &requestHash, &created, &indexedOrg, &indexedSubject, &indexedTestee); err != nil {
+	if err = tx.QueryRowContext(ctx, "SELECT CAST(payload AS BINARY),request_hash,created_at,CAST(organization_id AS CHAR),subject_id,CAST(testee_id AS CHAR) FROM ai_bridge_requests WHERE request_id=? FOR UPDATE", requestID).Scan(&original, &requestHash, &created, &indexedOrg, &indexedSubject, &indexedTestee); err != nil {
 		return false, err
 	}
 	var request app.Start

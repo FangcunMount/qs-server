@@ -71,3 +71,11 @@ Start、Change、参与者 Retry、评测 Start/Cancel 在同一条 `MessagingCo
 正常启动使用 Viper，而隔离进程 helper 直接读取 JSON。Viper 会把 `127.0.0.1:4150` 和 `qs.encrypt.v1` 内的点拆成配置树；直接解码到字符串映射会失败。MQ 选项仅对 NSQD、解密信任和 AI 签名信任三种本地映射接收该树，在宿主 `Options.Complete` 中恢复完整字面键，再沿原 Validate/KeyID/目标检查。不改变通用配置加载器、SDK Go 接口或 wire，不读取密钥或连接网络；直接 JSON / 构造选项保持原映射形态。非字符串叶值、保留的空分支及歧义拒绝，不将数字或列表转为可信密钥路径。Viper丢弃的空映射保持空值，仅兼容禁用配置；启用时沿原完整性校验拒绝，不能产生可信端点。沿现有 Viper 规则使用一致的小写本地 kid，并与 JWK 的固定 kid 精确一致。
 
 正常镜像启动与配置加载的回归必须独立于 helper 证据；配置失败、IAM 关闭的部分探针以及镜像静态检查都不能关闭完整宿主权限验收。
+
+## 宿主连接字符集与原 Unicode 正文
+
+当前 component-base 宿主池协商 `utf8`（MySQL 8 对应 utf8mb3），而合法结果含四字节 Unicode。原 JSON 参数写入会报转换错误，普通 JSON 查询还会把这类字符转换成问号；只用驱动默认 utf8mb4 的测试连接不能覆盖该风险。
+
+消息外围对已有请求、历史命令和结果投影的 JSON 参数显式使用 `CONVERT(CAST(? AS BINARY) USING utf8mb4)`，对 JSON 查询、历史移交与索引回填使用二进制结果读取。原 JSON 的 UTF-8 字节在进入数据库 JSON 解释前不经过连接字符集转换，读取仍由原业务解码器处理。首次业务 hash、protobuf body、签名和 wire 不重建；JSON 数据库自身的表示规范化规则不改变。没有 SET NAMES、额外池、连接配置或 schema 修改。
+
+必要存储回归必须显式协商宿主的三字节字符集并检查未被适配器更改，覆盖含 emoji/补充平面字符的原接单与历史回答、合法128KiB结果、原hash、重复复用ACK、ACK失败时投影与Inbox共同回滚。正常镜像中失败到技术挂起的旧隔离样本保留原身份、wire与预算；修复验证使用独立合成样本，不重置挂起样本或授予新模型调用。

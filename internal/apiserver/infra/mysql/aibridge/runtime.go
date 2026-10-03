@@ -153,7 +153,7 @@ func (s *Store) BackfillRuntimeIndexes(ctx context.Context, limit int) (int, err
 		return 0, err
 	}
 	defer func() { _ = tx.Rollback() }()
-	rows, err := tx.QueryContext(ctx, "SELECT request_id,payload,request_hash FROM ai_bridge_requests WHERE organization_id IS NULL ORDER BY request_id LIMIT ? FOR UPDATE", limit)
+	rows, err := tx.QueryContext(ctx, "SELECT request_id,CAST(payload AS BINARY),request_hash FROM ai_bridge_requests WHERE organization_id IS NULL ORDER BY request_id LIMIT ? FOR UPDATE", limit)
 	if err != nil {
 		return 0, err
 	}

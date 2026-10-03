@@ -5,6 +5,7 @@ import sys
 from pathlib import Path
 
 required = {
+    "TestMQOriginalUTF8BytesSurviveNormalHostCharset",
     "TestMQOptionsPreserveDottedEndpointsAndTrustThroughHostDecode",
     "TestMQOptionsRejectMalformedLocalMapWithoutCoercingTrust",
     "TestMQAdmissionClosedRejectsEveryNewFamilyWithoutRows",
