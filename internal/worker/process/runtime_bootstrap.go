@@ -117,8 +117,15 @@ func (s *server) initializeRuntime(resources resourceOutput, containerOutput con
 }
 
 func (s *server) holdReplayPolicy() retrygovernance.Policy {
-	policy := retrygovernance.DefaultOutboxPolicy
-	policy.Version = "retry-hold-publish/v1"
+	// Hold replay has its own budget and scheduling contract. Do not inherit
+	// changes to the API Outbox's recovery scheduling ceiling.
+	policy := retrygovernance.Policy{
+		Version:              "retry-hold-publish/v1",
+		MaxAutomaticAttempts: retrygovernance.HardMaxOutboxAttempts,
+		BaseDelay:            10 * time.Second,
+		MaxDelay:             time.Hour,
+		JitterFraction:       0.20,
+	}
 	if s.config == nil || s.config.RetryGovernance == nil || s.config.RetryGovernance.HoldReplay == nil {
 		return policy
 	}

@@ -111,7 +111,7 @@ func NewSystemGovernanceOptions() *SystemGovernanceOptions {
 			Outbox: &RetryPolicyOptions{
 				MaxAutomaticAttempts: 30,
 				BaseDelay:            10 * time.Second,
-				MaxDelay:             time.Hour,
+				MaxDelay:             time.Minute,
 				JitterFraction:       0.20,
 			},
 		},

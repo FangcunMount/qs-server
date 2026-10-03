@@ -178,7 +178,7 @@ func configureRetryPolicies(opts *apiserveroptions.SystemGovernanceOptions) {
 	toPolicy := func(version string, value *apiserveroptions.RetryPolicyOptions) retrygovernance.Policy {
 		return retrygovernance.Policy{Version: version, MaxAutomaticAttempts: value.MaxAutomaticAttempts, BaseDelay: value.BaseDelay, MaxDelay: value.MaxDelay, JitterFraction: value.JitterFraction}
 	}
-	if err := retrygovernance.ConfigurePolicies(toPolicy("business-retry/v1", retry.Business), toPolicy("outbox-publish-retry/v1", retry.Outbox)); err != nil {
+	if err := retrygovernance.ConfigurePolicies(toPolicy("business-retry/v1", retry.Business), toPolicy(retrygovernance.DefaultOutboxPolicy.Version, retry.Outbox)); err != nil {
 		panic(err)
 	}
 }
