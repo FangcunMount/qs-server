@@ -782,3 +782,23 @@ jobs:
           name: qs-${{ matrix.service }}
           path: bin/*
           retention-days: 7
+
+  qs03-original-effect-recovery:
+    name: QS-03 original effect recovery after actual broker loss
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+      - name: Prove original recovery command and normal late Worker deliveries
+        run: bash scripts/testing/m6-qs03-original-recovery-proof.sh "${RUNNER_TEMP}/qs03-original-effect-proof"
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: qs03-original-effect-proof
+          path: ${{ runner.temp }}/qs03-original-effect-proof
+          if-no-files-found: error
+          retention-days: 14
