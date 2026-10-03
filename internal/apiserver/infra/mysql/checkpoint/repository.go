@@ -94,6 +94,27 @@ func (r *Repository) Claim(ctx context.Context, request evaluationrun.ClaimReque
 	if request.AssessmentID == 0 || request.Token == "" || request.ClaimedAt.IsZero() || !request.LeaseUntil.After(request.ClaimedAt) {
 		return evaluationrun.ClaimResult{}, fmt.Errorf("invalid evaluation run claim request")
 	}
+	latest, err := r.FindLatestByAssessmentID(ctx, request.AssessmentID)
+	if err != nil {
+		return evaluationrun.ClaimResult{}, err
+	}
+	if latest == nil {
+		// Locking a missing assessment range takes an InnoDB gap lock. Two
+		// unrelated first claims can then deadlock when both insert into that
+		// gap. A first claim has only one durable write: let the existing unique
+		// run identity arbitrate the insert without a preceding locking read.
+		run := evalrun.NewEvaluationRun(request.AssessmentID)
+		if err := run.Claim(evalrun.ClaimInput{Token: request.Token, TraceID: request.TraceID, ClaimedAt: request.ClaimedAt, LeaseExpiresAt: request.LeaseUntil}); err != nil {
+			return evaluationrun.ClaimResult{}, err
+		}
+		if err := r.db.WithContext(ctx).Create(runToPO(run)).Error; err == nil {
+			return evaluationrun.ClaimResult{Run: run, Claimed: true}, nil
+		} else if !isDuplicateKey(err) {
+			return evaluationrun.ClaimResult{}, err
+		}
+		// Another claimant committed the same first attempt. The locked path
+		// below re-reads its lease; it never replaces the winner or its inputs.
+	}
 	result, err := r.claimOnce(ctx, request)
 	if err == nil || !isDuplicateKey(err) {
 		return result, err
