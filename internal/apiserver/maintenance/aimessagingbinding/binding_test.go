@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	options "github.com/FangcunMount/qs-server/internal/apiserver/options"
 	"github.com/spf13/viper"
 )
 
@@ -125,7 +126,7 @@ func TestMQBindingRenderKeepsOriginalConfigAndDoesNotReadEnvironment(t *testing.
 		t.Fatal("non-MQ config changed")
 	}
 	b := fixture()
-	opts := b.Options()
+	opts := options.AIWorkflowMessagingOptions{}
 	if err = v.UnmarshalKey("ai_workflow.messaging", &opts); err != nil {
 		t.Fatal(err)
 	}

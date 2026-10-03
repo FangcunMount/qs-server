@@ -73,12 +73,23 @@ class MQReleaseTests(unittest.TestCase):
         self.assertEqual(result['source_sha'], SOURCE)
         config = json.loads(Path(result['compose_file']).read_text())['services']['qs-apiserver']
         self.assertEqual(config['image'], IMAGE)
-        self.assertEqual(config['command'], ['--config=/run/qs-server-messaging/apiserver.json'])
+        self.assertEqual(config['command'], ['--config=/app/configs/apiserver.prod.yaml'])
         self.assertEqual(len(config['volumes']), 5)
         self.assertTrue(all(v['read_only'] for v in config['volumes']))
         self.assertTrue(any(v['target'].endswith('/qs.encrypt.json') for v in config['volumes']))
         self.assertNotIn('never logged', (self.releases / SOURCE / 'metadata.json').read_text())
         self.assertEqual(result['protected_image_ids'], [IMAGE])
+
+    def test_mq_frozen_main_keeps_original_relative_policy_directory(self):
+        # Production's cache policy resolves relative to the main config file.
+        # Relocating only the main file to /run breaks startup before storage.
+        config = module.overlay(self.root / 'release', [], IMAGE)['services']['qs-apiserver']
+        main = Path(config['command'][0].split('=', 1)[1])
+        self.assertEqual(main.parent / 'cache/apiserver.prod.yaml',
+                         Path('/app/configs/cache/apiserver.prod.yaml'))
+        mount = next(v for v in config['volumes'] if v['target'] == str(main))
+        self.assertEqual(mount['source'], str(self.root / 'release/apiserver.json'))
+        self.assertTrue(mount['read_only'])
 
     def test_mq_frozen_compatible_images_remain_protected_from_retention(self):
         self.prepare()

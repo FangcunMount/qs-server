@@ -102,12 +102,15 @@ def key_mounts(binding, root):
 
 
 def overlay(release, mounts, image):
+    # Preserve the main file's original directory: the ordinary host resolves
+    # external cache policy relative to it. Overlay just the immutable main file
+    # read-only within the existing configs mount; leave its sibling files intact.
     volumes = [{'type': 'bind', 'source': str(release / 'apiserver.json'),
-                'target': '/run/qs-server-messaging/apiserver.json', 'read_only': True}]
+                'target': '/app/configs/apiserver.prod.yaml', 'read_only': True}]
     volumes += [{'type': 'bind', 'source': str(source), 'target': target, 'read_only': readonly}
                 for source, target, readonly in mounts]
     return {'services': {'qs-apiserver': {'image': image,
-            'command': ['--config=/run/qs-server-messaging/apiserver.json'], 'volumes': volumes}}}
+            'command': ['--config=/app/configs/apiserver.prod.yaml'], 'volumes': volumes}}}
 
 
 def write_new(path, raw, mode=0o640):
