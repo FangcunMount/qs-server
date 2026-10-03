@@ -92,7 +92,7 @@ func main() {
 		os.Exit(1)
 	}
 }
-func run(limit int) error {
+func run(limit int) (resultErr error) {
 	raw := os.Getenv("QS_AI_MESSAGING_AUDIT_DSN")
 	if raw == "" {
 		return errors.New("explicit database binding required")
@@ -106,7 +106,7 @@ func run(limit int) error {
 	if err != nil {
 		return err
 	}
-	defer db.Close()
+	defer func() { resultErr = errors.Join(resultErr, db.Close()) }()
 	db.SetMaxOpenConns(1)
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()

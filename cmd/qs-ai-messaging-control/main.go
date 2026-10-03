@@ -28,7 +28,7 @@ func main() {
 		os.Exit(1)
 	}
 }
-func run(action, expected string) error {
+func run(action, expected string) (resultErr error) {
 	if action != "inspect" && action != "close" && action != "open" {
 		return errors.New("unsupported action")
 	}
@@ -51,7 +51,7 @@ func run(action, expected string) error {
 	if err != nil {
 		return err
 	}
-	defer db.Close()
+	defer func() { resultErr = errors.Join(resultErr, db.Close()) }()
 	db.SetMaxOpenConns(1)
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()

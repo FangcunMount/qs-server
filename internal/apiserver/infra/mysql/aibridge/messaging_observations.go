@@ -46,12 +46,16 @@ func RecordPayloadObservation(ctx context.Context, db *sql.DB, kind string) erro
 	}
 	return tx.Commit()
 }
-func collectTechnicalObservations(ctx context.Context, tx *sql.Tx) (map[string]float64, error) {
+func collectTechnicalObservations(ctx context.Context, tx *sql.Tx) (result map[string]float64, resultErr error) {
 	rows, err := tx.QueryContext(ctx, `SELECT /*+ MAX_EXECUTION_TIME(1000) */ kind,recorded_count,TIMESTAMPDIFF(MICROSECOND,'1970-01-01 00:00:00',recording_since)/1000000 FROM ai_messaging_observations`)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() {
+		if closeErr := rows.Close(); closeErr != nil {
+			result, resultErr = nil, errors.Join(resultErr, closeErr)
+		}
+	}()
 	counts := map[string]float64{}
 	var latest float64
 	for rows.Next() {

@@ -33,7 +33,7 @@ func main() {
 	}
 }
 
-func run() error {
+func run() (resultErr error) {
 	mode := flag.String("mode", "runtime", "runtime, stage-cancel or stage-history")
 	input := flag.String("input", "", "disposable historical request fixture")
 	config := flag.String("config", "", "disposable local configuration file")
@@ -59,7 +59,7 @@ func run() error {
 	if err != nil {
 		return err
 	}
-	defer db.Close()
+	defer func() { resultErr = errors.Join(resultErr, db.Close()) }()
 	db.SetMaxOpenConns(5)
 	if *mode == "stage-history" {
 		// This setup models a previously accepted request. It does not claim
@@ -113,7 +113,7 @@ func run() error {
 	if err != nil {
 		return err
 	}
-	defer conn.Close()
+	defer func() { resultErr = errors.Join(resultErr, conn.Close()) }()
 	r, err := client.NewMessagingRuntime(cfg.Options, db, s, &store.MessagingEventReceiver{DB: db, Store: s, Keys: keys.Ring, Bodies: client.NewMessagingPayloadClient(conn), Seal: seal})
 	if err != nil {
 		return err

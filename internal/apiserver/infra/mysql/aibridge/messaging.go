@@ -334,7 +334,8 @@ func (s *MessagingStore) applyReceipt(ctx context.Context, tx *sql.Tx, e *pb.Mes
 		return "", app.ErrConflict
 	}
 	decision := "held"
-	if r.Decision == pb.MessagingDecision_ACCEPTED {
+	switch r.Decision {
+	case pb.MessagingDecision_ACCEPTED:
 		decision = "accepted"
 		if pb.MessagingKind(kind) == pb.MessagingKind_EVALUATION_START || pb.MessagingKind(kind) == pb.MessagingKind_EVALUATION_CANCEL {
 			v := r.GetEvaluationReceipt()
@@ -368,7 +369,7 @@ func (s *MessagingStore) applyReceipt(ctx context.Context, tx *sql.Tx, e *pb.Mes
 				}
 			}
 		}
-	} else if r.Decision == pb.MessagingDecision_REJECTED {
+	case pb.MessagingDecision_REJECTED:
 		decision = "rejected"
 	}
 	_, err = tx.ExecContext(ctx, "UPDATE ai_messaging_operations SET decision=?,code=?,receipt_id=?,receipt=?,decided_at=UTC_TIMESTAMP(6) WHERE command_id=?", decision, r.Code, e.MessageId, raw, r.CommandId)

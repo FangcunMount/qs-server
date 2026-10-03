@@ -37,12 +37,12 @@ func main() {
 	}
 }
 
-func decode(path string, target any) error {
+func decode(path string, target any) (resultErr error) {
 	f, err := os.Open(path)
 	if err != nil {
 		return err
 	}
-	defer f.Close()
+	defer func() { resultErr = errors.Join(resultErr, f.Close()) }()
 	info, err := f.Stat()
 	if err != nil || !info.Mode().IsRegular() || info.Size() < 1 || info.Size() > 1<<20 {
 		return maintenance.ErrManifest
@@ -59,7 +59,7 @@ func decode(path string, target any) error {
 	return nil
 }
 
-func run(action, input, digest, keyFile string, stopped bool) error {
+func run(action, input, digest, keyFile string, stopped bool) (resultErr error) {
 	if action != "dry-run" && action != "apply" {
 		return maintenance.ErrManifest
 	}
@@ -75,7 +75,7 @@ func run(action, input, digest, keyFile string, stopped bool) error {
 	if err != nil {
 		return err
 	}
-	defer db.Close()
+	defer func() { resultErr = errors.Join(resultErr, db.Close()) }()
 	db.SetMaxOpenConns(1)
 	tool := &maintenance.Tool{DB: db}
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)

@@ -35,7 +35,6 @@ func run() error {
 		if err != nil {
 			return err
 		}
-		output = message.Wire
 		return json.NewEncoder(os.Stdout).Encode(struct{ Wire, Body []byte }{message.Wire, message.Body})
 	case "authenticate":
 		producer := "qs-server"
