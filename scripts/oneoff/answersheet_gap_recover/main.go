@@ -130,7 +130,9 @@ func runCLI(parent context.Context, args []string, stdout, stderr io.Writer) int
 		defer stop()
 		_ = client.Disconnect(cleanup)
 	}()
-	db, err := gorm.Open(gormmysql.Open(dsn), &gorm.Config{Logger: logger.Default.LogMode(logger.Silent)})
+	// Avoid the dialect's background SELECT VERSION and context-free Ping.
+	// The first actual read is WithContext(ctx), including initial handshake.
+	db, err := gorm.Open(gormmysql.New(gormmysql.Config{DSN: dsn, SkipInitializeWithVersion: true}), &gorm.Config{DisableAutomaticPing: true, Logger: logger.Default.LogMode(logger.Silent)})
 	if err != nil {
 		_, _ = fmt.Fprintln(stderr, "answersheet recovery: MySQL connection unavailable")
 		return 1

@@ -39,6 +39,7 @@ import (
 	"github.com/FangcunMount/reliable-messaging/transport"
 	sdknsq "github.com/FangcunMount/reliable-messaging/transport/nsq"
 	"github.com/FangcunMount/reliable-messaging/wire/legacy"
+	mysqldriver "github.com/go-sql-driver/mysql"
 	"github.com/google/uuid"
 	"github.com/nsqio/go-nsq"
 	"github.com/stretchr/testify/require"
@@ -125,6 +126,40 @@ func TestQS03OperatorRecoveryAfterBrokerLoss(t *testing.T) {
 		return output.Bytes()
 	}
 	scope := []string{"--answersheet-id=" + strconv.FormatUint(qs03ProofSheetID, 10), "--org-id=501", "--accepted-before=" + cutoff}
+	// Real TCP accepts but never supplies the MySQL handshake. The command
+	// must reject unknown source within its deadline, before reservation/RPC.
+	blockedListener, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+	defer func() { _ = blockedListener.Close() }()
+	acceptedConnection := make(chan struct{})
+	go func() {
+		connection, err := blockedListener.Accept()
+		if err != nil {
+			return
+		}
+		close(acceptedConnection)
+		defer func() { _ = connection.Close() }()
+		_, _ = io.Copy(io.Discard, connection)
+	}()
+	blockedDSN, err := mysqldriver.ParseDSN(os.Getenv("RM_QS03_MYSQL_DSN"))
+	require.NoError(t, err)
+	blockedDSN.Addr = blockedListener.Addr().String()
+	normalEnvironment := environment
+	environment = append(append([]string{}, environment...), "MYSQL_DSN="+blockedDSN.FormatDSN())
+	started := time.Now()
+	run(1, append(append([]string{}, scope...), "--timeout=1s")...)
+	elapsed := time.Since(started)
+	environment = normalEnvironment
+	select {
+	case <-acceptedConnection:
+	default:
+		t.Fatal("bounded check never reached actual MySQL handshake")
+	}
+	require.Less(t, elapsed, 4*time.Second, "initial connection escaped original operation deadline")
+	entries, err := os.ReadDir(journal)
+	require.NoError(t, err)
+	require.Empty(t, entries)
+	t.Logf("blocked_mysql_handshake=%s source=unknown journal=empty effect_calls=0", elapsed)
 	var plan answersheetgap.RecoveryPlan
 	require.NoError(t, json.Unmarshal(run(0, scope...), &plan))
 	require.Equal(t, stored.MessageID, plan.EventID)
