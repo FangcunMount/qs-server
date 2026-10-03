@@ -49,6 +49,9 @@ import (
 
 // Module assembles report read/query, builder-registry, and durable write capabilities.
 type Module struct {
+	aiMessagingRuntime     messagingLifecycle
+	aiMessagingReader      *bridgeStore.MessagingReader
+	aiOperations           *bridge.OperationAdministration
 	aiManagement           *bridge.EvaluationAdministration
 	aiParticipants         *bridge.ParticipantAdministration
 	aiPublications         *bridge.PublicationAdministration
@@ -224,7 +227,7 @@ func New(deps Deps) (*Module, error) {
 		module.executionExecutor = executor
 	}
 
-	if deps.AIWorkflow != nil && (deps.AIWorkflow.Management.Enabled || module.aiWorkflowEnabled) {
+	if deps.AIWorkflow != nil && (deps.AIWorkflow.Management.Enabled || module.aiWorkflowEnabled || deps.AIWorkflow.Messaging.Enabled) {
 		opts := deps.AIWorkflow.Management
 		opts.Enabled = true
 		if err := opts.Validate(); err != nil {
@@ -234,7 +237,7 @@ func New(deps Deps) (*Module, error) {
 		if err != nil {
 			return nil, err
 		}
-		if module.aiWorkflowEnabled {
+		if module.aiWorkflowEnabled && !deps.AIWorkflow.Messaging.Enabled {
 			module.aiBridge.Sender = clients.Commands
 			module.aiEligibility = clients.Commands
 		}
@@ -251,6 +254,12 @@ func New(deps Deps) (*Module, error) {
 			module.aiQuotas = &bridge.QuotaAdministration{Gateway: clients.Quotas}
 			module.aiSemanticDrafts = &bridge.SemanticDraftAdministration{Gateway: clients.SemanticDrafts}
 			module.aiAssets = &bridge.AssetCatalogAdministration{Gateway: clients.Assets}
+		}
+		if deps.AIWorkflow.Messaging.Enabled {
+			if err := module.configureAIMessaging(deps.AIWorkflow.Messaging, sqlDB, clients); err != nil {
+				_ = clients.Connection.Close()
+				return nil, err
+			}
 		}
 		module.aiManagementConnection = clients.Connection
 	}
@@ -549,12 +558,12 @@ func (m *Module) bindParticipantRuntime() {
 }
 
 func (m *Module) tryBindAIWorkflow() error {
-	if m != nil && m.aiWorkflowEnabled && m.aiWorkflow == nil && m.aiOutcomeRepo != nil && m.participantAccess != nil {
+	if m != nil && (m.aiWorkflowEnabled || m.aiMessagingRuntime != nil) && m.aiWorkflow == nil && m.aiOutcomeRepo != nil && m.participantAccess != nil {
 		resolver, err := aiexplanationsource.NewResolver(m.reportCatalog, m.reportRepo, m.aiOutcomeRepo)
 		if err != nil {
 			return err
 		}
-		m.aiWorkflow = &bridge.Participant{Access: m.participantAccess, Sources: resolver, Bridge: m.aiBridge, Eligibility: m.aiEligibility}
+		m.aiWorkflow = &bridge.Participant{IntakeClosed: !m.aiWorkflowEnabled, Access: m.participantAccess, Sources: resolver, Bridge: m.aiBridge, Eligibility: m.aiEligibility}
 	}
 
 	return nil
@@ -606,6 +615,13 @@ func buildReportBuilderRegistry() (rendering.Registry, error) {
 
 // Cleanup releases module resources.
 func (m *Module) Cleanup() error {
+	if m != nil && m.aiMessagingRuntime != nil {
+		ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+		defer cancel()
+		if err := m.aiMessagingRuntime.Stop(ctx); err != nil {
+			return err
+		}
+	}
 	if m != nil && m.aiRelayCancel != nil {
 		m.aiRelayCancel()
 		<-m.aiRelayDone
@@ -713,4 +729,11 @@ func (m *Module) AIWorkflowSemanticDrafts() *bridge.SemanticDraftAdministration 
 		return nil
 	}
 	return m.aiSemanticDrafts
+}
+
+func (m *Module) AIWorkflowOperations() *bridge.OperationAdministration {
+	if m == nil {
+		return nil
+	}
+	return m.aiOperations
 }

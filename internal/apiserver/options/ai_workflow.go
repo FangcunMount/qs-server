@@ -6,6 +6,7 @@ import "github.com/spf13/pflag"
 type AIWorkflowOptions struct {
 	Enabled    bool                        `json:"enabled" mapstructure:"enabled"`
 	Management AIWorkflowManagementOptions `json:"management" mapstructure:"management"`
+	Messaging  AIWorkflowMessagingOptions  `json:"messaging" mapstructure:"messaging"`
 }
 
 func NewAIWorkflowOptions() *AIWorkflowOptions { return &AIWorkflowOptions{} }
@@ -14,8 +15,11 @@ func (o *AIWorkflowOptions) Validate() []error {
 		return nil
 	}
 	transport := o.Management
-	transport.Enabled = transport.Enabled || o.Enabled
+	transport.Enabled = transport.Enabled || o.Enabled || o.Messaging.Enabled
 	if err := transport.Validate(); err != nil {
+		return []error{err}
+	}
+	if err := o.Messaging.Validate(); err != nil {
 		return []error{err}
 	}
 	return nil
@@ -25,6 +29,7 @@ func (o *AIWorkflowOptions) AddFlags(fs *pflag.FlagSet) {
 		return
 	}
 	fs.BoolVar(&o.Enabled, "ai_workflow.enabled", o.Enabled, "Enable qs-ai participant intake.")
+	fs.BoolVar(&o.Messaging.Enabled, "ai_workflow.messaging.enabled", o.Messaging.Enabled, "Use the reviewed MQ runtime for asynchronous AI messages.")
 	fs.BoolVar(&o.Management.Enabled, "ai_workflow.management.enabled", o.Management.Enabled, "Enable qs-ai management proxy.")
 	fs.StringVar(&o.Management.Address, "ai_workflow.management.address", o.Management.Address, "qs-ai gRPC address.")
 	fs.StringVar(&o.Management.CAFile, "ai_workflow.management.ca_file", o.Management.CAFile, "Trusted CA chain.")

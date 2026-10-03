@@ -113,6 +113,7 @@ func (c *Container) BuildRESTDeps(rateCfg *options.RateLimitOptions) resttranspo
 		deps.Interpretation.ReportTemplates = c.ReportModule.ReportTemplateService()
 	}
 	if c.ReportModule != nil {
+		deps.Interpretation.AIWorkflowOperations = c.ReportModule.AIWorkflowOperations()
 		deps.Interpretation.AIWorkflowManagement = c.ReportModule.AIWorkflowManagement()
 		deps.Interpretation.AIWorkflowParticipants = c.ReportModule.AIWorkflowParticipants()
 		deps.Interpretation.AIWorkflowPublications = c.ReportModule.AIWorkflowPublications()

@@ -69,6 +69,14 @@ func (h *AIWorkflowParticipantHandler) Retry(c *gin.Context) {
 	if err := h.BindJSON(c, &command); err != nil {
 		return
 	}
+	if h.service.Messages != nil {
+		if err := h.service.SubmitRetry(c.Request.Context(), scope, c.Param("session_id"), command); err != nil {
+			NewAIWorkflowManagementHandler(nil).failure(c, err)
+			return
+		}
+		submittedCommand(c, command.CommandID)
+		return
+	}
 	value, err := h.service.Retry(c.Request.Context(), scope, c.Param("session_id"), command)
 	if err != nil {
 		NewAIWorkflowManagementHandler(nil).failure(c, err)

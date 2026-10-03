@@ -50,6 +50,9 @@ func (s *ParticipantAIExplanationService) RequestAIWorkflow(ctx context.Context,
 		return nil, err
 	}
 	err = s.Workflow.Request(ctx, actor, request.TesteeId, request.AssessmentId, request.ReportId, request.RequestId)
+	if errors.Is(err, bridge.ErrRuntimeAdmissionClosed) {
+		return nil, status.Error(codes.ResourceExhausted, bridge.RuntimeAdmissionClosedReason)
+	}
 	if errors.Is(err, bridge.ErrInvalid) {
 		return nil, status.Error(codes.InvalidArgument, "invalid workflow request")
 	}
@@ -59,7 +62,11 @@ func (s *ParticipantAIExplanationService) RequestAIWorkflow(ctx context.Context,
 	if err != nil {
 		return nil, toAIExplanationGRPCError(err)
 	}
-	return &interpretationpb.AIWorkflowAccepted{RequestId: request.RequestId, Status: "accepted"}, nil
+	state := "accepted"
+	if s.Workflow.MessagingEnabled() {
+		state = "submitted"
+	}
+	return &interpretationpb.AIWorkflowAccepted{RequestId: request.RequestId, Status: state}, nil
 }
 
 // GetAIWorkflow rechecks current QS access; knowledge of a request ID grants no access.
@@ -73,6 +80,9 @@ func (s *ParticipantAIExplanationService) GetAIWorkflow(ctx context.Context, req
 	actor, err := s.workflowActor(ctx, request.TesteeId, request.AssessmentId, delegatedsubject.PurposeAIExplanationGet)
 	if err != nil {
 		return nil, err
+	}
+	if request.CommandId != "" {
+		return s.readOperation(ctx, actor, request)
 	}
 	event, err := s.Workflow.Read(ctx, actor, request.TesteeId, request.AssessmentId, request.RequestId)
 	if errors.Is(err, bridge.ErrNotFound) {

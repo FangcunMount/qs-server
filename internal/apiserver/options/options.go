@@ -965,6 +965,9 @@ func (o *Options) Complete() error {
 	if o.AIWorkflow == nil {
 		o.AIWorkflow = NewAIWorkflowOptions()
 	}
+	if err := o.AIWorkflow.Messaging.Complete(); err != nil {
+		return err
+	}
 	if o.Cache == nil {
 		o.Cache = NewCacheOptions()
 	}

@@ -30,6 +30,14 @@ func (h *AIWorkflowManagementHandler) Cancel(c *gin.Context) {
 	if err := h.BindJSON(c, &command); err != nil {
 		return
 	}
+	if h.service.Messages != nil {
+		if err := h.service.SubmitCancel(c.Request.Context(), scope, command); err != nil {
+			h.failure(c, err)
+			return
+		}
+		submittedCommand(c, command.CommandID)
+		return
+	}
 	value, err := h.service.Cancel(c.Request.Context(), scope, command)
 	if err != nil {
 		h.failure(c, err)

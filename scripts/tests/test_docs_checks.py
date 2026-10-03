@@ -25,9 +25,9 @@ class DocsFactsHelpersTest(unittest.TestCase):
 
     def test_grpc_inventory_includes_multiline_and_deprecated_rpcs(self) -> None:
         services, proto_file_count = check_docs_facts.grpc_inventory()
-        self.assertEqual(proto_file_count, 8)
-        self.assertEqual(len(services), 28)
-        self.assertEqual(sum(len(rpcs) for rpcs in services.values()), 131)
+        self.assertEqual(proto_file_count, 10)
+        self.assertEqual(len(services), 29)
+        self.assertEqual(sum(len(rpcs) for rpcs in services.values()), 132)
         self.assertEqual(services["qsai.workflow.v1.FlowManagement"], ["GetSolution", "GetPublication"])
         self.assertIn("List", services["qsai.workflow.v1.EvaluationManagement"])
         self.assertEqual(services["qsai.workflow.v1.SolutionManagement"], ["List", "Get", "GetReceipt", "GetModels", "Create", "Save", "Prepare"])
@@ -38,13 +38,14 @@ class DocsFactsHelpersTest(unittest.TestCase):
         self.assertEqual(services["internalapi.PlanEntryService"], ["ResolveTaskEntry", "ListParticipantTasks"])
         self.assertEqual(services["qsai.workflow.v1.Commands"], ["CheckEligibility", "Start", "Change"])
         self.assertEqual(services["qsai.workflow.v1.Results"], ["Accept"])
+        self.assertEqual(services["qsai.workflow.v1.MessagePayloads"], ["Get"])
         self.assertEqual(services["qsai.workflow.v1.PublicationManagement"], ["Publish", "Rollback", "Disable", "Get", "GetReceipt", "ListHistory", "GetHistory"])
         self.assertEqual(services["interpretation.AIWorkflowAccessService"], ["Authorize"])
 
     def test_migration_inventory_is_paired_and_current(self) -> None:
         inventory, issues = check_docs_facts.migration_inventory()
         self.assertEqual(issues, [])
-        self.assertEqual(inventory["mysql"], {"max_version": 90, "version_count": 90})
+        self.assertEqual(inventory["mysql"], {"max_version": 95, "version_count": 95})
         self.assertEqual(inventory["mongodb"], {"max_version": 36, "version_count": 36})
 
     def test_ledger_metadata_uses_named_fields(self) -> None:

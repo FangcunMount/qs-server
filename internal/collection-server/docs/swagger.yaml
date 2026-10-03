@@ -612,9 +612,36 @@ definitions:
     type: object
   github_com_FangcunMount_qs-server_internal_collection-server_application_aiexplanation.WorkflowAccepted:
     properties:
+      command_id:
+        type: string
+      operation_id:
+        type: string
       request_id:
         type: string
       status:
+        type: string
+      status_url:
+        type: string
+    type: object
+  github_com_FangcunMount_qs-server_internal_collection-server_application_aiexplanation.WorkflowOperation:
+    properties:
+      code:
+        type: string
+      command_id:
+        type: string
+      decision:
+        type: string
+      operation_id:
+        type: string
+      receipt:
+        items:
+          type: integer
+        type: array
+      resource_id:
+        type: string
+      status:
+        type: string
+      transport_status:
         type: string
     type: object
   github_com_FangcunMount_qs-server_internal_collection-server_application_aiexplanation.WorkflowResult:
@@ -2726,6 +2753,62 @@ paths:
       summary: 长轮询等待行为能力测评报告
       tags:
       - 行为能力测评
+  /api/v1/interpretation/ai-workflow/operations/{command_id}:
+    get:
+      parameters:
+      - description: 原命令UUID
+        in: path
+        name: command_id
+        required: true
+        type: string
+      - description: 原请求UUID
+        in: query
+        name: request_id
+        required: true
+        type: string
+      - description: 受试者ID
+        in: query
+        name: testee_id
+        required: true
+        type: string
+      - description: 测评ID
+        in: query
+        name: assessment_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/github_com_FangcunMount_qs-server_internal_collection-server_application_aiexplanation.WorkflowOperation'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+      security:
+      - BearerAuth: []
+      summary: 查询本人 AI 工作流命令的持久操作状态
+      tags:
+      - AI解读
   /api/v1/plan-task-entries/{task_id}:
     get:
       parameters:

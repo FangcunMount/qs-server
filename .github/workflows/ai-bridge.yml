@@ -1,5 +1,6 @@
 name: AI bridge MySQL
 on:
+  workflow_dispatch:
   pull_request:
     branches: [main]
   push:
@@ -9,9 +10,13 @@ permissions:
 jobs:
   delivery:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        mysql: ['8.0.36', '8.4']
     services:
       mysql:
-        image: mysql:8.4
+        image: mysql:${{ matrix.mysql }}
         env:
           MYSQL_ROOT_PASSWORD: bridge_test_root
           MYSQL_DATABASE: qs_bridge_test
@@ -26,13 +31,113 @@ jobs:
         with:
           go-version: '1.25.12'
           cache: true
+      - name: Start isolated NSQ with the production message size limit
+        run: |
+          docker run -d --name qs-ai-mq-ci-nsq --memory=128m --cpus=1 -p 4150:4150 -p 4151:4151 nsqio/nsq:v1.3.0 /nsqd --max-msg-size=262144 --mem-queue-size=3000
+          python3 - <<'PYREADY'
+          import time, urllib.request
+          for attempt in range(30):
+              try:
+                  with urllib.request.urlopen('http://127.0.0.1:4151/ping', timeout=1) as response:
+                      if response.status == 200:
+                          break
+              except Exception:
+                  time.sleep(1)
+          else:
+              raise SystemExit('required isolated NSQ is not ready')
+          PYREADY
       - name: Apply bridge schema to isolated test database
         env:
           MYSQL_CONTAINER: ${{ job.services.mysql.id }}
         run: |
           docker exec -i "$MYSQL_CONTAINER" mysql -uroot -pbridge_test_root qs_bridge_test < internal/pkg/migration/migrations/mysql/000072_ai_bridge_delivery.up.sql
           docker exec -i "$MYSQL_CONTAINER" mysql -uroot -pbridge_test_root qs_bridge_test < internal/pkg/migration/migrations/mysql/000083_ai_runtime_index.up.sql
+          docker exec -i "$MYSQL_CONTAINER" mysql -uroot -pbridge_test_root qs_bridge_test < internal/pkg/migration/migrations/mysql/000091_ai_messaging.up.sql
+          docker exec -i "$MYSQL_CONTAINER" mysql -uroot -pbridge_test_root qs_bridge_test < internal/pkg/migration/migrations/mysql/000092_ai_messaging_failures.up.sql
+          docker exec -i "$MYSQL_CONTAINER" mysql -uroot -pbridge_test_root qs_bridge_test < internal/pkg/migration/migrations/mysql/000093_ai_messaging_legacy_commands.up.sql
+          docker exec -i "$MYSQL_CONTAINER" mysql -uroot -pbridge_test_root qs_bridge_test < internal/pkg/migration/migrations/mysql/000094_ai_messaging_admission.up.sql
+          docker exec -i "$MYSQL_CONTAINER" mysql -uroot -pbridge_test_root qs_bridge_test < internal/pkg/migration/migrations/mysql/000095_ai_messaging_observations.up.sql
       - name: Verify durable request and result transactions
         env:
           QS_AI_BRIDGE_TEST_DSN: 'root:bridge_test_root@tcp(127.0.0.1:3306)/qs_bridge_test?parseTime=true'
-        run: go test -count=1 -race ./internal/apiserver/application/aibridge ./internal/apiserver/infra/mysql/aibridge ./internal/apiserver/infra/aibridge ./internal/apiserver/transport/grpc/aibridge ./cmd/qs-ai-bridge
+          QS_AI_MQ_TEST_DSN: 'root:bridge_test_root@tcp(127.0.0.1:3306)/qs_bridge_test?parseTime=true'
+          QS_AI_MQ_NSQD: '127.0.0.1:4150'
+          QS_AI_MQ_NSQD_HTTP: 'http://127.0.0.1:4151'
+          GOWORK: 'off'
+        run: |
+          mkdir -p artifacts
+          go test -p 1 -tags=integration -count=1 -race -json ./internal/apiserver/application/aibridge ./internal/apiserver/infra/mysql/aibridge ./internal/apiserver/infra/aibridge ./internal/apiserver/transport/grpc/aibridge > artifacts/ai-mq-tests.json
+          {
+            go test -count=1 -race -json ./internal/apiserver/transport/rest/handler ./internal/apiserver/transport/rest -run '^TestMQ'
+            go test -count=1 -race -json ./internal/apiserver/container/modules/interpretation ./internal/apiserver/options ./internal/apiserver/transport/grpc/service ./internal/collection-server/transport/rest/handler -run '^TestMQ'
+            go test -count=1 -race -json ./internal/apiserver/transport/grpc ./internal/collection-server/infra/grpcclient ./internal/collection-server/application/aiexplanation ./internal/collection-server/transport/rest
+            go test -tags=integration -count=1 -race -json ./cmd/qs-ai-messaging-audit
+            go test -tags=integration -count=1 -race -json ./internal/apiserver/maintenance/aimessaginghandoff ./cmd/qs-ai-messaging-handoff
+            go test -count=1 -race -json ./internal/apiserver/maintenance/aimessagingbinding ./cmd/qs-ai-messaging-preflight
+          } >> artifacts/ai-mq-tests.json
+          go build ./cmd/qs-apiserver ./cmd/collection-server ./cmd/qs-ai-bridge
+          go build -ldflags "-X main.sourceSHA=${{ github.sha }}" -o artifacts/qs-ai-messaging-audit ./cmd/qs-ai-messaging-audit
+          go build -ldflags "-X main.sourceSHA=${{ github.sha }}" -o artifacts/qs-ai-messaging-control ./cmd/qs-ai-messaging-control
+          go build -ldflags "-X main.sourceSHA=${{ github.sha }}" -o artifacts/qs-ai-messaging-handoff ./cmd/qs-ai-messaging-handoff
+          go build -ldflags "-X main.sourceSHA=${{ github.sha }}" -o artifacts/qs-ai-messaging-preflight ./cmd/qs-ai-messaging-preflight
+          python3 scripts/cd/test_ai_messaging_release.py > artifacts/ai-mq-release-tests.json
+          go build ./scripts/testing/ai-mq-process
+          python3 scripts/testing/ai-mq-report.py artifacts/ai-mq-tests.json
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: ai-mq-mysql-${{ matrix.mysql }}
+          path: |
+            artifacts/ai-mq-tests.json
+            artifacts/qs-ai-messaging-audit
+            artifacts/qs-ai-messaging-control
+            artifacts/qs-ai-messaging-handoff
+            artifacts/qs-ai-messaging-preflight
+            artifacts/ai-mq-release-tests.json
+          if-no-files-found: error
+  images:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        service: [qs-apiserver, collection-server]
+    steps:
+      - uses: actions/checkout@v6
+      - uses: docker/setup-buildx-action@v4
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: build/docker/Dockerfile.${{ matrix.service }}
+          platforms: linux/amd64
+          build-args: |
+            GIT_COMMIT=${{ github.sha }}
+            GIT_BRANCH=${{ github.ref_name }}
+            VERSION=mq-candidate
+          load: true
+          tags: qs-mq-${{ matrix.service }}:ci
+          cache-from: type=gha,scope=qs-ai-mq-${{ matrix.service }}
+          cache-to: type=gha,mode=max,scope=qs-ai-mq-${{ matrix.service }}
+      - name: Verify standard image without publication or production startup
+        env:
+          SERVICE: ${{ matrix.service }}
+        run: |
+          mkdir -p artifacts
+          docker run --rm --network none --read-only --entrypoint sh "qs-mq-$SERVICE:ci" -c 'test "$(id -u)" != "0" && test "$TZ" = Asia/Shanghai && test -x /app/'"$SERVICE"
+          if [ "$SERVICE" = qs-apiserver ]; then
+            docker run --rm --network none --read-only --entrypoint sh "qs-mq-$SERVICE:ci" -c 'for tool in audit control handoff preflight; do test -x "/app/qs-ai-messaging-$tool" || exit 1; done'
+            embedded_source="$(docker run --rm --network none --read-only --entrypoint /app/qs-ai-messaging-preflight "qs-mq-$SERVICE:ci" --source-sha)"
+            test "$embedded_source" = "$GITHUB_SHA"
+          fi
+          docker image inspect "qs-mq-$SERVICE:ci" > "artifacts/$SERVICE-image.json"
+          python3 - <<'PY'
+          import json, os
+          from pathlib import Path
+          service = os.environ['SERVICE']
+          p = Path('artifacts') / f'{service}-source.json'
+          p.write_text(json.dumps({'source_sha': os.environ['GITHUB_SHA'], 'service': service, 'dockerfile': f'build/docker/Dockerfile.{service}', 'runtime_health': 'not_verified', 'production': False}))
+          PY
+      - uses: actions/upload-artifact@v7
+        with:
+          name: ai-mq-image-${{ matrix.service }}
+          path: artifacts/
+          if-no-files-found: error

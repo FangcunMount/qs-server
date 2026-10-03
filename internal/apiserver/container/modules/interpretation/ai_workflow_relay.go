@@ -8,6 +8,9 @@ import (
 // StartAIWorkflowRelay is called once by process bootstrap, after dependencies are ready.
 // Cleanup cancels and joins it before closing the shared gRPC connection or database.
 func (m *Module) StartAIWorkflowRelay(ctx context.Context) error {
+	if m != nil && m.aiMessagingRuntime != nil {
+		return m.aiMessagingRuntime.Start(ctx)
+	}
 	if m == nil || !m.aiWorkflowEnabled || m.aiRelayCancel != nil {
 		return nil
 	}

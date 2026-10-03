@@ -1681,10 +1681,12 @@ func (*AIWorkflowAccessResponse) Descriptor() ([]byte, []int) {
 
 // Reads the current QS projection after participant authorization. No legacy generation ID.
 type GetAIWorkflowRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	TesteeId      uint64                 `protobuf:"varint,1,opt,name=testee_id,json=testeeId,proto3" json:"testee_id,omitempty"`
-	AssessmentId  uint64                 `protobuf:"varint,2,opt,name=assessment_id,json=assessmentId,proto3" json:"assessment_id,omitempty"`
-	RequestId     string                 `protobuf:"bytes,3,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
+	state        protoimpl.MessageState `protogen:"open.v1"`
+	TesteeId     uint64                 `protobuf:"varint,1,opt,name=testee_id,json=testeeId,proto3" json:"testee_id,omitempty"`
+	AssessmentId uint64                 `protobuf:"varint,2,opt,name=assessment_id,json=assessmentId,proto3" json:"assessment_id,omitempty"`
+	RequestId    string                 `protobuf:"bytes,3,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
+	// Optional original command identity selects the authorized operation view.
+	CommandId     string `protobuf:"bytes,4,opt,name=command_id,json=commandId,proto3" json:"command_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1740,6 +1742,13 @@ func (x *GetAIWorkflowRequest) GetRequestId() string {
 	return ""
 }
 
+func (x *GetAIWorkflowRequest) GetCommandId() string {
+	if x != nil {
+		return x.CommandId
+	}
+	return ""
+}
+
 type AIWorkflowResult struct {
 	state     protoimpl.MessageState `protogen:"open.v1"`
 	RequestId string                 `protobuf:"bytes,1,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
@@ -1751,8 +1760,9 @@ type AIWorkflowResult struct {
 	ReportId      string `protobuf:"bytes,6,opt,name=report_id,json=reportId,proto3" json:"report_id,omitempty"`
 	SourceVersion string `protobuf:"bytes,7,opt,name=source_version,json=sourceVersion,proto3" json:"source_version,omitempty"`
 	// Original selected references from the frozen input, not model-authored sources.
-	ReferenceMaterialJson        string `protobuf:"bytes,8,opt,name=reference_material_json,json=referenceMaterialJson,proto3" json:"reference_material_json,omitempty"`
-	ReferenceMaterialFingerprint string `protobuf:"bytes,9,opt,name=reference_material_fingerprint,json=referenceMaterialFingerprint,proto3" json:"reference_material_fingerprint,omitempty"`
+	ReferenceMaterialJson        string                `protobuf:"bytes,8,opt,name=reference_material_json,json=referenceMaterialJson,proto3" json:"reference_material_json,omitempty"`
+	ReferenceMaterialFingerprint string                `protobuf:"bytes,9,opt,name=reference_material_fingerprint,json=referenceMaterialFingerprint,proto3" json:"reference_material_fingerprint,omitempty"`
+	Operation                    *ParticipantOperation `protobuf:"bytes,10,opt,name=operation,proto3" json:"operation,omitempty"`
 	unknownFields                protoimpl.UnknownFields
 	sizeCache                    protoimpl.SizeCache
 }
@@ -1848,6 +1858,13 @@ func (x *AIWorkflowResult) GetReferenceMaterialFingerprint() string {
 		return x.ReferenceMaterialFingerprint
 	}
 	return ""
+}
+
+func (x *AIWorkflowResult) GetOperation() *ParticipantOperation {
+	if x != nil {
+		return x.Operation
+	}
+	return nil
 }
 
 // Current authorized report provenance only; no admission reservation or model call.
@@ -2028,7 +2045,7 @@ var File_interpretation_interpretation_proto protoreflect.FileDescriptor
 
 const file_interpretation_interpretation_proto_rawDesc = "" +
 	"\n" +
-	"#interpretation/interpretation.proto\x12\x0einterpretation\x1a\x1bevaluation/evaluation.proto\"c\n" +
+	"#interpretation/interpretation.proto\x12\x0einterpretation\x1a\x1bevaluation/evaluation.proto\x1a\x1einterpretation/messaging.proto\"c\n" +
 	"\n" +
 	"Suggestion\x12\x1a\n" +
 	"\bcategory\x18\x01 \x01(\tR\bcategory\x12\x18\n" +
@@ -2189,12 +2206,14 @@ const file_interpretation_interpretation_proto_rawDesc = "" +
 	"subject_id\x18\x02 \x01(\tR\tsubjectId\x12\x1b\n" +
 	"\ttestee_id\x18\x03 \x01(\tR\btesteeId\x12%\n" +
 	"\x0eassessment_ids\x18\x04 \x03(\tR\rassessmentIds\"\x1a\n" +
-	"\x18AIWorkflowAccessResponse\"w\n" +
+	"\x18AIWorkflowAccessResponse\"\x96\x01\n" +
 	"\x14GetAIWorkflowRequest\x12\x1b\n" +
 	"\ttestee_id\x18\x01 \x01(\x04R\btesteeId\x12#\n" +
 	"\rassessment_id\x18\x02 \x01(\x04R\fassessmentId\x12\x1d\n" +
 	"\n" +
-	"request_id\x18\x03 \x01(\tR\trequestId\"\xe9\x02\n" +
+	"request_id\x18\x03 \x01(\tR\trequestId\x12\x1d\n" +
+	"\n" +
+	"command_id\x18\x04 \x01(\tR\tcommandId\"\xad\x03\n" +
 	"\x10AIWorkflowResult\x12\x1d\n" +
 	"\n" +
 	"request_id\x18\x01 \x01(\tR\trequestId\x12\x16\n" +
@@ -2206,7 +2225,9 @@ const file_interpretation_interpretation_proto_rawDesc = "" +
 	"\treport_id\x18\x06 \x01(\tR\breportId\x12%\n" +
 	"\x0esource_version\x18\a \x01(\tR\rsourceVersion\x126\n" +
 	"\x17reference_material_json\x18\b \x01(\tR\x15referenceMaterialJson\x12D\n" +
-	"\x1ereference_material_fingerprint\x18\t \x01(\tR\x1creferenceMaterialFingerprint\"^\n" +
+	"\x1ereference_material_fingerprint\x18\t \x01(\tR\x1creferenceMaterialFingerprint\x12B\n" +
+	"\toperation\x18\n" +
+	" \x01(\v2$.interpretation.ParticipantOperationR\toperation\"^\n" +
 	"\x1aGetAIWorkflowSourceRequest\x12\x1b\n" +
 	"\ttestee_id\x18\x01 \x01(\x04R\btesteeId\x12#\n" +
 	"\rassessment_id\x18\x02 \x01(\x04R\fassessmentId\"\xb4\x01\n" +
@@ -2277,6 +2298,7 @@ var file_interpretation_interpretation_proto_goTypes = []any{
 	(*evaluation.ScoreValue)(nil),                // 27: evaluation.ScoreValue
 	(*evaluation.ResultLevel)(nil),               // 28: evaluation.ResultLevel
 	(*evaluation.ModelIdentity)(nil),             // 29: evaluation.ModelIdentity
+	(*ParticipantOperation)(nil),                 // 30: interpretation.ParticipantOperation
 }
 var file_interpretation_interpretation_proto_depIdxs = []int32{
 	27, // 0: interpretation.DimensionInterpret.derived_scores:type_name -> evaluation.ScoreValue
@@ -2295,30 +2317,31 @@ var file_interpretation_interpretation_proto_depIdxs = []int32{
 	14, // 13: interpretation.AIExplanationSuggestion.evidence_refs:type_name -> interpretation.AIExplanationEvidenceRef
 	15, // 14: interpretation.AIExplanationContent.integrated_insights:type_name -> interpretation.AIExplanationIntegratedInsight
 	16, // 15: interpretation.AIExplanationContent.suggestions:type_name -> interpretation.AIExplanationSuggestion
-	26, // 16: interpretation.AIWorkflowSource.ai_eligibility:type_name -> interpretation.AIEligibility
-	6,  // 17: interpretation.ParticipantReportService.GetAssessmentReport:input_type -> interpretation.GetAssessmentReportRequest
-	6,  // 18: interpretation.ParticipantReportService.GetAssessmentReportStatus:input_type -> interpretation.GetAssessmentReportRequest
-	9,  // 19: interpretation.ParticipantReportService.ListMyReports:input_type -> interpretation.ListMyReportsRequest
-	24, // 20: interpretation.ParticipantAIExplanationService.GetAIWorkflowSource:input_type -> interpretation.GetAIWorkflowSourceRequest
-	18, // 21: interpretation.ParticipantAIExplanationService.RequestAIWorkflow:input_type -> interpretation.RequestAIWorkflowRequest
-	22, // 22: interpretation.ParticipantAIExplanationService.GetAIWorkflow:input_type -> interpretation.GetAIWorkflowRequest
-	12, // 23: interpretation.InterpretationAutomationService.GenerateReportFromOutcome:input_type -> interpretation.GenerateReportFromOutcomeRequest
-	11, // 24: interpretation.InterpretationAutomationService.GenerateReportFromAssessment:input_type -> interpretation.GenerateReportFromAssessmentRequest
-	20, // 25: interpretation.AIWorkflowAccessService.Authorize:input_type -> interpretation.AIWorkflowAccessRequest
-	7,  // 26: interpretation.ParticipantReportService.GetAssessmentReport:output_type -> interpretation.GetAssessmentReportResponse
-	8,  // 27: interpretation.ParticipantReportService.GetAssessmentReportStatus:output_type -> interpretation.GetAssessmentReportStatusResponse
-	10, // 28: interpretation.ParticipantReportService.ListMyReports:output_type -> interpretation.ListMyReportsResponse
-	25, // 29: interpretation.ParticipantAIExplanationService.GetAIWorkflowSource:output_type -> interpretation.AIWorkflowSource
-	19, // 30: interpretation.ParticipantAIExplanationService.RequestAIWorkflow:output_type -> interpretation.AIWorkflowAccepted
-	23, // 31: interpretation.ParticipantAIExplanationService.GetAIWorkflow:output_type -> interpretation.AIWorkflowResult
-	13, // 32: interpretation.InterpretationAutomationService.GenerateReportFromOutcome:output_type -> interpretation.GenerateReportFromAssessmentResponse
-	13, // 33: interpretation.InterpretationAutomationService.GenerateReportFromAssessment:output_type -> interpretation.GenerateReportFromAssessmentResponse
-	21, // 34: interpretation.AIWorkflowAccessService.Authorize:output_type -> interpretation.AIWorkflowAccessResponse
-	26, // [26:35] is the sub-list for method output_type
-	17, // [17:26] is the sub-list for method input_type
-	17, // [17:17] is the sub-list for extension type_name
-	17, // [17:17] is the sub-list for extension extendee
-	0,  // [0:17] is the sub-list for field type_name
+	30, // 16: interpretation.AIWorkflowResult.operation:type_name -> interpretation.ParticipantOperation
+	26, // 17: interpretation.AIWorkflowSource.ai_eligibility:type_name -> interpretation.AIEligibility
+	6,  // 18: interpretation.ParticipantReportService.GetAssessmentReport:input_type -> interpretation.GetAssessmentReportRequest
+	6,  // 19: interpretation.ParticipantReportService.GetAssessmentReportStatus:input_type -> interpretation.GetAssessmentReportRequest
+	9,  // 20: interpretation.ParticipantReportService.ListMyReports:input_type -> interpretation.ListMyReportsRequest
+	24, // 21: interpretation.ParticipantAIExplanationService.GetAIWorkflowSource:input_type -> interpretation.GetAIWorkflowSourceRequest
+	18, // 22: interpretation.ParticipantAIExplanationService.RequestAIWorkflow:input_type -> interpretation.RequestAIWorkflowRequest
+	22, // 23: interpretation.ParticipantAIExplanationService.GetAIWorkflow:input_type -> interpretation.GetAIWorkflowRequest
+	12, // 24: interpretation.InterpretationAutomationService.GenerateReportFromOutcome:input_type -> interpretation.GenerateReportFromOutcomeRequest
+	11, // 25: interpretation.InterpretationAutomationService.GenerateReportFromAssessment:input_type -> interpretation.GenerateReportFromAssessmentRequest
+	20, // 26: interpretation.AIWorkflowAccessService.Authorize:input_type -> interpretation.AIWorkflowAccessRequest
+	7,  // 27: interpretation.ParticipantReportService.GetAssessmentReport:output_type -> interpretation.GetAssessmentReportResponse
+	8,  // 28: interpretation.ParticipantReportService.GetAssessmentReportStatus:output_type -> interpretation.GetAssessmentReportStatusResponse
+	10, // 29: interpretation.ParticipantReportService.ListMyReports:output_type -> interpretation.ListMyReportsResponse
+	25, // 30: interpretation.ParticipantAIExplanationService.GetAIWorkflowSource:output_type -> interpretation.AIWorkflowSource
+	19, // 31: interpretation.ParticipantAIExplanationService.RequestAIWorkflow:output_type -> interpretation.AIWorkflowAccepted
+	23, // 32: interpretation.ParticipantAIExplanationService.GetAIWorkflow:output_type -> interpretation.AIWorkflowResult
+	13, // 33: interpretation.InterpretationAutomationService.GenerateReportFromOutcome:output_type -> interpretation.GenerateReportFromAssessmentResponse
+	13, // 34: interpretation.InterpretationAutomationService.GenerateReportFromAssessment:output_type -> interpretation.GenerateReportFromAssessmentResponse
+	21, // 35: interpretation.AIWorkflowAccessService.Authorize:output_type -> interpretation.AIWorkflowAccessResponse
+	27, // [27:36] is the sub-list for method output_type
+	18, // [18:27] is the sub-list for method input_type
+	18, // [18:18] is the sub-list for extension type_name
+	18, // [18:18] is the sub-list for extension extendee
+	0,  // [0:18] is the sub-list for field type_name
 }
 
 func init() { file_interpretation_interpretation_proto_init() }
@@ -2326,6 +2349,7 @@ func file_interpretation_interpretation_proto_init() {
 	if File_interpretation_interpretation_proto != nil {
 		return
 	}
+	file_interpretation_messaging_proto_init()
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{

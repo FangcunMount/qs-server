@@ -289,7 +289,7 @@ EXPECTED_SIGNALS = {
     "typology_model_cache_changed",
 }
 
-EXPECTED_MIGRATION_MAX = {"mysql": 90, "mongodb": 36}
+EXPECTED_MIGRATION_MAX = {"mysql": 95, "mongodb": 36}
 EXPECTED_DOC_STATUS = {"aligned", "drifted", "needs_review", "planned", "archive_candidate"}
 EXPECTED_OWNERS = {
     "overview",
@@ -3578,11 +3578,14 @@ def priority_infrastructure_doc_contract_issues() -> list[Issue]:
                 )
 
     go_mod = (ROOT / "go.mod").read_text(encoding="utf-8")
+    # mq-ai.2 fixes only the new durable final-ACK failure budget. Legacy
+    # subscriber/relay/wire and contracts remain unchanged from mq-ai.1
+    # (read-only source audit, not original Go business acceptance).
     # The current subscriber and terminal handoff belong to the fixed SDK.
     # component-base v0.8.0 has no messaging/signaling packages; the old v0.6.11
     # contract is exercised only by independently built historical fixtures.
     if not (
-        re.search(r"^\s*github\.com/FangcunMount/reliable-messaging\s+v0\.3\.0-m6\.4\s*$", go_mod, flags=re.M)
+        re.search(r"^\s*github\.com/FangcunMount/reliable-messaging\s+v0\.3\.0-mq-ai\.2\s*$", go_mod, flags=re.M)
         and re.search(r"^\s*github\.com/FangcunMount/component-base\s+v0\.8\.0\s*$", go_mod, flags=re.M)
     ):
         issues.append(

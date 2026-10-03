@@ -4,11 +4,13 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
 
 	app "github.com/FangcunMount/qs-server/internal/collection-server/application/aiexplanation"
+	"github.com/FangcunMount/qs-server/internal/pkg/aicommand"
 	"github.com/FangcunMount/qs-server/internal/pkg/resilience/ratelimit"
 	"github.com/FangcunMount/qs-server/pkg/core"
 	"github.com/gin-gonic/gin"
@@ -66,6 +68,10 @@ func (h *AIExplanationHandler) respondError(c *gin.Context, err error) {
 	case codes.FailedPrecondition, codes.Aborted, codes.AlreadyExists:
 		h.ConflictResponse(c, "AI explanation request cannot be completed", nil)
 	case codes.ResourceExhausted:
+		if grpcstatus.Convert(err).Message() == aicommand.AdmissionClosedReason {
+			c.JSON(http.StatusTooManyRequests, core.ErrResponse{Code: http.StatusTooManyRequests, Message: aicommand.AdmissionClosedReason})
+			return // reopening is an operator decision, not a daily capacity reset
+		}
 		ratelimit.ApplyRetryAfterSeconds(c.Writer.Header(), secondsUntilNextUTCDate(time.Now()))
 		c.JSON(http.StatusTooManyRequests, core.ErrResponse{Code: http.StatusTooManyRequests, Message: "AI explanation daily capacity exceeded"})
 	case codes.Unavailable, codes.DeadlineExceeded:
@@ -119,7 +125,15 @@ func (h *AIExplanationHandler) RequestWorkflow(c *gin.Context) {
 		h.respondError(c, err)
 		return
 	}
-	c.JSON(http.StatusAccepted, core.Response{Code: 0, Message: "accepted", Data: result})
+	if result.Status == "submitted" {
+		copyResult := *result
+		result = &copyResult
+		result.OperationID = request.RequestID
+		result.CommandID = request.RequestID
+		q := url.Values{"testee_id": {strconv.FormatUint(testeeID, 10)}, "assessment_id": {strconv.FormatUint(assessmentID, 10)}, "request_id": {request.RequestID}}
+		result.StatusURL = "/api/v1/interpretation/ai-workflow/operations/" + request.RequestID + "?" + q.Encode()
+	}
+	c.JSON(http.StatusAccepted, core.Response{Code: 0, Message: result.Status, Data: result})
 }
 
 // GetWorkflow reads a durable AI result with current participant authorization.
@@ -183,4 +197,54 @@ func (h *AIExplanationHandler) GetWorkflowSource(c *gin.Context) {
 		return
 	}
 	h.Success(c, result)
+}
+
+// GetOperation is read-only and forwards identity through the existing delegated
+// participant boundary. UUID possession never authorizes a query.
+// @Summary 查询本人 AI 工作流命令的持久操作状态
+// @Tags AI解读
+// @Produce json
+// @Param command_id path string true "原命令UUID"
+// @Param request_id query string true "原请求UUID"
+// @Param testee_id query string true "受试者ID"
+// @Param assessment_id query string true "测评ID"
+// @Success 200 {object} core.Response{data=app.WorkflowOperation}
+// @Failure 400 {object} core.ErrResponse
+// @Failure 403 {object} core.ErrResponse
+// @Failure 404 {object} core.ErrResponse
+// @Failure 503 {object} core.ErrResponse
+// @Security BearerAuth
+// @Router /api/v1/interpretation/ai-workflow/operations/{command_id} [get]
+func (h *AIExplanationHandler) GetOperation(c *gin.Context) {
+	parse := func(key string) (uint64, error) {
+		raw := c.Query(key)
+		n, e := strconv.ParseUint(raw, 10, 64)
+		if e != nil || n == 0 || strconv.FormatUint(n, 10) != raw {
+			return 0, app.ErrInvalidRequest
+		}
+		return n, nil
+	}
+	testee, e := parse("testee_id")
+	if e != nil {
+		h.respondError(c, e)
+		return
+	}
+	assessment, e := parse("assessment_id")
+	if e != nil {
+		h.respondError(c, e)
+		return
+	}
+	s, ok := h.service.(interface {
+		GetWorkflowOperation(context.Context, uint64, uint64, string, string) (*app.WorkflowOperation, error)
+	})
+	if !ok {
+		h.respondError(c, app.ErrUnavailable)
+		return
+	}
+	o, e := s.GetWorkflowOperation(c.Request.Context(), testee, assessment, c.Query("request_id"), c.Param("command_id"))
+	if e != nil {
+		h.respondError(c, e)
+		return
+	}
+	c.JSON(http.StatusOK, core.Response{Code: 0, Message: "success", Data: o})
 }

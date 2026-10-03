@@ -62,14 +62,9 @@ func (s *ParticipantAdministration) Retry(ctx context.Context, scope DraftScope,
 	if err := s.authorize(ctx, scope); err != nil {
 		return Receipt{}, err
 	}
-	for _, id := range []string{sessionID, command.CommandID, command.ExpectedRunID} {
-		if !validID(id) || id == "00000000-0000-0000-0000-000000000000" {
-			return Receipt{}, ErrInvalid
-		}
-	}
-	command.Reason = strings.TrimSpace(command.Reason)
-	if command.ExpectedVersion < 1 || command.ExpectedVersion == math.MaxInt64 || !command.Confirm || command.ExpectedProviderInvocations != 1 || command.Reason == "" || len(command.Reason) > 1000 || strings.ContainsAny(command.Reason, "<>\x00") {
-		return Receipt{}, ErrInvalid
+	command, err := normalizeParticipantRetry(sessionID, command)
+	if err != nil {
+		return Receipt{}, err
 	}
 	return s.Gateway.RetryParticipant(ctx, scope, sessionID, command)
 }
@@ -81,4 +76,17 @@ func (s *ParticipantAdministration) RetryReceipt(ctx context.Context, scope Draf
 		return Receipt{}, ErrInvalid
 	}
 	return s.Gateway.GetParticipantRetryReceipt(ctx, scope, commandID)
+}
+
+func normalizeParticipantRetry(sessionID string, command ParticipantRetry) (ParticipantRetry, error) {
+	for _, id := range []string{sessionID, command.CommandID, command.ExpectedRunID} {
+		if !validID(id) || id == "00000000-0000-0000-0000-000000000000" {
+			return command, ErrInvalid
+		}
+	}
+	command.Reason = strings.TrimSpace(command.Reason)
+	if command.ExpectedVersion < 1 || command.ExpectedVersion == math.MaxInt64 || !command.Confirm || command.ExpectedProviderInvocations != 1 || command.Reason == "" || len(command.Reason) > 1000 || strings.ContainsAny(command.Reason, "<>\x00") {
+		return command, ErrInvalid
+	}
+	return command, nil
 }

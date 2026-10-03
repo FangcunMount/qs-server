@@ -30,6 +30,7 @@ func DialGovernanceClients(address, caFile, certFile, keyFile string) (*Evaluati
 }
 
 type GovernanceClients struct {
+	Payloads       *MessagingPayloadClient
 	Flows          *FlowClient
 	Runtime        *RuntimeClient
 	SemanticDrafts *SemanticDraftClient
@@ -64,5 +65,5 @@ func DialGovernance(address, caFile, certFile, keyFile string) (*GovernanceClien
 	if err != nil {
 		return nil, err
 	}
-	return &GovernanceClients{Flows: NewFlowClient(conn), Runtime: NewRuntimeClient(conn), SemanticDrafts: NewSemanticDraftClient(conn), Quotas: NewQuotaClient(conn), Solutions: NewSolutionClient(conn), Commands: New(conn), Participants: NewParticipantClient(conn), Assets: NewAssetCatalogClient(conn), Evaluation: NewEvaluationClient(conn), Publications: NewPublicationClient(conn), PromptDrafts: NewPromptDraftClient(conn), Suites: NewSuiteClient(conn), Profiles: NewProfileClient(conn), Connection: conn}, nil
+	return &GovernanceClients{Payloads: NewMessagingPayloadClient(conn), Flows: NewFlowClient(conn), Runtime: NewRuntimeClient(conn), SemanticDrafts: NewSemanticDraftClient(conn), Quotas: NewQuotaClient(conn), Solutions: NewSolutionClient(conn), Commands: New(conn), Participants: NewParticipantClient(conn), Assets: NewAssetCatalogClient(conn), Evaluation: NewEvaluationClient(conn), Publications: NewPublicationClient(conn), PromptDrafts: NewPromptDraftClient(conn), Suites: NewSuiteClient(conn), Profiles: NewProfileClient(conn), Connection: conn}, nil
 }

@@ -31,7 +31,7 @@ func (s *Service) RequestWorkflow(ctx context.Context, testeeID, assessmentID ui
 	if err != nil {
 		return nil, err
 	}
-	if result == nil || result.RequestID != request.RequestID || result.Status != "accepted" {
+	if result == nil || result.RequestID != request.RequestID || (result.Status != "accepted" && result.Status != "submitted") {
 		return nil, ErrUnavailable
 	}
 	return result, nil
@@ -89,4 +89,30 @@ func (s *Service) GetWorkflowSource(ctx context.Context, testeeID, assessmentID 
 		return nil, ErrUnavailable
 	}
 	return result, nil
+}
+
+type WorkflowOperation = aiport.WorkflowOperation
+
+func (s *Service) GetWorkflowOperation(ctx context.Context, testeeID, assessmentID uint64, requestID, commandID string) (*WorkflowOperation, error) {
+	for _, raw := range []string{requestID, commandID} {
+		id, err := uuid.Parse(raw)
+		if err != nil || id == uuid.Nil || id.String() != raw {
+			return nil, ErrInvalidRequest
+		}
+	}
+	if testeeID == 0 || assessmentID == 0 {
+		return nil, ErrInvalidRequest
+	}
+	reader, ok := s.client.(aiport.WorkflowOperationReader)
+	if !ok {
+		return nil, ErrUnavailable
+	}
+	o, err := reader.GetWorkflowOperation(ctx, testeeID, assessmentID, requestID, commandID)
+	if err != nil {
+		return nil, err
+	}
+	if o == nil || o.CommandID != commandID || o.OperationID != commandID {
+		return nil, ErrUnavailable
+	}
+	return o, nil
 }
