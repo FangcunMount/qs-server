@@ -9,15 +9,20 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+// SubmittedOperation proves only the QS transaction committed, not AI acceptance.
+type SubmittedOperation struct {
+	OperationID string `json:"operation_id"`
+	CommandID   string `json:"command_id"`
+	Status      string `json:"status"`
+	StatusURL   string `json:"status_url"`
+}
+
 // submittedCommand is a durable QS submission, not an AI admission receipt.
 func submittedCommand(c *gin.Context, id string) {
 	prefix := strings.SplitN(c.Request.URL.Path, "/interpretation/", 2)[0]
-	c.JSON(http.StatusAccepted, core.Response{Code: 0, Message: "submitted", Data: struct {
-		OperationID string `json:"operation_id"`
-		CommandID   string `json:"command_id"`
-		Status      string `json:"status"`
-		StatusURL   string `json:"status_url"`
-	}{id, id, "submitted", prefix + "/interpretation/ai-workflow/operations/" + id}})
+	c.JSON(http.StatusAccepted, core.Response{Code: 0, Message: "submitted", Data: SubmittedOperation{
+		OperationID: id, CommandID: id, Status: "submitted", StatusURL: prefix + "/interpretation/ai-workflow/operations/" + id,
+	}})
 }
 
 type AIWorkflowOperationsHandler struct {

@@ -18,7 +18,7 @@ func TestRuntimeIndexAtomicScopeAndStablePagination(t *testing.T) {
 	ctx := context.Background()
 	foreign.Actor.OrgID = "2"
 	for _, r := range []app.Start{a, b, foreign} {
-		if e := s.StageStart(ctx, r); e != nil {
+		if e := seedLegacyStartFixture(ctx, r, s); e != nil {
 			t.Fatal(e)
 		}
 	}
@@ -52,7 +52,7 @@ func TestRuntimeIndexAtomicScopeAndStablePagination(t *testing.T) {
 	}
 	changed := a
 	changed.AssessmentIDs = []string{"99"}
-	if e = s.StageStart(ctx, changed); !errors.Is(e, app.ErrConflict) {
+	if e = persistOriginalFixture(ctx, changed, s); !errors.Is(e, app.ErrConflict) {
 		t.Fatal(e)
 	}
 	var n int
@@ -66,7 +66,7 @@ func TestRuntimeHistoricalBackfillResumesWithoutInventingDates(t *testing.T) {
 	_, b := fixture(t)
 	ctx := context.Background()
 	for _, r := range []app.Start{a, b} {
-		if e := s.StageStart(ctx, r); e != nil {
+		if e := seedLegacyStartFixture(ctx, r, s); e != nil {
 			t.Fatal(e)
 		}
 		if _, e := s.DB.Exec("UPDATE ai_bridge_requests SET organization_id=NULL,subject_id=NULL,testee_id=NULL,created_at=NULL,updated_at=NULL WHERE request_id=?", r.RequestID); e != nil {
@@ -108,7 +108,7 @@ func TestRuntimeBackfillRejectsCorruptScopeWithoutPartialWrites(t *testing.T) {
 	_, b := fixture(t)
 	ctx := context.Background()
 	for _, r := range []app.Start{a, b} {
-		if e := s.StageStart(ctx, r); e != nil {
+		if e := seedLegacyStartFixture(ctx, r, s); e != nil {
 			t.Fatal(e)
 		}
 	}
@@ -139,7 +139,7 @@ func TestRuntimeUTCDoesNotDependOnDriverLocation(t *testing.T) {
 	defer func() { _ = db.Close() }()
 	store := &Store{DB: db}
 	before := time.Now().UTC().Add(-time.Second)
-	if err = store.StageStart(ctx, r); err != nil {
+	if err = seedLegacyStartFixture(ctx, r, store); err != nil {
 		t.Fatal(err)
 	}
 	page, err := store.ListRuntime(ctx, 1, app.RuntimeQuery{Since: before, Until: time.Now().UTC().Add(time.Second)})

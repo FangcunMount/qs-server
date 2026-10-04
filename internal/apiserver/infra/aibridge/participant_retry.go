@@ -2,7 +2,6 @@ package aibridge
 
 import (
 	"context"
-	"errors"
 	"strconv"
 	"time"
 
@@ -54,19 +53,6 @@ func participantReceipt(r *pb.Receipt) (app.Receipt, error) {
 		return app.Receipt{}, app.ErrConflict
 	}
 	return app.Receipt{SessionID: r.SessionId, RunID: r.RunId, Status: r.Status, Version: r.Version}, nil
-}
-func (c *ParticipantClient) RetryParticipant(ctx context.Context, scope app.DraftScope, sessionID string, command app.ParticipantRetry) (app.Receipt, error) {
-	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
-	defer cancel()
-	r, err := c.RPC.Retry(ctx, &pb.ParticipantRetryCommand{Scope: draftScope(scope), SessionId: sessionID, CommandId: command.CommandID, ExpectedRunId: command.ExpectedRunID, ExpectedVersion: command.ExpectedVersion, Reason: command.Reason, Confirm: command.Confirm, ExpectedProviderInvocations: command.ExpectedProviderInvocations, AcceptResultUnknownRisk: command.AcceptResultUnknownRisk}, grpc.MaxCallRecvMsgSize(4096))
-	if err != nil {
-		return app.Receipt{}, err
-	}
-	value, err := participantReceipt(r)
-	if err != nil || value.SessionID != sessionID || value.RunID == command.ExpectedRunID || value.Version != command.ExpectedVersion+1 {
-		return app.Receipt{}, errors.New("participant retry outcome unknown; query original command")
-	}
-	return value, nil
 }
 func (c *ParticipantClient) GetParticipantRetryReceipt(ctx context.Context, scope app.DraftScope, commandID string) (app.Receipt, error) {
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)

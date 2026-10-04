@@ -4,24 +4,16 @@ package main
 
 import (
 	"context"
-	"crypto/tls"
-	"crypto/x509"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
-	"net"
 	"os"
 
-	pb "github.com/FangcunMount/qs-server/api/grpc/gen/aiworkflow"
-	app "github.com/FangcunMount/qs-server/internal/apiserver/application/aibridge"
-	sender "github.com/FangcunMount/qs-server/internal/apiserver/infra/aibridge"
 	store "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/aibridge"
-	receiver "github.com/FangcunMount/qs-server/internal/apiserver/transport/grpc/aibridge"
 	_ "github.com/go-sql-driver/mysql"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials"
 )
 
 func main() {
@@ -34,15 +26,26 @@ func main() {
 	}
 }
 func run(output io.Writer) error {
-	mode := flag.String("mode", "", "stage-start, stage-change, relay, receive, projection, runtime-index-backfill")
-	address := flag.String("address", "", "bind address or AI target")
-	input := flag.String("input", "", "JSON command file")
-	id := flag.String("request-id", "", "business request ID")
-	ca := flag.String("ca", "", "CA file")
-	cert := flag.String("cert", "", "certificate")
-	key := flag.String("key", "", "private key")
-	batch := flag.Int("batch-size", 100, "runtime index backfill transaction size (1-500)")
-	flag.Parse()
+	return runArgs(output, os.Args[1:])
+}
+
+// runArgs rejects retired transport modes before opening a pool or reading keys.
+func runArgs(output io.Writer, args []string) error {
+	flags := flag.NewFlagSet("qs-ai-bridge", flag.ContinueOnError)
+	flags.SetOutput(io.Discard)
+	mode := flags.String("mode", "", "projection or runtime-index-backfill")
+	id := flags.String("request-id", "", "business request ID")
+	batch := flags.Int("batch-size", 100, "runtime index backfill transaction size (1-500)")
+	if err := flags.Parse(args); err != nil {
+		return err
+	}
+	switch *mode {
+	case "stage-start", "stage-change", "relay", "receive":
+		return errors.New("legacy AI transport retired; use the host MQ operation path")
+	case "projection", "runtime-index-backfill":
+	default:
+		return errors.New("read or maintenance mode required")
+	}
 	ctx := context.Background()
 	db, err := sql.Open("mysql", os.Getenv("QS_AI_BRIDGE_DSN"))
 	if err != nil {
@@ -50,92 +53,24 @@ func run(output io.Writer) error {
 	}
 	defer func() { _ = db.Close() }()
 	db.SetMaxOpenConns(5)
-	s := &app.Service{Store: &store.Store{DB: db}}
-	switch *mode {
-	case "runtime-index-backfill":
-		for {
-			n, e := (&store.Store{DB: db}).BackfillRuntimeIndexes(ctx, *batch)
-			if e != nil {
-				return e
-			}
-			if _, err := fmt.Fprintf(output, "indexed=%d\n", n); err != nil {
-				return err
-			}
-			if n == 0 {
-				return nil
-			}
-		}
-
-	case "stage-start":
-		var r app.Start
-		if err = read(*input, &r); err != nil {
+	original := &store.Store{DB: db}
+	if *mode == "projection" {
+		value, err := original.Projection(ctx, *id)
+		if err != nil {
 			return err
 		}
-		return s.Start(ctx, r)
-	case "stage-change":
-		var r app.Change
-		if err = read(*input, &r); err != nil {
-			return err
-		}
-		return s.Change(ctx, *id, r)
-	case "projection":
-		v, e := s.Store.Projection(ctx, *id)
-		if e != nil {
-			return e
-		}
-		return json.NewEncoder(output).Encode(v)
-	case "relay", "receive":
-		pair, e := tls.LoadX509KeyPair(*cert, *key)
-		if e != nil {
-			return e
-		}
-		roots, e := os.ReadFile(*ca)
-		if e != nil {
-			return e
-		}
-		pool := x509.NewCertPool()
-		if !pool.AppendCertsFromPEM(roots) {
-			return fmt.Errorf("invalid CA")
-		}
-		config := &tls.Config{MinVersion: tls.VersionTLS13, Certificates: []tls.Certificate{pair}, RootCAs: pool}
-		if *mode == "relay" {
-			conn, e := grpc.NewClient(*address, grpc.WithTransportCredentials(credentials.NewTLS(config)), grpc.WithDisableRetry())
-			if e != nil {
-				return e
-			}
-			defer func() { _ = conn.Close() }()
-			s.Sender = sender.New(conn)
-			n, e := s.Relay(ctx)
-			if e != nil {
-				return e
-			}
-			_, err := fmt.Fprintln(output, n)
-			return err
-		}
-		config.ClientCAs = pool
-		config.ClientAuth = tls.RequireAndVerifyClientCert
-		// The artifact envelope is bounded at 128 KiB by the application;
-		// allow room for the surrounding protobuf event and actor metadata.
-		server := grpc.NewServer(grpc.Creds(credentials.NewTLS(config)), grpc.MaxRecvMsgSize(256*1024))
-		defer server.Stop()
-		pb.RegisterResultsServer(server, &receiver.Receiver{Service: s})
-		listener, e := net.Listen("tcp", *address)
-		if e != nil {
-			return e
-		}
-		if _, err := fmt.Fprintln(output, "LISTENING", listener.Addr().String()); err != nil {
-			_ = listener.Close()
-			return err
-		}
-		return server.Serve(listener)
-	default:
-		return fmt.Errorf("mode required")
+		return json.NewEncoder(output).Encode(value)
 	}
-}
-func read(path string, value any) error {
-	raw, err := os.ReadFile(path)
-	if err != nil {
-		return err
+	for {
+		count, err := original.BackfillRuntimeIndexes(ctx, *batch)
+		if err != nil {
+			return err
+		}
+		if _, err := fmt.Fprintf(output, "indexed=%d\n", count); err != nil {
+			return err
+		}
+		if count == 0 {
+			return nil
+		}
 	}
-	return json.Unmarshal(raw, value)
 }

@@ -10139,8 +10139,8 @@
                     }
                 ],
                 "responses": {
-                    "200": {
-                        "description": "OK",
+                    "202": {
+                        "description": "Accepted",
                         "schema": {
                             "allOf": [
                                 {
@@ -10150,7 +10150,7 @@
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/aibridge.EvaluationState"
+                                            "$ref": "#/definitions/handler.SubmittedOperation"
                                         }
                                     }
                                 }
@@ -10183,6 +10183,12 @@
                     },
                     "409": {
                         "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "429": {
+                        "description": "Too Many Requests",
                         "schema": {
                             "$ref": "#/definitions/core.ErrResponse"
                         }
@@ -11196,8 +11202,8 @@
                     }
                 ],
                 "responses": {
-                    "200": {
-                        "description": "OK",
+                    "202": {
+                        "description": "Accepted",
                         "schema": {
                             "allOf": [
                                 {
@@ -11207,7 +11213,7 @@
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/aibridge.EvaluationState"
+                                            "$ref": "#/definitions/handler.SubmittedOperation"
                                         }
                                     }
                                 }
@@ -11240,6 +11246,12 @@
                     },
                     "409": {
                         "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "429": {
+                        "description": "Too Many Requests",
                         "schema": {
                             "$ref": "#/definitions/core.ErrResponse"
                         }
@@ -11497,8 +11509,8 @@
                     }
                 ],
                 "responses": {
-                    "200": {
-                        "description": "OK",
+                    "202": {
+                        "description": "Accepted",
                         "schema": {
                             "allOf": [
                                 {
@@ -11508,7 +11520,7 @@
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/aibridge.Receipt"
+                                            "$ref": "#/definitions/handler.SubmittedOperation"
                                         }
                                     }
                                 }
@@ -13555,6 +13567,9 @@
         "aibridge.EvaluationCancel": {
             "type": "object",
             "properties": {
+                "command_id": {
+                    "type": "string"
+                },
                 "confirm": {
                     "type": "boolean"
                 },
@@ -13967,6 +13982,9 @@
         "aibridge.EvaluationStart": {
             "type": "object",
             "properties": {
+                "command_id": {
+                    "type": "string"
+                },
                 "confirm": {
                     "type": "boolean"
                 },
@@ -16331,6 +16349,23 @@
                 },
                 "validate_only": {
                     "type": "boolean"
+                }
+            }
+        },
+        "handler.SubmittedOperation": {
+            "type": "object",
+            "properties": {
+                "command_id": {
+                    "type": "string"
+                },
+                "operation_id": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "status_url": {
+                    "type": "string"
                 }
             }
         },

@@ -5,6 +5,19 @@ import sys
 from pathlib import Path
 
 required = {
+    "TestMQWorkflowCancelRouteRequiresOrgAdminAndGovernanceDependency",
+    "TestMQParticipantRetryRoutesRequireCurrentAdminAndTrustedScope",
+    "TestMQRetiredResultsRPCNeverPersistsOrAcknowledges",
+    "TestMQOriginalProjectionStoreCannotSubmitOrDeliverLegacyCommands",
+    "TestMQConcurrentSubmissionRetainsFirstWire",
+    "TestMQCommandsUseUTCWithNonUTCSessions",
+    "TestMQRuntimeGatewaysCannotExposeRetiredGRPCWrites",
+    "TestMQManagementSubmissionNeverRetriesUncertainCommit",
+    "TestMQRetiredBridgeModesRejectBeforeStorageOrTransport",
+    "TestMQRetirementNeverStartsLegacyTransportOrExportsResultIngress",
+    "TestMQHTTP202MeansQSCommitAndUsesOriginalCommandIdentity/start/missing_transport",
+    "TestMQHTTP202MeansQSCommitAndUsesOriginalCommandIdentity/cancel/missing_transport",
+    "TestMQHTTP202MeansQSCommitAndUsesOriginalCommandIdentity/retry/missing_transport",
     "TestMQFinalAckRepeatedSuccessRetainsBudgetAndOriginalProjection",
     "TestMQHeldFinalAckDuplicateCannotRenewBudgetOrPublish",
     "TestMQBindingRejectsAmbiguousOrOutOfScopeInputs",

@@ -68,7 +68,7 @@ jobs:
           mkdir -p artifacts
           go test -p 1 -tags=integration -count=1 -race -json ./internal/apiserver/application/aibridge ./internal/apiserver/infra/mysql/aibridge ./internal/apiserver/infra/aibridge ./internal/apiserver/transport/grpc/aibridge > artifacts/ai-mq-tests.json
           {
-            go test -count=1 -race -json ./internal/apiserver/transport/rest/handler ./internal/apiserver/transport/rest -run '^TestMQ'
+            go test -count=1 -race -json ./cmd/qs-ai-bridge ./internal/apiserver/transport/rest/handler ./internal/apiserver/transport/rest -run '^TestMQ'
             go test -count=1 -race -json ./internal/apiserver/container/modules/interpretation ./internal/apiserver/options ./internal/apiserver/transport/grpc/service ./internal/collection-server/transport/rest/handler -run '^TestMQ'
             go test -count=1 -race -json ./internal/apiserver/transport/grpc ./internal/collection-server/infra/grpcclient ./internal/collection-server/application/aiexplanation ./internal/collection-server/transport/rest
             go test -tags=integration -count=1 -race -json ./cmd/qs-ai-messaging-audit

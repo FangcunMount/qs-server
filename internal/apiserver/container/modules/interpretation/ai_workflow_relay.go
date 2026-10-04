@@ -5,23 +5,14 @@ import (
 	"fmt"
 )
 
-// StartAIWorkflowRelay is called once by process bootstrap, after dependencies are ready.
-// Cleanup cancels and joins it before closing the shared gRPC connection or database.
+// StartAIWorkflowRelay starts only the shared MQ runtime after dependencies are ready.
+// Query-only hosts do not start a sender; MQ cannot fall back to retired gRPC writes.
 func (m *Module) StartAIWorkflowRelay(ctx context.Context) error {
 	if m != nil && m.aiMessagingRuntime != nil {
 		return m.aiMessagingRuntime.Start(ctx)
 	}
-	if m == nil || !m.aiWorkflowEnabled || m.aiRelayCancel != nil {
-		return nil
+	if m != nil && m.aiWorkflowEnabled {
+		return fmt.Errorf("AI runtime command intake requires the MQ runtime")
 	}
-	if m.aiBridge == nil || m.aiBridge.Store == nil || m.aiBridge.Sender == nil {
-		return fmt.Errorf("AI command relay dependencies are not configured")
-	}
-	ctx, m.aiRelayCancel = context.WithCancel(ctx)
-	m.aiRelayDone = make(chan struct{})
-	go func() {
-		defer close(m.aiRelayDone)
-		m.aiBridge.ServeRelay(ctx)
-	}()
 	return nil
 }

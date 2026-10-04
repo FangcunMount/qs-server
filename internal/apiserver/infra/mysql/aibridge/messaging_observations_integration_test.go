@@ -28,7 +28,7 @@ func TestMQDuplicateObservationSharesAckTransactionAndOriginalProjection(t *test
 	f := newMQFixture(t)
 	ctx := context.Background()
 	legacy := &Store{DB: f.db}
-	mustMQ(t, legacy.StageStart(ctx, f.request))
+	mustMQ(t, seedLegacyStartFixture(ctx, f.request, legacy))
 	state := &pb.StateEvent{EventId: uuid.NewString(), RequestId: f.request.RequestID, SessionId: f.session, Actor: &pb.Actor{OrgId: f.scope.OrganizationID, SubjectId: f.scope.SubjectID}, TesteeId: f.request.TesteeID, Version: 8, Status: "cancelled"}
 	event := f.protect(pb.MessagingKind_INTERPRETATION_STATE, state.EventId, f.request.RequestID, "", &pb.MessagingBody{Value: &pb.MessagingBody_InterpretationState{InterpretationState: state}}, true)
 	seals := 0

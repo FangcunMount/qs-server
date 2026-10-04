@@ -13,12 +13,13 @@ import (
 // @Produce json
 // @Param run_id path string true "评测 Run UUID"
 // @Param body body app.EvaluationCancel true "取消确认"
-// @Success 200 {object} core.Response{data=app.EvaluationState}
+// @Success 202 {object} core.Response{data=SubmittedOperation}
 // @Failure 400 {object} core.ErrResponse
 // @Failure 401 {object} core.ErrResponse
 // @Failure 403 {object} core.ErrResponse
 // @Failure 404 {object} core.ErrResponse
 // @Failure 409 {object} core.ErrResponse
+// @Failure 429 {object} core.ErrResponse
 // @Failure 500 {object} core.ErrResponse
 // @Router /internal/v2/interpretation/ai-workflow/evaluations/{run_id}/cancel [post]
 func (h *AIWorkflowManagementHandler) Cancel(c *gin.Context) {
@@ -30,18 +31,9 @@ func (h *AIWorkflowManagementHandler) Cancel(c *gin.Context) {
 	if err := h.BindJSON(c, &command); err != nil {
 		return
 	}
-	if h.service.Messages != nil {
-		if err := h.service.SubmitCancel(c.Request.Context(), scope, command); err != nil {
-			h.failure(c, err)
-			return
-		}
-		submittedCommand(c, command.CommandID)
-		return
-	}
-	value, err := h.service.Cancel(c.Request.Context(), scope, command)
-	if err != nil {
+	if err := h.service.SubmitCancel(c.Request.Context(), scope, command); err != nil {
 		h.failure(c, err)
 		return
 	}
-	h.Success(c, value)
+	submittedCommand(c, command.CommandID)
 }

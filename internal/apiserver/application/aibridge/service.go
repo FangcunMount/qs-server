@@ -3,7 +3,6 @@ package aibridge
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"strconv"
 
@@ -67,28 +66,14 @@ type Event struct {
 	FailureCode  string `json:"failure_code"`
 	ArtifactJSON string `json:"artifact_json,omitempty"`
 }
-type Command struct {
-	ID        string
-	RequestID string
-	Kind      string
-	Payload   json.RawMessage
-}
 type Store interface {
 	StageStart(context.Context, Start) error
 	Original(context.Context, string) (*Start, error)
 	StageChange(context.Context, string, Change) error
-	Pending(context.Context, int) ([]Command, error)
-	Acknowledge(context.Context, Command, Receipt) error
-	Retry(context.Context, string) error
-	Accept(context.Context, Event) error
 	Projection(context.Context, string) (*Event, error)
 }
-type Sender interface {
-	Send(context.Context, Command) (Receipt, error)
-}
 type Service struct {
-	Store  Store
-	Sender Sender
+	Store Store
 }
 
 func validID(s string) bool { id, err := uuid.Parse(s); return err == nil && id.String() == s }
@@ -118,32 +103,8 @@ func (s *Service) Change(ctx context.Context, id string, r Change) error {
 	}
 	return s.Store.StageChange(ctx, id, r)
 }
-func (s *Service) Relay(ctx context.Context) (int, error) {
-	commands, err := s.Store.Pending(ctx, 20)
-	if err != nil {
-		return 0, err
-	}
-	sent := 0
-	for _, command := range commands {
-		result, e := s.Sender.Send(ctx, command)
-		if e == nil && (!validID(result.SessionID) || result.Version < 1) {
-			e = ErrConflict
-		}
-		if e == nil {
-			e = s.Store.Acknowledge(ctx, command, result)
-		}
-		if e != nil {
-			if retryErr := s.Store.Retry(ctx, command.ID); retryErr != nil {
-				return sent, retryErr
-			}
-			continue
-		}
-		sent++
-	}
-	return sent, nil
-}
 
-// ValidateEvent is shared by gRPC and authenticated MQ before host persistence.
+// ValidateEvent protects authenticated MQ events before host persistence.
 func ValidateEvent(event Event) error {
 	if !validID(event.EventID) || !validID(event.RequestID) || !validID(event.SessionID) || event.Version < 1 {
 		return ErrInvalid
@@ -160,10 +121,4 @@ func ValidateEvent(event Event) error {
 		return err
 	}
 	return nil
-}
-func (s *Service) Accept(ctx context.Context, event Event) error {
-	if err := ValidateEvent(event); err != nil {
-		return err
-	}
-	return s.Store.Accept(ctx, event)
 }

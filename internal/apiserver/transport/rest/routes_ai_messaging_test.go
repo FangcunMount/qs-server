@@ -15,6 +15,45 @@ type mqOperationReader struct {
 	scope app.OperationScope
 }
 
+type mqRouteSubmitter struct {
+	app.RuntimeCommandSubmitter
+	calls                int
+	evaluationScope      app.EvaluationScope
+	participantScope     app.DraftScope
+	commandID, sessionID string
+	cancel               app.EvaluationCancel
+	retry                app.ParticipantRetry
+}
+
+func (s *mqRouteSubmitter) SubmitEvaluationCancel(_ context.Context, scope app.EvaluationScope, id string, command app.EvaluationCancel) error {
+	s.calls++
+	s.evaluationScope, s.commandID, s.cancel = scope, id, command
+	return nil
+}
+
+func (s *mqRouteSubmitter) SubmitParticipantRetry(_ context.Context, scope app.DraftScope, sessionID string, command app.ParticipantRetry) error {
+	s.calls++
+	s.participantScope, s.commandID, s.sessionID, s.retry = scope, command.CommandID, sessionID, command
+	return nil
+}
+
+func assertMQRouteSubmitted(t *testing.T, w *httptest.ResponseRecorder, commandID string) {
+	t.Helper()
+	var response struct {
+		Data struct {
+			OperationID string `json:"operation_id"`
+			CommandID   string `json:"command_id"`
+			Status      string `json:"status"`
+		}
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &response); err != nil {
+		t.Fatal(err)
+	}
+	if response.Data.OperationID != commandID || response.Data.CommandID != commandID || response.Data.Status != "submitted" {
+		t.Fatal("route lost original submitted identity", w.Body.String())
+	}
+}
+
 func (s *mqOperationReader) ReadOperation(_ context.Context, scope app.OperationScope, id string) (app.MessagingOperation, error) {
 	s.calls++
 	s.scope = scope

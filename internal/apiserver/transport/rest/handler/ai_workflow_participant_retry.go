@@ -50,7 +50,7 @@ func (h *AIWorkflowParticipantHandler) Get(c *gin.Context) {
 // @Produce json
 // @Param session_id path string true "AI 会话 UUID"
 // @Param body body app.ParticipantRetry true "重试确认"
-// @Success 200 {object} core.Response{data=app.Receipt}
+// @Success 202 {object} core.Response{data=SubmittedOperation}
 // @Failure 400 {object} core.ErrResponse
 // @Failure 401 {object} core.ErrResponse
 // @Failure 403 {object} core.ErrResponse
@@ -69,20 +69,11 @@ func (h *AIWorkflowParticipantHandler) Retry(c *gin.Context) {
 	if err := h.BindJSON(c, &command); err != nil {
 		return
 	}
-	if h.service.Messages != nil {
-		if err := h.service.SubmitRetry(c.Request.Context(), scope, c.Param("session_id"), command); err != nil {
-			NewAIWorkflowManagementHandler(nil).failure(c, err)
-			return
-		}
-		submittedCommand(c, command.CommandID)
-		return
-	}
-	value, err := h.service.Retry(c.Request.Context(), scope, c.Param("session_id"), command)
-	if err != nil {
+	if err := h.service.SubmitRetry(c.Request.Context(), scope, c.Param("session_id"), command); err != nil {
 		NewAIWorkflowManagementHandler(nil).failure(c, err)
 		return
 	}
-	h.Success(c, value)
+	submittedCommand(c, command.CommandID)
 }
 
 // RetryReceipt godoc

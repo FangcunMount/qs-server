@@ -25,11 +25,11 @@ func (p *messagingLifecycleProbe) Stop(ctx context.Context) error {
 func TestMQModuleReplacesLegacyRelayAndResultIngressWhileIntakeClosed(t *testing.T) {
 	legacy := &relayStore{entered: make(chan struct{})}
 	probe := &messagingLifecycleProbe{}
-	m := &Module{aiMessagingRuntime: probe, aiBridge: &app.Service{Store: legacy, Sender: unusedSender{}}}
+	m := &Module{aiMessagingRuntime: probe, aiBridge: &app.Service{Store: legacy}}
 	if err := m.StartAIWorkflowRelay(t.Context()); err != nil {
 		t.Fatal(err)
 	}
-	if probe.started != 1 || m.aiRelayDone != nil || legacy.calls.Load() != 0 {
+	if probe.started != 1 || legacy.calls.Load() != 0 {
 		t.Fatal("second scheduler or intake-dependent recovery")
 	}
 	if m.ExportGRPCDeps().AIWorkflowResults != nil {
