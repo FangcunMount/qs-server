@@ -163,11 +163,18 @@ def prepare(image, base, uid, gid, binding_root=BINDING_ROOT, release_root=RELEA
             local_binding = staging / 'binding.json'
             write_new(local_binding, binding_raw)
             os.chown(local_binding, uid, gid)
+            # CD uploads belong to the deployment account and remain 0600.
+            # Give the ordinary image a private, byte-identical staging copy;
+            # never widen or change ownership of the uploaded source file.
+            local_base = staging / 'source.yaml'
+            write_new(local_base, base_raw, mode=0o400)
+            os.chown(local_base, uid, gid)
             metadata = decoded(offline(image_id,
                 ['--binding=/preflight/binding.json', '--base-config=/preflight/source.yaml',
                  '--output-config=/output/apiserver.json'],
                 [(local_binding, '/preflight/binding.json', True),
-                 (base, '/preflight/source.yaml', True), (staging, '/output', False)] + mounts))
+                 (local_base, '/preflight/source.yaml', True), (staging, '/output', False)] + mounts))
+            local_base.unlink()  # Keep only the existing frozen release assets.
             require(metadata['source_sha'] == source and metadata['offline'] is True)
             require(metadata['rendered_config_sha256'] == digest(read(staging / 'apiserver.json', 1 << 20)))
             composition = encoded(overlay(release, mounts, image_id))
