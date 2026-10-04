@@ -13,15 +13,6 @@ import (
 	"google.golang.org/grpc"
 )
 
-func (s *evaluationRPCStub) Cancel(ctx context.Context, command *pb.EvaluationCancelCommand, _ ...grpc.CallOption) (*pb.EvaluationState, error) {
-	s.calls++
-	s.cancelCommand = command
-	if deadline, ok := ctx.Deadline(); !ok || time.Until(deadline) > 5*time.Second {
-		s.t.Fatal("bounded cancellation deadline required")
-	}
-	return s.cancelState, s.fail
-}
-
 func canceledState(discard bool) *pb.EvaluationState {
 	creation := creationFixture()
 	response := creationState(creation)
@@ -44,38 +35,41 @@ func canceledState(discard bool) *pb.EvaluationState {
 	return response
 }
 
-func TestCancelForwardsOnceAndMatchesOriginalDecision(t *testing.T) {
+type cancellationReadRPC struct {
+	pb.EvaluationManagementClient
+	t        *testing.T
+	calls    int
+	query    *pb.EvaluationQuery
+	response *pb.EvaluationState
+	fail     error
+}
+
+func (s *cancellationReadRPC) Get(ctx context.Context, query *pb.EvaluationQuery, _ ...grpc.CallOption) (*pb.EvaluationState, error) {
+	s.calls++
+	s.query = query
+	if deadline, ok := ctx.Deadline(); !ok || time.Until(deadline) > 5*time.Second {
+		s.t.Fatal("bounded query deadline required")
+	}
+	return s.response, s.fail
+}
+func TestCancellationReadPreservesDecisionWithoutWritingOrRetrying(t *testing.T) {
 	for _, discard := range []bool{false, true} {
-		rpc := &evaluationRPCStub{t: t, cancelState: canceledState(discard)}
+		rpc := &cancellationReadRPC{t: t, response: canceledState(discard)}
 		client := &EvaluationClient{RPC: rpc}
-		scope := app.EvaluationScope{RunID: rpc.cancelState.RunId, OrganizationID: 7, OperatorUserID: 42}
-		command := app.EvaluationCancel{ExpectedVersion: rpc.cancelState.Version - 1, Reason: "停止后续工作", Confirm: true, Discard: &discard}
-		result, err := client.CancelEvaluation(context.Background(), scope, command)
+		scope := app.EvaluationScope{RunID: rpc.response.RunId, OrganizationID: 7, OperatorUserID: 42}
+		result, err := client.GetEvaluation(context.Background(), scope)
 		if err != nil || result.Cancellation == nil || *result.Cancellation.Discard != discard || rpc.calls != 1 {
-			t.Fatal("valid cancellation receipt rejected", result, err)
+			t.Fatal("valid historical cancellation rejected", result, err)
 		}
-		if rpc.cancelCommand.Scope.OperatorUserId != 42 || rpc.cancelCommand.Scope.OrganizationId != 7 || rpc.cancelCommand.Discard == nil || *rpc.cancelCommand.Discard != discard {
-			t.Fatal("scope or explicit decision lost")
+		if rpc.query.OperatorUserId != 42 || rpc.query.OrganizationId != 7 || rpc.query.RunId != scope.RunID {
+			t.Fatal("trusted read scope lost")
 		}
-		if discard && string(result.ReviewReopenings) != rpc.cancelState.ReopeningsJson {
+		if discard && string(result.ReviewReopenings) != rpc.response.ReopeningsJson {
 			t.Fatal("discard erased historical reviews")
 		}
 		rpc.fail = context.DeadlineExceeded
-		if _, err := client.CancelEvaluation(context.Background(), scope, command); !errors.Is(err, context.DeadlineExceeded) || rpc.calls != 2 {
-			t.Fatal("uncertain cancellation retried", err)
-		}
-		rpc.fail = nil
-		for _, mutate := range []func(*app.EvaluationScope, *app.EvaluationCancel){
-			func(s *app.EvaluationScope, _ *app.EvaluationCancel) { s.OperatorUserID++ },
-			func(_ *app.EvaluationScope, c *app.EvaluationCancel) { c.ExpectedVersion-- },
-			func(_ *app.EvaluationScope, c *app.EvaluationCancel) { c.Reason = "另一次操作" },
-			func(_ *app.EvaluationScope, c *app.EvaluationCancel) { opposite := !discard; c.Discard = &opposite },
-		} {
-			s, c := scope, command
-			mutate(&s, &c)
-			if _, err := client.CancelEvaluation(context.Background(), s, c); !errors.Is(err, app.ErrConflict) {
-				t.Fatal("mismatched cancellation accepted", err)
-			}
+		if _, err := client.GetEvaluation(context.Background(), scope); !errors.Is(err, context.DeadlineExceeded) || rpc.calls != 2 {
+			t.Fatal("query uncertainty retried", err)
 		}
 	}
 }
@@ -129,11 +123,9 @@ func TestCancellationDrainRequestSurvivesLaterProjectionVersions(t *testing.T) {
 		SourceVersion: 7, Version: 8, Status: "cancel_requested", Actor: "user:42", Reason: "停止后续工作", RequestedAt: "2026-09-13T02:00:00Z"}
 	raw, _ := json.Marshal(request)
 	response.CancelRequestJson = string(raw)
-	rpc := &evaluationRPCStub{t: t, cancelState: response}
+	rpc := &cancellationReadRPC{t: t, response: response}
 	client := &EvaluationClient{RPC: rpc}
-	discard := false
-	result, err := client.CancelEvaluation(context.Background(), app.EvaluationScope{RunID: response.RunId, OrganizationID: 7, OperatorUserID: 42},
-		app.EvaluationCancel{ExpectedVersion: 7, Reason: request.Reason, Confirm: true, Discard: &discard})
+	result, err := client.GetEvaluation(context.Background(), app.EvaluationScope{RunID: response.RunId, OrganizationID: 7, OperatorUserID: 42})
 	if err != nil || result.CancelRequest == nil || result.Cancellation != nil || !result.CancelDraining || result.ActiveCallCount != 2 {
 		t.Fatal(result, err)
 	}

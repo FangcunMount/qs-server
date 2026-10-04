@@ -19,7 +19,7 @@ import (
 // without exhausting its failure budget or reapplying the business projection.
 func TestMQFinalAckRepeatedSuccessRetainsBudgetAndOriginalProjection(t *testing.T) {
 	f := newMQFixture(t)
-	mustMQ(t, (&Store{DB: f.db}).StageStart(t.Context(), f.request))
+	mustMQ(t, seedLegacyStartFixture(t.Context(), f.request, &Store{DB: f.db}))
 	id := uuid.NewString()
 	message := f.protect(pb.MessagingKind_INTERPRETATION_STATE, id, f.request.RequestID, "", &pb.MessagingBody{Value: &pb.MessagingBody_InterpretationState{InterpretationState: &pb.StateEvent{EventId: id, RequestId: f.request.RequestID, SessionId: f.session, Actor: &pb.Actor{OrgId: f.scope.OrganizationID, SubjectId: f.scope.SubjectID}, TesteeId: f.request.TesteeID, Version: 1, Status: "queued"}}}, true)
 	receiver := receiverFixture(f, &localEventBody{})
@@ -76,7 +76,7 @@ func TestMQFinalAckRepeatedSuccessRetainsBudgetAndOriginalProjection(t *testing.
 
 func TestMQHeldFinalAckDuplicateCannotRenewBudgetOrPublish(t *testing.T) {
 	f := newMQFixture(t)
-	mustMQ(t, (&Store{DB: f.db}).StageStart(t.Context(), f.request))
+	mustMQ(t, seedLegacyStartFixture(t.Context(), f.request, &Store{DB: f.db}))
 	id := uuid.NewString()
 	message := f.protect(pb.MessagingKind_INTERPRETATION_STATE, id, f.request.RequestID, "", &pb.MessagingBody{Value: &pb.MessagingBody_InterpretationState{InterpretationState: &pb.StateEvent{EventId: id, RequestId: f.request.RequestID, SessionId: f.session, Actor: &pb.Actor{OrgId: f.scope.OrganizationID, SubjectId: f.scope.SubjectID}, TesteeId: f.request.TesteeID, Version: 1, Status: "queued"}}}, true)
 	receiver := receiverFixture(f, &localEventBody{})

@@ -18,10 +18,8 @@ func (m *Module) ExportGRPCDeps() grpctransport.InterpretationDeps {
 	}
 	deps.CurrentAccess = m.aiCurrentAccess
 	deps.AIWorkflow = m.aiWorkflow
-	// Continue accepting already committed AI results even while new intake is closed.
-	if m.aiMessagingRuntime == nil {
-		deps.AIWorkflowResults = m.aiBridge
-	}
+	// Committed results remain owned by the MQ consumer while intake is closed.
+	// Retired gRPC result writes are never re-exported by a configuration change.
 	deps.AIMessagePayloads = m.aiMessagingReader
 	return deps
 }

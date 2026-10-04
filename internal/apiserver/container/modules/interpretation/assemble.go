@@ -65,8 +65,6 @@ type Module struct {
 	aiSemanticDrafts       *bridge.SemanticDraftAdministration
 	aiProfiles             *bridge.ProfileAdministration
 	aiManagementConnection io.Closer
-	aiRelayCancel          context.CancelFunc
-	aiRelayDone            chan struct{}
 	aiWorkflowEnabled      bool
 	aiWorkflow             *bridge.Participant
 	aiCurrentAccess        *bridge.CurrentAccess
@@ -237,8 +235,7 @@ func New(deps Deps) (*Module, error) {
 		if err != nil {
 			return nil, err
 		}
-		if module.aiWorkflowEnabled && !deps.AIWorkflow.Messaging.Enabled {
-			module.aiBridge.Sender = clients.Commands
+		if module.aiWorkflowEnabled {
 			module.aiEligibility = clients.Commands
 		}
 		if deps.AIWorkflow.Management.Enabled {
@@ -621,11 +618,6 @@ func (m *Module) Cleanup() error {
 		if err := m.aiMessagingRuntime.Stop(ctx); err != nil {
 			return err
 		}
-	}
-	if m != nil && m.aiRelayCancel != nil {
-		m.aiRelayCancel()
-		<-m.aiRelayDone
-		m.aiRelayCancel = nil
 	}
 	if m != nil && m.aiManagementConnection != nil {
 		return m.aiManagementConnection.Close()

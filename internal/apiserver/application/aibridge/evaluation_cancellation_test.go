@@ -10,18 +10,14 @@ import (
 	authz "github.com/FangcunMount/qs-server/internal/apiserver/application/authz"
 )
 
-func (g *managementStub) CancelEvaluation(ctx context.Context, scope EvaluationScope, command EvaluationCancel) (EvaluationState, error) {
-	g.cancel = command
-	return g.GetEvaluation(ctx, scope)
-}
-
 func TestCancellationRequiresCurrentAuthorityAndExplicitDecision(t *testing.T) {
 	gateway := &managementStub{}
-	service := &EvaluationAdministration{Gateway: gateway}
+	messages := &submissionCommands{}
+	service := &EvaluationAdministration{Gateway: gateway, Messages: messages}
 	discard := false
-	valid := EvaluationCancel{ExpectedVersion: 8, Reason: " 停止后续工作 ", Confirm: true, Discard: &discard}
+	valid := EvaluationCancel{CommandID: "00000000-0000-4000-8000-000000000005", ExpectedVersion: 8, Reason: " 停止后续工作 ", Confirm: true, Discard: &discard}
 	for _, ctx := range []context.Context{context.Background(), authz.WithSnapshot(context.Background(), &authz.Snapshot{})} {
-		if _, err := service.Cancel(ctx, managementScope(), valid); !errors.Is(err, ErrGovernanceDenied) {
+		if err := service.SubmitCancel(ctx, managementScope(), valid); !errors.Is(err, ErrGovernanceDenied) {
 			t.Fatal("missing or revoked authority reached AI", err)
 		}
 	}
@@ -36,19 +32,19 @@ func TestCancellationRequiresCurrentAuthorityAndExplicitDecision(t *testing.T) {
 	} {
 		command := valid
 		mutate(&command)
-		if _, err := service.Cancel(adminContext(), managementScope(), command); !errors.Is(err, ErrInvalid) {
+		if err := service.SubmitCancel(adminContext(), managementScope(), command); !errors.Is(err, ErrInvalid) {
 			t.Fatal("invalid cancellation accepted", err)
 		}
 	}
-	if gateway.calls != 0 {
+	if gateway.calls != 0 || messages.calls != 0 {
 		t.Fatal("invalid request reached AI")
 	}
 	for _, decision := range []bool{false, true} {
 		valid.Discard = &decision
-		if _, err := service.Cancel(adminContext(), managementScope(), valid); err != nil {
+		if err := service.SubmitCancel(adminContext(), managementScope(), valid); err != nil {
 			t.Fatal(err)
 		}
-		if gateway.cancel.Discard == nil || *gateway.cancel.Discard != decision || gateway.cancel.Reason != "停止后续工作" || gateway.scope != managementScope() {
+		if messages.cancel.Discard == nil || *messages.cancel.Discard != decision || messages.cancel.Reason != "停止后续工作" || messages.scope != managementScope() {
 			t.Fatal("trusted scope or explicit false lost")
 		}
 	}

@@ -19,6 +19,7 @@ type mqHTTPCommands struct {
 	org, user int64
 	id        string
 	err       error
+	cancel    app.EvaluationCancel
 }
 
 func (s *mqHTTPCommands) SubmitParticipantRetry(_ context.Context, scope app.DraftScope, _ string, command app.ParticipantRetry) error {
@@ -31,21 +32,28 @@ func (s *mqHTTPCommands) SubmitEvaluationStart(_ context.Context, scope app.Eval
 	s.org, s.user, s.id = scope.OrganizationID, scope.OperatorUserID, id
 	return s.err
 }
-func (s *mqHTTPCommands) SubmitEvaluationCancel(_ context.Context, scope app.EvaluationScope, id string, _ app.EvaluationCancel) error {
+func (s *mqHTTPCommands) SubmitEvaluationCancel(_ context.Context, scope app.EvaluationScope, id string, command app.EvaluationCancel) error {
 	s.calls++
 	s.org, s.user, s.id = scope.OrganizationID, scope.OperatorUserID, id
+	s.cancel = command
 	return s.err
 }
 
 type mqParticipantGateway struct {
 	app.ParticipantManagementGateway
+	calls int
+}
+
+func (g *mqParticipantGateway) RetryParticipant(context.Context, app.DraftScope, string, app.ParticipantRetry) (app.Receipt, error) {
+	g.calls++
+	return app.Receipt{}, nil
 }
 
 func TestMQHTTP202MeansQSCommitAndUsesOriginalCommandIdentity(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	id := "00000000-0000-4000-8000-000000000005"
 	for _, kind := range []string{"start", "cancel", "retry"} {
-		for _, scenario := range []string{"submitted", "missing_id", "revoked", "storage_failed", "maintenance"} {
+		for _, scenario := range []string{"submitted", "missing_id", "revoked", "storage_failed", "maintenance", "missing_transport"} {
 			t.Run(kind+"/"+scenario, func(t *testing.T) {
 				commands := &mqHTTPCommands{}
 				if scenario == "storage_failed" {
@@ -55,8 +63,15 @@ func TestMQHTTP202MeansQSCommitAndUsesOriginalCommandIdentity(t *testing.T) {
 					commands.err = app.ErrRuntimeAdmissionClosed
 				}
 				gateway := &managementGateway{}
-				evaluation := NewAIWorkflowManagementHandler(&app.EvaluationAdministration{Gateway: gateway, Messages: commands})
-				participant := NewAIWorkflowParticipantHandler(&app.ParticipantAdministration{Gateway: &mqParticipantGateway{}, Messages: commands})
+				participantGateway := &mqParticipantGateway{}
+				evaluationService := &app.EvaluationAdministration{Gateway: gateway, Messages: commands}
+				participantService := &app.ParticipantAdministration{Gateway: participantGateway, Messages: commands}
+				if scenario == "missing_transport" {
+					evaluationService.Messages = nil
+					participantService.Messages = nil
+				}
+				evaluation := NewAIWorkflowManagementHandler(evaluationService)
+				participant := NewAIWorkflowParticipantHandler(participantService)
 				commandID := id
 				if scenario == "missing_id" {
 					commandID = ""
@@ -92,8 +107,10 @@ func TestMQHTTP202MeansQSCommitAndUsesOriginalCommandIdentity(t *testing.T) {
 					expected = 500
 				case "maintenance":
 					expected = 429
+				case "missing_transport":
+					expected, calls = 501, 0
 				}
-				if w.Code != expected || commands.calls != calls || gateway.calls != 0 {
+				if w.Code != expected || commands.calls != calls || gateway.calls != 0 || participantGateway.calls != 0 {
 					t.Fatalf("status=%d submit=%d grpc=%d", w.Code, commands.calls, gateway.calls)
 				}
 				if strings.Contains(w.Body.String(), "secret driver detail") {

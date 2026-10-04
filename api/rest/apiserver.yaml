@@ -9972,8 +9972,8 @@ paths:
             schema:
               $ref: '#/components/schemas/aibridge.EvaluationCancel'
       responses:
-        '200':
-          description: OK
+        '202':
+          description: Accepted
           content:
             application/json:
               schema:
@@ -9982,7 +9982,7 @@ paths:
                 - type: object
                   properties:
                     data:
-                      $ref: '#/components/schemas/aibridge.EvaluationState'
+                      $ref: '#/components/schemas/handler.SubmittedOperation'
         '400':
           description: Bad Request
           content:
@@ -10009,6 +10009,12 @@ paths:
                 $ref: '#/components/schemas/core.ErrResponse'
         '409':
           description: Conflict
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '429':
+          description: Too Many Requests
           content:
             application/json:
               schema:
@@ -10785,8 +10791,8 @@ paths:
             schema:
               $ref: '#/components/schemas/aibridge.EvaluationStart'
       responses:
-        '200':
-          description: OK
+        '202':
+          description: Accepted
           content:
             application/json:
               schema:
@@ -10795,7 +10801,7 @@ paths:
                 - type: object
                   properties:
                     data:
-                      $ref: '#/components/schemas/aibridge.EvaluationState'
+                      $ref: '#/components/schemas/handler.SubmittedOperation'
         '400':
           description: Bad Request
           content:
@@ -10822,6 +10828,12 @@ paths:
                 $ref: '#/components/schemas/core.ErrResponse'
         '409':
           description: Conflict
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '429':
+          description: Too Many Requests
           content:
             application/json:
               schema:
@@ -11015,8 +11027,8 @@ paths:
             schema:
               $ref: '#/components/schemas/aibridge.ParticipantRetry'
       responses:
-        '200':
-          description: OK
+        '202':
+          description: Accepted
           content:
             application/json:
               schema:
@@ -11025,7 +11037,7 @@ paths:
                 - type: object
                   properties:
                     data:
-                      $ref: '#/components/schemas/aibridge.Receipt'
+                      $ref: '#/components/schemas/handler.SubmittedOperation'
         '400':
           description: Bad Request
           content:
@@ -12661,6 +12673,8 @@ components:
     aibridge.EvaluationCancel:
       type: object
       properties:
+        command_id:
+          type: string
         confirm:
           type: boolean
         discard:
@@ -12931,6 +12945,8 @@ components:
     aibridge.EvaluationStart:
       type: object
       properties:
+        command_id:
+          type: string
         confirm:
           type: boolean
         expected_version:
@@ -14508,6 +14524,17 @@ components:
           type: string
         validate_only:
           type: boolean
+    handler.SubmittedOperation:
+      type: object
+      properties:
+        command_id:
+          type: string
+        operation_id:
+          type: string
+        status:
+          type: string
+        status_url:
+          type: string
     interpretationassets.Assets:
       type: object
       properties:

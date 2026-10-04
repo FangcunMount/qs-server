@@ -1,7 +1,6 @@
 package aibridge
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"strconv"
@@ -11,7 +10,6 @@ import (
 
 	pb "github.com/FangcunMount/qs-server/api/grpc/gen/aiworkflow"
 	app "github.com/FangcunMount/qs-server/internal/apiserver/application/aibridge"
-	"google.golang.org/grpc"
 )
 
 // Check transport bindings; AI owns cancellation eligibility and original ledger validation.
@@ -49,34 +47,6 @@ func evaluationCancellation(response *pb.EvaluationState, creation *app.Evaluati
 		return nil, app.ErrConflict
 	}
 	return &receipt, nil
-}
-
-func (c *EvaluationClient) CancelEvaluation(ctx context.Context, scope app.EvaluationScope, command app.EvaluationCancel) (app.EvaluationState, error) {
-	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
-	defer cancel()
-	response, err := c.RPC.Cancel(ctx, &pb.EvaluationCancelCommand{
-		Scope: query(scope), ExpectedVersion: command.ExpectedVersion, Reason: command.Reason,
-		Confirm: command.Confirm, Discard: command.Discard,
-	}, grpc.MaxCallRecvMsgSize(4*1024*1024))
-	if err != nil {
-		return app.EvaluationState{}, err
-	}
-	result, err := state(response, scope)
-	if err != nil {
-		return app.EvaluationState{}, err
-	}
-	if request := result.CancelRequest; request != nil {
-		if command.Discard == nil || *command.Discard || request.SourceVersion != command.ExpectedVersion || request.Actor != fmt.Sprintf("user:%d", scope.OperatorUserID) || request.Reason != command.Reason {
-			return app.EvaluationState{}, app.ErrConflict
-		}
-		return result, nil
-	}
-	receipt := result.Cancellation
-	if receipt == nil || command.Discard == nil || receipt.SourceVersion != command.ExpectedVersion ||
-		receipt.Actor != fmt.Sprintf("user:%d", scope.OperatorUserID) || receipt.Reason != command.Reason || *receipt.Discard != *command.Discard {
-		return app.EvaluationState{}, app.ErrConflict
-	}
-	return result, nil
 }
 
 func evaluationCancelRequest(response *pb.EvaluationState, creation *app.EvaluationCreationReceipt) (*app.EvaluationCancelRequest, error) {

@@ -8,7 +8,9 @@ import (
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
+	"crypto/sha256"
 	"database/sql"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"os"
@@ -90,8 +92,34 @@ func setup(t *testing.T) *fixture {
 func (f *fixture) start(t *testing.T) app.Start {
 	t.Helper()
 	r := app.Start{RequestID: uuid.NewString(), Actor: app.Actor{OrgID: "18446744073709551615", SubjectID: "42"}, TesteeID: "7", AssessmentIDs: []string{"9"}, Goal: "private body：原 Unicode 😀 must remain private"}
-	checked(t, (&store.Store{DB: f.db}).StageStart(context.Background(), r))
+	// Seed immutable historical input only. Retired staging/delivery methods
+	// must stay unavailable; these fixtures have no duplicate/retry algorithm.
+	raw, err := json.Marshal(r)
+	checked(t, err)
+	sum := sha256.Sum256(raw)
+	hash := hex.EncodeToString(sum[:])
+	tx, err := f.db.BeginTx(t.Context(), nil)
+	checked(t, err)
+	defer func() { _ = tx.Rollback() }()
+	_, err = tx.ExecContext(t.Context(), "INSERT INTO ai_bridge_requests(request_id,request_hash,payload,organization_id,subject_id,testee_id,created_at,updated_at) VALUES(?,?,CONVERT(CAST(? AS BINARY) USING utf8mb4),?,?,?,UTC_TIMESTAMP(6),UTC_TIMESTAMP(6))", r.RequestID, hash, raw, r.Actor.OrgID, r.Actor.SubjectID, r.TesteeID)
+	checked(t, err)
+	for _, id := range r.AssessmentIDs {
+		_, err = tx.ExecContext(t.Context(), "INSERT INTO ai_bridge_request_assessments(request_id,assessment_id) VALUES(?,?)", r.RequestID, id)
+		checked(t, err)
+	}
+	_, err = tx.ExecContext(t.Context(), "INSERT INTO ai_bridge_commands(command_id,request_id,kind,payload,payload_hash,available_at) VALUES(?,?,'start',CONVERT(CAST(? AS BINARY) USING utf8mb4),?,UTC_TIMESTAMP(6))", r.RequestID, r.RequestID, raw, hash)
+	checked(t, err)
+	checked(t, tx.Commit())
 	return r
+}
+
+func (f *fixture) change(t *testing.T, requestID string, r app.Change) {
+	t.Helper()
+	raw, err := json.Marshal(r)
+	checked(t, err)
+	sum := sha256.Sum256(raw)
+	_, err = f.db.ExecContext(t.Context(), "INSERT INTO ai_bridge_commands(command_id,request_id,kind,payload,payload_hash,available_at) VALUES(?,?,?,CONVERT(CAST(? AS BINARY) USING utf8mb4),?,UTC_TIMESTAMP(6))", r.CommandID, requestID, r.Action, raw, hex.EncodeToString(sum[:]))
+	checked(t, err)
 }
 func count(t *testing.T, db *sql.DB, table string) int {
 	t.Helper()
@@ -273,7 +301,7 @@ func TestMQHandoffGlobalAmbiguousHistoryAndBoundsRefuse(t *testing.T) {
 	_, err = f.db.Exec("UPDATE ai_bridge_requests SET session_id=? WHERE request_id=?", session, ambiguous.RequestID)
 	checked(t, err)
 	for i := 0; i < 2; i++ {
-		checked(t, (&store.Store{DB: f.db}).StageChange(ctx, ambiguous.RequestID, app.Change{CommandID: uuid.NewString(), SessionID: session, Actor: ambiguous.Actor, Action: "cancel", ExpectedVersion: 2}))
+		f.change(t, ambiguous.RequestID, app.Change{CommandID: uuid.NewString(), SessionID: session, Actor: ambiguous.Actor, Action: "cancel", ExpectedVersion: 2})
 	}
 	m, err := f.tool.DryRun(ctx, []string{known.RequestID})
 	checked(t, err)

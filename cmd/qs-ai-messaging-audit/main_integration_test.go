@@ -7,7 +7,9 @@ import (
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
+	"crypto/sha256"
 	"database/sql"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"os"
@@ -103,14 +105,12 @@ func auditRow(t *testing.T, s snapshot, id string) pendingCommand {
 
 func TestMQAuditSnapshotPreservesHistoryAndSurfacesAmbiguousOwnership(t *testing.T) {
 	db := auditDatabase(t, true)
-	original := &store.Store{DB: db}
 	first, second := auditRequest(), auditRequest()
-	mustAudit(t, original.StageStart(context.Background(), first))
-	mustAudit(t, original.StageStart(context.Background(), second))
 	session := uuid.NewString()
-	mustAudit(t, original.Acknowledge(context.Background(), app.Command{ID: second.RequestID, RequestID: second.RequestID}, app.Receipt{SessionID: session, Version: 1}))
+	mustAudit(t, seedAuditHistory(db, first, false, ""))
+	mustAudit(t, seedAuditHistory(db, second, true, session))
 	for i := 0; i < 2; i++ {
-		mustAudit(t, original.StageChange(context.Background(), second.RequestID, app.Change{CommandID: uuid.NewString(), SessionID: session, Actor: second.Actor, Action: "cancel", ExpectedVersion: 1}))
+		mustAudit(t, seedAuditChange(db, second.RequestID, app.Change{CommandID: uuid.NewString(), SessionID: session, Actor: second.Actor, Action: "cancel", ExpectedVersion: 1}))
 	}
 	before := auditRead(t, db, 100)
 	if !before.ReadOnly || !before.MQTablesPresent || before.LegacyPending != 3 || before.LegacyDelivered != 1 || before.UnownedPending != 3 || before.UnknownOrderAggregates != 1 {
@@ -172,7 +172,7 @@ func TestMQAuditSnapshotPreservesHistoryAndSurfacesAmbiguousOwnership(t *testing
 func TestMQAuditMissingSchemaAndBoundsFailClosed(t *testing.T) {
 	db := auditDatabase(t, false)
 	r := auditRequest()
-	mustAudit(t, (&store.Store{DB: db}).StageStart(context.Background(), r))
+	mustAudit(t, seedAuditHistory(db, r, false, ""))
 	s := auditRead(t, db, 100)
 	if s.MQTablesPresent || s.PresentTables["ai_messaging_outbox"] || s.UnownedPending != 1 || auditRow(t, s, r.RequestID).Ownership != "legacy" {
 		t.Fatal("missing MQ schema treated as ready")
@@ -186,7 +186,7 @@ func TestMQAuditMissingSchemaAndBoundsFailClosed(t *testing.T) {
 func TestMQAuditSnapshotTransactionActuallyRejectsWrites(t *testing.T) {
 	db := auditDatabase(t, true)
 	r := auditRequest()
-	mustAudit(t, (&store.Store{DB: db}).StageStart(context.Background(), r))
+	mustAudit(t, seedAuditHistory(db, r, false, ""))
 	tx, err := db.BeginTx(context.Background(), &sql.TxOptions{ReadOnly: true, Isolation: sql.LevelRepeatableRead})
 	mustAudit(t, err)
 	defer func() { _ = tx.Rollback() }()
@@ -272,4 +272,45 @@ func TestMQAuditReportsSchemaAndRetainedBodyMetadataWithoutExport(t *testing.T) 
 		t.Fatal("read-only audit changed durable budget")
 	}
 	mustAudit(t, db.Ping())
+}
+
+// These helpers create bounded historical fixture data in auditDatabase's new
+// disposable database. The audit tool itself remains permanently read-only.
+func seedAuditHistory(db *sql.DB, r app.Start, delivered bool, session string) error {
+	raw, err := json.Marshal(r)
+	if err != nil {
+		return err
+	}
+	sum := sha256.Sum256(raw)
+	hash := hex.EncodeToString(sum[:])
+	tx, err := db.Begin()
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback() }()
+	var originalSession any
+	if session != "" {
+		originalSession = session
+	}
+	if _, err = tx.Exec("INSERT INTO ai_bridge_requests(request_id,request_hash,payload,organization_id,subject_id,testee_id,session_id,created_at,updated_at) VALUES(?,?,CONVERT(CAST(? AS BINARY) USING utf8mb4),?,?,?,?,UTC_TIMESTAMP(6),UTC_TIMESTAMP(6))", r.RequestID, hash, raw, r.Actor.OrgID, r.Actor.SubjectID, r.TesteeID, originalSession); err != nil {
+		return err
+	}
+	for _, assessment := range r.AssessmentIDs {
+		if _, err = tx.Exec("INSERT INTO ai_bridge_request_assessments(request_id,assessment_id) VALUES(?,?)", r.RequestID, assessment); err != nil {
+			return err
+		}
+	}
+	if _, err = tx.Exec("INSERT INTO ai_bridge_commands(command_id,request_id,kind,payload,payload_hash,available_at,delivered) VALUES(?,?,'start',CONVERT(CAST(? AS BINARY) USING utf8mb4),?,UTC_TIMESTAMP(6),?)", r.RequestID, r.RequestID, raw, hash, delivered); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+func seedAuditChange(db *sql.DB, requestID string, c app.Change) error {
+	raw, err := json.Marshal(c)
+	if err != nil {
+		return err
+	}
+	sum := sha256.Sum256(raw)
+	_, err = db.Exec("INSERT INTO ai_bridge_commands(command_id,request_id,kind,payload,payload_hash,available_at) VALUES(?,?,?,CONVERT(CAST(? AS BINARY) USING utf8mb4),?,UTC_TIMESTAMP(6))", c.CommandID, requestID, c.Action, raw, hex.EncodeToString(sum[:]))
+	return err
 }

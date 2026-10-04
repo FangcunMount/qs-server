@@ -9,7 +9,6 @@ import (
 	"errors"
 	"os"
 	"strings"
-	"sync"
 	"testing"
 
 	app "github.com/FangcunMount/qs-server/internal/apiserver/application/aibridge"
@@ -38,49 +37,24 @@ func fixture(t *testing.T) (*Store, app.Start) {
 	})
 	return &Store{DB: db}, r
 }
-func TestConcurrentStartAndChangedPayload(t *testing.T) {
-	store, r := fixture(t)
-	ctx := context.Background()
-	var wg sync.WaitGroup
-	errs := make(chan error, 2)
-	for i := 0; i < 2; i++ {
-		wg.Add(1)
-		go func() { defer wg.Done(); errs <- store.StageStart(ctx, r) }()
-	}
-	wg.Wait()
-	close(errs)
-	for err := range errs {
-		if err != nil {
-			t.Fatal(err)
-		}
-	}
-	var count int
-	if err := store.DB.QueryRow("SELECT COUNT(*) FROM ai_bridge_commands WHERE request_id=?", r.RequestID).Scan(&count); err != nil || count != 1 {
-		t.Fatalf("count=%d err=%v", count, err)
-	}
-	r.Goal = "changed"
-	if err := store.StageStart(ctx, r); !errors.Is(err, app.ErrConflict) {
-		t.Fatalf("want conflict, got %v", err)
-	}
-}
 func TestProjectionOutOfOrderDuplicateAndTerminalGuard(t *testing.T) {
 	store, r := fixture(t)
 	ctx := context.Background()
-	if err := store.StageStart(ctx, r); err != nil {
+	if err := seedLegacyStartFixture(ctx, r, store); err != nil {
 		t.Fatal(err)
 	}
 	e := app.Event{EventID: uuid.NewString(), RequestID: r.RequestID, SessionID: uuid.NewString(), Actor: r.Actor, TesteeID: r.TesteeID, Version: 8, Status: "cancelled"}
-	if err := store.Accept(ctx, e); err != nil {
+	if err := projectInHostTransaction(ctx, store, e); err != nil {
 		t.Fatal(err)
 	}
-	if err := store.Accept(ctx, e); err != nil {
+	if err := projectInHostTransaction(ctx, store, e); err != nil {
 		t.Fatal(err)
 	}
 	old := e
 	old.EventID = uuid.NewString()
 	old.Version = 3
 	old.Status = "running"
-	if err := store.Accept(ctx, old); err != nil {
+	if err := projectInHostTransaction(ctx, store, old); err != nil {
 		t.Fatal(err)
 	}
 	got, err := store.Projection(ctx, r.RequestID)
@@ -89,61 +63,41 @@ func TestProjectionOutOfOrderDuplicateAndTerminalGuard(t *testing.T) {
 	}
 	duplicate := e
 	duplicate.FailureCode = "different"
-	if err = store.Accept(ctx, duplicate); !errors.Is(err, app.ErrConflict) {
+	if err = projectInHostTransaction(ctx, store, duplicate); !errors.Is(err, app.ErrConflict) {
 		t.Fatalf("want conflict: %v", err)
 	}
 	late := old
 	late.EventID = uuid.NewString()
 	late.Version = 9
-	if err = store.Accept(ctx, late); !errors.Is(err, app.ErrConflict) {
+	if err = projectInHostTransaction(ctx, store, late); !errors.Is(err, app.ErrConflict) {
 		t.Fatalf("want terminal guard: %v", err)
 	}
 	wrong := old
 	wrong.Actor.SubjectID = "other"
-	if err = store.Accept(ctx, wrong); !errors.Is(err, app.ErrConflict) {
+	if err = projectInHostTransaction(ctx, store, wrong); !errors.Is(err, app.ErrConflict) {
 		t.Fatalf("want actor guard: %v", err)
 	}
-	beforeAck, err := store.GetRuntime(ctx, 1, r.RequestID)
-	if err != nil {
-		t.Fatal(err)
-	}
-	commands, err := store.Pending(ctx, 20)
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, command := range commands {
-		if command.RequestID == r.RequestID {
-			if err = store.Acknowledge(ctx, command, app.Receipt{SessionID: e.SessionID, Version: 2, Status: "queued"}); err != nil {
-				t.Fatal(err)
-			}
-		}
-	}
-	afterAck, err := store.GetRuntime(ctx, 1, r.RequestID)
-	if err != nil || !beforeAck.UpdatedAt.Equal(*afterAck.UpdatedAt) {
-		t.Fatalf("late command acknowledgement changed projection receipt time: %v", err)
-	}
-	got, err = store.Projection(ctx, r.RequestID)
-	if err != nil || got.Version != 8 {
-		t.Fatalf("ack regressed projection: %+v %v", got, err)
-	}
+	// Late decisions use the MQ receiver; the original terminal projection is
+	// covered by TestMQReceiptLostAckDuplicateAndLateReceiptDoNotRegress.
+
 }
 func TestUnknownRequestAndWrongSessionAreRejected(t *testing.T) {
 	store, r := fixture(t)
 	ctx := context.Background()
 	e := app.Event{EventID: uuid.NewString(), RequestID: r.RequestID, SessionID: uuid.NewString(), Actor: r.Actor, TesteeID: r.TesteeID, Version: 2, Status: "queued"}
-	if err := store.Accept(ctx, e); !errors.Is(err, app.ErrNotFound) {
+	if err := projectInHostTransaction(ctx, store, e); !errors.Is(err, app.ErrNotFound) {
 		t.Fatalf("expected not found: %v", err)
 	}
-	if err := store.StageStart(ctx, r); err != nil {
+	if err := seedLegacyStartFixture(ctx, r, store); err != nil {
 		t.Fatal(err)
 	}
-	if err := store.Accept(ctx, e); err != nil {
+	if err := projectInHostTransaction(ctx, store, e); err != nil {
 		t.Fatal(err)
 	}
 	e.SessionID = uuid.NewString()
 	e.EventID = uuid.NewString()
 	e.Version++
-	if err := store.Accept(ctx, e); !errors.Is(err, app.ErrConflict) {
+	if err := projectInHostTransaction(ctx, store, e); !errors.Is(err, app.ErrConflict) {
 		t.Fatalf("expected association conflict: %v", err)
 	}
 }
@@ -152,7 +106,7 @@ func TestCompleteArtifactReplaySourceBindingAndTerminalGuard(t *testing.T) {
 	store, r := fixture(t)
 	ctx := context.Background()
 	r.Evidence = []app.EvidenceItem{{AssessmentID: "9", TesteeID: "7", ReportID: "99", SourceVersion: "standard-v1:101", Facts: []app.Fact{{Ref: "standard_report", Value: "{}"}}}}
-	if err := store.StageStart(ctx, r); err != nil {
+	if err := seedLegacyStartFixture(ctx, r, store); err != nil {
 		t.Fatal(err)
 	}
 	event := app.Event{EventID: uuid.NewString(), RequestID: r.RequestID, SessionID: uuid.NewString(), Actor: r.Actor, TesteeID: r.TesteeID, Version: 4, Status: "completed"}
@@ -178,7 +132,7 @@ func TestCompleteArtifactReplaySourceBindingAndTerminalGuard(t *testing.T) {
 			bad.SourceVersion = "standard-v1:102"
 		}
 		event.ArtifactJSON = encodeArtifact(bad)
-		if err := store.Accept(ctx, event); !errors.Is(err, app.ErrConflict) {
+		if err := projectInHostTransaction(ctx, store, event); !errors.Is(err, app.ErrConflict) {
 			t.Fatalf("%s: expected conflict, got %v", field, err)
 		}
 	}
@@ -188,7 +142,7 @@ func TestCompleteArtifactReplaySourceBindingAndTerminalGuard(t *testing.T) {
 	}
 	event.ArtifactJSON = encodeArtifact(artifact)
 	for i := 0; i < 2; i++ {
-		if err := store.Accept(ctx, event); err != nil {
+		if err := projectInHostTransaction(ctx, store, event); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -205,13 +159,13 @@ func TestCompleteArtifactReplaySourceBindingAndTerminalGuard(t *testing.T) {
 	newer.Version++
 	newer.Status = "running"
 	newer.ArtifactJSON = ""
-	if err := store.Accept(ctx, newer); !errors.Is(err, app.ErrConflict) {
+	if err := projectInHostTransaction(ctx, store, newer); !errors.Is(err, app.ErrConflict) {
 		t.Fatalf("terminal overwritten: %v", err)
 	}
 	older := newer
 	older.Version = 2
 	older.EventID = uuid.NewString()
-	if err := store.Accept(ctx, older); err != nil {
+	if err := projectInHostTransaction(ctx, store, older); err != nil {
 		t.Fatal(err)
 	}
 	projection, err = store.Projection(ctx, r.RequestID)
@@ -223,19 +177,19 @@ func TestCompleteArtifactReplaySourceBindingAndTerminalGuard(t *testing.T) {
 func TestRetryStateResumesOriginalRequestWithoutOldFailureOverwritingIt(t *testing.T) {
 	store, request := fixture(t)
 	ctx := context.Background()
-	if err := store.StageStart(ctx, request); err != nil {
+	if err := seedLegacyStartFixture(ctx, request, store); err != nil {
 		t.Fatal(err)
 	}
 	failed := app.Event{EventID: uuid.NewString(), RequestID: request.RequestID, SessionID: uuid.NewString(), Actor: request.Actor, TesteeID: request.TesteeID, Version: 4, Status: "blocked", FailureCode: "provider_result_unknown"}
-	if err := store.Accept(ctx, failed); err != nil {
+	if err := projectInHostTransaction(ctx, store, failed); err != nil {
 		t.Fatal(err)
 	}
 	retry := failed
 	retry.EventID, retry.Version, retry.Status, retry.FailureCode = uuid.NewString(), 5, "queued", ""
-	if err := store.Accept(ctx, retry); err != nil {
+	if err := projectInHostTransaction(ctx, store, retry); err != nil {
 		t.Fatal(err)
 	}
-	if err := store.Accept(ctx, failed); err != nil {
+	if err := projectInHostTransaction(ctx, store, failed); err != nil {
 		t.Fatal(err)
 	}
 	projection, err := store.Projection(ctx, request.RequestID)
@@ -244,69 +198,11 @@ func TestRetryStateResumesOriginalRequestWithoutOldFailureOverwritingIt(t *testi
 	}
 	replacement := retry
 	replacement.EventID, replacement.SessionID, replacement.Version = uuid.NewString(), uuid.NewString(), 6
-	if err := store.Accept(ctx, replacement); !errors.Is(err, app.ErrConflict) {
+	if err := projectInHostTransaction(ctx, store, replacement); !errors.Is(err, app.ErrConflict) {
 		t.Fatal("retry must not replace original session", err)
 	}
 	original, err := store.Original(ctx, request.RequestID)
 	if err != nil || original.RequestID != request.RequestID || original.Actor != request.Actor {
 		t.Fatal(original, err)
-	}
-}
-
-func TestCommandsUseUTCWithNonUTCSessions(t *testing.T) {
-	for _, zone := range []string{"+00:00", "+08:00", "-05:00"} {
-		t.Run(zone, func(t *testing.T) {
-			store, request := fixture(t)
-			ctx := context.Background()
-			// Keep this fixture on the connection whose session timezone we set.
-			store.DB.SetMaxOpenConns(1)
-			if _, err := store.DB.ExecContext(ctx, "SET SESSION time_zone = ?", zone); err != nil {
-				t.Fatal(err)
-			}
-			if err := store.StageStart(ctx, request); err != nil {
-				t.Fatal(err)
-			}
-			assertDue := func(id string) {
-				t.Helper()
-				commands, err := store.Pending(ctx, 100)
-				if err != nil {
-					t.Fatal(err)
-				}
-				for _, command := range commands {
-					if command.ID == id {
-						return
-					}
-				}
-				t.Fatalf("new command %s is not immediately due in timezone %s", id, zone)
-			}
-			assertDue(request.RequestID)
-			if err := store.Retry(ctx, request.RequestID); err != nil {
-				t.Fatal(err)
-			}
-			var remainingMicroseconds int
-			var before, after string
-			const schedule = "SELECT DATE_FORMAT(available_at, '%Y-%m-%d %H:%i:%s.%f') FROM ai_bridge_commands WHERE command_id=?"
-			if err := store.DB.QueryRowContext(ctx, "SELECT TIMESTAMPDIFF(MICROSECOND,UTC_TIMESTAMP(6),available_at) FROM ai_bridge_commands WHERE command_id=?", request.RequestID).Scan(&remainingMicroseconds); err != nil || remainingMicroseconds <= 0 || remainingMicroseconds > 1_000_000 {
-				t.Fatalf("retry must use UTC and defer the command: remaining microseconds=%d err=%v", remainingMicroseconds, err)
-			}
-			if err := store.DB.QueryRowContext(ctx, schedule, request.RequestID).Scan(&before); err != nil {
-				t.Fatal(err)
-			}
-			if err := store.StageStart(ctx, request); err != nil {
-				t.Fatal(err)
-			}
-			if err := store.DB.QueryRowContext(ctx, schedule, request.RequestID).Scan(&after); err != nil || before != after {
-				t.Fatalf("duplicate admission changed retry schedule: before=%s after=%s err=%v", before, after, err)
-			}
-			sessionID := uuid.NewString()
-			if err := store.Acknowledge(ctx, app.Command{ID: request.RequestID, RequestID: request.RequestID}, app.Receipt{SessionID: sessionID, Version: 1}); err != nil {
-				t.Fatal(err)
-			}
-			change := app.Change{CommandID: uuid.NewString(), SessionID: sessionID, Actor: request.Actor, Action: "cancel", ExpectedVersion: 1}
-			if err := store.StageChange(ctx, request.RequestID, change); err != nil {
-				t.Fatal(err)
-			}
-			assertDue(change.CommandID)
-		})
 	}
 }

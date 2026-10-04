@@ -83,31 +83,28 @@ func TestEvaluationManagementRejectsUnconfirmedAndMissingIdentity(t *testing.T) 
 	}
 }
 
-func (g *managementStub) StartEvaluation(ctx context.Context, s EvaluationScope, _ EvaluationStart) (EvaluationState, error) {
-	return g.GetEvaluation(ctx, s)
-}
-
 func TestStartRequiresCurrentPermissionAndExplicitValidCommand(t *testing.T) {
 	gateway := &managementStub{}
-	service := &EvaluationAdministration{Gateway: gateway}
-	command := EvaluationStart{ExpectedVersion: 1, Reason: "启动评测", Confirm: true}
+	messages := &submissionCommands{}
+	service := &EvaluationAdministration{Gateway: gateway, Messages: messages}
+	command := EvaluationStart{CommandID: "00000000-0000-4000-8000-000000000005", ExpectedVersion: 1, Reason: "启动评测", Confirm: true}
 	for _, change := range []func(*EvaluationStart){func(c *EvaluationStart) { c.Confirm = false }, func(c *EvaluationStart) { c.ExpectedVersion = 0 }, func(c *EvaluationStart) { c.Reason = " " }, func(c *EvaluationStart) { c.Reason = "<invalid>" }} {
 		invalid := command
 		change(&invalid)
-		if _, err := service.Start(adminContext(), managementScope(), invalid); !errors.Is(err, ErrInvalid) {
+		if err := service.SubmitStart(adminContext(), managementScope(), invalid); !errors.Is(err, ErrInvalid) {
 			t.Fatal(err)
 		}
 	}
-	if gateway.calls != 0 {
+	if gateway.calls != 0 || messages.calls != 0 {
 		t.Fatal("invalid start forwarded")
 	}
-	if _, err := service.Start(adminContext(), managementScope(), command); err != nil {
+	if err := service.SubmitStart(adminContext(), managementScope(), command); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := service.Start(context.Background(), managementScope(), command); !errors.Is(err, ErrGovernanceDenied) {
+	if err := service.SubmitStart(context.Background(), managementScope(), command); !errors.Is(err, ErrGovernanceDenied) {
 		t.Fatal(err)
 	}
-	if gateway.calls != 1 || gateway.scope != managementScope() {
+	if gateway.calls != 0 || messages.calls != 1 || messages.scope != managementScope() {
 		t.Fatal("revoked start forwarded or scope drift")
 	}
 }

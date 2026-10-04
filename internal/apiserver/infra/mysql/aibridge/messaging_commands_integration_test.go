@@ -45,9 +45,6 @@ func TestMQSubmissionSharesOriginalRequestAndAvoidsLegacyDelivery(t *testing.T) 
 	if count != 0 {
 		t.Fatal("second gRPC delivery path staged")
 	}
-	if _, err := store.Pending(context.Background(), 20); !errors.Is(err, app.ErrManagementUnavailable) {
-		t.Fatal("legacy scanner allowed", err)
-	}
 	changed := f.request
 	changed.Goal = "same id different intent"
 	if err := service.Start(context.Background(), changed); !errors.Is(err, app.ErrConflict) {

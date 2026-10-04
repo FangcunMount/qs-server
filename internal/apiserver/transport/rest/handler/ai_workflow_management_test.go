@@ -74,8 +74,9 @@ func (g *managementGateway) StartEvaluation(ctx context.Context, s app.Evaluatio
 func TestAIWorkflowStartUsesProtectedIdentityNotBody(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	gateway := &managementGateway{}
-	h := NewAIWorkflowManagementHandler(&app.EvaluationAdministration{Gateway: gateway})
-	body := `{"organization_id":999,"operator_user_id":999,"expected_version":6,"execution_id":"execution:1","decision":"cancel_run","reason":"确认取消","confirm":true,"acknowledged_duplicate_call_and_cost_risk":true}`
+	commands := &mqHTTPCommands{}
+	h := NewAIWorkflowManagementHandler(&app.EvaluationAdministration{Gateway: gateway, Messages: commands})
+	body := `{"command_id":"00000000-0000-4000-8000-000000000005","organization_id":999,"operator_user_id":999,"expected_version":6,"execution_id":"execution:1","decision":"cancel_run","reason":"确认取消","confirm":true,"acknowledged_duplicate_call_and_cost_risk":true}`
 	w := httptest.NewRecorder()
 	ctx, _ := gin.CreateTestContext(w)
 	ctx.Request = httptest.NewRequest("POST", "/", strings.NewReader(body))
@@ -86,7 +87,7 @@ func TestAIWorkflowStartUsesProtectedIdentityNotBody(t *testing.T) {
 	snapshot := &authz.Snapshot{EffectiveRoles: []string{"qs:admin"}, Permissions: []authz.Permission{{Resource: "qs:*:*:*", Action: "*", Mode: authz.AuthorizationModeUnconditional}}}
 	ctx.Request = ctx.Request.WithContext(authz.WithSnapshot(ctx.Request.Context(), snapshot))
 	h.Start(ctx)
-	if w.Code != 200 || gateway.calls != 1 || gateway.scope.OrganizationID != 12 || gateway.scope.OperatorUserID != 34 {
+	if w.Code != 202 || gateway.calls != 0 || commands.calls != 1 || commands.org != 12 || commands.user != 34 {
 		t.Fatalf("status=%d calls=%d scope=%+v", w.Code, gateway.calls, gateway.scope)
 	}
 }

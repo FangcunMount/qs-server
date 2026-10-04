@@ -1,7 +1,6 @@
 package aibridge
 
 import (
-	"context"
 	"math"
 	"strings"
 )
@@ -28,17 +27,6 @@ type EvaluationCancellationReceipt struct {
 	CanceledAt         string `json:"canceled_at"`
 	ExecutionID        string `json:"execution_id"`
 	InvocationID       string `json:"invocation_id"`
-}
-
-func (s *EvaluationAdministration) Cancel(ctx context.Context, scope EvaluationScope, command EvaluationCancel) (EvaluationState, error) {
-	if err := s.authorize(ctx, scope); err != nil {
-		return EvaluationState{}, err
-	}
-	command, err := normalizeEvaluationCancel(command)
-	if err != nil {
-		return EvaluationState{}, err
-	}
-	return s.Gateway.CancelEvaluation(ctx, scope, command)
 }
 
 func normalizeEvaluationCancel(command EvaluationCancel) (EvaluationCancel, error) {
