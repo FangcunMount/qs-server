@@ -4,6 +4,7 @@ package aibridge
 
 import (
 	"bytes"
+	"context"
 	"database/sql"
 	"errors"
 	pb "github.com/FangcunMount/qs-server/api/grpc/gen/aiworkflow"
@@ -14,6 +15,15 @@ import (
 	"testing"
 	"time"
 )
+
+func seedLegacyChangeFixture(ctx context.Context, requestID string, r app.Change, s *Store) error {
+	raw, hash, err := encode(r)
+	if err != nil {
+		return err
+	}
+	_, err = s.DB.ExecContext(ctx, "INSERT INTO ai_bridge_commands(command_id,request_id,kind,payload,payload_hash,available_at) VALUES(?,?,?,CONVERT(CAST(? AS BINARY) USING utf8mb4),?,UTC_TIMESTAMP(6))", r.CommandID, requestID, r.Action, raw, hash)
+	return err
+}
 
 func handoffFixture(f *mqFixture, calls *int) *MessagingLegacyHandoff {
 	return &MessagingLegacyHandoff{Store: f.store, Seal: func(k pb.MessagingKind, id, agg, org, at string, b *pb.MessagingBody) (*app.PreparedMessaging, error) {

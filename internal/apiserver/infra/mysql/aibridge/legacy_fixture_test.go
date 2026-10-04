@@ -31,15 +31,6 @@ func seedLegacyStartFixture(ctx context.Context, r app.Start, s *Store) error {
 	return tx.Commit()
 }
 
-func seedLegacyChangeFixture(ctx context.Context, requestID string, r app.Change, s *Store) error {
-	raw, hash, err := encode(r)
-	if err != nil {
-		return err
-	}
-	_, err = s.DB.ExecContext(ctx, "INSERT INTO ai_bridge_commands(command_id,request_id,kind,payload,payload_hash,available_at) VALUES(?,?,?,CONVERT(CAST(? AS BINARY) USING utf8mb4),?,UTC_TIMESTAMP(6))", r.CommandID, requestID, r.Action, raw, hash)
-	return err
-}
-
 func persistOriginalFixture(ctx context.Context, r app.Start, s *Store) error {
 	raw, hash, err := encode(r)
 	if err != nil {
