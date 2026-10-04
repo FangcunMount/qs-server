@@ -67,26 +67,6 @@ func validateChange(ctx context.Context, tx *sql.Tx, id string, r app.Change) er
 	return nil
 }
 
-func (s *Store) Accept(ctx context.Context, e app.Event) error {
-	artifact, err := app.ValidateArtifact(e)
-	if err != nil {
-		return err
-	}
-	raw, hash, err := encode(e)
-	if err != nil {
-		return err
-	}
-	tx, err := s.DB.BeginTx(ctx, nil)
-	if err != nil {
-		return err
-	}
-	defer func() { _ = tx.Rollback() }()
-	if err := acceptPreparedInTransaction(ctx, tx, e, artifact, raw, hash); err != nil {
-		return err
-	}
-	return tx.Commit()
-}
-
 // acceptInTransaction borrows the MQ receiver's transaction; business projection,
 // Inbox and final acknowledgement are committed by that one caller.
 func acceptInTransaction(ctx context.Context, tx *sql.Tx, e app.Event) error {

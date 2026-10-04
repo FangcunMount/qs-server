@@ -15,7 +15,7 @@ type relayStore struct {
 	calls   atomic.Int32
 }
 
-func (s *relayStore) Pending(ctx context.Context, _ int) ([]bridge.Command, error) {
+func (s *relayStore) Pending(ctx context.Context, _ int) ([]struct{}, error) {
 	s.calls.Add(1)
 	close(s.entered)
 	<-ctx.Done()

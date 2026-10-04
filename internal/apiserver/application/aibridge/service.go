@@ -3,7 +3,6 @@ package aibridge
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"strconv"
 
@@ -67,17 +66,10 @@ type Event struct {
 	FailureCode  string `json:"failure_code"`
 	ArtifactJSON string `json:"artifact_json,omitempty"`
 }
-type Command struct {
-	ID        string
-	RequestID string
-	Kind      string
-	Payload   json.RawMessage
-}
 type Store interface {
 	StageStart(context.Context, Start) error
 	Original(context.Context, string) (*Start, error)
 	StageChange(context.Context, string, Change) error
-	Accept(context.Context, Event) error
 	Projection(context.Context, string) (*Event, error)
 }
 type Service struct {
@@ -112,7 +104,7 @@ func (s *Service) Change(ctx context.Context, id string, r Change) error {
 	return s.Store.StageChange(ctx, id, r)
 }
 
-// ValidateEvent is shared by gRPC and authenticated MQ before host persistence.
+// ValidateEvent protects authenticated MQ events before host persistence.
 func ValidateEvent(event Event) error {
 	if !validID(event.EventID) || !validID(event.RequestID) || !validID(event.SessionID) || event.Version < 1 {
 		return ErrInvalid
@@ -129,10 +121,4 @@ func ValidateEvent(event Event) error {
 		return err
 	}
 	return nil
-}
-func (s *Service) Accept(ctx context.Context, event Event) error {
-	if err := ValidateEvent(event); err != nil {
-		return err
-	}
-	return s.Store.Accept(ctx, event)
 }

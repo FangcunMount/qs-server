@@ -65,10 +65,24 @@ func TestMQOriginalProjectionStoreCannotSubmitOrDeliverLegacyCommands(t *testing
 		t.Fatal("old change reached storage", err)
 	}
 	for _, client := range []any{s, (*MessagingCommandStore)(nil)} {
-		for _, method := range []string{"Pending", "Acknowledge", "Retry"} {
+		for _, method := range []string{"Pending", "Acknowledge", "Retry", "Accept"} {
 			if _, exists := reflect.TypeOf(client).MethodByName(method); exists {
 				t.Fatalf("legacy delivery exposed: %T.%s", client, method)
 			}
 		}
 	}
+}
+
+// Projection tests exercise the same borrowed transaction function as the MQ
+// receiver. No production API can perform this standalone write or return ACK.
+func projectInHostTransaction(ctx context.Context, s *Store, e app.Event) error {
+	tx, err := s.DB.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback() }()
+	if err = acceptInTransaction(ctx, tx, e); err != nil {
+		return err
+	}
+	return tx.Commit()
 }
