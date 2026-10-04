@@ -2,9 +2,9 @@ package interpretation
 
 import (
 	"context"
+	"fmt"
 	"sync/atomic"
 	"testing"
-	"time"
 
 	bridge "github.com/FangcunMount/qs-server/internal/apiserver/application/aibridge"
 )
@@ -45,7 +45,7 @@ func (c *relayCloser) Close() error {
 
 func TestAIWorkflowRelayRequiresConfiguredTransportOnlyWhenEnabled(t *testing.T) {
 	m := &Module{}
-	if err := m.StartAIWorkflowRelay(t.Context()); err != nil || m.aiRelayDone != nil {
+	if err := m.StartAIWorkflowRelay(t.Context()); err != nil {
 		t.Fatal("disabled relay started")
 	}
 	m.aiWorkflowEnabled = true
@@ -54,33 +54,25 @@ func TestAIWorkflowRelayRequiresConfiguredTransportOnlyWhenEnabled(t *testing.T)
 	}
 }
 
-func TestAIWorkflowRelayStartsOnceAndJoinsBeforeClosingConnection(t *testing.T) {
-	s := &relayStore{entered: make(chan struct{})}
-	m := &Module{aiWorkflowEnabled: true, aiBridge: &bridge.Service{Store: s, Sender: unusedSender{}}}
-	if err := m.StartAIWorkflowRelay(t.Context()); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = m.Cleanup() })
-	select {
-	case <-s.entered:
-	case <-time.After(time.Second):
-		t.Fatal("relay did not start")
-	}
-	if err := m.StartAIWorkflowRelay(t.Context()); err != nil {
-		t.Fatal(err)
-	}
-	closer := &relayCloser{done: m.aiRelayDone}
-	m.aiManagementConnection = closer
-	if err := m.Cleanup(); err != nil {
-		t.Fatal(err)
-	}
-	if !closer.closed || s.calls.Load() != 1 {
-		t.Fatal("duplicate relay or unclosed connection")
-	}
-	// Closing intake does not disable receipt of already accepted AI results.
-	m.aiWorkflowEnabled = false
-	deps := m.ExportGRPCDeps()
-	if deps.AIWorkflowResults != m.aiBridge {
-		t.Fatal("result receiver was tied to intake")
+func TestMQRetirementNeverStartsLegacyTransportOrExportsResultIngress(t *testing.T) {
+	for _, enabled := range []bool{false, true} {
+		t.Run(fmt.Sprint(enabled), func(t *testing.T) {
+			store := &relayStore{entered: make(chan struct{})}
+			m := &Module{aiWorkflowEnabled: enabled, aiBridge: &bridge.Service{Store: store, Sender: unusedSender{}}}
+			t.Cleanup(func() { _ = m.Cleanup() })
+			err := m.StartAIWorkflowRelay(t.Context())
+			if enabled && err == nil {
+				t.Fatal("legacy transport accepted without MQ runtime")
+			}
+			if !enabled && err != nil {
+				t.Fatal("query-only configuration cannot start", err)
+			}
+			if store.calls.Load() != 0 {
+				t.Fatal("legacy sender was scheduled")
+			}
+			if m.ExportGRPCDeps().AIWorkflowResults != nil {
+				t.Fatal("retired result write ingress exported")
+			}
+		})
 	}
 }
