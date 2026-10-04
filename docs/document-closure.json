@@ -2,7 +2,7 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "13cef0f93abaebe79731d707d2bdd37b65b4d584",
+    "sha": "51741206f4e02aac65d1701545ad674ff9bc3370",
     "verified_on": "2026-10-04"
   },
   "status_policy": {
@@ -9244,7 +9244,7 @@
       "owner": "tooling",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "13cef0f93abaebe79731d707d2bdd37b65b4d584",
+        "source_sha": "51741206f4e02aac65d1701545ad674ff9bc3370",
         "verified_on": "2026-10-04"
       },
       "fact_sources": [
@@ -9331,6 +9331,13 @@
           "command": "python3 scripts/cd/test_ai_messaging_release.py",
           "result": "passed",
           "source_sha": "13cef0f93abaebe79731d707d2bdd37b65b4d584",
+          "verified_on": "2026-10-04"
+        },
+        {
+          "kind": "command",
+          "command": "python3 scripts/cd/test_ai_messaging_release.py",
+          "result": "passed",
+          "source_sha": "51741206f4e02aac65d1701545ad674ff9bc3370",
           "verified_on": "2026-10-04"
         }
       ],
@@ -9601,7 +9608,7 @@
       "owner": "tooling",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "13cef0f93abaebe79731d707d2bdd37b65b4d584",
+        "source_sha": "51741206f4e02aac65d1701545ad674ff9bc3370",
         "verified_on": "2026-10-04"
       },
       "fact_sources": [
@@ -9627,6 +9634,13 @@
           "command": "python3 scripts/cd/test_ai_messaging_release.py",
           "result": "passed",
           "source_sha": "13cef0f93abaebe79731d707d2bdd37b65b4d584",
+          "verified_on": "2026-10-04"
+        },
+        {
+          "kind": "command",
+          "command": "python3 scripts/cd/test_ai_messaging_release.py",
+          "result": "passed",
+          "source_sha": "51741206f4e02aac65d1701545ad674ff9bc3370",
           "verified_on": "2026-10-04"
         }
       ],
