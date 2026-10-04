@@ -22,12 +22,6 @@ func (s *relayStore) Pending(ctx context.Context, _ int) ([]bridge.Command, erro
 	return nil, ctx.Err()
 }
 
-type unusedSender struct{}
-
-func (unusedSender) Send(context.Context, bridge.Command) (bridge.Receipt, error) {
-	panic("no commands")
-}
-
 type relayCloser struct {
 	done   <-chan struct{}
 	closed bool
@@ -58,7 +52,7 @@ func TestMQRetirementNeverStartsLegacyTransportOrExportsResultIngress(t *testing
 	for _, enabled := range []bool{false, true} {
 		t.Run(fmt.Sprint(enabled), func(t *testing.T) {
 			store := &relayStore{entered: make(chan struct{})}
-			m := &Module{aiWorkflowEnabled: enabled, aiBridge: &bridge.Service{Store: store, Sender: unusedSender{}}}
+			m := &Module{aiWorkflowEnabled: enabled, aiBridge: &bridge.Service{Store: store}}
 			t.Cleanup(func() { _ = m.Cleanup() })
 			err := m.StartAIWorkflowRelay(t.Context())
 			if enabled && err == nil {

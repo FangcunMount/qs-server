@@ -45,7 +45,6 @@ func (m *Module) configureAIMessaging(o opts.AIWorkflowMessagingOptions, db *sql
 		return err
 	}
 	m.aiBridge.Store = commands
-	m.aiBridge.Sender = nil
 	m.aiEligibility = c.Commands
 	m.aiMessagingRuntime = runtime
 	m.aiMessagingReader = &store.MessagingReader{DB: db, Store: s}
