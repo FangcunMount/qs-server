@@ -225,6 +225,41 @@ APP_GID=2000
                 self.assertEqual(result.returncode == 0, risk == 'reviewed', result.stderr)
                 self.assertEqual(invoked.exists(), risk == 'reviewed')
 
+    def test_mq_guard_creation_uses_existing_permissions_preserves_existing_and_rejects_symlink(self):
+        text = Path(__file__).with_name('remote-deploy.sh').read_text()
+        function = text[text.index('mark_mq_required() ('):text.index('deploy_http_service() {')]
+        directory = self.root / 'marker'
+        directory.mkdir()
+        marker = directory / 'required'
+        function = function.replace('/opt/qs-server/qs-apiserver/ai-mq-releases/required', str(marker))
+        shell = '''set -e
+restricted() {
+ case "$1" in
+  test|rsync) "$@" ;;
+  chown|chmod) return 0 ;;
+  *) return 1 ;;
+ esac
+}
+SUDO=restricted
+''' + function + '\nmark_mq_required\n'
+        for risk in ['first', 'existing', 'symlink']:
+            with self.subTest(risk=risk):
+                if risk == 'existing':
+                    marker.write_bytes(b'original ownership')
+                    inode = marker.stat().st_ino
+                if risk == 'symlink':
+                    marker.unlink()
+                    marker.symlink_to(self.base)
+                result = subprocess.run(['bash', '-c', shell], capture_output=True, timeout=10)
+                self.assertEqual(result.returncode == 0, risk != 'symlink', result.stderr)
+                if risk == 'first':
+                    self.assertEqual(marker.read_bytes(), b'')
+                if risk == 'existing':
+                    self.assertEqual(marker.read_bytes(), b'original ownership')
+                    self.assertEqual(marker.stat().st_ino, inode)
+                if risk == 'symlink':
+                    self.assertEqual(self.base.read_text(), 'ai_workflow:\n  enabled: true\n')
+
     def test_mq_preflight_precedes_config_sync_and_stop_without_changing_default_flow(self):
         text = Path(__file__).with_name('remote-deploy.sh').read_text()
         body = text[text.index('acquire_image_deploy_lock\n'):]
@@ -232,7 +267,7 @@ APP_GID=2000
         self.assertLess(body.index('ai-messaging-release.py'), body.index('\n    deploy_http_service'))
         self.assertIn('if [ "$MQ_IMAGE_SELECTED" != "1" ]; then select_image; fi', body)
         service = text[text.index('deploy_http_service()'):text.index('collection_container_ids()')]
-        self.assertLess(service.index('/ai-mq-releases/required'), service.index('stop_single_container'))
+        self.assertLess(service.index('mark_mq_required'), service.index('stop_single_container'))
         self.assertIn('compose_args+=(-f "$MQ_COMPOSE_OVERRIDE")', service)
 
 
