@@ -62,7 +62,6 @@ type EvaluationState struct {
 }
 type EvaluationGateway interface {
 	ListEvaluations(context.Context, DraftScope, EvaluationCatalogQuery) (EvaluationCatalogPage, error)
-	CancelEvaluation(context.Context, EvaluationScope, EvaluationCancel) (EvaluationState, error)
 	ListEvaluationUnknowns(context.Context, EvaluationScope, int64) (EvaluationUnknownIndex, error)
 	PrepareEvaluation(context.Context, DraftScope, EvaluationPlanQuery) (EvaluationPlan, error)
 	ReopenEvaluationReview(context.Context, EvaluationScope, EvaluationReopen) (EvaluationState, error)
@@ -72,7 +71,6 @@ type EvaluationGateway interface {
 	GetEvaluationCandidate(context.Context, EvaluationScope, CandidateQuery) (EvaluationCandidateEvidence, error)
 	ReviewEvaluation(context.Context, EvaluationScope, EvaluationReview) (EvaluationState, error)
 	CreateEvaluation(context.Context, EvaluationScope, EvaluationCreate) (EvaluationState, error)
-	StartEvaluation(context.Context, EvaluationScope, EvaluationStart) (EvaluationState, error)
 	GetEvaluation(context.Context, EvaluationScope) (EvaluationState, error)
 	ResolveUnknown(context.Context, EvaluationScope, UnknownResolution) (EvaluationState, error)
 }
@@ -115,17 +113,6 @@ func (s *EvaluationAdministration) Resolve(ctx context.Context, scope Evaluation
 		return EvaluationState{}, ErrInvalid
 	}
 	return s.Gateway.ResolveUnknown(ctx, scope, command)
-}
-
-func (s *EvaluationAdministration) Start(ctx context.Context, scope EvaluationScope, command EvaluationStart) (EvaluationState, error) {
-	if err := s.authorize(ctx, scope); err != nil {
-		return EvaluationState{}, err
-	}
-	command, err := normalizeEvaluationStart(command)
-	if err != nil {
-		return EvaluationState{}, err
-	}
-	return s.Gateway.StartEvaluation(ctx, scope, command)
 }
 
 func normalizeEvaluationStart(command EvaluationStart) (EvaluationStart, error) {

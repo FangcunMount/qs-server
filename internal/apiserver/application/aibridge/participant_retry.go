@@ -58,16 +58,6 @@ func (s *ParticipantAdministration) Get(ctx context.Context, scope DraftScope, s
 	}
 	return s.Gateway.GetParticipantExecution(ctx, scope, sessionID)
 }
-func (s *ParticipantAdministration) Retry(ctx context.Context, scope DraftScope, sessionID string, command ParticipantRetry) (Receipt, error) {
-	if err := s.authorize(ctx, scope); err != nil {
-		return Receipt{}, err
-	}
-	command, err := normalizeParticipantRetry(sessionID, command)
-	if err != nil {
-		return Receipt{}, err
-	}
-	return s.Gateway.RetryParticipant(ctx, scope, sessionID, command)
-}
 func (s *ParticipantAdministration) RetryReceipt(ctx context.Context, scope DraftScope, commandID string) (Receipt, error) {
 	if err := s.authorize(ctx, scope); err != nil {
 		return Receipt{}, err

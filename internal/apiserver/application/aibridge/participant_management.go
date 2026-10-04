@@ -50,7 +50,6 @@ type ParticipantCapacity struct {
 type ParticipantManagementGateway interface {
 	GetParticipantCapacity(context.Context, DraftScope, ParticipantCapacityQuery) (ParticipantCapacity, error)
 	GetParticipantExecution(context.Context, DraftScope, string) (ParticipantExecution, error)
-	RetryParticipant(context.Context, DraftScope, string, ParticipantRetry) (Receipt, error)
 	GetParticipantRetryReceipt(context.Context, DraftScope, string) (Receipt, error)
 }
 type ParticipantAdministration struct {
