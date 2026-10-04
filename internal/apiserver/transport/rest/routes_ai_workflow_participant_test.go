@@ -58,26 +58,22 @@ func (g *participantRouteGateway) GetParticipantExecution(_ context.Context, sco
 	g.scope = scope
 	return app.ParticipantExecution{OrganizationID: scope.OrganizationID, SessionID: sessionID}, nil
 }
-func (g *participantRouteGateway) RetryParticipant(_ context.Context, scope app.DraftScope, sessionID string, _ app.ParticipantRetry) (app.Receipt, error) {
-	g.calls++
-	g.scope = scope
-	return app.Receipt{SessionID: sessionID}, nil
-}
 func (g *participantRouteGateway) GetParticipantRetryReceipt(_ context.Context, scope app.DraftScope, _ string) (app.Receipt, error) {
 	g.calls++
 	g.scope = scope
 	return app.Receipt{}, nil
 }
-func TestParticipantRetryRoutesRequireCurrentAdminAndTrustedScope(t *testing.T) {
+func TestMQParticipantRetryRoutesRequireCurrentAdminAndTrustedScope(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	sessionID := "00000000-0000-4000-8000-000000000001"
 	body := `{"command_id":"00000000-0000-4000-8000-000000000002","expected_run_id":"00000000-0000-4000-8000-000000000003","expected_version":4,"reason":"重试","confirm":true,"expected_provider_invocations":1,"accept_result_unknown_risk":true,"organization_id":99,"operator_user_id":99}`
 	for _, path := range []string{sessionID, sessionID + "/retry", "retry-commands/" + sessionID} {
 		for _, admin := range []bool{false, true} {
 			gateway := &participantRouteGateway{}
+			messages := &mqRouteSubmitter{}
 			engine := gin.New()
 			engine.Use(aiRouteSnapshotMiddleware(admin))
-			router := newRouterWithBudgets(Deps{Interpretation: InterpretationDeps{AIWorkflowParticipants: &app.ParticipantAdministration{Gateway: gateway}}})
+			router := newRouterWithBudgets(Deps{Interpretation: InterpretationDeps{AIWorkflowParticipants: &app.ParticipantAdministration{Gateway: gateway, Messages: messages}}})
 			router.registerInterpretationInternalV2Routes(engine.Group("/internal/v2"))
 			method := "GET"
 			if path == sessionID+"/retry" {
@@ -87,11 +83,17 @@ func TestParticipantRetryRoutesRequireCurrentAdminAndTrustedScope(t *testing.T) 
 			req.Header.Set("Content-Type", "application/json")
 			w := httptest.NewRecorder()
 			engine.ServeHTTP(w, req)
-			if admin && (w.Code != 200 || gateway.calls != 1 || gateway.scope.OrganizationID != 12 || gateway.scope.OperatorUserID != 34) {
-				t.Fatal(w.Code, w.Body.String(), gateway)
+			if admin && method == "GET" && (w.Code != 200 || gateway.calls != 1 || gateway.scope.OrganizationID != 12 || gateway.scope.OperatorUserID != 34 || messages.calls != 0) {
+				t.Fatal(w.Code, w.Body.String(), gateway, messages)
 			}
-			if !admin && (w.Code != 403 || gateway.calls != 0) {
-				t.Fatal(w.Code, gateway)
+			if admin && method == "POST" {
+				if w.Code != 202 || gateway.calls != 0 || messages.calls != 1 || messages.participantScope.OrganizationID != 12 || messages.participantScope.OperatorUserID != 34 || messages.sessionID != sessionID || messages.commandID != "00000000-0000-4000-8000-000000000002" || messages.retry.ExpectedVersion != 4 || messages.retry.ExpectedRunID != "00000000-0000-4000-8000-000000000003" || !messages.retry.AcceptResultUnknownRisk || messages.retry.ExpectedProviderInvocations != 1 {
+					t.Fatal("retry lost protected scope or intent", w.Code, w.Body.String(), gateway, messages)
+				}
+				assertMQRouteSubmitted(t, w, messages.commandID)
+			}
+			if !admin && (w.Code != 403 || gateway.calls != 0 || messages.calls != 0) {
+				t.Fatal(w.Code, gateway, messages)
 			}
 		}
 	}

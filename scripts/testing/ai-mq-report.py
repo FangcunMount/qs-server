@@ -5,6 +5,8 @@ import sys
 from pathlib import Path
 
 required = {
+    "TestMQWorkflowCancelRouteRequiresOrgAdminAndGovernanceDependency",
+    "TestMQParticipantRetryRoutesRequireCurrentAdminAndTrustedScope",
     "TestMQRetiredResultsRPCNeverPersistsOrAcknowledges",
     "TestMQOriginalProjectionStoreCannotSubmitOrDeliverLegacyCommands",
     "TestMQConcurrentSubmissionRetainsFirstWire",
