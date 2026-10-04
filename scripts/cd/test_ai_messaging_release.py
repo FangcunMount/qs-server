@@ -92,6 +92,33 @@ class MQReleaseTests(unittest.TestCase):
         self.assertEqual(mount['source'], str(self.root / 'release/apiserver.json'))
         self.assertTrue(mount['read_only'])
 
+    def test_mq_private_uploaded_config_is_readable_by_image_without_widening_source(self):
+        # A real CD upload is deploy-owned 0600; the image runs as UID/GID2000.
+        # Mounting that source directly makes preflight fail before replacement.
+        self.base.chmod(0o600)
+        original = self.base.read_bytes()
+        identity = self.base.stat()
+        original_offline = self.fake_offline
+
+        def checked_offline(image, args, mounts=()):
+            if any(arg.startswith('--output-config') for arg in args):
+                source, _, readonly = next(m for m in mounts if m[1] == '/preflight/source.yaml')
+                self.assertNotEqual(source, self.base)
+                self.assertEqual(source.read_bytes(), original)
+                self.assertEqual(source.stat().st_mode & 0o777, 0o400)
+                self.assertEqual((source.stat().st_uid, source.stat().st_gid), (os.getuid(), os.getgid()))
+                self.assertTrue(readonly)
+            return original_offline(image, args, mounts)
+
+        self.fake_offline = checked_offline
+        self.prepare()
+        self.assertEqual(self.base.read_bytes(), original)
+        after = self.base.stat()
+        self.assertEqual((after.st_uid, after.st_gid, after.st_mode),
+                         (identity.st_uid, identity.st_gid, identity.st_mode))
+        self.assertEqual({p.name for p in (self.releases / SOURCE).iterdir()},
+                         {'binding.json', 'apiserver.json', 'metadata.json', 'compose.json'})
+
     def test_mq_frozen_compatible_images_remain_protected_from_retention(self):
         self.prepare()
         self.source = 'f' * 40
