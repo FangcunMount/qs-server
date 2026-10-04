@@ -1,6 +1,6 @@
 # QS AI messaging runtime and participant operation reads
 
-The reviewed MQ mode chooses one Outbox, event subscriber and relay at process startup. It does not start the legacy command scanner or register the legacy Results receiver. Query/governance gRPC and read-only payload retrieval remain available. The mode is a cutover configuration, not an automatic failure fallback or authorization to run two writers.
+Runtime commands and events use one MQ Outbox, event subscriber and relay at process startup. The legacy command scanner, staging/retry/settlement SQL and direct runtime gRPC write adapters are retired. The normal module does not export the legacy Results receiver; an explicitly registered compatibility receiver still authenticates mTLS and permanently returns FailedPrecondition without persistence or acknowledgement. Query/governance gRPC and read-only payload retrieval remain available. Disabling MQ cannot reactivate any old writer.
 
 ## Assembly and lifecycle
 
@@ -28,7 +28,7 @@ Local tests cover real MySQL 8.0.36/8.4 and NSQ 1.3.0 at the 262144-byte limit, 
 
 Existing isolated evidence covers separate-process command/receipt/final-ACK loss after PUB, Broker and both-process kills, a 128 KiB protected reference through real mTLS, and real browser original-intent behavior against a synthetic HTTP backend. The process helper proves the original transport runtime, not a full QS host. Required remainder: full normal QS host health and each command family's accepted/refused/duplicate chain, reviewed historical inventory and apply tool, genuinely compatible MQ version rollback, final assets and production natural business samples. See the independent R1–R7 execution ledger; none of these tests is production acceptance.
 
-The production review must explicitly include the read-only `/qsai.workflow.v1.MessagePayloads/Get` permission for the qs-ai workload, host key/network/topology mounts and schema ownership. Existing production ACL/configuration has not been edited; local mTLS service tests do not prove production ACL readiness. Host main merge/automatic deployment requires separate review. SDK prerelease approval is not host production authorization.
+The production review must explicitly include the read-only `/qsai.workflow.v1.MessagePayloads/Get` permission for the qs-ai workload, host key/network/topology mounts and schema ownership. Actual production ACL/configuration readiness must be verified independently; local mTLS service tests do not prove it. Host main merge/automatic deployment requires separate review. SDK prerelease approval is not host production authorization.
 
 ## Historical command handoff boundary
 
@@ -36,7 +36,7 @@ Migration 093 adds immutable source evidence. `MessagingLegacyHandoff.StageSingl
 
 Old Start identity uses request_id; old answer/cancel identities use command_id. Known UTC request creation time is represented in UTC+8 with original precision. A Change has no stored original submission time, so its envelope retains an empty value instead of using retry available_at or the migration clock. Previous attempts and retry availability are carried forward; an exhausted historical budget is technically held and does not receive new retries. Already delivered history is not requeued. Duplicate handoff reuses first wire with no resealing.
 
-An aggregate with multiple unowned pending commands is refused: the old schema does not retain sufficient immutable commit ordering. Such rows stay untouched in the maintenance inventory until an explicit ordering/evidence disposition is reviewed. This API therefore does not claim universal historical migration completion. The maintenance transaction must roll back on any error; the API does not commit, create a transaction or close resources. Compatible runtime ownership disables the old scanner; switching off MQ is not a rollback to old gRPC writes.
+An aggregate with multiple unowned pending commands is refused: the old schema does not retain sufficient immutable commit ordering. Such rows stay untouched in the maintenance inventory until an explicit ordering/evidence disposition is reviewed. This API therefore does not claim universal historical migration completion. The maintenance transaction must roll back on any error; the API does not commit, create a transaction or close resources. The runtime no longer contains the old scanner; switching off MQ is not a rollback to old gRPC writes.
 
 ## 切换前只读数据库清单
 
@@ -79,13 +79,13 @@ Start、Change、参与者 Retry、评测 Start/Cancel 在同一条 `MessagingCo
 
 必要存储回归必须显式协商宿主的三字节字符集并检查未被适配器更改，覆盖含 emoji/补充平面字符的原接单与历史回答、合法128KiB结果、原hash、重复复用ACK、ACK失败时投影与Inbox共同回滚。正常镜像中失败到技术挂起的旧隔离样本保留原身份、wire与预算；修复验证使用独立合成样本，不重置挂起样本或授予新模型调用。
 
-## R2-04 持久状态观测首批
+## 持久状态观测
 
 MQ运行Start成功时在原Prometheus注册器登记pull collector，完成Stop后注销；构造/Describe不读库、不注册、不连接网络，没有observer任务或第二个调度器。MQ关闭不注册此命名空间，不能把不存在当零积压。每次scrape借用宿主原池，2秒总context/每SQL1秒、REPEATABLE READ+READ ONLY，读取后rollback，不领取/提交/确认/关闭池。
 
 固定qs_server_ai_mq_* gauges区分staged（含未来重试）、due（不是按序可领取）、awaiting_receipt（等待业务决定）、Outboxheld与Inboxheld；创建年龄clamp未来到0。四种quarantine保留分类记录为gauge，不把attempts的8次上限称终生counter。所有查询不读身份、正文、wire或密钥，注册器与renderer只认固定描述，无高基数标签；存储失败只给observation_available=0，不输出部分/旧值或空队列。
 
-当前完整重复次数与payload读取失败分类事实尚未持久记录，相应observations_available=0，不提供伪造次数。技术事实账/独立增量迁移以及AI组织Runtime.Health增量仍开放，R2-04不关闭。正常metrics证明和生命周期注册/注销必须分别取证；collector存在不等于业务已确认。
+迁移095增加固定技术事实账和记录起点。重复接收事实随原Inbox/ACK事务提交，正文读取失败沿独立有界技术记录事务提交；均不改变业务投影或重试授权。observations_available仅在完整记录设施存在时为1，缺表或旧设施保持不可用，读取错误不冒充零。历史覆盖标志与记录起点分别展示，不从新计数推断升级前历史。正常metrics与生命周期注册/注销必须分别取证；collector存在不等于业务已确认。
 
 定向真实MySQL测试使用随机独立测试schema，仅创建同结构状态表，不启动消息消费者/模型。验证未提交不可见、提交/rollback、writer持锁时reader不等待/不结算、未来时间clamp、技术保留记录是gauge、后续查询缺表不泄漏已读部分值和宿主池可用。原实际NSQ运行/停止/借用池回归保护新增注册生命周期，不重复GoM0～M6套件。
 

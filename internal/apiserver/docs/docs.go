@@ -10142,8 +10142,8 @@ const docTemplate = `{
                     }
                 ],
                 "responses": {
-                    "200": {
-                        "description": "OK",
+                    "202": {
+                        "description": "Accepted",
                         "schema": {
                             "allOf": [
                                 {
@@ -10153,7 +10153,7 @@ const docTemplate = `{
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/aibridge.EvaluationState"
+                                            "$ref": "#/definitions/handler.SubmittedOperation"
                                         }
                                     }
                                 }
@@ -10186,6 +10186,12 @@ const docTemplate = `{
                     },
                     "409": {
                         "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "429": {
+                        "description": "Too Many Requests",
                         "schema": {
                             "$ref": "#/definitions/core.ErrResponse"
                         }
@@ -11199,8 +11205,8 @@ const docTemplate = `{
                     }
                 ],
                 "responses": {
-                    "200": {
-                        "description": "OK",
+                    "202": {
+                        "description": "Accepted",
                         "schema": {
                             "allOf": [
                                 {
@@ -11210,7 +11216,7 @@ const docTemplate = `{
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/aibridge.EvaluationState"
+                                            "$ref": "#/definitions/handler.SubmittedOperation"
                                         }
                                     }
                                 }
@@ -11243,6 +11249,12 @@ const docTemplate = `{
                     },
                     "409": {
                         "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "429": {
+                        "description": "Too Many Requests",
                         "schema": {
                             "$ref": "#/definitions/core.ErrResponse"
                         }
@@ -11500,8 +11512,8 @@ const docTemplate = `{
                     }
                 ],
                 "responses": {
-                    "200": {
-                        "description": "OK",
+                    "202": {
+                        "description": "Accepted",
                         "schema": {
                             "allOf": [
                                 {
@@ -11511,7 +11523,7 @@ const docTemplate = `{
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/aibridge.Receipt"
+                                            "$ref": "#/definitions/handler.SubmittedOperation"
                                         }
                                     }
                                 }
@@ -13558,6 +13570,9 @@ const docTemplate = `{
         "aibridge.EvaluationCancel": {
             "type": "object",
             "properties": {
+                "command_id": {
+                    "type": "string"
+                },
                 "confirm": {
                     "type": "boolean"
                 },
@@ -13970,6 +13985,9 @@ const docTemplate = `{
         "aibridge.EvaluationStart": {
             "type": "object",
             "properties": {
+                "command_id": {
+                    "type": "string"
+                },
                 "confirm": {
                     "type": "boolean"
                 },
@@ -16334,6 +16352,23 @@ const docTemplate = `{
                 },
                 "validate_only": {
                     "type": "boolean"
+                }
+            }
+        },
+        "handler.SubmittedOperation": {
+            "type": "object",
+            "properties": {
+                "command_id": {
+                    "type": "string"
+                },
+                "operation_id": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "status_url": {
+                    "type": "string"
                 }
             }
         },
