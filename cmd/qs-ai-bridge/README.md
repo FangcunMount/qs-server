@@ -91,7 +91,7 @@ MQ运行Start成功时在原Prometheus注册器登记pull collector，完成Stop
 
 ## 隔离 CLI 与正式入口
 
-`qs-ai-bridge` 仅保留隔离联调和原历史数据读取，不提供用户认证。正常消息生命周期由 qs-apiserver 宿主装配；迁移完成后不能把旧 CLI relay 当作生产降级写路径。原业务契约继续来自 `api/grpc/proto/aiworkflow/workflow.proto`，新增消息契约来自 `messaging.proto`。维护清单、门禁与移交分别由同镜像中的 `qs-ai-messaging-audit`、`qs-ai-messaging-control`、`qs-ai-messaging-handoff` 执行，默认服务入口不改变。
+`qs-ai-bridge` 仅保留原历史投影读取与 runtime-index-backfill 维护，不提供用户认证。stage-start、stage-change、relay、receive 在借用数据库或传输资源前永久拒绝；隔离消息故障夹具由独立 testing 工具承载。正常消息生命周期由 qs-apiserver 宿主装配；迁移完成后不能把旧 CLI relay 当作生产降级写路径。原业务契约继续来自 `api/grpc/proto/aiworkflow/workflow.proto`，新增消息契约来自 `messaging.proto`。维护清单、门禁与移交分别由同镜像中的 `qs-ai-messaging-audit`、`qs-ai-messaging-control`、`qs-ai-messaging-handoff` 执行，默认服务入口不改变。
 
 ## MQ 发布绑定与离线预检
 

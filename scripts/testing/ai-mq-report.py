@@ -5,6 +5,11 @@ import sys
 from pathlib import Path
 
 required = {
+    "TestMQRetiredBridgeModesRejectBeforeStorageOrTransport",
+    "TestMQRetirementNeverStartsLegacyTransportOrExportsResultIngress",
+    "TestMQHTTP202MeansQSCommitAndUsesOriginalCommandIdentity/start/missing_transport",
+    "TestMQHTTP202MeansQSCommitAndUsesOriginalCommandIdentity/cancel/missing_transport",
+    "TestMQHTTP202MeansQSCommitAndUsesOriginalCommandIdentity/retry/missing_transport",
     "TestMQFinalAckRepeatedSuccessRetainsBudgetAndOriginalProjection",
     "TestMQHeldFinalAckDuplicateCannotRenewBudgetOrPublish",
     "TestMQBindingRejectsAmbiguousOrOutOfScopeInputs",
