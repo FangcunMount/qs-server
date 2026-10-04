@@ -6,6 +6,7 @@ import json
 import os
 from pathlib import Path
 import tempfile
+import subprocess
 import unittest
 from unittest.mock import patch
 
@@ -175,6 +176,90 @@ class MQReleaseTests(unittest.TestCase):
         self.assertNotIn('--env-file', args)
         self.assertNotIn('--env', args)
 
+    def test_mq_deploy_uses_reviewed_root_owned_tool_not_uploaded_python(self):
+        text = Path(__file__).with_name('remote-deploy.sh').read_text()
+        self.assertNotIn('$SUDO python3 "$DEPLOY_TMP/scripts/cd/ai-messaging-release.py"', text)
+        self.assertIn('ai-mq-tools/${mq_tool_digest}.py', text)
+        self.assertIn('[ -L "$mq_tool" ]', text)
+        self.assertIn("stat -c '%u:%a' \"$mq_tool\"", text)
+        self.assertIn('!= "0:555"', text)
+        self.assertIn('!= "$mq_tool_digest"', text)
+        self.assertLess(text.index('refusing replacement'), text.index('$SUDO python3 "$mq_tool"'))
+
+    def test_mq_reviewed_tool_guard_refuses_missing_tampered_writable_foreign_and_symlink_tools(self):
+        text = Path(__file__).with_name('remote-deploy.sh').read_text()
+        body = text[text.index('  mq_tool_digest='):text.index('  MQ_COMPOSE_OVERRIDE=')]
+        body = body.replace('/opt/qs-server/qs-apiserver/ai-mq-tools', str(self.root / 'tools'))
+        upload = self.root / 'upload'
+        (upload / 'scripts/cd').mkdir(parents=True)
+        script = upload / 'scripts/cd/ai-messaging-release.py'
+        script.write_text('import json; print(json.dumps({"preflight":"passed"}))\n')
+        expected = hashlib.sha256(script.read_bytes()).hexdigest()
+        tools = self.root / 'tools'
+        tools.mkdir()
+        tool = tools / (expected + '.py')
+        for risk, identity in [('missing', '0:555'), ('tampered', '0:555'),
+                ('writable', '0:755'), ('foreign', '1002:555'), ('symlink', '0:555'),
+                ('reviewed', '0:555')]:
+            with self.subTest(risk=risk):
+                if tool.exists() or tool.is_symlink():
+                    tool.unlink()
+                if risk == 'symlink':
+                    tool.symlink_to(script)
+                elif risk != 'missing':
+                    tool.write_bytes(script.read_bytes() + (b'#changed' if risk == 'tampered' else b''))
+                environment = dict(os.environ, DEPLOY_TMP=str(upload), TOOL_IDENTITY=identity)
+                shell = '''set -e
+stat() { printf '%s\\n' "$TOOL_IDENTITY"; }
+run_reviewed() { printf 'called\\n' > "$DEPLOY_TMP/invoked"; "$@"; }
+resolve_compose_image_ref() { printf 'sha256:reviewed\\n'; }
+SUDO=run_reviewed
+APP_UID=2000
+APP_GID=2000
+''' + body
+                invoked = upload / 'invoked'
+                if invoked.exists():
+                    invoked.unlink()
+                result = subprocess.run(['bash', '-c', shell], env=environment,
+                        capture_output=True, text=True, timeout=10)
+                self.assertEqual(result.returncode == 0, risk == 'reviewed', result.stderr)
+                self.assertEqual(invoked.exists(), risk == 'reviewed')
+
+    def test_mq_guard_creation_uses_existing_permissions_preserves_existing_and_rejects_symlink(self):
+        text = Path(__file__).with_name('remote-deploy.sh').read_text()
+        function = text[text.index('mark_mq_required() ('):text.index('deploy_http_service() {')]
+        directory = self.root / 'marker'
+        directory.mkdir()
+        marker = directory / 'required'
+        function = function.replace('/opt/qs-server/qs-apiserver/ai-mq-releases/required', str(marker))
+        shell = '''set -e
+restricted() {
+ case "$1" in
+  test|rsync) "$@" ;;
+  chown|chmod) return 0 ;;
+  *) return 1 ;;
+ esac
+}
+SUDO=restricted
+''' + function + '\nmark_mq_required\n'
+        for risk in ['first', 'existing', 'symlink']:
+            with self.subTest(risk=risk):
+                if risk == 'existing':
+                    marker.write_bytes(b'original ownership')
+                    inode = marker.stat().st_ino
+                if risk == 'symlink':
+                    marker.unlink()
+                    marker.symlink_to(self.base)
+                result = subprocess.run(['bash', '-c', shell], capture_output=True, timeout=10)
+                self.assertEqual(result.returncode == 0, risk != 'symlink', result.stderr)
+                if risk == 'first':
+                    self.assertEqual(marker.read_bytes(), b'')
+                if risk == 'existing':
+                    self.assertEqual(marker.read_bytes(), b'original ownership')
+                    self.assertEqual(marker.stat().st_ino, inode)
+                if risk == 'symlink':
+                    self.assertEqual(self.base.read_text(), 'ai_workflow:\n  enabled: true\n')
+
     def test_mq_preflight_precedes_config_sync_and_stop_without_changing_default_flow(self):
         text = Path(__file__).with_name('remote-deploy.sh').read_text()
         body = text[text.index('acquire_image_deploy_lock\n'):]
@@ -182,7 +267,7 @@ class MQReleaseTests(unittest.TestCase):
         self.assertLess(body.index('ai-messaging-release.py'), body.index('\n    deploy_http_service'))
         self.assertIn('if [ "$MQ_IMAGE_SELECTED" != "1" ]; then select_image; fi', body)
         service = text[text.index('deploy_http_service()'):text.index('collection_container_ids()')]
-        self.assertLess(service.index('/ai-mq-releases/required'), service.index('stop_single_container'))
+        self.assertLess(service.index('mark_mq_required'), service.index('stop_single_container'))
         self.assertIn('compose_args+=(-f "$MQ_COMPOSE_OVERRIDE")', service)
 
 
