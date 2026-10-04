@@ -559,6 +559,25 @@ docker_compose_pull() {
   echo "Pulled ${COMPOSE_SERVICE} image in ${pull_elapsed}s"
 }
 
+# Install the empty ownership guard with the existing restricted deployment
+# commands. Never overwrite an existing guard or require arbitrary root touch.
+mark_mq_required() (
+  local marker=/opt/qs-server/qs-apiserver/ai-mq-releases/required temporary
+  if $SUDO test -L "$marker"; then
+    echo "MQ ownership guard is a symlink; refusing replacement." >&2
+    exit 1
+  fi
+  if ! $SUDO test -e "$marker"; then
+    temporary="$(mktemp)"
+    trap 'rm -f -- "$temporary"' EXIT
+    $SUDO rsync -a --ignore-existing "$temporary" "$marker"
+    $SUDO test -f "$marker" && ! $SUDO test -L "$marker" || exit 1
+    $SUDO chown root:root "$marker"
+    $SUDO chmod 0644 "$marker"
+  fi
+  $SUDO test -f "$marker" && ! $SUDO test -L "$marker"
+)
+
 deploy_http_service() {
   cd "/opt/qs-server/${CONTAINER_NAME}"
   local -a compose_args=(-f "$DEPLOY_TMP/docker-compose.prod.yml")
@@ -570,7 +589,7 @@ deploy_http_service() {
   if [ -n "$MQ_COMPOSE_OVERRIDE" ]; then
     # Persistent, fail-closed ownership guard; a future missing binding or old
     # image must not silently reactivate the original gRPC writer.
-    $SUDO touch /opt/qs-server/qs-apiserver/ai-mq-releases/required
+    mark_mq_required
   fi
   stop_single_container
   # shellcheck disable=SC2046
