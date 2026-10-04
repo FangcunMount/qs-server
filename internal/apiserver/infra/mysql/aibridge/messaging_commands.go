@@ -83,12 +83,6 @@ func (s *MessagingCommandStore) stageCommand(ctx context.Context, kind pb.Messag
 	return tx.Commit()
 }
 
-// No legacy scanner may claim MQ-owned commands even if a host accidentally
-// invokes Service.Relay. Host lifecycle must choose the MQ step explicitly.
-func (s *MessagingCommandStore) Pending(context.Context, int) ([]app.Command, error) {
-	return nil, app.ErrManagementUnavailable
-}
-
 // SubmitParticipantRetry preserves the original request aggregate. The host
 // authenticates the operator before calling; qs-ai decides current eligibility
 // and rechecks participant access in its original admission transaction.

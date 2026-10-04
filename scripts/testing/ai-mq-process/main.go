@@ -4,9 +4,11 @@ package main
 
 import (
 	"context"
+	"crypto/sha256"
 	"crypto/tls"
 	"crypto/x509"
 	"database/sql"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"flag"
@@ -75,12 +77,35 @@ func run() (resultErr error) {
 		if err = json.Unmarshal(raw, &fixture); err != nil {
 			return err
 		}
-		original := &store.Store{DB: db}
-		service := &app.Service{Store: original}
-		if err = service.Start(context.Background(), fixture.Request); err != nil {
+		// Historical state is seeded only by this isolated acceptance binary;
+		// the production Store has no command writer or receipt settlement.
+		if fixture.Receipt.SessionID == "" || fixture.Receipt.Version < 1 {
+			return app.ErrInvalid
+		}
+		raw, err = json.Marshal(fixture.Request)
+		if err != nil {
 			return err
 		}
-		return original.Acknowledge(context.Background(), app.Command{ID: fixture.Request.RequestID, RequestID: fixture.Request.RequestID}, fixture.Receipt)
+		sum := sha256.Sum256(raw)
+		hash := hex.EncodeToString(sum[:])
+		tx, err := db.BeginTx(context.Background(), nil)
+		if err != nil {
+			return err
+		}
+		defer func() { _ = tx.Rollback() }()
+		r := fixture.Request
+		if _, err = tx.Exec("INSERT INTO ai_bridge_requests(request_id,request_hash,payload,organization_id,subject_id,testee_id,session_id,created_at,updated_at) VALUES(?,?,CONVERT(CAST(? AS BINARY) USING utf8mb4),?,?,?,?,UTC_TIMESTAMP(6),UTC_TIMESTAMP(6))", r.RequestID, hash, raw, r.Actor.OrgID, r.Actor.SubjectID, r.TesteeID, fixture.Receipt.SessionID); err != nil {
+			return err
+		}
+		for _, assessment := range r.AssessmentIDs {
+			if _, err = tx.Exec("INSERT INTO ai_bridge_request_assessments(request_id,assessment_id) VALUES(?,?)", r.RequestID, assessment); err != nil {
+				return err
+			}
+		}
+		if _, err = tx.Exec("INSERT INTO ai_bridge_commands(command_id,request_id,kind,payload,payload_hash,available_at,delivered) VALUES(?,?,'start',CONVERT(CAST(? AS BINARY) USING utf8mb4),?,UTC_TIMESTAMP(6),TRUE)", r.RequestID, r.RequestID, raw, hash); err != nil {
+			return err
+		}
+		return tx.Commit()
 	}
 	s := store.NewMessagingStore()
 	seal := func(k pb.MessagingKind, id, agg, org, at string, b *pb.MessagingBody) (*app.PreparedMessaging, error) {

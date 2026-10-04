@@ -35,7 +35,7 @@ func receiverFixture(f *mqFixture, b *localEventBody) *MessagingEventReceiver {
 }
 func TestMQReceiverBudgetSurvivesRepublishAndRestartWithoutProjection(t *testing.T) {
 	f := newMQFixture(t)
-	mustMQ(t, (&Store{DB: f.db}).StageStart(t.Context(), f.request))
+	mustMQ(t, seedLegacyStartFixture(t.Context(), f.request, &Store{DB: f.db}))
 	id := uuid.NewString()
 	body := &pb.MessagingBody{Value: &pb.MessagingBody_InterpretationState{InterpretationState: &pb.StateEvent{EventId: id, RequestId: f.request.RequestID, SessionId: f.session, Actor: &pb.Actor{OrgId: f.scope.OrganizationID, SubjectId: f.scope.SubjectID}, TesteeId: f.request.TesteeID, Version: 1, Status: "queued"}}}
 	m := f.protect(pb.MessagingKind_INTERPRETATION_STATE, id, f.request.RequestID, "", body, true)

@@ -18,23 +18,12 @@ func encode(v any) ([]byte, string, error) {
 	sum := sha256.Sum256(raw)
 	return raw, hex.EncodeToString(sum[:]), err
 }
-func (s *Store) StageStart(ctx context.Context, r app.Start) error {
-	raw, hash, err := encode(r)
-	if err != nil {
-		return err
-	}
-	tx, err := s.DB.BeginTx(ctx, nil)
-	if err != nil {
-		return err
-	}
-	defer func() { _ = tx.Rollback() }()
-	if err = persistStart(ctx, tx, r, raw, hash); err != nil {
-		return err
-	}
-	if err = stage(ctx, tx, r.RequestID, r.RequestID, "start", raw, hash); err != nil {
-		return err
-	}
-	return tx.Commit()
+
+// The original projection store is query-only for command submission. Old
+// callers are refused before storage; only MessagingCommandStore can submit.
+func (*Store) StageStart(context.Context, app.Start) error { return app.ErrManagementUnavailable }
+func (*Store) StageChange(context.Context, string, app.Change) error {
+	return app.ErrManagementUnavailable
 }
 
 // persistStart binds the original request hash and evidence on the host root transaction.
@@ -58,41 +47,6 @@ func persistStart(ctx context.Context, tx *sql.Tx, r app.Start, raw []byte, hash
 	return nil
 }
 
-func stage(ctx context.Context, tx *sql.Tx, id, requestID, kind string, raw []byte, hash string) error {
-	// available_at is a UTC DATETIME, like Pending and Retry. The database's
-	// CURRENT_TIMESTAMP default uses the session timezone (UTC+8 in production).
-	_, err := tx.ExecContext(ctx, "INSERT INTO ai_bridge_commands(command_id,request_id,kind,payload,payload_hash,available_at) VALUES(?,?,?,CONVERT(CAST(? AS BINARY) USING utf8mb4),?,UTC_TIMESTAMP(6)) ON DUPLICATE KEY UPDATE command_id=command_id", id, requestID, kind, raw, hash)
-	if err != nil {
-		return err
-	}
-	var oldHash, oldRequest string
-	err = tx.QueryRowContext(ctx, "SELECT payload_hash,request_id FROM ai_bridge_commands WHERE command_id=? FOR UPDATE", id).Scan(&oldHash, &oldRequest)
-	if err != nil {
-		return err
-	}
-	if oldHash != hash || oldRequest != requestID {
-		return app.ErrConflict
-	}
-	return nil
-}
-func (s *Store) StageChange(ctx context.Context, id string, r app.Change) error {
-	raw, hash, err := encode(r)
-	if err != nil {
-		return err
-	}
-	tx, err := s.DB.BeginTx(ctx, nil)
-	if err != nil {
-		return err
-	}
-	defer func() { _ = tx.Rollback() }()
-	if err = validateChange(ctx, tx, id, r); err != nil {
-		return err
-	}
-	if err = stage(ctx, tx, r.CommandID, id, r.Action, raw, hash); err != nil {
-		return err
-	}
-	return tx.Commit()
-}
 func validateChange(ctx context.Context, tx *sql.Tx, id string, r app.Change) error {
 	var original []byte
 	var session sql.NullString
@@ -113,50 +67,6 @@ func validateChange(ctx context.Context, tx *sql.Tx, id string, r app.Change) er
 	return nil
 }
 
-func (s *Store) Pending(ctx context.Context, limit int) ([]app.Command, error) {
-	rows, err := s.DB.QueryContext(ctx, "SELECT command_id,request_id,kind,CAST(payload AS BINARY) FROM ai_bridge_commands WHERE delivered=FALSE AND available_at<=UTC_TIMESTAMP(6) ORDER BY available_at,command_id LIMIT ?", limit)
-	if err != nil {
-		return nil, err
-	}
-	defer func() { _ = rows.Close() }()
-	result := []app.Command{}
-	for rows.Next() {
-		var c app.Command
-		if err = rows.Scan(&c.ID, &c.RequestID, &c.Kind, &c.Payload); err != nil {
-			return nil, err
-		}
-		result = append(result, c)
-	}
-	return result, rows.Err()
-}
-func (s *Store) Acknowledge(ctx context.Context, c app.Command, r app.Receipt) error {
-	if r.SessionID == "" || r.Version < 1 {
-		return app.ErrConflict
-	}
-	tx, err := s.DB.BeginTx(ctx, nil)
-	if err != nil {
-		return err
-	}
-	defer func() { _ = tx.Rollback() }()
-	var bound sql.NullString
-	if err = tx.QueryRowContext(ctx, "SELECT session_id FROM ai_bridge_requests WHERE request_id=? FOR UPDATE", c.RequestID).Scan(&bound); err != nil {
-		return err
-	}
-	if bound.Valid && bound.String != r.SessionID {
-		return app.ErrConflict
-	}
-	if _, err = tx.ExecContext(ctx, "UPDATE ai_bridge_requests SET session_id=? WHERE request_id=?", r.SessionID, c.RequestID); err != nil {
-		return err
-	}
-	if _, err = tx.ExecContext(ctx, "UPDATE ai_bridge_commands SET delivered=TRUE WHERE command_id=?", c.ID); err != nil {
-		return err
-	}
-	return tx.Commit()
-}
-func (s *Store) Retry(ctx context.Context, id string) error {
-	_, err := s.DB.ExecContext(ctx, "UPDATE ai_bridge_commands SET available_at=TIMESTAMPADD(SECOND,LEAST(60,POW(2,LEAST(attempts,6))),UTC_TIMESTAMP(6)),attempts=attempts+1 WHERE command_id=? AND delivered=FALSE", id)
-	return err
-}
 func (s *Store) Accept(ctx context.Context, e app.Event) error {
 	artifact, err := app.ValidateArtifact(e)
 	if err != nil {

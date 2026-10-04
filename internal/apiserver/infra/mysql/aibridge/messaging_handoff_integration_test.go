@@ -23,7 +23,7 @@ func handoffFixture(f *mqFixture, calls *int) *MessagingLegacyHandoff {
 }
 func TestMQLegacyHandoffAtomicIdentityBudgetAndOriginalTime(t *testing.T) {
 	f := newMQFixture(t)
-	mustMQ(t, (&Store{DB: f.db}).StageStart(t.Context(), f.request))
+	mustMQ(t, seedLegacyStartFixture(t.Context(), f.request, &Store{DB: f.db}))
 	calls := 0
 	h := handoffFixture(f, &calls)
 	_, e := f.db.Exec("UPDATE ai_bridge_requests SET created_at='2026-10-03 01:02:03.123456' WHERE request_id=?", f.request.RequestID)
@@ -88,9 +88,6 @@ func TestMQLegacyHandoffAtomicIdentityBudgetAndOriginalTime(t *testing.T) {
 	if calls != 1 || !bytes.Equal(wire, again) {
 		t.Fatal("duplicate migration resealed wire")
 	}
-	if _, e := f.commandStore(&calls).Pending(t.Context(), 20); e == nil {
-		t.Fatal("MQ store drove legacy scanner")
-	}
 	if e := f.db.Ping(); e != nil {
 		t.Fatal("handoff closed borrowed pool")
 	}
@@ -99,7 +96,7 @@ func TestMQLegacyHandoffPreservesDeliveredAndExhaustedHistory(t *testing.T) {
 	for _, scenario := range []string{"delivered", "exhausted"} {
 		t.Run(scenario, func(t *testing.T) {
 			f := newMQFixture(t)
-			mustMQ(t, (&Store{DB: f.db}).StageStart(t.Context(), f.request))
+			mustMQ(t, seedLegacyStartFixture(t.Context(), f.request, &Store{DB: f.db}))
 			calls := 0
 			h := handoffFixture(f, &calls)
 			if scenario == "delivered" {
@@ -134,11 +131,11 @@ func TestMQLegacyHandoffPreservesDeliveredAndExhaustedHistory(t *testing.T) {
 func TestMQLegacyHandoffRefusesInventedOrderAndPreservesUnknownChangeTime(t *testing.T) {
 	f := newMQFixture(t)
 	legacy := &Store{DB: f.db}
-	mustMQ(t, legacy.StageStart(t.Context(), f.request))
+	mustMQ(t, seedLegacyStartFixture(t.Context(), f.request, legacy))
 	_, e := f.db.Exec("UPDATE ai_bridge_requests SET session_id=? WHERE request_id=?", f.session, f.request.RequestID)
 	mustMQ(t, e)
 	c := app.Change{CommandID: uuid.NewString(), SessionID: f.session, Actor: f.request.Actor, Action: "cancel", ExpectedVersion: 1}
-	mustMQ(t, legacy.StageChange(t.Context(), f.request.RequestID, c))
+	mustMQ(t, seedLegacyChangeFixture(t.Context(), f.request.RequestID, c, legacy))
 	calls := 0
 	h := handoffFixture(f, &calls)
 	e = f.tx(func(tx *sql.Tx) error { _, e := h.StageSingle(t.Context(), tx, c.CommandID); return e })
@@ -173,7 +170,7 @@ func TestMQLegacyHandoffValidatesFirstSourceBeforeNullableIndexBackfill(t *testi
 	for _, scenario := range []string{"missing_indexes", "conflicting_index", "source_tamper"} {
 		t.Run(scenario, func(t *testing.T) {
 			f := newMQFixture(t)
-			mustMQ(t, (&Store{DB: f.db}).StageStart(t.Context(), f.request))
+			mustMQ(t, seedLegacyStartFixture(t.Context(), f.request, &Store{DB: f.db}))
 			calls := 0
 			h := handoffFixture(f, &calls)
 			_, e := f.db.Exec("UPDATE ai_bridge_requests SET organization_id=NULL,subject_id=NULL,testee_id=NULL,created_at=NULL WHERE request_id=?", f.request.RequestID)

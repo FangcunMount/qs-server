@@ -68,9 +68,8 @@ func TestMQOriginalUTF8BytesSurviveNormalHostCharset(t *testing.T) {
 	mustMQ(t, f.tx(func(tx *sql.Tx) error { return f.receive(tx, message, nil) }))
 	answer := "回答🙂𐐷"
 	change := app.Change{CommandID: uuid.NewString(), SessionID: f.session, Actor: f.request.Actor, Action: "answer", ExpectedVersion: 1, QuestionID: event.QuestionID, Answer: &answer}
-	// Verify the retained historical JSON writer too; this does not activate a
-	// legacy relay or add a second runtime path.
-	mustMQ(t, original.StageChange(context.Background(), f.request.RequestID, change))
+	// Seed a historical source row explicitly; no runtime legacy writer remains.
+	mustMQ(t, seedLegacyChangeFixture(context.Background(), f.request.RequestID, change, original))
 	var payload []byte
 	mustMQ(t, db.QueryRow("SELECT CAST(payload AS BINARY) FROM ai_bridge_commands WHERE command_id=?", change.CommandID).Scan(&payload))
 	var roundtrip app.Change

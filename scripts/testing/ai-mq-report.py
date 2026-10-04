@@ -5,6 +5,9 @@ import sys
 from pathlib import Path
 
 required = {
+    "TestMQOriginalProjectionStoreCannotSubmitOrDeliverLegacyCommands",
+    "TestMQConcurrentSubmissionRetainsFirstWire",
+    "TestMQCommandsUseUTCWithNonUTCSessions",
     "TestMQRuntimeGatewaysCannotExposeRetiredGRPCWrites",
     "TestMQManagementSubmissionNeverRetriesUncertainCommit",
     "TestMQRetiredBridgeModesRejectBeforeStorageOrTransport",

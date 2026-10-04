@@ -272,7 +272,7 @@ func TestMQReceiptLostAckDuplicateAndLateReceiptDoNotRegress(t *testing.T) {
 	f := newMQFixture(t)
 	ctx := context.Background()
 	legacy := &Store{DB: f.db}
-	mustMQ(t, legacy.StageStart(ctx, f.request))
+	mustMQ(t, seedLegacyStartFixture(ctx, f.request, legacy))
 	mustMQ(t, f.tx(func(tx *sql.Tx) error {
 		_, err := f.stage(tx, pb.MessagingKind_START, f.request.RequestID, f.request.RequestID, f.startBody(), f.scope, nil)
 		return err
@@ -281,10 +281,16 @@ func TestMQReceiptLostAckDuplicateAndLateReceiptDoNotRegress(t *testing.T) {
 	event := f.protect(pb.MessagingKind_INTERPRETATION_STATE, state.EventId, f.request.RequestID, "", &pb.MessagingBody{Value: &pb.MessagingBody_InterpretationState{InterpretationState: state}}, true)
 	calls := 0
 	mustMQ(t, f.tx(func(tx *sql.Tx) error { return f.receive(tx, event, &calls) }))
+	var projectionTimeBefore, projectionTimeAfter sql.NullTime
+	mustMQ(t, f.db.QueryRow("SELECT updated_at FROM ai_bridge_requests WHERE request_id=?", f.request.RequestID).Scan(&projectionTimeBefore))
 	var hash string
 	mustMQ(t, f.db.QueryRow("SELECT body_sha256 FROM ai_messaging_outbox WHERE message_id=?", f.request.RequestID).Scan(&hash))
 	receipt := f.protect(pb.MessagingKind_COMMAND_RECEIPT, uuid.NewString(), f.request.RequestID, f.request.RequestID, &pb.MessagingBody{Value: &pb.MessagingBody_CommandReceipt{CommandReceipt: &pb.MessagingCommandReceipt{CommandId: f.request.RequestID, CommandBodySha256: hash, Decision: pb.MessagingDecision_ACCEPTED, OriginalReceipt: &pb.MessagingCommandReceipt_WorkflowReceipt{WorkflowReceipt: &pb.Receipt{SessionId: f.session, RunId: uuid.NewString(), Version: 2, Status: "queued"}}}}}, true)
 	mustMQ(t, f.tx(func(tx *sql.Tx) error { return f.receive(tx, receipt, &calls) }))
+	mustMQ(t, f.db.QueryRow("SELECT updated_at FROM ai_bridge_requests WHERE request_id=?", f.request.RequestID).Scan(&projectionTimeAfter))
+	if !projectionTimeBefore.Valid || !projectionTimeAfter.Valid || !projectionTimeBefore.Time.Equal(projectionTimeAfter.Time) {
+		t.Fatal("late decision changed original projection receipt time")
+	}
 	got, err := legacy.Projection(ctx, f.request.RequestID)
 	mustMQ(t, err)
 	if got.Version != 8 || got.Status != "cancelled" {
@@ -319,7 +325,7 @@ func TestMQReceiptLostAckDuplicateAndLateReceiptDoNotRegress(t *testing.T) {
 func TestMQProjectionInboxAndAckRollbackTogether(t *testing.T) {
 	f := newMQFixture(t)
 	legacy := &Store{DB: f.db}
-	mustMQ(t, legacy.StageStart(context.Background(), f.request))
+	mustMQ(t, seedLegacyStartFixture(context.Background(), f.request, legacy))
 	state := &pb.StateEvent{EventId: uuid.NewString(), RequestId: f.request.RequestID, SessionId: f.session, Actor: &pb.Actor{OrgId: f.scope.OrganizationID, SubjectId: f.scope.SubjectID}, TesteeId: f.request.TesteeID, Version: 1, Status: "running"}
 	event := f.protect(pb.MessagingKind_INTERPRETATION_STATE, state.EventId, f.request.RequestID, "", &pb.MessagingBody{Value: &pb.MessagingBody_InterpretationState{InterpretationState: state}}, true)
 	injected := errors.New("ack persistence failure")
