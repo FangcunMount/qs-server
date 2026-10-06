@@ -72,7 +72,19 @@ func state(response *pb.EvaluationState, scope app.EvaluationScope) (app.Evaluat
 	if err != nil {
 		return app.EvaluationState{}, err
 	}
-	return app.EvaluationState{RunID: response.RunId, Version: response.Version, Status: response.Status,
+	originals, err := reviewAuditArray(response.OriginalReviewsJson, 70)
+	if err != nil {
+		return app.EvaluationState{}, err
+	}
+	corrections, err := reviewAuditArray(response.ReviewCorrectionsJson, 210)
+	if err != nil {
+		return app.EvaluationState{}, err
+	}
+	fingerprints, err := reviewAuditArray(response.ReviewFingerprintsJson, 70)
+	if err != nil {
+		return app.EvaluationState{}, err
+	}
+	return app.EvaluationState{OriginalReviews: originals, ReviewCorrections: corrections, ReviewFingerprints: fingerprints, RunID: response.RunId, Version: response.Version, Status: response.Status,
 		ExecutionMode: response.ExecutionMode, ActiveCallCount: response.ActiveCallCount,
 		ParallelCallLimit: response.ParallelCallLimit, CancelDraining: response.CancelDraining, CancelRequest: request,
 		UnresolvedResultUnknownCount: response.UnresolvedResultUnknownCount, Resolutions: json.RawMessage(response.ResolutionsJson), Reviews: json.RawMessage(reviews), Finalization: final, ReviewReopenings: reopenings, CanReopenReview: response.CanReopenReview, Creation: creation, Cancellation: cancellation}, nil
@@ -98,4 +110,16 @@ func (c *EvaluationClient) ResolveUnknown(ctx context.Context, scope app.Evaluat
 		return app.EvaluationState{}, err
 	}
 	return state(response, scope)
+}
+
+// This proxy checks transport bounds; qs-ai validates the full immutable evidence chain.
+func reviewAuditArray(raw string, limit int) (json.RawMessage, error) {
+	if raw == "" {
+		return nil, nil
+	} // Older compatible server.
+	var values []json.RawMessage
+	if len(raw) > 2*1024*1024 || json.Unmarshal([]byte(raw), &values) != nil || values == nil || len(values) > limit {
+		return nil, app.ErrConflict
+	}
+	return json.RawMessage(raw), nil
 }
