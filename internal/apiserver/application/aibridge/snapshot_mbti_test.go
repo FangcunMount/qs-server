@@ -158,3 +158,51 @@ func TestMBTISnapshotRejectsFrozenRangeOrSuggestionMismatch(t *testing.T) {
 		})
 	}
 }
+
+func TestMBTISnapshotProjectsHistoricalBoundedFactorAxesWithoutRewritingReport(t *testing.T) {
+	c := mbtiSnapshotContent(false)
+	for i, d := range c.Dimensions {
+		max := d.PoleFacts().MaxScore
+		c.Dimensions[i] = report.NewDimensionInterpret(report.NewFactorCode(d.Code().String()), d.Name(), d.RawScore(), &max, report.RiskLevelNone, d.Description(), d.Suggestion()).WithPoleFacts(d.PoleFacts())
+	}
+	current := mbtiSnapshotSource(t, c)
+	raw, err := reportSnapshot(current)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var snapshot struct {
+		Dimensions []struct {
+			Kind  string  `json:"kind"`
+			Raw   float64 `json:"raw_score"`
+			Facts struct {
+				Strength float64 `json:"strength"`
+			} `json:"pole_facts"`
+		} `json:"dimensions"`
+	}
+	if err := json.Unmarshal(raw, &snapshot); err != nil {
+		t.Fatal(err)
+	}
+	for i, d := range current.Report.Content().Dimensions {
+		if d.Kind() != report.DimensionKindFactor || snapshot.Dimensions[i].Kind != "pole" || snapshot.Dimensions[i].Raw != d.RawScore() || snapshot.Dimensions[i].Facts.Strength != d.PoleFacts().Strength {
+			t.Fatal("historical facts were changed or not projected canonically")
+		}
+	}
+	for _, scenario := range []string{"unbounded", "wrong maximum", "other kind"} {
+		t.Run(scenario, func(t *testing.T) {
+			bad := current.Report.Content()
+			d := bad.Dimensions[0]
+			max := float64(41)
+			switch scenario {
+			case "unbounded":
+				bad.Dimensions[0] = report.NewDimensionInterpret(report.NewFactorCode(d.Code().String()), d.Name(), d.RawScore(), nil, report.RiskLevelNone, "", "").WithPoleFacts(d.PoleFacts())
+			case "wrong maximum":
+				bad.Dimensions[0] = report.NewDimensionInterpret(report.NewFactorCode(d.Code().String()), d.Name(), d.RawScore(), &max, report.RiskLevelNone, "", "").WithPoleFacts(d.PoleFacts())
+			case "other kind":
+				bad.Dimensions[0] = report.NewNeutralDimensionInterpret(d.Code(), report.DimensionKindTrait, d.Name(), d.RawScore(), d.MaxScore(), nil, "", "").WithPoleFacts(d.PoleFacts())
+			}
+			if _, err := reportSnapshot(mbtiSnapshotSource(t, bad)); !errors.Is(err, source.ErrInconsistent) {
+				t.Fatalf("accepted unsupported historical axis: %v", err)
+			}
+		})
+	}
+}

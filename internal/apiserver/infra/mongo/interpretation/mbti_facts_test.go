@@ -105,7 +105,7 @@ func TestMBTIFactsSurviveFrozenReplayAndBSON(t *testing.T) {
 	for i, want := range []float64{56.25, 6.25, 25, 75} {
 		d := restored.Content().Dimensions[i]
 		p := d.PoleFacts()
-		if p == nil || p.Strength != want || p.CompositionOrder != i+1 || p.MinScore != 8 || p.MaxScore != 40 || d.Name() != "冻结轴 "+d.Code().String() {
+		if d.Kind() != report.DimensionKindPole || p == nil || p.Strength != want || p.CompositionOrder != i+1 || p.MinScore != 8 || p.MaxScore != 40 || d.Name() != "冻结轴 "+d.Code().String() {
 			t.Fatalf("lost exact facts: %+v", p)
 		}
 		p.Strength = 99

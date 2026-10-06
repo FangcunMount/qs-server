@@ -32,11 +32,15 @@ func mbtiReportSnapshot(current *source.Current) ([]byte, error) {
 		if p == nil {
 			return nil, source.ErrNotApplicable
 		}
-		if d.Kind() != report.DimensionKindPole || p.MinScore != 8 || p.MaxScore != 40 || p.Threshold != 24 {
+		// The bounded typology builder historically used the factor constructor
+		// for pole axes. Only accept that exact representation after validating
+		// all four frozen pole facts; never rewrite the immutable report itself.
+		legacyBoundedPole := d.Kind() == report.DimensionKindFactor && d.MaxScore() != nil && *d.MaxScore() == p.MaxScore
+		if (d.Kind() != report.DimensionKindPole && !legacyBoundedPole) || p.MinScore != 8 || p.MaxScore != 40 || p.Threshold != 24 {
 			return nil, source.ErrInconsistent
 		}
 		dimensions = append(dimensions, map[string]any{
-			"code": d.Code().String(), "kind": d.Kind(), "name": d.Name(), "raw_score": d.RawScore(),
+			"code": d.Code().String(), "kind": report.DimensionKindPole, "name": d.Name(), "raw_score": d.RawScore(),
 			"description": d.Description(), "suggestion": d.Suggestion(),
 			"pole_facts": map[string]any{
 				"schema_version": p.SchemaVersion, "left_pole": p.LeftPole, "right_pole": p.RightPole,

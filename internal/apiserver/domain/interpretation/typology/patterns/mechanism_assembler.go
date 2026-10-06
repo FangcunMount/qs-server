@@ -216,14 +216,14 @@ func mechanismPersonalityDimensions(detail PersonalityTypeReportDetail, tmpl Per
 		if dim.Preference != "" {
 			kind = report.DimensionKindPole
 		}
-		if maxScore != nil {
+		if maxScore != nil && kind == report.DimensionKindFactor {
 			dimensions = append(dimensions, report.NewDimensionInterpret(
 				report.FactorCode(dim.Code), name, dim.RawScore, maxScore, report.RiskLevelNone, description, "",
 			).WithPoleFacts(dim.PoleFacts))
 			continue
 		}
 		dimensions = append(dimensions, report.NewNeutralDimensionInterpret(
-			report.NewDimensionCode(dim.Code), kind, name, dim.RawScore, nil, nil, description, "",
+			report.NewDimensionCode(dim.Code), kind, name, dim.RawScore, maxScore, nil, description, "",
 		).WithPoleFacts(dim.PoleFacts))
 	}
 	return dimensions
