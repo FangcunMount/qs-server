@@ -43,6 +43,9 @@ type EvaluationCancelRequest struct {
 	RequestedAt   string `json:"requested_at"`
 }
 type EvaluationState struct {
+	OriginalReviews              json.RawMessage                `json:"original_reviews,omitempty"`
+	ReviewCorrections            json.RawMessage                `json:"review_corrections,omitempty"`
+	ReviewFingerprints           json.RawMessage                `json:"review_fingerprints,omitempty"`
 	ExecutionMode                string                         `json:"execution_mode,omitempty"`
 	ActiveCallCount              int32                          `json:"active_call_count"`
 	ParallelCallLimit            int32                          `json:"parallel_call_limit"`
