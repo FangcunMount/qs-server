@@ -2,7 +2,7 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "7750d6814b70e547d557dd168cef69f0386c0892",
+    "sha": "319cb94e90972cf384a57746f8d8942f24d9ea69",
     "verified_on": "2026-10-06"
   },
   "status_policy": {
@@ -128,7 +128,7 @@
       "source": "api/grpc/proto",
       "proto_file_count": 10,
       "service_count": 29,
-      "rpc_count": 132,
+      "rpc_count": 133,
       "services": {
         "actor.ActorService": [
           "CreateTestee",
@@ -234,6 +234,7 @@
           "ListUnknownExecutions",
           "ResolveUnknown",
           "Review",
+          "CorrectReview",
           "ListCandidates",
           "GetCandidate",
           "ListExecutions",
