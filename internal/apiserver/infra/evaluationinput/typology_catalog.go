@@ -10,35 +10,7 @@ import (
 	rulesetport "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 )
 
-type TypologyModelInputProvider struct {
-	algorithm           modelcatalog.Algorithm
-	catalog             port.TypologyModelCatalog
-	publishedModels     rulesetport.PublishedModelReader
-	answerSheetReader   port.AnswerSheetReader
-	questionnaireReader port.QuestionnaireReader
-}
-
-func NewTypologyModelInputProvider(
-	algorithm modelcatalog.Algorithm,
-	catalog port.TypologyModelCatalog,
-	publishedModels rulesetport.PublishedModelReader,
-	answerSheetReader port.AnswerSheetReader,
-	questionnaireReader port.QuestionnaireReader,
-) TypologyModelInputProvider {
-	return TypologyModelInputProvider{
-		algorithm:           algorithm,
-		catalog:             catalog,
-		publishedModels:     publishedModels,
-		answerSheetReader:   answerSheetReader,
-		questionnaireReader: questionnaireReader,
-	}
-}
-
-func (p TypologyModelInputProvider) ExecutionIdentity() evaldomain.ExecutionIdentity {
-	return evaldomain.PersonalityTypologyIdentity(p.algorithm)
-}
-
-// ConfiguredTypologyModelInputProvider resolves typology payloads without algorithm-alias guards.
+// ConfiguredTypologyModelInputProvider resolves configured personality-typology payloads.
 type ConfiguredTypologyModelInputProvider struct {
 	catalog             port.TypologyModelCatalog
 	publishedModels     rulesetport.PublishedModelReader
@@ -69,41 +41,27 @@ func (ConfiguredTypologyModelInputProvider) ExecutionPath() modelcatalog.Executi
 }
 
 func (p ConfiguredTypologyModelInputProvider) ResolveInput(ctx context.Context, ref port.InputRef) (*port.InputSnapshot, error) {
-	provider := TypologyModelInputProvider{
-		algorithm:           modelcatalog.AlgorithmPersonalityTypology,
-		catalog:             p.catalog,
-		publishedModels:     p.publishedModels,
-		answerSheetReader:   p.answerSheetReader,
-		questionnaireReader: p.questionnaireReader,
-	}
-	return provider.resolveConfiguredInput(ctx, ref)
-}
-
-func (p TypologyModelInputProvider) ResolveInput(ctx context.Context, ref port.InputRef) (*port.InputSnapshot, error) {
-	return p.resolveConfiguredInput(ctx, ref)
-}
-
-func (p TypologyModelInputProvider) resolveConfiguredInput(ctx context.Context, ref port.InputRef) (*port.InputSnapshot, error) {
+	const algorithm = modelcatalog.AlgorithmPersonalityTypology
 	if p.catalog == nil {
-		return nil, port.NewResolveError(port.FailureKindModelNotFound, fmt.Errorf("typology model catalog is not configured"), typologyModelNotFoundMessage(p.algorithm), "加载解释模型失败")
+		return nil, port.NewResolveError(port.FailureKindModelNotFound, fmt.Errorf("typology model catalog is not configured"), "人格模型不存在", "加载解释模型失败")
 	}
 	payload, err := p.catalog.GetTypologyModelByRef(ctx, ref.ModelRef)
 	if err != nil {
 		if modelcatalog.IsNotFound(err) {
-			return nil, port.NewResolveError(port.FailureKindModelNotFound, err, typologyModelNotFoundMessage(p.algorithm), "加载解释模型失败")
+			return nil, port.NewResolveError(port.FailureKindModelNotFound, err, "人格模型不存在", "加载解释模型失败")
 		}
 		return nil, port.NewDependencyResolveError(port.DependencyCategoryModelCatalog, err, "加载解释模型依赖失败", "加载解释模型失败")
 	}
 	if payload == nil {
-		return nil, port.NewResolveError(port.FailureKindModelNotFound, fmt.Errorf("typology model payload is nil"), typologyModelNotFoundMessage(p.algorithm), "加载解释模型失败")
+		return nil, port.NewResolveError(port.FailureKindModelNotFound, fmt.Errorf("typology model payload is nil"), "人格模型不存在", "加载解释模型失败")
 	}
-	if p.algorithm != "" && payload.Algorithm != p.algorithm {
-		err := fmt.Errorf("typology algorithm %s does not match provider %s", payload.Algorithm, p.algorithm)
+	if payload.Algorithm != algorithm {
+		err := fmt.Errorf("typology algorithm %s does not match provider %s", payload.Algorithm, algorithm)
 		return nil, port.NewResolveError(port.FailureKindUnsupportedModel, err, "不支持的解释模型", "加载解释模型失败")
 	}
 	if !payload.IsPublished() {
 		err := fmt.Errorf("typology model is not published: %s", payload.Code)
-		return nil, port.NewResolveError(port.FailureKindModelNotFound, err, typologyModelUnavailableMessage(p.algorithm), "加载解释模型失败")
+		return nil, port.NewResolveError(port.FailureKindModelNotFound, err, "人格模型不可用", "加载解释模型失败")
 	}
 
 	answerSheet, err := p.answerSheetReader.GetAnswerSheet(ctx, ref.AnswerSheetID)
@@ -130,16 +88,8 @@ func (p TypologyModelInputProvider) resolveConfiguredInput(ctx context.Context, 
 		AnswerSheet:   answerSheet,
 		Questionnaire: qnr,
 	}
-	if err := attachTypologyCanonical(ctx, p.publishedModels, ref, p.algorithm, snapshot); err != nil {
+	if err := attachTypologyCanonical(ctx, p.publishedModels, ref, algorithm, snapshot); err != nil {
 		return nil, err
 	}
 	return snapshot, nil
-}
-
-func typologyModelNotFoundMessage(algorithm modelcatalog.Algorithm) string {
-	return "人格模型不存在"
-}
-
-func typologyModelUnavailableMessage(algorithm modelcatalog.Algorithm) string {
-	return "人格模型不可用"
 }

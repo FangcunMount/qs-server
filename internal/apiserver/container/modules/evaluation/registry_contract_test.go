@@ -1,42 +1,55 @@
 package evaluation_test
 
 import (
-	"os"
-	"path/filepath"
-	"runtime"
-	"strings"
 	"testing"
+
+	evalruntime "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/runtime"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
+	evaluationinputInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/evaluationinput"
 )
 
-func TestEvaluationModuleUsesDescriptorParityGuard(t *testing.T) {
+func TestEvaluationModuleMaterializesProvidersForEveryDescriptorPath(t *testing.T) {
 	t.Parallel()
-
-	root := repoRoot(t)
-	path := filepath.Join(root, "internal", "apiserver", "container", "modules", "evaluation", "descriptors.go")
-	data, err := os.ReadFile(path)
+	registry, err := evalruntime.DefaultRuntimeDescriptorRegistry()
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(string(data), "func AssertExecutionPathParity") {
-		t.Fatal("evaluation descriptors must expose execution path parity guard for execute/input alignment")
+	paths, err := evalruntime.ExecutionPathsFromRegistry(registry)
+	if err != nil {
+		t.Fatal(err)
 	}
-}
-
-func repoRoot(t *testing.T) string {
-	t.Helper()
-	_, file, _, ok := runtime.Caller(0)
-	if !ok {
-		t.Fatal("resolve current file")
+	// Only provider materialization is exercised; no catalog or Survey reads occur.
+	providers, err := evaluationinputInfra.MaterializeInputProviders(paths, evaluationinputInfra.InputProviderDeps{
+		ScaleCatalog:            evaluationinputInfra.NewPublishedScaleCatalog(nil),
+		TypologyCatalog:         evaluationinputInfra.NewPublishedTypologyCatalog(nil),
+		BehavioralRatingCatalog: evaluationinputInfra.NewPublishedBehavioralRatingCatalog(nil),
+		CognitiveCatalog:        evaluationinputInfra.NewPublishedCognitiveCatalog(nil),
+		AnswerSheets:            evaluationinputInfra.NewRepositoryAnswerSheetSnapshotReader(nil),
+		Questionnaires:          evaluationinputInfra.NewRepositoryQuestionnaireSnapshotReader(nil),
+	})
+	if err != nil {
+		t.Fatal(err)
 	}
-	dir := filepath.Dir(file)
-	for {
-		if _, err := os.Stat(filepath.Join(dir, "go.mod")); err == nil {
-			return dir
+	descriptorPaths := make(map[modelcatalog.ExecutionPath]bool, len(paths))
+	for _, path := range paths {
+		descriptorPaths[path] = true
+	}
+	expectedPaths := make([]modelcatalog.ExecutionPath, 0, len(providers))
+	covered := make(map[modelcatalog.ExecutionPath]bool, len(paths))
+	for _, provider := range providers {
+		capability, ok := modelcatalog.FamilyCapabilityByKind(provider.ExecutionIdentity().Kind)
+		if !ok || !descriptorPaths[capability.ExecutionPath] {
+			t.Fatalf("provider identity %#v has no descriptor path", provider.ExecutionIdentity())
 		}
-		parent := filepath.Dir(dir)
-		if parent == dir {
-			t.Fatal("go.mod not found")
+		expectedPaths = append(expectedPaths, capability.ExecutionPath)
+		covered[capability.ExecutionPath] = true
+	}
+	if err := assertExecutionPathParity(expectedPaths, providers); err != nil {
+		t.Fatal(err)
+	}
+	for _, path := range paths {
+		if !covered[path] {
+			t.Fatalf("descriptor path %s has no materialized input provider", path)
 		}
-		dir = parent
 	}
 }
