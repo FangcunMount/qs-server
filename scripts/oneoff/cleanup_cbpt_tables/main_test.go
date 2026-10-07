@@ -54,13 +54,13 @@ func testConn(t *testing.T) (*sql.Conn, sqlmock.Sqlmock) {
 		if err := mock.ExpectationsWereMet(); err != nil {
 			t.Error(err)
 		}
-		db.Close()
+		_ = db.Close()
 	})
 	conn, err := db.Conn(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { conn.Close() })
+	t.Cleanup(func() { _ = conn.Close() })
 	return conn, mock
 }
 
@@ -547,7 +547,7 @@ func TestRestoreMarkerRefusesSourceAndWrongUUIDBeforeMetadataRead(t *testing.T) 
 		m, _ = testWriteManifest(t, o, m)
 		nonce := strings.Repeat("d", 32)
 		uuid := "22222222-2222-2222-2222-222222222222"
-		markerUUID := uuid
+		var markerUUID string
 		if sourceUUID {
 			uuid = m.SourceServerUUID
 			markerUUID = uuid

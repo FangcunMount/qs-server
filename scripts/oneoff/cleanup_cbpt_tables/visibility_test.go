@@ -26,12 +26,12 @@ func helpersVisibilityConnection(t *testing.T) (*sql.Conn, sqlmock.Sqlmock) {
 	}
 	conn, err := db.Conn(context.Background())
 	if err != nil {
-		db.Close()
+		_ = db.Close()
 		t.Fatal(err)
 	}
 	t.Cleanup(func() {
-		conn.Close()
-		db.Close()
+		_ = conn.Close()
+		_ = db.Close()
 	})
 	return conn, mock
 }

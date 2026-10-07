@@ -24,7 +24,6 @@ import (
 	mysql "github.com/go-sql-driver/mysql"
 )
 
-const formatVersion = 1
 const maxDumpBytes int64 = 20 << 30
 const maxJSONBytes int64 = 4 << 20
 
@@ -264,8 +263,8 @@ func run(ctx context.Context, o options, r *receipt) error {
 	if err != nil {
 		return err
 	}
-	defer db.Close()
-	defer conn.Close()
+	defer func() { _ = db.Close() }()
+	defer func() { _ = conn.Close() }()
 	targetHash := hashText(cfg.Host, strconv.Itoa(cfg.Port), cfg.Database, uuid)
 	r.SourceTargetHash = targetHash
 	switch o.operation {
@@ -320,10 +319,10 @@ func connect(ctx context.Context, c connectionConfig) (*sql.DB, *sql.Conn, uint6
 	db.SetMaxIdleConns(0)
 	cconn, err := db.Conn(ctx)
 	if err != nil {
-		db.Close()
+		_ = db.Close()
 		return nil, nil, 0, "", fail("connection_failed", err)
 	}
-	cleanup := func() { cconn.Close(); db.Close() }
+	cleanup := func() { _ = cconn.Close(); _ = db.Close() }
 	for _, stmt := range []string{"SET SESSION lock_wait_timeout = 5", "SET SESSION innodb_lock_wait_timeout = 5", "SET SESSION foreign_key_checks = 1", "SET SESSION time_zone = '+00:00'"} {
 		if _, err = cconn.ExecContext(ctx, stmt); err != nil {
 			cleanup()
@@ -350,7 +349,7 @@ func migrationHead(ctx context.Context, c *sql.Conn) error {
 	if err != nil {
 		return fail("migration_head_failed", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	n := 0
 	for rows.Next() {
 		var version int
@@ -376,7 +375,7 @@ func objects(ctx context.Context, c *sql.Conn, dbName string) ([]object, error) 
 	if err != nil {
 		return nil, fail("catalog_failed", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	var out []object
 	for rows.Next() {
 		var o object
@@ -452,7 +451,7 @@ func tableDDL(ctx context.Context, c *sql.Conn, dbName, table string) (string, e
 	if err != nil {
 		return "", fail("schema_definition_failed", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	cols, err := rows.Columns()
 	if err != nil || len(cols) < 2 || len(cols) > 4 {
 		return "", fail("schema_definition_failed")
@@ -557,9 +556,10 @@ func canonicalDDL(s string) string {
 			i++
 			continue
 		}
-		if ch == '(' {
+		switch ch {
+		case '(':
 			depth++
-		} else if ch == ')' {
+		case ')':
 			depth--
 		}
 		out.WriteByte(ch)
@@ -623,17 +623,17 @@ func fingerprint(ctx context.Context, c *sql.Conn, dbName, table string, content
 	for rows.Next() {
 		var col column
 		if err = rows.Scan(&col.Name, &col.DataType, &col.Extra, &col.CharacterSet, &col.Collation); err != nil {
-			rows.Close()
+			_ = rows.Close()
 			return fp, fail("column_definition_failed", err)
 		}
 		if !identifierRE.MatchString(col.Name) {
-			rows.Close()
+			_ = rows.Close()
 			return fp, fail("column_identifier_blocked")
 		}
 		fp.Columns = append(fp.Columns, col)
 	}
 	err = rows.Err()
-	rows.Close()
+	_ = rows.Close()
 	if err != nil || len(fp.Columns) == 0 || len(fp.Columns) > 256 {
 		return fp, fail("column_definition_failed", err)
 	}
@@ -644,13 +644,13 @@ func fingerprint(ctx context.Context, c *sql.Conn, dbName, table string, content
 	for rows.Next() {
 		var name sql.NullString
 		if err = rows.Scan(&name); err != nil || !name.Valid || !identifierRE.MatchString(name.String) {
-			rows.Close()
+			_ = rows.Close()
 			return fp, fail("primary_key_failed", err)
 		}
 		fp.PK = append(fp.PK, name.String)
 	}
 	err = rows.Err()
-	rows.Close()
+	_ = rows.Close()
 	if err != nil || len(fp.PK) == 0 || len(fp.PK) > 256 {
 		return fp, fail("primary_key_required", err)
 	}
@@ -670,7 +670,7 @@ func fingerprint(ctx context.Context, c *sql.Conn, dbName, table string, content
 	if err != nil {
 		return fp, fail("content_read_failed", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	h := sha256.New()
 	writeUint(h, uint64(len(names)))
 	vals := make([]sql.RawBytes, len(names))
@@ -728,18 +728,18 @@ func dependencies(ctx context.Context, c *sql.Conn, dbName string) error {
 	for rows.Next() {
 		var g string
 		if err = rows.Scan(&g); err != nil {
-			rows.Close()
+			_ = rows.Close()
 			return fail("metadata_visibility_blocked", err)
 		}
 		n++
 		if n > 100 {
-			rows.Close()
+			_ = rows.Close()
 			return fail("metadata_limit")
 		}
 		statements = append(statements, g)
 	}
 	err = rows.Err()
-	rows.Close()
+	_ = rows.Close()
 	if err != nil {
 		return fail("metadata_visibility_blocked", err)
 	}
@@ -758,21 +758,21 @@ func dependencies(ctx context.Context, c *sql.Conn, dbName string) error {
 	for rows.Next() {
 		var s, t, rs, rt string
 		if err = rows.Scan(&s, &t, &rs, &rt); err != nil {
-			rows.Close()
+			_ = rows.Close()
 			return fail("dependency_read_failed", err)
 		}
 		n++
 		if n > 10000 {
-			rows.Close()
+			_ = rows.Close()
 			return fail("metadata_limit")
 		}
 		if strings.EqualFold(s, dbName) && targets[strings.ToLower(t)] || strings.EqualFold(rs, dbName) && targets[strings.ToLower(rt)] {
-			rows.Close()
+			_ = rows.Close()
 			return fail("foreign_key_dependency")
 		}
 	}
 	err = rows.Err()
-	rows.Close()
+	_ = rows.Close()
 	if err != nil {
 		return fail("dependency_read_failed", err)
 	}
@@ -782,7 +782,7 @@ func dependencies(ctx context.Context, c *sql.Conn, dbName string) error {
 		"SELECT routine_schema,routine_name,routine_definition FROM information_schema.routines LIMIT 10001",
 		"SELECT event_schema,event_name,event_definition FROM information_schema.events LIMIT 10001",
 	}
-	dynamic := regexp.MustCompile("(?i)\\b(prepare|execute|execute_prepared_stmt)\\b")
+	dynamic := regexp.MustCompile(`(?i)\b(prepare|execute|execute_prepared_stmt)\b`)
 	total := 0
 	for i, q := range queries {
 		rows, err = c.QueryContext(ctx, q)
@@ -794,35 +794,35 @@ func dependencies(ctx context.Context, c *sql.Conn, dbName string) error {
 			var s, name string
 			var body sql.NullString
 			if err = rows.Scan(&s, &name, &body); err != nil {
-				rows.Close()
+				_ = rows.Close()
 				return fail("dependency_read_failed", err)
 			}
 			n++
 			total += len(body.String)
 			if n > 10000 || total > 16<<20 || len(body.String) > 1<<20 {
-				rows.Close()
+				_ = rows.Close()
 				return fail("metadata_limit")
 			}
 			if !body.Valid || body.String == "" {
-				rows.Close()
+				_ = rows.Close()
 				return fail("metadata_definition_hidden")
 			}
 			if i == 0 && strings.EqualFold(s, dbName) && targets[strings.ToLower(name)] {
-				rows.Close()
+				_ = rows.Close()
 				return fail("trigger_dependency")
 			}
 			if strings.Contains(strings.ToLower(body.String), "cbpt_") {
-				rows.Close()
+				_ = rows.Close()
 				return fail("definition_dependency")
 			}
 			system := s == "mysql" || s == "sys" || s == "information_schema" || s == "performance_schema"
 			if !system && i >= 2 && dynamic.MatchString(body.String) {
-				rows.Close()
+				_ = rows.Close()
 				return fail("dynamic_definition_unknown")
 			}
 		}
 		err = rows.Err()
-		rows.Close()
+		_ = rows.Close()
 		if err != nil {
 			return fail("dependency_read_failed", err)
 		}
@@ -961,14 +961,14 @@ func runDump(ctx context.Context, o options, dbName string) error {
 	if err != nil {
 		return fail("dump_file_failed")
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 	cw := &cappedWriter{w: f, limit: maxDumpBytes}
 	gz := gzip.NewWriter(cw)
 	home, err := os.MkdirTemp("", "cbpt-dump-home-")
 	if err != nil {
 		return fail("dump_environment_failed")
 	}
-	defer os.RemoveAll(home)
+	defer func() { _ = os.RemoveAll(home) }()
 	command := exec.CommandContext(ctx, "mysqldump", dumpArgs(o, dbName)...)
 	for _, env := range os.Environ() {
 		key, _, _ := strings.Cut(env, "=")
@@ -1402,7 +1402,7 @@ func readPrivateJSON(path string, dst any) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 	b, err := io.ReadAll(io.LimitReader(f, maxJSONBytes+1))
 	if err != nil || int64(len(b)) > maxJSONBytes {
 		return nil, fail("private_json_limit")
@@ -1440,8 +1440,8 @@ func writeAtomicJSON(path string, value any, replace bool) error {
 		return fail("artifact_write_failed")
 	}
 	name := f.Name()
-	defer os.Remove(name)
-	defer f.Close()
+	defer func() { _ = os.Remove(name) }()
+	defer func() { _ = f.Close() }()
 	if err = f.Chmod(0600); err != nil {
 		return fail("artifact_permissions_failed")
 	}
@@ -1469,7 +1469,7 @@ func syncDir(path string) error {
 	if err != nil {
 		return fail("directory_fsync_failed")
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 	if err = f.Sync(); err != nil {
 		return fail("directory_fsync_failed")
 	}
@@ -1480,7 +1480,7 @@ func fileHash(path string, limit int64) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 	h := sha256.New()
 	n, err := io.Copy(h, io.LimitReader(f, limit+1))
 	if err != nil || n > limit {
@@ -1493,7 +1493,7 @@ func checkDefaultsFile(path string, c connectionConfig) error {
 	if err != nil {
 		return err
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 	b, err := io.ReadAll(io.LimitReader(f, 32769))
 	if err != nil || len(b) > 32768 {
 		return fail("defaults_file_invalid")
