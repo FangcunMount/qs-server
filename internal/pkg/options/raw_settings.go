@@ -83,3 +83,19 @@ func lookupSchemaField(schema FieldSchema, key string) (FieldSchema, bool) {
 	child, ok := schema[normalized]
 	return child, ok
 }
+
+// HasRawSetting reports whether the exact nested key exists, including nil or false values.
+func HasRawSetting(settings map[string]any, path ...string) bool {
+	var current any = settings
+	for _, key := range path {
+		values, ok := current.(map[string]any)
+		if !ok {
+			return false
+		}
+		current, ok = values[key]
+		if !ok {
+			return false
+		}
+	}
+	return true
+}
