@@ -2,7 +2,7 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "f1b882447597a1fde40887669148bbd112bc91b1",
+    "sha": "a8ce31e80325d55cad95da8159f519b5a68a22d3",
     "verified_on": "2026-10-07"
   },
   "status_policy": {
@@ -53,7 +53,7 @@
         "docs/_archive/**/*.md",
         "tmp/**/*.md"
       ],
-      "expected_count": 42,
+      "expected_count": 43,
       "budgeted": false
     }
   },
@@ -10989,6 +10989,57 @@
         "observed_at": null,
         "limitations": [
           "Host tool provisioning is not final source deployment or MQ business acceptance."
+        ]
+      },
+      "gaps": []
+    },
+    {
+      "path": "scripts/dbops/production-inventory.md",
+      "class": "sidecar",
+      "owner": "tooling",
+      "doc_status": "aligned",
+      "verified": {
+        "source_sha": "a8ce31e80325d55cad95da8159f519b5a68a22d3",
+        "verified_on": "2026-10-07"
+      },
+      "fact_sources": [
+        {
+          "kind": "source",
+          "path": ".github/workflows/db-ops.yml"
+        },
+        {
+          "kind": "source",
+          "path": ".github/workflows/redis-control-contract.yml"
+        },
+        {
+          "kind": "source",
+          "path": "scripts/dbops/production-inventory.py"
+        },
+        {
+          "kind": "source",
+          "path": "scripts/dbops/production-inventory.sql"
+        },
+        {
+          "kind": "source",
+          "path": "scripts/dbops/production-inventory.js"
+        }
+      ],
+      "verification": [
+        {
+          "kind": "command",
+          "command": "bash scripts/dbops/test-production-inventory.sh",
+          "result": "passed",
+          "source_sha": "a8ce31e80325d55cad95da8159f519b5a68a22d3",
+          "verified_on": "2026-10-07"
+        }
+      ],
+      "production_evidence": {
+        "level": "none",
+        "refs": [],
+        "deployed_sha": null,
+        "observed_at": null,
+        "limitations": [
+          "Offline contract verification only; production connectivity and metadata are not yet observed. Counts never authorize deletion."
         ]
       },
       "gaps": []
