@@ -22,7 +22,7 @@ MYSQL = "server\tqs\t8.0.36\ntables\tschema_migrations\tBASE TABLE\tInnoDB\t1\t1
 
 
 def mongo_fixture():
-    return {"database": "qs", "migration_state": [{"version": "36", "dirty": False}], "namespaces": [{"name": "schema_migrations", "type": "collection", "validator_fields": [], "storage": {"estimated_documents": "1", "data_bytes": "22", "storage_bytes": "16384", "index_bytes": "16384"}, "indexes": [{"name": "_id_", "keys": {"_id": 1}, "unique": True, "sparse": False, "hidden": False, "partial": False, "expire_after_seconds": None}]}]}
+    return {"database": "qs", "metadata_complete": True, "migration_state": [{"version": "36", "dirty": False}], "namespaces": [{"name": "schema_migrations", "type": "collection", "validator_fields": [], "metadata_error": [], "storage": {"estimated_documents": "1", "data_bytes": "22", "storage_bytes": "16384", "index_bytes": "16384"}, "indexes": [{"name": "_id_", "keys": {"_id": 1}, "unique": True, "sparse": False, "hidden": False, "partial": False, "expire_after_seconds": None}]}]}
 
 
 def environment():
@@ -78,7 +78,7 @@ class InventoryContract(unittest.TestCase):
                 raw = json.dumps({"error": token})
                 self.assertEqual(inventory.mongo_failure_category(raw), token)
                 with patch.object(inventory, "capture", return_value=(1, raw)), self.assertRaises(inventory.InventoryError) as caught:
-                    inventory.invoke(["fixture"], mongo_failure=True)
+                    inventory.mongo_client_result(["fixture"], "qs")
                 self.assertEqual(str(caught.exception), token)
         for raw in (SECRET, json.dumps({"error": SECRET}), json.dumps({"error": "mongo_inventory_auth_code_18", "body": SECRET}),
                     '{"error":"mongo_inventory_auth_code_18","error":"mongo_inventory_auth_code_13"}',
@@ -87,19 +87,63 @@ class InventoryContract(unittest.TestCase):
                     '{"error":"mongo_inventory_auth_code_1.5"}', '{"error":"mongo_inventory_unknown_code_18"}',
                     json.dumps(mongo_fixture())):
             self.assertEqual(inventory.mongo_failure_category(raw), "mongo_client_exit_status_none")
-            with patch.object(inventory, "capture", return_value=(1, raw)), self.assertRaisesRegex(inventory.InventoryError, "^mongo_client_exit_status_1$"):
-                inventory.invoke(["fixture"], mongo_failure=True)
+            expected = "inconsistent_mongo_client_exit" if raw == json.dumps(mongo_fixture()) else "mongo_client_exit_status_1"
+            with patch.object(inventory, "capture", return_value=(1, raw)), self.assertRaisesRegex(inventory.InventoryError, "^" + expected + "$"):
+                inventory.mongo_client_result(["fixture"], "qs")
         for status in (0, 1, 125, 126, 127, 137, 255, -1, -9, -64):
             self.assertEqual(inventory.mongo_failure_category(SECRET, status), "mongo_client_exit_status_" + str(status))
         for status in (256, -65, True, "1", None):
             self.assertEqual(inventory.mongo_failure_category(SECRET, status), "mongo_client_exit_status_none")
         raw = '{"error":"mongo_inventory_auth_code_18"}'
         with patch.object(inventory, "capture", return_value=(0, raw)), self.assertRaises(inventory.InventoryError):
-            inventory.parse_mongo(inventory.invoke(["fixture"], mongo_failure=True), "qs")
+            inventory.mongo_client_result(["fixture"], "qs")
         with patch.object(inventory, "capture", return_value=(1, raw)), self.assertRaisesRegex(inventory.InventoryError, "^client_execution_failed$"):
             inventory.invoke(["fixture"])
         with self.assertRaisesRegex(inventory.InventoryError, "^mongo_inventory_auth_code_18$"):
-            inventory.invoke([sys.executable, "-c", "import sys; print(sys.argv[1]); sys.exit(1)", raw], mongo_failure=True)
+            inventory.mongo_client_result([sys.executable, "-c", "import sys; print(sys.argv[1]); sys.exit(1)", raw], "qs")
+
+    def test_mongo_partial_unauthorized_metadata_and_nonzero_job(self):
+        for token, field in (("collStats_unauthorized_code_13", "storage"), ("listIndexes_unauthorized_code_13", "indexes")):
+            fixture = mongo_fixture()
+            fixture["metadata_complete"] = False
+            fixture["namespaces"][0]["metadata_error"] = [token]
+            fixture["namespaces"][0][field] = None
+            raw = json.dumps(fixture)
+            parsed = inventory.parse_mongo(raw, "qs")
+            self.assertIsNone(parsed["namespaces"][0][field])
+            self.assertEqual(parsed["migration_state"], [{"version": 36, "dirty": False}])
+            with patch.object(inventory, "capture", return_value=(1, raw)):
+                self.assertFalse(inventory.mongo_client_result(["fixture"], "qs")["metadata_complete"])
+            for status in (0, 2, 137):
+                with patch.object(inventory, "capture", return_value=(status, raw)), self.assertRaises(inventory.InventoryError):
+                    inventory.mongo_client_result(["fixture"], "qs")
+            env = dict(environment(), INVENTORY_DATABASE="mongodb")
+            with patch.object(inventory, "invoke", return_value="network"), patch.object(inventory, "collect", return_value=parsed):
+                result = inventory.run(env)
+            self.assertFalse(result["complete"])
+            self.assertFalse(result["databases"]["mongodb"]["metadata_complete"])
+            output = io.StringIO()
+            with patch.object(inventory, "run", return_value=result), contextlib.redirect_stdout(output):
+                self.assertEqual(inventory.main(), 1)
+            self.assertNotIn(SECRET, output.getvalue())
+
+    def test_mongo_partial_consistency_errors_and_unknown_head_failclosed(self):
+        fixture = mongo_fixture()
+        fixture["metadata_complete"] = False
+        fixture["namespaces"][0]["metadata_error"] = ["collStats_unauthorized_code_13"]
+        fixture["namespaces"][0]["storage"] = None
+        mutations = (lambda f: f.update(metadata_complete=True), lambda f: f["namespaces"][0].update(metadata_error=[]),
+                     lambda f: f["namespaces"][0].update(metadata_error=[SECRET]), lambda f: f["namespaces"][0].update(metadata_error=["collStats_unauthorized_code_13", "collStats_unauthorized_code_13"]),
+                     lambda f: f["namespaces"][0].update(indexes=None), lambda f: f["namespaces"][0].update(metadata_error=[{}]), lambda f: f["namespaces"][0].update(type="view"), lambda f: f.update(migration_state=[]), lambda f: f["migration_state"][0].update(dirty=None))
+        for mutate in mutations:
+            changed = json.loads(json.dumps(fixture)); mutate(changed)
+            with self.assertRaises(inventory.InventoryError) as caught:
+                inventory.parse_mongo(json.dumps(changed), "qs")
+            self.assertNotIn(SECRET, str(caught.exception))
+        with patch.object(inventory, "capture", return_value=(1, json.dumps(mongo_fixture()))), self.assertRaisesRegex(inventory.InventoryError, "inconsistent_mongo_client_exit"):
+            inventory.mongo_client_result(["fixture"], "qs")
+        with patch.object(inventory, "capture", return_value=(0, json.dumps(mongo_fixture()))):
+            self.assertTrue(inventory.mongo_client_result(["fixture"], "qs")["metadata_complete"])
 
     def test_invalid_scope_and_system_database_rejected_before_docker(self):
         for changed in ({"INVENTORY_DATABASE": "redis"}, {"INVENTORY_SOURCE_SHA": SECRET}, {"MYSQL_DATABASE": "mysql"}, {"MONGODB_DBNAME": "admin"}, {"MONGODB_PORT": "70000"}):
@@ -129,7 +173,7 @@ class InventoryContract(unittest.TestCase):
                     self.assertIn(SECRET, config.read_text())
                     private_files.append(config)
                 return MYSQL if kind == "mysql" and "run" in args else json.dumps(mongo_fixture()) if "run" in args else "image-fixture"
-            with patch.object(inventory, "invoke", side_effect=invoke), patch.object(inventory, "capture", side_effect=[(1, ""), (0, "b" * 64 + "\n"), (0, ""), (0, "")]) as capture:
+            with patch.object(inventory, "invoke", side_effect=invoke), patch.object(inventory, "mongo_client_result", side_effect=lambda args, db: inventory.parse_mongo(invoke(args, timeout=75), db)), patch.object(inventory, "capture", side_effect=[(1, ""), (0, "b" * 64 + "\n"), (0, ""), (0, "")]) as capture:
                 inventory.collect(kind, environment(), ["docker"], Path(__file__).parent, "123-1")
             args, options = next(call for call in calls if "run" in call[0])
             self.assertNotIn(SECRET, " ".join(args))

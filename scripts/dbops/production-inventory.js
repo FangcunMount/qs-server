@@ -28,43 +28,58 @@ try {
     return rows;
   }
   const namespaces = await metadataCursor({listCollections: 1, nameOnly: false, authorizedCollections: false, cursor: {batchSize: 200}}, 1000, "listCollections");
-  const report = {database: process.env.MONGODB_DBNAME, namespaces: [], migration_state: []};
+  // Obtain and validate migration identity before any optional detail query.
+  stage = "migration";
+  if (!namespaces.some(item => item.name === "schema_migrations" && item.type === "collection")) throw new Error("migration_metadata_missing");
+  const migration = await target.getCollection("schema_migrations");
+  const migrationState = (await migration.find({}, {_id: 0, version: 1, dirty: 1}).limit(2).maxTimeMS(maxTimeMS).toArray()).map(head => ({version: number(head.version), dirty: head.dirty}));
+  stage = "head";
+  if (migrationState.length !== 1 || !/^[0-9]{1,20}$/.test(migrationState[0].version) || typeof migrationState[0].dirty !== "boolean") {
+    throw new Error("migration_metadata_incomplete");
+  }
+  const report = {database: process.env.MONGODB_DBNAME, namespaces: [], migration_state: migrationState, metadata_complete: true};
   let totalIndexes = 0;
   let totalFields = 0;
   for (const namespace of namespaces.sort((a, b) => a.name.localeCompare(b.name))) {
     if (Date.now() - started > 70000) throw new Error("metadata_deadline_exceeded");
     const properties = namespace.options?.validator?.$jsonSchema?.properties || {};
-    const item = {name: namespace.name, type: namespace.type, validator_fields: Object.keys(properties).sort(), storage: null, indexes: []};
+    const item = {name: namespace.name, type: namespace.type, validator_fields: Object.keys(properties).sort(), storage: null, indexes: [], metadata_error: []};
     totalFields += item.validator_fields.length;
     if (totalFields > 10000) throw new Error("metadata_limit_exceeded");
     if (item.type === "collection" || item.type === "timeseries") {
       stage = "collStats";
-      const stats = await target.runCommand({collStats: item.name, scale: 1, maxTimeMS});
-      if (stats.ok !== 1) throw Object.assign(new Error("storage_metadata_failed"), {code: stats.code});
-      item.storage = {estimated_documents: number(stats.count), data_bytes: number(stats.size), storage_bytes: number(stats.storageSize), index_bytes: number(stats.totalIndexSize)};
-      item.indexes = (await metadataCursor({listIndexes: item.name, cursor: {batchSize: 200}}, 1000, "listIndexes")).map(index => ({
-        name: index.name, keys: index.key, unique: index.unique === true || index.name === "_id_", sparse: index.sparse === true,
-        hidden: index.hidden === true, partial: index.partialFilterExpression !== undefined,
-        expire_after_seconds: number(index.expireAfterSeconds)
-      }));
+      try {
+        const stats = await target.runCommand({collStats: item.name, scale: 1, maxTimeMS});
+        if (stats.ok !== 1) throw Object.assign(new Error("storage_metadata_failed"), {code: stats.code});
+        item.storage = {estimated_documents: number(stats.count), data_bytes: number(stats.size), storage_bytes: number(stats.storageSize), index_bytes: number(stats.totalIndexSize)};
+      } catch (error) {
+        if (error?.code !== 13) throw error;
+        item.metadata_error.push("collStats_unauthorized_code_13");
+        report.metadata_complete = false;
+      }
+      try {
+        item.indexes = (await metadataCursor({listIndexes: item.name, cursor: {batchSize: 200}}, 1000, "listIndexes")).map(index => ({
+          name: index.name, keys: index.key, unique: index.unique === true || index.name === "_id_", sparse: index.sparse === true,
+          hidden: index.hidden === true, partial: index.partialFilterExpression !== undefined,
+          expire_after_seconds: number(index.expireAfterSeconds)
+        }));
+      } catch (error) {
+        if (error?.code !== 13) throw error;
+        item.indexes = null;
+        item.metadata_error.push("listIndexes_unauthorized_code_13");
+        report.metadata_complete = false;
+      }
     }
-    totalIndexes += item.indexes.length;
+    totalIndexes += item.indexes === null ? 0 : item.indexes.length;
     if (totalIndexes > 10000) throw new Error("metadata_limit_exceeded");
     report.namespaces.push(item);
   }
-  stage = "migration";
-  if (!namespaces.some(item => item.name === "schema_migrations" && item.type === "collection")) throw new Error("migration_metadata_missing");
-  const migration = await target.getCollection("schema_migrations");
-  report.migration_state = (await migration.find({}, {_id: 0, version: 1, dirty: 1}).limit(2).maxTimeMS(maxTimeMS).toArray()).map(head => ({version: number(head.version), dirty: head.dirty}));
-  stage = "head";
-  if (report.migration_state.length !== 1 || !/^[0-9]{1,20}$/.test(report.migration_state[0].version) || typeof report.migration_state[0].dirty !== "boolean") {
-    throw new Error("migration_metadata_incomplete");
-  }
   print(JSON.stringify(report));
+  return report.metadata_complete;
 } catch (error) {
   // Do not emit message, namespace, connection URI, username or raw error.
   const code = typeof error?.code === "number" && Number.isInteger(error.code) && error.code >= 0 && error.code <= 2147483647 ? String(error.code) : "none";
   print(JSON.stringify({error: `mongo_inventory_${stage}_code_${code}`}));
-  quit(1);
+  return false;
 }
-})();
+})().then(complete => { if (!complete) quit(1); });

@@ -87,17 +87,31 @@ def parse_mongo(raw, database):
         result = json.loads(raw)
     except (ValueError, TypeError):
         fail("unexpected_mongo_output")
-    if not isinstance(result, dict) or set(result) != {"database", "namespaces", "migration_state"} or result["database"] != database:
+    if not isinstance(result, dict) or set(result) != {"database", "namespaces", "migration_state", "metadata_complete"} or result["database"] != database:
         fail("unexpected_mongo_output_shape")
     if not isinstance(result["namespaces"], list) or len(result["namespaces"]) > 1000:
         fail("mongo_metadata_limit_exceeded")
+    if not isinstance(result["metadata_complete"], bool):
+        fail("invalid_mongo_metadata_complete")
+    incomplete = False
     total_indexes = 0
     total_fields = 0
     for item in result["namespaces"]:
-        required = {"name", "type", "validator_fields", "storage", "indexes"}
+        required = {"name", "type", "validator_fields", "storage", "indexes", "metadata_error"}
         if not isinstance(item, dict) or set(item) != required or item["type"] not in ("collection", "view", "timeseries"):
             fail("unexpected_mongo_namespace_shape")
         name(item["name"])
+        errors = item["metadata_error"]
+        allowed_errors = {"collStats_unauthorized_code_13", "listIndexes_unauthorized_code_13"}
+        if not isinstance(errors, list) or len(errors) > 2 or any(not isinstance(error, str) or error not in allowed_errors for error in errors) or len(set(errors)) != len(errors):
+            fail("invalid_mongo_metadata_error")
+        if errors and item["type"] not in ("collection", "timeseries"):
+            fail("invalid_mongo_partial_namespace")
+        incomplete = incomplete or bool(errors)
+        if ("collStats_unauthorized_code_13" in errors) != (item["storage"] is None and item["type"] in ("collection", "timeseries")):
+            fail("invalid_mongo_partial_storage")
+        if ("listIndexes_unauthorized_code_13" in errors) != (item["indexes"] is None):
+            fail("invalid_mongo_partial_indexes")
         if not isinstance(item["validator_fields"], list) or len(item["validator_fields"]) > 1000:
             fail("mongo_metadata_limit_exceeded")
         total_fields += len(item["validator_fields"])
@@ -109,12 +123,13 @@ def parse_mongo(raw, database):
             if set(item["storage"]) != {"estimated_documents", "data_bytes", "storage_bytes", "index_bytes"}:
                 fail("unexpected_mongo_storage_shape")
             item["storage"] = {key: integer(value, True) for key, value in item["storage"].items()}
-        if not isinstance(item["indexes"], list) or len(item["indexes"]) > 1000:
+        indexes = [] if item["indexes"] is None else item["indexes"]
+        if not isinstance(indexes, list) or len(indexes) > 1000:
             fail("mongo_metadata_limit_exceeded")
-        total_indexes += len(item["indexes"])
+        total_indexes += len(indexes)
         if total_indexes > 10000:
             fail("mongo_metadata_limit_exceeded")
-        for index in item["indexes"]:
+        for index in indexes:
             if not isinstance(index, dict) or set(index) != {"name", "keys", "unique", "sparse", "hidden", "partial", "expire_after_seconds"}:
                 fail("unexpected_mongo_index_shape")
             name(index["name"])
@@ -128,6 +143,8 @@ def parse_mongo(raw, database):
                 if not isinstance(index[flag], bool):
                     fail("invalid_mongo_index_flags")
             index["expire_after_seconds"] = integer(index["expire_after_seconds"], True)
+    if result["metadata_complete"] != (not incomplete):
+        fail("inconsistent_mongo_metadata_complete")
     heads = result["migration_state"]
     if not isinstance(heads, list) or len(heads) != 1 or not isinstance(heads[0], dict) or set(heads[0]) != {"version", "dirty"} or not isinstance(heads[0]["dirty"], bool):
         fail("mongo_metadata_incomplete")
@@ -195,6 +212,24 @@ def capture(args, *, input_text=None, timeout=15):
                     stream.close()
 
 
+def mongo_client_result(command, database):
+    status, raw = capture(command, timeout=75)
+    if status != 0:
+        if status != 1:
+            fail(mongo_failure_category(raw, status))
+        try:
+            result = parse_mongo(raw, database)
+        except InventoryError:
+            fail(mongo_failure_category(raw, status))
+        if result["metadata_complete"] is not False:
+            fail("inconsistent_mongo_client_exit")
+        return result
+    result = parse_mongo(raw, database)
+    if result["metadata_complete"] is not True:
+        fail("inconsistent_mongo_client_exit")
+    return result
+
+
 def mongo_failure_category(output, status=None):
     # Accept only the exact fixed-token JSON emitted by our mongosh script.
     # Raw server/client errors and extra fields are never returned to workflow logs.
@@ -206,10 +241,10 @@ def mongo_failure_category(output, status=None):
     return "mongo_client_exit_status_" + exit_status
 
 
-def invoke(args, *, input_text=None, timeout=15, mongo_failure=False):
+def invoke(args, *, input_text=None, timeout=15):
     status, output = capture(args, input_text=input_text, timeout=timeout)
     if status != 0:
-        fail(mongo_failure_category(output, status) if mongo_failure else "client_execution_failed")
+        fail("client_execution_failed")
     return output
 
 
@@ -300,7 +335,7 @@ def collect(kind, env, docker, script_dir, run_id):
                 raw = invoke(command, input_text=(script_dir / "production-inventory.sql").read_text(), timeout=75)
                 return parse_mysql(raw, database)
             command = [*common, "--env-file", str(config), image, "mongosh", "--nodb", "--quiet", "--file", "/audit/production-inventory.js"]
-            return parse_mongo(invoke(command, timeout=75, mongo_failure=True), database)
+            return mongo_client_result(command, database)
         finally:
             cleanup_client(docker, owner)
 
@@ -321,6 +356,8 @@ def run(env):
     for kind in kinds:
         try:
             result["databases"][kind] = collect(kind, env, docker, script_dir, run_id)
+            if result["databases"][kind].get("metadata_complete") is False:
+                result["complete"] = False
         except InventoryError as error:
             result["complete"] = False
             result["databases"][kind] = {"error": str(error)}
