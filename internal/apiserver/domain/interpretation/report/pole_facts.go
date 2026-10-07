@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"math"
 
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/mbticontract"
+	"github.com/FangcunMount/qs-server/internal/pkg/mbticontract"
 )
 
 const PoleFactsSchema = "mbti-pole-facts/v1"

@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"math"
 
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/mbticontract"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
+	"github.com/FangcunMount/qs-server/internal/pkg/mbticontract"
 )
 
 const MBTIPoleCatalogSchema = "mbti-pole-catalog/v1"

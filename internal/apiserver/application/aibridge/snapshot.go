@@ -2,7 +2,7 @@ package aibridge
 
 import (
 	"encoding/json"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/mbticontract"
+	"github.com/FangcunMount/qs-server/internal/pkg/mbticontract"
 	"time"
 
 	source "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/reportsource"

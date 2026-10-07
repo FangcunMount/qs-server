@@ -3,7 +3,7 @@ package aibridge
 import (
 	"context"
 	"encoding/json"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/mbticontract"
+	"github.com/FangcunMount/qs-server/internal/pkg/mbticontract"
 	"strings"
 	"unicode/utf8"
 

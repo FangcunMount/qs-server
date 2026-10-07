@@ -5,7 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/mbticontract"
+	"github.com/FangcunMount/qs-server/internal/pkg/mbticontract"
 	"io"
 	"net/url"
 	"regexp"
