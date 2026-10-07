@@ -7,6 +7,7 @@ on:
       - 'internal/apiserver/infra/redis/systemgovernance/**'
       - 'internal/pkg/redisruntime/keyspace/**'
       - 'scripts/dbops/**'
+      - 'scripts/oneoff/cleanup_cbpt_tables/**'
       - '.github/workflows/db-ops.yml'
       - '.github/workflows/redis-control-contract.yml'
   workflow_dispatch:
@@ -65,3 +66,21 @@ jobs:
 
       - name: Validate metadata-only inventory and safe output
         run: bash scripts/dbops/test-production-inventory.sh
+
+  cbpt-cleanup-contract:
+    name: Exact Legacy MySQL Backup Cleanup Contract
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Verify exact scope, archive proofs and failure boundaries
+        run: |
+          go test -race -count=1 ./scripts/oneoff/cleanup_cbpt_tables
+          python3 -B scripts/dbops/test-cbpt-cleanup.py

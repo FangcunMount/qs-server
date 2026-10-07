@@ -14,6 +14,10 @@ on:
           - restore
           - status
           - inventory
+          - cbpt-audit
+          - cbpt-archive
+          - cbpt-apply
+          - cbpt-verify
           - preflight-redis-control
           - govern-presentation
           - govern-template-release
@@ -21,7 +25,7 @@ on:
           - govern-model-template-route
           - govern-outcome-template-route
       backup_name:
-        description: 'Backup name (for restore operation)'
+        description: 'Backup name, or exact archive operation ID for cbpt-apply/cbpt-verify'
         required: false
         type: string
       database:
@@ -83,6 +87,144 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  cbpt-table-cleanup:
+    name: Archive and Clean Exact Legacy MySQL Backup Tables
+    if: startsWith(github.event.inputs.operation, 'cbpt-')
+    runs-on:
+      group: qlume
+      labels: [self-hosted, macOS, ARM64, ops]
+    timeout-minutes: 90
+    environment: production
+    steps:
+      - name: Checkout immutable cleanup source
+        uses: actions/checkout@v6
+
+      - name: Set up Go for the cleanup tool
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: false
+
+      - name: Check and package exact-table cleanup tools
+        id: package
+        run: |
+          set -Eeuo pipefail
+          go test ./scripts/oneoff/cleanup_cbpt_tables
+          python3 -B scripts/dbops/test-cbpt-cleanup.py
+          package_dir=$(mktemp -d "$RUNNER_TEMP/qs-cbpt-package.XXXXXX")
+          trap 'rm -f -- "$package_dir/cbpt-cleanup-linux-amd64" "$package_dir/cbpt-cleanup-linux-arm64" "$package_dir/cbpt-cleanup.py"; rmdir -- "$package_dir"' EXIT
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags='-s -w' -o "$package_dir/cbpt-cleanup-linux-amd64" ./scripts/oneoff/cleanup_cbpt_tables
+          CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -trimpath -ldflags='-s -w' -o "$package_dir/cbpt-cleanup-linux-arm64" ./scripts/oneoff/cleanup_cbpt_tables
+          cp scripts/dbops/cbpt-cleanup.py "$package_dir/cbpt-cleanup.py"
+          archive="qs-cbpt-cleanup-${GITHUB_RUN_ID}.tar.gz"
+          tar -czf "$archive" -C "$package_dir" cbpt-cleanup-linux-amd64 cbpt-cleanup-linux-arm64 cbpt-cleanup.py
+          echo "sha256=$(shasum -a 256 "$archive" | awk '{print $1}')" >> "$GITHUB_OUTPUT"
+
+      - name: Validate production SSH and cleanup stage
+        env:
+          CBPT_DATABASE_INPUT: ${{ github.event.inputs.database }}
+          CBPT_OPERATION_INPUT: ${{ github.event.inputs.operation }}
+          CBPT_ARCHIVE_ID: ${{ github.event.inputs.backup_name }}
+          SVRA_HOST: ${{ vars.SVRA_HOST }}
+          SVRA_USERNAME: ${{ vars.SVRA_USERNAME }}
+          SVRA_SSH_KEY: ${{ secrets.SVRA_SSH_KEY }}
+          SVRA_SSH_FINGERPRINT: ${{ vars.SVRA_SSH_FINGERPRINT }}
+        run: |
+          set -Eeuo pipefail
+          [[ "$CBPT_DATABASE_INPUT" == mysql ]] || { echo "cbpt cleanup requires mysql" >&2; exit 1; }
+          : "${SVRA_HOST:?production host binding is empty}"
+          : "${SVRA_USERNAME:?production SSH binding is empty}"
+          : "${SVRA_SSH_KEY:?production SSH key is empty}"
+          : "${SVRA_SSH_FINGERPRINT:?production fingerprint is empty}"
+          case "$CBPT_OPERATION_INPUT" in
+            cbpt-audit|cbpt-archive) [[ -z "$CBPT_ARCHIVE_ID" ]] || exit 1 ;;
+            cbpt-apply|cbpt-verify) [[ "$CBPT_ARCHIVE_ID" =~ ^[0-9]{1,20}-[0-9]{1,4}$ ]] || exit 1 ;;
+            *) exit 1 ;;
+          esac
+
+      - name: Upload immutable cleanup tools to ServerA
+        uses: appleboy/scp-action@v1.0.0
+        with:
+          host: ${{ vars.SVRA_HOST }}
+          username: ${{ vars.SVRA_USERNAME }}
+          key: ${{ secrets.SVRA_SSH_KEY }}
+          port: ${{ vars.SVRA_SSH_PORT || 22 }}
+          fingerprint: ${{ vars.SVRA_SSH_FINGERPRINT }}
+          source: qs-cbpt-cleanup-${{ github.run_id }}.tar.gz
+          target: /tmp
+
+      - name: Execute the bounded cleanup stage
+        uses: appleboy/ssh-action@v1.2.2
+        env:
+          CBPT_OPERATION_INPUT: ${{ github.event.inputs.operation }}
+          CBPT_SOURCE_SHA: ${{ github.sha }}
+          CBPT_RUN_ID: ${{ github.run_id }}-${{ github.run_attempt }}
+          CBPT_ARCHIVE_ID: ${{ github.event.inputs.backup_name }}
+          CBPT_PACKAGE_SHA256: ${{ steps.package.outputs.sha256 }}
+          MYSQL_HOST: ${{ secrets.MYSQL_HOST }}
+          MYSQL_PORT: ${{ secrets.MYSQL_PORT || 3306 }}
+          MYSQL_USERNAME: ${{ secrets.MYSQL_USERNAME }}
+          MYSQL_PASSWORD: ${{ secrets.MYSQL_PASSWORD }}
+          MYSQL_DATABASE: ${{ secrets.MYSQL_DATABASE != '' && secrets.MYSQL_DATABASE || secrets.MYSQL_DBNAME }}
+        with:
+          host: ${{ vars.SVRA_HOST }}
+          username: ${{ vars.SVRA_USERNAME }}
+          key: ${{ secrets.SVRA_SSH_KEY }}
+          port: ${{ vars.SVRA_SSH_PORT || 22 }}
+          fingerprint: ${{ vars.SVRA_SSH_FINGERPRINT }}
+          command_timeout: 80m
+          envs: CBPT_OPERATION_INPUT,CBPT_SOURCE_SHA,CBPT_RUN_ID,CBPT_ARCHIVE_ID,CBPT_PACKAGE_SHA256,MYSQL_HOST,MYSQL_PORT,MYSQL_USERNAME,MYSQL_PASSWORD,MYSQL_DATABASE
+          script: |
+            set -Eeuo pipefail
+            export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin${PATH:+:$PATH}"
+            umask 077
+            [[ "$CBPT_RUN_ID" =~ ^[0-9]{1,20}-[0-9]{1,4}$ ]] || exit 1
+            [[ "$CBPT_SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]] || exit 1
+            [[ "$CBPT_PACKAGE_SHA256" =~ ^[0-9a-f]{64}$ ]] || exit 1
+            case "$CBPT_OPERATION_INPUT" in
+              cbpt-audit) operation=audit ;;
+              cbpt-archive) operation=archive-verify ;;
+              cbpt-apply) operation=apply ;;
+              cbpt-verify) operation=verify ;;
+              *) exit 1 ;;
+            esac
+            archive="/tmp/qs-cbpt-cleanup-${CBPT_RUN_ID%-*}.tar.gz"
+            work_dir=$(mktemp -d /tmp/qs-cbpt-cleanup.XXXXXX)
+            cleanup_tools() {
+              rm -f -- "$work_dir/cbpt-cleanup-linux-amd64" "$work_dir/cbpt-cleanup-linux-arm64" "$work_dir/cbpt-cleanup.py" "$archive"
+              rmdir -- "$work_dir"
+            }
+            trap cleanup_tools EXIT
+            [[ "$(sha256sum "$archive" | awk '{print $1}')" == "$CBPT_PACKAGE_SHA256" ]] || exit 1
+            tar -xzf "$archive" -C "$work_dir" --no-same-owner
+            chmod 0700 "$work_dir" "$work_dir/cbpt-cleanup-linux-amd64" "$work_dir/cbpt-cleanup-linux-arm64"
+            chmod 0600 "$work_dir/cbpt-cleanup.py"
+            case "$(uname -m)" in
+              x86_64) tool="$work_dir/cbpt-cleanup-linux-amd64" ;;
+              aarch64|arm64) tool="$work_dir/cbpt-cleanup-linux-arm64" ;;
+              *) exit 1 ;;
+            esac
+            python3 - <<'PY_ARCHIVE_ROOT'
+            import os, stat, subprocess
+            from pathlib import Path
+            root = Path("/opt/backups/qs-server/mysql-cbpt-archive")
+            for part in (Path("/opt"), Path("/opt/backups"), Path("/opt/backups/qs-server"), root):
+                if not part.exists() and not part.is_symlink():
+                    result = subprocess.run(["sudo", "-n", "install", "-d", "-m", "0700", "-o", str(os.getuid()), "-g", str(os.getgid()), str(part)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                    if result.returncode:
+                        raise SystemExit("archive_root_unavailable")
+                try:
+                    metadata = part.lstat()
+                except OSError:
+                    raise SystemExit("archive_root_unavailable")
+                if not stat.S_ISDIR(metadata.st_mode) or metadata.st_mode & 0o022:
+                    raise SystemExit("archive_root_unavailable")
+            metadata = root.lstat()
+            if metadata.st_uid != os.getuid() or stat.S_IMODE(metadata.st_mode) != 0o700:
+                raise SystemExit("archive_root_unavailable")
+            PY_ARCHIVE_ROOT
+            python3 -B "$work_dir/cbpt-cleanup.py" --operation "$operation" --tool-binary "$tool" --source-sha "$CBPT_SOURCE_SHA" --run-id "$CBPT_RUN_ID" --archive-id "$CBPT_ARCHIVE_ID"
+
   database-inventory:
     name: MySQL and MongoDB Metadata Inventory
     if: github.event.inputs.operation == 'inventory'
