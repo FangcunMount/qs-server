@@ -2,7 +2,7 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "a8ce31e80325d55cad95da8159f519b5a68a22d3",
+    "sha": "2448f4a55fb77cd03b5e385a47652e1453b6f9a6",
     "verified_on": "2026-10-07"
   },
   "status_policy": {
@@ -10999,7 +10999,7 @@
       "owner": "tooling",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "e5d9952fce8c5253dd51b78b583f7ec0a85611f9",
+        "source_sha": "947597101b53c75b02c6ee1a3fb1555d8eb91e77",
         "verified_on": "2026-10-07"
       },
       "fact_sources": [
@@ -11029,7 +11029,7 @@
           "kind": "command",
           "command": "bash scripts/dbops/test-production-inventory.sh",
           "result": "passed",
-          "source_sha": "e5d9952fce8c5253dd51b78b583f7ec0a85611f9",
+          "source_sha": "947597101b53c75b02c6ee1a3fb1555d8eb91e77",
           "verified_on": "2026-10-07"
         }
       ],
