@@ -55,3 +55,13 @@ jobs:
 
       - name: Validate Mac mini backup script
         run: bash scripts/dbops/test-mongodb-mac-mini-backup.sh
+
+  database-inventory-contract:
+    name: Database Metadata Inventory Script Contract
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Validate metadata-only inventory and safe output
+        run: bash scripts/dbops/test-production-inventory.sh
