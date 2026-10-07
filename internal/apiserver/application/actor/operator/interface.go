@@ -38,14 +38,11 @@ type OperatorLifecycleService interface {
 	UpdateFromExternalSource(ctx context.Context, operatorID uint64, name, email, phone string) error
 }
 
-// OperatorAuthorizationService 操作者权限管理服务
+// OperatorAuthorizationService 操作者账号启停服务
 // 行为者：IT管理员/权限管理员 (IT Admin)
-// 职责：角色分配、权限管理、账号启停用
+// 职责：账号启停用
 // 变更来源：IT部门的权限管理需求变化
 type OperatorAuthorizationService interface {
-	// ReplaceRoles rejects retired role-only writes. Use ScopeService.Replace instead.
-	ReplaceRoles(ctx context.Context, operatorID uint64, roles []string) error
-
 	// Activate 激活操作者账号
 	Activate(ctx context.Context, operatorID uint64) error
 

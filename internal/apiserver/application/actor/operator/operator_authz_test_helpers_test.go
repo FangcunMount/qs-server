@@ -2,23 +2,9 @@ package operator
 
 import (
 	"context"
-	"github.com/FangcunMount/component-base/pkg/errors"
-	"github.com/FangcunMount/qs-server/internal/pkg/code"
-	"testing"
 
 	iambridge "github.com/FangcunMount/qs-server/internal/apiserver/port/iambridge"
 )
-
-// A role-only request must never clear scoped assignments or touch local state.
-func TestReplaceRolesRejectsLegacyWritesBeforeDependencies(t *testing.T) {
-	for _, roles := range [][]string{nil, {}, {"qs:assessment_operator"}} {
-		service := NewAuthorizationService(nil, nil, nil, nil, nil)
-		err := service.ReplaceRoles(context.Background(), 42, roles)
-		if err == nil || !errors.IsCode(err, code.ErrValidation) {
-			t.Fatalf("roles=%v error=%v, want validation rejection", roles, err)
-		}
-	}
-}
 
 type operatorAuthzGatewayFake struct {
 	replaceCalls     int

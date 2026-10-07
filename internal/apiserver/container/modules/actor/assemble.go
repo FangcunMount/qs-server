@@ -180,10 +180,8 @@ func New(deps Deps) (*Module, error) {
 	)
 	module.OperatorAuthorizationService = operatorApp.NewAuthorizationService(
 		operatorRepo,
-		operatorValidator,
 		operatorLifecycler,
 		txRunner,
-		operatorAuthzGateway,
 		retirementRepo,
 	)
 	module.OperatorQueryService = operatorApp.NewQueryService(actorReadModel)

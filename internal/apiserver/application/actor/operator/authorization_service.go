@@ -7,28 +7,22 @@ import (
 	"github.com/FangcunMount/component-base/pkg/errors"
 	apptransaction "github.com/FangcunMount/qs-server/internal/apiserver/application/transaction"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/operator"
-	iambridge "github.com/FangcunMount/qs-server/internal/apiserver/port/iambridge"
-	"github.com/FangcunMount/qs-server/internal/pkg/code"
 )
 
-// authorizationService 操作者权限管理服务实现
+// authorizationService 操作者账号启停服务实现
 // 行为者：IT管理员/权限管理员
 type authorizationService struct {
 	gate       retirement.MutationGate
 	repo       domain.Repository
-	validator  domain.Validator
 	lifecycler domain.Lifecycler
 	uow        apptransaction.Runner
-	authz      iambridge.OperatorAuthzGateway
 }
 
-// NewAuthorizationService 创建操作者权限管理服务
+// NewAuthorizationService 创建操作者账号启停服务
 func NewAuthorizationService(
 	repo domain.Repository,
-	validator domain.Validator,
 	lifecycler domain.Lifecycler,
 	uow apptransaction.Runner,
-	authz iambridge.OperatorAuthzGateway,
 	gates ...retirement.MutationGate,
 ) OperatorAuthorizationService {
 	var gate retirement.MutationGate
@@ -38,10 +32,8 @@ func NewAuthorizationService(
 	return &authorizationService{
 		gate:       gate,
 		repo:       repo,
-		validator:  validator,
 		lifecycler: lifecycler,
 		uow:        uow,
-		authz:      authz,
 	}
 }
 
@@ -94,9 +86,6 @@ func (s *authorizationService) mutate(ctx context.Context, id uint64, fn func(co
 		return err
 	}
 	return s.gate.WithinMutation(ctx, op.UserID(), fn)
-}
-func (s *authorizationService) ReplaceRoles(ctx context.Context, id uint64, roles []string) error {
-	return errors.WithCode(code.ErrValidation, "role-only updates are retired; use authorization-scope with an explicit range and policy version")
 }
 func (s *authorizationService) Activate(ctx context.Context, id uint64) error {
 	return s.mutate(ctx, id, func(locked context.Context) error { return s.activate(locked, id) })

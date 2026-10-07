@@ -217,7 +217,7 @@ func TestRegisterMembershipDoesNotReplaceExistingIAMAssignments(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	op.ReplaceRolesProjection([]domain.Role{domain.RoleResultReviewer}, []domain.Role{domain.RoleResultReviewer}, 42, nil, false)
+	op.ReplaceRolesProjection([]domain.Role{domain.RoleResultReviewer}, 42, nil, false)
 	result, err = service.Register(ctx, dto)
 	if err != nil {
 		t.Fatal(err)
