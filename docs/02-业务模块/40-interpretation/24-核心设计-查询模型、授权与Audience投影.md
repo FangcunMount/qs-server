@@ -1,9 +1,7 @@
 # 核心设计：查询模型、授权与 Audience 投影
 
-> 2026-10-02 M6 收口候选补正：Participant 新增只读 `GetAssessmentReportStatus(testee_id, assessment_id)`，Collection 使用独立签名 purpose 和精确 method ACL。归属校验通过后，按原 Outcome 的冻结 ReportType／TemplateVersion 查唯一 Generation，再读其 LatestRunID；最多两轮复核 Outcome 内容身份与 Generation 版本。返回仅含 exists、status、attempt、retry_disposition，无模型输入、失败详情、接单或重试权限。报告缺失时，Collection 据持久状态区分自动恢复、人工处理、终止失败；新授权 Run 可覆盖旧失败提示，succeeded Run 单独不能证明报告可见。此处描述候选源码，不代表已部署或 M6 整项验收；下文旧的“仅包装 GetAssessmentReport”以本补正为准。
-
 > 状态：本文已按当前源码重写。Participant、Administration 与 Operations 查询用例、授权先于正文读取的主链路、Catalog 分页查询和最小 Audience 投影已落地；
-> 患者端 gRPC 信任边界、Administration 角色语义、Catalog 关联复验与完整章节级可见性仍有明确缺口。
+> Catalog/Source 关联复验已 fail closed；委托签名启用/部署证据、完整角色章节矩阵与对外 V2 契约仍需分别验收。
 
 ## 1. 本文回答
 
@@ -241,11 +239,9 @@ sequenceDiagram
 - 调用 Evaluation Testee Service，验证 Assessment.TesteeID 等于 Actor.TesteeID；
 - 授权通过后才读取报告。
 
-它并不从 gRPC context 中取 IAM UserID，也不调用 ProfileLink 验证“这个调用者是否拥有 Testee”。`ParticipantReportService` 直接将 request 中的 TesteeID 构造为 Participant Actor。
+应用用例不重新查询 IAM ProfileLink。终端用户到 Testee 的关系由 collection-server 验证；Transport 在启用 delegated subject 时先验证签名、purpose、Testee 与允许工作负载，再构造 Participant Actor；应用用例继续核对 Assessment ownership。
 
-所以当前准确边界是：
-
-> 终端用户到 Testee 的授权依赖 collection-server ProfileLink 中间件；apiserver Participant 用例只验证 Testee 存在和 Assessment 归属。
+签名器使用已认证 HTTP User/Testee 上下文，Verifier由进程装配注入。Participant Report 当前保留 verifier未启用的兼容分支（required=false），因此仅看到接线或方法 ACL 不能证明目标环境已经强制委托验证。事实入口：[Participant guard](../../../internal/apiserver/transport/grpc/service/participant_report_guard.go)、[Collection client](../../../internal/collection-server/infra/grpcclient/evaluation_client.go)、[transport bootstrap](../../../internal/apiserver/process/transport_bootstrap.go)。
 
 ### 7.3 当前 gRPC 信任边界
 
@@ -255,20 +251,22 @@ sequenceDiagram
 - `allowed-ous: QS`，CN 白名单为空；
 - gRPC JWT auth 关闭；
 - gRPC ACL 启用、`default_policy: deny`，并从 `configs/grpc-acl.prod.yaml` 加载逐方法白名单；
-- `qs-collection-server.svc` 被精确允许调用 `AuthorizeAssessment` 和 `ParticipantReportService/GetAssessmentReport`，但不能调用未列入白名单的患者报告方法。
+- `qs-collection-server.svc` 被精确允许调用 `AuthorizeAssessment`、`ParticipantReportService/GetAssessmentReport` 和 `GetAssessmentReportStatus`，但不能调用未列入白名单的患者报告方法。
 
 这把 `ParticipantReportService/GetAssessmentReport` 限定在持有 collection-server 服务身份的调用方，但服务身份仍不能证明 request TesteeID 来自已验证的终端用户 ProfileLink。
 
-因此当前端到端边界是“生产 default-deny 方法 ACL + collection-server ProfileLink 授权 + apiserver Assessment ownership”。
+因此配置/代码边界是“default-deny 方法 ACL + collection-server ProfileLink + 可配置委托签名/purpose + apiserver Assessment ownership”；目标环境启用与密钥状态仍需独立验证。
 新增内部调用者或 gRPC 方法时，必须同时更新客户端允许方法清单、生产 ACL 和契约测试，不能只依赖 QS OU。
 
 ### 7.4 列表与详情的差异
 
 - `GetMyReport` 会验证 Assessment 归属；
 - `ListMyReports` 只验证 Testee 存在，之后使用 TesteeID 过滤 Catalog；
-- collection-server 当前 ParticipantReportClient 只包装了 GetAssessmentReport，但 proto 已公开 `ListMyReports`。
+- collection-server ParticipantReportClient 包装 GetAssessmentReport 与只读 GetAssessmentReportStatus，各有独立签名 purpose；proto 的 ListMyReports 在该客户端和生产 ACL 中未开放。
 
-这使 `ListMyReports` 对可信 gRPC 调用者的要求更高：如果调用者可任意传 TesteeID，它可以直接枚举某个存在 Testee 的当前报告。
+启用 ListMyReports 前必须同时确认客户端、method ACL、委托 purpose 与真实 User→Testee 关系，不因 proto 存在就宣称活动入口可用。
+
+GetAssessmentReportStatus 在归属授权后使用原 Outcome 的冻结模板路由定位唯一 Generation及LatestRunID，并最多两轮复核 Outcome 内容身份/Generation版本。响应仅含 exists/status/attempt/retry_disposition，不提供输入、失败详情或治理权限。Collection在报告缺失时据此区分automatic/manual/terminal；succeeded Run单独不证明成品可见。源码与契约见[RuntimeStatusReader](../../../internal/apiserver/application/interpretation/participant/runtime_status.go)、[只读RPC](../../../internal/apiserver/transport/grpc/service/participant_report.go)；代码接线不代表M6当前部署或业务验收。
 
 ## 8. Clinician 入口退役与可见性策略
 
@@ -473,7 +471,7 @@ Assessment.status == evaluated
 
 Journey 先通过 Evaluation Operator Query 获得已授权 Assessment，然后才用 AssessmentID 检查报告存在。这一步不返回报告正文，只用它的 CreatedAt 建立组合状态。
 
-当前列表投影会对每一个 evaluated Assessment 单独调用一次 `GetReportByAssessmentID`，在大页面上形成 N+1 Catalog 查询。这是读模型性能上的明确改进项。
+生产 reader 提供 `BatchReportMetadataReader`；Journey 收集当前页 evaluated Assessment ID，一次读取当前报告 metadata，逐项形成组合状态，不加载报告正文。仅不具备批量能力的替换 reader 保留逐条 fallback，不能据此把生产路径写成 N+1。事实与单次批量读取测试见 [`journey/reportquery`](../../../internal/apiserver/application/journey/reportquery/)。
 
 ## 14. 当前安全不变量
 
@@ -506,17 +504,11 @@ Journey 先通过 Evaluation Operator Query 获得已授权 Assessment，然后�
 
 ## 15. 当前设计问题与风险
 
-### 15.1 Participant gRPC 没有端到端绑定 IAM User 与 Testee
+### 15.1 委托验证的目标环境启用证据
 
-当前安全性建立在“collection-server 必然先跑 ProfileLink middleware”的信任上，但 Participant gRPC 本身没有验证证据。生产配置的 mTLS OU 范围又大于单一 collection-server。
+当前已有 collection-server 签名与 apiserver purpose/Testee/workload 校验接线，生产 ACL 按方法限制调用。Participant Report 仍允许 verifier未启用的兼容配置；当前环境是否启用、密钥轮换/过期/降级与真实 User→Testee 拒绝场景不能从静态接线证明。
 
-建议的改造方向可以是下列之一，但需要在安全架构中统一选型：
-
-- 启用真正可加载规则的 gRPC method ACL，只允许 collection-server 调用 ParticipantReportService；
-- 传递可验证的终端 Principal / delegated subject，由 apiserver 再次校验 ProfileLink；
-- 将“已验证 Testee subject”建模为签名的内部授权上下文，而不是普通 request field。
-
-只启用 gRPC JWT 但仍不将 UserID 绑定 TesteeID，不能单独解决这个问题。
+保留 IR-R016 已接受边界，启用新内部调用者或收紧兼容时分别验证签名拒绝、调用身份、对象ownership与审计；不能仅启用未绑定Testee的gRPC JWT替代委托关系。
 
 ### 15.2 Audience 决策与实际入口
 
@@ -538,19 +530,11 @@ Administration 已使用 Access 返回的 Audience，不再按包名无条件指
 
 在没有真实产品需求前不需要预先构造复杂 RBAC，但至少应将每个已存在 Section 的业务理由、默认可见性和测试矩阵固化。
 
-### 15.4 Catalog 没有在读取时复验 Source 关联
+### 15.4 Catalog/Source 关联已在读取时复验
 
-Catalog 行中有 AssessmentID、OrgID 和 TesteeID，Artifact 正文也有同样的冻结关联。但当前 `loadCatalogRows` 只验证 SourceID 是否能加载，没有验证：
+loadCatalogRows 在组装 ReportRow 前用 SourceEnvelope 对比 AssessmentID、OrgID、TesteeID；缺正文返回 dangling source，关联错配返回 CatalogSourceAssociationMismatchError 并记录指标/日志。批量 metadata 也报告 mismatch，不能将错误来源投影为已有报告。
 
-```text
-catalog.assessment_id == body.assessment_id
-catalog.org_id        == body.org_id
-catalog.testee_id     == body.testee_id
-```
-
-这在正常成功事务中不会出问题，因为 Catalog 从同一 Artifact 投影并与它一起提交。但历史回填、人工修复或数据损坏如果把一个已授权 Assessment 的 Catalog 指向了其他人的正文，应用层可能在完成正确授权后返回错误的报告内容。
-
-这是需要优先补强的安全一致性边界。读模型应在组装 ReportRow 前对比 Catalog 与 Source envelope，不一致时返回专用错误并告警。
+这保护历史回填、人工修复和损坏场景，但不替代源数据治理。新增 source/schema及repair仍须保持同一不变量。事实入口：[artifact_read_model.go](../../../internal/apiserver/infra/mongo/interpretation/artifact_read_model.go)。
 
 ### 15.5 REST DTO 兼容映射遮蔽了真实内容契约
 
@@ -558,15 +542,15 @@ catalog.testee_id     == body.testee_id
 
 这不仅是“少几个字段”，而是对多测评模型统一报告契约的偏移。后续需要一个真正的 Report Response V2，且 V2 必须从 Audience-projected Report 映射，不能从 PO 重建另一套规则。
 
-### 15.6 Operations FindReport 在授权前加载了完整 Artifact
+### 15.6 Operations 先读最小metadata并授权
 
-当前对外没有返回正文，但严格的“authorize before content”原则仍未满足。这个问题可以通过轻量 ArtifactMetadataReader 解决，也可以将 OrgID 作为已授权查询条件。
+FindReport先读取ArtifactMetadata取得OrgID，再执行审计授权，通过后才加载完整Artifact；拒绝请求不能读取正文。事实入口：[operations/service.go](../../../internal/apiserver/application/interpretation/operations/service.go)。新治理查询继续遵守该顺序，不能通过先加载正文获取授权归属。
 
 ### 15.7 ReportRow 缺少安全与追溯包络
 
 ReportRow 当前有 AssessmentID，却没有 OrgID、TesteeID、SourceKind、SourceID、ReportID、ReportType 和 TemplateVersion。这导致：
 
-- 应用层无法对 Catalog 与正文关联做完整复验；
+- Transport 不能从 ReportRow 单独输出完整来源包络；读模型已通过独立 SourceEnvelope 完成关联复验；
 - 上层无法在审计日志中记录实际返回的 ReportID 和版本；
 - 无法告诉客户端返回的是 Artifact 还是 Archive 兼容结果；
 - 不利于对历史推导数据做风险标记。
@@ -584,11 +568,11 @@ ReportRow 当前有 AssessmentID，却没有 OrgID、TesteeID、SourceKind、Sou
 
 对普通 10–100 条页面，这可以是可接受的最终一致读取；对大型机构工作台，后续应评估基于 `(sort_at, sort_report_id, assessment_id)` 的 cursor pagination，以及将访问范围转为可查读模型，而不是一次传入大量 ID。
 
-### 15.9 Assessment 组合状态存在 N+1 查询
+### 15.9 组合状态使用当前页批量metadata
 
-Assessment 列表先从 Evaluation 取一页，再对每个 evaluated Assessment 单独查 Catalog。这会将一次列表变成 1+N 次存储访问。
+生产ReportQuery Journey先取得已授权Assessment页，再一次读取evaluated IDs的当前报告metadata，不加载正文；单次批量读取契约已有测试。不具备batch接口的替换reader才保留逐条fallback。
 
-比较合适的方向是 ReportReader 增加批量 existence / metadata 查询，或建立独立 Journey 状态投影，而不是让 Evaluation 聚合新增 `interpreted` 状态。
+新规模需用实际分页和机构容量验证该查询；无需把interpreted加入Evaluation聚合。事实入口：[journey/reportquery](../../../internal/apiserver/application/journey/reportquery/)。
 
 ## 16. 建议的目标授权模型
 

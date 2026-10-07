@@ -73,7 +73,7 @@ Report status signaling 使用 SDK UniversalClient Signaler，自行管理专属
 - Redis Pub/Sub 不保存离线消息；subscriber 断连期间的 Signal 可以丢失。
 - Watch decode 失败不能自动修复业务事实，应记录并等待下一次 Signal/TTL/查询。
 - subscriber context cancel 后退出；重连属于各进程 runtime 行为。
-- Signal 不使用 ACK/NACK、Outbox、relay、ready-index 或 event settlement。
+- Signal 不使用 ACK/NACK、Outbox、relay 或 event settlement；旧 Event ready-index 也已退役。
 
 这种 best-effort 是有意设计，不是尚未补齐的 Event 可靠性。缓存正确性必须仍由 TTL、版本、主动读取或下一次变更保证。
 
@@ -107,5 +107,5 @@ go test -count=1 ./internal/pkg/cache/... \
 `TestSignalsManifestAndCodeConstantsStayInSync` 能证明：Signal 名称、delivery、transport 与代码常量一致，
 并把清单中的 publisher/subscriber 列表与测试内硬编码的 expected topology 比较。它不会扫描 composition root、publisher 调用点或 subscriber watcher，因此不能单独证明真实运行时接线一致。
 
-本轮已人工反查 apiserver CacheSubsystem、collection-server CacheSubsystem 和 report-status runtime，五条 Signal 拓扑与 `configs/signals.yaml` 一致。
+接线复核入口为 apiserver CacheSubsystem、collection-server CacheSubsystem、Worker reporter 与 report-status runtime，需对照五条实际 publisher/watcher 和 `configs/signals.yaml`。
 新增或修改 Signal 时，除运行上述测试外，仍必须人工或通过新的架构测试核对真实 publisher/subscriber 接线；普通单元测试通过也不代表 Redis Pub/Sub 目标环境已经验收。

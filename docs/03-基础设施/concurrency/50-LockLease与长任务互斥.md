@@ -218,7 +218,7 @@ snapshot 当前不记录 caller override 或 active run 的 effective TTL；例�
 
 | 状态 | 内容 |
 | --- | --- |
-| `已实现` | 十四个 workload 的统一 catalog、token-safe acquire/renew/release、active run 和 cooldown。 |
+| `已实现` | 十二个 workload 的统一 catalog、token-safe acquire/renew/release、active run 和 cooldown。 |
 | `已实现` | renewal failure/loss 取消 body，并对不合作 body 告警。 |
 | `配置意图` | 仓库 dev/prod YAML 声明启用自动续租；仍需核对目标环境 effective value。 |
 | `观测缺口` | runtime snapshot 只投影 catalog DefaultTTL，不展示 caller override 或 active run effective TTL。 |

@@ -12,9 +12,9 @@ Statistics 不在业务请求内实时维护计数器，而是每天以上海时
 ```text
 权威业务数据
   → 可扩展 Data Collector
-  → Access / Assessment / Plan Fact
+  → Access / Assessment / Plan / StoreActivity Fact
   → Typed Projection Engine
-  → 四类 Daily + Organization Snapshot
+  → 五类 Daily + Organization Snapshot
   → Read Service / API / Generation-aware Cache
 ```
 
@@ -46,7 +46,7 @@ Statistics 不在业务请求内实时维护计数器，而是每天以上海时
 - 不保证实时 `today`；
 - 不建设 Metric DSL、独立统计服务、持久化扫描 Checkpoint 或通用事实大表。
 
-## 4. 三类业务事实
+## 4. 四类业务事实
 
 ### 4.1 Access Fact
 
@@ -63,23 +63,30 @@ Statistics 不在业务请求内实时维护计数器，而是每天以上海时
 履约另使用 revision-scoped 的 `task_schedule_defined` 和 `task_schedule_terminal`，避免 Plan 恢复后旧 canceled Fact 永久排除同一 Task。
 `PlanEnrollment` 是持久化业务概念，一轮参与是统计履约的最小上下文。
 
+### 4.4 StoreActivity Fact
+
+独立记录答卷提交和首次测评成功的历史开展量。Survey AnsweringStart 先冻结开展门店、归属版本与作答意图；Collector 读取答卷/Assessment 中的这份冻结上下文，
+不使用受试者当前门店倒推历史。未归属开始与旧客户端未捕获开始分别进入明确 unknown reason，不能回填成公司或当前门店。
+
 ## 5. 物理数据模型
 
-Statistics 拥有九张 canonical 表：
+Statistics 拥有十一张 canonical 表：四张 Fact、五张 Daily、一张 Organization Snapshot 和一张 SyncRun。
 
 | 分层 | 表 |
 | --- | --- |
 | Fact | `statistics_access_fact` |
 | Fact | `statistics_assessment_fact` |
 | Fact | `statistics_plan_fact` |
+| Fact | `statistics_store_activity_fact` |
 | Result | `statistics_access_daily` |
 | Result | `statistics_assessment_daily` |
 | Result | `statistics_plan_activity_daily` |
 | Result | `statistics_plan_fulfillment_daily` |
+| Result | `statistics_store_activity_daily` |
 | Result | `statistics_org_snapshot` |
 | Run | `statistics_sync_run` |
 
-Fact 保存发生时刻 `DATETIME(3)` 和上海业务日 `DATE`。Daily 未知维度使用技术桶 `0/''`，Fact 中未知业务身份保持 `NULL`。比率不落库，由 Read Service 根据分子和分母计算。
+前三类 Fact 保存 `DATETIME(3)`，StoreActivity 保存 `DATETIME(6)`；均保存上海业务日 `DATE`。Daily 未知维度使用技术桶 `0/''`，Fact 中未知业务身份保持 `NULL`。比率不落库，由 Read Service 根据分子和分母计算。
 
 ## 6. 运行模型
 
@@ -87,8 +94,8 @@ Fact 保存发生时刻 `DATETIME(3)` 和上海业务日 `DATE`。Daily 未知�
 
 1. 获取 Redis 分布式租约；
 2. 创建 `statistics_sync_run`；
-3. 三类 Collector 按 `(occurred_at,id)` 稳定分页采集 Fact；
-4. 在单一 MySQL 结果事务内执行五个 Projection；
+3. 四类 Collector 按来源时间与稳定身份采集；StoreActivity 的 Mongo cursor 和 MySQL keyset 各遵循来源合同；
+4. 在单一 MySQL 结果事务内执行四个 Daily Engine Projection 和两个 Global Engine Projection；
 5. 同一事务将 Run 标记为 `data_committed`；
 6. 提交后切换机构缓存 Generation；
 7. 预热 `latest_complete_day / 7d / 30d`，标记 `succeeded`。
@@ -102,12 +109,12 @@ Redis 锁不可用时失败关闭，不允许两个批次并发重建同一机�
 - `GET /api/v2/statistics/overview`
 - `GET /api/v2/statistics/clinicians`
 - `GET /api/v2/statistics/clinicians/{id}`
-- `GET /api/v2/statistics/clinicians/me/overview`
-- `GET /api/v2/statistics/clinicians/me/entries`
-- `GET /api/v2/statistics/clinicians/me/testees-summary`
 - `GET /api/v2/statistics/entries`
 - `GET /api/v2/statistics/entries/{id}`
 - `POST /api/v2/statistics/contents/batch`
+
+运营门店查询使用 `/api/v2/statistics/operations/overview`、`operations/stores` 和 `operations/analysis/{overview,clinicians,entries}`，
+按运营统计 read 与 action/StoreScope 校验。专业接口继续按各自管理员/测评统计权限保护。`/statistics/clinicians/me` 及其所有子路径已退役，返回 410。
 
 每个响应包含 `freshness.as_of_date / snapshot_at / is_stale`。没有成功 publish 时返回 `statistics_not_ready`，不伪造零值。
 
@@ -130,11 +137,12 @@ Redis 锁不可用时失败关闭，不允许两个批次并发重建同一机�
 | [22-核心设计-Projection-Engine、同步与最终一致性.md](./22-核心设计-Projection-Engine、同步与最终一致性.md) | 理解批次事务和失败恢复 |
 | [30-关键链路-从业务数据到统计查询.md](./30-关键链路-从业务数据到统计查询.md) | 从来源追踪到 API |
 | [40-统计指标与口径.md](./40-统计指标与口径.md) | 查阅指标定义、维度和分母 |
-| [90-设计问题与重构清单.md](./90-设计问题与重构清单.md) | 记录历史验收、后续优化与作答开始/开展门店详细设计 |
+| [90-设计问题与重构清单.md](./90-设计问题与重构清单.md) | 当前风险、已实现证据与待完成的运行验收 |
 
 旧的 V2-only 重构目标文档已在目标架构落实后退出 active 层。当前数据完成定义由 20 维护，Collector 规则由 21 维护，Projection/缓存/恢复由 22 维护，代码、运行与生产验收门槛统一由 90 维护；不得再从迁移期检查表反推当前完成状态。
 
-已确认的门店统计升级采用独立开始事实；[ST-011 详细设计](./90-设计问题与重构清单.md#15-st-011作答开始记录开展门店与客户端兼容)明确模型、接口、幂等、跨库传递及旧客户端兼容。状态为规划改造，不代表当前接口已开放。
+独立开始事实、提交传递和 StoreActivity 已实现。业务开始/提交契约归 [Survey](../10-survey/README.md)，历史开展 Fact 的口径在本模块10/20维护；
+[ST-011](./90-设计问题与重构清单.md#15-st-011作答开始记录开展门店与客户端兼容)只跟踪客户端兼容、迁移/发布与运行证据。代码接线不证明生产已部署或指标已发布。
 
 ## 9. 源码事实入口
 

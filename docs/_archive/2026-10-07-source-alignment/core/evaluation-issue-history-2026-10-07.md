@@ -1,0 +1,1119 @@
+# evaluation 问题台账历史快照（2026-10-07）
+
+> 历史资料：保存收口前完整正文。原文件为 docs/02-业务模块/30-evaluation/90-设计问题与重构清单.md，归档前原文 sha256=48876f3d70eb976570333c3c761a829f3376900c8395b67fde94c73e762f179d。
+> 相对链接已按归档位置重基；正文与历史结论保持原文。
+> 本快照中的“当前”“已发布”“已关闭”与生产样本仅属于原文的日期和证据边界，不代表本次 checkout 或部署；不进入现行事实阅读路径。
+
+# Evaluation 设计问题与重构清单
+
+> Scope 重构复核中：下文原有模块结论保留为既有基线。当前工作区已增加运营入口的动作、公司及门店范围检查；历史上线证据不覆盖这次范围切换，待最终源码复核及普通角色线上验收后重新签署。
+
+> 历史验收判定（2026-08-06）：当时为**有条件通过，无开放 `FINAL-P1`**。Assessment、Run、Outcome、checkpoint 与 durable event 主链成立，
+> 当时的生产五项一致性查询与 non-canonical run identity 均为 0；历史读归一化和治理入口按具名兼容观察保留。该查询、部署和生产结论没有针对当前 checkout、DecisionKind-only 路由或本轮文档差异重跑；
+> 当前版本证据以[当前版本定档验收台账](../../../00-总览/09-当前版本定档验收台账.md)为准。
+
+本次新增验收项 `SCOPE-ROLLOUT-REVIEW` 尚未关闭：完成最终代码版本复核、普通角色动作与门店范围正反场景、受试者转店历史访问权交接，以及策略/缓存/投影收敛后再签署。现有单元测试、MySQL 锁测试与历史生产记录分别保留，不相互替代。
+
+## 1. 本文的用法
+
+本文不再重述 Evaluation 架构，而是回答：
+
+1. 完成本轮领域模型与关键链路分析后，实际发现了哪些问题；
+2. 哪些问题会影响业务正确性或可靠恢复，哪些只是扩展性债务；
+3. 跨 Survey、ModelCatalog、Actor、Interpretation 的问题由谁保护哪一段语义；
+4. 后续开启单独重构时，应从哪个稳定编号开始，如何判断已经关闭。
+
+使用约定：
+
+- 后续分析报告、Issue、提交和 PR 优先引用 `EV-Rxxx`；
+- 实施前必须重新阅读当时源码、配置、migration 和真实数据；
+- 一次重构只处理已确认的有界范围；本轮 ModelCatalog → Evaluation → Outcome/ReportInput 切换明确采用 current-only 契约；
+- 不符合 current-only 契约的历史 Assessment、Outcome 或 ReportInput 在维护窗口备份后删除并重建，不增加读兼容或回填；
+- 问题修复后更新状态、实施证据、验收结果和剩余风险，不直接删除条目。
+
+---
+
+## 2. 30 秒结论
+
+Evaluation 的核心主干已经成立：
+
+```text
+AnswerSheet durable fact
+  -> Assessment intake
+  -> evaluation.requested
+  -> EvaluationRun claim / lease
+  -> exact InputSnapshot
+  -> RuntimeDescriptor
+  -> Calculation
+  -> Outcome reliable commit
+  -> evaluation.outcome.committed
+```
+
+EV-R001、EV-R003、EV-R004、EV-R005、EV-R007、EV-R008、EV-R009、EV-R012、EV-R013、EV-R014、EV-R017 已完成技术验收；其余当时“待生产复验”的主链条目已由当前生产一致性盘点、严格路由部署与运行巡检补齐版本级证据。
+
+当前剩余工作收敛为三类非阻断治理：
+
+1. **具名兼容观察**：历史读归一化、无冻结 admission 回退等只服务存量，按指标观察至 2026-09-05，窗口完成也不自动授权删除；
+2. **运行证据持续积累**：Lease 时长、真实并发、容量和人工恢复演练继续作为黄色运行证据，不推翻当前主链成立；
+3. **按真实需求启动的演进项**：模型专用读模型、下一代 ReportInput schema identity 和 Outcome 防篡改暂不提前建设。
+
+下文保留 2026-07-23 的条目状态和实施细节，作为演进记录；其中“待 24h/7 天/14 天”是当时的退出条件，不是当前仍开放的 `FINAL-P1`。
+
+治理原则是：
+
+> 先关闭会让系统创建错误业务事实、选错执行输入或错误终止重试的问题；再强化快照、恢复和可观测性；最后才调整 pipeline 接口和投影结构。
+
+---
+
+## 3. 优先级与状态
+
+### 3.1 优先级
+
+| 级别 | 含义 | 判定标准 |
+| --- | --- | --- |
+| P0 | 业务事实、结果正确性或可靠恢复风险 | 可能创建无意义 Assessment、使用非预期发布版本、选错常模或将瞬时故障变成 terminal |
+| P1 | 执行可追溯性、状态契约和自动恢复能力 | 不一定立即算错，但会降低故障恢复和历史审计可信度 |
+| P2 | 扩展性、可维护性和运行时噪声 | 新机制接入需多点修改，接口不表达真实依赖，或运维难以分类故障 |
+| P3 | 需要真实业务或合规要求才启动 | 内容 hash、更强 append-only 保护等成本应由审计需求驱动 |
+
+这些级别属于 `EV-Rxxx` 模块风险命名空间；关闭后仍保留原等级以记录风险，不与 `FINAL-P*` 互换。
+
+### 3.2 状态
+
+| 状态 | 含义 |
+| --- | --- |
+| 规划改造 | 当前源码已能确认问题，尚未实施 |
+| 待补证据 | 需要生产数据、延迟分布或部署证据确认真实影响 |
+| 待业务决策 | 技术方案可实现，但仍缺必要的产品或合规语义 |
+| 已实现待验收 | 代码已修改，但还缺数据、故障注入或生产观测证据 |
+| 已关闭 | 代码、数据、测试、消费方和文档都已完成，无剩余必做项 |
+
+---
+
+## 4. 重构总表
+
+> 表内保留 2026-07-23 条目级实施状态，用于追溯原问题；当前生产版本判定见页首和总定档台账。后续重新启动任一条目时必须先按当前 checkout 与数据复核，不能直接沿用旧等待时长。
+
+| ID | 优先级 | 问题 | 状态 | 主要影响面 |
+| --- | --- | --- | --- | --- |
+| EV-R001 | P0 | 答卷可靠受理时未冻结测评意图与 Assessment release | 已关闭（2026-07-23，已提交并部署） | Survey → ModelCatalog → Evaluation 准入 |
+| EV-R002 | P0 | 独立 Questionnaire 仍创建 unbound pending Assessment | 已实现待验收（来源分流整改完成，待生产复验） | Assessment、Plan、report-status |
+| EV-R003 | P0 | `Assessment.Submit()` 未在聚合内强制 ModelRef | 已关闭（2026-07-23，技术验收通过且已部署） | 领域不变式、`evaluation.requested` |
+| EV-R004 | P0 | 输入解析错误统一落为不可重试 validation | 已关闭（2026-07-23，已提交并部署） | 业务重试与故障恢复 |
+| EV-R005 | P0 | NormSubject 尚未进入统一 InputSnapshot 物化链 | 已关闭（2026-07-23，技术验收通过且已部署） | 行为评定与常模结果 |
+| EV-R006 | P1 | Assessment Intake 查询未严格区分 NotFound 与依赖错误 | 已实现待验收（指标已补，待 24h 生产复验） | 幂等创建、可观测性 |
+| EV-R007 | P1 | assessment-readiness 把“Assessment 存在”当成“测评就绪” | 已关闭（2026-07-23，已提交并部署） | collection-system 轮询契约 |
+| EV-R008 | P1 | Evaluation 仍从模型身份兼容推导 DecisionKind / ModelRoute | 已关闭（2026-07-23，技术验收通过且已部署） | 精确版本执行、新 family 准入 |
+| EV-R009 | P1 | InputSnapshotRef 只是可读引用，不能证明完整输入内容 | 已关闭（2026-07-23，isn:v2-only 技术验收通过且已部署） | Run/Outcome 审计与重放 |
+| EV-R010 | P1 | EvaluationRun 默认 2 分钟 Lease 没有通用 heartbeat | 已实现待验收（保留 2min Lease；时长/预算指标已挂；不引入 heartbeat） | 长时认知任务、重复计算 |
+| EV-R011 | P1 | 一致性审计未覆盖 Assessment/Run/Outcome/Projection/Outbox 矩阵 | 已实现待验收（完整只读矩阵已补，待生产扫描） | 数据漂移发现与人工补偿 |
+| EV-R012 | P1 | Outcome v0/v1 与缺失 ReportInput 的退出路径未完成 | 已关闭（2026-07-23，current-only 已提交并部署） | 历史查询、Interpretation 输入 |
+| EV-R013 | P2 | InputAssembler 签名与真实输入职责不一致 | 已关闭（2026-07-23，技术验收通过且已部署） | Assemble(ExecutionInput)；四 family Calculator 读 calcInput.Execution |
+| EV-R014 | P2 | 新 AlgorithmFamily 需多处同步注册 | 已关闭（2026-07-23，RequiredFamilyManifest 技术验收通过且已部署） | Provider、Descriptor、Pipeline 扩展 |
+| EV-R015 | P2 | Worker 在回读 canonical Assessment 前用事件 payload 判断 NeedsEvaluation | 已实现待验收（payload gate 分类；不再早 ACK） | legacy 事件、静默 ACK |
+| EV-R016 | P2 | active Run claim 的重复消息会形成保守 NACK 噪声 | 证据已回填（决策：不改 ACK/requeue；另见 running 无 lease 脏数据） | MQ redelivery、Worker 压力 |
+| EV-R017 | P2 | internal gRPC 错误码过粗 | 已关闭（2026-07-23，toEvaluationGRPCError 技术验收通过且已部署） | Worker settlement 与运维定位 |
+| EV-R018 | P2 | `assessment_score` 仍是量表因子形状的查询投影 | 待业务查询需求 | 人格、行为、认知结果查询 |
+| EV-R019 | P2 | ReportInput 没有独立 format/schema identity | 待第二种不兼容结构 | Outcome 到 Interpretation 的冻结输入 |
+| EV-R020 | P3 | Outcome 不可变主要依赖应用接口和数据库权限 | 待合规决策 | 防篡改、审计、长期归档 |
+
+---
+
+### 4.1 本轮关闭记录
+
+| 条目 | 关闭依据 | 关闭后保留的运行关注点 |
+| --- | --- | --- |
+| EV-R001 | 双 validation mode、active/retained reader、Journey 来源映射、fail-closed 测试与活动文档均已完成；维护者确认已提交并部署 | 继续观察 frozen admission 创建失败率和非法 mode；出现异常按独立批次回滚 |
+| EV-R004 | Actor/ModelCatalog dependency taxonomy、四 family canonical 错误传播、cause 保留与执行链测试均已完成；维护者确认已提交并部署 | 继续观察 dependency retry、重试耗尽与风暴指标；MQ settlement 语义未改变 |
+| EV-R007 | 服务端四状态、collection-system 分流、页面恢复/失败行为、Node 16 UI/contract/typecheck 与接入文档均已完成；维护者确认已提交并部署 | 继续观察未知 phase、`ready` 缺 ID 和 readiness failure；客户端仍可独立回滚 |
+| EV-R012 | Outcome schema 2 / ReportInput schema 3 current-only、空输入全局 fail-closed、codec/Interpretation/commit 测试与维护门禁定义均已完成；维护者确认已提交并部署 | 后续禁止重新引入 current-catalog fallback、旧 schema decoder 或静默兼容 |
+| EV-R003 | 聚合在 Submit/Retry 时强制 Questionnaire、AnswerSheet、Model 完整；失败不迁移状态、不发事件；目标包和关键 race 通过，维护者确认已部署 | 继续监控非法提交，但不再允许应用层绕过聚合准入 |
+| EV-R005 | NormSubject 按 Assessment 时点物化，nil/零月龄、四 family golden、identity 和 Outcome 保真均通过；维护者确认已部署 | Actor 人口学修订只能通过受控 force retry 形成新的 v2 identity |
+| EV-R008 | RuntimeResolver 只消费冻结 DecisionKind，缺失/非法路由 fail-closed，禁止回退；维护者确认已部署 | 新 family 仍须先满足 DecisionKind 映射、descriptor 与发布能力门禁 |
+| EV-R009 | `isn:v2` 摘要、确定性排序、Run/Outcome 同一引用和重试漂移拒绝均通过；维护者确认已部署 | 禁止重新接受 v1、可读 label 或畸形 v2 引用 |
+| EV-R013 | 四 family 已显式传递 CalculationInput，旧 Context 输入 API 不存在；维护者确认已部署 | 后续 Calculator 不得恢复隐藏 Context 依赖 |
+| EV-R014 | RequiredFamilyManifest 覆盖四个稳定 family，descriptor/path/pipeline 缺失均启动失败；维护者确认已部署 | 新 family 通过 manifest 单点准入，不引入动态插件机制 |
+| EV-R017 | internal gRPC 分类和安全消息测试通过，不泄露 SQL/cause；维护者确认已部署 | 保持 Worker settlement 只依赖稳定 gRPC code |
+
+### 4.2 未完成项汇总
+
+当前仍有 **9 项未关闭**：
+
+- **5 项已实现待验收**：EV-R002、EV-R006、EV-R010、EV-R011、EV-R015；其中 EV-R002/R006/R011 已完成本地整改，仍需生产复验，EV-R010/R015 等待生产窗口证据；
+- **1 项证据结论为暂不改**：EV-R016。当前没有 active lease 争用证据，不修改 ACK/requeue；running 且无 lease 的历史脏数据应另开治理项；
+- **3 项按需求触发**：EV-R018 等待人格/行为/认知查询需求，EV-R019 等待第二种不兼容 ReportInput，EV-R020 等待明确合规要求。
+
+建议按以下顺序继续收口：
+
+1. **先完成生产复验**：EV-R002 连续 7 天无新增异常 unbound；EV-R006 指标观察 24h；EV-R011 完整扫描并观察 24h；
+2. **再收口生产证据项**：EV-R010 回填最近 7 天 lease 预算证据；EV-R015 等 `legacy_incomplete` 连续 14 天为零后再移除兼容分支；
+3. **保持 EV-R016 现状**：不修改 ACK/requeue，不与历史 running 无 lease 脏数据混做；
+4. **最后保留需求驱动项**：EV-R018、EV-R019、EV-R020 在启动条件出现前不排实现批次。
+
+---
+
+## 5. P0：先保护测评事实与可靠恢复
+
+### EV-R001：在可靠受理事实中冻结测评意图与 release
+
+**状态**：已关闭（2026-07-23，已提交并部署）
+
+#### EV-R001 当前事实（改造后）
+
+- 答卷提交时通过 `AssessmentBindingResolver` 解析并冻结 `Admission` 写入 `SubmissionContext` 与 `AnswerSheetSubmittedData.admission`（omitempty，兼容旧事件）；
+- Worker → gRPC `EnsureAssessmentRequest.admission` → Journey 优先消费冻结事实（`admission_source=frozen_admission`）；
+- 无 admission 的 legacy 事件仍走 live binding（`admission_source=legacy_binding`）；
+- Intake 以 `ModelValidationMode` 明确区分准入边界：冻结 Admission 使用 `retained_exact` 读取保留的精确 release，legacy/live binding 使用 `active_release`；
+  非法 mode 或选中 reader 未装配时 fail closed，不跨模式降级；
+- `purpose=assessment` 但 model identity 不完整时 fail closed；`independent_questionnaire` 不创建 Assessment。
+
+#### EV-R001 实施证据
+
+- [`answersheet.Admission`](../../../../internal/apiserver/domain/survey/answersheet/admission.go)
+- [`submissionService.resolveAdmission`](../../../../internal/apiserver/application/survey/answersheet/admission.go)
+- [`applyAdmissionOrBinding`](../../../../internal/apiserver/application/journey/assessmentintake/service.go)
+- 测试：
+  `TestPublishedModelValidatorAcceptsFrozenRetainedReleaseAfterArchive`、
+  `TestPublishedModelValidatorUsesActiveReleaseBoundaryForEveryKind`、
+  `TestEnsureFrozenAdmissionIgnoresLiveBindingVersionDrift`、`TestEnsureBoundAnswerSheetCreatesAndAutoSubmits`
+
+#### EV-R001 关闭记录
+
+- 代码、服务端测试、双 reader 装配、Survey/Evaluation 活动文档已经同步；
+- 维护者于 2026-07-23 确认本项修改已提交并部署；
+- 未新增数据库、proto、事件或兼容读写字段。
+
+#### EV-R001 证据
+
+- [`AnswerSheetSubmittedData`](../../../../internal/pkg/eventing/payload/answersheet.go)
+- [`assessmentintake.Service`](../../../../internal/apiserver/application/journey/assessmentintake/service.go)
+- [Survey 从作答事实到测评执行](../../../02-业务模块/10-survey/32-关键链路-从作答事实到测评执行.md)
+
+### EV-R002：独立 Questionnaire 不应创建 Assessment
+
+**状态**：已实现待验收（来源分流整改完成，待 7 天生产复验）
+
+#### EV-R002 当前事实（改造后）
+
+Journey 的 `Ensure` 在 `bound=false` 时：
+
+- 无已有 Assessment：不调用 `CreateForAnswerSheet`，不写 queued report-status，不匹配/完成 Plan，返回 `AssessmentID=0`（日志 `no_assessment_required`）；
+- 已有历史空壳 Assessment：幂等复用，不自动 Submit、不完成 Plan。
+
+`bound=true` 路径仍创建/复用并自动提交。
+
+来源边界已补齐：
+
+- frozen Admission 明确为 `independent_questionnaire` 时才走正常无 Assessment 结束；
+- legacy event 没有 Admission 时才允许读取 live binding；
+- binding resolver 未装配返回 `ModuleNotConfigured`；
+- legacy live binding 查无结果返回 `legacy_unclassified`，不再解释为 independent；
+- 新增只读 [`audit_evaluation_r002_unbound.sql`](../../../../scripts/oneoff/audit_evaluation_r002_unbound.sql)，
+  按状态盘点历史 model identity 不完整 Assessment，不执行自动修复。
+
+#### EV-R002 目标设计
+
+```text
+independent_questionnaire
+  -> base question score derived
+  -> no Assessment
+  -> no Plan assessment completion
+  -> no queued report status
+  -> journey result = no_assessment_required
+
+assessment + exact release
+  -> create/reuse Assessment
+  -> submit
+  -> complete Plan Task best-effort
+  -> queued report status
+
+assessment but release unavailable
+  -> explicit governed failure
+  -> retry/manual compensation
+```
+
+#### EV-R002 验收条件
+
+- independent 答卷只保留 AnswerSheet 与基础题分；
+- 不创建 Assessment，不发 `evaluation.requested`；
+- `answersheet.submitted` 重放仍幂等；
+- Plan 与 report-status 只在真正 Assessment 建立后更新；
+- 现有 unbound pending Assessment 有先审计、后迁移/归档的处置方案。
+
+#### EV-R002 剩余生产门槛
+
+- 执行只读盘点并为每条历史记录确定保留、归档或维护窗口重建处置；
+- 部署后连续 7 天没有新产生的异常无绑定 Assessment；
+- assessment、independent、legacy_unclassified、resolver missing 与 replay 路径的生产行为和告警符合预期。
+
+#### EV-R002 实施证据
+
+- [`assessmentintake.Service.Ensure`](../../../../internal/apiserver/application/journey/assessmentintake/service.go)
+- 单元测试：
+  `TestEnsureUnboundAnswerSheetEndsWithoutCreatingAssessment`、
+  `TestEnsureIndependentReplayReusesLegacyAssessmentWithoutSubmit`、`TestEnsureLegacyMissingBindingResolverFailsClosed`、
+  `TestEnsureLegacyWithoutLiveBindingIsUnclassified`
+
+#### EV-R002 跨模块关系
+
+本项与 ModelCatalog `MC-R001` 指向同一业务问题。ModelCatalog 保护“问卷是否存在可执行 release”；Evaluation 保护“只有明确测评意图才创建 Assessment”。
+
+### EV-R003：把 ModelRef 准入收回 Assessment 聚合
+
+**状态**：已关闭（2026-07-23，技术验收通过且已部署）
+
+#### EV-R003 当前事实（改造后）
+
+`Assessment.Submit()` 与 `RetryFromFailed()` 通过 `ensureReadyForEvaluationRequest()` 强制：
+
+```text
+QuestionnaireRef 非空
+AnswerSheetRef 非空
+HasEvaluationModel() == true
+```
+
+违反时返回 `ErrNoEvaluationModel` / `ErrInvalidArgument`，不迁移状态、不发 `evaluation.requested`。`ResumeForExecutionRetry` 不发事件，保持原语义。
+
+#### EV-R003 实施证据
+
+- [`Assessment.ensureReadyForEvaluationRequest`](../../../../internal/apiserver/domain/evaluation/assessment/assessment.go)
+- 单元测试：`TestSubmitAndRetryRejectUnboundAssessment`、`TestServiceRejectsSubmitForEvaluationWithoutModel`
+
+#### EV-R003 关闭记录
+
+- 聚合和应用层目标测试、受影响 package cluster 与关键 race 均通过；
+- 维护者确认当前实现已经部署；
+- 未改变事件、数据库或外部 API 契约。
+
+#### EV-R003 证据
+
+- [`Assessment.Submit`](../../../../internal/apiserver/domain/evaluation/assessment/assessment.go)
+- [`Evaluation Intake`](../../../../internal/apiserver/application/evaluation/intake/service.go)
+
+### EV-R004：区分语义错误与瞬时依赖故障
+
+**状态**：已关闭（2026-07-23，已提交并部署）
+
+#### EV-R004 当前事实（改造后）
+
+`ResolveError` 增加 `retryable` 与 `dependencyCategory`；基础设施错误使用 `FailureKindDependencyUnavailable` + `NewDependencyResolveError`。
+Actor 常模读取错误分类为 `actor` dependency；scale、typology、behavioral、cognitive 的 canonical ModelCatalog reload 错误分类为 `modelcatalog` dependency 并立即向上传播。
+明确 NotFound、DefinitionV2 缺失等语义缺口仍保持 terminal/fail-closed。Engine 通过 `runFailureFromInputResolveError` 映射为
+`evalrun.FailureKindDependency`（可重试），语义错误仍为 validation+terminal；`context.Canceled/DeadlineExceeded` 保留在 error chain 中且不 finalize。
+
+#### EV-R004 实施证据
+
+- [`NewDependencyResolveError`](../../../../internal/apiserver/port/evaluationinput/input.go)
+- [`runFailureFromInputResolveError`](../../../../internal/apiserver/application/evaluation/execute/evaluation_workflows.go)
+- 测试：
+  `TestCanonicalAttachClassifiesAllModelCatalogFailuresAsRetryable`、
+  `TestResolveNormSubjectPreservesCanceledDependencyCause`、
+  `TestBehavioralRatingProviderClassifiesNormSubjectReaderFailureAsRetryableActorDependency`、
+  `TestRunFailureFromInputResolveErrorClassifiesRetryability`
+
+#### EV-R004 关闭记录
+
+- 输入解析、执行、Worker 与关键 race 测试已经通过；
+- 维护者于 2026-07-23 确认本项修改已提交并部署；
+- EvaluationRun retry budget、RetryDecision、Worker ACK/NACK 与 MQ redelivery 语义保持不变。
+
+#### EV-R004 证据
+
+- [`evaluationinput.ResolveError`](../../../../internal/apiserver/port/evaluationinput/input.go)
+- [`evaluationInputWorkflow`](../../../../internal/apiserver/application/evaluation/execute/evaluation_workflows.go)
+- [`execute.Service`](../../../../internal/apiserver/application/evaluation/execute/service.go)
+
+### EV-R005：补齐 NormSubject 物化链
+
+**状态**：已关闭（2026-07-23，与 ModelCatalog `MC-R002` 同批技术验收通过且已部署）
+
+#### EV-R005 当前事实（改造后）
+
+- `InputRef` 携带 `TesteeID` + `AsOf`（来自 Assessment）；
+- `BehavioralRating` / `Cognitive` provider 通过 `NormSubjectReader`（Actor TesteeQuery）装配 `NormSubjectSnapshot`；
+- AgeMonths 按 `Assessment.SubmittedAt` 计算；`SubmittedAt/AsOf` 缺失时保持未知，不使用当前时间；
+- `AgeMonths=nil` 与已知 `0` 月龄严格区分；
+- 输入引用只接受 `isn:v2:<64-hex>`，摘要冻结人口学字段的存在性和值；旧 v1、可读 label 与畸形 v2 均终态拒绝；
+- automatic/manual/lease recovery 必须保持引用一致；`evaluation.force_retry` 只允许 v2→v2 修订，并记录 previous/current ref、action request ID 和 attempt origin；
+- Calculation 通过统一 resolver 返回 specific/generic 或四类精确终态失败（见 `MC-R002`）。
+
+#### EV-R005 切换与治理边界
+
+- 不回填或兼容历史 v1 引用；旧 Assessment/Outcome 由维护窗口备份后删除并重建；
+- 不把出生日期或人口学明文写入 EvaluationRun；
+- 旧 Outcome 不自动改写或重算，只通过只读审计评估影响。
+
+#### EV-R005 目标设计
+
+1. 从 Actor 权威事实读取出生日期与性别；
+2. 按 Assessment/AnswerSheet 的发生时间计算 AgeMonths，不按查询当天计算；
+3. 将人口学快照纳入 InputSnapshot 与可验证快照引用；
+4. 缺失必需人口学数据时，按发布策略明确拒绝或使用 generic fallback，不隐式匹配。
+
+#### EV-R005 验收条件
+
+- 年龄上下界、性别、出生日期缺失、generic fallback 均有 golden test；
+- 评分结果能回答实际使用哪个 Norm version/band；
+- 历史重试不会因受试者当前年龄增长而改变分层。
+
+#### EV-R005 实施证据
+
+- [`inputRefFromAssessment`](../../../../internal/apiserver/application/evaluation/execute/input_ref.go)
+- [`NewNormSubjectReader`](../../../../internal/apiserver/container/modules/evaluation/norm_subject.go)
+- [`BehavioralRatingModelInputProvider`](../../../../internal/apiserver/infra/evaluationinput/behavioral_rating_provider.go)
+- [`input_snapshot_ref.go`](../../../../internal/apiserver/application/evaluation/execute/input_snapshot_ref.go)
+- [`runFailureFromExecutionError`](../../../../internal/apiserver/application/evaluation/execute/evaluation_workflows.go)
+- 测试覆盖必需 Norm 失败无 Outcome、Actor 修正后 force v2 修订和正确 cohort 命中。
+
+#### EV-R005 跨模块关系
+
+ModelCatalog `MC-R002` 负责 Norm 匹配语义与发布约束；Actor 负责人口学事实；Evaluation 负责在正确时点物化并传入 Calculation。
+
+#### EV-R005 关闭记录
+
+- 年龄边界、已知零月龄/未知、generic fallback、四 family norm、identity 和 Outcome 保真测试通过；
+- 历史重试使用 Assessment 时点，不受当前年龄增长影响；
+- 维护者确认当前实现已经部署。
+
+---
+
+## 6. P1：执行可追溯性、契约与恢复
+
+### EV-R006：只有明确 NotFound 才能进入 Create
+
+**状态**：已实现待验收（指标已补，待 24h 生产复验）
+
+#### EV-R006 当前事实（改造后）
+
+- Repo `FindByAnswerSheetID`/`FindByID` 在 `gorm.ErrRecordNotFound` 时同时 wrap domain `assessment.ErrNotFound` + `code.ErrAssessmentNotFound`；
+- Intake `FindByAnswerSheetID` 仅对 NotFound 映射 `AssessmentNotFound`，其它错误 `Database` 透传；
+- Journey `Ensure` 按 `found | not_found | dependency_error` 三分支：依赖错误直接 return，不 Create；duplicate 后再查同样分类；
+- 日志字段：`find_result`、`duplicate_hit`；
+- 指标：`qs_evaluation_assessment_intake_lookup_total{result="found|not_found|dependency_error|duplicate_hit"}`。
+
+#### EV-R006 实施证据
+
+- [`assessment_repository.FindByAnswerSheetID`](../../../../internal/apiserver/infra/mysql/evaluation/assessment_repository.go)
+- [`intake.FindByAnswerSheetID`](../../../../internal/apiserver/application/evaluation/intake/service.go)
+- [`assessmentintake.Ensure`](../../../../internal/apiserver/application/journey/assessmentintake/service.go)
+- 测试：`TestEnsureFindDependencyErrorDoesNotCreate`、`TestEnsureNotFoundCreatesBoundAssessment`、duplicate+再查成功/依赖失败
+
+#### EV-R006 剩余生产门槛
+
+- staging 故障注入证明 dependency_error 后不调用 Create；
+- 部署后观察 24 小时，`sum(increase(qs_evaluation_assessment_intake_lookup_total[24h])) by (result)` 的四类指标与日志一致；
+- 不存在依赖故障被统计或处理为 NotFound。
+
+#### EV-R006 验收条件
+
+- repository NotFound 有稳定 sentinel/code；
+- timeout 时 Create 不被调用；
+- 并发 duplicate-then-read 仍解析为同一 Assessment；
+- 日志和指标可分辨 not_found、duplicate_hit 和 dependency_error。
+
+### EV-R007：重新定义 assessment-readiness
+
+**状态**：已关闭（2026-07-23，已提交并部署）
+
+#### EV-R007 当前事实（改造后）
+
+- AnswerSheet Mongo PO 持久化 `admission`（与 Submit 同写），读模型重建 `SubmissionContext.Admission`；
+- gRPC `ResolveAssessmentByAnswerSheetIDResponse` 携带 `readiness_phase` / `assessment_status` / `failure_reason`；
+- Apiserver Resolve 映射：`submitted|evaluated`→`ready`，`pending`→`pending`，`failed`→`failed`；无 Assessment 时按 Admission：
+  `independent_questionnaire`→`no_assessment_required`，否则 `pending`；
+- collection `GetAssessmentReadiness` 按 phase 设 `next_poll_after_ms`（pending/未知=2000；ready/no_assessment_required/failed=0）；
+  legacy NotFound 仍兼容为 pending。
+- collection-system 原样消费四状态：只有 `pending` 继续轮询；`ready` 才进入 report-status/WS；`no_assessment_required` 清理提交上下文并跳回答卷详情；
+  `failed` 显示 readiness 原因且不调用报告接口。未知状态和 `ready` 缺少 `assessment_id` 均按协议错误处理。
+
+#### EV-R007 实施证据
+
+- [`AnswerSheetPO.Admission`](../../../../internal/apiserver/infra/mongo/answersheet/po.go)
+- [`ResolveAssessmentByAnswerSheetID`](../../../../internal/apiserver/transport/grpc/service/assessment_intake.go)
+- [`GetAssessmentReadiness`](../../../../internal/collection-server/application/answersheet/submission_service.go)
+- 测试：服务端
+  `TestResolveAssessmentByAnswerSheetIDReadinessPhases`、`TestAssessmentReadinessPendingByPhase`、
+  `TestAssessmentReadinessNoAssessmentRequired`、`TestAssessmentReadinessFailed`；
+  前端 `answersheetApi.test.js`、`waitAssessmentReportLifecycle.test.js`、`assessmentWaitResume.test.js`
+
+#### EV-R007 关闭记录
+
+- 服务端、collection-server、collection-system 与三份接入文档已经同步；
+- Node 16 UI、contract、strict typecheck 与两仓 diff 检查已经通过；
+- 维护者于 2026-07-23 确认本项修改已提交并部署。
+
+#### EV-R007 验收条件
+
+- gRPC response 携带稳定 readiness phase，不只有 ID；
+- collection-server 对每种 phase 有明确 polling/terminal 策略；
+- 安全校验仍保护 writer/testee 关系；
+- 兼容窗口内旧客户端不会因新状态无限轮询。
+
+#### EV-R007 证据
+
+- [`ResolveAssessmentByAnswerSheetID`](../../../../internal/apiserver/transport/grpc/service/assessment_intake.go)
+- [`GetAssessmentReadiness`](../../../../internal/collection-server/application/answersheet/submission_service.go)
+
+### EV-R008：严格消费发布时冻结的 DecisionKind
+
+**状态**：已关闭（2026-07-23，技术验收通过且已部署）
+
+#### EV-R008 当前事实（改造后）
+
+- Published DefinitionV2 发布时解析/校验 AlgorithmFamily 与 DecisionKind，Mongo snapshot 冻结 DecisionKind；InputSnapshot 缺少 DecisionKind 时 fail closed；
+- `RuntimeResolver` 不回退 Assessment ModelRef，不从 Kind/Algorithm/PayloadFormat 推导缺失 DecisionKind；
+- Descriptor Registry 只按 `DecisionKind` 精确匹配七个已注册 route，注册时校验 descriptor.AlgorithmFamily 与 DecisionKind 映射，不提供 format 级或 family 级 fallback；
+- `CompatibilityResolver`、compat metrics、PayloadFormat 和 RuntimeMeta backfill 已删除。
+
+#### EV-R008 实施证据
+
+- [`runtime_resolver.go`](../../../../internal/apiserver/application/evaluation/execute/runtime_resolver.go)
+- [`descriptor/registry.go`](../../../../internal/apiserver/application/evaluation/runtime/descriptor/registry.go)
+- 测试：`TestRuntimeResolverRejectsFrozenRouteWithoutFallingBackToAssessment`、descriptor exact-match/capability matrix tests。
+
+#### EV-R008 跨模块关系
+
+ModelCatalog `MC-R006` 负责发布期 RuntimeIdentity 校验并冻结 canonical DecisionKind，`MC-R014` 负责 capability 同源；
+Evaluation 负责严格消费 DecisionKind、派生 family 并退出正常路径 fallback。
+
+#### EV-R008 关闭记录
+
+- frozen route 缺失、非法 route、descriptor exact match 和 capability matrix 测试通过；
+- 受影响 package cluster 与关键 race 通过，维护者确认当前实现已经部署；
+- 不保留 Assessment、format 或 family fallback。
+
+### EV-R009：让 InputSnapshotRef 能证明实际执行输入
+
+**状态**：已关闭（2026-07-23，isn:v2-only 技术验收通过且已部署）
+
+#### EV-R009 实施计划
+
+- EV-R009 已实施，独立实施说明已从现行树归档；当前结论重新以源码、机器契约和[版本验收台账](../../../00-总览/09-当前版本定档验收台账.md)为准。
+
+#### EV-R009 实施结果（2026-07-21）
+
+- 唯一合法的 `input_snapshot_ref` 为 `isn:v2:<sha256 composite digest>`（71 字符，VARCHAR(200) 内）；
+- `InputSnapshotIdentity`（[`port/evaluationinput/identity.go`](../../../../internal/apiserver/port/evaluationinput/identity.go)
+  ）：白名单语义字段、显式 field order、长度前缀防拼接歧义、答案按 QuestionCode 排序，不依赖 map 遍历顺序；
+- v2 明确编码 NormSubject 年龄是否存在、年龄值和性别；年龄按 `Assessment.SubmittedAt` 冻结；
+- Outcome commit 复制 Run 同一 ref（`committer.go` 既有行为），Run 内二次 Attach 不同 ref 仍由 `ErrInputSnapshotConflict` 拒绝；
+- automatic/manual/lease recovery 跨 attempt 必须保持 v2 引用完全一致；漂移时 terminal validation 失败，不静默重算；
+- force 只允许 v2→v2 修订，并保留 previous/current ref、action request ID、origin；任何 v1、`model:`、`answersheet:` 或畸形 v2 即使 force 也拒绝；
+- 测试覆盖全部语义成分变化、答案顺序稳定性、普通重试漂移拒绝、旧 ref 拒绝与 force 审计。
+
+#### EV-R009 身份边界
+
+应先定义可验证的 composite identity：
+
+```text
+model snapshot id/version/digest
+questionnaire code/version/digest
+answersheet id/content digest
+norm table/version
+subject snapshot presence/value digest
+```
+
+具体可以是结构化 `InputSnapshotIdentity` 加 composite hash，而不是把所有 JSON 再存一遍。
+
+#### EV-R009 验收条件
+
+- 任一成分变化都会形成不同引用；
+- Run 和 Outcome 保留同一 snapshot identity；
+- 重试能验证重新物化内容与原引用一致；
+- 算法不依赖 JSON map 的非稳定序列化顺序；
+- 在引入 hash 前明确哪些字段属于语义内容。
+
+#### EV-R009 关闭记录
+
+- 所有身份成分变化、答案顺序稳定、Run/Outcome 同一引用、普通重试漂移拒绝和 force 审计测试通过；
+- 受影响 package cluster 与关键 race 通过，维护者确认当前实现已经部署；
+- current-only 边界不接受 v1、可读 label 或畸形 v2。
+
+### EV-R010：为长执行建立 Lease 策略
+
+**状态**：已实现待验收（2026-07-21：保留 2min Lease；挂时长/预算指标；不引入 heartbeat）
+
+#### EV-R010 当前事实
+
+EvaluationRun 默认 Lease 为 2 分钟。Engine 在 Claim 时一次设置 `lease_until`，随后解析 InputSnapshot、计算并提交 Outcome，期间没有通用 Renew/Heartbeat。
+
+fencing token 会阻止旧 Worker 在 Lease 过期被接管后提交，因此不会产生两份 canonical Outcome；但可能产生重复计算、旧 Worker 最后 `claim lost` 和额外压力。
+
+#### EV-R010 证据采集（只读）
+
+- [`scripts/oneoff/audit_evaluation_p1_evidence.sql`](../../../../scripts/oneoff/audit_evaluation_p1_evidence.sql)（EV-R010
+  段：按 model_kind 时长与 ≥60/100/120s 计数）
+- 将结果回填本节后再决定是否引入 heartbeat。
+
+#### EV-R010 实测结果（2026-07-21，生产快照）
+
+| model_kind | succeeded | avg_ms | min_ms | max_ms | ≥60s | ≥100s | ≥120s(lease) |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| scale | 2308 | 76.1 | 21 | 3416 | 0 | 0 | 0 |
+| unknown | 2 | 1428.5 | 95 | 2762 | 0 | 0 | 0 |
+| behavioral_rating | 12 | 844.9 | 57 | 2101 | 0 | 0 | 0 |
+| typology | 35 | 52.4 | 29 | 184 | 0 | 0 | 0 |
+
+- 所有 family 的 `max` 执行时长 ≤ 3.4s，不足 120s Lease 的 3%；无任何 run ≥ 60s。
+- 另查“running 且 `lease_until < now`”的卡死候选为 **0**。
+
+**结论**：当前无长执行任务，保留 2 分钟 Lease + 时长预算告警即可，**暂不引入 heartbeat/续租**（避免在短任务上过早增加续租线程）。后续若新增长认知任务（当前样本未见 cognitive 独立分布），
+或出现 ≥60s 运行，再按 family 配置 Lease 或引入 token-safe heartbeat。
+
+#### EV-R010 运行期指标（2026-07-21 已挂）
+
+| 指标 | 触发点 | 用途 |
+| --- | --- | --- |
+| `qs_evaluation_run_duration_seconds{algorithm_family,result}` | Claim 成功后的 Evaluate wall time（含失败） | family 级 p50/p95/p99/max |
+| `qs_evaluation_run_lease_budget_breach_total{algorithm_family,threshold}` | 时长越过 `60s` / `100s` / `lease` | 预算告警；非零持续窗口则重开 heartbeat 讨论 |
+
+实施证据：[`execute/lease_metrics.go`](../../../../internal/apiserver/application/evaluation/execute/lease_metrics.go)；测试：
+`TestObserveEvaluationRunDurationBudgetBreaches`。
+
+生产复验使用最近 7 天：
+
+```promql
+sum(increase(qs_evaluation_run_lease_budget_breach_total{threshold=~"60s|100s|lease"}[7d]))
+  by (algorithm_family, threshold)
+
+histogram_quantile(
+  0.99,
+  sum by (le, algorithm_family) (
+    rate(qs_evaluation_run_duration_seconds_bucket{result="succeeded"}[7d])
+  )
+)
+```
+
+#### EV-R010 明确不做（本轮）
+
+- 不引入 Renew/Heartbeat 线程；
+- 不按 family 拆分 Lease 配置（证据未支持）。
+
+#### EV-R010 选择顺序
+
+1. 先量化不同 AlgorithmFamily 的 p95/p99/max 执行时间；
+2. 若所有正常任务远小于 2 分钟，保留简单 Lease 并设定时长预算；
+3. 若认知任务确实较长，再增加 token-safe heartbeat 或按 family 配置 Lease；
+4. 不为了“看起来完整”在短任务上过早引入续租线程。
+
+#### EV-R010 验收条件
+
+- 执行时长按 AlgorithmFamily/descriptor 可观测；✅（`run_duration_seconds`）
+- 时长预算越界可告警；✅（`run_lease_budget_breach_total`）
+- 续租必须匹配 run ID + attempt + claim token；⏸ 本轮不引入续租
+- 旧 Worker 不能续租或提交；⏸ 同上（既有 fencing 仍保护 Outcome 提交）
+- Worker 崩溃后 heartbeat 停止，Scheduler 仍能接管同一 attempt；⏸ 同上（既有 LeaseRecoverer）
+- 引入续租后不把进程卡死伪装成永不过期的健康任务；⏸ 同上
+
+### EV-R011：建立完整一致性矩阵，但不盲目自动修复
+
+**状态**：已实现待验收（完整只读矩阵已补，待生产扫描与 24h 观察）
+
+#### EV-R011 当前事实（改造后）
+
+- `AuditBatch` 按 Assessment ID 水位扫描 submitted/evaluated/failed，并批量装配 Assessment、Run、Outcome、Projection、committed Outbox 全部只读证据；
+- Outcome 证据查询只读取 `assessment_id`、`id`、`evaluation_run_id`、`model_kind`，不读取 `report_input_json` 或 `payload_json`；
+- `assessment_score` reader 检查行数、未关联行、distinct Outcome 数与 canonical Outcome ID；
+- committed Outbox reader 检查 `evaluation.outcome.committed` 行数、Outcome ID、Run ID 和状态；
+- `classifyDrifts` 一次扫描可返回多个 mismatch，不因第一类漂移遮蔽其它矩阵列；
+- 原有六类 Assessment×Run×Outcome 分类保留，并增加 Projection/Outbox/Run reference 八类显式分类；
+- 每类带 severity + recommended action；disposition 仍为 `deferred`；没有 Save/Restore/自动补写端口。
+- 全量审计、Evaluation 租约恢复、Interpretation 租约恢复已拆成三个独立 runner、三个 leader lock 和三个错误流；审计按 24 小时周期完成全量批次扫描并暴露水位指标。
+
+#### EV-R011 实施证据
+
+- [`scheduler/audit.go`](../../../../internal/apiserver/application/evaluation/scheduler/audit.go) `classifyDrifts`
+- [`evaluationconsistency.Reader`](../../../../internal/apiserver/port/evaluationconsistency/reader.go)
+- [`NewConsistencyReadModel`](../../../../internal/apiserver/infra/mysql/evaluation/consistency_read_model.go)
+- 测试：
+  `TestClassifyDriftMatrix`、`TestConsistencyReadModelReadsProjectionOutcomeLink`、
+  `TestConsistencyReadModelReadsCommittedOutboxReferences`
+
+#### EV-R011 剩余生产门槛
+
+- 部署后成功完成一次全量循环扫描，reader error 与未分类错误为零；
+- mismatch 均能从
+  `sum(increase(qs_evaluation_consistency_mismatch_total[24h])) by (kind)`、
+  `sum(increase(qs_evaluation_consistency_disposition_total[24h])) by (kind, disposition)` 和结构化日志定位；
+- 观察 24 小时无重复调度、审计写入或未受控修复。
+
+### EV-R012：用数据证据退出 Outcome 历史兼容
+
+**状态**：已关闭（2026-07-23，current-only 已提交并部署）
+
+#### EV-R012 当前事实（改造后）
+
+- Outcome 只写且只读 schema 2；schema 0/1 和 schema 0 默认值一律拒绝；
+- ReportInput 只写且只读 schema 3；`DecodeReportInput` 在 codec 单一入口对空输入返回带 Outcome ID 的错误，旧 schema 或冻结材料不完整同样拒绝；
+- 旧 Outcome detail、MBTI profile、FactorScore payload decoder、compat metrics 与 current-catalog metadata fallback 已删除；
+- 不提供回填和升级工具。不符合契约的数据由维护窗口备份后删除 Assessment 及其 Evaluation/Interpretation/Statistics 派生数据，再重新提交。
+
+#### EV-R012 实施证据
+
+- [`port/evaluationfact/codec/codec.go`](../../../../internal/apiserver/port/evaluationfact/codec/codec.go)
+- [`port/evaluationinput/report_input.go`](../../../../internal/apiserver/port/evaluationinput/report_input.go)
+- [`verify_definition_v2_cutover`](../../../../scripts/oneoff/verify_definition_v2_cutover/main.go)
+- 测试：
+  `TestDecodeReportInputRejectsMissingFrozenInputWithOutcomeID`、
+  `TestFromOutcomeRecordRejectsMissingReportInputForFactorScoring`、非 current Outcome/ReportInput schema 拒绝、四类当前 ReportInput 正常解码。
+  生产部署前仍必须运行 `verify_definition_v2_cutover --json` 并确认 `total=0`；本地单测不能替代生产审计。
+
+#### EV-R012 关闭记录
+
+- codec、四 family ReportInput、Outcome commit、Interpretation 与 cutover audit 工具测试已经通过；
+- 维护者于 2026-07-23 确认 current-only 修改已提交并部署；
+- 关闭后仍禁止旧 schema decoder、current-catalog fallback、backfill 或 compatibility layer。
+
+---
+
+## 7. P2：执行扩展性、运行时契约与读模型
+
+### EV-R013：让 InputAssembler 真正组装 CalculationInput
+
+**状态**：已关闭（2026-07-23，四 family 技术验收通过且已部署）
+
+#### EV-R013 当前事实（改造后）
+
+- `InputAssembler.Assemble(ExecutionInput)` 返回携带 `Route` + `Execution` 的 `CalculationInput`；
+- DescriptorExecutor 不再把业务输入塞进 context；
+- scoring / typology / norming / task_performance Calculator 从 `calcInput.Execution` 读取；
+- 过渡 API `ContextWithExecutionInput` / `ExecutionInputFromContext` **已删除**。
+
+#### EV-R013 目标设计
+
+```text
+InputAssembler.Assemble(ExecutionInput)
+  -> explicit CalculationInput{Route, Execution}
+
+Calculator.Calculate(ctx, CalculationInput)
+  -> raw result
+```
+
+context 仅携带 cancellation、deadline、trace 和 request metadata，不携带业务输入。
+
+#### EV-R013 实施边界
+
+- 先用现有 descriptor golden tests 保护行为；
+- 保留 OutcomeAssembler 对机制结果的边界；
+- 不把 ModelCatalog DTO 直接暴露给纯计算内核。
+
+#### EV-R013 实施证据
+
+- [`runtime/descriptor/contracts.go`](../../../../internal/apiserver/application/evaluation/runtime/descriptor/contracts.go)
+- [`execute/descriptor_executor.go`](../../../../internal/apiserver/application/evaluation/execute/descriptor_executor.go)
+- 四 family `pipeline_components.go`
+
+#### EV-R013 关闭记录
+
+- 四 family package、descriptor golden 和关键 race 通过；
+- `ContextWithExecutionInput` / `ExecutionInputFromContext` 全库检索为零；
+- 维护者确认当前实现已经部署。
+
+### EV-R014：收敛新 AlgorithmFamily 的注册面
+
+**状态**：已关闭（2026-07-23，RequiredFamilyManifest 技术验收通过且已部署）
+
+#### EV-R014 当前事实（改造后）
+
+- [`RequiredFamilyManifest`](../../../../internal/apiserver/application/evaluation/runtime/family_manifest.go) 作为 path↔family 单一清单；
+- `defaultPathMaterializations` 从 manifest 派生；
+- `AttachNativePipelines` 结束后调用 `ValidateFamilyManifestCompleteness`（缺 descriptor / 错 path / 缺 pipeline 三件套即失败）；
+- 测试：`TestValidateFamilyManifestCompletenessDetectsMissingPipeline`、`TestValidateFamilyManifestCompletenessAfterAttach`。
+
+#### EV-R014 未做
+
+- 不引入动态插件系统；同类新 model code 仍只靠配置/发布。
+
+#### EV-R014 关闭记录
+
+- 四个稳定 family 全覆盖，缺 descriptor、错 path、缺 pipeline 测试通过；
+- runtime/container 目标包与关键 race 通过；
+- 维护者确认当前实现已经部署。
+
+### EV-R015：事件 payload 不应在 canonical Assessment 之前决定是否执行
+
+**状态**：已实现待验收（2026-07-21，等待 14 天生产归零证据）
+
+#### EV-R015 当前事实（改造后）
+
+- `EvaluationRequestedData.ClassifyPayloadGate`：`complete` / `legacy_incomplete` / `invalid`；
+- Worker 不再因缺少 `model_code`/`scale_code` 而静默 ACK；`legacy_incomplete` 仍转发 `ExecuteEvaluation`，由 `Assessment.NeedsEvaluation` 决定 skip；
+- `invalid`（assessment_id ≤ 0）返回错误 → NACK；
+- 指标：`qs_worker_evaluation_payload_gate_total{class}`；`legacy_incomplete` 14d 归零后可收紧为 invalid。
+
+#### EV-R015 实施证据
+
+- [`payload/assessment.go`](../../../../internal/pkg/eventing/payload/assessment.go)
+- [`worker/handlers/assessment_handler.go`](../../../../internal/worker/handlers/assessment_handler.go)
+- 测试：`TestHandleEvaluationRequestedForwardsLegacyIncompletePayload`、`TestClassifyPayloadGate`
+
+#### EV-R015 剩余生产门槛
+
+- `sum(increase(qs_worker_evaluation_payload_gate_total{class="legacy_incomplete"}[14d])) == 0`，且有流量时 `complete` 非零；
+- `invalid` 无持续异常 publisher，日志中没有仍发送缺失 model identity 的生产方；
+- 证据满足后另批移除 legacy compatibility，将缺失 identity 固定判为 invalid；
+- 移除分支部署观察 24 小时无异常后才能关闭本项。
+
+### EV-R016：减少 active claim 的重投噪声
+
+**状态**：证据已回填（2026-07-21；决策：不改 ACK/requeue）
+
+#### EV-R016 当前事实
+
+当另一个 Worker 持有有效 Run Lease 时：
+
+```text
+Engine Claim -> Claimed=false
+Worker Service receipt -> Assessment submitted + Run running
+handler -> no durable terminal disposition
+MQ -> NACK
+```
+
+这是“宁可重投，不误 ACK 不确定状态”的保守设计，正确性优先。只有当指标证明重复消息和长计算会造成明显 NACK 压力时，才值得调整。
+
+#### EV-R016 证据采集（只读）
+
+- [`scripts/oneoff/audit_evaluation_p2_evidence.sql`](../../../../scripts/oneoff/audit_evaluation_p2_evidence.sql)
+
+#### EV-R016 实测结果（2026-07-21，生产快照）
+
+| 查询 | 结果 |
+| --- | --- |
+| SQL1 running claims | `running=2268`，`active_lease=0`，`lease_expired=0`，lease remaining 全 NULL |
+| SQL4 concurrent running | `2268`（与 SQL1 一致） |
+| SQL2 origin×status（14d） | `initial/succeeded=1928`；`unknown/succeeded=429`；`unknown/failed=44`；**无 `lease_recovery`** |
+| SQL3 multi-attempt（14d top） | 多条 assessment 各 5 attempt、5 failed、**0 lease_recovery**；窗口约 15min（像自动重试耗尽，不是 claim 争用） |
+
+#### EV-R016 解读
+
+- **没有** active Lease 争用信号：2268 条 `status=running` 均无 `lease_expires_at`，不是“有效 claim 持有中”的 NACK 压力画像。
+- **没有** lease_recovery 路径证据；多 attempt 是 failed 重试 churn。
+- 因此 **不引入** delayed requeue / processing+lease_until 回执改 ACK 语义。
+
+#### EV-R016 旁路运维发现（非 R016 门禁）
+
+- 大量 `running` 且 `lease_expires_at IS NULL` 的 checkpoint 更像历史脏数据/未释放状态，应另开清理或治理项，不要与 R016 NACK 语义改造混做。
+
+#### EV-R016 不能做的事
+
+不能因为“已有 Worker 在处理”就无条件 ACK 唯一恢复触发。必须先证明原执行者崩溃后还有 scheduler/relay 能稳定恢复。
+
+### EV-R017：建立 internal gRPC 错误分类
+
+**状态**：已关闭（2026-07-23，gRPC taxonomy 技术验收通过且已部署）
+
+#### EV-R017 当前事实（改造后）
+
+- 统一 [`toEvaluationGRPCError`](../../../../internal/apiserver/transport/grpc/service/evaluation_grpc_errors.go)；
+- `EnsureAssessment` / `ExecuteEvaluation` 使用该映射；
+- InvalidArgument / NotFound / FailedPrecondition / Unavailable(database) / Aborted(claim) / Canceled /DeadlineExceeded / Internal；
+- Internal/Unavailable 不泄露 SQL 或完整 error chain。
+
+#### EV-R017 实施证据
+
+- 测试：`TestToEvaluationGRPCErrorClassification`
+
+#### EV-R017 未改
+
+- Worker 仍对多数失败 NACK（正确性优先）；本项只扩 gRPC code 可观测性，不默认改 settlement ACK 语义。
+
+#### EV-R017 关闭记录
+
+- InvalidArgument、NotFound、FailedPrecondition、Unavailable、Aborted、Canceled、DeadlineExceeded、Internal 分类测试通过；
+- 安全消息测试确认不泄露 SQL 和底层 cause；
+- 维护者确认当前实现已经部署。
+
+### EV-R018：按查询需求建立模型无关或专用投影
+
+#### EV-R018 当前事实
+
+`assessment_score` 存储：
+
+```text
+assessment_id
+testee_id
+factor_code / factor_name
+raw_score
+risk_level
+is_total_score
+```
+
+它非常适合医学量表的因子趋势，也已与 Outcome ID 关联，是可重建查询投影；但不适合自然表达人格 profile、pole preference、行为常模派生分或认知任务 validity。
+
+#### EV-R018 目标原则
+
+- Outcome 继续是唯一不可变事实；
+- `assessment_score` 可继续服务 scale factor trend，不必为了“统一”强行替换；
+- 只在出现稳定查询需求时，为 typology/behavioral/cognitive 建立专用 read model；
+- 投影必须能从 Outcome 幂等重建；
+- 趋势的模型版本、因子 code 连续性和跨版本可比性必须明确。
+
+#### EV-R018 启动条件
+
+当前业务已确认需要患者级 factor trend；如果还没有人格/认知趋势或组合检索需求，不应预先建设一个“万能结果表”。
+
+### EV-R019：在真实演进时为 ReportInput 增加 schema identity
+
+#### EV-R019 当前事实
+
+Outcome 有 `SchemaVersion=2`，但该版本主要描述 Outcome fact payload。ReportInput 只根据 Model kind 解码成
+Scale/Typology/Behavioral/Cognitive payload，没有独立 `report_input_format` 和 `report_input_schema_version`。
+
+#### EV-R019 当前结论
+
+这是已知演进点，但不是必须立即实施的缺陷。在只有一种结构时，为版本号而版本化会增加无效复杂度。
+
+#### EV-R019 启动条件
+
+任一条成立时启动：
+
+- 同一 Model kind 出现第二种不兼容 ReportInput；
+- 模型发布需要在不改 Outcome schema 的情况下演进解释资产；
+- Interpretation 需并行支持两种解码器。
+
+目标字段可以是：
+
+```text
+report_input_format
+report_input_schema_version
+report_input_digest
+```
+
+---
+
+## 8. P3：由合规要求驱动的 Outcome 防篡改
+
+### EV-R020：在需要时增强 Outcome 内容完整性证明
+
+#### EV-R020 当前事实
+
+Outcome Repository 只提供创建和查询，Assessment ID 与 Run ID 唯一约束阻止多份 canonical Outcome。但 MySQL longtext payload 的不可变主要依赖：
+
+- application repository 不提供 Update/Delete；
+- 数据库账号权限；
+- 组织管理约定。
+
+对当前辅助测评业务，这一强度可以接受。不应在没有合规目标时盲目引入区块链或复杂签名系统。
+
+#### EV-R020 启动条件
+
+- 医疗/心理合规要求证明结果未被篡改；
+- 存在多系统复制或长期归档后的完整性校验需求；
+- 运维需要定期检测 payload/report input 损坏。
+
+#### EV-R020 候选能力
+
+- canonical serialization + payload/report input digest；
+- Outcome 创建审计与数据库权限隔离；
+- 定期完整性扫描；
+- 必要时使用组织级密钥签名，并建立密钥轮换与验证策略。
+
+---
+
+## 9. 跨模块依赖与所有权
+
+Evaluation 不应单独“修完”所有跨模块问题。正确所有权是：
+
+| Evaluation 条目 | 协作模块 | 对方保护 | Evaluation 保护 |
+| --- | --- | --- | --- |
+| EV-R001/002 | Survey + ModelCatalog | 可靠提交元数据、independent/assessment 意图、exact release | 只在准入完整时创建 Assessment |
+| EV-R005 | Actor + ModelCatalog | 人口学权威事实、Norm 匹配规则 | 按测评时点物化 NormSubject |
+| EV-R008/014 | ModelCatalog | 校验 RuntimeIdentity、冻结 DecisionKind、发布能力门禁 | exact DecisionKind descriptor 消费与 pipeline 装配 |
+| EV-R007 | collection-server | 用户身份、轮询和展示语义 | 提供真实 readiness phase |
+| EV-R012/019 | Interpretation | 按 schema 解码冻结资产 | 保存与提供不可变 ReportInput |
+| EV-R018 | Statistics/Journey | 跨业务组合统计 | 提供 Outcome 及可重建的 Evaluation read model |
+| EV-R010/011/016/017 | `03-基础设施` | MQ、Lease、Outbox、观测与治理的通用机制 | 定义 Evaluation 状态、回执和恢复语义 |
+
+---
+
+## 10. 建议实施顺序
+
+### 批次 0：先只读建立数据证据
+
+本批次不修数据，只生成可复核报告：
+
+- unbound pending Assessment 数量，按 Questionnaire、Plan/adhoc、创建时间分组；
+- AnswerSheet 受理到 Assessment 创建的延迟分布，以及期间 release 变更次数；
+- Evaluation input failure 的底层 cause 分布；
+- 各 AlgorithmFamily 执行 p50/p95/p99/max 与 Lease 接近程度；
+- active claim duplicate 导致的 NACK/redelivery 数量；
+- Outcome schema 0/1/2 分布与 ReportInput 缺失/解码失败数量；
+- Assessment/Run/Outcome/Projection/Outbox 一致性矩阵样本；
+- `assessment_score` 真实 API/报表消费方。
+
+### 批次 1：关闭受理与结果正确性缺口
+
+```text
+EV-R001 freeze submission intent + release
+EV-R002 independent questionnaire split
+EV-R003 Assessment.Submit invariant
+EV-R004 input failure taxonomy
+EV-R005 NormSubject materialization
+```
+
+EV-R001/002 应作为一个设计计划，但可分 Survey contract、Journey 分流、readiness 迁移和存量处置多个 PR。
+
+### 批次 2：收紧契约与精确执行
+
+```text
+EV-R006 strict Find/NotFound
+EV-R007 readiness phases
+EV-R008 frozen DecisionKind consumption
+EV-R009 verifiable InputSnapshot identity
+```
+
+EV-R008 必须在 ModelCatalog `MC-R006` 提供冻结 DecisionKind 的 snapshot 契约后实施，不反向让 Evaluation 自己写一份第二发布事实。
+
+### 批次 3：恢复与历史数据治理
+
+```text
+EV-R010 lease SLA / heartbeat decision
+EV-R011 consistency matrix
+EV-R012 historical Outcome migration
+EV-R016 duplicate settlement if metrics justify it
+EV-R017 gRPC taxonomy
+```
+
+其中 EV-R010 和 EV-R016 必须先看指标，不默认修改。
+
+### 批次 4：在行为保护下收敛扩展边界
+
+```text
+EV-R013 explicit CalculationInput
+EV-R014 registration manifest
+EV-R015 retire payload pre-gate
+```
+
+先建 characterization/golden tests，再逐 family 迁移，不同时修改计分结果、Outcome schema 或 Algorithm identity。
+
+### 批次 5：按需演进读模型与合规能力
+
+```text
+EV-R018 model-specific read models
+EV-R019 ReportInput schema identity
+EV-R020 tamper evidence
+```
+
+没有真实查询、schema 或合规需求时，本批次不启动。
+
+---
+
+## 11. 每个重构项的开始与关闭门槛
+
+### 11.1 开始前
+
+- [ ] 重新核对当前 checkout，不仅依赖本文；
+- [ ] 检查工作树，保护用户和并行工作的未提交修改；
+- [ ] 列明输入、输出、事件、状态机和持久化不变式；
+- [ ] 确认是否影响 collection-system、operating-system、Plan 或 Interpretation；
+- [ ] 完成存量数据和运行指标审计；
+- [ ] 补齐 characterization、golden、并发或故障注入测试；
+- [ ] 明确是纯重构、行为改造、契约迁移还是数据迁移；
+- [ ] 涉及 P0 或数据迁移时定义回滚点和线上观测窗口。
+
+### 11.2 关闭前
+
+- [ ] 所有验收条件均有测试、数据或部署证据；
+- [ ] AnswerSheet 202 可靠受理语义未被破坏；
+- [ ] Assessment、EvaluationRun 和 Outcome 的状态/事务不变式仍成立；
+- [ ] 重复消息、并发 Claim、Lease 过期和回执丢失场景通过；
+- [ ] 历史 exact-version 查询、重试和报告不漂移；
+- [ ] 数据迁移 dry-run 默认、可重跑、可审计，并有明确回滚/停止条件；
+- [ ] 兼容路径有指标，能证明命中量下降或归零；
+- [ ] 相关 Survey、ModelCatalog、Evaluation、Interpretation 和接入文档已同步；
+- [ ] `make docs-hygiene docs-facts`、相关 Go 测试和 `git diff --check` 通过。
+
+---
+
+## 12. 不应被重构破坏的已确认决策
+
+1. 202 Accepted 表示 AnswerSheet 与 Outbox 已可靠提交，不表示 Evaluation 已完成；
+2. Questionnaire 可以独立使用，只有绑定已发布 AssessmentModel 后才创建可执行 Assessment；
+3. Plan 保存 code，每个新 Task 使用当时最新发布版本；已受理测评的精确版本不再漂移；
+4. Worker 只拥有异步消费、调用和 settlement，不拥有 Evaluation/Interpretation 核心业务规则；
+5. EvaluationRun 分离执行 attempt，Assessment 只表达业务结果状态；
+6. MQ 重投、Outbox 发布尝试和 business retry attempt 是三个不同预算；
+7. 失败已持久化 automatic/manual_required/terminal RetryDecision 后，当前消息 ACK，后续由治理事件接管；
+8. Lease recovery 接管同一 attempt，不消耗新的 business retry budget；
+9. Calculator 保持无状态，Evaluation 编排输入、路由、计算与提交；
+10. 只有 Outcome、Assessment evaluated、Run succeeded、适用的查询投影和 committed Outbox 在可靠事务中成立，评分才算成功；
+11. Outcome 是不可变评分/判定事实，`assessment_score` 和 Assessment summary 是可重建/兼容投影；
+12. `Assessment=evaluated` 不表示 Report 已生成，Interpretation 失败不得回写 Evaluation 成 failed；
+13. 系统产生医生判断、治疗观察与随访的辅助信息，不产生医学诊断。
+
+---
+
+## 13. 维护规则
+
+每次更新某个 `EV-Rxxx` 时，至少记录：
+
+| 字段 | 要求 |
+| --- | --- |
+| 状态 | 规划改造 / 待补证据 / 待业务决策 / 已实现待验收 / 已关闭 |
+| 当前证据 | 当时的源码、数据、部署或测试，不只引用本文 |
+| 决策 | 接受方案、替代方案与未采用原因 |
+| 实施范围 | 本次修改什么，明确不修改什么 |
+| 事务/事件 | 是否改变 Assessment、Run、Outcome、Outbox 或 settlement |
+| 数据迁移 | 是否需要 audit/backfill/rollback |
+| 验收 | 单元、集成、故障注入、容量或生产观测证据 |
+| 剩余风险 | 关闭后仍保留的兼容面或未覆盖场景 |
+
+如果源码已修复问题而本文尚未更新，以源码和真实运行证据为准；修改者应随后更新条目状态，不让已解决问题长期留在“规划改造”。
+
+---
+
+## 14. 事实源与相关文档
+
+### 14.1 核心源码
+
+| 主题 | 路径 |
+| --- | --- |
+| AnswerSheet 事件 payload | [`internal/pkg/eventing/payload/answersheet.go`](../../../../internal/pkg/eventing/payload/answersheet.go) |
+| Assessment Journey | [`application/journey/assessmentintake`](../../../../internal/apiserver/application/journey/assessmentintake) |
+| Assessment Intake | [`application/evaluation/intake`](../../../../internal/apiserver/application/evaluation/intake) |
+| Assessment 聚合 | [`domain/evaluation/assessment`](../../../../internal/apiserver/domain/evaluation/assessment) |
+| EvaluationRun | [`domain/evaluation/run`](../../../../internal/apiserver/domain/evaluation/run) |
+| Evaluation Engine | [`application/evaluation/execute`](../../../../internal/apiserver/application/evaluation/execute) |
+| InputSnapshot 契约 | [`port/evaluationinput`](../../../../internal/apiserver/port/evaluationinput) |
+| InputSnapshot 物化 | [`infra/evaluationinput`](../../../../internal/apiserver/infra/evaluationinput) |
+| RuntimeDescriptor | [`application/evaluation/runtime`](../../../../internal/apiserver/application/evaluation/runtime) |
+| 机制适配 | [`application/evaluation/registry/mechanisms`](../../../../internal/apiserver/application/evaluation/registry/mechanisms) |
+| Outcome 提交 | [`application/evaluation/outcome/commit`](../../../../internal/apiserver/application/evaluation/outcome/commit) |
+| Outcome codec/read | [`port/evaluationfact/codec`](../../../../internal/apiserver/port/evaluationfact/codec)、[`application/evaluation/outcome`](../../../../internal/apiserver/application/evaluation/outcome) |
+| Run/Outcome 持久化 | [`infra/mysql/checkpoint`](../../../../internal/apiserver/infra/mysql/checkpoint)、[`infra/mysql/evaluation`](../../../../internal/apiserver/infra/mysql/evaluation) |
+| 一致性与 Lease 恢复 | [`application/evaluation/scheduler`](../../../../internal/apiserver/application/evaluation/scheduler) |
+| Worker handler/settlement | [`worker/handlers`](../../../../internal/worker/handlers)、[`worker/integration/messaging`](../../../../internal/worker/integration/messaging) |
+| internal gRPC | [`transport/grpc/service`](../../../../internal/apiserver/transport/grpc/service) |
+| 事件契约 | [`configs/events.yaml`](../../../../configs/events.yaml) |
+
+### 14.2 本模块文档
+
+- [Evaluation 总览](../../../02-业务模块/30-evaluation/README.md)
+- [领域模型](../../../02-业务模块/30-evaluation/10-领域模型.md)
+- [统一测评执行模型](../../../02-业务模块/30-evaluation/20-核心设计-统一测评执行模型.md)
+- [状态、幂等与可靠提交](../../../02-业务模块/30-evaluation/21-核心设计-状态、幂等与可靠提交.md)
+- [Outcome 事实与解释边界](../../../02-业务模块/30-evaluation/22-核心设计-Outcome事实与解释边界.md)
+- [从 AnswerSheet 到 Assessment](../../../02-业务模块/30-evaluation/30-关键链路-从AnswerSheet到Assessment.md)
+- [从执行请求到 Outcome 提交](../../../02-业务模块/30-evaluation/31-关键链路-从执行请求到Outcome提交.md)
+- [ModelCatalog 设计问题与重构清单](../../../02-业务模块/20-model-catalog/90-设计问题与重构清单.md)
+
+### 14.3 建议验证入口
+
+```bash
+go test ./internal/apiserver/application/journey/assessmentintake
+go test ./internal/apiserver/application/evaluation/intake
+go test ./internal/apiserver/domain/evaluation/...
+go test ./internal/apiserver/application/evaluation/...
+go test ./internal/apiserver/infra/evaluationinput
+go test ./internal/apiserver/infra/mysql/evaluation ./internal/apiserver/infra/mysql/checkpoint
+go test ./internal/apiserver/application/evaluation/scheduler
+go test ./internal/worker/handlers ./internal/worker/integration/messaging
+go test ./internal/collection-server/application/answersheet
+make docs-hygiene docs-facts
+```
+
+2026-09-11 授权边界复核：共享重试入口使用有效快照中的 retry / force_retry 动作权限；移除来源属性条件。本文的执行状态、重试资格、事务与 Outbox 语义保持，机构和受试者关系仍由业务系统检查。详见模块 README 的条件授权退役记录。
+
+重试状态冲突响应复核：测评未失败或最新运行不具备重试资格时，应用入口返回可识别的状态冲突，接口映射为 HTTP 409；权限、机构、关系与执行资格规则保持不变。该响应修复不证明正向生产重试验收已经完成。
+
+进度操作资格复核：进度 DTO 仅补充 `manual_retry_available` 布尔值，由失败测评的最新失败运行及 `manual_required` 处置决定。前端同时检查动作权限；缺失字段按不可用处理，不读取专业结果。重试提交仍重新检查状态。代码测试完成不等同于生产正向重试验收。

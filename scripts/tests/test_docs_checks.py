@@ -64,6 +64,45 @@ class DocsFactsHelpersTest(unittest.TestCase):
         )
 
 
+class EntryInventoryClaimsTest(unittest.TestCase):
+    expected = {"primary": 165, "sidecars": 42, "events": 15, "signals": 5}
+    current = (
+        "165 篇 primary active Markdown、42 篇 maintained sidecar；"
+        "Event Catalog 为 15 个事件、Signal Catalog 为 5 个信号"
+    )
+
+    def test_current_counts_and_unrelated_numbers_are_accepted(self) -> None:
+        self.assertEqual(check_docs_facts.inventory_count_claim_issues(
+            self.current + "；MySQL 95 个迁移；历史日期 2026-08-20", self.expected, "entry.md",
+        ), [])
+
+    def test_each_stale_inventory_is_rejected(self) -> None:
+        mutations = {
+            "primary": ("165 篇", "164 篇"),
+            "sidecars": ("42 篇", "30 篇"),
+            "events": ("15 个事件", "18 个事件"),
+            "signals": ("5 个信号", "6 个信号"),
+        }
+        for name, (before, after) in mutations.items():
+            with self.subTest(name=name):
+                issues = check_docs_facts.inventory_count_claim_issues(
+                    self.current.replace(before, after), self.expected, "entry.md",
+                )
+                self.assertEqual(len(issues), 1)
+                self.assertIn(name, issues[0].detail)
+
+    def test_a_second_conflicting_claim_is_rejected(self) -> None:
+        issues = check_docs_facts.inventory_count_claim_issues(
+            self.current + "；其他段落写 164 篇 primary", self.expected, "entry.md",
+        )
+        self.assertEqual(len(issues), 1)
+        self.assertIn("primary", issues[0].detail)
+
+    def test_missing_inventory_cannot_silently_pass(self) -> None:
+        issues = check_docs_facts.inventory_count_claim_issues("# Entry", self.expected, "entry.md")
+        self.assertEqual(len(issues), 4)
+
+
 class DocsHygieneScopeTest(unittest.TestCase):
     def test_facts_inventory_excludes_tmp_markdown(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

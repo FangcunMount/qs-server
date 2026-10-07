@@ -407,6 +407,18 @@ class InfrastructureParserTest(unittest.TestCase):
         )
         self.assertIn("priority-infrastructure-doc-drift", {issue.kind for issue in issues})
 
+    def test_published_effect_recovery_cannot_move_to_sdk_or_new_identity(self) -> None:
+        for before, after in (
+            ("QS 效果扫描核对原答卷", "SDK 自动复制业务意图"),
+            ("技术重投不得重新生成事件身份", "技术重投应重新生成事件身份"),
+        ):
+            with self.subTest(before=before):
+                issues = self.issues_after_mutation(
+                    check_docs_facts.EVENT_STATE_DOC, before, after,
+                    check_docs_facts.priority_infrastructure_doc_contract_issues,
+                )
+                self.assertIn("priority-infrastructure-doc-drift", {issue.kind for issue in issues})
+
     def test_backpressure_value_drift_is_rejected(self) -> None:
         issues = self.issues_after_mutation(
             check_docs_facts.CONCURRENCY_BACKPRESSURE_DOC,
@@ -988,7 +1000,7 @@ class InfrastructureProductionLedgerTest(unittest.TestCase):
         self.assertIn("infrastructure-production-entry-current-immutable-evidence", kinds)
 
     def test_repository_record_rejects_missing_anchor_and_archive(self) -> None:
-        valid_ref = "docs/00-总览/09-当前版本定档验收台账.md#6-mongo-consistency-audit-当前真值"
+        valid_ref = "docs/00-总览/10-基础设施生产证据台账.md#1-历史记录索引"
         self.assertTrue(check_docs_facts.production_evidence_ref_valid("repository_record", valid_ref))
         self.assertFalse(
             check_docs_facts.production_evidence_ref_valid(

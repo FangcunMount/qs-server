@@ -1,8 +1,6 @@
 # Plan 模块
 
-> Scope 重构复核中：下文原有模块结论保留为既有基线。当前工作区已增加运营入口的动作、公司及门店范围检查；历史上线证据不覆盖这次范围切换，待最终源码复核及普通角色线上验收后重新签署。
-
-> 状态：**本轮重建完成**。模块入口、领域模型、核心设计、关键链路与活动重构台账已经按当前源码复核。本文只承担模块导航职责，不再承载全部实现细节。
+> 状态：当前代码能力与文档导航。后台 action/门店 Scope 已接入；源码、仓库验证、部署和真实角色/履约证据分别见风险台账。
 
 ## 1. 30 秒结论
 
@@ -112,7 +110,7 @@ Plan 有一条管理链路和一条运行链路。拆分文档时必须保持这
 ```text
 PlanRunner 扫描到期 Task
   -> 生成入口并将 Task 置为 opened
-  -> best-effort 发布 task.opened
+  -> 按提醒开关：旧 best_effort 或同事务 reminder intent
   -> Worker 触发小程序提醒
   -> 患者提交 AnswerSheet
   -> 创建并提交 Assessment
@@ -151,14 +149,14 @@ Plan 和 Task 当前只保存 `scale_code`，不保存模型发布版本。每�
 | 独立 Enrollment 生命周期 | 已实现 | active、closed、terminated 与多轮参与 |
 | 患者周期明细 API | 已实现 | `GET /api/v2/plans/testees/{testee_id}/enrollments`，按 round 返回 Task 与轮内完成率 |
 | 内建多实例安全调度 | 已实现 | PlanRunner + Redis 租约 |
-| Task 入口与过期 | 部分实现 | 生成 token/URL 和 7 天窗口；token 尚无服务端解析契约 |
-| 小程序提醒 | 部分实现 | task.opened best-effort，可漏发，无送达账本 |
+| Task 入口与过期 | 已实现 | task_id 定位，登录及 active ProfileLink 授权；同步校验 Task/Enrollment、实时窗口和模型；历史 token 不授权 |
+| 小程序提醒 | 按开关分流，运行证据单列 | 关闭走旧 best_effort；开启同事务 reminder intent 与逐收件账本；供应商结果未知禁止自动重发 |
 | AnswerSheet 显式 Task 归因 | 已实现 | SubmissionContext 传递 task_id |
 | Task 完成可靠收敛 | 部分实现 | CompleteTask 错误被忽略，无专项调和 |
-| Enrollment 与 Task 原子迁移 | 已实现 | 加入、显式终止和 Task 终态关闭使用事务 |
-| Plan 模板与多条 Task 原子迁移 | 未实现 | 暂停、恢复、结束仍需继续治理 |
+| Plan/Enrollment 与 Task 原子迁移 | 已实现 | 加入、终止、模板生命周期、Resume 和 Task 轮次关闭使用本地事务 |
+| Plan 模板与多条 Task 原子迁移 | 已实现 | Pause/Finish/Cancel/Resume 同一 MySQL 事务；terminal CAS 和异步履约补偿单列 |
 | 多模型类型 Plan | 未实现 | 当前固定 KindScale / scale_code |
-| 时区建模 | 未实现 | 当前依赖进程 `time.Local` |
+| 时间与时区 | 部分实现 | 开放窗口/硬失效明确使用上海业务规则；模板时区、跨地区与部分输入解析仍需独立定义 |
 
 “部分实现”和“未实现”不会在 README 展开为改造方案，统一进入后续 `90-设计问题与重构清单.md`。
 
