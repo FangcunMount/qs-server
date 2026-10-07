@@ -13,6 +13,7 @@ on:
           - validate
           - restore
           - status
+          - inventory
           - preflight-redis-control
           - govern-presentation
           - govern-template-release
@@ -82,6 +83,98 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  database-inventory:
+    name: MySQL and MongoDB Metadata Inventory
+    if: github.event.inputs.operation == 'inventory'
+    runs-on:
+      group: qlume
+      labels: [self-hosted, macOS, ARM64, ops]
+    timeout-minutes: 10
+    environment: production
+    steps:
+      - name: Checkout inventory source
+        uses: actions/checkout@v6
+
+      - name: Package immutable inventory scripts
+        id: package
+        run: |
+          set -Eeuo pipefail
+          archive="qs-production-inventory-${GITHUB_RUN_ID}.tar.gz"
+          tar -czf "$archive" -C scripts/dbops production-inventory.py production-inventory.sql production-inventory.js
+          echo "sha256=$(shasum -a 256 "$archive" | awk '{print $1}')" >> "$GITHUB_OUTPUT"
+
+      - name: Validate production SSH binding
+        env:
+          INVENTORY_DATABASE: ${{ github.event.inputs.database }}
+          SVRA_HOST: ${{ vars.SVRA_HOST }}
+          SVRA_USERNAME: ${{ vars.SVRA_USERNAME }}
+          SVRA_SSH_KEY: ${{ secrets.SVRA_SSH_KEY }}
+          SVRA_SSH_FINGERPRINT: ${{ vars.SVRA_SSH_FINGERPRINT }}
+        run: |
+          set -Eeuo pipefail
+          case "$INVENTORY_DATABASE" in
+            mysql|mongodb|all) ;;
+            *) echo "inventory supports MySQL and MongoDB only" >&2; exit 1 ;;
+          esac
+          : "${SVRA_HOST:?SVRA_HOST is empty}"
+          : "${SVRA_USERNAME:?SVRA_USERNAME is empty}"
+          : "${SVRA_SSH_KEY:?SVRA_SSH_KEY is empty}"
+          : "${SVRA_SSH_FINGERPRINT:?SVRA_SSH_FINGERPRINT is empty}"
+
+      - name: Upload metadata inventory scripts to serverA
+        uses: appleboy/scp-action@v1.0.0
+        with:
+          host: ${{ vars.SVRA_HOST }}
+          username: ${{ vars.SVRA_USERNAME }}
+          key: ${{ secrets.SVRA_SSH_KEY }}
+          port: ${{ vars.SVRA_SSH_PORT || 22 }}
+          fingerprint: ${{ vars.SVRA_SSH_FINGERPRINT }}
+          source: qs-production-inventory-${{ github.run_id }}.tar.gz
+          target: /tmp
+
+      - name: Inventory database metadata without business documents
+        uses: appleboy/ssh-action@v1.2.2
+        env:
+          INVENTORY_SOURCE_SHA: ${{ github.sha }}
+          INVENTORY_RUN_ID: ${{ github.run_id }}-${{ github.run_attempt }}
+          INVENTORY_DATABASE: ${{ github.event.inputs.database }}
+          INVENTORY_ARCHIVE_SHA256: ${{ steps.package.outputs.sha256 }}
+          MYSQL_HOST: ${{ secrets.MYSQL_HOST }}
+          MYSQL_PORT: ${{ secrets.MYSQL_PORT || 3306 }}
+          MYSQL_USERNAME: ${{ secrets.MYSQL_USERNAME }}
+          MYSQL_PASSWORD: ${{ secrets.MYSQL_PASSWORD }}
+          MYSQL_DATABASE: ${{ secrets.MYSQL_DATABASE != '' && secrets.MYSQL_DATABASE || secrets.MYSQL_DBNAME }}
+          MONGODB_HOST: ${{ secrets.MONGODB_HOST }}
+          MONGODB_PORT: ${{ secrets.MONGODB_PORT || 27017 }}
+          MONGODB_USERNAME: ${{ secrets.MONGODB_USERNAME }}
+          MONGODB_PASSWORD: ${{ secrets.MONGODB_PASSWORD }}
+          MONGODB_DBNAME: ${{ secrets.MONGODB_DBNAME }}
+        with:
+          host: ${{ vars.SVRA_HOST }}
+          username: ${{ vars.SVRA_USERNAME }}
+          key: ${{ secrets.SVRA_SSH_KEY }}
+          port: ${{ vars.SVRA_SSH_PORT || 22 }}
+          fingerprint: ${{ vars.SVRA_SSH_FINGERPRINT }}
+          command_timeout: 5m
+          envs: INVENTORY_SOURCE_SHA,INVENTORY_RUN_ID,INVENTORY_DATABASE,INVENTORY_ARCHIVE_SHA256,MYSQL_HOST,MYSQL_PORT,MYSQL_USERNAME,MYSQL_PASSWORD,MYSQL_DATABASE,MONGODB_HOST,MONGODB_PORT,MONGODB_USERNAME,MONGODB_PASSWORD,MONGODB_DBNAME
+          script: |
+            set -Eeuo pipefail
+            export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin${PATH:+:$PATH}"
+            [[ "$INVENTORY_RUN_ID" =~ ^[0-9]{1,20}-[0-9]{1,4}$ ]] || exit 1
+            [[ "$INVENTORY_ARCHIVE_SHA256" =~ ^[0-9a-f]{64}$ ]] || exit 1
+            archive="/tmp/qs-production-inventory-${INVENTORY_RUN_ID%-*}.tar.gz"
+            work_dir=$(mktemp -d /tmp/qs-production-inventory.XXXXXX)
+            cleanup_inventory_scripts() {
+              rm -f -- "$work_dir/production-inventory.py" "$work_dir/production-inventory.sql" "$work_dir/production-inventory.js" "$archive"
+              rmdir -- "$work_dir"
+            }
+            trap cleanup_inventory_scripts EXIT
+            chmod 0700 "$work_dir"
+            [[ "$(sha256sum "$archive" | awk '{print $1}')" == "$INVENTORY_ARCHIVE_SHA256" ]] || exit 1
+            tar -xzf "$archive" -C "$work_dir" --no-same-owner
+            chmod 0600 "$work_dir/production-inventory.py" "$work_dir/production-inventory.sql" "$work_dir/production-inventory.js"
+            python3 -B "$work_dir/production-inventory.py"
+
   mongodb-backup:
     name: MongoDB Backup on Mac mini
     if: |
@@ -972,7 +1065,7 @@ jobs:
             sudo docker ps \
               --no-trunc \
               --filter ancestor=mongo:7.0 \
-              --format '{{.ID}}\t{{.Names}}\t{{.CreatedAt}}\t{{.Status}}\t{{.Labels}}\t{{.Command}}'
+              --format '{{.ID}}\t{{.Names}}\t{{.CreatedAt}}\t{{.Status}}\t{{.Labels}}'
 
         env:
           MONGODB_HOST: ${{ secrets.MONGODB_HOST }}

@@ -11,6 +11,48 @@ import (
 	statisticsDomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/statistics"
 )
 
+type fulfillmentContractTask struct {
+	TesteeID    uint64
+	DueAt       time.Time
+	CompletedAt *time.Time
+	Canceled    bool
+}
+
+type fulfillmentContractCounts struct {
+	PlannedTasks, PlannedParticipants, DueTasks           int
+	CompletedOnTime, CompletedOverdue, UncompletedOverdue int
+}
+
+// calculateFulfillmentContract is the executable metric contract mirrored by
+// PlanFulfillmentProjection's SQL. Keeping the boundary matrix explicit makes
+// due/on-time/overdue regressions visible without relying on chart rendering.
+func calculateFulfillmentContract(tasks []fulfillmentContractTask, cutoff time.Time) fulfillmentContractCounts {
+	var result fulfillmentContractCounts
+	participants := map[uint64]struct{}{}
+	for _, task := range tasks {
+		if task.Canceled {
+			continue
+		}
+		result.PlannedTasks++
+		participants[task.TesteeID] = struct{}{}
+		if task.DueAt.IsZero() {
+			continue
+		}
+		result.DueTasks++
+		if task.CompletedAt != nil {
+			if task.CompletedAt.After(task.DueAt) {
+				result.CompletedOverdue++
+			} else {
+				result.CompletedOnTime++
+			}
+		} else if task.DueAt.Before(cutoff) {
+			result.UncompletedOverdue++
+		}
+	}
+	result.PlannedParticipants = len(participants)
+	return result
+}
+
 func TestProjectionRegistriesSeparateWindowRepairFromGlobalPublication(t *testing.T) {
 	daily := NewDailyProjections(nil)
 	global := NewGlobalProjections(nil)

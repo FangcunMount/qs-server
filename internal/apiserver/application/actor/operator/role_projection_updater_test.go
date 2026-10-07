@@ -38,7 +38,7 @@ func TestRequestProjectionPreservesPendingOnMissingOrStaleFacts(t *testing.T) {
 	for _, gatewayVersion := range []int64{0, 9, 11} {
 		repo := newFakeOperatorRepo()
 		op := domain.NewOperator(1, 101, "test")
-		op.ReplaceRolesProjection([]domain.Role{domain.RoleAssessmentOperator}, []domain.Role{domain.RoleAssessmentOperator}, 10, nil, true)
+		op.ReplaceRolesProjection([]domain.Role{domain.RoleAssessmentOperator}, 10, nil, true)
 		if err := repo.Save(context.Background(), op); err != nil {
 			t.Fatal(err)
 		}
@@ -54,7 +54,7 @@ func TestRequestProjectionPreservesPendingOnMissingOrStaleFacts(t *testing.T) {
 func TestProjectionCannotRegressPersistedPolicyVersion(t *testing.T) {
 	repo := newFakeOperatorRepo()
 	op := domain.NewOperator(1, 101, "test")
-	op.ReplaceRolesProjection(nil, nil, 20, nil, true)
+	op.ReplaceRolesProjection(nil, 20, nil, true)
 	err := persistOperatorRoleProjection(context.Background(), repo, op, iambridge.OperatorRoleProjection{PolicyVersion: 19}, false)
 	if err == nil || repo.updates != 0 || op.AuthzPolicyVersion() != 20 || !op.AuthzProjectionPending() {
 		t.Fatal("older projection replaced current state")

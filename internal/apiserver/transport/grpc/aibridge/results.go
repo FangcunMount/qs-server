@@ -4,7 +4,6 @@ import (
 	"context"
 
 	pb "github.com/FangcunMount/qs-server/api/grpc/gen/aiworkflow"
-	app "github.com/FangcunMount/qs-server/internal/apiserver/application/aibridge"
 	"github.com/FangcunMount/qs-server/internal/pkg/aidiagnostics"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -15,9 +14,6 @@ import (
 
 type Receiver struct {
 	pb.UnimplementedResultsServer
-	// Service is retained only for existing registration wiring; it cannot
-	// enable the retired write route. Authenticated events use MQ exclusively.
-	Service *app.Service
 }
 
 func (r *Receiver) RegisterService(server *grpc.Server) {

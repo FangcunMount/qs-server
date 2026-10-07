@@ -43,12 +43,8 @@ func NewService(
 	testeeReader testeeReader,
 	latestRiskReader workbenchreadmodel.LatestRiskReader,
 	followUpQueueReader planreadmodel.FollowUpQueueReader,
-	assessmentSummaryReaders ...actorreadmodel.AssessmentSummaryReader,
+	assessmentSummaryReader actorreadmodel.AssessmentSummaryReader,
 ) Service {
-	var assessmentSummaryReader actorreadmodel.AssessmentSummaryReader
-	if len(assessmentSummaryReaders) > 0 {
-		assessmentSummaryReader = assessmentSummaryReaders[0]
-	}
 	return &service{
 		relationshipService:     relationshipService,
 		assignmentHydrator:      assignmentHydrator,
@@ -157,11 +153,9 @@ func (s *service) listHighRiskQueue(ctx context.Context, resolved resolvedScope,
 			RiskLevel:  row.RiskLevel,
 		})
 	}
-	if resolved.IncludeAssignments {
-		items, err = s.withAssignments(ctx, resolved.OrgID, items)
-		if err != nil {
-			return nil, err
-		}
+	items, err = s.withAssignments(ctx, resolved.OrgID, items)
+	if err != nil {
+		return nil, err
 	}
 
 	return queuePage(QueueTypeHighRisk, items, riskPage.Total, page, pageSize), nil
@@ -196,11 +190,9 @@ func (s *service) listFollowUpQueue(ctx context.Context, resolved resolvedScope,
 			Task:       taskSummary(task),
 		})
 	}
-	if resolved.IncludeAssignments {
-		items, err = s.withAssignments(ctx, resolved.OrgID, items)
-		if err != nil {
-			return nil, err
-		}
+	items, err = s.withAssignments(ctx, resolved.OrgID, items)
+	if err != nil {
+		return nil, err
 	}
 
 	return queuePage(QueueTypeFollowUp, items, taskPage.Total, page, pageSize), nil
@@ -228,11 +220,9 @@ func (s *service) listKeyFocusQueue(ctx context.Context, resolved resolvedScope,
 			Reason:     "重点关注",
 		})
 	}
-	if resolved.IncludeAssignments {
-		items, err = s.withAssignments(ctx, resolved.OrgID, items)
-		if err != nil {
-			return nil, err
-		}
+	items, err = s.withAssignments(ctx, resolved.OrgID, items)
+	if err != nil {
+		return nil, err
 	}
 	return queuePage(QueueTypeKeyFocus, items, total, page, pageSize), nil
 }
@@ -241,7 +231,6 @@ type resolvedScope struct {
 	OrgID               int64
 	TesteeIDs           []uint64
 	RestrictToTesteeIDs bool
-	IncludeAssignments  bool
 }
 
 func (s resolvedScope) isEmpty() bool {
@@ -255,7 +244,7 @@ func (s *service) resolveScope(ctx context.Context, scope Scope) (resolvedScope,
 			return resolvedScope{}, false, nil
 		}
 		if scope.ClinicianID == nil {
-			return resolvedScope{OrgID: scope.OrgID, IncludeAssignments: true}, true, nil
+			return resolvedScope{OrgID: scope.OrgID}, true, nil
 		}
 		ids, err := s.relationshipService.ListAssignedTesteeIDs(ctx, scope.OrgID, *scope.ClinicianID)
 		if err != nil {
@@ -265,7 +254,6 @@ func (s *service) resolveScope(ctx context.Context, scope Scope) (resolvedScope,
 			OrgID:               scope.OrgID,
 			TesteeIDs:           uniqueUint64(ids),
 			RestrictToTesteeIDs: true,
-			IncludeAssignments:  true,
 		}, true, nil
 	default:
 		return resolvedScope{}, false, errors.WithCode(code.ErrInvalidArgument, "unsupported workbench scope")

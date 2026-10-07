@@ -25,8 +25,6 @@ const (
 	PriorityP2   Priority = "p2"
 )
 
-var readyIndexBuckets = []string{string(PriorityP0), string(PriorityP1), string(PriorityP2)}
-
 // SettlementPolicy describes how a transport settles a returned handler error.
 type SettlementPolicy string
 
@@ -300,10 +298,6 @@ func (r *EffectiveRegistry) PriorityBucket(eventType string) string {
 		return string(evt.Priority)
 	}
 	return string(PriorityP2)
-}
-
-func (r *EffectiveRegistry) ReadyIndexBuckets() []string {
-	return append([]string(nil), readyIndexBuckets...)
 }
 
 func (r *EffectiveRegistry) Consumers(eventType string) []ConsumerSpec {

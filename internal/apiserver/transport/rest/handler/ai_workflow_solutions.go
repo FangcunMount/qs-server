@@ -9,12 +9,12 @@ import (
 )
 
 type AIWorkflowSolutionHandler struct {
-	*AIWorkflowPromptDraftHandler
+	*aiWorkflowHandlerSupport
 	solutions *app.SolutionAdministration
 }
 
 func NewAIWorkflowSolutionHandler(s *app.SolutionAdministration) *AIWorkflowSolutionHandler {
-	return &AIWorkflowSolutionHandler{NewAIWorkflowPromptDraftHandler(nil), s}
+	return &AIWorkflowSolutionHandler{newAIWorkflowHandlerSupport("draft"), s}
 }
 func (h *AIWorkflowSolutionHandler) Read(operation string) gin.HandlerFunc {
 	return func(c *gin.Context) {

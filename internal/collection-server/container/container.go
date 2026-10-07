@@ -522,20 +522,6 @@ func (c *Container) CatalogConcurrencyGate() *concurrency.Gate {
 	return c.catalogConcurrencyGate
 }
 
-func (c *Container) AssessmentModelCatalogQueryService() *appmodelcatalog.QueryService {
-	if c == nil {
-		return nil
-	}
-	return c.assessmentModelCatalogQueryService
-}
-
-func (c *Container) TypologyModelQueryService() *typologymodel.QueryService {
-	if c == nil {
-		return nil
-	}
-	return c.typologyModelQueryService
-}
-
 func (c *Container) QuestionnaireQueryService() *questionnaire.QueryService {
 	if c == nil {
 		return nil

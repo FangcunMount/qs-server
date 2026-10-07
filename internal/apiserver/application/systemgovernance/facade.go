@@ -28,7 +28,6 @@ type Facade interface {
 	GetGapRecoverySummary(ctx context.Context, orgID int64) (GapRecoverySummary, error)
 	GetCache(ctx context.Context, window string) (*CacheView, error)
 	GetResilience(ctx context.Context, window string) (*ResilienceView, error)
-	GetCheckpoints(ctx context.Context, window string) (*CheckpointView, error)
 	ListActions(ctx context.Context) (*ActionsView, error)
 	RunAction(ctx context.Context, orgID int64, actionID string, req ActionRunRequest) (*ActionRunResult, error)
 }
@@ -194,14 +193,6 @@ func (f *facade) GetResilience(ctx context.Context, window string) (*ResilienceV
 		return nil, err
 	}
 	return f.resilienceCollector().Collect(ctx, evalCtx)
-}
-
-func (f *facade) GetCheckpoints(ctx context.Context, window string) (*CheckpointView, error) {
-	evalCtx, err := f.newEvaluationContext(ctx, window)
-	if err != nil {
-		return nil, err
-	}
-	return f.checkpointCollector().Collect(ctx, evalCtx)
 }
 
 func (f *facade) eventCollector() eventGovernanceCollector {

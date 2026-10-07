@@ -54,7 +54,7 @@ func TestOperatorUpdatePersistsClearedProjectionPending(t *testing.T) {
 	op := domain.NewOperator(1, 2, "projection test")
 	op.SetID(3)
 	now := time.Now()
-	op.ReplaceRolesProjection([]domain.Role{domain.Role("qs:assessment_operator")}, nil, 12, &now, false)
+	op.ReplaceRolesProjection([]domain.Role{domain.Role("qs:assessment_operator")}, 12, &now, false)
 	if err := NewOperatorRepository(db).Update(context.Background(), op); err != nil {
 		t.Fatal(err)
 	}

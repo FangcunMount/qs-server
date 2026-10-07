@@ -7,6 +7,9 @@ import (
 	"testing"
 
 	bridge "github.com/FangcunMount/qs-server/internal/apiserver/application/aibridge"
+	grpctransport "github.com/FangcunMount/qs-server/internal/apiserver/transport/grpc"
+	servergrpc "github.com/FangcunMount/qs-server/internal/pkg/grpc"
+	"google.golang.org/grpc"
 )
 
 type relayStore struct {
@@ -64,9 +67,20 @@ func TestMQRetirementNeverStartsLegacyTransportOrExportsResultIngress(t *testing
 			if store.calls.Load() != 0 {
 				t.Fatal("legacy sender was scheduled")
 			}
-			if m.ExportGRPCDeps().AIWorkflowResults != nil {
-				t.Fatal("retired result write ingress exported")
-			}
+			assertRetiredResultIngressNotRegistered(t, m)
 		})
+	}
+}
+
+func assertRetiredResultIngressNotRegistered(t *testing.T, module *Module) {
+	t.Helper()
+	server := &servergrpc.Server{Server: grpc.NewServer()}
+	t.Cleanup(server.Stop)
+	registry := grpctransport.NewRegistry(grpctransport.Deps{Server: server, Interpretation: module.ExportGRPCDeps()})
+	if err := registry.RegisterServices(); err != nil {
+		t.Fatal(err)
+	}
+	if _, registered := server.GetServiceInfo()["qsai.workflow.v1.Results"]; registered {
+		t.Fatal("retired result write ingress registered in runtime")
 	}
 }

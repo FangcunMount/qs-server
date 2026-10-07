@@ -85,13 +85,12 @@ func persistOperatorRoleProjection(ctx context.Context, repo domain.Repository, 
 		return fmt.Errorf("operator projection policy version is invalid or stale")
 	}
 	direct := normalizedProjectedRoles(projection.DirectRoles)
-	effective := normalizedProjectedRoles(projection.DirectRoles)
-	if operatorRolesEqual(op.Roles(), direct) && operatorRolesEqual(op.EffectiveRoles(), effective) &&
+	if operatorRolesEqual(op.Roles(), direct) && operatorRolesEqual(op.EffectiveRoles(), direct) &&
 		op.AuthzPolicyVersion() == projection.PolicyVersion && op.AuthzProjectionPending() == pending {
 		return nil
 	}
 	now := time.Now().UTC()
-	op.ReplaceRolesProjection(direct, effective, projection.PolicyVersion, &now, pending)
+	op.ReplaceRolesProjection(direct, projection.PolicyVersion, &now, pending)
 	return repo.Update(ctx, op)
 }
 

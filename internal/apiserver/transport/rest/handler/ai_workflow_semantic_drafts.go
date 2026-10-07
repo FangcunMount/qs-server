@@ -9,12 +9,12 @@ import (
 )
 
 type AIWorkflowSemanticDraftHandler struct {
-	*AIWorkflowPromptDraftHandler
+	*aiWorkflowHandlerSupport
 	drafts *app.SemanticDraftAdministration
 }
 
 func NewAIWorkflowSemanticDraftHandler(s *app.SemanticDraftAdministration) *AIWorkflowSemanticDraftHandler {
-	return &AIWorkflowSemanticDraftHandler{NewAIWorkflowPromptDraftHandler(nil), s}
+	return &AIWorkflowSemanticDraftHandler{newAIWorkflowHandlerSupport("draft"), s}
 }
 func (h *AIWorkflowSemanticDraftHandler) Read(operation string) gin.HandlerFunc {
 	return func(c *gin.Context) {

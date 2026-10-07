@@ -75,19 +75,6 @@ func (s *ProfileLinkService) HasActiveProfileLink(ctx context.Context, userID, p
 	return resp.GetHasProfileLink(), nil
 }
 
-// HasActiveProfileLinkWithDetails 检查用户是否拥有指定 Profile 的 active link（返回详细信息）。
-func (s *ProfileLinkService) HasActiveProfileLinkWithDetails(ctx context.Context, userID, profileID string) (*identityv2.HasProfileLinkResponse, error) {
-	if !s.enabled {
-		return nil, fmt.Errorf("profile link service not enabled")
-	}
-	ctx, release, err := s.acquire(ctx)
-	if err != nil {
-		return nil, err
-	}
-	defer release()
-	return s.client.HasProfileLink(ctx, userID, profileID)
-}
-
 // ValidateProfileExists 验证 IAM Profile 是否存在。
 func (s *ProfileLinkService) ValidateProfileExists(ctx context.Context, profileID string) error {
 	if !s.enabled {
@@ -126,21 +113,6 @@ func (s *ProfileLinkService) ValidateProfileExists(ctx context.Context, profileI
 	return nil
 }
 
-// ListProfiles 列出用户 active ProfileLink 关联的 Profile。
-func (s *ProfileLinkService) ListProfiles(ctx context.Context, userID string) (*identityv2.ListProfilesResponse, error) {
-	if !s.enabled {
-		return nil, fmt.Errorf("profile link service not enabled")
-	}
-	ctx, release, err := s.acquire(ctx)
-	if err != nil {
-		return nil, err
-	}
-	defer release()
-	return s.client.ListProfiles(ctx, &identityv2.ListProfilesRequest{
-		UserId: userID,
-	})
-}
-
 // ListProfileLinks lists active ProfileLinks for a Profile.
 func (s *ProfileLinkService) ListProfileLinks(ctx context.Context, profileID string) (*identityv2.ListProfileLinksResponse, error) {
 	if !s.enabled {
@@ -154,58 +126,6 @@ func (s *ProfileLinkService) ListProfileLinks(ctx context.Context, profileID str
 	return s.client.ListProfileLinks(ctx, &identityv2.ListProfileLinksRequest{
 		ProfileId: profileID,
 	})
-}
-
-// EstablishProfileLink creates a ProfileLink.
-func (s *ProfileLinkService) EstablishProfileLink(ctx context.Context, req *identityv2.EstablishProfileLinkRequest) (*identityv2.EstablishProfileLinkResponse, error) {
-	if !s.enabled {
-		return nil, fmt.Errorf("profile link service not enabled")
-	}
-	ctx, release, err := s.acquire(ctx)
-	if err != nil {
-		return nil, err
-	}
-	defer release()
-	return s.client.EstablishProfileLink(ctx, req)
-}
-
-// RevokeProfileLink revokes a ProfileLink.
-func (s *ProfileLinkService) RevokeProfileLink(ctx context.Context, req *identityv2.RevokeProfileLinkRequest) (*identityv2.RevokeProfileLinkResponse, error) {
-	if !s.enabled {
-		return nil, fmt.Errorf("profile link service not enabled")
-	}
-	ctx, release, err := s.acquire(ctx)
-	if err != nil {
-		return nil, err
-	}
-	defer release()
-	return s.client.RevokeProfileLink(ctx, req)
-}
-
-// BatchRevokeProfileLinks revokes ProfileLinks in batch.
-func (s *ProfileLinkService) BatchRevokeProfileLinks(ctx context.Context, req *identityv2.BatchRevokeProfileLinksRequest) (*identityv2.BatchRevokeProfileLinksResponse, error) {
-	if !s.enabled {
-		return nil, fmt.Errorf("profile link service not enabled")
-	}
-	ctx, release, err := s.acquire(ctx)
-	if err != nil {
-		return nil, err
-	}
-	defer release()
-	return s.client.BatchRevokeProfileLinks(ctx, req)
-}
-
-// ImportProfileLinks imports ProfileLinks in batch.
-func (s *ProfileLinkService) ImportProfileLinks(ctx context.Context, req *identityv2.ImportProfileLinksRequest) (*identityv2.ImportProfileLinksResponse, error) {
-	if !s.enabled {
-		return nil, fmt.Errorf("profile link service not enabled")
-	}
-	ctx, release, err := s.acquire(ctx)
-	if err != nil {
-		return nil, err
-	}
-	defer release()
-	return s.client.ImportProfileLinks(ctx, req)
 }
 
 // Raw 返回原始 SDK 客户端（用于高级用法）

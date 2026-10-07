@@ -70,15 +70,10 @@ func (m *OperatorMapper) ToDomain(po *OperatorPO) *domain.Operator {
 	for i, roleStr := range po.Roles {
 		roles[i] = domain.Role(roleStr)
 	}
-	effectiveRoles := make([]domain.Role, len(po.EffectiveRoles))
-	for i, roleStr := range po.EffectiveRoles {
-		effectiveRoles[i] = domain.Role(roleStr)
-	}
 
 	// 从仓储恢复状态
 	item.RestoreFromRepository(
 		roles,
-		effectiveRoles,
 		po.AuthzPolicyVersion,
 		po.AuthzProjectedAt,
 		po.AuthzProjectionPending,

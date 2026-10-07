@@ -50,8 +50,6 @@ type Result struct {
 	ActionRequestID            string
 }
 
-func (r Result) ShouldRetry() bool { return r.Status == "failed" && r.Retryable }
-
 type Engine interface {
 	Evaluate(context.Context, uint64) error
 }

@@ -8,7 +8,6 @@ import (
 )
 
 type managementStub struct {
-	cancel   EvaluationCancel
 	reopen   EvaluationReopen
 	finalize EvaluationFinalize
 	review   EvaluationReview

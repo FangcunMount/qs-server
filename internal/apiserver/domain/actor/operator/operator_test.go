@@ -4,7 +4,7 @@ import "testing"
 
 func TestOperatorRoleProjectionIsCopied(t *testing.T) {
 	item := NewOperator(1, 10, "operator")
-	item.ReplaceRolesProjection([]Role{RoleAssessmentOperator}, []Role{RoleAssessmentOperator}, 1, nil, false)
+	item.ReplaceRolesProjection([]Role{RoleAssessmentOperator}, 1, nil, false)
 
 	roles := item.Roles()
 	if len(roles) != 1 || roles[0] != RoleAssessmentOperator {
@@ -14,7 +14,7 @@ func TestOperatorRoleProjectionIsCopied(t *testing.T) {
 
 func TestOperatorRolesReturnsCopy(t *testing.T) {
 	item := NewOperator(1, 10, "operator")
-	item.ReplaceRolesProjection([]Role{RoleAssessmentOperator}, []Role{RoleAssessmentOperator}, 1, nil, false)
+	item.ReplaceRolesProjection([]Role{RoleAssessmentOperator}, 1, nil, false)
 
 	roles := item.Roles()
 	roles[0] = RoleQSAdmin
@@ -25,11 +25,10 @@ func TestOperatorRolesReturnsCopy(t *testing.T) {
 	}
 }
 
-func TestReplaceRolesProjectionIgnoresInheritedEffectiveArgument(t *testing.T) {
+func TestReplaceRolesProjectionKeepsEffectiveRolesDirect(t *testing.T) {
 	item := NewOperator(1, 10, "operator")
 	item.ReplaceRolesProjection(
 		[]Role{RoleAssessmentOperator},
-		[]Role{RoleAssessmentOperator, RoleResultReviewer},
 		7,
 		nil,
 		false,

@@ -132,8 +132,8 @@ func (s *Operator) deactivate() {
 
 // === 仓储层重建方法（用于从数据库加载）===
 
-// ReplaceRolesProjection replaces the non-authoritative IAM role projection.
-func (s *Operator) ReplaceRolesProjection(directRoles, effectiveRoles []Role, policyVersion int64, projectedAt *time.Time, pending bool) {
+// ReplaceRolesProjection stores direct IAM roles in both compatibility projections.
+func (s *Operator) ReplaceRolesProjection(directRoles []Role, policyVersion int64, projectedAt *time.Time, pending bool) {
 	s.roles = append([]Role(nil), directRoles...)
 	s.effectiveRoles = append([]Role(nil), directRoles...)
 	s.authzPolicyVersion = policyVersion
@@ -150,7 +150,6 @@ func (s *Operator) ReplaceRolesProjection(directRoles, effectiveRoles []Role, po
 // 这些方法绕过领域服务的验证，仅用于从持久化存储加载数据
 func (s *Operator) RestoreFromRepository(
 	roles []Role,
-	effectiveRoles []Role,
 	authzPolicyVersion int64,
 	authzProjectedAt *time.Time,
 	authzProjectionPending bool,

@@ -14,7 +14,7 @@ func TestRoleProjectionReconcilerConvergesPendingOperator(t *testing.T) {
 
 	op := domain.NewOperator(1, 101, "operator")
 	op.SetID(201)
-	op.ReplaceRolesProjection([]domain.Role{domain.RoleResultReviewer}, []domain.Role{domain.RoleResultReviewer}, 10, nil, true)
+	op.ReplaceRolesProjection([]domain.Role{domain.RoleResultReviewer}, 10, nil, true)
 	repo := &pendingProjectionRepoStub{operators: []*domain.Operator{op}}
 	gateway := &projectionGatewayStub{projection: iambridge.OperatorRoleProjection{
 		DirectRoles:    []string{string(domain.RoleEvaluationPlanManager)},
@@ -44,7 +44,7 @@ func TestRoleProjectionReconcilerPreservesPendingOnIAMFailure(t *testing.T) {
 
 	op := domain.NewOperator(1, 101, "operator")
 	op.SetID(201)
-	op.ReplaceRolesProjection(nil, nil, 10, nil, true)
+	op.ReplaceRolesProjection(nil, 10, nil, true)
 	repo := &pendingProjectionRepoStub{operators: []*domain.Operator{op}}
 	reconciler := NewRoleProjectionReconciler(repo, &projectionGatewayStub{err: errors.New("IAM unavailable")})
 

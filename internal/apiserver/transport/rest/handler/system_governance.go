@@ -70,22 +70,9 @@ func (h *SystemGovernanceHandler) PendingReplayAudits(c *gin.Context) {
 		h.Error(c, err)
 		return
 	}
-	limit := 50
-	if raw := c.Query("limit"); raw != "" {
-		parsed, parseErr := strconv.Atoi(raw)
-		if parseErr != nil || parsed < 1 || parsed > 100 {
-			c.JSON(http.StatusBadRequest, gin.H{"message": "limit must be between 1 and 100"})
-			return
-		}
-		limit = parsed
-	}
-	cursor := c.Query("cursor")
-	if cursor != "" {
-		parsed, parseErr := strconv.ParseUint(cursor, 10, 64)
-		if parseErr != nil || parsed == 0 {
-			c.JSON(http.StatusBadRequest, gin.H{"message": "invalid cursor"})
-			return
-		}
+	cursor, limit, ok := governanceNumericPage(c)
+	if !ok {
+		return
 	}
 	result, err := h.facade.ListPendingReplayAudits(c.Request.Context(), orgID, cursor, limit)
 	if err != nil {
@@ -117,12 +104,27 @@ func (h *SystemGovernanceHandler) DeliveryReplayReviews(c *gin.Context) {
 		h.Error(c, err)
 		return
 	}
+	cursor, limit, ok := governanceNumericPage(c)
+	if !ok {
+		return
+	}
+	result, err := h.facade.ListDeliveryReplayReviews(c.Request.Context(), orgID, cursor, limit)
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+	h.Success(c, result)
+}
+
+// governanceNumericPage validates the two audit worklists whose cursor is a
+// positive uint64. Reminder and retry worklists keep their opaque cursors.
+func governanceNumericPage(c *gin.Context) (string, int, bool) {
 	limit := 50
 	if raw := c.Query("limit"); raw != "" {
 		parsed, parseErr := strconv.Atoi(raw)
 		if parseErr != nil || parsed < 1 || parsed > 100 {
 			c.JSON(http.StatusBadRequest, gin.H{"message": "limit must be between 1 and 100"})
-			return
+			return "", 0, false
 		}
 		limit = parsed
 	}
@@ -131,15 +133,10 @@ func (h *SystemGovernanceHandler) DeliveryReplayReviews(c *gin.Context) {
 		parsed, parseErr := strconv.ParseUint(cursor, 10, 64)
 		if parseErr != nil || parsed == 0 {
 			c.JSON(http.StatusBadRequest, gin.H{"message": "invalid cursor"})
-			return
+			return "", 0, false
 		}
 	}
-	result, err := h.facade.ListDeliveryReplayReviews(c.Request.Context(), orgID, cursor, limit)
-	if err != nil {
-		h.Error(c, err)
-		return
-	}
-	h.Success(c, result)
+	return cursor, limit, true
 }
 
 // ReminderReviews lists uncertain task-opened reminder sends for manual

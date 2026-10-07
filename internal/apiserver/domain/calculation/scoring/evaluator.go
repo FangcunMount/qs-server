@@ -4,14 +4,12 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/calculation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/calculation/capability"
 )
 
 // Evaluator executes scale factor scoring and risk classification.
 type Evaluator struct {
 	scoringRegistry StrategyRegistry
-	calculator      *calculation.Engine
 }
 
 // StrategyRegistry executes scale factor aggregation strategies.
@@ -26,7 +24,6 @@ func NewEvaluator(scoringRegistry StrategyRegistry) *Evaluator {
 	}
 	return &Evaluator{
 		scoringRegistry: scoringRegistry,
-		calculator:      calculation.NewEngine(scaleCalculationRegistry{registry: scoringRegistry}),
 	}
 }
 
@@ -82,20 +79,4 @@ func sumValues(values []float64) float64 {
 		total += value
 	}
 	return total
-}
-
-type scaleCalculationRegistry struct {
-	registry StrategyRegistry
-}
-
-func (r scaleCalculationRegistry) Score(ctx context.Context, dimension calculation.Dimension, values []float64) (float64, error) {
-	if r.registry == nil {
-		return 0, nil
-	}
-	factor := Factor{Code: dimension.Code, ScoringStrategy: dimension.StrategyCode}
-	if capability.Supports(capability.PathScaleDescriptor, capability.UsageCompositeProjection, dimension.StrategyCode) &&
-		!capability.Supports(capability.PathScaleDescriptor, capability.UsageQuestionAggregation, dimension.StrategyCode) {
-		factor.ChildCodes = []string{"_"}
-	}
-	return r.registry.ScoreFactor(ctx, factor, values)
 }

@@ -175,10 +175,6 @@ func (c SubmissionContext) Admission() Admission {
 	return c.admission
 }
 
-func (c SubmissionContext) HasAdmission() bool {
-	return !c.admission.IsZero()
-}
-
 func (c SubmissionContext) Attribution() AttributionSnapshot { return c.attribution }
 
 func (c SubmissionContext) clone() SubmissionContext {

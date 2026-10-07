@@ -41,8 +41,7 @@ type Module struct {
 	TaskReminderStateReader       planApp.TaskReminderStateReader
 	FollowUpQueueReader           planreadmodel.FollowUpQueueReader
 
-	eventPublisher      event.EventPublisher
-	testeeAccessService actorAccessApp.TesteeAccessService
+	eventPublisher event.EventPublisher
 }
 
 // Deps defines explicit constructor dependencies for the plan module.
@@ -69,7 +68,6 @@ func New(deps Deps) (*Module, error) {
 
 	module := &Module{}
 	module.eventPublisher = planEntryInfra.NewCommitPublisher(normalized.EventPublisher)
-	module.testeeAccessService = normalized.TesteeAccess
 
 	mysqlOptions := mysql.BaseRepositoryOptions{Limiter: normalized.MySQLLimiter}
 	basePlanRepo := planInfra.NewPlanRepository(normalized.MySQLDB, mysqlOptions)

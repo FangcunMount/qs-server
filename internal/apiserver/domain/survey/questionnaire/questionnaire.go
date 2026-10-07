@@ -159,7 +159,6 @@ func (q *Questionnaire) GetRecordRole() RecordRole {
 	}
 	return q.recordRole
 }
-func (q *Questionnaire) IsHead() bool { return q.GetRecordRole() == RecordRoleHead }
 func (q *Questionnaire) IsPublishedSnapshot() bool {
 	return q.GetRecordRole() == RecordRolePublishedSnapshot
 }
@@ -227,11 +226,6 @@ func (q *Questionnaire) SetActivePublished(active bool) {
 	}
 }
 
-func (q *Questionnaire) SetReleaseStatus(status ReleaseStatus) {
-	q.releaseStatus = NormalizeReleaseStatus(status, q.isActivePublished)
-	q.isActivePublished = q.releaseStatus.IsActive()
-}
-
 // GetQuestionByCode 根据问题编码获取问题
 func (q *Questionnaire) GetQuestionByCode(c meta.Code) (Question, bool) {
 	for _, que := range q.GetQuestions() {
@@ -269,12 +263,6 @@ func (q *Questionnaire) RemoveQuestion(questionCode meta.Code) error {
 		return newError(ErrorKindInvalidQuestion, "问题编码不能为空")
 	}
 	return q.removeQuestion(questionCode)
-}
-
-// RemoveAllQuestions 清空问卷中的所有问题。
-func (q *Questionnaire) RemoveAllQuestions() {
-	q.questions = []Question{}
-	q.questionCnt = 0
 }
 
 // ReplaceQuestions 替换问卷中的全部问题，并校验问题编码唯一。

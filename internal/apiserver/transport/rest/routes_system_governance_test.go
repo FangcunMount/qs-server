@@ -20,7 +20,6 @@ type stubSystemGovernanceFacade struct {
 	events            *systemgov.EventsView
 	cache             *systemgov.CacheView
 	resilience        *systemgov.ResilienceView
-	checkpoints       *systemgov.CheckpointView
 	candidates        *systemgov.RetryCandidatePage
 	candidateFn       func(int64, string, int) (*systemgov.RetryCandidatePage, error)
 	pendingFn         func(int64, string, int) (*systemgov.PendingReplayAuditPage, error)
@@ -397,13 +396,6 @@ func (s stubSystemGovernanceFacade) GetResilience(context.Context, string) (*sys
 		return s.resilience, nil
 	}
 	return &systemgov.ResilienceView{}, nil
-}
-
-func (s stubSystemGovernanceFacade) GetCheckpoints(context.Context, string) (*systemgov.CheckpointView, error) {
-	if s.checkpoints != nil {
-		return s.checkpoints, nil
-	}
-	return &systemgov.CheckpointView{}, nil
 }
 
 func (s stubSystemGovernanceFacade) ListActions(context.Context) (*systemgov.ActionsView, error) {

@@ -1,9 +1,10 @@
+# 直接运行 air 时默认启动 apiserver；多服务开发使用 make dev。
 root = "."
 testdata_dir = "testdata"
 tmp_dir = "tmp"
 
 [build]
-  args_bin = ["--config=configs/qs-apiserver.yaml"]
+  args_bin = ["--config=configs/apiserver.dev.yaml"]
   bin = "./tmp/main"
   cmd = "go build -o ./tmp/main ./cmd/qs-apiserver"
   delay = 1000
