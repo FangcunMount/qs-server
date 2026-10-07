@@ -422,10 +422,10 @@ DefinitionV2 支持 FactorGraph、Factor Source、sign、weight 和 option overr
 
 第二种更符合“模型配置与算法 DTO 分离”的长期方向。
 
-### 14.2 capability 元数据不一致
+### 14.2 capability 只描述运行能力
 
-`FamilyCapability` 中 scale 的部分 authoring 字段仍为 false，但 `management.Service`、ScaleDefinitionHandler 和 publication 已支持创建、编辑与发布。
-当前这些字段没有实际阻断管理服务，属于需要收敛的设计债务。
+`FamilyCapability` 只保留模型类型、是否可执行和执行路径。没有消费者的创建、列表、发布、绑定与编辑标志已删除。
+Scale 的创建、编辑与发布仍由 `management.Service`、ScaleDefinitionHandler 和 publication 的实际校验决定，不能从运行能力表推断管理操作权限。
 
 ### 14.3 scale 暂不支持常模
 
