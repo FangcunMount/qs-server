@@ -74,21 +74,6 @@ func (c *MultiCache[TDetail, TList, TCategories, THot]) SetDetail(code string, v
 	c.detail.Set(c.hooks.DetailKey(code), value)
 }
 
-func (c *MultiCache[TDetail, TList, TCategories, THot]) GetList(key string) (TList, bool) {
-	var zero TList
-	if c == nil || c.list == nil {
-		return zero, false
-	}
-	return c.list.Get(key)
-}
-
-func (c *MultiCache[TDetail, TList, TCategories, THot]) SetList(key string, value TList) {
-	if c == nil || c.list == nil || isNilValue(value) {
-		return
-	}
-	c.list.Set(key, value)
-}
-
 func (c *MultiCache[TDetail, TList, TCategories, THot]) GetListByRequest(req any) (TList, bool) {
 	if c == nil || c.list == nil || c.hooks.ListKey == nil {
 		var zero TList
@@ -117,36 +102,6 @@ func (c *MultiCache[TDetail, TList, TCategories, THot]) SetCategories(value TCat
 		return
 	}
 	c.categories.Set(c.hooks.CategoriesKey, value)
-}
-
-func (c *MultiCache[TDetail, TList, TCategories, THot]) GetHot(key string) (THot, bool) {
-	var zero THot
-	if c == nil || c.hot == nil {
-		return zero, false
-	}
-	return c.hot.Get(key)
-}
-
-func (c *MultiCache[TDetail, TList, TCategories, THot]) SetHot(key string, value THot) {
-	if c == nil || c.hot == nil || isNilValue(value) {
-		return
-	}
-	c.hot.Set(key, value)
-}
-
-func (c *MultiCache[TDetail, TList, TCategories, THot]) GetHotByRequest(req any) (THot, bool) {
-	if c == nil || c.hot == nil || c.hooks.HotKey == nil {
-		var zero THot
-		return zero, false
-	}
-	return c.hot.Get(c.hooks.HotKey(req))
-}
-
-func (c *MultiCache[TDetail, TList, TCategories, THot]) SetHotByRequest(req any, value THot) {
-	if c == nil || c.hot == nil || c.hooks.HotKey == nil || isNilValue(value) {
-		return
-	}
-	c.hot.Set(c.hooks.HotKey(req), value)
 }
 
 func (c *MultiCache[TDetail, TList, TCategories, THot]) EvictOnSignal(code string) {

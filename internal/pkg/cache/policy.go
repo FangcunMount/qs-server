@@ -83,13 +83,6 @@ func (p Policy) TTLOr(defaultTTL time.Duration) time.Duration {
 	return defaultTTL
 }
 
-func (p Policy) NegativeTTLOr(defaultTTL time.Duration) time.Duration {
-	if p.NegativeTTL > 0 {
-		return p.NegativeTTL
-	}
-	return defaultTTL
-}
-
 func (p Policy) NegativeEnabled(defaultValue bool) bool {
 	return p.Negative.Enabled(defaultValue)
 }
