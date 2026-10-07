@@ -133,7 +133,7 @@ class FakeRuntime:
 
 class Contracts(unittest.TestCase):
     def setUp(self):
-        self.temporary = tempfile.TemporaryDirectory(dir="/private/tmp", prefix="cbpt-test-")
+        self.temporary = tempfile.TemporaryDirectory(dir=str(Path(tempfile.gettempdir()).resolve()), prefix="cbpt-test-")
         self.root = Path(self.temporary.name)
         self.binary = self.root / "tool"
         self.binary.write_bytes(b"fixture")
