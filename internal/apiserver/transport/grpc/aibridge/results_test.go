@@ -15,7 +15,7 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-func TestMQRetiredResultsRPCNeverAcknowledgesAuthenticatedEvents(t *testing.T) {
+func TestMQRetiredResultsRPCNeverPersistsOrAcknowledges(t *testing.T) {
 	r := &Receiver{}
 	cert := &x509.Certificate{Subject: pkix.Name{CommonName: "qs-ai.svc"}}
 	ctx := peer.NewContext(t.Context(), &peer.Peer{AuthInfo: credentials.TLSInfo{State: tls.ConnectionState{PeerCertificates: []*x509.Certificate{cert}, VerifiedChains: [][]*x509.Certificate{{cert}}}}})
