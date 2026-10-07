@@ -93,20 +93,20 @@ func TestEvaluationManagementConnectionUsesMutualTLSAndCloses(t *testing.T) {
 	}
 	defer server.Stop()
 	go func() { _ = server.Serve(listener) }()
-	client, closer, err := DialEvaluationManagement(listener.Addr().String(), caPath, certPath, keyPath)
+	clients, err := DialGovernance(listener.Addr().String(), caPath, certPath, keyPath)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer func() { _ = closer.Close() }()
+	defer func() { _ = clients.Connection.Close() }()
 	scope := app.EvaluationScope{RunID: "00000000-0000-4000-8000-000000000001", OrganizationID: 1, OperatorUserID: 1}
-	value, err := client.GetEvaluation(context.Background(), scope)
+	value, err := clients.Evaluation.GetEvaluation(context.Background(), scope)
 	if err != nil || value.Version != 1 {
 		t.Fatalf("%+v %v", value, err)
 	}
-	if err := closer.Close(); err != nil {
+	if err := clients.Connection.Close(); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := client.GetEvaluation(context.Background(), scope); err == nil {
+	if _, err := clients.Evaluation.GetEvaluation(context.Background(), scope); err == nil {
 		t.Fatal("closed connection remained usable")
 	}
 }

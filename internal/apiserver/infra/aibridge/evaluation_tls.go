@@ -11,24 +11,6 @@ import (
 	"google.golang.org/grpc/credentials"
 )
 
-func DialEvaluationManagement(address, caFile, certFile, keyFile string) (*EvaluationClient, io.Closer, error) {
-	evaluation, _, connection, err := DialGovernanceManagement(address, caFile, certFile, keyFile)
-	return evaluation, connection, err
-}
-
-func DialGovernanceManagement(address, caFile, certFile, keyFile string) (*EvaluationClient, *PublicationClient, io.Closer, error) {
-	evaluation, publication, _, connection, err := DialGovernanceClients(address, caFile, certFile, keyFile)
-	return evaluation, publication, connection, err
-}
-
-func DialGovernanceClients(address, caFile, certFile, keyFile string) (*EvaluationClient, *PublicationClient, *PromptDraftClient, io.Closer, error) {
-	clients, err := DialGovernance(address, caFile, certFile, keyFile)
-	if err != nil {
-		return nil, nil, nil, nil, err
-	}
-	return clients.Evaluation, clients.Publications, clients.PromptDrafts, clients.Connection, nil
-}
-
 type GovernanceClients struct {
 	Payloads       *MessagingPayloadClient
 	Flows          *FlowClient
