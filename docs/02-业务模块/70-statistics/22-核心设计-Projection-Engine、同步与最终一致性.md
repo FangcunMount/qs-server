@@ -6,7 +6,7 @@
 ## 1. 本文回答
 
 1. T+1 到底同步什么、同步到哪个日期；
-2. Projection Engine 与五个 Projection 分别拥有什么责任；
+2. Projection Engine 与六个 Projection 分别拥有什么责任；
 3. Fact、Daily、Snapshot 哪些步骤处在同一事务；
 4. 为什么 Plan Fulfillment 第一版全量重建；
 5. MySQL 已提交但缓存失败时怎样表达；
@@ -19,9 +19,9 @@ Statistics 每天按机构执行一个可重跑批次：
 ```text
 获取租约
   -> 创建 SyncRun
-  -> Data Collector 构建三类 Fact
+  -> Data Collector 构建四类 Fact
   -> 对账来源与 Fact
-  -> Projection Engine 在单事务内执行五个 Projection
+  -> Projection Engine 在单事务内执行六个 Projection
   -> 标记 data_committed 并提交
   -> 切换机构缓存 Generation
   -> 标记 succeeded
@@ -72,6 +72,7 @@ ProjectionEngine
   AccessDailyProjection
   AssessmentDailyProjection
   PlanActivityDailyProjection
+  StoreActivityDailyProjection
   PlanFulfillmentProjection
   OrganizationSnapshotProjection
 ```
@@ -106,9 +107,12 @@ ProjectionRequest
 
 ### 4.4 三种 Projection 语义
 
+生产装配分 Daily Engine 与 Global Engine：前者显式执行 Access、Assessment、PlanActivity、StoreActivity 四个日窗口 Projection；
+后者执行 PlanFulfillment 与 OrganizationSnapshot。逻辑上有五张 Daily 表，Fulfillment 按机构全量重建，不能与四个窗口执行器的数量混用。
+
 | 类型 | Projection | 输入 | 语义 |
 | --- | --- | --- | --- |
-| 窗口事实 | Access / Assessment / PlanActivity | 指定日期窗口 Fact | 事件发生量 |
+| 窗口事实 | Access / Assessment / PlanActivity / StoreActivity | 指定日期窗口 Fact | 事件发生量 |
 | 截止日 cohort | PlanFulfillment | 全量 Plan Fact + 固定 cutoff | 应履约与逾期 |
 | 当前状态快照 | OrganizationSnapshot | 当前 MySQL 资源状态 + Fact 累计 | 最近机构观察 |
 
@@ -318,10 +322,11 @@ Access -> Assessment -> Plan
 2. Engine 调用 AccessDailyProjection；
 3. Engine 调用 AssessmentDailyProjection；
 4. Engine 调用 PlanActivityDailyProjection；
-5. Coordinator 将 SyncRun 标记为 `succeeded`；
-6. Coordinator 提交。
+5. Engine 调用 StoreActivityDailyProjection；
+6. Coordinator 将 SyncRun 标记为 `succeeded`；
+7. Coordinator 提交。
 
-`publish` 在上述三个 Daily Projection 之后继续：
+`publish` 在上述四个 Daily Projection 之后继续：
 
 1. 锁定当前机构 Snapshot 并校验水位只能单调前进；
 2. Engine 调用 PlanFulfillmentProjection；
@@ -550,7 +555,7 @@ Scheduler 只有一个 Statistics Coordinator，不存在版本模式或影子�
 - Outcome 和 Report 不再使用同一阶段近似；
 - Plan Activity 和 Fulfillment 分别对账。
 - Engine 只调度 Projection，不包含指标分支；
-- 五个 Projection 共用同一外层事务，任一失败均不发布部分结果。
+- 六个 Projection 共用同一外层事务，任一失败均不发布部分结果。
 
 ## 17. 当前实现入口
 

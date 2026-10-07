@@ -6,13 +6,13 @@
 
 后台受试者及医生列表的专业测评摘要始终受测评读取权限保护；医生身份和照护关系不能替代该动作权限。无权限时不读取或返回评分与风险摘要，独立自服务路径仍沿用既有关系规则。
 
-Store 是 Actor 内的服务门店聚合根，医生归属配置与二维码失效规则见[门店与医生配置](./20-核心设计-身份、关系与资源授权.md#8-门店与医生配置)。
+Store 是 Actor 内的服务门店聚合根。Testee 拥有当前服务门店与归属版本；后台按 IAM 动作权限及门店 Scope 访问，开展门店由 Survey 在作答开始时冻结。归属配置与二维码失效规则见[门店与医生配置](./20-核心设计-身份、关系与资源授权.md#8-门店与医生配置)。
 
 Actor 回答四组问题：
 
 1. **谁是受试者，谁实际提交了答卷？** Testee 表示被测评的人，Filler 表示这一次操作答卷的 IAM User；两者可以是同一人，也可以是患者与家长。
 2. **谁在机构内工作，谁承担医疗服务？** Operator 是 IAM User 在 qs-server 某个机构内的操作与授权投影；Clinician 是医生、咨询师、治疗师等业务从业者。一个人可以同时拥有二者，但两个概念不能合并。
-3. **医生为什么能查看某位受试者？** ClinicianTesteeRelation 记录照护关系；Actor access service 把 IAM 授权快照与有效照护关系组合成受试者访问范围。
+3. **医生为什么能查看某位受试者？** ClinicianTesteeRelation 记录照护关系；它与后台 IAM 动作/门店 Scope、参与者 ProfileLink 是三组独立事实，不能互相代替。
 4. **门诊二维码怎样变成可执行测评上下文？** AssessmentEntry 把公开 token 解析为机构、医生和测评编码，再完成受试者建档和照护关系建立。
 
 ```text
@@ -47,7 +47,8 @@ IAM 和 Actor 解决的是不同问题：
 | 在机构内具有什么平台能力 | 授权快照、角色与权限 | Operator 保存本地业务投影并消费授权结果 |
 | 谁是测评主体 | 不负责 | Testee |
 | 谁是医生、咨询师或治疗师 | 不负责 | Clinician |
-| 医生可访问哪些患者 | 不负责业务关系 | ClinicianTesteeRelation 与 TesteeAccessService |
+| 后台可操作哪些受试者 | IAM 动作权限与门店 Scope | 当前 Operator、Testee 公司/门店归属及资源 ownership |
+| 医生服务哪些患者 | 不负责业务关系 | ClinicianTesteeRelation；不据此恢复已退役医生后台身份 |
 | 门诊二维码属于谁、指向什么 | 不负责 | AssessmentEntry |
 
 项目早期曾在 qs-server 内解析微信身份并组织 User，后来升级为 IAM 统一身份系统。现在正确的边界是：
@@ -58,7 +59,8 @@ IAM 和 Actor 解决的是不同问题：
 
 | 对象 | 类型 | 核心身份 | 主要不变量 |
 | --- | --- | --- | --- |
-| Testee | 聚合根 | `org_id + testee_id`，可选 `profile_id` | 受试者属于单一机构；同一机构内 Profile 不应绑定多个 Testee |
+| Testee | 聚合根 | `org_id + testee_id`，可选 `profile_id`、`store_id` | 公司归属稳定；当前门店变更单独版本化；Profile 同公司不应重复绑定 |
+| Store | 聚合根 | `org_id + store_id` | 门店编号公司内唯一；未配置不是公司全部范围 |
 | FillerRef | 跨模块值对象 | IAM `user_id + filler_type` | 记录实际提交者，不替代 Testee |
 | TesteeRef | 跨模块值对象 | `testee_id`，可带 `profile_id` | 只携带稳定引用，不共享可变聚合 |
 | Operator | 聚合根 | `org_id + user_id` | 同一 User 在同一机构只有一个 Operator；直接/有效角色只作 IAM 投影；停用不撤销 IAM Assignment |
@@ -82,7 +84,7 @@ FillerType = guardian
 
 ### 4.2 Operator 与 Clinician
 
-Operator 是后台登录与平台操作身份；Clinician 是提供医疗或干预服务的业务身份。运营人员可以只有 Operator；暂时不登录 qs-server 的医生可以先有 Clinician；医生要使用后台能力时，再把 Clinician 绑定到 Operator。
+Operator 是后台登录与平台操作身份；Clinician 是提供医疗或干预服务的业务身份。运营人员可以只有 Operator；暂时不登录 qs-server 的医生可以先有 Clinician；医生后台身份与 Operator—Clinician 绑定入口已退役；后台由有效 Operator 和 IAM 动作/门店 Scope 授权。
 
 ### 4.3 creator 与访问关系
 
@@ -117,11 +119,11 @@ Actor 参与首尾两段：前段把公开入口变成确定的业务参与者�
 | Testee 建档与 IAM Profile 绑定 | 已实现 | 支持按 Profile 幂等确认，也支持无 Profile 的临时受试者 |
 | AnswerSheet 保存 Testee 与 Filler | 已实现 | SubmissionContext 同时要求 Testee、Filler、Org；历史数据允许缺字段重建 |
 | Operator 与 IAM User 对接 | 已实现 | 支持账号创建、机构内投影和 IAM AuthZ v4 授权同步；无本地角色写入回退 |
-| Clinician 独立业务身份 | 已实现 | 支持类型、科室、职称、工号、激活状态及 Operator 绑定 |
-| 照护关系与访问范围 | 已实现 | admin 机构范围；非 admin 必须绑定 Clinician 并具有有效访问型关系 |
+| Clinician 独立业务身份 | 已实现 | 支持类型、科室、职称、工号、激活状态及同公司服务门店；不绑定后台 Operator |
+| 照护关系与后台访问范围 | 已实现 | 照护关系保留业务历史；后台 action+Scope 校验当前公司及门店归属，参与者单独校验 active ProfileLink |
 | AssessmentEntry 解析与 Intake | 已实现 | token 解析、建档、creator/attending 关系和统计日志在事务内编排 |
 | 入口始终使用最新发布版本 | 设计已确认、实现未完全收敛 | 当前仍存在可选 `target_version`，记录在重构清单 |
-| 高风险重点关注投影 | 已实现并完成生产闭环 | Worker 为报告事件持久化 projection ledger，失败自动重试并以 Artifact fact reconcile 发现漏建记录；只自动标记、不自动取消。2026-08-06 前后两批 33+91 个历史缺口均已按独立清单精确收敛；入口退役后对账确认 projection 仅有 succeeded、168 份 high/severe 缺口与重复均为 0，生产 fact reconcile 已关闭且固定清单为空 |
+| 高风险重点关注投影 | 已实现，当前运行证据单列 | durable projection ledger、event_id 去重、重试与人工处置；历史缺口恢复次数不证明当前 checkout 已部署或生产对账完成 |
 
 ## 7. 文档地图
 

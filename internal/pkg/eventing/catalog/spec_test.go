@@ -1,7 +1,12 @@
 package eventcatalog
 
 import (
+	"fmt"
+	"go/ast"
+	"go/parser"
+	"go/token"
 	"os"
+	"regexp"
 	"slices"
 	"strconv"
 	"strings"
@@ -23,6 +28,7 @@ func loadDefaultRegistry(t *testing.T) *EffectiveRegistry {
 
 func TestEffectiveRegistryAndContractMatrixStayInSync(t *testing.T) {
 	registry := loadDefaultRegistry(t)
+	stores := loadMatrixStoreTokens(t)
 	matrixBytes, err := os.ReadFile("../../../../docs/03-基础设施/event/20-事件契约与演进.md")
 	if err != nil {
 		t.Fatalf("read event matrix: %v", err)
@@ -45,7 +51,7 @@ func TestEffectiveRegistryAndContractMatrixStayInSync(t *testing.T) {
 			"Owner":              evt.Owner,
 			"Delivery":           string(evt.Delivery),
 			"Profile":            string(evt.OutboxProfile),
-			"Store":              matrixStoreToken(evt.OutboxProfile),
+			"Store":              matrixStoreToken(t, evt.OutboxProfile, stores),
 			"Immediate":          strconv.FormatBool(evt.Immediate),
 			"Priority":           string(evt.Priority),
 			"Handler":            evt.PrimaryHandler,
@@ -91,14 +97,179 @@ func TestEffectiveRegistryAndContractMatrixStayInSync(t *testing.T) {
 	}
 }
 
-func matrixStoreToken(profile OutboxProfile) string {
-	switch profile {
-	case OutboxProfileMongoDomain:
-		return "Mongo domain_event_outbox"
-	case OutboxProfileAssessmentMySQL:
-		return "MySQL domain_event_outbox"
-	default:
+func matrixStoreToken(t *testing.T, profile OutboxProfile, stores map[OutboxProfile]string) string {
+	t.Helper()
+	if profile == "" {
 		return "none"
+	}
+	store, ok := stores[profile]
+	if !ok {
+		t.Fatalf("no host storage evidence for profile %q", profile)
+	}
+	return store
+}
+
+func loadMatrixStoreTokens(t *testing.T) map[OutboxProfile]string {
+	t.Helper()
+	read := func(path string) string {
+		t.Helper()
+		data, err := os.ReadFile("../../../../" + path)
+		if err != nil {
+			t.Fatalf("read host storage evidence %s: %v", path, err)
+		}
+		return string(data)
+	}
+	stores, err := deriveMatrixStoreTokens(
+		read("internal/apiserver/process/standard_event_subsystem_m4.go"),
+		read("internal/apiserver/infra/mysql/standardoutbox/status.go"),
+		read("internal/pkg/migration/migrations/mysql/000084_standard_reliable_outbox.up.sql"),
+	)
+	if err != nil {
+		t.Fatalf("derive current host stores: %v", err)
+	}
+	return stores
+}
+
+// Read the actual composition and query rather than copy a second store-name
+// catalog into the test. Fail closed when a source shape changes: that change
+// requires reviewing the documentation contract, not silently skipping a cell.
+func deriveMatrixStoreTokens(mongoComposition, mysqlStatus, migration string) (map[OutboxProfile]string, error) {
+	mongoBody, err := contractFunction(mongoComposition, "buildM4StandardEventSubsystem")
+	if err != nil {
+		return nil, err
+	}
+	var collections []string
+	ast.Inspect(mongoBody, func(node ast.Node) bool {
+		call, ok := node.(*ast.CallExpr)
+		if !ok {
+			return true
+		}
+		method, ok := call.Fun.(*ast.SelectorExpr)
+		if !ok || method.Sel.Name != "Collection" {
+			return true
+		}
+		db, ok := method.X.(*ast.SelectorExpr)
+		if !ok || db.Sel.Name != "MongoDB" {
+			return true
+		}
+		owner, ok := db.X.(*ast.Ident)
+		if !ok || owner.Name != "opts" {
+			return true
+		}
+		value := ""
+		if len(call.Args) == 1 {
+			value, _ = contractStringLiteral(call.Args[0])
+		}
+		collections = append(collections, value)
+		return true
+	})
+	if len(collections) != 1 || collections[0] == "" {
+		return nil, fmt.Errorf("expected one literal host Mongo Collection, found %v", collections)
+	}
+	mysqlBody, err := contractFunction(mysqlStatus, "OutboxStatusSnapshot")
+	if err != nil {
+		return nil, err
+	}
+	var queries []string
+	ast.Inspect(mysqlBody, func(node ast.Node) bool {
+		call, ok := node.(*ast.CallExpr)
+		if !ok {
+			return true
+		}
+		method, ok := call.Fun.(*ast.SelectorExpr)
+		if !ok || method.Sel.Name != "QueryContext" {
+			return true
+		}
+		query := ""
+		if len(call.Args) >= 2 {
+			query, _ = contractStringLiteral(call.Args[1])
+		}
+		queries = append(queries, query)
+		return true
+	})
+	if len(queries) != 1 || !regexp.MustCompile(`(?i)^\s*SELECT\b`).MatchString(queries[0]) {
+		return nil, fmt.Errorf("expected one literal SELECT in MySQL status reader, found %v", queries)
+	}
+	from := regexp.MustCompile("(?i)\\bFROM\\s+`?([A-Za-z_][A-Za-z0-9_]*)`?\\b").FindAllStringSubmatch(queries[0], -1)
+	if len(from) != 1 || regexp.MustCompile(`(?i)\b(JOIN|UNION)\b`).MatchString(queries[0]) {
+		return nil, fmt.Errorf("expected one unambiguous MySQL status FROM object")
+	}
+	table := from[0][1]
+	if collections[0] != table {
+		return nil, fmt.Errorf("Mongo collection %q and MySQL status table %q disagree", collections[0], table)
+	}
+	create := regexp.MustCompile("(?im)^\\s*CREATE\\s+TABLE(?:\\s+IF\\s+NOT\\s+EXISTS)?\\s+`?([A-Za-z_][A-Za-z0-9_]*)`?\\s*\\(").FindAllStringSubmatch(migration, -1)
+	declarations := 0
+	for _, match := range create {
+		if match[1] == table {
+			declarations++
+		}
+	}
+	if declarations != 1 {
+		return nil, fmt.Errorf("MySQL status table %q has %d standard migration declarations", table, declarations)
+	}
+	return map[OutboxProfile]string{
+		OutboxProfileMongoDomain:     "Mongo " + collections[0],
+		OutboxProfileAssessmentMySQL: "MySQL " + table,
+	}, nil
+}
+
+func contractFunction(source, name string) (*ast.BlockStmt, error) {
+	file, err := parser.ParseFile(token.NewFileSet(), "host.go", source, 0)
+	if err != nil {
+		return nil, err
+	}
+	var bodies []*ast.BlockStmt
+	for _, declaration := range file.Decls {
+		if fn, ok := declaration.(*ast.FuncDecl); ok && fn.Name.Name == name && fn.Body != nil {
+			bodies = append(bodies, fn.Body)
+		}
+	}
+	if len(bodies) != 1 {
+		return nil, fmt.Errorf("expected one host function %s, found %d", name, len(bodies))
+	}
+	return bodies[0], nil
+}
+
+func contractStringLiteral(expr ast.Expr) (string, error) {
+	literal, ok := expr.(*ast.BasicLit)
+	if !ok || literal.Kind != token.STRING {
+		return "", fmt.Errorf("host contract is not a literal string")
+	}
+	return strconv.Unquote(literal.Value)
+}
+
+func TestMatrixStoreEvidenceRejectsAmbiguousAndRetiredSources(t *testing.T) {
+	// A different coherent current name succeeds: no rm_outbox hard-coded oracle.
+	mongo := `package host; func buildM4StandardEventSubsystem() { opts.MongoDB.Collection("current_store") }`
+	mysql := `package host; func OutboxStatusSnapshot() { r.db.QueryContext(ctx, "SELECT state FROM current_store WHERE state <> 'published'") }`
+	migration := "CREATE TABLE current_store (id BIGINT);\nCREATE TABLE replay_ledger (id BIGINT);"
+	stores, err := deriveMatrixStoreTokens(mongo, mysql, migration)
+	if err != nil || stores[OutboxProfileMongoDomain] != "Mongo current_store" || stores[OutboxProfileAssessmentMySQL] != "MySQL current_store" {
+		t.Fatalf("coherent host stores = %v, error = %v", stores, err)
+	}
+	for _, tc := range []struct {
+		name, mongo, mysql, migration string
+	}{
+		{"retired-mongo", strings.ReplaceAll(mongo, "current_store", "domain_event_outbox"), mysql, migration},
+		{"retired-mysql", mongo, strings.ReplaceAll(mysql, "current_store", "domain_event_outbox"), migration},
+		{"retired-sources-vs-migration", strings.ReplaceAll(mongo, "current_store", "domain_event_outbox"), strings.ReplaceAll(mysql, "current_store", "domain_event_outbox"), migration},
+		{"missing-mongo", "package host; func buildM4StandardEventSubsystem() {}", mysql, migration},
+		{"multiple-mongo", strings.Replace(mongo, " }", `; opts.MongoDB.Collection("current_store") }`, 1), mysql, migration},
+		{"dynamic-mongo", strings.ReplaceAll(mongo, `"current_store"`, "collectionName"), mysql, migration},
+		{"missing-mysql", mongo, "package host; func OutboxStatusSnapshot() {}", migration},
+		{"multiple-mysql", mongo, strings.Replace(mysql, " }", `; r.db.QueryContext(ctx, "SELECT state FROM current_store") }`, 1), migration},
+		{"multiple-from", mongo, strings.ReplaceAll(mysql, "WHERE state", "WHERE id IN (SELECT id FROM current_store) AND state"), migration},
+		{"dynamic-mysql", mongo, "package host; func OutboxStatusSnapshot() { r.db.QueryContext(ctx, query) }", migration},
+		{"missing-migration", mongo, mysql, "CREATE TABLE unrelated (id BIGINT);"},
+		{"duplicate-migration", mongo, mysql, migration + "\nCREATE TABLE current_store (id BIGINT);"},
+		{"malformed-go", "not a Go file", mysql, migration},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if got, err := deriveMatrixStoreTokens(tc.mongo, tc.mysql, tc.migration); err == nil {
+				t.Fatalf("inconsistent/ambiguous source accepted: %v", got)
+			}
+		})
 	}
 }
 

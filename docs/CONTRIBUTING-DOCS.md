@@ -32,6 +32,12 @@
 
 同一事实只在一个 canonical 文档讲透，其它地方摘要并回链。
 
+README 维护导航，领域模型维护对象与不变量，设计专篇维护取舍，链路维护顺序与失败窗口。问题台账保留稳定 ID、当前状态、未决项、关闭条件及可回查证据；发现时的代码快照和实施过程退出现行正文。
+
+关闭问题时，同批修改所有原诊断正文；顶部新增“已修复”而正文继续称“当前缺口”不算完成。动态计数由机器清单核对，历史测试、部署和现场数字必须注明日期与版本，不复述成当前状态。
+
+抽出的 SDK 维护通用对象、协议和算法。宿主文档维护版本绑定的接入、事务与资源所有权、业务事件/效果、权限和恢复。引用库文档时绑定 QS 实际依赖版本，不把邻库 main 的新能力写成当前宿主能力。
+
 ## 4. 状态标签
 
 - 正文事实状态使用 `已实现`、`待补证据`、`规划改造`、`历史资料`：它说明某一条行为陈述的成熟度。
@@ -148,8 +154,8 @@ python scripts/check_docs_hygiene.py --fix --reflow
 `--reflow` 还会把正文段落折到约 120 列，并拼回被错误折断的中文/英文行，但不改信息指纹。facts 验证 active taxonomy、反引号仓库源码路径、目录预算、模块/事件入口、版本/API
 数量、scheduler/config 清单、关键状态、Mongo audit 与性能计划。反引号路径若只是历史已删除位置，应改写为历史说明并指向当前防回流测试或 Git 历史，不能继续伪装成现行事实入口。
 
-`docs-facts` 还必须验证 `document-closure.json` 对 164 篇 primary 文档和 27 篇 maintained sidecar 的 exact coverage、source
-baseline、状态枚举、七模块七轴签署、十项基础设施七轴签署，以及 REST/gRPC/Event/Signal/Migration 等机器契约 ratchet。164 超过 150 的评审目标但低于 165 硬上限，
+`docs-facts` 还必须验证 `document-closure.json` 对 165 篇 primary 文档和 42 篇 maintained sidecar 的 exact coverage、source
+baseline、状态枚举、七模块七轴签署、十项基础设施七轴签署，以及 REST/gRPC/Event/Signal/Migration 等机器契约 ratchet。165 超过 150 的评审目标且达到 165 硬上限，
 例外理由记录在 `budgets.exceptions`，不能据此继续无审查扩张。
 
 台账中的 `checkout_ref: git:HEAD` 是动态工作区引用；历史 CI、部署和生产 SHA 使用独立字段，不得要求它们等于 HEAD。

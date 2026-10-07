@@ -1,0 +1,1588 @@
+# interpretation 问题台账历史快照（2026-10-07）
+> 快照来源提交：`2ccc2de44bbd45e26d29e7e130da518cc32426f0`；原文 SHA256：`2833f5d3708bfc4bffa085716d06644bfaafd307e620da5651eb1f24871a2d5b`。只调整引用位置，历史结论仍按原记录时点解释。
+
+> 历史资料：保存收口前完整正文。原文件为 docs/02-业务模块/40-interpretation/90-设计问题与重构清单.md，归档前原文 sha256=2833f5d3708bfc4bffa085716d06644bfaafd307e620da5651eb1f24871a2d5b。
+> 相对链接已按归档位置重基；正文与历史结论保持原文。
+> 本快照中的“当前”“已发布”“已关闭”与生产样本仅属于原文的日期和证据边界，不代表本次 checkout 或部署；不进入现行事实阅读路径。
+
+# Interpretation 设计问题与重构清单
+
+> 历史验收判定（2026-08-06）：当时为**有条件通过，无开放** `FINAL-P1`。历史展示、双版本模板发布、严格路由、AdmissionFailure、成品来源、RetryDecision、Lease、Catalog
+> 对账与 Attention 33 + 91 缺口在当时闭环，5 个具名兼容候选计划观察至 2026-09-05。该闭环、观察窗口和生产结论没有针对当前 checkout 或本轮文档差异重跑；
+> 当前版本证据以[当前版本定档验收台账](../../../00-总览/09-当前版本定档验收台账.md)为准。
+
+## 1. 本文的用法
+
+本文不再重复 Interpretation 的完整架构，而是回答：
+
+1. 完成本轮领域模型、核心设计和关键链路分析后，实际发现了哪些问题；
+2. 哪些问题会影响隐私、结果语义或可靠恢复，哪些只是版本治理、扩展性和性能债务；
+3. 问题跨越 Evaluation、ModelCatalog、Actor、collection-server 或基础设施时，各模块分别保护什么；
+4. 后续开启单独重构时，应从哪个稳定编号开始，满足什么条件才能关闭。
+
+使用约定：
+
+- 后续分析报告、Issue、提交和 PR 优先引用 `IR-Rxxx`；
+- 实施前必须重新核对当时源码、事件契约、配置、migration 和真实数据；
+- 一次重构只处理经过确认的有界问题，不因为都与报告有关就一次重写整个 Interpretation；
+- 涉及已提交 Outcome、历史 InterpretReport 或医生已经使用的报告时，默认保护历史语义，不就地覆盖；
+- 安全问题的修复不能依赖“当前 DTO 恰好没输出这个字段”或“缓存通常不会命中”；
+- 问题修复后更新状态、实施证据、验收结果和剩余风险，不直接删除条目。
+
+---
+
+## 2. 30 秒结论
+
+Interpretation 的核心主干已经成立：
+
+```text
+committed EvaluationOutcome
+  -> frozen InterpretationInput
+  -> ReportGeneration identity
+  -> InterpretationRun attempt / lease / RetryDecision
+  -> mechanism-aware Builder
+  -> immutable InterpretReport
+  -> report_query_catalog
+  -> authorized Actor + Audience projection
+  -> interpreted composite read state
+```
+
+当前问题不是“报告模块应该推倒重写”。本版需要区分三类事项：
+
+1. **已闭环主链**：授权后读正文、严格模板路由、不可变 Artifact、可靠终态、AdmissionFailure、三类 RetryDecision 投影、统一 Lease 与 Catalog/Attention 对账均已进入当前代码和生产证据；
+2. **具名兼容观察**：旧 `GenerateReportFromAssessment` 等候选只服务观察期，窗口完成也不自动授权删除；
+3. **独立后续能力**：ReportRow V2、多 ReportType/多版本查询、复杂 Audience 和机制专属章节由真实业务或容量触发，不是本版缺口。
+
+下文 4.1～4.2 保留 2026-07-23～24 的实施过程；其中“未完成证据”是当时快照，已由 2026-08-06 总台账中的生产治理记录取代。
+
+治理原则是：
+
+> 先关闭会造成越权观察、返回错误报告正文或改变 Outcome 结论的问题；再补齐失败治理和历史版本证据；最后才处理查询性能、协议美化和未来多报告能力。
+
+---
+
+## 3. 优先级与状态语义
+
+### 3.1 优先级
+
+| 级别 | 含义 | 判定标准 |
+| --- | --- | --- |
+| P0 | 隐私、访问控制、结果语义或报告正确性风险 | 可能让调用者观察不属于自己的测评、返回错误人的正文、静默选择错误模板或由报告层改变结果等级 |
+| P1 | 可靠恢复、历史审计和版本一致性风险 | 不一定立即生成错误内容，但会让失败无法治理、历史来源无法证明或后置状态长期不收敛 |
+| P2 | 查询契约、性能和可维护性债务 | 主要影响大机构工作台、新客户端接入、排障成本或新机制维护成本 |
+| P3 | 需要真实产品、合规或容量需求才启动 | 多 ReportType、复杂 Audience、机制专属章节等能力不能只凭技术想象预建 |
+
+P0 不表示必须在一个大 PR 中同时解决，而表示在开展低优先级结构优化前，应先关闭风险或建立经过测试的防线。它属于 `IR-Rxxx` 模块风险命名空间，不与 `FINAL-P*` 互换。
+
+### 3.2 双轴状态
+
+单一“已实现待验收”不能区分“代码尚未接线”“生产未启用”和“只缺运行证据”。每个重构项必须同时维护以下两列。
+
+| 实现阶段 | 含义 |
+| --- | --- |
+| 未实施 | 只有问题与目标设计，尚无生产代码 |
+| 部分实现 | 已存在局部防线，但原问题仍有可达路径 |
+| 已实现未接线 | 代码已经存在，但没有 composition root、路由、调度器或消费者接入 |
+| 已接线未启用 | 运行链已具备，但生产配置或功能开关仍关闭 |
+| 已接线 | 当前源码和配置已形成可达闭环 |
+| 已发布 | 已确认部署到生产；不代表已经完成运行验收 |
+| 冻结候选 | 只有业务触发条件，不进入默认迭代 |
+
+| 验收结论 | 含义 |
+| --- | --- |
+| 未进入验收 | 尚未具备完整可验收实现，或被前置项阻塞 |
+| 阻塞 | 已确认存在必做代码、接线、配置或数据工作 |
+| 待集成验收 | 单元/包测试成立，仍缺跨进程、真实存储或消费者验证 |
+| 待数据/运行验收 | 仍缺历史数据、容量、故障注入或生产观察证据 |
+| 待业务验收 | 代码路径存在，但产品、医疗或合规语义尚未确认 |
+| 已接受边界 | 当前适用调用链、产品范围和风险防线已明确，不作为当前版本必做项 |
+| 兼容观察 | canonical 路径已迁移，旧入口按具名指标和期限观察，删除需另行授权 |
+| 可关闭 | 所有关闭证据已齐全，等待台账复核 |
+| 已关闭 | 代码、数据、测试、消费方、运行配置和文档均完成，无剩余必做项 |
+
+### 3.3 当前关闭判断
+
+关闭判断必须同时核对当前代码、生产数据和适用调用链。本版已经确认：
+
+- 状态缓存命中和正文加载都先完成资源归属/关联校验；
+- Artifact、Catalog、Run、Generation 与 Outbox 同事务提交，Catalog 有独立 audit/repair plan；
+- TemplateVersion 已形成 `legacy-v1` / `2026-08-v1` 双版本发布目录，ModelCatalog/Outcome 显式冻结；
+- RetryDecision 同时进入 Run、failed event 和等待端投影；
+- BuilderIdentity 与 ContentSchemaVersion 固化到 Artifact/Mongo/事件；
+- Attention 持久 ledger 与受控 FactReconciler 已完成两批历史恢复并归零。
+
+历史描述仍用于解释设计动机，但不能覆盖上面的当前事实。
+
+---
+
+## 4. 重构总表
+
+| ID | 优先级 | 问题 | 实现阶段 | 验收结论 | 主要影响面 |
+| --- | --- | --- | --- | --- | --- |
+| IR-R001 | P0 | medical / typology 状态缓存命中可绕过 Assessment ownership | 已发布 | 已关闭 | collection-server、报告状态、患者隐私 |
+| IR-R002 | P0 | Catalog 加载正文时不复验 Assessment / Org / Testee 关联 | 已发布 | 已关闭 | 报告正文越界、一致性损坏 |
+| IR-R003 | P0 | Administration Audience 不随真实行为人收窄 | 已接线 | 已接受边界 | 当前 DTO 不暴露差异；扩展章节前需业务矩阵 |
+| IR-R004 | P0 | 非法 typology runtime spec 与未知 TemplateID 静默回落 | 已发布 | 已关闭 | 模板路由、冻结输入正确性 |
+| IR-R005 | P0 | 解释规则缺口使用最后一条规则兜底 | 已发布 | 已关闭 | 因子解释正确性、发布门禁 |
+| IR-R006 | P0 | Interpretation 可能补写缺失 Level，越过 Outcome 边界 | 已发布 | 已关闭 | Evaluation → Interpretation 结果语义 |
+| IR-R007 | P1 | InterpretReport 构造器缺少最小内容完整性契约 | 已发布 | 已关闭 | 空成品、机制不匹配内容 |
+| IR-R008 | P1 | Outcome/Input 解码失败发生在 Generation / Run 之前 | 已发布 | 已关闭 | 独立 AdmissionFailure 证据 |
+| IR-R009 | P1 | `report.failed` 不携带完整 RetryDecision | 已发布 | 已关闭 | Worker、等待端、治理工作台 |
+| IR-R010 | P1 | `manual_required` 没有稳定的客户端状态投影 | 已发布 | 已关闭 | `waiting_manual_action` 投影 |
+| IR-R011 | P1 | lease 时长、扫描周期和恢复历史没有形成统一治理契约 | 已发布 | 已关闭 | 统一配置、恢复历史与指标 |
+| IR-R012 | P1 | Run duplicate 未完全归一为 claim conflict | 已发布 | 已关闭 | 并发重放、无意义 NACK |
+| IR-R013 | P1 | TemplateVersion 仍是固定 `legacy-v1`，没有发布资产闭环 | 已发布 | 已关闭 | 10 个双版本 release、显式路由 |
+| IR-R014 | P1 | Artifact 未固化 BuilderIdentity 与 ContentSchemaVersion | 已发布 | 已关闭 | 成品来源证明、schema 迁移 |
+| IR-R015 | P1 | Catalog 与运行时集合缺少持续对账和单一 migration 契约 | 已发布 | 已关闭 | Audit、repair plan、migration 与生产归零 |
+| IR-R016 | P1 | Participant gRPC 未端到端绑定 IAM User 与 Testee | 已接线未启用 | 已接受边界 | 非活动调用链；启用前必须重新验收 |
+| IR-R017 | P1 | 历史报告维度展示读取当前发布配置 | 已发布 | 已关闭 | 36,860 个 profile 等价物化 |
+| IR-R018 | P1 | attention sync 是 best-effort，失败没有持久化补偿 | 已发布 | 已关闭 | 持久 ledger；33 + 91 恢复归零 |
+| IR-R019 | P2 | ReportRow 与外部协议缺少统一来源包络和 V2 契约 | 未实施 | 未进入验收 | 多模型报告、追溯与兼容 |
+| IR-R020 | P2 | Operations 按 ReportID 查询在授权前加载完整 Artifact | 已发布 | 已关闭 | 最小读取原则、运维查询 |
+| IR-R021 | P2 | Assessment 组合状态列表形成 N+1 Catalog 查询 | 已发布 | 已关闭 | 批量 Catalog/source metadata |
+| IR-R022 | P2 | Catalog 深分页、大 `$in`、count/page 不是稳定快照 | 未实施 | 已接受边界 | 达到大机构容量触发条件后再启动 |
+| IR-R023 | P2 | Preview 与生产使用不同 Builder 解析路径 | 已发布 | 已关闭 | 共享 Registry/resolver，架构测试保护 |
+| IR-R024 | P2 | `GenerateReportFromAssessment` 名称与 Outcome 驱动语义漂移 | 已发布 | 兼容观察 | canonical RPC 已切换；旧入口观察至 2026-09-05 |
+| IR-R025 | P3 | Catalog 的 Assessment 单行模型无法表达多 ReportType / 多版本 | 冻结候选 | 待业务验收 | 患者版、医生版、简版、完整版 |
+| IR-R026 | P3 | Audience 只有 ModelExtra 一个章节且业务矩阵未固化 | 冻结候选 | 待业务验收 | 患者、家长、医生、管理员展示 |
+| IR-R027 | P3 | Norm 与 Task Builder 仍主要复用 FactorScoring 内容结构 | 冻结候选 | 待业务验收 | 行为评定、认知测验专属报告 |
+
+### 4.1 2026-07-23 实施证据（历史快照）
+
+本轮已形成以下源码闭环，但没有把任何项目直接标记为“已关闭”：
+
+- IR-R002 / IR-R015：在线读取与离线 reconcile 共用关联字段校验；reconcile 已进入 HA 一致性调度器，并提供组织范围只读运维查询。
+  Archive 缺失 OrgID 的权威回填与受控 Repair 已在 2026-07-24 接线，仍需真实 Mongo 与历史数据验收。
+- IR-R006：Evaluation RuntimeDescriptor 已显式声明 OutcomeCompletenessPolicy；
+  Committer 落库前验证 Primary / Dimension Level 或 classification identity，Registry 缺策略即拒绝启动。
+- IR-R008：AdmissionFailure 已增加带审计权限的按 Outcome 查询入口；稳定 typed reason 与受控 readmit 动作已在 2026-07-24 接线，仍需跨进程和真实存储验收。
+- IR-R011：新增按 BuilderIdentity 与固定 result 分类的 Build / Run duration histogram；是否启用 fencing heartbeat 必须等待生产耗时与 lease 余量证据。
+- IR-R016：生产配置已切换 gRPC ACL default-deny，并对 delegated subject 的启用配置、5 分钟 TTL、current/previous key 轮换建立启动校验。真实密钥投放、双方灰度和轮换演练仍是发布门禁。
+- IR-R020：Operations 按 ReportID 查询先读取 ID / OrgID / AssessmentID / GenerationID 元数据投影，授权通过后才加载完整 Artifact。
+- IR-R021：Assessment 列表使用一次批量 Catalog/source 元数据读取，返回 `found|missing|dangling|mismatch`，不再逐项读取完整报告。
+- IR-R023：生产和 Preview 共用默认 Builder registry 与 mechanism resolver；Preview 不再直接实例化 Typology Builder。
+- IR-R024：新增 `GenerateReportFromOutcome` RPC，Worker 已迁移；旧 RPC 标记 deprecated、委托同一 Outcome 服务并记录调用指标，删除仍需连续 30 天零调用证据。
+
+### 4.2 2026-07-24 下一阶段实施证据（历史快照）
+
+本轮完成了代码与 composition root 接线，但没有生产、历史数据或真实 Mongo Replica Set 证据，因此下列项目均未标记为“可关闭”或“已关闭”：
+
+- IR-R002 / IR-R015：新增唯一 `ArtifactAssociationValidator`，单读、批量元数据和 reconcile 共用 Assessment / Org / Testee / Outcome /Generation 校验；
+  Archive 缺失 OrgID 统一 fail-closed。新增 drift 明细、7 天 dry-run、二次复验、Mongo CAS 和 `interpretation.catalog_repair` 治理动作；
+  Archive 关联只允许以 committed Outcome 为权威恢复，禁止修改正文、风险与结论。
+- IR-R008：Admission 分类不再依赖错误字符串，使用稳定 typed reason；AdmissionFailure 持久化 committed Outcome
+  version、attempt、decision、first/last failure，并提供组织范围稳定游标查询。`interpretation.readmit_outcome` 只允许重新加载 committed Outcome，
+  校验 fingerprint、版本及主体关联后重接纳。
+- IR-R013：ReportTemplate draft 查询和创建已提供内部接口；publish / disable 只允许通过 System Governance。
+  ModelCatalog typology 发布链必须注入 PublishedTemplateLookup，未发布模板或生产缺少 lookup 时 fail-closed；模板正文仍由版本化代码 Builder 生成。
+- IR-R017：正常历史读取不再绑定当前 ModelCatalog visibility。旧 Archive 缺少冻结 profile 时只允许使用显式版本化的 `legacy_artifact_dimensions/v1` 规则从不可变正文维度恢复；
+  无法形成 profile 时保持不可证明，不读取当前发布配置。历史分布扫描和 compatibility sidecar 仍属于数据验收工作，未取得结果前不能关闭。
+- IR-R018：新增 Artifact fact reconciler，从显式 `attention_projection_reconcile_from` 切点开始扫描高风险不可变报告，发现完全缺失的 Attention projection；
+  默认 dry-run、批量 500、稳定 `GeneratedAt + ReportID` 游标，主体 mismatch 和 `manual_required` 均不自动覆盖。生产启用但缺少切点时配置校验失败。
+- 运维与迁移：新增 Attention fact reconcile 轮次、耗时、missing、连续失败指标，以及 AdmissionFailure stable-reason 指标；
+  Mongo migration `000019_add_interpretation_recovery_indexes` 固化 Attention、AdmissionFailure 和 Catalog repair plan 索引。
+
+当时未完成的证据（已由 2026-08-06 总台账逐项更新）：
+
+- 未提供 `QS_SERVER_TEST_MONGO_URI`，真实 Mongo Replica Set 的 CAS、TTL、稳定游标、Archive 恢复和 500 条批量读取尚未验收；
+- 尚未运行生产历史 dry-run，无法给出 repairable、conflict、ambiguous 与 `legacy_unproven` 的真实分布；
+- Attention 生产切点、抽样核对、小批量创建和至少 24 小时观察尚未执行；
+- ReportTemplate / Preview / ModelCatalog 的跨进程发布负例、生产密钥与 ACL、旧新 RPC 观察仍待对应验收通道完成。
+
+---
+
+## 5. P0：先保护授权、正文关联与结果语义
+
+> 第 5 节及以后保留原问题陈述、目标设计和验收方法；其中“当前事实”指问题发现时的代码快照。2026-08-06 的当前状态以第 4 节总表和总定档台账为准。
+
+### IR-R001：状态缓存命中前必须完成 Assessment ownership 授权
+
+#### IR-R001 当前事实
+
+collection-server 的路由中间件验证：
+
+```text
+IAM User -> Testee ProfileLink
+```
+
+通用 `reportwait.Service` 则先按 AssessmentID 读取 Redis：
+
+```text
+report_status:{assessment_id}
+```
+
+medical 与 typology 的 `report-status` / `wait-report` 在 cache hit 时可直接返回状态，不再调用 `GetMyAssessment(testee_id, assessment_id)`。
+因此下面的错误链路目前可能成立：
+
+```text
+用户合法代表 Testee A
+  -> 请求 Assessment B 的状态
+  -> B 的 Redis 快照命中
+  -> 返回 B 的 stage / status / failure reason
+  -> 没有证明 B 属于 A
+```
+
+behavior facade 和 WebSocket Resolver 已经在读取状态前验证 Assessment，说明这不是无法解决的架构限制，而是不同产品路径的授权顺序不一致。
+
+#### IR-R001 影响
+
+- 可能观察其他 Assessment 是否存在、是否完成或失败；
+- 失败原因、分数摘要等字段可能进一步扩大信息暴露；
+- cache miss 时授权正确、cache hit 时授权缺失，使安全结果依赖运行时缓存状态；
+- 单元测试若只覆盖 Redis miss，会误以为链路已经安全。
+
+#### IR-R001 目标设计
+
+统一成：
+
+```text
+ProfileLink authorization
+  -> AssessmentOwnership.Authorize(TesteeID, AssessmentID)
+  -> report_status cache / DB fallback
+```
+
+可以选择：
+
+1. 为 `reportwait.Service` 注入强制 Authorizer，并在 `GetStatus`、`Wait` 的第一步调用；
+2. 由 medical、typology、behavior 三个 facade 统一调用产品级 `Get/Authorize` 后再读 cache；
+3. 建立共享 `AuthorizedReportStatusQuery`，禁止 Transport 直接访问裸 cache service。
+
+无论选择哪种方案，授权结果不能缓存为普通 status snapshot 的附带假设。
+
+#### IR-R001 验收条件
+
+- Redis hit、miss、unavailable 三条路径的授权结果完全一致；
+- Testee A 查询 Testee B 的 Assessment 状态均被拒绝；
+- medical、typology、behavior、WebSocket 和 legacy wait-report 使用同一授权契约；
+- 授权失败不泄露 Assessment 是否存在；
+- 性能测试确认新增授权不会把高峰查询直接放大为不可控 DB 压力，可使用独立的受控 ownership projection/cache，但不得省略语义验证。
+
+#### IR-R001 证据
+
+- `[reportwait.Service](../../../../internal/collection-server/application/reportwait/service.go)`
+- `[testeeaccess.Authorizer](../../../../internal/collection-server/application/testeeaccess/authorizer.go)`
+- `[TesteeAccessMiddleware](../../../../internal/collection-server/transport/rest/middleware/iam_middleware.go)`
+- `[typologyassessment.QueryService](../../../../internal/collection-server/application/typologyassessment/query_service.go)`
+- `[behaviorassessment.QueryService](../../../../internal/collection-server/application/behaviorassessment/query_service.go)`
+- [从报告查询到组合状态](../../../02-业务模块/40-interpretation/31-关键链路-从报告查询到组合状态.md)
+
+#### IR-R001 实施结果（2026-07-23）
+
+- collection application 新增共享 `testeeaccess.Authorizer`，统一执行 `IAM User -> active ProfileLink -> Testee` 授权；
+  medical、typology、behavior 的报告 REST 中间件与 WebSocket 共用该授权器；
+- `reportwait.Service.GetStatus` 与 `Wait` 在任何 cache / DB 状态读取前复用 `GetMyAssessment` 完成 Assessment ownership 授权；
+  gRPC `NotFound`、`PermissionDenied` 与 nil 均收敛为 `ErrAssessmentAccess`，拒绝时 Redis 调用次数为 0；
+- 首次授权成功取得的 Assessment 仅供紧接着的第一次 DB fallback 复用，避免同一请求立即重复查询；后续等待循环仍读取最新状态；
+- WebSocket 在升级前要求 JWT UserID；首次订阅和终态 signal 再读取均按 `Testee access -> Assessment ownership -> status` 编排，ProfileLink 中途撤销后关闭连接；
+- WS 拒绝帧保持既有 `op:error` 结构：访问拒绝固定为 `forbidden / assessment access denied`，依赖故障固定为 `temporarily_unavailable`，不返回底层错误；
+- HTTP 契约已统一：User → Testee 拒绝为 403，Assessment 不存在或不属于 Testee 为相同 404，授权/查询依赖故障为 503；
+- 增加 `report_status_testee_access_total{result}`、`report_status_testee_access_duration_seconds`，
+  并将 `report_events_subscribe_denied_total{reason}` 限制为固定低基数分类；
+- 单测与真实 WebSocket 连接测试覆盖三种 kind、无 JWT、Testee/Assessment 越权、依赖故障、拒绝前零订阅及 ProfileLink 中途撤销；
+- 2026-07-23 当日仍缺预发联调、容量快照、指定 k6 场景和发布观察，因此当时只记为“已实现待验收”；后续闭环结论以第 4 节当前总表为准；
+- 当前闭环证据：`reportwait.Service.GetStatus` / `Wait` 在 cache、DB fallback 和 notifier 前调用独立 `AuthorizeAssessment`；
+  proto、collection client method 清单与生产 default-deny ACL 均包含该 RPC。
+  `report_status_testee_access_*`、`report_status_assessment_ownership_*` 和
+  `report_events_subscribe_denied_total{reason}` 提供观测，回归测试覆盖 cache hit/miss/unavailable、拒绝前零 cache 访问和 WebSocket 中途撤权。
+  详细当前授权边界统一由[查询模型、授权与 Audience 投影](../../../02-业务模块/40-interpretation/24-核心设计-查询模型、授权与Audience投影.md)维护。
+
+### IR-R002：Catalog 与正文关联必须 fail closed
+
+#### IR-R002 当前事实
+
+`report_query_catalog` 与 Artifact/Archive 都保存 Assessment、Org、Testee 关联。当前 `loadCatalogRows`：
+
+1. 根据 catalog 的 SourceKind / SourceID 批量加载正文；
+2. 只检查 SourceID 是否命中；
+3. 不对比 catalog 与正文的 Association。
+
+正常成功事务会从同一 Artifact 投影 catalog，所以常规写链路不会主动制造错配。但历史 backfill、人工修复、旧脚本或数据损坏可能把已授权 Assessment 的 catalog 指向另一个人的正文。
+
+#### IR-R002 风险
+
+应用层可能已经正确授权 Assessment A，随后读模型却根据错误 SourceID 返回 Assessment B 的完整报告。这是数据一致性错误直接升级为隐私错误的典型路径。
+
+#### IR-R002 目标设计
+
+读模型组装 `ReportRow` 前必须验证：
+
+```text
+catalog.assessment_id == source.assessment_id
+catalog.org_id        == source.org_id
+catalog.testee_id     == source.testee_id
+```
+
+不一致时：
+
+- 返回专用 `CatalogSourceAssociationMismatchError`；
+- 记录 AssessmentID、SourceKind、SourceID 和不一致字段，但不记录报告正文；
+- 增加指标与治理候选；
+- 不降级为 NotFound，也不尝试“猜一个可能正确的来源”。
+
+#### IR-R002 验收条件
+
+- Artifact 来源覆盖错配测试；
+- 详情与列表查询都 fail closed；
+- 错配不会向调用方返回任何正文；
+- backfill verify 与周期对账复用相同关联校验；
+- 运维入口能定位并受控修复 catalog，而不是直接删除报告。
+
+#### IR-R002 证据
+
+- `[artifact_read_model.go](../../../../internal/apiserver/infra/mongo/interpretation/artifact_read_model.go)`
+- `[report_catalog.go](../../../../internal/apiserver/infra/mongo/interpretation/report_catalog.go)`
+- [查询模型、授权与 Audience 投影](../../../02-业务模块/40-interpretation/24-核心设计-查询模型、授权与Audience投影.md)
+
+#### IR-R002 实施结果（2026-07-21）
+
+- `loadCatalogRows` 改为内部 `catalogSourceEnvelope`，在组装 `ReportRow` 前复验 catalog 与 source 的 association；
+- Artifact：比对 `assessment_id` / `org_id` / `testee_id`；
+- 不一致返回 `CatalogSourceAssociationMismatchError`（仅 identity + 不一致字段名，无正文），detail 与 list 均 fail closed；
+- 已增加 pure unit 与 Mongo 集成负例（artifact × detail / list）；
+- 尚缺 backfill verify / 周期对账复用同一校验、运维受控修复入口与生产错配观测，因此状态为“已实现待验收”。
+
+2026-08-15 后 Archive 查询兼容层已从候选代码移除，过去的 Archive 错配测试只作为实施历史，不再属于当前验收矩阵。
+
+### IR-R003：Audience 必须来自真实行为人，而不是调用包名
+
+#### IR-R003 当前事实
+
+Administration 已使用 Access 输出的 `ReportAccessDecision` / `ListScope.Audience`，当前正式装配按 IAM 快照选择
+admin/operator，而不是按调用包名决定可见性。独立 clinician 查询入口已退役，未装配的应用服务已删除。
+受限 clinician/operator 与 admin 的详情和列表可见性由实际 Administration 服务的表驱动测试保护。
+
+#### IR-R003 风险
+
+- 后续 REST V2 补齐字段时，潜在越权会立即暴露；
+- 新增敏感章节时，开发者可能相信 Administration 已正确处理角色；
+- 安全依赖 DTO 丢字段，而不是显式访问决策；
+- 医生、运营与管理员的业务边界不可解释。
+
+#### IR-R003 目标设计
+
+授权服务输出完整决策，而不是只输出 TesteeIDs：
+
+```text
+ReportAccessDecision
+  ActorKind
+  ResourceScope
+  Audience
+  AllowedSections
+  DecisionSource
+  AuditContext
+```
+
+真正只允许管理员使用的路由，应由 admin capability 限定；允许受限 clinician 复用的通用路由，必须使用 clinician Audience。
+
+#### IR-R003 验收条件
+
+- 同一 Actor 通过不同合法入口获得相同 Audience；
+- restricted clinician 不能获得 admin-only 章节；
+- admin、clinician、participant 的章节矩阵有 table-driven tests；
+- Transport 只能序列化已完成 Audience 投影的对象；
+- 新增 Section 时默认拒绝未知 Audience/Section。
+
+#### IR-R003 证据
+
+- `[administration/service.go](../../../../internal/apiserver/application/interpretation/administration/service.go)`
+- [Administration 可见性矩阵](../../../../internal/apiserver/application/interpretation/administration/service_test.go)
+- `[presentation/presenter.go](../../../../internal/apiserver/domain/interpretation/presentation/presenter.go)`
+
+#### IR-R003 实施结果
+
+- 2026-07-21：Administration Access 改为返回 Audience 决策，详情和列表不再硬编码 `AudienceAdmin`；
+- 当前生产 Access 使用 `actor.access.StoreScopeAccess`，以报告 read/list action 和当前门店归属限定查询范围，
+  QS 管理员投影为 admin，其他 Operator 投影为 operator；
+- 2026-10-03：删除未装配的 clinician 报告服务和比较两个实现的重复测试，改由 Administration 详情、列表矩阵
+  验证受限 clinician/operator 隐藏 ModelExtra、admin 保留，授权拒绝时不读取；
+- REST V2 端到端矩阵、完整章节矩阵与生产审计仍须分别验收，当前测试不替代这些证据。
+
+### IR-R004：冻结输入声明存在但非法时不得静默回落
+
+#### IR-R004 当前事实
+
+Outcome Adapter 只在 typology payload `ToRuntimeSpec()` 成功时写入 TemplateID 与 AdapterKey；解码失败时继续构建 InterpretationInput。
+模板 Registry 对未知 TemplateID 也可能回落到默认模板。
+
+这里混合了三种不同情况：
+
+```text
+历史输入确实没有 runtime spec
+当前输入声明了合法 spec
+当前输入声明了 spec，但格式非法或 TemplateID 不存在
+```
+
+只有第一种可以进入明确的历史兼容分支。第三种不应伪装成第一种。
+
+#### IR-R004 风险
+
+- 已冻结配置错误却生成“看起来正常”的默认报告；
+- 运营预览与生产结果难以解释；
+- 重试不会修复语义错误，只会重复生成同一个错误模板；
+- 报告无法证明实际使用的模板与发布配置一致。
+
+#### IR-R004 目标设计
+
+- 输入 schema 明确区分 field absent 与 decode invalid；
+- 非空未知 TemplateID 返回可分类、不可自动重试的配置错误；
+- 历史兼容分支按 schema/version 显式进入，不靠任意 error fallback；
+- 发布阶段验证 TemplateID、AdapterKey 与 DecisionKind 可解析；
+- 生产与 Preview 复用同一纯 resolver。
+
+#### IR-R004 验收条件
+
+- 合法 legacy input 仍可生成；
+- 声明存在但 malformed 的 runtime spec 必须失败并形成可治理证据；
+- 未注册 TemplateID 在发布或运行准入时 fail closed；
+- 错误分类能区分 historical fallback、invalid config 和 unsupported template；
+- 不通过 model code 特判修补个别模型。
+
+#### IR-R004 证据
+
+- `[outcome_record_adapter.go](../../../../internal/apiserver/application/interpretation/automation/input/outcome_record_adapter.go)`
+- `[template_registry.go](../../../../internal/apiserver/domain/interpretation/typology/patterns/template_registry.go)`
+- `[typology payload converter](../../../../internal/apiserver/port/modelcatalog/payload/typology/converter.go)`
+- `[report_routing.go](../../../../internal/apiserver/port/modelcatalog/payload/typology/report_routing.go)`
+
+#### IR-R004 实施结果（2026-07-21）
+
+- 抽取纯 `ResolveTypologyReportRouting`：`!HasExplicitRuntime → historical_legacy`（允许 derive）；
+  显式 runtime 且 `ToRuntimeSpec` 失败 → `ErrRuntimeSpecInvalid` fail closed；成功 → `explicit_runtime`；
+- `FromOutcomeRecord` 与 ModelCatalog preview 共用 `ResolveTypologyReportRouting`，不再吞掉 `ToRuntimeSpec` error；旧的独立 `FromPreviewOutcome` 测试适配器已删除；
+- `PersonalityTypeTemplateForSpec` / `TraitProfileTemplateForSpec`：仅空 TemplateID 允许 AdapterKey 默认；非空未知 TemplateID → `ErrUnknownTemplateID`；
+  `TypologyBuilder` 传播错误；
+- 发布门禁：`ValidateRuntimeSpecForPublish` 与 `validateReportMapAgainstDecision` 校验 TemplateID ∈
+  Registry（`report.template_id.unknown` / `report_section.template_id.unknown`）；
+- 已补测试：legacy absent、explicit valid、malformed runtime、unknown template（routing / adapter / builder / publish）；
+- 尚缺生产治理证据与端到端 Preview/Generation 矩阵，因此状态为“已实现待验收”。
+
+### IR-R005：解释区间缺口不能用最后一条规则掩盖
+
+#### IR-R005 当前事实
+
+旧的“未命中取末条规则”路径已删除；当前剩余兼容面是 `MatchBounds` 的历史末端点闭区间语义，以及无冻结解释资产、无 `InterpretRules` 时的 soft default。这些兼容行为仍可能掩盖：
+
+- 区间空洞；
+- 重叠或无序；
+- 边界端点定义不一致；
+- 分数超出合法范围；
+- 运营配置遗漏。
+
+#### IR-R005 实施结果（2026-07-21）
+
+- 因子存在 `InterpretRules` 但分数未命中时返回可分类的 `ErrInterpretationRuleMiss`，沿报告 builder error 链 fail closed；
+- soft default 仅在没有可用 InterpretationAssets 且没有因子规则时保留；
+- legacy 规则重匹配与 soft default 统一计入 `qs_interpretation_factor_interpretation_compat_total{path=...}`；
+- 未按 model code 增加分支；`MatchBounds` 的历史末端点兼容仍保留，待独立版本化退出。
+
+#### IR-R005 风险
+
+报告可能为某个分数返回没有业务依据的描述和建议。由于报告仍会正常生成，错误比显式失败更难发现。
+
+#### IR-R005 目标设计
+
+1. ModelCatalog 发布时验证区间排序、重叠、端点和必要覆盖范围；
+2. Interpretation 运行时精确匹配，未命中时返回分类错误；
+3. 如果产品确实需要默认规则，应以显式 `default` 语义建模，而不是借用“最后一条”；
+4. 已发布历史模型保留兼容解析，但应可识别并观测 fallback 次数。
+
+#### IR-R005 验收条件
+
+- 发布测试覆盖空洞、重叠、乱序、边界与 default；
+- 新发布模型不存在隐式 last-rule fallback；
+- 运行时未命中形成 Run Failure 与 RetryDecision；
+- 历史兼容 fallback 有指标、模型版本标签和退出计划；
+- 不改变已有 Outcome 分数，只修正解释选择语义。
+
+#### IR-R005 证据
+
+- `[scale_interpret.go](../../../../internal/apiserver/domain/interpretation/scoring/scale_interpret.go)`
+- [ModelCatalog 因子与计分模型](../../../02-业务模块/20-model-catalog/23-核心设计-因子与计分模型.md)
+
+### IR-R006：Level 必须由 Outcome 成立，Interpretation 只能读取
+
+#### IR-R006 当前事实
+
+Interpretation 已禁止根据冻结 Norm、T 分和解释规则补写缺失 Level。常模维度带 T 分但缺少 Level Code 时，Outcome 适配直接 fail closed；
+只有 Outcome 已有 Level Code 且与冻结 Norm 规则匹配时，才恢复 Label、结论和建议文案。
+
+> Outcome 决定结果，Interpretation 组织解释；Interpretation 不重新分类或改变结果。
+
+#### IR-R006 实施结果（2026-07-21）
+
+- `applyFrozenNormInterpretation` 改为返回 error，不再创建 Level 或补写空 Code；
+- T 分存在但 Level nil / Code 空时拒绝生成 Interpretation input；
+- 冻结 Norm 计算出的 level 与 Outcome Code 不一致时 fail closed，只在一致时补展示文案；
+- R006-B1 仍待 Evaluation 侧补齐 Outcome completeness 契约，从事实生产源保证常模维度 Level 完整。
+
+#### IR-R006 风险
+
+- 同一个 Outcome 在 Evaluation 查询与 Report 中呈现不同等级；
+- 修改 Interpretation 代码可能改变历史报告的结果表述；
+- 结果责任从 Decision/Evaluation 泄漏到报告层；
+- 医生追问等级来源时无法只沿 Outcome 证据链回答。
+
+#### IR-R006 目标设计
+
+- 新 Outcome 必须提交完整 ResultLevel 或明确的“该机制无 Level”；
+- Interpretation 遇到按机制必填但缺失的 Level 时 fail closed；
+- 历史缺失数据通过显式 legacy projection 处理，并标记 derived provenance；
+- Norm 文案恢复只选择与 Outcome 已有 Level 对应的解释，不重新决定等级；
+- 根因修复归属 Evaluation / ModelCatalog，而不是长期强化报告层兜底。
+
+#### IR-R006 验收条件
+
+- 新 Outcome 到 Report 的 Level code/label/severity 可逐字段证明一致；
+- Evaluation 与 Interpretation 的契约测试覆盖所有 AlgorithmFamily；
+- 历史兼容派生与新写入路径可区分；
+- 删除新路径中的 Level 补写后，已支持模型仍能正常生成；
+- 缺失必填 Level 的事件进入可治理失败，不生成模糊报告。
+
+#### IR-R006 证据
+
+- `[scoring](../../../../internal/apiserver/domain/interpretation/scoring)`
+- `[Evaluation Outcome](../../../02-业务模块/30-evaluation/22-核心设计-Outcome事实与解释边界.md)`
+- [Outcome 事实与解释边界](../../../02-业务模块/40-interpretation/22-核心设计-状态、幂等、重试与可靠提交.md)
+
+---
+
+## 6. P1：补齐可靠治理与成品不变量
+
+> **P1 实施回填（2026-07-21）**：IR-R007～IR-R018 代码侧已按模块设计型重构落地，状态统一为「已实现待验收」；关闭条件仍需运行证据（迁移 dry-run、密钥轮换、时延分布、产品投影验收）。交付顺序：
+> R012→R009→R010→R008→R014→R007→R015→R016→R018→R017→R013→R011a。R011 heartbeat 与 R013 ModelCatalog 发布 UI 接线列为后续。
+
+### IR-R007：定义跨机制的最小报告成品契约
+
+#### IR-R007 当前事实
+
+`NewInterpretReport` 已检查 ReportID、GenerationID、OutcomeID、RunID、Association、ReportType、TemplateVersion 和 GeneratedAt，
+但没有验证：
+
+- Model Identity 是否完整；
+- PrimaryScore、Level 在当前机制下是否必填；
+- Conclusion、Dimensions、Suggestions 是否允许全部为空；
+- ModelExtra 是否与 Model kind 匹配。
+
+正常 Builder 通常会生成有效内容，但 Artifact 聚合边界仍允许“来源身份完整、正文为空”的成品。
+
+#### IR-R007 目标设计
+
+采用两层不变量：
+
+```text
+CrossMechanismArtifactContract
+  -> 所有报告都必须满足的来源、模型与非空内容要求
+
+BuilderSpecificDraftContract
+  -> factor / norm / typology / task 各自的必填内容
+```
+
+不要用“所有报告必须有总分或结论”这类量表假设破坏人格和认知机制。
+
+#### IR-R007 验收条件
+
+- `Content{}` 不能成为新 Artifact；
+- Model kind 与 ModelExtra 类型不匹配时拒绝；
+- 四类 Builder 各有最小成品 golden tests；
+- 历史归档读取不被新写入不变量直接阻断；
+- Committer 只能提交经过成品契约验证的 Artifact。
+
+#### IR-R007 证据
+
+- `[report/artifact.go](../../../../internal/apiserver/domain/interpretation/report/artifact.go)`
+- `[rendering/builders.go](../../../../internal/apiserver/domain/interpretation/rendering/builders.go)`
+
+### IR-R008：为生命周期前失败建立可治理证据
+
+#### IR-R008 当前事实
+
+以下错误发生在 Starter 之前：
+
+- Outcome 不存在；
+- Outcome payload 解码失败；
+- ReportInput 解码失败；
+- FromOutcomeRecord 映射失败；
+- 冻结模型身份或报告输入不合法。
+
+此时没有 Generation、Run、Failure 或 RetryDecision。运维只能依赖日志、消息指标和 transport dead letter，无法从 Interpretation Operations API 回答“停在哪一步”。
+
+#### IR-R008 设计难点
+
+不能为了所有非法请求都创建业务 Generation：不存在的 Outcome、伪造 ID 或无法解析关联的信息，不应污染领域集合。
+
+#### IR-R008 目标设计
+
+引入明确的准入结果，例如：
+
+```text
+InterpretationAdmission
+  accepted -> Generation / Run
+  rejected -> AdmissionFailure evidence
+```
+
+也可以使用独立的治理事件/投影，但必须满足：
+
+- 已存在且可关联的 committed Outcome 发生输入错误时有持久化证据；
+- 不存在或未授权的 Outcome 不制造业务 Generation；
+- error kind、retryability 和安全 reason 可查询；
+- 修复后可以受控重新准入。
+
+#### IR-R008 验收条件
+
+- malformed ReportInput 能在治理入口定位；
+- 重放不会重复制造失败证据；
+- admission failure 与 Run failure 明确区分；
+- 自动、人工、terminal 语义仍由 retry governance 决定；
+- 日志与持久化证据可通过 EventID / OutcomeID 关联。
+
+#### IR-R008 证据
+
+- `[automation/service.go](../../../../internal/apiserver/application/interpretation/automation/service.go)`
+- `[automation/input](../../../../internal/apiserver/application/interpretation/automation/input)`
+- `[execution/starter.go](../../../../internal/apiserver/application/interpretation/automation/execution/starter.go)`
+
+### IR-R009：失败事件必须复制持久化 RetryDecision
+
+#### IR-R009 当前事实
+
+Run 已持久化 RetryDecision，但 `ReportFailedPayload` 主要携带 `retryable`，没有完整表达：
+
+- disposition：automatic / manual_required / terminal；
+- NextAttemptAt；
+- RetryEventID；
+- PolicyVersion；
+- 当前 attempt 与下一 attempt 的关系。
+
+下游因此无法只依据可靠事件区分“系统会继续恢复”和“等待人工处理”。
+
+#### IR-R009 目标设计
+
+failed event 应复制已经持久化的安全 RetryDecision 投影，而不是由 Worker 重新计算：
+
+```text
+retry_decision:
+  disposition
+  retryable
+  next_attempt_at
+  retry_event_id
+  policy_version
+```
+
+事件是 Run 决策的外部契约，不是新的决策者。
+
+#### IR-R009 验收条件
+
+- event payload 与 Run 中 RetryDecision 逐字段一致；
+- automatic、manual_required、terminal 都有契约测试；
+- Worker settlement 不再根据错误字符串或单个 boolean 猜测；
+- 事件 schema 升级有兼容读策略；
+- `configs/events.yaml`、wire contract 和 generated docs 同步更新。
+
+#### IR-R009 证据
+
+- `[eventing/outcome/payload.go](../../../../internal/pkg/eventing/outcome/payload.go)`
+- `[retry_governance.go](../../../../internal/apiserver/application/interpretation/automation/retry_governance.go)`
+- `[worker/report_handler.go](../../../../internal/worker/handlers/report_handler.go)`
+
+### IR-R010：为 `manual_required` 定义患者与运维两种投影
+
+#### IR-R010 当前事实
+
+Worker 仅在 `retryable=false` 时将 Redis report status 标记为 failed。自动预算耗尽进入 `manual_required` 时，`retryable` 仍可能为 true，
+因此患者端可能长期看到 processing/interpreting，直到人工处理或 TTL 变化。
+
+#### IR-R010 需要业务确认的部分
+
+运维必须看到 `manual_required`，但患者是否应该看到“等待人工重试”不是纯技术决定。医疗产品通常不应暴露内部治理术语。
+
+#### IR-R010 目标边界
+
+```text
+Internal governance status = manual_required
+
+Operations projection = waiting_manual_action + decision evidence
+Participant projection = temporarily_unavailable / failed / still_processing
+                      由产品语义决定
+```
+
+无论患者文案如何选择，后续人工重试成功必须可以推进为 interpreted；中间状态不能被当成不可逆的业务终态。
+
+#### IR-R010 验收条件
+
+- 治理工作台明确显示 manual_required；
+- 患者端状态和文案经过产品确认；
+- automatic retry 不过早显示最终失败；
+- manual/force 成功可覆盖等待状态；
+- Redis 丢失后可从 Generation/Run/Report 重建同等公开投影。
+
+#### IR-R010 证据
+
+- `[worker/report_handler.go](../../../../internal/worker/handlers/report_handler.go)`
+- `[reportstatus](../../../../internal/pkg/reportstatus)`
+- `[collection reportwait](../../../../internal/collection-server/application/reportwait/service.go)`
+
+### IR-R011：治理 lease 时长、恢复时延与审计语义
+
+#### IR-R011 当前事实
+
+Interpretation Run duration 已进入 `system_governance.retry.lease.run_duration`；恢复扫描已进入独立的 `interpretation_lease_recovery`，
+使用专属 runner、批量和 leader lock。claim history 也已持久化。仍需持续验证：
+
+- 没有基于 Builder 时延分布解释 lease 合理性；
+- 长 Builder 没有统一 heartbeat；
+- 生产环境的 expired lease 数量、恢复耗时和恢复成功率是否符合目标。
+
+#### IR-R011 目标设计
+
+- lease duration 与 recovery interval 分开配置但联合校验和观测；
+- 以 p95/p99 Builder 时延决定 lease，而不是凭常量；
+- 如果存在接近 lease 的任务，引入受 fencing token 保护的 heartbeat；
+- AttemptOrigin 保留业务创建来源；
+- 另设 ClaimHistory / RecoveryCount / LastReclaimedAt 表达执行接管历史。
+
+#### IR-R011 验收条件
+
+- 故障注入可证明 Worker 在 Build/Commit 前崩溃后自动恢复；
+- recovery 不增加业务 attempt；
+- 旧 Worker 不能在 lease 失效后提交；
+- 指标能看到 expired lease 数量和恢复耗时；
+- 配置文档能计算最坏恢复窗口。
+
+#### IR-R011 证据
+
+- `[execution/starter.go](../../../../internal/apiserver/application/interpretation/automation/execution/starter.go)`
+- `[lease_recovery.go](../../../../internal/apiserver/application/interpretation/automation/lease_recovery.go)`
+- `[run](../../../../internal/apiserver/domain/interpretation/run)`
+
+### IR-R012：将 Run duplicate 归一为幂等 claim conflict
+
+#### IR-R012 当前事实
+
+极端并发创建下一 attempt 时，Run 唯一索引 duplicate 可能先向上表现为普通错误和 NACK，而不是 Starter 重读 canonical Generation/Run 后返回 processing 或 generated。
+
+#### IR-R012 目标设计
+
+- `interpretationrun.ErrAlreadyExists` 与 Generation CAS conflict 一起纳入 claim conflict；
+- duplicate 后重读 latest Generation 和 Run；
+- 已有 active Run 返回 processing；
+- 已有 succeeded Report 返回 generated；
+- 只有真正的存储错误才进入 transport retry。
+
+#### IR-R012 验收条件
+
+- 使用真实 Mongo 唯一索引执行并发测试；
+- 同一 next attempt 只存在一个 Run；
+- 冲突消息 ACK/返回 processing，不制造无意义 transport redelivery；
+- 不吞掉非 duplicate 的数据库错误。
+
+#### IR-R012 证据
+
+- `[execution/starter.go](../../../../internal/apiserver/application/interpretation/automation/execution/starter.go)`
+- `[run/repository.go](../../../../internal/apiserver/domain/interpretation/run/repository.go)`
+- `[lifecycle_repo.go](../../../../internal/apiserver/infra/mongo/interpretation/lifecycle_repo.go)`
+
+### IR-R013：把 TemplateVersion 从字符串骨架升级为发布资产
+
+#### IR-R013 当前事实
+
+TemplateVersion 已进入：
+
+- Generation Key；
+- RenderingKey；
+- InterpretReport；
+- 成功事件。
+
+但生产适配器统一填充 `legacy-v1`，当前没有：
+
+- 模板版本编辑与发布；
+- 模型发布版本与 TemplateVersion 绑定；
+- 历史实现保留策略；
+- 禁用、回滚与重新生成语义；
+- 发布操作审计。
+
+#### IR-R013 目标设计需要先做的业务决定
+
+模板资产可以属于：
+
+1. ModelCatalog 发布资产的一部分；
+2. Interpretation 独立的 ReportTemplate 资产；
+3. 模型发布只引用 Interpretation 已发布模板。
+
+无论归属哪里，都必须区分 TemplateID、TemplateVersion、BuilderIdentity 与 ContentSchemaVersion。
+
+#### IR-R013 验收条件
+
+- 模型/报告发布能冻结精确 TemplateVersion；
+- 同一 Outcome + 不同 TemplateVersion 形成不同 Generation；
+- 旧版本实现仍可读取或受控重放；
+- 发布新模板不覆盖历史 Report；
+- 回滚只改变后续选择，不修改已生成成品；
+- Catalog 当前选择语义与版本发布同步定义。
+
+#### IR-R013 证据
+
+- `[policy/report_type.go](../../../../internal/apiserver/domain/interpretation/policy/report_type.go)`
+- `[rendering/registry.go](../../../../internal/apiserver/domain/interpretation/rendering/registry.go)`
+- [冻结输入、Builder 与模板路由](../../../02-业务模块/40-interpretation/21-核心设计-冻结输入、Builder与模板路由.md)
+
+### IR-R014：让 InterpretReport 自包含生成来源
+
+#### IR-R014 当前事实
+
+BuilderIdentity 与 ContentSchemaVersion 进入 `interpretation.report.generated`，但没有进入 InterpretReport Artifact。脱离事件日志后，
+成品无法独立回答由哪个 Builder、哪种内容 schema 生成。
+
+#### IR-R014 目标设计
+
+Artifact 固化：
+
+```text
+BuilderIdentity
+ContentSchemaVersion
+```
+
+Committer 验证：
+
+```text
+Artifact provenance
+  == generated event provenance
+  == resolved Builder declaration
+```
+
+历史 Artifact 读取时使用明确的 legacy/unknown provenance，而不是伪造当前 Builder 身份。
+
+#### IR-R014 验收条件
+
+- 新 Artifact 自包含 Builder/schema；
+- Mongo PO、mapper、领域构造器、事件与读模型一致；
+- 历史文档 migration/backfill 策略明确；
+- schema 版本可用于后续 DTO/渲染兼容；
+- generated event 不再是唯一来源证明。
+
+#### IR-R014 证据
+
+- `[report/artifact.go](../../../../internal/apiserver/domain/interpretation/report/artifact.go)`
+- `[events_outcome.go](../../../../internal/apiserver/domain/interpretation/events_outcome.go)`
+- `[lifecycle_po.go](../../../../internal/apiserver/infra/mongo/interpretation/lifecycle_po.go)`
+
+### IR-R015：建立 Catalog 持续对账与 migration 单一事实源
+
+#### IR-R015 当前事实
+
+新成功链路同事务写 Report 与 Catalog，历史数据有 one-off backfill/verify 工具。但当前没有持续发现以下问题的闭环：
+
+- catalog 指向已删除或软删除正文；
+- 历史导入绕过 projector 后漏建 catalog；
+- SourceID 不符合当前选择规则；
+- catalog 的 Org/Testee/Assessment 与正文不一致；
+- Runtime collection/index 与 migration/README/旧脚本描述漂移。
+
+#### IR-R015 目标设计
+
+- 建立只读 reconcile job，输出 missing、dangling、association_mismatch、wrong_winner；
+- 支持 dry-run、组织/时间范围、分页与可重复执行；
+- 修复动作必须单独授权和审计；
+- migration 成为新环境集合与索引的单一重建入口；
+- Runtime 自建索引只能作为防御，不替代 migration 契约。
+
+#### IR-R015 验收条件
+
+- 空数据库可仅凭标准 migration 建立正确集合和索引；
+- 生产副本 dry-run 对账有数量与样例证据；
+- 故意制造四类漂移可被发现；
+- 修复后 verify 清零且不修改报告正文；
+- 对账有指标、告警阈值和 runbook。
+
+#### IR-R015 证据
+
+- `[infra/mongo/interpretation](../../../../internal/apiserver/infra/mongo/interpretation)`
+- `[migration framework](../../../../internal/pkg/migration)`
+- [报告成品、版本与数据一致性](../../../02-业务模块/40-interpretation/23-核心设计-报告成品、版本与数据一致性.md)
+
+### IR-R016：收紧 Participant gRPC 的委托身份边界
+
+#### IR-R016 当前事实
+
+患者端主链依赖：
+
+```text
+collection-server 验证 IAM User -> Testee ProfileLink
+  -> Participant gRPC 接收 TesteeID
+  -> apiserver 验证 Assessment -> Testee
+```
+
+Participant gRPC 本身没有可验证的终端 User -> Testee 委托证据。当前生产安全依赖受信 BFF 与内部 gRPC 传输边界，mTLS OU 的范围又可能大于单一 collection-server。
+
+#### IR-R016 目标选项
+
+- method ACL 只允许明确的 collection-server identity 调用 ParticipantReportService；
+- 传递签名 delegated subject，包含 User、Testee、Org、purpose、expiry；
+- apiserver 使用内部授权上下文复验 ProfileLink；
+- 或将 Participant service 限制在具有更小 trust domain 的内部网络身份。
+
+仅启用一个不绑定 TesteeID 的 gRPC JWT，不能解决委托关系问题。
+
+#### IR-R016 验收条件
+
+- 非 collection-server 工作负载不能调用 Participant 报告接口；
+- 篡改 TesteeID 的内部请求被拒绝；
+- 调用日志可关联 service principal 与 delegated Testee；
+- 密钥轮换、过期和服务降级语义明确；
+- 不把患者 JWT 直接无边界透传为内部超级凭据。
+
+#### IR-R016 证据
+
+- `[participant](../../../../internal/apiserver/application/interpretation/participant)`
+- `[participant_report.go](../../../../internal/apiserver/transport/grpc/service/participant_report.go)`
+- [查询模型、授权与 Audience 投影](../../../02-业务模块/40-interpretation/24-核心设计-查询模型、授权与Audience投影.md)
+
+### IR-R017：冻结历史报告的维度展示语义
+
+#### IR-R017 当前事实
+
+collection-server 医学量表 `ReportDimensionFilter` 读取当前已发布 DefinitionV2 的可见 factor code，再过滤已经生成的历史报告。运营后来修改 `is_show`，历史 Report 本身不变，但小程序展示维度可能变化。
+
+#### IR-R017 影响
+
+- 患者和医生在不同时间看到同一报告的内容范围不同；
+- 历史报告无法独立重现生成当时的展示语义；
+- 版本保护只覆盖分数和文案，没有覆盖产品可见性；
+- 查询时依赖当前 ModelCatalog 增加链路和缓存复杂度。
+
+#### IR-R017 目标设计
+
+- 将维度 visibility/role 或完整 report presentation profile 冻结到 ReportInput；
+- Builder 将最终展示语义写入 InterpretReport；
+- 查询历史报告只读成品，不查询当前发布模型决定可见性；
+- 当前发布配置仅影响新生成报告；
+- 如果业务需要“运营立即隐藏有问题内容”，建模为显式合规遮蔽层，并保留审计，而不是普通版本更新。
+
+#### IR-R017 验收条件
+
+- 修改新发布模型 `is_show` 不改变旧报告快照测试；
+- 新报告使用新 visibility；
+- participant/clinician/admin 的 Audience 仍在冻结展示语义之后应用；
+- 非 current schema 的 ReportInput 明确拒绝，旧数据通过运营流程清理；
+- BFF 不再为正常历史读取依赖当前模型定义。
+
+#### IR-R017 证据
+
+- `[application/interpretation/reportprojection](../../../../internal/apiserver/application/interpretation/reportprojection)`
+- [报告成品、版本与数据一致性](../../../02-业务模块/40-interpretation/23-核心设计-报告成品、版本与数据一致性.md)
+
+### IR-R018：为高风险 attention 投影建立补偿闭环
+
+#### IR-R018 当前事实
+
+Worker 消费 `interpretation.report.generated` 后：
+
+- 更新 report status cache；
+- 记录高风险日志；
+- best-effort 调用 `SyncAssessmentAttention`。
+
+报告状态可从 Report 回源重建，但 attention sync 失败主要依赖日志，没有独立持久化待办或自动补偿。
+
+#### IR-R018 边界判断
+
+attention 不是 InterpretReport 成功事务的一部分，不能因为关注投影失败回滚报告。但如果它驱动医生重点关注工作台，就不能只依赖一次 best-effort RPC。
+
+#### IR-R018 目标设计
+
+优先考虑由可靠事件驱动独立 projector：
+
+```text
+interpretation.report.generated
+  -> attention projector
+  -> idempotent update
+  -> own retry / manual_required / reconciliation
+```
+
+也可以保留 Worker 调用，但必须有 durable delivery 与对账证据。
+
+#### IR-R018 验收条件
+
+- attention 服务不可用时报告仍成功；
+- 服务恢复后关注状态自动收敛；
+- 同一报告事件重复消费幂等；
+- 能查询 pending/failed projector 状态；
+- 定期对账可发现高风险 Report 与 attention 标记不一致。
+
+#### IR-R018 证据
+
+- `[worker/report_handler.go](../../../../internal/worker/handlers/report_handler.go)`
+- `[interpretation.report.generated](../../../../configs/events.yaml)`
+
+---
+
+## 7. P2：查询契约、性能与开发者体验
+
+### IR-R019：建立统一 ReportEnvelope 与 Report Response V2
+
+#### IR-R019 当前事实
+
+`ReportRow` 有业务内容，但缺少完整来源包络：
+
+- ReportID、GenerationID、OutcomeID；
+- OrgID、TesteeID；
+- ReportType、TemplateVersion；
+- BuilderIdentity、ContentSchemaVersion；
+- SourceKind、SourceID。
+
+Participant gRPC、generic REST 和 collection-server 产品 DTO 的字段损失也不一致。generic REST 仍主要使用 ScaleName、TotalScore、RiskLevel 表达多模型报告。
+
+#### IR-R019 目标设计
+
+先定义内部统一读模型：
+
+```text
+ReportEnvelope
+  Association
+  ArtifactIdentity
+  Provenance
+  ModelIdentity
+  Content
+  CompatibilityFlags
+```
+
+再从经过授权和 Audience 投影的 Report 映射外部 V2。V2 不直接序列化 Mongo PO，也不要求所有调用方看到内部来源字段。
+
+#### IR-R019 验收条件
+
+- scale、typology、behavior、cognitive 使用同一核心 V2 结构；
+- V2 能表达派生分、NormReference、ResultLevel 和 ModelExtra；
+- gRPC/REST 对字段是否损失有显式契约测试；
+- V1 保持兼容并有迁移期；
+- 审计日志可记录实际返回的 ReportID 和版本；
+- Audience 发生在 V2 Transport 映射之前。
+
+#### IR-R019 证据
+
+- `[interpretationreadmodel](../../../../internal/apiserver/port/interpretationreadmodel/readmodel.go)`
+- `[participant_report.go](../../../../internal/apiserver/transport/grpc/service/participant_report.go)`
+- `[REST report response](../../../../internal/apiserver/transport/rest/response)`
+
+### IR-R020：Operations 授权前只读取最小资源包络
+
+#### IR-R020 当前事实
+
+Operations 按 ReportID 查询时，需要从 Artifact 得到 OrgID 后授权，因此当前会在授权前加载完整 Artifact。服务最终不会在授权前返回正文，但仍违反最小读取原则。
+
+#### IR-R020 目标设计
+
+- 提供 `ArtifactMetadataReader`，只返回 ReportID、OrgID、AssessmentID、GenerationID；
+- 或 Repository 查询直接带入已授权 OrgID；
+- 授权通过后才加载完整 lifecycle/detail；
+- Operations 继续不返回业务报告正文。
+
+#### IR-R020 验收条件
+
+- 未授权调用不会反序列化 Content；
+- Mongo 查询 projection 只读取必要字段；
+- 运维详情功能不回退；
+- 测试验证授权发生在 full body reader 之前。
+
+#### IR-R020 证据
+
+- `[operations](../../../../internal/apiserver/application/interpretation/operations)`
+- `[lifecycle_repo.go](../../../../internal/apiserver/infra/mongo/interpretation/lifecycle_repo.go)`
+
+### IR-R021：批量投影 Assessment 的报告存在性
+
+#### IR-R021 当前事实
+
+`ListAssessmentProjection` 先查询一页 Evaluation Assessment，再对每个 `evaluated` 项单独调用 `GetReportByAssessmentID`。一页 N 个已评分测评会形成 1+N 查询。
+
+#### IR-R021 目标设计
+
+为 ReportReader 增加批量最小查询：
+
+```text
+GetCurrentReportMetadataByAssessmentIDs(ids)
+  -> map[AssessmentID]{exists, report_id, created_at}
+```
+
+或者建立专用 Journey Read Model。不要为了消除 N+1 把 `interpreted` 写回 Evaluation 聚合。
+
+#### IR-R021 验收条件
+
+- 一页组合状态只发生固定次数存储查询；
+- 未 evaluated 的 Assessment 不查询 report metadata；
+- not found、dangling 和 storage error 仍可区分；
+- 列表语义与单条投影一致；
+- 有查询次数与延迟基准测试。
+
+#### IR-R021 证据
+
+- `[journey/reportquery/service.go](../../../../internal/apiserver/application/journey/reportquery/service.go)`
+- `[artifact_read_model.go](../../../../internal/apiserver/infra/mongo/interpretation/artifact_read_model.go)`
+
+### IR-R022：根据真实规模演进分页与访问范围查询
+
+#### IR-R022 当前事实
+
+Catalog 列表当前使用：
+
+- skip/limit；
+- count 与 page 两次查询；
+- `(sort_at, sort_report_id, assessment_id)` 排序；
+- 受限操作员使用 TesteeIDs `$in`。
+
+对 10–100 条普通页面可以接受，但深分页、大机构受试者范围和并发插入会带来成本与翻页抖动。
+
+#### IR-R022 目标方向
+
+- 先收集 page depth、TesteeIDs 数量、查询延迟和 examined docs；
+- 达到阈值后引入基于现有排序键的 cursor pagination；
+- 大范围权限使用可查询的 access projection，而不是巨大 `$in`；
+- total 若成本过高，允许定义 approximate/optional total 契约。
+
+#### IR-R022 验收条件
+
+- 用真实量级数据做 explain 和基准；
+- cursor 在并发插入时不重复、不跳过已稳定游标之后的数据；
+- 访问范围仍由授权服务决定；
+- V1 page 接口有兼容或迁移计划。
+
+#### IR-R022 证据
+
+- `[artifact_read_model.go](../../../../internal/apiserver/infra/mongo/interpretation/artifact_read_model.go)`
+- `[administration](../../../../internal/apiserver/application/interpretation/administration)`
+
+### IR-R023：Preview 与生产共享纯解析机制
+
+#### IR-R023 当前事实
+
+生产通过 Rendering Registry 解析 Builder；当前 typology Preview 直接创建 TypologyBuilder。Preview 没有 Generation/Run 是正确边界，但解析路径不同可能导致发布前看到的内容与生产不同。
+
+#### IR-R023 目标设计
+
+共享纯领域能力：
+
+```text
+InterpretationInput validation
+RenderingKey construction
+Builder Registry resolution
+Draft build
+```
+
+Preview 仍然：
+
+- 不创建 Generation/Run；
+- 不分配生产 ReportID；
+- 不写 Catalog；
+- 不发 production event。
+
+#### IR-R023 验收条件
+
+- 同一冻结输入在 Preview 与生产使用同一 BuilderIdentity；
+- Draft 内容 golden test 一致；
+- Preview 不产生任何生产持久化副作用；
+- 新 Builder 只需注册一次 resolver 规则。
+
+#### IR-R023 证据
+
+- `[modelcatalog preview](../../../../internal/apiserver/container/modules/modelcatalog/preview)`
+- `[rendering/registry.go](../../../../internal/apiserver/domain/interpretation/rendering/registry.go)`
+
+### IR-R024：将 gRPC 名称迁移为 Outcome 驱动语义
+
+#### IR-R024 当前事实
+
+RPC 仍名为 `GenerateReportFromAssessment`，请求也保留 assessment_id 痕迹；生产真实准入已经是从 persisted EvaluationOutcome 加载冻结输入。
+
+#### IR-R024 影响
+
+- 新开发者可能误以为服务会读取当前 Assessment/Model；
+- 调用方可能尝试用 AssessmentID 触发报告；
+- 文档、日志和接口语义不一致。
+
+#### IR-R024 目标设计
+
+- 新增版本化 `GenerateReportFromOutcome`；
+- request 主身份为 OutcomeID；
+- 旧 RPC 在迁移期转发并记录弃用指标；
+- 所有生产调用方切换后再删除旧入口；
+- 不通过直接重命名破坏已有 Worker proto 兼容。
+
+#### IR-R024 验收条件
+
+- 新 RPC 只接受 committed Outcome；
+- Worker、重试事件和人工操作统一使用 OutcomeID；
+- 旧 RPC 的调用量可观测并归零；
+- proto、generated code、OpenAPI/文档与日志字段同步。
+
+#### IR-R024 证据
+
+- `[interpretation.proto](../../../../api/grpc/proto/interpretation/interpretation.proto)`
+- `[interpretation_automation.go](../../../../internal/apiserver/transport/grpc/service/interpretation_automation.go)`
+
+---
+
+## 8. P3：由业务需求驱动的能力演进
+
+### IR-R025：在多报告出现前重新定义 Catalog Identity
+
+#### IR-R025 当前事实
+
+Generation Key 是：
+
+```text
+OutcomeID + ReportType + TemplateVersion
+```
+
+Catalog 唯一身份是：
+
+```text
+AssessmentID
+```
+
+当前只有 `standard + legacy-v1`，因此“一次 Assessment 一份当前报告”成立。若未来同时存在患者版、医生版、简版、完整版或多个当前模板，单行 Catalog 会让它们互相覆盖。
+
+#### IR-R025 待业务决定
+
+- ReportType 是 audience、内容形状还是产品 SKU；
+- 每个 ReportType 是否只有一个 current version；
+- 指定历史 TemplateVersion 是否允许业务查询；
+- 新模板发布是否自动重生成历史 Outcome；
+- 患者版与医生版是两个 Artifact，还是同一 Artifact 的 Audience Projection。
+
+#### IR-R025 启动门槛
+
+只有出现第二种真实并存报告需求时才启动。不要为了 Generation 已预留 ReportType 就提前制造复杂 Catalog。
+
+#### IR-R025 验收条件
+
+- Catalog Key、current selector 和 version query 分开定义；
+- 同一 Assessment 的不同报告不会错误覆盖；
+- 授权与 Audience 不能通过选择另一个 ReportType 绕过；
+- 历史单行 catalog 有明确 migration。
+
+### IR-R026：用真实业务定义 Audience Section Matrix
+
+#### IR-R026 当前事实
+
+Presenter 当前只有 `model_extra` 一个 Section：participant/admin 可见，clinician 不可见。尚不能表达：
+
+- 专业解释与患者简化解释；
+- 严重风险提示；
+- 临床备注；
+- 家长和患者本人的差异；
+- 仅运维可见的 provenance。
+
+#### IR-R026 待业务决定
+
+患者与家长目前只区分谁提交、谁是受试者，没有“家长代填”和“家长观察量表”的独立关系语义。因此不能凭技术想象先构造家长角色矩阵。
+
+#### IR-R026 启动门槛
+
+- 产品出现真实章节差异；
+- 医疗/合规明确某些内容不适合某类读者；
+- 当前单 Section 已无法表达接口需求。
+
+#### IR-R026 验收条件
+
+- 每个 Section 有业务理由、默认值和 owner；
+- 未知 Section 默认拒绝；
+- Actor authorization 与 Audience 仍分层；
+- 章节矩阵有跨角色契约测试。
+
+### IR-R027：按真实报告差异演进 Norm 与 Task Builder
+
+#### IR-R027 当前事实
+
+NormProfileBuilder 与 TaskPerformanceBuilder 当前主要委托 FactorScoringBuilder。它们已有独立路由身份，但内容结构复用较深。
+
+这不是当前错误：
+
+- 行为评定仍需要维度、等级和建议；
+- 认知任务当前也可先使用统一维度表达；
+- 复用减少了尚未稳定阶段的重复结构。
+
+#### IR-R027 启动门槛
+
+当产品明确需要下列差异时再拆：
+
+- 常模基准图、百分位和人群解释成为一等章节；
+- 认知任务需要反应时分布、正确率、速度–准确率权衡；
+- 统一 Dimension 无法无损表达；
+- Preview 与客户端已有对应 UI 契约。
+
+#### IR-R027 验收条件
+
+- 新 Content schema 有明确版本；
+- 旧报告继续按旧 schema 读取；
+- Builder 拆分不复制 Generation/Run/Committer；
+- 同类新模型仍通过配置接入，不按 model code 分支。
+
+---
+
+## 9. 当前不建议启动的“重构”
+
+### 9.1 不为 Builder 做动态插件系统
+
+`DefaultBuilders` 目前手工注册四类 Builder。它简单、可追踪，当前没有独立团队、热加载或第三方插件需求。新增一种真正的 AlgorithmFamily 本就应该经过代码、测试和发布，不需要为了“零修改接入”引入动态插件复杂度。
+
+只有 Builder 数量、独立发布团队或插件安全边界发生真实变化时，再重新评估。
+
+### 9.2 不急于消除 Input Adapter 的 family switch
+
+按 AlgorithmFamily 解析机制专属 Facts 与按 model code 堆分支不同。新 family 意味着新输入形状，显式 switch 当前仍可理解。只有 family 数量显著增长、注册遗漏反复发生时，才值得引入 Adapter Registry。
+
+### 9.3 不把 `interpreted` 写回 Evaluation
+
+N+1 或状态等待问题不能通过给 Assessment 新增 interpreted 写状态来解决。Outcome 成立和 Report 存在仍属于两个模块、两个工作单元。优化应发生在批量读模型、组合投影和缓存，而不是破坏聚合边界。
+
+### 9.4 不让 Redis 成为报告状态事实源
+
+Redis 能降低查询链路成本，但它不参与 Report 成功事务，具有 TTL，也可能丢失。任何优化都必须保留：
+
+```text
+Assessment + current Report -> public composite status
+```
+
+### 9.5 不在没有业务语义时预建复杂 Audience
+
+章节级投影值得建立，但角色、章节和默认可见性必须来自真实产品与医疗语义。技术层可以先保证 unknown default deny，不应凭猜测设计几十种权限。
+
+---
+
+## 10. 跨模块责任边界
+
+| 问题 | Interpretation 负责 | 相邻模块负责 |
+| --- | --- | --- |
+| Outcome 缺失 Level | 拒绝新路径中不完整输入，不重新分类 | Evaluation 提交完整 Outcome；ModelCatalog 发布完整 Decision |
+| 解释区间缺口 | 运行时 fail closed、记录治理失败 | ModelCatalog 发布时验证区间完整性 |
+| TemplateVersion | 使用精确版本生成、保留旧成品 | ModelCatalog 或独立模板资产负责发布与绑定 |
+| report-status ownership | 提供可授权的状态组合语义 | collection-server 在 cache 前完成 User/Testee/Assessment 授权 |
+| Audience | 对已授权 Report 执行章节投影 | Actor/IAM 提供真实行为人与资源关系 |
+| attention sync | 发出可靠报告终态事实 | Actor/Statistics/投影服务幂等消费、重试与对账 |
+| Catalog migration | 定义领域关联与选择规则 | 基础设施 migration、job 和 runbook 落地 |
+| Report V2 | 提供统一授权后读模型 | REST/gRPC/BFF 负责兼容与产品 DTO |
+
+跨模块问题不能通过 Interpretation 单边“兜底”关闭。例如：
+
+- Interpretation 补 Level 不能替代 Evaluation 修复；
+- collection-server 多加一个 ProfileLink 中间件不能替代 Assessment ownership；
+- Catalog 正常事务正确不能替代 migration 和对账；
+- REST DTO 暂时丢字段不能替代正确 Audience。
+
+---
+
+## 11. 建议实施顺序
+
+### 阶段 A：安全与语义防线
+
+优先处理：
+
+```text
+IR-R001 cache 前 ownership
+IR-R002 catalog/source 关联复验
+IR-R003 Administration Audience
+IR-R004 runtime spec / Template fail closed
+IR-R005 解释区间门禁
+IR-R006 Outcome Level 边界
+```
+
+原因：这些问题可能造成跨受试者观察、返回错误正文或生成没有业务依据的解释。
+
+建议拆成多个有界重构：
+
+1. 状态授权链；
+2. Catalog source envelope；
+3. AccessDecision + Audience；
+4. 输入与模板准入；
+5. 解释规则发布校验；
+6. Evaluation–Interpretation Level 契约。
+
+### 阶段 B：失败治理与恢复闭环
+
+```text
+IR-R007 Artifact 内容契约
+IR-R008 AdmissionFailure
+IR-R009 failed event RetryDecision
+IR-R010 manual_required 投影
+IR-R011 lease 治理
+IR-R012 claim conflict
+IR-R018 attention 补偿
+```
+
+这一阶段完成后，目标是：
+
+> 对任何已准入但尚未成功的报告，都能判断停在哪一步、系统是否会自动重试、是否等待人工处理，以及后置投影是否已经收敛。
+
+### 阶段 C：版本与历史证据
+
+```text
+IR-R013 Template 发布资产
+IR-R014 Artifact provenance
+IR-R015 Catalog/migration 对账
+IR-R017 历史展示冻结
+IR-R019 ReportEnvelope / V2
+```
+
+Template 资产和多版本查询不能只改一个字段。建议先固化 Artifact provenance 与历史展示，再讨论真正的模板发布和重新生成策略。
+
+### 阶段 D：查询与协议优化
+
+```text
+IR-R020 Operations metadata reader
+IR-R021 batch report existence
+IR-R022 cursor/access projection（达到容量门槛后）
+IR-R023 Preview resolver
+IR-R024 Outcome-driven RPC
+```
+
+这些改造应在行为测试与查询基准保护下进行，避免把协议重命名和性能优化混进正确性修复。
+
+### 阶段 E：业务驱动演进
+
+```text
+IR-R025 multi ReportType catalog
+IR-R026 Audience section matrix
+IR-R027 mechanism-specific content
+```
+
+只有需求真实出现时启动，不为面试叙述提前制造未使用的抽象。
+
+---
+
+## 12. 重构前的统一门槛
+
+每个 `IR-Rxxx` 开始实施前至少完成：
+
+1. 重新读取该路径当前代码、配置和事件契约；
+2. 检查工作树，保护其他正在进行的重构；
+3. 写出不会改变的外部行为与允许改变的错误语义；
+4. 对历史 Artifact、Archive、Generation 和 Run 做数据分布抽样；
+5. 明确是否需要 migration、backfill、feature flag 或双读；
+6. 先增加能复现当前问题的测试或故障注入；
+7. 定义回滚后新旧数据如何兼容；
+8. 明确 `docs/`、proto、events.yaml、OpenAPI 和 runbook 的同步范围。
+
+对于 P0，还必须额外回答：
+
+- 修复前是否需要临时限流、关闭入口或收紧 ACL；
+- 是否存在历史越权或错误报告，需要做审计；
+- 错误应该 fail closed 还是兼容 fallback；
+- 兼容分支如何只服务已识别历史数据，而不放宽新写入。
+
+---
+
+## 13. 关闭一项问题需要什么证据
+
+### 13.1 代码证据
+
+- 领域不变量进入正确聚合或值对象；
+- Application 编排不再依赖隐含调用顺序；
+- Repository、Transport 和 Worker 没有保留旁路；
+- 错误分类和 retry semantics 与目标一致。
+
+### 13.2 数据证据
+
+- migration/backfill 可重复执行；
+- dry-run 数量和真实执行数量可对账；
+- 历史数据兼容策略有样例验证；
+- 无法自动修复的数据进入人工清单。
+
+### 13.3 测试证据
+
+- 单元测试保护领域边界；
+- 真实 Mongo transaction/index 测试保护并发与一致性；
+- 事件 wire contract 覆盖新旧 schema；
+- 授权负例覆盖 cache hit/miss 和跨组织/受试者；
+- 故障注入覆盖 Worker 崩溃、Redis 不可用、signal 丢失与下游不可用。
+
+### 13.4 运行证据
+
+- 指标与日志能识别新失败类型；
+- 告警阈值、治理入口和 runbook 已上线；
+- 灰度期间无错误重试风暴或报告读取回退；
+- 容量目标与查询延迟满足现有 SLO。
+
+### 13.5 文档与消费方证据
+
+- 本台账状态已更新；
+- 对应核心设计与关键链路已同步；
+- proto、OpenAPI、events.yaml 与生成文档一致；
+- collection-system、operating-system 和外部医疗系统完成迁移或确认兼容。
+
+只有上述必要证据齐全，才能标记“已关闭”；仅合并代码不能直接关闭。
+
+---
+
+## 14. 建议的验收测试矩阵
+
+| 主题 | 最小测试集 |
+| --- | --- |
+| 状态授权 | medical / typology / behavior / WS × Redis hit / miss / unavailable × own / foreign Assessment |
+| Catalog 关联 | artifact × detail / list × correct / dangling / association mismatch |
+| Audience | participant / clinician / restricted clinician / admin × 每个 Section |
+| 输入准入 | legacy absent / valid spec / malformed spec / unknown template / unsupported adapter |
+| 解释规则 | 完整区间 / 空洞 / 重叠 / 无序 / 端点 / 显式 default |
+| Outcome 边界 | 各 family 的 PrimaryScore / Level / NormReference 从 Outcome 到 Report 一致 |
+| 重试治理 | automatic / manual_required / terminal / manual / force / lease recovery |
+| 并发 | 重复 Outcome 事件、next Run duplicate、lease 过期前后提交竞争 |
+| 报告事务 | Artifact / Generation / Run / Catalog / Outbox 全成或全败 |
+| 历史语义 | 新模型、模板、is_show 发布不改变旧报告 |
+| 等待与通知 | Redis 丢失、signal 丢失、状态事件延迟、manual_required、后续成功 |
+| 查询性能 | batch projection、深分页、巨大 scope、count/page 并发写入 |
+
+---
+
+## 15. 建议验证入口
+
+### 15.1 领域、生成与可靠性
+
+```bash
+go test ./internal/apiserver/domain/interpretation/...
+go test ./internal/apiserver/application/interpretation/automation/...
+go test ./internal/apiserver/infra/mongo/interpretation
+go test ./internal/apiserver/container/modules/interpretation/...
+go test ./internal/worker/handlers
+```
+
+### 15.2 查询、授权与状态
+
+```bash
+go test ./internal/apiserver/application/interpretation/...
+go test ./internal/apiserver/application/journey/reportquery
+go test ./internal/apiserver/application/journey/reportwait
+go test ./internal/apiserver/transport/grpc/service
+go test ./internal/apiserver/transport/rest
+go test ./internal/collection-server/application/reportwait
+go test ./internal/collection-server/application/reportstatus
+go test ./internal/collection-server/application/reportevents
+go test ./internal/collection-server/application/typologyassessment
+go test ./internal/collection-server/application/behaviorassessment
+go test ./internal/collection-server/transport/ws
+go test ./internal/collection-server/transport/rest
+```
+
+### 15.3 文档与契约
+
+```bash
+make docs-hygiene
+make docs-facts
+```
+
+涉及 proto、OpenAPI 或事件契约的条目，还必须运行对应生成与 diff 检查，不能只验证 Go 编译。
+
+---
+
+## 16. 相关文档
+
+- [Interpretation 模块导航](../../../02-业务模块/40-interpretation/README.md)
+- [领域模型](../../../02-业务模块/40-interpretation/10-领域模型.md)
+- [统一报告生成模型](../../../02-业务模块/40-interpretation/20-核心设计-统一报告生成模型.md)
+- [冻结输入、Builder 与模板路由](../../../02-业务模块/40-interpretation/21-核心设计-冻结输入、Builder与模板路由.md)
+- [状态、幂等、重试与可靠提交](../../../02-业务模块/40-interpretation/22-核心设计-状态、幂等、重试与可靠提交.md)
+- [报告成品、版本与数据一致性](../../../02-业务模块/40-interpretation/23-核心设计-报告成品、版本与数据一致性.md)
+- [AI 解读核心设计](../../../02-业务模块/40-interpretation/25-核心设计-AI解读.md)
+
+---
+
+## 17. AI 解读：旧实现退役
+
+旧 AI 引擎、治理接口和恢复任务已在 M5 分支删除；新工作流通过 qs-ai 执行。详见 [当前责任与验收边界](../../../02-业务模块/40-interpretation/25-核心设计-AI解读.md)。
+
+历史门禁记录（位于 `../../_archive/2026-09-m5/qs-legacy-ai-delivery-gates.md`）仅保留迁移依据。当前剩余项目为真实 v6 验收、旧事件定向排空、新版本部署及备份验证后的定向清库；不再等待 24 小时，也不扩展新的产品门槛。

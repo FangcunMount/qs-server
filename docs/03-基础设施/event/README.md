@@ -1,116 +1,54 @@
-# Event 模块
+# QS Event 与 Signal
 
-Event 模块负责把进程内已经发生的业务事实，按明确的可靠性契约传播给其他处理器。它不是单一的 MQ 封装，而是由事件契约、发布路由、Outbox、消费结算、幂等策略、可观测性和进程级生命周期共同组成的基础设施。
-
-学习本专题时始终沿一条因果链，不按 package 逐个记忆：
+QS 保留业务事件、原事务、消费幂等和恢复许可；`reliable-messaging` 提供消息身份、wire、标准 Outbox、Relay、NSQ 传输和 Redis Signal 机制。抽出消息库后，Outbox 仍在 QS 的原业务数据库中，EventSubsystem 仍由 QS 进程装配和监督。
 
 ```text
-业务事实
-  → 同事务 Outbox 意图
-  → 发现与发布
-  → broker/channel 投递
-  → 业务副作用结算
-  → 有界重试、终态与人工恢复
+QS 业务事实 + 原事务内 Outbox
+  → SDK Relay / NSQ 发布
+  → QS 消费者持久处理
+  → SDK 消费结算
+  → QS 核对业务效果与恢复责任
 ```
 
-如果还没有读过根级 [统一模型与推理方法](../04-统一模型与推理方法.md)，建议先读。Event 是其中“持久事实 → 可靠传播 → 派生结果”这一段的展开。
+`published` 证明发送结算，ACK 证明某 channel 的这次投递结算；二者都不能证明报告完成。NSQ 发布确认也不提供数据库与 Broker 的共同事务。
 
-逐篇源码基线和复核状态由 [`document-closure.json`](../../document-closure.json) 维护。
-稳定文档只声明 `configs/events.yaml`、`EventSpec`/`EffectiveRegistry`、EventSubsystem、Outbox 与 settlement/replay 的当前契约；真实 broker 投递、崩溃恢复和积压清理速度必须单列环境证据。
+`evaluation.failed`、`interpretation.report.generated` 与 `interpretation.report.failed` 的 report-status Redis 写入/Signal 唤醒是 best-effort；Reporter 吞掉写入与通知错误，handler 可以最终 ACK。ACK 不证明 report-status 投影或唤醒已成功，具体业务窗口见[从事实到结算](./15-从事实到结算-失败窗口与状态机.md)。
 
-## 先看结论
+## 选择传播语义
 
-- 跨事务边界且不能丢失的业务事实使用 `durable_outbox`：业务事实与 Outbox 在同一本地事务提交，提交后由 immediate 和 relay 共同推动投递。
-- 允许丢失、只用于轻量后置动作的通知使用 `best_effort`：生产者直接交给 RoutingPublisher，不获得持久化保证。
-- Redis Pub/Sub Signal 只负责一次性唤醒和缓存失效提示，不属于 EventSubsystem，不承担业务事实投递。
-- MQ 消费语义固定为：无法解析的消息 NACK、unknown ACK、handler error NACK、handled ACK；NACK 只消耗有界运输预算。
-- 当前 NSQ 终态链不是“第 8 次失败后原子落 MySQL”：业务 channel 达到 `MaxAttempts` 后先发布 `cb.failed.<hash>` handoff topic，发布成功才 finish 原消息；
-  独立 handoff consumer 随后调用 MySQL recorder。handoff 发布、消费或 recorder 失败会 requeue，并形成独立积压窗口；只有 recorder 成功后才能确认 `event_delivery_dead_letter` 已存在。
-- `evaluation.failed`、`interpretation.report.generated` 与 `interpretation.report.failed` 的 report-status Redis 写入/Signal 唤醒是 best-effort；
-  Reporter 吞掉写入与通知错误，handler 可以最终 ACK。因此 ACK 不证明 report-status 投影或唤醒已成功。
-- 已持久化的 transport dead letter 由高风险治理动作 `events.replay_delivery` 做组织范围、带状态冲突检查的一次性人工重放；发布或完成结果未知时保留占用并列为待核对候选，不自动再次发送。即使操作审计已标记失败或超时，只要原操作仍关联自动占用的死信，待核对列表仍显示该操作供只读追查。`questionnaire.changed`、`assessment_model.changed` 与旧 `task.opened`、`task.completed`、`task.expired`、`task.canceled` 均可能触发无已证实收件端持久去重／回执的外部副作用，通用重放在整批预检和逐项占用时拒绝这六条最佳努力事件，交由人工按业务事实核对。新的持久 `task.opened.reminder.requested` 仍由独立逐收件账本和时限合同处理。
-- 对结果未知的报告生成死信，独立 `delivery-resolutions` 接口仅在原审计已结算、物理行仍由该操作占用，并且同一事件的测评、当前报告、参与者可读投影及关注结果全部核实后，才把结案审计与死信 `resolved_verified` 在一个 MySQL 事务中提交；不再次投递。相同结案请求编号可读取已提交回执，其他事件或证据不全均拒绝。生产人工结案仍须具体真实样本与权限验证，接口/测试存在不等于现场已验收。
-- 系统提供的是可治理的 at-least-once，不提供 exactly-once、统一 event-id ledger、自动修复 poison payload 或 schema negotiation。
+| 机制 | QS 用法 | 恢复责任 |
+| --- | --- | --- |
+| `durable_outbox` Event | 业务事实与 Mongo/MySQL `rm_outbox` 在同一本地事务提交 | SDK 扫描与租约恢复；业务效果缺口由 QS 核对 |
+| `best_effort` Event | RoutingPublisher 直接发布可丢通知 | producer 无持久补偿；消费端仍按声明的结算合同处理 |
+| `ephemeral_signal` | Redis Pub/Sub 提示缓存失效或报告状态刷新 | TTL、权威回读或下一次变更；无 ACK/Outbox |
 
-## 三种传播语义
+提交后的 `PostCommitWake` 只唤醒 SDK 的下次扫描。周期扫描以持久 Outbox 为依据。旧 Redis ready-index、ImmediateDispatcher、reconciler 已退役；`immediate/priority` 仅保留为兼容契约字段，不能据此推断当前有对应执行器。
 
-| 机制 | 适用场景 | 持久化 | 失败后的恢复 | 所有者 |
-| --- | --- | --- | --- | --- |
-| Durable Event | 不能因进程或 MQ 短暂故障丢失的业务事实 | Mongo/MySQL Outbox | immediate 失败后由 relay 重试 | EventSubsystem + 业务本地事务 |
-| Best-effort Event | 可丢失的轻量通知和后置动作 | 无 | 无持久化补偿 | RoutingPublisher |
-| Signal | 缓存失效、状态刷新等一次性唤醒 | 无 | TTL、下一次变更或主动查询 | 各进程 CacheSubsystem / report status runtime |
+## 阅读地图
 
-这里的“允许丢失”描述 producer 没有 Outbox；一旦消息已经进入 MQ，consumer 仍使用统一的有界运输结算和死信审计。不要把 producer delivery 与 consumer transport delivery 混为同一层保证。
-
-## 文档地图
-
-1. [架构与责任边界](./10-架构与责任边界.md)：模块边界、所有权、依赖方向和生命周期。
-2. [从事实到结算：失败窗口与状态机](./15-从事实到结算-失败窗口与状态机.md)：先区分 T1–T5 完成点，再推导 Outbox、at-least-once、逐副作用幂等和审计化恢复。
-3. [Event 契约与演进](./20-事件契约与演进.md)：契约来源、wire envelope、完整事件矩阵和演进规则。
-4. [Outbox 可靠出站链路](./30-Outbox可靠出站链路.md)：事务、profile、ready-index、immediate、relay 和恢复语义。
-5. [MQ 发布、消费与结算](./40-MQ发布消费与结算.md)：发布模式、消息封装、消费结算和逐事件幂等。
-6. [可观测性与故障恢复](./50-可观测性与故障恢复.md)：指标、状态接口、治理页面和排障路径。
-7. [Signal 一次性信令](./60-Signal一次性信令.md)：Signal 与 Event 的边界、拓扑和失效语义。
-8. [扩展与验收](./70-扩展与验收.md)：新增、变更和验收清单。
-
-前两篇建立概念和推理主轴；20–60 是当前实现事实；70 把新增事件重新带回“业务损失—失败窗口—状态机—证据”的决策闭环。不要从事件矩阵中抄一个相似配置就认为完成了设计。
-
-## 事实来源
-
-文档与实现冲突时，按以下顺序判断：
-
-1. QS 业务事件值：`internal/pkg/event`；通用 wire：`reliable-messaging/wire/domain`、`wire/legacy`。
-2. 事件路由清单：[`configs/events.yaml`](../../../configs/events.yaml)。
-3. 工程契约：`internal/pkg/eventing/catalog` 中的 `EventSpec` 与 `EffectiveRegistry`。
-4. 运行时行为：`internal/apiserver/eventing/subsystem`、Outbox Store/relay、worker eventing。
-5. 本目录文档。
-
-持久死信重放与旧 Relay 的历史领域信封由 `internal/pkg/eventing/runtime/decoder.go` 复用 SDK 解析，再映射为 QS 自有业务事件值；未知发布或完成结果仍进入人工核对。旧 Outbox 状态／存储桥和回退入口尚未退役，不能据此认定 `component-base` 已退出消息领域。
-
-`EffectiveRegistry` 在启动时合并 YAML 与代码契约并做严格校验；[Event 契约与演进](./20-事件契约与演进.md)中的矩阵还有同步测试保护。因此，文档矩阵不是手工维护的旁路清单。
-
-## 变更时更新哪里
-
-| 变更 | 必须同步 |
+| 读者问题 | 权威页 |
 | --- | --- |
-| 新增或删除事件 | `configs/events.yaml`、EventSpec、handler registry、事件矩阵、测试 |
-| 修改 delivery/profile/immediate/priority | EventSpec、事件矩阵、Outbox/Registry 测试 |
-| 新增附加消费者 | EventSpec、运行时 binding、配置、消费者矩阵、status 测试 |
-| 修改 envelope 或 payload JSON | component-base 或 payload DTO、兼容测试、领域事件文档 |
-| 修改 ACK/NACK 或运输预算 | runtime settlement、provider subscriber、死信/重放、worker 集成测试、MQ 文档和可观测 outcome |
-| 新增 Signal | `configs/signals.yaml`、代码常量/contract、拓扑测试、Signal 文档 |
+| QS 与 SDK 分别负责什么，谁启动和关闭资源？ | [架构与责任边界](./10-架构与责任边界.md) |
+| 答卷到测评、报告有哪些失败窗口？ | [从事实到结算](./15-从事实到结算-失败窗口与状态机.md) |
+| 有哪些事件、路由、业务 owner 和消费者？ | [事件契约与演进](./20-事件契约与演进.md) |
+| 如何在原事务接入标准 Outbox，怎样核对已发布但效果缺失？ | [Outbox 与业务效果恢复](./30-Outbox可靠出站链路.md) |
+| Worker、附加投影和失败记录何时 ACK？ | [消费与结算](./40-MQ发布消费与结算.md) |
+| 哪些指标确实有接线，如何定位失败与人工恢复？ | [可观测性与故障恢复](./50-可观测性与故障恢复.md) |
+| 五条业务 Signal 怎样装配、丢失后谁兜底？ | [Signal](./60-Signal一次性信令.md) |
+| 增加或改变一个事件需要同步什么？ | [扩展与验收](./70-扩展与验收.md) |
 
-## 验证入口
+通用消息算法与 SDK API 以[当前依赖版本的 SDK 合同](./10-架构与责任边界.md#sdk-版本与参考文档)为准，本专题记录 QS 如何使用它们。重写前的旧机制教程与阶段记录已保存历史快照，可通过 Git 追溯，不能用于解释当前运行时。
 
-```bash
-go test -count=1 ./internal/pkg/eventing/... \
-  ./internal/apiserver/application/eventing \
-  ./internal/apiserver/eventing/subsystem \
-  ./internal/worker/integration/eventing \
-  ./internal/worker/integration/messaging
+## 事实来源与变更入口
 
-go test -count=1 ./internal/pkg/signalcatalog ./internal/pkg/architecture
-make docs-hygiene
-```
+当前事实优先看实际 composition root、原事务与 handler，再看 `go.mod`、`configs/events.yaml`、`EventSpec/EffectiveRegistry` 和契约测试。`configs/signals.yaml` 是说明清单，不是启动时加载的控制配置。
 
-上述命令不包含带 `//go:build integration` 的 NSQ + MySQL terminal handoff 集成测试；该测试需要 `MESSAGING_INTEGRATION=1`、NSQ 和隔离 MySQL，
-2026-09-25 的 M5-04 候选已在本地真实 NSQ／一次性 MySQL 运行；该结果不在上述普通命令内，也不代表生产 broker 终态交接已验收。
+- 业务事件值归 `internal/pkg/event`；业务 payload 归 `internal/pkg/eventing/payload`、`outcome`。
+- 通用 envelope 与历史 wire 归 SDK `wire/domain`、`wire/legacy`；不要重新依赖 component-base 消息包。
+- 新增事件须同步 YAML、EventSpec、handler registry 和唯一事件矩阵。
+- 修改 ACK/错误返回须同步当前 Worker/投影适配器、持久审计、outcome 与测试。
+- 修改 Signal 须同时核对常量、清单及真实 publisher/watcher 接线。
 
-## 学习检查
+逐篇源码基线和复核状态由 [`document-closure.json`](../../document-closure.json) 维护。代码、普通测试、实库/真实 Broker 验证、目标环境部署与业务验收分别记录；缺少现场证据时不能用源码或健康容器补成完成。
 
-读完本目录后，应能独立回答：
-
-1. 为什么“数据库 commit 后直接 Publish”不能保证 durable event？
-2. 为什么 immediate 与 Redis ready-index 都可以失败，而 Outbox Store 不能被绕过？
-3. 为什么 MQ 成功不等于消费者副作用 exactly-once？
-4. unknown event 为什么 ACK，invalid payload 为什么 NACK，两者各自承担什么风险？
-5. business、Outbox、retry-hold 和 transport 四类 attempt 为什么不能相加？
-6. `events.replay_pending` 与 `events.replay_delivery` 分别恢复哪一层事实？
-7. 什么时候应该新增独立 channel，什么时候仍应留在一个 handler 的事务内？
-8. Signal 丢失为什么是设计语义，而不是尚未补齐的可靠性缺陷？
-
-### 标准 Outbox 的完整配置边界
-
-生产构建的标准 Outbox 入口要求每个已提供的宿主数据库都有完整标准 Profile：有 Mongo 数据库时必须选择 Mongo 标准 Profile，有 MySQL 数据库时必须选择测评标准 Profile。缺少配置会在存储预检和发布资源创建之前报错；子系统也会独立校验全部绑定，不再为缺失的 Profile 自动创建旧 Outbox 链路。只有单个宿主数据库的调用者仍可使用对应的单 Profile。
-
-这项源码边界不表示旧存储包已经删除，也不证明生产部署或业务验收完成。尚保留的旧构造入口与固定旧镜像回退责任须按退役计划单独处理；回退使用已核验的旧镜像和原配置。
+验证入口集中在[扩展与验收](./70-扩展与验收.md)，当前观测与恢复限制集中在[故障恢复](./50-可观测性与故障恢复.md)。

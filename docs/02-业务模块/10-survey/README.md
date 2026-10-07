@@ -68,7 +68,9 @@ AnswerSheet 只表示一次正式、最终提交，系统不定义客户端与�
 
 阅读新题型实现时看 `20`；排查历史答卷版本时看 `21`；分析 MongoDB 文档、事务或幂等边界时看 `22`；排查问卷发布时看 `30`；排查答卷为什么不能受理时看 `31`；排查答卷已受理但 Assessment 尚未就绪时看 `32`。
 
-规划改造：门店开展统计需要独立的 AnsweringStart，而非提前创建 AnswerSheet 草稿或 Assessment。完整规则见[作答开始与提交兼容设计](../70-statistics/90-设计问题与重构清单.md#15-st-011作答开始记录开展门店与客户端兼容)；当前正式提交边界保持不变。
+已实现：`POST /api/v1/answering-starts` 显式建立独立的作答开始事实；提交可携带 `answering_start_id`，服务端核对开始记录的身份、内容和来源后冻结 `StartContext`。旧客户端不携带该字段时保留 legacy/未知开展语义，不伪造开始时间或门店。它不是 AnswerSheet 草稿，也不提前创建 Assessment。
+
+事实入口为 [`answeringstart`](../../../internal/apiserver/application/survey/answeringstart/)、[`submission_start.go`](../../../internal/apiserver/application/survey/answersheet/submission_start.go) 和 collection [`router.go`](../../../internal/collection-server/transport/rest/router.go)。统计口径与剩余客户端验收见[作答开始与提交兼容设计](../70-statistics/90-设计问题与重构清单.md#15-st-011作答开始记录开展门店与客户端兼容)；当前工作区代码接线不等于生产或真实客户端验收。
 
 ## 4. 事实源与验证
 

@@ -1,7 +1,7 @@
 # 关键链路：从执行请求到 Outcome 提交
 
 > 状态：`evaluation.requested` durable Outbox、Worker internal gRPC、EvaluationRun Claim/Lease、精确输入解析、RuntimeDescriptor
-> 统一执行、Outcome 成功事务、失败事务和持久化回执 settlement 已形成完整主链。输入错误分类、Lease 续租和 InputSnapshotRef 审计强度仍有改进空间。
+> 统一执行、Outcome 成功事务、失败事务和持久化回执 settlement 已形成完整主链。依赖错误分类、显式输入传递与 isn:v2 内容身份已进入当前链路；Lease 长执行策略和环境运行证据仍需分别复核。
 
 ## 1. 本文回答
 
@@ -546,27 +546,11 @@ Retryable   = false
 
 ## 11. InputSnapshotRef：Run 的审计锚点
 
-输入解析成功后，Engine 生成可读引用：
+每次执行必须从实际物化 InputSnapshot 构造 `isn:v2` 内容摘要身份；无法形成完整身份时不退化为 model code/version 标签。Run 与成功 Outcome 记录同一引用。
 
-```text
-model:<code>@<version>
-```
+普通自动/人工重试比较前后摘要，输入漂移时拒绝继续；force retry 可以在明确治理授权下使用新的 v2 身份，但不能接受 v1 或畸形引用。摘要提供内容一致性证据，不保存完整输入副本，重放仍依赖不可变模型/问卷资产和作答事实保留。
 
-如果没有模型引用，则兼容退化为：
-
-```text
-answersheet:<id>
-```
-
-它被附加到 running EvaluationRun，并立即通过 `SaveClaimed` 持久化。`AttachInputSnapshot` 不允许同一 Run 后续切换到另一个非空引用。
-
-这提供了三个价值：
-
-- 失败排查可以知道本次 Run 解析到哪个模型；
-- 回执可以带回 InputSnapshotRef；
-- 重试不会在同一 Run 内悄悄改写引用。
-
-但它目前只是可读引用，不是完整 snapshot ID、内容 hash 或 release digest。它可以证明“声称使用哪个 code/version”，不能单独证明当时读取内容的字节级完整性。
+规范化字段、稳定排序与版本边界见 [`port/evaluationinput`](../../../internal/apiserver/port/evaluationinput/)；形成、跨 attempt 校验与定向测试见 [`input_snapshot_ref.go`](../../../internal/apiserver/application/evaluation/execute/input_snapshot_ref.go)。
 
 ---
 
@@ -626,14 +610,9 @@ OutcomeAssembler
 
 ### 13.1 InputAssembler
 
-负责把 ModelRoute 和当前 execution context 转换为 Calculator 需要的输入。它可以读取 context 中的：
+`InputAssembler.Assemble(ExecutionInput)` 显式接收 Assessment 与 InputSnapshot，形成 `CalculationInput{Route, Execution}`。Assessment、ModelPayload、AnswerSheet、Questionnaire 和 NormSubject 经显式输入到 Calculator，不经 context 传递。
 
-- Assessment；
-- InputSnapshot；
-- ModelPayload；
-- AnswerSheet；
-- Questionnaire；
-- NormSubject。
+四机制 Calculator 读取 `calcInput.Execution` 并转换为 Calculation 中性输入；context 保留取消、deadline 和追踪职责。接口边界由 [`descriptor/contracts.go`](../../../internal/apiserver/application/evaluation/runtime/descriptor/contracts.go) 和 [`descriptor_executor.go`](../../../internal/apiserver/application/evaluation/execute/descriptor_executor.go) 定义。
 
 ### 13.2 Calculator
 
@@ -1028,7 +1007,7 @@ ModelCatalog、Survey、Actor 等依赖暂时不可用时映射为 retryable dep
 | claim token | 判断谁拥有最终提交权 |
 | lease_expires_at | 判断运行中还是可接管 |
 | trace ID | 关联 gRPC 与 Engine 日志 |
-| InputSnapshotRef | 确认声明使用的模型版本 |
+| InputSnapshotRef | 核对 isn:v2 实际输入内容身份与重试漂移 |
 | DescriptorKey | 定位运行时能力 |
 | Outcome ID | 进入 committed 和 Interpretation 链路 |
 | RetryEventID / ActionRequestID | 验证下一 attempt 的治理授权 |

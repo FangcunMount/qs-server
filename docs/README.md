@@ -56,7 +56,7 @@ actor -------- plan -------- statistics ------+
 逐文档状态、源码基线、七模块七轴与十项基础设施七轴签署见 [`document-closure.json`](./document-closure.json)，
 基础设施机器证据见 [`infrastructure-production-evidence.json`](./infrastructure-production-evidence.json)。
 
-`document-closure.json` exact-cover 164 篇 primary 文档和 27 篇 maintained sidecar；active 数量超过 150 的评审目标但仍低于 165 硬上限，具名预算例外由 `budgets.exceptions` 管理。
+`document-closure.json` exact-cover 165 篇 primary 文档和 42 篇 maintained sidecar；active 数量超过 150 的评审目标但未超过 165 硬上限，具名预算例外由 `budgets.exceptions` 管理。
 它把文档对齐状态、代码实现状态和 E0-E7 证据等级分开记录；`needs_review`、`conditional`、`blocked` 或 `unsigned` 不能由门禁通过或历史生产记录自动升级，必须沿真实责任链复核。
 
 ## 6. 提交前验证
@@ -70,3 +70,9 @@ git diff --check
 `docs-hygiene` 检查仓库现行 Markdown（包括根 README 与代码、配置、脚本旁的 README，排除 `docs/_archive`）的链接、锚点和章节编号，并检查 `docs/` 的多余空行与标题/`---` 前空行；
 `docs-facts` 进一步检查 active taxonomy、反引号仓库源码路径、模块/事件入口、版本/API 数量、scheduler/config 清单、关键状态、Mongo audit 与性能计划 ratchet。两者都通过，
 仍不等于正文事实永久正确，涉及行为变更时必须重新沿代码链核对。
+
+## 7. 当前契约的维护位置
+
+README 只负责导航，领域模型负责对象与不变量，设计专篇负责方案取舍，关键链路负责顺序与失败窗口，问题台账只维护当前状态和关闭条件。风险关闭时必须同步修改原正文，不以追加日期补丁保留两种“当前实现”。
+
+消息通用机制由版本绑定的 reliable-messaging 文档维护；QS 的事务、事件矩阵、消费业务结算和授权恢复见 [Event](./03-基础设施/event/README.md)。实施分支、会话分工和历史验证退出接入指南；带日期快照保存在归档，现行阅读路径不依赖它们。

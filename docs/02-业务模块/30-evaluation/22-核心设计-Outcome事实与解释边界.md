@@ -184,7 +184,7 @@ Outcome Record 不只是一个 `payload_json`。它把“结果是什么”和�
 | --- | --- | --- |
 | Model version | 运营发布的 AssessmentModel 快照版本 | `v12` |
 | Outcome schema version | `payload_json` 的技术结构版本 | `2` |
-| Report template version | Interpretation 选择的模板契约版本 | 当前默认 `v1` |
+| Report template version | ModelCatalog 发布及 Outcome ReportInput 冻结的精确模板契约版本 | `legacy-v1` / `2026-08-v1`，运行时不补默认 |
 
 三者不能互相替代。模型版本变化代表业务配置变化；Outcome schema 变化代表持久化事实结构变化；模板版本变化代表解释呈现契约变化。
 
@@ -551,10 +551,9 @@ Repository 不提供 Update/Delete，但数据库管理员或直接 SQL 仍能�
 - append-only 约束；
 - Outcome 与 Report 的定期一致性校验。
 
-### 12.5 模板版本当前仍是默认值
+### 12.5 精确模板身份随发布冻结
 
-Interpretation adapter 当前使用默认 `TemplateVersionV1`，代码注释也明确等待 ModelCatalog 发布显式 report-template version。未来如需同一模型支持多模板演进，
-应把模板身份纳入可冻结、可审计的发布契约，而不是依赖运行时默认值。
+ModelCatalog 发布显式冻结 TemplateID/TemplateVersion，Outcome ReportInput 保留精确路由，Interpretation 按版本发布目录解析；缺失或未知身份 fail closed，不从当前模型或默认值猜测历史模板。模板发布与兼容边界由[冻结输入、Builder 与模板路由](../40-interpretation/21-核心设计-冻结输入、Builder与模板路由.md)维护。
 
 ---
 
