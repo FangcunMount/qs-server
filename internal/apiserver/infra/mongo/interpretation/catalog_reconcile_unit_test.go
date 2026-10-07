@@ -4,6 +4,20 @@ import (
 	"testing"
 )
 
+func countAssociationMismatches(entries []ReportCatalogPO, sources map[uint64]CatalogSourceAssociation) int64 {
+	var count int64
+	for _, entry := range entries {
+		source, ok := sources[entry.SourceID]
+		if !ok {
+			continue // Counted independently as dangling.
+		}
+		if HasAssociationMismatch(entry, source) {
+			count++
+		}
+	}
+	return count
+}
+
 func TestCountAssociationMismatchesUsesSharedValidatorAndSkipsDangling(t *testing.T) {
 	entries := []ReportCatalogPO{
 		{AssessmentID: 1, OrgID: 10, TesteeID: 100, SourceID: 11},

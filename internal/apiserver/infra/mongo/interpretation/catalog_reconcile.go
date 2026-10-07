@@ -295,20 +295,6 @@ func (s *CatalogReconcileStore) loadCatalogSourceAssociations(
 	return sources, cur.Err()
 }
 
-func countAssociationMismatches(entries []ReportCatalogPO, sources map[uint64]CatalogSourceAssociation) int64 {
-	var count int64
-	for _, entry := range entries {
-		source, ok := sources[entry.SourceID]
-		if !ok {
-			continue // Counted independently as dangling.
-		}
-		if HasAssociationMismatch(entry, source) {
-			count++
-		}
-	}
-	return count
-}
-
 func (s *CatalogReconcileStore) listCatalogBased(
 	ctx context.Context,
 	filter CatalogReconcileFilter,

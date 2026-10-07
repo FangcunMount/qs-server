@@ -1,61 +1,32 @@
 package binding
 
-// ModelFamilyCapability 记录领域 execution 和 lifecycle 守卫 用于 模型家族。
+// ModelFamilyCapability records runtime execution guards for a model family.
 type ModelFamilyCapability struct {
-	Kind                      Kind
-	CreateSupported           bool
-	ListSupported             bool
-	PublishSupported          bool
-	BindQuestionnaire         bool
-	DefinitionUpdateSupported bool
-	RuntimeExecutable         bool
-	ExecutionPath             ExecutionPath
-}
-
-func (c ModelFamilyCapability) CanExecute() bool {
-	return c.RuntimeExecutable
-}
-
-func (c ModelFamilyCapability) AllowsNewDraft() bool {
-	return c.CreateSupported
+	Kind              Kind
+	RuntimeExecutable bool
+	ExecutionPath     ExecutionPath
 }
 
 var defaultFamilyCapabilities = []ModelFamilyCapability{
 	{
-		Kind:                      KindTypology,
-		CreateSupported:           true,
-		ListSupported:             true,
-		PublishSupported:          true,
-		BindQuestionnaire:         true,
-		DefinitionUpdateSupported: true,
-		RuntimeExecutable:         true,
-		ExecutionPath:             ExecutionPathTypologyDescriptor,
+		Kind:              KindTypology,
+		RuntimeExecutable: true,
+		ExecutionPath:     ExecutionPathTypologyDescriptor,
 	},
 	{
-		Kind:                      KindBehavioralRating,
-		CreateSupported:           true,
-		ListSupported:             true,
-		PublishSupported:          true,
-		BindQuestionnaire:         true,
-		DefinitionUpdateSupported: true,
-		RuntimeExecutable:         true,
-		ExecutionPath:             ExecutionPathBehavioralRatingDescriptor,
+		Kind:              KindBehavioralRating,
+		RuntimeExecutable: true,
+		ExecutionPath:     ExecutionPathBehavioralRatingDescriptor,
 	},
 	{
 		Kind:              KindScale,
-		ListSupported:     false,
 		RuntimeExecutable: true,
 		ExecutionPath:     ExecutionPathScaleDescriptor,
 	},
 	{
-		Kind:                      KindCognitive,
-		CreateSupported:           true,
-		ListSupported:             true,
-		PublishSupported:          true,
-		BindQuestionnaire:         true,
-		DefinitionUpdateSupported: true,
-		RuntimeExecutable:         true,
-		ExecutionPath:             ExecutionPathCognitiveDescriptor,
+		Kind:              KindCognitive,
+		RuntimeExecutable: true,
+		ExecutionPath:     ExecutionPathCognitiveDescriptor,
 	},
 }
 
