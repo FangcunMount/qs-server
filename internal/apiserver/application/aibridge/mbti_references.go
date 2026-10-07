@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/mbticontract"
 	"io"
 	"net/url"
 	"regexp"
@@ -63,7 +64,8 @@ func validateMBTIReferences(a Artifact) error {
 	if dec.Decode(&material) != nil || dec.Decode(new(any)) != io.EOF {
 		return ErrInvalid
 	}
-	if material.SchemaVersion != "mbti-reference-selection/v1" || material.ModelCode != "MBTI_OEJTS" || material.ModelVersion != "v64-report-202608-v1" || !referenceVersion.MatchString(material.Version) || len(material.TypeCode) != 4 || len(material.Sources) < 1 || len(material.Sources) > 8 || len(material.Entries) < 12 || len(material.Entries) > 24 {
+	_, supported := mbticontract.Lookup(material.ModelCode, material.ModelVersion)
+	if !supported || material.SchemaVersion != "mbti-reference-selection/v1" || !referenceVersion.MatchString(material.Version) || len(material.TypeCode) != 4 || len(material.Sources) < 1 || len(material.Sources) > 8 || len(material.Entries) < 12 || len(material.Entries) > 24 {
 		return ErrInvalid
 	}
 	axes := []string{"EI", "SN", "TF", "JP"}

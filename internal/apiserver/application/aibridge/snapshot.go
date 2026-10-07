@@ -2,6 +2,7 @@ package aibridge
 
 import (
 	"encoding/json"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/mbticontract"
 	"time"
 
 	source "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/reportsource"
@@ -21,7 +22,7 @@ func reportSnapshot(current *source.Current) ([]byte, error) {
 		return nil, source.ErrInconsistent
 	}
 	content := r.Content()
-	if content.Model.Code == "MBTI_OEJTS" || outcome.Model().Code == "MBTI_OEJTS" {
+	if mbticontract.IsModelCode(content.Model.Code) || mbticontract.IsModelCode(outcome.Model().Code) {
 		return mbtiReportSnapshot(current)
 	}
 	dimensions := content.Dimensions

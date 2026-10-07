@@ -2,17 +2,17 @@ package commit
 
 import (
 	"encoding/json"
+	"fmt"
 	"reflect"
 	"strings"
 	"testing"
-
-	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/conclusion"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/definition"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/factor"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/interpretationassets"
+	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 )
 
 // Only model rules are reproduced here; no answers or live identifiers are used.
@@ -156,4 +156,88 @@ func mustMBTIOptions(t *testing.T, in *evaluationinput.InputSnapshot, ref evalua
 		t.Fatal(err)
 	}
 	return opts
+}
+
+func explorationFreezeFixture() (*evaluationinput.InputSnapshot, evaluationinput.ModelRef) {
+	in, ref := mbtiFreezeFixture()
+	ref.Code, ref.Version = "MBTI_FC_93", "v55-report-202608-v1"
+	in.Model.Code, in.Model.Version = ref.Code, ref.Version
+	in.Questionnaire = &evaluationinput.QuestionnaireSnapshot{Code: "MBTI_FC_93", Version: "8.0.1"}
+	td := in.DefinitionV2.Conclusions[0].(conclusion.TypeConclusion)
+	left, right := []string{"E", "S", "T", "J"}, []string{"I", "N", "F", "P"}
+	for i := range in.DefinitionV2.Measure.Scoring {
+		n := 23
+		if i == 3 {
+			n = 24
+		}
+		rule := &in.DefinitionV2.Measure.Scoring[i]
+		rule.Sources = nil
+		for j := 0; j < n; j++ {
+			code := fmt.Sprintf("q%d-%d", i, j)
+			rule.Sources = append(rule.Sources, factor.ScoringSource{Kind: factor.ScoringSourceQuestion, Code: code, ScoringMode: factor.QuestionScoringModeQuestionScore, Sign: 1, Weight: 1})
+			in.Questionnaire.Questions = append(in.Questionnaire.Questions, evaluationinput.QuestionSnapshot{Code: code, Options: []evaluationinput.OptionSnapshot{{Code: "A", Score: 0}, {Code: "B", Score: 1}}})
+		}
+		td.Decision.Poles[i].LeftPole, td.Decision.Poles[i].RightPole, td.Decision.Poles[i].Threshold = left[i], right[i], 11.5
+	}
+	in.DefinitionV2.Conclusions[0] = td
+	return in, ref
+}
+
+func TestExplorationUsesFrozenBinaryBoundsAndExactModel(t *testing.T) {
+	in, ref := explorationFreezeFixture()
+	opts := mustMBTIOptions(t, in, ref)
+	raw, err := evaluationinput.MarshalReportInput(opts)
+	if err != nil {
+		t.Fatal(err)
+	}
+	replay, err := evaluationinput.SnapshotFromReportInput(raw, ref)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i, axis := range replay.MBTIPoles.Axes {
+		max := float64(23)
+		if i == 3 {
+			max = 24
+		}
+		if axis.MinScore != 0 || axis.MaxScore != max || axis.Threshold != 11.5 {
+			t.Fatalf("wrong binary range: %+v", axis)
+		}
+	}
+	in.Questionnaire.Questions[0].Options[0].Score = 5
+	again, err := evaluationinput.SnapshotFromReportInput(raw, ref)
+	if err != nil || !reflect.DeepEqual(again.MBTIPoles, replay.MBTIPoles) {
+		t.Fatal("latest question changed frozen facts", err)
+	}
+	if _, err := reportInputFreezeOptions(in, ref, modelcatalog.DecisionKindPoleComposition); err == nil {
+		t.Fatal("changed option accepted")
+	}
+}
+
+func TestExplorationRequiresFrozenQuestionnaireAndAllContributions(t *testing.T) {
+	for _, name := range []string{"missing questionnaire", "wrong version", "missing question", "duplicate", "wrong weight", "base poles", "axis count"} {
+		t.Run(name, func(t *testing.T) {
+			in, ref := explorationFreezeFixture()
+			switch name {
+			case "missing questionnaire":
+				in.Questionnaire = nil
+			case "wrong version":
+				in.Questionnaire.Version = "latest"
+			case "missing question":
+				in.Questionnaire.Questions = in.Questionnaire.Questions[1:]
+			case "duplicate":
+				in.Questionnaire.Questions = append(in.Questionnaire.Questions, in.Questionnaire.Questions[0])
+			case "wrong weight":
+				in.DefinitionV2.Measure.Scoring[0].Sources[0].Weight = 2
+			case "base poles":
+				td := in.DefinitionV2.Conclusions[0].(conclusion.TypeConclusion)
+				td.Decision.Poles[0].LeftPole, td.Decision.Poles[0].RightPole = "I", "E"
+				in.DefinitionV2.Conclusions[0] = td
+			case "axis count":
+				in.DefinitionV2.Measure.Scoring[0].Sources = in.DefinitionV2.Measure.Scoring[0].Sources[1:]
+			}
+			if _, err := reportInputFreezeOptions(in, ref, modelcatalog.DecisionKindPoleComposition); err == nil {
+				t.Fatal("invalid frozen exploration accepted")
+			}
+		})
+	}
 }

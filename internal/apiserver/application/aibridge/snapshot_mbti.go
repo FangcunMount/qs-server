@@ -2,6 +2,7 @@ package aibridge
 
 import (
 	"encoding/json"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/mbticontract"
 	"math"
 	"time"
 
@@ -17,7 +18,8 @@ func mbtiReportSnapshot(current *source.Current) ([]byte, error) {
 	if c.Model.Kind != string(model.Kind) || c.Model.Algorithm != string(model.Algorithm) || c.Model.Code != model.Code || c.Model.Version != model.Version || c.Model.Title != model.Title {
 		return nil, source.ErrInconsistent
 	}
-	if model.Kind != "typology" || model.Algorithm != "personality_typology" || model.Code != "MBTI_OEJTS" || model.Version != "v64-report-202608-v1" || outcome.Runtime().DecisionKind != "pole_composition" {
+	contract, supported := mbticontract.Lookup(model.Code, model.Version)
+	if !supported || model.Kind != "typology" || model.Algorithm != "personality_typology" || outcome.Runtime().DecisionKind != "pole_composition" {
 		return nil, source.ErrNotApplicable
 	}
 	if err := report.ValidateMBTIPoleFacts(c); err != nil {
@@ -36,7 +38,8 @@ func mbtiReportSnapshot(current *source.Current) ([]byte, error) {
 		// for pole axes. Only accept that exact representation after validating
 		// all four frozen pole facts; never rewrite the immutable report itself.
 		legacyBoundedPole := d.Kind() == report.DimensionKindFactor && d.MaxScore() != nil && *d.MaxScore() == p.MaxScore
-		if (d.Kind() != report.DimensionKindPole && !legacyBoundedPole) || p.MinScore != 8 || p.MaxScore != 40 || p.Threshold != 24 {
+		ax := contract.Axes[p.CompositionOrder-1]
+		if (d.Kind() != report.DimensionKindPole && !legacyBoundedPole) || p.MinScore != ax.Min || p.MaxScore != ax.Max || p.Threshold != ax.Threshold {
 			return nil, source.ErrInconsistent
 		}
 		dimensions = append(dimensions, map[string]any{

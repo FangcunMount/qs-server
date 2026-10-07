@@ -85,3 +85,21 @@ func TestPublicationRequiresExplicitVersionZeroAndConfirmation(t *testing.T) {
 		t.Fatal("explicit zero rejected", err)
 	}
 }
+
+func TestExplorationPublicationIsIndependentOfBasic(t *testing.T) {
+	code, version := "MBTI_FC_93", "v55-report-202608-v1"
+	s := PublicationSelector{Audience: "participant", ModelKind: "typology", DecisionKind: "pole_composition", ModelCode: &code, ModelVersion: &version}
+	if !s.Valid() {
+		t.Fatal("exact exploration rejected")
+	}
+	basicCode, basicVersion := "MBTI_OEJTS", "v64-report-202608-v1"
+	b := s
+	b.ModelCode, b.ModelVersion = &basicCode, &basicVersion
+	if s.Equal(b) {
+		t.Fatal("publications conflated")
+	}
+	s.ModelVersion = &basicVersion
+	if s.Valid() {
+		t.Fatal("cross model version accepted")
+	}
+}
