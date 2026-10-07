@@ -673,3 +673,51 @@ func TestVerifyRemovedRequiresConfirmedLedgerAndPreservesNonTargetSchema(t *test
 		})
 	}
 }
+
+func TestCanonicalColumnCharsetEquivalentDisplayOnly(t *testing.T) {
+	source := "CREATE TABLE `t` (`id` bigint NOT NULL, `value` varchar(32) COLLATE utf8mb4_bin DEFAULT 'character set utf8mb4 collate utf8mb4_bin', `generated` varchar(64) COLLATE utf8mb4_bin GENERATED ALWAYS AS (concat(`value`,'x')) VIRTUAL, PRIMARY KEY (`id`)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci"
+	restored := strings.ReplaceAll(source, "varchar(32) COLLATE", "varchar(32) CHARACTER SET utf8mb4 COLLATE")
+	restored = strings.ReplaceAll(restored, "varchar(64) COLLATE", "varchar(64) CHARACTER SET utf8mb4 COLLATE")
+	if canonicalDDL(source) != canonicalDDL(restored) {
+		t.Fatal("equivalent explicit column charset was not normalized")
+	}
+	for _, changed := range []string{
+		strings.Replace(restored, "COLLATE utf8mb4_bin", "COLLATE utf8mb4_unicode_ci", 1),
+		strings.Replace(restored, "SET utf8mb4 COLLATE", "SET latin1 COLLATE", 1),
+		strings.Replace(restored, "DEFAULT CHARSET=utf8mb4", "DEFAULT CHARSET=latin1", 1),
+		strings.Replace(restored, "concat(`value`,'x')", "concat(`value`,'y')", 1),
+		strings.Replace(restored, "'character set utf8mb4 collate utf8mb4_bin'", "'collate utf8mb4_bin'", 1),
+	} {
+		if canonicalDDL(source) == canonicalDDL(changed) {
+			t.Fatal("actual charset, collation, expression, or literal change was normalized away")
+		}
+	}
+	for _, untouched := range []string{
+		"CREATE TABLE `t` (`v` varchar(32) GENERATED ALWAYS AS (CAST(`x` AS CHAR CHARACTER SET utf8mb4 COLLATE utf8mb4_bin)))",
+		"CREATE TABLE `t` (`character set utf8mb4 collate utf8mb4_bin` int)",
+		"CREATE TABLE `t` (`v` varchar(32) COMMENT 'CHARACTER SET utf8mb4 COLLATE utf8mb4_bin')",
+		"CREATE TABLE `t` (`v` varchar(32) /* CHARACTER SET utf8mb4 COLLATE utf8mb4_bin ( ) */)",
+		"CREATE TABLE `t` (`v` varchar(32)) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin",
+		"CREATE TABLE `t` (`v` varchar(32) CHARACTER SET latin1 COLLATE utf8mb4_bin)",
+	} {
+		if canonicalDDL(untouched) != untouched {
+			t.Fatal("normalization escaped a column declaration or matching charset pair")
+		}
+	}
+}
+
+func TestEffectiveColumnCharsetAndCollationIndependentlyBindSchema(t *testing.T) {
+	a := tableFingerprint{ContentMeasured: true, Name: targetTables()[0], SchemaSHA256: strings.Repeat("a", 64), ContentSHA256: strings.Repeat("b", 64), PK: []string{"id"}, Columns: []column{{Name: "id", DataType: "varchar", CharacterSet: "utf8mb4", Collation: "utf8mb4_bin"}}}
+	for _, tc := range []struct{ charset, collation string }{
+		{"utf8mb4", "utf8mb4_unicode_ci"},
+		{"latin1", "utf8mb4_bin"},
+		{"", "utf8mb4_bin"},
+	} {
+		b := a
+		b.Columns = append([]column(nil), a.Columns...)
+		b.Columns[0].CharacterSet, b.Columns[0].Collation = tc.charset, tc.collation
+		if sameTable(a, b) {
+			t.Fatal("identical DDL/content hashes hid effective charset or collation change")
+		}
+	}
+}
