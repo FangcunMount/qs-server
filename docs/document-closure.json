@@ -2,8 +2,8 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "6633066bd358e6ed5fc2fe7189c8cec832e9882e",
-    "verified_on": "2026-10-04"
+    "sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
+    "verified_on": "2026-10-07"
   },
   "status_policy": {
     "doc_status": [
@@ -69,15 +69,9 @@
     "exceptions": [
       {
         "scope": "active_markdown",
-        "reason": "Fourteen narrowly scoped infrastructure canonical and production-evidence documents separate lifecycle, security, observability, configuration/deployment, migration/recovery and historical evidence while remaining below the 165 hard ceiling.",
-        "owner": "infra",
-        "review_date": "2026-08-20"
-      },
-      {
-        "scope": "active_markdown",
-        "reason": "One planned Interpretation canonical document keeps the AI explanation boundary, machine contracts and implementation gates reviewable without mixing them into the already implemented standard-report design.",
-        "owner": "interpretation",
-        "review_date": "2026-08-26"
+        "reason": "The 165 current canonical documents preserve seven business modules and distinct host infrastructure responsibilities within the existing hard ceiling. This review reduces duplicate prose and moves process history to dated snapshots; SDK mechanism documentation is referenced by the actual dependency version. The 150-document target remains, and future additions require replacing or consolidating an existing responsibility.",
+        "owner": "overview",
+        "review_date": "2026-10-07"
       }
     ]
   },
@@ -323,7 +317,7 @@
       }
     }
   },
-  "initialization_note": "The exact document inventory remains explicit until each file receives sources and verification. initial_review_baseline preserves the unsigned starting state; module_signoff retains strict source review while test and production dimensions without reproducible current evidence remain unsigned. infrastructure_signoff is a separate ten-topic 7x7 matrix; historical production records never upgrade the current checkout.",
+  "initialization_note": "The exact document inventory remains explicit until each file receives sources and verification. initial_review_baseline preserves the unsigned starting state; module_signoff retains strict source review while test and production dimensions without reproducible current evidence remain unsigned. infrastructure_signoff is a separate ten-topic 7x7 matrix; historical production records never upgrade the current checkout. The 2026-10-07 audit corrects current statements and records local regression evidence at the new source baseline. Partial review does not promote every document to aligned or add an accountable signoff; CI, deployment, real dependencies and business acceptance remain separate.",
   "documents": [
     {
       "path": ".github/workflows/README.md",
@@ -571,11 +565,19 @@
       "owner": "overview",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": null,
-        "verified_on": null
+        "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
+        "verified_on": "2026-10-07"
       },
       "fact_sources": [],
-      "verification": [],
+      "verification": [
+        {
+          "kind": "command",
+          "command": "make docs-check",
+          "result": "passed",
+          "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
+          "verified_on": "2026-10-07"
+        }
+      ],
       "production_evidence": {
         "level": "none",
         "refs": [],
@@ -590,7 +592,7 @@
           "id": "DOC-CLOSURE-009",
           "kind": "verification",
           "severity": "medium",
-          "summary": "Source and semantic review have not yet been recorded.",
+          "summary": "Corrected current statements and repository gates are recorded; complete document-specific source review and accountable signoff remain incomplete.",
           "exit_criteria": "Record fact sources and verification evidence, then update doc_status through review."
         }
       ]
@@ -631,11 +633,19 @@
       "owner": "overview",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": null,
-        "verified_on": null
+        "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
+        "verified_on": "2026-10-07"
       },
       "fact_sources": [],
-      "verification": [],
+      "verification": [
+        {
+          "kind": "command",
+          "command": "make docs-check",
+          "result": "passed",
+          "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
+          "verified_on": "2026-10-07"
+        }
+      ],
       "production_evidence": {
         "level": "none",
         "refs": [],
@@ -650,7 +660,7 @@
           "id": "DOC-CLOSURE-011",
           "kind": "verification",
           "severity": "medium",
-          "summary": "Source and semantic review have not yet been recorded.",
+          "summary": "Corrected current statements and repository gates are recorded; complete document-specific source review and accountable signoff remain incomplete.",
           "exit_criteria": "Record fact sources and verification evidence, then update doc_status through review."
         }
       ]
@@ -691,11 +701,19 @@
       "owner": "overview",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": null,
-        "verified_on": null
+        "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
+        "verified_on": "2026-10-07"
       },
       "fact_sources": [],
-      "verification": [],
+      "verification": [
+        {
+          "kind": "command",
+          "command": "make docs-check",
+          "result": "passed",
+          "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
+          "verified_on": "2026-10-07"
+        }
+      ],
       "production_evidence": {
         "level": "none",
         "refs": [],
@@ -710,7 +728,7 @@
           "id": "DOC-CLOSURE-013",
           "kind": "verification",
           "severity": "medium",
-          "summary": "Source and semantic review have not yet been recorded.",
+          "summary": "Corrected current statements and repository gates are recorded; complete document-specific source review and accountable signoff remain incomplete.",
           "exit_criteria": "Record fact sources and verification evidence, then update doc_status through review."
         }
       ]
@@ -751,8 +769,8 @@
       "owner": "overview",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": null,
-        "verified_on": null
+        "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
+        "verified_on": "2026-10-07"
       },
       "fact_sources": [
         {
@@ -772,18 +790,22 @@
           "path": "internal/pkg/migration/migrations/**/*"
         }
       ],
-      "verification": [],
+      "verification": [
+        {
+          "kind": "command",
+          "command": "make docs-check",
+          "result": "passed",
+          "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
+          "verified_on": "2026-10-07"
+        }
+      ],
       "production_evidence": {
-        "level": "historical",
-        "refs": [
-          "CI 31896282313",
-          "Production Deploy 31896757704",
-          "Ping Runner 32085615223"
-        ],
-        "deployed_sha": "8f663383e117f186865686c78c9dbcae7ed50a91",
-        "observed_at": "2026-08-18",
+        "level": "none",
+        "refs": [],
+        "deployed_sha": null,
+        "observed_at": null,
         "limitations": [
-          "No evidence covers the reviewed baseline/local docs; Actor P0 and Statistics conditional gaps remain."
+          "Current CI, deployment and runtime evidence is unbound. Prior deployment and Mongo audit observations are preserved in the separate historical production ledger."
         ]
       },
       "gaps": [
@@ -791,8 +813,8 @@
           "id": "VERSION-LEDGER-CURRENT-EVIDENCE",
           "kind": "production",
           "severity": "high",
-          "summary": "CI/deployment/production evidence is historical and current Actor security blockers remain.",
-          "exit_criteria": "Fix blockers, pass CI, deploy exact SHA and capture dated production evidence."
+          "summary": "Current CI/deployment/runtime evidence is unbound. Public Intake representation remains open; the Testee object fix and local tests do not attest production.",
+          "exit_criteria": "Close the source blocker, pass required CI, deploy the exact version and retain dated runtime and business evidence."
         }
       ]
     },
@@ -899,11 +921,19 @@
       "owner": "runtime",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": null,
-        "verified_on": null
+        "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
+        "verified_on": "2026-10-07"
       },
       "fact_sources": [],
-      "verification": [],
+      "verification": [
+        {
+          "kind": "command",
+          "command": "make docs-check",
+          "result": "passed",
+          "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
+          "verified_on": "2026-10-07"
+        }
+      ],
       "production_evidence": {
         "level": "none",
         "refs": [],
@@ -918,7 +948,7 @@
           "id": "DOC-CLOSURE-018",
           "kind": "verification",
           "severity": "medium",
-          "summary": "Source and semantic review have not yet been recorded.",
+          "summary": "Corrected current statements and repository gates are recorded; complete document-specific source review and accountable signoff remain incomplete.",
           "exit_criteria": "Record fact sources and verification evidence, then update doc_status through review."
         }
       ]
@@ -1019,7 +1049,7 @@
       "production_evidence": {
         "level": "historical",
         "refs": [
-          "docs/00-总览/09-当前版本定档验收台账.md"
+          "docs/00-总览/10-基础设施生产证据台账.md"
         ],
         "deployed_sha": "8f663383e117f186865686c78c9dbcae7ed50a91",
         "observed_at": "2026-08-18",
@@ -1073,11 +1103,19 @@
       "owner": "runtime",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": null,
-        "verified_on": null
+        "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
+        "verified_on": "2026-10-07"
       },
       "fact_sources": [],
-      "verification": [],
+      "verification": [
+        {
+          "kind": "command",
+          "command": "make docs-check",
+          "result": "passed",
+          "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
+          "verified_on": "2026-10-07"
+        }
+      ],
       "production_evidence": {
         "level": "none",
         "refs": [],
@@ -1092,7 +1130,7 @@
           "id": "DOC-CLOSURE-023",
           "kind": "verification",
           "severity": "medium",
-          "summary": "Source and semantic review have not yet been recorded.",
+          "summary": "Corrected current statements and repository gates are recorded; complete document-specific source review and accountable signoff remain incomplete.",
           "exit_criteria": "Record fact sources and verification evidence, then update doc_status through review."
         }
       ]
@@ -1103,11 +1141,19 @@
       "owner": "runtime",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": null,
-        "verified_on": null
+        "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
+        "verified_on": "2026-10-07"
       },
       "fact_sources": [],
-      "verification": [],
+      "verification": [
+        {
+          "kind": "command",
+          "command": "make docs-check",
+          "result": "passed",
+          "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
+          "verified_on": "2026-10-07"
+        }
+      ],
       "production_evidence": {
         "level": "none",
         "refs": [],
@@ -1122,7 +1168,7 @@
           "id": "DOC-CLOSURE-024",
           "kind": "verification",
           "severity": "medium",
-          "summary": "Source and semantic review have not yet been recorded.",
+          "summary": "Corrected current statements and repository gates are recorded; complete document-specific source review and accountable signoff remain incomplete.",
           "exit_criteria": "Record fact sources and verification evidence, then update doc_status through review."
         }
       ]
@@ -1313,11 +1359,19 @@
       "owner": "survey",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": null,
-        "verified_on": null
+        "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
+        "verified_on": "2026-10-07"
       },
       "fact_sources": [],
-      "verification": [],
+      "verification": [
+        {
+          "kind": "command",
+          "command": "make docs-check",
+          "result": "passed",
+          "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
+          "verified_on": "2026-10-07"
+        }
+      ],
       "production_evidence": {
         "level": "none",
         "refs": [],
@@ -1332,7 +1386,7 @@
           "id": "DOC-CLOSURE-031",
           "kind": "verification",
           "severity": "medium",
-          "summary": "Source and semantic review have not yet been recorded.",
+          "summary": "Corrected current statements and repository gates are recorded; complete document-specific source review and accountable signoff remain incomplete.",
           "exit_criteria": "Record fact sources and verification evidence, then update doc_status through review."
         }
       ]
@@ -1407,7 +1461,7 @@
       "production_evidence": {
         "level": "historical",
         "refs": [
-          "docs/00-总览/09-当前版本定档验收台账.md"
+          "docs/00-总览/10-基础设施生产证据台账.md"
         ],
         "deployed_sha": "8f663383e117f186865686c78c9dbcae7ed50a91",
         "observed_at": "2026-08-18",
@@ -1438,11 +1492,19 @@
       "owner": "survey",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": null,
-        "verified_on": null
+        "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
+        "verified_on": "2026-10-07"
       },
       "fact_sources": [],
-      "verification": [],
+      "verification": [
+        {
+          "kind": "command",
+          "command": "make docs-check",
+          "result": "passed",
+          "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
+          "verified_on": "2026-10-07"
+        }
+      ],
       "production_evidence": {
         "level": "none",
         "refs": [],
@@ -1457,7 +1519,7 @@
           "id": "DOC-CLOSURE-034",
           "kind": "verification",
           "severity": "medium",
-          "summary": "Source and semantic review have not yet been recorded.",
+          "summary": "Corrected current statements and repository gates are recorded; complete document-specific source review and accountable signoff remain incomplete.",
           "exit_criteria": "Record fact sources and verification evidence, then update doc_status through review."
         }
       ]
@@ -1498,8 +1560,8 @@
       "owner": "survey",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": "bfbd991e01d16bc32891dea0e0ef9cdd8aac4f90",
-        "verified_on": "2026-09-10"
+        "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
+        "verified_on": "2026-10-07"
       },
       "fact_sources": [
         {
@@ -1527,12 +1589,19 @@
           "result": "matched",
           "source_sha": "e9f085e308009fbfdeb6d188c1af91e85c19b103",
           "verified_on": "2026-08-20"
+        },
+        {
+          "kind": "command",
+          "command": "make docs-check",
+          "result": "passed",
+          "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
+          "verified_on": "2026-10-07"
         }
       ],
       "production_evidence": {
         "level": "historical",
         "refs": [
-          "docs/00-总览/09-当前版本定档验收台账.md"
+          "docs/00-总览/10-基础设施生产证据台账.md"
         ],
         "deployed_sha": "8f663383e117f186865686c78c9dbcae7ed50a91",
         "observed_at": "2026-08-18",
@@ -1550,10 +1619,10 @@
         },
         {
           "id": "OPERATOR-RETIREMENT-REVIEW",
-          "kind": "documentation",
+          "kind": "verification",
           "severity": "medium",
-          "summary": "Operator retirement changed referenced sources; the previous alignment evidence does not cover this release.",
-          "exit_criteria": "Reconcile all affected statements with Operator retirement and refresh source evidence after review."
+          "summary": "Operator retirement is reflected in the revised statements; current client compatibility and deployed retirement behavior are not attested.",
+          "exit_criteria": "Retain current caller inventory and exact-version retirement/permission evidence, then complete the accountable review."
         }
       ]
     },
@@ -1563,11 +1632,19 @@
       "owner": "survey",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": null,
-        "verified_on": null
+        "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
+        "verified_on": "2026-10-07"
       },
       "fact_sources": [],
-      "verification": [],
+      "verification": [
+        {
+          "kind": "command",
+          "command": "make docs-check",
+          "result": "passed",
+          "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
+          "verified_on": "2026-10-07"
+        }
+      ],
       "production_evidence": {
         "level": "none",
         "refs": [],
@@ -1582,7 +1659,7 @@
           "id": "DOC-CLOSURE-037",
           "kind": "verification",
           "severity": "medium",
-          "summary": "Source and semantic review have not yet been recorded.",
+          "summary": "Corrected current statements and repository gates are recorded; complete document-specific source review and accountable signoff remain incomplete.",
           "exit_criteria": "Record fact sources and verification evidence, then update doc_status through review."
         }
       ]
@@ -1593,8 +1670,8 @@
       "owner": "survey",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": "bfbd991e01d16bc32891dea0e0ef9cdd8aac4f90",
-        "verified_on": "2026-09-10"
+        "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
+        "verified_on": "2026-10-07"
       },
       "fact_sources": [
         {
@@ -1622,12 +1699,19 @@
           "result": "matched",
           "source_sha": "e9f085e308009fbfdeb6d188c1af91e85c19b103",
           "verified_on": "2026-08-20"
+        },
+        {
+          "kind": "command",
+          "command": "make docs-check",
+          "result": "passed",
+          "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
+          "verified_on": "2026-10-07"
         }
       ],
       "production_evidence": {
         "level": "historical",
         "refs": [
-          "docs/00-总览/09-当前版本定档验收台账.md"
+          "docs/00-总览/10-基础设施生产证据台账.md"
         ],
         "deployed_sha": "8f663383e117f186865686c78c9dbcae7ed50a91",
         "observed_at": "2026-08-18",
@@ -1645,10 +1729,10 @@
         },
         {
           "id": "OPERATOR-RETIREMENT-REVIEW",
-          "kind": "documentation",
+          "kind": "verification",
           "severity": "medium",
-          "summary": "Operator retirement changed referenced sources; the previous alignment evidence does not cover this release.",
-          "exit_criteria": "Reconcile all affected statements with Operator retirement and refresh source evidence after review."
+          "summary": "Operator retirement is reflected in the revised statements; current client compatibility and deployed retirement behavior are not attested.",
+          "exit_criteria": "Retain current caller inventory and exact-version retirement/permission evidence, then complete the accountable review."
         }
       ]
     },
@@ -1658,11 +1742,28 @@
       "owner": "modelcatalog",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": null,
-        "verified_on": null
+        "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
+        "verified_on": "2026-10-07"
       },
-      "fact_sources": [],
-      "verification": [],
+      "fact_sources": [
+        {
+          "kind": "source",
+          "path": "internal/apiserver/application/survey/answersheet/admission.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/application/journey/assessmentintake/service.go"
+        }
+      ],
+      "verification": [
+        {
+          "kind": "command",
+          "command": "make docs-check",
+          "result": "passed",
+          "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
+          "verified_on": "2026-10-07"
+        }
+      ],
       "production_evidence": {
         "level": "none",
         "refs": [],
@@ -1677,7 +1778,7 @@
           "id": "DOC-CLOSURE-039",
           "kind": "verification",
           "severity": "medium",
-          "summary": "Source and semantic review have not yet been recorded.",
+          "summary": "Corrected current statements and repository gates are recorded; complete document-specific source review and accountable signoff remain incomplete.",
           "exit_criteria": "Record fact sources and verification evidence, then update doc_status through review."
         }
       ]
@@ -1691,7 +1792,16 @@
         "source_sha": null,
         "verified_on": null
       },
-      "fact_sources": [],
+      "fact_sources": [
+        {
+          "kind": "source",
+          "path": "internal/apiserver/application/survey/answersheet/admission.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/application/journey/assessmentintake/service.go"
+        }
+      ],
       "verification": [],
       "production_evidence": {
         "level": "none",
@@ -1737,6 +1847,14 @@
         {
           "kind": "source",
           "path": "internal/apiserver/domain/evaluation/routing/**/*.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/application/survey/answersheet/admission.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/application/journey/assessmentintake/service.go"
         }
       ],
       "verification": [
@@ -1752,7 +1870,7 @@
       "production_evidence": {
         "level": "historical",
         "refs": [
-          "docs/00-总览/09-当前版本定档验收台账.md"
+          "docs/00-总览/10-基础设施生产证据台账.md"
         ],
         "deployed_sha": "8f663383e117f186865686c78c9dbcae7ed50a91",
         "observed_at": "2026-08-18",
@@ -1765,8 +1883,8 @@
           "id": "MODELCATALOG-DOC-SEMANTIC",
           "kind": "verification",
           "severity": "medium",
-          "summary": "Independent-questionnaire admission, replica-set/current-family smoke and production evidence remain conditional.",
-          "exit_criteria": "Close the named contract/environment/production gaps, then re-sign affected dimensions."
+          "summary": "New independent-questionnaire admission splits before Assessment creation; current client terminal behavior, legacy admission classification, replica-set/full-family smoke and production evidence remain conditional.",
+          "exit_criteria": "Retain exact-version independent terminal and legacy-drain evidence, unskipped replica-set/full-family smoke, historical empty-shell disposition and accountable review."
         }
       ]
     },
@@ -1776,11 +1894,28 @@
       "owner": "modelcatalog",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": null,
-        "verified_on": null
+        "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
+        "verified_on": "2026-10-07"
       },
-      "fact_sources": [],
-      "verification": [],
+      "fact_sources": [
+        {
+          "kind": "source",
+          "path": "internal/apiserver/application/survey/answersheet/admission.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/application/journey/assessmentintake/service.go"
+        }
+      ],
+      "verification": [
+        {
+          "kind": "command",
+          "command": "make docs-check",
+          "result": "passed",
+          "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
+          "verified_on": "2026-10-07"
+        }
+      ],
       "production_evidence": {
         "level": "none",
         "refs": [],
@@ -1795,7 +1930,7 @@
           "id": "DOC-CLOSURE-042",
           "kind": "verification",
           "severity": "medium",
-          "summary": "Source and semantic review have not yet been recorded.",
+          "summary": "Corrected current statements and repository gates are recorded; complete document-specific source review and accountable signoff remain incomplete.",
           "exit_criteria": "Record fact sources and verification evidence, then update doc_status through review."
         }
       ]
@@ -1809,7 +1944,16 @@
         "source_sha": null,
         "verified_on": null
       },
-      "fact_sources": [],
+      "fact_sources": [
+        {
+          "kind": "source",
+          "path": "internal/apiserver/application/survey/answersheet/admission.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/application/journey/assessmentintake/service.go"
+        }
+      ],
       "verification": [],
       "production_evidence": {
         "level": "none",
@@ -1836,11 +1980,28 @@
       "owner": "modelcatalog",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": null,
-        "verified_on": null
+        "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
+        "verified_on": "2026-10-07"
       },
-      "fact_sources": [],
-      "verification": [],
+      "fact_sources": [
+        {
+          "kind": "source",
+          "path": "internal/apiserver/application/survey/answersheet/admission.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/application/journey/assessmentintake/service.go"
+        }
+      ],
+      "verification": [
+        {
+          "kind": "command",
+          "command": "make docs-check",
+          "result": "passed",
+          "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
+          "verified_on": "2026-10-07"
+        }
+      ],
       "production_evidence": {
         "level": "none",
         "refs": [],
@@ -1855,7 +2016,7 @@
           "id": "DOC-CLOSURE-044",
           "kind": "verification",
           "severity": "medium",
-          "summary": "Source and semantic review have not yet been recorded.",
+          "summary": "Corrected current statements and repository gates are recorded; complete document-specific source review and accountable signoff remain incomplete.",
           "exit_criteria": "Record fact sources and verification evidence, then update doc_status through review."
         }
       ]
@@ -1866,11 +2027,28 @@
       "owner": "modelcatalog",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": null,
-        "verified_on": null
+        "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
+        "verified_on": "2026-10-07"
       },
-      "fact_sources": [],
-      "verification": [],
+      "fact_sources": [
+        {
+          "kind": "source",
+          "path": "internal/apiserver/application/survey/answersheet/admission.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/application/journey/assessmentintake/service.go"
+        }
+      ],
+      "verification": [
+        {
+          "kind": "command",
+          "command": "make docs-check",
+          "result": "passed",
+          "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
+          "verified_on": "2026-10-07"
+        }
+      ],
       "production_evidence": {
         "level": "none",
         "refs": [],
@@ -1885,7 +2063,7 @@
           "id": "DOC-CLOSURE-045",
           "kind": "verification",
           "severity": "medium",
-          "summary": "Source and semantic review have not yet been recorded.",
+          "summary": "Corrected current statements and repository gates are recorded; complete document-specific source review and accountable signoff remain incomplete.",
           "exit_criteria": "Record fact sources and verification evidence, then update doc_status through review."
         }
       ]
@@ -1915,6 +2093,14 @@
         {
           "kind": "source",
           "path": "internal/apiserver/domain/evaluation/routing/**/*.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/application/survey/answersheet/admission.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/application/journey/assessmentintake/service.go"
         }
       ],
       "verification": [
@@ -1930,7 +2116,7 @@
       "production_evidence": {
         "level": "historical",
         "refs": [
-          "docs/00-总览/09-当前版本定档验收台账.md"
+          "docs/00-总览/10-基础设施生产证据台账.md"
         ],
         "deployed_sha": "8f663383e117f186865686c78c9dbcae7ed50a91",
         "observed_at": "2026-08-18",
@@ -1943,8 +2129,8 @@
           "id": "MODELCATALOG-DOC-SEMANTIC",
           "kind": "verification",
           "severity": "medium",
-          "summary": "Independent-questionnaire admission, replica-set/current-family smoke and production evidence remain conditional.",
-          "exit_criteria": "Close the named contract/environment/production gaps, then re-sign affected dimensions."
+          "summary": "New independent-questionnaire admission splits before Assessment creation; current client terminal behavior, legacy admission classification, replica-set/full-family smoke and production evidence remain conditional.",
+          "exit_criteria": "Retain exact-version independent terminal and legacy-drain evidence, unskipped replica-set/full-family smoke, historical empty-shell disposition and accountable review."
         }
       ]
     },
@@ -1957,7 +2143,16 @@
         "source_sha": null,
         "verified_on": null
       },
-      "fact_sources": [],
+      "fact_sources": [
+        {
+          "kind": "source",
+          "path": "internal/apiserver/application/survey/answersheet/admission.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/application/journey/assessmentintake/service.go"
+        }
+      ],
       "verification": [],
       "production_evidence": {
         "level": "none",
@@ -1984,8 +2179,8 @@
       "owner": "modelcatalog",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": "fc4136707c7c162fab01236b1dd1eebc897c7885",
-        "verified_on": "2026-09-08"
+        "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
+        "verified_on": "2026-10-07"
       },
       "fact_sources": [
         {
@@ -2003,6 +2198,14 @@
         {
           "kind": "source",
           "path": "internal/apiserver/domain/evaluation/routing/**/*.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/application/survey/answersheet/admission.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/application/journey/assessmentintake/service.go"
         }
       ],
       "verification": [
@@ -2013,12 +2216,19 @@
           "result": "matched",
           "source_sha": "fc4136707c7c162fab01236b1dd1eebc897c7885",
           "verified_on": "2026-09-08"
+        },
+        {
+          "kind": "command",
+          "command": "make docs-check",
+          "result": "passed",
+          "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
+          "verified_on": "2026-10-07"
         }
       ],
       "production_evidence": {
         "level": "historical",
         "refs": [
-          "docs/00-总览/09-当前版本定档验收台账.md"
+          "docs/00-总览/10-基础设施生产证据台账.md"
         ],
         "deployed_sha": "8f663383e117f186865686c78c9dbcae7ed50a91",
         "observed_at": "2026-08-18",
@@ -2031,8 +2241,8 @@
           "id": "MODELCATALOG-DOC-SEMANTIC",
           "kind": "verification",
           "severity": "medium",
-          "summary": "Independent-questionnaire admission, replica-set/current-family smoke and production evidence remain conditional.",
-          "exit_criteria": "Close the named contract/environment/production gaps, then re-sign affected dimensions."
+          "summary": "New independent-questionnaire admission splits before Assessment creation; current client terminal behavior, legacy admission classification, replica-set/full-family smoke and production evidence remain conditional.",
+          "exit_criteria": "Retain exact-version independent terminal and legacy-drain evidence, unskipped replica-set/full-family smoke, historical empty-shell disposition and accountable review."
         }
       ]
     },
@@ -2045,7 +2255,16 @@
         "source_sha": null,
         "verified_on": null
       },
-      "fact_sources": [],
+      "fact_sources": [
+        {
+          "kind": "source",
+          "path": "internal/apiserver/application/survey/answersheet/admission.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/application/journey/assessmentintake/service.go"
+        }
+      ],
       "verification": [],
       "production_evidence": {
         "level": "none",
@@ -2075,7 +2294,16 @@
         "source_sha": null,
         "verified_on": null
       },
-      "fact_sources": [],
+      "fact_sources": [
+        {
+          "kind": "source",
+          "path": "internal/apiserver/application/survey/answersheet/admission.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/application/journey/assessmentintake/service.go"
+        }
+      ],
       "verification": [],
       "production_evidence": {
         "level": "none",
@@ -2105,7 +2333,16 @@
         "source_sha": null,
         "verified_on": null
       },
-      "fact_sources": [],
+      "fact_sources": [
+        {
+          "kind": "source",
+          "path": "internal/apiserver/application/survey/answersheet/admission.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/application/journey/assessmentintake/service.go"
+        }
+      ],
       "verification": [],
       "production_evidence": {
         "level": "none",
@@ -2135,7 +2372,16 @@
         "source_sha": null,
         "verified_on": null
       },
-      "fact_sources": [],
+      "fact_sources": [
+        {
+          "kind": "source",
+          "path": "internal/apiserver/application/survey/answersheet/admission.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/application/journey/assessmentintake/service.go"
+        }
+      ],
       "verification": [],
       "production_evidence": {
         "level": "none",
@@ -2165,7 +2411,16 @@
         "source_sha": null,
         "verified_on": null
       },
-      "fact_sources": [],
+      "fact_sources": [
+        {
+          "kind": "source",
+          "path": "internal/apiserver/application/survey/answersheet/admission.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/application/journey/assessmentintake/service.go"
+        }
+      ],
       "verification": [],
       "production_evidence": {
         "level": "none",
@@ -2192,8 +2447,8 @@
       "owner": "modelcatalog",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": "fc4136707c7c162fab01236b1dd1eebc897c7885",
-        "verified_on": "2026-09-08"
+        "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
+        "verified_on": "2026-10-07"
       },
       "fact_sources": [
         {
@@ -2211,6 +2466,14 @@
         {
           "kind": "source",
           "path": "internal/apiserver/domain/evaluation/routing/**/*.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/application/survey/answersheet/admission.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/application/journey/assessmentintake/service.go"
         }
       ],
       "verification": [
@@ -2221,12 +2484,19 @@
           "result": "matched",
           "source_sha": "fc4136707c7c162fab01236b1dd1eebc897c7885",
           "verified_on": "2026-09-08"
+        },
+        {
+          "kind": "command",
+          "command": "make docs-check",
+          "result": "passed",
+          "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
+          "verified_on": "2026-10-07"
         }
       ],
       "production_evidence": {
         "level": "historical",
         "refs": [
-          "docs/00-总览/09-当前版本定档验收台账.md"
+          "docs/00-总览/10-基础设施生产证据台账.md"
         ],
         "deployed_sha": "8f663383e117f186865686c78c9dbcae7ed50a91",
         "observed_at": "2026-08-18",
@@ -2239,8 +2509,8 @@
           "id": "MODELCATALOG-DOC-SEMANTIC",
           "kind": "verification",
           "severity": "medium",
-          "summary": "Independent-questionnaire admission, replica-set/current-family smoke and production evidence remain conditional.",
-          "exit_criteria": "Close the named contract/environment/production gaps, then re-sign affected dimensions."
+          "summary": "New independent-questionnaire admission splits before Assessment creation; current client terminal behavior, legacy admission classification, replica-set/full-family smoke and production evidence remain conditional.",
+          "exit_criteria": "Retain exact-version independent terminal and legacy-drain evidence, unskipped replica-set/full-family smoke, historical empty-shell disposition and accountable review."
         }
       ]
     },
@@ -2269,6 +2539,14 @@
         {
           "kind": "source",
           "path": "internal/apiserver/domain/evaluation/routing/**/*.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/application/survey/answersheet/admission.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/application/journey/assessmentintake/service.go"
         }
       ],
       "verification": [
@@ -2284,7 +2562,7 @@
       "production_evidence": {
         "level": "historical",
         "refs": [
-          "docs/00-总览/09-当前版本定档验收台账.md"
+          "docs/00-总览/10-基础设施生产证据台账.md"
         ],
         "deployed_sha": "8f663383e117f186865686c78c9dbcae7ed50a91",
         "observed_at": "2026-08-18",
@@ -2297,8 +2575,8 @@
           "id": "MODELCATALOG-DOC-SEMANTIC",
           "kind": "verification",
           "severity": "medium",
-          "summary": "Independent-questionnaire admission, replica-set/current-family smoke and production evidence remain conditional.",
-          "exit_criteria": "Close the named contract/environment/production gaps, then re-sign affected dimensions."
+          "summary": "New independent-questionnaire admission splits before Assessment creation; current client terminal behavior, legacy admission classification, replica-set/full-family smoke and production evidence remain conditional.",
+          "exit_criteria": "Retain exact-version independent terminal and legacy-drain evidence, unskipped replica-set/full-family smoke, historical empty-shell disposition and accountable review."
         }
       ]
     },
@@ -2308,11 +2586,19 @@
       "owner": "evaluation",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": null,
-        "verified_on": null
+        "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
+        "verified_on": "2026-10-07"
       },
       "fact_sources": [],
-      "verification": [],
+      "verification": [
+        {
+          "kind": "command",
+          "command": "make docs-check",
+          "result": "passed",
+          "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
+          "verified_on": "2026-10-07"
+        }
+      ],
       "production_evidence": {
         "level": "none",
         "refs": [],
@@ -2327,7 +2613,7 @@
           "id": "DOC-CLOSURE-056",
           "kind": "verification",
           "severity": "medium",
-          "summary": "Source and semantic review have not yet been recorded.",
+          "summary": "Corrected current statements and repository gates are recorded; complete document-specific source review and accountable signoff remain incomplete.",
           "exit_criteria": "Record fact sources and verification evidence, then update doc_status through review."
         }
       ]
@@ -2338,8 +2624,8 @@
       "owner": "evaluation",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": "118afee15d7ceeef01a5641fa5bd17d69ddc2c80",
-        "verified_on": "2026-09-11"
+        "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
+        "verified_on": "2026-10-07"
       },
       "fact_sources": [
         {
@@ -2375,12 +2661,19 @@
           "result": "matched",
           "source_sha": "180ea9fdc88a45b405785c1fe18a0238580053c3",
           "verified_on": "2026-09-11"
+        },
+        {
+          "kind": "command",
+          "command": "make docs-check",
+          "result": "passed",
+          "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
+          "verified_on": "2026-10-07"
         }
       ],
       "production_evidence": {
         "level": "historical",
         "refs": [
-          "docs/00-总览/09-当前版本定档验收台账.md"
+          "docs/00-总览/10-基础设施生产证据台账.md"
         ],
         "deployed_sha": "8f663383e117f186865686c78c9dbcae7ed50a91",
         "observed_at": "2026-08-18",
@@ -2411,11 +2704,19 @@
       "owner": "evaluation",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": null,
-        "verified_on": null
+        "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
+        "verified_on": "2026-10-07"
       },
       "fact_sources": [],
-      "verification": [],
+      "verification": [
+        {
+          "kind": "command",
+          "command": "make docs-check",
+          "result": "passed",
+          "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
+          "verified_on": "2026-10-07"
+        }
+      ],
       "production_evidence": {
         "level": "none",
         "refs": [],
@@ -2430,7 +2731,7 @@
           "id": "DOC-CLOSURE-058",
           "kind": "verification",
           "severity": "medium",
-          "summary": "Source and semantic review have not yet been recorded.",
+          "summary": "Corrected current statements and repository gates are recorded; complete document-specific source review and accountable signoff remain incomplete.",
           "exit_criteria": "Record fact sources and verification evidence, then update doc_status through review."
         }
       ]
@@ -2441,11 +2742,19 @@
       "owner": "evaluation",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": null,
-        "verified_on": null
+        "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
+        "verified_on": "2026-10-07"
       },
       "fact_sources": [],
-      "verification": [],
+      "verification": [
+        {
+          "kind": "command",
+          "command": "make docs-check",
+          "result": "passed",
+          "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
+          "verified_on": "2026-10-07"
+        }
+      ],
       "production_evidence": {
         "level": "none",
         "refs": [],
@@ -2460,7 +2769,7 @@
           "id": "DOC-CLOSURE-059",
           "kind": "verification",
           "severity": "medium",
-          "summary": "Source and semantic review have not yet been recorded.",
+          "summary": "Corrected current statements and repository gates are recorded; complete document-specific source review and accountable signoff remain incomplete.",
           "exit_criteria": "Record fact sources and verification evidence, then update doc_status through review."
         }
       ]
@@ -2501,11 +2810,19 @@
       "owner": "evaluation",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": null,
-        "verified_on": null
+        "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
+        "verified_on": "2026-10-07"
       },
       "fact_sources": [],
-      "verification": [],
+      "verification": [
+        {
+          "kind": "command",
+          "command": "make docs-check",
+          "result": "passed",
+          "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
+          "verified_on": "2026-10-07"
+        }
+      ],
       "production_evidence": {
         "level": "none",
         "refs": [],
@@ -2520,7 +2837,7 @@
           "id": "DOC-CLOSURE-061",
           "kind": "verification",
           "severity": "medium",
-          "summary": "Source and semantic review have not yet been recorded.",
+          "summary": "Corrected current statements and repository gates are recorded; complete document-specific source review and accountable signoff remain incomplete.",
           "exit_criteria": "Record fact sources and verification evidence, then update doc_status through review."
         }
       ]
@@ -2531,8 +2848,8 @@
       "owner": "evaluation",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": "118afee15d7ceeef01a5641fa5bd17d69ddc2c80",
-        "verified_on": "2026-09-11"
+        "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
+        "verified_on": "2026-10-07"
       },
       "fact_sources": [
         {
@@ -2568,12 +2885,19 @@
           "result": "matched",
           "source_sha": "180ea9fdc88a45b405785c1fe18a0238580053c3",
           "verified_on": "2026-09-11"
+        },
+        {
+          "kind": "command",
+          "command": "make docs-check",
+          "result": "passed",
+          "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
+          "verified_on": "2026-10-07"
         }
       ],
       "production_evidence": {
         "level": "historical",
         "refs": [
-          "docs/00-总览/09-当前版本定档验收台账.md"
+          "docs/00-总览/10-基础设施生产证据台账.md"
         ],
         "deployed_sha": "8f663383e117f186865686c78c9dbcae7ed50a91",
         "observed_at": "2026-08-18",
@@ -2646,7 +2970,7 @@
       "production_evidence": {
         "level": "historical",
         "refs": [
-          "docs/00-总览/09-当前版本定档验收台账.md"
+          "docs/00-总览/10-基础设施生产证据台账.md"
         ],
         "deployed_sha": "8f663383e117f186865686c78c9dbcae7ed50a91",
         "observed_at": "2026-08-18",
@@ -2737,11 +3061,19 @@
       "owner": "interpretation",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": null,
-        "verified_on": null
+        "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
+        "verified_on": "2026-10-07"
       },
       "fact_sources": [],
-      "verification": [],
+      "verification": [
+        {
+          "kind": "command",
+          "command": "make docs-check",
+          "result": "passed",
+          "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
+          "verified_on": "2026-10-07"
+        }
+      ],
       "production_evidence": {
         "level": "none",
         "refs": [],
@@ -2756,7 +3088,7 @@
           "id": "DOC-CLOSURE-066",
           "kind": "verification",
           "severity": "medium",
-          "summary": "Source and semantic review have not yet been recorded.",
+          "summary": "Corrected current statements and repository gates are recorded; complete document-specific source review and accountable signoff remain incomplete.",
           "exit_criteria": "Record fact sources and verification evidence, then update doc_status through review."
         }
       ]
@@ -2827,8 +3159,8 @@
       "owner": "interpretation",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": "e9f085e308009fbfdeb6d188c1af91e85c19b103",
-        "verified_on": "2026-08-20"
+        "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
+        "verified_on": "2026-10-07"
       },
       "fact_sources": [
         {
@@ -2888,12 +3220,19 @@
           "result": "matched",
           "source_sha": "e9f085e308009fbfdeb6d188c1af91e85c19b103",
           "verified_on": "2026-08-20"
+        },
+        {
+          "kind": "command",
+          "command": "make docs-check",
+          "result": "passed",
+          "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
+          "verified_on": "2026-10-07"
         }
       ],
       "production_evidence": {
         "level": "historical",
         "refs": [
-          "docs/00-总览/09-当前版本定档验收台账.md"
+          "docs/00-总览/10-基础设施生产证据台账.md"
         ],
         "deployed_sha": "8f663383e117f186865686c78c9dbcae7ed50a91",
         "observed_at": "2026-08-18",
@@ -2994,11 +3333,19 @@
       "owner": "interpretation",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": null,
-        "verified_on": null
+        "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
+        "verified_on": "2026-10-07"
       },
       "fact_sources": [],
-      "verification": [],
+      "verification": [
+        {
+          "kind": "command",
+          "command": "make docs-check",
+          "result": "passed",
+          "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
+          "verified_on": "2026-10-07"
+        }
+      ],
       "production_evidence": {
         "level": "none",
         "refs": [],
@@ -3013,7 +3360,7 @@
           "id": "DOC-CLOSURE-071",
           "kind": "verification",
           "severity": "medium",
-          "summary": "Source and semantic review have not yet been recorded.",
+          "summary": "Corrected current statements and repository gates are recorded; complete document-specific source review and accountable signoff remain incomplete.",
           "exit_criteria": "Record fact sources and verification evidence, then update doc_status through review."
         }
       ]
@@ -3024,8 +3371,8 @@
       "owner": "interpretation",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": null,
-        "verified_on": null
+        "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
+        "verified_on": "2026-10-07"
       },
       "fact_sources": [
         {
@@ -3049,11 +3396,19 @@
           "path": "api/schema/interpretation/ai-explanation-*.schema.json"
         }
       ],
-      "verification": [],
+      "verification": [
+        {
+          "kind": "command",
+          "command": "make docs-check",
+          "result": "passed",
+          "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
+          "verified_on": "2026-10-07"
+        }
+      ],
       "production_evidence": {
         "level": "historical",
         "refs": [
-          "docs/00-总览/09-当前版本定档验收台账.md"
+          "docs/00-总览/10-基础设施生产证据台账.md"
         ],
         "deployed_sha": "8f663383e117f186865686c78c9dbcae7ed50a91",
         "observed_at": "2026-08-18",
@@ -3113,7 +3468,7 @@
       "production_evidence": {
         "level": "historical",
         "refs": [
-          "docs/00-总览/09-当前版本定档验收台账.md"
+          "docs/00-总览/10-基础设施生产证据台账.md"
         ],
         "deployed_sha": "8f663383e117f186865686c78c9dbcae7ed50a91",
         "observed_at": "2026-08-18",
@@ -3144,8 +3499,8 @@
       "owner": "actor",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": "cf98df7730e66d5e4df1393a70a545abd12f5b04",
-        "verified_on": "2026-09-11"
+        "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
+        "verified_on": "2026-10-07"
       },
       "fact_sources": [
         {
@@ -3163,6 +3518,26 @@
         {
           "kind": "source",
           "path": "internal/collection-server/application/testeeaccess/**/*.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/collection-server/transport/rest/router.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/collection-server/transport/rest/middleware/iam_middleware.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/collection-server/transport/rest/middleware/report_identity_test.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/collection-server/transport/rest/architecture_test.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/application/actor/assessmententry/service.go"
         }
       ],
       "verification": [
@@ -3173,12 +3548,26 @@
           "result": "matched",
           "source_sha": "e9f085e308009fbfdeb6d188c1af91e85c19b103",
           "verified_on": "2026-08-20"
+        },
+        {
+          "kind": "command",
+          "command": "make docs-check",
+          "result": "passed",
+          "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
+          "verified_on": "2026-10-07"
+        },
+        {
+          "kind": "command",
+          "command": "go test -count=1 ./internal/collection-server/transport/rest/middleware ./internal/collection-server/transport/rest ./internal/apiserver/eventing/standardoutbox ./internal/apiserver/eventing/subsystem ./internal/apiserver/process ./internal/pkg/eventing/catalog ./internal/pkg/signalcatalog",
+          "result": "passed",
+          "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
+          "verified_on": "2026-10-07"
         }
       ],
       "production_evidence": {
         "level": "historical",
         "refs": [
-          "docs/00-总览/09-当前版本定档验收台账.md"
+          "docs/00-总览/10-基础设施生产证据台账.md"
         ],
         "deployed_sha": "8f663383e117f186865686c78c9dbcae7ed50a91",
         "observed_at": "2026-08-18",
@@ -3191,15 +3580,15 @@
           "id": "ACTOR-DOC-SEMANTIC",
           "kind": "security",
           "severity": "high",
-          "summary": "Two current-source P0 authorization gaps block the Actor security dimension.",
-          "exit_criteria": "Implement Profile representation and User-to-Testee gates with negative tests, then re-sign security."
+          "summary": "Public Intake Profile representation remains open. Collection Testee routes already share the Authorizer; the path/query object mismatch is locally fixed and tested, with deployment and runtime evidence unbound.",
+          "exit_criteria": "Implement and test trusted Profile representation, then verify the corrected Testee paths with real IAM and obtain accountable security signoff."
         },
         {
           "id": "OPERATOR-RETIREMENT-REVIEW",
-          "kind": "documentation",
+          "kind": "verification",
           "severity": "medium",
-          "summary": "Operator retirement changed referenced sources; the previous alignment evidence does not cover this release.",
-          "exit_criteria": "Reconcile all affected statements with Operator retirement and refresh source evidence after review."
+          "summary": "Operator retirement is reflected in the revised statements; current client compatibility and deployed retirement behavior are not attested.",
+          "exit_criteria": "Retain current caller inventory and exact-version retirement/permission evidence, then complete the accountable review."
         }
       ]
     },
@@ -3209,8 +3598,8 @@
       "owner": "actor",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": "cf98df7730e66d5e4df1393a70a545abd12f5b04",
-        "verified_on": "2026-09-11"
+        "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
+        "verified_on": "2026-10-07"
       },
       "fact_sources": [
         {
@@ -3228,6 +3617,26 @@
         {
           "kind": "source",
           "path": "internal/collection-server/application/testeeaccess/**/*.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/collection-server/transport/rest/router.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/collection-server/transport/rest/middleware/iam_middleware.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/collection-server/transport/rest/middleware/report_identity_test.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/collection-server/transport/rest/architecture_test.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/application/actor/assessmententry/service.go"
         }
       ],
       "verification": [
@@ -3238,12 +3647,26 @@
           "result": "matched",
           "source_sha": "e9f085e308009fbfdeb6d188c1af91e85c19b103",
           "verified_on": "2026-08-20"
+        },
+        {
+          "kind": "command",
+          "command": "make docs-check",
+          "result": "passed",
+          "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
+          "verified_on": "2026-10-07"
+        },
+        {
+          "kind": "command",
+          "command": "go test -count=1 ./internal/collection-server/transport/rest/middleware ./internal/collection-server/transport/rest ./internal/apiserver/eventing/standardoutbox ./internal/apiserver/eventing/subsystem ./internal/apiserver/process ./internal/pkg/eventing/catalog ./internal/pkg/signalcatalog",
+          "result": "passed",
+          "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
+          "verified_on": "2026-10-07"
         }
       ],
       "production_evidence": {
         "level": "historical",
         "refs": [
-          "docs/00-总览/09-当前版本定档验收台账.md"
+          "docs/00-总览/10-基础设施生产证据台账.md"
         ],
         "deployed_sha": "8f663383e117f186865686c78c9dbcae7ed50a91",
         "observed_at": "2026-08-18",
@@ -3256,15 +3679,15 @@
           "id": "ACTOR-DOC-SEMANTIC",
           "kind": "security",
           "severity": "high",
-          "summary": "Two current-source P0 authorization gaps block the Actor security dimension.",
-          "exit_criteria": "Implement Profile representation and User-to-Testee gates with negative tests, then re-sign security."
+          "summary": "Public Intake Profile representation remains open. Collection Testee routes already share the Authorizer; the path/query object mismatch is locally fixed and tested, with deployment and runtime evidence unbound.",
+          "exit_criteria": "Implement and test trusted Profile representation, then verify the corrected Testee paths with real IAM and obtain accountable security signoff."
         },
         {
           "id": "OPERATOR-RETIREMENT-REVIEW",
-          "kind": "documentation",
+          "kind": "verification",
           "severity": "medium",
-          "summary": "Operator retirement changed referenced sources; the previous alignment evidence does not cover this release.",
-          "exit_criteria": "Reconcile all affected statements with Operator retirement and refresh source evidence after review."
+          "summary": "Operator retirement is reflected in the revised statements; current client compatibility and deployed retirement behavior are not attested.",
+          "exit_criteria": "Retain current caller inventory and exact-version retirement/permission evidence, then complete the accountable review."
         }
       ]
     },
@@ -3274,8 +3697,8 @@
       "owner": "actor",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": "cf98df7730e66d5e4df1393a70a545abd12f5b04",
-        "verified_on": "2026-09-11"
+        "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
+        "verified_on": "2026-10-07"
       },
       "fact_sources": [
         {
@@ -3293,6 +3716,26 @@
         {
           "kind": "source",
           "path": "internal/collection-server/application/testeeaccess/**/*.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/collection-server/transport/rest/router.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/collection-server/transport/rest/middleware/iam_middleware.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/collection-server/transport/rest/middleware/report_identity_test.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/collection-server/transport/rest/architecture_test.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/application/actor/assessmententry/service.go"
         }
       ],
       "verification": [
@@ -3303,12 +3746,26 @@
           "result": "matched",
           "source_sha": "e9f085e308009fbfdeb6d188c1af91e85c19b103",
           "verified_on": "2026-08-20"
+        },
+        {
+          "kind": "command",
+          "command": "make docs-check",
+          "result": "passed",
+          "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
+          "verified_on": "2026-10-07"
+        },
+        {
+          "kind": "command",
+          "command": "go test -count=1 ./internal/collection-server/transport/rest/middleware ./internal/collection-server/transport/rest ./internal/apiserver/eventing/standardoutbox ./internal/apiserver/eventing/subsystem ./internal/apiserver/process ./internal/pkg/eventing/catalog ./internal/pkg/signalcatalog",
+          "result": "passed",
+          "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
+          "verified_on": "2026-10-07"
         }
       ],
       "production_evidence": {
         "level": "historical",
         "refs": [
-          "docs/00-总览/09-当前版本定档验收台账.md"
+          "docs/00-总览/10-基础设施生产证据台账.md"
         ],
         "deployed_sha": "8f663383e117f186865686c78c9dbcae7ed50a91",
         "observed_at": "2026-08-18",
@@ -3321,15 +3778,15 @@
           "id": "ACTOR-DOC-SEMANTIC",
           "kind": "security",
           "severity": "high",
-          "summary": "Two current-source P0 authorization gaps block the Actor security dimension.",
-          "exit_criteria": "Implement Profile representation and User-to-Testee gates with negative tests, then re-sign security."
+          "summary": "Public Intake Profile representation remains open. Collection Testee routes already share the Authorizer; the path/query object mismatch is locally fixed and tested, with deployment and runtime evidence unbound.",
+          "exit_criteria": "Implement and test trusted Profile representation, then verify the corrected Testee paths with real IAM and obtain accountable security signoff."
         },
         {
           "id": "OPERATOR-RETIREMENT-REVIEW",
-          "kind": "documentation",
+          "kind": "verification",
           "severity": "medium",
-          "summary": "Operator retirement changed referenced sources; the previous alignment evidence does not cover this release.",
-          "exit_criteria": "Reconcile all affected statements with Operator retirement and refresh source evidence after review."
+          "summary": "Operator retirement is reflected in the revised statements; current client compatibility and deployed retirement behavior are not attested.",
+          "exit_criteria": "Retain current caller inventory and exact-version retirement/permission evidence, then complete the accountable review."
         }
       ]
     },
@@ -3339,8 +3796,8 @@
       "owner": "actor",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": "cf98df7730e66d5e4df1393a70a545abd12f5b04",
-        "verified_on": "2026-09-11"
+        "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
+        "verified_on": "2026-10-07"
       },
       "fact_sources": [
         {
@@ -3358,6 +3815,26 @@
         {
           "kind": "source",
           "path": "internal/collection-server/application/testeeaccess/**/*.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/collection-server/transport/rest/router.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/collection-server/transport/rest/middleware/iam_middleware.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/collection-server/transport/rest/middleware/report_identity_test.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/collection-server/transport/rest/architecture_test.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/application/actor/assessmententry/service.go"
         }
       ],
       "verification": [
@@ -3368,12 +3845,26 @@
           "result": "matched",
           "source_sha": "e9f085e308009fbfdeb6d188c1af91e85c19b103",
           "verified_on": "2026-08-20"
+        },
+        {
+          "kind": "command",
+          "command": "make docs-check",
+          "result": "passed",
+          "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
+          "verified_on": "2026-10-07"
+        },
+        {
+          "kind": "command",
+          "command": "go test -count=1 ./internal/collection-server/transport/rest/middleware ./internal/collection-server/transport/rest ./internal/apiserver/eventing/standardoutbox ./internal/apiserver/eventing/subsystem ./internal/apiserver/process ./internal/pkg/eventing/catalog ./internal/pkg/signalcatalog",
+          "result": "passed",
+          "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
+          "verified_on": "2026-10-07"
         }
       ],
       "production_evidence": {
         "level": "historical",
         "refs": [
-          "docs/00-总览/09-当前版本定档验收台账.md"
+          "docs/00-总览/10-基础设施生产证据台账.md"
         ],
         "deployed_sha": "8f663383e117f186865686c78c9dbcae7ed50a91",
         "observed_at": "2026-08-18",
@@ -3386,15 +3877,15 @@
           "id": "ACTOR-DOC-SEMANTIC",
           "kind": "security",
           "severity": "high",
-          "summary": "Two current-source P0 authorization gaps block the Actor security dimension.",
-          "exit_criteria": "Implement Profile representation and User-to-Testee gates with negative tests, then re-sign security."
+          "summary": "Public Intake Profile representation remains open. Collection Testee routes already share the Authorizer; the path/query object mismatch is locally fixed and tested, with deployment and runtime evidence unbound.",
+          "exit_criteria": "Implement and test trusted Profile representation, then verify the corrected Testee paths with real IAM and obtain accountable security signoff."
         },
         {
           "id": "OPERATOR-RETIREMENT-REVIEW",
-          "kind": "documentation",
+          "kind": "verification",
           "severity": "medium",
-          "summary": "Operator retirement changed referenced sources; the previous alignment evidence does not cover this release.",
-          "exit_criteria": "Reconcile all affected statements with Operator retirement and refresh source evidence after review."
+          "summary": "Operator retirement is reflected in the revised statements; current client compatibility and deployed retirement behavior are not attested.",
+          "exit_criteria": "Retain current caller inventory and exact-version retirement/permission evidence, then complete the accountable review."
         }
       ]
     },
@@ -3404,8 +3895,8 @@
       "owner": "actor",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": "cf98df7730e66d5e4df1393a70a545abd12f5b04",
-        "verified_on": "2026-09-11"
+        "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
+        "verified_on": "2026-10-07"
       },
       "fact_sources": [
         {
@@ -3423,6 +3914,26 @@
         {
           "kind": "source",
           "path": "internal/collection-server/application/testeeaccess/**/*.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/collection-server/transport/rest/router.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/collection-server/transport/rest/middleware/iam_middleware.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/collection-server/transport/rest/middleware/report_identity_test.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/collection-server/transport/rest/architecture_test.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/application/actor/assessmententry/service.go"
         }
       ],
       "verification": [
@@ -3433,12 +3944,26 @@
           "result": "matched",
           "source_sha": "e9f085e308009fbfdeb6d188c1af91e85c19b103",
           "verified_on": "2026-08-20"
+        },
+        {
+          "kind": "command",
+          "command": "make docs-check",
+          "result": "passed",
+          "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
+          "verified_on": "2026-10-07"
+        },
+        {
+          "kind": "command",
+          "command": "go test -count=1 ./internal/collection-server/transport/rest/middleware ./internal/collection-server/transport/rest ./internal/apiserver/eventing/standardoutbox ./internal/apiserver/eventing/subsystem ./internal/apiserver/process ./internal/pkg/eventing/catalog ./internal/pkg/signalcatalog",
+          "result": "passed",
+          "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
+          "verified_on": "2026-10-07"
         }
       ],
       "production_evidence": {
         "level": "historical",
         "refs": [
-          "docs/00-总览/09-当前版本定档验收台账.md"
+          "docs/00-总览/10-基础设施生产证据台账.md"
         ],
         "deployed_sha": "8f663383e117f186865686c78c9dbcae7ed50a91",
         "observed_at": "2026-08-18",
@@ -3451,15 +3976,15 @@
           "id": "ACTOR-DOC-SEMANTIC",
           "kind": "security",
           "severity": "high",
-          "summary": "Two current-source P0 authorization gaps block the Actor security dimension.",
-          "exit_criteria": "Implement Profile representation and User-to-Testee gates with negative tests, then re-sign security."
+          "summary": "Public Intake Profile representation remains open. Collection Testee routes already share the Authorizer; the path/query object mismatch is locally fixed and tested, with deployment and runtime evidence unbound.",
+          "exit_criteria": "Implement and test trusted Profile representation, then verify the corrected Testee paths with real IAM and obtain accountable security signoff."
         },
         {
           "id": "OPERATOR-RETIREMENT-REVIEW",
-          "kind": "documentation",
+          "kind": "verification",
           "severity": "medium",
-          "summary": "Operator retirement changed referenced sources; the previous alignment evidence does not cover this release.",
-          "exit_criteria": "Reconcile all affected statements with Operator retirement and refresh source evidence after review."
+          "summary": "Operator retirement is reflected in the revised statements; current client compatibility and deployed retirement behavior are not attested.",
+          "exit_criteria": "Retain current caller inventory and exact-version retirement/permission evidence, then complete the accountable review."
         }
       ]
     },
@@ -3469,11 +3994,19 @@
       "owner": "plan",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": null,
-        "verified_on": null
+        "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
+        "verified_on": "2026-10-07"
       },
       "fact_sources": [],
-      "verification": [],
+      "verification": [
+        {
+          "kind": "command",
+          "command": "make docs-check",
+          "result": "passed",
+          "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
+          "verified_on": "2026-10-07"
+        }
+      ],
       "production_evidence": {
         "level": "none",
         "refs": [],
@@ -3488,7 +4021,7 @@
           "id": "DOC-CLOSURE-079",
           "kind": "verification",
           "severity": "medium",
-          "summary": "Source and semantic review have not yet been recorded.",
+          "summary": "Corrected current statements and repository gates are recorded; complete document-specific source review and accountable signoff remain incomplete.",
           "exit_criteria": "Record fact sources and verification evidence, then update doc_status through review."
         }
       ]
@@ -3499,11 +4032,19 @@
       "owner": "plan",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": null,
-        "verified_on": null
+        "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
+        "verified_on": "2026-10-07"
       },
       "fact_sources": [],
-      "verification": [],
+      "verification": [
+        {
+          "kind": "command",
+          "command": "make docs-check",
+          "result": "passed",
+          "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
+          "verified_on": "2026-10-07"
+        }
+      ],
       "production_evidence": {
         "level": "none",
         "refs": [],
@@ -3518,7 +4059,7 @@
           "id": "DOC-CLOSURE-080",
           "kind": "verification",
           "severity": "medium",
-          "summary": "Source and semantic review have not yet been recorded.",
+          "summary": "Corrected current statements and repository gates are recorded; complete document-specific source review and accountable signoff remain incomplete.",
           "exit_criteria": "Record fact sources and verification evidence, then update doc_status through review."
         }
       ]
@@ -3529,11 +4070,19 @@
       "owner": "plan",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": null,
-        "verified_on": null
+        "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
+        "verified_on": "2026-10-07"
       },
       "fact_sources": [],
-      "verification": [],
+      "verification": [
+        {
+          "kind": "command",
+          "command": "make docs-check",
+          "result": "passed",
+          "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
+          "verified_on": "2026-10-07"
+        }
+      ],
       "production_evidence": {
         "level": "none",
         "refs": [],
@@ -3548,7 +4097,7 @@
           "id": "DOC-CLOSURE-081",
           "kind": "verification",
           "severity": "medium",
-          "summary": "Source and semantic review have not yet been recorded.",
+          "summary": "Corrected current statements and repository gates are recorded; complete document-specific source review and accountable signoff remain incomplete.",
           "exit_criteria": "Record fact sources and verification evidence, then update doc_status through review."
         }
       ]
@@ -3559,11 +4108,19 @@
       "owner": "plan",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": null,
-        "verified_on": null
+        "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
+        "verified_on": "2026-10-07"
       },
       "fact_sources": [],
-      "verification": [],
+      "verification": [
+        {
+          "kind": "command",
+          "command": "make docs-check",
+          "result": "passed",
+          "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
+          "verified_on": "2026-10-07"
+        }
+      ],
       "production_evidence": {
         "level": "none",
         "refs": [],
@@ -3578,7 +4135,7 @@
           "id": "DOC-CLOSURE-082",
           "kind": "verification",
           "severity": "medium",
-          "summary": "Source and semantic review have not yet been recorded.",
+          "summary": "Corrected current statements and repository gates are recorded; complete document-specific source review and accountable signoff remain incomplete.",
           "exit_criteria": "Record fact sources and verification evidence, then update doc_status through review."
         }
       ]
@@ -3589,11 +4146,19 @@
       "owner": "plan",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": null,
-        "verified_on": null
+        "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
+        "verified_on": "2026-10-07"
       },
       "fact_sources": [],
-      "verification": [],
+      "verification": [
+        {
+          "kind": "command",
+          "command": "make docs-check",
+          "result": "passed",
+          "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
+          "verified_on": "2026-10-07"
+        }
+      ],
       "production_evidence": {
         "level": "none",
         "refs": [],
@@ -3608,7 +4173,7 @@
           "id": "DOC-CLOSURE-083",
           "kind": "verification",
           "severity": "medium",
-          "summary": "Source and semantic review have not yet been recorded.",
+          "summary": "Corrected current statements and repository gates are recorded; complete document-specific source review and accountable signoff remain incomplete.",
           "exit_criteria": "Record fact sources and verification evidence, then update doc_status through review."
         }
       ]
@@ -3619,8 +4184,8 @@
       "owner": "plan",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": "e9f085e308009fbfdeb6d188c1af91e85c19b103",
-        "verified_on": "2026-08-20"
+        "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
+        "verified_on": "2026-10-07"
       },
       "fact_sources": [
         {
@@ -3648,12 +4213,19 @@
           "result": "matched",
           "source_sha": "e9f085e308009fbfdeb6d188c1af91e85c19b103",
           "verified_on": "2026-08-20"
+        },
+        {
+          "kind": "command",
+          "command": "make docs-check",
+          "result": "passed",
+          "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
+          "verified_on": "2026-10-07"
         }
       ],
       "production_evidence": {
         "level": "historical",
         "refs": [
-          "docs/00-总览/09-当前版本定档验收台账.md"
+          "docs/00-总览/10-基础设施生产证据台账.md"
         ],
         "deployed_sha": "8f663383e117f186865686c78c9dbcae7ed50a91",
         "observed_at": "2026-08-18",
@@ -3684,11 +4256,19 @@
       "owner": "plan",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": null,
-        "verified_on": null
+        "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
+        "verified_on": "2026-10-07"
       },
       "fact_sources": [],
-      "verification": [],
+      "verification": [
+        {
+          "kind": "command",
+          "command": "make docs-check",
+          "result": "passed",
+          "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
+          "verified_on": "2026-10-07"
+        }
+      ],
       "production_evidence": {
         "level": "none",
         "refs": [],
@@ -3703,7 +4283,7 @@
           "id": "DOC-CLOSURE-085",
           "kind": "verification",
           "severity": "medium",
-          "summary": "Source and semantic review have not yet been recorded.",
+          "summary": "Corrected current statements and repository gates are recorded; complete document-specific source review and accountable signoff remain incomplete.",
           "exit_criteria": "Record fact sources and verification evidence, then update doc_status through review."
         }
       ]
@@ -3714,8 +4294,8 @@
       "owner": "plan",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": "e9f085e308009fbfdeb6d188c1af91e85c19b103",
-        "verified_on": "2026-08-20"
+        "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
+        "verified_on": "2026-10-07"
       },
       "fact_sources": [
         {
@@ -3743,12 +4323,19 @@
           "result": "matched",
           "source_sha": "e9f085e308009fbfdeb6d188c1af91e85c19b103",
           "verified_on": "2026-08-20"
+        },
+        {
+          "kind": "command",
+          "command": "make docs-check",
+          "result": "passed",
+          "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
+          "verified_on": "2026-10-07"
         }
       ],
       "production_evidence": {
         "level": "historical",
         "refs": [
-          "docs/00-总览/09-当前版本定档验收台账.md"
+          "docs/00-总览/10-基础设施生产证据台账.md"
         ],
         "deployed_sha": "8f663383e117f186865686c78c9dbcae7ed50a91",
         "observed_at": "2026-08-18",
@@ -3779,8 +4366,8 @@
       "owner": "plan",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": "e9f085e308009fbfdeb6d188c1af91e85c19b103",
-        "verified_on": "2026-08-20"
+        "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
+        "verified_on": "2026-10-07"
       },
       "fact_sources": [
         {
@@ -3808,12 +4395,19 @@
           "result": "matched",
           "source_sha": "e9f085e308009fbfdeb6d188c1af91e85c19b103",
           "verified_on": "2026-08-20"
+        },
+        {
+          "kind": "command",
+          "command": "make docs-check",
+          "result": "passed",
+          "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
+          "verified_on": "2026-10-07"
         }
       ],
       "production_evidence": {
         "level": "historical",
         "refs": [
-          "docs/00-总览/09-当前版本定档验收台账.md"
+          "docs/00-总览/10-基础设施生产证据台账.md"
         ],
         "deployed_sha": "8f663383e117f186865686c78c9dbcae7ed50a91",
         "observed_at": "2026-08-18",
@@ -3844,11 +4438,40 @@
       "owner": "statistics",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": null,
-        "verified_on": null
+        "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
+        "verified_on": "2026-10-07"
       },
-      "fact_sources": [],
-      "verification": [],
+      "fact_sources": [
+        {
+          "kind": "source",
+          "path": "internal/apiserver/container/modules/statistics/assemble.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/infra/mysql/statistics/projections.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/transport/rest/routes_statistics.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/application/statistics/scoped_read.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/pkg/migration/migrations/mysql/000082_statistics_store_activity.up.sql"
+        }
+      ],
+      "verification": [
+        {
+          "kind": "command",
+          "command": "make docs-check",
+          "result": "passed",
+          "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
+          "verified_on": "2026-10-07"
+        }
+      ],
       "production_evidence": {
         "level": "none",
         "refs": [],
@@ -3863,7 +4486,7 @@
           "id": "DOC-CLOSURE-088",
           "kind": "verification",
           "severity": "medium",
-          "summary": "Source and semantic review have not yet been recorded.",
+          "summary": "Corrected current statements and repository gates are recorded; complete document-specific source review and accountable signoff remain incomplete.",
           "exit_criteria": "Record fact sources and verification evidence, then update doc_status through review."
         }
       ]
@@ -3874,8 +4497,8 @@
       "owner": "statistics",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": "bfbd991e01d16bc32891dea0e0ef9cdd8aac4f90",
-        "verified_on": "2026-09-10"
+        "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
+        "verified_on": "2026-10-07"
       },
       "fact_sources": [
         {
@@ -3893,6 +4516,26 @@
         {
           "kind": "source",
           "path": "internal/apiserver/transport/rest/handler/statistics.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/container/modules/statistics/assemble.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/infra/mysql/statistics/projections.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/transport/rest/routes_statistics.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/application/statistics/scoped_read.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/pkg/migration/migrations/mysql/000082_statistics_store_activity.up.sql"
         }
       ],
       "verification": [
@@ -3903,12 +4546,19 @@
           "result": "matched",
           "source_sha": "236c25b4f3c9eeae2845fd13a0689c6826503cb8",
           "verified_on": "2026-09-01"
+        },
+        {
+          "kind": "command",
+          "command": "make docs-check",
+          "result": "passed",
+          "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
+          "verified_on": "2026-10-07"
         }
       ],
       "production_evidence": {
         "level": "historical",
         "refs": [
-          "docs/00-总览/09-当前版本定档验收台账.md"
+          "docs/00-总览/10-基础设施生产证据台账.md"
         ],
         "deployed_sha": "8f663383e117f186865686c78c9dbcae7ed50a91",
         "observed_at": "2026-08-18",
@@ -3921,15 +4571,15 @@
           "id": "STATISTICS-DOC-SEMANTIC",
           "kind": "verification",
           "severity": "medium",
-          "summary": "Inactive-clinician cached self overview and current runtime/production evidence remain conditional.",
-          "exit_criteria": "Require fresh active identity, add warm-cache negatives, run runtime/production checks, then re-sign."
+          "summary": "The old clinician-self path is retired with HTTP 410. Current operator/StoreScope isolation, retirement compatibility, publication, capacity and production evidence remain conditional.",
+          "exit_criteria": "Verify retired routes and active Scope contracts, migration and publication behavior on exact versions, then obtain accountable review."
         },
         {
           "id": "OPERATOR-RETIREMENT-REVIEW",
-          "kind": "documentation",
+          "kind": "verification",
           "severity": "medium",
-          "summary": "Operator retirement changed referenced sources; the previous alignment evidence does not cover this release.",
-          "exit_criteria": "Reconcile all affected statements with Operator retirement and refresh source evidence after review."
+          "summary": "Operator retirement is reflected in the revised statements; current client compatibility and deployed retirement behavior are not attested.",
+          "exit_criteria": "Retain current caller inventory and exact-version retirement/permission evidence, then complete the accountable review."
         }
       ]
     },
@@ -3939,11 +4589,40 @@
       "owner": "statistics",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": null,
-        "verified_on": null
+        "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
+        "verified_on": "2026-10-07"
       },
-      "fact_sources": [],
-      "verification": [],
+      "fact_sources": [
+        {
+          "kind": "source",
+          "path": "internal/apiserver/container/modules/statistics/assemble.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/infra/mysql/statistics/projections.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/transport/rest/routes_statistics.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/application/statistics/scoped_read.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/pkg/migration/migrations/mysql/000082_statistics_store_activity.up.sql"
+        }
+      ],
+      "verification": [
+        {
+          "kind": "command",
+          "command": "make docs-check",
+          "result": "passed",
+          "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
+          "verified_on": "2026-10-07"
+        }
+      ],
       "production_evidence": {
         "level": "none",
         "refs": [],
@@ -3958,7 +4637,7 @@
           "id": "DOC-CLOSURE-090",
           "kind": "verification",
           "severity": "medium",
-          "summary": "Source and semantic review have not yet been recorded.",
+          "summary": "Corrected current statements and repository gates are recorded; complete document-specific source review and accountable signoff remain incomplete.",
           "exit_criteria": "Record fact sources and verification evidence, then update doc_status through review."
         }
       ]
@@ -3969,11 +4648,40 @@
       "owner": "statistics",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": null,
-        "verified_on": null
+        "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
+        "verified_on": "2026-10-07"
       },
-      "fact_sources": [],
-      "verification": [],
+      "fact_sources": [
+        {
+          "kind": "source",
+          "path": "internal/apiserver/container/modules/statistics/assemble.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/infra/mysql/statistics/projections.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/transport/rest/routes_statistics.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/application/statistics/scoped_read.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/pkg/migration/migrations/mysql/000082_statistics_store_activity.up.sql"
+        }
+      ],
+      "verification": [
+        {
+          "kind": "command",
+          "command": "make docs-check",
+          "result": "passed",
+          "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
+          "verified_on": "2026-10-07"
+        }
+      ],
       "production_evidence": {
         "level": "none",
         "refs": [],
@@ -3988,7 +4696,7 @@
           "id": "DOC-CLOSURE-091",
           "kind": "verification",
           "severity": "medium",
-          "summary": "Source and semantic review have not yet been recorded.",
+          "summary": "Corrected current statements and repository gates are recorded; complete document-specific source review and accountable signoff remain incomplete.",
           "exit_criteria": "Record fact sources and verification evidence, then update doc_status through review."
         }
       ]
@@ -3999,11 +4707,40 @@
       "owner": "statistics",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": null,
-        "verified_on": null
+        "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
+        "verified_on": "2026-10-07"
       },
-      "fact_sources": [],
-      "verification": [],
+      "fact_sources": [
+        {
+          "kind": "source",
+          "path": "internal/apiserver/container/modules/statistics/assemble.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/infra/mysql/statistics/projections.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/transport/rest/routes_statistics.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/application/statistics/scoped_read.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/pkg/migration/migrations/mysql/000082_statistics_store_activity.up.sql"
+        }
+      ],
+      "verification": [
+        {
+          "kind": "command",
+          "command": "make docs-check",
+          "result": "passed",
+          "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
+          "verified_on": "2026-10-07"
+        }
+      ],
       "production_evidence": {
         "level": "none",
         "refs": [],
@@ -4018,7 +4755,7 @@
           "id": "DOC-CLOSURE-092",
           "kind": "verification",
           "severity": "medium",
-          "summary": "Source and semantic review have not yet been recorded.",
+          "summary": "Corrected current statements and repository gates are recorded; complete document-specific source review and accountable signoff remain incomplete.",
           "exit_criteria": "Record fact sources and verification evidence, then update doc_status through review."
         }
       ]
@@ -4032,7 +4769,28 @@
         "source_sha": null,
         "verified_on": null
       },
-      "fact_sources": [],
+      "fact_sources": [
+        {
+          "kind": "source",
+          "path": "internal/apiserver/container/modules/statistics/assemble.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/infra/mysql/statistics/projections.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/transport/rest/routes_statistics.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/application/statistics/scoped_read.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/pkg/migration/migrations/mysql/000082_statistics_store_activity.up.sql"
+        }
+      ],
       "verification": [],
       "production_evidence": {
         "level": "none",
@@ -4059,8 +4817,8 @@
       "owner": "statistics",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": "bfbd991e01d16bc32891dea0e0ef9cdd8aac4f90",
-        "verified_on": "2026-09-10"
+        "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
+        "verified_on": "2026-10-07"
       },
       "fact_sources": [
         {
@@ -4078,6 +4836,26 @@
         {
           "kind": "source",
           "path": "internal/apiserver/transport/rest/handler/statistics.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/container/modules/statistics/assemble.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/infra/mysql/statistics/projections.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/transport/rest/routes_statistics.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/application/statistics/scoped_read.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/pkg/migration/migrations/mysql/000082_statistics_store_activity.up.sql"
         }
       ],
       "verification": [
@@ -4088,12 +4866,19 @@
           "result": "matched",
           "source_sha": "236c25b4f3c9eeae2845fd13a0689c6826503cb8",
           "verified_on": "2026-09-01"
+        },
+        {
+          "kind": "command",
+          "command": "make docs-check",
+          "result": "passed",
+          "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
+          "verified_on": "2026-10-07"
         }
       ],
       "production_evidence": {
         "level": "historical",
         "refs": [
-          "docs/00-总览/09-当前版本定档验收台账.md"
+          "docs/00-总览/10-基础设施生产证据台账.md"
         ],
         "deployed_sha": "8f663383e117f186865686c78c9dbcae7ed50a91",
         "observed_at": "2026-08-18",
@@ -4106,15 +4891,15 @@
           "id": "STATISTICS-DOC-SEMANTIC",
           "kind": "verification",
           "severity": "medium",
-          "summary": "Inactive-clinician cached self overview and current runtime/production evidence remain conditional.",
-          "exit_criteria": "Require fresh active identity, add warm-cache negatives, run runtime/production checks, then re-sign."
+          "summary": "The old clinician-self path is retired with HTTP 410. Current operator/StoreScope isolation, retirement compatibility, publication, capacity and production evidence remain conditional.",
+          "exit_criteria": "Verify retired routes and active Scope contracts, migration and publication behavior on exact versions, then obtain accountable review."
         },
         {
           "id": "OPERATOR-RETIREMENT-REVIEW",
-          "kind": "documentation",
+          "kind": "verification",
           "severity": "medium",
-          "summary": "Operator retirement changed referenced sources; the previous alignment evidence does not cover this release.",
-          "exit_criteria": "Reconcile all affected statements with Operator retirement and refresh source evidence after review."
+          "summary": "Operator retirement is reflected in the revised statements; current client compatibility and deployed retirement behavior are not attested.",
+          "exit_criteria": "Retain current caller inventory and exact-version retirement/permission evidence, then complete the accountable review."
         }
       ]
     },
@@ -4124,8 +4909,8 @@
       "owner": "statistics",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": "bfbd991e01d16bc32891dea0e0ef9cdd8aac4f90",
-        "verified_on": "2026-09-10"
+        "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
+        "verified_on": "2026-10-07"
       },
       "fact_sources": [
         {
@@ -4143,6 +4928,26 @@
         {
           "kind": "source",
           "path": "internal/apiserver/transport/rest/handler/statistics.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/container/modules/statistics/assemble.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/infra/mysql/statistics/projections.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/transport/rest/routes_statistics.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/application/statistics/scoped_read.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/pkg/migration/migrations/mysql/000082_statistics_store_activity.up.sql"
         }
       ],
       "verification": [
@@ -4153,12 +4958,19 @@
           "result": "matched",
           "source_sha": "236c25b4f3c9eeae2845fd13a0689c6826503cb8",
           "verified_on": "2026-09-01"
+        },
+        {
+          "kind": "command",
+          "command": "make docs-check",
+          "result": "passed",
+          "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
+          "verified_on": "2026-10-07"
         }
       ],
       "production_evidence": {
         "level": "historical",
         "refs": [
-          "docs/00-总览/09-当前版本定档验收台账.md"
+          "docs/00-总览/10-基础设施生产证据台账.md"
         ],
         "deployed_sha": "8f663383e117f186865686c78c9dbcae7ed50a91",
         "observed_at": "2026-08-18",
@@ -4171,15 +4983,15 @@
           "id": "STATISTICS-DOC-SEMANTIC",
           "kind": "verification",
           "severity": "medium",
-          "summary": "Inactive-clinician cached self overview and current runtime/production evidence remain conditional.",
-          "exit_criteria": "Require fresh active identity, add warm-cache negatives, run runtime/production checks, then re-sign."
+          "summary": "The old clinician-self path is retired with HTTP 410. Current operator/StoreScope isolation, retirement compatibility, publication, capacity and production evidence remain conditional.",
+          "exit_criteria": "Verify retired routes and active Scope contracts, migration and publication behavior on exact versions, then obtain accountable review."
         },
         {
           "id": "OPERATOR-RETIREMENT-REVIEW",
-          "kind": "documentation",
+          "kind": "verification",
           "severity": "medium",
-          "summary": "Operator retirement changed referenced sources; the previous alignment evidence does not cover this release.",
-          "exit_criteria": "Reconcile all affected statements with Operator retirement and refresh source evidence after review."
+          "summary": "Operator retirement is reflected in the revised statements; current client compatibility and deployed retirement behavior are not attested.",
+          "exit_criteria": "Retain current caller inventory and exact-version retirement/permission evidence, then complete the accountable review."
         }
       ]
     },
@@ -4219,11 +5031,19 @@
       "owner": "infra",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": null,
-        "verified_on": null
+        "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
+        "verified_on": "2026-10-07"
       },
       "fact_sources": [],
-      "verification": [],
+      "verification": [
+        {
+          "kind": "command",
+          "command": "make docs-check",
+          "result": "passed",
+          "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
+          "verified_on": "2026-10-07"
+        }
+      ],
       "production_evidence": {
         "level": "none",
         "refs": [],
@@ -4238,7 +5058,7 @@
           "id": "DOC-CLOSURE-097",
           "kind": "verification",
           "severity": "medium",
-          "summary": "Source and semantic review have not yet been recorded.",
+          "summary": "Corrected current statements and repository gates are recorded; complete document-specific source review and accountable signoff remain incomplete.",
           "exit_criteria": "Record fact sources and verification evidence, then update doc_status through review."
         }
       ]
@@ -4309,11 +5129,19 @@
       "owner": "infra",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": null,
-        "verified_on": null
+        "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
+        "verified_on": "2026-10-07"
       },
       "fact_sources": [],
-      "verification": [],
+      "verification": [
+        {
+          "kind": "command",
+          "command": "make docs-check",
+          "result": "passed",
+          "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
+          "verified_on": "2026-10-07"
+        }
+      ],
       "production_evidence": {
         "level": "none",
         "refs": [],
@@ -4328,7 +5156,7 @@
           "id": "DOC-CLOSURE-100",
           "kind": "verification",
           "severity": "medium",
-          "summary": "Source and semantic review have not yet been recorded.",
+          "summary": "Corrected current statements and repository gates are recorded; complete document-specific source review and accountable signoff remain incomplete.",
           "exit_criteria": "Record fact sources and verification evidence, then update doc_status through review."
         }
       ]
@@ -4339,11 +5167,19 @@
       "owner": "infra",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": null,
-        "verified_on": null
+        "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
+        "verified_on": "2026-10-07"
       },
       "fact_sources": [],
-      "verification": [],
+      "verification": [
+        {
+          "kind": "command",
+          "command": "make docs-check",
+          "result": "passed",
+          "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
+          "verified_on": "2026-10-07"
+        }
+      ],
       "production_evidence": {
         "level": "none",
         "refs": [],
@@ -4358,7 +5194,7 @@
           "id": "DOC-CLOSURE-101",
           "kind": "verification",
           "severity": "medium",
-          "summary": "Source and semantic review have not yet been recorded.",
+          "summary": "Corrected current statements and repository gates are recorded; complete document-specific source review and accountable signoff remain incomplete.",
           "exit_criteria": "Record fact sources and verification evidence, then update doc_status through review."
         }
       ]
@@ -4698,8 +5534,8 @@
       "owner": "infra",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": "df09c14c5ebdacc95f463af1b9a0ee55cff735d9",
-        "verified_on": "2026-08-20"
+        "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
+        "verified_on": "2026-10-07"
       },
       "fact_sources": [
         {
@@ -4757,6 +5593,13 @@
           "result": "passed",
           "source_sha": "df09c14c5ebdacc95f463af1b9a0ee55cff735d9",
           "verified_on": "2026-08-21"
+        },
+        {
+          "kind": "command",
+          "command": "make docs-check",
+          "result": "passed",
+          "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
+          "verified_on": "2026-10-07"
         }
       ],
       "production_evidence": {
@@ -5559,8 +6402,8 @@
       "owner": "infra",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": "b5baef7648bd6d0ddbb5b40c6763a94defdf39db",
-        "verified_on": "2026-08-25"
+        "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
+        "verified_on": "2026-10-07"
       },
       "fact_sources": [
         {
@@ -5595,6 +6438,13 @@
           "result": "passed",
           "source_sha": "df09c14c5ebdacc95f463af1b9a0ee55cff735d9",
           "verified_on": "2026-08-21"
+        },
+        {
+          "kind": "command",
+          "command": "make docs-check",
+          "result": "passed",
+          "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
+          "verified_on": "2026-10-07"
         }
       ],
       "production_evidence": {
@@ -6213,8 +7063,8 @@
       "owner": "infra",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": null,
-        "verified_on": null
+        "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
+        "verified_on": "2026-10-07"
       },
       "fact_sources": [
         {
@@ -6254,7 +7104,15 @@
           "path": "internal/pkg/migration/migrations/**/*"
         }
       ],
-      "verification": [],
+      "verification": [
+        {
+          "kind": "command",
+          "command": "make docs-check",
+          "result": "passed",
+          "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
+          "verified_on": "2026-10-07"
+        }
+      ],
       "production_evidence": {
         "level": "historical",
         "refs": [
@@ -6282,11 +7140,19 @@
       "owner": "infra",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": null,
-        "verified_on": null
+        "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
+        "verified_on": "2026-10-07"
       },
       "fact_sources": [],
-      "verification": [],
+      "verification": [
+        {
+          "kind": "command",
+          "command": "make docs-check",
+          "result": "passed",
+          "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
+          "verified_on": "2026-10-07"
+        }
+      ],
       "production_evidence": {
         "level": "none",
         "refs": [],
@@ -6301,7 +7167,7 @@
           "id": "DOC-CLOSURE-120",
           "kind": "verification",
           "severity": "medium",
-          "summary": "Source and semantic review have not yet been recorded.",
+          "summary": "Corrected current statements and repository gates are recorded; complete document-specific source review and accountable signoff remain incomplete.",
           "exit_criteria": "Record fact sources and verification evidence, then update doc_status through review."
         }
       ]
@@ -6312,11 +7178,19 @@
       "owner": "infra",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": null,
-        "verified_on": null
+        "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
+        "verified_on": "2026-10-07"
       },
       "fact_sources": [],
-      "verification": [],
+      "verification": [
+        {
+          "kind": "command",
+          "command": "make docs-check",
+          "result": "passed",
+          "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
+          "verified_on": "2026-10-07"
+        }
+      ],
       "production_evidence": {
         "level": "none",
         "refs": [],
@@ -6331,7 +7205,7 @@
           "id": "DOC-CLOSURE-121",
           "kind": "verification",
           "severity": "medium",
-          "summary": "Source and semantic review have not yet been recorded.",
+          "summary": "Corrected current statements and repository gates are recorded; complete document-specific source review and accountable signoff remain incomplete.",
           "exit_criteria": "Record fact sources and verification evidence, then update doc_status through review."
         }
       ]
@@ -6342,8 +7216,8 @@
       "owner": "infra",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": "df09c14c5ebdacc95f463af1b9a0ee55cff735d9",
-        "verified_on": "2026-08-21"
+        "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
+        "verified_on": "2026-10-07"
       },
       "fact_sources": [
         {
@@ -6365,6 +7239,22 @@
         {
           "kind": "source",
           "path": "internal/pkg/architecture/event_cache_signal_boundary_test.go"
+        },
+        {
+          "kind": "source",
+          "path": "go.mod"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/process/standard_event_subsystem_m4.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/eventing/standardoutbox/supervisor_m4_observe.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/eventing/standardoutbox/supervisor_m4_observe_test.go"
         }
       ],
       "verification": [
@@ -6374,6 +7264,27 @@
           "result": "passed",
           "source_sha": "df09c14c5ebdacc95f463af1b9a0ee55cff735d9",
           "verified_on": "2026-08-21"
+        },
+        {
+          "kind": "command",
+          "command": "make docs-check",
+          "result": "passed",
+          "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
+          "verified_on": "2026-10-07"
+        },
+        {
+          "kind": "command",
+          "command": "go test -count=1 ./internal/apiserver/eventing/standardoutbox ./internal/pkg/eventing/catalog ./internal/apiserver/process ./internal/worker/integration/messaging",
+          "result": "passed",
+          "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
+          "verified_on": "2026-10-07"
+        },
+        {
+          "kind": "command",
+          "command": "go test -count=1 -race ./internal/apiserver/eventing/standardoutbox ./internal/apiserver/eventing/subsystem ./internal/pkg/eventing/catalog",
+          "result": "passed",
+          "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
+          "verified_on": "2026-10-07"
         }
       ],
       "production_evidence": {
@@ -6408,8 +7319,8 @@
       "owner": "infra",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": "2a22b31a1b0fa3cd7135f7e160176a053733e15a",
-        "verified_on": "2026-08-25"
+        "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
+        "verified_on": "2026-10-07"
       },
       "fact_sources": [
         {
@@ -6435,6 +7346,18 @@
         {
           "kind": "source",
           "path": "go.mod"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/process/standard_event_subsystem_m4.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/eventing/standardoutbox/supervisor_m4_observe.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/eventing/standardoutbox/supervisor_m4_observe_test.go"
         }
       ],
       "verification": [
@@ -6444,6 +7367,27 @@
           "result": "passed",
           "source_sha": "fd694d35274184747dc9c8de72b65ecdf4d2354f",
           "verified_on": "2026-08-25"
+        },
+        {
+          "kind": "command",
+          "command": "make docs-check",
+          "result": "passed",
+          "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
+          "verified_on": "2026-10-07"
+        },
+        {
+          "kind": "command",
+          "command": "go test -count=1 ./internal/apiserver/eventing/standardoutbox ./internal/pkg/eventing/catalog ./internal/apiserver/process ./internal/worker/integration/messaging",
+          "result": "passed",
+          "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
+          "verified_on": "2026-10-07"
+        },
+        {
+          "kind": "command",
+          "command": "go test -count=1 -race ./internal/apiserver/eventing/standardoutbox ./internal/apiserver/eventing/subsystem ./internal/pkg/eventing/catalog",
+          "result": "passed",
+          "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
+          "verified_on": "2026-10-07"
         }
       ],
       "production_evidence": {
@@ -6479,8 +7423,8 @@
       "owner": "infra",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": "df09c14c5ebdacc95f463af1b9a0ee55cff735d9",
-        "verified_on": "2026-08-21"
+        "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
+        "verified_on": "2026-10-07"
       },
       "fact_sources": [
         {
@@ -6518,6 +7462,22 @@
         {
           "kind": "source",
           "path": "internal/pkg/reportstatus/cache.go"
+        },
+        {
+          "kind": "source",
+          "path": "go.mod"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/process/standard_event_subsystem_m4.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/eventing/standardoutbox/supervisor_m4_observe.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/eventing/standardoutbox/supervisor_m4_observe_test.go"
         }
       ],
       "verification": [
@@ -6527,6 +7487,27 @@
           "result": "passed",
           "source_sha": "df09c14c5ebdacc95f463af1b9a0ee55cff735d9",
           "verified_on": "2026-08-21"
+        },
+        {
+          "kind": "command",
+          "command": "make docs-check",
+          "result": "passed",
+          "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
+          "verified_on": "2026-10-07"
+        },
+        {
+          "kind": "command",
+          "command": "go test -count=1 ./internal/apiserver/eventing/standardoutbox ./internal/pkg/eventing/catalog ./internal/apiserver/process ./internal/worker/integration/messaging",
+          "result": "passed",
+          "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
+          "verified_on": "2026-10-07"
+        },
+        {
+          "kind": "command",
+          "command": "go test -count=1 -race ./internal/apiserver/eventing/standardoutbox ./internal/apiserver/eventing/subsystem ./internal/pkg/eventing/catalog",
+          "result": "passed",
+          "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
+          "verified_on": "2026-10-07"
         }
       ],
       "production_evidence": {
@@ -6561,17 +7542,13 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "dce4598a40664d1111f914eb2d2277243f9cb758",
-        "verified_on": "2026-10-02"
+        "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
+        "verified_on": "2026-10-07"
       },
       "fact_sources": [
         {
           "kind": "source",
           "path": "internal/apiserver/eventing/standardoutbox/supervisor_m4.go"
-        },
-        {
-          "kind": "source",
-          "path": "internal/apiserver/eventing/standardoutbox/post_commit_wake_m4.go"
         },
         {
           "kind": "source",
@@ -6587,7 +7564,23 @@
         },
         {
           "kind": "source",
-          "path": "internal/apiserver/eventing/standardoutbox/supervisor_m4.go"
+          "path": "go.mod"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/process/standard_event_subsystem_m4.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/eventing/standardoutbox/supervisor_m4_observe.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/eventing/standardoutbox/supervisor_m4_observe_test.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/infra/answersheetgap/scanner.go"
         }
       ],
       "verification": [
@@ -6604,6 +7597,27 @@
           "result": "passed",
           "source_sha": "504067f177bcfab821c0faf59b0a96da8d7c0c9b",
           "verified_on": "2026-09-27"
+        },
+        {
+          "kind": "command",
+          "command": "make docs-check",
+          "result": "passed",
+          "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
+          "verified_on": "2026-10-07"
+        },
+        {
+          "kind": "command",
+          "command": "go test -count=1 ./internal/apiserver/eventing/standardoutbox ./internal/pkg/eventing/catalog ./internal/apiserver/process ./internal/worker/integration/messaging",
+          "result": "passed",
+          "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
+          "verified_on": "2026-10-07"
+        },
+        {
+          "kind": "command",
+          "command": "go test -count=1 -race ./internal/apiserver/eventing/standardoutbox ./internal/apiserver/eventing/subsystem ./internal/pkg/eventing/catalog",
+          "result": "passed",
+          "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
+          "verified_on": "2026-10-07"
         }
       ],
       "production_evidence": {
@@ -6629,6 +7643,13 @@
           "severity": "medium",
           "summary": "Current exact-SHA Outbox backlog, claim-recovery, and publish-lag evidence is absent.",
           "exit_criteria": "Attach deployed SHA, effective Outbox configuration, backlog and stale-claim observations, and an observation timestamp."
+        },
+        {
+          "id": "EVENT-DOC-EFFECT-SCANNER",
+          "kind": "verification",
+          "severity": "high",
+          "summary": "AnswerSheet effect scanning and original-message recovery capabilities exist, but their production scheduler, API, cursor and authorization composition is not established.",
+          "exit_criteria": "Bind a bounded production scan and authorized original-identity recovery path, and retain persistence, concurrency, failure and target-environment evidence."
         }
       ]
     },
@@ -6638,8 +7659,8 @@
       "owner": "infra",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": "b1f6d35417e5a28fef5cfa8a72b709cb65066f5f",
-        "verified_on": "2026-08-28"
+        "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
+        "verified_on": "2026-10-07"
       },
       "fact_sources": [
         {
@@ -6665,6 +7686,22 @@
         {
           "kind": "source",
           "path": "internal/worker/integration/messaging/runtime.go"
+        },
+        {
+          "kind": "source",
+          "path": "go.mod"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/process/standard_event_subsystem_m4.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/eventing/standardoutbox/supervisor_m4_observe.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/eventing/standardoutbox/supervisor_m4_observe_test.go"
         }
       ],
       "verification": [
@@ -6674,6 +7711,27 @@
           "result": "passed",
           "source_sha": "b1f6d35417e5a28fef5cfa8a72b709cb65066f5f",
           "verified_on": "2026-08-28"
+        },
+        {
+          "kind": "command",
+          "command": "make docs-check",
+          "result": "passed",
+          "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
+          "verified_on": "2026-10-07"
+        },
+        {
+          "kind": "command",
+          "command": "go test -count=1 ./internal/apiserver/eventing/standardoutbox ./internal/pkg/eventing/catalog ./internal/apiserver/process ./internal/worker/integration/messaging",
+          "result": "passed",
+          "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
+          "verified_on": "2026-10-07"
+        },
+        {
+          "kind": "command",
+          "command": "go test -count=1 -race ./internal/apiserver/eventing/standardoutbox ./internal/apiserver/eventing/subsystem ./internal/pkg/eventing/catalog",
+          "result": "passed",
+          "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
+          "verified_on": "2026-10-07"
         }
       ],
       "production_evidence": {
@@ -6709,8 +7767,8 @@
       "owner": "infra",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": "df09c14c5ebdacc95f463af1b9a0ee55cff735d9",
-        "verified_on": "2026-08-21"
+        "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
+        "verified_on": "2026-10-07"
       },
       "fact_sources": [
         {
@@ -6732,6 +7790,26 @@
         {
           "kind": "source",
           "path": "internal/apiserver/application/systemgovernance/types_events.go"
+        },
+        {
+          "kind": "source",
+          "path": "go.mod"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/process/standard_event_subsystem_m4.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/eventing/standardoutbox/supervisor_m4_observe.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/eventing/standardoutbox/supervisor_m4_observe_test.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/infra/answersheetgap/scanner.go"
         }
       ],
       "verification": [
@@ -6741,6 +7819,27 @@
           "result": "passed",
           "source_sha": "df09c14c5ebdacc95f463af1b9a0ee55cff735d9",
           "verified_on": "2026-08-21"
+        },
+        {
+          "kind": "command",
+          "command": "make docs-check",
+          "result": "passed",
+          "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
+          "verified_on": "2026-10-07"
+        },
+        {
+          "kind": "command",
+          "command": "go test -count=1 ./internal/apiserver/eventing/standardoutbox ./internal/pkg/eventing/catalog ./internal/apiserver/process ./internal/worker/integration/messaging",
+          "result": "passed",
+          "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
+          "verified_on": "2026-10-07"
+        },
+        {
+          "kind": "command",
+          "command": "go test -count=1 -race ./internal/apiserver/eventing/standardoutbox ./internal/apiserver/eventing/subsystem ./internal/pkg/eventing/catalog",
+          "result": "passed",
+          "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
+          "verified_on": "2026-10-07"
         }
       ],
       "production_evidence": {
@@ -6773,6 +7872,13 @@
           "severity": "medium",
           "summary": "Current exact-SHA event metrics, backlog, alert, and recovery-drill evidence is absent.",
           "exit_criteria": "Attach deployed SHA, target dashboards and alerts, a bounded recovery drill, and an observation timestamp."
+        },
+        {
+          "id": "EVENT-DOC-EFFECT-SCANNER",
+          "kind": "verification",
+          "severity": "high",
+          "summary": "AnswerSheet effect scanning and original-message recovery capabilities exist, but their production scheduler, API, cursor and authorization composition is not established.",
+          "exit_criteria": "Bind a bounded production scan and authorized original-identity recovery path, and retain persistence, concurrency, failure and target-environment evidence."
         }
       ]
     },
@@ -6782,8 +7888,8 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "4f74b23cb64314dc59a39a5aa724c329ce27d1ba",
-        "verified_on": "2026-10-02"
+        "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
+        "verified_on": "2026-10-07"
       },
       "fact_sources": [
         {
@@ -6809,6 +7915,22 @@
         {
           "kind": "source",
           "path": "internal/collection-server/application/reportnotify/watcher.go"
+        },
+        {
+          "kind": "source",
+          "path": "go.mod"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/process/standard_event_subsystem_m4.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/eventing/standardoutbox/supervisor_m4_observe.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/eventing/standardoutbox/supervisor_m4_observe_test.go"
         }
       ],
       "verification": [
@@ -6825,6 +7947,27 @@
           "result": "passed",
           "source_sha": "4f74b23cb64314dc59a39a5aa724c329ce27d1ba",
           "verified_on": "2026-10-02"
+        },
+        {
+          "kind": "command",
+          "command": "make docs-check",
+          "result": "passed",
+          "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
+          "verified_on": "2026-10-07"
+        },
+        {
+          "kind": "command",
+          "command": "go test -count=1 ./internal/apiserver/eventing/standardoutbox ./internal/pkg/eventing/catalog ./internal/apiserver/process ./internal/worker/integration/messaging",
+          "result": "passed",
+          "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
+          "verified_on": "2026-10-07"
+        },
+        {
+          "kind": "command",
+          "command": "go test -count=1 -race ./internal/apiserver/eventing/standardoutbox ./internal/apiserver/eventing/subsystem ./internal/pkg/eventing/catalog",
+          "result": "passed",
+          "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
+          "verified_on": "2026-10-07"
         }
       ],
       "production_evidence": {
@@ -6866,8 +8009,8 @@
       "owner": "infra",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": "df09c14c5ebdacc95f463af1b9a0ee55cff735d9",
-        "verified_on": "2026-08-21"
+        "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
+        "verified_on": "2026-10-07"
       },
       "fact_sources": [
         {
@@ -6893,6 +8036,22 @@
         {
           "kind": "source",
           "path": "internal/pkg/architecture/event_cache_signal_boundary_test.go"
+        },
+        {
+          "kind": "source",
+          "path": "go.mod"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/process/standard_event_subsystem_m4.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/eventing/standardoutbox/supervisor_m4_observe.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/eventing/standardoutbox/supervisor_m4_observe_test.go"
         }
       ],
       "verification": [
@@ -6902,6 +8061,27 @@
           "result": "passed",
           "source_sha": "df09c14c5ebdacc95f463af1b9a0ee55cff735d9",
           "verified_on": "2026-08-21"
+        },
+        {
+          "kind": "command",
+          "command": "make docs-check",
+          "result": "passed",
+          "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
+          "verified_on": "2026-10-07"
+        },
+        {
+          "kind": "command",
+          "command": "go test -count=1 ./internal/apiserver/eventing/standardoutbox ./internal/pkg/eventing/catalog ./internal/apiserver/process ./internal/worker/integration/messaging",
+          "result": "passed",
+          "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
+          "verified_on": "2026-10-07"
+        },
+        {
+          "kind": "command",
+          "command": "go test -count=1 -race ./internal/apiserver/eventing/standardoutbox ./internal/apiserver/eventing/subsystem ./internal/pkg/eventing/catalog",
+          "result": "passed",
+          "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
+          "verified_on": "2026-10-07"
         }
       ],
       "production_evidence": {
@@ -6937,8 +8117,8 @@
       "owner": "infra",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": "df09c14c5ebdacc95f463af1b9a0ee55cff735d9",
-        "verified_on": "2026-08-21"
+        "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
+        "verified_on": "2026-10-07"
       },
       "fact_sources": [
         {
@@ -6988,6 +8168,26 @@
         {
           "kind": "source",
           "path": "internal/pkg/signalcatalog/catalog_test.go"
+        },
+        {
+          "kind": "source",
+          "path": "go.mod"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/process/standard_event_subsystem_m4.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/eventing/standardoutbox/supervisor_m4_observe.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/eventing/standardoutbox/supervisor_m4_observe_test.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/infra/answersheetgap/scanner.go"
         }
       ],
       "verification": [
@@ -6997,6 +8197,27 @@
           "result": "passed",
           "source_sha": "df09c14c5ebdacc95f463af1b9a0ee55cff735d9",
           "verified_on": "2026-08-21"
+        },
+        {
+          "kind": "command",
+          "command": "make docs-check",
+          "result": "passed",
+          "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
+          "verified_on": "2026-10-07"
+        },
+        {
+          "kind": "command",
+          "command": "go test -count=1 ./internal/apiserver/eventing/standardoutbox ./internal/pkg/eventing/catalog ./internal/apiserver/process ./internal/worker/integration/messaging",
+          "result": "passed",
+          "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
+          "verified_on": "2026-10-07"
+        },
+        {
+          "kind": "command",
+          "command": "go test -count=1 -race ./internal/apiserver/eventing/standardoutbox ./internal/apiserver/eventing/subsystem ./internal/pkg/eventing/catalog",
+          "result": "passed",
+          "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
+          "verified_on": "2026-10-07"
         }
       ],
       "production_evidence": {
@@ -7030,6 +8251,13 @@
           "severity": "medium",
           "summary": "No current exact-SHA target-environment or production acceptance is attached to the Event documentation set.",
           "exit_criteria": "Attach deployed SHA, effective Event and Signal topology, broker and Redis observations, and an observation timestamp."
+        },
+        {
+          "id": "EVENT-DOC-EFFECT-SCANNER",
+          "kind": "verification",
+          "severity": "high",
+          "summary": "AnswerSheet effect scanning and original-message recovery capabilities exist, but their production scheduler, API, cursor and authorization composition is not established.",
+          "exit_criteria": "Bind a bounded production scan and authorized original-identity recovery path, and retain persistence, concurrency, failure and target-environment evidence."
         }
       ]
     },
@@ -7170,8 +8398,8 @@
       "owner": "infra",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": null,
-        "verified_on": null
+        "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
+        "verified_on": "2026-10-07"
       },
       "fact_sources": [
         {
@@ -7183,7 +8411,15 @@
           "path": "internal/pkg/eventing/observe/**/*.go"
         }
       ],
-      "verification": [],
+      "verification": [
+        {
+          "kind": "command",
+          "command": "make docs-check",
+          "result": "passed",
+          "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
+          "verified_on": "2026-10-07"
+        }
+      ],
       "production_evidence": {
         "level": "historical",
         "refs": [
@@ -7368,8 +8604,8 @@
       "owner": "runtime",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": null,
-        "verified_on": null
+        "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
+        "verified_on": "2026-10-07"
       },
       "fact_sources": [
         {
@@ -7429,7 +8665,15 @@
           "path": "configs/worker.prod.yaml"
         }
       ],
-      "verification": [],
+      "verification": [
+        {
+          "kind": "command",
+          "command": "make docs-check",
+          "result": "passed",
+          "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
+          "verified_on": "2026-10-07"
+        }
+      ],
       "production_evidence": {
         "level": "none",
         "refs": [],
@@ -7485,8 +8729,8 @@
       "owner": "infra",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": null,
-        "verified_on": null
+        "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
+        "verified_on": "2026-10-07"
       },
       "fact_sources": [
         {
@@ -7546,7 +8790,15 @@
           "path": "configs/worker.prod.yaml"
         }
       ],
-      "verification": [],
+      "verification": [
+        {
+          "kind": "command",
+          "command": "make docs-check",
+          "result": "passed",
+          "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
+          "verified_on": "2026-10-07"
+        }
+      ],
       "production_evidence": {
         "level": "none",
         "refs": [],
@@ -7765,7 +9017,7 @@
       "production_evidence": {
         "level": "historical",
         "refs": [
-          "docs/00-总览/09-当前版本定档验收台账.md"
+          "docs/00-总览/10-基础设施生产证据台账.md"
         ],
         "deployed_sha": "8f663383e117f186865686c78c9dbcae7ed50a91",
         "observed_at": "2026-08-18",
@@ -7879,11 +9131,19 @@
       "owner": "interfaces",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": null,
-        "verified_on": null
+        "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
+        "verified_on": "2026-10-07"
       },
       "fact_sources": [],
-      "verification": [],
+      "verification": [
+        {
+          "kind": "command",
+          "command": "make docs-check",
+          "result": "passed",
+          "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
+          "verified_on": "2026-10-07"
+        }
+      ],
       "production_evidence": {
         "level": "none",
         "refs": [],
@@ -7898,7 +9158,7 @@
           "id": "DOC-CLOSURE-142",
           "kind": "verification",
           "severity": "medium",
-          "summary": "Source and semantic review have not yet been recorded.",
+          "summary": "Corrected current statements and repository gates are recorded; complete document-specific source review and accountable signoff remain incomplete.",
           "exit_criteria": "Record fact sources and verification evidence, then update doc_status through review."
         }
       ]
@@ -8059,11 +9319,19 @@
       "owner": "interfaces",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": null,
-        "verified_on": null
+        "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
+        "verified_on": "2026-10-07"
       },
       "fact_sources": [],
-      "verification": [],
+      "verification": [
+        {
+          "kind": "command",
+          "command": "make docs-check",
+          "result": "passed",
+          "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
+          "verified_on": "2026-10-07"
+        }
+      ],
       "production_evidence": {
         "level": "none",
         "refs": [],
@@ -8078,7 +9346,7 @@
           "id": "DOC-CLOSURE-148",
           "kind": "verification",
           "severity": "medium",
-          "summary": "Source and semantic review have not yet been recorded.",
+          "summary": "Corrected current statements and repository gates are recorded; complete document-specific source review and accountable signoff remain incomplete.",
           "exit_criteria": "Record fact sources and verification evidence, then update doc_status through review."
         }
       ]
@@ -8089,11 +9357,19 @@
       "owner": "interfaces",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": null,
-        "verified_on": null
+        "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
+        "verified_on": "2026-10-07"
       },
       "fact_sources": [],
-      "verification": [],
+      "verification": [
+        {
+          "kind": "command",
+          "command": "make docs-check",
+          "result": "passed",
+          "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
+          "verified_on": "2026-10-07"
+        }
+      ],
       "production_evidence": {
         "level": "none",
         "refs": [],
@@ -8108,7 +9384,7 @@
           "id": "DOC-CLOSURE-149",
           "kind": "verification",
           "severity": "medium",
-          "summary": "Source and semantic review have not yet been recorded.",
+          "summary": "Corrected current statements and repository gates are recorded; complete document-specific source review and accountable signoff remain incomplete.",
           "exit_criteria": "Record fact sources and verification evidence, then update doc_status through review."
         }
       ]
@@ -8119,11 +9395,19 @@
       "owner": "interfaces",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": null,
-        "verified_on": null
+        "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
+        "verified_on": "2026-10-07"
       },
       "fact_sources": [],
-      "verification": [],
+      "verification": [
+        {
+          "kind": "command",
+          "command": "make docs-check",
+          "result": "passed",
+          "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
+          "verified_on": "2026-10-07"
+        }
+      ],
       "production_evidence": {
         "level": "none",
         "refs": [],
@@ -8138,7 +9422,7 @@
           "id": "DOC-CLOSURE-150",
           "kind": "verification",
           "severity": "medium",
-          "summary": "Source and semantic review have not yet been recorded.",
+          "summary": "Corrected current statements and repository gates are recorded; complete document-specific source review and accountable signoff remain incomplete.",
           "exit_criteria": "Record fact sources and verification evidence, then update doc_status through review."
         }
       ]
@@ -8179,11 +9463,19 @@
       "owner": "decisions",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": null,
-        "verified_on": null
+        "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
+        "verified_on": "2026-10-07"
       },
       "fact_sources": [],
-      "verification": [],
+      "verification": [
+        {
+          "kind": "command",
+          "command": "make docs-check",
+          "result": "passed",
+          "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
+          "verified_on": "2026-10-07"
+        }
+      ],
       "production_evidence": {
         "level": "none",
         "refs": [],
@@ -8198,7 +9490,7 @@
           "id": "DOC-CLOSURE-152",
           "kind": "verification",
           "severity": "medium",
-          "summary": "Source and semantic review have not yet been recorded.",
+          "summary": "Corrected current statements and repository gates are recorded; complete document-specific source review and accountable signoff remain incomplete.",
           "exit_criteria": "Record fact sources and verification evidence, then update doc_status through review."
         }
       ]
@@ -8269,8 +9561,8 @@
       "owner": "governance",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": null,
-        "verified_on": null
+        "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
+        "verified_on": "2026-10-07"
       },
       "fact_sources": [
         {
@@ -8286,7 +9578,15 @@
           "path": ".github/workflows/ci.yml"
         }
       ],
-      "verification": [],
+      "verification": [
+        {
+          "kind": "command",
+          "command": "make docs-check",
+          "result": "passed",
+          "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
+          "verified_on": "2026-10-07"
+        }
+      ],
       "production_evidence": {
         "level": "not_applicable",
         "refs": [],
@@ -8312,8 +9612,8 @@
       "owner": "governance",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": null,
-        "verified_on": null
+        "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
+        "verified_on": "2026-10-07"
       },
       "fact_sources": [
         {
@@ -8329,7 +9629,15 @@
           "path": ".github/workflows/ci.yml"
         }
       ],
-      "verification": [],
+      "verification": [
+        {
+          "kind": "command",
+          "command": "make docs-check",
+          "result": "passed",
+          "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
+          "verified_on": "2026-10-07"
+        }
+      ],
       "production_evidence": {
         "level": "not_applicable",
         "refs": [],
@@ -8358,8 +9666,37 @@
         "source_sha": null,
         "verified_on": null
       },
-      "fact_sources": [],
-      "verification": [],
+      "fact_sources": [
+        {
+          "kind": "source",
+          "path": "internal/collection-server/transport/rest/router.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/collection-server/transport/rest/middleware/iam_middleware.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/collection-server/transport/rest/middleware/report_identity_test.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/collection-server/transport/rest/architecture_test.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/application/actor/assessmententry/service.go"
+        }
+      ],
+      "verification": [
+        {
+          "kind": "command",
+          "command": "go test -count=1 ./internal/collection-server/transport/rest/middleware ./internal/collection-server/transport/rest ./internal/apiserver/eventing/standardoutbox ./internal/apiserver/eventing/subsystem ./internal/apiserver/process ./internal/pkg/eventing/catalog ./internal/pkg/signalcatalog",
+          "result": "passed",
+          "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
+          "verified_on": "2026-10-07"
+        }
+      ],
       "production_evidence": {
         "level": "none",
         "refs": [],
@@ -10904,7 +12241,7 @@
           },
           "contract": {
             "review_state": "conditional",
-            "rationale": "Canonical dispatch is DecisionKind-only, while independent-questionnaire admission remains open.",
+            "rationale": "DecisionKind-only dispatch and frozen independent Admission are implemented; new independent submissions do not create an unbound Assessment. Legacy classification, client terminal behavior and historical data disposition remain separate verification conditions.",
             "evidence": [
               {
                 "kind": "source_selector",
@@ -10913,15 +12250,23 @@
                 "result": "matched",
                 "source_sha": "e9f085e308009fbfdeb6d188c1af91e85c19b103",
                 "verified_on": "2026-08-20"
+              },
+              {
+                "kind": "source_selector",
+                "path": "internal/apiserver/application/journey/assessmentintake/service.go",
+                "selector": "applyAdmissionOrBinding(ctx context.Context",
+                "result": "matched",
+                "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
+                "verified_on": "2026-10-07"
               }
             ],
             "gaps": [
               {
                 "id": "MODELCATALOG-UNBOUND-ASSESSMENT",
-                "kind": "contract",
+                "kind": "verification",
                 "severity": "high",
-                "summary": "Independent questionnaire submission can leave an unbound pending Assessment.",
-                "exit_criteria": "Split intake before Assessment creation and prove no evaluation.requested event is emitted."
+                "summary": "New frozen independent Admission skips Assessment creation. Current client terminal behavior, legacy-unclassified backlog and historical empty-shell disposition remain unbound.",
+                "exit_criteria": "Verify independent terminal behavior on the deployed version, drain/classify old events and approve any historical empty-shell disposition separately."
               }
             ],
             "signoff": {
@@ -11437,7 +12782,7 @@
           },
           "contract": {
             "review_state": "conditional",
-            "rationale": "Actor capabilities exist, but collection Testee routes accept bare IDs without caller access context.",
+            "rationale": "Testee GET/PUT/care-context share a fail-closed User-to-Testee gate. Bound paths are authoritative, including invalid values; query-only reports preserve their contract. Deployment and end-to-end ownership acceptance remain unbound.",
             "evidence": [
               {
                 "kind": "source_selector",
@@ -11446,15 +12791,30 @@
                 "result": "matched",
                 "source_sha": "e9f085e308009fbfdeb6d188c1af91e85c19b103",
                 "verified_on": "2026-08-20"
+              },
+              {
+                "kind": "command",
+                "command": "go test -count=1 ./internal/collection-server/transport/rest/middleware ./internal/collection-server/transport/rest ./internal/apiserver/eventing/standardoutbox ./internal/apiserver/eventing/subsystem ./internal/apiserver/process ./internal/pkg/eventing/catalog ./internal/pkg/signalcatalog",
+                "result": "passed",
+                "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
+                "verified_on": "2026-10-07"
+              },
+              {
+                "kind": "source_selector",
+                "path": "internal/collection-server/transport/rest/middleware/iam_middleware.go",
+                "selector": "raw, pathBound := c.Params.Get(testeeParam)",
+                "result": "matched",
+                "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
+                "verified_on": "2026-10-07"
               }
             ],
             "gaps": [
               {
                 "id": "ACTOR-TESTEE-CONTRACT",
-                "kind": "contract",
+                "kind": "verification",
                 "severity": "high",
-                "summary": "GET/PUT/care-context lack a mandatory end-user access decision.",
-                "exit_criteria": "Require authorized actor/access context for every bare-TesteeID operation."
+                "summary": "Collection Testee GET, PUT and care-context authorize the path-bound object; current deployed cross-user, inactive-link and dependency-failure behavior is not attested.",
+                "exit_criteria": "Bind the fixed version and retain exact-version transport-to-IAM negative results and compatible query-only report behavior."
               }
             ],
             "signoff": {
@@ -11495,7 +12855,7 @@
           },
           "security": {
             "review_state": "blocked",
-            "rationale": "Public Intake lacks Profile representation proof and collection Testee GET/PUT/care-context bypass testeeaccess.Authorizer.",
+            "rationale": "Public Intake Profile representation remains a source-level blocker. The distinct Testee path/query authorization mismatch is corrected and locally tested.",
             "evidence": [
               {
                 "kind": "source_selector",
@@ -11504,6 +12864,13 @@
                 "result": "matched",
                 "source_sha": "e9f085e308009fbfdeb6d188c1af91e85c19b103",
                 "verified_on": "2026-08-20"
+              },
+              {
+                "kind": "command",
+                "command": "go test -count=1 ./internal/collection-server/transport/rest/middleware ./internal/collection-server/transport/rest ./internal/apiserver/eventing/standardoutbox ./internal/apiserver/eventing/subsystem ./internal/apiserver/process ./internal/pkg/eventing/catalog ./internal/pkg/signalcatalog",
+                "result": "passed",
+                "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
+                "verified_on": "2026-10-07"
               }
             ],
             "gaps": [
@@ -11511,8 +12878,8 @@
                 "id": "ACTOR-P0-AUTHORIZATION",
                 "kind": "security",
                 "severity": "high",
-                "summary": "Two current-source paths permit identity/resource ownership bypass.",
-                "exit_criteria": "Add ProfileLink representation and fail-closed User-to-Testee gates with cross-user/cross-org/IAM/cache negatives."
+                "summary": "Public AssessmentEntry Intake accepts ProfileID and checks existence without proving caller representation. The separate Testee path/query mismatch is locally corrected.",
+                "exit_criteria": "Add trusted Profile representation and cross-user/cross-org negatives; verify the corrected Testee paths and obtain accountable security signoff."
               }
             ],
             "signoff": {
@@ -11524,15 +12891,23 @@
           },
           "test": {
             "review_state": "conditional",
-            "rationale": "The prior summary did not retain a checker-verifiable exact command; repository tests must be rerun and recorded before this dimension can be signed.",
-            "evidence": [],
+            "rationale": "Full middleware and REST packages pass locally, including path/query conflicts and real-route guards. Public Intake representation and real IAM/deployed negative evidence remain incomplete.",
+            "evidence": [
+              {
+                "kind": "command",
+                "command": "go test -count=1 ./internal/collection-server/transport/rest/middleware ./internal/collection-server/transport/rest ./internal/apiserver/eventing/standardoutbox ./internal/apiserver/eventing/subsystem ./internal/apiserver/process ./internal/pkg/eventing/catalog ./internal/pkg/signalcatalog",
+                "result": "passed",
+                "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
+                "verified_on": "2026-10-07"
+              }
+            ],
             "gaps": [
               {
                 "id": "ACTOR-SECURITY-TESTS",
                 "kind": "verification",
                 "severity": "high",
-                "summary": "No end-to-end tests prove the two P0 paths reject foreign identities.",
-                "exit_criteria": "Add transport-to-gRPC IDOR and public Intake representation tests."
+                "summary": "Middleware conflict/invalid-path/query-only and real-route guard regressions pass locally; public Intake representation E2E and real IAM failure evidence remain missing.",
+                "exit_criteria": "Add public Intake representation E2E and retain exact-version cross-user, cross-org, inactive-link and IAM-failure scenarios."
               }
             ],
             "signoff": {
@@ -11544,7 +12919,7 @@
           },
           "operations": {
             "review_state": "conditional",
-            "rationale": "IAM/attention recovery exists; denial telemetry and reconciliation for authorization gaps do not.",
+            "rationale": "IAM/attention recovery exists; public Intake representation and deployed denial/recovery telemetry remain unaccepted.",
             "evidence": [
               {
                 "kind": "source_selector",
@@ -11560,8 +12935,8 @@
                 "id": "ACTOR-AUTHZ-OPERATIONS",
                 "kind": "operations",
                 "severity": "high",
-                "summary": "Operations cannot demonstrate closure of the two authorization bypasses.",
-                "exit_criteria": "Add denial metrics/alerts and drill IAM/profile failure recovery after code fixes."
+                "summary": "Public Intake representation remains open; deployed denial telemetry and dependency-failure recovery for the corrected Testee paths have not been demonstrated.",
+                "exit_criteria": "Close public Intake representation, then bind denial telemetry and IAM/ProfileLink recovery drills to the deployed version."
               }
             ],
             "signoff": {
@@ -11573,7 +12948,7 @@
           },
           "production": {
             "review_state": "conditional",
-            "rationale": "Historical attention evidence cannot accept a baseline with current P0 defects.",
+            "rationale": "Historical evidence cannot attest the current checkout or close the remaining public Intake representation risk.",
             "evidence": [
               {
                 "kind": "source_selector",
@@ -11589,8 +12964,8 @@
                 "id": "ACTOR-CURRENT-PRODUCTION",
                 "kind": "production",
                 "severity": "high",
-                "summary": "No current exact-SHA security evidence exists and P0 paths remain open.",
-                "exit_criteria": "Fix/test, exact-SHA deploy, then run authorized negative smoke and observe denials."
+                "summary": "No current exact-version security acceptance exists; public Intake representation remains open and the local Testee fix is not deployed evidence.",
+                "exit_criteria": "Close and test the source blocker, deploy an exact version and retain authorized negative smoke and denial observations."
               }
             ],
             "signoff": {
@@ -11628,7 +13003,7 @@
           },
           "contract": {
             "review_state": "conditional",
-            "rationale": "REST/gRPC each omit part of EnrollmentResult and REST terminate discards its result.",
+            "rationale": "REST enrollment omits CreatedTaskCount; gRPC omits EnrollmentID/Round; REST termination discards EnrollmentTerminationResult. These current transport differences require an explicit compatibility decision.",
             "evidence": [
               {
                 "kind": "source_selector",
@@ -11678,7 +13053,7 @@
           },
           "security": {
             "review_state": "conditional",
-            "rationale": "Org scope and Entry tokens exist; token logging and patient-level negative smoke need hardening.",
+            "rationale": "TaskID locates the Task. New tokens are empty and legacy tokens are ignored; login, active ProfileLink and current server Task/window/content facts enforce access. Runtime revocation and client evidence remain unbound.",
             "evidence": [
               {
                 "kind": "source_selector",
@@ -11687,15 +13062,23 @@
                 "result": "matched",
                 "source_sha": "e9f085e308009fbfdeb6d188c1af91e85c19b103",
                 "verified_on": "2026-08-20"
+              },
+              {
+                "kind": "source_selector",
+                "path": "internal/collection-server/application/planentry/service.go",
+                "selector": "s.access.Authorize(ctx, userID, testeeID)",
+                "result": "matched",
+                "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
+                "verified_on": "2026-10-07"
               }
             ],
             "gaps": [
               {
                 "id": "PLAN-TOKEN-AUTHZ",
-                "kind": "security",
+                "kind": "verification",
                 "severity": "medium",
-                "summary": "Token-bearing logs and exact-SHA cross-patient/cross-org evidence remain.",
-                "exit_criteria": "Redact sensitive identifiers and add patient/org negative tests."
+                "summary": "TaskID is a locator; new tokens are empty and legacy tokens are ignored. Login, active User-to-Testee relationship and current server Task/window/content facts are enforced; real client and revocation evidence is unbound.",
+                "exit_criteria": "Retain exact-version client, relationship revocation, cross-subject/cross-org and dependency-failure results for Task entry."
               }
             ],
             "signoff": {
@@ -11727,7 +13110,7 @@
           },
           "operations": {
             "review_state": "conditional",
-            "rationale": "Scheduler renewal exists, but CompleteTask errors can be ignored and config TTL commentary is false.",
+            "rationale": "Scheduler execution uses a renewable lease. Journey completion remains best effort after logged CompleteTask errors; durable completion reconciliation and cross-store failure evidence remain open. The lease/scan interval comment is corrected without changing values.",
             "evidence": [
               {
                 "kind": "source_selector",
@@ -11743,8 +13126,8 @@
                 "id": "PLAN-COMPLETE-RECONCILIATION",
                 "kind": "operations",
                 "severity": "high",
-                "summary": "Ignored completion errors can leave Tasks opened; config also misstates 2m versus 60m.",
-                "exit_criteria": "Add durable completion reconciliation/metrics and correct the config comment in a source-baseline-safe commit."
+                "summary": "Journey CompleteTask errors are logged without propagation and no durable completion reconciliation is established. The renewable 2m execution lease is independent of the 60m scan interval; its incorrect comment is corrected.",
+                "exit_criteria": "Add durable completion intent/reconciliation, idempotent settlement and failure metrics, then verify cross-store failure windows."
               }
             ],
             "signoff": {
@@ -11790,7 +13173,7 @@
         "dimensions": {
           "runtime": {
             "review_state": "ready",
-            "rationale": "Collector, facts, projections, SyncRun, cache, read service and scheduler are assembled.",
+            "rationale": "Four collectors, four Fact tables, five daily result tables, one organization snapshot and one SyncRun are assembled. Execution uses four DailyEngine and two GlobalEngine projections; Plan fulfillment is a Global projection.",
             "evidence": [
               {
                 "kind": "source_selector",
@@ -11811,7 +13194,7 @@
           },
           "contract": {
             "review_state": "conditional",
-            "rationale": "v2 contracts exist; self overview's active-clinician promise is not enforced before cacheable read.",
+            "rationale": "Clinician-self routes and every subpath return 410 before identity/data reads. Current operator permissions, StoreScope and client retirement compatibility remain separate acceptance conditions.",
             "evidence": [
               {
                 "kind": "source_selector",
@@ -11820,15 +13203,23 @@
                 "result": "matched",
                 "source_sha": "e9f085e308009fbfdeb6d188c1af91e85c19b103",
                 "verified_on": "2026-08-20"
+              },
+              {
+                "kind": "source_selector",
+                "path": "internal/apiserver/transport/rest/routes_statistics.go",
+                "selector": "apiV2.Any(\"/statistics/clinicians/me/*path\", retiredClinicianAPI)",
+                "result": "matched",
+                "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
+                "verified_on": "2026-10-07"
               }
             ],
             "gaps": [
               {
                 "id": "STATISTICS-SELF-ACTIVE-CONTRACT",
-                "kind": "contract",
+                "kind": "verification",
                 "severity": "medium",
-                "summary": "Handler can query by user without first proving active clinician identity.",
-                "exit_criteria": "Resolve CurrentClinicianID on every request before statistics lookup."
+                "summary": "Clinician-self routes and subpaths are retired with HTTP 410 before identity or data reads; current callers and operator/StoreScope compatibility require retained evidence.",
+                "exit_criteria": "Verify retired endpoint/subpath behavior, inventory callers and test the current operator/StoreScope contract."
               }
             ],
             "signoff": {
@@ -11839,8 +13230,8 @@
             }
           },
           "data": {
-            "review_state": "ready",
-            "rationale": "Three Fact, five Result and one SyncRun tables plus deterministic projections exist.",
+            "review_state": "conditional",
+            "rationale": "The current schema has eleven tables with four Fact and six result/snapshot tables plus SyncRun. Source counts do not attest target migration, concurrency or publication correctness.",
             "evidence": [
               {
                 "kind": "source_selector",
@@ -11849,19 +13240,35 @@
                 "result": "matched",
                 "source_sha": "e9f085e308009fbfdeb6d188c1af91e85c19b103",
                 "verified_on": "2026-08-20"
+              },
+              {
+                "kind": "source_selector",
+                "path": "internal/apiserver/container/modules/statistics/assemble.go",
+                "selector": "statisticsInfra.NewStoreActivityCollector(deps.MySQLDB, deps.MongoDB)",
+                "result": "matched",
+                "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
+                "verified_on": "2026-10-07"
               }
             ],
-            "gaps": [],
+            "gaps": [
+              {
+                "id": "STATISTICS-DATA-CURRENT-ENV",
+                "kind": "environment",
+                "severity": "medium",
+                "summary": "Current target migrations, fact concurrency and published result correctness are not attested.",
+                "exit_criteria": "Retain exact-version migration, concurrency and publication evidence and obtain accountable data signoff."
+              }
+            ],
             "signoff": {
-              "state": "signed",
-              "by": "codex-repository-semantic-audit",
-              "at": "2026-08-20",
-              "source_sha": "e9f085e308009fbfdeb6d188c1af91e85c19b103"
+              "state": "unsigned",
+              "by": null,
+              "at": null,
+              "source_sha": null
             }
           },
           "security": {
             "review_state": "conditional",
-            "rationale": "Inactive clinician can receive cached or unfiltered self overview.",
+            "rationale": "The old inactive-clinician cache bypass is no longer reachable. Current operator and StoreScope isolation requires independent runtime negative evidence.",
             "evidence": [
               {
                 "kind": "source_selector",
@@ -11875,10 +13282,10 @@
             "gaps": [
               {
                 "id": "STATISTICS-INACTIVE-CLINICIAN",
-                "kind": "security",
+                "kind": "verification",
                 "severity": "medium",
-                "summary": "List query omits active predicate and cache can bypass a fresh identity check.",
-                "exit_criteria": "Require non-cache active identity then query by clinicianID; test inactive/deleted/cross-org/warm cache."
+                "summary": "The inactive-clinician cached-self bypass belongs to a retired 410 endpoint. Current operator permission and StoreScope isolation still require exact-version runtime negatives.",
+                "exit_criteria": "Retain retirement, store-transfer, inactive-operator and cross-store negative results for the current deployed read contract."
               }
             ],
             "signoff": {
@@ -11890,15 +13297,15 @@
           },
           "test": {
             "review_state": "conditional",
-            "rationale": "The prior summary did not retain a checker-verifiable exact command; repository tests must be rerun and recorded before this dimension can be signed.",
+            "rationale": "Repository regressions passed in the full Go run; current retirement, StoreScope and deployed cache/isolation acceptance requires separately retained evidence.",
             "evidence": [],
             "gaps": [
               {
                 "id": "STATISTICS-ACTIVE-CACHE-TEST",
                 "kind": "verification",
                 "severity": "medium",
-                "summary": "No test denies a clinician disabled after cache warmup.",
-                "exit_criteria": "Add handler/read-service integration for active-to-inactive transition."
+                "summary": "Retirement and current operator/StoreScope coverage must be assessed independently; the old clinician cache path must not be recreated.",
+                "exit_criteria": "Retain endpoint/subpath 410 regression and current store-transfer and cache-isolation tests with runtime evidence."
               }
             ],
             "signoff": {
@@ -11939,7 +13346,7 @@
           },
           "production": {
             "review_state": "conditional",
-            "rationale": "Publish/freshness and task reconciliation evidence is historical and ST-010 is open.",
+            "rationale": "No current exact-version deployment, migration, publish/freshness, failure or capacity evidence is bound; the retired clinician-self defect is not a current endpoint blocker.",
             "evidence": [
               {
                 "kind": "source_selector",
@@ -12049,6 +13456,13 @@
             "result": "passed",
             "source_sha": "df09c14c5ebdacc95f463af1b9a0ee55cff735d9",
             "verified_on": "2026-08-20"
+          },
+          {
+            "kind": "command",
+            "command": "go test -count=1 ./internal/collection-server/transport/rest/middleware ./internal/collection-server/transport/rest ./internal/apiserver/eventing/standardoutbox ./internal/apiserver/eventing/subsystem ./internal/apiserver/process ./internal/pkg/eventing/catalog ./internal/pkg/signalcatalog",
+            "result": "passed",
+            "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
+            "verified_on": "2026-10-07"
           }
         ],
         "environment_tests": [
@@ -12073,8 +13487,8 @@
             "id": "INFRA-RUNTIME_LIFECYCLE-CRITICAL",
             "kind": "semantic",
             "severity": "high",
-            "summary": "Apiserver shutdown currently releases container and database dependencies before closing HTTP and gRPC, and collection profiling is outside the normal shutdown owner.",
-            "exit_criteria": "Exercise exact-SHA startup failure and in-flight shutdown scenarios, then record bounded drain order and cleanup ownership."
+            "summary": "HTTP/gRPC drain precedes dependency release. Remaining gaps include unbounded gRPC GracefulStop, dual Worker signal ownership and target-environment cleanup/failure evidence.",
+            "exit_criteria": "Establish bounded gRPC drain/fallback and one awaited Worker shutdown owner, then retain startup-failure and in-flight shutdown evidence."
           },
           {
             "id": "INFRA-RUNTIME_LIFECYCLE-CURRENT-PRODUCTION",
@@ -12116,7 +13530,7 @@
           },
           "contract": {
             "review_state": "conditional",
-            "rationale": "Versioned repository contracts for process lifecycle are identifiable, but the full boundary and failure semantics are not yet signed.",
+            "rationale": "Drain precedes dependency release in current composition. Bounded gRPC stop, Worker signal ownership and target-environment startup/shutdown evidence remain open.",
             "evidence": [
               {
                 "kind": "source_selector",
@@ -12132,8 +13546,8 @@
                 "id": "INFRA-RUNTIME_LIFECYCLE-CRITICAL",
                 "kind": "semantic",
                 "severity": "high",
-                "summary": "Apiserver shutdown currently releases container and database dependencies before closing HTTP and gRPC, and collection profiling is outside the normal shutdown owner.",
-                "exit_criteria": "Exercise exact-SHA startup failure and in-flight shutdown scenarios, then record bounded drain order and cleanup ownership."
+                "summary": "HTTP/gRPC drain precedes dependency release. Remaining gaps include unbounded gRPC GracefulStop, dual Worker signal ownership and target-environment cleanup/failure evidence.",
+                "exit_criteria": "Establish bounded gRPC drain/fallback and one awaited Worker shutdown owner, then retain startup-failure and in-flight shutdown evidence."
               }
             ],
             "signoff": {
@@ -12211,6 +13625,13 @@
                 "result": "passed",
                 "source_sha": "df09c14c5ebdacc95f463af1b9a0ee55cff735d9",
                 "verified_on": "2026-08-20"
+              },
+              {
+                "kind": "command",
+                "command": "go test -count=1 ./internal/collection-server/transport/rest/middleware ./internal/collection-server/transport/rest ./internal/apiserver/eventing/standardoutbox ./internal/apiserver/eventing/subsystem ./internal/apiserver/process ./internal/pkg/eventing/catalog ./internal/pkg/signalcatalog",
+                "result": "passed",
+                "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
+                "verified_on": "2026-10-07"
               }
             ],
             "gaps": [
@@ -13296,6 +14717,18 @@
           {
             "kind": "source",
             "path": "internal/pkg/architecture/uow_outbox_ratchet_test.go"
+          },
+          {
+            "kind": "source",
+            "path": "internal/apiserver/process/standard_event_subsystem_m4.go"
+          },
+          {
+            "kind": "source",
+            "path": "internal/apiserver/eventing/standardoutbox/supervisor_m4_observe.go"
+          },
+          {
+            "kind": "source",
+            "path": "internal/apiserver/eventing/standardoutbox/supervisor_m4_observe_test.go"
           }
         ],
         "non_cached_tests": [
@@ -13305,6 +14738,20 @@
             "result": "passed",
             "source_sha": "df09c14c5ebdacc95f463af1b9a0ee55cff735d9",
             "verified_on": "2026-08-21"
+          },
+          {
+            "kind": "command",
+            "command": "go test -count=1 ./internal/apiserver/eventing/standardoutbox ./internal/pkg/eventing/catalog ./internal/apiserver/process ./internal/worker/integration/messaging",
+            "result": "passed",
+            "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
+            "verified_on": "2026-10-07"
+          },
+          {
+            "kind": "command",
+            "command": "go test -count=1 -race ./internal/apiserver/eventing/standardoutbox ./internal/apiserver/eventing/subsystem ./internal/pkg/eventing/catalog",
+            "result": "passed",
+            "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
+            "verified_on": "2026-10-07"
           }
         ],
         "environment_tests": [
@@ -13340,6 +14787,13 @@
             "severity": "high",
             "summary": "Only historical production records are linked for event, Outbox and MQ delivery; none covers the current source baseline and effective configuration.",
             "exit_criteria": "Run an exact-SHA deployment and current, unexpired production verification with effective-config evidence and accountable signoff."
+          },
+          {
+            "id": "EVENT-DOC-EFFECT-SCANNER",
+            "kind": "verification",
+            "severity": "high",
+            "summary": "AnswerSheet effect scanning and original-message recovery capabilities exist, but their production scheduler, API, cursor and authorization composition is not established.",
+            "exit_criteria": "Bind a bounded production scan and authorized original-identity recovery path, and retain persistence, concurrency, failure and target-environment evidence."
           }
         ],
         "dimensions": {
@@ -13461,7 +14915,7 @@
           },
           "test": {
             "review_state": "conditional",
-            "rationale": "Non-cached shared eventing, apiserver event application and worker event integration suites passed at the source baseline; no real broker loss, relay retry or dead-letter environment was exercised.",
+            "rationale": "Current message-aware relay observation, source-derived store matrix, process and Worker integration regressions plus standardoutbox/subsystem/catalog race pass locally. Real storage/Broker/handoff and effect recovery environment evidence remains unbound.",
             "evidence": [
               {
                 "kind": "command",
@@ -13469,6 +14923,20 @@
                 "result": "passed",
                 "source_sha": "df09c14c5ebdacc95f463af1b9a0ee55cff735d9",
                 "verified_on": "2026-08-21"
+              },
+              {
+                "kind": "command",
+                "command": "go test -count=1 ./internal/apiserver/eventing/standardoutbox ./internal/pkg/eventing/catalog ./internal/apiserver/process ./internal/worker/integration/messaging",
+                "result": "passed",
+                "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
+                "verified_on": "2026-10-07"
+              },
+              {
+                "kind": "command",
+                "command": "go test -count=1 -race ./internal/apiserver/eventing/standardoutbox ./internal/apiserver/eventing/subsystem ./internal/pkg/eventing/catalog",
+                "result": "passed",
+                "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
+                "verified_on": "2026-10-07"
               }
             ],
             "gaps": [
@@ -13507,6 +14975,13 @@
                 "severity": "high",
                 "summary": "No target-environment verification is retained for event, Outbox and MQ delivery.",
                 "exit_criteria": "Run durable Outbox and MQ failure injection with broker loss, relay retry, duplicate delivery and dead-letter verification."
+              },
+              {
+                "id": "EVENT-DOC-EFFECT-SCANNER",
+                "kind": "verification",
+                "severity": "high",
+                "summary": "AnswerSheet effect scanning and original-message recovery capabilities exist, but their production scheduler, API, cursor and authorization composition is not established.",
+                "exit_criteria": "Bind a bounded production scan and authorized original-identity recovery path, and retain persistence, concurrency, failure and target-environment evidence."
               }
             ],
             "signoff": {
@@ -14219,6 +15694,26 @@
           {
             "kind": "source",
             "path": "configs/worker.prod.yaml"
+          },
+          {
+            "kind": "source",
+            "path": "internal/collection-server/transport/rest/router.go"
+          },
+          {
+            "kind": "source",
+            "path": "internal/collection-server/transport/rest/middleware/iam_middleware.go"
+          },
+          {
+            "kind": "source",
+            "path": "internal/collection-server/transport/rest/middleware/report_identity_test.go"
+          },
+          {
+            "kind": "source",
+            "path": "internal/collection-server/transport/rest/architecture_test.go"
+          },
+          {
+            "kind": "source",
+            "path": "internal/apiserver/application/actor/assessmententry/service.go"
           }
         ],
         "non_cached_tests": [
@@ -14228,6 +15723,13 @@
             "result": "passed",
             "source_sha": "df09c14c5ebdacc95f463af1b9a0ee55cff735d9",
             "verified_on": "2026-08-20"
+          },
+          {
+            "kind": "command",
+            "command": "go test -count=1 ./internal/collection-server/transport/rest/middleware ./internal/collection-server/transport/rest ./internal/apiserver/eventing/standardoutbox ./internal/apiserver/eventing/subsystem ./internal/apiserver/process ./internal/pkg/eventing/catalog ./internal/pkg/signalcatalog",
+            "result": "passed",
+            "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
+            "verified_on": "2026-10-07"
           }
         ],
         "environment_tests": [
@@ -14252,8 +15754,8 @@
             "id": "INFRA-SECURITY_ACL_RESOURCE_OWNERSHIP-CRITICAL",
             "kind": "semantic",
             "severity": "high",
-            "summary": "Public Intake lacks caller-to-Profile representative proof and collection Testee GET, PUT and care-context do not invoke the existing Authorizer.",
-            "exit_criteria": "Connect fail-closed resource ownership gates, add cross-user, cross-org, inactive-link and dependency-failure negatives, then run them in staging."
+            "summary": "Public Intake still lacks caller-to-Profile representation. Testee GET/PUT/care-context already invoke the Authorizer; their path/query object mismatch is locally corrected, with runtime evidence pending.",
+            "exit_criteria": "Implement trusted Intake representation, then retain cross-user/cross-org/inactive-link/dependency-failure negatives and exact-version deployed Testee evidence."
           },
           {
             "id": "INFRA-SECURITY_ACL_RESOURCE_OWNERSHIP-CURRENT-PRODUCTION",
@@ -14311,8 +15813,8 @@
                 "id": "INFRA-SECURITY_ACL_RESOURCE_OWNERSHIP-CRITICAL",
                 "kind": "semantic",
                 "severity": "high",
-                "summary": "Public Intake lacks caller-to-Profile representative proof and collection Testee GET, PUT and care-context do not invoke the existing Authorizer.",
-                "exit_criteria": "Connect fail-closed resource ownership gates, add cross-user, cross-org, inactive-link and dependency-failure negatives, then run them in staging."
+                "summary": "Public Intake still lacks caller-to-Profile representation. Testee GET/PUT/care-context already invoke the Authorizer; their path/query object mismatch is locally corrected, with runtime evidence pending.",
+                "exit_criteria": "Implement trusted Intake representation, then retain cross-user/cross-org/inactive-link/dependency-failure negatives and exact-version deployed Testee evidence."
               }
             ],
             "signoff": {
@@ -14369,8 +15871,8 @@
                 "id": "INFRA-SECURITY_ACL_RESOURCE_OWNERSHIP-CRITICAL",
                 "kind": "semantic",
                 "severity": "high",
-                "summary": "Public Intake lacks caller-to-Profile representative proof and collection Testee GET, PUT and care-context do not invoke the existing Authorizer.",
-                "exit_criteria": "Connect fail-closed resource ownership gates, add cross-user, cross-org, inactive-link and dependency-failure negatives, then run them in staging."
+                "summary": "Public Intake still lacks caller-to-Profile representation. Testee GET/PUT/care-context already invoke the Authorizer; their path/query object mismatch is locally corrected, with runtime evidence pending.",
+                "exit_criteria": "Implement trusted Intake representation, then retain cross-user/cross-org/inactive-link/dependency-failure negatives and exact-version deployed Testee evidence."
               }
             ],
             "signoff": {
@@ -14382,7 +15884,7 @@
           },
           "test": {
             "review_state": "conditional",
-            "rationale": "Non-cached gRPC, HTTP identity, Testee access and collection REST suites passed at the source baseline; open resource-ownership blockers and target-environment negative checks remain.",
+            "rationale": "Current full middleware/REST regressions and actual Testee route guards pass locally. Public Intake representation and real IAM/deployed negatives remain unaccepted.",
             "evidence": [
               {
                 "kind": "command",
@@ -14390,6 +15892,13 @@
                 "result": "passed",
                 "source_sha": "df09c14c5ebdacc95f463af1b9a0ee55cff735d9",
                 "verified_on": "2026-08-20"
+              },
+              {
+                "kind": "command",
+                "command": "go test -count=1 ./internal/collection-server/transport/rest/middleware ./internal/collection-server/transport/rest ./internal/apiserver/eventing/standardoutbox ./internal/apiserver/eventing/subsystem ./internal/apiserver/process ./internal/pkg/eventing/catalog ./internal/pkg/signalcatalog",
+                "result": "passed",
+                "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
+                "verified_on": "2026-10-07"
               }
             ],
             "gaps": [
@@ -14433,8 +15942,8 @@
                 "id": "INFRA-SECURITY_ACL_RESOURCE_OWNERSHIP-CRITICAL",
                 "kind": "semantic",
                 "severity": "high",
-                "summary": "Public Intake lacks caller-to-Profile representative proof and collection Testee GET, PUT and care-context do not invoke the existing Authorizer.",
-                "exit_criteria": "Connect fail-closed resource ownership gates, add cross-user, cross-org, inactive-link and dependency-failure negatives, then run them in staging."
+                "summary": "Public Intake still lacks caller-to-Profile representation. Testee GET/PUT/care-context already invoke the Authorizer; their path/query object mismatch is locally corrected, with runtime evidence pending.",
+                "exit_criteria": "Implement trusted Intake representation, then retain cross-user/cross-org/inactive-link/dependency-failure negatives and exact-version deployed Testee evidence."
               }
             ],
             "signoff": {
