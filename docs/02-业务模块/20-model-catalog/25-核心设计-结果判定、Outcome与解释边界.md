@@ -1098,19 +1098,9 @@ Norm 报告会使用冻结 TScore rules 恢复：
 
 ### 16.4 当前解释兜底
 
-scale Interpretation 当前在没有命中解释规则时，可以：
+当前 scale 报告按冻结 OutcomeCode 查找 InterpretationAssets 中的文案；缺少冻结资产、OutcomeCode 或对应文案时返回明确错误。它不重匹配分数区间，不取最后一条规则，也不按风险等级生成通用医学文案。
 
-- 回退到最后一条规则；
-- 或根据风险等级生成通用结论与建议。
-
-这同样属于兼容行为。它不会改变 Outcome code，但可能掩盖解释资产不完整，使报告看起来“成功”。
-
-目标应按模型用途区分：
-
-- 对要求正式报告的模型，发布时校验所有可达 Outcome 都有解释资产；
-- 对仅内部测试或只展示数值的模型，显式声明无需完整解释；
-- 运行时 fallback 必须可观测，并逐步退出正式医学量表路径；
-- 不能让通用文案暗示医学诊断。
+这一边界由 [`scale_interpret.go`](../../../internal/apiserver/domain/interpretation/scoring/scale_interpret.go)、其资产/结果缺失回归测试和 scoring assembler 共同保护。发布侧的解释完整性与执行侧的 fail-closed 分别保护不同窗口：前者尽早拒绝不可达/缺失文案，后者阻止损坏输入伪装成成功报告。
 
 ---
 
@@ -1124,7 +1114,7 @@ scale Interpretation 当前在没有命中解释规则时，可以：
 - source refs；
 - section kind；
 - adapter key；
-- template ID；
+- template ID / template version；
 - category label。
 
 scale payload 当前用 `factor_scores` section 表达哪些因子分可在报告中展示；typology payload 用 ReportMap 往返转换报告 kind、adapter、template 和 category。
@@ -1144,16 +1134,15 @@ ReportMap 不改变：
 
 ### 17.3 当前实现程度
 
-目前 ReportMap 的通用校验只保证 section code 非空且不重复。还没有统一保证：
+当前校验分为三层：
 
-- `SourceRefs` 都指向存在且允许展示的 Factor；
-- adapter key 已注册；
-- template ID 存在；
-- report kind 与 DecisionKind 兼容；
-- 每个模型 family 的必需 section 完整；
-- template version 随模型发布明确冻结。
+- Definition 通用校验保护 section code 唯一；factor_scores 最多一章，SourceRefs 非空、不重复且指向已定义 Factor；类型结论同时校验 adapter/DecisionKind 与 template/adapter 兼容。
+- ModelCatalog 发布流水线要求至少一个 section，各章 TemplateID/TemplateVersion 完整一致且在 Interpretation 发布目录存在；非 typology 使用 standard。typology 另验证 report kind、adapter、算法及注册模板的兼容性。
+- Outcome 冻结 ReportInput 后，Interpretation 再验证精确模板路由与冻结分类/解释资产，运行期不补默认版本或查询最新配置。
 
-当前 Interpretation 默认模板版本仍以 `v1` 为主，ModelCatalog 尚未对通用报告模板版本形成完整发布契约。人格路径的 TemplateID/AdapterKey 配置更成熟，但不能据此认为所有 `ReportMap` 字段都已端到端消费。
+源码见[Definition ReportMap校验](../../../internal/apiserver/domain/modelcatalog/definition/validate.go)、[发布模板路由](../../../internal/apiserver/application/modelcatalog/definition/report_template_route_validation.go)、[typology报告校验](../../../internal/apiserver/port/modelcatalog/payload/typology/validator.go)。
+
+这些防线覆盖当前已实现章节；不能由此承诺任意新增 Section 均有 Builder/客户端消费者，或所有 family 的未来必需章节已经完整。新章节仍需确认语义、来源、权限和端到端契约，模板发布细节由[冻结输入、Builder与模板路由](../40-interpretation/21-核心设计-冻结输入、Builder与模板路由.md)维护。
 
 ### 17.4 目标边界
 

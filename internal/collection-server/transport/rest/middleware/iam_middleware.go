@@ -30,7 +30,7 @@ func UserIdentityMiddleware() gin.HandlerFunc {
 }
 
 // TesteeAccessMiddleware verifies that the authenticated IAM User can
-// represent the requested Testee before a protected report query is executed.
+// represent the same Testee that the protected operation will use.
 func TesteeAccessMiddleware(authorizer TesteeAccessAuthorizer, testeeParam string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		claims := pkgmiddleware.GetUserClaims(c)
@@ -39,9 +39,11 @@ func TesteeAccessMiddleware(authorizer TesteeAccessAuthorizer, testeeParam strin
 			c.Abort()
 			return
 		}
-		raw := c.Query(testeeParam)
-		if raw == "" {
-			raw = c.Param(testeeParam)
+		// A bound path parameter is authoritative, including an invalid value.
+		// Query-only report routes retain their query contract.
+		raw, pathBound := c.Params.Get(testeeParam)
+		if !pathBound {
+			raw = c.Query(testeeParam)
 		}
 		id, err := strconv.ParseUint(raw, 10, 64)
 		if err != nil || id == 0 {

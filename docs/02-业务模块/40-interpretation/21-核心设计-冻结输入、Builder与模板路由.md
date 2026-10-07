@@ -8,7 +8,7 @@
 
 1. 为什么报告生成必须使用 Evaluation 提交时冻结的事实，而不能重新查询当前 ModelCatalog；
 2. Outcome 结果事实、ReportInput 报告素材和 InterpretationInput 分别是什么；
-3. Interpretation 怎样兼容不同 Outcome schema，又不让 Builder 感知历史存储格式；
+3. Interpretation 怎样验证 current-only Outcome/ReportInput 契约，又不让 Builder 感知持久化格式；
 4. Registry 怎样根据运行机制、报告类型和模板版本选择 Builder；
 5. `TemplateVersion`、`TemplateID`、`AdapterKey`、`BuilderIdentity` 和 `ContentSchemaVersion` 为什么不能混为一个“模板字段”。
 
@@ -27,7 +27,7 @@ Outcome Record
 └── ReportInput                    当次报告需要的冻结模型素材
         │
         ▼
-FromOutcomeRecord                 防腐与兼容适配边界
+FromOutcomeRecord                 防腐与严格契约适配边界
         │
         ▼
 InterpretationInput               Interpretation 自己拥有的只读输入
@@ -38,8 +38,9 @@ InterpretationInput               Interpretation 自己拥有的只读输入
         │
         ▼
 Rendering Registry
-AlgorithmFamily + DecisionKind + ReportType + TemplateVersion
-+ optional Algorithm / ProductChannel / ReportProfile
+DecisionKind + ReportType + TemplateVersion
++ optional Algorithm / ReportProfile
+（AlgorithmFamily 仅由 DecisionKind 派生）
         │
         ▼
 Builder                           确定性地组装 Draft
@@ -52,7 +53,7 @@ Report Draft
 
 | 变化 | 由谁吸收 | 主链路是否改变 |
 | --- | --- | --- |
-| Outcome 历史 schema 不同 | Evaluation fact codec、Outcome adapter | 否 |
+| Outcome/ReportInput schema 演进 | codec 与显式迁移契约；当前仅接受既定 schema | Builder 接口保持稳定，旧格式不能静默兼容 |
 | 已有机制下增加一个模型 | 冻结输入和现有 Builder | 否 |
 | 同一机制增加具体呈现模板 | Template / Adapter | 通常不变 |
 | 出现新的报告输入形态 | 新 Builder 或新的机制键 | Registry 注册变化 |
@@ -149,8 +150,8 @@ Evaluation 提交的只读 Record 是跨模块事实边界。与本文相关的�
 | `OrgID` | 组织身份 | 形成报告关联事实，不直接授予访问权限 |
 | `AssessmentID` | 测评身份 | 关联报告与查询索引 |
 | `TesteeID` | 受试者身份 | 形成参与者查询范围 |
-| `Model` | 模型 kind、subkind、algorithm、code、version、title | 构建报告模型身份 |
-| `Runtime` | AlgorithmFamily、DecisionKind、PayloadFormat | 解析 Builder 与解码 payload |
+| `Model` | 模型 kind、algorithm、code、version、title | 构建报告模型身份 |
+| `Runtime` | canonical DecisionKind | 校验机制并解析 Builder |
 | `SchemaVersion` | Outcome 事实 schema | 选择版本化解码方式 |
 | `Payload` | 结果事实 JSON | 解码为版本中立 Execution |
 | `ReportInput` | 冻结报告素材 JSON | 解码为 InputSnapshot |
@@ -190,15 +191,15 @@ record.ReportInput
 | --- | --- | --- |
 | `OutcomeID` | Outcome ID | 追踪事实来源 |
 | `Association` | OrgID、AssessmentID、TesteeID | 报告关联与后续查询 |
-| `Model` | kind、subkind、algorithm、code、version、title、channel、family | 报告展示和追踪 |
-| `Runtime` | AlgorithmFamily、DecisionKind、PayloadFormat | Builder 机制路由 |
+| `Model` | kind、algorithm、code、version、title | 报告展示和追踪 |
+| `Runtime` | canonical DecisionKind | Builder 机制路由，Family 为进程内派生值 |
 | `Result` | Primary、Level | 已成立的总结果事实 |
-| `Report` | type、version、algorithm、channel、profile、adapter、template | 报告路由与模板选择 |
+| `Report` | type、version、algorithm、profile、adapter、template | 报告路由与模板选择 |
 | `FactorScoring` | 因子模型与因子结果 | 因子计分、常模与任务类报告 |
 | `PersonalityType` | 类型详情 | 人格类型类报告 |
 | `TraitProfile` | 特质详情 | 连续特质画像类报告 |
 
-Builder 只依赖这一层。它不需要知道 Outcome 是 schema v1 还是 v2，也不需要理解 MongoDB 中的 JSON 结构。
+Builder 只依赖这一层，不解码持久化 JSON。当前 codec 仅接受 Outcome schema 2 和 ReportInput schema 3；版本不符在 Builder 运行前拒绝。
 
 ## 5. FromOutcomeRecord 是防腐边界
 
@@ -213,19 +214,15 @@ DecodeExecution(record)
 DecodeReportInput(record)
 ```
 
-任一步解码失败，报告生成不会带着半完整数据继续执行。由于输入映射发生在 Starter 创建 Generation / Run 之前，这类错误当前不会形成 InterpretationRun；它属于生产链路中仍需在可观测性上继续补强的边界。
+任一步解码失败，报告生成不会带着半完整数据继续执行。由于输入映射发生在 Starter 创建 Generation / Run 之前，这类错误当前不会形成 InterpretationRun；Automation 通过独立 AdmissionFailure 记录稳定分类和治理证据；它不伪造已创建的 Run。
 
-### 5.2 补齐历史兼容身份
+### 5.2 严格消费冻结身份
 
-旧 Outcome 可能没有显式保存完整运行机制。当前适配器提供有限兼容：
+当前适配器只读取 Outcome.Runtime.DecisionKind；缺失或无法映射到 AlgorithmFamily 时返回 catalog_incompatible，不根据 kind、algorithm 或默认值恢复身份。AlgorithmFamily 是从已验证 DecisionKind 派生的进程内属性，ReportProfile 也由 DecisionKind 派生；它们不是额外持久化事实。
 
-- AlgorithmFamily 为空时，尝试根据 kind、subkind、algorithm 推导；
-- DecisionKind 为空时，根据 AlgorithmFamily 填入默认 DecisionKind；
-- 旧 scale 模型 algorithm 为空时，兼容为 `scale_default`；
-- 旧 typology 模型 algorithm 为空时，兼容为 `personality_typology`；
-- ReportProfile 根据 DecisionKind 推导。
+模板路由来自同一 Outcome.ReportInput 的冻结 InterpretationAssets。所有 section 的 TemplateID/TemplateVersion 必须完整一致，typology routing 还必须与其一致；缺失或冲突进入 artifact_contract_invalid，不查询当前 ModelCatalog 或补默认模板。
 
-这些是读取历史数据的兼容策略，不是新数据可以继续省略身份的理由。新的 Outcome 应显式冻结完整运行时身份；否则一个“默认值”将同时承担历史兼容和当前业务规则，后续很难安全演进。
+事实入口：[FromOutcomeRecord](../../../internal/apiserver/application/interpretation/automation/input/outcome_record_adapter.go)、[冻结模板解析](../../../internal/apiserver/domain/interpretation/reporttemplate/resolve.go)。
 
 ### 5.3 将通用结果映射为报告事实
 
@@ -253,76 +250,43 @@ Execution 中的通用结果会映射为：
 
 这种设计让统一执行主链路只处理 InterpretationInput，而把不同模型的事实形状保留在明确的扩展槽位中。
 
-## 6. schema v1、schema v2 与历史兼容
+## 6. current-only schema 与结果所有权
 
-### 6.1 版本化的目标
+### 6.1 四种版本边界
 
-Outcome schema 版本回答的是“持久化结果事实怎样解码”，不等于报告模板版本：
+| 版本概念 | 当前契约 | 保护对象 |
+| --- | --- | --- |
+| Outcome SchemaVersion | 2 | Evaluation Payload 结果事实 |
+| ReportInput schema | 3 | 冻结模型/解释素材与可选扩展 |
+| TemplateVersion | legacy-v1、2026-08-v1 等精确已发布版本 | 完整报告生成语义 |
+| ContentSchemaVersion | report-content/v1 等 | Artifact Content 结构 |
 
-| 版本概念 | 保护对象 |
-| --- | --- |
-| Outcome `SchemaVersion` | Evaluation Payload 的数据结构 |
-| `PayloadFormat` | 运行机制产生的 payload 格式身份 |
-| `TemplateVersion` | 一代完整报告生成语义 |
-| `ContentSchemaVersion` | 最终报告 Content 的结构 |
+Outcome schema 0/1/未知值和非当前 ReportInput 都拒绝；legacy-v1 是精确保留的模板 release 名称，不表示旧 Outcome schema decoder 仍可使用。PayloadFormat 不属于当前冻结运行身份。源码见[Outcome codec](../../../internal/apiserver/port/evaluationfact/codec/codec.go)与[输入契约](../../../internal/apiserver/port/evaluationinput/)。
 
-它们可以独立演进，不能用一个 `v1/v2` 同时指代所有层次。
+### 6.2 typology 分类事实与冻结解释资产
 
-### 6.2 typology schema v1
+schema 2 保存 TypeCode、Pattern、MatchPercent/Similarity、IsSpecial、SpecialTrigger 等分类事实；Interpretation 在同一 Outcome 的冻结 typology ReportInput 内查找名称、画像、建议、图片和来源。TypeCode 不存在、素材损坏或模板身份冲突时直接拒绝，不回读当前 ModelCatalog。
 
-历史 typology payload 可能已经包含大量报告详情，例如类型名称、一句话描述、优势、弱点、建议、图片和来源信息。codec 会恢复为 `PersonalityTypeDetail` 或
-`TraitProfileDetail`，适配器再直接转成 Interpretation facts。
+### 6.3 因子模型与常模素材
 
-这条路径的意义是兼容已存在事实，而不是鼓励 Evaluation 继续产出报告文案。
+因子报告从冻结素材恢复 code、title、max score、total 标识及解释资产，再结合 Outcome dimensions 的既有分数。解释只按冻结 OutcomeCode 选文案，不重新匹配分数产生结果。
 
-### 6.3 typology schema v2
+常模维度具有 T-score 时必须已有 Outcome Level.Code；缺失即失败。冻结常模匹配用于验证已有 code 并恢复 conclusion/suggestion，code 不一致也失败；只有展示 label 为空时可用冻结 conclusion 补展示文字。这不会创建或改变 Outcome-owned Level.Code。源码见[fact_mapping.applyFrozenNormInterpretation](../../../internal/apiserver/application/interpretation/automation/input/fact_mapping.go)。
 
-schema v2 将 Evaluation 事实收敛为更小的分类事实，例如：
+## 7. 报告路由身份与派生机制
 
-```text
-ClassificationFact
-├── TypeCode
-├── Pattern
-├── MatchPercent / Similarity
-├── IsSpecial
-└── SpecialTrigger
-```
-
-Interpretation 使用 `TypeCode` 在同一 Outcome 的冻结 typology ReportInput 中查找名称、说明、画像、建议、图片和来源信息。
-
-关键点是：
-
-> 查找发生在历史冻结输入内，不回退到当前 ModelCatalog。
-
-如果 TypeCode 在冻结输入中不存在，当前实现直接返回错误。这比读取当前配置“尽量生成一份报告”更可靠，因为后者会掩盖 Outcome 与发布模型不一致的问题。
-
-### 6.4 因子模型与常模素材
-
-因子计分报告从冻结 snapshot 恢复因子 code、title、max score、total 标识和解释规则，再把 Outcome dimensions 中的分数与其结合。
-
-常模报告还会使用冻结常模表和 Outcome 已有的 T 分数恢复 conclusion、suggestion 等展示内容。当前代码在个别维度缺少 Level 时还会补齐 Level code/label。
-这个行为已经接近“重新判定结果”的边界，后续应明确：
-
-- Interpretation 可以根据 Outcome level 选择文案；
-- Interpretation 不应在 Outcome 未给出 level 时重新决定 level；
-- 如果报告必需 level，Evaluation 应把它作为完整结果事实提交。
-
-因此，本文把当前实现记录为事实，但不把“Interpretation 补算 Level”固化为目标设计。
-
-## 7. 报告路由的七个身份
-
-Registry 的路由键由四个核心字段和三个可选细分字段组成：
+Registry 的公开 Key 由三个必需字段和两个可选细分字段组成：
 
 ```text
 Key
-├── AlgorithmFamily   必需：计算机制族
-├── DecisionKind      必需：结果判定形态
+├── DecisionKind      必需：canonical 结果机制
 ├── ReportType        必需：报告业务类型
-├── TemplateVersion   必需：报告生成语义版本
-├── Algorithm         可选：具体算法身份
-├── ProductChannel    可选：产品渠道
-└── ReportProfile     可选：呈现形态
+├── TemplateVersion   必需：精确报告生成语义版本
+├── Algorithm         可选：算法细分
+└── ReportProfile     可选：呈现细分
 ```
+
+内部 builderIndexKey 从 DecisionKind 派生 AlgorithmFamily；调用方不能提供另一个 Family。ProductChannel 已不在公开路由键或 InterpretationInput 中。
 
 ### 7.1 AlgorithmFamily
 
@@ -369,17 +333,11 @@ TemplateVersion 标识一代不可变的报告生成语义。当前定义希望�
 当前发布目录同时保留 `legacy-v1` 与 `2026-08-v1`。ModelCatalog active snapshot 显式冻结 TemplateID/TemplateVersion，Outcome 继续冻结同一组路由身份；
 运行时只解析已发布 release，缺失或未知版本会 fail-closed。
 
-### 7.5 Algorithm、ProductChannel 与 ReportProfile
+### 7.5 Algorithm 与 ReportProfile
 
-三个可选字段用于在共享机制内进一步区分呈现：
+Algorithm 支持同一机制内的算法差异，ReportProfile 支持 scale/norm/task/personality_type/trait_profile 等呈现细分。默认 Builder 主要注册 canonical DecisionKind + ReportType + TemplateVersion，ReportProfile 由 DecisionKind 派生。
 
-| 字段 | 适合解决的问题 | 不应承担的职责 |
-| --- | --- | --- |
-| Algorithm | 同一机制族中算法特有的报告差异 | 代替 AlgorithmFamily |
-| ProductChannel | 医疗、行为干预等渠道的产品呈现差异 | 代替组织授权或前端 Audience |
-| ReportProfile | scale、norm、task、personality_type、trait_profile 等内容形态 | 代替 DecisionKind |
-
-当前默认 Builder 主要注册在 AlgorithmFamily + DecisionKind 层，三个字段更多是未来的精细路由能力。ReportProfile 当前由 DecisionKind 推导。
+Registry 允许依次放宽可选 Algorithm/Profile 匹配，但始终保留相同 DecisionKind、ReportType 和 TemplateVersion；这不是缺失身份或跨模板版本 fallback。源码见[Registry](../../../internal/apiserver/domain/interpretation/rendering/registry.go)。
 
 ## 8. 五个容易混淆的“模板身份”
 
@@ -389,7 +347,7 @@ TemplateVersion 标识一代不可变的报告生成语义。当前定义希望�
 | --- | --- | --- | --- |
 | `TemplateVersion` | `legacy-v1`、`2026-08-v1` | 使用哪一代不可变报告生成语义？ | ModelCatalog snapshot、Outcome Input、Registry、Generation、Report、release manifest |
 | `TemplateID` | `mbti`、`sbti`、`bigfive` | typology Builder 内选择哪个具体内容模板？ | 冻结 ReportInput -> Input.Report |
-| `AdapterKey` | `personality_type`、`trait_profile`、`mbti` | 将 typology facts 交给哪种内置适配方式？ | 冻结 ReportInput -> Input.Report |
+| `AdapterKey` | `personality_type`、`trait_profile` | 将 typology facts 交给哪种内置适配方式？ | 冻结 ReportInput -> Input.Report |
 | `BuilderIdentity` | `factor-scoring`、`typology` | 实际是哪一个 Builder 实现生成的？ | Builder、Artifact、生成事件、日志 |
 | `ContentSchemaVersion` | `report-content/v1` | Draft/Report Content 使用什么结构？ | Builder、Artifact、生成事件 |
 
@@ -401,14 +359,9 @@ TemplateVersion 标识一代不可变的报告生成语义。当前定义希望�
 
 ### 8.2 AdapterKey 不是 Algorithm
 
-Algorithm 描述模型如何计算；AdapterKey 描述 Interpretation 怎样选择内置报告适配器。当前没有显式 AdapterKey 时，TypologyBuilder 会根据 model algorithm 回退：
+Algorithm 描述模型如何计算，AdapterKey 描述 Interpretation 使用哪类内置报告适配器。当前支持 personality_type 与 trait_profile；DefinitionV2 的显式 AdapterKey 优先，否则按已验证 ReportKind 派生，template kind 缺 AdapterKey 拒绝。它不会从 mbti/sbti/bigfive 算法字符串猜测 Adapter。
 
-- `mbti` -> MBTI adapter；
-- `sbti` -> SBTI adapter；
-- `bigfive` -> BigFive adapter；
-- 其他 -> 通用 personality type 或 trait profile adapter。
-
-这种回退用于兼容旧输入。新发布模型应尽量冻结明确 AdapterKey，避免 Interpretation 从算法名称猜测呈现策略。
+ModelCatalog 发布时校验 adapter、algorithm、DecisionKind、TemplateID 的兼容性，冻结 TypologyRouting；生产 Builder 读取冻结 AdapterKey 与 TemplateID，未知或不兼容选择失败。事实入口：[ResolvedAdapterKey](../../../internal/apiserver/port/modelcatalog/payload/typology/spec.go)、[报告路由](../../../internal/apiserver/port/modelcatalog/payload/typology/report_routing.go)、[模板注册表](../../../internal/apiserver/domain/interpretation/typology/patterns/template_registry.go)。
 
 ### 8.3 BuilderIdentity 不是 Builder 路由键
 
@@ -477,22 +430,18 @@ DefaultBuilders
 
 ReportProfile 是可派生的呈现细分键；ReportType、TemplateVersion 与 DecisionKind 是不可猜测的核心身份。路由上下文无效时，执行器会明确归类失败，不会选择默认版本或任意 Builder。
 
-### 10.2 从最具体键回落到通用键
+### 10.2 从具体键放宽可选细分
 
-Registry 会先尝试完整 Key，再逐步去掉可选细分字段。可以把当前候选顺序概括为：
+Registry 的候选顺序只放宽 Algorithm/ReportProfile：
 
 ```text
-family + decision + type + version + algorithm + channel + profile
-  -> 去掉部分 profile / channel / algorithm 组合
-  -> family + decision + type + version
-  -> family + type + version
+decision + type + version + algorithm + profile
+  -> decision + type + version + algorithm
+  -> decision + type + version + profile
+  -> decision + type + version
 ```
 
-这一策略支持“通用机制 Builder + 少量产品特化 Builder”：
-
-- 没有特化 Builder 时，同机制回落到通用实现；
-- 某个 algorithm、channel 或 profile 需要特殊报告时，可以注册更具体 Key；
-- 新模型 code 不需要注册新 Builder。
+这些候选始终保留同一 DecisionKind、ReportType 与 TemplateVersion。不存在 family-only 候选，也不接受 ProductChannel。新模型 code 无需注册 Builder；同一机制的呈现差异可通过可选 Algorithm/Profile 细分。
 
 ### 10.3 TemplateVersion 永不跨版本回落
 
@@ -505,15 +454,11 @@ family + decision + type + version + algorithm + channel + profile
 
 这是非常重要的不变量。跨 TemplateVersion 静默回落会让 Generation 身份声称使用 v2，实际内容却由 v1 生成，历史审计将失去意义。
 
-### 10.4 family-only 回落必须谨慎
+### 10.4 新 DecisionKind 必须显式接入
 
-最后一级候选允许 `AlgorithmFamily + ReportType + TemplateVersion`，不再包含 DecisionKind。它为一个 Builder 兼容整个机制族提供了空间，但也带来风险：
+当前 Key 必须包含合法 DecisionKind，注册和解析时从它派生 Family并校验；无 route 则 builder_not_found，不接受旧 family Builder 静默处理未知机制。一个 Builder 支持多个 DecisionKind 时通过 MultiKeyedBuilder 显式逐个声明。
 
-- 新增一个 DecisionKind 时，可能被旧的 family-level Builder 静默接收；
-- Builder 实际并不了解这种新结果形态，却没有得到 `builder_not_found`；
-- 扩展错误会表现为内容缺失或默认展示，而不是明确失败。
-
-因此，family-only Builder 必须主动声明它真的能处理该机制族内所有 DecisionKind。对于结果形态差异明显的 family，应优先注册明确的 DecisionKind 键。
+新增 DecisionKind 需要注册具体 Key、冻结输入/内容契约和发布兼容测试；不能仅增加 Family 映射就视为报告链路完成。
 
 ## 11. 当前四类 Builder
 
@@ -526,11 +471,9 @@ family + decision + type + version + algorithm + channel + profile
 
 ### 11.1 FactorScoringBuilder
 
-它把冻结 Factor model 与 Outcome factor scores 交给 scoring assembler，生成量表类报告 Draft。具体因子解释优先使用冻结解释规则；没有配置结论时，代码会按 risk level 生成默认文案。
+它把冻结 Factor model 与已提交 Outcome factor scores 交给 scoring assembler，生成量表类报告 Draft。具体文案只按冻结 OutcomeCode 查 InterpretationAssets；缺资产、缺代码或找不到对应文案时返回明确错误，不重匹配区间、不取末条规则、不按 risk level 发明结论或建议。
 
-当前解释规则存在一个兼容回落：如果没有区间精确命中但规则列表非空，会使用最后一条规则。这个行为可能掩盖规则区间缺口，目标设计更适合显式失败或由发布校验保证区间完整。
-
-默认文案本身也是报告语义。只要它仍由代码生成，就必须受 TemplateVersion 约束；否则修改一段 Go 文案也会改变历史重放结果。
+这使 Outcome 决定结果、Interpretation 组织文案的边界在失败路径也成立。资产和结果身份必须随模板/模型发布冻结，修改当前文案不能改变历史报告重放。规则由 [`scoring/scale_interpret.go`](../../../internal/apiserver/domain/interpretation/scoring/scale_interpret.go) 与直接回归测试保护。
 
 ### 11.2 NormProfileBuilder
 
@@ -733,11 +676,11 @@ Preview 继续保持无持久化、无 Generation/Run，但新增 release 或特
 - Outcome Payload 保存结果事实，ReportInput 保存报告所需冻结素材；
 - schema v2 类型编码只能在同一 Record 的冻结输入内解析；
 - 新 Outcome 必须显式保存完整模型与运行机制身份；
-- 兼容默认值只服务可识别的历史数据。
+- Outcome schema 2 / ReportInput schema 3 的严格契约拒绝旧格式、缺失身份与默认模板补造。
 
 ### 16.2 路由不变量
 
-- AlgorithmFamily、DecisionKind、ReportType 和 TemplateVersion 是核心路由身份；
+- DecisionKind、ReportType 和 TemplateVersion 是核心路由身份；AlgorithmFamily 仅为派生属性；
 - model code 不进入默认 Builder 路由；
 - 重复 Key 在装配阶段失败；
 - TemplateVersion 绝不跨版本 fallback；

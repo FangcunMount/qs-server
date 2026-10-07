@@ -3453,6 +3453,12 @@ def priority_infrastructure_doc_contract_issues() -> list[Issue]:
             "canonical capability catalog v3",
             "apiserver published-model L1 当前仅导出原始 Prometheus 指标",
         ),
+        EVENT_STATE_DOC: (
+            "原事务回滚",
+            "原 Outbox 已 published，但没有 Assessment",
+            "QS 效果扫描核对原答卷",
+            "技术重投不得重新生成事件身份",
+        ),
         EVENT_OUTBOX_DOC: (
             "MQ 接收但发布结算未持久化",
             "租约恢复可能再次投递",
@@ -3485,7 +3491,7 @@ def priority_infrastructure_doc_contract_issues() -> list[Issue]:
         SIGNAL_DOC: (
             "测试内硬编码的 expected topology",
             "不会扫描 composition root",
-            "本轮已人工反查",
+            "不能单独证明真实运行时接线一致",
         ),
         LOCKLEASE_DOC: (
             "DefaultTTL、caller override 与 snapshot",
@@ -3541,15 +3547,8 @@ def priority_infrastructure_doc_contract_issues() -> list[Issue]:
     if "Registry v2" in cache_text:
         issues.append(Issue("priority-cache-retired-registry-version", "cache docs contain Registry v2"))
 
+    # The transport owner is MQ; business windows link it rather than copy it.
     event_handoff_orders = {
-        EVENT_STATE_DOC: (
-            "业务 channel 达到 MaxAttempts",
-            "发布 cb.failed.<hash> handoff topic",
-            "finish 原消息",
-            "独立 handoff consumer",
-            "MySQL recorder",
-            "event_delivery_dead_letter(manual_required)",
-        ),
         EVENT_MQ_DOC: (
             "业务 channel 达到 MaxAttempts",
             "发布 cb.failed.<hash> handoff topic",
@@ -3757,6 +3756,27 @@ def briefing_case_sections(text: str) -> list[str]:
     )
 
 
+def inventory_count_claim_issues(
+    text: str, expected: dict[str, int], context: str,
+) -> list[Issue]:
+    """Bind current entry-document counts to inventories, not copied numbers."""
+    patterns = {
+        "primary": r"(\d+)\s*篇\s*primary\b",
+        "sidecars": r"(\d+)\s*篇\s*maintained sidecar\b",
+        "events": r"Event Catalog 为\s*(\d+)\s*个事件",
+        "signals": r"Signal Catalog 为\s*(\d+)\s*个信号",
+    }
+    issues: list[Issue] = []
+    for name, count in expected.items():
+        claims = [int(value) for value in re.findall(patterns[name], text)]
+        if not claims or any(value != count for value in claims):
+            issues.append(Issue(
+                "entry-inventory-count-drift",
+                f"{context}: {name} claims={claims}, source={count}",
+            ))
+    return issues
+
+
 def main() -> int:
     issues: list[Issue] = []
 
@@ -3804,6 +3824,21 @@ def main() -> int:
 
     files = list(active_markdown())
     maintained_files = list(maintained_markdown())
+    entry_counts = {
+        "primary": len(files),
+        "sidecars": len(set(maintained_files) - set(files)),
+    }
+    for entry_path in (DOCS / "README.md", DOCS / "CONTRIBUTING-DOCS.md", VERSION_LEDGER):
+        expected_counts = dict(entry_counts)
+        if entry_path == VERSION_LEDGER:
+            expected_counts.update(events=len(configured_events), signals=len(configured_signals))
+        if entry_path.exists():
+            issues.extend(inventory_count_claim_issues(
+                entry_path.read_text(encoding="utf-8"), expected_counts,
+                str(entry_path.relative_to(ROOT)),
+            ))
+        else:
+            issues.append(Issue("missing-inventory-entry", str(entry_path.relative_to(ROOT))))
     closure_exceptions: list[dict[str, object]] = []
     if CLOSURE_MANIFEST.exists():
         try:

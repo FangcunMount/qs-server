@@ -160,10 +160,11 @@ func buildM4StandardEventSubsystem(opts eventsubsystem.Options, cfg *config.Conf
 		if profile.Interval <= 0 || profile.PublishWorkers < 1 || profile.PublishWorkers > 1000 {
 			return eventsubsystem.StandardProfile{}, fmt.Errorf("M4 standard profile %s has invalid scan/concurrency bounds", name)
 		}
+		observedStore, observedPublisher := standardoutbox.ObserveRelayDelivery(store, publisher, name, opts.Observer)
 		supervisor, err := standardoutbox.NewRelaySupervisor(standardoutbox.SupervisorOptions{
 			Name: name, InitialBackoff: 500 * time.Millisecond, MaxBackoff: 30 * time.Second,
 			NewRelay: func(observe relay.Observer) (standardoutbox.RelayRunner, error) {
-				return relay.New(store, publisher, relay.Config{
+				return relay.New(observedStore, observedPublisher, relay.Config{
 					Concurrency: profile.PublishWorkers, PollInterval: profile.Interval,
 					Lease: lease, PublishTimeout: publishTimeout, WriteTimeout: writeTimeout,
 					Wake: wake.Wake(), Retry: standardoutbox.SDKRetryPolicy(), Observe: observe,

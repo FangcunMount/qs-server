@@ -13,7 +13,7 @@ Schema migration、dirty 和生产修复已提升为独立的[Migration 与恢�
 - MySQL 与 MongoDB 分别拥有不同业务事实；Redis 只拥有明确标注的 operational state，不替代权威业务事实。
 - MySQL UoW 和 Mongo session transaction 都只承诺单后端本地事务，系统没有跨库原子提交。
 - 可靠事件与业务事实必须落在同一后端、同一事务的 Outbox；跨库后续动作靠 at-least-once、幂等和可恢复状态机收敛。
-- unique constraint、claim/CAS 和 durable readback 裁决正确性；Redis guard/ready-index 只降低竞争与恢复成本。
+- unique constraint、claim/CAS 和 durable readback 裁决正确性；Redis guard 只降低竞争；Outbox 本地 Wake 只优化发现延迟。
 
 ## 验证边界
 
