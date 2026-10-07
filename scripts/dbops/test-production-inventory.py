@@ -155,7 +155,7 @@ class InventoryContract(unittest.TestCase):
             # without reading a developer/runner's real login configuration.
             login_file = root / "absent-fixture-login.cnf"
             self.assertFalse(login_file.exists())
-            with patch.dict(os.environ, {"HOME": str(root), "MYSQL_TEST_LOGIN_FILE": str(login_file)}):
+            with patch.dict(os.environ, {"MYSQL_TEST_LOGIN_FILE": str(login_file)}):
                 status, output = inventory.capture([shutil.which("my_print_defaults"), "--defaults-file=" + str(config), "--show", "client"])
         self.assertEqual(status, 0)
         self.assertTrue("--password=" + password in output.splitlines(), "MySQL option encoding roundtrip failed")
