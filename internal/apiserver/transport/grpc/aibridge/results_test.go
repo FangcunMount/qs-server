@@ -5,11 +5,9 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"crypto/x509/pkix"
-	"sync/atomic"
 	"testing"
 
 	pb "github.com/FangcunMount/qs-server/api/grpc/gen/aiworkflow"
-	app "github.com/FangcunMount/qs-server/internal/apiserver/application/aibridge"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials"
@@ -17,19 +15,8 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-type retiredResultStore struct {
-	app.Store
-	writes atomic.Int32
-}
-
-func (s *retiredResultStore) Accept(context.Context, app.Event) error {
-	s.writes.Add(1)
-	return nil
-}
-
-func TestMQRetiredResultsRPCNeverPersistsOrAcknowledges(t *testing.T) {
-	store := &retiredResultStore{}
-	r := &Receiver{Service: &app.Service{Store: store}}
+func TestMQRetiredResultsRPCNeverAcknowledgesAuthenticatedEvents(t *testing.T) {
+	r := &Receiver{}
 	cert := &x509.Certificate{Subject: pkix.Name{CommonName: "qs-ai.svc"}}
 	ctx := peer.NewContext(t.Context(), &peer.Peer{AuthInfo: credentials.TLSInfo{State: tls.ConnectionState{PeerCertificates: []*x509.Certificate{cert}, VerifiedChains: [][]*x509.Certificate{{cert}}}}})
 	e := &pb.StateEvent{
@@ -39,20 +26,14 @@ func TestMQRetiredResultsRPCNeverPersistsOrAcknowledges(t *testing.T) {
 	}
 	for _, event := range []*pb.StateEvent{e, {}, nil} {
 		ack, err := r.Accept(ctx, event)
-		if status.Code(err) != codes.FailedPrecondition || ack != nil || store.writes.Load() != 0 {
-			t.Fatalf("retired RPC persisted/acknowledged: code=%v ack=%v writes=%d", status.Code(err), ack, store.writes.Load())
+		if status.Code(err) != codes.FailedPrecondition || ack != nil {
+			t.Fatalf("retired RPC acknowledged: code=%v ack=%v", status.Code(err), ack)
 		}
-	}
-	// No configured business service may turn the retired route back on.
-	r.Service = nil
-	ack, err := r.Accept(ctx, e)
-	if status.Code(err) != codes.FailedPrecondition || ack != nil {
-		t.Fatal("nil service changed permanent rejection", ack, err)
 	}
 }
 
-func TestResultReceiverRegistersCanonicalServiceAndChecksCallerBeforeStore(t *testing.T) {
-	r := &Receiver{Service: &app.Service{}}
+func TestResultReceiverRegistersCanonicalServiceAndChecksCallerBeforeRejection(t *testing.T) {
+	r := &Receiver{}
 	server := grpc.NewServer()
 	t.Cleanup(server.Stop)
 	r.RegisterService(server)

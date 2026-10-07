@@ -32,9 +32,7 @@ func TestMQModuleReplacesLegacyRelayAndResultIngressWhileIntakeClosed(t *testing
 	if probe.started != 1 || legacy.calls.Load() != 0 {
 		t.Fatal("second scheduler or intake-dependent recovery")
 	}
-	if m.ExportGRPCDeps().AIWorkflowResults != nil {
-		t.Fatal("legacy result ingress still active")
-	}
+	assertRetiredResultIngressNotRegistered(t, m)
 	closer := &relayCloser{done: make(chan struct{})}
 	m.aiManagementConnection = closer
 	probe.stopError = errors.New("drain blocked")
