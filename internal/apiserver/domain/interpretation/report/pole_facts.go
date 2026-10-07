@@ -3,6 +3,8 @@ package report
 import (
 	"fmt"
 	"math"
+
+	"github.com/FangcunMount/qs-server/internal/pkg/mbticontract"
 )
 
 const PoleFactsSchema = "mbti-pole-facts/v1"
@@ -63,12 +65,10 @@ func ValidateMBTIPoleFacts(content Content) error {
 	if count == 0 {
 		return nil
 	}
-	if count != 4 || len(content.Dimensions) != 4 || content.Model.Kind != "typology" || content.Model.Code != "MBTI_OEJTS" || content.Model.Version != "v64-report-202608-v1" || content.Model.Algorithm != "personality_typology" || content.ModelExtra == nil || content.ModelExtra.IsSpecial {
+	model, supported := mbticontract.Lookup(content.Model.Code, content.Model.Version)
+	if !supported || count != 4 || len(content.Dimensions) != 4 || content.Model.Kind != "typology" || content.Model.Algorithm != "personality_typology" || content.ModelExtra == nil || content.ModelExtra.IsSpecial {
 		return fmt.Errorf("MBTI pole facts report identity mismatch")
 	}
-	codes := []string{"EI", "SN", "TF", "JP"}
-	left := []string{"I", "S", "F", "J"}
-	right := []string{"E", "N", "T", "P"}
 	preferences := make([]byte, 4)
 	for _, d := range content.Dimensions {
 		p := d.poleFacts
@@ -76,8 +76,11 @@ func ValidateMBTIPoleFacts(content Content) error {
 			return err
 		}
 		i := p.CompositionOrder - 1
-		if preferences[i] != 0 || d.Code().String() != codes[i] || d.Name() == "" || p.LeftPole != left[i] || p.RightPole != right[i] {
+		if preferences[i] != 0 || d.Code().String() != model.Axes[i].Code || d.Name() == "" || p.LeftPole != model.Axes[i].Left || p.RightPole != model.Axes[i].Right {
 			return fmt.Errorf("MBTI pole facts axes mismatch")
+		}
+		if content.Model.Code == "MBTI_FC_93" && (p.MinScore != model.Axes[i].Min || p.MaxScore != model.Axes[i].Max || p.Threshold != model.Axes[i].Threshold) {
+			return fmt.Errorf("exploration pole bounds mismatch")
 		}
 		preferences[i] = p.Preference[0]
 	}

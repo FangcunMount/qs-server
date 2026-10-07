@@ -46,7 +46,7 @@ func mbtiSnapshotSource(t *testing.T, c report.Content) *source.Current {
 	if err != nil {
 		t.Fatal(err)
 	}
-	return &source.Current{Report: r, Outcome: evaluationfact.NewRecord(evaluationfact.NewRecordInput{ID: r.OutcomeID(), OrgID: 1, AssessmentID: meta.FromUint64(42), TesteeID: 7, Model: evaluationfact.ModelIdentity{Kind: "typology", Algorithm: "personality_typology", Code: "MBTI_OEJTS", Version: c.Model.Version, Title: c.Model.Title}, Runtime: evaluationfact.RuntimeIdentity{DecisionKind: "pole_composition"}})}
+	return &source.Current{Report: r, Outcome: evaluationfact.NewRecord(evaluationfact.NewRecordInput{ID: r.OutcomeID(), OrgID: 1, AssessmentID: meta.FromUint64(42), TesteeID: 7, Model: evaluationfact.ModelIdentity{Kind: "typology", Algorithm: "personality_typology", Code: c.Model.Code, Version: c.Model.Version, Title: c.Model.Title}, Runtime: evaluationfact.RuntimeIdentity{DecisionKind: "pole_composition"}})}
 }
 
 // CI exports bytes from the real Go projector for the Python decoder/assembler.
@@ -87,6 +87,12 @@ func TestMBTISnapshotContractVector(t *testing.T) {
 		}
 		vectors[key] = raw
 	}
+	exploration := explorationSnapshotContent()
+	projected, err := reportSnapshot(mbtiSnapshotSource(t, exploration))
+	if err != nil {
+		t.Fatal(err)
+	}
+	vectors["mbti_exploration"] = projected
 	raw, err := reportSnapshot(snapshotSource(t, true))
 	if err != nil {
 		t.Fatal(err)
@@ -204,5 +210,49 @@ func TestMBTISnapshotProjectsHistoricalBoundedFactorAxesWithoutRewritingReport(t
 				t.Fatalf("accepted unsupported historical axis: %v", err)
 			}
 		})
+	}
+}
+
+func explorationSnapshotContent() report.Content {
+	c := mbtiSnapshotContent(false)
+	c.Model.Code, c.Model.Version, c.Model.Title = "MBTI_FC_93", "v55-report-202608-v1", "16人格测评（探索版）"
+	c.ModelExtra.TypeCode, c.ModelExtra.MatchPercent = "ESTP", 1.4214474943787707
+	c.Conclusion = "本次测评类型为 ESTP。"
+	c.Dimensions = nil
+	left, right := []string{"E", "S", "T", "J"}, []string{"I", "N", "F", "P"}
+	raw, strength := []float64{11, 11, 9, 14}, []float64{0, 0, 2, 2}
+	for i, code := range []string{"EI", "SN", "TF", "JP"} {
+		maximum := float64(23)
+		if i == 3 {
+			maximum = 24
+		}
+		preference := left[i]
+		if i == 3 {
+			preference = right[i]
+		}
+		c.Dimensions = append(c.Dimensions, report.NewNeutralDimensionInterpret(report.NewDimensionCode(code), report.DimensionKindPole, code, raw[i], nil, nil, "", "").WithPoleFacts(&report.PoleFacts{SchemaVersion: report.PoleFactsSchema, LeftPole: left[i], RightPole: right[i], Preference: preference, Strength: strength[i], MinScore: 0, MaxScore: maximum, Threshold: 11.5, CompositionOrder: i + 1}))
+	}
+	return c
+}
+
+func TestExplorationSnapshotPreservesFactUnitsAndRejectsLegacy(t *testing.T) {
+	c := explorationSnapshotContent()
+	raw, err := reportSnapshot(mbtiSnapshotSource(t, c))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var projected map[string]any
+	if err := json.Unmarshal(raw, &projected); err != nil {
+		t.Fatal(err)
+	}
+	axes := projected["dimensions"].([]any)
+	if axes[0].(map[string]any)["pole_facts"].(map[string]any)["strength"] != float64(0) {
+		t.Fatal("known zero changed")
+	}
+	for i := range c.Dimensions {
+		c.Dimensions[i] = c.Dimensions[i].WithPoleFacts(nil)
+	}
+	if _, err := reportSnapshot(mbtiSnapshotSource(t, c)); !errors.Is(err, source.ErrNotApplicable) {
+		t.Fatal("legacy exploration was inferred", err)
 	}
 }

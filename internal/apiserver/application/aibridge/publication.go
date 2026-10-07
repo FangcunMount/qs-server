@@ -3,6 +3,7 @@ package aibridge
 import (
 	"context"
 	"encoding/json"
+	"github.com/FangcunMount/qs-server/internal/pkg/mbticontract"
 	"strings"
 	"unicode/utf8"
 
@@ -25,8 +26,11 @@ func (s PublicationSelector) Valid() bool {
 		return false
 	}
 	if s.ModelKind == "typology" {
-		return s.DecisionKind == "pole_composition" && s.ModelCode != nil && *s.ModelCode == "MBTI_OEJTS" &&
-			s.ModelVersion != nil && *s.ModelVersion == "v64-report-202608-v1"
+		if s.ModelCode == nil || s.ModelVersion == nil {
+			return false
+		}
+		_, supported := mbticontract.Lookup(*s.ModelCode, *s.ModelVersion)
+		return s.DecisionKind == "pole_composition" && supported
 	}
 	return s.ModelKind == "scale" && s.DecisionKind == "score_range" &&
 		(s.ModelCode == nil || (strings.TrimSpace(*s.ModelCode) != "" && len(*s.ModelCode) <= 255 && utf8.ValidString(*s.ModelCode))) &&
