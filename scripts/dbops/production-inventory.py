@@ -195,10 +195,21 @@ def capture(args, *, input_text=None, timeout=15):
                     stream.close()
 
 
-def invoke(args, *, input_text=None, timeout=15):
+def mongo_failure_category(output, status=None):
+    # Accept only the exact fixed-token JSON emitted by our mongosh script.
+    # Raw server/client errors and extra fields are never returned to workflow logs.
+    match = re.fullmatch(r'\s*\{\s*"error"\s*:\s*"(mongo_inventory_(?:connect|auth|listCollections|collStats|listIndexes|migration|head)_code_(none|0|[1-9][0-9]{0,9}))"\s*\}\s*', output)
+    if match and (match[2] == "none" or int(match[2]) <= 2147483647):
+        return match[1]
+    # This is a client exit status, distinct from a MongoDB server error code.
+    exit_status = str(status) if type(status) is int and -64 <= status <= 255 else "none"
+    return "mongo_client_exit_status_" + exit_status
+
+
+def invoke(args, *, input_text=None, timeout=15, mongo_failure=False):
     status, output = capture(args, input_text=input_text, timeout=timeout)
     if status != 0:
-        fail("client_execution_failed")
+        fail(mongo_failure_category(output, status) if mongo_failure else "client_execution_failed")
     return output
 
 
@@ -289,7 +300,7 @@ def collect(kind, env, docker, script_dir, run_id):
                 raw = invoke(command, input_text=(script_dir / "production-inventory.sql").read_text(), timeout=75)
                 return parse_mysql(raw, database)
             command = [*common, "--env-file", str(config), image, "mongosh", "--nodb", "--quiet", "--file", "/audit/production-inventory.js"]
-            return parse_mongo(invoke(command, timeout=75), database)
+            return parse_mongo(invoke(command, timeout=75, mongo_failure=True), database)
         finally:
             cleanup_client(docker, owner)
 

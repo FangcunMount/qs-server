@@ -70,6 +70,37 @@ class InventoryContract(unittest.TestCase):
                 inventory.parse_mongo(raw, "qs")
             self.assertNotIn(SECRET, str(caught.exception))
 
+    def test_mongo_nonzero_fixed_stage_tokens_only(self):
+        stages = ("connect", "auth", "listCollections", "collStats", "listIndexes", "migration", "head")
+        for stage in stages:
+            for code in ("none", "0", "18", "2147483647"):
+                token = "mongo_inventory_" + stage + "_code_" + code
+                raw = json.dumps({"error": token})
+                self.assertEqual(inventory.mongo_failure_category(raw), token)
+                with patch.object(inventory, "capture", return_value=(1, raw)), self.assertRaises(inventory.InventoryError) as caught:
+                    inventory.invoke(["fixture"], mongo_failure=True)
+                self.assertEqual(str(caught.exception), token)
+        for raw in (SECRET, json.dumps({"error": SECRET}), json.dumps({"error": "mongo_inventory_auth_code_18", "body": SECRET}),
+                    '{"error":"mongo_inventory_auth_code_18","error":"mongo_inventory_auth_code_13"}',
+                    '{"error":"mongo_inventory_auth_code_18"} trailing', '{"error":"mongo_inventory_auth_code_01"}',
+                    '{"error":"mongo_inventory_auth_code_-1"}', '{"error":"mongo_inventory_auth_code_2147483648"}',
+                    '{"error":"mongo_inventory_auth_code_1.5"}', '{"error":"mongo_inventory_unknown_code_18"}',
+                    json.dumps(mongo_fixture())):
+            self.assertEqual(inventory.mongo_failure_category(raw), "mongo_client_exit_status_none")
+            with patch.object(inventory, "capture", return_value=(1, raw)), self.assertRaisesRegex(inventory.InventoryError, "^mongo_client_exit_status_1$"):
+                inventory.invoke(["fixture"], mongo_failure=True)
+        for status in (0, 1, 125, 126, 127, 137, 255, -1, -9, -64):
+            self.assertEqual(inventory.mongo_failure_category(SECRET, status), "mongo_client_exit_status_" + str(status))
+        for status in (256, -65, True, "1", None):
+            self.assertEqual(inventory.mongo_failure_category(SECRET, status), "mongo_client_exit_status_none")
+        raw = '{"error":"mongo_inventory_auth_code_18"}'
+        with patch.object(inventory, "capture", return_value=(0, raw)), self.assertRaises(inventory.InventoryError):
+            inventory.parse_mongo(inventory.invoke(["fixture"], mongo_failure=True), "qs")
+        with patch.object(inventory, "capture", return_value=(1, raw)), self.assertRaisesRegex(inventory.InventoryError, "^client_execution_failed$"):
+            inventory.invoke(["fixture"])
+        with self.assertRaisesRegex(inventory.InventoryError, "^mongo_inventory_auth_code_18$"):
+            inventory.invoke([sys.executable, "-c", "import sys; print(sys.argv[1]); sys.exit(1)", raw], mongo_failure=True)
+
     def test_invalid_scope_and_system_database_rejected_before_docker(self):
         for changed in ({"INVENTORY_DATABASE": "redis"}, {"INVENTORY_SOURCE_SHA": SECRET}, {"MYSQL_DATABASE": "mysql"}, {"MONGODB_DBNAME": "admin"}, {"MONGODB_PORT": "70000"}):
             env = dict(environment(), **changed)
