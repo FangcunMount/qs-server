@@ -10999,7 +10999,7 @@
       "owner": "tooling",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "9a2f06ed3c70086477597cfc2f7b926f40e14099",
+        "source_sha": "cd5c1c360aa766d70c9d5a0877002043970c2936",
         "verified_on": "2026-10-07"
       },
       "fact_sources": [
@@ -11029,7 +11029,7 @@
           "kind": "command",
           "command": "bash scripts/dbops/test-production-inventory.sh",
           "result": "passed",
-          "source_sha": "9a2f06ed3c70086477597cfc2f7b926f40e14099",
+          "source_sha": "cd5c1c360aa766d70c9d5a0877002043970c2936",
           "verified_on": "2026-10-07"
         }
       ],
