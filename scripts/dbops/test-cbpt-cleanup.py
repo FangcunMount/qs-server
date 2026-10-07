@@ -332,6 +332,92 @@ class Contracts(unittest.TestCase):
             self.assertNotIn("MYSQL_PASSWORD", json.dumps(command))
             self.assertNotIn("MYSQL_USERNAME", json.dumps(command))
 
+    def test_docker_space_uses_unprivileged_df_on_actual_docker_root(self):
+        runtime = cbpt.Runtime(self.binary, "123-1", SHA, ["docker"])
+        root = "/var/lib/docker"
+        output = "Filesystem 1024-blocks Used Available Capacity Mounted on\n/dev/fixture 20000000 5000000 15000000 25% /var/lib\n"
+        def ordinary_df_only(command, **kwargs):
+            # Simulate a host that rejects every extra sudo command.
+            if command[0] == "sudo":
+                cbpt.fail("fixture_sudo_denied")
+            self.assertEqual(command, ["env", "LC_ALL=C", "df", "-Pk", "--", root])
+            self.assertEqual(kwargs["timeout"], 15)
+            return 0, output
+        with patch.object(runtime, "invoke", return_value=root) as invoked, patch.object(cbpt, "capture", side_effect=ordinary_df_only):
+            runtime.docker_space(8 * cbpt.GIB)
+        invoked.assert_called_once_with(["info", "--format", "{{.DockerRootDir}}"])
+
+    def test_docker_space_nonzero_never_reports_low_or_accepts_capacity(self):
+        runtime = cbpt.Runtime(self.binary, "123-1", SHA, ["docker"])
+        header = "Filesystem 1024-blocks Used Available Capacity Mounted on\n"
+        for output in ("", header + "/dev/fixture 20 19 1 95% /\n", header + "/dev/fixture 20000000 0 20000000 0% /\n"):
+            with self.subTest(output=output), patch.object(runtime, "invoke", return_value="/var/lib/docker"), patch.object(cbpt, "capture", return_value=(1, output)), self.assertRaisesRegex(cbpt.CleanupError, "^docker_disk_unknown$"):
+                runtime.docker_space(8 * cbpt.GIB)
+
+    def test_docker_space_malformed_or_ambiguous_posix_output_is_unknown(self):
+        runtime = cbpt.Runtime(self.binary, "123-1", SHA, ["docker"])
+        header = "Filesystem 1024-blocks Used Available Capacity Mounted on\n"
+        row = "/dev/fixture 20000000 5000000 15000000 25% /\n"
+        for output in ("", row, header, header + row.rstrip("\n"), header + row + row,
+                       header + "/dev/fixture\n20000000 5000000 15000000 25% /\n",
+                       (header + row).replace("\n", "\r\n"), header.replace("Available", "Libre") + row,
+                       header + row.replace(" /\n", " relative\n"), header + row.replace("25%", "101%"),
+                       header + row.replace("25%", "25"), header + row.replace(" /\n", " /bad\x00path\n"),
+                       header + row.replace("/dev/fixture", "/dev/bad\x00fixture"),
+                       header + row.replace("/dev/fixture", "/dev/bad\x7ffixture")):
+            with self.subTest(output=output), patch.object(runtime, "invoke", return_value="/var/lib/docker"), patch.object(cbpt, "capture", return_value=(0, output)), self.assertRaisesRegex(cbpt.CleanupError, "^docker_disk_unknown$"):
+                runtime.docker_space(8 * cbpt.GIB)
+
+    def test_docker_space_numeric_bounds_and_consistency_are_checked(self):
+        runtime = cbpt.Runtime(self.binary, "123-1", SHA, ["docker"])
+        header = "Filesystem 1024-blocks Used Available Capacity Mounted on\n"
+        for total, used, available in (("20", "0", "-1"), ("20", "0", "+1"), ("20", "0", "1.5"),
+                                       ("20", "0", "1e3"), ("20", "0", "9" * 40),
+                                       (str(2 ** 63), "0", "1"), (str((2 ** 63 - 1) // 1024 + 1), "0", "1"),
+                                       ("0", "0", "0"),
+                                       ("20", "21", "0"), ("20", "10", "11")):
+            output = header + f"/dev/fixture {total} {used} {available} 0% /\n"
+            with self.subTest(values=(total, used, available)), patch.object(runtime, "invoke", return_value="/var/lib/docker"), patch.object(cbpt, "capture", return_value=(0, output)), self.assertRaisesRegex(cbpt.CleanupError, "^docker_disk_unknown$"):
+                runtime.docker_space(8 * cbpt.GIB)
+
+    def test_docker_space_capacity_threshold_is_in_kibibytes(self):
+        runtime = cbpt.Runtime(self.binary, "123-1", SHA, ["docker"])
+        output = "Filesystem 1024-blocks Used Available Capacity Mounted on\n/dev/fixture 10 9 1 90% /\n"
+        with patch.object(runtime, "invoke", return_value="/var/lib/docker"), patch.object(cbpt, "capture", return_value=(0, output)):
+            runtime.docker_space(1024)
+            with self.assertRaisesRegex(cbpt.CleanupError, "^docker_disk_low$"):
+                runtime.docker_space(1025)
+        blocks = (2 ** 63 - 1) // 1024
+        output = f"Filesystem 1024-blocks Used Available Capacity Mounted on\n/dev/fixture {blocks} 0 {blocks} 0% /\n"
+        with patch.object(runtime, "invoke", return_value="/var/lib/docker"), patch.object(cbpt, "capture", return_value=(0, output)):
+            runtime.docker_space(blocks * 1024)
+
+    def test_docker_space_invalid_storage_identity_never_runs_df(self):
+        runtime = cbpt.Runtime(self.binary, "123-1", SHA, ["docker"])
+        for root in ("relative", "", "/var/lib/docker\n/another", "/var/lib/do\x00cker", "/var/lib/docker\r"):
+            with self.subTest(root=root), patch.object(runtime, "invoke", return_value=root), patch.object(cbpt, "capture") as captured, self.assertRaisesRegex(cbpt.CleanupError, "^docker_storage_identity_invalid$"):
+                runtime.docker_space(8 * cbpt.GIB)
+            captured.assert_not_called()
+
+    def test_actual_docker_space_failure_retains_archive_and_stops_before_restore(self):
+        self.args.operation = "archive-verify"
+        class SpaceRuntime(FakeRuntime):
+            docker_space = cbpt.Runtime.docker_space
+            def invoke(self, args, **kwargs):
+                if args[0] == "info":
+                    return "/var/lib/docker"
+                return super().invoke(args, **kwargs)
+        with patch.object(cbpt, "capture", return_value=(1, "")), self.assertRaisesRegex(cbpt.CleanupError, "^docker_disk_unknown$") as caught:
+            cbpt.perform(self.args, env(), archive_root=self.archives, runtime_class=SpaceRuntime)
+        self.assertEqual(caught.exception.result["stage"], "archive_validation")
+        self.assertTrue(FakeRuntime.last.cleaned)
+        self.assertFalse(any(call == ["restore_container"] for call in FakeRuntime.last.calls))
+        archive = self.archives / "123-1"
+        self.assertTrue((archive / "dump.sql.gz").exists())
+        self.assertTrue((archive / "manifest.json").exists())
+        self.assertFalse((archive / "restore-proof.json").exists())
+        self.assertFalse((archive / "drop-ledger.json").exists())
+
     def test_restore_command_isolated_and_owner_checked_before_mount(self):
         runtime = cbpt.Runtime(self.binary, "123-1", SHA, ["docker"])
         container = "e" * 64

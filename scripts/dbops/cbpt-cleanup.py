@@ -408,13 +408,23 @@ class Runtime:
         root = self.invoke(["info", "--format", "{{.DockerRootDir}}"])
         if not root.startswith("/") or any(char in root for char in ("\x00", "\r", "\n")):
             fail("docker_storage_identity_invalid")
-        status, output = capture(["sudo", "-n", "df", "-Pk", "--", root], timeout=15)
-        try:
-            lines = output.splitlines()
-            available = int(lines[-1].split()[3]) * 1024
-        except (IndexError, ValueError):
+        # Filesystem metadata needs no extra sudo grant when ancestors are searchable.
+        status, output = capture(["env", "LC_ALL=C", "df", "-Pk", "--", root], timeout=15)
+        if status != 0 or not output.endswith("\n") or "\r" in output:
             fail("docker_disk_unknown")
-        if status != 0 or available < required:
+        lines = output.splitlines()
+        if len(lines) != 2 or lines[0].split() != ["Filesystem", "1024-blocks", "Used", "Available", "Capacity", "Mounted", "on"]:
+            fail("docker_disk_unknown")
+        fields = lines[1].split(maxsplit=5)
+        if (any(ord(char) < 32 and char != "\t" or ord(char) == 127 for char in lines[1])
+                or len(fields) != 6 or any(not re.fullmatch(r"[0-9]{1,16}", token) for token in fields[1:4])
+                or not re.fullmatch(r"[0-9]{1,3}%", fields[4]) or int(fields[4][:-1]) > 100
+                or not fields[5].startswith("/") or any(ord(char) < 32 for char in fields[5])):
+            fail("docker_disk_unknown")
+        total, used, available = (int(token) for token in fields[1:4])
+        if total <= 0 or total > (2 ** 63 - 1) // 1024 or used + available > total:
+            fail("docker_disk_unknown")
+        if available * 1024 < required:
             fail("docker_disk_low")
 
     def restore_container(self, connection, archive, operation_id, image):
