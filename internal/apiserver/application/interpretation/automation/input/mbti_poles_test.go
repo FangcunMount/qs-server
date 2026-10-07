@@ -17,7 +17,7 @@ func mbtiPoleFactsFixture() ([]patterns.PersonalityTypeDimensionReport, *evaluat
 	strength := []float64{56.25, 6.25, 25, 75}
 	dims := make([]patterns.PersonalityTypeDimensionReport, 4)
 	execution := &evaluationfact.Execution{}
-	assets := &evaluationinput.InputSnapshot{MBTIPoles: &evaluationinput.MBTIPoleCatalog{SchemaVersion: evaluationinput.MBTIPoleCatalogSchema}}
+	assets := &evaluationinput.InputSnapshot{Model: &evaluationinput.ModelSnapshot{Kind: evaluationinput.EvaluationModelKindTypology, Algorithm: "personality_typology", Code: "MBTI_OEJTS", Version: "v64-report-202608-v1"}, MBTIPoles: &evaluationinput.MBTIPoleCatalog{SchemaVersion: evaluationinput.MBTIPoleCatalogSchema}}
 	for i, c := range codes {
 		dims[i] = patterns.PersonalityTypeDimensionReport{Code: c, RawScore: raw[i], Preference: left[i], Strength: strength[i]}
 		execution.Dimensions = append(execution.Dimensions, evaluationfact.DimensionResult{Code: c, Score: &evaluationfact.ScoreValue{Kind: evaluationfact.ScoreKindRawTotal, Value: raw[i]}, Preference: left[i], Strength: &strength[i]})

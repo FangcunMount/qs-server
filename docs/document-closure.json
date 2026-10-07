@@ -122,7 +122,7 @@
       "source": "api/grpc/proto",
       "proto_file_count": 10,
       "service_count": 29,
-      "rpc_count": 132,
+      "rpc_count": 133,
       "services": {
         "actor.ActorService": [
           "CreateTestee",
@@ -228,6 +228,7 @@
           "ListUnknownExecutions",
           "ResolveUnknown",
           "Review",
+          "CorrectReview",
           "ListCandidates",
           "GetCandidate",
           "ListExecutions",

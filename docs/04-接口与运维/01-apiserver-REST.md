@@ -49,3 +49,13 @@ curl --fail-with-body --silent --show-error \
 - 5xx：用 request ID 关联日志，避免把内部 error、token 或响应正文写入证据。
 
 生产结果写入[基础设施生产证据台账](../00-总览/10-基础设施生产证据台账.md)。
+
+## 6. AI 审核更正增量接口
+
+`POST /internal/v2/interpretation/ai-workflow/evaluations/:run_id/review-corrections` 要求当前机构 OrgAdmin，scope 的机构与操作者只取受保护上下文。客户端提供 command_id、expected_version、candidate_id、role、previous_review_fingerprint、candidate_output_fingerprint、decision、reason、confirm；不能通过正文为其他人签名。
+
+QS 只做授权、格式/传输边界与 mTLS 代理，不计算质量门槛、不重复发送请求。AI 校验当前 awaiting_review、原审核者、冻结输出、原审核指纹与 CAS，并保存追加式更正回执。GET 原 Run 返回有效 reviews、original_reviews、review_corrections、review_fingerprints；旧服务没有新字段时仍可读取，但不能据旧字段推断更正已成功。
+
+超时先核对原命令的确切回执，必要时显式重试同一 command_id、版本与正文。更正不调用模型、不自动 Finalize 或 Publish，也不覆盖原签名。实际部署、账号操作与正式发布另验收。
+
+实现：[应用权限与命令校验](../../internal/apiserver/application/aibridge/evaluation_review_correction.go)、[一次调用代理](../../internal/apiserver/infra/aibridge/evaluation_review_correction.go)、[路由权限回归](../../internal/apiserver/transport/rest/routes_ai_workflow_review_corrections_test.go)、[AI 机器契约](../../api/grpc/proto/aiworkflow/workflow.proto)。

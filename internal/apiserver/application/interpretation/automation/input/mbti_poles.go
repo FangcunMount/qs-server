@@ -13,7 +13,10 @@ func attachFrozenMBTIPoles(dimensions []patterns.PersonalityTypeDimensionReport,
 	if assets == nil || assets.MBTIPoles == nil {
 		return nil
 	} // No latest-model fallback for old Outcomes.
-	if err := assets.MBTIPoles.Validate(); err != nil {
+	if assets.Model == nil {
+		return fmt.Errorf("frozen MBTI model is required")
+	}
+	if err := assets.MBTIPoles.ValidateForModel(assets.Model.ModelRef()); err != nil {
 		return err
 	}
 	if len(dimensions) != 4 || len(execution.Dimensions) != 4 {

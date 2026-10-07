@@ -6,6 +6,7 @@ import (
 	"math"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
+	"github.com/FangcunMount/qs-server/internal/pkg/mbticontract"
 )
 
 const MBTIPoleCatalogSchema = "mbti-pole-catalog/v1"
@@ -53,24 +54,33 @@ func (a *MBTIPoleAxis) UnmarshalJSON(data []byte) error {
 
 // RequiresMBTIPoleCatalog identifies the exact supported immutable MBTI model.
 func RequiresMBTIPoleCatalog(model ModelRef) bool {
-	return model.Kind == EvaluationModelKindTypology && model.Code == "MBTI_OEJTS" && model.Version == "v64-report-202608-v1" && model.Algorithm == string(modelcatalog.AlgorithmPersonalityTypology)
+	_, supported := mbticontract.Lookup(model.Code, model.Version)
+	return supported && model.Kind == EvaluationModelKindTypology && model.Algorithm == string(modelcatalog.AlgorithmPersonalityTypology)
 }
 
 func (c *MBTIPoleCatalog) Validate() error {
+	return c.ValidateForModel(ModelRef{Kind: EvaluationModelKindTypology, Algorithm: "personality_typology", Code: "MBTI_OEJTS", Version: "v64-report-202608-v1"})
+}
+
+func (c *MBTIPoleCatalog) ValidateForModel(ref ModelRef) error {
+	model, supported := mbticontract.Lookup(ref.Code, ref.Version)
+	if !supported || !RequiresMBTIPoleCatalog(ref) {
+		return fmt.Errorf("unsupported MBTI pole model")
+	}
 	if c == nil || c.SchemaVersion != MBTIPoleCatalogSchema || len(c.Axes) != 4 {
 		return fmt.Errorf("invalid MBTI pole catalog version or axes")
 	}
-	codes := []string{"EI", "SN", "TF", "JP"}
-	left := []string{"I", "S", "F", "J"}
-	right := []string{"E", "N", "T", "P"}
 	for i, a := range c.Axes {
-		if a.Code != codes[i] || a.Name == "" || a.LeftPole != left[i] || a.RightPole != right[i] {
+		if a.Code != model.Axes[i].Code || a.Name == "" || a.LeftPole != model.Axes[i].Left || a.RightPole != model.Axes[i].Right {
 			return fmt.Errorf("invalid MBTI pole identity or order")
 		}
 		for _, v := range []float64{a.MinScore, a.MaxScore, a.Threshold} {
 			if math.IsNaN(v) || math.IsInf(v, 0) {
 				return fmt.Errorf("nonfinite MBTI pole boundary")
 			}
+		}
+		if ref.Code == "MBTI_FC_93" && (a.MinScore != model.Axes[i].Min || a.MaxScore != model.Axes[i].Max || a.Threshold != model.Axes[i].Threshold) {
+			return fmt.Errorf("MBTI exploration pole boundary mismatch")
 		}
 		if a.MinScore >= a.Threshold || a.Threshold >= a.MaxScore {
 			return fmt.Errorf("invalid MBTI pole boundary")

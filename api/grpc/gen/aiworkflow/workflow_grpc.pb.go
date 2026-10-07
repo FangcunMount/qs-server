@@ -313,6 +313,7 @@ const (
 	EvaluationManagement_ListUnknownExecutions_FullMethodName = "/qsai.workflow.v1.EvaluationManagement/ListUnknownExecutions"
 	EvaluationManagement_ResolveUnknown_FullMethodName        = "/qsai.workflow.v1.EvaluationManagement/ResolveUnknown"
 	EvaluationManagement_Review_FullMethodName                = "/qsai.workflow.v1.EvaluationManagement/Review"
+	EvaluationManagement_CorrectReview_FullMethodName         = "/qsai.workflow.v1.EvaluationManagement/CorrectReview"
 	EvaluationManagement_ListCandidates_FullMethodName        = "/qsai.workflow.v1.EvaluationManagement/ListCandidates"
 	EvaluationManagement_GetCandidate_FullMethodName          = "/qsai.workflow.v1.EvaluationManagement/GetCandidate"
 	EvaluationManagement_ListExecutions_FullMethodName        = "/qsai.workflow.v1.EvaluationManagement/ListExecutions"
@@ -346,6 +347,7 @@ type EvaluationManagementClient interface {
 	ResolveUnknown(ctx context.Context, in *UnknownResolutionCommand, opts ...grpc.CallOption) (*EvaluationState, error)
 	// QS authorizes the selected review role; AI records the trusted operator and server time.
 	Review(ctx context.Context, in *EvaluationReviewCommand, opts ...grpc.CallOption) (*EvaluationState, error)
+	CorrectReview(ctx context.Context, in *EvaluationReviewCorrectionCommand, opts ...grpc.CallOption) (*EvaluationState, error)
 	ListCandidates(ctx context.Context, in *EvaluationQuery, opts ...grpc.CallOption) (*EvaluationCandidateIndex, error)
 	GetCandidate(ctx context.Context, in *EvaluationCandidateQuery, opts ...grpc.CallOption) (*EvaluationCandidateEvidence, error)
 	// Read original execution evidence, including failures without candidates. Never retries.
@@ -467,6 +469,16 @@ func (c *evaluationManagementClient) Review(ctx context.Context, in *EvaluationR
 	return out, nil
 }
 
+func (c *evaluationManagementClient) CorrectReview(ctx context.Context, in *EvaluationReviewCorrectionCommand, opts ...grpc.CallOption) (*EvaluationState, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(EvaluationState)
+	err := c.cc.Invoke(ctx, EvaluationManagement_CorrectReview_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *evaluationManagementClient) ListCandidates(ctx context.Context, in *EvaluationQuery, opts ...grpc.CallOption) (*EvaluationCandidateIndex, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(EvaluationCandidateIndex)
@@ -561,6 +573,7 @@ type EvaluationManagementServer interface {
 	ResolveUnknown(context.Context, *UnknownResolutionCommand) (*EvaluationState, error)
 	// QS authorizes the selected review role; AI records the trusted operator and server time.
 	Review(context.Context, *EvaluationReviewCommand) (*EvaluationState, error)
+	CorrectReview(context.Context, *EvaluationReviewCorrectionCommand) (*EvaluationState, error)
 	ListCandidates(context.Context, *EvaluationQuery) (*EvaluationCandidateIndex, error)
 	GetCandidate(context.Context, *EvaluationCandidateQuery) (*EvaluationCandidateEvidence, error)
 	// Read original execution evidence, including failures without candidates. Never retries.
@@ -611,6 +624,9 @@ func (UnimplementedEvaluationManagementServer) ResolveUnknown(context.Context, *
 }
 func (UnimplementedEvaluationManagementServer) Review(context.Context, *EvaluationReviewCommand) (*EvaluationState, error) {
 	return nil, status.Error(codes.Unimplemented, "method Review not implemented")
+}
+func (UnimplementedEvaluationManagementServer) CorrectReview(context.Context, *EvaluationReviewCorrectionCommand) (*EvaluationState, error) {
+	return nil, status.Error(codes.Unimplemented, "method CorrectReview not implemented")
 }
 func (UnimplementedEvaluationManagementServer) ListCandidates(context.Context, *EvaluationQuery) (*EvaluationCandidateIndex, error) {
 	return nil, status.Error(codes.Unimplemented, "method ListCandidates not implemented")
@@ -834,6 +850,24 @@ func _EvaluationManagement_Review_Handler(srv interface{}, ctx context.Context, 
 	return interceptor(ctx, in, info, handler)
 }
 
+func _EvaluationManagement_CorrectReview_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(EvaluationReviewCorrectionCommand)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(EvaluationManagementServer).CorrectReview(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: EvaluationManagement_CorrectReview_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(EvaluationManagementServer).CorrectReview(ctx, req.(*EvaluationReviewCorrectionCommand))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _EvaluationManagement_ListCandidates_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(EvaluationQuery)
 	if err := dec(in); err != nil {
@@ -1006,6 +1040,10 @@ var EvaluationManagement_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "Review",
 			Handler:    _EvaluationManagement_Review_Handler,
+		},
+		{
+			MethodName: "CorrectReview",
+			Handler:    _EvaluationManagement_CorrectReview_Handler,
 		},
 		{
 			MethodName: "ListCandidates",

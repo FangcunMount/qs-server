@@ -64,6 +64,7 @@ service EvaluationManagement {
  rpc ResolveUnknown(UnknownResolutionCommand) returns (EvaluationState);
  // QS authorizes the selected review role; AI records the trusted operator and server time.
  rpc Review(EvaluationReviewCommand) returns (EvaluationState);
+ rpc CorrectReview(EvaluationReviewCorrectionCommand) returns (EvaluationState);
  rpc ListCandidates(EvaluationQuery) returns (EvaluationCandidateIndex);
  rpc GetCandidate(EvaluationCandidateQuery) returns (EvaluationCandidateEvidence);
  // Read original execution evidence, including failures without candidates. Never retries.
@@ -251,6 +252,10 @@ message EvaluationState {
  int32 parallel_call_limit = 14;
  bool cancel_draining = 15;
  string cancel_request_json = 16;
+ // Originals remain immutable; reviews_json is the verified effective projection.
+ string original_reviews_json = 17;
+ string review_corrections_json = 18;
+ string review_fingerprints_json = 19;
 }
 
 message SemanticContradictionReview {
@@ -273,6 +278,19 @@ message EvaluationReviewCommand {
  int64 expected_version = 2;
  string role = 3;
  repeated CandidateReviewItem reviews = 4;
+}
+
+message EvaluationReviewCorrectionCommand {
+ EvaluationQuery scope = 1;
+ string command_id = 2;
+ int64 expected_version = 3;
+ string role = 4;
+ string candidate_id = 5;
+ string previous_review_fingerprint = 6;
+ string candidate_output_fingerprint = 7;
+ string decision = 8;
+ string reason = 9;
+ bool confirm = 10;
 }
 
 message EvaluationStartCommand {

@@ -2,6 +2,7 @@ package aibridge
 
 import (
 	"encoding/json"
+	"github.com/FangcunMount/qs-server/internal/pkg/mbticontract"
 	"math"
 	"time"
 
@@ -17,7 +18,8 @@ func mbtiReportSnapshot(current *source.Current) ([]byte, error) {
 	if c.Model.Kind != string(model.Kind) || c.Model.Algorithm != string(model.Algorithm) || c.Model.Code != model.Code || c.Model.Version != model.Version || c.Model.Title != model.Title {
 		return nil, source.ErrInconsistent
 	}
-	if model.Kind != "typology" || model.Algorithm != "personality_typology" || model.Code != "MBTI_OEJTS" || model.Version != "v64-report-202608-v1" || outcome.Runtime().DecisionKind != "pole_composition" {
+	contract, supported := mbticontract.Lookup(model.Code, model.Version)
+	if !supported || model.Kind != "typology" || model.Algorithm != "personality_typology" || outcome.Runtime().DecisionKind != "pole_composition" {
 		return nil, source.ErrNotApplicable
 	}
 	if err := report.ValidateMBTIPoleFacts(c); err != nil {
@@ -32,11 +34,16 @@ func mbtiReportSnapshot(current *source.Current) ([]byte, error) {
 		if p == nil {
 			return nil, source.ErrNotApplicable
 		}
-		if d.Kind() != report.DimensionKindPole || p.MinScore != 8 || p.MaxScore != 40 || p.Threshold != 24 {
+		// The bounded typology builder historically used the factor constructor
+		// for pole axes. Only accept that exact representation after validating
+		// all four frozen pole facts; never rewrite the immutable report itself.
+		legacyBoundedPole := d.Kind() == report.DimensionKindFactor && d.MaxScore() != nil && *d.MaxScore() == p.MaxScore
+		ax := contract.Axes[p.CompositionOrder-1]
+		if (d.Kind() != report.DimensionKindPole && !legacyBoundedPole) || p.MinScore != ax.Min || p.MaxScore != ax.Max || p.Threshold != ax.Threshold {
 			return nil, source.ErrInconsistent
 		}
 		dimensions = append(dimensions, map[string]any{
-			"code": d.Code().String(), "kind": d.Kind(), "name": d.Name(), "raw_score": d.RawScore(),
+			"code": d.Code().String(), "kind": report.DimensionKindPole, "name": d.Name(), "raw_score": d.RawScore(),
 			"description": d.Description(), "suggestion": d.Suggestion(),
 			"pole_facts": map[string]any{
 				"schema_version": p.SchemaVersion, "left_pole": p.LeftPole, "right_pole": p.RightPole,

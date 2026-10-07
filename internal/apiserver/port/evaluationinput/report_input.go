@@ -99,5 +99,5 @@ func validateMBTIPoleEnvelope(model ModelRef, poles *MBTIPoleCatalog) error {
 	if !RequiresMBTIPoleCatalog(model) {
 		return fmt.Errorf("MBTI pole catalog model identity mismatch")
 	}
-	return poles.Validate()
+	return poles.ValidateForModel(model)
 }
