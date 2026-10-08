@@ -358,3 +358,5 @@ stage/source/request checks. Required fields and unknown keys still fail before
 production credentials. The contract test executes the actual github-script
 validator for omitted empty defaults, complete inputs, unknown/mixed requests,
 missing requirements, wrong ref/runtime SHA and an advanced main.
+
+空库业务测试使用产品的双库预检和启动入口，编译时注入本次 checkout 的真实 `pkg/version.GitCommit`，并与独立的测试源码批准值核对。旧表已退役时核对命名空间确实缺失，标准 `rm_outbox` 的原事件、唯一业务事实及故障重投断言继续执行。QS-04 只延迟 SQL 的 NSQ 领取者；Mongo 仍提供完整标准存储、事务、Relay 和状态读取绑定，以完成生成 SQL 请求的前置答卷处理。测试准备不能绕过产品的空库身份、版本或授权门禁。
