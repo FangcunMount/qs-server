@@ -20,7 +20,11 @@ func testSource(t *testing.T) {
 }
 func privateTestDir(t *testing.T) string {
 	t.Helper()
-	d, err := os.MkdirTemp("/private/tmp", "qs-history-private-test-")
+	root, err := filepath.EvalSymlinks(os.TempDir())
+	if err != nil {
+		t.Fatal("platform temporary directory resolution failed")
+	}
+	d, err := os.MkdirTemp(root, "qs-history-private-test-")
 	if err != nil {
 		t.Fatal("owned private directory create failed")
 	}
