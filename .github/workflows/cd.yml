@@ -77,6 +77,9 @@ permissions:
   contents: read
 
 concurrency:
+  # Shared with every production-writing db-ops and compatibility retirement
+  # run. The retirement run deploys directly; it must never dispatch this
+  # workflow and wait while holding the same group.
   group: production-deploy
   cancel-in-progress: false
 

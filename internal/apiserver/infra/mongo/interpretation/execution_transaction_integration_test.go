@@ -206,7 +206,7 @@ func (f interpretationMongoFixture) assertStandardIntentCount(t *testing.T, gene
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer cursor.Close(t.Context())
+	defer func() { _ = cursor.Close(t.Context()) }()
 	count := 0
 	for cursor.Next(t.Context()) {
 		var row struct {

@@ -1,0 +1,214 @@
+name: Exact Compatibility Retirement
+
+# A-stage preparation performs bounded read-only source inventory. It never
+# treats that inventory as a retirement verdict. DDL/restore/release/purge stay
+# fail-closed until their independent, actual preparation gates exist.
+on:
+  workflow_dispatch:
+    inputs:
+      operation:
+        description: 'Exact four-object lifecycle stage'
+        required: true
+        type: choice
+        options: [prepare, apply, verify, recover, purge]
+      database:
+        description: 'This workflow always binds three MySQL tables and one Mongo collection'
+        required: true
+        type: choice
+        options: [mysql-and-mongodb]
+      approved_source_sha:
+        description: 'Exact approved current main source SHA'
+        required: true
+        type: string
+      operation_id:
+        description: 'Approved private operation ID (numeric run-attempt form)'
+        required: true
+        type: string
+      manifest_sha256:
+        description: 'Non-prepare stages: SHA256 of the immutable private manifest'
+        required: false
+        default: ''
+        type: string
+      inventory_request_sha256:
+        description: 'Prepare only: SHA256 of the private read-only inventory request'
+        required: false
+        default: ''
+        type: string
+      prepare_mode:
+        description: 'Prepare submode: metadata identity discovery or source inventory'
+        required: false
+        type: choice
+        options: [identity, inventory]
+        default: inventory
+      identity_request_sha256:
+        description: 'Prepare identity only: independently computed canonical request SHA256'
+        required: false
+        default: ''
+        type: string
+
+permissions:
+  contents: read
+  actions: read
+
+# Same lock as CD and every non-metadata db-ops operation. B deployment must
+# run directly inside this run; dispatching CD and waiting would deadlock.
+concurrency:
+  group: production-deploy
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    name: Validate approved main and exact stage
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Reject unknown inputs and stale source before production credentials
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const input = context.payload.inputs ?? {};
+            const expectedKeys = ['operation', 'database', 'approved_source_sha', 'operation_id', 'manifest_sha256', 'inventory_request_sha256', 'prepare_mode', 'identity_request_sha256'].sort();
+            const keys = Object.keys(input).sort();
+            if (JSON.stringify(keys) !== JSON.stringify(expectedKeys) ||
+                !['prepare', 'apply', 'verify', 'recover', 'purge'].includes(input.operation) ||
+                input.database !== 'mysql-and-mongodb' ||
+                !/^[0-9a-f]{40}$/.test(input.approved_source_sha) ||
+                !/^[0-9]{1,20}-[0-9]{1,4}$/.test(input.operation_id) ||
+                !['identity', 'inventory'].includes(input.prepare_mode) ||
+                (input.operation === 'prepare'
+                  ? (input.manifest_sha256 !== '' || (input.prepare_mode === 'identity'
+                      ? (!/^[0-9a-f]{64}$/.test(input.identity_request_sha256) || input.inventory_request_sha256 !== '')
+                      : (!/^[0-9a-f]{64}$/.test(input.inventory_request_sha256) || input.identity_request_sha256 !== '')))
+                  : (!/^[0-9a-f]{64}$/.test(input.manifest_sha256) || input.inventory_request_sha256 !== '' || input.identity_request_sha256 !== '' || input.prepare_mode !== 'inventory')) ||
+                context.ref !== 'refs/heads/main' || input.approved_source_sha !== context.sha) {
+              throw new Error('compatibility_retirement_input_or_source_rejected');
+            }
+            const current = await github.rest.repos.getCommit({...context.repo, ref: 'main'});
+            if (current.data.sha !== input.approved_source_sha) {
+              throw new Error('compatibility_retirement_main_advanced');
+            }
+      - name: Checkout immutable approved source
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.sha }}
+      - name: Test preparation, journal, deadlines and workflow contracts
+        run: python3 -B scripts/database/test-compatibility-retirement.py
+
+  controlled-stage:
+    name: Evaluate exact private lifecycle stage
+    needs: validate
+    runs-on:
+      group: qlume
+      labels: [self-hosted, macOS, ARM64, ops]
+    environment: production
+    timeout-minutes: 35
+    steps:
+      - name: Validate pinned production SSH binding
+        env:
+          RETIREMENT_SSH_HOST: ${{ vars.SVRA_HOST }}
+          RETIREMENT_SSH_USER: ${{ vars.SVRA_USERNAME }}
+          RETIREMENT_SSH_PORT: ${{ vars.SVRA_SSH_PORT || 22 }}
+          RETIREMENT_SSH_KEY: ${{ secrets.SVRA_SSH_KEY }}
+          RETIREMENT_SSH_FINGERPRINT: ${{ vars.SVRA_SSH_FINGERPRINT }}
+        run: |
+          set -Eeuo pipefail
+          : "${RETIREMENT_SSH_HOST:?production_host_missing}"
+          : "${RETIREMENT_SSH_USER:?production_user_missing}"
+          : "${RETIREMENT_SSH_KEY:?production_key_missing}"
+          : "${RETIREMENT_SSH_FINGERPRINT:?production_fingerprint_missing}"
+          [[ "$RETIREMENT_SSH_PORT" =~ ^[0-9]{1,5}$ ]] && (( RETIREMENT_SSH_PORT >= 1 && RETIREMENT_SSH_PORT <= 65535 )) || exit 1
+      - name: Checkout immutable approved source
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.sha }}
+      - name: Set up Go for immutable read-only inventory
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+      - name: Package only immutable tooling
+        id: package
+        run: |
+          set -Eeuo pipefail
+          package_dir=$(mktemp -d "$RUNNER_TEMP/qs-compatibility-package.XXXXXX")
+          trap 'rm -f -- "$package_dir/compatibility-retirement.py" "$package_dir/compatibility-retirement-entrypoints.json" "$package_dir/receipt-transport.py" "$package_dir/inventory-linux-amd64" "$package_dir/inventory-linux-arm64"; rmdir -- "$package_dir"' EXIT
+          cp scripts/database/compatibility-retirement.py scripts/database/compatibility-retirement-entrypoints.json scripts/dbops/receipt-transport.py "$package_dir/"
+          go test ./cmd/qs-compatibility-retirement
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags="-s -w -X main.sourceSHA=$GITHUB_SHA" -o "$package_dir/inventory-linux-amd64" ./cmd/qs-compatibility-retirement
+          CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -trimpath -ldflags="-s -w -X main.sourceSHA=$GITHUB_SHA" -o "$package_dir/inventory-linux-arm64" ./cmd/qs-compatibility-retirement
+          archive="qs-compatibility-retirement-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.tar.gz"
+          tar -czf "$archive" -C "$package_dir" compatibility-retirement.py compatibility-retirement-entrypoints.json receipt-transport.py inventory-linux-amd64 inventory-linux-arm64
+          echo "sha256=$(shasum -a 256 "$archive" | awk '{print $1}')" >> "$GITHUB_OUTPUT"
+      - name: Upload tooling with pinned ServerA identity
+        uses: appleboy/scp-action@v1.0.0
+        with:
+          host: ${{ vars.SVRA_HOST }}
+          username: ${{ vars.SVRA_USERNAME }}
+          key: ${{ secrets.SVRA_SSH_KEY }}
+          port: ${{ vars.SVRA_SSH_PORT || 22 }}
+          fingerprint: ${{ vars.SVRA_SSH_FINGERPRINT }}
+          source: qs-compatibility-retirement-${{ github.run_id }}-${{ github.run_attempt }}.tar.gz
+          target: /tmp
+      - name: Inventory source bytes or reject unavailable lifecycle stage
+        uses: appleboy/ssh-action@v1.2.2
+        env:
+          RETIREMENT_OPERATION: ${{ inputs.operation }}
+          RETIREMENT_OPERATION_ID: ${{ inputs.operation_id }}
+          RETIREMENT_MANIFEST_SHA256: ${{ inputs.manifest_sha256 }}
+          RETIREMENT_INVENTORY_REQUEST_SHA256: ${{ inputs.inventory_request_sha256 }}
+          RETIREMENT_PREPARE_MODE: ${{ inputs.prepare_mode }}
+          RETIREMENT_IDENTITY_REQUEST_SHA256: ${{ inputs.identity_request_sha256 }}
+          RETIREMENT_APPROVED_SHA: ${{ inputs.approved_source_sha }}
+          RETIREMENT_ACTUAL_SHA: ${{ github.sha }}
+          RETIREMENT_RUN_ID: ${{ github.run_id }}-${{ github.run_attempt }}
+          RETIREMENT_PACKAGE_SHA256: ${{ steps.package.outputs.sha256 }}
+          MYSQL_HOST: ${{ inputs.operation == 'prepare' && secrets.MYSQL_HOST || '' }}
+          MYSQL_PORT: ${{ secrets.MYSQL_PORT || 3306 }}
+          MYSQL_USERNAME: ${{ inputs.operation == 'prepare' && secrets.MYSQL_METADATA_ADMIN_USERNAME || '' }}
+          MYSQL_PASSWORD: ${{ inputs.operation == 'prepare' && secrets.MYSQL_METADATA_ADMIN_PASSWORD || '' }}
+          MYSQL_DATABASE: ${{ inputs.operation == 'prepare' && (secrets.MYSQL_DATABASE != '' && secrets.MYSQL_DATABASE || secrets.MYSQL_DBNAME) || '' }}
+          MONGODB_HOST: ${{ inputs.operation == 'prepare' && secrets.MONGODB_HOST || '' }}
+          MONGODB_PORT: ${{ secrets.MONGODB_PORT || 27017 }}
+          MONGODB_USERNAME: ${{ inputs.operation == 'prepare' && secrets.MONGODB_USERNAME || '' }}
+          MONGODB_PASSWORD: ${{ inputs.operation == 'prepare' && secrets.MONGODB_PASSWORD || '' }}
+          MONGODB_DBNAME: ${{ inputs.operation == 'prepare' && secrets.MONGODB_DBNAME || '' }}
+        with:
+          host: ${{ vars.SVRA_HOST }}
+          username: ${{ vars.SVRA_USERNAME }}
+          key: ${{ secrets.SVRA_SSH_KEY }}
+          port: ${{ vars.SVRA_SSH_PORT || 22 }}
+          fingerprint: ${{ vars.SVRA_SSH_FINGERPRINT }}
+          command_timeout: 32m
+          envs: RETIREMENT_OPERATION,RETIREMENT_OPERATION_ID,RETIREMENT_MANIFEST_SHA256,RETIREMENT_INVENTORY_REQUEST_SHA256,RETIREMENT_PREPARE_MODE,RETIREMENT_IDENTITY_REQUEST_SHA256,RETIREMENT_APPROVED_SHA,RETIREMENT_ACTUAL_SHA,RETIREMENT_RUN_ID,RETIREMENT_PACKAGE_SHA256,MYSQL_HOST,MYSQL_PORT,MYSQL_USERNAME,MYSQL_PASSWORD,MYSQL_DATABASE,MONGODB_HOST,MONGODB_PORT,MONGODB_USERNAME,MONGODB_PASSWORD,MONGODB_DBNAME
+          script: |
+            set -Eeuo pipefail
+            umask 077
+            [[ "$RETIREMENT_RUN_ID" =~ ^[0-9]{1,20}-[0-9]{1,4}$ ]] || exit 1
+            [[ "$RETIREMENT_PACKAGE_SHA256" =~ ^[0-9a-f]{64}$ ]] || exit 1
+            archive="/tmp/qs-compatibility-retirement-${RETIREMENT_RUN_ID}.tar.gz"
+            [[ "$(sha256sum "$archive" | awk '{print $1}')" == "$RETIREMENT_PACKAGE_SHA256" ]] || exit 1
+            tool_dir=$(mktemp -d /tmp/qs-compatibility-retirement.XXXXXX)
+            cleanup_tools() {
+              rm -f -- "$tool_dir/compatibility-retirement.py" "$tool_dir/compatibility-retirement-entrypoints.json" "$tool_dir/receipt-transport.py" "$tool_dir/inventory-linux-amd64" "$tool_dir/inventory-linux-arm64" "$archive"
+              rmdir -- "$tool_dir"
+            }
+            trap cleanup_tools EXIT
+            tar -xzf "$archive" -C "$tool_dir" --no-same-owner compatibility-retirement.py compatibility-retirement-entrypoints.json receipt-transport.py inventory-linux-amd64 inventory-linux-arm64
+            chmod 0700 "$tool_dir"
+            chmod 0600 "$tool_dir/compatibility-retirement.py" "$tool_dir/compatibility-retirement-entrypoints.json" "$tool_dir/receipt-transport.py"
+            chmod 0700 "$tool_dir/inventory-linux-amd64" "$tool_dir/inventory-linux-arm64"
+            case "$(uname -m)" in
+              x86_64) inventory_binary="$tool_dir/inventory-linux-amd64" ;;
+              aarch64|arm64) inventory_binary="$tool_dir/inventory-linux-arm64" ;;
+              *) exit 1 ;;
+            esac
+            python3 -B "$tool_dir/compatibility-retirement.py" \
+              --operation "$RETIREMENT_OPERATION" \
+              --operation-id "$RETIREMENT_OPERATION_ID" \
+              --approved-source-sha "$RETIREMENT_APPROVED_SHA" \
+              --actual-source-sha "$RETIREMENT_ACTUAL_SHA" \
+              --run-id "$RETIREMENT_RUN_ID" \
+              --manifest-hash "$RETIREMENT_MANIFEST_SHA256" \
+              --inventory-request-hash "$RETIREMENT_INVENTORY_REQUEST_SHA256" \
+              --identity-request-hash "$RETIREMENT_IDENTITY_REQUEST_SHA256" \
+              --prepare-mode "$RETIREMENT_PREPARE_MODE" \
+              --inventory-binary "$inventory_binary"

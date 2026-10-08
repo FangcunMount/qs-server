@@ -83,10 +83,12 @@ on:
 permissions:
   contents: read
 
-# Keep every existing operation on its production lock; only the two exact
-# read-only permissions profiles use the separate profile group.
+# Mutating operations, persistent audits/backups and status scans must exclude
+# app deployment and compatibility retirement. Only the three reviewed,
+# bounded metadata-only operations use the diagnostic group. New/unknown
+# operations default to the production lock; their job must also reject them.
 concurrency:
-  group: ${{ github.event_name == 'workflow_dispatch' && (github.event.inputs.operation == 'metadata-visibility-profile' || github.event.inputs.operation == 'metadata-visibility-admin-profile') && 'qs-server-db-metadata-visibility-profile' || 'qs-server-db-ops-production' }}
+  group: ${{ github.event_name == 'workflow_dispatch' && (github.event.inputs.operation == 'metadata-visibility-profile' || github.event.inputs.operation == 'metadata-visibility-admin-profile' || github.event.inputs.operation == 'inventory') && 'qs-server-db-metadata-visibility-profile' || 'production-deploy' }}
   cancel-in-progress: false
 
 jobs:
@@ -658,41 +660,39 @@ jobs:
             printjson(targetDB.getCollection("schema_migrations").findOne({}, {_id: 0, version: 1, dirty: 1}))
             print("Collections:")
             printjson(collectionNames)
-            const mongoOutbox = targetDB.getCollection("domain_event_outbox")
+            const mongoOutbox = targetDB.getCollection("rm_outbox")
             const mongoOutboxFilter = auditFrom
               ? {$or: [
-                  {status: {$in: ["pending", "publishing", "failed"]}},
-                  {status: "published", created_at: {$gte: auditFrom}}
+                  {state: {$ne: "published"}},
+                  {state: "published", created_at: {$gte: auditFrom}}
                 ]}
-              : {status: {$in: ["pending", "publishing", "failed"]}}
+              : {state: {$ne: "published"}}
             const mongoOutboxRows = mongoOutbox.aggregate([
               {$match: mongoOutboxFilter},
               {$group: {
-                _id: {event_type: "$event_type", status: "$status", retry_disposition: "$retry_disposition"},
+                _id: {producer: "$producer", destination: "$destination", event_type: "$event_type", state: "$state"},
                 records: {$sum: 1},
                 oldest_created_at: {$min: "$created_at"},
                 latest_updated_at: {$max: "$updated_at"},
                 max_attempt_count: {$max: "$attempt_count"}
               }},
-              {$sort: {"_id.event_type": 1, "_id.status": 1, "_id.retry_disposition": 1}}
-            ]).toArray()
+              {$sort: {"_id.producer": 1, "_id.destination": 1, "_id.event_type": 1, "_id.state": 1}}
+            ], {maxTimeMS: 15000}).toArray()
             const mongoOutboxKnownTypes = [
               "answersheet.submitted",
               "interpretation.report.generated",
               "interpretation.report.failed",
               "interpretation.retry.requested"
             ]
-            print("Mongo Outbox active/recent state:")
+            print("Standard Mongo Outbox active/recent transport state (not business acceptance):")
             printjson({
               audit_from: auditFrom,
               rows: mongoOutboxRows,
               unexpected_active_event_types: mongoOutbox.distinct("event_type", {
                 $and: [mongoOutboxFilter, {event_type: {$nin: mongoOutboxKnownTypes}}]
               }).sort(),
-              unfinished_missing_org_id: mongoOutbox.countDocuments({
-                status: {$in: ["pending", "publishing", "failed"]},
-                $or: [{org_id: {$exists: false}}, {org_id: null}]
-              })
+              // SDK scope is not the legacy org_id field. Business identity
+              // correctness belongs to the indexed standard audit reader.
             })
             print("Retirement candidate collection statistics:")
             printjson(collectionNames
@@ -2205,7 +2205,8 @@ jobs:
             if [ -n "${AUDIT_FROM:-}" ]; then
               audit_from_mysql="CONVERT_TZ('${AUDIT_FROM%Z}', '+00:00', '+08:00')"
               audit_clause="AND failed_at >= ${audit_from_mysql}"
-              event_audit_clause="OR (status = 'published' AND created_at >= ${audit_from_mysql})"
+              # SDK timestamps are UTC, unlike adjacent legacy business dates.
+              event_audit_clause="OR (state = 'published' AND created_at >= STR_TO_DATE('${AUDIT_FROM}', '%Y-%m-%dT%H:%i:%sZ'))"
               hold_audit_clause="OR (status = 'replayed' AND updated_at >= ${audit_from_mysql})"
             fi
             sudo docker run --rm --network infra-network \
@@ -2385,16 +2386,17 @@ jobs:
                    AND actual.table_type = 'BASE TABLE'
                   WHERE actual.table_name IS NULL
                   ORDER BY expected.table_name;
-                  SELECT event_type, status, COALESCE(retry_disposition, '') AS retry_disposition,
+                  SELECT CAST(producer AS CHAR) AS producer, CAST(destination AS CHAR) AS destination,
+                         CAST(event_type AS CHAR) AS event_type, state,
                          COUNT(*) AS records, MIN(created_at) AS oldest_created_at,
                          MAX(updated_at) AS latest_updated_at, MAX(attempt_count) AS max_attempt_count
-                  FROM domain_event_outbox
-                  WHERE status <> 'published' ${event_audit_clause}
-                  GROUP BY event_type, status, retry_disposition
-                  ORDER BY event_type, status, retry_disposition;
-                  SELECT DISTINCT event_type AS unexpected_active_event_type
-                  FROM domain_event_outbox
-                  WHERE (status <> 'published' ${event_audit_clause})
+                  FROM rm_outbox
+                  WHERE state <> 'published' ${event_audit_clause}
+                  GROUP BY producer, destination, event_type, state
+                  ORDER BY producer, destination, event_type, state;
+                  SELECT DISTINCT CAST(event_type AS CHAR) AS unexpected_active_event_type
+                  FROM rm_outbox
+                  WHERE (state <> 'published' ${event_audit_clause})
                     AND event_type NOT IN (
                       'evaluation.requested',
                       'evaluation.retry.requested',
