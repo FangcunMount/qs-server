@@ -722,10 +722,10 @@ func TestDBOpsInventoriesEventDeliveryAndRecoveryState(t *testing.T) {
 	}
 	content := string(workflow)
 	for _, required := range []string{
-		"Mongo Outbox active/recent state",
+		"Standard Mongo Outbox active/recent transport state",
 		"unexpected_active_event_types",
-		"unfinished_missing_org_id",
-		"FROM domain_event_outbox",
+		`getCollection("rm_outbox")`,
+		"FROM rm_outbox",
 		"unexpected_active_event_type",
 		"FROM retry_event_hold",
 		"FROM event_delivery_dead_letter",
@@ -734,6 +734,9 @@ func TestDBOpsInventoriesEventDeliveryAndRecoveryState(t *testing.T) {
 		if !strings.Contains(content, required) {
 			t.Errorf("DB ops Event inventory must contain %q", required)
 		}
+	}
+	if strings.Contains(content, "FROM domain_event_outbox") || strings.Contains(content, `getCollection("domain_event_outbox")`) {
+		t.Error("normal DB status must not read retired event storage")
 	}
 }
 

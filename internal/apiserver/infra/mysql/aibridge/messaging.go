@@ -87,15 +87,17 @@ func (s *MessagingStore) StageOperation(ctx context.Context, tx *sql.Tx, e *pb.M
 	if err = tx.QueryRowContext(ctx, "SELECT next_sequence FROM ai_messaging_aggregates WHERE aggregate_key=? FOR UPDATE", e.AggregateKey).Scan(&sequence); err != nil {
 		return 0, err
 	}
-	var oldHash, org, subject, resource, aggregate string
+	var oldHash sql.NullString
+	var org, subject, resource, aggregate string
+	var retired bool
 	var kind int32
-	var oldSeq uint64
-	err = tx.QueryRowContext(ctx, "SELECT body_sha256,CAST(organization_id AS CHAR),subject_id,resource_id,aggregate_key,kind,aggregate_sequence FROM ai_messaging_operations WHERE command_id=? FOR UPDATE", e.MessageId).Scan(&oldHash, &org, &subject, &resource, &aggregate, &kind, &oldSeq)
+	var oldSeq sql.Null[uint64]
+	err = tx.QueryRowContext(ctx, "SELECT retired,body_sha256,CAST(organization_id AS CHAR),subject_id,resource_id,aggregate_key,kind,aggregate_sequence FROM ai_messaging_operations WHERE command_id=? FOR UPDATE", e.MessageId).Scan(&retired, &oldHash, &org, &subject, &resource, &aggregate, &kind, &oldSeq)
 	if err == nil {
-		if oldHash != e.BodySha256 || org != scope.OrganizationID || subject != scope.SubjectID || resource != scope.ResourceID || aggregate != e.AggregateKey || kind != int32(e.Kind) {
+		if retired || !oldHash.Valid || !oldSeq.Valid || oldSeq.V == 0 || oldHash.String != e.BodySha256 || org != scope.OrganizationID || subject != scope.SubjectID || resource != scope.ResourceID || aggregate != e.AggregateKey || kind != int32(e.Kind) {
 			return 0, app.ErrConflict
 		}
-		return oldSeq, nil
+		return oldSeq.V, nil
 	}
 	if !errors.Is(err, sql.ErrNoRows) {
 		return 0, err
@@ -149,16 +151,18 @@ func operationScopeMatches(e *pb.MessagingEnvelope, b *pb.MessagingBody, scope a
 // missing ID (which would introduce cross-aggregate gap-lock deadlocks). Racing
 // open-gate submissions are still serialized and validated by StageOperation.
 func (s *MessagingStore) existingOperation(ctx context.Context, tx *sql.Tx, e *pb.MessagingEnvelope, scope app.OperationScope) (bool, error) {
-	var hash, org, subject, resource, aggregate string
+	var hash sql.NullString
+	var org, subject, resource, aggregate string
+	var retired bool
 	var kind int32
-	err := tx.QueryRowContext(ctx, "SELECT body_sha256,CAST(organization_id AS CHAR),subject_id,resource_id,aggregate_key,kind FROM ai_messaging_operations WHERE command_id=?", e.MessageId).Scan(&hash, &org, &subject, &resource, &aggregate, &kind)
+	err := tx.QueryRowContext(ctx, "SELECT retired,body_sha256,CAST(organization_id AS CHAR),subject_id,resource_id,aggregate_key,kind FROM ai_messaging_operations WHERE command_id=?", e.MessageId).Scan(&retired, &hash, &org, &subject, &resource, &aggregate, &kind)
 	if errors.Is(err, sql.ErrNoRows) {
 		return false, nil
 	}
 	if err != nil {
 		return false, err
 	}
-	if hash != e.BodySha256 || org != scope.OrganizationID || subject != scope.SubjectID || resource != scope.ResourceID || aggregate != e.AggregateKey || kind != int32(e.Kind) {
+	if retired || !hash.Valid || hash.String != e.BodySha256 || org != scope.OrganizationID || subject != scope.SubjectID || resource != scope.ResourceID || aggregate != e.AggregateKey || kind != int32(e.Kind) {
 		return false, app.ErrConflict
 	}
 	return true, nil
@@ -174,7 +178,7 @@ func (s *MessagingStore) Operation(ctx context.Context, tx *sql.Tx, scope app.Op
 		return result, app.ErrInvalid
 	}
 	var receipt []byte
-	err := tx.QueryRowContext(ctx, `SELECT o.resource_id,o.decision,o.code,o.receipt,b.stage FROM ai_messaging_operations o JOIN ai_messaging_outbox b ON b.producer='qs-server' AND b.destination='qs-ai' AND b.message_id=o.command_id WHERE o.command_id=? AND o.organization_id=? AND o.subject_id=?`, id, scope.OrganizationID, scope.SubjectID).Scan(&result.ResourceID, &result.Decision, &result.Code, &receipt, &result.TransportStatus)
+	err := tx.QueryRowContext(ctx, `SELECT o.resource_id,o.decision,o.code,o.receipt,b.stage FROM ai_messaging_operations o JOIN ai_messaging_outbox b ON b.producer='qs-server' AND b.destination='qs-ai' AND b.message_id=o.command_id WHERE o.retired=FALSE AND o.command_id=? AND o.organization_id=? AND o.subject_id=?`, id, scope.OrganizationID, scope.SubjectID).Scan(&result.ResourceID, &result.Decision, &result.Code, &receipt, &result.TransportStatus)
 	if errors.Is(err, sql.ErrNoRows) {
 		return result, app.ErrNotFound
 	}
@@ -320,17 +324,19 @@ func (s *MessagingStore) applyEvent(ctx context.Context, tx *sql.Tx, e *pb.Messa
 }
 
 func (s *MessagingStore) applyReceipt(ctx context.Context, tx *sql.Tx, e *pb.MessagingEnvelope, r *pb.MessagingCommandReceipt, raw []byte) (string, error) {
-	var hash, org, aggregate, resource string
+	var hash sql.NullString
+	var org, aggregate, resource string
+	var retired bool
 	var receiptID sql.NullString
 	var kind int32
-	err := tx.QueryRowContext(ctx, "SELECT body_sha256,CAST(organization_id AS CHAR),aggregate_key,resource_id,kind,receipt_id FROM ai_messaging_operations WHERE command_id=? FOR UPDATE", r.CommandId).Scan(&hash, &org, &aggregate, &resource, &kind, &receiptID)
+	err := tx.QueryRowContext(ctx, "SELECT retired,body_sha256,CAST(organization_id AS CHAR),aggregate_key,resource_id,kind,receipt_id FROM ai_messaging_operations WHERE command_id=? FOR UPDATE", r.CommandId).Scan(&retired, &hash, &org, &aggregate, &resource, &kind, &receiptID)
 	if errors.Is(err, sql.ErrNoRows) {
 		return "", app.ErrNotFound
 	}
 	if err != nil {
 		return "", err
 	}
-	if hash != r.CommandBodySha256 || aggregate != e.AggregateKey || (receiptID.Valid && receiptID.String != e.MessageId) || len(r.Code) > 128 || r.GrpcStatusCode < 0 || r.GrpcStatusCode > 16 {
+	if retired || !hash.Valid || hash.String != r.CommandBodySha256 || aggregate != e.AggregateKey || (receiptID.Valid && receiptID.String != e.MessageId) || len(r.Code) > 128 || r.GrpcStatusCode < 0 || r.GrpcStatusCode > 16 {
 		return "", app.ErrConflict
 	}
 	decision := "held"
@@ -378,9 +384,9 @@ func (s *MessagingStore) applyReceipt(ctx context.Context, tx *sql.Tx, e *pb.Mes
 	}
 	id := durable.Identity{Producer: "qs-server", Destination: "qs-ai", MessageID: r.CommandId}
 	if decision == "held" {
-		err = s.Outbox.Hold(ctx, tx, id, hash, "receiver_technical_hold")
+		err = s.Outbox.Hold(ctx, tx, id, hash.String, "receiver_technical_hold")
 	} else {
-		err = s.Outbox.Confirm(ctx, tx, id, hash)
+		err = s.Outbox.Confirm(ctx, tx, id, hash.String)
 	}
 	return org, err
 }

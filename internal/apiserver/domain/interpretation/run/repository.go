@@ -2,6 +2,7 @@ package run
 
 import (
 	"context"
+	"github.com/FangcunMount/qs-server/internal/pkg/eventing/evidence"
 	"time"
 
 	"github.com/FangcunMount/qs-server/internal/pkg/retrygovernance"
@@ -22,6 +23,7 @@ type RetryAuthorizationRequest struct {
 	Origin          retrygovernance.AttemptOrigin
 	RequestID       string
 	EventID         string
+	EventEvidence   *evidence.EventEvidenceV1
 	AuthorizedAt    time.Time
 }
 

@@ -154,7 +154,7 @@ python scripts/check_docs_hygiene.py --fix --reflow
 `--reflow` 还会把正文段落折到约 120 列，并拼回被错误折断的中文/英文行，但不改信息指纹。facts 验证 active taxonomy、反引号仓库源码路径、目录预算、模块/事件入口、版本/API
 数量、scheduler/config 清单、关键状态、Mongo audit 与性能计划。反引号路径若只是历史已删除位置，应改写为历史说明并指向当前防回流测试或 Git 历史，不能继续伪装成现行事实入口。
 
-`docs-facts` 还必须验证 `document-closure.json` 对 165 篇 primary 文档和 44 篇 maintained sidecar 的 exact coverage、source
+`docs-facts` 还必须验证 `document-closure.json` 对 165 篇 primary 文档和 45 篇 maintained sidecar 的 exact coverage、source
 baseline、状态枚举、七模块七轴签署、十项基础设施七轴签署，以及 REST/gRPC/Event/Signal/Migration 等机器契约 ratchet。165 超过 150 的评审目标且达到 165 硬上限，
 例外理由记录在 `budgets.exceptions`，不能据此继续无审查扩张。
 

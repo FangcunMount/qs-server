@@ -340,15 +340,11 @@ mongo_consistency_audit:
 # durable_outbox 不承担 Statistics 投影；Statistics 由夜间 Collector 读取权威业务数据。
 outbox_relay:
   mongo:
-    interval: "1s"                # mongo_domain_events DB fallback relay 周期；ready-index/immediate 可更早触发
-    batch_size: 200               # MQ 故障时限制单轮 claim，避免大批 pending 事件同时争抢 Mongo/NSQ
-    publish_workers: 16           # 与 immediate 合计 24，仅占 Mongo 背压预算的一半
-    immediate_max_concurrent: 8   # 为业务事务、健康检查与连接恢复保留 Mongo 容量
+    interval: "1s"                # Mongo 标准 Outbox relay 周期
+    publish_workers: 16           # Mongo 标准 relay 发布并发
   assessment:
-    interval: "1s"               # assessment_mysql_events DB fallback relay 周期
-    batch_size: 200               # 每轮最多 claim 的 MySQL profile 事件数
+    interval: "1s"               # MySQL 标准 Outbox relay 周期
     publish_workers: 16           # 限制 NSQ 故障时的并发重投放大
-    immediate_max_concurrent: 8   # evaluation.requested / outcome.committed immediate 并发上限
 
 # ----------------------------------------------------------------------------
 # 3.6.6 统计数据同步任务

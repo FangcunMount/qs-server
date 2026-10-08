@@ -201,13 +201,6 @@ func TestOptionsValidateOutboxRelay(t *testing.T) {
 			wantErr: "outbox_relay.mongo.interval must be greater than 0",
 		},
 		{
-			name: "mongo relay requires positive batch size",
-			mutate: func(opts *Options) {
-				opts.OutboxRelay.Mongo.BatchSize = 0
-			},
-			wantErr: "outbox_relay.mongo.batch_size must be greater than 0",
-		},
-		{
 			name: "mongo relay requires positive publish workers",
 			mutate: func(opts *Options) {
 				opts.OutboxRelay.Mongo.PublishWorkers = 0
@@ -223,27 +216,10 @@ func TestOptionsValidateOutboxRelay(t *testing.T) {
 			wantErr: "outbox_relay.mongo.publish_workers (9) must be <= backpressure.mongo.max_inflight * 0.8 (8)",
 		},
 		{
-			name: "mongo relay total publisher concurrency is capped by mongo backpressure",
-			mutate: func(opts *Options) {
-				opts.Backpressure.Mongo.MaxInflight = 10
-				opts.OutboxRelay.Mongo.PublishWorkers = 6
-				opts.OutboxRelay.Mongo.ImmediateMaxConcurrent = 3
-			},
-			wantErr: "outbox_relay.mongo publish_workers + immediate_max_concurrent (9) must be <= backpressure.mongo.max_inflight * 0.8 (8)",
-		},
-		{
-			name: "mongo relay immediate concurrency must be positive",
-			mutate: func(opts *Options) {
-				opts.OutboxRelay.Mongo.ImmediateMaxConcurrent = 0
-			},
-			wantErr: "outbox_relay.mongo.immediate_max_concurrent must be greater than 0",
-		},
-		{
 			name: "mysql pool does not cap mongo relay workers",
 			mutate: func(opts *Options) {
 				opts.MySQLOptions.MaxOpenConnections = 10
 				opts.OutboxRelay.Assessment.PublishWorkers = 4
-				opts.OutboxRelay.Assessment.ImmediateMaxConcurrent = 4
 				opts.Backpressure.Mongo.MaxInflight = 100
 				opts.OutboxRelay.Mongo.PublishWorkers = 20
 			},
@@ -269,13 +245,6 @@ func TestOptionsValidateOutboxRelay(t *testing.T) {
 				opts.OutboxRelay.Assessment.Interval = 0
 			},
 			wantErr: "outbox_relay.assessment.interval must be greater than 0",
-		},
-		{
-			name: "assessment relay requires positive batch size",
-			mutate: func(opts *Options) {
-				opts.OutboxRelay.Assessment.BatchSize = 0
-			},
-			wantErr: "outbox_relay.assessment.batch_size must be greater than 0",
 		},
 		{
 			name: "assessment relay requires positive publish workers",

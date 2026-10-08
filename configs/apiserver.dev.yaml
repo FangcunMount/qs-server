@@ -336,13 +336,10 @@ mongo_consistency_audit:
 outbox_relay:
   mongo:
     interval: "500ms"
-    batch_size: 300
     publish_workers: 8
   assessment:
     interval: "500ms"
-    batch_size: 200
     publish_workers: 16
-    immediate_max_concurrent: 8
 
 statistics_sync:
   enable: true

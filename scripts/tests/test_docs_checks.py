@@ -9,6 +9,11 @@ from scripts import check_docs_facts, check_docs_hygiene
 
 
 class DocsFactsHelpersTest(unittest.TestCase):
+    def test_python_bytecode_flag_preserves_repository_command_boundary(self) -> None:
+        self.assertTrue(check_docs_facts.command_is_verifiable("python3 -B scripts/database/test-compatibility-retirement.py"))
+        self.assertFalse(check_docs_facts.command_is_verifiable("python3 -B -c arbitrary_code"))
+        self.assertFalse(check_docs_facts.command_is_verifiable("python3 -B"))
+
     def test_yaml_section_keys_reads_every_event_and_signal(self) -> None:
         events = check_docs_facts.yaml_section_keys(
             check_docs_facts.EVENTS.read_text(encoding="utf-8"),
@@ -46,8 +51,8 @@ class DocsFactsHelpersTest(unittest.TestCase):
     def test_migration_inventory_is_paired_and_current(self) -> None:
         inventory, issues = check_docs_facts.migration_inventory()
         self.assertEqual(issues, [])
-        self.assertEqual(inventory["mysql"], {"max_version": 95, "version_count": 95})
-        self.assertEqual(inventory["mongodb"], {"max_version": 36, "version_count": 36})
+        self.assertEqual(inventory["mysql"], {"max_version": 98, "version_count": 98})
+        self.assertEqual(inventory["mongodb"], {"max_version": 37, "version_count": 37})
 
     def test_ledger_metadata_uses_named_fields(self) -> None:
         text = (

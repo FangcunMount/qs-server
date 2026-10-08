@@ -66,7 +66,7 @@ func TestEvaluationActorEntryContracts(t *testing.T) {
 			applicationFile: "internal/apiserver/application/evaluation/scheduler/audit.go",
 			applicationPort: "type Service interface",
 			entryFile:       "internal/apiserver/runtime/scheduler/evaluation_consistency_audit.go",
-			entrySymbol:     "AuditBatch(",
+			entrySymbol:     "AuditBatchTo(",
 			authorityFile:   "internal/apiserver/application/evaluation/scheduler/audit.go",
 			authoritySymbol: "read-only Evaluation maintenance",
 		},

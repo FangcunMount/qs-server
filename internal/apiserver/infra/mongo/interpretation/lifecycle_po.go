@@ -4,19 +4,22 @@ import (
 	"time"
 
 	base "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo"
+	"github.com/FangcunMount/qs-server/internal/pkg/eventing/evidence"
 )
 
 // ReportGenerationPO stores the report-generation aggregate.
 type ReportGenerationPO struct {
 	base.BaseDocument `bson:",inline"`
 
-	OutcomeID       uint64 `bson:"outcome_id"`
-	ReportType      string `bson:"report_type"`
-	TemplateVersion string `bson:"template_version"`
-	Status          string `bson:"status"`
-	LatestRunID     uint64 `bson:"latest_run_id,omitempty"`
-	ReportID        uint64 `bson:"report_id,omitempty"`
-	Version         uint64 `bson:"version"`
+	OutcomeID              uint64                    `bson:"outcome_id"`
+	ReportType             string                    `bson:"report_type"`
+	TemplateVersion        string                    `bson:"template_version"`
+	Status                 string                    `bson:"status"`
+	LatestRunID            uint64                    `bson:"latest_run_id,omitempty"`
+	ReportID               uint64                    `bson:"report_id,omitempty"`
+	Version                uint64                    `bson:"version"`
+	GeneratedEventID       string                    `bson:"generated_event_id,omitempty"`
+	GeneratedEventEvidence *evidence.EventEvidenceV1 `bson:"generated_event_evidence,omitempty"`
 	// TransactionSchemaVersion distinguishes the current atomic lifecycle
 	// contract from historical generations that predate cross-collection audit.
 	TransactionSchemaVersion uint32 `bson:"transaction_schema_version,omitempty"`
@@ -34,24 +37,25 @@ type InterpretationFailurePO struct {
 type InterpretationRunPO struct {
 	base.BaseDocument `bson:",inline"`
 
-	GenerationID       uint64                   `bson:"generation_id"`
-	Attempt            int                      `bson:"attempt"`
-	Status             string                   `bson:"status"`
-	Failure            *InterpretationFailurePO `bson:"failure,omitempty"`
-	TraceID            string                   `bson:"trace_id,omitempty"`
-	StartedAt          *time.Time               `bson:"started_at,omitempty"`
-	LeaseExpiresAt     *time.Time               `bson:"lease_expires_at,omitempty"`
-	FinishedAt         *time.Time               `bson:"finished_at,omitempty"`
-	AttemptOrigin      string                   `bson:"attempt_origin,omitempty"`
-	RetryDisposition   string                   `bson:"retry_disposition,omitempty"`
-	NextAttemptAt      *time.Time               `bson:"next_attempt_at,omitempty"`
-	PolicyMaxAttempts  int                      `bson:"policy_max_attempts,omitempty"`
-	RetryPolicyVersion string                   `bson:"retry_policy_version,omitempty"`
-	RetryEventID       string                   `bson:"retry_event_id,omitempty"`
-	ActionRequestID    string                   `bson:"action_request_id,omitempty"`
-	RecoveryCount      int                      `bson:"recovery_count,omitempty"`
-	LastReclaimedAt    *time.Time               `bson:"last_reclaimed_at,omitempty"`
-	ClaimHistory       []ClaimHistoryPO         `bson:"claim_history,omitempty"`
+	GenerationID       uint64                    `bson:"generation_id"`
+	Attempt            int                       `bson:"attempt"`
+	Status             string                    `bson:"status"`
+	Failure            *InterpretationFailurePO  `bson:"failure,omitempty"`
+	TraceID            string                    `bson:"trace_id,omitempty"`
+	StartedAt          *time.Time                `bson:"started_at,omitempty"`
+	LeaseExpiresAt     *time.Time                `bson:"lease_expires_at,omitempty"`
+	FinishedAt         *time.Time                `bson:"finished_at,omitempty"`
+	AttemptOrigin      string                    `bson:"attempt_origin,omitempty"`
+	RetryDisposition   string                    `bson:"retry_disposition,omitempty"`
+	NextAttemptAt      *time.Time                `bson:"next_attempt_at,omitempty"`
+	PolicyMaxAttempts  int                       `bson:"policy_max_attempts,omitempty"`
+	RetryPolicyVersion string                    `bson:"retry_policy_version,omitempty"`
+	RetryEventID       string                    `bson:"retry_event_id,omitempty"`
+	RetryEventEvidence *evidence.EventEvidenceV1 `bson:"retry_event_evidence,omitempty"`
+	ActionRequestID    string                    `bson:"action_request_id,omitempty"`
+	RecoveryCount      int                       `bson:"recovery_count,omitempty"`
+	LastReclaimedAt    *time.Time                `bson:"last_reclaimed_at,omitempty"`
+	ClaimHistory       []ClaimHistoryPO          `bson:"claim_history,omitempty"`
 }
 
 type ClaimHistoryPO struct {

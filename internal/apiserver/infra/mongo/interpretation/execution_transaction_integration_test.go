@@ -18,6 +18,7 @@ import (
 	mongointerpretation "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/interpretation"
 	mongostandard "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/standardoutbox"
 	"github.com/FangcunMount/qs-server/internal/pkg/event"
+	eventevidence "github.com/FangcunMount/qs-server/internal/pkg/eventing/evidence"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 	"github.com/FangcunMount/qs-server/internal/pkg/mongodbtest"
 	sdklegacy "github.com/FangcunMount/reliable-messaging/wire/legacy"
@@ -205,7 +206,7 @@ func (f interpretationMongoFixture) assertStandardIntentCount(t *testing.T, gene
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer cursor.Close(t.Context())
+	defer func() { _ = cursor.Close(t.Context()) }()
 	count := 0
 	for cursor.Next(t.Context()) {
 		var row struct {
@@ -368,4 +369,8 @@ func assertMongoDocumentCount(t *testing.T, collection *mongo.Collection, filter
 	if got != want {
 		t.Fatalf("%s count = %d, want %d (filter=%v)", collection.Name(), got, want, filter)
 	}
+}
+
+func (s faultEventStager) PrepareReference(evt event.DomainEvent) (eventevidence.StandardReference, error) {
+	return s.inner.PrepareReference(evt)
 }

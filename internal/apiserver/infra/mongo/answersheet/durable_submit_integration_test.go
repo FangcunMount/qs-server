@@ -16,8 +16,11 @@ import (
 	domainanswersheet "github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/answersheet"
 	domainquestionnaire "github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
 	mongoanswersheet "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/answersheet"
+	mongostandard "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/standardoutbox"
 	submitport "github.com/FangcunMount/qs-server/internal/apiserver/port/answersheetsubmit"
 	"github.com/FangcunMount/qs-server/internal/pkg/event"
+	eventcatalog "github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
+	eventevidence "github.com/FangcunMount/qs-server/internal/pkg/eventing/evidence"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -29,22 +32,29 @@ type integrationOutboxStager struct {
 	err  error
 }
 
+func (s integrationOutboxStager) standard() (*mongostandard.Stager, error) {
+	cfg, err := eventcatalog.Load("../../../../../configs/events.yaml")
+	if err != nil {
+		return nil, err
+	}
+	return mongostandard.NewStager(s.coll, eventcatalog.NewCatalog(cfg), "api-server")
+}
+func (s integrationOutboxStager) PrepareReference(evt event.DomainEvent) (eventevidence.StandardReference, error) {
+	inner, err := s.standard()
+	if err != nil {
+		return eventevidence.StandardReference{}, err
+	}
+	return inner.PrepareReference(evt)
+}
 func (s integrationOutboxStager) Stage(ctx context.Context, events ...event.DomainEvent) error {
 	if s.err != nil {
 		return s.err
 	}
-	if _, ok := ctx.(mongo.SessionContext); !ok {
-		return errors.New("active transaction required")
+	inner, err := s.standard()
+	if err != nil {
+		return err
 	}
-	docs := make([]interface{}, 0, len(events))
-	for _, evt := range events {
-		docs = append(docs, bson.M{"event_id": evt.EventID(), "event_type": evt.EventType(), "aggregate_id": evt.AggregateID()})
-	}
-	if len(docs) == 0 {
-		return nil
-	}
-	_, err := s.coll.InsertMany(ctx, docs)
-	return err
+	return inner.Stage(ctx, events...)
 }
 
 func mongoIntegrationRunner(db *mongo.Database) apptransaction.Runner {
@@ -129,7 +139,7 @@ func TestDurableSubmissionTransactionAgainstMongoReplicaSet(t *testing.T) {
 		t.Fatalf("answersheet indexes = %v, want durable event unique index", indexNames)
 	}
 
-	outbox := db.Collection("domain_event_outbox")
+	outbox := db.Collection("rm_outbox")
 	store := appanswersheet.NewTransactionalSubmissionDurableStore(mongoIntegrationRunner(db), repo, integrationOutboxStager{coll: outbox}, nil)
 	sheet := newIntegrationSheet(t, 90010001, "ok")
 	fingerprint, err := submitport.Fingerprint(sheet)
@@ -143,7 +153,7 @@ func TestDurableSubmissionTransactionAgainstMongoReplicaSet(t *testing.T) {
 	}
 	assertMongoCount(t, ctx, db.Collection("answersheets"), bson.M{"domain_id": uint64(90010001)}, 1)
 	assertMongoCount(t, ctx, db.Collection("answersheets"), bson.M{"submit_meta.writer_id": uint64(301), "submit_meta.idempotency_key": metaInfo.IdempotencyKey}, 1)
-	assertMongoCount(t, ctx, outbox, bson.M{"aggregate_id": sheet.ID().String()}, 1)
+	assertMongoCount(t, ctx, outbox, bson.M{}, 1)
 	var accepted struct {
 		DurableAcceptance *mongoanswersheet.DurableAcceptancePO `bson:"durable_acceptance"`
 	}
@@ -305,7 +315,7 @@ func TestAnsweringStartUniqueAndImmutableAgainstMongoReplicaSet(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	outbox := db.Collection("domain_event_outbox")
+	outbox := db.Collection("rm_outbox")
 	store := appanswersheet.NewTransactionalSubmissionDurableStore(mongoIntegrationRunner(db), repo, integrationOutboxStager{coll: outbox}, nil)
 	id := uint64(77)
 	start, err := domainanswersheet.NewStartContext(999, time.Now().UTC().Truncate(time.Millisecond), &id, 2)

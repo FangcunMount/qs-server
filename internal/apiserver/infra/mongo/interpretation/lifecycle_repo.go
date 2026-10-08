@@ -39,6 +39,7 @@ func generationIndexModels() []mongo.IndexModel {
 		{Keys: bson.D{{Key: "outcome_id", Value: 1}, {Key: "report_type", Value: 1}, {Key: "template_version", Value: 1}}, Options: options.Index().SetName("uk_generation_key").SetUnique(true)},
 		{Keys: bson.D{{Key: "outcome_id", Value: 1}, {Key: "status", Value: 1}, {Key: "updated_at", Value: -1}}, Options: options.Index().SetName("idx_generation_outcome_status_updated")},
 		{Keys: bson.D{{Key: "transaction_schema_version", Value: 1}, {Key: "status", Value: 1}, {Key: "domain_id", Value: 1}}, Options: options.Index().SetName("idx_generation_tx_schema_status_domain")},
+		{Keys: bson.D{{Key: "generated_event_id", Value: 1}}, Options: options.Index().SetName("uk_generation_generated_event_id").SetUnique(true).SetPartialFilterExpression(bson.M{"generated_event_id": bson.M{"$type": "string", "$gt": ""}})},
 	}
 }
 
@@ -107,14 +108,24 @@ func (r *GenerationRepository) Save(ctx context.Context, domain *generation.Repo
 		return generation.ErrVersionConflict
 	}
 	po := r.mapper.GenerationToPO(domain)
-	update := bson.M{"$set": bson.M{
+	if domain.Status() == generation.StatusGenerated && (domain.GeneratedEventEvidence() == nil || domain.GeneratedEventID() == "") {
+		return fmt.Errorf("generated event reference is required for native save")
+	}
+	set := bson.M{
 		"status":                     po.Status,
 		"latest_run_id":              po.LatestRunID,
 		"report_id":                  po.ReportID,
 		"version":                    po.Version,
 		"updated_at":                 po.UpdatedAt,
 		"transaction_schema_version": generationTransactionSchemaVersion,
-	}}
+	}
+	if po.GeneratedEventID != "" {
+		set["generated_event_id"] = po.GeneratedEventID
+	}
+	if po.GeneratedEventEvidence != nil {
+		set["generated_event_evidence"] = po.GeneratedEventEvidence
+	}
+	update := bson.M{"$set": set}
 	result, err := r.UpdateOne(ctx, bson.M{"domain_id": domain.ID().Uint64(), "version": expectedVersion}, update)
 	if err != nil {
 		return fmt.Errorf("save report generation: %w", err)
@@ -143,6 +154,7 @@ func runIndexModels() []mongo.IndexModel {
 		{Keys: bson.D{{Key: "domain_id", Value: 1}}, Options: options.Index().SetName("uk_interpretation_run_domain_id").SetUnique(true)},
 		{Keys: bson.D{{Key: "generation_id", Value: 1}, {Key: "attempt", Value: 1}}, Options: options.Index().SetName("uk_interpretation_run_generation_attempt").SetUnique(true)},
 		{Keys: bson.D{{Key: "generation_id", Value: 1}, {Key: "attempt", Value: -1}}, Options: options.Index().SetName("idx_interpretation_run_generation_attempt_desc")},
+		{Keys: bson.D{{Key: "retry_event_id", Value: 1}}, Options: options.Index().SetName("uk_interpretation_run_retry_event_id").SetUnique(true).SetPartialFilterExpression(bson.M{"retry_event_id": bson.M{"$type": "string", "$gt": ""}})},
 		{
 			Keys: bson.D{{Key: "retry_event_id", Value: 1}, {Key: "deleted_at", Value: 1}, {Key: "domain_id", Value: 1}},
 			Options: options.Index().SetName("idx_interpretation_run_retry_audit").
@@ -262,7 +274,10 @@ func (r *RunRepository) AuthorizeRetry(ctx context.Context, request interpretati
 		return nil, err
 	}
 	previous := domain.RetryDecision()
-	if err := domain.AuthorizeOneRetry(request.Origin, request.RequestID, request.EventID, request.AuthorizedAt); err != nil {
+	if request.EventEvidence == nil || request.EventID != request.EventEvidence.EventID {
+		return nil, fmt.Errorf("retry authorization event evidence identity mismatch")
+	}
+	if err := domain.AuthorizeOneRetryWithEvidence(request.Origin, request.RequestID, request.AuthorizedAt, request.EventEvidence); err != nil {
 		return nil, err
 	}
 	updated := r.mapper.RunToPO(domain)
@@ -271,6 +286,7 @@ func (r *RunRepository) AuthorizeRetry(ctx context.Context, request interpretati
 	}, bson.M{"$set": bson.M{
 		"retry_disposition": updated.RetryDisposition, "next_attempt_at": updated.NextAttemptAt,
 		"retry_event_id": updated.RetryEventID, "action_request_id": updated.ActionRequestID, "updated_at": request.AuthorizedAt,
+		"retry_event_evidence": updated.RetryEventEvidence,
 	}})
 	if err != nil {
 		return nil, err
@@ -333,13 +349,25 @@ func (r *RunRepository) Save(ctx context.Context, domain *interpretationrun.Inte
 	if po == nil {
 		return fmt.Errorf("interpretation run is required")
 	}
+	if po.RetryEventID != "" && po.RetryEventEvidence == nil {
+		return fmt.Errorf("retry original event evidence is required for native save")
+	}
+	if po.RetryEventEvidence != nil {
+		if err := po.RetryEventEvidence.Validate(); err != nil {
+			return err
+		}
+		if po.RetryEventEvidence.EventID != po.RetryEventID {
+			return fmt.Errorf("retry native save evidence identity conflict")
+		}
+	}
 	update := bson.M{"$set": bson.M{
 		"status": po.Status, "failure": po.Failure, "trace_id": po.TraceID,
 		"started_at": po.StartedAt, "lease_expires_at": po.LeaseExpiresAt, "finished_at": po.FinishedAt,
 		"attempt_origin": po.AttemptOrigin, "retry_disposition": po.RetryDisposition,
 		"next_attempt_at": po.NextAttemptAt, "policy_max_attempts": po.PolicyMaxAttempts,
 		"retry_policy_version": po.RetryPolicyVersion, "retry_event_id": po.RetryEventID,
-		"action_request_id": po.ActionRequestID, "recovery_count": po.RecoveryCount,
+		"retry_event_evidence": po.RetryEventEvidence,
+		"action_request_id":    po.ActionRequestID, "recovery_count": po.RecoveryCount,
 		"last_reclaimed_at": po.LastReclaimedAt, "claim_history": po.ClaimHistory,
 		"updated_at": time.Now(),
 	}}

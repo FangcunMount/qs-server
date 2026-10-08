@@ -66,12 +66,14 @@ func (s *MessagingStore) heldEventOrganization(ctx context.Context, tx *sql.Tx, 
 	switch e.Kind {
 	case pb.MessagingKind_COMMAND_RECEIPT:
 		receipt := b.GetCommandReceipt()
-		var hash, aggregate string
-		err := tx.QueryRowContext(ctx, "SELECT CAST(organization_id AS CHAR),body_sha256,aggregate_key FROM ai_messaging_operations WHERE command_id=? FOR UPDATE", receipt.CommandId).Scan(&org, &hash, &aggregate)
+		var hash sql.NullString
+		var aggregate string
+		var retired bool
+		err := tx.QueryRowContext(ctx, "SELECT retired,CAST(organization_id AS CHAR),body_sha256,aggregate_key FROM ai_messaging_operations WHERE command_id=? FOR UPDATE", receipt.CommandId).Scan(&retired, &org, &hash, &aggregate)
 		if err != nil {
 			return "", err
 		}
-		if hash != receipt.CommandBodySha256 || aggregate != e.AggregateKey {
+		if retired || !hash.Valid || hash.String != receipt.CommandBodySha256 || aggregate != e.AggregateKey {
 			return "", app.ErrConflict
 		}
 	case pb.MessagingKind_INTERPRETATION_STATE:

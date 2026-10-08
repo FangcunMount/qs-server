@@ -11,12 +11,9 @@ import (
 	app "github.com/FangcunMount/qs-server/internal/apiserver/application/systemgovernance"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 const maxCandidateOffset = 10000
-
-var governedOutboxDispositions = bson.A{"automatic", "manual_required"}
 
 func (r *Reader) ListRetryCandidates(ctx context.Context, orgID int64, cursor string, limit int) (app.RetryCandidatePage, error) {
 	if r == nil || r.mysql == nil || r.mongo == nil || orgID <= 0 || limit < 1 || limit > 100 {
@@ -149,32 +146,13 @@ func (r *Reader) appendInterpretationCandidates(ctx context.Context, orgID int64
 	return nil
 }
 
-type outboxCandidateRow struct {
-	EventID       string
-	AttemptCount  int
-	Disposition   string
-	NextAttemptAt *time.Time
-	LastErrorKind *string
-	UpdatedAt     time.Time
-}
-
 func (r *Reader) appendMySQLOutboxCandidates(ctx context.Context, orgID int64, limit int, dst *[]app.RetryCandidate) error {
 	if standard := r.standardOutboxes["assessment-mysql-outbox"]; standard != nil {
 		items, err := standard.ListOutboxCandidates(ctx, orgID, limit)
 		*dst = append(*dst, items...)
 		return err
 	}
-	var rows []outboxCandidateRow
-	if err := r.mysql.WithContext(ctx).Raw(`SELECT event_id, attempt_count, retry_disposition disposition,
-next_attempt_at, last_error_kind, updated_at FROM domain_event_outbox
-WHERE org_id=? AND status='failed' AND retry_disposition IN ('automatic','manual_required')
-ORDER BY updated_at DESC LIMIT ?`, orgID, limit).Scan(&rows).Error; err != nil {
-		return err
-	}
-	for _, row := range rows {
-		*dst = append(*dst, fromOutboxRow("mysql", row))
-	}
-	return nil
+	return fmt.Errorf("standard outbox governance reader %q is not configured", "assessment-mysql-outbox")
 }
 
 func (r *Reader) appendMongoOutboxCandidates(ctx context.Context, orgID int64, limit int, dst *[]app.RetryCandidate) error {
@@ -183,28 +161,7 @@ func (r *Reader) appendMongoOutboxCandidates(ctx context.Context, orgID int64, l
 		*dst = append(*dst, items...)
 		return err
 	}
-	findOpts := options.Find().SetSort(bson.D{{Key: "updated_at", Value: -1}}).SetLimit(int64(limit)).SetProjection(bson.M{"event_id": 1, "attempt_count": 1, "retry_disposition": 1, "next_attempt_at": 1, "last_error_kind": 1, "updated_at": 1})
-	cur, err := r.mongo.Collection("domain_event_outbox").Find(ctx, bson.M{"org_id": orgID, "status": "failed", "retry_disposition": bson.M{"$in": governedOutboxDispositions}}, findOpts)
-	if err != nil {
-		return err
-	}
-	var rows []struct {
-		EventID       string    `bson:"event_id"`
-		AttemptCount  int       `bson:"attempt_count"`
-		Disposition   string    `bson:"retry_disposition"`
-		NextAttemptAt time.Time `bson:"next_attempt_at"`
-		LastErrorKind string    `bson:"last_error_kind"`
-		UpdatedAt     time.Time `bson:"updated_at"`
-	}
-	if err := cur.All(ctx, &rows); err != nil {
-		return err
-	}
-	for _, row := range rows {
-		next := row.NextAttemptAt
-		lastKind := row.LastErrorKind
-		*dst = append(*dst, fromOutboxRow("mongo", outboxCandidateRow{EventID: row.EventID, AttemptCount: row.AttemptCount, Disposition: row.Disposition, NextAttemptAt: &next, LastErrorKind: &lastKind, UpdatedAt: row.UpdatedAt}))
-	}
-	return nil
+	return fmt.Errorf("standard outbox governance reader %q is not configured", "mongo-domain-events")
 }
 
 func (r *Reader) appendDeliveryCandidates(ctx context.Context, orgID int64, limit int, dst *[]app.RetryCandidate) error {
@@ -274,10 +231,6 @@ ORDER BY updated_at DESC LIMIT ?`, orgID, limit).Scan(&rows).Error; err != nil {
 
 func fromBusinessRow(kind, store string, row businessCandidateRow) app.RetryCandidate {
 	return app.RetryCandidate{Kind: kind, Store: store, ResourceID: row.ResourceID, Attempt: row.Attempt, Disposition: row.Disposition, NextAttemptAt: row.NextAttemptAt, RetryEventID: valueOrEmpty(row.RetryEventID), ActionRequestID: valueOrEmpty(row.ActionRequestID), UpdatedAt: row.UpdatedAt}
-}
-
-func fromOutboxRow(store string, row outboxCandidateRow) app.RetryCandidate {
-	return app.RetryCandidate{Kind: "outbox", Store: store, ResourceID: row.EventID, Attempt: row.AttemptCount, Disposition: row.Disposition, NextAttemptAt: row.NextAttemptAt, LastErrorKind: valueOrEmpty(row.LastErrorKind), UpdatedAt: row.UpdatedAt}
 }
 
 func valueOrEmpty(value *string) string {

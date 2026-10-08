@@ -24,6 +24,7 @@ import (
 	attributioninfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/answersheetattribution"
 	ruleengineInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/ruleengine"
 	rulesetport "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
+	outboxport "github.com/FangcunMount/qs-server/internal/apiserver/port/outbox"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/surveyreadmodel"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/internal/pkg/event"
@@ -196,6 +197,9 @@ func (m *Module) initAnswerSheetSubModule(mongoDB *mongo.Database, mongoLimiter 
 	})
 	if profile.Stager == nil || profile.PostCommit == nil {
 		return errors.WithCode(code.ErrModuleInitializationFailed, "mongo domain event profile is required")
+	}
+	if _, ok := profile.Stager.(outboxport.ReferencePreparer); !ok {
+		return errors.WithCode(code.ErrModuleInitializationFailed, "mongo domain profile requires original event reference preparation")
 	}
 	durableStore := asApp.NewTransactionalSubmissionDurableStore(mongoTxRunner, repo, profile.Stager, profile.PostCommit)
 	sub.SubmissionService = asApp.NewSubmissionService(repo, durableStore, questionnaireRepo, reader)

@@ -4,10 +4,9 @@ import (
 	"context"
 	"regexp"
 	"testing"
+	"time"
 
 	"github.com/DATA-DOG/go-sqlmock"
-	evalevent "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/event"
-	"github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
 	mysqlDriver "gorm.io/driver/mysql"
 	"gorm.io/gorm"
 )
@@ -61,10 +60,10 @@ func TestConsistencyReadModelReadsAuditEvidenceInBoundedBatches(t *testing.T) {
 	mock.ExpectQuery("(?s)SELECT assessment_id,.*FROM `assessment_score`.*GROUP BY `assessment_id`").
 		WithArgs(uint64(42)).
 		WillReturnRows(sqlmock.NewRows([]string{"assessment_id", "row_count", "unlinked_row_count", "distinct_outcome_count", "outcome_id"}).AddRow(42, 1, 0, 1, 9001))
-	mock.ExpectQuery("(?s)SELECT `id`,`aggregate_id`,`payload_json`,`status` FROM `domain_event_outbox`.*ORDER BY aggregate_id ASC, id DESC").
-		WithArgs(eventcatalog.EvaluationOutcomeCommitted, evalevent.AggregateType, "42").
-		WillReturnRows(sqlmock.NewRows([]string{"id", "aggregate_id", "payload_json", "status"}).
-			AddRow(7, "42", `{"data":{"outcome_id":"9001","evaluation_run_id":"42:1"}}`, "published"))
+	// Missing historical evidence must not consult the retired ledger.
+	mock.ExpectQuery("^" + regexp.QuoteMeta("SELECT * FROM `evaluation_outcome` WHERE assessment_id IN (?)") + "$").
+		WithArgs(uint64(42)).WillReturnRows(sqlmock.NewRows([]string{"id", "assessment_id", "testee_id", "org_id", "evaluation_run_id", "model_kind", "model_code", "payload_json", "evaluated_at"}).
+		AddRow(9001, 42, 21, 7, "42:1", "scale", "SCALE-1", `{}`, time.Now()))
 
 	batch, err := reader.ReadBatch(context.Background(), 0, 2)
 	if err != nil {
@@ -76,6 +75,21 @@ func TestConsistencyReadModelReadsAuditEvidenceInBoundedBatches(t *testing.T) {
 	item := batch.Items[0]
 	if item.Outcome == nil || item.Outcome.ID != "9001" || item.Run == nil || item.Run.ID != "42:1" || item.Projection == nil || item.Outbox == nil {
 		t.Fatalf("batch item = %#v", item)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestHistoricalUnclassifiedOutcomeNeverClaimsStandardSuccess(t *testing.T) {
+	reader, mock := newConsistencyReadModelTestDB(t)
+	mock.ExpectQuery(regexp.QuoteMeta("SELECT * FROM `evaluation_outcome`")).WithArgs(uint64(42)).WillReturnRows(sqlmock.NewRows([]string{"id", "assessment_id", "testee_id", "org_id", "evaluation_run_id", "model_kind", "model_code", "payload_json", "evaluated_at"}).AddRow(9001, 42, 21, 7, "42:1", "scale", "SCALE-1", `{}`, time.Now()))
+	got, err := reader.listCommittedOutboxEvidence(context.Background(), []uint64{42})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got[42] == nil || got[42].InvalidReason == "" || got[42].Class != "" {
+		t.Fatalf("unclassified=%#v", got[42])
 	}
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Fatal(err)

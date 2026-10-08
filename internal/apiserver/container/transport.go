@@ -577,8 +577,12 @@ func (c *Container) BuildServerRuntimeDeps() ServerRuntimeDeps {
 		deps.EvaluationLeaseRecoverer = c.EvaluationModule.EvaluationLeaseRecoverer
 	}
 	if c.mongoDB != nil && c.mysqlDB != nil {
+		scanner := mongomongoconsistency.NewScanner(c.mongoDB, c.MongoLimiter())
+		if c.EvaluationModule != nil {
+			scanner.WithOutcomeFacts(c.EvaluationModule.OutcomeRepository())
+		}
 		deps.MongoConsistencyAuditService = mongoconsistency.NewService(
-			mongomongoconsistency.NewScanner(c.mongoDB, c.MongoLimiter()),
+			scanner,
 			mysqlmongoconsistency.NewCheckpointRepository(c.mysqlDB),
 		)
 	}

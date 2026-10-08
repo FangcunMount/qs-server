@@ -17,7 +17,9 @@ import (
 	evalrun "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/run"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationrun"
+	outboxport "github.com/FangcunMount/qs-server/internal/apiserver/port/outbox"
 	"github.com/FangcunMount/qs-server/internal/pkg/event"
+	eventevidence "github.com/FangcunMount/qs-server/internal/pkg/eventing/evidence"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
@@ -82,6 +84,7 @@ func (c *committer) Commit(ctx context.Context, request CommitRequest) (*domaino
 	if request.EvaluatedAt.IsZero() {
 		request.EvaluatedAt = time.Now()
 	}
+	request.EvaluatedAt = request.EvaluatedAt.UTC().Truncate(time.Millisecond)
 	// Prepare terminal state on isolated copies. A failed transaction must leave
 	// the caller-owned submitted Assessment and running Run available for the
 	// execution service's atomic failure finalizer.
@@ -109,8 +112,9 @@ func (c *committer) Commit(ctx context.Context, request CommitRequest) (*domaino
 	if err != nil {
 		return nil, fmt.Errorf("marshal evaluation report input: %w", err)
 	}
-	record, err := domainoutcome.NewRecord(domainoutcome.NewRecordInput{
-		ID:           c.newID(),
+	outcomeID := c.newID()
+	recordInput := domainoutcome.NewRecordInput{
+		ID:           outcomeID,
 		OrgID:        assessmentToCommit.OrgID(),
 		AssessmentID: assessmentToCommit.ID(),
 		TesteeID:     assessmentToCommit.TesteeID().Uint64(),
@@ -130,7 +134,18 @@ func (c *committer) Commit(ctx context.Context, request CommitRequest) (*domaino
 		Payload:          payload,
 		SchemaVersion:    domainoutcome.CurrentSchemaVersion,
 		EvaluatedAt:      request.EvaluatedAt,
-	})
+	}
+	completedEvent := assessmentToCommit.StageEvaluatedEvent(request.EvaluatedAt, outcomeID, runToCommit.ID())
+	preparer := c.eventStager.(outboxport.ReferencePreparer)
+	reference, err := preparer.PrepareReference(completedEvent)
+	if err != nil {
+		return nil, fmt.Errorf("prepare evaluation committed event reference: %w", err)
+	}
+	recordInput.CommittedEventEvidence, err = eventevidence.NewStandard(reference, domainoutcome.BusinessBindingSHA256(recordInput))
+	if err != nil {
+		return nil, err
+	}
+	record, err := domainoutcome.NewRecord(recordInput)
 	if err != nil {
 		return nil, err
 	}
@@ -138,7 +153,6 @@ func (c *committer) Commit(ctx context.Context, request CommitRequest) (*domaino
 	if err := runToCommit.Succeed(request.EvaluatedAt); err != nil {
 		return nil, err
 	}
-	assessmentToCommit.StageEvaluatedEvent(request.EvaluatedAt, record.ID(), runToCommit.ID())
 	eventsToStage := assessmentToCommit.Events()
 	err = c.txRunner.WithinTransaction(ctx, func(txCtx context.Context) error {
 		if err := c.outcomeRepo.Save(txCtx, record); err != nil {
@@ -179,6 +193,9 @@ func (c *committer) Commit(ctx context.Context, request CommitRequest) (*domaino
 func (c *committer) validate(request CommitRequest) error {
 	if c == nil || c.txRunner == nil || c.assessmentRepo == nil || c.outcomeRepo == nil || c.runRepo == nil || c.eventStager == nil {
 		return evalerrors.ModuleNotConfigured("evaluation committer requires transaction, assessment, outcome, run and outbox dependencies")
+	}
+	if _, ok := c.eventStager.(outboxport.ReferencePreparer); !ok {
+		return evalerrors.ModuleNotConfigured("evaluation committer requires standard event reference preparation")
 	}
 	if request.Assessment == nil {
 		return fmt.Errorf("assessment is required")

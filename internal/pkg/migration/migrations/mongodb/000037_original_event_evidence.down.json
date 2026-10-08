@@ -1,0 +1,4 @@
+[
+  {"dropIndexes":"report_generations","index":"uk_generation_generated_event_id"},
+  {"dropIndexes":"interpretation_runs","index":"uk_interpretation_run_retry_event_id"}
+]

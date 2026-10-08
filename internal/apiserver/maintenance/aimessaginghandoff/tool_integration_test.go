@@ -70,13 +70,13 @@ func setup(t *testing.T) *fixture {
 		}
 		_ = root.Close()
 	})
-	for _, id := range []string{"000072_ai_bridge_delivery", "000083_ai_runtime_index", "000091_ai_messaging", "000092_ai_messaging_failures", "000093_ai_messaging_legacy_commands", "000094_ai_messaging_admission"} {
+	for _, id := range []string{"000072_ai_bridge_delivery", "000083_ai_runtime_index", "000091_ai_messaging", "000092_ai_messaging_failures", "000093_ai_messaging_legacy_commands", "000094_ai_messaging_admission", "000097_ai_command_retirement"} {
 		raw, err := os.ReadFile(filepath.Join("..", "..", "..", "pkg", "migration", "migrations", "mysql", id+".up.sql"))
 		checked(t, err)
 		_, err = db.Exec(string(raw))
 		checked(t, err)
 	}
-	_, err = db.Exec("CREATE TABLE schema_migrations(version BIGINT UNSIGNED NOT NULL,dirty BOOLEAN NOT NULL); INSERT INTO schema_migrations VALUES(95,FALSE)")
+	_, err = db.Exec("CREATE TABLE schema_migrations(version BIGINT UNSIGNED NOT NULL,dirty BOOLEAN NOT NULL); INSERT INTO schema_migrations VALUES(97,FALSE)")
 	checked(t, err)
 	sign, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	checked(t, err)

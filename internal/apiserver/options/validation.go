@@ -455,9 +455,6 @@ func validateOutboxRelay(opts *OutboxRelayOptions, mysqlMaxOpen int, backpressur
 		if relay.opt.Interval <= 0 {
 			errs = append(errs, fmt.Errorf("outbox_relay.%s.interval must be greater than 0", relay.name))
 		}
-		if relay.opt.BatchSize <= 0 {
-			errs = append(errs, fmt.Errorf("outbox_relay.%s.batch_size must be greater than 0", relay.name))
-		}
 		if relay.opt.PublishWorkers <= 0 {
 			errs = append(errs, fmt.Errorf("outbox_relay.%s.publish_workers must be greater than 0", relay.name))
 		}
@@ -470,19 +467,7 @@ func validateOutboxRelay(opts *OutboxRelayOptions, mysqlMaxOpen int, backpressur
 				relay.maxWorkers,
 			))
 		}
-		if relay.opt.ImmediateMaxConcurrent <= 0 {
-			errs = append(errs, fmt.Errorf("outbox_relay.%s.immediate_max_concurrent must be greater than 0", relay.name))
-		}
-		publisherConcurrency := relay.opt.PublishWorkers + relay.opt.ImmediateMaxConcurrent
-		if relay.maxWorkers > 0 && publisherConcurrency > relay.maxWorkers {
-			errs = append(errs, fmt.Errorf(
-				"outbox_relay.%s publish_workers + immediate_max_concurrent (%d) must be <= %s * 0.8 (%d)",
-				relay.name,
-				publisherConcurrency,
-				relay.capacityLabel,
-				relay.maxWorkers,
-			))
-		}
+
 	}
 	return errs
 }

@@ -2,6 +2,7 @@ package commit
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"strings"
 	"testing"
@@ -17,9 +18,12 @@ import (
 	modeldefinition "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/definition"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/factor"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/interpretationassets"
+	standardoutbox "github.com/FangcunMount/qs-server/internal/apiserver/eventing/standardoutbox"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationrun"
 	"github.com/FangcunMount/qs-server/internal/pkg/event"
+	eventcatalog "github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
+	eventevidence "github.com/FangcunMount/qs-server/internal/pkg/eventing/evidence"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
@@ -108,6 +112,7 @@ type commitEventStagerStub struct {
 	order    *[]string
 	events   []event.DomainEvent
 	stageErr error
+	prepares int
 }
 
 type commitPostCommitStub struct {
@@ -435,4 +440,75 @@ func joinOrder(items []string) string {
 		result += item
 	}
 	return result
+}
+
+func (s *commitEventStagerStub) PrepareReference(evt event.DomainEvent) (eventevidence.StandardReference, error) {
+	s.prepares++
+	config, err := eventcatalog.Load("../../../../../../configs/events.yaml")
+	if err != nil {
+		return eventevidence.StandardReference{}, err
+	}
+	return standardoutbox.PrepareReference(evt, eventcatalog.NewCatalog(config), "api-server")
+}
+
+type retryCommitRunner struct{}
+
+func (retryCommitRunner) WithinTransaction(ctx context.Context, fn func(context.Context) error) error {
+	txCtx := context.WithValue(ctx, commitTxMarker{}, true)
+	if err := fn(txCtx); err != nil {
+		return err
+	}
+	// Model a transient commit failure: the first transaction is rolled back and
+	// the exact same business callback executes again.
+	return fn(txCtx)
+}
+func TestCommitCallbackRetryKeepsOriginalEventAndReference(t *testing.T) {
+	a, execution := commitTestOutcome(t)
+	order := []string{}
+	outcomeRepo := &commitOutcomeRepoStub{order: &order}
+	runRepo := &commitRunRepoStub{order: &order}
+	stager := &commitEventStagerStub{order: &order}
+	c := NewCommitter(retryCommitRunner{}, commitAssessmentRepoStub{order: &order}, outcomeRepo, runRepo, commitScoreProjectorStub{order: &order}, stager, nil).(*committer)
+	allocated := 0
+	c.newID = func() meta.ID { allocated++; return meta.FromUint64(9001) }
+	run := evalrun.NewEvaluationRunWithAttempt(a.ID().Uint64(), 1)
+	if err := run.Start(time.Unix(100, 0)); err != nil {
+		t.Fatal(err)
+	}
+	if err := run.AttachInputSnapshot("isn:v2:" + strings.Repeat("a", 64)); err != nil {
+		t.Fatal(err)
+	}
+	record, err := c.Commit(t.Context(), CommitRequest{Assessment: a, Input: commitTestInput(), Execution: execution, DescriptorKey: evalpipeline.DescriptorKey{DecisionKind: modelcatalog.DecisionKindScoreRange}, OutcomePolicy: evalpipeline.DefaultOutcomeCompletenessPolicy(modelcatalog.DecisionKindScoreRange), Run: &run, EvaluatedAt: time.Unix(200, 123678901)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if allocated != 1 || stager.prepares != 1 || len(stager.events) != 2 {
+		t.Fatalf("allocations=%d preparations=%d staged=%d", allocated, stager.prepares, len(stager.events))
+	}
+	before, err := json.Marshal(stager.events[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+	after, err := json.Marshal(stager.events[1])
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(before) != string(after) || record.CommittedEventID() != stager.events[0].EventID() {
+		t.Fatal("transaction retry changed original identity, time or content")
+	}
+	if record.EvaluatedAt().Nanosecond() != 123000000 {
+		t.Fatal("business time was not frozen to storage milliseconds")
+	}
+	proof := record.CommittedEventEvidence()
+	cfg, err := eventcatalog.Load("../../../../../../configs/events.yaml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	actual, err := standardoutbox.PrepareReference(stager.events[1], eventcatalog.NewCatalog(cfg), "api-server")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if proof.Reference == nil || *proof.Reference != actual {
+		t.Fatal("saved evidence differs from actual staged fingerprint")
+	}
 }

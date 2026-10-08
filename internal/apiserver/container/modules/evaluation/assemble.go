@@ -36,6 +36,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationreadmodel"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationrun"
 	rulesetport "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
+	outboxport "github.com/FangcunMount/qs-server/internal/apiserver/port/outbox"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/workbenchreadmodel"
 	sharedcache "github.com/FangcunMount/qs-server/internal/pkg/cache"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
@@ -148,6 +149,9 @@ func newEvaluationInfra(normalized Deps) (*evaluationInfra, error) {
 	infra.txRunner = modtx.NewMySQLRunner(normalized.MySQLDB)
 	if normalized.OutboxProfile.Stager == nil || normalized.OutboxProfile.PostCommit == nil {
 		return nil, errors.WithCode(code.ErrModuleInitializationFailed, "assessment MySQL event profile is required")
+	}
+	if _, ok := normalized.OutboxProfile.Stager.(outboxport.ReferencePreparer); !ok {
+		return nil, errors.WithCode(code.ErrModuleInitializationFailed, "assessment MySQL event reference preparer is required")
 	}
 	infra.assessmentOutboxStore = normalized.OutboxProfile.Stager
 	infra.postCommit = normalized.OutboxProfile.PostCommit

@@ -11,6 +11,7 @@ import (
 	evalrun "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/run"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationconsistency"
+	eventevidence "github.com/FangcunMount/qs-server/internal/pkg/eventing/evidence"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 )
@@ -32,6 +33,8 @@ const (
 	mismatchCommittedOutboxMissing        mismatchKind = "committed_outbox_missing"
 	mismatchCommittedOutboxMismatch       mismatchKind = "committed_outbox_reference_mismatch"
 	mismatchRunOutcomeReferenceMismatch   mismatchKind = "run_outcome_reference_mismatch"
+	mismatchHistoricalEventGap            mismatchKind = "historical_event_unverifiable"
+	mismatchReverseOutboxConflict         mismatchKind = "standard_outbox_reverse_conflict"
 )
 
 type mismatchSeverity string
@@ -61,6 +64,14 @@ type Service interface {
 	AuditBatch(context.Context, uint64, int) (AuditBatchResult, error)
 }
 
+// CycleService guarantees bounded forward and reverse scans as one audit cycle.
+type CycleService interface {
+	BusinessUpperBound(context.Context) (uint64, error)
+	AuditBatchTo(context.Context, uint64, uint64, int) (AuditBatchResult, error)
+	OutboxUpperBound(context.Context) (uint64, error)
+	AuditOutboxBatch(context.Context, uint64, uint64, int) (AuditBatchResult, error)
+}
+
 type service struct {
 	consistency evaluationconsistency.Reader
 	now         func() time.Time
@@ -76,7 +87,7 @@ func NewService(consistency evaluationconsistency.Reader) Service {
 
 func (s *service) AuditBatch(ctx context.Context, afterID uint64, limit int) (AuditBatchResult, error) {
 	if s == nil || s.consistency == nil {
-		return AuditBatchResult{}, fmt.Errorf("evaluation consistency audit is not configured: batch evidence reader is required")
+		return AuditBatchResult{}, fmt.Errorf("evaluation consistency audit requires a reader")
 	}
 	if limit <= 0 {
 		return AuditBatchResult{CycleComplete: true}, nil
@@ -85,10 +96,67 @@ func (s *service) AuditBatch(ctx context.Context, afterID uint64, limit int) (Au
 	if err != nil {
 		return AuditBatchResult{}, err
 	}
+	return s.classifyBatch(batch), nil
+}
+func (s *service) BusinessUpperBound(ctx context.Context) (uint64, error) {
+	reader, err := s.cycleReader()
+	if err != nil {
+		return 0, err
+	}
+	return reader.BusinessUpperBound(ctx)
+}
+func (s *service) OutboxUpperBound(ctx context.Context) (uint64, error) {
+	reader, err := s.cycleReader()
+	if err != nil {
+		return 0, err
+	}
+	return reader.OutboxUpperBound(ctx)
+}
+func (s *service) cycleReader() (evaluationconsistency.CycleReader, error) {
+	if s == nil {
+		return nil, fmt.Errorf("evaluation consistency audit requires a reader")
+	}
+	reader, ok := s.consistency.(evaluationconsistency.CycleReader)
+	if !ok {
+		return nil, fmt.Errorf("evaluation consistency audit requires bounded bidirectional reader")
+	}
+	return reader, nil
+}
+func (s *service) AuditBatchTo(ctx context.Context, after, upper uint64, limit int) (AuditBatchResult, error) {
+	reader, err := s.cycleReader()
+	if err != nil {
+		return AuditBatchResult{}, err
+	}
+	batch, err := reader.ReadBatchTo(ctx, after, upper, limit)
+	if err != nil {
+		return AuditBatchResult{}, err
+	}
+	return s.classifyBatch(batch), nil
+}
+func (s *service) AuditOutboxBatch(ctx context.Context, after, upper uint64, limit int) (AuditBatchResult, error) {
+	reader, err := s.cycleReader()
+	if err != nil {
+		return AuditBatchResult{}, err
+	}
+	batch, err := reader.ReadOutboxBatch(ctx, after, upper, limit)
+	if err != nil {
+		return AuditBatchResult{}, err
+	}
+	for _, conflict := range batch.Conflicts {
+		observeMismatch(mismatchReverseOutboxConflict)
+		observeDisposition(mismatchReverseOutboxConflict, "deferred")
+		log.Warnf("evaluation reverse consistency conflict (message_id=%s, assessment_id=%d, reason=%s)", conflict.MessageID, conflict.AssessmentID, conflict.Reason)
+	}
+	return AuditBatchResult{Scanned: batch.Scanned, Detected: len(batch.Conflicts), NextCursor: batch.NextCursor, CycleComplete: batch.CycleComplete}, nil
+}
+func (s *service) classifyBatch(batch evaluationconsistency.Batch) AuditBatchResult {
 	detected := 0
 	for _, evidence := range batch.Items {
 		if evidence.AssessmentID == 0 {
 			continue
+		}
+		if evidence.Outbox != nil && evidence.Outbox.Class != "" {
+			evaluationConsistencyEvidenceClasses.WithLabelValues(string(evidence.Outbox.Class)).Inc()
 		}
 		items := classifyDrifts(consistencyEvidence{
 			status:     domainassessment.Status(evidence.Status),
@@ -110,7 +178,7 @@ func (s *service) AuditBatch(ctx context.Context, afterID uint64, limit int) (Au
 	}
 	return AuditBatchResult{
 		Scanned: len(batch.Items), Detected: detected, NextCursor: batch.NextCursor, CycleComplete: batch.CycleComplete,
-	}, nil
+	}
 }
 
 type consistencyEvidence struct {
@@ -165,8 +233,14 @@ func classifyDrifts(evidence consistencyEvidence, now time.Time) []*mismatch {
 		}
 
 		switch {
+		case evidence.outbox != nil && evidence.outbox.InvalidReason != "":
+			add(mismatchCommittedOutboxMismatch, severityHigh, "investigate classified evidence conflict; never synthesize or resend an event to erase uncertainty")
+		case evidence.outbox != nil && evidence.outbox.Class == eventevidence.Unverifiable:
+			add(mismatchHistoricalEventGap, severityLow, "retain the terminal historical gap; original message verification is unavailable")
+		case evidence.outbox != nil && evidence.outbox.Class == eventevidence.RetiredVerified:
+			// Verified retirement is recorded as historical provenance, not a live message match.
 		case evidence.outbox == nil || evidence.outbox.RowCount == 0:
-			add(mismatchCommittedOutboxMissing, severityHigh, "stage a governed replay only after verifying the committed outcome")
+			add(mismatchCommittedOutboxMissing, severityHigh, "investigate missing canonical event evidence; preserve unknown execution state")
 		case evidence.outbox.RowCount != 1 ||
 			evidence.outbox.OutcomeID != outcomeID ||
 			evidence.outbox.RunID != evidence.outcome.RunID:
@@ -196,6 +270,7 @@ func classifyDrifts(evidence consistencyEvidence, now time.Time) []*mismatch {
 }
 
 var (
+	evaluationConsistencyEvidenceClasses  = promauto.NewCounterVec(prometheus.CounterOpts{Namespace: "qs", Subsystem: "evaluation_consistency", Name: "event_evidence_classes_total", Help: "Classified event provenance; historical receipts do not claim current message verification."}, []string{"class"})
 	evaluationConsistencyMismatchTotal    = promauto.NewCounterVec(prometheus.CounterOpts{Namespace: "qs", Subsystem: "evaluation_consistency", Name: "mismatch_total", Help: "Total evaluation cross-store mismatches detected by the consistency audit."}, []string{"kind"})
 	evaluationConsistencyDispositionTotal = promauto.NewCounterVec(prometheus.CounterOpts{Namespace: "qs", Subsystem: "evaluation_consistency", Name: "disposition_total", Help: "Total evaluation consistency mismatches by kind and audit disposition."}, []string{"kind", "disposition"})
 )

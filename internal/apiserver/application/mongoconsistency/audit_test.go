@@ -14,6 +14,7 @@ type scannerStub struct {
 	upper    map[Phase]uint64
 	findings map[Phase][]Finding
 	err      error
+	result   *BatchResult
 }
 
 func (s *scannerStub) UpperBound(_ context.Context, phase Phase, _ time.Duration) (uint64, error) {
@@ -23,12 +24,19 @@ func (s *scannerStub) UpperBound(_ context.Context, phase Phase, _ time.Duration
 	return s.upper[phase], nil
 }
 
+func (s *scannerStub) OutboxUpperBound(context.Context, time.Duration) ([]byte, error) {
+	return []byte("test-bson-upper"), s.err
+}
+
 func (s *scannerStub) ScanBatch(_ context.Context, request BatchRequest) (BatchResult, error) {
 	s.requests = append(s.requests, request)
 	if s.err != nil {
 		return BatchResult{}, s.err
 	}
-	return BatchResult{NextID: request.UpperBound, Scanned: 1, Exhausted: true, Findings: s.findings[request.Phase]}, nil
+	if s.result != nil {
+		return *s.result, nil
+	}
+	return BatchResult{NextID: request.UpperBound, NextOutboxCursor: append([]byte(nil), request.OutboxUpperBound...), Scanned: 1, Exhausted: true, Findings: s.findings[request.Phase]}, nil
 }
 
 type memoryCheckpoint struct {
@@ -92,7 +100,14 @@ func TestAuditRunsAllBoundedPhasesAndPersistsCompletedStatistics(t *testing.T) {
 		t.Fatalf("requests=%d scanned=%d", len(scanner.requests), checkpoint.checkpoint.LastCompleted.Statistics.Scanned)
 	}
 	for index, request := range scanner.requests {
-		if request.UpperBound != uint64(index+10) || request.Limit != 200 || request.MaxTime != 3*time.Second {
+		wantUpper := uint64(index + 10)
+		if request.Phase == PhaseOutboxAnswerSheet {
+			wantUpper = 0
+			if string(request.OutboxUpperBound) != "test-bson-upper" {
+				t.Fatal("reverse phase lost BSON boundary")
+			}
+		}
+		if request.UpperBound != wantUpper || request.Limit != 200 || request.MaxTime != 3*time.Second {
 			t.Fatalf("request[%d] = %#v", index, request)
 		}
 	}
@@ -115,6 +130,40 @@ func TestAuditResumesCheckpointAcrossServiceRestart(t *testing.T) {
 	}
 	if len(scanner.requests) != 1 || scanner.requests[0].AfterID != 0 || scanner.requests[0].UpperBound != 20 {
 		t.Fatalf("resumed requests = %#v", scanner.requests)
+	}
+}
+
+func TestAuditUpgradesLegacyCursorByStartingFreshCycle(t *testing.T) {
+	completed := &CompletedCycle{CycleID: "previous", Statistics: Statistics{Scanned: 11}}
+	store := &memoryCheckpoint{exists: true, checkpoint: Checkpoint{SchemaVersion: 1, Revision: 8, CycleID: "old", Phase: PhaseOutboxAnswerSheet, Cursor: 100, UpperBound: 999, LastCompleted: completed}}
+	scanner := &scannerStub{upper: map[Phase]uint64{PhaseAnswerSheetOutbox: 42}}
+	_, err := NewService(scanner, store).RunAuditBatch(t.Context(), RunOptions{BatchSize: 2, BatchTimeout: time.Second, CycleInterval: time.Hour})
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := store.checkpoint
+	if got.SchemaVersion != 2 || got.Revision != 9 || got.Phase != PhaseAnswerSheetOutbox || got.Cursor != 0 || got.UpperBound != 42 || len(got.OutboxCursor) != 0 || len(scanner.requests) != 0 || got.LastCompleted.CycleID != "previous" {
+		t.Fatalf("legacy restart=%#v", got)
+	}
+}
+
+func TestAuditPersistsReverseBytesAndRejectsNoProgressWithoutMutatingStatistics(t *testing.T) {
+	store := &memoryCheckpoint{exists: true, checkpoint: Checkpoint{SchemaVersion: 2, Revision: 1, CycleID: "cycle", Phase: PhaseOutboxAnswerSheet, OutboxCursor: []byte("cursor-one"), OutboxUpperBound: []byte("fixed-upper"), Working: NewStatistics()}}
+	scanner := &scannerStub{result: &BatchResult{NextOutboxCursor: []byte("cursor-two"), Scanned: 2, EvidenceClasses: map[string]int64{"retired_verified": 1}}}
+	opts := RunOptions{BatchSize: 2, BatchTimeout: time.Second, CycleInterval: time.Hour}
+	service := NewService(scanner, store)
+	if _, err := service.RunAuditBatch(t.Context(), opts); err != nil {
+		t.Fatal(err)
+	}
+	if string(store.checkpoint.OutboxCursor) != "cursor-two" || string(store.checkpoint.OutboxUpperBound) != "fixed-upper" || store.checkpoint.Working.EvidenceClasses["retired_verified"] != 1 {
+		t.Fatal("reverse checkpoint lost original token or classes")
+	}
+	before := store.checkpoint.Revision
+	if _, err := NewService(scanner, store).RunAuditBatch(t.Context(), opts); err == nil {
+		t.Fatal("same BSON cursor accepted as progress")
+	}
+	if store.checkpoint.Revision != before || store.checkpoint.Working.EvidenceClasses["retired_verified"] != 1 {
+		t.Fatal("failed batch mutated committed checkpoint")
 	}
 }
 

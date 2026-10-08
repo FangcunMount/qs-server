@@ -289,7 +289,7 @@ EXPECTED_SIGNALS = {
     "typology_model_cache_changed",
 }
 
-EXPECTED_MIGRATION_MAX = {"mysql": 95, "mongodb": 36}
+EXPECTED_MIGRATION_MAX = {"mysql": 98, "mongodb": 37}
 EXPECTED_DOC_STATUS = {"aligned", "drifted", "needs_review", "planned", "archive_candidate"}
 EXPECTED_OWNERS = {
     "overview",
@@ -603,7 +603,7 @@ CURRENT_FACT_SNIPPETS = {
         "required": (
             "退出码 2",
             "MySQL migration 000069",
-            "Mongo migration 000027",
+            "Mongo migration 000024",
             "Redis leader lock",
         ),
         "forbidden": (),
@@ -1031,9 +1031,14 @@ def command_is_verifiable(command: object) -> bool:
                 return False
         return True
     if tokens[0] in {"python", "python3"} and len(tokens) >= 2:
-        if tokens[1] == "-m":
-            return len(tokens) >= 3 and tokens[2] == "unittest"
-        script = tokens[1]
+        arguments = tokens[1:]
+        if arguments[0] == "-B":
+            arguments = arguments[1:]
+        if not arguments:
+            return False
+        if arguments[0] == "-m":
+            return len(arguments) >= 2 and arguments[1] == "unittest"
+        script = arguments[0]
         return script.startswith("scripts/") and script.endswith(".py") and (ROOT / script).is_file()
     if tokens[0] in {"bash", "sh"} and len(tokens) >= 2:
         script = tokens[1]
@@ -4086,7 +4091,7 @@ def main() -> int:
                         )
                     )
         scanner_methods = interface_methods(mongo_source, "Scanner")
-        if scanner_methods != {"UpperBound", "ScanBatch"}:
+        if scanner_methods != {"UpperBound", "OutboxUpperBound", "ScanBatch"}:
             issues.append(Issue("mongo-audit-scanner-port-drift", str(sorted(scanner_methods))))
         checkpoint_methods = interface_methods(mongo_source, "CheckpointStore")
         if checkpoint_methods != {"Load", "Save"}:

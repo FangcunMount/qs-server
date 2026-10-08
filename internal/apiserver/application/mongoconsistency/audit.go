@@ -3,6 +3,7 @@
 package mongoconsistency
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -24,7 +25,7 @@ const (
 	PhasePublishedModelRuntime Phase = "published_model_runtime"
 	PhaseCompleted             Phase = "completed"
 	CheckpointKey                    = "mongo_consistency"
-	CheckpointSchemaVersion          = 1
+	CheckpointSchemaVersion          = 2
 )
 
 var AuditPhases = []Phase{
@@ -47,7 +48,7 @@ const (
 
 const (
 	DriftAnswerSheetMissingOutbox       = "answersheet_missing_outbox"
-	DriftOutboxMissingAnswerSheet       = "outbox_missing_answersheet"
+	DriftOutboxBusinessMismatch         = "standard_outbox_business_mismatch"
 	DriftGenerationMissingRun           = "generation_missing_run"
 	DriftGenerationRunStateMismatch     = "generation_run_state_mismatch"
 	DriftGeneratedMissingArtifact       = "generated_missing_artifact"
@@ -63,7 +64,7 @@ const (
 
 var DriftSeverities = map[string]Severity{
 	DriftAnswerSheetMissingOutbox:       SeverityHigh,
-	DriftOutboxMissingAnswerSheet:       SeverityHigh,
+	DriftOutboxBusinessMismatch:         SeverityHigh,
 	DriftGenerationMissingRun:           SeverityHigh,
 	DriftGenerationRunStateMismatch:     SeverityHigh,
 	DriftGeneratedMissingArtifact:       SeverityHigh,
@@ -89,9 +90,10 @@ type Finding struct {
 }
 
 type Statistics struct {
-	Scanned  int64               `json:"scanned"`
-	Findings map[string]int64    `json:"findings"`
-	Samples  map[string][]string `json:"samples,omitempty"`
+	Scanned         int64               `json:"scanned"`
+	Findings        map[string]int64    `json:"findings"`
+	Samples         map[string][]string `json:"samples,omitempty"`
+	EvidenceClasses map[string]int64    `json:"evidence_classes,omitempty"`
 }
 
 func NewStatistics() Statistics {
@@ -106,6 +108,12 @@ func (s *Statistics) Add(batch BatchResult, maxSamples int) {
 		s.Samples = make(map[string][]string)
 	}
 	s.Scanned += int64(batch.Scanned)
+	if s.EvidenceClasses == nil {
+		s.EvidenceClasses = make(map[string]int64)
+	}
+	for class, count := range batch.EvidenceClasses {
+		s.EvidenceClasses[class] += count
+	}
 	for _, finding := range batch.Findings {
 		s.Findings[finding.Kind]++
 		if finding.SampleID == "" || maxSamples <= 0 || len(s.Samples[finding.Kind]) >= maxSamples {
@@ -130,45 +138,53 @@ type CompletedCycle struct {
 }
 
 type Checkpoint struct {
-	SchemaVersion int             `json:"schema_version"`
-	Revision      int64           `json:"revision"`
-	CycleID       string          `json:"cycle_id"`
-	Phase         Phase           `json:"phase"`
-	Cursor        uint64          `json:"cursor"`
-	UpperBound    uint64          `json:"upper_bound"`
-	Working       Statistics      `json:"working"`
-	LastCompleted *CompletedCycle `json:"last_completed,omitempty"`
-	NextCycleAt   time.Time       `json:"next_cycle_at,omitempty"`
-	UpdatedAt     time.Time       `json:"updated_at"`
+	SchemaVersion    int             `json:"schema_version"`
+	Revision         int64           `json:"revision"`
+	CycleID          string          `json:"cycle_id"`
+	Phase            Phase           `json:"phase"`
+	Cursor           uint64          `json:"cursor"`
+	UpperBound       uint64          `json:"upper_bound"`
+	OutboxCursor     []byte          `json:"outbox_cursor,omitempty"`
+	OutboxUpperBound []byte          `json:"outbox_upper_bound,omitempty"`
+	Working          Statistics      `json:"working"`
+	LastCompleted    *CompletedCycle `json:"last_completed,omitempty"`
+	NextCycleAt      time.Time       `json:"next_cycle_at,omitempty"`
+	UpdatedAt        time.Time       `json:"updated_at"`
 }
 
 type BatchRequest struct {
-	Phase      Phase
-	AfterID    uint64
-	UpperBound uint64
-	Limit      int
-	MaxTime    time.Duration
-	MaxSamples int
+	Phase            Phase
+	AfterID          uint64
+	UpperBound       uint64
+	OutboxCursor     []byte
+	OutboxUpperBound []byte
+	Limit            int
+	MaxTime          time.Duration
+	MaxSamples       int
 }
 
 type BatchResult struct {
-	NextID    uint64
-	Scanned   int
-	Exhausted bool
-	Findings  []Finding
+	NextID           uint64
+	NextOutboxCursor []byte
+	Scanned          int
+	Exhausted        bool
+	Findings         []Finding
+	EvidenceClasses  map[string]int64
 }
 
 type BatchOutcome struct {
-	CycleID     string     `json:"cycle_id"`
-	Phase       Phase      `json:"phase"`
-	Cursor      uint64     `json:"cursor"`
-	UpperBound  uint64     `json:"upper_bound"`
-	Scanned     int        `json:"scanned"`
-	Findings    int        `json:"findings"`
-	Completed   bool       `json:"completed"`
-	Idle        bool       `json:"idle"`
-	NextCycleAt time.Time  `json:"next_cycle_at,omitempty"`
-	Statistics  Statistics `json:"statistics,omitempty"`
+	CycleID          string     `json:"cycle_id"`
+	Phase            Phase      `json:"phase"`
+	Cursor           uint64     `json:"cursor"`
+	UpperBound       uint64     `json:"upper_bound"`
+	OutboxCursor     []byte     `json:"outbox_cursor,omitempty"`
+	OutboxUpperBound []byte     `json:"outbox_upper_bound,omitempty"`
+	Scanned          int        `json:"scanned"`
+	Findings         int        `json:"findings"`
+	Completed        bool       `json:"completed"`
+	Idle             bool       `json:"idle"`
+	NextCycleAt      time.Time  `json:"next_cycle_at,omitempty"`
+	Statistics       Statistics `json:"statistics,omitempty"`
 }
 
 type RunOptions struct {
@@ -180,6 +196,7 @@ type RunOptions struct {
 
 type Scanner interface {
 	UpperBound(context.Context, Phase, time.Duration) (uint64, error)
+	OutboxUpperBound(context.Context, time.Duration) ([]byte, error)
 	ScanBatch(context.Context, BatchRequest) (BatchResult, error)
 }
 
@@ -220,7 +237,7 @@ func (s *Service) RunAuditBatch(ctx context.Context, opts RunOptions) (BatchOutc
 	}
 	observeReady(true)
 	now := s.now().UTC()
-	if missing || (checkpoint.Phase == PhaseCompleted && !now.Before(checkpoint.NextCycleAt)) {
+	if missing || checkpoint.SchemaVersion == 1 || (checkpoint.Phase == PhaseCompleted && !now.Before(checkpoint.NextCycleAt)) {
 		return s.startCycle(ctx, checkpoint, opts, now)
 	}
 	if checkpoint.Phase == PhaseCompleted {
@@ -238,6 +255,7 @@ func (s *Service) RunAuditBatch(ctx context.Context, opts RunOptions) (BatchOutc
 	started := time.Now()
 	result, err := s.scanner.ScanBatch(ctx, BatchRequest{
 		Phase: checkpoint.Phase, AfterID: checkpoint.Cursor, UpperBound: checkpoint.UpperBound,
+		OutboxCursor: append([]byte(nil), checkpoint.OutboxCursor...), OutboxUpperBound: append([]byte(nil), checkpoint.OutboxUpperBound...),
 		Limit: opts.BatchSize, MaxTime: opts.BatchTimeout, MaxSamples: opts.MaxSamples,
 	})
 	if err != nil {
@@ -251,22 +269,29 @@ func (s *Service) RunAuditBatch(ctx context.Context, opts RunOptions) (BatchOutc
 		return BatchOutcome{}, err
 	}
 	next := checkpoint
+	next.Working = cloneStatistics(checkpoint.Working)
 	next.Revision++
 	next.Cursor = result.NextID
+	next.OutboxCursor = append([]byte(nil), result.NextOutboxCursor...)
+	if checkpoint.Phase == PhaseOutboxAnswerSheet && !result.Exhausted && (result.Scanned <= 0 || len(result.NextOutboxCursor) == 0 || bytes.Equal(result.NextOutboxCursor, checkpoint.OutboxCursor)) {
+		return BatchOutcome{}, fmt.Errorf("mongo outbox audit made no cursor progress")
+	}
 	next.UpdatedAt = now
 	next.Working.Add(result, opts.MaxSamples)
 	completed := false
 	if result.Exhausted {
 		if nextPhase, ok := phaseAfter(checkpoint.Phase); ok {
-			upper, upperErr := s.scanner.UpperBound(ctx, nextPhase, opts.BatchTimeout)
+			upper, token, upperErr := s.phaseUpperBound(ctx, nextPhase, opts.BatchTimeout)
 			if upperErr != nil {
 				observeError("upper_bound")
 				return BatchOutcome{}, fmt.Errorf("load mongo consistency upper bound for %s: %w", nextPhase, upperErr)
 			}
 			next.Phase, next.Cursor, next.UpperBound = nextPhase, 0, upper
+			next.OutboxCursor, next.OutboxUpperBound = nil, token
 		} else {
 			completed = true
 			next.Phase, next.Cursor, next.UpperBound = PhaseCompleted, 0, 0
+			next.OutboxCursor, next.OutboxUpperBound = nil, nil
 			next.LastCompleted = &CompletedCycle{CycleID: checkpoint.CycleID, CompletedAt: now, Statistics: cloneStatistics(next.Working)}
 			next.NextCycleAt = now.Add(opts.CycleInterval)
 		}
@@ -285,8 +310,18 @@ func (s *Service) RunAuditBatch(ctx context.Context, opts RunOptions) (BatchOutc
 	return BatchOutcome{
 		CycleID: checkpoint.CycleID, Phase: checkpoint.Phase, Cursor: result.NextID,
 		UpperBound: checkpoint.UpperBound, Scanned: result.Scanned, Findings: len(result.Findings),
+		OutboxCursor: append([]byte(nil), result.NextOutboxCursor...), OutboxUpperBound: append([]byte(nil), checkpoint.OutboxUpperBound...),
 		Completed: completed, NextCycleAt: next.NextCycleAt, Statistics: cloneStatistics(next.Working),
 	}, nil
+}
+
+func (s *Service) phaseUpperBound(ctx context.Context, phase Phase, maxTime time.Duration) (uint64, []byte, error) {
+	if phase == PhaseOutboxAnswerSheet {
+		token, err := s.scanner.OutboxUpperBound(ctx, maxTime)
+		return 0, token, err
+	}
+	upper, err := s.scanner.UpperBound(ctx, phase, maxTime)
+	return upper, nil, err
 }
 
 func (s *Service) startCycle(ctx context.Context, previous Checkpoint, opts RunOptions, now time.Time) (BatchOutcome, error) {
@@ -356,6 +391,12 @@ func SortedFindingKinds(stats Statistics) []string {
 func cloneStatistics(source Statistics) Statistics {
 	result := NewStatistics()
 	result.Scanned = source.Scanned
+	if source.EvidenceClasses != nil {
+		result.EvidenceClasses = make(map[string]int64)
+		for class, count := range source.EvidenceClasses {
+			result.EvidenceClasses[class] = count
+		}
+	}
 	for kind, count := range source.Findings {
 		result.Findings[kind] = count
 	}

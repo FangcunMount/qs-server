@@ -59,3 +59,20 @@ func TestSelectedStandardOutboxesReplaceHistoricalGovernanceQueries(t *testing.T
 		t.Fatalf("selected views were not the only owners: items=%+v mysql=%v mongo=%v", items, mysql.orgIDs, mongo.orgIDs)
 	}
 }
+
+func TestMissingStandardReadersFailClosed(t *testing.T) {
+	reader := NewReader(nil, nil)
+	var summary app.RetryGovernanceSummary
+	var items []app.RetryCandidate
+	for _, name := range []string{"assessment-mysql-outbox", "mongo-domain-events"} {
+		if err := reader.addOutboxGovernance(t.Context(), 7, name, &summary); err == nil {
+			t.Fatalf("missing reader %s accepted", name)
+		}
+	}
+	if err := reader.appendMySQLOutboxCandidates(t.Context(), 7, 10, &items); err == nil {
+		t.Fatal("missing MySQL reader accepted")
+	}
+	if err := reader.appendMongoOutboxCandidates(t.Context(), 7, 10, &items); err == nil {
+		t.Fatal("missing Mongo reader accepted")
+	}
+}

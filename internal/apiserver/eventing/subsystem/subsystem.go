@@ -42,10 +42,8 @@ type ConsumerOptions struct {
 }
 
 type ProfileOptions struct {
-	Interval               time.Duration
-	BatchSize              int
-	PublishWorkers         int
-	ImmediateMaxConcurrent int
+	Interval       time.Duration
+	PublishWorkers int
 }
 
 type Options struct {

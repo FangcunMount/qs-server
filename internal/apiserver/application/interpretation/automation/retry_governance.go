@@ -9,9 +9,11 @@ import (
 	domaininterpretation "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
 	domaingeneration "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/generation"
 	interpretationrun "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/run"
+	"github.com/FangcunMount/qs-server/internal/apiserver/eventing/eventevidencebinding"
 	evaluationfact "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationfact"
 	outboxport "github.com/FangcunMount/qs-server/internal/apiserver/port/outbox"
 	"github.com/FangcunMount/qs-server/internal/pkg/event"
+	"github.com/FangcunMount/qs-server/internal/pkg/eventing/evidence"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 	"github.com/FangcunMount/qs-server/internal/pkg/retrygovernance"
 )
@@ -53,6 +55,14 @@ func (s *governedRetryService) Authorize(ctx context.Context, command GovernedRe
 	if command.OrgID == 0 || command.GenerationID.IsZero() || command.ExpectedAttempt < 1 || command.RequestID == "" || command.Reason == "" {
 		return nil, fmt.Errorf("interpretation retry governance input is invalid")
 	}
+	preparer, ok := s.events.(outboxport.ReferencePreparer)
+	if !ok {
+		return nil, fmt.Errorf("interpretation retry requires original event reference preparation")
+	}
+	scheduled, ok := s.events.(outboxport.ScheduledStager)
+	if !ok {
+		return nil, fmt.Errorf("interpretation retry requires scheduled staging")
+	}
 	generationRecord, err := s.generations.FindByID(ctx, command.GenerationID)
 	if err != nil {
 		return nil, err
@@ -74,6 +84,18 @@ func (s *governedRetryService) Authorize(ctx context.Context, command GovernedRe
 		ExpectedAttempt: command.ExpectedAttempt, AttemptOrigin: string(command.Origin), ActionRequestID: command.RequestID,
 		Mode: "next_attempt", RequestedAt: at,
 	})
+	binding, err := eventevidencebinding.Retry(retryEvent.Data)
+	if err != nil {
+		return nil, err
+	}
+	ref, err := preparer.PrepareReference(retryEvent)
+	if err != nil {
+		return nil, err
+	}
+	proof, err := evidence.NewStandard(ref, binding)
+	if err != nil {
+		return nil, err
+	}
 	authorizer, ok := s.runs.(interpretationrun.RetryAuthorizer)
 	if !ok {
 		return nil, fmt.Errorf("interpretation run repository does not support retry authorization")
@@ -84,14 +106,12 @@ func (s *governedRetryService) Authorize(ctx context.Context, command GovernedRe
 		authorized, authorizeErr = authorizer.AuthorizeRetry(txCtx, interpretationrun.RetryAuthorizationRequest{
 			GenerationID: command.GenerationID, ExpectedAttempt: command.ExpectedAttempt, Origin: command.Origin,
 			RequestID: command.RequestID, EventID: retryEvent.EventID(), AuthorizedAt: at,
+			EventEvidence: proof,
 		})
 		if authorizeErr != nil {
 			return authorizeErr
 		}
-		if scheduled, scheduledOK := s.events.(outboxport.ScheduledStager); scheduledOK {
-			return scheduled.StageAt(txCtx, at, retryEvent)
-		}
-		return s.events.Stage(txCtx, retryEvent)
+		return scheduled.StageAt(txCtx, at, retryEvent)
 	})
 	return authorized, err
 }

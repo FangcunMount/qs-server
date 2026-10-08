@@ -2,7 +2,7 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "0a695f22e42af9f08a9acb2aa3435487921416ad",
+    "sha": "5b5dc2778f8f93f09d17c68736c3134a794cba08",
     "verified_on": "2026-10-08"
   },
   "status_policy": {
@@ -53,7 +53,7 @@
         "docs/_archive/**/*.md",
         "tmp/**/*.md"
       ],
-      "expected_count": 44,
+      "expected_count": 45,
       "budgeted": false
     }
   },
@@ -78,12 +78,12 @@
   "machine_contracts": {
     "migrations": {
       "mysql": {
-        "max_version": 95,
-        "version_count": 95
+        "max_version": 98,
+        "version_count": 98
       },
       "mongodb": {
-        "max_version": 36,
-        "version_count": 36
+        "max_version": 37,
+        "version_count": 37
       }
     },
     "events": {
@@ -6083,8 +6083,8 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "504067f177bcfab821c0faf59b0a96da8d7c0c9b",
-        "verified_on": "2026-09-27"
+        "source_sha": "5b5dc2778f8f93f09d17c68736c3134a794cba08",
+        "verified_on": "2026-10-08"
       },
       "fact_sources": [
         {
@@ -6122,6 +6122,13 @@
           "result": "passed",
           "source_sha": "504067f177bcfab821c0faf59b0a96da8d7c0c9b",
           "verified_on": "2026-09-27"
+        },
+        {
+          "kind": "command",
+          "command": "go test -race ./internal/pkg/resilience/... ./internal/collection-server/concurrency ./internal/collection-server/transport/rest ./internal/collection-server/application/answersheet ./internal/apiserver/application/survey/answersheet",
+          "result": "passed",
+          "source_sha": "5b5dc2778f8f93f09d17c68736c3134a794cba08",
+          "verified_on": "2026-10-08"
         }
       ],
       "production_evidence": {
@@ -10999,7 +11006,7 @@
       "owner": "tooling",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "0a695f22e42af9f08a9acb2aa3435487921416ad",
+        "source_sha": "5b5dc2778f8f93f09d17c68736c3134a794cba08",
         "verified_on": "2026-10-08"
       },
       "fact_sources": [
@@ -11031,6 +11038,13 @@
           "result": "passed",
           "source_sha": "0a695f22e42af9f08a9acb2aa3435487921416ad",
           "verified_on": "2026-10-08"
+        },
+        {
+          "kind": "command",
+          "command": "bash scripts/dbops/test-production-inventory.sh",
+          "result": "passed",
+          "source_sha": "5b5dc2778f8f93f09d17c68736c3134a794cba08",
+          "verified_on": "2026-10-08"
         }
       ],
       "production_evidence": {
@@ -11050,7 +11064,7 @@
       "owner": "tooling",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "0a695f22e42af9f08a9acb2aa3435487921416ad",
+        "source_sha": "5b5dc2778f8f93f09d17c68736c3134a794cba08",
         "verified_on": "2026-10-08"
       },
       "fact_sources": [
@@ -11104,6 +11118,27 @@
           "result": "passed",
           "source_sha": "0a695f22e42af9f08a9acb2aa3435487921416ad",
           "verified_on": "2026-10-08"
+        },
+        {
+          "kind": "command",
+          "command": "go test -race ./scripts/oneoff/mysql_metadata_profile",
+          "result": "passed",
+          "source_sha": "5b5dc2778f8f93f09d17c68736c3134a794cba08",
+          "verified_on": "2026-10-08"
+        },
+        {
+          "kind": "command",
+          "command": "python3 -B scripts/dbops/test-mysql-metadata-profile.py",
+          "result": "passed",
+          "source_sha": "5b5dc2778f8f93f09d17c68736c3134a794cba08",
+          "verified_on": "2026-10-08"
+        },
+        {
+          "kind": "command",
+          "command": "python3 -B scripts/dbops/test-receipt-transport.py",
+          "result": "passed",
+          "source_sha": "5b5dc2778f8f93f09d17c68736c3134a794cba08",
+          "verified_on": "2026-10-08"
         }
       ],
       "production_evidence": {
@@ -11116,6 +11151,87 @@
         ]
       },
       "gaps": []
+    },
+    {
+      "path": "scripts/database/compatibility-retirement.md",
+      "class": "sidecar",
+      "owner": "tooling",
+      "doc_status": "aligned",
+      "verified": {
+        "source_sha": "5b5dc2778f8f93f09d17c68736c3134a794cba08",
+        "verified_on": "2026-10-08"
+      },
+      "fact_sources": [
+        {
+          "kind": "source",
+          "path": "scripts/database/compatibility-retirement.py"
+        },
+        {
+          "kind": "source",
+          "path": "scripts/database/compatibility-retirement-entrypoints.json"
+        },
+        {
+          "kind": "source",
+          "path": "cmd/qs-compatibility-retirement/*.go"
+        },
+        {
+          "kind": "source",
+          "path": ".github/workflows/compatibility-retirement.yml"
+        },
+        {
+          "kind": "source",
+          "path": ".github/workflows/cd.yml"
+        },
+        {
+          "kind": "source",
+          "path": ".github/workflows/db-ops.yml"
+        },
+        {
+          "kind": "source",
+          "path": ".github/workflows/authz-production-matrix-provision.yml"
+        }
+      ],
+      "verification": [
+        {
+          "kind": "command",
+          "command": "python3 -B scripts/database/test-compatibility-retirement.py",
+          "result": "passed",
+          "source_sha": "5b5dc2778f8f93f09d17c68736c3134a794cba08",
+          "verified_on": "2026-10-08"
+        },
+        {
+          "kind": "command",
+          "command": "go test -race ./cmd/qs-compatibility-retirement",
+          "result": "passed",
+          "source_sha": "5b5dc2778f8f93f09d17c68736c3134a794cba08",
+          "verified_on": "2026-10-08"
+        },
+        {
+          "kind": "command",
+          "command": "python3 -B scripts/database/compatibility-retirement-integration.py",
+          "result": "passed",
+          "source_sha": "5b5dc2778f8f93f09d17c68736c3134a794cba08",
+          "verified_on": "2026-10-08"
+        }
+      ],
+      "production_evidence": {
+        "level": "none",
+        "refs": [],
+        "deployed_sha": null,
+        "observed_at": null,
+        "limitations": [
+          "Production history verification, restore rehearsal, fencing, DROP, acceptance and purge have not been executed."
+        ]
+      },
+      "gaps": [
+        {
+          "id": "COMPAT-RETIREMENT-PRODUCTION",
+          "kind": "verification",
+          "severity": "high",
+          "summary": "The controlled retirement backend and production evidence are incomplete.",
+          "exit_criteria": "Implement and verify actual adapters, bind immutable operation/database/schema evidence, rehearse exact restoration, then complete the accepted production retirement gates."
+        }
+      ]
     }
   ],
   "initial_review_baseline": {

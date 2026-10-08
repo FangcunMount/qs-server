@@ -298,5 +298,8 @@ func (r *MessagingRuntime) preflightStorage(ctx context.Context) error {
 			return errors.New("AI MQ storage unavailable")
 		}
 	}
+	if err := store.RequireMessagingOperationSchema(ctx, tx); err != nil {
+		return err
+	}
 	return store.RequireMessagingObservations(ctx, tx)
 }

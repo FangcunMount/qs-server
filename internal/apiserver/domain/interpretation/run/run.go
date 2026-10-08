@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"time"
 
+	eventcatalog "github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
+	"github.com/FangcunMount/qs-server/internal/pkg/eventing/evidence"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 	"github.com/FangcunMount/qs-server/internal/pkg/retrygovernance"
 )
@@ -68,20 +70,21 @@ type ClaimRecord struct {
 // InterpretationRun is one attempt under a ReportGeneration. It never owns
 // report content and it cannot modify Evaluation facts.
 type InterpretationRun struct {
-	id              ID
-	generationID    meta.ID
-	attempt         int
-	status          Status
-	failure         *Failure
-	traceID         string
-	startedAt       *time.Time
-	leaseExpiresAt  *time.Time
-	finishedAt      *time.Time
-	origin          retrygovernance.AttemptOrigin
-	retryDecision   *retrygovernance.Decision
-	claimHistory    []ClaimRecord
-	recoveryCount   int
-	lastReclaimedAt *time.Time
+	id                 ID
+	generationID       meta.ID
+	attempt            int
+	status             Status
+	failure            *Failure
+	traceID            string
+	startedAt          *time.Time
+	leaseExpiresAt     *time.Time
+	finishedAt         *time.Time
+	origin             retrygovernance.AttemptOrigin
+	retryDecision      *retrygovernance.Decision
+	retryEventEvidence *evidence.EventEvidenceV1
+	claimHistory       []ClaimRecord
+	recoveryCount      int
+	lastReclaimedAt    *time.Time
 }
 
 func NewPending(id, generationID meta.ID, attempt int) (*InterpretationRun, error) {
@@ -127,20 +130,32 @@ func Restore(input RestoreInput) (*InterpretationRun, error) {
 	if input.StartedAt != nil && input.FinishedAt != nil && input.FinishedAt.Before(*input.StartedAt) {
 		return nil, fmt.Errorf("interpretation run finished at precedes started at")
 	}
+	if input.RetryEventEvidence != nil {
+		if err := input.RetryEventEvidence.Validate(); err != nil {
+			return nil, err
+		}
+		if input.RetryDecision == nil || input.RetryDecision.RetryEventID != input.RetryEventEvidence.EventID {
+			return nil, fmt.Errorf("retry event evidence identity mismatch")
+		}
+		if input.RetryEventEvidence.Reference != nil && input.RetryEventEvidence.Reference.EventType != eventcatalog.InterpretationRetryRequested {
+			return nil, fmt.Errorf("retry event evidence type mismatch")
+		}
+	}
 	r := &InterpretationRun{
-		id:              input.ID,
-		generationID:    input.GenerationID,
-		attempt:         input.Attempt,
-		status:          input.Status,
-		traceID:         input.TraceID,
-		startedAt:       copyTimePtr(input.StartedAt),
-		leaseExpiresAt:  copyTimePtr(input.LeaseExpiresAt),
-		finishedAt:      copyTimePtr(input.FinishedAt),
-		origin:          input.Origin,
-		retryDecision:   copyRetryDecision(input.RetryDecision),
-		claimHistory:    copyClaimHistory(input.ClaimHistory),
-		recoveryCount:   input.RecoveryCount,
-		lastReclaimedAt: copyTimePtr(input.LastReclaimedAt),
+		id:                 input.ID,
+		generationID:       input.GenerationID,
+		attempt:            input.Attempt,
+		status:             input.Status,
+		traceID:            input.TraceID,
+		startedAt:          copyTimePtr(input.StartedAt),
+		leaseExpiresAt:     copyTimePtr(input.LeaseExpiresAt),
+		finishedAt:         copyTimePtr(input.FinishedAt),
+		origin:             input.Origin,
+		retryDecision:      copyRetryDecision(input.RetryDecision),
+		retryEventEvidence: cloneEventEvidence(input.RetryEventEvidence),
+		claimHistory:       copyClaimHistory(input.ClaimHistory),
+		recoveryCount:      input.RecoveryCount,
+		lastReclaimedAt:    copyTimePtr(input.LastReclaimedAt),
 	}
 	if input.Failure != nil {
 		failure := *input.Failure
@@ -150,20 +165,21 @@ func Restore(input RestoreInput) (*InterpretationRun, error) {
 }
 
 type RestoreInput struct {
-	ID              ID
-	GenerationID    meta.ID
-	Attempt         int
-	Status          Status
-	Failure         *Failure
-	TraceID         string
-	StartedAt       *time.Time
-	LeaseExpiresAt  *time.Time
-	FinishedAt      *time.Time
-	Origin          retrygovernance.AttemptOrigin
-	RetryDecision   *retrygovernance.Decision
-	ClaimHistory    []ClaimRecord
-	RecoveryCount   int
-	LastReclaimedAt *time.Time
+	ID                 ID
+	GenerationID       meta.ID
+	Attempt            int
+	Status             Status
+	Failure            *Failure
+	TraceID            string
+	StartedAt          *time.Time
+	LeaseExpiresAt     *time.Time
+	FinishedAt         *time.Time
+	Origin             retrygovernance.AttemptOrigin
+	RetryDecision      *retrygovernance.Decision
+	RetryEventEvidence *evidence.EventEvidenceV1
+	ClaimHistory       []ClaimRecord
+	RecoveryCount      int
+	LastReclaimedAt    *time.Time
 }
 
 func Next(id meta.ID, latest *InterpretationRun) (*InterpretationRun, error) {
@@ -349,6 +365,45 @@ func (r *InterpretationRun) AttachRetryEvent(eventID string) error {
 	}
 	r.retryDecision.RetryEventID = eventID
 	return nil
+}
+
+func (r *InterpretationRun) AttachRetryEventEvidence(proof *evidence.EventEvidenceV1) error {
+	if err := validateNativeRetryEvidence(proof); err != nil {
+		return err
+	}
+	if err := r.AttachRetryEvent(proof.EventID); err != nil {
+		return err
+	}
+	r.retryEventEvidence = proof.Clone()
+	return nil
+}
+
+func (r *InterpretationRun) AuthorizeOneRetryWithEvidence(origin retrygovernance.AttemptOrigin, requestID string, at time.Time, proof *evidence.EventEvidenceV1) error {
+	if err := validateNativeRetryEvidence(proof); err != nil {
+		return err
+	}
+	if err := r.AuthorizeOneRetry(origin, requestID, proof.EventID, at); err != nil {
+		return err
+	}
+	r.retryEventEvidence = proof.Clone()
+	return nil
+}
+
+func validateNativeRetryEvidence(proof *evidence.EventEvidenceV1) error {
+	if proof == nil || proof.Origin != "native_atomic" || proof.Class != evidence.StandardReferenceClass || proof.Reference == nil || proof.Reference.EventType != eventcatalog.InterpretationRetryRequested {
+		return fmt.Errorf("native retry event evidence is required")
+	}
+	return proof.Validate()
+}
+
+func cloneEventEvidence(value *evidence.EventEvidenceV1) *evidence.EventEvidenceV1 {
+	if value == nil {
+		return nil
+	}
+	return value.Clone()
+}
+func (r *InterpretationRun) RetryEventEvidence() *evidence.EventEvidenceV1 {
+	return cloneEventEvidence(r.retryEventEvidence)
 }
 
 func (r *InterpretationRun) AuthorizeOneRetry(origin retrygovernance.AttemptOrigin, requestID, eventID string, at time.Time) error {
