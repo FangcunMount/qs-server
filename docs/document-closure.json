@@ -2,7 +2,7 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "5e1365e8533f473933094a95e9a69d81162ae4a3",
+    "sha": "37a5abcc1f0830f4f1a47730c9f059c469ec24cd",
     "verified_on": "2026-10-08"
   },
   "status_policy": {
@@ -78,12 +78,12 @@
   "machine_contracts": {
     "migrations": {
       "mysql": {
-        "max_version": 98,
-        "version_count": 98
+        "max_version": 99,
+        "version_count": 99
       },
       "mongodb": {
-        "max_version": 37,
-        "version_count": 37
+        "max_version": 38,
+        "version_count": 38
       }
     },
     "events": {
@@ -9112,8 +9112,29 @@
         "source_sha": null,
         "verified_on": null
       },
-      "fact_sources": [],
-      "verification": [],
+      "fact_sources": [
+        {
+          "kind": "source",
+          "path": "scripts/cd/remote-deploy.sh"
+        },
+        {
+          "kind": "source",
+          "path": "scripts/cd/runtime-evidence.py"
+        },
+        {
+          "kind": "source",
+          "path": ".github/workflows/cd.yml"
+        }
+      ],
+      "verification": [
+        {
+          "kind": "command",
+          "command": "python3 -B scripts/cd/test-runtime-evidence.py",
+          "result": "passed",
+          "source_sha": "37a5abcc1f0830f4f1a47730c9f059c469ec24cd",
+          "verified_on": "2026-10-08"
+        }
+      ],
       "production_evidence": {
         "level": "none",
         "refs": [],
@@ -9128,7 +9149,7 @@
           "id": "DOC-CLOSURE-141",
           "kind": "verification",
           "severity": "medium",
-          "summary": "Source and semantic review have not yet been recorded.",
+          "summary": "The newly documented per-instance runtime receipt is source-reviewed and locally tested; the complete document has no accountable semantic signoff, and this supplemental source is not deployed or accepted in production.",
           "exit_criteria": "Record fact sources and verification evidence, then update doc_status through review."
         }
       ]
@@ -10589,8 +10610,8 @@
       "owner": "tooling",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "51741206f4e02aac65d1701545ad674ff9bc3370",
-        "verified_on": "2026-10-04"
+        "source_sha": "37a5abcc1f0830f4f1a47730c9f059c469ec24cd",
+        "verified_on": "2026-10-08"
       },
       "fact_sources": [
         {
@@ -10684,6 +10705,27 @@
           "result": "passed",
           "source_sha": "51741206f4e02aac65d1701545ad674ff9bc3370",
           "verified_on": "2026-10-04"
+        },
+        {
+          "kind": "command",
+          "command": "python3 -B scripts/cd/test_image_retention.py",
+          "result": "passed",
+          "source_sha": "37a5abcc1f0830f4f1a47730c9f059c469ec24cd",
+          "verified_on": "2026-10-08"
+        },
+        {
+          "kind": "command",
+          "command": "python3 -B scripts/cd/test_sudo_selection.py",
+          "result": "passed",
+          "source_sha": "37a5abcc1f0830f4f1a47730c9f059c469ec24cd",
+          "verified_on": "2026-10-08"
+        },
+        {
+          "kind": "command",
+          "command": "python3 -B scripts/cd/test_ai_messaging_release.py",
+          "result": "passed",
+          "source_sha": "37a5abcc1f0830f4f1a47730c9f059c469ec24cd",
+          "verified_on": "2026-10-08"
         }
       ],
       "production_evidence": {
@@ -10953,8 +10995,8 @@
       "owner": "tooling",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "51741206f4e02aac65d1701545ad674ff9bc3370",
-        "verified_on": "2026-10-04"
+        "source_sha": "37a5abcc1f0830f4f1a47730c9f059c469ec24cd",
+        "verified_on": "2026-10-08"
       },
       "fact_sources": [
         {
@@ -10987,6 +11029,13 @@
           "result": "passed",
           "source_sha": "51741206f4e02aac65d1701545ad674ff9bc3370",
           "verified_on": "2026-10-04"
+        },
+        {
+          "kind": "command",
+          "command": "python3 -B scripts/cd/test_ai_messaging_release.py",
+          "result": "passed",
+          "source_sha": "37a5abcc1f0830f4f1a47730c9f059c469ec24cd",
+          "verified_on": "2026-10-08"
         }
       ],
       "production_evidence": {
@@ -11158,7 +11207,7 @@
       "owner": "tooling",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "5e1365e8533f473933094a95e9a69d81162ae4a3",
+        "source_sha": "37a5abcc1f0830f4f1a47730c9f059c469ec24cd",
         "verified_on": "2026-10-08"
       },
       "fact_sources": [
@@ -11219,6 +11268,13 @@
           "result": "passed",
           "source_sha": "5e1365e8533f473933094a95e9a69d81162ae4a3",
           "verified_on": "2026-10-08"
+        },
+        {
+          "kind": "command",
+          "command": "python3 -B scripts/database/test-compatibility-retirement.py",
+          "result": "passed",
+          "source_sha": "37a5abcc1f0830f4f1a47730c9f059c469ec24cd",
+          "verified_on": "2026-10-08"
         }
       ],
       "production_evidence": {
@@ -11235,8 +11291,8 @@
           "id": "COMPAT-RETIREMENT-PRODUCTION",
           "kind": "verification",
           "severity": "high",
-          "summary": "The controlled retirement backend and production evidence are incomplete.",
-          "exit_criteria": "Implement and verify actual adapters, bind immutable operation/database/schema evidence, rehearse exact restoration, then complete the accepted production retirement gates."
+          "summary": "Read-only identity/bootstrap and bounded inventory are implemented. Production business closure verification and CAS, fencing, exact backup/restore, release B, controlled DROP, acceptance and batch-owned purge remain incomplete.",
+          "exit_criteria": "Bind independent identity and scan approvals to the deployed source; complete all six historical event types and legacy commands, persist conclusions, prove the production fence and <=10-minute exact restoration, then execute the approved retirement phases."
         }
       ]
     }
