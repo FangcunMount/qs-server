@@ -64,6 +64,7 @@ func TestInactiveFixedRolePotentialDoesNotBecomeCurrent(t *testing.T) {
 	db, m := mockDB(t)
 	m.ExpectQuery(identitySQL).WillReturnRows(identities(10, "NONE"))
 	m.ExpectQuery(currentSQL).WillReturnRows(grants("GRANT USAGE ON *.* TO `fixture_user`@`%`", "GRANT ALL PRIVILEGES ON `fixture_db`.* TO `fixture_user`@`%`", "GRANT `rds_superuser_role`@`%` TO `fixture_user`@`%`"))
+	m.ExpectQuery(mandatorySQL).WillReturnRows(sqlmock.NewRows([]string{"mandatory_roles"}).AddRow(""))
 	m.ExpectQuery(rdsSQL).WillReturnRows(grants(positive(), "GRANT `rds_superuser_role`@`%` TO `fixture_user`@`%`"))
 	m.ExpectQuery(identitySQL).WillReturnRows(identities(10, "NONE"))
 	r := probe(context.Background(), db, fixtureConnection, fixtureBinding())
@@ -76,6 +77,7 @@ func TestCurrentOtherActiveRoleDoesNotEnterFixedRolePotential(t *testing.T) {
 	db, m := mockDB(t)
 	m.ExpectQuery(identitySQL).WillReturnRows(identities(10, "`other_active_role`@`%`"))
 	m.ExpectQuery(currentSQL).WillReturnRows(grants(positive()))
+	m.ExpectQuery(mandatorySQL).WillReturnRows(sqlmock.NewRows([]string{"mandatory_roles"}).AddRow(""))
 	m.ExpectQuery(rdsSQL).WillReturnRows(grants("GRANT SELECT ON *.* TO `fixture_user`@`%`"))
 	m.ExpectQuery(identitySQL).WillReturnRows(identities(10, "`other_active_role`@`%`"))
 	r := probe(context.Background(), db, fixtureConnection, fixtureBinding())
@@ -103,6 +105,7 @@ func TestOnlyCanonical3530MakesRoleUnavailable(t *testing.T) {
 			db, m := mockDB(t)
 			m.ExpectQuery(identitySQL).WillReturnRows(identities(10, "NONE"))
 			m.ExpectQuery(currentSQL).WillReturnRows(grants(positive()))
+			m.ExpectQuery(mandatorySQL).WillReturnRows(sqlmock.NewRows([]string{"mandatory_roles"}).AddRow(""))
 			m.ExpectQuery(rdsSQL).WillReturnError(&mysql.MySQLError{Number: tc.number, SQLState: tc.state, Message: fixtureSecret})
 			m.ExpectQuery(identitySQL).WillReturnRows(identities(10, "NONE"))
 			r := probe(context.Background(), db, fixtureConnection, fixtureBinding())
@@ -123,6 +126,7 @@ func TestUnknownRoleQueryErrorIsPrivateAndIncomplete(t *testing.T) {
 	db, m := mockDB(t)
 	m.ExpectQuery(identitySQL).WillReturnRows(identities(10, "NONE"))
 	m.ExpectQuery(currentSQL).WillReturnRows(grants(positive()))
+	m.ExpectQuery(mandatorySQL).WillReturnRows(sqlmock.NewRows([]string{"mandatory_roles"}).AddRow(""))
 	m.ExpectQuery(rdsSQL).WillReturnError(errors.New(fixtureSecret + " SHOW GRANTS " + fixtureUUID))
 	m.ExpectQuery(identitySQL).WillReturnRows(identities(10, "NONE"))
 	r := probe(context.Background(), db, fixtureConnection, fixtureBinding())
@@ -148,6 +152,7 @@ func TestPotentialPartialRevokeNeverQualifies(t *testing.T) {
 	db, m := mockDB(t)
 	m.ExpectQuery(identitySQL).WillReturnRows(identities(10, "NONE"))
 	m.ExpectQuery(currentSQL).WillReturnRows(grants(positive()))
+	m.ExpectQuery(mandatorySQL).WillReturnRows(sqlmock.NewRows([]string{"mandatory_roles"}).AddRow(""))
 	m.ExpectQuery(rdsSQL).WillReturnRows(grants(positive(), "REVOKE SELECT ON `hidden`.* FROM `fixture_user`@`%`"))
 	m.ExpectQuery(identitySQL).WillReturnRows(identities(10, "NONE"))
 	r := probe(context.Background(), db, fixtureConnection, fixtureBinding())
@@ -161,6 +166,7 @@ func TestCanonicalCurrentRevokeStillQueriesPotentialFixedRole(t *testing.T) {
 	db, m := mockDB(t)
 	m.ExpectQuery(identitySQL).WillReturnRows(identities(10, "NONE"))
 	m.ExpectQuery(currentSQL).WillReturnRows(grants(positive(), "REVOKE SELECT ON `hidden`.* FROM `fixture_user`@`%`"))
+	m.ExpectQuery(mandatorySQL).WillReturnRows(sqlmock.NewRows([]string{"mandatory_roles"}).AddRow(""))
 	m.ExpectQuery(rdsSQL).WillReturnRows(grants(positive()))
 	m.ExpectQuery(identitySQL).WillReturnRows(identities(10, "NONE"))
 	r := probe(context.Background(), db, fixtureConnection, fixtureBinding())
@@ -176,6 +182,7 @@ func TestOfficialRDSRoleStyleStaticAndDynamicGrantRows(t *testing.T) {
 	db, m := mockDB(t)
 	m.ExpectQuery(identitySQL).WillReturnRows(identities(10, "NONE"))
 	m.ExpectQuery(currentSQL).WillReturnRows(grants("GRANT USAGE ON *.* TO `fixture_user`@`%`"))
+	m.ExpectQuery(mandatorySQL).WillReturnRows(sqlmock.NewRows([]string{"mandatory_roles"}).AddRow(""))
 	m.ExpectQuery(rdsSQL).WillReturnRows(grants(static, dynamic, "GRANT `rds_superuser_role`@`%` TO `fixture_user`@`%`"))
 	m.ExpectQuery(identitySQL).WillReturnRows(identities(10, "NONE"))
 	r := probe(context.Background(), db, fixtureConnection, fixtureBinding())
@@ -195,10 +202,11 @@ func TestPinnedSessionOrActiveRoleChangeDiscardsPositiveResults(t *testing.T) {
 		db, m := mockDB(t)
 		m.ExpectQuery(identitySQL).WillReturnRows(identities(10, "NONE"))
 		m.ExpectQuery(currentSQL).WillReturnRows(grants(positive()))
+		m.ExpectQuery(mandatorySQL).WillReturnRows(sqlmock.NewRows([]string{"mandatory_roles"}).AddRow(""))
 		m.ExpectQuery(rdsSQL).WillReturnRows(grants(positive()))
 		m.ExpectQuery(identitySQL).WillReturnRows(identities(last.id, last.roles))
 		r := probe(context.Background(), db, fixtureConnection, fixtureBinding())
-		if r.Complete || r.CurrentUnrestricted || r.RDSAvailable != nil || r.ErrorCategory != "session_identity_changed" {
+		if r.Complete || r.CurrentUnrestricted || r.RDSAvailable != nil || r.RDSUnrestricted != nil || r.AssignedRoles != nil || r.MandatoryRoles != nil || r.ErrorCategory != "session_identity_changed" {
 			t.Fatal("session_change_left_positive_output")
 		}
 		assertPrivate(t, r)
@@ -230,4 +238,120 @@ func TestDriverAndInvalidEnvironmentNeverLogSecrets(t *testing.T) {
 	if run(nil, get, &out) != 1 || strings.Contains(out.String(), fixtureSecret) {
 		t.Fatal("invalid_env_or_secret_output")
 	}
+}
+
+func assertNoRoleConclusions(t *testing.T, r receipt) {
+	t.Helper()
+	if r.Complete || r.CurrentUnrestricted || r.RDSAvailable != nil || r.RDSUnrestricted != nil || r.AssignedRoles != nil || r.MandatoryRoles != nil {
+		t.Fatal("incomplete_receipt_retained_role_conclusion")
+	}
+	assertPrivate(t, r)
+}
+
+func TestRoleCensusPresenceDoesNotInferPrivilegeOrExposeNames(t *testing.T) {
+	cases := []struct {
+		name, roleRow, mandatory string
+		assigned, required       bool
+	}{
+		{"none", "", "", false, false},
+		{"assigned_only", "GRANT `" + fixtureSecret + ";query`@`%` TO `fixture_user`@`%`", "", true, false},
+		{"mandatory_only", "", "`" + fixtureSecret + "`@`%`", false, true},
+		{"both", "GRANT `first_role`@`%`,`" + fixtureSecret + "`@`%` TO `fixture_user`@`%` WITH ADMIN OPTION", "`" + fixtureSecret + "`@`%`", true, true},
+		{"proxy_is_not_role_assignment", "GRANT PROXY ON `" + fixtureSecret + "`@`%` TO `fixture_user`@`%`", " ", false, true},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			db, m := mockDB(t)
+			m.ExpectQuery(identitySQL).WillReturnRows(identities(10, "NONE"))
+			rows := grants("GRANT USAGE ON *.* TO `fixture_user`@`%`")
+			if tc.roleRow != "" {
+				rows.AddRow(tc.roleRow)
+			}
+			m.ExpectQuery(currentSQL).WillReturnRows(rows)
+			m.ExpectQuery(mandatorySQL).WillReturnRows(sqlmock.NewRows([]string{"mandatory_roles"}).AddRow(tc.mandatory))
+			m.ExpectQuery(rdsSQL).WillReturnError(&mysql.MySQLError{Number: roleNotGranted, SQLState: [5]byte{'H', 'Y', '0', '0', '0'}, Message: fixtureSecret})
+			m.ExpectQuery(identitySQL).WillReturnRows(identities(10, "NONE"))
+			r := probe(context.Background(), db, fixtureConnection, fixtureBinding())
+			if !r.Complete || r.CurrentUnrestricted || r.AssignedRoles == nil || *r.AssignedRoles != tc.assigned || r.MandatoryRoles == nil || *r.MandatoryRoles != tc.required || r.RDSAvailable == nil || *r.RDSAvailable || r.RDSUnrestricted != nil {
+				t.Fatal("census_presence_semantics_changed")
+			}
+			assertPrivate(t, r)
+		})
+	}
+}
+
+func TestMandatoryRoleCensusFailureClearsAllConclusions(t *testing.T) {
+	for _, tc := range []struct {
+		name  string
+		value any
+		err   error
+	}{
+		{"query_error", nil, errors.New(fixtureSecret)},
+		{"null", nil, nil},
+		{"oversized", strings.Repeat("x", 65537), nil},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			db, m := mockDB(t)
+			m.ExpectQuery(identitySQL).WillReturnRows(identities(10, "NONE"))
+			m.ExpectQuery(currentSQL).WillReturnRows(grants(positive(), "GRANT `"+fixtureSecret+"`@`%` TO `fixture_user`@`%`"))
+			q := m.ExpectQuery(mandatorySQL)
+			if tc.err != nil {
+				q.WillReturnError(tc.err)
+			} else {
+				q.WillReturnRows(sqlmock.NewRows([]string{"mandatory_roles"}).AddRow(tc.value))
+			}
+			m.ExpectQuery(identitySQL).WillReturnRows(identities(10, "NONE"))
+			r := probe(context.Background(), db, fixtureConnection, fixtureBinding())
+			if r.ErrorCategory != "mandatory_roles_query_failed" {
+				t.Fatal("mandatory_failure_not_fixed")
+			}
+			assertNoRoleConclusions(t, r)
+		})
+	}
+}
+
+func TestMalformedRoleRowCannotProduceCensus(t *testing.T) {
+	for _, bad := range []string{
+		"GRANT `" + fixtureSecret + "`@`%` TO missing_account",
+		"GRANT `role`@`%` TO `fixture_user`@`%`; SELECT '" + fixtureSecret + "'",
+		"GRANT `role`@`%` TO `fixture_user`@`%` WITH ADMIN OPTION UNKNOWN",
+	} {
+		db, m := mockDB(t)
+		m.ExpectQuery(identitySQL).WillReturnRows(identities(10, "NONE"))
+		m.ExpectQuery(currentSQL).WillReturnRows(grants(positive(), bad))
+		m.ExpectQuery(identitySQL).WillReturnRows(identities(10, "NONE"))
+		r := probe(context.Background(), db, fixtureConnection, fixtureBinding())
+		if r.ErrorCategory != "current_grants_rejected" {
+			t.Fatal("malformed_role_row_not_rejected")
+		}
+		assertNoRoleConclusions(t, r)
+	}
+}
+
+func TestCensusIsClearedWhenFinalIdentityCannotBeRead(t *testing.T) {
+	db, m := mockDB(t)
+	m.ExpectQuery(identitySQL).WillReturnRows(identities(10, "NONE"))
+	m.ExpectQuery(currentSQL).WillReturnRows(grants(positive(), "GRANT `"+fixtureSecret+"`@`%` TO `fixture_user`@`%`"))
+	m.ExpectQuery(mandatorySQL).WillReturnRows(sqlmock.NewRows([]string{"mandatory_roles"}).AddRow(fixtureSecret))
+	m.ExpectQuery(rdsSQL).WillReturnRows(grants(positive()))
+	m.ExpectQuery(identitySQL).WillReturnError(errors.New(fixtureSecret))
+	r := probe(context.Background(), db, fixtureConnection, fixtureBinding())
+	if r.ErrorCategory != "identity_final_failed" {
+		t.Fatal("final_identity_failure_not_closed")
+	}
+	assertNoRoleConclusions(t, r)
+}
+
+func TestRejectedPotentialSyntaxClearsCensusAndAvailability(t *testing.T) {
+	db, m := mockDB(t)
+	m.ExpectQuery(identitySQL).WillReturnRows(identities(10, "NONE"))
+	m.ExpectQuery(currentSQL).WillReturnRows(grants(positive(), "GRANT `"+fixtureSecret+"`@`%` TO `fixture_user`@`%`"))
+	m.ExpectQuery(mandatorySQL).WillReturnRows(sqlmock.NewRows([]string{"mandatory_roles"}).AddRow(fixtureSecret))
+	m.ExpectQuery(rdsSQL).WillReturnRows(grants(positive(), "UNKNOWN "+fixtureSecret))
+	m.ExpectQuery(identitySQL).WillReturnRows(identities(10, "NONE"))
+	r := probe(context.Background(), db, fixtureConnection, fixtureBinding())
+	if r.ErrorCategory != "rds_role_grants_rejected" {
+		t.Fatal("potential_syntax_failure_not_closed")
+	}
+	assertNoRoleConclusions(t, r)
 }

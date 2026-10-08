@@ -25,6 +25,7 @@ const (
 	identitySQL    = "SELECT CONNECTION_ID(), @@server_uuid, DATABASE(), VERSION(), CURRENT_ROLE()"
 	currentSQL     = "SHOW GRANTS FOR CURRENT_USER"
 	rdsSQL         = "SHOW GRANTS FOR CURRENT_USER USING `rds_superuser_role`@`%`"
+	mandatorySQL   = "SELECT @@GLOBAL.mandatory_roles"
 	roleNotGranted = 3530 // ER_ROLE_NOT_GRANTED, MySQL 8.0 official error reference.
 )
 
@@ -61,6 +62,8 @@ type receipt struct {
 	CurrentUnrestricted bool   `json:"current_unrestricted_metadata_grants"`
 	RDSAvailable        *bool  `json:"rds_role_grants_available"`
 	RDSUnrestricted     *bool  `json:"rds_role_unrestricted_metadata_grants"`
+	AssignedRoles       *bool  `json:"assigned_roles_present"`
+	MandatoryRoles      *bool  `json:"mandatory_roles_present"`
 	DiagnosticOnly      bool   `json:"diagnostic_only"`
 	Complete            bool   `json:"complete"`
 	ErrorCategory       string `json:"error_category"`
@@ -134,6 +137,18 @@ func readGrants(ctx context.Context, c *sql.Conn, query string) ([]string, error
 		return nil, errors.New("grant_output_empty")
 	}
 	return grants, nil
+}
+
+// Only presence is retained; mandatory role names are never exposed or used to
+// construct another query. Unknown/null or oversized values fail closed.
+func readMandatoryRoles(ctx context.Context, c *sql.Conn) (bool, error) {
+	ctx, cancel := context.WithTimeout(ctx, queryLimit)
+	defer cancel()
+	var roles string
+	if err := c.QueryRowContext(ctx, mandatorySQL).Scan(&roles); err != nil || len(roles) > 65536 {
+		return false, errors.New("mandatory_roles_query_failed")
+	}
+	return roles != "", nil
 }
 
 // Recognise static privilege and global dynamic-token syntax, but only the
@@ -228,6 +243,18 @@ func probe(ctx context.Context, db *sql.DB, cfg connection, b binding) receipt {
 			category = "current_grants_rejected"
 		}
 	}
+	var assigned, mandatory bool
+	if category == "none" {
+		// currentRows have already passed the complete canonical syntax check.
+		// A role grant establishes presence only, never effective privileges.
+		for _, row := range currentRows {
+			assigned = assigned || roleGrant.MatchString(row)
+		}
+		mandatory, err = readMandatoryRoles(ctx, c)
+		if err != nil {
+			category = "mandatory_roles_query_failed"
+		}
+	}
 	var available, potential *bool
 	if category == "none" {
 		rows, e := readGrants(ctx, c, rdsSQL)
@@ -261,17 +288,13 @@ func probe(ctx context.Context, db *sql.DB, cfg connection, b binding) receipt {
 	}
 	if category != "none" {
 		r.ErrorCategory = category
-		// Query succeeded but the output is restricted/unsupported: false,
-		// never a positive privilege conclusion. A query failure remains null.
-		if category == "rds_role_grants_rejected" {
-			r.RDSAvailable = available
-			r.RDSUnrestricted = potential
-		}
 		return r
 	}
 	r.CurrentUnrestricted = current
 	r.RDSAvailable = available
 	r.RDSUnrestricted = potential
+	r.AssignedRoles = &assigned
+	r.MandatoryRoles = &mandatory
 	r.Complete = true
 	r.ErrorCategory = "none"
 	return r

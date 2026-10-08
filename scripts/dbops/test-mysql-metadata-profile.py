@@ -29,6 +29,7 @@ def receipt():
     return {'format_version': 1, 'source_sha': SHA, 'run_id': RUN, 'expected_target_hash': HASH,
             'source_target_hash': HASH, 'current_unrestricted_metadata_grants': False,
             'rds_role_grants_available': True, 'rds_role_unrestricted_metadata_grants': True,
+            'assigned_roles_present': False, 'mandatory_roles_present': False,
             'diagnostic_only': True, 'complete': True, 'error_category': 'none'}
 
 
@@ -106,7 +107,8 @@ class ProfileTests(unittest.TestCase):
         cases = [('diagnostic_only', 1), ('complete', 1), ('current_unrestricted_metadata_grants', 0),
                  ('rds_role_grants_available', 1), ('rds_role_unrestricted_metadata_grants', 'true'),
                  ('error_category', []), ('error_category', SECRET), ('format_version', True),
-                 ('rds_role_grants_available', None), ('source_target_hash', SECRET)]
+                 ('rds_role_grants_available', None), ('assigned_roles_present', None), ('assigned_roles_present', 1),
+                 ('mandatory_roles_present', None), ('mandatory_roles_present', 'false'), ('source_target_hash', SECRET)]
         for field, value in cases:
             with self.subTest(field=field):
                 wrong = receipt()
@@ -129,7 +131,8 @@ class ProfileTests(unittest.TestCase):
     def test_failed_query_has_no_positive_receipt(self):
         value = receipt()
         value.update(complete=False, error_category='rds_role_query_failed',
-                     rds_role_grants_available=None, rds_role_unrestricted_metadata_grants=None)
+                     rds_role_grants_available=None, rds_role_unrestricted_metadata_grants=None,
+                     assigned_roles_present=None, mandatory_roles_present=None)
         self.assertFalse(self.validate(value, 1)['complete'])
         for field in ('current_unrestricted_metadata_grants', 'rds_role_unrestricted_metadata_grants'):
             with self.subTest(field=field):
@@ -141,6 +144,19 @@ class ProfileTests(unittest.TestCase):
             self.validate(value, 0)
         with self.assertRaises(Exception):
             self.validate(receipt(), 1)
+
+    def test_census_never_survives_failed_diagnostic(self):
+        for field in ('rds_role_grants_available', 'rds_role_unrestricted_metadata_grants', 'assigned_roles_present', 'mandatory_roles_present'):
+            for boolean in (False, True):
+                with self.subTest(field=field, boolean=boolean):
+                    value = receipt()
+                    value.update(complete=False, error_category='mandatory_roles_query_failed',
+                                 current_unrestricted_metadata_grants=False,
+                                 rds_role_grants_available=None, rds_role_unrestricted_metadata_grants=None,
+                                 assigned_roles_present=None, mandatory_roles_present=None)
+                    value[field] = boolean
+                    with self.assertRaises(Exception):
+                        self.validate(value, 1)
 
     def execute_fixture(self, callback, env=None):
         with tempfile.TemporaryDirectory() as directory:

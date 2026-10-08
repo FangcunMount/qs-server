@@ -12,8 +12,8 @@ import tempfile
 SHA = re.compile(r"^[0-9a-f]{40}$")
 HASH = re.compile(r"^[0-9a-f]{64}$")
 RUN = re.compile(r"^[0-9]{1,20}-[0-9]{1,4}$")
-KEYS = {"format_version", "source_sha", "run_id", "expected_target_hash", "source_target_hash", "current_unrestricted_metadata_grants", "rds_role_grants_available", "rds_role_unrestricted_metadata_grants", "diagnostic_only", "complete", "error_category"}
-ERRORS = {"none", "input_invalid", "connection_input_invalid", "connection_config_failed", "connection_failed", "identity_read_failed", "target_identity_mismatch", "target_hash_mismatch", "current_grants_query_failed", "current_grants_rejected", "rds_role_query_failed", "rds_role_grants_rejected", "identity_final_failed", "session_identity_changed"}
+KEYS = {"format_version", "source_sha", "run_id", "expected_target_hash", "source_target_hash", "current_unrestricted_metadata_grants", "rds_role_grants_available", "rds_role_unrestricted_metadata_grants", "assigned_roles_present", "mandatory_roles_present", "diagnostic_only", "complete", "error_category"}
+ERRORS = {"none", "input_invalid", "connection_input_invalid", "connection_config_failed", "connection_failed", "identity_read_failed", "target_identity_mismatch", "target_hash_mismatch", "current_grants_query_failed", "current_grants_rejected", "rds_role_query_failed", "rds_role_grants_rejected", "identity_final_failed", "session_identity_changed", "mandatory_roles_query_failed"}
 
 
 def runtime_module():
@@ -37,7 +37,7 @@ def safe_receipt(module, raw, code, sha, run, expected):
     for name in ("diagnostic_only", "complete", "current_unrestricted_metadata_grants"):
         if type(value[name]) is not bool:
             raise ValueError("receipt_type")
-    for name in ("rds_role_grants_available", "rds_role_unrestricted_metadata_grants"):
+    for name in ("rds_role_grants_available", "rds_role_unrestricted_metadata_grants", "assigned_roles_present", "mandatory_roles_present"):
         if value[name] is not None and type(value[name]) is not bool:
             raise ValueError("receipt_type")
     target = value.get("source_target_hash")
@@ -48,7 +48,7 @@ def safe_receipt(module, raw, code, sha, run, expected):
     if value["complete"]:
         if code != 0 or value["error_category"] != "none" or target != expected:
             raise ValueError("receipt_success")
-        if type(value["rds_role_grants_available"]) is not bool:
+        if type(value["rds_role_grants_available"]) is not bool or any(type(value[name]) is not bool for name in ("assigned_roles_present", "mandatory_roles_present")):
             raise ValueError("receipt_role_unknown")
         if value["rds_role_grants_available"] is True and type(value["rds_role_unrestricted_metadata_grants"]) is not bool:
             raise ValueError("receipt_role_unknown")
@@ -56,6 +56,8 @@ def safe_receipt(module, raw, code, sha, run, expected):
             raise ValueError("receipt_role_conflict")
     elif code == 0 or value["error_category"] == "none" or value["current_unrestricted_metadata_grants"] or value["rds_role_unrestricted_metadata_grants"] is True:
         raise ValueError("receipt_failure")
+    if not value["complete"] and any(value[name] is not None for name in ("rds_role_grants_available", "rds_role_unrestricted_metadata_grants", "assigned_roles_present", "mandatory_roles_present")):
+        raise ValueError("receipt_census_failure")
     return value
 
 
