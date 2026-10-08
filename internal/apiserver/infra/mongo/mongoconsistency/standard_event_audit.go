@@ -140,6 +140,16 @@ func verifyRow(row standardEventRow, ref evidence.StandardReference) (*domainwir
 	envelope, err := standard.VerifyReference(row.input(), hex.EncodeToString(row.Fingerprint), ref)
 	return envelope, conflict(err)
 }
+
+// Verify immutable storage identity and both wire layers before trusting a row's
+// event type for filtering. A corrupt outer type must not hide a covered orphan.
+func verifyStoredRow(row standardEventRow) (*domainwire.Envelope, error) {
+	msg, err := message.New(row.input())
+	if err != nil {
+		return nil, conflict(err)
+	}
+	return verifyRow(row, standard.ReferenceFromMessage(msg))
+}
 func countEvidence(result *appaudit.BatchResult, proof *evidence.EventEvidenceV1) {
 	if result.EvidenceClasses == nil {
 		result.EvidenceClasses = map[string]int64{}
@@ -466,7 +476,15 @@ func (s *Scanner) scanOutboxAnswerSheet(ctx context.Context, request appaudit.Ba
 			return result, err
 		}
 		result.NextOutboxCursor = append([]byte(nil), row.ID...)
-		if !coveredEventType(row.EventType) {
+		inner, err := verifyStoredRow(row)
+		if err != nil {
+			if !isEvidenceDrift(err) {
+				return result, err
+			}
+			result.Findings = append(result.Findings, appaudit.Finding{Kind: appaudit.DriftOutboxBusinessMismatch, Severity: appaudit.SeverityHigh, SampleID: row.MessageID})
+			continue
+		}
+		if !coveredEventType(inner.EventType) {
 			continue
 		}
 		if err := s.checkReverse(ctx, row); err != nil {

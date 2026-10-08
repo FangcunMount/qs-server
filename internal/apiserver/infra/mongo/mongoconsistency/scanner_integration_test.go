@@ -261,8 +261,11 @@ func TestScannerPagesActualCompoundBSONIdentitiesAndResumes(t *testing.T) {
 			seen[hex.EncodeToString(batch.NextOutboxCursor)] = true
 		}
 		total += batch.Scanned
-		if len(batch.Findings) != 0 {
-			t.Fatal(batch.Findings)
+		// These identity-only fixtures intentionally omit valid wire fields.
+		// They still advance exact BSON pages, while full row verification reports
+		// every malformed message instead of trusting its noncovered type.
+		if len(batch.Findings) != batch.Scanned {
+			t.Fatalf("malformed noncovered rows escaped verification: %#v", batch)
 		}
 		if batch.Exhausted {
 			if !bytes.Equal(batch.NextOutboxCursor, upper) {
@@ -274,6 +277,68 @@ func TestScannerPagesActualCompoundBSONIdentitiesAndResumes(t *testing.T) {
 	}
 	if total != len(docs) {
 		t.Fatalf("scanned %d, want %d", total, len(docs))
+	}
+}
+
+func TestReverseAuditDetectsCoveredOrphanHiddenByCorruptOuterType(t *testing.T) {
+	for _, kind := range []string{"unknown.type", "questionnaire.published"} {
+		for _, recompute := range []bool{false, true} {
+			t.Run(fmt.Sprintf("%s/recompute=%t", kind, recompute), func(t *testing.T) {
+				_, db := mongodbtest.ReplicaSetDatabase(t)
+				ctx := t.Context()
+				_, row := newSheetFixture(t, 101)
+				row["event_type"] = kind
+				if recompute {
+					body, err := bson.Marshal(row)
+					if err != nil {
+						t.Fatal(err)
+					}
+					var record standardEventRow
+					if err := bson.Unmarshal(body, &record); err != nil {
+						t.Fatal(err)
+					}
+					msg, err := message.New(record.input())
+					if err != nil {
+						t.Fatal(err)
+					}
+					fingerprint := msg.Fingerprint()
+					row["fingerprint"] = fingerprint[:]
+				}
+				// No AnswerSheet exists, so forward auditing cannot catch this row.
+				mustInsertMany(t, ctx, db.Collection("rm_outbox"), []any{row})
+				scanner := NewScanner(db, nil)
+				upper, err := scanner.OutboxUpperBound(ctx, time.Second)
+				if err != nil {
+					t.Fatal(err)
+				}
+				batch, err := scanner.ScanBatch(ctx, appaudit.BatchRequest{Phase: appaudit.PhaseOutboxAnswerSheet, OutboxUpperBound: upper, Limit: 10, MaxTime: time.Second})
+				if err != nil {
+					t.Fatal(err)
+				}
+				if batch.Scanned != 1 || !batch.Exhausted || len(batch.Findings) != 1 || batch.Findings[0].Kind != appaudit.DriftOutboxBusinessMismatch || batch.Findings[0].Severity != appaudit.SeverityHigh {
+					t.Fatalf("orphan outer-type corruption escaped reverse audit: %#v", batch)
+				}
+			})
+		}
+	}
+}
+
+func TestReverseAuditSkipsBusinessLookupOnlyAfterValidatingNoncoveredMessage(t *testing.T) {
+	_, db := mongodbtest.ReplicaSetDatabase(t)
+	ctx := t.Context()
+	evt := event.New("questionnaire.published", "Questionnaire", "1", struct {
+		OrgID int64 `json:"org_id"`
+	}{1})
+	_, row := eventRow(t, evt, evidence.BindingDigest("noncovered"))
+	mustInsertMany(t, ctx, db.Collection("rm_outbox"), []any{row})
+	scanner := NewScanner(db, nil)
+	upper, err := scanner.OutboxUpperBound(ctx, time.Second)
+	if err != nil {
+		t.Fatal(err)
+	}
+	batch, err := scanner.ScanBatch(ctx, appaudit.BatchRequest{Phase: appaudit.PhaseOutboxAnswerSheet, OutboxUpperBound: upper, Limit: 10, MaxTime: time.Second})
+	if err != nil || batch.Scanned != 1 || !batch.Exhausted || len(batch.Findings) != 0 {
+		t.Fatalf("valid noncovered type changed existing business scope: result=%#v err=%v", batch, err)
 	}
 }
 
