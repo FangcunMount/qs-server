@@ -189,6 +189,14 @@ type sourceAccumulator struct {
 	records, bytes uint64
 	done, failed   bool
 	identities     SourceIdentityTracker
+	authenticated  *authenticatedSourceObserver
+}
+
+func (s *sourceAccumulator) observeEvent(event *DecodedSourceEvent) error {
+	if s.authenticated != nil {
+		return s.authenticated.observe(event)
+	}
+	return s.identities.Observe(event)
 }
 
 // SourceIdentityTracker can be shared across the two private source readers by

@@ -223,14 +223,14 @@ func (c *HistoricalCoordinator) nextRow(ctx context.Context) (*coordinatorRow, e
 		}
 		if c.eventNext == nil {
 			if c.object == 0 {
-				r, err := NewSQLSourceReader(c.seekers[0], c.copies[0].Expected)
+				r, err := c.newAuthenticatedSQLSourceReader()
 				if err != nil {
 					return nil, err
 				}
 				c.eventNext = r.Next
 				c.eventReceipt = r.Receipt
 			} else {
-				r, err := NewMongoSourceReader(c.seekers[3], c.copies[3].Expected)
+				r, err := c.newAuthenticatedMongoSourceReader()
 				if err != nil {
 					return nil, err
 				}
