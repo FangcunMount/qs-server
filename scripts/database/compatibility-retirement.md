@@ -259,6 +259,24 @@ remain disabled.
 
 ## Required implementation before execution can become ready
 
+The target recovery library now provides `PrepareTargetRecovery` and
+`RecoverTargets` for this batch's exact four objects. It borrows the host's
+existing SQL connection and Mongo database, authenticates the original archive,
+heads, identities, target contents and non-target schema projection, and uses
+an opaque native DROP result with durably persisted intent. Missing objects by
+themselves do not grant restore authority. It restores missing targets only;
+existing exact targets remain unchanged, and a content conflict, unknown DDL
+result, changed owner or failed restoration blocks continuation. It preserves
+current MQ facts, business evidence, retired command identities and migration
+heads; a restored Mongo collection receives a newly observed UUID.
+
+Actual isolated nonempty native tests cover partial and complete target loss,
+ordered BSON/SQL restoration, repeated read-only verification and an unresolved
+foreign-key failure. They establish a local recovery primitive, not a production
+600-second full recovery budget, complete writer fencing, independent execution
+authorization or a production Action backend. Fresh production qualification,
+privilege-negative checks and deployment rollback still need their own proofs.
+
 1. The implemented inventory adapter must be extended by an actual retirement
    verifier that compares current facts to the frozen manifest and independently
    resolves dependency/business findings. The existing metadata inventory alone
