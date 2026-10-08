@@ -25,8 +25,19 @@ restores are outside this scope. No new DROP migration is included in A.
   another ref, a stale main SHA and another manifest hash before its production
   job. Only exact `prepare` receives existing `MYSQL_METADATA_ADMIN_USERNAME`,
   `MYSQL_METADATA_ADMIN_PASSWORD`, `MYSQL_HOST/PORT/DATABASE` (with existing
-  `MYSQL_DBNAME` fallback) and `MONGODB_HOST/PORT/USERNAME/PASSWORD/DBNAME`
-  production Secrets. No server vault variable is guessed. It deploys nothing.
+  `MYSQL_DBNAME` fallback) and `MONGODB_HOST/PORT/DBNAME` production Secrets.
+  For MongoDB it selects the dedicated pair `MONGODB_METADATA_ADMIN_USERNAME`
+  and `MONGODB_METADATA_ADMIN_PASSWORD` together when both are configured;
+  an incomplete pair fails before connecting. If neither is configured it uses
+  the existing `MONGODB_USERNAME/PASSWORD` pair. The selected credentials enter
+  only the temporary private inventory environment; service credentials are not
+  changed. Authentication uses the existing `admin` auth source. Read-only
+  identity discovery requires business-database reads and the cluster
+  [`replSetGetConfig`](https://www.mongodb.com/docs/v7.0/reference/privilege-actions/#replsetgetconfig)
+  privilege on the cluster resource; a real code-13 denial is reported as
+  `mongo_replica_anchor_not_authorized`, without a weaker identity fallback.
+  This discovery does not establish future write or DROP permission.
+  No server vault variable is guessed. It deploys nothing.
   A future B deployment
   must reuse prepared release scripts inside the same run, never dispatch CD
   and wait while occupying its lock.
@@ -58,6 +69,15 @@ restores are outside this scope. No new DROP migration is included in A.
 - Deadline helpers stop forward work at 20 minutes and all recovery work at
   30 minutes. These helpers alone do not guarantee recovery time; readiness
   requires a measured and independently verified rollback of at most 10 minutes.
+
+The main-line lint follow-up preserves six local deprecated-call exceptions:
+five deliberately disconnected `mongo.NewClient` fixtures must prove rejection
+before storage I/O, and PlanEntry keeps its deprecated token argument while the
+real resolver ignores it and Collection enforces the IAM User/Testee relationship.
+Cursor and transaction cleanup now explicitly ignore best-effort cleanup errors;
+read, business and commit outcomes, including cursor release before UPDATE,
+retain their existing order. These exceptions do not retire another public
+contract or establish production cleanup readiness.
 
 ## Required implementation before execution can become ready
 
