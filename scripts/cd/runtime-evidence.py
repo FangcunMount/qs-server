@@ -33,7 +33,10 @@ IMAGE_TEMPLATE = '{"image_id":{{json .Id}},"entrypoint":{{json .Config.Entrypoin
 
 
 class Refused(ValueError):
-    pass
+    def __init__(self, category, *, changed_fields=(), role_inventory_changed=False):
+        super().__init__(category)
+        self.changed_fields = changed_fields
+        self.role_inventory_changed = role_inventory_changed
 
 
 def refuse(category):
@@ -42,6 +45,33 @@ def refuse(category):
 
 def digest(value):
     return hashlib.sha256(json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=True).encode()).hexdigest()
+
+
+def canonical_projection(value):
+    # Docker versions differ in Mounts iteration order. Preserve every path's
+    # exact spelling and multiplicity; only order is nonsemantic here.
+    if type(value) is not dict or set(value) != INSPECT_KEYS:refuse("container_projection_invalid")
+    mounts = value["mount_destinations"]
+    if type(mounts) is not list:refuse("container_projection_invalid")
+    for mount in mounts:
+        if type(mount) is not str or not mount.startswith("/") or any(ord(char) < 32 or ord(char) == 127 for char in mount):refuse("container_projection_invalid")
+        try:mount.encode("utf-8", errors="strict")
+        except UnicodeError:refuse("container_projection_invalid")
+    if len(set(mounts)) != len(mounts):refuse("container_projection_invalid")
+    result = dict(value)
+    result["mount_destinations"] = sorted(mounts)
+    return result
+
+
+def runtime_change_diagnostic(error):
+    # Only fixed field names/categories escape. Never include values, IDs,
+    # rejected input, process output, or exception text in this diagnostic.
+    fields = getattr(error, "changed_fields", ())
+    if type(fields) is not tuple or len(fields) > len(INSPECT_KEYS) or any(type(field) is not str or field not in INSPECT_KEYS for field in fields):fields = ()
+    result = {"changed_fields": sorted(set(fields))}
+    if getattr(error, "role_inventory_changed", None) is True:
+        result["role_inventory_change"] = "instance_set_changed"
+    return result
 
 
 def unique(pairs):
@@ -144,8 +174,7 @@ def validate_projection(value, row, role, source, expected_image_config_id=None)
     elif not value["image_reference"].endswith(":" + source) or "@" in value["image_reference"]:refuse("image_tag_mismatch")
     if value["entrypoint"] != [binary] or value["path"] != binary:refuse("entrypoint_mismatch")
     if value["oneoff"].lower() != "false" or (role != "apiserver" and not re.fullmatch(r"[1-9][0-9]{0,2}", value["number"])):refuse("topology_mismatch")
-    mounts = value["mount_destinations"]
-    if type(mounts) is not list or any(type(m) is not str or not m.startswith("/") for m in mounts):refuse("container_projection_invalid")
+    mounts = canonical_projection(value)["mount_destinations"]
     for mount in mounts:
         path = posixpath.normpath("/"+mount.lstrip("/"))
         if path == binary or binary.startswith(path.rstrip("/")+"/") or path == "/proc" or path.startswith("/proc/"):refuse("binary_shadowed")
@@ -216,14 +245,18 @@ def collect(docker, role, expected, source, run, attempt, image_tag, expected_im
     validate_inputs(role, expected, source, run, attempt, image_tag, expected_image_config_id)
     before_list = docker.listing()
     rows = select_instances(before_list, role, expected)
-    before = [docker.inspect(row["container_id"]) for row in rows]
+    before = [canonical_projection(docker.inspect(row["container_id"])) for row in rows]
     for value, row in zip(before, rows):validate_projection(value, row, role, source, expected_image_config_id)
     if role != "apiserver" and {int(v["number"]) for v in before} != set(range(1, expected+1)):refuse("instance_set_invalid")
     _, _, binary, port, path = ROLES[role]
     instances = [inspect_program(docker, value, binary, source, port, path, VERSION_CONFIGS[role]) for value in before]
-    after = [docker.inspect(row["container_id"]) for row in rows]
+    after = [canonical_projection(docker.inspect(row["container_id"])) for row in rows]
     after_list = docker.listing()
-    if select_instances(after_list, role, expected) != rows or after != before:refuse("runtime_changed")
+    if select_instances(after_list, role, expected) != rows:
+        raise Refused("runtime_changed", role_inventory_changed=True)
+    if after != before:
+        changed = tuple(sorted({key for first, second in zip(before, after) for key in INSPECT_KEYS if first[key] != second[key]}))
+        raise Refused("runtime_changed", changed_fields=changed)
     # Compare the complete role inventory twice, including stopped containers.
     receipt = {"format_version": 2, "kind": "runtime_instance_evidence", "source_sha": source, "image_tag": image_tag,
             "run_id": run+"-"+attempt, "role": role, "expected_instances": expected, "observed_instances": len(instances),
@@ -314,6 +347,8 @@ def main(argv=None):
         category = str(error) if type(error) is Refused and str(error) in ERRORS else "docker_command_failed"
         # This fixed category never includes a rejected value or raw output.
         print("runtime_instance_evidence_refused:"+category, file=sys.stderr)
+        if category == "runtime_changed":
+            print("runtime_instance_evidence_change:"+json.dumps(runtime_change_diagnostic(error), sort_keys=True, separators=(",", ":")), file=sys.stderr)
         return 1
 
 
