@@ -848,3 +848,449 @@ class Native(unittest.IsolatedAsyncioTestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class Layout0040(unittest.TestCase):
+    def setUp(self):
+        self.layout = m._scanner("ai", "0040_module_table_names")._layout()
+        self.rows = {n: [] for n in self.layout.SPECS}
+        self.rows["alembic_version"] = [row(version_num=self.layout.HEAD)]
+        self.schemas = {n: {"columns": [(c,) for c in spec[0].split()], "columns_sha256": m.sha(n.encode())}
+                        for n, spec in self.layout.SPECS.items()}
+
+    def project(self):
+        return self.layout.project(self.rows, m.AI_SPECS, self.schemas)
+
+    def physical(self, table, **values):
+        contract = self.layout.CONTRACT[table]
+        out = {}
+        for c in contract["columns"]:
+            if c["name"] in values:
+                out[c["name"]] = raw(values[c["name"]])
+            elif c["nullable"]:
+                out[c["name"]] = None
+            elif c["type"] == "JSON":
+                out[c["name"]] = b"{}"
+            elif c["type"].startswith(("DATETIME", "TIMESTAMP")):
+                out[c["name"]] = b"2026-10-08 00:00:00.000000"
+            elif c["type"].startswith(("BIGINT", "INTEGER", "BOOL")):
+                out[c["name"]] = b"0"
+            else:
+                out[c["name"]] = b"fixture"
+        self.rows[table].append(out)
+        return out
+
+    def asset(self, kind="profile", owner=0, identity="fixture-asset", version="1", body=b'{ "raw": "unchanged" }'):
+        native = kind in ("profile", "prompt", "route", "schema")
+        return self.physical("governance_asset_versions", asset_row_id=len(self.rows["governance_asset_versions"])+1,
+            asset_kind=kind, owner_organization_id=owner, asset_id=identity, version=version,
+            fingerprint="a"*64, created_at="2026-10-08 00:00:00.000000", body_format="prompt_package_json" if kind=="prompt" else "semantic_markdown" if kind=="semantic_prompt" else "definition_json",
+            body_bytes=body, package_sha256="b"*64 if kind=="prompt" else None,
+            native_id_key=identity if native else None, scoped_id_key=None if native else identity,
+            profile_id_key=identity if kind=="profile" else None, catalog_version_key=version)
+
+    def draft(self, kind="prompt", identity="00000000-0000-0000-0000-000000000001", owner=1):
+        did=len(self.rows["governance_draft_heads"])+1
+        self.physical("governance_draft_heads",draft_row_id=did,draft_kind=kind,organization_id=owner,draft_id=identity,revision=1,
+            prompt_draft_id_key=identity if kind=="prompt" else None,semantic_draft_id_key=identity if kind=="semantic" else None)
+        blob=b'{ "snapshot": 1 }'
+        return self.physical("governance_draft_versions",draft_row_id=did,revision=1,draft_kind=kind,organization_id=owner,
+            command_id=identity if kind=="prompt" else None,operator_user_id=1 if kind=="prompt" else None,
+            request_bytes=b'{ "request": 1 }' if kind=="prompt" else None,
+            snapshot_bytes=blob,snapshot_sha256=m.sha(blob),prompt_command_id_key=identity if kind=="prompt" else None)
+
+    def completion(self, kind="generation"):
+        if not self.rows["evaluation_runs"]:
+            self.physical("evaluation_runs",run_id="fixture-run",frozen_execution_policy_fingerprint=None,frozen_execution_policy_json=None)
+        return self.physical("evaluation_completions",kind=kind,run_id="fixture-run",execution_id=kind,
+            candidate_id="candidate",case_id="case" if kind=="generation" else None,slot_ordinal=0 if kind=="generation" else None,
+            result_json=b'{ "result": 1 }' if kind=="semantic" else None,candidate_json=None,
+            raw_output=b'{ "raw": "kept" }',normalized_output=b' { "normalized": true } ',
+            gen_candidate_key="candidate" if kind=="generation" else None,gen_case_key="case" if kind=="generation" else None,
+            gen_slot_key=0 if kind=="generation" else None,sem_candidate_key="candidate" if kind=="semantic" else None)
+
+    def test_empty_whole43_plus_system_to53_has_no_inferred_records(self):
+        logical,lineage=self.project()
+        self.assertEqual(len(self.rows),44);self.assertEqual(len(logical),53)
+        self.assertTrue(all(not v for v in logical.values()));self.assertTrue(all(not v for v in lineage.values()))
+
+    def test_all_six_merge_groups_preserve_raw_and_exact_source_pk(self):
+        for kind in self.layout.ASSETS:self.asset(kind=kind,owner=1 if kind=="semantic_prompt" else 0,identity=kind)
+        self.draft();self.draft("semantic",owner=2)
+        self.completion();self.completion("semantic")
+        session=self.physical("interpretation_sessions",id="session",request_id="request")
+        run=self.rows["evaluation_runs"][0];run["frozen_execution_policy_fingerprint"]=b"a"*64;run["frozen_execution_policy_json"]=b' { "frozen": true } '
+        logical,lineage=self.project()
+        self.assertEqual(logical["profile_assets"][0]["definition_json"],self.rows["governance_asset_versions"][0]["body_bytes"])
+        self.assertEqual(logical["semantic_draft_versions"][0]["organization_id"],b"2")
+        self.assertEqual(logical["evaluation_semantic_completions"][0]["raw_output"],b'{ "raw": "kept" }')
+        self.assertEqual(logical["evaluation_run_policies"][0]["definition_json"],run["frozen_execution_policy_json"])
+        self.assertEqual(logical["external_requests"],[row(request_id="request",session_id="session")])
+        self.assertEqual(lineage["external_requests"][0]["physical_pk"],(session["id"],))
+        self.assertEqual(lineage["prompt_draft_revisions"][0]["physical_pk"],(b"1",b"1"))
+        self.assertEqual(lineage["evaluation_generation_completions"][0]["physical_pk"],(b"generation",b"fixture-run",b"generation"))
+        for name,values in logical.items():self.assertEqual(len(values),len(lineage[name]))
+
+    def test_unknown_merge_kinds_block_even_without_original_targets(self):
+        builders=(("asset_kind",lambda:self.asset()),("draft_kind",lambda:self.draft()),("kind",lambda:self.completion()))
+        for field,builder in builders:
+            self.setUp();target=builder();target[field]=b"unknown-private-do-not-echo"
+            with self.subTest(field=field),self.assertRaises(self.layout.Rejected) as caught:self.project()
+            self.assertNotIn("private",str(caught.exception))
+
+    def test_full_raw_scope_and_head_required(self):
+        for mutate in (lambda:self.rows.pop("messaging_observations"),lambda:self.rows["alembic_version"].clear(),lambda:self.rows["alembic_version"][0].update(version_num=b"0038_messaging_observations")):
+            self.setUp();mutate()
+            with self.assertRaises(self.layout.Rejected):self.project()
+
+    def test_global_orphan_unrelated_to_original_command_not_hidden(self):
+        self.physical("execution_model_calls",run_id="unbound-run")
+        with self.assertRaisesRegex(self.layout.Rejected,"orphan"):self.project()
+
+    def test_draft_wrong_parent_org_revision_and_null_audit_block(self):
+        for field,value in (("organization_id",b"2"),("draft_row_id",b"90"),("revision",b"2"),("command_id",None),("prompt_command_id_key",b"wrong"),("snapshot_bytes",b"changed")):
+            self.setUp();target=self.draft();target[field]=value
+            with self.subTest(field=field),self.assertRaises(self.layout.Rejected):self.project()
+
+    def test_policy_single_null_not_filled_from_current_policy(self):
+        for fp,body in ((b"a"*64,None),(None,b"{}")):
+            self.setUp();self.physical("evaluation_runs",run_id="r",frozen_execution_policy_fingerprint=fp,frozen_execution_policy_json=body)
+            with self.assertRaisesRegex(self.layout.Rejected,"single_null"):self.project()
+
+    def test_generated_owner_collision_null_shapes_block(self):
+        for mutate in (lambda r:r.update(owner_organization_id=b"9"),lambda r:r.update(profile_id_key=b"wrong"),lambda r:r.update(package_sha256=b"a"*64),lambda r:r.update(body_bytes=None)):
+            self.setUp();target=self.asset();mutate(target)
+            with self.assertRaises(self.layout.Rejected):self.project()
+        self.setUp();self.asset();self.asset()
+        with self.assertRaisesRegex(self.layout.Rejected,"collision"):self.project()
+
+    def test_completion_single_null_wrong_kind_or_generated_key_block(self):
+        for field,value in (("case_id",None),("gen_case_key",b"other"),("result_json",b"{}"),("run_id",b"missing")):
+            self.setUp();target=self.completion();target[field]=value
+            with self.subTest(field=field),self.assertRaises(self.layout.Rejected):self.project()
+
+    def test_physical_duplicate_pk_unknown_column_and_mutable_input_block(self):
+        for mutate in (lambda r:self.rows["governance_asset_versions"].append(dict(r)),lambda r:r.update(unknown=None),lambda r:r.update(body_bytes="not-binary")):
+            self.setUp();target=self.asset();mutate(target)
+            with self.assertRaises(self.layout.Rejected):self.project()
+
+    def test_physical_schema_isolated_from_legacy_registry_and_sealed_observer(self):
+        current=m._scanner("ai",self.layout.HEAD);legacy=m._scanner("ai",m.AI_HEAD)
+        self.assertEqual(len(current.SPECS),44);self.assertEqual(len(legacy.SPECS),53)
+        self.assertNotEqual(current.SPECS,legacy.SPECS);self.assertEqual(len(m.AI_SPECS),53)
+        changed=PATH.with_name("qs-ai-retirement-0040-layout.py").read_bytes()+b"\n"
+        with patch.object(Path,"read_bytes",return_value=changed),self.assertRaisesRegex(current.Rejected,"fixed_0040_layout_changed"):current._layout()
+
+
+@unittest.skipUnless(os.environ.get("QS_AI_RETIREMENT_VERIFIER_NATIVE") == "1", "owned native opt-in")
+class Native0040(unittest.IsolatedAsyncioTestCase):
+    clean=Native.clean
+    asyncTearDown=Native.asyncTearDown
+    snapshots=Native.snapshots
+    end=Native.end
+    qualify=Native.qualify
+
+    async def asyncSetUp(self):
+        from sqlalchemy import text
+        await Native.asyncSetUp(self)
+        self.layout=m._scanner("ai","0040_module_table_names")._layout()
+        try:
+            async with self.engines[0].begin() as c:
+                names=(await c.execute(text("SELECT TABLE_NAME FROM information_schema.tables WHERE table_schema=DATABASE()"))).scalars().all()
+                await c.execute(text("SET FOREIGN_KEY_CHECKS=0"))
+                for n in names:await c.execute(text("DROP TABLE `"+n+"`"))
+                # Exact pinned 82ffa/v0040 DDL, topological FK creation.
+                pending=dict(self.layout.CONTRACT);done=set()
+                while pending:
+                    ready=[n for n,t in pending.items() if all(f["table"] in done for f in t["foreign_keys"])]
+                    if not ready:raise AssertionError("0040_fixture_fk_cycle")
+                    for n in ready:
+                        t=pending.pop(n);await c.execute(text(t["create_sql"]))
+                        for sql in t["index_sql"]:await c.execute(text(sql))
+                        done.add(n)
+                await c.execute(text("SET FOREIGN_KEY_CHECKS=1"))
+                await c.execute(text("CREATE TABLE alembic_version(version_num VARCHAR(32) PRIMARY KEY) ENGINE=InnoDB"))
+                await c.execute(text("INSERT INTO alembic_version VALUES (:head)"),{"head":self.layout.HEAD})
+        except Exception:
+            await self.clean();raise AssertionError("owned_0040_exact_schema_setup_failed") from None
+
+    async def bounds(self,sessions):
+        return [await m.discover_full_bounds(s,side=side,source_sha=self.layout.SOURCE_SHA if side=="ai" else "a"*40,identity_hash=identity,head=head)
+                for s,side,identity,head in zip(sessions,("ai","peer"),self.identities,(self.layout.HEAD,"99"))]
+
+    async def insert(self,table,values):
+        from sqlalchemy import text
+        async with self.engines[0].begin() as c:
+            await c.execute(text("INSERT INTO `"+table+"` ("+",".join("`"+k+"`" for k in values)+") VALUES ("+",".join(":"+k for k in values)+")"),values)
+
+    async def test_native0040_all43_actual_columns_pk_indexes_system_two_passes_fresh(self):
+        sessions=await self.snapshots()
+        try:
+            bounds=await self.bounds(sessions);q=await self.qualify(sessions,bounds)
+            scan=q._scans[0]
+            self.assertEqual(len(scan.sections),44);self.assertEqual(len(scan.rows),53)
+            self.assertEqual(scan.sections["alembic_version"]["rows"],1)
+            self.assertTrue(all(section["equal_full_passes"]==2 for section in scan.sections.values()))
+            self.assertTrue(all("indexes" in s and "foreign_keys" in s and "checks" in s for s in bounds[0].tables.values()))
+            self.assertFalse(q.receipt()["drop_ready"])
+            self.assertTrue(all(s.get_transaction().is_active for s in sessions))
+            with self.assertRaisesRegex(m.Rejected,"original_snapshots_must_end"):await m.recheck(*sessions,q)
+        finally:await self.end(sessions)
+        fresh=await self.snapshots()
+        try:self.assertTrue((await m.recheck(*fresh,q))["unchanged_full_source_hashes"])
+        finally:await self.end(fresh)
+
+    async def test_native0040_actual_blob_identity_lineage_and_below_upper_change(self):
+        values=dict(asset_kind="profile",owner_organization_id=0,asset_id="fixture-profile",version="1",fingerprint="a"*64,
+                    body_format="definition_json",body_bytes=b' { "private": "raw" } ',source_ref="fixture-source",imported_by=1,created_at=None)
+        await self.insert("governance_asset_versions",values)
+        sessions=await self.snapshots()
+        try:
+            bounds=await self.bounds(sessions);scan=await m._scan(sessions[0],bounds[0],bounds[0].digest())
+            self.assertEqual(scan.rows["profile_assets"][0]["definition_json"],values["body_bytes"])
+            self.assertEqual(scan.lineage["profile_assets"][0]["physical_table"],"governance_asset_versions")
+            self.assertEqual(scan.lineage["profile_assets"][0]["physical_pk"],(b"1",))
+        finally:await self.end(sessions)
+        from sqlalchemy import text
+        async with self.engines[0].begin() as c:await c.execute(text("UPDATE governance_asset_versions SET body_bytes=:v"),{"v":b' { "private": "changed" } '})
+        fresh=await self.snapshots()
+        try:
+            self.assertFalse(any(v["next_cycle_required"] for v in (await scan.module.fresh_after_upper(fresh[0],scan.observation)).values()))
+            changed=await m._scan(fresh[0],bounds[0],bounds[0].digest())
+            self.assertNotEqual(changed.sections,scan.sections)
+        finally:await self.end(fresh)
+
+    async def test_native0040_schema_unknown_column_new_index_and_write_tx_rejected(self):
+        from sqlalchemy import text
+        write=await self.snapshots(False)
+        try:
+            with self.assertRaisesRegex(m.Rejected,"actual_readonly_snapshot_not_observed"):await self.bounds(write)
+        finally:await self.end(write)
+        for ddl in ("ALTER TABLE operations_runtime_milestones ADD unknown_private_column TEXT NULL","CREATE INDEX unknown_extra_index ON operations_runtime_milestones(kind)"):
+            async with self.engines[0].begin() as c:await c.execute(text(ddl))
+            sessions=await self.snapshots()
+            try:
+                with self.assertRaises(m.Rejected):await self.bounds(sessions)
+            finally:await self.end(sessions)
+            async with self.engines[0].begin() as c:await c.execute(text("ALTER TABLE operations_runtime_milestones DROP COLUMN unknown_private_column" if "ADD" in ddl else "DROP INDEX unknown_extra_index ON operations_runtime_milestones"))
+
+
+
+
+    async def test_native0040_actual_ai_collation_mixed_unicode_and_numeric_keyset_complete(self):
+        from sqlalchemy import text
+        keys=["Z","a","é","Ω","ß","中","q"]
+        numbers=[0,1,2,9,10]
+        async with self.engines[0].begin() as c:
+            for key in keys:
+                await c.execute(text("INSERT INTO evaluation_runs(run_id,execution_mode,organization_id,requested_by,definition_json,progress_json) VALUES (:id,'serial_v1',1,'fixture','{}','{}')"),{"id":key})
+                for number in numbers:
+                    await c.execute(text("INSERT INTO evaluation_slot_claims(run_id,case_id,slot_ordinal,version,checkpoint_json) VALUES (:id,'case',:n,0,'{}')"),{"id":key,"n":number})
+        sessions=await self.snapshots()
+        try:
+            with patch.object(m,"PAGE",2):
+                bounds=await self.bounds(sessions)
+                metadata={c[0]:c for c in bounds[0].tables["evaluation_runs"]["columns"]}
+                self.assertEqual(metadata["run_id"][5],"utf8mb4_0900_ai_ci")
+                actual=list((await sessions[0].execute(text("SELECT CAST(run_id AS BINARY) FROM evaluation_runs ORDER BY run_id"))).scalars().all())
+                numeric=[tuple(x) for x in (await sessions[0].execute(text("SELECT CAST(run_id AS BINARY),CAST(slot_ordinal AS BINARY) FROM evaluation_slot_claims ORDER BY run_id,case_id,slot_ordinal"))).all()]
+                self.assertNotEqual(actual,sorted(actual))
+                self.assertNotEqual(numeric,sorted(numeric))
+                scan=await m._scan(sessions[0],bounds[0],bounds[0].digest())
+                self.assertEqual([r["run_id"] for r in scan.physical_rows["evaluation_runs"]],actual)
+                self.assertEqual([(r["run_id"],r["slot_ordinal"]) for r in scan.physical_rows["evaluation_slot_claims"]],numeric)
+                self.assertEqual(scan.sections["evaluation_runs"]["rows"],len(keys))
+                self.assertEqual(scan.sections["evaluation_slot_claims"]["rows"],len(keys)*len(numbers))
+                self.assertGreater(scan.sections["evaluation_slot_claims"]["pages"],1)
+                self.assertTrue(all(x["equal_full_passes"]==2 for x in scan.sections.values()))
+        finally:await self.end(sessions)
+
+    async def test_native0040_all_six_nonempty_merges_keep_binary_null_and_original_identity(self):
+        from sqlalchemy import text
+        fixture=Layout0040();fixture.setUp()
+        for kind in self.layout.ASSETS:fixture.asset(kind,1 if kind=="semantic_prompt" else 0,identity=kind)
+        fixture.draft();fixture.draft("semantic",owner=2)
+        fixture.completion();fixture.completion("semantic")
+        policy=fixture.rows["evaluation_runs"][0]
+        policy["frozen_execution_policy_fingerprint"]=b"a"*64
+        policy["frozen_execution_policy_json"]=b' { "frozen": "original" } '
+        fixture.physical("interpretation_sessions",id="session",request_id="request")
+        async with self.engines[0].begin() as c:
+            pending=dict(self.layout.CONTRACT);done=set()
+            while pending:
+                ready=[n for n,t in pending.items() if all(f["table"] in done for f in t["foreign_keys"])]
+                for n in ready:
+                    contract=pending.pop(n)
+                    for original in fixture.rows[n]:
+                        values={k:(value.decode("utf-8") if value is not None and next(col for col in contract["columns"] if col["name"]==k)["type"]=="JSON" else value) for k,value in original.items() if next(col for col in contract["columns"] if col["name"]==k)["computed"] is None}
+                        await c.execute(text("INSERT INTO `"+n+"` ("+",".join("`"+k+"`" for k in values)+") VALUES ("+",".join(":"+k for k in values)+")"),values)
+                    done.add(n)
+        sessions=await self.snapshots()
+        try:
+            bounds=await self.bounds(sessions);scan=await m._scan(sessions[0],bounds[0],bounds[0].digest())
+            self.assertEqual(scan.rows["profile_assets"][0]["definition_json"],fixture.rows["governance_asset_versions"][0]["body_bytes"])
+            self.assertEqual(scan.rows["prompt_draft_revisions"][0]["snapshot_json"],b'{ "snapshot": 1 }')
+            self.assertEqual(scan.rows["semantic_draft_versions"][0]["snapshot_json"],b'{ "snapshot": 1 }')
+            self.assertIsNone(scan.physical_rows["governance_draft_versions"][1]["request_bytes"])
+            self.assertEqual(scan.rows["evaluation_generation_completions"][0]["normalized_output"],b' { "normalized": true } ')
+            self.assertEqual(scan.rows["evaluation_semantic_completions"][0]["raw_output"],b'{ "raw": "kept" }')
+            self.assertEqual(scan.rows["evaluation_run_policies"][0]["definition_json"],policy["frozen_execution_policy_json"])
+            self.assertEqual(scan.rows["external_requests"][0]["request_id"],b"request")
+            physical={(n,tuple(r[k] for k in self.layout.SPECS[n][1].split())) for n,rows in scan.physical_rows.items() if n!="alembic_version" for r in rows}
+            projected={(x["physical_table"],x["physical_pk"]) for refs in scan.lineage.values() for x in refs}
+            self.assertEqual(physical,projected)
+        finally:await self.end(sessions)
+
+    async def test_native0040_standalone_observer_fresh_checks_below_upper_and_host_ownership(self):
+        from sqlalchemy import text
+        path=PATH.with_name("qs-ai-retirement-readonly-observer.py")
+        name="_native_standalone_0040_"+uuid4().hex
+        spec=importlib.util.spec_from_file_location(name,path);observer=importlib.util.module_from_spec(spec);sys.modules[name]=observer
+        try:spec.loader.exec_module(observer)
+        finally:sys.modules.pop(name,None)
+        await self.insert("governance_asset_versions",dict(asset_kind="profile",owner_organization_id=0,asset_id="fixture-profile",version="1",fingerprint="a"*64,body_format="definition_json",body_bytes=b' { "raw": 1 } ',source_ref="fixture",imported_by=1))
+        sessions=await self.snapshots()
+        try:
+            bound=await observer.discover_bounds(sessions[0],identity_hash=self.identities[0],source_sha=self.layout.SOURCE_SHA,head=self.layout.HEAD)
+            observation=await observer.observe(sessions[0],bound,approved_bounds_sha256=bound.digest())
+            self.assertEqual(len(observation._sections),44);self.assertEqual(len(observation._rows),18)
+            self.assertEqual(observation.receipt()["server_readonly_snapshot_mode"],"actual_rr_readonly_observed")
+            self.assertTrue(sessions[0].get_transaction().is_active)
+            with self.assertRaisesRegex(observer.Rejected,"original_snapshot_must_end"):await observer.fresh_after_upper(sessions[0],observation)
+        finally:await self.end(sessions)
+        fresh=await self.snapshots()
+        try:
+            result=await observer.fresh_after_upper(fresh[0],observation)
+            self.assertEqual(len(result),44);self.assertTrue(all(x["unchanged_full_source_hashes"] for x in result.values()))
+            self.assertTrue(fresh[0].get_transaction().is_active)
+        finally:await self.end(fresh)
+        async with self.engines[0].begin() as c:await c.execute(text("UPDATE governance_asset_versions SET body_bytes=:body"),{"body":b' { "raw": 2 } '})
+        changed=await self.snapshots()
+        try:
+            with self.assertRaisesRegex(observer.Rejected,"post_snapshot_full_source_changed"):await observer.fresh_after_upper(changed[0],observation)
+            self.assertTrue(changed[0].get_transaction().is_active)
+        finally:await self.end(changed)
+
+    async def test_native0040_eight_originals_not_synthetic_targets_and_peer_corruption(self):
+        from sqlalchemy import text
+        fixture=Layout0040();fixture.setUp()
+        peer={n:[] for n in m.PEER_SPECS}
+        for _ in range(8):
+            ai,p,_,_=history()
+            request=ai["external_requests"][0]["request_id"]
+            for old,rows in ai.items():
+                if old=="external_requests":continue
+                physical=self.layout.RENAMES.get(old,old)
+                for original in rows:
+                    values=dict(original)
+                    if old=="interpretation_sessions":values["request_id"]=request
+                    fixture.physical(physical,**values)
+            for n,rows in p.items():peer[n].extend(rows)
+        async with self.engines[0].begin() as c:
+            pending=dict(self.layout.CONTRACT);done=set()
+            while pending:
+                ready=[n for n,t in pending.items() if all(f["table"] in done for f in t["foreign_keys"])]
+                for n in ready:
+                    contract=pending.pop(n)
+                    for original in fixture.rows[n]:
+                        values={k:(value.decode("utf-8") if value is not None and next(col for col in contract["columns"] if col["name"]==k)["type"]=="JSON" else value) for k,value in original.items() if next(col for col in contract["columns"] if col["name"]==k)["computed"] is None}
+                        await c.execute(text("INSERT INTO `"+n+"` ("+",".join("`"+k+"`" for k in values)+") VALUES ("+",".join(":"+k for k in values)+")"),values)
+                    done.add(n)
+        async with self.engines[1].begin() as c:
+            for n in ["ai_bridge_requests"]+[k for k in peer if k!="ai_bridge_requests"]:
+                json_fields=set((await c.execute(text("SELECT COLUMN_NAME FROM information_schema.columns WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME=:n AND DATA_TYPE='json'"),{"n":n})).scalars().all())
+                for original in peer[n]:
+                    values={k:(v.decode("utf-8") if k in json_fields and v is not None else v) for k,v in original.items()}
+                    await c.execute(text("INSERT INTO `"+n+"` ("+",".join("`"+k+"`" for k in values)+") VALUES ("+",".join(":"+k for k in values)+")"),values)
+        sessions=await self.snapshots()
+        try:
+            bounds=await self.bounds(sessions);q=await self.qualify(sessions,bounds)
+            self.assertEqual(q.receipt()["originals"],8)
+            self.assertEqual(q.receipt()["summary"]["known_terminal_without_artifact"],8)
+            self.assertFalse(q.receipt()["drop_ready"])
+            self.assertEqual(len(q._scans[0].lineage["external_requests"]),8)
+        finally:await self.end(sessions)
+        async with self.engines[1].begin() as c:await c.execute(text("UPDATE ai_bridge_events SET payload_hash=:bad LIMIT 1"),{"bad":"0"*64})
+        fresh=await self.snapshots()
+        try:
+            with self.assertRaises(m.Rejected):await m.recheck(*fresh,q)
+        finally:await self.end(fresh)
+
+    async def test_native0040_unknown_kind_single_null_and_bad_constraints_refused(self):
+        from sqlalchemy import text
+        async with self.engines[0].begin() as c:
+            for ck in self.layout.CONTRACT["governance_asset_versions"]["checks"]:
+                await c.execute(text("ALTER TABLE governance_asset_versions ALTER CHECK `"+ck["name"]+"` NOT ENFORCED"))
+            await c.execute(text("INSERT INTO governance_asset_versions(asset_kind,owner_organization_id,asset_id,version,fingerprint,body_format,body_bytes,source_ref,imported_by) VALUES ('unknown',0,'unknown','1',:fp,'definition_json',:body,'fixture',1)"),{"fp":"a"*64,"body":b"{}"})
+
+        sessions=await self.snapshots()
+        try:
+            with self.assertRaisesRegex(m.Rejected,"check_constraint_conflict"):await self.bounds(sessions)
+        finally:await self.end(sessions)
+        async with self.engines[0].begin() as c:
+            await c.execute(text("DELETE FROM governance_asset_versions"))
+            for ck in self.layout.CONTRACT["governance_asset_versions"]["checks"]:
+                await c.execute(text("ALTER TABLE governance_asset_versions ALTER CHECK `"+ck["name"]+"` ENFORCED"))
+            await c.execute(text("ALTER TABLE evaluation_runs DROP CHECK ck_evaluation_runs_frozen_policy"))
+        sessions=await self.snapshots()
+        try:
+            with self.assertRaisesRegex(m.Rejected,"complete_checks"):await self.bounds(sessions)
+        finally:await self.end(sessions)
+
+    async def test_native0040_global_orphan_cannot_hide_with_fk_off_at_import(self):
+        from sqlalchemy import text
+        async with self.engines[0].begin() as c:
+            await c.execute(text("SET FOREIGN_KEY_CHECKS=0"))
+            await c.execute(text("INSERT INTO execution_model_calls(run_id,invocation_id,fence_token,status,request_json) VALUES ('orphan','call',1,'failed','{}')"))
+            await c.execute(text("SET FOREIGN_KEY_CHECKS=1"))
+        sessions=await self.snapshots()
+        try:
+            bounds=await self.bounds(sessions)
+            with self.assertRaisesRegex(m.Rejected,"orphan"):await m._scan(sessions[0],bounds[0],bounds[0].digest())
+        finally:await self.end(sessions)
+
+
+class Layout0040Metadata(unittest.TestCase):
+    def setUp(self):self.layout=m._scanner("ai","0040_module_table_names")._layout()
+
+    def metadata(self,table):
+        t=self.layout.CONTRACT[table]
+        columns=[];generated=[];indexes=[];fks=[];checks=[]
+        for c in t["columns"]:
+            auto=any(__import__('re').search(r"\b"+c["name"]+r"\b.*AUTO_INCREMENT",line,__import__('re').I) for line in t["create_sql"].splitlines())
+            extra="auto_increment" if auto else "STORED GENERATED" if c["computed"] and c["persisted"] else "VIRTUAL GENERATED" if c["computed"] else ""
+            columns.append((c["name"],self.layout._type(c["type"]),"YES" if c["nullable"] else "NO",c["default"],extra,c["collation"]))
+            generated.append((c["name"],c["computed"] or ""))
+        for name,keys,unique in [("PRIMARY",t["primary_key"],True)]+[(i["name"],i["columns"],i["unique"]) for i in t["indexes"]]:
+            indexes.extend((name,n,k,0 if unique else 1,"A",None,"BTREE","YES",None) for n,k in enumerate(keys,1))
+        for f in t["foreign_keys"]:
+            fks.extend((f["name"],n,k,"fixture_db",f["table"],parent,"NO ACTION",f["ondelete"] or "NO ACTION") for n,(k,parent) in enumerate(zip(f["columns"],f["referred_columns"]),1))
+        checks.extend((c["name"],c["sql"],"YES") for c in t["checks"])
+        return columns,indexes,generated,fks,checks
+
+    def test_all_fixed_contract_metadata_and_mysql_boolean_rendering(self):
+        for n in self.layout.CONTRACT:
+            columns,indexes,generated,fks,checks=self.metadata(n)
+            self.layout.validate_schema(n,columns,indexes)
+            self.layout.validate_constraints(n,generated,fks,checks,"fixture_db")
+        a="(kind='generation' AND case_id IS NOT NULL) OR kind='semantic'"
+        b="((`kind` = _utf8mb4'generation') and (`case_id` is not null)) or (`kind` = _utf8mb4'semantic')"
+        self.assertEqual(self.layout._expression(a),self.layout._expression(b))
+        self.assertEqual(self.layout._expression(a),self.layout._expression(b.replace("_utf8mb4'generation'", "_ascii\\'generation\\'").replace("_utf8mb4'semantic'", "_ascii\\'semantic\\'")))
+        self.assertNotEqual(self.layout._expression("(a=1 OR b=1) AND c=1"),self.layout._expression("a=1 OR (b=1 AND c=1)"))
+
+    def test_index_column_default_type_null_generated_collation_strict(self):
+        n="governance_asset_versions"
+        for mutate in (lambda c,i:c[0].__setitem__(1,"bigint"),lambda c,i:c[0].__setitem__(2,"YES"),lambda c,i:c[0].__setitem__(4,""),lambda c,i:c[1].__setitem__(3,"unknown"),lambda c,i:i.append(["unknown",1,"asset_id",1,"A",None,"BTREE","YES",None]),lambda c,i:i[0].__setitem__(7,"NO"),lambda c,i:i[0].__setitem__(4,"D")):
+            columns,indexes,*_=self.metadata(n);columns=[list(x) for x in columns];indexes=[list(x) for x in indexes];mutate(columns,indexes)
+            with self.assertRaises(self.layout.Rejected):self.layout.validate_schema(n,columns,indexes)
+
+    def test_fk_check_and_generated_expressions_cannot_be_approved_wrong(self):
+        n="governance_draft_versions"
+        for part,mutate in (("fk",lambda g,f,c:f.clear()),("cross_schema",lambda g,f,c:f[0].__setitem__(3,"another_db")),("generated",lambda g,f,c:g[-1].__setitem__(1,"command_id")),("disabled_check",lambda g,f,c:c[0].__setitem__(2,"NO")),("changed_precedence",lambda g,f,c:c[0].__setitem__(1,"revision>=0"))):
+            _,_,g,f,c=self.metadata(n);g=[list(x) for x in g];f=[list(x) for x in f];c=[list(x) for x in c];mutate(g,f,c)
+            with self.subTest(part=part),self.assertRaises(self.layout.Rejected):self.layout.validate_constraints(n,g,f,c,"fixture_db")
+
+    def test_system_schema_null_check_extra_generated_not_accepted(self):
+        with self.assertRaises(self.layout.Rejected):self.layout.validate_schema("alembic_version",[("version_num","varchar(32)","YES",None,"","utf8mb4_bin")],[])
+        with self.assertRaises(self.layout.Rejected):self.layout.validate_constraints("alembic_version",[("version_num","'fixed'")],[],[],"fixture_db")

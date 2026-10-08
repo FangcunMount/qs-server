@@ -19,7 +19,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from uuid import UUID, uuid5, NAMESPACE_URL
 
-_OBSERVER_SHA = "52e9aef9d97d3accacb1faa34c6eb1f5d5f716cb9fe0d74d4d64c3a6a9438fa4"
+_OBSERVER_SHA = "20c501d0930a21c1e8be12416156d5635430cf6171e01d28a6db789e83f06d5a"
 PAGE = 1000
 MAX_ROWS = 1_000_000
 MAX_BYTES = 2 << 30
@@ -376,13 +376,15 @@ def _scanner(side, head):
     finally:
         # Functions retain their isolated globals, but do not accumulate modules.
         del sys.modules[name]
-    module.SPECS = AI_SPECS if side == "ai" else PEER_SPECS
+    module.SPECS = module._layout().SPECS if side == "ai" and head == "0040_module_table_names" else AI_SPECS if side == "ai" else PEER_SPECS
+    module._RAW_LAYOUT_SCAN = True
     module.HEAD = head
     module.PAGE, module.MAX_ROWS, module.MAX_BYTES = PAGE, MAX_ROWS, MAX_BYTES
     module.MAX_GRAPH_BYTES, module.QUERY_SECONDS, module.TOTAL_SECONDS = MAX_PRIVATE_BYTES, QUERY_SECONDS, TOTAL_SECONDS
     module._canon = _private_json
     module._minimal = lambda _, row: row
-    module._schema = lambda reader, table: _schema(module, reader, table)
+    original_schema = module._schema
+    module._schema = lambda reader, table: original_schema(reader, table) if side == "ai" and head == "0040_module_table_names" else _schema(module, reader, table)
     module._binding = lambda reader, identity, source: _binding(reader, identity, source, side, head, module)
     original_reader = module._Borrowed
     class BoundedReader(original_reader):
@@ -401,6 +403,8 @@ async def _binding(reader, identity, source, side, head, module):
     row = await reader.query("SELECT CAST(@@server_uuid AS BINARY),CAST(DATABASE() AS BINARY),VERSION(),@@transaction_isolation")
     if len(row) != 1 or module._identity(row[0][0], row[0][1]) != identity or not row[0][2].startswith("8.") or row[0][3] != "REPEATABLE-READ":
         fail("database_identity_or_isolation_changed")
+    if side == "ai" and head == "0040_module_table_names" and source != module._layout().SOURCE_SHA:
+        fail("fixed_0040_source_revision_required")
     # Check the actual running server transaction, not only the session default.
     current = await reader.query("SELECT t.ACCESS_MODE,t.ISOLATION_LEVEL,t.STATE FROM performance_schema.events_transactions_current t JOIN performance_schema.threads p ON p.THREAD_ID=t.THREAD_ID WHERE p.PROCESSLIST_ID=CONNECTION_ID()")
     if current != [("READ ONLY", "REPEATABLE READ", "ACTIVE")]:
@@ -438,7 +442,7 @@ async def _schema(module, reader, table):
 async def _catalog(reader, side):
     names = await reader.query("SELECT TABLE_NAME FROM information_schema.tables WHERE table_schema=DATABASE() AND TABLE_TYPE='BASE TABLE' ORDER BY TABLE_NAME")
     actual = {r[0] for r in names}
-    expected = set(AI_SPECS) | {"alembic_version"} if side == "ai" else set(PEER_SPECS)
+    expected = set(reader.specs) | {"alembic_version"} if side == "ai" else set(PEER_SPECS)
     if side == "ai" and actual != expected:
         fail("unsupported_database_catalog")
     if side == "peer" and ({n for n in actual if n.startswith(("ai_", "ai_bridge_"))} != expected):
@@ -471,13 +475,13 @@ class FullBounds:
 
 
 async def discover_full_bounds(session, *, side, source_sha, identity_hash, head):
-    if side not in ("ai", "peer") or (side == "ai" and head != AI_HEAD) or (side == "peer" and (not isinstance(head, str) or not re.fullmatch(r"[1-9][0-9]{0,8}", head))):
+    if side not in ("ai", "peer") or (side == "ai" and head not in (AI_HEAD, "0040_module_table_names")) or (side == "peer" and (not isinstance(head, str) or not re.fullmatch(r"[1-9][0-9]{0,8}", head))):
         fail("unsupported_bound_head")
     module = _scanner(side, head)
     reader = module._Borrowed(session)
     catalog = await _catalog(reader, side)
     try:
-        bounds = await module.discover_bounds(session, identity_hash=identity_hash, source_sha=source_sha)
+        bounds = await module.discover_bounds(session, identity_hash=identity_hash, source_sha=source_sha, head=head)
         return FullBounds(side, source_sha, identity_hash, head, catalog, bounds.tables)
     except module.Rejected as e:
         fail(str(e))
@@ -903,7 +907,12 @@ class _Scan:
             fail("actual_scan_required")
         self.bounds, self.observation, self.module = bounds, observation, module
         self.approved_bounds_sha256 = bounds.digest()
-        self.rows = {name: _SourceRows(rows) for name, rows in observation._rows.items()}
+        self.physical_rows = observation._rows
+        self.lineage = None
+        rows = observation._rows
+        if bounds.side == "ai" and bounds.head == "0040_module_table_names":
+            rows, self.lineage = module._project(rows, bounds.tables)
+        self.rows = {name: _SourceRows(values) for name, values in rows.items()}
         self.sections = observation._sections
 
     def __repr__(self):

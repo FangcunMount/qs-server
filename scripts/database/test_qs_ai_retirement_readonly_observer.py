@@ -441,3 +441,46 @@ class OwnedNative(unittest.IsolatedAsyncioTestCase):
 
 
 if __name__=="__main__":unittest.main()
+
+
+class Observer0040(unittest.IsolatedAsyncioTestCase):
+    def test_fixed_0040_registry_does_not_replace_legacy_specs(self):
+        layout=m._layout()
+        self.assertEqual(len(layout.CONTRACT),43);self.assertEqual(len(m._specs(layout.HEAD)),44)
+        self.assertEqual(len(m.SPECS),18);self.assertEqual(m._specs(m.HEAD),m.SPECS)
+        self.assertEqual(layout.SOURCE_SHA,"82ffa1b43308f23fbb1ebe669c3071e0486e105a")
+        self.assertEqual(layout.CONTRACT_SHA256,"1920802a64a4410fbd863873231d69694bc92b1ed36102191fc922975e837e92")
+
+    def test_bounds_head_and_complete_physical_scope_covered_by_approval_hash(self):
+        layout=m._layout();tables={n:{"upper":None} for n in layout.SPECS}
+        bound=m.PrivateBounds("a"*64,layout.SOURCE_SHA,layout.HEAD,tables)
+        bad=dict(tables);bad.pop("alembic_version")
+        self.assertNotEqual(bound.digest(),m.PrivateBounds("a"*64,layout.SOURCE_SHA,layout.HEAD,bad).digest())
+        self.assertNotEqual(bound.digest(),m.PrivateBounds("a"*64,layout.SOURCE_SHA,m.HEAD,tables).digest())
+        with self.assertRaises(m.Rejected):m.PrivateObservation(bound,{}, {},None,_seal=object())
+
+    async def test_new_layout_keyset_reads_every_raw_column_before_projection(self):
+        layout=m._layout();table="governance_asset_versions";spec=layout.SPECS[table]
+        names=spec[0].split();cols=[(name,"bigint unsigned" if name=="asset_row_id" else "text","YES",None,"",None) for name in names]
+        cells=[None]*len(names);cells[names.index("asset_row_id")]=b"1";cells[names.index("body_bytes")]=b"raw-byte-unchanged"
+        class PhysicalReader:
+            head=layout.HEAD;specs=layout.SPECS
+            def __init__(self):self.calls=[]
+            async def query(self,sql,params):
+                self.calls.append(sql)
+                return [(b"1",sum(len(c) for c in cells if c is not None))] if " AS _source_row_bytes " in sql else [tuple(cells)]
+        reader=PhysicalReader();bound=dict(columns=cols,columns_sha256="a"*64,kinds={"asset_row_id":"bigint unsigned"},upper=[base64.b64encode(b"1").decode()])
+        section,rows=await m._pass(reader,table,bound,retain=True)
+        self.assertEqual(section["rows"],1);self.assertEqual(rows[0]["body_bytes"],b"raw-byte-unchanged")
+        self.assertEqual(set(rows[0]),set(names));self.assertEqual(len(reader.calls),2)
+        self.assertFalse(any(" JOIN " in sql or "asset_kind=" in sql for sql in reader.calls))
+        self.assertTrue(all("CAST(`"+name+"` AS BINARY)" in reader.calls[1] for name in names))
+
+    def test_adapter_and_observer_remain_no_io_no_lifecycle_no_execution_authorization(self):
+        paths=(PATH,PATH.with_name("qs-ai-retirement-0040-layout.py"))
+        for path in paths:
+            tree=ast.parse(path.read_text())
+            for n in ast.walk(tree):
+                if isinstance(n,ast.Call):
+                    name=n.func.attr if isinstance(n.func,ast.Attribute) else getattr(n.func,"id","")
+                    self.assertNotIn(name,{"create_async_engine","commit","rollback","begin","send","publish","connect","open_connection"})

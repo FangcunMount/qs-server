@@ -8,11 +8,13 @@ from __future__ import annotations
 import asyncio
 import base64
 import hashlib
+import importlib.util
 import json
 import re
 import struct
 import time
 from dataclasses import dataclass
+from pathlib import Path
 from uuid import UUID
 
 PAGE = 1000
@@ -23,6 +25,28 @@ QUERY_SECONDS = 30
 TOTAL_SECONDS = 1500
 HEAD = "0038_messaging_observations"
 _OBSERVATION_SEAL = object()
+_LAYOUT_SHA = "690d68be91713641ad6ce13ad9ad126828c64fe780bda05522bd68697ead577f"
+_RAW_LAYOUT_SCAN = False
+
+def _layout():
+    path = Path(__file__).with_name("qs-ai-retirement-0040-layout.py")
+    if hashlib.sha256(path.read_bytes()).hexdigest() != _LAYOUT_SHA:
+        _fail("fixed_0040_layout_changed")
+    spec = importlib.util.spec_from_file_location("_qs_ai_fixed_0040_layout", path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+def _specs(head):
+    return _layout().SPECS if head == "0040_module_table_names" else SPECS
+
+def _project(dataset, schemas):
+    layout = _layout()
+    try:
+        return layout.project(dataset, layout.LOGICAL_SPECS, schemas)
+    except layout.Rejected as e:
+        _fail(str(e))
+
 
 # Complete current named columns; ordinal/type/default/collation metadata and
 # SHOW CREATE bytes are additionally frozen by the independently approved bound.
@@ -152,8 +176,8 @@ class PrivateObservation:
                 "fence_verified": False, "peer_receipts_verified": False,
                 "message_reauthentication": "not_performed",
                 "qs_ai_runtime_source_binding": "not_observed",
-                "server_readonly_snapshot_mode": "host_contract_not_independently_observed",
-                "catalogue_coverage": "closed_18_responsibility_tables",
+                "server_readonly_snapshot_mode": "actual_rr_readonly_observed" if self._bounds.head == "0040_module_table_names" else "host_contract_not_independently_observed",
+                "catalogue_coverage": "closed_43_physical_tables_and_system_head" if self._bounds.head == "0040_module_table_names" else "closed_18_responsibility_tables",
                 "other_business_tables_semantic_scope": "not_qualified",
                 "fresh_after_upper_observation": "host_required",
                 "milestone_history": "retained_diagnostics_only"}
@@ -163,11 +187,13 @@ class PrivateObservation:
 
 
 class _Borrowed:
-    def __init__(self, session):
+    def __init__(self, session, *, head=None):
         # Real SQLAlchemy transaction validation, never a caller's complete flag.
         from sqlalchemy.ext.asyncio import AsyncSession
         if not isinstance(session, AsyncSession):
             _fail("original_async_session_required")
+        self.head = HEAD if head is None else head
+        self.specs = _specs(self.head)
         self.session, self.tx = session, session.get_transaction()
         if (self.tx is None or not self.tx.is_active or session.get_nested_transaction() is not None
                 or session.get_bind().dialect.name != "mysql"):
@@ -211,8 +237,18 @@ async def _binding(reader, identity, source):
     row = await reader.query("SELECT CAST(@@server_uuid AS BINARY),CAST(DATABASE() AS BINARY),VERSION(),@@transaction_isolation")
     if len(row) != 1 or row[0][0] is None or row[0][1] is None or _identity(row[0][0], row[0][1]) != identity or not row[0][2].startswith("8.") or row[0][3] != "REPEATABLE-READ":
         _fail("database_binding_rejected")
+    if reader.head == "0040_module_table_names":
+        layout = _layout()
+        if source != layout.SOURCE_SHA:
+            _fail("fixed_0040_source_revision_required")
+        current = await reader.query("SELECT t.ACCESS_MODE,t.ISOLATION_LEVEL,t.STATE FROM performance_schema.events_transactions_current t JOIN performance_schema.threads p ON p.THREAD_ID=t.THREAD_ID WHERE p.PROCESSLIST_ID=CONNECTION_ID()")
+        if current != [("READ ONLY", "REPEATABLE READ", "ACTIVE")]:
+            _fail("actual_readonly_snapshot_not_observed")
+        catalog = await reader.query("SELECT TABLE_NAME FROM information_schema.tables WHERE table_schema=DATABASE() AND TABLE_TYPE='BASE TABLE' ORDER BY TABLE_NAME")
+        if {r[0] for r in catalog} != set(reader.specs) or len(catalog) != len(reader.specs):
+            _fail("unsupported_complete_0040_catalog")
     head = await reader.query("SELECT version_num FROM alembic_version ORDER BY version_num")
-    if head != [(HEAD,)]:
+    if head != [(reader.head,)]:
         _fail("unsupported_alembic_head")
 
 
@@ -221,27 +257,42 @@ async def _schema(reader, table):
     if engine != [("InnoDB",)]:
         _fail("transactional_source_table_required")
     columns = await reader.query("SELECT COLUMN_NAME,COLUMN_TYPE,IS_NULLABLE,COLUMN_DEFAULT,EXTRA,COLLATION_NAME FROM information_schema.columns WHERE table_schema=DATABASE() AND table_name=:name ORDER BY ORDINAL_POSITION", {"name": table})
-    if set(c[0] for c in columns) != set(SPECS[table][0].split()) or len(columns) != len(SPECS[table][0].split()):
+    if set(c[0] for c in columns) != set(getattr(reader, "specs", SPECS)[table][0].split()) or len(columns) != len(getattr(reader, "specs", SPECS)[table][0].split()):
         _fail("unsupported_complete_table_schema")
     keys = await reader.query("SELECT COLUMN_NAME FROM information_schema.statistics WHERE table_schema=DATABASE() AND table_name=:name AND index_name='PRIMARY' ORDER BY SEQ_IN_INDEX", {"name": table})
-    if [c[0] for c in keys] != SPECS[table][1].split():
+    if [c[0] for c in keys] != getattr(reader, "specs", SPECS)[table][1].split():
         _fail("unsupported_primary_key")
     ddl = await reader.query("SHOW CREATE TABLE `" + table + "`")
     if len(ddl) != 1 or len(ddl[0]) != 2 or ddl[0][0] != table:
         _fail("missing_source_table")
+    metadata = {}
+    if reader.head == "0040_module_table_names":
+        indexes = await reader.query("SELECT INDEX_NAME,SEQ_IN_INDEX,COLUMN_NAME,NON_UNIQUE,COLLATION,SUB_PART,INDEX_TYPE,IS_VISIBLE,EXPRESSION FROM information_schema.statistics WHERE table_schema=DATABASE() AND table_name=:name ORDER BY INDEX_NAME,SEQ_IN_INDEX", {"name": table})
+        generated = await reader.query("SELECT COLUMN_NAME,GENERATION_EXPRESSION FROM information_schema.columns WHERE table_schema=DATABASE() AND table_name=:name ORDER BY ORDINAL_POSITION", {"name": table})
+        foreign_keys = await reader.query("SELECT k.CONSTRAINT_NAME,k.ORDINAL_POSITION,k.COLUMN_NAME,k.REFERENCED_TABLE_SCHEMA,k.REFERENCED_TABLE_NAME,k.REFERENCED_COLUMN_NAME,r.UPDATE_RULE,r.DELETE_RULE FROM information_schema.key_column_usage k JOIN information_schema.referential_constraints r ON r.CONSTRAINT_SCHEMA=k.CONSTRAINT_SCHEMA AND r.TABLE_NAME=k.TABLE_NAME AND r.CONSTRAINT_NAME=k.CONSTRAINT_NAME WHERE k.TABLE_SCHEMA=DATABASE() AND k.TABLE_NAME=:name AND k.REFERENCED_TABLE_NAME IS NOT NULL ORDER BY k.CONSTRAINT_NAME,k.ORDINAL_POSITION", {"name": table})
+        checks = await reader.query("SELECT t.CONSTRAINT_NAME,c.CHECK_CLAUSE,t.ENFORCED FROM information_schema.table_constraints t JOIN information_schema.check_constraints c ON c.CONSTRAINT_SCHEMA=t.CONSTRAINT_SCHEMA AND c.CONSTRAINT_NAME=t.CONSTRAINT_NAME WHERE t.TABLE_SCHEMA=DATABASE() AND t.TABLE_NAME=:name AND t.CONSTRAINT_TYPE='CHECK' ORDER BY t.CONSTRAINT_NAME", {"name": table})
+        layout = _layout()
+        database_name = await reader.query("SELECT DATABASE()")
+        try:
+            layout.validate_schema(table, columns, indexes)
+            layout.validate_constraints(table, generated, foreign_keys, checks, database_name[0][0])
+        except layout.Rejected as e:
+            _fail(str(e))
+        metadata = {"indexes": indexes, "generated": generated, "foreign_keys": foreign_keys, "checks": checks}
+    pk_collations = ("ascii_bin", "utf8mb4_bin") + (("utf8mb4_0900_bin", "utf8mb4_0900_ai_ci") if reader.head == "0040_module_table_names" else ())
     kinds = {}
     for c in columns:
-        if c[0] in SPECS[table][1].split():
+        if c[0] in getattr(reader, "specs", SPECS)[table][1].split():
             if (not (c[1] in ("bigint unsigned", "bigint", "int", "integer", "tinyint unsigned")
-                     or (re.fullmatch(r"(?:var)?char\([0-9]+\)", c[1]) and c[5] in ("ascii_bin", "utf8mb4_bin")))):
+                     or (re.fullmatch(r"(?:var)?char\([0-9]+\)", c[1]) and c[5] in pk_collations))):
                 _fail("unsupported_primary_key_type")
             kinds[c[0]] = c[1]
     return {"columns": columns, "kinds": kinds, "ddl_sha256": _sha(_canon(ddl)),
-            "columns_sha256": _sha(_canon(columns))}
+            "columns_sha256": _sha(_canon(columns)), **metadata}
 
 
-def _pk_sql(table):
-    return ",".join("`" + k + "`" for k in SPECS[table][1].split())
+def _pk_sql(table, specs=None):
+    return ",".join("`" + k + "`" for k in (SPECS if specs is None else specs)[table][1].split())
 
 
 def _upper_values(approved, keys):
@@ -259,23 +310,23 @@ def _upper_values(approved, keys):
         _fail("unsupported_approved_cursor")
 
 
-async def discover_bounds(session, *, identity_hash, source_sha):
+async def discover_bounds(session, *, identity_hash, source_sha, head=None):
     """Independent diagnostic discovery; discovery is never approval."""
-    reader = _Borrowed(session)
+    reader = _Borrowed(session, head=head)
     await _binding(reader, identity_hash, source_sha)
     tables = {}
-    for table in SPECS:
+    for table in reader.specs:
         schema = await _schema(reader, table)
-        keys = SPECS[table][1].split()
+        keys = getattr(reader, "specs", SPECS)[table][1].split()
         upper = await reader.query("SELECT " + ",".join("CAST(`"+k+"` AS BINARY)" for k in keys) + " FROM `"+table+"` ORDER BY " + ",".join("`"+k+"` DESC" for k in keys) + " LIMIT 1")
         schema["upper"] = [base64.b64encode(v).decode() for v in upper[0]] if upper else None
         tables[table] = schema
     await _binding(reader, identity_hash, source_sha)
-    return PrivateBounds(identity_hash, source_sha, HEAD, tables)
+    return PrivateBounds(identity_hash, source_sha, reader.head, tables)
 
 
 async def _pass(reader, table, approved, *, retain, retained_budget=None):
-    keys = SPECS[table][1].split()
+    keys = getattr(reader, "specs", SPECS)[table][1].split()
     columns = [c[0] for c in approved["columns"]]
     upper = approved["upper"]
     upper_values = _upper_values(approved, keys)
@@ -292,11 +343,11 @@ async def _pass(reader, table, approved, *, retain, retained_budget=None):
         else:
             for i, k in enumerate(keys):
                 params["u"+str(i)] = upper_values[i]
-            clauses.append("("+_pk_sql(table)+") <= ("+",".join(":u"+str(i) for i in range(len(keys)))+")")
+            clauses.append("("+_pk_sql(table, getattr(reader, "specs", SPECS))+") <= ("+",".join(":u"+str(i) for i in range(len(keys)))+")")
         if last is not None:
             for i, k in enumerate(keys): params["l"+str(i)] = _typed(last[i], approved["kinds"][k])
-            clauses.append("("+_pk_sql(table)+") > ("+",".join(":l"+str(i) for i in range(len(keys)))+")")
-        suffix = " WHERE " + " AND ".join(clauses) + " ORDER BY " + _pk_sql(table) + " LIMIT :page"
+            clauses.append("("+_pk_sql(table, getattr(reader, "specs", SPECS))+") > ("+",".join(":l"+str(i) for i in range(len(keys)))+")")
+        suffix = " WHERE " + " AND ".join(clauses) + " ORDER BY " + _pk_sql(table, getattr(reader, "specs", SPECS)) + " LIMIT :page"
         preview = await reader.query(preview_select + suffix, params)
         if (len(preview) > PAGE or any(len(row) != len(keys)+1 or type(row[-1]) is not int or row[-1] < 0 for row in preview)):
             _fail("source_page_length_shape_changed")
@@ -320,8 +371,8 @@ async def _pass(reader, table, approved, *, retain, retained_budget=None):
             last = cursor
             for v in cells: _frame(h, v)
             if retain:
-                fact = _minimal(table, dict(zip(columns, cells)))
-                retained_budget[0] += len(_canon(fact))
+                fact = dict(zip(columns, cells)) if getattr(reader, "head", None) == "0040_module_table_names" else _minimal(table, dict(zip(columns, cells)))
+                retained_budget[0] += sum(9 + (len(v) if v is not None else 0) for v in fact.values()) if getattr(reader, "head", None) == "0040_module_table_names" else len(_canon(fact))
                 if retained_budget[0] > MAX_GRAPH_BYTES: _fail("fixed_minimal_graph_budget_exceeded")
                 minimal.append(fact)
         if len(rows) < PAGE: break
@@ -330,13 +381,13 @@ async def _pass(reader, table, approved, *, retain, retained_budget=None):
 
 
 async def observe(session, bounds, *, approved_bounds_sha256):
-    if (not isinstance(bounds, PrivateBounds) or set(bounds.tables) != set(SPECS)
-            or bounds.head != HEAD or approved_bounds_sha256 != bounds.digest()):
+    if (not isinstance(bounds, PrivateBounds) or set(bounds.tables) != set(_specs(bounds.head))
+            or bounds.head not in (HEAD, "0040_module_table_names") or approved_bounds_sha256 != bounds.digest()):
         _fail("independent_bounds_approval_required")
-    reader = _Borrowed(session)
+    reader = _Borrowed(session, head=bounds.head)
     await _binding(reader, bounds.identity_hash, bounds.source_sha)
     sections = {}; dataset = {}; retained_budget = [0]
-    for table in SPECS:
+    for table in reader.specs:
         schema = await _schema(reader, table)
         approved = bounds.tables.get(table)
         if approved is None or any(schema[k] != approved[k] for k in schema):
@@ -350,6 +401,9 @@ async def observe(session, bounds, *, approved_bounds_sha256):
         sections[table] = {**first, "equal_full_passes": 2, "complete": True}
         dataset[table] = rows
     await _binding(reader, bounds.identity_hash, bounds.source_sha)
+    if bounds.head == "0040_module_table_names" and not _RAW_LAYOUT_SCAN:
+        logical, _ = _project(dataset, bounds.tables)
+        dataset = {name: [_minimal(name, row) for row in logical[name]] for name in SPECS}
     return PrivateObservation(bounds, sections, dataset, reader.tx, _seal=_OBSERVATION_SEAL)
 
 
@@ -358,23 +412,33 @@ async def fresh_after_upper(session, observation):
     if not isinstance(observation, PrivateObservation) or observation._original_tx.is_active:
         _fail("original_snapshot_must_end_before_fresh_observation")
     bounds=observation._bounds
-    reader = _Borrowed(session)
+    reader = _Borrowed(session, head=bounds.head)
     if reader.tx is observation._original_tx:
         _fail("fresh_snapshot_required")
     await _binding(reader, bounds.identity_hash, bounds.source_sha)
     result = {}
-    for table in SPECS:
+    for table in reader.specs:
         schema = await _schema(reader, table)
         approved = bounds.tables[table]
         if any(schema[k] != approved[k] for k in schema): _fail("post_snapshot_schema_changed")
         params = {}; clauses = ""
         if approved["upper"] is not None:
-            keys = SPECS[table][1].split()
+            keys = getattr(reader, "specs", SPECS)[table][1].split()
             upper_values = _upper_values(approved, keys)
             for i, k in enumerate(keys): params["u"+str(i)] = upper_values[i]
-            clauses = " WHERE ("+_pk_sql(table)+") > ("+",".join(":u"+str(i) for i in range(len(keys)))+")"
+            clauses = " WHERE ("+_pk_sql(table, getattr(reader, "specs", SPECS))+") > ("+",".join(":u"+str(i) for i in range(len(keys)))+")"
         rows = await reader.query("SELECT 1 FROM `"+table+"`" + clauses + " LIMIT 1", params)
         result[table] = {"next_cycle_required": bool(rows)}
+        if reader.head == "0040_module_table_names" and not _RAW_LAYOUT_SCAN:
+            first, _ = await _pass(reader, table, approved, retain=False)
+            second, _ = await _pass(reader, table, approved, retain=False)
+            old = {k: observation._sections[table][k] for k in first}
+            if first != second or first != old:
+                _fail("post_snapshot_full_source_changed")
+            current = await _schema(reader, table)
+            if any(current[k] != approved[k] for k in current):
+                _fail("post_snapshot_schema_changed")
+            result[table]["unchanged_full_source_hashes"] = True
     return result
 
 
