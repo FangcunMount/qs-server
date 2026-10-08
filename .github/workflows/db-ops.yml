@@ -14,6 +14,8 @@ on:
           - restore
           - status
           - inventory
+          - metadata-visibility-profile
+          - metadata-visibility-admin-profile
           - cbpt-audit
           - cbpt-archive
           - cbpt-apply
@@ -71,7 +73,7 @@ on:
         default: false
         type: boolean
       governance_confirm:
-        description: 'Exact confirmation phrase required by the selected governance write operation'
+        description: 'Governance write confirmation, or exact reviewed source SHA for cbpt cleanup'
         required: false
         type: string
 
@@ -81,9 +83,10 @@ on:
 permissions:
   contents: read
 
-# Serialize scheduled and manual production database operations across workflow runs.
+# Keep every existing operation on its production lock; only the two exact
+# read-only permissions profiles use the separate profile group.
 concurrency:
-  group: qs-server-db-ops-production
+  group: ${{ github.event_name == 'workflow_dispatch' && (github.event.inputs.operation == 'metadata-visibility-profile' || github.event.inputs.operation == 'metadata-visibility-admin-profile') && 'qs-server-db-metadata-visibility-profile' || 'qs-server-db-ops-production' }}
   cancel-in-progress: false
 
 jobs:
@@ -96,8 +99,17 @@ jobs:
     timeout-minutes: 90
     environment: production
     steps:
+      - name: Validate exact reviewed cleanup revision
+        env:
+          CBPT_EXPECTED_SOURCE_SHA: ${{ github.event.inputs.governance_confirm }}
+        run: |
+          set -Eeuo pipefail
+          [[ "$CBPT_EXPECTED_SOURCE_SHA" =~ ^[0-9a-f]{40}$ && "$CBPT_EXPECTED_SOURCE_SHA" == "$GITHUB_SHA" ]] || { echo "cleanup source revision mismatch" >&2; exit 1; }
+
       - name: Checkout immutable cleanup source
         uses: actions/checkout@v6
+        with:
+          ref: ${{ github.sha }}
 
       - name: Set up Go for the cleanup tool
         uses: actions/setup-go@v6
@@ -111,13 +123,14 @@ jobs:
           set -Eeuo pipefail
           go test ./scripts/oneoff/cleanup_cbpt_tables
           python3 -B scripts/dbops/test-cbpt-cleanup.py
+          python3 -B scripts/dbops/test-receipt-transport.py
           package_dir=$(mktemp -d "$RUNNER_TEMP/qs-cbpt-package.XXXXXX")
-          trap 'rm -f -- "$package_dir/cbpt-cleanup-linux-amd64" "$package_dir/cbpt-cleanup-linux-arm64" "$package_dir/cbpt-cleanup.py"; rmdir -- "$package_dir"' EXIT
+          trap 'rm -f -- "$package_dir/cbpt-cleanup-linux-amd64" "$package_dir/cbpt-cleanup-linux-arm64" "$package_dir/cbpt-cleanup.py" "$package_dir/receipt-transport.py"; rmdir -- "$package_dir"' EXIT
           CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags='-s -w' -o "$package_dir/cbpt-cleanup-linux-amd64" ./scripts/oneoff/cleanup_cbpt_tables
           CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -trimpath -ldflags='-s -w' -o "$package_dir/cbpt-cleanup-linux-arm64" ./scripts/oneoff/cleanup_cbpt_tables
-          cp scripts/dbops/cbpt-cleanup.py "$package_dir/cbpt-cleanup.py"
+          cp scripts/dbops/cbpt-cleanup.py scripts/dbops/receipt-transport.py "$package_dir/"
           archive="qs-cbpt-cleanup-${GITHUB_RUN_ID}.tar.gz"
-          tar -czf "$archive" -C "$package_dir" cbpt-cleanup-linux-amd64 cbpt-cleanup-linux-arm64 cbpt-cleanup.py
+          tar -czf "$archive" -C "$package_dir" cbpt-cleanup-linux-amd64 cbpt-cleanup-linux-arm64 cbpt-cleanup.py receipt-transport.py
           echo "sha256=$(shasum -a 256 "$archive" | awk '{print $1}')" >> "$GITHUB_OUTPUT"
 
       - name: Validate production SSH and cleanup stage
@@ -125,6 +138,8 @@ jobs:
           CBPT_DATABASE_INPUT: ${{ github.event.inputs.database }}
           CBPT_OPERATION_INPUT: ${{ github.event.inputs.operation }}
           CBPT_ARCHIVE_ID: ${{ github.event.inputs.backup_name }}
+          MYSQL_USERNAME: ${{ secrets.MYSQL_METADATA_ADMIN_USERNAME }}
+          MYSQL_PASSWORD: ${{ secrets.MYSQL_METADATA_ADMIN_PASSWORD }}
           SVRA_HOST: ${{ vars.SVRA_HOST }}
           SVRA_USERNAME: ${{ vars.SVRA_USERNAME }}
           SVRA_SSH_KEY: ${{ secrets.SVRA_SSH_KEY }}
@@ -136,6 +151,8 @@ jobs:
           : "${SVRA_USERNAME:?production SSH binding is empty}"
           : "${SVRA_SSH_KEY:?production SSH key is empty}"
           : "${SVRA_SSH_FINGERPRINT:?production fingerprint is empty}"
+          : "${MYSQL_USERNAME:?metadata administrator username binding is empty}"
+          : "${MYSQL_PASSWORD:?metadata administrator password binding is empty}"
           case "$CBPT_OPERATION_INPUT" in
             cbpt-audit|cbpt-archive) [[ -z "$CBPT_ARCHIVE_ID" ]] || exit 1 ;;
             cbpt-apply|cbpt-verify) [[ "$CBPT_ARCHIVE_ID" =~ ^[0-9]{1,20}-[0-9]{1,4}$ ]] || exit 1 ;;
@@ -163,8 +180,8 @@ jobs:
           CBPT_PACKAGE_SHA256: ${{ steps.package.outputs.sha256 }}
           MYSQL_HOST: ${{ secrets.MYSQL_HOST }}
           MYSQL_PORT: ${{ secrets.MYSQL_PORT || 3306 }}
-          MYSQL_USERNAME: ${{ secrets.MYSQL_USERNAME }}
-          MYSQL_PASSWORD: ${{ secrets.MYSQL_PASSWORD }}
+          MYSQL_USERNAME: ${{ secrets.MYSQL_METADATA_ADMIN_USERNAME }}
+          MYSQL_PASSWORD: ${{ secrets.MYSQL_METADATA_ADMIN_PASSWORD }}
           MYSQL_DATABASE: ${{ secrets.MYSQL_DATABASE != '' && secrets.MYSQL_DATABASE || secrets.MYSQL_DBNAME }}
         with:
           host: ${{ vars.SVRA_HOST }}
@@ -191,14 +208,14 @@ jobs:
             archive="/tmp/qs-cbpt-cleanup-${CBPT_RUN_ID%-*}.tar.gz"
             work_dir=$(mktemp -d /tmp/qs-cbpt-cleanup.XXXXXX)
             cleanup_tools() {
-              rm -f -- "$work_dir/cbpt-cleanup-linux-amd64" "$work_dir/cbpt-cleanup-linux-arm64" "$work_dir/cbpt-cleanup.py" "$archive"
+              rm -f -- "$work_dir/cbpt-cleanup-linux-amd64" "$work_dir/cbpt-cleanup-linux-arm64" "$work_dir/cbpt-cleanup.py" "$work_dir/receipt-transport.py" "$archive"
               rmdir -- "$work_dir"
             }
             trap cleanup_tools EXIT
             [[ "$(sha256sum "$archive" | awk '{print $1}')" == "$CBPT_PACKAGE_SHA256" ]] || exit 1
             tar -xzf "$archive" -C "$work_dir" --no-same-owner
             chmod 0700 "$work_dir" "$work_dir/cbpt-cleanup-linux-amd64" "$work_dir/cbpt-cleanup-linux-arm64"
-            chmod 0600 "$work_dir/cbpt-cleanup.py"
+            chmod 0600 "$work_dir/cbpt-cleanup.py" "$work_dir/receipt-transport.py"
             case "$(uname -m)" in
               x86_64) tool="$work_dir/cbpt-cleanup-linux-amd64" ;;
               aarch64|arm64) tool="$work_dir/cbpt-cleanup-linux-arm64" ;;
@@ -224,6 +241,119 @@ jobs:
                 raise SystemExit("archive_root_unavailable")
             PY_ARCHIVE_ROOT
             python3 -B "$work_dir/cbpt-cleanup.py" --operation "$operation" --tool-binary "$tool" --source-sha "$CBPT_SOURCE_SHA" --run-id "$CBPT_RUN_ID" --archive-id "$CBPT_ARCHIVE_ID"
+
+  mysql-metadata-visibility-profile:
+    name: Read Only Current and Granted RDS Role Metadata Profile
+    if: github.event_name == 'workflow_dispatch' && (github.event.inputs.operation == 'metadata-visibility-profile' || github.event.inputs.operation == 'metadata-visibility-admin-profile') && github.event.inputs.database == 'mysql'
+    runs-on:
+      group: qlume
+      labels: [self-hosted, macOS, ARM64, ops]
+    timeout-minutes: 15
+    environment: production
+    steps:
+      - name: Checkout immutable diagnostic source
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.sha }}
+
+      - name: Set up Go for the read-only diagnostic
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: false
+
+      - name: Check and package read-only diagnostic
+        id: package
+        run: |
+          set -Eeuo pipefail
+          go test ./scripts/oneoff/mysql_metadata_profile
+          python3 -B scripts/dbops/test-mysql-metadata-profile.py
+          python3 -B scripts/dbops/test-receipt-transport.py
+          profile_package=$(mktemp -d "$RUNNER_TEMP/qs-metadata-profile-package.XXXXXX")
+          trap 'rm -f -- "$profile_package/profile-linux-amd64" "$profile_package/profile-linux-arm64" "$profile_package/mysql-metadata-profile.py" "$profile_package/cbpt-cleanup.py" "$profile_package/receipt-transport.py"; rmdir -- "$profile_package"' EXIT
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags='-s -w' -o "$profile_package/profile-linux-amd64" ./scripts/oneoff/mysql_metadata_profile
+          CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -trimpath -ldflags='-s -w' -o "$profile_package/profile-linux-arm64" ./scripts/oneoff/mysql_metadata_profile
+          cp scripts/dbops/mysql-metadata-profile.py scripts/dbops/cbpt-cleanup.py scripts/dbops/receipt-transport.py "$profile_package/"
+          profile_archive="qs-mysql-metadata-profile-${GITHUB_RUN_ID}.tar.gz"
+          tar -czf "$profile_archive" -C "$profile_package" profile-linux-amd64 profile-linux-arm64 mysql-metadata-profile.py cbpt-cleanup.py receipt-transport.py
+          echo "sha256=$(shasum -a 256 "$profile_archive" | awk '{print $1}')" >> "$GITHUB_OUTPUT"
+
+      - name: Validate read-only operation and production SSH binding
+        env:
+          PROFILE_OPERATION: ${{ github.event.inputs.operation }}
+          PROFILE_DATABASE: ${{ github.event.inputs.database }}
+          PROFILE_ARCHIVE_INPUT: ${{ github.event.inputs.backup_name }}
+          MYSQL_USERNAME: ${{ secrets[github.event.inputs.operation == 'metadata-visibility-admin-profile' && 'MYSQL_METADATA_ADMIN_USERNAME' || 'MYSQL_USERNAME'] }}
+          MYSQL_PASSWORD: ${{ secrets[github.event.inputs.operation == 'metadata-visibility-admin-profile' && 'MYSQL_METADATA_ADMIN_PASSWORD' || 'MYSQL_PASSWORD'] }}
+          SVRA_HOST: ${{ vars.SVRA_HOST }}
+          SVRA_USERNAME: ${{ vars.SVRA_USERNAME }}
+          SVRA_SSH_KEY: ${{ secrets.SVRA_SSH_KEY }}
+          SVRA_SSH_FINGERPRINT: ${{ vars.SVRA_SSH_FINGERPRINT }}
+        run: |
+          set -Eeuo pipefail
+          [[ ( "$PROFILE_OPERATION" == metadata-visibility-profile || "$PROFILE_OPERATION" == metadata-visibility-admin-profile ) && "$PROFILE_DATABASE" == mysql && -z "$PROFILE_ARCHIVE_INPUT" ]] || exit 1
+          : "${SVRA_HOST:?production host binding is empty}"
+          : "${SVRA_USERNAME:?production SSH binding is empty}"
+          : "${SVRA_SSH_KEY:?production SSH key is empty}"
+          : "${SVRA_SSH_FINGERPRINT:?production fingerprint is empty}"
+          : "${MYSQL_USERNAME:?selected MySQL username binding is empty}"
+          : "${MYSQL_PASSWORD:?selected MySQL password binding is empty}"
+
+      - name: Upload checksummed read-only diagnostic
+        uses: appleboy/scp-action@v1.0.0
+        with:
+          host: ${{ vars.SVRA_HOST }}
+          username: ${{ vars.SVRA_USERNAME }}
+          key: ${{ secrets.SVRA_SSH_KEY }}
+          port: ${{ vars.SVRA_SSH_PORT || 22 }}
+          fingerprint: ${{ vars.SVRA_SSH_FINGERPRINT }}
+          source: qs-mysql-metadata-profile-${{ github.run_id }}.tar.gz
+          target: /tmp
+
+      - name: Read current and fixed granted-role metadata permissions
+        uses: appleboy/ssh-action@v1.2.2
+        env:
+          PROFILE_SOURCE_SHA: ${{ github.sha }}
+          PROFILE_RUN_ID: ${{ github.run_id }}-${{ github.run_attempt }}
+          PROFILE_PACKAGE_SHA256: ${{ steps.package.outputs.sha256 }}
+          # Exact identity from the verified archive; no UUID/host is published.
+          PROFILE_EXPECTED_TARGET_HASH: '8764516c9ac46675e1fbd68c395534ac74d8899b4f3fe35854c1988ba337f1a0'
+          MYSQL_HOST: ${{ secrets.MYSQL_HOST }}
+          MYSQL_PORT: ${{ secrets.MYSQL_PORT || 3306 }}
+          MYSQL_USERNAME: ${{ secrets[github.event.inputs.operation == 'metadata-visibility-admin-profile' && 'MYSQL_METADATA_ADMIN_USERNAME' || 'MYSQL_USERNAME'] }}
+          MYSQL_PASSWORD: ${{ secrets[github.event.inputs.operation == 'metadata-visibility-admin-profile' && 'MYSQL_METADATA_ADMIN_PASSWORD' || 'MYSQL_PASSWORD'] }}
+          MYSQL_DATABASE: ${{ secrets.MYSQL_DATABASE != '' && secrets.MYSQL_DATABASE || secrets.MYSQL_DBNAME }}
+        with:
+          host: ${{ vars.SVRA_HOST }}
+          username: ${{ vars.SVRA_USERNAME }}
+          key: ${{ secrets.SVRA_SSH_KEY }}
+          port: ${{ vars.SVRA_SSH_PORT || 22 }}
+          fingerprint: ${{ vars.SVRA_SSH_FINGERPRINT }}
+          command_timeout: 10m
+          envs: PROFILE_SOURCE_SHA,PROFILE_RUN_ID,PROFILE_PACKAGE_SHA256,PROFILE_EXPECTED_TARGET_HASH,MYSQL_HOST,MYSQL_PORT,MYSQL_USERNAME,MYSQL_PASSWORD,MYSQL_DATABASE
+          script: |
+            set -Eeuo pipefail
+            export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin${PATH:+:$PATH}"
+            umask 077
+            [[ "$PROFILE_RUN_ID" =~ ^[0-9]{1,20}-[0-9]{1,4}$ && "$PROFILE_SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]] || exit 1
+            [[ "$PROFILE_PACKAGE_SHA256" =~ ^[0-9a-f]{64}$ && "$PROFILE_EXPECTED_TARGET_HASH" =~ ^[0-9a-f]{64}$ ]] || exit 1
+            profile_archive="/tmp/qs-mysql-metadata-profile-${PROFILE_RUN_ID%-*}.tar.gz"
+            profile_dir=$(mktemp -d /tmp/qs-mysql-metadata-profile.XXXXXX)
+            cleanup_profile_tools() {
+              rm -f -- "$profile_dir/profile-linux-amd64" "$profile_dir/profile-linux-arm64" "$profile_dir/mysql-metadata-profile.py" "$profile_dir/cbpt-cleanup.py" "$profile_dir/receipt-transport.py" "$profile_archive"
+              rmdir -- "$profile_dir"
+            }
+            trap cleanup_profile_tools EXIT
+            [[ "$(sha256sum "$profile_archive" | awk '{print $1}')" == "$PROFILE_PACKAGE_SHA256" ]] || exit 1
+            tar -xzf "$profile_archive" -C "$profile_dir" --no-same-owner
+            chmod 0700 "$profile_dir" "$profile_dir/profile-linux-amd64" "$profile_dir/profile-linux-arm64"
+            chmod 0600 "$profile_dir/mysql-metadata-profile.py" "$profile_dir/cbpt-cleanup.py" "$profile_dir/receipt-transport.py"
+            case "$(uname -m)" in
+              x86_64) profile_binary="$profile_dir/profile-linux-amd64" ;;
+              aarch64|arm64) profile_binary="$profile_dir/profile-linux-arm64" ;;
+              *) exit 1 ;;
+            esac
+            python3 -B "$profile_dir/mysql-metadata-profile.py" --binary "$profile_binary"
 
   database-inventory:
     name: MySQL and MongoDB Metadata Inventory
