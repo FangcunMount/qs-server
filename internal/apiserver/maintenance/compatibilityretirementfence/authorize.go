@@ -10,6 +10,9 @@ import (
 type Permit struct {
 	policyHash, sourceSHA, operation, run, request, tokenHash, snapshotHash string
 	workflows                                                               int
+	challengeHash                                                           string
+	verifiedAt, expiresAt                                                   time.Time
+	verified                                                                bool
 }
 
 type Receipt struct {
@@ -94,8 +97,13 @@ func AuthorizeProbe(ctx context.Context, client HTTPDoer, p Policy, originalComm
 	if err = p.Validate(finished); err != nil {
 		return nil, err
 	}
-	if _, err = verifyOIDC(token, raw, p, finished); err != nil {
+	claims, err := verifyOIDC(token, raw, p, finished)
+	if err != nil {
 		return nil, err
 	}
-	return &Permit{policyHash: p.digest(), sourceSHA: p.SourceSHA, operation: p.OperationID, run: p.RunID + "-" + p.RunAttempt, request: p.RequestSHA256, tokenHash: digest([]byte(token)), snapshotHash: after.Digest, workflows: after.WorkflowCount}, nil
+	expires := time.Unix(claims.Exp, 0)
+	if p.ExpiresAt.Before(expires) {
+		expires = p.ExpiresAt
+	}
+	return &Permit{challengeHash: p.ChallengeSHA256, verifiedAt: finished, expiresAt: expires, verified: true, policyHash: p.digest(), sourceSHA: p.SourceSHA, operation: p.OperationID, run: p.RunID + "-" + p.RunAttempt, request: p.RequestSHA256, tokenHash: digest([]byte(token)), snapshotHash: after.Digest, workflows: after.WorkflowCount}, nil
 }
