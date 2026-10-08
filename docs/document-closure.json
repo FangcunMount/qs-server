@@ -2,8 +2,8 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "2876c2141eb6c9705a329ba0251e1baf3573178c",
-    "verified_on": "2026-10-07"
+    "sha": "0a695f22e42af9f08a9acb2aa3435487921416ad",
+    "verified_on": "2026-10-08"
   },
   "status_policy": {
     "doc_status": [
@@ -53,7 +53,7 @@
         "docs/_archive/**/*.md",
         "tmp/**/*.md"
       ],
-      "expected_count": 43,
+      "expected_count": 44,
       "budgeted": false
     }
   },
@@ -10999,8 +10999,8 @@
       "owner": "tooling",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "947597101b53c75b02c6ee1a3fb1555d8eb91e77",
-        "verified_on": "2026-10-07"
+        "source_sha": "0a695f22e42af9f08a9acb2aa3435487921416ad",
+        "verified_on": "2026-10-08"
       },
       "fact_sources": [
         {
@@ -11029,8 +11029,8 @@
           "kind": "command",
           "command": "bash scripts/dbops/test-production-inventory.sh",
           "result": "passed",
-          "source_sha": "947597101b53c75b02c6ee1a3fb1555d8eb91e77",
-          "verified_on": "2026-10-07"
+          "source_sha": "0a695f22e42af9f08a9acb2aa3435487921416ad",
+          "verified_on": "2026-10-08"
         }
       ],
       "production_evidence": {
@@ -11040,6 +11040,79 @@
         "observed_at": null,
         "limitations": [
           "Offline contract verification only; production connectivity and metadata are not yet observed. Counts never authorize deletion."
+        ]
+      },
+      "gaps": []
+    },
+    {
+      "path": "scripts/oneoff/mysql_metadata_profile/README.md",
+      "class": "sidecar",
+      "owner": "tooling",
+      "doc_status": "aligned",
+      "verified": {
+        "source_sha": "0a695f22e42af9f08a9acb2aa3435487921416ad",
+        "verified_on": "2026-10-08"
+      },
+      "fact_sources": [
+        {
+          "kind": "source",
+          "path": ".github/workflows/db-ops.yml"
+        },
+        {
+          "kind": "source",
+          "path": "scripts/oneoff/mysql_metadata_profile/main.go"
+        },
+        {
+          "kind": "source",
+          "path": "scripts/oneoff/mysql_metadata_profile/main_test.go"
+        },
+        {
+          "kind": "source",
+          "path": "scripts/dbops/mysql-metadata-profile.py"
+        },
+        {
+          "kind": "source",
+          "path": "scripts/dbops/test-mysql-metadata-profile.py"
+        },
+        {
+          "kind": "source",
+          "path": "scripts/dbops/receipt-transport.py"
+        },
+        {
+          "kind": "source",
+          "path": "scripts/dbops/test-receipt-transport.py"
+        }
+      ],
+      "verification": [
+        {
+          "kind": "command",
+          "command": "go test -race -count=1 ./scripts/oneoff/mysql_metadata_profile",
+          "result": "passed",
+          "source_sha": "0a695f22e42af9f08a9acb2aa3435487921416ad",
+          "verified_on": "2026-10-08"
+        },
+        {
+          "kind": "command",
+          "command": "python3 scripts/dbops/test-mysql-metadata-profile.py",
+          "result": "passed",
+          "source_sha": "0a695f22e42af9f08a9acb2aa3435487921416ad",
+          "verified_on": "2026-10-08"
+        },
+        {
+          "kind": "command",
+          "command": "python3 scripts/dbops/test-receipt-transport.py",
+          "result": "passed",
+          "source_sha": "0a695f22e42af9f08a9acb2aa3435487921416ad",
+          "verified_on": "2026-10-08"
+        }
+      ],
+      "production_evidence": {
+        "level": "none",
+        "refs": [],
+        "deployed_sha": null,
+        "observed_at": null,
+        "limitations": [
+          "Offline diagnostic and safe receipt contracts do not prove current production permissions, archive validity or cleanup eligibility."
         ]
       },
       "gaps": []
