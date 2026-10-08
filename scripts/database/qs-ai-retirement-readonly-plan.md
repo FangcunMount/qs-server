@@ -148,10 +148,14 @@ WHERE s.id IS NULL OR src.id IS NULL OR dst.id IS NULL OR er.request_id IS NULL
 
 公开回执只允许 protocol/operation/run/source、DB identity hash/schema head、目标 source/reference hash、每个固定表 rows/bytes/pages/source SHA/upper-token SHA、实际核验项版本和固定结果类别。完整未来回执还应绑定 peer receipt SHA、broker observation SHA、writer fence SHA、fresh recheck SHA 和全目录 SHA。不得包含库名、原 IDs、正文、配置、模型输入/输出、URL、wire 或任意异常文本。未知或矛盾保持 blocked/unknown；不接受外部 JSON 里的 complete/drop_ready 字段。
 
-原型暴露 `discover_bounds(session,...)`、`observe(session,bounds,approved_bounds_sha256=...)`、`fresh_after_upper(new_session,observation)`；`PrivateObservation.facts(exact_eight_targets)` 只返回 partial diagnostic。公开始终 `business_retirement_proven=false`、`drop_ready=false`、`peer_receipts_verified=false`、`fence_verified=false`。RR 隔离和真实根事务可以检查；`READ ONLY / WITH CONSISTENT SNAPSHOT` 的实际设置由宿主负责，原型明确未独立观察该服务端模式。当前本机 venv 缺 reliable_messaging SDK，测试未假装验证 SDK JOSE 生命周期。
+原型暴露 `discover_bounds(session,...)`、`observe(session,bounds,approved_bounds_sha256=...)`、`fresh_after_upper(new_session,observation)`；`PrivateObservation.facts(exact_eight_targets)` 只返回 partial diagnostic。公开始终 `business_retirement_proven=false`、`drop_ready=false`、`peer_receipts_verified=false`、`fence_verified=false`。RR 隔离和真实根事务可以检查；`READ ONLY / WITH CONSISTENT SNAPSHOT` 的实际设置由宿主负责，原型明确未独立观察该服务端模式。早期观察器没有 SDK JOSE 验签能力；新增完整核验器复用真实 SDK，历史 wire 的可信 keys 仍须由宿主独立绑定。
 
 原型不保存 source 正文文件，只有受控内存中的当前页和最小图引用/摘要。未来受控宿主若必须生成 bound/checkpoint/源临时副本，应先注册 owned 私有路径，用 O_EXCL/NOFOLLOW/0600+fsync，不覆盖既存不同文件；只允许 hash 引用和明确审批链，不从日志导回正文。故障时保留真实 checkpoint 供核对，不自行续写旧 source。按本批已批准策略，临时回滚材料在最终删除验收通过后销毁；这不让缺少原证明的 unknown 自动变为成功，也不保留长期正文归档。
 
 本地验证使用 qs-ai 实际 SQLAlchemy metadata + 0037 原 DDL，在根授权且先核验 CID/image/labels/volume/127.0.0.1:34306 的 owned MySQL 中创建独立随机 schema，最终清理自己的 schema。30 个离线测试通过（另5个 native 默认跳过），5 个显式 owned-native 测试通过。离线覆盖固定集、NULL source digest、Python 原 fingerprint、PB/hash/内外 kind、八目标批准、孤儿/跨 org/unknown/held、分页、empty、预检 row/byte/图预算、隐私和 host ownership；原生覆盖真实18表、RR read-only/根事务、1001行分页、BIGINT 9/10 复合排序、同 RR 并发新增不可见、结束后 fresh above-upper、schema/head/identity/nested、非事务引擎/非 binary PK、deadline/query timeout拒绝。通过不等于生产观察。
 
 完成 typed 产物/配置/历史 writer、全反向 MQ/retry/独立评测归属、peer 原接受/ACK、真实 frozen broker、最终 fence/recheck 之前，**此原型的通过只证明有限扫描机制，不计为八个旧命令已核验退出**。
+
+新增的 `qs-ai-retirement-readonly-verifier.py` 已实现 53 个 qs-ai 账本与 14 个 qs-server 协作表的全主键、固定上界扫描，核对原请求、执行版本、模型调用、产物、原接受和 MQ/ACK 事实，并在宿主结束旧快照后，使用独立新事务重读完整 source 与业务摘要。原命令范围来自完整旧表扫描，未硬编码为八个 ID；旧 gRPC 历史缺少原 wire 时记录缺口，不补造当前协议消息。观察器仍仅承担扫描基础，不得单独作为业务闭环证明。
+
+当前本地独立回归为 61 项规则／真实 SDK JOSE 测试及 14 项 owned MySQL 原生测试通过；包括完整脚本及其观察器依赖。核验器不创建连接或接管宿主事务，不发送、修复、回填或退休命令。生产 qs-ai 库身份／schema／部署来源、历史可信 keys、NSQ 冻结拓扑、跨服务写入隔离与最终批准尚未绑定；公开结果保持 `production_proof=false`、`retirement_proven=false`、`drop_ready=false`。这些本地结果不证明生产八条旧命令已经核验或退役。
