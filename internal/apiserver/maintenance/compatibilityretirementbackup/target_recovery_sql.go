@@ -9,6 +9,7 @@ import (
 // Shared native producer, deliberately package-private. A future fixed host
 // executor must supply independent approval/fencing BEFORE calling it. JSON or
 // an absence observation alone cannot reproduce the returned private proof.
+//nolint:unused // Native recovery tests exercise this producer until the reviewed host executor is wired.
 func executeTargetDrop(ctx context.Context, p *TargetRecoveryPlan, i int) error {
 	if p == nil || p.self != p || i < 0 || i >= 4 {
 		return ErrRecoveryBinding
