@@ -1,0 +1,128 @@
+name: Compatibility Host Read-only Inventory
+
+on:
+  workflow_dispatch:
+    inputs:
+      approval_json:
+        description: Canonical readonly descriptor; v1 pre-registered Match or explicitly approved v2 current-session observation
+        required: true
+        type: string
+      approval_sha256:
+        description: Independent descriptor JSON plus LF SHA256 (distinct from the actual-run derived request SHA256)
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: production-deploy
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    outputs:
+      host_class: ${{ steps.validate.outputs.host_class }}
+      source_sha: ${{ steps.validate.outputs.source_sha }}
+    steps:
+      - name: Validate readonly scope and exact current main before credentials
+        id: validate
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const reject = () => {throw new Error('host_inventory_input_or_source_rejected');};
+            const raw = context.payload.inputs || {};
+            if (Object.keys(raw).sort().join(',') !== 'approval_json,approval_sha256' ||
+                typeof raw.approval_json !== 'string' || !/^[\x20-\x7e]{1,4096}$/.test(raw.approval_json) ||
+                typeof raw.approval_sha256 !== 'string' || !/^[0-9a-f]{64}$/.test(raw.approval_sha256) ||
+                context.eventName !== 'workflow_dispatch' || context.ref !== 'refs/heads/main' ||
+                context.repo.owner !== 'FangcunMount' || context.repo.repo !== 'qs-server' ||
+                !/^[0-9a-f]{40}$/.test(context.sha) ||
+                process.env.GITHUB_WORKFLOW_REF !== 'FangcunMount/qs-server/.github/workflows/compatibility-host-inventory.yml@refs/heads/main') {reject();}
+            let a;
+            try {a = JSON.parse(raw.approval_json);} catch {reject();}
+            const observation = a && a.protocol === 'qs-host-inventory-action-approval/v2';
+            const keys = ['protocol','source_sha','operation_id','host_class','route','inventory_sha256','transport_sha256','wrapper_sha256',observation ? 'context_mode' : 'matches_sha256','run_binding','total_seconds'].sort();
+            const routes = {server_a:'pinned_svra_retirement',collection:'pinned_svra_retirement',worker:'pinned_svrd_m5_postcheck',runner:'runner_no_linux_channel'};
+            if (!a || typeof a !== 'object' || Array.isArray(a) || Object.keys(a).sort().join(',') !== keys.join(',') ||
+                !['qs-host-inventory-action-approval/v1','qs-host-inventory-action-approval/v2'].includes(a.protocol) || a.source_sha !== context.sha ||
+                typeof a.operation_id !== 'string' || !/^[1-9][0-9]{0,19}-[1-9][0-9]{0,3}$/.test(a.operation_id) ||
+                typeof a.host_class !== 'string' || !Object.prototype.hasOwnProperty.call(routes,a.host_class) || a.route !== routes[a.host_class] ||
+                a.inventory_sha256 !== 'f0827b5c2e5fe803cd6ba11676fc0611659d2b91cf91cb2097333a2658c625b4' ||
+                a.transport_sha256 !== '5f88b51b14771960a46670a4e32353547bb2da5c0e303c4d3b27b4f58cc2e92a' ||
+                typeof a.wrapper_sha256 !== 'string' || !/^[0-9a-f]{64}$/.test(a.wrapper_sha256) ||
+                (observation ? a.context_mode !== 'current_ssh_session_observation' : typeof a.matches_sha256 !== 'string' || !/^[0-9a-f]{64}$/.test(a.matches_sha256)) ||
+                a.run_binding !== 'current_workflow_run' || !Number.isInteger(a.total_seconds) || a.total_seconds !== 120) {reject();}
+            const line = JSON.stringify(Object.fromEntries(keys.map(k => [k,a[k]])));
+            if (line !== raw.approval_json || require('crypto').createHash('sha256').update(line+'\n','ascii').digest('hex') !== raw.approval_sha256) {reject();}
+            let main;
+            try {main = await github.rest.repos.getBranch({...context.repo,branch:'main'});} catch {reject();}
+            if (main.data.commit.sha !== context.sha) {reject();}
+            core.setOutput('host_class',a.host_class);
+            core.setOutput('source_sha',context.sha);
+
+  inventory:
+    needs: validate
+    if: needs.validate.outputs.host_class != 'runner'
+    runs-on:
+      group: qlume
+      labels: [self-hosted, macOS, ARM64, ops]
+    environment: production
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.validate.outputs.source_sha }}
+          persist-credentials: false
+      - name: Recheck current main after environment approval
+        id: main
+        uses: actions/github-script@v8
+        env:
+          HOST_INVENTORY_EXPECTED_SHA: ${{ needs.validate.outputs.source_sha }}
+        with:
+          script: |
+            const expected = process.env.HOST_INVENTORY_EXPECTED_SHA;
+            let main;
+            try {main = await github.rest.repos.getBranch({...context.repo,branch:'main'});} catch {throw new Error('host_inventory_current_main_read_failed');}
+            if (context.ref !== 'refs/heads/main' || context.sha !== expected || main.data.commit.sha !== expected) {
+              throw new Error('host_inventory_current_main_changed');
+            }
+            core.setOutput('sha',expected);
+      - name: Bounded readonly private transport and safe projection
+        env:
+          HOST_INVENTORY_APPROVAL_JSON: ${{ inputs.approval_json }}
+          HOST_INVENTORY_APPROVAL_SHA256: ${{ inputs.approval_sha256 }}
+          HOST_INVENTORY_VALIDATED_MAIN_SHA: ${{ steps.main.outputs.sha }}
+          # Existing deployment route vars are non-sensitive and may appear in
+          # the GitHub step env header. The SSH key remains an existing Secret.
+          # Python stdout/receipts are closed projections; this workflow does not
+          # claim the entire GitHub run log hides route metadata.
+          # Disjoint host predicates: a missing SVRD host MUST NOT fall back to ServerA.
+          HOST_INVENTORY_SSH_HOST: ${{ needs.validate.outputs.host_class == 'worker' && vars.SVRD_HOST || needs.validate.outputs.host_class != 'worker' && vars.SVRA_HOST || '' }}
+          HOST_INVENTORY_SSH_USERNAME: ${{ needs.validate.outputs.host_class == 'worker' && (vars.SVRD_USERNAME || vars.SVRA_USERNAME) || needs.validate.outputs.host_class != 'worker' && vars.SVRA_USERNAME || '' }}
+          HOST_INVENTORY_SSH_PORT: ${{ needs.validate.outputs.host_class == 'worker' && (vars.SVRD_SSH_PORT || 22) || needs.validate.outputs.host_class != 'worker' && (vars.SVRA_SSH_PORT || 22) || '' }}
+          HOST_INVENTORY_SSH_KEY: ${{ needs.validate.outputs.host_class == 'worker' && (secrets.SVR_MINI_SSH_KEY || secrets.SVRD_SSH_KEY || secrets.SVRA_SSH_KEY) || needs.validate.outputs.host_class != 'worker' && secrets.SVRA_SSH_KEY || '' }}
+          HOST_INVENTORY_SSH_FINGERPRINT: ${{ needs.validate.outputs.host_class == 'worker' && vars.SVRD_SSH_FINGERPRINT || needs.validate.outputs.host_class != 'worker' && vars.SVRA_SSH_FINGERPRINT || '' }}
+        run: python3 scripts/database/compatibility-host-inventory-action.py run --repo "$GITHUB_WORKSPACE"
+
+  unsupported-runner:
+    needs: validate
+    if: needs.validate.outputs.host_class == 'runner'
+    runs-on:
+      group: qlume
+      labels: [self-hosted, macOS, ARM64, ops]
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.validate.outputs.source_sha }}
+          persist-credentials: false
+      - name: Refuse Linux inventory on the current Mac Runner without SSH credentials
+        env:
+          HOST_INVENTORY_APPROVAL_JSON: ${{ inputs.approval_json }}
+          HOST_INVENTORY_APPROVAL_SHA256: ${{ inputs.approval_sha256 }}
+          HOST_INVENTORY_VALIDATED_MAIN_SHA: ${{ needs.validate.outputs.source_sha }}
+        run: python3 scripts/database/compatibility-host-inventory-action.py run --repo "$GITHUB_WORKSPACE"

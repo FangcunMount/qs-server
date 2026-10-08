@@ -730,8 +730,9 @@ class SafetyContracts(unittest.TestCase):
         self.assertIs(value["live_fence_proven"], False)
         self.assertIs(value["historical_rerun_proven_denied"], False)
         entries = value["entrypoints"]
-        self.assertEqual(len(entries), 12)
-        self.assertEqual(len({entry["workflow"] for entry in entries}), 12)
+        self.assertEqual(len(entries), 13)
+        self.assertEqual(len({entry["workflow"] for entry in entries}), 13)
+        self.assertEqual(value["current_source_entrypoint_workflow_total"], len(entries))
         self.assertEqual(len(value["historical_workflows_reported_active_not_in_current_source"]), 9)
         self.assertTrue(all(entry["credential_path_proven_denied"] is False for entry in value["historical_workflows_reported_active_not_in_current_source"]))
         self.assertIs(value["remote_metadata_report"]["observation_is_fence_proof"], False)
@@ -740,6 +741,10 @@ class SafetyContracts(unittest.TestCase):
                 self.assertTrue((repository / path).is_file(), path)
         by_name = {entry["name"]: entry for entry in entries}
         self.assertEqual(by_name["Provision Production AuthZ Matrix Subjects"]["classification"], "production_writer")
+        host = by_name["Compatibility Host Read-only Inventory"]
+        self.assertIs(host["production_environment"], True)
+        self.assertEqual(host["workflow"], ".github/workflows/compatibility-host-inventory.yml")
+        self.assertEqual(host["classification"], "controlled_host_readonly_partial_observation")
         for name in ("M5 AuthZ Outage Read-only Preflight", "M5 AuthZ Ephemeral Read-only Postcheck", "Ping Runner"):
             self.assertIs(by_name[name]["production_environment"], False)
 

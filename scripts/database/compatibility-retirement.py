@@ -810,7 +810,7 @@ def live_inventory(args, directory):
     if mode == "inventory" and request["format_version"] == 2:
         validate_approved_boundary_file(request, directory)
     entrypoints, entrypoint_hash = read_private(Path(__file__).parent, "compatibility-retirement-entrypoints.json")
-    if entrypoints.get("format_version") != 1 or entrypoints.get("kind") != "source_only_production_entrypoint_catalog" or entrypoints.get("live_fence_proven") is not False or entrypoints.get("historical_rerun_proven_denied") is not False or len(entrypoints.get("entrypoints", ())) != 12:
+    if entrypoints.get("format_version") != 1 or entrypoints.get("kind") != "source_only_production_entrypoint_catalog" or entrypoints.get("live_fence_proven") is not False or entrypoints.get("historical_rerun_proven_denied") is not False or len(entrypoints.get("entrypoints", ())) != 13 or entrypoints.get("current_source_entrypoint_workflow_total") != 13:
         fail("inventory_entrypoint_catalog_invalid")
     binary = Path(args.inventory_binary)
     try:
