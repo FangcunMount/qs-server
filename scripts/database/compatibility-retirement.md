@@ -2,9 +2,13 @@
 
 This is the foundation for the accepted four-object operation, not an enabled
 production cleanup. `prepare` has real read-only identity discovery, separately approved private
-request bootstrap, fixed-upper-bound discovery and paged source inventory;
-all exit 42 with diagnostic receipts. Discovery is
-never automatic approval of an observed database identity.
+request bootstrap, fixed-upper-bound discovery, paged source inventory and a
+separately approved read-only history host. Identity, boundaries, inventory and
+their existing bootstrap modes exit 42 with diagnostic receipts. The history
+host may exit 0 only when its actual child completes two independent epochs,
+the private and stdout readiness bytes agree, and the diagnostic receipt is
+successfully armored. Its `complete`, `execution_allowed` and `drop_ready`
+remain false. A successful diagnostic Action does not authorize retirement.
 `apply`, `verify`, `recover` and `purge` remain unavailable and exit 42.
 Neither a JSON boolean nor
 a workflow input can enable a missing backend. Do not dispatch this foundation
@@ -83,8 +87,9 @@ authorize evidence writes, message sends or deletion.
 
 Production qualification still requires actual whole-epoch transaction lifetime,
 peak process memory, related-owner and evidence-slot capacity measurements.
-It also requires the current qs-ai physical-schema adapter and complete original
-execution/MQ closure, independent approvals, writer fencing, evidence CAS and
+The exact qs-ai 0040 physical-schema adapter is implemented locally; production
+still requires its actual source, database and original execution/MQ closure,
+independent approvals, writer fencing, evidence CAS and
 fresh readback. The local CLI and synthetic source-scale tests establish none
 of those production gates.
 
@@ -106,6 +111,42 @@ field names or the `instance_set_changed` category; it exposes no values,
 container IDs, process output or credentials. Successful receipt v2 and its
 business-acceptance boundary are unchanged. Local mounted-container and actual
 restart tests do not identify the cause of a past production failure.
+
+## Read-only history Action
+
+`prepare_mode=bootstrap-history` binds an independently reviewed canonical
+approval to the exact source, operation, original parent request/run, inventory
+request/report and four whole-file hashes and encoded sizes. The original
+`history-request.json` is read without rewriting. A new unique current-run
+directory receives an immutable registration and a derived request whose only
+changed field is `run_id`; the compiled history binary must report that exact
+source in its strict JSON `--source-sha` response.
+
+The host preserves the original absolute input paths in read-only mounts and
+allows writes only to its own readiness directory. It validates the inspected
+image ID, inherited labels, exact container ID, user, mounts, network and fixed
+3 GiB / two CPU / no additional swap profile. The image's declared MySQL volume
+is overridden by an explicitly owned empty read-only bind, so this diagnostic
+container does not create an anonymous data volume. Creation or attach outcomes
+that are unknown are inspected and retained for reconciliation; another run is
+not allowed to erase the uncertainty by creating a replacement.
+
+The first epoch releases its SQL/Mongo row graphs only after validating and
+sealing the original live-scope anchor. The host then closes its own transactions
+and starts genuinely different second transactions. The anchor retains original
+identities, source receipts and digests; it does not extend their lifetime.
+Candidate storage retains stable page values through private pointers instead
+of repeatedly copying a growing value slice. Public range reads remain deep
+copies, and the original ordered candidate hash contract is preserved.
+
+The current Action consumes a previously provisioned parent request. Production
+parent provisioning and a separately reviewable observation of all four complete
+file hashes/encoded sizes still need wiring; the inventory's semantic `DataHash`
+and source-byte count are not those physical-file values. Local fixture parent
+creation is not evidence that the production chain can start with Secrets alone.
+Read-only completion counts retain local, AI and global blockers, while production
+approval, external AI closure, process-budget proof, CAS, fencing, restore and
+DROP capabilities remain false.
 
 ## Required implementation before execution can become ready
 
