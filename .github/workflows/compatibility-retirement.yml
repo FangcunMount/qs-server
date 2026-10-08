@@ -38,10 +38,20 @@ on:
         description: 'Prepare submode: identity, diagnostic upper boundaries, or independently approved inventory'
         required: false
         type: choice
-        options: [identity, bounds, inventory]
+        options: [identity, bootstrap-bounds, bounds, bootstrap-inventory, inventory]
         default: inventory
       identity_request_sha256:
         description: 'Prepare identity only: independently computed canonical request SHA256'
+        required: false
+        default: ''
+        type: string
+      bootstrap_approval_json:
+        description: 'Bootstrap only: canonical public approval JSON, no credentials, names or BSON tokens'
+        required: false
+        default: ''
+        type: string
+      bootstrap_approval_sha256:
+        description: 'Bootstrap only: independently approved canonical JSON plus LF SHA256'
         required: false
         default: ''
         type: string
@@ -67,28 +77,59 @@ jobs:
         with:
           script: |
             const raw = context.payload.inputs ?? {};
-            const expectedKeys = ['operation', 'database', 'approved_source_sha', 'operation_id', 'manifest_sha256', 'inventory_request_sha256', 'prepare_mode', 'identity_request_sha256'].sort();
+            const expectedKeys = ['operation', 'database', 'approved_source_sha', 'operation_id', 'manifest_sha256', 'inventory_request_sha256', 'prepare_mode', 'identity_request_sha256', 'bootstrap_approval_json', 'bootstrap_approval_sha256'].sort();
             if (Object.keys(raw).some(key => !expectedKeys.includes(key))) {
               throw new Error('compatibility_retirement_unknown_input');
             }
             // GitHub omits optional empty strings in workflow_dispatch payloads.
             // Only declared optional inputs have defaults; required fields and
             // supplied values still pass the complete strict stage validation.
-            const input = {manifest_sha256: '', inventory_request_sha256: '', prepare_mode: 'inventory', identity_request_sha256: '', ...raw};
+            const input = {manifest_sha256: '', inventory_request_sha256: '', prepare_mode: 'inventory', identity_request_sha256: '', bootstrap_approval_json: '', bootstrap_approval_sha256: '', ...raw};
             const keys = Object.keys(input).sort();
+            const bootstrap = ['bootstrap-bounds', 'bootstrap-inventory'].includes(input.prepare_mode);
             if (JSON.stringify(keys) !== JSON.stringify(expectedKeys) ||
                 !['prepare', 'apply', 'verify', 'recover', 'purge'].includes(input.operation) ||
                 input.database !== 'mysql-and-mongodb' ||
                 !/^[0-9a-f]{40}$/.test(input.approved_source_sha) ||
                 !/^[0-9]{1,20}-[0-9]{1,4}$/.test(input.operation_id) ||
-                !['identity', 'bounds', 'inventory'].includes(input.prepare_mode) ||
+                !['identity', 'bounds', 'inventory', 'bootstrap-bounds', 'bootstrap-inventory'].includes(input.prepare_mode) ||
+                (bootstrap
+                  ? (input.operation !== 'prepare' || input.manifest_sha256 !== '' || input.inventory_request_sha256 !== '' || input.identity_request_sha256 !== '' || typeof input.bootstrap_approval_json !== 'string' || !/^[\x20-\x7e]{1,4096}$/.test(input.bootstrap_approval_json) || !/^[0-9a-f]{64}$/.test(input.bootstrap_approval_sha256))
+                  : (input.bootstrap_approval_json !== '' || input.bootstrap_approval_sha256 !== '')) ||
                 (input.operation === 'prepare'
-                  ? (input.manifest_sha256 !== '' || (input.prepare_mode === 'identity'
+                  ? (input.manifest_sha256 !== '' || (!bootstrap && (input.prepare_mode === 'identity'
                       ? (!/^[0-9a-f]{64}$/.test(input.identity_request_sha256) || input.inventory_request_sha256 !== '')
-                      : (!/^[0-9a-f]{64}$/.test(input.inventory_request_sha256) || input.identity_request_sha256 !== '')))
+                      : (!/^[0-9a-f]{64}$/.test(input.inventory_request_sha256) || input.identity_request_sha256 !== ''))))
                   : (!/^[0-9a-f]{64}$/.test(input.manifest_sha256) || input.inventory_request_sha256 !== '' || input.identity_request_sha256 !== '' || input.prepare_mode !== 'inventory')) ||
                 context.ref !== 'refs/heads/main' || input.approved_source_sha !== context.sha) {
               throw new Error('compatibility_retirement_input_or_source_rejected');
+            }
+            if (bootstrap) {
+              const reject = () => {throw new Error('compatibility_retirement_bootstrap_approval_rejected');};
+              const object = value => value !== null && typeof value === 'object' && !Array.isArray(value);
+              const exact = (value, keys) => object(value) && JSON.stringify(Object.keys(value).sort()) === JSON.stringify(keys.slice().sort());
+              const canonical = value => object(value) ? Object.fromEntries(Object.keys(value).sort().map(key => [key, canonical(value[key])])) : value;
+              let approval;
+              try {approval = JSON.parse(input.bootstrap_approval_json);} catch {reject();}
+              const core = ['format_version', 'kind', 'prepare_mode', 'operation_id', 'source_sha', 'target_hash', 'database_scope', 'identity_report', 'identity_hashes', 'expected_migrations', 'limits'];
+              if (!exact(approval, input.prepare_mode === 'bootstrap-inventory' ? [...core, 'boundary_report'] : core) ||
+                  approval.format_version !== 1 || approval.kind !== 'readonly_request_bootstrap_approval' || approval.prepare_mode !== input.prepare_mode ||
+                  approval.operation_id !== input.operation_id || approval.source_sha !== input.approved_source_sha ||
+                  approval.target_hash !== '4e09444409d1cfab3c9df383ed80a0999419fcbbd2f4e80d2e5dac1cf7dfcfb8' || approval.database_scope !== 'mysql-and-mongodb' ||
+                  !exact(approval.identity_hashes, ['mysql', 'mongodb']) || !exact(approval.expected_migrations, ['mysql', 'mongodb']) ||
+                  approval.identity_hashes.mysql === approval.identity_hashes.mongodb) {reject();}
+              for (const database of ['mysql', 'mongodb']) {
+                if (typeof approval.identity_hashes[database] !== 'string' || !/^[0-9a-f]{64}$/.test(approval.identity_hashes[database]) || !Number.isSafeInteger(approval.expected_migrations[database]) || approval.expected_migrations[database] < 1) {reject();}
+              }
+              const limits = {query_seconds:30,total_seconds:1500,max_records:1000000,max_bytes:2147483648,page_size:1000,max_pages:1001};
+              if (!exact(approval.limits, Object.keys(limits)) || Object.keys(limits).some(key => approval.limits[key] !== limits[key])) {reject();}
+              for (const name of input.prepare_mode === 'bootstrap-inventory' ? ['identity_report', 'boundary_report'] : ['identity_report']) {
+                const ref = approval[name];
+                if (!exact(ref, ['run_id', 'source_sha', 'sha256']) || typeof ref.run_id !== 'string' || !/^[0-9]{1,20}-[0-9]{1,4}$/.test(ref.run_id) || ref.source_sha !== input.approved_source_sha || typeof ref.sha256 !== 'string' || !/^[0-9a-f]{64}$/.test(ref.sha256)) {reject();}
+              }
+              if (approval.boundary_report && approval.boundary_report.run_id === approval.identity_report.run_id) {reject();}
+              const line = JSON.stringify(canonical(approval));
+              if (line !== input.bootstrap_approval_json || require('crypto').createHash('sha256').update(line+'\n', 'ascii').digest('hex') !== input.bootstrap_approval_sha256) {reject();}
             }
             const current = await github.rest.repos.getCommit({...context.repo, ref: 'main'});
             if (current.data.sha !== input.approved_source_sha) {
@@ -164,20 +205,22 @@ jobs:
           RETIREMENT_INVENTORY_REQUEST_SHA256: ${{ inputs.inventory_request_sha256 }}
           RETIREMENT_PREPARE_MODE: ${{ inputs.prepare_mode }}
           RETIREMENT_IDENTITY_REQUEST_SHA256: ${{ inputs.identity_request_sha256 }}
+          RETIREMENT_BOOTSTRAP_APPROVAL_JSON: ${{ inputs.bootstrap_approval_json }}
+          RETIREMENT_BOOTSTRAP_APPROVAL_SHA256: ${{ inputs.bootstrap_approval_sha256 }}
           RETIREMENT_APPROVED_SHA: ${{ inputs.approved_source_sha }}
           RETIREMENT_ACTUAL_SHA: ${{ github.sha }}
           RETIREMENT_RUN_ID: ${{ github.run_id }}-${{ github.run_attempt }}
           RETIREMENT_PACKAGE_SHA256: ${{ steps.package.outputs.sha256 }}
-          MYSQL_HOST: ${{ inputs.operation == 'prepare' && secrets.MYSQL_HOST || '' }}
-          MYSQL_PORT: ${{ secrets.MYSQL_PORT || 3306 }}
-          MYSQL_USERNAME: ${{ inputs.operation == 'prepare' && secrets.MYSQL_METADATA_ADMIN_USERNAME || '' }}
-          MYSQL_PASSWORD: ${{ inputs.operation == 'prepare' && secrets.MYSQL_METADATA_ADMIN_PASSWORD || '' }}
-          MYSQL_DATABASE: ${{ inputs.operation == 'prepare' && (secrets.MYSQL_DATABASE != '' && secrets.MYSQL_DATABASE || secrets.MYSQL_DBNAME) || '' }}
-          MONGODB_HOST: ${{ inputs.operation == 'prepare' && secrets.MONGODB_HOST || '' }}
-          MONGODB_PORT: ${{ secrets.MONGODB_PORT || 27017 }}
-          MONGODB_USERNAME: ${{ inputs.operation == 'prepare' && secrets.MONGODB_USERNAME || '' }}
-          MONGODB_PASSWORD: ${{ inputs.operation == 'prepare' && secrets.MONGODB_PASSWORD || '' }}
-          MONGODB_DBNAME: ${{ inputs.operation == 'prepare' && secrets.MONGODB_DBNAME || '' }}
+          MYSQL_HOST: ${{ inputs.operation == 'prepare' && !startsWith(inputs.prepare_mode, 'bootstrap-') && secrets.MYSQL_HOST || '' }}
+          MYSQL_PORT: ${{ inputs.operation == 'prepare' && !startsWith(inputs.prepare_mode, 'bootstrap-') && (secrets.MYSQL_PORT || 3306) || '' }}
+          MYSQL_USERNAME: ${{ inputs.operation == 'prepare' && !startsWith(inputs.prepare_mode, 'bootstrap-') && secrets.MYSQL_METADATA_ADMIN_USERNAME || '' }}
+          MYSQL_PASSWORD: ${{ inputs.operation == 'prepare' && !startsWith(inputs.prepare_mode, 'bootstrap-') && secrets.MYSQL_METADATA_ADMIN_PASSWORD || '' }}
+          MYSQL_DATABASE: ${{ inputs.operation == 'prepare' && !startsWith(inputs.prepare_mode, 'bootstrap-') && (secrets.MYSQL_DATABASE != '' && secrets.MYSQL_DATABASE || secrets.MYSQL_DBNAME) || '' }}
+          MONGODB_HOST: ${{ inputs.operation == 'prepare' && !startsWith(inputs.prepare_mode, 'bootstrap-') && secrets.MONGODB_HOST || '' }}
+          MONGODB_PORT: ${{ inputs.operation == 'prepare' && !startsWith(inputs.prepare_mode, 'bootstrap-') && (secrets.MONGODB_PORT || 27017) || '' }}
+          MONGODB_USERNAME: ${{ inputs.operation == 'prepare' && !startsWith(inputs.prepare_mode, 'bootstrap-') && secrets.MONGODB_USERNAME || '' }}
+          MONGODB_PASSWORD: ${{ inputs.operation == 'prepare' && !startsWith(inputs.prepare_mode, 'bootstrap-') && secrets.MONGODB_PASSWORD || '' }}
+          MONGODB_DBNAME: ${{ inputs.operation == 'prepare' && !startsWith(inputs.prepare_mode, 'bootstrap-') && secrets.MONGODB_DBNAME || '' }}
         with:
           host: ${{ vars.SVRA_HOST }}
           username: ${{ vars.SVRA_USERNAME }}
@@ -185,7 +228,7 @@ jobs:
           port: ${{ vars.SVRA_SSH_PORT || 22 }}
           fingerprint: ${{ vars.SVRA_SSH_FINGERPRINT }}
           command_timeout: 35m
-          envs: RETIREMENT_OPERATION,RETIREMENT_OPERATION_ID,RETIREMENT_MANIFEST_SHA256,RETIREMENT_INVENTORY_REQUEST_SHA256,RETIREMENT_PREPARE_MODE,RETIREMENT_IDENTITY_REQUEST_SHA256,RETIREMENT_APPROVED_SHA,RETIREMENT_ACTUAL_SHA,RETIREMENT_RUN_ID,RETIREMENT_PACKAGE_SHA256,MYSQL_HOST,MYSQL_PORT,MYSQL_USERNAME,MYSQL_PASSWORD,MYSQL_DATABASE,MONGODB_HOST,MONGODB_PORT,MONGODB_USERNAME,MONGODB_PASSWORD,MONGODB_DBNAME
+          envs: RETIREMENT_OPERATION,RETIREMENT_OPERATION_ID,RETIREMENT_MANIFEST_SHA256,RETIREMENT_INVENTORY_REQUEST_SHA256,RETIREMENT_PREPARE_MODE,RETIREMENT_IDENTITY_REQUEST_SHA256,RETIREMENT_BOOTSTRAP_APPROVAL_JSON,RETIREMENT_BOOTSTRAP_APPROVAL_SHA256,RETIREMENT_APPROVED_SHA,RETIREMENT_ACTUAL_SHA,RETIREMENT_RUN_ID,RETIREMENT_PACKAGE_SHA256,MYSQL_HOST,MYSQL_PORT,MYSQL_USERNAME,MYSQL_PASSWORD,MYSQL_DATABASE,MONGODB_HOST,MONGODB_PORT,MONGODB_USERNAME,MONGODB_PASSWORD,MONGODB_DBNAME
           script: |
             set -Eeuo pipefail
             umask 077
@@ -217,5 +260,7 @@ jobs:
               --manifest-hash "$RETIREMENT_MANIFEST_SHA256" \
               --inventory-request-hash "$RETIREMENT_INVENTORY_REQUEST_SHA256" \
               --identity-request-hash "$RETIREMENT_IDENTITY_REQUEST_SHA256" \
+              --bootstrap-approval-json "$RETIREMENT_BOOTSTRAP_APPROVAL_JSON" \
+              --bootstrap-approval-hash "$RETIREMENT_BOOTSTRAP_APPROVAL_SHA256" \
               --prepare-mode "$RETIREMENT_PREPARE_MODE" \
               --inventory-binary "$inventory_binary"

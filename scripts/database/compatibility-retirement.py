@@ -45,6 +45,8 @@ NAME = re.compile(r"^[a-z][a-z0-9_-]{0,80}\.json$")
 MAX_JSON = 256 * 1024
 INVENTORY_V2_LIMITS = {"query_seconds": 30, "total_seconds": 1500, "max_records": 1000000,
                        "max_bytes": 2147483648, "page_size": 1000, "max_pages": 1001}
+BOOTSTRAP_MODES = frozenset({"bootstrap-bounds", "bootstrap-inventory"})
+MAX_BOOTSTRAP_APPROVAL = 4096
 MAX_WINDOW_SECONDS = 1800
 FORWARD_STOP_SECONDS = 1200
 CAPABILITIES = {
@@ -534,6 +536,185 @@ def bootstrap_identity_request(args):
     return directory
 
 
+def canonical_bytes(value):
+    return (json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=True,
+                       allow_nan=False) + "\n").encode("ascii")
+
+
+def validate_bootstrap_approval(args):
+    text = getattr(args, "bootstrap_approval_json", "")
+    approved_hash = getattr(args, "bootstrap_approval_hash", "")
+    token(approved_hash, HASH)
+    if type(text) is not str or not 0 < len(text) <= MAX_BOOTSTRAP_APPROVAL or not text.isascii():
+        fail("bootstrap_approval_invalid")
+    value = decode(text.encode("ascii"))
+    raw = canonical_bytes(value)
+    # The input is one canonical JSON line; its approved digest includes LF.
+    if text.encode("ascii") != raw[:-1] or hashlib.sha256(raw).hexdigest() != approved_hash:
+        fail("bootstrap_approval_hash_or_encoding_invalid")
+    mode = args.prepare_mode
+    core = ("format_version", "kind", "prepare_mode", "operation_id", "source_sha", "target_hash",
+            "database_scope", "identity_report", "identity_hashes", "expected_migrations", "limits")
+    fields(value, core if mode == "bootstrap-bounds" else (*core, "boundary_report"))
+    if type(value["format_version"]) is not int or value["format_version"] != 1 or value["kind"] != "readonly_request_bootstrap_approval" or value["prepare_mode"] != mode:
+        fail("bootstrap_approval_class_invalid")
+    validate_binding(value, args.operation_id, args.actual_source_sha)
+    request = {key: value[key] for key in ("operation_id", "source_sha", "target_hash", "database_scope", "identity_hashes", "expected_migrations", "limits")}
+    request.update(format_version=2, kind="readonly_inventory_boundary_request")
+    validate_v2_request(request, args.operation_id, args.actual_source_sha, boundary=True)
+    # JSON numbers must have the same exact representation in Node and Python.
+    if any(head > 2**53-1 for head in value["expected_migrations"].values()):
+        fail("bootstrap_approval_head_invalid")
+    for key in (("identity_report",) if mode == "bootstrap-bounds" else ("identity_report", "boundary_report")):
+        reference = value[key]
+        fields(reference, ("run_id", "source_sha", "sha256"))
+        token(reference["run_id"], RUN); token(reference["source_sha"], SHA); token(reference["sha256"], HASH)
+        if reference["source_sha"] != args.actual_source_sha or reference["run_id"] == args.run_id:
+            fail("bootstrap_report_origin_invalid")
+    if mode == "bootstrap-inventory" and value["identity_report"]["run_id"] == value["boundary_report"]["run_id"]:
+        fail("bootstrap_report_origin_invalid")
+    return value, request
+
+
+def bootstrap_identity_report(directory, value, args):
+    reference = value["identity_report"]
+    output = private_directory(directory / ("identity-" + reference["run_id"]))
+    report, report_hash = read_private(output, "identity.private.json", reference["sha256"])
+    expected_hash = hashlib.sha256(identity_request_bytes(args.operation_id, args.actual_source_sha)).hexdigest()
+    original_request, _ = read_private(directory, "identity-request.json", expected_hash)
+    validate_identity_request(original_request, args.operation_id, args.actual_source_sha)
+    original_args = argparse.Namespace(actual_source_sha=args.actual_source_sha, operation_id=args.operation_id,
+                                       run_id=reference["run_id"])
+    summary = dict(report, private_report_hash=report_hash)
+    validate_identity_receipt(summary, 0, original_args, output, expected_hash, "0" * 64)
+    if report["complete"] is not True or any(item["complete"] is not True or item["error_category"] != "none" for item in report["diagnostic_histograms"]):
+        fail("bootstrap_identity_report_incomplete")
+    for database, state in report["database_states"].items():
+        if state["identity_hash"] != value["identity_hashes"][database] or state["migration_version"] != value["expected_migrations"][database]:
+            fail("bootstrap_identity_binding_mismatch")
+
+
+def bootstrap_boundary_report(directory, value, request, args):
+    reference = value["boundary_report"]
+    output = private_directory(directory / ("bounds-" + reference["run_id"]))
+    report, _ = read_private(output, "boundary.private.json", reference["sha256"])
+    fields(report, ("format_version", "kind", "source_sha", "operation_id", "run_id", "request_hash", "target_hash", "observed_at", "complete", "drop_ready", "diagnostic_only", "error_category", "database_bindings", "targets", "source_bytes_protocol", "consistency_semantics"), ("boundary_report_hash",))
+    if type(report["format_version"]) is not int or report["format_version"] != 2 or report["kind"] != "readonly_inventory_boundaries" or report["source_sha"] != args.actual_source_sha or report["operation_id"] != args.operation_id or report["run_id"] != reference["run_id"] or report["target_hash"] != TARGET_HASH or report["complete"] is not True or report["drop_ready"] is not False or report["diagnostic_only"] is not True or report["error_category"] != "none" or report.get("boundary_report_hash", "") != "" or report["source_bytes_protocol"] != "no_source_body_copy" or report["consistency_semantics"] != "diagnostic_upper_discovery_requires_independent_request_approval":
+        fail("bootstrap_boundary_report_invalid")
+    utc(report["observed_at"])
+    token(report["request_hash"], HASH)
+    original_request, _ = read_private(directory, "boundary-request.json", report["request_hash"])
+    validate_v2_request(original_request, args.operation_id, args.actual_source_sha, boundary=True)
+    if original_request != request:
+        fail("bootstrap_boundary_request_mismatch")
+    objects = report["targets"]
+    if type(objects) is not list or len(objects) != 4:
+        fail("bootstrap_boundary_report_invalid")
+    boundaries = []
+    for item, target in zip(objects, TARGETS):
+        fields(item, ("database", "name", "kind", "present", "complete", "records", "bytes", "schema_hash", "data_hash", "identity_hash", "classification", "error_category", "equal_full_passes", "pages", "next_cycle_required", "boundary"))
+        expected_data_hash = "" if item["present"] is True else hashlib.sha256(b"null").hexdigest()
+        if tuple(item[key] for key in ("database", "name", "kind")) != target or type(item["present"]) is not bool or item["complete"] is not True or item["error_category"] != "none" or type(item["next_cycle_required"]) is not bool or item["next_cycle_required"] or item["classification"] != {} or item["data_hash"] != expected_data_hash:
+            fail("bootstrap_boundary_target_invalid")
+        for key in ("records", "bytes", "equal_full_passes", "pages"):
+            uint(item[key])
+            if item[key]:
+                fail("bootstrap_boundary_copied_source_body")
+        bound = item["boundary"]
+        if type(bound) is not dict or any(bound.get(key) != item[key] for key in ("database", "name", "kind", "present", "schema_hash", "identity_hash")):
+            fail("bootstrap_boundary_target_invalid")
+        boundaries.append(bound)
+    request.update(kind="readonly_inventory_request", boundary_run_id=reference["run_id"],
+                   boundary_report_hash=reference["sha256"], approved_boundaries=boundaries)
+    validate_v2_request(request, args.operation_id, args.actual_source_sha, boundary=False)
+    validate_approved_boundary_file(request, directory)
+    for binding in report["database_bindings"].values():
+        fields(binding, ("identity_hash", "expected_identity_match", "migration_version", "migration_dirty", "expected_migration_match", "catalog_hash", "non_target_schema_hash", "metadata_complete", "permissions", "outside_dependencies", "dependency_coverage_complete", "inbound_foreign_key_coverage_complete", "dependency_scope", "dependency_text_review_required", "error_category"))
+        uint(binding["migration_version"]); uint(binding["outside_dependencies"])
+        for key in ("identity_hash", "catalog_hash", "non_target_schema_hash"):
+            token(binding[key], HASH)
+        for key in ("expected_identity_match", "migration_dirty", "expected_migration_match", "metadata_complete", "dependency_coverage_complete", "inbound_foreign_key_coverage_complete", "dependency_text_review_required"):
+            if type(binding[key]) is not bool:
+                fail("bootstrap_boundary_report_invalid")
+        if type(binding["permissions"]) is not dict or any(type(flag) is not bool for flag in binding["permissions"].values()) or type(binding["dependency_scope"]) is not str or binding["error_category"] != "none":
+            fail("bootstrap_boundary_report_invalid")
+
+
+def create_bootstrap_file(directory, filename, raw):
+    """Publish complete bytes exclusively; interrupted partial files block retry."""
+    partial = directory / (filename + ".bootstrap.partial")
+    try:
+        fd = os.open(partial, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
+    except OSError:
+        fail("bootstrap_request_creation_incomplete")
+    try:
+        with os.fdopen(fd, "wb", closefd=False) as stream:
+            stream.write(raw); stream.flush(); os.fsync(stream.fileno())
+        os.close(fd)
+        fd = None
+        os.link(partial, directory / filename, follow_symlinks=False)
+        partial.unlink()
+        parent_fd = os.open(directory, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+        try:
+            os.fsync(parent_fd)
+        finally:
+            os.close(parent_fd)
+    except OSError:
+        # Preserve the exact interruption for review; never resume/overwrite it.
+        fail("bootstrap_request_creation_incomplete")
+    finally:
+        if fd is not None:
+            os.close(fd)
+
+
+def bootstrap_private_request(args):
+    value, request = validate_bootstrap_approval(args)
+    directory = operation_directory(args.root, args.operation_id)
+    filename = "boundary-request.json" if args.prepare_mode == "bootstrap-bounds" else "inventory-request.json"
+    registry_name = filename.removesuffix(".json") + "-bootstrap.json"
+    with locked_operation(directory):
+        bootstrap_identity_report(directory, value, args)
+        if args.prepare_mode == "bootstrap-inventory":
+            bootstrap_boundary_report(directory, value, request, args)
+        raw = canonical_bytes(request)
+        request_hash = hashlib.sha256(raw).hexdigest()
+        registration = {"format_version": 1, "kind": "private_request_bootstrap_binding", "source_sha": args.actual_source_sha,
+                        "operation_id": args.operation_id, "created_run_id": args.run_id, "prepare_mode": args.prepare_mode,
+                        "approval_sha256": args.bootstrap_approval_hash, "request_sha256": request_hash,
+                        "identity_report": value["identity_report"], "boundary_report": value.get("boundary_report")}
+        paths = [directory / name for name in (filename, registry_name)]
+        if any((directory / (name + ".bootstrap.partial")).exists() or (directory / (name + ".bootstrap.partial")).is_symlink() for name in (filename, registry_name)):
+            fail("bootstrap_request_creation_incomplete")
+        present = [path.exists() or path.is_symlink() for path in paths]
+        if any(present):
+            if not all(present):
+                fail("bootstrap_request_creation_incomplete")
+            existing, _ = read_private(directory, filename, request_hash)
+            recorded, _ = read_private(directory, registry_name)
+            fields(recorded, registration.keys())
+            token(recorded["created_run_id"], RUN)
+            if recorded["created_run_id"] in {value[key]["run_id"] for key in ("identity_report", "boundary_report") if key in value}:
+                fail("bootstrap_request_binding_mismatch")
+            expected = dict(registration, created_run_id=recorded["created_run_id"])
+            if existing != request or recorded != expected or canonical_bytes(recorded) != canonical_bytes(expected):
+                fail("bootstrap_request_binding_mismatch")
+            created_run = recorded["created_run_id"]
+        else:
+            create_bootstrap_file(directory, registry_name, canonical_bytes(registration))
+            create_bootstrap_file(directory, filename, raw)
+            created_run = args.run_id
+    receipt = {"format_version": 1, "operation": "prepare", "prepare_mode": args.prepare_mode,
+            "source_sha": args.actual_source_sha, "run_id": args.run_id, "operation_id": args.operation_id,
+            "target_hash": TARGET_HASH, "target_count": 4, "complete": False, "execution_allowed": False,
+            "diagnostic_only": True, "drop_ready": False, "request_bootstrap_complete": True,
+            "bootstrap_approval_sha256": args.bootstrap_approval_hash, "derived_request_sha256": request_hash,
+            "request_created_run_id": created_run, "approved_identity_report": value["identity_report"],
+            "error_category": "request_bootstrap_requires_independent_request_approval"}
+    if "boundary_report" in value:
+        receipt["approved_boundary_report"] = value["boundary_report"]
+    return receipt
+
+
 def capture_fixed(command, *, timeout, maximum=32768):
     # Child error output may contain connection strings; it is never relayed.
     try:
@@ -991,6 +1172,14 @@ def execute(args):
     mode = getattr(args, "prepare_mode", "inventory")
     identity_request = getattr(args, "identity_request_hash", "")
     inventory_request = getattr(args, "inventory_request_hash", "")
+    bootstrap_json = getattr(args, "bootstrap_approval_json", "")
+    bootstrap_hash = getattr(args, "bootstrap_approval_hash", "")
+    if mode in BOOTSTRAP_MODES:
+        if args.operation != "prepare" or args.manifest_hash or identity_request or inventory_request or not bootstrap_json or not bootstrap_hash:
+            fail("input_classes_mixed")
+        return bootstrap_private_request(args)
+    if bootstrap_json or bootstrap_hash:
+        fail("input_classes_mixed")
     if mode not in ("identity", "bounds", "inventory") or (identity_request and (args.operation != "prepare" or mode != "identity" or inventory_request or args.manifest_hash)) or (mode == "identity" and (args.operation != "prepare" or not identity_request)) or (mode == "bounds" and (args.operation != "prepare" or not inventory_request or args.manifest_hash)):
         fail("input_classes_mixed")
     if args.operation == "prepare" and mode == "identity":
@@ -1044,6 +1233,8 @@ def main(argv=None):
     parser.add_argument("--inventory-binary", default="")
     parser.add_argument("--prepare-mode", default="inventory")
     parser.add_argument("--identity-request-hash", default="")
+    parser.add_argument("--bootstrap-approval-json", default="")
+    parser.add_argument("--bootstrap-approval-hash", default="")
     receipt = {"format_version": 1, "complete": False, "execution_allowed": False,
                "error_category": "input_invalid"}
     try:
@@ -1057,7 +1248,10 @@ def main(argv=None):
               "operation": OPERATIONS, "source_sha": "sha40", "run_id": "run_id", "operation_id": "run_id",
               "manifest_hash": "hash64", "target_hash": "hash64", "target_count": "uint",
               "inventory_complete": "bool", "inventory_private_report_hash": "hash64",
-              "prepare_mode": frozenset({"identity", "bounds", "inventory"}), "diagnostic_only": "bool", "drop_ready": "bool",
+              "prepare_mode": frozenset({"identity", "bounds", "inventory"}) | BOOTSTRAP_MODES, "diagnostic_only": "bool", "drop_ready": "bool",
+              "request_bootstrap_complete": "bool", "bootstrap_approval_sha256": "hash64", "derived_request_sha256": "hash64", "request_created_run_id": "run_id",
+              "approved_identity_report": {"run_id": "run_id", "source_sha": "sha40", "sha256": "hash64"},
+              "approved_boundary_report": {"run_id": "run_id", "source_sha": "sha40", "sha256": "hash64"},
               "boundary_discovery_complete": "bool", "boundary_private_report_hash": "hash64", "boundary_request_hash": "hash64",
               "inventory_next_cycle_required": "bool", "inventory_boundary_report_hash": "nullable_hash64", "inventory_two_equal_scans": "bool",
               "identity_discovery_complete": "bool", "identity_private_report_hash": "hash64", "identity_request_hash": "hash64",
