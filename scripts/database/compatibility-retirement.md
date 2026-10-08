@@ -1,8 +1,9 @@
 # Exact compatibility retirement: A-stage execution barrier
 
 This is the foundation for the accepted four-object operation, not an enabled
-production cleanup. `prepare` has real read-only identity discovery and a bounded
-source inventory adapter; both exit 42 with diagnostic receipts. Discovery is
+production cleanup. `prepare` has real read-only identity discovery, separately approved private
+request bootstrap, fixed-upper-bound discovery and paged source inventory;
+all exit 42 with diagnostic receipts. Discovery is
 never automatic approval of an observed database identity.
 `apply`, `verify`, `recover` and `purge` remain unavailable and exit 42.
 Neither a JSON boolean nor
@@ -153,20 +154,61 @@ terminal/replay responsibility. Public receipts allow at most 128 total buckets,
 flattened into four pages of at most 32; excess keeps headers incomplete and
 retains only private count/hash diagnostics. It does not authorize cleanup.
 
-The pre-provisioned private request has `format_version: 1`,
-`kind: readonly_inventory_request`, approved `operation_id`/`source_sha`,
-`target_hash` of the ordered four-object whitelist, `database_scope:
-mysql-and-mongodb`, exact `identity_hashes.mysql/mongodb`,
-`expected_migrations.mysql/mongodb`, and these immutable limits:
-`query_seconds=15`, `total_seconds=180`, `max_records=100000`,
-`max_bytes=134217728`. Record/byte limits are per target, so total source bytes
-are bounded by four times that byte limit. Exceeding a bound produces incomplete
-inventory; there is no automatic pagination/resume or limit override.
-The prior metadata estimate of 651,765 SQL DCE rows is neither fresh nor exact,
-but exceeds this source-inventory cap. This adapter must report incomplete for
-such a dataset. It has no request-bound fixed SQL ID/BSON upper bound or paged
-production traversal. Equal whole scans and a successful diagnostic histogram
-do not satisfy those missing production preparation requirements.
+Request pre-provisioning is implemented as two separate diagnostic modes.
+`bootstrap-bounds` receives independently approved canonical
+`bootstrap_approval_json` plus its SHA256 including the final newline. It binds
+the exact main/source/operation/target, identity producer run and private report
+hash, clean heads and the fixed V2 profile; it verifies that original private
+report and creates `boundary-request.json` without opening a database.
+`bootstrap-inventory` additionally verifies the separately approved original
+boundary producer run/report before creating `inventory-request.json`; the true
+BSON tokens stay private. Neither mode chooses an observed identity for the
+reviewer, executes a scan or permits deletion. Both return exit 42 and
+`request_bootstrap_complete:true` with `derived_request_sha256`. That derived
+hash must be reviewed and separately supplied to the subsequent `bounds` or
+`inventory` run.
+
+The request and bootstrap binding are exact 0600, no-follow, exclusive-created
+files with fsync under the operation lock. An identical completed pair is
+verified; changed bytes, a one-file partial pair, symlink/hardlink or an
+interrupted `.bootstrap.partial` refuses continuation. No overwrite, automatic
+repair or discovery-to-approval shortcut exists.
+
+Production boundary and inventory requests require `format_version: 2`. V1's
+100,000-record / 128 MiB / 180-second helpers remain only for historical fixture
+coverage; both live Python and Go entrypoints reject V1 before connecting.
+V2 retains the exact scope, separately approved source/operation, identity hashes
+and expected clean heads. Its immutable per-target profile is
+`query_seconds=30`, `total_seconds=1500`, `max_records=1000000`,
+`max_bytes=2147483648`, `page_size=1000`, `max_pages=1001`.
+The source-byte total and the actual encoded private source file each have the
+2 GiB bound; framing/base64 overhead cannot bypass the on-disk bound. Exceeding
+any record, byte, page or deadline cap remains incomplete and denies readiness.
+
+`bounds` reads exact namespace/schema and the true primary-key upper token into
+an immutable `boundary.private.json` owned by that run. Missing and present-empty
+objects have distinct representations. This observation does not create an
+inventory approval. A reviewer must independently bind and approve that file's
+raw SHA256 and all four boundaries in the separate inventory request using
+`boundary_run_id`, `boundary_report_hash`, and `approved_boundaries`; there is no
+automatic discovery-to-approval path or limit override.
+
+SQL pages compare numeric bigint IDs numerically; AI command IDs require the
+actual supported single ASCII binary-collation primary key. Mongo retains true
+one-field BSON `_id` tokens and proves a homogeneous supported `_id` type across
+the collection before paging: string, ObjectID, int32 or int64. Mixed/unsupported
+types and non-simple collection collation fail explicitly. Converting `_id` to
+JSON text or allowing type-bracket queries to silently skip records is forbidden.
+
+Two complete passes use the approved fixed upper bound. SQL passes share one
+read-only repeatable-read snapshot, then close it before a fresh read observes
+post-upper records and rechecks identity/head/catalog. Mongo also rechecks its
+actual catalog/head/UUID after scanning. New records above the approved upper
+set `next_cycle_required`; they are not silently folded into the old approval.
+The two equal passes prove content within the scanned range, not a production
+writer fence, global business-history coverage or an atomic dual-store snapshot.
+The final maintenance fence still requires a fresh final difference check and
+fixed-bound scan before deletion.
 
 Identity protocol `mysql_database_identity_v1` hashes actual `@@server_uuid`
 and selected `DATABASE()` with unambiguous length framing. Protocol
@@ -179,6 +221,19 @@ Mongo database identity across B migrations. Record and bind the pre/post
 migration UUIDs and heads separately. A genuinely new empty database has no such
 UUID and needs an explicit pristine-catalog bootstrap proof before migration;
 discovery cannot authorize that bootstrap or weaken identity checks.
+The additive tooling also records `database_anchor_hash` independently from
+`migration_generation_hash`. MySQL uses the existing server UUID/selected database
+identity and an empty migration generation. Mongo requires actual
+`replSetGetConfig` visibility and hashes the observed nonzero
+`settings.replicaSetId`, matching replica-set name and selected database; its
+migration generation separately hashes the actual migration-collection UUID.
+Primary/hosts/`me` and migration UUID do not enter the stable Mongo anchor.
+Permission errors, unsupported topology, ambiguous BSON and mismatched set
+identity fail explicitly. Existing V1 identity/head request bytes and approvals
+remain unchanged; the new anchor does not replace full catalog or non-target
+business-baseline checks. Across a migration, compare the separately bound
+stable anchor and expected catalog/facts, while recording the changed generation;
+do not silently accept a changed V1 aggregate.
 The embedded binary SHA must equal the approved source before DB credentials are
 written to a private temporary environment file. Secrets never enter argv,
 stdout, public artifacts or the raw source inventory.
@@ -204,10 +259,11 @@ must succeed. An inaccessible `system.profile` index therefore keeps metadata
 incomplete; the tool never treats permission-denied as absence. Dependency text
 review remains required even after a successful metadata read; dynamic SQL or
 external/manual writers cannot be proved absent by this adapter.
-The current SQL foreign-key count covers selected-schema outbound metadata only
-and compares referenced schema as well as target name. `dependency_scope` says so
-and `dependency_coverage_complete:false` remains explicit: cross-schema inbound
-keys and dynamic/external dependencies require a later exact verifier. A complete
+The SQL catalog reads cross-schema inbound foreign-key metadata with exact
+referenced schema/name matching under proven global visibility. Its narrowly
+scoped `inbound_foreign_key_coverage_complete` does not establish complete
+dependency coverage: selected-schema SQL text still requires review, and dynamic
+SQL, external/manual writers and other repositories remain unproved. A complete
 catalog is never a complete dependency/business deletion proof.
 
 Each producer run owns a new 0700 `inventory-<run-attempt>` below its private

@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Safety contracts: all fixtures are local synthetic test inputs, never evidence."""
 import argparse
+import base64
 import contextlib
 import copy
 import datetime
@@ -24,6 +25,16 @@ SPEC.loader.exec_module(tool)
 NOW = datetime.datetime(2026, 10, 8, 12, 0, tzinfo=datetime.timezone.utc)
 SOURCE = "a" * 40
 OPERATION = "123-1"
+
+
+def inventory_binding(database, identity, version):
+    return {"identity_hash": identity, "database_anchor_hash": identity if database == "mysql" else "7" * 64,
+            "migration_generation_hash": "" if database == "mysql" else "8" * 64,
+            "expected_identity_match": True, "migration_version": version, "migration_dirty": False,
+            "expected_migration_match": True, "catalog_hash": "5" * 64, "non_target_schema_hash": "6" * 64,
+            "metadata_complete": True, "permissions": {}, "outside_dependencies": 0,
+            "dependency_coverage_complete": False, "inbound_foreign_key_coverage_complete": False,
+            "dependency_scope": "metadata_only", "dependency_text_review_required": True, "error_category": "none"}
 
 
 def manifest():
@@ -353,6 +364,176 @@ class SafetyContracts(unittest.TestCase):
             args.inventory_request_hash = "a" * 64
             self.assertBlocked("input_classes_mixed", tool.execute, args)
 
+    def v2_request(self, boundary=False):
+        value = {"format_version": 2, "kind": "readonly_inventory_boundary_request" if boundary else "readonly_inventory_request",
+                 "operation_id": OPERATION, "source_sha": SOURCE, "target_hash": tool.TARGET_HASH,
+                 "database_scope": "mysql-and-mongodb", "identity_hashes": {"mysql": "1" * 64, "mongodb": "2" * 64},
+                 "expected_migrations": {"mysql": 98, "mongodb": 37}, "limits": tool.INVENTORY_V2_LIMITS.copy()}
+        if not boundary:
+            value.update(boundary_run_id="456-1", boundary_report_hash="a" * 64,
+                         approved_boundaries=[{"database": database, "name": name, "kind": kind, "present": False,
+                                               "empty": False, "pk_type": "", "upper_token": "",
+                                               "schema_hash": "3" * 64, "identity_hash": "4" * 64}
+                                              for database, name, kind in tool.TARGETS])
+        return value
+
+    def test_v2_exact_profile_and_independent_boundary_approval(self):
+        value = self.v2_request()
+        tool.validate_inventory_request(value, OPERATION, SOURCE)
+        for mutate in (lambda v: v.pop("boundary_report_hash"), lambda v: v["limits"].update(page_size=2000),
+                       lambda v: v["limits"].update(max_records=650000), lambda v: v["limits"].update(max_bytes=2147483649),
+                       lambda v: v["limits"].update(query_seconds=31), lambda v: v["limits"].update(total_seconds=1501),
+                       lambda v: v["limits"].update(max_pages=1002), lambda v: v.update(allow_unknown=True),
+                       lambda v: v["approved_boundaries"][0].update(empty=True)):
+            changed = copy.deepcopy(value); mutate(changed)
+            with self.assertRaises(tool.Blocked):
+                tool.validate_inventory_request(changed, OPERATION, SOURCE)
+        discovery = self.v2_request(boundary=True)
+        tool.validate_v2_request(discovery, OPERATION, SOURCE, boundary=True)
+        discovery["approved_boundaries"] = value["approved_boundaries"]
+        self.assertBlocked("evidence_fields_invalid", lambda: tool.validate_v2_request(discovery, OPERATION, SOURCE, boundary=True))
+
+    def test_production_inventory_has_no_v1_bypass(self):
+        tool.require_inventory_v2(self.v2_request())
+        for version in (1, True, "2", 3, None):
+            self.assertBlocked("inventory_v1_retired", tool.require_inventory_v2, {"format_version": version})
+
+    def test_v2_present_empty_is_not_absence_and_sql_numbers_are_exact(self):
+        value = self.v2_request()
+        first = value["approved_boundaries"][0]
+        first.update(present=True, empty=True, pk_type="uint64")
+        tool.validate_inventory_request(value, OPERATION, SOURCE)
+        first.update(empty=False, upper_token=base64.b64encode(b"18446744073709551615").decode())
+        tool.validate_inventory_request(value, OPERATION, SOURCE)
+        for raw in (b"18446744073709551616", b"01", b"+1", b"-1", b"PRIVATE_NOT_NUMERIC"):
+            first["upper_token"] = base64.b64encode(raw).decode()
+            self.assertBlocked("boundary_token_invalid", tool.validate_inventory_request, value, OPERATION, SOURCE)
+
+    def test_boundary_report_is_exact_private_identity_head_and_never_auto_approved(self):
+        value = self.v2_request()
+        bounds = self.directory / "bounds-456-1"; bounds.mkdir(mode=0o700)
+        observed = {"format_version": 2, "kind": "readonly_inventory_boundaries", "source_sha": SOURCE,
+                    "operation_id": OPERATION, "run_id": "456-1", "target_hash": tool.TARGET_HASH,
+                    "complete": True, "drop_ready": False, "diagnostic_only": True,
+                    "targets": [{"boundary": b, "complete": True, "error_category": "none"} for b in value["approved_boundaries"]],
+                    "database_bindings": {db: inventory_binding(db, value["identity_hashes"][db], value["expected_migrations"][db]) for db in ("mysql", "mongodb")}}
+        def store(report):
+            raw = json.dumps(report, separators=(",", ":")).encode()
+            path = bounds / "boundary.private.json"; path.write_bytes(raw); path.chmod(0o600)
+            value["boundary_report_hash"] = hashlib.sha256(raw).hexdigest()
+        store(observed); tool.validate_approved_boundary_file(value, self.directory)
+        for mutate in (lambda v: v.update(drop_ready=True), lambda v: v.update(source_sha="b" * 40),
+                       lambda v: v.update(run_id="999-1"), lambda v: v["targets"][0]["boundary"].update(present=True),
+                       lambda v: v["database_bindings"]["mysql"].update(migration_dirty=True),
+                       lambda v: v["database_bindings"]["mongodb"].update(identity_hash="f" * 64)):
+            changed = copy.deepcopy(observed); mutate(changed); store(changed)
+            with self.assertRaises(tool.Blocked):
+                tool.validate_approved_boundary_file(value, self.directory)
+        store(observed); value["boundary_report_hash"] = "f" * 64
+        with self.assertRaises(tool.Blocked):
+            tool.validate_approved_boundary_file(value, self.directory)
+        value["boundary_report_hash"] = hashlib.sha256((bounds / "boundary.private.json").read_bytes()).hexdigest()
+        bounds.rename(self.directory / "real-bounds"); bounds.symlink_to(self.directory / "real-bounds", target_is_directory=True)
+        with self.assertRaises(tool.Blocked):
+            tool.validate_approved_boundary_file(value, self.directory)
+
+    def test_bounds_cannot_mix_manifest_or_enable_nonprepare_stage(self):
+        for operation in ("prepare", "apply", "verify", "recover", "purge"):
+            args = self.arguments(operation); args.prepare_mode = "bounds"; args.inventory_request_hash = "a" * 64
+            self.assertBlocked("input_classes_mixed", tool.execute, args)
+
+    def test_inventory_v2_receipt_binds_every_target_and_never_unlocks_retirement(self):
+        request = self.v2_request(); args = self.arguments()
+        args.prepare_mode = "inventory"; args.inventory_request_hash = "a" * 64; args.run_id = "789-1"
+        objects = [dict(database=db, name=name, kind=kind, present=False, complete=True, records=0,
+                        bytes=0, schema_hash="3" * 64, data_hash="5" * 64, identity_hash="4" * 64,
+                        classification={}, error_category="none", equal_full_passes=2, pages=0,
+                        next_cycle_required=False, boundary=bound)
+                   for (db, name, kind), bound in zip(tool.TARGETS, request["approved_boundaries"])]
+        bindings = {db: inventory_binding(db, request["identity_hashes"][db], request["expected_migrations"][db])
+                    for db in ("mysql", "mongodb")}
+        report = {"format_version": 2, "kind": "readonly_compatibility_inventory", "source_sha": SOURCE,
+                  "operation_id": OPERATION, "run_id": "789-1", "request_hash": "a" * 64, "target_hash": tool.TARGET_HASH,
+                  "complete": True, "drop_ready": False, "diagnostic_only": True,
+                  "boundary_report_hash": request["boundary_report_hash"], "database_bindings": bindings,
+                  "targets": objects, "error_category": "none"}
+        def receipt(value, mutate=None):
+            raw = json.dumps(value, separators=(",", ":")).encode(); path = self.directory / "inventory.private.json"
+            path.write_bytes(raw); path.chmod(0o600)
+            summary = {key: value[key] for key in ("format_version", "kind", "source_sha", "operation_id", "run_id", "request_hash", "target_hash", "complete", "drop_ready", "diagnostic_only", "boundary_report_hash", "error_category", "database_bindings")}
+            summary["private_report_hash"] = hashlib.sha256(raw).hexdigest()
+            public_keys = ("database", "name", "present", "complete", "records", "bytes", "schema_hash", "data_hash", "identity_hash", "classification", "error_category", "equal_full_passes", "pages", "next_cycle_required")
+            summary["targets"] = [dict({key: item[key] for key in public_keys}, boundary_hash=hashlib.sha256(json.dumps(item["boundary"], separators=(",", ":")).encode()).hexdigest()) for item in value["targets"]]
+            if mutate:
+                mutate(summary)
+            return tool.validate_inventory_receipt(summary, 0, args, self.directory, request, "a" * 64, "b" * 64, "sha256:" + "c" * 64)
+        safe = receipt(report)
+        self.assertIs(safe["inventory_complete"], True); self.assertIs(safe["inventory_two_equal_scans"], True)
+        for key in ("complete", "execution_allowed", "drop_ready"):
+            self.assertIs(safe[key], False)
+        self.assertIs(safe["capabilities"]["history_verifier"], False)
+        self.assertNotIn("upper_token", json.dumps(safe)); self.assertNotIn("source_file", json.dumps(safe))
+        self.assertBlocked("inventory_receipt_private_mismatch", lambda: receipt(report, lambda s: s["targets"][0].update(records=1)))
+        self.assertBlocked("inventory_receipt_private_mismatch", lambda: receipt(report, lambda s: s.update(database_bindings={db: dict(b, database_anchor_hash="a" * 64) for db, b in s["database_bindings"].items()})))
+        changed = copy.deepcopy(report); changed["targets"][0]["equal_full_passes"] = 1
+        self.assertBlocked("inventory_receipt_boundary_invalid", receipt, changed)
+        changed = copy.deepcopy(report); changed["targets"][0]["source_file"] = "PRIVATE_UNREGISTERED_BODY"
+        self.assertBlocked("inventory_receipt_target_invalid", receipt, changed)
+        output = io.StringIO()
+        with mock.patch.object(tool, "execute", return_value=safe), contextlib.redirect_stdout(output):
+            tool.main(["--operation", "prepare", "--operation-id", OPERATION, "--approved-source-sha", SOURCE,
+                       "--actual-source-sha", SOURCE, "--run-id", "789-1"])
+        decoded = json.loads(tool.transport().decode_armored_receipt(output.getvalue()))
+        self.assertIs(decoded["drop_ready"], False); self.assertIs(decoded["inventory_two_equal_scans"], True)
+        self.assertEqual(decoded["inventory_database_states"]["mongodb"]["migration_generation_hash"], "8" * 64)
+
+    def test_database_anchor_contract_refuses_missing_old_or_invented_values(self):
+        bindings = {db: inventory_binding(db, str(index) * 64, 95 if db == "mysql" else 36) for index, db in enumerate(("mysql", "mongodb"), 1)}
+        tool.validate_inventory_bindings(bindings, True)
+        mutations = (lambda b: b["mongodb"].pop("database_anchor_hash"),
+                     lambda b: b["mongodb"].pop("migration_generation_hash"),
+                     lambda b: b["mongodb"].update(database_anchor_hash=""),
+                     lambda b: b["mongodb"].update(migration_generation_hash=""),
+                     lambda b: b["mongodb"].update(database_anchor_hash="A" * 64),
+                     lambda b: b["mongodb"].update(migration_generation_hash=None),
+                     lambda b: b["mysql"].update(database_anchor_hash="a" * 64),
+                     lambda b: b["mysql"].update(migration_generation_hash="a" * 64),
+                     lambda b: b["mysql"].update(unapproved_anchor="a" * 64))
+        for mutate in mutations:
+            changed = copy.deepcopy(bindings); mutate(changed)
+            with self.assertRaises(tool.Blocked):tool.validate_inventory_bindings(changed, True)
+
+    def test_incomplete_anchor_observation_never_becomes_complete(self):
+        bindings = {db: inventory_binding(db, "", 0) for db in ("mysql", "mongodb")}
+        bindings["mongodb"].update(database_anchor_hash="", migration_generation_hash="")
+        tool.validate_inventory_bindings(bindings, False)
+        self.assertBlocked("database_anchor_missing", tool.validate_inventory_bindings, bindings, True)
+        bindings["mysql"]["database_anchor_hash"] = "1" * 64
+        self.assertBlocked("database_anchor_invalid", tool.validate_inventory_bindings, bindings, False)
+
+    def test_private_source_copy_requires_exact_registry_and_safe_file(self):
+        args = self.arguments(); filename = tool.SOURCE_FILENAMES[("mysql", "domain_event_outbox")]
+        bound = self.v2_request()["approved_boundaries"][0]
+        item = {"database": "mysql", "name": "domain_event_outbox", "source_file": filename, "boundary": bound}
+        source = self.directory / filename; source.write_bytes(b"PRIVATE_BODY_SENTINEL"); source.chmod(0o600)
+        registry = {"format_version": 1, "kind": "temporary_inventory_source_copy", "filename": filename,
+                    "source_sha": SOURCE, "operation_id": OPERATION, "run_id": args.run_id, "request_hash": "a" * 64,
+                    "protocol": "mysql_cast_binary_columns_pk_order_v2", "boundary": bound, "contains_original_body": True,
+                    "retirement_proof": False, "purge_required_after_acceptance": True, "resume_existing_file_allowed": False}
+        asset = self.directory / (filename + ".asset.json")
+        asset.write_text(json.dumps(registry)); asset.chmod(0o600)
+        tool.validate_source_asset(self.directory, item, args, "a" * 64, 1024)
+        registry["request_hash"] = "b" * 64; asset.write_text(json.dumps(registry))
+        self.assertBlocked("inventory_source_asset_binding_invalid", tool.validate_source_asset, self.directory, item, args, "a" * 64, 1024)
+        registry["request_hash"] = "a" * 64; asset.write_text(json.dumps(registry))
+        self.assertBlocked("inventory_source_asset_invalid", tool.validate_source_asset, self.directory, item, args, "a" * 64, 1)
+        source.chmod(0o644)
+        self.assertBlocked("inventory_source_asset_invalid", tool.validate_source_asset, self.directory, item, args, "a" * 64, 1024)
+        source.chmod(0o600); linked = self.directory / "hardlinked-body"; os.link(source, linked)
+        self.assertBlocked("inventory_source_asset_invalid", tool.validate_source_asset, self.directory, item, args, "a" * 64, 1024)
+        source.unlink(); source.symlink_to(linked)
+        self.assertBlocked("inventory_source_asset_unavailable", tool.validate_source_asset, self.directory, item, args, "a" * 64, 1024)
+
     def test_identity_bootstrap_hash_precedes_creation_and_never_overwrites(self):
         args = self.arguments()
         args.prepare_mode = "identity"; args.inventory_request_hash = ""; args.manifest_hash = ""
@@ -387,7 +568,7 @@ class SafetyContracts(unittest.TestCase):
 
     def test_identity_histogram_receipt_transport_is_bounded_and_payload_free(self):
         args = self.arguments()
-        state = {"identity_hash": "1" * 64, "identity_observed": True, "migration_version": 95,
+        state = {"identity_hash": "1" * 64, "database_anchor_hash": "1" * 64, "migration_generation_hash": "", "identity_observed": True, "migration_version": 95,
                  "migration_head_observed": True, "migration_dirty": False, "migration_clean": True,
                  "metadata_permissions_sufficient": True, "permission_scope": "identity_and_migration_head", "error_category": "none"}
         histogram = [{"database": database, "name": name, "present": True, "complete": True,
@@ -399,7 +580,7 @@ class SafetyContracts(unittest.TestCase):
                    "operation_id": OPERATION, "run_id": "456-1", "request_hash": "a" * 64,
                    "target_hash": tool.TARGET_HASH, "diagnostic_only": True, "drop_ready": False, "complete": True,
                    "identity_protocols": {"mysql": "mysql_database_identity_v1", "mongodb": "mongodb_database_identity_v1"},
-                   "database_states": {"mysql": state, "mongodb": dict(state, identity_hash="4" * 64, migration_version=36)},
+                   "database_states": {"mysql": state, "mongodb": dict(state, identity_hash="4" * 64, database_anchor_hash="7" * 64, migration_generation_hash="8" * 64, migration_version=36)},
                    "diagnostic_histograms": histogram, "error_category": "none"}
         def validate(value):
             raw = json.dumps(value, separators=(",", ":")).encode()
@@ -414,6 +595,14 @@ class SafetyContracts(unittest.TestCase):
             self.assertEqual(tool.main(["--operation", "prepare", "--operation-id", OPERATION,
                                        "--approved-source-sha", SOURCE, "--actual-source-sha", SOURCE, "--run-id", "456-1"]), 42)
         decoded = json.loads(tool.transport().decode_armored_receipt(output.getvalue()))
+        self.assertEqual(decoded["identity_database_states"]["mongodb"]["database_anchor_hash"], "7" * 64)
+        self.assertIsNone(decoded["identity_database_states"]["mysql"]["migration_generation_hash"])
+        for mutate in (lambda s: s["mysql"].update(database_anchor_hash="a" * 64),
+                       lambda s: s["mysql"].update(migration_generation_hash="a" * 64),
+                       lambda s: s["mongodb"].pop("database_anchor_hash"),
+                       lambda s: s["mongodb"].update(migration_generation_hash="")):
+            changed = copy.deepcopy(summary); mutate(changed["database_states"])
+            with self.assertRaises(tool.Blocked):validate(changed)
         self.assertIs(decoded["execution_allowed"], False)
         self.assertIs(decoded["drop_ready"], False)
         self.assertEqual(decoded["identity_histogram_bucket_pages"]["page_a"][0]["type_label"], "footprint_entry_opened")
@@ -457,8 +646,8 @@ class SafetyContracts(unittest.TestCase):
         self.assertIn("needs: validate", production)
         self.assertNotIn("MYSQL_PASSWORD", validation)
         self.assertNotIn("MONGODB_PASSWORD", validation)
-        self.assertIn("inputs.operation == 'prepare' && secrets.MYSQL_METADATA_ADMIN_PASSWORD", production)
-        self.assertIn("inputs.operation == 'prepare' && secrets.MONGODB_PASSWORD", production)
+        self.assertIn("inputs.operation == 'prepare' && !startsWith(inputs.prepare_mode, 'bootstrap-') && secrets.MYSQL_METADATA_ADMIN_PASSWORD", production)
+        self.assertIn("inputs.operation == 'prepare' && !startsWith(inputs.prepare_mode, 'bootstrap-') && secrets.MONGODB_PASSWORD", production)
         self.assertIn("inventory_request_sha256", workflow)
         self.assertIn("${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.tar.gz", workflow)
         self.assertIn("qs-compatibility-retirement-${RETIREMENT_RUN_ID}.tar.gz", workflow)
@@ -483,15 +672,30 @@ class SafetyContracts(unittest.TestCase):
         self.assertIn("cancel-in-progress: false", workflow)
         self.assertNotIn("group: qs-server-authz-production-matrix-provision", workflow)
 
-    def test_actual_workflow_validation_normalizes_only_declared_optional_inputs(self):
+    def test_workflow_embedded_javascript_parses(self):
+        if not shutil.which("node"):
+            self.skipTest("Node parser unavailable; no code is executed")
         repository = SCRIPT.parents[2]
+        workflow = (repository / ".github/workflows/db-ops.yml").read_text()
+        script = workflow.split("<<'MONGOJS'\n", 1)[1].split("\n            MONGOJS", 1)[0]
+        result = subprocess.run(["node", "--check"], input=script, text=True, capture_output=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
         workflow = (repository / ".github/workflows/compatibility-retirement.yml").read_text()
+        script = workflow.split("          script: |\n", 1)[1].split("      - name:", 1)[0]
+        result = subprocess.run(["node", "--check"], input="async function validate() {\n" + script + "\n}", text=True, capture_output=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_actual_workflow_validation_normalizes_only_declared_optional_inputs(self):
+        workflow = (SCRIPT.parents[2] / ".github/workflows/compatibility-retirement.yml").read_text()
         script = textwrap.dedent(workflow.split("          script: |\n", 1)[1].split("      - name:", 1)[0])
-        supplied = {"operation": "prepare", "database": "mysql-and-mongodb",
-                    "approved_source_sha": SOURCE, "operation_id": OPERATION,
-                    "prepare_mode": "identity", "identity_request_sha256": "1" * 64}
+        supplied = {"operation": "prepare", "database": "mysql-and-mongodb", "approved_source_sha": SOURCE,
+                    "operation_id": OPERATION, "prepare_mode": "identity", "identity_request_sha256": "1" * 64}
+        bounds = {**supplied, "prepare_mode": "bounds", "inventory_request_sha256": "2" * 64}
+        bounds.pop("identity_request_sha256")
         scenarios = [("omitted_empty_defaults", supplied, "refs/heads/main", SOURCE, SOURCE, True),
                      ("all_defaults_present", dict(supplied, manifest_sha256="", inventory_request_sha256=""), "refs/heads/main", SOURCE, SOURCE, True),
+                     ("bounds_omitted_identity", bounds, "refs/heads/main", SOURCE, SOURCE, True),
+                     ("bounds_missing_request", {k: v for k, v in bounds.items() if k != "inventory_request_sha256"}, "refs/heads/main", SOURCE, SOURCE, False),
                      ("unknown_input", dict(supplied, unknown=""), "refs/heads/main", SOURCE, SOURCE, False),
                      ("mixed_request", dict(supplied, inventory_request_sha256="2" * 64), "refs/heads/main", SOURCE, SOURCE, False),
                      ("missing_required", {k: v for k, v in supplied.items() if k != "operation"}, "refs/heads/main", SOURCE, SOURCE, False),
@@ -509,18 +713,266 @@ class SafetyContracts(unittest.TestCase):
                 result = subprocess.run(["node", "-e", program], capture_output=True, text=True, check=False)
                 self.assertEqual(result.returncode, 0 if allowed else 1, result.stderr)
 
-    def test_workflow_embedded_javascript_parses(self):
-        if not shutil.which("node"):
-            self.skipTest("Node parser unavailable; no code is executed")
-        repository = SCRIPT.parents[2]
-        workflow = (repository / ".github/workflows/db-ops.yml").read_text()
-        script = workflow.split("<<'MONGOJS'\n", 1)[1].split("\n            MONGOJS", 1)[0]
-        result = subprocess.run(["node", "--check"], input=script, text=True, capture_output=True)
-        self.assertEqual(result.returncode, 0, result.stderr)
-        workflow = (repository / ".github/workflows/compatibility-retirement.yml").read_text()
-        script = workflow.split("          script: |\n", 1)[1].split("      - name:", 1)[0]
-        result = subprocess.run(["node", "--check"], input="async function validate() {\n" + script + "\n}", text=True, capture_output=True)
-        self.assertEqual(result.returncode, 0, result.stderr)
+    def bootstrap_fixture(self, inventory=False):
+        def store(directory, filename, value):
+            raw = tool.canonical_bytes(value)
+            path = directory / filename; path.write_bytes(raw); path.chmod(0o600)
+            return hashlib.sha256(raw).hexdigest()
+        identity_raw = tool.identity_request_bytes(OPERATION, SOURCE)
+        (self.directory / "identity-request.json").write_bytes(identity_raw)
+        (self.directory / "identity-request.json").chmod(0o600)
+        identity_output = self.directory / "identity-701-1"; identity_output.mkdir(mode=0o700, exist_ok=True)
+        state = {"identity_hash": "1" * 64, "database_anchor_hash": "1" * 64, "migration_generation_hash": "", "identity_observed": True, "migration_version": 95,
+                 "migration_head_observed": True, "migration_dirty": False, "migration_clean": True,
+                 "metadata_permissions_sufficient": True, "permission_scope": "identity_and_migration_head", "error_category": "none"}
+        identity = {"format_version": 1, "kind": "readonly_identity_discovery", "source_sha": SOURCE,
+                    "operation_id": OPERATION, "run_id": "701-1", "request_hash": hashlib.sha256(identity_raw).hexdigest(),
+                    "target_hash": tool.TARGET_HASH, "diagnostic_only": True, "drop_ready": False, "complete": True,
+                    "identity_protocols": {"mysql": "mysql_database_identity_v1", "mongodb": "mongodb_database_identity_v1"},
+                    "database_states": {"mysql": state, "mongodb": dict(state, identity_hash="2" * 64, database_anchor_hash="7" * 64, migration_generation_hash="8" * 64, migration_version=36)},
+                    "diagnostic_histograms": [{"database": db, "name": name, "present": True, "complete": True,
+                                               "error_category": "none", "diagnostic_only": True, "buckets": []} for db, name, _ in tool.TARGETS],
+                    "error_category": "none"}
+        identity_hash = store(identity_output, "identity.private.json", identity)
+        value = {"format_version": 1, "kind": "readonly_request_bootstrap_approval", "prepare_mode": "bootstrap-bounds",
+                 "source_sha": SOURCE, "operation_id": OPERATION, "target_hash": tool.TARGET_HASH,
+                 "database_scope": "mysql-and-mongodb", "identity_report": {"run_id": "701-1", "source_sha": SOURCE, "sha256": identity_hash},
+                 "identity_hashes": {"mysql": "1" * 64, "mongodb": "2" * 64}, "expected_migrations": {"mysql": 95, "mongodb": 36},
+                 "limits": tool.INVENTORY_V2_LIMITS.copy()}
+        args = self.arguments(); args.manifest_hash = ""; args.prepare_mode = "bootstrap-bounds"; args.run_id = "703-1"
+        def approve():
+            args.bootstrap_approval_json = tool.canonical_bytes(value)[:-1].decode("ascii")
+            args.bootstrap_approval_hash = hashlib.sha256(tool.canonical_bytes(value)).hexdigest()
+        approve()
+        if inventory:
+            tool.execute(args)
+            boundary_request, boundary_hash = tool.read_private(self.directory, "boundary-request.json")
+            bounds = self.directory / "bounds-702-1"; bounds.mkdir(mode=0o700)
+            targets = []
+            for database, name, kind in tool.TARGETS:
+                bound = {"database": database, "name": name, "kind": kind, "present": True, "empty": name == "ai_messaging_legacy_commands",
+                         "pk_type": "long" if database == "mongodb" else "uint64", "upper_token": "" if name == "ai_messaging_legacy_commands" else base64.b64encode(b"PRIVATE_UPPER_TOKEN" if database == "mongodb" else b"42").decode(),
+                         "schema_hash": "3" * 64, "identity_hash": "4" * 64}
+                targets.append({"database": database, "name": name, "kind": kind, "present": True, "complete": True,
+                                "records": 0, "bytes": 0, "schema_hash": "3" * 64, "data_hash": "", "identity_hash": "4" * 64,
+                                "classification": {}, "error_category": "none", "equal_full_passes": 0, "pages": 0,
+                                "next_cycle_required": False, "boundary": bound})
+            bindings = {db: inventory_binding(db, value["identity_hashes"][db], value["expected_migrations"][db])
+                        for db in ("mysql", "mongodb")}
+            report = {"format_version": 2, "kind": "readonly_inventory_boundaries", "source_sha": SOURCE,
+                      "operation_id": OPERATION, "run_id": "702-1", "request_hash": boundary_hash, "target_hash": tool.TARGET_HASH,
+                      "observed_at": "2026-10-08T12:00:00Z", "complete": True, "drop_ready": False, "diagnostic_only": True,
+                      "error_category": "none", "database_bindings": bindings, "targets": targets,
+                      "source_bytes_protocol": "no_source_body_copy", "consistency_semantics": "diagnostic_upper_discovery_requires_independent_request_approval"}
+            value.update(prepare_mode="bootstrap-inventory", boundary_report={"run_id": "702-1", "source_sha": SOURCE,
+                                                                             "sha256": store(bounds, "boundary.private.json", report)})
+            args.prepare_mode = "bootstrap-inventory"; args.run_id = "704-1"; approve()
+        return args, value
+
+    def reapprove_bootstrap(self, args, value):
+        args.bootstrap_approval_json = tool.canonical_bytes(value)[:-1].decode("ascii")
+        args.bootstrap_approval_hash = hashlib.sha256(tool.canonical_bytes(value)).hexdigest()
+
+    def test_bootstrap_bounds_uses_real_identity_and_keeps_request_approval_separate(self):
+        args, value = self.bootstrap_fixture()
+        with mock.patch.object(tool, "live_inventory", side_effect=AssertionError("DB path called")), mock.patch.object(tool, "capture_fixed", side_effect=AssertionError("runtime called")), mock.patch.object(tool.subprocess, "run", side_effect=AssertionError("child called")):
+            receipt = tool.execute(args)
+        request, digest = tool.read_private(self.directory, "boundary-request.json", receipt["derived_request_sha256"])
+        self.assertNotEqual(digest, args.bootstrap_approval_hash)
+        tool.validate_v2_request(request, OPERATION, SOURCE, boundary=True)
+        self.assertTrue(receipt["request_bootstrap_complete"])
+        self.assertFalse(receipt["complete"]); self.assertFalse(receipt["execution_allowed"]); self.assertFalse(receipt["drop_ready"])
+        args.run_id = "705-1"
+        again = tool.execute(args)
+        self.assertEqual(again["derived_request_sha256"], digest)
+        self.assertEqual(again["request_created_run_id"], "703-1")
+        self.assertTrue(all(not ready for key, ready in tool.CAPABILITIES.items() if key.endswith("backend")))
+
+    def test_bootstrap_inventory_copies_only_approved_private_bounds_and_receipt_has_no_tokens(self):
+        args, value = self.bootstrap_fixture(inventory=True)
+        with mock.patch.object(tool, "live_inventory", side_effect=AssertionError("DB path called")), mock.patch.object(tool, "capture_fixed", side_effect=AssertionError("runtime called")):
+            receipt = tool.execute(args)
+        request, digest = tool.read_private(self.directory, "inventory-request.json", receipt["derived_request_sha256"])
+        tool.validate_inventory_request(request, OPERATION, SOURCE)
+        tool.validate_approved_boundary_file(request, self.directory)
+        self.assertEqual(request["boundary_report_hash"], value["boundary_report"]["sha256"])
+        self.assertEqual(request["approved_boundaries"][3]["upper_token"], base64.b64encode(b"PRIVATE_UPPER_TOKEN").decode())
+        self.assertNotIn("PRIVATE_UPPER_TOKEN", json.dumps(receipt))
+        self.assertNotIn(base64.b64encode(b"PRIVATE_UPPER_TOKEN").decode(), json.dumps(receipt))
+        output = io.StringIO()
+        with mock.patch.object(tool, "execute", return_value=receipt), contextlib.redirect_stdout(output):
+            tool.main(["--operation", "prepare", "--operation-id", OPERATION, "--approved-source-sha", SOURCE, "--actual-source-sha", SOURCE, "--run-id", args.run_id])
+        decoded = json.loads(tool.transport().decode_armored_receipt(output.getvalue()))
+        self.assertEqual(decoded["derived_request_sha256"], digest)
+        self.assertFalse(decoded["execution_allowed"])
+
+    def test_bootstrap_public_descriptor_cannot_contain_private_or_unknown_fields(self):
+        args, value = self.bootstrap_fixture()
+        for change in (lambda v: v.update(password="TEST_PRIVATE_DO_NOT_PRINT"), lambda v: v.update(database_name="secret_database"),
+                       lambda v: v.update(original_id="old-id"), lambda v: v.update(upper_token="token"), lambda v: v.update(complete=True),
+                       lambda v: v["identity_report"].update(path="../identity.private.json"), lambda v: v["limits"].update(total_seconds=1501),
+                       lambda v: v["expected_migrations"].update(mysql=True), lambda v: v["expected_migrations"].update(mysql=2**53),
+                       lambda v: v.update(source_sha="b" * 40), lambda v: v.update(operation_id="999-1"),
+                       lambda v: v["identity_report"].update(source_sha="b" * 40), lambda v: v["identity_report"].update(run_id=args.run_id)):
+            changed = copy.deepcopy(value); change(changed); self.reapprove_bootstrap(args, changed)
+            with self.assertRaises(tool.Blocked):tool.execute(args)
+        self.assertFalse((self.directory / "boundary-request.json").exists())
+
+    def test_bootstrap_canonical_hash_and_stage_are_required_before_files(self):
+        args, value = self.bootstrap_fixture()
+        for text in (json.dumps(value), args.bootstrap_approval_json + "\n", '{"x":1,"x":2}', '"text"', '[]', 'null', '{"x":"非ASCII"}', 'x' * 4097):
+            args.bootstrap_approval_json = text
+            with self.assertRaises(tool.Blocked):tool.execute(args)
+        self.reapprove_bootstrap(args, value); args.bootstrap_approval_hash = "0" * 64
+        with self.assertRaises(tool.Blocked):tool.execute(args)
+        self.reapprove_bootstrap(args, value)
+        for operation in ("apply", "verify", "recover", "purge"):
+            args.operation = operation
+            self.assertBlocked("input_classes_mixed", tool.execute, args)
+        args.operation = "prepare"; args.inventory_request_hash = "1" * 64
+        self.assertBlocked("input_classes_mixed", tool.execute, args)
+        args.inventory_request_hash = ""; args.prepare_mode = "bounds"
+        self.assertBlocked("input_classes_mixed", tool.execute, args)
+
+    def test_bootstrap_identity_report_drift_dirty_incomplete_and_origin_block(self):
+        args, value = self.bootstrap_fixture()
+        path = self.directory / "identity-701-1" / "identity.private.json"
+        original = tool.decode(path.read_bytes())
+        for change in (lambda v: v.update(source_sha="b" * 40), lambda v: v.update(operation_id="999-1"), lambda v: v.update(run_id="999-1"),
+                       lambda v: v.update(complete=False), lambda v: v.update(request_hash="0" * 64),
+                       lambda v: v["database_states"]["mysql"].update(migration_dirty=True),
+                       lambda v: v["database_states"]["mysql"].update(migration_version=96),
+                       lambda v: v["database_states"]["mongodb"].update(identity_hash="3" * 64),
+                       lambda v: v["diagnostic_histograms"][0].update(complete=False)):
+            report = copy.deepcopy(original); change(report); path.write_bytes(tool.canonical_bytes(report))
+            value["identity_report"]["sha256"] = hashlib.sha256(path.read_bytes()).hexdigest(); self.reapprove_bootstrap(args, value)
+            with self.assertRaises(tool.Blocked):tool.execute(args)
+        self.assertFalse((self.directory / "boundary-request.json").exists())
+
+    def test_bootstrap_boundary_report_drift_unknown_body_and_dirty_block(self):
+        args, value = self.bootstrap_fixture(inventory=True)
+        path = self.directory / "bounds-702-1" / "boundary.private.json"
+        original = tool.decode(path.read_bytes())
+        for change in (lambda v: v.update(source_sha="b" * 40), lambda v: v.update(operation_id="999-1"), lambda v: v.update(run_id="999-1"),
+                       lambda v: v.update(complete=False), lambda v: v.update(request_hash="0" * 64), lambda v: v.update(raw_body="TEST_PRIVATE_DO_NOT_PRINT"),
+                       lambda v: v["targets"].reverse(), lambda v: v["targets"][0].update(records=1), lambda v: v["targets"][0].update(source_file="data.ndjson"),
+                       lambda v: v["targets"][0]["boundary"].update(schema_hash="5" * 64), lambda v: v["targets"][0].update(present=False),
+                       lambda v: v["database_bindings"]["mysql"].update(migration_dirty=True), lambda v: v["database_bindings"]["mongodb"].update(migration_version=37)):
+            report = copy.deepcopy(original); change(report); path.write_bytes(tool.canonical_bytes(report))
+            value["boundary_report"]["sha256"] = hashlib.sha256(path.read_bytes()).hexdigest(); self.reapprove_bootstrap(args, value)
+            with self.assertRaises(tool.Blocked):tool.execute(args)
+        self.assertFalse((self.directory / "inventory-request.json").exists())
+
+    def test_bootstrap_existing_request_registry_symlink_and_partial_never_overwrite(self):
+        args, value = self.bootstrap_fixture()
+        receipt = tool.execute(args)
+        request_path = self.directory / "boundary-request.json"; good = request_path.read_bytes()
+        request_path.write_bytes(b'{"wrong":true}')
+        with self.assertRaises(tool.Blocked):tool.execute(args)
+        self.assertEqual(request_path.read_bytes(), b'{"wrong":true}')
+        request_path.write_bytes(good)
+        registry = self.directory / "boundary-request-bootstrap.json"
+        value = tool.decode(registry.read_bytes()); value["approval_sha256"] = "0" * 64
+        registry.write_bytes(tool.canonical_bytes(value))
+        self.assertBlocked("bootstrap_request_binding_mismatch", tool.execute, args)
+        registry.unlink(); registry.symlink_to(request_path)
+        with self.assertRaises(tool.Blocked):tool.execute(args)
+        registry.unlink(); request_path.unlink()
+        partial = self.directory / "boundary-request.json.bootstrap.partial"; partial.write_bytes(b'incomplete'); partial.chmod(0o600)
+        self.assertBlocked("bootstrap_request_creation_incomplete", tool.execute, args)
+        self.assertEqual(partial.read_bytes(), b'incomplete')
+
+    def test_bootstrap_interruption_keeps_explicit_checkpoint_and_refuses_resume(self):
+        args, value = self.bootstrap_fixture()
+        original = tool.create_bootstrap_file
+        def interrupt(directory, filename, raw):
+            if filename == "boundary-request.json":raise tool.Blocked("bootstrap_request_creation_incomplete")
+            return original(directory, filename, raw)
+        with mock.patch.object(tool, "create_bootstrap_file", side_effect=interrupt):
+            self.assertBlocked("bootstrap_request_creation_incomplete", tool.execute, args)
+        self.assertTrue((self.directory / "boundary-request-bootstrap.json").exists())
+        self.assertFalse((self.directory / "boundary-request.json").exists())
+        args.run_id = "705-1"
+        self.assertBlocked("bootstrap_request_creation_incomplete", tool.execute, args)
+
+    def test_bootstrap_native_lock_blocks_concurrent_process_and_idempotent_after_release(self):
+        args, value = self.bootstrap_fixture()
+        with tool.locked_operation(self.directory):
+            command = ["python3", "-B", str(SCRIPT), "--operation", "prepare", "--root", str(self.root),
+                       "--operation-id", OPERATION, "--approved-source-sha", SOURCE, "--actual-source-sha", SOURCE,
+                       "--run-id", args.run_id, "--prepare-mode", args.prepare_mode,
+                       "--bootstrap-approval-json", args.bootstrap_approval_json, "--bootstrap-approval-hash", args.bootstrap_approval_hash]
+            process = subprocess.run(command, capture_output=True, text=True, check=False)
+            self.assertEqual(process.returncode, 42)
+            receipt = json.loads(tool.transport().decode_armored_receipt(process.stdout))
+            self.assertEqual(receipt["error_category"], "operation_busy")
+        self.assertFalse((self.directory / "boundary-request.json").exists())
+        tool.execute(args); tool.execute(args)
+
+    def test_bootstrap_native_process_exit_leaves_partial_and_never_resumes(self):
+        args, value = self.bootstrap_fixture()
+        program = ("import argparse,importlib.util,os;spec=importlib.util.spec_from_file_location('t',"+repr(str(SCRIPT))+");"
+                   "t=importlib.util.module_from_spec(spec);spec.loader.exec_module(t);"
+                   "args=argparse.Namespace(**"+repr(vars(args))+");t.os.fsync=lambda fd:os._exit(9);t.execute(args)")
+        result = subprocess.run(["python3", "-B", "-c", program], capture_output=True, check=False)
+        self.assertEqual(result.returncode, 9)
+        partial = self.directory / "boundary-request-bootstrap.json.bootstrap.partial"
+        self.assertTrue(partial.exists()); before = partial.read_bytes()
+        self.assertEqual(partial.stat().st_mode & 0o777, 0o600)
+        self.assertFalse((self.directory / "boundary-request.json").exists())
+        self.assertBlocked("bootstrap_request_creation_incomplete", tool.execute, args)
+        self.assertEqual(partial.read_bytes(), before)
+
+    def test_bootstrap_concurrent_real_callers_do_not_clobber_request_or_origin(self):
+        args, value = self.bootstrap_fixture()
+        command = ["python3", "-B", str(SCRIPT), "--operation", "prepare", "--root", str(self.root),
+                   "--operation-id", OPERATION, "--approved-source-sha", SOURCE, "--actual-source-sha", SOURCE,
+                   "--run-id", args.run_id, "--prepare-mode", args.prepare_mode,
+                   "--bootstrap-approval-json", args.bootstrap_approval_json, "--bootstrap-approval-hash", args.bootstrap_approval_hash]
+        first = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        second_command = list(command); second_command[second_command.index("--run-id")+1] = "705-1"
+        second = subprocess.Popen(second_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        receipts = []
+        for process in (first, second):
+            output, error = process.communicate(timeout=10)
+            self.assertEqual(process.returncode, 42, error)
+            receipts.append(json.loads(tool.transport().decode_armored_receipt(output.decode())))
+        ready = [r for r in receipts if r.get("request_bootstrap_complete")]
+        self.assertGreaterEqual(len(ready), 1)
+        self.assertTrue(all(r.get("request_bootstrap_complete") or r["error_category"] == "operation_busy" for r in receipts))
+        request, digest = tool.read_private(self.directory, "boundary-request.json")
+        tool.validate_v2_request(request, OPERATION, SOURCE, boundary=True)
+        self.assertTrue(all(r["derived_request_sha256"] == digest for r in ready))
+        registry, _ = tool.read_private(self.directory, "boundary-request-bootstrap.json")
+        self.assertIn(registry["created_run_id"], ("703-1", "705-1"))
+        self.assertEqual(registry["request_sha256"], digest)
+
+    def test_actual_bootstrap_workflow_validation_public_descriptor_and_hash(self):
+        args, value = self.bootstrap_fixture()
+        workflow = (SCRIPT.parents[2] / ".github/workflows/compatibility-retirement.yml").read_text()
+        script = textwrap.dedent(workflow.split("          script: |\n", 1)[1].split("      - name:", 1)[0])
+        base = {"operation": "prepare", "database": "mysql-and-mongodb", "approved_source_sha": SOURCE, "operation_id": OPERATION,
+                "prepare_mode": args.prepare_mode, "bootstrap_approval_json": args.bootstrap_approval_json, "bootstrap_approval_sha256": args.bootstrap_approval_hash}
+        scenarios = [(base, True), (dict(base, bootstrap_approval_sha256="0" * 64), False),
+                     (dict(base, inventory_request_sha256="1" * 64), False), (dict(base, operation="apply"), False),
+                     (dict(base, unknown=""), False), (dict(base, prepare_mode="inventory"), False),
+                     (dict(base, bootstrap_approval_json=args.bootstrap_approval_json+"\n"), False)]
+        inventory_value = dict(value, prepare_mode="bootstrap-inventory", boundary_report={"run_id": "702-1", "source_sha": SOURCE, "sha256": "3" * 64})
+        inventory_input = dict(base, prepare_mode="bootstrap-inventory", bootstrap_approval_json=tool.canonical_bytes(inventory_value)[:-1].decode(), bootstrap_approval_sha256=hashlib.sha256(tool.canonical_bytes(inventory_value)).hexdigest())
+        scenarios.append((inventory_input, True))
+        invalid_origin = copy.deepcopy(inventory_value); invalid_origin["boundary_report"]["run_id"] = "701-1"
+        scenarios.append((dict(inventory_input, bootstrap_approval_json=tool.canonical_bytes(invalid_origin)[:-1].decode(), bootstrap_approval_sha256=hashlib.sha256(tool.canonical_bytes(invalid_origin)).hexdigest()), False))
+        for change in (lambda v: v.update(password="TEST_PRIVATE_DO_NOT_PRINT"), lambda v: v.update(complete=True),
+                       lambda v: v["identity_report"].update(source_sha="b" * 40), lambda v: v["expected_migrations"].update(mysql=True),
+                       lambda v: v["limits"].update(page_size=2000)):
+            changed = copy.deepcopy(value); change(changed)
+            scenarios.append((dict(base, bootstrap_approval_json=tool.canonical_bytes(changed)[:-1].decode(), bootstrap_approval_sha256=hashlib.sha256(tool.canonical_bytes(changed)).hexdigest()), False))
+        for inputs, allowed in scenarios:
+            context = {"payload": {"inputs": inputs}, "ref": "refs/heads/main", "sha": SOURCE, "repo": {}}
+            program = ("const script="+json.dumps(script)+";const context="+json.dumps(context)+";const github={rest:{repos:{getCommit:async()=>({data:{sha:"+json.dumps(SOURCE)+"}})}}};"
+                       +"new (Object.getPrototypeOf(async function(){}).constructor)('context','github','require',script)(context,github,require).catch(()=>{process.exitCode=1;});")
+            result = subprocess.run(["node", "-e", program], capture_output=True, text=True, check=False)
+            self.assertEqual(result.returncode, 0 if allowed else 1, result.stderr)
 
 
 if __name__ == "__main__":

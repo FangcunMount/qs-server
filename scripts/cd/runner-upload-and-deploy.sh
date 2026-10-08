@@ -14,6 +14,14 @@ SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 : "${DOCKER_REPOSITORY:?DOCKER_REPOSITORY is required}"
 : "${WWW_UID:?WWW_UID is required}"
 : "${WWW_GID:?WWW_GID is required}"
+: "${CD_SOURCE_SHA:?CD_SOURCE_SHA is required}"
+: "${CD_RUN_ID:?CD_RUN_ID is required}"
+: "${CD_RUN_ATTEMPT:?CD_RUN_ATTEMPT is required}"
+if ! [[ "$CD_SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]] || [ "$CD_SOURCE_SHA" != "$IMAGE_TAG" ] ||
+  ! [[ "$CD_RUN_ID" =~ ^[1-9][0-9]{0,19}$ ]] || ! [[ "$CD_RUN_ATTEMPT" =~ ^[1-9][0-9]{0,3}$ ]]; then
+  echo "CD runtime evidence source/run binding is invalid" >&2
+  exit 1
+fi
 
 PACKAGE_FILE="${DEPLOY_PACKAGE:-deploy-package-${PACKAGE_SUFFIX}.tar.gz}"
 IMAGE_FILE="${DEPLOY_IMAGE_PACKAGE:-deploy-image-${PACKAGE_SUFFIX}.tar.gz}"
@@ -70,6 +78,9 @@ emit_export() {
 
 emit_export SERVICE             "$SERVICE"
 emit_export IMAGE_TAG           "$IMAGE_TAG"
+emit_export CD_SOURCE_SHA       "$CD_SOURCE_SHA"
+emit_export CD_RUN_ID           "$CD_RUN_ID"
+emit_export CD_RUN_ATTEMPT      "$CD_RUN_ATTEMPT"
 emit_export DEPLOY_IMAGE_SOURCE "${DEPLOY_IMAGE_SOURCE:-tarball}"
 emit_export IMAGE_TARBALL       "$REMOTE_IMAGE"
 emit_export DOCKER_REGISTRY     "$DOCKER_REGISTRY"

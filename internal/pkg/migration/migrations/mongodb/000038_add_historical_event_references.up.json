@@ -1,0 +1,34 @@
+[
+  {
+    "createIndexes": "answersheets",
+    "indexes": [
+      {
+        "key": { "legacy_submission_evidence.entries.event_id": 1 },
+        "name": "uk_answersheet_legacy_submission_event_id",
+        "unique": true,
+        "collation": { "locale": "simple" },
+        "partialFilterExpression": { "legacy_submission_evidence.entries.event_id": { "$type": "string" } }
+      },
+      {
+        "key": { "legacy_submission_evidence.version": 1, "deleted_at": 1, "domain_id": 1 },
+        "name": "idx_answersheet_legacy_submission_audit"
+      }
+    ]
+  },
+  {
+    "createIndexes": "report_generations",
+    "indexes": [
+      {
+        "key": { "historical_generated_evidence.entries.event_id": 1 },
+        "name": "uk_generation_historical_generated_event_id",
+        "unique": true,
+        "collation": { "locale": "simple" },
+        "partialFilterExpression": { "historical_generated_evidence.entries.event_id": { "$type": "string" } }
+      },
+      {
+        "key": { "historical_generated_evidence.version": 1, "deleted_at": 1, "status": 1, "domain_id": 1 },
+        "name": "idx_generation_historical_generated_audit"
+      }
+    ]
+  }
+]

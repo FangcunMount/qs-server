@@ -2,6 +2,9 @@
 
 package migration
 
+// These contracts stop at the historical/A boundary; paired B cold bootstrap
+// has separate native coverage in compatibility_retirement_b_integration_test.go.
+
 import (
 	"strings"
 	"testing"
@@ -64,7 +67,7 @@ func TestAIEngineRetirementFreshAndCleanedUpgradeAndRestart(t *testing.T) {
 				t.Fatal(err)
 			}
 			for i := 0; i < 2; i++ {
-				version, changed, err := NewMongoMigrator(client, config).Run()
+				version, changed, err := NewMongoMigrator(client, config).run(aiEngineRetirementVersion)
 				if err != nil || version != aiEngineRetirementVersion || changed != (i == 0) {
 					t.Fatalf("upgrade/restart: %d %v %v", version, changed, err)
 				}

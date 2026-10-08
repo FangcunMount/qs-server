@@ -33,12 +33,20 @@ func TestIsolatedRealInventoryPresenceStates(t *testing.T) {
 	if e != nil {
 		t.Fatal(e)
 	}
-	defer db.Close()
+	defer func() {
+		if e := db.Close(); e != nil {
+			t.Error(e)
+		}
+	}()
 	client, e := mongoOpen(ctx)
 	if e != nil {
 		t.Fatal(e)
 	}
-	defer client.Disconnect(context.Background())
+	defer func() {
+		if e := client.Disconnect(context.Background()); e != nil {
+			t.Error(e)
+		}
+	}()
 	mdb := client.Database(os.Getenv("MONGODB_DBNAME"))
 	for _, statement := range []string{"CREATE TABLE schema_migrations(version BIGINT NOT NULL,dirty BOOL NOT NULL)", "INSERT INTO schema_migrations VALUES(95,FALSE)", "CREATE TABLE kept_fact(id BIGINT PRIMARY KEY,note TEXT)", "CREATE TABLE domain_event_outbox(id BIGINT UNSIGNED PRIMARY KEY,event_type VARCHAR(128),status VARCHAR(32),payload_json LONGTEXT)", "CREATE TABLE ai_bridge_commands(command_id CHAR(36) PRIMARY KEY,kind VARCHAR(32),delivered BOOL,payload JSON)", "CREATE TABLE ai_messaging_legacy_commands(command_id CHAR(36) PRIMARY KEY,source_kind VARCHAR(32),source_payload MEDIUMBLOB)", "INSERT INTO domain_event_outbox VALUES(1,'footprint.entry_opened','published','{\"sentinel\":\"private SQL bytes\"}'),(2,'TEST_PRIVATE_UNKNOWN_TYPE','pending',NULL)", "INSERT INTO ai_bridge_commands VALUES('command-a','request',TRUE,'{\"value\":1}')", "INSERT INTO ai_messaging_legacy_commands VALUES('command-b','prepare',X'00FF10')"} {
 		if _, e = db.ExecContext(ctx, statement); e != nil {

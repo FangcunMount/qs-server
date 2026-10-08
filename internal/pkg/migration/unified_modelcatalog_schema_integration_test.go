@@ -2,6 +2,9 @@
 
 package migration
 
+// These contracts stop at the historical/A boundary; paired B cold bootstrap
+// has separate native coverage in compatibility_retirement_b_integration_test.go.
+
 import (
 	"testing"
 
@@ -133,7 +136,7 @@ func TestUnifiedModelCatalogSchemaDirty13FailsClosed(t *testing.T) {
 		t.Fatal(err)
 	}
 	migrator := NewMongoMigrator(client, &Config{Enabled: true, Database: db.Name()})
-	version, changed, err := migrator.Run()
+	version, changed, err := migrator.run(13)
 	if err == nil || version != 13 || changed {
 		t.Fatalf("Run() = version %d, changed %t, err %v; want dirty@13 diagnostic", version, changed, err)
 	}

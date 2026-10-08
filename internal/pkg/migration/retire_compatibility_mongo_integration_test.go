@@ -2,6 +2,9 @@
 
 package migration
 
+// These contracts stop at the historical/A boundary; paired B cold bootstrap
+// has separate native coverage in compatibility_retirement_b_integration_test.go.
+
 import (
 	"strings"
 	"testing"
@@ -103,8 +106,8 @@ func TestRuntimeLedgerRetirementFromVersion22WithSourcesAlreadyDropped(t *testin
 		}
 	}
 
-	wantVersion := latestEmbeddedMongoMigrationVersion(t)
-	version, changed, err := NewMongoMigrator(client, config).Run()
+	const wantVersion uint = 37
+	version, changed, err := NewMongoMigrator(client, config).run(37)
 	if err != nil || !changed || version != wantVersion {
 		t.Fatalf("migrate MongoDB %d -> %d: version=%d changed=%v err=%v", compatibilityRetirementVersion, wantVersion, version, changed, err)
 	}

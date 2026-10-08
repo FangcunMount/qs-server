@@ -2,6 +2,9 @@
 
 package migration
 
+// These contracts cover the historical AI schema through Mongo 34; version 35
+// and paired B cold bootstrap separately verify its retirement.
+
 import (
 	"os"
 	"reflect"
@@ -16,8 +19,8 @@ import (
 
 func TestAIExplanationMongoColdStartEnforcesRuntimeSchema(t *testing.T) {
 	client, db := mongodbtest.ReplicaSetDatabase(t)
-	version, changed, err := NewMongoMigrator(client, &Config{Enabled: true, Database: db.Name()}).Run()
-	wantVersion := latestEmbeddedMongoMigrationVersion(t)
+	version, changed, err := NewMongoMigrator(client, &Config{Enabled: true, Database: db.Name()}).run(34)
+	const wantVersion uint = 34
 	if err != nil || !changed || version != wantVersion {
 		t.Fatalf("migrate MongoDB 0 -> %d: version=%d changed=%v err=%v", wantVersion, version, changed, err)
 	}
@@ -121,8 +124,8 @@ func TestAIExplanationMongoColdStartEnforcesRuntimeSchema(t *testing.T) {
 
 func TestAIExplanationMongoTTLMonitorDeletesExpiredRecords(t *testing.T) {
 	client, db := mongodbtest.ReplicaSetDatabase(t)
-	version, changed, err := NewMongoMigrator(client, &Config{Enabled: true, Database: db.Name()}).Run()
-	wantVersion := latestEmbeddedMongoMigrationVersion(t)
+	version, changed, err := NewMongoMigrator(client, &Config{Enabled: true, Database: db.Name()}).run(34)
+	const wantVersion uint = 34
 	if err != nil || !changed || version != wantVersion {
 		t.Fatalf("migrate MongoDB 0 -> %d: version=%d changed=%v err=%v", wantVersion, version, changed, err)
 	}
