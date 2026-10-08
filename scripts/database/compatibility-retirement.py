@@ -45,7 +45,7 @@ NAME = re.compile(r"^[a-z][a-z0-9_-]{0,80}\.json$")
 MAX_JSON = 256 * 1024
 INVENTORY_V2_LIMITS = {"query_seconds": 30, "total_seconds": 1500, "max_records": 1000000,
                        "max_bytes": 2147483648, "page_size": 1000, "max_pages": 1001}
-BOOTSTRAP_MODES = frozenset({"bootstrap-bounds", "bootstrap-inventory", "bootstrap-history", "bootstrap-history-metadata"})
+BOOTSTRAP_MODES = frozenset({"bootstrap-bounds", "bootstrap-inventory", "bootstrap-history", "bootstrap-history-metadata", "bootstrap-history-parent"})
 MAX_BOOTSTRAP_APPROVAL = 4096
 MAX_WINDOW_SECONDS = 1800
 FORWARD_STOP_SECONDS = 1200
@@ -1246,9 +1246,11 @@ def execute(args):
     if mode in BOOTSTRAP_MODES:
         if args.operation != "prepare" or args.manifest_hash or identity_request or inventory_request or not bootstrap_json or not bootstrap_hash:
             fail("input_classes_mixed")
-        if mode in ("bootstrap-history", "bootstrap-history-metadata"):
-            path = Path(__file__).with_name("compatibility-history-prepare.py")
-            spec = importlib.util.spec_from_file_location("compatibility_history_prepare", path)
+        if mode in ("bootstrap-history", "bootstrap-history-metadata", "bootstrap-history-parent"):
+            filename = "compatibility-history-parent.py" if mode == "bootstrap-history-parent" else "compatibility-history-prepare.py"
+            module_name = "compatibility_history_parent" if mode == "bootstrap-history-parent" else "compatibility_history_prepare"
+            path = Path(__file__).with_name(filename)
+            spec = importlib.util.spec_from_file_location(module_name, path)
             module = importlib.util.module_from_spec(spec)
             spec.loader.exec_module(module)
             entrypoint = module.prepare_metadata if mode == "bootstrap-history-metadata" else module.prepare
@@ -1334,6 +1336,8 @@ def main(argv=None):
               "history_parent_proposal_sha256": "hash64", "parent_proposal_run_id": "run_id",
               "history_metadata_assets": [{"database": frozenset({"mysql", "mongodb"}), "name": frozenset(target[1] for target in TARGETS),
                    "full_file_sha256": "hash64", "full_file_bytes": "uint", "source_asset_sha256": "hash64"}],
+              "history_parent_registration_complete": "bool", "history_parent_process_budget_proven": "bool",
+              "history_parent_registration_sha256": "hash64", "approved_metadata_report": {"run_id": "run_id", "sha256": "hash64"},
               "history_parent_request_sha256": "hash64", "history_private_readiness_sha256": "hash64",
               "history_readonly_complete": "bool", "history_independent_epochs": "uint",
               "history_local_candidates": "uint", "history_locally_qualified": "uint", "history_blocked_local": "uint",
@@ -1362,7 +1366,7 @@ def main(argv=None):
               "capabilities": {key: "bool" for key in CAPABILITIES}}
     emitted = False
     try:
-        secrets = () if getattr(args, "prepare_mode", "") == "bootstrap-history-metadata" else tuple(os.environ.get(key, "") for key in ("MYSQL_USERNAME", "MYSQL_PASSWORD", "MONGODB_USERNAME", "MONGODB_PASSWORD",
+        secrets = () if getattr(args, "prepare_mode", "") in ("bootstrap-history-metadata", "bootstrap-history-parent") else tuple(os.environ.get(key, "") for key in ("MYSQL_USERNAME", "MYSQL_PASSWORD", "MONGODB_USERNAME", "MONGODB_PASSWORD",
                                                                           "MONGODB_METADATA_ADMIN_USERNAME", "MONGODB_METADATA_ADMIN_PASSWORD"))
         armor = transport().encode_armored_receipt(receipt, schema=schema, secrets=secrets)
         print(armor)
@@ -1372,7 +1376,9 @@ def main(argv=None):
         # valid framed receipt. Never print a raw protocol/debug alternative.
         print("compatibility_retirement_receipt_transport_failed", file=sys.stderr)
     diagnostic_complete = ((receipt.get("prepare_mode") == "bootstrap-history" and receipt.get("history_readonly_complete") is True) or
-        (receipt.get("prepare_mode") == "bootstrap-history-metadata" and receipt.get("history_metadata_complete") is True))
+        (receipt.get("prepare_mode") == "bootstrap-history-metadata" and receipt.get("history_metadata_complete") is True) or
+        (receipt.get("prepare_mode") == "bootstrap-history-parent" and receipt.get("history_parent_registration_complete") is True and
+         receipt.get("diagnostic_only") is True and receipt.get("history_cas_complete") is False and receipt.get("history_parent_process_budget_proven") is False))
     return 0 if emitted and diagnostic_complete and receipt.get("complete") is False and receipt.get("execution_allowed") is False and receipt.get("drop_ready") is False else 42
 
 
