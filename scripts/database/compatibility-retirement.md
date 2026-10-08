@@ -277,6 +277,14 @@ foreign-key failure. They establish a local recovery primitive, not a production
 authorization or a production Action backend. Fresh production qualification,
 privilege-negative checks and deployment rollback still need their own proofs.
 
+The private decoded-fact fingerprint now streams text through bounded,
+instance-owned scratch storage. Its original frame bytes, protocol, NULL/type
+semantics and byte/node limits remain unchanged. Independent byte vectors,
+source-authentication/joint-scan regression and full package race checks pass.
+This implementation change does not establish the full-size scan memory or
+lifetime budget; the earlier full-size OOM remains a failed observation until
+a new independently bounded scan completes both physical EOF epochs.
+
 1. The implemented inventory adapter must be extended by an actual retirement
    verifier that compares current facts to the frozen manifest and independently
    resolves dependency/business findings. The existing metadata inventory alone

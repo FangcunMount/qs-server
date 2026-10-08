@@ -2,7 +2,7 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "113e12b5178dad72ca16cfe993780a4c76ead63e",
+    "sha": "523250d83e520531a211dd19c9849f12fd161b69",
     "verified_on": "2026-10-09"
   },
   "status_policy": {
@@ -11270,7 +11270,7 @@
       "owner": "tooling",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "113e12b5178dad72ca16cfe993780a4c76ead63e",
+        "source_sha": "523250d83e520531a211dd19c9849f12fd161b69",
         "verified_on": "2026-10-09"
       },
       "fact_sources": [
@@ -11586,6 +11586,20 @@
           "selector": "func TestTargetRecoveryNative(t *testing.T)",
           "result": "matched",
           "source_sha": "113e12b5178dad72ca16cfe993780a4c76ead63e",
+          "verified_on": "2026-10-09"
+        },
+        {
+          "kind": "command",
+          "command": "go test -race -p=3 -parallel=3 -count=1 -json ./internal/apiserver/maintenance/compatibilityretirement",
+          "result": "passed",
+          "source_sha": "523250d83e520531a211dd19c9849f12fd161b69",
+          "verified_on": "2026-10-09"
+        },
+        {
+          "kind": "command",
+          "command": "go test -race -p=3 -parallel=3 -count=1 -json ./cmd/qs-compatibility-history",
+          "result": "passed",
+          "source_sha": "523250d83e520531a211dd19c9849f12fd161b69",
           "verified_on": "2026-10-09"
         }
       ],
