@@ -2,8 +2,8 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "f37c39b5064201fc46ee7a66a9433c0da62fb3b5",
-    "verified_on": "2026-10-08"
+    "sha": "c98d6aa28df5867231fa3c12fa109ecbd52eecf5",
+    "verified_on": "2026-10-09"
   },
   "status_policy": {
     "doc_status": [
@@ -11270,8 +11270,8 @@
       "owner": "tooling",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "f37c39b5064201fc46ee7a66a9433c0da62fb3b5",
-        "verified_on": "2026-10-08"
+        "source_sha": "c98d6aa28df5867231fa3c12fa109ecbd52eecf5",
+        "verified_on": "2026-10-09"
       },
       "fact_sources": [
         {
@@ -11337,6 +11337,18 @@
         {
           "kind": "source",
           "path": "internal/apiserver/transport/grpc/service/plan_entry.go"
+        },
+        {
+          "kind": "source",
+          "path": "scripts/cd/runtime-evidence.py"
+        },
+        {
+          "kind": "source",
+          "path": "scripts/cd/test-runtime-evidence.py"
+        },
+        {
+          "kind": "source",
+          "path": "scripts/cd/runtime-evidence-integration.py"
         }
       ],
       "verification": [
@@ -11409,6 +11421,20 @@
           "result": "passed",
           "source_sha": "f37c39b5064201fc46ee7a66a9433c0da62fb3b5",
           "verified_on": "2026-10-08"
+        },
+        {
+          "kind": "command",
+          "command": "python3 -B scripts/cd/test-runtime-evidence.py",
+          "result": "passed",
+          "source_sha": "c98d6aa28df5867231fa3c12fa109ecbd52eecf5",
+          "verified_on": "2026-10-09"
+        },
+        {
+          "kind": "command",
+          "command": "python3 -B scripts/cd/runtime-evidence-integration.py",
+          "result": "passed",
+          "source_sha": "c98d6aa28df5867231fa3c12fa109ecbd52eecf5",
+          "verified_on": "2026-10-09"
         }
       ],
       "production_evidence": {
