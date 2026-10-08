@@ -87,7 +87,8 @@ func requireM4MongoIndexes(ctx context.Context, collection *mongo.Collection, re
 	if err != nil {
 		return err
 	}
-	defer cursor.Close(ctx)
+	// Preserve decode/read/missing-index failures; cursor cleanup is best effort.
+	defer func() { _ = cursor.Close(ctx) }()
 	found := make(map[string]bool, len(required))
 	for cursor.Next(ctx) {
 		var row struct {

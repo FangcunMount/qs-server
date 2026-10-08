@@ -44,7 +44,8 @@ func (l *ReplayLedger) Authorize(ctx context.Context, input request.ReplayReques
 	if err != nil {
 		return nil, err
 	}
-	defer tx.Rollback()
+	// Commit outcomes and operation errors are returned explicitly; rollback cleanup must not replace them (including ErrTxDone after Commit).
+	defer func() { _ = tx.Rollback() }()
 	insert, err := tx.ExecContext(ctx, `INSERT IGNORE INTO qs_rm_replay_requests
  (org_id,request_id,store_name,reason,input_hash) VALUES (?,?,?,?,?)`,
 		input.OrgID, input.RequestID, input.Store, input.Reason, fingerprint[:])
@@ -112,7 +113,8 @@ func (l *ReplayLedger) Resolve(ctx context.Context, input request.ReplayRequest)
 	if err != nil {
 		return nil, false, err
 	}
-	defer tx.Rollback()
+	// Commit outcomes and operation errors are returned explicitly; rollback cleanup must not replace them (including ErrTxDone after Commit).
+	defer func() { _ = tx.Rollback() }()
 	var storedHash []byte
 	err = tx.QueryRowContext(ctx, `SELECT input_hash FROM qs_rm_replay_requests
  WHERE org_id=? AND request_id=?`, input.OrgID, input.RequestID).Scan(&storedHash)
@@ -141,7 +143,8 @@ func loadReplayResults(ctx context.Context, tx *sql.Tx, input request.ReplayRequ
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	// Preserve scan/ledger errors and rows.Err(); cursor cleanup is best effort.
+	defer func() { _ = rows.Close() }()
 	results := make([]request.ReplayResult, 0, len(input.Targets))
 	for rows.Next() {
 		var ordinal int
@@ -180,13 +183,15 @@ func authorizeOne(ctx context.Context, tx *sql.Tx, input request.ReplayRequest, 
 	for rows.Next() {
 		var row record
 		if err := rows.Scan(&row.id, &row.scope, &row.state, &row.code, &row.failures, &row.version); err != nil {
-			rows.Close()
+			// Preserve the Scan error while releasing this cursor before returning.
+			_ = rows.Close()
 			return result, err
 		}
 		found = append(found, row)
 	}
 	err = rows.Err()
-	rows.Close()
+	// Release the cursor before reusing this transaction for UPDATE; keep its read error authoritative.
+	_ = rows.Close()
 	if err != nil {
 		return result, err
 	}

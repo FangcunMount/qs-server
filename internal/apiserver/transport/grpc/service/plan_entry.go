@@ -33,7 +33,7 @@ func (s *PlanEntryService) ResolveTaskEntry(ctx context.Context, req *pb.Resolve
 	if s == nil || s.resolver == nil || req == nil {
 		return nil, status.Error(codes.Unavailable, "task entry resolver unavailable")
 	}
-	entry, err := s.resolver.ResolveTaskEntry(ctx, req.GetTaskId(), req.GetToken())
+	entry, err := s.resolver.ResolveTaskEntry(ctx, req.GetTaskId(), req.GetToken()) //nolint:staticcheck // SA1019: Preserve the deprecated legacy locator argument; the resolver ignores it and Collection still authorizes the IAM User/Testee relationship.
 	if err != nil {
 		if baseerrors.IsCode(err, code.ErrPageNotFound) {
 			return nil, status.Error(codes.NotFound, "task entry not found")

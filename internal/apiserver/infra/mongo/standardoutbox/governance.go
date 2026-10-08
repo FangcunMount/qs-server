@@ -55,7 +55,8 @@ func (r *StatusReader) ListOutboxCandidates(ctx context.Context, orgID int64, li
 	if err != nil {
 		return nil, err
 	}
-	defer cur.Close(ctx)
+	// Read/decode errors below determine the result; cursor cleanup must not replace them.
+	defer func() { _ = cur.Close(ctx) }()
 	var rows []struct {
 		EventID       string    `bson:"message_id"`
 		FailureCount  uint64    `bson:"failure_count"`

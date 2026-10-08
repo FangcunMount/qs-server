@@ -113,6 +113,65 @@ class SafetyContracts(unittest.TestCase):
                                   approved_source_sha=SOURCE, actual_source_sha=SOURCE, run_id="456-1",
                                   manifest_hash=self.write("manifest.json", self.value))
 
+    def connection_environment(self):
+        return {"MYSQL_HOST": "synthetic-mysql", "MYSQL_USERNAME": "synthetic-sql-reader",
+                "MYSQL_PASSWORD": "synthetic-sql-secret", "MYSQL_DATABASE": "synthetic-business",
+                "MONGODB_HOST": "synthetic-mongo", "MONGODB_USERNAME": "synthetic-app-user",
+                "MONGODB_PASSWORD": "synthetic-app-secret", "MONGODB_DBNAME": "synthetic-business"}
+
+    def test_inventory_legacy_mongo_pair_and_port_defaults(self):
+        values = tool.inventory_connection_values(self.connection_environment())
+        self.assertEqual(values["MONGODB_USERNAME"], "synthetic-app-user")
+        self.assertEqual(values["MONGODB_PASSWORD"], "synthetic-app-secret")
+        self.assertEqual(values["MYSQL_PORT"], "3306")
+        self.assertEqual(values["MONGODB_PORT"], "27017")
+
+    def test_inventory_metadata_mongo_pair_is_selected_together(self):
+        environment = self.connection_environment()
+        environment.update(MONGODB_METADATA_ADMIN_USERNAME="synthetic-meta-user",
+                           MONGODB_METADATA_ADMIN_PASSWORD="synthetic-meta-secret")
+        values = tool.inventory_connection_values(environment)
+        self.assertEqual(values["MONGODB_USERNAME"], "synthetic-meta-user")
+        self.assertEqual(values["MONGODB_PASSWORD"], "synthetic-meta-secret")
+        self.assertEqual(environment["MONGODB_USERNAME"], "synthetic-app-user")
+        self.assertEqual(environment["MONGODB_PASSWORD"], "synthetic-app-secret")
+        self.assertNotIn("MONGODB_METADATA_ADMIN_USERNAME", values)
+        self.assertNotIn("MONGODB_METADATA_ADMIN_PASSWORD", values)
+
+    def test_inventory_metadata_pair_does_not_require_service_credentials(self):
+        environment = self.connection_environment()
+        del environment["MONGODB_USERNAME"]
+        del environment["MONGODB_PASSWORD"]
+        environment.update(MONGODB_METADATA_ADMIN_USERNAME="synthetic-meta-user",
+                           MONGODB_METADATA_ADMIN_PASSWORD="synthetic-meta-secret")
+        self.assertEqual(tool.inventory_connection_values(environment)["MONGODB_USERNAME"], "synthetic-meta-user")
+
+    def test_inventory_partial_metadata_pair_never_mixes_credentials(self):
+        for key in ("MONGODB_METADATA_ADMIN_USERNAME", "MONGODB_METADATA_ADMIN_PASSWORD"):
+            with self.subTest(key=key):
+                environment = self.connection_environment()
+                environment[key] = "synthetic-partial-pair"
+                self.assertBlocked("inventory_connection_input_invalid", tool.inventory_connection_values, environment)
+
+    def test_inventory_metadata_pair_rejects_env_file_injection_with_fixed_error(self):
+        for key in ("MONGODB_METADATA_ADMIN_USERNAME", "MONGODB_METADATA_ADMIN_PASSWORD"):
+            for value in ("synthetic-private\nMYSQL_HOST=injected", "synthetic-private\r", "synthetic-private\x00", "x" * 4097, 123):
+                with self.subTest(key=key, value_type=type(value).__name__):
+                    environment = self.connection_environment()
+                    environment.update(MONGODB_METADATA_ADMIN_USERNAME="synthetic-meta-user",
+                                       MONGODB_METADATA_ADMIN_PASSWORD="synthetic-meta-secret")
+                    environment[key] = value
+                    self.assertBlocked("inventory_connection_input_invalid", tool.inventory_connection_values, environment)
+
+    def test_inventory_metadata_pair_keeps_required_database_binding(self):
+        for key in ("MONGODB_HOST", "MONGODB_DBNAME", "MYSQL_DATABASE"):
+            with self.subTest(key=key):
+                environment = self.connection_environment()
+                environment.update(MONGODB_METADATA_ADMIN_USERNAME="synthetic-meta-user",
+                                   MONGODB_METADATA_ADMIN_PASSWORD="synthetic-meta-secret")
+                del environment[key]
+                self.assertBlocked("inventory_connection_input_invalid", tool.inventory_connection_values, environment)
+
     def test_fixed_four_targets_exclude_cbpt_and_other_legacy(self):
         self.assertEqual(len(tool.TARGETS), 4)
         self.assertEqual([target[0] for target in tool.TARGETS], ["mysql"] * 3 + ["mongodb"])
@@ -700,6 +759,11 @@ class SafetyContracts(unittest.TestCase):
         self.assertNotIn("MONGODB_PASSWORD", validation)
         self.assertIn("inputs.operation == 'prepare' && !startsWith(inputs.prepare_mode, 'bootstrap-') && secrets.MYSQL_METADATA_ADMIN_PASSWORD", production)
         self.assertIn("inputs.operation == 'prepare' && !startsWith(inputs.prepare_mode, 'bootstrap-') && secrets.MONGODB_PASSWORD", production)
+        for key in ("MONGODB_METADATA_ADMIN_USERNAME", "MONGODB_METADATA_ADMIN_PASSWORD"):
+            self.assertNotIn(key, validation)
+            self.assertIn("inputs.operation == 'prepare' && !startsWith(inputs.prepare_mode, 'bootstrap-') && secrets." + key, production)
+            ssh_envs = production.split("          envs: ", 1)[1].split("\n", 1)[0].split(",")
+            self.assertIn(key, ssh_envs)
         self.assertIn("inventory_request_sha256", workflow)
         self.assertIn("${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.tar.gz", workflow)
         self.assertIn("qs-compatibility-retirement-${RETIREMENT_RUN_ID}.tar.gz", workflow)
