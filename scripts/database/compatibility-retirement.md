@@ -136,7 +136,13 @@ DROP authorization exists.
 `metadata_permissions_sufficient` in discovery is explicitly scoped by
 `permission_scope=identity_and_migration_head`. Mongo identity/head/connectionStatus
 success does not prove full-catalog/system.profile/listIndexes visibility; the
-separate source inventory must actually perform those reads. Runtime image/network
+separate source inventory must actually perform those reads. Each database state
+also carries its producer's `error_category` through the armored diagnostic receipt.
+Only reviewed, fixed categories from that database's allowlist are accepted;
+unknown categories and raw exception/connection text are rejected before transport.
+An incomplete identity receipt remains diagnostic (`execution_allowed=false`,
+`drop_ready=false`), including when another database's head was observed clean.
+Runtime image/network
 receipt fields record inspected image ID and selected fixed network configuration,
 not a container ID. Timeout leaves actual container ownership unknown until live
 read-only inspection binds ID, labels, image and mounts before any removal/retry.

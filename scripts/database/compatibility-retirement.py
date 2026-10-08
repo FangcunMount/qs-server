@@ -73,6 +73,26 @@ HISTOGRAM_STATES = frozenset({"unknown_state", "pending", "publishing", "publish
 HISTOGRAM_ERRORS = frozenset({"none", "identity_metadata_not_ready", "histogram_namespace_kind_rejected", "histogram_schema_rejected", "histogram_query_failed_or_timed_out", "histogram_bucket_bound_exceeded", "histogram_public_bound_exceeded", "histogram_count_invalid", "histogram_metadata_query_failed", "mysql_metadata_read_failed", "metadata_bound_exceeded", "connection_input_invalid", "mongo_connection_failed", "mongo_close_failed"})
 
 
+# These are producer-owned, fixed categories, never raw driver exceptions.
+# Keep the allowlists scoped per database so failed identity discovery can be
+# diagnosed without leaking names, connection strings or server error text.
+IDENTITY_ERRORS = {
+    "mysql": frozenset({"none", "connection_input_invalid", "mysql_connection_invalid",
+        "mysql_connection_failed", "mysql_close_failed", "mysql_readonly_transaction_failed",
+        "mysql_readonly_close_failed", "mysql_identity_or_version_rejected",
+        "mysql_metadata_read_failed", "metadata_bound_exceeded",
+        "mysql_global_metadata_visibility_unproven", "mysql_migration_head_invalid",
+        "migration_head_rejected"}),
+    "mongodb": frozenset({"none", "connection_input_invalid", "mongo_connection_failed",
+        "mongo_close_failed", "mongo_identity_read_failed", "mongo_version_rejected",
+        "mongo_identity_metadata_permission_or_missing", "mongo_database_uuid_unavailable",
+        "mongo_replica_anchor_permission_or_read_failed", "mongo_replica_anchor_metadata_rejected",
+        "mongo_replica_anchor_topology_rejected", "mongo_replica_anchor_unavailable",
+        "mongo_migration_generation_rejected", "mongo_privileges_read_failed",
+        "mongo_migration_head_invalid", "migration_head_rejected"}),
+}
+
+
 class Blocked(ValueError):
     """Fixed error categories; never include private input in the message."""
 
@@ -1020,7 +1040,9 @@ def validate_identity_receipt(summary, code, args, output, request_hash, entrypo
             fail("identity_receipt_type_invalid")
         if summary["complete"] and (not all(state[key] for key in ("identity_observed", "migration_head_observed", "migration_clean", "metadata_permissions_sufficient")) or state["migration_dirty"] is not False or not state["identity_hash"] or state["error_category"] != "none"):
             fail("identity_receipt_outcome_invalid")
-        clean_states[database] = {key: state[key] for key in state if key != "error_category"}
+        if type(state["error_category"]) is not str or state["error_category"] not in IDENTITY_ERRORS[database]:
+            fail("identity_error_category_invalid")
+        clean_states[database] = dict(state)
         clean_states[database]["identity_hash"] = state["identity_hash"] or None
         clean_states[database]["database_anchor_hash"] = state["database_anchor_hash"] or None
         clean_states[database]["migration_generation_hash"] = state["migration_generation_hash"] or None
@@ -1286,7 +1308,7 @@ def main(argv=None):
               "boundary_discovery_complete": "bool", "boundary_private_report_hash": "hash64", "boundary_request_hash": "hash64",
               "inventory_next_cycle_required": "bool", "inventory_boundary_report_hash": "nullable_hash64", "inventory_two_equal_scans": "bool",
               "identity_discovery_complete": "bool", "identity_private_report_hash": "hash64", "identity_request_hash": "hash64",
-              "identity_database_states": {database: {"identity_hash": "nullable_hash64", "database_anchor_hash": "nullable_hash64", "migration_generation_hash": "nullable_hash64", "identity_observed": "bool", "migration_version": "uint", "migration_head_observed": "bool", "migration_dirty": "nullable_bool", "migration_clean": "bool", "metadata_permissions_sufficient": "bool", "permission_scope": frozenset({"identity_and_migration_head"})} for database in ("mysql", "mongodb")},
+              "identity_database_states": {database: {"identity_hash": "nullable_hash64", "database_anchor_hash": "nullable_hash64", "migration_generation_hash": "nullable_hash64", "identity_observed": "bool", "migration_version": "uint", "migration_head_observed": "bool", "migration_dirty": "nullable_bool", "migration_clean": "bool", "metadata_permissions_sufficient": "bool", "permission_scope": frozenset({"identity_and_migration_head"}), "error_category": IDENTITY_ERRORS[database]} for database in ("mysql", "mongodb")},
               "identity_diagnostic_histograms": [{"database": frozenset({"mysql", "mongodb"}), "name": frozenset(target[1] for target in TARGETS), "present": "nullable_bool", "complete": "bool", "diagnostic_only": "bool", "error_category": HISTOGRAM_ERRORS,
                    "bucket_count": "uint"}],
               "identity_histogram_bucket_pages": {"page_" + chr(97 + index): [{"object_index": "uint", "bucket_index": "uint", "type_label": frozenset(label.replace(".", "_") for label in HISTOGRAM_TYPES), "type_hash": "hash64", "state_label": HISTOGRAM_STATES, "state_hash": "hash64", "records": "uint"}] for index in range(4)},
