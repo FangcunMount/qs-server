@@ -773,6 +773,27 @@ def capture_fixed(command, *, timeout, maximum=32768):
     return result.returncode, result.stdout
 
 
+def inventory_connection_values(environment):
+    # Select the Mongo pair together. An incomplete metadata pair must never
+    # combine an administrator username with an application password.
+    keys = ("MYSQL_HOST", "MYSQL_PORT", "MYSQL_USERNAME", "MYSQL_PASSWORD", "MYSQL_DATABASE",
+            "MONGODB_HOST", "MONGODB_PORT", "MONGODB_USERNAME", "MONGODB_PASSWORD", "MONGODB_DBNAME")
+    mongo_pair = tuple(environment.get(key, "") for key in
+                       ("MONGODB_METADATA_ADMIN_USERNAME", "MONGODB_METADATA_ADMIN_PASSWORD"))
+    if any(mongo_pair) and not all(mongo_pair):
+        fail("inventory_connection_input_invalid")
+    selected = {key: environment.get(key, "") for key in keys}
+    if all(mongo_pair):
+        selected["MONGODB_USERNAME"], selected["MONGODB_PASSWORD"] = mongo_pair
+    values = {}
+    for key in keys:
+        value = selected.get(key, "") or ({"MYSQL_PORT": "3306", "MONGODB_PORT": "27017"}.get(key, ""))
+        if not isinstance(value, str) or not value or len(value) > 4096 or any(character in value for character in ("\n", "\r", "\x00")):
+            fail("inventory_connection_input_invalid")
+        values[key] = value
+    return values
+
+
 def live_inventory(args, directory):
     mode = getattr(args, "prepare_mode", "inventory")
     request_hash = args.identity_request_hash if mode == "identity" else args.inventory_request_hash
@@ -801,14 +822,8 @@ def live_inventory(args, directory):
     code, raw = capture_fixed([str(binary), "--source-sha"], timeout=5, maximum=128)
     if code or raw.decode("ascii", errors="ignore").strip() != args.actual_source_sha:
         fail("inventory_binary_source_mismatch")
-    keys = ("MYSQL_HOST", "MYSQL_PORT", "MYSQL_USERNAME", "MYSQL_PASSWORD", "MYSQL_DATABASE",
-            "MONGODB_HOST", "MONGODB_PORT", "MONGODB_USERNAME", "MONGODB_PASSWORD", "MONGODB_DBNAME")
-    values = {}
-    for key in keys:
-        value = os.environ.get(key, "") or ({"MYSQL_PORT": "3306", "MONGODB_PORT": "27017"}.get(key, ""))
-        if not value or len(value) > 4096 or any(character in value for character in ("\n", "\r", "\x00")):
-            fail("inventory_connection_input_invalid")
-        values[key] = value
+    values = inventory_connection_values(os.environ)
+    keys = tuple(values)
     docker = ["sudo", "-n", "docker"]
     code, raw = capture_fixed([*docker, "image", "inspect", "mysql:8.0", "--format", "{{.Id}}"], timeout=15, maximum=256)
     image = raw.decode("ascii", errors="ignore").strip()
@@ -1324,7 +1339,8 @@ def main(argv=None):
               "blockers": [frozenset(receipt.get("blockers", ()))],
               "capabilities": {key: "bool" for key in CAPABILITIES}}
     try:
-        secrets = tuple(os.environ.get(key, "") for key in ("MYSQL_USERNAME", "MYSQL_PASSWORD", "MONGODB_USERNAME", "MONGODB_PASSWORD"))
+        secrets = tuple(os.environ.get(key, "") for key in ("MYSQL_USERNAME", "MYSQL_PASSWORD", "MONGODB_USERNAME", "MONGODB_PASSWORD",
+                                                                          "MONGODB_METADATA_ADMIN_USERNAME", "MONGODB_METADATA_ADMIN_PASSWORD"))
         armor = transport().encode_armored_receipt(receipt, schema=schema, secrets=secrets)
         print(armor)
     except Exception:

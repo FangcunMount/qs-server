@@ -73,7 +73,7 @@ func (run candidateRunner) Run(ctx context.Context) error { return run(ctx) }
 func TestStandardProfileReplacesWholeLegacyRuntimeBeforeStart(t *testing.T) {
 	// An unconnected client proves selection does not construct the legacy
 	// Mongo store, whose constructor creates indexes over the old collection.
-	client, err := mongo.NewClient(options.Client().ApplyURI("mongodb://127.0.0.1:1"))
+	client, err := mongo.NewClient(options.Client().ApplyURI("mongodb://127.0.0.1:1")) //nolint:staticcheck // SA1019: Keep this client disconnected; Connect would start monitoring and weaken the no-storage-I/O assertion.
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -183,7 +183,7 @@ func TestStandardProfileReplacesWholeLegacyRuntimeBeforeStart(t *testing.T) {
 }
 
 func TestBothStandardProfilesKeepHotRankConsumer(t *testing.T) {
-	client, err := mongo.NewClient(options.Client().ApplyURI("mongodb://127.0.0.1:1"))
+	client, err := mongo.NewClient(options.Client().ApplyURI("mongodb://127.0.0.1:1")) //nolint:staticcheck // SA1019: Keep this client disconnected; Connect would start monitoring and weaken the no-storage-I/O assertion.
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -191,7 +191,8 @@ func TestBothStandardProfilesKeepHotRankConsumer(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer sqlDB.Close()
+	// The deliberately disconnected test pool is best-effort cleanup; keep the selection assertions authoritative.
+	defer func() { _ = sqlDB.Close() }()
 	mysqlDB, err := gorm.Open(gormmysql.New(gormmysql.Config{Conn: sqlDB, SkipInitializeWithVersion: true}),
 		&gorm.Config{DisableAutomaticPing: true})
 	if err != nil {
@@ -250,7 +251,7 @@ func TestBothStandardProfilesKeepHotRankConsumer(t *testing.T) {
 }
 
 func TestStandardProfileFailsClosedWhenIncomplete(t *testing.T) {
-	client, err := mongo.NewClient(options.Client().ApplyURI("mongodb://127.0.0.1:1"))
+	client, err := mongo.NewClient(options.Client().ApplyURI("mongodb://127.0.0.1:1")) //nolint:staticcheck // SA1019: Keep this client disconnected; Connect would start monitoring and weaken the no-storage-I/O assertion.
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -286,7 +287,7 @@ func TestStandardProfileDrainHasBoundedContext(t *testing.T) {
 // Missing standard bindings must fail before constructing a legacy store or
 // starting any runner. These database handles deliberately cannot do I/O.
 func TestStandardProfilesRejectMissingDatabaseBinding(t *testing.T) {
-	client, err := mongo.NewClient(options.Client().ApplyURI("mongodb://127.0.0.1:1"))
+	client, err := mongo.NewClient(options.Client().ApplyURI("mongodb://127.0.0.1:1")) //nolint:staticcheck // SA1019: Keep this client disconnected; Connect would start monitoring and weaken the no-storage-I/O assertion.
 	if err != nil {
 		t.Fatal(err)
 	}

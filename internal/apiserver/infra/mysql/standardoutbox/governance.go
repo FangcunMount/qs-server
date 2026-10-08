@@ -41,7 +41,8 @@ func (r *StatusReader) ListOutboxCandidates(ctx context.Context, orgID int64, li
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	// Preserve scan/candidate errors and rows.Err(); cursor cleanup is best effort.
+	defer func() { _ = rows.Close() }()
 	items := make([]app.RetryCandidate, 0)
 	for rows.Next() {
 		var eventID, state, lastError, updatedText string

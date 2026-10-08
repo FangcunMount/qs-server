@@ -43,7 +43,8 @@ func (r *StatusReader) OutboxStatusSnapshot(ctx context.Context, now time.Time) 
 	if err != nil {
 		return outboxport.StatusSnapshot{}, err
 	}
-	defer cursor.Close(ctx)
+	// Preserve read/decode/status errors; cursor cleanup is best effort.
+	defer func() { _ = cursor.Close(ctx) }()
 	counts := make([]appstandard.StatusCount, 0, 4)
 	for cursor.Next(ctx) {
 		var row struct {
@@ -87,7 +88,8 @@ func (r *StatusReader) OutboxStatusByEventType(ctx context.Context, _ time.Time)
 	if err != nil {
 		return nil, err
 	}
-	defer cursor.Close(ctx)
+	// Preserve read/decode/status errors; cursor cleanup is best effort.
+	defer func() { _ = cursor.Close(ctx) }()
 	buckets := make([]outboxport.EventTypeStatusBucket, 0)
 	for cursor.Next(ctx) {
 		var row struct {

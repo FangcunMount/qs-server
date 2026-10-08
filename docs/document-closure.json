@@ -2,7 +2,7 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "2a4ecd365a6306b11b4824d0234312822c6f2708",
+    "sha": "f37c39b5064201fc46ee7a66a9433c0da62fb3b5",
     "verified_on": "2026-10-08"
   },
   "status_policy": {
@@ -11270,7 +11270,7 @@
       "owner": "tooling",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "2a4ecd365a6306b11b4824d0234312822c6f2708",
+        "source_sha": "f37c39b5064201fc46ee7a66a9433c0da62fb3b5",
         "verified_on": "2026-10-08"
       },
       "fact_sources": [
@@ -11301,6 +11301,42 @@
         {
           "kind": "source",
           "path": ".github/workflows/authz-production-matrix-provision.yml"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/eventing/subsystem/standard_profiles_m4_test.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/infra/mongo/standardoutbox/governance.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/infra/mongo/standardoutbox/status.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/infra/mysql/standardoutbox/governance.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/infra/mysql/standardoutbox/replay.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/infra/mysql/standardoutbox/status.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/process/standard_outbox_preflight_m4.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/process/standard_event_profile_retirement_m4_test.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/transport/grpc/service/plan_entry.go"
         }
       ],
       "verification": [
@@ -11358,6 +11394,20 @@
           "command": "go test -race -p=3 ./cmd/qs-compatibility-retirement -count=1",
           "result": "passed",
           "source_sha": "2a4ecd365a6306b11b4824d0234312822c6f2708",
+          "verified_on": "2026-10-08"
+        },
+        {
+          "kind": "command",
+          "command": "python3 -B scripts/database/test-compatibility-retirement.py",
+          "result": "passed",
+          "source_sha": "f37c39b5064201fc46ee7a66a9433c0da62fb3b5",
+          "verified_on": "2026-10-08"
+        },
+        {
+          "kind": "command",
+          "command": "python3 -B scripts/dbops/test-receipt-transport.py",
+          "result": "passed",
+          "source_sha": "f37c39b5064201fc46ee7a66a9433c0da62fb3b5",
           "verified_on": "2026-10-08"
         }
       ],

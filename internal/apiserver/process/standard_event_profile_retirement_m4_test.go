@@ -14,7 +14,7 @@ import (
 )
 
 func TestStandardProfileRetirementRejectsMixedConfigurationBeforeStorage(t *testing.T) {
-	client, err := mongo.NewClient(mongooptions.Client().ApplyURI("mongodb://127.0.0.1:1"))
+	client, err := mongo.NewClient(mongooptions.Client().ApplyURI("mongodb://127.0.0.1:1")) //nolint:staticcheck // SA1019: Keep this client disconnected to prove configuration rejection happens before storage I/O.
 	if err != nil {
 		t.Fatal(err)
 	}

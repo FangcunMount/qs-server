@@ -33,7 +33,8 @@ FROM rm_outbox WHERE state <> 'published' GROUP BY state`)
 	if err != nil {
 		return outboxport.StatusSnapshot{}, err
 	}
-	defer rows.Close()
+	// Preserve scan/time/status errors and rows.Err(); cursor cleanup is best effort.
+	defer func() { _ = rows.Close() }()
 	counts := make([]appstandard.StatusCount, 0, 4)
 	for rows.Next() {
 		var state, oldestText string
