@@ -83,7 +83,7 @@ func VerifySourceCopies(ctx context.Context, copies []SourceCopyInput) (*Verifie
 		return nil, ErrSourceIncomplete
 	}
 	expectedObjects := [4][2]string{{"mysql", "domain_event_outbox"}, {"mysql", AIBridgeCommandSource}, {"mysql", AILegacyCommandSource}, {"mongodb", "domain_event_outbox"}}
-	var approvedRecords uint64
+	var approvedRecords, approvedEventRecords uint64
 	for i, input := range copies {
 		b := input.Expected.Boundary
 		if sourceReaderAbsent(input.Input) || !b.Present || b.Database != expectedObjects[i][0] || b.Name != expectedObjects[i][1] || input.Expected.Records > MaxSourceRecords {
@@ -93,8 +93,11 @@ func VerifySourceCopies(ctx context.Context, copies []SourceCopyInput) (*Verifie
 			return nil, ErrSourceBounds
 		}
 		approvedRecords += input.Expected.Records
+		if i == 0 || i == 3 {
+			approvedEventRecords += input.Expected.Records
+		}
 	}
-	v := &VerifiedSourceCopies{rows: make(map[verifiedSourceKey]verifiedSourceRow, int(approvedRecords)), eventIDs: make(map[string]verifiedSourceKey), pairs: make(map[string]verifiedAIPair), reservation: approvedRecords * sourceIndexReservationPerRow}
+	v := &VerifiedSourceCopies{rows: make(map[verifiedSourceKey]verifiedSourceRow, int(approvedRecords)), eventIDs: make(map[string]verifiedSourceKey, int(approvedEventRecords)), pairs: make(map[string]verifiedAIPair), reservation: approvedRecords * sourceIndexReservationPerRow}
 	for i, input := range copies {
 		if err := ctx.Err(); err != nil {
 			return nil, ErrSourceIncomplete

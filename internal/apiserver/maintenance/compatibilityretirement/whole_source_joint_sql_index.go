@@ -142,7 +142,7 @@ func (c *HistoricalCoordinator) PrepareWholeSourceJointIndex(ctx context.Context
 	if err := c.alive(ctx); err != nil {
 		return nil, err
 	}
-	x := &WholeSourceJointIndex{owner: c, auth: c.authenticated, entries: map[string]wholeSourceJointEntry{}, byAssessment: map[uint64][]string{}, bySheet: map[uint64][]string{}, limits: limits}
+	x := &WholeSourceJointIndex{owner: c, auth: c.authenticated, byAssessment: map[uint64][]string{}, bySheet: map[uint64][]string{}, limits: limits}
 	var records uint64
 	for i, v := range copies {
 		if wholeJointReaderAbsent(v.Input) || !reflect.DeepEqual(v.Expected, c.copies[i].Expected) || v.Expected.Records > limits.MaxIndexEntries-records {
@@ -154,6 +154,10 @@ func (c *HistoricalCoordinator) PrepareWholeSourceJointIndex(ctx context.Context
 	if records > limits.MaxIndexReservationBytes/1024 {
 		return nil, ErrWholeSourceJointBounds
 	}
+	// Use the original authenticated EOF counts only after all four new
+	// expectations and the existing entry/reservation bounds have matched.
+	eventRecords := c.authenticated.receipts[0].Records + c.authenticated.receipts[3].Records
+	x.entries = make(map[string]wholeSourceJointEntry, int(eventRecords))
 	for i, v := range copies {
 		r := &wholeSourceJointAtReader{input: v.Input, limit: int64(limits.MaxEncodedCopyBytes), line: i != 3, h: sha256.New()}
 		var next func() (*DecodedSourceEvent, error)
