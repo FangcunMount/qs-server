@@ -138,7 +138,13 @@ func TestNativeShellRejectsHistoricalPayloadAndAdmitsOnlyBoundProbe(t *testing.T
 			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 			defer cancel()
 			cmd := exec.CommandContext(ctx, "/bin/sh", "-c", `exec "$1" -test.run='^TestFenceNativeChild$'`, "fence-owned-fixture", exe)
-			cmd.Env = []string{"PATH=/usr/bin:/bin", "QS_FENCE_NATIVE_CHILD=1", "SSH_ORIGINAL_COMMAND=" + command}
+			// Covered child processes must own their coverage directory; the
+			// parent directory/environment is never inherited by this whitelist.
+			coverageDir := t.TempDir()
+			if os.Chmod(coverageDir, 0700) != nil {
+				t.Fatal("native child coverage protection failed")
+			}
+			cmd.Env = []string{"PATH=/usr/bin:/bin", "GOCOVERDIR=" + coverageDir, "QS_FENCE_NATIVE_CHILD=1", "SSH_ORIGINAL_COMMAND=" + command}
 			cmd.Stdin = bytes.NewReader(payload)
 			var stderr bytes.Buffer
 			cmd.Stderr = &stderr
