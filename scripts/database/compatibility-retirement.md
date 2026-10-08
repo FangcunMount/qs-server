@@ -256,3 +256,9 @@ historical five at `3de8761108c02b613f9641847b24f89585d85125:configs/events.yaml
 and pre-delivery-guard six at `ea123c7f88b521a68f9fa2de2e7dbe8b44223883:configs/events.yaml:28-154`.
 Their presence in historical config is diagnostic vocabulary, not proof of real
 production row existence or business verification.
+
+Dispatch validation normalizes only declared optional defaults before the strict
+stage/source/request checks. Required fields and unknown keys still fail before
+production credentials. The contract test executes the actual github-script
+validator for omitted empty defaults, complete inputs, unknown/mixed requests,
+missing requirements, wrong ref/runtime SHA and an advanced main.

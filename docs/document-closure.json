@@ -2,7 +2,7 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "5b5dc2778f8f93f09d17c68736c3134a794cba08",
+    "sha": "5e1365e8533f473933094a95e9a69d81162ae4a3",
     "verified_on": "2026-10-08"
   },
   "status_policy": {
@@ -11158,7 +11158,7 @@
       "owner": "tooling",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "5b5dc2778f8f93f09d17c68736c3134a794cba08",
+        "source_sha": "5e1365e8533f473933094a95e9a69d81162ae4a3",
         "verified_on": "2026-10-08"
       },
       "fact_sources": [
@@ -11211,6 +11211,13 @@
           "command": "python3 -B scripts/database/compatibility-retirement-integration.py",
           "result": "passed",
           "source_sha": "5b5dc2778f8f93f09d17c68736c3134a794cba08",
+          "verified_on": "2026-10-08"
+        },
+        {
+          "kind": "command",
+          "command": "python3 -B scripts/database/test-compatibility-retirement.py",
+          "result": "passed",
+          "source_sha": "5e1365e8533f473933094a95e9a69d81162ae4a3",
           "verified_on": "2026-10-08"
         }
       ],
