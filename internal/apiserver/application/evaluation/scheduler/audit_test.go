@@ -10,6 +10,7 @@ import (
 	evalrun "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/run"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationconsistency"
+	eventevidence "github.com/FangcunMount/qs-server/internal/pkg/eventing/evidence"
 )
 
 type consistencyReaderStub struct {
@@ -131,4 +132,21 @@ func containsMismatch(items []*mismatch, kind mismatchKind) bool {
 		}
 	}
 	return false
+}
+
+func TestHistoricalEventProvenanceIsNotCurrentMessageVerification(t *testing.T) {
+	outcome := testOutcome(modelcatalog.KindScale, "r2")
+	base := consistencyEvidence{status: domainassessment.StatusEvaluated, outcome: outcome, run: &evaluationconsistency.RunEvidence{ID: "r2", Status: string(evalrun.StatusSucceeded)}, projection: &evaluationconsistency.ProjectionEvidence{RowCount: 1, DistinctOutcomeCount: 1, OutcomeID: outcome.ID}, outbox: &evaluationconsistency.CommittedOutboxEvidence{Class: eventevidence.RetiredVerified, RowCount: 0, OutcomeID: outcome.ID, RunID: outcome.RunID}}
+	if got := classifyDrifts(base, time.Now()); len(got) != 0 {
+		t.Fatalf("verified retirement generated a false current-message missing alert: %#v", got)
+	}
+	base.outbox.Class = eventevidence.Unverifiable
+	base.outbox.HistoricalReason = "original message absent, terminal ownership and closure verified"
+	if got := classifyDrifts(base, time.Now()); !containsMismatch(got, mismatchHistoricalEventGap) {
+		t.Fatal("historical gap was displayed as complete message verification")
+	}
+	base.outbox.InvalidReason = "business binding conflict"
+	if got := classifyDrifts(base, time.Now()); !containsMismatch(got, mismatchCommittedOutboxMismatch) {
+		t.Fatal("historical class hid a binding conflict")
+	}
 }

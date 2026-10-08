@@ -263,15 +263,17 @@ func (a *Assessment) PrepareScoringProjection(projection ScoringProjection, eval
 
 // StageEvaluatedEvent records the durable outcome and run references emitted
 // after scoring completes.
-func (a *Assessment) StageEvaluatedEvent(evaluatedAt time.Time, outcomeID meta.ID, runID evalrun.ID) {
-	a.addEvent(NewEvaluationOutcomeCommittedEvent(
+func (a *Assessment) StageEvaluatedEvent(evaluatedAt time.Time, outcomeID meta.ID, runID evalrun.ID) DomainEvent {
+	evt := NewEvaluationOutcomeCommittedEvent(
 		a.orgID,
 		a.id,
 		a.testeeRef,
 		outcomeID,
 		runID,
 		evaluatedAt,
-	))
+	)
+	a.addEvent(evt)
+	return evt
 }
 
 // MarkAsFailed 标记评估失败

@@ -8,9 +8,11 @@ import (
 	"time"
 
 	domainAnswerSheet "github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/answersheet"
+	"github.com/FangcunMount/qs-server/internal/apiserver/eventing/eventevidencebinding"
 	mongoBase "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo"
 	submitport "github.com/FangcunMount/qs-server/internal/apiserver/port/answersheetsubmit"
 	"github.com/FangcunMount/qs-server/internal/pkg/event"
+	"github.com/FangcunMount/qs-server/internal/pkg/eventing/evidence"
 	"github.com/FangcunMount/qs-server/internal/pkg/safeconv"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -70,7 +72,7 @@ func (r *Repository) WaitForCompletedSubmission(ctx context.Context, metaInfo su
 	return r.waitForCompletedIdempotentResult(ctx, metaInfo)
 }
 
-func (r *Repository) SaveSubmittedAnswerSheet(ctx context.Context, sheet *domainAnswerSheet.AnswerSheet, metaInfo submitport.DurableSubmitMeta) ([]event.DomainEvent, error) {
+func (r *Repository) SaveSubmittedAnswerSheet(ctx context.Context, sheet *domainAnswerSheet.AnswerSheet, metaInfo submitport.DurableSubmitMeta, proof *evidence.EventEvidenceV1) ([]event.DomainEvent, error) {
 	if sheet == nil {
 		return nil, nil
 	}
@@ -80,6 +82,31 @@ func (r *Repository) SaveSubmittedAnswerSheet(ctx context.Context, sheet *domain
 	events := append([]event.DomainEvent{}, sheet.Events()...)
 	if len(events) != 1 || events[0] == nil || events[0].EventType() != domainAnswerSheet.EventTypeSubmitted || events[0].EventID() == "" {
 		return nil, fmt.Errorf("answersheet durable save requires exactly one submitted event")
+	}
+	if proof == nil || proof.Origin != "native_atomic" || proof.Class != evidence.StandardReferenceClass || proof.Reference == nil || proof.EventID != events[0].EventID() || proof.Reference.EventType != domainAnswerSheet.EventTypeSubmitted {
+		return nil, fmt.Errorf("answersheet original event evidence is required")
+	}
+	if err := proof.Validate(); err != nil {
+		return nil, err
+	}
+	submitted, ok := events[0].(domainAnswerSheet.AnswerSheetSubmittedEvent)
+	if pointer, pointerOK := events[0].(*domainAnswerSheet.AnswerSheetSubmittedEvent); pointerOK && pointer != nil {
+		submitted = *pointer
+		ok = true
+	}
+	if !ok {
+		return nil, fmt.Errorf("answersheet submitted payload is invalid")
+	}
+	data := submitted.Data
+	if data.RequestID != "" && metaInfo.RequestID != "" && data.RequestID != metaInfo.RequestID {
+		return nil, fmt.Errorf("answersheet request identity conflict")
+	}
+	if metaInfo.RequestID != "" {
+		data.RequestID = metaInfo.RequestID
+	}
+	binding, err := eventevidencebinding.AnswerSheet(data)
+	if err != nil || binding != proof.BusinessBindingSHA256 || proof.Reference.Scope != fmt.Sprintf("org:%d", data.OrgID) {
+		return nil, fmt.Errorf("answersheet original business binding conflict: %v", err)
 	}
 	submissionContext := sheet.SubmissionContext()
 	if err := submissionContext.Validate(); err != nil {
@@ -105,6 +132,8 @@ func (r *Repository) SaveSubmittedAnswerSheet(ctx context.Context, sheet *domain
 		SchemaVersion: durableAcceptanceSchemaVersion,
 		EventID:       events[0].EventID(),
 		AcceptedAt:    acceptedAt,
+		EventEvidence: proof.Clone(),
+		RequestID:     data.RequestID,
 	}
 	if metaInfo.IdempotencyKey != "" {
 		po.SubmitMeta = &SubmitMetaPO{IdempotencyKey: metaInfo.IdempotencyKey, WriterID: writerID, Fingerprint: metaInfo.Fingerprint, RequestID: metaInfo.RequestID, AcceptedAt: acceptedAt}

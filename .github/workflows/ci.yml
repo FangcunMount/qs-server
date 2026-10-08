@@ -321,6 +321,18 @@ jobs:
             -run '^(TestStatisticsCanonicalSchemaFromEmptyDatabaseAndRetirementRollback|TestStatisticsAuditMigrationReplaysAfterInitialSchema|TestStatisticsMongoCollectorIndexesUpDown|TestStatisticsColdStartPublishIdempotencyAndRedisFailure)$' \
             -count=1 -timeout=15m -v ./internal/pkg/migration
 
+      - name: Verify compatibility retirement A evidence contracts on real databases
+        env:
+          QS_COMPAT_OUTCOME_MYSQL_DSN: root:root@tcp(127.0.0.1:3306)/mysql?parseTime=true&multiStatements=true
+          QS_COMPAT_REQUIRE_DATABASE: '1'
+          MYSQL_DSN: root:root@tcp(127.0.0.1:3306)/mysql?parseTime=true&multiStatements=true
+          MONGO_URI: mongodb://127.0.0.1:27017/?replicaSet=rs0
+          QS_SERVER_TEST_MONGO_URI: mongodb://127.0.0.1:27017/?replicaSet=rs0
+        run: |
+          go test -race -tags=integration -count=1 -timeout=5m ./internal/apiserver/infra/mysql/evaluation -run '^TestCommittedEvidence'
+          go test -race -tags=integration -count=1 -timeout=5m ./internal/apiserver/infra/retrygovernance
+          go test -race -tags=integration -count=1 -timeout=5m ./internal/pkg/migration -run '^TestCompatibilityRetirementA'
+
       - name: Run Survey and ModelCatalog Mongo integration contracts
         env:
           QS_SERVER_TEST_MONGO_URI: mongodb://127.0.0.1:27017/?replicaSet=rs0

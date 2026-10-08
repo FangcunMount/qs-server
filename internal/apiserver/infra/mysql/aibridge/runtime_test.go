@@ -32,7 +32,7 @@ func TestRuntimeIndexAtomicScopeAndStablePagination(t *testing.T) {
 	if e != nil || len(first.Items) != 1 || first.NextCursor == "" {
 		t.Fatal(first, e)
 	}
-	if first.Items[0].SessionID != "" || first.Items[0].CommandsPending != 1 {
+	if first.Items[0].SessionID != "" || first.Items[0].CommandsPending != 0 || first.Items[0].CommandAttempts != 0 {
 		t.Fatal(first)
 	}
 	q.Cursor = first.NextCursor

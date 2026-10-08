@@ -2,13 +2,10 @@ package evaluation
 
 import (
 	"context"
-	"encoding/json"
 	"strconv"
 	"time"
 
-	evalevent "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/event"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationconsistency"
-	"github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
 	"gorm.io/gorm"
 )
 
@@ -28,6 +25,12 @@ func NewConsistencyReadModel(db *gorm.DB) evaluationconsistency.Reader {
 }
 
 func (r *consistencyReadModel) ReadBatch(ctx context.Context, afterID uint64, limit int) (evaluationconsistency.Batch, error) {
+	return r.readBatch(ctx, afterID, nil, limit)
+}
+func (r *consistencyReadModel) ReadBatchTo(ctx context.Context, afterID, upperID uint64, limit int) (evaluationconsistency.Batch, error) {
+	return r.readBatch(ctx, afterID, &upperID, limit)
+}
+func (r *consistencyReadModel) readBatch(ctx context.Context, afterID uint64, upperID *uint64, limit int) (evaluationconsistency.Batch, error) {
 	if limit <= 0 {
 		return evaluationconsistency.Batch{Items: []evaluationconsistency.AssessmentEvidence{}, CycleComplete: true}, nil
 	}
@@ -35,13 +38,12 @@ func (r *consistencyReadModel) ReadBatch(ctx context.Context, afterID uint64, li
 		ID     uint64 `gorm:"column:id"`
 		Status string `gorm:"column:status"`
 	}
-	if err := r.db.WithContext(ctx).
-		Table("assessment").
-		Select("id", "status").
-		Where("status IN ? AND id > ? AND deleted_at IS NULL", []string{"submitted", "evaluated", "failed"}, afterID).
-		Order("id ASC").
-		Limit(limit).
-		Find(&candidates).Error; err != nil {
+	query := r.db.WithContext(ctx).Table("assessment").Select("id", "status").
+		Where("status IN ? AND id > ? AND deleted_at IS NULL", []string{"submitted", "evaluated", "failed"}, afterID)
+	if upperID != nil {
+		query = query.Where("id <= ?", *upperID)
+	}
+	if err := query.Order("id ASC").Limit(limit).Find(&candidates).Error; err != nil {
 		return evaluationconsistency.Batch{}, err
 	}
 	if len(candidates) == 0 {
@@ -163,52 +165,6 @@ func (r *consistencyReadModel) listProjectionEvidence(ctx context.Context, asses
 			evidence.OutcomeID = strconv.FormatUint(*row.OutcomeID, 10)
 		}
 		result[row.AssessmentID] = evidence
-	}
-	return result, nil
-}
-
-func (r *consistencyReadModel) listCommittedOutboxEvidence(ctx context.Context, assessmentIDs []uint64) (map[uint64]*evaluationconsistency.CommittedOutboxEvidence, error) {
-	aggregateIDs := make([]string, 0, len(assessmentIDs))
-	for _, assessmentID := range assessmentIDs {
-		aggregateIDs = append(aggregateIDs, strconv.FormatUint(assessmentID, 10))
-	}
-	var rows []struct {
-		ID          uint64 `gorm:"column:id"`
-		AggregateID string `gorm:"column:aggregate_id"`
-		PayloadJSON string `gorm:"column:payload_json"`
-		Status      string `gorm:"column:status"`
-	}
-	if err := r.db.WithContext(ctx).
-		Table("domain_event_outbox").
-		Select("id", "aggregate_id", "payload_json", "status").
-		Where("event_type = ? AND aggregate_type = ? AND aggregate_id IN ?", eventcatalog.EvaluationOutcomeCommitted, evalevent.AggregateType, aggregateIDs).
-		Order("aggregate_id ASC, id DESC").
-		Find(&rows).Error; err != nil {
-		return nil, err
-	}
-	result := make(map[uint64]*evaluationconsistency.CommittedOutboxEvidence, len(rows))
-	for _, row := range rows {
-		assessmentID, err := strconv.ParseUint(row.AggregateID, 10, 64)
-		if err != nil {
-			return nil, err
-		}
-		evidence := result[assessmentID]
-		if evidence == nil {
-			evidence = &evaluationconsistency.CommittedOutboxEvidence{Status: row.Status}
-			var envelope struct {
-				Data struct {
-					OutcomeID       string `json:"outcome_id"`
-					EvaluationRunID string `json:"evaluation_run_id"`
-				} `json:"data"`
-			}
-			if err := json.Unmarshal([]byte(row.PayloadJSON), &envelope); err != nil {
-				return nil, err
-			}
-			evidence.OutcomeID = envelope.Data.OutcomeID
-			evidence.RunID = envelope.Data.EvaluationRunID
-			result[assessmentID] = evidence
-		}
-		evidence.RowCount++
 	}
 	return result, nil
 }

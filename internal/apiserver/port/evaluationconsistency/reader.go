@@ -5,6 +5,8 @@ package evaluationconsistency
 import (
 	"context"
 	"time"
+
+	eventevidence "github.com/FangcunMount/qs-server/internal/pkg/eventing/evidence"
 )
 
 // OutcomeEvidence is the minimal canonical Outcome identity needed by the
@@ -45,12 +47,35 @@ type ProjectionEvidence struct {
 }
 
 type CommittedOutboxEvidence struct {
-	RowCount  int64
-	OutcomeID string
-	RunID     string
-	Status    string
+	Class            eventevidence.Class
+	InvalidReason    string
+	HistoricalReason string
+	RowCount         int64
+	OutcomeID        string
+	RunID            string
+	Status           string
 }
 
 type Reader interface {
 	ReadBatch(context.Context, uint64, int) (Batch, error)
+}
+
+// CycleReader fixes both directions to bounds captured before a full cycle.
+// Delivery state, scheduling timestamps and attempts are never event evidence.
+type CycleReader interface {
+	BusinessUpperBound(context.Context) (uint64, error)
+	ReadBatchTo(context.Context, uint64, uint64, int) (Batch, error)
+	OutboxUpperBound(context.Context) (uint64, error)
+	ReadOutboxBatch(context.Context, uint64, uint64, int) (ReverseBatch, error)
+}
+type ReverseConflict struct {
+	MessageID    string
+	AssessmentID uint64
+	Reason       string
+}
+type ReverseBatch struct {
+	Scanned       int
+	NextCursor    uint64
+	CycleComplete bool
+	Conflicts     []ReverseConflict
 }

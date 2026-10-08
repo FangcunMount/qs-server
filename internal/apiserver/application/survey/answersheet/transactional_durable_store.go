@@ -8,8 +8,11 @@ import (
 
 	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
 	domainAnswerSheet "github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/answersheet"
+	"github.com/FangcunMount/qs-server/internal/apiserver/eventing/eventevidencebinding"
 	submitport "github.com/FangcunMount/qs-server/internal/apiserver/port/answersheetsubmit"
+	outboxport "github.com/FangcunMount/qs-server/internal/apiserver/port/outbox"
 	"github.com/FangcunMount/qs-server/internal/pkg/event"
+	"github.com/FangcunMount/qs-server/internal/pkg/eventing/evidence"
 )
 
 type transactionalSubmissionDurableStore struct {
@@ -57,16 +60,52 @@ func (s transactionalSubmissionDurableStore) CreateDurably(ctx context.Context, 
 		}
 	}
 
-	var stagedEvents []event.DomainEvent
+	preparer, ok := s.stager.(outboxport.ReferencePreparer)
+	if !ok {
+		return nil, false, fmt.Errorf("answersheet durable store requires original event reference preparation")
+	}
+	for _, evt := range sheet.Events() {
+		var originalRequestID string
+		switch submitted := evt.(type) {
+		case domainAnswerSheet.AnswerSheetSubmittedEvent:
+			originalRequestID = submitted.Data.RequestID
+		case *domainAnswerSheet.AnswerSheetSubmittedEvent:
+			if submitted != nil {
+				originalRequestID = submitted.Data.RequestID
+			}
+		}
+		if originalRequestID != "" && meta.RequestID != "" && originalRequestID != meta.RequestID {
+			return nil, false, fmt.Errorf("answersheet request identity conflict")
+		}
+	}
+	stagedEvents := withSubmissionRequestID(append([]event.DomainEvent(nil), sheet.Events()...), meta.RequestID)
+	if len(stagedEvents) != 1 || stagedEvents[0] == nil {
+		return nil, false, fmt.Errorf("answersheet requires one frozen submitted event")
+	}
+	submitted, ok := stagedEvents[0].(domainAnswerSheet.AnswerSheetSubmittedEvent)
+	if !ok {
+		return nil, false, fmt.Errorf("answersheet submitted event payload is invalid")
+	}
+	binding, err := eventevidencebinding.AnswerSheet(submitted.Data)
+	if err != nil {
+		return nil, false, err
+	}
+	ref, err := preparer.PrepareReference(submitted)
+	if err != nil {
+		return nil, false, err
+	}
+	proof, err := evidence.NewStandard(ref, binding)
+	if err != nil {
+		return nil, false, err
+	}
 	transactionStarted := time.Now()
 	if err := s.runner.WithinTransaction(ctx, func(txCtx context.Context) error {
-		events, err := s.writer.SaveSubmittedAnswerSheet(txCtx, sheet, meta)
+		events, err := s.writer.SaveSubmittedAnswerSheet(txCtx, sheet, meta, proof)
 		if err != nil {
 			return err
 		}
-		stagedEvents = withSubmissionRequestID(events, meta.RequestID)
-		if len(events) == 0 {
-			return nil
+		if len(events) != 1 || events[0] == nil || events[0].EventID() != proof.EventID {
+			return fmt.Errorf("answersheet durable writer did not preserve original submitted event")
 		}
 		outboxStarted := time.Now()
 		err = s.stager.Stage(txCtx, stagedEvents...)
@@ -127,20 +166,32 @@ func observeDurableLookupOperation(operation string, completed *CompletedSubmiss
 }
 
 func withSubmissionRequestID(events []event.DomainEvent, requestID string) []event.DomainEvent {
-	if requestID == "" || len(events) == 0 {
-		return events
-	}
 	enriched := append([]event.DomainEvent(nil), events...)
 	for index, evt := range enriched {
-		switch submitted := evt.(type) {
+		var submitted domainAnswerSheet.AnswerSheetSubmittedEvent
+		switch value := evt.(type) {
 		case domainAnswerSheet.AnswerSheetSubmittedEvent:
-			submitted.Data.RequestID = requestID
-			enriched[index] = submitted
+			submitted = value
 		case *domainAnswerSheet.AnswerSheetSubmittedEvent:
-			copy := *submitted
-			copy.Data.RequestID = requestID
-			enriched[index] = copy
+			if value == nil {
+				continue
+			}
+			submitted = *value
+		default:
+			continue
 		}
+		if requestID != "" {
+			submitted.Data.RequestID = requestID
+		}
+		if submitted.Data.Admission != nil {
+			copy := *submitted.Data.Admission
+			submitted.Data.Admission = &copy
+		}
+		if submitted.Data.Attribution != nil {
+			copy := *submitted.Data.Attribution
+			submitted.Data.Attribution = &copy
+		}
+		enriched[index] = submitted
 	}
 	return enriched
 }

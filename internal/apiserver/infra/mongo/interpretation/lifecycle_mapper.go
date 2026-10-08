@@ -21,14 +21,16 @@ func (m *LifecycleMapper) GenerationToPO(domain *generation.ReportGeneration) *R
 		return nil
 	}
 	return &ReportGenerationPO{
-		BaseDocument:    base.BaseDocument{DomainID: domain.ID(), CreatedAt: domain.CreatedAt(), UpdatedAt: domain.UpdatedAt()},
-		OutcomeID:       domain.Key().OutcomeID.Uint64(),
-		ReportType:      domain.Key().ReportType.String(),
-		TemplateVersion: domain.Key().TemplateVersion.String(),
-		Status:          string(domain.Status()),
-		LatestRunID:     domain.LatestRunID().Uint64(),
-		ReportID:        domain.ReportID().Uint64(),
-		Version:         domain.Version(),
+		BaseDocument:           base.BaseDocument{DomainID: domain.ID(), CreatedAt: domain.CreatedAt(), UpdatedAt: domain.UpdatedAt()},
+		OutcomeID:              domain.Key().OutcomeID.Uint64(),
+		ReportType:             domain.Key().ReportType.String(),
+		TemplateVersion:        domain.Key().TemplateVersion.String(),
+		Status:                 string(domain.Status()),
+		LatestRunID:            domain.LatestRunID().Uint64(),
+		ReportID:               domain.ReportID().Uint64(),
+		Version:                domain.Version(),
+		GeneratedEventID:       domain.GeneratedEventID(),
+		GeneratedEventEvidence: domain.GeneratedEventEvidence(),
 	}
 }
 
@@ -37,14 +39,16 @@ func (m *LifecycleMapper) GenerationToDomain(po *ReportGenerationPO) (*generatio
 		return nil, nil
 	}
 	return generation.Restore(generation.RestoreInput{
-		ID:          po.DomainID,
-		Key:         generation.Key{OutcomeID: meta.FromUint64(po.OutcomeID), ReportType: policy.ReportType(po.ReportType), TemplateVersion: policy.TemplateVersion(po.TemplateVersion)},
-		Status:      generation.Status(po.Status),
-		LatestRunID: meta.FromUint64(po.LatestRunID),
-		ReportID:    meta.FromUint64(po.ReportID),
-		Version:     po.Version,
-		CreatedAt:   po.CreatedAt,
-		UpdatedAt:   po.UpdatedAt,
+		ID:                     po.DomainID,
+		Key:                    generation.Key{OutcomeID: meta.FromUint64(po.OutcomeID), ReportType: policy.ReportType(po.ReportType), TemplateVersion: policy.TemplateVersion(po.TemplateVersion)},
+		Status:                 generation.Status(po.Status),
+		LatestRunID:            meta.FromUint64(po.LatestRunID),
+		ReportID:               meta.FromUint64(po.ReportID),
+		Version:                po.Version,
+		GeneratedEventID:       po.GeneratedEventID,
+		GeneratedEventEvidence: po.GeneratedEventEvidence,
+		CreatedAt:              po.CreatedAt,
+		UpdatedAt:              po.UpdatedAt,
 	})
 }
 
@@ -53,17 +57,18 @@ func (m *LifecycleMapper) RunToPO(domain *interpretationrun.InterpretationRun) *
 		return nil
 	}
 	po := &InterpretationRunPO{
-		BaseDocument:    base.BaseDocument{DomainID: domain.ID()},
-		GenerationID:    domain.GenerationID().Uint64(),
-		Attempt:         domain.Attempt(),
-		Status:          string(domain.Status()),
-		TraceID:         domain.TraceID(),
-		StartedAt:       domain.StartedAt(),
-		LeaseExpiresAt:  domain.LeaseExpiresAt(),
-		FinishedAt:      domain.FinishedAt(),
-		AttemptOrigin:   string(domain.Origin()),
-		RecoveryCount:   domain.RecoveryCount(),
-		LastReclaimedAt: domain.LastReclaimedAt(),
+		BaseDocument:       base.BaseDocument{DomainID: domain.ID()},
+		GenerationID:       domain.GenerationID().Uint64(),
+		Attempt:            domain.Attempt(),
+		Status:             string(domain.Status()),
+		TraceID:            domain.TraceID(),
+		StartedAt:          domain.StartedAt(),
+		LeaseExpiresAt:     domain.LeaseExpiresAt(),
+		FinishedAt:         domain.FinishedAt(),
+		AttemptOrigin:      string(domain.Origin()),
+		RecoveryCount:      domain.RecoveryCount(),
+		LastReclaimedAt:    domain.LastReclaimedAt(),
+		RetryEventEvidence: domain.RetryEventEvidence(),
 	}
 	if history := domain.ClaimHistory(); len(history) > 0 {
 		po.ClaimHistory = make([]ClaimHistoryPO, len(history))
@@ -94,18 +99,19 @@ func (m *LifecycleMapper) RunToDomain(po *InterpretationRunPO) (*interpretationr
 		failure = &interpretationrun.Failure{Kind: interpretationrun.FailureKind(po.Failure.Kind), Code: po.Failure.Code, SafeMessage: po.Failure.SafeMessage, Retryable: po.Failure.Retryable}
 	}
 	restore := interpretationrun.RestoreInput{
-		ID:              po.DomainID,
-		GenerationID:    meta.FromUint64(po.GenerationID),
-		Attempt:         po.Attempt,
-		Status:          interpretationrun.Status(po.Status),
-		Failure:         failure,
-		TraceID:         po.TraceID,
-		StartedAt:       po.StartedAt,
-		LeaseExpiresAt:  po.LeaseExpiresAt,
-		FinishedAt:      po.FinishedAt,
-		Origin:          retrygovernance.AttemptOrigin(po.AttemptOrigin),
-		RecoveryCount:   po.RecoveryCount,
-		LastReclaimedAt: po.LastReclaimedAt,
+		ID:                 po.DomainID,
+		GenerationID:       meta.FromUint64(po.GenerationID),
+		Attempt:            po.Attempt,
+		Status:             interpretationrun.Status(po.Status),
+		Failure:            failure,
+		TraceID:            po.TraceID,
+		StartedAt:          po.StartedAt,
+		LeaseExpiresAt:     po.LeaseExpiresAt,
+		FinishedAt:         po.FinishedAt,
+		Origin:             retrygovernance.AttemptOrigin(po.AttemptOrigin),
+		RecoveryCount:      po.RecoveryCount,
+		LastReclaimedAt:    po.LastReclaimedAt,
+		RetryEventEvidence: po.RetryEventEvidence,
 	}
 	if len(po.ClaimHistory) > 0 {
 		restore.ClaimHistory = make([]interpretationrun.ClaimRecord, len(po.ClaimHistory))

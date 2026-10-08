@@ -116,11 +116,26 @@ func (r *EvaluationConsistencyAuditRunner) executeCycle(ctx context.Context) (cy
 		evaluationConsistencyAuditCycleDuration.Observe(r.now().Sub(startedAt).Seconds())
 	}()
 
+	cycleService, ok := r.service.(evaluationscheduler.CycleService)
+	if !ok {
+		return fmt.Errorf("evaluation audit requires bounded bidirectional service")
+	}
+	boundCtx, cancelBounds := context.WithTimeout(ctx, r.opts.BatchTimeout)
+	businessUpper, err := cycleService.BusinessUpperBound(boundCtx)
+	if err != nil {
+		cancelBounds()
+		return err
+	}
+	outboxUpper, err := cycleService.OutboxUpperBound(boundCtx)
+	cancelBounds()
+	if err != nil {
+		return err
+	}
 	var cursor uint64
 	totalScanned := 0
 	for {
 		batchCtx, cancel := context.WithTimeout(ctx, r.opts.BatchTimeout)
-		result, err := r.service.AuditBatch(batchCtx, cursor, r.opts.BatchSize)
+		result, err := cycleService.AuditBatchTo(batchCtx, cursor, businessUpper, r.opts.BatchSize)
 		cancel()
 		if err != nil {
 			evaluationConsistencyAuditBatchesTotal.WithLabelValues("error").Inc()
@@ -137,10 +152,8 @@ func (r *EvaluationConsistencyAuditRunner) executeCycle(ctx context.Context) (cy
 			if result.NextCursor > completedWatermark {
 				completedWatermark = result.NextCursor
 			}
-			evaluationConsistencyAuditLastCycleScanned.Set(float64(totalScanned))
-			evaluationConsistencyAuditLastSuccess.Set(float64(r.now().Unix()))
-			log.Infof("evaluation consistency audit cycle completed (scanned=%d, watermark_assessment_id=%d)", totalScanned, completedWatermark)
-			return nil
+			log.Infof("evaluation forward audit scan completed (scanned=%d, watermark_assessment_id=%d, upper=%d)", totalScanned, completedWatermark, businessUpper)
+			break
 		}
 		if result.Scanned <= 0 || result.NextCursor <= cursor {
 			return fmt.Errorf("evaluation consistency audit made no watermark progress (cursor=%d, next=%d, scanned=%d)", cursor, result.NextCursor, result.Scanned)
@@ -150,6 +163,32 @@ func (r *EvaluationConsistencyAuditRunner) executeCycle(ctx context.Context) (cy
 			return ctx.Err()
 		}
 	}
+	cursor = 0
+	for {
+		batchCtx, cancel := context.WithTimeout(ctx, r.opts.BatchTimeout)
+		result, err := cycleService.AuditOutboxBatch(batchCtx, cursor, outboxUpper, r.opts.BatchSize)
+		cancel()
+		if err != nil {
+			evaluationConsistencyAuditBatchesTotal.WithLabelValues("error").Inc()
+			return err
+		}
+		evaluationConsistencyAuditBatchesTotal.WithLabelValues("success").Inc()
+		totalScanned += result.Scanned
+		if result.CycleComplete {
+			break
+		}
+		if result.Scanned <= 0 || result.NextCursor <= cursor {
+			return fmt.Errorf("evaluation reverse audit made no watermark progress (cursor=%d next=%d)", cursor, result.NextCursor)
+		}
+		cursor = result.NextCursor
+		if !waitForScheduler(ctx, r.opts.BatchInterval) {
+			return ctx.Err()
+		}
+	}
+	evaluationConsistencyAuditLastCycleScanned.Set(float64(totalScanned))
+	evaluationConsistencyAuditLastSuccess.Set(float64(r.now().Unix()))
+	log.Infof("evaluation bidirectional audit completed (scanned=%d business_upper=%d outbox_upper=%d)", totalScanned, businessUpper, outboxUpper)
+	return nil
 }
 
 func waitForScheduler(ctx context.Context, duration time.Duration) bool {

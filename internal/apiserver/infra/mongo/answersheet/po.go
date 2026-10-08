@@ -4,6 +4,7 @@ import (
 	"time"
 
 	base "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo"
+	"github.com/FangcunMount/qs-server/internal/pkg/eventing/evidence"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -35,9 +36,11 @@ type AnswerSheetPO struct {
 // AnswerSheet + Outbox contract. Historical documents without this marker are
 // intentionally outside the bidirectional consistency invariant.
 type DurableAcceptancePO struct {
-	SchemaVersion uint32    `bson:"schema_version" json:"schema_version"`
-	EventID       string    `bson:"event_id" json:"event_id"`
-	AcceptedAt    time.Time `bson:"accepted_at" json:"accepted_at"`
+	SchemaVersion uint32                    `bson:"schema_version" json:"schema_version"`
+	EventID       string                    `bson:"event_id" json:"event_id"`
+	AcceptedAt    time.Time                 `bson:"accepted_at" json:"accepted_at"`
+	EventEvidence *evidence.EventEvidenceV1 `bson:"event_evidence,omitempty" json:"event_evidence,omitempty"`
+	RequestID     string                    `bson:"request_id,omitempty" json:"request_id,omitempty"`
 }
 
 // SubmitMetaPO is a technical acceptance fact embedded in the AnswerSheet

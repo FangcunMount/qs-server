@@ -19,6 +19,7 @@ func TestCheckpointPORoundTrip(t *testing.T) {
 	checkpoint := appaudit.Checkpoint{
 		SchemaVersion: appaudit.CheckpointSchemaVersion, Revision: 7, CycleID: "cycle-1",
 		Phase: appaudit.PhaseGeneratedTerminal, Cursor: 22, UpperBound: 90,
+		OutboxCursor: []byte("original BSON cursor"), OutboxUpperBound: []byte("original BSON upper"),
 		Working: appaudit.Statistics{
 			Scanned:  33,
 			Findings: map[string]int64{appaudit.DriftGeneratedMissingArtifact: 2},
@@ -40,6 +41,14 @@ func TestCheckpointPORoundTrip(t *testing.T) {
 	}
 	if roundTrip.Revision != 7 || roundTrip.Cursor != 22 || roundTrip.UpperBound != 90 || roundTrip.Working.Findings[appaudit.DriftGeneratedMissingArtifact] != 2 {
 		t.Fatalf("round trip = %#v", roundTrip)
+	}
+	if string(roundTrip.OutboxCursor) != string(checkpoint.OutboxCursor) || string(roundTrip.OutboxUpperBound) != string(checkpoint.OutboxUpperBound) {
+		t.Fatal("BSON token round trip changed bytes")
+	}
+	checkpoint.OutboxCursor[0] = 'X'
+	po.OutboxUpperBound[0] = 'X'
+	if string(roundTrip.OutboxCursor) != "original BSON cursor" || string(roundTrip.OutboxUpperBound) != "original BSON upper" {
+		t.Fatal("token aliases escaped checkpoint mapper")
 	}
 	if roundTrip.LastCompleted == nil || roundTrip.LastCompleted.CycleID != "cycle-0" || !roundTrip.NextCycleAt.Equal(checkpoint.NextCycleAt) {
 		t.Fatalf("completed cycle = %#v", roundTrip.LastCompleted)

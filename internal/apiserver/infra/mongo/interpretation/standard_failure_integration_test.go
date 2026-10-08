@@ -26,6 +26,7 @@ import (
 	evaluationfact "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationfact"
 	"github.com/FangcunMount/qs-server/internal/pkg/event"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
+	eventevidence "github.com/FangcunMount/qs-server/internal/pkg/eventing/evidence"
 	eventruntime "github.com/FangcunMount/qs-server/internal/pkg/eventing/runtime"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 	"github.com/FangcunMount/qs-server/internal/pkg/mongodbtest"
@@ -577,4 +578,8 @@ func (s failAfterScheduledStage) StageAt(ctx context.Context, dueAt time.Time, e
 		return err
 	}
 	return s.failure
+}
+
+func (s failAfterScheduledStage) PrepareReference(evt event.DomainEvent) (eventevidence.StandardReference, error) {
+	return s.inner.PrepareReference(evt)
 }

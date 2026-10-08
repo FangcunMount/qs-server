@@ -20,6 +20,8 @@ type checkpointPO struct {
 	Phase             string     `gorm:"column:phase;size:64;not null"`
 	Cursor            uint64     `gorm:"column:cursor;not null"`
 	CycleUpperBound   uint64     `gorm:"column:cycle_upper_bound;not null"`
+	OutboxCursor      []byte     `gorm:"column:outbox_cursor;type:varbinary(1024)"`
+	OutboxUpperBound  []byte     `gorm:"column:outbox_upper_bound;type:varbinary(1024)"`
 	StatisticsJSON    string     `gorm:"column:statistics_json;type:json;not null"`
 	LastCompletedJSON *string    `gorm:"column:last_completed_json;type:json"`
 	NextCycleAt       *time.Time `gorm:"column:next_cycle_at"`
@@ -47,7 +49,7 @@ func (r *CheckpointRepository) Load(ctx context.Context) (appaudit.Checkpoint, e
 	if err != nil {
 		return appaudit.Checkpoint{}, err
 	}
-	if po.SchemaVersion != appaudit.CheckpointSchemaVersion {
+	if po.SchemaVersion != 1 && po.SchemaVersion != appaudit.CheckpointSchemaVersion {
 		return appaudit.Checkpoint{}, fmt.Errorf("unsupported mongo consistency checkpoint schema %d", po.SchemaVersion)
 	}
 	return fromPO(po)
@@ -78,6 +80,7 @@ func (r *CheckpointRepository) Save(ctx context.Context, expectedRevision int64,
 		Updates(map[string]any{
 			"schema_version": po.SchemaVersion, "revision": po.Revision, "cycle_id": po.CycleID,
 			"phase": po.Phase, "cursor": po.Cursor, "cycle_upper_bound": po.CycleUpperBound,
+			"outbox_cursor": po.OutboxCursor, "outbox_upper_bound": po.OutboxUpperBound,
 			"statistics_json": po.StatisticsJSON, "last_completed_json": po.LastCompletedJSON,
 			"next_cycle_at": po.NextCycleAt, "updated_at": po.UpdatedAt,
 		})
@@ -109,6 +112,7 @@ func toPO(checkpoint appaudit.Checkpoint) (checkpointPO, error) {
 		CheckpointKey: appaudit.CheckpointKey, SchemaVersion: checkpoint.SchemaVersion,
 		Revision: checkpoint.Revision, CycleID: checkpoint.CycleID, Phase: string(checkpoint.Phase),
 		Cursor: checkpoint.Cursor, CycleUpperBound: checkpoint.UpperBound, StatisticsJSON: string(stats),
+		OutboxCursor: append([]byte(nil), checkpoint.OutboxCursor...), OutboxUpperBound: append([]byte(nil), checkpoint.OutboxUpperBound...),
 		LastCompletedJSON: completed, NextCycleAt: optionalTime(checkpoint.NextCycleAt),
 		CreatedAt: updatedAt, UpdatedAt: updatedAt,
 	}, nil
@@ -118,7 +122,8 @@ func fromPO(po checkpointPO) (appaudit.Checkpoint, error) {
 	checkpoint := appaudit.Checkpoint{
 		SchemaVersion: po.SchemaVersion, Revision: po.Revision, CycleID: po.CycleID,
 		Phase: appaudit.Phase(po.Phase), Cursor: po.Cursor, UpperBound: po.CycleUpperBound,
-		UpdatedAt: po.UpdatedAt,
+		UpdatedAt:    po.UpdatedAt,
+		OutboxCursor: append([]byte(nil), po.OutboxCursor...), OutboxUpperBound: append([]byte(nil), po.OutboxUpperBound...),
 	}
 	if err := json.Unmarshal([]byte(po.StatisticsJSON), &checkpoint.Working); err != nil {
 		return appaudit.Checkpoint{}, fmt.Errorf("decode mongo consistency statistics: %w", err)

@@ -144,7 +144,7 @@ func (s *MessagingCommandStore) ReadRequestOperation(ctx context.Context, scope 
 	}
 	defer func() { _ = tx.Rollback() }()
 	var found string
-	err = tx.QueryRowContext(ctx, `SELECT message_id FROM ai_messaging_outbox WHERE producer='qs-server' AND destination='qs-ai' AND message_id=? AND aggregate_key=? AND kind IN (?,?)`, id, requestID, pb.MessagingKind_START, pb.MessagingKind_CHANGE).Scan(&found)
+	err = tx.QueryRowContext(ctx, `SELECT b.message_id FROM ai_messaging_outbox b JOIN ai_messaging_operations o ON o.command_id=b.message_id AND o.retired=FALSE WHERE b.producer='qs-server' AND b.destination='qs-ai' AND b.message_id=? AND b.aggregate_key=? AND b.kind IN (?,?)`, id, requestID, pb.MessagingKind_START, pb.MessagingKind_CHANGE).Scan(&found)
 	if errors.Is(err, sql.ErrNoRows) {
 		return app.MessagingOperation{}, app.ErrNotFound
 	}

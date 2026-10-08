@@ -1,0 +1,8 @@
+[
+  {"createIndexes":"report_generations","indexes":[
+    {"key":{"generated_event_id":1},"name":"uk_generation_generated_event_id","unique":true,"partialFilterExpression":{"generated_event_id":{"$type":"string","$gt":""}}}
+  ]},
+  {"createIndexes":"interpretation_runs","indexes":[
+    {"key":{"retry_event_id":1},"name":"uk_interpretation_run_retry_event_id","unique":true,"partialFilterExpression":{"retry_event_id":{"$type":"string","$gt":""}}}
+  ]}
+]

@@ -8,8 +8,11 @@ import (
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor"
 	domainAnswerSheet "github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/answersheet"
+	standard "github.com/FangcunMount/qs-server/internal/apiserver/eventing/standardoutbox"
 	submitport "github.com/FangcunMount/qs-server/internal/apiserver/port/answersheetsubmit"
 	"github.com/FangcunMount/qs-server/internal/pkg/event"
+	"github.com/FangcunMount/qs-server/internal/pkg/eventing/evidence"
+	eventpayload "github.com/FangcunMount/qs-server/internal/pkg/eventing/payload"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 	"github.com/prometheus/client_golang/prometheus/testutil"
 )
@@ -58,6 +61,7 @@ type durableStoreWriterStub struct {
 	findMeta     DurableSubmitMeta
 	waitMeta     DurableSubmitMeta
 	waitCtxErr   error
+	proofs       []*evidence.EventEvidenceV1
 }
 
 func (w *durableStoreWriterStub) FindCompletedSubmission(_ context.Context, meta DurableSubmitMeta) (*CompletedSubmission, error) {
@@ -66,10 +70,14 @@ func (w *durableStoreWriterStub) FindCompletedSubmission(_ context.Context, meta
 	return w.completed, w.findErr
 }
 
-func (w *durableStoreWriterStub) SaveSubmittedAnswerSheet(ctx context.Context, _ *domainAnswerSheet.AnswerSheet, _ DurableSubmitMeta) ([]event.DomainEvent, error) {
+func (w *durableStoreWriterStub) SaveSubmittedAnswerSheet(ctx context.Context, sheet *domainAnswerSheet.AnswerSheet, _ DurableSubmitMeta, proof *evidence.EventEvidenceV1) ([]event.DomainEvent, error) {
 	w.saveCalled = true
 	w.saveCalls++
 	w.saveSawTxCtx = ctx.Value(durableStoreTxMarkerKey{}) == "tx"
+	w.proofs = append(w.proofs, proof.Clone())
+	if w.saveEvents == nil {
+		return sheet.Events(), w.saveErr
+	}
 	return w.saveEvents, w.saveErr
 }
 
@@ -222,6 +230,15 @@ type durableStoreStagerStub struct {
 	events     []event.DomainEvent
 }
 
+type evidenceTopicResolver struct{}
+
+func (evidenceTopicResolver) GetTopicForEvent(kind string) (string, bool) {
+	return "test." + kind, true
+}
+func (s *durableStoreStagerStub) PrepareReference(evt event.DomainEvent) (evidence.StandardReference, error) {
+	return standard.PrepareReference(evt, evidenceTopicResolver{}, "api-server")
+}
+
 type durableStorePostCommitStub struct {
 	calls      int
 	eventTypes []string
@@ -308,7 +325,7 @@ func TestTransactionalSubmissionDurableStoreStagesInTransactionContext(t *testin
 	sheet := newDurableStoreTestSheet(t)
 	runner := &durableStoreRunnerStub{}
 	writer := &durableStoreWriterStub{
-		saveEvents: []event.DomainEvent{event.New("survey.answersheet.submitted", "AnswerSheet", "1", map[string]string{"id": "1"})},
+		saveEvents: sheet.Events(),
 	}
 	stager := &durableStoreStagerStub{}
 	postCommit := &durableStorePostCommitStub{}
@@ -349,6 +366,9 @@ func TestTransactionalSubmissionDurableStoreIsStableWhenCallbackRunsTwice(t *tes
 	if stager.events[0].EventID() == "" || stager.events[0].EventID() != stager.events[1].EventID() || !stager.events[0].OccurredAt().Equal(stager.events[1].OccurredAt()) {
 		t.Fatalf("callback events are not retry-stable: %s/%s", stager.events[0].EventID(), stager.events[1].EventID())
 	}
+	if len(writer.proofs) != 2 || *writer.proofs[0].Reference != *writer.proofs[1].Reference || !writer.proofs[0].Verification.VerifiedAt.Equal(writer.proofs[1].Verification.VerifiedAt) || writer.proofs[0].BusinessBindingSHA256 != writer.proofs[1].BusinessBindingSHA256 {
+		t.Fatal("transaction callback recreated original event evidence")
+	}
 	if postCommit.calls != 1 || len(postCommit.eventTypes) != 1 {
 		t.Fatalf("post-commit effects = calls:%d events:%d, want 1/1", postCommit.calls, len(postCommit.eventTypes))
 	}
@@ -357,12 +377,44 @@ func TestTransactionalSubmissionDurableStoreIsStableWhenCallbackRunsTwice(t *tes
 	}
 }
 
+type incapableStager struct{}
+
+func (incapableStager) Stage(context.Context, ...event.DomainEvent) error { return nil }
+func TestTransactionalSubmissionRejectsMissingPreparationBeforeTransaction(t *testing.T) {
+	runner := &durableStoreRunnerStub{}
+	writer := &durableStoreWriterStub{}
+	store := NewTransactionalSubmissionDurableStore(runner, writer, incapableStager{}, nil)
+	if _, _, err := store.CreateDurably(t.Context(), newDurableStoreTestSheet(t), DurableSubmitMeta{}); err == nil || runner.called || writer.saveCalled {
+		t.Fatal("missing reference capability entered transaction")
+	}
+}
+
+func TestTransactionalSubmissionRejectsWriterEventReplacement(t *testing.T) {
+	sheet := newDurableStoreTestSheet(t)
+	replacement := newDurableStoreTestSheet(t)
+	store := NewTransactionalSubmissionDurableStore(&durableStoreRunnerStub{}, &durableStoreWriterStub{saveEvents: replacement.Events()}, &durableStoreStagerStub{}, nil)
+	if _, _, err := store.CreateDurably(t.Context(), sheet, DurableSubmitMeta{}); err == nil || len(sheet.Events()) == 0 {
+		t.Fatal("writer replaced original event or cleared failed submission")
+	}
+}
+
+func TestFrozenSubmissionEventDoesNotAliasAdmissionOrAttribution(t *testing.T) {
+	source := domainAnswerSheet.AnswerSheetSubmittedEvent{Data: domainAnswerSheet.AnswerSheetSubmittedData{Admission: &eventpayload.AssessmentAdmission{ModelCode: "original"}, Attribution: &eventpayload.AttributionSnapshot{OriginID: "original"}}}
+	values := withSubmissionRequestID([]event.DomainEvent{&source}, "trace")
+	frozen := values[0].(domainAnswerSheet.AnswerSheetSubmittedEvent)
+	source.Data.Admission.ModelCode = "mutated"
+	source.Data.Attribution.OriginID = "mutated"
+	if frozen.Data.Admission.ModelCode != "original" || frozen.Data.Attribution.OriginID != "original" || frozen.Data.RequestID != "trace" {
+		t.Fatal("final enriched payload was mutable")
+	}
+}
+
 func TestTransactionalSubmissionDurableStoreStageFailureDoesNotClearEvents(t *testing.T) {
 	sheet := newDurableStoreTestSheet(t)
 	stageErr := errors.New("stage failed")
 	runner := &durableStoreRunnerStub{}
 	writer := &durableStoreWriterStub{
-		saveEvents: []event.DomainEvent{event.New("survey.answersheet.submitted", "AnswerSheet", "1", map[string]string{})},
+		saveEvents: sheet.Events(),
 	}
 	stager := &durableStoreStagerStub{err: stageErr}
 	postCommit := &durableStorePostCommitStub{}
@@ -388,7 +440,7 @@ func TestTransactionalSubmissionDurableStoreCommitFailureDoesNotAcknowledgeOrCle
 	commitErr := errors.New("commit failed")
 	runner := &durableStoreRunnerStub{err: commitErr}
 	writer := &durableStoreWriterStub{
-		saveEvents: []event.DomainEvent{event.New("survey.answersheet.submitted", "AnswerSheet", "1", map[string]string{})},
+		saveEvents: sheet.Events(),
 	}
 	stager := &durableStoreStagerStub{}
 	postCommit := &durableStorePostCommitStub{}
@@ -416,7 +468,7 @@ func TestTransactionalSubmissionDurableStoreFailureCanReturnCompletedIdempotentR
 	runner := &durableStoreRunnerStub{}
 	writer := &durableStoreWriterStub{
 		waitExisting: existing,
-		saveEvents:   []event.DomainEvent{event.New("survey.answersheet.submitted", "AnswerSheet", "1", map[string]string{})},
+		saveEvents:   sheet.Events(),
 	}
 	stager := &durableStoreStagerStub{err: stageErr}
 	store := NewTransactionalSubmissionDurableStore(runner, writer, stager, nil)

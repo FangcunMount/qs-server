@@ -11,8 +11,10 @@ import (
 	domaingeneration "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/generation"
 	domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/report"
 	interpretationrun "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/run"
+	"github.com/FangcunMount/qs-server/internal/apiserver/eventing/eventevidencebinding"
 	outboxport "github.com/FangcunMount/qs-server/internal/apiserver/port/outbox"
 	"github.com/FangcunMount/qs-server/internal/pkg/event"
+	"github.com/FangcunMount/qs-server/internal/pkg/eventing/evidence"
 	eventoutcome "github.com/FangcunMount/qs-server/internal/pkg/eventing/outcome"
 	"github.com/FangcunMount/qs-server/internal/pkg/retrygovernance"
 )
@@ -65,6 +67,8 @@ type interpretationCommitter struct {
 	runs        interpretationrun.Repository
 	reports     domainreport.ReportRepository
 	stager      EventStager
+	preparer    outboxport.ReferencePreparer
+	scheduled   outboxport.ScheduledStager
 	postCommit  appEventing.PostCommitDispatcher
 	catalog     ReportCatalogProjector
 }
@@ -81,8 +85,16 @@ func NewInterpretationCommitter(
 	if txRunner == nil || generations == nil || runs == nil || reports == nil || stager == nil || catalog == nil {
 		return nil, fmt.Errorf("interpretation committer dependencies are required")
 	}
+	preparer, ok := stager.(outboxport.ReferencePreparer)
+	if !ok {
+		return nil, fmt.Errorf("interpretation committer requires original event reference preparation")
+	}
+	scheduled, ok := stager.(outboxport.ScheduledStager)
+	if !ok {
+		return nil, fmt.Errorf("interpretation committer requires scheduled staging")
+	}
 	return &interpretationCommitter{
-		txRunner: txRunner, generations: generations, runs: runs, reports: reports, stager: stager, postCommit: postCommit, catalog: catalog,
+		txRunner: txRunner, generations: generations, runs: runs, reports: reports, stager: stager, preparer: preparer, scheduled: scheduled, postCommit: postCommit, catalog: catalog,
 	}, nil
 }
 
@@ -109,10 +121,23 @@ func (c *interpretationCommitter) CommitSuccess(ctx context.Context, request Com
 	if err := runToCommit.Succeed(completedAt); err != nil {
 		return nil, err
 	}
-	if err := generationToCommit.Succeed(runToCommit.ID(), request.InterpretReport.ID(), completedAt); err != nil {
+	events := generatedEvents(request.InterpretReport, runToCommit.Attempt())
+	generated := events[0].(domaininterpretation.ReportGeneratedOutcomeEvent)
+	binding, err := eventevidencebinding.Generated(generated.Data)
+	if err != nil {
 		return nil, err
 	}
-	events := generatedEvents(request.InterpretReport, runToCommit.Attempt())
+	ref, err := c.preparer.PrepareReference(generated)
+	if err != nil {
+		return nil, err
+	}
+	proof, err := evidence.NewStandard(ref, binding)
+	if err != nil {
+		return nil, err
+	}
+	if err := generationToCommit.SucceedWithEvidence(runToCommit.ID(), request.InterpretReport.ID(), completedAt, proof); err != nil {
+		return nil, err
+	}
 	if err := c.txRunner.WithinTransaction(ctx, func(txCtx context.Context) error {
 		if err := c.reports.Insert(txCtx, request.InterpretReport); err != nil {
 			return err
@@ -176,7 +201,19 @@ func (c *interpretationCommitter) CommitFailure(ctx context.Context, request Com
 			AssessmentID: request.Association.AssessmentID.String(), OutcomeID: request.OutcomeID.String(), TesteeID: request.Association.TesteeID,
 			ExpectedAttempt: runToCommit.Attempt(), AttemptOrigin: string(retrygovernance.AttemptOriginAutomatic), Mode: "next_attempt", RequestedAt: retryAt,
 		})
-		if err := runToCommit.AttachRetryEvent(retry.EventID()); err != nil {
+		binding, err := eventevidencebinding.Retry(retry.Data)
+		if err != nil {
+			return nil, err
+		}
+		ref, err := c.preparer.PrepareReference(retry)
+		if err != nil {
+			return nil, err
+		}
+		proof, err := evidence.NewStandard(ref, binding)
+		if err != nil {
+			return nil, err
+		}
+		if err := runToCommit.AttachRetryEventEvidence(proof); err != nil {
 			return nil, err
 		}
 		retryEvent = retry
@@ -192,11 +229,7 @@ func (c *interpretationCommitter) CommitFailure(ctx context.Context, request Com
 			return err
 		}
 		if retryEvent != nil {
-			scheduled, ok := c.stager.(outboxport.ScheduledStager)
-			if !ok {
-				return fmt.Errorf("interpretation retry requires scheduled outbox staging")
-			}
-			return scheduled.StageAt(txCtx, retryAt, retryEvent)
+			return c.scheduled.StageAt(txCtx, retryAt, retryEvent)
 		}
 		return nil
 	}); err != nil {
@@ -210,7 +243,7 @@ func (c *interpretationCommitter) CommitFailure(ctx context.Context, request Com
 }
 
 func (c *interpretationCommitter) validateSuccess(request CommitSuccessRequest) error {
-	if c == nil || c.txRunner == nil || c.generations == nil || c.runs == nil || c.reports == nil || c.stager == nil || c.catalog == nil {
+	if c == nil || c.txRunner == nil || c.generations == nil || c.runs == nil || c.reports == nil || c.stager == nil || c.catalog == nil || c.preparer == nil || c.scheduled == nil {
 		return fmt.Errorf("interpretation committer is not configured")
 	}
 	if request.Generation == nil || request.Run == nil || request.InterpretReport == nil {
@@ -239,7 +272,7 @@ func (c *interpretationCommitter) validateSuccess(request CommitSuccessRequest) 
 }
 
 func (c *interpretationCommitter) validateFailure(request CommitFailureRequest) error {
-	if c == nil || c.txRunner == nil || c.generations == nil || c.runs == nil || c.reports == nil || c.stager == nil {
+	if c == nil || c.txRunner == nil || c.generations == nil || c.runs == nil || c.reports == nil || c.stager == nil || c.preparer == nil || c.scheduled == nil {
 		return fmt.Errorf("interpretation committer is not configured")
 	}
 	if request.Generation == nil || request.Run == nil || request.OutcomeID.IsZero() {
@@ -273,6 +306,7 @@ func cloneGeneration(source *domaingeneration.ReportGeneration) (*domaingenerati
 	return domaingeneration.Restore(domaingeneration.RestoreInput{
 		ID: source.ID(), Key: source.Key(), Status: source.Status(), LatestRunID: source.LatestRunID(), ReportID: source.ReportID(),
 		Version: source.Version(), CreatedAt: source.CreatedAt(), UpdatedAt: source.UpdatedAt(),
+		GeneratedEventID: source.GeneratedEventID(), GeneratedEventEvidence: source.GeneratedEventEvidence(),
 	})
 }
 
@@ -284,6 +318,7 @@ func cloneRun(source *interpretationrun.InterpretationRun) (*interpretationrun.I
 		ID: source.ID(), GenerationID: source.GenerationID(), Attempt: source.Attempt(), Status: source.Status(), Failure: source.Failure(), TraceID: source.TraceID(),
 		StartedAt: source.StartedAt(), LeaseExpiresAt: source.LeaseExpiresAt(), FinishedAt: source.FinishedAt(),
 		Origin: source.Origin(), RetryDecision: source.RetryDecision(),
+		RetryEventEvidence: source.RetryEventEvidence(),
 	})
 }
 

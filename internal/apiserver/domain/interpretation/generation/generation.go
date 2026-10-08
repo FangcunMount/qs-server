@@ -5,6 +5,8 @@ import (
 	"time"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/policy"
+	eventcatalog "github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
+	"github.com/FangcunMount/qs-server/internal/pkg/eventing/evidence"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
@@ -52,14 +54,16 @@ func (s Status) IsValid() bool {
 // ReportGeneration is the aggregate root for a requested report. It tracks
 // only intent, current attempt and successful report reference.
 type ReportGeneration struct {
-	id          ID
-	key         Key
-	status      Status
-	latestRunID meta.ID
-	reportID    meta.ID
-	version     uint64
-	createdAt   time.Time
-	updatedAt   time.Time
+	id                     ID
+	key                    Key
+	status                 Status
+	latestRunID            meta.ID
+	reportID               meta.ID
+	generatedEventID       string
+	generatedEventEvidence *evidence.EventEvidenceV1
+	version                uint64
+	createdAt              time.Time
+	updatedAt              time.Time
 }
 
 func New(id ID, key Key, at time.Time) (*ReportGeneration, error) {
@@ -97,6 +101,19 @@ func Restore(input RestoreInput) (*ReportGeneration, error) {
 	if input.UpdatedAt.Before(input.CreatedAt) {
 		return nil, fmt.Errorf("report generation updated at precedes created at")
 	}
+	if input.GeneratedEventEvidence != nil {
+		if err := input.GeneratedEventEvidence.Validate(); err != nil {
+			return nil, err
+		}
+		if input.Status != StatusGenerated || input.GeneratedEventEvidence.EventID != input.GeneratedEventID {
+			return nil, fmt.Errorf("generated event evidence identity mismatch")
+		}
+		if input.GeneratedEventEvidence.Reference != nil && input.GeneratedEventEvidence.Reference.EventType != eventcatalog.InterpretationReportGenerated {
+			return nil, fmt.Errorf("generated event evidence type mismatch")
+		}
+	} else if input.GeneratedEventID != "" {
+		return nil, fmt.Errorf("generated event evidence is required for its reference")
+	}
 	switch input.Status {
 	case StatusPending:
 		if !input.LatestRunID.IsZero() || !input.ReportID.IsZero() {
@@ -112,26 +129,30 @@ func Restore(input RestoreInput) (*ReportGeneration, error) {
 		}
 	}
 	return &ReportGeneration{
-		id:          input.ID,
-		key:         input.Key,
-		status:      input.Status,
-		latestRunID: input.LatestRunID,
-		reportID:    input.ReportID,
-		version:     input.Version,
-		createdAt:   input.CreatedAt,
-		updatedAt:   input.UpdatedAt,
+		id:                     input.ID,
+		key:                    input.Key,
+		status:                 input.Status,
+		latestRunID:            input.LatestRunID,
+		reportID:               input.ReportID,
+		generatedEventID:       input.GeneratedEventID,
+		generatedEventEvidence: cloneEvidence(input.GeneratedEventEvidence),
+		version:                input.Version,
+		createdAt:              input.CreatedAt,
+		updatedAt:              input.UpdatedAt,
 	}, nil
 }
 
 type RestoreInput struct {
-	ID          ID
-	Key         Key
-	Status      Status
-	LatestRunID meta.ID
-	ReportID    meta.ID
-	Version     uint64
-	CreatedAt   time.Time
-	UpdatedAt   time.Time
+	ID                     ID
+	Key                    Key
+	Status                 Status
+	LatestRunID            meta.ID
+	ReportID               meta.ID
+	GeneratedEventID       string
+	GeneratedEventEvidence *evidence.EventEvidenceV1
+	Version                uint64
+	CreatedAt              time.Time
+	UpdatedAt              time.Time
 }
 
 // Begin associates a newly created InterpretationRun with this Generation.
@@ -174,6 +195,34 @@ func (g *ReportGeneration) Succeed(runID, reportID meta.ID, at time.Time) error 
 	g.updatedAt = at
 	g.version++
 	return nil
+}
+
+// SucceedWithEvidence binds the one original staged event without adding a
+// second lifecycle version or changing immutable report content.
+func (g *ReportGeneration) SucceedWithEvidence(runID, reportID meta.ID, at time.Time, proof *evidence.EventEvidenceV1) error {
+	if proof == nil || proof.Origin != "native_atomic" || proof.Class != evidence.StandardReferenceClass || proof.Reference == nil || proof.Reference.EventType != eventcatalog.InterpretationReportGenerated {
+		return fmt.Errorf("native generated event evidence is required")
+	}
+	if err := proof.Validate(); err != nil {
+		return err
+	}
+	if err := g.Succeed(runID, reportID, at); err != nil {
+		return err
+	}
+	g.generatedEventID, g.generatedEventEvidence = proof.EventID, proof.Clone()
+	return nil
+}
+
+func cloneEvidence(value *evidence.EventEvidenceV1) *evidence.EventEvidenceV1 {
+	if value == nil {
+		return nil
+	}
+	return value.Clone()
+}
+
+func (g *ReportGeneration) GeneratedEventID() string { return g.generatedEventID }
+func (g *ReportGeneration) GeneratedEventEvidence() *evidence.EventEvidenceV1 {
+	return cloneEvidence(g.generatedEventEvidence)
 }
 
 func (g *ReportGeneration) Fail(runID meta.ID, at time.Time) error {

@@ -9,6 +9,7 @@ import (
 	domainAnswerSheet "github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/answersheet"
 	submitport "github.com/FangcunMount/qs-server/internal/apiserver/port/answersheetsubmit"
 	"github.com/FangcunMount/qs-server/internal/pkg/event"
+	"github.com/FangcunMount/qs-server/internal/pkg/eventing/evidence"
 )
 
 // DurableSubmitMeta 携带application-等级 持久化 write 元数据。
@@ -33,7 +34,7 @@ type SubmissionIdempotencyReader interface {
 
 type SubmissionDurableWriter interface {
 	FindCompletedSubmission(ctx context.Context, meta DurableSubmitMeta) (*CompletedSubmission, error)
-	SaveSubmittedAnswerSheet(ctx context.Context, sheet *domainAnswerSheet.AnswerSheet, meta DurableSubmitMeta) ([]event.DomainEvent, error)
+	SaveSubmittedAnswerSheet(ctx context.Context, sheet *domainAnswerSheet.AnswerSheet, meta DurableSubmitMeta, proof *evidence.EventEvidenceV1) ([]event.DomainEvent, error)
 	WaitForCompletedSubmission(ctx context.Context, meta DurableSubmitMeta) (*domainAnswerSheet.AnswerSheet, error)
 }
 
