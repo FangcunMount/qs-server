@@ -175,6 +175,38 @@ container IDs, process output or credentials. Successful receipt v2 and its
 business-acceptance boundary are unchanged. Local mounted-container and actual
 restart tests do not identify the cause of a past production failure.
 
+## Read-only host inventory Action
+
+`compatibility-host-inventory.yml` permits only an independently approved current-main
+source, operation and descriptor, sharing `production-deploy`. ServerA and Collection
+use `SVRA_HOST`, `SVRA_USERNAME`, `SVRA_SSH_PORT` (default 22),
+`SVRA_SSH_FINGERPRINT` and the existing `SVRA_SSH_KEY` Secret. Worker uses
+`SVRD_HOST`, `SVRD_SSH_PORT` (default 22), `SVRD_SSH_FINGERPRINT`,
+`SVRD_USERNAME || SVRA_USERNAME` and the existing
+`SVR_MINI_SSH_KEY`/`SVRD_SSH_KEY`/`SVRA_SSH_KEY` fallback chain. The existing pin is
+checked against the actual SSH handshake key's binary SHA256; no `accept-new` exists.
+The current Mac Runner returns unsupported without SSH credentials. Existing route
+vars may appear in GitHub step headers; Python stdout and reports expose only closed
+hash/category projections, never private keys or inventory/configuration bodies.
+
+V1 strictly requires independently hashed, preplaced private `matches.json`; absence
+never selects another mode. The explicitly approved v2
+`current_ssh_session_observation` derives its request in the final execute SSH session
+from actual UID/euid, NSS username and the four `SSH_CONNECTION` tokens. The public
+inventory v2 entry rechecks identity and connection before and after reading. Descriptor
+approval, actual-run request and observed Match hashes remain separate. Only an observed
+sshd ancestor, protected configuration and `UseDNS=no` query permit a numeric peer-IP
+Host context. `UseDNS=yes` or unknown skips Host-dependent Match queries without guessing
+or DNS lookup; other OS/process/container/systemd observations continue.
+
+V2 remains partial: ordinary-shell environment origin, the daemon's originally loaded
+configuration, all Match contexts, management authority and all-writer isolation are
+unproved. All eight production capabilities remain false. The 98 local Python tests
+and successful actionlint check do not establish actual SSH connectivity, production
+installation, historical-rerun denial or a writer fence. The separate isolated host
+installer has only 41 local unit-test results: no production installation or system
+sshd reload has been executed or proved.
+
 ## Read-only history Action
 
 `prepare_mode=bootstrap-history` binds an independently reviewed canonical
@@ -520,7 +552,7 @@ left with exact operation/run/source/request labels for read-only reconciliation
 not blindly removed or retried.
 
 `compatibility-retirement-entrypoints.json` is the reviewed **source-only**
-12-workflow inventory for the later fence verifier. Besides CD/db-ops it includes
+13-workflow inventory for the later fence verifier. Besides CD/db-ops it includes
 the writing AuthZ provisioner, approved read-only diagnostics with privileged
 SSH, and isolated registry-backed image tests. M5 preflight/postcheck and Ping
 Runner jobs have no production environment: environment ref policy alone cannot
@@ -530,7 +562,8 @@ Host cron/manual tasks, other repositories and obsolete source reruns remain
 unproven. The pre-A independent metadata snapshot reported 27 remote workflows
 against 18 then-current source workflows, with nine active historical workflows absent
 from that source baseline listed explicitly as unproved. These counts are dated
-observations; adding this workflow or merging A requires a fresh live inventory. Organization Secrets coverage,
+observations; the 13 current source entries do not refresh that 27/18 snapshot. Adding
+a workflow or merging A requires a fresh live inventory. Organization Secrets coverage,
 historical rerun credential denial and production ref protection are not inferred
 from that metadata or the source catalog. The final fence must deny all historical credential paths before the
 maintenance window, not simply cancel current CD/db-ops runs.

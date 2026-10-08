@@ -2,7 +2,7 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "b55153fbc56a7dbc8121fe762de8405bac7eaa8c",
+    "sha": "3ecc5922d30229c18a036936f6b665b62033a0f6",
     "verified_on": "2026-10-09"
   },
   "status_policy": {
@@ -11270,7 +11270,7 @@
       "owner": "tooling",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "b55153fbc56a7dbc8121fe762de8405bac7eaa8c",
+        "source_sha": "3ecc5922d30229c18a036936f6b665b62033a0f6",
         "verified_on": "2026-10-09"
       },
       "fact_sources": [
@@ -11385,6 +11385,34 @@
         {
           "kind": "source",
           "path": "internal/apiserver/maintenance/compatibilityretirementbackup/*.go"
+        },
+        {
+          "kind": "source",
+          "path": ".github/workflows/compatibility-host-inventory.yml"
+        },
+        {
+          "kind": "source",
+          "path": "scripts/database/compatibility-host-inventory-action.py"
+        },
+        {
+          "kind": "source",
+          "path": "scripts/database/test-compatibility-host-inventory-action.py"
+        },
+        {
+          "kind": "source",
+          "path": "scripts/database/compatibility-retirement-host-inventory.py"
+        },
+        {
+          "kind": "source",
+          "path": "scripts/database/test-compatibility-retirement-host-inventory.py"
+        },
+        {
+          "kind": "source",
+          "path": "scripts/database/compatibility-retirement-host-install.py"
+        },
+        {
+          "kind": "source",
+          "path": "scripts/database/test-compatibility-retirement-host-install.py"
         }
       ],
       "verification": [
@@ -11601,6 +11629,34 @@
           "result": "passed",
           "source_sha": "523250d83e520531a211dd19c9849f12fd161b69",
           "verified_on": "2026-10-09"
+        },
+        {
+          "kind": "command",
+          "command": "python3 scripts/database/test-compatibility-host-inventory-action.py -v",
+          "result": "passed",
+          "source_sha": "3ecc5922d30229c18a036936f6b665b62033a0f6",
+          "verified_on": "2026-10-09"
+        },
+        {
+          "kind": "command",
+          "command": "python3 scripts/database/test-compatibility-retirement-host-inventory.py -v",
+          "result": "passed",
+          "source_sha": "3ecc5922d30229c18a036936f6b665b62033a0f6",
+          "verified_on": "2026-10-09"
+        },
+        {
+          "kind": "command",
+          "command": "python3 scripts/database/test-compatibility-retirement-host-install.py -v",
+          "result": "passed",
+          "source_sha": "3ecc5922d30229c18a036936f6b665b62033a0f6",
+          "verified_on": "2026-10-09"
+        },
+        {
+          "kind": "command",
+          "command": "python3 scripts/database/test-compatibility-retirement.py -v",
+          "result": "passed",
+          "source_sha": "3ecc5922d30229c18a036936f6b665b62033a0f6",
+          "verified_on": "2026-10-09"
         }
       ],
       "production_evidence": {
@@ -11617,7 +11673,7 @@
           "id": "COMPAT-RETIREMENT-PRODUCTION",
           "kind": "verification",
           "severity": "high",
-          "summary": "Physical-file metadata and immutable parent registration are implemented and locally tested with separate Action modes. The current production identity/bounds/inventory/metadata/parent/history chain, full-sized resource/lifetime budgets, original AI/MQ closure, evidence CAS, writer fencing, production-sized exact backup/restore, release B, DROP, acceptance and batch-owned purge remain incomplete. The pre-fix combined challenge regression and actual Linux public-root anchor rejection are retained as historical failures. The amended local regression passes, and a source-equivalent local Linux public-root test passes. Its synthetic API origin does not prove live GitHub origin, production installation or complete writer fencing. The committed maintenance-window v2 budget component and one source-equivalent actual Linux root public-entry test pass. That case checks the returned cancel function, not native parent-context cancellation; BudgetOnly does not prove a full 600-second restoration or production/executor/writer/CAS/DROP authority. The exact four-target native recovery primitive passes isolated nonempty partial/all-loss restoration, unknown FK-load rejection, race regression and integration-tag verification. This proves a local recovery component only: privilege-denied tests, complete production writers, independent fixed execution authority, production 600-second combined recovery and Action integration remain unproved.",
+          "summary": "Physical-file metadata and immutable parent registration are implemented and locally tested with separate Action modes. The current production identity/bounds/inventory/metadata/parent/history chain, full-sized resource/lifetime budgets, original AI/MQ closure, evidence CAS, writer fencing, production-sized exact backup/restore, release B, DROP, acceptance and batch-owned purge remain incomplete. The pre-fix combined challenge regression and actual Linux public-root anchor rejection are retained as historical failures. The amended local regression passes, and a source-equivalent local Linux public-root test passes. Its synthetic API origin does not prove live GitHub origin, production installation or complete writer fencing. The committed maintenance-window v2 budget component and one source-equivalent actual Linux root public-entry test pass. That case checks the returned cancel function, not native parent-context cancellation; BudgetOnly does not prove a full 600-second restoration or production/executor/writer/CAS/DROP authority. The exact four-target native recovery primitive passes isolated nonempty partial/all-loss restoration, unknown FK-load rejection, race regression and integration-tag verification. This proves a local recovery component only: privilege-denied tests, complete production writers, independent fixed execution authority, production 600-second combined recovery and Action integration remain unproved. The read-only host inventory Action has strict preplaced-Match v1 and explicitly approved current-SSH-session-observation v2, with 98 local inventory/transport tests and actionlint verification. The separate installer has 41 local unit tests only. Original daemon/config binding, all Match coverage, actual management/install capability and the full writer fence remain unproved; the current Mac Runner is unsupported.",
           "exit_criteria": "Bind independent identity and scan approvals to the deployed source; complete all six historical event types and legacy commands, persist conclusions, prove the production fence and <=10-minute exact restoration, then execute the approved retirement phases."
         }
       ]
@@ -11628,7 +11684,7 @@
       "owner": "tooling",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "357fc2d9b38a870096fe11afcc9700615ec0ac4f",
+        "source_sha": "3ecc5922d30229c18a036936f6b665b62033a0f6",
         "verified_on": "2026-10-09"
       },
       "fact_sources": [
@@ -11643,6 +11699,18 @@
         {
           "kind": "source",
           "path": "scripts/database/compatibility-retirement-entrypoints.json"
+        },
+        {
+          "kind": "source",
+          "path": ".github/workflows/compatibility-host-inventory.yml"
+        },
+        {
+          "kind": "source",
+          "path": "scripts/database/compatibility-host-inventory-action.py"
+        },
+        {
+          "kind": "source",
+          "path": "scripts/database/compatibility-retirement-host-inventory.py"
         }
       ],
       "verification": [

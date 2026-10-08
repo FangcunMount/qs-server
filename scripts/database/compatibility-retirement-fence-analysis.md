@@ -4,7 +4,7 @@ P. 代码分析报告
 
 ## 分析目标与范围
 
-追踪当前 source-only catalog 的 12 个入口、仍被 GitHub 列为 active 的 9 个历史工作流，以及部署/数据库维护的 SSH、直接数据库连接和本地执行旁路。只新增 `internal/apiserver/maintenance/compatibilityretirementfence/` 和本报告；不改当前 workflow、主 retirement Python、业务服务、迁移或其他维护包。
+当前 source-only catalog 登记 13 个入口；历史快照中的 9 个 active 工作流仍按未证明处理。初始隔离批次追踪部署/数据库维护的 SSH、直接数据库连接和本地执行旁路，只新增 `internal/apiserver/maintenance/compatibilityretirementfence/` 和本报告。后续新增的只读主机盘点入口登记如下；生产安装、管理通道和完整写者隔离仍未证明。
 
 ## 入口与调用路径
 
@@ -22,6 +22,8 @@ P. 代码分析报告
 | `ping-runner.yml` | 定时；无 production environment；ServerA/ServerB SSH，ServerD 健康观测；`setup-runner-ssh.sh:67` 也可跳过 SSH | 常规只读检查不等于凭据不可用于写入 |
 | `reliable-messaging-m6-qs-image-handoff.yml` | 当前 harness 使用 disposable DB/NSQ 和镜像；发布镜像分支取得 registry credentials | Registry 与 runner 资源是另一边界，不能由 DB readonly 推导全历史无权限 |
 | `compatibility-retirement.yml` | `:59` contents/actions read，无 id-token write；`:65` production-deploy；`:233` production；`:310–321` 为数据库 prepare/history 模式传 SQL/Mongo credentials；原 validate 仅约束当前源码 | 现有入口尚不能取得所需 OIDC；即使新源码 validate 正确，旧 workflow revision 的 rerun 也不能由它代为拒绝 |
+
+| `compatibility-host-inventory.yml` | 批准当前 main/source/op/descriptor，共用 production-deploy；使用已固定 ServerA/Collection 与 ServerD 路线。v1 要求独立预置 Match 文件；显式批准的 v2 只读观测最终 SSH 会话。当前 Mac Runner 不支持 | v2 不能证明 shell 环境来源、daemon 原已载入配置、全部 Match、管理或写者隔离；不会回退到其他模式 |
 
 历史元数据和每个最后实际 run 对应 YAML 已通过只读 GitHub API 获取，原始文件和 API JSON 仅保存在私有 0600 证据目录，正文不进入本报告。该已保存只读快照中，9 个对象的 metadata 均为 active；这不是隔离失败或生产写入的单独证明。
 
