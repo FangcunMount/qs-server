@@ -1,6 +1,6 @@
 P. 代码分析报告
 
-本批实现可验证的 **SSH probe 来源门禁**及一次挑战持久消费原语。生产尚未安装；一次消费尚未接入生产固定入口，完整写入隔离、生产 executor 和 DROP 能力保持 false。单凭 workflow disable、production 限定 main、共享 SSH key 或暂停变量，均不能证明旧 main SHA 的重跑已被拒绝。
+本批实现可验证的 **SSH probe 来源门禁**、一次挑战持久消费原语及 root 目录维护窗口预算。生产尚未安装；一次消费尚未接入生产固定入口，完整写入隔离、生产 executor 和 DROP 能力保持 false。单凭 workflow disable、production 限定 main、共享 SSH key 或暂停变量，均不能证明旧 main SHA 的重跑已被拒绝。
 
 ## 分析目标与范围
 
@@ -46,6 +46,7 @@ P. 代码分析报告
 - GitHub OIDC 用固定 issuer/JWKS 和标准 RSA RS256 验签。必须有批准 audience/subject、workflow SHA、event SHA/ref、repository/owner、run/attempt、check-run、actor、production/self-hosted 与有效时间；缺失字段、重复 JSON key、算法变化、伪造、过期或历史 main SHA 均拒绝。JWKS、API 读取失败不放行。主 executable 的 read-only API credential 仅传 `api.github.com`，不发给 issuer 或其他 host，拒 redirect。
 - 两次独立 REST 完整分页读取 repository identity、current main、精确 run attempt、全部 workflows、queued/in_progress/waiting/pending/requested 和精确 attempt jobs；固定 body/page/total deadline，超 API 可证明的 1000 results 上限明确拒绝。只有批准 job/runner 可以正在执行，其他非终态都阻断。两次 raw response 摘要必须相等。这是两次观测，不是平台原子 queue freeze。
 - `ConsumeProbeChallenge(ctx, fixedRootDir, approvedPolicy, opaquePermit)`：生产 API 要求实际 euid 0、root 所有的 0700 目录与受保护的完整祖先路径。只接受 `AuthorizeProbe` 返回且尚未过期的真实不透明 permit；按相同完整 policy/source/op/run/request/challenge 绑定，通过相对 dirfd 的 NOFOLLOW/NONBLOCK、O_EXCL、文件与目录 fsync、inode/owner/single-link/原字节复读记录 intent/result。成功、半写、中断或未知状态均占用原挑战，禁止覆盖、采用或换审批重用；文件操作后的实际过期再次拒绝。普通用户测试 seam 不是 root 安装证明，目录必须由后续独立管理通道固定绑定。
+- `StartMaintenanceWindow` / `OpenMaintenanceWindow`：公共 Linux API 要求真实 euid 0、root 所有的 0700 目录及受保护祖先。固定四目标/source/op/manifest/原 run 绑定；用真实 `CLOCK_BOOTTIME` 与 procfs `boot_id`、目录 flock、O_EXCL primary/commit seal 和文件/目录 fsync 保存原起点。`ForwardContext` 上限 1,200 秒，共享窗口 1,800 秒；`RecoveryContext` 从第一次恢复保存 `min(原起点+1800秒,首次恢复起点+600秒)`，Close/Open 不能重置。25ms 时钟监控是协作取消，不是 OS 硬超时；其他平台拒绝公共生产入口。零值 Close 不释放任何 FD，副本在 mutex 前拒绝使用或释放原 lease；Diagnostic 只返回 `BudgetOnly`，不授予写入或恢复权限。
 - `PrepareSSH`：为所有独立批准 raw public keys 生成 `restrict,command=...` 行，固定 policy path/hash、每 key 的真实 fingerprint、read-token path；保留原 from/expiry/verification 限制，证书/环境/未支持 options 阻断。完整原 bytes 只在 opaque plan 中；`RestoreOriginal` 要求当前 bytes 恰好等于已准备 restricted bytes，拒覆盖并发修改。
 - `VerifyEffectiveSSHD`：只验证宿主实际 `sshd -T` 投影；独立 root authorized file、无旁路 CA/AuthorizedKeysCommand/password/hostbased/GSSAPI、禁 user env/rc/forwarding/TTY，ForceCommand 不能覆盖 per-key forced command。每个 account/client Match context 都须实际核验，单次 projection 不证明全局。
 - 包内 `internal/apiserver/maintenance/compatibilityretirementfence/cmd/qs-retirement-fence` 是可编译真实普通用户 forced-command probe。策略 hash 和 key 来源必须来自 root 安装的固定 key line，不能来自客户端 env。JWT 仅 stdin；45 秒 executable deadline 由宿主关闭自己的 stdin；不执行客户端 shell、DB、CAS、DDL 或生产 executor。
@@ -66,7 +67,9 @@ SSH forced command 本身不禁止 forwarding，key 的 command 也可被 server
 
 修复前源码 `2a89d5577ddfb6598b54eda6f1ec22670da1deb2` 的五包竞态/覆盖率组合回归有 711 条测试记录，其中 710 条通过、1 条并发挑战错误分类失败；独立实际 Linux euid 0 调用还在受保护路径校验中拒绝了公共入口的根锚点 `/`。普通用户测试 seam 的通过不能代替真正 root 公共入口的通过，文档门禁通过也不能覆盖这些失败。后续修复必须分别绑定新源码、公共入口原生结果和完整并发回归；生产 root 安装与完整写隔离仍未证明。
 
-提交 `b3c546f0bdd5d79b4d69d42130a813f6937e1b9d` 保留完整祖先路径、所有权和持久结果校验，允许精确的 `/` 根锚点。打开目录时发现同挑战的既有保留记录，只把该竞态归为拒绝重用，不接受变化目录、不采用状态或授予执行权。该提交的完整五包竞态/覆盖率回归为 713 条测试及 5 条包级结果全部通过、0 失败、0 跳过；三个针对用例各重复 20 次，共 60 条测试全部通过。独立真实 Linux arm64 euid 0 公共 API 原生测试已终态通过：非 race、非 coverage，1 个父测试、0 子测试、0 失败、0 跳过。其 `2a89` 加两个精确库文件覆盖版本与 `b3c546` 的 4,026 个跟踪文件逐字节等价，额外私有原生夹具单独声明。真实签名检查与两次完整 synthetic 本地 API 快照产生 permit，再调用公共 `ConsumeProbeChallenge`；两个状态文件均为 0600 单链接，拒绝 0702 目录、symlink、重放和错误 source，独立 CID/volume 清理剩余为 0。安全回执 `qs-fence-linux-root-public-api-native-20261009.json` 的 SHA256 为 `afab6c0c43b158aaa406409b215a0192bc0417738af003c0d9cbc68d17a16cd6`。它不证明真实 GitHub origin、生产 root 安装、executor、完整写隔离、CAS 或 DROP；旧 `4b402` 的 root 拒绝证据保持。尚未提交的新维护窗口实现仍在开发，不属于本文的源码核验基线。
+提交 `b3c546f0bdd5d79b4d69d42130a813f6937e1b9d` 保留完整祖先路径、所有权和持久结果校验，允许精确的 `/` 根锚点。打开目录时发现同挑战的既有保留记录，只把该竞态归为拒绝重用，不接受变化目录、不采用状态或授予执行权。该提交的完整五包竞态/覆盖率回归为 713 条测试及 5 条包级结果全部通过、0 失败、0 跳过；三个针对用例各重复 20 次，共 60 条测试全部通过。独立真实 Linux arm64 euid 0 公共 API 原生测试已终态通过：非 race、非 coverage，1 个父测试、0 子测试、0 失败、0 跳过。其 `2a89` 加两个精确库文件覆盖版本与 `b3c546` 的 4,026 个跟踪文件逐字节等价，额外私有原生夹具单独声明。真实签名检查与两次完整 synthetic 本地 API 快照产生 permit，再调用公共 `ConsumeProbeChallenge`；两个状态文件均为 0600 单链接，拒绝 0702 目录、symlink、重放和错误 source，独立 CID/volume 清理剩余为 0。安全回执 `qs-fence-linux-root-public-api-native-20261009.json` 的 SHA256 为 `afab6c0c43b158aaa406409b215a0192bc0417738af003c0d9cbc68d17a16cd6`。它不证明真实 GitHub origin、生产 root 安装、executor、完整写隔离、CAS 或 DROP；旧 `4b402` 的 root 拒绝证据保持。
+
+提交 `d252d11fd80bf42ea23d9eb5c5d2a92f8eb57cc2` 已纳入维护窗口四文件。独立实际 Linux arm64 root 用例 `TestMaintenanceWindowActualLinuxRootLease` 真实终态为 1 个父测试通过、0 子测试、0 失败、0 跳过，非 race、非 coverage；`b7e8b905` 完整 archive 加精确四文件与该提交的 4,030 个跟踪文件逐字节等价，额外 metadata-only 私有 harness 单独绑定。真实 euid 0、CLOCK_BOOTTIME、procfs、root 0700 tmpfs、互斥 flock 和五个 root 0600 单链接文件经过读取核验；Start→返回 forward cancel→OpenBusy→首次 Recovery→Close/Open 保留原起点/恢复截止时间。该用例没有取消 parent context，不能记录为原生 parent-cancel 证明。安全回执 `qs-maintenance-window-linux-root-native-20261009.json` 的 SHA256 为 `22f06e68fa71c41e54ca110c13311c634c51f13524db5890c3aaf74fb3b67b8e`；容器墙钟约 0.307 秒，独立两次 CID/volume 读回均为 0。此次只证明预算组件公共入口；不是完整业务链在 600 秒内恢复的演练，不证明生产安装、真实 GitHub origin、全写者隔离、executor、CAS、DROP 或部署许可，生产能力保持 false。
 
 ## 主要风险、缺口及最小下一步
 

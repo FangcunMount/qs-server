@@ -124,9 +124,37 @@ replay and wrong-source rejection. The safe receipt
 `qs-fence-linux-root-public-api-native-20261009.json` has SHA256
 `afab6c0c43b158aaa406409b215a0192bc0417738af003c0d9cbc68d17a16cd6`.
 This local root-entry result establishes no live GitHub origin, production
-installation, executor, whole-writer fence, CAS or DROP. New maintenance-window
-work outside this committed source is still under development and is not part
-of this verification baseline.
+installation, executor, whole-writer fence, CAS or DROP.
+
+Source `d252d11fd80bf42ea23d9eb5c5d2a92f8eb57cc2` adds the root-directory
+maintenance-window budget component. Its immutable binding fixes the four
+legacy targets, source, operation, manifest and original run. Public Linux
+entry points require actual euid 0 and a root-owned 0700 directory with protected
+ancestors. The original start and first recovery record use `CLOCK_BOOTTIME` and
+`/proc/sys/kernel/random/boot_id`, exclusive creation, primary/commit seals,
+file/directory fsync and a real directory flock. Forward work has at most 1,200
+seconds; the shared window has 1,800 seconds; recovery expires at
+`min(original_start + 1800s, first_recovery_start + 600s)`. Reopening cannot reset
+those records. The 25ms clock monitor is cooperative, not a hard OS timeout.
+Zero-value Close is a no-op; a copied receiver cannot acquire budget or release
+the original lease. Other platforms reject the public production entry.
+
+The separate actual Linux arm64 root test
+`TestMaintenanceWindowActualLinuxRootLease` passes once: one parent test,
+no subtest, failure or skip, without race or coverage instrumentation. Its
+`b7e8b905` archive plus the exact four window files is byte-identical to the
+4,030 tracked files at `d252d11`; a metadata-only private harness is declared
+separately. The native test uses public root options, real kernel time/procfs,
+0700 tmpfs and flock, observes five root-owned 0600 single-link files, verifies
+start/first-recovery seals and preserves the original deadlines after Close/Open.
+It checks propagation of the returned forward cancel function; it does not test
+parent-context cancellation natively. The safe receipt
+`qs-maintenance-window-linux-root-native-20261009.json` has SHA256
+`22f06e68fa71c41e54ca110c13311c634c51f13524db5890c3aaf74fb3b67b8e`.
+This seconds-scale local entry/lease test is `BudgetOnly`: it proves neither a
+complete 600-second restoration nor independent production approval, writer
+fencing, installed executor, CAS, DROP, restore or deployment permission.
+Production capabilities remain false.
 
 The main-line lint follow-up preserves six local deprecated-call exceptions:
 five deliberately disconnected `mongo.NewClient` fixtures must prove rejection

@@ -2,7 +2,7 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "b3c546f0bdd5d79b4d69d42130a813f6937e1b9d",
+    "sha": "d252d11fd80bf42ea23d9eb5c5d2a92f8eb57cc2",
     "verified_on": "2026-10-09"
   },
   "status_policy": {
@@ -11270,7 +11270,7 @@
       "owner": "tooling",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "b3c546f0bdd5d79b4d69d42130a813f6937e1b9d",
+        "source_sha": "d252d11fd80bf42ea23d9eb5c5d2a92f8eb57cc2",
         "verified_on": "2026-10-09"
       },
       "fact_sources": [
@@ -11377,6 +11377,10 @@
         {
           "kind": "source",
           "path": "scripts/database/test-compatibility-history-parent-action.py"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/maintenance/compatibilityretirementfence/maintenance_window*.go"
         }
       ],
       "verification": [
@@ -11526,6 +11530,36 @@
           "result": "passed",
           "source_sha": "b3c546f0bdd5d79b4d69d42130a813f6937e1b9d",
           "verified_on": "2026-10-09"
+        },
+        {
+          "kind": "source_selector",
+          "path": "internal/apiserver/maintenance/compatibilityretirementfence/maintenance_window.go",
+          "selector": "BudgetOnly: true",
+          "result": "matched",
+          "source_sha": "d252d11fd80bf42ea23d9eb5c5d2a92f8eb57cc2",
+          "verified_on": "2026-10-09"
+        },
+        {
+          "kind": "source_selector",
+          "path": "internal/apiserver/maintenance/compatibilityretirementfence/maintenance_window_linux.go",
+          "selector": "unix.CLOCK_BOOTTIME",
+          "result": "matched",
+          "source_sha": "d252d11fd80bf42ea23d9eb5c5d2a92f8eb57cc2",
+          "verified_on": "2026-10-09"
+        },
+        {
+          "kind": "command",
+          "command": "make docs-check",
+          "result": "passed",
+          "source_sha": "d252d11fd80bf42ea23d9eb5c5d2a92f8eb57cc2",
+          "verified_on": "2026-10-09"
+        },
+        {
+          "kind": "command",
+          "command": "python3 -B scripts/compare_api_docs.py",
+          "result": "passed",
+          "source_sha": "d252d11fd80bf42ea23d9eb5c5d2a92f8eb57cc2",
+          "verified_on": "2026-10-09"
         }
       ],
       "production_evidence": {
@@ -11542,7 +11576,7 @@
           "id": "COMPAT-RETIREMENT-PRODUCTION",
           "kind": "verification",
           "severity": "high",
-          "summary": "Physical-file metadata and immutable parent registration are implemented and locally tested with separate Action modes. The current production identity/bounds/inventory/metadata/parent/history chain, full-sized resource/lifetime budgets, original AI/MQ closure, evidence CAS, writer fencing, production-sized exact backup/restore, release B, DROP, acceptance and batch-owned purge remain incomplete. The pre-fix combined challenge regression and actual Linux public-root anchor rejection are retained as historical failures. The amended local regression passes, and a source-equivalent local Linux public-root test passes. Its synthetic API origin does not prove live GitHub origin, production installation or complete writer fencing.",
+          "summary": "Physical-file metadata and immutable parent registration are implemented and locally tested with separate Action modes. The current production identity/bounds/inventory/metadata/parent/history chain, full-sized resource/lifetime budgets, original AI/MQ closure, evidence CAS, writer fencing, production-sized exact backup/restore, release B, DROP, acceptance and batch-owned purge remain incomplete. The pre-fix combined challenge regression and actual Linux public-root anchor rejection are retained as historical failures. The amended local regression passes, and a source-equivalent local Linux public-root test passes. Its synthetic API origin does not prove live GitHub origin, production installation or complete writer fencing. The committed maintenance-window v2 budget component and one source-equivalent actual Linux root public-entry test pass. That case checks the returned cancel function, not native parent-context cancellation; BudgetOnly does not prove a full 600-second restoration or production/executor/writer/CAS/DROP authority.",
           "exit_criteria": "Bind independent identity and scan approvals to the deployed source; complete all six historical event types and legacy commands, persist conclusions, prove the production fence and <=10-minute exact restoration, then execute the approved retirement phases."
         }
       ]
@@ -11553,7 +11587,7 @@
       "owner": "tooling",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "b3c546f0bdd5d79b4d69d42130a813f6937e1b9d",
+        "source_sha": "d252d11fd80bf42ea23d9eb5c5d2a92f8eb57cc2",
         "verified_on": "2026-10-09"
       },
       "fact_sources": [
@@ -11607,6 +11641,36 @@
           "result": "matched",
           "source_sha": "b3c546f0bdd5d79b4d69d42130a813f6937e1b9d",
           "verified_on": "2026-10-09"
+        },
+        {
+          "kind": "source_selector",
+          "path": "internal/apiserver/maintenance/compatibilityretirementfence/maintenance_window.go",
+          "selector": "BudgetOnly: true",
+          "result": "matched",
+          "source_sha": "d252d11fd80bf42ea23d9eb5c5d2a92f8eb57cc2",
+          "verified_on": "2026-10-09"
+        },
+        {
+          "kind": "source_selector",
+          "path": "internal/apiserver/maintenance/compatibilityretirementfence/maintenance_window_linux.go",
+          "selector": "unix.CLOCK_BOOTTIME",
+          "result": "matched",
+          "source_sha": "d252d11fd80bf42ea23d9eb5c5d2a92f8eb57cc2",
+          "verified_on": "2026-10-09"
+        },
+        {
+          "kind": "command",
+          "command": "make docs-check",
+          "result": "passed",
+          "source_sha": "d252d11fd80bf42ea23d9eb5c5d2a92f8eb57cc2",
+          "verified_on": "2026-10-09"
+        },
+        {
+          "kind": "command",
+          "command": "python3 -B scripts/compare_api_docs.py",
+          "result": "passed",
+          "source_sha": "d252d11fd80bf42ea23d9eb5c5d2a92f8eb57cc2",
+          "verified_on": "2026-10-09"
         }
       ],
       "production_evidence": {
@@ -11623,7 +11687,7 @@
           "id": "RETIREMENT-FENCE-PRODUCTION",
           "kind": "verification",
           "severity": "high",
-          "summary": "The cryptographic SSH probe and protected challenge persistence are implemented and locally tested. Pre-fix combined concurrency and actual Linux public-root-anchor failures are retained; amended local regressions and a source-equivalent synthetic-API Linux public-root test pass. Live GitHub origin, production root installation, executor integration and all production writer paths remain unproven.",
+          "summary": "The cryptographic SSH probe and protected challenge persistence are implemented and locally tested. Pre-fix combined concurrency and actual Linux public-root-anchor failures are retained; amended local regressions and a source-equivalent synthetic-API Linux public-root test pass. Live GitHub origin, production root installation, executor integration and all production writer paths remain unproven. The committed maintenance-window v2 budget component and one source-equivalent actual Linux root public-entry test pass. That case checks the returned cancel function, not native parent-context cancellation; BudgetOnly does not prove a full 600-second restoration or production/executor/writer/CAS/DROP authority.",
           "exit_criteria": "Bind the actual root management connection and every writer/authentication path; prove exact restoration, single-use execution and complete historical-run exclusion before production mutation."
         }
       ]
