@@ -366,6 +366,40 @@ func TestChallengeRejectsDirectoryAndFileReplacement(t *testing.T) {
 	}
 }
 
+func TestChallengePathsAcceptOnlyExactRootOrProtectedAncestor(t *testing.T) {
+	for _, pair := range [][2]string{{"/opt/qs-retirement/state", "/"}, {"/opt/qs-retirement/state", "/opt/qs-retirement"}, {"/opt/qs-retirement", "/opt/qs-retirement"}} {
+		if !challengePathsValid(pair[0], pair[1]) {
+			t.Fatal("valid protected anchor rejected")
+		}
+	}
+	for _, pair := range [][2]string{{"/opt/qs-retirement/state", "//"}, {"/opt/qs-retirement/state", ""}, {"/opt/qs-retirement/state", "opt"}, {"/opt/qs-retirement/state", "/opt/../opt"}, {"/opt/qs-retirement-else/state", "/opt/qs-retirement"}, {"/opt/qs-retirement/../state", "/"}, {"/opt/qs-retirement/with space", "/"}} {
+		if challengePathsValid(pair[0], pair[1]) {
+			t.Fatal("unsafe or nonancestor path accepted")
+		}
+	}
+}
+
+func TestChallengeReservationDuringDirectoryOpenRejectsAsUsed(t *testing.T) {
+	p, permit, _, _ := challengeFixture(t, nil)
+	dir, opts := challengeTestDir(t)
+	winnerOpts := opts
+	winnerRan := false
+	opts.after = func(stage string) error {
+		if stage != "directories_opened" {
+			return nil
+		}
+		winnerRan = true
+		_, err := consumeProbeChallenge(context.Background(), dir, p, permit, winnerOpts)
+		return err
+	}
+	if _, err := consumeProbeChallenge(context.Background(), dir, p, permit, opts); !errors.Is(err, ErrChallengeUsed) {
+		t.Fatal("same-key reservation during protected open became retryable")
+	}
+	if !winnerRan {
+		t.Fatal("protected-open counterexample was not exercised")
+	}
+}
+
 func TestChallengeConcurrentGoroutinesConsumeExactlyOnce(t *testing.T) {
 	p, permit, _, _ := challengeFixture(t, nil)
 	dir, opts := challengeTestDir(t)

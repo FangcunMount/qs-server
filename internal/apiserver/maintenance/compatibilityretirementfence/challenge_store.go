@@ -109,7 +109,9 @@ func consumeProbeChallenge(ctx context.Context, rootDir string, policy Policy, p
 	if err = challengeValid(ctx, policy, p); err != nil {
 		return receipt, err
 	}
-	dirs, err := openChallengeDirs(rootDir, opts)
+	intentName := p.challengeHash + ".intent.json"
+	resultName := p.challengeHash + ".result.json"
+	dirs, err := openChallengeDirsForReservation(rootDir, opts, []string{intentName, resultName})
 	if err != nil {
 		return receipt, err
 	}
@@ -122,8 +124,6 @@ func consumeProbeChallenge(ctx context.Context, rootDir string, policy Policy, p
 		}
 	}()
 	fd := dirs[len(dirs)-1].fd
-	intentName := p.challengeHash + ".intent.json"
-	resultName := p.challengeHash + ".result.json"
 	for _, name := range []string{intentName, resultName} {
 		var st unix.Stat_t
 		e := unix.Fstatat(fd, name, &st, unix.AT_SYMLINK_NOFOLLOW)
@@ -197,8 +197,20 @@ func challengeDirValid(st unix.Stat_t, owner uint32, final bool) bool {
 	return st.Mode&unix.S_IFMT == unix.S_IFDIR && st.Uid == owner && st.Nlink > 0 && st.Mode&0022 == 0 && (!final || st.Mode&07777 == 0700)
 }
 
-func openChallengeDirs(path string, opts challengeOptions) (dirs []challengeDir, err error) {
-	if !protectedPath.MatchString(path) || !protectedPath.MatchString(opts.anchor) || filepath.Clean(path) != path || filepath.Clean(opts.anchor) != opts.anchor || !filepath.IsAbs(path) || !filepath.IsAbs(opts.anchor) || (path != opts.anchor && !strings.HasPrefix(path, opts.anchor+string(os.PathSeparator)) && opts.anchor != "/") {
+func challengePathsValid(path, anchor string) bool {
+	return protectedPath.MatchString(path) && (anchor == "/" || protectedPath.MatchString(anchor)) && filepath.Clean(path) == path && filepath.Clean(anchor) == anchor && filepath.IsAbs(path) && filepath.IsAbs(anchor) && (path == anchor || anchor == "/" || strings.HasPrefix(path, anchor+string(os.PathSeparator)))
+}
+
+func openChallengeDirs(path string, opts challengeOptions) ([]challengeDir, error) {
+	return openChallengeDirsForReservation(path, opts, nil)
+}
+
+// A reservation can change APFS's directory-entry link count while these FDs
+// are being opened. Detecting an existing exact key only selects a rejection
+// category: it never accepts the changed directory, reads/adopts state or grants
+// execution. Callers without an exact reservation retain the strict open check.
+func openChallengeDirsForReservation(path string, opts challengeOptions, keys []string) (dirs []challengeDir, err error) {
+	if !challengePathsValid(path, opts.anchor) {
 		return nil, ErrChallengeStore
 	}
 	defer func() {
@@ -235,7 +247,16 @@ func openChallengeDirs(path string, opts challengeOptions) (dirs []challengeDir,
 			}
 		}
 	}
+	if challengeHook(opts, "directories_opened") != nil {
+		return dirs, ErrChallengeStore
+	}
 	if checkChallengeDirs(dirs, opts.owner) != nil {
+		for _, key := range keys {
+			var st unix.Stat_t
+			if unix.Fstatat(dirs[len(dirs)-1].fd, key, &st, unix.AT_SYMLINK_NOFOLLOW) == nil {
+				return dirs, ErrChallengeUsed
+			}
+		}
 		return dirs, ErrChallengeStore
 	}
 	return dirs, nil
