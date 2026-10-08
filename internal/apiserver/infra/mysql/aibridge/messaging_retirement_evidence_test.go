@@ -72,7 +72,7 @@ func TestRetirementPoolUsesOriginalSDKTransactionGate(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 	mock.ExpectBegin()
 	tx, err := db.BeginTx(context.Background(), nil)
 	if err != nil {

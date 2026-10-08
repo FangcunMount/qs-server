@@ -84,7 +84,7 @@ func (e CommandRetirementEvidence) validate(transferred bool) error {
 		if e.Conclusion != "transferred_verified" || e.Reason != "handoff_verified" || e.VerificationMethod != "source_identity_hash_and_live_ledger" || !validDigest(e.LiveBodySHA256) {
 			return app.ErrConflict
 		}
-	} else if e.LiveBodySHA256 != "" || !e.ResponsibilityClosed || !e.BusinessTerminal || e.VerificationMethod != "source_identity_hash_and_business_closure" || !((e.Conclusion == "verified" && e.Reason == "history_terminal_verified") || (e.Conclusion == "unverifiable" && e.Reason == "history_terminal_evidence_gap")) {
+	} else if e.LiveBodySHA256 != "" || !e.ResponsibilityClosed || !e.BusinessTerminal || e.VerificationMethod != "source_identity_hash_and_business_closure" || ((e.Conclusion != "verified" || e.Reason != "history_terminal_verified") && (e.Conclusion != "unverifiable" || e.Reason != "history_terminal_evidence_gap")) {
 		return app.ErrConflict
 	}
 	seen := map[string]bool{}
@@ -123,7 +123,7 @@ func validDigest(value string) bool {
 
 func messagingHashDigest(value string) bool {
 	for _, c := range value {
-		if !(c >= '0' && c <= '9' || c >= 'a' && c <= 'f') {
+		if (c < '0' || c > '9') && (c < 'a' || c > 'f') {
 			return false
 		}
 	}
