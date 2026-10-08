@@ -4,8 +4,11 @@ This is the foundation for the accepted four-object operation, not an enabled
 production cleanup. `prepare` has real read-only identity discovery, separately approved private
 request bootstrap, fixed-upper-bound discovery, paged source inventory and a
 separately approved read-only history host. Identity, boundaries, inventory and
-their existing bootstrap modes exit 42 with diagnostic receipts. The history
-host may exit 0 only when its actual child completes two independent epochs,
+their existing bootstrap modes exit 42 with diagnostic receipts. Separately
+approved physical-file metadata observation and parent registration may exit 0
+only after their complete read-only checks and durable registration; neither
+grants execution or CAS authority. The history host may exit 0 only when its
+actual child completes two independent epochs,
 the private and stdout readiness bytes agree, and the diagnostic receipt is
 successfully armored. Its `complete`, `execution_allowed` and `drop_ready`
 remain false. A successful diagnostic Action does not authorize retirement.
@@ -27,7 +30,7 @@ restores are outside this scope. No new DROP migration is included in A.
   group. This does not retroactively change old workflow revisions.
 - The new workflow rejects unknown fields/operations, another database scope,
   another ref, a stale main SHA and another manifest hash before its production
-  job. Only exact `prepare` receives existing `MYSQL_METADATA_ADMIN_USERNAME`,
+  job. Only database-backed `prepare` modes receive existing `MYSQL_METADATA_ADMIN_USERNAME`,
   `MYSQL_METADATA_ADMIN_PASSWORD`, `MYSQL_HOST/PORT/DATABASE` (with existing
   `MYSQL_DBNAME` fallback) and `MONGODB_HOST/PORT/DBNAME` production Secrets.
   For MongoDB it selects the dedicated pair `MONGODB_METADATA_ADMIN_USERNAME`
@@ -136,17 +139,48 @@ sealing the original live-scope anchor. The host then closes its own transaction
 and starts genuinely different second transactions. The anchor retains original
 identities, source receipts and digests; it does not extend their lifetime.
 Candidate storage retains stable page values through private pointers instead
-of repeatedly copying a growing value slice. Public range reads remain deep
-copies, and the original ordered candidate hash contract is preserved.
+of repeatedly copying a growing value slice. A coordinator-private pool shares
+only identical ordered lists for original-run gaps, historical gaps, blockers
+and required adapters. The 4,096-entry / 8 MiB accounted limit bounds this
+optional cache: saturation retains the complete original list and continues.
+A used cache conflict fails before consuming a page. Public range reads remain
+deep copies; nil/empty distinctions and the original ordered private hash remain
+unchanged. Source indexes reserve capacity only after authenticated bounded
+counts; these changes do not establish the complete production resource budget.
 
-The current Action consumes a previously provisioned parent request. Production
-parent provisioning and a separately reviewable observation of all four complete
-file hashes/encoded sizes still need wiring; the inventory's semantic `DataHash`
-and source-byte count are not those physical-file values. Local fixture parent
-creation is not evidence that the production chain can start with Secrets alone.
-Read-only completion counts retain local, AI and global blockers, while production
-approval, external AI closure, process-budget proof, CAS, fencing, restore and
-DROP capabilities remain false.
+`prepare_mode=bootstrap-history-metadata` has a separate independently hashed
+`readonly_history_metadata_approval`. It binds the final tooling SHA, operation,
+original inventory run/request/report and exact limits. The Python-only four-file
+package uses no database credentials or Go binary. It rechecks the original
+private identity/bounds/inventory/sidecars, rejects prior unknown handles, and
+reads each exact source file to EOF twice. Regular single-link private files,
+full encoded byte counts, physical SHA256 and before/after inode/stat baselines
+must agree. The physical file SHA/size are distinct from the inventory semantic
+`DataHash` and source bytes. The 900-second limit is cooperative, not proof that
+all operating-system I/O is bounded. A fresh private run saves the approved
+metadata and an immutable parent proposal, without registering an executable
+history request or claiming semantic source verification.
+
+`prepare_mode=bootstrap-history-parent` requires another independently hashed
+`readonly_history_parent_registration_approval` binding the actual metadata
+run/report, proposal SHA, original inventory run/report and all four exact
+physical assets. Its Python-only five-file package also sends no database
+credentials. It repeats the complete read-only file checks and exclusively
+publishes `history-request-bootstrap.json` and `history-request.json`; an
+interrupted one-sided publication blocks rather than adopting or overwriting
+it. The parent keeps the original inventory run; metadata and registration runs
+are separate. An identical registration is idempotent and preserves its first
+creator. Both modes require armored diagnostic receipts and keep
+`complete`, `execution_allowed`, `drop_ready`, CAS and process-budget proof false.
+
+Production must run the whole identity/bounds/inventory/metadata/parent/history
+chain on the same final main tooling SHA, with independently bound approvals.
+The local filesystem, Action package and native fixture tests do not prove that
+production chain, full-sized scan budgets or database historical acceptance.
+Read-only completion counts retain local, AI and global blockers. External AI
+closure, evidence CAS, writer fencing, production-sized exact restore, release B,
+DROP, acceptance and batch-owned purge remain incomplete; execution backends
+remain disabled.
 
 ## Required implementation before execution can become ready
 

@@ -2,7 +2,7 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "d043f88f2957a280e5d054c6f2dadd479542b492",
+    "sha": "7904ee23da3e03ce5344a84028274e776de2ab94",
     "verified_on": "2026-10-09"
   },
   "status_policy": {
@@ -11270,7 +11270,7 @@
       "owner": "tooling",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "d043f88f2957a280e5d054c6f2dadd479542b492",
+        "source_sha": "7904ee23da3e03ce5344a84028274e776de2ab94",
         "verified_on": "2026-10-09"
       },
       "fact_sources": [
@@ -11365,6 +11365,18 @@
         {
           "kind": "source",
           "path": "scripts/database/test-compatibility-history-prepare.py"
+        },
+        {
+          "kind": "source",
+          "path": "scripts/database/compatibility-history-parent.py"
+        },
+        {
+          "kind": "source",
+          "path": "scripts/database/test-compatibility-history-parent.py"
+        },
+        {
+          "kind": "source",
+          "path": "scripts/database/test-compatibility-history-parent-action.py"
         }
       ],
       "verification": [
@@ -11472,6 +11484,34 @@
           "result": "passed",
           "source_sha": "c8c16ecf534cd18bf5f326dbb7ccee41e50ca121",
           "verified_on": "2026-10-09"
+        },
+        {
+          "kind": "command",
+          "command": "python3 -B scripts/database/test-compatibility-retirement.py",
+          "result": "passed",
+          "source_sha": "51a78bfa54c472e8ec2b1d9250bacc70ba618882",
+          "verified_on": "2026-10-09"
+        },
+        {
+          "kind": "command",
+          "command": "python3 -B scripts/database/test-compatibility-history-prepare.py",
+          "result": "passed",
+          "source_sha": "51a78bfa54c472e8ec2b1d9250bacc70ba618882",
+          "verified_on": "2026-10-09"
+        },
+        {
+          "kind": "command",
+          "command": "python3 -B scripts/database/test-compatibility-history-parent.py",
+          "result": "passed",
+          "source_sha": "51a78bfa54c472e8ec2b1d9250bacc70ba618882",
+          "verified_on": "2026-10-09"
+        },
+        {
+          "kind": "command",
+          "command": "python3 -B scripts/database/test-compatibility-history-parent-action.py",
+          "result": "passed",
+          "source_sha": "51a78bfa54c472e8ec2b1d9250bacc70ba618882",
+          "verified_on": "2026-10-09"
         }
       ],
       "production_evidence": {
@@ -11488,7 +11528,7 @@
           "id": "COMPAT-RETIREMENT-PRODUCTION",
           "kind": "verification",
           "severity": "high",
-          "summary": "The current Action can run an independently approved read-only history request locally. Production physical-file metadata and immutable parent provisioning, whole scan resource/lifetime budgets, original AI/MQ closure, evidence CAS, fencing, exact backup/restore, release B, DROP, acceptance and batch-owned purge remain incomplete.",
+          "summary": "Physical-file metadata and immutable parent registration are implemented and locally tested with separate Action modes. The current production identity/bounds/inventory/metadata/parent/history chain, full-sized resource/lifetime budgets, original AI/MQ closure, evidence CAS, writer fencing, production-sized exact backup/restore, release B, DROP, acceptance and batch-owned purge remain incomplete.",
           "exit_criteria": "Bind independent identity and scan approvals to the deployed source; complete all six historical event types and legacy commands, persist conclusions, prove the production fence and <=10-minute exact restoration, then execute the approved retirement phases."
         }
       ]
