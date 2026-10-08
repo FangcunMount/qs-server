@@ -65,6 +65,15 @@ func NewMongoMigrator(client *mongo.Client, config *Config) *Migrator {
 // 4. 执行迁移到最新版本
 // 5. 返回最新版本及是否执行了迁移
 func (m *Migrator) Run() (uint, bool, error) {
+	return m.run()
+}
+
+// run accepts a package-private historical boundary for migration-contract
+// fixtures. The public startup entrypoint always upgrades to the embedded head.
+func (m *Migrator) run(target ...uint) (uint, bool, error) {
+	if len(target) > 1 {
+		return 0, false, fmt.Errorf("invalid migration target count")
+	}
 	if !m.config.Enabled {
 		return 0, false, nil
 	}
@@ -107,7 +116,12 @@ func (m *Migrator) Run() (uint, bool, error) {
 	}
 
 	// 执行迁移
-	upErr := instance.Up()
+	var upErr error
+	if len(target) == 1 {
+		upErr = instance.Migrate(target[0])
+	} else {
+		upErr = instance.Up()
+	}
 	cleanupErr := cleanup(context.Background())
 	if upErr != nil {
 		if errors.Is(upErr, migrate.ErrNoChange) {

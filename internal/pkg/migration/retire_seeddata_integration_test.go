@@ -2,6 +2,9 @@
 
 package migration
 
+// These contracts stop at the historical/A boundary; paired B cold bootstrap
+// has separate native coverage in compatibility_retirement_b_integration_test.go.
+
 import (
 	"database/sql"
 	"os"
@@ -86,8 +89,8 @@ func TestRetireSeedBackfillControlColdStart(t *testing.T) {
 	}
 	db, databaseName := openStatisticsMigrationDatabase(t, dsn)
 	migrator := NewMigrator(db, &Config{Enabled: true, Database: databaseName})
-	version, changed, err := migrator.Run()
-	wantVersion := latestEmbeddedMySQLMigrationVersion(t)
+	version, changed, err := migrator.run(98)
+	const wantVersion uint = 98
 	if err != nil || !changed || version != wantVersion {
 		t.Fatalf("migrate MySQL 0 -> latest: version=%d changed=%v err=%v want_version=%d", version, changed, err, wantVersion)
 	}
@@ -150,8 +153,8 @@ func TestRetireLegacyMongoCollectionsFrom19AndDown(t *testing.T) {
 func TestRetireLegacyMongoCollectionsColdStart(t *testing.T) {
 	client, db := mongodbtest.ReplicaSetDatabase(t)
 	migrator := NewMongoMigrator(client, &Config{Enabled: true, Database: db.Name()})
-	wantVersion := latestEmbeddedMongoMigrationVersion(t)
-	version, changed, err := migrator.Run()
+	const wantVersion uint = 37
+	version, changed, err := migrator.run(37)
 	if err != nil || !changed || version != wantVersion {
 		t.Fatalf("migrate MongoDB 0 -> %d: version=%d changed=%v err=%v", wantVersion, version, changed, err)
 	}

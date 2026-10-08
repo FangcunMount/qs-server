@@ -2,6 +2,9 @@
 
 package migration
 
+// These contracts stop at the historical/A boundary; paired B cold bootstrap
+// has separate native coverage in compatibility_retirement_b_integration_test.go.
+
 import (
 	"database/sql"
 	"os"
@@ -39,7 +42,7 @@ func TestTaskReminderLedgerMigratorFrom86AndRefusesDataLoss(t *testing.T) {
 	if err := instance.Force(86); err != nil {
 		t.Fatal(err)
 	}
-	version, changed, err := NewMigrator(db, config).Run()
+	version, changed, err := NewMigrator(db, config).run(87)
 	if err != nil || !changed || version != 87 {
 		t.Fatalf("migration 86->87: version=%d changed=%t err=%v", version, changed, err)
 	}
@@ -48,7 +51,7 @@ func TestTaskReminderLedgerMigratorFrom86AndRefusesDataLoss(t *testing.T) {
 		WHERE table_schema=DATABASE() AND table_name='task_opened_reminder_delivery'`).Scan(&exists); err != nil || exists != 1 {
 		t.Fatalf("reminder ledger table missing: exists=%d err=%v", exists, err)
 	}
-	version, changed, err = NewMigrator(db, config).Run()
+	version, changed, err = NewMigrator(db, config).run(87)
 	if err != nil || changed || version != 87 {
 		t.Fatalf("repeat migration changed schema: version=%d changed=%t err=%v", version, changed, err)
 	}

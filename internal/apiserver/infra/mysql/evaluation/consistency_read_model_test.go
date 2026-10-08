@@ -61,9 +61,12 @@ func TestConsistencyReadModelReadsAuditEvidenceInBoundedBatches(t *testing.T) {
 		WithArgs(uint64(42)).
 		WillReturnRows(sqlmock.NewRows([]string{"assessment_id", "row_count", "unlinked_row_count", "distinct_outcome_count", "outcome_id"}).AddRow(42, 1, 0, 1, 9001))
 	// Missing historical evidence must not consult the retired ledger.
-	mock.ExpectQuery("^" + regexp.QuoteMeta("SELECT * FROM `evaluation_outcome` WHERE assessment_id IN (?)") + "$").
+	mock.ExpectQuery("^" + regexp.QuoteMeta("SELECT evaluation_outcome.*, committed_event_id IS NULL AND committed_event_evidence IS NULL AS canonical_pair_null FROM `evaluation_outcome` WHERE assessment_id IN (?)") + "$").
 		WithArgs(uint64(42)).WillReturnRows(sqlmock.NewRows([]string{"id", "assessment_id", "testee_id", "org_id", "evaluation_run_id", "model_kind", "model_code", "payload_json", "evaluated_at"}).
 		AddRow(9001, 42, 21, 7, "42:1", "scale", "SCALE-1", `{}`, time.Now()))
+	mock.ExpectQuery(regexp.QuoteMeta("SELECT @@server_uuid AS server,DATABASE() AS `database`")).WillReturnRows(sqlmock.NewRows([]string{"server", "database"}).AddRow("fixture-server", "fixture-db"))
+	mock.ExpectQuery("SELECT \\* FROM `assessment` WHERE id IN \\(\\?\\) LIMIT \\?").WithArgs(uint64(42), 2).WillReturnRows(sqlmock.NewRows([]string{"id", "historical_lifecycle_evidence"}).AddRow(42, nil))
+	mock.ExpectQuery("SELECT \\* FROM `evaluation_outcome` WHERE assessment_id IN \\(\\?\\) LIMIT \\?").WithArgs(uint64(42), 2).WillReturnRows(sqlmock.NewRows([]string{"id", "assessment_id", "historical_committed_evidence"}).AddRow(9001, 42, nil))
 
 	batch, err := reader.ReadBatch(context.Background(), 0, 2)
 	if err != nil {
@@ -83,7 +86,7 @@ func TestConsistencyReadModelReadsAuditEvidenceInBoundedBatches(t *testing.T) {
 
 func TestHistoricalUnclassifiedOutcomeNeverClaimsStandardSuccess(t *testing.T) {
 	reader, mock := newConsistencyReadModelTestDB(t)
-	mock.ExpectQuery(regexp.QuoteMeta("SELECT * FROM `evaluation_outcome`")).WithArgs(uint64(42)).WillReturnRows(sqlmock.NewRows([]string{"id", "assessment_id", "testee_id", "org_id", "evaluation_run_id", "model_kind", "model_code", "payload_json", "evaluated_at"}).AddRow(9001, 42, 21, 7, "42:1", "scale", "SCALE-1", `{}`, time.Now()))
+	mock.ExpectQuery(regexp.QuoteMeta("SELECT evaluation_outcome.*, committed_event_id IS NULL AND committed_event_evidence IS NULL AS canonical_pair_null FROM `evaluation_outcome`")).WithArgs(uint64(42)).WillReturnRows(sqlmock.NewRows([]string{"id", "assessment_id", "testee_id", "org_id", "evaluation_run_id", "model_kind", "model_code", "payload_json", "evaluated_at"}).AddRow(9001, 42, 21, 7, "42:1", "scale", "SCALE-1", `{}`, time.Now()))
 	got, err := reader.listCommittedOutboxEvidence(context.Background(), []uint64{42})
 	if err != nil {
 		t.Fatal(err)

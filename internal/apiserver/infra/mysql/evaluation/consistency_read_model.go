@@ -70,16 +70,22 @@ func (r *consistencyReadModel) readBatch(ctx context.Context, afterID uint64, up
 	if err != nil {
 		return evaluationconsistency.Batch{}, err
 	}
+	history, err := r.listHistoricalReferences(ctx, ids)
+	if err != nil {
+		return evaluationconsistency.Batch{}, err
+	}
 
 	items := make([]evaluationconsistency.AssessmentEvidence, 0, len(candidates))
 	for _, candidate := range candidates {
 		items = append(items, evaluationconsistency.AssessmentEvidence{
-			AssessmentID: candidate.ID,
-			Status:       candidate.Status,
-			Outcome:      outcomes[candidate.ID],
-			Run:          runs[candidate.ID],
-			Projection:   projections[candidate.ID],
-			Outbox:       outboxes[candidate.ID],
+			AssessmentID:         candidate.ID,
+			Status:               candidate.Status,
+			Outcome:              outcomes[candidate.ID],
+			Run:                  runs[candidate.ID],
+			Projection:           projections[candidate.ID],
+			Outbox:               outboxes[candidate.ID],
+			HistoricalReferences: history[candidate.ID],
+			CommittedHistory:     committedHistoricalDisposition(outboxes[candidate.ID], history[candidate.ID]),
 		})
 	}
 	return evaluationconsistency.Batch{

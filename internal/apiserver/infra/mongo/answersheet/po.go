@@ -27,9 +27,11 @@ type AnswerSheetPO struct {
 	StartContext         *StartContextPO        `bson:"start_context,omitempty" json:"start_context,omitempty"`
 	SubmitMeta           *SubmitMetaPO          `bson:"submit_meta,omitempty" json:"submit_meta,omitempty"`
 	DurableAcceptance    *DurableAcceptancePO   `bson:"durable_acceptance,omitempty" json:"durable_acceptance,omitempty"`
-	TotalScore           float64                `bson:"total_score" json:"total_score"`
-	FilledAt             time.Time              `bson:"filled_at" json:"filled_at"`
-	Answers              []AnswerPO             `bson:"answers" json:"answers"`
+	// LegacySubmissionEvidence is historical verification, not atomic acceptance.
+	LegacySubmissionEvidence *evidence.HistoricalReferenceSetV1 `bson:"legacy_submission_evidence,omitempty" json:"-"`
+	TotalScore               float64                            `bson:"total_score" json:"total_score"`
+	FilledAt                 time.Time                          `bson:"filled_at" json:"filled_at"`
+	Answers                  []AnswerPO                         `bson:"answers" json:"answers"`
 }
 
 // DurableAcceptancePO marks submissions created by the current atomic

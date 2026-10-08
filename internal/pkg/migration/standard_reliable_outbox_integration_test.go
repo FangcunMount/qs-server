@@ -2,6 +2,9 @@
 
 package migration
 
+// These contracts stop at the historical/A boundary; paired B cold bootstrap
+// has separate native coverage in compatibility_retirement_b_integration_test.go.
+
 import (
 	"context"
 	"database/sql"
@@ -120,8 +123,9 @@ func TestStandardReliableOutboxMySQLColdStartReachesLatestSchema(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer db.Close()
-	version, changed, err := NewMigrator(db, &Config{Enabled: true, Database: databaseName}).Run()
-	if err != nil || !changed || version != latestEmbeddedMySQLMigrationVersion(t) {
+	const wantVersion uint = 98
+	version, changed, err := NewMigrator(db, &Config{Enabled: true, Database: databaseName}).run(98)
+	if err != nil || !changed || version != wantVersion {
 		t.Fatalf("cold-start MySQL standard schema: version=%d changed=%t err=%v", version, changed, err)
 	}
 	for _, column := range []string{"failure_count", "manual_replay_request_id", "manual_replay_version", "updated_at"} {
@@ -191,8 +195,9 @@ func TestStandardReliableOutboxMongoMigrationRetainsCollectionsOnDowngrade(t *te
 
 func TestStandardReliableOutboxMongoColdStartReachesLatestIndexes(t *testing.T) {
 	client, db := mongodbtest.ReplicaSetDatabase(t)
-	version, changed, err := NewMongoMigrator(client, &Config{Enabled: true, Database: db.Name()}).Run()
-	if err != nil || !changed || version != latestEmbeddedMongoMigrationVersion(t) {
+	const wantVersion uint = 37
+	version, changed, err := NewMongoMigrator(client, &Config{Enabled: true, Database: db.Name()}).run(37)
+	if err != nil || !changed || version != wantVersion {
 		t.Fatalf("cold-start Mongo standard indexes: version=%d changed=%t err=%v", version, changed, err)
 	}
 	for collection, indexName := range map[string]string{

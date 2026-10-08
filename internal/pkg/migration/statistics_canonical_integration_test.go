@@ -2,6 +2,9 @@
 
 package migration
 
+// These contracts stop at the historical/A boundary; paired B cold bootstrap
+// has separate native coverage in compatibility_retirement_b_integration_test.go.
+
 import (
 	"context"
 	"database/sql"
@@ -23,11 +26,11 @@ func TestStatisticsCanonicalSchemaFromEmptyDatabaseAndRetirementRollback(t *test
 
 	db, databaseName := openStatisticsMigrationDatabase(t, dsn)
 	migrator := NewMigrator(db, &Config{Enabled: true, Database: databaseName})
-	version, migrated, err := migrator.Run()
+	version, migrated, err := migrator.run(98)
 	if err != nil {
 		t.Fatal(err)
 	}
-	wantVersion := latestEmbeddedMySQLMigrationVersion(t)
+	const wantVersion uint = 98
 	if !migrated || version != wantVersion {
 		t.Fatalf("migration version=%d migrated=%v, want version %d", version, migrated, wantVersion)
 	}

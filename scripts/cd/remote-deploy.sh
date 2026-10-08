@@ -921,6 +921,21 @@ verify_running_image() {
 }
 
 verify_running_image
+runtime_expected_instances=1
+case "$SERVICE" in
+  collection) runtime_expected_instances="$COLLECTION_REPLICAS" ;;
+  worker) runtime_expected_instances="$WORKER_REPLICAS" ;;
+esac
+# The observer reads fixed Docker fields and readiness only. It emits a schema
+# armored receipt; no raw version/probe output or connection settings reach CI.
+runtime_docker_args=()
+if [ -n "${SUDO:-}" ]; then runtime_docker_args=(--sudo-docker); fi
+# Keep Python and the packaged transport unprivileged. Only the observer's
+# closed read-only Docker executor may use the existing sudo Docker chain.
+python3 "$DEPLOY_TMP/scripts/cd/runtime-evidence.py" "${runtime_docker_args[@]}" \
+  --role "$SERVICE" --expected-instances "$runtime_expected_instances" \
+  --image-tag "$IMAGE_TAG" --source-sha "${CD_SOURCE_SHA:?CD_SOURCE_SHA is required}" \
+  --run-id "${CD_RUN_ID:?CD_RUN_ID is required}" --run-attempt "${CD_RUN_ATTEMPT:?CD_RUN_ATTEMPT is required}"
 retain_successful_image "$(resolve_compose_image_ref)"
 rm -rf "$DEPLOY_TMP"
 rm -f "$PKG_PATH"

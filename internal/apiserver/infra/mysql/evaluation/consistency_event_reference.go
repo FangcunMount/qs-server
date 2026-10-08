@@ -32,6 +32,8 @@ type committedStandardRow struct {
 	State         string
 }
 
+const canonicalMissingClassificationReason = "canonical outcome lacks classified committed event evidence"
+
 func (row committedStandardRow) input() message.Input {
 	return message.Input{Producer: row.Producer, ID: row.MessageID, Destination: row.Destination, EventType: row.EventType,
 		SchemaVersion: row.SchemaVersion, Scope: row.Scope, ContentType: row.ContentType, OccurredAt: row.OccurredAt, Payload: row.Payload}
@@ -65,8 +67,11 @@ func verifyCommittedStandard(row committedStandardRow, record *domainoutcome.Rec
 }
 
 func (r *consistencyReadModel) listCommittedOutboxEvidence(ctx context.Context, assessmentIDs []uint64) (map[uint64]*evaluationconsistency.CommittedOutboxEvidence, error) {
-	var outcomes []EvaluationOutcomePO
-	if err := r.db.WithContext(ctx).Where("assessment_id IN ?", assessmentIDs).Find(&outcomes).Error; err != nil {
+	var outcomes []struct {
+		EvaluationOutcomePO `gorm:"embedded"`
+		CanonicalPairNull   bool `gorm:"column:canonical_pair_null"`
+	}
+	if err := r.db.WithContext(ctx).Table("evaluation_outcome").Select("evaluation_outcome.*, committed_event_id IS NULL AND committed_event_evidence IS NULL AS canonical_pair_null").Where("assessment_id IN ?", assessmentIDs).Find(&outcomes).Error; err != nil {
 		return nil, err
 	}
 	ids := make([]string, 0, len(outcomes))
@@ -87,7 +92,7 @@ func (r *consistencyReadModel) listCommittedOutboxEvidence(ctx context.Context, 
 	}
 	result := make(map[uint64]*evaluationconsistency.CommittedOutboxEvidence, len(outcomes))
 	for i := range outcomes {
-		po := &outcomes[i]
+		po := &outcomes[i].EvaluationOutcomePO
 		e := &evaluationconsistency.CommittedOutboxEvidence{OutcomeID: strconv.FormatUint(po.ID, 10), RunID: po.EvaluationRunID}
 		result[po.AssessmentID] = e
 		record, err := outcomeFromPO(po)
@@ -97,7 +102,8 @@ func (r *consistencyReadModel) listCommittedOutboxEvidence(ctx context.Context, 
 		}
 		proof := record.CommittedEventEvidence()
 		if proof == nil {
-			e.InvalidReason = "canonical outcome lacks classified committed event evidence"
+			e.InvalidReason = canonicalMissingClassificationReason
+			e.LegacyCanonicalAbsent = outcomes[i].CanonicalPairNull
 			continue
 		}
 		e.Class = proof.Class

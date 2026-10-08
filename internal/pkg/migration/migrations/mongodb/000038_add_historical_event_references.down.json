@@ -1,0 +1,6 @@
+[
+  { "dropIndexes": "answersheets", "index": "uk_answersheet_legacy_submission_event_id" },
+  { "dropIndexes": "answersheets", "index": "idx_answersheet_legacy_submission_audit" },
+  { "dropIndexes": "report_generations", "index": "uk_generation_historical_generated_event_id" },
+  { "dropIndexes": "report_generations", "index": "idx_generation_historical_generated_audit" }
+]

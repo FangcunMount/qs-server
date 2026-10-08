@@ -1,6 +1,7 @@
 name: CI
 
 on:
+  workflow_dispatch: {}
   push:
     branches: [main]
   pull_request:
@@ -574,6 +575,9 @@ jobs:
 
       - name: Test deployment lock bootstrap
         run: python3 scripts/cd/test_image_deploy_lock.py
+
+      - name: Test per-instance deployment evidence
+        run: python3 scripts/cd/test-runtime-evidence.py
 
       - name: Validate deployment shell scripts
         run: bash -n scripts/cd/*.sh

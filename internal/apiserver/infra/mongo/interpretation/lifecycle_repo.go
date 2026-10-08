@@ -119,6 +119,8 @@ func (r *GenerationRepository) Save(ctx context.Context, domain *generation.Repo
 		"updated_at":                 po.UpdatedAt,
 		"transaction_schema_version": generationTransactionSchemaVersion,
 	}
+	// historical_generated_evidence belongs to maintenance and is intentionally
+	// excluded even when an ordinary domain reconstruction has no such field.
 	if po.GeneratedEventID != "" {
 		set["generated_event_id"] = po.GeneratedEventID
 	}

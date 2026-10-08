@@ -37,14 +37,14 @@ func TestCompatibilityRetirementAUpgradesWithOldMySQLTargetsMissing(t *testing.T
 					}
 				}
 			}
-			version, changed, err := NewMigrator(db, cfg).Run()
+			version, changed, err := NewMigrator(db, cfg).run(98)
 			if err != nil || !changed || version != 98 {
 				t.Fatalf("A upgrade version=%d changed=%v error=%v", version, changed, err)
 			}
 			for i, target := range targets {
 				assertMySQLTable(t, db, name, target, mask&(1<<i) == 0)
 			}
-			version, changed, err = NewMigrator(db, cfg).Run()
+			version, changed, err = NewMigrator(db, cfg).run(98)
 			if err != nil || changed || version != 98 {
 				t.Fatalf("repeated A startup version=%d changed=%v error=%v", version, changed, err)
 			}
@@ -83,7 +83,7 @@ func TestCompatibilityRetirementAUpgradesWithOldMongoTargetMissing(t *testing.T)
 					t.Fatal(err)
 				}
 			}
-			version, changed, err := NewMongoMigrator(client, cfg).Run()
+			version, changed, err := NewMongoMigrator(client, cfg).run(37)
 			if err != nil || !changed || version != 37 {
 				t.Fatalf("A upgrade version=%d changed=%v error=%v", version, changed, err)
 			}
@@ -94,7 +94,7 @@ func TestCompatibilityRetirementAUpgradesWithOldMongoTargetMissing(t *testing.T)
 			if (len(names) == 0) != absent {
 				t.Fatalf("A rebuilt or dropped the old collection: %v", names)
 			}
-			version, changed, err = NewMongoMigrator(client, cfg).Run()
+			version, changed, err = NewMongoMigrator(client, cfg).run(37)
 			if err != nil || changed || version != 37 {
 				t.Fatalf("repeated A startup version=%d changed=%v error=%v", version, changed, err)
 			}

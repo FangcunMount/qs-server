@@ -15,26 +15,27 @@ import (
 )
 
 type EvaluationOutcomePO struct {
-	ID                     uint64                         `gorm:"column:id;primaryKey"`
-	OrgID                  int64                          `gorm:"column:org_id;not null;index:idx_evaluation_outcome_org"`
-	AssessmentID           uint64                         `gorm:"column:assessment_id;not null;uniqueIndex:uk_evaluation_outcome_assessment_id"`
-	TesteeID               uint64                         `gorm:"column:testee_id;not null;index:idx_evaluation_outcome_testee"`
-	EvaluationRunID        string                         `gorm:"column:evaluation_run_id;size:128;not null;uniqueIndex:uk_evaluation_outcome_run_id"`
-	ModelKind              string                         `gorm:"column:model_kind;size:50;not null"`
-	ModelSubKind           *string                        `gorm:"column:model_sub_kind;size:50"`
-	ModelAlgorithm         *string                        `gorm:"column:model_algorithm;size:50"`
-	ModelCode              string                         `gorm:"column:model_code;size:100;not null"`
-	ModelVersion           string                         `gorm:"column:model_version;size:50;not null"`
-	ModelTitle             *string                        `gorm:"column:model_title;size:255"`
-	DecisionKind           *string                        `gorm:"column:decision_kind;size:50"`
-	InputSnapshotRef       *string                        `gorm:"column:input_snapshot_ref;size:200"`
-	ReportInputJSON        *string                        `gorm:"column:report_input_json;type:longtext"`
-	PayloadJSON            string                         `gorm:"column:payload_json;type:longtext;not null"`
-	SchemaVersion          uint                           `gorm:"column:schema_version;not null"`
-	EvaluatedAt            time.Time                      `gorm:"column:evaluated_at;not null"`
-	CreatedAt              time.Time                      `gorm:"column:created_at;not null"`
-	CommittedEventID       *string                        `gorm:"column:committed_event_id;type:varbinary(128);uniqueIndex:uq_evaluation_outcome_committed_event_id"`
-	CommittedEventEvidence *eventevidence.EventEvidenceV1 `gorm:"column:committed_event_evidence;type:json;serializer:json"`
+	ID                          uint64                         `gorm:"column:id;primaryKey"`
+	OrgID                       int64                          `gorm:"column:org_id;not null;index:idx_evaluation_outcome_org"`
+	AssessmentID                uint64                         `gorm:"column:assessment_id;not null;uniqueIndex:uk_evaluation_outcome_assessment_id"`
+	TesteeID                    uint64                         `gorm:"column:testee_id;not null;index:idx_evaluation_outcome_testee"`
+	EvaluationRunID             string                         `gorm:"column:evaluation_run_id;size:128;not null;uniqueIndex:uk_evaluation_outcome_run_id"`
+	ModelKind                   string                         `gorm:"column:model_kind;size:50;not null"`
+	ModelSubKind                *string                        `gorm:"column:model_sub_kind;size:50"`
+	ModelAlgorithm              *string                        `gorm:"column:model_algorithm;size:50"`
+	ModelCode                   string                         `gorm:"column:model_code;size:100;not null"`
+	ModelVersion                string                         `gorm:"column:model_version;size:50;not null"`
+	ModelTitle                  *string                        `gorm:"column:model_title;size:255"`
+	DecisionKind                *string                        `gorm:"column:decision_kind;size:50"`
+	InputSnapshotRef            *string                        `gorm:"column:input_snapshot_ref;size:200"`
+	ReportInputJSON             *string                        `gorm:"column:report_input_json;type:longtext"`
+	PayloadJSON                 string                         `gorm:"column:payload_json;type:longtext;not null"`
+	SchemaVersion               uint                           `gorm:"column:schema_version;not null"`
+	EvaluatedAt                 time.Time                      `gorm:"column:evaluated_at;not null"`
+	CreatedAt                   time.Time                      `gorm:"column:created_at;not null"`
+	CommittedEventID            *string                        `gorm:"column:committed_event_id;type:varbinary(128);uniqueIndex:uq_evaluation_outcome_committed_event_id"`
+	CommittedEventEvidence      *eventevidence.EventEvidenceV1 `gorm:"column:committed_event_evidence;type:json;serializer:json"`
+	HistoricalCommittedEvidence *string                        `gorm:"column:historical_committed_evidence;type:json;->"`
 }
 
 func (EvaluationOutcomePO) TableName() string { return "evaluation_outcome" }

@@ -80,6 +80,8 @@ func (r *Repository) Update(ctx context.Context, sheet *answersheet.AnswerSheet)
 	delete(updateData, "_id")
 	// A score or ordinary update cannot change acceptance-time start evidence.
 	delete(updateData, "start_context")
+	// Maintenance conclusions are independent of domain score/submission writes.
+	delete(updateData, "legacy_submission_evidence")
 
 	// 使用 $set 操作符包装更新数据
 	update := bson.M{"$set": updateData}
