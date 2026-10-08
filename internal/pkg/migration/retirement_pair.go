@@ -24,8 +24,8 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
-const compatibilitySQLVersion uint = 99
-const compatibilityMongoVersion uint = 38
+const compatibilitySQLVersion uint = 100
+const compatibilityMongoVersion uint = 39
 
 var retirementSQLNames = []string{"domain_event_outbox", "ai_bridge_commands", "ai_messaging_legacy_commands"}
 var retirementHashRE = regexp.MustCompile(`^[0-9a-f]{64}$`)
@@ -73,8 +73,8 @@ func marshalSQLIdentity(uuid, name string) ([]byte, error) {
 	return json.Marshal([]any{"mysql_server_selected_v1", uuid, name})
 }
 func CompatibilityMigrationResourcesSHA256() string {
-	a, _ := migrations.ReadFile("migrations/mysql/000099_retire_compatibility_message_storage.up.sql")
-	b, _ := migrations.ReadFile("migrations/mongodb/000038_retire_compatibility_message_storage.up.json")
+	a, _ := migrations.ReadFile("migrations/mysql/000100_retire_compatibility_message_storage.up.sql")
+	b, _ := migrations.ReadFile("migrations/mongodb/000039_retire_compatibility_message_storage.up.json")
 	raw, _ := json.Marshal([]string{retirementHash(a), retirementHash(b)})
 	return retirementHash(raw)
 }
@@ -382,7 +382,7 @@ func PreflightCompatibilityPair(ctx context.Context, db *sql.DB, client *mongo.C
 	if sqlState.pristine != mongoState.pristine {
 		return nil, retirementError("mixed pristine pair rejected")
 	}
-	if !sqlState.pristine && sqlState.version == 98 && mongoState.version == 38 {
+	if !sqlState.pristine && sqlState.version == 99 && mongoState.version == 39 {
 		return nil, retirementError("unexpected reverse partial pair")
 	}
 	p := &PairPreflight{sqlDB: db, mongo: client, config: cfg, pristine: sqlState.pristine, sqlHash: sqlHash, mongoHash: mongoHash}
@@ -432,10 +432,10 @@ func (p *PairPreflight) validateStart(ctx context.Context, backend Backend) erro
 		if sqlState.pristine || mongoState.pristine {
 			return retirementError("installed pair state changed")
 		}
-		if sqlState.version == 98 && mongoState.version == 38 {
+		if sqlState.version == 99 && mongoState.version == 39 {
 			return retirementError("unexpected reverse partial pair")
 		}
-		if backend == BackendMongo && sqlState.version != 99 {
+		if backend == BackendMongo && sqlState.version != 100 {
 			return retirementError("mysql retirement head must precede mongo up")
 		}
 		return nil
@@ -446,7 +446,7 @@ func (p *PairPreflight) validateStart(ctx context.Context, backend Backend) erro
 		}
 		return consumeBootstrapAuthorization(p.config, p.authorization)
 	}
-	if !p.sqlDone || sqlState.pristine || sqlState.version != 99 || !mongoState.pristine {
+	if !p.sqlDone || sqlState.pristine || sqlState.version != 100 || !mongoState.pristine {
 		return retirementError("pristine complete sql up unproven")
 	}
 	return nil
@@ -502,7 +502,7 @@ func readBootstrapAuthorization(cfg PairConfig) (*bootstrapAuthorization, error)
 		return nil, retirementError("bootstrap authorization schema rejected")
 	}
 	expires, e := time.Parse(time.RFC3339, a.ExpiresAt)
-	if e != nil || !strings.HasSuffix(a.ExpiresAt, "Z") || !time.Now().Before(expires) || expires.After(time.Now().Add(24*time.Hour)) || a.FormatVersion != 1 || a.Kind != "qs_compatibility_retirement_b_pristine_bootstrap" || !retirementOpRE.MatchString(a.OperationID) || !regexp.MustCompile(`^[0-9a-f]{40}$`).MatchString(a.ApprovedSourceSHA) || a.ApprovedSourceSHA != cfg.ExpectedSourceSHA || !retirementHashRE.MatchString(a.ApprovalSummarySHA256) || a.MySQLVersion != 99 || a.MongoVersion != 38 || a.MigrationResourcesSHA256 != CompatibilityMigrationResourcesSHA256() || !retirementHashRE.MatchString(a.MySQLIdentitySHA256) || !retirementHashRE.MatchString(a.MongoClusterSHA256) {
+	if e != nil || !strings.HasSuffix(a.ExpiresAt, "Z") || !time.Now().Before(expires) || expires.After(time.Now().Add(24*time.Hour)) || a.FormatVersion != 1 || a.Kind != "qs_compatibility_retirement_b_pristine_bootstrap" || !retirementOpRE.MatchString(a.OperationID) || !regexp.MustCompile(`^[0-9a-f]{40}$`).MatchString(a.ApprovedSourceSHA) || a.ApprovedSourceSHA != cfg.ExpectedSourceSHA || !retirementHashRE.MatchString(a.ApprovalSummarySHA256) || a.MySQLVersion != 100 || a.MongoVersion != 39 || a.MigrationResourcesSHA256 != CompatibilityMigrationResourcesSHA256() || !retirementHashRE.MatchString(a.MySQLIdentitySHA256) || !retirementHashRE.MatchString(a.MongoClusterSHA256) {
 		return nil, retirementError("bootstrap authorization binding rejected")
 	}
 	if _, e = os.Lstat(path + ".consumed"); !errors.Is(e, os.ErrNotExist) {

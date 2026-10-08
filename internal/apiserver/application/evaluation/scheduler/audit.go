@@ -35,6 +35,7 @@ const (
 	mismatchRunOutcomeReferenceMismatch   mismatchKind = "run_outcome_reference_mismatch"
 	mismatchHistoricalEventGap            mismatchKind = "historical_event_unverifiable"
 	mismatchReverseOutboxConflict         mismatchKind = "standard_outbox_reverse_conflict"
+	mismatchHistoricalReferenceConflict   mismatchKind = "historical_reference_conflict"
 )
 
 type mismatchSeverity string
@@ -158,13 +159,32 @@ func (s *service) classifyBatch(batch evaluationconsistency.Batch) AuditBatchRes
 		if evidence.Outbox != nil && evidence.Outbox.Class != "" {
 			evaluationConsistencyEvidenceClasses.WithLabelValues(string(evidence.Outbox.Class)).Inc()
 		}
+		if history := evidence.CommittedHistory; history != nil && (history.Class == eventevidence.RetiredVerified || history.Class == eventevidence.Unverifiable) {
+			evaluationCommittedHistoricalClasses.WithLabelValues(string(history.Class)).Inc()
+		}
 		items := classifyDrifts(consistencyEvidence{
-			status:     domainassessment.Status(evidence.Status),
-			outcome:    evidence.Outcome,
-			run:        evidence.Run,
-			projection: evidence.Projection,
-			outbox:     evidence.Outbox,
+			status:           domainassessment.Status(evidence.Status),
+			outcome:          evidence.Outcome,
+			run:              evidence.Run,
+			projection:       evidence.Projection,
+			outbox:           evidence.Outbox,
+			committedHistory: evidence.CommittedHistory,
 		}, s.now())
+		for _, reference := range evidence.HistoricalReferences {
+			if reference.InvalidReason != "" {
+				items = append(items, &mismatch{Kind: mismatchHistoricalReferenceConflict, Severity: severityHigh, RecommendedAction: "investigate retained historical owner or source conflict; never manufacture or resend the original message", DetectedAt: s.now()})
+				continue
+			}
+			switch reference.Class {
+			case eventevidence.RetiredVerified:
+				evaluationHistoricalReferenceClasses.WithLabelValues(string(reference.Class)).Inc()
+			case eventevidence.Unverifiable:
+				evaluationHistoricalReferenceClasses.WithLabelValues(string(reference.Class)).Inc()
+				items = append(items, &mismatch{Kind: mismatchHistoricalEventGap, Severity: severityLow, RecommendedAction: "retain the explicit terminal historical gap; full original message verification remains unavailable", DetectedAt: s.now()})
+			default:
+				items = append(items, &mismatch{Kind: mismatchHistoricalReferenceConflict, Severity: severityHigh, RecommendedAction: "investigate invalid historical provenance classification", DetectedAt: s.now()})
+			}
+		}
 		for _, item := range items {
 			item.AssessmentID = evidence.AssessmentID
 			observeMismatch(item.Kind)
@@ -182,11 +202,12 @@ func (s *service) classifyBatch(batch evaluationconsistency.Batch) AuditBatchRes
 }
 
 type consistencyEvidence struct {
-	status     domainassessment.Status
-	outcome    *evaluationconsistency.OutcomeEvidence
-	run        *evaluationconsistency.RunEvidence
-	projection *evaluationconsistency.ProjectionEvidence
-	outbox     *evaluationconsistency.CommittedOutboxEvidence
+	status           domainassessment.Status
+	outcome          *evaluationconsistency.OutcomeEvidence
+	run              *evaluationconsistency.RunEvidence
+	projection       *evaluationconsistency.ProjectionEvidence
+	outbox           *evaluationconsistency.CommittedOutboxEvidence
+	committedHistory *evaluationconsistency.CommittedHistoricalEvidence
 }
 
 // classifyDrifts maps the complete Assessment/Run/Outcome/Projection/Outbox
@@ -233,6 +254,10 @@ func classifyDrifts(evidence consistencyEvidence, now time.Time) []*mismatch {
 		}
 
 		switch {
+		case evidence.outbox != nil && evidence.outbox.LegacyCanonicalAbsent && evidence.outbox.Class == "" && evidence.outbox.RowCount == 0 && evidence.committedHistory != nil && evidence.committedHistory.OutcomeID == outcomeID && evidence.committedHistory.RunID == evidence.outcome.RunID && (evidence.committedHistory.Class == eventevidence.RetiredVerified || evidence.committedHistory.Class == eventevidence.Unverifiable):
+			// The physical canonical pair is empty and the old owner/run has
+			// qualified retained provenance. Gap findings remain per original ID
+			// below; do not double-count them or claim an SDK message match.
 		case evidence.outbox != nil && evidence.outbox.InvalidReason != "":
 			add(mismatchCommittedOutboxMismatch, severityHigh, "investigate classified evidence conflict; never synthesize or resend an event to erase uncertainty")
 		case evidence.outbox != nil && evidence.outbox.Class == eventevidence.Unverifiable:
@@ -270,6 +295,8 @@ func classifyDrifts(evidence consistencyEvidence, now time.Time) []*mismatch {
 }
 
 var (
+	evaluationCommittedHistoricalClasses  = promauto.NewCounterVec(prometheus.CounterOpts{Namespace: "qs", Subsystem: "evaluation_consistency", Name: "committed_historical_classes_total", Help: "Qualified historical-only committed owners with physically empty canonical pairs; no standard message fingerprint claim."}, []string{"class"})
+	evaluationHistoricalReferenceClasses  = promauto.NewCounterVec(prometheus.CounterOpts{Namespace: "qs", Subsystem: "evaluation_consistency", Name: "historical_reference_classes_total", Help: "Business-local retained historical conclusions, independently classified; not standard message verification or full legacy source coverage."}, []string{"class"})
 	evaluationConsistencyEvidenceClasses  = promauto.NewCounterVec(prometheus.CounterOpts{Namespace: "qs", Subsystem: "evaluation_consistency", Name: "event_evidence_classes_total", Help: "Classified event provenance; historical receipts do not claim current message verification."}, []string{"class"})
 	evaluationConsistencyMismatchTotal    = promauto.NewCounterVec(prometheus.CounterOpts{Namespace: "qs", Subsystem: "evaluation_consistency", Name: "mismatch_total", Help: "Total evaluation cross-store mismatches detected by the consistency audit."}, []string{"kind"})
 	evaluationConsistencyDispositionTotal = promauto.NewCounterVec(prometheus.CounterOpts{Namespace: "qs", Subsystem: "evaluation_consistency", Name: "disposition_total", Help: "Total evaluation consistency mismatches by kind and audit disposition."}, []string{"kind", "disposition"})

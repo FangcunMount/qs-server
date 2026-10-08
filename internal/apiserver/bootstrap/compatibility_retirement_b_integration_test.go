@@ -132,7 +132,7 @@ func (f *recoveryLocalPair) seed(t *testing.T, sqlDirty, mongoDirty bool) {
 			t.Fatal(err)
 		}
 	}
-	if _, err := f.db.ExecContext(t.Context(), "INSERT INTO schema_migrations VALUES(99,?)", sqlDirty); err != nil {
+	if _, err := f.db.ExecContext(t.Context(), "INSERT INTO schema_migrations VALUES(100,?)", sqlDirty); err != nil {
 		t.Fatal(err)
 	}
 	for _, name := range []string{"domain_event_outbox", "ai_bridge_commands", "ai_messaging_legacy_commands"} {
@@ -144,7 +144,7 @@ func (f *recoveryLocalPair) seed(t *testing.T, sqlDirty, mongoDirty bool) {
 		}
 	}
 	db := f.client.Database(f.name)
-	if _, err := db.Collection("schema_migrations").InsertOne(t.Context(), bson.D{{Key: "_id", Value: "head"}, {Key: "version", Value: int64(38)}, {Key: "dirty", Value: mongoDirty}}); err != nil {
+	if _, err := db.Collection("schema_migrations").InsertOne(t.Context(), bson.D{{Key: "_id", Value: "head"}, {Key: "version", Value: int64(39)}, {Key: "dirty", Value: mongoDirty}}); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := db.Collection("b_recovery_protected").InsertOne(t.Context(), bson.D{{Key: "_id", Value: 1}, {Key: "note", Value: "recovery protected original Mongo fact"}}); err != nil {

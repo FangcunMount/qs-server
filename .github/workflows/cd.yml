@@ -317,6 +317,9 @@ jobs:
 
       - name: Upload and deploy apiserver
         env:
+          CD_SOURCE_SHA: ${{ env.DEPLOY_SHA }}
+          CD_RUN_ID: ${{ github.run_id }}
+          CD_RUN_ATTEMPT: ${{ github.run_attempt }}
           RUNNER_SSH_ALIAS: deploy-target-apiserver
           RUNNER_SSH_HOST: ${{ vars.SVRA_PUBLIC_HOST || secrets.SVRA_PUBLIC_HOST || vars.SVRA_HOST }}
           SERVICE: apiserver
@@ -425,6 +428,9 @@ jobs:
 
       - name: Upload and deploy collection
         env:
+          CD_SOURCE_SHA: ${{ env.DEPLOY_SHA }}
+          CD_RUN_ID: ${{ github.run_id }}
+          CD_RUN_ATTEMPT: ${{ github.run_attempt }}
           RUNNER_SSH_ALIAS: deploy-target-collection
           RUNNER_SSH_HOST: ${{ vars.SVRA_PUBLIC_HOST || secrets.SVRA_PUBLIC_HOST || vars.SVRA_HOST }}
           SERVICE: collection
@@ -547,6 +553,9 @@ jobs:
 
       - name: Upload and deploy worker
         env:
+          CD_SOURCE_SHA: ${{ env.DEPLOY_SHA }}
+          CD_RUN_ID: ${{ github.run_id }}
+          CD_RUN_ATTEMPT: ${{ github.run_attempt }}
           RUNNER_SSH_ALIAS: deploy-target-worker
           RUNNER_SSH_HOST: ${{ vars.SVRD_PUBLIC_HOST || secrets.SVRD_PUBLIC_HOST || vars.SVRD_HOST }}
           # worker 与 apiserver/collection 共用 docker-compose.prod.yml；

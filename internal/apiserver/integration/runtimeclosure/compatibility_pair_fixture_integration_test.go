@@ -25,8 +25,8 @@ import (
 	"gorm.io/gorm"
 )
 
-const runtimeFixtureSQLHead uint = 99
-const runtimeFixtureMongoHead uint = 38
+const runtimeFixtureSQLHead uint = 100
+const runtimeFixtureMongoHead uint = 39
 
 // This prepares only the random databases allocated by the runtime test. The
 // test supplies an independently pinned build SHA and consumes the same private
@@ -114,7 +114,7 @@ func migrateRuntimeCompatibilityPair(t *testing.T, sqlDB *sql.DB, sqlName string
 	if version, changed, err := migrationpkg.NewMongoMigrator(client, fresh.MongoConfig(false)).Run(); err != nil || changed || version != runtimeFixtureMongoHead {
 		t.Fatalf("repeat installed MongoDB Up: version=%d changed=%v err=%v", version, changed, err)
 	}
-	t.Log("runtime fixture: real pristine pair approved/consumed; SQL99/Mongo38 clean and four retired objects absent; fresh installed startup passed")
+	t.Log("runtime fixture: real pristine pair approved/consumed; SQL100/Mongo39 clean and four retired objects absent; fresh installed startup passed")
 }
 
 func runtimeFixtureSourceSHA(compiled, githubSHA, approvedSHA string) (string, error) {

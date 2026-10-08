@@ -25,12 +25,39 @@ type RunEvidence struct {
 }
 
 type AssessmentEvidence struct {
-	AssessmentID uint64
-	Status       string
-	Outcome      *OutcomeEvidence
-	Run          *RunEvidence
-	Projection   *ProjectionEvidence
-	Outbox       *CommittedOutboxEvidence
+	AssessmentID         uint64
+	Status               string
+	Outcome              *OutcomeEvidence
+	Run                  *RunEvidence
+	Projection           *ProjectionEvidence
+	Outbox               *CommittedOutboxEvidence
+	HistoricalReferences []HistoricalReferenceEvidence
+	CommittedHistory     *CommittedHistoricalEvidence
+}
+
+// CommittedHistoricalEvidence covers only a physically empty canonical pair.
+// It records retained history, with no SDK fingerprint or message row claim.
+type CommittedHistoricalEvidence struct {
+	Class     eventevidence.Class
+	OutcomeID string
+	RunID     string
+	Reasons   []string
+}
+
+// HistoricalReferenceEvidence is a retained source conclusion, separately
+// inspected within this business batch. It never means a standard message was
+// resolved or that all six retired legacy event types have been covered.
+type HistoricalReferenceEvidence struct {
+	Owner                 string
+	OwnerID               string
+	EventID               string
+	EventType             string
+	Class                 eventevidence.Class
+	InvalidReason         string
+	RunID                 string
+	Attempt               uint
+	HistoricalReason      string
+	LegacyCanonicalAbsent bool
 }
 
 type Batch struct {
@@ -47,13 +74,16 @@ type ProjectionEvidence struct {
 }
 
 type CommittedOutboxEvidence struct {
-	Class            eventevidence.Class
-	InvalidReason    string
-	HistoricalReason string
-	RowCount         int64
-	OutcomeID        string
-	RunID            string
-	Status           string
+	// Derived from physical SQL NULLs and a valid canonical Outcome, never
+	// from JSON null, an empty ID, or a caller-supplied absence assertion.
+	LegacyCanonicalAbsent bool
+	Class                 eventevidence.Class
+	InvalidReason         string
+	HistoricalReason      string
+	RowCount              int64
+	OutcomeID             string
+	RunID                 string
+	Status                string
 }
 
 type Reader interface {

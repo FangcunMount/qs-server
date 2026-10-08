@@ -81,6 +81,8 @@ type snapshot struct {
 }
 type databaseInventory struct {
 	IdentityHash                 string          `json:"identity_hash"`
+	DatabaseAnchorHash           string          `json:"database_anchor_hash"`
+	MigrationGenerationHash      string          `json:"migration_generation_hash"`
 	ExpectedIdentityMatch        bool            `json:"expected_identity_match"`
 	Version                      uint64          `json:"migration_version"`
 	Dirty                        bool            `json:"migration_dirty"`
@@ -569,6 +571,7 @@ func mysqlInventory(ctx context.Context, r request, dir string) (databaseInvento
 		return d, nil, category("mysql_identity_or_version_rejected")
 	}
 	d.IdentityHash = hashParts("mysql_database_identity_v1", val(ids[0], 0), val(ids[0], 1))
+	d.DatabaseAnchorHash = d.IdentityHash
 	d.ExpectedIdentityMatch = d.IdentityHash == r.Identities["mysql"]
 	if !d.ExpectedIdentityMatch {
 		return d, nil, category("database_identity_mismatch")
@@ -859,6 +862,14 @@ func mongoInventory(ctx context.Context, r request, dir string) (databaseInvento
 	}
 	stableJSON, _ := json.Marshal(stable)
 	d.IdentityHash = hashParts("mongodb_database_identity_v1", string(stableJSON), os.Getenv("MONGODB_DBNAME"), hex.EncodeToString(bytes))
+	d.DatabaseAnchorHash, e = mongoDatabaseAnchor(ctx, db, hello)
+	if e != nil {
+		return d, s, e
+	}
+	d.MigrationGenerationHash, e = mongoMigrationGeneration(migration)
+	if e != nil {
+		return d, s, e
+	}
 	d.ExpectedIdentityMatch = d.IdentityHash == r.Identities["mongodb"]
 	if !d.ExpectedIdentityMatch {
 		return d, s, category("database_identity_mismatch")

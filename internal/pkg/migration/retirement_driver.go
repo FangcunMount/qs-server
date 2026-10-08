@@ -33,10 +33,10 @@ type retirementDatabaseDriver struct {
 }
 
 func newRetirementDatabaseDriver(driver migratedb.Driver, backend Backend, cfg *Config, conn *sql.Conn, client *mongo.Client, fs embed.FS) *retirementDatabaseDriver {
-	directory, base := "mysql", "000099_retire_compatibility_message_storage"
+	directory, base := "mysql", "000100_retire_compatibility_message_storage"
 	extension := "sql"
 	if backend == BackendMongo {
-		directory, base, extension = "mongodb", "000038_retire_compatibility_message_storage", "json"
+		directory, base, extension = "mongodb", "000039_retire_compatibility_message_storage", "json"
 	}
 	up, _ := fs.ReadFile("migrations/" + directory + "/" + base + ".up." + extension)
 	down, _ := fs.ReadFile("migrations/" + directory + "/" + base + ".down." + extension)
@@ -51,9 +51,9 @@ func newRetirementDatabaseDriver(driver migratedb.Driver, backend Backend, cfg *
 }
 func (d *retirementDatabaseDriver) tailVersion() int {
 	if d.backend == BackendMongo {
-		return 38
+		return 39
 	}
-	return 99
+	return 100
 }
 func (d *retirementDatabaseDriver) SetVersion(version int, dirty bool) error {
 	if version > d.tailVersion() {

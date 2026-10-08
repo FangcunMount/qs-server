@@ -6,6 +6,7 @@ import importlib.util
 import os
 from pathlib import Path
 import re
+import socket
 import subprocess
 import sys
 import tempfile
@@ -39,7 +40,7 @@ def bootstrap_native(repository, names, password, env):
         command(["docker", "exec", names[0], "mysql", "-uroot", "-p"+password, "qs_retirement_inventory_test", "--execute", statement])
     for statement in sql:sql_command(statement)
     def mongo_command(statement):
-        command(["docker", "exec", names[1], "mongosh", "--quiet", "--username", "local_inventory_root", "--password", password,
+        command(["docker", "exec", names[1], "mongosh", "--quiet", "--port", env["MONGODB_PORT"], "--username", "local_inventory_root", "--password", password,
                  "--authenticationDatabase", "admin", "--eval", "db=db.getSiblingDB('qs_retirement_inventory_test');"+statement])
     mongo_command("db.schema_migrations.insertOne({version:NumberLong(36),dirty:false});db.domain_event_outbox.insertOne({_id:ObjectId('000000000000000000000001'),event_type:'answersheet.submitted',status:'published'});")
     with tempfile.TemporaryDirectory(prefix="qs-compat-bootstrap-native-") as temporary:
@@ -119,21 +120,28 @@ def main():
     names = [owner + "-mysql", owner + "-mongo"]
     synthetic_password = uuid.uuid4().hex
     repository = Path(__file__).resolve().parents[2]
+    with socket.socket() as reservation:
+        reservation.bind(("127.0.0.1", 0)); mongo_port = str(reservation.getsockname()[1])
     try:
         for name, image, port, envs in (
             (names[0], "mysql:8.0", "3306", {"MYSQL_ROOT_PASSWORD": synthetic_password,
              "MYSQL_DATABASE": "qs_retirement_inventory_test"}),
-            (names[1], "mongo:7", "27017", {"MONGO_INITDB_ROOT_USERNAME": "local_inventory_root",
+            (names[1], "mongo:7", mongo_port, {"MONGO_INITDB_ROOT_USERNAME": "local_inventory_root",
              "MONGO_INITDB_ROOT_PASSWORD": synthetic_password}),
         ):
             args = ["docker", "run", "--detach", "--pull=never", "--name", name,
                     "--label", "qs.compatibility-retirement.local-test=" + owner,
-                    "--publish", "127.0.0.1::" + port, "--memory=1g", "--cpus=1"]
+                    "--publish", "127.0.0.1:" + (port + ":" if name == names[1] else ":") + port, "--memory=1g", "--cpus=1"]
             for key, value in envs.items():
                 args += ["--env", key + "=" + value]
-            command([*args, image], timeout=30)
+            if name == names[1]:
+                args += ["--env", "QS_LOCAL_REPLICA_KEY=" + uuid.uuid4().hex + uuid.uuid4().hex,
+                         "--entrypoint", "bash"]
+                command([*args, image, "-c", 'umask 077; printf "%s" "$QS_LOCAL_REPLICA_KEY" > /tmp/qs-local-replica-key; chown 999:999 /tmp/qs-local-replica-key; exec /usr/local/bin/docker-entrypoint.sh mongod --replSet qs_local_inventory --keyFile /tmp/qs-local-replica-key --bind_ip_all --port "$1"', "qs-local", port], timeout=30)
+            else:
+                command([*args, image], timeout=30)
         ports = []
-        for name, port in zip(names, ("3306", "27017")):
+        for name, port in zip(names, ("3306", mongo_port)):
             output = command(["docker", "port", name, port + "/tcp"]).stdout.decode().strip()
             if not re.fullmatch(r"127\.0\.0\.1:[0-9]{1,5}", output):
                 raise RuntimeError("non_loopback_test_port_rejected")
@@ -146,13 +154,24 @@ def main():
             mysql = command(["docker", "exec", names[0], "mysql", "--protocol=TCP", "--host=127.0.0.1",
                              "--batch", "--skip-column-names", "-uroot", "-p" + synthetic_password,
                              "--execute", "SELECT 1"], check=False)
-            mongo = command(["docker", "exec", names[1], "mongosh", "--quiet", "--host", "127.0.0.1",
+            mongo = command(["docker", "exec", names[1], "mongosh", "--quiet", "--host", "127.0.0.1", "--port", mongo_port,
                              "--username", "local_inventory_root", "--password", synthetic_password,
                              "--authenticationDatabase", "admin", "--eval", "if(db.runCommand({ping:1}).ok!==1)quit(1)"], check=False)
             if mysql.returncode == mongo.returncode == 0 and mysql.stdout.strip() == b"1":
                 break
             if time.monotonic() >= limit:
                 raise RuntimeError("local_database_readiness_timeout")
+            time.sleep(1)
+        command(["docker", "exec", names[1], "mongosh", "--quiet", "--port", mongo_port, "--username", "local_inventory_root", "--password", synthetic_password,
+                 "--authenticationDatabase", "admin", "--eval", 'rs.initiate({_id:"qs_local_inventory",members:[{_id:0,host:"127.0.0.1:'+mongo_port+'"}]})'])
+        limit = time.monotonic() + 60
+        while True:
+            primary = command(["docker", "exec", names[1], "mongosh", "--quiet", "--port", mongo_port, "--username", "local_inventory_root", "--password", synthetic_password,
+                               "--authenticationDatabase", "admin", "--eval", "if(!db.hello().isWritablePrimary)quit(1)"], check=False)
+            if primary.returncode == 0:
+                break
+            if time.monotonic() >= limit:
+                raise RuntimeError("local_replica_readiness_timeout")
             time.sleep(1)
         env = os.environ.copy()
         env.update({"QS_RETIREMENT_LOCAL_INTEGRATION": "1", "MYSQL_HOST": "127.0.0.1",

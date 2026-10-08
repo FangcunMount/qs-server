@@ -78,10 +78,10 @@ func (m *Migrator) run(historicalTarget uint) (version uint, changed bool, resul
 		return 0, false, err
 	}
 	backend := BackendMySQL
-	limit := uint(98)
+	limit := compatibilitySQLVersion - 1
 	if m.driver.SourcePath() == "migrations/mongodb" {
 		backend = BackendMongo
-		limit = 37
+		limit = compatibilityMongoVersion - 1
 	}
 	if historicalTarget > limit {
 		return 0, false, retirementError("historical target crosses retirement boundary")

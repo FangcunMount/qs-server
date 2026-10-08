@@ -1,9 +1,9 @@
 # Exact compatibility retirement: preparation and B startup barriers
 
 This is the foundation for the accepted four-object operation, not an enabled
-production cleanup. `prepare` has real read-only identity discovery, separately approved boundary
-discovery and a fixed-upper-bound paged source inventory adapter. These diagnostic
-stages exit 42 with receipts even when the individual read-only producer succeeds. Discovery is
+production cleanup. `prepare` has real read-only identity discovery, separately approved private
+request bootstrap, fixed-upper-bound discovery and paged source inventory;
+all exit 42 with diagnostic receipts. Discovery is
 never automatic approval of an observed database identity.
 `apply`, `verify`, `recover` and `purge` remain unavailable and exit 42.
 Neither a JSON boolean nor
@@ -223,6 +223,19 @@ Mongo database identity across B migrations. Record and bind the pre/post
 migration UUIDs and heads separately. A genuinely new empty database has no such
 UUID and needs an explicit pristine-catalog bootstrap proof before migration;
 discovery cannot authorize that bootstrap or weaken identity checks.
+The additive tooling also records `database_anchor_hash` independently from
+`migration_generation_hash`. MySQL uses the existing server UUID/selected database
+identity and an empty migration generation. Mongo requires actual
+`replSetGetConfig` visibility and hashes the observed nonzero
+`settings.replicaSetId`, matching replica-set name and selected database; its
+migration generation separately hashes the actual migration-collection UUID.
+Primary/hosts/`me` and migration UUID do not enter the stable Mongo anchor.
+Permission errors, unsupported topology, ambiguous BSON and mismatched set
+identity fail explicitly. Existing V1 identity/head request bytes and approvals
+remain unchanged; the new anchor does not replace full catalog or non-target
+business-baseline checks. Across a migration, compare the separately bound
+stable anchor and expected catalog/facts, while recording the changed generation;
+do not silently accept a changed V1 aggregate.
 The embedded binary SHA must equal the approved source before DB credentials are
 written to a private temporary environment file. Secrets never enter argv,
 stdout, public artifacts or the raw source inventory.
@@ -249,7 +262,7 @@ incomplete; the tool never treats permission-denied as absence. Dependency text
 review remains required even after a successful metadata read; dynamic SQL or
 external/manual writers cannot be proved absent by this adapter.
 The SQL catalog reads cross-schema inbound foreign-key metadata with exact
-referenced schema/name matching, under proven global visibility. Its narrowly
+referenced schema/name matching under proven global visibility. Its narrowly
 scoped `inbound_foreign_key_coverage_complete` does not establish complete
 dependency coverage: selected-schema SQL text still requires review, and dynamic
 SQL, external/manual writers and other repositories remain unproved. A complete
@@ -307,7 +320,7 @@ production row existence or business verification.
 
 ## B migration and startup contract
 
-B adds SQL99 and Mongo38 without rewriting any historical migration. Business
+B adds SQL100 and Mongo39 without rewriting any historical migration. Business
 logic remains A's. Installed databases must have all four targets absent,
 including empty-present objects, before either provider can create or mutate
 migration metadata. Joint live preflight verifies both selected logical databases,
@@ -317,7 +330,7 @@ fail before migration writes. The Mongo selection must equal the database actual
 used by the business connection; migration overrides cannot point elsewhere.
 
 SQL advances first (`98 -> 99`) and Mongo follows (`37 -> 38`). A fresh complete
-joint proof can continue clean `99/37`; reverse `98/38` fails. The run owns only
+joint proof can continue clean `100/38`; reverse `99/39` fails. The run owns only
 its acquired SQL connection and releases it on every result, retaining the host's
 borrowed pool and Mongo client. Public low-level Force/Down calls cannot downgrade
 a B head or clear its dirty state without the successful exact terminal run.

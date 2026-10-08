@@ -31,15 +31,17 @@ type identityRequest struct {
 	} `json:"limits"`
 }
 type identityState struct {
-	IdentityHash          string `json:"identity_hash"`
-	IdentityObserved      bool   `json:"identity_observed"`
-	Version               uint64 `json:"migration_version"`
-	HeadObserved          bool   `json:"migration_head_observed"`
-	Dirty                 *bool  `json:"migration_dirty"`
-	Clean                 bool   `json:"migration_clean"`
-	PermissionsSufficient bool   `json:"metadata_permissions_sufficient"`
-	PermissionScope       string `json:"permission_scope"`
-	ErrorCategory         string `json:"error_category"`
+	IdentityHash            string `json:"identity_hash"`
+	DatabaseAnchorHash      string `json:"database_anchor_hash"`
+	MigrationGenerationHash string `json:"migration_generation_hash"`
+	IdentityObserved        bool   `json:"identity_observed"`
+	Version                 uint64 `json:"migration_version"`
+	HeadObserved            bool   `json:"migration_head_observed"`
+	Dirty                   *bool  `json:"migration_dirty"`
+	Clean                   bool   `json:"migration_clean"`
+	PermissionsSufficient   bool   `json:"metadata_permissions_sufficient"`
+	PermissionScope         string `json:"permission_scope"`
+	ErrorCategory           string `json:"error_category"`
 }
 type identityReport struct {
 	FormatVersion  int                      `json:"format_version"`
@@ -113,6 +115,7 @@ func discoverMySQL(ctx context.Context) (state identityState, err error) {
 		return state, category("mysql_identity_or_version_rejected")
 	}
 	state.IdentityHash = hashParts("mysql_database_identity_v1", val(rows[0], 0), val(rows[0], 1))
+	state.DatabaseAnchorHash = state.IdentityHash
 	state.IdentityObserved = true
 	grants, e := scanSQL(ctx, tx, "SHOW GRANTS FOR CURRENT_USER")
 	if e != nil {
@@ -220,6 +223,14 @@ func discoverMongo(ctx context.Context) (state identityState, err error) {
 	}
 	canonical, _ := json.Marshal(stable)
 	state.IdentityHash = hashParts("mongodb_database_identity_v1", string(canonical), os.Getenv("MONGODB_DBNAME"), hex.EncodeToString(bytes))
+	state.DatabaseAnchorHash, e = mongoDatabaseAnchor(ctx, db, hello)
+	if e != nil {
+		return state, e
+	}
+	state.MigrationGenerationHash, e = mongoMigrationGeneration(entries[0])
+	if e != nil {
+		return state, e
+	}
 	state.IdentityObserved = true
 	var privileges bson.Raw
 	q, cancel = queryContext(ctx)

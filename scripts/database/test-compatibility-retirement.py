@@ -27,6 +27,16 @@ SOURCE = "a" * 40
 OPERATION = "123-1"
 
 
+def inventory_binding(database, identity, version):
+    return {"identity_hash": identity, "database_anchor_hash": identity if database == "mysql" else "7" * 64,
+            "migration_generation_hash": "" if database == "mysql" else "8" * 64,
+            "expected_identity_match": True, "migration_version": version, "migration_dirty": False,
+            "expected_migration_match": True, "catalog_hash": "5" * 64, "non_target_schema_hash": "6" * 64,
+            "metadata_complete": True, "permissions": {}, "outside_dependencies": 0,
+            "dependency_coverage_complete": False, "inbound_foreign_key_coverage_complete": False,
+            "dependency_scope": "metadata_only", "dependency_text_review_required": True, "error_category": "none"}
+
+
 def manifest():
     bindings = {database: {"identity_hash": digit * 64, "migration_version": version,
                            "migration_dirty": False, "catalog_hash": "d" * 64,
@@ -406,9 +416,7 @@ class SafetyContracts(unittest.TestCase):
                     "operation_id": OPERATION, "run_id": "456-1", "target_hash": tool.TARGET_HASH,
                     "complete": True, "drop_ready": False, "diagnostic_only": True,
                     "targets": [{"boundary": b, "complete": True, "error_category": "none"} for b in value["approved_boundaries"]],
-                    "database_bindings": {db: {"identity_hash": value["identity_hashes"][db], "migration_version": value["expected_migrations"][db],
-                                               "migration_dirty": False, "metadata_complete": True, "expected_identity_match": True,
-                                               "expected_migration_match": True} for db in ("mysql", "mongodb")}}
+                    "database_bindings": {db: inventory_binding(db, value["identity_hashes"][db], value["expected_migrations"][db]) for db in ("mysql", "mongodb")}}
         def store(report):
             raw = json.dumps(report, separators=(",", ":")).encode()
             path = bounds / "boundary.private.json"; path.write_bytes(raw); path.chmod(0o600)
@@ -442,8 +450,7 @@ class SafetyContracts(unittest.TestCase):
                         classification={}, error_category="none", equal_full_passes=2, pages=0,
                         next_cycle_required=False, boundary=bound)
                    for (db, name, kind), bound in zip(tool.TARGETS, request["approved_boundaries"])]
-        bindings = {db: {"identity_hash": request["identity_hashes"][db], "migration_version": request["expected_migrations"][db],
-                         "migration_dirty": False, "metadata_complete": True, "expected_identity_match": True, "expected_migration_match": True}
+        bindings = {db: inventory_binding(db, request["identity_hashes"][db], request["expected_migrations"][db])
                     for db in ("mysql", "mongodb")}
         report = {"format_version": 2, "kind": "readonly_compatibility_inventory", "source_sha": SOURCE,
                   "operation_id": OPERATION, "run_id": "789-1", "request_hash": "a" * 64, "target_hash": tool.TARGET_HASH,
@@ -467,6 +474,7 @@ class SafetyContracts(unittest.TestCase):
         self.assertIs(safe["capabilities"]["history_verifier"], False)
         self.assertNotIn("upper_token", json.dumps(safe)); self.assertNotIn("source_file", json.dumps(safe))
         self.assertBlocked("inventory_receipt_private_mismatch", lambda: receipt(report, lambda s: s["targets"][0].update(records=1)))
+        self.assertBlocked("inventory_receipt_private_mismatch", lambda: receipt(report, lambda s: s.update(database_bindings={db: dict(b, database_anchor_hash="a" * 64) for db, b in s["database_bindings"].items()})))
         changed = copy.deepcopy(report); changed["targets"][0]["equal_full_passes"] = 1
         self.assertBlocked("inventory_receipt_boundary_invalid", receipt, changed)
         changed = copy.deepcopy(report); changed["targets"][0]["source_file"] = "PRIVATE_UNREGISTERED_BODY"
@@ -477,6 +485,31 @@ class SafetyContracts(unittest.TestCase):
                        "--actual-source-sha", SOURCE, "--run-id", "789-1"])
         decoded = json.loads(tool.transport().decode_armored_receipt(output.getvalue()))
         self.assertIs(decoded["drop_ready"], False); self.assertIs(decoded["inventory_two_equal_scans"], True)
+        self.assertEqual(decoded["inventory_database_states"]["mongodb"]["migration_generation_hash"], "8" * 64)
+
+    def test_database_anchor_contract_refuses_missing_old_or_invented_values(self):
+        bindings = {db: inventory_binding(db, str(index) * 64, 95 if db == "mysql" else 36) for index, db in enumerate(("mysql", "mongodb"), 1)}
+        tool.validate_inventory_bindings(bindings, True)
+        mutations = (lambda b: b["mongodb"].pop("database_anchor_hash"),
+                     lambda b: b["mongodb"].pop("migration_generation_hash"),
+                     lambda b: b["mongodb"].update(database_anchor_hash=""),
+                     lambda b: b["mongodb"].update(migration_generation_hash=""),
+                     lambda b: b["mongodb"].update(database_anchor_hash="A" * 64),
+                     lambda b: b["mongodb"].update(migration_generation_hash=None),
+                     lambda b: b["mysql"].update(database_anchor_hash="a" * 64),
+                     lambda b: b["mysql"].update(migration_generation_hash="a" * 64),
+                     lambda b: b["mysql"].update(unapproved_anchor="a" * 64))
+        for mutate in mutations:
+            changed = copy.deepcopy(bindings); mutate(changed)
+            with self.assertRaises(tool.Blocked):tool.validate_inventory_bindings(changed, True)
+
+    def test_incomplete_anchor_observation_never_becomes_complete(self):
+        bindings = {db: inventory_binding(db, "", 0) for db in ("mysql", "mongodb")}
+        bindings["mongodb"].update(database_anchor_hash="", migration_generation_hash="")
+        tool.validate_inventory_bindings(bindings, False)
+        self.assertBlocked("database_anchor_missing", tool.validate_inventory_bindings, bindings, True)
+        bindings["mysql"]["database_anchor_hash"] = "1" * 64
+        self.assertBlocked("database_anchor_invalid", tool.validate_inventory_bindings, bindings, False)
 
     def test_private_source_copy_requires_exact_registry_and_safe_file(self):
         args = self.arguments(); filename = tool.SOURCE_FILENAMES[("mysql", "domain_event_outbox")]
@@ -535,7 +568,7 @@ class SafetyContracts(unittest.TestCase):
 
     def test_identity_histogram_receipt_transport_is_bounded_and_payload_free(self):
         args = self.arguments()
-        state = {"identity_hash": "1" * 64, "identity_observed": True, "migration_version": 95,
+        state = {"identity_hash": "1" * 64, "database_anchor_hash": "1" * 64, "migration_generation_hash": "", "identity_observed": True, "migration_version": 95,
                  "migration_head_observed": True, "migration_dirty": False, "migration_clean": True,
                  "metadata_permissions_sufficient": True, "permission_scope": "identity_and_migration_head", "error_category": "none"}
         histogram = [{"database": database, "name": name, "present": True, "complete": True,
@@ -547,7 +580,7 @@ class SafetyContracts(unittest.TestCase):
                    "operation_id": OPERATION, "run_id": "456-1", "request_hash": "a" * 64,
                    "target_hash": tool.TARGET_HASH, "diagnostic_only": True, "drop_ready": False, "complete": True,
                    "identity_protocols": {"mysql": "mysql_database_identity_v1", "mongodb": "mongodb_database_identity_v1"},
-                   "database_states": {"mysql": state, "mongodb": dict(state, identity_hash="4" * 64, migration_version=36)},
+                   "database_states": {"mysql": state, "mongodb": dict(state, identity_hash="4" * 64, database_anchor_hash="7" * 64, migration_generation_hash="8" * 64, migration_version=36)},
                    "diagnostic_histograms": histogram, "error_category": "none"}
         def validate(value):
             raw = json.dumps(value, separators=(",", ":")).encode()
@@ -562,6 +595,14 @@ class SafetyContracts(unittest.TestCase):
             self.assertEqual(tool.main(["--operation", "prepare", "--operation-id", OPERATION,
                                        "--approved-source-sha", SOURCE, "--actual-source-sha", SOURCE, "--run-id", "456-1"]), 42)
         decoded = json.loads(tool.transport().decode_armored_receipt(output.getvalue()))
+        self.assertEqual(decoded["identity_database_states"]["mongodb"]["database_anchor_hash"], "7" * 64)
+        self.assertIsNone(decoded["identity_database_states"]["mysql"]["migration_generation_hash"])
+        for mutate in (lambda s: s["mysql"].update(database_anchor_hash="a" * 64),
+                       lambda s: s["mysql"].update(migration_generation_hash="a" * 64),
+                       lambda s: s["mongodb"].pop("database_anchor_hash"),
+                       lambda s: s["mongodb"].update(migration_generation_hash="")):
+            changed = copy.deepcopy(summary); mutate(changed["database_states"])
+            with self.assertRaises(tool.Blocked):validate(changed)
         self.assertIs(decoded["execution_allowed"], False)
         self.assertIs(decoded["drop_ready"], False)
         self.assertEqual(decoded["identity_histogram_bucket_pages"]["page_a"][0]["type_label"], "footprint_entry_opened")
@@ -631,32 +672,6 @@ class SafetyContracts(unittest.TestCase):
         self.assertIn("cancel-in-progress: false", workflow)
         self.assertNotIn("group: qs-server-authz-production-matrix-provision", workflow)
 
-    def test_actual_workflow_validation_normalizes_only_declared_optional_inputs(self):
-        repository = SCRIPT.parents[2]
-        workflow = (repository / ".github/workflows/compatibility-retirement.yml").read_text()
-        script = textwrap.dedent(workflow.split("          script: |\n", 1)[1].split("      - name:", 1)[0])
-        supplied = {"operation": "prepare", "database": "mysql-and-mongodb",
-                    "approved_source_sha": SOURCE, "operation_id": OPERATION,
-                    "prepare_mode": "identity", "identity_request_sha256": "1" * 64}
-        scenarios = [("omitted_empty_defaults", supplied, "refs/heads/main", SOURCE, SOURCE, True),
-                     ("all_defaults_present", dict(supplied, manifest_sha256="", inventory_request_sha256=""), "refs/heads/main", SOURCE, SOURCE, True),
-                     ("unknown_input", dict(supplied, unknown=""), "refs/heads/main", SOURCE, SOURCE, False),
-                     ("mixed_request", dict(supplied, inventory_request_sha256="2" * 64), "refs/heads/main", SOURCE, SOURCE, False),
-                     ("missing_required", {k: v for k, v in supplied.items() if k != "operation"}, "refs/heads/main", SOURCE, SOURCE, False),
-                     ("wrong_ref", supplied, "refs/heads/old", SOURCE, SOURCE, False),
-                     ("wrong_runtime_sha", supplied, "refs/heads/main", "b" * 40, SOURCE, False),
-                     ("main_advanced", supplied, "refs/heads/main", SOURCE, "b" * 40, False)]
-        for name, inputs, ref, actual_sha, current_sha, allowed in scenarios:
-            with self.subTest(name=name):
-                context = {"payload": {"inputs": inputs}, "ref": ref, "sha": actual_sha, "repo": {}}
-                program = ("const script=" + json.dumps(script) + ";const context=" + json.dumps(context)
-                           + ";const current=" + json.dumps(current_sha)
-                           + ";const github={rest:{repos:{getCommit:async()=>({data:{sha:current}})}}};"
-                           + "new (Object.getPrototypeOf(async function(){}).constructor)('context','github',script)(context,github)"
-                           + ".catch(()=>{process.exitCode=1;});")
-                result = subprocess.run(["node", "-e", program], capture_output=True, text=True, check=False)
-                self.assertEqual(result.returncode, 0 if allowed else 1, result.stderr)
-
     def test_workflow_embedded_javascript_parses(self):
         if not shutil.which("node"):
             self.skipTest("Node parser unavailable; no code is executed")
@@ -707,14 +722,14 @@ class SafetyContracts(unittest.TestCase):
         (self.directory / "identity-request.json").write_bytes(identity_raw)
         (self.directory / "identity-request.json").chmod(0o600)
         identity_output = self.directory / "identity-701-1"; identity_output.mkdir(mode=0o700, exist_ok=True)
-        state = {"identity_hash": "1" * 64, "identity_observed": True, "migration_version": 95,
+        state = {"identity_hash": "1" * 64, "database_anchor_hash": "1" * 64, "migration_generation_hash": "", "identity_observed": True, "migration_version": 95,
                  "migration_head_observed": True, "migration_dirty": False, "migration_clean": True,
                  "metadata_permissions_sufficient": True, "permission_scope": "identity_and_migration_head", "error_category": "none"}
         identity = {"format_version": 1, "kind": "readonly_identity_discovery", "source_sha": SOURCE,
                     "operation_id": OPERATION, "run_id": "701-1", "request_hash": hashlib.sha256(identity_raw).hexdigest(),
                     "target_hash": tool.TARGET_HASH, "diagnostic_only": True, "drop_ready": False, "complete": True,
                     "identity_protocols": {"mysql": "mysql_database_identity_v1", "mongodb": "mongodb_database_identity_v1"},
-                    "database_states": {"mysql": state, "mongodb": dict(state, identity_hash="2" * 64, migration_version=36)},
+                    "database_states": {"mysql": state, "mongodb": dict(state, identity_hash="2" * 64, database_anchor_hash="7" * 64, migration_generation_hash="8" * 64, migration_version=36)},
                     "diagnostic_histograms": [{"database": db, "name": name, "present": True, "complete": True,
                                                "error_category": "none", "diagnostic_only": True, "buckets": []} for db, name, _ in tool.TARGETS],
                     "error_category": "none"}
@@ -742,12 +757,7 @@ class SafetyContracts(unittest.TestCase):
                                 "records": 0, "bytes": 0, "schema_hash": "3" * 64, "data_hash": "", "identity_hash": "4" * 64,
                                 "classification": {}, "error_category": "none", "equal_full_passes": 0, "pages": 0,
                                 "next_cycle_required": False, "boundary": bound})
-            bindings = {db: {"identity_hash": value["identity_hashes"][db], "expected_identity_match": True,
-                             "migration_version": value["expected_migrations"][db], "migration_dirty": False,
-                             "expected_migration_match": True, "catalog_hash": "5" * 64, "non_target_schema_hash": "6" * 64,
-                             "metadata_complete": True, "permissions": {}, "outside_dependencies": 0,
-                             "dependency_coverage_complete": False, "inbound_foreign_key_coverage_complete": False,
-                             "dependency_scope": "metadata_only", "dependency_text_review_required": True, "error_category": "none"}
+            bindings = {db: inventory_binding(db, value["identity_hashes"][db], value["expected_migrations"][db])
                         for db in ("mysql", "mongodb")}
             report = {"format_version": 2, "kind": "readonly_inventory_boundaries", "source_sha": SOURCE,
                       "operation_id": OPERATION, "run_id": "702-1", "request_hash": boundary_hash, "target_hash": tool.TARGET_HASH,
@@ -963,6 +973,21 @@ class SafetyContracts(unittest.TestCase):
                        +"new (Object.getPrototypeOf(async function(){}).constructor)('context','github','require',script)(context,github,require).catch(()=>{process.exitCode=1;});")
             result = subprocess.run(["node", "-e", program], capture_output=True, text=True, check=False)
             self.assertEqual(result.returncode, 0 if allowed else 1, result.stderr)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 if __name__ == "__main__":

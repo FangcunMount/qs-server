@@ -109,18 +109,18 @@ func (s *Scanner) OutboxUpperBound(ctx context.Context, maxTime time.Duration) (
 	return append([]byte(nil), row.ID...), nil
 }
 func answerSheetAuditFilter() bson.M {
-	return bson.M{"deleted_at": nil, "$or": bson.A{bson.M{"durable_acceptance.schema_version": 1}, bson.M{"durable_acceptance.event_evidence": bson.M{"$exists": true}}}}
+	return bson.M{"deleted_at": nil, "$or": bson.A{bson.M{"durable_acceptance.schema_version": 1}, bson.M{"durable_acceptance.event_evidence": bson.M{"$exists": true}}, bson.M{"legacy_submission_evidence": bson.M{"$exists": true}}}}
 }
 func generatedAuditFilter() bson.M {
-	return bson.M{"deleted_at": nil, "status": "generated", "$or": bson.A{bson.M{"transaction_schema_version": 1}, bson.M{"generated_event_evidence": bson.M{"$exists": true}}}}
+	return bson.M{"deleted_at": nil, "status": "generated", "$or": bson.A{bson.M{"transaction_schema_version": 1}, bson.M{"generated_event_evidence": bson.M{"$exists": true}}, bson.M{"historical_generated_evidence": bson.M{"$exists": true}}}}
 }
 
 func retryAuditFilter() bson.M {
 	return bson.M{"deleted_at": nil, "$or": bson.A{bson.M{"retry_event_id": bson.M{"$type": "string", "$ne": ""}}, bson.M{"retry_event_evidence": bson.M{"$exists": true}}}}
 }
 
-var sheetAuditProjection = bson.M{"domain_id": 1, "org_id": 1, "testee_id": 1, "filler_id": 1, "filler_type": 1, "questionnaire_code": 1, "questionnaire_version": 1, "task_id": 1, "admission": 1, "attribution": 1, "filled_at": 1, "submit_meta.request_id": 1, "durable_acceptance": 1}
-var generationAuditProjection = bson.M{"domain_id": 1, "outcome_id": 1, "report_type": 1, "template_version": 1, "status": 1, "latest_run_id": 1, "report_id": 1, "generated_event_id": 1, "generated_event_evidence": 1}
+var sheetAuditProjection = bson.M{"domain_id": 1, "org_id": 1, "testee_id": 1, "filler_id": 1, "filler_type": 1, "questionnaire_code": 1, "questionnaire_version": 1, "task_id": 1, "admission": 1, "attribution": 1, "filled_at": 1, "submit_meta.request_id": 1, "durable_acceptance": 1, "legacy_submission_evidence": 1}
+var generationAuditProjection = bson.M{"domain_id": 1, "outcome_id": 1, "report_type": 1, "template_version": 1, "status": 1, "latest_run_id": 1, "report_id": 1, "version": 1, "transaction_schema_version": 1, "generated_event_id": 1, "generated_event_evidence": 1, "historical_generated_evidence": 1}
 var runAuditProjection = bson.M{"domain_id": 1, "generation_id": 1, "attempt": 1, "status": 1, "retry_disposition": 1, "next_attempt_at": 1, "retry_event_id": 1, "retry_event_evidence": 1, "action_request_id": 1}
 var artifactAuditProjection = bson.M{"domain_id": 1, "generation_id": 1, "outcome_id": 1, "interpretation_run_id": 1, "org_id": 1, "assessment_id": 1, "testee_id": 1, "report_type": 1, "template_version": 1, "builder_identity": 1, "content_schema_version": 1, "generated_at": 1, "model": 1, "primary_score": 1, "level": 1}
 
@@ -241,6 +241,26 @@ func (s *Scanner) scanAnswerSheetOutbox(ctx context.Context, request appaudit.Ba
 	result := appaudit.BatchResult{Scanned: len(rows)}
 	for _, row := range rows {
 		result.NextID = row.DomainID.Uint64()
+		if row.LegacySubmissionEvidence != nil {
+			err := s.checkHistoricalSlot(ctx, "answersheets", row.DomainID.Uint64(), "legacy_submission_evidence", row.LegacySubmissionEvidence)
+			if err == nil {
+				err = checkLegacySubmission(row)
+			}
+			if err != nil {
+				if !isEvidenceDrift(err) {
+					return result, err
+				}
+				result.Findings = append(result.Findings, finding(appaudit.DriftAnswerSheetMissingOutbox, result.NextID))
+			} else {
+				for _, entry := range row.LegacySubmissionEvidence.Entries {
+					countEvidence(&result, entry.Proof)
+				}
+			}
+			// A separate historical slot never claims atomic durable acceptance.
+			if row.DurableAcceptance == nil {
+				continue
+			}
+		}
 		if err := s.checkSheet(ctx, row); err != nil {
 			if !isEvidenceDrift(err) {
 				return result, err
@@ -348,6 +368,21 @@ func (s *Scanner) scanGeneratedTerminal(ctx context.Context, request appaudit.Ba
 				return result, err
 			}
 			result.Findings = append(result.Findings, finding(appaudit.DriftGeneratedMissingArtifact, result.NextID))
+		}
+		if g.HistoricalGeneratedEvidence != nil {
+			if err := s.checkHistoricalGenerated(ctx, g); err != nil {
+				if !isEvidenceDrift(err) {
+					return result, err
+				}
+				result.Findings = append(result.Findings, finding(appaudit.DriftGeneratedMissingTerminalOutbox, result.NextID))
+			} else {
+				for _, entry := range g.HistoricalGeneratedEvidence.Entries {
+					countEvidence(&result, entry.Proof)
+				}
+			}
+		}
+		if g.TransactionSchemaVersion != 1 && g.GeneratedEventEvidence == nil && g.HistoricalGeneratedEvidence != nil {
+			continue
 		}
 		if err := s.checkGenerated(ctx, g); err != nil {
 			if !isEvidenceDrift(err) {

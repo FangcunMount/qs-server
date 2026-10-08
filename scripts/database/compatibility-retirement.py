@@ -436,6 +436,30 @@ def validate_v2_request(value, operation_id, source_sha, *, boundary):
                     fail("boundary_token_invalid")
 
 
+INVENTORY_BINDING_FIELDS = ("identity_hash", "database_anchor_hash", "migration_generation_hash", "expected_identity_match", "migration_version", "migration_dirty", "expected_migration_match", "catalog_hash", "non_target_schema_hash", "metadata_complete", "permissions", "outside_dependencies", "dependency_coverage_complete", "inbound_foreign_key_coverage_complete", "dependency_scope", "dependency_text_review_required", "error_category")
+
+
+def validate_database_anchors(database, state, complete):
+    # Anchors are observations, never derived from a request or a name here.
+    for key in ("database_anchor_hash", "migration_generation_hash"):
+        if type(state[key]) is not str:
+            fail("database_anchor_invalid")
+        if state[key]:
+            token(state[key], HASH)
+    if database == "mysql":
+        if state["database_anchor_hash"] != state["identity_hash"] or state["migration_generation_hash"] != "":
+            fail("database_anchor_invalid")
+    elif complete and (not state["database_anchor_hash"] or not state["migration_generation_hash"]):
+        fail("database_anchor_missing")
+
+
+def validate_inventory_bindings(bindings, complete):
+    fields(bindings, ("mysql", "mongodb"))
+    for database, binding in bindings.items():
+        fields(binding, INVENTORY_BINDING_FIELDS)
+        validate_database_anchors(database, binding, complete)
+
+
 def validate_approved_boundary_file(request, directory):
     # This is a supplied approval, never a bootstrap from newly observed state.
     bounds_directory = private_directory(directory / ("bounds-" + request["boundary_run_id"]))
@@ -446,6 +470,7 @@ def validate_approved_boundary_file(request, directory):
     objects = observed.get("targets")
     if type(objects) is not list or len(objects) != 4 or [item.get("boundary") for item in objects] != request["approved_boundaries"] or any(item.get("complete") is not True or item.get("error_category") != "none" for item in objects):
         fail("approved_boundary_mismatch")
+    validate_inventory_bindings(observed.get("database_bindings"), True)
     for database in ("mysql", "mongodb"):
         state = observed.get("database_bindings", {}).get(database, {})
         if state.get("identity_hash") != request["identity_hashes"][database] or state.get("migration_version") != request["expected_migrations"][database] or state.get("migration_dirty") is not False or any(state.get(key) is not True for key in ("metadata_complete", "expected_identity_match", "expected_migration_match")):
@@ -629,7 +654,7 @@ def bootstrap_boundary_report(directory, value, request, args):
     validate_v2_request(request, args.operation_id, args.actual_source_sha, boundary=False)
     validate_approved_boundary_file(request, directory)
     for binding in report["database_bindings"].values():
-        fields(binding, ("identity_hash", "expected_identity_match", "migration_version", "migration_dirty", "expected_migration_match", "catalog_hash", "non_target_schema_hash", "metadata_complete", "permissions", "outside_dependencies", "dependency_coverage_complete", "inbound_foreign_key_coverage_complete", "dependency_scope", "dependency_text_review_required", "error_category"))
+        fields(binding, INVENTORY_BINDING_FIELDS)
         uint(binding["migration_version"]); uint(binding["outside_dependencies"])
         for key in ("identity_hash", "catalog_hash", "non_target_schema_hash"):
             token(binding[key], HASH)
@@ -894,8 +919,8 @@ def validate_inventory_receipt(summary, code, args, output, request, request_has
                     fail("inventory_receipt_target_invalid")
             elif mode == "bounds" and (item["records"] or item["bytes"] or item.get("source_file") or item.get("equal_full_passes") or item.get("pages")):
                 fail("boundary_receipt_copied_source_body")
+    validate_inventory_bindings(report["database_bindings"], summary["complete"])
     if summary["complete"]:
-        fields(report["database_bindings"], ("mysql", "mongodb"))
         for database, binding in report["database_bindings"].items():
             if binding.get("identity_hash") != request["identity_hashes"][database] or binding.get("migration_version") != request["expected_migrations"][database] or binding.get("migration_dirty") is not False or binding.get("metadata_complete") is not True or binding.get("expected_identity_match") is not True or binding.get("expected_migration_match") is not True:
                 fail("inventory_receipt_database_invalid")
@@ -908,6 +933,8 @@ def validate_inventory_receipt(summary, code, args, output, request, request_has
         version = binding.get("migration_version", 0)
         uint(version)
         database_states[database] = {"identity_hash": identity or None,
+                                     "database_anchor_hash": binding["database_anchor_hash"] or None,
+                                     "migration_generation_hash": binding["migration_generation_hash"] or None,
                                      "migration_version": version,
                                      "migration_head_observed": version > 0,
                                      "migration_dirty": binding.get("migration_dirty") if version > 0 else None,
@@ -969,6 +996,7 @@ def validate_identity_receipt(summary, code, args, output, request_hash, entrypo
     keys = ("format_version", "kind", "source_sha", "operation_id", "run_id", "request_hash", "target_hash", "diagnostic_only", "drop_ready", "complete", "identity_protocols", "database_states", "diagnostic_histograms", "error_category")
     fields(summary, (*keys, "private_report_hash"))
     report, digest = read_private(output, "identity.private.json", summary["private_report_hash"])
+    fields(report, keys)
     if any(report.get(key) != summary[key] for key in keys):
         fail("identity_receipt_private_mismatch")
     if summary["format_version"] != 1 or summary["kind"] != "readonly_identity_discovery" or summary["source_sha"] != args.actual_source_sha or summary["operation_id"] != args.operation_id or summary["run_id"] != args.run_id or summary["request_hash"] != request_hash or summary["target_hash"] != TARGET_HASH or summary["diagnostic_only"] is not True or summary["drop_ready"] is not False or summary["identity_protocols"] != {"mysql": "mysql_database_identity_v1", "mongodb": "mongodb_database_identity_v1"}:
@@ -978,7 +1006,8 @@ def validate_identity_receipt(summary, code, args, output, request_hash, entrypo
     fields(summary["database_states"], ("mysql", "mongodb"))
     clean_states = {}
     for database, state in summary["database_states"].items():
-        fields(state, ("identity_hash", "identity_observed", "migration_version", "migration_head_observed", "migration_dirty", "migration_clean", "metadata_permissions_sufficient", "permission_scope", "error_category"))
+        fields(state, ("identity_hash", "database_anchor_hash", "migration_generation_hash", "identity_observed", "migration_version", "migration_head_observed", "migration_dirty", "migration_clean", "metadata_permissions_sufficient", "permission_scope", "error_category"))
+        validate_database_anchors(database, state, summary["complete"])
         if state["permission_scope"] != "identity_and_migration_head":
             fail("identity_receipt_permission_scope_invalid")
         for key in ("identity_observed", "migration_head_observed", "migration_clean", "metadata_permissions_sufficient"):
@@ -993,6 +1022,8 @@ def validate_identity_receipt(summary, code, args, output, request_hash, entrypo
             fail("identity_receipt_outcome_invalid")
         clean_states[database] = {key: state[key] for key in state if key != "error_category"}
         clean_states[database]["identity_hash"] = state["identity_hash"] or None
+        clean_states[database]["database_anchor_hash"] = state["database_anchor_hash"] or None
+        clean_states[database]["migration_generation_hash"] = state["migration_generation_hash"] or None
     if summary["complete"] and summary["error_category"] != "none":
         fail("identity_receipt_outcome_invalid")
     histograms = summary["diagnostic_histograms"]
@@ -1255,14 +1286,14 @@ def main(argv=None):
               "boundary_discovery_complete": "bool", "boundary_private_report_hash": "hash64", "boundary_request_hash": "hash64",
               "inventory_next_cycle_required": "bool", "inventory_boundary_report_hash": "nullable_hash64", "inventory_two_equal_scans": "bool",
               "identity_discovery_complete": "bool", "identity_private_report_hash": "hash64", "identity_request_hash": "hash64",
-              "identity_database_states": {database: {"identity_hash": "nullable_hash64", "identity_observed": "bool", "migration_version": "uint", "migration_head_observed": "bool", "migration_dirty": "nullable_bool", "migration_clean": "bool", "metadata_permissions_sufficient": "bool", "permission_scope": frozenset({"identity_and_migration_head"})} for database in ("mysql", "mongodb")},
+              "identity_database_states": {database: {"identity_hash": "nullable_hash64", "database_anchor_hash": "nullable_hash64", "migration_generation_hash": "nullable_hash64", "identity_observed": "bool", "migration_version": "uint", "migration_head_observed": "bool", "migration_dirty": "nullable_bool", "migration_clean": "bool", "metadata_permissions_sufficient": "bool", "permission_scope": frozenset({"identity_and_migration_head"})} for database in ("mysql", "mongodb")},
               "identity_diagnostic_histograms": [{"database": frozenset({"mysql", "mongodb"}), "name": frozenset(target[1] for target in TARGETS), "present": "nullable_bool", "complete": "bool", "diagnostic_only": "bool", "error_category": HISTOGRAM_ERRORS,
                    "bucket_count": "uint"}],
               "identity_histogram_bucket_pages": {"page_" + chr(97 + index): [{"object_index": "uint", "bucket_index": "uint", "type_label": frozenset(label.replace(".", "_") for label in HISTOGRAM_TYPES), "type_hash": "hash64", "state_label": HISTOGRAM_STATES, "state_hash": "hash64", "records": "uint"}] for index in range(4)},
               "inventory_entrypoint_catalog_hash": "hash64",
               "runtime_image_id_sha256": "hash64", "runtime_network": frozenset({"infra_network"}),
               "inventory_present_targets": "uint", "inventory_records": "uint", "inventory_source_bytes": "uint",
-              "inventory_database_states": {database: {"identity_hash": "nullable_hash64", "migration_version": "uint",
+              "inventory_database_states": {database: {"identity_hash": "nullable_hash64", "database_anchor_hash": "nullable_hash64", "migration_generation_hash": "nullable_hash64", "migration_version": "uint",
                                                        "migration_head_observed": "bool", "migration_dirty": "nullable_bool",
                                                        "metadata_complete": "bool", "identity_match": "bool"}
                                             for database in ("mysql", "mongodb")},

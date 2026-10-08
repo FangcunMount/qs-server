@@ -42,7 +42,7 @@ PACKAGE_DIR="${DEPLOY_PACKAGE_DIR:-deploy-package}"
 ENV_FILE="${PACKAGE_DIR}/configs/env/config.prod.env"
 
 rm -rf "$PACKAGE_DIR" "$DEPLOY_PACKAGE"
-mkdir -p "${PACKAGE_DIR}/configs/env" "${PACKAGE_DIR}/scripts/cd"
+mkdir -p "${PACKAGE_DIR}/configs/env" "${PACKAGE_DIR}/scripts/cd" "${PACKAGE_DIR}/scripts/dbops"
 cp -r configs "$PACKAGE_DIR/"
 cp build/docker/docker-compose.prod.yml "${PACKAGE_DIR}/docker-compose.prod.yml"
 cp \
@@ -52,12 +52,14 @@ cp \
   scripts/cd/ai-messaging-release.py \
   scripts/cd/sudo-selection.sh \
   scripts/cd/remote-deploy.sh \
+  scripts/cd/runtime-evidence.py \
   scripts/cd/wait-worker-readiness.sh \
   scripts/cd/verify-worker-dependencies.sh \
   scripts/cd/verify-collection-nginx.sh \
   scripts/cd/verify-observability-nginx.sh \
   scripts/cd/verify-worker-governance.sh \
   "${PACKAGE_DIR}/scripts/cd/"
+cp scripts/dbops/receipt-transport.py "${PACKAGE_DIR}/scripts/dbops/"
 
 case "$SERVICE" in
   apiserver)

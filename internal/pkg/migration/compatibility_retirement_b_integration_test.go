@@ -359,7 +359,7 @@ func TestCompatibilityRetirementBInstalledSixteenPresenceCombinations(t *testing
 	for present := 0; present < 16; present++ {
 		t.Run(fmt.Sprintf("mask_%02d", present), func(t *testing.T) {
 			f := bNativeDatabasePair(t)
-			f.installed(t, 98, 37)
+			f.installed(t, 99, 38)
 			f.targets(t, present, false)
 			before := f.snapshot(t)
 			pair, err := PreflightCompatibilityPair(t.Context(), f.sqlDB, f.client, f.config())
@@ -375,12 +375,12 @@ func TestCompatibilityRetirementBInstalledSixteenPresenceCombinations(t *testing
 					t.Fatalf("absent installed pair refused: %v", err)
 				}
 				version, changed, err := NewMigrator(f.sqlDB, pair.MySQLConfig(false)).Run()
-				if err != nil || version != 99 || !changed {
+				if err != nil || version != 100 || !changed {
 					t.Fatalf("SQL installed forward: version=%d changed=%v error=%v", version, changed, err)
 				}
 				f.assertPoolsReusable(t)
 				version, changed, err = NewMongoMigrator(f.client, pair.MongoConfig(false)).Run()
-				if err != nil || version != 38 || !changed {
+				if err != nil || version != 39 || !changed {
 					t.Fatalf("Mongo installed forward: version=%d changed=%v error=%v", version, changed, err)
 				}
 				f.assertTargetsAbsent(t)
@@ -393,18 +393,18 @@ func TestCompatibilityRetirementBInstalledSixteenPresenceCombinations(t *testing
 
 func TestCompatibilityRetirementBPartialForwardAndRestart(t *testing.T) {
 	f := bNativeDatabasePair(t)
-	f.installed(t, 99, 37)
+	f.installed(t, 100, 38)
 	for iteration := 0; iteration < 2; iteration++ {
 		pair, err := PreflightCompatibilityPair(t.Context(), f.sqlDB, f.client, f.config())
 		if err != nil {
 			t.Fatalf("clean partial/latest preflight: %v", err)
 		}
 		version, changed, err := NewMigrator(f.sqlDB, pair.MySQLConfig(false)).Run()
-		if err != nil || version != 99 || changed {
+		if err != nil || version != 100 || changed {
 			t.Fatalf("SQL already-forward: version=%d changed=%v error=%v", version, changed, err)
 		}
 		version, changed, err = NewMongoMigrator(f.client, pair.MongoConfig(false)).Run()
-		if err != nil || version != 38 || changed != (iteration == 0) {
+		if err != nil || version != 39 || changed != (iteration == 0) {
 			t.Fatalf("Mongo resume/restart: version=%d changed=%v error=%v", version, changed, err)
 		}
 		f.assertPoolsReusable(t)
@@ -430,25 +430,25 @@ func TestCompatibilityRetirementBRejectsInvalidInstalledPairWithoutWrites(t *tes
 				t.Fatal(err)
 			}
 		}},
-		{"sql_multiple_heads", func(t *testing.T, f *bNativeFixture) { f.exec(t, "INSERT INTO schema_migrations VALUES(99,FALSE)") }},
+		{"sql_multiple_heads", func(t *testing.T, f *bNativeFixture) { f.exec(t, "INSERT INTO schema_migrations VALUES(100,FALSE)") }},
 		{"sql_VARCHAR_version", func(t *testing.T, f *bNativeFixture) {
 			f.exec(t, "DROP TABLE schema_migrations")
 			f.exec(t, "CREATE TABLE schema_migrations(version VARCHAR(32) NOT NULL PRIMARY KEY,dirty BOOLEAN NOT NULL)")
-			f.exec(t, "INSERT INTO schema_migrations VALUES('98',FALSE)")
+			f.exec(t, "INSERT INTO schema_migrations VALUES('99',FALSE)")
 		}},
 		{"sql_VARCHAR_dirty", func(t *testing.T, f *bNativeFixture) {
 			f.exec(t, "DROP TABLE schema_migrations")
 			f.exec(t, "CREATE TABLE schema_migrations(version BIGINT NOT NULL PRIMARY KEY,dirty VARCHAR(32) NOT NULL)")
-			f.exec(t, "INSERT INTO schema_migrations VALUES(98,'false')")
+			f.exec(t, "INSERT INTO schema_migrations VALUES(99,'false')")
 		}},
 		{"sql_dirty_two", func(t *testing.T, f *bNativeFixture) { f.exec(t, "UPDATE schema_migrations SET dirty=2") }},
 		{"mongo_multiple_heads", func(t *testing.T, f *bNativeFixture) {
-			if _, err := f.mongoDB.Collection("schema_migrations").InsertOne(t.Context(), bson.D{{Key: "version", Value: int64(38)}, {Key: "dirty", Value: false}}); err != nil {
+			if _, err := f.mongoDB.Collection("schema_migrations").InsertOne(t.Context(), bson.D{{Key: "version", Value: int64(39)}, {Key: "dirty", Value: false}}); err != nil {
 				t.Fatal(err)
 			}
 		}},
 		{"reverse_partial", func(t *testing.T, f *bNativeFixture) {
-			if _, err := f.mongoDB.Collection("schema_migrations").UpdateOne(t.Context(), bson.D{}, bson.D{{Key: "$set", Value: bson.D{{Key: "version", Value: int64(38)}}}}); err != nil {
+			if _, err := f.mongoDB.Collection("schema_migrations").UpdateOne(t.Context(), bson.D{}, bson.D{{Key: "$set", Value: bson.D{{Key: "version", Value: int64(39)}}}}); err != nil {
 				t.Fatal(err)
 			}
 		}},
@@ -466,7 +466,7 @@ func TestCompatibilityRetirementBRejectsInvalidInstalledPairWithoutWrites(t *tes
 	for _, test := range cases {
 		t.Run(test.name, func(t *testing.T) {
 			f := bNativeDatabasePair(t)
-			f.installed(t, 98, 37)
+			f.installed(t, 99, 38)
 			test.change(t, f)
 			before := f.snapshot(t)
 			pair, err := PreflightCompatibilityPair(t.Context(), f.sqlDB, f.client, f.config())
@@ -484,7 +484,7 @@ func TestCompatibilityRetirementBRejectsInvalidInstalledPairWithoutWrites(t *tes
 
 func TestCompatibilityRetirementBStandaloneMigratorCannotCrossTail(t *testing.T) {
 	f := bNativeDatabasePair(t)
-	f.installed(t, 98, 37)
+	f.installed(t, 99, 38)
 	f.targets(t, 15, true)
 	before := f.snapshot(t)
 	if _, _, err := NewMigrator(f.sqlDB, &Config{Enabled: true, Database: f.sqlName}).Run(); err == nil {
@@ -507,7 +507,7 @@ func TestCompatibilityRetirementBLowLevelForceAndDownCannotRewriteRetirementHead
 				for _, useProof := range []bool{false, true} {
 					t.Run(fmt.Sprintf("%s_%s_dirty_%t_proof_%t", backend, action, dirty, useProof), func(t *testing.T) {
 						f := bNativeDatabasePair(t)
-						f.installed(t, 99, 38)
+						f.installed(t, 100, 39)
 						pair, err := PreflightCompatibilityPair(t.Context(), f.sqlDB, f.client, f.config())
 						if err != nil {
 							t.Fatal(err)
@@ -524,7 +524,7 @@ func TestCompatibilityRetirementBLowLevelForceAndDownCannotRewriteRetirementHead
 						before := f.snapshot(t)
 						var instance *migrate.Migrate
 						var sqlDriver *MySQLDriver
-						current := 99
+						current := 100
 						if backend == BackendMySQL {
 							cfg := ensureConfigDefaults(&Config{Enabled: true, Database: f.sqlName})
 							if useProof {
@@ -538,7 +538,7 @@ func TestCompatibilityRetirementBLowLevelForceAndDownCannotRewriteRetirementHead
 								cfg = ensureConfigDefaults(pair.MongoConfig(false))
 							}
 							instance, err = NewMongoDriver(f.client).CreateInstance(migrations, cfg)
-							current = 38
+							current = 39
 						}
 						if err != nil {
 							t.Fatal(err)
@@ -574,17 +574,17 @@ func TestCompatibilityRetirementBLowLevelForceAndDownCannotRewriteRetirementHead
 }
 
 func TestCompatibilityRetirementBOrderAndMetadataOverridesRefuseBeforeWrites(t *testing.T) {
-	for _, scenario := range []string{"Mongo_before_SQL_99", "SQL_metadata_override", "Mongo_metadata_override"} {
+	for _, scenario := range []string{"Mongo_before_SQL_100", "SQL_metadata_override", "Mongo_metadata_override"} {
 		t.Run(scenario, func(t *testing.T) {
 			f := bNativeDatabasePair(t)
-			f.installed(t, 98, 37)
+			f.installed(t, 99, 38)
 			pair, err := PreflightCompatibilityPair(t.Context(), f.sqlDB, f.client, f.config())
 			if err != nil {
 				t.Fatal(err)
 			}
 			before := f.snapshot(t)
 			switch scenario {
-			case "Mongo_before_SQL_99":
+			case "Mongo_before_SQL_100":
 				_, _, err = NewMongoMigrator(f.client, pair.MongoConfig(false)).Run()
 			case "SQL_metadata_override":
 				cfg := pair.MySQLConfig(false)
@@ -611,13 +611,13 @@ func TestCompatibilityRetirementBLateNamespaceReappearanceRefuses(t *testing.T) 
 		for _, nonempty := range []bool{false, true} {
 			t.Run(fmt.Sprintf("mask_%d_nonempty_%t", mask, nonempty), func(t *testing.T) {
 				f := bNativeDatabasePair(t)
-				f.installed(t, 98, 37)
+				f.installed(t, 99, 38)
 				pair, err := PreflightCompatibilityPair(t.Context(), f.sqlDB, f.client, f.config())
 				if err != nil {
 					t.Fatal(err)
 				}
 				if mask == 8 {
-					if version, changed, err := NewMigrator(f.sqlDB, pair.MySQLConfig(false)).Run(); err != nil || version != 99 || !changed {
+					if version, changed, err := NewMigrator(f.sqlDB, pair.MySQLConfig(false)).Run(); err != nil || version != 100 || !changed {
 						t.Fatalf("prepare ordered late Mongo source: %d %t %v", version, changed, err)
 					}
 				}
@@ -651,9 +651,9 @@ func TestCompatibilityRetirementBPairCannotAuthorizeDifferentConnectionsOrNames(
 	for _, scenario := range []string{"different_SQL_pool", "different_Mongo_client", "different_SQL_name", "different_Mongo_name"} {
 		t.Run(scenario, func(t *testing.T) {
 			f := bNativeDatabasePair(t)
-			f.installed(t, 98, 37)
+			f.installed(t, 99, 38)
 			other := bNativeDatabasePair(t)
-			other.installed(t, 98, 37)
+			other.installed(t, 99, 38)
 			pair, err := PreflightCompatibilityPair(t.Context(), f.sqlDB, f.client, f.config())
 			if err != nil {
 				t.Fatal(err)
@@ -702,7 +702,7 @@ func (f *bNativeFixture) bootstrapConfig(t *testing.T) PairConfig {
 		OperationID: "123-1", ExpiresAt: time.Now().UTC().Add(30 * time.Minute).Format(time.RFC3339),
 		ApprovedSourceSHA: strings.Repeat("a", 40), ApprovalSummarySHA256: strings.Repeat("b", 64),
 		MySQLDatabase: f.sqlName, MongoDatabase: f.mongoName, MySQLIdentitySHA256: sqlIdentity,
-		MongoClusterSHA256: mongoIdentity, MySQLVersion: 99, MongoVersion: 38,
+		MongoClusterSHA256: mongoIdentity, MySQLVersion: 100, MongoVersion: 39,
 		MigrationResourcesSHA256: CompatibilityMigrationResourcesSHA256(),
 	}
 	raw, err := json.Marshal(authorization)
@@ -755,7 +755,7 @@ func TestCompatibilityRetirementBAuthorizedColdFullHistoryAndRestart(t *testing.
 		t.Fatalf("authorized pristine preflight: %v", err)
 	}
 	version, changed, err := NewMigrator(f.sqlDB, pair.MySQLConfig(false)).Run()
-	if err != nil || version != 99 || !changed {
+	if err != nil || version != 100 || !changed {
 		t.Fatalf("authorized cold SQL: version=%d changed=%v error=%v", version, changed, err)
 	}
 	info, err := os.Lstat(cfg.BootstrapAuthorizationFile + ".consumed")
@@ -767,7 +767,7 @@ func TestCompatibilityRetirementBAuthorizedColdFullHistoryAndRestart(t *testing.
 	}
 	f.assertPoolsReusable(t)
 	version, changed, err = NewMongoMigrator(f.client, pair.MongoConfig(false)).Run()
-	if err != nil || version != 38 || !changed {
+	if err != nil || version != 39 || !changed {
 		t.Fatalf("authorized cold Mongo: version=%d changed=%v error=%v", version, changed, err)
 	}
 	f.assertTargetsAbsent(t)
@@ -778,11 +778,11 @@ func TestCompatibilityRetirementBAuthorizedColdFullHistoryAndRestart(t *testing.
 			t.Fatal(err)
 		}
 		version, changed, err = NewMigrator(f.sqlDB, pair.MySQLConfig(false)).Run()
-		if err != nil || version != 99 || changed {
+		if err != nil || version != 100 || changed {
 			t.Fatalf("cold SQL restart: version=%d changed=%v error=%v", version, changed, err)
 		}
 		version, changed, err = NewMongoMigrator(f.client, pair.MongoConfig(false)).Run()
-		if err != nil || version != 38 || changed {
+		if err != nil || version != 39 || changed {
 			t.Fatalf("cold Mongo restart: version=%d changed=%v error=%v", version, changed, err)
 		}
 		f.assertTargetsAbsent(t)
@@ -864,7 +864,7 @@ func (f *bNativeFixture) limitedMongo(t *testing.T, actions []string, collection
 func TestCompatibilityRetirementBIncompleteVisibilityRefusesWithoutWrites(t *testing.T) {
 	t.Run("SQL_table_only_select", func(t *testing.T) {
 		f := bNativeDatabasePair(t)
-		f.installed(t, 98, 37)
+		f.installed(t, 99, 38)
 		db := f.limitedSQL(t, []string{"GRANT SELECT ON `" + f.sqlName + "`.schema_migrations"})
 		before := f.snapshot(t)
 		if pair, err := PreflightCompatibilityPair(t.Context(), db, f.client, f.config()); err == nil || pair != nil {
@@ -877,7 +877,7 @@ func TestCompatibilityRetirementBIncompleteVisibilityRefusesWithoutWrites(t *tes
 	})
 	t.Run("Mongo_collection_only_find", func(t *testing.T) {
 		f := bNativeDatabasePair(t)
-		f.installed(t, 98, 37)
+		f.installed(t, 99, 38)
 		client := f.limitedMongo(t, []string{"find"})
 		before := f.snapshot(t)
 		if pair, err := PreflightCompatibilityPair(t.Context(), f.sqlDB, client, f.config()); err == nil || pair != nil {
@@ -1040,7 +1040,7 @@ func TestCompatibilityRetirementBPristineAuthorizationRejectsTamperingWithoutCon
 			bNativeRewriteAuthorization(t, cfg, func(a *bootstrapAuthorization) { a.MigrationResourcesSHA256 = strings.Repeat("e", 64) })
 		}},
 		{"wrong_version", func(t *testing.T, cfg *PairConfig) {
-			bNativeRewriteAuthorization(t, cfg, func(a *bootstrapAuthorization) { a.MySQLVersion = 98 })
+			bNativeRewriteAuthorization(t, cfg, func(a *bootstrapAuthorization) { a.MySQLVersion = 99 })
 		}},
 		{"wrong_approved_source", func(t *testing.T, cfg *PairConfig) {
 			bNativeRewriteAuthorization(t, cfg, func(a *bootstrapAuthorization) { a.ApprovedSourceSHA = strings.Repeat("c", 40) })
@@ -1142,7 +1142,7 @@ func bNativeMongoTailWrapper(t *testing.T, f *bNativeFixture, pair *PairPrefligh
 
 func bNativeMongoUpBytes(t *testing.T) []byte {
 	t.Helper()
-	raw, err := migrations.ReadFile("migrations/mongodb/000038_retire_compatibility_message_storage.up.json")
+	raw, err := migrations.ReadFile("migrations/mongodb/000039_retire_compatibility_message_storage.up.json")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1169,14 +1169,14 @@ func TestCompatibilityRetirementBNativeMongoWrapperBoundaries(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				if version, changed, err := NewMigrator(f.sqlDB, pair.MySQLConfig(false)).Run(); err != nil || version != 99 || !changed {
+				if version, changed, err := NewMigrator(f.sqlDB, pair.MySQLConfig(false)).Run(); err != nil || version != 100 || !changed {
 					t.Fatalf("SQL full-up before narrow cold wrapper: %d %t %v", version, changed, err)
 				}
 				if err := pair.validateStart(t.Context(), BackendMongo); err != nil {
 					t.Fatal(err)
 				}
 			} else {
-				f.installed(t, 99, 37)
+				f.installed(t, 100, 38)
 				pair, err = PreflightCompatibilityPair(t.Context(), f.sqlDB, f.client, f.config())
 				if err != nil {
 					t.Fatal(err)
@@ -1188,9 +1188,9 @@ func TestCompatibilityRetirementBNativeMongoWrapperBoundaries(t *testing.T) {
 			}
 			dropCommands.Store(0)
 			createCommands.Store(0)
-			version := 38
+			version := 39
 			if scenario == "canonical_body_wrong_version" || scenario == "ordinary_missing_namespace_error" {
-				version = 37
+				version = 38
 			}
 			if err := wrapper.SetVersion(version, true); err != nil {
 				t.Fatal(err)
@@ -1285,7 +1285,7 @@ func TestCompatibilityRetirementBNativeMongoUUIDReplacementBeforeDropRefuses(t *
 	if err != nil {
 		t.Fatal(err)
 	}
-	if version, changed, err := NewMigrator(f.sqlDB, pair.MySQLConfig(false)).Run(); err != nil || version != 99 || !changed {
+	if version, changed, err := NewMigrator(f.sqlDB, pair.MySQLConfig(false)).Run(); err != nil || version != 100 || !changed {
 		t.Fatalf("cold SQL before UUID replacement: %d %t %v", version, changed, err)
 	}
 	if err := pair.validateStart(t.Context(), BackendMongo); err != nil {
@@ -1301,7 +1301,7 @@ func TestCompatibilityRetirementBNativeMongoUUIDReplacementBeforeDropRefuses(t *
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := wrapper.SetVersion(38, true); err != nil {
+	if err := wrapper.SetVersion(39, true); err != nil {
 		t.Fatal(err)
 	}
 	dropCommands.Store(0)
@@ -1354,10 +1354,10 @@ func TestCompatibilityRetirementBHeadlessOrMixedPairIsNotPristine(t *testing.T) 
 		}},
 		{"installed_sql_pristine_mongo", func(t *testing.T, f *bNativeFixture) {
 			f.exec(t, "CREATE TABLE schema_migrations(version BIGINT NOT NULL PRIMARY KEY,dirty BOOLEAN NOT NULL)")
-			f.exec(t, "INSERT INTO schema_migrations VALUES(98,FALSE)")
+			f.exec(t, "INSERT INTO schema_migrations VALUES(99,FALSE)")
 		}},
 		{"pristine_sql_installed_mongo", func(t *testing.T, f *bNativeFixture) {
-			if _, err := f.mongoDB.Collection("schema_migrations").InsertOne(t.Context(), bson.D{{Key: "version", Value: int64(37)}, {Key: "dirty", Value: false}}); err != nil {
+			if _, err := f.mongoDB.Collection("schema_migrations").InsertOne(t.Context(), bson.D{{Key: "version", Value: int64(38)}, {Key: "dirty", Value: false}}); err != nil {
 				t.Fatal(err)
 			}
 		}},
