@@ -1,6 +1,6 @@
 P. 代码分析报告
 
-本批只实现可验证的 **SSH probe 来源门禁**。生产尚未安装；完整写入隔离、一次挑战消费、生产 executor 和 DROP 能力保持 false。单凭 workflow disable、production 限定 main、共享 SSH key 或暂停变量，均不能证明旧 main SHA 的重跑已被拒绝。
+本批实现可验证的 **SSH probe 来源门禁**及一次挑战持久消费原语。生产尚未安装；一次消费尚未接入生产固定入口，完整写入隔离、生产 executor 和 DROP 能力保持 false。单凭 workflow disable、production 限定 main、共享 SSH key 或暂停变量，均不能证明旧 main SHA 的重跑已被拒绝。
 
 ## 分析目标与范围
 
@@ -19,11 +19,11 @@ P. 代码分析报告
 | `m6-qs03-gap-readonly.yml` | `:37` production；上传二进制、容器内读取 AnswerSheet/SQL | 上传与 sudo Docker 能力仍需阻断旧版本 |
 | `m5-authz-outage-preflight.yml` | ServerA job 未使用 production environment；SSH+sudo Docker 读取配置；ServerD 可本地 runner 执行 | production branch policy 无法覆盖 repo Secret 与本地执行 |
 | `m5-authz-ephemeral-postcheck.yml` | 无 production environment；ServerA/ServerD SSH 读取配置/NSQ | 包括备用 key、直接 host 路径 |
-| `ping-runner.yml` | 定时；无 production environment；ServerA/ServerB SSH，ServerD 健康观测；`setup-runner-ssh.sh:60` 也可跳过 SSH | 常规只读检查不等于凭据不可用于写入 |
+| `ping-runner.yml` | 定时；无 production environment；ServerA/ServerB SSH，ServerD 健康观测；`setup-runner-ssh.sh:67` 也可跳过 SSH | 常规只读检查不等于凭据不可用于写入 |
 | `reliable-messaging-m6-qs-image-handoff.yml` | 当前 harness 使用 disposable DB/NSQ 和镜像；发布镜像分支取得 registry credentials | Registry 与 runner 资源是另一边界，不能由 DB readonly 推导全历史无权限 |
-| `compatibility-retirement.yml` | `:59` contents/actions read，无 id-token write；`:65` production-deploy；`:151` production；`:216` metadata-admin SQL、`:221` Mongo credentials；原 validate 仅约束当前源码 | 现有入口尚不能取得所需 OIDC；即使新源码 validate 正确，旧 workflow revision 的 rerun 也不能由它代为拒绝 |
+| `compatibility-retirement.yml` | `:59` contents/actions read，无 id-token write；`:65` production-deploy；`:233` production；`:310–321` 为数据库 prepare/history 模式传 SQL/Mongo credentials；原 validate 仅约束当前源码 | 现有入口尚不能取得所需 OIDC；即使新源码 validate 正确，旧 workflow revision 的 rerun 也不能由它代为拒绝 |
 
-历史元数据和每个最后实际 run 对应 YAML 已通过只读 GitHub API 获取，原始文件和 API JSON 仅保存在私有 0600 证据目录，正文不进入本报告。9 个对象当前 metadata 均为 active；这不是隔离失败或生产写入的单独证明。
+历史元数据和每个最后实际 run 对应 YAML 已通过只读 GitHub API 获取，原始文件和 API JSON 仅保存在私有 0600 证据目录，正文不进入本报告。该已保存只读快照中，9 个对象的 metadata 均为 active；这不是隔离失败或生产写入的单独证明。
 
 | workflow ID | 实际名称 | 最后实际 source SHA |
 | --- | --- | --- |
@@ -45,13 +45,14 @@ P. 代码分析报告
 - `AuthorizeProbe(ctx, borrowedHTTPClient, policy, SSH_ORIGINAL_COMMAND, fixedAuthenticatedKey, stdinOIDC, actualUID, now)`：只接受固定 probe grammar；源码 SHA/op/request/current run/attempt/check-run/actor/repo/owner IDs、SSH key 指纹和 UID 必须精确匹配。借用 HTTP client 只发固定 GET，不关闭其 transport；响应 body 属于本次读取并关闭。
 - GitHub OIDC 用固定 issuer/JWKS 和标准 RSA RS256 验签。必须有批准 audience/subject、workflow SHA、event SHA/ref、repository/owner、run/attempt、check-run、actor、production/self-hosted 与有效时间；缺失字段、重复 JSON key、算法变化、伪造、过期或历史 main SHA 均拒绝。JWKS、API 读取失败不放行。主 executable 的 read-only API credential 仅传 `api.github.com`，不发给 issuer 或其他 host，拒 redirect。
 - 两次独立 REST 完整分页读取 repository identity、current main、精确 run attempt、全部 workflows、queued/in_progress/waiting/pending/requested 和精确 attempt jobs；固定 body/page/total deadline，超 API 可证明的 1000 results 上限明确拒绝。只有批准 job/runner 可以正在执行，其他非终态都阻断。两次 raw response 摘要必须相等。这是两次观测，不是平台原子 queue freeze。
+- `ConsumeProbeChallenge(ctx, fixedRootDir, approvedPolicy, opaquePermit)`：生产 API 要求实际 euid 0、root 所有的 0700 目录与受保护的完整祖先路径。只接受 `AuthorizeProbe` 返回且尚未过期的真实不透明 permit；按相同完整 policy/source/op/run/request/challenge 绑定，通过相对 dirfd 的 NOFOLLOW/NONBLOCK、O_EXCL、文件与目录 fsync、inode/owner/single-link/原字节复读记录 intent/result。成功、半写、中断或未知状态均占用原挑战，禁止覆盖、采用或换审批重用；文件操作后的实际过期再次拒绝。普通用户测试 seam 不是 root 安装证明，目录必须由后续独立管理通道固定绑定。
 - `PrepareSSH`：为所有独立批准 raw public keys 生成 `restrict,command=...` 行，固定 policy path/hash、每 key 的真实 fingerprint、read-token path；保留原 from/expiry/verification 限制，证书/环境/未支持 options 阻断。完整原 bytes 只在 opaque plan 中；`RestoreOriginal` 要求当前 bytes 恰好等于已准备 restricted bytes，拒覆盖并发修改。
 - `VerifyEffectiveSSHD`：只验证宿主实际 `sshd -T` 投影；独立 root authorized file、无旁路 CA/AuthorizedKeysCommand/password/hostbased/GSSAPI、禁 user env/rc/forwarding/TTY，ForceCommand 不能覆盖 per-key forced command。每个 account/client Match context 都须实际核验，单次 projection 不证明全局。
 - 包内 `internal/apiserver/maintenance/compatibilityretirementfence/cmd/qs-retirement-fence` 是可编译真实普通用户 forced-command probe。策略 hash 和 key 来源必须来自 root 安装的固定 key line，不能来自客户端 env。JWT 仅 stdin；45 秒 executable deadline 由宿主关闭自己的 stdin；不执行客户端 shell、DB、CAS、DDL 或生产 executor。
 
 ## 行为、契约与不变量
 
-`SSHProbeInvocationVerified` 只表示该 probe 的来源/当前平台读取验证通过；`ProductionInstalled`、`WholeSystemWriterFenceProven`、`MutationBackendEnabled`、`DropReady` 始终 false。一次挑战消费未实现，`ReplayProtectionUnproven=true`；permit 不可用于生产写入。外部调用者不能通过任意 imported complete/count/boolean 生成 permit。
+`SSHProbeInvocationVerified` 只表示该 probe 的来源/当前平台读取验证通过；`ProductionInstalled`、`WholeSystemWriterFenceProven`、`MutationBackendEnabled`、`DropReady` 始终 false。原 probe 回执继续保留 `ReplayProtectionUnproven=true`；单独的 `ConsumeProbeChallenge` 只记录本次 probe 挑战的持久消费，permit 不可用于生产写入。外部调用者不能通过任意 imported complete/count/boolean 生成 permit。
 
 按 GitHub 官方语义，rerun 使用原事件的 SHA/ref，production 分支规则匹配 ref，所以 main-only 不排除旧 main SHA。[GitHub rerun 文档](https://docs.github.com/en/actions/how-tos/manage-workflow-runs/re-run-workflows-and-jobs)，[Environment 规则](https://docs.github.com/en/actions/reference/workflows-and-actions/deployments-and-environments)。本适配层同时核验 signed workflow SHA 和独立 current-main/run API。[OIDC primary reference](https://docs.github.com/en/actions/reference/security/oidc)，[issuer discovery（含 sha/RS256）](https://token.actions.githubusercontent.com/.well-known/openid-configuration)。
 
@@ -63,11 +64,15 @@ SSH forced command 本身不禁止 forwarding，key 的 command 也可被 server
 
 本地真实 `/bin/sh`→独立 Go 子进程→loopback HTTP 的 synthetic 签名/平台 fixture，覆盖批准 probe、旧 shell/scp/SFTP/注入、旧 main SHA、历史 rerun、排队/待审批/等待与错误隐私；另有完整跨页 catalog、重复/缺失结果、跨 repo/actor/key/UID、有效时间、配置并发变化、受保护路径和原字节 rollback 测试。它们不是实际 GitHub OIDC 或生产 sshd 安装的验收。
 
+修复前源码 `2a89d5577ddfb6598b54eda6f1ec22670da1deb2` 的五包竞态/覆盖率组合回归有 711 条测试记录，其中 710 条通过、1 条并发挑战错误分类失败；独立实际 Linux euid 0 调用还在受保护路径校验中拒绝了公共入口的根锚点 `/`。普通用户测试 seam 的通过不能代替真正 root 公共入口的通过，文档门禁通过也不能覆盖这些失败。后续修复必须分别绑定新源码、公共入口原生结果和完整并发回归；生产 root 安装与完整写隔离仍未证明。
+
+提交 `b3c546f0bdd5d79b4d69d42130a813f6937e1b9d` 保留完整祖先路径、所有权和持久结果校验，允许精确的 `/` 根锚点。打开目录时发现同挑战的既有保留记录，只把该竞态归为拒绝重用，不接受变化目录、不采用状态或授予执行权。该提交的完整五包竞态/覆盖率回归为 713 条测试及 5 条包级结果全部通过、0 失败、0 跳过；三个针对用例各重复 20 次，共 60 条测试全部通过。独立真实 Linux arm64 euid 0 公共 API 原生测试已终态通过：非 race、非 coverage，1 个父测试、0 子测试、0 失败、0 跳过。其 `2a89` 加两个精确库文件覆盖版本与 `b3c546` 的 4,026 个跟踪文件逐字节等价，额外私有原生夹具单独声明。真实签名检查与两次完整 synthetic 本地 API 快照产生 permit，再调用公共 `ConsumeProbeChallenge`；两个状态文件均为 0600 单链接，拒绝 0702 目录、symlink、重放和错误 source，独立 CID/volume 清理剩余为 0。安全回执 `qs-fence-linux-root-public-api-native-20261009.json` 的 SHA256 为 `afab6c0c43b158aaa406409b215a0192bc0417738af003c0d9cbc68d17a16cd6`。它不证明真实 GitHub origin、生产 root 安装、executor、完整写隔离、CAS 或 DROP；旧 `4b402` 的 root 拒绝证据保持。尚未提交的新维护窗口实现仍在开发，不属于本文的源码核验基线。
+
 ## 主要风险、缺口及最小下一步
 
 1. **管理通道未证明**：源码只显示现有 deploy SSH/sudo Docker/install 使用；没有读取实际 authorized-key fingerprints、effective sshd configs、sudoers 或独立管理连接。不能猜同一账号临时限制后仍能自行恢复。需独立 root 管理通道，先保存所有原 file bytes/mode/owner/unset policy 状态及 hash，再 native 验证配置、安装前后和精确 rollback，禁止 sudo 执行上传目录的可写解释器。
 2. **完整身份与权限**：root 批准全部实际 SSH key/account/host 集合和 policy IDs；每个认证来源及 Match context 封住旁路。已建立 SSH sessions/local runner 不受新 key restriction 追溯影响，必须另行实际 drain 与本地执行隔离。 key forced command 仍由账号 login shell -c 启动；restrict 禁止 ~/.ssh/rc，却不能保证 Bash 不先读取用户可写 ~/.bashrc。须核对真实 shell/hash、所有启动文件和父路径、loader 环境；必要时另行受控暂时绑定不会读取用户启动文件的可信 shell，精确保留/恢复原账号配置，不能自行 chmod 用户 home 或仅加 key restriction 就宣称完整隔离。[GNU Bash startup primary reference](https://www.gnu.org/software/bash/manual/html_node/Bash-Startup-Files)。
 3. **直接 DB/外部写者**：当前主工具能直接获得生产 DB credentials；业务 API/Collection/Worker、scheduler、host cron/manual、其他 repo/qs-ai/IAM、外部管理员连接仍可绕 SSH。需实际账号 grants/current sessions/network writer scope、服务停止/连接释放和独立复读，不改业务账号密码/权限扩大，也不把 Docker stopped 与网络所有写者静止混为一谈。
 4. **GitHub 许可与 queue**：当前 workflow 无 id-token:write，生产源码集成尚未做。read-only host token 的实际权限、environment/repo/org/reusable workflows 与 Secrets/protection原状态需实际读取；非终态作业多次完整分页和 installed gate 的真实拒绝实验缺一不可。
-5. **重放保护与 executor**：挑战原子一次消费/本批次私有持久结果记录/中断未知语义未实现。所有许可仍仅 probe；只有源码、安装、生产 origin、队列、写者与一次消费闭环通过后，才可另行接固定受保护 executor。不得先打开 mutation capability。
+5. **重放保护与 executor**：挑战原子一次消费、本批私有持久结果和中断未知语义已实现并进行本地文件及并发进程测试；生产 root 目录的固定安装、当前 SSH 来源与实际 executor 接线未完成。所有许可仍仅 probe；只有源码、安装、生产 origin、队列、写者与一次消费闭环通过后，才可另行接固定受保护 executor。不得先打开 mutation capability。
 6. **恢复原状态**：源 adapter 只保留最小临时 original bytes 并拒绝冲突；宿主必须实际 atomic/CAS 安装和恢复、验收后清理所有本批原始 assets。没有永久备份或绕过变更状态的 blanket rollback。

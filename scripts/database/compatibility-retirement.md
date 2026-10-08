@@ -73,6 +73,10 @@ restores are outside this scope. No new DROP migration is included in A.
   permit purge. The journal requires an operation lock and is not called by the
   current mutation CLI. Preparation writes only operation-owned private source
   inventory files; it issues no INSERT/UPDATE/DELETE/DDL/migration commands.
+- Backup private-file reads use `NOFOLLOW` and `NONBLOCK`, then require a
+  regular file and preserve the existing owner, mode and size checks. A FIFO
+  without a writer is rejected before reading. This protects file acquisition;
+  it does not bound regular-file I/O or prove the combined 10-minute recovery.
 - Deadline helpers stop forward work at 20 minutes and all recovery work at
   30 minutes. These helpers alone do not guarantee recovery time; readiness
   requires a measured and independently verified rollback of at most 10 minutes.
@@ -95,6 +99,34 @@ still requires its actual source, database and original execution/MQ closure,
 independent approvals, writer fencing, evidence CAS and
 fresh readback. The local CLI and synthetic source-scale tests establish none
 of those production gates.
+
+The pre-fix combined five-package race/coverage regression at source
+`2a89d5577ddfb6598b54eda6f1ec22670da1deb2` recorded 710 passing test actions
+and one failed concurrent-challenge category test. A separate actual Linux
+euid-0 call rejected the public challenge-store root anchor `/` at protected-path
+validation. Prior ordinary-user seams, synthetic fixtures and documentation
+checks cannot replace successful current-source public-root and complete
+concurrency verification. Those failures grant no production fence or execution
+authority; source regression, local root-entry proof and production installation
+remain separate gates.
+
+The subsequent source `b3c546f0bdd5d79b4d69d42130a813f6937e1b9d` passes the
+combined five-package race/coverage regression: 713 test actions and five package
+results pass, with no failure or skip. Each of three targeted challenge tests
+also passes 20 repetitions (60 test actions). These are local regression results.
+A separate Linux arm64 euid-0 public-API test passes with one parent test, no
+subtest, failure or skip, without race or coverage instrumentation. Its
+`2a89` plus exact two-file library overlay is independently equal to all 4,026
+tracked files at `b3c546`; the extra private native fixture is declared separately.
+It verifies genuine signature checks against two complete synthetic local API
+snapshots, durable public challenge consumption and unsafe-directory, symlink,
+replay and wrong-source rejection. The safe receipt
+`qs-fence-linux-root-public-api-native-20261009.json` has SHA256
+`afab6c0c43b158aaa406409b215a0192bc0417738af003c0d9cbc68d17a16cd6`.
+This local root-entry result establishes no live GitHub origin, production
+installation, executor, whole-writer fence, CAS or DROP. New maintenance-window
+work outside this committed source is still under development and is not part
+of this verification baseline.
 
 The main-line lint follow-up preserves six local deprecated-call exceptions:
 five deliberately disconnected `mongo.NewClient` fixtures must prove rejection
@@ -145,7 +177,22 @@ and required adapters. The 4,096-entry / 8 MiB accounted limit bounds this
 optional cache: saturation retains the complete original list and continues.
 A used cache conflict fails before consuming a page. Public range reads remain
 deep copies; nil/empty distinctions and the original ordered private hash remain
-unchanged. Source indexes reserve capacity only after authenticated bounded
+unchanged. After each epoch has independently authenticated all four complete
+copies, only the coordinator-owned event consumption readers retain a compact
+original-ID set instead of a second complete event reference. Every decoded
+row still matches the sealed complete typed-fact digest; public readers, initial
+authentication, origin/index reads, strict ordering, clean EOF, per-page keys
+and original defensive-clone checks retain their existing behavior. This removes
+duplicate retention; it does not establish a measured production memory budget.
+
+The private decoded-fact digest includes the time-zone name and offset as part
+of the complete DTO. The derived diagnostic `whole_source_index_sha256` is
+therefore a process-environment-dependent observation, compared only between
+two epochs of the same CLI. It is not portable across time zones and is not
+persistent business evidence. Original source bytes, content digests, SDK
+fingerprints and business bindings remain independently verified. The capacity
+golden test uses explicit UTC input; other historical fixtures retain their
+original inputs. Source indexes reserve capacity only after authenticated bounded
 counts; these changes do not establish the complete production resource budget.
 
 `prepare_mode=bootstrap-history-metadata` has a separate independently hashed
