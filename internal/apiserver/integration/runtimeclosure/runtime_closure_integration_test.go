@@ -59,7 +59,6 @@ import (
 	eventcatalog "github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
 	eventruntime "github.com/FangcunMount/qs-server/internal/pkg/eventing/runtime"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
-	migrationpkg "github.com/FangcunMount/qs-server/internal/pkg/migration"
 	"github.com/FangcunMount/qs-server/internal/pkg/mongodbtest"
 	genericoptions "github.com/FangcunMount/qs-server/internal/pkg/options"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime"
@@ -122,27 +121,11 @@ func runCurrentRuntimeClosure(t *testing.T, eventFactory runtimeClosureEventFact
 	startedAt := time.Now().UTC().Add(-5 * time.Second)
 
 	sqlDB, databaseName := openRuntimeDatabase(t, mysqlDSN)
-	mysqlMigrator := migrationpkg.NewMigrator(sqlDB, &migrationpkg.Config{Enabled: true, Database: databaseName})
-	mysqlVersion, changed, err := mysqlMigrator.Run()
-	if err != nil || !changed || mysqlVersion == 0 {
-		t.Fatalf("migrate empty MySQL: version=%d changed=%v err=%v", mysqlVersion, changed, err)
-	}
-	if version, changed, err := mysqlMigrator.Run(); err != nil || changed || version != mysqlVersion {
-		t.Fatalf("repeat MySQL migration: version=%d want_version=%d changed=%v err=%v", version, mysqlVersion, changed, err)
-	}
+	mongoClient, mongoDB := mongodbtest.ReplicaSetDatabase(t)
+	migrateRuntimeCompatibilityPair(t, sqlDB, databaseName, mongoClient, mongoDB)
 	gormDB, err := gorm.Open(gormmysql.New(gormmysql.Config{Conn: sqlDB, SkipInitializeWithVersion: true}), &gorm.Config{})
 	if err != nil {
 		t.Fatal(err)
-	}
-
-	mongoClient, mongoDB := mongodbtest.ReplicaSetDatabase(t)
-	mongoMigrator := migrationpkg.NewMongoMigrator(mongoClient, &migrationpkg.Config{Enabled: true, Database: mongoDB.Name()})
-	mongoVersion, changed, err := mongoMigrator.Run()
-	if err != nil || !changed || mongoVersion == 0 {
-		t.Fatalf("migrate empty MongoDB: version=%d changed=%v err=%v", mongoVersion, changed, err)
-	}
-	if version, changed, err := mongoMigrator.Run(); err != nil || changed || version != mongoVersion {
-		t.Fatalf("repeat MongoDB migration: version=%d want_version=%d changed=%v err=%v", version, mongoVersion, changed, err)
 	}
 
 	redisOptions, err := redis.ParseURL(redisURL)
@@ -338,11 +321,10 @@ func runCurrentRuntimeClosure(t *testing.T, eventFactory runtimeClosureEventFact
 	if err != nil || answerResponse.GetId() == 0 {
 		t.Fatalf("submit AnswerSheet: response=%+v err=%v", answerResponse, err)
 	}
-	var answerMessage *rmtransport.Received
 	if delivery != nil && delivery.Covers(eventcatalog.AnswerSheetSubmitted) {
-		answerMessage, err = delivery.Wait(t, eventcatalog.AnswerSheetSubmitted)
+		_, err = delivery.Wait(t, eventcatalog.AnswerSheetSubmitted)
 	} else {
-		answerMessage = capture.Wait(t, eventcatalog.AnswerSheetSubmitted)
+		answerMessage := capture.Wait(t, eventcatalog.AnswerSheetSubmitted)
 		err = answerHandler(t.Context(), eventcatalog.AnswerSheetSubmitted, answerMessage.Payload)
 	}
 	if err != nil {
@@ -446,11 +428,10 @@ func runCurrentRuntimeClosure(t *testing.T, eventFactory runtimeClosureEventFact
 		assertStandardEvaluationPublished(t, gormDB, eventcatalog.EvaluationRequested)
 		assertStandardEvaluationPublished(t, gormDB, eventcatalog.EvaluationOutcomeCommitted)
 	}
-	var reportMessage *rmtransport.Received
 	if delivery != nil && delivery.Covers(eventcatalog.InterpretationReportGenerated) {
-		reportMessage, err = delivery.Wait(t, eventcatalog.InterpretationReportGenerated)
+		_, err = delivery.Wait(t, eventcatalog.InterpretationReportGenerated)
 	} else {
-		reportMessage = capture.Wait(t, eventcatalog.InterpretationReportGenerated)
+		reportMessage := capture.Wait(t, eventcatalog.InterpretationReportGenerated)
 		err = reportHandler(t.Context(), eventcatalog.InterpretationReportGenerated, reportMessage.Payload)
 	}
 	if err != nil {
@@ -481,7 +462,7 @@ func assertEvaluationIntentCount(t *testing.T, db *gorm.DB, standard bool, event
 	t.Helper()
 	if standard {
 		assertRowCount(t, db, "rm_outbox", "event_type = ?", want, eventType)
-		assertRowCount(t, db, "domain_event_outbox", "event_type = ?", 0, eventType)
+		assertRuntimeRetiredSQLNamespaceAbsent(t, db)
 		return
 	}
 	assertRowCount(t, db, "domain_event_outbox", "event_type = ?", want, eventType)
@@ -505,10 +486,7 @@ func assertStandardEvaluationPublished(t *testing.T, db *gorm.DB, eventType stri
 
 func assertStandardMongoIntentPublished(t *testing.T, db *mongo.Database, eventType string) {
 	t.Helper()
-	old, err := db.Collection("domain_event_outbox").CountDocuments(t.Context(), bson.M{"event_type": eventType})
-	if err != nil || old != 0 {
-		t.Fatalf("old Mongo %s intents=%d err=%v, want zero", eventType, old, err)
-	}
+	assertRuntimeRetiredMongoNamespaceAbsent(t, db)
 	deadline := time.Now().Add(5 * time.Second)
 	for time.Now().Before(deadline) {
 		count, err := db.Collection("rm_outbox").CountDocuments(t.Context(), bson.M{"event_type": eventType, "state": "published"})
@@ -886,9 +864,13 @@ func assertSingleCommittedReport(t *testing.T, db *mongo.Database, standardMongo
 	if err != nil || count != 1 {
 		t.Fatalf("%s report generated count=%d err=%v, want one", outboxCollection, count, err)
 	}
-	unused, err := db.Collection(unusedCollection).CountDocuments(t.Context(), bson.M{"event_type": eventcatalog.InterpretationReportGenerated})
-	if err != nil || unused != 0 {
-		t.Fatalf("%s report generated count=%d err=%v, want zero", unusedCollection, unused, err)
+	if standardMongo {
+		assertRuntimeRetiredMongoNamespaceAbsent(t, db)
+	} else {
+		unused, err := db.Collection(unusedCollection).CountDocuments(t.Context(), bson.M{"event_type": eventcatalog.InterpretationReportGenerated})
+		if err != nil || unused != 0 {
+			t.Fatalf("%s report generated count=%d err=%v, want zero", unusedCollection, unused, err)
+		}
 	}
 }
 

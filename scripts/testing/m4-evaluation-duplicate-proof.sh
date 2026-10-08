@@ -2,6 +2,8 @@
 set -euo pipefail
 
 repo=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)
+source_sha=$(git -C "$repo" rev-parse HEAD)
+[[ "$source_sha" =~ ^[0-9a-f]{40}$ ]] || { echo "Exact QS source SHA is required" >&2; exit 1; }
 project="qs-m4-evaluation-duplicate-$(date +%s)-$$-${RANDOM}"
 compose=(docker compose --project-name "$project" --file "$repo/scripts/testing/m4-evaluation-duplicate-compose.yaml")
 
@@ -35,11 +37,14 @@ case "$architecture" in
 esac
 binary=/tmp/qs-m4-evaluation-duplicate.test
 (cd "$repo" && GOPROXY=https://proxy.golang.org,direct CGO_ENABLED=0 GOOS=linux GOARCH="$goarch" go test -c \
+  -ldflags="-X github.com/FangcunMount/qs-server/pkg/version.GitCommit=$source_sha" \
   -tags=integration -o "$binary" ./internal/apiserver/integration/runtimeclosure)
+[[ $(git -C "$repo" rev-parse HEAD) == "$source_sha" ]] || { echo "QS source changed during test build" >&2; exit 1; }
 "${compose[@]}" exec -T mysql mkdir -p /tmp/m4-duplicate/configs /tmp/m4-duplicate/internal/apiserver/integration/runtimeclosure
 "${compose[@]}" cp "$repo/configs/events.yaml" mysql:/tmp/m4-duplicate/configs/events.yaml
 "${compose[@]}" cp "$binary" mysql:/tmp/m4-duplicate/internal/apiserver/integration/runtimeclosure/runtimeclosure.test
 "${compose[@]}" exec -T -w /tmp/m4-duplicate/internal/apiserver/integration/runtimeclosure \
+  -e QS_RUNTIME_CLOSURE_APPROVED_SOURCE_SHA="$source_sha" \
   -e MYSQL_DSN='root@tcp(mysql:3306)/mysql?parseTime=true&multiStatements=true&loc=Asia%2FShanghai' \
   -e QS_SERVER_TEST_MONGO_URI='mongodb://mongo:27017/?replicaSet=rm-test' \
   -e QS_SERVER_TEST_MONGO_DB_PREFIX='qs_m4_duplicate_test' \

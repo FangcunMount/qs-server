@@ -386,7 +386,9 @@ jobs:
           QS_SERVER_TEST_MONGO_DB_PREFIX: qs_runtime_closure_test
           QS_SERVER_TEST_REDIS_URL: redis://127.0.0.1:6379/15
         run: |
+          test "$(git rev-parse HEAD)" = "${GITHUB_SHA}"
           go test -tags=integration \
+            -ldflags="-X github.com/FangcunMount/qs-server/pkg/version.GitCommit=${GITHUB_SHA}" \
             -run '^TestCurrentRuntimeClosure$' \
             -count=1 -timeout=15m -v ./internal/apiserver/integration/runtimeclosure
 

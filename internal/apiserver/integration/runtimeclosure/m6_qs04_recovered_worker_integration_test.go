@@ -12,6 +12,7 @@ import (
 	eventsubsystem "github.com/FangcunMount/qs-server/internal/apiserver/eventing/subsystem"
 	mysqlstandard "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/standardoutbox"
 	grpctransport "github.com/FangcunMount/qs-server/internal/apiserver/transport/grpc"
+	eventcatalog "github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
 	"github.com/stretchr/testify/require"
 	"gorm.io/gorm"
 )
@@ -127,9 +128,21 @@ func TestM6QS04RecoveredOriginalHasOneWorkerEffect(t *testing.T) {
 		},
 	}
 	runCurrentRuntimeClosure(t, func(t *testing.T, opts eventsubsystem.Options, sqlDB *sql.DB) (*eventsubsystem.Subsystem, runtimeClosureDelivery, error) {
-		subsystem, d, err := newM5StandardEventSubsystemControlled(t, opts, sqlDB, true, false, true)
+		// QS-04 loses only the SQL Evaluation request before its consumer
+		// connects. Mongo retains the required standard rm_outbox profile and
+		// captured publisher/real handlers, so AnswerSheet can first create that
+		// SQL request. Routing it to the delayed SQL consumer would deadlock.
+		subsystem, d, err := newM5StandardEventSubsystemControlled(t, opts, sqlDB, false, false, true)
 		if err == nil {
 			delivery = d.(*standardClosureDelivery)
+			t.Run("captured_Mongo_retains_complete_standard_profile", func(t *testing.T) {
+				binding := subsystem.Profile(eventcatalog.OutboxProfileMongoDomain)
+				require.NotNil(t, binding.Stager)
+				require.NotNil(t, binding.PostCommit)
+				require.False(t, delivery.Covers(eventcatalog.AnswerSheetSubmitted))
+				require.False(t, delivery.Covers(eventcatalog.InterpretationReportGenerated))
+				require.True(t, delivery.Covers(eventcatalog.EvaluationRequested))
+			})
 		}
 		return subsystem, d, err
 	}, scenario)
