@@ -21,11 +21,12 @@ const maxPrivateFactBytes = 2 * MaxSourceRowBytes
 type privateFactHasher struct {
 	h            hash.Hash
 	bytes, nodes int
+	scratch      [256]byte
 }
 
 func privateFactsSHA(value any) ([32]byte, error) {
 	h := &privateFactHasher{h: sha256.New()}
-	if err := h.frame([]byte(privateFactsProtocol)); err != nil {
+	if err := h.text(privateFactsProtocol); err != nil {
 		return [32]byte{}, err
 	}
 	if err := h.value(reflect.ValueOf(value), 0); err != nil {
@@ -36,12 +37,52 @@ func privateFactsSHA(value any) ([32]byte, error) {
 	return result, nil
 }
 
-func (h *privateFactHasher) frame(raw []byte) error {
-	if len(raw) > maxPrivateFactBytes-h.bytes-9 {
+// hash.Hash.Write consumes bytes synchronously; only this hasher owns and
+// reuses its bounded scratch space. The original non-NULL nine-byte framing
+// and byte budget remain unchanged, including empty string/byte frames.
+func (h *privateFactHasher) frameHeader(size int) error {
+	if h.bytes > maxPrivateFactBytes-9 || size < 0 || size > maxPrivateFactBytes-h.bytes-9 {
 		return ErrSourceBounds
 	}
-	h.bytes += len(raw) + 9
-	sourceFrame(h.h, raw, false)
+	h.bytes += size + 9
+	h.scratch[0] = 1
+	binary.BigEndian.PutUint64(h.scratch[1:9], uint64(size))
+	_, _ = h.h.Write(h.scratch[:9])
+	return nil
+}
+
+func (h *privateFactHasher) frame(raw []byte) error {
+	if err := h.frameHeader(len(raw)); err != nil {
+		return err
+	}
+	_, _ = h.h.Write(raw)
+	return nil
+}
+
+func (h *privateFactHasher) text(value string) error {
+	return h.textParts(value)
+}
+
+// Parts share ONE original frame: splitting a type label or long UTF-8 text
+// changes neither the recorded length nor the bytes entering the hash.
+func (h *privateFactHasher) textParts(parts ...string) error {
+	size := 0
+	for _, part := range parts {
+		if len(part) > maxPrivateFactBytes-size {
+			return ErrSourceBounds
+		}
+		size += len(part)
+	}
+	if err := h.frameHeader(size); err != nil {
+		return err
+	}
+	for _, part := range parts {
+		for len(part) > 0 {
+			n := copy(h.scratch[:], part)
+			_, _ = h.h.Write(h.scratch[:n])
+			part = part[n:]
+		}
+	}
 	return nil
 }
 
@@ -53,37 +94,37 @@ func (h *privateFactHasher) value(v reflect.Value, depth int) error {
 		return ErrSourceBounds
 	}
 	if !v.IsValid() {
-		return h.frame([]byte("invalid"))
+		return h.text("invalid")
 	}
-	if err := h.frame([]byte(v.Type().PkgPath() + ":" + v.Type().String())); err != nil {
+	if err := h.textParts(v.Type().PkgPath(), ":", v.Type().String()); err != nil {
 		return err
 	}
 	if v.Type() == privateTimeType {
 		t := v.Interface().(time.Time)
-		if err := h.frame([]byte(t.UTC().Format(time.RFC3339Nano))); err != nil {
+		if err := h.text(t.UTC().Format(time.RFC3339Nano)); err != nil {
 			return err
 		}
 		name, offset := t.Zone()
-		if err := h.frame([]byte(name)); err != nil {
+		if err := h.text(name); err != nil {
 			return err
 		}
-		return h.frame([]byte(strconv.Itoa(offset)))
+		return h.text(strconv.Itoa(offset))
 	}
 	switch v.Kind() {
 	case reflect.Pointer, reflect.Interface:
 		if v.IsNil() {
-			return h.frame([]byte("nil"))
+			return h.text("nil")
 		}
-		if err := h.frame([]byte("present")); err != nil {
+		if err := h.text("present"); err != nil {
 			return err
 		}
 		return h.value(v.Elem(), depth+1)
 	case reflect.Bool:
-		return h.frame([]byte(strconv.FormatBool(v.Bool())))
+		return h.text(strconv.FormatBool(v.Bool()))
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-		return h.frame([]byte(strconv.FormatInt(v.Int(), 10)))
+		return h.text(strconv.FormatInt(v.Int(), 10))
 	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
-		return h.frame([]byte(strconv.FormatUint(v.Uint(), 10)))
+		return h.text(strconv.FormatUint(v.Uint(), 10))
 	case reflect.Float32, reflect.Float64:
 		n := v.Float()
 		if math.IsNaN(n) || math.IsInf(n, 0) {
@@ -93,14 +134,14 @@ func (h *privateFactHasher) value(v reflect.Value, depth int) error {
 		binary.BigEndian.PutUint64(raw[:], math.Float64bits(n))
 		return h.frame(raw[:])
 	case reflect.String:
-		return h.frame([]byte(v.String()))
+		return h.text(v.String())
 	case reflect.Struct:
 		for i := 0; i < v.NumField(); i++ {
 			f := v.Type().Field(i)
 			if f.PkgPath != "" {
 				return ErrSourceAuthentication
 			}
-			if err := h.frame([]byte(f.Name)); err != nil {
+			if err := h.text(f.Name); err != nil {
 				return err
 			}
 			if err := h.value(v.Field(i), depth+1); err != nil {
@@ -110,9 +151,9 @@ func (h *privateFactHasher) value(v reflect.Value, depth int) error {
 		return nil
 	case reflect.Array, reflect.Slice:
 		if v.Kind() == reflect.Slice && v.IsNil() {
-			return h.frame([]byte("nil"))
+			return h.text("nil")
 		}
-		if err := h.frame([]byte(strconv.Itoa(v.Len()))); err != nil {
+		if err := h.text(strconv.Itoa(v.Len())); err != nil {
 			return err
 		}
 		for i := 0; i < v.Len(); i++ {
@@ -123,7 +164,7 @@ func (h *privateFactHasher) value(v reflect.Value, depth int) error {
 		return nil
 	case reflect.Map:
 		if v.IsNil() {
-			return h.frame([]byte("nil"))
+			return h.text("nil")
 		}
 		if v.Type().Key().Kind() != reflect.String {
 			return ErrSourceAuthentication
@@ -133,7 +174,7 @@ func (h *privateFactHasher) value(v reflect.Value, depth int) error {
 		}
 		keys := v.MapKeys()
 		sort.Slice(keys, func(i, j int) bool { return keys[i].String() < keys[j].String() })
-		if err := h.frame([]byte(strconv.Itoa(len(keys)))); err != nil {
+		if err := h.text(strconv.Itoa(len(keys))); err != nil {
 			return err
 		}
 		for _, k := range keys {
