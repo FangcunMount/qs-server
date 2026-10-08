@@ -2,7 +2,7 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "0347152c36e93f41775840123ef645078039e5f8",
+    "sha": "2e383cca73e13d5afe92804e6fd0f679435d57b9",
     "verified_on": "2026-10-08"
   },
   "status_policy": {
@@ -78,12 +78,12 @@
   "machine_contracts": {
     "migrations": {
       "mysql": {
-        "max_version": 99,
-        "version_count": 99
+        "max_version": 100,
+        "version_count": 100
       },
       "mongodb": {
-        "max_version": 38,
-        "version_count": 38
+        "max_version": 39,
+        "version_count": 39
       }
     },
     "events": {
@@ -11214,7 +11214,7 @@
       "owner": "tooling",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "37a5abcc1f0830f4f1a47730c9f059c469ec24cd",
+        "source_sha": "2e383cca73e13d5afe92804e6fd0f679435d57b9",
         "verified_on": "2026-10-08"
       },
       "fact_sources": [
@@ -11312,6 +11312,34 @@
           "command": "python3 -B scripts/database/test-compatibility-retirement.py",
           "result": "passed",
           "source_sha": "37a5abcc1f0830f4f1a47730c9f059c469ec24cd",
+          "verified_on": "2026-10-08"
+        },
+        {
+          "kind": "command",
+          "command": "python3 -B scripts/database/test-compatibility-retirement.py",
+          "result": "passed",
+          "source_sha": "2e383cca73e13d5afe92804e6fd0f679435d57b9",
+          "verified_on": "2026-10-08"
+        },
+        {
+          "kind": "command",
+          "command": "go test -p 4 ./...",
+          "result": "passed",
+          "source_sha": "2e383cca73e13d5afe92804e6fd0f679435d57b9",
+          "verified_on": "2026-10-08"
+        },
+        {
+          "kind": "command",
+          "command": "python3 -B scripts/database/compatibility-retirement-b-integration.py",
+          "result": "passed",
+          "source_sha": "2e383cca73e13d5afe92804e6fd0f679435d57b9",
+          "verified_on": "2026-10-08"
+        },
+        {
+          "kind": "command",
+          "command": "make docs-check",
+          "result": "passed",
+          "source_sha": "2e383cca73e13d5afe92804e6fd0f679435d57b9",
           "verified_on": "2026-10-08"
         }
       ],
