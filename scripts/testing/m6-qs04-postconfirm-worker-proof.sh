@@ -13,7 +13,9 @@ if [[ -n ${DOCKER_HOST:-} || "$endpoint" != unix://* ]]; then
   exit 1
 fi
 docker info >/dev/null
-printf 'QS source: %s\n' "$(git -C "$repo" rev-parse HEAD)"
+source_sha=$(git -C "$repo" rev-parse HEAD)
+[[ "$source_sha" =~ ^[0-9a-f]{40}$ ]] || { echo "Exact QS source SHA is required" >&2; exit 1; }
+printf 'QS source: %s\n' "$source_sha"
 printf 'SDK dependency: %s\n' "$(cd "$repo" && GOPROXY=https://proxy.golang.org,direct go list -m github.com/FangcunMount/reliable-messaging)"
 
 cleanup() {
@@ -56,13 +58,16 @@ esac
 build_dir=$(mktemp -d "${TMPDIR:-/tmp}/$project-build.XXXXXX")
 (cd "$repo" && GOPROXY=https://proxy.golang.org,direct CGO_ENABLED=0 GOOS=linux GOARCH="$goarch" go test -c \
   -tags='integration,reliable_messaging_m4,reliable_messaging_m5' \
+  -ldflags="-X github.com/FangcunMount/qs-server/pkg/version.GitCommit=$source_sha" \
   -o "$build_dir/runtimeclosure.test" ./internal/apiserver/integration/runtimeclosure)
+[[ $(git -C "$repo" rev-parse HEAD) == "$source_sha" ]] || { echo "QS source changed during test build" >&2; exit 1; }
 "${compose[@]}" exec -T mysql mkdir -p /tmp/m6-qs04/configs /tmp/m6-qs04/internal/apiserver/integration/runtimeclosure
 "${compose[@]}" cp "$repo/configs/events.yaml" mysql:/tmp/m6-qs04/configs/events.yaml
 "${compose[@]}" cp "$repo/configs/grpc-acl.prod.yaml" mysql:/tmp/m6-qs04/configs/grpc-acl.prod.yaml
 "${compose[@]}" cp "$build_dir/runtimeclosure.test" mysql:/tmp/m6-qs04/internal/apiserver/integration/runtimeclosure/runtimeclosure.test
 
 "${compose[@]}" exec -T -w /tmp/m6-qs04/internal/apiserver/integration/runtimeclosure \
+  -e QS_RUNTIME_CLOSURE_APPROVED_SOURCE_SHA="$source_sha" \
   -e MYSQL_DSN='root@tcp(mysql:3306)/mysql?parseTime=true&multiStatements=true&loc=Asia%2FShanghai' \
   -e QS_SERVER_TEST_MONGO_URI='mongodb://mongo:27017/?replicaSet=rm-test' \
   -e QS_SERVER_TEST_MONGO_DB_PREFIX='qs_m6_qs04_worker_test' \

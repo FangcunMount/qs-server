@@ -1,4 +1,4 @@
-# Exact compatibility retirement: A-stage execution barrier
+# Exact compatibility retirement: preparation and B startup barriers
 
 This is the foundation for the accepted four-object operation, not an enabled
 production cleanup. `prepare` has real read-only identity discovery, separately approved private
@@ -43,7 +43,8 @@ restores are outside this scope. No new DROP migration is included in A.
   and wait while occupying its lock.
 - A private 0700 operation directory under
   `/opt/backups/qs-server/compatibility-retirement/<operation-id>` owns its
-  immutable 0600 `inventory-request.json` first, then a separately approved
+  immutable 0600 requests (`identity-request.json`, `boundary-request.json`,
+  `inventory-request.json` as applicable), then a separately approved
   `manifest.json` after real preparation. IDs use numeric `run-attempt` format.
   Manifest/evidence reads reject symlinks, hard links, duplicate JSON keys,
   malformed types, unknown fields, source/operation/target mismatches, dirty
@@ -132,7 +133,8 @@ returning success for an unsupported stage is not a valid implementation.
 ## Real read-only preparation contract
 
 `prepare_mode=identity` requires only `identity_request_sha256`;
-`prepare_mode=inventory` requires only `inventory_request_sha256`. Both require an
+`prepare_mode=bounds` and `prepare_mode=inventory` require only
+`inventory_request_sha256`. All three preparation classes require an
 empty `manifest_sha256`. Other stages require the immutable manifest hash and
 empty request hashes. Unknown/mixed classes, another operation,
 another SHA or another target set are rejected before connections are opened.
@@ -315,8 +317,10 @@ counts, hashes, observed head/identity flags and `inventory_complete`; it always
 keeps `complete:false`, `execution_allowed:false`. It binds the exact private
 report file hash and does not infer business terminal status from published or
 delivered transport flags. Temporary credentials are removed independently of
-inventory retention; inventory payload copies must be registered for the later
-batch-specific purge alongside the temporary backups. A timed-out container is
+inventory retention; inventory payload copies are immutably registered by operation/run/request,
+namespace, approved boundary and file SHA256 for later batch-specific purge
+alongside the temporary backups. This temporary source register is not a
+permanent database archive or a business-retirement verdict. A timed-out container is
 left with exact operation/run/source/request labels for read-only reconciliation,
 not blindly removed or retried.
 
@@ -355,8 +359,59 @@ and pre-delivery-guard six at `ea123c7f88b521a68f9fa2de2e7dbe8b44223883:configs/
 Their presence in historical config is diagnostic vocabulary, not proof of real
 production row existence or business verification.
 
+
+## B migration and startup contract
+
+B adds SQL100 and Mongo39 without rewriting any historical migration. Business
+logic remains A's. Installed databases must have all four targets absent,
+including empty-present objects, before either provider can create or mutate
+migration metadata. Joint live preflight verifies both selected logical databases,
+complete required catalog visibility, stable identity and clean expected heads;
+missing/dirty/unknown heads, permission/network failures and mixed pristine pairs
+fail before migration writes. The Mongo selection must equal the database actually
+used by the business connection; migration overrides cannot point elsewhere.
+
+SQL advances first (`98 -> 99`) and Mongo follows (`37 -> 38`). A fresh complete
+joint proof can continue clean `100/38`; reverse `99/39` fails. The run owns only
+its acquired SQL connection and releases it on every result, retaining the host's
+borrowed pool and Mongo client. Public low-level Force/Down calls cannot downgrade
+a B head or clear its dirty state without the successful exact terminal run.
+
+The Mongo wrapper pins B's exact version/direction/resource bytes and single
+terminal drop command. Installed absence is a no-op for that terminal command,
+never a collection recreation. Other commands and permission/network/namespace
+errors remain ordinary failures. Only an independently approved, truly pristine
+pair may remove an empty old collection created by full historical bootstrap;
+namespace type, UUID, empty content and identity are rechecked immediately.
+
+Cold bootstrap needs complete empty catalogs (including routine/event/profiling
+state), plus an identity/resource/source-bound private one-use authorization.
+The two formal keys are `migration.retirement-bootstrap-authorization-file` and
+`migration.retirement-bootstrap-authorization-sha256`. No boolean, empty target,
+self-reported source SHA or observed state automatically approves cold bootstrap.
+The application compares the approval source with its built GitCommit for this
+cold path, rejects an unknown build SHA, and fsyncs the consumed receipt before
+SQL creates metadata. Provisioning, exclusive writers and the actual image digest
+still require independent external proof.
+
+Recovery uses a preverified image and batch-bound configuration with
+`migration.enabled=false`. It never performs Up/Down/Force or clears dirty state;
+only the exact batch targets may be restored, retaining new evidence, retired IDs
+and current MQ facts. The original A image is a possible candidate when separately
+verified with migration disabled; B-checkout disabled-branch tests alone do not
+attest that image or business acceptance. A restoration startup must not be
+mistaken for successful B migration or production cleanup.
+
+`python3 -B scripts/database/compatibility-retirement-b-integration.py` exercises
+these paired contracts in owned authenticated loopback-only disposable MySQL8 /
+Mongo7 fixtures. Source inventory scale verification is separate. Neither local
+suite enables the currently unavailable deletion/recovery/acceptance/purge
+backends or substitutes for the real measured ten-minute restoration budget.
+
 Dispatch validation normalizes only declared optional defaults before the strict
 stage/source/request checks. Required fields and unknown keys still fail before
 production credentials. The contract test executes the actual github-script
 validator for omitted empty defaults, complete inputs, unknown/mixed requests,
 missing requirements, wrong ref/runtime SHA and an advanced main.
+
+空库业务测试使用产品的双库预检和启动入口，编译时注入本次 checkout 的真实 `pkg/version.GitCommit`，并与独立的测试源码批准值核对。旧表已退役时核对命名空间确实缺失，标准 `rm_outbox` 的原事件、唯一业务事实及故障重投断言继续执行。QS-04 只延迟 SQL 的 NSQ 领取者；Mongo 仍提供完整标准存储、事务、Relay 和状态读取绑定，以完成生成 SQL 请求的前置答卷处理。测试准备不能绕过产品的空库身份、版本或授权门禁。

@@ -313,42 +313,51 @@ func newM5StandardEventSubsystemControlled(t *testing.T, opts eventsubsystem.Opt
 			Status: appeventing.NamedOutboxStatusReader{Name: "assessment-mysql-outbox", Reader: status},
 		},
 	}
-	if standardMongo {
-		collection := opts.MongoDB.Collection("rm_outbox")
-		if _, err := collection.Indexes().CreateMany(t.Context(), sdkmongo.Indexes()); err != nil {
-			return nil, nil, err
+	// The flag selects physical NSQ routing for Mongo; both values retain the
+	// required standard storage, transaction, Relay and status contracts.
+	var mongoPublisher rmtransport.Publisher = publisher
+	mongoDrain := drain
+	if !standardMongo {
+		if opts.WirePublisher == nil {
+			return nil, nil, fmt.Errorf("captured standard Mongo transport is required")
 		}
-		mongoStore, err := sdkmongo.New(collection)
-		if err != nil {
-			return nil, nil, err
-		}
-		mongoStager, err := mongostandard.NewStager(collection, opts.Catalog, eventruntime.SourceAPIServer)
-		if err != nil {
-			return nil, nil, err
-		}
-		mongoStatus, err := mongostandard.NewStatusReader(collection)
-		if err != nil {
-			return nil, nil, err
-		}
-		mongoWake := standardoutbox.NewPostCommitWake()
-		mongoSupervisor, err := standardoutbox.NewRelaySupervisor(standardoutbox.SupervisorOptions{
-			Name: "mongo-domain-events", InitialBackoff: 100 * time.Millisecond, MaxBackoff: time.Second,
-			NewRelay: func(observe relay.Observer) (standardoutbox.RelayRunner, error) {
-				return relay.New(mongoStore, publisher, relay.Config{
-					Concurrency: 1, PollInterval: 50 * time.Millisecond, Lease: 5 * time.Second,
-					PublishTimeout: 2 * time.Second, WriteTimeout: time.Second,
-					Wake: mongoWake.Wake(), Retry: standardoutbox.SDKRetryPolicy(), Observe: observe,
-				})
-			},
-		})
-		if err != nil {
-			return nil, nil, err
-		}
-		replacements[eventcatalog.OutboxProfileMongoDomain] = eventsubsystem.StandardProfile{
-			Binding:    appeventing.ProfileBinding{Stager: mongoStager, PostCommit: mongoWake},
-			Supervisor: mongoSupervisor, Drain: drain, DrainTimeout: 5 * time.Second,
-			Status: appeventing.NamedOutboxStatusReader{Name: "mongo-domain-events", Reader: mongoStatus},
-		}
+		mongoPublisher = capturedSDKPublisher{wire: opts.WirePublisher}
+		mongoDrain = func(context.Context) error { return nil }
+	}
+	collection := opts.MongoDB.Collection("rm_outbox")
+	if _, err := collection.Indexes().CreateMany(t.Context(), sdkmongo.Indexes()); err != nil {
+		return nil, nil, err
+	}
+	mongoStore, err := sdkmongo.New(collection)
+	if err != nil {
+		return nil, nil, err
+	}
+	mongoStager, err := mongostandard.NewStager(collection, opts.Catalog, eventruntime.SourceAPIServer)
+	if err != nil {
+		return nil, nil, err
+	}
+	mongoStatus, err := mongostandard.NewStatusReader(collection)
+	if err != nil {
+		return nil, nil, err
+	}
+	mongoWake := standardoutbox.NewPostCommitWake()
+	mongoSupervisor, err := standardoutbox.NewRelaySupervisor(standardoutbox.SupervisorOptions{
+		Name: "mongo-domain-events", InitialBackoff: 100 * time.Millisecond, MaxBackoff: time.Second,
+		NewRelay: func(observe relay.Observer) (standardoutbox.RelayRunner, error) {
+			return relay.New(mongoStore, mongoPublisher, relay.Config{
+				Concurrency: 1, PollInterval: 50 * time.Millisecond, Lease: 5 * time.Second,
+				PublishTimeout: 2 * time.Second, WriteTimeout: time.Second,
+				Wake: mongoWake.Wake(), Retry: standardoutbox.SDKRetryPolicy(), Observe: observe,
+			})
+		},
+	})
+	if err != nil {
+		return nil, nil, err
+	}
+	replacements[eventcatalog.OutboxProfileMongoDomain] = eventsubsystem.StandardProfile{
+		Binding:    appeventing.ProfileBinding{Stager: mongoStager, PostCommit: mongoWake},
+		Supervisor: mongoSupervisor, Drain: mongoDrain, DrainTimeout: 5 * time.Second,
+		Status: appeventing.NamedOutboxStatusReader{Name: "mongo-domain-events", Reader: mongoStatus},
 	}
 	subsystem, err := eventsubsystem.NewWithStandardProfiles(opts, replacements)
 	return subsystem, delivery, err

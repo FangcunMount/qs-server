@@ -28,6 +28,7 @@ type Config struct {
 	Database             string // 数据库名称
 	MigrationsTable      string // MySQL 迁移记录表名
 	MigrationsCollection string // MongoDB 迁移记录集合名
+	retirementPair       *PairPreflight
 }
 
 // Migrator 数据库迁移器
@@ -64,22 +65,59 @@ func NewMongoMigrator(client *mongo.Client, config *Config) *Migrator {
 // 3. 获取当前版本
 // 4. 执行迁移到最新版本
 // 5. 返回最新版本及是否执行了迁移
-func (m *Migrator) Run() (uint, bool, error) {
-	return m.run()
-}
+func (m *Migrator) Run() (uint, bool, error) { return m.run(0) }
 
-// run accepts a package-private historical boundary for migration-contract
-// fixtures. The public startup entrypoint always upgrades to the embedded head.
-func (m *Migrator) run(target ...uint) (uint, bool, error) {
-	if len(target) > 1 {
-		return 0, false, fmt.Errorf("invalid migration target count")
-	}
+// Explicit historical targets are package-internal; normal startup always runs
+// the paired preflight and cannot choose a bypass mode.
+func (m *Migrator) run(historicalTarget uint) (version uint, changed bool, resultErr error) {
 	if !m.config.Enabled {
 		return 0, false, nil
 	}
 
 	if err := m.validate(); err != nil {
 		return 0, false, err
+	}
+	backend := BackendMySQL
+	limit := compatibilitySQLVersion - 1
+	if m.driver.SourcePath() == "migrations/mongodb" {
+		backend = BackendMongo
+		limit = compatibilityMongoVersion - 1
+	}
+	if historicalTarget > limit {
+		return 0, false, retirementError("historical target crosses retirement boundary")
+	}
+	if historicalTarget == 0 {
+		p := m.config.retirementPair
+		if p == nil {
+			return 0, false, retirementError("paired preflight required before latest migration")
+		}
+		if m.config.MigrationsTable != defaultTable || m.config.MigrationsCollection != defaultTable {
+			return 0, false, retirementError("paired migration namespace override rejected")
+		}
+		if backend == BackendMySQL {
+			d, ok := m.driver.(*MySQLDriver)
+			if !ok || d.db != p.sqlDB || m.config.Database != p.config.MySQLDatabase {
+				return 0, false, retirementError("paired mysql connection mismatch")
+			}
+		} else {
+			d, ok := m.driver.(*MongoDriver)
+			if !ok || d.client != p.mongo || m.config.Database != p.config.MongoDatabase {
+				return 0, false, retirementError("paired mongo connection mismatch")
+			}
+		}
+		if err := p.validateStart(context.Background(), backend); err != nil {
+			return 0, false, err
+		}
+	}
+	if finalizer, ok := m.driver.(interface{ finishRun() error }); ok {
+		defer func() {
+			if err := finalizer.finishRun(); err != nil {
+				resultErr = errors.Join(resultErr, fmt.Errorf("release run-owned migration connection: %w", err))
+			}
+			if resultErr == nil && backend == BackendMySQL && m.config.retirementPair != nil && version == compatibilitySQLVersion {
+				m.config.retirementPair.sqlFinished()
+			}
+		}()
 	}
 
 	// 创建 migrate 实例
@@ -106,6 +144,9 @@ func (m *Migrator) run(target ...uint) (uint, bool, error) {
 	if dirty {
 		return versionBefore, false, fmt.Errorf("database is in dirty state at version %d, please fix manually", versionBefore)
 	}
+	if historicalTarget != 0 && versionBefore > limit {
+		return versionBefore, false, retirementError("historical runner cannot adopt retirement head")
+	}
 
 	cleanup := func(context.Context) error { return nil }
 	if preparer, ok := m.driver.(runPreparer); ok {
@@ -117,10 +158,10 @@ func (m *Migrator) run(target ...uint) (uint, bool, error) {
 
 	// 执行迁移
 	var upErr error
-	if len(target) == 1 {
-		upErr = instance.Migrate(target[0])
-	} else {
+	if historicalTarget == 0 {
 		upErr = instance.Up()
+	} else {
+		upErr = instance.Migrate(historicalTarget)
 	}
 	cleanupErr := cleanup(context.Background())
 	if upErr != nil {

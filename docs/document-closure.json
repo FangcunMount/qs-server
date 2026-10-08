@@ -2,7 +2,7 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "c98d6aa28df5867231fa3c12fa109ecbd52eecf5",
+    "sha": "61bff6c406b54273132db13ae31724aac1c276fb",
     "verified_on": "2026-10-09"
   },
   "status_policy": {
@@ -78,12 +78,12 @@
   "machine_contracts": {
     "migrations": {
       "mysql": {
-        "max_version": 99,
-        "version_count": 99
+        "max_version": 100,
+        "version_count": 100
       },
       "mongodb": {
-        "max_version": 38,
-        "version_count": 38
+        "max_version": 39,
+        "version_count": 39
       }
     },
     "events": {
@@ -11270,7 +11270,7 @@
       "owner": "tooling",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "c98d6aa28df5867231fa3c12fa109ecbd52eecf5",
+        "source_sha": "61bff6c406b54273132db13ae31724aac1c276fb",
         "verified_on": "2026-10-09"
       },
       "fact_sources": [
@@ -11301,6 +11301,30 @@
         {
           "kind": "source",
           "path": ".github/workflows/authz-production-matrix-provision.yml"
+        },
+        {
+          "kind": "source",
+          "path": "scripts/database/compatibility-retirement-b-integration.py"
+        },
+        {
+          "kind": "source",
+          "path": "internal/pkg/migration/**/*.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/pkg/migration/migrations/**/*"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/bootstrap/database.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/pkg/options/migration_options.go"
+        },
+        {
+          "kind": "source",
+          "path": ".github/workflows/ci.yml"
         },
         {
           "kind": "source",
@@ -11356,6 +11380,76 @@
           "kind": "command",
           "command": "python3 -B scripts/database/test-compatibility-retirement.py",
           "result": "passed",
+          "source_sha": "6aee167b9a75e1c175dce63036083fa9f77a468f",
+          "verified_on": "2026-10-08"
+        },
+        {
+          "kind": "command",
+          "command": "go test -race ./cmd/qs-compatibility-retirement",
+          "result": "passed",
+          "source_sha": "6aee167b9a75e1c175dce63036083fa9f77a468f",
+          "verified_on": "2026-10-08"
+        },
+        {
+          "kind": "command",
+          "command": "python3 -B scripts/database/compatibility-retirement-integration.py",
+          "result": "passed",
+          "source_sha": "6aee167b9a75e1c175dce63036083fa9f77a468f",
+          "verified_on": "2026-10-08"
+        },
+        {
+          "kind": "command",
+          "command": "python3 -B scripts/database/compatibility-retirement-b-integration.py",
+          "result": "passed",
+          "source_sha": "6aee167b9a75e1c175dce63036083fa9f77a468f",
+          "verified_on": "2026-10-08"
+        },
+        {
+          "kind": "command",
+          "command": "python3 -B scripts/database/test-compatibility-retirement.py",
+          "result": "passed",
+          "source_sha": "5e1365e8533f473933094a95e9a69d81162ae4a3",
+          "verified_on": "2026-10-08"
+        },
+        {
+          "kind": "command",
+          "command": "python3 -B scripts/database/test-compatibility-retirement.py",
+          "result": "passed",
+          "source_sha": "37a5abcc1f0830f4f1a47730c9f059c469ec24cd",
+          "verified_on": "2026-10-08"
+        },
+        {
+          "kind": "command",
+          "command": "python3 -B scripts/database/test-compatibility-retirement.py",
+          "result": "passed",
+          "source_sha": "2e383cca73e13d5afe92804e6fd0f679435d57b9",
+          "verified_on": "2026-10-08"
+        },
+        {
+          "kind": "command",
+          "command": "go test -p 4 ./...",
+          "result": "passed",
+          "source_sha": "2e383cca73e13d5afe92804e6fd0f679435d57b9",
+          "verified_on": "2026-10-08"
+        },
+        {
+          "kind": "command",
+          "command": "python3 -B scripts/database/compatibility-retirement-b-integration.py",
+          "result": "passed",
+          "source_sha": "2e383cca73e13d5afe92804e6fd0f679435d57b9",
+          "verified_on": "2026-10-08"
+        },
+        {
+          "kind": "command",
+          "command": "make docs-check",
+          "result": "passed",
+          "source_sha": "2e383cca73e13d5afe92804e6fd0f679435d57b9",
+          "verified_on": "2026-10-08"
+        },
+        {
+          "kind": "command",
+          "command": "python3 -B scripts/database/test-compatibility-retirement.py",
+          "result": "passed",
           "source_sha": "5b5dc2778f8f93f09d17c68736c3134a794cba08",
           "verified_on": "2026-10-08"
         },
@@ -11371,20 +11465,6 @@
           "command": "python3 -B scripts/database/compatibility-retirement-integration.py",
           "result": "passed",
           "source_sha": "5b5dc2778f8f93f09d17c68736c3134a794cba08",
-          "verified_on": "2026-10-08"
-        },
-        {
-          "kind": "command",
-          "command": "python3 -B scripts/database/test-compatibility-retirement.py",
-          "result": "passed",
-          "source_sha": "5e1365e8533f473933094a95e9a69d81162ae4a3",
-          "verified_on": "2026-10-08"
-        },
-        {
-          "kind": "command",
-          "command": "python3 -B scripts/database/test-compatibility-retirement.py",
-          "result": "passed",
-          "source_sha": "37a5abcc1f0830f4f1a47730c9f059c469ec24cd",
           "verified_on": "2026-10-08"
         },
         {
@@ -11443,7 +11523,7 @@
         "deployed_sha": null,
         "observed_at": null,
         "limitations": [
-          "Production history verification, restore rehearsal, fencing, DROP, acceptance and purge have not been executed."
+          "Only A-source production identity/head/type-state diagnostic discovery was observed on 2026-10-08; it does not attest B inventory, historical responsibility, fencing, restore, DROP, acceptance or purge. B-checkout local native disabled-migration evidence does not attest an original A recovery image. The B startup local receipt is derived from actual test output, not a saved original log."
         ]
       },
       "gaps": [

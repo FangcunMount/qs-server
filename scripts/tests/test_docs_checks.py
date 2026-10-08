@@ -9,6 +9,60 @@ from scripts import check_docs_facts, check_docs_hygiene
 
 
 class DocsFactsHelpersTest(unittest.TestCase):
+    def test_go_root_recursion_and_parallelism_forms_are_verifiable(self) -> None:
+        for command in (
+            "go test ./...",
+            "go test -p 4 ./...",
+            "go test -p=4 ./...",
+            "go test -race -p 4 ./cmd/... ./internal/...",
+            "go test -p=4 ./cmd/qs-compatibility-retirement",
+        ):
+            with self.subTest(command=command):
+                self.assertTrue(check_docs_facts.command_is_verifiable(command))
+        self.assertTrue(check_docs_facts.command_is_non_cached_test("go test -race -p 4 -count=1 ./..."))
+
+    def test_go_parallelism_requires_its_own_positive_numeric_value(self) -> None:
+        for command in (
+            "go test -p",
+            "go test -p ./...",
+            "go test -p= ./...",
+            "go test -p many ./...",
+            "go test -p=many ./...",
+            "go test -p -1 ./...",
+            "go test -p=-1 ./...",
+            "go test -p=0 ./...",
+            "go test -p=9223372036854775808 ./...",
+            "go test -p 4",
+        ):
+            with self.subTest(command=command):
+                self.assertFalse(check_docs_facts.command_is_verifiable(command))
+
+    def test_go_commands_preserve_repository_package_and_shell_boundaries(self) -> None:
+        for command in (
+            "go test -p 4 ../outside/...",
+            "go test -p=4 /tmp/outside/...",
+            "go test -p 4 ./../qs-server/...",
+            "go test -p=4 ./cmd/../../outside/...",
+            "go test -p=4 ./missing-package/...",
+            "go test -p=4 ./go.mod",
+            "go test -p=4 ./...; echo passed",
+            "go test -p 4 ./... && echo passed",
+            "go test -p=4 ./... | sh",
+            "go test -p $(echo 4) ./...",
+            "go test -p=4 ./...\necho passed",
+        ):
+            with self.subTest(command=command):
+                self.assertFalse(check_docs_facts.command_is_verifiable(command))
+        with tempfile.TemporaryDirectory() as temporary:
+            parent = Path(temporary)
+            root = parent / "repository"
+            outside = parent / "outside"
+            root.mkdir()
+            outside.mkdir()
+            (root / "external-link").symlink_to(outside, target_is_directory=True)
+            with mock.patch.object(check_docs_facts, "ROOT", root):
+                self.assertFalse(check_docs_facts.command_is_verifiable("go test -p 4 ./external-link/..."))
+
     def test_python_bytecode_flag_preserves_repository_command_boundary(self) -> None:
         self.assertTrue(check_docs_facts.command_is_verifiable("python3 -B scripts/database/test-compatibility-retirement.py"))
         self.assertFalse(check_docs_facts.command_is_verifiable("python3 -B -c arbitrary_code"))
@@ -51,8 +105,8 @@ class DocsFactsHelpersTest(unittest.TestCase):
     def test_migration_inventory_is_paired_and_current(self) -> None:
         inventory, issues = check_docs_facts.migration_inventory()
         self.assertEqual(issues, [])
-        self.assertEqual(inventory["mysql"], {"max_version": 99, "version_count": 99})
-        self.assertEqual(inventory["mongodb"], {"max_version": 38, "version_count": 38})
+        self.assertEqual(inventory["mysql"], {"max_version": 100, "version_count": 100})
+        self.assertEqual(inventory["mongodb"], {"max_version": 39, "version_count": 39})
 
     def test_ledger_metadata_uses_named_fields(self) -> None:
         text = (

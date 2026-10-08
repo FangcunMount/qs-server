@@ -289,7 +289,7 @@ EXPECTED_SIGNALS = {
     "typology_model_cache_changed",
 }
 
-EXPECTED_MIGRATION_MAX = {"mysql": 99, "mongodb": 38}
+EXPECTED_MIGRATION_MAX = {"mysql": 100, "mongodb": 39}
 EXPECTED_DOC_STATUS = {"aligned", "drifted", "needs_review", "planned", "archive_candidate"}
 EXPECTED_OWNERS = {
     "overview",
@@ -1020,14 +1020,40 @@ def command_is_verifiable(command: object) -> bool:
         targets = [token for token in tokens[1:] if not token.startswith("-") and "=" not in token]
         return bool(targets) and all(target in make_targets() for target in targets)
     if len(tokens) >= 2 and tokens[:2] == ["go", "test"]:
-        packages = [token for token in tokens[2:] if not token.startswith("-")]
+        packages: list[str] = []
+        index = 2
+        while index < len(tokens):
+            token = tokens[index]
+            if token == "-p" or token.startswith("-p="):
+                if token == "-p":
+                    index += 1
+                    if index == len(tokens):
+                        return False
+                    parallelism = tokens[index]
+                else:
+                    parallelism = token.removeprefix("-p=")
+                if (
+                    re.fullmatch(r"[0-9]{1,19}", parallelism) is None
+                    or not 0 < int(parallelism) <= sys.maxsize
+                ):
+                    return False
+            elif not token.startswith("-"):
+                packages.append(token)
+            index += 1
         if not packages:
             return False
         for package in packages:
             if not package.startswith("./"):
                 return False
-            base = package.removeprefix("./").removesuffix("/...").rstrip("/")
-            if base and not (ROOT / base).exists():
+            # Root recursion is a Go package pattern, not a directory named ... .
+            base = (
+                "" if package == "./..."
+                else package.removeprefix("./").removesuffix("/...").rstrip("/")
+            )
+            if ".." in base.split("/"):
+                return False
+            target = (ROOT / base).resolve()
+            if not target.is_relative_to(ROOT.resolve()) or not target.is_dir():
                 return False
         return True
     if tokens[0] in {"python", "python3"} and len(tokens) >= 2:
