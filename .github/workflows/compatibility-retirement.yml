@@ -66,10 +66,15 @@ jobs:
         uses: actions/github-script@v8
         with:
           script: |
-            const input = context.payload.inputs ?? {};
+            const supplied = context.payload.inputs ?? {};
             const expectedKeys = ['operation', 'database', 'approved_source_sha', 'operation_id', 'manifest_sha256', 'inventory_request_sha256', 'prepare_mode', 'identity_request_sha256'].sort();
-            const keys = Object.keys(input).sort();
-            if (JSON.stringify(keys) !== JSON.stringify(expectedKeys) ||
+            if (Object.keys(supplied).some(key => !expectedKeys.includes(key))) {
+              throw new Error('compatibility_retirement_unknown_input_rejected');
+            }
+            // GitHub may omit optional inputs whose string value is empty.
+            // Normalize only declared defaults; required inputs remain required.
+            const input = {manifest_sha256: '', inventory_request_sha256: '', prepare_mode: 'inventory', identity_request_sha256: '', ...supplied};
+            if (
                 !['prepare', 'apply', 'verify', 'recover', 'purge'].includes(input.operation) ||
                 input.database !== 'mysql-and-mongodb' ||
                 !/^[0-9a-f]{40}$/.test(input.approved_source_sha) ||
