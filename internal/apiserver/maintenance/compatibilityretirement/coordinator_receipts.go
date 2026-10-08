@@ -114,6 +114,10 @@ func (c *HistoricalCoordinator) Receipt() HistoricalCoordinatorReceipt {
 	if !c.coverage || c.failed {
 		return r
 	}
+	candidateHash := coordinatorStoredCandidateHash(c.candidates)
+	if candidateHash == "" {
+		return r
+	}
 	r.SourceCoverageComplete = true
 	r.CandidateCount = uint64(len(c.candidates))
 	for _, v := range c.candidates {
@@ -124,7 +128,7 @@ func (c *HistoricalCoordinator) Receipt() HistoricalCoordinatorReceipt {
 			r.BlockedLocalCount++
 		}
 	}
-	r.CandidateSHA256 = coordinatorCandidateHash(c.candidates)
+	r.CandidateSHA256 = candidateHash
 	r.PageBoundarySHA256 = coordinatorPageHash(c.pages)
 	return r
 }
@@ -152,7 +156,11 @@ func (c *HistoricalCoordinator) CandidateRange(offset, limit int) ([]HistoricalC
 	}
 	out := make([]HistoricalCandidate, end-offset)
 	for i := range out {
-		out[i] = coordinatorCloneCandidate(c.candidates[offset+i])
+		candidate := c.candidates[offset+i]
+		if candidate == nil {
+			return nil, ErrCoordinatorIncomplete
+		}
+		out[i] = coordinatorCloneCandidate(*candidate)
 	}
 	return out, nil
 }
@@ -189,6 +197,37 @@ func coordinatorCandidateHash(values []HistoricalCandidate) string {
 		sourceFrame(h, digest[:], false)
 	}
 	return hex.EncodeToString(h.Sum(nil))
+}
+
+// This typed path preserves the value-hash framing and dereferenced facts.
+// A missing internal value cannot match an empty expected digest.
+func coordinatorStoredCandidateHash(values []*HistoricalCandidate) string {
+	h := sha256.New()
+	sourceFrame(h, []byte("historical-candidate-sequence/v1"), false)
+	sourceFrame(h, []byte(strconv.Itoa(len(values))), false)
+	for _, value := range values {
+		if value == nil {
+			return ""
+		}
+		digest, err := privateFactsSHA(*value)
+		if err != nil {
+			return ""
+		}
+		sourceFrame(h, digest[:], false)
+	}
+	return hex.EncodeToString(h.Sum(nil))
+}
+func coordinatorStoredCandidateMatches(values []*HistoricalCandidate, expected string) bool {
+	actual := coordinatorStoredCandidateHash(values)
+	return actual != "" && actual == expected
+}
+func coordinatorStoredCandidatesPresent(values []*HistoricalCandidate) bool {
+	for _, value := range values {
+		if value == nil {
+			return false
+		}
+	}
+	return true
 }
 func coordinatorPageHash(values []HistoricalCoordinatorPageReceipt) string {
 	h := sha256.New()

@@ -23,7 +23,7 @@ func (c *HistoricalCoordinator) MongoCASReadiness() HistoricalMongoCASReadiness 
 	}
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	if !c.coverage || c.failed || c.now().Sub(c.started) > c.limits.MaxDuration {
+	if !c.coverage || c.failed || c.now().Sub(c.started) > c.limits.MaxDuration || !coordinatorStoredCandidatesPresent(c.candidates) {
 		return r
 	}
 	r.WholeFourCopyCoverage = true
@@ -56,7 +56,7 @@ func (c *HistoricalCoordinator) PrepareMongoCAS(ctx context.Context, batch *Mong
 	if e := c.alive(ctx); e != nil {
 		return nil, e
 	}
-	if !c.coverage || c.failed {
+	if !c.coverage || c.failed || !coordinatorStoredCandidatesPresent(c.candidates) {
 		return nil, ErrCoordinatorIncomplete
 	}
 	return nil, ErrCoordinatorMongoCASUnqualified

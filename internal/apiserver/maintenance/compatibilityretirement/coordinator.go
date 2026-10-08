@@ -105,7 +105,7 @@ type HistoricalCoordinator struct {
 	pendingRow    *coordinatorRow
 	sequence      uint64
 	pages         []HistoricalCoordinatorPageReceipt
-	candidates    []HistoricalCandidate
+	candidates    []*HistoricalCandidate
 	coverage      bool
 	failed        bool
 	reservation   uint64
@@ -122,7 +122,7 @@ func PrepareHistoricalCoordinator(ctx context.Context, binding HistoricalCoordin
 	if ctx == nil || ctx.Err() != nil || len(copies) != 4 || !limits.valid() || !aiLocalOperationID(binding.OperationID) || !coordinatorSourceSHA(binding.SourceSHA) {
 		return nil, ErrCoordinatorInvalid
 	}
-	c := &HistoricalCoordinator{binding: binding, limits: limits, started: time.Now(), now: time.Now, remaining: map[verifiedSourceKey]bool{}}
+	c := &HistoricalCoordinator{binding: binding, limits: limits, started: time.Now(), now: time.Now}
 	var records uint64
 	for i, v := range copies {
 		if sourceReaderAbsent(v.Input) {
@@ -151,6 +151,10 @@ func PrepareHistoricalCoordinator(ctx context.Context, binding HistoricalCoordin
 		return nil, err
 	}
 	c.authenticated = verified
+	// Reserve pointer slots only after all four copies have authenticated EOF.
+	// Candidate values remain in bounded page blocks; no large value array moves.
+	c.candidates = make([]*HistoricalCandidate, 0, int(verified.entries))
+	c.remaining = make(map[verifiedSourceKey]bool, int(verified.entries))
 	for key := range verified.rows {
 		c.remaining[key] = true
 	}
@@ -339,6 +343,10 @@ func (c *HistoricalCoordinator) NextPage(ctx context.Context) (*HistoricalSource
 		return nil, ErrCoordinatorPage
 	}
 	if c.coverage {
+		if !coordinatorStoredCandidatesPresent(c.candidates) {
+			c.failed = true
+			return nil, ErrCoordinatorIncomplete
+		}
 		return nil, io.EOF
 	}
 	p := &HistoricalSourcePage{owner: c, sequence: c.sequence + 1, issued: c.now()}
@@ -378,7 +386,7 @@ func (c *HistoricalCoordinator) NextPage(ctx context.Context) (*HistoricalSource
 		}
 	}
 	if len(p.rows) == 0 {
-		if len(c.remaining) != 0 || uint64(len(c.candidates)) != c.authenticated.entries {
+		if len(c.remaining) != 0 || uint64(len(c.candidates)) != c.authenticated.entries || !coordinatorStoredCandidatesPresent(c.candidates) {
 			c.failed = true
 			return nil, ErrCoordinatorIncomplete
 		}

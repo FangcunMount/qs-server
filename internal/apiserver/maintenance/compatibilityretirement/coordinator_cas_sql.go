@@ -26,7 +26,7 @@ func (c *HistoricalCoordinator) SQLCASReadiness() HistoricalSQLCASReadiness {
 	}
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	if !c.coverage || c.failed || c.now().Sub(c.started) > c.limits.MaxDuration {
+	if !c.coverage || c.failed || c.now().Sub(c.started) > c.limits.MaxDuration || !coordinatorStoredCandidatesPresent(c.candidates) {
 		return r
 	}
 	r.WholeFourCopyCoverage = true
@@ -63,7 +63,7 @@ func (c *HistoricalCoordinator) PrepareSQLCAS(ctx context.Context, batch *SQLBus
 	if err := c.alive(ctx); err != nil {
 		return nil, err
 	}
-	if !c.coverage || c.failed {
+	if !c.coverage || c.failed || !coordinatorStoredCandidatesPresent(c.candidates) {
 		return nil, ErrCoordinatorIncomplete
 	}
 	return nil, ErrCoordinatorSQLCASUnqualified

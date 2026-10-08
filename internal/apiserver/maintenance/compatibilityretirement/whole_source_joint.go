@@ -413,7 +413,7 @@ func (p *WholeSourceJointPage) Summary() WholeSourceJointPageSummary {
 	if err != nil || bindingsSHA != p.bindingSHA {
 		return s
 	}
-	if p.candidateStart < 0 || p.candidateCount <= 0 || p.candidateStart+p.candidateCount > len(c.candidates) || coordinatorCandidateHash(c.candidates[p.candidateStart:p.candidateStart+p.candidateCount]) != p.candidateSHA {
+	if p.candidateStart < 0 || p.candidateCount <= 0 || p.candidateStart+p.candidateCount > len(c.candidates) || !coordinatorStoredCandidateMatches(c.candidates[p.candidateStart:p.candidateStart+p.candidateCount], p.candidateSHA) {
 		return s
 	}
 	s.WholeFourSourceCoverageBound = true

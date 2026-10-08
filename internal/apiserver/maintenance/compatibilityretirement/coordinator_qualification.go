@@ -289,7 +289,10 @@ func (c *HistoricalCoordinator) consume(p *HistoricalSourcePage, rows []Historic
 	receipt.FirstPrimaryKeySHA256 = rows[0].Source.PrimaryKeySHA256
 	receipt.LastPrimaryKeySHA256 = rows[len(rows)-1].Source.PrimaryKeySHA256
 	receipt.CandidateSHA256 = coordinatorCandidateHash(rows)
-	c.candidates = append(c.candidates, rows...)
+	// Retain these private, bounded page values without copying earlier pages.
+	for i := range rows {
+		c.candidates = append(c.candidates, &rows[i])
+	}
 	c.pages = append(c.pages, receipt)
 	p.consumed = true
 	p.rows = nil

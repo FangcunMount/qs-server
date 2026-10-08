@@ -278,7 +278,7 @@ func (p *HistoricalCoordinatorCrossStorePage) wholeCoverageBoundLocked() error {
 	if c.now().Sub(c.started) > c.limits.MaxDuration {
 		return ErrCoordinatorExpired
 	}
-	if p.page.owner != c || !p.page.consumed || p.page.sequence == 0 || p.page.sequence > uint64(len(c.pages)) || p.candidateStart < 0 || p.candidateCount < 1 || p.candidateStart+p.candidateCount > len(c.candidates) || c.pages[p.page.sequence-1].CandidateSHA256 != p.candidateSHA || coordinatorCandidateHash(c.candidates[p.candidateStart:p.candidateStart+p.candidateCount]) != p.candidateSHA {
+	if p.page.owner != c || !p.page.consumed || p.page.sequence == 0 || p.page.sequence > uint64(len(c.pages)) || p.candidateStart < 0 || p.candidateCount < 1 || p.candidateStart+p.candidateCount > len(c.candidates) || c.pages[p.page.sequence-1].CandidateSHA256 != p.candidateSHA || !coordinatorStoredCandidateMatches(c.candidates[p.candidateStart:p.candidateStart+p.candidateCount], p.candidateSHA) {
 		return ErrCoordinatorPage
 	}
 	hash, err := privateFactsSHA(p.bindings)
