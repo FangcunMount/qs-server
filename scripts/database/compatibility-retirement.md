@@ -156,6 +156,26 @@ terminal/replay responsibility. Public receipts allow at most 128 total buckets,
 flattened into four pages of at most 32; excess keeps headers incomplete and
 retains only private count/hash diagnostics. It does not authorize cleanup.
 
+Request pre-provisioning is implemented as two separate diagnostic modes.
+`bootstrap-bounds` receives independently approved canonical
+`bootstrap_approval_json` plus its SHA256 including the final newline. It binds
+the exact main/source/operation/target, identity producer run and private report
+hash, clean heads and the fixed V2 profile; it verifies that original private
+report and creates `boundary-request.json` without opening a database.
+`bootstrap-inventory` additionally verifies the separately approved original
+boundary producer run/report before creating `inventory-request.json`; the true
+BSON tokens stay private. Neither mode chooses an observed identity for the
+reviewer, executes a scan or permits deletion. Both return exit 42 and
+`request_bootstrap_complete:true` with `derived_request_sha256`. That derived
+hash must be reviewed and separately supplied to the subsequent `bounds` or
+`inventory` run.
+
+The request and bootstrap binding are exact 0600, no-follow, exclusive-created
+files with fsync under the operation lock. An identical completed pair is
+verified; changed bytes, a one-file partial pair, symlink/hardlink or an
+interrupted `.bootstrap.partial` refuses continuation. No overwrite, automatic
+repair or discovery-to-approval shortcut exists.
+
 Production boundary and inventory requests require `format_version: 2`. V1's
 100,000-record / 128 MiB / 180-second helpers remain only for historical fixture
 coverage; both live Python and Go entrypoints reject V1 before connecting.

@@ -2,7 +2,7 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "6aee167b9a75e1c175dce63036083fa9f77a468f",
+    "sha": "3eb68b03dce493d51d89716457de0cd2d156f219",
     "verified_on": "2026-10-08"
   },
   "status_policy": {
@@ -11158,7 +11158,7 @@
       "owner": "tooling",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "6aee167b9a75e1c175dce63036083fa9f77a468f",
+        "source_sha": "3eb68b03dce493d51d89716457de0cd2d156f219",
         "verified_on": "2026-10-08"
       },
       "fact_sources": [
@@ -11250,6 +11250,13 @@
           "result": "passed",
           "source_sha": "5e1365e8533f473933094a95e9a69d81162ae4a3",
           "verified_on": "2026-10-08"
+        },
+        {
+          "kind": "command",
+          "command": "python3 -B scripts/database/test-compatibility-retirement.py",
+          "result": "passed",
+          "source_sha": "ca48194feb32faefadeebc4621585f58723a9d4f",
+          "verified_on": "2026-10-08"
         }
       ],
       "production_evidence": {
@@ -11266,7 +11273,7 @@
           "id": "COMPAT-RETIREMENT-PRODUCTION",
           "kind": "verification",
           "severity": "high",
-          "summary": "Production history verifier, private v2 request pre-provisioning, exclusive fence, measured recovery and actual deletion/acceptance/purge backends remain incomplete.",
+          "summary": "Production history verifier, independent V2 request approvals and full production scans, exclusive fence, measured recovery and actual deletion/acceptance/purge backends remain incomplete.",
           "exit_criteria": "Implement and verify actual adapters, bind immutable operation/database/schema evidence, rehearse exact restoration, then complete the accepted production retirement gates."
         }
       ]
