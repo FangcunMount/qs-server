@@ -1,11 +1,14 @@
 package main
 
 import (
+	"errors"
+	"fmt"
 	"strings"
 	"testing"
 
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/mongo"
 )
 
 func anchorRaw(t *testing.T, value any) bson.Raw {
@@ -84,5 +87,34 @@ func TestMongoAnchorRejectsUnsupportedOrAmbiguousMetadata(t *testing.T) {
 		if got, err := mongoMigrationGeneration(anchorRaw(t, value)); err == nil || got != "" {
 			t.Fatal("invalid generation produced a trusted hash")
 		}
+	}
+}
+
+func TestMongoAnchorReadFailureUsesServerCodesOnly(t *testing.T) {
+	const private = "PRIVATE_CONNECTION_OR_SERVER_MESSAGE"
+	var missing *mongo.CommandError
+	for _, tc := range []struct {
+		name  string
+		input error
+		want  string
+	}{
+		{"unauthorized", mongo.CommandError{Code: 13, Message: private}, "mongo_replica_anchor_not_authorized"},
+		{"unauthorized_pointer", &mongo.CommandError{Code: 13, Message: private}, "mongo_replica_anchor_not_authorized"},
+		{"unauthorized_wrapped", fmt.Errorf("host: %w", mongo.CommandError{Code: 13, Message: private}), "mongo_replica_anchor_not_authorized"},
+		{"no_replication", mongo.CommandError{Code: 76, Message: private}, "mongo_replica_anchor_replication_not_enabled"},
+		{"no_replication_wrapped_pointer", fmt.Errorf("host: %w", &mongo.CommandError{Code: 76, Message: private}), "mongo_replica_anchor_replication_not_enabled"},
+		{"network", errors.New(private), "mongo_replica_anchor_permission_or_read_failed"},
+		{"spoofed_text", errors.New("Unauthorized code 13 " + private), "mongo_replica_anchor_permission_or_read_failed"},
+		{"other_server_code", mongo.CommandError{Code: 8, Message: "Unauthorized " + private}, "mongo_replica_anchor_permission_or_read_failed"},
+		{"typed_nil_error", missing, "mongo_replica_anchor_permission_or_read_failed"},
+		{"wrapped_typed_nil_error", fmt.Errorf("host: %w", missing), "mongo_replica_anchor_permission_or_read_failed"},
+		{"nil_error", nil, "mongo_replica_anchor_permission_or_read_failed"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			got := mongoAnchorReadFailure(tc.input)
+			if got == nil || got.Error() != tc.want || strings.Contains(got.Error(), private) {
+				t.Fatal("specific diagnosis absent, guessed, or private text leaked")
+			}
+		})
 	}
 }

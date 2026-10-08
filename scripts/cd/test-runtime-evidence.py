@@ -286,6 +286,42 @@ class RuntimeEvidenceTests(unittest.TestCase):
         docker=FakeDocker(); self.collect(docker)
         for args in docker.calls:self.assertNotIn("logs",args)
 
+    def test_process_hash_read_uses_configured_entrypoint_user(self):
+        for role, count in (("apiserver", 1), ("collection", 2), ("worker", 3)):
+            docker = FakeDocker(role, count)
+            self.collect(docker, role=role, expected=count)
+            reads = [args for args in docker.calls if "sha256sum" in args]
+            self.assertEqual(len(reads), count)
+            for args in reads:
+                self.assertEqual(args, ["exec", args[1], "sha256sum", "/proc/1/exe", tool.ROLES[role][2]])
+                self.assertTrue(tool.readonly_docker_command(args))
+                self.assertFalse(tool.readonly_docker_command(["exec", "--user", "0", *args[1:]]))
+
+    def test_process_hash_failure_has_fixed_category_without_private_output(self):
+        command = ["exec", "1"*64, "sha256sum", "/proc/1/exe", "/app/qs-worker"]
+        result = subprocess.CompletedProcess([], 1, SECRET.encode(), SECRET.encode())
+        with mock.patch.object(tool.subprocess, "run", return_value=result):
+            with self.assertRaisesRegex(tool.Refused, "^process_executable_read_failed$"):
+                tool.Docker().capture(command, failure="process_executable_read_failed")
+
+    def test_fixed_projection_failures_identify_step_without_private_output(self):
+        result = subprocess.CompletedProcess([], 1, SECRET.encode(), SECRET.encode())
+        with mock.patch.object(tool.subprocess, "run", return_value=result):
+            with self.assertRaisesRegex(tool.Refused, "^docker_inventory_read_failed$"):
+                tool.Docker().listing()
+            with self.assertRaisesRegex(tool.Refused, "^container_projection_read_failed$"):
+                tool.Docker().inspect("1"*64)
+        for prefix, category in ((["image", "inspect"], "image_metadata_read_failed"), (["diff"], "container_changes_read_failed")):
+            docker = FakeDocker()
+            original = docker.capture
+            def fail_selected(args, **kwargs):
+                if args[:len(prefix)] == prefix:
+                    with mock.patch.object(tool.subprocess, "run", return_value=result):
+                        return tool.Docker().capture(args, **kwargs)
+                return original(args, **kwargs)
+            docker.capture = fail_selected
+            self.blocked(category, docker)
+
     def test_process_failure_never_exposes_secret_stdout_or_stderr(self):
         result=subprocess.CompletedProcess([],1,SECRET.encode(),SECRET.encode())
         listing=["ps","--all","--no-trunc","--format",tool.LIST_TEMPLATE]

@@ -2,7 +2,7 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "ba564d3d3d80113c4a23d271b0f52e9fa30878f0",
+    "sha": "2a4ecd365a6306b11b4824d0234312822c6f2708",
     "verified_on": "2026-10-08"
   },
   "status_policy": {
@@ -9154,6 +9154,20 @@
           "result": "passed",
           "source_sha": "ba564d3d3d80113c4a23d271b0f52e9fa30878f0",
           "verified_on": "2026-10-08"
+        },
+        {
+          "kind": "command",
+          "command": "python3 -B scripts/cd/test-runtime-evidence.py",
+          "result": "passed",
+          "source_sha": "2a4ecd365a6306b11b4824d0234312822c6f2708",
+          "verified_on": "2026-10-08"
+        },
+        {
+          "kind": "command",
+          "command": "python3 -B scripts/cd/runtime-evidence-integration.py",
+          "result": "passed",
+          "source_sha": "2a4ecd365a6306b11b4824d0234312822c6f2708",
+          "verified_on": "2026-10-08"
         }
       ],
       "production_evidence": {
@@ -11256,7 +11270,7 @@
       "owner": "tooling",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "ba564d3d3d80113c4a23d271b0f52e9fa30878f0",
+        "source_sha": "2a4ecd365a6306b11b4824d0234312822c6f2708",
         "verified_on": "2026-10-08"
       },
       "fact_sources": [
@@ -11330,6 +11344,20 @@
           "command": "python3 -B scripts/database/test-compatibility-retirement.py",
           "result": "passed",
           "source_sha": "ba564d3d3d80113c4a23d271b0f52e9fa30878f0",
+          "verified_on": "2026-10-08"
+        },
+        {
+          "kind": "command",
+          "command": "python3 scripts/database/test-compatibility-retirement.py",
+          "result": "passed",
+          "source_sha": "2a4ecd365a6306b11b4824d0234312822c6f2708",
+          "verified_on": "2026-10-08"
+        },
+        {
+          "kind": "command",
+          "command": "go test -race -p=3 ./cmd/qs-compatibility-retirement -count=1",
+          "result": "passed",
+          "source_sha": "2a4ecd365a6306b11b4824d0234312822c6f2708",
           "verified_on": "2026-10-08"
         }
       ],
