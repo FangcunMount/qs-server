@@ -9,6 +9,7 @@ import (
 	hostmysql "github.com/FangcunMount/qs-server/internal/pkg/database/mysql"
 	eventevidence "github.com/FangcunMount/qs-server/internal/pkg/eventing/evidence"
 	sdkmysql "github.com/FangcunMount/reliable-messaging/storage/mysql"
+	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
 
@@ -19,6 +20,12 @@ func BackfillCommittedEventEvidence(ctx context.Context, baseline EvaluationOutc
 	tx, err := hostmysql.RequireTx(ctx)
 	if err != nil {
 		return err
+	}
+	if tx == nil || tx.Statement == nil {
+		return hostmysql.ErrActiveTransactionRequired
+	}
+	if prepared, ok := tx.Statement.ConnPool.(*gorm.PreparedStmtTX); ok && prepared == nil {
+		return hostmysql.ErrActiveTransactionRequired
 	}
 	// The host context lookup alone is insufficient: verify a real borrowed
 	// SQL transaction without opening, committing or closing it.
