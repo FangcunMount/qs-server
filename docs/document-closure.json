@@ -3,7 +3,7 @@
   "checkout_ref": "git:HEAD",
   "source_baseline": {
     "sha": "2e383cca73e13d5afe92804e6fd0f679435d57b9",
-    "verified_on": "2026-10-08"
+    "verified_on": "2026-10-09"
   },
   "status_policy": {
     "doc_status": [
@@ -9140,6 +9140,34 @@
           "result": "passed",
           "source_sha": "0347152c36e93f41775840123ef645078039e5f8",
           "verified_on": "2026-10-08"
+        },
+        {
+          "kind": "command",
+          "command": "python3 -B scripts/cd/test-runtime-evidence.py",
+          "result": "passed",
+          "source_sha": "ba564d3d3d80113c4a23d271b0f52e9fa30878f0",
+          "verified_on": "2026-10-08"
+        },
+        {
+          "kind": "command",
+          "command": "python3 -B scripts/cd/runtime-evidence-integration.py",
+          "result": "passed",
+          "source_sha": "ba564d3d3d80113c4a23d271b0f52e9fa30878f0",
+          "verified_on": "2026-10-08"
+        },
+        {
+          "kind": "command",
+          "command": "python3 -B scripts/cd/test-runtime-evidence.py",
+          "result": "passed",
+          "source_sha": "2a4ecd365a6306b11b4824d0234312822c6f2708",
+          "verified_on": "2026-10-08"
+        },
+        {
+          "kind": "command",
+          "command": "python3 -B scripts/cd/runtime-evidence-integration.py",
+          "result": "passed",
+          "source_sha": "2a4ecd365a6306b11b4824d0234312822c6f2708",
+          "verified_on": "2026-10-08"
         }
       ],
       "production_evidence": {
@@ -10617,7 +10645,7 @@
       "owner": "tooling",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "37a5abcc1f0830f4f1a47730c9f059c469ec24cd",
+        "source_sha": "ba564d3d3d80113c4a23d271b0f52e9fa30878f0",
         "verified_on": "2026-10-08"
       },
       "fact_sources": [
@@ -10732,6 +10760,27 @@
           "command": "python3 -B scripts/cd/test_ai_messaging_release.py",
           "result": "passed",
           "source_sha": "37a5abcc1f0830f4f1a47730c9f059c469ec24cd",
+          "verified_on": "2026-10-08"
+        },
+        {
+          "kind": "command",
+          "command": "python3 -B scripts/cd/test_ai_messaging_release.py",
+          "result": "passed",
+          "source_sha": "ba564d3d3d80113c4a23d271b0f52e9fa30878f0",
+          "verified_on": "2026-10-08"
+        },
+        {
+          "kind": "command",
+          "command": "python3 -B scripts/cd/test_image_retention.py",
+          "result": "passed",
+          "source_sha": "ba564d3d3d80113c4a23d271b0f52e9fa30878f0",
+          "verified_on": "2026-10-08"
+        },
+        {
+          "kind": "command",
+          "command": "python3 -B scripts/cd/test_sudo_selection.py",
+          "result": "passed",
+          "source_sha": "ba564d3d3d80113c4a23d271b0f52e9fa30878f0",
           "verified_on": "2026-10-08"
         }
       ],
@@ -11002,7 +11051,7 @@
       "owner": "tooling",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "37a5abcc1f0830f4f1a47730c9f059c469ec24cd",
+        "source_sha": "ba564d3d3d80113c4a23d271b0f52e9fa30878f0",
         "verified_on": "2026-10-08"
       },
       "fact_sources": [
@@ -11042,6 +11091,13 @@
           "command": "python3 -B scripts/cd/test_ai_messaging_release.py",
           "result": "passed",
           "source_sha": "37a5abcc1f0830f4f1a47730c9f059c469ec24cd",
+          "verified_on": "2026-10-08"
+        },
+        {
+          "kind": "command",
+          "command": "python3 -B scripts/cd/test_ai_messaging_release.py",
+          "result": "passed",
+          "source_sha": "ba564d3d3d80113c4a23d271b0f52e9fa30878f0",
           "verified_on": "2026-10-08"
         }
       ],
@@ -11215,7 +11271,7 @@
       "doc_status": "aligned",
       "verified": {
         "source_sha": "2e383cca73e13d5afe92804e6fd0f679435d57b9",
-        "verified_on": "2026-10-08"
+        "verified_on": "2026-10-09"
       },
       "fact_sources": [
         {
@@ -11269,6 +11325,54 @@
         {
           "kind": "source",
           "path": ".github/workflows/ci.yml"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/eventing/subsystem/standard_profiles_m4_test.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/infra/mongo/standardoutbox/governance.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/infra/mongo/standardoutbox/status.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/infra/mysql/standardoutbox/governance.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/infra/mysql/standardoutbox/replay.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/infra/mysql/standardoutbox/status.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/process/standard_outbox_preflight_m4.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/process/standard_event_profile_retirement_m4_test.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/transport/grpc/service/plan_entry.go"
+        },
+        {
+          "kind": "source",
+          "path": "scripts/cd/runtime-evidence.py"
+        },
+        {
+          "kind": "source",
+          "path": "scripts/cd/test-runtime-evidence.py"
+        },
+        {
+          "kind": "source",
+          "path": "scripts/cd/runtime-evidence-integration.py"
         }
       ],
       "verification": [
@@ -11341,6 +11445,76 @@
           "result": "passed",
           "source_sha": "2e383cca73e13d5afe92804e6fd0f679435d57b9",
           "verified_on": "2026-10-08"
+        },
+        {
+          "kind": "command",
+          "command": "python3 -B scripts/database/test-compatibility-retirement.py",
+          "result": "passed",
+          "source_sha": "5b5dc2778f8f93f09d17c68736c3134a794cba08",
+          "verified_on": "2026-10-08"
+        },
+        {
+          "kind": "command",
+          "command": "go test -race ./cmd/qs-compatibility-retirement",
+          "result": "passed",
+          "source_sha": "5b5dc2778f8f93f09d17c68736c3134a794cba08",
+          "verified_on": "2026-10-08"
+        },
+        {
+          "kind": "command",
+          "command": "python3 -B scripts/database/compatibility-retirement-integration.py",
+          "result": "passed",
+          "source_sha": "5b5dc2778f8f93f09d17c68736c3134a794cba08",
+          "verified_on": "2026-10-08"
+        },
+        {
+          "kind": "command",
+          "command": "python3 -B scripts/database/test-compatibility-retirement.py",
+          "result": "passed",
+          "source_sha": "ba564d3d3d80113c4a23d271b0f52e9fa30878f0",
+          "verified_on": "2026-10-08"
+        },
+        {
+          "kind": "command",
+          "command": "python3 scripts/database/test-compatibility-retirement.py",
+          "result": "passed",
+          "source_sha": "2a4ecd365a6306b11b4824d0234312822c6f2708",
+          "verified_on": "2026-10-08"
+        },
+        {
+          "kind": "command",
+          "command": "go test -race -p=3 ./cmd/qs-compatibility-retirement -count=1",
+          "result": "passed",
+          "source_sha": "2a4ecd365a6306b11b4824d0234312822c6f2708",
+          "verified_on": "2026-10-08"
+        },
+        {
+          "kind": "command",
+          "command": "python3 -B scripts/database/test-compatibility-retirement.py",
+          "result": "passed",
+          "source_sha": "f37c39b5064201fc46ee7a66a9433c0da62fb3b5",
+          "verified_on": "2026-10-08"
+        },
+        {
+          "kind": "command",
+          "command": "python3 -B scripts/dbops/test-receipt-transport.py",
+          "result": "passed",
+          "source_sha": "f37c39b5064201fc46ee7a66a9433c0da62fb3b5",
+          "verified_on": "2026-10-08"
+        },
+        {
+          "kind": "command",
+          "command": "python3 -B scripts/cd/test-runtime-evidence.py",
+          "result": "passed",
+          "source_sha": "c98d6aa28df5867231fa3c12fa109ecbd52eecf5",
+          "verified_on": "2026-10-09"
+        },
+        {
+          "kind": "command",
+          "command": "python3 -B scripts/cd/runtime-evidence-integration.py",
+          "result": "passed",
+          "source_sha": "c98d6aa28df5867231fa3c12fa109ecbd52eecf5",
+          "verified_on": "2026-10-09"
         }
       ],
       "production_evidence": {

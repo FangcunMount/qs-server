@@ -930,6 +930,15 @@ esac
 # armored receipt; no raw version/probe output or connection settings reach CI.
 runtime_docker_args=()
 if [ -n "${SUDO:-}" ]; then runtime_docker_args=(--sudo-docker); fi
+# This ID is populated only by the immutable MQ preflight above and consumed
+# only after verify_running_image proved the running API uses that exact ID.
+if [ -n "$MQ_IMAGE_ID" ]; then
+  if [ "$SERVICE" != "apiserver" ] || ! [[ "$MQ_IMAGE_ID" =~ ^sha256:[0-9a-f]{64}$ ]]; then
+    echo "CD immutable image evidence binding is invalid" >&2
+    exit 1
+  fi
+  runtime_docker_args+=(--expected-image-config-id "$MQ_IMAGE_ID")
+fi
 # Keep Python and the packaged transport unprivileged. Only the observer's
 # closed read-only Docker executor may use the existing sudo Docker chain.
 python3 "$DEPLOY_TMP/scripts/cd/runtime-evidence.py" "${runtime_docker_args[@]}" \
