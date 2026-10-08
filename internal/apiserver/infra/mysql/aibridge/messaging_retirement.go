@@ -62,6 +62,7 @@ type CommandRetirementEvidence struct {
 }
 
 var retirementToken = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._:/@#-]*$`)
+var retirementOperationID = regexp.MustCompile(`^[0-9]{1,20}-[0-9]{1,4}$`)
 
 func validRetirementID(id string) bool {
 	u, err := uuid.Parse(id)
@@ -71,7 +72,7 @@ func validRetirementID(id string) bool {
 func (e CommandRetirementEvidence) validate(transferred bool) error {
 	org, err := strconv.ParseUint(e.OrganizationID, 10, 64)
 	_, offset := e.VerifiedAt.Zone()
-	if e.Version != 1 || !validRetirementID(e.OperationID) || !validRetirementID(e.CommandID) || !validRetirementID(e.RequestID) || !validRetirementID(e.ResourceID) || err != nil || org == 0 || strconv.FormatUint(org, 10) != e.OrganizationID || e.SubjectID == "" || len(e.SubjectID) > 128 || len(e.VerifierVersion) > 128 || !retirementToken.MatchString(e.VerifierVersion) || e.VerifiedAt.IsZero() || offset != 0 || !e.OwnershipVerified || len(e.Sources) == 0 || len(e.Sources) > 2 || len(e.References) == 0 || len(e.References) > 16 {
+	if e.Version != 1 || !retirementOperationID.MatchString(e.OperationID) || !validRetirementID(e.CommandID) || !validRetirementID(e.RequestID) || !validRetirementID(e.ResourceID) || err != nil || org == 0 || strconv.FormatUint(org, 10) != e.OrganizationID || e.SubjectID == "" || len(e.SubjectID) > 128 || len(e.VerifierVersion) > 128 || !retirementToken.MatchString(e.VerifierVersion) || e.VerifiedAt.IsZero() || offset != 0 || !e.OwnershipVerified || len(e.Sources) == 0 || len(e.Sources) > 2 || len(e.References) == 0 || len(e.References) > 16 {
 		return app.ErrConflict
 	}
 	if e.SourceKind != "start" && e.SourceKind != "answer" && e.SourceKind != "cancel" {

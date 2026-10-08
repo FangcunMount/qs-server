@@ -16,11 +16,11 @@ import (
 
 func TestRetirementEvidenceRejectsUnknownPermissionAndMixedDigestKinds(t *testing.T) {
 	id := uuid.NewString()
-	e := CommandRetirementEvidence{Version: 1, OperationID: uuid.NewString(), VerifierVersion: "retirement/v1", VerificationMethod: "source_identity_hash_and_business_closure", VerifiedAt: time.Now().UTC(), CommandID: id, RequestID: id, SourceKind: "start", OrganizationID: "1", SubjectID: "42", ResourceID: id, Sources: []CommandRetirementSource{{Table: "ai_bridge_commands", CommandID: id, BytesKind: "mysql_json_payload_cast_binary_sha256", BytesSHA256: strings.Repeat("a", 64), BusinessPayloadHash: strings.Repeat("b", 64)}}, References: []CommandRetirementReference{{Kind: "business_record", ID: id}}, Conclusion: "verified", Reason: "history_terminal_verified", OwnershipVerified: true, ResponsibilityClosed: true, BusinessTerminal: true}
+	e := CommandRetirementEvidence{Version: 1, OperationID: "123-1", VerifierVersion: "retirement/v1", VerificationMethod: "source_identity_hash_and_business_closure", VerifiedAt: time.Now().UTC(), CommandID: id, RequestID: id, SourceKind: "start", OrganizationID: "1", SubjectID: "42", ResourceID: id, Sources: []CommandRetirementSource{{Table: "ai_bridge_commands", CommandID: id, BytesKind: "mysql_json_payload_cast_binary_sha256", BytesSHA256: strings.Repeat("a", 64), BusinessPayloadHash: strings.Repeat("b", 64)}}, References: []CommandRetirementReference{{Kind: "business_record", ID: id}}, Conclusion: "verified", Reason: "history_terminal_verified", OwnershipVerified: true, ResponsibilityClosed: true, BusinessTerminal: true}
 	if err := e.validate(false); err != nil {
 		t.Fatal(err)
 	}
-	for _, scenario := range []string{"responsibility", "terminal", "owner", "source_kind", "bytes_kind", "standard_hash", "source_reference", "raw_body_reference", "unknown_conclusion", "timezone", "version"} {
+	for _, scenario := range []string{"responsibility", "terminal", "owner", "source_kind", "bytes_kind", "standard_hash", "source_reference", "raw_body_reference", "unknown_conclusion", "timezone", "version", "uuid_operation", "malformed_operation", "overlong_operation", "numeric_command", "numeric_request", "numeric_resource"} {
 		bad := e
 		bad.Sources = append([]CommandRetirementSource(nil), e.Sources...)
 		bad.References = append([]CommandRetirementReference(nil), e.References...)
@@ -47,6 +47,18 @@ func TestRetirementEvidenceRejectsUnknownPermissionAndMixedDigestKinds(t *testin
 			bad.VerifiedAt = bad.VerifiedAt.In(time.FixedZone("offset", 3600))
 		case "version":
 			bad.Version = 2
+		case "uuid_operation":
+			bad.OperationID = uuid.NewString()
+		case "malformed_operation":
+			bad.OperationID = "123-1-other"
+		case "overlong_operation":
+			bad.OperationID = strings.Repeat("1", 21) + "-1"
+		case "numeric_command":
+			bad.CommandID = e.OperationID
+		case "numeric_request":
+			bad.RequestID = e.OperationID
+		case "numeric_resource":
+			bad.ResourceID = e.OperationID
 		}
 		if err := bad.validate(false); !errors.Is(err, app.ErrConflict) {
 			t.Fatal(scenario, err)

@@ -35,7 +35,7 @@ func retirementEvidence(t *testing.T, f *mqFixture) CommandRetirementEvidence {
 	mustMQ(t, f.db.QueryRow("SELECT CAST(payload AS BINARY),payload_hash FROM ai_bridge_commands WHERE command_id=?", f.request.RequestID).Scan(&raw, &businessHash))
 	var revision uint64
 	mustMQ(t, f.db.QueryRow("SELECT revision FROM ai_messaging_admission WHERE singleton=1").Scan(&revision))
-	return CommandRetirementEvidence{Version: 1, OperationID: uuid.NewString(), VerifierVersion: "qs-retirement/v1", VerificationMethod: "source_identity_hash_and_business_closure", VerifiedAt: time.Now().UTC(), AdmissionRevision: revision, CommandID: f.request.RequestID, RequestID: f.request.RequestID, SourceKind: "start", OrganizationID: f.scope.OrganizationID, SubjectID: f.scope.SubjectID, ResourceID: f.request.RequestID, Sources: []CommandRetirementSource{{Table: "ai_bridge_commands", CommandID: f.request.RequestID, BytesKind: "mysql_json_payload_cast_binary_sha256", BytesSHA256: messagingHash(raw), BusinessPayloadHash: businessHash}}, References: []CommandRetirementReference{{Kind: "business_record", ID: f.request.RequestID}}, Conclusion: "verified", Reason: "history_terminal_verified", OwnershipVerified: true, ResponsibilityClosed: true, BusinessTerminal: true}
+	return CommandRetirementEvidence{Version: 1, OperationID: "123-1", VerifierVersion: "qs-retirement/v1", VerificationMethod: "source_identity_hash_and_business_closure", VerifiedAt: time.Now().UTC(), AdmissionRevision: revision, CommandID: f.request.RequestID, RequestID: f.request.RequestID, SourceKind: "start", OrganizationID: f.scope.OrganizationID, SubjectID: f.scope.SubjectID, ResourceID: f.request.RequestID, Sources: []CommandRetirementSource{{Table: "ai_bridge_commands", CommandID: f.request.RequestID, BytesKind: "mysql_json_payload_cast_binary_sha256", BytesSHA256: messagingHash(raw), BusinessPayloadHash: businessHash}}, References: []CommandRetirementReference{{Kind: "business_record", ID: f.request.RequestID}}, Conclusion: "verified", Reason: "history_terminal_verified", OwnershipVerified: true, ResponsibilityClosed: true, BusinessTerminal: true}
 }
 
 func TestMQRetiredIdentityPreservesNoReplayAcrossRestoreAndLateReceipt(t *testing.T) {
@@ -66,11 +66,18 @@ func TestMQRetiredIdentityPreservesNoReplayAcrossRestoreAndLateReceipt(t *testin
 		}))
 	}
 	changed := e
-	changed.OperationID = uuid.NewString()
+	changed.OperationID = "123-2"
 	if err = f.tx(func(tx *sql.Tx) error {
 		return RecordOperationRetirement(t.Context(), retirementGORM(t, f.db, tx), changed)
 	}); !errors.Is(err, app.ErrConflict) {
 		t.Fatal("different evidence overwrote a retirement", err)
+	}
+	changed = e
+	changed.VerifierVersion = "qs-retirement/v2"
+	if err = f.tx(func(tx *sql.Tx) error {
+		return RecordOperationRetirement(t.Context(), retirementGORM(t, f.db, tx), changed)
+	}); !errors.Is(err, app.ErrConflict) {
+		t.Fatal("same operation with different evidence overwrote a retirement", err)
 	}
 	// Restored old pending rows remain present. Neither normal staging nor the
 	// still-packaged pre-cutover handoff path may manufacture a new command.
@@ -208,6 +215,13 @@ func TestMQRetirementSourceDriftUnknownAndTransferEvidence(t *testing.T) {
 			}
 			return RecordOperationTransferEvidence(t.Context(), g, e)
 		}))
+	}
+	changed := e
+	changed.VerifierVersion = "qs-retirement/v2"
+	if err = f.tx(func(tx *sql.Tx) error {
+		return RecordOperationTransferEvidence(t.Context(), retirementGORM(t, f.db, tx), changed)
+	}); !errors.Is(err, app.ErrConflict) {
+		t.Fatal("same operation with different evidence overwrote a live handoff", err)
 	}
 	var same bool
 	mustMQ(t, f.db.QueryRow("SELECT retired=FALSE AND body_sha256=? AND aggregate_sequence=? AND created_at=? AND receipt IS NULL AND decision='' FROM ai_messaging_operations WHERE command_id=?", bodyHash, sequence, created, e.CommandID).Scan(&same))
