@@ -9,23 +9,29 @@ import (
 	"io"
 	"reflect"
 	"testing"
+	"time"
 
 	"go.mongodb.org/mongo-driver/bson"
 )
 
 func wholeJointUnitFixture(t *testing.T, ai int, paired bool) authFixture {
 	t.Helper()
+	return wholeJointUnitFixtureAt(t, ai, paired, fixtureClock)
+}
+
+func wholeJointUnitFixtureAt(t *testing.T, ai int, paired bool, clock time.Time) authFixture {
+	t.Helper()
 	f := coordinatorFixture(t, ai, paired)
 	var sqlRows [][][]byte
 	for i, kind := range []string{"evaluation.requested", "evaluation.retry.requested", "evaluation.failed", "evaluation.outcome.committed"} {
-		body := bytes.ReplaceAll(wireFixture(t, kind), []byte("original-event-1"), []byte(fmt.Sprintf("coordinator-sql-%d", i)))
+		body := bytes.ReplaceAll(wireFixtureAt(t, kind, clock), []byte("original-event-1"), []byte(fmt.Sprintf("coordinator-sql-%d", i)))
 		body = bytes.ReplaceAll(body, []byte("sheet-1"), []byte("10042"))
 		sqlRows = append(sqlRows, fixtureSQLRow(t, body, fmt.Sprint(i+1)))
 	}
 	f.raw[0], f.expected[0] = fixtureSQLCopy(t, sqlRows, nil)
 	var mongoRows [][]byte
 	for i, kind := range []string{"answersheet.submitted", "interpretation.report.generated"} {
-		body := bytes.ReplaceAll(wireFixture(t, kind), []byte("original-event-1"), []byte(fmt.Sprintf("coordinator-mongo-%d", i)))
+		body := bytes.ReplaceAll(wireFixtureAt(t, kind, clock), []byte("original-event-1"), []byte(fmt.Sprintf("coordinator-mongo-%d", i)))
 		body = bytes.ReplaceAll(body, []byte("sheet-1"), []byte("10042"))
 		raw, err := bson.Marshal(fixtureMongoRow(t, body, int64(fixtureLargeID+int64(i))))
 		if err != nil {

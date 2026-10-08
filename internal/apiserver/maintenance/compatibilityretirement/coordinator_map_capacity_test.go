@@ -6,9 +6,11 @@ import (
 	"testing"
 )
 
-// These digests were observed from the complete preallocation-free 7546aaaf
-// baseline. Capacity changes must preserve original bytes, order and blocked
-// candidates rather than silently omit facts to reduce memory.
+// These digests were independently observed from the complete preallocation-free
+// 7546aaaf baseline and the capacity version using the same explicit UTC fixture.
+// Default fixtures retain their original +08:00 inputs; only this golden selects
+// UTC so decoded timezone names do not depend on the test process location.
+// Capacity changes must preserve original bytes, order and blocked candidates.
 func TestSourceIndexCapacityPreservesWholeEOFDigests(t *testing.T) {
 	for _, tc := range []struct {
 		name                   string
@@ -16,11 +18,11 @@ func TestSourceIndexCapacityPreservesWholeEOFDigests(t *testing.T) {
 		events, candidates     uint64
 		indexSHA, candidateSHA string
 	}{
-		{"six_types_and_paired_ai", false, 6, 10, "fe593a17c39d3b8de98e57df14e939bddaf76cba6115bfa70adcfb0fb3782bb6", "ec9fb618482b7042163d8c849a28b038395c1e6781371e9c1e6dfc8b52fc8b06"},
+		{"six_types_and_paired_ai", false, 6, 10, "d8a92b73920b536bd1e5fb664af767d58796d6e76397b3359ebfb98683fb9394", "d7358d0a2dba18b784bf0ababaf7ec055c6b9822163f1951419bb2f03765157d"},
 		{"empty_events_and_paired_ai", true, 0, 4, "f54d70135c51a5178952f96e1e35d669026c074c7c2b66a87c2d03de9f931e35", "8c889c300a1f9dbad55fe4f74f4628b2fb8a790b9712f0579ab459716abaa282"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			f := wholeJointUnitFixture(t, 2, true)
+			f := wholeJointUnitFixtureAt(t, 2, true, fixtureClock.UTC())
 			if tc.empty {
 				f.raw[0], f.expected[0] = fixtureSQLCopy(t, nil, nil)
 				f.raw[3], f.expected[3] = fixtureMongoCopy(t, nil)

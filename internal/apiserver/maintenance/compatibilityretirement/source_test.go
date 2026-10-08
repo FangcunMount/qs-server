@@ -36,11 +36,16 @@ const fixtureLargeID = int64(639678084915671598)
 // They are synthetic identities, not copied production payloads.
 func wireFixture(t *testing.T, kind string) []byte {
 	t.Helper()
-	base := event.BaseEvent{ID: "original-event-1", EventTypeValue: kind, OccurredAtValue: fixtureClock.Add(time.Second), AggregateTypeValue: "Evaluation", AggregateIDValue: "639678084915671598"}
+	return wireFixtureAt(t, kind, fixtureClock)
+}
+
+func wireFixtureAt(t *testing.T, kind string, clock time.Time) []byte {
+	t.Helper()
+	base := event.BaseEvent{ID: "original-event-1", EventTypeValue: kind, OccurredAtValue: clock.Add(time.Second), AggregateTypeValue: "Evaluation", AggregateIDValue: "639678084915671598"}
 	var evt event.DomainEvent
 	switch kind {
 	case "evaluation.requested", "evaluation.retry.requested":
-		p := eventpayload.EvaluationRequestedData{OrgID: fixtureLargeID, AssessmentID: fixtureLargeID, TesteeID: math.MaxUint64, QuestionnaireCode: "q-code", QuestionnaireVer: "v1", AnswerSheetID: "sheet-1", ModelKind: "scale", ModelCode: "scale-1", ModelVersion: "v1", RequestedAt: fixtureClock}
+		p := eventpayload.EvaluationRequestedData{OrgID: fixtureLargeID, AssessmentID: fixtureLargeID, TesteeID: math.MaxUint64, QuestionnaireCode: "q-code", QuestionnaireVer: "v1", AnswerSheetID: "sheet-1", ModelKind: "scale", ModelCode: "scale-1", ModelVersion: "v1", RequestedAt: clock}
 		if kind == "evaluation.retry.requested" {
 			p.ExpectedAttempt = 2
 			p.AttemptOrigin = "automatic"
@@ -48,17 +53,17 @@ func wireFixture(t *testing.T, kind string) []byte {
 		}
 		evt = event.Event[eventpayload.EvaluationRequestedData]{BaseEvent: base, Data: p}
 	case "evaluation.failed":
-		evt = event.Event[eventpayload.EvaluationFailedData]{BaseEvent: base, Data: eventpayload.EvaluationFailedData{OrgID: fixtureLargeID, AssessmentID: fixtureLargeID, TesteeID: math.MaxUint64, Reason: "historical reason", FailedAt: fixtureClock}}
+		evt = event.Event[eventpayload.EvaluationFailedData]{BaseEvent: base, Data: eventpayload.EvaluationFailedData{OrgID: fixtureLargeID, AssessmentID: fixtureLargeID, TesteeID: math.MaxUint64, Reason: "historical reason", FailedAt: clock}}
 	case "evaluation.outcome.committed":
-		evt = event.Event[eventpayload.EvaluationOutcomeCommittedData]{BaseEvent: base, Data: eventpayload.EvaluationOutcomeCommittedData{OrgID: fixtureLargeID, AssessmentID: fixtureLargeID, TesteeID: math.MaxUint64, OutcomeID: "outcome-1", EvaluationRunID: "run-1", CommittedAt: fixtureClock}}
+		evt = event.Event[eventpayload.EvaluationOutcomeCommittedData]{BaseEvent: base, Data: eventpayload.EvaluationOutcomeCommittedData{OrgID: fixtureLargeID, AssessmentID: fixtureLargeID, TesteeID: math.MaxUint64, OutcomeID: "outcome-1", EvaluationRunID: "run-1", CommittedAt: clock}}
 	case "answersheet.submitted":
 		base.AggregateTypeValue = "AnswerSheet"
 		base.AggregateIDValue = "sheet-1"
-		evt = event.Event[eventpayload.AnswerSheetSubmittedData]{BaseEvent: base, Data: eventpayload.AnswerSheetSubmittedData{AnswerSheetID: "sheet-1", QuestionnaireCode: "q-code", QuestionnaireVersion: "v1", TesteeID: math.MaxUint64, OrgID: uint64(fixtureLargeID), FillerID: math.MaxUint64, FillerType: "testee", SubmittedAt: fixtureClock, Admission: &eventpayload.AssessmentAdmission{Purpose: eventpayload.AdmissionPurposeIndependentQuestionnaire, QuestionnaireCode: "q-code", QuestionnaireVersion: "v1"}}}
+		evt = event.Event[eventpayload.AnswerSheetSubmittedData]{BaseEvent: base, Data: eventpayload.AnswerSheetSubmittedData{AnswerSheetID: "sheet-1", QuestionnaireCode: "q-code", QuestionnaireVersion: "v1", TesteeID: math.MaxUint64, OrgID: uint64(fixtureLargeID), FillerID: math.MaxUint64, FillerType: "testee", SubmittedAt: clock, Admission: &eventpayload.AssessmentAdmission{Purpose: eventpayload.AdmissionPurposeIndependentQuestionnaire, QuestionnaireCode: "q-code", QuestionnaireVersion: "v1"}}}
 	case "interpretation.report.generated":
 		base.AggregateTypeValue = "ReportGeneration"
 		base.AggregateIDValue = "generation-1"
-		evt = event.Event[eventoutcome.ReportGeneratedPayload]{BaseEvent: base, Data: eventoutcome.ReportGeneratedPayload{OrgID: fixtureLargeID, GenerationID: "generation-1", RunID: "run-1", ReportID: "report-1", AssessmentID: "639678084915671598", OutcomeID: "outcome-1", TesteeID: math.MaxUint64, Attempt: 2, ReportType: "scale", TemplateVersion: "v1", BuilderIdentity: "builder:v1", ContentSchemaVersion: "v1", Model: eventoutcome.ModelIdentity{Kind: "scale", Code: "scale-1", Version: "v1"}, PrimaryScore: &eventoutcome.ScoreValue{Kind: "score", Value: 5.1}, GeneratedAt: fixtureClock}}
+		evt = event.Event[eventoutcome.ReportGeneratedPayload]{BaseEvent: base, Data: eventoutcome.ReportGeneratedPayload{OrgID: fixtureLargeID, GenerationID: "generation-1", RunID: "run-1", ReportID: "report-1", AssessmentID: "639678084915671598", OutcomeID: "outcome-1", TesteeID: math.MaxUint64, Attempt: 2, ReportType: "scale", TemplateVersion: "v1", BuilderIdentity: "builder:v1", ContentSchemaVersion: "v1", Model: eventoutcome.ModelIdentity{Kind: "scale", Code: "scale-1", Version: "v1"}, PrimaryScore: &eventoutcome.ScoreValue{Kind: "score", Value: 5.1}, GeneratedAt: clock}}
 	default:
 		t.Fatal("unsupported fixture")
 	}
