@@ -124,7 +124,7 @@ via noninteractive sudo, then assigned to the current SSH user. Existing owners,
 permissions or inaccessible ancestors are not repaired. Such a host path issue
 requires an independently controlled setup, not weaker path validation.
 
-Discovery reads actual stable identity, MySQL 8/Mongo 7 versions, actual migration
+Discovery reads actual identity snapshots, MySQL 8/Mongo 7 versions, actual migration
 head/dirty flags and necessary narrow metadata visibility. Its receipt is
 `diagnostic_only:true`, `drop_ready:false`, `complete:false` at the orchestrator
 level, even when `identity_discovery_complete:true`. Root must independently bind
@@ -172,7 +172,13 @@ Identity protocol `mysql_database_identity_v1` hashes actual `@@server_uuid`
 and selected `DATABASE()` with unambiguous length framing. Protocol
 `mongodb_database_identity_v1` hashes actual hello `setName/hosts/me`, the selected
 database name and that database's `schema_migrations` UUID. A standalone server
-therefore still requires a real database UUID; hostname alone is never accepted.
+therefore still requires an observed migration-collection UUID; hostname alone is never accepted.
+The pinned Mongo migration driver drops and recreates `schema_migrations` when
+setting a version, so this UUID is an A-head snapshot anchor, not an immutable
+Mongo database identity across B migrations. Record and bind the pre/post
+migration UUIDs and heads separately. A genuinely new empty database has no such
+UUID and needs an explicit pristine-catalog bootstrap proof before migration;
+discovery cannot authorize that bootstrap or weaken identity checks.
 The embedded binary SHA must equal the approved source before DB credentials are
 written to a private temporary environment file. Secrets never enter argv,
 stdout, public artifacts or the raw source inventory.
@@ -224,9 +230,10 @@ Runner jobs have no production environment: environment ref policy alone cannot
 fence their repository credential path. Current ordinary Nginx verification is
 read-only; its shared script's install/reload mode is separately called by CD.
 Host cron/manual tasks, other repositories and obsolete source reruns remain
-unproven. Root's independent metadata query also reported 27 remote workflows
-against 18 current source workflows, with nine active historical workflows absent
-from current source listed explicitly as unproved. Organization Secrets coverage,
+unproven. The pre-A independent metadata snapshot reported 27 remote workflows
+against 18 then-current source workflows, with nine active historical workflows absent
+from that source baseline listed explicitly as unproved. These counts are dated
+observations; adding this workflow or merging A requires a fresh live inventory. Organization Secrets coverage,
 historical rerun credential denial and production ref protection are not inferred
 from that metadata or the source catalog. The final fence must deny all historical credential paths before the
 maintenance window, not simply cancel current CD/db-ops runs.

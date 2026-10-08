@@ -59,3 +59,15 @@ QS 只做授权、格式/传输边界与 mTLS 代理，不计算质量门槛、�
 超时先核对原命令的确切回执，必要时显式重试同一 command_id、版本与正文。更正不调用模型、不自动 Finalize 或 Publish，也不覆盖原签名。实际部署、账号操作与正式发布另验收。
 
 实现：[应用权限与命令校验](../../internal/apiserver/application/aibridge/evaluation_review_correction.go)、[一次调用代理](../../internal/apiserver/infra/aibridge/evaluation_review_correction.go)、[路由权限回归](../../internal/apiserver/transport/rest/routes_ai_workflow_review_corrections_test.go)、[AI 机器契约](../../api/grpc/proto/aiworkflow/workflow.proto)。
+
+## AI Runtime 统计口径（兼容链退役发布 A）
+
+公共 REST/gRPC 字段名称和类型保持：Runtime 的 `commands_pending`、`command_attempts` 以及 Health 的 `pending_commands` 从当前 `ai_messaging_operations/outbox` 读取，不再回读旧命令表。
+
+- 只统计 START、CHANGE、PARTICIPANT_RETRY；ACK、评测命令及其他组织不计入。
+- pending 包含 held，只有业务回执 accepted/rejected 才排除；Broker 已接收不等于业务已接受。
+- attempts 累加当前 Outbox 的投递预算，包括已核实交接继承的预算；不再另加旧历史计数，不表示模型调用次数。
+- 退休 ID 永久占用原命令身份，不发送、不复用、不应用回执。迟到回执明确 Conflict 并隔离。
+- 查询检查双向关联完整性；缺操作、缺 Outbox、跨组织或同请求错误归属返回错误，不能显示为零积压。
+
+接口字段兼容不代表统计语义未变。发布验收需要绑定实际 A 版本及现场查询结果；本说明不证明已上线。
