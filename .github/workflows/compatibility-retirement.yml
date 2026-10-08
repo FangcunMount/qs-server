@@ -30,15 +30,15 @@ on:
         default: ''
         type: string
       inventory_request_sha256:
-        description: 'Prepare only: SHA256 of the private read-only inventory request'
+        description: 'Prepare bounds/inventory only: independently approved private request SHA256'
         required: false
         default: ''
         type: string
       prepare_mode:
-        description: 'Prepare submode: metadata identity discovery or source inventory'
+        description: 'Prepare submode: identity, diagnostic upper boundaries, or independently approved inventory'
         required: false
         type: choice
-        options: [identity, inventory]
+        options: [identity, bounds, inventory]
         default: inventory
       identity_request_sha256:
         description: 'Prepare identity only: independently computed canonical request SHA256'
@@ -66,15 +66,22 @@ jobs:
         uses: actions/github-script@v8
         with:
           script: |
-            const input = context.payload.inputs ?? {};
+            const raw = context.payload.inputs ?? {};
             const expectedKeys = ['operation', 'database', 'approved_source_sha', 'operation_id', 'manifest_sha256', 'inventory_request_sha256', 'prepare_mode', 'identity_request_sha256'].sort();
+            if (Object.keys(raw).some(key => !expectedKeys.includes(key))) {
+              throw new Error('compatibility_retirement_unknown_input');
+            }
+            // GitHub omits optional empty strings in workflow_dispatch payloads.
+            // Only declared optional inputs have defaults; required fields and
+            // supplied values still pass the complete strict stage validation.
+            const input = {manifest_sha256: '', inventory_request_sha256: '', prepare_mode: 'inventory', identity_request_sha256: '', ...raw};
             const keys = Object.keys(input).sort();
             if (JSON.stringify(keys) !== JSON.stringify(expectedKeys) ||
                 !['prepare', 'apply', 'verify', 'recover', 'purge'].includes(input.operation) ||
                 input.database !== 'mysql-and-mongodb' ||
                 !/^[0-9a-f]{40}$/.test(input.approved_source_sha) ||
                 !/^[0-9]{1,20}-[0-9]{1,4}$/.test(input.operation_id) ||
-                !['identity', 'inventory'].includes(input.prepare_mode) ||
+                !['identity', 'bounds', 'inventory'].includes(input.prepare_mode) ||
                 (input.operation === 'prepare'
                   ? (input.manifest_sha256 !== '' || (input.prepare_mode === 'identity'
                       ? (!/^[0-9a-f]{64}$/.test(input.identity_request_sha256) || input.inventory_request_sha256 !== '')
@@ -101,7 +108,7 @@ jobs:
       group: qlume
       labels: [self-hosted, macOS, ARM64, ops]
     environment: production
-    timeout-minutes: 35
+    timeout-minutes: 40
     steps:
       - name: Validate pinned production SSH binding
         env:
@@ -177,7 +184,7 @@ jobs:
           key: ${{ secrets.SVRA_SSH_KEY }}
           port: ${{ vars.SVRA_SSH_PORT || 22 }}
           fingerprint: ${{ vars.SVRA_SSH_FINGERPRINT }}
-          command_timeout: 32m
+          command_timeout: 35m
           envs: RETIREMENT_OPERATION,RETIREMENT_OPERATION_ID,RETIREMENT_MANIFEST_SHA256,RETIREMENT_INVENTORY_REQUEST_SHA256,RETIREMENT_PREPARE_MODE,RETIREMENT_IDENTITY_REQUEST_SHA256,RETIREMENT_APPROVED_SHA,RETIREMENT_ACTUAL_SHA,RETIREMENT_RUN_ID,RETIREMENT_PACKAGE_SHA256,MYSQL_HOST,MYSQL_PORT,MYSQL_USERNAME,MYSQL_PASSWORD,MYSQL_DATABASE,MONGODB_HOST,MONGODB_PORT,MONGODB_USERNAME,MONGODB_PASSWORD,MONGODB_DBNAME
           script: |
             set -Eeuo pipefail

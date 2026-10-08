@@ -2,6 +2,9 @@
 
 package migration
 
+// These contracts stop at the historical/A boundary; paired B cold bootstrap
+// has separate native coverage in compatibility_retirement_b_integration_test.go.
+
 import (
 	"context"
 	actoraccess "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/access"
@@ -72,8 +75,8 @@ func TestStatisticsColdStartPublishIdempotencyAndRedisFailure(t *testing.T) {
 	}
 
 	sqlDB, databaseName := openStatisticsMigrationDatabase(t, mysqlDSN)
-	version, _, err := NewMigrator(sqlDB, &Config{Enabled: true, Database: databaseName}).Run()
-	wantVersion := latestEmbeddedMySQLMigrationVersion(t)
+	version, _, err := NewMigrator(sqlDB, &Config{Enabled: true, Database: databaseName}).run(98)
+	const wantVersion uint = 98
 	if err != nil || version != wantVersion {
 		t.Fatalf("migrate empty MySQL: version=%d want=%d err=%v", version, wantVersion, err)
 	}
@@ -83,8 +86,8 @@ func TestStatisticsColdStartPublishIdempotencyAndRedisFailure(t *testing.T) {
 	}
 
 	mongoClient, mongoDB := mongodbtest.ReplicaSetDatabase(t)
-	mongoVersion, _, err := NewMongoMigrator(mongoClient, &Config{Enabled: true, Database: mongoDB.Name()}).Run()
-	wantMongoVersion := latestEmbeddedMongoMigrationVersion(t)
+	mongoVersion, _, err := NewMongoMigrator(mongoClient, &Config{Enabled: true, Database: mongoDB.Name()}).run(37)
+	const wantMongoVersion uint = 37
 	if err != nil || mongoVersion != wantMongoVersion {
 		t.Fatalf("migrate empty MongoDB: version=%d want=%d err=%v", mongoVersion, wantMongoVersion, err)
 	}

@@ -45,26 +45,31 @@ def main():
             ports.append(output.split(":")[-1])
         limit = time.monotonic() + 90
         while True:
-            mysql = command(["docker", "exec", names[0], "mysqladmin", "ping", "--silent",
-                             "-uroot", "-p" + synthetic_password], check=False)
+            # The image's temporary bootstrap server answers socket pings but
+            # cannot serve the host TCP endpoint; require the final TCP server
+            # and an authenticated query before starting native inventory.
+            mysql = command(["docker", "exec", names[0], "mysql", "--protocol=TCP", "--host=127.0.0.1",
+                             "--batch", "--skip-column-names", "-uroot", "-p" + synthetic_password,
+                             "--execute", "SELECT 1"], check=False)
             mongo = command(["docker", "exec", names[1], "mongosh", "--quiet", "--host", "127.0.0.1",
                              "--username", "local_inventory_root", "--password", synthetic_password,
                              "--authenticationDatabase", "admin", "--eval", "if(db.runCommand({ping:1}).ok!==1)quit(1)"], check=False)
-            if mysql.returncode == mongo.returncode == 0:
+            if mysql.returncode == mongo.returncode == 0 and mysql.stdout.strip() == b"1":
                 break
             if time.monotonic() >= limit:
                 raise RuntimeError("local_database_readiness_timeout")
             time.sleep(1)
         env = os.environ.copy()
         env.update({"QS_RETIREMENT_LOCAL_INTEGRATION": "1", "MYSQL_HOST": "127.0.0.1",
+                    "QS_RETIREMENT_SCALE_ROWS": "650123",
                     "MYSQL_PORT": ports[0], "MYSQL_USERNAME": "root", "MYSQL_PASSWORD": synthetic_password,
                     "MYSQL_DATABASE": "qs_retirement_inventory_test", "MONGODB_HOST": "127.0.0.1",
                     "MONGODB_PORT": ports[1], "MONGODB_USERNAME": "local_inventory_root",
                     "MONGODB_PASSWORD": synthetic_password, "MONGODB_DBNAME": "qs_retirement_inventory_test"})
         with tempfile.TemporaryDirectory(prefix="qs-compat-integration-cache-") as cache:
-            env["GOCACHE"] = cache
+            env["GOCACHE"] = os.environ.get("GOCACHE", cache)
             result = command(["go", "test", "-tags=integration", "-count=1", "./cmd/qs-compatibility-retirement"],
-                             timeout=240, check=False, env=env)
+                             timeout=900, check=False, env=env)
         if result.returncode:
             # The fixed test's output contains synthetic evidence only. Redact
             # its random local password before reporting any debugging text.
@@ -73,8 +78,12 @@ def main():
             return 1
         print(json.dumps({"local_only": True, "mysql_major": 8, "mongodb_major": 7,
                           "presence_cases": ["all_present", "partially_absent", "all_absent"],
+                          "production_profile": {"rows_per_sql_and_mongo_target": 650123, "equal_passes": 2,
+                                                 "fixed_upper": True, "post_upper_next_cycle": True,
+                                                 "temporary_assets_registered": True, "drop_ready": False},
                           "reject_cases": ["dirty_head", "wrong_database_identity", "mysql_view", "mongodb_view", "discovery_dirty_mysql", "discovery_dirty_mongodb", "discovery_absent_database_uuid", "histogram_excess_buckets",
-                                           "partial_mysql_metadata_permission"], "passed": True}))
+                                           "partial_mysql_metadata_permission", "mixed_bson_types", "unsupported_bson_type",
+                                           "page_cap", "row_cap", "byte_cap", "timeout", "overwrite_or_resume"], "passed": True}))
         return 0
     except Exception as error:
         print(type(error).__name__ + ":local_integration_failed", file=sys.stderr)

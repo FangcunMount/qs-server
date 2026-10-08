@@ -333,6 +333,13 @@ jobs:
           go test -race -tags=integration -count=1 -timeout=5m ./internal/apiserver/infra/retrygovernance
           go test -race -tags=integration -count=1 -timeout=5m ./internal/pkg/migration -run '^TestCompatibilityRetirementA'
 
+      - name: Verify compatibility retirement B paired migration and recovery guards
+        timeout-minutes: 12
+        run: |
+          docker pull mysql:8.0
+          docker pull mongo:7
+          python3 -B scripts/database/compatibility-retirement-b-integration.py
+
       - name: Run Survey and ModelCatalog Mongo integration contracts
         env:
           QS_SERVER_TEST_MONGO_URI: mongodb://127.0.0.1:27017/?replicaSet=rs0

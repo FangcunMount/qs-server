@@ -46,36 +46,38 @@ const totalSeconds = 180
 var targets = [][3]string{{"mysql", "domain_event_outbox", "base_table"}, {"mysql", "ai_bridge_commands", "base_table"}, {"mysql", "ai_messaging_legacy_commands", "base_table"}, {"mongodb", "domain_event_outbox", "collection"}}
 
 type request struct {
-	FormatVersion int               `json:"format_version"`
-	Kind          string            `json:"kind"`
-	OperationID   string            `json:"operation_id"`
-	SourceSHA     string            `json:"source_sha"`
-	TargetHash    string            `json:"target_hash"`
-	DatabaseScope string            `json:"database_scope"`
-	Identities    map[string]string `json:"identity_hashes"`
-	Migrations    map[string]uint64 `json:"expected_migrations"`
-	Limits        struct {
-		QuerySeconds int `json:"query_seconds"`
-		TotalSeconds int `json:"total_seconds"`
-		MaxRecords   int `json:"max_records"`
-		MaxBytes     int `json:"max_bytes"`
-	} `json:"limits"`
+	FormatVersion      int               `json:"format_version"`
+	Kind               string            `json:"kind"`
+	OperationID        string            `json:"operation_id"`
+	SourceSHA          string            `json:"source_sha"`
+	TargetHash         string            `json:"target_hash"`
+	DatabaseScope      string            `json:"database_scope"`
+	Identities         map[string]string `json:"identity_hashes"`
+	Migrations         map[string]uint64 `json:"expected_migrations"`
+	Limits             scanLimits        `json:"limits"`
+	BoundaryRunID      string            `json:"boundary_run_id,omitempty"`
+	BoundaryReportHash string            `json:"boundary_report_hash,omitempty"`
+	Boundaries         []targetBoundary  `json:"approved_boundaries,omitempty"`
 }
 
 type snapshot struct {
-	Database       string            `json:"database"`
-	Name           string            `json:"name"`
-	Kind           string            `json:"kind"`
-	Present        bool              `json:"present"`
-	Complete       bool              `json:"complete"`
-	Records        uint64            `json:"records"`
-	SchemaHash     string            `json:"schema_hash"`
-	DataHash       string            `json:"data_hash"`
-	IdentityHash   string            `json:"identity_hash"`
-	Bytes          uint64            `json:"bytes"`
-	Classification map[string]uint64 `json:"classification"`
-	SourceFile     string            `json:"source_file,omitempty"`
-	ErrorCategory  string            `json:"error_category"`
+	Database          string            `json:"database"`
+	Name              string            `json:"name"`
+	Kind              string            `json:"kind"`
+	Present           bool              `json:"present"`
+	Complete          bool              `json:"complete"`
+	Records           uint64            `json:"records"`
+	SchemaHash        string            `json:"schema_hash"`
+	DataHash          string            `json:"data_hash"`
+	IdentityHash      string            `json:"identity_hash"`
+	Bytes             uint64            `json:"bytes"`
+	Classification    map[string]uint64 `json:"classification"`
+	SourceFile        string            `json:"source_file,omitempty"`
+	ErrorCategory     string            `json:"error_category"`
+	Boundary          *targetBoundary   `json:"boundary,omitempty"`
+	Passes            int               `json:"equal_full_passes"`
+	Pages             uint64            `json:"pages"`
+	NextCycleRequired bool              `json:"next_cycle_required"`
 }
 type databaseInventory struct {
 	IdentityHash                 string          `json:"identity_hash"`
@@ -89,6 +91,7 @@ type databaseInventory struct {
 	Permissions                  map[string]bool `json:"permissions"`
 	OutsideDependencies          uint64          `json:"outside_dependencies"`
 	DependencyCoverageComplete   bool            `json:"dependency_coverage_complete"`
+	InboundFKCoverageComplete    bool            `json:"inbound_foreign_key_coverage_complete"`
 	DependencyScope              string          `json:"dependency_scope"`
 	DependencyTextReviewRequired bool            `json:"dependency_text_review_required"`
 	ErrorCategory                string          `json:"error_category"`
@@ -109,6 +112,8 @@ type report struct {
 	SourceBytesProtocol  string                       `json:"source_bytes_protocol"`
 	ConsistencySemantics string                       `json:"consistency_semantics"`
 	ErrorCategory        string                       `json:"error_category"`
+	BoundaryReportHash   string                       `json:"boundary_report_hash,omitempty"`
+	DiagnosticOnly       bool                         `json:"diagnostic_only"`
 }
 
 func digest(v any) string {
@@ -201,7 +206,7 @@ func writeJSON(path string, value any) (err error) {
 }
 func readRequest(path, expected, op string) (request, error) {
 	var r request
-	if !hashRE.MatchString(expected) || !runRE.MatchString(op) || !shaRE.MatchString(sourceSHA) || filepath.Base(path) != "inventory-request.json" {
+	if !hashRE.MatchString(expected) || !runRE.MatchString(op) || !shaRE.MatchString(sourceSHA) || (filepath.Base(path) != "inventory-request.json" && filepath.Base(path) != "boundary-request.json") {
 		return r, category("request_binding_invalid")
 	}
 	info, e := os.Lstat(path)
@@ -221,7 +226,13 @@ func readRequest(path, expected, op string) (request, error) {
 	if d.Decode(&r) != nil || d.Decode(new(any)) != io.EOF {
 		return r, category("request_schema_invalid")
 	}
-	if r.FormatVersion != 1 || r.Kind != "readonly_inventory_request" || r.OperationID != op || r.SourceSHA != sourceSHA || r.TargetHash != digest(targets) || r.DatabaseScope != "mysql-and-mongodb" || len(r.Identities) != 2 || len(r.Migrations) != 2 || !hashRE.MatchString(r.Identities["mysql"]) || !hashRE.MatchString(r.Identities["mongodb"]) || r.Migrations["mysql"] == 0 || r.Migrations["mongodb"] == 0 || r.Limits.QuerySeconds != querySeconds || r.Limits.TotalSeconds != totalSeconds || r.Limits.MaxRecords != maxRecords || r.Limits.MaxBytes != maxBytes {
+	if r.OperationID != op || r.SourceSHA != sourceSHA || r.TargetHash != digest(targets) || r.DatabaseScope != "mysql-and-mongodb" || len(r.Identities) != 2 || len(r.Migrations) != 2 || !hashRE.MatchString(r.Identities["mysql"]) || !hashRE.MatchString(r.Identities["mongodb"]) || r.Identities["mysql"] == r.Identities["mongodb"] || r.Migrations["mysql"] == 0 || r.Migrations["mongodb"] == 0 {
+		return r, category("request_binding_invalid")
+	}
+	if r.FormatVersion == 2 {
+		return r, validateV2Request(r, path)
+	}
+	if r.FormatVersion != 1 || r.Kind != "readonly_inventory_request" || filepath.Base(path) != "inventory-request.json" || r.Limits != legacyLimits() || r.BoundaryRunID != "" || r.BoundaryReportHash != "" || len(r.Boundaries) != 0 {
 		return r, category("request_binding_invalid")
 	}
 	return r, nil
@@ -371,9 +382,18 @@ func mysqlCatalog(ctx context.Context, tx *sql.Tx) (map[string]string, map[strin
 		if e != nil || len(create) != 1 {
 			return nil, nil, category("mysql_schema_read_failed")
 		}
+		// SHOW CREATE exposes a mutable next auto-increment value; it is not
+		// schema and must not invalidate approved bounds when new rows arrive.
+		for _, row := range create {
+			if len(row) > 1 && row[1] != nil {
+				normalized := regexp.MustCompile(` AUTO_INCREMENT=[0-9]+`).ReplaceAllString(*row[1], "")
+				row[1] = &normalized
+			}
+		}
 		defs["table:"+n] = create
 	}
 	queries := []struct{ key, q string }{{"triggers", "SELECT TRIGGER_NAME,EVENT_OBJECT_TABLE,ACTION_STATEMENT FROM information_schema.triggers WHERE trigger_schema=DATABASE() ORDER BY TRIGGER_NAME"}, {"routines", "SELECT ROUTINE_NAME,ROUTINE_TYPE,ROUTINE_DEFINITION FROM information_schema.routines WHERE routine_schema=DATABASE() ORDER BY ROUTINE_NAME"}, {"events", "SELECT EVENT_NAME,EVENT_DEFINITION,STATUS FROM information_schema.events WHERE event_schema=DATABASE() ORDER BY EVENT_NAME"}, {"constraints", "SELECT TABLE_NAME,CONSTRAINT_NAME,REFERENCED_TABLE_SCHEMA,REFERENCED_TABLE_NAME FROM information_schema.key_column_usage WHERE table_schema=DATABASE() AND REFERENCED_TABLE_NAME IS NOT NULL ORDER BY TABLE_NAME,CONSTRAINT_NAME,ORDINAL_POSITION"}}
+	queries = append(queries, struct{ key, q string }{"inbound_constraints", "SELECT TABLE_SCHEMA,TABLE_NAME,CONSTRAINT_NAME,REFERENCED_TABLE_SCHEMA,REFERENCED_TABLE_NAME,COLUMN_NAME,REFERENCED_COLUMN_NAME FROM information_schema.key_column_usage WHERE REFERENCED_TABLE_SCHEMA=DATABASE() AND REFERENCED_TABLE_NAME IN ('domain_event_outbox','ai_bridge_commands','ai_messaging_legacy_commands') ORDER BY TABLE_SCHEMA,TABLE_NAME,CONSTRAINT_NAME,ORDINAL_POSITION"})
 	for _, query := range queries {
 		rows, e := scanSQL(ctx, tx, query.q)
 		if e != nil {
@@ -398,7 +418,10 @@ func targetSQL(name string) bool {
 	return name == "domain_event_outbox" || name == "ai_bridge_commands" || name == "ai_messaging_legacy_commands"
 }
 
-func mysqlTarget(ctx context.Context, tx *sql.Tx, name, kind string, defs map[string]any, dir string) (snapshot, error) {
+func mysqlTarget(ctx context.Context, tx *sql.Tx, name, kind string, defs map[string]any, dir string, supplied ...request) (snapshot, error) {
+	if len(supplied) == 1 && supplied[0].FormatVersion == 2 {
+		return mysqlTargetV2(ctx, tx, name, kind, defs, dir, supplied[0])
+	}
 	s := snapshot{Database: "mysql", Name: name, Kind: "base_table", Present: kind != "", Complete: false, Classification: map[string]uint64{}, ErrorCategory: "none"}
 	if kind == "" {
 		s.Complete = true
@@ -524,7 +547,7 @@ func classifySQL(count map[string]uint64, name string, columns []string, raw []s
 	}
 }
 func mysqlInventory(ctx context.Context, r request, dir string) (databaseInventory, []snapshot, error) {
-	d := databaseInventory{Permissions: map[string]bool{}, DependencyTextReviewRequired: true, DependencyScope: "selected_schema_outbound_only", ErrorCategory: "none"}
+	d := databaseInventory{Permissions: map[string]bool{}, DependencyTextReviewRequired: true, DependencyScope: "selected_schema_text_and_global_inbound_foreign_keys_dynamic_external_unproven", ErrorCategory: "none"}
 	db, e := mysqlOpen(ctx)
 	if e != nil {
 		return d, nil, e
@@ -597,14 +620,15 @@ func mysqlInventory(ctx context.Context, r request, dir string) (databaseInvento
 		}
 	}
 	d.NonTargetSchemaHash = digest(non)
-	for _, item := range defs["constraints"].([][]*string) {
-		if val(item, 2) == os.Getenv("MYSQL_DATABASE") && targetSQL(val(item, 3)) && !targetSQL(val(item, 0)) {
+	for _, item := range defs["inbound_constraints"].([][]*string) {
+		if val(item, 0) != os.Getenv("MYSQL_DATABASE") || !targetSQL(val(item, 1)) {
 			d.OutsideDependencies++
 		}
 	}
+	d.InboundFKCoverageComplete = true
 	var snapshots []snapshot
 	for _, t := range targets[:3] {
-		s, e := mysqlTarget(ctx, tx, t[1], kinds[t[1]], defs, dir)
+		s, e := mysqlTarget(ctx, tx, t[1], kinds[t[1]], defs, dir, r)
 		if e != nil {
 			s.ErrorCategory = e.Error()
 			snapshots = append(snapshots, s)
@@ -618,6 +642,16 @@ func mysqlInventory(ctx context.Context, r request, dir string) (databaseInvento
 	}
 	if e = writeJSON(filepath.Join(dir, "mysql-metadata.private.json"), map[string]any{"identity": ids, "grants_hash": digest(grants), "permission_facts": d.Permissions, "schema": defs}); e != nil {
 		return d, snapshots, e
+	}
+	if r.FormatVersion == 2 && !boundaryMode(r) {
+		// A concurrent post-upper insert is invisible in the old RR snapshot.
+		// Close it before a separately bound live, read-only observation.
+		if e = tx.Rollback(); e != nil {
+			return d, snapshots, category("mysql_readonly_transaction_close_failed")
+		}
+		if e = mysqlObserveAfterUpper(ctx, db, r, d.CatalogHash, snapshots); e != nil {
+			return d, snapshots, e
+		}
 	}
 	d.MetadataComplete = true
 	return d, snapshots, nil
@@ -891,47 +925,74 @@ func mongoInventory(ctx context.Context, r request, dir string) (databaseInvento
 		}
 	}
 	d.NonTargetSchemaHash = digest(non)
-	b, present := collections[s.Name]
-	s.Present = present
-	if !present {
-		s.SchemaHash = digest(nil)
-		s.DataHash = digest(nil)
-		s.IdentityHash = hashParts("mongodb-absent", s.Name)
-		s.Complete = true
-	} else {
-		if b.Lookup("type").StringValue() != "collection" {
-			return d, s, category("target_type_rejected")
-		}
-		s.SchemaHash = digest(map[string]any{"collection": defs["collection:"+s.Name], "indexes": defs["indexes:"+s.Name]})
-		targetUUID := b.Lookup("info", "uuid")
-		if targetUUID.Type != bson.TypeBinary {
-			return d, s, category("mongo_target_uuid_unavailable")
-		}
-		_, v := targetUUID.Binary()
-		s.IdentityHash = hashParts("mongodb-object-v1", hex.EncodeToString(v))
-		s.SourceFile = "mongodb-domain_event_outbox.source.bsonframes"
-		f, e := os.OpenFile(filepath.Join(dir, s.SourceFile), os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0600)
-		if e != nil {
-			return d, s, category("private_output_exists_or_unavailable")
-		}
-		s.Records, s.Bytes, s.DataHash, s.Classification, e = mongoScan(ctx, db.Collection(s.Name), f)
-		syncErr := f.Sync()
-		closeErr := f.Close()
+	if r.FormatVersion == 2 {
+		s, e = mongoTargetV2(ctx, db, collections, defs, dir, r)
 		if e != nil {
 			return d, s, e
 		}
-		if syncErr != nil || closeErr != nil {
-			return d, s, category("private_output_failed")
+	} else {
+		b, present := collections[s.Name]
+		s.Present = present
+		if !present {
+			s.SchemaHash = digest(nil)
+			s.DataHash = digest(nil)
+			s.IdentityHash = hashParts("mongodb-absent", s.Name)
+			s.Complete = true
+		} else {
+			if b.Lookup("type").StringValue() != "collection" {
+				return d, s, category("target_type_rejected")
+			}
+			s.SchemaHash = digest(map[string]any{"collection": defs["collection:"+s.Name], "indexes": defs["indexes:"+s.Name]})
+			targetUUID := b.Lookup("info", "uuid")
+			if targetUUID.Type != bson.TypeBinary {
+				return d, s, category("mongo_target_uuid_unavailable")
+			}
+			_, v := targetUUID.Binary()
+			s.IdentityHash = hashParts("mongodb-object-v1", hex.EncodeToString(v))
+			s.SourceFile = "mongodb-domain_event_outbox.source.bsonframes"
+			f, e := os.OpenFile(filepath.Join(dir, s.SourceFile), os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0600)
+			if e != nil {
+				return d, s, category("private_output_exists_or_unavailable")
+			}
+			s.Records, s.Bytes, s.DataHash, s.Classification, e = mongoScan(ctx, db.Collection(s.Name), f)
+			syncErr := f.Sync()
+			closeErr := f.Close()
+			if e != nil {
+				return d, s, e
+			}
+			if syncErr != nil || closeErr != nil {
+				return d, s, category("private_output_failed")
+			}
+			n, size, hash, _, e := mongoScan(ctx, db.Collection(s.Name), nil)
+			if e != nil || n != s.Records || size != s.Bytes || hash != s.DataHash {
+				return d, s, category("mongo_source_changed_during_scan")
+			}
+			s.Complete = true
 		}
-		n, size, hash, _, e := mongoScan(ctx, db.Collection(s.Name), nil)
-		if e != nil || n != s.Records || size != s.Bytes || hash != s.DataHash {
-			return d, s, category("mongo_source_changed_during_scan")
-		}
-		s.Complete = true
 	}
 	_, end, e := mongoSchemas(ctx, db)
 	if e != nil || digest(end) != d.CatalogHash {
 		return d, s, category("mongo_schema_changed_during_scan")
+	}
+	if r.FormatVersion == 2 {
+		var endHead struct {
+			Version int64 `bson:"version"`
+			Dirty   bool  `bson:"dirty"`
+		}
+		q, cancel = queryContext(ctx)
+		var endRows []bson.Raw
+		endCursor, headErr := db.Collection("schema_migrations").Find(q, bson.D{}, options.Find().SetLimit(2))
+		if headErr == nil {
+			headErr = endCursor.All(q, &endRows)
+			closeErr := endCursor.Close(q)
+			if headErr == nil {
+				headErr = closeErr
+			}
+		}
+		cancel()
+		if headErr != nil || len(endRows) != 1 || bson.Unmarshal(endRows[0], &endHead) != nil || endRows[0].Lookup("dirty").Type != bson.TypeBoolean || endHead.Version < 0 || uint64(endHead.Version) != d.Version || endHead.Dirty {
+			return d, s, category("mongo_migration_head_changed_during_scan")
+		}
 	}
 	if e = writeJSON(filepath.Join(dir, "mongodb-metadata.private.json"), map[string]any{"hello": mustCanonical(hello), "effective_privileges_hash": digest(mustCanonical(privileges)), "permission_facts": d.Permissions, "schema": defs, "version": build.Version}); e != nil {
 		return d, s, e
@@ -942,7 +1003,7 @@ func mongoInventory(ctx context.Context, r request, dir string) (databaseInvento
 func mustCanonical(raw bson.Raw) any { v, _ := canonicalBSON(raw); return v }
 
 func run(requestPath, requestHash, op, runID, output string) (report, error) {
-	result := report{FormatVersion: 1, Kind: "readonly_compatibility_inventory", SourceSHA: sourceSHA, OperationID: op, RunID: runID, RequestHash: requestHash, TargetHash: digest(targets), ObservedAt: time.Now().UTC().Format(time.RFC3339), DropReady: false, DatabaseBindings: map[string]databaseInventory{}, SourceBytesProtocol: "mysql_cast_binary_columns_pk_order_v1+mongodb_server_bson_pk_order_v1", ConsistencySemantics: "mysql_readonly_repeatable_read_and_schema_reobserve;mongo_two_equal_full_scans_and_schema_reobserve", ErrorCategory: "inventory_incomplete"}
+	result := report{FormatVersion: 1, Kind: "readonly_compatibility_inventory", SourceSHA: sourceSHA, OperationID: op, RunID: runID, RequestHash: requestHash, TargetHash: digest(targets), ObservedAt: time.Now().UTC().Format(time.RFC3339), DropReady: false, DiagnosticOnly: true, DatabaseBindings: map[string]databaseInventory{}, SourceBytesProtocol: "mysql_cast_binary_columns_pk_order_v1+mongodb_server_bson_pk_order_v1", ConsistencySemantics: "mysql_readonly_repeatable_read_and_schema_reobserve;mongo_two_equal_full_scans_and_schema_reobserve", ErrorCategory: "inventory_incomplete"}
 	if !runRE.MatchString(runID) || privateDir(filepath.Dir(requestPath)) != nil || privateDir(output) != nil {
 		return result, category("input_or_private_path_invalid")
 	}
@@ -950,8 +1011,22 @@ func run(requestPath, requestHash, op, runID, output string) (report, error) {
 	if e != nil {
 		return result, e
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), totalSeconds*time.Second)
+	if r.FormatVersion == 2 {
+		result.FormatVersion = 2
+		result.BoundaryReportHash = r.BoundaryReportHash
+		result.SourceBytesProtocol = "mysql_cast_binary_columns_pk_order_v2+mongodb_server_bson_pk_order_v2"
+		result.ConsistencySemantics = "two_equal_complete_passes_within_independently_approved_upper;sql_same_readonly_snapshot;mongo_homogeneous_bson_id_simple_collation;after_upper_next_cycle_not_fenced"
+	}
+	filename := "inventory.private.json"
+	if boundaryMode(r) {
+		result.Kind = "readonly_inventory_boundaries"
+		filename = "boundary.private.json"
+		result.SourceBytesProtocol = "no_source_body_copy"
+		result.ConsistencySemantics = "diagnostic_upper_discovery_requires_independent_request_approval"
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(r.Limits.TotalSeconds)*time.Second)
 	defer cancel()
+	ctx = context.WithValue(ctx, scanRunKey{}, scanRunIdentity{OperationID: op, RunID: runID, RequestHash: requestHash})
 	d, sqlTargets, sqlErr := mysqlInventory(ctx, r, output)
 	if sqlErr != nil {
 		d.ErrorCategory = sqlErr.Error()
@@ -969,7 +1044,7 @@ func run(requestPath, requestHash, op, runID, output string) (report, error) {
 		result.Complete = true
 		result.ErrorCategory = "none"
 	}
-	if e = writeJSON(filepath.Join(output, "inventory.private.json"), result); e != nil {
+	if e = writeJSON(filepath.Join(output, filename), result); e != nil {
 		return result, e
 	}
 	if !result.Complete {
@@ -983,10 +1058,10 @@ func run(requestPath, requestHash, op, runID, output string) (report, error) {
 func safeSummary(r report) map[string]any {
 	objects := make([]map[string]any, 0, len(r.Targets))
 	for _, s := range r.Targets {
-		objects = append(objects, map[string]any{"database": s.Database, "name": s.Name, "present": s.Present, "complete": s.Complete, "records": s.Records, "bytes": s.Bytes, "schema_hash": s.SchemaHash, "data_hash": s.DataHash, "identity_hash": s.IdentityHash, "classification": s.Classification, "error_category": s.ErrorCategory})
+		objects = append(objects, map[string]any{"database": s.Database, "name": s.Name, "present": s.Present, "complete": s.Complete, "records": s.Records, "bytes": s.Bytes, "schema_hash": s.SchemaHash, "data_hash": s.DataHash, "identity_hash": s.IdentityHash, "classification": s.Classification, "error_category": s.ErrorCategory, "boundary_hash": digest(s.Boundary), "equal_full_passes": s.Passes, "pages": s.Pages, "next_cycle_required": s.NextCycleRequired})
 	}
 	encoded, _ := json.Marshal(r)
-	return map[string]any{"format_version": 1, "kind": r.Kind, "source_sha": r.SourceSHA, "operation_id": r.OperationID, "run_id": r.RunID, "request_hash": r.RequestHash, "target_hash": r.TargetHash, "complete": r.Complete, "drop_ready": false, "error_category": r.ErrorCategory, "database_bindings": r.DatabaseBindings, "targets": objects, "private_report_hash": digestRaw(append(encoded, '\n'))}
+	return map[string]any{"format_version": r.FormatVersion, "kind": r.Kind, "source_sha": r.SourceSHA, "operation_id": r.OperationID, "run_id": r.RunID, "request_hash": r.RequestHash, "target_hash": r.TargetHash, "complete": r.Complete, "drop_ready": false, "diagnostic_only": true, "boundary_report_hash": r.BoundaryReportHash, "error_category": r.ErrorCategory, "database_bindings": r.DatabaseBindings, "targets": objects, "private_report_hash": digestRaw(append(encoded, '\n'))}
 }
 func main() {
 	if len(os.Args) == 2 && os.Args[1] == "--source-sha" {
@@ -1017,8 +1092,12 @@ func main() {
 		}
 		return
 	}
-	if *mode != "inventory" {
+	if *mode != "inventory" && *mode != "bounds" {
 		fmt.Println(`{"format_version":1,"complete":false,"drop_ready":false,"error_category":"input_invalid"}`)
+		os.Exit(1)
+	}
+	if r, e := readRequest(*req, *hash, *op); e == nil && productionRequestClass(r, *mode) != nil {
+		fmt.Println(`{"format_version":1,"complete":false,"drop_ready":false,"error_category":"request_class_or_version_rejected"}`)
 		os.Exit(1)
 	}
 	r, e := run(*req, *hash, *op, *runID, *out)
