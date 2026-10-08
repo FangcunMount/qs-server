@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/hex"
+	"errors"
 	"unicode/utf8"
 
 	"go.mongodb.org/mongo-driver/bson"
@@ -20,9 +21,36 @@ func mongoDatabaseAnchor(ctx context.Context, db *mongo.Database, hello bson.Raw
 	q, cancel := queryContext(ctx)
 	defer cancel()
 	if err := db.Client().Database("admin").RunCommand(q, bson.D{{Key: "replSetGetConfig", Value: 1}}).Decode(&config); err != nil {
-		return "", category("mongo_replica_anchor_permission_or_read_failed")
+		return "", mongoAnchorReadFailure(err)
 	}
 	return mongoAnchorFromMetadata(hello, config, db.Name())
+}
+
+// Only actual server codes establish a specific diagnosis. Error text is
+// private and is never used as a permission/topology signal or forwarded.
+// MongoDB documents 13 as Unauthorized and 76 as NoReplicationEnabled:
+// https://www.mongodb.com/docs/manual/reference/error-codes/
+func mongoAnchorReadFailure(err error) error {
+	var command mongo.CommandError
+	var pointer *mongo.CommandError
+	var code int32
+	if errors.As(err, &pointer) {
+		// A typed nil pointer satisfies error but cannot be unwrapped as a
+		// value CommandError. Keep it unknown without traversing it again.
+		if pointer != nil {
+			code = pointer.Code
+		}
+	} else if errors.As(err, &command) {
+		code = command.Code
+	}
+	switch code {
+	case 13:
+		return category("mongo_replica_anchor_not_authorized")
+	case 76:
+		return category("mongo_replica_anchor_replication_not_enabled")
+	default:
+		return category("mongo_replica_anchor_permission_or_read_failed")
+	}
 }
 
 func uniqueMongoMetadata(raw bson.Raw) bool {

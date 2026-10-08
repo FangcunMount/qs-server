@@ -140,6 +140,12 @@ separate source inventory must actually perform those reads. Each database state
 also carries its producer's `error_category` through the armored diagnostic receipt.
 Only reviewed, fixed categories from that database's allowlist are accepted;
 unknown categories and raw exception/connection text are rejected before transport.
+The `replSetGetConfig` anchor read classifies only actual MongoDB driver
+`CommandError` codes: 13 produces `mongo_replica_anchor_not_authorized`, and
+76 produces `mongo_replica_anchor_replication_not_enabled`. Network failures,
+other codes and nil errors retain `mongo_replica_anchor_permission_or_read_failed`.
+Error text is never used to infer these diagnoses. These categories do not
+change permissions, accept a standalone server, or substitute another anchor.
 An incomplete identity receipt remains diagnostic (`execution_allowed=false`,
 `drop_ready=false`), including when another database's head was observed clean.
 Runtime image/network
