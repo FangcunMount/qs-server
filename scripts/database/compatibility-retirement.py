@@ -45,7 +45,7 @@ NAME = re.compile(r"^[a-z][a-z0-9_-]{0,80}\.json$")
 MAX_JSON = 256 * 1024
 INVENTORY_V2_LIMITS = {"query_seconds": 30, "total_seconds": 1500, "max_records": 1000000,
                        "max_bytes": 2147483648, "page_size": 1000, "max_pages": 1001}
-BOOTSTRAP_MODES = frozenset({"bootstrap-bounds", "bootstrap-inventory", "bootstrap-history"})
+BOOTSTRAP_MODES = frozenset({"bootstrap-bounds", "bootstrap-inventory", "bootstrap-history", "bootstrap-history-metadata"})
 MAX_BOOTSTRAP_APPROVAL = 4096
 MAX_WINDOW_SECONDS = 1800
 FORWARD_STOP_SECONDS = 1200
@@ -184,7 +184,7 @@ def read_private(directory, filename, expected_hash=None):
     if expected_hash is not None:
         token(expected_hash, HASH)
     try:
-        fd = os.open(directory / filename, os.O_RDONLY | os.O_NOFOLLOW)
+        fd = os.open(directory / filename, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
     except OSError:
         fail("evidence_unavailable")
     try:
@@ -1009,7 +1009,7 @@ def validate_source_asset(output, item, args, request_hash, maximum):
     if item.get("source_file") != filename:
         fail("inventory_source_asset_invalid")
     try:
-        fd = os.open(output / filename, os.O_RDONLY | os.O_NOFOLLOW)
+        fd = os.open(output / filename, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
     except OSError:
         fail("inventory_source_asset_unavailable")
     try:
@@ -1246,12 +1246,13 @@ def execute(args):
     if mode in BOOTSTRAP_MODES:
         if args.operation != "prepare" or args.manifest_hash or identity_request or inventory_request or not bootstrap_json or not bootstrap_hash:
             fail("input_classes_mixed")
-        if mode == "bootstrap-history":
+        if mode in ("bootstrap-history", "bootstrap-history-metadata"):
             path = Path(__file__).with_name("compatibility-history-prepare.py")
             spec = importlib.util.spec_from_file_location("compatibility_history_prepare", path)
             module = importlib.util.module_from_spec(spec)
             spec.loader.exec_module(module)
-            return module.prepare(args, argparse.Namespace(**globals()))
+            entrypoint = module.prepare_metadata if mode == "bootstrap-history-metadata" else module.prepare
+            return entrypoint(args, argparse.Namespace(**globals()))
         return bootstrap_private_request(args)
     if bootstrap_json or bootstrap_hash:
         fail("input_classes_mixed")
@@ -1313,6 +1314,7 @@ def main(argv=None):
     parser.add_argument("--bootstrap-approval-hash", default="")
     receipt = {"format_version": 1, "complete": False, "execution_allowed": False,
                "error_category": "input_invalid"}
+    args = None
     try:
         args = parser.parse_args(argv)
         receipt = execute(args)
@@ -1326,6 +1328,12 @@ def main(argv=None):
               "inventory_complete": "bool", "inventory_private_report_hash": "hash64",
               "prepare_mode": frozenset({"identity", "bounds", "inventory"}) | BOOTSTRAP_MODES, "diagnostic_only": "bool", "drop_ready": "bool",
               "request_bootstrap_complete": "bool", "bootstrap_approval_sha256": "hash64", "derived_request_sha256": "hash64", "request_created_run_id": "run_id",
+              "history_metadata_complete": "bool", "history_metadata_process_budget_proven": "bool",
+              "metadata_private_report_sha256": "hash64", "metadata_created_run_id": "run_id",
+              "approved_inventory_report": {"run_id": "run_id", "sha256": "hash64"}, "inventory_request_sha256": "hash64",
+              "history_parent_proposal_sha256": "hash64", "parent_proposal_run_id": "run_id",
+              "history_metadata_assets": [{"database": frozenset({"mysql", "mongodb"}), "name": frozenset(target[1] for target in TARGETS),
+                   "full_file_sha256": "hash64", "full_file_bytes": "uint", "source_asset_sha256": "hash64"}],
               "history_parent_request_sha256": "hash64", "history_private_readiness_sha256": "hash64",
               "history_readonly_complete": "bool", "history_independent_epochs": "uint",
               "history_local_candidates": "uint", "history_locally_qualified": "uint", "history_blocked_local": "uint",
@@ -1354,7 +1362,7 @@ def main(argv=None):
               "capabilities": {key: "bool" for key in CAPABILITIES}}
     emitted = False
     try:
-        secrets = tuple(os.environ.get(key, "") for key in ("MYSQL_USERNAME", "MYSQL_PASSWORD", "MONGODB_USERNAME", "MONGODB_PASSWORD",
+        secrets = () if getattr(args, "prepare_mode", "") == "bootstrap-history-metadata" else tuple(os.environ.get(key, "") for key in ("MYSQL_USERNAME", "MYSQL_PASSWORD", "MONGODB_USERNAME", "MONGODB_PASSWORD",
                                                                           "MONGODB_METADATA_ADMIN_USERNAME", "MONGODB_METADATA_ADMIN_PASSWORD"))
         armor = transport().encode_armored_receipt(receipt, schema=schema, secrets=secrets)
         print(armor)
@@ -1363,7 +1371,9 @@ def main(argv=None):
         # Fixed ASCII fallback contains no input and cannot be mistaken for a
         # valid framed receipt. Never print a raw protocol/debug alternative.
         print("compatibility_retirement_receipt_transport_failed", file=sys.stderr)
-    return 0 if emitted and receipt.get("prepare_mode") == "bootstrap-history" and receipt.get("history_readonly_complete") is True and receipt.get("complete") is False and receipt.get("execution_allowed") is False and receipt.get("drop_ready") is False else 42
+    diagnostic_complete = ((receipt.get("prepare_mode") == "bootstrap-history" and receipt.get("history_readonly_complete") is True) or
+        (receipt.get("prepare_mode") == "bootstrap-history-metadata" and receipt.get("history_metadata_complete") is True))
+    return 0 if emitted and diagnostic_complete and receipt.get("complete") is False and receipt.get("execution_allowed") is False and receipt.get("drop_ready") is False else 42
 
 
 if __name__ == "__main__":

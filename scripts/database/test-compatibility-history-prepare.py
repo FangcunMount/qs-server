@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Synthetic Action/host contracts. No database or production calls."""
 import argparse
+import base64
 import contextlib
 import copy
 import hashlib
@@ -47,7 +48,7 @@ def native_fixture_paths(env):
         tool.fail("history_native_binary_invalid")
     try:
         before = binary.lstat()
-        fd = os.open(binary, os.O_RDONLY | os.O_NOFOLLOW)
+        fd = os.open(binary, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
     except OSError:
         tool.fail("history_native_binary_invalid")
     try:
@@ -570,6 +571,313 @@ class HistoryPreparation(unittest.TestCase):
                 record.update(cleanup_confirmed=True,anonymous_volume_created=False,
                     volume_catalog_unchanged=True,remaining_owned_containers=0)
                 write_native_receipt(record_path,record)
+
+
+class HistoryMetadata(unittest.TestCase):
+    def setUp(self):
+        self.fixture = HistoryPreparation(methodName="test_actual_derivation_only_run_changes_and_diagnostic_not_authority")
+        self.fixture.setUp()
+        self.directory = self.fixture.directory; self.output = self.fixture.inventory_dir
+        (self.directory / "history-request.json").unlink()
+        self.args = copy.deepcopy(self.fixture.args); self.args.prepare_mode = history.METADATA_MODE
+        self.commands = []; self.failure = None
+        def binding(database):
+            v = {key: False for key in tool.INVENTORY_BINDING_FIELDS}
+            v.update(identity_hash=("1" if database == "mysql" else "2")*64,
+                database_anchor_hash=("1" if database == "mysql" else "3")*64,
+                migration_generation_hash="" if database == "mysql" else "4"*64,
+                expected_identity_match=True,migration_version=99 if database == "mysql" else 38,
+                migration_dirty=False,expected_migration_match=True,catalog_hash="5"*64,non_target_schema_hash="6"*64,
+                metadata_complete=True,permissions={"metadata_read":True},outside_dependencies=0,
+                dependency_coverage_complete=False,inbound_foreign_key_coverage_complete=False,
+                dependency_scope="selected_schema_outbound_only",dependency_text_review_required=True,error_category="none")
+            return v
+        self.bindings = {db:binding(db) for db in ("mysql","mongodb")}
+        self.bounds = []
+        for i,target in enumerate(tool.TARGETS):
+            self.bounds.append({"database":target[0],"name":target[1],"kind":target[2],"present":True,"empty":i==3,
+                "pk_type":"uint64" if target[0]=="mysql" else "","upper_token":base64.b64encode(b"1").decode() if i!=3 else "",
+                "schema_hash":"7"*64,"identity_hash":self.bindings[target[0]]["identity_hash"]})
+        bounds_dir=self.directory/"bounds-600-1";bounds_dir.mkdir(mode=0o700)
+        bound_report={"format_version":2,"kind":"readonly_inventory_boundaries","source_sha":SOURCE,
+            "operation_id":OPERATION,"run_id":"600-1","target_hash":tool.TARGET_HASH,"complete":True,
+            "drop_ready":False,"diagnostic_only":True,"database_bindings":self.bindings,
+            "targets":[{"boundary":b,"complete":True,"error_category":"none"} for b in self.bounds]}
+        bound_hash=self.fixture.store(bounds_dir,"boundary.private.json",bound_report)
+        self.request={"format_version":2,"kind":"readonly_inventory_request","source_sha":SOURCE,"operation_id":OPERATION,
+            "target_hash":tool.TARGET_HASH,"database_scope":"mysql-and-mongodb",
+            "identity_hashes":{db:v["identity_hash"] for db,v in self.bindings.items()},
+            "expected_migrations":{db:v["migration_version"] for db,v in self.bindings.items()},"limits":tool.INVENTORY_V2_LIMITS.copy(),
+            "boundary_run_id":"600-1","boundary_report_hash":bound_hash,"approved_boundaries":self.bounds}
+        self.request_hash=self.fixture.store(self.directory,"inventory-request.json",self.request)
+        targets=[]
+        for i,(target,bound) in enumerate(zip(tool.TARGETS,self.bounds)):
+            filename=tool.SOURCE_FILENAMES[target[:2]]
+            # Raw database source bytes deliberately differ from encoded file bytes.
+            targets.append({"database":target[0],"name":target[1],"kind":target[2],"present":True,"complete":True,
+                "records":int(i!=3),"schema_hash":bound["schema_hash"],"data_hash":str(i+1)*64,"identity_hash":bound["identity_hash"],
+                "bytes":5 if i!=3 else 0,"classification":{},"source_file":filename,"error_category":"none","boundary":bound,
+                "equal_full_passes":2,"pages":2 if i!=3 else 0,"next_cycle_required":False})
+            self.fixture.store(self.output,filename+".asset.json",{"format_version":1,"kind":"temporary_inventory_source_copy",
+                "filename":filename,"source_sha":SOURCE,"operation_id":OPERATION,"run_id":"700-1","request_hash":self.request_hash,
+                "protocol":"mysql_cast_binary_columns_pk_order_v2" if target[0]=="mysql" else "mongodb_server_bson_pk_order_v2",
+                "boundary":bound,"contains_original_body":True,"retirement_proof":False,"purge_required_after_acceptance":True,"resume_existing_file_allowed":False})
+        self.report={"format_version":2,"kind":"readonly_compatibility_inventory","source_sha":SOURCE,"operation_id":OPERATION,
+            "run_id":"700-1","request_hash":self.request_hash,"target_hash":tool.TARGET_HASH,"observed_at":"2026-10-09T01:00:00Z",
+            "complete":True,"drop_ready":False,"database_bindings":self.bindings,"targets":targets,
+            "source_bytes_protocol":"mysql_cast_binary_columns_pk_order_v2+mongodb_server_bson_pk_order_v2",
+            "consistency_semantics":"two_equal_complete_passes_within_independently_approved_upper;sql_same_readonly_snapshot;mongo_homogeneous_bson_id_simple_collation;after_upper_next_cycle_not_fenced",
+            "error_category":"none","boundary_report_hash":bound_hash,"diagnostic_only":True}
+        self.report_hash=self.fixture.store(self.output,"inventory.private.json",self.report)
+        self.value={"format_version":1,"kind":"readonly_history_metadata_approval","prepare_mode":history.METADATA_MODE,
+            "source_sha":SOURCE,"operation_id":OPERATION,"target_hash":tool.TARGET_HASH,"database_scope":"mysql-and-mongodb",
+            "inventory_request_sha256":self.request_hash,"inventory_report":{"run_id":"700-1","sha256":self.report_hash},
+            "metadata_limits":history.METADATA_LIMITS.copy()}
+        self.approve()
+
+    def tearDown(self): self.fixture.tearDown()
+
+    def approve(self):
+        raw=tool.canonical_bytes(self.value);self.args.bootstrap_approval_json=raw[:-1].decode()
+        self.args.bootstrap_approval_hash=hashlib.sha256(raw).hexdigest()
+
+    def capture(self, command, **kwargs):
+        self.commands.append(command)
+        self.assertEqual(command[:3],["sudo","-n","docker"])
+        if command[3:5]==["container","ls"]:
+            if self.failure=="unavailable":return 1,b""
+            if self.failure=="name_hidden" and "name=^/qs-compatibility-inventory-700-1$" in command:return 0,(CID+"\n").encode()
+            if self.failure=="whole_existing" and any(v.startswith("label=") for v in command):return 0,(CID+"\n").encode()
+            return 0,b""
+        if command[3]=="inspect": return 0,tool.canonical_bytes({"id":CID,"status":"exited","running":False})
+        self.fail("metadata attempted non-readonly Docker call")
+
+    def run_metadata(self):
+        with mock.patch.object(tool,"capture_fixed",side_effect=self.capture),mock.patch.object(tool,"inventory_connection_values",side_effect=AssertionError("database values requested")),mock.patch.object(history,"_binary",side_effect=AssertionError("binary requested")):
+            return history.prepare_metadata(self.args,tool)
+
+    def test_two_complete_physical_passes_persisted_proposal_and_no_authority(self):
+        result=self.run_metadata();self.assertTrue(result["history_metadata_complete"])
+        for key in ("complete","execution_allowed","drop_ready","history_cas_complete","history_metadata_process_budget_proven"):self.assertIs(result[key],False)
+        self.assertEqual(result["parent_proposal_run_id"],"700-1");self.assertEqual(result["metadata_created_run_id"],RUN)
+        self.assertFalse((self.directory/"history-request.json").exists())
+        private=self.directory/("history-metadata-"+RUN)
+        proposal,digest=tool.read_private(private,"history-parent-proposal.json")
+        self.assertEqual(digest,result["history_parent_proposal_sha256"]);self.assertEqual(proposal["run_id"],"700-1")
+        self.assertNotEqual(result["history_metadata_assets"][0]["full_file_bytes"],self.report["targets"][0]["bytes"])
+        self.assertEqual(result["history_metadata_assets"][3]["full_file_bytes"],0)
+        self.assertEqual(sum(any(v.startswith("label=") for v in c) for c in self.commands),2)
+        self.assertEqual(sum("name=^/qs-compatibility-inventory-700-1$" in c for c in self.commands),2)
+        for p in private.iterdir():self.assertEqual(p.stat().st_mode&0o777,0o600)
+
+    def test_canonical_descriptor_limits_run_source_and_unknown_fields_reject(self):
+        for change in (lambda v:v.update(extra=True),lambda v:v.update(source_sha="b"*40),
+            lambda v:v["inventory_report"].update(run_id=RUN),lambda v:v["metadata_limits"].update(passes=1),
+            lambda v:v["metadata_limits"].update(total_seconds=True)):
+            with self.subTest(change=change):
+                changed=copy.deepcopy(self.value);change(changed);raw=tool.canonical_bytes(changed)
+                args=copy.deepcopy(self.args);args.bootstrap_approval_json=raw[:-1].decode();args.bootstrap_approval_hash=hashlib.sha256(raw).hexdigest()
+                with self.assertRaises(tool.Blocked):history.metadata_approval(args,tool)
+        args=copy.deepcopy(self.args);args.bootstrap_approval_json+=' '
+        with self.assertRaises(tool.Blocked):history.metadata_approval(args,tool)
+
+    def test_existing_or_unknown_inventory_handles_not_owned_or_cleared(self):
+        for failure in ("whole_existing","name_hidden","unavailable"):
+            with self.subTest(failure=failure):
+                self.failure=failure
+                with self.assertRaises(tool.Blocked):self.run_metadata()
+        self.assertTrue(any(c[3]=="inspect" for c in self.commands))
+        self.assertFalse(any(c[3] in ("create","run","stop","rm","start") for c in self.commands))
+        self.assertFalse((self.directory/("history-metadata-"+RUN)).exists())
+
+    def test_old_history_unknown_attempt_also_blocks_metadata(self):
+        prior=self.directory/"history-888-1";prior.mkdir(mode=0o700)
+        self.fixture.store(prior,"history.creation.intent.json",{"unknown":True})
+        with self.assertRaisesRegex(tool.Blocked,"history_prior_container_outcome_unresolved"):self.run_metadata()
+
+    def test_prior_inventory_run_bound_rejects_without_docker_create(self):
+        for i in range(128):(self.directory/("identity-"+str(1000+i)+"-1")).mkdir(mode=0o700)
+        with self.assertRaisesRegex(tool.Blocked,"history_metadata_prior_runs_bound_exceeded"):self.run_metadata()
+        self.assertEqual(self.commands,[])
+
+    def test_report_or_sidecar_wrong_original_run_schema_null_and_unknown_reject(self):
+        original=copy.deepcopy(self.report)
+        for change in (lambda v:v.update(run_id=RUN),lambda v:v.update(source_sha="b"*40),lambda v:v.update(extra=0),
+            lambda v:v["targets"][0].update(next_cycle_required=True),lambda v:v["targets"][1].update(complete=None),
+            lambda v:v["database_bindings"]["mysql"].update(migration_dirty=True)):
+            with self.subTest(change=change):
+                self.report=copy.deepcopy(original);change(self.report)
+                self.value["inventory_report"]["sha256"]=self.fixture.store(self.output,"inventory.private.json",self.report);self.approve()
+                with self.assertRaises(tool.Blocked):self.run_metadata()
+        self.report=original;self.value["inventory_report"]["sha256"]=self.fixture.store(self.output,"inventory.private.json",original);self.approve()
+        filename=tool.SOURCE_FILENAMES[tool.TARGETS[0][:2]]+".asset.json"
+        v,_=tool.read_private(self.output,filename);v["run_id"]=RUN;self.fixture.store(self.output,filename,v)
+        with self.assertRaisesRegex(tool.Blocked,"inventory_source_asset_binding_invalid"):self.run_metadata()
+
+    def test_file_symlink_hardlink_mode_and_source_bound_reject(self):
+        path=self.output/tool.SOURCE_FILENAMES[tool.TARGETS[0][:2]];raw=path.read_bytes()
+        path.chmod(0o644)
+        with self.assertRaises(tool.Blocked):self.run_metadata()
+        path.chmod(0o600);alias=self.output/"alias";os.link(path,alias)
+        with self.assertRaises(tool.Blocked):self.run_metadata()
+        alias.unlink();path.unlink();path.symlink_to(self.output/tool.SOURCE_FILENAMES[tool.TARGETS[1][:2]])
+        with self.assertRaises(tool.Blocked):self.run_metadata()
+        path.unlink();path.write_bytes(raw);path.chmod(0o600)
+        with self.assertRaisesRegex(tool.Blocked,"history_metadata_file_invalid"):
+            history._metadata_physical_file(tool,path,1,history.time.monotonic()+1)
+
+    def test_same_size_mutation_between_passes_and_late_mutation_reject(self):
+        original=history._metadata_physical_file;calls=0
+        path=self.output/tool.SOURCE_FILENAMES[tool.TARGETS[0][:2]]
+        def changed(*args):
+            nonlocal calls
+            row=original(*args);calls+=1
+            if calls==4:path.write_bytes(b"X"*path.stat().st_size)
+            return row
+        with mock.patch.object(history,"_metadata_physical_file",side_effect=changed):
+            with self.assertRaisesRegex(tool.Blocked,"history_metadata_file_changed"):self.run_metadata()
+        self.assertFalse((self.directory/("history-metadata-"+RUN)).exists())
+
+    def test_real_fifos_without_writer_are_immediately_rejected(self):
+        fifo=self.output/"fifo.json";os.mkfifo(fifo,0o600)
+        baseline=history._metadata_snapshot(fifo.lstat())
+        started=history.time.monotonic()
+        with self.assertRaisesRegex(tool.Blocked,"evidence_not_private"):tool.read_private(self.output,fifo.name)
+        with self.assertRaisesRegex(tool.Blocked,"history_private_asset_invalid"):history._file_baseline(tool,fifo,hashlib.sha256(b"").hexdigest(),tool.MAX_JSON)
+        with self.assertRaisesRegex(tool.Blocked,"history_metadata_file_invalid"):history._metadata_physical_file(tool,fifo,tool.MAX_JSON,history.time.monotonic()+1)
+        with self.assertRaisesRegex(tool.Blocked,"history_metadata_file_changed"):history._metadata_current_stat(tool,fifo,baseline)
+        private=self.directory/"fifo-readiness";private.mkdir(mode=0o700)
+        os.mkfifo(private/"history.readiness.json",0o600)
+        with self.assertRaisesRegex(tool.Blocked,"history_readiness_private_invalid"):history._readiness_file(tool,private)
+        source=self.output/tool.SOURCE_FILENAMES[tool.TARGETS[0][:2]];source.unlink();os.mkfifo(source,0o600)
+        original=copy.deepcopy(self.args);original.run_id="700-1"
+        with self.assertRaisesRegex(tool.Blocked,"inventory_source_asset_invalid"):
+            tool.validate_source_asset(self.output,self.report["targets"][0],original,self.request_hash,2<<30)
+        self.assertLess(history.time.monotonic()-started,1.0)
+        self.assertFalse((self.directory/("history-metadata-"+RUN)).exists())
+
+    def test_source_or_private_record_changed_during_publication_cannot_complete(self):
+        original=tool.create_bootstrap_file
+        def mutate(directory,filename,raw):
+            original(directory,filename,raw)
+            if filename=="history-metadata.json":
+                path=self.output/tool.SOURCE_FILENAMES[tool.TARGETS[0][:2]]
+                path.write_bytes(b"Y"*path.stat().st_size)
+        with mock.patch.object(tool,"create_bootstrap_file",side_effect=mutate):
+            with self.assertRaisesRegex(tool.Blocked,"history_metadata_file_changed"):self.run_metadata()
+
+    def test_private_readback_byte_hash_changed_cannot_complete(self):
+        original=tool.create_bootstrap_file
+        def mutate(directory,filename,raw):
+            original(directory,filename,raw)
+            if filename=="history-metadata.json":
+                path=directory/filename;path.write_bytes(b" "+path.read_bytes())
+        with mock.patch.object(tool,"create_bootstrap_file",side_effect=mutate):
+            with self.assertRaisesRegex(tool.Blocked,"evidence_hash_mismatch"):self.run_metadata()
+
+    def test_actual_source_stream_uses_bounded_chunks_and_two_eof_passes(self):
+        source=self.output/tool.SOURCE_FILENAMES[tool.TARGETS[0][:2]]
+        source.write_bytes(b"K"*(history.METADATA_LIMITS["stream_chunk_bytes"]*3+1));source.chmod(0o600)
+        original=history._metadata_physical_file;calls=[]
+        def observed(*args):
+            result=original(*args);calls.append((args[1],result));return result
+        with mock.patch.object(history,"_metadata_physical_file",side_effect=observed):result=self.run_metadata()
+        self.assertEqual(len(calls),8)
+        self.assertEqual(calls[:4],calls[4:])
+        self.assertEqual(result["history_metadata_assets"][0]["full_file_sha256"],hashlib.sha256(source.read_bytes()).hexdigest())
+        self.assertEqual(result["history_metadata_assets"][0]["full_file_bytes"],source.stat().st_size)
+
+    def test_deadline_and_private_persistence_failure_never_complete(self):
+        with mock.patch.object(history,"_metadata_time",side_effect=tool.Blocked("history_metadata_cooperative_deadline_exceeded")):
+            with self.assertRaises(tool.Blocked):self.run_metadata()
+        original=tool.create_bootstrap_file
+        def fail_write(directory,filename,raw):
+            if filename=="history-metadata.json":raise tool.Blocked("bootstrap_request_creation_incomplete")
+            return original(directory,filename,raw)
+        with mock.patch.object(tool,"create_bootstrap_file",side_effect=fail_write):
+            with self.assertRaises(tool.Blocked):self.run_metadata()
+        with self.assertRaisesRegex(tool.Blocked,"history_metadata_run_directory_exists_or_unavailable"):self.run_metadata()
+
+    def test_parent_entrypoint_armored_metadata_success_with_no_db_environment_reads(self):
+        argv=["--operation","prepare","--root",str(self.fixture.root),"--operation-id",OPERATION,
+            "--approved-source-sha",SOURCE,"--actual-source-sha",SOURCE,"--run-id",RUN,"--prepare-mode",history.METADATA_MODE,
+            "--bootstrap-approval-json",self.args.bootstrap_approval_json,"--bootstrap-approval-hash",self.args.bootstrap_approval_hash]
+        output=io.StringIO()
+        class NoDatabaseEnv(dict):
+            def get(self,key,*args):
+                if key.startswith(("MYSQL_","MONGODB_")):raise AssertionError("database env read")
+                return super().get(key,*args)
+        with contextlib.redirect_stdout(output),mock.patch.object(tool,"capture_fixed",side_effect=self.capture),mock.patch.object(tool.os,"environ",NoDatabaseEnv()),mock.patch.object(tool,"inventory_connection_values",side_effect=AssertionError("connection values")):
+            self.assertEqual(tool.main(argv),0)
+        decoded=json.loads(tool.transport().decode_armored_receipt(output.getvalue()))
+        self.assertTrue(decoded["history_metadata_complete"]);self.assertFalse(decoded["complete"])
+        self.assertEqual(decoded["parent_proposal_run_id"],"700-1")
+        self.assertNotIn(str(self.directory),output.getvalue())
+
+    def test_metadata_armor_failure_returns42_and_original_sources_unchanged(self):
+        argv=["--operation","prepare","--root",str(self.fixture.root),"--operation-id",OPERATION,
+            "--approved-source-sha",SOURCE,"--actual-source-sha",SOURCE,"--run-id",RUN,"--prepare-mode",history.METADATA_MODE,
+            "--bootstrap-approval-json",self.args.bootstrap_approval_json,"--bootstrap-approval-hash",self.args.bootstrap_approval_hash]
+        before=[p.read_bytes() for p in self.output.iterdir()]
+        with mock.patch.object(tool,"capture_fixed",side_effect=self.capture),mock.patch.object(tool,"transport",return_value=argparse.Namespace(encode_armored_receipt=mock.Mock(side_effect=ValueError("safe failure")))),contextlib.redirect_stdout(io.StringIO()),contextlib.redirect_stderr(io.StringIO()):
+            self.assertEqual(tool.main(argv),42)
+        self.assertEqual(before,[p.read_bytes() for p in self.output.iterdir()])
+
+    def test_source_reader_close_failure_returns42_without_private_completion(self):
+        argv=["--operation","prepare","--root",str(self.fixture.root),"--operation-id",OPERATION,
+            "--approved-source-sha",SOURCE,"--actual-source-sha",SOURCE,"--run-id",RUN,"--prepare-mode",history.METADATA_MODE,
+            "--bootstrap-approval-json",self.args.bootstrap_approval_json,"--bootstrap-approval-hash",self.args.bootstrap_approval_hash]
+        original_read=history._metadata_physical_file;original_close=os.close
+        def read_with_close_failure(*args):
+            def bad_close(fd):
+                original_close(fd)
+                raise OSError("synthetic close failure")
+            with mock.patch.object(history.os,"close",side_effect=bad_close):return original_read(*args)
+        output=io.StringIO()
+        with mock.patch.object(tool,"capture_fixed",side_effect=self.capture),mock.patch.object(history,"_metadata_physical_file",side_effect=read_with_close_failure),contextlib.redirect_stdout(output):
+            # Invoke this instance to inject the actual file-close failure, then
+            # let the public entrypoint exercise its same fixed failure channel.
+            with self.assertRaises(OSError):self.run_metadata()
+        self.assertFalse((self.directory/("history-metadata-"+RUN)).exists())
+        original_loader=tool.importlib.util.module_from_spec
+        def loader(spec):
+            loaded=original_loader(spec)
+            if spec.name != "compatibility_history_prepare":return loaded
+            # The CLI loads a separate module; apply the same failure inside
+            # its own source reader, not by fabricating a complete DTO.
+            original_exec=spec.loader.exec_module
+            def execute(module):
+                original_exec(module)
+                read=module._metadata_physical_file
+                def failing(*args):
+                    def bad_close(fd):original_close(fd);raise OSError("synthetic close failure")
+                    with mock.patch.object(module.os,"close",side_effect=bad_close):return read(*args)
+                module._metadata_physical_file=failing
+            spec.loader.exec_module=execute
+            return loaded
+        with mock.patch.object(tool,"capture_fixed",side_effect=self.capture),mock.patch.object(tool.importlib.util,"module_from_spec",side_effect=loader),contextlib.redirect_stdout(output):
+            self.assertEqual(tool.main(argv),42)
+        decoded=json.loads(tool.transport().decode_armored_receipt(output.getvalue()))
+        self.assertNotIn("history_metadata_complete",decoded)
+        self.assertFalse((self.directory/("history-metadata-"+RUN)).exists())
+
+    def test_actual_node_metadata_strict_approval_matrix(self):
+        workflow=(ROOT/".github/workflows/compatibility-retirement.yml").read_text()
+        script=textwrap.dedent(workflow.split("          script: |\n",1)[1].split("      - name:",1)[0])
+        cases=[("valid",lambda v:None,True),("wrong_originalrun",lambda v:v["inventory_report"].update(run_id=RUN),False),
+            ("wrong_source",lambda v:v.update(source_sha="b"*40),False),("unapprovedhash",lambda v:v.update(inventory_request_sha256=""),False),
+            ("unknown",lambda v:v.update(extra=True),False),("numericstring",lambda v:v["metadata_limits"].update(passes="2"),False),
+            ("capacitychange",lambda v:v["metadata_limits"].update(max_encoded_file_bytes=4<<30),False),
+            ("contextmismatch",lambda v:None,False),("badattempt",lambda v:None,False)]
+        for name,change,allowed in cases:
+            with self.subTest(name=name):
+                value=copy.deepcopy(self.value);change(value);raw=tool.canonical_bytes(value)
+                inputs={"operation":"prepare","database":"mysql-and-mongodb","approved_source_sha":SOURCE,"operation_id":OPERATION,
+                    "prepare_mode":history.METADATA_MODE,"bootstrap_approval_json":raw[:-1].decode(),"bootstrap_approval_sha256":hashlib.sha256(raw).hexdigest()}
+                context={"payload":{"inputs":inputs},"ref":"refs/heads/main","sha":SOURCE,"repo":{},"runId":901 if name=="contextmismatch" else 900}
+                program="process.env.GITHUB_RUN_ID='900';process.env.GITHUB_RUN_ATTEMPT="+json.dumps("x" if name=="badattempt" else "1")+";const script="+json.dumps(script)+";const context="+json.dumps(context)+";const github={rest:{repos:{getCommit:async()=>({data:{sha:'"+SOURCE+"'}})}}};new (Object.getPrototypeOf(async function(){}).constructor)('context','github',script)(context,github).catch(()=>{process.exitCode=1;});"
+                r=subprocess.run(["node","-e",program],capture_output=True,check=False)
+                self.assertEqual(r.returncode,0 if allowed else 1)
 
 
 if __name__ == "__main__":

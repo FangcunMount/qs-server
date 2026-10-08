@@ -10,6 +10,7 @@ from pathlib import Path
 import re
 import stat
 import tempfile
+import time
 
 
 MODE = "bootstrap-history"
@@ -82,7 +83,7 @@ def _file_baseline(t, path, expected, maximum):
     t.private_directory(path.parent)
     try:
         before = path.lstat()
-        fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW)
+        fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
     except OSError:
         t.fail("history_private_asset_unavailable")
     try:
@@ -166,7 +167,7 @@ def _readiness_file(t, directory, filename="history.readiness.json"):
     path = directory / filename
     try:
         before = path.lstat()
-        fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW)
+        fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
     except OSError:
         t.fail("history_readiness_private_unavailable")
     try:
@@ -252,7 +253,7 @@ def _binary(t, path, expected):
     if code or raw != (json.dumps({"source_sha": expected}, separators=(",", ":")) + "\n").encode("ascii"):
         t.fail("history_binary_source_json_invalid")
     try:
-        fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW)
+        fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
     except OSError:
         t.fail("history_binary_changed")
     try:
@@ -552,3 +553,276 @@ def prepare(args, t):
             "exit_code": state["exit_code"], "container_removed": True,
             "private_readiness_sha256": receipt["history_private_readiness_sha256"]}))
         return receipt
+
+
+METADATA_MODE = "bootstrap-history-metadata"
+METADATA_LIMITS = {"passes": 2, "stream_chunk_bytes": 131072, "total_seconds": 900,
+    "max_encoded_file_bytes": 2147483648, "max_total_encoded_bytes": 8589934592,
+    "max_operation_run_directories": 128}
+INVENTORY_REPORT_FIELDS = ("format_version", "kind", "source_sha", "operation_id", "run_id", "request_hash",
+    "target_hash", "observed_at", "complete", "drop_ready", "database_bindings", "targets",
+    "source_bytes_protocol", "consistency_semantics", "error_category", "boundary_report_hash", "diagnostic_only")
+INVENTORY_TARGET_FIELDS = ("database", "name", "kind", "present", "complete", "records", "schema_hash",
+    "data_hash", "identity_hash", "bytes", "classification", "source_file", "error_category", "boundary",
+    "equal_full_passes", "pages", "next_cycle_required")
+
+
+def metadata_approval(args, t):
+    t.token(args.actual_source_sha, t.SHA)
+    t.token(args.operation_id, t.RUN)
+    t.token(args.run_id, t.RUN)
+    text = args.bootstrap_approval_json
+    t.token(args.bootstrap_approval_hash, t.HASH)
+    if type(text) is not str or not 0 < len(text) <= t.MAX_BOOTSTRAP_APPROVAL or not text.isascii():
+        t.fail("history_metadata_approval_invalid")
+    value = t.decode(text.encode("ascii"))
+    raw = t.canonical_bytes(value)
+    if raw[:-1] != text.encode("ascii") or hashlib.sha256(raw).hexdigest() != args.bootstrap_approval_hash:
+        t.fail("history_metadata_approval_encoding_or_hash_invalid")
+    t.fields(value, ("format_version", "kind", "prepare_mode", "source_sha", "operation_id", "target_hash",
+        "database_scope", "inventory_request_sha256", "inventory_report", "metadata_limits"))
+    if (type(value["format_version"]) is not int or value["format_version"] != 1 or
+        value["kind"] != "readonly_history_metadata_approval" or value["prepare_mode"] != METADATA_MODE or
+        value["source_sha"] != args.actual_source_sha or value["operation_id"] != args.operation_id or
+        value["target_hash"] != t.TARGET_HASH or value["database_scope"] != "mysql-and-mongodb"):
+        t.fail("history_metadata_approval_binding_invalid")
+    _reference(t, value["inventory_report"])
+    t.token(value["inventory_request_sha256"], t.HASH)
+    if value["inventory_report"]["run_id"] == args.run_id:
+        t.fail("history_metadata_actual_run_reused")
+    t.fields(value["metadata_limits"], METADATA_LIMITS)
+    if any(type(value["metadata_limits"][key]) is not int or value["metadata_limits"][key] != expected
+           for key, expected in METADATA_LIMITS.items()):
+        t.fail("history_metadata_limits_invalid")
+    return value
+
+
+def _metadata_time(t, deadline):
+    remaining = deadline - time.monotonic()
+    if remaining <= 0:
+        t.fail("history_metadata_cooperative_deadline_exceeded")
+    return remaining
+
+
+def _metadata_snapshot(s):
+    return (s.st_dev, s.st_ino, s.st_size, s.st_mtime_ns, s.st_ctime_ns, s.st_uid, s.st_mode, s.st_nlink)
+
+
+def _metadata_physical_file(t, path, maximum, deadline):
+    """Observe bytes through bounded reads, retaining no source body.
+
+    The deadline is cooperative. It cannot interrupt an OS-blocked file read
+    and is not a claim that production process/memory budgets are qualified.
+    """
+    _metadata_time(t, deadline)
+    t.private_directory(path.parent)
+    try:
+        before = path.lstat()
+        fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+    except OSError:
+        t.fail("history_metadata_file_unavailable")
+    try:
+        opened = os.fstat(fd)
+        if (not os.path.samestat(before, opened) or not stat.S_ISREG(opened.st_mode) or
+            opened.st_uid != os.getuid() or stat.S_IMODE(opened.st_mode) != 0o600 or opened.st_nlink != 1 or
+            opened.st_size > maximum):
+            t.fail("history_metadata_file_invalid")
+        digest = hashlib.sha256(); size = 0
+        with os.fdopen(fd, "rb", closefd=False) as stream:
+            while True:
+                _metadata_time(t, deadline)
+                chunk = stream.read(METADATA_LIMITS["stream_chunk_bytes"])
+                if not chunk: break
+                size += len(chunk)
+                if size > maximum: t.fail("history_metadata_file_bound_exceeded")
+                digest.update(chunk)
+        after = os.fstat(fd); visible = path.lstat()
+        if (_metadata_snapshot(before) != _metadata_snapshot(after) or
+            _metadata_snapshot(after) != _metadata_snapshot(visible) or size != opened.st_size):
+            t.fail("history_metadata_file_changed")
+        _metadata_time(t, deadline)
+        return digest.hexdigest(), size, _metadata_snapshot(after)
+    finally:
+        os.close(fd)
+
+
+def _metadata_current_stat(t, path, baseline):
+    try:
+        before = path.lstat(); fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+    except OSError:
+        t.fail("history_metadata_file_changed")
+    try:
+        opened = os.fstat(fd)
+        if (not stat.S_ISREG(opened.st_mode) or opened.st_uid != os.getuid() or
+            stat.S_IMODE(opened.st_mode) != 0o600 or opened.st_nlink != 1 or
+            _metadata_snapshot(before) != baseline or _metadata_snapshot(opened) != baseline or _metadata_snapshot(path.lstat()) != baseline):
+            t.fail("history_metadata_file_changed")
+    finally:
+        os.close(fd)
+
+
+def _metadata_prior_handles(t, docker, directory, deadline):
+    runs = []
+    for path in directory.iterdir():
+        if re.fullmatch(r"(?:identity|bounds|inventory)-[0-9]{1,20}-[0-9]{1,4}", path.name):
+            t.private_directory(path)
+            runs.append(path.name.split("-", 1)[1])
+            if len(runs) > METADATA_LIMITS["max_operation_run_directories"]:
+                t.fail("history_metadata_prior_runs_bound_exceeded")
+    filters = ["label=qs.compatibility-retirement.operation=" + directory.name]
+    filters += ["name=^/qs-compatibility-inventory-"+run+"$" for run in sorted(set(runs))]
+    for fixed_filter in filters:
+        code, raw = t.capture_fixed([*docker, "container", "ls", "--all", "--no-trunc", "--filter", fixed_filter,
+            "--format", "{{.ID}}"], timeout=min(15, _metadata_time(t, deadline)), maximum=16 * 1024)
+        _metadata_time(t, deadline)
+        if code: t.fail("history_metadata_inventory_state_unknown")
+        if raw:
+            try: ids = raw.decode("ascii").splitlines()
+            except UnicodeError: t.fail("history_metadata_inventory_state_unknown")
+            if not ids or len(ids) > 128 or len(ids) != len(set(ids)) or any(not re.fullmatch(r"[0-9a-f]{64}", cid) for cid in ids):
+                t.fail("history_metadata_inventory_state_unknown")
+            # Existing handles, even exited, are not owned by this stage. Read
+            # only a fixed safe projection before reporting unknown; no Env,
+            # start/stop/rm, automatic reconciliation or guessed ownership.
+            code, observed = t.capture_fixed([*docker, "inspect", "--format", INSPECT_FORMAT, ids[0]],
+                timeout=min(15, _metadata_time(t, deadline)), maximum=t.MAX_JSON)
+            if code or t.decode(observed).get("id") != ids[0]:
+                t.fail("history_metadata_inventory_state_unknown")
+            t.fail("history_metadata_inventory_outcome_unresolved")
+    _metadata_time(t, deadline)
+    _prior_runs(t, docker, directory)
+    _metadata_time(t, deadline)
+
+
+def _metadata_inputs(t, directory, value, args):
+    request, _ = t.read_private(directory, "inventory-request.json", value["inventory_request_sha256"])
+    t.validate_v2_request(request, args.operation_id, args.actual_source_sha, boundary=False)
+    t.validate_approved_boundary_file(request, directory)
+    output = t.private_directory(directory / ("inventory-" + value["inventory_report"]["run_id"]))
+    report, _ = t.read_private(output, "inventory.private.json", value["inventory_report"]["sha256"])
+    t.fields(report, INVENTORY_REPORT_FIELDS)
+    if (type(report["format_version"]) is not int or report["format_version"] != 2 or report["kind"] != "readonly_compatibility_inventory" or
+        report["source_sha"] != args.actual_source_sha or report["operation_id"] != args.operation_id or
+        report["run_id"] != value["inventory_report"]["run_id"] or report["request_hash"] != value["inventory_request_sha256"] or
+        report["target_hash"] != t.TARGET_HASH or report["complete"] is not True or report["diagnostic_only"] is not True or
+        report["drop_ready"] is not False or report["error_category"] != "none" or
+        report["boundary_report_hash"] != request["boundary_report_hash"] or
+        report["source_bytes_protocol"] != "mysql_cast_binary_columns_pk_order_v2+mongodb_server_bson_pk_order_v2" or
+        report["consistency_semantics"] != "two_equal_complete_passes_within_independently_approved_upper;sql_same_readonly_snapshot;mongo_homogeneous_bson_id_simple_collation;after_upper_next_cycle_not_fenced"):
+        t.fail("history_metadata_inventory_binding_invalid")
+    t.utc(report["observed_at"])
+    t.validate_inventory_bindings(report["database_bindings"], True)
+    for database, binding in report["database_bindings"].items():
+        if (binding["identity_hash"] != request["identity_hashes"][database] or
+            type(binding["migration_version"]) is not int or binding["migration_version"] != request["expected_migrations"][database] or
+            binding["migration_dirty"] is not False or binding["metadata_complete"] is not True or
+            binding["expected_identity_match"] is not True or binding["expected_migration_match"] is not True or binding["error_category"] != "none"):
+            t.fail("history_metadata_inventory_binding_invalid")
+        for key in ("catalog_hash", "non_target_schema_hash"): t.token(binding[key], t.HASH)
+        for key in ("dependency_coverage_complete", "inbound_foreign_key_coverage_complete", "dependency_text_review_required"):
+            if type(binding[key]) is not bool: t.fail("history_metadata_inventory_binding_invalid")
+        t.uint(binding["outside_dependencies"])
+        if type(binding["dependency_scope"]) is not str or type(binding["permissions"]) is not dict or any(type(flag) is not bool for flag in binding["permissions"].values()):
+            t.fail("history_metadata_inventory_binding_invalid")
+    if type(report["targets"]) is not list or len(report["targets"]) != 4:
+        t.fail("history_metadata_inventory_targets_invalid")
+    originals = [(directory / "inventory-request.json", value["inventory_request_sha256"]),
+        (output / "inventory.private.json", value["inventory_report"]["sha256"]),
+        (directory / ("bounds-"+request["boundary_run_id"]) / "boundary.private.json", request["boundary_report_hash"])]
+    sources = []
+    original_args = type(args)(**vars(args))
+    original_args.run_id = report["run_id"]
+    for item, target, bound in zip(report["targets"], t.TARGETS, request["approved_boundaries"]):
+        t.fields(item, INVENTORY_TARGET_FIELDS)
+        if (tuple(item[key] for key in ("database", "name", "kind")) != target or item["present"] is not True or
+            item["complete"] is not True or item["error_category"] != "none" or item["next_cycle_required"] is not False or
+            type(item["equal_full_passes"]) is not int or item["equal_full_passes"] != 2 or item["boundary"] != bound or
+            item["schema_hash"] != bound["schema_hash"] or item["identity_hash"] != bound["identity_hash"]):
+            t.fail("history_metadata_inventory_targets_invalid")
+        for key in ("records", "bytes", "pages"): t.uint(item[key])
+        if item["records"] > request["limits"]["max_records"] or item["bytes"] > request["limits"]["max_bytes"] or bound["empty"] != (item["records"] == 0):
+            t.fail("history_metadata_inventory_targets_invalid")
+        t.token(item["data_hash"], t.HASH)
+        if type(item["classification"]) is not dict or any(type(count) is not int or not 0 <= count <= 2**64-1 for count in item["classification"].values()):
+            t.fail("history_metadata_inventory_targets_invalid")
+        t.validate_source_asset(output, item, original_args, value["inventory_request_sha256"], request["limits"]["max_bytes"])
+        path = output / t.SOURCE_FILENAMES[target[:2]]
+        _, sidecar_hash = t.read_private(output, path.name + ".asset.json")
+        originals.append((output / (path.name + ".asset.json"), sidecar_hash))
+        sources.append(path)
+    baselines = [(path, digest, t.MAX_JSON, _file_baseline(t, path, digest, t.MAX_JSON)) for path, digest in originals]
+    return request, report, sources, baselines
+
+
+def prepare_metadata(args, t):
+    value = metadata_approval(args, t)
+    directory = t.operation_directory(args.root, args.operation_id)
+    deadline = time.monotonic() + METADATA_LIMITS["total_seconds"]
+    docker = ["sudo", "-n", "docker"]
+    with t.locked_operation(directory):
+        _metadata_prior_handles(t, docker, directory, deadline)
+        request, report, paths, json_baselines = _metadata_inputs(t, directory, value, args)
+        observed = []
+        for pass_index in range(METADATA_LIMITS["passes"]):
+            current = []; total = 0
+            for path in paths:
+                item = _metadata_physical_file(t, path, METADATA_LIMITS["max_encoded_file_bytes"], deadline)
+                total += item[1]
+                if total > METADATA_LIMITS["max_total_encoded_bytes"]: t.fail("history_metadata_total_bound_exceeded")
+                current.append(item)
+            if pass_index and current != observed: t.fail("history_metadata_file_changed")
+            observed = current
+        _unchanged(t, json_baselines)
+        for path, item in zip(paths, observed): _metadata_current_stat(t, path, item[2])
+        _metadata_prior_handles(t, docker, directory, deadline)
+        _unchanged(t, json_baselines)
+        for path, item in zip(paths, observed): _metadata_current_stat(t, path, item[2])
+        _metadata_time(t, deadline)
+        assets = [{"database": target[0], "name": target[1], "path": str(path),
+            "full_file_sha256": item[0], "full_file_bytes": item[1]} for target, path, item in zip(t.TARGETS, paths, observed)]
+        proposal = {"format_version": 1, "kind": "readonly_compatibility_history_request", "source_sha": args.actual_source_sha,
+            "operation_id": args.operation_id, "run_id": report["run_id"],
+            "inventory_request": {"path": str(directory / "inventory-request.json"), "sha256": value["inventory_request_sha256"]},
+            "inventory_report": {"path": str(paths[0].parent / "inventory.private.json"), "sha256": value["inventory_report"]["sha256"]}, "assets": assets}
+        proposal_raw = t.canonical_bytes(proposal); proposal_hash = hashlib.sha256(proposal_raw).hexdigest()
+        public_assets = [{key: item[key] for key in ("database", "name", "full_file_sha256", "full_file_bytes")} for item in assets]
+        for public, baseline in zip(public_assets, json_baselines[3:]): public["source_asset_sha256"] = baseline[1]
+        output = directory / ("history-metadata-"+args.run_id)
+        try: output.mkdir(mode=0o700)
+        except OSError: t.fail("history_metadata_run_directory_exists_or_unavailable")
+        registration = {"format_version": 1, "kind": "readonly_history_metadata_binding", "source_sha": args.actual_source_sha,
+            "operation_id": args.operation_id, "created_run_id": args.run_id, "approval_sha256": args.bootstrap_approval_hash,
+            "approval": value, "parent_proposal_run_id": report["run_id"], "parent_proposal_sha256": proposal_hash}
+        t.create_bootstrap_file(output, "history-metadata-bootstrap.json", t.canonical_bytes(registration))
+        t.create_bootstrap_file(output, "history-parent-proposal.json", proposal_raw)
+        private = {"format_version": 1, "kind": "readonly_history_file_metadata", "source_sha": args.actual_source_sha,
+            "operation_id": args.operation_id, "run_id": args.run_id, "metadata_limits": METADATA_LIMITS,
+            "approved_inventory_report": value["inventory_report"], "inventory_request_sha256": value["inventory_request_sha256"],
+            "approval_sha256": args.bootstrap_approval_hash, "parent_proposal_run_id": report["run_id"], "parent_proposal_sha256": proposal_hash,
+            "assets": public_assets, "equal_full_physical_passes": 2, "metadata_complete": True,
+            "input_baseline_sha256": hashlib.sha256(t.canonical_bytes([(str(path), baseline) for path, _, _, baseline in json_baselines] + [(str(path), item[2]) for path, item in zip(paths, observed)])).hexdigest(),
+            "semantic_source_coverage_verified": False, "production_process_budget_proven": False,
+            "complete": False, "execution_allowed": False, "drop_ready": False, "cas_complete": False}
+        private_raw = t.canonical_bytes(private)
+        t.create_bootstrap_file(output, "history-metadata.json", private_raw)
+        stored, stored_hash = t.read_private(output, "history-metadata.json", hashlib.sha256(private_raw).hexdigest())
+        registered, _ = t.read_private(output, "history-metadata-bootstrap.json", hashlib.sha256(t.canonical_bytes(registration)).hexdigest())
+        proposed, _ = t.read_private(output, "history-parent-proposal.json", proposal_hash)
+        if stored != private or registered != registration or proposed != proposal:
+            t.fail("history_metadata_private_mismatch")
+        created_baselines = [(output / name, digest, t.MAX_JSON, _file_baseline(t, output / name, digest, t.MAX_JSON))
+            for name, digest in (("history-metadata.json", stored_hash), ("history-metadata-bootstrap.json", hashlib.sha256(t.canonical_bytes(registration)).hexdigest()),
+                                 ("history-parent-proposal.json", proposal_hash))]
+        _unchanged(t, json_baselines + created_baselines)
+        for path, item in zip(paths, observed): _metadata_current_stat(t, path, item[2])
+        _metadata_time(t, deadline)
+        return {"format_version": 1, "operation": "prepare", "prepare_mode": METADATA_MODE,
+            "source_sha": args.actual_source_sha, "operation_id": args.operation_id, "run_id": args.run_id,
+            "target_hash": t.TARGET_HASH, "target_count": 4, "complete": False, "execution_allowed": False,
+            "drop_ready": False, "diagnostic_only": True, "history_cas_complete": False,
+            "history_metadata_complete": True, "history_metadata_process_budget_proven": False,
+            "metadata_private_report_sha256": stored_hash, "metadata_created_run_id": args.run_id,
+            "bootstrap_approval_sha256": args.bootstrap_approval_hash, "approved_inventory_report": value["inventory_report"],
+            "inventory_request_sha256": value["inventory_request_sha256"], "history_parent_proposal_sha256": proposal_hash,
+            "parent_proposal_run_id": report["run_id"], "history_metadata_assets": public_assets,
+            "error_category": "history_metadata_completed_requires_independent_parent_approval"}

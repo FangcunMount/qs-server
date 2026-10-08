@@ -1109,5 +1109,44 @@ class SafetyContracts(unittest.TestCase):
             self.assertEqual(result.returncode, 0 if allowed else 1, result.stderr)
 
 
+class MetadataWorkflowContracts(unittest.TestCase):
+    def test_metadata_has_separate_no_database_environment_ssh_step(self):
+        workflow=(SCRIPT.parents[2]/".github/workflows/compatibility-retirement.yml").read_text()
+        step=workflow.split("      - name: Observe approved inventory file metadata without database credentials\n",1)[1]
+        self.assertIn("if: inputs.prepare_mode == 'bootstrap-history-metadata'",step)
+        for forbidden in ("MYSQL_","MONGODB_","inventory_binary","history_binary","uname -m","go build","docker create","docker rm"):
+            self.assertNotIn(forbidden,step)
+        envs=step.split("          envs: ",1)[1].split("\n",1)[0].split(",")
+        self.assertEqual(len(envs),9);self.assertTrue(all(name.startswith("RETIREMENT_") for name in envs))
+        old=workflow.split("      - name: Inventory source bytes or reject unavailable lifecycle stage\n",1)[1].split("      - name: Observe approved",1)[0]
+        self.assertIn("if: inputs.prepare_mode != 'bootstrap-history-metadata'",old)
+        self.assertIn("MONGODB_METADATA_ADMIN_PASSWORD",old)
+        setup=workflow.split("      - name: Set up Go for immutable read-only inventory\n",1)[1].split("      - name:",1)[0]
+        self.assertIn("if: inputs.prepare_mode != 'bootstrap-history-metadata'",setup)
+
+    def test_actual_metadata_package_has_exact_four_files_and_never_executes_go(self):
+        repository=SCRIPT.parents[2]
+        workflow=(repository/".github/workflows/compatibility-retirement.yml").read_text()
+        step=workflow.split("      - name: Package only immutable tooling\n",1)[1].split("      - name:",1)[0]
+        body=textwrap.dedent(step.split("        run: |\n",1)[1])
+        with tempfile.TemporaryDirectory() as temporary:
+            root=Path(temporary).resolve();(root/"scripts/database").mkdir(parents=True);(root/"scripts/dbops").mkdir(parents=True)
+            for rel in ("scripts/database/compatibility-retirement.py","scripts/database/compatibility-history-prepare.py",
+                        "scripts/database/compatibility-retirement-entrypoints.json","scripts/dbops/receipt-transport.py"):
+                (root/rel).write_bytes((repository/rel).read_bytes())
+            tools=root/"tools";tools.mkdir(mode=0o700)
+            sentinel=tools/"go";sentinel.write_text("#!/bin/sh\necho unexpected_go >&2\nexit 99\n");sentinel.chmod(0o700)
+            runtemp=root/"runtime";runtemp.mkdir(mode=0o700);output=root/"output"
+            env=dict(os.environ,RETIREMENT_PACKAGE_MODE="bootstrap-history-metadata",RUNNER_TEMP=str(runtemp),
+                GITHUB_RUN_ID="900",GITHUB_RUN_ATTEMPT="1",GITHUB_SHA=SOURCE,GITHUB_OUTPUT=str(output),PATH=str(tools)+os.pathsep+os.environ["PATH"])
+            result=subprocess.run(["bash","-c",body],cwd=root,env=env,capture_output=True,check=False)
+            self.assertEqual(result.returncode,0,result.stderr.decode())
+            archive=root/"qs-compatibility-retirement-900-1.tar.gz"
+            listing=subprocess.run(["tar","-tzf",str(archive)],capture_output=True,check=True).stdout.decode().splitlines()
+            self.assertEqual(listing,["compatibility-retirement.py","compatibility-history-prepare.py","compatibility-retirement-entrypoints.json","receipt-transport.py"])
+            self.assertEqual(output.read_text().strip(),"sha256="+hashlib.sha256(archive.read_bytes()).hexdigest())
+            self.assertEqual(list(runtemp.iterdir()),[])
+
+
 if __name__ == "__main__":
     unittest.main()
