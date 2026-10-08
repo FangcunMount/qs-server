@@ -5,6 +5,7 @@ import contextlib
 import fcntl
 import gzip
 import hashlib
+import importlib.util
 import json
 import os
 from pathlib import Path
@@ -51,6 +52,59 @@ TARGETS = tuple(sorted("cbpt_" + table + "_" + suffix for table in (
     "retry_event_hold", "runtime_checkpoint", "statistics_assessment_daily",
     "statistics_assessment_fact", "statistics_org_snapshot",
 ) for suffix in ("20260827114947", "20260827131756")))
+
+# Fixed receipt categories, never exception text; matches the frozen tool contract.
+TOOL_ERROR_CATEGORIES = frozenset((
+    'archive_already_exists archive_dump_mismatch artifact_already_exists artifact_close_failed '
+    'artifact_encode_failed artifact_fsync_failed artifact_hash_failed artifact_path_failed '
+    'artifact_permissions_failed artifact_publish_failed artifact_write_failed catalog_failed '
+    'catalog_limit catalog_unsupported_identifier column_definition_failed column_identifier_blocked '
+    'connection_failed content_read_failed content_value_limit defaults_file_invalid '
+    'defaults_file_mismatch definition_dependency dependency_read_failed directory_fsync_failed '
+    'drop_ack_fsync_unknown drop_complete_fsync_unknown drop_execution_unknown drop_intent_fsync_failed '
+    'drop_ledger_already_exists drop_ledger_invalid drop_ledger_state_invalid drop_ledger_unconfirmed '
+    'dump_client_failed dump_close_failed dump_environment_failed dump_file_failed dump_fsync_failed '
+    'dump_publish_failed dump_size_limit dump_write_failed dynamic_definition_unknown '
+    'foreign_key_dependency internal_failure invalid_connection invalid_operation invalid_options '
+    'lock_session_lost manifest_column_invalid manifest_invalid manifest_non_target_invalid '
+    'manifest_object_set_invalid manifest_pk_invalid manifest_source_missing manifest_table_invalid '
+    'metadata_definition_hidden metadata_limit metadata_visibility_blocked migration_head_failed '
+    'migration_head_mismatch non_target_schema_changed none object_set_mismatch primary_key_failed '
+    'primary_key_required private_directory_failed private_directory_permissions private_file_permissions '
+    'private_file_read_failed private_json_invalid private_json_limit private_path_invalid '
+    'removed_object_set_mismatch restore_proof_invalid restore_target_marker_invalid '
+    'restored_content_mismatch restored_object_set_mismatch restored_table_type_blocked '
+    'schema_definition_failed session_setup_failed source_content_changed source_identity_mismatch '
+    'source_table_type_blocked target_identity_failed target_lock_failed target_still_present '
+    'target_table_type_blocked trigger_dependency '
+).split())
+SUMMARY_ERROR_CATEGORIES = frozenset((
+    'archive_audit_binding_mismatch archive_create_failed archive_disk_low archive_disk_unknown '
+    'archive_id_required archive_lock_invalid archive_not_eligible archive_object_invalid '
+    'archive_operation_exists archive_path_invalid archive_path_writable archive_root_permissions '
+    'archive_root_unavailable archive_size_limit cleanup_already_running cleanup_completion_unconfirmed '
+    'client_image_unavailable client_output_limit client_start_failed client_termination_unconfirmed '
+    'client_timeout client_timeout_or_output_invalid container_name_conflict container_preflight_failed '
+    'database_environment_control_character database_environment_missing database_host_invalid '
+    'database_name_invalid database_port_invalid docker_disk_low docker_disk_unknown '
+    'docker_operation_failed docker_storage_identity_invalid dump_archive_invalid dump_empty '
+    'dump_file_invalid dump_hash_invalid dump_hash_mismatch duplicate_json_key image_identity_invalid '
+    'invalid_cleanup_binding invalid_private_json invalid_tool_boolean invalid_tool_count '
+    'invalid_tool_hash invalid_tool_number invalid_tool_token manifest_archive_invalid '
+    'manifest_binding_mismatch manifest_migration_binding_invalid manifest_row_count_invalid '
+    'manifest_source_identity_invalid manifest_target_scope_invalid operation_time_budget_exhausted '
+    'private_file_invalid private_file_limit private_file_unavailable resource_cleanup_unconfirmed '
+    'restore_client_failed restore_client_output_limit restore_client_start_failed restore_client_timeout '
+    'restore_container_identity_invalid restore_container_isolation_unconfirmed '
+    'restore_database_create_failed restore_proof_binding_mismatch restore_proof_identity_invalid '
+    'restore_proof_marker_invalid restore_server_identity_invalid restore_server_not_ready '
+    'restore_size_limit restore_source_identity_collision restore_volume_identity_invalid '
+    'restore_volume_name_conflict restore_volume_ownership_unconfirmed restore_volume_preflight_failed '
+    'system_database_not_allowed tool_binary_invalid tool_binary_unavailable tool_binding_mismatch '
+    'tool_execution_failed tool_operation_mismatch tool_result_not_success tool_target_count_mismatch '
+    'unexpected_archive_id unexpected_cleanup_failure unexpected_tool_output unsafe_cleanup_summary '
+).split())
+SUMMARY_ERROR_CATEGORIES |= frozenset("tool_" + category for category in TOOL_ERROR_CATEGORIES)
 
 
 class CleanupError(Exception):
@@ -775,6 +829,78 @@ def perform(args, env, *, archive_root=None, runtime_class=Runtime):
     return result
 
 
+def receipt_transport_module():
+    spec = importlib.util.spec_from_file_location("cbpt_receipt_transport", Path(__file__).with_name("receipt-transport.py"))
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def summary_schema():
+    operations = frozenset({"audit", "archive", "verify-restored", "apply", "verify-removed"})
+    stage = {key: "uint" for key in {"format_version", "error_code", "target_table_count", "non_target_count", "remaining_target_count"} | COUNT_KEYS}
+    stage.update({key: "hash64_or_empty" for key in HASH_KEYS})
+    stage.update({key: "bool" for key in {"archive_eligible", "drop_eligible", "ledger_complete"}})
+    stage.update(operation=operations, stage=operations, status=frozenset({"ok", "archive_only", "blocked", "unknown"}),
+                 error_category=TOOL_ERROR_CATEGORIES | frozenset({""}), drop_block_reason=frozenset({"", "none"}) | ARCHIVE_ONLY_REASONS,
+                 source_sha="sha40", operation_id="run_id")
+    return {"format_version": "uint", "operation": frozenset({"audit", "archive-verify", "apply", "verify"}),
+            "complete": "bool", "source_sha": "sha40", "run_id": "run_id", "archive_id": "run_id",
+            "archive_private": "bool", "archive_retention": frozenset({"preserve_no_automatic_prune"}),
+            "stage": frozenset({"preflight", "source_audit", "source_archive", "archive_validation", "restore_runtime",
+                                "restore_import", "restore_validation", "source_apply", "source_verify", "complete"}),
+            "stages": [stage], "failure": stage, "error_category": SUMMARY_ERROR_CATEGORIES,
+            "archive_compressed_bytes": "uint", "archive_uncompressed_bytes": "uint", "total_archived_rows": "uint"}
+
+
+def safe_summary(value, args):
+    """Validate only the final public summary; private records and tool APIs stay plain JSON."""
+    if not isinstance(value, dict) or not set(value) <= set(summary_schema()):
+        fail("unsafe_cleanup_summary")
+    if type(value.get("format_version")) is not int or value["format_version"] != 1 or type(value.get("complete")) is not bool or value.get("operation") != args.operation:
+        fail("unsafe_cleanup_summary")
+    operation_id = args.archive_id or args.run_id
+    for key, expected, pattern in (("source_sha", args.source_sha, SHA), ("run_id", args.run_id, RUN_ID), ("archive_id", operation_id, RUN_ID)):
+        if key in value and (value[key] != expected or not isinstance(value[key], str) or not pattern.fullmatch(value[key])):
+            fail("unsafe_cleanup_summary")
+    stages = value.get("stages", [])
+    expected = {"audit": ["audit"], "archive-verify": ["audit", "archive", "verify-restored"],
+                "apply": ["apply", "verify-removed"], "verify": ["verify-removed"]}[args.operation]
+    if not isinstance(stages, list) or len(stages) > len(expected):
+        fail("unsafe_cleanup_summary")
+    if value["complete"] or stages or "failure" in value:
+        if not {"source_sha", "run_id", "archive_id"} <= set(value):
+            fail("unsafe_cleanup_summary")
+    for index, item in enumerate(stages):
+        checked = safe_output(json.dumps(item), expected[index], args.source_sha, operation_id)
+        if checked.get("status") not in {"ok", "archive_only"}:
+            fail("unsafe_cleanup_summary")
+    if "failure" in value:
+        if value["complete"] or len(stages) >= len(expected):
+            fail("unsafe_cleanup_summary")
+        checked = safe_output(json.dumps(value["failure"]), expected[len(stages)], args.source_sha, operation_id)
+        if checked.get("status") not in {"blocked", "unknown"} or checked.get("error_category") in {"", "none"}:
+            fail("unsafe_cleanup_summary")
+    if value["complete"]:
+        if len(stages) != len(expected) or value.get("stage") != "complete" or "error_category" in value or value.get("archive_private") is not True or value.get("archive_retention") != "preserve_no_automatic_prune":
+            fail("unsafe_cleanup_summary")
+    elif value.get("error_category") not in SUMMARY_ERROR_CATEGORIES:
+        fail("unsafe_cleanup_summary")
+    for key, limit in (("archive_compressed_bytes", ARCHIVE_LIMIT), ("archive_uncompressed_bytes", RESTORE_LIMIT), ("total_archived_rows", 2 ** 64 - 1)):
+        if key in value and (type(value[key]) is not int or not 0 <= value[key] <= limit):
+            fail("unsafe_cleanup_summary")
+    return value
+
+
+def failure_summary(args, category):
+    value = {"format_version": 1, "complete": False, "operation": args.operation,
+             "error_category": category if category in SUMMARY_ERROR_CATEGORIES else "unexpected_cleanup_failure"}
+    for key, candidate, pattern in (("source_sha", args.source_sha, SHA), ("run_id", args.run_id, RUN_ID), ("archive_id", args.archive_id or args.run_id, RUN_ID)):
+        if pattern.fullmatch(candidate):
+            value[key] = candidate
+    return value
+
+
 def main(argv=None, env=None):
     parser = argparse.ArgumentParser(description="Private fixed-scope cbpt cleanup")
     parser.add_argument("--operation", required=True, choices=("audit", "archive-verify", "apply", "verify"))
@@ -783,26 +909,37 @@ def main(argv=None, env=None):
     parser.add_argument("--run-id", required=True)
     parser.add_argument("--archive-id", default="")
     args = parser.parse_args(argv)
+    values = dict(os.environ) if env is None else env
     try:
-        result = perform(args, dict(os.environ) if env is None else env)
+        transport = receipt_transport_module()
+    except Exception:
+        print("QS_CBPT_CLEANUP_TRANSPORT_UNAVAILABLE", file=sys.stderr)
+        return 1
+    try:
+        result = perform(args, values)
     except CleanupError as error:
         category = str(error)
-        if not re.fullmatch(r"[a-z0-9_]{1,100}", category):
+        if category not in SUMMARY_ERROR_CATEGORIES:
             category = "unexpected_cleanup_failure"
-        base = {"format_version": 1, "complete": False, "operation": args.operation}
-        if SHA.fullmatch(args.source_sha):
-            base["source_sha"] = args.source_sha
-        if RUN_ID.fullmatch(args.run_id):
-            base["run_id"] = args.run_id
-        archive_id = args.archive_id or args.run_id
-        if RUN_ID.fullmatch(archive_id):
-            base["archive_id"] = archive_id
-        result = getattr(error, "result", base)
-        result["error_category"] = category
+        result = getattr(error, "result", failure_summary(args, category))
+        if isinstance(result, dict):
+            result["error_category"] = category
     except Exception:
-        result = {"format_version": 1, "complete": False, "error_category": "unexpected_cleanup_failure"}
+        result = failure_summary(args, "unexpected_cleanup_failure")
+    selected_secrets = tuple(values.get(key, "") for key in ("MYSQL_USERNAME", "MYSQL_PASSWORD"))
+    try:
+        result = safe_summary(result, args)
+        encoded = transport.encode_armored_receipt(result, schema=summary_schema(), secrets=selected_secrets)
+    except Exception:
+        result = failure_summary(args, "unsafe_cleanup_summary")
+        try:
+            result = safe_summary(result, args)
+            encoded = transport.encode_armored_receipt(result, schema=summary_schema(), secrets=selected_secrets)
+        except Exception:
+            print("QS_CBPT_CLEANUP_TRANSPORT_FAILED", file=sys.stderr)
+            return 1
     print("QS_CBPT_CLEANUP_BEGIN")
-    print(json.dumps(result, ensure_ascii=True, sort_keys=True))
+    print(encoded)
     print("QS_CBPT_CLEANUP_END")
     return 0 if result["complete"] else 1
 

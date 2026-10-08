@@ -40,6 +40,24 @@ def receipt(operation, operation_id="123-1"):
     return value
 
 
+def full_receipt(operation, operation_id="123-1"):
+    # All emitted Go struct fields, including the successful audit/archive "none" reason.
+    value = receipt(operation, operation_id)
+    value.update(manifest_sha256="", dump_sha256="", proof_sha256="", drop_block_reason="",
+                 dropped_count=0, pending_count=22, unknown_count=0, failed_count=0, ledger_complete=False)
+    if operation in {"audit", "archive"}:
+        value["drop_block_reason"] = "none"
+    if operation in {"archive", "verify-restored", "apply", "verify-removed"}:
+        value.update(manifest_sha256=HASH, dump_sha256=HASH)
+    if operation in {"verify-restored", "apply", "verify-removed"}:
+        value["proof_sha256"] = HASH
+    if operation == "verify-restored":
+        value["drop_eligible"] = False
+    if operation in {"apply", "verify-removed"}:
+        value.update(dropped_count=22, pending_count=0, ledger_complete=True)
+    return value
+
+
 def manifest(operation_id, digest):
     return {"format_version": 1, "operation_id": operation_id, "source_sha": SHA,
             "source_server_uuid": SOURCE_UUID, "source_target_hash": HASH, "migration_version": 95,
@@ -521,10 +539,11 @@ class Contracts(unittest.TestCase):
             runtime.cleanup()
 
     def test_main_never_prints_source_secrets_and_preserves_safe_partial_progress(self):
-        error = cbpt.CleanupError("tool_fixture_failure")
+        error = cbpt.CleanupError("tool_drop_ledger_unconfirmed")
         error.result = {"format_version": 1, "complete": False, "operation": "apply", "source_sha": SHA,
                         "run_id": "123-1", "archive_id": "122-1", "stages": [receipt("apply", "122-1")],
-                        "failure": dict(receipt("verify-removed", "122-1"), status="blocked", unknown_count=1)}
+                        "failure": dict(receipt("verify-removed", "122-1"), status="unknown", error_category="drop_ledger_unconfirmed",
+                                        unknown_count=1, dropped_count=21, ledger_complete=False)}
         output = io.StringIO()
         with patch.object(cbpt, "perform", side_effect=error), contextlib.redirect_stdout(output):
             status = cbpt.main(["--operation", "apply", "--tool-binary", str(self.binary), "--source-sha", SHA,
@@ -533,9 +552,206 @@ class Contracts(unittest.TestCase):
         raw = output.getvalue()
         self.assertNotIn(SECRET, raw)
         self.assertNotIn(SOURCE_UUID, raw)
-        self.assertIn('"unknown_count": 1', raw)
+        decoded = cbpt.load_json_bytes(cbpt.receipt_transport_module().decode_armored_receipt(raw.splitlines()[1]))
+        self.assertEqual(decoded["failure"]["unknown_count"], 1)
+        self.assertEqual(decoded["failure"]["dropped_count"], 21)
+        self.assertFalse(decoded["failure"]["ledger_complete"])
         self.assertTrue(raw.startswith("QS_CBPT_CLEANUP_BEGIN\n"))
         self.assertTrue(raw.endswith("QS_CBPT_CLEANUP_END\n"))
+
+
+    def output_args(self, operation="audit", archive_id=""):
+        return ["--operation", operation, "--tool-binary", str(self.binary), "--source-sha", SHA,
+                "--run-id", "123-1", "--archive-id", archive_id]
+
+    def decoded_summary(self, raw):
+        lines = raw.splitlines()
+        self.assertEqual(len(lines), 3)
+        self.assertEqual(lines[0], "QS_CBPT_CLEANUP_BEGIN")
+        self.assertEqual(lines[2], "QS_CBPT_CLEANUP_END")
+        self.assertFalse(lines[1].startswith("{"))
+        return cbpt.load_json_bytes(cbpt.receipt_transport_module().decode_armored_receipt(lines[1]))
+
+    def test_encoded_archive_success_roundtrips_all_verified_stages_and_counts(self):
+        self.args.operation = "archive-verify"
+        result = cbpt.perform(self.args, env(), archive_root=self.archives, runtime_class=FakeRuntime)
+        output = io.StringIO()
+        with patch.object(cbpt, "perform", return_value=result), contextlib.redirect_stdout(output):
+            status = cbpt.main(self.output_args("archive-verify"), env())
+        decoded = self.decoded_summary(output.getvalue())
+        self.assertEqual(status, 0)
+        self.assertEqual(decoded, result)
+        self.assertEqual([x["operation"] for x in decoded["stages"]], ["audit", "archive", "verify-restored"])
+        self.assertEqual(decoded["total_archived_rows"], 22)
+        self.assertNotIn(SECRET, output.getvalue())
+        self.assertNotIn(SOURCE_UUID, output.getvalue())
+
+    def test_real_go_field_shape_archive_full_chain_encodes_success_none_reason(self):
+        class CompleteReceiptRuntime(FakeRuntime):
+            def tool(self, operation, connection, archive, operation_id, image, **kwargs):
+                super().tool(operation, connection, archive, operation_id, image, **kwargs)
+                return full_receipt(operation, operation_id)
+
+        self.args.operation = "archive-verify"
+        result = cbpt.perform(self.args, env(), archive_root=self.archives, runtime_class=CompleteReceiptRuntime)
+        output = io.StringIO()
+        with patch.object(cbpt, "perform", return_value=result), contextlib.redirect_stdout(output):
+            self.assertEqual(cbpt.main(self.output_args("archive-verify"), env()), 0)
+        decoded = self.decoded_summary(output.getvalue())
+        self.assertEqual(decoded, result)
+        self.assertEqual([item["drop_block_reason"] for item in decoded["stages"]], ["none", "none", ""])
+        self.assertFalse(decoded["stages"][2]["drop_eligible"])
+        self.assertEqual(decoded["total_archived_rows"], 22)
+        self.assertTrue(FakeRuntime.last.cleaned)
+
+    def test_full_apply_and_verify_summaries_encode_confirmed_ledger(self):
+        class CompleteReceiptRuntime(FakeRuntime):
+            def tool(self, operation, connection, archive, operation_id, image, **kwargs):
+                super().tool(operation, connection, archive, operation_id, image, **kwargs)
+                return full_receipt(operation, operation_id)
+
+        archive = self.archives / "122-1"
+        archive.mkdir(mode=0o700)
+        make_archive(archive, "122-1")
+        make_proof(archive, "122-1")
+        for operation in ("apply", "verify"):
+            self.args.operation, self.args.archive_id = operation, "122-1"
+            result = cbpt.perform(self.args, env(), archive_root=self.archives, runtime_class=CompleteReceiptRuntime)
+            output = io.StringIO()
+            with self.subTest(operation=operation), patch.object(cbpt, "perform", return_value=result), contextlib.redirect_stdout(output):
+                self.assertEqual(cbpt.main(self.output_args(operation, "122-1"), env()), 0)
+            decoded = self.decoded_summary(output.getvalue())
+            self.assertEqual(decoded, result)
+            self.assertEqual(decoded["stages"][-1]["remaining_target_count"], 0)
+            self.assertEqual(decoded["stages"][-1]["dropped_count"], 22)
+            self.assertTrue(decoded["stages"][-1]["ledger_complete"])
+
+    def test_archive_only_envelope_keeps_drop_blocked_without_rewriting_gate(self):
+        class ArchiveOnlyRuntime(FakeRuntime):
+            def tool(self, operation, connection, archive, operation_id, image, **kwargs):
+                super().tool(operation, connection, archive, operation_id, image, **kwargs)
+                return dict(full_receipt(operation, operation_id), status="archive_only", drop_eligible=False,
+                            drop_block_reason="metadata_visibility_blocked")
+
+        result = cbpt.perform(self.args, env(), archive_root=self.archives, runtime_class=ArchiveOnlyRuntime)
+        output = io.StringIO()
+        with patch.object(cbpt, "perform", return_value=result), contextlib.redirect_stdout(output):
+            self.assertEqual(cbpt.main(self.output_args(), env()), 0)
+        decoded = self.decoded_summary(output.getvalue())
+        self.assertEqual(decoded, result)
+        self.assertFalse(decoded["stages"][0]["drop_eligible"])
+        self.assertEqual(decoded["stages"][0]["drop_block_reason"], "metadata_visibility_blocked")
+
+    def test_legacy_empty_stage_category_and_late_cleanup_failure_keep_safe_progress(self):
+        result = cbpt.perform(self.args, env(), archive_root=self.archives, runtime_class=FakeRuntime)
+        result["stages"][0]["error_category"] = ""
+        output = io.StringIO()
+        with patch.object(cbpt, "perform", return_value=result), contextlib.redirect_stdout(output):
+            self.assertEqual(cbpt.main(self.output_args(), env()), 0)
+        self.assertEqual(self.decoded_summary(output.getvalue()), result)
+        error = cbpt.CleanupError("resource_cleanup_unconfirmed")
+        error.result = dict(result, complete=False, stage="source_audit")
+        output = io.StringIO()
+        with patch.object(cbpt, "perform", side_effect=error), contextlib.redirect_stdout(output):
+            self.assertEqual(cbpt.main(self.output_args(), env()), 1)
+        value = self.decoded_summary(output.getvalue())
+        self.assertFalse(value["complete"])
+        self.assertEqual(value["stages"], result["stages"])
+        self.assertEqual(value["error_category"], "resource_cleanup_unconfirmed")
+        self.assertNotIn("failure", value)
+
+    def test_failure_receipt_rechecks_binding_scope_and_private_fields_before_encoding(self):
+        failure = dict(full_receipt("apply", "122-1"), status="unknown", error_category="drop_execution_unknown",
+                       dropped_count=0, pending_count=21, unknown_count=1, ledger_complete=False)
+        for changes in ({"source_sha": "f" * 40}, {"operation": "audit"},
+                        {"target_table_count": 23}, {"raw_error": SECRET}):
+            error = cbpt.CleanupError("tool_drop_execution_unknown")
+            error.result = {"format_version": 1, "complete": False, "operation": "apply", "source_sha": SHA,
+                            "run_id": "123-1", "archive_id": "122-1", "stage": "source_apply", "stages": [],
+                            "failure": dict(failure, **changes)}
+            output = io.StringIO()
+            with self.subTest(keys=tuple(changes)), patch.object(cbpt, "perform", side_effect=error), contextlib.redirect_stdout(output):
+                self.assertEqual(cbpt.main(self.output_args("apply", "122-1"), env()), 1)
+            value = self.decoded_summary(output.getvalue())
+            self.assertEqual(value["error_category"], "unsafe_cleanup_summary")
+            self.assertNotIn("failure", value)
+            self.assertNotIn(SECRET, json.dumps(value))
+
+    def test_transport_resists_ascii_boolean_and_hash_masking_without_changing_plain_api(self):
+        result = cbpt.perform(self.args, env(), archive_root=self.archives, runtime_class=FakeRuntime)
+        output = io.StringIO()
+        with patch.object(cbpt, "perform", return_value=result), contextlib.redirect_stdout(output):
+            self.assertEqual(cbpt.main(self.output_args(), dict(env(), MYSQL_USERNAME="true", MYSQL_PASSWORD="false")), 0)
+        masked = output.getvalue()
+        for token in ("true", "false", "1", SHA, HASH):
+            masked = masked.replace(token, "***")
+        self.assertEqual(self.decoded_summary(masked), result)
+        plain = json.dumps(receipt("audit"))
+        self.assertEqual(cbpt.safe_output(plain, "audit", SHA, "123-1"), receipt("audit"))
+
+    def test_final_summary_rejects_untrusted_fields_bindings_counts_and_stage_order(self):
+        result = cbpt.perform(self.args, env(), archive_root=self.archives, runtime_class=FakeRuntime)
+        bad = []
+        value = dict(result, raw_error=SECRET)
+        bad.append(value)
+        for changes in ({"password": SECRET}, {"source_sha": "f" * 40}, {"target_table_count": 21}, {"unknown_count": True}):
+            bad.append(dict(result, stages=[dict(result["stages"][0], **changes)]))
+        bad.append(dict(result, stages=[receipt("apply")]))
+        bad.append(dict(result, total_archived_rows=2 ** 64))
+        bad.append(dict(result, archive_compressed_bytes=True))
+        for value in bad:
+            with self.subTest(keys=tuple(value)), patch.object(cbpt, "perform", return_value=value), contextlib.redirect_stdout(io.StringIO()) as output:
+                self.assertEqual(cbpt.main(self.output_args(), env()), 1)
+            decoded = self.decoded_summary(output.getvalue())
+            self.assertFalse(decoded["complete"])
+            self.assertEqual(decoded["error_category"], "unsafe_cleanup_summary")
+            self.assertNotIn("stages", decoded)
+            self.assertNotIn(SECRET, cbpt.receipt_transport_module().decode_armored_receipt(output.getvalue().splitlines()[1]))
+
+    def test_unknown_exception_tokens_and_untrusted_failure_body_never_get_encoded(self):
+        for error in (RuntimeError(SECRET), cbpt.CleanupError("private_database_name_must_never_leak")):
+            output = io.StringIO()
+            with patch.object(cbpt, "perform", side_effect=error), contextlib.redirect_stdout(output):
+                self.assertEqual(cbpt.main(self.output_args(), env()), 1)
+            decoded = self.decoded_summary(output.getvalue())
+            self.assertEqual(decoded["error_category"], "unexpected_cleanup_failure")
+            self.assertNotIn(SECRET, json.dumps(decoded))
+            self.assertNotIn("private_database_name_must_never_leak", json.dumps(decoded))
+        error = cbpt.CleanupError("docker_disk_unknown")
+        error.result = {"format_version": 1, "complete": False, "operation": "audit", "raw_error": SECRET}
+        output = io.StringIO()
+        with patch.object(cbpt, "perform", side_effect=error), contextlib.redirect_stdout(output):
+            self.assertEqual(cbpt.main(self.output_args(), env()), 1)
+        self.assertEqual(self.decoded_summary(output.getvalue())["error_category"], "unsafe_cleanup_summary")
+
+    def test_missing_transport_stops_before_any_cleanup_and_has_no_plain_fallback(self):
+        output, errors = io.StringIO(), io.StringIO()
+        with patch.object(cbpt, "receipt_transport_module", side_effect=OSError(SECRET)), patch.object(cbpt, "perform") as perform, contextlib.redirect_stdout(output), contextlib.redirect_stderr(errors):
+            self.assertEqual(cbpt.main(self.output_args(), env()), 1)
+        perform.assert_not_called()
+        self.assertEqual(output.getvalue(), "")
+        self.assertEqual(errors.getvalue(), "QS_CBPT_CLEANUP_TRANSPORT_UNAVAILABLE\n")
+
+    def test_encoding_refusal_has_no_secret_error_or_plain_fallback(self):
+        result = cbpt.perform(self.args, env(), archive_root=self.archives, runtime_class=FakeRuntime)
+        transport = cbpt.receipt_transport_module()
+        output, errors = io.StringIO(), io.StringIO()
+        with patch.object(cbpt, "receipt_transport_module", return_value=transport), patch.object(transport, "encode_armored_receipt", side_effect=RuntimeError(SECRET)), patch.object(cbpt, "perform", return_value=result), contextlib.redirect_stdout(output), contextlib.redirect_stderr(errors):
+            self.assertEqual(cbpt.main(self.output_args(), env()), 1)
+        self.assertEqual(output.getvalue(), "")
+        self.assertEqual(errors.getvalue(), "QS_CBPT_CLEANUP_TRANSPORT_FAILED\n")
+
+    def test_early_input_failure_encodes_only_valid_bindings_and_fixed_error(self):
+        output = io.StringIO()
+        argv = self.output_args()
+        argv[argv.index("--source-sha") + 1] = SECRET
+        with contextlib.redirect_stdout(output):
+            self.assertEqual(cbpt.main(argv, env()), 1)
+        value = self.decoded_summary(output.getvalue())
+        self.assertFalse(value["complete"])
+        self.assertEqual(value["error_category"], "invalid_cleanup_binding")
+        self.assertNotIn("source_sha", value)
+        self.assertNotIn(SECRET, json.dumps(value))
 
 
 if __name__ == "__main__":

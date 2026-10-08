@@ -15,6 +15,7 @@ SPEC = importlib.util.spec_from_file_location('profile', Path(__file__).with_nam
 profile = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(profile)
 transport = profile.runtime_module()
+armor = profile.receipt_transport_module()
 SHA, RUN, HASH = 'a' * 40, '123-1', 'b' * 64
 SECRET = 'fixture_password_NEVER_PRINT'
 
@@ -238,10 +239,78 @@ class ProfileTests(unittest.TestCase):
              patch.object(profile, 'execute', side_effect=RuntimeError(SECRET)), contextlib.redirect_stdout(out):
             self.assertEqual(profile.main(), 1)
         self.assertNotIn(SECRET, out.getvalue())
-        value = json.loads(out.getvalue())
+        value = json.loads(armor.decode_armored_receipt(out.getvalue()))
         self.assertFalse(value['complete'])
         self.assertTrue(value['diagnostic_only'])
         self.assertEqual(value['error_category'], 'profile_transport_or_receipt_failed')
+
+
+    def main_fixture(self, value, code=0, env=None):
+        out = io.StringIO()
+        with patch.object(sys, 'argv', ['profile', '--binary', '/fixture']), \
+             patch.dict(os.environ, env or environment(), clear=True), \
+             patch.object(profile, 'execute', return_value=(code, value)), contextlib.redirect_stdout(out):
+            result = profile.main()
+        return result, out.getvalue()
+
+    def test_main_success_armor_preserves_binding_and_plain_validator(self):
+        env = environment(); env.update(MYSQL_USERNAME='0', MYSQL_PASSWORD='a')
+        code, output = self.main_fixture(receipt(), env=env)
+        self.assertEqual(code, 0)
+        self.assertNotIn('{', output)
+        self.assertNotIn('0', output)
+        self.assertNotIn('a', output)
+        masked = output.replace('0', '***').replace('a', '***')
+        decoded = armor.decode_armored_receipt(masked)
+        self.assertEqual(profile.safe_receipt(transport, decoded, code, SHA, RUN, HASH), receipt())
+        self.assertEqual(self.validate(receipt()), receipt())
+        with self.assertRaises(Exception):
+            profile.safe_receipt(transport, decoded, code, 'c' * 40, RUN, HASH)
+
+    def test_main_failed_diagnostic_armor_retains_unknown_roles(self):
+        value = receipt()
+        value.update(complete=False, error_category='mandatory_roles_query_failed',
+                     current_unrestricted_metadata_grants=False, rds_role_grants_available=None,
+                     rds_role_unrestricted_metadata_grants=None, assigned_roles_present=None, mandatory_roles_present=None)
+        code, output = self.main_fixture(value, code=1)
+        self.assertEqual(code, 1)
+        decoded = armor.decode_armored_receipt(output)
+        self.assertEqual(profile.safe_receipt(transport, decoded, code, SHA, RUN, HASH), value)
+
+    def test_main_never_encodes_unknown_raw_or_secret_fields(self):
+        for field in ('raw_grants', 'password', 'host', 'roles', 'uuid'):
+            with self.subTest(field=field):
+                value = receipt(); value[field] = SECRET
+                code, output = self.main_fixture(value)
+                self.assertEqual(code, 1)
+                decoded = armor.decode_armored_receipt(output)
+                self.assertNotIn(SECRET, decoded)
+                self.assertEqual(json.loads(decoded), profile.FAILURE_RECEIPT)
+        with self.assertRaises(Exception):
+            armor.encode_armored_receipt(json.dumps(receipt()), schema=profile.RECEIPT_SCHEMA)
+
+    def test_main_credential_collision_uses_backup_alphabet(self):
+        env = environment(); env.update(MYSQL_USERNAME='\ue100', MYSQL_PASSWORD='\ue300')
+        code, output = self.main_fixture(receipt(), env=env)
+        self.assertEqual(code, 0)
+        self.assertEqual(ord(output[0]), 0xE500)
+        self.assertEqual(json.loads(armor.decode_armored_receipt(output)), receipt())
+
+    def test_main_armor_failure_has_no_plain_output(self):
+        with patch.object(armor, 'encode_armored_receipt', side_effect=armor.ReceiptTransportError('receipt_transport_credential_collision')), \
+             patch.object(profile, 'receipt_transport_module', return_value=armor):
+            code, output = self.main_fixture(receipt())
+        self.assertEqual(code, 1)
+        self.assertEqual(output, '')
+
+    def test_main_missing_armor_stops_before_diagnostic(self):
+        out = io.StringIO()
+        with patch.object(sys, 'argv', ['profile', '--binary', '/fixture']), \
+             patch.object(profile, 'receipt_transport_module', side_effect=RuntimeError(SECRET)), \
+             patch.object(profile, 'execute') as execute, contextlib.redirect_stdout(out):
+            self.assertEqual(profile.main(), 1)
+        execute.assert_not_called()
+        self.assertEqual(out.getvalue(), '')
 
 
 if __name__ == '__main__':

@@ -2,7 +2,7 @@
 
 此工具只读诊断当前 session 的 SHOW GRANTS，以及固定 RDS 角色的潜在权限集合。它不激活角色，不替代现有删除门禁，不证明清理资格，不读取业务记录。
 
-工作流提供两个独立的只读入口：`metadata-visibility-profile` 使用现有应用账号；`metadata-visibility-admin-profile` 使用 production 环境中的 `MYSQL_METADATA_ADMIN_USERNAME`、`MYSQL_METADATA_ADMIN_PASSWORD`，复用既有 host/port/database，并保持上述生产目标 hash 校验。管理员 Secret 缺失时停止，绝不回落到应用账号。CBPT 清理四个入口固定使用这组管理员身份，但原有全局元数据、依赖、锁、内容与恢复证明门禁不变。新工作流 source SHA 必须重新归档和隔离恢复，原归档及证明保留。
+工作流提供两个独立的只读入口：`metadata-visibility-profile` 使用现有应用账号；`metadata-visibility-admin-profile` 使用 production 环境中的 `MYSQL_METADATA_ADMIN_USERNAME`、`MYSQL_METADATA_ADMIN_PASSWORD`，复用既有 host/port/database，并保持上述生产目标 hash 校验。管理员 Secret 缺失时停止，绝不回落到应用账号。CBPT 清理四个入口固定使用这组管理员身份，但原有全局元数据、依赖、锁、内容与恢复证明门禁不变。新工作流 source SHA 必须重新归档和隔离恢复，原归档及证明保留。 CBPT 手工入口必须提交 `governance_confirm`，在 checkout 和执行前核对实际 GitHub SHA，防止派发期间分支移动导致执行未审查版本。
 
 固定输入：PROFILE_SOURCE_SHA（40 位小写十六进制）、PROFILE_RUN_ID（GitHub run-attempt 数字格式）、PROFILE_EXPECTED_TARGET_HASH（64 位小写十六进制），以及 MYSQL_HOST/PORT/USERNAME/PASSWORD/DATABASE 五项环境变量。没有命令行业务参数；额外 argv 或格式不合法时只输出固定失败。workflow 将预先验证的生产 target hash 作为固定绑定传入；不包含生产连接或凭据。
 
@@ -28,3 +28,12 @@ RDS 完整 static/dynamic 多行 fixture 依据 [AWS RDS 官方角色模型](htt
 离线 sqlmock 测试覆盖未激活固定角色 potential=true/current=false、其它 active role current=true/potential=false、3530/HY000 与缺失或其它 state、3523/1045严格区分、RDS完整grant语法、合法REVOKE继续潜在诊断、畸形语法/SQL注入后缀拒绝、未知错误私密、session/role变化丢弃正结论、expected target mismatch不读取权限、driver logger/multiStatement边界。通过 Go race/vet 与 Python 传输测试后，workflow 才会运行诊断。运行结果应独立绑定 source/run/target hash。
 
 Python 传输使用 0700 临时目录中的 0600 环境文件向只读短时容器传入凭据，文件随退出删除；容器仅挂载诊断 binary，不挂载归档或数据库数据卷。当前 cbpt 删除工具与门禁保持原样。
+
+
+## 日志回执运输
+
+最终日志只编码 `safe_receipt` 已验证的非秘密字典，内部 Go JSON 与原 `safe_receipt` 输入接口保持不变。共享 `scripts/dbops/receipt-transport.py` 再按显式字段、严格布尔/无符号计数、SHA/hash/run ID 和固定 token 白名单检查；不接受原始日志、GRANT、账号、连接或凭据字段。运输编码用于避免平台掩码损坏安全摘要，不用于传输秘密。
+
+UTF-8 JSON 每个 byte 映射到私用字符 U+E000..U+E0FF，以 U+E100/U+E101 框定；必要时整体改用 +0x200 或 +0x400 的独立字母表。若完整 frame 含选中的 MYSQL_USERNAME 或 MYSQL_PASSWORD 任一非空值，就尝试下一字母表；全部碰撞或编码器不可用时失败关闭，不输出明文 JSON 回退。错误输出也只使用本地固定白名单失败字典，原始异常永不进入编码。
+
+共享 API：`encode_armored_receipt(value, schema=..., secrets=...)` 返回 frame，`decode_armored_receipt(text)` 返回 JSON 文本，错误为固定类别的 `ReceiptTransportError`。schema 是可选字段白名单；字段完整性与绑定仍由原验证器负责。JSON body 上限 64 KiB、日志上限 4 Mi 字符；解码必须恰有一个完整 frame，字母表和 UTF-8 合法、无重复 JSON key。解码后仍须原 source/run/target/exit 验证，不能把可解码等同于清理资格，也不尝试修补旧的被掩码 JSON。共享与 profile 离线测试覆盖短字符掩码、备用字母表、缺失/重复/混合或超限 frame、凭据碰撞、未知 raw 字段及绑定拒绝。

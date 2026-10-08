@@ -16,6 +16,25 @@ KEYS = {"format_version", "source_sha", "run_id", "expected_target_hash", "sourc
 ERRORS = {"none", "input_invalid", "connection_input_invalid", "connection_config_failed", "connection_failed", "identity_read_failed", "target_identity_mismatch", "target_hash_mismatch", "current_grants_query_failed", "current_grants_rejected", "rds_role_query_failed", "rds_role_grants_rejected", "identity_final_failed", "session_identity_changed", "mandatory_roles_query_failed"}
 
 
+FAILURE_RECEIPT = {"format_version": 1, "diagnostic_only": True, "complete": False,
+                   "error_category": "profile_transport_or_receipt_failed"}
+RECEIPT_SCHEMA = {
+    "format_version": "uint", "source_sha": "sha40", "run_id": "run_id",
+    "expected_target_hash": "hash64", "source_target_hash": "nullable_hash64",
+    "current_unrestricted_metadata_grants": "bool", "rds_role_grants_available": "nullable_bool",
+    "rds_role_unrestricted_metadata_grants": "nullable_bool", "assigned_roles_present": "nullable_bool",
+    "mandatory_roles_present": "nullable_bool", "diagnostic_only": "bool", "complete": "bool",
+    "error_category": frozenset(ERRORS | {"profile_transport_or_receipt_failed"}),
+}
+
+
+def receipt_transport_module():
+    spec = importlib.util.spec_from_file_location("bounded_receipt_transport", Path(__file__).with_name("receipt-transport.py"))
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
 def runtime_module():
     spec = importlib.util.spec_from_file_location("bounded_cbpt_transport", Path(__file__).with_name("cbpt-cleanup.py"))
     module = importlib.util.module_from_spec(spec)
@@ -98,12 +117,28 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--binary", required=True)
     args = parser.parse_args()
+    # Transport must be available before any database diagnostic starts.
     try:
+        armor = receipt_transport_module()
+    except Exception:
+        return 1
+    try:
+        # execute returns only the dictionary accepted by safe_receipt.
         code, value = execute(args.binary, os.environ, runtime_module())
     except Exception:
-        value = {"format_version": 1, "diagnostic_only": True, "complete": False, "error_category": "profile_transport_or_receipt_failed"}
+        value = dict(FAILURE_RECEIPT)
         code = 1
-    print(json.dumps(value, sort_keys=True))
+    secrets = tuple(os.environ.get(key, "") for key in ("MYSQL_USERNAME", "MYSQL_PASSWORD"))
+    try:
+        output = armor.encode_armored_receipt(value, schema=RECEIPT_SCHEMA, secrets=secrets)
+    except Exception:
+        code = 1
+        try:
+            output = armor.encode_armored_receipt(dict(FAILURE_RECEIPT), schema=RECEIPT_SCHEMA, secrets=secrets)
+        except Exception:
+            # No unarmored fallback if all alphabets collide or armor is invalid.
+            return 1
+    print(output)
     return code
 
 
