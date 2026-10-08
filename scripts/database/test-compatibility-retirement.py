@@ -631,6 +631,32 @@ class SafetyContracts(unittest.TestCase):
         self.assertIn("cancel-in-progress: false", workflow)
         self.assertNotIn("group: qs-server-authz-production-matrix-provision", workflow)
 
+    def test_actual_workflow_validation_normalizes_only_declared_optional_inputs(self):
+        repository = SCRIPT.parents[2]
+        workflow = (repository / ".github/workflows/compatibility-retirement.yml").read_text()
+        script = textwrap.dedent(workflow.split("          script: |\n", 1)[1].split("      - name:", 1)[0])
+        supplied = {"operation": "prepare", "database": "mysql-and-mongodb",
+                    "approved_source_sha": SOURCE, "operation_id": OPERATION,
+                    "prepare_mode": "identity", "identity_request_sha256": "1" * 64}
+        scenarios = [("omitted_empty_defaults", supplied, "refs/heads/main", SOURCE, SOURCE, True),
+                     ("all_defaults_present", dict(supplied, manifest_sha256="", inventory_request_sha256=""), "refs/heads/main", SOURCE, SOURCE, True),
+                     ("unknown_input", dict(supplied, unknown=""), "refs/heads/main", SOURCE, SOURCE, False),
+                     ("mixed_request", dict(supplied, inventory_request_sha256="2" * 64), "refs/heads/main", SOURCE, SOURCE, False),
+                     ("missing_required", {k: v for k, v in supplied.items() if k != "operation"}, "refs/heads/main", SOURCE, SOURCE, False),
+                     ("wrong_ref", supplied, "refs/heads/old", SOURCE, SOURCE, False),
+                     ("wrong_runtime_sha", supplied, "refs/heads/main", "b" * 40, SOURCE, False),
+                     ("main_advanced", supplied, "refs/heads/main", SOURCE, "b" * 40, False)]
+        for name, inputs, ref, actual_sha, current_sha, allowed in scenarios:
+            with self.subTest(name=name):
+                context = {"payload": {"inputs": inputs}, "ref": ref, "sha": actual_sha, "repo": {}}
+                program = ("const script=" + json.dumps(script) + ";const context=" + json.dumps(context)
+                           + ";const current=" + json.dumps(current_sha)
+                           + ";const github={rest:{repos:{getCommit:async()=>({data:{sha:current}})}}};"
+                           + "new (Object.getPrototypeOf(async function(){}).constructor)('context','github',script)(context,github)"
+                           + ".catch(()=>{process.exitCode=1;});")
+                result = subprocess.run(["node", "-e", program], capture_output=True, text=True, check=False)
+                self.assertEqual(result.returncode, 0 if allowed else 1, result.stderr)
+
     def test_workflow_embedded_javascript_parses(self):
         if not shutil.which("node"):
             self.skipTest("Node parser unavailable; no code is executed")

@@ -332,3 +332,9 @@ these paired contracts in owned authenticated loopback-only disposable MySQL8 /
 Mongo7 fixtures. Source inventory scale verification is separate. Neither local
 suite enables the currently unavailable deletion/recovery/acceptance/purge
 backends or substitutes for the real measured ten-minute restoration budget.
+
+Dispatch validation normalizes only declared optional defaults before the strict
+stage/source/request checks. Required fields and unknown keys still fail before
+production credentials. The contract test executes the actual github-script
+validator for omitted empty defaults, complete inputs, unknown/mixed requests,
+missing requirements, wrong ref/runtime SHA and an advanced main.
