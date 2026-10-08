@@ -277,6 +277,11 @@ foreign-key failure. They establish a local recovery primitive, not a production
 authorization or a production Action backend. Fresh production qualification,
 privilege-negative checks and deployment rollback still need their own proofs.
 
+The native DROP producer remains package-private and is currently exercised
+only by integration-tag recovery tests. Its narrow unused-linter exception
+does not provide a production mutation entry; the reviewed fixed host
+executor and its independent authority remain required.
+
 The private decoded-fact fingerprint now streams text through bounded,
 instance-owned scratch storage. Its original frame bytes, protocol, NULL/type
 semantics and byte/node limits remain unchanged. Independent byte vectors,
