@@ -167,8 +167,8 @@ func runCurrentRuntimeClosure(t *testing.T, eventFactory runtimeClosureEventFact
 	eventing, delivery, err := eventFactory(t, eventsubsystem.Options{
 		MySQLDB: gormDB, MongoDB: mongoDB, OpsRedis: redisClient,
 		Catalog: eventcatalog.NewCatalog(events), WirePublisher: capture, PublisherMode: eventruntime.PublishModeMQ,
-		Mongo:      eventsubsystem.ProfileOptions{BatchSize: 20, PublishWorkers: 1, ImmediateMaxConcurrent: 1},
-		Assessment: eventsubsystem.ProfileOptions{BatchSize: 20, PublishWorkers: 1, ImmediateMaxConcurrent: 1},
+		Mongo:      eventsubsystem.ProfileOptions{PublishWorkers: 1},
+		Assessment: eventsubsystem.ProfileOptions{PublishWorkers: 1},
 		Consumers:  map[string]eventsubsystem.ConsumerOptions{"modelcatalog.hot_rank_projection": {Enabled: false}},
 	}, sqlDB)
 	if err != nil {

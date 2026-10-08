@@ -25,9 +25,8 @@ func NewReader(mysql *gorm.DB, mongoDB *mongo.Database) *Reader {
 	return &Reader{mysql: mysql, mongo: mongoDB}
 }
 
-// WithStandardOutboxes replaces only the selected profiles' historical
-// Outbox views. Business retry, delivery dead letters and holds remain owned
-// by their existing readers.
+// WithStandardOutboxes binds required standard profile readers. Business retry,
+// delivery dead letters and holds remain owned by their existing readers.
 func (r *Reader) WithStandardOutboxes(readers map[string]app.OutboxGovernanceReader) *Reader {
 	if r != nil {
 		r.standardOutboxes = make(map[string]app.OutboxGovernanceReader, len(readers))
@@ -117,32 +116,7 @@ func (r *Reader) addOutboxGovernance(ctx context.Context, orgID int64, name stri
 		summary.BlockedRetryEvents += counts.BlockedRetryEvents
 		return nil
 	}
-	if name == "assessment-mysql-outbox" {
-		var rows []countRow
-		if err := r.mysql.WithContext(ctx).Raw("SELECT retry_disposition disposition, COUNT(*) count FROM domain_event_outbox WHERE org_id=? AND status='failed' GROUP BY retry_disposition", orgID).Scan(&rows).Error; err != nil {
-			return err
-		}
-		addOutboxCounts(summary, rows)
-		var blocked int64
-		if err := r.mysql.WithContext(ctx).Raw("SELECT COUNT(*) FROM domain_event_outbox WHERE org_id=? AND status='failed' AND retry_disposition='manual_required' AND event_type IN ('evaluation.retry.requested','interpretation.retry.requested')", orgID).Scan(&blocked).Error; err != nil {
-			return err
-		}
-		summary.BlockedRetryEvents += blocked
-		return nil
-	}
-	for _, disposition := range []string{"automatic", "manual_required"} {
-		count, err := r.mongo.Collection("domain_event_outbox").CountDocuments(ctx, bson.M{"org_id": orgID, "status": "failed", "retry_disposition": disposition})
-		if err != nil {
-			return err
-		}
-		addOutbox(summary, disposition, count)
-	}
-	blocked, err := r.mongo.Collection("domain_event_outbox").CountDocuments(ctx, bson.M{"org_id": orgID, "status": "failed", "retry_disposition": "manual_required", "event_type": bson.M{"$in": []string{"evaluation.retry.requested", "interpretation.retry.requested"}}})
-	if err != nil {
-		return err
-	}
-	summary.BlockedRetryEvents += blocked
-	return nil
+	return fmt.Errorf("standard outbox governance reader %q is not configured", name)
 }
 
 func addDispositionCounts(summary *app.RetryGovernanceSummary, rows []countRow) {
@@ -158,19 +132,6 @@ func addDisposition(summary *app.RetryGovernanceSummary, disposition string, cou
 		summary.ManualRequired += count
 	case "terminal":
 		summary.Terminal += count
-	}
-}
-func addOutboxCounts(summary *app.RetryGovernanceSummary, rows []countRow) {
-	for _, row := range rows {
-		addOutbox(summary, row.Disposition, row.Count)
-	}
-}
-func addOutbox(summary *app.RetryGovernanceSummary, disposition string, count int64) {
-	switch disposition {
-	case "automatic":
-		summary.OutboxAutomatic += count
-	case "manual_required":
-		summary.OutboxManual += count
 	}
 }
 

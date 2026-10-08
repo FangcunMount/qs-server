@@ -129,15 +129,11 @@ func buildEventProfileOptions(cfg *config.Config) (eventsubsystem.ProfileOptions
 	assessmentProfile := eventsubsystem.ProfileOptions{}
 	if cfg.OutboxRelay.Mongo != nil {
 		mongoProfile.Interval = cfg.OutboxRelay.Mongo.Interval
-		mongoProfile.BatchSize = cfg.OutboxRelay.Mongo.BatchSize
 		mongoProfile.PublishWorkers = cfg.OutboxRelay.Mongo.PublishWorkers
-		mongoProfile.ImmediateMaxConcurrent = cfg.OutboxRelay.Mongo.ImmediateMaxConcurrent
 	}
 	if cfg.OutboxRelay.Assessment != nil {
 		assessmentProfile.Interval = cfg.OutboxRelay.Assessment.Interval
-		assessmentProfile.BatchSize = cfg.OutboxRelay.Assessment.BatchSize
 		assessmentProfile.PublishWorkers = cfg.OutboxRelay.Assessment.PublishWorkers
-		assessmentProfile.ImmediateMaxConcurrent = cfg.OutboxRelay.Assessment.ImmediateMaxConcurrent
 	}
 	return mongoProfile, assessmentProfile
 }

@@ -10,6 +10,9 @@ import (
 	"testing"
 	"time"
 
+	app "github.com/FangcunMount/qs-server/internal/apiserver/application/systemgovernance"
+	mongostandard "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/standardoutbox"
+	mysqlstandard "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/standardoutbox"
 	drivermysql "github.com/go-sql-driver/mysql"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -25,7 +28,7 @@ func TestGovernanceSummaryReconcilesWithOrganizationCandidates(t *testing.T) {
 	seedRetryGovernanceMySQL(t, mysqlDB, now)
 	seedRetryGovernanceMongo(t, mongoDB, now)
 
-	reader := NewReader(mysqlDB, mongoDB)
+	reader := currentRetryGovernanceReader(t, mysqlDB, mongoDB)
 	summary, err := reader.ReadRetryGovernance(t.Context(), 7)
 	if err != nil {
 		t.Fatal(err)
@@ -96,7 +99,7 @@ func TestArchivedMockDeliveryLeavesGovernanceWithoutHidingOtherOrganizations(t *
 	if result.Error != nil || result.RowsAffected != 1 {
 		t.Fatalf("archive mock delivery affected=%d err=%v", result.RowsAffected, result.Error)
 	}
-	reader := NewReader(mysqlDB, mongoDB)
+	reader := currentRetryGovernanceReader(t, mysqlDB, mongoDB)
 	for _, check := range []struct {
 		orgID               int64
 		wantTransportManual int64
@@ -117,7 +120,7 @@ func TestArchivedMockDeliveryLeavesGovernanceWithoutHidingOtherOrganizations(t *
 		}
 		var transportCandidates int64
 		for _, candidate := range page.Items {
-			if candidate.Kind == "transport_delivery" {
+			if candidate.Kind == "transport_delivery" && candidate.Disposition == "manual_required" {
 				transportCandidates++
 			}
 		}
@@ -171,11 +174,6 @@ CREATE TABLE runtime_checkpoint (
  updated_at datetime(3) NOT NULL, deleted_at datetime(3) NULL
 );
 CREATE TABLE evaluation_outcome (id bigint unsigned PRIMARY KEY, org_id bigint NOT NULL);
-CREATE TABLE domain_event_outbox (
- event_id varchar(128) PRIMARY KEY, org_id bigint NULL, event_type varchar(128) NOT NULL,
- status varchar(32) NOT NULL, retry_disposition varchar(32) NULL, attempt_count int NOT NULL,
- next_attempt_at datetime(3) NULL, last_error_kind varchar(64) NULL, updated_at datetime(3) NOT NULL
-);
 CREATE TABLE event_delivery_dead_letter (
  id bigint unsigned AUTO_INCREMENT PRIMARY KEY, org_id bigint NULL,
  message_id varchar(128) NOT NULL, transport_message_id varchar(64) NOT NULL DEFAULT '', event_id varchar(64) NULL,
@@ -189,6 +187,13 @@ CREATE TABLE retry_event_hold (
  retry_disposition varchar(32) NOT NULL, replay_attempt_count int NOT NULL,
  next_attempt_at datetime(3) NULL, last_error text NULL, updated_at datetime(3) NOT NULL
 )`).Error; err != nil {
+		t.Fatal(err)
+	}
+	schema, err := os.ReadFile("../../../pkg/migration/migrations/mysql/000084_standard_reliable_outbox.up.sql")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Exec(string(schema)).Error; err != nil {
 		t.Fatal(err)
 	}
 	return db
@@ -223,10 +228,6 @@ INSERT INTO runtime_checkpoint (assessment_id,attempt_no,scope,status,retry_disp
  (3,1,'evaluation_run','failed','terminal',?),
  (8,1,'evaluation_run','failed','automatic',?);
 INSERT INTO evaluation_outcome (id,org_id) VALUES (101,7),(102,7),(103,7),(201,8);
-INSERT INTO domain_event_outbox (event_id,org_id,event_type,status,retry_disposition,attempt_count,updated_at) VALUES
- ('mysql-auto',7,'evaluation.retry.requested','failed','automatic',2,?),
- ('mysql-manual',7,'evaluation.retry.requested','failed','manual_required',30,?),
- ('org-8-outbox',8,'evaluation.retry.requested','failed','manual_required',30,?);
 INSERT INTO event_delivery_dead_letter (org_id,message_id,event_id,topic_name,channel_name,delivery_attempts,last_error,retry_disposition,updated_at) VALUES
  (7,'manual-7',NULL,'qs.report','qs-worker',8,'delivery failed','manual_required',?),
  (8,'manual-8',NULL,'qs.report','qs-worker',8,'delivery failed','manual_required',?);
@@ -238,9 +239,25 @@ INSERT INTO retry_event_hold (event_id,org_id,status,retry_disposition,replay_at
  ('hold-manual',7,'failed','manual_required',30,?),
  ('hold-org-8',8,'blocked','automatic',0,?)`,
 		now.Add(-time.Hour), now, now, now, now,
-		now, now, now, now, now, now, now, now, now, now).Error; err != nil {
+		now, now, now, now, now, now, now).Error; err != nil {
 		t.Fatal(err)
 	}
+	for _, row := range []struct {
+		id       string
+		org      int64
+		state    string
+		failures int
+		code     string
+	}{
+		{"mysql-auto", 7, "retry_wait", 2, "temporary"}, {"mysql-manual", 7, "quarantined", 30, "publish_unknown"}, {"org-8-outbox", 8, "quarantined", 30, "publish_unknown"},
+	} {
+		if err := db.Exec(`INSERT INTO rm_outbox
+        (producer,message_id,destination,event_type,schema_version,scope,content_type,occurred_at,payload,fingerprint,state,next_attempt_at,failure_count,last_error_code,updated_at)
+        VALUES ('qs-server',?,'qs.evaluation.lifecycle','evaluation.retry.requested','v1',?,'application/json',?,'{}',UNHEX(REPEAT('00',32)),?,?,?,?,?)`, row.id, fmt.Sprintf("org:%d", row.org), now.Format(time.RFC3339Nano), row.state, now, row.failures, row.code, now).Error; err != nil {
+			t.Fatal(err)
+		}
+	}
+
 }
 
 func seedRetryGovernanceMongo(t *testing.T, db *mongo.Database, now time.Time) {
@@ -261,11 +278,30 @@ func seedRetryGovernanceMongo(t *testing.T, db *mongo.Database, now time.Time) {
 	}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := db.Collection("domain_event_outbox").InsertMany(t.Context(), []any{
-		bson.M{"event_id": "mongo-auto", "org_id": int64(7), "event_type": "interpretation.retry.requested", "status": "failed", "retry_disposition": "automatic", "attempt_count": 2, "updated_at": now},
-		bson.M{"event_id": "mongo-manual", "org_id": int64(7), "event_type": "interpretation.retry.requested", "status": "failed", "retry_disposition": "manual_required", "attempt_count": 30, "updated_at": now},
-		bson.M{"event_id": "org-8-outbox", "org_id": int64(8), "event_type": "interpretation.retry.requested", "status": "failed", "retry_disposition": "manual_required", "attempt_count": 30, "updated_at": now},
+
+	if _, err := db.Collection("rm_outbox").InsertMany(t.Context(), []any{
+		bson.M{"_id": bson.D{{Key: "producer", Value: "qs-server"}, {Key: "message_id", Value: "mongo-auto"}, {Key: "destination", Value: "qs.evaluation.lifecycle"}}, "message_id": "mongo-auto", "scope": "org:7", "event_type": "interpretation.retry.requested", "state": "retry_wait", "failure_count": 2, "next_attempt_at": now, "updated_at": now, "last_error_code": "temporary", "version": 0},
+		bson.M{"_id": bson.D{{Key: "producer", Value: "qs-server"}, {Key: "message_id", Value: "mongo-manual"}, {Key: "destination", Value: "qs.evaluation.lifecycle"}}, "message_id": "mongo-manual", "scope": "org:7", "event_type": "interpretation.retry.requested", "state": "quarantined", "failure_count": 30, "next_attempt_at": now, "updated_at": now, "last_error_code": "publish_unknown", "version": 0},
+		bson.M{"_id": bson.D{{Key: "producer", Value: "qs-server"}, {Key: "message_id", Value: "org-8-outbox"}, {Key: "destination", Value: "qs.evaluation.lifecycle"}}, "message_id": "org-8-outbox", "scope": "org:8", "event_type": "interpretation.retry.requested", "state": "quarantined", "failure_count": 30, "next_attempt_at": now, "updated_at": now, "last_error_code": "publish_unknown", "version": 0},
 	}); err != nil {
 		t.Fatal(err)
 	}
+
+}
+
+func currentRetryGovernanceReader(t *testing.T, db *gorm.DB, mongoDB *mongo.Database) *Reader {
+	t.Helper()
+	sqlDB, err := db.DB()
+	if err != nil {
+		t.Fatal(err)
+	}
+	my, err := mysqlstandard.NewStatusReader(sqlDB)
+	if err != nil {
+		t.Fatal(err)
+	}
+	mo, err := mongostandard.NewStatusReader(mongoDB.Collection("rm_outbox"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return NewReader(db, mongoDB).WithStandardOutboxes(map[string]app.OutboxGovernanceReader{"assessment-mysql-outbox": my, "mongo-domain-events": mo})
 }
