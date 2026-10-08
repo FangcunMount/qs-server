@@ -70,7 +70,9 @@ func newPrivateFile(path string) (*os.File, error) {
 	return f, nil
 }
 func openPrivateFile(path string) (*os.File, error) {
-	f, e := os.OpenFile(path, os.O_RDONLY|syscall.O_NOFOLLOW, 0)
+	// A FIFO must not block before the descriptor's regular-file check. The
+	// flag does not weaken O_NOFOLLOW or change reads of accepted regular files.
+	f, e := os.OpenFile(path, os.O_RDONLY|syscall.O_NOFOLLOW|syscall.O_NONBLOCK, 0)
 	if e != nil {
 		return nil, ErrPrivate
 	}
