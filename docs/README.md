@@ -56,7 +56,7 @@ actor -------- plan -------- statistics ------+
 逐文档状态、源码基线、七模块七轴与十项基础设施七轴签署见 [`document-closure.json`](./document-closure.json)，
 基础设施机器证据见 [`infrastructure-production-evidence.json`](./infrastructure-production-evidence.json)。
 
-`document-closure.json` exact-cover 165 篇 primary 文档和 45 篇 maintained sidecar；active 数量超过 150 的评审目标但未超过 165 硬上限，具名预算例外由 `budgets.exceptions` 管理。
+`document-closure.json` exact-cover 165 篇 primary 文档和 47 篇 maintained sidecar；active 数量超过 150 的评审目标但未超过 165 硬上限，具名预算例外由 `budgets.exceptions` 管理。
 它把文档对齐状态、代码实现状态和 E0-E7 证据等级分开记录；`needs_review`、`conditional`、`blocked` 或 `unsigned` 不能由门禁通过或历史生产记录自动升级，必须沿真实责任链复核。
 
 ## 6. 提交前验证

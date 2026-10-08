@@ -2,8 +2,8 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "0347152c36e93f41775840123ef645078039e5f8",
-    "verified_on": "2026-10-08"
+    "sha": "f718fbe7ee34c1b0c2cb83d8c3b91d028770ce51",
+    "verified_on": "2026-10-09"
   },
   "status_policy": {
     "doc_status": [
@@ -53,7 +53,7 @@
         "docs/_archive/**/*.md",
         "tmp/**/*.md"
       ],
-      "expected_count": 45,
+      "expected_count": 47,
       "budgeted": false
     }
   },
@@ -770,8 +770,8 @@
       "owner": "overview",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
-        "verified_on": "2026-10-07"
+        "source_sha": "9ff123e8ac43e7adffe23bdfcfa4704682ea9473",
+        "verified_on": "2026-10-09"
       },
       "fact_sources": [
         {
@@ -9597,8 +9597,8 @@
       "owner": "governance",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
-        "verified_on": "2026-10-07"
+        "source_sha": "9ff123e8ac43e7adffe23bdfcfa4704682ea9473",
+        "verified_on": "2026-10-09"
       },
       "fact_sources": [
         {
@@ -9648,8 +9648,8 @@
       "owner": "governance",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
-        "verified_on": "2026-10-07"
+        "source_sha": "9ff123e8ac43e7adffe23bdfcfa4704682ea9473",
+        "verified_on": "2026-10-09"
       },
       "fact_sources": [
         {
@@ -11300,6 +11300,129 @@
           "severity": "high",
           "summary": "Read-only identity/bootstrap and bounded inventory are implemented. Production business closure verification and CAS, fencing, exact backup/restore, release B, controlled DROP, acceptance and batch-owned purge remain incomplete.",
           "exit_criteria": "Bind independent identity and scan approvals to the deployed source; complete all six historical event types and legacy commands, persist conclusions, prove the production fence and <=10-minute exact restoration, then execute the approved retirement phases."
+        }
+      ]
+    },
+    {
+      "path": "scripts/database/compatibility-retirement-fence-analysis.md",
+      "class": "sidecar",
+      "owner": "tooling",
+      "doc_status": "aligned",
+      "verified": {
+        "source_sha": "9ff123e8ac43e7adffe23bdfcfa4704682ea9473",
+        "verified_on": "2026-10-09"
+      },
+      "fact_sources": [
+        {
+          "kind": "source",
+          "path": "internal/apiserver/maintenance/compatibilityretirementfence/*.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/maintenance/compatibilityretirementfence/cmd/qs-retirement-fence/*.go"
+        },
+        {
+          "kind": "source",
+          "path": "scripts/database/compatibility-retirement-entrypoints.json"
+        }
+      ],
+      "verification": [
+        {
+          "kind": "command",
+          "command": "go test -race -count=1 -json ./internal/apiserver/maintenance/compatibilityretirementfence/...",
+          "result": "passed",
+          "source_sha": "d94ba54ce870328f7ea324a2a6bfa8673e0b7b7d",
+          "verified_on": "2026-10-09"
+        },
+        {
+          "kind": "source_selector",
+          "path": "internal/apiserver/maintenance/compatibilityretirementfence/authorize.go",
+          "selector": "ReplayProtectionUnproven: true",
+          "result": "matched",
+          "source_sha": "d94ba54ce870328f7ea324a2a6bfa8673e0b7b7d",
+          "verified_on": "2026-10-09"
+        }
+      ],
+      "production_evidence": {
+        "level": "none",
+        "refs": [],
+        "deployed_sha": null,
+        "observed_at": null,
+        "limitations": [
+          "Local source and native regression evidence does not prove production retirement, fencing or deletion."
+        ]
+      },
+      "gaps": [
+        {
+          "id": "RETIREMENT-FENCE-PRODUCTION",
+          "kind": "verification",
+          "severity": "high",
+          "summary": "The cryptographic SSH probe is implemented and locally tested; root installation, single-use execution and all production writer paths remain unproven.",
+          "exit_criteria": "Bind the actual root management connection and every writer/authentication path; prove exact restoration, single-use execution and complete historical-run exclusion before production mutation."
+        }
+      ]
+    },
+    {
+      "path": "scripts/database/qs-ai-retirement-readonly-plan.md",
+      "class": "sidecar",
+      "owner": "tooling",
+      "doc_status": "aligned",
+      "verified": {
+        "source_sha": "9ff123e8ac43e7adffe23bdfcfa4704682ea9473",
+        "verified_on": "2026-10-09"
+      },
+      "fact_sources": [
+        {
+          "kind": "source",
+          "path": "scripts/database/qs-ai-retirement-readonly-verifier.py"
+        },
+        {
+          "kind": "source",
+          "path": "scripts/database/qs-ai-retirement-readonly-observer.py"
+        },
+        {
+          "kind": "source",
+          "path": "scripts/database/test_qs_ai_retirement_readonly_verifier.py"
+        },
+        {
+          "kind": "source",
+          "path": "scripts/database/test_qs_ai_retirement_readonly_observer.py"
+        }
+      ],
+      "verification": [
+        {
+          "kind": "source_selector",
+          "path": "scripts/database/qs-ai-retirement-readonly-verifier.py",
+          "selector": "\"diagnostic_only\": True, \"drop_ready\": False, \"retirement_proven\": False,",
+          "result": "matched",
+          "source_sha": "26b6b709bf0ac5e3fc6fa9ee54329534562aca3f",
+          "verified_on": "2026-10-09"
+        },
+        {
+          "kind": "source_selector",
+          "path": "scripts/database/qs-ai-retirement-readonly-verifier.py",
+          "selector": "fail(\"original_snapshots_must_end_before_recheck\")",
+          "result": "matched",
+          "source_sha": "26b6b709bf0ac5e3fc6fa9ee54329534562aca3f",
+          "verified_on": "2026-10-09"
+        }
+      ],
+      "production_evidence": {
+        "level": "none",
+        "refs": [],
+        "deployed_sha": null,
+        "observed_at": null,
+        "limitations": [
+          "Local source and native regression evidence does not prove production retirement, fencing or deletion."
+        ]
+      },
+      "gaps": [
+        {
+          "id": "RETIREMENT-AI-PRODUCTION",
+          "kind": "verification",
+          "severity": "high",
+          "summary": "Full original execution and MQ ledger verification is implemented and locally tested; production identity, runtime source, historical trusted keys, broker and writer-fence bindings remain unproven.",
+          "exit_criteria": "Bind actual qs-ai and qs-server databases/runtime sources, original message keys, frozen broker responsibility and writer fencing; verify all original command IDs and persist minimal retirement records before DROP."
         }
       ]
     }

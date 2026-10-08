@@ -47,7 +47,7 @@ P. 代码分析报告
 - 两次独立 REST 完整分页读取 repository identity、current main、精确 run attempt、全部 workflows、queued/in_progress/waiting/pending/requested 和精确 attempt jobs；固定 body/page/total deadline，超 API 可证明的 1000 results 上限明确拒绝。只有批准 job/runner 可以正在执行，其他非终态都阻断。两次 raw response 摘要必须相等。这是两次观测，不是平台原子 queue freeze。
 - `PrepareSSH`：为所有独立批准 raw public keys 生成 `restrict,command=...` 行，固定 policy path/hash、每 key 的真实 fingerprint、read-token path；保留原 from/expiry/verification 限制，证书/环境/未支持 options 阻断。完整原 bytes 只在 opaque plan 中；`RestoreOriginal` 要求当前 bytes 恰好等于已准备 restricted bytes，拒覆盖并发修改。
 - `VerifyEffectiveSSHD`：只验证宿主实际 `sshd -T` 投影；独立 root authorized file、无旁路 CA/AuthorizedKeysCommand/password/hostbased/GSSAPI、禁 user env/rc/forwarding/TTY，ForceCommand 不能覆盖 per-key forced command。每个 account/client Match context 都须实际核验，单次 projection 不证明全局。
-- 包内 `cmd/qs-retirement-fence` 是可编译真实普通用户 forced-command probe。策略 hash 和 key 来源必须来自 root 安装的固定 key line，不能来自客户端 env。JWT 仅 stdin；45 秒 executable deadline 由宿主关闭自己的 stdin；不执行客户端 shell、DB、CAS、DDL 或生产 executor。
+- 包内 `internal/apiserver/maintenance/compatibilityretirementfence/cmd/qs-retirement-fence` 是可编译真实普通用户 forced-command probe。策略 hash 和 key 来源必须来自 root 安装的固定 key line，不能来自客户端 env。JWT 仅 stdin；45 秒 executable deadline 由宿主关闭自己的 stdin；不执行客户端 shell、DB、CAS、DDL 或生产 executor。
 
 ## 行为、契约与不变量
 

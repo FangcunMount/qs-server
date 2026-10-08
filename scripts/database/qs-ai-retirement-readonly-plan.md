@@ -8,7 +8,7 @@
 
 - `src/qs_ai/bootstrap/providers/core.py:51`：应用拥有 `Database`。`src/qs_ai/bootstrap/messaging.py:99` 把同一个 Database 交给 MQ，参与者执行与 MQ 使用同一 MySQL 库和连接池。
 - `src/qs_ai/infrastructure/persistence/mysql/database.py:49,93,123`：Database 管理引擎；Transactions 管理连接与根事务；BorrowedTransactions 校验真实原事务。观察器只接受宿主已开启的 `AsyncSession` 根事务，不 Begin/Commit/Rollback、不关闭借来的连接或池；只关闭自己消费的查询结果。
-- `.github/workflows/deploy.yml:100,122` 的 production 已有 Secret 名称为 `MYSQL_HOST`、`MYSQL_PORT`、`MYSQL_DATABASE`、`MYSQL_DBNAME`、`MYSQL_USERNAME`、`MYSQL_PASSWORD`。`scripts/cd/deploy.py:50` 要求 DATABASE/DBNAME 同时存在时相同，将其编码成 `QS_AI_DATABASE_URL`；`src/qs_ai/config.py:195,203` 使用 SecretStr。此处没有读取这些值，也没有证明 qs-server 的连接就是 qs-ai 的连接。
+- [qs-ai 的部署工作流第 100 行](https://github.com/FangcunMount/qs-ai/blob/main/.github/workflows/deploy.yml#L100) 的 production 已有 Secret 名称为 `MYSQL_HOST`、`MYSQL_PORT`、`MYSQL_DATABASE`、`MYSQL_DBNAME`、`MYSQL_USERNAME`、`MYSQL_PASSWORD`。[qs-ai 的部署脚本第 50 行](https://github.com/FangcunMount/qs-ai/blob/main/scripts/cd/deploy.py#L50) 要求 DATABASE/DBNAME 同时存在时相同，将其编码成 `QS_AI_DATABASE_URL`；`src/qs_ai/config.py:195,203` 使用 SecretStr。此处没有读取这些值，也没有证明 qs-server 的连接就是 qs-ai 的连接。
 - `src/qs_ai/maintenance/messaging_audit.py:187` 已有维护环境变量 `QS_AI_MESSAGING_AUDIT_DATABASE_URL`；这是源码入口名称，不代表已经存在相应 GitHub Secret。后续宿主可用 qs-ai 自己的受控工作流注入经过独立批准的只读连接；不能让操作者从日志复制 URL，不能用管理 UI 的摘要冒充数据库凭据或身份。
 - `src/qs_ai/infrastructure/persistence/mysql/runtime.py:49,117` 使用 RR 快照，但详情截断 Run/结果为 100、诊断里程碑为 300，且明确 history_complete=false。本方案直接读取真实账本，不调用这些摘要作为完整性证明。
 
