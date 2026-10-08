@@ -76,7 +76,9 @@ type MongoOwnerResolution struct {
 	db               *mongo.Database
 	config           MongoOwnerConfig
 	source           *DecodedSourceEvent
-	sqlFacts         *sqlevaluation.SQLHistoricalOwnerFacts
+	sqlFacts         mongoSQLBusinessFacts
+	legacySQLFacts   *sqlevaluation.SQLHistoricalOwnerFacts
+	businessReader   mongoBusinessReader
 	metadata         mongoOwnerMetadata
 	reads            []mongoOwnerRead
 	bytes            int
@@ -106,7 +108,10 @@ func ResolveMongoOwner(ctx context.Context, db *mongo.Database, config MongoOwne
 	if err != nil {
 		return nil, err
 	}
-	r := &MongoOwnerResolution{db: db, config: config, source: copy, sqlFacts: sqlFacts, metadata: metadata}
+	r := &MongoOwnerResolution{db: db, config: config, source: copy, legacySQLFacts: sqlFacts, metadata: metadata}
+	if sqlFacts != nil {
+		r.sqlFacts = sqlFacts
+	}
 	r.local = MongoLocalResolution{EventID: copy.EventID, EventType: copy.EventType, OrgID: copy.OrgID, SourceAuthenticationRequired: true, SQLCrossClosureRequired: true, SQLResponsibilityRequired: true, GlobalUnboundResponsibilityCoverageRequired: true}
 	switch copy.EventType {
 	case "answersheet.submitted":
@@ -150,7 +155,7 @@ func (r *MongoOwnerResolution) RecheckMongo(ctx context.Context) error {
 	if r == nil {
 		return ErrMongoOwnerResolution
 	}
-	current, err := ResolveMongoOwner(ctx, r.db, r.config, r.source, r.sqlFacts)
+	current, err := ResolveMongoOwner(ctx, r.db, r.config, r.source, r.legacySQLFacts)
 	if err != nil {
 		return err
 	}
@@ -161,10 +166,10 @@ func (r *MongoOwnerResolution) RecheckMongo(ctx context.Context) error {
 }
 
 func (r *MongoOwnerResolution) RecheckSQL(ctx context.Context) error {
-	if r == nil || r.sqlFacts == nil {
+	if r == nil || r.legacySQLFacts == nil {
 		return ErrMongoOwnerResolution
 	}
-	return r.sqlFacts.Recheck(ctx)
+	return r.legacySQLFacts.Recheck(ctx)
 }
 
 func copyMongoSource(v *DecodedSourceEvent) (*DecodedSourceEvent, error) {

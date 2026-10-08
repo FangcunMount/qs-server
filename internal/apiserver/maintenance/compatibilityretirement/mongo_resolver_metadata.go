@@ -149,13 +149,21 @@ func mongoExactInteger(v bson.RawValue) (int64, bool) {
 }
 
 func (r *MongoOwnerResolution) readRows(ctx context.Context, name string, filter bson.D) ([]bson.Raw, error) {
-	cursor, err := r.db.Collection(name).Find(ctx, filter, options.Find().SetSort(bson.D{{Key: "_id", Value: 1}}).SetLimit(MongoOwnerRowLimit+1).SetMaxTime(15*time.Second).SetCollation(&options.Collation{Locale: "simple"}))
-	if err != nil {
-		return nil, ErrMongoOwnerRead
-	}
 	var rows []bson.Raw
-	if err = cursor.All(ctx, &rows); err != nil {
-		return nil, ErrMongoOwnerRead
+	var err error
+	if r.businessReader != nil {
+		rows, err = r.businessReader.rows(ctx, name, filter)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		cursor, readErr := r.db.Collection(name).Find(ctx, filter, options.Find().SetSort(bson.D{{Key: "_id", Value: 1}}).SetLimit(MongoOwnerRowLimit+1).SetMaxTime(15*time.Second).SetCollation(&options.Collation{Locale: "simple"}))
+		if readErr != nil {
+			return nil, ErrMongoOwnerRead
+		}
+		if err = cursor.All(ctx, &rows); err != nil {
+			return nil, ErrMongoOwnerRead
+		}
 	}
 	if len(rows) > MongoOwnerRowLimit {
 		return nil, ErrMongoOwnerBounds
@@ -200,6 +208,26 @@ func (r *MongoOwnerResolution) readRows(ctx context.Context, name string, filter
 		return nil, ErrMongoOwnerResolution
 	}
 	r.reads = append(r.reads, mongoOwnerRead{collection: name, filter: sealed, rows: rows})
+	return rows, nil
+}
+
+func (r *MongoOwnerResolution) readArtifactIndexes(ctx context.Context) ([]bson.Raw, error) {
+	if r.businessReader != nil {
+		return r.businessReader.artifactIndexes(ctx)
+	}
+	metadataCtx, cancel := mongoMetadataContext(ctx)
+	defer cancel()
+	cursor, err := r.db.Collection("interpret_report_artifacts").Indexes().List(metadataCtx)
+	if err != nil {
+		return nil, ErrMongoOwnerRead
+	}
+	var rows []bson.Raw
+	if err = cursor.All(metadataCtx, &rows); err != nil {
+		return nil, ErrMongoOwnerRead
+	}
+	if len(rows) > 128 {
+		return nil, ErrMongoOwnerBounds
+	}
 	return rows, nil
 }
 

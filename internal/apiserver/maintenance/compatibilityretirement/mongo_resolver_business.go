@@ -273,18 +273,11 @@ func (r *MongoOwnerResolution) readGenerated(ctx context.Context) error {
 	if r.sqlFacts == nil {
 		return ErrMongoOwnerResolution
 	}
-	metadataCtx, cancel := mongoMetadataContext(ctx)
-	defer cancel()
-	cursor, indexErr := r.db.Collection("interpret_report_artifacts").Indexes().List(metadataCtx)
+	indexes, indexErr := r.readArtifactIndexes(ctx)
 	if indexErr != nil {
-		return ErrMongoOwnerRead
+		return indexErr
 	}
-	if indexErr = cursor.All(metadataCtx, &r.metadata.artifactIndexes); indexErr != nil {
-		return ErrMongoOwnerRead
-	}
-	if len(r.metadata.artifactIndexes) > 128 {
-		return ErrMongoOwnerBounds
-	}
+	r.metadata.artifactIndexes = indexes
 	unique := false
 	for _, raw := range r.metadata.artifactIndexes {
 		var index struct {
