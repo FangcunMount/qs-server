@@ -187,12 +187,40 @@ class RuntimeEvidenceTests(unittest.TestCase):
         command=["ps","--all","--no-trunc","--format",tool.LIST_TEMPLATE]
         result=subprocess.CompletedProcess([],0,b"",b"")
         for flag, prefix in ((False,["docker"]),(True,["sudo","-n","docker"])):
-            with mock.patch.object(tool.subprocess,"run",return_value=result) as run:
+            with mock.patch.dict(tool.os.environ,{},clear=True), mock.patch.object(tool.subprocess,"run",return_value=result) as run:
                 self.assertEqual(tool.Docker(flag).capture(command),"")
                 self.assertEqual(run.call_args.args[0],prefix+command)
                 self.assertNotIn("shell",run.call_args.kwargs)
         for value in ("sudo -S",["sudo","python3"],1,None):
             with self.assertRaisesRegex(tool.Refused,"^input_binding_invalid$"):tool.Docker(value)
+
+    def test_password_sudo_uses_private_stdin_and_fixed_docker_only(self):
+        command=["ps","--all","--no-trunc","--format",tool.LIST_TEMPLATE]
+        result=subprocess.CompletedProcess([],0,b"",b"")
+        with mock.patch.dict(tool.os.environ,{"SUDO_PASSWORD":SECRET}), mock.patch.object(tool.subprocess,"run",return_value=result) as run:
+            self.assertEqual(tool.Docker(True).capture(command),"")
+            self.assertEqual(run.call_args.args[0],["sudo","-S","-p","","docker",*command])
+            self.assertEqual(run.call_args.kwargs["input"],SECRET.encode()+b"\n")
+            self.assertNotIn(SECRET,repr(run.call_args.args[0]))
+            self.assertNotIn("shell",run.call_args.kwargs)
+            self.assertEqual(tool.Docker(False).capture(command),"")
+            self.assertEqual(run.call_args.args[0],["docker",*command])
+            self.assertNotIn("input",run.call_args.kwargs)
+
+    def test_invalid_password_input_is_refused_before_any_command(self):
+        command=["ps","--all","--no-trunc","--format",tool.LIST_TEMPLATE]
+        for password in (SECRET+"\n",SECRET+"\r",SECRET+"\x00","x"*4097,"\ud800"):
+            with mock.patch.object(tool.os,"environ",{"SUDO_PASSWORD":password}), mock.patch.object(tool.subprocess,"run") as run:
+                with self.assertRaisesRegex(tool.Refused,"^input_binding_invalid$"):tool.Docker(True).capture(command)
+                run.assert_not_called()
+
+    def test_password_failure_does_not_echo_credentials_or_process_output(self):
+        command=["ps","--all","--no-trunc","--format",tool.LIST_TEMPLATE]
+        result=subprocess.CompletedProcess([],1,SECRET.encode(),SECRET.encode())
+        out=io.StringIO();err=io.StringIO()
+        with mock.patch.dict(tool.os.environ,{"SUDO_PASSWORD":SECRET}), mock.patch.object(tool.subprocess,"run",return_value=result), contextlib.redirect_stdout(out),contextlib.redirect_stderr(err):
+            with self.assertRaisesRegex(tool.Refused,"^docker_command_failed$"):tool.Docker(True).capture(command)
+        self.assertEqual(out.getvalue()+err.getvalue(),"")
 
     def test_executor_refuses_mutation_arbitrary_exec_and_free_sudo_arguments(self):
         commands=(["restart","1"*64],["rm","1"*64],["exec","1"*64,"sh","-c",SECRET],

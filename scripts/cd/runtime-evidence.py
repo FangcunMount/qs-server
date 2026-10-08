@@ -4,6 +4,7 @@ import argparse
 import hashlib
 import importlib.util
 import json
+import os
 from pathlib import Path
 import posixpath
 import re
@@ -64,9 +65,23 @@ class Docker:
 
     def capture(self, args, *, timeout=15, maximum=256*1024, failure="docker_command_failed", discard_stderr=False):
         if not readonly_docker_command(args):refuse("docker_command_refused")
-        prefix = ["sudo", "-n", "docker"] if self.sudo_docker else ["docker"]
+        prefix, private_input = ["docker"], {}
+        if self.sudo_docker:
+            password = os.environ.get("SUDO_PASSWORD", "")
+            if password:
+                try:encoded = password.encode("utf-8", errors="strict")
+                except UnicodeError:refuse("input_binding_invalid")
+                if len(encoded) > 4096 or any(value in encoded for value in (b"\n", b"\r", b"\x00")):
+                    refuse("input_binding_invalid")
+                # Preserve the host's password-based sudo mode without relying
+                # on the parent shell's ticket. Only fixed read-only Docker
+                # commands receive stdin; neither Python nor argv is privileged.
+                prefix = ["sudo", "-S", "-p", "", "docker"]
+                private_input = {"input": encoded + b"\n"}
+            else:
+                prefix = ["sudo", "-n", "docker"]
         try:
-            result = subprocess.run([*prefix, *args], stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=timeout, check=False)
+            result = subprocess.run([*prefix, *args], stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=timeout, check=False, **private_input)
         except Exception:refuse(failure)
         if result.returncode or (result.stderr and not discard_stderr):refuse(failure)
         if len(result.stdout) + len(result.stderr) > maximum:refuse("docker_output_rejected")
