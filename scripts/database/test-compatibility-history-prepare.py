@@ -405,6 +405,35 @@ class HistoryPreparation(unittest.TestCase):
         with self.assertRaises(tool.Blocked):
             history._receipt(tool, v, tool.canonical_bytes(v)+b" ", 0, self.args, out, request, derived, "1"*64, self.parent_hash, self.inventory)
 
+    def test_failed_readiness_accepts_fixed_ai_category_and_rejects_raw_or_false_success(self):
+        out = self.directory / "category-test"; out.mkdir(mode=0o700)
+        request = dict(self.parent, run_id=RUN)
+        derived = hashlib.sha256(tool.canonical_bytes(request)).hexdigest()
+        v = self.readiness(derived)
+        v.update(completed_readonly_pipeline=False,
+                 error_category="history_ai_readonly_resolver_failed")
+        self.store(out, "history.readiness.json", v)
+        result = history._receipt(tool, v, tool.canonical_bytes(v), 1, self.args,
+            out, request, derived, "1"*64, self.parent_hash, self.inventory)
+        self.assertFalse(result["history_readonly_complete"])
+        self.assertFalse(result["execution_allowed"])
+        self.assertFalse(result["drop_ready"])
+        self.assertEqual(result["error_category"], "history_readonly_blocked")
+        for category in ("none", "history_unknown_future_error", "private DSN and original body",
+                         "history_failed\nprivate secret", 1, True, None, ["private"], {"private": "body"}):
+            with self.subTest(category_type=type(category).__name__):
+                v["error_category"] = category
+                self.store(out, "history.readiness.json", v)
+                self.blocked("history_readiness_category_invalid", history._receipt,
+                    tool, v, tool.canonical_bytes(v), 1, self.args, out, request,
+                    derived, "1"*64, self.parent_hash, self.inventory)
+        v.update(completed_readonly_pipeline=True,
+                 error_category="history_ai_readonly_resolver_failed")
+        self.store(out, "history.readiness.json", v)
+        self.blocked("history_readiness_category_invalid", history._receipt,
+            tool, v, tool.canonical_bytes(v), 0, self.args, out, request,
+            derived, "1"*64, self.parent_hash, self.inventory)
+
     def test_parent_main_actual_wrapper_armor_and_diagnostic_exit0(self):
         args = ["--operation","prepare","--root",str(self.root),"--operation-id",OPERATION,
             "--approved-source-sha",SOURCE,"--actual-source-sha",SOURCE,"--run-id",RUN,

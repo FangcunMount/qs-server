@@ -30,6 +30,69 @@ HASH_FIELDS = frozenset({"whole_source_index_sha256", "candidate_sha256", "sql_c
     "mongo_current_facts_sha256"})
 UINT_FIELDS = frozenset({"local_candidates", "locally_qualified", "blocked_local", "joint_event_pages",
     "ai_blocked_pages", "sql_ledger_count", "mongo_collection_count", "elapsed_milliseconds"})
+# Closed producer categories. Failed readiness must not import arbitrary
+# messages, identifiers, paths, SQL or credential text into the lifecycle result.
+ERROR_CATEGORIES = frozenset({
+    'history_actual_origin_independent_epoch_failed',
+    'history_actual_source_origin_failed',
+    'history_ai_readonly_page_failed',
+    'history_ai_readonly_resolver_failed',
+    'history_approved_metadata_changed',
+    'history_arguments_rejected',
+    'history_asset_hash_changed',
+    'history_asset_missing',
+    'history_asset_read_failed',
+    'history_build_or_request_binding_rejected',
+    'history_build_source_rejected',
+    'history_candidate_summary_failed',
+    'history_complete_source_index_failed',
+    'history_connection_close_failed',
+    'history_connection_input_rejected',
+    'history_coordinator_page_failed',
+    'history_database_binding_rejected',
+    'history_epoch_changed_before_close',
+    'history_four_source_coverage_incomplete',
+    'history_global_coverage_incomplete',
+    'history_global_mongo_scan_failed',
+    'history_global_sql_scan_failed',
+    'history_hash_rejected',
+    'history_host_epoch_rejected',
+    'history_host_mongo_abort_failed',
+    'history_host_sql_rollback_failed',
+    'history_incomplete',
+    'history_independent_epoch_facts_changed',
+    'history_inventory_input_rejected',
+    'history_inventory_report_rejected',
+    'history_inventory_request_rejected',
+    'history_joint_original_qualification_failed',
+    'history_joint_page_consumption_failed',
+    'history_json_rejected',
+    'history_migration_binding_rejected',
+    'history_mongo_close_failed',
+    'history_mongo_connect_failed',
+    'history_origin_anchor_rejected',
+    'history_original_business_selection_failed',
+    'history_original_sql_business_failed',
+    'history_pipeline_input_rejected',
+    'history_private_close_failed',
+    'history_private_file_changed',
+    'history_private_file_rejected',
+    'history_private_output_close_failed',
+    'history_private_output_exists_or_unavailable',
+    'history_private_output_failed',
+    'history_private_output_rejected',
+    'history_private_path_rejected',
+    'history_related_source_budget_exceeded',
+    'history_request_binding_rejected',
+    'history_source_authentication_failed',
+    'history_source_binding_rejected',
+    'history_source_origin_binding_failed',
+    'history_sql_close_failed',
+    'history_sql_connect_failed',
+    'history_sql_cross_store_catalog_failed',
+    'history_unclassified_failure',
+    'none',
+})
 READINESS_FIELDS = BOOL_FIELDS | HASH_FIELDS | UINT_FIELDS | frozenset({"protocol", "source_sha",
     "operation_id", "run_id", "request_sha256", "inventory_request_sha256", "inventory_report_sha256",
     "independent_epochs", "sources", "full_source_file_sha256", "sql_global", "mongo_global",
@@ -338,6 +401,10 @@ def _creation_unknown(t, docker, name, image, labels, mounts, output):
 
 def _receipt(t, summary, raw, code, args, directory, request, derived_hash, approval_hash, parent_hash, inventory):
     t.fields(summary, READINESS_FIELDS)
+    category = summary["error_category"]
+    if (type(category) is not str or category not in ERROR_CATEGORIES or
+        (category == "none") != (summary["completed_readonly_pipeline"] is True)):
+        t.fail("history_readiness_category_invalid")
     if (summary["protocol"] != "qs-compatibility-history-readonly/v1" or
         summary["source_sha"] != args.actual_source_sha or summary["operation_id"] != args.operation_id or
         summary["run_id"] != args.run_id or summary["request_sha256"] != derived_hash or
