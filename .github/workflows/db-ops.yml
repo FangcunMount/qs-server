@@ -15,6 +15,7 @@ on:
           - status
           - inventory
           - metadata-visibility-profile
+          - metadata-visibility-admin-profile
           - cbpt-audit
           - cbpt-archive
           - cbpt-apply
@@ -82,10 +83,10 @@ on:
 permissions:
   contents: read
 
-# Keep every existing operation on its production lock; only the exact read-only
-# permissions profile uses a separate group and cannot replace the pending cleanup.
+# Keep every existing operation on its production lock; only the two exact
+# read-only permissions profiles use the separate profile group.
 concurrency:
-  group: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.operation == 'metadata-visibility-profile' && 'qs-server-db-metadata-visibility-profile' || 'qs-server-db-ops-production' }}
+  group: ${{ github.event_name == 'workflow_dispatch' && (github.event.inputs.operation == 'metadata-visibility-profile' || github.event.inputs.operation == 'metadata-visibility-admin-profile') && 'qs-server-db-metadata-visibility-profile' || 'qs-server-db-ops-production' }}
   cancel-in-progress: false
 
 jobs:
@@ -127,6 +128,8 @@ jobs:
           CBPT_DATABASE_INPUT: ${{ github.event.inputs.database }}
           CBPT_OPERATION_INPUT: ${{ github.event.inputs.operation }}
           CBPT_ARCHIVE_ID: ${{ github.event.inputs.backup_name }}
+          MYSQL_USERNAME: ${{ secrets.MYSQL_METADATA_ADMIN_USERNAME }}
+          MYSQL_PASSWORD: ${{ secrets.MYSQL_METADATA_ADMIN_PASSWORD }}
           SVRA_HOST: ${{ vars.SVRA_HOST }}
           SVRA_USERNAME: ${{ vars.SVRA_USERNAME }}
           SVRA_SSH_KEY: ${{ secrets.SVRA_SSH_KEY }}
@@ -138,6 +141,8 @@ jobs:
           : "${SVRA_USERNAME:?production SSH binding is empty}"
           : "${SVRA_SSH_KEY:?production SSH key is empty}"
           : "${SVRA_SSH_FINGERPRINT:?production fingerprint is empty}"
+          : "${MYSQL_USERNAME:?metadata administrator username binding is empty}"
+          : "${MYSQL_PASSWORD:?metadata administrator password binding is empty}"
           case "$CBPT_OPERATION_INPUT" in
             cbpt-audit|cbpt-archive) [[ -z "$CBPT_ARCHIVE_ID" ]] || exit 1 ;;
             cbpt-apply|cbpt-verify) [[ "$CBPT_ARCHIVE_ID" =~ ^[0-9]{1,20}-[0-9]{1,4}$ ]] || exit 1 ;;
@@ -165,8 +170,8 @@ jobs:
           CBPT_PACKAGE_SHA256: ${{ steps.package.outputs.sha256 }}
           MYSQL_HOST: ${{ secrets.MYSQL_HOST }}
           MYSQL_PORT: ${{ secrets.MYSQL_PORT || 3306 }}
-          MYSQL_USERNAME: ${{ secrets.MYSQL_USERNAME }}
-          MYSQL_PASSWORD: ${{ secrets.MYSQL_PASSWORD }}
+          MYSQL_USERNAME: ${{ secrets.MYSQL_METADATA_ADMIN_USERNAME }}
+          MYSQL_PASSWORD: ${{ secrets.MYSQL_METADATA_ADMIN_PASSWORD }}
           MYSQL_DATABASE: ${{ secrets.MYSQL_DATABASE != '' && secrets.MYSQL_DATABASE || secrets.MYSQL_DBNAME }}
         with:
           host: ${{ vars.SVRA_HOST }}
@@ -229,7 +234,7 @@ jobs:
 
   mysql-metadata-visibility-profile:
     name: Read Only Current and Granted RDS Role Metadata Profile
-    if: github.event_name == 'workflow_dispatch' && github.event.inputs.operation == 'metadata-visibility-profile' && github.event.inputs.database == 'mysql'
+    if: github.event_name == 'workflow_dispatch' && (github.event.inputs.operation == 'metadata-visibility-profile' || github.event.inputs.operation == 'metadata-visibility-admin-profile') && github.event.inputs.database == 'mysql'
     runs-on:
       group: qlume
       labels: [self-hosted, macOS, ARM64, ops]
@@ -265,17 +270,21 @@ jobs:
           PROFILE_OPERATION: ${{ github.event.inputs.operation }}
           PROFILE_DATABASE: ${{ github.event.inputs.database }}
           PROFILE_ARCHIVE_INPUT: ${{ github.event.inputs.backup_name }}
+          MYSQL_USERNAME: ${{ secrets[github.event.inputs.operation == 'metadata-visibility-admin-profile' && 'MYSQL_METADATA_ADMIN_USERNAME' || 'MYSQL_USERNAME'] }}
+          MYSQL_PASSWORD: ${{ secrets[github.event.inputs.operation == 'metadata-visibility-admin-profile' && 'MYSQL_METADATA_ADMIN_PASSWORD' || 'MYSQL_PASSWORD'] }}
           SVRA_HOST: ${{ vars.SVRA_HOST }}
           SVRA_USERNAME: ${{ vars.SVRA_USERNAME }}
           SVRA_SSH_KEY: ${{ secrets.SVRA_SSH_KEY }}
           SVRA_SSH_FINGERPRINT: ${{ vars.SVRA_SSH_FINGERPRINT }}
         run: |
           set -Eeuo pipefail
-          [[ "$PROFILE_OPERATION" == metadata-visibility-profile && "$PROFILE_DATABASE" == mysql && -z "$PROFILE_ARCHIVE_INPUT" ]] || exit 1
+          [[ ( "$PROFILE_OPERATION" == metadata-visibility-profile || "$PROFILE_OPERATION" == metadata-visibility-admin-profile ) && "$PROFILE_DATABASE" == mysql && -z "$PROFILE_ARCHIVE_INPUT" ]] || exit 1
           : "${SVRA_HOST:?production host binding is empty}"
           : "${SVRA_USERNAME:?production SSH binding is empty}"
           : "${SVRA_SSH_KEY:?production SSH key is empty}"
           : "${SVRA_SSH_FINGERPRINT:?production fingerprint is empty}"
+          : "${MYSQL_USERNAME:?selected MySQL username binding is empty}"
+          : "${MYSQL_PASSWORD:?selected MySQL password binding is empty}"
 
       - name: Upload checksummed read-only diagnostic
         uses: appleboy/scp-action@v1.0.0
@@ -298,8 +307,8 @@ jobs:
           PROFILE_EXPECTED_TARGET_HASH: '8764516c9ac46675e1fbd68c395534ac74d8899b4f3fe35854c1988ba337f1a0'
           MYSQL_HOST: ${{ secrets.MYSQL_HOST }}
           MYSQL_PORT: ${{ secrets.MYSQL_PORT || 3306 }}
-          MYSQL_USERNAME: ${{ secrets.MYSQL_USERNAME }}
-          MYSQL_PASSWORD: ${{ secrets.MYSQL_PASSWORD }}
+          MYSQL_USERNAME: ${{ secrets[github.event.inputs.operation == 'metadata-visibility-admin-profile' && 'MYSQL_METADATA_ADMIN_USERNAME' || 'MYSQL_USERNAME'] }}
+          MYSQL_PASSWORD: ${{ secrets[github.event.inputs.operation == 'metadata-visibility-admin-profile' && 'MYSQL_METADATA_ADMIN_PASSWORD' || 'MYSQL_PASSWORD'] }}
           MYSQL_DATABASE: ${{ secrets.MYSQL_DATABASE != '' && secrets.MYSQL_DATABASE || secrets.MYSQL_DBNAME }}
         with:
           host: ${{ vars.SVRA_HOST }}
