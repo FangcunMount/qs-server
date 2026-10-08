@@ -22,10 +22,10 @@ ROLES = {
     "worker": ("qs-worker", "runtime", "/app/qs-worker", 9092, "/readyz"),
 }
 VERSION_CONFIGS = {"apiserver": "/app/configs/apiserver.prod.yaml", "collection": "/app/configs/collection-server.prod.yaml", "worker": "/app/configs/worker.prod.yaml"}
-ERRORS = frozenset({"none", "input_binding_invalid", "docker_command_failed", "docker_command_refused", "docker_output_rejected",
+ERRORS = frozenset({"none", "input_binding_invalid", "docker_command_failed", "docker_inventory_read_failed", "container_projection_read_failed", "image_metadata_read_failed", "container_changes_read_failed", "docker_command_refused", "docker_output_rejected",
     "instance_set_invalid", "container_projection_invalid", "container_not_running", "topology_mismatch",
     "image_tag_mismatch", "image_config_binding_mismatch", "receipt_binding_invalid", "entrypoint_mismatch", "binary_shadowed", "binary_modified", "binary_hash_mismatch",
-    "version_output_rejected", "version_mismatch", "readiness_failed", "runtime_changed", "transport_failed"})
+    "version_output_rejected", "version_mismatch", "process_executable_read_failed", "readiness_failed", "runtime_changed", "transport_failed"})
 LIST_TEMPLATE = '{"container_id":{{json .ID}},"name":{{json .Names}},"project":{{json (.Label "com.docker.compose.project")}},"service":{{json (.Label "com.docker.compose.service")}}}'
 INSPECT_TEMPLATE = '{"container_id":{{json .Id}},"name":{{json .Name}},"image_id":{{json .Image}},"image_reference":{{json .Config.Image}},"entrypoint":{{json .Config.Entrypoint}},"path":{{json .Path}},"status":{{json .State.Status}},"running":{{json .State.Running}},"dead":{{json .State.Dead}},"restarting":{{json .State.Restarting}},"started_at":{{json .State.StartedAt}},"finished_at":{{json .State.FinishedAt}},"restart_count":{{json .RestartCount}},"project":{{json (index .Config.Labels "com.docker.compose.project")}},"service":{{json (index .Config.Labels "com.docker.compose.service")}},"number":{{json (index .Config.Labels "com.docker.compose.container-number")}},"oneoff":{{json (index .Config.Labels "com.docker.compose.oneoff")}},"mount_destinations":[{{range $i,$m := .Mounts}}{{if $i}},{{end}}{{json $m.Destination}}{{end}}]}'
 INSPECT_KEYS = frozenset(("container_id", "name", "image_id", "image_reference", "entrypoint", "path", "status", "running", "dead", "restarting", "started_at", "finished_at", "restart_count", "project", "service", "number", "oneoff", "mount_destinations"))
@@ -89,7 +89,7 @@ class Docker:
         except UnicodeError:refuse("docker_output_rejected")
 
     def listing(self):
-        raw = self.capture(["ps", "--all", "--no-trunc", "--format", LIST_TEMPLATE])
+        raw = self.capture(["ps", "--all", "--no-trunc", "--format", LIST_TEMPLATE], failure="docker_inventory_read_failed")
         rows = [load(line) for line in raw.splitlines()]
         if len(rows) > 4096:refuse("instance_set_invalid")
         for row in rows:
@@ -98,7 +98,7 @@ class Docker:
         return rows
 
     def inspect(self, container):
-        value = load(self.capture(["inspect", "--type", "container", "--format", INSPECT_TEMPLATE, container], maximum=64*1024))
+        value = load(self.capture(["inspect", "--type", "container", "--format", INSPECT_TEMPLATE, container], maximum=64*1024, failure="container_projection_read_failed"))
         if type(value) is not dict or set(value) != INSPECT_KEYS:refuse("container_projection_invalid")
         return value
 
@@ -111,8 +111,8 @@ def readonly_docker_command(args):
     if len(args) == 6 and args[:5] == ["inspect", "--type", "container", "--format", INSPECT_TEMPLATE]:return bool(HASH.fullmatch(args[5]))
     if len(args) == 5 and args[:4] == ["image", "inspect", "--format", IMAGE_TEMPLATE]:return bool(IMAGE.fullmatch(args[4]))
     if len(args) == 2 and args[0] == "diff":return bool(HASH.fullmatch(args[1]))
-    if len(args) == 7 and args[:3] == ["exec", "--user", "0"] and HASH.fullmatch(args[3]) and args[4:6] == ["sha256sum", "/proc/1/exe"]:
-        return args[6] in {role[2] for role in ROLES.values()}
+    if len(args) == 5 and args[0] == "exec" and HASH.fullmatch(args[1]) and args[2:4] == ["sha256sum", "/proc/1/exe"]:
+        return args[4] in {role[2] for role in ROLES.values()}
     if len(args) >= 2 and args[0] == "exec" and HASH.fullmatch(args[1]):
         for role, spec in ROLES.items():
             if args[2:] == [spec[2], "--version=true", "--config="+VERSION_CONFIGS[role]]:return True
@@ -178,15 +178,19 @@ def version_commit(raw):
 
 def inspect_program(docker, container, binary, source, port, path, version_config):
     # Do not expose stderr/stdout, even on failure. These commands never read Env.
-    image_check = load(docker.capture(["image", "inspect", "--format", IMAGE_TEMPLATE, container["image_id"]], maximum=1024))
+    image_check = load(docker.capture(["image", "inspect", "--format", IMAGE_TEMPLATE, container["image_id"]], maximum=1024, failure="image_metadata_read_failed"))
     if image_check != {"image_id": container["image_id"], "entrypoint": [binary]}:refuse("entrypoint_mismatch")
-    changes = docker.capture(["diff", container["container_id"]])
+    changes = docker.capture(["diff", container["container_id"]], failure="container_changes_read_failed")
     for line in changes.splitlines():
         match = re.fullmatch(r"([ACD]) (/[\x20-\x7e]+)", line)
         if not match:refuse("docker_output_rejected")
         changed = match[2].rstrip("/") or "/"
         if changed == binary or (match[1] in "AD" and binary.startswith(changed.rstrip("/")+"/")):refuse("binary_modified")
-    raw = docker.capture(["exec", "--user", "0", container["container_id"], "sha256sum", "/proc/1/exe", binary], maximum=512)
+    # The image runs its direct entrypoint as www. Read /proc as that same
+    # configured user: container root lacks CAP_SYS_PTRACE and can be denied
+    # access to the non-root process. No extra capability or user override is
+    # needed; both executable hashes still have to match exactly.
+    raw = docker.capture(["exec", container["container_id"], "sha256sum", "/proc/1/exe", binary], maximum=512, failure="process_executable_read_failed")
     hashes = []
     for line, filename in zip(raw.splitlines(), ("/proc/1/exe", binary)):
         match = re.fullmatch(r"([0-9a-f]{64})  " + re.escape(filename), line)

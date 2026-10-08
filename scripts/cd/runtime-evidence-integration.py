@@ -100,11 +100,18 @@ def main():
             flags = "-X github.com/FangcunMount/qs-server/pkg/version.GitVersion=v1.0.0 -X github.com/FangcunMount/qs-server/pkg/version.GitCommit="+SOURCE+" -X github.com/FangcunMount/qs-server/pkg/version.GitTreeState=clean -X github.com/FangcunMount/qs-server/pkg/version.BuildDate=2026-10-08T12:00:00Z"
             run(["go", "build", "-ldflags", flags, "-o", str(private/"fixture"), str(private/"main.go")], timeout=180, env=env)
             worker_image=owner+"-worker:"+SOURCE
-            (private/"Dockerfile").write_text('FROM alpine:3.21\nCOPY fixture /app/qs-worker\nENTRYPOINT ["/app/qs-worker"]\n')
+            (private/"Dockerfile").write_text('FROM alpine:3.21\nCOPY fixture /app/qs-worker\nUSER 10001:10001\nENTRYPOINT ["/app/qs-worker"]\n')
             run(["docker", "build", "--pull=false", "--label", label+"="+owner, "-t", worker_image, str(private)], timeout=120)
             images[worker_image]=image_id(worker_image)
             workers=[create_container(owner+"-"+str(index),"worker",worker_image) for index in range(1,4)]
             for cid in workers:wait_ready(cid,"worker")
+            # Reproduce the real non-root image boundary. The same user can
+            # read its executable; container root has no ptrace capability.
+            same_user=run(["docker","exec",workers[0],"sha256sum","/proc/1/exe","/app/qs-worker"])
+            root_user=run(["docker","exec","--user","0",workers[0],"sha256sum","/proc/1/exe","/app/qs-worker"],check=False)
+            expected_lines=same_user.stdout.decode().splitlines()
+            if len(expected_lines)!=2 or expected_lines[0].split()[0]!=expected_lines[1].split()[0] or root_user.returncode==0 or b"Permission denied" not in root_user.stderr:
+                raise RuntimeError("native_nonroot_process_boundary_not_observed")
             receipt=tool.collect(tool.Docker(),"worker",3,SOURCE,"99001","1",SOURCE)
             bindings=dict(role="worker",expected=3,source=SOURCE,run="99001",attempt="1",tool_sha256=hashlib.sha256(PATH.read_bytes()).hexdigest(),expected_container_ids=sorted(workers))
             tool.receive_armored_receipt(tool.transport().encode_armored_receipt(receipt,schema=tool.SCHEMA),**bindings)
@@ -115,7 +122,7 @@ def main():
             refused("binary_modified",lambda:tool.collect(tool.Docker(),"worker",3,SOURCE,"99001","1",SOURCE))
 
             api_image=owner+"-api:"+SOURCE
-            (private/"Dockerfile").write_text('FROM alpine:3.21\nCOPY fixture /app/qs-apiserver\nENTRYPOINT ["/app/qs-apiserver"]\n')
+            (private/"Dockerfile").write_text('FROM alpine:3.21\nCOPY fixture /app/qs-apiserver\nUSER 10001:10001\nENTRYPOINT ["/app/qs-apiserver"]\n')
             run(["docker","build","--pull=false","--label",label+"="+owner,"-t",api_image,str(private)],timeout=120)
             config_id=image_id(api_image); images[api_image]=config_id; images[config_id]=config_id
             api=create_container("qs-apiserver","apiserver",config_id)
@@ -131,7 +138,7 @@ def main():
             refused("version_mismatch",lambda:tool.collect(tool.Docker(),"apiserver",1,"b"*40,"99002","1","b"*40,config_id))
             run(["docker","exec","--user","0",api,"sh","-c","cp /bin/busybox /app/replacement; mv /app/replacement /app/qs-apiserver"])
             refused("binary_modified",lambda:tool.collect(tool.Docker(),"apiserver",1,SOURCE,"99002","1",SOURCE,config_id))
-            result_payload={"local_only":True,"production_operations":False,"native_worker_instances":3,"native_api_instances":1,"actual_docker_projection":True,"real_repository_version_formatter":True,"fixture_build_source_is_synthetic":True,"proc_executable_sha_verified":True,"image_config_digest_verified":True,"loopback_readiness_verified":True,"stopped_extra_rejected":True,"modified_worker_binary_rejected":True,"exact_api_config_image_id_observed":True,"missing_and_wrong_api_config_id_rejected":True,"wrong_actual_compiled_version_rejected":True,"modified_api_binary_rejected":True,"semantic_v2_receiver_verified":True,"business_acceptance_verified":False}
+            result_payload={"local_only":True,"production_operations":False,"native_worker_instances":3,"native_api_instances":1,"actual_docker_projection":True,"real_repository_version_formatter":True,"fixture_build_source_is_synthetic":True,"proc_executable_sha_verified":True,"nonroot_entrypoint_user":True,"root_proc_access_denied_without_extra_capabilities":True,"same_user_proc_hash_read_verified":True,"image_config_digest_verified":True,"loopback_readiness_verified":True,"stopped_extra_rejected":True,"modified_worker_binary_rejected":True,"exact_api_config_image_id_observed":True,"missing_and_wrong_api_config_id_rejected":True,"wrong_actual_compiled_version_rejected":True,"modified_api_binary_rejected":True,"semantic_v2_receiver_verified":True,"business_acceptance_verified":False}
         except Exception as error:
             safe_failures={"existing_local_role_refused","non_local_docker_endpoint_refused","non_local_docker_daemon_refused"}
             failure=str(error) if type(error) is tool.Refused or type(error) is RuntimeError and str(error) in safe_failures else "local_runtime_native_failed"
