@@ -519,3 +519,58 @@ func TestHistoryCLINativeEmptySourcesDoNotHideGlobalUnknown(t *testing.T) {
 		t.Fatal("empty legacy source hid actual global unknown responsibility")
 	}
 }
+
+func TestHistoryCLINativeFirstEpochReleasesGraphsBeforeSecond(t *testing.T) {
+	testSource(t)
+	pool, client, db, _ := nativeFixture(t, true)
+	_, _, a := nativeInputs(t, pool, client, db)
+	host, err := openDatabases(t.Context(), a)
+	if err != nil {
+		t.Fatal(safeCategory(err))
+	}
+	defer func() {
+		if host.close() != nil {
+			t.Error("owned host close")
+		}
+	}()
+	var first *epochResult
+	if err = host.epoch(t.Context(), func(ctx context.Context) error {
+		var err error
+		first, err = buildEpoch(ctx, a, host)
+		if err != nil {
+			return err
+		}
+		before := jsonHash(first.coordinator)
+		if err = first.compactOrigin(ctx); err != nil {
+			return err
+		}
+		if first.sql != nil || first.mongo != nil || first.origin != nil || first.anchor == nil || jsonHash(first.coordinator) != before {
+			t.Fatal("compaction kept old graphs or lost stable source facts")
+		}
+		if err = first.compactOrigin(ctx); err == nil {
+			t.Fatal("already compacted first epoch accepted twice")
+		}
+		return nil
+	}); err != nil {
+		t.Fatal(safeCategory(err))
+	}
+	if err = host.epoch(t.Context(), func(ctx context.Context) error {
+		second, err := buildEpoch(ctx, a, host)
+		if err != nil {
+			return err
+		}
+		if err = compareEpochs(first, second); err != nil {
+			return err
+		}
+		proof, err := first.anchor.RecheckSnapshots(ctx, second.sql, second.mongo, a.readers())
+		if err != nil {
+			return err
+		}
+		if r := proof.Report(); !r.IndependentEpochRechecked || r.DropReady || r.CASAuthorized {
+			t.Fatal("compaction changed fresh proof authority")
+		}
+		return nil
+	}); err != nil {
+		t.Fatal(safeCategory(err))
+	}
+}

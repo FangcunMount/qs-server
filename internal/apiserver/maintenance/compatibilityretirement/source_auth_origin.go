@@ -56,7 +56,10 @@ type SourceOriginEpoch struct {
 	boundaries                                                     [4]SourceBoundary
 	hash                                                           string
 }
-type SourceOriginRecheckProof struct{ first, second *SourceOriginEpoch }
+type SourceOriginRecheckProof struct {
+	first, second *SourceOriginEpoch
+	firstAnchor   *FreshRecheckAnchor
+}
 type SourceOriginReport struct {
 	Protocol, BindingSHA256, FirstEpochSHA256, SecondEpochSHA256, SQLIdentitySHA256, MongoIdentitySHA256 string
 	Sources                                                                                              [4]SourceCopyReceipt
@@ -89,11 +92,22 @@ func originReport() SourceOriginReport {
 }
 func (p *SourceOriginRecheckProof) Report() SourceOriginReport {
 	r := originReport()
-	if p == nil || p.first == nil || p.second == nil {
+	if p == nil || p.second == nil {
 		return r
 	}
-	r.BindingSHA256 = p.first.binding.hash
-	r.FirstEpochSHA256 = p.first.hash
+	if p.firstAnchor != nil {
+		if !p.firstAnchor.intact() {
+			return r
+		}
+		r.BindingSHA256 = p.firstAnchor.binding.hash
+		r.FirstEpochSHA256 = p.firstAnchor.originalEpochHash
+	} else {
+		if p.first == nil {
+			return r
+		}
+		r.BindingSHA256 = p.first.binding.hash
+		r.FirstEpochSHA256 = p.first.hash
+	}
 	r.SecondEpochSHA256 = p.second.hash
 	r.SQLIdentitySHA256 = p.second.sqlIdentity
 	r.MongoIdentitySHA256 = p.second.mongoIdentity

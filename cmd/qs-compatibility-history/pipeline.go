@@ -94,6 +94,7 @@ type epochResult struct {
 	sqlFacts            stableSQLFacts
 	mongoFacts          stableMongoFacts
 	origin              *retirement.SourceOriginEpoch
+	anchor              *retirement.FreshRecheckAnchor
 	sql                 *retirement.SQLResponsibilitySnapshot
 	mongo               *retirement.MongoResponsibilitySnapshot
 	jointPages, aiPages uint64
@@ -255,6 +256,25 @@ func buildEpoch(ctx context.Context, a *approvedInputs, d *historyDatabase) (*ep
 	}
 	return e, nil
 }
+
+// Keep stable summaries and the original opaque source binding across epochs.
+// This releases row-graph references only; d.epoch still ends the host scopes.
+func (e *epochResult) compactOrigin(ctx context.Context) error {
+	if e == nil || e.origin == nil || e.sql == nil || e.mongo == nil || e.anchor != nil {
+		return fixedError("history_origin_anchor_rejected")
+	}
+	anchor, err := e.origin.FreezeFreshRecheckAnchor(ctx)
+	if err != nil {
+		return fixedError("history_origin_anchor_rejected")
+	}
+	e.anchor = anchor
+	e.origin, e.sql, e.mongo = nil, nil, nil
+	return nil
+}
+
+// Summary and legacy pointer checks do not establish actual snapshot freshness.
+// Once the first graph is compacted, the anchor independently checks actual SQL
+// ConnPool/CycleID and Mongo Lsid/Txn before its complete origin re-observation.
 func compareEpochs(first, second *epochResult) error {
 	if first == nil || second == nil || first.sql == second.sql || first.mongo == second.mongo || first.coordinator.CandidateSHA256 != second.coordinator.CandidateSHA256 || first.coordinator.CandidateCount != second.coordinator.CandidateCount || first.coordinator.LocallyQualifiedCount != second.coordinator.LocallyQualifiedCount || first.coordinator.BlockedLocalCount != second.coordinator.BlockedLocalCount || first.coordinator.ApprovedCopies != second.coordinator.ApprovedCopies || first.coordinator.SecondPassCopies != second.coordinator.SecondPassCopies || first.coordinator.ConsumedRecords != second.coordinator.ConsumedRecords || first.index.IndexSHA256 != second.index.IndexSHA256 || first.jointPages != second.jointPages || first.aiPages != second.aiPages || !reflect.DeepEqual(first.sqlFacts, second.sqlFacts) || !reflect.DeepEqual(first.mongoFacts, second.mongoFacts) || !reflect.DeepEqual(first.reasons, second.reasons) {
 		return fixedError("history_independent_epoch_facts_changed")
@@ -266,7 +286,14 @@ func executePipeline(ctx context.Context, a *approvedInputs, d *historyDatabase)
 	r = emptyReadiness(a)
 	defer func() { r.ElapsedMilliseconds = time.Since(start).Milliseconds() }()
 	var first, second *epochResult
-	if err := d.epoch(ctx, func(scope context.Context) error { var e error; first, e = buildEpoch(scope, a, d); return e }); err != nil {
+	if err := d.epoch(ctx, func(scope context.Context) error {
+		var err error
+		first, err = buildEpoch(scope, a, d)
+		if err != nil {
+			return err
+		}
+		return first.compactOrigin(scope)
+	}); err != nil {
 		return r, err
 	}
 	// The first SQL RRRO and Mongo snapshot have ended before the next starts.
@@ -282,7 +309,7 @@ func executePipeline(ctx context.Context, a *approvedInputs, d *historyDatabase)
 		if a.rewind() != nil {
 			return fixedError("history_asset_read_failed")
 		}
-		proof, e := first.origin.RecheckSnapshots(scope, second.sql, second.mongo, a.readers())
+		proof, e := first.anchor.RecheckSnapshots(scope, second.sql, second.mongo, a.readers())
 		if e != nil {
 			return fixedError("history_actual_origin_independent_epoch_failed")
 		}
