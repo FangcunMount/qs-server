@@ -59,6 +59,24 @@ restores are outside this scope. No new DROP migration is included in A.
   30 minutes. These helpers alone do not guarantee recovery time; readiness
   requires a measured and independently verified rollback of at most 10 minutes.
 
+`cmd/qs-compatibility-history` implements a strictly read-only host for the
+actual inventory outputs. It binds the compiled source, operation/run, approved
+input bytes and all four private source files, authenticates clean EOF, and
+checks actual original source rows against current SQL and Mongo business facts.
+The host owns and ends each SQL repeatable-read read-only transaction and Mongo
+snapshot before starting a different actual epoch. Full global unknown/orphan
+coverage remains visible when the old objects contain no candidate rows.
+Database and input close outcomes are settled before the final private readiness
+file is written. Readiness counts and hashes cannot recreate a qualifier or
+authorize evidence writes, message sends or deletion.
+
+Production qualification still requires actual whole-epoch transaction lifetime,
+peak process memory, related-owner and evidence-slot capacity measurements.
+It also requires the current qs-ai physical-schema adapter and complete original
+execution/MQ closure, independent approvals, writer fencing, evidence CAS and
+fresh readback. The local CLI and synthetic source-scale tests establish none
+of those production gates.
+
 ## Required implementation before execution can become ready
 
 1. The implemented inventory adapter must be extended by an actual retirement

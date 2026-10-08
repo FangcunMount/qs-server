@@ -2,7 +2,7 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "653b616974fc0158a40b3b5e373024fb861a2a42",
+    "sha": "510b1b5e5b0724c6450c63a370c1146fe75baf29",
     "verified_on": "2026-10-09"
   },
   "status_policy": {
@@ -11214,8 +11214,8 @@
       "owner": "tooling",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "37a5abcc1f0830f4f1a47730c9f059c469ec24cd",
-        "verified_on": "2026-10-08"
+        "source_sha": "510b1b5e5b0724c6450c63a370c1146fe75baf29",
+        "verified_on": "2026-10-09"
       },
       "fact_sources": [
         {
@@ -11245,6 +11245,14 @@
         {
           "kind": "source",
           "path": ".github/workflows/authz-production-matrix-provision.yml"
+        },
+        {
+          "kind": "source",
+          "path": "cmd/qs-compatibility-history/*.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/maintenance/compatibilityretirement/*.go"
         }
       ],
       "verification": [
@@ -11282,6 +11290,13 @@
           "result": "passed",
           "source_sha": "37a5abcc1f0830f4f1a47730c9f059c469ec24cd",
           "verified_on": "2026-10-08"
+        },
+        {
+          "kind": "command",
+          "command": "go test -json -race -count=1 ./cmd/qs-compatibility-history",
+          "result": "passed",
+          "source_sha": "510b1b5e5b0724c6450c63a370c1146fe75baf29",
+          "verified_on": "2026-10-09"
         }
       ],
       "production_evidence": {
@@ -11298,7 +11313,7 @@
           "id": "COMPAT-RETIREMENT-PRODUCTION",
           "kind": "verification",
           "severity": "high",
-          "summary": "Read-only identity/bootstrap and bounded inventory are implemented. Production business closure verification and CAS, fencing, exact backup/restore, release B, controlled DROP, acceptance and batch-owned purge remain incomplete.",
+          "summary": "Read-only inventory and two actual history epochs are implemented locally. Whole production scan resource and lifetime budgets, current qs-ai physical schema and original execution/MQ closure, evidence CAS, fencing, exact backup/restore, release B, controlled DROP, acceptance and batch-owned purge remain incomplete.",
           "exit_criteria": "Bind independent identity and scan approvals to the deployed source; complete all six historical event types and legacy commands, persist conclusions, prove the production fence and <=10-minute exact restoration, then execute the approved retirement phases."
         }
       ]
