@@ -1,8 +1,9 @@
-# Exact compatibility retirement: A-stage execution barrier
+# Exact compatibility retirement: preparation and B startup barriers
 
 This is the foundation for the accepted four-object operation, not an enabled
-production cleanup. `prepare` has real read-only identity discovery and a bounded
-source inventory adapter; both exit 42 with diagnostic receipts. Discovery is
+production cleanup. `prepare` has real read-only identity discovery, separately approved boundary
+discovery and a fixed-upper-bound paged source inventory adapter. These diagnostic
+stages exit 42 with receipts even when the individual read-only producer succeeds. Discovery is
 never automatic approval of an observed database identity.
 `apply`, `verify`, `recover` and `purge` remain unavailable and exit 42.
 Neither a JSON boolean nor
@@ -31,7 +32,8 @@ restores are outside this scope. No new DROP migration is included in A.
   and wait while occupying its lock.
 - A private 0700 operation directory under
   `/opt/backups/qs-server/compatibility-retirement/<operation-id>` owns its
-  immutable 0600 `inventory-request.json` first, then a separately approved
+  immutable 0600 requests (`identity-request.json`, `boundary-request.json`,
+  `inventory-request.json` as applicable), then a separately approved
   `manifest.json` after real preparation. IDs use numeric `run-attempt` format.
   Manifest/evidence reads reject symlinks, hard links, duplicate JSON keys,
   malformed types, unknown fields, source/operation/target mismatches, dirty
@@ -101,7 +103,8 @@ returning success for an unsupported stage is not a valid implementation.
 ## Real read-only preparation contract
 
 `prepare_mode=identity` requires only `identity_request_sha256`;
-`prepare_mode=inventory` requires only `inventory_request_sha256`. Both require an
+`prepare_mode=bounds` and `prepare_mode=inventory` require only
+`inventory_request_sha256`. All three preparation classes require an
 empty `manifest_sha256`. Other stages require the immutable manifest hash and
 empty request hashes. Unknown/mixed classes, another operation,
 another SHA or another target set are rejected before connections are opened.
@@ -153,20 +156,41 @@ terminal/replay responsibility. Public receipts allow at most 128 total buckets,
 flattened into four pages of at most 32; excess keeps headers incomplete and
 retains only private count/hash diagnostics. It does not authorize cleanup.
 
-The pre-provisioned private request has `format_version: 1`,
-`kind: readonly_inventory_request`, approved `operation_id`/`source_sha`,
-`target_hash` of the ordered four-object whitelist, `database_scope:
-mysql-and-mongodb`, exact `identity_hashes.mysql/mongodb`,
-`expected_migrations.mysql/mongodb`, and these immutable limits:
-`query_seconds=15`, `total_seconds=180`, `max_records=100000`,
-`max_bytes=134217728`. Record/byte limits are per target, so total source bytes
-are bounded by four times that byte limit. Exceeding a bound produces incomplete
-inventory; there is no automatic pagination/resume or limit override.
-The prior metadata estimate of 651,765 SQL DCE rows is neither fresh nor exact,
-but exceeds this source-inventory cap. This adapter must report incomplete for
-such a dataset. It has no request-bound fixed SQL ID/BSON upper bound or paged
-production traversal. Equal whole scans and a successful diagnostic histogram
-do not satisfy those missing production preparation requirements.
+Production boundary and inventory requests require `format_version: 2`. V1's
+100,000-record / 128 MiB / 180-second helpers remain only for historical fixture
+coverage; both live Python and Go entrypoints reject V1 before connecting.
+V2 retains the exact scope, separately approved source/operation, identity hashes
+and expected clean heads. Its immutable per-target profile is
+`query_seconds=30`, `total_seconds=1500`, `max_records=1000000`,
+`max_bytes=2147483648`, `page_size=1000`, `max_pages=1001`.
+The source-byte total and the actual encoded private source file each have the
+2 GiB bound; framing/base64 overhead cannot bypass the on-disk bound. Exceeding
+any record, byte, page or deadline cap remains incomplete and denies readiness.
+
+`bounds` reads exact namespace/schema and the true primary-key upper token into
+an immutable `boundary.private.json` owned by that run. Missing and present-empty
+objects have distinct representations. This observation does not create an
+inventory approval. A reviewer must independently bind and approve that file's
+raw SHA256 and all four boundaries in the separate inventory request using
+`boundary_run_id`, `boundary_report_hash`, and `approved_boundaries`; there is no
+automatic discovery-to-approval path or limit override.
+
+SQL pages compare numeric bigint IDs numerically; AI command IDs require the
+actual supported single ASCII binary-collation primary key. Mongo retains true
+one-field BSON `_id` tokens and proves a homogeneous supported `_id` type across
+the collection before paging: string, ObjectID, int32 or int64. Mixed/unsupported
+types and non-simple collection collation fail explicitly. Converting `_id` to
+JSON text or allowing type-bracket queries to silently skip records is forbidden.
+
+Two complete passes use the approved fixed upper bound. SQL passes share one
+read-only repeatable-read snapshot, then close it before a fresh read observes
+post-upper records and rechecks identity/head/catalog. Mongo also rechecks its
+actual catalog/head/UUID after scanning. New records above the approved upper
+set `next_cycle_required`; they are not silently folded into the old approval.
+The two equal passes prove content within the scanned range, not a production
+writer fence, global business-history coverage or an atomic dual-store snapshot.
+The final maintenance fence still requires a fresh final difference check and
+fixed-bound scan before deletion.
 
 Identity protocol `mysql_database_identity_v1` hashes actual `@@server_uuid`
 and selected `DATABASE()` with unambiguous length framing. Protocol
@@ -204,10 +228,11 @@ must succeed. An inaccessible `system.profile` index therefore keeps metadata
 incomplete; the tool never treats permission-denied as absence. Dependency text
 review remains required even after a successful metadata read; dynamic SQL or
 external/manual writers cannot be proved absent by this adapter.
-The current SQL foreign-key count covers selected-schema outbound metadata only
-and compares referenced schema as well as target name. `dependency_scope` says so
-and `dependency_coverage_complete:false` remains explicit: cross-schema inbound
-keys and dynamic/external dependencies require a later exact verifier. A complete
+The SQL catalog reads cross-schema inbound foreign-key metadata with exact
+referenced schema/name matching, under proven global visibility. Its narrowly
+scoped `inbound_foreign_key_coverage_complete` does not establish complete
+dependency coverage: selected-schema SQL text still requires review, and dynamic
+SQL, external/manual writers and other repositories remain unproved. A complete
 catalog is never a complete dependency/business deletion proof.
 
 Each producer run owns a new 0700 `inventory-<run-attempt>` below its private
@@ -217,8 +242,10 @@ counts, hashes, observed head/identity flags and `inventory_complete`; it always
 keeps `complete:false`, `execution_allowed:false`. It binds the exact private
 report file hash and does not infer business terminal status from published or
 delivered transport flags. Temporary credentials are removed independently of
-inventory retention; inventory payload copies must be registered for the later
-batch-specific purge alongside the temporary backups. A timed-out container is
+inventory retention; inventory payload copies are immutably registered by operation/run/request,
+namespace, approved boundary and file SHA256 for later batch-specific purge
+alongside the temporary backups. This temporary source register is not a
+permanent database archive or a business-retirement verdict. A timed-out container is
 left with exact operation/run/source/request labels for read-only reconciliation,
 not blindly removed or retried.
 
@@ -256,3 +283,52 @@ historical five at `3de8761108c02b613f9641847b24f89585d85125:configs/events.yaml
 and pre-delivery-guard six at `ea123c7f88b521a68f9fa2de2e7dbe8b44223883:configs/events.yaml:28-154`.
 Their presence in historical config is diagnostic vocabulary, not proof of real
 production row existence or business verification.
+
+
+## B migration and startup contract
+
+B adds SQL99 and Mongo38 without rewriting any historical migration. Business
+logic remains A's. Installed databases must have all four targets absent,
+including empty-present objects, before either provider can create or mutate
+migration metadata. Joint live preflight verifies both selected logical databases,
+complete required catalog visibility, stable identity and clean expected heads;
+missing/dirty/unknown heads, permission/network failures and mixed pristine pairs
+fail before migration writes. The Mongo selection must equal the database actually
+used by the business connection; migration overrides cannot point elsewhere.
+
+SQL advances first (`98 -> 99`) and Mongo follows (`37 -> 38`). A fresh complete
+joint proof can continue clean `99/37`; reverse `98/38` fails. The run owns only
+its acquired SQL connection and releases it on every result, retaining the host's
+borrowed pool and Mongo client. Public low-level Force/Down calls cannot downgrade
+a B head or clear its dirty state without the successful exact terminal run.
+
+The Mongo wrapper pins B's exact version/direction/resource bytes and single
+terminal drop command. Installed absence is a no-op for that terminal command,
+never a collection recreation. Other commands and permission/network/namespace
+errors remain ordinary failures. Only an independently approved, truly pristine
+pair may remove an empty old collection created by full historical bootstrap;
+namespace type, UUID, empty content and identity are rechecked immediately.
+
+Cold bootstrap needs complete empty catalogs (including routine/event/profiling
+state), plus an identity/resource/source-bound private one-use authorization.
+The two formal keys are `migration.retirement-bootstrap-authorization-file` and
+`migration.retirement-bootstrap-authorization-sha256`. No boolean, empty target,
+self-reported source SHA or observed state automatically approves cold bootstrap.
+The application compares the approval source with its built GitCommit for this
+cold path, rejects an unknown build SHA, and fsyncs the consumed receipt before
+SQL creates metadata. Provisioning, exclusive writers and the actual image digest
+still require independent external proof.
+
+Recovery uses a preverified image and batch-bound configuration with
+`migration.enabled=false`. It never performs Up/Down/Force or clears dirty state;
+only the exact batch targets may be restored, retaining new evidence, retired IDs
+and current MQ facts. The original A image is a possible candidate when separately
+verified with migration disabled; B-checkout disabled-branch tests alone do not
+attest that image or business acceptance. A restoration startup must not be
+mistaken for successful B migration or production cleanup.
+
+`python3 -B scripts/database/compatibility-retirement-b-integration.py` exercises
+these paired contracts in owned authenticated loopback-only disposable MySQL8 /
+Mongo7 fixtures. Source inventory scale verification is separate. Neither local
+suite enables the currently unavailable deletion/recovery/acceptance/purge
+backends or substitutes for the real measured ten-minute restoration budget.

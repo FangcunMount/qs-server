@@ -2,7 +2,7 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "5b5dc2778f8f93f09d17c68736c3134a794cba08",
+    "sha": "6aee167b9a75e1c175dce63036083fa9f77a468f",
     "verified_on": "2026-10-08"
   },
   "status_policy": {
@@ -78,12 +78,12 @@
   "machine_contracts": {
     "migrations": {
       "mysql": {
-        "max_version": 98,
-        "version_count": 98
+        "max_version": 99,
+        "version_count": 99
       },
       "mongodb": {
-        "max_version": 37,
-        "version_count": 37
+        "max_version": 38,
+        "version_count": 38
       }
     },
     "events": {
@@ -11158,7 +11158,7 @@
       "owner": "tooling",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "5b5dc2778f8f93f09d17c68736c3134a794cba08",
+        "source_sha": "6aee167b9a75e1c175dce63036083fa9f77a468f",
         "verified_on": "2026-10-08"
       },
       "fact_sources": [
@@ -11189,6 +11189,30 @@
         {
           "kind": "source",
           "path": ".github/workflows/authz-production-matrix-provision.yml"
+        },
+        {
+          "kind": "source",
+          "path": "scripts/database/compatibility-retirement-b-integration.py"
+        },
+        {
+          "kind": "source",
+          "path": "internal/pkg/migration/**/*.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/pkg/migration/migrations/**/*"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/bootstrap/database.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/pkg/options/migration_options.go"
+        },
+        {
+          "kind": "source",
+          "path": ".github/workflows/ci.yml"
         }
       ],
       "verification": [
@@ -11196,21 +11220,28 @@
           "kind": "command",
           "command": "python3 -B scripts/database/test-compatibility-retirement.py",
           "result": "passed",
-          "source_sha": "5b5dc2778f8f93f09d17c68736c3134a794cba08",
+          "source_sha": "6aee167b9a75e1c175dce63036083fa9f77a468f",
           "verified_on": "2026-10-08"
         },
         {
           "kind": "command",
           "command": "go test -race ./cmd/qs-compatibility-retirement",
           "result": "passed",
-          "source_sha": "5b5dc2778f8f93f09d17c68736c3134a794cba08",
+          "source_sha": "6aee167b9a75e1c175dce63036083fa9f77a468f",
           "verified_on": "2026-10-08"
         },
         {
           "kind": "command",
           "command": "python3 -B scripts/database/compatibility-retirement-integration.py",
           "result": "passed",
-          "source_sha": "5b5dc2778f8f93f09d17c68736c3134a794cba08",
+          "source_sha": "6aee167b9a75e1c175dce63036083fa9f77a468f",
+          "verified_on": "2026-10-08"
+        },
+        {
+          "kind": "command",
+          "command": "python3 -B scripts/database/compatibility-retirement-b-integration.py",
+          "result": "passed",
+          "source_sha": "6aee167b9a75e1c175dce63036083fa9f77a468f",
           "verified_on": "2026-10-08"
         }
       ],
@@ -11220,7 +11251,7 @@
         "deployed_sha": null,
         "observed_at": null,
         "limitations": [
-          "Production history verification, restore rehearsal, fencing, DROP, acceptance and purge have not been executed."
+          "Only A-source production identity/head/type-state diagnostic discovery was observed on 2026-10-08; it does not attest B inventory, historical responsibility, fencing, restore, DROP, acceptance or purge. B-checkout local native disabled-migration evidence does not attest an original A recovery image. The B startup local receipt is derived from actual test output, not a saved original log."
         ]
       },
       "gaps": [
@@ -11228,7 +11259,7 @@
           "id": "COMPAT-RETIREMENT-PRODUCTION",
           "kind": "verification",
           "severity": "high",
-          "summary": "The controlled retirement backend and production evidence are incomplete.",
+          "summary": "Production history verifier, private v2 request pre-provisioning, exclusive fence, measured recovery and actual deletion/acceptance/purge backends remain incomplete.",
           "exit_criteria": "Implement and verify actual adapters, bind immutable operation/database/schema evidence, rehearse exact restoration, then complete the accepted production retirement gates."
         }
       ]
