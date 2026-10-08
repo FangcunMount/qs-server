@@ -54,19 +54,24 @@ type identity struct {
 	UUID, Database, Version, Roles string
 }
 type receipt struct {
-	FormatVersion       int    `json:"format_version"`
-	SourceSHA           string `json:"source_sha,omitempty"`
-	RunID               string `json:"run_id,omitempty"`
-	ExpectedTargetHash  string `json:"expected_target_hash,omitempty"`
-	SourceTargetHash    string `json:"source_target_hash,omitempty"`
-	CurrentUnrestricted bool   `json:"current_unrestricted_metadata_grants"`
-	RDSAvailable        *bool  `json:"rds_role_grants_available"`
-	RDSUnrestricted     *bool  `json:"rds_role_unrestricted_metadata_grants"`
-	AssignedRoles       *bool  `json:"assigned_roles_present"`
-	MandatoryRoles      *bool  `json:"mandatory_roles_present"`
-	DiagnosticOnly      bool   `json:"diagnostic_only"`
-	Complete            bool   `json:"complete"`
-	ErrorCategory       string `json:"error_category"`
+	FormatVersion             int    `json:"format_version"`
+	SourceSHA                 string `json:"source_sha,omitempty"`
+	RunID                     string `json:"run_id,omitempty"`
+	ExpectedTargetHash        string `json:"expected_target_hash,omitempty"`
+	SourceTargetHash          string `json:"source_target_hash,omitempty"`
+	CurrentUnrestricted       bool   `json:"current_unrestricted_metadata_grants"`
+	CurrentGlobalSelect       *bool  `json:"current_global_select_grant"`
+	CurrentGlobalShowView     *bool  `json:"current_global_show_view_grant"`
+	CurrentGlobalTrigger      *bool  `json:"current_global_trigger_grant"`
+	CurrentGlobalEvent        *bool  `json:"current_global_event_grant"`
+	CurrentPartialRevocations *bool  `json:"current_partial_revocations_present"`
+	RDSAvailable              *bool  `json:"rds_role_grants_available"`
+	RDSUnrestricted           *bool  `json:"rds_role_unrestricted_metadata_grants"`
+	AssignedRoles             *bool  `json:"assigned_roles_present"`
+	MandatoryRoles            *bool  `json:"mandatory_roles_present"`
+	DiagnosticOnly            bool   `json:"diagnostic_only"`
+	Complete                  bool   `json:"complete"`
+	ErrorCategory             string `json:"error_category"`
 }
 
 func baseReceipt(b binding) receipt {
@@ -203,6 +208,46 @@ func unrestricted(grants []string) (bool, bool) {
 	}
 	return !restricted && global["SELECT"] && global["SHOW VIEW"] && global["TRIGGER"] && global["EVENT"], true
 }
+
+// These facts describe canonical current GRANT rows, not deletion eligibility.
+// Positive global grants remain visible here when a partial REVOKE restricts
+// them; unrestricted retains the authority to qualify the complete grant set.
+type currentGrantFacts struct {
+	Select, ShowView, Trigger, Event, PartialRevocations bool
+}
+
+func currentMetadataGrantFacts(grants []string) (currentGrantFacts, bool) {
+	if _, known := unrestricted(grants); !known {
+		return currentGrantFacts{}, false
+	}
+	var facts currentGrantFacts
+	for _, row := range grants {
+		if privilegeRevoke.MatchString(row) {
+			facts.PartialRevocations = true
+			continue
+		}
+		grant := privilegeGrant.FindStringSubmatch(row)
+		if grant == nil || grant[2] != "*.*" {
+			continue
+		}
+		for _, privilege := range strings.Split(grant[1], ",") {
+			switch strings.TrimSpace(privilege) {
+			case "ALL PRIVILEGES":
+				facts.Select, facts.ShowView, facts.Trigger, facts.Event = true, true, true, true
+			case "SELECT":
+				facts.Select = true
+			case "SHOW VIEW":
+				facts.ShowView = true
+			case "TRIGGER":
+				facts.Trigger = true
+			case "EVENT":
+				facts.Event = true
+			}
+		}
+	}
+	return facts, true
+}
+
 func probe(ctx context.Context, db *sql.DB, cfg connection, b binding) receipt {
 	r := baseReceipt(b)
 	if !validBinding(b) {
@@ -234,6 +279,7 @@ func probe(ctx context.Context, db *sql.DB, cfg connection, b binding) receipt {
 	currentRows, err := readGrants(ctx, c, currentSQL)
 	category := "none"
 	current := false
+	var currentFacts currentGrantFacts
 	if err != nil {
 		category = "current_grants_query_failed"
 	} else {
@@ -241,6 +287,11 @@ func probe(ctx context.Context, db *sql.DB, cfg connection, b binding) receipt {
 		current, known = unrestricted(currentRows)
 		if !known {
 			category = "current_grants_rejected"
+		} else {
+			currentFacts, known = currentMetadataGrantFacts(currentRows)
+			if !known {
+				category = "current_grants_rejected"
+			}
 		}
 	}
 	var assigned, mandatory bool
@@ -291,6 +342,11 @@ func probe(ctx context.Context, db *sql.DB, cfg connection, b binding) receipt {
 		return r
 	}
 	r.CurrentUnrestricted = current
+	r.CurrentGlobalSelect = &currentFacts.Select
+	r.CurrentGlobalShowView = &currentFacts.ShowView
+	r.CurrentGlobalTrigger = &currentFacts.Trigger
+	r.CurrentGlobalEvent = &currentFacts.Event
+	r.CurrentPartialRevocations = &currentFacts.PartialRevocations
 	r.RDSAvailable = available
 	r.RDSUnrestricted = potential
 	r.AssignedRoles = &assigned

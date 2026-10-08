@@ -13,6 +13,9 @@ SHA = re.compile(r"^[0-9a-f]{40}$")
 HASH = re.compile(r"^[0-9a-f]{64}$")
 RUN = re.compile(r"^[0-9]{1,20}-[0-9]{1,4}$")
 KEYS = {"format_version", "source_sha", "run_id", "expected_target_hash", "source_target_hash", "current_unrestricted_metadata_grants", "rds_role_grants_available", "rds_role_unrestricted_metadata_grants", "assigned_roles_present", "mandatory_roles_present", "diagnostic_only", "complete", "error_category"}
+FACT_KEYS = {"current_global_select_grant", "current_global_show_view_grant", "current_global_trigger_grant", "current_global_event_grant", "current_partial_revocations_present"}
+ALLOWED_KEYS = KEYS | FACT_KEYS
+
 ERRORS = {"none", "input_invalid", "connection_input_invalid", "connection_config_failed", "connection_failed", "identity_read_failed", "target_identity_mismatch", "target_hash_mismatch", "current_grants_query_failed", "current_grants_rejected", "rds_role_query_failed", "rds_role_grants_rejected", "identity_final_failed", "session_identity_changed", "mandatory_roles_query_failed"}
 
 
@@ -27,6 +30,7 @@ RECEIPT_SCHEMA = {
     "error_category": frozenset(ERRORS | {"profile_transport_or_receipt_failed"}),
 }
 
+RECEIPT_SCHEMA.update({key: "nullable_bool" for key in FACT_KEYS})
 
 def receipt_transport_module():
     spec = importlib.util.spec_from_file_location("bounded_receipt_transport", Path(__file__).with_name("receipt-transport.py"))
@@ -44,7 +48,7 @@ def runtime_module():
 
 def safe_receipt(module, raw, code, sha, run, expected):
     value = module.load_json_bytes(raw)
-    if not isinstance(value, dict) or set(value) - KEYS:
+    if not isinstance(value, dict) or set(value) - ALLOWED_KEYS:
         raise ValueError("receipt_fields")
     required = KEYS - {"source_target_hash"}
     if not required <= set(value):
@@ -77,6 +81,18 @@ def safe_receipt(module, raw, code, sha, run, expected):
         raise ValueError("receipt_failure")
     if not value["complete"] and any(value[name] is not None for name in ("rds_role_grants_available", "rds_role_unrestricted_metadata_grants", "assigned_roles_present", "mandatory_roles_present")):
         raise ValueError("receipt_census_failure")
+    facts = set(value) & FACT_KEYS
+    if facts:
+        if facts != FACT_KEYS:
+            raise ValueError("receipt_grant_facts_missing")
+        if value["complete"]:
+            if any(type(value[key]) is not bool for key in FACT_KEYS):
+                raise ValueError("receipt_grant_facts_type")
+            full = not value["current_partial_revocations_present"] and all(value[key] for key in FACT_KEYS - {"current_partial_revocations_present"})
+            if full != value["current_unrestricted_metadata_grants"]:
+                raise ValueError("receipt_grant_facts_conflict")
+        elif any(value[key] is not None for key in FACT_KEYS):
+            raise ValueError("receipt_grant_facts_failure")
     return value
 
 

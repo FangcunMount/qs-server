@@ -53,6 +53,13 @@ func assertPrivate(t *testing.T, r receipt) {
 	if e != nil {
 		t.Fatal("encode_failed")
 	}
+	if !r.Complete {
+		for _, fact := range []*bool{r.CurrentGlobalSelect, r.CurrentGlobalShowView, r.CurrentGlobalTrigger, r.CurrentGlobalEvent, r.CurrentPartialRevocations} {
+			if fact != nil {
+				t.Fatal("incomplete_receipt_retained_grant_fact")
+			}
+		}
+	}
 	for _, bad := range []string{fixtureSecret, fixtureUUID, "fixture_user", "rds_superuser_role", "SHOW GRANTS", "NONE", "127.0.0.1"} {
 		if bytes.Contains(raw, []byte(bad)) {
 			t.Fatal("private_source_value_leaked")
@@ -354,4 +361,102 @@ func TestRejectedPotentialSyntaxClearsCensusAndAvailability(t *testing.T) {
 		t.Fatal("potential_syntax_failure_not_closed")
 	}
 	assertNoRoleConclusions(t, r)
+}
+
+func TestCurrentMetadataGrantFactsUseOnlyKnownCurrentGlobalRows(t *testing.T) {
+	cases := []struct {
+		name  string
+		rows  []string
+		want  currentGrantFacts
+		known bool
+	}{
+		{"schema_only", []string{"GRANT ALL PRIVILEGES ON `fixture_db`.* TO `fixture_user`@`%`"}, currentGrantFacts{}, true},
+		{"global_all", []string{"GRANT ALL PRIVILEGES ON *.* TO `fixture_user`@`%`"}, currentGrantFacts{Select: true, ShowView: true, Trigger: true, Event: true}, true},
+		{"global_four", []string{positive()}, currentGrantFacts{Select: true, ShowView: true, Trigger: true, Event: true}, true},
+		{"no_select", []string{"GRANT SHOW VIEW, TRIGGER, EVENT ON *.* TO `fixture_user`@`%`"}, currentGrantFacts{ShowView: true, Trigger: true, Event: true}, true},
+		{"no_show_view", []string{"GRANT SELECT, TRIGGER, EVENT ON *.* TO `fixture_user`@`%`"}, currentGrantFacts{Select: true, Trigger: true, Event: true}, true},
+		{"no_trigger", []string{"GRANT SELECT, SHOW VIEW, EVENT ON *.* TO `fixture_user`@`%`"}, currentGrantFacts{Select: true, ShowView: true, Event: true}, true},
+		{"no_event", []string{"GRANT SELECT, SHOW VIEW, TRIGGER ON *.* TO `fixture_user`@`%`"}, currentGrantFacts{Select: true, ShowView: true, Trigger: true}, true},
+		{"partial_revoke", []string{positive(), "REVOKE SELECT ON `hidden`.* FROM `fixture_user`@`%`"}, currentGrantFacts{Select: true, ShowView: true, Trigger: true, Event: true, PartialRevocations: true}, true},
+		{"split_global_rows", []string{"GRANT SELECT, SHOW VIEW ON *.* TO `fixture_user`@`%`", "GRANT TRIGGER, EVENT ON *.* TO `fixture_user`@`%`"}, currentGrantFacts{Select: true, ShowView: true, Trigger: true, Event: true}, true},
+		{"dynamic_role_proxy_ignored", []string{"GRANT SELECT, SHOW VIEW, TRIGGER, EVENT ON `fixture_db`.* TO `fixture_user`@`%`", "GRANT ROLE_ADMIN ON *.* TO `fixture_user`@`%`", "GRANT `fixture_role`@`%` TO `fixture_user`@`%`", "GRANT PROXY ON `fixture_proxy`@`%` TO `fixture_user`@`%`"}, currentGrantFacts{}, true},
+		{"unknown_after_positive", []string{positive(), "UNKNOWN " + fixtureSecret}, currentGrantFacts{}, false},
+		{"malformed_revoke", []string{positive(), "REVOKE SELECT ON `hidden`.* FROM missing_account"}, currentGrantFacts{}, false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got, known := currentMetadataGrantFacts(tc.rows)
+			if known != tc.known || got != tc.want {
+				t.Fatal("current_global_fact_contract_failed")
+			}
+			_, originalKnown := unrestricted(tc.rows)
+			if known != originalKnown {
+				t.Fatal("diagnostic_broadened_canonical_syntax")
+			}
+		})
+	}
+}
+
+func TestCurrentGrantFactsPublishOnlyAfterCompleteProbe(t *testing.T) {
+	cases := []struct {
+		name         string
+		rows         []string
+		want         currentGrantFacts
+		unrestricted bool
+	}{
+		{"schema_only_despite_positive_rds", []string{"GRANT ALL PRIVILEGES ON `fixture_db`.* TO `fixture_user`@`%`"}, currentGrantFacts{}, false},
+		{"global_all", []string{"GRANT ALL PRIVILEGES ON *.* TO `fixture_user`@`%`"}, currentGrantFacts{Select: true, ShowView: true, Trigger: true, Event: true}, true},
+		{"missing_event", []string{"GRANT SELECT, SHOW VIEW, TRIGGER ON *.* TO `fixture_user`@`%`"}, currentGrantFacts{Select: true, ShowView: true, Trigger: true}, false},
+		{"current_revoke", []string{positive(), "REVOKE SELECT ON `hidden`.* FROM `fixture_user`@`%`"}, currentGrantFacts{Select: true, ShowView: true, Trigger: true, Event: true, PartialRevocations: true}, false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			db, m := mockDB(t)
+			m.ExpectQuery(identitySQL).WillReturnRows(identities(10, "NONE"))
+			m.ExpectQuery(currentSQL).WillReturnRows(grants(tc.rows...))
+			m.ExpectQuery(mandatorySQL).WillReturnRows(sqlmock.NewRows([]string{"mandatory_roles"}).AddRow(""))
+			m.ExpectQuery(rdsSQL).WillReturnRows(grants(positive()))
+			m.ExpectQuery(identitySQL).WillReturnRows(identities(10, "NONE"))
+			r := probe(context.Background(), db, fixtureConnection, fixtureBinding())
+			if !r.Complete || r.CurrentUnrestricted != tc.unrestricted || r.ErrorCategory != "none" {
+				t.Fatal("unrestricted_semantics_changed")
+			}
+			facts := []*bool{r.CurrentGlobalSelect, r.CurrentGlobalShowView, r.CurrentGlobalTrigger, r.CurrentGlobalEvent, r.CurrentPartialRevocations}
+			want := []bool{tc.want.Select, tc.want.ShowView, tc.want.Trigger, tc.want.Event, tc.want.PartialRevocations}
+			for i, fact := range facts {
+				if fact == nil || *fact != want[i] {
+					t.Fatal("complete_current_fact_contract_failed")
+				}
+			}
+			assertPrivate(t, r)
+		})
+	}
+}
+
+func TestIncompleteRunEmitsNullCurrentFactsAndOnlyReceiptFields(t *testing.T) {
+	var out bytes.Buffer
+	if run(nil, func(string) string { return fixtureSecret }, &out) != 1 {
+		t.Fatal("invalid_input_returned_success")
+	}
+	var fields map[string]any
+	if err := json.Unmarshal(out.Bytes(), &fields); err != nil {
+		t.Fatal("receipt_json_invalid")
+	}
+	allowed := map[string]bool{}
+	for _, key := range []string{"format_version", "source_sha", "run_id", "expected_target_hash", "source_target_hash", "current_unrestricted_metadata_grants", "current_global_select_grant", "current_global_show_view_grant", "current_global_trigger_grant", "current_global_event_grant", "current_partial_revocations_present", "rds_role_grants_available", "rds_role_unrestricted_metadata_grants", "assigned_roles_present", "mandatory_roles_present", "diagnostic_only", "complete", "error_category"} {
+		allowed[key] = true
+	}
+	for key := range fields {
+		if !allowed[key] {
+			t.Fatal("unapproved_receipt_field")
+		}
+	}
+	for _, key := range []string{"current_global_select_grant", "current_global_show_view_grant", "current_global_trigger_grant", "current_global_event_grant", "current_partial_revocations_present"} {
+		if value, exists := fields[key]; !exists || value != nil {
+			t.Fatal("incomplete_fact_not_explicit_null")
+		}
+	}
+	if strings.Contains(out.String(), fixtureSecret) {
+		t.Fatal("input_value_leaked")
+	}
 }

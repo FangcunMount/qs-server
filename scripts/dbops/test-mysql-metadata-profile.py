@@ -159,6 +159,45 @@ class ProfileTests(unittest.TestCase):
                     with self.assertRaises(Exception):
                         self.validate(value, 1)
 
+    def test_grant_facts_full_partial_and_legacy_contract(self):
+        self.assertEqual(self.validate(receipt()), receipt())
+        for full, restricted in [(False, False), (True, False), (True, True)]:
+            value = receipt()
+            value.update({key: full for key in profile.FACT_KEYS})
+            value["current_partial_revocations_present"] = restricted
+            value["current_unrestricted_metadata_grants"] = full and not restricted
+            checked = self.validate(value)
+            encoded = armor.encode_armored_receipt(checked, schema=profile.RECEIPT_SCHEMA, secrets=("true", "false"))
+            self.assertEqual(json.loads(armor.decode_armored_receipt(encoded)), value)
+            wrong = dict(value, current_unrestricted_metadata_grants=not value["current_unrestricted_metadata_grants"])
+            with self.assertRaises(Exception):
+                self.validate(wrong)
+
+    def test_grant_facts_partial_group_and_wrong_types_rejected(self):
+        value = receipt()
+        value.update({key: False for key in profile.FACT_KEYS})
+        for key in profile.FACT_KEYS:
+            partial = dict(value);del partial[key]
+            with self.assertRaises(Exception):
+                self.validate(partial)
+            for item in (None, 0, "false", SECRET):
+                wrong = dict(value);wrong[key] = item
+                with self.assertRaises(Exception):
+                    self.validate(wrong)
+
+    def test_grant_facts_failure_clears_every_observation(self):
+        value = receipt()
+        value.update(complete=False, error_category="identity_final_failed", current_unrestricted_metadata_grants=False,
+                     rds_role_grants_available=None, rds_role_unrestricted_metadata_grants=None,
+                     assigned_roles_present=None, mandatory_roles_present=None)
+        value.update({key: None for key in profile.FACT_KEYS})
+        self.assertFalse(self.validate(value, 1)["complete"])
+        for key in profile.FACT_KEYS:
+            for item in (False, True):
+                wrong = dict(value);wrong[key] = item
+                with self.assertRaises(Exception):
+                    self.validate(wrong, 1)
+
     def execute_fixture(self, callback, env=None):
         with tempfile.TemporaryDirectory() as directory:
             binary = Path(directory) / 'profile'

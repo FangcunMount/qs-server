@@ -37,3 +37,5 @@ Python 传输使用 0700 临时目录中的 0600 环境文件向只读短时容�
 UTF-8 JSON 每个 byte 映射到私用字符 U+E000..U+E0FF，以 U+E100/U+E101 框定；必要时整体改用 +0x200 或 +0x400 的独立字母表。若完整 frame 含选中的 MYSQL_USERNAME 或 MYSQL_PASSWORD 任一非空值，就尝试下一字母表；全部碰撞或编码器不可用时失败关闭，不输出明文 JSON 回退。错误输出也只使用本地固定白名单失败字典，原始异常永不进入编码。
 
 共享 API：`encode_armored_receipt(value, schema=..., secrets=...)` 返回 frame，`decode_armored_receipt(text)` 返回 JSON 文本，错误为固定类别的 `ReceiptTransportError`。schema 是可选字段白名单；字段完整性与绑定仍由原验证器负责。JSON body 上限 64 KiB、日志上限 4 Mi 字符；解码必须恰有一个完整 frame，字母表和 UTF-8 合法、无重复 JSON key。解码后仍须原 source/run/target/exit 验证，不能把可解码等同于清理资格，也不尝试修补旧的被掩码 JSON。共享与 profile 离线测试覆盖短字符掩码、备用字母表、缺失/重复/混合或超限 frame、凭据碰撞、未知 raw 字段及绑定拒绝。
+
+当前权限不足时，诊断进一步输出四项全局 GRANT 是否存在及是否存在部分 REVOKE，均为布尔字段，不含账号或语句。字段只在目标、查询和最终同一会话身份全部验证后发布；失败均为 null。它们解释现有权限结论，不改变清理门禁。schema 级授权不能代表全局可见性，正向 GRANT 与 REVOKE 同时存在也不能代表完整权限。旧摘要仍可解析；新字段若出现必须五项完整且与原 current_unrestricted_metadata_grants 一致。
