@@ -273,6 +273,12 @@ func (c *HistoricalCoordinator) consume(p *HistoricalSourcePage, rows []Historic
 			return ErrCoordinatorPage
 		}
 	}
+	// All physical source identities are checked before sharing immutable lists.
+	// Cache saturation keeps the original lists; cache faults consume no rows.
+	if err := c.shareCandidateProfiles(rows); err != nil {
+		c.failed = true
+		return err
+	}
 	receipt.Sequence = p.sequence
 	receipt.IssuedAt = p.issued.UTC().Truncate(time.Millisecond)
 	receipt.ConsumedAt = c.now().UTC().Truncate(time.Millisecond)

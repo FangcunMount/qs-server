@@ -106,6 +106,7 @@ type HistoricalCoordinator struct {
 	sequence      uint64
 	pages         []HistoricalCoordinatorPageReceipt
 	candidates    []*HistoricalCandidate
+	profiles      candidateProfilePool
 	coverage      bool
 	failed        bool
 	reservation   uint64
