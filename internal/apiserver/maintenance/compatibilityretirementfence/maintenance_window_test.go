@@ -274,11 +274,30 @@ func TestMaintenanceWindowPartialUnknownAndFilesystem(t *testing.T) {
 			}
 			replace := func(path string) {
 				t.Helper()
-				raw, e := os.ReadFile(path)
+				// Keep the unlinked original open so the filesystem cannot reuse
+				// its inode for the replacement this test intends to exercise.
+				original, e := os.Open(path)
+				if e != nil {
+					t.Fatal("fixture original open")
+				}
+				t.Cleanup(func() {
+					if original.Close() != nil {
+						t.Error("fixture original close")
+					}
+				})
+				before, e := original.Stat()
+				if e != nil {
+					t.Fatal("fixture original identity")
+				}
+				raw, e := io.ReadAll(original)
 				if e != nil || os.Remove(path) != nil {
 					t.Fatal("fixture replacement")
 				}
 				write(path, raw)
+				after, e := os.Stat(path)
+				if e != nil || os.SameFile(before, after) {
+					t.Fatal("fixture did not replace the original inode")
+				}
 			}
 			switch kind {
 			case "torn_start":
