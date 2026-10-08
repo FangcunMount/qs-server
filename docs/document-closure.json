@@ -2,7 +2,7 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "37a5abcc1f0830f4f1a47730c9f059c469ec24cd",
+    "sha": "0347152c36e93f41775840123ef645078039e5f8",
     "verified_on": "2026-10-08"
   },
   "status_policy": {
@@ -9132,6 +9132,13 @@
           "command": "python3 -B scripts/cd/test-runtime-evidence.py",
           "result": "passed",
           "source_sha": "37a5abcc1f0830f4f1a47730c9f059c469ec24cd",
+          "verified_on": "2026-10-08"
+        },
+        {
+          "kind": "command",
+          "command": "python3 -B scripts/cd/test-runtime-evidence.py",
+          "result": "passed",
+          "source_sha": "0347152c36e93f41775840123ef645078039e5f8",
           "verified_on": "2026-10-08"
         }
       ],
