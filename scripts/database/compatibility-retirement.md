@@ -25,8 +25,19 @@ restores are outside this scope. No new DROP migration is included in A.
   another ref, a stale main SHA and another manifest hash before its production
   job. Only exact `prepare` receives existing `MYSQL_METADATA_ADMIN_USERNAME`,
   `MYSQL_METADATA_ADMIN_PASSWORD`, `MYSQL_HOST/PORT/DATABASE` (with existing
-  `MYSQL_DBNAME` fallback) and `MONGODB_HOST/PORT/USERNAME/PASSWORD/DBNAME`
-  production Secrets. No server vault variable is guessed. It deploys nothing.
+  `MYSQL_DBNAME` fallback) and `MONGODB_HOST/PORT/DBNAME` production Secrets.
+  For MongoDB it selects the dedicated pair `MONGODB_METADATA_ADMIN_USERNAME`
+  and `MONGODB_METADATA_ADMIN_PASSWORD` together when both are configured;
+  an incomplete pair fails before connecting. If neither is configured it uses
+  the existing `MONGODB_USERNAME/PASSWORD` pair. The selected credentials enter
+  only the temporary private inventory environment; service credentials are not
+  changed. Authentication uses the existing `admin` auth source. Read-only
+  identity discovery requires business-database reads and the cluster
+  [`replSetGetConfig`](https://www.mongodb.com/docs/v7.0/reference/privilege-actions/#replsetgetconfig)
+  privilege on the cluster resource; a real code-13 denial is reported as
+  `mongo_replica_anchor_not_authorized`, without a weaker identity fallback.
+  This discovery does not establish future write or DROP permission.
+  No server vault variable is guessed. It deploys nothing.
   A future B deployment
   must reuse prepared release scripts inside the same run, never dispatch CD
   and wait while occupying its lock.
@@ -76,6 +87,25 @@ It also requires the current qs-ai physical-schema adapter and complete original
 execution/MQ closure, independent approvals, writer fencing, evidence CAS and
 fresh readback. The local CLI and synthetic source-scale tests establish none
 of those production gates.
+
+The main-line lint follow-up preserves six local deprecated-call exceptions:
+five deliberately disconnected `mongo.NewClient` fixtures must prove rejection
+before storage I/O, and PlanEntry keeps its deprecated token argument while the
+real resolver ignores it and Collection enforces the IAM User/Testee relationship.
+Cursor and transaction cleanup now explicitly ignore best-effort cleanup errors;
+read, business and commit outcomes, including cursor release before UPDATE,
+retain their existing order. These exceptions do not retire another public
+contract or establish production cleanup readiness.
+
+The runtime observer preserves full role-inventory and container-state checks.
+Only the order of strictly validated unique mount-destination strings is
+canonicalized, with exact path spelling and members retained in the state hash.
+A real identity, image, restart, start-time or mount-member change still fails.
+On `runtime_changed`, an additional fixed diagnostic exposes only approved
+field names or the `instance_set_changed` category; it exposes no values,
+container IDs, process output or credentials. Successful receipt v2 and its
+business-acceptance boundary are unchanged. Local mounted-container and actual
+restart tests do not identify the cause of a past production failure.
 
 ## Required implementation before execution can become ready
 
@@ -154,7 +184,19 @@ DROP authorization exists.
 `metadata_permissions_sufficient` in discovery is explicitly scoped by
 `permission_scope=identity_and_migration_head`. Mongo identity/head/connectionStatus
 success does not prove full-catalog/system.profile/listIndexes visibility; the
-separate source inventory must actually perform those reads. Runtime image/network
+separate source inventory must actually perform those reads. Each database state
+also carries its producer's `error_category` through the armored diagnostic receipt.
+Only reviewed, fixed categories from that database's allowlist are accepted;
+unknown categories and raw exception/connection text are rejected before transport.
+The `replSetGetConfig` anchor read classifies only actual MongoDB driver
+`CommandError` codes: 13 produces `mongo_replica_anchor_not_authorized`, and
+76 produces `mongo_replica_anchor_replication_not_enabled`. Network failures,
+other codes and nil errors retain `mongo_replica_anchor_permission_or_read_failed`.
+Error text is never used to infer these diagnoses. These categories do not
+change permissions, accept a standalone server, or substitute another anchor.
+An incomplete identity receipt remains diagnostic (`execution_allowed=false`,
+`drop_ready=false`), including when another database's head was observed clean.
+Runtime image/network
 receipt fields record inspected image ID and selected fixed network configuration,
 not a container ID. Timeout leaves actual container ownership unknown until live
 read-only inspection binds ID, labels, image and mounts before any removal/retry.
