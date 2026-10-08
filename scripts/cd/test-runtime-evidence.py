@@ -231,6 +231,64 @@ class RuntimeEvidenceTests(unittest.TestCase):
             docker=FakeDocker(); docker.values[docker.rows[0]["container_id"]]["mount_destinations"].append(destination)
             self.blocked("binary_shadowed", docker)
 
+    def test_mount_permutation_is_canonical_for_every_role_and_state_hash(self):
+        for role, count in (("apiserver", 1), ("collection", 2), ("worker", 3)):
+            baseline = self.collect(FakeDocker(role, count), role, count)
+            docker = FakeDocker(role, count)
+            for value in docker.values.values():value["mount_destinations"].reverse()
+            docker.change = lambda value:value["mount_destinations"].reverse()
+            changed = self.collect(docker, role, count)
+            self.assertEqual(changed, baseline)
+            for value in docker.values.values():
+                self.assertEqual(tool.canonical_projection(value)["mount_destinations"], sorted(value["mount_destinations"]))
+                self.assertEqual(value["mount_destinations"], ["/data/logs/qs", "/app/configs"])
+
+    def test_mount_add_remove_and_exact_spelling_change_still_refused(self):
+        for change in (lambda value:value["mount_destinations"].append("/fixture/new"),
+                       lambda value:value["mount_destinations"].pop(),
+                       lambda value:value.update(mount_destinations=["/app//configs", "/data/logs/qs"])):
+            docker = FakeDocker(); docker.change = change
+            with self.assertRaises(tool.Refused) as caught:self.collect(docker)
+            self.assertEqual(str(caught.exception), "runtime_changed")
+            self.assertEqual(tool.runtime_change_diagnostic(caught.exception), {"changed_fields":["mount_destinations"]})
+
+    def test_mount_projection_rejects_duplicates_invalid_paths_and_types(self):
+        for mounts in (("/a",), None, ["/a", "/a"], ["relative"], [""], [1], [True], ["/nul\x00path"], ["/newline\npath"], ["/bad\ud800path"]):
+            docker = FakeDocker(); docker.values[docker.rows[0]["container_id"]]["mount_destinations"] = mounts
+            self.blocked("container_projection_invalid", docker)
+            self.assertFalse(docker.calls)
+        value = FakeDocker().values[format(1,"064x")]
+        value["mount_destinations"] = ["/z", "/a//b", "/a/b"]
+        canonical = tool.canonical_projection(value)
+        self.assertEqual(canonical["mount_destinations"], ["/a//b", "/a/b", "/z"])
+        self.assertEqual(len(canonical["mount_destinations"]), 3)
+
+    def test_runtime_change_diagnostics_are_fixed_fields_and_keep_category(self):
+        docker = FakeDocker(); docker.change = lambda value:value.update(restart_count=1, started_at="2026-10-08T12:01:00Z")
+        with self.assertRaises(tool.Refused) as caught:self.collect(docker)
+        self.assertEqual(str(caught.exception), "runtime_changed")
+        self.assertEqual(tool.runtime_change_diagnostic(caught.exception), {"changed_fields":["restart_count", "started_at"]})
+        docker = FakeDocker(); docker.after = copy.deepcopy(docker.rows)
+        docker.after[0]["container_id"] = "9"*64
+        with self.assertRaises(tool.Refused) as caught:self.collect(docker)
+        self.assertEqual(str(caught.exception), "runtime_changed")
+        self.assertEqual(tool.runtime_change_diagnostic(caught.exception), {"changed_fields":[], "role_inventory_change":"instance_set_changed"})
+        forged = tool.Refused("runtime_changed", changed_fields=(SECRET,), role_inventory_changed=SECRET)
+        self.assertEqual(tool.runtime_change_diagnostic(forged), {"changed_fields":[]})
+        err = tool.Refused("runtime_changed", changed_fields=("image_id", "image_id"))
+        self.assertEqual(tool.runtime_change_diagnostic(err), {"changed_fields":["image_id"]})
+
+    def test_runtime_change_cli_diagnostic_never_outputs_values_or_ids(self):
+        docker = FakeDocker(); docker.change = lambda value:value.update(image_reference="registry/"+SECRET)
+        output, errors = io.StringIO(), io.StringIO()
+        args = ["--role","worker","--expected-instances","3","--source-sha",SOURCE,"--run-id","12345","--run-attempt","1","--image-tag",SOURCE]
+        with mock.patch.object(tool,"Docker",return_value=docker), contextlib.redirect_stdout(output), contextlib.redirect_stderr(errors):
+            self.assertEqual(tool.main(args), 1)
+        self.assertEqual(output.getvalue(), "")
+        self.assertEqual(errors.getvalue(), 'runtime_instance_evidence_refused:runtime_changed\nruntime_instance_evidence_change:{"changed_fields":["image_reference"]}\n')
+        self.assertNotIn(SECRET, errors.getvalue())
+        for row in docker.rows:self.assertNotIn(row["container_id"], errors.getvalue())
+
     def test_configuration_mount_and_unrelated_changes_allowed(self):
         docker=FakeDocker(); docker.changes="C /app\nA /tmp/request-buffer\n"
         self.assertTrue(self.collect(docker)["complete"])

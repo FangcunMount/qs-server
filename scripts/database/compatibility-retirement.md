@@ -79,6 +79,16 @@ read, business and commit outcomes, including cursor release before UPDATE,
 retain their existing order. These exceptions do not retire another public
 contract or establish production cleanup readiness.
 
+The runtime observer preserves full role-inventory and container-state checks.
+Only the order of strictly validated unique mount-destination strings is
+canonicalized, with exact path spelling and members retained in the state hash.
+A real identity, image, restart, start-time or mount-member change still fails.
+On `runtime_changed`, an additional fixed diagnostic exposes only approved
+field names or the `instance_set_changed` category; it exposes no values,
+container IDs, process output or credentials. Successful receipt v2 and its
+business-acceptance boundary are unchanged. Local mounted-container and actual
+restart tests do not identify the cause of a past production failure.
+
 ## Required implementation before execution can become ready
 
 1. The implemented inventory adapter must be extended by an actual retirement
