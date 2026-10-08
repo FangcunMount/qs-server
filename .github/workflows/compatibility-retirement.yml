@@ -38,7 +38,7 @@ on:
         description: 'Prepare submode: identity, diagnostic upper boundaries, or independently approved inventory'
         required: false
         type: choice
-        options: [identity, bootstrap-bounds, bounds, bootstrap-inventory, inventory]
+        options: [identity, bootstrap-bounds, bounds, bootstrap-inventory, inventory, bootstrap-history]
         default: inventory
       identity_request_sha256:
         description: 'Prepare identity only: independently computed canonical request SHA256'
@@ -86,13 +86,13 @@ jobs:
             // supplied values still pass the complete strict stage validation.
             const input = {manifest_sha256: '', inventory_request_sha256: '', prepare_mode: 'inventory', identity_request_sha256: '', bootstrap_approval_json: '', bootstrap_approval_sha256: '', ...raw};
             const keys = Object.keys(input).sort();
-            const bootstrap = ['bootstrap-bounds', 'bootstrap-inventory'].includes(input.prepare_mode);
+            const bootstrap = ['bootstrap-bounds', 'bootstrap-inventory', 'bootstrap-history'].includes(input.prepare_mode);
             if (JSON.stringify(keys) !== JSON.stringify(expectedKeys) ||
                 !['prepare', 'apply', 'verify', 'recover', 'purge'].includes(input.operation) ||
                 input.database !== 'mysql-and-mongodb' ||
                 !/^[0-9a-f]{40}$/.test(input.approved_source_sha) ||
                 !/^[0-9]{1,20}-[0-9]{1,4}$/.test(input.operation_id) ||
-                !['identity', 'bounds', 'inventory', 'bootstrap-bounds', 'bootstrap-inventory'].includes(input.prepare_mode) ||
+                !['identity', 'bounds', 'inventory', 'bootstrap-bounds', 'bootstrap-inventory', 'bootstrap-history'].includes(input.prepare_mode) ||
                 (bootstrap
                   ? (input.operation !== 'prepare' || input.manifest_sha256 !== '' || input.inventory_request_sha256 !== '' || input.identity_request_sha256 !== '' || typeof input.bootstrap_approval_json !== 'string' || !/^[\x20-\x7e]{1,4096}$/.test(input.bootstrap_approval_json) || !/^[0-9a-f]{64}$/.test(input.bootstrap_approval_sha256))
                   : (input.bootstrap_approval_json !== '' || input.bootstrap_approval_sha256 !== '')) ||
@@ -104,7 +104,7 @@ jobs:
                 context.ref !== 'refs/heads/main' || input.approved_source_sha !== context.sha) {
               throw new Error('compatibility_retirement_input_or_source_rejected');
             }
-            if (bootstrap) {
+            if (bootstrap && input.prepare_mode !== 'bootstrap-history') {
               const reject = () => {throw new Error('compatibility_retirement_bootstrap_approval_rejected');};
               const object = value => value !== null && typeof value === 'object' && !Array.isArray(value);
               const exact = (value, keys) => object(value) && JSON.stringify(Object.keys(value).sort()) === JSON.stringify(keys.slice().sort());
@@ -131,6 +131,34 @@ jobs:
               const line = JSON.stringify(canonical(approval));
               if (line !== input.bootstrap_approval_json || require('crypto').createHash('sha256').update(line+'\n', 'ascii').digest('hex') !== input.bootstrap_approval_sha256) {reject();}
             }
+            if (input.prepare_mode === 'bootstrap-history') {
+              const reject = () => {throw new Error('compatibility_retirement_history_approval_rejected');};
+              const object = v => v !== null && typeof v === 'object' && !Array.isArray(v);
+              const exact = (v, keys) => object(v) && JSON.stringify(Object.keys(v).sort()) === JSON.stringify(keys.slice().sort());
+              const canonical = v => Array.isArray(v) ? v.map(canonical) : object(v) ? Object.fromEntries(Object.keys(v).sort().map(k => [k, canonical(v[k])])) : v;
+              const hash = v => typeof v === 'string' && /^[0-9a-f]{64}$/.test(v);
+              const run = v => typeof v === 'string' && /^[0-9]{1,20}-[0-9]{1,4}$/.test(v);
+              const actualRun = `${context.runId}-${process.env.GITHUB_RUN_ATTEMPT}`;
+              if (!run(actualRun) || String(context.runId) !== process.env.GITHUB_RUN_ID) {reject();}
+              let a;
+              try {a = JSON.parse(input.bootstrap_approval_json);} catch {reject();}
+              if (!exact(a, ['format_version','kind','prepare_mode','source_sha','operation_id','target_hash','database_scope','parent_request','inventory_request_sha256','inventory_report','assets','process_limits']) ||
+                  a.format_version !== 1 || a.kind !== 'readonly_history_bootstrap_approval' || a.prepare_mode !== 'bootstrap-history' ||
+                  a.source_sha !== input.approved_source_sha || a.operation_id !== input.operation_id ||
+                  a.target_hash !== '4e09444409d1cfab3c9df383ed80a0999419fcbbd2f4e80d2e5dac1cf7dfcfb8' || a.database_scope !== 'mysql-and-mongodb' || !hash(a.inventory_request_sha256)) {reject();}
+              for (const ref of [a.parent_request, a.inventory_report]) {
+                if (!exact(ref, ['run_id','sha256']) || !run(ref.run_id) || !hash(ref.sha256) || ref.run_id === actualRun) {reject();}
+              }
+              const limits = {memory_bytes:3221225472,cpus:2,memory_swap_bytes:3221225472,timeout_seconds:1830};
+              if (!exact(a.process_limits, Object.keys(limits)) || Object.keys(limits).some(k => a.process_limits[k] !== limits[k])) {reject();}
+              const targets = [['mysql','domain_event_outbox'],['mysql','ai_bridge_commands'],['mysql','ai_messaging_legacy_commands'],['mongodb','domain_event_outbox']];
+              if (!Array.isArray(a.assets) || a.assets.length !== 4) {reject();}
+              a.assets.forEach((v, i) => {
+                if (!exact(v, ['database','name','full_file_sha256','full_file_bytes']) || v.database !== targets[i][0] || v.name !== targets[i][1] || !hash(v.full_file_sha256) || !Number.isSafeInteger(v.full_file_bytes) || v.full_file_bytes < 0 || v.full_file_bytes > 4362076160 || (i !== 3 && v.full_file_bytes === 0)) {reject();}
+              });
+              const line = JSON.stringify(canonical(a));
+              if (line !== input.bootstrap_approval_json || require('crypto').createHash('sha256').update(line+'\n','ascii').digest('hex') !== input.bootstrap_approval_sha256) {reject();}
+            }
             const current = await github.rest.repos.getCommit({...context.repo, ref: 'main'});
             if (current.data.sha !== input.approved_source_sha) {
               throw new Error('compatibility_retirement_main_advanced');
@@ -140,7 +168,9 @@ jobs:
         with:
           ref: ${{ github.sha }}
       - name: Test preparation, journal, deadlines and workflow contracts
-        run: python3 -B scripts/database/test-compatibility-retirement.py
+        run: |
+          python3 -B scripts/database/test-compatibility-retirement.py
+          python3 -B scripts/database/test-compatibility-history-prepare.py
 
   controlled-stage:
     name: Evaluate exact private lifecycle stage
@@ -178,13 +208,16 @@ jobs:
         run: |
           set -Eeuo pipefail
           package_dir=$(mktemp -d "$RUNNER_TEMP/qs-compatibility-package.XXXXXX")
-          trap 'rm -f -- "$package_dir/compatibility-retirement.py" "$package_dir/compatibility-retirement-entrypoints.json" "$package_dir/receipt-transport.py" "$package_dir/inventory-linux-amd64" "$package_dir/inventory-linux-arm64"; rmdir -- "$package_dir"' EXIT
-          cp scripts/database/compatibility-retirement.py scripts/database/compatibility-retirement-entrypoints.json scripts/dbops/receipt-transport.py "$package_dir/"
+          trap 'rm -f -- "$package_dir/compatibility-retirement.py" "$package_dir/compatibility-retirement-entrypoints.json" "$package_dir/receipt-transport.py" "$package_dir/inventory-linux-amd64" "$package_dir/inventory-linux-arm64" "$package_dir/history-linux-amd64" "$package_dir/history-linux-arm64" "$package_dir/compatibility-history-prepare.py"; rmdir -- "$package_dir"' EXIT
+          cp scripts/database/compatibility-retirement.py scripts/database/compatibility-history-prepare.py scripts/database/compatibility-retirement-entrypoints.json scripts/dbops/receipt-transport.py "$package_dir/"
           go test ./cmd/qs-compatibility-retirement
           CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags="-s -w -X main.sourceSHA=$GITHUB_SHA" -o "$package_dir/inventory-linux-amd64" ./cmd/qs-compatibility-retirement
           CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -trimpath -ldflags="-s -w -X main.sourceSHA=$GITHUB_SHA" -o "$package_dir/inventory-linux-arm64" ./cmd/qs-compatibility-retirement
+          go test ./cmd/qs-compatibility-history
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags="-s -w -X main.sourceSHA=$GITHUB_SHA" -o "$package_dir/history-linux-amd64" ./cmd/qs-compatibility-history
+          CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -trimpath -ldflags="-s -w -X main.sourceSHA=$GITHUB_SHA" -o "$package_dir/history-linux-arm64" ./cmd/qs-compatibility-history
           archive="qs-compatibility-retirement-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.tar.gz"
-          tar -czf "$archive" -C "$package_dir" compatibility-retirement.py compatibility-retirement-entrypoints.json receipt-transport.py inventory-linux-amd64 inventory-linux-arm64
+          tar -czf "$archive" -C "$package_dir" compatibility-retirement.py compatibility-history-prepare.py compatibility-retirement-entrypoints.json receipt-transport.py inventory-linux-amd64 inventory-linux-arm64 history-linux-amd64 history-linux-arm64
           echo "sha256=$(shasum -a 256 "$archive" | awk '{print $1}')" >> "$GITHUB_OUTPUT"
       - name: Upload tooling with pinned ServerA identity
         uses: appleboy/scp-action@v1.0.0
@@ -211,16 +244,18 @@ jobs:
           RETIREMENT_ACTUAL_SHA: ${{ github.sha }}
           RETIREMENT_RUN_ID: ${{ github.run_id }}-${{ github.run_attempt }}
           RETIREMENT_PACKAGE_SHA256: ${{ steps.package.outputs.sha256 }}
-          MYSQL_HOST: ${{ inputs.operation == 'prepare' && !startsWith(inputs.prepare_mode, 'bootstrap-') && secrets.MYSQL_HOST || '' }}
-          MYSQL_PORT: ${{ inputs.operation == 'prepare' && !startsWith(inputs.prepare_mode, 'bootstrap-') && (secrets.MYSQL_PORT || 3306) || '' }}
-          MYSQL_USERNAME: ${{ inputs.operation == 'prepare' && !startsWith(inputs.prepare_mode, 'bootstrap-') && secrets.MYSQL_METADATA_ADMIN_USERNAME || '' }}
-          MYSQL_PASSWORD: ${{ inputs.operation == 'prepare' && !startsWith(inputs.prepare_mode, 'bootstrap-') && secrets.MYSQL_METADATA_ADMIN_PASSWORD || '' }}
-          MYSQL_DATABASE: ${{ inputs.operation == 'prepare' && !startsWith(inputs.prepare_mode, 'bootstrap-') && (secrets.MYSQL_DATABASE != '' && secrets.MYSQL_DATABASE || secrets.MYSQL_DBNAME) || '' }}
-          MONGODB_HOST: ${{ inputs.operation == 'prepare' && !startsWith(inputs.prepare_mode, 'bootstrap-') && secrets.MONGODB_HOST || '' }}
-          MONGODB_PORT: ${{ inputs.operation == 'prepare' && !startsWith(inputs.prepare_mode, 'bootstrap-') && (secrets.MONGODB_PORT || 27017) || '' }}
-          MONGODB_USERNAME: ${{ inputs.operation == 'prepare' && !startsWith(inputs.prepare_mode, 'bootstrap-') && secrets.MONGODB_USERNAME || '' }}
-          MONGODB_PASSWORD: ${{ inputs.operation == 'prepare' && !startsWith(inputs.prepare_mode, 'bootstrap-') && secrets.MONGODB_PASSWORD || '' }}
-          MONGODB_DBNAME: ${{ inputs.operation == 'prepare' && !startsWith(inputs.prepare_mode, 'bootstrap-') && secrets.MONGODB_DBNAME || '' }}
+          MYSQL_HOST: ${{ inputs.operation == 'prepare' && !startsWith(inputs.prepare_mode, 'bootstrap-') && secrets.MYSQL_HOST || inputs.operation == 'prepare' && inputs.prepare_mode == 'bootstrap-history' && secrets.MYSQL_HOST || '' }}
+          MYSQL_PORT: ${{ inputs.operation == 'prepare' && !startsWith(inputs.prepare_mode, 'bootstrap-') && (secrets.MYSQL_PORT || 3306) || inputs.operation == 'prepare' && inputs.prepare_mode == 'bootstrap-history' && (secrets.MYSQL_PORT || 3306) || '' }}
+          MYSQL_USERNAME: ${{ inputs.operation == 'prepare' && !startsWith(inputs.prepare_mode, 'bootstrap-') && secrets.MYSQL_METADATA_ADMIN_USERNAME || inputs.operation == 'prepare' && inputs.prepare_mode == 'bootstrap-history' && secrets.MYSQL_METADATA_ADMIN_USERNAME || '' }}
+          MYSQL_PASSWORD: ${{ inputs.operation == 'prepare' && !startsWith(inputs.prepare_mode, 'bootstrap-') && secrets.MYSQL_METADATA_ADMIN_PASSWORD || inputs.operation == 'prepare' && inputs.prepare_mode == 'bootstrap-history' && secrets.MYSQL_METADATA_ADMIN_PASSWORD || '' }}
+          MYSQL_DATABASE: ${{ inputs.operation == 'prepare' && !startsWith(inputs.prepare_mode, 'bootstrap-') && (secrets.MYSQL_DATABASE != '' && secrets.MYSQL_DATABASE || secrets.MYSQL_DBNAME) || inputs.operation == 'prepare' && inputs.prepare_mode == 'bootstrap-history' && (secrets.MYSQL_DATABASE != '' && secrets.MYSQL_DATABASE || secrets.MYSQL_DBNAME) || '' }}
+          MONGODB_HOST: ${{ inputs.operation == 'prepare' && !startsWith(inputs.prepare_mode, 'bootstrap-') && secrets.MONGODB_HOST || inputs.operation == 'prepare' && inputs.prepare_mode == 'bootstrap-history' && secrets.MONGODB_HOST || '' }}
+          MONGODB_PORT: ${{ inputs.operation == 'prepare' && !startsWith(inputs.prepare_mode, 'bootstrap-') && (secrets.MONGODB_PORT || 27017) || inputs.operation == 'prepare' && inputs.prepare_mode == 'bootstrap-history' && (secrets.MONGODB_PORT || 27017) || '' }}
+          MONGODB_USERNAME: ${{ inputs.operation == 'prepare' && !startsWith(inputs.prepare_mode, 'bootstrap-') && secrets.MONGODB_USERNAME || inputs.operation == 'prepare' && inputs.prepare_mode == 'bootstrap-history' && secrets.MONGODB_USERNAME || '' }}
+          MONGODB_PASSWORD: ${{ inputs.operation == 'prepare' && !startsWith(inputs.prepare_mode, 'bootstrap-') && secrets.MONGODB_PASSWORD || inputs.operation == 'prepare' && inputs.prepare_mode == 'bootstrap-history' && secrets.MONGODB_PASSWORD || '' }}
+          MONGODB_DBNAME: ${{ inputs.operation == 'prepare' && !startsWith(inputs.prepare_mode, 'bootstrap-') && secrets.MONGODB_DBNAME || inputs.operation == 'prepare' && inputs.prepare_mode == 'bootstrap-history' && secrets.MONGODB_DBNAME || '' }}
+          MONGODB_METADATA_ADMIN_USERNAME: ${{ inputs.operation == 'prepare' && !startsWith(inputs.prepare_mode, 'bootstrap-') && secrets.MONGODB_METADATA_ADMIN_USERNAME || inputs.operation == 'prepare' && inputs.prepare_mode == 'bootstrap-history' && secrets.MONGODB_METADATA_ADMIN_USERNAME || '' }}
+          MONGODB_METADATA_ADMIN_PASSWORD: ${{ inputs.operation == 'prepare' && !startsWith(inputs.prepare_mode, 'bootstrap-') && secrets.MONGODB_METADATA_ADMIN_PASSWORD || inputs.operation == 'prepare' && inputs.prepare_mode == 'bootstrap-history' && secrets.MONGODB_METADATA_ADMIN_PASSWORD || '' }}
         with:
           host: ${{ vars.SVRA_HOST }}
           username: ${{ vars.SVRA_USERNAME }}
@@ -228,7 +263,7 @@ jobs:
           port: ${{ vars.SVRA_SSH_PORT || 22 }}
           fingerprint: ${{ vars.SVRA_SSH_FINGERPRINT }}
           command_timeout: 35m
-          envs: RETIREMENT_OPERATION,RETIREMENT_OPERATION_ID,RETIREMENT_MANIFEST_SHA256,RETIREMENT_INVENTORY_REQUEST_SHA256,RETIREMENT_PREPARE_MODE,RETIREMENT_IDENTITY_REQUEST_SHA256,RETIREMENT_BOOTSTRAP_APPROVAL_JSON,RETIREMENT_BOOTSTRAP_APPROVAL_SHA256,RETIREMENT_APPROVED_SHA,RETIREMENT_ACTUAL_SHA,RETIREMENT_RUN_ID,RETIREMENT_PACKAGE_SHA256,MYSQL_HOST,MYSQL_PORT,MYSQL_USERNAME,MYSQL_PASSWORD,MYSQL_DATABASE,MONGODB_HOST,MONGODB_PORT,MONGODB_USERNAME,MONGODB_PASSWORD,MONGODB_DBNAME
+          envs: RETIREMENT_OPERATION,RETIREMENT_OPERATION_ID,RETIREMENT_MANIFEST_SHA256,RETIREMENT_INVENTORY_REQUEST_SHA256,RETIREMENT_PREPARE_MODE,RETIREMENT_IDENTITY_REQUEST_SHA256,RETIREMENT_BOOTSTRAP_APPROVAL_JSON,RETIREMENT_BOOTSTRAP_APPROVAL_SHA256,RETIREMENT_APPROVED_SHA,RETIREMENT_ACTUAL_SHA,RETIREMENT_RUN_ID,RETIREMENT_PACKAGE_SHA256,MYSQL_HOST,MYSQL_PORT,MYSQL_USERNAME,MYSQL_PASSWORD,MYSQL_DATABASE,MONGODB_HOST,MONGODB_PORT,MONGODB_USERNAME,MONGODB_PASSWORD,MONGODB_DBNAME,MONGODB_METADATA_ADMIN_USERNAME,MONGODB_METADATA_ADMIN_PASSWORD
           script: |
             set -Eeuo pipefail
             umask 077
@@ -238,17 +273,17 @@ jobs:
             [[ "$(sha256sum "$archive" | awk '{print $1}')" == "$RETIREMENT_PACKAGE_SHA256" ]] || exit 1
             tool_dir=$(mktemp -d /tmp/qs-compatibility-retirement.XXXXXX)
             cleanup_tools() {
-              rm -f -- "$tool_dir/compatibility-retirement.py" "$tool_dir/compatibility-retirement-entrypoints.json" "$tool_dir/receipt-transport.py" "$tool_dir/inventory-linux-amd64" "$tool_dir/inventory-linux-arm64" "$archive"
+              rm -f -- "$tool_dir/compatibility-retirement.py" "$tool_dir/compatibility-retirement-entrypoints.json" "$tool_dir/receipt-transport.py" "$tool_dir/inventory-linux-amd64" "$tool_dir/inventory-linux-arm64" "$tool_dir/history-linux-amd64" "$tool_dir/history-linux-arm64" "$tool_dir/compatibility-history-prepare.py" "$archive"
               rmdir -- "$tool_dir"
             }
             trap cleanup_tools EXIT
-            tar -xzf "$archive" -C "$tool_dir" --no-same-owner compatibility-retirement.py compatibility-retirement-entrypoints.json receipt-transport.py inventory-linux-amd64 inventory-linux-arm64
+            tar -xzf "$archive" -C "$tool_dir" --no-same-owner compatibility-retirement.py compatibility-history-prepare.py compatibility-retirement-entrypoints.json receipt-transport.py inventory-linux-amd64 inventory-linux-arm64 history-linux-amd64 history-linux-arm64
             chmod 0700 "$tool_dir"
-            chmod 0600 "$tool_dir/compatibility-retirement.py" "$tool_dir/compatibility-retirement-entrypoints.json" "$tool_dir/receipt-transport.py"
-            chmod 0700 "$tool_dir/inventory-linux-amd64" "$tool_dir/inventory-linux-arm64"
+            chmod 0600 "$tool_dir/compatibility-history-prepare.py" "$tool_dir/compatibility-retirement.py" "$tool_dir/compatibility-retirement-entrypoints.json" "$tool_dir/receipt-transport.py"
+            chmod 0700 "$tool_dir/inventory-linux-amd64" "$tool_dir/inventory-linux-arm64" "$tool_dir/history-linux-amd64" "$tool_dir/history-linux-arm64"
             case "$(uname -m)" in
-              x86_64) inventory_binary="$tool_dir/inventory-linux-amd64" ;;
-              aarch64|arm64) inventory_binary="$tool_dir/inventory-linux-arm64" ;;
+              x86_64) inventory_binary="$tool_dir/inventory-linux-amd64"; history_binary="$tool_dir/history-linux-amd64" ;;
+              aarch64|arm64) inventory_binary="$tool_dir/inventory-linux-arm64"; history_binary="$tool_dir/history-linux-arm64" ;;
               *) exit 1 ;;
             esac
             python3 -B "$tool_dir/compatibility-retirement.py" \
@@ -263,4 +298,5 @@ jobs:
               --bootstrap-approval-json "$RETIREMENT_BOOTSTRAP_APPROVAL_JSON" \
               --bootstrap-approval-hash "$RETIREMENT_BOOTSTRAP_APPROVAL_SHA256" \
               --prepare-mode "$RETIREMENT_PREPARE_MODE" \
-              --inventory-binary "$inventory_binary"
+              --inventory-binary "$inventory_binary" \
+              --history-binary "$history_binary"

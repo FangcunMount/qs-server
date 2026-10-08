@@ -45,7 +45,7 @@ NAME = re.compile(r"^[a-z][a-z0-9_-]{0,80}\.json$")
 MAX_JSON = 256 * 1024
 INVENTORY_V2_LIMITS = {"query_seconds": 30, "total_seconds": 1500, "max_records": 1000000,
                        "max_bytes": 2147483648, "page_size": 1000, "max_pages": 1001}
-BOOTSTRAP_MODES = frozenset({"bootstrap-bounds", "bootstrap-inventory"})
+BOOTSTRAP_MODES = frozenset({"bootstrap-bounds", "bootstrap-inventory", "bootstrap-history"})
 MAX_BOOTSTRAP_APPROVAL = 4096
 MAX_WINDOW_SECONDS = 1800
 FORWARD_STOP_SECONDS = 1200
@@ -71,6 +71,27 @@ HISTOGRAM_TYPES = frozenset({"unknown_type", "request", "change", "cancel", "pre
     "assessment.submitted", "assessment.evaluated", "assessment.interpreted", "assessment.failed", "report.generated", "questionnaire.changed", "scale.changed", "task.opened", "task.completed", "task.expired", "task.canceled"})
 HISTOGRAM_STATES = frozenset({"unknown_state", "pending", "publishing", "published", "failed", "quarantined", "retry_wait", "0", "1", "historical_mapping"})
 HISTOGRAM_ERRORS = frozenset({"none", "identity_metadata_not_ready", "histogram_namespace_kind_rejected", "histogram_schema_rejected", "histogram_query_failed_or_timed_out", "histogram_bucket_bound_exceeded", "histogram_public_bound_exceeded", "histogram_count_invalid", "histogram_metadata_query_failed", "mysql_metadata_read_failed", "metadata_bound_exceeded", "connection_input_invalid", "mongo_connection_failed", "mongo_close_failed"})
+
+
+# These are producer-owned, fixed categories, never raw driver exceptions.
+# Keep the allowlists scoped per database so failed identity discovery can be
+# diagnosed without leaking names, connection strings or server error text.
+IDENTITY_ERRORS = {
+    "mysql": frozenset({"none", "connection_input_invalid", "mysql_connection_invalid",
+        "mysql_connection_failed", "mysql_close_failed", "mysql_readonly_transaction_failed",
+        "mysql_readonly_close_failed", "mysql_identity_or_version_rejected",
+        "mysql_metadata_read_failed", "metadata_bound_exceeded",
+        "mysql_global_metadata_visibility_unproven", "mysql_migration_head_invalid",
+        "migration_head_rejected"}),
+    "mongodb": frozenset({"none", "connection_input_invalid", "mongo_connection_failed",
+        "mongo_close_failed", "mongo_identity_read_failed", "mongo_version_rejected",
+        "mongo_identity_metadata_permission_or_missing", "mongo_database_uuid_unavailable",
+        "mongo_replica_anchor_permission_or_read_failed", "mongo_replica_anchor_not_authorized",
+        "mongo_replica_anchor_replication_not_enabled", "mongo_replica_anchor_metadata_rejected",
+        "mongo_replica_anchor_topology_rejected", "mongo_replica_anchor_unavailable",
+        "mongo_migration_generation_rejected", "mongo_privileges_read_failed",
+        "mongo_migration_head_invalid", "migration_head_rejected"}),
+}
 
 
 class Blocked(ValueError):
@@ -752,6 +773,27 @@ def capture_fixed(command, *, timeout, maximum=32768):
     return result.returncode, result.stdout
 
 
+def inventory_connection_values(environment):
+    # Select the Mongo pair together. An incomplete metadata pair must never
+    # combine an administrator username with an application password.
+    keys = ("MYSQL_HOST", "MYSQL_PORT", "MYSQL_USERNAME", "MYSQL_PASSWORD", "MYSQL_DATABASE",
+            "MONGODB_HOST", "MONGODB_PORT", "MONGODB_USERNAME", "MONGODB_PASSWORD", "MONGODB_DBNAME")
+    mongo_pair = tuple(environment.get(key, "") for key in
+                       ("MONGODB_METADATA_ADMIN_USERNAME", "MONGODB_METADATA_ADMIN_PASSWORD"))
+    if any(mongo_pair) and not all(mongo_pair):
+        fail("inventory_connection_input_invalid")
+    selected = {key: environment.get(key, "") for key in keys}
+    if all(mongo_pair):
+        selected["MONGODB_USERNAME"], selected["MONGODB_PASSWORD"] = mongo_pair
+    values = {}
+    for key in keys:
+        value = selected.get(key, "") or ({"MYSQL_PORT": "3306", "MONGODB_PORT": "27017"}.get(key, ""))
+        if not isinstance(value, str) or not value or len(value) > 4096 or any(character in value for character in ("\n", "\r", "\x00")):
+            fail("inventory_connection_input_invalid")
+        values[key] = value
+    return values
+
+
 def live_inventory(args, directory):
     mode = getattr(args, "prepare_mode", "inventory")
     request_hash = args.identity_request_hash if mode == "identity" else args.inventory_request_hash
@@ -780,14 +822,8 @@ def live_inventory(args, directory):
     code, raw = capture_fixed([str(binary), "--source-sha"], timeout=5, maximum=128)
     if code or raw.decode("ascii", errors="ignore").strip() != args.actual_source_sha:
         fail("inventory_binary_source_mismatch")
-    keys = ("MYSQL_HOST", "MYSQL_PORT", "MYSQL_USERNAME", "MYSQL_PASSWORD", "MYSQL_DATABASE",
-            "MONGODB_HOST", "MONGODB_PORT", "MONGODB_USERNAME", "MONGODB_PASSWORD", "MONGODB_DBNAME")
-    values = {}
-    for key in keys:
-        value = os.environ.get(key, "") or ({"MYSQL_PORT": "3306", "MONGODB_PORT": "27017"}.get(key, ""))
-        if not value or len(value) > 4096 or any(character in value for character in ("\n", "\r", "\x00")):
-            fail("inventory_connection_input_invalid")
-        values[key] = value
+    values = inventory_connection_values(os.environ)
+    keys = tuple(values)
     docker = ["sudo", "-n", "docker"]
     code, raw = capture_fixed([*docker, "image", "inspect", "mysql:8.0", "--format", "{{.Id}}"], timeout=15, maximum=256)
     image = raw.decode("ascii", errors="ignore").strip()
@@ -1020,7 +1056,9 @@ def validate_identity_receipt(summary, code, args, output, request_hash, entrypo
             fail("identity_receipt_type_invalid")
         if summary["complete"] and (not all(state[key] for key in ("identity_observed", "migration_head_observed", "migration_clean", "metadata_permissions_sufficient")) or state["migration_dirty"] is not False or not state["identity_hash"] or state["error_category"] != "none"):
             fail("identity_receipt_outcome_invalid")
-        clean_states[database] = {key: state[key] for key in state if key != "error_category"}
+        if type(state["error_category"]) is not str or state["error_category"] not in IDENTITY_ERRORS[database]:
+            fail("identity_error_category_invalid")
+        clean_states[database] = dict(state)
         clean_states[database]["identity_hash"] = state["identity_hash"] or None
         clean_states[database]["database_anchor_hash"] = state["database_anchor_hash"] or None
         clean_states[database]["migration_generation_hash"] = state["migration_generation_hash"] or None
@@ -1208,6 +1246,12 @@ def execute(args):
     if mode in BOOTSTRAP_MODES:
         if args.operation != "prepare" or args.manifest_hash or identity_request or inventory_request or not bootstrap_json or not bootstrap_hash:
             fail("input_classes_mixed")
+        if mode == "bootstrap-history":
+            path = Path(__file__).with_name("compatibility-history-prepare.py")
+            spec = importlib.util.spec_from_file_location("compatibility_history_prepare", path)
+            module = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(module)
+            return module.prepare(args, argparse.Namespace(**globals()))
         return bootstrap_private_request(args)
     if bootstrap_json or bootstrap_hash:
         fail("input_classes_mixed")
@@ -1262,6 +1306,7 @@ def main(argv=None):
     parser.add_argument("--manifest-hash", default="")
     parser.add_argument("--inventory-request-hash", default="")
     parser.add_argument("--inventory-binary", default="")
+    parser.add_argument("--history-binary", default="")
     parser.add_argument("--prepare-mode", default="inventory")
     parser.add_argument("--identity-request-hash", default="")
     parser.add_argument("--bootstrap-approval-json", default="")
@@ -1281,12 +1326,19 @@ def main(argv=None):
               "inventory_complete": "bool", "inventory_private_report_hash": "hash64",
               "prepare_mode": frozenset({"identity", "bounds", "inventory"}) | BOOTSTRAP_MODES, "diagnostic_only": "bool", "drop_ready": "bool",
               "request_bootstrap_complete": "bool", "bootstrap_approval_sha256": "hash64", "derived_request_sha256": "hash64", "request_created_run_id": "run_id",
+              "history_parent_request_sha256": "hash64", "history_private_readiness_sha256": "hash64",
+              "history_readonly_complete": "bool", "history_independent_epochs": "uint",
+              "history_local_candidates": "uint", "history_locally_qualified": "uint", "history_blocked_local": "uint",
+              "history_ai_blocked_pages": "uint", "history_cas_complete": "bool", "history_process_budget_proven": "bool",
+              "history_source_rows": ["uint"],
+              "history_global_sql": {key: "uint" for key in ("observed", "retirement_related", "outside_retirement", "unknown", "blocking")},
+              "history_global_mongodb": {key: "uint" for key in ("rows", "classified_rows", "blocking_reason_count", "coverage_gap_count")},
               "approved_identity_report": {"run_id": "run_id", "source_sha": "sha40", "sha256": "hash64"},
               "approved_boundary_report": {"run_id": "run_id", "source_sha": "sha40", "sha256": "hash64"},
               "boundary_discovery_complete": "bool", "boundary_private_report_hash": "hash64", "boundary_request_hash": "hash64",
               "inventory_next_cycle_required": "bool", "inventory_boundary_report_hash": "nullable_hash64", "inventory_two_equal_scans": "bool",
               "identity_discovery_complete": "bool", "identity_private_report_hash": "hash64", "identity_request_hash": "hash64",
-              "identity_database_states": {database: {"identity_hash": "nullable_hash64", "database_anchor_hash": "nullable_hash64", "migration_generation_hash": "nullable_hash64", "identity_observed": "bool", "migration_version": "uint", "migration_head_observed": "bool", "migration_dirty": "nullable_bool", "migration_clean": "bool", "metadata_permissions_sufficient": "bool", "permission_scope": frozenset({"identity_and_migration_head"})} for database in ("mysql", "mongodb")},
+              "identity_database_states": {database: {"identity_hash": "nullable_hash64", "database_anchor_hash": "nullable_hash64", "migration_generation_hash": "nullable_hash64", "identity_observed": "bool", "migration_version": "uint", "migration_head_observed": "bool", "migration_dirty": "nullable_bool", "migration_clean": "bool", "metadata_permissions_sufficient": "bool", "permission_scope": frozenset({"identity_and_migration_head"}), "error_category": IDENTITY_ERRORS[database]} for database in ("mysql", "mongodb")},
               "identity_diagnostic_histograms": [{"database": frozenset({"mysql", "mongodb"}), "name": frozenset(target[1] for target in TARGETS), "present": "nullable_bool", "complete": "bool", "diagnostic_only": "bool", "error_category": HISTOGRAM_ERRORS,
                    "bucket_count": "uint"}],
               "identity_histogram_bucket_pages": {"page_" + chr(97 + index): [{"object_index": "uint", "bucket_index": "uint", "type_label": frozenset(label.replace(".", "_") for label in HISTOGRAM_TYPES), "type_hash": "hash64", "state_label": HISTOGRAM_STATES, "state_hash": "hash64", "records": "uint"}] for index in range(4)},
@@ -1300,15 +1352,18 @@ def main(argv=None):
               "error_category": frozenset({receipt["error_category"]}),
               "blockers": [frozenset(receipt.get("blockers", ()))],
               "capabilities": {key: "bool" for key in CAPABILITIES}}
+    emitted = False
     try:
-        secrets = tuple(os.environ.get(key, "") for key in ("MYSQL_USERNAME", "MYSQL_PASSWORD", "MONGODB_USERNAME", "MONGODB_PASSWORD"))
+        secrets = tuple(os.environ.get(key, "") for key in ("MYSQL_USERNAME", "MYSQL_PASSWORD", "MONGODB_USERNAME", "MONGODB_PASSWORD",
+                                                                          "MONGODB_METADATA_ADMIN_USERNAME", "MONGODB_METADATA_ADMIN_PASSWORD"))
         armor = transport().encode_armored_receipt(receipt, schema=schema, secrets=secrets)
         print(armor)
+        emitted = True
     except Exception:
         # Fixed ASCII fallback contains no input and cannot be mistaken for a
         # valid framed receipt. Never print a raw protocol/debug alternative.
         print("compatibility_retirement_receipt_transport_failed", file=sys.stderr)
-    return 42
+    return 0 if emitted and receipt.get("prepare_mode") == "bootstrap-history" and receipt.get("history_readonly_complete") is True and receipt.get("complete") is False and receipt.get("execution_allowed") is False and receipt.get("drop_ready") is False else 42
 
 
 if __name__ == "__main__":

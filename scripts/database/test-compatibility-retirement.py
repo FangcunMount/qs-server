@@ -113,6 +113,65 @@ class SafetyContracts(unittest.TestCase):
                                   approved_source_sha=SOURCE, actual_source_sha=SOURCE, run_id="456-1",
                                   manifest_hash=self.write("manifest.json", self.value))
 
+    def connection_environment(self):
+        return {"MYSQL_HOST": "synthetic-mysql", "MYSQL_USERNAME": "synthetic-sql-reader",
+                "MYSQL_PASSWORD": "synthetic-sql-secret", "MYSQL_DATABASE": "synthetic-business",
+                "MONGODB_HOST": "synthetic-mongo", "MONGODB_USERNAME": "synthetic-app-user",
+                "MONGODB_PASSWORD": "synthetic-app-secret", "MONGODB_DBNAME": "synthetic-business"}
+
+    def test_inventory_legacy_mongo_pair_and_port_defaults(self):
+        values = tool.inventory_connection_values(self.connection_environment())
+        self.assertEqual(values["MONGODB_USERNAME"], "synthetic-app-user")
+        self.assertEqual(values["MONGODB_PASSWORD"], "synthetic-app-secret")
+        self.assertEqual(values["MYSQL_PORT"], "3306")
+        self.assertEqual(values["MONGODB_PORT"], "27017")
+
+    def test_inventory_metadata_mongo_pair_is_selected_together(self):
+        environment = self.connection_environment()
+        environment.update(MONGODB_METADATA_ADMIN_USERNAME="synthetic-meta-user",
+                           MONGODB_METADATA_ADMIN_PASSWORD="synthetic-meta-secret")
+        values = tool.inventory_connection_values(environment)
+        self.assertEqual(values["MONGODB_USERNAME"], "synthetic-meta-user")
+        self.assertEqual(values["MONGODB_PASSWORD"], "synthetic-meta-secret")
+        self.assertEqual(environment["MONGODB_USERNAME"], "synthetic-app-user")
+        self.assertEqual(environment["MONGODB_PASSWORD"], "synthetic-app-secret")
+        self.assertNotIn("MONGODB_METADATA_ADMIN_USERNAME", values)
+        self.assertNotIn("MONGODB_METADATA_ADMIN_PASSWORD", values)
+
+    def test_inventory_metadata_pair_does_not_require_service_credentials(self):
+        environment = self.connection_environment()
+        del environment["MONGODB_USERNAME"]
+        del environment["MONGODB_PASSWORD"]
+        environment.update(MONGODB_METADATA_ADMIN_USERNAME="synthetic-meta-user",
+                           MONGODB_METADATA_ADMIN_PASSWORD="synthetic-meta-secret")
+        self.assertEqual(tool.inventory_connection_values(environment)["MONGODB_USERNAME"], "synthetic-meta-user")
+
+    def test_inventory_partial_metadata_pair_never_mixes_credentials(self):
+        for key in ("MONGODB_METADATA_ADMIN_USERNAME", "MONGODB_METADATA_ADMIN_PASSWORD"):
+            with self.subTest(key=key):
+                environment = self.connection_environment()
+                environment[key] = "synthetic-partial-pair"
+                self.assertBlocked("inventory_connection_input_invalid", tool.inventory_connection_values, environment)
+
+    def test_inventory_metadata_pair_rejects_env_file_injection_with_fixed_error(self):
+        for key in ("MONGODB_METADATA_ADMIN_USERNAME", "MONGODB_METADATA_ADMIN_PASSWORD"):
+            for value in ("synthetic-private\nMYSQL_HOST=injected", "synthetic-private\r", "synthetic-private\x00", "x" * 4097, 123):
+                with self.subTest(key=key, value_type=type(value).__name__):
+                    environment = self.connection_environment()
+                    environment.update(MONGODB_METADATA_ADMIN_USERNAME="synthetic-meta-user",
+                                       MONGODB_METADATA_ADMIN_PASSWORD="synthetic-meta-secret")
+                    environment[key] = value
+                    self.assertBlocked("inventory_connection_input_invalid", tool.inventory_connection_values, environment)
+
+    def test_inventory_metadata_pair_keeps_required_database_binding(self):
+        for key in ("MONGODB_HOST", "MONGODB_DBNAME", "MYSQL_DATABASE"):
+            with self.subTest(key=key):
+                environment = self.connection_environment()
+                environment.update(MONGODB_METADATA_ADMIN_USERNAME="synthetic-meta-user",
+                                   MONGODB_METADATA_ADMIN_PASSWORD="synthetic-meta-secret")
+                del environment[key]
+                self.assertBlocked("inventory_connection_input_invalid", tool.inventory_connection_values, environment)
+
     def test_fixed_four_targets_exclude_cbpt_and_other_legacy(self):
         self.assertEqual(len(tool.TARGETS), 4)
         self.assertEqual([target[0] for target in tool.TARGETS], ["mysql"] * 3 + ["mongodb"])
@@ -613,6 +672,58 @@ class SafetyContracts(unittest.TestCase):
         self.assertFalse(bounded["identity_histogram_bucket_pages"])
         self.assertTrue(all(h["error_category"] == "histogram_public_bound_exceeded" and not h["complete"] for h in bounded["identity_diagnostic_histograms"]))
 
+    def test_identity_error_categories_are_bounded_database_specific_and_diagnostic_only(self):
+        args, approval = self.bootstrap_fixture()
+        directory = self.directory / "identity-701-1"
+        baseline = json.loads((directory / "identity.private.json").read_bytes())
+        args.run_id = baseline["run_id"]
+
+        def validate(value, code):
+            raw = tool.canonical_bytes(value)
+            path = directory / "identity.private.json"
+            path.write_bytes(raw); path.chmod(0o600)
+            summary = dict(value, private_report_hash=hashlib.sha256(raw).hexdigest())
+            return tool.validate_identity_receipt(summary, code, args, directory,
+                                                 value["request_hash"], "b" * 64)
+
+        for database, categories in tool.IDENTITY_ERRORS.items():
+            for category in sorted(categories):
+                with self.subTest(database=database, category=category):
+                    changed = copy.deepcopy(baseline)
+                    if category != "none":
+                        changed["complete"] = False
+                        changed["error_category"] = "identity_discovery_incomplete"
+                        changed["database_states"][database].update(
+                            identity_hash="", database_anchor_hash="", migration_generation_hash="",
+                            identity_observed=False, migration_version=0, migration_head_observed=False,
+                            migration_dirty=None, migration_clean=False, metadata_permissions_sufficient=False,
+                            error_category=category)
+                    receipt = validate(changed, 0 if changed["complete"] else 42)
+                    self.assertEqual(receipt["identity_database_states"][database]["error_category"], category)
+                    self.assertFalse(receipt["execution_allowed"])
+                    self.assertFalse(receipt["drop_ready"])
+                    output = io.StringIO()
+                    with mock.patch.object(tool, "execute", return_value=receipt), contextlib.redirect_stdout(output):
+                        self.assertEqual(tool.main(["--operation", "prepare", "--operation-id", OPERATION,
+                                                   "--approved-source-sha", SOURCE, "--actual-source-sha", SOURCE,
+                                                   "--run-id", "701-1"]), 42)
+                    decoded = json.loads(tool.transport().decode_armored_receipt(output.getvalue()))
+                    self.assertEqual(decoded["identity_database_states"][database]["error_category"], category)
+                    self.assertFalse(decoded["execution_allowed"])
+                    self.assertFalse(decoded["drop_ready"])
+
+        for database, invalid in (("mysql", "mongo_replica_anchor_unavailable"),
+                                  ("mongodb", "mysql_migration_head_invalid"),
+                                  ("mongodb", "mongodb://private:password@private-host/database"),
+                                  ("mongodb", "server_error\nPRIVATE_DO_NOT_PRINT"),
+                                  ("mongodb", None), ("mongodb", True), ("mongodb", {})):
+            with self.subTest(database=database, invalid_type=type(invalid).__name__):
+                changed = copy.deepcopy(baseline)
+                changed["complete"] = False
+                changed["error_category"] = "identity_discovery_incomplete"
+                changed["database_states"][database]["error_category"] = invalid
+                self.assertBlocked("identity_error_category_invalid", validate, changed, 42)
+
     def test_entrypoint_catalog_is_source_only_and_includes_unprotected_ssh(self):
         repository = SCRIPT.parents[2]
         value = json.loads((repository / "scripts/database/compatibility-retirement-entrypoints.json").read_text())
@@ -648,6 +759,11 @@ class SafetyContracts(unittest.TestCase):
         self.assertNotIn("MONGODB_PASSWORD", validation)
         self.assertIn("inputs.operation == 'prepare' && !startsWith(inputs.prepare_mode, 'bootstrap-') && secrets.MYSQL_METADATA_ADMIN_PASSWORD", production)
         self.assertIn("inputs.operation == 'prepare' && !startsWith(inputs.prepare_mode, 'bootstrap-') && secrets.MONGODB_PASSWORD", production)
+        for key in ("MONGODB_METADATA_ADMIN_USERNAME", "MONGODB_METADATA_ADMIN_PASSWORD"):
+            self.assertNotIn(key, validation)
+            self.assertIn("inputs.operation == 'prepare' && !startsWith(inputs.prepare_mode, 'bootstrap-') && secrets." + key, production)
+            ssh_envs = production.split("          envs: ", 1)[1].split("\n", 1)[0].split(",")
+            self.assertIn(key, ssh_envs)
         self.assertIn("inventory_request_sha256", workflow)
         self.assertIn("${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.tar.gz", workflow)
         self.assertIn("qs-compatibility-retirement-${RETIREMENT_RUN_ID}.tar.gz", workflow)
@@ -685,6 +801,22 @@ class SafetyContracts(unittest.TestCase):
         result = subprocess.run(["node", "--check"], input="async function validate() {\n" + script + "\n}", text=True, capture_output=True)
         self.assertEqual(result.returncode, 0, result.stderr)
 
+    def test_history_bootstrap_wiring_preserves_old_credential_and_mutation_boundary(self):
+        workflow = (SCRIPT.parents[2] / ".github/workflows/compatibility-retirement.yml").read_text()
+        for key in ("MYSQL_METADATA_ADMIN_USERNAME", "MYSQL_METADATA_ADMIN_PASSWORD",
+                    "MONGODB_METADATA_ADMIN_USERNAME", "MONGODB_METADATA_ADMIN_PASSWORD"):
+            self.assertIn("inputs.prepare_mode == 'bootstrap-history' && secrets." + key, workflow)
+        self.assertIn("!startsWith(inputs.prepare_mode, 'bootstrap-')", workflow)
+        self.assertIn('history_binary="$tool_dir/history-linux-amd64"', workflow)
+        self.assertIn('history_binary="$tool_dir/history-linux-arm64"', workflow)
+        self.assertIn("CGO_ENABLED=0 GOOS=linux GOARCH=amd64", workflow)
+        self.assertIn("CGO_ENABLED=0 GOOS=linux GOARCH=arm64", workflow)
+        self.assertIn('main.sourceSHA=$GITHUB_SHA', workflow)
+        self.assertIn("test-compatibility-history-prepare.py", workflow)
+        self.assertFalse(tool.CAPABILITIES["history_verifier"])
+        self.assertFalse(tool.CAPABILITIES["production_database_backend"])
+        self.assertFalse(tool.CAPABILITIES["private_backup_restore_backend"])
+
     def test_actual_workflow_validation_normalizes_only_declared_optional_inputs(self):
         workflow = (SCRIPT.parents[2] / ".github/workflows/compatibility-retirement.yml").read_text()
         script = textwrap.dedent(workflow.split("          script: |\n", 1)[1].split("      - name:", 1)[0])
@@ -692,9 +824,11 @@ class SafetyContracts(unittest.TestCase):
                     "operation_id": OPERATION, "prepare_mode": "identity", "identity_request_sha256": "1" * 64}
         bounds = {**supplied, "prepare_mode": "bounds", "inventory_request_sha256": "2" * 64}
         bounds.pop("identity_request_sha256")
+        inventory = dict(bounds, prepare_mode="inventory")
         scenarios = [("omitted_empty_defaults", supplied, "refs/heads/main", SOURCE, SOURCE, True),
                      ("all_defaults_present", dict(supplied, manifest_sha256="", inventory_request_sha256=""), "refs/heads/main", SOURCE, SOURCE, True),
                      ("bounds_omitted_identity", bounds, "refs/heads/main", SOURCE, SOURCE, True),
+                     ("inventory_omitted_identity", inventory, "refs/heads/main", SOURCE, SOURCE, True),
                      ("bounds_missing_request", {k: v for k, v in bounds.items() if k != "inventory_request_sha256"}, "refs/heads/main", SOURCE, SOURCE, False),
                      ("unknown_input", dict(supplied, unknown=""), "refs/heads/main", SOURCE, SOURCE, False),
                      ("mixed_request", dict(supplied, inventory_request_sha256="2" * 64), "refs/heads/main", SOURCE, SOURCE, False),
