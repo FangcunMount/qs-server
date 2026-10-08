@@ -2,7 +2,7 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "0347152c36e93f41775840123ef645078039e5f8",
+    "sha": "ba564d3d3d80113c4a23d271b0f52e9fa30878f0",
     "verified_on": "2026-10-08"
   },
   "status_policy": {
@@ -9140,6 +9140,20 @@
           "result": "passed",
           "source_sha": "0347152c36e93f41775840123ef645078039e5f8",
           "verified_on": "2026-10-08"
+        },
+        {
+          "kind": "command",
+          "command": "python3 -B scripts/cd/test-runtime-evidence.py",
+          "result": "passed",
+          "source_sha": "ba564d3d3d80113c4a23d271b0f52e9fa30878f0",
+          "verified_on": "2026-10-08"
+        },
+        {
+          "kind": "command",
+          "command": "python3 -B scripts/cd/runtime-evidence-integration.py",
+          "result": "passed",
+          "source_sha": "ba564d3d3d80113c4a23d271b0f52e9fa30878f0",
+          "verified_on": "2026-10-08"
         }
       ],
       "production_evidence": {
@@ -10617,7 +10631,7 @@
       "owner": "tooling",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "37a5abcc1f0830f4f1a47730c9f059c469ec24cd",
+        "source_sha": "ba564d3d3d80113c4a23d271b0f52e9fa30878f0",
         "verified_on": "2026-10-08"
       },
       "fact_sources": [
@@ -10732,6 +10746,27 @@
           "command": "python3 -B scripts/cd/test_ai_messaging_release.py",
           "result": "passed",
           "source_sha": "37a5abcc1f0830f4f1a47730c9f059c469ec24cd",
+          "verified_on": "2026-10-08"
+        },
+        {
+          "kind": "command",
+          "command": "python3 -B scripts/cd/test_ai_messaging_release.py",
+          "result": "passed",
+          "source_sha": "ba564d3d3d80113c4a23d271b0f52e9fa30878f0",
+          "verified_on": "2026-10-08"
+        },
+        {
+          "kind": "command",
+          "command": "python3 -B scripts/cd/test_image_retention.py",
+          "result": "passed",
+          "source_sha": "ba564d3d3d80113c4a23d271b0f52e9fa30878f0",
+          "verified_on": "2026-10-08"
+        },
+        {
+          "kind": "command",
+          "command": "python3 -B scripts/cd/test_sudo_selection.py",
+          "result": "passed",
+          "source_sha": "ba564d3d3d80113c4a23d271b0f52e9fa30878f0",
           "verified_on": "2026-10-08"
         }
       ],
@@ -11002,7 +11037,7 @@
       "owner": "tooling",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "37a5abcc1f0830f4f1a47730c9f059c469ec24cd",
+        "source_sha": "ba564d3d3d80113c4a23d271b0f52e9fa30878f0",
         "verified_on": "2026-10-08"
       },
       "fact_sources": [
@@ -11042,6 +11077,13 @@
           "command": "python3 -B scripts/cd/test_ai_messaging_release.py",
           "result": "passed",
           "source_sha": "37a5abcc1f0830f4f1a47730c9f059c469ec24cd",
+          "verified_on": "2026-10-08"
+        },
+        {
+          "kind": "command",
+          "command": "python3 -B scripts/cd/test_ai_messaging_release.py",
+          "result": "passed",
+          "source_sha": "ba564d3d3d80113c4a23d271b0f52e9fa30878f0",
           "verified_on": "2026-10-08"
         }
       ],
@@ -11214,7 +11256,7 @@
       "owner": "tooling",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "37a5abcc1f0830f4f1a47730c9f059c469ec24cd",
+        "source_sha": "ba564d3d3d80113c4a23d271b0f52e9fa30878f0",
         "verified_on": "2026-10-08"
       },
       "fact_sources": [
@@ -11281,6 +11323,13 @@
           "command": "python3 -B scripts/database/test-compatibility-retirement.py",
           "result": "passed",
           "source_sha": "37a5abcc1f0830f4f1a47730c9f059c469ec24cd",
+          "verified_on": "2026-10-08"
+        },
+        {
+          "kind": "command",
+          "command": "python3 -B scripts/database/test-compatibility-retirement.py",
+          "result": "passed",
+          "source_sha": "ba564d3d3d80113c4a23d271b0f52e9fa30878f0",
           "verified_on": "2026-10-08"
         }
       ],

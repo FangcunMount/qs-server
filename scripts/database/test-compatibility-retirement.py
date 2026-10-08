@@ -613,6 +613,58 @@ class SafetyContracts(unittest.TestCase):
         self.assertFalse(bounded["identity_histogram_bucket_pages"])
         self.assertTrue(all(h["error_category"] == "histogram_public_bound_exceeded" and not h["complete"] for h in bounded["identity_diagnostic_histograms"]))
 
+    def test_identity_error_categories_are_bounded_database_specific_and_diagnostic_only(self):
+        args, approval = self.bootstrap_fixture()
+        directory = self.directory / "identity-701-1"
+        baseline = json.loads((directory / "identity.private.json").read_bytes())
+        args.run_id = baseline["run_id"]
+
+        def validate(value, code):
+            raw = tool.canonical_bytes(value)
+            path = directory / "identity.private.json"
+            path.write_bytes(raw); path.chmod(0o600)
+            summary = dict(value, private_report_hash=hashlib.sha256(raw).hexdigest())
+            return tool.validate_identity_receipt(summary, code, args, directory,
+                                                 value["request_hash"], "b" * 64)
+
+        for database, categories in tool.IDENTITY_ERRORS.items():
+            for category in sorted(categories):
+                with self.subTest(database=database, category=category):
+                    changed = copy.deepcopy(baseline)
+                    if category != "none":
+                        changed["complete"] = False
+                        changed["error_category"] = "identity_discovery_incomplete"
+                        changed["database_states"][database].update(
+                            identity_hash="", database_anchor_hash="", migration_generation_hash="",
+                            identity_observed=False, migration_version=0, migration_head_observed=False,
+                            migration_dirty=None, migration_clean=False, metadata_permissions_sufficient=False,
+                            error_category=category)
+                    receipt = validate(changed, 0 if changed["complete"] else 42)
+                    self.assertEqual(receipt["identity_database_states"][database]["error_category"], category)
+                    self.assertFalse(receipt["execution_allowed"])
+                    self.assertFalse(receipt["drop_ready"])
+                    output = io.StringIO()
+                    with mock.patch.object(tool, "execute", return_value=receipt), contextlib.redirect_stdout(output):
+                        self.assertEqual(tool.main(["--operation", "prepare", "--operation-id", OPERATION,
+                                                   "--approved-source-sha", SOURCE, "--actual-source-sha", SOURCE,
+                                                   "--run-id", "701-1"]), 42)
+                    decoded = json.loads(tool.transport().decode_armored_receipt(output.getvalue()))
+                    self.assertEqual(decoded["identity_database_states"][database]["error_category"], category)
+                    self.assertFalse(decoded["execution_allowed"])
+                    self.assertFalse(decoded["drop_ready"])
+
+        for database, invalid in (("mysql", "mongo_replica_anchor_unavailable"),
+                                  ("mongodb", "mysql_migration_head_invalid"),
+                                  ("mongodb", "mongodb://private:password@private-host/database"),
+                                  ("mongodb", "server_error\nPRIVATE_DO_NOT_PRINT"),
+                                  ("mongodb", None), ("mongodb", True), ("mongodb", {})):
+            with self.subTest(database=database, invalid_type=type(invalid).__name__):
+                changed = copy.deepcopy(baseline)
+                changed["complete"] = False
+                changed["error_category"] = "identity_discovery_incomplete"
+                changed["database_states"][database]["error_category"] = invalid
+                self.assertBlocked("identity_error_category_invalid", validate, changed, 42)
+
     def test_entrypoint_catalog_is_source_only_and_includes_unprotected_ssh(self):
         repository = SCRIPT.parents[2]
         value = json.loads((repository / "scripts/database/compatibility-retirement-entrypoints.json").read_text())

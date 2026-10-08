@@ -84,6 +84,121 @@ class RuntimeEvidenceTests(unittest.TestCase):
         docker=FakeDocker(); docker.values[docker.rows[0]["container_id"]]["image_reference"]="registry/repo:"+"b"*40
         self.blocked("image_tag_mismatch", docker)
 
+    def pinned_api(self):
+        docker = FakeDocker("apiserver", 1)
+        value = docker.values[docker.rows[0]["container_id"]]
+        value["image_reference"] = value["image_id"]
+        return docker, value["image_id"]
+
+    def receipt_bindings(self, role="worker", count=3, config=None):
+        return dict(role=role, expected=count, source=SOURCE, run="12345", attempt="1",
+                    tool_sha256=tool.hashlib.sha256(PATH.read_bytes()).hexdigest(), expected_image_config_id=config)
+
+    def test_exact_api_preflight_image_config_binding(self):
+        docker, config = self.pinned_api()
+        receipt = self.collect(docker, role="apiserver", count=1, expected_image_config_id=config)
+        self.assertEqual(receipt["format_version"], 2)
+        self.assertEqual(receipt["image_binding_kind"], "preflight_config_id")
+        self.assertEqual(receipt["expected_image_config_sha256"], config[7:])
+        self.assertEqual(receipt["instances"][0]["image_config_sha256"], config[7:])
+        self.assertIs(tool.receive_armored_receipt(tool.transport().encode_armored_receipt(receipt, schema=tool.SCHEMA), **self.receipt_bindings("apiserver", 1, config))["complete"], True)
+
+    def test_preflight_config_input_only_api_count_one(self):
+        for role, count in (("collection", 2), ("worker", 3), ("apiserver", 2)):
+            docker = FakeDocker(role, count)
+            self.blocked("input_binding_invalid", docker, role=role, count=count, expected_image_config_id="sha256:"+"f"*64)
+            self.assertEqual(docker.lists, 0)
+        for config in ("", "f"*64, "sha256:"+"F"*64, "registry@sha256:"+"f"*64, 1, SECRET):
+            docker, _ = self.pinned_api()
+            self.blocked("input_binding_invalid", docker, role="apiserver", count=1, expected_image_config_id=config)
+            self.assertEqual(docker.lists, 0)
+
+    def test_missing_wrong_default_and_registry_digest_bindings_refused(self):
+        docker, config = self.pinned_api()
+        self.blocked("image_tag_mismatch", docker, role="apiserver", count=1)
+        docker, config = self.pinned_api()
+        self.blocked("image_config_binding_mismatch", docker, role="apiserver", count=1, expected_image_config_id="sha256:"+"e"*64)
+        for reference in ("registry@sha256:"+"f"*64, "registry/repo:"+SOURCE, "sha256:"+"e"*64):
+            docker, config = self.pinned_api()
+            docker.values[docker.rows[0]["container_id"]]["image_reference"] = reference
+            self.blocked("image_config_binding_mismatch", docker, role="apiserver", count=1, expected_image_config_id=config)
+        docker = FakeDocker(); docker.values[docker.rows[0]["container_id"]]["image_reference"] = "registry@sha256:"+"f"*64
+        self.blocked("image_tag_mismatch", docker)
+        docker, config = self.pinned_api(); docker.values[docker.rows[0]["container_id"]]["image_id"] = "sha256:"+"e"*64
+        self.blocked("image_config_binding_mismatch", docker, role="apiserver", count=1, expected_image_config_id=config)
+
+    def test_pinned_api_still_proves_version_binary_and_reread(self):
+        for category, change in (("version_mismatch", lambda d:setattr(d,"version",VERSION.replace(SOURCE,"b"*40))),
+                                 ("binary_modified", lambda d:setattr(d,"changes","C /app/qs-apiserver\n")),
+                                 ("binary_hash_mismatch", lambda d:setattr(d,"hashes",["e"*64,"b"*64])),
+                                 ("runtime_changed", lambda d:setattr(d,"change",lambda v:v.update(image_id="sha256:"+"e"*64))),
+                                 ("readiness_failed", lambda d:setattr(d,"ready",False))):
+            docker, config = self.pinned_api(); change(docker)
+            self.blocked(category, docker, role="apiserver", count=1, expected_image_config_id=config)
+
+    def test_semantic_receiver_requires_every_field_not_schema_only(self):
+        receipt = self.collect()
+        for key in receipt:
+            changed = copy.deepcopy(receipt); del changed[key]
+            armor = tool.transport().encode_armored_receipt(changed, schema=tool.SCHEMA)
+            with self.assertRaisesRegex(tool.Refused,"^receipt_binding_invalid$"):
+                tool.receive_armored_receipt(armor, **self.receipt_bindings())
+        for key in tool.INSTANCE_SCHEMA:
+            changed = copy.deepcopy(receipt); del changed["instances"][0][key]
+            armor = tool.transport().encode_armored_receipt(changed, schema=tool.SCHEMA)
+            with self.assertRaisesRegex(tool.Refused,"^receipt_binding_invalid$"):
+                tool.receive_armored_receipt(armor, **self.receipt_bindings())
+
+    def test_semantic_receiver_binds_source_run_tool_mode_instances_and_body(self):
+        receipt = self.collect()
+        changes = ({"format_version":1}, {"source_sha":"b"*40}, {"image_tag":"b"*40}, {"run_id":"12345-2"},
+                   {"role":"collection"}, {"expected_instances":2}, {"observed_instances":2}, {"tool_sha256":"b"*64},
+                   {"topology_sha256":"b"*64}, {"complete":False}, {"health_verified":False},
+                   {"business_acceptance_verified":True}, {"error_category":"runtime_changed"},
+                   {"image_binding_kind":"preflight_config_id"}, {"expected_image_config_sha256":"f"*64})
+        for change in changes:
+            changed = copy.deepcopy(receipt); changed.update(change)
+            changed["receipt_body_sha256"] = tool.digest({k:v for k,v in changed.items() if k!="receipt_body_sha256"})
+            with self.assertRaisesRegex(tool.Refused,"^receipt_binding_invalid$"):
+                tool.validate_receipt(changed, **self.receipt_bindings())
+        for kind in ("duplicate_id", "wrong_version", "not_ready", "unknown_field", "bad_body_hash"):
+            changed = copy.deepcopy(receipt)
+            if kind == "duplicate_id":changed["instances"][1]["container_id"] = changed["instances"][0]["container_id"]
+            elif kind == "wrong_version":changed["instances"][0]["build_git_commit"] = "b"*40
+            elif kind == "not_ready":changed["instances"][0]["ready"] = False
+            elif kind == "unknown_field":changed["instances"][0]["credentials"] = SECRET
+            else:changed["receipt_body_sha256"] = "b"*64
+            if kind != "bad_body_hash":changed["receipt_body_sha256"] = tool.digest({k:v for k,v in changed.items() if k!="receipt_body_sha256"})
+            with self.assertRaisesRegex(tool.Refused,"^receipt_binding_invalid$"):
+                tool.validate_receipt(changed, **self.receipt_bindings())
+
+    def test_semantic_receiver_can_bind_independent_actual_instance_and_state(self):
+        receipt = self.collect()
+        bindings = dict(self.receipt_bindings(), expected_container_ids=[i["container_id"] for i in receipt["instances"]],
+                        expected_state_sha256=[i["state_sha256"] for i in receipt["instances"]],
+                        expected_instance_set_sha256=receipt["instance_set_sha256"])
+        self.assertIs(tool.validate_receipt(receipt, **bindings), receipt)
+        for key in ("expected_container_ids", "expected_state_sha256", "expected_instance_set_sha256"):
+            changed = copy.deepcopy(bindings)
+            changed[key] = "e"*64 if type(changed[key]) is str else ["e"*64]*3
+            with self.assertRaisesRegex(tool.Refused,"^receipt_binding_invalid$"):
+                tool.validate_receipt(receipt, **changed)
+        docker, config = self.pinned_api(); pinned = self.collect(docker, role="apiserver", count=1, expected_image_config_id=config)
+        for expected_config in (None, "sha256:"+"e"*64):
+            with self.assertRaisesRegex(tool.Refused,"^receipt_binding_invalid$"):
+                tool.validate_receipt(pinned, **self.receipt_bindings("apiserver",1,expected_config))
+        pinned["instances"][0]["image_config_sha256"] = "e"*64
+        pinned["receipt_body_sha256"] = tool.digest({k:v for k,v in pinned.items() if k!="receipt_body_sha256"})
+        with self.assertRaisesRegex(tool.Refused,"^receipt_binding_invalid$"):
+            tool.validate_receipt(pinned, **self.receipt_bindings("apiserver",1,config))
+
+    def test_producer_applies_semantic_receiver_before_emit(self):
+        incomplete = self.collect(); del incomplete["image_binding_kind"]
+        out=io.StringIO(); err=io.StringIO()
+        with mock.patch.object(tool,"collect",return_value=incomplete), contextlib.redirect_stdout(out),contextlib.redirect_stderr(err):
+            self.assertEqual(tool.main(["--role","worker","--expected-instances","3","--source-sha",SOURCE,"--image-tag",SOURCE,"--run-id","12345","--run-attempt","1"]),1)
+        self.assertEqual(out.getvalue(),"");self.assertEqual(err.getvalue(),"runtime_instance_evidence_refused:receipt_binding_invalid\n")
+
     def test_tag_is_not_image_or_manifest_identity(self):
         receipt = self.collect(); self.assertEqual(receipt["instances"][0]["image_config_sha256"], "f"*64)
         self.assertNotIn("manifest", json.dumps(receipt))
@@ -263,6 +378,40 @@ class RuntimeEvidenceTests(unittest.TestCase):
         self.assertNotIn('$SUDO python3 "$DEPLOY_TMP/scripts/cd/runtime-evidence.py"',remote)
         self.assertIn('if [ -n "${SUDO:-}" ]; then runtime_docker_args=(--sudo-docker); fi',remote)
         self.assertLess(remote.index('python3 "$DEPLOY_TMP/scripts/cd/runtime-evidence.py"'),remote.index('retain_successful_image "$(resolve_compose_image_ref)"'))
+        self.assertLess(remote.index('\nverify_running_image\n'),remote.index('runtime_docker_args+=(--expected-image-config-id "$MQ_IMAGE_ID")'))
+        self.assertIn('if [ "$SERVICE" != "apiserver" ] || ! [[ "$MQ_IMAGE_ID" =~ ^sha256:[0-9a-f]{64}$ ]]',remote)
+
+
+class NativeRuntimeSafetyTests(unittest.TestCase):
+    def native(self):
+        path=PATH.with_name("runtime-evidence-integration.py")
+        spec=importlib.util.spec_from_file_location("runtime_native_safety",path)
+        module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module)
+        return module
+
+    def test_existing_role_is_refused_before_any_fixture_mutation(self):
+        native=self.native();out=io.StringIO();err=io.StringIO()
+        def command(args, **kwargs):
+            if args==["docker","context","show"]:raw=b"synthetic\n"
+            elif args==["docker","context","inspect","--format","{{json .Endpoints.docker.Host}}","synthetic"]:raw=b'"unix:///tmp/synthetic-docker.sock"\n'
+            else:raise AssertionError("mutation or unexpected daemon command")
+            return subprocess.CompletedProcess(args,0,raw,b"")
+        with mock.patch.dict(native.os.environ,{},clear=True), mock.patch.object(native.sys,"argv",[str(PATH)]), mock.patch.object(native.subprocess,"run",side_effect=command), mock.patch.object(native.tool,"Docker") as docker, contextlib.redirect_stdout(out),contextlib.redirect_stderr(err):
+            docker.return_value.listing.return_value=[{"container_id":"e"*64,"name":"qs-apiserver","project":"existing","service":"qs-apiserver"}]
+            self.assertEqual(native.main(),1)
+        self.assertEqual(out.getvalue(),"");self.assertEqual(err.getvalue(),"runtime_evidence_native_refused:existing_local_role_refused\n")
+
+    def test_remote_named_context_is_refused_before_daemon_or_fixture_calls(self):
+        native=self.native();out=io.StringIO();err=io.StringIO()
+        def command(args, **kwargs):
+            if args==["docker","context","show"]:raw=b"synthetic\n"
+            elif args==["docker","context","inspect","--format","{{json .Endpoints.docker.Host}}","synthetic"]:raw=b'"ssh://synthetic.invalid"\n'
+            else:raise AssertionError("mutation or unexpected daemon command")
+            return subprocess.CompletedProcess(args,0,raw,b"")
+        with mock.patch.dict(native.os.environ,{"DOCKER_CONTEXT":"synthetic"},clear=True), mock.patch.object(native.sys,"argv",[str(PATH)]), mock.patch.object(native.subprocess,"run",side_effect=command), mock.patch.object(native.tool,"Docker") as docker, contextlib.redirect_stdout(out),contextlib.redirect_stderr(err):
+            self.assertEqual(native.main(),1)
+            docker.assert_not_called()
+        self.assertEqual(out.getvalue(),"");self.assertEqual(err.getvalue(),"runtime_evidence_native_refused:non_local_docker_endpoint_refused\n")
 
 
 if __name__ == "__main__":unittest.main()
