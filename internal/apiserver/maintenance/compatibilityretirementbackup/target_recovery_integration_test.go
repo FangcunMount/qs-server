@@ -481,5 +481,23 @@ func nativeTargetProtectedPoints(t *testing.T, conn *sql.Conn, mdb *mongo.Databa
 		t.Fatal("actual Mongo head point read failed")
 	}
 	out["mongo_head"] = sha(raw)
+	for _, name := range []string{"answersheets", "interpret_report_artifacts", "interpretation_runs", "report_generations"} {
+		ctx := context.Background()
+		cur, e := mdb.Collection(name).Find(ctx, bson.D{}, options.Find().SetSort(bson.D{{Key: "_id", Value: 1}}))
+		if e != nil {
+			t.Fatal("actual retained Mongo facts read failed")
+		}
+		var rows []bson.Raw
+		readErr := cur.All(ctx, &rows)
+		closeErr := cur.Close(ctx)
+		if readErr != nil || closeErr != nil {
+			t.Fatal("actual retained Mongo facts cursor failed")
+		}
+		hashes := make([]string, len(rows))
+		for i, row := range rows {
+			hashes[i] = sha(row)
+		}
+		out["mongo_kept/"+name] = jsonSHA(hashes)
+	}
 	return out
 }
