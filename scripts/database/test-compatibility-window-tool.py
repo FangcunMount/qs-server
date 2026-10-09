@@ -59,6 +59,24 @@ class WindowToolMetadata(unittest.TestCase):
         for mutate in (lambda v:v.update(image_id='qs-ai:latest'),lambda v:v['ai_bounds'].update(path='/tmp/ai.json'),lambda v:v['ai_bounds'].update(path='/opt/backups/qs-server/compatibility-retirement/13-1/ai.json'),lambda v:v.update(protection=v['ai_bounds']),lambda v:v.update(runtime_source_sha='main')):
             v=self.final_history();mutate(v)
             with self.assertRaises(tool.Refused):tool.validate_final_history(v,'12-1')
+    def test_writer_control_preserves_expected_hash_only_and_rejects_prepare_even_null(self):
+        for value in (None,dict(workflow_scope_sha256='a'*64)):
+            r=self.request();r['writer_control']=value;a=self.approval(r)
+            with self.assertRaises(tool.Refused):tool.derive_request(tool.canonical(r),a,'22-3')
+        r=self.request();r['writer_control']=dict(workflow_scope_sha256='a'*64)
+        a=self.approval(r,'apply')
+        out=tool.decode(tool.derive_request(tool.canonical(r),a,'22-3'))
+        self.assertEqual(out['writer_control'],r['writer_control'])
+        for value in (None,dict(workflow_scope_sha256='main'),dict(workflow_scope_sha256='a'*64,drop_ready=True)):
+            r['writer_control']=value;a=self.approval(r,'apply')
+            with self.assertRaises(tool.Refused):tool.derive_request(tool.canonical(r),a,'22-3')
+    def test_prepare_retains_twelve_credentials_and_effects_use_private_read_token(self):
+        self.assertEqual(tool.credential_names('prepare'),tool.CREDENTIALS)
+        self.assertEqual(tool.credential_names('apply'),tool.CREDENTIALS+('GITHUB_READ_TOKEN',))
+        with self.assertRaises(tool.Refused):tool.credential_names('other')
+        ast.parse(tool.ROOT_BOOTSTRAP)
+        self.assertIn("names=namespace['credential_names'](stage)",tool.ROOT_BOOTSTRAP)
+
     def test_mixed_unknown_uppercase_and_proof_fields_reject(self):
         for name in ('drop_ready','whole_writer_fence','SourceSHA','tool_sha','window_lease'):
             r=self.request();r[name]=True;a=self.approval(r)

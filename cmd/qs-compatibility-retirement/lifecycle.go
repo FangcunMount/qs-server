@@ -41,6 +41,7 @@ type lifecycleRequest struct {
 	ServiceControl    *lifecycleServiceControl             `json:"service_control,omitempty"`
 	DeploymentControl *lifecycleAPIDeploymentControl       `json:"deployment_control,omitempty"`
 	FinalHistory      *lifecycleFinalHistoryInput          `json:"final_history,omitempty"`
+	WriterControl     *lifecycleWriterControl              `json:"writer_control,omitempty"`
 	requestSHA256     string                               `json:"-"`
 	prepareRoot       string                               `json:"-"`
 }
@@ -296,6 +297,9 @@ func loadLifecycleRequest(ctx context.Context, path, expected, operation, actual
 		(recovery.SQLNonTargetSHA256 != "" && !hashRE.MatchString(recovery.SQLNonTargetSHA256)) || !hashRE.MatchString(recovery.MongoNonTargetSHA256) ||
 		recovery.SQLHead != 99 || recovery.MongoHead != 38 || !runRE.MatchString(recovery.ActualRunID) {
 		return r, nil, lifecycleError("lifecycle_binding_rejected")
+	}
+	if stage != "prepare" && !r.WriterControl.valid() {
+		return r, nil, lifecycleError("lifecycle_writer_scope_binding_rejected")
 	}
 	if stage != "prepare" && !r.DeploymentControl.valid() {
 		return r, nil, lifecycleError("lifecycle_actual_inline_image_approval_missing")

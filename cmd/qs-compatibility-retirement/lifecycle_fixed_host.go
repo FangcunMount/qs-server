@@ -26,6 +26,7 @@ type lifecycleFixedHost struct {
 	dataBaseline      *backup.NonTargetDataBaseline
 	acceptancePlan    *backup.TargetRecoveryPlan
 	acceptancePair    *migration.CompatibilityPairMigrationProof
+	writers           *lifecycleWriterObservation
 }
 
 func newLifecycleFixedHost(ctx context.Context, r lifecycleRequest, a *backup.Archive) (lifecycleHost, error) {
@@ -139,8 +140,8 @@ func (h *lifecycleFixedHost) RestoreStoppedServices(ctx context.Context, r lifec
 	return h.services.RestorePartialStop(ctx, r, w)
 }
 
-func (*lifecycleFixedHost) CheckWholeWriterFence(context.Context, lifecycleRequest) error {
-	return lifecycleError("lifecycle_whole_writer_and_old_ref_fence_missing")
+func (h *lifecycleFixedHost) CheckWholeWriterFence(ctx context.Context, r lifecycleRequest) error {
+	return h.observeWholeWriterScopes(ctx, r)
 }
 func (h *lifecycleFixedHost) FinalDifferenceAndEOF(ctx context.Context, r lifecycleRequest, a *backup.Archive) error {
 	return h.finalDifferenceAndEOF(ctx, r, a)
@@ -251,6 +252,9 @@ func (h *lifecycleFixedHost) Close() error {
 		return nil
 	}
 	var result error
+	if h.writers != nil {
+		h.writers.close()
+	}
 	if h.services != nil {
 		result = h.services.Close()
 	}

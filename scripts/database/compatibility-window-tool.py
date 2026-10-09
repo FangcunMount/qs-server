@@ -31,6 +31,16 @@ TARGET = "4e09444409d1cfab3c9df383ed80a0999419fcbbd2f4e80d2e5dac1cf7dfcfb8"
 STAGES = {"prepare", "apply", "verify", "recover", "purge"}
 CREDENTIALS = ("MYSQL_HOST", "MYSQL_PORT", "MYSQL_USERNAME", "MYSQL_PASSWORD", "MYSQL_DATABASE", "MONGODB_HOST", "MONGODB_PORT", "MONGODB_USERNAME", "MONGODB_PASSWORD", "MONGODB_DBNAME", "MONGODB_METADATA_ADMIN_USERNAME", "MONGODB_METADATA_ADMIN_PASSWORD")
 
+READ_TOKEN = "GITHUB_READ_TOKEN"
+
+
+def credential_names(stage):
+    if stage not in STAGES:
+        reject()
+    # Preparation retains the exact original twelve-credential packet. Only a
+    # future effectful caller may borrow this run's short-lived GET credential.
+    return CREDENTIALS if stage == "prepare" else CREDENTIALS + (READ_TOKEN,)
+
 
 class Refused(Exception):
     pass
@@ -114,7 +124,7 @@ def derive_request(raw, approval, current_run):
         reject("window_tool_template_hash_rejected")
     r = decode(raw)
     required = ("format_version", "kind", "tool_source_sha", "original_source_sha", "operation_id", "actual_run_id", "manifest_sha256", "archive_directory", "window_directory", "journal_directory", "archive_approval", "recovery")
-    optional = ("source_directory", "restore_engines", "source_file_sha256", "service_control", "resume", "resume_kind", "deployment_control", "final_history")
+    optional = ("source_directory", "restore_engines", "source_file_sha256", "service_control", "resume", "resume_kind", "deployment_control", "final_history", "writer_control")
     exact(r, required, optional)
     if type(r["format_version"]) is not int or r["format_version"] != 1 or r["kind"] != "compatibility_retirement_lifecycle_request" or r["tool_source_sha"] != approval["tool_source_sha"] or r["original_source_sha"] != approval["original_source_sha"] or r["operation_id"] != approval["operation_id"] or r["actual_run_id"] != "" or r["manifest_sha256"] != approval["manifest_sha256"]:
         reject("window_tool_template_binding_rejected")
@@ -129,8 +139,11 @@ def derive_request(raw, approval, current_run):
     result = copy.deepcopy(r)
     result["actual_run_id"] = current_run
     if approval["stage"] == "prepare":
-        if any(key in r for key in ("resume", "resume_kind", "service_control", "deployment_control", "final_history")) or q["archive_sha256"] != "":
+        if any(key in r for key in ("resume", "resume_kind", "service_control", "deployment_control", "final_history", "writer_control")) or q["archive_sha256"] != "":
             reject("window_tool_prepare_effect_fields_rejected")
+    if "writer_control" in r:
+        exact(r["writer_control"], ("workflow_scope_sha256",))
+        token(r["writer_control"]["workflow_scope_sha256"], HASH)
     if "final_history" in r:
         validate_final_history(r["final_history"], approval["operation_id"])
     if "resume" not in r:
@@ -500,6 +513,14 @@ def root_execute(arguments, packet, source_uid, archive_raw):
               "package_sha256": package_hash, "tool_directory": packet["tool_directory"], "tool_program_sha256": packet["tool_program_sha256"], "native_sha256": digest(binary), "native_path": str(native), "b_image_id": a["b_image_id"],
               "b_program_sha256": a["b_program_sha256"], "source_uid": source_uid, "drop_authority": False}
     write_new(invocation / "native-call.intent.private.json", canonical(intent))
+    if stage != "prepare" and "writer_control" in decode(derived):
+        scope_hash = decode(derived)["writer_control"]["workflow_scope_sha256"]
+        scope_raw = read_owned(original / "approved-workflow-scope.json", source_uid, scope_hash, 64 << 10)
+        scope_target = tool_root / "approved-workflow-scope.json"
+        if not scope_target.exists():
+            write_new(scope_target, scope_raw)
+        elif read_owned(scope_target, 0, scope_hash, 64 << 10) != scope_raw:
+            reject("window_tool_existing_scope_conflict")
     if stage == "prepare":
         write_new(batch / "tool.intent.private.json", canonical(intent))
     if not native.exists():
@@ -513,7 +534,7 @@ def root_execute(arguments, packet, source_uid, archive_raw):
         reject("window_tool_actual_source_rejected")
     write_new(invocation / "lifecycle-request.json", derived)
     write_new(invocation / "manifest.json", frozen_manifest)
-    environment = {name: packet["credentials"][name] for name in CREDENTIALS}
+    environment = {name: packet["credentials"][name] for name in credential_names(stage)}
     environment["PATH"] = "/usr/bin:/bin"
     environment["QS_RETIREMENT_SOURCE_UID"] = str(source_uid)
     # The real native process owns every later connection/Window/proof. This
@@ -570,7 +591,7 @@ try:
  if hashlib.sha256(program).hexdigest()!=packet['tool_program_sha256']: raise ValueError()
  namespace={'__name__':'approved_window_tool_root_module'}
  exec(compile(program,'approved-hash-bound-window-tool','exec'),namespace)
- names=namespace['CREDENTIALS']
+ names=namespace['credential_names'](stage)
  if set(packet['credentials'])!=set(names) or any(type(v)is not str or any(c in v for c in ('\x00','\r','\n')) for v in packet['credentials'].values()): raise ValueError()
  namespace['read_owned'](tool_directory/'compatibility-window-tool.py',source_uid,packet['tool_program_sha256'],1<<20)
  raise SystemExit(namespace['root_execute'](arguments,packet,source_uid,archive_raw))
@@ -588,6 +609,7 @@ PUBLIC_ERRORS = frozenset({"none", "lifecycle_actual_host_adapters_missing", "li
     "lifecycle_final_historical_input_rejected", "lifecycle_final_historical_scope_rejected", "lifecycle_final_historical_scope_cleanup_failed",
     "lifecycle_final_historical_q_and_eof_missing", "lifecycle_actual_inline_b_deployment_missing",
     "lifecycle_actual_runtime_and_data_acceptance_missing", "lifecycle_actual_ddl_stopped_unproven",
+    "lifecycle_writer_scope_binding_rejected", "lifecycle_platform_observation_unproven", "lifecycle_host_database_external_writer_isolation_unproven",
     "lifecycle_actual_no_migration_rollback_missing", "lifecycle_actual_batch_material_purge_missing",
     "lifecycle_actual_batch_material_zero_check_missing", "lifecycle_native_operation_failed",
     "window_tool_root_native_call_rejected", "window_tool_call_rejected"})
@@ -675,7 +697,7 @@ def main():
         if not re.fullmatch(r"/tmp/qs-independent-window-tool\.[a-zA-Z0-9]{6,16}", str(directory)):
             reject("window_tool_parent_path_rejected")
         program_hash = digest(Path(__file__).read_bytes())
-        packet = canonical({"approval": raw, "credentials": {key: os.environ.get(key, "") for key in CREDENTIALS}, "tool_directory": str(directory), "tool_program_sha256": program_hash})
+        packet = canonical({"approval": raw, "credentials": {key: os.environ.get(key, "") for key in credential_names(args.operation)}, "tool_directory": str(directory), "tool_program_sha256": program_hash})
         template_path = Path("/opt/backups/qs-server/compatibility-retirement") / args.operation_id / "lifecycle-request-template.json"
         approved_template = read_owned(template_path, os.getuid(), args.template_hash, 256 << 10)
         derived_hash = digest(derive_request(approved_template, a, args.run_id))
@@ -696,10 +718,10 @@ def main():
         native = validate_native(native_raw, code, a, args.run_id, derived_hash)
         result = {"format_version": 1, "kind": "independent_window_tool_call_result", "dispatcher_source_sha": args.dispatcher_sha,
                   "tool_source_sha": a["tool_source_sha"], "approved_template_sha256": args.template_hash, "derived_request_sha256": derived_hash, "native_result": native}
-        emit(result, tuple(os.environ.get(key, "") for key in CREDENTIALS))
+        emit(result, tuple(os.environ.get(key, "") for key in CREDENTIALS + (READ_TOKEN,)))
         return code
     except (Refused, OSError, ValueError, subprocess.SubprocessError):
-        emit({'format_version':1,'complete':False,'execution_allowed':False,'drop_ready':False,'error_category':'window_tool_call_rejected'}, tuple(os.environ.get(key, '') for key in CREDENTIALS))
+        emit({'format_version':1,'complete':False,'execution_allowed':False,'drop_ready':False,'error_category':'window_tool_call_rejected'}, tuple(os.environ.get(key, '') for key in CREDENTIALS + (READ_TOKEN,)))
         return 1
 
 
