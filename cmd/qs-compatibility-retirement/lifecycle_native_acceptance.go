@@ -8,6 +8,7 @@ import (
 
 	backup "github.com/FangcunMount/qs-server/internal/apiserver/maintenance/compatibilityretirementbackup"
 	hostmysql "github.com/FangcunMount/qs-server/internal/pkg/database/mysql"
+	"github.com/FangcunMount/qs-server/internal/pkg/migration"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"go.mongodb.org/mongo-driver/mongo/readconcern"
@@ -31,8 +32,10 @@ func (h *lifecycleFixedHost) BindAcceptancePlan(ctx context.Context, r lifecycle
 // Every partial proof below comes from original native owners. This adapter
 // deliberately cannot finish acceptance until controlled A internal resume,
 // actual audit/MQ runtime and the complete same-batch material producers are
-// present. Data comparison happens before any such resume, under the original
-// Window. It creates no user/event/command or audit checkpoint database write.
+// present. The complete data comparison has already finished before the native
+// B API start (its first controlled internal resume). Acceptance consumes that
+// same-process fact; it does not demand byte equality after normal writers run.
+// It creates no user/event/command or audit checkpoint database write.
 func (h *lifecycleFixedHost) verifyNativeAcceptance(ctx context.Context, r lifecycleRequest, a *backup.Archive) error {
 	if h == nil || ctx == nil || ctx.Err() != nil || h.owner == nil || h.services == nil || h.services.window == nil || !h.services.identity.matches(r) || h.dataBaseline == nil || h.acceptancePlan == nil || h.acceptancePair == nil || h.api == nil {
 		return lifecycleError("lifecycle_actual_runtime_and_data_acceptance_missing")
@@ -57,7 +60,7 @@ func (h *lifecycleFixedHost) verifyNativeAcceptance(ctx context.Context, r lifec
 	if e = h.acceptancePair.VerifyAfter(q, h.owner.originalConn, h.owner.originalDB); e != nil || !lifecycleInlineMigrationBindingMatches(r, h.acceptancePair.Observation(), h.services.window, q) {
 		return lifecycleError("lifecycle_actual_pair_acceptance_missing")
 	}
-	if e = h.verifyCompleteDataBeforeInternalResume(q); e != nil {
+	if e = h.verifyPreBDataComparison(q, r); e != nil {
 		return e
 	}
 	if e = h.api.observeAcceptance(q, r); e != nil {
@@ -76,7 +79,7 @@ func (h *lifecycleFixedHost) verifyNativeAcceptance(ctx context.Context, r lifec
 	return lifecycleError("lifecycle_controlled_internal_resume_audit_mq_and_complete_material_producers_missing")
 }
 
-func (h *lifecycleFixedHost) verifyCompleteDataBeforeInternalResume(ctx context.Context) (result error) {
+func (h *lifecycleFixedHost) verifyCompleteDataBeforeInternalResume(ctx context.Context, proof *migration.CompatibilityPairMigrationProof) (result error) {
 	if h == nil || h.owner == nil || h.owner.originalConn == nil || h.owner.originalMongo == nil || h.owner.originalDB == nil {
 		return lifecycleError("lifecycle_actual_complete_data_baseline_missing")
 	}
@@ -104,10 +107,15 @@ func (h *lifecycleFixedHost) verifyCompleteDataBeforeInternalResume(ctx context.
 	defer func() {
 		cleanup, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
-		if e := session.AbortTransaction(cleanup); e != nil && result == nil {
+		// Pinned driver's AbortTransaction discards its actual command error.
+		// First require the server's response from the original native session;
+		// ordinary Abort then maintains driver state regardless of that result.
+		nativeError := lifecycleAbortComparisonMongo(cleanup, h.owner.originalMongo, session)
+		localError := session.AbortTransaction(cleanup)
+		if (nativeError != nil || localError != nil) && result == nil {
 			result = lifecycleError("lifecycle_acceptance_snapshot_cleanup_failed")
 		}
 	}()
 	paired := mongo.NewSessionContext(hostmysql.WithTx(ctx, g), session)
-	return backup.VerifyCompleteNonTargetData(paired, h.dataBaseline, h.acceptancePlan, h.acceptancePair, backup.BorrowedSources{SQL: tx, Mongo: h.owner.originalDB})
+	return backup.VerifyCompleteNonTargetData(paired, h.dataBaseline, h.acceptancePlan, proof, backup.BorrowedSources{SQL: tx, Mongo: h.owner.originalDB})
 }

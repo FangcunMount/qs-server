@@ -430,10 +430,24 @@ jobs:
           QS_HISTORY_REQUIRE_DATABASE: '1'
           QS_SERVER_TEST_MONGO_URI: mongodb://127.0.0.1:27017/?replicaSet=rs0
           QS_SERVER_TEST_MONGO_DB_PREFIX: qs_history_ci_contract
+          QS_RETIREMENT_REQUIRE_ABORT_NATIVE: '1'
         run: |
+          set -euo pipefail
           go test -race -tags=integration -count=1 -timeout=10m ./internal/apiserver/infra/mysql/evaluation -run '^TestSQLCASProvenanceNative|^TestSQLHistoricalMissingOriginalRunPolicyNative$|^TestSQLHistoricalOriginalRunGlobalAbsenceNative$'
           go test -race -tags=integration -count=1 -timeout=10m ./internal/apiserver/maintenance/compatibilityretirement -run '^(TestHistoricalCASPersistenceNative|TestQualifiedHistoricalCASNative|TestFinalHistoricalEOFNative)'
           go test -race -tags=integration -count=1 -timeout=10m ./internal/apiserver/maintenance/compatibilityretirementbackup -run '^(TestNonTargetDataNativePagingDriftAndBSONIdentity|TestMongoMetadataSnapshotNative)$'
+          go test -race -tags=integration -count=1 -timeout=2m -v ./cmd/qs-compatibility-retirement -run '^TestComparisonMongoAbortNativeOriginalSessionResponseAndUnknown$' | tee "${RUNNER_TEMP}/qs-comparison-mongo-abort-native.log"
+          if grep -q -- '--- SKIP:' "${RUNNER_TEMP}/qs-comparison-mongo-abort-native.log"; then
+            echo 'Original-session Mongo abort response proof unexpectedly skipped' >&2
+            exit 1
+          fi
+          for marker in \
+            'TestComparisonMongoAbortNativeOriginalSessionResponseAndUnknown' \
+            'TestComparisonMongoAbortNativeOriginalSessionResponseAndUnknown/actual-same-session-success' \
+            'TestComparisonMongoAbortNativeOriginalSessionResponseAndUnknown/canceled-rejected-before-fact' \
+            'TestComparisonMongoAbortNativeOriginalSessionResponseAndUnknown/actual-server-reply-withheld-is-unknown'; do
+            grep -q -- "--- PASS: ${marker}" "${RUNNER_TEMP}/qs-comparison-mongo-abort-native.log"
+          done
 
       - name: Run Survey and ModelCatalog Mongo integration contracts
         env:

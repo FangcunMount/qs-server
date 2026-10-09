@@ -192,7 +192,11 @@ func (h *lifecycleFixedHost) finalDifferenceAndEOF(ctx context.Context, r lifecy
 	defer func() {
 		cleanup, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
-		if e := session.AbortTransaction(cleanup); e != nil && result == nil {
+		// Require the real original-session server response before any DROP;
+		// the pinned driver's ordinary Abort ignores network/command errors.
+		nativeError := lifecycleAbortComparisonMongo(cleanup, h.owner.originalMongo, session)
+		localError := session.AbortTransaction(cleanup)
+		if (nativeError != nil || localError != nil) && result == nil {
 			result = lifecycleError("lifecycle_final_historical_scope_cleanup_failed")
 		}
 	}()

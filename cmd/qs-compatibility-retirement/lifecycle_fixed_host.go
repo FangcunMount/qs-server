@@ -18,15 +18,17 @@ func lifecycleEffectsPreflight(context.Context) error {
 }
 
 type lifecycleFixedHost struct {
-	owner             *lifecyclePreparationOwner
-	restoreOwner      *lifecyclePreparationOwner
-	acceptedMaterials *lifecycleAcceptedMaterials
-	services          *lifecycleServiceController
-	api               *lifecycleAPITransition
-	dataBaseline      *backup.NonTargetDataBaseline
-	acceptancePlan    *backup.TargetRecoveryPlan
-	acceptancePair    *migration.CompatibilityPairMigrationProof
-	writers           *lifecycleWriterObservation
+	owner               *lifecyclePreparationOwner
+	restoreOwner        *lifecyclePreparationOwner
+	acceptedMaterials   *lifecycleAcceptedMaterials
+	services            *lifecycleServiceController
+	api                 *lifecycleAPITransition
+	dataBaseline        *backup.NonTargetDataBaseline
+	acceptancePlan      *backup.TargetRecoveryPlan
+	acceptancePair      *migration.CompatibilityPairMigrationProof
+	preBComparison      *lifecyclePreBDataComparison
+	comparisonAttempted bool
+	writers             *lifecycleWriterObservation
 }
 
 func newLifecycleFixedHost(ctx context.Context, r lifecycleRequest, a *backup.Archive) (lifecycleHost, error) {
@@ -147,7 +149,7 @@ func (h *lifecycleFixedHost) FinalDifferenceAndEOF(ctx context.Context, r lifecy
 	return h.finalDifferenceAndEOF(ctx, r, a)
 }
 func (h *lifecycleFixedHost) DeployBInline(ctx context.Context, r lifecycleRequest, p *migration.CompatibilityPairMigrationProof, w *fence.MaintenanceWindow) error {
-	if h == nil || h.owner == nil || h.services == nil || h.api == nil || p == nil || w == nil || h.services.window != w {
+	if h == nil || h.owner == nil || h.services == nil || h.api == nil || p == nil || w == nil || h.services.window != w || h.comparisonAttempted || h.preBComparison != nil || h.acceptancePair != nil {
 		return lifecycleError("lifecycle_actual_inline_b_deployment_missing")
 	}
 	q, c, e := w.ForwardContext(ctx)
@@ -155,15 +157,12 @@ func (h *lifecycleFixedHost) DeployBInline(ctx context.Context, r lifecycleReque
 		return e
 	}
 	defer c()
-	if e = h.services.Check(q); e != nil {
+	// A normal B startup immediately resumes its A-equivalent relays and
+	// schedulers. Complete the frozen data comparison and end both RO scopes
+	// before the first native API start, while all original services are stopped.
+	h.preBComparison, e = h.compareCompleteDataBeforeB(q, r, p, w)
+	if e != nil {
 		return e
-	}
-	if e = p.VerifyAfter(q, h.owner.originalConn, h.owner.originalDB); e != nil {
-		return e
-	}
-	o := p.Observation()
-	if !lifecycleInlineMigrationBindingMatches(r, o, w, q) {
-		return lifecycleError("lifecycle_actual_inline_b_deployment_missing")
 	}
 	if e = h.api.deploy(q, r, false); e != nil {
 		return e
