@@ -10,6 +10,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"os/exec"
@@ -318,6 +319,187 @@ func publicCLICleanupEngines(root, archive, source, operation, run, manifest str
 	return count, nil
 }
 
+const (
+	publicCLIInventoryPageSize = 1000
+	publicCLIInventoryMaxPages = 1001
+)
+
+// These paths describe only successful output from the fixed v2 inventory
+// producer. They grant no backup, restore or purge permission.
+func publicCLIInventoryMaterialPaths(report inventory, run string) (map[string]bool, error) {
+	if !runPattern.MatchString(run) || report.RunID != run || !report.Complete || report.ErrorCategory != "none" || len(report.Targets) != 4 {
+		return nil, ErrSource
+	}
+	directory := "inventory-" + run
+	paths := map[string]bool{directory: true}
+	for i, s := range report.Targets {
+		database, kind := "mysql", "base_table"
+		if i == 3 {
+			database, kind = "mongodb", "collection"
+		}
+		if s.Database != database || s.Name != targetNames[i] || s.Kind != kind || !s.Present || !s.Complete || s.ErrorCategory != "none" || s.NextCycle || s.Passes != 2 || s.SourceFile != sourceNames[i] || s.Records > 1000000 || s.Boundary.Database != database || s.Boundary.Name != targetNames[i] || s.Boundary.Kind != kind || !s.Boundary.Present {
+			return nil, ErrSource
+		}
+		// Both passes return before querying/checkpointing an approved empty bound.
+		// Otherwise an exactly full last page produces a final empty EOF page.
+		pagesPerPass := uint64(0)
+		if s.Boundary.Empty {
+			if s.Records != 0 {
+				return nil, ErrSource
+			}
+		} else {
+			pagesPerPass = s.Records/publicCLIInventoryPageSize + 1
+		}
+		if pagesPerPass > publicCLIInventoryMaxPages || s.Pages != 2*pagesPerPass {
+			return nil, ErrSource
+		}
+		paths[filepath.Join(directory, s.SourceFile)] = true
+		paths[filepath.Join(directory, s.SourceFile+".asset.json")] = true
+		for pass := 1; pass <= 2; pass++ {
+			for page := uint64(1); page <= pagesPerPass; page++ {
+				paths[filepath.Join(directory, fmt.Sprintf("%s-%s-pass-%d-page-%06d.checkpoint.json", database, s.Name, pass, page))] = true
+			}
+		}
+	}
+	return paths, nil
+}
+
+func publicCLIMaterialRelativeKnown(path, name string, allowed map[string]bool) error {
+	relative, e := filepath.Rel(path, name)
+	if e != nil || (relative != "." && !allowed[relative]) {
+		return ErrPrivate
+	}
+	return nil
+}
+
+func TestLifecyclePublicCLIInventoryMaterialBoundaries(t *testing.T) {
+	for _, tc := range []struct {
+		name                  string
+		records, pagesPerPass uint64
+		empty                 bool
+	}{
+		{"approved_empty", 0, 0, true},
+		{"nonempty_bound_zero_records", 0, 1, false},
+		{"partial_page", 999, 1, false},
+		{"one_full_page_plus_empty_eof", 1000, 2, false},
+		{"multi_page", 1001, 2, false},
+		{"two_full_pages_plus_empty_eof", 2000, 3, false},
+		{"maximum_records_and_eof", 1000000, 1001, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			report := publicCLIInventoryMaterialTestReport(tc.records, tc.pagesPerPass, tc.empty)
+			paths, e := publicCLIInventoryMaterialPaths(report, report.RunID)
+			if e != nil || len(paths) != 9+int(tc.pagesPerPass)*8 {
+				t.Fatal("public_cli_inventory_material_boundary_rejected")
+			}
+			for _, s := range report.Targets {
+				directory := "inventory-" + report.RunID
+				if !paths[filepath.Join(directory, s.SourceFile+".asset.json")] {
+					t.Fatal("public_cli_inventory_source_asset_missing")
+				}
+				for pass := 1; pass <= 2; pass++ {
+					prefix := s.Database + "-" + s.Name
+					if tc.pagesPerPass > 0 && !paths[filepath.Join(directory, fmt.Sprintf("%s-pass-%d-page-%06d.checkpoint.json", prefix, pass, tc.pagesPerPass))] {
+						t.Fatal("public_cli_inventory_last_eof_page_missing")
+					}
+					if paths[filepath.Join(directory, fmt.Sprintf("%s-pass-%d-page-%06d.checkpoint.json", prefix, pass, tc.pagesPerPass+1))] {
+						t.Fatal("public_cli_inventory_extra_page_allowed")
+					}
+				}
+			}
+		})
+	}
+	for _, name := range []string{"odd_pages", "missing_eof_page", "extra_pages", "empty_with_records", "source_path_escape", "wrong_passes", "wrong_database", "incomplete_report"} {
+		t.Run(name, func(t *testing.T) {
+			report := publicCLIInventoryMaterialTestReport(1000, 2, false)
+			switch name {
+			case "odd_pages":
+				report.Targets[0].Pages = 3
+			case "missing_eof_page":
+				report.Targets[0].Pages = 2
+			case "extra_pages":
+				report.Targets[0].Pages = 6
+			case "empty_with_records":
+				report.Targets[0].Boundary.Empty = true
+			case "source_path_escape":
+				report.Targets[0].SourceFile = "../unregistered"
+			case "wrong_passes":
+				report.Targets[0].Passes = 1
+			case "wrong_database":
+				report.Targets[0].Database = "mongodb"
+			case "incomplete_report":
+				report.Complete = false
+			}
+			if _, e := publicCLIInventoryMaterialPaths(report, report.RunID); e == nil {
+				t.Fatal("public_cli_inventory_inconsistent_material_plan_accepted")
+			}
+		})
+	}
+}
+
+func publicCLIInventoryMaterialTestReport(records, pagesPerPass uint64, empty bool) inventory {
+	report := inventory{RunID: "100-3", Complete: true, ErrorCategory: "none"}
+	for i := 0; i < 4; i++ {
+		database, kind := "mysql", "base_table"
+		if i == 3 {
+			database, kind = "mongodb", "collection"
+		}
+		s := SourceSnapshot{Database: database, Name: targetNames[i], Kind: kind, Present: true, Complete: true, ErrorCategory: "none", Records: records, SourceFile: sourceNames[i], Passes: 2, Pages: 2 * pagesPerPass}
+		s.Boundary.Database, s.Boundary.Name, s.Boundary.Kind = database, targetNames[i], kind
+		s.Boundary.Present, s.Boundary.Empty = true, empty
+		report.Targets = append(report.Targets, s)
+	}
+	return report
+}
+
+func TestLifecyclePublicCLIInventoryMaterialDirectory(t *testing.T) {
+	report := publicCLIInventoryMaterialTestReport(1000, 2, false)
+	allowed, e := publicCLIInventoryMaterialPaths(report, report.RunID)
+	if e != nil {
+		t.Fatal("public_cli_inventory_material_test_plan_rejected")
+	}
+	root := t.TempDir()
+	for relative := range allowed {
+		path := filepath.Join(root, relative)
+		if relative == "inventory-"+report.RunID {
+			if os.MkdirAll(path, 0700) != nil {
+				t.Fatal("public_cli_inventory_material_directory_failed")
+			}
+		} else {
+			if os.MkdirAll(filepath.Dir(path), 0700) != nil || os.WriteFile(path, []byte("fixture"), 0600) != nil {
+				t.Fatal("public_cli_inventory_material_file_failed")
+			}
+		}
+	}
+	// Exercise the same filename check on real directory entries. This does not
+	// impersonate root ownership; the production-equivalent metadata gate stays
+	// independent and must still reject these local non-root fixtures.
+	namesKnown := func() error {
+		return filepath.WalkDir(root, func(name string, entry os.DirEntry, walkErr error) error {
+			if walkErr != nil {
+				return ErrPrivate
+			}
+			return publicCLIMaterialRelativeKnown(root, name, allowed)
+		})
+	}
+	if namesKnown() != nil {
+		t.Fatal("public_cli_inventory_exact_directory_names_rejected")
+	}
+	if os.Geteuid() != 0 && publicCLIMaterialsKnown(root, allowed) == nil {
+		t.Fatal("public_cli_inventory_nonroot_metadata_accepted")
+	}
+	extra := filepath.Join(root, "inventory-"+report.RunID, "mysql-domain_event_outbox-pass-3-page-000001.checkpoint.json")
+	if os.WriteFile(extra, []byte("unregistered"), 0600) != nil {
+		t.Fatal("public_cli_inventory_unknown_file_setup_failed")
+	}
+	if namesKnown() == nil {
+		t.Fatal("public_cli_inventory_unknown_actual_file_accepted")
+	}
+	if os.Remove(extra) != nil || namesKnown() != nil {
+		t.Fatal("public_cli_inventory_actual_directory_recheck_failed")
+	}
+}
+
 func publicCLIMaterialsKnown(path string, allowed map[string]bool) error {
 	if _, e := os.Lstat(path); os.IsNotExist(e) {
 		return nil
@@ -328,8 +510,7 @@ func publicCLIMaterialsKnown(path string, allowed map[string]bool) error {
 		if walkErr != nil {
 			return ErrPrivate
 		}
-		relative, e := filepath.Rel(path, name)
-		if e != nil || (relative != "." && !allowed[relative]) {
+		if publicCLIMaterialRelativeKnown(path, name, allowed) != nil {
 			return ErrPrivate
 		}
 		info, e := os.Lstat(name)
@@ -393,7 +574,7 @@ func publicCLIInventory(t *testing.T, cli, opDir, source, operation, boundRun, i
 	t.Helper()
 	ids, heads := nativeIdentities(t, db, mdb)
 	scope := [4][3]string{{"mysql", "domain_event_outbox", "base_table"}, {"mysql", "ai_bridge_commands", "base_table"}, {"mysql", "ai_messaging_legacy_commands", "base_table"}, {"mongodb", "domain_event_outbox", "collection"}}
-	limits := map[string]int{"query_seconds": 30, "total_seconds": 1500, "max_records": 1000000, "max_bytes": 2 << 30, "page_size": 1000, "max_pages": 1001}
+	limits := map[string]int{"query_seconds": 30, "total_seconds": 1500, "max_records": 1000000, "max_bytes": 2 << 30, "page_size": publicCLIInventoryPageSize, "max_pages": publicCLIInventoryMaxPages}
 	request := map[string]any{"format_version": 2, "kind": "readonly_inventory_boundary_request", "source_sha": source, "operation_id": operation, "target_hash": jsonSHA(scope), "database_scope": "mysql-and-mongodb", "identity_hashes": ids, "expected_migrations": heads, "limits": limits}
 	path := filepath.Join(opDir, "boundary-request.json")
 	hash := nativeJSON(t, path, request)
@@ -781,6 +962,13 @@ func TestLifecyclePublicCLINativePrepareRootOnce(t *testing.T) {
 	}
 	var report inventory
 	approval, report = publicCLIInventory(t, cli, opDir, source, op, boundRun, invRun, env, db, mdb)
+	inventoryMaterials, materialErr := publicCLIInventoryMaterialPaths(report, invRun)
+	if materialErr != nil {
+		t.Fatal("public_cli_native_inventory_material_registration_failed")
+	}
+	for path := range inventoryMaterials {
+		opMaterial[path] = true
+	}
 	bindings := map[string]any{}
 	for database, b := range report.Bindings {
 		bindings[database] = map[string]any{"identity_hash": b.IdentityHash, "migration_version": b.Version, "migration_dirty": b.Dirty, "catalog_hash": b.CatalogHash, "non_target_schema_hash": b.NonTargetHash}
