@@ -175,7 +175,13 @@ func validatePrepareFactsInventory(r prepareFactsRequest, req request, report re
 
 // Read actual identity and clean heads through the owned, already-open handles.
 // This is a source-binding check, not a new inventory/history verdict.
-func observePrepareFactsIdentity(ctx context.Context, o *lifecyclePreparationOwner, req request, inventory report) (result error) {
+func observePrepareFactsIdentity(ctx context.Context, o *lifecyclePreparationOwner, req request, inventory report) error {
+	return observeBorrowedDatabaseIdentity(ctx, o, req.Identities, req.Migrations, req.MongoNamespaceAnchor, inventory.DatabaseBindings["mongodb"].DatabaseAnchorHash)
+}
+
+// Expectations are already validated original producer facts. This function
+// rereads both actual borrowed connections; it never opens or closes the pools.
+func observeBorrowedDatabaseIdentity(ctx context.Context, o *lifecyclePreparationOwner, identities map[string]string, migrations map[string]uint64, anchor *identitymeta.MongoNamespaceAnchor, mongoAnchorHash string) (result error) {
 	tx, e := o.originalSQL.BeginTx(ctx, &sql.TxOptions{ReadOnly: true})
 	if e != nil {
 		return lifecycleError("prepare_facts_sql_read_failed")
@@ -188,13 +194,13 @@ func observePrepareFactsIdentity(ctx context.Context, o *lifecyclePreparationOwn
 	q, c := context.WithTimeout(ctx, 30*time.Second)
 	ids, e := scanSQL(q, tx, "SELECT @@server_uuid,DATABASE(),VERSION()")
 	c()
-	if e != nil || len(ids) != 1 || !mysqlUUIDRE.MatchString(val(ids[0], 0)) || val(ids[0], 1) != os.Getenv("MYSQL_DATABASE") || !strings.HasPrefix(val(ids[0], 2), "8.") || hashParts("mysql_database_identity_v1", val(ids[0], 0), val(ids[0], 1)) != req.Identities["mysql"] {
+	if e != nil || len(ids) != 1 || !mysqlUUIDRE.MatchString(val(ids[0], 0)) || val(ids[0], 1) != os.Getenv("MYSQL_DATABASE") || !strings.HasPrefix(val(ids[0], 2), "8.") || hashParts("mysql_database_identity_v1", val(ids[0], 0), val(ids[0], 1)) != identities["mysql"] {
 		return lifecycleError("prepare_facts_identity_rejected")
 	}
 	q, c = context.WithTimeout(ctx, 30*time.Second)
 	heads, e := scanSQL(q, tx, "SELECT version,dirty FROM schema_migrations LIMIT 2")
 	c()
-	if e != nil || len(heads) != 1 || val(heads[0], 0) != strconv.FormatUint(req.Migrations["mysql"], 10) || val(heads[0], 1) != "0" {
+	if e != nil || len(heads) != 1 || val(heads[0], 0) != strconv.FormatUint(migrations["mysql"], 10) || val(heads[0], 1) != "0" {
 		return lifecycleError("prepare_facts_migration_rejected")
 	}
 	db := o.originalDB
@@ -238,17 +244,17 @@ func observePrepareFactsIdentity(ctx context.Context, o *lifecyclePreparationOwn
 		}
 	}
 	canonical, e := json.Marshal(stable)
-	if e != nil || hashParts("mongodb_database_identity_v1", string(canonical), os.Getenv("MONGODB_DBNAME"), hex.EncodeToString(b)) != req.Identities["mongodb"] {
+	if e != nil || hashParts("mongodb_database_identity_v1", string(canonical), os.Getenv("MONGODB_DBNAME"), hex.EncodeToString(b)) != identities["mongodb"] {
 		return lifecycleError("prepare_facts_identity_rejected")
 	}
-	if req.MongoNamespaceAnchor != nil {
+	if anchor != nil {
 		actual, e := mongoNamespaceAnchor(ctx, db)
-		if e != nil || !identitymeta.MatchMongoNamespaceAnchors(req.MongoNamespaceAnchor, actual) || actual.Hash != inventory.DatabaseBindings["mongodb"].DatabaseAnchorHash {
+		if e != nil || !identitymeta.MatchMongoNamespaceAnchors(anchor, actual) || actual.Hash != mongoAnchorHash {
 			return lifecycleError("prepare_facts_identity_rejected")
 		}
 	} else {
 		actual, e := mongoDatabaseAnchor(ctx, db, hello)
-		if e != nil || actual != inventory.DatabaseBindings["mongodb"].DatabaseAnchorHash {
+		if e != nil || actual != mongoAnchorHash {
 			return lifecycleError("prepare_facts_identity_rejected")
 		}
 	}
@@ -278,7 +284,7 @@ func observePrepareFactsIdentity(ctx context.Context, o *lifecyclePreparationOwn
 	if e != nil || closeErr != nil || len(rawHeads) != 1 || rawHeads[0].Lookup("dirty").Type != bson.TypeBoolean || (rawHeads[0].Lookup("version").Type != bson.TypeInt32 && rawHeads[0].Lookup("version").Type != bson.TypeInt64) {
 		return lifecycleError("prepare_facts_migration_rejected")
 	}
-	if bson.Unmarshal(rawHeads[0], &migration) != nil || migration.Version < 1 || uint64(migration.Version) != req.Migrations["mongodb"] || migration.Dirty {
+	if bson.Unmarshal(rawHeads[0], &migration) != nil || migration.Version < 1 || uint64(migration.Version) != migrations["mongodb"] || migration.Dirty {
 		return lifecycleError("prepare_facts_migration_rejected")
 	}
 	return nil

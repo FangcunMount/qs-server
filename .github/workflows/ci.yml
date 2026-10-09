@@ -776,6 +776,8 @@ jobs:
       - name: Validate retirement lifecycle contracts on the final source
         run: |
           python3 -B scripts/database/test-compatibility-retirement.py
+          python3 -B scripts/database/test-compatibility-host-writer-scope.py
+          python3 -B scripts/database/test-compatibility-db-writer-census.py
           python3 -B scripts/database/test-compatibility-window-tool.py
           python3 -B scripts/database/test-compatibility-evidence-write-inputs.py
           python3 -B scripts/database/test-compatibility-inventory-report-diagnostic.py

@@ -1644,11 +1644,11 @@ def private_directory(path):
 try:
     if os.getuid() != 0 or os.geteuid() != 0 or len(sys.argv) not in (8,9): stop()
     stage = 'lifecycle' if len(sys.argv) == 8 else sys.argv[-1]
-    if stage not in ('lifecycle','prepare-facts') or (stage == 'lifecycle' and len(sys.argv) != 8): stop()
+    if stage not in ('lifecycle','prepare-facts','host-writer-scope','db-writer-census') or (stage == 'lifecycle' and len(sys.argv) != 8): stop()
     operation, run, tool_sha, request_hash, package_hash, manifest_hash, source_channel = sys.argv[1:8]
     if not all(re.fullmatch(r'[0-9]{1,20}-[0-9]{1,4}',v) for v in (operation,run)): stop()
     if not re.fullmatch(r'[0-9a-f]{40}',tool_sha) or not all(re.fullmatch(r'[0-9a-f]{64}',v) for v in (request_hash,package_hash)): stop()
-    if (stage == 'lifecycle' and not re.fullmatch(r'[0-9a-f]{64}',manifest_hash)) or (stage == 'prepare-facts' and manifest_hash != ''): stop()
+    if (stage == 'lifecycle' and not re.fullmatch(r'[0-9a-f]{64}',manifest_hash)) or (stage in ('prepare-facts','host-writer-scope','db-writer-census') and manifest_hash != ''): stop()
     if source_channel == 'sudo-user':
         source_uid = int(os.environ['SUDO_UID'])
         if source_uid < 1: stop()
@@ -1669,6 +1669,7 @@ try:
             value[key]=item
         return value
     credentials=json.loads(packet,object_pairs_hook=unique_credentials)
+    if stage == 'host-writer-scope': allowed=set()
     if not isinstance(credentials,dict) or set(credentials)!=allowed or any(not isinstance(v,str) or '\x00' in v or '\r' in v or '\n' in v for v in credentials.values()): stop()
     archive=Path('/tmp/qs-compatibility-retirement-'+run+'.tar.gz')
     fd=os.open(archive,os.O_RDONLY|os.O_NOFOLLOW|os.O_NONBLOCK)
@@ -1692,11 +1693,17 @@ try:
     try: base.mkdir(mode=0o700)
     except FileExistsError: pass
     private_directory(base)
+    if stage in ('host-writer-scope','db-writer-census'):
+        # The new observer executable is installed only below an actual root
+        # namespace; original user-owned request sources are not re-owned.
+        for ancestor in (base, *base.parents):
+            v=ancestor.lstat()
+            if v.st_uid != 0 or stat.S_IMODE(v.st_mode) & 0o022: stop()
     batch=base/(operation+'-'+run)
     batch.mkdir(mode=0o700) # once only; unknown earlier work never silently adopted
     private_directory(batch)
     native=batch/'restore-native'
-    request_name = 'lifecycle-request.json' if stage == 'lifecycle' else 'prepare-facts-request-'+run+'.json'
+    request_name = 'lifecycle-request.json' if stage == 'lifecycle' else stage+'-request-'+run+'.json'
     request_path='/opt/backups/qs-server/compatibility-retirement/'+operation+'/'+request_name
     registry={'format_version':1,'kind':'approved_root_once_tool_staging','stage':stage,'operation_id':operation,'actual_run_id':run,'tool_source_sha':tool_sha,'request_path':request_path,'request_sha256':request_hash,'manifest_sha256':manifest_hash,'package_sha256':package_hash,'native_sha256':hashlib.sha256(binary).hexdigest(),'source_uid':source_uid,'drop_authority':False,'purge_after_acceptance_required':True}
     fd=os.open(batch/'tool.intent.private.json',os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o600)
@@ -1714,7 +1721,7 @@ try:
     if check.returncode or check.stdout!=tool_sha.encode()+b'\n': stop()
     credentials['PATH']='/usr/bin:/bin'
     credentials['QS_RETIREMENT_SOURCE_UID']=str(source_uid)
-    native_mode = 'lifecycle-prepare-root-once' if stage == 'lifecycle' else 'prepare-facts-root-once'
+    native_mode = stage+'-root-once' if stage != 'lifecycle' else 'lifecycle-prepare-root-once'
     os.execve(native,[str(native),'--mode',native_mode,'--request',request_path,'--request-hash',request_hash,'--operation-id',operation,'--run-id',run],credentials)
 except (OSError,ValueError,KeyError,tarfile.TarError,subprocess.SubprocessError):
     stop()
@@ -1722,25 +1729,27 @@ except (OSError,ValueError,KeyError,tarfile.TarError,subprocess.SubprocessError)
 
 
 def root_once_lifecycle_prepare(args):
-    if args.operation != 'prepare' or args.prepare_mode not in ('lifecycle','prepare-facts'):
+    if args.operation != 'prepare' or args.prepare_mode not in ('lifecycle','prepare-facts','host-writer-scope','db-writer-census'):
         fail('lifecycle_root_host_channel_required')
     package_hash=os.environ.get('RETIREMENT_PACKAGE_SHA256','')
     token(package_hash,HASH)
     names=('MYSQL_HOST','MYSQL_PORT','MYSQL_USERNAME','MYSQL_PASSWORD','MYSQL_DATABASE','MONGODB_HOST','MONGODB_PORT','MONGODB_USERNAME','MONGODB_PASSWORD','MONGODB_DBNAME','MONGODB_METADATA_ADMIN_USERNAME','MONGODB_METADATA_ADMIN_PASSWORD')
-    packet=json.dumps({name:os.environ.get(name,'') for name in names},separators=(',',':')).encode()
+    packet=json.dumps({} if args.prepare_mode == 'host-writer-scope' else {name:os.environ.get(name,'') for name in names},separators=(',',':')).encode()
     if len(packet)>32768: fail('lifecycle_connection_input_rejected')
     uid, euid = os.getuid(), os.geteuid()
     if uid != euid:
         fail('lifecycle_root_host_channel_required')
-    facts = args.prepare_mode == 'prepare-facts'
-    request_hash = args.prepare_facts_request_hash if facts else args.lifecycle_request_hash
+    facts = args.prepare_mode in ('prepare-facts','host-writer-scope','db-writer-census')
+    request_hash = args.db_census_request_hash if args.prepare_mode == 'db-writer-census' else args.host_scope_request_hash if args.prepare_mode == 'host-writer-scope' else args.prepare_facts_request_hash if facts else args.lifecycle_request_hash
     token(request_hash,HASH)
     if facts and args.manifest_hash: fail('prepare_facts_input_classes_mixed')
     bindings=[args.operation_id,args.run_id,args.actual_source_sha,request_hash,package_hash,args.manifest_hash]
-    suffix = ['prepare-facts'] if facts else []
+    suffix = [args.prepare_mode] if facts else []
     # Credentials remain on this bounded private pipe, not argv/stdout/logs.
     if uid == 0:
         result=subprocess.run(['/usr/bin/python3','-I','-c',ROOT_PREPARE_ONCE,*bindings,'root-direct',*suffix],env={'PATH':'/usr/bin:/bin'},input=packet,stdout=subprocess.PIPE,stderr=subprocess.DEVNULL,timeout=91*60,check=False)
+    elif args.prepare_mode in ('host-writer-scope','db-writer-census'):
+        result=subprocess.run(['/usr/bin/sudo','-n','--','/usr/bin/python3','-I','-c',ROOT_PREPARE_ONCE,*bindings,'sudo-user',*suffix],env={'PATH':'/usr/bin:/bin'},input=packet,stdout=subprocess.PIPE,stderr=subprocess.DEVNULL,timeout=3*60,check=False)
     else:
         result=subprocess.run(['sudo','-n','python3','-I','-c',ROOT_PREPARE_ONCE,*bindings,'sudo-user',*suffix],input=packet,stdout=subprocess.PIPE,stderr=subprocess.DEVNULL,timeout=91*60,check=False)
     if len(result.stdout)>32768: fail('lifecycle_native_receipt_invalid')
@@ -1937,6 +1946,127 @@ def live_prepare_facts(args):
     return validate_prepare_facts_result(decode(native), args, request, request_hash, code)
 
 
+HOST_SCOPE_GAPS = frozenset(('absent_source_end_recheck_changed_or_unread', 'absent_source_end_recheck_unknown', 'account_home_source_unsupported', 'account_startup_indirect_execution_not_proven', 'account_startup_or_public_key_unread', 'activation_source_unread', 'all_match_authentication_domains_not_exhaustively_proven', 'directory_end_recheck_changed_or_unread', 'docker_socket_and_other_container_writer_admission_not_fenced', 'dynamic_key_or_principal_provider_not_exhaustively_proven', 'existing_sessions_not_drained_or_admission_fenced', 'external_database_and_qs_ai_writers_not_observed', 'external_or_conditional_nss_backend_not_exhaustively_proven', 'host_identity_read_unknown', 'host_namespace_read_unknown', 'indirect_activation_scripts_and_arbitrary_commands_unproven', 'local_accounts_schema_unknown', 'local_accounts_unread', 'local_groups_unread', 'local_runner_workflow_admission_not_fenced', 'login_session_listing_unread', 'login_session_schema_unknown', 'native_command_end_recheck_changed_or_unread', 'native_docker_roster_budget_exceeded', 'native_docker_roster_schema_unknown', 'native_docker_roster_unread', 'native_docker_selected_inspect_schema_unknown', 'native_docker_selected_inspect_unread', 'native_nss_accounts_schema_unknown', 'native_nss_differs_from_local_accounts', 'native_nss_enumeration_unread', 'native_systemd_listing_schema_unknown', 'native_systemd_listing_unread', 'native_systemd_properties_unread', 'native_systemd_unit_budget_exceeded', 'nss_sources_unread', 'observation_handle_close_failed', 'pam_and_dynamic_authentication_modules_not_exhaustively_proven', 'pam_authentication_source_unread', 'proc_roster_unread', 'process_cgroup_unread', 'process_changed_during_read', 'process_disappeared_or_stat_unread', 'process_end_recheck_changed_or_unread', 'process_executable_hash_unread', 'process_executable_unread', 'process_namespace_unread', 'process_stat_schema_unknown', 'process_status_unread', 'process_uid_schema_unknown', 'public_key_options_and_certificate_semantics_not_proven', 'source_activation_directory_unread', 'source_activation_symlink_target_not_followed', 'source_activation_symlink_unread', 'source_activation_tree_budget_exceeded', 'source_activation_tree_unread', 'source_end_recheck_changed_or_unread', 'source_sshd_configuration_unread', 'source_sshd_include_cycle_or_duplicate', 'source_sshd_include_directory_unread', 'source_sshd_include_path_unsupported', 'source_sshd_include_pattern_unknown', 'source_sshd_include_scope_or_budget_unknown', 'source_sshd_original_config_from_process_title_unproven', 'source_sshd_syntax_unknown', 'ssh_authorization_path_scope_unknown', 'ssh_key_path_expansion_requires_effective_subject', 'ssh_public_authorization_unread', 'sshd_argv_end_recheck_changed_or_unread', 'sshd_command_line_override_semantics_unproven', 'sshd_daemon_not_observed', 'sshd_loaded_configuration_snapshot_unproven', 'sshd_original_argv_unread', 'symlink_source_end_recheck_changed_or_unread', 'unclassified_processes_require_independent_writer_catalog', 'user_manager_runtime_socket_activation_not_exhaustively_proven', 'writer_admission_and_historical_platform_fence_not_installed'))
+HOST_SCOPE_NAMES = frozenset({'ssh_configuration_sources','nss_accounts_and_key_sources','existing_sessions_and_processes','local_activation_sources'})
+HOST_SCOPE_ERRORS = frozenset({'none','host_scope_incomplete','host_scope_root_once_required','host_scope_request_read_rejected','host_scope_schema_rejected','host_scope_binding_rejected','host_scope_private_observation_write_failed','host_scope_observation_incomplete','host_scope_read_budget_exceeded'})
+# The native adapter has not read/validated approval before these finite refusals.
+HOST_SCOPE_EARLY_ERRORS = frozenset({'host_scope_root_once_required','host_scope_request_read_rejected','host_scope_schema_rejected','host_scope_binding_rejected','host_scope_read_budget_exceeded'})
+
+def host_scope_request(args):
+    approval = decode(args.bootstrap_approval_json.encode('ascii') + b'\n')
+    if hashlib.sha256(canonical_bytes(approval)).hexdigest() != args.bootstrap_approval_hash:
+        fail('host_scope_approval_hash_rejected')
+    fields(approval, ('format_version','kind','prepare_mode','source_sha','operation_id','target_hash','host_role'))
+    if (type(approval['format_version']) is not int or approval['format_version'] != 1 or
+        approval['kind'] != 'readonly_host_writer_scope_descriptor' or approval['prepare_mode'] != 'host-writer-scope' or
+        approval['source_sha'] != args.actual_source_sha or approval['operation_id'] != args.operation_id or
+        approval['target_hash'] != TARGET_HASH or approval['host_role'] != 'server_a'):
+        fail('host_scope_approval_binding_rejected')
+    return {'format_version':1,'kind':'readonly_host_writer_scope_request','source_sha':args.actual_source_sha,
+        'operation_id':args.operation_id,'actual_run_id':args.run_id,'host_role':approval['host_role'],
+        'target_hash':TARGET_HASH,'observation_approval_sha256':args.bootstrap_approval_hash}
+
+
+def validate_host_scope_result(result,args,request,request_hash,code):
+    fields(result, ('format_version','kind','operation','prepare_mode','source_sha','operation_id','run_id','host_role','source_uid',
+        'request_sha256','observation_approval_sha256','target_hash','complete','diagnostic_only','execution_allowed','drop_ready',
+        'host_observation_complete','writer_scope_complete','observed_machine_id_sha256','observed_boot_id_sha256',
+        'observed_namespace_sha256','host_scope_private_observation_sha256','host_scope_catalog_sha256',
+        'process_count','file_count','entry_count','observation_elapsed_millis','observed_scopes','unknown','error_category'))
+    # Keep the native early diagnostic without inventing an unread approval.
+    # Partial observations or successful calls still require the exact digest.
+    early_refusal = (type(code) is int and code == 1 and result['error_category'] in HOST_SCOPE_EARLY_ERRORS and
+        result['observation_approval_sha256'] == '' and result['host_observation_complete'] is False and
+        all(result[k] == 0 for k in ('source_uid','process_count','file_count','entry_count')) and
+        all(result[k] == '' for k in ('observed_machine_id_sha256','observed_boot_id_sha256','observed_namespace_sha256',
+            'host_scope_private_observation_sha256','host_scope_catalog_sha256')) and
+        result['observed_scopes'] == [] and result['unknown'] == [])
+    if (result['format_version'] != 1 or type(result['format_version']) is not int or result['kind'] != 'readonly_host_writer_scope_observation' or
+        result['operation'] != 'prepare' or result['prepare_mode'] != 'host-writer-scope' or result['source_sha'] != args.actual_source_sha or
+        result['operation_id'] != args.operation_id or result['run_id'] != args.run_id or result['host_role'] != request['host_role'] or
+        result['request_sha256'] != request_hash or (result['observation_approval_sha256'] != args.bootstrap_approval_hash and not early_refusal) or result['target_hash'] != TARGET_HASH or
+        any(result[k] is not False for k in ('complete','execution_allowed','drop_ready','writer_scope_complete')) or result['diagnostic_only'] is not True or
+        type(result['host_observation_complete']) is not bool or result['error_category'] not in HOST_SCOPE_ERRORS or
+        result['host_observation_complete'] != (code == 0 and result['error_category'] == 'none')):
+        fail('host_scope_native_binding_rejected')
+    for k in ('source_uid','process_count','file_count','entry_count','observation_elapsed_millis'): uint(result[k])
+    for k in ('observed_machine_id_sha256','observed_boot_id_sha256','observed_namespace_sha256','host_scope_private_observation_sha256','host_scope_catalog_sha256'):
+        token(result[k], re.compile(r'(?:[0-9a-f]{64})?'))
+    if result['host_observation_complete'] and result['observation_elapsed_millis'] >= 120000: fail('host_scope_native_budget_exceeded')
+    if result['host_observation_complete'] and any(not result[k] for k in ('observed_machine_id_sha256','observed_boot_id_sha256','observed_namespace_sha256','host_scope_private_observation_sha256','host_scope_catalog_sha256')):
+        fail('host_scope_native_incomplete')
+    scopes=result['observed_scopes']
+    if type(scopes) is not list or len(scopes)>4: fail('host_scope_native_schema_rejected')
+    seen=set()
+    for value in scopes:
+        fields(value, ('name','enumeration_complete','recheck_equal','items','catalog_sha256','unknown'))
+        if value['name'] not in HOST_SCOPE_NAMES or value['name'] in seen or any(type(value[k]) is not bool for k in ('enumeration_complete','recheck_equal')): fail('host_scope_native_schema_rejected')
+        seen.add(value['name']);uint(value['items']);token(value['catalog_sha256'],HASH)
+        if type(value['unknown']) is not list or len(value['unknown'])>32 or any(v not in HOST_SCOPE_GAPS for v in value['unknown']): fail('host_scope_native_schema_rejected')
+    if type(result['unknown']) is not list or len(result['unknown'])>32 or any(v not in HOST_SCOPE_GAPS for v in result['unknown']): fail('host_scope_native_schema_rejected')
+    if result['host_observation_complete'] and (len(scopes)!=4 or any(not v['enumeration_complete'] or not v['recheck_equal'] for v in scopes)): fail('host_scope_native_incomplete')
+    result['capabilities']={key:False for key in CAPABILITIES}
+    return result
+
+
+def live_host_scope(args):
+    request=host_scope_request(args)
+    directory=operation_directory(args.root,args.operation_id)
+    raw=canonical_bytes(request);request_hash=hashlib.sha256(raw).hexdigest()
+    with locked_operation(directory):
+        create_bootstrap_file(directory,'host-writer-scope-request-'+args.run_id+'.json',raw)
+        args.host_scope_request_hash=request_hash
+        code,native=root_once_lifecycle_prepare(args)
+    return validate_host_scope_result(decode(native),args,request,request_hash,code)
+
+
+DB_CENSUS_SECTION_NAMES = frozenset(('mysql_accounts','mysql_role_edges','mysql_default_roles','mysql_dynamic_grants','mysql_proxy_grants','mysql_observer_grants','mysql_connections','mysql_account_grants','mongodb_observer_privileges','mongodb_users','mongodb_databases','mongodb_stored_role_definitions','mongodb_roles','mongodb_authentication_configuration','mongodb_authentication_parameters','mongodb_connections_and_idle_operations','mongodb_local_logical_sessions','mongodb_persisted_logical_sessions'))
+DB_CENSUS_GAPS = frozenset(name+'_unread' for name in DB_CENSUS_SECTION_NAMES) | frozenset(('mysql_full_process_privilege_unproven','mysql_external_authentication_and_direct_writer_admission_not_fenced','mongodb_other_nodes_sessions_and_external_authentication_unobserved','mongodb_external_direct_writer_admission_not_fenced','mongodb_startup_authorization_and_external_provider_configuration_unobserved'))
+DB_CENSUS_SECTION_ERRORS = frozenset(('none','db_census_sql_query_failed_or_bounded','db_census_sql_account_grants_incomplete','db_census_sql_full_process_permission_unproven','db_census_mongo_query_failed_or_bounded','db_census_second_enumeration_missing'))
+DB_CENSUS_ERRORS = frozenset(('none','db_census_incomplete','db_census_read_budget_exceeded','db_census_root_once_required','db_census_request_read_rejected','db_census_request_binding_rejected','db_census_original_identity_read_rejected','db_census_original_identity_binding_rejected','db_census_original_connection_failed','db_census_owner_close_failed','db_census_actual_identity_rejected','db_census_actual_identity_changed','db_census_original_identity_changed','db_census_private_catalog_write_failed','db_census_catalog_or_session_permissions_incomplete'))
+
+def db_census_request(args):
+    approval=decode(args.bootstrap_approval_json.encode('ascii')+b'\n')
+    if hashlib.sha256(canonical_bytes(approval)).hexdigest()!=args.bootstrap_approval_hash: fail('db_census_approval_hash_rejected')
+    fields(approval,('format_version','kind','prepare_mode','source_sha','operation_id','target_hash','database_scope','identity_report'))
+    reference=approval['identity_report'];fields(reference,('operation_id','run_id','source_sha','sha256','request_sha256'))
+    if (type(approval['format_version']) is not int or approval['format_version']!=1 or approval['kind']!='readonly_db_writer_census_descriptor' or approval['prepare_mode']!='db-writer-census' or approval['source_sha']!=args.actual_source_sha or approval['operation_id']!=args.operation_id or approval['target_hash']!=TARGET_HASH or approval['database_scope']!='mysql-and-mongodb' or reference['operation_id']!=args.operation_id or reference['run_id']==args.run_id): fail('db_census_approval_binding_rejected')
+    token(reference['run_id'],RUN);token(reference['source_sha'],SHA);token(reference['sha256'],HASH);token(reference['request_sha256'],HASH)
+    return {'format_version':1,'kind':'readonly_db_writer_census_request','source_sha':args.actual_source_sha,'operation_id':args.operation_id,'actual_run_id':args.run_id,'target_hash':TARGET_HASH,'observation_approval_sha256':args.bootstrap_approval_hash,'identity_report':reference}
+
+def validate_db_census_result(result,args,request,request_hash,code):
+    fields(result,('format_version','kind','operation','prepare_mode','source_sha','operation_id','run_id','source_uid','target_hash','request_sha256','observation_approval_sha256','observed_identity_producer','mysql_identity_sha256','mongodb_identity_sha256','mongodb_namespace_anchor_sha256','mysql_migration_version','mongodb_migration_version','complete','diagnostic_only','execution_allowed','drop_ready','db_census_observation_complete','mysql_all_connections_permission_proven','mongodb_local_all_sessions_permission_proven','all_nodes_sessions_coverage_complete','external_writer_coverage_complete','writer_scope_complete','db_census_private_catalog_sha256','db_census_catalog_sha256','observed_sections','unknown','observation_elapsed_millis','error_category'))
+    if (type(result['format_version']) is not int or result['format_version']!=1 or result['kind']!='readonly_db_writer_census_observation' or result['operation']!='prepare' or result['prepare_mode']!='db-writer-census' or result['source_sha']!=args.actual_source_sha or result['operation_id']!=args.operation_id or result['run_id']!=args.run_id or result['request_sha256']!=request_hash or result['target_hash']!=TARGET_HASH or result['diagnostic_only'] is not True or any(result[k] is not False for k in ('complete','execution_allowed','drop_ready','writer_scope_complete','all_nodes_sessions_coverage_complete','external_writer_coverage_complete')) or any(type(result[k]) is not bool for k in ('mysql_all_connections_permission_proven','mongodb_local_all_sessions_permission_proven')) or type(result['db_census_observation_complete']) is not bool or result['error_category'] not in DB_CENSUS_ERRORS or result['db_census_observation_complete']!=(code==0 and result['error_category']=='none')): fail('db_census_native_binding_rejected')
+    for key in ('source_uid','mysql_migration_version','mongodb_migration_version','observation_elapsed_millis'): uint(result[key])
+    for key in ('mysql_identity_sha256','mongodb_identity_sha256','mongodb_namespace_anchor_sha256','db_census_private_catalog_sha256','db_census_catalog_sha256','observation_approval_sha256'): token(result[key],re.compile(r'(?:[0-9a-f]{64})?'))
+    # A pre-identity rejection keeps empty producer facts; successful observations
+    # require the exact original report reference, never a relabeled current run.
+    observed=result['observed_identity_producer'];fields(observed,('operation_id','run_id','source_sha','sha256','request_sha256'))
+    if observed!=request['identity_report'] and any(observed.values()): fail('db_census_native_identity_rejected')
+    if result['observation_approval_sha256'] not in ('',args.bootstrap_approval_hash): fail('db_census_native_approval_rejected')
+    sections=result['observed_sections']
+    if type(sections) is not list or len(sections)>18: fail('db_census_native_schema_rejected')
+    seen=set()
+    for section in sections:
+        fields(section,('name','enumeration_complete','recheck_equal','items','sha256','error_category'))
+        if section['name'] not in DB_CENSUS_SECTION_NAMES or section['name'] in seen or any(type(section[k]) is not bool for k in ('enumeration_complete','recheck_equal')) or section['error_category'] not in DB_CENSUS_SECTION_ERRORS: fail('db_census_native_schema_rejected')
+        seen.add(section['name']);uint(section['items']);token(section['sha256'],re.compile(r'(?:[0-9a-f]{64})?'))
+        if section['enumeration_complete'] and (section['error_category']!='none' or not section['sha256']): fail('db_census_native_schema_rejected')
+    if type(result['unknown']) is not list or len(result['unknown'])>32 or any(value not in DB_CENSUS_GAPS for value in result['unknown']): fail('db_census_native_schema_rejected')
+    if result['db_census_observation_complete'] and (not result['mysql_all_connections_permission_proven'] or not result['mongodb_local_all_sessions_permission_proven'] or result['mysql_migration_version']!=99 or result['mongodb_migration_version']!=38 or result['observation_elapsed_millis']>=120000 or len(sections)!=18 or any(not s['enumeration_complete'] for s in sections) or observed!=request['identity_report'] or result['observation_approval_sha256']!=args.bootstrap_approval_hash or any(not result[k] for k in ('mysql_identity_sha256','mongodb_identity_sha256','mongodb_namespace_anchor_sha256','db_census_private_catalog_sha256','db_census_catalog_sha256'))): fail('db_census_native_incomplete')
+    result['capabilities']={key:False for key in CAPABILITIES}
+    return result
+
+def live_db_census(args):
+    request=db_census_request(args);directory=operation_directory(args.root,args.operation_id)
+    raw=canonical_bytes(request);request_hash=hashlib.sha256(raw).hexdigest()
+    with locked_operation(directory):
+        create_bootstrap_file(directory,'db-writer-census-request-'+args.run_id+'.json',raw)
+        args.db_census_request_hash=request_hash
+        code,native=root_once_lifecycle_prepare(args)
+    return validate_db_census_result(decode(native),args,request,request_hash,code)
+
+
 def execute(args):
     if args.operation not in OPERATIONS:
         fail("operation_unsupported")
@@ -1957,6 +2087,13 @@ def execute(args):
         return live_lifecycle(args, operation_directory(args.root, args.operation_id))
     if mode == "lifecycle":
         fail("lifecycle_request_approval_missing")
+    if mode == "db-writer-census":
+        if args.operation != "prepare" or args.manifest_hash or identity_request or inventory_request or not bootstrap_json or not bootstrap_hash: fail("input_classes_mixed")
+        return live_db_census(args)
+    if mode == "host-writer-scope":
+        if args.operation != "prepare" or args.manifest_hash or identity_request or inventory_request or not bootstrap_json or not bootstrap_hash:
+            fail("input_classes_mixed")
+        return live_host_scope(args)
     if mode == "prepare-facts":
         if args.operation != "prepare" or args.manifest_hash or identity_request or inventory_request or not bootstrap_json or not bootstrap_hash:
             fail("input_classes_mixed")
@@ -2056,7 +2193,7 @@ def main(argv=None):
     schema = {"format_version": "uint", "complete": "bool", "execution_allowed": "bool",
               "operation": OPERATIONS, "source_sha": "sha40", "run_id": "run_id", "operation_id": "run_id",
               "manifest_hash": "hash64", "target_hash": "hash64", "target_count": "uint",
-              "kind": frozenset({"compatibility_retirement_lifecycle_result", "readonly_prepare_facts_observation"}),
+              "kind": frozenset({"compatibility_retirement_lifecycle_result", "readonly_prepare_facts_observation", "readonly_host_writer_scope_observation", "readonly_db_writer_census_observation"}),
               "original_source_sha": "sha40", "manifest_sha256": "hash64", "request_sha256": "hash64", "archive_sha256": "hash64_or_empty",
               "isolated_content_restore_complete": "bool", "restore_elapsed_millis": "uint", "mysql_recovery_non_target_sha256": "hash64",
               "archive_binding_complete": "bool", "recovery_attempted": "bool", "recovery_complete": "bool",
@@ -2068,9 +2205,18 @@ def main(argv=None):
               "observed_ordered_mongo_schema_sha256": "hash64_or_empty",
               "observed_restore_engines": {"mysql_image_id_sha256": "hash64", "mongodb_image_id_sha256": "hash64", "architecture": frozenset({"amd64", "arm64"})},
               "observed_filesystems": [{"scope": frozenset({"source", "staging", "archive", "docker"}), "path_sha256": "hash64", "total_bytes": "uint", "available_bytes": "uint", "free_bytes": "uint"}],
+              "db_census_observation_complete":"bool", "mysql_all_connections_permission_proven":"bool", "mongodb_local_all_sessions_permission_proven":"bool", "all_nodes_sessions_coverage_complete":"bool", "external_writer_coverage_complete":"bool", "db_census_private_catalog_sha256":"hash64_or_empty", "db_census_catalog_sha256":"hash64_or_empty",
+              "observed_identity_producer":({key:frozenset({""}) for key in ("operation_id","run_id","source_sha","sha256","request_sha256")} if not any(receipt.get("observed_identity_producer",{}).values()) else {"operation_id":"run_id", "run_id":"run_id", "source_sha":"sha40", "sha256":"hash64", "request_sha256":"hash64"}),
+              "mysql_identity_sha256":"hash64_or_empty", "mongodb_identity_sha256":"hash64_or_empty", "mongodb_namespace_anchor_sha256":"hash64_or_empty", "mysql_migration_version":"uint", "mongodb_migration_version":"uint",
+              "observed_sections":[{"name":DB_CENSUS_SECTION_NAMES,"enumeration_complete":"bool","recheck_equal":"bool","items":"uint","sha256":"hash64_or_empty","error_category":DB_CENSUS_SECTION_ERRORS}],
+              "host_role": frozenset({"server_a"}), "source_uid": "uint", "host_observation_complete": "bool", "writer_scope_complete": "bool",
+              "observed_machine_id_sha256": "hash64_or_empty", "observed_boot_id_sha256": "hash64_or_empty", "observed_namespace_sha256": "hash64_or_empty",
+              "host_scope_private_observation_sha256": "hash64_or_empty", "host_scope_catalog_sha256": "hash64_or_empty",
+              "process_count": "uint", "file_count": "uint", "entry_count": "uint", "unknown": [HOST_SCOPE_GAPS | DB_CENSUS_GAPS],
+              "observed_scopes": [{"name":HOST_SCOPE_NAMES, "enumeration_complete":"bool", "recheck_equal":"bool", "items":"uint", "catalog_sha256":"hash64", "unknown":[HOST_SCOPE_GAPS]}],
               "observed_socket_kind": frozenset({"", "fixed_root_owned_unix_docker"}), "observation_elapsed_millis": "uint",
               "inventory_complete": "bool", "inventory_private_report_hash": "hash64",
-              "prepare_mode": frozenset({"identity", "bounds", "inventory", "report-diagnostic", "prepare-facts"}) | BOOTSTRAP_MODES, "diagnostic_only": "bool", "drop_ready": "bool",
+              "prepare_mode": frozenset({"identity", "bounds", "inventory", "report-diagnostic", "prepare-facts", "host-writer-scope", "db-writer-census"}) | BOOTSTRAP_MODES, "diagnostic_only": "bool", "drop_ready": "bool",
               "request_bootstrap_complete": "bool", "bootstrap_approval_sha256": "hash64", "derived_request_sha256": "hash64", "request_created_run_id": "run_id",
               "history_metadata_complete": "bool", "history_metadata_process_budget_proven": "bool",
               "metadata_private_report_sha256": "hash64", "metadata_created_run_id": "run_id",
