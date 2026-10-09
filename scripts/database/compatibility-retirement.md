@@ -124,6 +124,23 @@ writer, existing-report observation and index diagnostics described below.
 The new CLI/root/stdio connection has not yet completed a native rehearsal;
 source review and offline checks do not certify that connection in production.
 
+Final-source CI adds a mandatory public-caller rehearsal to the existing
+Seeddata job. It builds the CLI at the actual checkout SHA, binds the real
+Linux root/socket and service image identities, creates only owned source
+namespaces with an actual SCRAM Mongo user, and invokes public Python
+preparation through root-once staging, capture and both real stdio restores.
+The selector fails on missing prerequisites or skips. It independently checks
+source catalogs/content, all seven original/staged assets and registered
+restore-resource/material cleanup. This fixture result cannot establish a
+production inventory, historical qualification, writer fence or production
+600-second restore budget. Until the final-source job actually succeeds, its
+native result remains unproved.
+The fixture uses a dedicated host process group and observes its actual absence
+after cancellation and reaping. A failed or unaccepted public call retains its
+source namespaces, restore intent and temporary materials; host process exit
+does not resolve an unknown daemon-side create/exec response. Only complete
+local acceptance permits exact fixture cleanup with fresh runtime checks.
+
 For `operation=prepare, prepare_mode=lifecycle`, the Action keeps exactly ten
 dispatch inputs. `manifest_sha256` binds the approved immutable manifest;
 the existing `inventory_request_sha256` field carries the SHA256 of the separate
