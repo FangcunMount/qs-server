@@ -18,21 +18,23 @@ type SessionRequest struct {
 	Action   string `json:"action"`
 }
 type SessionDiagnostic struct {
-	Protocol                     string `json:"protocol"`
-	Sequence                     uint64 `json:"sequence"`
-	Action                       string `json:"action"`
-	HostRole                     string `json:"host_role"`
-	SourceSHA                    string `json:"source_sha"`
-	ToolSourceSHA                string `json:"tool_source_sha"`
-	OperationID                  string `json:"operation_id"`
-	ManifestSHA256               string `json:"manifest_sha256"`
-	OriginalRunID                string `json:"original_run_id"`
-	WindowStartSHA256            string `json:"window_start_sha256"`
-	RemainingMilliseconds        int64  `json:"remaining_milliseconds"`
-	ForwardRemainingMilliseconds int64  `json:"forward_remaining_milliseconds"`
-	Outcome                      string `json:"outcome"`
-	ErrorCategory                string `json:"error_category"`
-	WholeWriterFenceProven       bool   `json:"whole_writer_fence_proven"`
+	Protocol                     string                    `json:"protocol"`
+	Sequence                     uint64                    `json:"sequence"`
+	Action                       string                    `json:"action"`
+	HostRole                     string                    `json:"host_role"`
+	SourceSHA                    string                    `json:"source_sha"`
+	ToolSourceSHA                string                    `json:"tool_source_sha"`
+	OperationID                  string                    `json:"operation_id"`
+	ManifestSHA256               string                    `json:"manifest_sha256"`
+	OriginalRunID                string                    `json:"original_run_id"`
+	WindowStartSHA256            string                    `json:"window_start_sha256"`
+	RemainingMilliseconds        int64                     `json:"remaining_milliseconds"`
+	ForwardRemainingMilliseconds int64                     `json:"forward_remaining_milliseconds"`
+	Outcome                      string                    `json:"outcome"`
+	ErrorCategory                string                    `json:"error_category"`
+	WholeWriterFenceProven       bool                      `json:"whole_writer_fence_proven"`
+	Runtime                      *DependentRuntimeSnapshot `json:"runtime,omitempty"`
+	Materials                    *RemoteMaterialSnapshot   `json:"materials,omitempty"`
 }
 
 func parseSessionRequest(raw []byte, sequence uint64) (SessionRequest, error) {
@@ -48,7 +50,7 @@ func parseSessionAction(raw []byte, sequence uint64, remote bool) (SessionReques
 	if len(raw) > 1024 || exactJSON(raw, &v) != nil || v.Protocol != sessionProtocol || v.Sequence != sequence || sequence == 0 || sequence > 256 {
 		return v, ErrCommand
 	}
-	if !serviceAction(v.Action) || v.Action == "bind" && !remote {
+	if !serviceAction(v.Action) || !remote && (v.Action == "bind" || controlledAction(v.Action)) {
 		return v, ErrCommand
 	}
 	return v, nil

@@ -83,6 +83,7 @@ type Approval struct {
 	path       string
 	toolMu     sync.Mutex
 	toolInfo   os.FileInfo
+	materials  *RootRemoteMaterials
 }
 
 func (*Approval) MarshalJSON() ([]byte, error) { return nil, ErrBinding }
@@ -408,22 +409,29 @@ func sameIdentity(got actualContainer, want Container) bool {
 // That lets the host restore the exact original running set under its recovery
 // context. An interrupted/failed stop can never satisfy Check.
 type Lease struct {
-	self     *Lease
-	mu       sync.Mutex
-	approval *Approval
-	dir      string
-	dirFD    int
-	baseline []Container
-	stopped  map[string]bool
-	restored map[string]string
-	failed   bool
-	closed   bool
-	window   serviceWindow
+	self                                *Lease
+	mu                                  sync.Mutex
+	approval                            *Approval
+	dir                                 string
+	dirFD                               int
+	baseline                            []Container
+	stopped                             map[string]bool
+	restored                            map[string]string
+	failed                              bool
+	closed                              bool
+	window                              serviceWindow
+	controlledIssued, controlledResumed bool
+	runtimeObservation                  *DependentRuntimeObservation
 }
 
 func (*Lease) MarshalJSON() ([]byte, error) { return nil, ErrBinding }
 func (*Lease) String() string               { return "opaque actual QS service stop lease; no global writer fence" }
-func (l *Lease) record(name string, v any) error {
+func (l *Lease) record(name string, v any) (result error) {
+	defer func() {
+		if result != nil {
+			l.approval.materials.markUnknown()
+		}
+	}()
 	b, e := json.Marshal(v)
 	if e != nil {
 		return ErrJournal
@@ -445,7 +453,7 @@ func (l *Lease) record(name string, v any) error {
 	if e != nil || ce != nil || syscall.Fsync(l.dirFD) != nil {
 		return ErrJournal
 	}
-	return nil
+	return l.approval.materials.registerWritten("service-journal/"+name, b)
 }
 func openJournal(dir string) (int, error) {
 	if rootProtected(dir, true) != nil {

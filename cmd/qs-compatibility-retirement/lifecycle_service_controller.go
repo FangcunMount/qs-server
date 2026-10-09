@@ -49,6 +49,7 @@ type lifecycleServiceController struct {
 	identity                 lifecycleServiceControllerIdentity
 	recoveryAttempted        bool
 	managementReady          bool
+	controlledAttempted      bool
 }
 
 func openLifecycleServiceController(ctx context.Context, r lifecycleRequest, w *fence.MaintenanceWindow, recovery bool) (_ *lifecycleServiceController, result error) {

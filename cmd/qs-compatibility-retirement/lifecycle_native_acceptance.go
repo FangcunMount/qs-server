@@ -30,10 +30,10 @@ func (h *lifecycleFixedHost) BindAcceptancePlan(ctx context.Context, r lifecycle
 }
 
 // Every partial proof below comes from original native owners. This adapter
-// deliberately cannot finish acceptance until controlled A internal resume,
-// actual audit/MQ runtime and the complete same-batch material producers are
-// present. The complete data comparison has already finished before the native
-// B API start (its first controlled internal resume). Acceptance consumes that
+// deliberately cannot finish acceptance until actual audit/MQ/broker runtime
+// and the complete same-batch material producers are present. Controlled A/D
+// resume is wired only after consuming the retained pre-B comparison. The
+// complete data comparison has already finished before the native B API start (its first controlled internal resume). Acceptance consumes that
 // same-process fact; it does not demand byte equality after normal writers run.
 // It creates no user/event/command or audit checkpoint database write.
 func (h *lifecycleFixedHost) verifyNativeAcceptance(ctx context.Context, r lifecycleRequest, a *backup.Archive) error {
@@ -79,6 +79,13 @@ func (h *lifecycleFixedHost) verifyNativeAcceptance(ctx context.Context, r lifec
 		return e
 	}
 	if e = h.CheckWholeWriterFence(q, r); e != nil {
+		return e
+	}
+	observed, e := h.observeControlledAfterDataComparison(q, r)
+	if e != nil {
+		return e
+	}
+	if e = observed.validate(h); e != nil {
 		return e
 	}
 	// A readiness report is Redis/runtime evidence, not complete acceptance.

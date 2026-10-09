@@ -114,19 +114,20 @@ func candidateBudgetState(old remoteBudgetState, p remoteBudgetPayload, boot str
 // Whole-network round trip is therefore conservatively deducted without clock
 // synchronization. Every subsequent bound can only shorten the original bound.
 type RemoteBudget struct {
-	self       *RemoteBudget
-	mu         sync.Mutex
-	approval   *Approval
-	trust      remoteBudgetTrust
-	dir        string
-	dirFD      int
-	state      remoteBudgetState
-	recordHash string
-	lastNanos  int64
-	pending    *BudgetChallenge
-	closed     bool
-	done       context.Context
-	cancel     context.CancelFunc
+	self           *RemoteBudget
+	mu             sync.Mutex
+	approval       *Approval
+	trust          remoteBudgetTrust
+	dir            string
+	dirFD          int
+	state          remoteBudgetState
+	recordHash     string
+	lastNanos      int64
+	pending        *BudgetChallenge
+	closed         bool
+	done           context.Context
+	cancel         context.CancelFunc
+	terminalBudget *remoteOwnedPurgeBudget
 }
 
 func (*RemoteBudget) MarshalJSON() ([]byte, error) { return nil, ErrRemoteBudget }
@@ -231,7 +232,21 @@ func OpenRemoteBudget(ctx context.Context, a *Approval) (out *RemoteBudget, err 
 	return b, nil
 }
 func (b *RemoteBudget) clockLocked(ctx context.Context) (string, int64, error) {
-	if b.closed || ctx == nil || ctx.Err() != nil || b.approval.validate() != nil {
+	if b.closed || ctx == nil || ctx.Err() != nil {
+		return "", 0, ErrRemoteBudget
+	}
+	if p := b.terminalBudget; p != nil {
+		// Only the actual same-session owner may unlink its protected inputs.
+		// Keep the original kernel clock and immutable signed deadlines; no
+		// descriptor re-import or new challenge can extend this terminal phase.
+		boot, now, e := remoteBootClock()
+		if e != nil || p.owner == nil || p.owner.failed.Load() || p.state != b.state || p.recordHash != b.recordHash || boot != p.state.BootID || now < b.lastNanos || now >= p.state.TotalDeadline || now >= p.state.ForwardDeadline {
+			return "", 0, ErrRemoteBudget
+		}
+		b.lastNanos = now
+		return boot, now, nil
+	}
+	if b.approval.validate() != nil {
 		return "", 0, ErrRemoteBudget
 	}
 	trust, e := readRemoteBudgetTrust(b.approval)
@@ -261,7 +276,7 @@ func (b *RemoteBudget) BeginChallenge(ctx context.Context, action string) (*Budg
 	}
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	if b.pending != nil || !serviceAction(action) || b.state.Counter >= 4096 {
+	if b.terminalBudget != nil || b.pending != nil || !serviceAction(action) || b.state.Counter >= 4096 {
 		return nil, ErrRemoteBudget
 	}
 	boot, before, e := b.clockLocked(ctx)
@@ -313,11 +328,16 @@ func (b *RemoteBudget) AcceptGrant(ctx context.Context, c *BudgetChallenge, raw 
 	}
 	name := fmt.Sprintf("grant-%04d.json", state.Counter)
 	if e = writeRootExclusive(b.dirFD, name, data); e != nil {
+		b.approval.materials.markUnknown()
 		return e
 	}
 	saved, e := readRootBudgetFile(filepath.Join(b.dir, name))
 	if e != nil || !bytes.Equal(saved, data) {
+		b.approval.materials.markUnknown()
 		return ErrRemoteBudget
+	}
+	if e = b.approval.materials.registerWritten("remote-budget/"+name, data); e != nil {
+		return e
 	}
 	b.state = state
 	b.recordHash = digest(data)

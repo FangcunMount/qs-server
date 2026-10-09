@@ -15,6 +15,7 @@ import (
 
 	"golang.org/x/sys/unix"
 
+	stop "github.com/FangcunMount/qs-server/internal/apiserver/maintenance/compatibilityretirementstop"
 	"github.com/FangcunMount/qs-server/pkg/version"
 )
 
@@ -64,13 +65,16 @@ const (
 	lifecycleMaterialScopeCount
 )
 
-// The remote zero producer is also not implemented by this leaf. A local SSH
-// Wait, saved remote response, copied journal or new SSH connection cannot
-// construct a complete remote scope. A future producer must bind the original
-// native connection and terminal exact owned cleanup before supplying this.
+// Only purgeAcceptedRemoteMaterials constructs this D-scoped observation from
+// the original native owned-cleanup reply AND that same SSH child's successful
+// actual terminal result. Neither SSH Wait alone nor a saved response/copy or
+// new connection constructs it. All other material scopes remain mandatory.
 type lifecycleRemoteMaterialZero struct {
-	self    *lifecycleRemoteMaterialZero
-	binding lifecycleMaterialBinding
+	self     *lifecycleRemoteMaterialZero
+	binding  lifecycleMaterialBinding
+	native   *stop.RemoteMaterialZero
+	services *lifecycleServiceController
+	terminal *lifecycleDTerminal
 }
 
 type lifecycleBatchMaterials struct {
@@ -113,8 +117,14 @@ func (h *lifecycleFixedHost) acceptedBatchMaterials(ctx context.Context, r lifec
 		return nil, lifecycleError("lifecycle_actual_batch_acceptance_missing")
 	}
 	c := a.catalog
-	if c.closed || c.unknown || c.archive == nil || c.journal == nil || len(c.engines) != 2 || h.restoreOwner == nil || len(h.restoreOwner.engines) != 2 || c.remote == nil || c.remote.self != c.remote || c.remote.binding != c.binding || len(c.scopes) != int(lifecycleMaterialScopeCount) || !lifecycleMaterialPathsMatch(c, r) {
+	if c.closed || c.unknown || c.archive == nil || c.journal == nil || len(c.engines) != 2 || h.restoreOwner == nil || len(h.restoreOwner.engines) != 2 || c.remote == nil || c.remote.self != c.remote || c.remote.binding != c.binding || c.remote.native == nil || c.remote.services != h.services || len(c.scopes) != int(lifecycleMaterialScopeCount) || !lifecycleMaterialPathsMatch(c, r) {
 		return nil, lifecycleError("lifecycle_actual_complete_material_scope_missing")
+	}
+	if z, e := c.remote.native.Snapshot(); e != nil || z.RemainingTemporaryFiles != 0 {
+		return nil, lifecycleError("lifecycle_material_zero_unproven")
+	}
+	if c.remote.terminal == nil || c.remote.terminal.native != c.remote.native || c.remote.terminal.validate(ctx, h, r) != nil {
+		return nil, lifecycleError("lifecycle_material_zero_unproven")
 	}
 	for scope := lifecycleMaterialScope(0); scope < lifecycleMaterialScopeCount; scope++ {
 		if _, ok := c.scopes[scope]; !ok {

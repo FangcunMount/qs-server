@@ -37,6 +37,22 @@ func ServeRootRemoteHostSession(ctx context.Context, a *Approval, journalDir str
 	return serveRemoteHostSession(ctx, a, journalDir, in, out, recoveryOnly)
 }
 
+// ServeRootRemoteOwnedSession keeps the original live D management channel and
+// owns this process's actual registered temporary files. No completion token is
+// accepted. Recovery and legacy sessions retain their existing cleanup rules.
+func ServeRootRemoteOwnedSession(ctx context.Context, a *Approval, m *RootRemoteMaterials, journal string, in, out *os.File) (result error) {
+	if os.Getuid() != 0 || os.Geteuid() != 0 || a == nil || a.materials != nil || m == nil || m.self != m || m.approval != a || m.closed || m.failed.Load() {
+		return ErrRemoteMaterials
+	}
+	a.materials = m
+	defer func() {
+		if e := m.Close(); result == nil && e != nil {
+			result = e
+		}
+	}()
+	return serveRemoteHostSession(ctx, a, journal, in, out, false)
+}
+
 func serveRemoteHostSession(ctx context.Context, a *Approval, journalDir string, in, out *os.File, recoveryOnly bool) (err error) {
 	if ctx == nil || ctx.Err() != nil || a.validate() != nil || a.descriptor.HostRole != "server-d" || !validSessionFD(in) || !validSessionFD(out) {
 		return ErrRemoteBudget
@@ -52,6 +68,7 @@ func serveRemoteHostSession(ctx context.Context, a *Approval, journalDir string,
 	}()
 	var l *Lease
 	var bound, stopIssued, forwardRefused, recoveryIssued bool
+	var controlledIssued, controlledResumed bool
 	defer func() {
 		if l != nil {
 			if ce := l.Close(); err == nil && ce != nil {
@@ -87,8 +104,11 @@ func serveRemoteHostSession(ctx context.Context, a *Approval, journalDir string,
 				return ErrCommand
 			}
 		} else {
-			if !remoteSessionActionAllowed(req.Action, bound, stopIssued, forwardRefused, recoveryIssued) {
+			if !remoteSessionRequestAllowed(req.Action, bound, stopIssued, forwardRefused, recoveryIssued, controlledIssued, controlledResumed) {
 				return ErrCommand
+			}
+			if req.Action == "controlled_resume" {
+				controlledIssued = true
 			}
 			if req.Action == "bind" {
 				bound = true
@@ -143,6 +163,8 @@ func serveRemoteHostSession(ctx context.Context, a *Approval, journalDir string,
 			}
 		}
 		released := false
+		var actualRuntime *DependentRuntimeSnapshot
+		var actualMaterials *RemoteMaterialSnapshot
 		switch req.Action {
 		case "bind":
 			// Actual descriptor/trust, fresh native signature and original budget
@@ -162,6 +184,40 @@ func serveRemoteHostSession(ctx context.Context, a *Approval, journalDir string,
 			}
 			e = l.ResumeDependents(ctx)
 			released = e == nil
+		case "controlled_resume":
+			if l == nil {
+				return ErrCommand
+			}
+			e = l.ControlledResumeDependents(ctx)
+			controlledResumed = e == nil
+		case "check_running":
+			if l == nil {
+				return ErrCommand
+			}
+			var observed *DependentRuntimeObservation
+			observed, e = l.ObserveRunningDependents(ctx)
+			if e == nil {
+				var snapshot DependentRuntimeSnapshot
+				snapshot, e = observed.Snapshot()
+				if e == nil {
+					actualRuntime = &snapshot
+				}
+			}
+		case "purge_materials":
+			if l == nil || a.materials == nil || l.runtimeObservation == nil {
+				return ErrRemoteMaterials
+			}
+			// Reobserve from this original Lease immediately before deleting its
+			// journals. No reconnect, saved runtime DTO or requested CID is used.
+			_, e = l.ObserveRunningDependents(ctx)
+			if e == nil {
+				var snapshot RemoteMaterialSnapshot
+				snapshot, e = a.materials.purge(ctx, b, l)
+				if e == nil {
+					actualMaterials = &snapshot
+					released = true
+				}
+			}
 		case "restore":
 			if l == nil {
 				return ErrCommand
@@ -184,6 +240,8 @@ func serveRemoteHostSession(ctx context.Context, a *Approval, journalDir string,
 			return be
 		}
 		diagnostic := SessionDiagnostic{Protocol: sessionProtocol, Sequence: seq, Action: req.Action, HostRole: a.descriptor.HostRole, SourceSHA: a.descriptor.SourceSHA, ToolSourceSHA: a.descriptor.ToolSourceSHA, OperationID: a.descriptor.OperationID, ManifestSHA256: a.descriptor.ManifestSHA256, OriginalRunID: a.descriptor.OriginalRunID, WindowStartSHA256: budget.StartSHA256, RemainingMilliseconds: budget.RemainingMilliseconds, ForwardRemainingMilliseconds: remaining, Outcome: "observed", ErrorCategory: sessionCategory(e)}
+		diagnostic.Runtime = actualRuntime
+		diagnostic.Materials = actualMaterials
 		if e != nil {
 			diagnostic.Outcome = "refused"
 		}
@@ -202,7 +260,7 @@ func serveRemoteHostSession(ctx context.Context, a *Approval, journalDir string,
 			return writeErr
 		}
 		if e != nil {
-			if l == nil || recoveryAction(req.Action) || recoveryOnly {
+			if req.Action == "purge_materials" || l == nil || recoveryAction(req.Action) || recoveryOnly {
 				return e
 			}
 			// A real refused action may already have a native partial Lease. Keep
@@ -271,8 +329,20 @@ func remoteSessionActionAllowed(action string, bound, stopIssued, forwardRefused
 		return !bound && !stopIssued
 	case "stop":
 		return !stopIssued // Preserves the legacy initial Stop route.
-	case "check", "resume_dependents":
+	case "check", "resume_dependents", "controlled_resume", "check_running", "purge_materials":
 		return stopIssued
 	}
 	return false
+}
+
+// This is the actual live-session request gate, before the fresh native budget
+// challenge. An allowed request still needs its original signed grant, Lease,
+// current runtime observation and exact registered material owner before purge.
+func remoteSessionRequestAllowed(action string, bound, stopIssued, forwardRefused, recoveryIssued, controlledIssued, controlledResumed bool) bool {
+	if !remoteSessionActionAllowed(action, bound, stopIssued, forwardRefused, recoveryIssued) {
+		return false
+	}
+	return !controlledAction(action) || bound &&
+		(action != "controlled_resume" || !controlledIssued) &&
+		(action != "check_running" && action != "purge_materials" || controlledResumed)
 }

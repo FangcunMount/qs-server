@@ -55,12 +55,36 @@ func lifecyclePlatformToken() ([]byte, error) {
 }
 
 func (h *lifecycleFixedHost) observeWholeWriterScopes(ctx context.Context, r lifecycleRequest) error {
+	return h.observeWholeWriterScopesForOriginalD(ctx, r, nil)
+}
+
+// Only the same-process owned purge caller enters this phase. No request field
+// chooses it, and it relaxes only the original D management liveness condition.
+func (h *lifecycleFixedHost) observeWholeWriterScopesAfterDTerminal(ctx context.Context, r lifecycleRequest, terminal *lifecycleDTerminal) error {
+	if terminal == nil {
+		return lifecycleError("lifecycle_material_zero_unproven")
+	}
+	return h.observeWholeWriterScopesForOriginalD(ctx, r, terminal)
+}
+
+func (h *lifecycleFixedHost) checkOriginalDManagementPhase(ctx context.Context, r lifecycleRequest, terminal *lifecycleDTerminal) error {
+	if h == nil || h.services == nil || h.services.child == nil {
+		return lifecycleError("lifecycle_writer_scope_binding_rejected")
+	}
+	if terminal == nil {
+		return h.services.child.requireLive()
+	}
+	return terminal.validate(ctx, h, r)
+}
+
+func (h *lifecycleFixedHost) observeWholeWriterScopesForOriginalD(ctx context.Context, r lifecycleRequest, terminal *lifecycleDTerminal) error {
 	if h == nil || ctx == nil || ctx.Err() != nil || !r.WriterControl.valid() || r.DeploymentControl == nil || h.services == nil || h.services.window == nil || !h.services.managementReady || !h.services.identity.matches(r) || h.services.child == nil {
 		return lifecycleError("lifecycle_writer_scope_binding_rejected")
 	}
-	// This is the same pre-established D management process. Checking liveness
-	// does not stop it, create another login, or claim that other sessions are gone.
-	if e := h.services.child.requireLive(); e != nil {
+	// Ordinary phases require the same pre-established D process to be live.
+	// Only completed native purge may verify that original process's terminal
+	// result instead; neither phase creates a login or isolates other writers.
+	if e := h.checkOriginalDManagementPhase(ctx, r, terminal); e != nil {
 		return e
 	}
 	if e := validateLifecycleAPIInvocation(r); e != nil {
@@ -88,7 +112,7 @@ func (h *lifecycleFixedHost) observeWholeWriterScopes(ctx context.Context, r lif
 		return lifecycleError("lifecycle_platform_observation_unproven")
 	}
 	after, e := readLifecycleAPIRecord(intentPath)
-	if e != nil || !bytes.Equal(before, after) || validateLifecycleAPIInvocation(r) != nil || h.services.child.requireLive() != nil || observed.ValidateOriginalWindow(ctx, h.services.window, lifecycleWindowBinding(r)) != nil {
+	if e != nil || !bytes.Equal(before, after) || validateLifecycleAPIInvocation(r) != nil || h.checkOriginalDManagementPhase(ctx, r, terminal) != nil || observed.ValidateOriginalWindow(ctx, h.services.window, lifecycleWindowBinding(r)) != nil {
 		return lifecycleError("lifecycle_writer_scope_binding_rejected")
 	}
 	h.writers.platform = observed

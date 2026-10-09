@@ -66,6 +66,7 @@ func loadLifecycleServiceRole(ctx context.Context, path, hash, operation, run, r
 }
 
 func runLifecycleServiceSession(ctx context.Context, mode, path, hash, operation, run string, in, out *os.File) error {
+	originalHash := hash
 	template := mode == "host-services-d-template" || mode == "host-services-d-recovery-template"
 	recovery := mode == "host-services-d-recovery" || mode == "host-services-d-recovery-template"
 	if mode != "host-services-d" && mode != "host-services-d-recovery" && !template {
@@ -84,5 +85,16 @@ func runLifecycleServiceSession(ctx context.Context, mode, path, hash, operation
 	}
 	// Session stdout is the bounded native challenge/reply wire. Do not append a
 	// JSON completion receipt or raw diagnostic after the stream has terminated.
-	return stop.ServeRootRemoteHostSession(ctx, a, journal, in, out, recovery)
+	if recovery {
+		return stop.ServeRootRemoteHostSession(ctx, a, journal, in, out, true)
+	}
+	templateHash := ""
+	if template {
+		templateHash = originalHash
+	}
+	materials, err := stop.OpenRootRemoteMaterials(ctx, a, path, hash, run, templateHash)
+	if err != nil {
+		return err
+	}
+	return stop.ServeRootRemoteOwnedSession(ctx, a, materials, journal, in, out)
 }

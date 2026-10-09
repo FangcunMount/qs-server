@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"os"
+	"strings"
 	"sync"
 
 	"golang.org/x/sys/unix"
@@ -25,6 +26,9 @@ type RemoteController struct {
 	closed                                 bool
 	managementBound, stopIssued            bool
 	forwardRefused, recoveryIssued         bool
+	controlledIssued, controlledResumed    bool
+	runtimeObservation                     *RemoteRuntimeObservation
+	materialsZero                          *RemoteMaterialZero
 }
 
 var ErrRemoteActionRefused = errors.New("actual remote service action refused")
@@ -52,7 +56,7 @@ func (c *RemoteController) Do(ctx context.Context, action string) (v SessionDiag
 		return v, ErrRemoteBudget
 	}
 	if action == "bind" && c.seq != 0 || action == "stop" && c.stopIssued || c.forwardRefused && !recoveryAction(action) || recoveryAction(action) && (c.recoveryIssued || c.seq != 0 && !c.stopIssued) ||
-		(action == "check" || action == "resume_dependents") && !c.stopIssued {
+		(action == "check" || action == "resume_dependents" || controlledAction(action)) && !c.stopIssued || controlledAction(action) && (!c.managementBound || action == "controlled_resume" && c.controlledIssued || (action == "check_running" || action == "purge_materials") && !c.controlledResumed || action == "purge_materials" && c.runtimeObservation == nil) {
 		return v, ErrRemoteBudget
 	}
 	var a, b unix.Stat_t
@@ -84,6 +88,9 @@ func (c *RemoteController) Do(ctx context.Context, action string) (v SessionDiag
 	}()
 	if action == "stop" {
 		c.stopIssued = true // Actual issued responsibility, not a stop proof.
+	}
+	if action == "controlled_resume" {
+		c.controlledIssued = true
 	}
 	if recoveryAction(action) {
 		c.recoveryIssued = true
@@ -118,6 +125,9 @@ func (c *RemoteController) Do(ctx context.Context, action string) (v SessionDiag
 	if exactJSON(reply, &v) != nil || v.Protocol != sessionProtocol || v.Sequence != c.seq || v.Action != action || v.HostRole != "server-d" || v.SourceSHA != c.issuer.record.Binding.SourceSHA || v.ToolSourceSHA != c.issuer.record.ToolSourceSHA || v.OperationID != c.issuer.record.Binding.OperationID || v.ManifestSHA256 != c.issuer.record.Binding.ManifestSHA256 || v.OriginalRunID != c.issuer.record.Binding.OriginalRunID || v.WindowStartSHA256 != c.issuer.record.StartSHA256 || v.WholeWriterFenceProven || v.RemainingMilliseconds <= 0 || v.RemainingMilliseconds > 1800000 || v.ForwardRemainingMilliseconds < 0 || v.ForwardRemainingMilliseconds > 1200000 || !remoteDiagnosticOutcomeValid(v) {
 		return v, ErrRemoteBudget
 	}
+	if !remoteRuntimeDiagnosticValid(v) || !remoteMaterialsDiagnosticValid(v) {
+		return v, ErrRemoteBudget
+	}
 	after, e := c.issuer.window.Diagnostic(q)
 	if e != nil || after.StartSHA256 != c.issuer.record.StartSHA256 || recoveryAction(action) != (after.RecoverySHA256 != "") {
 		return v, ErrRemoteBudget
@@ -133,7 +143,38 @@ func (c *RemoteController) Do(ctx context.Context, action string) (v SessionDiag
 	if action == "bind" {
 		c.managementBound = true
 	}
+	if action == "controlled_resume" {
+		c.controlledResumed = true
+	}
+	if action == "check_running" {
+		o := &RemoteRuntimeObservation{controller: c, sequence: c.seq, snapshot: *v.Runtime, seal: runtimeDigest(*v.Runtime)}
+		o.self = o
+		c.runtimeObservation = o
+	}
+	if action == "purge_materials" {
+		z := &RemoteMaterialZero{controller: c, sequence: c.seq, snapshot: *v.Materials, seal: runtimeDigest(*v.Materials)}
+		z.self = z
+		c.materialsZero = z
+		c.closed = true
+	}
 	return v, nil
+}
+
+func remoteRuntimeDiagnosticValid(v SessionDiagnostic) bool {
+	if v.Action != "check_running" || v.Outcome != "observed" {
+		return v.Runtime == nil
+	}
+	if v.Runtime == nil || len(v.Runtime.Instances) == 0 || len(v.Runtime.Instances) > 32 {
+		return false
+	}
+	seen := map[string]bool{}
+	for _, r := range v.Runtime.Instances {
+		if !hash64.MatchString(r.ContainerID) || seen[r.ContainerID] || !strings.HasPrefix(r.ImageID, "sha256:") || !hash64.MatchString(strings.TrimPrefix(r.ImageID, "sha256:")) || !hash64.MatchString(r.ProgramSHA256) || !hash64.MatchString(r.StateSHA256) || !hash64.MatchString(r.ReadySHA256) {
+			return false
+		}
+		seen[r.ContainerID] = true
+	}
+	return true
 }
 func remoteDiagnosticOutcomeValid(v SessionDiagnostic) bool {
 	if v.Outcome == "observed" {
