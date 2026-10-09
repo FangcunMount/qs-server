@@ -40,6 +40,7 @@ type lifecycleRequest struct {
 	SourceFileSHA256  map[string]string                    `json:"source_file_sha256,omitempty"`
 	ServiceControl    *lifecycleServiceControl             `json:"service_control,omitempty"`
 	DeploymentControl *lifecycleAPIDeploymentControl       `json:"deployment_control,omitempty"`
+	FinalHistory      *lifecycleFinalHistoryInput          `json:"final_history,omitempty"`
 	requestSHA256     string                               `json:"-"`
 	prepareRoot       string                               `json:"-"`
 }
@@ -165,7 +166,15 @@ func lifecycleCategory(err error) string {
 }
 
 func readLifecyclePrivate(path, expected string, dst any) error {
-	if !hashRE.MatchString(expected) || privateDir(filepath.Dir(path)) != nil {
+	return readLifecyclePrivateLimit(path, expected, dst, 256<<10)
+}
+
+func readLifecyclePrivateLimit(path, expected string, dst any, maximum int64) error {
+	return readLifecyclePrivateAs(path, expected, dst, maximum, uint32(os.Getuid()))
+}
+
+func readLifecyclePrivateAs(path, expected string, dst any, maximum int64, owner uint32) error {
+	if !hashRE.MatchString(expected) || lifecycleSourcePrivateDirectory(filepath.Dir(path), owner) != nil {
 		return lifecycleError("lifecycle_private_input_rejected")
 	}
 	f, err := os.OpenFile(path, os.O_RDONLY|syscall.O_NOFOLLOW|syscall.O_NONBLOCK, 0)
@@ -173,13 +182,15 @@ func readLifecyclePrivate(path, expected string, dst any) error {
 		return lifecycleError("lifecycle_private_input_rejected")
 	}
 	st, statErr := f.Stat()
-	if statErr != nil || st == nil || !st.Mode().IsRegular() || st.Mode().Perm() != 0600 || st.Size() > 256<<10 || st.Sys().(*syscall.Stat_t).Uid != uint32(os.Getuid()) || st.Sys().(*syscall.Stat_t).Nlink != 1 {
+	if statErr != nil || st == nil || !st.Mode().IsRegular() || st.Mode().Perm() != 0600 || st.Size() < 0 || st.Size() > maximum || st.Sys().(*syscall.Stat_t).Uid != owner || st.Sys().(*syscall.Stat_t).Nlink != 1 {
 		_ = f.Close()
 		return lifecycleError("lifecycle_private_input_rejected")
 	}
-	raw, readErr := io.ReadAll(io.LimitReader(f, (256<<10)+1))
+	raw, readErr := io.ReadAll(io.LimitReader(f, maximum+1))
+	after, afterErr := f.Stat()
+	named, namedErr := os.Lstat(path)
 	closeErr := f.Close()
-	if readErr != nil || closeErr != nil || len(raw) > 256<<10 || digestRaw(raw) != expected || rejectDuplicateJSON(raw) != nil {
+	if readErr != nil || closeErr != nil || afterErr != nil || namedErr != nil || !lifecycleFinalFileSame(st, after) || !lifecycleFinalFileSame(st, named) || int64(len(raw)) > maximum || digestRaw(raw) != expected || rejectDuplicateJSON(raw) != nil {
 		return lifecycleError("lifecycle_private_input_rejected")
 	}
 	d := json.NewDecoder(strings.NewReader(string(raw)))
@@ -287,6 +298,9 @@ func loadLifecycleRequest(ctx context.Context, path, expected, operation, actual
 	}
 	if stage != "prepare" && !r.DeploymentControl.valid() {
 		return r, nil, lifecycleError("lifecycle_actual_inline_image_approval_missing")
+	}
+	if r.FinalHistory != nil && (stage == "prepare" || !r.FinalHistory.valid(r)) {
+		return r, nil, lifecycleError("lifecycle_final_historical_input_rejected")
 	}
 	if stage == "prepare" && !r.RestoreEngines.valid() {
 		return r, nil, lifecycleError("lifecycle_restore_engine_approval_missing")

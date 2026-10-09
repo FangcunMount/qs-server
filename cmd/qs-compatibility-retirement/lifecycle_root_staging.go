@@ -92,7 +92,7 @@ func decodeLifecycleStagingRequest(raw []byte) (lifecycleRequest, error) {
 	if json.Unmarshal(raw, &fields) != nil {
 		return r, lifecycleError("lifecycle_staging_request_rejected")
 	}
-	for _, name := range []string{"resume", "resume_kind", "service_control", "deployment_control"} {
+	for _, name := range []string{"resume", "resume_kind", "service_control", "deployment_control", "final_history"} {
 		if _, exists := fields[name]; exists {
 			return r, lifecycleError("lifecycle_staging_request_rejected")
 		}

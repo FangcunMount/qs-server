@@ -12,6 +12,7 @@ type aiExternalExecMode string
 
 const aiExternalVerifyMode aiExternalExecMode = "verify"
 const aiExternalBoundsMode aiExternalExecMode = "bounds"
+const aiExternalFinalVerifyMode aiExternalExecMode = "final-verify"
 
 // This is the existing host operation_directory(root, operation_id), not a new
 // root authorization mechanism. Fixed names remain identical across attempts.
@@ -29,6 +30,8 @@ func aiExternalExecModePath(directory, operation string, mode aiExternalExecMode
 		name = "qs-ai-external-verify.exec.jsonl"
 	case aiExternalBoundsMode:
 		name = "qs-ai-external-bounds.exec.jsonl"
+	case aiExternalFinalVerifyMode:
+		name = "qs-ai-external-final-verify.exec.jsonl"
 	default:
 		return "", ErrAIExternalExecJournal
 	}
@@ -64,14 +67,14 @@ func aiExternalExecModeBinding(ctx context.Context, mode aiExternalExecMode, own
 	}
 	protocol := ""
 	switch mode {
-	case aiExternalVerifyMode:
+	case aiExternalVerifyMode, aiExternalFinalVerifyMode:
 		protocol = "qs-ai-readonly-host-input/v2"
 	case aiExternalBoundsMode:
 		protocol = "qs-ai-readonly-bounds-discovery-input/v1"
 	default:
 		return empty, ErrAIExternalExecJournal
 	}
-	if packet.Protocol != protocol && (mode != aiExternalVerifyMode || packet.Protocol != "qs-ai-readonly-host-input/v3") {
+	if packet.Protocol != protocol && ((mode != aiExternalVerifyMode && mode != aiExternalFinalVerifyMode) || packet.Protocol != "qs-ai-readonly-host-input/v3") {
 		return empty, ErrAIExternalExecJournal
 	}
 	binding := aiExecBinding{SourceSHA: owner.SourceSHA, OperationID: owner.OperationID, RunID: run, RuntimeSourceSHA: runtime, ImageID: image, ContainerID: cid, PythonSHA256: aiExternalHostSHA, InputSHA256: sourceSHA(input), DeadlineUnixNano: deadline.UnixNano()}
@@ -92,6 +95,16 @@ func aiExternalExecuteMode(ctx context.Context, docker *aiExternalDockerExecutor
 	if e != nil {
 		return nil, e
 	}
+	var prior *aiExecJournal
+	if mode == aiExternalFinalVerifyMode {
+		// A new fixed phase is not a retry of an old unknown execution. Keep
+		// the original successful verify chain locked throughout the fresh Q.
+		prior, e = aiExecOpenFinalPredecessor(ctx, docker, directory, owner, runtime, image, cid)
+		if e != nil {
+			return nil, e
+		}
+		defer func() { _ = prior.Close() }()
+	}
 	journal, e := aiExecOpenJournal(path, binding, true)
 	if e != nil {
 		return nil, e
@@ -109,6 +122,15 @@ func aiExternalExecuteMode(ctx context.Context, docker *aiExternalDockerExecutor
 	}
 	if e = journal.Close(); e != nil {
 		return nil, ErrAIExternalExecJournal
+	}
+	if prior != nil {
+		prior.mu.Lock()
+		e = prior.checkLocked()
+		prior.mu.Unlock()
+		closeErr := prior.Close()
+		if e != nil || closeErr != nil {
+			return nil, ErrAIExternalExecJournal
+		}
 	}
 	return raw, nil
 }

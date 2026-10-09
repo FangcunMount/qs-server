@@ -39,10 +39,26 @@ class WindowToolMetadata(unittest.TestCase):
         self.assertNotEqual(tool.digest(derived),a['request_template_sha256'])
         self.assertEqual(value['archive_approval'],r['archive_approval']);self.assertEqual(value['recovery']['original_run_id'],'11-1')
     def test_prepare_forbids_effect_fields_including_null(self):
-        for name in ('resume','resume_kind','service_control','deployment_control'):
+        for name in ('resume','resume_kind','service_control','deployment_control','final_history'):
             with self.subTest(name=name):
                 r=self.request();r[name]=None;a=self.approval(r)
                 with self.assertRaises(tool.Refused):tool.derive_request(tool.canonical(r),a,'22-3')
+    def final_history(self):
+        root='/opt/backups/qs-server/compatibility-retirement/12-1/'
+        return dict(assets_directory='/opt/qs-server/retirement-assets',runtime_source_sha='a'*40,image_id='sha256:'+'b'*64,container_id='c'*64,runtime_binding_sha256='d'*64,ai_bounds=dict(path=root+'ai.json',sha256='1'*64),peer_bounds=dict(path=root+'peer.json',sha256='2'*64),protection=dict(path=root+'protection.json',sha256='3'*64))
+    def test_final_history_has_only_inputs_and_current_run_derivation_preserves_them(self):
+        r=self.request();r['final_history']=self.final_history();a=self.approval(r,'apply')
+        out=tool.decode(tool.derive_request(tool.canonical(r),a,'22-3'))
+        self.assertEqual(out['final_history'],r['final_history']);self.assertEqual(r['actual_run_id'],'')
+        for key,value in (('drop_ready',True),('q_complete',True),('run_id','22'),('PeerConnection',{})):
+            with self.subTest(key=key):
+                v=self.final_history();v[key]=value
+                with self.assertRaises(tool.Refused):tool.validate_final_history(v,'12-1')
+    def test_final_history_rejects_null_alias_other_operation_and_nonexact_runtime(self):
+        with self.assertRaises(tool.Refused):tool.validate_final_history(None,'12-1')
+        for mutate in (lambda v:v.update(image_id='qs-ai:latest'),lambda v:v['ai_bounds'].update(path='/tmp/ai.json'),lambda v:v['ai_bounds'].update(path='/opt/backups/qs-server/compatibility-retirement/13-1/ai.json'),lambda v:v.update(protection=v['ai_bounds']),lambda v:v.update(runtime_source_sha='main')):
+            v=self.final_history();mutate(v)
+            with self.assertRaises(tool.Refused):tool.validate_final_history(v,'12-1')
     def test_mixed_unknown_uppercase_and_proof_fields_reject(self):
         for name in ('drop_ready','whole_writer_fence','SourceSHA','tool_sha','window_lease'):
             r=self.request();r[name]=True;a=self.approval(r)

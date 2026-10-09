@@ -139,8 +139,8 @@ func (h *lifecycleFixedHost) RestoreStoppedServices(ctx context.Context, r lifec
 func (*lifecycleFixedHost) CheckWholeWriterFence(context.Context, lifecycleRequest) error {
 	return lifecycleError("lifecycle_whole_writer_and_old_ref_fence_missing")
 }
-func (*lifecycleFixedHost) FinalDifferenceAndEOF(context.Context, lifecycleRequest, *backup.Archive) error {
-	return lifecycleError("lifecycle_final_historical_q_and_eof_missing")
+func (h *lifecycleFixedHost) FinalDifferenceAndEOF(ctx context.Context, r lifecycleRequest, a *backup.Archive) error {
+	return h.finalDifferenceAndEOF(ctx, r, a)
 }
 func (h *lifecycleFixedHost) DeployBInline(ctx context.Context, r lifecycleRequest, p *migration.CompatibilityPairMigrationProof, w *fence.MaintenanceWindow) error {
 	if h == nil || h.owner == nil || h.services == nil || h.api == nil || p == nil || w == nil || h.services.window != w {

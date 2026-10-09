@@ -114,7 +114,7 @@ def derive_request(raw, approval, current_run):
         reject("window_tool_template_hash_rejected")
     r = decode(raw)
     required = ("format_version", "kind", "tool_source_sha", "original_source_sha", "operation_id", "actual_run_id", "manifest_sha256", "archive_directory", "window_directory", "journal_directory", "archive_approval", "recovery")
-    optional = ("source_directory", "restore_engines", "source_file_sha256", "service_control", "resume", "resume_kind", "deployment_control")
+    optional = ("source_directory", "restore_engines", "source_file_sha256", "service_control", "resume", "resume_kind", "deployment_control", "final_history")
     exact(r, required, optional)
     if type(r["format_version"]) is not int or r["format_version"] != 1 or r["kind"] != "compatibility_retirement_lifecycle_request" or r["tool_source_sha"] != approval["tool_source_sha"] or r["original_source_sha"] != approval["original_source_sha"] or r["operation_id"] != approval["operation_id"] or r["actual_run_id"] != "" or r["manifest_sha256"] != approval["manifest_sha256"]:
         reject("window_tool_template_binding_rejected")
@@ -129,8 +129,10 @@ def derive_request(raw, approval, current_run):
     result = copy.deepcopy(r)
     result["actual_run_id"] = current_run
     if approval["stage"] == "prepare":
-        if any(key in r for key in ("resume", "resume_kind", "service_control", "deployment_control")) or q["archive_sha256"] != "":
+        if any(key in r for key in ("resume", "resume_kind", "service_control", "deployment_control", "final_history")) or q["archive_sha256"] != "":
             reject("window_tool_prepare_effect_fields_rejected")
+    if "final_history" in r:
+        validate_final_history(r["final_history"], approval["operation_id"])
     if "resume" not in r:
         if "resume_kind" in r or q["actual_run_id"] != "":
             reject("window_tool_current_run_not_empty")
@@ -146,6 +148,28 @@ def derive_request(raw, approval, current_run):
         token(q["actual_run_id"], RUN)
         result["resume"]["Recovery"]["CurrentRunID"] = current_run
     return canonical(result)
+
+
+def validate_final_history(value, operation):
+    exact(value, ("assets_directory", "runtime_source_sha", "image_id", "container_id", "runtime_binding_sha256", "ai_bounds", "peer_bounds", "protection"))
+    token(value["runtime_source_sha"], SHA)
+    token(value["container_id"], HASH)
+    token(value["runtime_binding_sha256"], HASH)
+    if not isinstance(value["image_id"], str) or not value["image_id"].startswith("sha256:"):
+        reject("window_tool_final_history_rejected")
+    token(value["image_id"][7:], HASH)
+    assets=value["assets_directory"]
+    if not isinstance(assets,str) or not os.path.isabs(assets) or os.path.normpath(assets)!=assets:
+        reject("window_tool_final_history_rejected")
+    root=Path('/opt/backups/qs-server/compatibility-retirement',operation)
+    seen=set()
+    for key in ("ai_bounds","peer_bounds","protection"):
+        file=value[key]
+        exact(file,("path","sha256"));token(file["sha256"], HASH)
+        p=file["path"]
+        if not isinstance(p,str) or os.path.normpath(p)!=p or not Path(p).is_relative_to(root) or p==str(root) or p in seen:
+            reject("window_tool_final_history_rejected")
+        seen.add(p)
 
 
 def protected_directory(path, *, create=False):
@@ -561,6 +585,7 @@ ADAPTERS = frozenset({"actual_four_source_historical_persistence_and_readback", 
     "server_a_and_server_d_stop_drain_lease", "whole_writer_and_old_ref_fence", "prepared_inline_b_and_no_automigration_rollback",
     "actual_runtime_acceptance_and_private_purge"})
 PUBLIC_ERRORS = frozenset({"none", "lifecycle_actual_host_adapters_missing", "lifecycle_whole_writer_and_old_ref_fence_missing",
+    "lifecycle_final_historical_input_rejected", "lifecycle_final_historical_scope_rejected", "lifecycle_final_historical_scope_cleanup_failed",
     "lifecycle_final_historical_q_and_eof_missing", "lifecycle_actual_inline_b_deployment_missing",
     "lifecycle_actual_runtime_and_data_acceptance_missing", "lifecycle_actual_ddl_stopped_unproven",
     "lifecycle_actual_no_migration_rollback_missing", "lifecycle_actual_batch_material_purge_missing",

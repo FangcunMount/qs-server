@@ -189,6 +189,17 @@ func (q *AIExternalExecutionQualification) Summary() AIExternalExecutionSummary 
 // The fixed Python host owns its separate ai/peer read-only pools and sessions.
 // The controller accepts only the producer it just executed, never saved output.
 func (c *HistoricalCoordinator) PrepareAIExternalExecution(ctx context.Context, local *AIReadOnlyResolver, reverse *AIReverseSnapshot, in AIExternalExecutionInput) (*AIExternalExecutionQualification, error) {
+	return c.prepareAIExternalExecution(ctx, local, reverse, in, aiExternalVerifyMode)
+}
+
+// The window's fixed final phase runs a complete fresh native producer after
+// a known successful original phase. It cannot select another mode or reuse a
+// saved Q, and never changes the original operation, journal or business IDs.
+func (c *HistoricalCoordinator) PrepareAIFinalExternalExecution(ctx context.Context, local *AIReadOnlyResolver, reverse *AIReverseSnapshot, in AIExternalExecutionInput) (*AIExternalExecutionQualification, error) {
+	return c.prepareAIExternalExecution(ctx, local, reverse, in, aiExternalFinalVerifyMode)
+}
+
+func (c *HistoricalCoordinator) prepareAIExternalExecution(ctx context.Context, local *AIReadOnlyResolver, reverse *AIReverseSnapshot, in AIExternalExecutionInput, mode aiExternalExecMode) (*AIExternalExecutionQualification, error) {
 	if c == nil || ctx == nil {
 		return nil, ErrAIExternalInput
 	}
@@ -265,7 +276,7 @@ func (c *HistoricalCoordinator) PrepareAIExternalExecution(ctx context.Context, 
 	if err != nil || !before.matches(in) || !release.matchesMounts(before.Mounts) {
 		return nil, ErrAIExternalRuntime
 	}
-	result, err := aiExternalExecuteMode(work, docker, in.OperationDirectory, aiExternalVerifyMode, c.binding, in.RunID, in.RuntimeSourceSHA, in.ImageID, in.ContainerID, assets.host, raw)
+	result, err := aiExternalExecuteMode(work, docker, in.OperationDirectory, mode, c.binding, in.RunID, in.RuntimeSourceSHA, in.ImageID, in.ContainerID, assets.host, raw)
 	if err != nil {
 		return nil, ErrAIExternalExecution
 	}

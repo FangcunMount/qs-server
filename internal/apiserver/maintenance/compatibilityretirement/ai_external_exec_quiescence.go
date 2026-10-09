@@ -107,7 +107,7 @@ func RequireAIExternalExecQuiescence(ctx context.Context, in AIExternalExecQuies
 		return ErrAIExternalExecJournal
 	}
 	var docker *aiExternalDockerExecutor
-	for _, mode := range []aiExternalExecMode{aiExternalBoundsMode, aiExternalVerifyMode} {
+	for _, mode := range []aiExternalExecMode{aiExternalBoundsMode, aiExternalVerifyMode, aiExternalFinalVerifyMode} {
 		path, e := aiExternalExecModePath(in.OperationDirectory, in.OperationID, mode)
 		if e != nil {
 			return e
