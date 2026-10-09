@@ -14,6 +14,7 @@ from pathlib import Path
 import shutil
 import subprocess
 import tempfile
+import time
 import textwrap
 import unittest
 from unittest import mock
@@ -1325,6 +1326,248 @@ class MetadataWorkflowContracts(unittest.TestCase):
             self.assertEqual(listing,["compatibility-retirement.py","compatibility-history-prepare.py","compatibility-retirement-entrypoints.json","receipt-transport.py"])
             self.assertEqual(output.read_text().strip(),"sha256="+hashlib.sha256(archive.read_bytes()).hexdigest())
             self.assertEqual(list(runtemp.iterdir()),[])
+
+
+DIAGNOSTIC_SOURCE = 'a' * 40
+DIAGNOSTIC_ORIGINAL = 'b' * 40
+DIAGNOSTIC_OP = '123-1'
+DIAGNOSTIC_RUN = '702-1'
+DIAGNOSTIC_OBSERVE = '703-1'
+DIAGNOSTIC_WORKFLOW = SCRIPT.parents[2] / '.github/workflows/compatibility-retirement.yml'
+
+
+def diagnostic_binding(database):
+    complete = database == 'mysql'
+    return {'identity_hash': '1' * 64 if complete else '',
+            'database_anchor_hash': '1' * 64 if complete else '', 'migration_generation_hash': '',
+            'expected_identity_match': complete, 'migration_version': 99 if complete else 0,
+            'migration_dirty': False, 'expected_migration_match': complete,
+            'catalog_hash': '2' * 64 if complete else '', 'non_target_schema_hash': '3' * 64 if complete else '',
+            'metadata_complete': complete, 'permissions': {}, 'outside_dependencies': 0,
+            'dependency_coverage_complete': False, 'inbound_foreign_key_coverage_complete': False,
+            'dependency_scope': 'metadata_only' if complete else '', 'dependency_text_review_required': True,
+            'error_category': 'none' if complete else 'mongo_index_visibility_incomplete'}
+
+
+class ReportDiagnosticSafetyContracts(unittest.TestCase):
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory(prefix='report-diagnostic-test-')
+        self.base = Path(self.temp.name).resolve()
+        self.root = self.base / 'backups/qs-server/compatibility-retirement'
+        self.root.mkdir(parents=True, mode=0o700)
+        self.directory = self.root / DIAGNOSTIC_OP; self.directory.mkdir(mode=0o700)
+        self.output = self.directory / ('bounds-' + DIAGNOSTIC_RUN); self.output.mkdir(mode=0o700)
+        self.request = {'format_version': 2, 'kind': 'readonly_inventory_boundary_request',
+                        'source_sha': DIAGNOSTIC_ORIGINAL, 'operation_id': DIAGNOSTIC_OP, 'target_hash': tool.TARGET_HASH,
+                        'database_scope': 'mysql-and-mongodb', 'identity_hashes': {'mysql': '1' * 64, 'mongodb': '4' * 64},
+                        'expected_migrations': {'mysql': 99, 'mongodb': 38}, 'limits': tool.INVENTORY_V2_LIMITS.copy()}
+        self.request_hash = self.write(self.directory / 'boundary-request.json', self.request)
+        self.report = {'format_version': 2, 'kind': 'readonly_inventory_boundaries', 'source_sha': DIAGNOSTIC_ORIGINAL,
+                       'operation_id': DIAGNOSTIC_OP, 'run_id': DIAGNOSTIC_RUN, 'request_hash': self.request_hash, 'target_hash': tool.TARGET_HASH,
+                       'observed_at': '2026-10-09T11:00:00Z', 'complete': False, 'drop_ready': False,
+                       'diagnostic_only': True, 'error_category': 'inventory_incomplete',
+                       'database_bindings': {db: diagnostic_binding(db) for db in ('mysql', 'mongodb')},
+                       'targets': [dict(zip(('database', 'name', 'kind'), target)) for target in tool.TARGETS],
+                       'source_bytes_protocol': 'no_source_body_copy',
+                       'consistency_semantics': 'diagnostic_upper_discovery_requires_independent_request_approval'}
+        self.report_hash = self.write(self.output / 'boundary.private.json', self.report)
+        self.approval = {'format_version': 1, 'kind': 'readonly_existing_boundary_report_approval',
+                         'prepare_mode': 'report-diagnostic', 'source_sha': DIAGNOSTIC_SOURCE, 'operation_id': DIAGNOSTIC_OP,
+                         'target_hash': tool.TARGET_HASH, 'database_scope': 'mysql-and-mongodb',
+                         'boundary_report': {'run_id': DIAGNOSTIC_RUN, 'source_sha': DIAGNOSTIC_ORIGINAL, 'sha256': self.report_hash,
+                                             'request_sha256': self.request_hash}}
+        self.args = argparse.Namespace(operation='prepare', root=str(self.root), operation_id=DIAGNOSTIC_OP,
+                                       approved_source_sha=DIAGNOSTIC_SOURCE, actual_source_sha=DIAGNOSTIC_SOURCE, run_id=DIAGNOSTIC_OBSERVE,
+                                       manifest_hash='', identity_request_hash='', inventory_request_hash='',
+                                       prepare_mode='report-diagnostic', inventory_binary='', history_binary='')
+        self.approve()
+
+    def tearDown(self):
+        self.temp.cleanup()
+
+    def write(self, path, value):
+        raw = tool.canonical_bytes(value); path.write_bytes(raw); path.chmod(0o600)
+        return hashlib.sha256(raw).hexdigest()
+
+    def approve(self):
+        raw = tool.canonical_bytes(self.approval)
+        self.args.bootstrap_approval_json = raw[:-1].decode('ascii')
+        self.args.bootstrap_approval_hash = hashlib.sha256(raw).hexdigest()
+
+    def inventory(self):
+        return {str(path.relative_to(self.directory)): (path.stat().st_ino, path.stat().st_mode,
+                path.stat().st_mtime_ns, hashlib.sha256(path.read_bytes()).hexdigest())
+                for path in self.directory.rglob('*') if path.is_file()}
+
+    def assertBlocked(self, category):
+        with self.assertRaisesRegex(tool.Blocked, '^' + category + '$'):
+            tool.execute(self.args)
+
+    def test_real_failed_report_exact_origin_readonly_no_runtime_and_no_writes(self):
+        before = self.inventory()
+        with mock.patch.object(tool, 'live_inventory', side_effect=AssertionError('DB path entered')),\
+             mock.patch.object(tool, 'capture_fixed', side_effect=AssertionError('child path entered')),\
+             mock.patch.object(tool, 'inventory_connection_values', side_effect=AssertionError('credentials read')),\
+             mock.patch.object(tool, 'locked_operation', side_effect=AssertionError('lock created')):
+            result = tool.execute(self.args)
+        self.assertEqual(result['inventory_database_error_categories'], {'mysql': 'none', 'mongodb': 'mongo_index_visibility_incomplete'})
+        self.assertTrue(result['report_diagnostic_complete']); self.assertFalse(result['boundary_discovery_complete'])
+        self.assertFalse(result['complete']); self.assertFalse(result['execution_allowed']); self.assertFalse(result['drop_ready'])
+        self.assertTrue(all(value is False for value in result['capabilities'].values()))
+        self.assertEqual(result['source_sha'], DIAGNOSTIC_SOURCE); self.assertEqual(result['observed_boundary_report']['source_sha'], DIAGNOSTIC_ORIGINAL)
+        self.assertEqual(self.inventory(), before)
+        self.assertFalse((self.directory / 'operation.lock').exists())
+
+    def test_unknown_technical_text_never_enters_receipt(self):
+        secret = 'synthetic-private-connection-value'
+        self.report['database_bindings']['mongodb']['error_category'] = secret
+        self.approval['boundary_report']['sha256'] = self.write(self.output / 'boundary.private.json', self.report); self.approve()
+        result = tool.execute(self.args)
+        self.assertEqual(result['inventory_database_error_categories']['mongodb'], 'inventory_database_error_unrecognized')
+        self.assertNotIn(secret, json.dumps(result))
+
+    def test_non_string_category_is_closed_unknown(self):
+        self.report['database_bindings']['mongodb']['error_category'] = {'private': 'synthetic-value'}
+        self.approval['boundary_report']['sha256'] = self.write(self.output / 'boundary.private.json', self.report); self.approve()
+        self.assertEqual(tool.execute(self.args)['inventory_database_error_categories']['mongodb'], 'inventory_database_error_unrecognized')
+
+    def test_source_and_stage_binding_not_relaxed(self):
+        original = copy.deepcopy(self.args)
+        for field, value, category in [('operation', 'apply', 'input_classes_mixed'), ('manifest_hash', '1' * 64, 'input_classes_mixed'),
+                ('inventory_request_hash', '1' * 64, 'input_classes_mixed'), ('identity_request_hash', '1' * 64, 'input_classes_mixed'),
+                ('actual_source_sha', DIAGNOSTIC_ORIGINAL, 'source_revision_mismatch'), ('run_id', DIAGNOSTIC_RUN, 'report_diagnostic_origin_invalid')]:
+            with self.subTest(field=field):
+                self.args = copy.deepcopy(original); setattr(self.args, field, value); self.assertBlocked(category)
+        self.args = original
+
+    def test_approval_canonical_hash_and_unknown_fields_reject(self):
+        original = self.args.bootstrap_approval_json
+        self.args.bootstrap_approval_hash = '0' * 64; self.assertBlocked('report_diagnostic_approval_hash_invalid')
+        self.approve(); self.args.bootstrap_approval_json = original + '\n'; self.assertBlocked('report_diagnostic_approval_hash_invalid')
+        self.approval['unknown'] = True; self.approve(); self.assertBlocked('evidence_fields_invalid')
+
+    def test_original_report_and_request_bytes_tamper_refused(self):
+        path = self.output / 'boundary.private.json'; old = path.read_bytes(); path.write_bytes(old + b' ')
+        self.assertBlocked('evidence_hash_mismatch'); path.write_bytes(old)
+        path = self.directory / 'boundary-request.json'; path.write_bytes(path.read_bytes() + b' ')
+        self.assertBlocked('evidence_hash_mismatch')
+
+    def test_original_report_cross_origin_and_target_refused(self):
+        original = copy.deepcopy(self.report)
+        for key, value in [('source_sha', DIAGNOSTIC_SOURCE), ('operation_id', '124-1'), ('run_id', '704-1'),
+                           ('request_hash', '0' * 64), ('target_hash', '0' * 64), ('drop_ready', True), ('diagnostic_only', False)]:
+            with self.subTest(key=key):
+                self.report = dict(original, **{key: value})
+                self.approval['boundary_report']['sha256'] = self.write(self.output / 'boundary.private.json', self.report); self.approve()
+                self.assertBlocked('report_diagnostic_report_binding_invalid')
+
+    def test_original_request_source_cannot_be_reapproved_as_current(self):
+        self.request['source_sha'] = DIAGNOSTIC_SOURCE
+        self.approval['boundary_report']['request_sha256'] = self.write(self.directory / 'boundary-request.json', self.request); self.approve()
+        self.assertBlocked('evidence_binding_mismatch')
+
+    def test_unknown_database_and_target_cannot_extend_scope(self):
+        self.report['database_bindings']['unknown'] = diagnostic_binding('mongodb')
+        self.approval['boundary_report']['sha256'] = self.write(self.output / 'boundary.private.json', self.report); self.approve()
+        self.assertBlocked('evidence_fields_invalid')
+        del self.report['database_bindings']['unknown']; self.report['targets'][0]['name'] = 'non-target'
+        self.approval['boundary_report']['sha256'] = self.write(self.output / 'boundary.private.json', self.report); self.approve()
+        self.assertBlocked('report_diagnostic_report_binding_invalid')
+
+    def test_report_recheck_observes_drift(self):
+        read = tool.read_private
+        count = 0
+        def changing(directory, filename, expected_hash=None):
+            nonlocal count
+            result = read(directory, filename, expected_hash)
+            if filename == 'boundary.private.json':
+                count += 1
+                if count == 1:
+                    path = directory / filename; path.write_bytes(path.read_bytes() + b' ')
+            return result
+        with mock.patch.object(tool, 'read_private', side_effect=changing):
+            self.assertBlocked('evidence_hash_mismatch')
+
+    def test_symlink_hardlink_and_fifo_refused_without_blocking(self):
+        path = self.output / 'boundary.private.json'; raw = path.read_bytes(); path.unlink()
+        peer = self.output / 'other.json'; peer.write_bytes(raw); peer.chmod(0o600)
+        path.symlink_to(peer); self.assertBlocked('evidence_unavailable'); path.unlink()
+        os.link(peer, path); self.assertBlocked('evidence_not_private'); path.unlink(); peer.unlink()
+        os.mkfifo(path, 0o600); started = time.monotonic(); self.assertBlocked('evidence_not_private')
+        self.assertLess(time.monotonic() - started, 1)
+
+    def test_real_cli_transport_body_free_success_and_false_capabilities(self):
+        args = ['--operation','prepare','--root',str(self.root),'--operation-id',DIAGNOSTIC_OP,'--approved-source-sha',DIAGNOSTIC_SOURCE,
+                '--actual-source-sha',DIAGNOSTIC_SOURCE,'--run-id',DIAGNOSTIC_OBSERVE,'--prepare-mode','report-diagnostic',
+                '--bootstrap-approval-json',self.args.bootstrap_approval_json,'--bootstrap-approval-hash',self.args.bootstrap_approval_hash]
+        result = subprocess.run(['python3','-B',str(SCRIPT),*args], capture_output=True, timeout=5)
+        self.assertEqual(result.returncode, 0); self.assertEqual(result.stderr, b'')
+        receipt = json.loads(tool.transport().decode_armored_receipt(result.stdout.decode().strip()))
+        self.assertTrue(receipt['report_diagnostic_complete']); self.assertFalse(receipt['boundary_discovery_complete'])
+        self.assertEqual(receipt['boundary_private_report_hash'], self.report_hash)
+        self.assertTrue(all(value is False for value in receipt['capabilities'].values()))
+        self.assertNotIn(str(self.root), json.dumps(receipt)); self.assertNotIn('targets', receipt)
+
+    def test_actual_node_validator_current_tool_vs_historical_report(self):
+        script = textwrap.dedent(DIAGNOSTIC_WORKFLOW.read_text().split('          script: |\n', 1)[1].split('      - name:', 1)[0])
+        supplied = {'operation':'prepare','database':'mysql-and-mongodb','approved_source_sha':DIAGNOSTIC_SOURCE,'operation_id':DIAGNOSTIC_OP,
+                    'prepare_mode':'report-diagnostic','bootstrap_approval_json':self.args.bootstrap_approval_json,
+                    'bootstrap_approval_sha256':self.args.bootstrap_approval_hash}
+        cases = [('valid_historical_report', supplied, 'refs/heads/main', DIAGNOSTIC_SOURCE, DIAGNOSTIC_SOURCE, True),
+                 ('wrong_ref', supplied, 'refs/heads/old', DIAGNOSTIC_SOURCE, DIAGNOSTIC_SOURCE, False),
+                 ('wrong_runtime_source', supplied, 'refs/heads/main', DIAGNOSTIC_ORIGINAL, DIAGNOSTIC_SOURCE, False),
+                 ('main_advanced', supplied, 'refs/heads/main', DIAGNOSTIC_SOURCE, DIAGNOSTIC_ORIGINAL, False),
+                 ('unknown_input',dict(supplied, extra=''), 'refs/heads/main', DIAGNOSTIC_SOURCE, DIAGNOSTIC_SOURCE, False),
+                 ('mix_manifest',dict(supplied, manifest_sha256='1'*64), 'refs/heads/main', DIAGNOSTIC_SOURCE, DIAGNOSTIC_SOURCE, False),
+                 ('mix_request',dict(supplied, inventory_request_sha256='1'*64), 'refs/heads/main', DIAGNOSTIC_SOURCE, DIAGNOSTIC_SOURCE, False),
+                 ('mutation_stage',dict(supplied, operation='apply'), 'refs/heads/main', DIAGNOSTIC_SOURCE, DIAGNOSTIC_SOURCE, False),
+                 ('wrong_approval_hash',dict(supplied, bootstrap_approval_sha256='0'*64), 'refs/heads/main', DIAGNOSTIC_SOURCE, DIAGNOSTIC_SOURCE, False)]
+        for key, value in [('format_version', True), ('source_sha', DIAGNOSTIC_ORIGINAL), ('operation_id', '124-1'), ('extra', True)]:
+            descriptor = dict(self.approval, **{key:value}); raw=tool.canonical_bytes(descriptor)
+            cases.append(('descriptor_'+key,dict(supplied,bootstrap_approval_json=raw[:-1].decode(),bootstrap_approval_sha256=hashlib.sha256(raw).hexdigest()),'refs/heads/main',DIAGNOSTIC_SOURCE,DIAGNOSTIC_SOURCE,False))
+        for key,value in [('run_id',DIAGNOSTIC_OBSERVE),('source_sha','old'),('sha256','0'*63),('request_sha256','0'*63),('extra',True)]:
+            descriptor=copy.deepcopy(self.approval);descriptor['boundary_report'][key]=value;raw=tool.canonical_bytes(descriptor)
+            cases.append(('reference_'+key,dict(supplied,bootstrap_approval_json=raw[:-1].decode(),bootstrap_approval_sha256=hashlib.sha256(raw).hexdigest()),'refs/heads/main',DIAGNOSTIC_SOURCE,DIAGNOSTIC_SOURCE,False))
+        for name, inputs, ref, actual, current, allowed in cases:
+            with self.subTest(name=name):
+                context={'payload':{'inputs':inputs},'ref':ref,'sha':actual,'runId':703,'runAttempt':1,'repo':{}}
+                program=('const script='+json.dumps(script)+';const context='+json.dumps(context)+';const current='+json.dumps(current)
+                         +';const github={rest:{repos:{getCommit:async()=>({data:{sha:current}})}}};'
+                         +"new (Object.getPrototypeOf(async function(){}).constructor)('context','github',script)(context,github).catch(()=>{process.exitCode=1;});")
+                env=dict(os.environ,GITHUB_RUN_ATTEMPT='1')
+                result=subprocess.run(['node','-e',program],capture_output=True,env=env,timeout=5)
+                self.assertEqual(result.returncode,0 if allowed else 1)
+
+    def test_workflow_route_has_no_db_env_and_go_is_excluded(self):
+        source=DIAGNOSTIC_WORKFLOW.read_text()
+        step=source.split('      - name: Observe exact existing boundary report without database credentials\n',1)[1].split('      - name:',1)[0]
+        for forbidden in ('MYSQL_', 'MONGODB_', 'docker ', 'go build', 'go test', 'inventory_binary'):
+            self.assertNotIn(forbidden,step)
+        self.assertIn('fingerprint: ${{ vars.SVRA_SSH_FINGERPRINT }}',step)
+        self.assertIn('command_timeout: 2m',step)
+        setup=source.split('      - name: Set up Go for immutable read-only inventory\n',1)[1].split('      - name:',1)[0]
+        original=source.split('      - name: Inventory source bytes or reject unavailable lifecycle stage\n',1)[1].split('      - name:',1)[0]
+        self.assertIn("inputs.prepare_mode != 'report-diagnostic'",setup)
+        self.assertIn("inputs.prepare_mode != 'report-diagnostic'",original)
+        self.assertIn('group: production-deploy',source);self.assertIn('Require successful final source CI',source)
+
+    def test_real_package_branch_contains_only_python_and_never_executes_go(self):
+        source=DIAGNOSTIC_WORKFLOW.read_text()
+        script=textwrap.dedent(source.split('      - name: Package only immutable tooling\n',1)[1].split('          script: |\n',1)[1].split('      - name:',1)[0]) if '          script: |\n' in source.split('      - name: Package only immutable tooling\n',1)[1].split('      - name:',1)[0] else textwrap.dedent(source.split('      - name: Package only immutable tooling\n',1)[1].split('        run: |\n',1)[1].split('      - name:',1)[0])
+        runner=self.base/'runner';runner.mkdir();fakebin=self.base/'bin';fakebin.mkdir();marker=self.base/'go-was-called'
+        (fakebin/'go').write_text('#!/bin/sh\ntouch "'+str(marker)+'"\nexit 99\n');(fakebin/'go').chmod(0o700)
+        env=dict(os.environ,COPYFILE_DISABLE='1',RETIREMENT_PACKAGE_MODE='report-diagnostic',RUNNER_TEMP=str(runner),GITHUB_RUN_ID='703',GITHUB_RUN_ATTEMPT='1',GITHUB_OUTPUT=str(runner/'outputs'),PATH=str(fakebin)+os.pathsep+os.environ['PATH'])
+        # Build in an isolated tiny tree, never write a package in the source.
+        build=self.base/'build';(build/'scripts/database').mkdir(parents=True);(build/'scripts/dbops').mkdir(parents=True)
+        for name in ('compatibility-retirement.py','compatibility-history-prepare.py','compatibility-retirement-entrypoints.json'):
+            shutil.copyfile(SCRIPT.with_name(name),build/'scripts/database'/name)
+        shutil.copyfile(SCRIPT.parents[1]/'dbops/receipt-transport.py',build/'scripts/dbops/receipt-transport.py')
+        result=subprocess.run(['bash','-c',script],cwd=build,env=env,capture_output=True,timeout=5)
+        self.assertEqual(result.returncode,0);self.assertFalse(marker.exists());self.assertEqual(list(runner.glob('qs-compatibility-package.*')),[])
+        import tarfile
+        with tarfile.open(build/'qs-compatibility-retirement-703-1.tar.gz') as archive:
+            self.assertEqual(sorted(archive.getnames()),['compatibility-retirement.py','receipt-transport.py'])
+
 
 
 if __name__ == "__main__":

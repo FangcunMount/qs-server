@@ -95,6 +95,26 @@ IDENTITY_ERRORS = {
 }
 
 
+# Only producer-owned fixed categories may enter a public inventory receipt.
+# An unknown private category is reduced to one closed token, never relayed.
+INVENTORY_DIAGNOSTIC_ERRORS = {
+    database: IDENTITY_ERRORS[database] | frozenset({
+        "database_identity_mismatch", "metadata_bound_exceeded",
+        "inventory_database_error_unrecognized",
+    }) | (frozenset({"mongo_catalog_read_failed", "mongo_schema_decode_failed",
+                    "mongo_index_visibility_incomplete"}) if database == "mongodb" else frozenset())
+    for database in ("mysql", "mongodb")
+}
+
+
+def inventory_diagnostic_error_categories(bindings):
+    return {database: (binding["error_category"]
+                      if type(binding["error_category"]) is str and
+                      binding["error_category"] in INVENTORY_DIAGNOSTIC_ERRORS[database]
+                      else "inventory_database_error_unrecognized")
+            for database, binding in bindings.items()}
+
+
 class Blocked(ValueError):
     """Fixed error categories; never include private input in the message."""
 
@@ -1096,6 +1116,7 @@ def validate_inventory_receipt(summary, code, args, output, request, request_has
                                      "metadata_complete": binding.get("metadata_complete") is True,
                                      "identity_match": binding.get("expected_identity_match") is True}
         if "namespace_anchor" in binding: database_states[database].update(public_namespace_anchor(binding["namespace_anchor"]))
+    database_errors = inventory_diagnostic_error_categories(report["database_bindings"])
     if mode == "bounds":
         return {"format_version": 1, "operation": "prepare", "prepare_mode": "bounds", "source_sha": args.actual_source_sha,
                 "run_id": args.run_id, "operation_id": args.operation_id, "target_hash": TARGET_HASH, "target_count": 4,
@@ -1103,7 +1124,8 @@ def validate_inventory_receipt(summary, code, args, output, request, request_has
                 "boundary_discovery_complete": summary["complete"], "boundary_private_report_hash": report_hash,
                 "boundary_request_hash": request_hash, "inventory_entrypoint_catalog_hash": entrypoint_hash,
                 "runtime_image_id_sha256": image.removeprefix("sha256:"), "runtime_network": "infra_network",
-                "inventory_database_states": database_states, "error_category": "boundary_discovery_requires_independent_approval"}
+                "inventory_database_states": database_states, "inventory_database_error_categories": database_errors,
+                "error_category": "boundary_discovery_requires_independent_approval"}
     return {"format_version": 1, "operation": "prepare", "source_sha": args.actual_source_sha,
             "run_id": args.run_id, "operation_id": args.operation_id, "target_hash": TARGET_HASH,
             "target_count": 4, "complete": False, "execution_allowed": False,
@@ -1118,7 +1140,7 @@ def validate_inventory_receipt(summary, code, args, output, request, request_has
             "inventory_boundary_report_hash": request.get("boundary_report_hash") or None,
             "inventory_two_equal_scans": request["format_version"] == 2 and summary["complete"],
             "diagnostic_only": True, "drop_ready": False,
-            "inventory_database_states": database_states,
+            "inventory_database_states": database_states, "inventory_database_error_categories": database_errors,
             "blockers": ["history_verifier_not_implemented", "production_fence_unproven", "backup_restore_backend_not_implemented",
                          "prepared_release_backend_not_implemented", "live_acceptance_verifier_not_implemented"],
             "capabilities": CAPABILITIES.copy()}
@@ -1353,6 +1375,71 @@ class SafeParser(argparse.ArgumentParser):
         fail("input_invalid")
 
 
+def report_diagnostic(args):
+    """Observe an exact existing boundary report, never repeat its DB scan."""
+    text = args.bootstrap_approval_json
+    token(args.bootstrap_approval_hash, HASH)
+    if type(text) is not str or not 0 < len(text) <= MAX_BOOTSTRAP_APPROVAL or not text.isascii():
+        fail("report_diagnostic_approval_invalid")
+    value = decode(text.encode("ascii"))
+    raw = canonical_bytes(value)
+    if text.encode("ascii") != raw[:-1] or hashlib.sha256(raw).hexdigest() != args.bootstrap_approval_hash:
+        fail("report_diagnostic_approval_hash_invalid")
+    fields(value, ("format_version", "kind", "prepare_mode", "source_sha", "operation_id",
+                   "target_hash", "database_scope", "boundary_report"))
+    if type(value["format_version"]) is not int or value["format_version"] != 1 or value["kind"] != "readonly_existing_boundary_report_approval" or value["prepare_mode"] != "report-diagnostic" or value["target_hash"] != TARGET_HASH or value["database_scope"] != "mysql-and-mongodb":
+        fail("report_diagnostic_approval_invalid")
+    validate_binding(value, args.operation_id, args.actual_source_sha)
+    reference = value["boundary_report"]
+    fields(reference, ("run_id", "source_sha", "sha256", "request_sha256"))
+    token(reference["run_id"], RUN); token(reference["source_sha"], SHA)
+    token(reference["sha256"], HASH); token(reference["request_sha256"], HASH)
+    if reference["run_id"] == args.run_id:
+        fail("report_diagnostic_origin_invalid")
+    # A historical source may differ from the current approved TOOL source
+    # only in this diagnostic branch. It cannot mint an inventory approval.
+    directory = operation_directory(args.root, args.operation_id)
+    original_request, _ = read_private(directory, "boundary-request.json", reference["request_sha256"])
+    validate_v2_request(original_request, args.operation_id, reference["source_sha"], boundary=True)
+    output = private_directory(directory / ("bounds-" + reference["run_id"]))
+    report, report_hash = read_private(output, "boundary.private.json", reference["sha256"])
+    fields(report, ("format_version", "kind", "source_sha", "operation_id", "run_id", "request_hash", "target_hash", "observed_at", "complete", "drop_ready", "diagnostic_only", "error_category", "database_bindings", "targets", "source_bytes_protocol", "consistency_semantics"), ("boundary_report_hash",))
+    if type(report["format_version"]) is not int or report["format_version"] != 2 or report["kind"] != "readonly_inventory_boundaries" or report["source_sha"] != reference["source_sha"] or report["operation_id"] != args.operation_id or report["run_id"] != reference["run_id"] or report["request_hash"] != reference["request_sha256"] or report["target_hash"] != TARGET_HASH or type(report["complete"]) is not bool or report["drop_ready"] is not False or report["diagnostic_only"] is not True or report.get("boundary_report_hash", "") != "" or report["source_bytes_protocol"] != "no_source_body_copy" or report["consistency_semantics"] != "diagnostic_upper_discovery_requires_independent_request_approval":
+        fail("report_diagnostic_report_binding_invalid")
+    utc(report["observed_at"])
+    validate_inventory_bindings(report["database_bindings"], report["complete"])
+    # Exact report bytes are independently bound above; inspect no source body.
+    # Unknown error strings stay private and reduce to a fixed unknown token.
+    categories = inventory_diagnostic_error_categories(report["database_bindings"])
+    if type(report["targets"]) is not list or len(report["targets"]) > 4:
+        fail("report_diagnostic_report_binding_invalid")
+    seen = set()
+    for item in report["targets"]:
+        if type(item) is not dict:
+            fail("report_diagnostic_report_binding_invalid")
+        target = tuple(item.get(key) for key in ("database", "name", "kind"))
+        if any(type(part) is not str for part in target) or target not in TARGETS or target in seen:
+            fail("report_diagnostic_report_binding_invalid")
+        seen.add(target)
+    if report["complete"] and (len(seen) != 4 or any(category != "none" for category in categories.values())):
+        fail("report_diagnostic_report_binding_invalid")
+    # Recheck real file bytes and directory protections before emitting. No
+    # operation lock/file, registry, request, report or checkpoint is written.
+    operation_directory(args.root, args.operation_id)
+    private_directory(output)
+    read_private(directory, "boundary-request.json", reference["request_sha256"])
+    read_private(output, "boundary.private.json", reference["sha256"])
+    return {"format_version": 1, "operation": "prepare", "prepare_mode": "report-diagnostic",
+            "source_sha": args.actual_source_sha, "run_id": args.run_id, "operation_id": args.operation_id,
+            "target_hash": TARGET_HASH, "target_count": 4, "complete": False, "execution_allowed": False,
+            "diagnostic_only": True, "drop_ready": False, "report_diagnostic_complete": True,
+            "report_diagnostic_approval_sha256": args.bootstrap_approval_hash,
+            "observed_boundary_report": reference.copy(), "boundary_discovery_complete": report["complete"],
+            "boundary_private_report_hash": report_hash, "boundary_request_hash": reference["request_sha256"],
+            "inventory_database_error_categories": categories,
+            "error_category": "existing_report_diagnostic_only", "capabilities": {key: False for key in CAPABILITIES}}
+
+
 def execute(args):
     if args.operation not in OPERATIONS:
         fail("operation_unsupported")
@@ -1366,6 +1453,10 @@ def execute(args):
     inventory_request = getattr(args, "inventory_request_hash", "")
     bootstrap_json = getattr(args, "bootstrap_approval_json", "")
     bootstrap_hash = getattr(args, "bootstrap_approval_hash", "")
+    if mode == "report-diagnostic":
+        if args.operation != "prepare" or args.manifest_hash or identity_request or inventory_request or not bootstrap_json or not bootstrap_hash:
+            fail("input_classes_mixed")
+        return report_diagnostic(args)
     if mode in BOOTSTRAP_MODES:
         if args.operation != "prepare" or args.manifest_hash or identity_request or inventory_request or not bootstrap_json or not bootstrap_hash:
             fail("input_classes_mixed")
@@ -1451,7 +1542,7 @@ def main(argv=None):
               "operation": OPERATIONS, "source_sha": "sha40", "run_id": "run_id", "operation_id": "run_id",
               "manifest_hash": "hash64", "target_hash": "hash64", "target_count": "uint",
               "inventory_complete": "bool", "inventory_private_report_hash": "hash64",
-              "prepare_mode": frozenset({"identity", "bounds", "inventory"}) | BOOTSTRAP_MODES, "diagnostic_only": "bool", "drop_ready": "bool",
+              "prepare_mode": frozenset({"identity", "bounds", "inventory", "report-diagnostic"}) | BOOTSTRAP_MODES, "diagnostic_only": "bool", "drop_ready": "bool",
               "request_bootstrap_complete": "bool", "bootstrap_approval_sha256": "hash64", "derived_request_sha256": "hash64", "request_created_run_id": "run_id",
               "history_metadata_complete": "bool", "history_metadata_process_budget_proven": "bool",
               "metadata_private_report_sha256": "hash64", "metadata_created_run_id": "run_id",
@@ -1474,6 +1565,8 @@ def main(argv=None):
                   **{key: "bool" for key in ("whole_ledger_eof", "independent_epoch_rechecked")}},
               "approved_identity_report": {"run_id": "run_id", "source_sha": "sha40", "sha256": "hash64"},
               "approved_boundary_report": {"run_id": "run_id", "source_sha": "sha40", "sha256": "hash64"},
+              "report_diagnostic_complete": "bool", "report_diagnostic_approval_sha256": "hash64",
+              "observed_boundary_report": {"run_id": "run_id", "source_sha": "sha40", "sha256": "hash64", "request_sha256": "hash64"},
               "boundary_discovery_complete": "bool", "boundary_private_report_hash": "hash64", "boundary_request_hash": "hash64",
               "inventory_next_cycle_required": "bool", "inventory_boundary_report_hash": "nullable_hash64", "inventory_two_equal_scans": "bool",
               "identity_discovery_complete": "bool", "identity_private_report_hash": "hash64", "identity_request_hash": "hash64",
@@ -1481,6 +1574,7 @@ def main(argv=None):
               "identity_diagnostic_histograms": [{"database": frozenset({"mysql", "mongodb"}), "name": frozenset(target[1] for target in TARGETS), "present": "nullable_bool", "complete": "bool", "diagnostic_only": "bool", "error_category": HISTOGRAM_ERRORS,
                    "bucket_count": "uint"}],
               "identity_histogram_bucket_pages": {"page_" + chr(97 + index): [{"object_index": "uint", "bucket_index": "uint", "type_label": frozenset(label.replace(".", "_") for label in HISTOGRAM_TYPES), "type_hash": "hash64", "state_label": HISTOGRAM_STATES, "state_hash": "hash64", "records": "uint"}] for index in range(4)},
+              "inventory_database_error_categories": INVENTORY_DIAGNOSTIC_ERRORS,
               "inventory_entrypoint_catalog_hash": "hash64",
               "runtime_image_id_sha256": "hash64", "runtime_network": frozenset({"infra_network"}),
               "inventory_present_targets": "uint", "inventory_records": "uint", "inventory_source_bytes": "uint",
@@ -1493,7 +1587,7 @@ def main(argv=None):
               "capabilities": {key: "bool" for key in CAPABILITIES}}
     emitted = False
     try:
-        secrets = () if getattr(args, "prepare_mode", "") in ("bootstrap-history-metadata", "bootstrap-history-parent") else tuple(os.environ.get(key, "") for key in ("MYSQL_USERNAME", "MYSQL_PASSWORD", "MONGODB_USERNAME", "MONGODB_PASSWORD",
+        secrets = () if getattr(args, "prepare_mode", "") in ("bootstrap-history-metadata", "bootstrap-history-parent", "report-diagnostic") else tuple(os.environ.get(key, "") for key in ("MYSQL_USERNAME", "MYSQL_PASSWORD", "MONGODB_USERNAME", "MONGODB_PASSWORD",
                                                                           "MONGODB_METADATA_ADMIN_USERNAME", "MONGODB_METADATA_ADMIN_PASSWORD"))
         armor = transport().encode_armored_receipt(receipt, schema=schema, secrets=secrets)
         print(armor)
@@ -1502,7 +1596,8 @@ def main(argv=None):
         # Fixed ASCII fallback contains no input and cannot be mistaken for a
         # valid framed receipt. Never print a raw protocol/debug alternative.
         print("compatibility_retirement_receipt_transport_failed", file=sys.stderr)
-    diagnostic_complete = ((receipt.get("prepare_mode") == "bootstrap-history" and receipt.get("history_readonly_complete") is True) or
+    diagnostic_complete = ((receipt.get("prepare_mode") == "report-diagnostic" and receipt.get("report_diagnostic_complete") is True and receipt.get("diagnostic_only") is True and all(value is False for value in receipt.get("capabilities", {}).values())) or
+        (receipt.get("prepare_mode") == "bootstrap-history" and receipt.get("history_readonly_complete") is True) or
         (receipt.get("prepare_mode") == "bootstrap-history-metadata" and receipt.get("history_metadata_complete") is True) or
         (receipt.get("prepare_mode") == "bootstrap-history-parent" and receipt.get("history_parent_registration_complete") is True and
          receipt.get("diagnostic_only") is True and receipt.get("history_cas_complete") is False and receipt.get("history_parent_process_budget_proven") is False))
