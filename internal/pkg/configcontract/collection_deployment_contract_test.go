@@ -68,10 +68,10 @@ func TestCollectionComposeSupportsTwoReplicas(t *testing.T) {
 			t.Errorf("collection expose = %v, want %s", service.Expose, port)
 		}
 	}
-	if service.MemLimit != "1536m" || service.CPUs != "2" {
-		t.Fatalf("collection per-replica resources = cpu %q memory %q, want 2/1536m", service.CPUs, service.MemLimit)
+	if service.MemLimit != "320m" || service.CPUs != "1" {
+		t.Fatalf("collection per-replica resources = cpu %q memory %q, want 1/320m", service.CPUs, service.MemLimit)
 	}
-	for _, env := range []string{"GOMEMLIMIT=1152MiB", "GOMAXPROCS=2"} {
+	for _, env := range []string{"GOMEMLIMIT=240MiB", "GOMAXPROCS=1"} {
 		if !slices.Contains(service.Environment, env) {
 			t.Errorf("collection environment = %v, want %q", service.Environment, env)
 		}
@@ -704,7 +704,7 @@ func TestCollectionProductionLoggingIsReplicaSafe(t *testing.T) {
 		}
 	}
 	for _, required := range []string{
-		"go-mem-limit: \"1152MiB\"",
+		"go-mem-limit: \"240MiB\"",
 		"- stdout",
 		"- stderr",
 	} {
