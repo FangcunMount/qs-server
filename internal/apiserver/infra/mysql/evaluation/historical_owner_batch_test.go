@@ -51,3 +51,54 @@ func TestSQLHistoricalOwnerBatchDetachedSnapshotAndAssociation(t *testing.T) {
 		t.Fatal("local facts acquired retirement approval")
 	}
 }
+
+func TestSQLHistoricalOriginalRunCandidatesAreNotGlobalAbsence(t *testing.T) {
+	text := func(v string) *string { return &v }
+	base := func() map[string][]historicalSQLRow {
+		return map[string][]historicalSQLRow{"evaluation_outcome": {{"id": text("9001"), "evaluation_run_id": text("42:1")}}, "runtime_checkpoint": {}}
+	}
+	for _, tc := range []struct {
+		name    string
+		change  func(map[string][]historicalSQLRow)
+		want    int
+		invalid bool
+	}{
+		{"candidate only", func(map[string][]historicalSQLRow) {}, 1, false},
+		{"other retained Run", func(rows map[string][]historicalSQLRow) {
+			rows["runtime_checkpoint"] = []historicalSQLRow{{"resource_id": text("42:2")}}
+		}, 1, false},
+		{"original retained different scope deleted", func(rows map[string][]historicalSQLRow) {
+			rows["runtime_checkpoint"] = []historicalSQLRow{{"resource_id": text("42:1"), "scope": text("other_scope"), "deleted_at": text("2026-10-09 00:00:00")}}
+		}, 0, false},
+		{"duplicate outcome", func(rows map[string][]historicalSQLRow) {
+			rows["evaluation_outcome"] = append(rows["evaluation_outcome"], rows["evaluation_outcome"][0])
+		}, 0, true},
+		{"missing declared identity", func(rows map[string][]historicalSQLRow) { rows["evaluation_outcome"][0]["evaluation_run_id"] = nil }, 0, true},
+		{"bounded owners", func(rows map[string][]historicalSQLRow) {
+			rows["evaluation_outcome"] = append(rows["evaluation_outcome"], historicalSQLRow{"id": text("9002"), "evaluation_run_id": text("43:1")})
+		}, 0, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			rows := base()
+			tc.change(rows)
+			got, err := batchOriginalRunCandidates(rows, 1)
+			if tc.invalid {
+				if err == nil {
+					t.Fatal("invalid declaration selected")
+				}
+				return
+			}
+			if err != nil || len(got) != tc.want || tc.want == 1 && got[9001] != "42:1" {
+				t.Fatal("original declaration lost or an unrelated Run substituted", err)
+			}
+		})
+	}
+}
+
+func TestSQLHistoricalOriginalRunAbsenceRejectsCallerConstructedBatch(t *testing.T) {
+	for _, facts := range []*SQLHistoricalBatchOwnerFacts{nil, {}, {batch: &SQLHistoricalOwnerBatch{report: SQLHistoricalOwnerBatchReport{Complete: true}, originalOutcomeRunAbsence: map[uint64]string{9001: "42:1"}}, id: 42}} {
+		if err := facts.OriginalOutcomeRunAbsent(t.Context(), 9001, "42:1"); err == nil {
+			t.Fatal("editable completion/cache stood in for an actual RR-RO epoch")
+		}
+	}
+}

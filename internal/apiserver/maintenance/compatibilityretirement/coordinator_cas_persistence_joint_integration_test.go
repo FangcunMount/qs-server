@@ -128,6 +128,15 @@ func persistenceJointNativePreparePage(t *testing.T, ctx context.Context, curren
 	if err = c.QualifyWholeSourceJointPage(ctx, page, joint); err != nil {
 		return nil, err
 	}
+	// Seal the small body-free anchor while the original consumed graph and
+	// actual two borrowed snapshots are still available. No EOF is fabricated.
+	replay, err := c.SealWholeSourceJointReplayAnchor(ctx, joint)
+	if err != nil {
+		return nil, err
+	}
+	if _, err = c.ReplayWholeSourceJointPage(ctx, replay, page.sequence, joint.candidateStart, index, catalog, global); !errors.Is(err, ErrCoordinatorIncomplete) {
+		return nil, ErrHistoricalCASPersistence
+	}
 	if next, eof := c.NextPage(ctx); next != nil || eof != io.EOF {
 		return nil, ErrHistoricalCASPersistence
 	}
@@ -135,7 +144,25 @@ func persistenceJointNativePreparePage(t *testing.T, ctx context.Context, curren
 	if !receipt.SourceCoverageComplete || receipt.ConsumedRecords != [4]uint64{1, 0, 0, 0} || receipt.CASComplete || receipt.BusinessClosureVerified || receipt.DropReady {
 		return nil, ErrHistoricalCASPersistence
 	}
-	return &persistenceJointNativePage{coordinator: c, joint: joint, source: sources[0], origin: origin, ai: ai}, nil
+	original := joint.Summary()
+	if _, err = c.ReplayWholeSourceJointPage(ctx, replay, page.sequence, joint.candidateStart+1, index, catalog, global); !errors.Is(err, ErrWholeSourceJoint) {
+		return nil, ErrHistoricalCASPersistence
+	}
+	replayed, err := c.ReplayWholeSourceJointPage(ctx, replay, page.sequence, joint.candidateStart, index, catalog, global)
+	if err != nil {
+		return nil, err
+	}
+	// The future qualified factory requires real private source rows even for
+	// an already consumed page. Replay restores them without consuming again.
+	if len(replayed.page.rows) != replayed.candidateCount || replayed.page.rows[0].event != replayed.current[0] || len(replayed.page.rows[0].keys) != 1 || !replayed.page.consumed || !replayed.consumed || replayed.mongo.started != joint.mongo.started || !replay.expires.After(replayed.mongo.started) || historicalCASObservationHash(receipt) != historicalCASObservationHash(c.Receipt()) || historicalCASObservationHash(original) != historicalCASObservationHash(replayed.Summary()) {
+		return nil, ErrHistoricalCASPersistence
+	}
+	// This call must remain a rejection: replay is already consumed, not a
+	// new NextPage capability and cannot increase any four-source counters.
+	if err = c.QualifyWholeSourceJointPage(ctx, replayed.page, replayed); !errors.Is(err, ErrCoordinatorPage) {
+		return nil, ErrHistoricalCASPersistence
+	}
+	return &persistenceJointNativePage{coordinator: c, joint: replayed, source: sources[0], origin: origin, ai: ai}, nil
 }
 
 func persistenceJointNativeAttachment(t *testing.T, ctx context.Context, p *persistenceJointNativePage) (sqlevaluation.SQLHistoricalBatchAttachment, error) {

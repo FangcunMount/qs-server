@@ -501,6 +501,36 @@ def validate_mongo_namespace_anchor(anchor):
     if not seen or _mongo_framed_hash(parts) != anchor["hash"]: fail("database_anchor_invalid")
 
 
+def validate_mongo_namespace_approval(anchor):
+    # A public kind/hash reference binds approval to an existing private
+    # observation. It is not a complete v2 request or metadata authority.
+    if type(anchor) is dict and set(anchor) == {"kind", "hash"}:
+        if anchor["kind"] != MONGO_NAMESPACE_PROFILE: fail("database_anchor_invalid")
+        token(anchor["hash"], HASH)
+        return True
+    validate_mongo_namespace_anchor(anchor)
+    return False
+
+
+def expand_approved_namespace_anchor(approval, binding):
+    expected = approval.get("mongodb_namespace_anchor")
+    if expected is None:
+        validate_approved_namespace_anchor(approval, binding)
+        return None
+    reference = validate_mongo_namespace_approval(expected)
+    observed = binding.get("namespace_anchor")
+    if observed is None: fail("database_anchor_profile_mismatch")
+    validate_mongo_namespace_anchor(observed)
+    if reference:
+        if observed["kind"] != expected["kind"] or observed["hash"] != expected["hash"] or binding["database_anchor_hash"] != expected["hash"]:
+            fail("database_anchor_profile_mismatch")
+    else:
+        validate_approved_namespace_anchor(approval, binding)
+    # Independent copy: never alias/mutate the approved descriptor or original
+    # private report. The caller must FIRST validate the exact report chain.
+    return decode(canonical_bytes(observed))
+
+
 def validate_approved_namespace_anchor(request, binding):
     expected = request.get("mongodb_namespace_anchor")
     observed = binding.get("namespace_anchor")
@@ -677,12 +707,12 @@ def validate_bootstrap_approval(args):
     core = ("format_version", "kind", "prepare_mode", "operation_id", "source_sha", "target_hash",
             "database_scope", "identity_report", "identity_hashes", "expected_migrations", "limits")
     fields(value, core if mode == "bootstrap-bounds" else (*core, "boundary_report"), ("mongodb_namespace_anchor",))
-    if "mongodb_namespace_anchor" in value: validate_mongo_namespace_anchor(value["mongodb_namespace_anchor"])
+    namespace_ref = "mongodb_namespace_anchor" in value and validate_mongo_namespace_approval(value["mongodb_namespace_anchor"])
     if type(value["format_version"]) is not int or value["format_version"] != 1 or value["kind"] != "readonly_request_bootstrap_approval" or value["prepare_mode"] != mode:
         fail("bootstrap_approval_class_invalid")
     validate_binding(value, args.operation_id, args.actual_source_sha)
     request = {key: value[key] for key in ("operation_id", "source_sha", "target_hash", "database_scope", "identity_hashes", "expected_migrations", "limits")}
-    if "mongodb_namespace_anchor" in value: request["mongodb_namespace_anchor"] = value["mongodb_namespace_anchor"]
+    if "mongodb_namespace_anchor" in value and not namespace_ref: request["mongodb_namespace_anchor"] = value["mongodb_namespace_anchor"]
     request.update(format_version=2, kind="readonly_inventory_boundary_request")
     validate_v2_request(request, args.operation_id, args.actual_source_sha, boundary=True)
     # JSON numbers must have the same exact representation in Node and Python.
@@ -713,12 +743,15 @@ def bootstrap_identity_report(directory, value, args):
                                        run_id=reference["run_id"])
     summary = dict(report, private_report_hash=report_hash)
     validate_identity_receipt(summary, 0, original_args, output, expected_hash, "0" * 64, profile)
-    validate_approved_namespace_anchor(value, report["database_states"]["mongodb"])
     if report["complete"] is not True or any(item["complete"] is not True or item["error_category"] != "none" for item in report["diagnostic_histograms"]):
         fail("bootstrap_identity_report_incomplete")
     for database, state in report["database_states"].items():
         if state["identity_hash"] != value["identity_hashes"][database] or state["migration_version"] != value["expected_migrations"][database]:
             fail("bootstrap_identity_binding_mismatch")
+
+    # Expand only AFTER original request/report/source/run, full identity
+    # outcome, exact heads and complete diagnostic histograms were validated.
+    return expand_approved_namespace_anchor(value, report["database_states"]["mongodb"])
 
 
 def bootstrap_boundary_report(directory, value, request, args):
@@ -800,7 +833,10 @@ def bootstrap_private_request(args):
     filename = "boundary-request.json" if args.prepare_mode == "bootstrap-bounds" else "inventory-request.json"
     registry_name = filename.removesuffix(".json") + "-bootstrap.json"
     with locked_operation(directory):
-        bootstrap_identity_report(directory, value, args)
+        namespace_anchor = bootstrap_identity_report(directory, value, args)
+        if namespace_anchor is not None:
+            request["mongodb_namespace_anchor"] = namespace_anchor
+        validate_v2_request(request, args.operation_id, args.actual_source_sha, boundary=True)
         if args.prepare_mode == "bootstrap-inventory":
             bootstrap_boundary_report(directory, value, request, args)
         raw = canonical_bytes(request)

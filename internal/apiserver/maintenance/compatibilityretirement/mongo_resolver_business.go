@@ -91,7 +91,7 @@ func (r *MongoOwnerResolution) readSubmission(ctx context.Context) error {
 			r.local.Gaps = append(r.local.Gaps, "storage_precision_gap")
 		}
 		r.local.AssessmentID = o.AssessmentID
-		r.checkSQLTerminal(facts)
+		r.checkSQLTerminal(ctx, facts)
 	default:
 		return ErrMongoOwnerResolution
 	}
@@ -163,13 +163,25 @@ func mongoSubmissionPayload(row sheetmongo.AnswerSheetPO) (eventpayload.AnswerSh
 	return p, nil
 }
 
-func (r *MongoOwnerResolution) checkSQLTerminal(facts sqlevaluation.SQLHistoricalFactsSnapshot) {
+// Only the actual opaque batch (including the private resolved-owner wrapper)
+// may supply global original-Run absence. Editable snapshots and the legacy
+// point-reader API are not an absence capability.
+func (r *MongoOwnerResolution) originalSQLOutcomeRunAbsent(ctx context.Context, outcome sqlevaluation.SQLHistoricalOutcome) error {
+	switch reader := r.sqlFacts.(type) {
+	case *sqlevaluation.SQLHistoricalBatchOwnerFacts:
+		return reader.OriginalOutcomeRunAbsent(ctx, outcome.ID, outcome.RunID)
+	case *sqlMongoResolvedOwnerReader:
+		if reader != nil && reader.actual != nil {
+			return reader.actual.OriginalOutcomeRunAbsent(ctx, outcome.ID, outcome.RunID)
+		}
+	}
+	return ErrMongoOwnerConflict
+}
+
+func (r *MongoOwnerResolution) checkSQLTerminal(ctx context.Context, facts sqlevaluation.SQLHistoricalFactsSnapshot) {
 	o := facts.Owner
 	if o.AssessmentID == 0 || o.OrgID != r.source.OrgID || o.TesteeID != r.local.TesteeID || (o.Status != "evaluated" && o.Status != "failed") {
 		r.block("sql_business_owner_unfinished_or_conflicting")
-	}
-	if len(facts.Runs) == 0 {
-		r.block("sql_runtime_history_absent")
 	}
 	resources := map[string]bool{}
 	attempts := map[uint]sqlevaluation.SQLHistoricalRun{}
@@ -206,10 +218,20 @@ func (r *MongoOwnerResolution) checkSQLTerminal(facts sqlevaluation.SQLHistorica
 	if o.Status == "evaluated" && len(facts.Outcomes) != 1 {
 		r.block("sql_outcome_absent_or_ambiguous")
 	}
+	missingOriginal := map[uint64]bool{}
 	for _, outcome := range facts.Outcomes {
-		if outcome.Invalid || outcome.AssessmentID != o.AssessmentID || outcome.OrgID != o.OrgID || outcome.TesteeID != o.TesteeID || !resources[outcome.RunID] {
+		if outcome.Invalid || outcome.AssessmentID != o.AssessmentID || outcome.OrgID != o.OrgID || outcome.TesteeID != o.TesteeID || outcome.RunID == "" {
 			r.block("sql_original_outcome_runtime_conflict")
+		} else if !resources[outcome.RunID] {
+			if o.Status == "evaluated" && len(facts.Outcomes) == 1 && r.originalSQLOutcomeRunAbsent(ctx, outcome) == nil {
+				missingOriginal[outcome.ID] = true
+			} else {
+				r.block("sql_original_outcome_runtime_conflict")
+			}
 		}
+	}
+	if len(facts.Runs) == 0 && (o.Status != "evaluated" || len(facts.Outcomes) != 1 || !missingOriginal[facts.Outcomes[0].ID]) {
+		r.block("sql_runtime_history_absent")
 	}
 	ownerClock := func(actual *time.Time, original time.Time, dataType string, precision int) bool {
 		matched, gap := sqlLocalOwnerClock(actual, original, dataType, precision, o.ClockComparisonRuleVersion)
@@ -241,7 +263,7 @@ func (r *MongoOwnerResolution) checkSQLTerminal(facts sqlevaluation.SQLHistorica
 					closed++
 				}
 			}
-			if closed != 1 {
+			if closed != 1 && (closed != 0 || !missingOriginal[outcome.ID]) {
 				r.block("sql_evaluated_owner_original_success_unproven")
 			}
 		}
@@ -266,6 +288,12 @@ func (r *MongoOwnerResolution) checkSQLTerminal(facts sqlevaluation.SQLHistorica
 		if responsibility.Invalid || responsibility.Unfinished || responsibility.LeasePresent || responsibility.OrgID != o.OrgID || responsibility.AssessmentID != 0 && responsibility.AssessmentID != o.AssessmentID || responsibility.TesteeID != 0 && responsibility.TesteeID != o.TesteeID {
 			r.block("sql_current_responsibility_unclosed")
 		}
+	}
+	// The gap is retained only after exact canonical clocks/identity and every
+	// current pending/lease/retry check passed. It never supplies a Run/attempt
+	// or erases a conflicting retained row, even outside the selected owner.
+	if r.local.OwnerLocalTerminal && len(r.local.BlockingReasons) == 0 && len(missingOriginal) != 0 {
+		r.local.Gaps = append(r.local.Gaps, "original_outcome_run_absent")
 	}
 }
 
@@ -326,7 +354,7 @@ func (r *MongoOwnerResolution) readGenerated(ctx context.Context) error {
 	r.local.ReportID = aid
 	r.local.OutcomeID = oid
 	r.local.OwnerLocalTerminal = true
-	r.checkSQLTerminal(facts)
+	r.checkSQLTerminal(ctx, facts)
 	graph := func(reportID, runID uint64) (string, error) {
 		var a interpretmongo.InterpretReportPO
 		var run interpretmongo.InterpretationRunPO

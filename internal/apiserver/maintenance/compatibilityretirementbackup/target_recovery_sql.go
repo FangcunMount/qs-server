@@ -17,6 +17,16 @@ func executeTargetDrop(ctx context.Context, p *TargetRecoveryPlan, i int) error 
 	}
 	p.mu.Lock()
 	defer p.mu.Unlock()
+	return executeTargetDropLocked(ctx, p, i)
+}
+
+// The batch entry holds the same plan mutex across all four statements.
+// This shares the actual native statement/readback producer without allowing
+// RecoverTargets to interleave a restore with the middle of a DROP batch.
+func executeTargetDropLocked(ctx context.Context, p *TargetRecoveryPlan, i int) error {
+	if p == nil || p.self != p || i < 0 || i >= 4 {
+		return ErrRecoveryBinding
+	}
 	if p.drop[i] != nil || p.observations[i].State != "existing_exact" {
 		return ErrRecoveryState
 	}
