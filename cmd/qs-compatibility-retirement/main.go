@@ -1224,21 +1224,6 @@ func main() {
 		}
 		return
 	}
-	if *mode == "lifecycle-prepare-root-once" {
-		ctx, cancel := context.WithTimeout(context.Background(), 90*time.Minute)
-		staged, e := stageLifecycleRootInputs(ctx, *req, *hash, *op, *runID)
-		r := lifecycleReceipt{FormatVersion: 1, Kind: "compatibility_retirement_lifecycle_result", Operation: "prepare", SourceSHA: sourceSHA, OperationID: *op, RunID: *runID, RequestSHA256: *hash, TargetHash: digest(targets), TargetCount: 4}
-		if e == nil {
-			r, e = runLifecycleCLI(ctx, "lifecycle-prepare", staged, *hash, *op, *runID)
-		} else {
-			r.ErrorCategory = lifecycleCategory(e)
-		}
-		cancel()
-		if json.NewEncoder(os.Stdout).Encode(r) != nil || e != nil {
-			os.Exit(1)
-		}
-		return
-	}
 	if strings.HasPrefix(*mode, "lifecycle-") {
 		ctx, cancel := context.WithTimeout(context.Background(), 90*time.Minute)
 		r, e := runLifecycleCLI(ctx, *mode, *req, *hash, *op, *runID)
