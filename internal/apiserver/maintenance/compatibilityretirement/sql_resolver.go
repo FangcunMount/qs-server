@@ -178,14 +178,16 @@ func resolveSQLLocalFacts(source *DecodedSourceEvent, facts sqlevaluation.SQLHis
 		}
 	}
 	if len(runs) == 0 {
-		block("runtime_execution_history_absent")
+		result.Gaps = append(result.Gaps, "runtime_execution_history_absent")
 	}
 	if len(facts.Outcomes) > 1 {
 		block("canonical_outcome_ambiguous")
 	}
 	for _, outcome := range facts.Outcomes {
-		if outcome.Invalid || outcome.AssessmentID != id || outcome.OrgID != o.OrgID || outcome.TesteeID != o.TesteeID || resources[outcome.RunID] != 1 {
+		if outcome.Invalid || outcome.AssessmentID != id || outcome.OrgID != o.OrgID || outcome.TesteeID != o.TesteeID || resources[outcome.RunID] > 1 {
 			block("canonical_outcome_owner_or_run_conflict")
+		} else if resources[outcome.RunID] == 0 {
+			result.Gaps = append(result.Gaps, "canonical_outcome_original_run_absent")
 		}
 	}
 	switch o.Status {
@@ -204,7 +206,11 @@ func resolveSQLLocalFacts(source *DecodedSourceEvent, facts sqlevaluation.SQLHis
 				}
 			}
 			if !closed {
-				block("evaluated_owner_original_success_unproven")
+				if resources[outcome.RunID] == 0 && !outcome.Invalid {
+					result.Gaps = append(result.Gaps, "evaluated_owner_original_success_not_retained")
+				} else {
+					block("evaluated_owner_original_success_unproven")
+				}
 			}
 		}
 	case "failed":
@@ -220,7 +226,19 @@ func resolveSQLLocalFacts(source *DecodedSourceEvent, facts sqlevaluation.SQLHis
 			// This checks the current terminal owner only. It never assigns
 			// this clock candidate to a source that did not declare a Run.
 			if currentFailures != 1 {
-				block("failed_owner_actual_terminal_run_unproven")
+				// A missing historical failure is distinct from a retained Run
+				// contradicting this exact terminal owner clock. No Run is inferred.
+				contradictory := false
+				for _, run := range runs {
+					if run.Status != "failed" && run.FinishedAt != nil && ownerClock(o.FailedAt, *run.FinishedAt, o.ActualFailedAtDataType, o.ActualFailedAtPrecision) {
+						contradictory = true
+					}
+				}
+				if currentFailures == 0 && !contradictory {
+					result.Gaps = append(result.Gaps, "failed_owner_actual_terminal_run_not_retained")
+				} else {
+					block("failed_owner_actual_terminal_run_unproven")
+				}
 			}
 		}
 	default:
@@ -265,22 +283,32 @@ func resolveSQLLocalFacts(source *DecodedSourceEvent, facts sqlevaluation.SQLHis
 				return result, ErrSourceIdentity
 			}
 			matched := 0
-			for _, run := range runs {
+			// Count original rows, not the attempt-keyed map: that map has
+			// already collapsed duplicate attempts after recording a conflict.
+			// Two rows carrying one authorization must remain ambiguous.
+			for _, run := range facts.Runs {
 				if run.RetryEventID == source.EventID {
 					matched++
-					if run.Status != "failed" || run.Attempt != uint(p.ExpectedAttempt) || run.ActionRequestID != p.ActionRequestID || run.RetryDisposition != "automatic" {
+					if run.Scope != "evaluation_run" || run.AssessmentID != id || run.ResourceID == "" || run.Attempt == 0 || run.Status != "failed" || run.Attempt != uint(p.ExpectedAttempt) || run.ActionRequestID != p.ActionRequestID || run.RetryDisposition != "automatic" {
 						block("retry_original_authorization_conflict")
 						continue
 					}
 					result.AuthorizationRun = &evidence.HistoricalRunReferenceV1{RunID: run.ResourceID, Attempt: run.Attempt}
-					if next, exists := runs[run.Attempt+1]; exists && next.Origin == p.AttemptOrigin && next.ActionRequestID == p.ActionRequestID {
-						result.ExecutionRun = &evidence.HistoricalRunReferenceV1{RunID: next.ResourceID, Attempt: next.Attempt}
+					if next, exists := runs[run.Attempt+1]; exists {
+						if next.Origin == p.AttemptOrigin && next.ActionRequestID == p.ActionRequestID {
+							result.ExecutionRun = &evidence.HistoricalRunReferenceV1{RunID: next.ResourceID, Attempt: next.Attempt}
+						} else {
+							block("retry_authorized_execution_link_unproven")
+						}
 					} else {
-						block("retry_authorized_execution_link_unproven")
+						result.Gaps = append(result.Gaps, "retry_authorized_execution_not_retained")
 					}
 				}
 			}
-			if matched != 1 {
+			if matched == 0 {
+				result.Gaps = append(result.Gaps, "retry_original_authorization_not_retained")
+			} else if matched > 1 {
+				result.AuthorizationRun, result.ExecutionRun = nil, nil
 				block("retry_original_authorization_missing_or_ambiguous")
 			}
 			// ExpectedAttempt is never promoted to an original executed Run.
@@ -328,7 +356,11 @@ func resolveSQLLocalFacts(source *DecodedSourceEvent, facts sqlevaluation.SQLHis
 			}
 		}
 		if result.OriginalRun == nil {
-			block("original_outcome_run_absent")
+			if resources[p.EvaluationRunID] == 0 {
+				result.Gaps = append(result.Gaps, "original_outcome_run_absent")
+			} else {
+				block("original_outcome_run_absent")
+			}
 		}
 	}
 	result.OwnerLocalTerminal = len(result.BlockingReasons) == 0 && (o.Status == "evaluated" || o.Status == "failed")

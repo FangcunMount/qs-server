@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/hex"
 	"encoding/json"
+	identitymeta "github.com/FangcunMount/qs-server/internal/pkg/databaseidentity"
 	"io"
 	"os"
 	"path/filepath"
@@ -18,30 +19,32 @@ import (
 )
 
 type identityRequest struct {
-	FormatVersion int               `json:"format_version"`
-	Kind          string            `json:"kind"`
-	SourceSHA     string            `json:"source_sha"`
-	OperationID   string            `json:"operation_id"`
-	TargetHash    string            `json:"target_hash"`
-	DatabaseScope string            `json:"database_scope"`
-	Protocols     map[string]string `json:"identity_protocols"`
-	Limits        struct {
+	FormatVersion      int               `json:"format_version"`
+	Kind               string            `json:"kind"`
+	SourceSHA          string            `json:"source_sha"`
+	OperationID        string            `json:"operation_id"`
+	TargetHash         string            `json:"target_hash"`
+	DatabaseScope      string            `json:"database_scope"`
+	Protocols          map[string]string `json:"identity_protocols"`
+	MongoAnchorProfile string            `json:"mongo_anchor_profile,omitempty"`
+	Limits             struct {
 		QuerySeconds int `json:"query_seconds"`
 		TotalSeconds int `json:"total_seconds"`
 	} `json:"limits"`
 }
 type identityState struct {
-	IdentityHash            string `json:"identity_hash"`
-	DatabaseAnchorHash      string `json:"database_anchor_hash"`
-	MigrationGenerationHash string `json:"migration_generation_hash"`
-	IdentityObserved        bool   `json:"identity_observed"`
-	Version                 uint64 `json:"migration_version"`
-	HeadObserved            bool   `json:"migration_head_observed"`
-	Dirty                   *bool  `json:"migration_dirty"`
-	Clean                   bool   `json:"migration_clean"`
-	PermissionsSufficient   bool   `json:"metadata_permissions_sufficient"`
-	PermissionScope         string `json:"permission_scope"`
-	ErrorCategory           string `json:"error_category"`
+	IdentityHash            string                             `json:"identity_hash"`
+	DatabaseAnchorHash      string                             `json:"database_anchor_hash"`
+	NamespaceAnchor         *identitymeta.MongoNamespaceAnchor `json:"namespace_anchor,omitempty"`
+	MigrationGenerationHash string                             `json:"migration_generation_hash"`
+	IdentityObserved        bool                               `json:"identity_observed"`
+	Version                 uint64                             `json:"migration_version"`
+	HeadObserved            bool                               `json:"migration_head_observed"`
+	Dirty                   *bool                              `json:"migration_dirty"`
+	Clean                   bool                               `json:"migration_clean"`
+	PermissionsSufficient   bool                               `json:"metadata_permissions_sufficient"`
+	PermissionScope         string                             `json:"permission_scope"`
+	ErrorCategory           string                             `json:"error_category"`
 }
 type identityReport struct {
 	FormatVersion  int                      `json:"format_version"`
@@ -63,31 +66,35 @@ type identityReport struct {
 func identityProtocols() map[string]string {
 	return map[string]string{"mysql": "mysql_database_identity_v1", "mongodb": "mongodb_database_identity_v1"}
 }
-func readIdentityRequest(path, expected, op string) error {
+func loadIdentityRequest(path, expected, op string) (identityRequest, error) {
+	var r identityRequest
 	if !hashRE.MatchString(expected) || !runRE.MatchString(op) || !shaRE.MatchString(sourceSHA) || filepath.Base(path) != "identity-request.json" {
-		return category("identity_request_binding_invalid")
+		return r, category("identity_request_binding_invalid")
 	}
 	info, e := os.Lstat(path)
 	if e != nil || !info.Mode().IsRegular() || info.Mode().Perm() != 0600 || info.Size() < 1 || info.Size() > 256*1024 || info.Sys().(*syscall.Stat_t).Uid != uint32(os.Getuid()) || info.Sys().(*syscall.Stat_t).Nlink != 1 {
-		return category("identity_request_private_invalid")
+		return r, category("identity_request_private_invalid")
 	}
 	raw, e := os.ReadFile(path)
 	if e != nil || digestRaw(raw) != expected {
-		return category("identity_request_hash_mismatch")
+		return r, category("identity_request_hash_mismatch")
 	}
-	if rejectDuplicateJSON(raw) != nil {
-		return category("identity_request_schema_invalid")
+	if rejectDuplicateJSON(raw) != nil || identitymeta.ValidateOptionalMongoNamespaceJSON(raw, "mongo_anchor_profile") != nil {
+		return r, category("identity_request_schema_invalid")
 	}
 	d := json.NewDecoder(strings.NewReader(string(raw)))
 	d.DisallowUnknownFields()
-	var r identityRequest
 	if d.Decode(&r) != nil || d.Decode(new(any)) != io.EOF {
-		return category("identity_request_schema_invalid")
+		return r, category("identity_request_schema_invalid")
 	}
-	if r.FormatVersion != 1 || r.Kind != "readonly_identity_discovery_request" || r.SourceSHA != sourceSHA || r.OperationID != op || r.TargetHash != digest(targets) || r.DatabaseScope != "mysql-and-mongodb" || digest(r.Protocols) != digest(identityProtocols()) || r.Limits.QuerySeconds != 15 || r.Limits.TotalSeconds != 90 {
-		return category("identity_request_binding_invalid")
+	if r.FormatVersion != 1 || r.Kind != "readonly_identity_discovery_request" || r.SourceSHA != sourceSHA || r.OperationID != op || r.TargetHash != digest(targets) || r.DatabaseScope != "mysql-and-mongodb" || digest(r.Protocols) != digest(identityProtocols()) || r.Limits.QuerySeconds != 15 || r.Limits.TotalSeconds != 90 || (r.MongoAnchorProfile != "" && r.MongoAnchorProfile != identitymeta.MongoReplicaAnchorKind && r.MongoAnchorProfile != identitymeta.MongoNamespaceAnchorKind) {
+		return r, category("identity_request_binding_invalid")
 	}
-	return nil
+	return r, nil
+}
+func readIdentityRequest(path, expected, op string) error {
+	_, err := loadIdentityRequest(path, expected, op)
+	return err
 }
 func discoverMySQL(ctx context.Context) (state identityState, err error) {
 	state.ErrorCategory = "none"
@@ -158,7 +165,10 @@ func discoverMySQL(ctx context.Context) (state identityState, err error) {
 	}
 	return state, nil
 }
-func discoverMongo(ctx context.Context) (state identityState, err error) {
+func discoverMongo(ctx context.Context) (identityState, error) {
+	return discoverMongoProfile(ctx, identitymeta.MongoReplicaAnchorKind)
+}
+func discoverMongoProfile(ctx context.Context, profile string) (state identityState, err error) {
 	state.ErrorCategory = "none"
 	state.PermissionScope = "identity_and_migration_head"
 	client, e := mongoOpen(ctx)
@@ -223,9 +233,20 @@ func discoverMongo(ctx context.Context) (state identityState, err error) {
 	}
 	canonical, _ := json.Marshal(stable)
 	state.IdentityHash = hashParts("mongodb_database_identity_v1", string(canonical), os.Getenv("MONGODB_DBNAME"), hex.EncodeToString(bytes))
-	state.DatabaseAnchorHash, e = mongoDatabaseAnchor(ctx, db, hello)
-	if e != nil {
-		return state, e
+	switch profile {
+	case identitymeta.MongoNamespaceAnchorKind:
+		state.NamespaceAnchor, e = mongoNamespaceAnchor(ctx, db)
+		if e != nil {
+			return state, e
+		}
+		state.DatabaseAnchorHash = state.NamespaceAnchor.Hash
+	case "", identitymeta.MongoReplicaAnchorKind:
+		state.DatabaseAnchorHash, e = mongoDatabaseAnchor(ctx, db, hello)
+		if e != nil {
+			return state, e
+		}
+	default:
+		return state, category("mongo_namespace_anchor_rejected")
 	}
 	state.MigrationGenerationHash, e = mongoMigrationGeneration(entries[0])
 	if e != nil {
@@ -284,7 +305,8 @@ func runIdentity(path, expected, op, runID, output string) (identityReport, erro
 	if !runRE.MatchString(runID) || privateDir(filepath.Dir(path)) != nil || privateDir(output) != nil {
 		return r, category("input_or_private_path_invalid")
 	}
-	if e := readIdentityRequest(path, expected, op); e != nil {
+	approved, e := loadIdentityRequest(path, expected, op)
+	if e != nil {
 		return r, e
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
@@ -294,7 +316,13 @@ func runIdentity(path, expected, op, runID, output string) (identityReport, erro
 		a.ErrorCategory = sqlErr.Error()
 	}
 	r.States["mysql"] = a
-	b, mongoErr := discoverMongo(ctx)
+	var b identityState
+	var mongoErr error
+	if approved.MongoAnchorProfile == "" {
+		b, mongoErr = discoverMongo(ctx)
+	} else {
+		b, mongoErr = discoverMongoProfile(ctx, approved.MongoAnchorProfile)
+	}
 	if mongoErr != nil {
 		b.ErrorCategory = mongoErr.Error()
 	}

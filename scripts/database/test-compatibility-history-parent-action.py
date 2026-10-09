@@ -203,7 +203,9 @@ class ParentWorkflow(unittest.TestCase):
         self.assertIn("MONGODB_METADATA_ADMIN_PASSWORD", old)
         setup = workflow.split("      - name: Set up Go for immutable read-only inventory\n", 1)[1].split("      - name:", 1)[0]
         self.assertIn("inputs.prepare_mode != 'bootstrap-history-parent'", setup)
-        self.assertIn("python3 -B scripts/database/test-compatibility-history-parent-action.py", workflow)
+        ci = (ROOT / ".github/workflows/ci.yml").read_text()
+        self.assertIn("python3 -B scripts/database/test-compatibility-history-parent-action.py", ci)
+        self.assertIn("Require successful final source CI", workflow)
 
     def test_actual_parent_package_exact_five_without_any_go_call_metadata_stays_four(self):
         workflow = (ROOT / ".github/workflows/compatibility-retirement.yml").read_text()

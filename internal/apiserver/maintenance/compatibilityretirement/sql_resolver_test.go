@@ -128,8 +128,8 @@ func TestSQLLocalResolutionRetrySeparatesAuthorizationFromExecution(t *testing.T
 	}
 	source.EventID = "different-retry-id"
 	v, err = resolveSQLLocalFacts(source, facts)
-	if err != nil || !containsString(v.BlockingReasons, "retry_original_authorization_missing_or_ambiguous") {
-		t.Fatal("unlinked authorization accepted", err)
+	if err != nil || !v.OwnerLocalTerminal || !containsString(v.Gaps, "retry_original_authorization_not_retained") || v.AuthorizationRun != nil || v.ExecutionRun != nil {
+		t.Fatal("absent historical authorization was inferred or lost its gap", err)
 	}
 	source.EventID = facts.Runs[0].RetryEventID
 	facts.Runs[1].ActionRequestID = "different-action"
@@ -246,5 +246,72 @@ func TestSQLLocalSnapshotCopiesAndUntrustedDTOMismatch(t *testing.T) {
 	facts.Owner.ModelCode = "different-intake-identity"
 	if _, err := resolveSQLLocalFacts(source, facts); !errors.Is(err, ErrSourceIdentity) {
 		t.Fatal("fixed intake model identity conflict accepted")
+	}
+}
+
+func TestSQLLocalMissingHistoryUsesTerminalOwnerWithoutInventingRun(t *testing.T) {
+	for _, kind := range []string{"evaluation.requested", "evaluation.retry.requested", "evaluation.failed", "evaluation.outcome.committed"} {
+		t.Run(kind, func(t *testing.T) {
+			source, facts := sqlResolverFixture(t, kind), sqlFactsFixture()
+			facts.Runs = nil
+			if kind == "evaluation.failed" {
+				facts.Owner.Status, facts.Owner.EvaluatedAt, facts.Owner.FailedAt = "failed", nil, &source.BusinessAt
+				facts.Owner.FailureReasonSHA256 = evidence.SourceDigest("sql-owner-failure-reason/v1", []byte(source.Failed.Reason)).SHA256
+				facts.Outcomes = nil
+			}
+			v, err := resolveSQLLocalFacts(source, facts)
+			if err != nil || !v.OwnerLocalTerminal || len(v.BlockingReasons) != 0 || v.OriginalRun != nil || v.AuthorizationRun != nil || v.ExecutionRun != nil || !containsString(v.Gaps, "runtime_execution_history_absent") {
+				t.Fatal("missing historical execution was blocked or invented", err)
+			}
+			if kind == "evaluation.outcome.committed" && !containsString(v.Gaps, "original_outcome_run_absent") {
+				t.Fatal("declared original Outcome Run identity gap lost")
+			}
+			if !v.SourceAuthenticationRequired || !v.MongoDBResponsibilityRequired || !v.GlobalUnboundResponsibilityCoverageRequired {
+				t.Fatal("historical gap became whole retirement authorization")
+			}
+		})
+	}
+}
+
+func TestSQLLocalMissingHistoryStillBlocksCanonicalConflictAndCurrentResponsibility(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		mutate func(*sqlevaluation.SQLHistoricalFactsSnapshot)
+	}{
+		{"canonical absent", func(f *sqlevaluation.SQLHistoricalFactsSnapshot) { f.Outcomes = nil }},
+		{"canonical duplicate", func(f *sqlevaluation.SQLHistoricalFactsSnapshot) { f.Outcomes = append(f.Outcomes, f.Outcomes[0]) }},
+		{"canonical org", func(f *sqlevaluation.SQLHistoricalFactsSnapshot) { f.Outcomes[0].OrgID = 8 }},
+		{"owner nonterminal", func(f *sqlevaluation.SQLHistoricalFactsSnapshot) { f.Owner.Status = "submitted" }},
+		{"current pending", func(f *sqlevaluation.SQLHistoricalFactsSnapshot) {
+			f.Responsibilities = []sqlevaluation.SQLHistoricalResponsibility{{Store: "rm_outbox", OrgID: 7, AssessmentID: 42, Unfinished: true}}
+		}},
+		{"current lease", func(f *sqlevaluation.SQLHistoricalFactsSnapshot) {
+			f.Responsibilities = []sqlevaluation.SQLHistoricalResponsibility{{Store: "retry_event_hold", OrgID: 7, AssessmentID: 42, LeasePresent: true}}
+		}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			facts := sqlFactsFixture()
+			facts.Runs = nil
+			tc.mutate(&facts)
+			v, err := resolveSQLLocalFacts(sqlResolverFixture(t, "evaluation.outcome.committed"), facts)
+			if err != nil || v.OwnerLocalTerminal || len(v.BlockingReasons) == 0 {
+				t.Fatal("missing old Run hid present conflict/responsibility", err)
+			}
+		})
+	}
+}
+
+func TestSQLLocalMissingRetrySuccessorDoesNotSettleAutomaticResponsibility(t *testing.T) {
+	source, facts := sqlResolverFixture(t, "evaluation.retry.requested"), sqlFactsFixture()
+	at := source.BusinessAt
+	facts.Runs = []sqlevaluation.SQLHistoricalRun{{ID: 1, AssessmentID: 42, ResourceID: "original-authorization", Scope: "evaluation_run", Attempt: 1, Status: "failed", FinishedAt: &at, Retryable: true, RetryDisposition: "automatic", RetryEventID: source.EventID}}
+	v, err := resolveSQLLocalFacts(source, facts)
+	if err != nil || v.OwnerLocalTerminal || !containsString(v.Gaps, "retry_authorized_execution_not_retained") || !containsString(v.BlockingReasons, "business_retry_responsibility_unclosed") || v.ExecutionRun != nil {
+		t.Fatal("missing successor erased current automatic retry responsibility", err)
+	}
+	facts.Runs = append(facts.Runs, facts.Runs[0])
+	v, err = resolveSQLLocalFacts(source, facts)
+	if err != nil || v.OwnerLocalTerminal || !containsString(v.BlockingReasons, "retry_original_authorization_missing_or_ambiguous") || v.AuthorizationRun != nil || v.ExecutionRun != nil {
+		t.Fatal("duplicate authorization demoted to a historical gap or selected an arbitrary original Run", err)
 	}
 }

@@ -11,6 +11,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	identitymeta "github.com/FangcunMount/qs-server/internal/pkg/databaseidentity"
 	"hash"
 	"io"
 	"os"
@@ -150,6 +151,9 @@ func validateV2Request(r request, path string) error {
 		if !ok || d.IdentityHash != r.Identities[db] || d.Version != r.Migrations[db] || d.Dirty || !d.MetadataComplete || !d.ExpectedIdentityMatch || !d.ExpectedMigrationMatch {
 			return category("boundary_report_binding_invalid")
 		}
+	}
+	if !identitymeta.MatchMongoNamespaceAnchors(r.MongoNamespaceAnchor, observed.DatabaseBindings["mongodb"].NamespaceAnchor) {
+		return category("mongo_namespace_anchor_mismatch")
 	}
 	for i, t := range targets {
 		s := observed.Targets[i]

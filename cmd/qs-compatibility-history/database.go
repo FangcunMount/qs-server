@@ -12,6 +12,7 @@ import (
 
 	retirement "github.com/FangcunMount/qs-server/internal/apiserver/maintenance/compatibilityretirement"
 	hostmysql "github.com/FangcunMount/qs-server/internal/pkg/database/mysql"
+	identitymeta "github.com/FangcunMount/qs-server/internal/pkg/databaseidentity"
 	drivermysql "github.com/go-sql-driver/mysql"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
@@ -25,12 +26,13 @@ import (
 // Only this executable owns connections/sessions/transaction lifecycle. Every
 // maintenance adapter receives an already active borrowed paired read scope.
 type historyDatabase struct {
-	sqlPool     *sql.DB
-	sql         *gorm.DB
-	mongoClient *mongo.Client
-	mongo       *mongo.Database
-	mongoConfig retirement.MongoOwnerConfig
-	sqlHead     uint64
+	sqlPool         *sql.DB
+	sql             *gorm.DB
+	mongoClient     *mongo.Client
+	mongo           *mongo.Database
+	mongoConfig     retirement.MongoOwnerConfig
+	sqlHead         uint64
+	namespaceAnchor *identitymeta.MongoNamespaceAnchor
 }
 
 func connectionValue(key string) (string, error) {
@@ -126,6 +128,13 @@ func openDatabases(ctx context.Context, a *approvedInputs) (db *historyDatabase,
 	if err != nil {
 		return db, err
 	}
+	if a.inventory.MongoNamespaceAnchor != nil {
+		endpoint, endpointErr := identitymeta.MongoEndpointSHA256(host, port, namespace)
+		if endpointErr != nil || a.inventory.MongoNamespaceAnchor.Validate() != nil || a.inventory.MongoNamespaceAnchor.Database != namespace || a.inventory.MongoNamespaceAnchor.EndpointSHA256 != endpoint {
+			return db, fixedError("history_database_binding_rejected")
+		}
+		db.namespaceAnchor = a.inventory.MongoNamespaceAnchor.Clone()
+	}
 	opts := options.Client().SetHosts([]string{net.JoinHostPort(host, strconv.Itoa(port))}).SetAuth(options.Credential{Username: user, Password: password, AuthSource: "admin"}).SetConnectTimeout(10 * time.Second).SetServerSelectionTimeout(10 * time.Second).SetSocketTimeout(30 * time.Second).SetMaxPoolSize(1).SetReadPreference(readpref.Primary()).SetReadConcern(readconcern.Majority())
 	db.mongoClient, err = mongo.Connect(ctx, opts)
 	if err != nil {
@@ -167,6 +176,16 @@ func (d *historyDatabase) epoch(ctx context.Context, fn func(context.Context) er
 	if d == nil || d.sql == nil || d.mongo == nil || d.mongoClient == nil || ctx == nil || ctx.Err() != nil || fn == nil {
 		return fixedError("history_host_epoch_rejected")
 	}
+	if err := d.validateNamespaceAnchor(ctx); err != nil {
+		return err
+	}
+	// Register before the transaction cleanup defers so metadata is read after
+	// actual abort/rollback, without replacing an original pipeline error.
+	defer func() {
+		if err := d.validateNamespaceAnchor(ctx); result == nil && err != nil {
+			result = err
+		}
+	}()
 	session, err := d.mongoClient.StartSession()
 	if err != nil {
 		return fixedError("history_host_epoch_rejected")
@@ -219,4 +238,15 @@ func (d *historyDatabase) epoch(ctx context.Context, fn func(context.Context) er
 	}
 	paired := mongo.NewSessionContext(hostmysql.WithTx(ctx, tx), session)
 	return fn(paired)
+}
+
+func (d *historyDatabase) validateNamespaceAnchor(ctx context.Context) error {
+	if d.namespaceAnchor == nil {
+		return nil
+	}
+	observed, err := identitymeta.ObserveMongoNamespaceAnchor(ctx, d.mongo, d.namespaceAnchor.EndpointSHA256)
+	if err != nil || !identitymeta.MatchMongoNamespaceAnchors(d.namespaceAnchor, observed) {
+		return fixedError("history_database_binding_rejected")
+	}
+	return nil
 }

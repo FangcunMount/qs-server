@@ -44,6 +44,7 @@ type SQLHistoricalBatchCASPlan struct {
 	before                     sqlHistoricalCASImage
 	groups                     []sqlHistoricalCASGroup
 	attachments                []SQLHistoricalBatchAttachment
+	missingOriginalRunIDs      []string
 }
 
 // Statement facts deliberately do not certify host Commit. The host must
@@ -143,6 +144,12 @@ func casRow(v sqlHistoricalCASImage, table string, id uint64) (historicalSQLRow,
 	return found, nil
 }
 func casTarget(v sqlHistoricalCASImage, a SQLHistoricalBatchAttachment) (string, string, uint64, historicalSQLRow, historicalSQLRow, error) {
+	return casTargetForBinding(v, a, false)
+}
+
+// bindingOnly is private to the digest reader. It never permits Prepare/Apply
+// to bypass the exact Unverifiable conclusion or any full-row CAS invariant.
+func casTargetForBinding(v sqlHistoricalCASImage, a SQLHistoricalBatchAttachment, bindingOnly bool) (string, string, uint64, historicalSQLRow, historicalSQLRow, error) {
 	table, column, id := "assessment", "historical_lifecycle_evidence", a.AssessmentID
 	if a.OutcomeID != 0 {
 		table, column, id = "evaluation_outcome", "historical_committed_evidence", a.OutcomeID
@@ -175,8 +182,23 @@ func casTarget(v sqlHistoricalCASImage, a SQLHistoricalBatchAttachment) (string,
 			return "", "", 0, nil, nil, ErrSQLHistoricalBatchCAS
 		}
 	}
-	if table == "evaluation_outcome" && (run == nil || valueOrEmpty(row["evaluation_run_id"]) != a.Entry.Run.RunID) {
-		return "", "", 0, nil, nil, ErrSQLHistoricalBatchCAS
+	if table == "evaluation_outcome" {
+		originalID := valueOrEmpty(row["evaluation_run_id"])
+		if a.Entry.Run != nil {
+			if run == nil || originalID != a.Entry.Run.RunID {
+				return "", "", 0, nil, nil, ErrSQLHistoricalBatchCAS
+			}
+		} else {
+			if originalID == "" || valueOrEmpty(owner["status"]) != "evaluated" || (!bindingOnly && !historicalOutcomeRunAbsent(a.Entry)) {
+				return "", "", 0, nil, nil, ErrSQLHistoricalBatchCAS
+			}
+			// No org/scope/deleted filter may hide a retained contradictory Run.
+			for _, r := range v.rows["runtime_checkpoint"] {
+				if valueOrEmpty(r["resource_id"]) == originalID {
+					return "", "", 0, nil, nil, ErrSQLHistoricalBatchCAS
+				}
+			}
+		}
 	}
 	return table, column, id, row, run, nil
 }
@@ -191,7 +213,7 @@ func SQLHistoricalBatchBinding(ctx context.Context, b *SQLHistoricalOwnerBatch, 
 		return "", e
 	}
 	a := SQLHistoricalBatchAttachment{AssessmentID: assessmentID, OutcomeID: outcomeID, Entry: evidence.HistoricalReferenceEntryV1{EventType: eventType, Run: run}}
-	table, _, _, row, r, e := casTarget(sqlHistoricalCASImage{rows: b.rows}, a)
+	table, _, _, row, r, e := casTargetForBinding(sqlHistoricalCASImage{rows: b.rows}, a, true)
 	if e != nil {
 		return "", e
 	}
@@ -202,6 +224,11 @@ func SQLHistoricalBatchBinding(ctx context.Context, b *SQLHistoricalOwnerBatch, 
 	server, database, e := historicalDatabase(tx)
 	if e != nil {
 		return "", e
+	}
+	if table == "evaluation_outcome" && run == nil {
+		if e := casMissingOriginalRuns(tx, []string{valueOrEmpty(row["evaluation_run_id"])}, false); e != nil {
+			return "", e
+		}
 	}
 	return historicalStableBinding(server, database, table, eventType, row, r)
 }
@@ -233,6 +260,7 @@ func PrepareSQLHistoricalBatchCAS(ctx context.Context, b *SQLHistoricalOwnerBatc
 		entry evidence.HistoricalReferenceEntryV1
 	}
 	byEvent, bySource := map[string]referenceIdentity{}, map[string]referenceIdentity{}
+	missingRuns := map[string]bool{}
 	register := func(table string, id uint64, entry evidence.HistoricalReferenceEntryV1) error {
 		value := referenceIdentity{table: table, id: id, entry: entry}
 		source := entry.Source.Database + ":" + entry.Source.Object + ":" + entry.Source.PrimaryKeySHA256
@@ -243,6 +271,26 @@ func PrepareSQLHistoricalBatchCAS(ctx context.Context, b *SQLHistoricalOwnerBatc
 			return evidence.ErrHistoricalReferenceConflict
 		}
 		byEvent[entry.EventID], bySource[source] = value, value
+		if table == "evaluation_outcome" && entry.Run == nil {
+			row, err := casRow(p.before, table, id)
+			if err != nil || !historicalOutcomeRunAbsent(entry) {
+				return ErrSQLHistoricalBatchCAS
+			}
+			ownerID, err := sqlHistoricalUint(row, "assessment_id")
+			facts := b.owners[ownerID]
+			if err != nil || facts == nil {
+				return ErrSQLHistoricalBatchCAS
+			}
+			// The new missing-Run exception cannot settle an actual current
+			// message or lease. These facts come from this opaque SQL8 cycle;
+			// source/global/joint authority remains independently required.
+			for _, responsibility := range facts.snapshot.Responsibilities {
+				if responsibility.Unfinished || responsibility.LeasePresent {
+					return ErrSQLHistoricalBatchCAS
+				}
+			}
+			missingRuns[valueOrEmpty(row["evaluation_run_id"])] = true
+		}
 		return nil
 	}
 	for _, table := range []string{"assessment", "evaluation_outcome"} {
@@ -335,10 +383,44 @@ func PrepareSQLHistoricalBatchCAS(ctx context.Context, b *SQLHistoricalOwnerBatc
 		group.set = next
 		p.attachments = append(p.attachments, a)
 	}
+	for id := range missingRuns {
+		p.missingOriginalRunIDs = append(p.missingOriginalRunIDs, id)
+	}
+	slices.Sort(p.missingOriginalRunIDs)
+	if len(p.missingOriginalRunIDs) != 0 {
+		if e = casMissingOriginalRuns(tx, p.missingOriginalRunIDs, false); e != nil {
+			return nil, e
+		}
+	}
 	if e = b.ValidateBorrowedSnapshot(ctx); e != nil {
 		return nil, e
 	}
 	return p, nil
+}
+
+// An owner batch is not a global absence proof. Recheck the declared IDs across
+// every scope/owner/deleted state; any retained row is a conflict, not a gap.
+func casMissingOriginalRuns(tx *gorm.DB, ids []string, lock bool) error {
+	if len(ids) == 0 || len(ids) > 512 {
+		return ErrSQLHistoricalBatchCAS
+	}
+	for _, id := range ids {
+		if id == "" {
+			return ErrSQLHistoricalBatchCAS
+		}
+	}
+	q := "SELECT * FROM runtime_checkpoint WHERE CAST(resource_id AS BINARY) IN ? ORDER BY id LIMIT ?"
+	if lock {
+		q += " FOR UPDATE"
+	}
+	rows, _, _, err := cycleQuery(tx, q, 1, ids, 2)
+	if err != nil {
+		return err
+	}
+	if len(rows) != 0 {
+		return ErrSQLHistoricalBatchCAS
+	}
+	return nil
 }
 
 func casActualRW(tx *gorm.DB) (sqlResponsibilityTransaction, error) {
@@ -435,6 +517,11 @@ func (p *SQLHistoricalBatchCASPlan) capture(tx *gorm.DB, lock bool) (sqlHistoric
 				return v, e
 			}
 			v.rows[pair[0]] = rows
+		}
+	}
+	if len(p.missingOriginalRunIDs) != 0 {
+		if e := casMissingOriginalRuns(tx, p.missingOriginalRunIDs, lock); e != nil {
+			return v, e
 		}
 	}
 	for key := range p.before.rows {
@@ -627,6 +714,11 @@ func (s *SQLHistoricalBatchCASStatement) VerifyPersisted(ctx context.Context, fr
 	head, _, _, e := cycleQuery(tx, "SELECT version,dirty FROM schema_migrations ORDER BY version", 2)
 	if e != nil {
 		return e
+	}
+	if len(s.plan.missingOriginalRunIDs) != 0 {
+		if e := casMissingOriginalRuns(tx, s.plan.missingOriginalRunIDs, false); e != nil {
+			return e
+		}
 	}
 	observed := casCloneImage(sqlHistoricalCASImage{rows: fresh.rows, schema: fresh.schema, columns: fresh.columns})
 	observed.rows["cas_migration_head"] = head

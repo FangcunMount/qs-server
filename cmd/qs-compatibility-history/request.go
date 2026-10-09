@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	identitymeta "github.com/FangcunMount/qs-server/internal/pkg/databaseidentity"
 	"io"
 	"os"
 	"path/filepath"
@@ -59,18 +60,19 @@ type inventoryLimits struct {
 	MaxPages     int `json:"max_pages,omitempty"`
 }
 type inventoryRequest struct {
-	FormatVersion      int                         `json:"format_version"`
-	Kind               string                      `json:"kind"`
-	OperationID        string                      `json:"operation_id"`
-	SourceSHA          string                      `json:"source_sha"`
-	TargetHash         string                      `json:"target_hash"`
-	DatabaseScope      string                      `json:"database_scope"`
-	Identities         map[string]string           `json:"identity_hashes"`
-	Migrations         map[string]uint64           `json:"expected_migrations"`
-	Limits             inventoryLimits             `json:"limits"`
-	BoundaryRunID      string                      `json:"boundary_run_id,omitempty"`
-	BoundaryReportHash string                      `json:"boundary_report_hash,omitempty"`
-	Boundaries         []retirement.SourceBoundary `json:"approved_boundaries,omitempty"`
+	FormatVersion        int                                `json:"format_version"`
+	Kind                 string                             `json:"kind"`
+	OperationID          string                             `json:"operation_id"`
+	SourceSHA            string                             `json:"source_sha"`
+	TargetHash           string                             `json:"target_hash"`
+	DatabaseScope        string                             `json:"database_scope"`
+	Identities           map[string]string                  `json:"identity_hashes"`
+	Migrations           map[string]uint64                  `json:"expected_migrations"`
+	Limits               inventoryLimits                    `json:"limits"`
+	BoundaryRunID        string                             `json:"boundary_run_id,omitempty"`
+	BoundaryReportHash   string                             `json:"boundary_report_hash,omitempty"`
+	Boundaries           []retirement.SourceBoundary        `json:"approved_boundaries,omitempty"`
+	MongoNamespaceAnchor *identitymeta.MongoNamespaceAnchor `json:"mongodb_namespace_anchor,omitempty"`
 }
 type inventorySnapshot struct {
 	Database          string                     `json:"database"`
@@ -92,23 +94,24 @@ type inventorySnapshot struct {
 	NextCycleRequired bool                       `json:"next_cycle_required"`
 }
 type databaseInventory struct {
-	IdentityHash                 string          `json:"identity_hash"`
-	DatabaseAnchorHash           string          `json:"database_anchor_hash"`
-	MigrationGenerationHash      string          `json:"migration_generation_hash"`
-	ExpectedIdentityMatch        bool            `json:"expected_identity_match"`
-	Version                      uint64          `json:"migration_version"`
-	Dirty                        bool            `json:"migration_dirty"`
-	ExpectedMigrationMatch       bool            `json:"expected_migration_match"`
-	CatalogHash                  string          `json:"catalog_hash"`
-	NonTargetSchemaHash          string          `json:"non_target_schema_hash"`
-	MetadataComplete             bool            `json:"metadata_complete"`
-	Permissions                  map[string]bool `json:"permissions"`
-	OutsideDependencies          uint64          `json:"outside_dependencies"`
-	DependencyCoverageComplete   bool            `json:"dependency_coverage_complete"`
-	InboundFKCoverageComplete    bool            `json:"inbound_foreign_key_coverage_complete"`
-	DependencyScope              string          `json:"dependency_scope"`
-	DependencyTextReviewRequired bool            `json:"dependency_text_review_required"`
-	ErrorCategory                string          `json:"error_category"`
+	IdentityHash                 string                             `json:"identity_hash"`
+	DatabaseAnchorHash           string                             `json:"database_anchor_hash"`
+	NamespaceAnchor              *identitymeta.MongoNamespaceAnchor `json:"namespace_anchor,omitempty"`
+	MigrationGenerationHash      string                             `json:"migration_generation_hash"`
+	ExpectedIdentityMatch        bool                               `json:"expected_identity_match"`
+	Version                      uint64                             `json:"migration_version"`
+	Dirty                        bool                               `json:"migration_dirty"`
+	ExpectedMigrationMatch       bool                               `json:"expected_migration_match"`
+	CatalogHash                  string                             `json:"catalog_hash"`
+	NonTargetSchemaHash          string                             `json:"non_target_schema_hash"`
+	MetadataComplete             bool                               `json:"metadata_complete"`
+	Permissions                  map[string]bool                    `json:"permissions"`
+	OutsideDependencies          uint64                             `json:"outside_dependencies"`
+	DependencyCoverageComplete   bool                               `json:"dependency_coverage_complete"`
+	InboundFKCoverageComplete    bool                               `json:"inbound_foreign_key_coverage_complete"`
+	DependencyScope              string                             `json:"dependency_scope"`
+	DependencyTextReviewRequired bool                               `json:"dependency_text_review_required"`
+	ErrorCategory                string                             `json:"error_category"`
 }
 type inventoryReport struct {
 	FormatVersion        int                          `json:"format_version"`
@@ -404,6 +407,12 @@ func loadInputs(ctx context.Context, path, expected, op, run string) (a *approve
 		if db == "mongodb" && (!hashPattern.MatchString(b.DatabaseAnchorHash) || !hashPattern.MatchString(b.MigrationGenerationHash)) {
 			return a, fixedError("history_database_binding_rejected")
 		}
+	}
+	if !identitymeta.MatchMongoNamespaceAnchors(inv.MongoNamespaceAnchor, report.DatabaseBindings["mongodb"].NamespaceAnchor) || (inv.MongoNamespaceAnchor != nil && report.DatabaseBindings["mongodb"].DatabaseAnchorHash != inv.MongoNamespaceAnchor.Hash) {
+		return a, fixedError("history_database_binding_rejected")
+	}
+	if report.DatabaseBindings["mysql"].NamespaceAnchor != nil {
+		return a, fixedError("history_database_binding_rejected")
 	}
 	if inv.Identities["mysql"] == inv.Identities["mongodb"] {
 		return a, fixedError("history_database_binding_rejected")

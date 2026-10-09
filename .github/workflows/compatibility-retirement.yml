@@ -108,11 +108,13 @@ jobs:
               const reject = () => {throw new Error('compatibility_retirement_bootstrap_approval_rejected');};
               const object = value => value !== null && typeof value === 'object' && !Array.isArray(value);
               const exact = (value, keys) => object(value) && JSON.stringify(Object.keys(value).sort()) === JSON.stringify(keys.slice().sort());
-              const canonical = value => object(value) ? Object.fromEntries(Object.keys(value).sort().map(key => [key, canonical(value[key])])) : value;
+              const canonical = value => Array.isArray(value) ? value.map(canonical) : object(value) ? Object.fromEntries(Object.keys(value).sort().map(key => [key, canonical(value[key])])) : value;
               let approval;
               try {approval = JSON.parse(input.bootstrap_approval_json);} catch {reject();}
               const core = ['format_version', 'kind', 'prepare_mode', 'operation_id', 'source_sha', 'target_hash', 'database_scope', 'identity_report', 'identity_hashes', 'expected_migrations', 'limits'];
-              if (!exact(approval, input.prepare_mode === 'bootstrap-inventory' ? [...core, 'boundary_report'] : core) ||
+              const namespace = Object.prototype.hasOwnProperty.call(approval ?? {}, 'mongodb_namespace_anchor');
+              const keys = input.prepare_mode === 'bootstrap-inventory' ? [...core, 'boundary_report'] : core;
+              if (!exact(approval, namespace ? [...keys, 'mongodb_namespace_anchor'] : keys) ||
                   approval.format_version !== 1 || approval.kind !== 'readonly_request_bootstrap_approval' || approval.prepare_mode !== input.prepare_mode ||
                   approval.operation_id !== input.operation_id || approval.source_sha !== input.approved_source_sha ||
                   approval.target_hash !== '4e09444409d1cfab3c9df383ed80a0999419fcbbd2f4e80d2e5dac1cf7dfcfb8' || approval.database_scope !== 'mysql-and-mongodb' ||
@@ -121,6 +123,33 @@ jobs:
               for (const database of ['mysql', 'mongodb']) {
                 if (typeof approval.identity_hashes[database] !== 'string' || !/^[0-9a-f]{64}$/.test(approval.identity_hashes[database]) || !Number.isSafeInteger(approval.expected_migrations[database]) || approval.expected_migrations[database] < 1) {reject();}
               }
+              if (namespace) {
+                const anchor = approval.mongodb_namespace_anchor;
+                const names = ['answersheets', 'interpret_report_artifacts', 'interpretation_runs', 'report_generations'];
+                if (!exact(anchor, ['kind', 'hash', 'endpoint_sha256', 'database', 'replica_set_name', 'collections']) || anchor.kind !== 'selected_namespace_kept_uuids_v1' || !/^[0-9a-f]{64}$/.test(anchor.hash ?? '') || !/^[0-9a-f]{64}$/.test(anchor.endpoint_sha256 ?? '') || !Array.isArray(anchor.collections) || anchor.collections.length !== names.length) {reject();}
+                for (const value of [anchor.database, anchor.replica_set_name]) {
+                  if (typeof value !== 'string' || !value || Buffer.byteLength(value, 'utf8') > 128 || /[\u0000\r\n]/.test(value)) {reject();}
+                }
+                const parts = [anchor.kind, anchor.endpoint_sha256, anchor.database, anchor.replica_set_name];
+                const seen = new Set();
+                for (let i = 0; i < names.length; i++) {
+                  const item = anchor.collections[i];
+                  if (!exact(item, ['name', 'present', 'uuid']) || item.name !== names[i] || typeof item.present !== 'boolean' || typeof item.uuid !== 'string') {reject();}
+                  if (item.present) {
+                    if (!/^[0-9a-f]{32}$/.test(item.uuid) || item.uuid === '0'.repeat(32) || seen.has(item.uuid)) {reject();}
+                    seen.add(item.uuid);
+                  } else if (item.uuid !== '') {reject();}
+                  parts.push(item.name, item.present ? 'present' : 'absent', item.uuid);
+                }
+                if (seen.size < 1) {reject();}
+                const digest = require('crypto').createHash('sha256');
+                for (const part of parts) {
+                  const raw = Buffer.from(part, 'utf8'); const header = Buffer.alloc(9);
+                  header[0] = 1; header.writeBigUInt64BE(BigInt(raw.length), 1);
+                  digest.update(header); digest.update(raw);
+                }
+                if (digest.digest('hex') !== anchor.hash) {reject();}
+              }
               const limits = {query_seconds:30,total_seconds:1500,max_records:1000000,max_bytes:2147483648,page_size:1000,max_pages:1001};
               if (!exact(approval.limits, Object.keys(limits)) || Object.keys(limits).some(key => approval.limits[key] !== limits[key])) {reject();}
               for (const name of input.prepare_mode === 'bootstrap-inventory' ? ['identity_report', 'boundary_report'] : ['identity_report']) {
@@ -128,7 +157,10 @@ jobs:
                 if (!exact(ref, ['run_id', 'source_sha', 'sha256']) || typeof ref.run_id !== 'string' || !/^[0-9]{1,20}-[0-9]{1,4}$/.test(ref.run_id) || ref.source_sha !== input.approved_source_sha || typeof ref.sha256 !== 'string' || !/^[0-9a-f]{64}$/.test(ref.sha256)) {reject();}
               }
               if (approval.boundary_report && approval.boundary_report.run_id === approval.identity_report.run_id) {reject();}
-              const line = JSON.stringify(canonical(approval));
+              const serialized = JSON.stringify(canonical(approval));
+              // Match Python ensure_ascii for this optional namespace profile;
+              // UTF-16 code units preserve supplementary-character surrogate pairs.
+              const line = namespace ? serialized.replace(/[\u007f-\uffff]/g, c => '\\u' + c.charCodeAt(0).toString(16).padStart(4, '0')) : serialized;
               if (line !== input.bootstrap_approval_json || require('crypto').createHash('sha256').update(line+'\n', 'ascii').digest('hex') !== input.bootstrap_approval_sha256) {reject();}
             }
             if (input.prepare_mode === 'bootstrap-history') {
@@ -213,16 +245,21 @@ jobs:
             if (current.data.sha !== input.approved_source_sha) {
               throw new Error('compatibility_retirement_main_advanced');
             }
-      - name: Checkout immutable approved source
-        uses: actions/checkout@v6
+      - name: Require successful final source CI
+        uses: actions/github-script@v8
         with:
-          ref: ${{ github.sha }}
-      - name: Test preparation, journal, deadlines and workflow contracts
-        run: |
-          python3 -B scripts/database/test-compatibility-retirement.py
-          python3 -B scripts/database/test-compatibility-history-prepare.py
-          python3 -B scripts/database/test-compatibility-history-parent.py
-          python3 -B scripts/database/test-compatibility-history-parent-action.py
+          script: |
+            const response = await github.rest.actions.listWorkflowRuns({
+              ...context.repo, workflow_id: 'ci.yml', branch: 'main',
+              event: 'push', head_sha: context.sha, per_page: 100,
+            });
+            const runs = response.data.workflow_runs.filter(run =>
+              run.head_sha === context.sha && run.head_branch === 'main' &&
+              run.event === 'push' && run.path === '.github/workflows/ci.yml');
+            runs.sort((a, b) => b.id - a.id);
+            if (!runs.length || runs[0].status !== 'completed' || runs[0].conclusion !== 'success') {
+              throw new Error('compatibility_retirement_final_source_ci_required');
+            }
 
   controlled-stage:
     name: Evaluate exact private lifecycle stage

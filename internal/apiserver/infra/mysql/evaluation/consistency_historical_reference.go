@@ -12,6 +12,14 @@ import (
 	"gorm.io/gorm"
 )
 
+const historicalOutcomeRunAbsentReason = "original_outcome_run_absent"
+
+// This exact token is a classified trace gap, never a standard-message match.
+// Composite or similar-looking caller reasons cannot opt into missing-Run CAS.
+func historicalOutcomeRunAbsent(entry evidence.HistoricalReferenceEntryV1) bool {
+	return entry.EventType == "evaluation.outcome.committed" && entry.Run == nil && entry.Proof != nil && entry.Proof.Class == evidence.Unverifiable && entry.Proof.Verification.Reason == historicalOutcomeRunAbsentReason
+}
+
 // The persisted anchor is reconstructable after an ordinary aggregate Save.
 // Full-row, NULL and future-column freezing remains a separate CAS invariant.
 // It authenticates an owner binding, never original message bytes or delivery.
@@ -226,6 +234,24 @@ func (r *consistencyReadModel) listHistoricalReferences(ctx context.Context, ids
 				out.InvalidReason = "historical owner graph conflicts"
 			}
 			var run historicalSQLRow
+			if table == "evaluation_outcome" && entry.Run == nil {
+				originalID := valueOrEmpty(row["evaluation_run_id"])
+				if !historicalOutcomeRunAbsent(entry) || originalID == "" || business == nil || valueOrEmpty(business["status"]) != "evaluated" {
+					out.InvalidReason = "historical missing original run conclusion conflicts"
+				} else {
+					// Recheck physical absence without filtering away another org,
+					// scope or deleted row with the same declared original identity.
+					runs, err := historicalAuditRows(db, "runtime_checkpoint", "CAST(resource_id AS BINARY)=?", 1, originalID)
+					if err != nil {
+						return err
+					}
+					if len(runs) != 0 {
+						out.InvalidReason = "historical missing original run is actually retained"
+					} else {
+						out.RunID = originalID
+					}
+				}
+			}
 			if entry.Run != nil {
 				runs, err := historicalAuditRows(db, "runtime_checkpoint", "CAST(scope AS BINARY)=? AND assessment_id=? AND attempt_no=? AND deleted_at IS NULL", 1, "evaluation_run", id, entry.Run.Attempt)
 				if err != nil {
@@ -281,7 +307,10 @@ func committedHistoricalDisposition(outbox *evaluationconsistency.CommittedOutbo
 		if reference.Owner != "evaluation_outcome" {
 			continue
 		}
-		if !reference.LegacyCanonicalAbsent || reference.OwnerID != outbox.OutcomeID || reference.EventType != "evaluation.outcome.committed" || reference.InvalidReason != "" || reference.RunID == "" || reference.RunID != outbox.RunID || reference.Attempt == 0 {
+		if !reference.LegacyCanonicalAbsent || reference.OwnerID != outbox.OutcomeID || reference.EventType != "evaluation.outcome.committed" || reference.InvalidReason != "" || reference.RunID == "" || reference.RunID != outbox.RunID {
+			return nil
+		}
+		if reference.Attempt == 0 && (reference.Class != evidence.Unverifiable || reference.HistoricalReason != historicalOutcomeRunAbsentReason) {
 			return nil
 		}
 		switch reference.Class {

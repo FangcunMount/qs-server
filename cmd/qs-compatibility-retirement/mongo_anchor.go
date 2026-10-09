@@ -4,6 +4,9 @@ import (
 	"context"
 	"encoding/hex"
 	"errors"
+	"os"
+
+	identitymeta "github.com/FangcunMount/qs-server/internal/pkg/databaseidentity"
 	"unicode/utf8"
 
 	"go.mongodb.org/mongo-driver/bson"
@@ -113,4 +116,32 @@ func mongoMigrationGeneration(collection bson.Raw) (string, error) {
 		return "", category("mongo_migration_generation_rejected")
 	}
 	return hashParts("mongodb_migration_generation_v1", hex.EncodeToString(value)), nil
+}
+
+// Explicit namespace profile, not a permission-error fallback. The old replica
+// anchor functions and their Unauthorized/standalone behavior are untouched.
+func mongoNamespaceEndpoint(db *mongo.Database) (string, error) {
+	port, err := envPort("MONGODB_PORT", 27017)
+	if err != nil {
+		return "", err
+	}
+	endpoint, err := identitymeta.MongoEndpointSHA256(os.Getenv("MONGODB_HOST"), port, db.Name())
+	if err != nil {
+		return "", category("mongo_namespace_anchor_rejected")
+	}
+	return endpoint, nil
+}
+func mongoNamespaceAnchor(ctx context.Context, db *mongo.Database) (*identitymeta.MongoNamespaceAnchor, error) {
+	endpoint, err := mongoNamespaceEndpoint(db)
+	if err != nil {
+		return nil, err
+	}
+	observed, err := identitymeta.ObserveMongoNamespaceAnchor(ctx, db, endpoint)
+	if err != nil {
+		if errors.Is(err, identitymeta.ErrMongoNamespaceRead) {
+			return nil, category("mongo_namespace_anchor_read_failed")
+		}
+		return nil, category("mongo_namespace_anchor_rejected")
+	}
+	return observed, nil
 }
