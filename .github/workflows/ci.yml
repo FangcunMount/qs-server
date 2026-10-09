@@ -13,6 +13,8 @@ permissions:
 env:
   GO_VERSION: '1.25.12'
   GOTOOLCHAIN: auto
+  # Only availability is shared; credentials stay in the service/login inputs.
+  CI_DOCKERHUB_LOGIN: ${{ secrets.DOCKERHUB_USERNAME != '' || secrets.DOCKERHUB_TOKEN != '' }}
 
 jobs:
   test:
@@ -69,6 +71,9 @@ jobs:
     services:
       mysql:
         image: mysql:8.0
+        credentials:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
         env:
           MYSQL_ROOT_PASSWORD: root
           MYSQL_DATABASE: action_audit_test
@@ -110,6 +115,9 @@ jobs:
     services:
       mysql:
         image: mysql:8.4
+        credentials:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
         env:
           MYSQL_ROOT_PASSWORD: root
           MYSQL_DATABASE: qs_authz_guard_test
@@ -140,6 +148,9 @@ jobs:
     services:
       mysql:
         image: mysql:8.0
+        credentials:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
         env:
           MYSQL_ROOT_PASSWORD: root
         ports:
@@ -232,6 +243,9 @@ jobs:
     services:
       mysql:
         image: mysql:8.4
+        credentials:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
         env:
           MYSQL_ROOT_PASSWORD: root
         ports:
@@ -245,6 +259,9 @@ jobs:
           --health-retries=20
       redis:
         image: redis:7-alpine
+        credentials:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
         ports:
           - 6379:6379
         options: >-
@@ -255,6 +272,14 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v6
+      - name: Log in for CI image pulls
+        if: env.CI_DOCKERHUB_LOGIN == 'true'
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4
+        with:
+          registry: docker.io
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+          logout: true
 
       - name: Setup Go
         uses: actions/setup-go@v6
@@ -956,6 +981,14 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v6
+      - name: Log in for CI image pulls
+        if: env.CI_DOCKERHUB_LOGIN == 'true'
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4
+        with:
+          registry: docker.io
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+          logout: true
       - uses: actions/setup-go@v6
         with:
           go-version: ${{ env.GO_VERSION }}
@@ -976,6 +1009,14 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v6
+      - name: Log in for CI image pulls
+        if: env.CI_DOCKERHUB_LOGIN == 'true'
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4
+        with:
+          registry: docker.io
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+          logout: true
       - uses: actions/setup-go@v6
         with:
           go-version: ${{ env.GO_VERSION }}
