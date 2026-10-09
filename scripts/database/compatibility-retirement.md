@@ -92,6 +92,35 @@ Database and input close outcomes are settled before the final private readiness
 file is written. Readiness counts and hashes cannot recreate a qualifier or
 authorize evidence writes, message sends or deletion.
 
+The current AI reverse pass reads fourteen exact ledgers to fixed upper bounds
+and authenticated EOF in the host's borrowed read-only SQL epoch. It binds all
+four original sources and the current request/operation, inbox/outbox, aggregate,
+evaluation and admission graph. Pending or held transport responsibility remains
+visible even when an ACK is stored; delivered does not mean business acceptance.
+Empty old command sources cannot hide current orphan or unknown responsibility.
+The compact first-epoch anchor retains sealed identity, metadata and complete
+content digests; the fresh epoch uses different actual transactions and repeats
+source, business and AI graph verification. Stable empty reason lists compare
+through the same summary representation, and original Mongo session ownership
+and the original deadline remain intact during source-origin replay.
+
+Source `ad458f8a6580890be033d1dd0736e2136713a616` has 696 passing local
+race test actions across the two affected packages, ordinary and integration-tag
+lint, and 27 passing real local MySQL/Mongo joint native test actions (eight
+parents, one package, no failure or skip). All 3,222 Go and module files are
+byte-identical to the tested frozen private source; the composed Python driver
+separately preserves its existing thirteen-entrypoint contract. The three
+composed Python suites pass 167 cases and skip one optional native case; the
+separate 27-case native wave is independently verified. Its temporary container,
+volumes, network, credentials and owned SQL namespaces are absent, and protected
+fixture identities/account catalogs are unchanged. The safe receipt
+`qs-history-ai-reverse-native-20261009.json` has SHA256
+`d3963b28b9e198d73f8edc665bac82ff4a862e9141283ee79f9ad94ee2e5cba8`.
+These synthetic local results do not prove production historical acceptance,
+whole-epoch scale, external AI closure, evidence CAS or deletion readiness.
+Missing original Run identity remains an explicit local historical gap; it does
+not establish complete original execution verification.
+
 Production qualification still requires actual whole-epoch transaction lifetime,
 peak process memory, related-owner and evidence-slot capacity measurements.
 The exact qs-ai 0040 physical-schema adapter is implemented locally; production
