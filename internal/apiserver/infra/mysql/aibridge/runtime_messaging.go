@@ -26,7 +26,13 @@ const runtimeAttemptsSelect = `(SELECT COALESCE(SUM(b.attempts),0)` + runtimeCom
 // messages. Request ownership also scopes both scans: two matching forged
 // ledger organizations must not hide a command from its actual request owner.
 // The checks distinguish broker settlement from business receipt.
-func requireRuntimeMessagingIntegrity(ctx context.Context, db *sql.DB, org int64, requestID string) error {
+// RuntimeMessagingReadConnection is a borrowed host read handle. It owns no
+// connection/transaction lifecycle and exposes no dispatch or settlement.
+type RuntimeMessagingReadConnection interface {
+	QueryRowContext(context.Context, string, ...any) *sql.Row
+}
+
+func requireRuntimeMessagingIntegrity(ctx context.Context, db RuntimeMessagingReadConnection, org int64, requestID string) error {
 	operationScope, messageScope := "", ""
 	args := []any{org, org}
 	if requestID != "" {

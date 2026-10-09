@@ -29,6 +29,7 @@ type lifecycleFixedHost struct {
 	preBComparison      *lifecyclePreBDataComparison
 	comparisonAttempted bool
 	writers             *lifecycleWriterObservation
+	runtimeLedgers      *lifecycleRuntimeLedgerObservation
 }
 
 func newLifecycleFixedHost(ctx context.Context, r lifecycleRequest, a *backup.Archive) (lifecycleHost, error) {

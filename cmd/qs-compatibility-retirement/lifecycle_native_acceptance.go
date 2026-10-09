@@ -72,11 +72,20 @@ func (h *lifecycleFixedHost) verifyNativeAcceptance(ctx context.Context, r lifec
 	if e = h.CheckWholeWriterFence(q, r); e != nil {
 		return e
 	}
+	if e = h.observeRuntimeLedgers(q, r); e != nil {
+		return e
+	}
+	if e = h.services.CheckStoppedDependents(q, h.api.bCID); e != nil {
+		return e
+	}
+	if e = h.CheckWholeWriterFence(q, r); e != nil {
+		return e
+	}
 	// A readiness report is Redis/runtime evidence, not complete acceptance.
 	// Do not resume arbitrary IDs, reconnect SSH, mint an accepted-materials
 	// token or purge from a health success/JSON assertion. The remaining real
 	// producers must be integrated under the original full external fence.
-	return lifecycleError("lifecycle_controlled_internal_resume_audit_mq_and_complete_material_producers_missing")
+	return lifecycleError("lifecycle_controlled_internal_resume_broker_and_complete_material_producers_missing")
 }
 
 func (h *lifecycleFixedHost) verifyCompleteDataBeforeInternalResume(ctx context.Context, proof *migration.CompatibilityPairMigrationProof) (result error) {

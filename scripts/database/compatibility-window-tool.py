@@ -635,6 +635,8 @@ ADAPTERS = frozenset({"actual_four_source_historical_persistence_and_readback", 
     "actual_runtime_acceptance_and_private_purge"})
 PUBLIC_ERRORS = frozenset({"none", "lifecycle_actual_host_adapters_missing", "lifecycle_whole_writer_and_old_ref_fence_missing",
     "lifecycle_parent_window_budget_rejected",
+    "lifecycle_runtime_ledger_scan_rejected", "lifecycle_standard_audit_findings_present",
+    "lifecycle_controlled_internal_resume_broker_and_complete_material_producers_missing",
     "lifecycle_final_historical_input_rejected", "lifecycle_final_historical_scope_rejected", "lifecycle_final_historical_scope_cleanup_failed",
     "lifecycle_final_historical_q_and_eof_missing", "lifecycle_actual_inline_b_deployment_missing",
     "lifecycle_actual_runtime_and_data_acceptance_missing", "lifecycle_actual_ddl_stopped_unproven",
