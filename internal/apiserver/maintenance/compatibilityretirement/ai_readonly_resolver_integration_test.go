@@ -7,15 +7,12 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
-	"errors"
 	"io"
 	"strings"
 	"testing"
 
 	sqlevaluation "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/evaluation"
 	hostmysql "github.com/FangcunMount/qs-server/internal/pkg/database/mysql"
-	"github.com/FangcunMount/qs-server/internal/pkg/migration"
-	drivermysql "github.com/go-sql-driver/mysql"
 	gormmysql "gorm.io/driver/mysql"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
@@ -36,16 +33,7 @@ func newAIReadonlyNativeFixture(t *testing.T, mapped, closed bool) *aiReadonlyNa
 	if db.QueryRowContext(t.Context(), "SELECT DATABASE()").Scan(&database) != nil {
 		t.Fatal("owned namespace read failed")
 	}
-	if version, _, err := migration.NewMigrator(db, &migration.Config{Enabled: true, Database: database}).Run(); err != nil || version != 99 {
-		var serverError *drivermysql.MySQLError
-		var number uint16
-		var state string
-		if errors.As(err, &serverError) {
-			number = serverError.Number
-			state = string(serverError.SQLState[:])
-		}
-		t.Fatal("complete actual SQL99 migration failed", "migration_or_head_failure", version, number, state)
-	}
+	migrateHistoricalA99Fixture(t, db, database)
 	var actualHead uint64
 	var actualDirty bool
 	if db.QueryRowContext(t.Context(), "SELECT version,dirty FROM schema_migrations").Scan(&actualHead, &actualDirty) != nil || actualHead != 99 || actualDirty {

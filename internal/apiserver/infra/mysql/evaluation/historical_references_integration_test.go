@@ -17,7 +17,6 @@ import (
 
 	hostmysql "github.com/FangcunMount/qs-server/internal/pkg/database/mysql"
 	evidence "github.com/FangcunMount/qs-server/internal/pkg/eventing/evidence"
-	"github.com/FangcunMount/qs-server/internal/pkg/migration"
 	drivermysql "github.com/go-sql-driver/mysql"
 	golangmigrate "github.com/golang-migrate/migrate/v4"
 	migratemysql "github.com/golang-migrate/migrate/v4/database/mysql"
@@ -80,24 +79,36 @@ func openHistoricalReferencesDB(t *testing.T, from98 ...bool) *gorm.DB {
 			t.Error(err)
 		}
 	})
+	// These historical evidence tests retain the production A schema and old
+	// source objects at SQL99. B's paired empty/installed upgrade is covered by
+	// its separate native tests; this fixture must never request its DROP tail.
+	source, err := iofs.New(os.DirFS("../../../../pkg/migration/migrations/mysql"), ".")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		if err := source.Close(); err != nil {
+			t.Error(err)
+		}
+	}()
+	conn, err := pool.Conn(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		if err := conn.Close(); err != nil {
+			t.Error(err)
+		}
+	}()
+	driver, err := migratemysql.WithConnection(t.Context(), conn, &migratemysql.Config{DatabaseName: name, MigrationsTable: "schema_migrations"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	instance, err := golangmigrate.NewWithInstance("iofs", source, name, driver)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if len(from98) > 0 && from98[0] {
-		source, err := iofs.New(os.DirFS("../../../../pkg/migration/migrations/mysql"), ".")
-		if err != nil {
-			t.Fatal(err)
-		}
-		t.Cleanup(func() {
-			if err := source.Close(); err != nil {
-				t.Error(err)
-			}
-		})
-		driver, err := migratemysql.WithInstance(pool, &migratemysql.Config{DatabaseName: name, MigrationsTable: "schema_migrations"})
-		if err != nil {
-			t.Fatal(err)
-		}
-		instance, err := golangmigrate.NewWithInstance("iofs", source, name, driver)
-		if err != nil {
-			t.Fatal(err)
-		}
 		if err := instance.Migrate(98); err != nil {
 			t.Fatal(err)
 		}
@@ -107,13 +118,15 @@ func openHistoricalReferencesDB(t *testing.T, from98 ...bool) *gorm.DB {
 		}
 		t.Log("actual complete resources upgraded to head98 clean before additive99")
 	}
-	version, changed, err := migration.NewMigrator(pool, &migration.Config{Enabled: true, Database: name}).Run()
-	if err != nil || version != 99 || !changed {
-		t.Fatalf("actual full empty upgrade: head=%d changed=%v error=%v", version, changed, err)
-	}
-	version, changed, err = migration.NewMigrator(pool, &migration.Config{Enabled: true, Database: name}).Run()
-	if err != nil || version != 99 || changed {
-		t.Fatalf("actual full restart: head=%d changed=%v error=%v", version, changed, err)
+	for attempt := 0; attempt < 2; attempt++ {
+		err := instance.Migrate(99)
+		if (attempt == 0 && err != nil) || (attempt == 1 && !errors.Is(err, golangmigrate.ErrNoChange)) {
+			t.Fatalf("actual A99 upgrade/restart attempt=%d error=%v", attempt, err)
+		}
+		version, dirty, err := instance.Version()
+		if err != nil || version != 99 || dirty {
+			t.Fatalf("actual A99 clean head: head=%d dirty=%v error=%v", version, dirty, err)
+		}
 	}
 	return db
 }
