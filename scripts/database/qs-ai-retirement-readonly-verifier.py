@@ -651,7 +651,41 @@ def _retry_acceptance(ai, row):
     return command, receipt
 
 
-def _reverse(ai, peer):
+def _original_execution_scope(ai, peer, originals):
+    # Only _verify passes originals constructed from both approved full-EOF
+    # legacy sources. None is unknown scope; an actual empty tuple is empty.
+    if originals is None:
+        return None
+    sessions = {text(r["id"]): r for r in ai["interpretation_sessions"]}
+    if len(sessions) != len(ai["interpretation_sessions"]):
+        fail("global_duplicate_participant_owner")
+    runs = {text(r["id"]): r for r in ai["interpretation_runs"]}
+    if len(runs) != len(ai["interpretation_runs"]):
+        fail("global_duplicate_participant_run")
+    targets, target_sessions = set(), set()
+    for original in originals:
+        if not isinstance(original, _Original) or original.command_id in targets:
+            fail("original_source_scope_not_authenticated")
+        request = one(match(peer["ai_bridge_requests"], request_id=original.request_id),
+                      "original_peer_request_missing_or_ambiguous")
+        owner = one(match(ai["interpretation_sessions"], id=original.session_id),
+                    "original_session_missing_or_ambiguous")
+        payload, _ = _start(doc(request, "payload"))
+        if (original.command_id != original.request_id or
+                payload != original.start or text(request["request_hash"]) != original.writer_sha256 or
+                text(request["session_id"]) != original.session_id or
+                (str(number(owner["org_id"])), text(owner["owner_subject_id"]),
+                 str(number(owner["testee_id"])), doc(owner, "assessment_ids"), text(owner["goal"])) !=
+                (original.start["actor"]["org_id"], original.start["actor"]["subject_id"],
+                 original.start["testee_id"], original.start["assessment_ids"], original.start["goal"])):
+            fail("original_session_owner_or_request_conflict")
+        targets.add(original.request_id)
+        target_sessions.add(original.session_id)
+    target_runs = {rid for rid, row in runs.items() if text(row["session_id"]) in target_sessions}
+    return targets, target_sessions, target_runs
+
+
+def _reverse(ai, peer, originals=None):
     sessions = {text(r["id"]): r for r in ai["interpretation_sessions"]}
     runs = {text(r["id"]): r for r in ai["interpretation_runs"]}
     externals = {text(r["session_id"]): r for r in ai["external_requests"]}
@@ -705,16 +739,29 @@ def _reverse(ai, peer):
         original, _ = _start(doc(request, "payload"))
         if text(request["request_hash"]) != sha(_go_json(original)) or (original["actor"]["org_id"], original["actor"]["subject_id"], original["testee_id"], original["assessment_ids"], original["goal"]) != (str(number(owner["org_id"])), text(owner["owner_subject_id"]), str(number(owner["testee_id"])), doc(owner, "assessment_ids"), text(owner["goal"])):
             fail("global_external_request_original_owner_conflict")
+    scope = _original_execution_scope(ai, peer, originals)
+    outside_unknown = 0
     for row in ai["model_calls"]:
-        if text(row["status"]) in ("unknown", "dispatched"):
-            fail("global_participant_provider_result_unknown")
-        if text(row["status"]) not in ("failed", "response_received"):
+        status = text(row["status"])
+        if status not in ("failed", "response_received", "unknown", "dispatched"):
             fail("unsupported_global_model_call_status")
+        if status in ("unknown", "dispatched"):
+            if scope is None:
+                fail("original_source_scope_required_for_provider_responsibility")
+            # Global parent/session/org checks above have already proved the
+            # current owner. Only exact original session-owned runs are target.
+            if text(row["run_id"]) in scope[2]:
+                fail("global_participant_provider_result_unknown")
+            job = one(match(ai["execution_jobs"], run_id=text(row["run_id"])),
+                      "global_provider_job_missing_or_ambiguous")
+            if text(job["session_id"]) != text(runs[text(row["run_id"])]["session_id"]):
+                fail("global_cross_session_fact")
+            outside_unknown += 1
     for table in ("ai_bridge_events", "ai_bridge_request_assessments"):
         for row in peer[table]:
             if text(row["request_id"]) not in requests:
                 fail("global_orphan_peer_request_fact")
-    return sessions, runs, evaluations
+    return {"outside_retirement_provider_result_unknown": outside_unknown}
 
 
 def _event_projection(value):
@@ -947,7 +994,7 @@ def _decoded_row(row, json_keys=(), binary_keys=()):
     return result
 
 
-async def _evaluations(ai, db):
+async def _evaluations(ai, db, originals=None, peer=None):
     from qs_ai.infrastructure.persistence.mysql.evaluation_creation_receipt import creation_receipt
     from qs_ai.infrastructure.persistence.mysql.evaluation_frozen_policies import frozen_policies
     from qs_ai.infrastructure.persistence.mysql.evaluation_projection import project_slots
@@ -957,7 +1004,9 @@ async def _evaluations(ai, db):
     from qs_ai.infrastructure.persistence.mysql.evaluation_assets import stored_run_suite
     from qs_ai.infrastructure.persistence.mysql.evaluation_contracts import semantic_contract
     from qs_ai.domain.evaluation.identity import EvidenceReleaseIdentity, FrozenContractRef
-    result = {"non_target_runs": 0, "legitimate_pending_runs": 0, "terminal_runs": 0}
+    scope = _original_execution_scope(ai, peer, originals) if peer is not None else None
+    result = {"non_target_runs": 0, "legitimate_pending_runs": 0, "terminal_runs": 0,
+              "outside_retirement_provider_result_unknown": 0}
     for row in ai["evaluation_runs"]:
         rid = text(row["run_id"])
         original_uuid(rid)
@@ -1001,9 +1050,15 @@ async def _evaluations(ai, db):
         dispatches = [_decoded_row(r, ("checkpoint_json",)) for r in match(ai["evaluation_dispatches"], run_id=rid)]
         generations = [_decoded_row(r, ("candidate_json", "evidence_json"), ("raw_output", "normalized_output")) for r in match(ai["evaluation_generation_completions"], run_id=rid)]
         semantics = [_decoded_row(r, ("evidence_json", "result_json"), ("raw_output", "normalized_output")) for r in match(ai["evaluation_semantic_completions"], run_id=rid)]
-        # Unknown provider result remains a hard blocker even after risk authorization.
-        if any(r["evidence_json"].get("status") == "result_unknown" for r in generations + semantics):
-            fail("evaluation_provider_result_unknown")
+        unknown = sum(r["evidence_json"].get("status") == "result_unknown" for r in generations + semantics)
+        if unknown:
+            if scope is None:
+                fail("original_source_scope_required_for_provider_responsibility")
+            # Evaluation is a separate actual owner graph, not an interpretation
+            # execution. A colliding original identity cannot prove unrelated.
+            if rid in scope[0] | scope[1] | scope[2]:
+                fail("evaluation_provider_result_unknown")
+            result["outside_retirement_provider_result_unknown"] += unknown
         terminal = terminal_dispatches(dispatches, generations + semantics, tuple(claims))
         project_slots(creation["slots"], generations, terminal, semantics,
                       progress.get("result_unknown_resolutions", []),
@@ -1372,9 +1427,9 @@ async def _verify(ai_session, peer_session, *, ai_bounds, peer_bounds,
     originals = _originals(peer_scan, approved_original_sections)
     ai, peer = ai_scan.rows, peer_scan.rows
     try:
-        _reverse(ai, peer)
+        reverse = _reverse(ai, peer, originals)
         summary = {"historical_gap_candidates": 0, "typed_configuration_artifacts_verified": 0,
-                   "known_terminal_without_artifact": 0}
+                   "known_terminal_without_artifact": 0, "participant_reverse": reverse}
         for original in originals:
             row = one(match(ai["interpretation_sessions"], id=original.session_id), "original_session_missing_or_ambiguous")
             session = _session(row)
@@ -1409,7 +1464,7 @@ async def _verify(ai_session, peer_session, *, ai_bounds, peer_bounds,
             else:
                 summary["known_terminal_without_artifact"] += 1
         async with asyncio.timeout(min(QUERY_SECONDS, TOTAL_SECONDS - (time.monotonic() - started))):
-            summary["evaluation"] = await _evaluations(ai, ai_session)
+            summary["evaluation"] = await _evaluations(ai, ai_session, originals, peer)
         summary["mq"] = _mq(ai, peer, originals, protection_keys, deadline=started + TOTAL_SECONDS)
         # Revalidate borrowed ownership after actual typed helper SELECTs.
         for scan, session in ((ai_scan, ai_session), (peer_scan, peer_session)):

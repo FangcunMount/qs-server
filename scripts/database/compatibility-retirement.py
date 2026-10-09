@@ -45,7 +45,7 @@ NAME = re.compile(r"^[a-z][a-z0-9_-]{0,80}\.json$")
 MAX_JSON = 256 * 1024
 INVENTORY_V2_LIMITS = {"query_seconds": 30, "total_seconds": 1500, "max_records": 1000000,
                        "max_bytes": 2147483648, "page_size": 1000, "max_pages": 1001}
-BOOTSTRAP_MODES = frozenset({"bootstrap-bounds", "bootstrap-inventory", "bootstrap-history", "bootstrap-history-metadata", "bootstrap-history-parent"})
+BOOTSTRAP_MODES = frozenset({"bootstrap-bounds", "bootstrap-inventory", "bootstrap-history", "bootstrap-history-metadata", "bootstrap-history-parent", "bootstrap-ai-bounds", "bootstrap-ai-verify"})
 MAX_BOOTSTRAP_APPROVAL = 4096
 MAX_WINDOW_SECONDS = 1800
 FORWARD_STOP_SECONDS = 1200
@@ -1460,6 +1460,12 @@ def execute(args):
     if mode in BOOTSTRAP_MODES:
         if args.operation != "prepare" or args.manifest_hash or identity_request or inventory_request or not bootstrap_json or not bootstrap_hash:
             fail("input_classes_mixed")
+        if mode in ("bootstrap-ai-bounds", "bootstrap-ai-verify"):
+            path = Path(__file__).with_name("compatibility-ai-history-prepare.py")
+            spec = importlib.util.spec_from_file_location("compatibility_ai_history_prepare", path)
+            module = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(module)
+            return module.prepare(args, argparse.Namespace(**globals()))
         if mode in ("bootstrap-history", "bootstrap-history-metadata", "bootstrap-history-parent"):
             filename = "compatibility-history-parent.py" if mode == "bootstrap-history-parent" else "compatibility-history-prepare.py"
             module_name = "compatibility_history_parent" if mode == "bootstrap-history-parent" else "compatibility_history_prepare"
@@ -1553,6 +1559,11 @@ def main(argv=None):
               "history_parent_registration_complete": "bool", "history_parent_process_budget_proven": "bool",
               "history_parent_registration_sha256": "hash64", "approved_metadata_report": {"run_id": "run_id", "sha256": "hash64"},
               "history_parent_request_sha256": "hash64", "history_private_readiness_sha256": "hash64",
+              "ai_host_readonly_complete": "bool", "ai_host_process_budget_proven": "bool",
+              "ai_host_mode": frozenset({"bounds", "verify"}), "ai_host_private_readiness_sha256": "hash64",
+              "ai_host_runtime_binding_sha256": "hash64", "ai_host_facts_sha256": "hash64",
+              "ai_host_independent_epochs": "uint", "ai_host_originals": "uint", "ai_host_descriptor_sha256": "hash64",
+              "ai_host_ai_bounds_sha256": "hash64", "ai_host_peer_bounds_sha256": "hash64",
               "history_readonly_complete": "bool", "history_independent_epochs": "uint",
               "history_local_candidates": "uint", "history_locally_qualified": "uint", "history_blocked_local": "uint",
               "history_ai_blocked_pages": "uint", "history_cas_complete": "bool", "history_process_budget_proven": "bool",
@@ -1600,7 +1611,10 @@ def main(argv=None):
         (receipt.get("prepare_mode") == "bootstrap-history" and receipt.get("history_readonly_complete") is True) or
         (receipt.get("prepare_mode") == "bootstrap-history-metadata" and receipt.get("history_metadata_complete") is True) or
         (receipt.get("prepare_mode") == "bootstrap-history-parent" and receipt.get("history_parent_registration_complete") is True and
-         receipt.get("diagnostic_only") is True and receipt.get("history_cas_complete") is False and receipt.get("history_parent_process_budget_proven") is False))
+         receipt.get("diagnostic_only") is True and receipt.get("history_cas_complete") is False and receipt.get("history_parent_process_budget_proven") is False) or
+        (receipt.get("prepare_mode") in ("bootstrap-ai-bounds", "bootstrap-ai-verify") and receipt.get("ai_host_readonly_complete") is True and
+         receipt.get("diagnostic_only") is True and receipt.get("ai_host_process_budget_proven") is False and
+         all(value is False for value in receipt.get("capabilities", {}).values())))
     return 0 if emitted and diagnostic_complete and receipt.get("complete") is False and receipt.get("execution_allowed") is False and receipt.get("drop_ready") is False else 42
 
 
