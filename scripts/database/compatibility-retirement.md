@@ -311,6 +311,33 @@ The source-only entrypoint catalog retains `live_fence_proven=false` and
 backup/restore rehearsal, deletion, B deployment, acceptance and purge still
 require their own evidence.
 
+## Source-only A/B preparation integration (2026-10-10)
+
+The current source combination retains the existing `prepare-facts` observer,
+its ten inputs and the separate history-parent channel without database, Go,
+architecture or binary environment. The optional `prepare_mode=window-tool`
+uses those same ten inputs only with `operation=prepare`. Its compact approval
+must bind `tool_source_sha` to the actual approved dispatcher SHA and keep
+`b_image_id` and `b_program_sha256` empty. A different tool source and all four
+effectful stages are rejected before tool metadata or production credentials.
+`inventory_request_sha256` binds the immutable empty-run lifecycle template;
+the helper derives only the assigned actual run, hashes template and derived
+request separately, records exclusive root intents, preserves the original
+producer/manifest/source UID and seven source assets, and retains failures.
+The read-only facts observer itself does not authorize that separate template.
+
+The B inline API, original A/D connection, Window, issuer, partial Stop lease
+and strict unknown-result recovery remain source-only implementations. The
+root key-file exchange primitive is neither a whole-writer fence nor an sshd
+configuration/loaded-state proof. The 26-path original prerequisite snapshot
+is inherited draft source, not a newly approved or production-tested baseline.
+This combination has no new Linux-root/current-SSH/native restore evidence.
+Full writer and old-ref fencing, final historical Q/EOF, controlled execution
+and B deployment within the same retirement run, runtime/data acceptance and
+exact material purge remain required unfinished adapters. Their effects
+preflight continues to reject; the prepare-only Action does not replace the
+final controlled deletion Action or its production lock and recovery duties.
+
 ## Current writer and diagnostic source (2026-10-09)
 
 Source `23bacb7d4a05bd711e353655eca85219514edb49` connects

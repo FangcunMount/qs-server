@@ -143,7 +143,7 @@ class WorkflowWindowTool(unittest.TestCase):
     approval=WindowToolMetadata.approval
     # Run the actual checked-in github-script offline with read-only metadata
     # responses. These are selector contracts, never a fence/restore proof.
-    def run_script(self, inputs, *, branch='refs/heads/main', main='d'*40, ci='success', selected='a'*40):
+    def run_script(self, inputs, *, branch='refs/heads/main', main='d'*40, ci='success', selected='d'*40):
         import subprocess
         workflow=(Path(__file__).resolve().parents[2]/'.github/workflows/compatibility-retirement.yml').read_text()
         start=workflow.index('          script: |')+len('          script: |\n')
@@ -161,7 +161,8 @@ const core={setOutput:(k,v)=>outputs[k]=v};process.env.GITHUB_RUN_ATTEMPT='1';
         child=subprocess.run(['node','-e',runner],input=json.dumps(dict(inputs=inputs,branch=branch,main=main,ci=ci,selected=selected,script=script)),text=True,capture_output=True,timeout=10,check=True)
         return json.loads(child.stdout)
     def inputs(self,stage='prepare'):
-        a=self.approval(self.request(),stage)
+        r=self.request();r['tool_source_sha']='d'*40
+        a=self.approval(r,stage);a['tool_source_sha']='d'*40
         if stage!='prepare':a.update(b_image_id='sha256:'+'9'*64,b_program_sha256='a'*64)
         raw=tool.canonical(a)
         return dict(operation=stage,database='mysql-and-mongodb',approved_source_sha='d'*40,operation_id='12-1',manifest_sha256='c'*64,inventory_request_sha256=a['request_template_sha256'],prepare_mode='window-tool',identity_request_sha256='',bootstrap_approval_json=raw[:-1].decode(),bootstrap_approval_sha256=tool.digest(raw))
@@ -172,13 +173,28 @@ const core={setOutput:(k,v)=>outputs[k]=v};process.env.GITHUB_RUN_ATTEMPT='1';
         self.assertEqual(len(re.findall(r'^      [a-z0-9_]+:',input_block,re.M)),10)
         self.assertIn('group: production-deploy',workflow)
         self.assertNotIn('workflow_dispatch:',workflow.split('  controlled-stage:',1)[1])
-    def test_workflow_selects_independent_checked_source_and_actual_main(self):
+    def test_workflow_selects_same_checked_source_and_actual_main(self):
         value=self.run_script(self.inputs())
-        self.assertTrue(value['accepted']);self.assertEqual(value['outputs'],{'tool_source_sha':'a'*40})
-        self.assertIn(['getCommit','main'],value['calls']);self.assertIn(['listWorkflowRuns','a'*40],value['calls'])
-    def test_workflow_supports_all_five_stages_without_b_main_deploy(self):
+        self.assertTrue(value['accepted']);self.assertEqual(value['outputs'],{'tool_source_sha':'d'*40})
+        self.assertIn(['getCommit','main'],value['calls']);self.assertIn(['listWorkflowRuns','d'*40],value['calls'])
+    def test_workflow_only_admits_prepare_and_never_b_effectful_stages(self):
         for stage in sorted(tool.STAGES):
-            with self.subTest(stage=stage):self.assertTrue(self.run_script(self.inputs(stage))['accepted'])
+            with self.subTest(stage=stage):
+                value=self.run_script(self.inputs(stage))
+                self.assertEqual(value['accepted'],stage=='prepare')
+                if stage!='prepare':self.assertEqual(value['calls'],[])
+    def test_workflow_refuses_old_independent_tool_source_before_metadata_reads(self):
+        q=self.inputs();a=tool.decode(q['bootstrap_approval_json']);a['tool_source_sha']='a'*40
+        raw=tool.canonical(a);q.update(bootstrap_approval_json=raw[:-1].decode(),bootstrap_approval_sha256=tool.digest(raw))
+        value=self.run_script(q)
+        self.assertFalse(value['accepted']);self.assertEqual(value['calls'],[])
+    def test_workflow_refuses_b_image_or_program_fields_for_prepare(self):
+        for field,value in (('b_image_id','sha256:'+'9'*64),('b_program_sha256','a'*64),('b_image_id',None)):
+            with self.subTest(field=field,value=value):
+                q=self.inputs();a=tool.decode(q['bootstrap_approval_json']);a[field]=value
+                raw=tool.canonical(a);q.update(bootstrap_approval_json=raw[:-1].decode(),bootstrap_approval_sha256=tool.digest(raw))
+                result=self.run_script(q)
+                self.assertFalse(result['accepted']);self.assertEqual(result['calls'],[])
     def test_workflow_current_main_a_prepare_requires_no_b_image(self):
         q=self.inputs();a=tool.decode(q['bootstrap_approval_json']);a['tool_source_sha']='d'*40
         raw=tool.canonical(a);q.update(bootstrap_approval_json=raw[:-1].decode(),bootstrap_approval_sha256=tool.digest(raw))

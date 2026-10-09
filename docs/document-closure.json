@@ -2,7 +2,7 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "12311e2a8c4d1a9bfcd318f0d3a1572f85a873eb",
+    "sha": "7f63d3a3ce23218e4f3042f9a4ab9f40e2019b0f",
     "verified_on": "2026-10-10"
   },
   "status_policy": {
@@ -11268,7 +11268,7 @@
       "path": "scripts/database/compatibility-retirement.md",
       "class": "sidecar",
       "owner": "tooling",
-      "doc_status": "source-lag",
+      "doc_status": "needs_review",
       "verified": {
         "source_sha": "12311e2a8c4d1a9bfcd318f0d3a1572f85a873eb",
         "verified_on": "2026-10-10"
@@ -11561,6 +11561,22 @@
         {
           "kind": "source",
           "path": "scripts/database/test-compatibility-root-prepare.py"
+        },
+        {
+          "kind": "source",
+          "path": "scripts/database/compatibility-window-tool.py"
+        },
+        {
+          "kind": "source",
+          "path": "scripts/database/test-compatibility-window-tool.py"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/maintenance/compatibilityretirementstop/*.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/maintenance/compatibilityretirementfence/ssh_key_file*.go"
         }
       ],
       "verification": [
@@ -12482,7 +12498,7 @@
       "path": "scripts/database/compatibility-retirement-fence-analysis.md",
       "class": "sidecar",
       "owner": "tooling",
-      "doc_status": "aligned",
+      "doc_status": "needs_review",
       "verified": {
         "source_sha": "12311e2a8c4d1a9bfcd318f0d3a1572f85a873eb",
         "verified_on": "2026-10-10"
@@ -12614,6 +12630,13 @@
           "severity": "high",
           "summary": "The cryptographic SSH probe and protected challenge persistence are implemented and locally tested. Pre-fix combined concurrency and actual Linux public-root-anchor failures are retained; amended local regressions and a source-equivalent synthetic-API Linux public-root test pass. Live GitHub origin, production root installation, executor integration and all production writer paths remain unproven. The committed maintenance-window v2 budget component and one source-equivalent actual Linux root public-entry test pass. That case checks the returned cancel function, not native parent-context cancellation; BudgetOnly does not prove a full 600-second restoration or production/executor/writer/CAS/DROP authority.",
           "exit_criteria": "Bind the actual root management connection and every writer/authentication path; prove exact restoration, single-use execution and complete historical-run exclusion before production mutation."
+        },
+        {
+          "id": "private_b_a_source_combination_pending_review",
+          "kind": "source-lag",
+          "severity": "medium",
+          "summary": "当前私有 A/B 源码合并改变该文档的来源范围，旧核验记录仅保留为历史；snapshot26未被本次重新批准，运行/生产能力不因合并升格。",
+          "exit_criteria": "完成本组合相应源码与文档独立复核，并以真实新检查补齐源码证据，生产运行证据保持独立。"
         }
       ]
     },
