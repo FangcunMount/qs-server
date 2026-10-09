@@ -1,8 +1,10 @@
 # Exact compatibility retirement: qualified evidence write and lifecycle barrier
 
-The accepted four-object operation now has a qualified historical-evidence write
-caller; production deletion and recovery remain unavailable. Read-only `prepare`
-modes have real identity discovery, separately approved private
+The accepted four-object operation has a qualified historical-evidence write
+caller and a `prepare_mode=lifecycle` caller for exact temporary backup and
+isolated content restoration. Production deletion and recovery remain unavailable
+in A. The separate read-only `prepare` modes have real identity discovery,
+separately approved private
 request bootstrap, fixed-upper-bound discovery, paged source inventory and a
 separately approved read-only history host. Identity, boundaries, inventory and
 their existing bootstrap modes exit 42 with diagnostic receipts. Separately
@@ -30,9 +32,11 @@ It observed original boundary run `37896613961-1` from source
 and every capability false. Its successful Action means the existing report
 was read; it neither proves inventory completion nor executes the new
 `7e39ed4f7790917db67919e2bf765080031dc83d` index diagnostic instrumentation.
-Neither a JSON boolean nor
-a workflow input can enable a missing backend. Do not dispatch this foundation
-as proof that a production preparation/deletion/recovery/purge was performed.
+Neither a JSON boolean nor a workflow input can enable a missing backend.
+Source review, offline checks and a successful diagnostic Action do not prove
+production preparation, deletion, recovery or purge. Lifecycle preparation may
+finish only after its actual backup, isolated restore and cleanup checks;
+it still grants no historical write qualification or DROP capability.
 
 The exact scope is MySQL `domain_event_outbox`, `ai_bridge_commands`,
 `ai_messaging_legacy_commands`, and MongoDB `domain_event_outbox`. The prior
@@ -110,6 +114,202 @@ dedicated Action modes described below. Read-only output cannot recreate the
 writer's opaque qualification. Pre-window historical evidence CAS uses the actual
 closed-admission and fresh locked-baseline checks; full writer/old-ref isolation
 and the measured maintenance-window capabilities remain necessary for DROP.
+
+## Lifecycle preparation and typed Mongo scan diagnostics (2026-10-09)
+
+The lifecycle source connects the existing Action, Python caller and native
+retirement executable to `Capture`, `VerifyHostOriginalSources`, `RestoreSQL`
+and `RestoreMongoWithOriginal`. It preserves the current historical-evidence
+writer, existing-report observation and index diagnostics described below.
+The new CLI/root/stdio connection has not yet completed a native rehearsal;
+source review and offline checks do not certify that connection in production.
+
+Final-source CI adds a mandatory public-caller rehearsal to the existing
+Seeddata job. It builds the CLI at the actual checkout SHA, binds the real
+Linux root/socket and service image identities, creates only owned source
+namespaces with an actual SCRAM Mongo user, and invokes public Python
+preparation through root-once staging, capture and both real stdio restores.
+The selector fails on missing prerequisites or skips. It independently checks
+source catalogs/content, all seven original/staged assets and registered
+restore-resource/material cleanup. This fixture result cannot establish a
+production inventory, historical qualification, writer fence or production
+600-second restore budget. Until the final-source job actually succeeds, its
+native result remains unproved.
+The fixture uses a dedicated host process group and observes its actual absence
+after cancellation and reaping. A failed or unaccepted public call retains its
+source namespaces, restore intent and temporary materials; host process exit
+does not resolve an unknown daemon-side create/exec response. Only complete
+local acceptance permits exact fixture cleanup with fresh runtime checks.
+
+For `operation=prepare, prepare_mode=lifecycle`, the Action keeps exactly ten
+dispatch inputs. `manifest_sha256` binds the approved immutable manifest;
+the existing `inventory_request_sha256` field carries the SHA256 of the separate
+private lifecycle request. Identity and bootstrap input fields must be empty.
+The request keeps `original_source_sha` and original inventory/run/operation
+bindings separate from `tool_source_sha` and the actual current run. Neither
+the original material nor earlier native results are relabeled as this caller's
+current source. The seven exact full source-file SHA256s in `source_file_sha256`
+cover the inventory report, two metadata files, three SQL raw source streams
+and the Mongo raw BSON stream. The first three must also equal their separately
+approved inventory and metadata hashes.
+
+On the existing pinned SSH connection, preparation uses a fixed noninteractive
+root-once bootstrap. It authenticates the approved package bytes and compiled
+tool source before staging, durably records tool and source-copy intents before
+copying bodies, and copies only those seven approved files. Root/private fresh
+staging rejects links, non-regular files, changed file identities and mismatched
+bytes; it does not change the original files' owner or adopt an earlier run.
+The exact approved archive leaf remains inside the original operation.
+`OrderedMongoSchemaSHA256` is a distinct required approval from an actual
+ordered BSON schema observation. Empty approval is rejected; ExtJSON metadata
+and an observed value cannot silently supply that approval.
+
+The real `Capture` producer validates source contents, schema, metadata,
+identities and clean heads before creating the exact four-object archive.
+Restore preparation requires the request's immutable MySQL/Mongo image IDs
+and architecture, verified by actual local inspection. Docker operations use
+the explicitly pinned local Unix socket after root-owned socket/path checks,
+rather than an ambient Docker context. Unique engines have no network or
+published ports, exact owned volumes/labels and read-only archive/native mounts.
+Durable resource intent precedes creation and isolated database writes;
+failed, partial or unknown effects remain precisely registered.
+
+Fresh inspection precedes each actual fixed exec. The approved native helper
+connects to each engine's local database socket, with the real host drivers
+reading/writing through private stdio connections. Source and restore SQL UUIDs
+and Mongo process identities must differ. Actual restore calls create opaque
+proofs in the same process; saved JSON, readiness booleans and imported summaries
+cannot substitute for those proofs. Independent read/write deadlines control
+active I/O, and context cancellation reaps exec processes and joins blocked I/O.
+
+One live 600-second context starts before engine creation and includes engine
+initialization, both real restores and readbacks, original Mongo metadata
+recheck, a final host-owned read-only epoch with two full original-source passes,
+all driver/wire closure and reaping, and fresh final engine inspections.
+An explicit empty exec set, successful closure and an unexpired total budget
+are required before preparation can finish. Failure-only background cleanup
+does not establish a successful restore budget. Archive and restore copies
+remain registered for the later accepted batch purge; preparation does not
+destroy them. Structural/content restore retains
+`ForeignKeyBusinessClosure=not_proven`; it neither invents missing business
+parents nor proves production foreign-key responsibility closure.
+
+The new target-read stderr diagnostic is distinct from the existing index
+marker. It preserves `mongo_target_read_failed_or_timed_out`, inventory report
+schema, limits and all capability gates. A fixed bounded line identifies actual
+`find`, `iterate` or `close` phase, typed error kind and numeric server code;
+it separately samples run/page context state before cancellation, pass/page,
+observed record/source-byte counts and monotonic page/run/MySQL elapsed time.
+No driver error text, URI, BSON body or cursor token is public. Python forwards
+only exact allowlisted bounded markers; original request/report schemas and
+existing hash transport remain unchanged. These observations can distinguish actual failure states in a
+new run; they cannot retrospectively prove that SQL exhausted the old run's
+budget, that the page/socket timeout fired, or that inventory reached EOF.
+No timeout limit, identity check, permission requirement or DROP gate is relaxed.
+
+A's `apply/verify/recover/purge` adapters remain closed. The separately reviewed
+B candidate remains a later release; this preparation caller does not merge or
+deploy it. Actual sudo/socket/image/architecture/capacity facts, complete
+production inventory, independently approved ordered Mongo schema, native
+CLI/root/wire rehearsal and a production-bound measured 600-second restoration
+remain unproved. Complete production historical qualification and persisted
+readback, whole-writer/old-ref fencing, final difference/EOF, DROP, B deployment,
+acceptance and batch-only destruction/zero-leftover verification are also
+unfinished. Existing writer/library/native/CI proofs retain their original
+source and scope.
+
+## Read-only preparation facts (2026-10-10)
+
+The independently reviewed observer is published in [draft PR #311](https://github.com/FangcunMount/qs-server/pull/311), following [preparation and native rehearsal PR #310](https://github.com/FangcunMount/qs-server/pull/310). Publication and CI do not establish a production observation; an independently approved production run and its original receipts remain required.
+
+The existing Action/Python/native caller now implements
+`operation=prepare, prepare_mode=prepare-facts`. It observes facts needed for a
+separate lifecycle request. It has no `Capture`, restore, historical CAS, DROP,
+deployment or purge authority. A successful observation is separate from
+production retirement readiness, the full writer fence and restore acceptance.
+
+The Action retains exactly these ten dispatch inputs:
+
+| Input | Value for `prepare-facts` |
+| --- | --- |
+| `operation` | `prepare` |
+| `database` | `mysql-and-mongodb` |
+| `approved_source_sha` | Independently approved current main tooling SHA |
+| `operation_id` | Existing approved inventory operation |
+| `manifest_sha256` | Empty |
+| `inventory_request_sha256` | Empty |
+| `prepare_mode` | `prepare-facts` |
+| `identity_request_sha256` | Empty |
+| `bootstrap_approval_json` | Canonical observation descriptor, without the final LF |
+| `bootstrap_approval_sha256` | SHA256 of the descriptor bytes plus one LF |
+
+The descriptor uses sorted compact ASCII JSON, format 1 and kind
+`readonly_prepare_facts_observation_descriptor`. It binds current `source_sha`,
+`operation_id`, the exact target hash/scope, `inventory_report`,
+`restore_engines` and the prospective `archive_directory` inside that operation
+and outside the original inventory directory. `inventory_report` separately
+retains the original producer's operation, run, source SHA, complete raw report
+SHA256 and original request SHA256. `restore_engines` approves two distinct
+existing `sha256:` image IDs and `amd64` or `arm64` architecture. These approvals
+identify what may be observed; they do not approve the returned schema or capacity.
+The actual observer run comes from GitHub run ID/attempt, not another input.
+
+Under the existing operation lock, Python exclusively publishes
+`prepare-facts-request-<actual-run>.json` in that operation. Its exact path and
+hash are shared by root staging intent, native invocation and Go validation.
+A retry with a new actual run keeps the same operation and original producer,
+leaves the earlier request bytes intact and uses a new request/root staging
+batch. Repeating the same actual run rejects before another native invocation.
+The observer never relabels the original inventory as the current tool/run.
+
+The original inventory must be complete, bind clean MySQL 99/MongoDB 38 heads
+and show two complete passes of all four present targets. Through owned original
+database handles, the observer rechecks identity/anchors and clean heads before
+and after observation. It calls the real `ReadOrderedMongoSchema` driver twice
+and requires matching digests of ordered raw collection BSON, UUID and index
+key/options BSON. The metadata ExtJSON catalog digest remains a separate value.
+It hashes these seven original files in place, preserving their owner and bytes:
+
+- `inventory.private.json`
+- `mysql-metadata.private.json`
+- `mongodb-metadata.private.json`
+- `mysql-domain_event_outbox.source.ndjson`
+- `mysql-ai_bridge_commands.source.ndjson`
+- `mysql-ai_messaging_legacy_commands.source.ndjson`
+- `mongodb-domain_event_outbox.source.bsonframes`
+
+Private single-link regular files, original ownership, mode and unchanged file
+identity/size are checked around reads. The report digest must match the approved
+producer report; the two metadata schema digests must match its catalog bindings.
+Source stream bodies are never copied into an observation receipt or root stage.
+
+The existing pinned SSH/root-once path stages only the authenticated native
+executable and tool intent. Native execution requires real root identity,
+protected paths and the fixed local `unix:///run/docker.sock`. Actual inspection
+checks both approved image IDs and architecture; it does not pull images or
+create containers, networks or volumes. Four `statfs` observations record path
+SHA256, total, available and free bytes for the original source, root staging,
+nearest existing prospective archive parent and that daemon's actual
+`DockerRootDir`. Those measurements do not establish sufficient capacity or the
+production 600-second restore budget.
+
+Only successful observation and owned-handle closure within the 90-minute
+native budget set `prepare_facts_observation_complete=true`. The body-free private
+receipt is written beneath
+`/opt/backups/qs-server/compatibility-retirement-root-prepare/<operation>-<actual-run>/prepare-facts.private.json`;
+its full raw SHA256 is returned. Public armored output retains allowlisted
+technical facts; filenames use underscore tokens and image IDs expose their
+SHA256 components. `complete`, `execution_allowed`, `drop_ready` and every
+capability remain false. Observer request/staging/receipt materials remain
+registered for later accepted batch cleanup.
+
+Returned facts require independent review before constructing and approving the
+separate lifecycle request and manifest. This observer does not solve the
+future actual-run lifecycle request/approval and root-binding preparation gap.
+The source-only entrypoint catalog retains `live_fence_proven=false` and
+`historical_rerun_proven_denied=false`; production observation, full fencing,
+backup/restore rehearsal, deletion, B deployment, acceptance and purge still
+require their own evidence.
 
 ## Current writer and diagnostic source (2026-10-09)
 
@@ -719,11 +919,11 @@ a new independently bounded scan completes both physical EOF epochs.
    all queued/running/waiting jobs. Disabling a workflow or allowing main alone
    does not prove that old historical main runs cannot rerun before credentials.
    An unproved historical-rerun boundary denies the maintenance window.
-4. A dedicated backup/isolated-restore backend must dump only these four objects
-   into this operation's private assets, perform real restores in owned isolated
-   instances with no production network/ports, compare complete contents and
-   schema/index/options, and register every raw copy/restore resource. It must
-   never call the CBPT 22-target tool or whole-db Mongo `--drop db.*` restore.
+4. The lifecycle backup/isolated-restore caller described above is connected
+   to the exact four-object producers. Its native CLI/root/stdio rehearsal and
+   actual production-bound complete source/restore budget remain required.
+   Every raw copy/restore resource must remain registered. This caller never
+   calls the CBPT 22-target tool or whole-db Mongo `--drop db.*` restore.
 5. The actual DDL/recover backend must recheck frozen identities/digests before
    each exact statement, durably write intent first, and stop on unknown results.
    Recovery restores only missing targets and never reactivates a legacy writer,
@@ -748,9 +948,15 @@ returning success for an unsupported stage is not a valid implementation.
 
 `prepare_mode=identity` requires only `identity_request_sha256`;
 `prepare_mode=inventory` requires only `inventory_request_sha256`. Both require an
-empty `manifest_sha256`. Other stages require the immutable manifest hash and
-empty request hashes. Unknown/mixed classes, another operation,
-another SHA or another target set are rejected before connections are opened.
+empty `manifest_sha256`. Lifecycle preparation instead requires the immutable
+manifest hash and the lifecycle request hash in `inventory_request_sha256`,
+as described above; it is separate from these read-only request classes.
+`prepare-facts` instead requires only the canonical observation descriptor and
+its LF-terminated SHA256 in the existing bootstrap fields; the manifest, identity
+and inventory-request fields must be empty. Its complete contract is described
+above. Other stages remain unavailable in A regardless of supplied hashes.
+Unknown/mixed classes, another operation, incorrect original/tool source
+bindings or another target set are rejected before connections are opened.
 
 Identity bootstrap does not require the operator to read a GitHub SSH Secret or
 locally connect to production. After reviewing the approved main tooling SHA and

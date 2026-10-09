@@ -2,6 +2,8 @@ P. 代码分析报告
 
 本批实现可验证的 **SSH probe 来源门禁**、一次挑战持久消费原语及 root 目录维护窗口预算。生产尚未安装；一次消费尚未接入生产固定入口，完整写入隔离、生产 executor 和 DROP 能力保持 false。单凭 workflow disable、production 限定 main、共享 SSH key 或暂停变量，均不能证明旧 main SHA 的重跑已被拒绝。
 
+2026-10-09 的 A 准备源码增加了实际历史证据 CAS 和 `prepare_mode=lifecycle` 临时备份／隔离恢复入口。生产入口目录已据实际职责更新：历史写入仍需独立 Q 与锁定基线，准备入口通过同一 root-once 暂存和真实无网络恢复，不授予维护窗口、全写者隔离或 DROP 权限；A 的 apply／verify／recover／purge 在读取输入或连接数据库前仍拒绝执行。新公开恢复入口的原生演练及生产 600 秒预算未证明。该职责更新不改变本报告对 13 个现行入口、9 个历史工作流及其他旁路的未隔离结论。
+
 ## 分析目标与范围
 
 当前 source-only catalog 登记 13 个入口；历史快照中的 9 个 active 工作流仍按未证明处理。初始隔离批次追踪部署/数据库维护的 SSH、直接数据库连接和本地执行旁路，只新增 `internal/apiserver/maintenance/compatibilityretirementfence/` 和本报告。后续新增的只读主机盘点入口登记如下；生产安装、管理通道和完整写者隔离仍未证明。

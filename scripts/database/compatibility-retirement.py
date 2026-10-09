@@ -1642,10 +1642,13 @@ def private_directory(path):
         if not stat.S_ISDIR(v.st_mode) or (stat.S_IMODE(v.st_mode) & 0o022 and not v.st_mode & stat.S_ISVTX): stop()
 
 try:
-    if os.getuid() != 0 or os.geteuid() != 0 or len(sys.argv) != 8: stop()
-    operation, run, tool_sha, request_hash, package_hash, manifest_hash, source_channel = sys.argv[1:]
+    if os.getuid() != 0 or os.geteuid() != 0 or len(sys.argv) not in (8,9): stop()
+    stage = 'lifecycle' if len(sys.argv) == 8 else sys.argv[-1]
+    if stage not in ('lifecycle','prepare-facts') or (stage == 'lifecycle' and len(sys.argv) != 8): stop()
+    operation, run, tool_sha, request_hash, package_hash, manifest_hash, source_channel = sys.argv[1:8]
     if not all(re.fullmatch(r'[0-9]{1,20}-[0-9]{1,4}',v) for v in (operation,run)): stop()
-    if not re.fullmatch(r'[0-9a-f]{40}',tool_sha) or not all(re.fullmatch(r'[0-9a-f]{64}',v) for v in (request_hash,package_hash,manifest_hash)): stop()
+    if not re.fullmatch(r'[0-9a-f]{40}',tool_sha) or not all(re.fullmatch(r'[0-9a-f]{64}',v) for v in (request_hash,package_hash)): stop()
+    if (stage == 'lifecycle' and not re.fullmatch(r'[0-9a-f]{64}',manifest_hash)) or (stage == 'prepare-facts' and manifest_hash != ''): stop()
     if source_channel == 'sudo-user':
         source_uid = int(os.environ['SUDO_UID'])
         if source_uid < 1: stop()
@@ -1693,7 +1696,9 @@ try:
     batch.mkdir(mode=0o700) # once only; unknown earlier work never silently adopted
     private_directory(batch)
     native=batch/'restore-native'
-    registry={'format_version':1,'kind':'approved_root_once_tool_staging','operation_id':operation,'actual_run_id':run,'tool_source_sha':tool_sha,'request_sha256':request_hash,'manifest_sha256':manifest_hash,'package_sha256':package_hash,'native_sha256':hashlib.sha256(binary).hexdigest(),'source_uid':source_uid,'drop_authority':False,'purge_after_acceptance_required':True}
+    request_name = 'lifecycle-request.json' if stage == 'lifecycle' else 'prepare-facts-request-'+run+'.json'
+    request_path='/opt/backups/qs-server/compatibility-retirement/'+operation+'/'+request_name
+    registry={'format_version':1,'kind':'approved_root_once_tool_staging','stage':stage,'operation_id':operation,'actual_run_id':run,'tool_source_sha':tool_sha,'request_path':request_path,'request_sha256':request_hash,'manifest_sha256':manifest_hash,'package_sha256':package_hash,'native_sha256':hashlib.sha256(binary).hexdigest(),'source_uid':source_uid,'drop_authority':False,'purge_after_acceptance_required':True}
     fd=os.open(batch/'tool.intent.private.json',os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o600)
     with os.fdopen(fd,'wb') as f: f.write(json.dumps(registry,sort_keys=True,separators=(',',':')).encode()+b'\n'); f.flush(); os.fsync(f.fileno())
     fd=os.open(batch,os.O_RDONLY|os.O_DIRECTORY)
@@ -1709,14 +1714,15 @@ try:
     if check.returncode or check.stdout!=tool_sha.encode()+b'\n': stop()
     credentials['PATH']='/usr/bin:/bin'
     credentials['QS_RETIREMENT_SOURCE_UID']=str(source_uid)
-    os.execve(native,[str(native),'--mode','lifecycle-prepare-root-once','--request','/opt/backups/qs-server/compatibility-retirement/'+operation+'/lifecycle-request.json','--request-hash',request_hash,'--operation-id',operation,'--run-id',run],credentials)
+    native_mode = 'lifecycle-prepare-root-once' if stage == 'lifecycle' else 'prepare-facts-root-once'
+    os.execve(native,[str(native),'--mode',native_mode,'--request',request_path,'--request-hash',request_hash,'--operation-id',operation,'--run-id',run],credentials)
 except (OSError,ValueError,KeyError,tarfile.TarError,subprocess.SubprocessError):
     stop()
 """
 
 
 def root_once_lifecycle_prepare(args):
-    if args.operation != 'prepare' or args.prepare_mode != 'lifecycle':
+    if args.operation != 'prepare' or args.prepare_mode not in ('lifecycle','prepare-facts'):
         fail('lifecycle_root_host_channel_required')
     package_hash=os.environ.get('RETIREMENT_PACKAGE_SHA256','')
     token(package_hash,HASH)
@@ -1726,12 +1732,17 @@ def root_once_lifecycle_prepare(args):
     uid, euid = os.getuid(), os.geteuid()
     if uid != euid:
         fail('lifecycle_root_host_channel_required')
-    bindings=[args.operation_id,args.run_id,args.actual_source_sha,args.lifecycle_request_hash,package_hash,args.manifest_hash]
+    facts = args.prepare_mode == 'prepare-facts'
+    request_hash = args.prepare_facts_request_hash if facts else args.lifecycle_request_hash
+    token(request_hash,HASH)
+    if facts and args.manifest_hash: fail('prepare_facts_input_classes_mixed')
+    bindings=[args.operation_id,args.run_id,args.actual_source_sha,request_hash,package_hash,args.manifest_hash]
+    suffix = ['prepare-facts'] if facts else []
     # Credentials remain on this bounded private pipe, not argv/stdout/logs.
     if uid == 0:
-        result=subprocess.run(['/usr/bin/python3','-I','-c',ROOT_PREPARE_ONCE,*bindings,'root-direct'],env={'PATH':'/usr/bin:/bin'},input=packet,stdout=subprocess.PIPE,stderr=subprocess.DEVNULL,timeout=91*60,check=False)
+        result=subprocess.run(['/usr/bin/python3','-I','-c',ROOT_PREPARE_ONCE,*bindings,'root-direct',*suffix],env={'PATH':'/usr/bin:/bin'},input=packet,stdout=subprocess.PIPE,stderr=subprocess.DEVNULL,timeout=91*60,check=False)
     else:
-        result=subprocess.run(['sudo','-n','python3','-I','-c',ROOT_PREPARE_ONCE,*bindings,'sudo-user'],input=packet,stdout=subprocess.PIPE,stderr=subprocess.DEVNULL,timeout=91*60,check=False)
+        result=subprocess.run(['sudo','-n','python3','-I','-c',ROOT_PREPARE_ONCE,*bindings,'sudo-user',*suffix],input=packet,stdout=subprocess.PIPE,stderr=subprocess.DEVNULL,timeout=91*60,check=False)
     if len(result.stdout)>32768: fail('lifecycle_native_receipt_invalid')
     return result.returncode,result.stdout
 
@@ -1810,6 +1821,125 @@ def live_lifecycle(args, directory):
     return result
 
 
+PREPARE_SOURCE_NAMES = ("inventory.private.json", "mysql-metadata.private.json", "mongodb-metadata.private.json",
+    "mysql-domain_event_outbox.source.ndjson", "mysql-ai_bridge_commands.source.ndjson",
+    "mysql-ai_messaging_legacy_commands.source.ndjson", "mongodb-domain_event_outbox.source.bsonframes")
+
+
+
+def prepare_facts_request(args):
+    """Approve only where to observe; never approve the returned schema facts."""
+    token(args.operation_id, RUN); token(args.run_id, RUN)
+    text = args.bootstrap_approval_json
+    token(args.bootstrap_approval_hash, HASH)
+    if type(text) is not str or not 0 < len(text) <= MAX_BOOTSTRAP_APPROVAL or not text.isascii():
+        fail("prepare_facts_descriptor_invalid")
+    value = decode(text.encode("ascii"))
+    raw = canonical_bytes(value)
+    if text.encode("ascii") != raw[:-1] or hashlib.sha256(raw).hexdigest() != args.bootstrap_approval_hash:
+        fail("prepare_facts_descriptor_hash_invalid")
+    fields(value, ("format_version", "kind", "prepare_mode", "source_sha", "operation_id", "target_hash",
+        "database_scope", "inventory_report", "restore_engines", "archive_directory"))
+    if (type(value["format_version"]) is not int or value["format_version"] != 1 or
+        value["kind"] != "readonly_prepare_facts_observation_descriptor" or value["prepare_mode"] != "prepare-facts" or
+        value["source_sha"] != args.actual_source_sha or value["operation_id"] != args.operation_id or
+        value["target_hash"] != TARGET_HASH or value["database_scope"] != "mysql-and-mongodb"):
+        fail("prepare_facts_descriptor_binding_rejected")
+    producer = value["inventory_report"]
+    fields(producer, ("operation_id", "run_id", "source_sha", "sha256", "request_sha256"))
+    token(producer["operation_id"], RUN); token(producer["run_id"], RUN); token(producer["source_sha"], SHA)
+    token(producer["sha256"], HASH); token(producer["request_sha256"], HASH)
+    if producer["operation_id"] != args.operation_id or producer["run_id"] == args.run_id:
+        fail("prepare_facts_producer_rejected")
+    engines = value["restore_engines"]
+    fields(engines, ("mysql_image_id", "mongodb_image_id", "architecture"))
+    image = re.compile(r"sha256:[0-9a-f]{64}")
+    token(engines["mysql_image_id"], image); token(engines["mongodb_image_id"], image)
+    if engines["mysql_image_id"] == engines["mongodb_image_id"] or engines["architecture"] not in ("amd64", "arm64"):
+        fail("prepare_facts_images_rejected")
+    path = value["archive_directory"]
+    root = Path("/opt/backups/qs-server/compatibility-retirement") / args.operation_id
+    if (type(path) is not str or not 1 <= len(path) <= 1024 or any(v in path for v in ("\x00", "\r", "\n")) or
+        not Path(path).is_absolute() or ".." in Path(path).parts or str(Path(path)) != path or
+        not Path(path).is_relative_to(root) or Path(path) == root or
+        Path(path).is_relative_to(root / ("inventory-" + producer["run_id"]))):
+        fail("prepare_facts_archive_path_rejected")
+    return {"format_version": 1, "kind": "readonly_prepare_facts_request", "source_sha": args.actual_source_sha,
+        "operation_id": args.operation_id, "actual_run_id": args.run_id, "target_hash": TARGET_HASH,
+        "database_scope": "mysql-and-mongodb", "observation_approval_sha256": args.bootstrap_approval_hash,
+        "inventory_report": producer, "restore_engines": engines, "archive_directory": path}
+
+
+
+def validate_prepare_facts_result(result, args, request, request_hash, code):
+    fields(result, ("format_version", "kind", "operation", "prepare_mode", "source_sha", "operation_id", "run_id",
+        "request_sha256", "observation_approval_sha256", "target_hash", "complete", "prepare_facts_observation_complete",
+        "diagnostic_only", "execution_allowed", "drop_ready", "observed_inventory_producer", "prepare_source_files",
+        "observed_ordered_mongo_schema_sha256", "observed_filesystems", "observed_socket_kind",
+        "observation_elapsed_millis", "error_category"), ("observed_restore_engines", "prepare_facts_private_observation_sha256"))
+    if (type(result["format_version"]) is not int or result["format_version"] != 1 or
+        result["kind"] != "readonly_prepare_facts_observation" or result["operation"] != "prepare" or
+        result["prepare_mode"] != "prepare-facts" or result["source_sha"] != args.actual_source_sha or
+        result["operation_id"] != args.operation_id or result["run_id"] != args.run_id or
+        result["request_sha256"] != request_hash or result["observation_approval_sha256"] != args.bootstrap_approval_hash or
+        result["target_hash"] != TARGET_HASH or result["observed_inventory_producer"] != request["inventory_report"] or
+        any(result[k] is not False for k in ("complete", "execution_allowed", "drop_ready")) or
+        result["diagnostic_only"] is not True or type(result["prepare_facts_observation_complete"]) is not bool or
+        (result["prepare_facts_observation_complete"] is True) != (code == 0 and result["error_category"] == "none") or
+        not re.fullmatch(r"(?:prepare_facts|lifecycle)_[a-z_]{1,100}|none", result["error_category"])):
+        fail("prepare_facts_native_binding_rejected")
+    uint(result["observation_elapsed_millis"])
+    files = result["prepare_source_files"]
+    if type(files) is not list or len(files) > 7:
+        fail("prepare_facts_native_files_rejected")
+    for index, value in enumerate(files):
+        fields(value, ("name", "sha256", "bytes"))
+        if value["name"] != PREPARE_SOURCE_NAMES[index]: fail("prepare_facts_native_files_rejected")
+        token(value["sha256"], HASH); uint(value["bytes"])
+    capacity = result["observed_filesystems"]
+    scopes = ("source", "staging", "archive", "docker")
+    if type(capacity) is not list or len(capacity) > 4: fail("prepare_facts_native_capacity_rejected")
+    for index, value in enumerate(capacity):
+        fields(value, ("scope", "path_sha256", "total_bytes", "available_bytes", "free_bytes"))
+        if value["scope"] != scopes[index]: fail("prepare_facts_native_capacity_rejected")
+        token(value["path_sha256"], HASH)
+        for k in ("total_bytes", "available_bytes", "free_bytes"): uint(value[k])
+        if value["available_bytes"] > value["total_bytes"] or value["free_bytes"] > value["total_bytes"]: fail("prepare_facts_native_capacity_rejected")
+    if result["prepare_facts_observation_complete"]:
+        token(result["observed_ordered_mongo_schema_sha256"], HASH)
+        token(result.get("prepare_facts_private_observation_sha256"), HASH)
+        if (len(files) != 7 or len(capacity) != 4 or result.get("observed_restore_engines") != request["restore_engines"] or
+            result["observed_socket_kind"] != "fixed_root_owned_unix_docker" or files[0]["sha256"] != request["inventory_report"]["sha256"]):
+            fail("prepare_facts_native_incomplete")
+    else:
+        token(result["observed_ordered_mongo_schema_sha256"], re.compile(r"(?:[0-9a-f]{64})?"))
+        if result.get("observed_restore_engines") is not None and result["observed_restore_engines"] != request["restore_engines"]:
+            fail("prepare_facts_native_images_rejected")
+        if result["observed_socket_kind"] not in ("", "fixed_root_owned_unix_docker"):
+            fail("prepare_facts_native_socket_rejected")
+    # Only allowlisted tokens go through the existing armored public transport.
+    # The root-owned raw observation keeps the exact original filenames/IDs.
+    for value in files: value["name"] = value["name"].replace(".", "_")
+    if result.get("observed_restore_engines") is not None:
+        engines = result["observed_restore_engines"]
+        result["observed_restore_engines"] = {"mysql_image_id_sha256": engines["mysql_image_id"][7:],
+            "mongodb_image_id_sha256": engines["mongodb_image_id"][7:], "architecture": engines["architecture"]}
+    result["capabilities"] = {key: False for key in CAPABILITIES}
+    return result
+
+
+
+def live_prepare_facts(args):
+    request = prepare_facts_request(args)
+    directory = operation_directory(args.root, args.operation_id)
+    raw = canonical_bytes(request); request_hash = hashlib.sha256(raw).hexdigest()
+    with locked_operation(directory):
+        create_bootstrap_file(directory, "prepare-facts-request-" + args.run_id + ".json", raw)
+        args.prepare_facts_request_hash = request_hash
+        code, native = root_once_lifecycle_prepare(args)
+    return validate_prepare_facts_result(decode(native), args, request, request_hash, code)
+
+
 def execute(args):
     if args.operation not in OPERATIONS:
         fail("operation_unsupported")
@@ -1830,6 +1960,10 @@ def execute(args):
         return live_lifecycle(args, operation_directory(args.root, args.operation_id))
     if mode == "lifecycle":
         fail("lifecycle_request_approval_missing")
+    if mode == "prepare-facts":
+        if args.operation != "prepare" or args.manifest_hash or identity_request or inventory_request or not bootstrap_json or not bootstrap_hash:
+            fail("input_classes_mixed")
+        return live_prepare_facts(args)
     if mode == "report-diagnostic":
         if args.operation != "prepare" or args.manifest_hash or identity_request or inventory_request or not bootstrap_json or not bootstrap_hash:
             fail("input_classes_mixed")
@@ -1925,14 +2059,21 @@ def main(argv=None):
     schema = {"format_version": "uint", "complete": "bool", "execution_allowed": "bool",
               "operation": OPERATIONS, "source_sha": "sha40", "run_id": "run_id", "operation_id": "run_id",
               "manifest_hash": "hash64", "target_hash": "hash64", "target_count": "uint",
-              "kind": frozenset({"compatibility_retirement_lifecycle_result"}),
+              "kind": frozenset({"compatibility_retirement_lifecycle_result", "readonly_prepare_facts_observation"}),
               "original_source_sha": "sha40", "manifest_sha256": "hash64", "request_sha256": "hash64", "archive_sha256": "hash64_or_empty",
               "isolated_content_restore_complete": "bool", "restore_elapsed_millis": "uint", "mysql_recovery_non_target_sha256": "hash64",
               "archive_binding_complete": "bool", "recovery_attempted": "bool", "recovery_complete": "bool",
               "acceptance_complete": "bool", "purge_complete": "bool", "required_adapters": [LIFECYCLE_ADAPTERS],
               "recovery_error_category": frozenset({receipt.get("recovery_error_category", "none")}),
+              "prepare_facts_private_observation_sha256": "hash64", "prepare_facts_observation_complete": "bool", "observation_approval_sha256": "hash64_or_empty",
+              "observed_inventory_producer": {"operation_id": "run_id", "run_id": "run_id", "source_sha": "sha40", "sha256": "hash64", "request_sha256": "hash64"},
+              "prepare_source_files": [{"name": frozenset(name.replace(".", "_") for name in PREPARE_SOURCE_NAMES), "sha256": "hash64", "bytes": "uint"}],
+              "observed_ordered_mongo_schema_sha256": "hash64_or_empty",
+              "observed_restore_engines": {"mysql_image_id_sha256": "hash64", "mongodb_image_id_sha256": "hash64", "architecture": frozenset({"amd64", "arm64"})},
+              "observed_filesystems": [{"scope": frozenset({"source", "staging", "archive", "docker"}), "path_sha256": "hash64", "total_bytes": "uint", "available_bytes": "uint", "free_bytes": "uint"}],
+              "observed_socket_kind": frozenset({"", "fixed_root_owned_unix_docker"}), "observation_elapsed_millis": "uint",
               "inventory_complete": "bool", "inventory_private_report_hash": "hash64",
-              "prepare_mode": frozenset({"identity", "bounds", "inventory", "report-diagnostic"}) | BOOTSTRAP_MODES, "diagnostic_only": "bool", "drop_ready": "bool",
+              "prepare_mode": frozenset({"identity", "bounds", "inventory", "report-diagnostic", "prepare-facts"}) | BOOTSTRAP_MODES, "diagnostic_only": "bool", "drop_ready": "bool",
               "request_bootstrap_complete": "bool", "bootstrap_approval_sha256": "hash64", "derived_request_sha256": "hash64", "request_created_run_id": "run_id",
               "history_metadata_complete": "bool", "history_metadata_process_budget_proven": "bool",
               "metadata_private_report_sha256": "hash64", "metadata_created_run_id": "run_id",
@@ -2000,7 +2141,7 @@ def main(argv=None):
         # Fixed ASCII fallback contains no input and cannot be mistaken for a
         # valid framed receipt. Never print a raw protocol/debug alternative.
         print("compatibility_retirement_receipt_transport_failed", file=sys.stderr)
-    diagnostic_complete = ((receipt.get("prepare_mode") == "report-diagnostic" and receipt.get("report_diagnostic_complete") is True and receipt.get("diagnostic_only") is True and all(value is False for value in receipt.get("capabilities", {}).values())) or
+    diagnostic_complete = ((receipt.get("prepare_mode") == "prepare-facts" and receipt.get("prepare_facts_observation_complete") is True and receipt.get("diagnostic_only") is True and all(value is False for value in receipt.get("capabilities", {}).values())) or (receipt.get("prepare_mode") == "report-diagnostic" and receipt.get("report_diagnostic_complete") is True and receipt.get("diagnostic_only") is True and all(value is False for value in receipt.get("capabilities", {}).values())) or
         (receipt.get("prepare_mode") == "bootstrap-history" and receipt.get("history_readonly_complete") is True) or
         (receipt.get("prepare_mode") == "bootstrap-history-metadata" and receipt.get("history_metadata_complete") is True) or
         (receipt.get("prepare_mode") == "bootstrap-history-parent" and receipt.get("history_parent_registration_complete") is True and

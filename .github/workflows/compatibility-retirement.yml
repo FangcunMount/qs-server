@@ -38,7 +38,7 @@ on:
         description: 'Observe sources, persist prewindow historical evidence, or diagnose an existing boundary report'
         required: false
         type: choice
-        options: [identity, bootstrap-bounds, bounds, bootstrap-inventory, inventory, bootstrap-history, bootstrap-history-metadata, bootstrap-history-parent, bootstrap-ai-bounds, bootstrap-ai-verify, historical-evidence-write, historical-ai-bounds, report-diagnostic, lifecycle, window-tool]
+        options: [identity, bootstrap-bounds, bounds, bootstrap-inventory, inventory, bootstrap-history, bootstrap-history-metadata, bootstrap-history-parent, bootstrap-ai-bounds, bootstrap-ai-verify, historical-evidence-write, historical-ai-bounds, report-diagnostic, lifecycle, prepare-facts, window-tool]
         default: inventory
       identity_request_sha256:
         description: 'Prepare identity only: independently computed canonical request SHA256'
@@ -92,15 +92,16 @@ jobs:
             const windowTool = input.prepare_mode === 'window-tool';
             const diagnostic = input.prepare_mode === 'report-diagnostic';
             const bootstrap = ['bootstrap-bounds', 'bootstrap-inventory', 'bootstrap-history', 'bootstrap-history-metadata', 'bootstrap-history-parent', 'bootstrap-ai-bounds', 'bootstrap-ai-verify', 'historical-evidence-write', 'historical-ai-bounds'].includes(input.prepare_mode);
-            const descriptor = bootstrap || diagnostic || windowTool;
+            const prepareFacts = input.prepare_mode === 'prepare-facts';
+            const descriptor = bootstrap || diagnostic || prepareFacts || windowTool;
             if (JSON.stringify(keys) !== JSON.stringify(expectedKeys) ||
                 !['prepare', 'apply', 'verify', 'recover', 'purge'].includes(input.operation) ||
                 input.database !== 'mysql-and-mongodb' ||
                 !/^[0-9a-f]{40}$/.test(input.approved_source_sha) ||
                 !/^[0-9]{1,20}-[0-9]{1,4}$/.test(input.operation_id) ||
-                !['identity', 'bounds', 'inventory', 'bootstrap-bounds', 'bootstrap-inventory', 'bootstrap-history', 'bootstrap-history-metadata', 'bootstrap-history-parent', 'bootstrap-ai-bounds', 'bootstrap-ai-verify', 'historical-evidence-write', 'historical-ai-bounds', 'report-diagnostic', 'lifecycle', 'window-tool'].includes(input.prepare_mode) ||
+                !['identity', 'bounds', 'inventory', 'bootstrap-bounds', 'bootstrap-inventory', 'bootstrap-history', 'bootstrap-history-metadata', 'bootstrap-history-parent', 'bootstrap-ai-bounds', 'bootstrap-ai-verify', 'historical-evidence-write', 'historical-ai-bounds', 'report-diagnostic', 'lifecycle', 'prepare-facts', 'window-tool'].includes(input.prepare_mode) ||
                 (windowTool
-                  ? (typeof input.bootstrap_approval_json !== 'string' || !/^[\x20-\x7e]{1,4096}$/.test(input.bootstrap_approval_json) || !/^[0-9a-f]{64}$/.test(input.bootstrap_approval_sha256))
+                  ? (input.operation !== 'prepare' || typeof input.bootstrap_approval_json !== 'string' || !/^[\x20-\x7e]{1,4096}$/.test(input.bootstrap_approval_json) || !/^[0-9a-f]{64}$/.test(input.bootstrap_approval_sha256))
                   : descriptor
                   ? (input.operation !== 'prepare' || input.manifest_sha256 !== '' || input.inventory_request_sha256 !== '' || input.identity_request_sha256 !== '' || typeof input.bootstrap_approval_json !== 'string' || !/^[\x20-\x7e]{1,4096}$/.test(input.bootstrap_approval_json) || !/^[0-9a-f]{64}$/.test(input.bootstrap_approval_sha256))
                   : (input.bootstrap_approval_json !== '' || input.bootstrap_approval_sha256 !== '')) ||
@@ -128,13 +129,12 @@ jobs:
               try {a = JSON.parse(input.bootstrap_approval_json);} catch {reject();}
               if (!exact(a, ['format_version','kind','dispatcher_source_sha','tool_source_sha','original_source_sha','operation_id','original_run_id','stage','target_hash','manifest_sha256','request_template_sha256','tool_binary_sha256','b_image_id','b_program_sha256']) ||
                   a.format_version !== 1 || a.kind !== 'independent_compatibility_window_tool_approval' || a.dispatcher_source_sha !== context.sha ||
-                  !sha(a.tool_source_sha) || !sha(a.original_source_sha) || a.operation_id !== input.operation_id ||
+                  a.tool_source_sha !== context.sha || !sha(a.original_source_sha) || a.operation_id !== input.operation_id ||
                   typeof a.original_run_id !== 'string' || !/^[1-9][0-9]{0,19}-[1-9][0-9]{0,3}$/.test(a.original_run_id) ||
-                  a.stage !== input.operation || a.target_hash !== '4e09444409d1cfab3c9df383ed80a0999419fcbbd2f4e80d2e5dac1cf7dfcfb8' ||
+                  a.stage !== 'prepare' || a.stage !== input.operation || a.target_hash !== '4e09444409d1cfab3c9df383ed80a0999419fcbbd2f4e80d2e5dac1cf7dfcfb8' ||
                   a.manifest_sha256 !== input.manifest_sha256 || a.request_template_sha256 !== input.inventory_request_sha256 ||
                   !exact(a.tool_binary_sha256,['amd64','arm64']) || !hash(a.tool_binary_sha256.amd64) || !hash(a.tool_binary_sha256.arm64) ||
-                  !((a.stage === 'prepare' && a.b_image_id === '' && a.b_program_sha256 === '') ||
-                    (typeof a.b_image_id === 'string' && /^sha256:[0-9a-f]{64}$/.test(a.b_image_id) && hash(a.b_program_sha256)))) {reject();}
+                  a.b_image_id !== '' || a.b_program_sha256 !== '') {reject();}
               const line = JSON.stringify(canonical(a));
               if (line !== input.bootstrap_approval_json || require('crypto').createHash('sha256').update(line+'\n','ascii').digest('hex') !== input.bootstrap_approval_sha256) {reject();}
               const selected = await github.rest.repos.getCommit({...context.repo, ref: a.tool_source_sha});
@@ -145,6 +145,38 @@ jobs:
               if (!runs.length || runs[0].status !== 'completed' || runs[0].conclusion !== 'success') {reject();}
               toolSource = a.tool_source_sha;
               core.setOutput('tool_source_sha', toolSource);
+            }
+            if (prepareFacts) {
+              const reject = () => {throw new Error('compatibility_retirement_prepare_facts_descriptor_rejected');};
+              const object = v => v !== null && typeof v === 'object' && !Array.isArray(v);
+              const exact = (v, keys) => object(v) && JSON.stringify(Object.keys(v).sort()) === JSON.stringify(keys.slice().sort());
+              const canonical = v => Array.isArray(v) ? v.map(canonical) : object(v) ? Object.fromEntries(Object.keys(v).sort().map(k => [k, canonical(v[k])])) : v;
+              let v;
+              try {v = JSON.parse(input.bootstrap_approval_json);} catch {reject();}
+              if (!exact(v, ['format_version','kind','prepare_mode','source_sha','operation_id','target_hash','database_scope','inventory_report','restore_engines','archive_directory']) ||
+                  v.format_version !== 1 || v.kind !== 'readonly_prepare_facts_observation_descriptor' || v.prepare_mode !== 'prepare-facts' ||
+                  v.source_sha !== input.approved_source_sha || v.operation_id !== input.operation_id ||
+                  v.target_hash !== '4e09444409d1cfab3c9df383ed80a0999419fcbbd2f4e80d2e5dac1cf7dfcfb8' || v.database_scope !== 'mysql-and-mongodb') {reject();}
+              const p = v.inventory_report, e = v.restore_engines;
+              const currentRun = String(context.runId)+'-'+String(process.env.GITHUB_RUN_ATTEMPT);
+              if (!exact(p, ['operation_id','run_id','source_sha','sha256','request_sha256']) || p.operation_id !== v.operation_id ||
+                  typeof p.run_id !== 'string' || !/^[0-9]{1,20}-[0-9]{1,4}$/.test(p.run_id) || p.run_id === currentRun ||
+                  typeof p.source_sha !== 'string' || !/^[0-9a-f]{40}$/.test(p.source_sha) ||
+                  typeof p.sha256 !== 'string' || !/^[0-9a-f]{64}$/.test(p.sha256) ||
+                  typeof p.request_sha256 !== 'string' || !/^[0-9a-f]{64}$/.test(p.request_sha256) ||
+                  !exact(e, ['mysql_image_id','mongodb_image_id','architecture']) ||
+                  typeof e.mysql_image_id !== 'string' || !/^sha256:[0-9a-f]{64}$/.test(e.mysql_image_id) ||
+                  typeof e.mongodb_image_id !== 'string' || !/^sha256:[0-9a-f]{64}$/.test(e.mongodb_image_id) ||
+                  e.mysql_image_id === e.mongodb_image_id || !['amd64','arm64'].includes(e.architecture)) {reject();}
+              const root = '/opt/backups/qs-server/compatibility-retirement/'+v.operation_id+'/';
+              const path = v.archive_directory;
+              if (typeof path !== 'string' || path.length > 1024 || !path.startsWith(root) || path.length <= root.length ||
+                  /[\u0000\r\n]/.test(path) || path.endsWith('/') || path.split('/').some((part,i) => i > 0 && (!part || part === '.' || part === '..')) ||
+                  path === root+'inventory-'+p.run_id || path.startsWith(root+'inventory-'+p.run_id+'/')) {reject();}
+              const line = JSON.stringify(canonical(v));
+              if (line !== input.bootstrap_approval_json || require('crypto').createHash('sha256').update(line+'\n','ascii').digest('hex') !== input.bootstrap_approval_sha256) {reject();}
+              // Returned BSON/image/capacity facts require separate review. This
+              // descriptor cannot approve a manifest, backup or DROP capability.
             }
             if (diagnostic) {
               const reject = () => {throw new Error('compatibility_retirement_report_diagnostic_approval_rejected');};
@@ -382,7 +414,7 @@ jobs:
       group: qlume
       labels: [self-hosted, macOS, ARM64, ops]
     environment: production
-    timeout-minutes: ${{ (inputs.prepare_mode == 'lifecycle' || inputs.prepare_mode == 'window-tool') && 115 || 40 }}
+    timeout-minutes: ${{ (inputs.prepare_mode == 'lifecycle' || inputs.prepare_mode == 'prepare-facts' || inputs.prepare_mode == 'window-tool') && 115 || 40 }}
     steps:
       - name: Validate pinned production SSH binding
         env:
@@ -494,7 +526,7 @@ jobs:
           key: ${{ secrets.SVRA_SSH_KEY }}
           port: ${{ vars.SVRA_SSH_PORT || 22 }}
           fingerprint: ${{ vars.SVRA_SSH_FINGERPRINT }}
-          command_timeout: ${{ inputs.prepare_mode == 'lifecycle' && '100m' || '35m' }}
+          command_timeout: ${{ (inputs.prepare_mode == 'lifecycle' || inputs.prepare_mode == 'prepare-facts') && '100m' || '35m' }}
           envs: RETIREMENT_OPERATION,RETIREMENT_OPERATION_ID,RETIREMENT_MANIFEST_SHA256,RETIREMENT_INVENTORY_REQUEST_SHA256,RETIREMENT_LIFECYCLE_REQUEST_SHA256,RETIREMENT_PREPARE_MODE,RETIREMENT_IDENTITY_REQUEST_SHA256,RETIREMENT_BOOTSTRAP_APPROVAL_JSON,RETIREMENT_BOOTSTRAP_APPROVAL_SHA256,RETIREMENT_APPROVED_SHA,RETIREMENT_ACTUAL_SHA,RETIREMENT_RUN_ID,RETIREMENT_PACKAGE_SHA256,MYSQL_HOST,MYSQL_PORT,MYSQL_USERNAME,MYSQL_PASSWORD,MYSQL_DATABASE,MONGODB_HOST,MONGODB_PORT,MONGODB_USERNAME,MONGODB_PASSWORD,MONGODB_DBNAME,MONGODB_METADATA_ADMIN_USERNAME,MONGODB_METADATA_ADMIN_PASSWORD
           script: |
             set -Eeuo pipefail

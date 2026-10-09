@@ -481,37 +481,25 @@ func runLifecycleCLI(ctx context.Context, mode, requestPath, requestHash, operat
 	receipt.ArchiveBindingComplete = true
 	receipt.SQLRecoveryBaselineSHA256 = r.Recovery.SQLNonTargetSHA256
 	if stage == "prepare" {
-		prepared, owner, prepareErr := prepareLifecycleNative(ctx, r, archive)
-		if prepareErr != nil {
-			return receipt, prepareErr
+		prepared, owner, err := prepareLifecycleNative(ctx, r, archive)
+		if err != nil {
+			return receipt, err
 		}
 		if !lifecyclePreparationMatches(archive, prepared) {
 			_ = owner.Close()
 			return receipt, lifecycleError("lifecycle_actual_restore_proof_missing_or_budget_rejected")
 		}
-		sqlProof, mongoProof := prepared.SQLRestore.Summary(), prepared.MongoRestore.Summary()
-		started, finished := sqlProof.StartedAt, sqlProof.FinishedAt
-		if mongoProof.StartedAt.Before(started) {
-			started = mongoProof.StartedAt
+		// No success receipt until every actual handle, wire exec and final runtime
+		// inspection finishes under the unchanged original600-second deadline.
+		elapsed, err := owner.finishPreparation()
+		if err != nil {
+			return receipt, err
 		}
-		if mongoProof.FinishedAt.After(finished) {
-			finished = mongoProof.FinishedAt
-		}
-		receipt.RestoreElapsedMillis = finished.Sub(started).Milliseconds()
-		if prepared.combinedElapsedMillis > 0 {
-			receipt.RestoreElapsedMillis = prepared.combinedElapsedMillis
-		}
-		// Success includes actual driver closure, every real wire exec joined,
-		// final live engine inspection, and the original unchanged deadline.
-		completeElapsed, closeErr := owner.finishPreparation()
-		if closeErr != nil {
-			return receipt, closeErr
-		}
-		receipt.RestoreElapsedMillis = completeElapsed
-		receipt.IsolatedContentRestoreComplete = true
-		receipt.Complete = true
+		receipt.RestoreElapsedMillis = elapsed
+		receipt.IsolatedContentRestoreComplete, receipt.Complete = true, true
 		return receipt, nil
 	}
+
 	host, err := newLifecycleFixedHost(ctx, r, archive)
 	if err != nil || host == nil {
 		if err == nil {

@@ -1182,6 +1182,30 @@ func main() {
 		fmt.Println(`{"format_version":1,"complete":false,"drop_ready":false,"error_category":"input_invalid"}`)
 		os.Exit(1)
 	}
+	if *mode == "prepare-facts-root-once" {
+		ctx, cancel := context.WithTimeout(context.Background(), 90*time.Minute)
+		r, e := runPrepareFacts(ctx, *req, *hash, *op, *runID)
+		cancel()
+		if json.NewEncoder(os.Stdout).Encode(r) != nil || e != nil {
+			os.Exit(1)
+		}
+		return
+	}
+	if *mode == "lifecycle-prepare-root-once" {
+		ctx, cancel := context.WithTimeout(context.Background(), 90*time.Minute)
+		staged, e := stageLifecycleRootInputs(ctx, *req, *hash, *op, *runID)
+		r := lifecycleReceipt{FormatVersion: 1, Kind: "compatibility_retirement_lifecycle_result", Operation: "prepare", SourceSHA: sourceSHA, OperationID: *op, RunID: *runID, RequestSHA256: *hash, TargetHash: digest(targets), TargetCount: 4}
+		if e == nil {
+			r, e = runLifecycleCLI(ctx, "lifecycle-prepare", staged, *hash, *op, *runID)
+		} else {
+			r.ErrorCategory = lifecycleCategory(e)
+		}
+		cancel()
+		if json.NewEncoder(os.Stdout).Encode(r) != nil || e != nil {
+			os.Exit(1)
+		}
+		return
+	}
 	if *mode == "host-budget-key-create" || *mode == "host-budget-key-open" {
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		r, err := runLifecycleServiceKey(ctx, *mode, *req, *hash, *op, *runID)

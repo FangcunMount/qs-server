@@ -136,11 +136,22 @@ func nativeRoot(t *testing.T, filename, port string) nativeContainer {
 }
 func nativePrivateDir(t *testing.T) string {
 	t.Helper()
+	return nativePrivateDirWithCleanupGuard(t, nil)
+}
+
+func nativePrivateDirWithCleanupGuard(t *testing.T, cleanupAllowed func() bool) string {
+	t.Helper()
 	p, e := os.MkdirTemp(nativePrivateRoot, "backup-native-owned-")
 	if e != nil || os.Chmod(p, 0700) != nil {
 		t.Fatal("owned_private_directory_failed")
 	}
 	t.Cleanup(func() {
+		// This in-memory guard remains effective when disk-full or permission
+		// failures prevent a durable unresolved checkpoint from being written.
+		if cleanupAllowed != nil && !cleanupAllowed() {
+			t.Error("owned_private_material_cleanup_not_accepted_retained")
+			return
+		}
 		if _, e := os.Lstat(filepath.Join(p, "cleanup-unresolved.private.json")); e == nil {
 			t.Error("owned_cleanup_unresolved_checkpoint_retained")
 			return
@@ -1040,6 +1051,11 @@ func (f *nativeSourceRS) cleanup(ctx context.Context) error {
 }
 func nativeStartSourceRS(t *testing.T, dir string, root nativeContainer, env map[string]string) *nativeSourceRS {
 	t.Helper()
+	return nativeStartSourceRSWithCleanupGuard(t, dir, root, env, nil)
+}
+
+func nativeStartSourceRSWithCleanupGuard(t *testing.T, dir string, root nativeContainer, env map[string]string, cleanupAllowed func() bool) *nativeSourceRS {
+	t.Helper()
 	listener, e := net.Listen("tcp", "127.0.0.1:0")
 	if e != nil {
 		t.Fatal("owned_source_port_reservation_failed")
@@ -1069,6 +1085,11 @@ func nativeStartSourceRS(t *testing.T, dir string, root nativeContainer, env map
 	}
 	nativeJSON(t, filepath.Join(dir, "source-rs-requested.private.json"), f)
 	t.Cleanup(func() {
+		if cleanupAllowed != nil && !cleanupAllowed() {
+			nativeRetainCleanup(t, dir)
+			t.Error("owned_source_producer_stop_unproven_resources_retained")
+			return
+		}
 		if e := f.cleanup(context.Background()); e != nil {
 			nativeRetainCleanup(t, dir)
 			t.Error(e)
