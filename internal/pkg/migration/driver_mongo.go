@@ -66,7 +66,7 @@ func (d *MongoDriver) CreateInstance(fs embed.FS, config *Config) (*migrate.Migr
 		return nil, fmt.Errorf("mongodb: failed to create database driver: %w", err)
 	}
 
-	return d.createInstance(fs, databaseDriver)
+	return d.createInstance(fs, newRetirementDatabaseDriver(databaseDriver, BackendMongo, config, nil, d.client, fs))
 }
 
 // PrepareRun enforces data-dependent migration preconditions and installs the

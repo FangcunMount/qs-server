@@ -19,6 +19,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/mongoconfig"
 	mongo_indexes "github.com/FangcunMount/qs-server/internal/pkg/mongodb"
 	options "github.com/FangcunMount/qs-server/internal/pkg/options"
+	"github.com/FangcunMount/qs-server/pkg/version"
 )
 
 // DatabaseManager 数据库管理器
@@ -469,6 +470,9 @@ func redisDatabaseForLog(cfg *database.RedisConfig) int {
 
 // runMigrations 执行数据库迁移
 func (dm *DatabaseManager) runMigrations(ctx context.Context) error {
+	if dm.config.MigrationOptions == nil {
+		return fmt.Errorf("migration options are required")
+	}
 	// 检查是否启用迁移
 	if !dm.config.MigrationOptions.Enabled {
 		logger.L(ctx).Infow("Database migration is disabled, skipping...",
@@ -477,33 +481,49 @@ func (dm *DatabaseManager) runMigrations(ctx context.Context) error {
 		)
 		return nil
 	}
-
-	var ran bool
+	if errs := dm.config.MigrationOptions.Validate(); len(errs) != 0 {
+		return fmt.Errorf("migration options rejected: %v", errs)
+	}
+	// Both stores are observed before either provider may create migration metadata.
+	// Empty catalogs require an externally approved, identity-bound private artifact.
+	pairedSQL, err := dm.GetMySQLDB()
+	if err != nil {
+		return fmt.Errorf("paired mysql migration connection unavailable: %w", err)
+	}
+	pairedDB, err := pairedSQL.DB()
+	if err != nil {
+		return fmt.Errorf("paired mysql migration pool unavailable: %w", err)
+	}
+	pairedMongo, err := dm.GetMongoClient()
+	if err != nil {
+		return fmt.Errorf("paired mongo migration connection unavailable: %w", err)
+	}
+	if dm.config.MySQLOptions == nil || dm.config.MongoDBOptions == nil {
+		return fmt.Errorf("paired selected database options required")
+	}
+	selectedSQL, selectedMongo := dm.config.MySQLOptions.Database, dm.config.MongoDBOptions.Database
+	if businessMongo := viper.GetString("mongodb.database"); businessMongo == "" || businessMongo != selectedMongo {
+		return fmt.Errorf("migration selected mongodb does not match configured business database")
+	}
+	if override := dm.config.MigrationOptions.Database; override != "" && (override != selectedSQL || override != selectedMongo) {
+		return fmt.Errorf("migration override does not match both configured selected databases")
+	}
+	pair, err := migration.PreflightCompatibilityPair(ctx, pairedDB, pairedMongo, migration.PairConfig{
+		MySQLDatabase: selectedSQL, MongoDatabase: selectedMongo,
+		BootstrapAuthorizationFile:   dm.config.MigrationOptions.BootstrapAuthorizationFile,
+		BootstrapAuthorizationSHA256: dm.config.MigrationOptions.BootstrapAuthorizationSHA256,
+		ExpectedSourceSHA:            version.Get().GitCommit,
+	})
+	if err != nil {
+		return fmt.Errorf("paired migration preflight rejected: %w", err)
+	}
 
 	// MySQL 迁移
-	if gormDB, err := dm.GetMySQLDB(); err != nil {
-		logger.L(ctx).Warnw("MySQL not configured, skipping MySQL migration",
-			"component", "MySQLMigration",
-			"result", "skipped",
-		)
-	} else {
-		sqlDB, derr := gormDB.DB()
-		if derr != nil {
-			return fmt.Errorf("failed to get sql.DB: %w", derr)
-		}
+	{
+		database := selectedSQL
+		migrationConfig := pair.MySQLConfig(dm.config.MigrationOptions.AutoSeed)
 
-		database := dm.config.MigrationOptions.Database
-		if database == "" {
-			database = dm.config.MySQLOptions.Database
-		}
-
-		migrationConfig := &migration.Config{
-			Enabled:  dm.config.MigrationOptions.Enabled,
-			AutoSeed: dm.config.MigrationOptions.AutoSeed,
-			Database: database,
-		}
-
-		migrator := migration.NewMigrator(sqlDB, migrationConfig)
+		migrator := migration.NewMigrator(pairedDB, migrationConfig)
 
 		logger.L(ctx).Infow("Starting MySQL database migration...",
 			"component", "MySQLMigration",
@@ -529,34 +549,13 @@ func (dm *DatabaseManager) runMigrations(ctx context.Context) error {
 				"version", version,
 			)
 		}
-		ran = true
 	}
 
-	// MongoDB 迁移（可选）
-	mongoDBName := viper.GetString("mongodb.database")
-	if mongoClient, err := dm.GetMongoClient(); err != nil {
-		logger.L(ctx).Infow("MongoDB not configured or unavailable, skipping migration",
-			"component", "MongoDBMigration",
-			"result", "skipped",
-			"error", err.Error(),
-		)
-	} else if mongoDBName == "" {
-		logger.L(ctx).Warnw("MongoDB database name not configured, skipping MongoDB migration",
-			"component", "MongoDBMigration",
-			"result", "skipped",
-		)
-	} else {
-		mongoDatabase := dm.config.MigrationOptions.Database
-		if mongoDatabase == "" {
-			mongoDatabase = mongoDBName
-		}
-
-		mongoConfig := &migration.Config{
-			Enabled:              dm.config.MigrationOptions.Enabled,
-			AutoSeed:             dm.config.MigrationOptions.AutoSeed,
-			Database:             mongoDatabase,
-			MigrationsCollection: "schema_migrations",
-		}
+	// MongoDB follows the proved SQL100 head on the same borrowed client.
+	{
+		mongoDatabase := selectedMongo
+		mongoClient := pairedMongo
+		mongoConfig := pair.MongoConfig(dm.config.MigrationOptions.AutoSeed)
 
 		mongoMigrator := migration.NewMongoMigrator(mongoClient, mongoConfig)
 		logger.L(ctx).Infow("Starting MongoDB migration...",
@@ -597,14 +596,6 @@ func (dm *DatabaseManager) runMigrations(ctx context.Context) error {
 			"component", "MongoDBMigration",
 			"action", "verify_indexes",
 			"result", "success",
-		)
-		ran = true
-	}
-
-	if !ran {
-		logger.L(ctx).Warnw("No database migration target configured, skipping...",
-			"component", "Migration",
-			"result", "skipped",
 		)
 	}
 

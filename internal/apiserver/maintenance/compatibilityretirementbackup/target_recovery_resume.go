@@ -15,7 +15,7 @@ import (
 )
 
 const targetJournalFileLimit = 64 << 10
-const targetJournalEntryLimit = 35
+const targetJournalEntryLimit = 37 // original closed entries plus two exact B-migration files
 
 // This is reconciliation input, not execution permission. A new run retains the
 // original binding and the original window start; it cannot reset either.
@@ -256,7 +256,7 @@ func readTargetJournalEntry(ctx context.Context, fd int, name string) (raw []byt
 }
 
 func targetJournalNameSupported(name string) bool {
-	if name == "target-recovery-binding.json" {
+	if name == "target-recovery-binding.json" || name == "target-recovery-b-migration-intent.json" || name == "target-recovery-b-migration-result.json" {
 		return true
 	}
 	for i := 0; i < 4; i++ {
@@ -270,6 +270,13 @@ func targetJournalNameSupported(name string) bool {
 }
 
 func inspectTargetJournal(ctx context.Context, path string, request TargetRecoveryRequest, windowStart string) (snapshot *targetJournalSnapshot, result error) {
+	return inspectTargetJournalKind(ctx, path, request, windowStart, targetBJournalComplete)
+}
+
+func inspectTargetJournalKind(ctx context.Context, path string, request TargetRecoveryRequest, windowStart string, kind targetBJournalKind) (snapshot *targetJournalSnapshot, result error) {
+	if !targetBJournalKindValid(kind) {
+		return nil, ErrRecoveryBinding
+	}
 	if ctx == nil || ctx.Err() != nil || !hashPattern.MatchString(windowStart) {
 		return nil, ErrRecoveryJournal
 	}
@@ -307,6 +314,9 @@ func inspectTargetJournal(ctx context.Context, path string, request TargetRecove
 	canonical, e := json.Marshal(s.request)
 	if e != nil || !reflect.DeepEqual(raw, canonical) {
 		return nil, ErrRecoveryJournal
+	}
+	if e := targetValidateBMigrationJournalKind(s, kind); e != nil {
+		return nil, e
 	}
 	namesAfter, e := listTargetJournalFiles(fd)
 	if e != nil || !targetJournalNamesEqual(names, namesAfter) || verifyTargetJournalDirectories(dirs) != nil {
@@ -410,6 +420,12 @@ func targetJournalRestoreBinding(s *targetJournalSnapshot, i int) (TargetRecover
 // This reopens only the just-inspected physical ledger, not a serialized DROP
 // proof. Original native targetDropProof values are deliberately never minted.
 func reopenTargetRecoveryJournal(ctx context.Context, path string, s *targetJournalSnapshot) (*targetRecoveryJournal, error) {
+	return reopenTargetRecoveryJournalKind(ctx, path, s, targetBJournalComplete)
+}
+func reopenTargetRecoveryJournalKind(ctx context.Context, path string, s *targetJournalSnapshot, kind targetBJournalKind) (*targetRecoveryJournal, error) {
+	if !targetBJournalKindValid(kind) {
+		return nil, ErrRecoveryBinding
+	}
 	if ctx == nil || ctx.Err() != nil || s == nil || privateDirectory(path) != nil {
 		return nil, ErrRecoveryJournal
 	}
@@ -437,7 +453,7 @@ func reopenTargetRecoveryJournal(ctx context.Context, path string, s *targetJour
 	if j.validate() != nil {
 		return nil, ErrRecoveryJournal
 	}
-	fresh, e := inspectTargetJournal(ctx, path, s.request, s.windowStart)
+	fresh, e := inspectTargetJournalKind(ctx, path, s.request, s.windowStart, kind)
 	if e != nil || fresh.hash != s.hash {
 		return nil, ErrRecoveryJournal
 	}
@@ -449,6 +465,9 @@ func reopenTargetRecoveryJournal(ctx context.Context, path string, s *targetJour
 // bounded files under the original window/backup binding; it never accepts a
 // receipt as proof, invents a DROP result, or authorizes a database mutation.
 func InspectTargetRecoveryJournal(ctx context.Context, a *Archive, r TargetRecoveryRequest, path string, w *fence.MaintenanceWindow) (TargetRecoveryJournalSummary, error) {
+	return inspectTargetRecoveryJournalKind(ctx, a, r, path, w, targetBJournalComplete)
+}
+func inspectTargetRecoveryJournalKind(ctx context.Context, a *Archive, r TargetRecoveryRequest, path string, w *fence.MaintenanceWindow, kind targetBJournalKind) (TargetRecoveryJournalSummary, error) {
 	var out TargetRecoveryJournalSummary
 	if ctx == nil || ctx.Err() != nil || a == nil || !hashPattern.MatchString(r.ManifestSHA256) || !hashPattern.MatchString(r.SQLNonTargetSHA256) || !hashPattern.MatchString(r.MongoNonTargetSHA256) || !runPattern.MatchString(r.ActualRunID) || r.SourceSHA != a.data.Approval.SourceSHA || r.OperationID != a.data.Approval.OperationID || r.OriginalRunID != a.data.Approval.RunID || r.ArchiveSHA256 != a.digest || !sourcePattern.MatchString(r.SourceSHA) || !runPattern.MatchString(r.OperationID) {
 		return out, ErrRecoveryBinding
@@ -463,7 +482,7 @@ func InspectTargetRecoveryJournal(ctx context.Context, a *Archive, r TargetRecov
 	if e != nil {
 		return out, e
 	}
-	s, e := inspectTargetJournal(ctx, path, r, start)
+	s, e := inspectTargetJournalKind(ctx, path, r, start, kind)
 	if e != nil {
 		return out, e
 	}

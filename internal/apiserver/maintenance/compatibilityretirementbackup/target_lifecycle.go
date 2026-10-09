@@ -174,7 +174,7 @@ func targetLifecycleReadback(ctx context.Context, p *TargetRecoveryPlan, origina
 	if p.journal == nil || p.journal.validate() != nil {
 		return nil, ErrRecoveryJournal
 	}
-	s, e := inspectTargetJournal(ctx, p.journal.dir, original, start)
+	s, e := inspectTargetJournalKind(ctx, p.journal.dir, original, start, targetTransitionJournalKind(p.bMigration))
 	if e != nil {
 		return nil, e
 	}
@@ -210,7 +210,7 @@ func ResumeTargetRecovery(ctx context.Context, v *TargetRecoveryReconciliation, 
 	if v.summary.Unresolved != 0 || len(v.summary.Targets) != 4 {
 		return nil, ErrRecoveryUnknown
 	}
-	fresh, e := ReconcileTargetRecovery(ctx, v.archive, b, v.request, v.journalDir, w)
+	fresh, e := v.reconcileActual(ctx, b, w)
 	if e != nil {
 		return nil, e
 	}
@@ -229,17 +229,17 @@ func ResumeTargetRecovery(ctx context.Context, v *TargetRecoveryReconciliation, 
 		return nil, ErrBudget
 	}
 	defer c()
-	s, e := inspectTargetJournal(q, v.journalDir, v.request.Original, start)
+	s, e := inspectTargetJournalKind(q, v.journalDir, v.request.Original, start, targetTransitionJournalKind(fresh.bMigration))
 	if e != nil || s.hash != v.request.JournalSHA256 {
 		return nil, ErrRecoveryJournal
 	}
-	j, e := reopenTargetRecoveryJournal(q, v.journalDir, s)
+	j, e := reopenTargetRecoveryJournalKind(q, v.journalDir, s, targetTransitionJournalKind(fresh.bMigration))
 	if e != nil {
 		return nil, e
 	}
 	r := v.request.Original
 	r.ActualRunID = v.request.CurrentRunID
-	p := &TargetRecoveryPlan{archive: v.archive, borrowed: b, request: r, journal: j, window: w, budget: w.RecoveryContext}
+	p := &TargetRecoveryPlan{archive: v.archive, borrowed: b, request: r, journal: j, window: w, budget: w.RecoveryContext, bMigration: fresh.bMigration}
 	p.self = p
 	// A resumed plan has no native process-bound DROP capabilities, including
 	// after a successful restore. Logged DROP readback is a distinct evidence tier.
@@ -295,7 +295,7 @@ func ResumeTargetRecovery(ctx context.Context, v *TargetRecoveryReconciliation, 
 		if e != nil || present {
 			return nil, ErrRecoveryState
 		}
-		before, e := inspectTargetJournal(q, v.journalDir, v.request.Original, start)
+		before, e := inspectTargetJournalKind(q, v.journalDir, v.request.Original, start, targetTransitionJournalKind(p.bMigration))
 		if e != nil {
 			return nil, e
 		}

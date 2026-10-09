@@ -80,6 +80,7 @@ type TargetRecoveryPlan struct {
 	observations                                                                           [4]TargetRecoveryObservation
 	sqlNamespace, sqlConnection, sqlBaseline, mongoBaseline, mongoProcess, mongoTargetUUID string
 	blocked                                                                                bool
+	bMigration                                                                             *targetBMigrationTransition
 }
 
 func (*TargetRecoveryPlan) MarshalJSON() ([]byte, error) { return nil, ErrSerialization }
