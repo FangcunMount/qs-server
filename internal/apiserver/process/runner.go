@@ -132,6 +132,7 @@ func (r *prepareRunner) run() (preparedServer, string, error) {
 				startShutdown: r.server.gs.Start,
 				httpServer:    state.transport.httpServer,
 				grpcServer:    state.transport.grpcServer,
+				runtimeFacts:  r.server.runtimeFacts,
 			}
 		},
 	}.Run()

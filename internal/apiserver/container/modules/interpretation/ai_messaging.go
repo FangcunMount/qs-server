@@ -11,11 +11,24 @@ import (
 	client "github.com/FangcunMount/qs-server/internal/apiserver/infra/aibridge"
 	store "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/aibridge"
 	opts "github.com/FangcunMount/qs-server/internal/apiserver/options"
+	"github.com/FangcunMount/qs-server/internal/pkg/runtimefacts"
 )
 
 type messagingLifecycle interface {
 	Start(context.Context) error
 	Stop(context.Context) error
+}
+
+func (m *Module) BindMessagingRuntimeFacts(facts *runtimefacts.Owner) {
+	if m == nil || m.aiMessagingRuntime == nil || facts == nil {
+		return
+	}
+	observer, ok := m.aiMessagingRuntime.(interface {
+		BindRuntimeFacts(*runtimefacts.Owner) error
+	})
+	if !ok || observer.BindRuntimeFacts(facts) != nil {
+		facts.MarkIncomplete("api-ai-events")
+	}
 }
 
 // Configure selects one host-owned transport before admitting commands. There is
