@@ -15,8 +15,13 @@ import (
 )
 
 const lifecycleRootPrepareBase = "/opt/backups/qs-server/compatibility-retirement-root-prepare"
+const lifecycleInvocationBase = "/opt/backups/qs-server/compatibility-retirement-invocations"
 
 var lifecycleSourceNames = []string{"inventory.private.json", "mysql-metadata.private.json", "mongodb-metadata.private.json", "mysql-domain_event_outbox.source.ndjson", "mysql-ai_bridge_commands.source.ndjson", "mysql-ai_messaging_legacy_commands.source.ndjson", "mongodb-domain_event_outbox.source.bsonframes"}
+
+func lifecycleInvocationBatch(operation, run string) string {
+	return filepath.Join(lifecycleInvocationBase, operation+"-"+run)
+}
 
 func lifecycleRootBatch(operation, run string) string {
 	return filepath.Join(lifecycleRootPrepareBase, operation+"-"+run)
@@ -158,10 +163,16 @@ func stageLifecycleRootInputs(ctx context.Context, path, expected, operation, ac
 		return "", lifecycleError("lifecycle_staging_root_once_required")
 	}
 	original := filepath.Join("/opt/backups/qs-server/compatibility-retirement", operation)
-	if path != filepath.Join(original, "lifecycle-request.json") {
+	metadataUID := uint32(uid64)
+	metadataRoot := original
+	if path == filepath.Join(lifecycleInvocationBatch(operation, actualRun), "lifecycle-request.json") {
+		// Only the exact current-run metadata is root-owned. The original
+		// producer and all seven source bodies retain their source UID binding.
+		metadataUID, metadataRoot = 0, lifecycleInvocationBatch(operation, actualRun)
+	} else if path != filepath.Join(original, "lifecycle-request.json") {
 		return "", lifecycleError("lifecycle_staging_path_rejected")
 	}
-	raw, e := readLifecycleOwnedBytes(path, expected, uint32(uid64), 256<<10)
+	raw, e := readLifecycleOwnedBytes(path, expected, metadataUID, 256<<10)
 	if e != nil {
 		return "", e
 	}
@@ -185,7 +196,7 @@ func stageLifecycleRootInputs(ctx context.Context, path, expected, operation, ac
 	if r.SourceFileSHA256[lifecycleSourceNames[0]] != r.Approval.InventorySHA256 || r.SourceFileSHA256[lifecycleSourceNames[1]] != r.Approval.SQLMetadataSHA256 || r.SourceFileSHA256[lifecycleSourceNames[2]] != r.Approval.MongoMetadataSHA256 {
 		return "", lifecycleError("lifecycle_staging_metadata_binding_rejected")
 	}
-	manifest, e := readLifecycleOwnedBytes(filepath.Join(original, "manifest.json"), r.ManifestSHA256, uint32(uid64), 256<<10)
+	manifest, e := readLifecycleOwnedBytes(filepath.Join(metadataRoot, "manifest.json"), r.ManifestSHA256, metadataUID, 256<<10)
 	if e != nil {
 		return "", e
 	}

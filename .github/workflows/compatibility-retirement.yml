@@ -38,7 +38,7 @@ on:
         description: 'Observe sources, persist prewindow historical evidence, or diagnose an existing boundary report'
         required: false
         type: choice
-        options: [identity, bootstrap-bounds, bounds, bootstrap-inventory, inventory, bootstrap-history, bootstrap-history-metadata, bootstrap-history-parent, bootstrap-ai-bounds, bootstrap-ai-verify, historical-evidence-write, historical-ai-bounds, report-diagnostic, lifecycle, prepare-facts]
+        options: [identity, bootstrap-bounds, bounds, bootstrap-inventory, inventory, bootstrap-history, bootstrap-history-metadata, bootstrap-history-parent, bootstrap-ai-bounds, bootstrap-ai-verify, historical-evidence-write, historical-ai-bounds, report-diagnostic, lifecycle, prepare-facts, window-tool]
         default: inventory
       identity_request_sha256:
         description: 'Prepare identity only: independently computed canonical request SHA256'
@@ -89,17 +89,20 @@ jobs:
             const diagnostic = input.prepare_mode === 'report-diagnostic';
             const bootstrap = ['bootstrap-bounds', 'bootstrap-inventory', 'bootstrap-history', 'bootstrap-history-metadata', 'bootstrap-history-parent', 'bootstrap-ai-bounds', 'bootstrap-ai-verify', 'historical-evidence-write', 'historical-ai-bounds'].includes(input.prepare_mode);
             const prepareFacts = input.prepare_mode === 'prepare-facts';
-            const descriptor = bootstrap || diagnostic || prepareFacts;
+            const windowTool = input.prepare_mode === 'window-tool';
+            const descriptor = bootstrap || diagnostic || prepareFacts || windowTool;
             if (JSON.stringify(keys) !== JSON.stringify(expectedKeys) ||
                 !['prepare', 'apply', 'verify', 'recover', 'purge'].includes(input.operation) ||
                 input.database !== 'mysql-and-mongodb' ||
                 !/^[0-9a-f]{40}$/.test(input.approved_source_sha) ||
                 !/^[0-9]{1,20}-[0-9]{1,4}$/.test(input.operation_id) ||
-                !['identity', 'bounds', 'inventory', 'bootstrap-bounds', 'bootstrap-inventory', 'bootstrap-history', 'bootstrap-history-metadata', 'bootstrap-history-parent', 'bootstrap-ai-bounds', 'bootstrap-ai-verify', 'historical-evidence-write', 'historical-ai-bounds', 'report-diagnostic', 'lifecycle', 'prepare-facts'].includes(input.prepare_mode) ||
-                (descriptor
+                !['identity', 'bounds', 'inventory', 'bootstrap-bounds', 'bootstrap-inventory', 'bootstrap-history', 'bootstrap-history-metadata', 'bootstrap-history-parent', 'bootstrap-ai-bounds', 'bootstrap-ai-verify', 'historical-evidence-write', 'historical-ai-bounds', 'report-diagnostic', 'lifecycle', 'prepare-facts', 'window-tool'].includes(input.prepare_mode) ||
+                (windowTool
+                  ? (input.operation !== 'prepare' || typeof input.bootstrap_approval_json !== 'string' || !/^[\x20-\x7e]{1,4096}$/.test(input.bootstrap_approval_json) || !/^[0-9a-f]{64}$/.test(input.bootstrap_approval_sha256))
+                  : descriptor
                   ? (input.operation !== 'prepare' || input.manifest_sha256 !== '' || input.inventory_request_sha256 !== '' || input.identity_request_sha256 !== '' || typeof input.bootstrap_approval_json !== 'string' || !/^[\x20-\x7e]{1,4096}$/.test(input.bootstrap_approval_json) || !/^[0-9a-f]{64}$/.test(input.bootstrap_approval_sha256))
                   : (input.bootstrap_approval_json !== '' || input.bootstrap_approval_sha256 !== '')) ||
-                (input.prepare_mode === 'lifecycle'
+                (['lifecycle', 'window-tool'].includes(input.prepare_mode)
                   ? (input.operation !== 'prepare' || !/^[0-9a-f]{64}$/.test(input.manifest_sha256) || !/^[0-9a-f]{64}$/.test(input.inventory_request_sha256) || input.identity_request_sha256 !== '')
                   : (input.operation === 'prepare'
                   ? (input.manifest_sha256 !== '' || (!descriptor && (input.prepare_mode === 'identity'
@@ -108,6 +111,26 @@ jobs:
                   : (!/^[0-9a-f]{64}$/.test(input.manifest_sha256) || input.inventory_request_sha256 !== '' || input.identity_request_sha256 !== '' || input.prepare_mode !== 'inventory'))) ||
                 context.ref !== 'refs/heads/main' || input.approved_source_sha !== context.sha) {
               throw new Error('compatibility_retirement_input_or_source_rejected');
+            }
+            if (windowTool) {
+              const reject = () => {throw new Error('compatibility_retirement_window_tool_approval_rejected');};
+              const object = v => v !== null && typeof v === 'object' && !Array.isArray(v);
+              const exact = (v, keys) => object(v) && JSON.stringify(Object.keys(v).sort()) === JSON.stringify(keys.slice().sort());
+              const canonical = v => object(v) ? Object.fromEntries(Object.keys(v).sort().map(k => [k, canonical(v[k])])) : v;
+              const hash = v => typeof v === 'string' && /^[0-9a-f]{64}$/.test(v);
+              const sha = v => typeof v === 'string' && /^[0-9a-f]{40}$/.test(v);
+              let a;
+              try {a = JSON.parse(input.bootstrap_approval_json);} catch {reject();}
+              if (!exact(a, ['format_version','kind','dispatcher_source_sha','tool_source_sha','original_source_sha','operation_id','original_run_id','stage','target_hash','manifest_sha256','request_template_sha256','tool_binary_sha256','b_image_id','b_program_sha256']) ||
+                  a.format_version !== 1 || a.kind !== 'independent_compatibility_window_tool_approval' || a.dispatcher_source_sha !== context.sha ||
+                  a.tool_source_sha !== context.sha || !sha(a.original_source_sha) || a.operation_id !== input.operation_id ||
+                  typeof a.original_run_id !== 'string' || !/^[1-9][0-9]{0,19}-[1-9][0-9]{0,3}$/.test(a.original_run_id) || a.original_run_id === String(context.runId)+'-'+String(process.env.GITHUB_RUN_ATTEMPT) ||
+                  a.stage !== 'prepare' || a.stage !== input.operation || a.target_hash !== '4e09444409d1cfab3c9df383ed80a0999419fcbbd2f4e80d2e5dac1cf7dfcfb8' ||
+                  a.manifest_sha256 !== input.manifest_sha256 || a.request_template_sha256 !== input.inventory_request_sha256 ||
+                  !exact(a.tool_binary_sha256,['amd64','arm64']) || !hash(a.tool_binary_sha256.amd64) || !hash(a.tool_binary_sha256.arm64) ||
+                  a.b_image_id !== '' || a.b_program_sha256 !== '') {reject();}
+              const line = JSON.stringify(canonical(a));
+              if (line !== input.bootstrap_approval_json || require('crypto').createHash('sha256').update(line+'\n','ascii').digest('hex') !== input.bootstrap_approval_sha256) {reject();}
             }
             if (prepareFacts) {
               const reject = () => {throw new Error('compatibility_retirement_prepare_facts_descriptor_rejected');};
@@ -377,7 +400,7 @@ jobs:
       group: qlume
       labels: [self-hosted, macOS, ARM64, ops]
     environment: production
-    timeout-minutes: ${{ (inputs.prepare_mode == 'lifecycle' || inputs.prepare_mode == 'prepare-facts') && 115 || 40 }}
+    timeout-minutes: ${{ (inputs.prepare_mode == 'lifecycle' || inputs.prepare_mode == 'prepare-facts' || inputs.prepare_mode == 'window-tool') && 115 || 40 }}
     steps:
       - name: Validate pinned production SSH binding
         env:
@@ -406,13 +429,22 @@ jobs:
         id: package
         env:
           RETIREMENT_PACKAGE_MODE: ${{ inputs.prepare_mode }}
+          RETIREMENT_TOOL_SOURCE_SHA: ${{ github.sha }}
         run: |
           set -Eeuo pipefail
           package_dir=$(mktemp -d "$RUNNER_TEMP/qs-compatibility-package.XXXXXX")
-          trap 'rm -f -- "$package_dir/compatibility-retirement.py" "$package_dir/compatibility-retirement-entrypoints.json" "$package_dir/receipt-transport.py" "$package_dir/inventory-linux-amd64" "$package_dir/inventory-linux-arm64" "$package_dir/history-linux-amd64" "$package_dir/history-linux-arm64" "$package_dir/compatibility-history-prepare.py" "$package_dir/compatibility-history-parent.py" "$package_dir/compatibility-ai-history-prepare.py" "$package_dir/qs-ai-retirement-readonly-host.py" "$package_dir/qs-ai-retirement-readonly-verifier.py" "$package_dir/qs-ai-retirement-readonly-observer.py" "$package_dir/qs-ai-retirement-0040-layout.py"; rmdir -- "$package_dir"' EXIT
+          trap 'rm -f -- "$package_dir/compatibility-retirement.py" "$package_dir/compatibility-window-tool.py" "$package_dir/compatibility-retirement-entrypoints.json" "$package_dir/receipt-transport.py" "$package_dir/inventory-linux-amd64" "$package_dir/inventory-linux-arm64" "$package_dir/history-linux-amd64" "$package_dir/history-linux-arm64" "$package_dir/compatibility-history-prepare.py" "$package_dir/compatibility-history-parent.py" "$package_dir/compatibility-ai-history-prepare.py" "$package_dir/qs-ai-retirement-readonly-host.py" "$package_dir/qs-ai-retirement-readonly-verifier.py" "$package_dir/qs-ai-retirement-readonly-observer.py" "$package_dir/qs-ai-retirement-0040-layout.py"; rmdir -- "$package_dir"' EXIT
           cp scripts/database/compatibility-retirement.py scripts/database/compatibility-history-prepare.py scripts/database/compatibility-retirement-entrypoints.json scripts/dbops/receipt-transport.py "$package_dir/"
           archive="qs-compatibility-retirement-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.tar.gz"
-          if [[ "$RETIREMENT_PACKAGE_MODE" == "report-diagnostic" ]]; then
+          if [[ "$RETIREMENT_PACKAGE_MODE" == "window-tool" ]]; then
+            [[ "$RETIREMENT_TOOL_SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]] || exit 1
+            [[ "$(git rev-parse HEAD)" == "$RETIREMENT_TOOL_SOURCE_SHA" ]] || exit 1
+            cp scripts/database/compatibility-window-tool.py "$package_dir/"
+            go test ./cmd/qs-compatibility-retirement
+            CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -buildvcs=false -trimpath -ldflags="-s -w -X main.sourceSHA=$RETIREMENT_TOOL_SOURCE_SHA -X github.com/FangcunMount/qs-server/pkg/version.GitCommit=$RETIREMENT_TOOL_SOURCE_SHA" -o "$package_dir/inventory-linux-amd64" ./cmd/qs-compatibility-retirement
+            CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -buildvcs=false -trimpath -ldflags="-s -w -X main.sourceSHA=$RETIREMENT_TOOL_SOURCE_SHA -X github.com/FangcunMount/qs-server/pkg/version.GitCommit=$RETIREMENT_TOOL_SOURCE_SHA" -o "$package_dir/inventory-linux-arm64" ./cmd/qs-compatibility-retirement
+            tar -czf "$archive" -C "$package_dir" compatibility-window-tool.py receipt-transport.py inventory-linux-amd64 inventory-linux-arm64
+          elif [[ "$RETIREMENT_PACKAGE_MODE" == "report-diagnostic" ]]; then
             tar -czf "$archive" -C "$package_dir" compatibility-retirement.py receipt-transport.py
           elif [[ "$RETIREMENT_PACKAGE_MODE" == "bootstrap-history-metadata" ]]; then
             tar -czf "$archive" -C "$package_dir" compatibility-retirement.py compatibility-history-prepare.py compatibility-retirement-entrypoints.json receipt-transport.py
@@ -446,7 +478,7 @@ jobs:
           source: qs-compatibility-retirement-${{ github.run_id }}-${{ github.run_attempt }}.tar.gz
           target: /tmp
       - name: Inventory source bytes or reject unavailable lifecycle stage
-        if: inputs.prepare_mode != 'bootstrap-history-metadata' && inputs.prepare_mode != 'bootstrap-history-parent' && inputs.prepare_mode != 'report-diagnostic' && inputs.prepare_mode != 'bootstrap-ai-bounds' && inputs.prepare_mode != 'bootstrap-ai-verify' && inputs.prepare_mode != 'historical-evidence-write' && inputs.prepare_mode != 'historical-ai-bounds'
+        if: inputs.prepare_mode != 'bootstrap-history-metadata' && inputs.prepare_mode != 'bootstrap-history-parent' && inputs.prepare_mode != 'report-diagnostic' && inputs.prepare_mode != 'bootstrap-ai-bounds' && inputs.prepare_mode != 'bootstrap-ai-verify' && inputs.prepare_mode != 'historical-evidence-write' && inputs.prepare_mode != 'historical-ai-bounds' && inputs.prepare_mode != 'window-tool'
         uses: appleboy/ssh-action@v1.2.2
         env:
           RETIREMENT_OPERATION: ${{ inputs.operation }}
@@ -731,3 +763,54 @@ jobs:
               --bootstrap-approval-json "$RETIREMENT_BOOTSTRAP_APPROVAL_JSON" \
               --bootstrap-approval-hash "$RETIREMENT_BOOTSTRAP_APPROVAL_SHA256" \
               --prepare-mode "$RETIREMENT_PREPARE_MODE"
+      - name: Invoke approved independent window tool on the still-A database
+        if: inputs.prepare_mode == 'window-tool' && inputs.operation == 'prepare'
+        uses: appleboy/ssh-action@v1.2.2
+        env:
+          RETIREMENT_OPERATION: ${{ inputs.operation }}
+          RETIREMENT_OPERATION_ID: ${{ inputs.operation_id }}
+          RETIREMENT_MANIFEST_SHA256: ${{ inputs.manifest_sha256 }}
+          RETIREMENT_TEMPLATE_SHA256: ${{ inputs.inventory_request_sha256 }}
+          RETIREMENT_DISPATCHER_SHA: ${{ github.sha }}
+          RETIREMENT_RUN_ID: ${{ github.run_id }}-${{ github.run_attempt }}
+          RETIREMENT_BOOTSTRAP_APPROVAL_JSON: ${{ inputs.bootstrap_approval_json }}
+          RETIREMENT_BOOTSTRAP_APPROVAL_SHA256: ${{ inputs.bootstrap_approval_sha256 }}
+          RETIREMENT_PACKAGE_SHA256: ${{ steps.package.outputs.sha256 }}
+          MYSQL_HOST: ${{ secrets.MYSQL_HOST }}
+          MYSQL_PORT: ${{ secrets.MYSQL_PORT || 3306 }}
+          MYSQL_USERNAME: ${{ secrets.MYSQL_METADATA_ADMIN_USERNAME }}
+          MYSQL_PASSWORD: ${{ secrets.MYSQL_METADATA_ADMIN_PASSWORD }}
+          MYSQL_DATABASE: ${{ secrets.MYSQL_DATABASE != '' && secrets.MYSQL_DATABASE || secrets.MYSQL_DBNAME }}
+          MONGODB_HOST: ${{ secrets.MONGODB_HOST }}
+          MONGODB_PORT: ${{ secrets.MONGODB_PORT || 27017 }}
+          MONGODB_USERNAME: ${{ secrets.MONGODB_USERNAME }}
+          MONGODB_PASSWORD: ${{ secrets.MONGODB_PASSWORD }}
+          MONGODB_DBNAME: ${{ secrets.MONGODB_DBNAME }}
+          MONGODB_METADATA_ADMIN_USERNAME: ${{ secrets.MONGODB_METADATA_ADMIN_USERNAME }}
+          MONGODB_METADATA_ADMIN_PASSWORD: ${{ secrets.MONGODB_METADATA_ADMIN_PASSWORD }}
+        with:
+          host: ${{ vars.SVRA_HOST }}
+          username: ${{ vars.SVRA_USERNAME }}
+          key: ${{ secrets.SVRA_SSH_KEY }}
+          port: ${{ vars.SVRA_SSH_PORT || 22 }}
+          fingerprint: ${{ vars.SVRA_SSH_FINGERPRINT }}
+          command_timeout: 115m
+          envs: RETIREMENT_OPERATION,RETIREMENT_OPERATION_ID,RETIREMENT_MANIFEST_SHA256,RETIREMENT_TEMPLATE_SHA256,RETIREMENT_DISPATCHER_SHA,RETIREMENT_RUN_ID,RETIREMENT_BOOTSTRAP_APPROVAL_JSON,RETIREMENT_BOOTSTRAP_APPROVAL_SHA256,RETIREMENT_PACKAGE_SHA256,MYSQL_HOST,MYSQL_PORT,MYSQL_USERNAME,MYSQL_PASSWORD,MYSQL_DATABASE,MONGODB_HOST,MONGODB_PORT,MONGODB_USERNAME,MONGODB_PASSWORD,MONGODB_DBNAME,MONGODB_METADATA_ADMIN_USERNAME,MONGODB_METADATA_ADMIN_PASSWORD
+          script: |
+            set -Eeuo pipefail
+            umask 077
+            [[ "$RETIREMENT_OPERATION" == "prepare" ]] || exit 1
+            [[ "$RETIREMENT_RUN_ID" =~ ^[1-9][0-9]{0,19}-[1-9][0-9]{0,3}$ ]] || exit 1
+            [[ "$RETIREMENT_PACKAGE_SHA256" =~ ^[0-9a-f]{64}$ ]] || exit 1
+            archive="/tmp/qs-compatibility-retirement-${RETIREMENT_RUN_ID}.tar.gz"
+            [[ "$(sha256sum "$archive" | awk '{print $1}')" == "$RETIREMENT_PACKAGE_SHA256" ]] || exit 1
+            chmod 0600 "$archive"
+            tool_dir=$(mktemp -d /tmp/qs-independent-window-tool.XXXXXX)
+            # Unknown work is retained in the exact batch intent; purge owns it.
+            tar -xzf "$archive" -C "$tool_dir" --no-same-owner compatibility-window-tool.py receipt-transport.py
+            chmod 0700 "$tool_dir"
+            chmod 0600 "$tool_dir/compatibility-window-tool.py" "$tool_dir/receipt-transport.py"
+            python3 -B "$tool_dir/compatibility-window-tool.py" \
+              --operation "$RETIREMENT_OPERATION" --operation-id "$RETIREMENT_OPERATION_ID" \
+              --run-id "$RETIREMENT_RUN_ID" --dispatcher-sha "$RETIREMENT_DISPATCHER_SHA" \
+              --manifest-hash "$RETIREMENT_MANIFEST_SHA256" --template-hash "$RETIREMENT_TEMPLATE_SHA256"

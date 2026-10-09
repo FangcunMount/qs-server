@@ -1293,7 +1293,7 @@ class SafetyContracts(unittest.TestCase):
 class MetadataWorkflowContracts(unittest.TestCase):
     def test_metadata_has_separate_no_database_environment_ssh_step(self):
         workflow=(SCRIPT.parents[2]/".github/workflows/compatibility-retirement.yml").read_text()
-        step=workflow.split("      - name: Observe approved inventory file metadata without database credentials\n",1)[1]
+        step=workflow.split("      - name: Observe approved inventory file metadata without database credentials\n",1)[1].split("\n      - name:",1)[0]
         self.assertIn("if: inputs.prepare_mode == 'bootstrap-history-metadata'",step)
         for forbidden in ("MYSQL_","MONGODB_","inventory_binary","history_binary","uname -m","go build","docker create","docker rm"):
             self.assertNotIn(forbidden,step)
