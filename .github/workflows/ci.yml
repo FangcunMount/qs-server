@@ -432,7 +432,7 @@ jobs:
           QS_SERVER_TEST_MONGO_DB_PREFIX: qs_history_ci_contract
         run: |
           go test -race -tags=integration -count=1 -timeout=10m ./internal/apiserver/infra/mysql/evaluation -run '^TestSQLCASProvenanceNative|^TestSQLHistoricalMissingOriginalRunPolicyNative$|^TestSQLHistoricalOriginalRunGlobalAbsenceNative$'
-          go test -race -tags=integration -count=1 -timeout=10m ./internal/apiserver/maintenance/compatibilityretirement -run '^(TestHistoricalCASPersistenceNative|TestQualifiedHistoricalCASNative|TestFinalHistoricalEOFNativePersistedOriginalAndMissingConflictSourceDrift$)'
+          go test -race -tags=integration -count=1 -timeout=10m ./internal/apiserver/maintenance/compatibilityretirement -run '^(TestHistoricalCASPersistenceNative|TestQualifiedHistoricalCASNative|TestFinalHistoricalEOFNative)'
 
       - name: Run Survey and ModelCatalog Mongo integration contracts
         env:
