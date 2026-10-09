@@ -549,6 +549,9 @@ func bCrossProcessNative(t *testing.T, sqlOnly bool) {
 	if e != nil {
 		t.Fatal("native original SQL baseline unknown")
 	}
+	if a.data.SQLRecoveryNonTargetHash != non || non == a.data.Inventory.Bindings["mysql"].NonTargetHash {
+		t.Fatal("actual archive recovery projection missing or confused with target-owned FK inventory")
+	}
 	_, mdefs, e := mongoCatalog(context.Background(), mdb)
 	if e != nil {
 		t.Fatal("native original Mongo metadata unknown")

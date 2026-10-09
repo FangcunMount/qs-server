@@ -224,6 +224,17 @@ func (p *targetBReconciledMigrationProof) VerifyAfter(ctx context.Context, conn 
 	return nil
 }
 
+// This field is produced only by Capture from the approved actual source
+// catalog, and is sealed by the independently bound archive digest. Inventory
+// retains target-owned foreign keys, so its NonTargetHash has another meaning.
+// Missing older archive fields cannot be supplied by a recovery caller.
+func targetBArchiveSQLRecoveryBaseline(a *Archive, r TargetRecoveryRequest) error {
+	if a == nil || !hashPattern.MatchString(a.data.SQLRecoveryNonTargetHash) || r.SQLNonTargetSHA256 != a.data.SQLRecoveryNonTargetHash {
+		return ErrRecoveryBinding
+	}
+	return nil
+}
+
 func prepareTargetBRecoveryTransitionKind(ctx context.Context, a *Archive, b TargetRecoveryBorrowed, r TargetBRecoveryResumeRequest, dir string, w *fence.MaintenanceWindow, s *targetJournalSnapshot, kind targetBJournalKind) (*targetBMigrationTransition, error) {
 	if ctx == nil || ctx.Err() != nil || a == nil || b.SQL == nil || b.Mongo == nil || w == nil || mongo.SessionFromContext(ctx) != nil || r.ApprovedBSourceSHA != buildversion.Get().GitCommit {
 		return nil, ErrRecoveryBinding
@@ -235,7 +246,7 @@ func prepareTargetBRecoveryTransitionKind(ctx context.Context, a *Archive, b Tar
 	original := r.Recovery.Original
 	sb, sok := a.data.Inventory.Bindings["mysql"]
 	mb, mok := a.data.Inventory.Bindings["mongodb"]
-	if !sok || !mok || original.SQLHead != 99 || original.MongoHead != 38 || sb.Version != 99 || mb.Version != 38 || original.SQLNonTargetSHA256 != sb.NonTargetHash || original.MongoNonTargetSHA256 != mb.NonTargetHash || original.SourceSHA != a.data.Approval.SourceSHA || original.OperationID != a.data.Approval.OperationID || original.OriginalRunID != a.data.Approval.RunID || original.ArchiveSHA256 != a.digest || intent.SQLIdentitySHA256 != sb.IdentityHash || intent.MongoIdentitySHA256 != mb.IdentityHash || intent.MongoGenerationSHA256 != mb.GenerationHash {
+	if !sok || !mok || original.SQLHead != 99 || original.MongoHead != 38 || sb.Version != 99 || mb.Version != 38 || targetBArchiveSQLRecoveryBaseline(a, original) != nil || original.MongoNonTargetSHA256 != mb.NonTargetHash || original.SourceSHA != a.data.Approval.SourceSHA || original.OperationID != a.data.Approval.OperationID || original.OriginalRunID != a.data.Approval.RunID || original.ArchiveSHA256 != a.digest || intent.SQLIdentitySHA256 != sb.IdentityHash || intent.MongoIdentitySHA256 != mb.IdentityHash || intent.MongoGenerationSHA256 != mb.GenerationHash {
 		return nil, ErrRecoveryBinding
 	}
 	if a.verifyAssets(ctx) != nil {

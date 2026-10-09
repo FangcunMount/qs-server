@@ -182,6 +182,17 @@ func Capture(ctx context.Context, borrowed BorrowedSources, approved Approval, i
 	if e != nil || jsonSHA(defs) != jsonSHA(sm.Schema) {
 		return nil, ErrStructure
 	}
+	// Seal the target-exclusion recovery projection while reading the actual
+	// approved source catalog. Do not derive it from caller-provided recovery
+	// requests or compare it with inventory's target-owned-FK projection.
+	sqlNamespace, e := readSQL(ctx, borrowed.SQL, "SELECT DATABASE()")
+	if e != nil || len(sqlNamespace) != 1 || len(sqlNamespace[0]) != 1 || cell(sqlNamespace[0], 0) == "" {
+		return nil, ErrIdentity
+	}
+	sqlRecoveryNonTarget, e := targetSQLNonTarget(defs, cell(sqlNamespace[0], 0))
+	if e != nil {
+		return nil, e
+	}
 	// SHOW CREATE TABLE excludes trigger bodies. The current four historical
 	// layouts have none; a newly discovered target trigger is unsupported, not
 	// silently omitted from a supposedly complete rollback asset.
@@ -217,7 +228,7 @@ func Capture(ctx context.Context, borrowed BorrowedSources, approved Approval, i
 	if !ok || processID.IsZero() {
 		return nil, ErrIdentity
 	}
-	m := manifest{InventoryRaw: append([]byte(nil), reportBytes...), SourceMongoNamespace: borrowed.Mongo.Name(), SourceMongoProcessID: processID.Hex(), Version: 1, Approval: approved, Inventory: r, Mongo: ordered.data, SQLMetadataHash: sha(sqlBytes), MongoMetadataHash: sha(mongoBytes), OrderedMongoSchemaHash: ordered.digest}
+	m := manifest{InventoryRaw: append([]byte(nil), reportBytes...), SourceMongoNamespace: borrowed.Mongo.Name(), SourceMongoProcessID: processID.Hex(), Version: 1, Approval: approved, Inventory: r, Mongo: ordered.data, SQLRecoveryNonTargetHash: sqlRecoveryNonTarget, SQLMetadataHash: sha(sqlBytes), MongoMetadataHash: sha(mongoBytes), OrderedMongoSchemaHash: ordered.digest}
 	for i := 0; i < 3; i++ {
 		s, e := sqlStructure(ctx, borrowed.SQL, i)
 		if e != nil {
@@ -330,6 +341,11 @@ func OpenArchive(ctx context.Context, dir, expected string) (*Archive, error) {
 	}
 	var m manifest
 	if exactJSON(raw, &m) != nil || m.Version != 1 || !approvalValid(m.Approval) || m.OrderedMongoSchemaHash != m.Approval.OrderedMongoSchemaSHA256 || jsonSHA(m.Mongo) != m.OrderedMongoSchemaHash || sha(m.InventoryRaw) != m.Approval.InventorySHA256 || m.SQLMetadataHash != m.Approval.SQLMetadataSHA256 || m.MongoMetadataHash != m.Approval.MongoMetadataSHA256 {
+		return nil, ErrPrivate
+	}
+	// Older version 1 framing did not carry the recovery projection. Only B
+	// recovery requires it; a present malformed value is never accepted.
+	if m.SQLRecoveryNonTargetHash != "" && !hashPattern.MatchString(m.SQLRecoveryNonTargetHash) {
 		return nil, ErrPrivate
 	}
 	original, e := validateInventory(m.InventoryRaw, m.Approval)
