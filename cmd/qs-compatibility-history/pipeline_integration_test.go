@@ -544,7 +544,7 @@ func TestHistoryCLINativeFirstEpochReleasesGraphsBeforeSecond(t *testing.T) {
 		if err = first.compactOrigin(ctx); err != nil {
 			return err
 		}
-		if first.sql != nil || first.mongo != nil || first.origin != nil || first.anchor == nil || jsonHash(first.coordinator) != before {
+		if first.sql != nil || first.mongo != nil || first.origin != nil || first.anchor != nil || first.aiReverse != nil || first.aiReverseCoordinator != nil || first.reverseAnchor == nil || jsonHash(first.coordinator) != before {
 			t.Fatal("compaction kept old graphs or lost stable source facts")
 		}
 		if err = first.compactOrigin(ctx); err == nil {
@@ -562,11 +562,18 @@ func TestHistoryCLINativeFirstEpochReleasesGraphsBeforeSecond(t *testing.T) {
 		if err = compareEpochs(first, second); err != nil {
 			return err
 		}
-		proof, err := first.anchor.RecheckSnapshots(ctx, second.sql, second.mongo, a.readers())
+		aiProof, err := first.recheckAIReverse(ctx, second, a)
 		if err != nil {
 			return err
 		}
-		if r := proof.Report(); !r.IndependentEpochRechecked || r.DropReady || r.CASAuthorized {
+		if a.rewind() != nil {
+			return fixedError("history_asset_read_failed")
+		}
+		proof, err := first.reverseAnchor.RecheckOrigin(ctx, aiProof, second.sql, second.mongo, second.aiReverseCoordinator, a.readers())
+		if err != nil {
+			return err
+		}
+		if r := proof.Report(); !r.ActualOriginMatched || !r.SourceFilesMatched || !r.IndependentEpochRechecked || !r.IndependentApprovalRequired || !r.FirstAuthMetadataContinuityUnproven || r.DropReady || r.CASAuthorized {
 			t.Fatal("compaction changed fresh proof authority")
 		}
 		return nil

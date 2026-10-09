@@ -30,6 +30,30 @@ HASH_FIELDS = frozenset({"whole_source_index_sha256", "candidate_sha256", "sql_c
     "mongo_current_facts_sha256"})
 UINT_FIELDS = frozenset({"local_candidates", "locally_qualified", "blocked_local", "joint_event_pages",
     "ai_blocked_pages", "sql_ledger_count", "mongo_collection_count", "elapsed_milliseconds"})
+AI_REVERSE_UINT_FIELDS = frozenset({"ledger_count", "rows", "retirement_related", "outside_retirement",
+    "unknown", "blocking", "outside_active"})
+AI_REVERSE_HASH_FIELDS = frozenset({"data_sha256", "source_scope_sha256"})
+AI_REVERSE_BOOL_FIELDS = frozenset({"whole_ledger_eof", "independent_epoch_rechecked"})
+AI_REVERSE_FIELDS = AI_REVERSE_UINT_FIELDS | AI_REVERSE_HASH_FIELDS | AI_REVERSE_BOOL_FIELDS
+# Fixed producer tokens from emptyReadiness and coordinatorRequiredAdapters.
+# These required, unresolved capabilities are diagnostics, never permission.
+BASE_REQUIRED_ADAPTERS = frozenset({
+    "independent_authenticated_production_request_approval",
+    "ordered_mongo_original_source_metadata_independent_approval",
+    "production_process_budget", "actual_mongo_transaction_lifetime_and_whole_epoch_scale",
+    "whole_process_peak_rss_and_related_owner_width",
+    "qs_ai_complete_original_execution_and_message_closure",
+    "ai_stored_wire_original_jose_authentication",
+    "production_platform_account_and_writer_fence", "historical_evidence_cas",
+    "post_cas_independent_business_readback", "actual_production_backup_isolated_restore_and_budget",
+    "maintenance_acceptance_and_private_asset_purge"})
+REQUIRED_ADAPTERS = BASE_REQUIRED_ADAPTERS | frozenset({
+    "production_source_origin_authentication", "global_ai_and_inbox_reverse_coverage",
+    "historical_rerun_and_live_writer_fence", "exact_prepared_business_baseline_to_writer_cas",
+    "all_four_targets_committed_cas_and_independent_readback", "post_cas_expected_business_baseline",
+    "different_actual_final_snapshots_and_full_hash_recheck",
+    "prewindow_exact_backup_and_actual_isolated_restore",
+    "maintenance_acceptance_and_immediate_private_asset_purge"})
 # Closed producer categories. Failed readiness must not import arbitrary
 # messages, identifiers, paths, SQL or credential text into the lifecycle result.
 ERROR_CATEGORIES = frozenset({
@@ -37,6 +61,10 @@ ERROR_CATEGORIES = frozenset({
     'history_actual_source_origin_failed',
     'history_ai_readonly_page_failed',
     'history_ai_readonly_resolver_failed',
+    'history_ai_reverse_coverage_incomplete',
+    'history_ai_reverse_independent_epoch_failed',
+    'history_ai_reverse_scan_failed',
+    'history_ai_reverse_source_scope_failed',
     'history_approved_metadata_changed',
     'history_arguments_rejected',
     'history_asset_hash_changed',
@@ -95,7 +123,7 @@ ERROR_CATEGORIES = frozenset({
 })
 READINESS_FIELDS = BOOL_FIELDS | HASH_FIELDS | UINT_FIELDS | frozenset({"protocol", "source_sha",
     "operation_id", "run_id", "request_sha256", "inventory_request_sha256", "inventory_report_sha256",
-    "independent_epochs", "sources", "full_source_file_sha256", "sql_global", "mongo_global",
+    "independent_epochs", "sources", "full_source_file_sha256", "sql_global", "mongo_global", "ai_reverse_global",
     "blocking_reasons", "required_adapters", "error_category"})
 
 
@@ -399,6 +427,43 @@ def _creation_unknown(t, docker, name, image, labels, mounts, output):
     t.fail("history_container_creation_unknown")
 
 
+def _ai_reverse_summary(t, summary):
+    value = summary["ai_reverse_global"]
+    t.fields(value, AI_REVERSE_FIELDS)
+    for key in AI_REVERSE_UINT_FIELDS:
+        t.uint(value[key])
+    for key in AI_REVERSE_HASH_FIELDS:
+        if value[key] != "":
+            t.token(value[key], t.HASH)
+    for key in AI_REVERSE_BOOL_FIELDS:
+        if type(value[key]) is not bool:
+            t.fail("history_ai_reverse_summary_invalid")
+    # A failed scan may honestly retain zero/partial coverage and empty hashes.
+    # Positive EOF/fresh claims need their actual, complete diagnostic scope.
+    if value["ledger_count"] > 14 or value["outside_active"] > value["outside_retirement"]:
+        t.fail("history_ai_reverse_summary_invalid")
+    if value["whole_ledger_eof"] and (value["ledger_count"] != 14 or not value["data_sha256"] or
+        value["retirement_related"] + value["outside_retirement"] + value["unknown"] != value["rows"] or
+        value["blocking"] < value["unknown"]):
+        t.fail("history_ai_reverse_summary_invalid")
+    if value["independent_epoch_rechecked"] and (not value["whole_ledger_eof"] or
+        not value["source_scope_sha256"] or summary["independent_epochs"] != 2):
+        t.fail("history_ai_reverse_summary_invalid")
+    if summary["completed_readonly_pipeline"] and (value["ledger_count"] != 14 or
+        not value["whole_ledger_eof"] or not value["independent_epoch_rechecked"] or
+        any(not value[key] for key in AI_REVERSE_HASH_FIELDS)):
+        t.fail("history_ai_reverse_coverage_incomplete")
+    # A diagnostic can finish with unresolved responsibility. Keep that fact
+    # visible and do not turn a completed read into remote closure or a grant.
+    if summary["completed_readonly_pipeline"]:
+        reasons = summary["blocking_reasons"]
+        for counter, reason in (("unknown", "ai_reverse_global_unknown_responsibility"),
+                                ("blocking", "ai_reverse_global_blocking_responsibility")):
+            if value[counter] and reasons.get(reason) != value[counter]:
+                t.fail("history_ai_reverse_summary_invalid")
+    return dict(value)
+
+
 def _receipt(t, summary, raw, code, args, directory, request, derived_hash, approval_hash, parent_hash, inventory):
     t.fields(summary, READINESS_FIELDS)
     category = summary["error_category"]
@@ -437,10 +502,17 @@ def _receipt(t, summary, raw, code, args, directory, request, derived_hash, appr
             if type(key) is not str or not re.fullmatch(r"[a-z][a-z0-9_.-]{0,127}", key):
                 t.fail("history_global_summary_invalid")
             t.uint(v)
-    for collection in (summary["required_adapters"], mongo["blocking_reasons"], mongo["coverage_gaps"]):
+    for collection in (mongo["blocking_reasons"], mongo["coverage_gaps"]):
         if type(collection) is not list or len(collection) > 1024 or any(
             type(v) is not str or not re.fullmatch(r"[a-z][a-z0-9_.-]{0,127}", v) for v in collection):
             t.fail("history_global_summary_invalid")
+    adapters = summary["required_adapters"]
+    if (type(adapters) is not list or len(adapters) > len(REQUIRED_ADAPTERS) or
+        any(type(value) is not str or value not in REQUIRED_ADAPTERS for value in adapters) or
+        len(set(adapters)) != len(adapters) or (summary["completed_readonly_pipeline"] and
+        not BASE_REQUIRED_ADAPTERS.issubset(adapters))):
+        t.fail("history_required_adapters_invalid")
+    ai_reverse = _ai_reverse_summary(t, summary)
     if type(summary["sources"]) is not list or len(summary["sources"]) != 4:
         t.fail("history_sources_invalid")
     for source, target, original in zip(summary["sources"], t.TARGETS, inventory["targets"]):
@@ -482,6 +554,7 @@ def _receipt(t, summary, raw, code, args, directory, request, derived_hash, appr
         "history_global_sql": {key: v for key, v in sql.items() if key != "schema_coverage"},
         "history_global_mongodb": {"rows": mongo["rows"], "classified_rows": mongo["classified_rows"],
             "blocking_reason_count": len(mongo["blocking_reasons"]), "coverage_gap_count": len(mongo["coverage_gaps"])},
+        "history_global_ai_reverse": ai_reverse,
         "error_category": "history_readonly_completed_diagnostic" if completed else "history_readonly_blocked"}
 
 

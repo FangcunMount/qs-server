@@ -175,7 +175,12 @@ class HistoryPreparation(unittest.TestCase):
                 "blocking": 1, "schema_coverage": "synthetic_fixed_scope"},
             mongo_global={"rows": 6, "classified_rows": 6, "class_counts": {"non_target": 6},
                 "blocking_reasons": ["synthetic_gap"], "coverage_gaps": []},
-            blocking_reasons={"external_ai_closure_required": 1}, required_adapters=["writer_fence_required"],
+            ai_reverse_global={"ledger_count": 14, "rows": 5, "retirement_related": 2,
+                "outside_retirement": 2, "unknown": 1, "blocking": 1, "outside_active": 1,
+                "data_sha256": "7"*64, "source_scope_sha256": "8"*64,
+                "whole_ledger_eof": True, "independent_epoch_rechecked": True},
+            blocking_reasons={"external_ai_closure_required": 1, "ai_reverse_global_unknown_responsibility": 1,
+                "ai_reverse_global_blocking_responsibility": 1}, required_adapters=sorted(history.REQUIRED_ADAPTERS),
             error_category="none", local_candidates=3, locally_qualified=2, blocked_local=1, ai_blocked_pages=1)
         for key in ("completed_readonly_pipeline", "source_files_and_actual_origins_matched",
             "whole_four_source_coverage_complete", "business_and_responsibility_facts_unchanged"):
@@ -434,6 +439,203 @@ class HistoryPreparation(unittest.TestCase):
             tool, v, tool.canonical_bytes(v), 0, self.args, out, request,
             derived, "1"*64, self.parent_hash, self.inventory)
 
+    def checked_readiness(self, change=None, code=0):
+        out = self.directory / "ai-reverse-readiness"
+        out.mkdir(mode=0o700, exist_ok=True)
+        request = dict(self.parent, run_id=RUN)
+        derived = hashlib.sha256(tool.canonical_bytes(request)).hexdigest()
+        value = self.readiness(derived)
+        if change:
+            change(value)
+        self.store(out, "history.readiness.json", value)
+        return history._receipt(tool, value, tool.canonical_bytes(value), code, self.args,
+            out, request, derived, "1"*64, self.parent_hash, self.inventory)
+
+    def test_ai_reverse_completed_diagnostic_keeps_unknown_blocking_and_all_grants_false(self):
+        result = self.checked_readiness()
+        self.assertTrue(result["history_readonly_complete"])
+        self.assertEqual(set(result["history_global_ai_reverse"]), history.AI_REVERSE_FIELDS)
+        self.assertEqual(len(result["history_global_ai_reverse"]), 11)
+        self.assertEqual(result["history_global_ai_reverse"]["unknown"], 1)
+        self.assertEqual(result["history_global_ai_reverse"]["blocking"], 1)
+        self.assertEqual(result["history_global_ai_reverse"]["outside_active"], 1)
+        for key in ("complete", "execution_allowed", "drop_ready", "history_cas_complete", "history_process_budget_proven"):
+            self.assertIs(result[key], False)
+
+    def test_ai_reverse_empty_whole_scope_is_valid_and_not_missing_coverage(self):
+        def empty(value):
+            ai = value["ai_reverse_global"]
+            for key in history.AI_REVERSE_UINT_FIELDS - {"ledger_count"}:
+                ai[key] = 0
+            value["blocking_reasons"] = {}
+        result = self.checked_readiness(empty)
+        self.assertTrue(result["history_readonly_complete"])
+        self.assertEqual(result["history_global_ai_reverse"]["rows"], 0)
+        self.assertEqual(result["history_global_ai_reverse"]["ledger_count"], 14)
+
+    def test_ai_reverse_each_completed_coverage_requirement_is_mandatory(self):
+        for key, wrong in (("ledger_count", 0), ("ledger_count", 13), ("ledger_count", 15),
+            ("whole_ledger_eof", False), ("independent_epoch_rechecked", False),
+            ("data_sha256", ""), ("source_scope_sha256", "")):
+            with self.subTest(key=key, value=wrong):
+                with self.assertRaises(tool.Blocked):
+                    self.checked_readiness(lambda v: v["ai_reverse_global"].update({key: wrong}))
+
+    def test_ai_reverse_every_counter_rejects_bool_negative_float_string_and_null(self):
+        for key in sorted(history.AI_REVERSE_UINT_FIELDS):
+            for wrong in (True, False, -1, 1.0, "1", None, 1 << 64, [], {}):
+                with self.subTest(key=key, type=type(wrong).__name__):
+                    self.blocked("evidence_type_invalid", self.checked_readiness,
+                        lambda v: v["ai_reverse_global"].update({key: wrong}))
+
+    def test_ai_reverse_booleans_are_actual_bools(self):
+        for key in sorted(history.AI_REVERSE_BOOL_FIELDS):
+            for wrong in (0, 1, "true", None, [], {}):
+                with self.subTest(key=key, type=type(wrong).__name__):
+                    self.blocked("history_ai_reverse_summary_invalid", self.checked_readiness,
+                        lambda v: v["ai_reverse_global"].update({key: wrong}))
+
+    def test_ai_reverse_hashes_are_empty_only_on_failure_or_exact_lowercase_hex(self):
+        for key in sorted(history.AI_REVERSE_HASH_FIELDS):
+            for wrong in ("a"*63, "a"*65, "A"*64, "g"*64, "a"*64+"\n", "sha256:"+"a"*64,
+                          "synthetic-private-body", True, None, [], {}):
+                with self.subTest(key=key, type=type(wrong).__name__):
+                    self.blocked("evidence_type_invalid", self.checked_readiness,
+                        lambda v: v["ai_reverse_global"].update({key: wrong}))
+
+    def test_ai_reverse_missing_or_unknown_fields_and_nonobjects_cannot_carry_original_body(self):
+        for key in sorted(history.AI_REVERSE_FIELDS):
+            with self.subTest(missing=key):
+                self.blocked("evidence_fields_invalid", self.checked_readiness,
+                    lambda v: v["ai_reverse_global"].pop(key))
+        for key in ("raw_body", "body", "wire", "projection", "request_id", "command_id", "global_reverse_qualified", "cas_authority", "drop_ready"):
+            with self.subTest(unknown=key):
+                self.blocked("evidence_fields_invalid", self.checked_readiness,
+                    lambda v: v["ai_reverse_global"].update({key: "synthetic-private-body"}))
+        for wrong in (None, [], True, "synthetic-private-body"):
+            with self.subTest(type=type(wrong).__name__):
+                self.blocked("evidence_fields_invalid", self.checked_readiness,
+                    lambda v: v.update(ai_reverse_global=wrong))
+
+    def test_ai_reverse_scope_counts_and_visible_blockers_cannot_be_forged(self):
+        for change in (
+            lambda v: v["ai_reverse_global"].update(rows=6),
+            lambda v: v["ai_reverse_global"].update(outside_active=3),
+            lambda v: v["ai_reverse_global"].update(blocking=0),
+            lambda v: v["blocking_reasons"].pop("ai_reverse_global_unknown_responsibility"),
+            lambda v: v["blocking_reasons"].update(ai_reverse_global_blocking_responsibility=2),
+        ):
+            with self.assertRaises(tool.Blocked):
+                self.checked_readiness(change)
+
+    def test_ai_reverse_structural_blockers_may_exceed_rows_without_becoming_a_grant(self):
+        def structural(value):
+            value["ai_reverse_global"]["blocking"] = 6
+            value["blocking_reasons"]["ai_reverse_global_blocking_responsibility"] = 6
+        result = self.checked_readiness(structural)
+        self.assertEqual(result["history_global_ai_reverse"]["blocking"], 6)
+        self.assertFalse(result["drop_ready"])
+
+    def test_ai_reverse_all_four_new_fixed_failures_accept_honest_zero_or_partial_diagnostics(self):
+        for category in ("history_ai_reverse_scan_failed", "history_ai_reverse_source_scope_failed",
+                         "history_ai_reverse_coverage_incomplete", "history_ai_reverse_independent_epoch_failed"):
+            for partial in (False, True):
+                with self.subTest(category=category, partial=partial):
+                    def failed(value):
+                        value.update(completed_readonly_pipeline=False, independent_epochs=0 if not partial else 1,
+                                     error_category=category, blocking_reasons={}, required_adapters=[])
+                        value["ai_reverse_global"] = {key: 0 for key in history.AI_REVERSE_UINT_FIELDS}
+                        value["ai_reverse_global"].update({key: "" for key in history.AI_REVERSE_HASH_FIELDS})
+                        value["ai_reverse_global"].update({key: False for key in history.AI_REVERSE_BOOL_FIELDS})
+                        if partial:
+                            value["ai_reverse_global"].update(ledger_count=3, rows=2, unknown=2, blocking=2,
+                                                              data_sha256="7"*64)
+                    result = self.checked_readiness(failed, code=1)
+                    self.assertFalse(result["history_readonly_complete"])
+                    self.assertFalse(result["history_global_ai_reverse"]["independent_epoch_rechecked"])
+                    self.assertEqual(result["error_category"], "history_readonly_blocked")
+                    for key in ("complete", "execution_allowed", "drop_ready", "history_cas_complete"):
+                        self.assertIs(result[key], False)
+
+    def test_ai_reverse_failed_diagnostic_cannot_claim_inconsistent_positive_eof_or_fresh(self):
+        for change in (
+            lambda v: v["ai_reverse_global"].update(ledger_count=13),
+            lambda v: v["ai_reverse_global"].update(data_sha256=""),
+            lambda v: v["ai_reverse_global"].update(source_scope_sha256=""),
+            lambda v: v["ai_reverse_global"].update(whole_ledger_eof=False),
+            lambda v: v.update(independent_epochs=1),
+        ):
+            def failed(value):
+                value.update(completed_readonly_pipeline=False, error_category="history_ai_reverse_independent_epoch_failed")
+                change(value)
+            self.blocked("history_ai_reverse_summary_invalid", self.checked_readiness, failed, 1)
+
+    def test_ai_reverse_unfinished_read_may_report_whole_first_scope_without_fresh_claim(self):
+        def failed(value):
+            value.update(completed_readonly_pipeline=False, independent_epochs=1,
+                         error_category="history_ai_reverse_independent_epoch_failed")
+            value["ai_reverse_global"].update(independent_epoch_rechecked=False, source_scope_sha256="")
+        result = self.checked_readiness(failed, 1)
+        self.assertTrue(result["history_global_ai_reverse"]["whole_ledger_eof"])
+        self.assertFalse(result["history_readonly_complete"])
+
+    def test_ai_reverse_required_original_wire_adapter_is_retained_and_closed(self):
+        required = "ai_stored_wire_original_jose_authentication"
+        self.assertIn(required, history.BASE_REQUIRED_ADAPTERS)
+        for change in (
+            lambda v: v["required_adapters"].remove(required),
+            lambda v: v["required_adapters"].append("future_unapproved_adapter"),
+            lambda v: v["required_adapters"].append("synthetic_private_body"),
+            lambda v: v["required_adapters"].append(required),
+            lambda v: v.update(required_adapters=[{}]),
+            lambda v: v.update(required_adapters=True),
+        ):
+            self.blocked("history_required_adapters_invalid", self.checked_readiness, change)
+
+    def test_ai_reverse_cannot_upgrade_any_forbidden_pipeline_capability(self):
+        for key in sorted(history.FORBIDDEN_TRUE):
+            with self.subTest(key=key):
+                self.blocked("history_readiness_authority_invalid", self.checked_readiness,
+                    lambda v: v.update({key: True}))
+
+    def test_ai_reverse_public_armor_has_exact_bodyfree_fields_and_rejects_illegal_types(self):
+        good = self.checked_readiness()
+        args = ["--operation", "prepare", "--operation-id", OPERATION,
+                "--approved-source-sha", SOURCE, "--actual-source-sha", SOURCE, "--run-id", RUN]
+        stdout = io.StringIO()
+        with mock.patch.object(tool, "execute", return_value=good), contextlib.redirect_stdout(stdout):
+            self.assertEqual(tool.main(args), 0)
+        decoded = json.loads(tool.transport().decode_armored_receipt(stdout.getvalue()))
+        self.assertEqual(decoded["history_global_ai_reverse"], good["history_global_ai_reverse"])
+        for key, wrong in (("rows", True), ("whole_ledger_eof", 1), ("data_sha256", "A"*64),
+                           ("source_scope_sha256", "synthetic-private-body"), ("body", "synthetic-private-body"),
+                           ("global_reverse_qualified", True), ("drop_ready", True)):
+            with self.subTest(key=key):
+                value = copy.deepcopy(good); value["history_global_ai_reverse"][key] = wrong
+                stdout, stderr = io.StringIO(), io.StringIO()
+                with mock.patch.object(tool, "execute", return_value=value), contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
+                    self.assertEqual(tool.main(args), 42)
+                self.assertEqual(stdout.getvalue(), "")
+                self.assertEqual(stderr.getvalue(), "compatibility_retirement_receipt_transport_failed\n")
+
+    def test_ai_reverse_failed_public_armor_remains_exit42_with_empty_hashes(self):
+        def failed(value):
+            value.update(completed_readonly_pipeline=False, independent_epochs=0,
+                         error_category="history_ai_reverse_scan_failed", blocking_reasons={})
+            value["ai_reverse_global"] = {key: 0 for key in history.AI_REVERSE_UINT_FIELDS}
+            value["ai_reverse_global"].update({key: "" for key in history.AI_REVERSE_HASH_FIELDS})
+            value["ai_reverse_global"].update({key: False for key in history.AI_REVERSE_BOOL_FIELDS})
+        result = self.checked_readiness(failed, 1)
+        stdout = io.StringIO()
+        args = ["--operation", "prepare", "--operation-id", OPERATION,
+                "--approved-source-sha", SOURCE, "--actual-source-sha", SOURCE, "--run-id", RUN]
+        with mock.patch.object(tool, "execute", return_value=result), contextlib.redirect_stdout(stdout):
+            self.assertEqual(tool.main(args), 42)
+        decoded = json.loads(tool.transport().decode_armored_receipt(stdout.getvalue()))
+        self.assertFalse(decoded["history_readonly_complete"])
+        self.assertEqual(decoded["history_global_ai_reverse"]["data_sha256"], "")
+        self.assertFalse(decoded["drop_ready"])
+
     def test_parent_main_actual_wrapper_armor_and_diagnostic_exit0(self):
         args = ["--operation","prepare","--root",str(self.root),"--operation-id",OPERATION,
             "--approved-source-sha",SOURCE,"--actual-source-sha",SOURCE,"--run-id",RUN,
@@ -445,6 +647,10 @@ class HistoryPreparation(unittest.TestCase):
         self.assertEqual(code, 0)
         decoded = json.loads(tool.transport().decode_armored_receipt(stdout.getvalue()))
         self.assertTrue(decoded["history_readonly_complete"])
+        self.assertEqual(decoded["history_global_ai_reverse"]["ledger_count"], 14)
+        self.assertIs(decoded["history_global_ai_reverse"]["whole_ledger_eof"], True)
+        self.assertIs(decoded["history_global_ai_reverse"]["independent_epoch_rechecked"], True)
+        self.assertEqual(decoded["history_global_ai_reverse"]["unknown"], 1)
         self.assertFalse(decoded["execution_allowed"])
         self.assertFalse(decoded["drop_ready"])
         self.assertNotIn("synthetic-admin-secret", stdout.getvalue())

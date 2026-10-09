@@ -225,9 +225,17 @@ func (c *HistoricalCoordinator) PrepareWholeSourceJointIndex(ctx context.Context
 			if e != nil {
 				return nil, e
 			}
-			if _, e = x.auth.BindEvent(event); e != nil {
+			bound, e := x.auth.BindEvent(event)
+			if e != nil {
 				return nil, e
 			}
+			if bound == nil || bound.facts == nil {
+				return nil, ErrSourceAuthentication
+			}
+			// BindEvent already compared both the original DTO and its detached
+			// clone with the sealed facts. Keep that private clone for all fields
+			// below instead of discarding it and hashing the original a third time.
+			event = bound.facts
 			length := r.position - before
 			if length <= 0 || length > 2*MaxSourceRowBytes+8 {
 				return nil, ErrWholeSourceJointBounds
@@ -240,15 +248,15 @@ func (c *HistoricalCoordinator) PrepareWholeSourceJointIndex(ctx context.Context
 			if e != nil {
 				return nil, e
 			}
-			facts, e := privateFactsSHA(event)
-			if e != nil {
-				return nil, e
+			approved, exists := x.auth.rows[key]
+			if !exists {
+				return nil, ErrSourceAuthentication
 			}
 			if _, exists := x.entries[event.EventID]; exists {
 				return nil, ErrSourceIdentity
 			}
 			physical := sha256.Sum256(frame)
-			entry := wholeSourceJointEntry{Key: key, Offset: before, Length: length, PhysicalSHA256: hex.EncodeToString(physical[:]), FactsSHA256: facts, EventID: event.EventID, EventType: event.EventType, AggregateType: event.AggregateType, AggregateID: event.AggregateID, OrgID: event.OrgID}
+			entry := wholeSourceJointEntry{Key: key, Offset: before, Length: length, PhysicalSHA256: hex.EncodeToString(physical[:]), FactsSHA256: approved.facts, EventID: event.EventID, EventType: event.EventType, AggregateType: event.AggregateType, AggregateID: event.AggregateID, OrgID: event.OrgID}
 			if event.Submitted != nil {
 				entry.AnswerSheetID, e = mongoCycleStringID(event.Submitted.AnswerSheetID)
 			} else if event.Generated != nil {

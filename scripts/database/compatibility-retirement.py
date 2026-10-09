@@ -1345,6 +1345,10 @@ def main(argv=None):
               "history_source_rows": ["uint"],
               "history_global_sql": {key: "uint" for key in ("observed", "retirement_related", "outside_retirement", "unknown", "blocking")},
               "history_global_mongodb": {key: "uint" for key in ("rows", "classified_rows", "blocking_reason_count", "coverage_gap_count")},
+              "history_global_ai_reverse": {
+                  **{key: "uint" for key in ("ledger_count", "rows", "retirement_related", "outside_retirement", "unknown", "blocking", "outside_active")},
+                  **{key: "hash64_or_empty" for key in ("data_sha256", "source_scope_sha256")},
+                  **{key: "bool" for key in ("whole_ledger_eof", "independent_epoch_rechecked")}},
               "approved_identity_report": {"run_id": "run_id", "source_sha": "sha40", "sha256": "hash64"},
               "approved_boundary_report": {"run_id": "run_id", "source_sha": "sha40", "sha256": "hash64"},
               "boundary_discovery_complete": "bool", "boundary_private_report_hash": "hash64", "boundary_request_hash": "hash64",

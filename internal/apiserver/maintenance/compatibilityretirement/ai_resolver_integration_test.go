@@ -94,6 +94,8 @@ func aiNativeOwnedMySQL(t *testing.T) *sql.DB {
 	cfg.Net = "tcp"
 	cfg.Addr = "127.0.0.1:34306"
 	cfg.ParseTime = true
+	// The complete SQL migration runner executes real multi-statement resources.
+	cfg.MultiStatements = true
 	cfg.Loc = time.UTC
 	cfg.Params = map[string]string{"charset": "utf8mb4"}
 	cfg.Timeout = 5 * time.Second

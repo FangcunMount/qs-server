@@ -60,6 +60,9 @@ type AIResolverBinding struct {
 type AILocalResolver struct {
 	pool    gorm.ConnPool
 	binding AIResolverBinding
+	// Only the authenticated RR-RO coordinator adapter constructs this private
+	// mode. NewAILocalResolver and qualification Recheck retain locking reads.
+	readOnly *aiReadOnlyMode
 }
 
 type AILocalQualification struct {
@@ -218,6 +221,13 @@ func NewAILocalResolver(ctx context.Context, tx *gorm.DB, binding AIResolverBind
 // Every query is fixed or uses identifiers from this compile-time closed list.
 // All raw values stay in memory; errors never embed SQL, IDs, DSNs or bodies.
 func (r *AILocalResolver) read(ctx context.Context, q string, args ...any) (out [][][]byte, result error) {
+	if r.readOnly != nil {
+		var err error
+		q, err = aiReadOnlyStatement(q)
+		if err != nil {
+			return nil, err
+		}
+	}
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 	rows, err := r.pool.QueryContext(ctx, q, args...)
@@ -431,7 +441,11 @@ func (r *AILocalResolver) observe(ctx context.Context, source, legacySource *Dec
 	if err != nil {
 		return nil, nil, err
 	}
-	if len(admission) != 1 || len(admission[0]) != 3 || aiText(admission[0], 0) != "1" || aiText(admission[0], 1) != strconv.FormatUint(r.binding.AdmissionRevision, 10) {
+	closed := "1"
+	if r.readOnly != nil {
+		closed = r.readOnly.closed
+	}
+	if len(admission) != 1 || len(admission[0]) != 3 || aiText(admission[0], 0) != closed || aiText(admission[0], 1) != strconv.FormatUint(r.binding.AdmissionRevision, 10) {
 		return nil, nil, ErrAILocalBinding
 	}
 	requests, err := read("requests", aiRequestQuery, source.RequestID, source.ResourceID)

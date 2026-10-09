@@ -166,6 +166,19 @@ func coordinatorEventCandidate(v *DecodedSourceEvent) HistoricalCandidate {
 // independent of the RR-RO event epoch and never turns delivered into accepted.
 // Both physical source rows yield candidates/counts, sharing one command owner.
 func (c *HistoricalCoordinator) QualifyAIPage(ctx context.Context, p *HistoricalSourcePage, resolver *AILocalResolver) error {
+	return c.qualifyAIPage(ctx, p, resolver, nil)
+}
+
+// QualifyAIReadOnlyPage observes the actual authenticated point graph within
+// the original RR-RO epoch. It grants no RW/CAS or external closure capability.
+func (c *HistoricalCoordinator) QualifyAIReadOnlyPage(ctx context.Context, p *HistoricalSourcePage, resolver *AIReadOnlyResolver) error {
+	if resolver == nil || resolver.owner != c {
+		return ErrAILocalBinding
+	}
+	return c.qualifyAIPage(ctx, p, nil, resolver)
+}
+
+func (c *HistoricalCoordinator) qualifyAIPage(ctx context.Context, p *HistoricalSourcePage, resolver *AILocalResolver, readonly *AIReadOnlyResolver) error {
 	if c == nil {
 		return ErrCoordinatorInvalid
 	}
@@ -181,6 +194,12 @@ func (c *HistoricalCoordinator) QualifyAIPage(ctx context.Context, p *Historical
 		if r.event != nil || r.bridge == nil {
 			return ErrCoordinatorPage
 		}
+	}
+	if readonly != nil {
+		if readonly.owner != c || readonly.validate(ctx) != nil {
+			return ErrAILocalTransaction
+		}
+		resolver = readonly.inner
 	}
 	if resolver != nil && (resolver.binding.SourceSHA != c.binding.SourceSHA || resolver.binding.OperationID != c.binding.OperationID || resolver.binding.BridgeBoundary != c.copies[1].Expected.Boundary || resolver.binding.LegacyBoundary != c.copies[2].Expected.Boundary) {
 		return ErrCoordinatorInvalid
@@ -203,7 +222,15 @@ func (c *HistoricalCoordinator) QualifyAIPage(ctx context.Context, p *Historical
 		}
 		var summary AILocalSummary
 		var localError bool
-		if resolver != nil {
+		if readonly != nil {
+			q, e := readonly.resolve(ctx, bridge, legacy)
+			// A failed point read has no complete baseline. Refuse this page
+			// rather than hiding drift behind an empty blocked-candidate hash.
+			if e != nil {
+				return e
+			}
+			summary = q.Summary().AILocalSummary
+		} else if resolver != nil {
 			q, e := resolver.Resolve(ctx, bridge, legacy)
 			localError = e != nil
 			if e == nil {
@@ -235,6 +262,11 @@ func (c *HistoricalCoordinator) QualifyAIPage(ctx context.Context, p *Historical
 	}
 	if err := c.pageValid(p); err != nil {
 		return err
+	}
+	if readonly != nil {
+		if err := readonly.validate(ctx); err != nil {
+			return err
+		}
 	}
 	return c.consume(p, rows, HistoricalCoordinatorPageReceipt{})
 }

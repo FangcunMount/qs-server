@@ -42,6 +42,7 @@ type readiness struct {
 	MongoCollectionCount                    int                             `json:"mongo_collection_count"`
 	SQLGlobal                               sqlGlobalSummary                `json:"sql_global"`
 	MongoGlobal                             mongoGlobalSummary              `json:"mongo_global"`
+	AIReverseGlobal                         aiReverseGlobalSummary          `json:"ai_reverse_global"`
 	BlockingReasons                         map[string]uint64               `json:"blocking_reasons"`
 	RequiredAdapters                        []string                        `json:"required_adapters"`
 	IndependentProductionApprovalVerified   bool                            `json:"independent_production_approval_verified"`
@@ -73,6 +74,30 @@ type mongoGlobalSummary struct {
 	BlockingReasons []string          `json:"blocking_reasons"`
 	CoverageGaps    []string          `json:"coverage_gaps"`
 }
+
+// These public fields are fixed hashes, counts and local coverage only. They
+// never serialize request/command/session/Run IDs or encrypted/plain bodies.
+type aiReverseGlobalSummary struct {
+	LedgerCount               int    `json:"ledger_count"`
+	Rows                      uint64 `json:"rows"`
+	Related                   uint64 `json:"retirement_related"`
+	Outside                   uint64 `json:"outside_retirement"`
+	Unknown                   uint64 `json:"unknown"`
+	Blocking                  uint64 `json:"blocking"`
+	OutsideActive             uint64 `json:"outside_active"`
+	DataSHA256                string `json:"data_sha256"`
+	SourceScopeSHA256         string `json:"source_scope_sha256"`
+	WholeLedgerEOF            bool   `json:"whole_ledger_eof"`
+	IndependentEpochRechecked bool   `json:"independent_epoch_rechecked"`
+}
+type stableAIReverseFacts struct {
+	IdentitySHA256, DataSHA256, BusinessAnchorsSHA256, SourceScopeSHA256 string
+	MigrationVersion                                                     uint64
+	Ledgers                                                              []retirement.AIReverseLedgerSummary
+	Sources                                                              [4]retirement.SourceCopyReceipt
+	Rows, Bytes, Related, Outside, Unknown, Blocking, OutsideActive      uint64
+	BlockingReasons                                                      []string
+}
 type stableSQLFacts struct {
 	IdentitySHA256                                string
 	BusinessAnchorsSHA256                         string
@@ -89,20 +114,25 @@ type stableMongoFacts struct {
 	Rows, Bytes, Pages, ClassifiedRows             uint64
 }
 type epochResult struct {
-	coordinator         retirement.HistoricalCoordinatorReceipt
-	index               retirement.WholeSourceJointIndexSummary
-	sqlFacts            stableSQLFacts
-	mongoFacts          stableMongoFacts
-	origin              *retirement.SourceOriginEpoch
-	anchor              *retirement.FreshRecheckAnchor
-	sql                 *retirement.SQLResponsibilitySnapshot
-	mongo               *retirement.MongoResponsibilitySnapshot
-	jointPages, aiPages uint64
-	reasons             map[string]uint64
+	coordinator          retirement.HistoricalCoordinatorReceipt
+	index                retirement.WholeSourceJointIndexSummary
+	aiFacts              retirement.AIReadOnlyBindingSummary
+	aiReverseFacts       stableAIReverseFacts
+	aiReverse            *retirement.AIReverseSnapshot
+	aiReverseCoordinator *retirement.HistoricalCoordinator
+	sqlFacts             stableSQLFacts
+	mongoFacts           stableMongoFacts
+	origin               *retirement.SourceOriginEpoch
+	anchor               *retirement.FreshRecheckAnchor // always nil after joint compaction; no old auth retention
+	reverseAnchor        *retirement.AIReverseRecheckAnchor
+	sql                  *retirement.SQLResponsibilitySnapshot
+	mongo                *retirement.MongoResponsibilitySnapshot
+	jointPages, aiPages  uint64
+	reasons              map[string]uint64
 }
 
 func emptyReadiness(a *approvedInputs) readiness {
-	r := readiness{Protocol: "qs-compatibility-history-readonly/v1", MongoGlobal: mongoGlobalSummary{ClassCounts: map[string]uint64{}, BlockingReasons: []string{}, CoverageGaps: []string{}}, ErrorCategory: "history_incomplete", BlockingReasons: map[string]uint64{}, RequiredAdapters: []string{"independent_authenticated_production_request_approval", "ordered_mongo_original_source_metadata_independent_approval", "production_process_budget", "actual_mongo_transaction_lifetime_and_whole_epoch_scale", "whole_process_peak_rss_and_related_owner_width", "qs_ai_complete_original_execution_and_message_closure", "production_platform_account_and_writer_fence", "historical_evidence_cas", "post_cas_independent_business_readback", "actual_production_backup_isolated_restore_and_budget", "maintenance_acceptance_and_private_asset_purge"}}
+	r := readiness{Protocol: "qs-compatibility-history-readonly/v1", MongoGlobal: mongoGlobalSummary{ClassCounts: map[string]uint64{}, BlockingReasons: []string{}, CoverageGaps: []string{}}, ErrorCategory: "history_incomplete", BlockingReasons: map[string]uint64{}, RequiredAdapters: []string{"independent_authenticated_production_request_approval", "ordered_mongo_original_source_metadata_independent_approval", "production_process_budget", "actual_mongo_transaction_lifetime_and_whole_epoch_scale", "whole_process_peak_rss_and_related_owner_width", "qs_ai_complete_original_execution_and_message_closure", "ai_stored_wire_original_jose_authentication", "production_platform_account_and_writer_fence", "historical_evidence_cas", "post_cas_independent_business_readback", "actual_production_backup_isolated_restore_and_budget", "maintenance_acceptance_and_private_asset_purge"}}
 	if a == nil {
 		return r
 	}
@@ -176,7 +206,49 @@ func buildEpoch(ctx context.Context, a *approvedInputs, d *historyDatabase) (*ep
 	if err != nil {
 		return nil, fixedError("history_sql_cross_store_catalog_failed")
 	}
-	e := &epochResult{origin: origin, sql: current, mongo: global, reasons: map[string]uint64{}}
+	// Re-read exact authenticated AI copies to EOF and bind their actual point
+	// graph to this same host-owned RR-RO SQL epoch. Lifecycle remains here.
+	if a.rewind() != nil {
+		return nil, fixedError("history_asset_read_failed")
+	}
+	aiCopies := a.copies()
+	aiReadonly, err := c.PrepareAIReadOnlyResolver(ctx, current, a.inventory.Migrations["mysql"], aiCopies[1:3])
+	if err != nil {
+		return nil, fixedError("history_ai_readonly_resolver_failed")
+	}
+	if a.rewind() != nil {
+		return nil, fixedError("history_asset_read_failed")
+	}
+	// The point graph alone cannot see unreferenced current MQ/inbox/orphans.
+	// Scan the exact complete physical 14-table layout in this same SQL8 RRRO
+	// epoch, then independently re-read all four authenticated source copies.
+	aiReverse, err := retirement.PrepareAIReverseSnapshot(ctx, current, a.inventory.Migrations["mysql"], retirement.DefaultAIReverseLimits())
+	if err != nil {
+		return nil, fixedError("history_ai_reverse_scan_failed")
+	}
+	if a.rewind() != nil {
+		return nil, fixedError("history_asset_read_failed")
+	}
+	if c.BindAIReverseSourceScope(ctx, aiReverse, a.copies()) != nil {
+		return nil, fixedError("history_ai_reverse_source_scope_failed")
+	}
+	aiReverseFacts, err := stableAIReverseObservation(aiReverse.Summary())
+	if err != nil || aiReverseFacts.IdentitySHA256 != sqlReport.DatabaseIdentitySHA256 {
+		return nil, fixedError("history_ai_reverse_coverage_incomplete")
+	}
+	if a.rewind() != nil {
+		return nil, fixedError("history_asset_read_failed")
+	}
+	e := &epochResult{origin: origin, sql: current, mongo: global, aiFacts: aiReadonly.Summary(), aiReverseFacts: aiReverseFacts, aiReverse: aiReverse, aiReverseCoordinator: c, reasons: map[string]uint64{}}
+	if aiReverseFacts.Unknown > 0 {
+		e.reasons["ai_reverse_global_unknown_responsibility"] = aiReverseFacts.Unknown
+	}
+	if aiReverseFacts.Blocking > 0 {
+		e.reasons["ai_reverse_global_blocking_responsibility"] = aiReverseFacts.Blocking
+	}
+	for _, reason := range aiReverseFacts.BlockingReasons {
+		e.reasons["ai_reverse_"+reason]++
+	}
 	// Global orphan/unknown responsibility remains visible even when all
 	// four legacy sources are empty and there are no candidate-local reasons.
 	if sqlReport.Unknown > 0 {
@@ -204,10 +276,9 @@ func buildEpoch(ctx context.Context, a *approvedInputs, d *historyDatabase) (*ep
 			return nil, fixedError("history_coordinator_page_failed")
 		}
 		if len(events) == 0 {
-			// The existing AI resolver performs FOR UPDATE. This strictly read-only
-			// host cannot mint that capability; actual source rows are consumed as
-			// blocked candidates, preserving IDs privately and complete EOF counts.
-			if c.QualifyAIPage(ctx, page, nil) != nil {
+			// Local readonly facts do not prove the external qs-ai execution or
+			// whole reverse MQ graph, and cannot authorize evidence CAS or DROP.
+			if c.QualifyAIReadOnlyPage(ctx, page, aiReadonly) != nil {
 				return nil, fixedError("history_ai_readonly_page_failed")
 			}
 			e.aiPages++
@@ -251,24 +322,25 @@ func buildEpoch(ctx context.Context, a *approvedInputs, d *historyDatabase) (*ep
 	}
 	e.sqlFacts = stableSQLFacts{sqlReport.DatabaseIdentitySHA256, sqlReport.BusinessAnchorsSHA256, sqlReport.SchemaCoverage, sqlReport.Ledgers, sqlReport.Observed, sqlReport.RetirementRelated, sqlReport.OutsideRetirement, sqlReport.Unknown, sqlReport.Blocking}
 	e.mongoFacts = stableMongoFacts{mongoReport.IdentitySHA256, mongoReport.MetadataSHA256, mongoReport.SnapshotSHA256, mongoReport.MigrationVersion, mongoReport.Collections, mongoReport.ClassCounts, mongoReport.BlockingReasons, mongoReport.CoverageGaps, mongoReport.Rows, mongoReport.Bytes, mongoReport.Pages, mongoReport.ClassifiedRows}
-	if current.ValidateBorrowedSnapshot(ctx) != nil || global.ValidateBorrowedSnapshot(ctx) != nil || a.verifyFullFiles(ctx) != nil {
+	if current.ValidateBorrowedSnapshot(ctx) != nil || global.ValidateBorrowedSnapshot(ctx) != nil || aiReverse.ValidateBorrowedSnapshot(ctx) != nil || a.verifyFullFiles(ctx) != nil {
 		return nil, fixedError("history_epoch_changed_before_close")
 	}
 	return e, nil
 }
 
-// Keep stable summaries and the original opaque source binding across epochs.
-// This releases row-graph references only; d.epoch still ends the host scopes.
+// Release every original business/source graph only after an actual joint
+// opaque AI/origin seal. The retained borrowed Tx checks host-ended lifecycle;
+// fixed metadata and digests are not a production approval or memory proof.
 func (e *epochResult) compactOrigin(ctx context.Context) error {
-	if e == nil || e.origin == nil || e.sql == nil || e.mongo == nil || e.anchor != nil {
+	if e == nil || e.origin == nil || e.sql == nil || e.mongo == nil || e.aiReverse == nil || e.aiReverseCoordinator == nil || e.anchor != nil || e.reverseAnchor != nil {
 		return fixedError("history_origin_anchor_rejected")
 	}
-	anchor, err := e.origin.FreezeFreshRecheckAnchor(ctx)
+	anchor, err := e.aiReverse.FreezeFreshAnchor(ctx, e.origin)
 	if err != nil {
 		return fixedError("history_origin_anchor_rejected")
 	}
-	e.anchor = anchor
-	e.origin, e.sql, e.mongo = nil, nil, nil
+	e.reverseAnchor = anchor
+	e.origin, e.sql, e.mongo, e.aiReverse, e.aiReverseCoordinator, e.anchor = nil, nil, nil, nil, nil, nil
 	return nil
 }
 
@@ -276,7 +348,7 @@ func (e *epochResult) compactOrigin(ctx context.Context) error {
 // Once the first graph is compacted, the anchor independently checks actual SQL
 // ConnPool/CycleID and Mongo Lsid/Txn before its complete origin re-observation.
 func compareEpochs(first, second *epochResult) error {
-	if first == nil || second == nil || first.sql == second.sql || first.mongo == second.mongo || first.coordinator.CandidateSHA256 != second.coordinator.CandidateSHA256 || first.coordinator.CandidateCount != second.coordinator.CandidateCount || first.coordinator.LocallyQualifiedCount != second.coordinator.LocallyQualifiedCount || first.coordinator.BlockedLocalCount != second.coordinator.BlockedLocalCount || first.coordinator.ApprovedCopies != second.coordinator.ApprovedCopies || first.coordinator.SecondPassCopies != second.coordinator.SecondPassCopies || first.coordinator.ConsumedRecords != second.coordinator.ConsumedRecords || first.index.IndexSHA256 != second.index.IndexSHA256 || first.jointPages != second.jointPages || first.aiPages != second.aiPages || !reflect.DeepEqual(first.sqlFacts, second.sqlFacts) || !reflect.DeepEqual(first.mongoFacts, second.mongoFacts) || !reflect.DeepEqual(first.reasons, second.reasons) {
+	if first == nil || second == nil || first.sql == second.sql || first.mongo == second.mongo || first.coordinator.CandidateSHA256 != second.coordinator.CandidateSHA256 || first.coordinator.CandidateCount != second.coordinator.CandidateCount || first.coordinator.LocallyQualifiedCount != second.coordinator.LocallyQualifiedCount || first.coordinator.BlockedLocalCount != second.coordinator.BlockedLocalCount || first.coordinator.ApprovedCopies != second.coordinator.ApprovedCopies || first.coordinator.SecondPassCopies != second.coordinator.SecondPassCopies || first.coordinator.ConsumedRecords != second.coordinator.ConsumedRecords || first.index.IndexSHA256 != second.index.IndexSHA256 || first.jointPages != second.jointPages || first.aiPages != second.aiPages || !reflect.DeepEqual(first.aiFacts, second.aiFacts) || !reflect.DeepEqual(first.aiReverseFacts, second.aiReverseFacts) || !reflect.DeepEqual(first.sqlFacts, second.sqlFacts) || !reflect.DeepEqual(first.mongoFacts, second.mongoFacts) || !reflect.DeepEqual(first.reasons, second.reasons) {
 		return fixedError("history_independent_epoch_facts_changed")
 	}
 	return nil
@@ -306,10 +378,17 @@ func executePipeline(ctx context.Context, a *approvedInputs, d *historyDatabase)
 		if e = compareEpochs(first, second); e != nil {
 			return e
 		}
+		// Equality of exported diagnostics is not a freshness proof. This calls
+		// the actual ended-old-Tx/new-ConnPool/cycle full 8+14 replay and binds
+		// its four EOF readers to this independently authenticated coordinator.
+		aiProof, e := first.recheckAIReverse(scope, second, a)
+		if e != nil {
+			return e
+		}
 		if a.rewind() != nil {
 			return fixedError("history_asset_read_failed")
 		}
-		proof, e := first.anchor.RecheckSnapshots(scope, second.sql, second.mongo, a.readers())
+		proof, e := first.reverseAnchor.RecheckOrigin(scope, aiProof, second.sql, second.mongo, second.aiReverseCoordinator, a.readers())
 		if e != nil {
 			return fixedError("history_actual_origin_independent_epoch_failed")
 		}
@@ -329,7 +408,11 @@ func executePipeline(ctx context.Context, a *approvedInputs, d *historyDatabase)
 	r.Sources = second.coordinator.SecondPassCopies
 	r.WholeSourceIndexSHA256 = second.index.IndexSHA256
 	r.CandidateSHA256 = second.coordinator.CandidateSHA256
-	r.SQLCurrentFactsSHA256 = jsonHash(second.sqlFacts)
+	r.SQLCurrentFactsSHA256 = jsonHash(struct {
+		SQL       stableSQLFacts
+		AI        retirement.AIReadOnlyBindingSummary
+		AIReverse stableAIReverseFacts
+	}{second.sqlFacts, second.aiFacts, second.aiReverseFacts})
 	r.MongoCurrentFactsSHA256 = jsonHash(second.mongoFacts)
 	r.LocalCandidates = second.coordinator.CandidateCount
 	r.LocallyQualified = second.coordinator.LocallyQualifiedCount
@@ -340,6 +423,7 @@ func executePipeline(ctx context.Context, a *approvedInputs, d *historyDatabase)
 	r.MongoCollectionCount = len(second.mongoFacts.Collections)
 	r.SQLGlobal = sqlGlobalSummary{second.sqlFacts.Observed, second.sqlFacts.Related, second.sqlFacts.Outside, second.sqlFacts.Unknown, second.sqlFacts.Blocking, second.sqlFacts.SchemaCoverage}
 	r.MongoGlobal = mongoGlobalSummary{second.mongoFacts.Rows, second.mongoFacts.ClassifiedRows, second.mongoFacts.ClassCounts, append([]string{}, second.mongoFacts.BlockingReasons...), append([]string{}, second.mongoFacts.CoverageGaps...)}
+	r.AIReverseGlobal = aiReverseGlobalSummary{LedgerCount: len(second.aiReverseFacts.Ledgers), Rows: second.aiReverseFacts.Rows, Related: second.aiReverseFacts.Related, Outside: second.aiReverseFacts.Outside, Unknown: second.aiReverseFacts.Unknown, Blocking: second.aiReverseFacts.Blocking, OutsideActive: second.aiReverseFacts.OutsideActive, DataSHA256: second.aiReverseFacts.DataSHA256, SourceScopeSHA256: second.aiReverseFacts.SourceScopeSHA256, WholeLedgerEOF: true, IndependentEpochRechecked: true}
 	r.BlockingReasons = second.reasons
 	r.ErrorCategory = "none"
 	r.RequiredAdapters = append(r.RequiredAdapters, second.coordinator.RequiredAdapters...)
@@ -347,6 +431,28 @@ func executePipeline(ctx context.Context, a *approvedInputs, d *historyDatabase)
 	r.RequiredAdapters = uniqueStrings(r.RequiredAdapters)
 	return r, nil
 }
+func stableAIReverseObservation(r retirement.AIReverseSummary) (stableAIReverseFacts, error) {
+	// This is a body-free diagnostic serializer of an actual constructed
+	// snapshot. It has no caller-facing qualification or write entrypoint.
+	if r.MigrationVersion != 99 || !r.ActualReadOnlyRR || !r.WholeLedgerEOF || r.SourceAuthenticationRequired || len(r.Ledgers) != 14 || r.GlobalReverseQualified || r.CASAuthority || r.DropReady || !r.ExternalOriginRequired || !r.ExternalQSAIClosureRequired || !r.StoredWireAuthenticationRequired || !r.WriterFenceRequired {
+		return stableAIReverseFacts{}, fixedError("history_ai_reverse_coverage_incomplete")
+	}
+	return stableAIReverseFacts{r.DatabaseIdentitySHA256, r.DataSHA256, r.BusinessAnchorsSHA256, r.SourceScopeSHA256, r.MigrationVersion, append([]retirement.AIReverseLedgerSummary(nil), r.Ledgers...), r.SourceCopies, r.Rows, r.Bytes, r.Related, r.OutsideRetirement, r.Unknown, r.Blocking, r.OutsideActive, append([]string(nil), r.BlockingReasons...)}, nil
+}
+func (first *epochResult) recheckAIReverse(ctx context.Context, second *epochResult, a *approvedInputs) (*retirement.AIReverseFreshProof, error) {
+	if first == nil || second == nil || a == nil || first.reverseAnchor == nil || first.origin != nil || first.sql != nil || first.mongo != nil || first.aiReverse != nil || first.aiReverseCoordinator != nil || first.anchor != nil || second.aiReverse == nil || second.aiReverseCoordinator == nil || second.sql == nil {
+		return nil, fixedError("history_ai_reverse_independent_epoch_failed")
+	}
+	if a.rewind() != nil {
+		return nil, fixedError("history_asset_read_failed")
+	}
+	proof, err := first.reverseAnchor.RecheckFresh(ctx, second.sql, a.inventory.Migrations["mysql"], second.aiReverseCoordinator, a.copies())
+	if err != nil || proof == nil {
+		return nil, fixedError("history_ai_reverse_independent_epoch_failed")
+	}
+	return proof, nil
+}
+
 func uniqueStrings(values []string) []string {
 	out := make([]string, 0, len(values))
 	for _, v := range values {

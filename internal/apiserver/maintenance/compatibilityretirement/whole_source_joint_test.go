@@ -104,6 +104,141 @@ func TestWholeSourceJointIndexSixTypesOriginalOffsetsAndIndependentEOF(t *testin
 	}
 }
 
+func TestWholeSourceJointIndexDetachedClonePreservesOriginalFactsAndDigest(t *testing.T) {
+	f := wholeJointUnitFixture(t, 2, true)
+	c, err := PrepareHistoricalCoordinator(t.Context(), coordinatorBinding(), f.inputs(), DefaultHistoricalCoordinatorLimits())
+	if err != nil {
+		t.Fatal(err)
+	}
+	x, err := c.PrepareWholeSourceJointIndex(t.Context(), wholeJointCopies(f), DefaultWholeSourceJointLimits())
+	if err != nil {
+		t.Fatal(err)
+	}
+	before := x.Summary().IndexSHA256
+	legacy := *x
+	legacy.entries = make(map[string]wholeSourceJointEntry, len(x.entries))
+	observed := 0
+	for _, object := range []int{0, 3} {
+		var next func() (*DecodedSourceEvent, error)
+		var receipt func() SourceCopyReceipt
+		if object == 0 {
+			r, e := NewSQLSourceReader(bytes.NewReader(f.raw[object]), f.expected[object])
+			if e != nil {
+				t.Fatal(e)
+			}
+			next, receipt = r.Next, r.Receipt
+		} else {
+			r, e := NewMongoSourceReader(bytes.NewReader(f.raw[object]), f.expected[object])
+			if e != nil {
+				t.Fatal(e)
+			}
+			next, receipt = r.Next, r.Receipt
+		}
+		for {
+			original, e := next()
+			if e == io.EOF {
+				break
+			}
+			if e != nil {
+				t.Fatal(e)
+			}
+			id := original.EventID
+			entry, exists := x.entries[id]
+			if !exists {
+				t.Fatal("independently decoded original is missing from the index")
+			}
+			// The old index read these fields from the public decoder DTO and
+			// calculated its facts digest again. Reconstruct that contract from
+			// a separate complete read, without copying the index hash protocol.
+			old := entry
+			old.Key, e = sourceAuthKey(original.Source.Database, original.Source.Object, original.Source.PrimaryKeySHA256)
+			if e != nil {
+				t.Fatal(e)
+			}
+			old.FactsSHA256, e = privateFactsSHA(original)
+			if e != nil {
+				t.Fatal(e)
+			}
+			old.EventID, old.EventType, old.AggregateType, old.AggregateID = original.EventID, original.EventType, original.AggregateType, original.AggregateID
+			old.OrgID = original.OrgID
+			old.AssessmentID, old.AnswerSheetID = 0, 0
+			if original.Submitted != nil {
+				old.AnswerSheetID, e = mongoCycleStringID(original.Submitted.AnswerSheetID)
+			} else if original.Generated != nil {
+				old.AssessmentID, e = mongoCycleStringID(original.Generated.AssessmentID)
+			} else {
+				old.AssessmentID, e = sqlSourceAssessment(original)
+			}
+			if e != nil || !reflect.DeepEqual(entry, old) {
+				t.Fatal("opaque-clone index changed original facts or identity fields")
+			}
+			legacy.entries[id] = old
+			bound, e := c.authenticated.BindEvent(original)
+			if e != nil || bound == nil || bound.facts == nil {
+				t.Fatal("original source did not yield an opaque detached clone")
+			}
+			original.EventID += "-changed"
+			original.EventType = "changed.type"
+			original.OrgID++
+			original.AggregateID = "changed-owner"
+			if original.BusinessIDs != nil {
+				original.BusinessIDs["assessment_id"] = "999"
+			}
+			if original.Submitted != nil {
+				original.Submitted.AnswerSheetID = "999"
+			}
+			if original.Generated != nil {
+				original.Generated.AssessmentID = "999"
+			}
+			if _, e = c.authenticated.BindEvent(original); !errors.Is(e, ErrSourceAuthentication) {
+				t.Fatal("changed original DTO reused the authenticated facts digest")
+			}
+			clonedDigest, e := privateFactsSHA(bound.facts)
+			if e != nil || clonedDigest != old.FactsSHA256 || bound.facts.EventID != id {
+				t.Fatal("original DTO mutation reached the private opaque clone")
+			}
+			indexed, e := x.event(t.Context(), id)
+			if e != nil {
+				t.Fatal(e)
+			}
+			indexedDigest, e := privateFactsSHA(indexed.facts)
+			if e != nil || indexedDigest != old.FactsSHA256 {
+				t.Fatal("index no longer reads the original authenticated frame")
+			}
+			observed++
+		}
+		if !receipt().Complete || receipt() != c.authenticated.receipts[object] {
+			t.Fatal("old-contract comparison did not reach independent source EOF")
+		}
+	}
+	if observed != 6 || observed != len(x.entries) || legacy.digest() != before || x.digest() != before || x.Summary().DropReady {
+		t.Fatal("complete original index digest or authority changed")
+	}
+}
+
+func TestWholeSourceJointIndexRejectsUnmatchedAuthenticatedFactsBeforeReuse(t *testing.T) {
+	f := wholeJointUnitFixture(t, 1, true)
+	c, err := PrepareHistoricalCoordinator(t.Context(), coordinatorBinding(), f.inputs(), DefaultHistoricalCoordinatorLimits())
+	if err != nil {
+		t.Fatal(err)
+	}
+	changed := false
+	for key, row := range c.authenticated.rows {
+		if key.object == 0 {
+			row.facts[0] ^= 1
+			c.authenticated.rows[key] = row
+			changed = true
+			break
+		}
+	}
+	if !changed {
+		t.Fatal("fixture did not authenticate an original SQL source row")
+	}
+	if x, e := c.PrepareWholeSourceJointIndex(t.Context(), wholeJointCopies(f), DefaultWholeSourceJointLimits()); !errors.Is(e, ErrSourceAuthentication) || x != nil {
+		t.Fatal("index reused a sealed digest without validating the original and clone")
+	}
+}
+
 func TestWholeSourceJointIndexNeverTreatsCapOrTruncationAsEOF(t *testing.T) {
 	for _, mutation := range []string{"truncated_mongo", "trailing_mongo", "truncated_ai", "encoded_cap", "changed_expectation", "nil_copy", "typed_nil_copy", "invalid_limits"} {
 		t.Run(mutation, func(t *testing.T) {
