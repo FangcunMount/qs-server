@@ -1182,6 +1182,15 @@ func main() {
 		fmt.Println(`{"format_version":1,"complete":false,"drop_ready":false,"error_category":"input_invalid"}`)
 		os.Exit(1)
 	}
+	if *mode == "prepare-facts-root-once" {
+		ctx, cancel := context.WithTimeout(context.Background(), 90*time.Minute)
+		r, e := runPrepareFacts(ctx, *req, *hash, *op, *runID)
+		cancel()
+		if json.NewEncoder(os.Stdout).Encode(r) != nil || e != nil {
+			os.Exit(1)
+		}
+		return
+	}
 	if *mode == "lifecycle-prepare-root-once" {
 		ctx, cancel := context.WithTimeout(context.Background(), 90*time.Minute)
 		staged, e := stageLifecycleRootInputs(ctx, *req, *hash, *op, *runID)
