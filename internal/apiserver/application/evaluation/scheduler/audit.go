@@ -272,7 +272,23 @@ func classifyDrifts(evidence consistencyEvidence, now time.Time) []*mismatch {
 			add(mismatchCommittedOutboxMismatch, severityHigh, "quarantine conflicting outbox evidence and require operator decision")
 		}
 
-		if evidence.run == nil || evidence.run.ID != evidence.outcome.RunID {
+		// The reader already rechecked physical absence of the canonical
+		// original ID and its stable owner. Another retained, closed Run is
+		// not that missing original. Never exempt an unfinished/unknown Run
+		// or any retained lease; their existing matrix findings remain.
+		gap := evidence.status.IsEvaluated() && evidence.outbox != nil && evidence.outbox.LegacyCanonicalAbsent && evidence.outbox.Class == "" && evidence.outbox.RowCount == 0 && evidence.outbox.InvalidReason == "canonical outcome lacks classified committed event evidence" && evidence.committedHistory != nil && evidence.committedHistory.Class == eventevidence.Unverifiable && evidence.committedHistory.OutcomeID == outcomeID && evidence.committedHistory.RunID == evidence.outcome.RunID
+		if gap {
+			gap = false
+			for _, reason := range evidence.committedHistory.Reasons {
+				if reason == "original_outcome_run_absent" {
+					gap = true
+				}
+			}
+		}
+		if evidence.run != nil && (runStatus != evalrun.StatusSucceeded && runStatus != evalrun.StatusFailed || evidence.run.LeaseExpiresAt != nil) {
+			gap = false
+		}
+		if (evidence.run == nil || evidence.run.ID != evidence.outcome.RunID) && !gap {
 			add(mismatchRunOutcomeReferenceMismatch, severityHigh, "locate the exact run referenced by the canonical outcome")
 		}
 	}

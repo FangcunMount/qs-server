@@ -852,6 +852,7 @@ def _metadata_inputs(t, directory, value, args):
         t.fail("history_metadata_inventory_binding_invalid")
     t.utc(report["observed_at"])
     t.validate_inventory_bindings(report["database_bindings"], True)
+    t.validate_approved_namespace_anchor(request, report["database_bindings"]["mongodb"])
     for database, binding in report["database_bindings"].items():
         if (binding["identity_hash"] != request["identity_hashes"][database] or
             type(binding["migration_version"]) is not int or binding["migration_version"] != request["expected_migrations"][database] or

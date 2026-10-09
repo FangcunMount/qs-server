@@ -236,6 +236,8 @@ jobs:
           MYSQL_ROOT_PASSWORD: root
         ports:
           - 3306:3306
+          # The historical fixture keeps its fixed loopback route.
+          - 34306:3306
         options: >-
           --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -proot"
           --health-interval=5s
@@ -333,6 +335,16 @@ jobs:
           go test -race -tags=integration -count=1 -timeout=5m ./internal/apiserver/infra/mysql/evaluation -run '^TestCommittedEvidence'
           go test -race -tags=integration -count=1 -timeout=5m ./internal/apiserver/infra/retrygovernance
           go test -race -tags=integration -count=1 -timeout=5m ./internal/pkg/migration -run '^TestCompatibilityRetirementA'
+
+      - name: Verify retained historical evidence persistence on real databases
+        env:
+          QS_HISTORY_MYSQL_DSN: root:root@tcp(127.0.0.1:34306)/mysql?parseTime=true&multiStatements=true
+          QS_HISTORY_REQUIRE_DATABASE: '1'
+          QS_SERVER_TEST_MONGO_URI: mongodb://127.0.0.1:27017/?replicaSet=rs0
+          QS_SERVER_TEST_MONGO_DB_PREFIX: qs_history_ci_contract
+        run: |
+          go test -race -tags=integration -count=1 -timeout=10m ./internal/apiserver/infra/mysql/evaluation -run '^TestSQLCASProvenanceNative|^TestSQLHistoricalMissingOriginalRunPolicyNative$'
+          go test -race -tags=integration -count=1 -timeout=10m ./internal/apiserver/maintenance/compatibilityretirement -run '^TestHistoricalCASPersistenceNative'
 
       - name: Run Survey and ModelCatalog Mongo integration contracts
         env:
@@ -611,6 +623,14 @@ jobs:
 
       - name: Validate Attention reconcile dry-run/apply audit contract
         run: bash scripts/cd/test-attention-reconcile-audit.sh
+
+      - name: Validate retirement lifecycle contracts on the final source
+        run: |
+          python3 -B scripts/database/test-compatibility-retirement.py
+          python3 -B scripts/database/test-compatibility-history-prepare.py
+          python3 -B scripts/database/test-compatibility-history-parent.py
+          python3 -B scripts/database/test-compatibility-history-parent-action.py
+          python3 -B scripts/database/test-compatibility-namespace-anchor.py
 
       - name: Validate compatibility observation contract
         run: bash scripts/cd/test-compatibility-observation.sh

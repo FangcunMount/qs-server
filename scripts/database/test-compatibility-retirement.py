@@ -817,7 +817,9 @@ class SafetyContracts(unittest.TestCase):
         self.assertIn("CGO_ENABLED=0 GOOS=linux GOARCH=amd64", workflow)
         self.assertIn("CGO_ENABLED=0 GOOS=linux GOARCH=arm64", workflow)
         self.assertIn('main.sourceSHA=$GITHUB_SHA', workflow)
-        self.assertIn("test-compatibility-history-prepare.py", workflow)
+        ci = (SCRIPT.parents[2] / ".github/workflows/ci.yml").read_text()
+        self.assertIn("test-compatibility-history-prepare.py", ci)
+        self.assertIn("Require successful final source CI", workflow)
         self.assertFalse(tool.CAPABILITIES["history_verifier"])
         self.assertFalse(tool.CAPABILITIES["production_database_backend"])
         self.assertFalse(tool.CAPABILITIES["private_backup_restore_backend"])
@@ -847,6 +849,31 @@ class SafetyContracts(unittest.TestCase):
                 program = ("const script=" + json.dumps(script) + ";const context=" + json.dumps(context)
                            + ";const current=" + json.dumps(current_sha)
                            + ";const github={rest:{repos:{getCommit:async()=>({data:{sha:current}})}}};"
+                           + "new (Object.getPrototypeOf(async function(){}).constructor)('context','github',script)(context,github)"
+                           + ".catch(()=>{process.exitCode=1;});")
+                result = subprocess.run(["node", "-e", program], capture_output=True, text=True, check=False)
+                self.assertEqual(result.returncode, 0 if allowed else 1, result.stderr)
+
+    def test_retirement_reuses_only_latest_successful_ci_for_same_main_source(self):
+        workflow = (SCRIPT.parents[2] / ".github/workflows/compatibility-retirement.yml").read_text()
+        step = workflow.split("      - name: Require successful final source CI\n", 1)[1].split("\n  controlled-stage:", 1)[0]
+        script = textwrap.dedent(step.split("          script: |\n", 1)[1])
+        run = {"id": 100, "head_sha": SOURCE, "head_branch": "main", "event": "push",
+               "path": ".github/workflows/ci.yml", "status": "completed", "conclusion": "success"}
+        cases = [("success", [run], True), ("absent", [], False),
+                 ("newer_failure", [run, dict(run, id=101, conclusion="failure")], False),
+                 ("unfinished", [dict(run, status="in_progress")], False),
+                 ("wrong_sha", [dict(run, head_sha="b" * 40)], False),
+                 ("wrong_branch", [dict(run, head_branch="feature")], False),
+                 ("pull_request", [dict(run, event="pull_request")], False),
+                 ("wrong_workflow", [dict(run, path=".github/workflows/other.yml")], False)]
+        for name, runs, allowed in cases:
+            with self.subTest(name=name):
+                program = ("const script=" + json.dumps(script) + ";const context={repo:{owner:'fixture',repo:'fixture'},sha:"
+                           + json.dumps(SOURCE) + "};const runs=" + json.dumps(runs)
+                           + ";const github={rest:{actions:{listWorkflowRuns:async args=>{"
+                           + "if(args.workflow_id!=='ci.yml'||args.branch!=='main'||args.event!=='push'||args.head_sha!==context.sha)throw Error('bad_query');"
+                           + "return {data:{workflow_runs:runs}};}}}};"
                            + "new (Object.getPrototypeOf(async function(){}).constructor)('context','github',script)(context,github)"
                            + ".catch(()=>{process.exitCode=1;});")
                 result = subprocess.run(["node", "-e", program], capture_output=True, text=True, check=False)

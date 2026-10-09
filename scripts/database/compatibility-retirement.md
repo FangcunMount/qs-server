@@ -22,6 +22,68 @@ The exact scope is MySQL `domain_event_outbox`, `ai_bridge_commands`,
 22 CBPT objects, their private archives, normal Mongo backups and whole-db
 restores are outside this scope. No new DROP migration is included in A.
 
+## Approved accelerated execution (2026-10-09)
+
+The user approved consolidating intermediate checks and accepting explicitly
+unverifiable closed history. The four-object end state and the existing
+30-minute maintenance window remain unchanged. This amendment changes the
+execution order and historical acceptance criteria; it does not enable the
+currently unavailable production lifecycle adapters.
+
+- Run one combined regression and required CI on the final changed source,
+  one actual restore of this batch's exact production backup, and one production
+  acceptance. Repeat a check only after a relevant change, failure or unresolved
+  concern. Additional synthetic million-row comparisons, the synthetic local
+  13-GiB free-space gate and a new root/AF_UNIX authorization platform are not
+  prerequisites for delivery. Preserve failed and unexecuted experiment receipts.
+- Authenticate every row of all four actual production sources to fixed bounds
+  and complete EOF. Bind source SHA, operation, database identity and immutable
+  asset hashes through the existing GitHub Action. Sampling and successful
+  four-event audit coverage do not replace complete old-object coverage.
+- A trusted current terminal business record with settled legacy processing and
+  replay responsibility may carry `unverifiable` when an original Run,
+  authorization link or old receipt is absent. An explicit current-protocol
+  handoff may settle the old obligation while preserving the current operation's
+  facts and responsibility. Preserve original identity, source/content/business
+  digests, the policy/version, operation, verification time and exact gap reason
+  in existing business records. Never invent an original attempt or label a
+  historical gap `retired_verified`.
+- Missing historical trace is distinct from a conflicting or active trace.
+  Current pending/held work, leases, unknown current execution responsibility,
+  conflicting identities or hashes, ambiguous ownership, unsupported data and
+  unpersisted conclusions still block deletion. `published` or `delivered=1`
+  alone does not establish terminal business state or a settled obligation.
+- Reuse the existing Action and short maintenance process for
+  `prepare/apply/verify/recover/purge`. Finish bulk backfill, image preparation and
+  restore rehearsal before the window. Validate actual production resource
+  capacity and restore duration; optional synthetic gates are not substitutes.
+  Keep exact backups, actual restoration within 600 seconds, forward stop at
+  1,200 seconds, final acceptance and batch-only purge. Ordinary backups and
+  earlier cleanup archives remain outside this operation.
+
+The goal remains active. These approved criteria are being connected to the
+existing classifier, persistence, audit and lifecycle code. The earlier local
+proofs below keep their original scope and do not certify those new connections.
+
+The accelerated implementation now accepts a physically missing canonical
+Outcome Run only under the exact `original_outcome_run_absent` unverifiable
+classification. The original ID must be absent across organizations, scopes and
+soft-deleted rows. The terminal owner, frozen business binding, empty-evidence
+CAS, current responsibilities and independent persisted readback are still
+checked. A different retained closed Run does not substitute for the original;
+unfinished Runs, leases and duplicate retry authorization rows remain conflicts.
+The lower-level persistence bridge borrows the host transaction and does not
+certify that the host committed successfully. Production CAS qualification
+and lifecycle execution are still unavailable.
+
+The five offline retirement contract suites run in final-source CI. Each
+production preparation reuses the latest successful main-push `ci.yml` run for
+its exact approved SHA instead of repeating those suites. Failed, unfinished,
+missing and other-source CI are rejected. Native SQL historical-gap and SQL/Mongo
+persistence tests are wired into CI's disposable databases; local integration-tag
+compilation is not an executed native database result. The changed Go packages,
+Python contracts, both lint profiles and Action syntax passed local verification.
+
 ## Implemented and tested
 
 - CD, all persistent/operational db-ops, the production AuthZ provisioner and this workflow share
@@ -38,12 +100,18 @@ restores are outside this scope. No new DROP migration is included in A.
   an incomplete pair fails before connecting. If neither is configured it uses
   the existing `MONGODB_USERNAME/PASSWORD` pair. The selected credentials enter
   only the temporary private inventory environment; service credentials are not
-  changed. Authentication uses the existing `admin` auth source. Read-only
-  identity discovery requires business-database reads and the cluster
+  changed. Authentication uses the existing `admin` auth source. The default
+  replica identity profile requires business-database reads and the cluster
   [`replSetGetConfig`](https://www.mongodb.com/docs/v7.0/reference/privilege-actions/#replsetgetconfig)
-  privilege on the cluster resource; a real code-13 denial is reported as
-  `mongo_replica_anchor_not_authorized`, without a weaker identity fallback.
-  This discovery does not establish future write or DROP permission.
+  privilege; a real code-13 denial remains `mongo_replica_anchor_not_authorized`.
+  An explicitly requested `selected_namespace_kept_uuids_v1` profile instead
+  binds the actual endpoint, selected database, replica-set name and the exact
+  present/absent UUID set of four retained collections. Full catalog visibility,
+  at least one retained UUID, approved request/report equality and actual
+  before/after observations are required. It does not claim a cluster UUID and
+  never activates after a permission error. Legacy `identity_v1` and migration
+  generation checks remain unchanged. The backup adapter still needs separate
+  namespace-profile integration. Neither profile proves write or DROP permission.
   No server vault variable is guessed. It deploys nothing.
   A future B deployment
   must reuse prepared release scripts inside the same run, never dispatch CD

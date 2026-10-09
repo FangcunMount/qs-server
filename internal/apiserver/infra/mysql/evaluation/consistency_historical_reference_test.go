@@ -3,6 +3,7 @@ package evaluation
 import (
 	"testing"
 
+	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationconsistency"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventing/evidence"
 )
 
@@ -75,5 +76,45 @@ func TestHistoricalAnchorTimeUsesOriginalMilliseconds(t *testing.T) {
 	}
 	if _, err := historicalMillisecond("2026-10-08T01:02:03.456001Z"); err == nil {
 		t.Fatal("sub-millisecond original fact rounded")
+	}
+}
+
+func TestCommittedHistoricalDispositionNilRunRequiresExactGapAndCanonicalPair(t *testing.T) {
+	outbox := &evaluationconsistency.CommittedOutboxEvidence{OutcomeID: "9001", RunID: "original-run", LegacyCanonicalAbsent: true, InvalidReason: canonicalMissingClassificationReason}
+	ref := evaluationconsistency.HistoricalReferenceEvidence{Owner: "evaluation_outcome", OwnerID: "9001", EventType: "evaluation.outcome.committed", Class: evidence.Unverifiable, RunID: "original-run", HistoricalReason: "original_outcome_run_absent", LegacyCanonicalAbsent: true}
+	if v := committedHistoricalDisposition(outbox, []evaluationconsistency.HistoricalReferenceEvidence{ref}); v == nil || v.Class != evidence.Unverifiable || v.RunID != outbox.RunID || len(v.Reasons) != 1 {
+		t.Fatal("exact nil Run historical gap lost canonical owner reference")
+	}
+	for _, mutate := range []func(*evaluationconsistency.HistoricalReferenceEvidence){
+		func(r *evaluationconsistency.HistoricalReferenceEvidence) { r.Class = evidence.RetiredVerified },
+		func(r *evaluationconsistency.HistoricalReferenceEvidence) {
+			r.HistoricalReason = "not_original_outcome_run_absent"
+		},
+		func(r *evaluationconsistency.HistoricalReferenceEvidence) { r.HistoricalReason += ",other_gap" },
+		func(r *evaluationconsistency.HistoricalReferenceEvidence) { r.RunID = "another-run" },
+		func(r *evaluationconsistency.HistoricalReferenceEvidence) {
+			r.InvalidReason = "owner or retained Run conflict"
+		},
+		func(r *evaluationconsistency.HistoricalReferenceEvidence) { r.LegacyCanonicalAbsent = false },
+	} {
+		bad := ref
+		mutate(&bad)
+		if committedHistoricalDisposition(outbox, []evaluationconsistency.HistoricalReferenceEvidence{bad}) != nil {
+			t.Fatal("invalid zero-attempt history bypassed audit")
+		}
+	}
+	for _, mutate := range []func(*evaluationconsistency.CommittedOutboxEvidence){
+		func(o *evaluationconsistency.CommittedOutboxEvidence) { o.Class = evidence.StandardReferenceClass },
+		func(o *evaluationconsistency.CommittedOutboxEvidence) { o.LegacyCanonicalAbsent = false },
+		func(o *evaluationconsistency.CommittedOutboxEvidence) { o.RowCount = 1 },
+		func(o *evaluationconsistency.CommittedOutboxEvidence) {
+			o.InvalidReason = "standard fingerprint damaged"
+		},
+	} {
+		bad := *outbox
+		mutate(&bad)
+		if committedHistoricalDisposition(&bad, []evaluationconsistency.HistoricalReferenceEvidence{ref}) != nil {
+			t.Fatal("historical gap hid standard reference corruption")
+		}
 	}
 }

@@ -51,7 +51,9 @@ func openCommittedEvidenceDB(t *testing.T) *gorm.DB {
 	}
 	name := fmt.Sprintf("qs_compat_outcome_%d", time.Now().UnixNano())
 	if _, err := admin.ExecContext(t.Context(), "CREATE DATABASE `"+name+"`"); err != nil {
-		admin.Close()
+		if closeErr := admin.Close(); closeErr != nil {
+			t.Errorf("close fixture administrator after setup failure: %v", closeErr)
+		}
 		t.Fatal(err)
 	}
 	t.Cleanup(func() {
@@ -61,7 +63,9 @@ func openCommittedEvidenceDB(t *testing.T) *gorm.DB {
 		if err != nil {
 			t.Errorf("drop owned fixture: %v", err)
 		}
-		admin.Close()
+		if closeErr := admin.Close(); closeErr != nil {
+			t.Errorf("close owned fixture administrator: %v", closeErr)
+		}
 	})
 	cfg.DBName = name
 	db, err := gorm.Open(mysqlDriver.Open(cfg.FormatDSN()), &gorm.Config{Logger: logger.Default.LogMode(logger.Silent)})
@@ -72,7 +76,11 @@ func openCommittedEvidenceDB(t *testing.T) *gorm.DB {
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { sqlDB.Close() })
+	t.Cleanup(func() {
+		if closeErr := sqlDB.Close(); closeErr != nil {
+			t.Errorf("close owned fixture business pool: %v", closeErr)
+		}
+	})
 	if err := db.Exec("CREATE TABLE assessment(id BIGINT UNSIGNED PRIMARY KEY,org_id BIGINT,testee_id BIGINT UNSIGNED,status VARCHAR(32),deleted_at DATETIME(3) NULL)").Error; err != nil {
 		t.Fatal(err)
 	}

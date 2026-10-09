@@ -90,6 +90,7 @@ IDENTITY_ERRORS = {
         "mongo_replica_anchor_replication_not_enabled", "mongo_replica_anchor_metadata_rejected",
         "mongo_replica_anchor_topology_rejected", "mongo_replica_anchor_unavailable",
         "mongo_migration_generation_rejected", "mongo_privileges_read_failed",
+        "mongo_namespace_anchor_read_failed", "mongo_namespace_anchor_rejected", "mongo_namespace_anchor_mismatch",
         "mongo_migration_head_invalid", "migration_head_rejected"}),
 }
 
@@ -403,7 +404,8 @@ def validate_inventory_request(value, operation_id, source_sha):
 def validate_v2_request(value, operation_id, source_sha, *, boundary):
     core = ("format_version", "kind", "operation_id", "source_sha", "target_hash", "database_scope",
             "identity_hashes", "expected_migrations", "limits")
-    fields(value, core if boundary else (*core, "boundary_run_id", "boundary_report_hash", "approved_boundaries"))
+    fields(value, core if boundary else (*core, "boundary_run_id", "boundary_report_hash", "approved_boundaries"), ("mongodb_namespace_anchor",))
+    if "mongodb_namespace_anchor" in value: validate_mongo_namespace_anchor(value["mongodb_namespace_anchor"])
     if type(value["format_version"]) is not int or value["format_version"] != 2 or value["kind"] != ("readonly_inventory_boundary_request" if boundary else "readonly_inventory_request"):
         fail("inventory_request_class_invalid")
     validate_binding(value, operation_id, source_sha)
@@ -457,10 +459,75 @@ def validate_v2_request(value, operation_id, source_sha, *, boundary):
                     fail("boundary_token_invalid")
 
 
+MONGO_NAMESPACE_PROFILE = "selected_namespace_kept_uuids_v1"
+MONGO_REPLICA_PROFILE = "replica_set_uuid_v1"
+MONGO_KEPT_NAMES = ("answersheets", "interpret_report_artifacts", "interpretation_runs", "report_generations")
+
+
+def _mongo_framed_hash(parts):
+    digest = hashlib.sha256()
+    for value in parts:
+        if type(value) is not str: fail("database_anchor_invalid")
+        try: raw = value.encode("utf-8", "strict")
+        except UnicodeError: fail("database_anchor_invalid")
+        digest.update(b"\x01" + len(raw).to_bytes(8, "big") + raw)
+    return digest.hexdigest()
+
+
+def validate_mongo_namespace_anchor(anchor):
+    # Metadata DTO validation only. Actual before/after observations are made by
+    # the native connection owner; accepting this shape is never execution proof.
+    fields(anchor, ("kind", "hash", "endpoint_sha256", "database", "replica_set_name", "collections"))
+    if anchor["kind"] != MONGO_NAMESPACE_PROFILE: fail("database_anchor_invalid")
+    for key in ("hash", "endpoint_sha256"): token(anchor[key], HASH)
+    for key in ("database", "replica_set_name"):
+        value = anchor[key]
+        if type(value) is not str or not value or any(ch in value for ch in ("\x00", "\r", "\n")): fail("database_anchor_invalid")
+        try: encoded = value.encode("utf-8", "strict")
+        except UnicodeError: fail("database_anchor_invalid")
+        if len(encoded) > 128: fail("database_anchor_invalid")
+    rows = anchor["collections"]
+    if type(rows) is not list or len(rows) != len(MONGO_KEPT_NAMES): fail("database_anchor_invalid")
+    parts = [anchor["kind"], anchor["endpoint_sha256"], anchor["database"], anchor["replica_set_name"]]
+    seen = set()
+    for name, row in zip(MONGO_KEPT_NAMES, rows):
+        fields(row, ("name", "present", "uuid"))
+        if row["name"] != name or type(row["present"]) is not bool or type(row["uuid"]) is not str: fail("database_anchor_invalid")
+        if row["present"]:
+            if not re.fullmatch(r"[0-9a-f]{32}", row["uuid"]) or row["uuid"] == "0" * 32 or row["uuid"] in seen: fail("database_anchor_invalid")
+            seen.add(row["uuid"])
+        elif row["uuid"] != "": fail("database_anchor_invalid")
+        parts.extend((name, "present" if row["present"] else "absent", row["uuid"]))
+    if not seen or _mongo_framed_hash(parts) != anchor["hash"]: fail("database_anchor_invalid")
+
+
+def validate_approved_namespace_anchor(request, binding):
+    expected = request.get("mongodb_namespace_anchor")
+    observed = binding.get("namespace_anchor")
+    if expected is None:
+        if observed is not None: fail("database_anchor_profile_mismatch")
+        return
+    validate_mongo_namespace_anchor(expected)
+    if observed is None: fail("database_anchor_profile_mismatch")
+    validate_mongo_namespace_anchor(observed)
+    if observed != expected or binding["database_anchor_hash"] != expected["hash"]: fail("database_anchor_profile_mismatch")
+
+
+def public_namespace_anchor(anchor):
+    validate_mongo_namespace_anchor(anchor)
+    return {"database_anchor_kind": MONGO_NAMESPACE_PROFILE,
+            "database_anchor_uuid_set_sha256": hashlib.sha256(canonical_bytes(anchor["collections"])).hexdigest(),
+            "database_anchor_kept_count": sum(row["present"] for row in anchor["collections"])}
+
+
 INVENTORY_BINDING_FIELDS = ("identity_hash", "database_anchor_hash", "migration_generation_hash", "expected_identity_match", "migration_version", "migration_dirty", "expected_migration_match", "catalog_hash", "non_target_schema_hash", "metadata_complete", "permissions", "outside_dependencies", "dependency_coverage_complete", "inbound_foreign_key_coverage_complete", "dependency_scope", "dependency_text_review_required", "error_category")
 
 
 def validate_database_anchors(database, state, complete):
+    if "namespace_anchor" in state:
+        if database != "mongodb": fail("database_anchor_invalid")
+        validate_mongo_namespace_anchor(state["namespace_anchor"])
+        if state["database_anchor_hash"] != state["namespace_anchor"]["hash"]: fail("database_anchor_invalid")
     # Anchors are observations, never derived from a request or a name here.
     for key in ("database_anchor_hash", "migration_generation_hash"):
         if type(state[key]) is not str:
@@ -477,7 +544,7 @@ def validate_database_anchors(database, state, complete):
 def validate_inventory_bindings(bindings, complete):
     fields(bindings, ("mysql", "mongodb"))
     for database, binding in bindings.items():
-        fields(binding, INVENTORY_BINDING_FIELDS)
+        fields(binding, INVENTORY_BINDING_FIELDS, ("namespace_anchor",))
         validate_database_anchors(database, binding, complete)
 
 
@@ -492,6 +559,7 @@ def validate_approved_boundary_file(request, directory):
     if type(objects) is not list or len(objects) != 4 or [item.get("boundary") for item in objects] != request["approved_boundaries"] or any(item.get("complete") is not True or item.get("error_category") != "none" for item in objects):
         fail("approved_boundary_mismatch")
     validate_inventory_bindings(observed.get("database_bindings"), True)
+    validate_approved_namespace_anchor(request, observed["database_bindings"]["mongodb"])
     for database in ("mysql", "mongodb"):
         state = observed.get("database_bindings", {}).get(database, {})
         if state.get("identity_hash") != request["identity_hashes"][database] or state.get("migration_version") != request["expected_migrations"][database] or state.get("migration_dirty") is not False or any(state.get(key) is not True for key in ("metadata_complete", "expected_identity_match", "expected_migration_match")):
@@ -499,7 +567,8 @@ def validate_approved_boundary_file(request, directory):
 
 
 def validate_identity_request(value, operation_id, source_sha):
-    fields(value, ("format_version", "kind", "operation_id", "source_sha", "target_hash", "database_scope", "identity_protocols", "limits"))
+    fields(value, ("format_version", "kind", "operation_id", "source_sha", "target_hash", "database_scope", "identity_protocols", "limits"), ("mongo_anchor_profile",))
+    if "mongo_anchor_profile" in value and value["mongo_anchor_profile"] not in (MONGO_NAMESPACE_PROFILE, MONGO_REPLICA_PROFILE): fail("identity_request_protocol_or_limits_invalid")
     if type(value["format_version"]) is not int or value["format_version"] != 1 or value["kind"] != "readonly_identity_discovery_request":
         fail("identity_request_class_invalid")
     validate_binding(value, operation_id, source_sha)
@@ -509,13 +578,15 @@ def validate_identity_request(value, operation_id, source_sha):
         fail("identity_request_protocol_or_limits_invalid")
 
 
-def identity_request_bytes(operation_id, source_sha):
+def identity_request_bytes(operation_id, source_sha, anchor_profile=""):
+    if anchor_profile not in ("", MONGO_NAMESPACE_PROFILE, MONGO_REPLICA_PROFILE): fail("identity_request_protocol_or_limits_invalid")
     token(operation_id, RUN); token(source_sha, SHA)
     value = {"format_version": 1, "kind": "readonly_identity_discovery_request",
              "operation_id": operation_id, "source_sha": source_sha,
              "target_hash": TARGET_HASH, "database_scope": "mysql-and-mongodb",
              "identity_protocols": {"mysql": "mysql_database_identity_v1", "mongodb": "mongodb_database_identity_v1"},
              "limits": {"query_seconds": 15, "total_seconds": 90}}
+    if anchor_profile: value["mongo_anchor_profile"] = anchor_profile
     return json.dumps(value, sort_keys=True, separators=(",", ":"), allow_nan=False).encode("ascii") + b"\n"
 
 
@@ -523,10 +594,14 @@ def bootstrap_identity_request(args):
     # Request bytes contain no observed/expected identity and no credential.
     # The caller approves their exact hash independently before any directory
     # creation or connection. Never generate an inventory request from discovery.
-    raw = identity_request_bytes(args.operation_id, args.actual_source_sha)
     token(args.identity_request_hash, HASH)
-    if hashlib.sha256(raw).hexdigest() != args.identity_request_hash:
-        fail("identity_request_hash_mismatch")
+    # Choose only among two exact pre-approved raw forms, before any connection.
+    # No server error or newly observed state can select/fallback a profile.
+    candidates = [identity_request_bytes(args.operation_id, args.actual_source_sha, profile)
+                  for profile in ("", MONGO_NAMESPACE_PROFILE, MONGO_REPLICA_PROFILE)]
+    matched = [raw for raw in candidates if hashlib.sha256(raw).hexdigest() == args.identity_request_hash]
+    if len(matched) != 1: fail("identity_request_hash_mismatch")
+    raw = matched[0]
     root = Path(args.root)
     if not root.is_absolute() or ".." in root.parts or tuple(root.parts[-3:]) != ROOT_SUFFIX:
         fail("operation_root_invalid")
@@ -601,11 +676,13 @@ def validate_bootstrap_approval(args):
     mode = args.prepare_mode
     core = ("format_version", "kind", "prepare_mode", "operation_id", "source_sha", "target_hash",
             "database_scope", "identity_report", "identity_hashes", "expected_migrations", "limits")
-    fields(value, core if mode == "bootstrap-bounds" else (*core, "boundary_report"))
+    fields(value, core if mode == "bootstrap-bounds" else (*core, "boundary_report"), ("mongodb_namespace_anchor",))
+    if "mongodb_namespace_anchor" in value: validate_mongo_namespace_anchor(value["mongodb_namespace_anchor"])
     if type(value["format_version"]) is not int or value["format_version"] != 1 or value["kind"] != "readonly_request_bootstrap_approval" or value["prepare_mode"] != mode:
         fail("bootstrap_approval_class_invalid")
     validate_binding(value, args.operation_id, args.actual_source_sha)
     request = {key: value[key] for key in ("operation_id", "source_sha", "target_hash", "database_scope", "identity_hashes", "expected_migrations", "limits")}
+    if "mongodb_namespace_anchor" in value: request["mongodb_namespace_anchor"] = value["mongodb_namespace_anchor"]
     request.update(format_version=2, kind="readonly_inventory_boundary_request")
     validate_v2_request(request, args.operation_id, args.actual_source_sha, boundary=True)
     # JSON numbers must have the same exact representation in Node and Python.
@@ -626,13 +703,17 @@ def bootstrap_identity_report(directory, value, args):
     reference = value["identity_report"]
     output = private_directory(directory / ("identity-" + reference["run_id"]))
     report, report_hash = read_private(output, "identity.private.json", reference["sha256"])
-    expected_hash = hashlib.sha256(identity_request_bytes(args.operation_id, args.actual_source_sha)).hexdigest()
+    profiles = (MONGO_NAMESPACE_PROFILE,) if "mongodb_namespace_anchor" in value else ("", MONGO_REPLICA_PROFILE)
+    matched = [(profile, hashlib.sha256(identity_request_bytes(args.operation_id, args.actual_source_sha, profile)).hexdigest()) for profile in profiles if hashlib.sha256(identity_request_bytes(args.operation_id, args.actual_source_sha, profile)).hexdigest() == report.get("request_hash")]
+    if len(matched) != 1: fail("bootstrap_identity_binding_mismatch")
+    profile, expected_hash = matched[0]
     original_request, _ = read_private(directory, "identity-request.json", expected_hash)
     validate_identity_request(original_request, args.operation_id, args.actual_source_sha)
     original_args = argparse.Namespace(actual_source_sha=args.actual_source_sha, operation_id=args.operation_id,
                                        run_id=reference["run_id"])
     summary = dict(report, private_report_hash=report_hash)
-    validate_identity_receipt(summary, 0, original_args, output, expected_hash, "0" * 64)
+    validate_identity_receipt(summary, 0, original_args, output, expected_hash, "0" * 64, profile)
+    validate_approved_namespace_anchor(value, report["database_states"]["mongodb"])
     if report["complete"] is not True or any(item["complete"] is not True or item["error_category"] != "none" for item in report["diagnostic_histograms"]):
         fail("bootstrap_identity_report_incomplete")
     for database, state in report["database_states"].items():
@@ -675,7 +756,7 @@ def bootstrap_boundary_report(directory, value, request, args):
     validate_v2_request(request, args.operation_id, args.actual_source_sha, boundary=False)
     validate_approved_boundary_file(request, directory)
     for binding in report["database_bindings"].values():
-        fields(binding, INVENTORY_BINDING_FIELDS)
+        fields(binding, INVENTORY_BINDING_FIELDS, ("namespace_anchor",))
         uint(binding["migration_version"]); uint(binding["outside_dependencies"])
         for key in ("identity_hash", "catalog_hash", "non_target_schema_hash"):
             token(binding[key], HASH)
@@ -880,7 +961,7 @@ def live_inventory(args, directory):
             code, raw = capture_fixed(command, timeout=request["limits"]["total_seconds"] + 30, maximum=MAX_JSON)
     summary = decode(raw)
     if mode == "identity":
-        receipt = validate_identity_receipt(summary, code, args, output, request_hash, entrypoint_hash)
+        receipt = validate_identity_receipt(summary, code, args, output, request_hash, entrypoint_hash, request.get("mongo_anchor_profile", ""))
         receipt["runtime_image_id_sha256"] = image.removeprefix("sha256:")
         receipt["runtime_network"] = "infra_network"
         return receipt
@@ -957,6 +1038,7 @@ def validate_inventory_receipt(summary, code, args, output, request, request_has
                 fail("boundary_receipt_copied_source_body")
     validate_inventory_bindings(report["database_bindings"], summary["complete"])
     if summary["complete"]:
+        validate_approved_namespace_anchor(request, report["database_bindings"]["mongodb"])
         for database, binding in report["database_bindings"].items():
             if binding.get("identity_hash") != request["identity_hashes"][database] or binding.get("migration_version") != request["expected_migrations"][database] or binding.get("migration_dirty") is not False or binding.get("metadata_complete") is not True or binding.get("expected_identity_match") is not True or binding.get("expected_migration_match") is not True:
                 fail("inventory_receipt_database_invalid")
@@ -968,6 +1050,7 @@ def validate_inventory_receipt(summary, code, args, output, request, request_has
             token(identity, HASH)
         version = binding.get("migration_version", 0)
         uint(version)
+        if "namespace_anchor" in binding: validate_mongo_namespace_anchor(binding["namespace_anchor"])
         database_states[database] = {"identity_hash": identity or None,
                                      "database_anchor_hash": binding["database_anchor_hash"] or None,
                                      "migration_generation_hash": binding["migration_generation_hash"] or None,
@@ -976,6 +1059,7 @@ def validate_inventory_receipt(summary, code, args, output, request, request_has
                                      "migration_dirty": binding.get("migration_dirty") if version > 0 else None,
                                      "metadata_complete": binding.get("metadata_complete") is True,
                                      "identity_match": binding.get("expected_identity_match") is True}
+        if "namespace_anchor" in binding: database_states[database].update(public_namespace_anchor(binding["namespace_anchor"]))
     if mode == "bounds":
         return {"format_version": 1, "operation": "prepare", "prepare_mode": "bounds", "source_sha": args.actual_source_sha,
                 "run_id": args.run_id, "operation_id": args.operation_id, "target_hash": TARGET_HASH, "target_count": 4,
@@ -1028,7 +1112,8 @@ def validate_source_asset(output, item, args, request_hash, maximum):
         fail("inventory_source_asset_binding_invalid")
 
 
-def validate_identity_receipt(summary, code, args, output, request_hash, entrypoint_hash):
+def validate_identity_receipt(summary, code, args, output, request_hash, entrypoint_hash, anchor_profile=""):
+    if anchor_profile not in ("", MONGO_REPLICA_PROFILE, MONGO_NAMESPACE_PROFILE): fail("database_anchor_profile_mismatch")
     keys = ("format_version", "kind", "source_sha", "operation_id", "run_id", "request_hash", "target_hash", "diagnostic_only", "drop_ready", "complete", "identity_protocols", "database_states", "diagnostic_histograms", "error_category")
     fields(summary, (*keys, "private_report_hash"))
     report, digest = read_private(output, "identity.private.json", summary["private_report_hash"])
@@ -1042,7 +1127,8 @@ def validate_identity_receipt(summary, code, args, output, request_hash, entrypo
     fields(summary["database_states"], ("mysql", "mongodb"))
     clean_states = {}
     for database, state in summary["database_states"].items():
-        fields(state, ("identity_hash", "database_anchor_hash", "migration_generation_hash", "identity_observed", "migration_version", "migration_head_observed", "migration_dirty", "migration_clean", "metadata_permissions_sufficient", "permission_scope", "error_category"))
+        fields(state, ("identity_hash", "database_anchor_hash", "migration_generation_hash", "identity_observed", "migration_version", "migration_head_observed", "migration_dirty", "migration_clean", "metadata_permissions_sufficient", "permission_scope", "error_category"), ("namespace_anchor",))
+        if database == "mongodb" and ((anchor_profile != MONGO_NAMESPACE_PROFILE and "namespace_anchor" in state) or (summary["complete"] and anchor_profile == MONGO_NAMESPACE_PROFILE and "namespace_anchor" not in state)): fail("database_anchor_profile_mismatch")
         validate_database_anchors(database, state, summary["complete"])
         if state["permission_scope"] != "identity_and_migration_head":
             fail("identity_receipt_permission_scope_invalid")
@@ -1058,7 +1144,8 @@ def validate_identity_receipt(summary, code, args, output, request_hash, entrypo
             fail("identity_receipt_outcome_invalid")
         if type(state["error_category"]) is not str or state["error_category"] not in IDENTITY_ERRORS[database]:
             fail("identity_error_category_invalid")
-        clean_states[database] = dict(state)
+        clean_states[database] = {key: item for key, item in state.items() if key != "namespace_anchor"}
+        if "namespace_anchor" in state: clean_states[database].update(public_namespace_anchor(state["namespace_anchor"]))
         clean_states[database]["identity_hash"] = state["identity_hash"] or None
         clean_states[database]["database_anchor_hash"] = state["database_anchor_hash"] or None
         clean_states[database]["migration_generation_hash"] = state["migration_generation_hash"] or None
@@ -1354,14 +1441,14 @@ def main(argv=None):
               "boundary_discovery_complete": "bool", "boundary_private_report_hash": "hash64", "boundary_request_hash": "hash64",
               "inventory_next_cycle_required": "bool", "inventory_boundary_report_hash": "nullable_hash64", "inventory_two_equal_scans": "bool",
               "identity_discovery_complete": "bool", "identity_private_report_hash": "hash64", "identity_request_hash": "hash64",
-              "identity_database_states": {database: {"identity_hash": "nullable_hash64", "database_anchor_hash": "nullable_hash64", "migration_generation_hash": "nullable_hash64", "identity_observed": "bool", "migration_version": "uint", "migration_head_observed": "bool", "migration_dirty": "nullable_bool", "migration_clean": "bool", "metadata_permissions_sufficient": "bool", "permission_scope": frozenset({"identity_and_migration_head"}), "error_category": IDENTITY_ERRORS[database]} for database in ("mysql", "mongodb")},
+              "identity_database_states": {database: {**({"database_anchor_kind": frozenset({MONGO_NAMESPACE_PROFILE}), "database_anchor_uuid_set_sha256": "hash64", "database_anchor_kept_count": "uint"} if database == "mongodb" else {}), "identity_hash": "nullable_hash64", "database_anchor_hash": "nullable_hash64", "migration_generation_hash": "nullable_hash64", "identity_observed": "bool", "migration_version": "uint", "migration_head_observed": "bool", "migration_dirty": "nullable_bool", "migration_clean": "bool", "metadata_permissions_sufficient": "bool", "permission_scope": frozenset({"identity_and_migration_head"}), "error_category": IDENTITY_ERRORS[database]} for database in ("mysql", "mongodb")},
               "identity_diagnostic_histograms": [{"database": frozenset({"mysql", "mongodb"}), "name": frozenset(target[1] for target in TARGETS), "present": "nullable_bool", "complete": "bool", "diagnostic_only": "bool", "error_category": HISTOGRAM_ERRORS,
                    "bucket_count": "uint"}],
               "identity_histogram_bucket_pages": {"page_" + chr(97 + index): [{"object_index": "uint", "bucket_index": "uint", "type_label": frozenset(label.replace(".", "_") for label in HISTOGRAM_TYPES), "type_hash": "hash64", "state_label": HISTOGRAM_STATES, "state_hash": "hash64", "records": "uint"}] for index in range(4)},
               "inventory_entrypoint_catalog_hash": "hash64",
               "runtime_image_id_sha256": "hash64", "runtime_network": frozenset({"infra_network"}),
               "inventory_present_targets": "uint", "inventory_records": "uint", "inventory_source_bytes": "uint",
-              "inventory_database_states": {database: {"identity_hash": "nullable_hash64", "database_anchor_hash": "nullable_hash64", "migration_generation_hash": "nullable_hash64", "migration_version": "uint",
+              "inventory_database_states": {database: {**({"database_anchor_kind": frozenset({MONGO_NAMESPACE_PROFILE}), "database_anchor_uuid_set_sha256": "hash64", "database_anchor_kept_count": "uint"} if database == "mongodb" else {}), "identity_hash": "nullable_hash64", "database_anchor_hash": "nullable_hash64", "migration_generation_hash": "nullable_hash64", "migration_version": "uint",
                                                        "migration_head_observed": "bool", "migration_dirty": "nullable_bool",
                                                        "metadata_complete": "bool", "identity_match": "bool"}
                                             for database in ("mysql", "mongodb")},

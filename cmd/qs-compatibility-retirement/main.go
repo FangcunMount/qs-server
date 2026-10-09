@@ -24,6 +24,7 @@ import (
 	"syscall"
 	"time"
 
+	identitymeta "github.com/FangcunMount/qs-server/internal/pkg/databaseidentity"
 	"github.com/go-sql-driver/mysql"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -46,18 +47,19 @@ const totalSeconds = 180
 var targets = [][3]string{{"mysql", "domain_event_outbox", "base_table"}, {"mysql", "ai_bridge_commands", "base_table"}, {"mysql", "ai_messaging_legacy_commands", "base_table"}, {"mongodb", "domain_event_outbox", "collection"}}
 
 type request struct {
-	FormatVersion      int               `json:"format_version"`
-	Kind               string            `json:"kind"`
-	OperationID        string            `json:"operation_id"`
-	SourceSHA          string            `json:"source_sha"`
-	TargetHash         string            `json:"target_hash"`
-	DatabaseScope      string            `json:"database_scope"`
-	Identities         map[string]string `json:"identity_hashes"`
-	Migrations         map[string]uint64 `json:"expected_migrations"`
-	Limits             scanLimits        `json:"limits"`
-	BoundaryRunID      string            `json:"boundary_run_id,omitempty"`
-	BoundaryReportHash string            `json:"boundary_report_hash,omitempty"`
-	Boundaries         []targetBoundary  `json:"approved_boundaries,omitempty"`
+	FormatVersion        int                                `json:"format_version"`
+	Kind                 string                             `json:"kind"`
+	OperationID          string                             `json:"operation_id"`
+	SourceSHA            string                             `json:"source_sha"`
+	TargetHash           string                             `json:"target_hash"`
+	DatabaseScope        string                             `json:"database_scope"`
+	Identities           map[string]string                  `json:"identity_hashes"`
+	Migrations           map[string]uint64                  `json:"expected_migrations"`
+	Limits               scanLimits                         `json:"limits"`
+	BoundaryRunID        string                             `json:"boundary_run_id,omitempty"`
+	BoundaryReportHash   string                             `json:"boundary_report_hash,omitempty"`
+	Boundaries           []targetBoundary                   `json:"approved_boundaries,omitempty"`
+	MongoNamespaceAnchor *identitymeta.MongoNamespaceAnchor `json:"mongodb_namespace_anchor,omitempty"`
 }
 
 type snapshot struct {
@@ -80,23 +82,24 @@ type snapshot struct {
 	NextCycleRequired bool              `json:"next_cycle_required"`
 }
 type databaseInventory struct {
-	IdentityHash                 string          `json:"identity_hash"`
-	DatabaseAnchorHash           string          `json:"database_anchor_hash"`
-	MigrationGenerationHash      string          `json:"migration_generation_hash"`
-	ExpectedIdentityMatch        bool            `json:"expected_identity_match"`
-	Version                      uint64          `json:"migration_version"`
-	Dirty                        bool            `json:"migration_dirty"`
-	ExpectedMigrationMatch       bool            `json:"expected_migration_match"`
-	CatalogHash                  string          `json:"catalog_hash"`
-	NonTargetSchemaHash          string          `json:"non_target_schema_hash"`
-	MetadataComplete             bool            `json:"metadata_complete"`
-	Permissions                  map[string]bool `json:"permissions"`
-	OutsideDependencies          uint64          `json:"outside_dependencies"`
-	DependencyCoverageComplete   bool            `json:"dependency_coverage_complete"`
-	InboundFKCoverageComplete    bool            `json:"inbound_foreign_key_coverage_complete"`
-	DependencyScope              string          `json:"dependency_scope"`
-	DependencyTextReviewRequired bool            `json:"dependency_text_review_required"`
-	ErrorCategory                string          `json:"error_category"`
+	IdentityHash                 string                             `json:"identity_hash"`
+	DatabaseAnchorHash           string                             `json:"database_anchor_hash"`
+	NamespaceAnchor              *identitymeta.MongoNamespaceAnchor `json:"namespace_anchor,omitempty"`
+	MigrationGenerationHash      string                             `json:"migration_generation_hash"`
+	ExpectedIdentityMatch        bool                               `json:"expected_identity_match"`
+	Version                      uint64                             `json:"migration_version"`
+	Dirty                        bool                               `json:"migration_dirty"`
+	ExpectedMigrationMatch       bool                               `json:"expected_migration_match"`
+	CatalogHash                  string                             `json:"catalog_hash"`
+	NonTargetSchemaHash          string                             `json:"non_target_schema_hash"`
+	MetadataComplete             bool                               `json:"metadata_complete"`
+	Permissions                  map[string]bool                    `json:"permissions"`
+	OutsideDependencies          uint64                             `json:"outside_dependencies"`
+	DependencyCoverageComplete   bool                               `json:"dependency_coverage_complete"`
+	InboundFKCoverageComplete    bool                               `json:"inbound_foreign_key_coverage_complete"`
+	DependencyScope              string                             `json:"dependency_scope"`
+	DependencyTextReviewRequired bool                               `json:"dependency_text_review_required"`
+	ErrorCategory                string                             `json:"error_category"`
 }
 type report struct {
 	FormatVersion        int                          `json:"format_version"`
@@ -219,7 +222,7 @@ func readRequest(path, expected, op string) (request, error) {
 	if e != nil || digestRaw(b) != expected {
 		return r, category("request_hash_mismatch")
 	}
-	if rejectDuplicateJSON(b) != nil {
+	if rejectDuplicateJSON(b) != nil || identitymeta.ValidateOptionalMongoNamespaceJSON(b, "mongodb_namespace_anchor") != nil {
 		return r, category("request_schema_invalid")
 	}
 	// The Python supervisor performs duplicate-key and ownership validation too.
@@ -230,6 +233,9 @@ func readRequest(path, expected, op string) (request, error) {
 	}
 	if r.OperationID != op || r.SourceSHA != sourceSHA || r.TargetHash != digest(targets) || r.DatabaseScope != "mysql-and-mongodb" || len(r.Identities) != 2 || len(r.Migrations) != 2 || !hashRE.MatchString(r.Identities["mysql"]) || !hashRE.MatchString(r.Identities["mongodb"]) || r.Identities["mysql"] == r.Identities["mongodb"] || r.Migrations["mysql"] == 0 || r.Migrations["mongodb"] == 0 {
 		return r, category("request_binding_invalid")
+	}
+	if r.MongoNamespaceAnchor != nil && (r.FormatVersion != 2 || r.MongoNamespaceAnchor.Validate() != nil) {
+		return r, category("mongo_namespace_anchor_rejected")
 	}
 	if r.FormatVersion == 2 {
 		return r, validateV2Request(r, path)
@@ -862,9 +868,20 @@ func mongoInventory(ctx context.Context, r request, dir string) (databaseInvento
 	}
 	stableJSON, _ := json.Marshal(stable)
 	d.IdentityHash = hashParts("mongodb_database_identity_v1", string(stableJSON), os.Getenv("MONGODB_DBNAME"), hex.EncodeToString(bytes))
-	d.DatabaseAnchorHash, e = mongoDatabaseAnchor(ctx, db, hello)
-	if e != nil {
-		return d, s, e
+	if r.MongoNamespaceAnchor != nil {
+		d.NamespaceAnchor, e = mongoNamespaceAnchor(ctx, db)
+		if e != nil {
+			return d, s, e
+		}
+		if !identitymeta.MatchMongoNamespaceAnchors(r.MongoNamespaceAnchor, d.NamespaceAnchor) {
+			return d, s, category("mongo_namespace_anchor_mismatch")
+		}
+		d.DatabaseAnchorHash = d.NamespaceAnchor.Hash
+	} else {
+		d.DatabaseAnchorHash, e = mongoDatabaseAnchor(ctx, db, hello)
+		if e != nil {
+			return d, s, e
+		}
 	}
 	d.MigrationGenerationHash, e = mongoMigrationGeneration(migration)
 	if e != nil {
@@ -979,6 +996,15 @@ func mongoInventory(ctx context.Context, r request, dir string) (databaseInvento
 				return d, s, category("mongo_source_changed_during_scan")
 			}
 			s.Complete = true
+		}
+	}
+	if r.MongoNamespaceAnchor != nil {
+		endAnchor, anchorErr := mongoNamespaceAnchor(ctx, db)
+		if anchorErr != nil {
+			return d, s, anchorErr
+		}
+		if !identitymeta.MatchMongoNamespaceAnchors(d.NamespaceAnchor, endAnchor) {
+			return d, s, category("mongo_namespace_anchor_mismatch")
 		}
 	}
 	_, end, e := mongoSchemas(ctx, db)

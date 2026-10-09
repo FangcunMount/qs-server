@@ -150,3 +150,55 @@ func TestHistoricalEventProvenanceIsNotCurrentMessageVerification(t *testing.T) 
 		t.Fatal("historical class hid a binding conflict")
 	}
 }
+
+func TestMissingRunAuditAcceptsOnlyReaderVerifiedHistoricalGap(t *testing.T) {
+	outcome := testOutcome(modelcatalog.KindScale, "original-run")
+	base := consistencyEvidence{status: domainassessment.StatusEvaluated, outcome: outcome, projection: &evaluationconsistency.ProjectionEvidence{RowCount: 1, DistinctOutcomeCount: 1, OutcomeID: outcome.ID}, outbox: &evaluationconsistency.CommittedOutboxEvidence{OutcomeID: outcome.ID, RunID: outcome.RunID, LegacyCanonicalAbsent: true, InvalidReason: "canonical outcome lacks classified committed event evidence"}, committedHistory: &evaluationconsistency.CommittedHistoricalEvidence{Class: eventevidence.Unverifiable, OutcomeID: outcome.ID, RunID: outcome.RunID, Reasons: []string{"original_outcome_run_absent"}}}
+	if got := classifyDrifts(base, time.Now()); len(got) != 0 {
+		t.Fatalf("qualified original-ID gap was double-counted or made a high current-Run finding: %#v", got)
+	}
+	otherClosed := base
+	otherClosed.run = &evaluationconsistency.RunEvidence{ID: "retained-earlier-run", Status: string(evalrun.StatusSucceeded)}
+	if got := classifyDrifts(otherClosed, time.Now()); len(got) != 0 {
+		t.Fatalf("another closed Run was substituted for the missing original identity: %#v", got)
+	}
+	for _, tc := range []struct {
+		name   string
+		mutate func(*consistencyEvidence)
+	}{
+		{"pending other Run", func(v *consistencyEvidence) {
+			v.run = &evaluationconsistency.RunEvidence{ID: "other-run", Status: string(evalrun.StatusPending)}
+		}},
+		{"running other Run", func(v *consistencyEvidence) {
+			v.run = &evaluationconsistency.RunEvidence{ID: "other-run", Status: string(evalrun.StatusRunning)}
+		}},
+		{"leased terminal other Run", func(v *consistencyEvidence) {
+			lease := time.Now().Add(time.Hour)
+			v.run = &evaluationconsistency.RunEvidence{ID: "other-run", Status: string(evalrun.StatusSucceeded), LeaseExpiresAt: &lease}
+		}},
+		{"unqualified closed other Run", func(v *consistencyEvidence) {
+			v.run = &evaluationconsistency.RunEvidence{ID: "other-run", Status: string(evalrun.StatusSucceeded)}
+			v.committedHistory.Reasons = []string{"not_original_outcome_run_absent"}
+		}},
+		{"reason similar", func(v *consistencyEvidence) { v.committedHistory.Reasons = []string{"not_original_outcome_run_absent"} }},
+		{"verified missing Run", func(v *consistencyEvidence) { v.committedHistory.Class = eventevidence.RetiredVerified }},
+		{"standard reference", func(v *consistencyEvidence) { v.outbox.Class = eventevidence.StandardReferenceClass }},
+		{"standard corruption", func(v *consistencyEvidence) { v.outbox.InvalidReason = "standard fingerprint damaged" }},
+		{"canonical pair present", func(v *consistencyEvidence) { v.outbox.LegacyCanonicalAbsent = false }},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			v := base
+			o, h := *base.outbox, *base.committedHistory
+			v.outbox, v.committedHistory = &o, &h
+			tc.mutate(&v)
+			if got := classifyDrifts(v, time.Now()); !containsMismatch(got, mismatchRunOutcomeReferenceMismatch) {
+				t.Fatal("historical gap suppressed an unqualified actual-Run mismatch")
+			}
+		})
+	}
+	reader := &consistencyReaderStub{batches: map[uint64]evaluationconsistency.Batch{0: {Items: []evaluationconsistency.AssessmentEvidence{{AssessmentID: 42, Status: string(base.status), Outcome: base.outcome, Run: otherClosed.run, Projection: base.projection, Outbox: base.outbox, CommittedHistory: base.committedHistory, HistoricalReferences: []evaluationconsistency.HistoricalReferenceEvidence{{Owner: "evaluation_outcome", OwnerID: outcome.ID, EventType: "evaluation.outcome.committed", Class: eventevidence.Unverifiable, RunID: outcome.RunID, HistoricalReason: "original_outcome_run_absent", LegacyCanonicalAbsent: true}}}}}}}
+	result, err := NewService(reader).AuditBatch(t.Context(), 0, 1)
+	if err != nil || result.Detected != 1 {
+		t.Fatal("original historical gap was lost or counted twice", result, err)
+	}
+}
