@@ -220,6 +220,8 @@ source and scope.
 
 ## Read-only preparation facts (2026-10-10)
 
+The independently reviewed observer is published in [draft PR #311](https://github.com/FangcunMount/qs-server/pull/311), following [preparation and native rehearsal PR #310](https://github.com/FangcunMount/qs-server/pull/310). Publication and CI do not establish a production observation; an independently approved production run and its original receipts remain required.
+
 The existing Action/Python/native caller now implements
 `operation=prepare, prepare_mode=prepare-facts`. It observes facts needed for a
 separate lifecycle request. It has no `Capture`, restore, historical CAS, DROP,
