@@ -71,7 +71,7 @@ func aiExternalExecModeBinding(ctx context.Context, mode aiExternalExecMode, own
 	default:
 		return empty, ErrAIExternalExecJournal
 	}
-	if packet.Protocol != protocol {
+	if packet.Protocol != protocol && (mode != aiExternalVerifyMode || packet.Protocol != "qs-ai-readonly-host-input/v3") {
 		return empty, ErrAIExternalExecJournal
 	}
 	binding := aiExecBinding{SourceSHA: owner.SourceSHA, OperationID: owner.OperationID, RunID: run, RuntimeSourceSHA: runtime, ImageID: image, ContainerID: cid, PythonSHA256: aiExternalHostSHA, InputSHA256: sourceSHA(input), DeadlineUnixNano: deadline.UnixNano()}

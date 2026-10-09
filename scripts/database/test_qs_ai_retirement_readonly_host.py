@@ -6,6 +6,7 @@ import json
 from pathlib import Path
 import subprocess
 import sys
+import tempfile
 import unittest
 
 PATH = Path(__file__).with_name("qs-ai-retirement-readonly-host.py")
@@ -36,6 +37,37 @@ class ActualHostContract(unittest.TestCase):
         for field in ("complete", "production_proof", "fence_verified", "drop_ready", "executable", "ai_database_url"):
             with self.subTest(field=field), self.assertRaises(m.Rejected):
                 m.input_packet(m.canonical({**packet, field: True}))
+
+    def test_v3_mapped_expectations_cannot_import_terminal_or_completion(self):
+        from uuid import uuid4
+        packet=self.packet(); packet["protocol"]="qs-ai-readonly-host-input/v3"
+        cid=str(uuid4())
+        descriptor={k:"a"*64 for k in m.KNOWN_HANDOFF_FIELDS if k.endswith("sha256")}
+        descriptor.update(command_id=cid,request_id=cid,resource_id=cid,source_kind="start",organization_id="1",testee_id="2",subject_id="subject",source_attempts=2,aggregate_sequence=1)
+        packet["known_handoffs"]=[descriptor]
+        self.assertEqual(m.input_packet(m.canonical(packet)),packet)
+        for mode in ("missing","unknown","bool","zero","duplicate","v2","verdict","kind"):
+            broken=json.loads(json.dumps(packet))
+            if mode=="missing": del broken["known_handoffs"]
+            elif mode=="unknown": broken["known_handoffs"][0]["body"]="private-payload"
+            elif mode=="bool": broken["known_handoffs"][0]["source_attempts"]=True
+            elif mode=="zero": broken["known_handoffs"][0]["aggregate_sequence"]=0
+            elif mode=="duplicate": broken["known_handoffs"]*=2
+            elif mode=="v2": broken["protocol"]="qs-ai-readonly-host-input/v2"
+            elif mode=="verdict": broken["known_handoffs"][0]["business_terminal"]=True
+            else: broken["known_handoffs"][0]["source_kind"]="retry"
+            with self.subTest(mode=mode),self.assertRaises(m.Rejected): m.input_packet(m.canonical(broken))
+
+    def test_v3_actual_source_modules_are_sealed_and_wrong_verifier_refused(self):
+        packet=self.packet(); packet["protocol"]="qs-ai-readonly-host-input/v3"; packet["known_handoffs"]=[]
+        packet["modules"]={name:base64.b64encode(PATH.with_name(name).read_bytes()).decode() for name in m.MODULES}
+        parsed=m.input_packet(m.canonical(packet))
+        with tempfile.TemporaryDirectory() as directory:
+            verifier=m.load_verifier(parsed,Path(directory))
+            self.assertEqual(verifier.KNOWN_HANDOFF_FIELDS,m.KNOWN_HANDOFF_FIELDS)
+        packet["modules"]["qs-ai-retirement-readonly-verifier.py"]=base64.b64encode(b"complete=True").decode()
+        with tempfile.TemporaryDirectory() as directory,self.assertRaises(m.Rejected):
+            m.load_verifier(packet,Path(directory))
 
     def test_missing_source_identity_and_unknown_modules_rejected(self):
         packet = self.packet()

@@ -136,7 +136,7 @@ func TestSourceOriginAnchorNativeActualFreezeAndIndependentRecheck(t *testing.T)
 }
 
 func TestSourceOriginAnchorNativeFullSourceAndMetadataDriftRefused(t *testing.T) {
-	for _, kind := range []string{"sql_null", "sql_upper", "mongo_raw_order", "mongo_uuid", "file_truncated", "expiry", "anchor_tamper"} {
+	for _, kind := range []string{"sql_null", "sql_delete", "sql_upper", "mongo_raw_order", "mongo_delete", "mongo_uuid", "file_truncated", "expiry", "anchor_tamper"} {
 		t.Run(kind, func(t *testing.T) {
 			sqlDB, client, db, cfg := originNativeDBs(t, false)
 			session, err := client.StartSession()
@@ -169,6 +169,8 @@ func TestSourceOriginAnchorNativeFullSourceAndMetadataDriftRefused(t *testing.T)
 			switch kind {
 			case "sql_null":
 				err = sqlDB.Exec("UPDATE domain_event_outbox SET last_error='' WHERE id=1").Error
+			case "sql_delete":
+				err = sqlDB.Exec("DELETE FROM domain_event_outbox WHERE id=1").Error
 			case "sql_upper":
 				row := fixtureSQLRow(t, bytes.ReplaceAll(wireFixture(t, "evaluation.failed"), []byte("original-event-1"), []byte("origin-extra")), "5")
 				originNativeInsertSQL(t, sqlDB, "domain_event_outbox", row)
@@ -178,6 +180,8 @@ func TestSourceOriginAnchorNativeFullSourceAndMetadataDriftRefused(t *testing.T)
 					old[1], old[len(old)-1] = old[len(old)-1], old[1]
 					_, err = db.Collection("domain_event_outbox").ReplaceOne(t.Context(), bson.D{{Key: "_id", Value: int64(1)}}, old)
 				}
+			case "mongo_delete":
+				_, err = db.Collection("domain_event_outbox").DeleteOne(t.Context(), bson.D{{Key: "_id", Value: int64(1)}})
 			case "mongo_uuid":
 				err = db.Collection("domain_event_outbox").Drop(t.Context())
 				if err == nil {

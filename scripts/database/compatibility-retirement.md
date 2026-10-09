@@ -1,7 +1,8 @@
-# Exact compatibility retirement: A-stage execution barrier
+# Exact compatibility retirement: qualified evidence write and lifecycle barrier
 
-This is the foundation for the accepted four-object operation, not an enabled
-production cleanup. `prepare` has real read-only identity discovery, separately approved private
+The accepted four-object operation now has a qualified historical-evidence write
+caller; production deletion and recovery remain unavailable. Read-only `prepare`
+modes have real identity discovery, separately approved private
 request bootstrap, fixed-upper-bound discovery, paged source inventory and a
 separately approved read-only history host. Identity, boundaries, inventory and
 their existing bootstrap modes exit 42 with diagnostic receipts. Separately
@@ -14,11 +15,12 @@ successfully armored. Its `complete`, `execution_allowed` and `drop_ready`
 remain false. A successful diagnostic Action does not authorize retirement.
 `apply`, `verify`, `recover` and `purge` remain unavailable and exit 42.
 The `report-diagnostic` prepare mode reads an independently bound existing
-boundary report and its original request, then emits only fixed technical error
-categories and the original report/request hashes. It uses the existing pinned SSH path without Go,
-Docker or database credentials. Exit 0 means the report was observed; the
-original boundary completion result is reported separately; every capability in
-the diagnostic receipt remains false.
+boundary or inventory report and its original request, then emits only fixed
+producer-owned technical error categories and the original report/request hashes.
+It uses the existing pinned SSH path without Go, Docker or database credentials.
+Exit 0 means the report was observed; the original completion result is reported
+separately; every capability in the diagnostic receipt remains false. The existing
+boundary validation and binding rules are unchanged.
 The actual report observation `37904651280` ran with tooling SHA
 `5c71b215b71ddd277608fecdbf097e874062ab9a` and returned
 MySQL `none` / MongoDB `mongo_index_visibility_incomplete` (decoded receipt
@@ -88,24 +90,102 @@ CAS, current responsibilities and independent persisted readback are still
 checked. A different retained closed Run does not substitute for the original;
 unfinished Runs, leases and duplicate retry authorization rows remain conflicts.
 The lower-level persistence bridge borrows the host transaction and does not
-certify that the host committed successfully. A qualified library factory and
-exact lifecycle/reconciliation kernels are now available to a fixed host;
-the production Action has no caller for them and its mutation modes remain
-unavailable.
+certify that the host committed successfully. The qualified historical CAS
+factory has a public caller described below. Exact lifecycle/reconciliation
+kernels remain library capabilities; the production Action still has no actual
+`apply/verify/recover/purge` lifecycle caller.
 The historical write host now provides a private multi-page spool, inherited
 transaction deadlines, separate real commit results, and a fresh read-only epoch
 that checks persisted evidence and raw business bindings. The host owns both
 transactions and handles uncertain commits without resending. The local actual
 MySQL/MongoDB test covers two-page commit/readback, rollback and ordinary-field
 drift rejection; it does not prove production capacity or authorize a write.
-This write-host implementation is not connected to main, CLI or the Action.
+Those earlier mixed-store results retain their original source and scope; the
+current main/CLI/Action connection below is verified separately.
 The external AI producer also tracks each actual Docker exec in the existing
 private operation directory. Reopening can inspect the original exec but cannot
 restart it or recreate lost qualification output from a successful exit alone.
 The read-only AI caller is now connected to the native history CLI and the
-dedicated Action modes described below. The historical write host remains
-unconnected; read-only output cannot recreate its opaque qualification. Writer
-isolation remains required for any mutation.
+dedicated Action modes described below. Read-only output cannot recreate the
+writer's opaque qualification. Pre-window historical evidence CAS uses the actual
+closed-admission and fresh locked-baseline checks; full writer/old-ref isolation
+and the measured maintenance-window capabilities remain necessary for DROP.
+
+## Current writer and diagnostic source (2026-10-09)
+
+Source `23bacb7d4a05bd711e353655eca85219514edb49` connects
+`cmd/qs-compatibility-history` with `--write-mode evidence` to the existing
+`executeHistoricalEvidenceWrite` host. The Action's
+`prepare_mode=historical-evidence-write` uses the independently bound
+`historical_evidence_write_approval`; its ten dispatch inputs are unchanged.
+The original source/request/assets and the current compiled tool source are
+separate bindings. `historical-ai-bounds` can prepare the corresponding original
+source-bound bounds without relabeling the old material as the new tool SHA.
+
+The writer consumes genuine external execution qualification produced by the
+existing native AI host in its actual second read-only epoch, complete fourteen
+ledger/source checks and qualified event/AI CAS preparations. It then performs
+fresh locked RW checks with evidence empty and business baselines unchanged.
+A third independent read-only epoch checks persisted evidence/business facts
+and re-reads all four original sources using the second epoch's frozen origin
+anchor. Changed or deleted source records, conflicting conclusions, unknown
+execution and unsettled responsibilities prevent a finished result. Commit
+results are recorded per database; an unresolved attempt blocks automatic replay
+under another run or output within the same operation directory. Changing the
+operation or business ID must not substitute for reconciling an unknown result.
+No saved JSON, flag or read-only summary can recreate Q.
+
+AI-only writes record `mongo_commit_requirement=not_required`, commit SQL, and
+report no actual Mongo commit response. Event writes that require Mongo must
+have a real live snapshot transaction in the pinned driver's `InProgress` state
+before SQL commit intent. A SQL-only event path with no actual Mongo transaction
+command is safely rejected; it is not an accepted write path. This caller permits
+qualified historical evidence CAS before the deletion window; it grants no DROP,
+recovery or whole-writer fence capability.
+
+The inventory diagnostic accepts only
+`readonly_existing_inventory_report_approval` with a distinct `inventory_report`
+reference. It reads the exact existing `inventory-<run>/inventory.private.json`
+and original request twice; it does not rescan databases, read source payloads,
+write operation state or create a permit. Original inventory run `37930082189-1`
+retains source `f5aafcc97626bd8894256edacc68ce4ce1e69c42`, operation
+`37913340196-1`, request SHA256
+`846f85a20a9aef926433e3cf331a6325bf637b323838e47e02f9004cc24e81a8`
+and report SHA256
+`7873eaa4085c8eac0a014a323f57a9c7cde8573a68aac8beb5b7f05899706340`.
+That production run read 744,496 SQL records / 741,141,779 source bytes; Mongo
+EOF remains incomplete. The original request has been independently identified;
+no missing user parameter is inferred. Its earlier public
+`inventory_database_error_unrecognized` does not identify the underlying Mongo
+failure. The original identity/head bindings remain clean SQL 99 / Mongo 38;
+report observation does not complete that inventory.
+
+The exact fifteen-file source manifest has SHA256
+`dbed0d180580850ef1bf701d4e99d0a84b1152fab0e68c00ab8b31176c477cea`.
+Local final-source checks passed 121 CLI Go actions / 34 parents and 23 origin
+Go actions / eight parents, with no failure or skip. Nine existing CI Python
+scripts passed 230 of 231 cases; one native Docker fixture opt-in was explicitly
+skipped. The earlier narrow offline diagnostic/API selection passed 30 cases
+(13 inventory, 15 boundary, two initial writer-input); final writer-input
+coverage is seven cases and is included in the 231-case total. Both new Python
+scripts are called directly by the existing deployment-contracts CI job.
+Affected lint/depguard/vet, formatting, workflow syntax and Linux amd64/arm64
+compilation passed. These are local checks; committed-source CI is still required.
+
+The actual local native `TestSourceOriginAnchorNativeFullSourceAndMetadataDriftRefused`
+selection passed `sql_delete`, `mongo_delete`, `sql_null` and `mongo_raw_order`:
+four subtests plus their parent, zero failure/skip, terminal exit 0, child reaped,
+23.689 seconds. The body-free result `native-result.private.json` SHA256 is
+`fbf109d81c2ae18ed7714d9a5dc28b9c5a8932954b3f7e470b9d3c4258620730`.
+Independent `before.private.json` / `after.private.json` SHA256s are
+`22a018dfa3e0644d2a3a3c9605606250c2638cde653bd8441125d03b51c45c89` /
+`56791d5da7f8fed9cf208c807a72fe4159e8ecdf6e5c62eb345de67d76eaf024`.
+All non-test catalog/content baselines and fixture identities were unchanged;
+owned SQL/Mongo test namespaces remaining were zero. This scope proves actual
+source-drift refusal only: it does not execute the complete writer, real external
+qs-ai Q, production CAS, full writer/old-ref fencing, a measured production
+600-second restore, DROP, B deployment, acceptance or purge. Earlier native,
+mixed-store, CI and deployment results below keep their original source and scope.
 
 The retirement lifecycle and AI read-only producer contract suites run in final-source CI. Each
 production preparation reuses the latest successful main-push `ci.yml` run for
@@ -216,8 +296,10 @@ original AI commands, historical backfill, four-object DROP, B deployment, accep
   An interrupted `intent`/`unknown` cannot start another DROP. Only a new live
   read may reconcile it to `dropped`; incomplete/mixed/restored journals do not
   permit purge. The journal requires an operation lock and is not called by the
-  current mutation CLI. Preparation writes only operation-owned private source
-  inventory files; it issues no INSERT/UPDATE/DELETE/DDL/migration commands.
+  current lifecycle mutation CLI. Read-only preparation writes only
+  operation-owned private source inventory files and issues no database mutations.
+  The separately bound `historical-evidence-write` mode can perform qualified
+  evidence/retirement-record CAS; it issues no DROP or schema migration commands.
 - Backup private-file reads use `NOFOLLOW` and `NONBLOCK`, then require a
   regular file and preserve the existing owner, mode and size checks. A FIFO
   without a writer is rejected before reading. This protects file acquisition;
@@ -226,8 +308,8 @@ original AI commands, historical backfill, four-object DROP, B deployment, accep
   30 minutes. These helpers alone do not guarantee recovery time; readiness
   requires a measured and independently verified rollback of at most 10 minutes.
 
-`cmd/qs-compatibility-history` implements a strictly read-only host for the
-actual inventory outputs. It binds the compiled source, operation/run, approved
+The read-only modes of `cmd/qs-compatibility-history` implement a host for the
+actual inventory outputs; the explicit evidence-write mode is described above. It binds the compiled source, operation/run, approved
 input bytes and all four private source files, authenticates clean EOF, and
 checks actual original source rows against current SQL and Mongo business facts.
 The host owns and ends each SQL repeatable-read read-only transaction and Mongo
@@ -491,9 +573,10 @@ states are attributed through the original sessions/runs/jobs/reservations/lease
 provably unrelated current work is outside this retirement, while orphan,
 conflicting, unowned or related unknown/pending responsibility remains blocked.
 
-Production must run the whole identity/bounds/inventory/metadata/parent/history
-and AI read-only chain on the same final main tooling SHA, with independently
-bound approvals.
+Production must bind the whole identity/bounds/inventory/metadata/parent/history
+and AI chain to the exact approved current-main tool SHA and independently bound
+approvals. Original request/source/asset facts retain their original SHA; they are
+not relabeled as the current executable.
 The local filesystem, Action package and native fixture tests do not prove that
 production chain, full-sized scan budgets or database historical acceptance.
 Read-only completion counts retain local, AI and global blockers. External AI
@@ -514,6 +597,16 @@ remain unqualified. Imported candidates, JSON readiness, terminal flags and
 local database tests cannot create these private proofs or authorize a host
 write. The host still owns RW transactions, commit/rollback and independent
 persisted readback.
+
+Mixed AI history persistence uses the original command ID. A mapped command
+records verified transfer while preserving its current MQ responsibility and
+inherited budget; an independently closed unmapped command records a minimal
+retirement row. The v3 external packet binds the full mapped descriptor, complete
+53/14-ledger observations, and original organization/session identity. Discovery
+continues to use v2. Preparation, the borrowed host write, and fresh independent
+readback remain separate; zero event rows do not fabricate an event CAS ticket.
+These library paths alone do not enable a write. The current explicit writer
+caller consumes their actual qualification; the DROP stages remain unavailable.
 
 Allowed missing historical traces keep their exact `unverifiable` reason and
 never acquire a current/latest Run or invented attempt. Unknown current

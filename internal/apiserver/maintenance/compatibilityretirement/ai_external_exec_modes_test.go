@@ -60,6 +60,19 @@ func TestAIExternalExecModesBindActualProtocolPacketAndInheritedDeadline(t *test
 	if e != nil || binding.DeadlineUnixNano != deadline.UnixNano() || binding.InputSHA256 != sourceSHA(raw) {
 		t.Fatal("original actual packet/deadline not bound")
 	}
+	packet["protocol"] = "qs-ai-readonly-host-input/v3"
+	mixed, marshalErr := json.Marshal(packet)
+	if marshalErr != nil {
+		t.Fatal("closed v3 packet marshal")
+	}
+	v3, v3Err := aiExternalExecModeBinding(ctx, aiExternalVerifyMode, owner, "901", runtime, image, cid, host, mixed)
+	if v3Err != nil || v3.InputSHA256 != sourceSHA(mixed) || v3.DeadlineUnixNano != deadline.UnixNano() {
+		t.Fatal("closed mixed protocol did not bind exact bytes/deadline")
+	}
+	if _, v3Err = aiExternalExecModeBinding(ctx, aiExternalBoundsMode, owner, "901", runtime, image, cid, host, mixed); v3Err == nil {
+		t.Fatal("mixed verify protocol executed under discovery mode")
+	}
+	packet["protocol"] = "qs-ai-readonly-host-input/v2"
 	if _, e = aiExternalExecModeBinding(ctx, aiExternalBoundsMode, owner, "901", runtime, image, cid, host, raw); e == nil {
 		t.Fatal("verify packet executed as bounds")
 	}
