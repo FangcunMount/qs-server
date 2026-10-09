@@ -6,6 +6,7 @@ import (
 	"context"
 	"database/sql"
 	"database/sql/driver"
+	"encoding/json"
 	"errors"
 	"io"
 	"os"
@@ -186,25 +187,29 @@ func bNativeSQL(t *testing.T, env map[string]string, name string, hook *bNativeS
 	cfg := mysql.NewConfig()
 	cfg.User, cfg.Passwd = env["MYSQL_USERNAME"], env["MYSQL_PASSWORD"]
 	cfg.Net, cfg.Addr, cfg.DBName = "tcp", env["MYSQL_HOST"]+":"+env["MYSQL_PORT"], name
-	cfg.Params = map[string]string{"charset": "utf8mb4"}
+	// NewConnector consumes Config directly; DSN-only charset must not be sent
+	// as a server variable through Params. Keep the real utf8mb4 connection.
+	if e := cfg.Apply(mysql.Charset("utf8mb4", "")); e != nil {
+		bNativePhaseFailure(t, "mysql_charset", e)
+	}
 	cfg.Timeout = 5 * time.Second
 	// This native-only connection must execute the real embedded three-statement
 	// SQL100 body. It does not split/reimplement the production migration.
 	cfg.MultiStatements = true
 	connector, e := mysql.NewConnector(cfg)
 	if e != nil {
-		t.Fatal("native connector construction failed")
+		bNativePhaseFailure(t, "mysql_connector", e)
 	}
 	db := sql.OpenDB(bNativeConnector{connector, hook})
 	db.SetMaxOpenConns(1)
-	if db.PingContext(context.Background()) != nil {
-		t.Fatal("native connection failed")
-	}
 	t.Cleanup(func() {
 		if db.Close() != nil {
 			t.Error("native pool close failed")
 		}
 	})
+	if e := db.PingContext(context.Background()); e != nil {
+		bNativePhaseFailure(t, "mysql_ping", e)
+	}
 	return db
 }
 
@@ -263,6 +268,86 @@ func bNativeMongoRows(t *testing.T, db *mongo.Database) []string {
 	return values
 }
 
+// Failure-only metadata never carries an error string, query, URI or credential.
+// The waiting parent reads it only after the real child has exited; it is not a
+// migration result or permission to continue after an unsuccessful process.
+type bNativeChildFailureReceipt struct {
+	PID       int    `json:"pid"`
+	Phase     string `json:"phase"`
+	Stage     string `json:"stage"`
+	Category  string `json:"category"`
+	MySQLCode uint16 `json:"mysql_code"`
+}
+
+func bNativeFailureFieldsValid(r bNativeChildFailureReceipt) bool {
+	switch r.Phase {
+	case "migrate", "recover":
+	default:
+		return false
+	}
+	switch r.Stage {
+	case "mysql_charset", "mysql_connector", "mysql_ping", "archive_open", "window_open", "sql_connection", "sql_connection_identity", "recovery_prepare", "targets_apply", "b_migration", "sql_only_result", "recovery_reconcile", "targets_restore":
+	default:
+		return false
+	}
+	switch r.Category {
+	case "mysql_server_error":
+		return r.PID > 0 && r.MySQLCode > 0
+	case "context_cancelled", "context_deadline", "native_operation_failed", "native_predicate_rejected",
+		string(ErrApproval), string(ErrStructure), string(ErrIdentity), string(ErrSource), string(ErrPrivate), string(ErrRead), string(ErrRestore), string(ErrContent), string(ErrIsolation), string(ErrBudget), string(ErrSerialization),
+		string(ErrRecoveryAuthority), string(ErrRecoveryBinding), string(ErrRecoveryState), string(ErrRecoveryUnknown), string(ErrRecoveryHead), string(ErrRecoveryTransaction), string(ErrRecoveryJournal):
+		return r.PID > 0 && r.MySQLCode == 0
+	default:
+		return false
+	}
+}
+
+func bNativePhaseFailure(t *testing.T, stage string, e error) {
+	t.Helper()
+	r := bNativeChildFailureReceipt{PID: os.Getpid(), Phase: os.Getenv("QS_B_RECOVERY_CHILD_PHASE"), Stage: stage, Category: "native_operation_failed"}
+	var server *mysql.MySQLError
+	var known Error
+	switch {
+	case e == nil:
+		r.Category = "native_predicate_rejected"
+	case errors.As(e, &server) && server != nil && server.Number > 0:
+		r.Category, r.MySQLCode = "mysql_server_error", server.Number
+	case errors.Is(e, context.Canceled):
+		r.Category = "context_cancelled"
+	case errors.Is(e, context.DeadlineExceeded):
+		r.Category = "context_deadline"
+	case errors.As(e, &known):
+		r.Category = string(known)
+		if !bNativeFailureFieldsValid(r) {
+			r.Category = "native_operation_failed"
+		}
+	}
+	input := os.Getenv("QS_B_RECOVERY_CHILD_INPUT")
+	written := false
+	if bNativeFailureFieldsValid(r) && filepath.IsAbs(input) && filepath.Clean(input) == input && privateDirectory(filepath.Dir(input)) == nil {
+		raw, marshalError := json.Marshal(r)
+		written = marshalError == nil && writePrivate(filepath.Join(filepath.Dir(input), r.Phase+"-failure.private.json"), raw) == nil
+	}
+	t.Fatalf("native phase failed stage=%s category=%s mysql_code=%d diagnostic_written=%t", stage, r.Category, r.MySQLCode, written)
+}
+
+func bNativeReadFailure(input, phase string, pid int) (bNativeChildFailureReceipt, bool) {
+	var r bNativeChildFailureReceipt
+	if !filepath.IsAbs(input) || filepath.Clean(input) != input || privateDirectory(filepath.Dir(input)) != nil {
+		return r, false
+	}
+	f, e := openPrivateFile(filepath.Join(filepath.Dir(input), phase+"-failure.private.json"))
+	if e != nil {
+		return r, false
+	}
+	raw, re := readPrivate(f, 4096)
+	ce := f.Close()
+	if re != nil || ce != nil || exactJSON(raw, &r) != nil || r.PID != pid || r.Phase != phase || !bNativeFailureFieldsValid(r) {
+		return bNativeChildFailureReceipt{}, false
+	}
+	return r, true
+}
+
 // No child output is persisted or printed. Fixed counts/exit categories cannot
 // expose credentials/body. The actual process group is killed on byte overflow
 // or the parent's single deadline; Wait always reaps it before any next phase.
@@ -314,6 +399,9 @@ func bNativeChild(t *testing.T, ctx context.Context, input, phase, parent string
 		exit := -1
 		if cmd.ProcessState != nil {
 			exit = cmd.ProcessState.ExitCode()
+		}
+		if failure, ok := bNativeReadFailure(input, phase, pid); ok {
+			t.Fatalf("native child refused phase=%s exit=%d output_bytes=%d overflow=%t stage=%s category=%s mysql_code=%d", phase, exit, counter.bytes, counter.overflow, failure.Stage, failure.Category, failure.MySQLCode)
 		}
 		t.Fatalf("native child refused phase=%s exit=%d output_bytes=%d overflow=%t", phase, exit, counter.bytes, counter.overflow)
 	}
@@ -587,11 +675,11 @@ func bNativePhase(t *testing.T, input, phase string, sqlOnly bool) {
 	defer cancel()
 	a, e := OpenArchive(ctx, h.ArchiveDirectory, h.ArchiveSHA256)
 	if e != nil {
-		t.Fatal("native actual Archive reopen refused")
+		bNativePhaseFailure(t, "archive_open", e)
 	}
 	w, e := fence.OpenMaintenanceWindow(ctx, h.WindowDirectory, h.WindowBinding)
 	if e != nil {
-		t.Fatal("native actual original Window reopen refused")
+		bNativePhaseFailure(t, "window_open", e)
 	}
 	closed := false
 	t.Cleanup(func() {
@@ -603,7 +691,7 @@ func bNativePhase(t *testing.T, input, phase string, sqlOnly bool) {
 	db := bNativeSQL(t, nativeEnv(t), h.Name, hook)
 	conn, e := db.Conn(ctx)
 	if e != nil {
-		t.Fatal("native phase borrowed connection failed")
+		bNativePhaseFailure(t, "sql_connection", e)
 	}
 	t.Cleanup(func() {
 		if conn.Close() != nil {
@@ -613,17 +701,17 @@ func bNativePhase(t *testing.T, input, phase string, sqlOnly bool) {
 	client := nativeMongo(t, nativeEnv(t))
 	mdb := client.Database(h.Name)
 	var connectionID string
-	if conn.QueryRowContext(ctx, "SELECT CAST(CONNECTION_ID() AS CHAR)").Scan(&connectionID) != nil {
-		t.Fatal("native actual connection identity unavailable")
+	if e = conn.QueryRowContext(ctx, "SELECT CAST(CONNECTION_ID() AS CHAR)").Scan(&connectionID); e != nil {
+		bNativePhaseFailure(t, "sql_connection_identity", e)
 	}
 	if phase == "migrate" {
 		p, e := PrepareTargetRecovery(ctx, a, TargetRecoveryBorrowed{conn, mdb}, h.Request, filepath.Join(h.Directory, "journal"), w)
 		if e != nil {
-			t.Fatal("native actual recovery plan refused")
+			bNativePhaseFailure(t, "recovery_prepare", e)
 		}
 		applied, e := ApplyTargets(ctx, p)
 		if e != nil || applied == nil || applied.Summary().Targets.NativeDropProofs != 4 || applied.Summary().Targets.DropReady {
-			t.Fatal("native four actual DROP responses/readbacks missing")
+			bNativePhaseFailure(t, "targets_apply", e)
 		}
 		if sqlOnly {
 			hook.armed.Store(true)
@@ -631,20 +719,20 @@ func bNativePhase(t *testing.T, input, phase string, sqlOnly bool) {
 		proof, e := RunTargetBMigration(ctx, p, h.ApprovedBSourceSHA)
 		if sqlOnly {
 			if e == nil || proof != nil || !hook.fired.Load() {
-				t.Fatal("native SQL-only response was not actual context boundary")
+				bNativePhaseFailure(t, "b_migration", e)
 			}
 			// Use a fresh read context after the original canceled migration ctx.
 			bNativeHeads(t, conn, mdb, 100, 38)
 			result := bNativeRead[targetBMigrationResult](t, filepath.Join(h.Directory, "journal", "target-recovery-b-migration-result.json"))
-			if targetValidateSQLOnlyAttempt(result) != nil {
-				t.Fatal("native returned partial result is not known SQL-only")
+			if e = targetValidateSQLOnlyAttempt(result); e != nil {
+				bNativePhaseFailure(t, "sql_only_result", e)
 			}
 			if _, e = migration.PreflightCompatibilityPair(context.Background(), db, client, migration.PairConfig{MySQLDatabase: h.Name, MongoDatabase: h.Name, ExpectedSourceSHA: h.ApprovedBSourceSHA}); e == nil {
 				t.Fatal("ordinary restart completed an unknown partial pair")
 			}
 		} else {
 			if e != nil || proof == nil || proof.Observation().SQLAfter != 100 || proof.Observation().MongoAfter != 39 {
-				t.Fatal("actual B pair migration not completed")
+				bNativePhaseFailure(t, "b_migration", e)
 			}
 			bNativeHeads(t, conn, mdb, 100, 39)
 		}
@@ -659,7 +747,7 @@ func bNativePhase(t *testing.T, input, phase string, sqlOnly bool) {
 			reconciled, e = ReconcileTargetBRecovery(ctx, a, TargetRecoveryBorrowed{conn, mdb}, *h.Resume, filepath.Join(h.Directory, "journal"), w)
 		}
 		if e != nil || reconciled == nil {
-			t.Fatal("native new process reconciliation refused")
+			bNativePhaseFailure(t, "recovery_reconcile", e)
 		}
 		s := reconciled.Summary()
 		if s.Unresolved != 0 || s.MutationAllowed || s.ProductionAuthorityIntegrated || s.DropReady || !s.WriterFenceRequired {
@@ -667,7 +755,7 @@ func bNativePhase(t *testing.T, input, phase string, sqlOnly bool) {
 		}
 		restored, e := ResumeTargetRecovery(ctx, reconciled, TargetRecoveryBorrowed{conn, mdb}, w)
 		if e != nil || restored == nil || restored.Summary().Targets.NativeDropProofs != 0 || restored.Summary().Targets.DropReady || restored.Summary().Targets.ProductionAuthorityIntegrated || restored.Summary().Targets.WholeWriterFenceProven {
-			t.Fatal("native original physical journal restore refused or overclaimed")
+			bNativePhaseFailure(t, "targets_restore", e)
 		}
 		if len(restored.Summary().Targets.Targets) != 4 {
 			t.Fatal("native recovery omitted a target")
