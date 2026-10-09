@@ -173,6 +173,144 @@ class Offline(unittest.IsolatedAsyncioTestCase):
         with self.assertRaisesRegex(m.Rejected, "global_orphan_participant_fact"):
             m._reverse(ai, peer)
 
+    def test_unrelated_unknown_provider_has_real_global_owner(self):
+        for status in ("unknown", "dispatched"):
+            ai, peer, scan, approved = history()
+            unrelated, current, _, _ = history()
+            # Actual separate org/request/session/run graph, never supplied IDs.
+            start = m.json_value(current["ai_bridge_requests"][0]["payload"])
+            start["actor"]["org_id"] = "9"
+            start["actor"]["subject_id"] = "outside-subject"
+            owner = unrelated["interpretation_sessions"][0]
+            owner["org_id"], owner["owner_subject_id"] = b"9", b"outside-subject"
+            request = current["ai_bridge_requests"][0]
+            request["payload"] = m.canonical(start)
+            request["request_hash"] = m.sha(m._go_json(m._start(start)[0])).encode()
+            request["organization_id"], request["subject_id"] = b"9", b"outside-subject"
+            for name in ("interpretation_sessions", "interpretation_runs", "external_requests"):
+                ai[name].extend(unrelated[name])
+            peer["ai_bridge_requests"].extend(current["ai_bridge_requests"])
+            rid = m.text(unrelated["interpretation_runs"][0]["id"])
+            ai["execution_jobs"].append(row(id=str(uuid4()), run_id=rid,
+                session_id=m.text(unrelated["interpretation_sessions"][0]["id"]), status="pending"))
+            ai["model_calls"].append(row(run_id=rid, status=status))
+            result = m._reverse(ai, peer, originals(scan, approved))
+            self.assertEqual(result, {"outside_retirement_provider_result_unknown": 1})
+            self.assertNotIn(rid, json.dumps(result))
+            self.assertNotIn("private-secret-goal", json.dumps(result))
+
+    def test_original_unknown_provider_and_unbound_scope_remain_blocked(self):
+        for status in ("unknown", "dispatched"):
+            ai, peer, scan, approved = history()
+            rid = m.text(ai["interpretation_runs"][0]["id"])
+            ai["model_calls"].append(row(run_id=rid, status=status))
+            with self.subTest(status=status), self.assertRaisesRegex(m.Rejected, "global_participant_provider_result_unknown"):
+                m._reverse(ai, peer, originals(scan, approved))
+            with self.assertRaisesRegex(m.Rejected, "original_source_scope_required"):
+                m._reverse(ai, peer)
+
+    def test_unknown_provider_orphan_cross_session_and_fake_owner_block(self):
+        for fault in ("orphan", "cross_session", "owner", "duplicate_owner", "duplicate_run", "missing_job"):
+            ai, peer, scan, approved = history()
+            unrelated, current, _, _ = history()
+            for name in ("interpretation_sessions", "interpretation_runs", "external_requests"):
+                ai[name].extend(unrelated[name])
+            peer["ai_bridge_requests"].extend(current["ai_bridge_requests"])
+            rid = m.text(unrelated["interpretation_runs"][0]["id"])
+            call = row(run_id=rid, status="unknown")
+            if fault != "missing_job":
+                ai["execution_jobs"].append(row(id=str(uuid4()), run_id=rid,
+                    session_id=m.text(unrelated["interpretation_sessions"][0]["id"]), status="pending"))
+            if fault == "orphan":
+                call["run_id"] = str(uuid4()).encode()
+            elif fault == "cross_session":
+                call["session_id"] = ai["interpretation_sessions"][0]["id"]
+            elif fault == "owner":
+                ai["interpretation_sessions"][-1]["org_id"] = b"99"
+            elif fault == "duplicate_owner":
+                ai["interpretation_sessions"].append(copy.deepcopy(unrelated["interpretation_sessions"][0]))
+            elif fault == "duplicate_run":
+                ai["interpretation_runs"].append(copy.deepcopy(unrelated["interpretation_runs"][0]))
+            ai["model_calls"].append(call)
+            with self.subTest(fault=fault), self.assertRaises(m.Rejected):
+                m._reverse(ai, peer, originals(scan, approved))
+
+    async def test_unrelated_evaluation_unknown_keeps_real_typed_evidence_validation(self):
+        from datetime import datetime, timezone, timedelta
+        from dataclasses import fields
+        from unittest.mock import AsyncMock
+        from qs_ai.domain.evaluation.identity import EvidenceReleaseIdentity, FrozenContractRef
+        from qs_ai.domain.evaluation.checkpoint import ExecutionCheckpoint
+        from qs_ai.domain.evaluation.completion import GenerationCompletion
+        from qs_ai.domain.evaluation.failure import ClassifiedFailure
+        from qs_ai.infrastructure.persistence.mysql.evaluation_checkpoints import encode
+        from qs_ai.infrastructure.qs_server.evaluation_policies import load_execution_policy, load_gate_policy
+        policy, gate = load_execution_policy(), load_gate_policy()
+        ai, peer, scan, approved = history()
+        source = originals(scan, approved)
+        rid = str(uuid4())
+        refs = {f.name: FrozenContractRef(f.name, "v1", "sha256:" + "a"*64)
+                for f in fields(EvidenceReleaseIdentity)}
+        refs.update(execution_policy=FrozenContractRef(policy.policy_id, policy.version, policy.fingerprint),
+                    gate_policy=gate.reference)
+        release = EvidenceReleaseIdentity(**refs)
+        slots = [{"case_id": "case:" + str(i), "ordinal": j}
+                 for i in range(1, policy.generation_cases+1)
+                 for j in range(1, policy.candidates_per_case+1)]
+        creation = dict(schema_version="qs-ai-evaluation-run-creation/v1", run_id=rid,
+            release=asdict(release), release_fingerprint=release.fingerprint(),
+            audit=dict(organization_id=9, requested_by="user:9", request_reason="offline scope fixture",
+                       created_at="2026-10-08T00:00:00+00:00"),
+            execution_policy_json=policy.definition_json, gate_policy_json=gate.definition_json,
+            slots=slots, status="blocked", transitions=[])
+        ai["evaluation_runs"] = [row(run_id=rid, organization_id=9, requested_by="user:9",
+            definition_json=creation, progress_json=dict(status="blocked"), execution_mode="serial_v1")]
+        ai["evaluation_run_policies"] = [row(run_id=rid, definition_json=policy.definition_json,
+                                              fingerprint=policy.fingerprint)]
+        ai["evaluation_checkpoints"] = [row(run_id=rid, checkpoint_json=None, version=1)]
+        at = datetime(2026,10,8,tzinfo=timezone.utc)
+        cp = ExecutionCheckpoint("exec:1", "generation", slots[0]["case_id"], slots[0]["ordinal"], "",
+            1, "owner:9", "inv:1", "dispatching", at, at+timedelta(minutes=1), at)
+        failure = ClassifiedFailure("generation_execution", "result_unknown", "provider_result_unknown",
+            False, True, "manual_acknowledgement", "Provider result unknown", ("execution:exec:1",))
+        completion = GenerationCompletion("exec:1", slots[0]["case_id"], slots[0]["ordinal"], 1,
+            "inv:1", "result_unknown", at, at+timedelta(seconds=1), 1, failure=failure)
+        value = asdict(completion)
+        value["started_at"], value["finished_at"] = completion.started_at.isoformat(), completion.finished_at.isoformat()
+        value.pop("raw_output"); value.pop("normalized_output")
+        ai["evaluation_dispatches"] = [row(run_id=rid, invocation_id="inv:1", execution_id="exec:1",
+            kind="generation", case_id=slots[0]["case_id"], slot_ordinal=slots[0]["ordinal"],
+            candidate_id="", checkpoint_json=encode(cp))]
+        ai["evaluation_generation_completions"] = [row(run_id=rid, invocation_id="inv:1", execution_id="exec:1",
+            case_id=slots[0]["case_id"], slot_ordinal=slots[0]["ordinal"], execution_ordinal=1,
+            candidate_id=None, candidate_json=None, evidence_json=value, raw_output=b"", normalized_output=b"")]
+        suite = SimpleNamespace(slots=lambda: [(x["case_id"],x["ordinal"]) for x in slots],
+            generation_case_ids=list(range(policy.generation_cases)), repetitions=policy.candidates_per_case)
+        # Only host asset reads are mocked. Real creation, frozen policies,
+        # checkpoint, terminal_dispatches and project_slots stay active.
+        with patch("qs_ai.infrastructure.persistence.mysql.evaluation_assets.stored_run_suite", AsyncMock(return_value=suite)), \
+             patch("qs_ai.infrastructure.persistence.mysql.evaluation_contracts.semantic_contract", AsyncMock()):
+            m._reverse(ai, peer, source)
+            result = await m._evaluations(ai, None, source, peer)
+            self.assertEqual(result["outside_retirement_provider_result_unknown"], 1)
+            self.assertEqual(result["legitimate_pending_runs"], 1)
+            ai["evaluation_dispatches"][0]["invocation_id"] = b"conflicting:invocation"
+            with self.assertRaises(Exception):
+                await m._evaluations(ai, None, source, peer)
+            ai["evaluation_dispatches"][0]["invocation_id"] = b"inv:1"
+            # A real original ID collision is not proof of unrelated ownership.
+            collision = source[0].request_id
+            ai["evaluation_runs"][0]["run_id"] = collision.encode()
+            creation["run_id"] = collision
+            ai["evaluation_runs"][0]["definition_json"] = m.canonical(creation)
+            for name in ("evaluation_run_policies", "evaluation_checkpoints", "evaluation_dispatches",
+                         "evaluation_generation_completions"):
+                ai[name][0]["run_id"] = collision.encode()
+            with self.assertRaisesRegex(m.Rejected, "evaluation_provider_result_unknown"):
+                await m._evaluations(ai, None, source, peer)
+            with self.assertRaisesRegex(m.Rejected, "original_source_scope_required"):
+                await m._evaluations(ai, None)
+
     def test_original_body_unknown_fields_hash_and_owner_block(self):
         for key, change in (("kind", b"PARTICIPANT_RETRY"), ("command_id", str(uuid4()).encode()),
                             ("payload_hash", b"a"*64)):

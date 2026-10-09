@@ -25,7 +25,7 @@ OUTPUT_LIMIT = 32 << 20
 ORIGINAL_LIMIT = 10000
 TOTAL_SECONDS = 1500
 MODULES = {
-    "qs-ai-retirement-readonly-verifier.py": "ed85cf9419ac5c17b5c886fb3fc83230054e89ea8227fb537a29a900db9bd4ec",
+    "qs-ai-retirement-readonly-verifier.py": "008ebc7256d35fcdb705528397e0e5ff8535cc6af681b9befc8d8dad02a638d1",
     "qs-ai-retirement-readonly-observer.py": "20c501d0930a21c1e8be12416156d5635430cf6171e01d28a6db789e83f06d5a",
     "qs-ai-retirement-0040-layout.py": "690d68be91713641ad6ce13ad9ad126828c64fe780bda05522bd68697ead577f",
 }

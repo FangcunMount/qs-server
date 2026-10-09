@@ -13,6 +13,7 @@ import os
 from pathlib import Path
 import shutil
 import subprocess
+import sys
 import tempfile
 import time
 import textwrap
@@ -1568,6 +1569,72 @@ class ReportDiagnosticSafetyContracts(unittest.TestCase):
         with tarfile.open(build/'qs-compatibility-retirement-703-1.tar.gz') as archive:
             self.assertEqual(sorted(archive.getnames()),['compatibility-retirement.py','receipt-transport.py'])
 
+
+
+class MongoIndexStderrDiagnostic(unittest.TestCase):
+    LINE = (b"QS_MONGO_INDEX_DIAGNOSTIC phase=list kind=server code=13 "
+            b"namespace_sha256=" + b"a" * 64 + b" elapsed_ms=25\n")
+
+    def test_real_child_private_stderr_only_forwards_fixed_line_and_preserves_stdout_exit(self):
+        stderr = io.StringIO()
+        private = b"PRIVATE_URI_AND_PASSWORD\n" + self.LINE + b"PRIVATE_USER_AND_BODY\n"
+        child = ("import os,stat,sys; s=os.fstat(2); "
+                 "assert stat.S_ISREG(s.st_mode) and stat.S_IMODE(s.st_mode)==0o600; "
+                 "os.write(1,b'fixed-stdout\\n'); os.write(2," + repr(private) + "); sys.exit(7)")
+        with mock.patch("sys.stderr", stderr):
+            code, raw = tool.capture_fixed([sys.executable, "-c", child], timeout=5,
+                                           mongo_index_diagnostics=True)
+        self.assertEqual((code, raw), (7, b"fixed-stdout\n"))
+        self.assertEqual(stderr.getvalue(), self.LINE.decode("ascii"))
+        self.assertNotIn("PRIVATE", stderr.getvalue())
+
+    def test_default_capture_never_relays_stderr_or_opt_in_for_other_modes(self):
+        stderr = io.StringIO()
+        child = "import os; os.write(1,b'fixed-stdout\\n'); os.write(2," + repr(self.LINE) + ")"
+        with mock.patch("sys.stderr", stderr):
+            self.assertEqual(tool.capture_fixed([sys.executable, "-c", child], timeout=5),
+                             (0, b"fixed-stdout\n"))
+        self.assertEqual(stderr.getvalue(), "")
+
+    def test_closed_line_rejects_injection_unknowns_bad_numbers_and_ambiguous_duplicates(self):
+        malformed = (
+            self.LINE.replace(b"phase=list", b"phase=unknown"),
+            self.LINE.replace(b"kind=server", b"kind=permission_guess"),
+            self.LINE.replace(b"code=13", b"code=2147483648"),
+            self.LINE.replace(b"code=13", b"code=-2147483649"),
+            self.LINE.replace(b"code=13", b"code=013"),
+            self.LINE.replace(b"namespace_sha256=" + b"a" * 64, b"namespace_sha256=PRIVATE_NAMESPACE"),
+            self.LINE.replace(b"elapsed_ms=25", b"elapsed_ms=-1"),
+            self.LINE.replace(b"elapsed_ms=25", b"elapsed_ms=2.5"),
+            self.LINE[:-1] + b" raw=PRIVATE_URI\n",
+            b"PRIVATE_PREFIX " + self.LINE,
+            self.LINE.replace(b"phase=list", "phase=líst".encode()),
+            self.LINE.replace(b"\n", b"\r\n"),
+            self.LINE[:-1],
+            self.LINE + self.LINE,
+            self.LINE + b"PRIVATE" * 2000,
+        )
+        for index, raw in enumerate(malformed):
+            with self.subTest(index=index), mock.patch("sys.stderr", new_callable=io.StringIO) as stderr:
+                tool._forward_mongo_index_diagnostic(raw)
+                self.assertEqual(stderr.getvalue(), "")
+        for code in (-2147483648, 0, 2147483647):
+            raw = self.LINE.replace(b"code=13", ("code=" + str(code)).encode("ascii"))
+            with mock.patch("sys.stderr", new_callable=io.StringIO) as stderr:
+                tool._forward_mongo_index_diagnostic(raw)
+                self.assertEqual(stderr.getvalue().encode("ascii"), raw)
+
+    def test_real_child_oversize_stderr_and_stdout_budget_never_change_failure_contract(self):
+        stderr = io.StringIO()
+        child = "import os; os.write(1,b'fixed-stdout\\n'); os.write(2," + repr(self.LINE) + "+b'PRIVATE'*2000)"
+        with mock.patch("sys.stderr", stderr):
+            self.assertEqual(tool.capture_fixed([sys.executable, "-c", child], timeout=5,
+                                               mongo_index_diagnostics=True),
+                             (0, b"fixed-stdout\n"))
+        self.assertEqual(stderr.getvalue(), "")
+        with self.assertRaisesRegex(tool.Blocked, "^inventory_output_bound_exceeded$"):
+            tool.capture_fixed([sys.executable, "-c", "import os; os.write(1,b'12345')"],
+                               timeout=5, maximum=4, mongo_index_diagnostics=True)
 
 
 if __name__ == "__main__":

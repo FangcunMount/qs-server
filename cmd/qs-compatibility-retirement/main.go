@@ -706,7 +706,60 @@ func canonicalBSON(raw bson.Raw) (any, error) {
 	}
 	return v, nil
 }
+
+// Diagnostic output contains only fixed tokens, a numeric server code and a
+// namespace digest. Never format the driver error: it can contain credentials.
+func mongoIndexDiagnosticLine(phase, namespace string, elapsed time.Duration, err error) string {
+	switch phase {
+	case "list", "iterate", "close":
+	default:
+		return ""
+	}
+	if err == nil {
+		return ""
+	}
+	kind, code := mongoIndexErrorKind(err)
+	if elapsed < 0 {
+		elapsed = 0
+	}
+	namespaceHash := sha256.Sum256([]byte(namespace))
+	return fmt.Sprintf("QS_MONGO_INDEX_DIAGNOSTIC phase=%s kind=%s code=%d namespace_sha256=%x elapsed_ms=%d", phase, kind, code, namespaceHash, elapsed.Milliseconds())
+}
+
+func mongoIndexErrorKind(err error) (string, int32) {
+	var code int32
+	server := false
+	var pointer *mongo.CommandError
+	if errors.As(err, &pointer) {
+		// A typed-nil error cannot safely be unwrapped or treated as a server error.
+		if pointer == nil {
+			return "other", 0
+		}
+		code, server = pointer.Code, true
+	} else {
+		var value mongo.CommandError
+		if errors.As(err, &value) {
+			code, server = value.Code, true
+		}
+	}
+	if errors.Is(err, context.DeadlineExceeded) {
+		return "context_deadline", code
+	}
+	if errors.Is(err, context.Canceled) {
+		return "context_cancelled", code
+	}
+	if server {
+		return "server", code
+	}
+	var network net.Error
+	if errors.As(err, &network) && network.Timeout() {
+		return "network_timeout", 0
+	}
+	return "other", 0
+}
+
 func mongoSchemas(ctx context.Context, db *mongo.Database) (map[string]bson.Raw, map[string]any, error) {
+	started := time.Now()
 	q, cancel := queryContext(ctx)
 	defer cancel()
 	cur, e := db.ListCollections(q, bson.D{}, options.ListCollections().SetNameOnly(false).SetAuthorizedCollections(false))
@@ -738,6 +791,7 @@ func mongoSchemas(ctx context.Context, db *mongo.Database) (map[string]bson.Raw,
 		}
 		indexes, e := db.Collection(n).Indexes().List(q)
 		if e != nil {
+			_, _ = fmt.Fprintln(os.Stderr, mongoIndexDiagnosticLine("list", db.Name()+"."+n, time.Since(started), e))
 			return raw, defs, category("mongo_index_visibility_incomplete")
 		}
 		var defsIndex []any
@@ -750,11 +804,14 @@ func mongoSchemas(ctx context.Context, db *mongo.Database) (map[string]bson.Raw,
 			defsIndex = append(defsIndex, v)
 		}
 		err := indexes.Err()
+		phase := "iterate"
 		closeErr := indexes.Close(ctx)
 		if err == nil && closeErr != nil {
 			err = closeErr
+			phase = "close"
 		}
 		if err != nil {
+			_, _ = fmt.Fprintln(os.Stderr, mongoIndexDiagnosticLine(phase, db.Name()+"."+n, time.Since(started), err))
 			return raw, defs, category("mongo_index_visibility_incomplete")
 		}
 		sort.Slice(defsIndex, func(i, j int) bool { return digest(defsIndex[i]) < digest(defsIndex[j]) })

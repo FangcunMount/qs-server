@@ -167,6 +167,15 @@ func main() {
 		return
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
+	if len(os.Args) > 1 && os.Args[1] == "--ai-host-mode" {
+		r, err := runAIHostCLI(ctx, os.Args[1:])
+		cancel()
+		r.ErrorCategory = safeCategory(err)
+		if json.NewEncoder(os.Stdout).Encode(r) != nil || err != nil {
+			os.Exit(1)
+		}
+		return
+	}
 	r, err := runCLI(ctx, os.Args[1:])
 	cancel()
 	r.ErrorCategory = safeCategory(err)

@@ -19,6 +19,15 @@ categories and the original report/request hashes. It uses the existing pinned S
 Docker or database credentials. Exit 0 means the report was observed; the
 original boundary completion result is reported separately; every capability in
 the diagnostic receipt remains false.
+The actual report observation `37904651280` ran with tooling SHA
+`5c71b215b71ddd277608fecdbf097e874062ab9a` and returned
+MySQL `none` / MongoDB `mongo_index_visibility_incomplete` (decoded receipt
+`d03b747946e413d8f1c571f6d141b109a9cc409c4d900f764a07269a4893d1c6`).
+It observed original boundary run `37896613961-1` from source
+`7c52127670a5702474e11f02e8fc1abacd573365`, with boundary completion false
+and every capability false. Its successful Action means the existing report
+was read; it neither proves inventory completion nor executes the new
+`7e39ed4f7790917db67919e2bf765080031dc83d` index diagnostic instrumentation.
 Neither a JSON boolean nor
 a workflow input can enable a missing backend. Do not dispatch this foundation
 as proof that a production preparation/deletion/recovery/purge was performed.
@@ -93,23 +102,60 @@ This write-host implementation is not connected to main, CLI or the Action.
 The external AI producer also tracks each actual Docker exec in the existing
 private operation directory. Reopening can inspect the original exec but cannot
 restart it or recreate lost qualification output from a successful exit alone.
-Production callers and writer isolation remain required.
+The read-only AI caller is now connected to the native history CLI and the
+dedicated Action modes described below. The historical write host remains
+unconnected; read-only output cannot recreate its opaque qualification. Writer
+isolation remains required for any mutation.
 
 The retirement lifecycle and AI read-only producer contract suites run in final-source CI. Each
 production preparation reuses the latest successful main-push `ci.yml` run for
 its exact approved SHA instead of repeating those suites. Failed, unfinished,
 missing and other-source CI are rejected. Native SQL historical-gap and SQL/Mongo
 persistence tests are wired into CI's disposable databases; local integration-tag
-compilation is not an executed native database result. For the host batch source-reviewed at Git
-`5196893331a34891183b81bd7b6196d2696fca2d`, the affected AI race selection
-passes 46 test actions in 23 parent tests with both lint profiles. The earlier
-spool-native snapshot passes four actions in two parents, followed by an
-independent zero-owned-namespace and unchanged-protected-fixture readback.
-Subsequent AI modes and report-diagnostic changes are outside that native wave;
-the spool and its tested dependency bytes are unchanged. Six Python suites and
-configured Action syntax checks pass. These limited checks do not promote older
-full-package results or prove whole-source native coverage at this commit.
-Final committed-source CI and production verification remain required.
+compilation is not an executed native database result. For source-reviewed Git
+`7e39ed4f7790917db67919e2bf765080031dc83d`, the prior
+`743f4afefdbd0f92155f127d9b9ee91cfd1a655e` AI Go selection is unchanged. Its
+72 passing actions in 30 parents, native CLI build and affected lint retain
+their original verified scope with no test failure or skip (receipt
+`ced79fa738a4a49ae09cbeedcf02f57b86b0c26a14f6a3db79b788f73618e95c`). Seven
+actual Python suites ran 205 cases with one existing optional native skip, and
+configured syntax checks on both affected workflows passed on that prior
+installed fourteen-file combination (receipt
+`61070fa61053b50e611f65fd91e070d94ed0f76da309e5ef75d884577a2a75f8`).
+The actual Go selection and lint commands were:
+
+```sh
+go test -race -count=1 -json -run '^(TestAIHost|TestAIExecQuiescence|TestAIExternal)' ./cmd/qs-compatibility-history ./internal/apiserver/maintenance/compatibilityretirement
+bin/golangci-lint run ./cmd/qs-compatibility-history ./internal/apiserver/maintenance/compatibilityretirement
+```
+
+They used Go 1.25.12 with `GOMAXPROCS=3`, `GOTOOLCHAIN=local` and
+`GOFLAGS=-mod=readonly`; no `-p` argument was used.
+The additional Mongo diagnostic source at `7e39ed4f7790917db67919e2bf765080031dc83d`
+passes 55 affected Go race actions in 20 parents with no failure or skip,
+a native tool build, affected lint and 90 Python tests; the four tested source
+files are unchanged before/after verification (receipt
+`2a7bda09844b1578de7d098101dc66451f476e7855eba9945dfe10a92cdb2763`).
+Its actual test commands were:
+
+```sh
+go test -race -count=1 -json ./cmd/qs-compatibility-retirement
+python3 -B scripts/database/test-compatibility-retirement.py -v
+```
+
+The additional diagnostic preserves the original visibility error. Only
+bounds/inventory can forward one bounded ASCII line containing a fixed
+phase/kind, numeric server code, namespace SHA-256 and elapsed milliseconds;
+unknown, duplicated or oversized stderr and driver error text remain private.
+It does not skip indexes, grant permissions or alter retirement capability gates.
+The older spool-native snapshot retains its four passing actions in two parents
+and independent zero-owned-namespace/unchanged-protected-fixture readback;
+later AI modes are outside that native wave. The current CLI build does not prove
+a source-pinned production executable or a successful B migration/recovery.
+Final committed-source CI and production retirement verification remain required.
+The main release `5c71b215b71ddd277608fecdbf097e874062ab9a` passed CI and all ten
+CD jobs in run `37904411717`; this is code/release evidence, not proof of eight
+original AI commands, historical backfill, four-object DROP, B deployment, acceptance or purge.
 
 ## Implemented and tested
 
@@ -122,8 +168,9 @@ Final committed-source CI and production verification remain required.
   job. Only database-backed `prepare` modes receive existing `MYSQL_METADATA_ADMIN_USERNAME`,
   `MYSQL_METADATA_ADMIN_PASSWORD`, `MYSQL_HOST/PORT/DATABASE` (with existing
   `MYSQL_DBNAME` fallback) and `MONGODB_HOST/PORT/DBNAME` production Secrets.
-  For MongoDB it selects the dedicated pair `MONGODB_METADATA_ADMIN_USERNAME`
-  and `MONGODB_METADATA_ADMIN_PASSWORD` together when both are configured;
+  For MongoDB the existing inventory/history modes select the dedicated pair
+  `MONGODB_METADATA_ADMIN_USERNAME` and `MONGODB_METADATA_ADMIN_PASSWORD`
+  together when both are configured;
   an incomplete pair fails before connecting. If neither is configured it uses
   the existing `MONGODB_USERNAME/PASSWORD` pair. The selected credentials enter
   only the temporary private inventory environment; service credentials are not
@@ -407,8 +454,46 @@ are separate. An identical registration is idempotent and preserves its first
 creator. Both modes require armored diagnostic receipts and keep
 `complete`, `execution_allowed`, `drop_ready`, CAS and process-budget proof false.
 
+`prepare_mode=bootstrap-ai-bounds` and `bootstrap-ai-verify` use a separately
+hashed `readonly_ai_host_bootstrap_approval`. It contains the exact existing
+history approval and runtime source/image/container/binding constraints; verify
+also binds a prior bounds run, the two private bounds hashes and the private
+protection-file hash. The original parent request/run/bytes remain unchanged.
+Only the trusted current Action `run_id` is derived into a new request, with an
+immutable approval-to-parent-to-derived-request/input registration. Unknown
+inventory/history handles block instead of being restarted or adopted.
+
+`scripts/database/compatibility-ai-history-prepare.py` invokes the native
+`cmd/qs-compatibility-history` entrypoint with `--ai-host-mode bounds` or `verify`.
+These modes package two source-pinned Linux history binaries and nine fixed
+Python/registry/transport assets, then run the selected native architecture
+through the existing pinned ServerA SSH path. They do not run the AI CLI inside
+the MySQL diagnostic container. Both Mongo metadata administrator Secrets are
+mandatory and selected together; these modes have no application-account
+fallback. The wrapper releases its short registration lock before the native
+CLI takes `operation.lock`. The CLI checks original exec quiescence by inspecting
+the existing handle; a terminal exit without saved output cannot recreate a
+qualification. The two modes only read existing runtime Settings, source files
+and databases; they do not resend an original command.
+
+Exit 0 requires actual native success, the strict source/operation/current-run,
+request/input/runtime bindings, both complete observed external epochs and exact
+private/stdout readiness bytes, followed by a valid armored diagnostic receipt.
+Bounds discovery with `next_cycle_required` remains an unapproved observation;
+verify requires independently approved exact bounds. Every capability in the new
+receipt and `complete`, `execution_allowed`, CAS and `drop_ready` remain false.
+Errors, unknown execution, changed assets or failed armor exit 42. The native
+route does not establish the host memory/CPU/scan budget or the production eight
+command closure. JSON output cannot import the live opaque qualification.
+The external verifier still requires complete 53-ledger and 14-peer-ledger EOF
+and intact original identity/hash/organization/session bindings. Responsibility
+states are attributed through the original sessions/runs/jobs/reservations/leases:
+provably unrelated current work is outside this retirement, while orphan,
+conflicting, unowned or related unknown/pending responsibility remains blocked.
+
 Production must run the whole identity/bounds/inventory/metadata/parent/history
-chain on the same final main tooling SHA, with independently bound approvals.
+and AI read-only chain on the same final main tooling SHA, with independently
+bound approvals.
 The local filesystem, Action package and native fixture tests do not prove that
 production chain, full-sized scan budgets or database historical acceptance.
 Read-only completion counts retain local, AI and global blockers. External AI
