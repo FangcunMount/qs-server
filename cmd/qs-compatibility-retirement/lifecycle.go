@@ -134,6 +134,7 @@ type lifecycleHost interface {
 	FinalDifferenceAndEOF(context.Context, lifecycleRequest, *backup.Archive) error
 	DeployBInline(context.Context, lifecycleRequest, *migration.CompatibilityPairMigrationProof, *fence.MaintenanceWindow) error
 	VerifyAcceptance(context.Context, lifecycleRequest, *backup.Archive) error
+	BindAcceptancePlan(context.Context, lifecycleRequest, *backup.Archive, *backup.TargetRecoveryPlan) error
 	CheckActualDDLStopped(context.Context, lifecycleRequest) error
 	DeployRollbackInline(context.Context, lifecycleRequest, *lifecycleRecoveryReadback, *fence.MaintenanceWindow) error
 	// PurgeTemporaryCopies includes isolated restore copies, full-source/CAS
@@ -639,6 +640,9 @@ func runLifecycleCLI(ctx context.Context, mode, requestPath, requestHash, operat
 	}
 	plan, err := backup.PrepareTargetRecovery(forward, archive, prepared.Borrowed, r.Recovery, r.JournalDirectory, window)
 	if err != nil {
+		return receipt, err
+	}
+	if err = host.BindAcceptancePlan(forward, r, archive, plan); err != nil {
 		return receipt, err
 	}
 	// Keep the process-bound native plan alive through DROP, migration, inline

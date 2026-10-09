@@ -23,6 +23,9 @@ type lifecycleFixedHost struct {
 	acceptedMaterials *lifecycleAcceptedMaterials
 	services          *lifecycleServiceController
 	api               *lifecycleAPITransition
+	dataBaseline      *backup.NonTargetDataBaseline
+	acceptancePlan    *backup.TargetRecoveryPlan
+	acceptancePair    *migration.CompatibilityPairMigrationProof
 }
 
 func newLifecycleFixedHost(ctx context.Context, r lifecycleRequest, a *backup.Archive) (lifecycleHost, error) {
@@ -161,10 +164,14 @@ func (h *lifecycleFixedHost) DeployBInline(ctx context.Context, r lifecycleReque
 	if !lifecycleInlineMigrationBindingMatches(r, o, w, q) {
 		return lifecycleError("lifecycle_actual_inline_b_deployment_missing")
 	}
-	return h.api.deploy(q, r, false)
+	if e = h.api.deploy(q, r, false); e != nil {
+		return e
+	}
+	h.acceptancePair = p // The actual same-run native producer, never its DTO.
+	return nil
 }
-func (*lifecycleFixedHost) VerifyAcceptance(context.Context, lifecycleRequest, *backup.Archive) error {
-	return lifecycleError("lifecycle_actual_runtime_and_data_acceptance_missing")
+func (h *lifecycleFixedHost) VerifyAcceptance(ctx context.Context, r lifecycleRequest, a *backup.Archive) error {
+	return h.verifyNativeAcceptance(ctx, r, a)
 }
 func (h *lifecycleFixedHost) CheckActualDDLStopped(ctx context.Context, r lifecycleRequest) error {
 	if h == nil || h.owner == nil || h.services == nil || h.services.window == nil {
@@ -249,6 +256,11 @@ func (h *lifecycleFixedHost) Close() error {
 	}
 	if h.api != nil && h.api.engine != nil {
 		h.api.engine.transport.CloseIdleConnections()
+	}
+	if h.api != nil && h.api.materials != nil {
+		if err := h.api.materials.close(); result == nil {
+			result = err
+		}
 	}
 	if h.acceptedMaterials != nil && h.acceptedMaterials.catalog != nil {
 		if err := h.acceptedMaterials.catalog.close(); result == nil {

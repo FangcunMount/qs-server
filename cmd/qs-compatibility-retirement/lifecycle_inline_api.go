@@ -16,6 +16,8 @@ import (
 	"syscall"
 	"time"
 
+	"golang.org/x/sys/unix"
+
 	backup "github.com/FangcunMount/qs-server/internal/apiserver/maintenance/compatibilityretirementbackup"
 	fence "github.com/FangcunMount/qs-server/internal/apiserver/maintenance/compatibilityretirementfence"
 	stop "github.com/FangcunMount/qs-server/internal/apiserver/maintenance/compatibilityretirementstop"
@@ -130,6 +132,7 @@ type lifecycleAPIInspection struct {
 		Running, Paused, Restarting, Dead, OOMKilled bool
 		PID, ExitCode                                int
 		StartedAt                                    string
+		Health                                       struct{ Status string }
 	}
 	NetworkSettings struct{ Networks map[string]json.RawMessage }
 	ExecIDs         json.RawMessage
@@ -171,6 +174,9 @@ type lifecycleAPITransition struct {
 	bCID, rollbackCID                         string
 	removedOriginal                           bool
 	unknown                                   bool
+	materials                                 *lifecycleMaterialDirectory
+	acceptance                                *lifecycleAPIRuntimeObservation
+	programProbeIDs                           [2]string
 }
 
 // Prewarm runs before StartMaintenanceWindow. All probes are never started,
@@ -234,11 +240,15 @@ func prepareLifecycleAPITransition(ctx context.Context, r lifecycleRequest) (v *
 	if e = syncLifecycleDirectory(r.prepareRoot); e != nil {
 		return v, e
 	}
+	v.materials, e = openLifecycleMaterialDirectory(v.dir, 0)
+	if e != nil {
+		return v, e
+	}
 	raw, e := json.Marshal(original.spec())
 	if e != nil {
 		return v, lifecycleError("lifecycle_api_binding_rejected")
 	}
-	if e = writeLifecycleRaw(filepath.Join(v.dir, "original-runtime-spec.private.json"), raw, 0600); e != nil {
+	if e = v.writeMaterial("original-runtime-spec.private.json", raw); e != nil {
 		return v, e
 	}
 	if e = v.verifyImageProgram(ctx, "b", r.DeploymentControl.BImageID, r.ToolSourceSHA, r.DeploymentControl.BProgramSHA256); e != nil {
@@ -257,10 +267,45 @@ func (v *lifecycleAPITransition) record(name string, value any) error {
 	if e != nil {
 		return lifecycleError("lifecycle_api_journal_rejected")
 	}
-	return writeLifecycleRaw(filepath.Join(v.dir, name+".private.json"), append(raw, '\n'), 0600)
+	return v.writeMaterial(name+".private.json", append(raw, '\n'))
+}
+
+// Register bytes/FD identity only at this original owner's actual successful
+// O_EXCL+fsync write. A later walker cannot adopt an unregistered file or secret.
+func (v *lifecycleAPITransition) writeMaterial(name string, raw []byte) error {
+	if v == nil || v.self != v || v.materials == nil || v.unknown || v.materials.unchanged() != nil || filepath.Base(name) != name || name == "." || name == ".." || strings.ContainsAny(name, "/\\\x00") {
+		return lifecycleError("lifecycle_api_material_owner_missing")
+	}
+	fd, e := unix.Openat(int(v.materials.file.Fd()), name, unix.O_WRONLY|unix.O_CREAT|unix.O_EXCL|unix.O_NOFOLLOW, 0600)
+	if e != nil {
+		v.unknown, v.materials.unknown = true, true
+		return lifecycleError("lifecycle_api_material_owner_missing")
+	}
+	f := os.NewFile(uintptr(fd), filepath.Join(v.dir, name))
+	_, writeErr := f.Write(raw)
+	syncErr, closeErr := f.Sync(), f.Close()
+	if writeErr != nil || syncErr != nil || closeErr != nil || v.materials.file.Sync() != nil {
+		v.unknown, v.materials.unknown = true, true
+		return lifecycleError("lifecycle_api_material_owner_missing")
+	}
+	if e := v.materials.register(name, digestRaw(raw), 0, 0600); e != nil {
+		v.unknown, v.materials.unknown = true, true
+		return e
+	}
+	return nil
 }
 
 func (v *lifecycleAPITransition) verifyImageProgram(ctx context.Context, kind, image, source, expected string) error {
+	index := -1
+	switch kind {
+	case "b":
+		index = 0
+	case "rollback":
+		index = 1
+	}
+	if v == nil || v.self != v || index < 0 || v.programProbeIDs[index] != "" {
+		return lifecycleError("lifecycle_api_image_program_unproven")
+	}
 	raw, e := v.engine.call(ctx, http.MethodGet, "/images/"+image+"/json", nil, 200)
 	var actual struct {
 		ID               string `json:"Id"`
@@ -285,6 +330,7 @@ func (v *lifecycleAPITransition) verifyImageProgram(ctx context.Context, kind, i
 		v.unknown = true
 		return lifecycleError("lifecycle_api_image_program_unproven")
 	}
+	v.programProbeIDs[index] = result.ID
 	if e = v.record(kind+"-program-create-result", map[string]string{"id": result.ID}); e != nil {
 		v.unknown = true
 		return e
@@ -307,6 +353,15 @@ func (v *lifecycleAPITransition) verifyImageProgram(ctx context.Context, kind, i
 	if _, e = readLifecycleRootFile(program, expected, true); e != nil {
 		v.unknown = true
 		return e
+	}
+	info, e := os.Lstat(program)
+	if e != nil || v.materials == nil || v.materials.register(filepath.Base(program), expected, 0, info.Mode().Perm()) != nil {
+		v.unknown = true
+		return lifecycleError("lifecycle_api_material_owner_missing")
+	}
+	if v.materials.files[filepath.Base(program)].file.Sync() != nil || syncLifecycleDirectory(v.dir) != nil {
+		v.unknown, v.materials.unknown = true, true
+		return lifecycleError("lifecycle_api_material_owner_missing")
 	}
 	if e = v.record(kind+"-program-copy-result", map[string]string{"id": result.ID, "program_sha256": expected}); e != nil {
 		return e
@@ -616,7 +671,7 @@ func (v *lifecycleAPITransition) deploy(ctx context.Context, r lifecycleRequest,
 	if e != nil {
 		return e
 	}
-	if e = writeLifecycleRaw(filepath.Join(v.dir, kind+"-api-create-body.private.json"), body, 0600); e != nil {
+	if e = v.writeMaterial(kind+"-api-create-body.private.json", body); e != nil {
 		return e
 	}
 	if e = v.record(kind+"-api-create-intent", map[string]string{"name": strings.TrimPrefix(v.original.Name, "/"), "image": image, "body_sha256": digestRaw(body), "program_sha256": program}); e != nil {

@@ -221,6 +221,21 @@ func (v *lifecycleServiceController) Check(ctx context.Context) error {
 	return err
 }
 
+// This post-deployment readback keeps the original A/D leases and the full
+// relevant-container catalog. The API ID is supplied only by the original
+// inline native API owner, never a request or imported receipt. It does not
+// relax Check or any recovery path, resume services, or prove external fencing.
+func (v *lifecycleServiceController) CheckStoppedDependents(ctx context.Context, nativeInlineAPIID string) error {
+	if v == nil || v.local == nil || v.remote == nil {
+		return lifecycleError("lifecycle_actual_service_lease_missing")
+	}
+	if err := v.local.CheckStoppedDependents(ctx, nativeInlineAPIID); err != nil {
+		return err
+	}
+	_, err := v.remote.Do(ctx, "check")
+	return err
+}
+
 func (v *lifecycleServiceController) ResumeDependents(ctx context.Context) error {
 	if v == nil || v.local == nil || v.remote == nil {
 		return lifecycleError("lifecycle_actual_service_lease_missing")

@@ -126,7 +126,7 @@ func lifecycleFinalExternalInput(r lifecycleRequest) (*retirement.AIExternalExec
 }
 
 func (h *lifecycleFixedHost) finalDifferenceAndEOF(ctx context.Context, r lifecycleRequest, a *backup.Archive) (result error) {
-	if h == nil || h.owner == nil || h.owner.originalConn == nil || h.owner.originalMongo == nil || h.owner.originalDB == nil || h.services == nil || !h.services.managementReady || h.services.window == nil || !h.services.identity.matches(r) || ctx == nil || ctx.Err() != nil {
+	if h == nil || h.dataBaseline != nil || h.owner == nil || h.owner.originalConn == nil || h.owner.originalMongo == nil || h.owner.originalDB == nil || h.services == nil || !h.services.managementReady || h.services.window == nil || !h.services.identity.matches(r) || ctx == nil || ctx.Err() != nil {
 		return lifecycleError("lifecycle_final_historical_scope_rejected")
 	}
 	q, c, e := h.services.window.ForwardContext(ctx)
@@ -211,11 +211,18 @@ func (h *lifecycleFixedHost) finalDifferenceAndEOF(ctx context.Context, r lifecy
 	if e = backup.VerifyHostOriginalSources(paired, a, borrowed); e != nil {
 		return e
 	}
+	baseline, e := backup.CaptureCompleteNonTargetData(paired, a, borrowed, o)
+	if e != nil {
+		return e
+	}
 	if e = sources.Verify(q); e != nil {
 		return e
 	}
 	if e = h.services.Check(q); e != nil {
 		return e
+	}
+	if q.Err() == nil {
+		h.dataBaseline = baseline
 	}
 	return q.Err() // All borrowed RO scopes are ended by this host before DDL.
 }
