@@ -35,6 +35,7 @@ case "$architecture" in
 esac
 binary=/tmp/qs-m4-evaluation-duplicate.test
 (cd "$repo" && GOPROXY=https://proxy.golang.org,direct CGO_ENABLED=0 GOOS=linux GOARCH="$goarch" go test -c \
+  -ldflags "-X github.com/FangcunMount/qs-server/pkg/version.GitCommit=$(git rev-parse HEAD)" \
   -tags=integration -o "$binary" ./internal/apiserver/integration/runtimeclosure)
 "${compose[@]}" exec -T mysql mkdir -p /tmp/m4-duplicate/configs /tmp/m4-duplicate/internal/apiserver/integration/runtimeclosure
 "${compose[@]}" cp "$repo/configs/events.yaml" mysql:/tmp/m4-duplicate/configs/events.yaml

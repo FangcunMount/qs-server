@@ -392,6 +392,7 @@ jobs:
           QS_SERVER_TEST_REDIS_URL: redis://127.0.0.1:6379/15
         run: |
           go test -tags=integration \
+            -ldflags "-X github.com/FangcunMount/qs-server/pkg/version.GitCommit=$(git rev-parse HEAD)" \
             -run '^TestCurrentRuntimeClosure$' \
             -count=1 -timeout=15m -v ./internal/apiserver/integration/runtimeclosure
 

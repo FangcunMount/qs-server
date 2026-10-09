@@ -122,27 +122,35 @@ func runCurrentRuntimeClosure(t *testing.T, eventFactory runtimeClosureEventFact
 	startedAt := time.Now().UTC().Add(-5 * time.Second)
 
 	sqlDB, databaseName := openRuntimeDatabase(t, mysqlDSN)
-	mysqlMigrator := migrationpkg.NewMigrator(sqlDB, &migrationpkg.Config{Enabled: true, Database: databaseName})
-	mysqlVersion, changed, err := mysqlMigrator.Run()
-	if err != nil || !changed || mysqlVersion == 0 {
+	// Current runtime closure proves the real pristine B path. Both stores must
+	// be observed before either migration creates a version namespace.
+	mongoClient, mongoDB := mongodbtest.ReplicaSetDatabase(t)
+	pair := runtimeClosurePristinePair(t, sqlDB, databaseName, mongoClient, mongoDB.Name())
+	mysqlVersion, changed, err := migrationpkg.NewMigrator(sqlDB, pair.MySQLConfig(false)).Run()
+	if err != nil || !changed || mysqlVersion != 100 {
 		t.Fatalf("migrate empty MySQL: version=%d changed=%v err=%v", mysqlVersion, changed, err)
 	}
-	if version, changed, err := mysqlMigrator.Run(); err != nil || changed || version != mysqlVersion {
+	mongoVersion, changed, err := migrationpkg.NewMongoMigrator(mongoClient, pair.MongoConfig(false)).Run()
+	if err != nil || !changed || mongoVersion != 39 {
+		t.Fatalf("migrate empty MongoDB: version=%d changed=%v err=%v", mongoVersion, changed, err)
+	}
+	// The consumed pristine authorization is not reusable. A restart gets a
+	// fresh genuine installed-pair preflight after both actual upgrades finish.
+	restart, err := migrationpkg.PreflightCompatibilityPair(t.Context(), sqlDB, mongoClient, migrationpkg.PairConfig{
+		MySQLDatabase: databaseName, MongoDatabase: mongoDB.Name(), ExpectedSourceSHA: runtimeClosureCompiledSource(t),
+	})
+	if err != nil {
+		t.Fatalf("preflight complete current pair: %v", err)
+	}
+	if version, changed, err := migrationpkg.NewMigrator(sqlDB, restart.MySQLConfig(false)).Run(); err != nil || changed || version != mysqlVersion {
 		t.Fatalf("repeat MySQL migration: version=%d want_version=%d changed=%v err=%v", version, mysqlVersion, changed, err)
+	}
+	if version, changed, err := migrationpkg.NewMongoMigrator(mongoClient, restart.MongoConfig(false)).Run(); err != nil || changed || version != mongoVersion {
+		t.Fatalf("repeat MongoDB migration: version=%d want_version=%d changed=%v err=%v", version, mongoVersion, changed, err)
 	}
 	gormDB, err := gorm.Open(gormmysql.New(gormmysql.Config{Conn: sqlDB, SkipInitializeWithVersion: true}), &gorm.Config{})
 	if err != nil {
 		t.Fatal(err)
-	}
-
-	mongoClient, mongoDB := mongodbtest.ReplicaSetDatabase(t)
-	mongoMigrator := migrationpkg.NewMongoMigrator(mongoClient, &migrationpkg.Config{Enabled: true, Database: mongoDB.Name()})
-	mongoVersion, changed, err := mongoMigrator.Run()
-	if err != nil || !changed || mongoVersion == 0 {
-		t.Fatalf("migrate empty MongoDB: version=%d changed=%v err=%v", mongoVersion, changed, err)
-	}
-	if version, changed, err := mongoMigrator.Run(); err != nil || changed || version != mongoVersion {
-		t.Fatalf("repeat MongoDB migration: version=%d want_version=%d changed=%v err=%v", version, mongoVersion, changed, err)
 	}
 
 	redisOptions, err := redis.ParseURL(redisURL)
