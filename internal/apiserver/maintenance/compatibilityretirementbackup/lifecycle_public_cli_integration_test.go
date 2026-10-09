@@ -328,6 +328,24 @@ func publicCLIMaterialsKnown(path string, allowed map[string]bool) error {
 	})
 }
 
+func publicCLIFixedParentRole(path string) string {
+	roles := map[string]string{
+		"/":                      "filesystem_root",
+		"/opt":                   "opt_parent",
+		"/opt/backups":           "backups_parent",
+		"/opt/backups/qs-server": "service_parent",
+		"/opt/backups/qs-server/compatibility-retirement": "operation_base",
+		"/private":        "native_private_parent",
+		"/private/tmp":    "native_tmp_parent",
+		"/tmp":            "system_tmp_parent",
+		nativePrivateRoot: "native_private_base",
+	}
+	if role, ok := roles[path]; ok {
+		return role
+	}
+	return "other_ancestor"
+}
+
 func publicCLIProtectedDir(t *testing.T, path string) {
 	t.Helper()
 	if os.MkdirAll(path, 0700) != nil {
@@ -336,6 +354,12 @@ func publicCLIProtectedDir(t *testing.T, path string) {
 	for p := path; ; p = filepath.Dir(p) {
 		st, e := os.Lstat(p)
 		if e != nil || !st.IsDir() || st.Mode()&os.ModeSymlink != 0 || st.Sys().(*syscall.Stat_t).Uid != 0 || (p != "/tmp" && st.Mode().Perm()&022 != 0) {
+			if e == nil {
+				v := st.Sys().(*syscall.Stat_t)
+				t.Logf("public_cli_fixture_parent_rejected role=%s stat_observed=true uid=%d gid=%d mode=%04o symlink=%t directory=%t", publicCLIFixedParentRole(p), v.Uid, v.Gid, uint32(v.Mode)&07777, st.Mode()&os.ModeSymlink != 0, st.IsDir())
+			} else {
+				t.Logf("public_cli_fixture_parent_rejected role=%s stat_observed=false", publicCLIFixedParentRole(p))
+			}
 			t.Fatal("public_cli_fixture_protected_parent_rejected")
 		}
 		if p == filepath.Dir(p) {
