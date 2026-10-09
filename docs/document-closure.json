@@ -2,7 +2,7 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "54eca96239071eaeee0573dca529cd4cca77098c",
+    "sha": "a4e7bc77bfd00268f2ddfc028cab89080380ba2b",
     "verified_on": "2026-10-09"
   },
   "status_policy": {
@@ -11270,7 +11270,7 @@
       "owner": "tooling",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "54eca96239071eaeee0573dca529cd4cca77098c",
+        "source_sha": "a4e7bc77bfd00268f2ddfc028cab89080380ba2b",
         "verified_on": "2026-10-09"
       },
       "fact_sources": [
@@ -12222,6 +12222,30 @@
           "command": "python3 -B scripts/database/test-compatibility-root-prepare.py",
           "result": "passed",
           "source_sha": "54eca96239071eaeee0573dca529cd4cca77098c",
+          "verified_on": "2026-10-09"
+        },
+        {
+          "kind": "source_selector",
+          "path": "internal/apiserver/maintenance/compatibilityretirementbackup/lifecycle_public_cli_integration_test.go",
+          "selector": "func TestLifecyclePublicCLINativePrepareRootOnce(t *testing.T)",
+          "result": "matched",
+          "source_sha": "a4e7bc77bfd00268f2ddfc028cab89080380ba2b",
+          "verified_on": "2026-10-09"
+        },
+        {
+          "kind": "source_selector",
+          "path": "internal/apiserver/maintenance/compatibilityretirementbackup/lifecycle_public_cli_integration_test.go",
+          "selector": "func publicCLIRunProcessGroup(cmd *exec.Cmd)",
+          "result": "matched",
+          "source_sha": "a4e7bc77bfd00268f2ddfc028cab89080380ba2b",
+          "verified_on": "2026-10-09"
+        },
+        {
+          "kind": "source_selector",
+          "path": ".github/workflows/ci.yml",
+          "selector": "Verify public lifecycle root-once capture and isolated restore",
+          "result": "matched",
+          "source_sha": "a4e7bc77bfd00268f2ddfc028cab89080380ba2b",
           "verified_on": "2026-10-09"
         }
       ],
