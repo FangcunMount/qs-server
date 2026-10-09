@@ -15,6 +15,7 @@ import (
 	"io"
 	"reflect"
 	"strconv"
+	"strings"
 	"time"
 	"unicode/utf8"
 )
@@ -116,7 +117,10 @@ func exactNames(raw []byte, t reflect.Type) error {
 		allowed := map[string]reflect.Type{}
 		for i := 0; i < t.NumField(); i++ {
 			f := t.Field(i)
-			tag := f.Tag.Get("json")
+			tag, _, _ := strings.Cut(f.Tag.Get("json"), ",")
+			if tag == "-" {
+				continue
+			}
 			if tag == "" {
 				tag = f.Name
 			}

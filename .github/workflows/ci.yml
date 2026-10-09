@@ -343,8 +343,8 @@ jobs:
           QS_SERVER_TEST_MONGO_URI: mongodb://127.0.0.1:27017/?replicaSet=rs0
           QS_SERVER_TEST_MONGO_DB_PREFIX: qs_history_ci_contract
         run: |
-          go test -race -tags=integration -count=1 -timeout=10m ./internal/apiserver/infra/mysql/evaluation -run '^TestSQLCASProvenanceNative|^TestSQLHistoricalMissingOriginalRunPolicyNative$'
-          go test -race -tags=integration -count=1 -timeout=10m ./internal/apiserver/maintenance/compatibilityretirement -run '^TestHistoricalCASPersistenceNative'
+          go test -race -tags=integration -count=1 -timeout=10m ./internal/apiserver/infra/mysql/evaluation -run '^TestSQLCASProvenanceNative|^TestSQLHistoricalMissingOriginalRunPolicyNative$|^TestSQLHistoricalOriginalRunGlobalAbsenceNative$'
+          go test -race -tags=integration -count=1 -timeout=10m ./internal/apiserver/maintenance/compatibilityretirement -run '^(TestHistoricalCASPersistenceNative|TestQualifiedHistoricalCASNative)'
 
       - name: Run Survey and ModelCatalog Mongo integration contracts
         env:

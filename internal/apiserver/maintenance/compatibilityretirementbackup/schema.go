@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	retirement "github.com/FangcunMount/qs-server/internal/apiserver/maintenance/compatibilityretirement"
+	identitymeta "github.com/FangcunMount/qs-server/internal/pkg/databaseidentity"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
@@ -253,13 +254,24 @@ func mongoState(ctx context.Context, db *mongo.Database, b Binding, collections 
 	if identity != b.IdentityHash || parts("mongodb_migration_generation_v1", hex.EncodeToString(uuid)) != b.GenerationHash {
 		return "", ErrIdentity
 	}
-	if db.Client().Database("admin").RunCommand(ctx, bson.D{{Key: "replSetGetConfig", Value: 1}}).Decode(&config) != nil {
-		return "", ErrIdentity
-	}
-	id, ok := config.Lookup("config", "settings", "replicaSetId").ObjectIDOK()
-	set, okSet := hello.Lookup("setName").StringValueOK()
-	if !ok || !okSet || id.IsZero() || parts("mongodb_database_anchor_v1", id.Hex(), set, db.Name()) != b.AnchorHash {
-		return "", ErrIdentity
+	if b.NamespaceAnchor != nil {
+		// hello and collections above came from the real borrowed client and
+		// full-visible catalog. The approved seed endpoint stays immutable;
+		// the host connection owner is responsible for that selected route.
+		if matchMongoNamespaceMetadata(hello, collections, db.Name(), b) != nil {
+			return "", ErrIdentity
+		}
+	} else {
+		// Never retry this legacy profile as namespace metadata after code 13
+		// or any other replSetGetConfig failure.
+		if db.Client().Database("admin").RunCommand(ctx, bson.D{{Key: "replSetGetConfig", Value: 1}}).Decode(&config) != nil {
+			return "", ErrIdentity
+		}
+		id, ok := config.Lookup("config", "settings", "replicaSetId").ObjectIDOK()
+		set, okSet := hello.Lookup("setName").StringValueOK()
+		if !ok || !okSet || id.IsZero() || parts("mongodb_database_anchor_v1", id.Hex(), set, db.Name()) != b.AnchorHash {
+			return "", ErrIdentity
+		}
 	}
 	cur, e := db.Collection("schema_migrations").Find(ctx, bson.D{}, options.Find().SetLimit(2))
 	if e != nil {
@@ -286,6 +298,28 @@ func mongoState(ctx context.Context, db *mongo.Database, b Binding, collections 
 		return "", ErrIdentity
 	}
 	return identity, nil
+}
+
+// The catalog caller establishes authorizedCollections=false/full visibility.
+// This is a metadata comparison, not a source approval or write capability.
+func matchMongoNamespaceMetadata(hello bson.Raw, collections map[string]bson.Raw, database string, b Binding) error {
+	expected := b.NamespaceAnchor
+	if expected == nil || expected.Validate() != nil || expected.Database != database || expected.Hash != b.AnchorHash || !hashPattern.MatchString(b.GenerationHash) {
+		return ErrIdentity
+	}
+	rows := make([]bson.Raw, 0, len(collections))
+	for name, raw := range collections {
+		actualName, ok := raw.Lookup("name").StringValueOK()
+		if !ok || name != actualName {
+			return ErrIdentity
+		}
+		rows = append(rows, raw)
+	}
+	observed, err := identitymeta.MongoNamespaceAnchorFromMetadata(hello, rows, database, expected.EndpointSHA256)
+	if err != nil || !identitymeta.MatchMongoNamespaceAnchors(expected, observed) {
+		return ErrIdentity
+	}
+	return nil
 }
 
 // OrderedMongoSchema is a newly observed original BSON schema candidate, not

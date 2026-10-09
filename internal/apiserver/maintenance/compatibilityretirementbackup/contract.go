@@ -10,6 +10,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	retirement "github.com/FangcunMount/qs-server/internal/apiserver/maintenance/compatibilityretirement"
+	identitymeta "github.com/FangcunMount/qs-server/internal/pkg/databaseidentity"
 	"hash"
 	"io"
 	"regexp"
@@ -73,24 +74,47 @@ type SourceSnapshot struct {
 	NextCycle      bool                      `json:"next_cycle_required"`
 }
 type Binding struct {
-	IdentityHash        string          `json:"identity_hash"`
-	AnchorHash          string          `json:"database_anchor_hash"`
-	GenerationHash      string          `json:"migration_generation_hash"`
-	IdentityMatch       bool            `json:"expected_identity_match"`
-	Version             uint64          `json:"migration_version"`
-	Dirty               bool            `json:"migration_dirty"`
-	HeadMatch           bool            `json:"expected_migration_match"`
-	CatalogHash         string          `json:"catalog_hash"`
-	NonTargetHash       string          `json:"non_target_schema_hash"`
-	MetadataComplete    bool            `json:"metadata_complete"`
-	Permissions         map[string]bool `json:"permissions"`
-	OutsideDependencies uint64          `json:"outside_dependencies"`
-	DependencyCoverage  bool            `json:"dependency_coverage_complete"`
-	InboundCoverage     bool            `json:"inbound_foreign_key_coverage_complete"`
-	DependencyScope     string          `json:"dependency_scope"`
-	TextReview          bool            `json:"dependency_text_review_required"`
-	ErrorCategory       string          `json:"error_category"`
+	NamespaceAnchor     *identitymeta.MongoNamespaceAnchor `json:"namespace_anchor,omitempty"`
+	IdentityHash        string                             `json:"identity_hash"`
+	AnchorHash          string                             `json:"database_anchor_hash"`
+	GenerationHash      string                             `json:"migration_generation_hash"`
+	IdentityMatch       bool                               `json:"expected_identity_match"`
+	Version             uint64                             `json:"migration_version"`
+	Dirty               bool                               `json:"migration_dirty"`
+	HeadMatch           bool                               `json:"expected_migration_match"`
+	CatalogHash         string                             `json:"catalog_hash"`
+	NonTargetHash       string                             `json:"non_target_schema_hash"`
+	MetadataComplete    bool                               `json:"metadata_complete"`
+	Permissions         map[string]bool                    `json:"permissions"`
+	OutsideDependencies uint64                             `json:"outside_dependencies"`
+	DependencyCoverage  bool                               `json:"dependency_coverage_complete"`
+	InboundCoverage     bool                               `json:"inbound_foreign_key_coverage_complete"`
+	DependencyScope     string                             `json:"dependency_scope"`
+	TextReview          bool                               `json:"dependency_text_review_required"`
+	ErrorCategory       string                             `json:"error_category"`
 }
+
+// Only the explicitly approved new profile changes the stable anchor. The
+// legacy missing-field representation and its replica permission check remain.
+func (b *Binding) UnmarshalJSON(raw []byte) error {
+	if b == nil {
+		return ErrApproval
+	}
+	type plain Binding
+	var decoded plain
+	if exactJSON(raw, &decoded) != nil || identitymeta.ValidateOptionalMongoNamespaceJSON(raw, "namespace_anchor") != nil {
+		return ErrApproval
+	}
+	if decoded.NamespaceAnchor != nil {
+		if decoded.NamespaceAnchor.Validate() != nil || decoded.AnchorHash != decoded.NamespaceAnchor.Hash || !hashPattern.MatchString(decoded.GenerationHash) {
+			return ErrApproval
+		}
+		decoded.NamespaceAnchor = decoded.NamespaceAnchor.Clone()
+	}
+	*b = Binding(decoded)
+	return nil
+}
+
 type inventory struct {
 	Format        int                `json:"format_version"`
 	Kind          string             `json:"kind"`

@@ -46,7 +46,7 @@ on:
         default: ''
         type: string
       bootstrap_approval_json:
-        description: 'Bootstrap only: canonical public approval JSON, no credentials, names or BSON tokens'
+        description: 'Bootstrap only: canonical public approval JSON (namespace anchor kind/hash reference), no credentials, names or BSON tokens'
         required: false
         default: ''
         type: string
@@ -125,30 +125,34 @@ jobs:
               }
               if (namespace) {
                 const anchor = approval.mongodb_namespace_anchor;
-                const names = ['answersheets', 'interpret_report_artifacts', 'interpretation_runs', 'report_generations'];
-                if (!exact(anchor, ['kind', 'hash', 'endpoint_sha256', 'database', 'replica_set_name', 'collections']) || anchor.kind !== 'selected_namespace_kept_uuids_v1' || !/^[0-9a-f]{64}$/.test(anchor.hash ?? '') || !/^[0-9a-f]{64}$/.test(anchor.endpoint_sha256 ?? '') || !Array.isArray(anchor.collections) || anchor.collections.length !== names.length) {reject();}
-                for (const value of [anchor.database, anchor.replica_set_name]) {
-                  if (typeof value !== 'string' || !value || Buffer.byteLength(value, 'utf8') > 128 || /[\u0000\r\n]/.test(value)) {reject();}
+                if (exact(anchor, ['kind', 'hash'])) {
+                  if (anchor.kind !== 'selected_namespace_kept_uuids_v1' || typeof anchor.hash !== 'string' || !/^[0-9a-f]{64}$/.test(anchor.hash)) {reject();}
+                } else {
+                  const names = ['answersheets', 'interpret_report_artifacts', 'interpretation_runs', 'report_generations'];
+                  if (!exact(anchor, ['kind', 'hash', 'endpoint_sha256', 'database', 'replica_set_name', 'collections']) || anchor.kind !== 'selected_namespace_kept_uuids_v1' || !/^[0-9a-f]{64}$/.test(anchor.hash ?? '') || !/^[0-9a-f]{64}$/.test(anchor.endpoint_sha256 ?? '') || !Array.isArray(anchor.collections) || anchor.collections.length !== names.length) {reject();}
+                  for (const value of [anchor.database, anchor.replica_set_name]) {
+                    if (typeof value !== 'string' || !value || Buffer.byteLength(value, 'utf8') > 128 || /[\u0000\r\n]/.test(value)) {reject();}
+                  }
+                  const parts = [anchor.kind, anchor.endpoint_sha256, anchor.database, anchor.replica_set_name];
+                  const seen = new Set();
+                  for (let i = 0; i < names.length; i++) {
+                    const item = anchor.collections[i];
+                    if (!exact(item, ['name', 'present', 'uuid']) || item.name !== names[i] || typeof item.present !== 'boolean' || typeof item.uuid !== 'string') {reject();}
+                    if (item.present) {
+                      if (!/^[0-9a-f]{32}$/.test(item.uuid) || item.uuid === '0'.repeat(32) || seen.has(item.uuid)) {reject();}
+                      seen.add(item.uuid);
+                    } else if (item.uuid !== '') {reject();}
+                    parts.push(item.name, item.present ? 'present' : 'absent', item.uuid);
+                  }
+                  if (seen.size < 1) {reject();}
+                  const digest = require('crypto').createHash('sha256');
+                  for (const part of parts) {
+                    const raw = Buffer.from(part, 'utf8'); const header = Buffer.alloc(9);
+                    header[0] = 1; header.writeBigUInt64BE(BigInt(raw.length), 1);
+                    digest.update(header); digest.update(raw);
+                  }
+                  if (digest.digest('hex') !== anchor.hash) {reject();}
                 }
-                const parts = [anchor.kind, anchor.endpoint_sha256, anchor.database, anchor.replica_set_name];
-                const seen = new Set();
-                for (let i = 0; i < names.length; i++) {
-                  const item = anchor.collections[i];
-                  if (!exact(item, ['name', 'present', 'uuid']) || item.name !== names[i] || typeof item.present !== 'boolean' || typeof item.uuid !== 'string') {reject();}
-                  if (item.present) {
-                    if (!/^[0-9a-f]{32}$/.test(item.uuid) || item.uuid === '0'.repeat(32) || seen.has(item.uuid)) {reject();}
-                    seen.add(item.uuid);
-                  } else if (item.uuid !== '') {reject();}
-                  parts.push(item.name, item.present ? 'present' : 'absent', item.uuid);
-                }
-                if (seen.size < 1) {reject();}
-                const digest = require('crypto').createHash('sha256');
-                for (const part of parts) {
-                  const raw = Buffer.from(part, 'utf8'); const header = Buffer.alloc(9);
-                  header[0] = 1; header.writeBigUInt64BE(BigInt(raw.length), 1);
-                  digest.update(header); digest.update(raw);
-                }
-                if (digest.digest('hex') !== anchor.hash) {reject();}
               }
               const limits = {query_seconds:30,total_seconds:1500,max_records:1000000,max_bytes:2147483648,page_size:1000,max_pages:1001};
               if (!exact(approval.limits, Object.keys(limits)) || Object.keys(limits).some(key => approval.limits[key] !== limits[key])) {reject();}

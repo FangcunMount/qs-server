@@ -224,7 +224,7 @@ func TestMongoLocalSQLCurrentOwnerRequiresActualCanonicalExecution(t *testing.T)
 				facts.Owner.ClockComparisonRuleVersion = ""
 			}
 			r := &MongoOwnerResolution{source: &DecodedSourceEvent{OrgID: 7}, local: MongoLocalResolution{OrgID: 7, TesteeID: 21, OwnerLocalTerminal: true}}
-			r.checkSQLTerminal(facts)
+			r.checkSQLTerminal(t.Context(), facts)
 			if kind == "evaluated_closed" || kind == "failed_closed" {
 				if !r.local.OwnerLocalTerminal || len(r.local.BlockingReasons) != 0 {
 					t.Fatal("actual current canonical owner rejected")
@@ -234,6 +234,44 @@ func TestMongoLocalSQLCurrentOwnerRequiresActualCanonicalExecution(t *testing.T)
 			}
 			if r.local.OriginalRun != nil {
 				t.Fatal("current owner clock inferred undeclared original Run")
+			}
+		})
+	}
+}
+
+func TestMongoLocalSQLMissingRunRequiresActualGlobalBatchObservation(t *testing.T) {
+	at := mongoLocalSheet().FilledAt
+	seconds := at.Truncate(time.Second)
+	for _, tc := range []struct {
+		name   string
+		mutate func(*sqlevaluation.SQLHistoricalFactsSnapshot)
+	}{
+		{"nil snapshot Runs", func(*sqlevaluation.SQLHistoricalFactsSnapshot) {}},
+		{"other terminal Run", func(f *sqlevaluation.SQLHistoricalFactsSnapshot) {
+			f.Runs = []sqlevaluation.SQLHistoricalRun{{ID: 1, Scope: "evaluation_run", AssessmentID: 42, ResourceID: "42:2", Attempt: 2, Status: "succeeded", FinishedAt: &at}}
+		}},
+		{"original cross scope", func(f *sqlevaluation.SQLHistoricalFactsSnapshot) {
+			f.Runs = []sqlevaluation.SQLHistoricalRun{{ID: 1, Scope: "other_scope", AssessmentID: 42, ResourceID: "42:1", Attempt: 1, Status: "succeeded", FinishedAt: &at}}
+		}},
+		{"pending responsibility", func(f *sqlevaluation.SQLHistoricalFactsSnapshot) {
+			f.Responsibilities = []sqlevaluation.SQLHistoricalResponsibility{{Store: "rm_outbox", AssessmentID: 42, OrgID: 7, Unfinished: true}}
+		}},
+		{"lease responsibility", func(f *sqlevaluation.SQLHistoricalFactsSnapshot) {
+			f.Responsibilities = []sqlevaluation.SQLHistoricalResponsibility{{Store: "retry_event_hold", AssessmentID: 42, OrgID: 7, LeasePresent: true}}
+		}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			facts := sqlevaluation.SQLHistoricalFactsSnapshot{Owner: sqlevaluation.SQLHistoricalOwner{AssessmentID: 42, OrgID: 7, TesteeID: 21, Status: "evaluated", EvaluatedAt: &seconds, ActualEvaluatedAtDataType: "datetime", ActualEvaluatedAtPrecision: 0, ClockComparisonRuleVersion: "sql-assessment-clock/v1"}, Outcomes: []sqlevaluation.SQLHistoricalOutcome{{ID: 9001, AssessmentID: 42, OrgID: 7, TesteeID: 21, RunID: "42:1", EvaluatedAt: at}}}
+			tc.mutate(&facts)
+			r := &MongoOwnerResolution{source: &DecodedSourceEvent{OrgID: 7}, local: MongoLocalResolution{TesteeID: 21, OwnerLocalTerminal: true}}
+			r.checkSQLTerminal(t.Context(), facts)
+			if r.local.OwnerLocalTerminal || len(r.local.BlockingReasons) == 0 || r.local.OriginalRun != nil {
+				t.Fatal("unproven absence settled original/current responsibility")
+			}
+			for _, gap := range r.local.Gaps {
+				if gap == "original_outcome_run_absent" {
+					t.Fatal("a DTO created a global absence gap")
+				}
 			}
 		})
 	}
