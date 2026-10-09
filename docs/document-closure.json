@@ -2,7 +2,7 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "c5b60d02f912485f791001e78abced00bc601cea",
+    "sha": "5196893331a34891183b81bd7b6196d2696fca2d",
     "verified_on": "2026-10-09"
   },
   "status_policy": {
@@ -11270,7 +11270,7 @@
       "owner": "tooling",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "c5b60d02f912485f791001e78abced00bc601cea",
+        "source_sha": "5196893331a34891183b81bd7b6196d2696fca2d",
         "verified_on": "2026-10-09"
       },
       "fact_sources": [
@@ -11441,6 +11441,14 @@
         {
           "kind": "source",
           "path": "internal/apiserver/infra/mysql/evaluation/historical_batch_bindings.go"
+        },
+        {
+          "kind": "source",
+          "path": "scripts/database/qs-ai-retirement-readonly-host.py"
+        },
+        {
+          "kind": "source",
+          "path": "scripts/database/test_qs_ai_retirement_readonly_host.py"
         }
       ],
       "verification": [
@@ -11825,6 +11833,80 @@
           "result": "matched",
           "verified_on": "2026-10-09",
           "source_sha": "c5b60d02f912485f791001e78abced00bc601cea"
+        },
+        {
+          "kind": "source_selector",
+          "path": "scripts/database/compatibility-retirement.py",
+          "selector": "def report_diagnostic(args):",
+          "result": "matched",
+          "source_sha": "5196893331a34891183b81bd7b6196d2696fca2d",
+          "verified_on": "2026-10-09"
+        },
+        {
+          "kind": "source_selector",
+          "path": "cmd/qs-compatibility-history/write_pipeline.go",
+          "selector": "func executeHistoricalEvidenceWrite(",
+          "result": "matched",
+          "source_sha": "5196893331a34891183b81bd7b6196d2696fca2d",
+          "verified_on": "2026-10-09"
+        },
+        {
+          "kind": "source_selector",
+          "path": "internal/apiserver/maintenance/compatibilityretirement/historical_cas_spool.go",
+          "selector": "func (s *HistoricalCASSpool) FinishReadback(",
+          "result": "matched",
+          "source_sha": "5196893331a34891183b81bd7b6196d2696fca2d",
+          "verified_on": "2026-10-09"
+        },
+        {
+          "kind": "source_selector",
+          "path": "internal/apiserver/maintenance/compatibilityretirement/ai_external_exec_modes.go",
+          "selector": "func ObserveAIExternalExecLifecycle(",
+          "result": "matched",
+          "source_sha": "5196893331a34891183b81bd7b6196d2696fca2d",
+          "verified_on": "2026-10-09"
+        },
+        {
+          "kind": "command",
+          "command": "python3 -B scripts/database/test-compatibility-retirement.py",
+          "result": "passed",
+          "source_sha": "5196893331a34891183b81bd7b6196d2696fca2d",
+          "verified_on": "2026-10-09"
+        },
+        {
+          "kind": "command",
+          "command": "python3 -B scripts/database/test-compatibility-history-prepare.py",
+          "result": "passed",
+          "source_sha": "5196893331a34891183b81bd7b6196d2696fca2d",
+          "verified_on": "2026-10-09"
+        },
+        {
+          "kind": "command",
+          "command": "python3 -B scripts/database/test-compatibility-history-parent.py",
+          "result": "passed",
+          "source_sha": "5196893331a34891183b81bd7b6196d2696fca2d",
+          "verified_on": "2026-10-09"
+        },
+        {
+          "kind": "command",
+          "command": "python3 -B scripts/database/test-compatibility-history-parent-action.py",
+          "result": "passed",
+          "source_sha": "5196893331a34891183b81bd7b6196d2696fca2d",
+          "verified_on": "2026-10-09"
+        },
+        {
+          "kind": "command",
+          "command": "python3 -B scripts/database/test-compatibility-namespace-anchor.py",
+          "result": "passed",
+          "source_sha": "5196893331a34891183b81bd7b6196d2696fca2d",
+          "verified_on": "2026-10-09"
+        },
+        {
+          "kind": "command",
+          "command": "python3 -B scripts/database/test_qs_ai_retirement_readonly_host.py",
+          "result": "passed",
+          "source_sha": "5196893331a34891183b81bd7b6196d2696fca2d",
+          "verified_on": "2026-10-09"
         }
       ],
       "production_evidence": {
@@ -11841,7 +11923,7 @@
           "id": "COMPAT-RETIREMENT-PRODUCTION",
           "kind": "verification",
           "severity": "high",
-          "summary": "The committed-source review at c5b60d02f912485f791001e78abced00bc601cea has an actual consumed-joint/origin-fresh/AI-fresh historical CAS attachment factory, bounded same-epoch authenticated page replay, an original AI publisher-transfer recording caller, approved body-free namespace anchor references, namespace-profile backup/isolated-restore binding, and public exact lifecycle/reconciliation/resume library callers. The old two-argument CAS gates remain unqualified and production Action mutation modes remain disabled. The original pre-lint native snapshot (source manifest 9e08c1ff3f6728b69da184341a16ccb02995408d922a69f350ff4818a6e2a212) passed 38 test actions, 12 parents and one package, with zero failures/skips, in 151.017 seconds; separate read-only cleanup confirmed zero owned namespaces and protected fixture projections unchanged. Its result is not reassigned to the three later equivalent predicate/test-syntax lint fixes. Prior combined ordinary checks report 997 passing test actions and two existing database-conditional skips; 71 retirement Python cases and Action syntax checks pass. The committed library source is reviewed; final-source CI remains pending. Pure historical gaps are accepted only after actual terminal ownership and settled or explicitly transferred legacy responsibility; unknown external coverage remains blocked, including independent Admission/SQL absence without external closure. Production whole-source history/CAS host wiring, full writer fencing, external qs-ai 53-ledger closure, production backup/isolated restore and measured 600-second recovery, B39 deployment, DROP, acceptance and batch-only purge remain outstanding. Historical verification entries are retained without promotion.",
+          "summary": "The source review at 5196893331a34891183b81bd7b6196d2696fca2d adds a bounded private multi-page historical CAS spool and unconnected write-host implementation with inherited deadlines, separate commit results and independent persisted readback; actual Docker-exec lifecycle observation/reconciliation and body-free external bounds discovery; and report-diagnostic for a hash-bound existing boundary report without a DB scan. The write host is not connected to main/CLI/Action, the diagnostic capability fields are all false, and production mutation modes remain disabled. Local affected AI checks passed 46 test actions in 23 parent tests with both lint profiles (receipt 4dcc5a59e0666f9b6d6bba6c88a1d5d08599977c641eb2bc5249dcc563b94b30). An earlier spool-native snapshot passed 4 actions in 2 parents (receipt ef8925afc3decc17f8b31843bdc40c0fadd3260b86873475e126ece4f7c736e4), followed by independent zero-owned-namespace/protected-fixture readback (31e7da6bcda2b1a1598197032060dddb39a94eba8d460218c2a5a6db9bd3cc53). The later AI modes and report-diagnostic changes were not in that native wave; its spool/dependency bytes are unchanged, not a whole-source 5196893 native proof. Six actual Python suites and configured Action syntax checks pass (812a44488befbc51ebc6f5ed85889e0388ca004235415fcd8ae2132c95a41779). Final committed-source CI and every production lifecycle prerequisite remain required. The following prior review and tests retain their original source and scope. The committed-source review at c5b60d02f912485f791001e78abced00bc601cea has an actual consumed-joint/origin-fresh/AI-fresh historical CAS attachment factory, bounded same-epoch authenticated page replay, an original AI publisher-transfer recording caller, approved body-free namespace anchor references, namespace-profile backup/isolated-restore binding, and public exact lifecycle/reconciliation/resume library callers. The old two-argument CAS gates remain unqualified and production Action mutation modes remain disabled. The original pre-lint native snapshot (source manifest 9e08c1ff3f6728b69da184341a16ccb02995408d922a69f350ff4818a6e2a212) passed 38 test actions, 12 parents and one package, with zero failures/skips, in 151.017 seconds; separate read-only cleanup confirmed zero owned namespaces and protected fixture projections unchanged. Its result is not reassigned to the three later equivalent predicate/test-syntax lint fixes. Prior combined ordinary checks report 997 passing test actions and two existing database-conditional skips; 71 retirement Python cases and Action syntax checks pass. The committed library source is reviewed; final-source CI remains pending. Pure historical gaps are accepted only after actual terminal ownership and settled or explicitly transferred legacy responsibility; unknown external coverage remains blocked, including independent Admission/SQL absence without external closure. Production whole-source history/CAS host wiring, full writer fencing, external qs-ai 53-ledger closure, production backup/isolated restore and measured 600-second recovery, B39 deployment, DROP, acceptance and batch-only purge remain outstanding. Historical verification entries are retained without promotion.",
           "exit_criteria": "Bind all four actual production fixed-bound source streams and complete EOF to the final approved source/material chain; invoke the genuine qualified factory and transferred-evidence caller through the controlled host, commit and independently read back every retained conclusion without accepting unknown current responsibilities. Prove all actual writers are isolated and exact restoration completes within 600 seconds, then execute controlled lifecycle/journal reconciliation as needed, B39 deployment, final acceptance and batch-only purge. Optional synthetic stress is not a production permission."
         }
       ]

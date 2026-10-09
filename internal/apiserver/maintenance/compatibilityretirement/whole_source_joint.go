@@ -184,7 +184,14 @@ func prepareWholeSourceJointPage(ctx context.Context, c *HistoricalCoordinator, 
 		return nil, err
 	}
 	for _, source := range sources {
-		facts, key, err := mongo.source(source)
+		_, key, err := mongo.source(source)
+		if err != nil {
+			return nil, err
+		}
+		// The owner batch keeps a compact baseline without BusinessIDs and
+		// resolver gaps. Candidates require the authenticated source's full
+		// defensive facts, as the other coordinator qualification paths do.
+		facts, err := source.Facts()
 		if err != nil {
 			return nil, err
 		}

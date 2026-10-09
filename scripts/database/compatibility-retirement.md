@@ -13,6 +13,12 @@ the private and stdout readiness bytes agree, and the diagnostic receipt is
 successfully armored. Its `complete`, `execution_allowed` and `drop_ready`
 remain false. A successful diagnostic Action does not authorize retirement.
 `apply`, `verify`, `recover` and `purge` remain unavailable and exit 42.
+The `report-diagnostic` prepare mode reads an independently bound existing
+boundary report and its original request, then emits only fixed technical error
+categories and the original report/request hashes. It uses the existing pinned SSH path without Go,
+Docker or database credentials. Exit 0 means the report was observed; the
+original boundary completion result is reported separately; every capability in
+the diagnostic receipt remains false.
 Neither a JSON boolean nor
 a workflow input can enable a missing backend. Do not dispatch this foundation
 as proof that a production preparation/deletion/recovery/purge was performed.
@@ -77,14 +83,33 @@ certify that the host committed successfully. A qualified library factory and
 exact lifecycle/reconciliation kernels are now available to a fixed host;
 the production Action has no caller for them and its mutation modes remain
 unavailable.
+The historical write host now provides a private multi-page spool, inherited
+transaction deadlines, separate real commit results, and a fresh read-only epoch
+that checks persisted evidence and raw business bindings. The host owns both
+transactions and handles uncertain commits without resending. The local actual
+MySQL/MongoDB test covers two-page commit/readback, rollback and ordinary-field
+drift rejection; it does not prove production capacity or authorize a write.
+This write-host implementation is not connected to main, CLI or the Action.
+The external AI producer also tracks each actual Docker exec in the existing
+private operation directory. Reopening can inspect the original exec but cannot
+restart it or recreate lost qualification output from a successful exit alone.
+Production callers and writer isolation remain required.
 
-The five offline retirement contract suites run in final-source CI. Each
+The retirement lifecycle and AI read-only producer contract suites run in final-source CI. Each
 production preparation reuses the latest successful main-push `ci.yml` run for
 its exact approved SHA instead of repeating those suites. Failed, unfinished,
 missing and other-source CI are rejected. Native SQL historical-gap and SQL/Mongo
 persistence tests are wired into CI's disposable databases; local integration-tag
-compilation is not an executed native database result. The changed Go packages,
-Python contracts, both lint profiles and Action syntax passed local verification.
+compilation is not an executed native database result. For the host batch source-reviewed at Git
+`5196893331a34891183b81bd7b6196d2696fca2d`, the affected AI race selection
+passes 46 test actions in 23 parent tests with both lint profiles. The earlier
+spool-native snapshot passes four actions in two parents, followed by an
+independent zero-owned-namespace and unchanged-protected-fixture readback.
+Subsequent AI modes and report-diagnostic changes are outside that native wave;
+the spool and its tested dependency bytes are unchanged. Six Python suites and
+configured Action syntax checks pass. These limited checks do not promote older
+full-package results or prove whole-source native coverage at this commit.
+Final committed-source CI and production verification remain required.
 
 ## Implemented and tested
 
