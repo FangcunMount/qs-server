@@ -218,6 +218,97 @@ acceptance and batch-only destruction/zero-leftover verification are also
 unfinished. Existing writer/library/native/CI proofs retain their original
 source and scope.
 
+## Read-only preparation facts (2026-10-10)
+
+The existing Action/Python/native caller now implements
+`operation=prepare, prepare_mode=prepare-facts`. It observes facts needed for a
+separate lifecycle request. It has no `Capture`, restore, historical CAS, DROP,
+deployment or purge authority. A successful observation is separate from
+production retirement readiness, the full writer fence and restore acceptance.
+
+The Action retains exactly these ten dispatch inputs:
+
+| Input | Value for `prepare-facts` |
+| --- | --- |
+| `operation` | `prepare` |
+| `database` | `mysql-and-mongodb` |
+| `approved_source_sha` | Independently approved current main tooling SHA |
+| `operation_id` | Existing approved inventory operation |
+| `manifest_sha256` | Empty |
+| `inventory_request_sha256` | Empty |
+| `prepare_mode` | `prepare-facts` |
+| `identity_request_sha256` | Empty |
+| `bootstrap_approval_json` | Canonical observation descriptor, without the final LF |
+| `bootstrap_approval_sha256` | SHA256 of the descriptor bytes plus one LF |
+
+The descriptor uses sorted compact ASCII JSON, format 1 and kind
+`readonly_prepare_facts_observation_descriptor`. It binds current `source_sha`,
+`operation_id`, the exact target hash/scope, `inventory_report`,
+`restore_engines` and the prospective `archive_directory` inside that operation
+and outside the original inventory directory. `inventory_report` separately
+retains the original producer's operation, run, source SHA, complete raw report
+SHA256 and original request SHA256. `restore_engines` approves two distinct
+existing `sha256:` image IDs and `amd64` or `arm64` architecture. These approvals
+identify what may be observed; they do not approve the returned schema or capacity.
+The actual observer run comes from GitHub run ID/attempt, not another input.
+
+Under the existing operation lock, Python exclusively publishes
+`prepare-facts-request-<actual-run>.json` in that operation. Its exact path and
+hash are shared by root staging intent, native invocation and Go validation.
+A retry with a new actual run keeps the same operation and original producer,
+leaves the earlier request bytes intact and uses a new request/root staging
+batch. Repeating the same actual run rejects before another native invocation.
+The observer never relabels the original inventory as the current tool/run.
+
+The original inventory must be complete, bind clean MySQL 99/MongoDB 38 heads
+and show two complete passes of all four present targets. Through owned original
+database handles, the observer rechecks identity/anchors and clean heads before
+and after observation. It calls the real `ReadOrderedMongoSchema` driver twice
+and requires matching digests of ordered raw collection BSON, UUID and index
+key/options BSON. The metadata ExtJSON catalog digest remains a separate value.
+It hashes these seven original files in place, preserving their owner and bytes:
+
+- `inventory.private.json`
+- `mysql-metadata.private.json`
+- `mongodb-metadata.private.json`
+- `mysql-domain_event_outbox.source.ndjson`
+- `mysql-ai_bridge_commands.source.ndjson`
+- `mysql-ai_messaging_legacy_commands.source.ndjson`
+- `mongodb-domain_event_outbox.source.bsonframes`
+
+Private single-link regular files, original ownership, mode and unchanged file
+identity/size are checked around reads. The report digest must match the approved
+producer report; the two metadata schema digests must match its catalog bindings.
+Source stream bodies are never copied into an observation receipt or root stage.
+
+The existing pinned SSH/root-once path stages only the authenticated native
+executable and tool intent. Native execution requires real root identity,
+protected paths and the fixed local `unix:///run/docker.sock`. Actual inspection
+checks both approved image IDs and architecture; it does not pull images or
+create containers, networks or volumes. Four `statfs` observations record path
+SHA256, total, available and free bytes for the original source, root staging,
+nearest existing prospective archive parent and that daemon's actual
+`DockerRootDir`. Those measurements do not establish sufficient capacity or the
+production 600-second restore budget.
+
+Only successful observation and owned-handle closure within the 90-minute
+native budget set `prepare_facts_observation_complete=true`. The body-free private
+receipt is written beneath
+`/opt/backups/qs-server/compatibility-retirement-root-prepare/<operation>-<actual-run>/prepare-facts.private.json`;
+its full raw SHA256 is returned. Public armored output retains allowlisted
+technical facts; filenames use underscore tokens and image IDs expose their
+SHA256 components. `complete`, `execution_allowed`, `drop_ready` and every
+capability remain false. Observer request/staging/receipt materials remain
+registered for later accepted batch cleanup.
+
+Returned facts require independent review before constructing and approving the
+separate lifecycle request and manifest. This observer does not solve the
+future actual-run lifecycle request/approval and root-binding preparation gap.
+The source-only entrypoint catalog retains `live_fence_proven=false` and
+`historical_rerun_proven_denied=false`; production observation, full fencing,
+backup/restore rehearsal, deletion, B deployment, acceptance and purge still
+require their own evidence.
+
 ## Current writer and diagnostic source (2026-10-09)
 
 Source `23bacb7d4a05bd711e353655eca85219514edb49` connects
@@ -858,7 +949,10 @@ returning success for an unsupported stage is not a valid implementation.
 empty `manifest_sha256`. Lifecycle preparation instead requires the immutable
 manifest hash and the lifecycle request hash in `inventory_request_sha256`,
 as described above; it is separate from these read-only request classes.
-Other stages remain unavailable in A regardless of supplied hashes.
+`prepare-facts` instead requires only the canonical observation descriptor and
+its LF-terminated SHA256 in the existing bootstrap fields; the manifest, identity
+and inventory-request fields must be empty. Its complete contract is described
+above. Other stages remain unavailable in A regardless of supplied hashes.
 Unknown/mixed classes, another operation, incorrect original/tool source
 bindings or another target set are rejected before connections are opened.
 
