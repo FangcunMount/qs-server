@@ -416,6 +416,14 @@ func bCrossProcessNative(t *testing.T, sqlOnly bool) {
 	if _, e = mdb.Collection("domain_event_outbox").InsertOne(context.Background(), bson.D{{Key: "_id", Value: primitive.NewObjectID()}, {Key: "event_id", Value: id}, {Key: "status", Value: "published"}, {Key: "raw", Value: primitive.Binary{Subtype: 0, Data: []byte{0, 255}}}}); e != nil {
 		t.Fatal("native BSON fact creation failed")
 	}
+	// The namespace anchor observes real UUIDs of the fixed retained objects.
+	// Create these facts only in this parent's owned database; the production
+	// anchor's requirement and absence semantics remain unchanged.
+	for _, kept := range []string{"answersheets", "interpret_report_artifacts", "interpretation_runs", "report_generations"} {
+		if _, e = mdb.Collection(kept).InsertOne(context.Background(), bson.D{{Key: "_id", Value: "kept-fixture"}, {Key: "protected", Value: true}}); e != nil {
+			t.Fatal("native retained namespace setup failed")
+		}
+	}
 	port, e := strconv.Atoi(env["MONGODB_PORT"])
 	if e != nil {
 		t.Fatal("actual protected Mongo endpoint invalid")
