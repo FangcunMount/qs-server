@@ -883,3 +883,64 @@ stage/source/request checks. Required fields and unknown keys still fail before
 production credentials. The contract test executes the actual github-script
 validator for omitted empty defaults, complete inputs, unknown/mixed requests,
 missing requirements, wrong ref/runtime SHA and an advanced main.
+
+
+## B integration and local cross-process recovery (2026-10-09)
+
+The B product scope is implemented at saved branch source
+`3bcf8125f4fc3002fff73d2c42db4e7fcee55fff` and integrated onto A
+`f5aafcc97626bd8894256edacc68ce4ce1e69c42` at
+`5db561a71fa1b19edc5ad9099978000a9338c02b`. The integration preserves the exact
+36 A-changed paths, 33 B-changed paths and 276 historical migration files. It adds
+only SQL100/Mongo39 tail resources; their original B bytes are retained. The
+main branch and production schema are not changed by this local integration.
+
+Before either normal migration, B jointly observes the two selected database
+identities, clean heads, visibility and all four retired namespaces. Installed
+stores must already have all four targets absent. Partial/all unknown state,
+wrong identity, permission/network failure and reappearing old targets reject
+startup. The local Mongo driver handles only the exact bound B tail drop; it
+does not convert general errors into absence or rebuild old collections.
+Cold bootstrap is separately restricted to externally approved pristine stores,
+actual compiled SHA, identity pair, resource bytes and approval expiry.
+
+`Capture` computes `sql_recovery_non_target_schema_hash` from the actual approved
+SQL metadata and selected database, sealing the recovery projection inside the
+opaque immutable archive. Target-owned foreign keys make the inventory's
+non-target hash a different projection; that inventory contract is unchanged.
+B requires the captured same-projection hash and the current actual catalog.
+Missing older archive fields, malformed/tampered captured hashes or substituted
+caller hashes fail B recovery. Production preparation therefore needs a newly
+captured and actually restored batch archive before DROP.
+
+The saved `3bcf8125` binary executed two actual Linux root parents:
+`TestTargetBCompleteCrossProcessNative` and
+`TestTargetBSQLOnlyCrossProcessNative`. Both passed with no failures or skips;
+they actually dropped the targets, ran B migration and waited for a separate
+recovery process. Root wave receipt SHA256 is
+`391e3e7f4900c9f8ed35872a5a78416ac35fe259945f8f1e7c9aefd35f1d053f`;
+independent after receipt SHA256 is
+`d9519d745af94f736f3a9bd6452c8e180baad0abb363fcc4c5180f7c4b059bf7`.
+The after observation compares catalog and bounded non-system content, confirms
+protected baselines unchanged and zero owned SQL/Mongo namespaces and owner lab.
+Mongo used the actual no-auth state of the two fixed owned fixtures; this is not
+SCRAM coverage. The old failed V6 wave remains failed and is not overwritten.
+
+The integrated `5db561a7` source has 147 backup, 71 default-tag migration and
+46 options passing ordinary test actions; six explicit native opt-in cases are
+skipped, and affected-package lint passes. Initial misuse of the integration tag
+also loaded mandatory Mongo migration cases without an isolated URI; the original
+failure log is retained and only the default-tag ordinary migration scope was
+rerun. Local delivery receipt SHA256 is
+`344eabe52f50c8e92b8480c4dbdd1482e0aa2785afb3206a87cfc66dc354fb2a`.
+Its Linux/amd64 binary is only compiled, SHA256
+`bbf103d928c0c2675cdf240a7354059d2741431604cc0cd5478a79875a32d639`,
+with source manifest SHA256
+`55743efb99f9472d491522a3bb95d7d77d0b71d35c93bed6a4cd057a8b371cb1`.
+The two-parent PASS is not reassigned from `3bcf8125` to this integration or later
+heads; final-head native execution and CI remain separate.
+
+These are bounded synthetic owned-fixture results. They do not establish
+production full-source closure, writer fencing, historical CAS, production-scale
+600-second restoration, B deployment, controlled DROP, acceptance or batch-only
+purge. Production mutation modes retain their gates.

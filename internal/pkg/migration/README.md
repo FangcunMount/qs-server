@@ -17,9 +17,21 @@ qs-server 在 apiserver 启动阶段按配置执行 MySQL 与 MongoDB 向上迁�
 - MySQL：`NewMigrator(db, config)`；
 - MongoDB：`NewMongoMigrator(client, config)`；
 - dirty 状态会阻断继续迁移；
-- 当前目录末端版本为 MySQL `99`、MongoDB `38`；MySQL `86` 为传输死信增加物理投递身份，`87` 新建任务开放提醒逐收件账本，`88` 原子冻结一次开放事件的完整收件身份集合，`89` 在原业务事务内索引 Assessment 与其原始评估请求事件 ID（不回填或重放旧消息），`90` 增加单条缺口恢复的宿主审批结果账本（不自动重投）。`91`～`95` 为 AI MQ 增加持久消息、失败状态、旧命令归属、统一准入门禁和技术观测；原消息及未确认责任须保留。仓库目录版本未代表生产已执行或启用；生产实际版本以数据库只读查询和[当前版本定档验收台账](../../../docs/00-总览/09-当前版本定档验收台账.md)为准。`87`／`88` 一旦写入真实提醒责任，应用回退时须保留两张表；`89`／`90` 的事件身份与人工恢复证据亦须保留，不执行删除账本或关联的 down 迁移。
+- 当前目录末端版本为 MySQL `100`、MongoDB `39`；MySQL `86` 为传输死信增加物理投递身份，`87` 新建任务开放提醒逐收件账本，`88` 原子冻结一次开放事件的完整收件身份集合，`89` 在原业务事务内索引 Assessment 与其原始评估请求事件 ID（不回填或重放旧消息），`90` 增加单条缺口恢复的宿主审批结果账本（不自动重投）。`91`～`95` 为 AI MQ 增加持久消息、失败状态、旧命令归属、统一准入门禁和技术观测；原消息及未确认责任须保留。仓库目录版本未代表生产已执行或启用；生产实际版本以数据库只读查询和[当前版本定档验收台账](../../../docs/00-总览/09-当前版本定档验收台账.md)为准。`87`／`88` 一旦写入真实提醒责任，应用回退时须保留两张表；`89`／`90` 的事件身份与人工恢复证据亦须保留，不执行删除账本或关联的 down 迁移。
 
 MySQL `99`、MongoDB `38` 增加既有业务记录的有界历史证据槽与相关索引，保留原始事件身份、摘要和核验结论，不保存旧消息正文，也不删除本轮四个旧存储对象。历史回填与删除仍须通过独立的全量核验、生产隔离和恢复门禁；目录升级成功不能代替这些结论。
+
+## 兼容链退役末尾版本
+
+MySQL `100` 与 MongoDB `39` 是发布 B 的退役收尾。对已安装库，迁移前必须证明 MySQL `domain_event_outbox`、`ai_bridge_commands`、`ai_messaging_legacy_commands` 和 MongoDB `domain_event_outbox` 均已缺失；正常启动不会代替受控流程删除现存旧对象。部分 DROP、身份错误、dirty、权限或网络错误、旧对象重新出现均阻断。既有 MySQL `99` 与 MongoDB `38` 以及更早迁移不改写。
+
+末尾 driver 只识别精确嵌入的 MySQL `100`／MongoDB `39` 正文及受支持的双库版本顺序。MongoDB 仅在已绑定末尾删除命令且目标确实缺失时正常完成；权限、网络和其他错误继续失败，不把错误当作不存在。只有经外部确认的新空双库才能在历史完整升级后删除新生成的空旧集合。
+
+新空库另需 `migration.retirement-bootstrap-authorization-file` 与 `migration.retirement-bootstrap-authorization-sha256` 成对配置：文件为私有绝对路径，摘要为已批准原始字节 SHA256，批准绑定实际编译 SHA、双库身份、末尾资源与有效期。目录为空不构成批准。正常恢复不使用该冷启动批准，也不能靠关闭迁移、down、force 或清除 dirty 绕过配对检查。
+
+四目标备份恢复保留新增业务证据、退休 command ID 与当前 MQ 事实。备份 `Capture` 从已核验的实际 SQL 元数据和 `DATABASE()` 生成并封存 `sql_recovery_non_target_schema_hash`，恢复与该同口径摘要及当前 catalog 比较；库存目录的 `NonTargetHash` 仍保留自身含义，不能替代恢复摘要。旧档案缺少该字段、字段被篡改或 caller 自填摘要，均不能进行 B 恢复；须在删除前重新生成并实际恢复核验本批备份。
+
+本节是源码契约。生产四对象删除、B 部署及恢复预算仍须独立证明，参见[退役工具说明](../../../scripts/database/compatibility-retirement.md)。
 
 ## 目录与职责
 
@@ -49,8 +61,8 @@ MySQL `85` 只为现有 `system_governance_action_runs` 增加按组织、动作
 apiserver 的数据库 bootstrap 执行顺序为：
 
 1. 建立数据库连接；
-2. `migration.enabled=true` 时执行 MySQL migration；
-3. 配置了 MongoDB 时执行 MongoDB migration；
+2. `migration.enabled=true` 时，先联合核对配置选定的 MySQL 与 MongoDB 身份、clean head、可见性和四个退役对象的实际状态；两个连接和选定库都必须存在，覆盖库名须与两个业务库一致；
+3. 联合检查成功后先执行 MySQL migration，再执行 MongoDB migration；
 4. MongoDB migration 完成后协调并验证 ModelCatalog 与报告目录索引；
 5. 任一步失败都会中止启动，不应带着部分完成状态继续提供服务。
 
