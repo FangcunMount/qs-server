@@ -1,9 +1,11 @@
 # Exact compatibility retirement: qualified evidence write and lifecycle barrier
 
 The accepted four-object operation has a qualified historical-evidence write
-caller and a `prepare_mode=lifecycle` caller for exact temporary backup and
-isolated content restoration. Production deletion and recovery remain unavailable
-in A. The separate read-only `prepare` modes have real identity discovery,
+caller and preparation callers for exact temporary backup and isolated content
+restoration. `prepare_mode=window-tool` binds the assigned Action run from an
+independently approved immutable empty-run template; `prepare_mode=lifecycle`
+retains its existing request contract. Production deletion and recovery remain
+unavailable in A. The separate read-only `prepare` modes have real identity discovery,
 separately approved private
 request bootstrap, fixed-upper-bound discovery, paged source inventory and a
 separately approved read-only history host. Identity, boundaries, inventory and
@@ -121,8 +123,9 @@ The lifecycle source connects the existing Action, Python caller and native
 retirement executable to `Capture`, `VerifyHostOriginalSources`, `RestoreSQL`
 and `RestoreMongoWithOriginal`. It preserves the current historical-evidence
 writer, existing-report observation and index diagnostics described below.
-The new CLI/root/stdio connection has not yet completed a native rehearsal;
-source review and offline checks do not certify that connection in production.
+The new `window-tool` CLI/root/control-pipe path requires its own native
+rehearsal. Earlier `lifecycle` caller results do not cover that path; source
+review and offline checks do not certify either caller in production.
 
 Final-source CI adds a mandatory public-caller rehearsal to the existing
 Seeddata job. It builds the CLI at the actual checkout SHA, binds the real
@@ -152,6 +155,68 @@ current source. The seven exact full source-file SHA256s in `source_file_sha256`
 cover the inventory report, two metadata files, three SQL raw source streams
 and the Mongo raw BSON stream. The first three must also equal their separately
 approved inventory and metadata hashes.
+
+For `operation=prepare, prepare_mode=window-tool`, the Action uses the same ten
+inputs, with these distinct bindings:
+
+| Input | Value for `window-tool` |
+| --- | --- |
+| `operation` | `prepare` |
+| `database` | `mysql-and-mongodb` |
+| `approved_source_sha` | Independently approved current main dispatcher/tool SHA |
+| `operation_id` | Existing approved original inventory operation |
+| `manifest_sha256` | SHA256 of the approved immutable manifest |
+| `inventory_request_sha256` | SHA256 of the immutable empty-run request template |
+| `prepare_mode` | `window-tool` |
+| `identity_request_sha256` | Empty |
+| `bootstrap_approval_json` | Canonical independent tool approval, without final LF |
+| `bootstrap_approval_sha256` | SHA256 of the approval bytes plus one LF |
+
+The format-1 `independent_compatibility_window_tool_approval` uses sorted compact
+ASCII JSON. Its `dispatcher_source_sha` and `tool_source_sha` must both equal
+that approved current main SHA; `stage` must be `prepare`. It separately binds
+`original_source_sha`, `original_run_id`, the operation, exact four-target hash,
+manifest and template hashes, and both approved `amd64`/`arm64` native binary
+hashes. A requires `b_image_id` and `b_program_sha256` to be empty and rejects
+unknown or mixed fields. Original producer bindings are not replaced by the
+current tool SHA or actual caller run.
+
+Before dispatch, the approved `lifecycle-request-template.json` and
+`manifest.json` must exist in the original operation under
+`/opt/backups/qs-server/compatibility-retirement/<operation>/`. The template's
+`actual_run_id` and `recovery.actual_run_id` must both be empty; its recovery archive hash
+must also be empty. After GitHub assigns `<run-id>-<attempt>`, the helper fills
+only those two run fields, preserving the other original bindings by value,
+and records the canonical derived request's separate SHA256. The Action does
+not accept a future run ID as an input, and original inventory run reuse is
+rejected.
+
+The pinned SSH root-once bootstrap authenticates the package/helper/native
+bytes. It exclusively creates root-owned mode-0700 invocation and preparation
+batches at
+`/opt/backups/qs-server/compatibility-retirement-invocations/<operation>-<actual-run>/`
+and
+`/opt/backups/qs-server/compatibility-retirement-root-prepare/<operation>-<actual-run>/`.
+Mode-0600 request, manifest and intent writes use `O_EXCL`; an existing actual
+run is not adopted or overwritten. A new actual run uses separate batches while
+retaining the original operation and producer. Before native invocation, intents
+bind both request hashes, manifest, package/helper/native hashes, source UID
+and original/current source and run identities; the actual native
+`--source-sha` must match the approved tool SHA. Go accepts root-owned metadata
+only at the exact operation/current-run invocation path. All seven original
+assets still require the actual source UID obtained from the root/sudo channel,
+private single-link regular files, approved hashes and unchanged file identity;
+a root-owned request does not relax their ownership or source-copy checks.
+
+Failures and unknown results retain the exact requests, intents and temporary
+materials. The helper owns local children through a live management pipe;
+physical process closure cannot resolve unknown Docker/SSH/database effects.
+Fresh Linux/root, sudo, subreaper/pidfd, pipe-loss and descendant termination
+rehearsal for this entry remains unproved. Local unprivileged process tests,
+compiled Linux binaries and earlier caller CI are separate evidence. Preparation
+does not grant historical qualification Q, a full writer/old-ref fence, a live
+maintenance Window, DROP, B deployment, acceptance or purge authority; A's
+effectful CLI adapters remain closed.
 
 On the existing pinned SSH connection, preparation uses a fixed noninteractive
 root-once bootstrap. It authenticates the approved package bytes and compiled
@@ -210,17 +275,17 @@ No timeout limit, identity check, permission requirement or DROP gate is relaxed
 A's `apply/verify/recover/purge` adapters remain closed. The separately reviewed
 B candidate remains a later release; this preparation caller does not merge or
 deploy it. Actual sudo/socket/image/architecture/capacity facts, complete
-production inventory, independently approved ordered Mongo schema, native
-CLI/root/wire rehearsal and a production-bound measured 600-second restoration
-remain unproved. Complete production historical qualification and persisted
-readback, whole-writer/old-ref fencing, final difference/EOF, DROP, B deployment,
+production inventory, independently approved ordered Mongo schema, the new
+`window-tool` CLI/root/wire rehearsal and a production-bound measured
+600-second restoration remain unproved. Complete production historical
+qualification and persisted readback, whole-writer/old-ref fencing, final difference/EOF, DROP, B deployment,
 acceptance and batch-only destruction/zero-leftover verification are also
 unfinished. Existing writer/library/native/CI proofs retain their original
 source and scope.
 
 ## Read-only preparation facts (2026-10-10)
 
-The independently reviewed observer is published in [draft PR #311](https://github.com/FangcunMount/qs-server/pull/311), following [preparation and native rehearsal PR #310](https://github.com/FangcunMount/qs-server/pull/310). Publication and CI do not establish a production observation; an independently approved production run and its original receipts remain required.
+The independently reviewed observer is published in [merged PR #311](https://github.com/FangcunMount/qs-server/pull/311), following [preparation and native rehearsal PR #310](https://github.com/FangcunMount/qs-server/pull/310). Publication and CI do not establish a production observation; an independently approved production run and its original receipts remain required.
 
 The existing Action/Python/native caller now implements
 `operation=prepare, prepare_mode=prepare-facts`. It observes facts needed for a
@@ -304,8 +369,10 @@ capability remain false. Observer request/staging/receipt materials remain
 registered for later accepted batch cleanup.
 
 Returned facts require independent review before constructing and approving the
-separate lifecycle request and manifest. This observer does not solve the
-future actual-run lifecycle request/approval and root-binding preparation gap.
+separate lifecycle request and manifest. The observer neither derives that
+request nor grants its caller approval. The separately approved `window-tool`
+contract above supplies actual-run template derivation and exact root metadata
+binding in source; its new root/native execution proof remains outstanding.
 The source-only entrypoint catalog retains `live_fence_proven=false` and
 `historical_rerun_proven_denied=false`; production observation, full fencing,
 backup/restore rehearsal, deletion, B deployment, acceptance and purge still
@@ -944,17 +1011,62 @@ and independent integration tests. Removing the false capability bits, adding
 an `--allow` switch, accepting an externally supplied `complete: true`, or
 returning success for an unsupported stage is not a valid implementation.
 
+## Read-only host and database writer catalogs
+
+The existing ten-input Action also accepts `operation=prepare` with
+`prepare_mode=host-writer-scope` or `prepare_mode=db-writer-census`. Both use a
+canonical independently approved descriptor and its LF-terminated SHA256 in the
+bootstrap fields; manifest, identity-request and inventory-request inputs stay
+empty. The actual current run is assigned by GitHub. Under the original operation
+lock, each run exclusively registers its own request and private root metadata;
+repeating that run rejects rather than replacing an earlier observation.
+
+`host-writer-scope` binds `host_role=server_a` and calls the shared Linux-root
+observer through the existing pinned root-once path, without database credentials.
+Within the inherited 120-second bound it records finite SSH configuration,
+NSS/key-source, process/session and activation-source EOF/recheck facts. Loaded
+sshd state, exhaustive Match/NSS/KeysCommand behavior, indirect launchers and
+external writers retain explicit unknowns. An early root/path/request refusal
+keeps the unread approval digest empty only in the exact finite error profile,
+with zero identity/counts, empty scopes and no capabilities. Any successful or
+partial observation still requires the exact approved digest.
+
+`db-writer-census` separately binds the original identity report's operation,
+run, source, raw report hash and original request hash. Through host-owned
+connections it rechecks actual identities, selected Mongo namespace and clean
+MySQL99/MongoDB38 heads before and after two bounded catalog passes. It reads
+accounts, grants and all permitted connections including SQL Sleep, plus Mongo
+users/roles and local idle/logical sessions. User expansion queries use only
+identities from actual complete enumeration; credential and custom-data fields
+are disabled. Accounts/grants/session facts remain in the private catalog;
+public output contains only allowlisted sections, hashes, permissions and gaps.
+Startup/external authentication, other Mongo nodes and future direct-writer
+admission remain unproved. The shared observer never opens/closes borrowed pools,
+alters authentication or kills sessions.
+
+Neither observation stops a service, installs isolation or creates a FenceProof.
+`complete`, `execution_allowed`, `drop_ready`, writer-scope completion and every
+capability remain false; successful finite observation is separate from a full
+writers fence. Materials are retained for approved batch cleanup. Production
+fencing, recovery-budget proof, DROP, B rollout, acceptance and purge still require
+their own actual evidence.
+
 ## Real read-only preparation contract
 
 `prepare_mode=identity` requires only `identity_request_sha256`;
 `prepare_mode=inventory` requires only `inventory_request_sha256`. Both require an
 empty `manifest_sha256`. Lifecycle preparation instead requires the immutable
 manifest hash and the lifecycle request hash in `inventory_request_sha256`,
-as described above; it is separate from these read-only request classes.
+as described above. `window-tool` instead uses that field for the immutable
+empty-run template hash, plus the canonical independent tool approval and its
+LF-terminated hash in the bootstrap fields; its identity field remains empty.
+Both preparation contracts are separate from these read-only request classes.
 `prepare-facts` instead requires only the canonical observation descriptor and
 its LF-terminated SHA256 in the existing bootstrap fields; the manifest, identity
 and inventory-request fields must be empty. Its complete contract is described
-above. Other stages remain unavailable in A regardless of supplied hashes.
+above. The two writer-catalog modes use their separately approved descriptors
+as described above; neither accepts mixed lifecycle/identity/inventory inputs.
+Other stages remain unavailable in A regardless of supplied hashes.
 Unknown/mixed classes, another operation, incorrect original/tool source
 bindings or another target set are rejected before connections are opened.
 

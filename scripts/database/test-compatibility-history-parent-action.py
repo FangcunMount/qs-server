@@ -191,7 +191,7 @@ class ParentAction(unittest.TestCase):
 class ParentWorkflow(unittest.TestCase):
     def test_separate_parent_ssh_has_no_db_go_arch_or_binary_environment(self):
         workflow = (ROOT / ".github/workflows/compatibility-retirement.yml").read_text()
-        step = workflow.split("      - name: Register independently approved history parent without database credentials\n", 1)[1]
+        step = workflow.split("      - name: Register independently approved history parent without database credentials\n", 1)[1].split("      - name:", 1)[0]
         self.assertIn("if: inputs.prepare_mode == 'bootstrap-history-parent'", step)
         for forbidden in ("MYSQL_", "MONGODB_", "inventory_binary", "history_binary", "uname -m", "go build", "docker create", "docker rm"):
             self.assertNotIn(forbidden, step)

@@ -200,6 +200,7 @@
       "classification": "controlled_inventory_historical_evidence_and_temporary_restore_preparation",
       "source": [
         "scripts/database/compatibility-retirement.py",
+        "scripts/database/compatibility-window-tool.py",
         "cmd/qs-compatibility-retirement/main.go",
         "cmd/qs-compatibility-retirement/prepare_facts.go",
         "cmd/qs-compatibility-retirement/lifecycle.go",
@@ -208,7 +209,7 @@
         "cmd/qs-compatibility-retirement/lifecycle_restore_engine.go",
         "cmd/qs-compatibility-retirement/lifecycle_restore_wire.go"
       ],
-      "reason": "Only the exact approved main SHA, operation and independently bound request use the existing production credential paths. Inventory/report diagnostics read originals; prepare-facts hashes seven source files in place and observes ordered Mongo schema, fixed-socket image identities and filesystem capacities without granting capture, CAS, DROP or deployment authority; prewindow historical evidence uses separately qualified locked CAS; lifecycle preparation captures exact four-target temporary assets and performs actual isolated network-none restores through the fixed root-once caller. Preparation grants no DROP/fence/window authority. A apply/verify/recover/purge remain unavailable before input/database access. All phases share production-deploy.",
+      "reason": "Only the exact approved main SHA, operation and independently bound request use the existing production credential paths. Inventory/report diagnostics read originals; prepare-facts hashes seven source files in place and observes ordered Mongo schema, fixed-socket image identities and filesystem capacities without granting capture, CAS, DROP or deployment authority; prewindow historical evidence uses separately qualified locked CAS; window-tool prepare uses the approved current-main CLI, immutable original template/manifest and exclusive actual-run metadata without B or effectful authority; lifecycle preparation captures exact four-target temporary assets and performs actual isolated network-none restores through the fixed root-once caller. Preparation grants no DROP/fence/window authority. A apply/verify/recover/purge remain unavailable before input/database access. All phases share production-deploy.",
       "fence_action": "Allow only approved main SHA/op/request or frozen manifest; no unsupported phase may return success."
     },
     {

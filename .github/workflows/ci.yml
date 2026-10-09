@@ -13,6 +13,8 @@ permissions:
 env:
   GO_VERSION: '1.25.12'
   GOTOOLCHAIN: auto
+  # Only availability is shared; credentials stay in the service/login inputs.
+  CI_DOCKERHUB_LOGIN: ${{ secrets.DOCKERHUB_USERNAME != '' || secrets.DOCKERHUB_TOKEN != '' }}
 
 jobs:
   test:
@@ -69,6 +71,9 @@ jobs:
     services:
       mysql:
         image: mysql:8.0
+        credentials:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
         env:
           MYSQL_ROOT_PASSWORD: root
           MYSQL_DATABASE: action_audit_test
@@ -110,6 +115,9 @@ jobs:
     services:
       mysql:
         image: mysql:8.4
+        credentials:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
         env:
           MYSQL_ROOT_PASSWORD: root
           MYSQL_DATABASE: qs_authz_guard_test
@@ -140,6 +148,9 @@ jobs:
     services:
       mysql:
         image: mysql:8.0
+        credentials:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
         env:
           MYSQL_ROOT_PASSWORD: root
         ports:
@@ -232,6 +243,9 @@ jobs:
     services:
       mysql:
         image: mysql:8.4
+        credentials:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
         env:
           MYSQL_ROOT_PASSWORD: root
         ports:
@@ -245,6 +259,9 @@ jobs:
           --health-retries=20
       redis:
         image: redis:7-alpine
+        credentials:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
         ports:
           - 6379:6379
         options: >-
@@ -255,6 +272,14 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v6
+      - name: Log in for CI image pulls
+        if: env.CI_DOCKERHUB_LOGIN == 'true'
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4
+        with:
+          registry: docker.io
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+          logout: true
 
       - name: Setup Go
         uses: actions/setup-go@v6
@@ -262,6 +287,37 @@ jobs:
           go-version: ${{ env.GO_VERSION }}
           check-latest: true
           cache: true
+
+      - name: Verify public Linux root SSH key-file install and restore
+        timeout-minutes: 5
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
+          umask 077
+          keyfile_test="${RUNNER_TEMP}/qs-ssh-keyfile-public-root.test"
+          keyfile_log="${RUNNER_TEMP}/qs-ssh-keyfile-public-root.private.log"
+          CGO_ENABLED=0 go test -c -trimpath \
+            -ldflags "-X github.com/FangcunMount/qs-server/pkg/version.GitCommit=${GITHUB_SHA}" \
+            -o "$keyfile_test" ./internal/apiserver/maintenance/compatibilityretirementfence
+          keyfile_binary_sha="$(sha256sum "$keyfile_test" | cut -d ' ' -f 1)"
+          sudo -n env -i PATH=/usr/bin:/bin \
+            QS_SSH_KEY_FILE_NATIVE=1 \
+            QS_SSH_KEY_FILE_NATIVE_REQUIRED=1 \
+            QS_SSH_KEY_FILE_SOURCE_SHA="$GITHUB_SHA" \
+            QS_SSH_KEY_FILE_RUN_ID="$GITHUB_RUN_ID" \
+            QS_SSH_KEY_FILE_RUN_ATTEMPT="$GITHUB_RUN_ATTEMPT" \
+            QS_SSH_KEY_FILE_BINARY_SHA256="$keyfile_binary_sha" \
+            "$keyfile_test" -test.v -test.timeout=2m \
+            -test.run '^TestSSHKeyFileActualLinuxRootPublic$' | tee "$keyfile_log"
+          grep -Eq '^--- PASS: TestSSHKeyFileActualLinuxRootPublic \(' "$keyfile_log"
+          for keyfile_case in exact_restore close_preserves xattr acl owner nlink; do
+            grep -Eq "^[[:space:]]+--- PASS: TestSSHKeyFileActualLinuxRootPublic/${keyfile_case} \(" "$keyfile_log"
+          done
+          if grep -Eq -- '--- SKIP:|--- FAIL:|DATA RACE' "$keyfile_log"; then
+            exit 1
+          fi
+          grep -Fq 'native fixture exact owned-file/inode catalog removed;' "$keyfile_log"
 
       - name: Start Mongo Replica Set
         run: |
@@ -293,15 +349,18 @@ jobs:
             sleep 2
           done
 
-      - name: Verify public lifecycle root-once capture and isolated restore
+      - name: Verify window-tool root-once capture, restore and owned-process cancellation
         env:
           MYSQL_CONTAINER: ${{ job.services.mysql.id }}
         run: |
           set -euo pipefail
           lifecycle_cli="${RUNNER_TEMP}/qs-lifecycle-inventory-cli"
           lifecycle_test="${RUNNER_TEMP}/qs-lifecycle-public-cli.test"
+          lifecycle_other_cli="${RUNNER_TEMP}/qs-lifecycle-inventory-cli-arm64"
           CGO_ENABLED=0 go build -trimpath -ldflags "-X main.sourceSHA=${GITHUB_SHA}" \
             -o "$lifecycle_cli" ./cmd/qs-compatibility-retirement
+          CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -trimpath -ldflags "-X main.sourceSHA=${GITHUB_SHA}" \
+            -o "$lifecycle_other_cli" ./cmd/qs-compatibility-retirement
           go test -c -tags=integration -o "$lifecycle_test" \
             ./internal/apiserver/maintenance/compatibilityretirementbackup
           mongo_cid="$(docker --host unix:///run/docker.sock inspect --format '{{.Id}}' qs-runtime-closure-e2e-mongo)"
@@ -371,15 +430,17 @@ jobs:
             QS_LIFECYCLE_PUBLIC_CLI_REPOSITORY="$GITHUB_WORKSPACE" \
             QS_LIFECYCLE_PUBLIC_CLI_SOURCE_SHA="$GITHUB_SHA" \
             QS_LIFECYCLE_PUBLIC_CLI_BINARY="$lifecycle_cli" \
+            QS_LIFECYCLE_PUBLIC_CLI_OTHER_BINARY="$lifecycle_other_cli" \
             QS_LIFECYCLE_PUBLIC_CLI_MYSQL_CID="$MYSQL_CONTAINER" \
             QS_LIFECYCLE_PUBLIC_CLI_MONGO_CID="$mongo_cid" \
-            "$lifecycle_test" -test.run '^TestLifecyclePublicCLI' \
+            "$lifecycle_test" -test.run '^(TestLifecyclePublicCLI|TestNativeSharedReadback)' \
             -test.count=1 -test.timeout=25m -test.v | tee "${RUNNER_TEMP}/qs-lifecycle-public-cli.log"
           if grep -q -- '--- SKIP:' "${RUNNER_TEMP}/qs-lifecycle-public-cli.log"; then
             echo 'Required public lifecycle rehearsal unexpectedly skipped' >&2
             exit 1
           fi
-          grep -q -- '--- PASS: TestLifecyclePublicCLINativePrepareRootOnce' "${RUNNER_TEMP}/qs-lifecycle-public-cli.log"
+          grep -q -- '--- PASS: TestLifecyclePublicCLINativeWindowToolPrepareRootOnce' "${RUNNER_TEMP}/qs-lifecycle-public-cli.log"
+          grep -q -- '--- PASS: TestLifecyclePublicCLILinuxRootControlLossReapsDetachedDescendants' "${RUNNER_TEMP}/qs-lifecycle-public-cli.log"
 
       - name: Run retirement and retry persistence integration tests
         env:
@@ -715,6 +776,9 @@ jobs:
       - name: Validate retirement lifecycle contracts on the final source
         run: |
           python3 -B scripts/database/test-compatibility-retirement.py
+          python3 -B scripts/database/test-compatibility-host-writer-scope.py
+          python3 -B scripts/database/test-compatibility-db-writer-census.py
+          python3 -B scripts/database/test-compatibility-window-tool.py
           python3 -B scripts/database/test-compatibility-evidence-write-inputs.py
           python3 -B scripts/database/test-compatibility-inventory-report-diagnostic.py
           python3 -B scripts/database/test-compatibility-mongo-target-diagnostic.py
@@ -919,6 +983,14 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v6
+      - name: Log in for CI image pulls
+        if: env.CI_DOCKERHUB_LOGIN == 'true'
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4
+        with:
+          registry: docker.io
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+          logout: true
       - uses: actions/setup-go@v6
         with:
           go-version: ${{ env.GO_VERSION }}
@@ -939,6 +1011,14 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v6
+      - name: Log in for CI image pulls
+        if: env.CI_DOCKERHUB_LOGIN == 'true'
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4
+        with:
+          registry: docker.io
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+          logout: true
       - uses: actions/setup-go@v6
         with:
           go-version: ${{ env.GO_VERSION }}
