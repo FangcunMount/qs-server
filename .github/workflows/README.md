@@ -16,7 +16,7 @@
 | `authz-production-matrix.yml` | 使用生产主体执行只读 IAM AuthZ v3 精确 12 项矩阵 | 覆盖角色与 origin、缺属性、错误属性类型及 force_retry；IAM 快照复核角色，不写角色或业务数据 |
 | `authz-production-matrix-provision.yml` | 显式创建隔离的 evaluator 与 plan manager 矩阵主体 | 仅手工触发并要求固定确认词；幂等创建无登录凭据/联系方式/外部身份的 IAM 用户及单一角色 assignment，不修改现有用户 |
 
-兼容链历史核验在现有 MySQL/MongoDB 集成步骤中必须执行最终证据回读测试，覆盖已保存、缺失、冲突和旧源删除四个场景。测试仅使用自身创建的临时命名空间；完整 AI 核验、生产写入隔离和恢复预算需要另外验证。
+兼容链历史核验在现有 MySQL/MongoDB 集成步骤中必须执行全部 `TestFinalHistoricalEOFNative` 测试，覆盖已保存、缺失、冲突和旧源删除，并验证非空答卷与报告生成证据及恢复原始记录后的再次核验。测试仅使用自身创建的临时命名空间；完整 AI 核验、生产写入隔离和恢复预算需要另外验证。
 
 删除、重命名或改变触发关系时，必须同步 `scripts/cd` 契约测试和文档门禁。历史 run 只进入证据台账，不回写本页。
 

@@ -136,9 +136,13 @@ Actual host ownership of both phases remains a required deployment check.
 The existing real-database CI step requires the final-readback test with four
 cases: persisted evidence, missing evidence, conflicting evidence and deleted
 source. These cases passed locally against owned random SQL99/Mongo38 test
-namespaces. This fixture contains one SQL Outcome event and empty AI sources;
-full Mongo event and AI histories, the native service/window caller, production
-fixed bounds and the production recovery duration need their own verification.
+namespaces. A second native fixture authenticates and commits two SQL and two
+Mongo originals through the existing two-epoch spool. It checks both answer-sheet
+and report-generation evidence for missing/conflicting entries, rejects deleted
+Mongo sources, and verifies the restored original records again. CI requires
+both final-readback tests. AI source copies remain empty in these fixtures;
+full AI history, the native service/window caller, production fixed bounds and
+the production recovery duration need their own verification.
 
 The cleanup kernel retains exact registered file/container/volume ownership
 and requires actual acceptance plus complete material catalogs and zero-leftover
