@@ -115,6 +115,37 @@ writer's opaque qualification. Pre-window historical evidence CAS uses the actua
 closed-admission and fresh locked-baseline checks; full writer/old-ref isolation
 and the measured maintenance-window capabilities remain necessary for DROP.
 
+## Final historical readback and temporary-material cleanup
+
+`FinalDifferenceAndEOF` uses the original service lease and maintenance-window
+budget, borrows the existing dedicated SQL connection for RR/read-only work,
+and uses the existing Mongo client in a snapshot transaction. It holds and
+rechecks the four registered source files, compares current sources before and
+after verification, scans fixed upper bounds to EOF, and checks the historical
+conclusions already stored in business records. Missing, conflicting or changed
+references fail. Verification does not apply another CAS, create IDs or resend
+commands. Both borrowed database scopes end before later DDL.
+
+Final AI verification has a separate fixed journal. It requires the original
+verify execution to be known successful and independently checks its actual
+Engine/exec identity before starting a fresh final read. An unknown original
+execution remains blocking. The historical verification time and Q fingerprint
+remain historical facts; the final read verifies current closure separately.
+Actual host ownership of both phases remains a required deployment check.
+
+The existing real-database CI step requires the final-readback test with four
+cases: persisted evidence, missing evidence, conflicting evidence and deleted
+source. These cases passed locally against owned random SQL99/Mongo38 test
+namespaces. This fixture contains one SQL Outcome event and empty AI sources;
+full Mongo event and AI histories, the native service/window caller, production
+fixed bounds and the production recovery duration need their own verification.
+
+The cleanup kernel retains exact registered file/container/volume ownership
+and requires actual acceptance plus complete material catalogs and zero-leftover
+observations. Complete writer/old-ref fencing, runtime acceptance, remote-material
+registration and production execution remain unfinished. The lifecycle effects
+preflight continues to reject until those real adapters are verified.
+
 ## Lifecycle preparation and typed Mongo scan diagnostics (2026-10-09)
 
 The lifecycle source connects the existing Action, Python caller and native
