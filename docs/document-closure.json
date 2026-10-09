@@ -2,7 +2,7 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "49d25592df3082efe0056c9b29bb32518c350db2",
+    "sha": "c4c7a9ed433f05bcc2411f4205f198edb7f02cd4",
     "verified_on": "2026-10-10"
   },
   "status_policy": {
@@ -326,11 +326,33 @@
       "owner": "ci",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": null,
-        "verified_on": null
+        "source_sha": "c4c7a9ed433f05bcc2411f4205f198edb7f02cd4",
+        "verified_on": "2026-10-10"
       },
-      "fact_sources": [],
-      "verification": [],
+      "fact_sources": [
+        {
+          "kind": "source",
+          "path": ".github/workflows/ci.yml"
+        }
+      ],
+      "verification": [
+        {
+          "kind": "source_selector",
+          "path": ".github/workflows/ci.yml",
+          "selector": "TestMongoMetadataSnapshotNative",
+          "result": "matched",
+          "source_sha": "c4c7a9ed433f05bcc2411f4205f198edb7f02cd4",
+          "verified_on": "2026-10-10"
+        },
+        {
+          "kind": "source_selector",
+          "path": ".github/workflows/ci.yml",
+          "selector": "TestComparisonMongoAbortNativeOriginalSessionResponseAndUnknown/actual-server-reply-withheld-is-unknown",
+          "result": "matched",
+          "source_sha": "c4c7a9ed433f05bcc2411f4205f198edb7f02cd4",
+          "verified_on": "2026-10-10"
+        }
+      ],
       "production_evidence": {
         "level": "none",
         "refs": [],
@@ -11270,7 +11292,7 @@
       "owner": "tooling",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": "12311e2a8c4d1a9bfcd318f0d3a1572f85a873eb",
+        "source_sha": "c4c7a9ed433f05bcc2411f4205f198edb7f02cd4",
         "verified_on": "2026-10-10"
       },
       "fact_sources": [
@@ -11577,6 +11599,26 @@
         {
           "kind": "source",
           "path": "internal/apiserver/maintenance/compatibilityretirementfence/ssh_key_file*.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/maintenance/compatibilityretirementbackup/mongo_metadata_context.go"
+        },
+        {
+          "kind": "source",
+          "path": "cmd/qs-compatibility-retirement/lifecycle_mongo_abort.go"
+        },
+        {
+          "kind": "source",
+          "path": "cmd/qs-compatibility-retirement/lifecycle_pre_b_comparison.go"
+        },
+        {
+          "kind": "source",
+          "path": "cmd/qs-compatibility-retirement/lifecycle_fixed_host.go"
+        },
+        {
+          "kind": "source",
+          "path": "cmd/qs-compatibility-retirement/lifecycle.go"
         }
       ],
       "verification": [
@@ -12458,6 +12500,62 @@
           "result": "matched",
           "source_sha": "12311e2a8c4d1a9bfcd318f0d3a1572f85a873eb",
           "verified_on": "2026-10-10"
+        },
+        {
+          "kind": "source_selector",
+          "path": "internal/apiserver/maintenance/compatibilityretirementbackup/mongo_metadata_context.go",
+          "selector": "func mongoMetadataContext(ctx context.Context) context.Context",
+          "result": "matched",
+          "source_sha": "c4c7a9ed433f05bcc2411f4205f198edb7f02cd4",
+          "verified_on": "2026-10-10"
+        },
+        {
+          "kind": "source_selector",
+          "path": "cmd/qs-compatibility-retirement/lifecycle_mongo_abort.go",
+          "selector": "func lifecycleAbortComparisonMongo(ctx context.Context, client *mongo.Client, original mongo.Session) error",
+          "result": "matched",
+          "source_sha": "c4c7a9ed433f05bcc2411f4205f198edb7f02cd4",
+          "verified_on": "2026-10-10"
+        },
+        {
+          "kind": "source_selector",
+          "path": "cmd/qs-compatibility-retirement/lifecycle_pre_b_comparison.go",
+          "selector": "func (h *lifecycleFixedHost) compareCompleteDataBeforeB(",
+          "result": "matched",
+          "source_sha": "c4c7a9ed433f05bcc2411f4205f198edb7f02cd4",
+          "verified_on": "2026-10-10"
+        },
+        {
+          "kind": "source_selector",
+          "path": "cmd/qs-compatibility-retirement/lifecycle_fixed_host.go",
+          "selector": "h.preBComparison, e = h.compareCompleteDataBeforeB(q, r, p, w)",
+          "result": "matched",
+          "source_sha": "c4c7a9ed433f05bcc2411f4205f198edb7f02cd4",
+          "verified_on": "2026-10-10"
+        },
+        {
+          "kind": "source_selector",
+          "path": "cmd/qs-compatibility-retirement/lifecycle.go",
+          "selector": "func lifecycleRequireParentWindowBudget(ctx context.Context) error",
+          "result": "matched",
+          "source_sha": "c4c7a9ed433f05bcc2411f4205f198edb7f02cd4",
+          "verified_on": "2026-10-10"
+        },
+        {
+          "kind": "source_selector",
+          "path": ".github/workflows/ci.yml",
+          "selector": "TestMongoMetadataSnapshotNative",
+          "result": "matched",
+          "source_sha": "c4c7a9ed433f05bcc2411f4205f198edb7f02cd4",
+          "verified_on": "2026-10-10"
+        },
+        {
+          "kind": "source_selector",
+          "path": ".github/workflows/ci.yml",
+          "selector": "TestComparisonMongoAbortNativeOriginalSessionResponseAndUnknown/actual-server-reply-withheld-is-unknown",
+          "result": "matched",
+          "source_sha": "c4c7a9ed433f05bcc2411f4205f198edb7f02cd4",
+          "verified_on": "2026-10-10"
         }
       ],
       "production_evidence": {
@@ -12489,8 +12587,8 @@
           "id": "b_combined_snapshot_and_native_fence_pending",
           "kind": "source-lag",
           "severity": "medium",
-          "summary": "B 私有 snapshot26 来源仍是原稿继承；当前组合仅安全接通 A prepare/facts 与 B 源码，full fence/Q/受控 B 运行/验收/purge及当前 combined native 证明未完成。",
-          "exit_criteria": "根独立审核组合八冲突及原稿来源，刷新真实组合源码文档证据；保持生产能力 unknown，在后续完成同一退役 run 内受控 B 部署与完整门禁。"
+          "summary": "Current combined source c4c7a9ed433f05bcc2411f4205f198edb7f02cd4 isolates metadata from the original Mongo snapshot without changing its lifetime/bindings, completes frozen full non-target comparison and real original-session abort ACK plus SQL cleanup before the first native B start, and checks the original parent has at least30 minutes remaining before/after opening apply. Local c4 race has1607 PASS actions/445 parents/1162 subcases/zero failure and one unexecuted Linux-root opt-in; vet,38 Python and Action syntax pass. The actual owned local metadata1PASS and abort5PASS including whitelist/three scenarios/parent remain bound to source63bcd7b4b021d11f3b0ceddc13552633019d7fee. These results do not prove CI27017/rs0, full Window/Archive/Pair, production writers isolation, controlled B execution, acceptance or purge; lifecycle effects remain closed.",
+          "exit_criteria": "Complete final combined-source CI and the actual same-run production prerequisites, full writer/old-ref isolation, exact archive/restoration and measured unchanged30/20/10-minute budget; then verify controlled B runtime, acceptance and batch-only purge. Retain the original local native source and its scoped receipts without promotion."
         }
       ]
     },

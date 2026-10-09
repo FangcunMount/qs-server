@@ -144,14 +144,33 @@ both final-readback tests. AI source copies remain empty in these fixtures;
 full AI history, the native service/window caller, production fixed bounds and
 the production recovery duration need their own verification.
 
-The host now captures every stored non-target object in the approved complete
-namespace catalog in that same paired read-only epoch. A fresh snapshot compares
-the full baseline after the actual native DROP/migration pair and before any
-internal writer resumes. The only normalized data difference is that pair's
-exact clean schema-head transition from MySQL99/Mongo38 to MySQL100/Mongo39.
-Views retain their full definitions and backing stores remain in scope. Missing
-primary keys, mixed/unsupported BSON IDs and unsupported technical collections
-are explicit blockers; no responsibility subset replaces the complete catalog.
+The host captures every stored non-target object in the approved complete
+namespace catalog in the paired read-only epoch. Metadata commands use a context
+that masks only the existing Mongo session; the original deadline, cancellation
+and host binding values remain. Collection/index/topology metadata therefore
+run outside the transaction, while bodies and the actual migration head retain
+the original snapshot context. No new client, transaction or lifecycle owner is
+created by this metadata context.
+
+After the actual native DROP/migration pair, a fresh snapshot compares the full
+frozen baseline **before the first native B API start**: ordinary B startup can
+immediately resume its A-equivalent relays and schedulers. The comparison ends
+only after an unambiguous server ACK for `abortTransaction` on the original
+Mongo session/transaction, ordinary driver Abort/EndSession and SQL Rollback.
+The host then checks the dedicated SQL connection is actually in autocommit
+with no active transaction, rechecks missing targets, the clean pair, stopped
+services and writer isolation, and retains an opaque same-process comparison
+fact. Missing ACK, unknown cleanup or a changed binding blocks B startup;
+`recovery_complete` or a serialized receipt cannot recreate this fact.
+
+The only normalized data difference is the exact clean schema-head transition
+from MySQL99/Mongo38 to MySQL100/Mongo39. Views retain their full definitions and
+backing stores remain in scope. Missing primary keys, mixed/unsupported BSON
+IDs and unsupported technical collections are explicit blockers; no
+responsibility subset replaces the complete catalog. After B starts, acceptance
+checks the retained frozen-interval comparison, schema/absence, runtime, audit/MQ
+and external isolation; it does not demand an unchanged row snapshot while
+B's normal internal writers are running.
 
 The native API owner reads the actual deployed B container's image, process,
 configuration and fixed health/version/readiness endpoints. Post-deployment
@@ -167,12 +186,26 @@ unknown mutation cannot be retried. The dedicated mutation-job and full host,
 database and external-writer isolation caller are still required. An observation
 or saved receipt cannot enable lifecycle effects.
 
-The existing real-database CI step also requires non-target reader tests for
+The existing real-database CI step requires non-target reader tests for
 unsigned composite SQL paging, NULL/empty drift, ordered Mongo RM document IDs,
-mixed-ID refusal and the exact clean schema-head normalization. Four scenarios
-passed locally in owned random namespaces, including restored data comparisons.
-They verify native readers, not the full Archive/Window/Pair acceptance caller
-or production recovery duration.
+mixed-ID refusal and the exact clean schema-head normalization, plus
+`TestMongoMetadataSnapshotNative`. It also requires all three original-session
+abort response scenarios: success, cancellation rejected before a fact, and an
+actual server reply withheld as unknown. `pipefail`, explicit SKIP rejection
+and the parent/three child PASS markers prevent zero-test or partial abort
+execution from passing. Missing mandatory Mongo prerequisites fail.
+
+At local source `63bcd7b4b021d11f3b0ceddc13552633019d7fee`, the actual owned
+loopback fixture passed the metadata test, all three abort scenarios and the
+fixture URI whitelist: six PASS actions including parents, with no failure or
+skip. Source `c4c7a9ed433f05bcc2411f4205f198edb7f02cd4` adds only the parent
+budget repair to that code and passed the combined five-package race check
+with 1,607 PASS actions (445 parents, 1,162 subcases), zero failures and one
+unexecuted Linux-root opt-in (`TestMaintenanceWindowActualLinuxRootLease`),
+plus vet, 38 window-tool Python tests and Action syntax checks. The local native
+results remain bound to `63bcd7`; they are not rerun or relabeled as `c4c7`.
+These checks prove neither CI's separate `127.0.0.1:27017/rs0` execution nor a
+production/full Window/Archive/Pair run, final acceptance or recovery duration.
 
 The cleanup kernel retains exact registered file/container/volume ownership
 and requires actual acceptance plus complete material catalogs and zero-leftover
@@ -596,9 +629,14 @@ original AI commands, historical backfill, four-object DROP, B deployment, accep
   regular file and preserve the existing owner, mode and size checks. A FIFO
   without a writer is rejected before reading. This protects file acquisition;
   it does not bound regular-file I/O or prove the combined 10-minute recovery.
-- Deadline helpers stop forward work at 20 minutes and all recovery work at
-  30 minutes. These helpers alone do not guarantee recovery time; readiness
-  requires a measured and independently verified rollback of at most 10 minutes.
+- The original CLI parent must have a real deadline with at least 30 minutes
+  remaining immediately before opening a fresh apply window and again just
+  after it opens, before any service-management channel or Stop. Preparation
+  time cannot consume the fixed window; no renewed parent/child deadline extends
+  that budget. Forward work still stops at 20 minutes, recovery remains bounded
+  by the original 30-minute window and its 10-minute recovery allowance, and the
+  isolated restore budget remains 600 seconds. These checks alone do not prove
+  readiness: actual restoration and rollback duration must still be measured.
 
 The read-only modes of `cmd/qs-compatibility-history` implement a host for the
 actual inventory outputs; the explicit evidence-write mode is described above. It binds the compiled source, operation/run, approved

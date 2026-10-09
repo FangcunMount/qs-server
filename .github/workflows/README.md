@@ -18,7 +18,9 @@
 
 兼容链历史核验在现有 MySQL/MongoDB 集成步骤中必须执行全部 `TestFinalHistoricalEOFNative` 测试，覆盖已保存、缺失、冲突和旧源删除，并验证非空答卷与报告生成证据及恢复原始记录后的再次核验。测试仅使用自身创建的临时命名空间；完整 AI 核验、生产写入隔离和恢复预算需要另外验证。
 
-同一步骤还必跑 `TestNonTargetDataNativePagingDriftAndBSONIdentity`，验证完整数据读取器的 SQL/BSON 分页和数据变化；验收范围及剩余门禁见[退役运行说明](../../scripts/database/compatibility-retirement.md#final-historical-readback-and-temporary-material-cleanup)。
+同一步骤还必跑 `TestNonTargetDataNativePagingDriftAndBSONIdentity` 和 `TestMongoMetadataSnapshotNative`，验证完整数据读取器的 SQL/BSON 分页，以及元数据读取与原正文快照事务的隔离。元数据读取保留原 deadline、取消和宿主绑定，仅移除 Mongo session；正文和迁移 head 仍用原 snapshot。缺少真实 Replica Set 等前置条件必须失败，不能 SKIP。
+
+同一步骤要求 `TestComparisonMongoAbortNativeOriginalSessionResponseAndUnknown` 的原 session 成功回执、取消拒绝和服务器回执被截断三个子场景。`pipefail`、SKIP 拒绝及父／子 PASS 标记共同防止零测试或只执行部分场景被算作成功。完整非目标比较必须在第一次 B 启动前结束，并取得实际 Mongo abort ACK、结束 session、回滚 SQL 和核对连接已回到非事务状态；普通 driver 本地状态或健康探针不能替代这些结论。验收范围及剩余门禁见[退役运行说明](../../scripts/database/compatibility-retirement.md#final-historical-readback-and-temporary-material-cleanup)。
 
 删除、重命名或改变触发关系时，必须同步 `scripts/cd` 契约测试和文档门禁。历史 run 只进入证据台账，不回写本页。
 
