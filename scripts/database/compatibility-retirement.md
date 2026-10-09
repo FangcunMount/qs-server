@@ -1099,3 +1099,43 @@ remain unchanged from 89bf. Final-commit CI and genuine empty-pair runtime
 execution remain pending. The prior b617 native evidence keeps its original
 source and scope; this repair does not establish database/native or production
 retirement acceptance.
+
+
+### B current-runtime absent-namespace follow-up (2026-10-09)
+
+The `4cc76b5499b1448410d4a7656d29a814c02e7468` PR checks are terminal:
+18 succeeded, one failed and two skipped. CI `37939857087` passed its historical
+persistence steps 6–13. Its current-runtime test actually completed the pristine
+MySQL100/Mongo39 upgrade and both repeated-start checks, then failed because a
+test assertion still selected the retired SQL `domain_event_outbox` (MySQL 1146).
+The original job log SHA256 is
+`319b77a8d5e28ffc6629a69bfc478d4718b986b2d38faa2f61a228f80b0aa0f4`.
+This establishes those initial migration checks only; the complete business
+closure failed and the two later recovery steps did not execute.
+
+Source `894804a98ce73a179ad57946db52739195969d26` merges the approved A main
+`ca1319ede3fcca3f0713421f896c781a73930667` and changes one existing runtime test
+file. Standard event counts read `rm_outbox`. Exact SQL metadata checks require
+all three retired table names to be absent; Mongo `ListCollections` requires the
+retired collection to be absent. These checks run after the genuine upgrade and
+restart, and again after the full business flow. Metadata or cursor errors fail
+the test. No missing-table error is converted to a zero count. The public paired
+preflight and single-use pristine authorization are unchanged; no A99 fallback
+or mixed historical fixture was added.
+
+All B product guards and four tail migration files remain byte-identical to
+4cc. The 276 preserved historical artifacts consist of 275 numbered migration
+files and one README. Two runtime tag combinations compile and new-diff lint
+passes on the installed merged source; receipt SHA256 is
+`8e3e91fd548d53909f26a740c76c9025c33daf310157752066423d2a3196e41a`.
+The nine CI retirement Python suites run 231 cases successfully with one
+existing native opt-in skip; receipt SHA256 is
+`4e39c8234d0a5c507d95e0d2141f3b33cf300a42e698e0ae0ba3e5f59cb6d10f`.
+The committed-source identity test links and checks the actual 894 source,
+accepts the matching SHA and rejects the wrong SHA without database execution;
+receipt SHA256 is
+`79f5626bb620e1c191d9d4cfecaacae76825d44120213f88d7c38e3ec784bd84`.
+The original b617 native results retain their source and scope. Final-source CI,
+full B business/recovery execution and production retirement acceptance remain
+pending. Production is still at clean MySQL99/Mongo38; no production historical
+CAS, four-target backup/restore rehearsal, DROP, B deployment or purge has run.
