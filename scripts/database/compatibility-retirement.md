@@ -1011,6 +1011,46 @@ and independent integration tests. Removing the false capability bits, adding
 an `--allow` switch, accepting an externally supplied `complete: true`, or
 returning success for an unsupported stage is not a valid implementation.
 
+## Read-only host and database writer catalogs
+
+The existing ten-input Action also accepts `operation=prepare` with
+`prepare_mode=host-writer-scope` or `prepare_mode=db-writer-census`. Both use a
+canonical independently approved descriptor and its LF-terminated SHA256 in the
+bootstrap fields; manifest, identity-request and inventory-request inputs stay
+empty. The actual current run is assigned by GitHub. Under the original operation
+lock, each run exclusively registers its own request and private root metadata;
+repeating that run rejects rather than replacing an earlier observation.
+
+`host-writer-scope` binds `host_role=server_a` and calls the shared Linux-root
+observer through the existing pinned root-once path, without database credentials.
+Within the inherited 120-second bound it records finite SSH configuration,
+NSS/key-source, process/session and activation-source EOF/recheck facts. Loaded
+sshd state, exhaustive Match/NSS/KeysCommand behavior, indirect launchers and
+external writers retain explicit unknowns. An early root/path/request refusal
+keeps the unread approval digest empty only in the exact finite error profile,
+with zero identity/counts, empty scopes and no capabilities. Any successful or
+partial observation still requires the exact approved digest.
+
+`db-writer-census` separately binds the original identity report's operation,
+run, source, raw report hash and original request hash. Through host-owned
+connections it rechecks actual identities, selected Mongo namespace and clean
+MySQL99/MongoDB38 heads before and after two bounded catalog passes. It reads
+accounts, grants and all permitted connections including SQL Sleep, plus Mongo
+users/roles and local idle/logical sessions. User expansion queries use only
+identities from actual complete enumeration; credential and custom-data fields
+are disabled. Accounts/grants/session facts remain in the private catalog;
+public output contains only allowlisted sections, hashes, permissions and gaps.
+Startup/external authentication, other Mongo nodes and future direct-writer
+admission remain unproved. The shared observer never opens/closes borrowed pools,
+alters authentication or kills sessions.
+
+Neither observation stops a service, installs isolation or creates a FenceProof.
+`complete`, `execution_allowed`, `drop_ready`, writer-scope completion and every
+capability remain false; successful finite observation is separate from a full
+writers fence. Materials are retained for approved batch cleanup. Production
+fencing, recovery-budget proof, DROP, B rollout, acceptance and purge still require
+their own actual evidence.
+
 ## Real read-only preparation contract
 
 `prepare_mode=identity` requires only `identity_request_sha256`;
@@ -1024,7 +1064,9 @@ Both preparation contracts are separate from these read-only request classes.
 `prepare-facts` instead requires only the canonical observation descriptor and
 its LF-terminated SHA256 in the existing bootstrap fields; the manifest, identity
 and inventory-request fields must be empty. Its complete contract is described
-above. Other stages remain unavailable in A regardless of supplied hashes.
+above. The two writer-catalog modes use their separately approved descriptors
+as described above; neither accepts mixed lifecycle/identity/inventory inputs.
+Other stages remain unavailable in A regardless of supplied hashes.
 Unknown/mixed classes, another operation, incorrect original/tool source
 bindings or another target set are rejected before connections are opened.
 
