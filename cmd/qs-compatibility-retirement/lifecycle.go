@@ -167,6 +167,21 @@ func lifecycleCategory(err error) string {
 	return "lifecycle_native_operation_failed"
 }
 
+// Preparation runs under the original CLI parent. A fresh maintenance window
+// must retain its full 30-minute budget in that same parent; a child context or
+// a renewed deadline cannot extend it. Check again after creating the immutable
+// start, before opening any service-management channel or issuing a stop.
+func lifecycleRequireParentWindowBudget(ctx context.Context) error {
+	if ctx == nil || ctx.Err() != nil {
+		return lifecycleError("lifecycle_parent_window_budget_rejected")
+	}
+	deadline, ok := ctx.Deadline()
+	if !ok || time.Until(deadline) < 30*time.Minute || ctx.Err() != nil {
+		return lifecycleError("lifecycle_parent_window_budget_rejected")
+	}
+	return nil
+}
+
 func readLifecyclePrivate(path, expected string, dst any) error {
 	return readLifecyclePrivateLimit(path, expected, dst, 256<<10)
 }
@@ -560,6 +575,9 @@ func runLifecycleCLI(ctx context.Context, mode, requestPath, requestHash, operat
 		if r.Resume != nil {
 			return receipt, lifecycleError("lifecycle_apply_cannot_resume_or_redrop")
 		}
+		if err = lifecycleRequireParentWindowBudget(ctx); err != nil {
+			return receipt, err
+		}
 		window, err = fence.StartMaintenanceWindow(ctx, r.WindowDirectory, lifecycleWindowBinding(r))
 	} else {
 		window, err = fence.OpenMaintenanceWindow(ctx, r.WindowDirectory, lifecycleWindowBinding(r))
@@ -573,6 +591,11 @@ func runLifecycleCLI(ctx context.Context, mode, requestPath, requestHash, operat
 			receipt.Complete = false
 		}
 	}()
+	if stage == "apply" {
+		if err = lifecycleRequireParentWindowBudget(ctx); err != nil {
+			return receipt, err
+		}
+	}
 	if stage == "recover" {
 		receipt.RecoveryAttempted = true
 		err = lifecycleRecover(ctx, r, archive, prepared, window, host)

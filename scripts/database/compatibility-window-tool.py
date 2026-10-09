@@ -606,6 +606,7 @@ ADAPTERS = frozenset({"actual_four_source_historical_persistence_and_readback", 
     "server_a_and_server_d_stop_drain_lease", "whole_writer_and_old_ref_fence", "prepared_inline_b_and_no_automigration_rollback",
     "actual_runtime_acceptance_and_private_purge"})
 PUBLIC_ERRORS = frozenset({"none", "lifecycle_actual_host_adapters_missing", "lifecycle_whole_writer_and_old_ref_fence_missing",
+    "lifecycle_parent_window_budget_rejected",
     "lifecycle_final_historical_input_rejected", "lifecycle_final_historical_scope_rejected", "lifecycle_final_historical_scope_cleanup_failed",
     "lifecycle_final_historical_q_and_eof_missing", "lifecycle_actual_inline_b_deployment_missing",
     "lifecycle_actual_runtime_and_data_acceptance_missing", "lifecycle_actual_ddl_stopped_unproven",
