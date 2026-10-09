@@ -144,9 +144,39 @@ both final-readback tests. AI source copies remain empty in these fixtures;
 full AI history, the native service/window caller, production fixed bounds and
 the production recovery duration need their own verification.
 
+The host now captures every stored non-target object in the approved complete
+namespace catalog in that same paired read-only epoch. A fresh snapshot compares
+the full baseline after the actual native DROP/migration pair and before any
+internal writer resumes. The only normalized data difference is that pair's
+exact clean schema-head transition from MySQL99/Mongo38 to MySQL100/Mongo39.
+Views retain their full definitions and backing stores remain in scope. Missing
+primary keys, mixed/unsupported BSON IDs and unsupported technical collections
+are explicit blockers; no responsibility subset replaces the complete catalog.
+
+The native API owner reads the actual deployed B container's image, process,
+configuration and fixed health/version/readiness endpoints. Post-deployment
+dependent checks keep the full relevant-container catalog and allow only that
+owner's actual replacement API CID; a residual old API or changed dependent
+still fails. These observations do not prove broker or business acceptance.
+
+The current platform reader independently checks the approved workflow roster,
+current run/job/runner, five unfinished run states and fixed main SHA twice.
+The runner quarantine owner records original workflow states and journals each
+disable/enable intent before the actual request; restoration is explicit and an
+unknown mutation cannot be retried. The dedicated mutation-job and full host,
+database and external-writer isolation caller are still required. An observation
+or saved receipt cannot enable lifecycle effects.
+
+The existing real-database CI step also requires non-target reader tests for
+unsigned composite SQL paging, NULL/empty drift, ordered Mongo RM document IDs,
+mixed-ID refusal and the exact clean schema-head normalization. Four scenarios
+passed locally in owned random namespaces, including restored data comparisons.
+They verify native readers, not the full Archive/Window/Pair acceptance caller
+or production recovery duration.
+
 The cleanup kernel retains exact registered file/container/volume ownership
 and requires actual acceptance plus complete material catalogs and zero-leftover
-observations. Complete writer/old-ref fencing, runtime acceptance, remote-material
+observations. Complete writer/old-ref fencing, full runtime acceptance, remote-material
 registration and production execution remain unfinished. The lifecycle effects
 preflight continues to reject until those real adapters are verified.
 

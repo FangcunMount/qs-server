@@ -18,6 +18,8 @@
 
 兼容链历史核验在现有 MySQL/MongoDB 集成步骤中必须执行全部 `TestFinalHistoricalEOFNative` 测试，覆盖已保存、缺失、冲突和旧源删除，并验证非空答卷与报告生成证据及恢复原始记录后的再次核验。测试仅使用自身创建的临时命名空间；完整 AI 核验、生产写入隔离和恢复预算需要另外验证。
 
+同一步骤还必跑 `TestNonTargetDataNativePagingDriftAndBSONIdentity`，验证完整数据读取器的 SQL/BSON 分页和数据变化；验收范围及剩余门禁见[退役运行说明](../../scripts/database/compatibility-retirement.md#final-historical-readback-and-temporary-material-cleanup)。
+
 删除、重命名或改变触发关系时，必须同步 `scripts/cd` 契约测试和文档门禁。历史 run 只进入证据台账，不回写本页。
 
 ## 2. 交付链
