@@ -178,6 +178,34 @@ dependent checks keep the full relevant-container catalog and allow only that
 owner's actual replacement API CID; a residual old API or changed dependent
 still fails. These observations do not prove broker or business acceptance.
 
+The native acceptance host now reads the standard event audit and current MQ
+ledger through its original borrowed handles. A fresh SQL RR/read-only epoch
+scans business records and `rm_outbox` in both directions; a fresh Mongo snapshot
+scans all seven current audit phases, preserving ordered BSON cursor bytes.
+Fixed bounds and an actual final empty page are required for every scan. The
+SQL audit reuses the existing classification matrix without its normal metric
+or business-identity log side effects. Qualified historical gaps remain explicit
+`unverifiable` counts and never become original-message verification successes;
+other findings block this acceptance component.
+
+Current MQ reads reuse Runtime's exact integrity and pending/attempt formulas.
+The organization catalog includes requests and both current operation/outbox
+directions; invalid ownership, orphans and unknown/conflicting states cannot
+appear as zero backlog. START, CHANGE and PARTICIPANT_RETRY count, held remains
+pending, accepted/rejected do not, and inherited persisted attempts count once.
+ACK and evaluation commands stay outside these statistics. Existing application
+Runtime and Health response names, types and statistics semantics are unchanged.
+
+The host retains only private bounded-read counters after an actual Mongo abort
+response, driver Abort/EndSession and SQL rollback, then rechecks the original
+window binding and external isolation. This observation cannot serialize into
+an acceptance or full-writer token. The two database epochs are not a globally
+simultaneous snapshot; actual drift is reported. Real loaded broker endpoints,
+authentication/network/subscription and consumer facts, controlled D runtime and
+all eight material scopes still require their own native producers. Existing
+native receipts retain their original source and do not certify this component.
+Lifecycle effects remain closed until the complete original gates are satisfied.
+
 The current platform reader independently checks the approved workflow roster,
 current run/job/runner, five unfinished run states and fixed main SHA twice.
 The runner quarantine owner records original workflow states and journals each

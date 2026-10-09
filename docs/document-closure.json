@@ -2,7 +2,7 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "0f5f441da99084eb9f61e2ae641c89dd50adea17",
+    "sha": "edb57ffe03b5ec8c3d8c5b7784fdf9738b3ab5a0",
     "verified_on": "2026-10-10"
   },
   "status_policy": {
@@ -326,7 +326,7 @@
       "owner": "ci",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": "0f5f441da99084eb9f61e2ae641c89dd50adea17",
+        "source_sha": "edb57ffe03b5ec8c3d8c5b7784fdf9738b3ab5a0",
         "verified_on": "2026-10-10"
       },
       "fact_sources": [
@@ -11304,7 +11304,7 @@
       "owner": "tooling",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": "0f5f441da99084eb9f61e2ae641c89dd50adea17",
+        "source_sha": "edb57ffe03b5ec8c3d8c5b7784fdf9738b3ab5a0",
         "verified_on": "2026-10-10"
       },
       "fact_sources": [
@@ -11635,6 +11635,10 @@
         {
           "kind": "source",
           "path": "scripts/database/compatibility-platform-window-action.py"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/infra/mysql/aibridge/runtime_messaging*.go"
         }
       ],
       "verification": [
@@ -12579,6 +12583,30 @@
           "selector": "def disposition(window, transport, raw, exit_code, approval, run):",
           "result": "matched",
           "source_sha": "0f5f441da99084eb9f61e2ae641c89dd50adea17",
+          "verified_on": "2026-10-10"
+        },
+        {
+          "kind": "source_selector",
+          "path": "cmd/qs-compatibility-retirement/lifecycle_runtime_ledger.go",
+          "selector": "func (h *lifecycleFixedHost) observeRuntimeLedgers",
+          "result": "matched",
+          "source_sha": "edb57ffe03b5ec8c3d8c5b7784fdf9738b3ab5a0",
+          "verified_on": "2026-10-10"
+        },
+        {
+          "kind": "source_selector",
+          "path": "internal/apiserver/application/evaluation/scheduler/audit.go",
+          "selector": "func SummarizeReadOnlyBatch",
+          "result": "matched",
+          "source_sha": "edb57ffe03b5ec8c3d8c5b7784fdf9738b3ab5a0",
+          "verified_on": "2026-10-10"
+        },
+        {
+          "kind": "source_selector",
+          "path": "internal/apiserver/infra/mysql/aibridge/runtime_messaging_observation.go",
+          "selector": "func ReadCurrentMessagingOrganization",
+          "result": "matched",
+          "source_sha": "edb57ffe03b5ec8c3d8c5b7784fdf9738b3ab5a0",
           "verified_on": "2026-10-10"
         }
       ],
