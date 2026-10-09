@@ -237,7 +237,7 @@ func nativeMongo(t *testing.T, env map[string]string) *mongo.Client {
 }
 func nativeSourceSchemas(t *testing.T, db *sql.DB, mdb *mongo.Database) {
 	t.Helper()
-	nativeExec(t, db, "CREATE TABLE schema_migrations(version BIGINT NOT NULL,dirty BOOL NOT NULL)")
+	nativeExec(t, db, "CREATE TABLE schema_migrations(version BIGINT NOT NULL PRIMARY KEY,dirty BOOL NOT NULL)")
 	nativeExec(t, db, "INSERT INTO schema_migrations VALUES(99,FALSE)")
 	nativeExec(t, db, "CREATE TABLE rm_outbox(id BIGINT PRIMARY KEY,protected_fact BLOB)")
 	nativeExec(t, db, "INSERT INTO rm_outbox VALUES(1,X'00FF')")
