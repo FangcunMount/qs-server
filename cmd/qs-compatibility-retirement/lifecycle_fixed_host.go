@@ -18,9 +18,11 @@ func lifecycleEffectsPreflight(context.Context) error {
 }
 
 type lifecycleFixedHost struct {
-	owner    *lifecyclePreparationOwner
-	services *lifecycleServiceController
-	api      *lifecycleAPITransition
+	owner             *lifecyclePreparationOwner
+	restoreOwner      *lifecyclePreparationOwner
+	acceptedMaterials *lifecycleAcceptedMaterials
+	services          *lifecycleServiceController
+	api               *lifecycleAPITransition
 }
 
 func newLifecycleFixedHost(ctx context.Context, r lifecycleRequest, a *backup.Archive) (lifecycleHost, error) {
@@ -56,7 +58,13 @@ func (h *lifecycleFixedHost) OpenRecoveryHandles(ctx context.Context, _ lifecycl
 }
 
 func (h *lifecycleFixedHost) Prepare(ctx context.Context, r lifecycleRequest, a *backup.Archive) (*lifecyclePreparation, error) {
+	if h == nil || h.restoreOwner != nil || h.owner != nil {
+		return nil, lifecycleError("lifecycle_native_handles_existing_or_unknown")
+	}
 	p, owner, err := prepareLifecycleNative(ctx, r, a)
+	if owner != nil {
+		h.restoreOwner = owner // Retain the actual restore owners; never adopt their JSON registry.
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -192,11 +200,19 @@ func (h *lifecycleFixedHost) DeployRollbackInline(ctx context.Context, r lifecyc
 	}
 	return h.api.deploy(q, r, true)
 }
-func (*lifecycleFixedHost) PurgeTemporaryCopies(context.Context, lifecycleRequest) error {
-	return lifecycleError("lifecycle_actual_batch_material_purge_missing")
+func (h *lifecycleFixedHost) PurgeTemporaryCopies(ctx context.Context, r lifecycleRequest) error {
+	materials, err := h.acceptedBatchMaterials(ctx, r)
+	if err != nil {
+		return err
+	}
+	return materials.purge(ctx)
 }
-func (*lifecycleFixedHost) VerifyTemporaryMaterialsZero(context.Context, lifecycleRequest) error {
-	return lifecycleError("lifecycle_actual_batch_material_zero_check_missing")
+func (h *lifecycleFixedHost) VerifyTemporaryMaterialsZero(ctx context.Context, r lifecycleRequest) error {
+	materials, err := h.acceptedBatchMaterials(ctx, r)
+	if err != nil {
+		return err
+	}
+	return materials.verifyZero(ctx)
 }
 
 func (h *lifecycleFixedHost) ResumeAcceptedEntrypoints(ctx context.Context, _ lifecycleRequest) error {
@@ -233,6 +249,16 @@ func (h *lifecycleFixedHost) Close() error {
 	}
 	if h.api != nil && h.api.engine != nil {
 		h.api.engine.transport.CloseIdleConnections()
+	}
+	if h.acceptedMaterials != nil && h.acceptedMaterials.catalog != nil {
+		if err := h.acceptedMaterials.catalog.close(); result == nil {
+			result = err
+		}
+	}
+	if h.restoreOwner != nil {
+		if err := h.restoreOwner.Close(); result == nil {
+			result = err
+		}
 	}
 	if h.owner != nil {
 		if err := h.owner.Close(); result == nil {
