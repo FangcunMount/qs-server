@@ -280,7 +280,7 @@ func nonTargetDataScan(ctx context.Context, b BorrowedSources, defs map[string]a
 // ExtJSON maps alone cannot show an index-order change. Only the paired
 // migration's own schema_migrations UUID is normalized; all other UUIDs stay.
 func nonTargetOrderedMongo(ctx context.Context, db *mongo.Database, name string, raw bson.Raw) (string, error) {
-	q, cancel := context.WithTimeout(ctx, 30*time.Second)
+	q, cancel := context.WithTimeout(mongoMetadataContext(ctx), 30*time.Second)
 	defer cancel()
 	cur, e := db.Collection(name).Indexes().List(q)
 	if e != nil {
