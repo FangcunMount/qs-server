@@ -149,15 +149,19 @@ type manifest struct {
 	SourceMongoNamespace string `json:"source_mongo_namespace"`
 	SourceMongoProcessID string `json:"source_mongo_process_id"`
 
-	Version                int             `json:"version"`
-	Approval               Approval        `json:"approval"`
-	Inventory              inventory       `json:"inventory"`
-	SQL                    [3]SQLStructure `json:"sql"`
-	Mongo                  MongoStructure  `json:"mongo"`
-	Assets                 [4]Asset        `json:"assets"`
-	SQLMetadataHash        string          `json:"sql_metadata_hash"`
-	MongoMetadataHash      string          `json:"mongo_metadata_hash"`
-	OrderedMongoSchemaHash string          `json:"ordered_mongo_schema_hash"`
+	Version   int             `json:"version"`
+	Approval  Approval        `json:"approval"`
+	Inventory inventory       `json:"inventory"`
+	SQL       [3]SQLStructure `json:"sql"`
+	Mongo     MongoStructure  `json:"mongo"`
+	Assets    [4]Asset        `json:"assets"`
+	// Capture derives this recovery projection from the actual approved SQL
+	// catalog. Inventory's different projection retains target-owned FK rows.
+	// Version 1 archives without this field may still open, but cannot resume B.
+	SQLRecoveryNonTargetHash string `json:"sql_recovery_non_target_schema_hash,omitempty"`
+	SQLMetadataHash          string `json:"sql_metadata_hash"`
+	MongoMetadataHash        string `json:"mongo_metadata_hash"`
+	OrderedMongoSchemaHash   string `json:"ordered_mongo_schema_hash"`
 }
 type Asset struct {
 	Filename string `json:"filename"`

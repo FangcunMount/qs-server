@@ -957,6 +957,56 @@ def _forward_mongo_index_diagnostic(raw):
         print(lines[0].decode("ascii"), file=sys.stderr)
 
 
+MONGO_TARGET_DIAGNOSTIC = re.compile(
+    rb"QS_MONGO_TARGET_DIAGNOSTIC phase=(?:find|iterate|close) "
+    rb"kind=(?:context_deadline|context_cancelled|server|network_timeout|other) "
+    rb"code=(?:0|-?[1-9][0-9]{0,9}) "
+    rb"run_ctx=(?:active|deadline|cancelled|other) page_ctx=(?:active|deadline|cancelled|other) "
+    rb"pass=[12] page=[1-9][0-9]{0,3} records=(?:0|[1-9][0-9]{0,6}) "
+    rb"source_bytes=(?:0|[1-9][0-9]{0,9}) "
+    rb"page_elapsed_ms=(?:0|[1-9][0-9]{0,15}) "
+    rb"run_elapsed_ms=(?:0|[1-9][0-9]{0,15}) "
+    rb"mysql_elapsed_ms=(?:0|[1-9][0-9]{0,15})")
+
+
+def _forward_mongo_target_diagnostic(raw):
+    if len(raw) > 8192:
+        return
+    lines = []
+    for line in raw.split(b"\n")[:-1]:
+        if not MONGO_TARGET_DIAGNOSTIC.fullmatch(line):
+            continue
+        fields = dict(token.split(b"=", 1) for token in line.split(b" ")[1:])
+        numbers = {key: int(fields[key]) for key in
+                   (b"code", b"page", b"records", b"source_bytes", b"page_elapsed_ms", b"run_elapsed_ms", b"mysql_elapsed_ms")}
+        if (not -(1 << 31) <= numbers[b"code"] < (1 << 31) or numbers[b"page"] > 1001 or
+                numbers[b"records"] > 1000000 or numbers[b"source_bytes"] > 2 << 30 or
+                numbers[b"run_elapsed_ms"] > (1 << 63) - 1 or
+                numbers[b"page_elapsed_ms"] > numbers[b"run_elapsed_ms"] or
+                numbers[b"mysql_elapsed_ms"] > numbers[b"run_elapsed_ms"]):
+            continue
+        lines.append(line)
+    # A pagination failure has one primary phase. Separate index diagnostics
+    # and unrecognized stderr never become a target-failure classification.
+    if len(lines) == 1:
+        print(lines[0].decode("ascii"), file=sys.stderr)
+
+
+def _forward_inventory_diagnostic_fd(private_stderr):
+    size = os.fstat(private_stderr.fileno()).st_size
+    if size <= 8192:
+        private_stderr.seek(0)
+        raw = private_stderr.read(8193)
+        _forward_mongo_index_diagnostic(raw)
+    else:
+        # Keep only a bounded tail. Inspect its preceding byte so a truncated
+        # private line cannot acquire a valid marker merely at the cutoff.
+        private_stderr.seek(size - 8193)
+        tail = private_stderr.read(8193)
+        raw = tail[1:] if tail[:1] == b"\n" else tail[1:].partition(b"\n")[2]
+    _forward_mongo_target_diagnostic(raw)
+
+
 def capture_fixed(command, *, timeout, maximum=32768, mongo_index_diagnostics=False):
     # Raw child errors can contain connection strings. Capturing into a
     # private temporary fd avoids retaining an unbounded stderr PIPE in RAM.
@@ -966,9 +1016,8 @@ def capture_fixed(command, *, timeout, maximum=32768, mongo_index_diagnostics=Fa
             result = subprocess.run(command, stdout=subprocess.PIPE,
                                     stderr=private_stderr if private_stderr is not None else subprocess.DEVNULL,
                                     timeout=timeout, check=False)
-            if private_stderr is not None and os.fstat(private_stderr.fileno()).st_size <= 8192:
-                private_stderr.seek(0)
-                _forward_mongo_index_diagnostic(private_stderr.read(8193))
+            if private_stderr is not None:
+                _forward_inventory_diagnostic_fd(private_stderr)
     except (OSError, subprocess.TimeoutExpired):
         fail("inventory_runtime_failed")
     if len(result.stdout) > maximum:
@@ -1568,6 +1617,199 @@ def inventory_report_diagnostic(args, value):
             "error_category": "existing_report_diagnostic_only", "capabilities": {key: False for key in CAPABILITIES}}
 
 
+LIFECYCLE_ADAPTERS = frozenset({"actual_four_source_historical_persistence_and_readback",
+    "actual_production_bound_isolated_restore", "server_a_and_server_d_stop_drain_lease",
+    "whole_writer_and_old_ref_fence", "prepared_inline_b_and_no_automigration_rollback",
+    "actual_runtime_acceptance_and_private_purge"})
+
+
+# This fixed inline root once program is part of the already hash-verified
+# immutable Action package. The same pinned SSH connection supplies sudo;
+# inability to execute it fails prepare before a database/engine operation.
+ROOT_PREPARE_ONCE = r"""
+import hashlib, io, json, os, platform, re, stat, subprocess, sys, tarfile
+from pathlib import Path
+
+def stop():
+    print('{"format_version":1,"complete":false,"execution_allowed":false,"drop_ready":false,"error_category":"lifecycle_root_once_bootstrap_rejected"}')
+    raise SystemExit(1)
+
+def private_directory(path):
+    info = path.lstat()
+    if not stat.S_ISDIR(info.st_mode) or info.st_uid != 0 or stat.S_IMODE(info.st_mode) != 0o700: stop()
+    for ancestor in path.parents:
+        v = ancestor.lstat()
+        if not stat.S_ISDIR(v.st_mode) or (stat.S_IMODE(v.st_mode) & 0o022 and not v.st_mode & stat.S_ISVTX): stop()
+
+try:
+    if os.getuid() != 0 or os.geteuid() != 0 or len(sys.argv) != 8: stop()
+    operation, run, tool_sha, request_hash, package_hash, manifest_hash, source_channel = sys.argv[1:]
+    if not all(re.fullmatch(r'[0-9]{1,20}-[0-9]{1,4}',v) for v in (operation,run)): stop()
+    if not re.fullmatch(r'[0-9a-f]{40}',tool_sha) or not all(re.fullmatch(r'[0-9a-f]{64}',v) for v in (request_hash,package_hash,manifest_hash)): stop()
+    if source_channel == 'sudo-user':
+        source_uid = int(os.environ['SUDO_UID'])
+        if source_uid < 1: stop()
+    elif source_channel == 'root-direct':
+        # The fixed root caller supplies a cleaned environment. Never adopt
+        # another user's identity from an inherited SUDO_UID or input DTO.
+        if 'SUDO_UID' in os.environ: stop()
+        source_uid = os.getuid() # actual root identity, already jointly checked
+    else:
+        stop()
+    allowed = {'MYSQL_HOST','MYSQL_PORT','MYSQL_USERNAME','MYSQL_PASSWORD','MYSQL_DATABASE','MONGODB_HOST','MONGODB_PORT','MONGODB_USERNAME','MONGODB_PASSWORD','MONGODB_DBNAME','MONGODB_METADATA_ADMIN_USERNAME','MONGODB_METADATA_ADMIN_PASSWORD'}
+    packet = sys.stdin.buffer.read(32769)
+    if len(packet)>32768: stop()
+    def unique_credentials(items):
+        value={}
+        for key,item in items:
+            if key in value: stop()
+            value[key]=item
+        return value
+    credentials=json.loads(packet,object_pairs_hook=unique_credentials)
+    if not isinstance(credentials,dict) or set(credentials)!=allowed or any(not isinstance(v,str) or '\x00' in v or '\r' in v or '\n' in v for v in credentials.values()): stop()
+    archive=Path('/tmp/qs-compatibility-retirement-'+run+'.tar.gz')
+    fd=os.open(archive,os.O_RDONLY|os.O_NOFOLLOW|os.O_NONBLOCK)
+    with os.fdopen(fd,'rb') as f:
+        info=os.fstat(f.fileno())
+        if not stat.S_ISREG(info.st_mode) or info.st_nlink!=1 or info.st_uid!=source_uid or info.st_size<1 or info.st_size>256<<20: stop()
+        raw=f.read((256<<20)+1)
+    if len(raw)>256<<20 or hashlib.sha256(raw).hexdigest()!=package_hash: stop()
+    arch={'x86_64':'amd64','aarch64':'arm64','arm64':'arm64'}.get(platform.machine())
+    if arch is None: stop()
+    name='inventory-linux-'+arch
+    with tarfile.open(fileobj=io.BytesIO(raw),mode='r:gz') as tar:
+        members=tar.getmembers()
+        names=[m.name for m in members]
+        if len(names)!=len(set(names)) or any(not m.isfile() or '/' in m.name or m.size>64<<20 for m in members): stop()
+        selected=[m for m in members if m.name==name]
+        if len(selected)!=1: stop()
+        binary=tar.extractfile(selected[0]).read((64<<20)+1)
+        if not binary or len(binary)>64<<20: stop()
+    base=Path('/opt/backups/qs-server/compatibility-retirement-root-prepare')
+    try: base.mkdir(mode=0o700)
+    except FileExistsError: pass
+    private_directory(base)
+    batch=base/(operation+'-'+run)
+    batch.mkdir(mode=0o700) # once only; unknown earlier work never silently adopted
+    private_directory(batch)
+    native=batch/'restore-native'
+    registry={'format_version':1,'kind':'approved_root_once_tool_staging','operation_id':operation,'actual_run_id':run,'tool_source_sha':tool_sha,'request_sha256':request_hash,'manifest_sha256':manifest_hash,'package_sha256':package_hash,'native_sha256':hashlib.sha256(binary).hexdigest(),'source_uid':source_uid,'drop_authority':False,'purge_after_acceptance_required':True}
+    fd=os.open(batch/'tool.intent.private.json',os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o600)
+    with os.fdopen(fd,'wb') as f: f.write(json.dumps(registry,sort_keys=True,separators=(',',':')).encode()+b'\n'); f.flush(); os.fsync(f.fileno())
+    fd=os.open(batch,os.O_RDONLY|os.O_DIRECTORY)
+    os.fsync(fd);os.close(fd)
+    fd=os.open(base,os.O_RDONLY|os.O_DIRECTORY)
+    os.fsync(fd);os.close(fd)
+    fd=os.open(native,os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o700)
+    with os.fdopen(fd,'wb') as f: f.write(binary); f.flush(); os.fsync(f.fileno())
+    fd=os.open(batch,os.O_RDONLY|os.O_DIRECTORY)
+    os.fsync(fd);os.close(fd)
+    import subprocess
+    check=subprocess.run([str(native),'--source-sha'],stdout=subprocess.PIPE,stderr=subprocess.DEVNULL,timeout=5,env={'PATH':'/usr/bin:/bin'})
+    if check.returncode or check.stdout!=tool_sha.encode()+b'\n': stop()
+    credentials['PATH']='/usr/bin:/bin'
+    credentials['QS_RETIREMENT_SOURCE_UID']=str(source_uid)
+    os.execve(native,[str(native),'--mode','lifecycle-prepare-root-once','--request','/opt/backups/qs-server/compatibility-retirement/'+operation+'/lifecycle-request.json','--request-hash',request_hash,'--operation-id',operation,'--run-id',run],credentials)
+except (OSError,ValueError,KeyError,tarfile.TarError,subprocess.SubprocessError):
+    stop()
+"""
+
+
+def root_once_lifecycle_prepare(args):
+    if args.operation != 'prepare' or args.prepare_mode != 'lifecycle':
+        fail('lifecycle_root_host_channel_required')
+    package_hash=os.environ.get('RETIREMENT_PACKAGE_SHA256','')
+    token(package_hash,HASH)
+    names=('MYSQL_HOST','MYSQL_PORT','MYSQL_USERNAME','MYSQL_PASSWORD','MYSQL_DATABASE','MONGODB_HOST','MONGODB_PORT','MONGODB_USERNAME','MONGODB_PASSWORD','MONGODB_DBNAME','MONGODB_METADATA_ADMIN_USERNAME','MONGODB_METADATA_ADMIN_PASSWORD')
+    packet=json.dumps({name:os.environ.get(name,'') for name in names},separators=(',',':')).encode()
+    if len(packet)>32768: fail('lifecycle_connection_input_rejected')
+    uid, euid = os.getuid(), os.geteuid()
+    if uid != euid:
+        fail('lifecycle_root_host_channel_required')
+    bindings=[args.operation_id,args.run_id,args.actual_source_sha,args.lifecycle_request_hash,package_hash,args.manifest_hash]
+    # Credentials remain on this bounded private pipe, not argv/stdout/logs.
+    if uid == 0:
+        result=subprocess.run(['/usr/bin/python3','-I','-c',ROOT_PREPARE_ONCE,*bindings,'root-direct'],env={'PATH':'/usr/bin:/bin'},input=packet,stdout=subprocess.PIPE,stderr=subprocess.DEVNULL,timeout=91*60,check=False)
+    else:
+        result=subprocess.run(['sudo','-n','python3','-I','-c',ROOT_PREPARE_ONCE,*bindings,'sudo-user'],input=packet,stdout=subprocess.PIPE,stderr=subprocess.DEVNULL,timeout=91*60,check=False)
+    if len(result.stdout)>32768: fail('lifecycle_native_receipt_invalid')
+    return result.returncode,result.stdout
+
+
+def live_lifecycle(args, directory):
+    """Invoke the fixed native caller; a DTO never supplies its host adapters."""
+    if args.operation != "prepare":
+        fail("lifecycle_actual_host_adapters_missing")
+    token(args.lifecycle_request_hash, HASH)
+    token(args.manifest_hash, HASH)
+    request, request_hash = read_private(directory, "lifecycle-request.json", args.lifecycle_request_hash)
+    fields(request, ("format_version", "kind", "tool_source_sha", "original_source_sha",
+        "operation_id", "actual_run_id", "manifest_sha256", "archive_directory",
+        "window_directory", "journal_directory", "archive_approval", "recovery"),
+        ("source_directory", "restore_engines", "source_file_sha256"))
+    token(request["original_source_sha"], SHA)
+    if (request["format_version"] != 1 or request["kind"] != "compatibility_retirement_lifecycle_request" or
+        request["tool_source_sha"] != args.actual_source_sha or request["operation_id"] != args.operation_id or
+        request["actual_run_id"] != args.run_id or request["manifest_sha256"] != args.manifest_hash):
+        fail("lifecycle_request_binding_rejected")
+    manifest, _ = read_private(directory, "manifest.json", args.manifest_hash)
+    # Original A inventory/archive/window bindings are retained when the fixed
+    # tool and B image are approved at another SHA. Never rewrite either value.
+    validate_manifest(manifest, args.operation_id, request["original_source_sha"])
+    binary = Path(args.inventory_binary)
+    try:
+        metadata = binary.lstat()
+    except OSError:
+        fail("lifecycle_binary_unavailable")
+    if (not binary.is_absolute() or not stat.S_ISREG(metadata.st_mode) or
+        metadata.st_nlink != 1 or metadata.st_uid != os.getuid() or stat.S_IMODE(metadata.st_mode) != 0o700):
+        fail("lifecycle_binary_rejected")
+    code, raw = capture_fixed([str(binary), "--source-sha"], timeout=5, maximum=128)
+    if code or raw.decode("ascii", errors="ignore").strip() != args.actual_source_sha:
+        fail("lifecycle_binary_source_mismatch")
+    # This host-native process requires the root management channel and actual
+    # fixed runtime adapters. Do not reuse the read-only inventory container or
+    # serialize a Window/RestoreVerification/stop lease into its arguments.
+    with locked_operation(directory):
+        # Both legal privilege identities use the same actual once staging.
+        # No root branch can invoke the unstaged lifecycle-prepare mode.
+        code, raw = root_once_lifecycle_prepare(args)
+    result = decode(raw)
+    required = ("format_version", "kind", "operation", "source_sha", "original_source_sha",
+        "operation_id", "run_id", "manifest_sha256", "request_sha256", "archive_sha256",
+        "target_hash", "target_count", "complete", "execution_allowed", "drop_ready",
+        "archive_binding_complete", "recovery_attempted", "recovery_complete", "acceptance_complete",
+        "purge_complete", "error_category", "required_adapters", "isolated_content_restore_complete", "restore_elapsed_millis")
+    fields(result, required, ("recovery_error_category", "mysql_recovery_non_target_sha256"))
+    if (result["format_version"] != 1 or result["kind"] != "compatibility_retirement_lifecycle_result" or
+        result["operation"] != args.operation or result["source_sha"] != args.actual_source_sha or
+        result["original_source_sha"] != request["original_source_sha"] or result["operation_id"] != args.operation_id or
+        result["run_id"] != args.run_id or result["manifest_sha256"] != args.manifest_hash or
+        result["request_sha256"] != request_hash or result["target_hash"] != TARGET_HASH or result["target_count"] != 4 or
+        type(result["required_adapters"]) is not list or set(result["required_adapters"]) - LIFECYCLE_ADAPTERS):
+        fail("lifecycle_native_receipt_binding_rejected")
+    for key in ("complete", "execution_allowed", "drop_ready", "archive_binding_complete", "recovery_attempted",
+                "recovery_complete", "acceptance_complete", "purge_complete", "isolated_content_restore_complete"):
+        if type(result[key]) is not bool:
+            fail("lifecycle_native_receipt_rejected")
+    for key in ("manifest_sha256", "request_sha256"):
+        token(result[key], HASH)
+    token(result["archive_sha256"], HASH if result["complete"] else re.compile(r"(?:[0-9a-f]{64})?"))
+    if "mysql_recovery_non_target_sha256" in result:
+        token(result["mysql_recovery_non_target_sha256"], HASH)
+    if type(result["restore_elapsed_millis"]) is not int or not 0 <= result["restore_elapsed_millis"] <= 600000:
+        fail("lifecycle_native_restore_budget_rejected")
+    if args.operation == "prepare" and result["complete"] and not result["isolated_content_restore_complete"]:
+        fail("lifecycle_native_restore_missing")
+    if (result["execution_allowed"] is not False or result["drop_ready"] is not False or
+        (result["complete"] is True) != (code == 0 and result["error_category"] == "none") or
+        not re.fullmatch(r"[a-z_]{1,128}", result["error_category"]) or
+        ("recovery_error_category" in result and not re.fullmatch(r"[a-z_]{1,128}", result["recovery_error_category"]))):
+        fail("lifecycle_native_receipt_rejected")
+    result["capabilities"] = {key: False for key in CAPABILITIES}
+    return result
+
+
 def execute(args):
     if args.operation not in OPERATIONS:
         fail("operation_unsupported")
@@ -1581,6 +1823,13 @@ def execute(args):
     inventory_request = getattr(args, "inventory_request_hash", "")
     bootstrap_json = getattr(args, "bootstrap_approval_json", "")
     bootstrap_hash = getattr(args, "bootstrap_approval_hash", "")
+    lifecycle_request = getattr(args, "lifecycle_request_hash", "")
+    if lifecycle_request:
+        if identity_request or inventory_request or bootstrap_json or bootstrap_hash or mode != "lifecycle":
+            fail("input_classes_mixed")
+        return live_lifecycle(args, operation_directory(args.root, args.operation_id))
+    if mode == "lifecycle":
+        fail("lifecycle_request_approval_missing")
     if mode == "report-diagnostic":
         if args.operation != "prepare" or args.manifest_hash or identity_request or inventory_request or not bootstrap_json or not bootstrap_hash:
             fail("input_classes_mixed")
@@ -1655,6 +1904,7 @@ def main(argv=None):
     parser.add_argument("--actual-source-sha", required=True)
     parser.add_argument("--run-id", required=True)
     parser.add_argument("--manifest-hash", default="")
+    parser.add_argument("--lifecycle-request-hash", default="")
     parser.add_argument("--inventory-request-hash", default="")
     parser.add_argument("--inventory-binary", default="")
     parser.add_argument("--history-binary", default="")
@@ -1675,6 +1925,12 @@ def main(argv=None):
     schema = {"format_version": "uint", "complete": "bool", "execution_allowed": "bool",
               "operation": OPERATIONS, "source_sha": "sha40", "run_id": "run_id", "operation_id": "run_id",
               "manifest_hash": "hash64", "target_hash": "hash64", "target_count": "uint",
+              "kind": frozenset({"compatibility_retirement_lifecycle_result"}),
+              "original_source_sha": "sha40", "manifest_sha256": "hash64", "request_sha256": "hash64", "archive_sha256": "hash64_or_empty",
+              "isolated_content_restore_complete": "bool", "restore_elapsed_millis": "uint", "mysql_recovery_non_target_sha256": "hash64",
+              "archive_binding_complete": "bool", "recovery_attempted": "bool", "recovery_complete": "bool",
+              "acceptance_complete": "bool", "purge_complete": "bool", "required_adapters": [LIFECYCLE_ADAPTERS],
+              "recovery_error_category": frozenset({receipt.get("recovery_error_category", "none")}),
               "inventory_complete": "bool", "inventory_private_report_hash": "hash64",
               "prepare_mode": frozenset({"identity", "bounds", "inventory", "report-diagnostic"}) | BOOTSTRAP_MODES, "diagnostic_only": "bool", "drop_ready": "bool",
               "request_bootstrap_complete": "bool", "bootstrap_approval_sha256": "hash64", "derived_request_sha256": "hash64", "request_created_run_id": "run_id",
@@ -1763,7 +2019,12 @@ def main(argv=None):
         receipt.get("history_prepared_pages") == receipt.get("history_readback_pages") and
         (receipt.get("history_ai_original_commands") == 0 or receipt.get("history_ai_command_persistence_complete") is True) and
         all(value is False for value in receipt.get("capabilities", {}).values()))
-    return 0 if emitted and (diagnostic_complete or evidence_finished) and receipt.get("complete") is False and receipt.get("execution_allowed") is False and receipt.get("drop_ready") is False else 42
+    lifecycle_complete = (receipt.get("kind") == "compatibility_retirement_lifecycle_result" and
+        receipt.get("operation") == "prepare" and receipt.get("complete") is True and
+        receipt.get("error_category") == "none" and receipt.get("isolated_content_restore_complete") is True and
+        receipt.get("execution_allowed") is False and receipt.get("drop_ready") is False and
+        all(value is False for value in receipt.get("capabilities", {}).values()))
+    return 0 if emitted and (lifecycle_complete or ((diagnostic_complete or evidence_finished) and receipt.get("complete") is False and receipt.get("execution_allowed") is False and receipt.get("drop_ready") is False)) else 42
 
 
 if __name__ == "__main__":
