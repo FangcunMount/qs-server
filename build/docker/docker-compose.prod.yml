@@ -1,5 +1,5 @@
 # 生产拓扑（2026-07）：
-# - serverA（4C/8G）：qs-apiserver + qs-collection-server x2（本文件前两段）
+# - serverA（2C/4G 资源预算）：qs-apiserver + qs-collection-server x2（本文件前两段）
 # - serverB：IAM（iam-apiserver，经 Swarm overlay infra-network 跨机 DNS 解析）
 # - serverD：qs-worker（本文件 qs-worker 段，compose -p qs-worker 独立部署）
 services:
@@ -10,9 +10,9 @@ services:
     # Must exceed the 8m Prompt-evaluation attempt lease so GracefulStop can
     # persist an in-flight Provider result before Docker sends SIGKILL.
     stop_grace_period: 8m30s
-    # apiserver 4C/4G；GOMEMLIMIT 取容器内存 75%。
-    mem_limit: "4096m"
-    cpus: "4"
+    # apiserver 1GiB；运行时预算 75%，保留两核突发上限。
+    mem_limit: "1024m"
+    cpus: "2"
     networks:
       qs-network:
       infra-network:
@@ -43,16 +43,21 @@ services:
       - /data/image/qrcode:/data/image/qrcode:rw
     environment:
       - QS_ENVIRONMENT=production
-      - GOMEMLIMIT=3072MiB
-      - GOMAXPROCS=4
+      - GOMEMLIMIT=768MiB
+      - GOMAXPROCS=2
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "3"
     command: ["--config=/app/configs/apiserver.prod.yaml"]
 
   server:
     image: ${DOCKER_IMAGE_QS_COLLECTION_SERVER:-ghcr.io/fangcunmount/qs-collection-server:latest}
     restart: unless-stopped
-    # 默认由 CD 扩为 2 副本；每个副本 2C/1.5G，CPU 配额与 GOMAXPROCS 对齐。
-    mem_limit: "1536m"
-    cpus: "2"
+    # 保留两个副本；每副本 1C/320MiB，合计内存预算 640MiB。
+    mem_limit: "320m"
+    cpus: "1"
     networks:
       qs-network:
         aliases:
@@ -77,8 +82,8 @@ services:
       # gRPC mTLS 证书目录；公网 HTTPS 由 serverA Nginx 终止
       - /data/infra/ssl/grpc:/etc/qs-server/ssl/grpc:ro
     environment:
-      - GOMEMLIMIT=1152MiB
-      - GOMAXPROCS=2
+      - GOMEMLIMIT=240MiB
+      - GOMAXPROCS=1
     logging:
       driver: json-file
       options:

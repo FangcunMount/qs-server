@@ -139,7 +139,7 @@ mysql:
   username: "app_user"
   password: ""
   database: "qs"
-  max-idle-connections: 40        # 4C/8G mixed_280+：略增热连接，减少池重建
+  max-idle-connections: 16        # 2C/4G：收敛空闲连接；保留前台最大连接预算
   max-open-connections: 150       # 与 backpressure.mysql.max_inflight 对齐（4C/8G 榨干档）
   max-connection-life-time: 30m   # 缩短连接生命周期，避免超时
   max-idle-time: 10m              # 添加空闲超时
@@ -341,10 +341,10 @@ mongo_consistency_audit:
 outbox_relay:
   mongo:
     interval: "1s"                # Mongo 标准 Outbox relay 周期
-    publish_workers: 16           # Mongo 标准 relay 发布并发
+    publish_workers: 8           # Mongo 标准 relay 发布并发
   assessment:
     interval: "1s"               # MySQL 标准 Outbox relay 周期
-    publish_workers: 16           # 限制 NSQ 故障时的并发重投放大
+    publish_workers: 8           # 限制 NSQ 故障时的并发重投放大
 
 # ----------------------------------------------------------------------------
 # 3.6.6 统计数据同步任务
