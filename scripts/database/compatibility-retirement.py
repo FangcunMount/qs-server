@@ -898,11 +898,44 @@ def bootstrap_private_request(args):
     return receipt
 
 
-def capture_fixed(command, *, timeout, maximum=32768):
-    # Child error output may contain connection strings; it is never relayed.
+MONGO_INDEX_DIAGNOSTIC = re.compile(
+    rb"QS_MONGO_INDEX_DIAGNOSTIC phase=(?:list|iterate|close) "
+    rb"kind=(?:context_deadline|context_cancelled|server|network_timeout|other) "
+    rb"code=(?:0|-?[1-9][0-9]{0,9}) namespace_sha256=[0-9a-f]{64} "
+    rb"elapsed_ms=(?:0|[1-9][0-9]{0,15})")
+
+
+def _forward_mongo_index_diagnostic(raw):
+    # Only the immutable inventory caller enables this path. Unknown stderr
+    # stays in the private temporary fd and is never put in logs or receipts.
+    if len(raw) > 8192:
+        return
+    lines = []
+    for line in raw.split(b"\n")[:-1]:
+        if not MONGO_INDEX_DIAGNOSTIC.fullmatch(line):
+            continue
+        fields = dict(token.split(b"=", 1) for token in line.split(b" ")[1:])
+        if not -(1 << 31) <= int(fields[b"code"]) < (1 << 31) or int(fields[b"elapsed_ms"]) > (1 << 63) - 1:
+            continue
+        lines.append(line)
+    # One failed catalog call emits one diagnostic. Multiple candidate lines
+    # are ambiguous, and none may be adopted as the actual failure.
+    if len(lines) == 1:
+        print(lines[0].decode("ascii"), file=sys.stderr)
+
+
+def capture_fixed(command, *, timeout, maximum=32768, mongo_index_diagnostics=False):
+    # Raw child errors can contain connection strings. Capturing into a
+    # private temporary fd avoids retaining an unbounded stderr PIPE in RAM.
+    # The normal path continues to discard stderr; no other mode opts in.
     try:
-        result = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
-                                timeout=timeout, check=False)
+        with (tempfile.TemporaryFile() if mongo_index_diagnostics else contextlib.nullcontext()) as private_stderr:
+            result = subprocess.run(command, stdout=subprocess.PIPE,
+                                    stderr=private_stderr if private_stderr is not None else subprocess.DEVNULL,
+                                    timeout=timeout, check=False)
+            if private_stderr is not None and os.fstat(private_stderr.fileno()).st_size <= 8192:
+                private_stderr.seek(0)
+                _forward_mongo_index_diagnostic(private_stderr.read(8193))
     except (OSError, subprocess.TimeoutExpired):
         fail("inventory_runtime_failed")
     if len(result.stdout) > maximum:
@@ -1014,7 +1047,8 @@ def live_inventory(args, directory):
             # container ID is observed. A timeout must first reconcile live
             # ID/labels/image/mounts by read-only inspection, without automatic
             # removal or retry of a potentially pre-existing container.
-            code, raw = capture_fixed(command, timeout=request["limits"]["total_seconds"] + 30, maximum=MAX_JSON)
+            code, raw = capture_fixed(command, timeout=request["limits"]["total_seconds"] + 30, maximum=MAX_JSON,
+                                      mongo_index_diagnostics=mode in ("bounds", "inventory"))
     summary = decode(raw)
     if mode == "identity":
         receipt = validate_identity_receipt(summary, code, args, output, request_hash, entrypoint_hash, request.get("mongo_anchor_profile", ""))
