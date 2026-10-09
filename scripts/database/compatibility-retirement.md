@@ -944,3 +944,37 @@ These are bounded synthetic owned-fixture results. They do not establish
 production full-source closure, writer fencing, historical CAS, production-scale
 600-second restoration, B deployment, controlled DROP, acceptance or batch-only
 purge. Production mutation modes retain their gates.
+
+
+### A99 historical fixture follow-up (2026-10-09)
+
+The final B binary at `b617cade837bd3a77bb9797b2c88db99aaa2ef17`
+subsequently passed the same two actual cross-process parents, with zero failures
+or skips. Root wave receipt SHA256 is
+`ee25a8dc994dd9cc2ac5d04876a205982169143aea64deff825847436e235078`;
+independent unchanged/zero after receipt SHA256 is
+`6295982dd0faa74f77c5c0e3d286656728e8ee1b820968a5327301b9abb0f795`.
+These observations retain their exact b617 source and owned-fixture scope.
+
+The b617 Seeddata E2E CI run failed while initializing retained historical
+SQL fixtures: they expected A99 but requested latest, correctly hitting B's
+paired-preflight requirement before business assertions. Test-only commit
+`be2b74d080dfc06eb8b574f114c5e75554e56fd0` uses the complete real migration
+resources with an explicit `Migrate(99)` fixture boundary, checks 98-to-99 where
+required, and verifies a clean 99 head plus no change on the second run. Its
+fixture-owned connection and source are checked and closed when initialization
+returns, leaving the borrowed pool available for actual evidence transactions.
+The B product startup guards, paired migrations and all 276 historical migration
+files are unchanged.
+
+At that test-only source, ordinary tests pass 904 actions with zero failures and
+two existing database-conditional skips. Both affected integration-tag test
+binaries compile, and affected integration-tag lint passes. The ordinary/compile
+receipt SHA256 is
+`848017b314d239ac24659773d814795bceeb211f4883533228078eb311ad8630`;
+lint receipt SHA256 is
+`5cd9d28069d3d1a4c609a23a4deeaacb369fb0c52ad9aa71a737167c8f9b8435`.
+The integration binaries were not executed and no database operation was run for
+this fixture repair. Real-database CI E2E remains required. The b617 native PASS
+is not reassigned to be2 or a later documentation-only head. None of these local
+results establish production deletion, deployment, restoration budget or purge.
