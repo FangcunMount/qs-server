@@ -130,8 +130,10 @@ A third independent read-only epoch checks persisted evidence/business facts
 and re-reads all four original sources using the second epoch's frozen origin
 anchor. Changed or deleted source records, conflicting conclusions, unknown
 execution and unsettled responsibilities prevent a finished result. Commit
-results are recorded per database; an unknown result blocks replay under another
-run, operation or ID. No saved JSON, flag or read-only summary can recreate Q.
+results are recorded per database; an unresolved attempt blocks automatic replay
+under another run or output within the same operation directory. Changing the
+operation or business ID must not substitute for reconciling an unknown result.
+No saved JSON, flag or read-only summary can recreate Q.
 
 AI-only writes record `mongo_commit_requirement=not_required`, commit SQL, and
 report no actual Mongo commit response. Event writes that require Mongo must
