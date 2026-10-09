@@ -39,7 +39,14 @@ func aiNativeOwnedMySQL(t *testing.T) *sql.DB {
 	if os.Getenv("MYSQL_HOST") != "127.0.0.1" || os.Getenv("MYSQL_PORT") != "34306" {
 		t.Fatal("non-owned native endpoint rejected")
 	}
-	raw, err := os.ReadFile("/private/tmp/qs-compatibility-retirement/owned-mysql.json")
+	manifestPath := os.Getenv("QS_RETIREMENT_LOCAL_MYSQL_MANIFEST")
+	if manifestPath == "" {
+		manifestPath = "/private/tmp/qs-compatibility-retirement/owned-mysql.json"
+	}
+	if !filepath.IsAbs(manifestPath) {
+		t.Fatal("owned fixture manifest must be an absolute path")
+	}
+	raw, err := os.ReadFile(manifestPath)
 	if err != nil {
 		t.Fatal("owned fixture manifest required")
 	}
