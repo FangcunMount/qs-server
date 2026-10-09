@@ -73,8 +73,10 @@ CAS, current responsibilities and independent persisted readback are still
 checked. A different retained closed Run does not substitute for the original;
 unfinished Runs, leases and duplicate retry authorization rows remain conflicts.
 The lower-level persistence bridge borrows the host transaction and does not
-certify that the host committed successfully. Production CAS qualification
-and lifecycle execution are still unavailable.
+certify that the host committed successfully. A qualified library factory and
+exact lifecycle/reconciliation kernels are now available to a fixed host;
+the production Action has no caller for them and its mutation modes remain
+unavailable.
 
 The five offline retirement contract suites run in final-source CI. Each
 production preparation reuses the latest successful main-push `ci.yml` run for
@@ -110,8 +112,11 @@ Python contracts, both lint profiles and Action syntax passed local verification
   at least one retained UUID, approved request/report equality and actual
   before/after observations are required. It does not claim a cluster UUID and
   never activates after a permission error. Legacy `identity_v1` and migration
-  generation checks remain unchanged. The backup adapter still needs separate
-  namespace-profile integration. Neither profile proves write or DROP permission.
+  generation checks remain unchanged. Backup capture and isolated Mongo restore
+  consume the same explicitly approved namespace profile. Restore requires the
+  real original database handle and separately observes the isolated database;
+  it never compares the two databases' collection UUIDs or substitutes a missing
+  original handle. Neither profile proves write or DROP permission.
   No server vault variable is guessed. It deploys nothing.
   A future B deployment
   must reuse prepared release scripts inside the same run, never dispatch CD
@@ -386,6 +391,77 @@ closure, evidence CAS, writer fencing, production-sized exact restore, release B
 DROP, acceptance and batch-owned purge remain incomplete; execution backends
 remain disabled.
 
+## Qualified history and responsibility transfer library
+
+`PrepareQualifiedHistoricalCAS` consumes this coordinator's actual consumed
+`WholeSourceJointPage`, `SourceOriginRecheckProof` and `AIReverseFreshProof`.
+Four-source authenticated EOF, complete global observations, original source
+identities and digests, original business graphs and current responsibility
+checks precede attachment construction. The factory rebuilds stable business
+bindings and calls the existing SQL/Mongo batch CAS preparers and persistence
+seal. The original two-argument `PrepareSQLCAS` and `PrepareMongoCAS` entries
+remain unqualified. Imported candidates, JSON readiness, terminal flags and
+local database tests cannot create these private proofs or authorize a host
+write. The host still owns RW transactions, commit/rollback and independent
+persisted readback.
+
+Allowed missing historical traces keep their exact `unverifiable` reason and
+never acquire a current/latest Run or invented attempt. Unknown current
+execution, pending/held work, leases, conflicting hashes or owners, and required
+external responsibility coverage remain blockers. In particular,
+`independent_admission_unique_sql_absence_observed_external_coverage_required`
+is not a pure historical evidence gap and cannot produce
+`ResponsibilityClosed=true`. Independent frozen Admission plus absent SQL
+Assessment alone does not close external responsibilities.
+
+`SealWholeSourceJointReplayAnchor` retains a bounded body-free record of an
+already consumed page. After actual four-source EOF,
+`ReplayWholeSourceJointPage` authenticates original frames through the existing
+index and rechecks original candidate hashes, business baselines and observation
+bindings under the same borrowed SQL/Mongo epoch. It restores genuine private
+row handles without consuming again, changing counters or extending TTL. It is
+page reacquisition, not a new fresh proof or execution permission.
+
+`PrepareAICommandHandoffBatch` and `AICommandHandoffBatch.Record` are real
+library callers for recording an old command publisher's transfer to the
+existing current protocol. They bind original source IDs and the full fourteen
+local ledgers; Record rechecks the ended read epoch and actual new RW transaction
+before storing transferred evidence in `ai_messaging_operations`. Current
+body/wire/receipt/ACK/sequence and operation facts remain unchanged. An unmapped
+old ID, held or unknown related obligation cannot be adopted or restaged under
+a new ID. A pending current operation remains pending: transfer of the old
+publisher's duty does not prove provider completion or external qs-ai closure.
+
+Bootstrap bounds/inventory approval accepts the body-free namespace reference
+`{"kind":"selected_namespace_kept_uuids_v1","hash":"<64 lowercase hex>"}`.
+Only after validating the independently approved original identity report's
+run/source/SHA, heads and actual observation does the private request expand
+that reference to its complete descriptor. The descriptor kind and full hash
+must match the approval; a newly supplied report cannot approve its own anchor.
+The original full-descriptor input remains supported. Both shapes reject unknown
+or mixed fields, and missing/failed observation never falls back to a replica
+profile. Database and replica-set names remain in private materials.
+
+The library contracts above are source-reviewed at Git
+`c5b60d02f912485f791001e78abced00bc601cea`. The earlier pre-lint native
+snapshot over `e720d5b8aa4d6786822e61c18b7891a7d7dbc3b7`, source manifest
+`9e08c1ff3f6728b69da184341a16ccb02995408d922a69f350ff4818a6e2a212`,
+passed the combined Qualified/Handoff/Persistence/Replay native selection:
+38 test actions, 12 parent tests and one package passed, with zero failures or
+skips, in 151.017 seconds. It includes genuine attachment factory preparation,
+Apply/Commit and an independent third readback, plus AI handoff positive and
+negative cases. A separate read-only cleanup confirmed zero owned test namespaces
+and unchanged protected fixture projections. Three subsequent lint fixes change
+an equivalent predicate, an intentional nil-context test annotation and tagged
+switch test syntax; the native result belongs to its original source bytes,
+not to this later snapshot. Ordinary checks reported 997 passing test actions
+with two existing database-conditional skips; 71 retirement Python cases and
+Action syntax checks passed. Final committed-source CI remains required.
+Historical verification entries retain their original source and scope.
+None of these local/library results certifies a production full host, all-writer
+fencing, the external 53-ledger qs-ai chain, B migration 39, real production
+restore within 600 seconds, DROP or purge.
+
 ## Required implementation before execution can become ready
 
 The target recovery library now provides `PrepareTargetRecovery` and
@@ -406,10 +482,18 @@ foreign-key failure. They establish a local recovery primitive, not a production
 authorization or a production Action backend. Fresh production qualification,
 privilege-negative checks and deployment rollback still need their own proofs.
 
-The native DROP producer remains package-private and is currently exercised
-only by integration-tag recovery tests. Its narrow unused-linter exception
-does not provide a production mutation entry; the reviewed fixed host
-executor and its independent authority remain required.
+The public `ApplyTargets` and `VerifyDroppedTargets` library kernels consume
+an actual opaque recovery plan and the original maintenance window. All four
+original targets and the archive are checked before effects; each DROP intent
+and actual result is durably journalled. `ReconcileTargetRecovery` reads the
+physical journal and actual namespaces. `ResumeTargetRecovery` consumes that
+opaque reconciliation and rechecks it before restoring only logged successful
+DROPs with confirmed absence. A missing result, unknown DROP, incomplete restore,
+target reappearance, changed identity or original deadline still blocks resume.
+These calls borrow host-owned handles, retain current MQ/evidence and preserve
+schema heads. They neither reconstruct DROP authority from missing tables nor
+prove production writer isolation, approval, a 600-second restoration or an
+Action mutation caller.
 
 The private decoded-fact fingerprint now streams text through bounded,
 instance-owned scratch storage. Its original frame bytes, protocol, NULL/type

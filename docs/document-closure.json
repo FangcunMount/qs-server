@@ -2,7 +2,7 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "4d96b5b1caf91d6f0965eb2ff5c32eb57cc170aa",
+    "sha": "c5b60d02f912485f791001e78abced00bc601cea",
     "verified_on": "2026-10-09"
   },
   "status_policy": {
@@ -11270,7 +11270,7 @@
       "owner": "tooling",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "19224794d20a352044c272fee62539da6a9c39f6",
+        "source_sha": "c5b60d02f912485f791001e78abced00bc601cea",
         "verified_on": "2026-10-09"
       },
       "fact_sources": [
@@ -11437,6 +11437,10 @@
         {
           "kind": "source",
           "path": "scripts/database/test-compatibility-namespace-anchor.py"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/infra/mysql/evaluation/historical_batch_bindings.go"
         }
       ],
       "verification": [
@@ -11773,6 +11777,54 @@
           "result": "passed",
           "source_sha": "19224794d20a352044c272fee62539da6a9c39f6",
           "verified_on": "2026-10-09"
+        },
+        {
+          "kind": "source_selector",
+          "path": "internal/apiserver/maintenance/compatibilityretirement/coordinator_cas_qualified.go",
+          "selector": "func (c *HistoricalCoordinator) PrepareQualifiedHistoricalCAS(",
+          "result": "matched",
+          "verified_on": "2026-10-09",
+          "source_sha": "c5b60d02f912485f791001e78abced00bc601cea"
+        },
+        {
+          "kind": "source_selector",
+          "path": "internal/apiserver/maintenance/compatibilityretirement/whole_source_joint_replay.go",
+          "selector": "func (c *HistoricalCoordinator) ReplayWholeSourceJointPage(",
+          "result": "matched",
+          "verified_on": "2026-10-09",
+          "source_sha": "c5b60d02f912485f791001e78abced00bc601cea"
+        },
+        {
+          "kind": "source_selector",
+          "path": "internal/apiserver/maintenance/compatibilityretirement/ai_command_handoff.go",
+          "selector": "func (p *AICommandHandoffBatch) Record(",
+          "result": "matched",
+          "verified_on": "2026-10-09",
+          "source_sha": "c5b60d02f912485f791001e78abced00bc601cea"
+        },
+        {
+          "kind": "source_selector",
+          "path": "scripts/database/compatibility-retirement.py",
+          "selector": "def expand_approved_namespace_anchor(approval, binding):",
+          "result": "matched",
+          "verified_on": "2026-10-09",
+          "source_sha": "c5b60d02f912485f791001e78abced00bc601cea"
+        },
+        {
+          "kind": "source_selector",
+          "path": "internal/apiserver/maintenance/compatibilityretirementbackup/target_lifecycle.go",
+          "selector": "func ResumeTargetRecovery(",
+          "result": "matched",
+          "verified_on": "2026-10-09",
+          "source_sha": "c5b60d02f912485f791001e78abced00bc601cea"
+        },
+        {
+          "kind": "source_selector",
+          "path": "internal/apiserver/maintenance/compatibilityretirementbackup/target_operation_reconcile.go",
+          "selector": "func ReconcileTargetRecovery(",
+          "result": "matched",
+          "verified_on": "2026-10-09",
+          "source_sha": "c5b60d02f912485f791001e78abced00bc601cea"
         }
       ],
       "production_evidence": {
@@ -11789,8 +11841,8 @@
           "id": "COMPAT-RETIREMENT-PRODUCTION",
           "kind": "verification",
           "severity": "high",
-          "summary": "The user-approved acceleration consolidates final-source checks and accepts explicitly unverifiable terminal history with settled legacy responsibilities. Local race regressions, integration-tag compile/vet, ordinary/integration lint, Python contracts and Action syntax passed. The first combined run found a duplicate retry diagnostic and an invalid asynchronous test wrapper; the corrected affected checks pass, with original failures retained. The new SQL and joint SQL/Mongo native cases are wired into final-source CI but have not yet executed for this source. Namespace identity discovery now binds actual retained UUIDs without a replica-admin fallback; backup profile integration remains incomplete. Complete current production scans, persisted per-row conclusions, actual writer isolation, exact production backup/restoration, lifecycle host callers, B deployment, DROP, acceptance and batch-only purge remain outstanding. PrepareSQLCAS and PrepareMongoCAS remain unqualified; production mutation backends stay disabled.",
-          "exit_criteria": "Complete all four fixed-bound source scans; persist qualified current-terminal or explicitly handed-off historical conclusions, including honest gaps; prove actual writer isolation and exact restoration within 600 seconds; execute the approved controlled retirement, B deployment, acceptance and batch-only purge. Optional synthetic stress and original-trace reconstruction are outside the critical path."
+          "summary": "The committed-source review at c5b60d02f912485f791001e78abced00bc601cea has an actual consumed-joint/origin-fresh/AI-fresh historical CAS attachment factory, bounded same-epoch authenticated page replay, an original AI publisher-transfer recording caller, approved body-free namespace anchor references, namespace-profile backup/isolated-restore binding, and public exact lifecycle/reconciliation/resume library callers. The old two-argument CAS gates remain unqualified and production Action mutation modes remain disabled. The original pre-lint native snapshot (source manifest 9e08c1ff3f6728b69da184341a16ccb02995408d922a69f350ff4818a6e2a212) passed 38 test actions, 12 parents and one package, with zero failures/skips, in 151.017 seconds; separate read-only cleanup confirmed zero owned namespaces and protected fixture projections unchanged. Its result is not reassigned to the three later equivalent predicate/test-syntax lint fixes. Prior combined ordinary checks report 997 passing test actions and two existing database-conditional skips; 71 retirement Python cases and Action syntax checks pass. The committed library source is reviewed; final-source CI remains pending. Pure historical gaps are accepted only after actual terminal ownership and settled or explicitly transferred legacy responsibility; unknown external coverage remains blocked, including independent Admission/SQL absence without external closure. Production whole-source history/CAS host wiring, full writer fencing, external qs-ai 53-ledger closure, production backup/isolated restore and measured 600-second recovery, B39 deployment, DROP, acceptance and batch-only purge remain outstanding. Historical verification entries are retained without promotion.",
+          "exit_criteria": "Bind all four actual production fixed-bound source streams and complete EOF to the final approved source/material chain; invoke the genuine qualified factory and transferred-evidence caller through the controlled host, commit and independently read back every retained conclusion without accepting unknown current responsibilities. Prove all actual writers are isolated and exact restoration completes within 600 seconds, then execute controlled lifecycle/journal reconciliation as needed, B39 deployment, final acceptance and batch-only purge. Optional synthetic stress is not a production permission."
         }
       ]
     },
