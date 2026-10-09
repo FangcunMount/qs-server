@@ -2,7 +2,7 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "5196893331a34891183b81bd7b6196d2696fca2d",
+    "sha": "7e39ed4f7790917db67919e2bf765080031dc83d",
     "verified_on": "2026-10-09"
   },
   "status_policy": {
@@ -11270,7 +11270,7 @@
       "owner": "tooling",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "5196893331a34891183b81bd7b6196d2696fca2d",
+        "source_sha": "7e39ed4f7790917db67919e2bf765080031dc83d",
         "verified_on": "2026-10-09"
       },
       "fact_sources": [
@@ -11449,6 +11449,58 @@
         {
           "kind": "source",
           "path": "scripts/database/test_qs_ai_retirement_readonly_host.py"
+        },
+        {
+          "kind": "source",
+          "path": "cmd/qs-compatibility-history/host_ai_external.go"
+        },
+        {
+          "kind": "source",
+          "path": "cmd/qs-compatibility-history/host_ai_external_test.go"
+        },
+        {
+          "kind": "source",
+          "path": "cmd/qs-compatibility-history/main.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/maintenance/compatibilityretirement/ai_external_exec_quiescence.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/maintenance/compatibilityretirement/ai_external_exec_quiescence_test.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/maintenance/compatibilityretirement/ai_external_execution.go"
+        },
+        {
+          "kind": "source",
+          "path": "scripts/database/compatibility-ai-history-prepare.py"
+        },
+        {
+          "kind": "source",
+          "path": "scripts/database/qs-ai-retirement-readonly-verifier.py"
+        },
+        {
+          "kind": "source",
+          "path": "scripts/database/test-compatibility-ai-history-prepare.py"
+        },
+        {
+          "kind": "source",
+          "path": "scripts/database/test_qs_ai_retirement_readonly_verifier.py"
+        },
+        {
+          "kind": "source",
+          "path": "cmd/qs-compatibility-retirement/main.go"
+        },
+        {
+          "kind": "source",
+          "path": "cmd/qs-compatibility-retirement/mongo_index_diagnostic_test.go"
+        },
+        {
+          "kind": "source",
+          "path": "scripts/database/test-compatibility-retirement.py"
         }
       ],
       "verification": [
@@ -11907,6 +11959,133 @@
           "result": "passed",
           "source_sha": "5196893331a34891183b81bd7b6196d2696fca2d",
           "verified_on": "2026-10-09"
+        },
+        {
+          "kind": "source_selector",
+          "path": "cmd/qs-compatibility-history/host_ai_external_test.go",
+          "selector": "func TestAIHostCLIExactModesAndArguments(t *testing.T)",
+          "result": "matched",
+          "source_sha": "743f4afefdbd0f92155f127d9b9ee91cfd1a655e",
+          "verified_on": "2026-10-09"
+        },
+        {
+          "kind": "source_selector",
+          "path": "internal/apiserver/maintenance/compatibilityretirement/ai_external_exec_quiescence_test.go",
+          "selector": "func TestAIExecQuiescenceActualInspectorOverridesSavedCompletion(t *testing.T)",
+          "result": "matched",
+          "source_sha": "743f4afefdbd0f92155f127d9b9ee91cfd1a655e",
+          "verified_on": "2026-10-09"
+        },
+        {
+          "kind": "command",
+          "command": "python3 -B scripts/database/test-compatibility-ai-history-prepare.py",
+          "result": "passed",
+          "source_sha": "743f4afefdbd0f92155f127d9b9ee91cfd1a655e",
+          "verified_on": "2026-10-09"
+        },
+        {
+          "kind": "command",
+          "command": "python3 -B scripts/database/test-compatibility-retirement.py",
+          "result": "passed",
+          "source_sha": "743f4afefdbd0f92155f127d9b9ee91cfd1a655e",
+          "verified_on": "2026-10-09"
+        },
+        {
+          "kind": "command",
+          "command": "python3 -B scripts/database/test_qs_ai_retirement_readonly_host.py",
+          "result": "passed",
+          "source_sha": "743f4afefdbd0f92155f127d9b9ee91cfd1a655e",
+          "verified_on": "2026-10-09"
+        },
+        {
+          "kind": "command",
+          "command": "python3 -B scripts/database/test-compatibility-history-prepare.py",
+          "result": "passed",
+          "source_sha": "743f4afefdbd0f92155f127d9b9ee91cfd1a655e",
+          "verified_on": "2026-10-09"
+        },
+        {
+          "kind": "command",
+          "command": "python3 -B scripts/database/test-compatibility-history-parent.py",
+          "result": "passed",
+          "source_sha": "743f4afefdbd0f92155f127d9b9ee91cfd1a655e",
+          "verified_on": "2026-10-09"
+        },
+        {
+          "kind": "command",
+          "command": "python3 -B scripts/database/test-compatibility-history-parent-action.py",
+          "result": "passed",
+          "source_sha": "743f4afefdbd0f92155f127d9b9ee91cfd1a655e",
+          "verified_on": "2026-10-09"
+        },
+        {
+          "kind": "command",
+          "command": "python3 -B scripts/database/test-compatibility-namespace-anchor.py",
+          "result": "passed",
+          "source_sha": "743f4afefdbd0f92155f127d9b9ee91cfd1a655e",
+          "verified_on": "2026-10-09"
+        },
+        {
+          "kind": "source_selector",
+          "path": "cmd/qs-compatibility-history/host_ai_external.go",
+          "selector": "func runAIHostCLI(ctx context.Context, args []string)",
+          "result": "matched",
+          "source_sha": "743f4afefdbd0f92155f127d9b9ee91cfd1a655e",
+          "verified_on": "2026-10-09"
+        },
+        {
+          "kind": "source_selector",
+          "path": "internal/apiserver/maintenance/compatibilityretirement/ai_external_exec_quiescence.go",
+          "selector": "func RequireAIExternalExecQuiescence(",
+          "result": "matched",
+          "source_sha": "743f4afefdbd0f92155f127d9b9ee91cfd1a655e",
+          "verified_on": "2026-10-09"
+        },
+        {
+          "kind": "source_selector",
+          "path": "scripts/database/compatibility-ai-history-prepare.py",
+          "selector": "def prepare(args, t):",
+          "result": "matched",
+          "source_sha": "743f4afefdbd0f92155f127d9b9ee91cfd1a655e",
+          "verified_on": "2026-10-09"
+        },
+        {
+          "kind": "command",
+          "command": "go test -race -count=1 -json ./cmd/qs-compatibility-retirement",
+          "result": "passed",
+          "source_sha": "7e39ed4f7790917db67919e2bf765080031dc83d",
+          "verified_on": "2026-10-09"
+        },
+        {
+          "kind": "command",
+          "command": "python3 -B scripts/database/test-compatibility-retirement.py -v",
+          "result": "passed",
+          "source_sha": "7e39ed4f7790917db67919e2bf765080031dc83d",
+          "verified_on": "2026-10-09"
+        },
+        {
+          "kind": "source_selector",
+          "path": "cmd/qs-compatibility-retirement/main.go",
+          "selector": "func mongoIndexDiagnosticLine(phase, namespace string, elapsed time.Duration, err error) string",
+          "result": "matched",
+          "source_sha": "7e39ed4f7790917db67919e2bf765080031dc83d",
+          "verified_on": "2026-10-09"
+        },
+        {
+          "kind": "source_selector",
+          "path": "cmd/qs-compatibility-retirement/mongo_index_diagnostic_test.go",
+          "selector": "func TestMongoIndexDiagnosticClassifiesActualTypedErrorsWithoutErrorText(t *testing.T)",
+          "result": "matched",
+          "source_sha": "7e39ed4f7790917db67919e2bf765080031dc83d",
+          "verified_on": "2026-10-09"
+        },
+        {
+          "kind": "source_selector",
+          "path": "scripts/database/compatibility-retirement.py",
+          "selector": "def _forward_mongo_index_diagnostic(raw):",
+          "result": "matched",
+          "source_sha": "7e39ed4f7790917db67919e2bf765080031dc83d",
+          "verified_on": "2026-10-09"
         }
       ],
       "production_evidence": {
@@ -11923,7 +12102,7 @@
           "id": "COMPAT-RETIREMENT-PRODUCTION",
           "kind": "verification",
           "severity": "high",
-          "summary": "The source review at 5196893331a34891183b81bd7b6196d2696fca2d adds a bounded private multi-page historical CAS spool and unconnected write-host implementation with inherited deadlines, separate commit results and independent persisted readback; actual Docker-exec lifecycle observation/reconciliation and body-free external bounds discovery; and report-diagnostic for a hash-bound existing boundary report without a DB scan. The write host is not connected to main/CLI/Action, the diagnostic capability fields are all false, and production mutation modes remain disabled. Local affected AI checks passed 46 test actions in 23 parent tests with both lint profiles (receipt 4dcc5a59e0666f9b6d6bba6c88a1d5d08599977c641eb2bc5249dcc563b94b30). An earlier spool-native snapshot passed 4 actions in 2 parents (receipt ef8925afc3decc17f8b31843bdc40c0fadd3260b86873475e126ece4f7c736e4), followed by independent zero-owned-namespace/protected-fixture readback (31e7da6bcda2b1a1598197032060dddb39a94eba8d460218c2a5a6db9bd3cc53). The later AI modes and report-diagnostic changes were not in that native wave; its spool/dependency bytes are unchanged, not a whole-source 5196893 native proof. Six actual Python suites and configured Action syntax checks pass (812a44488befbc51ebc6f5ed85889e0388ca004235415fcd8ae2132c95a41779). Final committed-source CI and every production lifecycle prerequisite remain required. The following prior review and tests retain their original source and scope. The committed-source review at c5b60d02f912485f791001e78abced00bc601cea has an actual consumed-joint/origin-fresh/AI-fresh historical CAS attachment factory, bounded same-epoch authenticated page replay, an original AI publisher-transfer recording caller, approved body-free namespace anchor references, namespace-profile backup/isolated-restore binding, and public exact lifecycle/reconciliation/resume library callers. The old two-argument CAS gates remain unqualified and production Action mutation modes remain disabled. The original pre-lint native snapshot (source manifest 9e08c1ff3f6728b69da184341a16ccb02995408d922a69f350ff4818a6e2a212) passed 38 test actions, 12 parents and one package, with zero failures/skips, in 151.017 seconds; separate read-only cleanup confirmed zero owned namespaces and protected fixture projections unchanged. Its result is not reassigned to the three later equivalent predicate/test-syntax lint fixes. Prior combined ordinary checks report 997 passing test actions and two existing database-conditional skips; 71 retirement Python cases and Action syntax checks pass. The committed library source is reviewed; final-source CI remains pending. Pure historical gaps are accepted only after actual terminal ownership and settled or explicitly transferred legacy responsibility; unknown external coverage remains blocked, including independent Admission/SQL absence without external closure. Production whole-source history/CAS host wiring, full writer fencing, external qs-ai 53-ledger closure, production backup/isolated restore and measured 600-second recovery, B39 deployment, DROP, acceptance and batch-only purge remain outstanding. Historical verification entries are retained without promotion.",
+          "summary": "Current source-reviewed 7e39ed4f7790917db67919e2bf765080031dc83d preserves the prior 743f4afefdbd0f92155f127d9b9ee91cfd1a655e source, which connects the native readonly AI bounds/verify CLI to two dedicated Action prepare modes, preserving original parent request bytes, trusted actual-run derivation, independently bound runtime/bounds hashes, explicit complete Mongo metadata credentials, native operation-lock ownership and real original-exec quiescence. The fourteen-file installed combination has 72 passing affected Go race actions in 30 parents, an actual CLI compile and affected lint (ced79fa738a4a49ae09cbeedcf02f57b86b0c26a14f6a3db79b788f73618e95c); seven actual Python suites run 205 cases with one existing optional native skip, and both configured workflow syntax checks pass (61070fa61053b50e611f65fd91e070d94ed0f76da309e5ef75d884577a2a75f8). Go files are unchanged between the nine-file Go check and the fourteen-file composition. Actual commands: go test -race -count=1 -json -run '^(TestAIHost|TestAIExecQuiescence|TestAIExternal)' ./cmd/qs-compatibility-history ./internal/apiserver/maintenance/compatibilityretirement; bin/golangci-lint run ./cmd/qs-compatibility-history ./internal/apiserver/maintenance/compatibilityretirement. Environment: GOMAXPROCS=3, Go 1.25.12, GOTOOLCHAIN=local, GOFLAGS=-mod=readonly; no -p argument. The closure verification entries use source selectors for this scope because its command validator cannot represent the actual regex/lint argv; the receipt remains the test evidence. The compile is not a formally source-pinned production executable, and final committed-source CI remains required. Main 5c71b215b71ddd277608fecdbf097e874062ab9a CI and all ten CD jobs in 37904411717 succeeded, separately from retirement acceptance. The additional four Mongo diagnostic files at 7e39ed4f7790917db67919e2bf765080031dc83d pass 55 affected race actions/20 parents/0 failure/0 skip, native build, affected lint, 90 Python tests and diff checking; source is unchanged, receipt 2a7bda09844b1578de7d098101dc66451f476e7855eba9945dfe10a92cdb2763. Their actual test argv are go test -race -count=1 -json ./cmd/qs-compatibility-retirement and python3 -B scripts/database/test-compatibility-retirement.py -v. Fixed bounded phase/kind/code/namespace digest/elapsed stderr adds diagnosis only, preserving visibility failure and all capability gates. Earlier report observation 37904651280 on tooling 5c71 returns MySQL none/MongoDB mongo_index_visibility_incomplete, decoded receipt d03b747946e413d8f1c571f6d141b109a9cc409c4d900f764a07269a4893d1c6; its original boundary 37896613961-1/source7c52127670a5702474e11f02e8fc1abacd573365 is incomplete and all capabilities false. Diagnostic Action success is not inventory success and did not execute the new 7e39 diagnostic source. The external verifier preserves complete 53/14-ledger EOF and original bindings, attributes execution responsibility to this batch and rejects orphan/conflicting/unowned or related unknown work rather than unrelated proven current work. No actual production eight-command closure, historical backfill, full source/owner scan budget, writer fence, controlled DROP, successful B migration/recovery, acceptance or purge is established. The historical write host is still unconnected to main/CLI/Action; imported diagnostic JSON grants no opaque write qualification and every new diagnostic capability remains false. The earlier spool-native four-action/two-parent success and independent cleanup retain ef8925afc3decc17f8b31843bdc40c0fadd3260b86873475e126ece4f7c736e4 and 31e7da6bcda2b1a1598197032060dddb39a94eba8d460218c2a5a6db9bd3cc53; those results do not include later AI modes. B recovery and the combined 600-second production budget are still unverified. The following prior review and tests retain their original source and scope. The committed-source review at c5b60d02f912485f791001e78abced00bc601cea has an actual consumed-joint/origin-fresh/AI-fresh historical CAS attachment factory, bounded same-epoch authenticated page replay, an original AI publisher-transfer recording caller, approved body-free namespace anchor references, namespace-profile backup/isolated-restore binding, and public exact lifecycle/reconciliation/resume library callers. The old two-argument CAS gates remain unqualified and production Action mutation modes remain disabled. The original pre-lint native snapshot (source manifest 9e08c1ff3f6728b69da184341a16ccb02995408d922a69f350ff4818a6e2a212) passed 38 test actions, 12 parents and one package, with zero failures/skips, in 151.017 seconds; separate read-only cleanup confirmed zero owned namespaces and protected fixture projections unchanged. Its result is not reassigned to the three later equivalent predicate/test-syntax lint fixes. Prior combined ordinary checks report 997 passing test actions and two existing database-conditional skips; 71 retirement Python cases and Action syntax checks pass. The committed library source is reviewed; final-source CI remains pending. Pure historical gaps are accepted only after actual terminal ownership and settled or explicitly transferred legacy responsibility; unknown external coverage remains blocked, including independent Admission/SQL absence without external closure. Production whole-source history/CAS host wiring, full writer fencing, external qs-ai 53-ledger closure, production backup/isolated restore and measured 600-second recovery, B39 deployment, DROP, acceptance and batch-only purge remain outstanding. Historical verification entries are retained without promotion.",
           "exit_criteria": "Bind all four actual production fixed-bound source streams and complete EOF to the final approved source/material chain; invoke the genuine qualified factory and transferred-evidence caller through the controlled host, commit and independently read back every retained conclusion without accepting unknown current responsibilities. Prove all actual writers are isolated and exact restoration completes within 600 seconds, then execute controlled lifecycle/journal reconciliation as needed, B39 deployment, final acceptance and batch-only purge. Optional synthetic stress is not a production permission."
         }
       ]
@@ -12057,7 +12236,7 @@
       "owner": "tooling",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "d043f88f2957a280e5d054c6f2dadd479542b492",
+        "source_sha": "7e39ed4f7790917db67919e2bf765080031dc83d",
         "verified_on": "2026-10-09"
       },
       "fact_sources": [
@@ -12112,6 +12291,46 @@
           "result": "passed",
           "source_sha": "51ac84a0e0cd220dc5e7cb5b553cd3dcaee884e5",
           "verified_on": "2026-10-09"
+        },
+        {
+          "kind": "source_selector",
+          "path": "scripts/database/qs-ai-retirement-readonly-verifier.py",
+          "selector": "def _original_execution_scope(ai, peer, originals):",
+          "result": "matched",
+          "source_sha": "7e39ed4f7790917db67919e2bf765080031dc83d",
+          "verified_on": "2026-10-09"
+        },
+        {
+          "kind": "source_selector",
+          "path": "scripts/database/qs-ai-retirement-readonly-verifier.py",
+          "selector": "reverse = _reverse(ai, peer, originals)",
+          "result": "matched",
+          "source_sha": "7e39ed4f7790917db67919e2bf765080031dc83d",
+          "verified_on": "2026-10-09"
+        },
+        {
+          "kind": "source_selector",
+          "path": "scripts/database/test_qs_ai_retirement_readonly_verifier.py",
+          "selector": "def test_original_unknown_provider_and_unbound_scope_remain_blocked(self):",
+          "result": "matched",
+          "source_sha": "7e39ed4f7790917db67919e2bf765080031dc83d",
+          "verified_on": "2026-10-09"
+        },
+        {
+          "kind": "source_selector",
+          "path": "scripts/database/test_qs_ai_retirement_readonly_verifier.py",
+          "selector": "def test_unknown_provider_orphan_cross_session_and_fake_owner_block(self):",
+          "result": "matched",
+          "source_sha": "7e39ed4f7790917db67919e2bf765080031dc83d",
+          "verified_on": "2026-10-09"
+        },
+        {
+          "kind": "source_selector",
+          "path": "scripts/database/test_qs_ai_retirement_readonly_verifier.py",
+          "selector": "async def test_unrelated_evaluation_unknown_keeps_real_typed_evidence_validation(self):",
+          "result": "matched",
+          "source_sha": "7e39ed4f7790917db67919e2bf765080031dc83d",
+          "verified_on": "2026-10-09"
         }
       ],
       "production_evidence": {
@@ -12128,7 +12347,7 @@
           "id": "RETIREMENT-AI-PRODUCTION",
           "kind": "verification",
           "severity": "high",
-          "summary": "Full original execution and MQ ledger verification is implemented and locally tested; production identity, runtime source, historical trusted keys, broker and writer-fence bindings remain unproven.",
+          "summary": "Full original execution and MQ ledger verification is implemented and locally tested; current source derives target scope from both independently approved full-EOF legacy AI sources, validates the actual request/session/org/run graph, and reports unrelated unknown provider work only after complete owner/typed evaluation integrity checks. Target unknown/held/pending responsibility, orphan/cross-owner/duplicate/hash conflicts remain blockers. This source calibration is not new production verification; production identity, runtime source, historical trusted keys, broker and writer-fence bindings remain unproven.",
           "exit_criteria": "Bind actual qs-ai and qs-server databases/runtime sources, original message keys, frozen broker responsibility and writer fencing; verify all original command IDs and persist minimal retirement records before DROP."
         }
       ]

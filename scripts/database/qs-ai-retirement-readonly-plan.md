@@ -2,6 +2,10 @@
 
 当前完整核验器的输入来自四个旧对象的全量扫描；八个 START 是既有盘点样本，不是固定白名单或全库覆盖证明。完整核验器扫描 53 个逻辑账本及 14 个 qs-server 协作表，当前另有精确的 `0040_module_table_names` 物理适配：43 个业务表及一个 Alembic 表，固定契约来自 qs-ai 的实际来源 `82ffa1b43308f23fbb1ebe669c3071e0486e105a`。先核对完整物理目录、DDL、主键、索引、外键、约束、NULL 和原字节，再重建原逻辑投影；不以旧名称 JOIN 或过滤隐藏孤儿。旧 0038 布局保留独立识别分支，其他布局明确拒绝。
 
+当前 `7e39ed4f7790917db67919e2bf765080031dc83d` 的目标范围从两份独立批准、完整 EOF 的旧 AI 源生成 `_Original`，再由 `_verify` 把同一原对象传给 `_reverse`、`_evaluations` 和 `_mq`。`_original_execution_scope` 严格重核原 command=request、请求原哈希、session、组织、主体、受试者、测评和 goal，范围包括这些原 session 的全部保留 Run；不是调用者给出的 ID 数组，也不是八条样本白名单。未知范围不能当成空范围。
+
+全量 53/14 账本扫描和反向完整性检查保持不变。当前无关的 `model_calls` unknown/dispatched 只有在全局 Run/Session/唯一 Job、原 request 与组织归属检查通过、且不属于任何原目标 session 时，才记为 `outside_retirement_provider_result_unknown`；缺 Job、孤儿、跨 session/组织、重复 owner/run 或原摘要冲突继续阻断。独立评测的 result_unknown 也必须继续通过真实 creation receipt、冻结 policy/asset、dispatch/completion/slot/response 和组织归属校验，且原 run 不与目标 request/session/run ID 相撞，才能记为目标外观察。目标外 unknown 没有被改成成功或关闭状态，本批有关 unknown/dispatched、held、待处理预算/租约、MQ/回执冲突仍阻断。
+
 下文早期 18 表观察器及 0037 夹具的结果仅描述其有限机制。新 0040 适配与完整核验器已经通过本地真实 MySQL 回归，包括合并表、未知类型、NULL、复合主键以及 SQL 原生排序；这些结果未绑定生产宿主、历史可信 keys 或责任闭环。核验器继续借用宿主连接和事务，不自行创建连接、回填、重发或退休命令。
 
 
@@ -48,7 +52,7 @@ schema 定义在 `src/qs_ai/infrastructure/persistence/mysql/schema.py:10,62,73,
 
 参与者 START 的执行 claim 就在 execution_jobs + execution_leases；模型 unknown 就在 model_calls，没有另一张“Participant unknown 表”。Report 图在 `src/qs_ai/infrastructure/workflows/report.py:59` 使用 `graph.compile()`，没有接入独立 LangGraph checkpoint 数据库，不能凭 checkpoint_ref 假设另一套已审计账本。
 
-评测是一条独立责任链：`evaluation_runs`（definition/progress 中包含创建 receipt、取消/恢复/人工决策）、`evaluation_checkpoints`、`evaluation_run_policies`、`evaluation_dispatches`、`evaluation_generation_completions`、`evaluation_semantic_completions`、`evaluation_slot_claims`、`evaluation_response_receipts`、`evaluation_capacity_reservations` 与 `ai_messaging_evaluation_sequences`。定义为 `schema.py:228–331,477,716`、0037 DDL；unknown 和人工 resolution 存于完成证据及 progress，不是独立 unknown 表（`evaluation_resolution_evidence.py:45`、`evaluation_unknowns.py:23`）。它们不能被 JOIN 到 interpretation_runs 或套用 Participant 终态。全局 MQ 出现评测类型时，必须按这条真实链证明其属于另一个已知责任域；关联到本批 START 原 ID、错组织、缺运行记录或未能分类时阻断。原型暂未实现该域的完整语义验证，回执明确保留缺口。
+评测是一条独立责任链：`evaluation_runs`（definition/progress 中包含创建 receipt、取消/恢复/人工决策）、`evaluation_checkpoints`、`evaluation_run_policies`、`evaluation_dispatches`、`evaluation_generation_completions`、`evaluation_semantic_completions`、`evaluation_slot_claims`、`evaluation_response_receipts`、`evaluation_capacity_reservations` 与 `ai_messaging_evaluation_sequences`。定义为 `schema.py:228–331,477,716`、0037 DDL；unknown 和人工 resolution 存于完成证据及 progress，不是独立 unknown 表（`evaluation_resolution_evidence.py:45`、`evaluation_unknowns.py:23`）。它们不能被 JOIN 到 interpretation_runs 或套用 Participant 终态。全局 MQ 出现评测类型时，必须按这条真实链证明其属于另一个已知责任域；关联到本批 START 原 ID、错组织、缺运行记录或未能分类时阻断。早期 18 表原型未实现该域的完整语义验证；当前完整核验器的 `_evaluations` 按上文目标范围规则复用实际评测验证器，目标外观察仍不代表本批已经退出。
 
 ## 执行查询与两阶段批准
 
@@ -107,11 +111,11 @@ ORDER BY organization_id,command_id LIMIT :page;
 
 ## 精确本地闭环验证
 
-私有批准目标恰为八个 START，字段仅 command_id=request_id、session_id、organization_id、subject_id、testee_id、assessment_ids、可信 decoder 计算的 qs_ai_request_hash 和完整原源行 SHA；禁止 imported complete:true。原 IDs 必须 canonical UUID、业务 ID 为非零 uint64，八个原命令/session 均唯一。公开回执仅逐目标 reference_sha256/source_row_sha256。
+以下六项首先描述早期 18 表原型的八个 START 样本合同；当前完整核验器使用上文经完整源认证得到的实际范围，不固定八个 ID。原型字段仅 command_id=request_id、session_id、organization_id、subject_id、testee_id、assessment_ids、可信 decoder 计算的 qs_ai_request_hash 和完整原源行 SHA；禁止 imported complete:true。原 IDs 必须 canonical UUID、业务 ID 为非零 uint64，原命令/session 均唯一。公开回执仅逐目标 reference_sha256/source_row_sha256。
 
 1. **原接受事实**：external_requests、session 和 global scope=`fingerprint(["qs-server","external-start-v1"])` 的 idempotency 行恰各一条。request_hash 用 `service.py:178` 的真实 Python算法：UTF-8、sort_keys、compact JSON，对 `[asdict(actor),testee,assessment_tuple,goal]+asdict(evidence_items)` 求 SHA。原 Receipt 的 session/run/status/version 与可信开始事实对照；这里不能用 qs-server 的 payload_hash，也不能用后来生成的新 request。零行、跨 org/subject/testee、另一 session 或不支持的历史 writer 版本阻断。
 2. **全部运行责任**：按 session 收集所有 interpretation_runs，按 run 双向匹配 job/call；还从全表反查无 Run 的 job/call、job.run 的 session 不同、无 session 的子行。没有 `LIMIT 100`。原开始 receipt.run、每次答题和 retry 链必须能解释每个非初始 run，拒绝未关联分支、环、重复 source/new_run 或跨组织。
-3. **Provider责任**：`execution.py:73` 先提交 dispatched 再调用 HTTP，崩溃前后不可分辨，禁止用租约过期、job dead/cancelled、session cancelled、accepted_unknown_risk 把 dispatched/unknown 变成功。response_received 必须 strict `JSONModelCallCodec.decode_request/decode_response` 验证原 schema、invocation/fence/provider request。failed 必须已知确定失败，技术未知仍阻断。当前原型只验状态/响应存在；完整 codec/历史 schema 分支尚未实现。
+3. **Provider责任**：`execution.py:73` 先提交 dispatched 再调用 HTTP，崩溃前后不可分辨，禁止用租约过期、job dead/cancelled、session cancelled、accepted_unknown_risk 把 dispatched/unknown 变成功。response_received 必须 strict `JSONModelCallCodec.decode_request/decode_response` 验证原 schema、invocation/fence/provider request。failed 必须已知确定失败，技术未知仍阻断。早期 18 表原型只验状态/响应存在；当前完整核验器另走 `_typed_execution` 的真实 codec/配置/产物核验，不能以目标外计数替代本批原执行核验。
 4. **终态与原产物**：completed 要按 `execution.py:462` 验 session/run/evidence/invocation/provider request/content fingerprint；发布快照按 `execution_configurations.validate_generation` 与 `build_artifact` 精确重建，使用原冻结配置和响应，禁止最新配置/再次调用模型。cancelled 需证明没有活动执行或 unknown。原 admission blocked/no job/no call 只能在已知确定拒绝和 qs-server 对应原关闭回执成立后归类；普通 blocked 不自动等于全责关闭。答卷/clarification 要核原答复、answered_by/at 与 successor job.question_id，不能只看最新 session。
 5. **预算和租约**：每个 reservation 完整匹配 org/subject/assessment/run；active=1 阻断。lease fence 与 job/call 原 token 对照，expiry 不是关闭结论。`participant_retries.py:156` 的原 command/org、source→new run、原 receipt/frozen_request、expected_version/人工批准逐条核对。承认 unknown risk 只是新调用授权，不能抹掉原 provider unknown。预算/attempt 保留真实发生值，不补造未发生 attempt。
 6. **原结果**：result_outbox 全历史版本、StateEvent UUID/request/session/actor/testee/status/version 全部核对。completed event 的 artifact_json 必须等于已证原 Artifact；question/failure 的实际 payload 与对应业务事实匹配。delivered 是旧 gRPC/MQ 投递状态，不能证明 qs-server 完成接受和业务关闭。mq_owned 要与真实原 MQ wire/预算继承匹配；不得因 transferred/delivered 推断结束。
