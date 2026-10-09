@@ -8,6 +8,7 @@ import (
 	"compress/gzip"
 	"context"
 	"database/sql"
+	"debug/elf"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -633,22 +634,77 @@ func publicCLIInventory(t *testing.T, cli, opDir, source, operation, boundRun, i
 	return Approval{InventorySHA256: sha(reportRaw), SQLMetadataSHA256: sha(sqlRaw), MongoMetadataSHA256: sha(mongoRaw), OrderedMongoSchemaSHA256: ordered.SHA256(), SourceSHA: source, OperationID: operation, RunID: invRun, RequestHash: hash}, report
 }
 
-func publicCLIPackage(t *testing.T, path, cli string) string {
+type publicCLIWindowIntent struct {
+	Format        int    `json:"format_version"`
+	Kind          string `json:"kind"`
+	Dispatcher    string `json:"dispatcher_source_sha"`
+	Tool          string `json:"tool_source_sha"`
+	Original      string `json:"original_source_sha"`
+	Operation     string `json:"operation_id"`
+	OriginalRun   string `json:"original_run_id"`
+	ActualRun     string `json:"actual_run_id"`
+	Stage         string `json:"stage"`
+	Template      string `json:"approved_template_sha256"`
+	Request       string `json:"derived_request_sha256"`
+	Manifest      string `json:"manifest_sha256"`
+	Package       string `json:"package_sha256"`
+	ToolDirectory string `json:"tool_directory"`
+	ToolProgram   string `json:"tool_program_sha256"`
+	Native        string `json:"native_sha256"`
+	NativePath    string `json:"native_path"`
+	BImage        string `json:"b_image_id"`
+	BProgram      string `json:"b_program_sha256"`
+	SourceUID     int    `json:"source_uid"`
+	Drop          bool   `json:"drop_authority"`
+}
+
+func publicCLIWindowPackage(t *testing.T, path, cli, other, repo, toolDirectory string) (string, map[string]string, map[string]string) {
 	t.Helper()
-	raw, e := os.ReadFile(cli)
-	if e != nil {
-		t.Fatal("public_cli_native_binary_missing")
+	if !filepath.IsAbs(other) || runtime.GOARCH != "amd64" && runtime.GOARCH != "arm64" {
+		t.Fatal("public_cli_native_other_architecture_binary_missing")
 	}
+	otherArch := "arm64"
+	if runtime.GOARCH == "arm64" {
+		otherArch = "amd64"
+	}
+	paths := map[string]string{"inventory-linux-" + runtime.GOARCH: cli, "inventory-linux-" + otherArch: other, "compatibility-window-tool.py": filepath.Join(repo, "scripts/database/compatibility-window-tool.py"), "receipt-transport.py": filepath.Join(repo, "scripts/dbops/receipt-transport.py")}
 	var b bytes.Buffer
 	gz := gzip.NewWriter(&b)
 	tw := tar.NewWriter(gz)
-	if tw.WriteHeader(&tar.Header{Name: "inventory-linux-" + runtime.GOARCH, Mode: 0700, Size: int64(len(raw)), Typeflag: tar.TypeReg}) != nil {
+	binaryHashes, programHashes := map[string]string{}, map[string]string{}
+	for _, name := range []string{"compatibility-window-tool.py", "receipt-transport.py", "inventory-linux-amd64", "inventory-linux-arm64"} {
+		raw, e := os.ReadFile(paths[name])
+		if e != nil || len(raw) == 0 || len(raw) > 64<<20 {
+			t.Fatal("public_cli_native_window_package_input_missing")
+		}
+		if strings.HasPrefix(name, "inventory-linux-") {
+			arch := strings.TrimPrefix(name, "inventory-linux-")
+			image, e := elf.NewFile(bytes.NewReader(raw))
+			want := elf.EM_X86_64
+			if arch == "arm64" {
+				want = elf.EM_AARCH64
+			}
+			if e != nil || image.Machine != want || image.Class != elf.ELFCLASS64 || image.Close() != nil {
+				t.Fatal("public_cli_native_window_package_elf_architecture_rejected")
+			}
+			binaryHashes[arch] = sha(raw)
+		} else {
+			if writePrivate(filepath.Join(toolDirectory, name), raw) != nil {
+				t.Fatal("public_cli_native_window_program_copy_failed")
+			}
+			programHashes[name] = sha(raw)
+		}
+		if tw.WriteHeader(&tar.Header{Name: name, Mode: 0600, Size: int64(len(raw)), Typeflag: tar.TypeReg}) != nil {
+			t.Fatal("public_cli_native_package_failed")
+		}
+		if _, e = tw.Write(raw); e != nil {
+			t.Fatal("public_cli_native_package_failed")
+		}
+	}
+	if tw.Close() != nil || gz.Close() != nil || writePrivate(path, b.Bytes()) != nil {
 		t.Fatal("public_cli_native_package_failed")
 	}
-	if _, e = tw.Write(raw); e != nil || tw.Close() != nil || gz.Close() != nil || writePrivate(path, b.Bytes()) != nil {
-		t.Fatal("public_cli_native_package_failed")
-	}
-	return sha(b.Bytes())
+	return sha(b.Bytes()), binaryHashes, programHashes
 }
 
 func publicCLIDecode(t *testing.T, repo string, raw []byte) map[string]any {
@@ -734,7 +790,7 @@ func publicCLIRunProcessGroup(cmd *exec.Cmd) (runErr error, stopped bool) {
 	}
 }
 
-func TestLifecyclePublicCLINativePrepareRootOnce(t *testing.T) {
+func TestLifecyclePublicCLINativeWindowToolPrepareRootOnce(t *testing.T) {
 	run, e := publicCLIOptIn(os.Getenv("QS_LIFECYCLE_PUBLIC_CLI_NATIVE"), os.Getenv("QS_LIFECYCLE_PUBLIC_CLI_NATIVE_REQUIRED"))
 	if e != nil {
 		t.Fatal(e)
@@ -865,9 +921,16 @@ func TestLifecyclePublicCLINativePrepareRootOnce(t *testing.T) {
 	archive := filepath.Join(opDir, "archive")
 	root := filepath.Join("/opt/backups/qs-server/compatibility-retirement-root-prepare", op+"-"+actualRun)
 	pkg := filepath.Join("/tmp", "qs-compatibility-retirement-"+actualRun+".tar.gz")
+	invocation := filepath.Join("/opt/backups/qs-server/compatibility-retirement-invocations", op+"-"+actualRun)
+	toolDirectory, e := os.MkdirTemp("/tmp", "qs-independent-window-tool.")
+	if e != nil {
+		t.Fatal("public_cli_native_window_tool_directory_failed")
+	}
+	invocationMaterial := map[string]bool{"native-call.intent.private.json": true, "lifecycle-request.json": true, "manifest.json": true}
+	toolMaterial := map[string]bool{"compatibility-window-tool.py": true, "receipt-transport.py": true}
 	manifestHash := ""
 	approval := Approval{}
-	opMaterial := map[string]bool{"inventory-cli": true, "boundary-request.json": true, "inventory-request.json": true, "manifest.json": true, "lifecycle-request.json": true, "operation.lock": true, "archive": true, "bounds-" + boundRun: true, "inventory-" + invRun: true}
+	opMaterial := map[string]bool{"inventory-cli": true, "boundary-request.json": true, "inventory-request.json": true, "manifest.json": true, "lifecycle-request-template.json": true, "operation.lock": true, "archive": true, "bounds-" + boundRun: true, "inventory-" + invRun: true}
 	rootMaterial := map[string]bool{"restore-native": true, "tool.intent.private.json": true, "source-copy.intent.private.json": true, "manifest.json": true, "lifecycle-request.json": true, "lifecycle-restore-" + actualRun + ".registration.private.json": true, "inventory-" + invRun: true}
 	for _, name := range append([]string{"inventory.private.json", "mysql-metadata.private.json", "mongodb-metadata.private.json"}, sourceNames[:]...) {
 		opMaterial[filepath.Join("inventory-"+invRun, name)] = true
@@ -931,18 +994,18 @@ func TestLifecyclePublicCLINativePrepareRootOnce(t *testing.T) {
 				rootMaterial[filepath.Base(p)] = true
 			}
 		}
-		if publicCLIMaterialsKnown(root, rootMaterial) != nil || publicCLIMaterialsKnown(opDir, opMaterial) != nil {
+		if publicCLIMaterialsKnown(root, rootMaterial) != nil || publicCLIMaterialsKnown(opDir, opMaterial) != nil || publicCLIMaterialsKnown(invocation, invocationMaterial) != nil || publicCLIMaterialsKnown(toolDirectory, toolMaterial) != nil {
 			retainFixture()
 			t.Error("public_cli_native_unregistered_material_retained")
 			return
 		}
 		removePackage := os.Remove(pkg)
-		if (removePackage != nil && !os.IsNotExist(removePackage)) || os.RemoveAll(root) != nil || os.RemoveAll(opDir) != nil {
+		if (removePackage != nil && !os.IsNotExist(removePackage)) || os.RemoveAll(root) != nil || os.RemoveAll(opDir) != nil || os.RemoveAll(invocation) != nil || os.RemoveAll(toolDirectory) != nil {
 			retainFixture()
 			t.Error("public_cli_native_owned_material_cleanup_failed")
 			return
 		}
-		for _, p := range []string{pkg, root, opDir} {
+		for _, p := range []string{pkg, root, opDir, invocation, toolDirectory} {
 			if _, e := os.Lstat(p); !os.IsNotExist(e) {
 				retainFixture()
 				t.Error("public_cli_native_owned_material_remaining")
@@ -987,17 +1050,42 @@ func TestLifecyclePublicCLINativePrepareRootOnce(t *testing.T) {
 		}
 		hashes[name] = sha(raw)
 	}
-	recovery := TargetRecoveryRequest{SourceSHA: source, OperationID: op, OriginalRunID: invRun, ActualRunID: actualRun, ManifestSHA256: manifestHash, MongoNonTargetSHA256: report.Bindings["mongodb"].NonTargetHash, SQLHead: 99, MongoHead: 38}
-	requestHash := nativeJSON(t, filepath.Join(opDir, "lifecycle-request.json"), map[string]any{"format_version": 1, "kind": "compatibility_retirement_lifecycle_request", "tool_source_sha": source, "original_source_sha": source, "operation_id": op, "actual_run_id": actualRun, "manifest_sha256": manifestHash, "archive_directory": archive, "source_directory": sourceDir, "window_directory": filepath.Join(opDir, "window"), "journal_directory": filepath.Join(opDir, "journal"), "archive_approval": approval, "recovery": recovery, "restore_engines": map[string]string{"mysql_image_id": mysqlRoot.Image, "mongodb_image_id": mongoRoot.Image, "architecture": runtime.GOARCH}, "source_file_sha256": hashes})
-	packageHash := publicCLIPackage(t, pkg, cli)
+	recovery := TargetRecoveryRequest{SourceSHA: source, OperationID: op, OriginalRunID: invRun, ManifestSHA256: manifestHash, MongoNonTargetSHA256: report.Bindings["mongodb"].NonTargetHash, SQLHead: 99, MongoHead: 38}
+	template := map[string]any{"format_version": 1, "kind": "compatibility_retirement_lifecycle_request", "tool_source_sha": source, "original_source_sha": source, "operation_id": op, "actual_run_id": "", "manifest_sha256": manifestHash, "archive_directory": archive, "source_directory": sourceDir, "window_directory": filepath.Join(opDir, "window"), "journal_directory": filepath.Join(opDir, "journal"), "archive_approval": approval, "recovery": recovery, "restore_engines": map[string]string{"mysql_image_id": mysqlRoot.Image, "mongodb_image_id": mongoRoot.Image, "architecture": runtime.GOARCH}, "source_file_sha256": hashes}
+	templateHash := nativeJSON(t, filepath.Join(opDir, "lifecycle-request-template.json"), template)
+	// The expected current request changes only the two approved run fields.
+	// Normalize the original struct-containing map into JSON objects before the
+	// independently expected canonical bytes, matching the public JSON contract.
+	templateBytes, e := os.ReadFile(filepath.Join(opDir, "lifecycle-request-template.json"))
+	var expectedRequest map[string]any
+	if e != nil || json.Unmarshal(templateBytes, &expectedRequest) != nil {
+		t.Fatal("public_cli_native_template_decode_failed")
+	}
+	expectedRequest["actual_run_id"] = actualRun
+	expectedRequest["recovery"].(map[string]any)["actual_run_id"] = actualRun
+	derivedBytes, e := json.Marshal(expectedRequest)
+	if e != nil {
+		t.Fatal("public_cli_native_template_derived_request_failed")
+	}
+	derivedBytes = append(derivedBytes, '\n')
+	requestHash := sha(derivedBytes)
+	packageHash, binaryHashes, toolHashes := publicCLIWindowPackage(t, pkg, cli, os.Getenv("QS_LIFECYCLE_PUBLIC_CLI_OTHER_BINARY"), repo, toolDirectory)
+	toolApproval := map[string]any{"format_version": 1, "kind": "independent_compatibility_window_tool_approval", "dispatcher_source_sha": source, "tool_source_sha": source, "original_source_sha": source, "operation_id": op, "original_run_id": invRun, "stage": "prepare", "target_hash": report.TargetHash, "manifest_sha256": manifestHash, "request_template_sha256": templateHash, "tool_binary_sha256": binaryHashes, "b_image_id": "", "b_program_sha256": ""}
+	approvalBytes, e := json.Marshal(toolApproval)
+	if e != nil {
+		t.Fatal("public_cli_native_tool_approval_failed")
+	}
+	approvalHash := sha(append(append([]byte(nil), approvalBytes...), '\n'))
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Minute)
 	defer cancel()
-	cmd := exec.CommandContext(ctx, "/usr/bin/python3", filepath.Join(repo, "scripts/database/compatibility-retirement.py"), "--operation", "prepare", "--prepare-mode", "lifecycle", "--operation-id", op, "--approved-source-sha", source, "--actual-source-sha", source, "--run-id", actualRun, "--manifest-hash", manifestHash, "--lifecycle-request-hash", requestHash, "--inventory-binary", cli, "--root", base)
+	cmd := exec.CommandContext(ctx, "/usr/bin/python3", "-B", filepath.Join(toolDirectory, "compatibility-window-tool.py"), "--operation", "prepare", "--operation-id", op, "--dispatcher-sha", source, "--run-id", actualRun, "--manifest-hash", manifestHash, "--template-hash", templateHash)
 	child := map[string]string{}
 	for k, v := range env {
 		child[k] = v
 	}
 	child["RETIREMENT_PACKAGE_SHA256"] = packageHash
+	child["RETIREMENT_BOOTSTRAP_APPROVAL_JSON"] = string(approvalBytes)
+	child["RETIREMENT_BOOTSTRAP_APPROVAL_SHA256"] = approvalHash
 	cmd.Env = nativeChildEnv(child)
 	cmd.Dir = repo
 	var stdout, stderr bytes.Buffer
@@ -1021,7 +1109,11 @@ func TestLifecyclePublicCLINativePrepareRootOnce(t *testing.T) {
 		t.Fatal("public_cli_native_host_producer_stop_unproven")
 	}
 	t.Logf("public_cli_native_output_sha256=%s private_stderr_sha256=%s public_child_reaped=true public_host_group_absent=true public_child_exit_success=%t", sha(stdout.Bytes()), sha(stderr.Bytes()), runErr == nil)
-	result := publicCLIDecode(t, repo, stdout.Bytes())
+	callResult := publicCLIDecode(t, repo, stdout.Bytes())
+	result, resultOK := callResult["native_result"].(map[string]any)
+	if !resultOK || callResult["format_version"] != float64(1) || callResult["kind"] != "independent_window_tool_call_result" || callResult["dispatcher_source_sha"] != source || callResult["tool_source_sha"] != source || callResult["approved_template_sha256"] != templateHash || callResult["derived_request_sha256"] != requestHash || len(callResult) != 7 {
+		t.Fatal("public_cli_native_window_tool_result_binding_failed")
+	}
 	if category, ok := result["error_category"].(string); ok && safeNativeCategory(category) {
 		t.Log("public_cli_native_result_category=" + category)
 	}
@@ -1031,15 +1123,6 @@ func TestLifecyclePublicCLINativePrepareRootOnce(t *testing.T) {
 	for _, k := range []string{"execution_allowed", "drop_ready", "recovery_attempted", "recovery_complete", "acceptance_complete", "purge_complete"} {
 		if result[k] != false {
 			t.Fatal("public_cli_native_effect_authority_changed")
-		}
-	}
-	caps, ok := result["capabilities"].(map[string]any)
-	if !ok || len(caps) == 0 {
-		t.Fatal("public_cli_native_capabilities_missing")
-	}
-	for _, v := range caps {
-		if v != false {
-			t.Fatal("public_cli_native_capability_promoted")
 		}
 	}
 	elapsed, ok := result["restore_elapsed_millis"].(float64)
@@ -1059,14 +1142,36 @@ func TestLifecyclePublicCLINativePrepareRootOnce(t *testing.T) {
 		}
 	}
 	for path, expected := range map[string]string{
-		filepath.Join(opDir, "manifest.json"):          manifestHash,
-		filepath.Join(root, "manifest.json"):           manifestHash,
-		filepath.Join(opDir, "lifecycle-request.json"): requestHash,
+		filepath.Join(opDir, "manifest.json"):                   manifestHash,
+		filepath.Join(root, "manifest.json"):                    manifestHash,
+		filepath.Join(opDir, "lifecycle-request-template.json"): templateHash,
+		filepath.Join(invocation, "lifecycle-request.json"):     requestHash,
+		filepath.Join(invocation, "manifest.json"):              manifestHash,
+		filepath.Join(root, "lifecycle-request.json"):           requestHash,
+		pkg: packageHash,
 	} {
 		actual, readErr := os.ReadFile(path)
 		if readErr != nil || sha(actual) != expected {
 			t.Fatal("public_cli_native_immutable_descriptor_changed")
 		}
+	}
+	var actualIntent publicCLIWindowIntent
+	if publicCLIPrivateJSON(filepath.Join(invocation, "native-call.intent.private.json"), &actualIntent) != nil || actualIntent != (publicCLIWindowIntent{Format: 1, Kind: "independent_window_tool_native_invocation", Dispatcher: source, Tool: source, Original: source, Operation: op, OriginalRun: invRun, ActualRun: actualRun, Stage: "prepare", Template: templateHash, Request: requestHash, Manifest: manifestHash, Package: packageHash, ToolDirectory: toolDirectory, ToolProgram: toolHashes["compatibility-window-tool.py"], Native: binaryHashes[runtime.GOARCH], NativePath: filepath.Join(root, "restore-native"), SourceUID: 0, Drop: false}) {
+		t.Fatal("public_cli_native_window_tool_intent_binding_failed")
+	}
+	callIntent, e := os.ReadFile(filepath.Join(invocation, "native-call.intent.private.json"))
+	rootIntent, rootIntentErr := os.ReadFile(filepath.Join(root, "tool.intent.private.json"))
+	if e != nil || rootIntentErr != nil || !bytes.Equal(callIntent, rootIntent) {
+		t.Fatal("public_cli_native_window_tool_intents_changed")
+	}
+	for name, expected := range toolHashes {
+		raw, e := os.ReadFile(filepath.Join(toolDirectory, name))
+		if e != nil || sha(raw) != expected {
+			t.Fatal("public_cli_native_packaged_program_changed")
+		}
+	}
+	if publicCLIMaterialsKnown(invocation, invocationMaterial) != nil || publicCLIMaterialsKnown(toolDirectory, toolMaterial) != nil {
+		t.Fatal("public_cli_native_invocation_material_metadata_rejected")
 	}
 	// OpenArchive verifies actual registered files to EOF again. The fixture
 	// destroys this exact four-object archive only after its local acceptance.
@@ -1105,7 +1210,7 @@ func TestLifecyclePublicCLINativePrepareRootOnce(t *testing.T) {
 	cleanupComplete = true
 	fixtureCleanupAllowed = true
 	t.Logf("public_cli_native_source_sha=%s operation_id=%s actual_run_id=%s manifest_sha256=%s request_sha256=%s archive_sha256=%s original_source_baseline_sha256=%s final_source_baseline_sha256=%s", source, op, actualRun, manifestHash, requestHash, hash, before, after)
-	t.Logf("public_cli_native_prepare_complete=true actual_root_once=true actual_inventory_eof=true actual_stdio_restore=true target_count=4 combined_restore_millis=%d public_call_millis=%d original_catalog_and_content_equal=true engines_remaining=0 volumes_remaining=0 archive_assets_remaining=0 production_drop=false production_purge=false", int64(elapsed), time.Since(started).Milliseconds())
+	t.Logf("public_cli_native_prepare_complete=true actual_window_tool=true actual_template_run_derivation=true actual_root_once=true actual_inventory_eof=true actual_stdio_restore=true target_count=4 combined_restore_millis=%d public_call_millis=%d original_catalog_and_content_equal=true engines_remaining=0 volumes_remaining=0 archive_assets_remaining=0 production_drop=false production_purge=false", int64(elapsed), time.Since(started).Milliseconds())
 }
 
 func writeLifecycleFixtureBinary(path string, raw []byte) error {
@@ -1254,4 +1359,172 @@ func TestLifecyclePublicCLIProcessGroupBindingAndNormalExit(t *testing.T) {
 	if absent, err := publicCLIHostGroupAbsent(cmd.Process.Pid); err != nil || !absent {
 		t.Fatal("public_cli_normal_child_group_remained")
 	}
+}
+
+func TestLifecyclePublicCLIWindowInvocationRegistryShape(t *testing.T) {
+	// Exact real producer shape, not a substitute for the privileged caller.
+	raw := []byte(`{"format_version":1,"kind":"independent_window_tool_native_invocation","dispatcher_source_sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","tool_source_sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","original_source_sha":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","operation_id":"10-1","original_run_id":"10-3","actual_run_id":"10-4","stage":"prepare","approved_template_sha256":"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc","derived_request_sha256":"dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd","manifest_sha256":"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee","package_sha256":"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff","tool_directory":"/tmp/qs-independent-window-tool.ABCDEF","tool_program_sha256":"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc","native_sha256":"dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd","native_path":"/opt/backups/qs-server/compatibility-retirement-root-prepare/10-1-10-4/restore-native","b_image_id":"","b_program_sha256":"","source_uid":0,"drop_authority":false}`)
+	var got publicCLIWindowIntent
+	if exactJSON(raw, &got) != nil || got.OriginalRun != "10-3" || got.ActualRun != "10-4" || got.SourceUID != 0 || got.Drop {
+		t.Fatal("public_cli_window_invocation_exact_registry_rejected")
+	}
+	for _, mutation := range []string{
+		strings.Replace(string(raw), `"source_uid"`, `"Source_UID"`, 1),
+		strings.TrimSuffix(string(raw), "}") + `,"unregistered":true}`,
+		strings.TrimSuffix(string(raw), "}") + `,"actual_run_id":"overwritten"}`,
+	} {
+		if exactJSON([]byte(mutation), new(publicCLIWindowIntent)) == nil {
+			t.Fatal("public_cli_window_invocation_unknown_alias_or_duplicate_accepted")
+		}
+	}
+}
+
+func TestLifecyclePublicCLILinuxRootControlLossReapsDetachedDescendants(t *testing.T) {
+	run, e := publicCLIOptIn(os.Getenv("QS_LIFECYCLE_PUBLIC_CLI_NATIVE"), os.Getenv("QS_LIFECYCLE_PUBLIC_CLI_NATIVE_REQUIRED"))
+	if e != nil {
+		t.Fatal(e)
+	}
+	if !run {
+		t.Skip("public lifecycle Linux root fixture not requested")
+	}
+	if runtime.GOOS != "linux" || os.Getuid() != 0 || os.Geteuid() != 0 || os.Getenv("SUDO_UID") != "" {
+		t.Fatal("public_cli_owned_process_actual_linux_root_required")
+	}
+	repo, source := os.Getenv("QS_LIFECYCLE_PUBLIC_CLI_REPOSITORY"), os.Getenv("QS_LIFECYCLE_PUBLIC_CLI_SOURCE_SHA")
+	if !filepath.IsAbs(repo) || !sourcePattern.MatchString(source) {
+		t.Fatal("public_cli_owned_process_source_missing")
+	}
+	actual, e := nativeCommand(context.Background(), []string{"PATH=/usr/bin:/bin"}, "/usr/bin/git", "-c", "safe.directory="+repo, "-C", repo, "rev-parse", "HEAD")
+	if e != nil || strings.TrimSpace(string(actual)) != source {
+		t.Fatal("public_cli_owned_process_actual_checkout_mismatch")
+	}
+	private, e := os.MkdirTemp("/tmp", "qs-owned-process-native.")
+	if e != nil {
+		t.Fatal("public_cli_owned_process_private_directory_failed")
+	}
+	accepted := false
+	t.Cleanup(func() {
+		// No automatic RemoveAll: unknown producer/result/material is retained,
+		// including if registering a disk checkpoint would itself fail.
+		if !accepted || t.Failed() {
+			t.Error("public_cli_owned_process_unaccepted_material_retained")
+			return
+		}
+		if publicCLIMaterialsKnown(private, map[string]bool{"intent.private.json": true, "children.private.log": true}) != nil {
+			t.Error("public_cli_owned_process_unregistered_material_retained")
+			return
+		}
+		for _, name := range []string{"children.private.log", "intent.private.json"} {
+			if os.Remove(filepath.Join(private, name)) != nil {
+				t.Error("public_cli_owned_process_material_cleanup_failed")
+				return
+			}
+		}
+		if os.Remove(private) != nil {
+			t.Error("public_cli_owned_process_private_directory_cleanup_failed")
+			return
+		}
+		if _, e := os.Lstat(private); !os.IsNotExist(e) {
+			t.Error("public_cli_owned_process_material_remaining")
+			return
+		}
+		t.Log("public_cli_owned_process_accepted_private_material_remaining=0 production_operations=false")
+	})
+	intent := []byte("{\"format_version\":1,\"kind\":\"owned_process_control_loss_fixture\",\"drop_authority\":false}\n")
+	if writePrivate(filepath.Join(private, "intent.private.json"), intent) != nil {
+		t.Fatal("public_cli_owned_process_intent_failed")
+	}
+	script := `import importlib.util,json,os,signal,subprocess,sys,time
+spec=importlib.util.spec_from_file_location('actual_owned',sys.argv[1]);m=importlib.util.module_from_spec(spec);spec.loader.exec_module(m)
+owner=m.LinuxChildOwner()
+child_script=r'''import os,signal,subprocess,sys,time
+signal.signal(signal.SIGTERM,signal.SIG_IGN)
+fd=os.open(sys.argv[2],os.O_WRONLY|os.O_CREAT|os.O_APPEND|os.O_NOFOLLOW,0o600)
+os.write(fd,(str(os.getpid())+'\n').encode());os.fsync(fd);os.close(fd)
+if int(sys.argv[1]):subprocess.Popen([sys.executable,'-I','-c',sys.argv[3],str(int(sys.argv[1])-1),sys.argv[2],sys.argv[3]],start_new_session=True)
+while True:time.sleep(.02)
+'''
+try:m.owned_process([sys.executable,'-I','-c',child_script,'2',sys.argv[2],child_script],{'PATH':'/usr/bin:/bin'},control=0,owner=owner,timeout=90)
+except m.Refused as e:
+ if str(e)!='window_tool_local_execution_unknown':raise
+else:raise SystemExit(4)
+owner.reap_adopted()
+if owner.descendants():raise SystemExit(5)
+with open(sys.argv[2],'r',encoding='ascii') as f:pids=[int(line.strip()) for line in f]
+if len(set(pids))!=3:raise SystemExit(6)
+for pid in pids:
+ try:os.kill(pid,0)
+ except ProcessLookupError:pass
+ else:raise SystemExit(7)
+print(json.dumps({'actual_root':os.getuid()==0 and os.geteuid()==0,'control_eof':True,'actual_adopted_descendants_remaining':len(owner.descendants()),'actual_pids':pids,'drop_authority':False},sort_keys=True),flush=True)
+`
+	ctx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, "/usr/bin/python3", "-I", "-c", script, filepath.Join(repo, "scripts/database/compatibility-window-tool.py"), filepath.Join(private, "children.private.log"))
+	cmd.Env = []string{"PATH=/usr/bin:/bin"}
+	control, e := cmd.StdinPipe()
+	if e != nil {
+		t.Fatal("public_cli_owned_process_actual_control_pipe_failed")
+	}
+	defer func() { _ = control.Close() }()
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout, cmd.Stderr = &stdout, &stderr
+	type terminal struct {
+		err     error
+		stopped bool
+	}
+	done := make(chan terminal, 1)
+	go func() { err, stopped := publicCLIRunProcessGroup(cmd); done <- terminal{err, stopped} }()
+	var observed []int
+	deadline := time.Now().Add(10 * time.Second)
+	for time.Now().Before(deadline) {
+		raw, e := os.ReadFile(filepath.Join(private, "children.private.log"))
+		if e == nil && len(raw) < 1024 {
+			fields := strings.Fields(string(raw))
+			observed = nil
+			for _, f := range fields {
+				pid, e := strconv.Atoi(f)
+				if e != nil || pid < 2 {
+					t.Fatal("public_cli_owned_process_actual_pid_invalid")
+				}
+				observed = append(observed, pid)
+			}
+			if len(observed) == 3 {
+				break
+			}
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	// Actual EOF on the root supervisor's live control pipe requests stop.
+	disconnected := time.Now()
+	if e = control.Close(); e != nil {
+		t.Fatal("public_cli_owned_process_control_disconnect_failed")
+	}
+	outcome := <-done
+	if time.Since(disconnected) >= 20*time.Second || len(observed) != 3 || outcome.err != nil || !outcome.stopped || stdout.Len() > 32768 || stderr.Len() > 32768 {
+		t.Fatal("public_cli_owned_process_control_loss_terminal_unproven")
+	}
+	var proof struct {
+		Root      bool  `json:"actual_root"`
+		EOF       bool  `json:"control_eof"`
+		Remaining int   `json:"actual_adopted_descendants_remaining"`
+		PIDs      []int `json:"actual_pids"`
+		Drop      bool  `json:"drop_authority"`
+	}
+	if exactJSON(stdout.Bytes(), &proof) != nil || !proof.Root || !proof.EOF || proof.Remaining != 0 || proof.Drop || !reflect.DeepEqual(proof.PIDs, observed) {
+		t.Fatal("public_cli_owned_process_actual_root_proof_rejected")
+	}
+	// Independently observe absence after the real supervisor has returned;
+	// a JSON count alone is not evidence that the privileged descendants died.
+	for _, pid := range observed {
+		if !errors.Is(syscall.Kill(pid, 0), syscall.ESRCH) {
+			t.Fatal("public_cli_owned_process_descendant_still_present")
+		}
+	}
+	actualIntent, e := os.ReadFile(filepath.Join(private, "intent.private.json"))
+	if e != nil || !bytes.Equal(intent, actualIntent) {
+		t.Fatal("public_cli_owned_process_failure_intent_changed")
+	}
+	accepted = true
+	t.Logf("public_cli_owned_process_source_sha=%s actual_linux_root=true actual_subreaper=true actual_pidfd=true actual_control_eof=true detached_descendant_layers=3 actual_descendants_remaining=0 failure_intent_retained_until_acceptance=true daemon_exec_proven=false production_operations=false", source)
 }

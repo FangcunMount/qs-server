@@ -293,15 +293,18 @@ jobs:
             sleep 2
           done
 
-      - name: Verify public lifecycle root-once capture and isolated restore
+      - name: Verify window-tool root-once capture, restore and owned-process cancellation
         env:
           MYSQL_CONTAINER: ${{ job.services.mysql.id }}
         run: |
           set -euo pipefail
           lifecycle_cli="${RUNNER_TEMP}/qs-lifecycle-inventory-cli"
           lifecycle_test="${RUNNER_TEMP}/qs-lifecycle-public-cli.test"
+          lifecycle_other_cli="${RUNNER_TEMP}/qs-lifecycle-inventory-cli-arm64"
           CGO_ENABLED=0 go build -trimpath -ldflags "-X main.sourceSHA=${GITHUB_SHA}" \
             -o "$lifecycle_cli" ./cmd/qs-compatibility-retirement
+          CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -trimpath -ldflags "-X main.sourceSHA=${GITHUB_SHA}" \
+            -o "$lifecycle_other_cli" ./cmd/qs-compatibility-retirement
           go test -c -tags=integration -o "$lifecycle_test" \
             ./internal/apiserver/maintenance/compatibilityretirementbackup
           mongo_cid="$(docker --host unix:///run/docker.sock inspect --format '{{.Id}}' qs-runtime-closure-e2e-mongo)"
@@ -371,6 +374,7 @@ jobs:
             QS_LIFECYCLE_PUBLIC_CLI_REPOSITORY="$GITHUB_WORKSPACE" \
             QS_LIFECYCLE_PUBLIC_CLI_SOURCE_SHA="$GITHUB_SHA" \
             QS_LIFECYCLE_PUBLIC_CLI_BINARY="$lifecycle_cli" \
+            QS_LIFECYCLE_PUBLIC_CLI_OTHER_BINARY="$lifecycle_other_cli" \
             QS_LIFECYCLE_PUBLIC_CLI_MYSQL_CID="$MYSQL_CONTAINER" \
             QS_LIFECYCLE_PUBLIC_CLI_MONGO_CID="$mongo_cid" \
             "$lifecycle_test" -test.run '^TestLifecyclePublicCLI' \
@@ -379,7 +383,8 @@ jobs:
             echo 'Required public lifecycle rehearsal unexpectedly skipped' >&2
             exit 1
           fi
-          grep -q -- '--- PASS: TestLifecyclePublicCLINativePrepareRootOnce' "${RUNNER_TEMP}/qs-lifecycle-public-cli.log"
+          grep -q -- '--- PASS: TestLifecyclePublicCLINativeWindowToolPrepareRootOnce' "${RUNNER_TEMP}/qs-lifecycle-public-cli.log"
+          grep -q -- '--- PASS: TestLifecyclePublicCLILinuxRootControlLossReapsDetachedDescendants' "${RUNNER_TEMP}/qs-lifecycle-public-cli.log"
 
       - name: Run retirement and retry persistence integration tests
         env:
