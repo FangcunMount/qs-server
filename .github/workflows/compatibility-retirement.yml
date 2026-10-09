@@ -46,7 +46,7 @@ on:
         default: ''
         type: string
       bootstrap_approval_json:
-        description: 'Bootstrap/report-diagnostic: canonical public approval JSON, no credentials, names or BSON tokens'
+        description: 'Canonical public bootstrap, diagnostic or window-tool approval; no credentials or BSON tokens'
         required: false
         default: ''
         type: string
@@ -101,7 +101,7 @@ jobs:
                 !/^[0-9]{1,20}-[0-9]{1,4}$/.test(input.operation_id) ||
                 !['identity', 'bounds', 'inventory', 'bootstrap-bounds', 'bootstrap-inventory', 'bootstrap-history', 'bootstrap-history-metadata', 'bootstrap-history-parent', 'bootstrap-ai-bounds', 'bootstrap-ai-verify', 'historical-evidence-write', 'historical-ai-bounds', 'report-diagnostic', 'lifecycle', 'prepare-facts', 'window-tool'].includes(input.prepare_mode) ||
                 (windowTool
-                  ? (input.operation !== 'prepare' || typeof input.bootstrap_approval_json !== 'string' || !/^[\x20-\x7e]{1,4096}$/.test(input.bootstrap_approval_json) || !/^[0-9a-f]{64}$/.test(input.bootstrap_approval_sha256))
+                  ? (typeof input.bootstrap_approval_json !== 'string' || !/^[\x20-\x7e]{1,4096}$/.test(input.bootstrap_approval_json) || !/^[0-9a-f]{64}$/.test(input.bootstrap_approval_sha256))
                   : descriptor
                   ? (input.operation !== 'prepare' || input.manifest_sha256 !== '' || input.inventory_request_sha256 !== '' || input.identity_request_sha256 !== '' || typeof input.bootstrap_approval_json !== 'string' || !/^[\x20-\x7e]{1,4096}$/.test(input.bootstrap_approval_json) || !/^[0-9a-f]{64}$/.test(input.bootstrap_approval_sha256))
                   : (input.bootstrap_approval_json !== '' || input.bootstrap_approval_sha256 !== '')) ||
@@ -127,14 +127,25 @@ jobs:
               const sha = v => typeof v === 'string' && /^[0-9a-f]{40}$/.test(v);
               let a;
               try {a = JSON.parse(input.bootstrap_approval_json);} catch {reject();}
-              if (!exact(a, ['format_version','kind','dispatcher_source_sha','tool_source_sha','original_source_sha','operation_id','original_run_id','stage','target_hash','manifest_sha256','request_template_sha256','tool_binary_sha256','b_image_id','b_program_sha256']) ||
+              const prepare = input.operation === 'prepare';
+              const keys = ['format_version','kind','dispatcher_source_sha','tool_source_sha','original_source_sha','operation_id','original_run_id','stage','target_hash','manifest_sha256','request_template_sha256','tool_binary_sha256','b_image_id','b_program_sha256'];
+              if (!exact(a, prepare ? keys : [...keys,'workflow_scope']) ||
                   a.format_version !== 1 || a.kind !== 'independent_compatibility_window_tool_approval' || a.dispatcher_source_sha !== context.sha ||
-                  a.tool_source_sha !== context.sha || !sha(a.original_source_sha) || a.operation_id !== input.operation_id ||
+                  !sha(a.tool_source_sha) || (prepare && a.tool_source_sha !== context.sha) || !sha(a.original_source_sha) || a.operation_id !== input.operation_id ||
                   typeof a.original_run_id !== 'string' || !/^[1-9][0-9]{0,19}-[1-9][0-9]{0,3}$/.test(a.original_run_id) ||
-                  a.stage !== 'prepare' || a.stage !== input.operation || a.target_hash !== '4e09444409d1cfab3c9df383ed80a0999419fcbbd2f4e80d2e5dac1cf7dfcfb8' ||
+                  a.stage !== input.operation || a.target_hash !== '4e09444409d1cfab3c9df383ed80a0999419fcbbd2f4e80d2e5dac1cf7dfcfb8' ||
                   a.manifest_sha256 !== input.manifest_sha256 || a.request_template_sha256 !== input.inventory_request_sha256 ||
                   !exact(a.tool_binary_sha256,['amd64','arm64']) || !hash(a.tool_binary_sha256.amd64) || !hash(a.tool_binary_sha256.arm64) ||
-                  a.b_image_id !== '' || a.b_program_sha256 !== '') {reject();}
+                  (prepare ? (a.b_image_id !== '' || a.b_program_sha256 !== '') : (!/^sha256:[0-9a-f]{64}$/.test(a.b_image_id ?? '') || !hash(a.b_program_sha256)))) {reject();}
+              if (!prepare) {
+                const p = a.workflow_scope;
+                if (!exact(p,['format_version','kind','dispatcher_source_sha','tool_source_sha','original_source_sha','operation_id','original_run_id','manifest_sha256','repository_id','owner_id','actor_id','workflow_id','workflow_ids','job_name','runner_id']) || p.format_version !== 1 || p.kind !== 'approved_runner_workflow_quarantine_scope' ||
+                    ['dispatcher_source_sha','tool_source_sha','original_source_sha','operation_id','original_run_id','manifest_sha256'].some(k => p[k] !== a[k]) ||
+                    ['repository_id','owner_id','actor_id'].some(k => typeof p[k] !== 'string' || !/^[1-9][0-9]{0,19}$/.test(p[k])) ||
+                    !Number.isSafeInteger(p.workflow_id) || p.workflow_id <= 0 || !Number.isSafeInteger(p.runner_id) || p.runner_id <= 0 ||
+                    !Array.isArray(p.workflow_ids) || p.workflow_ids.length < 1 || p.workflow_ids.length > 1000 || p.workflow_ids.some((v,i,vs) => !Number.isSafeInteger(v) || v <= 0 || (i > 0 && v <= vs[i-1])) || !p.workflow_ids.includes(p.workflow_id) ||
+                    p.job_name !== 'Retire exact private lifecycle stage with workflow quarantine') {reject();}
+              }
               const line = JSON.stringify(canonical(a));
               if (line !== input.bootstrap_approval_json || require('crypto').createHash('sha256').update(line+'\n','ascii').digest('hex') !== input.bootstrap_approval_sha256) {reject();}
               const selected = await github.rest.repos.getCommit({...context.repo, ref: a.tool_source_sha});
@@ -409,6 +420,7 @@ jobs:
 
   controlled-stage:
     name: Evaluate exact private lifecycle stage
+    if: inputs.prepare_mode != 'window-tool' || inputs.operation == 'prepare'
     needs: validate
     runs-on:
       group: qlume
@@ -827,3 +839,79 @@ jobs:
               --operation "$RETIREMENT_OPERATION" --operation-id "$RETIREMENT_OPERATION_ID" \
               --run-id "$RETIREMENT_RUN_ID" --dispatcher-sha "$RETIREMENT_DISPATCHER_SHA" \
               --manifest-hash "$RETIREMENT_MANIFEST_SHA256" --template-hash "$RETIREMENT_TEMPLATE_SHA256"
+
+  controlled-window-mutation:
+    name: Retire exact private lifecycle stage with workflow quarantine
+    if: inputs.prepare_mode == 'window-tool' && inputs.operation != 'prepare'
+    needs: validate
+    permissions:
+      contents: read
+      actions: write
+    runs-on:
+      group: qlume
+      labels: [self-hosted, macOS, ARM64, ops]
+    environment: production
+    timeout-minutes: 115
+    steps:
+      - name: Checkout exact dispatcher source
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.sha }}
+          path: dispatcher
+          persist-credentials: false
+      - name: Checkout approved standalone B tooling
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.validate.outputs.tool_source_sha }}
+          path: standalone-tool
+          persist-credentials: false
+      - name: Set up exact toolchain for standalone tooling
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: standalone-tool/go.mod
+      - name: Build the independently approved two architectures
+        id: tool-binaries
+        working-directory: standalone-tool
+        env:
+          RETIREMENT_TOOL_SOURCE_SHA: ${{ needs.validate.outputs.tool_source_sha }}
+        run: |
+          set -Eeuo pipefail
+          umask 077
+          [[ "$RETIREMENT_TOOL_SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]] || exit 1
+          [[ "$(git rev-parse HEAD)" == "$RETIREMENT_TOOL_SOURCE_SHA" ]] || exit 1
+          binary_dir=$(mktemp -d "$RUNNER_TEMP/qs-retirement-window-binaries.XXXXXX")
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -buildvcs=false -trimpath -ldflags="-s -w -X main.sourceSHA=$RETIREMENT_TOOL_SOURCE_SHA -X github.com/FangcunMount/qs-server/pkg/version.GitCommit=$RETIREMENT_TOOL_SOURCE_SHA" -o "$binary_dir/inventory-linux-amd64" ./cmd/qs-compatibility-retirement
+          CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -buildvcs=false -trimpath -ldflags="-s -w -X main.sourceSHA=$RETIREMENT_TOOL_SOURCE_SHA -X github.com/FangcunMount/qs-server/pkg/version.GitCommit=$RETIREMENT_TOOL_SOURCE_SHA" -o "$binary_dir/inventory-linux-arm64" ./cmd/qs-compatibility-retirement
+          echo "directory=$binary_dir" >> "$GITHUB_OUTPUT"
+      - name: Hold same-run workflow owner through native acceptance or recovery
+        env:
+          RETIREMENT_PLATFORM_TOKEN: ${{ github.token }}
+          RETIREMENT_OPERATION: ${{ inputs.operation }}
+          RETIREMENT_OPERATION_ID: ${{ inputs.operation_id }}
+          RETIREMENT_MANIFEST_SHA256: ${{ inputs.manifest_sha256 }}
+          RETIREMENT_TEMPLATE_SHA256: ${{ inputs.inventory_request_sha256 }}
+          RETIREMENT_TOOL_SOURCE_SHA: ${{ needs.validate.outputs.tool_source_sha }}
+          RETIREMENT_BOOTSTRAP_APPROVAL_JSON: ${{ inputs.bootstrap_approval_json }}
+          RETIREMENT_BOOTSTRAP_APPROVAL_SHA256: ${{ inputs.bootstrap_approval_sha256 }}
+          HOST_INVENTORY_SSH_HOST: ${{ vars.SVRA_HOST }}
+          HOST_INVENTORY_SSH_USERNAME: ${{ vars.SVRA_USERNAME }}
+          HOST_INVENTORY_SSH_PORT: ${{ vars.SVRA_SSH_PORT || 22 }}
+          HOST_INVENTORY_SSH_KEY: ${{ secrets.SVRA_SSH_KEY }}
+          HOST_INVENTORY_SSH_FINGERPRINT: ${{ vars.SVRA_SSH_FINGERPRINT }}
+          MYSQL_HOST: ${{ secrets.MYSQL_HOST }}
+          MYSQL_PORT: ${{ secrets.MYSQL_PORT || 3306 }}
+          MYSQL_USERNAME: ${{ secrets.MYSQL_METADATA_ADMIN_USERNAME }}
+          MYSQL_PASSWORD: ${{ secrets.MYSQL_METADATA_ADMIN_PASSWORD }}
+          MYSQL_DATABASE: ${{ secrets.MYSQL_DATABASE != '' && secrets.MYSQL_DATABASE || secrets.MYSQL_DBNAME }}
+          MONGODB_HOST: ${{ secrets.MONGODB_HOST }}
+          MONGODB_PORT: ${{ secrets.MONGODB_PORT || 27017 }}
+          MONGODB_USERNAME: ${{ secrets.MONGODB_USERNAME }}
+          MONGODB_PASSWORD: ${{ secrets.MONGODB_PASSWORD }}
+          MONGODB_DBNAME: ${{ secrets.MONGODB_DBNAME }}
+          MONGODB_METADATA_ADMIN_USERNAME: ${{ secrets.MONGODB_METADATA_ADMIN_USERNAME }}
+          MONGODB_METADATA_ADMIN_PASSWORD: ${{ secrets.MONGODB_METADATA_ADMIN_PASSWORD }}
+          RETIREMENT_BINARY_DIRECTORY: ${{ steps.tool-binaries.outputs.directory }}
+        run: |
+          set -Eeuo pipefail
+          umask 077
+          python3 -B dispatcher/scripts/database/compatibility-platform-window-action.py --dispatcher-repo "$GITHUB_WORKSPACE/dispatcher" --tool-repo "$GITHUB_WORKSPACE/standalone-tool" --binary-directory "$RETIREMENT_BINARY_DIRECTORY"

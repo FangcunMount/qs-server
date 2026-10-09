@@ -97,7 +97,8 @@ def approve(raw, expected, dispatcher, stage, operation, manifest, template):
     except UnicodeError:
         reject()
     a = decode(supplied)
-    exact(a, ("format_version", "kind", "dispatcher_source_sha", "tool_source_sha", "original_source_sha", "operation_id", "original_run_id", "stage", "target_hash", "manifest_sha256", "request_template_sha256", "tool_binary_sha256", "b_image_id", "b_program_sha256"))
+    fields = ("format_version", "kind", "dispatcher_source_sha", "tool_source_sha", "original_source_sha", "operation_id", "original_run_id", "stage", "target_hash", "manifest_sha256", "request_template_sha256", "tool_binary_sha256", "b_image_id", "b_program_sha256")
+    exact(a, fields if stage == "prepare" else fields + ("workflow_scope",))
     if canonical(a) != supplied or digest(supplied) != expected or type(a["format_version"]) is not int or a["format_version"] != 1 or a["kind"] != "independent_compatibility_window_tool_approval" or a["dispatcher_source_sha"] != dispatcher or a["stage"] != stage or a["operation_id"] != operation or a["manifest_sha256"] != manifest or a["request_template_sha256"] != template or a["target_hash"] != TARGET:
         reject()
     for key in ("tool_source_sha", "original_source_sha"):
@@ -114,7 +115,28 @@ def approve(raw, expected, dispatcher, stage, operation, manifest, template):
     else:
         token(a["b_image_id"], re.compile(r"sha256:[0-9a-f]{64}"))
         token(a["b_program_sha256"], HASH)
+    if stage != "prepare":
+        validate_workflow_scope(a["workflow_scope"], a)
     return a
+
+
+def validate_workflow_scope(scope, approval):
+    """Approved identities only; no API state or execution result is imported."""
+    exact(scope, ("format_version", "kind", "dispatcher_source_sha", "tool_source_sha", "original_source_sha", "operation_id", "original_run_id", "manifest_sha256", "repository_id", "owner_id", "actor_id", "workflow_id", "workflow_ids", "job_name", "runner_id"))
+    if type(scope["format_version"]) is not int or scope["format_version"] != 1 or scope["kind"] != "approved_runner_workflow_quarantine_scope":
+        reject("window_tool_workflow_scope_rejected")
+    for key in ("dispatcher_source_sha", "tool_source_sha", "original_source_sha", "operation_id", "original_run_id", "manifest_sha256"):
+        if scope[key] != approval[key]:
+            reject("window_tool_workflow_scope_rejected")
+    for key in ("repository_id", "owner_id", "actor_id"):
+        token(scope[key], re.compile(r"[1-9][0-9]{0,19}"))
+    for key in ("workflow_id", "runner_id"):
+        if type(scope[key]) is not int or not 0 < scope[key] < 1 << 63:
+            reject("window_tool_workflow_scope_rejected")
+    ids = scope["workflow_ids"]
+    if type(ids) is not list or not 1 <= len(ids) <= 1000 or any(type(i) is not int or not 0 < i < 1 << 63 for i in ids) or ids != sorted(set(ids)) or scope["workflow_id"] not in ids:
+        reject("window_tool_workflow_scope_rejected")
+    token(scope["job_name"], re.compile(r"[A-Za-z0-9 ()_.-]{1,200}"))
 
 
 def derive_request(raw, approval, current_run):
@@ -144,6 +166,10 @@ def derive_request(raw, approval, current_run):
     if "writer_control" in r:
         exact(r["writer_control"], ("workflow_scope_sha256",))
         token(r["writer_control"]["workflow_scope_sha256"], HASH)
+    if approval["stage"] != "prepare":
+        validate_workflow_scope(approval.get("workflow_scope"), approval)
+        if "writer_control" not in r or r["writer_control"]["workflow_scope_sha256"] != digest(canonical(approval["workflow_scope"])):
+            reject("window_tool_workflow_scope_rejected")
     if "final_history" in r:
         validate_final_history(r["final_history"], approval["operation_id"])
     if "resume" not in r:
@@ -516,6 +542,8 @@ def root_execute(arguments, packet, source_uid, archive_raw):
     if stage != "prepare" and "writer_control" in decode(derived):
         scope_hash = decode(derived)["writer_control"]["workflow_scope_sha256"]
         scope_raw = read_owned(original / "approved-workflow-scope.json", source_uid, scope_hash, 64 << 10)
+        if scope_raw != canonical(a["workflow_scope"]):
+            reject("window_tool_workflow_scope_rejected")
         scope_target = tool_root / "approved-workflow-scope.json"
         if not scope_target.exists():
             write_new(scope_target, scope_raw)
@@ -678,27 +706,25 @@ def emit(result, secrets):
     print(transport.encode_armored_receipt(result, schema=schema, secrets=secrets))
 
 
-def main():
-    p = argparse.ArgumentParser(description=__doc__)
-    p.add_argument("--operation", required=True)
-    p.add_argument("--operation-id", required=True)
-    p.add_argument("--run-id", required=True)
-    p.add_argument("--dispatcher-sha", required=True)
-    p.add_argument("--manifest-hash", required=True)
-    p.add_argument("--template-hash", required=True)
-    args = p.parse_args()
+def run_window_call(args, raw, approval_hash, package, credentials, *, control=None):
+    """Actual caller, with credentials borrowed from the private live pipe.
+
+    The runner caller passes only expected bindings and credentials here. This
+    function still loads the protected original template and invokes the fixed
+    root supervisor/native binary. It accepts no execution result or callback.
+    """
+    secrets = tuple(credentials.values()) if type(credentials) is dict else ()
     try:
         token(args.run_id, RUN)
-        raw = os.environ.get("RETIREMENT_BOOTSTRAP_APPROVAL_JSON", "")
-        approval_hash = os.environ.get("RETIREMENT_BOOTSTRAP_APPROVAL_SHA256", "")
         a = approve(raw, approval_hash, args.dispatcher_sha, args.operation, args.operation_id, args.manifest_hash, args.template_hash)
-        package = os.environ.get("RETIREMENT_PACKAGE_SHA256", "")
+        if type(credentials) is not dict or set(credentials) != set(credential_names(args.operation)) or any(type(v) is not str or len(v) > 8192 or "\x00" in v for v in credentials.values()):
+            reject()
         token(package, HASH)
         directory = Path(__file__).resolve(strict=True).parent
         if not re.fullmatch(r"/tmp/qs-independent-window-tool\.[a-zA-Z0-9]{6,16}", str(directory)):
             reject("window_tool_parent_path_rejected")
         program_hash = digest(Path(__file__).read_bytes())
-        packet = canonical({"approval": raw, "credentials": {key: os.environ.get(key, "") for key in credential_names(args.operation)}, "tool_directory": str(directory), "tool_program_sha256": program_hash})
+        packet = canonical({"approval": raw, "credentials": credentials, "tool_directory": str(directory), "tool_program_sha256": program_hash})
         template_path = Path("/opt/backups/qs-server/compatibility-retirement") / args.operation_id / "lifecycle-request-template.json"
         approved_template = read_owned(template_path, os.getuid(), args.template_hash, 256 << 10)
         derived_hash = digest(derive_request(approved_template, a, args.run_id))
@@ -715,14 +741,29 @@ def main():
             environment = None
         # The live pipe requests root-owned cancellation if this manager loses
         # its caller. No saved JSON is turned into a live proof.
-        code, native_raw = owned_process(command, environment, packet=packet, timeout=115 * 60)
+        code, native_raw = owned_process(command, environment, packet=packet, control=control, timeout=115 * 60)
         native = validate_native(native_raw, code, a, args.run_id, derived_hash)
         result = {"format_version": 1, "kind": "independent_window_tool_call_result", "dispatcher_source_sha": args.dispatcher_sha,
                   "tool_source_sha": a["tool_source_sha"], "approved_template_sha256": args.template_hash, "derived_request_sha256": derived_hash, "native_result": native}
-        emit(result, tuple(os.environ.get(key, "") for key in CREDENTIALS + (READ_TOKEN,)))
+        emit(result, secrets)
         return code
     except (Refused, OSError, ValueError, subprocess.SubprocessError):
-        emit({'format_version':1,'complete':False,'execution_allowed':False,'drop_ready':False,'error_category':'window_tool_call_rejected'}, tuple(os.environ.get(key, '') for key in CREDENTIALS + (READ_TOKEN,)))
+        emit({'format_version':1,'complete':False,'execution_allowed':False,'drop_ready':False,'error_category':'window_tool_call_rejected'}, secrets)
+        return 1
+
+
+def main():
+    p = argparse.ArgumentParser(description=__doc__)
+    for field in ("operation", "operation-id", "run-id", "dispatcher-sha", "manifest-hash", "template-hash"):
+        p.add_argument("--" + field, required=True)
+    args = p.parse_args()
+    try:
+        return run_window_call(args, os.environ.get("RETIREMENT_BOOTSTRAP_APPROVAL_JSON", ""),
+            os.environ.get("RETIREMENT_BOOTSTRAP_APPROVAL_SHA256", ""), os.environ.get("RETIREMENT_PACKAGE_SHA256", ""),
+            {key: os.environ.get(key, "") for key in credential_names(args.operation)})
+    except Refused:
+        emit({'format_version':1,'complete':False,'execution_allowed':False,'drop_ready':False,'error_category':'window_tool_call_rejected'},
+            tuple(os.environ.get(key, "") for key in CREDENTIALS + (READ_TOKEN,)))
         return 1
 
 

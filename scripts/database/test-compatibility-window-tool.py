@@ -17,9 +17,16 @@ class WindowToolMetadata(unittest.TestCase):
                 'archive_approval':{'InventorySHA256':'1'*64,'SQLMetadataSHA256':'2'*64,'MongoMetadataSHA256':'3'*64,'OrderedMongoSchemaSHA256':'4'*64,'SourceSHA':'b'*40,'OperationID':'12-1','RunID':'11-1','RequestHash':'5'*64},
                 'recovery':{'source_sha':'b'*40,'operation_id':'12-1','original_run_id':'11-1','actual_run_id':'','manifest_sha256':'c'*64,'archive_sha256':'','mysql_non_target_sha256':'','mongodb_non_target_sha256':'6'*64,'mysql_head':99,'mongodb_head':38}}
     def approval(self,r,stage='prepare'):
-        return {'format_version':1,'kind':'independent_compatibility_window_tool_approval','dispatcher_source_sha':'d'*40,'tool_source_sha':'a'*40,
+        value = {'format_version':1,'kind':'independent_compatibility_window_tool_approval','dispatcher_source_sha':'d'*40,'tool_source_sha':'a'*40,
                 'original_source_sha':'b'*40,'operation_id':'12-1','original_run_id':'11-1','stage':stage,'target_hash':tool.TARGET,'manifest_sha256':'c'*64,
                 'request_template_sha256':tool.digest(tool.canonical(r)),'tool_binary_sha256':{'amd64':'7'*64,'arm64':'8'*64},'b_image_id':'','b_program_sha256':''}
+        if stage != 'prepare':
+            scope = {k:value[k] for k in ('dispatcher_source_sha','tool_source_sha','original_source_sha','operation_id','original_run_id','manifest_sha256')}
+            scope.update(format_version=1,kind='approved_runner_workflow_quarantine_scope',repository_id='21',owner_id='22',actor_id='23',workflow_id=24,workflow_ids=[24,25],job_name='Retire exact private lifecycle stage with workflow quarantine',runner_id=26)
+            value['workflow_scope'] = scope
+            r.setdefault('writer_control',dict(workflow_scope_sha256=tool.digest(tool.canonical(scope))))
+            value['request_template_sha256']=tool.digest(tool.canonical(r))
+        return value
     def approve(self,a):
         raw=tool.canonical(a)
         return tool.approve(raw[:-1].decode(),tool.digest(raw),'d'*40,a['stage'],'12-1','c'*64,a['request_template_sha256'])
@@ -63,8 +70,7 @@ class WindowToolMetadata(unittest.TestCase):
         for value in (None,dict(workflow_scope_sha256='a'*64)):
             r=self.request();r['writer_control']=value;a=self.approval(r)
             with self.assertRaises(tool.Refused):tool.derive_request(tool.canonical(r),a,'22-3')
-        r=self.request();r['writer_control']=dict(workflow_scope_sha256='a'*64)
-        a=self.approval(r,'apply')
+        r=self.request();a=self.approval(r,'apply')
         out=tool.decode(tool.derive_request(tool.canonical(r),a,'22-3'))
         self.assertEqual(out['writer_control'],r['writer_control'])
         for value in (None,dict(workflow_scope_sha256='main'),dict(workflow_scope_sha256='a'*64,drop_ready=True)):

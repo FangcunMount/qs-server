@@ -733,6 +733,7 @@ jobs:
           python3 -B scripts/database/test-compatibility-retirement.py
           python3 -B scripts/database/test-compatibility-window-tool.py
           python3 -B scripts/database/test-compatibility-platform-fence.py
+          python3 -B scripts/database/test-compatibility-platform-window-action.py
           python3 -B scripts/database/test-compatibility-evidence-write-inputs.py
           python3 -B scripts/database/test-compatibility-inventory-report-diagnostic.py
           python3 -B scripts/database/test-compatibility-mongo-target-diagnostic.py

@@ -10,6 +10,7 @@ import fcntl
 import hashlib
 import json
 import os
+import platform
 from pathlib import Path
 import re
 import resource
@@ -401,18 +402,26 @@ def open_native_workflow_quarantine(scope, approved_sha256, directory, short_liv
     or completed recovery, never merely in a generic finally block.
     """
     validate_scope(scope)
-    if type(approved_sha256) is not str or HASH.fullmatch(approved_sha256) is None or digest(canonical(scope)) != approved_sha256 or type(total_seconds) is not int or not 1 <= total_seconds <= 1800:
+    # This runner API owner spans prewindow preparation and the original native
+    # window; it is not a boot-clock Window and grants no maintenance extension.
+    if type(approved_sha256) is not str or HASH.fullmatch(approved_sha256) is None or digest(canonical(scope)) != approved_sha256 or type(total_seconds) is not int or not 1 <= total_seconds <= 115 * 60:
         fail("platform_fence_scope_rejected")
     rid, attempt = os.environ.get("GITHUB_RUN_ID", ""), os.environ.get("GITHUB_RUN_ATTEMPT", "")
     run = rid + "-" + attempt
     if RUN.fullmatch(run) is None or os.environ.get("GITHUB_SHA") != scope["dispatcher_source_sha"] or os.environ.get("GITHUB_REPOSITORY") != REPO or os.environ.get("GITHUB_EVENT_NAME") != "workflow_dispatch" or os.environ.get("GITHUB_REF") != "refs/heads/main":
         fail("platform_fence_runner_binding_rejected")
     soft, _ = resource.getrlimit(resource.RLIMIT_NOFILE)
-    descriptors = Path("/proc/self/fd")
+    system = platform.system()
+    descriptor_path = {"Linux": "/proc/self/fd", "Darwin": "/dev/fd"}.get(system)
     if soft != resource.RLIM_INFINITY:
-        if not descriptors.is_dir():
+        if descriptor_path is None:
             fail("platform_fence_descriptor_budget_unproven")
-        current = len(list(descriptors.iterdir()))
+        # Fixed kernel descriptor directory for the actual runner platform.
+        # No caller-supplied count or host/root capability is accepted.
+        try:
+            current = len(os.listdir(descriptor_path))
+        except OSError:
+            fail("platform_fence_descriptor_budget_unproven")
         if current + 4 * len(scope["workflow_ids"]) + 64 >= soft:
             fail("platform_fence_descriptor_budget_unproven")
     api = _NativeAPI(short_lived_token, time.monotonic() + total_seconds)
