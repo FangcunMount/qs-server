@@ -857,7 +857,27 @@ func TestLifecyclePublicCLINativeWindowToolPrepareRootOnce(t *testing.T) {
 	t.Cleanup(func() {
 		for _, before := range []nativeContainer{mysqlRoot, mongoRoot} {
 			after, e := nativeInspect(context.Background(), before.ID)
-			if e != nil || !reflect.DeepEqual(before, after) {
+			comparison := nativeCompareSharedContainer(before, after)
+			if e != nil || !comparison.RawEqual || !comparison.Equal {
+				var observed *nativeContainer
+				if e == nil {
+					observed = &after
+				} else {
+					comparison.Category = "shared_readback_unavailable"
+					comparison.Equal = false
+					comparison.RawEqual = false
+					comparison.AfterSHA256 = ""
+					comparison.NormalizedAfterSHA256 = ""
+					comparison.ChangedFields = []string{"readback"}
+				}
+				path, artifactHash, saveErr := nativeSaveSharedReadback(nativePrivateRoot, source, before, observed)
+				if saveErr != nil {
+					t.Error("public_cli_native_shared_diagnostic_persistence_failed")
+				} else {
+					t.Logf("public_cli_native_shared_readback category=%s fields=%s before_sha256=%s after_sha256=%s artifact_sha256=%s artifact_file=%s", comparison.Category, strings.Join(comparison.ChangedFields, ","), comparison.BeforeSHA256, comparison.AfterSHA256, artifactHash, filepath.Base(path))
+				}
+			}
+			if e != nil || !comparison.Equal {
 				t.Error("public_cli_native_shared_service_changed")
 			}
 		}

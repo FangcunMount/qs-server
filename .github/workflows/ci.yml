@@ -263,6 +263,37 @@ jobs:
           check-latest: true
           cache: true
 
+      - name: Verify public Linux root SSH key-file install and restore
+        timeout-minutes: 5
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
+          umask 077
+          keyfile_test="${RUNNER_TEMP}/qs-ssh-keyfile-public-root.test"
+          keyfile_log="${RUNNER_TEMP}/qs-ssh-keyfile-public-root.private.log"
+          CGO_ENABLED=0 go test -c -trimpath \
+            -ldflags "-X github.com/FangcunMount/qs-server/pkg/version.GitCommit=${GITHUB_SHA}" \
+            -o "$keyfile_test" ./internal/apiserver/maintenance/compatibilityretirementfence
+          keyfile_binary_sha="$(sha256sum "$keyfile_test" | cut -d ' ' -f 1)"
+          sudo -n env -i PATH=/usr/bin:/bin \
+            QS_SSH_KEY_FILE_NATIVE=1 \
+            QS_SSH_KEY_FILE_NATIVE_REQUIRED=1 \
+            QS_SSH_KEY_FILE_SOURCE_SHA="$GITHUB_SHA" \
+            QS_SSH_KEY_FILE_RUN_ID="$GITHUB_RUN_ID" \
+            QS_SSH_KEY_FILE_RUN_ATTEMPT="$GITHUB_RUN_ATTEMPT" \
+            QS_SSH_KEY_FILE_BINARY_SHA256="$keyfile_binary_sha" \
+            "$keyfile_test" -test.v -test.timeout=2m \
+            -test.run '^TestSSHKeyFileActualLinuxRootPublic$' | tee "$keyfile_log"
+          grep -Eq '^--- PASS: TestSSHKeyFileActualLinuxRootPublic \(' "$keyfile_log"
+          for keyfile_case in exact_restore close_preserves xattr acl owner nlink; do
+            grep -Eq "^[[:space:]]+--- PASS: TestSSHKeyFileActualLinuxRootPublic/${keyfile_case} \(" "$keyfile_log"
+          done
+          if grep -Eq -- '--- SKIP:|--- FAIL:|DATA RACE' "$keyfile_log"; then
+            exit 1
+          fi
+          grep -Fq 'native fixture exact owned-file/inode catalog removed;' "$keyfile_log"
+
       - name: Start Mongo Replica Set
         run: |
           docker run --detach --rm \
@@ -377,7 +408,7 @@ jobs:
             QS_LIFECYCLE_PUBLIC_CLI_OTHER_BINARY="$lifecycle_other_cli" \
             QS_LIFECYCLE_PUBLIC_CLI_MYSQL_CID="$MYSQL_CONTAINER" \
             QS_LIFECYCLE_PUBLIC_CLI_MONGO_CID="$mongo_cid" \
-            "$lifecycle_test" -test.run '^TestLifecyclePublicCLI' \
+            "$lifecycle_test" -test.run '^(TestLifecyclePublicCLI|TestNativeSharedReadback)' \
             -test.count=1 -test.timeout=25m -test.v | tee "${RUNNER_TEMP}/qs-lifecycle-public-cli.log"
           if grep -q -- '--- SKIP:' "${RUNNER_TEMP}/qs-lifecycle-public-cli.log"; then
             echo 'Required public lifecycle rehearsal unexpectedly skipped' >&2
