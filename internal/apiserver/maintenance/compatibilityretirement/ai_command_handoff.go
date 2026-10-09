@@ -69,6 +69,10 @@ func (c *HistoricalCoordinator) PrepareAICommandHandoffBatch(ctx context.Context
 	}
 	c.mu.Lock()
 	defer c.mu.Unlock()
+	return c.prepareAICommandHandoffRowsLocked(ctx, page, reverse, pageRows(page))
+}
+
+func (c *HistoricalCoordinator) prepareAICommandHandoffRowsLocked(ctx context.Context, page *HistoricalSourcePage, reverse *AIReverseSnapshot, rows []coordinatorRow) (*AICommandHandoffBatch, error) {
 	if c.now == nil || c.alive(ctx) != nil || c.pageValid(page) != nil || c.authenticated == nil || !c.authenticated.complete || reverse.scope == nil || reverse.scope.owner != c || reverse.scope.auth != c.authenticated || reverse.scope.verifiedEntries != c.authenticated.entries || reverse.scope.missingCurrent || reverse.ValidateBorrowedSnapshot(ctx) != nil {
 		return nil, ErrAILocalBinding
 	}
@@ -120,7 +124,7 @@ func (c *HistoricalCoordinator) PrepareAICommandHandoffBatch(ctx context.Context
 	}
 	verifiedAt := time.Now().UTC()
 	seen := map[string]bool{}
-	for _, row := range page.rows {
+	for _, row := range rows {
 		if row.event != nil {
 			continue
 		}
@@ -284,22 +288,8 @@ func (p *AICommandHandoffBatch) Record(ctx context.Context, tx *gorm.DB) (AIComm
 	if err != nil {
 		return AICommandHandoffResult{}, err
 	}
-	for _, conclusion := range p.evidence {
-		if ctx.Err() != nil || time.Now().After(p.expires) {
-			return AICommandHandoffResult{}, ErrAILocalBounds
-		}
-		if err := store.RecordOperationTransferEvidence(ctx, tx, conclusion); err != nil {
-			return AICommandHandoffResult{}, ErrAILocalChanged
-		}
-		if err := p.verifyWrittenOperation(ctx, resolver, before[conclusion.CommandID], conclusion); err != nil {
-			return AICommandHandoffResult{}, err
-		}
-	}
-	if err := p.verifyCurrentMetadata(ctx, resolver); err != nil {
+	if err := p.recordCurrent(ctx, tx, resolver, before); err != nil {
 		return AICommandHandoffResult{}, err
-	}
-	if !p.intact() || ctx.Err() != nil || time.Now().After(p.expires) {
-		return AICommandHandoffResult{}, ErrAILocalBounds
 	}
 	return AICommandHandoffResult{Scope: "old-publisher-handoff-evidence-in-borrowed-transaction", Records: uint64(len(p.evidence)), EvidenceSHA256: aiJSONHash(p.evidence), HostCommitRequired: true}, nil
 }
@@ -307,3 +297,30 @@ func (p *AICommandHandoffBatch) Record(ctx context.Context, tx *gorm.DB) (AIComm
 // Keep equality explicit for nullable/raw fields; no reserialization can hide
 // a changed receipt, decision, original clock, body, sequence or retirement ID.
 func aiCommandHandoffMetadataEqual(a, b []aiReverseMetadata) bool { return reflect.DeepEqual(a, b) }
+
+func (p *AICommandHandoffBatch) recordCurrent(ctx context.Context, tx *gorm.DB, resolver *AILocalResolver, before map[string]aiReverseRow) error {
+	for _, conclusion := range p.evidence {
+		if ctx.Err() != nil || time.Now().After(p.expires) {
+			return ErrAILocalBounds
+		}
+		var writeErr error
+		if conclusion.Conclusion == "transferred_verified" {
+			writeErr = store.RecordOperationTransferEvidence(ctx, tx, conclusion)
+		} else {
+			writeErr = store.RecordOperationRetirement(ctx, tx, conclusion)
+		}
+		if writeErr != nil {
+			return ErrAILocalChanged
+		}
+		if err := p.verifyWrittenOperation(ctx, resolver, before[conclusion.CommandID], conclusion); err != nil {
+			return err
+		}
+	}
+	if err := p.verifyCurrentMetadata(ctx, resolver); err != nil {
+		return err
+	}
+	if !p.intact() || ctx.Err() != nil || time.Now().After(p.expires) {
+		return ErrAILocalBounds
+	}
+	return nil
+}

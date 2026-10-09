@@ -23,8 +23,9 @@ import (
 )
 
 // This is NOT connected to main/CLI/Action/CAPABILITIES. It is an actual host
-// implementation candidate for limited event evidence persistence, not a
-// production authority. Original commands/external qs-ai closure remain separate.
+// implementation candidate for limited event/old-command evidence persistence,
+// not a production authority. Actual external facts are obtained only by the
+// fixed producer; current mapped pending/provider work is never completed here.
 type preparedWriteEpoch struct {
 	facts       *epochResult
 	coordinator *retirement.HistoricalCoordinator
@@ -32,9 +33,11 @@ type preparedWriteEpoch struct {
 	catalog     *retirement.SQLCrossStoreResponsibilityCatalog
 	global      *retirement.MongoResponsibilitySnapshot
 	anchors     []*retirement.WholeSourceJointReplayAnchor
+	aiBatch     *retirement.AICommandPersistenceBatch
 }
 type preparedWriteDiagnostic struct {
 	Protocol, SourceSHA, OperationID, RunID, CommitState                                                                           string
+	AIOriginalCommands, AISourceReferences                                                                                         uint64
 	PreparedPages, ReadBackPages, EventReferences                                                                                  uint64
 	ActualSQLCommitResponse, ActualMongoCommitResponse                                                                             bool
 	LimitedEventPersistenceObserved                                                                                                bool
@@ -153,7 +156,7 @@ func (j *historyWriteJournal) record(ctx context.Context, stage string, position
 		return fixedError("history_write_journal_unknown")
 	}
 	switch stage {
-	case "prepared", "write_epoch_started", "page_statement_applied", "all_statements_applied", "sql_commit_intent", "sql_commit_success", "sql_commit_unknown", "mongo_commit_intent", "mongo_commit_success", "mongo_commit_unknown", "mongo_abort_failed", "sql_rollback_failed", "fresh_page_verified", "limited_event_readback_finished":
+	case "prepared", "write_epoch_started", "page_statement_applied", "all_statements_applied", "sql_commit_intent", "sql_commit_success", "sql_commit_unknown", "mongo_commit_intent", "mongo_commit_success", "mongo_commit_unknown", "mongo_abort_failed", "sql_rollback_failed", "fresh_page_verified", "limited_event_readback_finished", "ai_statements_applied", "ai_independent_readback_finished":
 	default:
 		return fixedError("history_write_journal_unknown")
 	}
@@ -178,8 +181,8 @@ func (j *historyWriteJournal) record(ctx context.Context, stage string, position
 	return nil
 }
 
-func buildPreparedWriteEpoch(ctx context.Context, a *approvedInputs, d *historyDatabase) (*preparedWriteEpoch, error) {
-	if a == nil || d == nil {
+func buildPreparedWriteEpoch(ctx context.Context, a *approvedInputs, d *historyDatabase, external ...retirement.AIExternalExecutionInput) (*preparedWriteEpoch, error) {
+	if a == nil || d == nil || len(external) > 1 {
 		return nil, fixedError("history_pipeline_input_rejected")
 	}
 	if a.verifyFullFiles(ctx) != nil {
@@ -270,6 +273,29 @@ func buildPreparedWriteEpoch(ctx context.Context, a *approvedInputs, d *historyD
 	if a.rewind() != nil {
 		return nil, fixedError("history_asset_read_failed")
 	}
+
+	var externalQualification *retirement.AIExternalExecutionQualification
+	var aiPages []*retirement.AIExternalPageQualification
+	if aiCopies[1].Expected.Records+aiCopies[2].Expected.Records > 0 {
+		if len(external) != 1 {
+			return nil, fixedError("history_ai_external_execution_input_required")
+		}
+		input := external[0]
+		canonicalRun, runErr := aiHostRun(a.request.RunID)
+		if runErr != nil || input.RunID != canonicalRun {
+			return nil, fixedError("history_ai_external_execution_input_required")
+		}
+		if retirement.RequireAIExternalExecQuiescence(ctx, retirement.AIExternalExecQuiescenceInput{OperationDirectory: input.OperationDirectory, SourceSHA: a.request.SourceSHA, OperationID: a.request.OperationID, RuntimeSourceSHA: input.RuntimeSourceSHA, ImageID: input.ImageID, ContainerID: input.ContainerID, SudoDocker: input.SudoDocker}) != nil {
+			return nil, fixedError("history_ai_external_exec_quiescence_unproven")
+		}
+		externalQualification, err = c.PrepareAIExternalExecution(ctx, aiReadonly, aiReverse, input)
+		if err != nil {
+			return nil, fixedError("history_ai_external_execution_failed")
+		}
+		if a.rewind() != nil {
+			return nil, fixedError("history_asset_read_failed")
+		}
+	}
 	w := &preparedWriteEpoch{coordinator: c, index: index, catalog: catalog, global: global}
 	e := &epochResult{origin: origin, sql: current, mongo: global, aiFacts: aiReadonly.Summary(), aiReverseFacts: aiReverseFacts, aiReverse: aiReverse, aiReverseCoordinator: c, reasons: map[string]uint64{}}
 	if aiReverseFacts.Unknown > 0 {
@@ -308,14 +334,22 @@ func buildPreparedWriteEpoch(ctx context.Context, a *approvedInputs, d *historyD
 			return nil, fixedError("history_coordinator_page_failed")
 		}
 		if len(events) == 0 {
+			if externalQualification == nil {
+				return nil, fixedError("history_ai_external_execution_input_required")
+			}
+			prepared, prepareErr := c.PrepareAICommandPersistencePage(ctx, page, externalQualification)
+			if prepareErr != nil {
+				return nil, fixedError("history_ai_original_persistence_prepare_failed")
+			}
+			aiPages = append(aiPages, prepared)
 			// Local readonly facts do not prove the external qs-ai execution or
 			// whole reverse MQ graph, and cannot authorize evidence CAS or DROP.
 			if c.QualifyAIReadOnlyPage(ctx, page, aiReadonly) != nil {
 				return nil, fixedError("history_ai_readonly_page_failed")
 			}
 			e.aiPages++
-			// External qs-ai closure stays a per-AI-row blocker. This path writes
-			// six-type event evidence only, never retires or resends an old command.
+			// Consumption retains every original candidate/blocker. The separately
+			// derived opaque persistence batch neither clears these nor sends commands.
 			continue
 		}
 		selectors, err := retirement.MongoHistoricalSQLBatchSelectors(events)
@@ -359,6 +393,10 @@ func buildPreparedWriteEpoch(ctx context.Context, a *approvedInputs, d *historyD
 			}
 		}
 	}
+	w.aiBatch, err = c.SealAICommandPersistencePages(ctx, aiPages)
+	if err != nil {
+		return nil, fixedError("history_ai_original_persistence_prepare_failed")
+	}
 	e.sqlFacts = stableSQLFacts{sqlReport.DatabaseIdentitySHA256, sqlReport.BusinessAnchorsSHA256, sqlReport.SchemaCoverage, sqlReport.Ledgers, sqlReport.Observed, sqlReport.RetirementRelated, sqlReport.OutsideRetirement, sqlReport.Unknown, sqlReport.Blocking}
 	e.mongoFacts = stableMongoFacts{mongoReport.IdentitySHA256, mongoReport.MetadataSHA256, mongoReport.SnapshotSHA256, mongoReport.MigrationVersion, mongoReport.Collections, mongoReport.ClassCounts, mongoReport.BlockingReasons, mongoReport.CoverageGaps, mongoReport.Rows, mongoReport.Bytes, mongoReport.Pages, mongoReport.ClassifiedRows}
 	if current.ValidateBorrowedSnapshot(ctx) != nil || global.ValidateBorrowedSnapshot(ctx) != nil || aiReverse.ValidateBorrowedSnapshot(ctx) != nil || a.verifyFullFiles(ctx) != nil {
@@ -369,11 +407,11 @@ func buildPreparedWriteEpoch(ctx context.Context, a *approvedInputs, d *historyD
 }
 
 // This real caller has no public invocation. The future production host must
-// additionally bind independent approval/writer fence/AI closure; neither a
+// additionally bind independent approval/writer fence; neither a
 // request JSON nor this diagnostic return can confer those missing authorities.
-func executeHistoricalEvidenceWrite(ctx context.Context, a *approvedInputs, d *historyDatabase, outputDir string) (report preparedWriteDiagnostic, result error) {
-	report = preparedWriteDiagnostic{Protocol: "limited-historical-evidence-host/v1", CommitState: "not_attempted", Required: []string{"independent_production_source_approval", "whole_writer_and_historical_rerun_fence", "production_process_and_transaction_budget", "external_qs_ai_closure_for_related_original_commands", "all_ai_command_retirement_and_readback", "final_expected_global_and_absent_range_fence", "prewindow_actual_isolated_restore", "maintenance_acceptance_and_purge"}}
-	if ctx == nil || ctx.Err() != nil || a == nil || d == nil {
+func executeHistoricalEvidenceWrite(ctx context.Context, a *approvedInputs, d *historyDatabase, outputDir string, external ...retirement.AIExternalExecutionInput) (report preparedWriteDiagnostic, result error) {
+	report = preparedWriteDiagnostic{Protocol: "limited-historical-evidence-host/v1", CommitState: "not_attempted", Required: []string{"independent_production_source_approval", "whole_writer_and_historical_rerun_fence", "production_process_and_transaction_budget", "actual_external_qs_ai_facts_for_unmapped_original_commands", "complete_original_command_evidence_persistence_and_readback", "final_expected_global_and_absent_range_fence", "prewindow_actual_isolated_restore", "maintenance_acceptance_and_purge"}}
+	if ctx == nil || ctx.Err() != nil || a == nil || d == nil || len(external) > 1 {
 		return report, fixedError("history_write_input_rejected")
 	}
 	report.SourceSHA, report.OperationID, report.RunID = a.request.SourceSHA, a.request.OperationID, a.request.RunID
@@ -409,6 +447,8 @@ func executeHistoricalEvidenceWrite(ctx context.Context, a *approvedInputs, d *h
 		return report, fixedError("history_write_spool_failed")
 	}
 	var first *epochResult
+	var aiBatch *retirement.AICommandPersistenceBatch
+	eventExpected := a.copies()[0].Expected.Records + a.copies()[3].Expected.Records
 	if e = d.epoch(ctx, func(scope context.Context) error {
 		var err error
 		first, err = buildEpoch(scope, a, d)
@@ -423,7 +463,7 @@ func executeHistoricalEvidenceWrite(ctx context.Context, a *approvedInputs, d *h
 	// immediately writes raw bodies/baselines to private bounded disk capsules.
 	// Its related graphs are page-bounded, not retained as 1,242,978 future plans.
 	if e = d.epoch(ctx, func(scope context.Context) error {
-		second, err := buildPreparedWriteEpoch(scope, a, d)
+		second, err := buildPreparedWriteEpoch(scope, a, d, external...)
 		if err != nil {
 			return err
 		}
@@ -466,9 +506,16 @@ func executeHistoricalEvidenceWrite(ctx context.Context, a *approvedInputs, d *h
 			report.PreparedPages++
 			report.EventReferences += refs
 		}
-		if spool.Seal(scope, second.coordinator) != nil {
-			return fixedError("history_write_spool_failed")
+		if eventExpected > 0 {
+			if spool.Seal(scope, second.coordinator) != nil {
+				return fixedError("history_write_spool_failed")
+			}
 		}
+		aiBatch = second.aiBatch
+		if eventExpected == 0 && aiBatch == nil {
+			return fixedError("history_write_no_original_statements")
+		}
+
 		// Do not keep old whole SQL8/Mongo11/AI14/source/index or body-free anchors
 		// past this callback. The spool retains small actual epoch/file capabilities.
 		second = nil
@@ -477,11 +524,20 @@ func executeHistoricalEvidenceWrite(ctx context.Context, a *approvedInputs, d *h
 		return report, e
 	}
 	first = nil
-	tickets, e := spool.Tickets()
-	if e != nil {
-		return report, fixedError("history_write_spool_failed")
+	var tickets []*retirement.HistoricalCASSpoolTicket
+	if eventExpected > 0 {
+		tickets, e = spool.Tickets()
+		if e != nil {
+			return report, fixedError("history_write_spool_failed")
+		}
 	}
-	bounded, cancel, e := spool.InheritedContext(ctx)
+	var bounded context.Context
+	var cancel context.CancelFunc
+	if eventExpected > 0 {
+		bounded, cancel, e = spool.InheritedContext(ctx)
+	} else {
+		bounded, cancel, e = aiBatch.InheritedContext(ctx)
+	}
 	if e != nil {
 		return report, fixedError("history_write_spool_failed")
 	}
@@ -489,7 +545,7 @@ func executeHistoricalEvidenceWrite(ctx context.Context, a *approvedInputs, d *h
 	if a.verifyFullFiles(bounded) != nil {
 		return report, fixedError("history_asset_hash_changed")
 	}
-	applied, e := d.writePreparedEpoch(bounded, spool, tickets, journal, &report)
+	applied, e := d.writePreparedEpoch(bounded, spool, tickets, journal, &report, aiBatch)
 	if e != nil {
 		return report, e
 	}
@@ -538,9 +594,29 @@ func executeHistoricalEvidenceWrite(ctx context.Context, a *approvedInputs, d *h
 			}
 			report.ReadBackPages++
 		}
-		if spool.FinishReadback(scope, applied) != nil {
-			return fixedError("history_write_independent_readback_failed")
+		if eventExpected > 0 {
+			if spool.FinishReadback(scope, applied) != nil {
+				return fixedError("history_write_independent_readback_failed")
+			}
 		}
+		if aiBatch != nil {
+			reverse, scanErr := retirement.PrepareAIReverseSnapshot(scope, current, a.inventory.Migrations["mysql"], retirement.DefaultAIReverseLimits())
+			if scanErr != nil {
+				return fixedError("history_ai_reverse_scan_failed")
+			}
+			if a.rewind() != nil || c.BindAIReverseSourceScope(scope, reverse, a.copies()) != nil {
+				return fixedError("history_ai_reverse_source_scope_failed")
+			}
+			observation, readErr := aiBatch.VerifyReadback(scope, reverse)
+			if readErr != nil || !observation.IndependentReadbackMatched || observation.OriginalCommands != report.AIOriginalCommands || observation.OriginalSourceReferences != report.AISourceReferences {
+				return fixedError("history_ai_original_independent_readback_failed")
+			}
+			if journal.record(scope, "ai_independent_readback_finished", -1, report.AISourceReferences, nil) != nil {
+				return fixedError("history_write_journal_unknown")
+			}
+			report.AICommandPersistenceComplete = true
+		}
+
 		if current.ValidateBorrowedSnapshot(scope) != nil || global.ValidateBorrowedSnapshot(scope) != nil || a.verifyFullFiles(scope) != nil {
 			return fixedError("history_epoch_changed_before_close")
 		}
@@ -554,12 +630,19 @@ func executeHistoricalEvidenceWrite(ctx context.Context, a *approvedInputs, d *h
 	if e = journal.record(bounded, "limited_event_readback_finished", -1, report.EventReferences, nil); e != nil {
 		return report, e
 	}
-	report.LimitedEventPersistenceObserved = true
+	report.LimitedEventPersistenceObserved = eventExpected > 0
 	return report, nil
 }
 
-func (d *historyDatabase) writePreparedEpoch(ctx context.Context, spool *retirement.HistoricalCASSpool, tickets []*retirement.HistoricalCASSpoolTicket, journal *historyWriteJournal, report *preparedWriteDiagnostic) (applied *retirement.HistoricalCASSpoolApplied, result error) {
-	if d == nil || spool == nil || len(tickets) == 0 || report == nil || ctx == nil || ctx.Err() != nil || d.validateNamespaceAnchor(ctx) != nil {
+func (d *historyDatabase) writePreparedEpoch(ctx context.Context, spool *retirement.HistoricalCASSpool, tickets []*retirement.HistoricalCASSpoolTicket, journal *historyWriteJournal, report *preparedWriteDiagnostic, aiBatches ...*retirement.AICommandPersistenceBatch) (applied *retirement.HistoricalCASSpoolApplied, result error) {
+	var aiBatch *retirement.AICommandPersistenceBatch
+	if len(aiBatches) > 1 {
+		return nil, fixedError("history_write_host_epoch_rejected")
+	}
+	if len(aiBatches) == 1 {
+		aiBatch = aiBatches[0]
+	}
+	if d == nil || spool == nil || len(tickets) == 0 && aiBatch == nil || report == nil || ctx == nil || ctx.Err() != nil || d.validateNamespaceAnchor(ctx) != nil {
 		return nil, fixedError("history_write_host_epoch_rejected")
 	}
 	session, e := d.mongoClient.StartSession()
@@ -613,6 +696,16 @@ func (d *historyDatabase) writePreparedEpoch(ctx context.Context, spool *retirem
 	if journal.record(paired, "write_epoch_started", -1, 0, nil) != nil {
 		return nil, fixedError("history_write_journal_unknown")
 	}
+	if aiBatch != nil {
+		written, writeErr := aiBatch.Record(paired, tx)
+		if writeErr != nil || !written.InTransactionWritten {
+			return nil, fixedError("history_ai_original_persistence_statement_failed")
+		}
+		report.AIOriginalCommands, report.AISourceReferences = written.OriginalCommands, written.OriginalSourceReferences
+		if journal.record(paired, "ai_statements_applied", -1, written.OriginalSourceReferences, nil) != nil {
+			return nil, fixedError("history_write_journal_unknown")
+		}
+	}
 	for _, ticket := range tickets {
 		if spool.ApplyTicket(paired, ticket) != nil {
 			return nil, fixedError("history_write_statement_failed")
@@ -622,10 +715,13 @@ func (d *historyDatabase) writePreparedEpoch(ctx context.Context, spool *retirem
 			return nil, fixedError("history_write_journal_unknown")
 		}
 	}
-	applied, e = spool.FinishApply(paired)
-	if e != nil {
-		return nil, fixedError("history_write_statement_failed")
+	if len(tickets) > 0 {
+		applied, e = spool.FinishApply(paired)
+		if e != nil {
+			return nil, fixedError("history_write_statement_failed")
+		}
 	}
+
 	if journal.record(paired, "all_statements_applied", -1, report.EventReferences, nil) != nil {
 		return nil, fixedError("history_write_journal_unknown")
 	}

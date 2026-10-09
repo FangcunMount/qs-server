@@ -515,6 +515,15 @@ local database tests cannot create these private proofs or authorize a host
 write. The host still owns RW transactions, commit/rollback and independent
 persisted readback.
 
+Mixed AI history persistence uses the original command ID. A mapped command
+records verified transfer while preserving its current MQ responsibility and
+inherited budget; an independently closed unmapped command records a minimal
+retirement row. The v3 external packet binds the full mapped descriptor, complete
+53/14-ledger observations, and original organization/session identity. Discovery
+continues to use v2. Preparation, the borrowed host write, and fresh independent
+readback remain separate; zero event rows do not fabricate an event CAS ticket.
+These library paths do not enable the public production write or DROP stages.
+
 Allowed missing historical traces keep their exact `unverifiable` reason and
 never acquire a current/latest Run or invented attempt. Unknown current
 execution, pending/held work, leases, conflicting hashes or owners, and required

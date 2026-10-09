@@ -4,6 +4,8 @@
 
 当前 `7e39ed4f7790917db67919e2bf765080031dc83d` 的目标范围从两份独立批准、完整 EOF 的旧 AI 源生成 `_Original`，再由 `_verify` 把同一原对象传给 `_reverse`、`_evaluations` 和 `_mq`。`_original_execution_scope` 严格重核原 command=request、请求原哈希、session、组织、主体、受试者、测评和 goal，范围包括这些原 session 的全部保留 Run；不是调用者给出的 ID 数组，也不是八条样本白名单。未知范围不能当成空范围。
 
+本轮新增 v3 混合输入：已进入当前协议的原命令，通过完整 descriptor、原组织／请求／正文摘要和现用 14 表关联验证，记录旧发布责任已经交接，同时保留当前 pending、投递预算和回执事实。它不把当前执行改成业务终态。尚未交接的原命令仍须证明业务终态和旧责任关闭；unknown、held、孤儿、缺少可信业务记录或摘要冲突继续阻断。bounds 保持 v2；v3 只用于明确批准的核验模式。两次完整读取和独立落盘后读取均必须保留这份 mapped 身份集合。
+
 全量 53/14 账本扫描和反向完整性检查保持不变。当前无关的 `model_calls` unknown/dispatched 只有在全局 Run/Session/唯一 Job、原 request 与组织归属检查通过、且不属于任何原目标 session 时，才记为 `outside_retirement_provider_result_unknown`；缺 Job、孤儿、跨 session/组织、重复 owner/run 或原摘要冲突继续阻断。独立评测的 result_unknown 也必须继续通过真实 creation receipt、冻结 policy/asset、dispatch/completion/slot/response 和组织归属校验，且原 run 不与目标 request/session/run ID 相撞，才能记为目标外观察。目标外 unknown 没有被改成成功或关闭状态，本批有关 unknown/dispatched、held、待处理预算/租约、MQ/回执冲突仍阻断。
 
 下文早期 18 表观察器及 0037 夹具的结果仅描述其有限机制。新 0040 适配与完整核验器已经通过本地真实 MySQL 回归，包括合并表、未知类型、NULL、复合主键以及 SQL 原生排序；这些结果未绑定生产宿主、历史可信 keys 或责任闭环。核验器继续借用宿主连接和事务，不自行创建连接、回填、重发或退休命令。
