@@ -38,7 +38,7 @@ on:
         description: 'Observe sources, persist prewindow historical evidence, or diagnose an existing boundary report'
         required: false
         type: choice
-        options: [identity, bootstrap-bounds, bounds, bootstrap-inventory, inventory, bootstrap-history, bootstrap-history-metadata, bootstrap-history-parent, bootstrap-ai-bounds, bootstrap-ai-verify, historical-evidence-write, historical-ai-bounds, report-diagnostic]
+        options: [identity, bootstrap-bounds, bounds, bootstrap-inventory, inventory, bootstrap-history, bootstrap-history-metadata, bootstrap-history-parent, bootstrap-ai-bounds, bootstrap-ai-verify, historical-evidence-write, historical-ai-bounds, report-diagnostic, lifecycle]
         default: inventory
       identity_request_sha256:
         description: 'Prepare identity only: independently computed canonical request SHA256'
@@ -94,15 +94,17 @@ jobs:
                 input.database !== 'mysql-and-mongodb' ||
                 !/^[0-9a-f]{40}$/.test(input.approved_source_sha) ||
                 !/^[0-9]{1,20}-[0-9]{1,4}$/.test(input.operation_id) ||
-                !['identity', 'bounds', 'inventory', 'bootstrap-bounds', 'bootstrap-inventory', 'bootstrap-history', 'bootstrap-history-metadata', 'bootstrap-history-parent', 'bootstrap-ai-bounds', 'bootstrap-ai-verify', 'historical-evidence-write', 'historical-ai-bounds', 'report-diagnostic'].includes(input.prepare_mode) ||
+                !['identity', 'bounds', 'inventory', 'bootstrap-bounds', 'bootstrap-inventory', 'bootstrap-history', 'bootstrap-history-metadata', 'bootstrap-history-parent', 'bootstrap-ai-bounds', 'bootstrap-ai-verify', 'historical-evidence-write', 'historical-ai-bounds', 'report-diagnostic', 'lifecycle'].includes(input.prepare_mode) ||
                 (descriptor
                   ? (input.operation !== 'prepare' || input.manifest_sha256 !== '' || input.inventory_request_sha256 !== '' || input.identity_request_sha256 !== '' || typeof input.bootstrap_approval_json !== 'string' || !/^[\x20-\x7e]{1,4096}$/.test(input.bootstrap_approval_json) || !/^[0-9a-f]{64}$/.test(input.bootstrap_approval_sha256))
                   : (input.bootstrap_approval_json !== '' || input.bootstrap_approval_sha256 !== '')) ||
-                (input.operation === 'prepare'
+                (input.prepare_mode === 'lifecycle'
+                  ? (input.operation !== 'prepare' || !/^[0-9a-f]{64}$/.test(input.manifest_sha256) || !/^[0-9a-f]{64}$/.test(input.inventory_request_sha256) || input.identity_request_sha256 !== '')
+                  : (input.operation === 'prepare'
                   ? (input.manifest_sha256 !== '' || (!descriptor && (input.prepare_mode === 'identity'
                       ? (!/^[0-9a-f]{64}$/.test(input.identity_request_sha256) || input.inventory_request_sha256 !== '')
                       : (!/^[0-9a-f]{64}$/.test(input.inventory_request_sha256) || input.identity_request_sha256 !== ''))))
-                  : (!/^[0-9a-f]{64}$/.test(input.manifest_sha256) || input.inventory_request_sha256 !== '' || input.identity_request_sha256 !== '' || input.prepare_mode !== 'inventory')) ||
+                  : (!/^[0-9a-f]{64}$/.test(input.manifest_sha256) || input.inventory_request_sha256 !== '' || input.identity_request_sha256 !== '' || input.prepare_mode !== 'inventory'))) ||
                 context.ref !== 'refs/heads/main' || input.approved_source_sha !== context.sha) {
               throw new Error('compatibility_retirement_input_or_source_rejected');
             }
@@ -342,7 +344,7 @@ jobs:
       group: qlume
       labels: [self-hosted, macOS, ARM64, ops]
     environment: production
-    timeout-minutes: 40
+    timeout-minutes: ${{ inputs.prepare_mode == 'lifecycle' && 115 || 40 }}
     steps:
       - name: Validate pinned production SSH binding
         env:
@@ -417,7 +419,8 @@ jobs:
           RETIREMENT_OPERATION: ${{ inputs.operation }}
           RETIREMENT_OPERATION_ID: ${{ inputs.operation_id }}
           RETIREMENT_MANIFEST_SHA256: ${{ inputs.manifest_sha256 }}
-          RETIREMENT_INVENTORY_REQUEST_SHA256: ${{ inputs.inventory_request_sha256 }}
+          RETIREMENT_INVENTORY_REQUEST_SHA256: ${{ inputs.prepare_mode != 'lifecycle' && inputs.inventory_request_sha256 || '' }}
+          RETIREMENT_LIFECYCLE_REQUEST_SHA256: ${{ inputs.prepare_mode == 'lifecycle' && inputs.inventory_request_sha256 || '' }}
           RETIREMENT_PREPARE_MODE: ${{ inputs.prepare_mode }}
           RETIREMENT_IDENTITY_REQUEST_SHA256: ${{ inputs.identity_request_sha256 }}
           RETIREMENT_BOOTSTRAP_APPROVAL_JSON: ${{ inputs.bootstrap_approval_json }}
@@ -444,8 +447,8 @@ jobs:
           key: ${{ secrets.SVRA_SSH_KEY }}
           port: ${{ vars.SVRA_SSH_PORT || 22 }}
           fingerprint: ${{ vars.SVRA_SSH_FINGERPRINT }}
-          command_timeout: 35m
-          envs: RETIREMENT_OPERATION,RETIREMENT_OPERATION_ID,RETIREMENT_MANIFEST_SHA256,RETIREMENT_INVENTORY_REQUEST_SHA256,RETIREMENT_PREPARE_MODE,RETIREMENT_IDENTITY_REQUEST_SHA256,RETIREMENT_BOOTSTRAP_APPROVAL_JSON,RETIREMENT_BOOTSTRAP_APPROVAL_SHA256,RETIREMENT_APPROVED_SHA,RETIREMENT_ACTUAL_SHA,RETIREMENT_RUN_ID,RETIREMENT_PACKAGE_SHA256,MYSQL_HOST,MYSQL_PORT,MYSQL_USERNAME,MYSQL_PASSWORD,MYSQL_DATABASE,MONGODB_HOST,MONGODB_PORT,MONGODB_USERNAME,MONGODB_PASSWORD,MONGODB_DBNAME,MONGODB_METADATA_ADMIN_USERNAME,MONGODB_METADATA_ADMIN_PASSWORD
+          command_timeout: ${{ inputs.prepare_mode == 'lifecycle' && '100m' || '35m' }}
+          envs: RETIREMENT_OPERATION,RETIREMENT_OPERATION_ID,RETIREMENT_MANIFEST_SHA256,RETIREMENT_INVENTORY_REQUEST_SHA256,RETIREMENT_LIFECYCLE_REQUEST_SHA256,RETIREMENT_PREPARE_MODE,RETIREMENT_IDENTITY_REQUEST_SHA256,RETIREMENT_BOOTSTRAP_APPROVAL_JSON,RETIREMENT_BOOTSTRAP_APPROVAL_SHA256,RETIREMENT_APPROVED_SHA,RETIREMENT_ACTUAL_SHA,RETIREMENT_RUN_ID,RETIREMENT_PACKAGE_SHA256,MYSQL_HOST,MYSQL_PORT,MYSQL_USERNAME,MYSQL_PASSWORD,MYSQL_DATABASE,MONGODB_HOST,MONGODB_PORT,MONGODB_USERNAME,MONGODB_PASSWORD,MONGODB_DBNAME,MONGODB_METADATA_ADMIN_USERNAME,MONGODB_METADATA_ADMIN_PASSWORD
           script: |
             set -Eeuo pipefail
             umask 077
@@ -475,6 +478,7 @@ jobs:
               --actual-source-sha "$RETIREMENT_ACTUAL_SHA" \
               --run-id "$RETIREMENT_RUN_ID" \
               --manifest-hash "$RETIREMENT_MANIFEST_SHA256" \
+              --lifecycle-request-hash "$RETIREMENT_LIFECYCLE_REQUEST_SHA256" \
               --inventory-request-hash "$RETIREMENT_INVENTORY_REQUEST_SHA256" \
               --identity-request-hash "$RETIREMENT_IDENTITY_REQUEST_SHA256" \
               --bootstrap-approval-json "$RETIREMENT_BOOTSTRAP_APPROVAL_JSON" \

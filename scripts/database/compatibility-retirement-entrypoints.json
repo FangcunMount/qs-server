@@ -197,12 +197,17 @@
       "workflow": ".github/workflows/compatibility-retirement.yml",
       "name": "Exact Compatibility Retirement",
       "production_environment": true,
-      "classification": "controlled_readonly_prepare_unsupported_mutations",
+      "classification": "controlled_inventory_historical_evidence_and_temporary_restore_preparation",
       "source": [
         "scripts/database/compatibility-retirement.py",
-        "cmd/qs-compatibility-retirement/main.go"
+        "cmd/qs-compatibility-retirement/main.go",
+        "cmd/qs-compatibility-retirement/lifecycle.go",
+        "cmd/qs-compatibility-retirement/lifecycle_prepare.go",
+        "cmd/qs-compatibility-retirement/lifecycle_root_staging.go",
+        "cmd/qs-compatibility-retirement/lifecycle_restore_engine.go",
+        "cmd/qs-compatibility-retirement/lifecycle_restore_wire.go"
       ],
-      "reason": "Only exact approved main prepare obtains DB credentials and reads four targets. All mutation stages currently fail closed. All phases share production-deploy.",
+      "reason": "Only the exact approved main SHA, operation and independently bound request use the existing production credential paths. Inventory/report diagnostics read originals; prewindow historical evidence uses separately qualified locked CAS; lifecycle preparation captures exact four-target temporary assets and performs actual isolated network-none restores through the fixed root-once caller. Preparation grants no DROP/fence/window authority. A apply/verify/recover/purge remain unavailable before input/database access. All phases share production-deploy.",
       "fence_action": "Allow only approved main SHA/op/request or frozen manifest; no unsupported phase may return success."
     },
     {

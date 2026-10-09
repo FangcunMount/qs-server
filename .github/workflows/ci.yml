@@ -629,6 +629,8 @@ jobs:
           python3 -B scripts/database/test-compatibility-retirement.py
           python3 -B scripts/database/test-compatibility-evidence-write-inputs.py
           python3 -B scripts/database/test-compatibility-inventory-report-diagnostic.py
+          python3 -B scripts/database/test-compatibility-mongo-target-diagnostic.py
+          python3 -B scripts/database/test-compatibility-root-prepare.py
           python3 -B scripts/database/test_qs_ai_retirement_readonly_host.py
           python3 -B scripts/database/test-compatibility-ai-history-prepare.py
           python3 -B scripts/database/test-compatibility-history-prepare.py
