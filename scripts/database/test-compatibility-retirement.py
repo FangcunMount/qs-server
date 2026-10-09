@@ -730,8 +730,9 @@ class SafetyContracts(unittest.TestCase):
         self.assertIs(value["live_fence_proven"], False)
         self.assertIs(value["historical_rerun_proven_denied"], False)
         entries = value["entrypoints"]
-        self.assertEqual(len(entries), 12)
-        self.assertEqual(len({entry["workflow"] for entry in entries}), 12)
+        self.assertEqual(len(entries), 13)
+        self.assertEqual(len({entry["workflow"] for entry in entries}), 13)
+        self.assertEqual(value["current_source_entrypoint_workflow_total"], len(entries))
         self.assertEqual(len(value["historical_workflows_reported_active_not_in_current_source"]), 9)
         self.assertTrue(all(entry["credential_path_proven_denied"] is False for entry in value["historical_workflows_reported_active_not_in_current_source"]))
         self.assertIs(value["remote_metadata_report"]["observation_is_fence_proof"], False)
@@ -740,6 +741,10 @@ class SafetyContracts(unittest.TestCase):
                 self.assertTrue((repository / path).is_file(), path)
         by_name = {entry["name"]: entry for entry in entries}
         self.assertEqual(by_name["Provision Production AuthZ Matrix Subjects"]["classification"], "production_writer")
+        host = by_name["Compatibility Host Read-only Inventory"]
+        self.assertIs(host["production_environment"], True)
+        self.assertEqual(host["workflow"], ".github/workflows/compatibility-host-inventory.yml")
+        self.assertEqual(host["classification"], "controlled_host_readonly_partial_observation")
         for name in ("M5 AuthZ Outage Read-only Preflight", "M5 AuthZ Ephemeral Read-only Postcheck", "Ping Runner"):
             self.assertIs(by_name[name]["production_environment"], False)
 
@@ -801,6 +806,22 @@ class SafetyContracts(unittest.TestCase):
         result = subprocess.run(["node", "--check"], input="async function validate() {\n" + script + "\n}", text=True, capture_output=True)
         self.assertEqual(result.returncode, 0, result.stderr)
 
+    def test_history_bootstrap_wiring_preserves_old_credential_and_mutation_boundary(self):
+        workflow = (SCRIPT.parents[2] / ".github/workflows/compatibility-retirement.yml").read_text()
+        for key in ("MYSQL_METADATA_ADMIN_USERNAME", "MYSQL_METADATA_ADMIN_PASSWORD",
+                    "MONGODB_METADATA_ADMIN_USERNAME", "MONGODB_METADATA_ADMIN_PASSWORD"):
+            self.assertIn("inputs.prepare_mode == 'bootstrap-history' && secrets." + key, workflow)
+        self.assertIn("!startsWith(inputs.prepare_mode, 'bootstrap-')", workflow)
+        self.assertIn('history_binary="$tool_dir/history-linux-amd64"', workflow)
+        self.assertIn('history_binary="$tool_dir/history-linux-arm64"', workflow)
+        self.assertIn("CGO_ENABLED=0 GOOS=linux GOARCH=amd64", workflow)
+        self.assertIn("CGO_ENABLED=0 GOOS=linux GOARCH=arm64", workflow)
+        self.assertIn('main.sourceSHA=$GITHUB_SHA', workflow)
+        self.assertIn("test-compatibility-history-prepare.py", workflow)
+        self.assertFalse(tool.CAPABILITIES["history_verifier"])
+        self.assertFalse(tool.CAPABILITIES["production_database_backend"])
+        self.assertFalse(tool.CAPABILITIES["private_backup_restore_backend"])
+
     def test_actual_workflow_validation_normalizes_only_declared_optional_inputs(self):
         workflow = (SCRIPT.parents[2] / ".github/workflows/compatibility-retirement.yml").read_text()
         script = textwrap.dedent(workflow.split("          script: |\n", 1)[1].split("      - name:", 1)[0])
@@ -808,9 +829,11 @@ class SafetyContracts(unittest.TestCase):
                     "operation_id": OPERATION, "prepare_mode": "identity", "identity_request_sha256": "1" * 64}
         bounds = {**supplied, "prepare_mode": "bounds", "inventory_request_sha256": "2" * 64}
         bounds.pop("identity_request_sha256")
+        inventory = dict(bounds, prepare_mode="inventory")
         scenarios = [("omitted_empty_defaults", supplied, "refs/heads/main", SOURCE, SOURCE, True),
                      ("all_defaults_present", dict(supplied, manifest_sha256="", inventory_request_sha256=""), "refs/heads/main", SOURCE, SOURCE, True),
                      ("bounds_omitted_identity", bounds, "refs/heads/main", SOURCE, SOURCE, True),
+                     ("inventory_omitted_identity", inventory, "refs/heads/main", SOURCE, SOURCE, True),
                      ("bounds_missing_request", {k: v for k, v in bounds.items() if k != "inventory_request_sha256"}, "refs/heads/main", SOURCE, SOURCE, False),
                      ("unknown_input", dict(supplied, unknown=""), "refs/heads/main", SOURCE, SOURCE, False),
                      ("mixed_request", dict(supplied, inventory_request_sha256="2" * 64), "refs/heads/main", SOURCE, SOURCE, False),
@@ -1089,6 +1112,45 @@ class SafetyContracts(unittest.TestCase):
                        +"new (Object.getPrototypeOf(async function(){}).constructor)('context','github','require',script)(context,github,require).catch(()=>{process.exitCode=1;});")
             result = subprocess.run(["node", "-e", program], capture_output=True, text=True, check=False)
             self.assertEqual(result.returncode, 0 if allowed else 1, result.stderr)
+
+
+class MetadataWorkflowContracts(unittest.TestCase):
+    def test_metadata_has_separate_no_database_environment_ssh_step(self):
+        workflow=(SCRIPT.parents[2]/".github/workflows/compatibility-retirement.yml").read_text()
+        step=workflow.split("      - name: Observe approved inventory file metadata without database credentials\n",1)[1]
+        self.assertIn("if: inputs.prepare_mode == 'bootstrap-history-metadata'",step)
+        for forbidden in ("MYSQL_","MONGODB_","inventory_binary","history_binary","uname -m","go build","docker create","docker rm"):
+            self.assertNotIn(forbidden,step)
+        envs=step.split("          envs: ",1)[1].split("\n",1)[0].split(",")
+        self.assertEqual(len(envs),9);self.assertTrue(all(name.startswith("RETIREMENT_") for name in envs))
+        old=workflow.split("      - name: Inventory source bytes or reject unavailable lifecycle stage\n",1)[1].split("      - name: Observe approved",1)[0]
+        self.assertIn("if: inputs.prepare_mode != 'bootstrap-history-metadata'",old)
+        self.assertIn("MONGODB_METADATA_ADMIN_PASSWORD",old)
+        setup=workflow.split("      - name: Set up Go for immutable read-only inventory\n",1)[1].split("      - name:",1)[0]
+        self.assertIn("if: inputs.prepare_mode != 'bootstrap-history-metadata'",setup)
+
+    def test_actual_metadata_package_has_exact_four_files_and_never_executes_go(self):
+        repository=SCRIPT.parents[2]
+        workflow=(repository/".github/workflows/compatibility-retirement.yml").read_text()
+        step=workflow.split("      - name: Package only immutable tooling\n",1)[1].split("      - name:",1)[0]
+        body=textwrap.dedent(step.split("        run: |\n",1)[1])
+        with tempfile.TemporaryDirectory() as temporary:
+            root=Path(temporary).resolve();(root/"scripts/database").mkdir(parents=True);(root/"scripts/dbops").mkdir(parents=True)
+            for rel in ("scripts/database/compatibility-retirement.py","scripts/database/compatibility-history-prepare.py",
+                        "scripts/database/compatibility-retirement-entrypoints.json","scripts/dbops/receipt-transport.py"):
+                (root/rel).write_bytes((repository/rel).read_bytes())
+            tools=root/"tools";tools.mkdir(mode=0o700)
+            sentinel=tools/"go";sentinel.write_text("#!/bin/sh\necho unexpected_go >&2\nexit 99\n");sentinel.chmod(0o700)
+            runtemp=root/"runtime";runtemp.mkdir(mode=0o700);output=root/"output"
+            env=dict(os.environ,RETIREMENT_PACKAGE_MODE="bootstrap-history-metadata",RUNNER_TEMP=str(runtemp),
+                GITHUB_RUN_ID="900",GITHUB_RUN_ATTEMPT="1",GITHUB_SHA=SOURCE,GITHUB_OUTPUT=str(output),PATH=str(tools)+os.pathsep+os.environ["PATH"])
+            result=subprocess.run(["bash","-c",body],cwd=root,env=env,capture_output=True,check=False)
+            self.assertEqual(result.returncode,0,result.stderr.decode())
+            archive=root/"qs-compatibility-retirement-900-1.tar.gz"
+            listing=subprocess.run(["tar","-tzf",str(archive)],capture_output=True,check=True).stdout.decode().splitlines()
+            self.assertEqual(listing,["compatibility-retirement.py","compatibility-history-prepare.py","compatibility-retirement-entrypoints.json","receipt-transport.py"])
+            self.assertEqual(output.read_text().strip(),"sha256="+hashlib.sha256(archive.read_bytes()).hexdigest())
+            self.assertEqual(list(runtemp.iterdir()),[])
 
 
 if __name__ == "__main__":

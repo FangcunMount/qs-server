@@ -45,7 +45,7 @@ NAME = re.compile(r"^[a-z][a-z0-9_-]{0,80}\.json$")
 MAX_JSON = 256 * 1024
 INVENTORY_V2_LIMITS = {"query_seconds": 30, "total_seconds": 1500, "max_records": 1000000,
                        "max_bytes": 2147483648, "page_size": 1000, "max_pages": 1001}
-BOOTSTRAP_MODES = frozenset({"bootstrap-bounds", "bootstrap-inventory"})
+BOOTSTRAP_MODES = frozenset({"bootstrap-bounds", "bootstrap-inventory", "bootstrap-history", "bootstrap-history-metadata", "bootstrap-history-parent"})
 MAX_BOOTSTRAP_APPROVAL = 4096
 MAX_WINDOW_SECONDS = 1800
 FORWARD_STOP_SECONDS = 1200
@@ -184,7 +184,7 @@ def read_private(directory, filename, expected_hash=None):
     if expected_hash is not None:
         token(expected_hash, HASH)
     try:
-        fd = os.open(directory / filename, os.O_RDONLY | os.O_NOFOLLOW)
+        fd = os.open(directory / filename, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
     except OSError:
         fail("evidence_unavailable")
     try:
@@ -810,7 +810,7 @@ def live_inventory(args, directory):
     if mode == "inventory" and request["format_version"] == 2:
         validate_approved_boundary_file(request, directory)
     entrypoints, entrypoint_hash = read_private(Path(__file__).parent, "compatibility-retirement-entrypoints.json")
-    if entrypoints.get("format_version") != 1 or entrypoints.get("kind") != "source_only_production_entrypoint_catalog" or entrypoints.get("live_fence_proven") is not False or entrypoints.get("historical_rerun_proven_denied") is not False or len(entrypoints.get("entrypoints", ())) != 12:
+    if entrypoints.get("format_version") != 1 or entrypoints.get("kind") != "source_only_production_entrypoint_catalog" or entrypoints.get("live_fence_proven") is not False or entrypoints.get("historical_rerun_proven_denied") is not False or len(entrypoints.get("entrypoints", ())) != 13 or entrypoints.get("current_source_entrypoint_workflow_total") != 13:
         fail("inventory_entrypoint_catalog_invalid")
     binary = Path(args.inventory_binary)
     try:
@@ -1009,7 +1009,7 @@ def validate_source_asset(output, item, args, request_hash, maximum):
     if item.get("source_file") != filename:
         fail("inventory_source_asset_invalid")
     try:
-        fd = os.open(output / filename, os.O_RDONLY | os.O_NOFOLLOW)
+        fd = os.open(output / filename, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
     except OSError:
         fail("inventory_source_asset_unavailable")
     try:
@@ -1246,6 +1246,15 @@ def execute(args):
     if mode in BOOTSTRAP_MODES:
         if args.operation != "prepare" or args.manifest_hash or identity_request or inventory_request or not bootstrap_json or not bootstrap_hash:
             fail("input_classes_mixed")
+        if mode in ("bootstrap-history", "bootstrap-history-metadata", "bootstrap-history-parent"):
+            filename = "compatibility-history-parent.py" if mode == "bootstrap-history-parent" else "compatibility-history-prepare.py"
+            module_name = "compatibility_history_parent" if mode == "bootstrap-history-parent" else "compatibility_history_prepare"
+            path = Path(__file__).with_name(filename)
+            spec = importlib.util.spec_from_file_location(module_name, path)
+            module = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(module)
+            entrypoint = module.prepare_metadata if mode == "bootstrap-history-metadata" else module.prepare
+            return entrypoint(args, argparse.Namespace(**globals()))
         return bootstrap_private_request(args)
     if bootstrap_json or bootstrap_hash:
         fail("input_classes_mixed")
@@ -1300,12 +1309,14 @@ def main(argv=None):
     parser.add_argument("--manifest-hash", default="")
     parser.add_argument("--inventory-request-hash", default="")
     parser.add_argument("--inventory-binary", default="")
+    parser.add_argument("--history-binary", default="")
     parser.add_argument("--prepare-mode", default="inventory")
     parser.add_argument("--identity-request-hash", default="")
     parser.add_argument("--bootstrap-approval-json", default="")
     parser.add_argument("--bootstrap-approval-hash", default="")
     receipt = {"format_version": 1, "complete": False, "execution_allowed": False,
                "error_category": "input_invalid"}
+    args = None
     try:
         args = parser.parse_args(argv)
         receipt = execute(args)
@@ -1319,6 +1330,25 @@ def main(argv=None):
               "inventory_complete": "bool", "inventory_private_report_hash": "hash64",
               "prepare_mode": frozenset({"identity", "bounds", "inventory"}) | BOOTSTRAP_MODES, "diagnostic_only": "bool", "drop_ready": "bool",
               "request_bootstrap_complete": "bool", "bootstrap_approval_sha256": "hash64", "derived_request_sha256": "hash64", "request_created_run_id": "run_id",
+              "history_metadata_complete": "bool", "history_metadata_process_budget_proven": "bool",
+              "metadata_private_report_sha256": "hash64", "metadata_created_run_id": "run_id",
+              "approved_inventory_report": {"run_id": "run_id", "sha256": "hash64"}, "inventory_request_sha256": "hash64",
+              "history_parent_proposal_sha256": "hash64", "parent_proposal_run_id": "run_id",
+              "history_metadata_assets": [{"database": frozenset({"mysql", "mongodb"}), "name": frozenset(target[1] for target in TARGETS),
+                   "full_file_sha256": "hash64", "full_file_bytes": "uint", "source_asset_sha256": "hash64"}],
+              "history_parent_registration_complete": "bool", "history_parent_process_budget_proven": "bool",
+              "history_parent_registration_sha256": "hash64", "approved_metadata_report": {"run_id": "run_id", "sha256": "hash64"},
+              "history_parent_request_sha256": "hash64", "history_private_readiness_sha256": "hash64",
+              "history_readonly_complete": "bool", "history_independent_epochs": "uint",
+              "history_local_candidates": "uint", "history_locally_qualified": "uint", "history_blocked_local": "uint",
+              "history_ai_blocked_pages": "uint", "history_cas_complete": "bool", "history_process_budget_proven": "bool",
+              "history_source_rows": ["uint"],
+              "history_global_sql": {key: "uint" for key in ("observed", "retirement_related", "outside_retirement", "unknown", "blocking")},
+              "history_global_mongodb": {key: "uint" for key in ("rows", "classified_rows", "blocking_reason_count", "coverage_gap_count")},
+              "history_global_ai_reverse": {
+                  **{key: "uint" for key in ("ledger_count", "rows", "retirement_related", "outside_retirement", "unknown", "blocking", "outside_active")},
+                  **{key: "hash64_or_empty" for key in ("data_sha256", "source_scope_sha256")},
+                  **{key: "bool" for key in ("whole_ledger_eof", "independent_epoch_rechecked")}},
               "approved_identity_report": {"run_id": "run_id", "source_sha": "sha40", "sha256": "hash64"},
               "approved_boundary_report": {"run_id": "run_id", "source_sha": "sha40", "sha256": "hash64"},
               "boundary_discovery_complete": "bool", "boundary_private_report_hash": "hash64", "boundary_request_hash": "hash64",
@@ -1338,16 +1368,22 @@ def main(argv=None):
               "error_category": frozenset({receipt["error_category"]}),
               "blockers": [frozenset(receipt.get("blockers", ()))],
               "capabilities": {key: "bool" for key in CAPABILITIES}}
+    emitted = False
     try:
-        secrets = tuple(os.environ.get(key, "") for key in ("MYSQL_USERNAME", "MYSQL_PASSWORD", "MONGODB_USERNAME", "MONGODB_PASSWORD",
+        secrets = () if getattr(args, "prepare_mode", "") in ("bootstrap-history-metadata", "bootstrap-history-parent") else tuple(os.environ.get(key, "") for key in ("MYSQL_USERNAME", "MYSQL_PASSWORD", "MONGODB_USERNAME", "MONGODB_PASSWORD",
                                                                           "MONGODB_METADATA_ADMIN_USERNAME", "MONGODB_METADATA_ADMIN_PASSWORD"))
         armor = transport().encode_armored_receipt(receipt, schema=schema, secrets=secrets)
         print(armor)
+        emitted = True
     except Exception:
         # Fixed ASCII fallback contains no input and cannot be mistaken for a
         # valid framed receipt. Never print a raw protocol/debug alternative.
         print("compatibility_retirement_receipt_transport_failed", file=sys.stderr)
-    return 42
+    diagnostic_complete = ((receipt.get("prepare_mode") == "bootstrap-history" and receipt.get("history_readonly_complete") is True) or
+        (receipt.get("prepare_mode") == "bootstrap-history-metadata" and receipt.get("history_metadata_complete") is True) or
+        (receipt.get("prepare_mode") == "bootstrap-history-parent" and receipt.get("history_parent_registration_complete") is True and
+         receipt.get("diagnostic_only") is True and receipt.get("history_cas_complete") is False and receipt.get("history_parent_process_budget_proven") is False))
+    return 0 if emitted and diagnostic_complete and receipt.get("complete") is False and receipt.get("execution_allowed") is False and receipt.get("drop_ready") is False else 42
 
 
 if __name__ == "__main__":

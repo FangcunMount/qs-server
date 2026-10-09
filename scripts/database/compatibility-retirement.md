@@ -2,9 +2,16 @@
 
 This is the foundation for the accepted four-object operation, not an enabled
 production cleanup. `prepare` has real read-only identity discovery, separately approved private
-request bootstrap, fixed-upper-bound discovery and paged source inventory;
-all exit 42 with diagnostic receipts. Discovery is
-never automatic approval of an observed database identity.
+request bootstrap, fixed-upper-bound discovery, paged source inventory and a
+separately approved read-only history host. Identity, boundaries, inventory and
+their existing bootstrap modes exit 42 with diagnostic receipts. Separately
+approved physical-file metadata observation and parent registration may exit 0
+only after their complete read-only checks and durable registration; neither
+grants execution or CAS authority. The history host may exit 0 only when its
+actual child completes two independent epochs,
+the private and stdout readiness bytes agree, and the diagnostic receipt is
+successfully armored. Its `complete`, `execution_allowed` and `drop_ready`
+remain false. A successful diagnostic Action does not authorize retirement.
 `apply`, `verify`, `recover` and `purge` remain unavailable and exit 42.
 Neither a JSON boolean nor
 a workflow input can enable a missing backend. Do not dispatch this foundation
@@ -23,7 +30,7 @@ restores are outside this scope. No new DROP migration is included in A.
   group. This does not retroactively change old workflow revisions.
 - The new workflow rejects unknown fields/operations, another database scope,
   another ref, a stale main SHA and another manifest hash before its production
-  job. Only exact `prepare` receives existing `MYSQL_METADATA_ADMIN_USERNAME`,
+  job. Only database-backed `prepare` modes receive existing `MYSQL_METADATA_ADMIN_USERNAME`,
   `MYSQL_METADATA_ADMIN_PASSWORD`, `MYSQL_HOST/PORT/DATABASE` (with existing
   `MYSQL_DBNAME` fallback) and `MONGODB_HOST/PORT/DBNAME` production Secrets.
   For MongoDB it selects the dedicated pair `MONGODB_METADATA_ADMIN_USERNAME`
@@ -66,9 +73,117 @@ restores are outside this scope. No new DROP migration is included in A.
   permit purge. The journal requires an operation lock and is not called by the
   current mutation CLI. Preparation writes only operation-owned private source
   inventory files; it issues no INSERT/UPDATE/DELETE/DDL/migration commands.
+- Backup private-file reads use `NOFOLLOW` and `NONBLOCK`, then require a
+  regular file and preserve the existing owner, mode and size checks. A FIFO
+  without a writer is rejected before reading. This protects file acquisition;
+  it does not bound regular-file I/O or prove the combined 10-minute recovery.
 - Deadline helpers stop forward work at 20 minutes and all recovery work at
   30 minutes. These helpers alone do not guarantee recovery time; readiness
   requires a measured and independently verified rollback of at most 10 minutes.
+
+`cmd/qs-compatibility-history` implements a strictly read-only host for the
+actual inventory outputs. It binds the compiled source, operation/run, approved
+input bytes and all four private source files, authenticates clean EOF, and
+checks actual original source rows against current SQL and Mongo business facts.
+The host owns and ends each SQL repeatable-read read-only transaction and Mongo
+snapshot before starting a different actual epoch. Full global unknown/orphan
+coverage remains visible when the old objects contain no candidate rows.
+Database and input close outcomes are settled before the final private readiness
+file is written. Readiness counts and hashes cannot recreate a qualifier or
+authorize evidence writes, message sends or deletion.
+
+The current AI reverse pass reads fourteen exact ledgers to fixed upper bounds
+and authenticated EOF in the host's borrowed read-only SQL epoch. It binds all
+four original sources and the current request/operation, inbox/outbox, aggregate,
+evaluation and admission graph. Pending or held transport responsibility remains
+visible even when an ACK is stored; delivered does not mean business acceptance.
+Empty old command sources cannot hide current orphan or unknown responsibility.
+The compact first-epoch anchor retains sealed identity, metadata and complete
+content digests; the fresh epoch uses different actual transactions and repeats
+source, business and AI graph verification. Stable empty reason lists compare
+through the same summary representation, and original Mongo session ownership
+and the original deadline remain intact during source-origin replay.
+
+Source `ad458f8a6580890be033d1dd0736e2136713a616` has 696 passing local
+race test actions across the two affected packages, ordinary and integration-tag
+lint, and 27 passing real local MySQL/Mongo joint native test actions (eight
+parents, one package, no failure or skip). All 3,222 Go and module files are
+byte-identical to the tested frozen private source; the composed Python driver
+separately preserves its existing thirteen-entrypoint contract. The three
+composed Python suites pass 167 cases and skip one optional native case; the
+separate 27-case native wave is independently verified. Its temporary container,
+volumes, network, credentials and owned SQL namespaces are absent, and protected
+fixture identities/account catalogs are unchanged. The safe receipt
+`qs-history-ai-reverse-native-20261009.json` has SHA256
+`d3963b28b9e198d73f8edc665bac82ff4a862e9141283ee79f9ad94ee2e5cba8`.
+These synthetic local results do not prove production historical acceptance,
+whole-epoch scale, external AI closure, evidence CAS or deletion readiness.
+Missing original Run identity remains an explicit local historical gap; it does
+not establish complete original execution verification.
+
+Production qualification still requires actual whole-epoch transaction lifetime,
+peak process memory, related-owner and evidence-slot capacity measurements.
+The exact qs-ai 0040 physical-schema adapter is implemented locally; production
+still requires its actual source, database and original execution/MQ closure,
+independent approvals, writer fencing, evidence CAS and
+fresh readback. The local CLI and synthetic source-scale tests establish none
+of those production gates.
+
+The pre-fix combined five-package race/coverage regression at source
+`2a89d5577ddfb6598b54eda6f1ec22670da1deb2` recorded 710 passing test actions
+and one failed concurrent-challenge category test. A separate actual Linux
+euid-0 call rejected the public challenge-store root anchor `/` at protected-path
+validation. Prior ordinary-user seams, synthetic fixtures and documentation
+checks cannot replace successful current-source public-root and complete
+concurrency verification. Those failures grant no production fence or execution
+authority; source regression, local root-entry proof and production installation
+remain separate gates.
+
+The subsequent source `b3c546f0bdd5d79b4d69d42130a813f6937e1b9d` passes the
+combined five-package race/coverage regression: 713 test actions and five package
+results pass, with no failure or skip. Each of three targeted challenge tests
+also passes 20 repetitions (60 test actions). These are local regression results.
+A separate Linux arm64 euid-0 public-API test passes with one parent test, no
+subtest, failure or skip, without race or coverage instrumentation. Its
+`2a89` plus exact two-file library overlay is independently equal to all 4,026
+tracked files at `b3c546`; the extra private native fixture is declared separately.
+It verifies genuine signature checks against two complete synthetic local API
+snapshots, durable public challenge consumption and unsafe-directory, symlink,
+replay and wrong-source rejection. The safe receipt
+`qs-fence-linux-root-public-api-native-20261009.json` has SHA256
+`afab6c0c43b158aaa406409b215a0192bc0417738af003c0d9cbc68d17a16cd6`.
+This local root-entry result establishes no live GitHub origin, production
+installation, executor, whole-writer fence, CAS or DROP.
+
+Source `d252d11fd80bf42ea23d9eb5c5d2a92f8eb57cc2` adds the root-directory
+maintenance-window budget component. Its immutable binding fixes the four
+legacy targets, source, operation, manifest and original run. Public Linux
+entry points require actual euid 0 and a root-owned 0700 directory with protected
+ancestors. The original start and first recovery record use `CLOCK_BOOTTIME` and
+`/proc/sys/kernel/random/boot_id`, exclusive creation, primary/commit seals,
+file/directory fsync and a real directory flock. Forward work has at most 1,200
+seconds; the shared window has 1,800 seconds; recovery expires at
+`min(original_start + 1800s, first_recovery_start + 600s)`. Reopening cannot reset
+those records. The 25ms clock monitor is cooperative, not a hard OS timeout.
+Zero-value Close is a no-op; a copied receiver cannot acquire budget or release
+the original lease. Other platforms reject the public production entry.
+
+The separate actual Linux arm64 root test
+`TestMaintenanceWindowActualLinuxRootLease` passes once: one parent test,
+no subtest, failure or skip, without race or coverage instrumentation. Its
+`b7e8b905` archive plus the exact four window files is byte-identical to the
+4,030 tracked files at `d252d11`; a metadata-only private harness is declared
+separately. The native test uses public root options, real kernel time/procfs,
+0700 tmpfs and flock, observes five root-owned 0600 single-link files, verifies
+start/first-recovery seals and preserves the original deadlines after Close/Open.
+It checks propagation of the returned forward cancel function; it does not test
+parent-context cancellation natively. The safe receipt
+`qs-maintenance-window-linux-root-native-20261009.json` has SHA256
+`22f06e68fa71c41e54ca110c13311c634c51f13524db5890c3aaf74fb3b67b8e`.
+This seconds-scale local entry/lease test is `BudgetOnly`: it proves neither a
+complete 600-second restoration nor independent production approval, writer
+fencing, installed executor, CAS, DROP, restore or deployment permission.
+Production capabilities remain false.
 
 The main-line lint follow-up preserves six local deprecated-call exceptions:
 five deliberately disconnected `mongo.NewClient` fixtures must prove rejection
@@ -89,7 +204,152 @@ container IDs, process output or credentials. Successful receipt v2 and its
 business-acceptance boundary are unchanged. Local mounted-container and actual
 restart tests do not identify the cause of a past production failure.
 
+## Read-only host inventory Action
+
+`compatibility-host-inventory.yml` permits only an independently approved current-main
+source, operation and descriptor, sharing `production-deploy`. ServerA and Collection
+use `SVRA_HOST`, `SVRA_USERNAME`, `SVRA_SSH_PORT` (default 22),
+`SVRA_SSH_FINGERPRINT` and the existing `SVRA_SSH_KEY` Secret. Worker uses
+`SVRD_HOST`, `SVRD_SSH_PORT` (default 22), `SVRD_SSH_FINGERPRINT`,
+`SVRD_USERNAME || SVRA_USERNAME` and the existing
+`SVR_MINI_SSH_KEY`/`SVRD_SSH_KEY`/`SVRA_SSH_KEY` fallback chain. The existing pin is
+checked against the actual SSH handshake key's binary SHA256; no `accept-new` exists.
+The current Mac Runner returns unsupported without SSH credentials. Existing route
+vars may appear in GitHub step headers; Python stdout and reports expose only closed
+hash/category projections, never private keys or inventory/configuration bodies.
+
+V1 strictly requires independently hashed, preplaced private `matches.json`; absence
+never selects another mode. The explicitly approved v2
+`current_ssh_session_observation` derives its request in the final execute SSH session
+from actual UID/euid, NSS username and the four `SSH_CONNECTION` tokens. The public
+inventory v2 entry rechecks identity and connection before and after reading. Descriptor
+approval, actual-run request and observed Match hashes remain separate. Only an observed
+sshd ancestor, protected configuration and `UseDNS=no` query permit a numeric peer-IP
+Host context. `UseDNS=yes` or unknown skips Host-dependent Match queries without guessing
+or DNS lookup; other OS/process/container/systemd observations continue.
+
+V2 remains partial: ordinary-shell environment origin, the daemon's originally loaded
+configuration, all Match contexts, management authority and all-writer isolation are
+unproved. All eight production capabilities remain false. The 98 local Python tests
+and successful actionlint check do not establish actual SSH connectivity, production
+installation, historical-rerun denial or a writer fence. The separate isolated host
+installer has only 41 local unit-test results: no production installation or system
+sshd reload has been executed or proved.
+
+## Read-only history Action
+
+`prepare_mode=bootstrap-history` binds an independently reviewed canonical
+approval to the exact source, operation, original parent request/run, inventory
+request/report and four whole-file hashes and encoded sizes. The original
+`history-request.json` is read without rewriting. A new unique current-run
+directory receives an immutable registration and a derived request whose only
+changed field is `run_id`; the compiled history binary must report that exact
+source in its strict JSON `--source-sha` response.
+
+The host preserves the original absolute input paths in read-only mounts and
+allows writes only to its own readiness directory. It validates the inspected
+image ID, inherited labels, exact container ID, user, mounts, network and fixed
+3 GiB / two CPU / no additional swap profile. The image's declared MySQL volume
+is overridden by an explicitly owned empty read-only bind, so this diagnostic
+container does not create an anonymous data volume. Creation or attach outcomes
+that are unknown are inspected and retained for reconciliation; another run is
+not allowed to erase the uncertainty by creating a replacement.
+
+The first epoch releases its SQL/Mongo row graphs only after validating and
+sealing the original live-scope anchor. The host then closes its own transactions
+and starts genuinely different second transactions. The anchor retains original
+identities, source receipts and digests; it does not extend their lifetime.
+Candidate storage retains stable page values through private pointers instead
+of repeatedly copying a growing value slice. A coordinator-private pool shares
+only identical ordered lists for original-run gaps, historical gaps, blockers
+and required adapters. The 4,096-entry / 8 MiB accounted limit bounds this
+optional cache: saturation retains the complete original list and continues.
+A used cache conflict fails before consuming a page. Public range reads remain
+deep copies; nil/empty distinctions and the original ordered private hash remain
+unchanged. After each epoch has independently authenticated all four complete
+copies, only the coordinator-owned event consumption readers retain a compact
+original-ID set instead of a second complete event reference. Every decoded
+row still matches the sealed complete typed-fact digest; public readers, initial
+authentication, origin/index reads, strict ordering, clean EOF, per-page keys
+and original defensive-clone checks retain their existing behavior. This removes
+duplicate retention; it does not establish a measured production memory budget.
+
+The private decoded-fact digest includes the time-zone name and offset as part
+of the complete DTO. The derived diagnostic `whole_source_index_sha256` is
+therefore a process-environment-dependent observation, compared only between
+two epochs of the same CLI. It is not portable across time zones and is not
+persistent business evidence. Original source bytes, content digests, SDK
+fingerprints and business bindings remain independently verified. The capacity
+golden test uses explicit UTC input; other historical fixtures retain their
+original inputs. Source indexes reserve capacity only after authenticated bounded
+counts; these changes do not establish the complete production resource budget.
+
+`prepare_mode=bootstrap-history-metadata` has a separate independently hashed
+`readonly_history_metadata_approval`. It binds the final tooling SHA, operation,
+original inventory run/request/report and exact limits. The Python-only four-file
+package uses no database credentials or Go binary. It rechecks the original
+private identity/bounds/inventory/sidecars, rejects prior unknown handles, and
+reads each exact source file to EOF twice. Regular single-link private files,
+full encoded byte counts, physical SHA256 and before/after inode/stat baselines
+must agree. The physical file SHA/size are distinct from the inventory semantic
+`DataHash` and source bytes. The 900-second limit is cooperative, not proof that
+all operating-system I/O is bounded. A fresh private run saves the approved
+metadata and an immutable parent proposal, without registering an executable
+history request or claiming semantic source verification.
+
+`prepare_mode=bootstrap-history-parent` requires another independently hashed
+`readonly_history_parent_registration_approval` binding the actual metadata
+run/report, proposal SHA, original inventory run/report and all four exact
+physical assets. Its Python-only five-file package also sends no database
+credentials. It repeats the complete read-only file checks and exclusively
+publishes `history-request-bootstrap.json` and `history-request.json`; an
+interrupted one-sided publication blocks rather than adopting or overwriting
+it. The parent keeps the original inventory run; metadata and registration runs
+are separate. An identical registration is idempotent and preserves its first
+creator. Both modes require armored diagnostic receipts and keep
+`complete`, `execution_allowed`, `drop_ready`, CAS and process-budget proof false.
+
+Production must run the whole identity/bounds/inventory/metadata/parent/history
+chain on the same final main tooling SHA, with independently bound approvals.
+The local filesystem, Action package and native fixture tests do not prove that
+production chain, full-sized scan budgets or database historical acceptance.
+Read-only completion counts retain local, AI and global blockers. External AI
+closure, evidence CAS, writer fencing, production-sized exact restore, release B,
+DROP, acceptance and batch-owned purge remain incomplete; execution backends
+remain disabled.
+
 ## Required implementation before execution can become ready
+
+The target recovery library now provides `PrepareTargetRecovery` and
+`RecoverTargets` for this batch's exact four objects. It borrows the host's
+existing SQL connection and Mongo database, authenticates the original archive,
+heads, identities, target contents and non-target schema projection, and uses
+an opaque native DROP result with durably persisted intent. Missing objects by
+themselves do not grant restore authority. It restores missing targets only;
+existing exact targets remain unchanged, and a content conflict, unknown DDL
+result, changed owner or failed restoration blocks continuation. It preserves
+current MQ facts, business evidence, retired command identities and migration
+heads; a restored Mongo collection receives a newly observed UUID.
+
+Actual isolated nonempty native tests cover partial and complete target loss,
+ordered BSON/SQL restoration, repeated read-only verification and an unresolved
+foreign-key failure. They establish a local recovery primitive, not a production
+600-second full recovery budget, complete writer fencing, independent execution
+authorization or a production Action backend. Fresh production qualification,
+privilege-negative checks and deployment rollback still need their own proofs.
+
+The native DROP producer remains package-private and is currently exercised
+only by integration-tag recovery tests. Its narrow unused-linter exception
+does not provide a production mutation entry; the reviewed fixed host
+executor and its independent authority remain required.
+
+The private decoded-fact fingerprint now streams text through bounded,
+instance-owned scratch storage. Its original frame bytes, protocol, NULL/type
+semantics and byte/node limits remain unchanged. Independent byte vectors,
+source-authentication/joint-scan regression and full package race checks pass.
+This implementation change does not establish the full-size scan memory or
+lifetime budget; the earlier full-size OOM remains a failed observation until
+a new independently bounded scan completes both physical EOF epochs.
 
 1. The implemented inventory adapter must be extended by an actual retirement
    verifier that compares current facts to the frozen manifest and independently
@@ -321,7 +581,7 @@ left with exact operation/run/source/request labels for read-only reconciliation
 not blindly removed or retried.
 
 `compatibility-retirement-entrypoints.json` is the reviewed **source-only**
-12-workflow inventory for the later fence verifier. Besides CD/db-ops it includes
+13-workflow inventory for the later fence verifier. Besides CD/db-ops it includes
 the writing AuthZ provisioner, approved read-only diagnostics with privileged
 SSH, and isolated registry-backed image tests. M5 preflight/postcheck and Ping
 Runner jobs have no production environment: environment ref policy alone cannot
@@ -331,7 +591,8 @@ Host cron/manual tasks, other repositories and obsolete source reruns remain
 unproven. The pre-A independent metadata snapshot reported 27 remote workflows
 against 18 then-current source workflows, with nine active historical workflows absent
 from that source baseline listed explicitly as unproved. These counts are dated
-observations; adding this workflow or merging A requires a fresh live inventory. Organization Secrets coverage,
+observations; the 13 current source entries do not refresh that 27/18 snapshot. Adding
+a workflow or merging A requires a fresh live inventory. Organization Secrets coverage,
 historical rerun credential denial and production ref protection are not inferred
 from that metadata or the source catalog. The final fence must deny all historical credential paths before the
 maintenance window, not simply cancel current CD/db-ops runs.

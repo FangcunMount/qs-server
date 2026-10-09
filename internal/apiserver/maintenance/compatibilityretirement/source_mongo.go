@@ -156,7 +156,7 @@ func (s *MongoSourceReader) Next() (*DecodedSourceEvent, error) {
 	if err := s.acc.add(size); err != nil {
 		return nil, err
 	}
-	if err := s.acc.identities.Observe(v); err != nil {
+	if err := s.acc.observeEvent(v); err != nil {
 		s.acc.failed = true
 		return nil, err
 	}
