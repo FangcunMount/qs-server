@@ -25,7 +25,7 @@ OUTPUT_LIMIT = 32 << 20
 ORIGINAL_LIMIT = 10000
 TOTAL_SECONDS = 1500
 MODULES = {
-    "qs-ai-retirement-readonly-verifier.py": "008ebc7256d35fcdb705528397e0e5ff8535cc6af681b9befc8d8dad02a638d1",
+    "qs-ai-retirement-readonly-verifier.py": "6a7e746e313a1028bd54edc878947c74c262d0e47af6de32b6c032fea035cee9",
     "qs-ai-retirement-readonly-observer.py": "20c501d0930a21c1e8be12416156d5635430cf6171e01d28a6db789e83f06d5a",
     "qs-ai-retirement-0040-layout.py": "690d68be91713641ad6ce13ad9ad126828c64fe780bda05522bd68697ead577f",
 }
@@ -90,12 +90,53 @@ def pattern(value, regex):
         reject()
 
 
+KNOWN_HANDOFF_FIELDS = frozenset("command_id request_id source_kind organization_id subject_id resource_id testee_id bridge_payload_bytes_sha256 legacy_payload_bytes_sha256 writer_payload_sha256 messaging_body_sha256 source_attempts aggregate_sequence operation_row_sha256 outbox_row_sha256".split())
+
+
+def handoff_descriptors(items):
+    if not isinstance(items, list) or len(items) > ORIGINAL_LIMIT:
+        reject()
+    for item in items:
+        if not isinstance(item, dict) or set(item) != KNOWN_HANDOFF_FIELDS:
+            reject()
+        for k in ("command_id", "request_id", "resource_id"):
+            from uuid import UUID
+            try:
+                valid = isinstance(item[k], str) and str(UUID(item[k])) == item[k] and UUID(item[k]).int != 0
+            except (ValueError, TypeError, AttributeError):
+                valid = False
+            if not valid:
+                reject()
+        if item["source_kind"] not in ("start", "answer", "cancel"):
+            reject()
+        for k in ("organization_id", "testee_id"):
+            pattern(item[k], r"[1-9][0-9]{0,19}")
+            if int(item[k]) >= 2**64:
+                reject()
+        if not isinstance(item["subject_id"], str) or not 1 <= len(item["subject_id"].encode()) <= 128:
+            reject()
+        for k in KNOWN_HANDOFF_FIELDS:
+            if k.endswith("sha256"):
+                pattern(item[k], r"[0-9a-f]{64}")
+        for k, lo, hi in (("source_attempts", 0, 2**32-1), ("aggregate_sequence", 1, 2**64-1)):
+            if type(item[k]) is not int or not lo <= item[k] <= hi:
+                reject()
+    ids = [item["command_id"] for item in items]
+    if ids != sorted(set(ids)):
+        reject()
+
+
 def input_packet(raw):
     if not raw or len(raw) > INPUT_LIMIT:
         reject()
     value = decode(raw)
-    if not isinstance(value, dict) or set(value) != FIELDS or value["protocol"] != "qs-ai-readonly-host-input/v2":
+    if not isinstance(value, dict):
         reject()
+    mixed = value.get("protocol") == "qs-ai-readonly-host-input/v3"
+    if set(value) != (FIELDS | {"known_handoffs"} if mixed else FIELDS) or value["protocol"] not in ("qs-ai-readonly-host-input/v2", "qs-ai-readonly-host-input/v3"):
+        reject()
+    if mixed:
+        handoff_descriptors(value["known_handoffs"])
     for key in ("source_sha", "runtime_source_sha"):
         pattern(value[key], r"[0-9a-f]{40}")
     pattern(value["operation_id"], r"[0-9]{1,20}-[0-9]{1,4}")
@@ -342,7 +383,8 @@ async def execute(packet, module):
         qualification = await module.verify(*sessions, ai_bounds=ai_bound, peer_bounds=peer_bound,
             approved_ai_bounds_sha256=packet["ai_bounds_sha256"],
             approved_peer_bounds_sha256=packet["peer_bounds_sha256"],
-            approved_original_sections=packet["original_sections"], protection_keys=keys)
+            approved_original_sections=packet["original_sections"], protection_keys=keys,
+            known_handoffs=packet.get("known_handoffs"), handoff_operation_id=packet["operation_id"] if "known_handoffs" in packet else None)
         # This object came only from the actual verifier call in this process.
         # It is never reconstructed from stdin, a report or a success flag.
         originals = []
@@ -376,13 +418,15 @@ async def execute(packet, module):
         _, fresh_key_baseline = protection(module, packet, settings)
         if fresh_key_baseline != key_baseline:
             reject()
-        output = {"protocol": "qs-ai-actual-execution-facts/v2", "source_sha": packet["source_sha"],
+        output = {"protocol": "qs-ai-actual-execution-facts/v3" if "known_handoffs" in packet else "qs-ai-actual-execution-facts/v2", "source_sha": packet["source_sha"],
                   "operation_id": packet["operation_id"], "run_id": packet["run_id"],
                   "runtime_source_sha": packet["runtime_source_sha"], "runtime_binding_sha256": packet["runtime_binding_sha256"], "image_id": packet["image_id"],
                   "container_id": packet["container_id"], "ai_bounds_sha256": packet["ai_bounds_sha256"],
                   "peer_bounds_sha256": packet["peer_bounds_sha256"], "snapshots": facts,
                   "original_sections": packet["original_sections"], "originals": originals,
                   "peer_rows": peer_facts}
+        if "known_handoffs" in packet:
+            output["known_handoffs"] = [h.descriptor() for h in qualification._known_handoffs]
     finally:
         cleanup_failed = False
         try:

@@ -1,7 +1,7 @@
 name: Exact Compatibility Retirement
 
-# A-stage preparation performs bounded read-only source inventory. It never
-# treats that inventory as a retirement verdict. DDL/restore/release/purge stay
+# A-stage preparation observes sources or explicitly performs prewindow evidence
+# CAS. Neither is a retirement verdict. DDL/restore/release/purge stay
 # fail-closed until their independent, actual preparation gates exist.
 on:
   workflow_dispatch:
@@ -35,10 +35,10 @@ on:
         default: ''
         type: string
       prepare_mode:
-        description: 'Prepare read-only identity/bounds/inventory, or diagnose an exact existing boundary report'
+        description: 'Observe sources, persist prewindow historical evidence, or diagnose an existing boundary report'
         required: false
         type: choice
-        options: [identity, bootstrap-bounds, bounds, bootstrap-inventory, inventory, bootstrap-history, bootstrap-history-metadata, bootstrap-history-parent, bootstrap-ai-bounds, bootstrap-ai-verify, report-diagnostic]
+        options: [identity, bootstrap-bounds, bounds, bootstrap-inventory, inventory, bootstrap-history, bootstrap-history-metadata, bootstrap-history-parent, bootstrap-ai-bounds, bootstrap-ai-verify, historical-evidence-write, historical-ai-bounds, report-diagnostic]
         default: inventory
       identity_request_sha256:
         description: 'Prepare identity only: independently computed canonical request SHA256'
@@ -87,14 +87,14 @@ jobs:
             const input = {manifest_sha256: '', inventory_request_sha256: '', prepare_mode: 'inventory', identity_request_sha256: '', bootstrap_approval_json: '', bootstrap_approval_sha256: '', ...raw};
             const keys = Object.keys(input).sort();
             const diagnostic = input.prepare_mode === 'report-diagnostic';
-            const bootstrap = ['bootstrap-bounds', 'bootstrap-inventory', 'bootstrap-history', 'bootstrap-history-metadata', 'bootstrap-history-parent', 'bootstrap-ai-bounds', 'bootstrap-ai-verify'].includes(input.prepare_mode);
+            const bootstrap = ['bootstrap-bounds', 'bootstrap-inventory', 'bootstrap-history', 'bootstrap-history-metadata', 'bootstrap-history-parent', 'bootstrap-ai-bounds', 'bootstrap-ai-verify', 'historical-evidence-write', 'historical-ai-bounds'].includes(input.prepare_mode);
             const descriptor = bootstrap || diagnostic;
             if (JSON.stringify(keys) !== JSON.stringify(expectedKeys) ||
                 !['prepare', 'apply', 'verify', 'recover', 'purge'].includes(input.operation) ||
                 input.database !== 'mysql-and-mongodb' ||
                 !/^[0-9a-f]{40}$/.test(input.approved_source_sha) ||
                 !/^[0-9]{1,20}-[0-9]{1,4}$/.test(input.operation_id) ||
-                !['identity', 'bounds', 'inventory', 'bootstrap-bounds', 'bootstrap-inventory', 'bootstrap-history', 'bootstrap-history-metadata', 'bootstrap-history-parent', 'bootstrap-ai-bounds', 'bootstrap-ai-verify', 'report-diagnostic'].includes(input.prepare_mode) ||
+                !['identity', 'bounds', 'inventory', 'bootstrap-bounds', 'bootstrap-inventory', 'bootstrap-history', 'bootstrap-history-metadata', 'bootstrap-history-parent', 'bootstrap-ai-bounds', 'bootstrap-ai-verify', 'historical-evidence-write', 'historical-ai-bounds', 'report-diagnostic'].includes(input.prepare_mode) ||
                 (descriptor
                   ? (input.operation !== 'prepare' || input.manifest_sha256 !== '' || input.inventory_request_sha256 !== '' || input.identity_request_sha256 !== '' || typeof input.bootstrap_approval_json !== 'string' || !/^[\x20-\x7e]{1,4096}$/.test(input.bootstrap_approval_json) || !/^[0-9a-f]{64}$/.test(input.bootstrap_approval_sha256))
                   : (input.bootstrap_approval_json !== '' || input.bootstrap_approval_sha256 !== '')) ||
@@ -113,11 +113,13 @@ jobs:
               const canonical = value => Array.isArray(value) ? value.map(canonical) : object(value) ? Object.fromEntries(Object.keys(value).sort().map(key => [key, canonical(value[key])])) : value;
               let approval;
               try {approval = JSON.parse(input.bootstrap_approval_json);} catch {reject();}
-              if (!exact(approval, ['format_version','kind','prepare_mode','source_sha','operation_id','target_hash','database_scope','boundary_report']) ||
-                  approval.format_version !== 1 || approval.kind !== 'readonly_existing_boundary_report_approval' || approval.prepare_mode !== 'report-diagnostic' ||
+              const inventoryReport = object(approval) && approval.kind === 'readonly_existing_inventory_report_approval';
+              const referenceKey = inventoryReport ? 'inventory_report' : 'boundary_report';
+              if (!exact(approval, ['format_version','kind','prepare_mode','source_sha','operation_id','target_hash','database_scope',referenceKey]) ||
+                  approval.format_version !== 1 || approval.kind !== (inventoryReport ? 'readonly_existing_inventory_report_approval' : 'readonly_existing_boundary_report_approval') || approval.prepare_mode !== 'report-diagnostic' ||
                   approval.source_sha !== input.approved_source_sha || approval.operation_id !== input.operation_id ||
                   approval.target_hash !== '4e09444409d1cfab3c9df383ed80a0999419fcbbd2f4e80d2e5dac1cf7dfcfb8' || approval.database_scope !== 'mysql-and-mongodb') {reject();}
-              const report = approval.boundary_report;
+              const report = approval[referenceKey];
               const currentRun = String(context.runId)+'-'+String(process.env.GITHUB_RUN_ATTEMPT);
               if (!exact(report, ['run_id','source_sha','sha256','request_sha256']) || typeof report.run_id !== 'string' || !/^[0-9]{1,20}-[0-9]{1,4}$/.test(report.run_id) ||
                   typeof report.source_sha !== 'string' || !/^[0-9a-f]{40}$/.test(report.source_sha) ||
@@ -127,7 +129,7 @@ jobs:
               const line = JSON.stringify(canonical(approval));
               if (line !== input.bootstrap_approval_json || require('crypto').createHash('sha256').update(line+'\n','ascii').digest('hex') !== input.bootstrap_approval_sha256) {reject();}
             }
-            if (bootstrap && !['bootstrap-history', 'bootstrap-history-metadata', 'bootstrap-history-parent', 'bootstrap-ai-bounds', 'bootstrap-ai-verify'].includes(input.prepare_mode)) {
+            if (bootstrap && !['bootstrap-history', 'bootstrap-history-metadata', 'bootstrap-history-parent', 'bootstrap-ai-bounds', 'bootstrap-ai-verify', 'historical-evidence-write', 'historical-ai-bounds'].includes(input.prepare_mode)) {
               const reject = () => {throw new Error('compatibility_retirement_bootstrap_approval_rejected');};
               const object = value => value !== null && typeof value === 'object' && !Array.isArray(value);
               const exact = (value, keys) => object(value) && JSON.stringify(Object.keys(value).sort()) === JSON.stringify(keys.slice().sort());
@@ -190,7 +192,7 @@ jobs:
               const line = namespace ? serialized.replace(/[\u007f-\uffff]/g, c => '\\u' + c.charCodeAt(0).toString(16).padStart(4, '0')) : serialized;
               if (line !== input.bootstrap_approval_json || require('crypto').createHash('sha256').update(line+'\n', 'ascii').digest('hex') !== input.bootstrap_approval_sha256) {reject();}
             }
-            if (['bootstrap-ai-bounds','bootstrap-ai-verify'].includes(input.prepare_mode)) {
+            if (['bootstrap-ai-bounds','bootstrap-ai-verify','historical-evidence-write', 'historical-ai-bounds'].includes(input.prepare_mode)) {
               const reject = () => {throw new Error('compatibility_retirement_ai_host_approval_rejected');};
               const object = v => v !== null && typeof v === 'object' && !Array.isArray(v);
               const exact = (v, keys) => object(v) && JSON.stringify(Object.keys(v).sort()) === JSON.stringify(keys.slice().sort());
@@ -201,15 +203,18 @@ jobs:
               if (!run(actualRun) || String(context.runId) !== process.env.GITHUB_RUN_ID) {reject();}
               let v;
               try {v = JSON.parse(input.bootstrap_approval_json);} catch {reject();}
-              const verify = input.prepare_mode === 'bootstrap-ai-verify';
-              if (!exact(v, ['format_version','kind','prepare_mode','source_sha','operation_id','target_hash','database_scope','history','runtime', ...(verify ? ['bounds','protection_sha256'] : [])]) ||
-                  v.format_version !== 1 || v.kind !== 'readonly_ai_host_bootstrap_approval' || v.prepare_mode !== input.prepare_mode ||
+              const writing = input.prepare_mode === 'historical-evidence-write';
+              const originalSource = writing || input.prepare_mode === 'historical-ai-bounds';
+              const verify = input.prepare_mode === 'bootstrap-ai-verify' || writing;
+              if (!exact(v, ['format_version','kind','prepare_mode','source_sha','operation_id','target_hash','database_scope','history','runtime', ...(verify ? ['bounds','protection_sha256'] : []), ...(originalSource ? ['original_source_sha'] : [])]) ||
+                  v.format_version !== 1 || v.kind !== (writing ? 'historical_evidence_write_approval' : originalSource ? 'readonly_ai_original_source_bounds_approval' : 'readonly_ai_host_bootstrap_approval') || v.prepare_mode !== input.prepare_mode ||
                   v.source_sha !== input.approved_source_sha || v.operation_id !== input.operation_id ||
                   v.target_hash !== '4e09444409d1cfab3c9df383ed80a0999419fcbbd2f4e80d2e5dac1cf7dfcfb8' || v.database_scope !== 'mysql-and-mongodb') {reject();}
+              if (originalSource && (typeof v.original_source_sha !== 'string' || !/^[0-9a-f]{40}$/.test(v.original_source_sha))) {reject();}
               const a = v.history;
               if (!exact(a, ['format_version','kind','prepare_mode','source_sha','operation_id','target_hash','database_scope','parent_request','inventory_request_sha256','inventory_report','assets','process_limits']) ||
                   a.format_version !== 1 || a.kind !== 'readonly_history_bootstrap_approval' || a.prepare_mode !== 'bootstrap-history' ||
-                  a.source_sha !== v.source_sha || a.operation_id !== v.operation_id || a.target_hash !== v.target_hash || a.database_scope !== v.database_scope || !hash(a.inventory_request_sha256)) {reject();}
+                  a.source_sha !== (originalSource ? v.original_source_sha : v.source_sha) || a.operation_id !== v.operation_id || a.target_hash !== v.target_hash || a.database_scope !== v.database_scope || !hash(a.inventory_request_sha256)) {reject();}
               for (const ref of [a.parent_request, a.inventory_report]) {
                 if (!exact(ref, ['run_id','sha256']) || !run(ref.run_id) || !hash(ref.sha256) || ref.run_id === actualRun) {reject();}
               }
@@ -379,7 +384,7 @@ jobs:
           elif [[ "$RETIREMENT_PACKAGE_MODE" == "bootstrap-history-parent" ]]; then
             cp scripts/database/compatibility-history-parent.py "$package_dir/"
             tar -czf "$archive" -C "$package_dir" compatibility-retirement.py compatibility-history-prepare.py compatibility-history-parent.py compatibility-retirement-entrypoints.json receipt-transport.py
-          elif [[ "$RETIREMENT_PACKAGE_MODE" == "bootstrap-ai-bounds" || "$RETIREMENT_PACKAGE_MODE" == "bootstrap-ai-verify" ]]; then
+          elif [[ "$RETIREMENT_PACKAGE_MODE" == "bootstrap-ai-bounds" || "$RETIREMENT_PACKAGE_MODE" == "bootstrap-ai-verify" || "$RETIREMENT_PACKAGE_MODE" == "historical-evidence-write" || "$RETIREMENT_PACKAGE_MODE" == "historical-ai-bounds" ]]; then
             cp scripts/database/compatibility-ai-history-prepare.py scripts/database/qs-ai-retirement-readonly-host.py scripts/database/qs-ai-retirement-readonly-verifier.py scripts/database/qs-ai-retirement-readonly-observer.py scripts/database/qs-ai-retirement-0040-layout.py "$package_dir/"
             go test ./cmd/qs-compatibility-history
             CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags="-s -w -X main.sourceSHA=$GITHUB_SHA" -o "$package_dir/history-linux-amd64" ./cmd/qs-compatibility-history
@@ -406,7 +411,7 @@ jobs:
           source: qs-compatibility-retirement-${{ github.run_id }}-${{ github.run_attempt }}.tar.gz
           target: /tmp
       - name: Inventory source bytes or reject unavailable lifecycle stage
-        if: inputs.prepare_mode != 'bootstrap-history-metadata' && inputs.prepare_mode != 'bootstrap-history-parent' && inputs.prepare_mode != 'report-diagnostic' && inputs.prepare_mode != 'bootstrap-ai-bounds' && inputs.prepare_mode != 'bootstrap-ai-verify'
+        if: inputs.prepare_mode != 'bootstrap-history-metadata' && inputs.prepare_mode != 'bootstrap-history-parent' && inputs.prepare_mode != 'report-diagnostic' && inputs.prepare_mode != 'bootstrap-ai-bounds' && inputs.prepare_mode != 'bootstrap-ai-verify' && inputs.prepare_mode != 'historical-evidence-write' && inputs.prepare_mode != 'historical-ai-bounds'
         uses: appleboy/ssh-action@v1.2.2
         env:
           RETIREMENT_OPERATION: ${{ inputs.operation }}
@@ -477,8 +482,8 @@ jobs:
               --prepare-mode "$RETIREMENT_PREPARE_MODE" \
               --inventory-binary "$inventory_binary" \
               --history-binary "$history_binary"
-      - name: Read actual AI bounds or verification on native ServerA host
-        if: inputs.prepare_mode == 'bootstrap-ai-bounds' || inputs.prepare_mode == 'bootstrap-ai-verify'
+      - name: Read actual AI bounds or verification, or persist historical evidence on ServerA
+        if: inputs.prepare_mode == 'bootstrap-ai-bounds' || inputs.prepare_mode == 'bootstrap-ai-verify' || inputs.prepare_mode == 'historical-evidence-write' || inputs.prepare_mode == 'historical-ai-bounds'
         uses: appleboy/ssh-action@v1.2.2
         env:
           RETIREMENT_OPERATION: ${{ inputs.operation }}

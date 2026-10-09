@@ -21,7 +21,7 @@ import (
 	store "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/aibridge"
 )
 
-const aiExternalHostSHA = "3de5e6498d1754f57779a7fd53070588b7b71d7f9470d60a87c4f842ab4fe654"
+const aiExternalHostSHA = "e1d06df65b11ea66fe8930ca0012f6ac3b8c120888f490f399236cbb3d0b5268"
 const aiExternalResultLimit = 32 << 20
 const aiExternalInputLimit = 16 << 20
 
@@ -122,6 +122,7 @@ type aiExternalFacts struct {
 	Sections          map[string]aiExternalSection `json:"original_sections"`
 	Originals         []aiExternalOriginal         `json:"originals"`
 	PeerRows          []aiExternalPeerRow          `json:"peer_rows"`
+	KnownHandoffs     []aiExternalKnownHandoff     `json:"known_handoffs"`
 }
 type aiExternalMount struct {
 	Type        string `json:"Type"`
@@ -142,14 +143,15 @@ type aiExternalRuntime struct {
 // It proves two observed database epochs, not a distributed snapshot, runtime
 // execution fence, Broker queue coverage, retirement persistence or DROP.
 type AIExternalExecutionQualification struct {
-	self    *AIExternalExecutionQualification
-	owner   *HistoricalCoordinator
-	local   *AIReadOnlyResolver
-	reverse *AIReverseSnapshot
-	facts   aiExternalFacts
-	byID    map[string]aiExternalOriginal
-	expires time.Time
-	seal    string
+	self     *AIExternalExecutionQualification
+	owner    *HistoricalCoordinator
+	local    *AIReadOnlyResolver
+	reverse  *AIReverseSnapshot
+	facts    aiExternalFacts
+	byID     map[string]aiExternalOriginal
+	handoffs map[string]aiExternalKnownHandoff
+	expires  time.Time
+	seal     string
 }
 type AIExternalExecutionSummary struct {
 	Scope                                                                    string
@@ -180,7 +182,7 @@ func (q *AIExternalExecutionQualification) Summary() AIExternalExecutionSummary 
 	if q == nil || q.self != q || q.seal != aiJSONHash(q.facts) {
 		return AIExternalExecutionSummary{}
 	}
-	return AIExternalExecutionSummary{Scope: "actual-full-qs-ai-and-peer-two-epoch-database-facts-only", Originals: uint64(len(q.byID)), FactsSHA256: q.seal, IndependentEpochs: 2, ExternalDatabaseFactsObserved: true}
+	return AIExternalExecutionSummary{Scope: "actual-full-qs-ai-and-peer-two-epoch-database-facts-only", Originals: uint64(len(q.byID) + len(q.handoffs)), FactsSHA256: q.seal, IndependentEpochs: 2, ExternalDatabaseFactsObserved: true}
 }
 
 // PrepareAIExternalExecution never opens/closes the borrowed Go transaction.
@@ -217,6 +219,10 @@ func (c *HistoricalCoordinator) PrepareAIExternalExecution(ctx context.Context, 
 	if len(sections) != 2 || sections[AIBridgeCommandSource].Rows+sections[AILegacyCommandSource].Rows > 10000 {
 		return nil, ErrAIExternalInput
 	}
+	knownHandoffs, err := aiExternalActualHandoffs(ctx, c, reverse)
+	if err != nil {
+		return nil, err
+	}
 	packet := struct {
 		Protocol          string                       `json:"protocol"`
 		SourceSHA         string                       `json:"source_sha"`
@@ -235,7 +241,8 @@ func (c *HistoricalCoordinator) PrepareAIExternalExecution(ctx context.Context, 
 		Peer              aiExternalPeerConnectionWire `json:"peer_connection"`
 		Protection        json.RawMessage              `json:"protection"`
 		Modules           map[string]string            `json:"modules"`
-	}{"qs-ai-readonly-host-input/v2", c.binding.SourceSHA, c.binding.OperationID, in.RunID, in.RuntimeSourceSHA, in.ImageID, in.ContainerID, release.seal, release.messaging, base64.StdEncoding.EncodeToString(in.AIBounds), in.ApprovedAIBoundsSHA256, base64.StdEncoding.EncodeToString(in.PeerBounds), in.ApprovedPeerBoundsSHA256, sections, aiExternalPeerConnectionWire(in.PeerConnection), in.ProtectionJSON, assets.modules}
+		KnownHandoffs     []aiExternalKnownHandoff     `json:"known_handoffs"`
+	}{"qs-ai-readonly-host-input/v3", c.binding.SourceSHA, c.binding.OperationID, in.RunID, in.RuntimeSourceSHA, in.ImageID, in.ContainerID, release.seal, release.messaging, base64.StdEncoding.EncodeToString(in.AIBounds), in.ApprovedAIBoundsSHA256, base64.StdEncoding.EncodeToString(in.PeerBounds), in.ApprovedPeerBoundsSHA256, sections, aiExternalPeerConnectionWire(in.PeerConnection), in.ProtectionJSON, assets.modules, knownHandoffs}
 	raw, err := json.Marshal(packet)
 	if err != nil || len(raw) > aiExternalInputLimit {
 		return nil, ErrAIExternalInput
@@ -281,9 +288,19 @@ func (c *HistoricalCoordinator) PrepareAIExternalExecution(ctx context.Context, 
 	if err = aiExternalPeerRowsMatch(facts.PeerRows, reverse); err != nil {
 		return nil, err
 	}
+	if !reflect.DeepEqual(facts.KnownHandoffs, knownHandoffs) {
+		return nil, ErrAIExternalChanged
+	}
+	handoffs := make(map[string]aiExternalKnownHandoff, len(knownHandoffs))
+	for _, entry := range knownHandoffs {
+		if _, exists := handoffs[entry.CommandID]; exists {
+			return nil, ErrAIExternalChanged
+		}
+		handoffs[entry.CommandID] = entry
+	}
 	byID := make(map[string]aiExternalOriginal, len(facts.Originals))
 	for _, original := range facts.Originals {
-		if _, duplicate := byID[original.CommandID]; duplicate || !aiExternalOriginalValid(original) {
+		if _, duplicate := byID[original.CommandID]; duplicate || !aiExternalOriginalValid(original) || handoffs[original.CommandID].CommandID != "" {
 			return nil, ErrAIExternalChanged
 		}
 		byID[original.CommandID] = original
@@ -292,16 +309,19 @@ func (c *HistoricalCoordinator) PrepareAIExternalExecution(ctx context.Context, 
 	// through its authenticated source frame. No sampled/caller target list exists.
 	for _, source := range []string{AIBridgeCommandSource, AILegacyCommandSource} {
 		for _, node := range reverse.byTable[source] {
+			if _, mapped := handoffs[node.id]; mapped {
+				continue
+			}
 			original, ok := byID[node.id]
 			if !ok || original.RequestID != node.request || original.OrganizationID != node.org || original.SubjectID != node.subject || original.ResourceID != node.resource || original.TesteeID != node.testee || original.WriterSHA != node.hash || original.Attempts != node.attempts {
 				return nil, ErrAIExternalChanged
 			}
 		}
 	}
-	if len(byID) != len(reverse.byTable[AIBridgeCommandSource]) || local.validate(ctx) != nil || reverse.ValidateBorrowedSnapshot(ctx) != nil || c.alive(ctx) != nil {
+	if len(byID)+len(handoffs) != len(reverse.byTable[AIBridgeCommandSource]) || len(handoffs) != len(reverse.byTable[AILegacyCommandSource]) || local.validate(ctx) != nil || reverse.ValidateBorrowedSnapshot(ctx) != nil || c.alive(ctx) != nil {
 		return nil, ErrAIExternalChanged
 	}
-	q := &AIExternalExecutionQualification{owner: c, local: local, reverse: reverse, facts: facts, byID: byID, expires: deadline}
+	q := &AIExternalExecutionQualification{owner: c, local: local, reverse: reverse, facts: facts, byID: byID, handoffs: handoffs, expires: deadline}
 	q.self = q
 	q.seal = aiJSONHash(q.facts)
 	return q, nil
@@ -312,6 +332,12 @@ func (c *HistoricalCoordinator) PrepareAIExternalExecution(ctx context.Context, 
 // permit. The lifecycle host still needs fence/fresh-origin/closed-admission
 // CAS and independent readback before using the existing retirement store.
 type AIExternalPageQualification struct {
+	self     *AIExternalPageQualification
+	page     *HistoricalSourcePage
+	covered  map[verifiedSourceKey]string
+	guard    *AICommandHandoffBatch
+	handoff  *AICommandHandoffBatch
+	seal     string
 	owner    *AIExternalExecutionQualification
 	evidence []store.CommandRetirementEvidence
 }
@@ -327,11 +353,21 @@ func (c *HistoricalCoordinator) PrepareAIExternalPage(ctx context.Context, page 
 	}
 	c.mu.Lock()
 	defer c.mu.Unlock()
+	return c.prepareAIExternalRowsLocked(ctx, page, q, pageRows(page))
+}
+
+func pageRows(page *HistoricalSourcePage) []coordinatorRow {
+	if page == nil {
+		return nil
+	}
+	return page.rows
+}
+func (c *HistoricalCoordinator) prepareAIExternalRowsLocked(ctx context.Context, page *HistoricalSourcePage, q *AIExternalExecutionQualification, rows []coordinatorRow) (*AIExternalPageQualification, error) {
 	if q == nil || q.self != q || q.owner != c || q.seal != aiJSONHash(q.facts) || time.Now().After(q.expires) || c.now == nil || c.pageValid(page) != nil || c.alive(ctx) != nil || q.local.validate(ctx) != nil || q.reverse.ValidateBorrowedSnapshot(ctx) != nil {
 		return nil, ErrAIExternalChanged
 	}
 	p := &AIExternalPageQualification{owner: q}
-	for _, row := range page.rows {
+	for _, row := range rows {
 		if row.event != nil || row.bridge == nil {
 			return nil, ErrCoordinatorPage
 		}
@@ -410,7 +446,7 @@ func aiExternalDecodeActualResult(raw []byte) (aiExternalFacts, error) {
 	}
 	d := json.NewDecoder(bytes.NewReader(raw))
 	d.DisallowUnknownFields()
-	if d.Decode(&facts) != nil || facts.Protocol != "qs-ai-actual-execution-facts/v2" {
+	if d.Decode(&facts) != nil || facts.Protocol != "qs-ai-actual-execution-facts/v3" {
 		return facts, ErrAIExternalExecution
 	}
 	if d.Decode(&struct{}{}) != io.EOF {
@@ -458,7 +494,7 @@ func aiExternalAssets(directory string) (aiExternalAssetSet, error) {
 	if !filepath.IsAbs(directory) || filepath.Clean(directory) != directory {
 		return out, ErrAIExternalInput
 	}
-	files := map[string]string{"qs-ai-retirement-readonly-host.py": aiExternalHostSHA, "qs-ai-retirement-readonly-verifier.py": "008ebc7256d35fcdb705528397e0e5ff8535cc6af681b9befc8d8dad02a638d1", "qs-ai-retirement-readonly-observer.py": "20c501d0930a21c1e8be12416156d5635430cf6171e01d28a6db789e83f06d5a", "qs-ai-retirement-0040-layout.py": "690d68be91713641ad6ce13ad9ad126828c64fe780bda05522bd68697ead577f"}
+	files := map[string]string{"qs-ai-retirement-readonly-host.py": aiExternalHostSHA, "qs-ai-retirement-readonly-verifier.py": "6a7e746e313a1028bd54edc878947c74c262d0e47af6de32b6c032fea035cee9", "qs-ai-retirement-readonly-observer.py": "20c501d0930a21c1e8be12416156d5635430cf6171e01d28a6db789e83f06d5a", "qs-ai-retirement-0040-layout.py": "690d68be91713641ad6ce13ad9ad126828c64fe780bda05522bd68697ead577f"}
 	for name, want := range files {
 		path := filepath.Join(directory, name)
 		fd, e := syscall.Open(path, syscall.O_RDONLY|syscall.O_NOFOLLOW|syscall.O_NONBLOCK, 0)

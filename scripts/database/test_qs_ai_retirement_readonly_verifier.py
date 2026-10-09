@@ -529,6 +529,186 @@ def signed_history(*, receipt_code="admission_input_invalid", grpc_status=3):
     return ai, peer, scan, approved, keys
 
 
+def mixed_handoff_history(*, stage="staged", kind="start", session=True):
+    # Uses actual SDK protected bytes, full native column values and source pairs;
+    # this is an offline row-contract fixture, never a minted Qualification.
+    from qs_ai.contracts.workflow import messaging_pb2 as pb, workflow_pb2 as workflow
+    from qs_ai.infrastructure.workflow_transport.messaging import prepare
+    ai, peer, scan, _, keys = signed_history()
+    bridge = peer["ai_bridge_commands"][0]
+    rid = m.text(bridge["request_id"])
+    sid = m.text(peer["ai_bridge_requests"][0]["session_id"])
+    start = m._start(m.json_value(bridge["payload"]))[0]
+    cid = rid if kind == "start" else str(uuid4())
+    payload = start if kind == "start" else dict(command_id=cid, session_id=sid, actor=start["actor"], action=kind, expected_version=4, question_id=str(uuid4()) if kind == "answer" else "", skip=False)
+    if kind == "answer":
+        payload["answer"] = "private-answer"
+    parsed = m._start(payload)[0] if kind == "start" else m._change(payload, kind)
+    # Both legacy sources store identical source bytes; MySQL JSON bytes do not
+    # have to equal original Go writer serialization or its separate digest.
+    stored = m.canonical(payload)
+    writer = m.sha(m._go_json(parsed))
+    bridge.update(command_id=raw(cid), kind=raw(kind), delivered=b"0", payload=stored, payload_hash=raw(writer), attempts=b"2")
+    peer["ai_messaging_legacy_commands"] = [row(command_id=cid, request_id=rid, source_kind=kind, source_payload=stored, source_payload_hash=writer, source_attempts=2, source_available_at=m.text(bridge["available_at"]), source_original_time="", transferred_at="2026-10-08 00:00:01.000000", messaging_body_sha256="a"*64)]
+    # Sign using the real trusted peer signer and actual decrypt recipient.
+    signer = keys.trusted_signers["peer-sign"].key
+    recipient = keys.decrypt_keys["ai-encrypt"]
+    body = pb.MessagingBody(start=workflow.StartCommand(**parsed)) if kind == "start" else pb.MessagingBody(change=workflow.ChangeCommand(**parsed))
+    prepared = prepare(pb.START if kind == "start" else pb.CHANGE, cid, rid, body, organization_id="1", signing_key=signer, recipient_key=recipient)
+    base = dict(peer["ai_messaging_outbox"][0])
+    base.update(producer=raw(prepared.envelope.producer), destination=raw(prepared.envelope.destination), message_id=raw(cid), body=prepared.body, body_sha256=raw(prepared.envelope.body_sha256), wire=prepared.wire, wire_sha256=raw(m.sha(prepared.wire)), kind=raw(pb.START if kind == "start" else pb.CHANGE), topic=raw(prepared.topic), stage=raw(stage), attempts=b"2", published_at=None, confirmed_at=None)
+    peer["ai_messaging_outbox"] = [base]
+    peer["ai_messaging_operations"] = [row(command_id=cid, kind=pb.START if kind == "start" else pb.CHANGE, body_sha256=prepared.envelope.body_sha256, organization_id=1, subject_id="subject", resource_id=rid if kind == "start" else sid, aggregate_key=rid, aggregate_sequence=1, decision=None, code=None, receipt_id=None, receipt=None, created_at="2026-10-08 00:00:00.000000", decided_at=None, retired=0, retirement_evidence=None, retired_at=None)]
+    peer["ai_messaging_inbox"].clear()
+    ai["ai_messaging_outbox"].clear(); ai["ai_messaging_inbox"].clear()
+    peer["ai_messaging_legacy_commands"][0]["messaging_body_sha256"] = raw(prepared.envelope.body_sha256)
+    if not session:
+        peer["ai_bridge_requests"][0].update(session_id=None, projection=None, status=b"pending", version=b"0")
+        peer["ai_bridge_events"].clear()
+        for name in ("interpretation_sessions", "interpretation_runs", "external_requests", "result_outbox", "idempotency_requests"):
+            ai[name].clear()
+    scan.bounds = SimpleNamespace(tables={n: {"columns": [(col,) for col in spec[0].split()]} for n, spec in m.PEER_SPECS.items()})
+    for n in ("ai_bridge_commands", "ai_messaging_legacy_commands"):
+        scan.sections[n]["rows"] = len(peer[n])
+    expected = copy.deepcopy(scan.sections)
+    descriptor = dict(command_id=cid, request_id=rid, source_kind=kind, organization_id="1", subject_id="subject", resource_id=rid if kind == "start" else sid, testee_id="2", bridge_payload_bytes_sha256=m.sha(stored), legacy_payload_bytes_sha256=m.sha(stored), writer_payload_sha256=writer, messaging_body_sha256=prepared.envelope.body_sha256, source_attempts=2, aggregate_sequence=1, operation_row_sha256=m._peer_row_sha(scan, "ai_messaging_operations", peer["ai_messaging_operations"][0]), outbox_row_sha256=m._peer_row_sha(scan, "ai_messaging_outbox", base))
+    return ai, peer, scan, expected, keys, descriptor
+
+
+class MixedHandoff(unittest.TestCase):
+    def test_real_protected_pending_handoff_has_no_fake_remote_acceptance(self):
+        for stage in ("staged", "awaiting_receipt"):
+            for session in (False, True):
+                ai, peer, scan, expected, keys, descriptor = mixed_handoff_history(stage=stage, session=session)
+                mapped = m._known_handoffs(scan, expected, [descriptor])
+                self.assertEqual(m._originals(scan, expected, mapped), ())
+                self.assertEqual(mapped[0].descriptor(), descriptor)
+                self.assertNotEqual(descriptor["writer_payload_sha256"], descriptor["bridge_payload_bytes_sha256"])
+                result = m._mq(ai, peer, (), keys, known_handoffs=mapped)
+                self.assertEqual(result["transferred_current_protocol_messages"], 1)
+                self.assertEqual(result["target_mq_responsibilities"], 0)
+                self.assertEqual(ai["ai_messaging_inbox"], [])
+                m._reverse(ai, peer, (), mapped)
+
+    def test_original_change_writer_and_authenticated_body_are_bound(self):
+        for kind in ("answer", "cancel"):
+            ai, peer, scan, expected, keys, descriptor = mixed_handoff_history(kind=kind)
+            mapped = m._known_handoffs(scan, expected, [descriptor])
+            self.assertEqual(m._mq(ai, peer, (), keys, known_handoffs=mapped)["transferred_current_protocol_messages"], 1)
+            peer["ai_messaging_outbox"][0]["body"] += b"private-conflict"
+            with self.assertRaises(m.Rejected):
+                m._mq(ai, peer, (), keys, known_handoffs=mapped)
+
+    def test_mixed_same_request_keeps_unmapped_terminal_chain_and_exact_pending_handoff(self):
+        from qs_ai.contracts.workflow import messaging_pb2 as pb, workflow_pb2 as workflow
+        from qs_ai.infrastructure.workflow_transport.messaging import prepare
+        ai, peer, scan, _, keys = signed_history()
+        rid = m.text(peer["ai_bridge_requests"][0]["request_id"])
+        sid = m.text(peer["ai_bridge_requests"][0]["session_id"])
+        cid = str(uuid4())
+        payload=dict(command_id=cid,session_id=sid,actor=dict(org_id="1",subject_id="subject"),action="cancel",expected_version=4,question_id="",skip=False)
+        raw_source=m.canonical(payload); writer=m.sha(m._go_json(m._change(payload,"cancel")))
+        available="2026-10-08 00:00:00.000000"
+        peer["ai_bridge_commands"].append(row(command_id=cid,request_id=rid,kind="cancel",payload=raw_source,payload_hash=writer,delivered=0,attempts=2,available_at=available))
+        prepared=prepare(pb.CHANGE,cid,rid,pb.MessagingBody(change=workflow.ChangeCommand(**payload)),organization_id="1",signing_key=keys.trusted_signers["peer-sign"].key,recipient_key=keys.decrypt_keys["ai-encrypt"])
+        box=dict(peer["ai_messaging_outbox"][0])
+        box.update(message_id=raw(cid),kind=raw(pb.CHANGE),body=prepared.body,body_sha256=raw(prepared.envelope.body_sha256),wire=prepared.wire,wire_sha256=raw(m.sha(prepared.wire)),topic=raw(prepared.topic),aggregate_sequence=b"2",stage=b"staged",attempts=b"2",confirmed_at=None,published_at=None)
+        peer["ai_messaging_outbox"].append(box)
+        op=row(command_id=cid,kind=pb.CHANGE,body_sha256=prepared.envelope.body_sha256,organization_id=1,subject_id="subject",resource_id=sid,aggregate_key=rid,aggregate_sequence=2,decision=None,code=None,receipt_id=None,receipt=None,created_at=available,decided_at=None,retired=0,retirement_evidence=None,retired_at=None)
+        peer["ai_messaging_operations"].append(op)
+        peer["ai_messaging_aggregates"][0]["next_sequence"]=b"3"
+        peer["ai_messaging_legacy_commands"]=[row(command_id=cid,request_id=rid,source_kind="cancel",source_payload=raw_source,source_payload_hash=writer,source_attempts=2,source_available_at=available,source_original_time="",messaging_body_sha256=prepared.envelope.body_sha256,transferred_at=available)]
+        for n in ("ai_bridge_commands","ai_messaging_legacy_commands"):scan.sections[n]["rows"]=len(peer[n])
+        scan.bounds=SimpleNamespace(tables={n:{"columns":[(col,) for col in spec[0].split()]} for n,spec in m.PEER_SPECS.items()})
+        approved=copy.deepcopy(scan.sections)
+        descriptor=dict(command_id=cid,request_id=rid,source_kind="cancel",organization_id="1",subject_id="subject",resource_id=sid,testee_id="2",bridge_payload_bytes_sha256=m.sha(raw_source),legacy_payload_bytes_sha256=m.sha(raw_source),writer_payload_sha256=writer,messaging_body_sha256=prepared.envelope.body_sha256,source_attempts=2,aggregate_sequence=2,operation_row_sha256=m._peer_row_sha(scan,"ai_messaging_operations",op),outbox_row_sha256=m._peer_row_sha(scan,"ai_messaging_outbox",box))
+        handed=m._known_handoffs(scan,approved,[descriptor])
+        values=m._originals(scan,approved,handed)
+        self.assertEqual([v.command_id for v in values],[rid])
+        result=m._mq(ai,peer,values,keys,known_handoffs=handed)
+        self.assertEqual(result["target_mq_responsibilities"],5)
+        self.assertEqual(result["transferred_current_protocol_messages"],1)
+        peer["ai_messaging_outbox"][0]["stage"]=b"staged"
+        peer["ai_messaging_outbox"][0]["confirmed_at"]=None
+        with self.assertRaisesRegex(m.Rejected,"target_mq_delivery_responsibility_open"):
+            m._mq(ai,peer,values,keys,known_handoffs=handed)
+
+    def test_full_mapping_scope_and_actual_raw_descriptor_are_required(self):
+        for mode in ("missing", "extra", "row-hash", "source-hash", "boolean", "duplicate", "source-kind", "unknown"):
+            _, _, scan, expected, _, descriptor = mixed_handoff_history()
+            supplied = [dict(descriptor)]
+            if mode == "missing": supplied = []
+            elif mode == "extra": supplied[0]["command_id"] = str(uuid4())
+            elif mode == "row-hash": supplied[0]["operation_row_sha256"] = "a"*64
+            elif mode == "source-hash": supplied[0]["bridge_payload_bytes_sha256"] = "b"*64
+            elif mode == "boolean": supplied[0]["source_attempts"] = True
+            elif mode == "duplicate": supplied *= 2
+            elif mode == "source-kind": supplied[0]["source_kind"] = "PARTICIPANT_RETRY"
+            else: supplied[0]["complete"] = True
+            with self.subTest(mode=mode), self.assertRaises(m.Rejected):
+                m._known_handoffs(scan, expected, supplied)
+
+    def test_pending_budget_held_partial_receipt_owner_and_source_conflicts_block(self):
+        for mode in ("held", "exhausted", "receipt", "retired", "NULL-sequence", "owner", "delivered", "clock", "payload"):
+            _, peer, scan, expected, _, descriptor = mixed_handoff_history()
+            op, box, src, legacy = peer["ai_messaging_operations"][0], peer["ai_messaging_outbox"][0], peer["ai_bridge_commands"][0], peer["ai_messaging_legacy_commands"][0]
+            if mode == "held": box["stage"] = b"held"
+            elif mode == "exhausted": box["attempts"] = b"8"
+            elif mode == "receipt": op["receipt_id"] = raw(str(uuid4()))
+            elif mode == "retired": op["retired"] = b"1"
+            elif mode == "NULL-sequence": op["aggregate_sequence"] = None
+            elif mode == "owner": op["organization_id"] = b"2"
+            elif mode == "delivered": src["delivered"] = b"1"
+            elif mode == "clock": legacy["source_available_at"] = b"2026-10-09 00:00:00.000000"
+            else: legacy["source_payload"] += b" "
+            with self.subTest(mode=mode), self.assertRaises(m.Rejected):
+                m._known_handoffs(scan, expected, [descriptor])
+
+    def test_mapped_unknown_provider_or_lease_and_global_orphan_stay_blocked(self):
+        for mode in ("unknown", "dispatched", "lease", "orphan", "cross-org", "missing-external"):
+            ai, peer, scan, expected, _, descriptor = mixed_handoff_history()
+            mapped = m._known_handoffs(scan, expected, [descriptor])
+            if mode in ("unknown", "dispatched"):
+                ai["model_calls"].append(row(run_id=m.text(ai["interpretation_runs"][0]["id"]), status=mode))
+            elif mode == "lease":
+                ai["execution_leases"].append(row(thread_id=mapped[0].session_id, expires_at="9999-01-01 00:00:00"))
+            elif mode == "orphan": ai["execution_jobs"].append(row(run_id=str(uuid4()), session_id=str(uuid4())))
+            elif mode == "cross-org": ai["interpretation_sessions"][0]["org_id"] = b"9"
+            else: ai["external_requests"].clear()
+            with self.subTest(mode=mode), self.assertRaises(m.Rejected):
+                m._reverse(ai, peer, (), mapped)
+
+    def test_existing_confirmed_at_exhausted_budget_requires_actual_receipt_chain(self):
+        ai, peer, scan, expected, keys = signed_history()
+        src = peer["ai_bridge_commands"][0]
+        src.update(delivered=b"0", attempts=b"8")
+        source = m._start(m.json_value(src["payload"]))[0]
+        peer["ai_messaging_legacy_commands"] = [row(command_id=m.text(src["command_id"]), request_id=m.text(src["request_id"]), source_kind="start", source_payload=src["payload"], source_payload_hash=m.text(src["payload_hash"]), source_attempts=8, source_available_at=m.text(src["available_at"]), source_original_time="", transferred_at="2026-10-08 00:00:01.000000", messaging_body_sha256=m.text(peer["ai_messaging_outbox"][0]["body_sha256"]))]
+        box = peer["ai_messaging_outbox"][0]; box["attempts"] = b"8"
+        scan.sections["ai_messaging_legacy_commands"]["rows"] = 1
+        scan.bounds = SimpleNamespace(tables={n: {"columns": [(col,) for col in spec[0].split()]} for n, spec in m.PEER_SPECS.items()})
+        expected = copy.deepcopy(scan.sections)
+        cid = m.text(src["command_id"])
+        descriptor = dict(command_id=cid, request_id=cid, source_kind="start", organization_id="1", subject_id="subject", resource_id=cid, testee_id="2", bridge_payload_bytes_sha256=m.sha(src["payload"]), legacy_payload_bytes_sha256=m.sha(src["payload"]), writer_payload_sha256=m.sha(m._go_json(source)), messaging_body_sha256=m.text(box["body_sha256"]), source_attempts=8, aggregate_sequence=1, operation_row_sha256=m._peer_row_sha(scan,"ai_messaging_operations",peer["ai_messaging_operations"][0]), outbox_row_sha256=m._peer_row_sha(scan,"ai_messaging_outbox",box))
+        mapped = m._known_handoffs(scan, expected, [descriptor])
+        m._mq(ai,peer,(),keys,known_handoffs=mapped)
+        ai["ai_messaging_inbox"].clear()
+        with self.assertRaises(m.Rejected): m._mq(ai,peer,(),keys,known_handoffs=mapped)
+
+    def test_live_transfer_metadata_is_same_batch_not_business_terminal_claim(self):
+        _, peer, scan, expected, _, descriptor = mixed_handoff_history()
+        op = peer["ai_messaging_operations"][0]
+        peer["ai_messaging_admission"] = [row(singleton=1,closed=1,revision=7,updated_at="2026-10-08 00:00:00.000000")]
+        meta = dict(version=1,operation_id="123-1",verifier_version="qs-original-handoff/v1",verification_method="source_identity_hash_and_live_ledger",verified_at="2026-10-08T00:00:01.123Z",admission_revision=7,command_id=descriptor["command_id"],request_id=descriptor["request_id"],source_kind="start",organization_id="1",subject_id="subject",resource_id=descriptor["resource_id"],live_body_sha256=descriptor["messaging_body_sha256"],sources=[dict(table=n,command_id=descriptor["command_id"],bytes_kind=k,bytes_sha256=descriptor[b],business_payload_hash=descriptor["writer_payload_sha256"]) for n,k,b in (("ai_bridge_commands","mysql_json_payload_cast_binary_sha256","bridge_payload_bytes_sha256"),("ai_messaging_legacy_commands","mysql_blob_source_payload_sha256","legacy_payload_bytes_sha256"))],references=[dict(kind="business_record",id=descriptor["request_id"]),dict(kind="operation",id=descriptor["command_id"]),dict(kind="readonly_run",id="123-1")],conclusion="transferred_verified",reason="handoff_verified",ownership_verified=True,responsibility_closed=False,business_terminal=False)
+        op["retirement_evidence"] = m.canonical(meta)
+        descriptor["operation_row_sha256"] = m._peer_row_sha(scan,"ai_messaging_operations",op)
+        m._known_handoffs(scan, expected, [descriptor], "123-1")
+        for key,value in (("business_terminal",True),("responsibility_closed",True),("operation_id","124-1"),("version",True),("live_body_sha256","0"*64)):
+            bad = {**meta,key:value}; op["retirement_evidence"] = m.canonical(bad)
+            descriptor["operation_row_sha256"] = m._peer_row_sha(scan,"ai_messaging_operations",op)
+            with self.subTest(key=key),self.assertRaises(m.Rejected): m._known_handoffs(scan,expected,[descriptor],"123-1")
+
+
 class SignedMQ(unittest.TestCase):
     def test_real_signature_original_command_first_receipt_peer_ack_chain(self):
         ai, peer, scan, approved, keys = signed_history()

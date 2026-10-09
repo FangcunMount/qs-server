@@ -109,8 +109,10 @@ func (p *AICommandHandoffBatch) lockCurrentLedgers(ctx context.Context, resolver
 			return nil, ErrAILocalChanged
 		}
 	}
-	if len(before) != len(wanted) {
-		return nil, ErrAILocalChanged
+	for _, e := range p.evidence {
+		if (before[e.CommandID] != nil) != (e.Conclusion == "transferred_verified") {
+			return nil, ErrAILocalChanged
+		}
 	}
 	if err := p.lockBusinessAnchors(ctx, probe, p.limits.MaxBytes-totalBytes); err != nil {
 		return nil, err
@@ -155,7 +157,7 @@ func (p *AICommandHandoffBatch) verifyCurrentMetadata(ctx context.Context, resol
 }
 
 func (p *AICommandHandoffBatch) verifyWrittenOperation(ctx context.Context, resolver *AILocalResolver, before aiReverseRow, expected store.CommandRetirementEvidence) error {
-	if timeExpiredHandoff(ctx, p) || before == nil {
+	if timeExpiredHandoff(ctx, p) {
 		return ErrAILocalChanged
 	}
 	spec := aiReverseSpecByTable("ai_messaging_operations")
@@ -164,6 +166,9 @@ func (p *AICommandHandoffBatch) verifyWrittenOperation(ctx context.Context, reso
 	rows, names, _, err := probe.read(ctx, "SELECT "+projection+" FROM `ai_messaging_operations` WHERE command_id=? FOR UPDATE", 2, expected.CommandID)
 	if err != nil || len(rows) != 1 || !reflect.DeepEqual(names, spec.columns) {
 		return ErrAILocalChanged
+	}
+	if before == nil {
+		return aiCommandRetirementOperationExpected(spec.columns, rows[0], expected)
 	}
 	return aiCommandHandoffOperationUnchanged(spec.columns, before, rows[0], expected)
 }

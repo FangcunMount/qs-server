@@ -553,11 +553,209 @@ class _Original:
         return "<private original START binding>"
 
 
-def _originals(peer, approved_sections):
+KNOWN_HANDOFF_FIELDS = frozenset("command_id request_id source_kind organization_id subject_id resource_id testee_id bridge_payload_bytes_sha256 legacy_payload_bytes_sha256 writer_payload_sha256 messaging_body_sha256 source_attempts aggregate_sequence operation_row_sha256 outbox_row_sha256".split())
+
+
+def known_handoff_descriptors(value):
+    # Input is only an expectation. Actual full source/peer rows and authenticated
+    # MQ bytes below must independently reproduce every descriptor.
+    if not isinstance(value, list) or len(value) > 10000:
+        fail("unsupported_known_handoff_scope")
+    result = []
+    for item in value:
+        if not isinstance(item, dict) or set(item) != KNOWN_HANDOFF_FIELDS:
+            fail("unsupported_known_handoff_descriptor")
+        for key in ("command_id", "request_id", "resource_id"):
+            original_uuid(item[key])
+        for key in ("organization_id", "testee_id"):
+            if not isinstance(item[key], str) or not re.fullmatch(r"[1-9][0-9]{0,19}", item[key]) or int(item[key]) >= 2**64:
+                fail("invalid_known_handoff_owner")
+        if not isinstance(item["subject_id"], str) or not 1 <= len(item["subject_id"].encode()) <= 128 or item["source_kind"] not in ("start", "answer", "cancel"):
+            fail("invalid_known_handoff_owner")
+        for key in KNOWN_HANDOFF_FIELDS:
+            if key.endswith("sha256") and (not isinstance(item[key], str) or re.fullmatch(r"[0-9a-f]{64}", item[key]) is None):
+                fail("invalid_known_handoff_digest")
+        for key, minimum, maximum in (("source_attempts", 0, 2**32-1), ("aggregate_sequence", 1, 2**64-1)):
+            if type(item[key]) is not int or not minimum <= item[key] <= maximum:
+                fail("invalid_known_handoff_budget_or_sequence")
+        result.append(dict(item))
+    ids = [r["command_id"] for r in result]
+    if ids != sorted(set(ids)):
+        fail("duplicate_or_unsorted_known_handoff_scope")
+    return result
+
+
+def _peer_row_sha(scan, table, row):
+    columns = [c[0] for c in scan.bounds.tables[table]["columns"]]
+    if len(columns) != len(set(columns)) or set(columns) != set(PEER_SPECS[table][0].split()) or set(row) != set(columns):
+        fail("known_handoff_raw_schema_conflict")
+    h = hashlib.sha256()
+    parts = [b"ai-reverse-native-row/v1"]
+    for key in columns:
+        parts.extend((key.encode(), row[key]))
+    for raw in parts:
+        if raw is not None and not isinstance(raw, bytes):
+            fail("known_handoff_raw_schema_conflict")
+        h.update(b"\x00" if raw is None else b"\x01")
+        h.update((0 if raw is None else len(raw)).to_bytes(8, "big"))
+        if raw is not None:
+            h.update(raw)
+    return h.hexdigest()
+
+
+def _change(value, kind):
+    required = set("command_id session_id actor action expected_version question_id skip".split())
+    if not isinstance(value, dict) or not required <= set(value) <= required | {"answer"} or any(v is None for v in value.values()):
+        fail("unsupported_original_change")
+    fixed_fields(value["actor"], "org_id subject_id", "unsupported_original_actor")
+    original_uuid(value["command_id"]); original_uuid(value["session_id"])
+    org, subject = value["actor"]["org_id"], value["actor"]["subject_id"]
+    if not isinstance(org, str) or not re.fullmatch(r"[1-9][0-9]{0,19}", org) or int(org) >= 2**64 or not isinstance(subject, str) or not 1 <= len(subject.encode()) <= 128:
+        fail("invalid_original_owner")
+    if value["action"] != kind or kind not in ("answer", "cancel") or type(value["expected_version"]) is not int or not 1 <= value["expected_version"] < 2**63 or type(value["skip"]) is not bool or not isinstance(value["question_id"], str):
+        fail("invalid_original_change")
+    if "answer" in value and not isinstance(value["answer"], str):
+        fail("invalid_original_change")
+    if kind == "answer":
+        original_uuid(value["question_id"])
+        if value["skip"] and "answer" in value or not value["skip"] and not value.get("answer"):
+            fail("invalid_original_change")
+    result = {k: value[k] for k in ("command_id", "session_id", "actor", "action", "expected_version", "question_id")}
+    result["actor"] = {k: value["actor"][k] for k in ("org_id", "subject_id")}
+    if "answer" in value:
+        result["answer"] = value["answer"]
+    result["skip"] = value["skip"]
+    return result
+
+
+@dataclass(frozen=True, repr=False)
+class _KnownHandoff:
+    fields: tuple
+    payload: bytes  # private canonical original writer bytes, never public
+    session_id: str | None
+    seal: object
+
+    def descriptor(self):
+        if self.seal is not _SEAL:
+            fail("actual_known_handoff_rows_required")
+        return dict(self.fields)
+
+    def __repr__(self):
+        return "<private independently read current-protocol handoff>"
+
+
+def _approved_sources(peer, approved_sections):
+    names = ("ai_bridge_commands", "ai_messaging_legacy_commands")
+    if not isinstance(approved_sections, dict) or set(approved_sections) != set(names):
+        fail("independent_original_sources_approval_required")
+    for table in names:
+        section = approved_sections[table]
+        fixed_fields(section, "rows source_bytes source_sha256", "unsupported_original_source_approval")
+        if section != {k: peer.sections[table][k] for k in section}:
+            fail("approved_original_source_changed")
+
+
+def _live_handoff_metadata(peer, op, descriptor, operation_id):
+    raw = op["retirement_evidence"]
+    if raw is None:
+        return
+    value = json_value(raw)
+    fixed_fields(value, "version operation_id verifier_version verification_method verified_at admission_revision command_id request_id source_kind organization_id subject_id resource_id live_body_sha256 sources references conclusion reason ownership_verified responsibility_closed business_terminal", "unsupported_known_handoff_metadata")
+    if not isinstance(operation_id, str) or not re.fullmatch(r"[0-9]{1,20}-[0-9]{1,4}", operation_id) or value["operation_id"] != operation_id:
+        fail("known_handoff_metadata_batch_conflict")
+    if type(value["version"]) is not int or value["version"] != 1 or value["verifier_version"] != "qs-original-handoff/v1" or value["verification_method"] != "source_identity_hash_and_live_ledger" or value["conclusion"] != "transferred_verified" or value["reason"] != "handoff_verified" or value["ownership_verified"] is not True or value["responsibility_closed"] is not False or value["business_terminal"] is not False:
+        fail("known_handoff_metadata_conclusion_conflict")
+    at = value["verified_at"]
+    if not isinstance(at, str) or not re.fullmatch(r"[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\.[0-9]{1,9})?Z", at) or datetime.fromisoformat(at.replace("Z", "+00:00")).year <= 1:
+        fail("invalid_known_handoff_metadata_time")
+    admission = one(peer["ai_messaging_admission"], "known_handoff_admission_missing_or_ambiguous")
+    if type(value["admission_revision"]) is not int or value["admission_revision"] != number(admission["revision"]):
+        fail("known_handoff_metadata_admission_conflict")
+    for key in ("command_id", "request_id", "source_kind", "organization_id", "subject_id", "resource_id"):
+        if value[key] != descriptor[key]:
+            fail("known_handoff_metadata_identity_conflict")
+    if value["live_body_sha256"] != descriptor["messaging_body_sha256"]:
+        fail("known_handoff_metadata_identity_conflict")
+    sources = [{"table": name, "command_id": descriptor["command_id"], "bytes_kind": kind, "bytes_sha256": descriptor[bytes_key], "business_payload_hash": descriptor["writer_payload_sha256"]} for name, kind, bytes_key in (("ai_bridge_commands", "mysql_json_payload_cast_binary_sha256", "bridge_payload_bytes_sha256"), ("ai_messaging_legacy_commands", "mysql_blob_source_payload_sha256", "legacy_payload_bytes_sha256"))]
+    refs = [{"kind": "business_record", "id": descriptor["request_id"]}, {"kind": "operation", "id": descriptor["command_id"]}, {"kind": "readonly_run", "id": operation_id}]
+    if value["sources"] != sources or value["references"] != refs:
+        fail("known_handoff_metadata_source_conflict")
+
+
+def _known_handoffs(scan, approved_sections, expected, operation_id=None):
+    _approved_sources(scan, approved_sections)
+    expected = known_handoff_descriptors(expected)
+    peer = scan.rows
+    actual_ids = [text(r["command_id"]) for r in peer["ai_messaging_legacy_commands"]]
+    if len(actual_ids) != len(set(actual_ids)) or set(actual_ids) != {v["command_id"] for v in expected}:
+        fail("known_handoff_mapping_scope_conflict")
+    result = []
+    for descriptor in expected:
+        cid, rid, kind = (descriptor[k] for k in ("command_id", "request_id", "source_kind"))
+        bridge = one(match(peer["ai_bridge_commands"], command_id=cid), "known_handoff_bridge_missing_or_ambiguous")
+        legacy = one(match(peer["ai_messaging_legacy_commands"], command_id=cid), "known_handoff_mapping_missing_or_ambiguous")
+        if (text(bridge["request_id"]), text(legacy["request_id"]), text(bridge["kind"]), text(legacy["source_kind"])) != (rid, rid, kind, kind) or boolean(bridge["delivered"]):
+            fail("known_handoff_source_identity_conflict")
+        if bridge["payload"] != legacy["source_payload"] or bridge["available_at"] != legacy["source_available_at"] or bridge["available_at"] is None or legacy["transferred_at"] is None:
+            fail("known_handoff_source_bytes_or_clock_conflict")
+        available = text(bridge["available_at"])
+        if re.fullmatch(r"[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}\.[0-9]{6}", available) is None:
+            fail("known_handoff_source_bytes_or_clock_conflict")
+        datetime.fromisoformat(available)
+        parsed = _start(json_value(bridge["payload"]))[0] if kind == "start" else _change(json_value(bridge["payload"]), kind)
+        writer = sha(_go_json(parsed))
+        resource = parsed["request_id"] if kind == "start" else parsed["session_id"]
+        if (parsed["request_id"] if kind == "start" else parsed["command_id"]) != cid or kind == "start" and rid != cid:
+            fail("known_handoff_source_identity_conflict")
+        if (text(bridge["payload_hash"]), text(legacy["source_payload_hash"])) != (writer, writer):
+            fail("known_handoff_writer_digest_conflict")
+        attempts = number(bridge["attempts"])
+        if attempts > 2**32-1 or number(legacy["source_attempts"]) != attempts:
+            fail("known_handoff_source_budget_conflict")
+        request = one(match(peer["ai_bridge_requests"], request_id=rid), "known_handoff_request_missing_or_ambiguous")
+        start = _start(doc(request, "payload"))[0]
+        if text(request["request_hash"]) != sha(_go_json(start)) or start["request_id"] != rid or (text(request["organization_id"]), text(request["subject_id"]), text(request["testee_id"])) != (start["actor"]["org_id"], start["actor"]["subject_id"], start["testee_id"]) or parsed["actor"] != start["actor"]:
+            fail("known_handoff_request_owner_conflict")
+        if sorted(text(v["assessment_id"]) for v in match(peer["ai_bridge_request_assessments"], request_id=rid)) != sorted(start["assessment_ids"]):
+            fail("known_handoff_request_assessment_conflict")
+        sid = text(request["session_id"])
+        if sid is not None:
+            original_uuid(sid)
+        if kind == "start" and parsed != start or kind != "start" and sid != resource:
+            fail("known_handoff_original_request_or_session_conflict")
+        op = one(match(peer["ai_messaging_operations"], command_id=cid), "known_handoff_operation_missing_or_ambiguous")
+        box = one(match(peer["ai_messaging_outbox"], producer="qs-server", destination="qs-ai", message_id=cid), "known_handoff_outbox_missing_or_ambiguous")
+        body_hash = text(legacy["messaging_body_sha256"])
+        sequence = number(op["aggregate_sequence"])
+        if boolean(op["retired"]) or op["retired_at"] is not None:
+            fail("known_handoff_retired_or_metadata_requires_verifier")
+        if op["created_at"] is None or sequence == 0 or number(op["kind"]) != (1 if kind == "start" else 2) or number(box["kind"]) != number(op["kind"]) or (text(op["body_sha256"]), text(box["body_sha256"])) != (body_hash, body_hash) or sha(box["body"]) != body_hash:
+            fail("known_handoff_current_identity_conflict")
+        if (text(op["aggregate_key"]), text(box["aggregate_key"]), text(op["subject_id"]), text(op["resource_id"]), str(number(op["organization_id"])), str(number(box["organization_id"])), number(box["aggregate_sequence"])) != (rid, rid, parsed["actor"]["subject_id"], resource, parsed["actor"]["org_id"], parsed["actor"]["org_id"], sequence):
+            fail("known_handoff_current_owner_conflict")
+        stage, decision = text(box["stage"]), text(op["decision"])
+        if stage not in ("staged", "awaiting_receipt", "confirmed") or number(box["attempts"]) < min(attempts, 8) or stage != "confirmed" and number(box["attempts"]) >= 8:
+            fail("known_handoff_current_budget_or_held")
+        if decision in (None, ""):
+            if stage == "confirmed" or any(op[k] is not None for k in ("receipt_id", "receipt", "decided_at")) or text(op["code"]) not in (None, "") or box["confirmed_at"] is not None:
+                fail("known_handoff_partial_or_unproven_receipt")
+        elif decision not in ("accepted", "rejected") or op["receipt_id"] is None or op["receipt"] is None or op["decided_at"] is None:
+            fail("known_handoff_partial_or_unproven_receipt")
+        actual = dict(command_id=cid, request_id=rid, source_kind=kind, organization_id=parsed["actor"]["org_id"], subject_id=parsed["actor"]["subject_id"], resource_id=resource, testee_id=start["testee_id"], bridge_payload_bytes_sha256=sha(bridge["payload"]), legacy_payload_bytes_sha256=sha(legacy["source_payload"]), writer_payload_sha256=writer, messaging_body_sha256=body_hash, source_attempts=attempts, aggregate_sequence=sequence, operation_row_sha256=_peer_row_sha(scan, "ai_messaging_operations", op), outbox_row_sha256=_peer_row_sha(scan, "ai_messaging_outbox", box))
+        _live_handoff_metadata(peer, op, actual, operation_id)
+        if actual != descriptor:
+            fail("known_handoff_descriptor_not_actual_rows")
+        result.append(_KnownHandoff(tuple(sorted(actual.items())), _go_json(parsed), sid, _SEAL))
+    return tuple(result)
+
+
+def _originals(peer, approved_sections, known_handoffs=()):
     # Approval is for actual full-EOF frame hashes/counts, not a supplied target list.
     names = ("ai_bridge_commands", "ai_messaging_legacy_commands")
     if not isinstance(approved_sections, dict) or set(approved_sections) != set(names):
         fail("independent_original_sources_approval_required")
+    _approved_sources(peer, approved_sections)
+    mapped = {v.descriptor()["command_id"] for v in known_handoffs}
     sources = {}
     for table in names:
         section = approved_sections[table]
@@ -568,6 +766,8 @@ def _originals(peer, approved_sections):
         for row in peer.rows[table]:
             cid, rid = text(row["command_id"]), text(row["request_id"])
             original_uuid(cid); original_uuid(rid)
+            if cid in mapped:
+                continue
             kind = text(row["kind"] if table == names[0] else row["source_kind"])
             if kind != "start" or cid != rid:
                 fail("unsupported_original_command_type")
@@ -651,7 +851,7 @@ def _retry_acceptance(ai, row):
     return command, receipt
 
 
-def _original_execution_scope(ai, peer, originals):
+def _original_execution_scope(ai, peer, originals, known_handoffs=()):
     # Only _verify passes originals constructed from both approved full-EOF
     # legacy sources. None is unknown scope; an actual empty tuple is empty.
     if originals is None:
@@ -681,11 +881,30 @@ def _original_execution_scope(ai, peer, originals):
             fail("original_session_owner_or_request_conflict")
         targets.add(original.request_id)
         target_sessions.add(original.session_id)
+    for handoff in known_handoffs:
+        descriptor = handoff.descriptor()
+        targets.add(descriptor["request_id"])
+        if handoff.session_id is None:
+            if match(ai["external_requests"], request_id=descriptor["request_id"]):
+                fail("known_handoff_original_session_conflict")
+            continue
+        owner = one(match(ai["interpretation_sessions"], id=handoff.session_id), "known_handoff_session_missing_or_ambiguous")
+        request = one(match(peer["ai_bridge_requests"], request_id=descriptor["request_id"]), "known_handoff_request_missing_or_ambiguous")
+        start = _start(doc(request, "payload"))[0]
+        if (str(number(owner["org_id"])), text(owner["owner_subject_id"]), str(number(owner["testee_id"])), doc(owner, "assessment_ids"), text(owner["goal"])) != (start["actor"]["org_id"], start["actor"]["subject_id"], start["testee_id"], start["assessment_ids"], start["goal"]):
+            fail("known_handoff_original_session_conflict")
+        leases = match(ai["execution_leases"], thread_id=handoff.session_id)
+        if any(datetime.fromisoformat(text(v["expires_at"])).replace(tzinfo=timezone.utc) > datetime.now(timezone.utc) for v in leases):
+            fail("known_handoff_execution_lease_active")
+        external = one(match(ai["external_requests"], request_id=descriptor["request_id"]), "known_handoff_external_binding_missing_or_ambiguous")
+        if text(external["session_id"]) != handoff.session_id:
+            fail("known_handoff_original_session_conflict")
+        target_sessions.add(handoff.session_id)
     target_runs = {rid for rid, row in runs.items() if text(row["session_id"]) in target_sessions}
     return targets, target_sessions, target_runs
 
 
-def _reverse(ai, peer, originals=None):
+def _reverse(ai, peer, originals=None, known_handoffs=()):
     sessions = {text(r["id"]): r for r in ai["interpretation_sessions"]}
     runs = {text(r["id"]): r for r in ai["interpretation_runs"]}
     externals = {text(r["session_id"]): r for r in ai["external_requests"]}
@@ -739,7 +958,7 @@ def _reverse(ai, peer, originals=None):
         original, _ = _start(doc(request, "payload"))
         if text(request["request_hash"]) != sha(_go_json(original)) or (original["actor"]["org_id"], original["actor"]["subject_id"], original["testee_id"], original["assessment_ids"], original["goal"]) != (str(number(owner["org_id"])), text(owner["owner_subject_id"]), str(number(owner["testee_id"])), doc(owner, "assessment_ids"), text(owner["goal"])):
             fail("global_external_request_original_owner_conflict")
-    scope = _original_execution_scope(ai, peer, originals)
+    scope = _original_execution_scope(ai, peer, originals, known_handoffs)
     outside_unknown = 0
     for row in ai["model_calls"]:
         status = text(row["status"])
@@ -994,7 +1213,7 @@ def _decoded_row(row, json_keys=(), binary_keys=()):
     return result
 
 
-async def _evaluations(ai, db, originals=None, peer=None):
+async def _evaluations(ai, db, originals=None, peer=None, known_handoffs=()):
     from qs_ai.infrastructure.persistence.mysql.evaluation_creation_receipt import creation_receipt
     from qs_ai.infrastructure.persistence.mysql.evaluation_frozen_policies import frozen_policies
     from qs_ai.infrastructure.persistence.mysql.evaluation_projection import project_slots
@@ -1004,7 +1223,7 @@ async def _evaluations(ai, db, originals=None, peer=None):
     from qs_ai.infrastructure.persistence.mysql.evaluation_assets import stored_run_suite
     from qs_ai.infrastructure.persistence.mysql.evaluation_contracts import semantic_contract
     from qs_ai.domain.evaluation.identity import EvidenceReleaseIdentity, FrozenContractRef
-    scope = _original_execution_scope(ai, peer, originals) if peer is not None else None
+    scope = _original_execution_scope(ai, peer, originals, known_handoffs) if peer is not None else None
     result = {"non_target_runs": 0, "legitimate_pending_runs": 0, "terminal_runs": 0,
               "outside_retirement_provider_result_unknown": 0}
     for row in ai["evaluation_runs"]:
@@ -1095,7 +1314,7 @@ class ProtectionKeys:
         return "<host-owned message protection keys>"
 
 
-def _mq(ai, peer, originals, keys, *, deadline=None):
+def _mq(ai, peer, originals, keys, *, deadline=None, known_handoffs=()):
     deadline = time.monotonic() + TOTAL_SECONDS if deadline is None else deadline
     def require_budget():
         if time.monotonic() >= deadline:
@@ -1119,9 +1338,13 @@ def _mq(ai, peer, originals, keys, *, deadline=None):
     evaluations = {text(r["run_id"]): r for r in ai["evaluation_runs"]}
     if set(requests) & set(evaluations):
         fail("cross_domain_aggregate_identity_ambiguous")
+    handed = {h.descriptor()["command_id"]: h for h in known_handoffs}
+    handed_requests = {h.descriptor()["request_id"] for h in known_handoffs}
     targets = {o.request_id for o in originals}
     target_sessions = {o.session_id for o in originals}
     counts = {"authenticated_messages": 0, "target_mq_responsibilities": 0, "non_target_pending_messages": 0}
+    if handed:
+        counts["transferred_current_protocol_messages"] = 0
     for side, dataset in (("ai", ai), ("peer", peer)):
         for row in dataset["ai_messaging_outbox"]:
             require_budget()
@@ -1190,6 +1413,25 @@ def _mq(ai, peer, originals, keys, *, deadline=None):
                     fail("mq_original_state_binding_conflict")
             elif env.kind not in (pb.COMMAND_RECEIPT, pb.EVENT_ACKNOWLEDGEMENT):
                 fail("unsupported_global_mq_kind")
+            mapped = handed.get(env.message_id) if side == "peer" else None
+            if mapped is not None:
+                descriptor = mapped.descriptor()
+                if env.kind not in (pb.START, pb.CHANGE) or env.aggregate_key != descriptor["request_id"] or env.body_sha256 != descriptor["messaging_body_sha256"]:
+                    fail("known_handoff_authenticated_message_conflict")
+                if env.kind == pb.START:
+                    if _start(actual)[0] != json_value(mapped.payload):
+                        fail("known_handoff_original_message_conflict")
+                else:
+                    actual_change = {"command_id": value.command_id, "session_id": value.session_id, "actor": {"org_id": value.actor.org_id, "subject_id": value.actor.subject_id}, "action": value.action, "expected_version": value.expected_version, "question_id": value.question_id, "skip": value.skip}
+                    if value.HasField("answer"):
+                        actual_change["answer"] = value.answer
+                    if _change(actual_change, descriptor["source_kind"]) != json_value(mapped.payload):
+                        fail("known_handoff_original_message_conflict")
+                # Only this independently mapped command is transferred. Other
+                # messages in the same aggregate retain the original target gate.
+                target = False
+            if env.aggregate_key in handed_requests and text(row["stage"]) == "held":
+                fail("known_handoff_related_transport_held")
             if number(row["attempts"]) >= 8 and text(row["stage"]) not in ("confirmed", "held"):
                 fail("mq_attempt_budget_state_conflict")
             if text(row["stage"]) not in ("staged", "awaiting_receipt", "confirmed", "held"):
@@ -1201,6 +1443,8 @@ def _mq(ai, peer, originals, keys, *, deadline=None):
                 counts["target_mq_responsibilities"] += 1
                 if text(row["stage"]) != "confirmed" or row["confirmed_at"] is None:
                     fail("target_mq_delivery_responsibility_open")
+            elif mapped is not None:
+                counts["transferred_current_protocol_messages"] += 1
             elif text(row["stage"]) != "confirmed":
                 counts["non_target_pending_messages"] += 1
             messages[ident] = (row, env, body, target)
@@ -1223,7 +1467,7 @@ def _mq(ai, peer, originals, keys, *, deadline=None):
                 decision = text(row["decision"])
                 if decision not in ("accepted", "rejected", "held", "processing"):
                     fail("unsupported_mq_inbox_decision")
-                if target and decision not in ("accepted", "rejected"):
+                if (target or mid in handed) and decision not in ("accepted", "rejected"):
                     fail("target_mq_command_decision_open")
                 receipt_id = text(row["receipt_id"])
                 if decision in ("accepted", "rejected", "held"):
@@ -1289,7 +1533,7 @@ def _mq(ai, peer, originals, keys, *, deadline=None):
                 outcome = text(row["outcome"])
                 if a.event_id != mid or a.event_body_sha256 != env.body_sha256 or a.event_kind != env.kind or ack[1].aggregate_key != env.aggregate_key or number(ack[0]["organization_id"]) != number(source["organization_id"]) or a.outcome != {"stored": pb.MessagingEventAcknowledgement.STORED, "held": pb.MessagingEventAcknowledgement.TECHNICALLY_HELD}.get(outcome):
                     fail("mq_event_business_ack_conflict")
-                if target and outcome != "stored":
+                if (target or env.aggregate_key in handed_requests) and outcome != "stored":
                     fail("target_mq_peer_business_receipt_held")
     for ident, (row, env, body, target) in messages.items():
         require_budget()
@@ -1307,7 +1551,7 @@ def _mq(ai, peer, originals, keys, *, deadline=None):
                 receipt = messages.get(("qs-ai", "qs-server", text(op["receipt_id"])))
                 if received is None or receipt is None or op["receipt"] != receipt[0]["body"] or text(op["decision"]) != text(received["decision"]):
                     fail("mq_peer_operation_first_receipt_conflict")
-            if target and received is None:
+            if (target or env.message_id in handed and text(row["stage"]) == "confirmed") and received is None:
                 fail("target_mq_command_business_acceptance_missing")
         elif env.kind == pb.COMMAND_RECEIPT:
             r = body.command_receipt
@@ -1392,10 +1636,12 @@ def _mq(ai, peer, originals, keys, *, deadline=None):
 
 
 class Qualification:
-    def __init__(self, scans, originals, summary, *, seal):
+    def __init__(self, scans, originals, summary, *, seal, known_handoffs=(), handoff_operation_id=None):
         if seal is not _SEAL:
             fail("actual_full_qualification_required")
         self._scans, self._originals, self._summary = scans, originals, summary
+        self._known_handoffs = known_handoffs
+        self._handoff_operation_id = handoff_operation_id
 
     def __repr__(self):
         return "<private readonly full-ledger qualification>"
@@ -1417,17 +1663,18 @@ class Qualification:
 
 async def _verify(ai_session, peer_session, *, ai_bounds, peer_bounds,
                  approved_ai_bounds_sha256, approved_peer_bounds_sha256,
-                 approved_original_sections, protection_keys=None):
+                 approved_original_sections, protection_keys=None, known_handoffs=None, handoff_operation_id=None):
     """Borrow two actual host RR/RO snapshots. Approval is independent of discovery."""
     if not isinstance(ai_bounds, FullBounds) or ai_bounds.side != "ai" or not isinstance(peer_bounds, FullBounds) or peer_bounds.side != "peer":
         fail("separately_bound_database_snapshots_required")
     started = time.monotonic()
     ai_scan = await _scan(ai_session, ai_bounds, approved_ai_bounds_sha256)
     peer_scan = await _scan(peer_session, peer_bounds, approved_peer_bounds_sha256)
-    originals = _originals(peer_scan, approved_original_sections)
+    mapped = () if known_handoffs is None else _known_handoffs(peer_scan, approved_original_sections, known_handoffs, handoff_operation_id)
+    originals = _originals(peer_scan, approved_original_sections, mapped)
     ai, peer = ai_scan.rows, peer_scan.rows
     try:
-        reverse = _reverse(ai, peer, originals)
+        reverse = _reverse(ai, peer, originals, mapped)
         summary = {"historical_gap_candidates": 0, "typed_configuration_artifacts_verified": 0,
                    "known_terminal_without_artifact": 0, "participant_reverse": reverse}
         for original in originals:
@@ -1464,13 +1711,13 @@ async def _verify(ai_session, peer_session, *, ai_bounds, peer_bounds,
             else:
                 summary["known_terminal_without_artifact"] += 1
         async with asyncio.timeout(min(QUERY_SECONDS, TOTAL_SECONDS - (time.monotonic() - started))):
-            summary["evaluation"] = await _evaluations(ai, ai_session, originals, peer)
-        summary["mq"] = _mq(ai, peer, originals, protection_keys, deadline=started + TOTAL_SECONDS)
+            summary["evaluation"] = await _evaluations(ai, ai_session, originals, peer, mapped)
+        summary["mq"] = _mq(ai, peer, originals, protection_keys, deadline=started + TOTAL_SECONDS, known_handoffs=mapped)
         # Revalidate borrowed ownership after actual typed helper SELECTs.
         for scan, session in ((ai_scan, ai_session), (peer_scan, peer_session)):
             reader = scan.module._Borrowed(session)
             await scan.module._binding(reader, scan.bounds.identity_hash, scan.bounds.source_sha)
-        return Qualification((ai_scan, peer_scan), originals, summary, seal=_SEAL)
+        return Qualification((ai_scan, peer_scan), originals, summary, seal=_SEAL, known_handoffs=mapped, handoff_operation_id=handoff_operation_id)
     except Rejected:
         raise
     except TimeoutError:
@@ -1513,8 +1760,10 @@ async def _recheck(ai_session, peer_session, qualification, *, protection_keys=N
     repeated = await verify(ai_session, peer_session, ai_bounds=old[0].bounds, peer_bounds=old[1].bounds,
                             approved_ai_bounds_sha256=old[0].approved_bounds_sha256,
                             approved_peer_bounds_sha256=old[1].approved_bounds_sha256,
-                            approved_original_sections=expected, protection_keys=protection_keys)
-    if repeated._summary != qualification._summary:
+                            approved_original_sections=expected, protection_keys=protection_keys,
+                            known_handoffs=[h.descriptor() for h in qualification._known_handoffs] if qualification._known_handoffs else None,
+                            handoff_operation_id=qualification._handoff_operation_id)
+    if [h.descriptor() for h in repeated._known_handoffs] != [h.descriptor() for h in qualification._known_handoffs] or repeated._summary != qualification._summary:
         fail("readonly_qualification_changed")
     return {"protocol": "qs-ai-full-ledger-fresh-recheck/v1", "unchanged_full_source_hashes": True,
             "both_original_snapshots_ended": True, "no_above_upper_rows": True,
