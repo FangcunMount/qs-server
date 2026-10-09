@@ -978,3 +978,31 @@ The integration binaries were not executed and no database operation was run for
 this fixture repair. Real-database CI E2E remains required. The b617 native PASS
 is not reassigned to be2 or a later documentation-only head. None of these local
 results establish production deletion, deployment, restoration budget or purge.
+
+### Pristine current-runtime fixture follow-up (2026-10-09)
+
+The `89bf28af9d50ac32b28359a00ff57c6676a1638e` CI run
+`37936257412` is terminal: 18 successful checks, one current-runtime closure
+failure and two skipped checks. The historical A99 persistence steps pass.
+The current-runtime fixture still requested latest migrations independently,
+so B correctly refused it before the empty-pair business assertions.
+
+Test/build-only commit `ff05fbecba16842547da13ff73f60bb3deb19c6f` changes two integration test files, the
+existing CI command and three existing proof runners. It observes both newly
+allocated empty test databases and their actual identities, writes a private
+single-use cold-bootstrap authorization, and uses the public live Pair for
+MySQL100/Mongo39. A fresh installed Pair verifies the second migration run.
+The compiled `pkg/version.GitCommit` comes from each runner's actual checkout;
+no fallback source flag or production guard bypass is introduced.
+
+Both installed-source tag combinations compile. At the committed source, the
+pure no-database identity test reads the actual linked commit, passes a matching
+expectation and rejects a deliberately wrong SHA. Receipt SHA256 is
+`9333c85da9ab8ce83b9b674c95287ac6e4c3a32fb874605dac98ce65956afae3`.
+New-diff lint against 89bf and repository-config depguard pass. Full-package
+integration lint still reports 14 pre-existing diagnostics; it is not reported
+as passed. All product source, 276 historical migrations and four B tail files
+remain unchanged from 89bf. Final-commit CI and genuine empty-pair runtime
+execution remain pending. The prior b617 native evidence keeps its original
+source and scope; this repair does not establish database/native or production
+retirement acceptance.
