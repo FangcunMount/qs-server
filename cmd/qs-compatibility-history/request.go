@@ -367,8 +367,14 @@ func (a *approvedInputs) verifyFullFiles(ctx context.Context) error {
 	}
 	return a.rewind()
 }
-func loadInputs(ctx context.Context, path, expected, op, run string) (a *approvedInputs, result error) {
-	if !sourcePattern.MatchString(sourceSHA) || !hashPattern.MatchString(expected) || !runPattern.MatchString(op) || !runPattern.MatchString(run) {
+func loadInputs(ctx context.Context, path, expected, op, run string) (*approvedInputs, error) {
+	return loadInputsForSource(ctx, path, expected, op, run, sourceSHA)
+}
+
+// Only the explicit evidence-write caller supplies an original inventory source.
+// Read-only callers retain exact build-source binding through loadInputs.
+func loadInputsForSource(ctx context.Context, path, expected, op, run, originalSource string) (a *approvedInputs, result error) {
+	if !sourcePattern.MatchString(sourceSHA) || !sourcePattern.MatchString(originalSource) || !hashPattern.MatchString(expected) || !runPattern.MatchString(op) || !runPattern.MatchString(run) {
 		return nil, fixedError("history_build_or_request_binding_rejected")
 	}
 	a = &approvedInputs{requestSHA: expected, requestPath: path}
@@ -382,7 +388,7 @@ func loadInputs(ctx context.Context, path, expected, op, run string) (a *approve
 		return a, e
 	}
 	r := a.request
-	if r.FormatVersion != 1 || r.Kind != "readonly_compatibility_history_request" || r.SourceSHA != sourceSHA || r.OperationID != op || r.RunID != run || len(r.Assets) != 4 {
+	if r.FormatVersion != 1 || r.Kind != "readonly_compatibility_history_request" || r.SourceSHA != originalSource || r.OperationID != op || r.RunID != run || len(r.Assets) != 4 {
 		return a, fixedError("history_request_binding_rejected")
 	}
 	if privateJSON(r.InventoryRequest, &a.inventory) != nil || privateJSON(r.InventoryReport, &a.report) != nil {
@@ -390,10 +396,10 @@ func loadInputs(ctx context.Context, path, expected, op, run string) (a *approve
 	}
 	inv, report := a.inventory, a.report
 	fixedLimits := inventoryLimits{30, 1500, 1_000_000, 2 << 30, 1000, 1001}
-	if inv.FormatVersion != 2 || inv.Kind != "readonly_inventory_request" || inv.OperationID != op || inv.SourceSHA != sourceSHA || inv.TargetHash != jsonHash(historyTargets) || inv.DatabaseScope != "mysql-and-mongodb" || inv.Limits != fixedLimits || len(inv.Boundaries) != 4 || len(inv.Identities) != 2 || len(inv.Migrations) != 2 || !runPattern.MatchString(inv.BoundaryRunID) || !hashPattern.MatchString(inv.BoundaryReportHash) {
+	if inv.FormatVersion != 2 || inv.Kind != "readonly_inventory_request" || inv.OperationID != op || inv.SourceSHA != originalSource || inv.TargetHash != jsonHash(historyTargets) || inv.DatabaseScope != "mysql-and-mongodb" || inv.Limits != fixedLimits || len(inv.Boundaries) != 4 || len(inv.Identities) != 2 || len(inv.Migrations) != 2 || !runPattern.MatchString(inv.BoundaryRunID) || !hashPattern.MatchString(inv.BoundaryReportHash) {
 		return a, fixedError("history_inventory_request_rejected")
 	}
-	if report.FormatVersion != 2 || report.Kind != "readonly_compatibility_inventory" || report.SourceSHA != sourceSHA || report.OperationID != op || !runPattern.MatchString(report.RunID) || report.RequestHash != r.InventoryRequest.SHA256 || report.TargetHash != inv.TargetHash || !report.Complete || report.DropReady || !report.DiagnosticOnly || report.ErrorCategory != "none" || report.SourceBytesProtocol != "mysql_cast_binary_columns_pk_order_v2+mongodb_server_bson_pk_order_v2" || report.ConsistencySemantics != "two_equal_complete_passes_within_independently_approved_upper;sql_same_readonly_snapshot;mongo_homogeneous_bson_id_simple_collation;after_upper_next_cycle_not_fenced" || report.BoundaryReportHash != inv.BoundaryReportHash || len(report.Targets) != 4 || len(report.DatabaseBindings) != 2 {
+	if report.FormatVersion != 2 || report.Kind != "readonly_compatibility_inventory" || report.SourceSHA != originalSource || report.OperationID != op || !runPattern.MatchString(report.RunID) || report.RequestHash != r.InventoryRequest.SHA256 || report.TargetHash != inv.TargetHash || !report.Complete || report.DropReady || !report.DiagnosticOnly || report.ErrorCategory != "none" || report.SourceBytesProtocol != "mysql_cast_binary_columns_pk_order_v2+mongodb_server_bson_pk_order_v2" || report.ConsistencySemantics != "two_equal_complete_passes_within_independently_approved_upper;sql_same_readonly_snapshot;mongo_homogeneous_bson_id_simple_collation;after_upper_next_cycle_not_fenced" || report.BoundaryReportHash != inv.BoundaryReportHash || len(report.Targets) != 4 || len(report.DatabaseBindings) != 2 {
 		return a, fixedError("history_inventory_report_rejected")
 	}
 	for _, db := range []string{"mysql", "mongodb"} {

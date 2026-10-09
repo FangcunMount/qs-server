@@ -45,7 +45,7 @@ NAME = re.compile(r"^[a-z][a-z0-9_-]{0,80}\.json$")
 MAX_JSON = 256 * 1024
 INVENTORY_V2_LIMITS = {"query_seconds": 30, "total_seconds": 1500, "max_records": 1000000,
                        "max_bytes": 2147483648, "page_size": 1000, "max_pages": 1001}
-BOOTSTRAP_MODES = frozenset({"bootstrap-bounds", "bootstrap-inventory", "bootstrap-history", "bootstrap-history-metadata", "bootstrap-history-parent", "bootstrap-ai-bounds", "bootstrap-ai-verify"})
+BOOTSTRAP_MODES = frozenset({"bootstrap-bounds", "bootstrap-inventory", "bootstrap-history", "bootstrap-history-metadata", "bootstrap-history-parent", "bootstrap-ai-bounds", "bootstrap-ai-verify", "historical-evidence-write", "historical-ai-bounds"})
 MAX_BOOTSTRAP_APPROVAL = 4096
 MAX_WINDOW_SECONDS = 1800
 FORWARD_STOP_SECONDS = 1200
@@ -111,6 +111,39 @@ def inventory_diagnostic_error_categories(bindings):
     return {database: (binding["error_category"]
                       if type(binding["error_category"]) is str and
                       binding["error_category"] in INVENTORY_DIAGNOSTIC_ERRORS[database]
+                      else "inventory_database_error_unrecognized")
+            for database, binding in bindings.items()}
+
+
+# Existing boundary diagnostics intentionally keep their original allowlist.
+# These additional literal categories belong to the Go v2 inventory producer
+# (main.go/paging.go); no driver text or dynamically derived token is public.
+INVENTORY_REPORT_SHARED_ERRORS = frozenset({
+    "approved_boundary_missing", "approved_boundary_mismatch", "boundary_token_invalid",
+    "target_type_rejected", "target_boundary_read_failed", "target_page_bound_exceeded",
+    "target_record_bound_exceeded", "target_byte_bound_exceeded", "target_output_byte_bound_exceeded",
+    "private_output_exists_or_unavailable", "private_output_failed", "source_asset_binding_missing",
+})
+INVENTORY_REPORT_DIAGNOSTIC_ERRORS = {
+    "mysql": INVENTORY_DIAGNOSTIC_ERRORS["mysql"] | INVENTORY_REPORT_SHARED_ERRORS | frozenset({
+        "target_primary_key_rejected", "target_primary_key_type_unsupported", "target_columns_unavailable",
+        "target_read_failed_or_timed_out", "cursor_did_not_advance", "mysql_source_changed_during_scan",
+        "mysql_migration_head_changed_during_scan", "mysql_schema_changed_during_scan",
+    }),
+    "mongodb": INVENTORY_DIAGNOSTIC_ERRORS["mongodb"] | INVENTORY_REPORT_SHARED_ERRORS | frozenset({
+        "mongo_cursor_invalid", "mongo_id_type_unsupported", "mongo_id_type_proof_failed",
+        "mongo_mixed_id_types_unsupported", "mongo_source_changed_during_bounds",
+        "mongo_source_changed_during_scan", "mongo_target_read_failed_or_timed_out",
+        "mongo_target_decode_failed", "mongo_target_collation_unsupported", "mongo_target_uuid_unavailable",
+        "mongo_schema_changed_during_scan", "mongo_migration_head_changed_during_scan",
+    }),
+}
+
+
+def inventory_report_error_categories(bindings):
+    return {database: (binding["error_category"]
+                      if type(binding["error_category"]) is str and
+                      binding["error_category"] in INVENTORY_REPORT_DIAGNOSTIC_ERRORS[database]
                       else "inventory_database_error_unrecognized")
             for database, binding in bindings.items()}
 
@@ -1419,6 +1452,8 @@ def report_diagnostic(args):
     raw = canonical_bytes(value)
     if text.encode("ascii") != raw[:-1] or hashlib.sha256(raw).hexdigest() != args.bootstrap_approval_hash:
         fail("report_diagnostic_approval_hash_invalid")
+    if type(value) is dict and value.get("kind") == "readonly_existing_inventory_report_approval":
+        return inventory_report_diagnostic(args, value)
     fields(value, ("format_version", "kind", "prepare_mode", "source_sha", "operation_id",
                    "target_hash", "database_scope", "boundary_report"))
     if type(value["format_version"]) is not int or value["format_version"] != 1 or value["kind"] != "readonly_existing_boundary_report_approval" or value["prepare_mode"] != "report-diagnostic" or value["target_hash"] != TARGET_HASH or value["database_scope"] != "mysql-and-mongodb":
@@ -1474,6 +1509,65 @@ def report_diagnostic(args):
             "error_category": "existing_report_diagnostic_only", "capabilities": {key: False for key in CAPABILITIES}}
 
 
+def inventory_report_diagnostic(args, value):
+    """Read an exact existing native inventory report, never its source assets."""
+    fields(value, ("format_version", "kind", "prepare_mode", "source_sha", "operation_id",
+                   "target_hash", "database_scope", "inventory_report"))
+    if type(value["format_version"]) is not int or value["format_version"] != 1 or value["kind"] != "readonly_existing_inventory_report_approval" or value["prepare_mode"] != "report-diagnostic" or value["target_hash"] != TARGET_HASH or value["database_scope"] != "mysql-and-mongodb":
+        fail("report_diagnostic_approval_invalid")
+    validate_binding(value, args.operation_id, args.actual_source_sha)
+    reference = value["inventory_report"]
+    fields(reference, ("run_id", "source_sha", "sha256", "request_sha256"))
+    token(reference["run_id"], RUN); token(reference["source_sha"], SHA)
+    token(reference["sha256"], HASH); token(reference["request_sha256"], HASH)
+    if reference["run_id"] == args.run_id:
+        fail("report_diagnostic_origin_invalid")
+    directory = operation_directory(args.root, args.operation_id)
+    request, _ = read_private(directory, "inventory-request.json", reference["request_sha256"])
+    validate_v2_request(request, args.operation_id, reference["source_sha"], boundary=False)
+    # Exact existing path used by native_inventory/live_inventory. A diagnostic
+    # never creates this directory, a lock, request, checkpoint or permit.
+    output = private_directory(directory / ("inventory-" + reference["run_id"]))
+    report, report_hash = read_private(output, "inventory.private.json", reference["sha256"])
+    fields(report, ("format_version", "kind", "source_sha", "operation_id", "run_id", "request_hash", "target_hash", "observed_at", "complete", "drop_ready", "diagnostic_only", "error_category", "database_bindings", "targets", "source_bytes_protocol", "consistency_semantics", "boundary_report_hash"))
+    if type(report["format_version"]) is not int or report["format_version"] != 2 or report["kind"] != "readonly_compatibility_inventory" or report["source_sha"] != reference["source_sha"] or report["operation_id"] != args.operation_id or report["run_id"] != reference["run_id"] or report["request_hash"] != reference["request_sha256"] or report["target_hash"] != TARGET_HASH or type(report["complete"]) is not bool or report["drop_ready"] is not False or report["diagnostic_only"] is not True or report["boundary_report_hash"] != request["boundary_report_hash"] or report["source_bytes_protocol"] != "mysql_cast_binary_columns_pk_order_v2+mongodb_server_bson_pk_order_v2" or report["consistency_semantics"] != "two_equal_complete_passes_within_independently_approved_upper;sql_same_readonly_snapshot;mongo_homogeneous_bson_id_simple_collation;after_upper_next_cycle_not_fenced":
+        fail("report_diagnostic_report_binding_invalid")
+    utc(report["observed_at"])
+    validate_inventory_bindings(report["database_bindings"], report["complete"])
+    categories = inventory_report_error_categories(report["database_bindings"])
+    if type(report["targets"]) is not list or len(report["targets"]) > 4:
+        fail("report_diagnostic_report_binding_invalid")
+    seen = set()
+    for item in report["targets"]:
+        fields(item, ("database", "name", "kind", "present", "complete", "records", "schema_hash", "data_hash", "identity_hash", "bytes", "classification", "error_category", "equal_full_passes", "pages", "next_cycle_required"), ("source_file", "boundary"))
+        target = tuple(item[key] for key in ("database", "name", "kind"))
+        if any(type(part) is not str for part in target) or target not in TARGETS or target in seen:
+            fail("report_diagnostic_report_binding_invalid")
+        seen.add(target)
+        for key in ("records", "bytes", "pages", "equal_full_passes"): uint(item[key])
+        if any(type(item[key]) is not bool for key in ("present", "complete", "next_cycle_required")):
+            fail("report_diagnostic_report_binding_invalid")
+        if report["complete"] and (item["complete"] is not True or item["error_category"] != "none" or item["equal_full_passes"] != 2 or item.get("boundary") != request["approved_boundaries"][TARGETS.index(target)]):
+            fail("report_diagnostic_report_binding_invalid")
+    if report["complete"] and (len(seen) != 4 or report["error_category"] != "none" or any(category != "none" for category in categories.values())):
+        fail("report_diagnostic_report_binding_invalid")
+    # Recheck protected original files before publishing only fixed categories.
+    # Reading a report cannot prove that its source assets or history passed.
+    operation_directory(args.root, args.operation_id)
+    private_directory(output)
+    read_private(directory, "inventory-request.json", reference["request_sha256"])
+    read_private(output, "inventory.private.json", reference["sha256"])
+    return {"format_version": 1, "operation": "prepare", "prepare_mode": "report-diagnostic",
+            "source_sha": args.actual_source_sha, "run_id": args.run_id, "operation_id": args.operation_id,
+            "target_hash": TARGET_HASH, "target_count": 4, "complete": False, "execution_allowed": False,
+            "diagnostic_only": True, "drop_ready": False, "report_diagnostic_complete": True,
+            "report_diagnostic_approval_sha256": args.bootstrap_approval_hash,
+            "observed_inventory_report": reference.copy(), "inventory_complete": report["complete"],
+            "inventory_private_report_hash": report_hash, "inventory_request_hash": reference["request_sha256"],
+            "inventory_database_error_categories": categories,
+            "error_category": "existing_report_diagnostic_only", "capabilities": {key: False for key in CAPABILITIES}}
+
+
 def execute(args):
     if args.operation not in OPERATIONS:
         fail("operation_unsupported")
@@ -1494,7 +1588,7 @@ def execute(args):
     if mode in BOOTSTRAP_MODES:
         if args.operation != "prepare" or args.manifest_hash or identity_request or inventory_request or not bootstrap_json or not bootstrap_hash:
             fail("input_classes_mixed")
-        if mode in ("bootstrap-ai-bounds", "bootstrap-ai-verify"):
+        if mode in ("bootstrap-ai-bounds", "bootstrap-ai-verify", "historical-evidence-write", "historical-ai-bounds"):
             path = Path(__file__).with_name("compatibility-ai-history-prepare.py")
             spec = importlib.util.spec_from_file_location("compatibility_ai_history_prepare", path)
             module = importlib.util.module_from_spec(spec)
@@ -1594,6 +1688,13 @@ def main(argv=None):
               "history_parent_registration_sha256": "hash64", "approved_metadata_report": {"run_id": "run_id", "sha256": "hash64"},
               "history_parent_request_sha256": "hash64", "history_private_readiness_sha256": "hash64",
               "ai_host_readonly_complete": "bool", "ai_host_process_budget_proven": "bool",
+              "original_source_sha": "sha40", "history_evidence_write_finished": "bool", "history_write_private_result_sha256": "hash64",
+              "history_actual_sql_commit_response": "bool", "history_actual_mongo_commit_response": "bool",
+              "history_commit_state": frozenset({"not_attempted", "sql_unknown_mongo_not_attempted", "sql_response_success_journal_unknown",
+                  "sql_committed_mongo_not_attempted", "sql_committed_mongo_unknown", "both_responses_success_non_atomic", "sql_committed_mongo_not_required"}),
+              "history_mongo_commit_requirement": frozenset({"undetermined", "required", "not_required"}),
+              "history_prepared_pages": "uint", "history_readback_pages": "uint", "history_event_references": "uint",
+              "history_ai_original_commands": "uint", "history_ai_source_references": "uint", "history_ai_command_persistence_complete": "bool",
               "ai_host_mode": frozenset({"bounds", "verify"}), "ai_host_private_readiness_sha256": "hash64",
               "ai_host_runtime_binding_sha256": "hash64", "ai_host_facts_sha256": "hash64",
               "ai_host_independent_epochs": "uint", "ai_host_originals": "uint", "ai_host_descriptor_sha256": "hash64",
@@ -1612,6 +1713,8 @@ def main(argv=None):
               "approved_boundary_report": {"run_id": "run_id", "source_sha": "sha40", "sha256": "hash64"},
               "report_diagnostic_complete": "bool", "report_diagnostic_approval_sha256": "hash64",
               "observed_boundary_report": {"run_id": "run_id", "source_sha": "sha40", "sha256": "hash64", "request_sha256": "hash64"},
+              "observed_inventory_report": {"run_id": "run_id", "source_sha": "sha40", "sha256": "hash64", "request_sha256": "hash64"},
+              "inventory_request_hash": "hash64",
               "boundary_discovery_complete": "bool", "boundary_private_report_hash": "hash64", "boundary_request_hash": "hash64",
               "inventory_next_cycle_required": "bool", "inventory_boundary_report_hash": "nullable_hash64", "inventory_two_equal_scans": "bool",
               "identity_discovery_complete": "bool", "identity_private_report_hash": "hash64", "identity_request_hash": "hash64",
@@ -1619,7 +1722,7 @@ def main(argv=None):
               "identity_diagnostic_histograms": [{"database": frozenset({"mysql", "mongodb"}), "name": frozenset(target[1] for target in TARGETS), "present": "nullable_bool", "complete": "bool", "diagnostic_only": "bool", "error_category": HISTOGRAM_ERRORS,
                    "bucket_count": "uint"}],
               "identity_histogram_bucket_pages": {"page_" + chr(97 + index): [{"object_index": "uint", "bucket_index": "uint", "type_label": frozenset(label.replace(".", "_") for label in HISTOGRAM_TYPES), "type_hash": "hash64", "state_label": HISTOGRAM_STATES, "state_hash": "hash64", "records": "uint"}] for index in range(4)},
-              "inventory_database_error_categories": INVENTORY_DIAGNOSTIC_ERRORS,
+              "inventory_database_error_categories": INVENTORY_REPORT_DIAGNOSTIC_ERRORS,
               "inventory_entrypoint_catalog_hash": "hash64",
               "runtime_image_id_sha256": "hash64", "runtime_network": frozenset({"infra_network"}),
               "inventory_present_targets": "uint", "inventory_records": "uint", "inventory_source_bytes": "uint",
@@ -1646,10 +1749,21 @@ def main(argv=None):
         (receipt.get("prepare_mode") == "bootstrap-history-metadata" and receipt.get("history_metadata_complete") is True) or
         (receipt.get("prepare_mode") == "bootstrap-history-parent" and receipt.get("history_parent_registration_complete") is True and
          receipt.get("diagnostic_only") is True and receipt.get("history_cas_complete") is False and receipt.get("history_parent_process_budget_proven") is False) or
-        (receipt.get("prepare_mode") in ("bootstrap-ai-bounds", "bootstrap-ai-verify") and receipt.get("ai_host_readonly_complete") is True and
+        (receipt.get("prepare_mode") in ("bootstrap-ai-bounds", "bootstrap-ai-verify", "historical-ai-bounds") and receipt.get("ai_host_readonly_complete") is True and
          receipt.get("diagnostic_only") is True and receipt.get("ai_host_process_budget_proven") is False and
          all(value is False for value in receipt.get("capabilities", {}).values())))
-    return 0 if emitted and diagnostic_complete and receipt.get("complete") is False and receipt.get("execution_allowed") is False and receipt.get("drop_ready") is False else 42
+    evidence_finished = (receipt.get("prepare_mode") == "historical-evidence-write" and
+        receipt.get("history_evidence_write_finished") is True and receipt.get("history_actual_sql_commit_response") is True and
+        ((receipt.get("history_mongo_commit_requirement") == "required" and receipt.get("history_actual_mongo_commit_response") is True and
+          receipt.get("history_commit_state") == "both_responses_success_non_atomic" and receipt.get("history_event_references", 0) > 0 and
+          receipt.get("history_prepared_pages", 0) > 0) or
+         (receipt.get("history_mongo_commit_requirement") == "not_required" and receipt.get("history_actual_mongo_commit_response") is False and
+          receipt.get("history_commit_state") == "sql_committed_mongo_not_required" and receipt.get("history_event_references") == 0 and
+          receipt.get("history_prepared_pages") == 0 and receipt.get("history_ai_original_commands", 0) > 0)) and
+        receipt.get("history_prepared_pages") == receipt.get("history_readback_pages") and
+        (receipt.get("history_ai_original_commands") == 0 or receipt.get("history_ai_command_persistence_complete") is True) and
+        all(value is False for value in receipt.get("capabilities", {}).values()))
+    return 0 if emitted and (diagnostic_complete or evidence_finished) and receipt.get("complete") is False and receipt.get("execution_allowed") is False and receipt.get("drop_ready") is False else 42
 
 
 if __name__ == "__main__":

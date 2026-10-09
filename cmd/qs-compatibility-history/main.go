@@ -1,5 +1,5 @@
-// qs-compatibility-history owns a strictly read-only two-epoch qualification
-// pipeline. It has no migration, evidence-CAS, message-send or DROP entrypoint.
+// qs-compatibility-history hosts bounded historical qualification and the
+// explicitly selected evidence CAS pipeline. It has no migration, send or DROP.
 package main
 
 import (
@@ -167,6 +167,15 @@ func main() {
 		return
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
+	if len(os.Args) > 1 && os.Args[1] == "--write-mode" {
+		r, err := runEvidenceWriteCLI(ctx, os.Args[1:])
+		cancel()
+		r.ErrorCategory = safeCategory(err)
+		if json.NewEncoder(os.Stdout).Encode(r) != nil || err != nil {
+			os.Exit(1)
+		}
+		return
+	}
 	if len(os.Args) > 1 && os.Args[1] == "--ai-host-mode" {
 		r, err := runAIHostCLI(ctx, os.Args[1:])
 		cancel()

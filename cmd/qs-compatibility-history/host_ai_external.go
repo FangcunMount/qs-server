@@ -21,6 +21,7 @@ type aiHostDescriptor struct {
 	FormatVersion          int          `json:"format_version"`
 	Kind                   string       `json:"kind"`
 	SourceSHA              string       `json:"source_sha"`
+	ToolSourceSHA          string       `json:"tool_source_sha,omitempty"`
 	OperationID            string       `json:"operation_id"`
 	ActualRunID            string       `json:"actual_run_id"`
 	Mode                   string       `json:"mode"`
@@ -41,6 +42,7 @@ type aiHostReport struct {
 	Protocol                     string                              `json:"protocol"`
 	Mode                         string                              `json:"mode"`
 	SourceSHA                    string                              `json:"source_sha"`
+	ToolSourceSHA                string                              `json:"tool_source_sha,omitempty"`
 	OperationID                  string                              `json:"operation_id"`
 	ActualRunID                  string                              `json:"actual_run_id"`
 	ExternalRunID                string                              `json:"external_run_id"`
@@ -178,12 +180,20 @@ func parseAIHostFlags(args []string) (map[string]string, error) {
 			return nil, fixedError("history_ai_host_arguments_rejected")
 		}
 		k := strings.TrimPrefix(args[i], "--")
-		if !want[k] || out[k] != "" || args[i+1] == "" {
+		if (!want[k] && k != "original-source-sha") || out[k] != "" || args[i+1] == "" {
 			return nil, fixedError("history_ai_host_arguments_rejected")
 		}
 		out[k] = args[i+1]
 	}
-	if len(out) != len(want) || (out["ai-host-mode"] != "bounds" && out["ai-host-mode"] != "verify") || !hashPattern.MatchString(out["request-sha256"]) || !hashPattern.MatchString(out["ai-input-sha256"]) {
+	extended := out["original-source-sha"] != ""
+	if extended && (out["ai-host-mode"] != "bounds" || !sourcePattern.MatchString(out["original-source-sha"])) {
+		return nil, fixedError("history_ai_host_arguments_rejected")
+	}
+	expectedCount := len(want)
+	if extended {
+		expectedCount++
+	}
+	if len(out) != expectedCount || (out["ai-host-mode"] != "bounds" && out["ai-host-mode"] != "verify") || !hashPattern.MatchString(out["request-sha256"]) || !hashPattern.MatchString(out["ai-input-sha256"]) {
 		return nil, fixedError("history_ai_host_arguments_rejected")
 	}
 	if _, e := aiHostRun(out["run"]); e != nil {
@@ -195,7 +205,16 @@ func parseAIHostFlags(args []string) (map[string]string, error) {
 	return out, nil
 }
 func validateAIHostDescriptor(v aiHostDescriptor, f map[string]string) error {
-	if v.FormatVersion != 1 || v.Kind != "readonly_ai_external_host_input" || v.SourceSHA != sourceSHA || v.OperationID != f["operation"] || v.ActualRunID != f["run"] || v.Mode != f["ai-host-mode"] || v.RequestSHA256 != f["request-sha256"] || !sourcePattern.MatchString(v.RuntimeSourceSHA) || !strings.HasPrefix(v.ImageID, "sha256:") || !hashPattern.MatchString(strings.TrimPrefix(v.ImageID, "sha256:")) || !hashPattern.MatchString(v.ContainerID) || !hashPattern.MatchString(v.RuntimeBindingSHA256) || !filepath.IsAbs(v.AssetsDirectory) || filepath.Clean(v.AssetsDirectory) != v.AssetsDirectory || privateParent(filepath.Join(v.AssetsDirectory, "asset")) != nil {
+	expectedSource := sourceSHA
+	if f["original-source-sha"] != "" {
+		if f["ai-host-mode"] != "bounds" || !sourcePattern.MatchString(f["original-source-sha"]) || v.ToolSourceSHA != sourceSHA {
+			return fixedError("history_ai_host_descriptor_rejected")
+		}
+		expectedSource = f["original-source-sha"]
+	} else if v.ToolSourceSHA != "" {
+		return fixedError("history_ai_host_descriptor_rejected")
+	}
+	if v.FormatVersion != 1 || v.Kind != "readonly_ai_external_host_input" || v.SourceSHA != expectedSource || v.OperationID != f["operation"] || v.ActualRunID != f["run"] || v.Mode != f["ai-host-mode"] || v.RequestSHA256 != f["request-sha256"] || !sourcePattern.MatchString(v.RuntimeSourceSHA) || !strings.HasPrefix(v.ImageID, "sha256:") || !hashPattern.MatchString(strings.TrimPrefix(v.ImageID, "sha256:")) || !hashPattern.MatchString(v.ContainerID) || !hashPattern.MatchString(v.RuntimeBindingSHA256) || !filepath.IsAbs(v.AssetsDirectory) || filepath.Clean(v.AssetsDirectory) != v.AssetsDirectory || privateParent(filepath.Join(v.AssetsDirectory, "asset")) != nil {
 		return fixedError("history_ai_host_descriptor_rejected")
 	}
 	if (v.ExpectedAIIdentityHash == "") != (v.ExpectedAIHead == "") || v.ExpectedAIIdentityHash != "" && (!hashPattern.MatchString(v.ExpectedAIIdentityHash) || v.ExpectedAIHead != "0038_messaging_observations" && v.ExpectedAIHead != "0040_module_table_names") {
@@ -302,8 +321,8 @@ func aiHostCategory(e error) error {
 	}
 }
 
-// The executable is the real host of the borrowed read transaction and sources.
-// No SQL/Mongo writer, migration, dispatch/resend or imported evidence path exists.
+// This read-only entry hosts the borrowed read transaction and sources.
+// It does not import qualification, write evidence, migrate or send messages.
 func runAIHostCLI(ctx context.Context, args []string) (r aiHostReport, result error) {
 	r = aiHostReport{Protocol: "qs-compatibility-ai-host-readonly/v1", DiagnosticOnly: true, ErrorCategory: "none", RequiredAdapters: []string{"independent_production_descriptor_and_bounds_approval", "actual_host_process_memory_cpu_and_scan_budget", "original_exec_unknown_keeps_mutation_blocked", "whole_writer_fence_for_any_mutation", "historical_evidence_write_authority", "post_write_independent_readback", "backup_restore_acceptance_purge"}}
 	flags, e := parseAIHostFlags(args)
@@ -311,6 +330,9 @@ func runAIHostCLI(ctx context.Context, args []string) (r aiHostReport, result er
 		return r, e
 	}
 	r.Mode, r.SourceSHA, r.OperationID, r.ActualRunID = flags["ai-host-mode"], sourceSHA, flags["operation"], flags["run"]
+	if flags["original-source-sha"] != "" {
+		r.SourceSHA, r.ToolSourceSHA = flags["original-source-sha"], sourceSHA
+	}
 	r.ExternalRunID, _ = aiHostRun(r.ActualRunID)
 	r.RequestSHA256, r.DescriptorSHA256 = flags["request-sha256"], flags["ai-input-sha256"]
 	lock, e := lockAIHostOperation(flags["operation-directory"])
@@ -384,7 +406,7 @@ func runAIHostCLI(ctx context.Context, args []string) (r aiHostReport, result er
 			packets[item.name] = asset.raw
 		}
 	}
-	a, e = loadInputs(ctx, flags["request"], flags["request-sha256"], flags["operation"], flags["run"])
+	a, e = loadInputsForSource(ctx, flags["request"], flags["request-sha256"], flags["operation"], flags["run"], r.SourceSHA)
 	if e != nil {
 		return r, e
 	}
