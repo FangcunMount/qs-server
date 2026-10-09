@@ -52,45 +52,66 @@ func TestLifecyclePublicCLIOptInContract(t *testing.T) {
 	}
 }
 
-type publicCLIRestoreIntent struct {
-	Format                                                                                                    int    `json:"format_version"`
-	Kind                                                                                                      string `json:"kind"`
-	Original, Tool, Operation, Run, Manifest, Archive, Namespace, Owner, Name, Image, Arch, ToolHash, Network string
-	Labels, ContainerLabels                                                                                   map[string]string
-	Volumes                                                                                                   []string
-	Drop, Purge                                                                                               bool
-}
-
 // Exact declared JSON names are read from the actual private durable registry.
 // These values are cleanup expectations only; they never supply restore proof.
-func (v *publicCLIRestoreIntent) UnmarshalJSON(raw []byte) error {
-	var q struct {
-		Format          int               `json:"format_version"`
-		Kind            string            `json:"kind"`
-		Original        string            `json:"original_source_sha"`
-		Tool            string            `json:"tool_source_sha"`
-		Operation       string            `json:"operation_id"`
-		Run             string            `json:"actual_run_id"`
-		Manifest        string            `json:"manifest_sha256"`
-		Archive         string            `json:"archive_sha256"`
-		Namespace       string            `json:"namespace"`
-		Owner           string            `json:"owner"`
-		Name            string            `json:"container_name"`
-		Image           string            `json:"image_id"`
-		Arch            string            `json:"architecture"`
-		Labels          map[string]string `json:"labels"`
-		ContainerLabels map[string]string `json:"container_labels"`
-		Volumes         []string          `json:"volumes"`
-		ToolHash        string            `json:"tool_sha256"`
-		Network         string            `json:"network"`
-		Drop            bool              `json:"drop_authority"`
-		Purge           bool              `json:"purge_after_acceptance_required"`
+type publicCLIRestoreIntent struct {
+	Format          int               `json:"format_version"`
+	Kind            string            `json:"kind"`
+	Original        string            `json:"original_source_sha"`
+	Tool            string            `json:"tool_source_sha"`
+	Operation       string            `json:"operation_id"`
+	Run             string            `json:"actual_run_id"`
+	Manifest        string            `json:"manifest_sha256"`
+	Archive         string            `json:"archive_sha256"`
+	Namespace       string            `json:"namespace"`
+	Owner           string            `json:"owner"`
+	Name            string            `json:"container_name"`
+	Image           string            `json:"image_id"`
+	Arch            string            `json:"architecture"`
+	Labels          map[string]string `json:"labels"`
+	ContainerLabels map[string]string `json:"container_labels"`
+	Volumes         []string          `json:"volumes"`
+	ToolHash        string            `json:"tool_sha256"`
+	Network         string            `json:"network"`
+	Drop            bool              `json:"drop_authority"`
+	Purge           bool              `json:"purge_after_acceptance_required"`
+}
+
+func TestLifecyclePublicCLIRestoreIntentRegistryShape(t *testing.T) {
+	// The fixed shape is startLifecycleOwnedEngine's durable intent, including
+	// all exact producer keys. It is an input-contract test, not restore proof.
+	raw := []byte(`{"format_version":1,"kind":"temporary_network_none_restore_intent","original_source_sha":"1111111111111111111111111111111111111111","tool_source_sha":"2222222222222222222222222222222222222222","operation_id":"100-1","actual_run_id":"100-4","manifest_sha256":"3333333333333333333333333333333333333333333333333333333333333333","archive_sha256":"4444444444444444444444444444444444444444444444444444444444444444","namespace":"qs_retirement_restore_555555555555555555555555","owner":"66666666666666666666666666666666","container_name":"qs-retirement-restore-66666666666666666666666666666666","image_id":"sha256:7777777777777777777777777777777777777777777777777777777777777777","architecture":"amd64","labels":{"codex.owner":"66666666666666666666666666666666"},"container_labels":{"codex.owner":"66666666666666666666666666666666","vendor":"actual-image-label"},"volumes":["qs-retirement-data-66666666666666666666666666666666"],"tool_sha256":"8888888888888888888888888888888888888888888888888888888888888888","network":"none","drop_authority":false,"purge_after_acceptance_required":true}`)
+	var got publicCLIRestoreIntent
+	if exactJSON(raw, &got) != nil {
+		t.Fatal("public_cli_exact_producer_registry_rejected")
 	}
-	if exactJSON(raw, &q) != nil {
-		return ErrIsolation
+	want := publicCLIRestoreIntent{
+		Format: 1, Kind: "temporary_network_none_restore_intent",
+		Original: strings.Repeat("1", 40), Tool: strings.Repeat("2", 40),
+		Operation: "100-1", Run: "100-4", Manifest: strings.Repeat("3", 64), Archive: strings.Repeat("4", 64),
+		Namespace: "qs_retirement_restore_" + strings.Repeat("5", 24), Owner: strings.Repeat("6", 32),
+		Name: "qs-retirement-restore-" + strings.Repeat("6", 32), Image: "sha256:" + strings.Repeat("7", 64), Arch: "amd64",
+		Labels:          map[string]string{"codex.owner": strings.Repeat("6", 32)},
+		ContainerLabels: map[string]string{"codex.owner": strings.Repeat("6", 32), "vendor": "actual-image-label"},
+		Volumes:         []string{"qs-retirement-data-" + strings.Repeat("6", 32)}, ToolHash: strings.Repeat("8", 64), Network: "none", Drop: false, Purge: true,
 	}
-	*v = publicCLIRestoreIntent{Format: q.Format, Kind: q.Kind, Original: q.Original, Tool: q.Tool, Operation: q.Operation, Run: q.Run, Manifest: q.Manifest, Archive: q.Archive, Namespace: q.Namespace, Owner: q.Owner, Name: q.Name, Image: q.Image, Arch: q.Arch, ToolHash: q.ToolHash, Network: q.Network, Labels: q.Labels, ContainerLabels: q.ContainerLabels, Volumes: q.Volumes, Drop: q.Drop, Purge: q.Purge}
-	return nil
+	if !reflect.DeepEqual(got, want) {
+		t.Fatal("public_cli_exact_producer_registry_fields_changed")
+	}
+	cases := map[string][]byte{
+		"source_case_alias":           []byte(strings.Replace(string(raw), `"original_source_sha"`, `"Original_source_sha"`, 1)),
+		"container_labels_case_alias": []byte(strings.Replace(string(raw), `"container_labels"`, `"Container_Labels"`, 1)),
+		"drop_case_alias":             []byte(strings.Replace(string(raw), `"drop_authority"`, `"Drop_Authority"`, 1)),
+		"unknown_field":               append(append([]byte(nil), raw[:len(raw)-1]...), []byte(`,"unknown_registry_fact":true}`)...),
+		"duplicate_source":            append(append([]byte(nil), raw[:len(raw)-1]...), []byte(`,"original_source_sha":"overwritten"}`)...),
+	}
+	for name, input := range cases {
+		t.Run(name, func(t *testing.T) {
+			if exactJSON(input, new(publicCLIRestoreIntent)) == nil {
+				t.Fatal("public_cli_registry_alias_unknown_or_duplicate_accepted")
+			}
+		})
+	}
 }
 
 type publicCLIInspection struct {
