@@ -17,6 +17,7 @@ import (
 // A budget-only Window or this result cannot satisfy that host responsibility.
 type TargetLifecycleResult struct {
 	self    *TargetLifecycleResult
+	plan    *TargetRecoveryPlan
 	summary TargetLifecycleSummary
 }
 
@@ -190,7 +191,7 @@ func targetLifecycleReadback(ctx context.Context, p *TargetRecoveryPlan, origina
 	if _, e = targetWindowMatches(ctx, p.window, original, start); e != nil {
 		return nil, e
 	}
-	v := &TargetLifecycleResult{summary: TargetLifecycleSummary{Targets: p.summaryLocked(), Journal: TargetRecoveryJournalSummary{JournalSHA256: s.hash, RequestSHA256: jsonSHA(original), WindowStartSHA256: start, Files: len(s.entries)}, ActualRunID: p.request.ActualRunID, WriterFenceRequired: true}}
+	v := &TargetLifecycleResult{plan: p, summary: TargetLifecycleSummary{Targets: p.summaryLocked(), Journal: TargetRecoveryJournalSummary{JournalSHA256: s.hash, RequestSHA256: jsonSHA(original), WindowStartSHA256: start, Files: len(s.entries)}, ActualRunID: p.request.ActualRunID, WriterFenceRequired: true}}
 	v.self = v
 	return v, nil
 }

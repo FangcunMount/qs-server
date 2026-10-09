@@ -355,7 +355,7 @@ func RecoverTargets(ctx context.Context, p *TargetRecoveryPlan) (*TargetRecovery
 			return nil, ErrContent
 		}
 	}
-	v := &TargetRecoveryVerification{summary: p.summaryLocked()}
+	v := &TargetRecoveryVerification{plan: p, summary: p.summaryLocked()}
 	v.self = v
 	return v, nil
 }

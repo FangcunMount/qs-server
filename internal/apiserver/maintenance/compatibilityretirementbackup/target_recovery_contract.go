@@ -107,6 +107,7 @@ func (p *TargetRecoveryPlan) Summary() TargetRecoverySummary {
 
 type TargetRecoveryVerification struct {
 	self    *TargetRecoveryVerification
+	plan    *TargetRecoveryPlan
 	summary TargetRecoverySummary
 }
 

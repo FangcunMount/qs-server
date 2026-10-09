@@ -1,5 +1,5 @@
-// qs-compatibility-retirement owns its connections and performs bounded reads
-// only. Its private source-byte inventory is not a business retirement verdict.
+// qs-compatibility-retirement owns its connections. Inventory is read-only;
+// fixed prepare captures and restores temporary assets without DROP authority.
 package main
 
 import (
@@ -1118,6 +1118,7 @@ func run(requestPath, requestHash, op, runID, output string) (report, error) {
 		result.SourceBytesProtocol = "no_source_body_copy"
 		result.ConsistencySemantics = "diagnostic_upper_discovery_requires_independent_request_approval"
 	}
+	runStarted := time.Now()
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(r.Limits.TotalSeconds)*time.Second)
 	defer cancel()
 	ctx = context.WithValue(ctx, scanRunKey{}, scanRunIdentity{OperationID: op, RunID: runID, RequestHash: requestHash})
@@ -1127,6 +1128,7 @@ func run(requestPath, requestHash, op, runID, output string) (report, error) {
 	}
 	result.DatabaseBindings["mysql"] = d
 	result.Targets = append(result.Targets, sqlTargets...)
+	ctx = context.WithValue(ctx, scanTimingKey{}, scanTiming{RunStarted: runStarted, MySQLFinished: time.Now()})
 	m, mongoTarget, mongoErr := mongoInventory(ctx, r, output)
 	if mongoErr != nil {
 		m.ErrorCategory = mongoErr.Error()
@@ -1158,6 +1160,12 @@ func safeSummary(r report) map[string]any {
 	return map[string]any{"format_version": r.FormatVersion, "kind": r.Kind, "source_sha": r.SourceSHA, "operation_id": r.OperationID, "run_id": r.RunID, "request_hash": r.RequestHash, "target_hash": r.TargetHash, "complete": r.Complete, "drop_ready": false, "diagnostic_only": true, "boundary_report_hash": r.BoundaryReportHash, "error_category": r.ErrorCategory, "database_bindings": r.DatabaseBindings, "targets": objects, "private_report_hash": digestRaw(append(encoded, '\n'))}
 }
 func main() {
+	if len(os.Args) == 3 && os.Args[1] == "--restore-wire" {
+		if runLifecycleRestoreWire(os.Args[2]) != nil {
+			os.Exit(1)
+		}
+		return
+	}
 	if len(os.Args) == 2 && os.Args[1] == "--source-sha" {
 		fmt.Println(sourceSHA)
 		return
@@ -1173,6 +1181,48 @@ func main() {
 	if fs.Parse(os.Args[1:]) != nil || fs.NArg() != 0 {
 		fmt.Println(`{"format_version":1,"complete":false,"drop_ready":false,"error_category":"input_invalid"}`)
 		os.Exit(1)
+	}
+	if *mode == "host-budget-key-create" || *mode == "host-budget-key-open" {
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		r, err := runLifecycleServiceKey(ctx, *mode, *req, *hash, *op, *runID)
+		cancel()
+		if json.NewEncoder(os.Stdout).Encode(r) != nil || err != nil {
+			os.Exit(1)
+		}
+		return
+	}
+	if *mode == "host-services-d" || *mode == "host-services-d-recovery" || *mode == "host-services-d-template" || *mode == "host-services-d-recovery-template" {
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
+		err := runLifecycleServiceSession(ctx, *mode, *req, *hash, *op, *runID, os.Stdin, os.Stdout)
+		cancel()
+		if err != nil {
+			os.Exit(1)
+		}
+		return
+	}
+	if *mode == "lifecycle-prepare-root-once" {
+		ctx, cancel := context.WithTimeout(context.Background(), 90*time.Minute)
+		staged, e := stageLifecycleRootInputs(ctx, *req, *hash, *op, *runID)
+		r := lifecycleReceipt{FormatVersion: 1, Kind: "compatibility_retirement_lifecycle_result", Operation: "prepare", SourceSHA: sourceSHA, OperationID: *op, RunID: *runID, RequestSHA256: *hash, TargetHash: digest(targets), TargetCount: 4}
+		if e == nil {
+			r, e = runLifecycleCLI(ctx, "lifecycle-prepare", staged, *hash, *op, *runID)
+		} else {
+			r.ErrorCategory = lifecycleCategory(e)
+		}
+		cancel()
+		if json.NewEncoder(os.Stdout).Encode(r) != nil || e != nil {
+			os.Exit(1)
+		}
+		return
+	}
+	if strings.HasPrefix(*mode, "lifecycle-") {
+		ctx, cancel := context.WithTimeout(context.Background(), 90*time.Minute)
+		r, e := runLifecycleCLI(ctx, *mode, *req, *hash, *op, *runID)
+		cancel()
+		if json.NewEncoder(os.Stdout).Encode(r) != nil || e != nil {
+			os.Exit(1)
+		}
+		return
 	}
 	if *mode == "identity" {
 		r, e := runIdentity(*req, *hash, *op, *runID, *out)

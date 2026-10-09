@@ -437,6 +437,10 @@ func mysqlObserveAfterUpper(ctx context.Context, db *sql.DB, r request, catalogH
 type scanRunKey struct{}
 type scanRunIdentity struct{ OperationID, RunID, RequestHash string }
 
+// Internal monotonic observations only; these do not enter a request or report.
+type scanTimingKey struct{}
+type scanTiming struct{ RunStarted, MySQLFinished time.Time }
+
 func registerSource(ctx context.Context, dir, filename, protocol string, b targetBoundary) error {
 	run, ok := ctx.Value(scanRunKey{}).(scanRunIdentity)
 	if !ok || !runRE.MatchString(run.OperationID) || !runRE.MatchString(run.RunID) || !hashRE.MatchString(run.RequestHash) {
@@ -671,6 +675,46 @@ func mongoUpper(ctx context.Context, col *mongo.Collection, limits scanLimits) (
 	}
 	return token, kind, false, nil
 }
+func mongoTargetDiagnosticContextState(ctx context.Context) string {
+	switch err := ctx.Err(); {
+	case err == nil:
+		return "active"
+	case errors.Is(err, context.DeadlineExceeded):
+		return "deadline"
+	case errors.Is(err, context.Canceled):
+		return "cancelled"
+	default:
+		return "other"
+	}
+}
+
+// Classify only typed errors and actual context state before cancellation. No
+// error text, query, namespace, cursor token or source BSON enters this line.
+func mongoTargetDiagnosticLine(ctx, pageCtx context.Context, phase string, pass, page int, s snapshot, pageStarted, now time.Time, err error) string {
+	if ctx == nil || pageCtx == nil || err == nil || pass < 1 || pass > 2 || page < 1 || page > 1001 || s.Records > 1000000 || s.Bytes > 2<<30 {
+		return ""
+	}
+	switch phase {
+	case "find", "iterate", "close":
+	default:
+		return ""
+	}
+	timing, ok := ctx.Value(scanTimingKey{}).(scanTiming)
+	if !ok || timing.RunStarted.IsZero() || timing.MySQLFinished.IsZero() || pageStarted.IsZero() || timing.MySQLFinished.Before(timing.RunStarted) || pageStarted.Before(timing.MySQLFinished) || now.Before(pageStarted) {
+		return ""
+	}
+	kind, code := mongoIndexErrorKind(err)
+	return fmt.Sprintf("QS_MONGO_TARGET_DIAGNOSTIC phase=%s kind=%s code=%d run_ctx=%s page_ctx=%s pass=%d page=%d records=%d source_bytes=%d page_elapsed_ms=%d run_elapsed_ms=%d mysql_elapsed_ms=%d",
+		phase, kind, code, mongoTargetDiagnosticContextState(ctx), mongoTargetDiagnosticContextState(pageCtx), pass, page, s.Records, s.Bytes,
+		now.Sub(pageStarted).Milliseconds(), now.Sub(timing.RunStarted).Milliseconds(), timing.MySQLFinished.Sub(timing.RunStarted).Milliseconds())
+}
+
+func emitMongoTargetDiagnostic(ctx, pageCtx context.Context, phase string, pass, page int, s snapshot, pageStarted time.Time, err error) {
+	if line := mongoTargetDiagnosticLine(ctx, pageCtx, phase, pass, page, s, pageStarted, time.Now(), err); line != "" {
+		_, _ = fmt.Fprintln(os.Stderr, line)
+	}
+}
+
 func mongoPagedPass(ctx context.Context, col *mongo.Collection, b targetBoundary, limits scanLimits, dir string, pass int, f *os.File) (snapshot, error) {
 	s := snapshot{Classification: map[string]uint64{}}
 	h := sha256.New()
@@ -711,9 +755,11 @@ func mongoPagedPass(ctx context.Context, col *mongo.Collection, b targetBoundary
 			}
 			rangeOps = append(rangeOps, bson.E{Key: "$gt", Value: last})
 		}
+		pageStarted := time.Now()
 		q, cancel := scopedQuery(ctx, limits)
 		cur, e := col.Find(q, bson.D{{Key: "_id", Value: rangeOps}}, options.Find().SetSort(bson.D{{Key: "_id", Value: 1}}).SetHint("_id_").SetCollation(&options.Collation{Locale: "simple"}).SetLimit(int64(limits.PageSize)).SetBatchSize(int32(limits.PageSize)).SetMaxTime(time.Duration(limits.QuerySeconds)*time.Second))
 		if e != nil {
+			emitMongoTargetDiagnostic(ctx, q, "find", pass, page, s, pageStarted, e)
 			cancel()
 			return s, category("mongo_target_read_failed_or_timed_out")
 		}
@@ -762,7 +808,14 @@ func mongoPagedPass(ctx context.Context, col *mongo.Collection, b targetBoundary
 			n++
 			cursor = next
 		}
-		readErr, closeErr := cur.Err(), cur.Close(q)
+		readErr := cur.Err()
+		if readErr != nil {
+			emitMongoTargetDiagnostic(ctx, q, "iterate", pass, page, s, pageStarted, readErr)
+		}
+		closeErr := cur.Close(q)
+		if readErr == nil && closeErr != nil {
+			emitMongoTargetDiagnostic(ctx, q, "close", pass, page, s, pageStarted, closeErr)
+		}
 		cancel()
 		if readErr != nil || closeErr != nil {
 			return s, category("mongo_target_read_failed_or_timed_out")
