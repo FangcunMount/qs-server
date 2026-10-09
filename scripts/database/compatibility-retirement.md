@@ -181,10 +181,14 @@ still fails. These observations do not prove broker or business acceptance.
 The current platform reader independently checks the approved workflow roster,
 current run/job/runner, five unfinished run states and fixed main SHA twice.
 The runner quarantine owner records original workflow states and journals each
-disable/enable intent before the actual request; restoration is explicit and an
-unknown mutation cannot be retried. The dedicated mutation-job and full host,
-database and external-writer isolation caller are still required. An observation
-or saved receipt cannot enable lifecycle effects.
+disable/enable intent before the actual request. The dedicated window job owns
+that live quarantine and its fixed SSH/native invocation; the preparation job
+retains read-only platform permissions. Restoration requires the actual child's
+EOF/Wait and an unambiguous terminal result. A failed call's recovery-complete
+boolean cannot release workflow isolation or remove identity material; an
+unknown mutation is retained for explicit recovery. Full host, database and
+external-writer isolation and actual platform execution still require proof.
+An observation or saved receipt cannot enable lifecycle effects.
 
 The existing real-database CI step requires non-target reader tests for
 unsigned composite SQL paging, NULL/empty drift, ordered Mongo RM document IDs,

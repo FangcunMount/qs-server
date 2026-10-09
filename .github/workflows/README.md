@@ -11,6 +11,7 @@
 | `cd.yml` | 计划服务、构建/交付镜像、生成部署包、按依赖顺序部署、逐实例验证 | 成功结果必须记录 exact SHA、image digest、effective config 与环境 |
 | `ping-runner.yml` | 周期/手动执行目标环境连通与服务探针 | 只证明该时点、该检查项；不证明业务全链和数据一致性 |
 | `db-ops.yml` | 受保护的备份、恢复与只读数据盘点入口 | 写操作/恢复需要独立授权、备份和复验；不输出凭据 |
+| `compatibility-retirement.yml` | 兼容链 prepare/apply/verify/recover/purge 入口，绑定批准 SHA、操作 ID、库身份及清单 | prepare 的平台权限只读；窗口专用 job 持有工作流隔离权限，执行结果未知时保留隔离与身份材料；完整删除门禁仍须通过 |
 | `attention-reconcile-audit.yml` | 受控 Attention reconciliation 审计 | 不得把 dry-run 自动升级为 apply |
 | `compatibility-observation.yml` | 只读兼容流量/指标观察 | 无指标、零值、无命中和证据缺失必须区分 |
 | `authz-production-matrix.yml` | 使用生产主体执行只读 IAM AuthZ v3 精确 12 项矩阵 | 覆盖角色与 origin、缺属性、错误属性类型及 force_retry；IAM 快照复核角色，不写角色或业务数据 |
