@@ -4,11 +4,13 @@ package retirement
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"testing"
 	"time"
 
+	hostmysql "github.com/FangcunMount/qs-server/internal/pkg/database/mysql"
 	"gorm.io/gorm"
 )
 
@@ -74,6 +76,9 @@ func TestAIHistoricalInputNativeTwoSourceBoundFullDiskEpochs(t *testing.T) {
 			if v, e := PrepareAIHistoricalInputEpoch(ctx, c, source, fixture.inputs(), snapshotInputNativeFile(t), tiny); !errors.Is(e, ErrAIReverseBounds) || v != nil {
 				return fmt.Errorf("actual compact reservation was not enforced: %w", e)
 			}
+			if err = source.StopCapture(ctx); err != nil {
+				return err
+			}
 			return nil
 		}
 	}
@@ -99,6 +104,42 @@ func TestAIHistoricalInputNativeTwoSourceBoundFullDiskEpochs(t *testing.T) {
 	pair, err := CompareIndependentAIHistoricalInputs(t.Context(), ai1, ai2, sources)
 	if err != nil || pair.ValidateFrozen(t.Context()) != nil || !pair.Summary().TwoIndependentInputsMatched || pair.Summary().CASAuthority || pair.Summary().DropReady || pair.Summary().Blocking == 0 {
 		t.Fatal("two actual native pure inputs accepted invalid authority", err)
+	}
+
+	// A new native RRRO scope reads real full14 without an old SQL8 cycle.
+	// It remains ineligible for every legacy global/write entry point.
+	var live *AIReverseSnapshot
+	if err = sqlDB.Transaction(func(tx *gorm.DB) error {
+		ctx := hostmysql.WithTx(t.Context(), tx)
+		limits := DefaultAIReverseLimits()
+		limits.MaxRetainedBytes = 64 << 20
+		var e error
+		live, e = prepareHistoricalAIFullSnapshot(ctx, sources, pair, limits, "READ ONLY")
+		if e != nil {
+			return e
+		}
+		if live.validateHistoricalSnapshot(ctx) != nil || live.ValidateBorrowedSnapshot(ctx) == nil || live.snapshot != nil || !historicalAILedgersEqual(live.report.Ledgers, pair.second.report.Ledgers) {
+			return errors.New("actual full14 input-origin/native guard mismatch")
+		}
+		originals, e := historicalAIOriginalCommands(ctx, sources, pair)
+		if e != nil || uint64(len(originals[0])) != sources.second.receipts[1].Records || uint64(len(originals[1])) != sources.second.receipts[2].Records {
+			return errors.New("original authenticated source commands not recovered exactly")
+		}
+		if _, e = PrepareHistoricalAICommandPersistenceBatch(ctx, sources, pair, &AIExternalExecutionQualification{}); e == nil {
+			return errors.New("actual full14 alone minted external/persistence authority")
+		}
+		if e = tx.Exec("USE mysql").Error; e != nil {
+			return e
+		}
+		if live.validateHistoricalSnapshot(ctx) == nil {
+			return errors.New("same native RRRO transaction changed database undetected")
+		}
+		return nil
+	}, &sql.TxOptions{Isolation: sql.LevelRepeatableRead, ReadOnly: true}); err != nil {
+		t.Fatal("actual input-origin full14 observation", err)
+	}
+	if live.validateHistoricalSnapshot(t.Context()) == nil {
+		t.Fatal("ended/absent actual transaction reused")
 	}
 	// The original real fourteen-ledger read also froze a compact owner/page
 	// index. This is pure input; native current component authorization is a

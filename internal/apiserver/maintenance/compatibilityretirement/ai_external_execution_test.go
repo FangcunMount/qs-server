@@ -203,3 +203,119 @@ func TestAIExternalActualMQRewritePreservesBaseTLSAndBindsEveryJOSEFile(t *testi
 		t.Fatal("app shadow authorized")
 	}
 }
+
+func TestHistoricalAIQualificationRejectsImportedAndExpiredInputs(t *testing.T) {
+	ctx := t.Context()
+	if q, err := PrepareHistoricalAIExternalExecution(ctx, nil, nil, AIExternalExecutionInput{}); q != nil || err == nil {
+		t.Fatal("missing actual inputs minted external qualification")
+	}
+	if b, err := PrepareHistoricalAICommandPersistenceBatch(ctx, nil, nil, &AIExternalExecutionQualification{}); b != nil || err == nil {
+		t.Fatal("external DTO minted persistence batch")
+	}
+	if err := ValidateHistoricalComponentAI(ctx, nil, &AIExternalExecutionQualification{}, &AICommandPersistenceBatch{}); err == nil {
+		t.Fatal("empty component/receipt bypassed actual AI closure")
+	}
+	var b AICommandPersistenceBatch
+	if _, err := b.VerifyHistoricalReadback(ctx, nil, nil); err == nil {
+		t.Fatal("empty batch claimed committed server read")
+	}
+	q := &AIExternalExecutionQualification{}
+	q.self = q
+	if q.historicalIntact(ctx, nil, nil) == nil {
+		t.Fatal("self pointer alone minted qualification")
+	}
+	if _, err := prepareHistoricalAIFullSnapshot(ctx, nil, nil, DefaultAIReverseLimits(), "READ ONLY"); err == nil {
+		t.Fatal("full14 observed without original pair")
+	}
+}
+func TestHistoricalAIWholeLedgerEqualityPreservesActualPhysicalFacts(t *testing.T) {
+	ledgers := make([]AIReverseLedgerSummary, len(aiReverseSpecs))
+	for i, spec := range aiReverseSpecs {
+		ledgers[i] = AIReverseLedgerSummary{Store: spec.table, Rows: 1, Bytes: 8, Pages: 1, SchemaSHA256: "schema", PrimaryKeySHA256: "pk", UpperSHA256: "upper", RowsSHA256: "actual"}
+	}
+	got := append([]AIReverseLedgerSummary(nil), ledgers...)
+	got[0].Pages = 9
+	if !historicalAILedgersEqual(got, ledgers) {
+		t.Fatal("pagination was mistaken for changed content")
+	}
+	for _, mutate := range []func(*AIReverseLedgerSummary){func(v *AIReverseLedgerSummary) { v.Rows++ }, func(v *AIReverseLedgerSummary) { v.Bytes++ }, func(v *AIReverseLedgerSummary) { v.RowsSHA256 = "changed" }, func(v *AIReverseLedgerSummary) { v.SchemaSHA256 = "changed" }, func(v *AIReverseLedgerSummary) { v.PrimaryKeySHA256 = "changed" }, func(v *AIReverseLedgerSummary) { v.UpperSHA256 = "changed" }, func(v *AIReverseLedgerSummary) { v.Store = "outside" }} {
+		changed := append([]AIReverseLedgerSummary(nil), ledgers...)
+		mutate(&changed[3])
+		if historicalAILedgersEqual(changed, ledgers) {
+			t.Fatal("real row/catalog/upper change was hidden")
+		}
+	}
+	if historicalAILedgersEqual(got[:13], ledgers) {
+		t.Fatal("missing whole ledger accepted")
+	}
+}
+
+func TestHistoricalAIKnownPendingDoesNotAdoptReceiptsOrHeldWork(t *testing.T) {
+	q := &AIExternalExecutionQualification{handoffs: map[string]aiExternalKnownHandoff{"original": {CommandID: "original", RequestID: "request"}}}
+	for _, store := range []string{"ai_messaging_inbox", "ai_messaging_failures", AIBridgeCommandSource} {
+		n := &aiReverseNode{id: "original", command: "original", state: "staged", observation: AIReverseObservation{Store: store, Unfinished: true}}
+		if historicalAIKnownCurrentPending(n, q) {
+			t.Fatal("mapped ID adopted another delivery responsibility")
+		}
+	}
+	n := &aiReverseNode{id: "original", command: "original", state: "staged", observation: AIReverseObservation{Store: "ai_messaging_outbox", Unfinished: true}}
+	if !historicalAIKnownCurrentPending(n, q) {
+		t.Fatal("known current staged handoff lost")
+	}
+	n.observation.Held = true
+	if historicalAIKnownCurrentPending(n, q) {
+		t.Fatal("held handoff was adopted")
+	}
+	n.observation.Held = false
+	n.state = "confirmed"
+	if historicalAIKnownCurrentPending(n, q) {
+		t.Fatal("unexpected transport state was adopted")
+	}
+}
+
+func TestHistoricalAIScopedContinuityKeepsNegativeRangesAndIgnoresUnrelatedRows(t *testing.T) {
+	current := &AIReverseSnapshot{metadata: make([]aiReverseMetadata, len(aiReverseSpecs)), scope: &aiReverseScope{relatedRequests: map[string]bool{"request": true}, relatedIDs: map[string]bool{"command": true}}, componentAssessments: map[string]bool{"42": true}, componentResources: map[string]bool{"resource": true}, byTable: map[string]map[string]*aiReverseNode{}}
+	committed := &AIReverseSnapshot{metadata: make([]aiReverseMetadata, len(aiReverseSpecs)), byTable: map[string]map[string]*aiReverseNode{}}
+	for _, spec := range aiReverseSpecs {
+		current.byTable[spec.table], committed.byTable[spec.table] = map[string]*aiReverseNode{}, map[string]*aiReverseNode{}
+	}
+	row := func(table, id, request, resource, hash string) *aiReverseNode {
+		return &aiReverseNode{id: id, request: request, resource: resource, observation: AIReverseObservation{Store: table, PrimaryKeySHA256: "pk:" + id, RowSHA256: hash}}
+	}
+	related := row("ai_messaging_operations", "command", "", "resource", "committed-retirement")
+	current.byTable[related.observation.Store][related.id] = related
+	committed.byTable[related.observation.Store][related.id] = related
+	committed.byTable["ai_messaging_operations"]["unrelated"] = row("ai_messaging_operations", "unrelated", "", "other-resource", "other-current-business")
+	if !historicalAIScopedRowsEqual(current, committed) {
+		t.Fatal("unrelated legitimate business row blocked selected continuity")
+	}
+	delete(current.byTable[related.observation.Store], related.id)
+	if historicalAIScopedRowsEqual(current, committed) {
+		t.Fatal("disappeared related operation hidden")
+	}
+	current.byTable[related.observation.Store][related.id] = row(related.observation.Store, related.id, "", "resource", "changed-org-or-payload")
+	if historicalAIScopedRowsEqual(current, committed) {
+		t.Fatal("changed selected raw row accepted")
+	}
+	current.byTable[related.observation.Store][related.id] = related
+	current.byTable["ai_messaging_operations"]["new-command"] = row("ai_messaging_operations", "new-command", "", "resource", "new-current-responsibility")
+	if historicalAIScopedRowsEqual(current, committed) {
+		t.Fatal("new matching responsibility omitted from expected image")
+	}
+	delete(current.byTable["ai_messaging_operations"], "new-command")
+	absent := row("ai_bridge_request_assessments", "request:42", "request", "42", "original-negative-range")
+	committed.byTable[absent.observation.Store][absent.id] = absent
+	if historicalAIScopedRowsEqual(current, committed) {
+		t.Fatal("request/assessment negative expansion was cut")
+	}
+	delete(committed.byTable[absent.observation.Store], absent.id)
+	admission := row("ai_messaging_admission", "1", "", "", "closed-revision")
+	committed.byTable[admission.observation.Store][admission.id] = admission
+	if historicalAIScopedRowsEqual(current, committed) {
+		t.Fatal("missing actual admission control accepted")
+	}
+	current.byTable[admission.observation.Store][admission.id] = admission
+	if !historicalAIScopedRowsEqual(current, committed) {
+		t.Fatal("same closed selected image rejected")
+	}
+}

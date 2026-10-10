@@ -243,28 +243,32 @@ type aiReverseNode struct {
 }
 type aiReverseAnchor struct{ id, org, testee, sheet, rawSHA string }
 type AIReverseSnapshot struct {
-	self              *AIReverseSnapshot
-	snapshot          *SQLResponsibilitySnapshot
-	pool              gorm.ConnPool
-	head              uint64
-	limits            AIReverseLimits
-	started           time.Time
-	metadata          []aiReverseMetadata
-	upper             [][]string
-	nodes             []*aiReverseNode
-	byTable           map[string]map[string]*aiReverseNode
-	anchors           map[string]aiReverseAnchor
-	anchorMetadataSHA string
-	structuralReasons []string
-	report            AIReverseSummary
-	scope             *aiReverseScope
-	inputSink         aiHistoricalInputSink
-	inputPage         int
-	component         *HistoricalCASComponent
-	componentSource   *HistoricalComponentSourceObservation
-	componentPair     *AIHistoricalInputPair
-	componentSeal     string
-	componentComplete bool
+	self                                               *AIReverseSnapshot
+	snapshot                                           *SQLResponsibilitySnapshot
+	pool                                               gorm.ConnPool
+	head                                               uint64
+	limits                                             AIReverseLimits
+	started                                            time.Time
+	metadata                                           []aiReverseMetadata
+	upper                                              [][]string
+	nodes                                              []*aiReverseNode
+	byTable                                            map[string]map[string]*aiReverseNode
+	anchors                                            map[string]aiReverseAnchor
+	anchorMetadataSHA                                  string
+	structuralReasons                                  []string
+	report                                             AIReverseSummary
+	scope                                              *aiReverseScope
+	inputSink                                          aiHistoricalInputSink
+	inputPage                                          int
+	component                                          *HistoricalCASComponent
+	componentSource                                    *HistoricalComponentSourceObservation
+	componentPair                                      *AIHistoricalInputPair
+	componentSeal                                      string
+	componentComplete                                  bool
+	componentAssessments, componentResources           map[string]bool
+	historicalSources                                  *HistoricalSourceInputPair
+	historicalPair                                     *AIHistoricalInputPair
+	historicalNative, historicalSeal, historicalAccess string
 }
 type aiReverseScope struct {
 	owner                       *HistoricalCoordinator
@@ -2920,6 +2924,8 @@ func PrepareAIHistoricalComponentSnapshot(parent context.Context, component *His
 	if err = s.validateComponentScope(ctx); err != nil {
 		return nil, err
 	}
+	s.scope = scope
+	s.componentAssessments, s.componentResources = assessments, resources
 	s.report.DataSHA256 = aiComponentDataDigest(s)
 	s.report.CompletedAt = time.Now().UTC()
 	s.componentComplete = true
@@ -2959,21 +2965,31 @@ func (s *AIReverseSnapshot) ValidateComponentObservation(ctx context.Context) er
 	}
 	return s.validateComponentScope(ctx)
 }
-func (e *AIHistoricalInputEpoch) componentPage(ctx context.Context, page int) ([]aiReverseRow, aiReverseSpec, aiReverseMetadata, error) {
+func (e *AIHistoricalInputEpoch) componentFrame(ctx context.Context, page int) (*aiHistoricalInputFrame, error) {
 	if e.validFile(ctx) != nil || !e.complete || e.source == nil || e.componentIndexSHA == "" || page < 0 || page >= len(e.pages) {
-		return nil, aiReverseSpec{}, aiReverseMetadata{}, ErrAIReverseBinding
+		return nil, ErrAIReverseBinding
 	}
 	ref := e.pages[page]
 	if ref.Offset < 0 || ref.Length <= 0 || ref.Length > 2*sourceOriginInputPageBytes+(1<<20) || ref.Offset > e.end-ref.Length {
-		return nil, aiReverseSpec{}, aiReverseMetadata{}, ErrAIReverseRead
+		return nil, ErrAIReverseRead
 	}
 	raw := make([]byte, int(ref.Length))
 	n, err := e.file.ReadAt(raw, ref.Offset)
 	if err != nil || n != len(raw) || historicalSpoolSHA(raw) != ref.SHA256 {
-		return nil, aiReverseSpec{}, aiReverseMetadata{}, ErrAIReverseRead
+		return nil, ErrAIReverseRead
 	}
 	var frame aiHistoricalInputFrame
-	if historicalSpoolDecode(raw, &frame) != nil || frame.Version != 1 || frame.Epoch != e.epoch || frame.SourceInput != e.source.resultHash || frame.EOF {
+	if historicalSpoolDecode(raw, &frame) != nil || frame.Version != 1 || frame.Epoch != e.epoch || frame.SourceInput != e.source.resultHash {
+		return nil, ErrAIReverseBinding
+	}
+	return &frame, nil
+}
+func (e *AIHistoricalInputEpoch) componentPage(ctx context.Context, page int) ([]aiReverseRow, aiReverseSpec, aiReverseMetadata, error) {
+	frame, err := e.componentFrame(ctx, page)
+	if err != nil {
+		return nil, aiReverseSpec{}, aiReverseMetadata{}, err
+	}
+	if frame.EOF {
 		return nil, aiReverseSpec{}, aiReverseMetadata{}, ErrAIReverseBinding
 	}
 	var rows []aiReverseRow
@@ -3117,6 +3133,9 @@ func aiComponentPredicate(spec aiReverseSpec, scope *aiReverseScope, assessments
 func fmtAIComponentArgs(args []any) string { raw, _ := json.Marshal(args); return string(raw) }
 func aiComponentDataDigest(s *AIReverseSnapshot) string {
 	parts := []string{"ai-reverse-component-current/v1", s.componentSeal, s.report.DatabaseIdentitySHA256, s.report.SourceScopeSHA256, s.report.BusinessAnchorsSHA256}
+	if s.scope != nil {
+		parts = append(parts, aiJSONHash(s.scope.relatedRequests), aiJSONHash(s.scope.relatedIDs), aiJSONHash(s.componentAssessments), aiJSONHash(s.componentResources))
+	}
 	for _, spec := range aiReverseSpecs {
 		for _, id := range aiReverseSortedKeys(s.byTable[spec.table]) {
 			n := s.byTable[spec.table][id]
@@ -3125,4 +3144,125 @@ func aiComponentDataDigest(s *AIReverseSnapshot) string {
 		}
 	}
 	return aiReverseHash(parts...)
+}
+
+// This live full14 observer borrows a genuine fresh native RRRO transaction.
+// Frozen pairs select original inputs; they never supply a completed SQL8 cycle.
+func prepareHistoricalAIFullSnapshot(ctx context.Context, sources *HistoricalSourceInputPair, pair *AIHistoricalInputPair, limits AIReverseLimits, access string) (*AIReverseSnapshot, error) {
+	if ctx == nil || access != "READ ONLY" && access != "READ WRITE" || !limits.valid() || limits.MaxRetainedBytes > aiHistoricalInputMaxRetained || aiComponentPairIntact(ctx, pair, sources) != nil || !sources.first.captureStopped || !sources.second.captureStopped {
+		return nil, ErrAIReverseBinding
+	}
+	tx, err := hostmysql.RequireTx(ctx)
+	if err != nil || tx.Statement == nil || tx.Statement.ConnPool == nil || tx.Statement.ConnPool == pair.first.pool || tx.Statement.ConnPool == pair.second.pool {
+		return nil, ErrAIReverseFresh
+	}
+	if _, err = sdkmysql.BindGORM(tx); err != nil {
+		return nil, ErrAIReverseFresh
+	}
+	s := &AIReverseSnapshot{pool: tx.Statement.ConnPool, head: 99, limits: limits, started: time.Now(), byTable: map[string]map[string]*aiReverseNode{}, anchors: map[string]aiReverseAnchor{}, historicalSources: sources, historicalPair: pair, historicalAccess: access}
+	s.self = s
+	s.report = AIReverseSummary{Version: "ai-reverse-historical-live/v1", DatabaseIdentitySHA256: pair.second.report.DatabaseIdentitySHA256, MigrationVersion: 99, StartedAt: s.started.UTC(), ExternalOriginRequired: true, ExternalQSAIClosureRequired: true, StoredWireAuthenticationRequired: true, WriterFenceRequired: true}
+	work, cancel := context.WithDeadline(ctx, s.started.Add(limits.MaxDuration))
+	defer cancel()
+	if s.historicalNative, err = s.historicalTransaction(work, access); err != nil {
+		return nil, err
+	}
+	for _, spec := range aiReverseSpecs {
+		if err = s.scan(work, spec); err != nil {
+			return nil, err
+		}
+	}
+	if err = s.readAssessmentAnchors(work); err != nil {
+		return nil, err
+	}
+	s.reverse()
+	commands, err := historicalAIOriginalCommands(work, sources, pair)
+	if err != nil {
+		return nil, err
+	}
+	scope := &aiReverseScope{relatedRequests: map[string]bool{}, relatedIDs: map[string]bool{}, identityConflicts: map[string]bool{}, receipts: sources.second.receipts, sha: aiReverseHash("historical-full14-source/v1", sources.second.resultHash, pair.second.componentIndexSHA)}
+	for i, table := range []string{AIBridgeCommandSource, AILegacyCommandSource} {
+		if len(commands[i]) != len(s.byTable[table]) {
+			return nil, ErrAIReverseChanged
+		}
+		for id, v := range commands[i] {
+			n := s.byTable[table][id]
+			if n == nil || n.sourceRowHash != v.Source.Digest.SHA256 || n.request != v.RequestID || n.org != v.OrganizationID || n.subject != v.SubjectID || n.resource != v.ResourceID {
+				return nil, ErrSourceAuthentication
+			}
+			scope.relatedRequests[v.RequestID], scope.relatedIDs[id] = true, true
+		}
+	}
+	s.classify(scope)
+	for i, spec := range aiReverseSpecs {
+		meta, e := s.schema(work, spec)
+		if e != nil || !reflect.DeepEqual(meta, pair.second.metadata[i]) || !reflect.DeepEqual(meta, s.metadata[i]) {
+			return nil, ErrAIReverseSchema
+		}
+	}
+	if _, hash, e := s.assessmentMetadata(work); e != nil || hash != s.anchorMetadataSHA {
+		return nil, ErrAIReverseSchema
+	}
+	if token, e := s.historicalTransaction(work, access); e != nil || token != s.historicalNative {
+		return nil, ErrAIReverseFresh
+	}
+	s.report.ActualReadOnlyRR, s.report.WholeLedgerEOF = access == "READ ONLY", true
+	s.report.CompletedAt, s.report.DataSHA256 = time.Now().UTC(), s.dataDigest()
+	s.historicalSeal = s.historicalDigest()
+	if s.validateHistoricalSnapshot(work) != nil {
+		return nil, ErrAIReverseFresh
+	}
+	return s, nil
+}
+
+// Instrumentation binds actual transaction identity and mode, not session defaults.
+func (s *AIReverseSnapshot) historicalTransaction(ctx context.Context, access string) (string, error) {
+	if s == nil || s.pool == nil || s.alive(ctx) != nil {
+		return "", ErrAIReverseFresh
+	}
+	rows, _, _, err := s.read(ctx, "SELECT t.PROCESSLIST_ID AS connection_id,e.THREAD_ID AS thread_id,e.EVENT_ID AS event_id,e.STATE AS state,e.END_EVENT_ID AS end_event_id,e.ACCESS_MODE AS access_mode,e.ISOLATION_LEVEL AS isolation_level,e.AUTOCOMMIT AS autocommit FROM performance_schema.events_transactions_current e JOIN performance_schema.threads t ON t.THREAD_ID=e.THREAD_ID WHERE t.PROCESSLIST_ID=CONNECTION_ID()", 2)
+	if err != nil || len(rows) != 1 || rows[0].text("state") != "ACTIVE" || rows[0]["end_event_id"] != nil || rows[0].text("access_mode") != access || rows[0].text("isolation_level") != "REPEATABLE READ" || rows[0].text("autocommit") != "NO" {
+		return "", ErrAIReverseFresh
+	}
+	for _, name := range []string{"connection_id", "thread_id", "event_id"} {
+		if !aiPositiveNumber(rows[0].text(name)) {
+			return "", ErrAIReverseFresh
+		}
+	}
+	identity, _, _, e := s.read(ctx, "SELECT @@server_uuid AS server,DATABASE() AS db,VERSION() AS version", 1)
+	if e != nil || len(identity) != 1 || !strings.HasPrefix(identity[0].text("version"), "8.") || aiReverseHash("mysql_database_identity_v1", identity[0].text("server"), identity[0].text("db")) != s.report.DatabaseIdentitySHA256 {
+		return "", ErrAIReverseBinding
+	}
+	head, _, _, e := s.read(ctx, "SELECT CAST(version AS BINARY) AS version,CAST(dirty AS BINARY) AS dirty FROM schema_migrations", 2)
+	if e != nil || len(head) != 1 || head[0].text("version") != "99" || head[0].text("dirty") != "0" {
+		return "", ErrAIReverseBinding
+	}
+	return aiReverseHash("historical-ai-native/v1", rows[0].text("connection_id"), rows[0].text("thread_id"), rows[0].text("event_id"), access), nil
+}
+func (s *AIReverseSnapshot) historicalDigest() string {
+	if s == nil || s.historicalSources == nil || s.historicalPair == nil {
+		return ""
+	}
+	return aiJSONHash(struct {
+		Source, Input, Native, Access, Data, Class string
+		Started                                    time.Time
+		Limits                                     AIReverseLimits
+	}{s.historicalSources.second.resultHash, s.historicalPair.second.componentIndexSHA, s.historicalNative, s.historicalAccess, s.report.DataSHA256, aiJSONHash(s.report), s.started, s.limits})
+}
+func (s *AIReverseSnapshot) validateHistoricalSnapshot(ctx context.Context) error {
+	if s == nil || s.self != s || s.snapshot != nil || s.component != nil || !s.report.WholeLedgerEOF || s.historicalAccess != "READ ONLY" && s.historicalAccess != "READ WRITE" || s.historicalSeal == "" || s.historicalSeal != s.historicalDigest() || aiComponentPairIntact(ctx, s.historicalPair, s.historicalSources) != nil {
+		return ErrAIReverseBinding
+	}
+	tx, err := hostmysql.RequireTx(ctx)
+	if err != nil || tx.Statement == nil || tx.Statement.ConnPool != s.pool {
+		return ErrAIReverseFresh
+	}
+	if _, err = sdkmysql.BindGORM(tx); err != nil {
+		return ErrAIReverseFresh
+	}
+	token, err := s.historicalTransaction(ctx, s.historicalAccess)
+	if err != nil || token != s.historicalNative {
+		return ErrAIReverseFresh
+	}
+	return nil
 }
