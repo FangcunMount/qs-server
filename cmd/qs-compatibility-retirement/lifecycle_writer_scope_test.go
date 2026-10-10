@@ -621,3 +621,40 @@ func TestKnownWriterFenceRequiresEachOriginalActorAndKeepsEffectsClosed(t *testi
 		t.Fatal("fixed actor wiring activated unverified production adapters")
 	}
 }
+
+func TestDatabaseCredentialRestoreCannotInventOriginalRecoveryOwner(t *testing.T) {
+	r := lifecycleRequest{ActualRunID: "new-run"}
+	w := new(fence.MaintenanceWindow)
+	owner := new(lifecyclePreparationOwner)
+	h := &lifecycleFixedHost{owner: owner, services: &lifecycleServiceController{window: w}}
+	v := &lifecycleDBWriterLease{host: h, window: w, binding: lifecycleWindowBinding(r), actualRunID: r.ActualRunID, installed: true}
+	v.self, h.dbWriters = v, v
+	if e := h.restoreDatabaseWriterLease(t.Context(), r, false); e == nil || lifecycleCategory(e) != "lifecycle_database_original_recovery_owner_unproven" {
+		t.Fatal("imported window began recovery or consumed credential restoration", e)
+	}
+	if h.owner != owner || h.dbWriters != v || v.restored {
+		t.Fatal("rejected restore destroyed/replaced original owner or marked restored")
+	}
+	if h.restoreDatabaseWriterLeaseAttempt(nil, r, false) == nil {
+		t.Fatal("missing recovery context admitted attempt")
+	}
+}
+
+func TestDatabaseOriginalRestoreReconcilesLostEffectBeforeRetry(t *testing.T) {
+	v, m := databaseWriterSQLFixture(t)
+	p := v.input.SQLPrincipals[0]
+	q := regexp.QuoteMeta("SELECT account_locked FROM mysql.user WHERE User=? AND Host=?")
+	m.ExpectQuery(q).WithArgs(p.User, p.HostOrDatabase).WillReturnRows(sqlmock.NewRows([]string{"locked"}).AddRow("Y"))
+	m.ExpectExec(regexp.QuoteMeta("ALTER USER 'app''o'@'%' ACCOUNT UNLOCK")).WillReturnError(errors.New("original reply lost"))
+	if e := v.setSQLLock(t.Context(), p, false); e == nil {
+		t.Fatal("unknown original restore was relabelled success")
+	}
+	// The next attempt reads native original N; it must not send another ALTER.
+	m.ExpectQuery(q).WithArgs(p.User, p.HostOrDatabase).WillReturnRows(sqlmock.NewRows([]string{"locked"}).AddRow("N"))
+	if e := v.setSQLLock(t.Context(), p, false); e != nil {
+		t.Fatal("actual original state denied idempotent restoration", e)
+	}
+	if e := m.ExpectationsWereMet(); e != nil {
+		t.Fatal(e)
+	}
+}

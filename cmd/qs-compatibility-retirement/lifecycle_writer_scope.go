@@ -12,6 +12,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 
 	dbcensus "github.com/FangcunMount/qs-server/internal/apiserver/maintenance/compatibilityretirementdbcensus"
 	fence "github.com/FangcunMount/qs-server/internal/apiserver/maintenance/compatibilityretirementfence"
@@ -1190,6 +1191,11 @@ func (v *lifecycleDBWriterLease) setMongoRoles(ctx context.Context, p lifecycleD
 		return e
 	}
 	if restore && lifecycleDBDigest(current) == lifecycleDBDigest(original) {
+		// A prior grant may have succeeded while its cache-invalidation reply
+		// failed. Native original roles alone do not complete that obligation.
+		if v.host.owner.originalMongo.Database("admin").RunCommand(ctx, bson.D{{Key: "invalidateUserCache", Value: 1}}).Err() != nil {
+			return lifecycleError("lifecycle_database_authorization_cache_unproven")
+		}
 		return nil
 	}
 	if restore && len(current) != 0 || !restore && lifecycleDBDigest(current) != lifecycleDBDigest(original) {
@@ -1371,6 +1377,52 @@ func (h *lifecycleFixedHost) restoreDatabaseWriterLease(ctx context.Context, r l
 	if v.self != v || v.host != h || v.binding != lifecycleWindowBinding(r) || v.actualRunID != r.ActualRunID || h.services == nil || v.window != h.services.window {
 		return lifecycleError("lifecycle_database_writer_binding_rejected")
 	}
+	if forward {
+		return h.restoreDatabaseWriterLeaseAttempt(ctx, r, true)
+	}
+	// This caller is reached only after the original pre-DDL recovery or actual
+	// target/DDL reconciliation. Preserve the original process, account baseline
+	// and borrowed DB connections through its real recovery budget; do not close
+	// them on the first failed credential read/apply. No Stop/DDL/deploy is retried.
+	d, e := v.window.Diagnostic(ctx)
+	if e != nil || d.Binding != v.binding || !d.DirectoryLeaseHeld || d.RecoverySHA256 == "" {
+		return lifecycleError("lifecycle_database_original_recovery_owner_unproven")
+	}
+	q, cancel, e := v.window.RecoveryContext(ctx)
+	if e != nil {
+		return e
+	}
+	defer cancel()
+	var last error
+	for {
+		if q.Err() != nil {
+			return errors.Join(last, context.Cause(q))
+		}
+		if last = h.restoreDatabaseWriterLeaseAttempt(q, r, false); last == nil {
+			return nil
+		}
+		timer := time.NewTimer(time.Second)
+		select {
+		case <-q.Done():
+			timer.Stop()
+			return errors.Join(last, context.Cause(q))
+		case <-timer.C:
+		}
+	}
+}
+
+// Every retry re-reads actual identity, complete grants and current account
+// state. Changed principals/roles remain conflicts; observed original state is
+// idempotent restoration, never a lost command result declared successful.
+func (h *lifecycleFixedHost) restoreDatabaseWriterLeaseAttempt(ctx context.Context, r lifecycleRequest, forward bool) error {
+	if ctx == nil || ctx.Err() != nil || h == nil || h.dbWriters == nil || h.services == nil {
+		return lifecycleError("lifecycle_database_writer_binding_rejected")
+	}
+	v := h.dbWriters
+	if v.self != v || v.host != h || v.binding != lifecycleWindowBinding(r) || v.actualRunID != r.ActualRunID || v.window != h.services.window {
+		return lifecycleError("lifecycle_database_writer_binding_rejected")
+	}
+
 	if e := v.nativeIdentityAndAuthentication(ctx); e != nil {
 		return e
 	}
