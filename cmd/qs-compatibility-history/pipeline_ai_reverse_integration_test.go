@@ -226,6 +226,18 @@ func nativeHistoryExternalFixture(t *testing.T, pool *sql.DB, client *mongo.Clie
 			t.Fatal("actual AI schema head seed")
 		}
 	}
+	// Fixed 90403's 0038 migration initializes these technical counters; 0040
+	// renames their table to messaging_observations. DDL alone cannot start MQ.
+	for _, kind := range []string{
+		"duplicate_command", "duplicate_ack", "payload_fetch_unavailable",
+		"payload_fetch_reference_mismatch", "payload_fetch_workload_denied",
+		"payload_serve_reference_mismatch", "payload_serve_workload_denied",
+		"payload_serve_storage_unavailable",
+	} {
+		if _, err = conn.ExecContext(t.Context(), "INSERT INTO messaging_observations (kind,recorded_count,recording_since) VALUES (?,0,UTC_TIMESTAMP(6))", kind); err != nil {
+			t.Fatal("actual fixed AI observation initialization rejected")
+		}
+	}
 	// Return the borrowed pool connection to its original namespace before any
 	// further peer reads. An actual server UUID/database view binds both sides.
 	if _, err = conn.ExecContext(t.Context(), "USE `"+db.Name()+"`"); err != nil {
