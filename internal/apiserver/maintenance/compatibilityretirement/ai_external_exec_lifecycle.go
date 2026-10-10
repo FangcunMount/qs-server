@@ -446,25 +446,30 @@ func aiExternalExecTracked(ctx context.Context, d *aiExternalDockerExecutor, j *
 }
 func aiExecProduce(ctx context.Context, p aiExecProtocol, j *aiExecJournal, host, input []byte) (*aiExternalExecObservation, error) {
 	if j == nil || j.self != j || p == nil {
+		aiExternalExecutionFailure("exec_owner", ErrAIExternalExecUnknown)
 		return nil, ErrAIExternalExecUnknown
 	}
 	j.mu.Lock()
 	defer j.mu.Unlock()
 	if j.checkLocked() != nil || !j.startable || len(j.raw) != 0 || sourceSHA(host) != j.binding.PythonSHA256 || sourceSHA(input) != j.binding.InputSHA256 || len(input) == 0 || len(input) > aiExternalInputLimit {
+		aiExternalExecutionFailure("exec_journal", ErrAIExternalExecJournal)
 		return nil, ErrAIExternalExecJournal
 	}
 	work, cancel, e := j.binding.scope(ctx)
 	if e != nil {
+		aiExternalExecutionFailure("exec_scope", e)
 		return nil, e
 	}
 	defer cancel()
 	version, e := p.version(work)
 	if e != nil || !evidenceHash(version) {
+		aiExternalExecutionFailure("exec_version", e)
 		return nil, ErrAIExternalExecUnknown
 	}
 	// The on-disk create intent is durable BEFORE the only create attempt.
 	r := aiExecRecord{Stage: "create_intent", EngineVersionSHA256: version}
 	if e = j.appendLocked(r); e != nil {
+		aiExternalExecutionFailure("exec_create_intent", e)
 		return nil, e
 	}
 	j.startable = false
@@ -473,28 +478,34 @@ func aiExecProduce(ctx context.Context, p aiExecProtocol, j *aiExecJournal, host
 		r.Running = nil
 		r.ExitCode = nil
 		if j.appendLocked(r) != nil {
+			aiExternalExecutionFailure("exec_unknown_journal", ErrAIExternalExecJournal)
 			return nil, ErrAIExternalExecJournal
 		}
 		return nil, ErrAIExternalExecUnknown
 	}
 	id, createErr := p.create(work, j.binding.executionCID(), host)
 	if !evidenceHash(id) {
+		aiExternalExecutionFailure("exec_create", createErr)
 		return markUnknown()
 	}
 	r.Stage = "created"
 	r.ExecID = id
 	if e = j.appendLocked(r); e != nil {
+		aiExternalExecutionFailure("exec_created_journal", e)
 		return nil, e
 	}
 	if createErr != nil {
+		aiExternalExecutionFailure("exec_create_transport", createErr)
 		return markUnknown()
 	}
 	original, e := p.inspect(work, id, j.binding.executionCID(), j.binding.PythonSHA256)
 	if e != nil || original.Running || original.ExitCode != nil {
+		aiExternalExecutionFailure("exec_inspect_before", e)
 		return markUnknown()
 	}
 	r.Stage = "start_intent"
 	if e = j.appendLocked(r); e != nil {
+		aiExternalExecutionFailure("exec_start_intent", e)
 		return nil, e
 	}
 	output, attachErr := p.attach(work, id, input)
@@ -504,11 +515,14 @@ func aiExecProduce(ctx context.Context, p aiExecProtocol, j *aiExecJournal, host
 		r.OutputBytes = uint64(len(output))
 		r.OutputSHA256 = sourceSHA(output)
 		if e = j.appendLocked(r); e != nil {
+			aiExternalExecutionFailure("exec_attached_journal", e)
 			return nil, e
 		}
 	} else {
+		aiExternalExecutionFailure("exec_attach", attachErr)
 		r.Stage = "unknown"
 		if e = j.appendLocked(r); e != nil {
+			aiExternalExecutionFailure("exec_unknown_journal", e)
 			return nil, e
 		}
 		output = nil
@@ -517,17 +531,20 @@ func aiExecProduce(ctx context.Context, p aiExecProtocol, j *aiExecJournal, host
 	// the original Engine exec ID, with the original absolute budget still set.
 	observed, e := p.inspect(work, id, j.binding.executionCID(), j.binding.PythonSHA256)
 	if e != nil {
+		aiExternalExecutionFailure("exec_inspect_after", e)
 		return markUnknown()
 	}
 	r.Stage = "observed"
 	r.Running = &observed.Running
 	r.ExitCode = observed.ExitCode
 	if e = j.appendLocked(r); e != nil {
+		aiExternalExecutionFailure("exec_observed_journal", e)
 		return nil, e
 	}
 	v := &aiExternalExecObservation{journal: j, binding: j.binding, execID: id, running: observed.Running, exitCode: observed.ExitCode, output: output, complete: r.AttachComplete}
 	v.self = v
 	if attachErr != nil || work.Err() != nil || !v.complete || v.running || v.exitCode == nil || *v.exitCode != 0 {
+		aiExternalExecutionFailure("exec_terminal", ErrAIExternalExecUnknown)
 		return v, ErrAIExternalExecUnknown
 	}
 	return v, nil
@@ -650,10 +667,12 @@ func aiExecRequest(method, path string, raw []byte, upgrade bool) (*http.Request
 func (p *aiExecDockerProtocol) ordinary(ctx context.Context, method, path string, raw []byte, status int) ([]byte, error) {
 	req, e := aiExecRequest(method, path, raw, false)
 	if e != nil {
+		aiExternalExecutionFailure("http_request", e)
 		return nil, e
 	}
 	s, e := p.docker.execDial(ctx)
 	if e != nil {
+		aiExternalExecutionFailure("http_dial", e)
 		return nil, e
 	}
 	done := false
@@ -663,22 +682,27 @@ func (p *aiExecDockerProtocol) ordinary(ctx context.Context, method, path string
 		}
 	}()
 	if req.Write(s.in) != nil || s.in.Close() != nil {
+		aiExternalExecutionFailure("http_write", ErrAIExternalExecUnknown)
 		return nil, ErrAIExternalExecUnknown
 	}
 	resp, e := http.ReadResponse(bufio.NewReader(&aiExecHeaderReader{reader: io.LimitReader(s.out, aiExecReplyLimit+aiExecHeaderLimit+1)}), req)
 	if e != nil {
+		aiExternalExecutionFailure("http_header", e)
 		return nil, ErrAIExternalExecUnknown
 	}
 	if resp.StatusCode != status {
+		aiExternalExecutionFailure("http_status", ErrAIExternalExecUnknown)
 		_ = resp.Body.Close()
 		return nil, ErrAIExternalExecUnknown
 	}
 	body, e := io.ReadAll(io.LimitReader(resp.Body, aiExecReplyLimit+1))
 	closed := resp.Body.Close()
 	if e != nil || closed != nil || len(body) > aiExecReplyLimit || ctx.Err() != nil {
+		aiExternalExecutionFailure("http_body", e)
 		return nil, ErrAIExternalExecUnknown
 	}
 	if s.finish(false) != nil {
+		aiExternalExecutionFailure("http_finish", ErrAIExternalExecUnknown)
 		done = true
 		return body, ErrAIExternalExecUnknown
 	}
@@ -688,6 +712,7 @@ func (p *aiExecDockerProtocol) ordinary(ctx context.Context, method, path string
 func (p *aiExecDockerProtocol) version(ctx context.Context) (string, error) {
 	raw, e := p.ordinary(ctx, http.MethodGet, "/version", nil, http.StatusOK)
 	if e != nil || strictJSON(raw) != nil {
+		aiExternalExecutionFailure("version_response", e)
 		return "", ErrAIExternalExecUnknown
 	}
 	var v struct {
@@ -696,6 +721,7 @@ func (p *aiExecDockerProtocol) version(ctx context.Context) (string, error) {
 		OS         string `json:"Os"`
 	}
 	if json.Unmarshal(raw, &v) != nil || v.OS != "linux" || !aiExecVersionSupports(v.Minimum, v.APIVersion) {
+		aiExternalExecutionFailure("version_contract", ErrAIExternalExecUnknown)
 		return "", ErrAIExternalExecUnknown
 	}
 	return sourceSHA(raw), nil
@@ -715,6 +741,7 @@ func aiExecVersionSupports(minimum, maximum string) bool {
 }
 func (p *aiExecDockerProtocol) create(ctx context.Context, cid string, host []byte) (string, error) {
 	if !evidenceHash(cid) || (sourceSHA(host) != aiExternalHostSHA && sourceSHA(host) != sourceSHA([]byte(aiStoppedCarrierHost))) {
+		aiExternalExecutionFailure("create_request", ErrAIExternalExecUnknown)
 		return "", ErrAIExternalExecUnknown
 	}
 	request := struct {
@@ -723,6 +750,7 @@ func (p *aiExecDockerProtocol) create(ctx context.Context, cid string, host []by
 	}{true, true, true, false, false, []string{"/app/.venv/bin/python", "-I", "-B", "-c", string(host)}}
 	raw, e := json.Marshal(request)
 	if e != nil {
+		aiExternalExecutionFailure("create_request", e)
 		return "", ErrAIExternalExecUnknown
 	}
 	result, e := p.ordinary(ctx, http.MethodPost, "/v"+aiExecAPIVersion+"/containers/"+cid+"/exec", raw, http.StatusCreated)
@@ -732,6 +760,7 @@ func (p *aiExecDockerProtocol) create(ctx context.Context, cid string, host []by
 	decoder := json.NewDecoder(bytes.NewReader(result))
 	decoder.DisallowUnknownFields()
 	if strictJSON(result) != nil || decoder.Decode(&v) != nil || decoder.Decode(&struct{}{}) != io.EOF || !evidenceHash(v.ID) {
+		aiExternalExecutionFailure("create_response", ErrAIExternalExecUnknown)
 		return "", ErrAIExternalExecUnknown
 	}
 	// A validated Engine response still yields its ID if local transport Wait
@@ -753,19 +782,23 @@ func aiExecDecodeInspect(raw []byte, id, cid, pythonSHA string) (aiExecInspect, 
 		}
 	}
 	if strictJSON(raw) != nil || json.Unmarshal(raw, &v) != nil || v.ID != id || v.ContainerID != cid || v.Running == nil || v.OpenStdin == nil || !*v.OpenStdin || v.OpenStdout == nil || !*v.OpenStdout || v.OpenStderr == nil || !*v.OpenStderr || v.ProcessConfig == nil || v.ProcessConfig.Tty == nil || *v.ProcessConfig.Tty || v.ProcessConfig.Privileged == nil || *v.ProcessConfig.Privileged || v.ProcessConfig.Entrypoint != "/app/.venv/bin/python" || len(v.ProcessConfig.Arguments) != 4 || !reflect.DeepEqual(v.ProcessConfig.Arguments[:3], []string{"-I", "-B", "-c"}) || sourceSHA([]byte(v.ProcessConfig.Arguments[3])) != pythonSHA {
+		aiExternalExecutionFailure("inspect_decode", ErrAIExternalExecUnknown)
 		return aiExecInspect{}, ErrAIExternalExecUnknown
 	}
 	if *v.Running && v.ExitCode != nil || v.ExitCode != nil && (*v.ExitCode < 0 || *v.ExitCode > 255) {
+		aiExternalExecutionFailure("inspect_decode", ErrAIExternalExecUnknown)
 		return aiExecInspect{}, ErrAIExternalExecUnknown
 	}
 	return aiExecInspect{Running: *v.Running, ExitCode: v.ExitCode}, nil
 }
 func (p *aiExecDockerProtocol) inspect(ctx context.Context, id, cid, pythonSHA string) (aiExecInspect, error) {
 	if !evidenceHash(id) || !evidenceHash(cid) || (pythonSHA != aiExternalHostSHA && pythonSHA != sourceSHA([]byte(aiStoppedCarrierHost))) {
+		aiExternalExecutionFailure("inspect_input", ErrAIExternalExecUnknown)
 		return aiExecInspect{}, ErrAIExternalExecUnknown
 	}
 	raw, e := p.ordinary(ctx, http.MethodGet, "/v"+aiExecAPIVersion+"/exec/"+id+"/json", nil, http.StatusOK)
 	if e != nil {
+		aiExternalExecutionFailure("inspect_read", e)
 		return aiExecInspect{}, e
 	}
 	return aiExecDecodeInspect(raw, id, cid, pythonSHA)
@@ -848,14 +881,17 @@ func aiExecMultiplex(reader io.Reader) ([]byte, error) {
 }
 func (p *aiExecDockerProtocol) attach(ctx context.Context, id string, input []byte) ([]byte, error) {
 	if !evidenceHash(id) || len(input) == 0 || len(input) > aiExternalInputLimit {
+		aiExternalExecutionFailure("attach_input", ErrAIExternalExecUnknown)
 		return nil, ErrAIExternalExecUnknown
 	}
 	req, e := aiExecRequest(http.MethodPost, "/v"+aiExecAPIVersion+"/exec/"+id+"/start", []byte(`{"Detach":false,"Tty":false}`), true)
 	if e != nil {
+		aiExternalExecutionFailure("attach_request", e)
 		return nil, e
 	}
 	s, e := p.docker.execDial(ctx)
 	if e != nil {
+		aiExternalExecutionFailure("attach_dial", e)
 		return nil, e
 	}
 	done := false
@@ -865,11 +901,13 @@ func (p *aiExecDockerProtocol) attach(ctx context.Context, id string, input []by
 		}
 	}()
 	if req.Write(s.in) != nil {
+		aiExternalExecutionFailure("attach_start", ErrAIExternalExecUnknown)
 		return nil, ErrAIExternalExecUnknown
 	}
 	reader := bufio.NewReader(&aiExecHeaderReader{reader: s.out})
 	resp, e := http.ReadResponse(reader, req)
 	if e != nil || resp.StatusCode != http.StatusSwitchingProtocols || !strings.EqualFold(resp.Header.Get("Upgrade"), "tcp") || !strings.EqualFold(resp.Header.Get("Connection"), "Upgrade") || resp.Header.Get("Content-Type") != "application/vnd.docker.multiplexed-stream" {
+		aiExternalExecutionFailure("attach_upgrade", e)
 		return nil, ErrAIExternalExecUnknown
 	}
 	// Write stdin after the real Engine upgrade; EOF half-closes daemon input
@@ -886,6 +924,7 @@ func (p *aiExecDockerProtocol) attach(ctx context.Context, id string, input []by
 	}()
 	output, readErr := aiExecMultiplex(reader)
 	if readErr != nil {
+		aiExternalExecutionFailure("attach_read", readErr)
 		_ = s.finish(true)
 		done = true
 		<-written
@@ -895,6 +934,7 @@ func (p *aiExecDockerProtocol) attach(ctx context.Context, id string, input []by
 	finishErr := s.finish(false)
 	done = true
 	if writeErr != nil || finishErr != nil || ctx.Err() != nil {
+		aiExternalExecutionFailure("attach_finish", ErrAIExternalExecUnknown)
 		return nil, ErrAIExternalExecUnknown
 	}
 	return output, nil

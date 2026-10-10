@@ -1061,13 +1061,37 @@ func ObserveAIExternalCurrentRuntime(ctx context.Context, sudo bool) (AIExternal
 // Keep fmt from rendering sensitive input internals even in caller diagnostics.
 var _ fmt.Stringer = AIExternalExecutionInput{}
 
+// Only closed phase/sentinel names leave these failure paths. No execution
+// output, input, database error or saved journal can become qualification.
+func aiExternalExecutionFailure(phase string, err error) {
+	switch phase {
+	case "q_input", "q_full_snapshot", "q_local_facts", "q_original_commands", "q_handoffs", "q_sections", "q_external_facts", "q_peer_facts", "q_handoff_identity", "q_original_identity", "q_final_snapshot",
+		"facts_assets", "facts_release_before", "facts_packet", "facts_stopped_mode", "facts_docker", "facts_runtime_before", "facts_runtime_after", "facts_tracked_exec", "facts_release_after", "facts_decode",
+		"exec_owner", "exec_journal", "exec_scope", "exec_version", "exec_create_intent", "exec_create", "exec_created_journal", "exec_create_transport", "exec_inspect_before", "exec_start_intent", "exec_attached_journal", "exec_attach", "exec_unknown_journal", "exec_inspect_after", "exec_observed_journal", "exec_terminal",
+		"http_request", "http_dial", "http_write", "http_header", "http_status", "http_body", "http_finish", "version_response", "version_contract", "create_request", "create_response", "inspect_input", "inspect_read", "inspect_decode", "attach_input", "attach_request", "attach_dial", "attach_start", "attach_upgrade", "attach_read", "attach_finish":
+	default:
+		phase = "unknown"
+	}
+	category := "unknown"
+	switch err {
+	case ErrAIExternalInput, ErrAIExternalRuntime, ErrAIExternalExecution, ErrAIExternalChanged,
+		ErrAIExternalExecUnknown, ErrAIExternalExecJournal, ErrAIStoppedRuntime,
+		ErrAIReverseBinding, ErrAIReverseRead, ErrAIReverseSchema, ErrAIReverseBounds, ErrAIReverseChanged, ErrAIReverseFresh,
+		ErrAILocalBinding, ErrAILocalUnknown, ErrAILocalResponsibility:
+		category = string(err.(SourceError))
+	}
+	_, _ = fmt.Fprintln(os.Stderr, "QS_AI_EXTERNAL_EXECUTION_DIAGNOSTIC phase="+phase+" category="+category)
+}
+
 func executeAIExternalFacts(ctx context.Context, binding HistoricalCoordinatorBinding, in AIExternalExecutionInput, sections map[string]aiExternalSection, knownHandoffs []aiExternalKnownHandoff, mode aiExternalExecMode, stopped *AIStoppedRuntimeLease, deadline time.Time) (aiExternalFacts, error) {
 	assets, err := aiExternalAssets(in.AssetsDirectory)
 	if err != nil {
+		aiExternalExecutionFailure("facts_assets", err)
 		return aiExternalFacts{}, err
 	}
 	release, err := aiExternalReadRelease(in.RuntimeSourceSHA, in.ImageID)
 	if err != nil || release.seal != in.ApprovedAIRuntimeBindingSHA256 {
+		aiExternalExecutionFailure("facts_release_before", err)
 		return aiExternalFacts{}, ErrAIExternalRuntime
 	}
 	packet := struct {
@@ -1092,6 +1116,7 @@ func executeAIExternalFacts(ctx context.Context, binding HistoricalCoordinatorBi
 	}{"qs-ai-readonly-host-input/v3", binding.SourceSHA, binding.OperationID, in.RunID, in.RuntimeSourceSHA, in.ImageID, in.ContainerID, release.seal, release.messaging, base64.StdEncoding.EncodeToString(in.AIBounds), in.ApprovedAIBoundsSHA256, base64.StdEncoding.EncodeToString(in.PeerBounds), in.ApprovedPeerBoundsSHA256, sections, aiExternalPeerConnectionWire(in.PeerConnection), in.ProtectionJSON, assets.modules, knownHandoffs}
 	raw, err := json.Marshal(packet)
 	if err != nil || len(raw) > aiExternalInputLimit {
+		aiExternalExecutionFailure("facts_packet", err)
 		return aiExternalFacts{}, ErrAIExternalInput
 	}
 	work, cancel := context.WithDeadline(ctx, deadline)
@@ -1099,35 +1124,42 @@ func executeAIExternalFacts(ctx context.Context, binding HistoricalCoordinatorBi
 	var result []byte
 	if stopped != nil {
 		if mode != aiExternalFinalVerifyMode {
+			aiExternalExecutionFailure("facts_stopped_mode", ErrAIStoppedRuntime)
 			return aiExternalFacts{}, ErrAIStoppedRuntime
 		}
 		result, err = stopped.executeFinal(work, binding, in, assets.host, raw)
 	} else {
 		docker, e := aiExternalDocker(in.SudoDocker)
 		if e != nil {
+			aiExternalExecutionFailure("facts_docker", e)
 			return aiExternalFacts{}, e
 		}
 		before, e := docker.inspect(work, in.ContainerID)
 		if e != nil || !before.matches(in) || !release.matchesMounts(before.Mounts) {
+			aiExternalExecutionFailure("facts_runtime_before", e)
 			return aiExternalFacts{}, ErrAIExternalRuntime
 		}
 		result, err = aiExternalExecuteMode(work, docker, in.OperationDirectory, mode, binding, in.RunID, in.RuntimeSourceSHA, in.ImageID, in.ContainerID, assets.host, raw)
 		if err == nil {
 			after, e := docker.inspect(work, in.ContainerID)
 			if e != nil || !reflect.DeepEqual(before, after) || !after.matches(in) || !release.matchesMounts(after.Mounts) {
+				aiExternalExecutionFailure("facts_runtime_after", e)
 				return aiExternalFacts{}, ErrAIExternalRuntime
 			}
 		}
 	}
 	if err != nil {
+		aiExternalExecutionFailure("facts_tracked_exec", err)
 		return aiExternalFacts{}, ErrAIExternalExecution
 	}
 	repeated, err := aiExternalReadRelease(in.RuntimeSourceSHA, in.ImageID)
 	if err != nil || repeated.seal != release.seal || !reflect.DeepEqual(repeated, release) {
+		aiExternalExecutionFailure("facts_release_after", err)
 		return aiExternalFacts{}, ErrAIExternalRuntime
 	}
 	facts, err := aiExternalDecodeActualResult(result)
 	if err != nil || facts.SourceSHA != binding.SourceSHA || facts.OperationID != binding.OperationID || facts.RunID != in.RunID || facts.RuntimeSourceSHA != in.RuntimeSourceSHA || facts.RuntimeBindingSHA != release.seal || facts.ImageID != in.ImageID || facts.ContainerID != in.ContainerID || facts.AIBoundsSHA != in.ApprovedAIBoundsSHA256 || facts.PeerBoundsSHA != in.ApprovedPeerBoundsSHA256 || !reflect.DeepEqual(facts.Sections, sections) || len(facts.Snapshots) != 2 {
+		aiExternalExecutionFailure("facts_decode", err)
 		return aiExternalFacts{}, ErrAIExternalChanged
 	}
 	return facts, nil
@@ -1137,22 +1169,27 @@ func executeAIExternalFacts(ctx context.Context, binding HistoricalCoordinatorBi
 // Saved JSON, two matching input summaries and a caller flag cannot mint Q.
 func PrepareHistoricalAIExternalExecution(ctx context.Context, sources *HistoricalSourceInputPair, pair *AIHistoricalInputPair, in AIExternalExecutionInput) (*AIExternalExecutionQualification, error) {
 	if ctx == nil || sources == nil || pair == nil || sources.ValidateFrozen(ctx) != nil || pair.ValidateFrozen(ctx) != nil || !coordinatorSourceSHA(in.Binding.SourceSHA) || !aiLocalOperationID(in.Binding.OperationID) || !aiOriginalSourceSHA(in.RuntimeSourceSHA) || !aiExternalImageID(in.ImageID) || len(in.ContainerID) != 64 || !evidenceHash(in.ContainerID) || !aiExternalRunID(in.RunID) || !evidenceHash(in.ApprovedAIBoundsSHA256) || !evidenceHash(in.ApprovedPeerBoundsSHA256) || !evidenceHash(in.ApprovedAIRuntimeBindingSHA256) || sourceSHA(in.AIBounds) != in.ApprovedAIBoundsSHA256 || sourceSHA(in.PeerBounds) != in.ApprovedPeerBoundsSHA256 || len(in.AIBounds) > 4<<20 || len(in.PeerBounds) > 4<<20 || strictJSON(in.ProtectionJSON) != nil {
+		aiExternalExecutionFailure("q_input", ErrAIExternalInput)
 		return nil, ErrAIExternalInput
 	}
 	limits := pair.second.limits
 	reverse, err := prepareHistoricalAIFullSnapshot(ctx, sources, pair, limits, "READ ONLY")
 	if err != nil {
+		aiExternalExecutionFailure("q_full_snapshot", err)
 		return nil, err
 	}
 	if reverse.report.Unknown != 0 || len(reverse.structuralReasons) != 0 || !historicalAILedgersEqual(reverse.report.Ledgers, pair.second.report.Ledgers) {
+		aiExternalExecutionFailure("q_local_facts", ErrAILocalUnknown)
 		return nil, ErrAILocalUnknown
 	}
 	commands, err := historicalAIOriginalCommands(ctx, sources, pair)
 	if err != nil {
+		aiExternalExecutionFailure("q_original_commands", err)
 		return nil, err
 	}
 	handoffs, err := historicalAIKnownHandoffs(reverse, commands)
 	if err != nil {
+		aiExternalExecutionFailure("q_handoffs", err)
 		return nil, err
 	}
 	sections := map[string]aiExternalSection{}
@@ -1161,6 +1198,7 @@ func PrepareHistoricalAIExternalExecution(ctx context.Context, sources *Historic
 		sections[expected.Boundary.Name] = aiExternalSection{expected.Records, expected.Bytes, expected.DataHash}
 	}
 	if len(sections) != 2 || sections[AIBridgeCommandSource].Rows+sections[AILegacyCommandSource].Rows > 10000 {
+		aiExternalExecutionFailure("q_sections", ErrAIExternalInput)
 		return nil, ErrAIExternalInput
 	}
 	deadline := reverse.started.Add(reverse.limits.MaxDuration)
@@ -1169,14 +1207,17 @@ func PrepareHistoricalAIExternalExecution(ctx context.Context, sources *Historic
 	}
 	facts, err := executeAIExternalFacts(ctx, in.Binding, in, sections, handoffs, aiExternalVerifyMode, nil, deadline)
 	if err != nil {
+		aiExternalExecutionFailure("q_external_facts", err)
 		return nil, err
 	}
 	if facts.Snapshots[0].Side != "ai" || facts.Snapshots[1].Side != "peer" || facts.Snapshots[1].Identity != reverse.report.DatabaseIdentitySHA256 || facts.Snapshots[1].Head != "99" || aiExternalPeerRowsMatch(facts.PeerRows, reverse) != nil || !reflect.DeepEqual(facts.KnownHandoffs, handoffs) {
+		aiExternalExecutionFailure("q_peer_facts", ErrAIExternalChanged)
 		return nil, ErrAIExternalChanged
 	}
 	q := &AIExternalExecutionQualification{reverse: reverse, facts: facts, byID: map[string]aiExternalOriginal{}, handoffs: map[string]aiExternalKnownHandoff{}, expires: deadline, historicalSources: sources, historicalPair: pair, historicalBinding: in.Binding}
 	for _, entry := range handoffs {
 		if q.handoffs[entry.CommandID].CommandID != "" {
+			aiExternalExecutionFailure("q_handoff_identity", ErrAIExternalChanged)
 			return nil, ErrAIExternalChanged
 		}
 		q.handoffs[entry.CommandID] = entry
@@ -1184,11 +1225,13 @@ func PrepareHistoricalAIExternalExecution(ctx context.Context, sources *Historic
 	for _, original := range facts.Originals {
 		v := commands[0][original.CommandID]
 		if v == nil || q.byID[original.CommandID].CommandID != "" || q.handoffs[original.CommandID].CommandID != "" || !aiExternalOriginalValid(original) || original.RequestID != v.RequestID || original.OrganizationID != v.OrganizationID || original.SubjectID != v.SubjectID || original.ResourceID != v.ResourceID || original.TesteeID != v.Business.TesteeID || original.WriterSHA != v.WriterPayloadDigest.SHA256 || original.Attempts != uint64(v.Transport.SourceAttempts) || original.HandoffSHA != nil || len(original.Sources) != 1 || original.Sources[0].Table != AIBridgeCommandSource || original.Sources[0].PayloadSHA != v.PayloadBytesDigest.SHA256 {
+			aiExternalExecutionFailure("q_original_identity", ErrAIExternalChanged)
 			return nil, ErrAIExternalChanged
 		}
 		q.byID[original.CommandID] = original
 	}
 	if len(q.byID)+len(q.handoffs) != len(commands[0]) || len(q.handoffs) != len(commands[1]) || reverse.validateHistoricalSnapshot(ctx) != nil {
+		aiExternalExecutionFailure("q_final_snapshot", ErrAIExternalChanged)
 		return nil, ErrAIExternalChanged
 	}
 	q.self, q.seal = q, aiJSONHash(q.facts)
