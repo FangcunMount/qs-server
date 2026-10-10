@@ -46,6 +46,14 @@ func TestSQLHistoricalComponentClosedScopeAndNoImportedAuthority(t *testing.T) {
 	if _, err := o.apply(context.Background()); err == nil {
 		t.Fatal("empty observation writes")
 	}
+	for _, observed := range []*SQLHistoricalComponentObservation{nil, o} {
+		if statement, err := observed.ApplyHistoricalAttachments(context.Background(), []SQLHistoricalBatchAttachment{{}}); err == nil || statement != nil {
+			t.Fatal("forged physical observer accepted imported attachments")
+		}
+	}
+	if report := (&SQLHistoricalComponentStatement{}).Report(); report.StatementApplied || report.HostCommitVerified || report.SourceAuthenticated || report.BusinessClosureVerified || report.DropReady || !report.IndependentReadbackRequired || !report.HostCommitRequired {
+		t.Fatal("empty physical statement invented closure or host commit")
+	}
 	if _, err := (&SQLHistoricalComponentStatement{}).VerifyIndependentPersisted(context.Background(), time.Second); err == nil {
 		t.Fatal("forged statement readback accepted")
 	}

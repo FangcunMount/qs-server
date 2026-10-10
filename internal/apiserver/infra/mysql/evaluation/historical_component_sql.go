@@ -13,6 +13,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	standard "github.com/FangcunMount/qs-server/internal/apiserver/eventing/standardoutbox"
@@ -45,6 +46,7 @@ type SQLHistoricalComponentRecipe struct {
 // The host owns every transaction and its commit. This observer grants only a
 // short-lived SQL component read, not source, Mongo, AI or retirement authority.
 type SQLHistoricalComponentObservation struct {
+	applyMu        sync.Mutex
 	self           *SQLHistoricalComponentObservation
 	recipe         *SQLHistoricalComponentRecipe
 	pool           gorm.ConnPool
@@ -62,6 +64,7 @@ type SQLHistoricalComponentObservation struct {
 type SQLHistoricalComponentStatement struct {
 	self        *SQLHistoricalComponentStatement
 	observation *SQLHistoricalComponentObservation
+	plan        *SQLHistoricalBatchCASPlan
 	statement   *SQLHistoricalBatchCASStatement
 	seal        string
 }
@@ -1800,11 +1803,15 @@ func (v *SQLHistoricalComponentSemanticView) BusinessBinding(ctx context.Context
 	return result, nil
 }
 
-// The physical native CAS primitive is private. Frozen input and physical
-// observations cannot reach a public production write API. A real fresh
-// source/Mongo/AI-qualified aggregate must be composed before a public caller
-// is added. Native regressions exercise this primitive without granting one.
+// The old frozen-provenance regression path remains private. Planning inputs
+// use the explicit SQL physical persistence boundary below; the maintenance
+// host independently qualifies source/Mongo/AI before any production effect.
 func (o *SQLHistoricalComponentObservation) apply(ctx context.Context) (*SQLHistoricalComponentStatement, error) {
+	if o == nil {
+		return nil, ErrSQLHistoricalComponent
+	}
+	o.applyMu.Lock()
+	defer o.applyMu.Unlock()
 	if o.live(ctx) != nil || !o.writable || o.used || len(o.recipe.plan.groups) == 0 {
 		return nil, ErrSQLHistoricalComponent
 	}
@@ -1816,16 +1823,84 @@ func (o *SQLHistoricalComponentObservation) apply(ctx context.Context) (*SQLHist
 	if statement.transaction != o.transaction || o.live(ctx) != nil {
 		return nil, ErrSQLHistoricalComponent
 	}
-	s := &SQLHistoricalComponentStatement{observation: o, statement: statement}
+	s := &SQLHistoricalComponentStatement{observation: o, plan: o.recipe.plan, statement: statement}
 	s.self = s
 	s.seal = s.digest()
 	return s, nil
 }
+
+// ApplyHistoricalAttachments is the SQL physical persistence boundary, like
+// SQLHistoricalBatchCASPlan.Apply. It grants no source, AI or business closure
+// authority. The maintenance host must qualify the actual cross-store graph
+// before calling it; a CLI must not call it with imported conclusions.
+// Every target and binding uses this observer's fresh locked full-row baseline
+// and actual semantic owner view, never a reconstructed cycle or owner batch.
+func (o *SQLHistoricalComponentObservation) ApplyHistoricalAttachments(ctx context.Context, attachments []SQLHistoricalBatchAttachment) (*SQLHistoricalComponentStatement, error) {
+	if o == nil {
+		return nil, ErrSQLHistoricalComponent
+	}
+	o.applyMu.Lock()
+	defer o.applyMu.Unlock()
+	if o.live(ctx) != nil || !o.writable || o.used || len(attachments) == 0 || len(attachments) > 512 || len(o.recipe.plan.groups) != 0 || len(o.recipe.plan.attachments) != 0 {
+		return nil, ErrSQLHistoricalComponent
+	}
+	bounded, cancel := context.WithDeadline(ctx, o.expires)
+	defer cancel()
+	view, err := o.SemanticView(bounded)
+	if err != nil {
+		return nil, err
+	}
+	for _, a := range attachments {
+		if !slices.Contains(o.recipe.selectors.EventIDs, a.Entry.EventID) || view.owners[a.AssessmentID] == nil {
+			return nil, ErrSQLHistoricalComponent
+		}
+	}
+	tx, err := historicalTx(bounded)
+	if err != nil {
+		return nil, err
+	}
+	base := o.recipe.plan
+	p := &SQLHistoricalBatchCASPlan{oldTransaction: base.oldTransaction, identity: base.identity, server: base.server, database: base.database, request: SQLHistoricalOwnerBatchRequest{AssessmentIDs: slices.Clone(base.request.AssessmentIDs), AnswerSheetIDs: slices.Clone(base.request.AnswerSheetIDs)}, limits: base.limits, before: casCloneImage(o.business)}
+	p, err = prepareSQLHistoricalBatchCASFromImage(bounded, tx, p, view.owners, attachments)
+	if err != nil || !reflect.DeepEqual(p.before, o.business) || o.live(bounded) != nil {
+		return nil, ErrSQLHistoricalComponent
+	}
+	// Poison before the first possible write. An unknown effect is not retried
+	// by this original physical observation, even if no statement is returned.
+	o.used = true
+	statement, err := p.Apply(bounded)
+	if err != nil {
+		return nil, err
+	}
+	if statement.transaction != o.transaction || o.live(bounded) != nil {
+		return nil, ErrSQLHistoricalComponent
+	}
+	s := &SQLHistoricalComponentStatement{observation: o, plan: p, statement: statement}
+	s.self = s
+	s.seal = s.digest()
+	if s.seal == "" {
+		return nil, ErrSQLHistoricalComponent
+	}
+	return s, nil
+}
+
 func (s *SQLHistoricalComponentStatement) digest() string {
-	if s == nil || s.observation == nil || s.statement == nil || s.statement.plan != s.observation.recipe.plan {
+	if s == nil || s.observation == nil || s.statement == nil || s.plan == nil || s.statement.plan != s.plan || !s.observation.recipe.intact() {
+		return ""
+	}
+	base := s.observation.recipe.plan
+	if s.plan.identity != base.identity || s.plan.server != base.server || s.plan.database != base.database || s.plan.oldTransaction != base.oldTransaction || !reflect.DeepEqual(s.plan.request, base.request) || s.plan.limits != base.limits || !reflect.DeepEqual(s.plan.before, s.observation.business) || s.statement.transaction != s.observation.transaction {
 		return ""
 	}
 	return cycleKeyDigest([]string{s.observation.seal, casImageHash(s.statement.expected), strconv.FormatUint(s.statement.transaction.event, 10)})
+}
+
+// Statement facts are not a host commit response or cross-store permission.
+func (s *SQLHistoricalComponentStatement) Report() SQLHistoricalBatchCASReport {
+	if s == nil || s.self != s || s.seal == "" || s.seal != s.digest() {
+		return SQLHistoricalBatchCASReport{HostCommitRequired: true, IndependentReadbackRequired: true}
+	}
+	return s.statement.Report()
 }
 
 // A different actual RR-RO transaction must read the committed server bytes.
@@ -1843,7 +1918,7 @@ func (s *SQLHistoricalComponentStatement) VerifyIndependentPersisted(ctx context
 		return r, ErrSQLHistoricalComponent
 	}
 	server, database, err := historicalDatabase(tx)
-	p := s.observation.recipe.plan
+	p := s.plan
 	if err != nil || server != p.server || database != p.database {
 		return r, ErrSQLHistoricalComponent
 	}

@@ -249,6 +249,23 @@ func PrepareSQLHistoricalBatchCAS(ctx context.Context, b *SQLHistoricalOwnerBatc
 		return nil, e
 	}
 	p := &SQLHistoricalBatchCASPlan{oldTransaction: b.cycle.transaction, identity: b.report.DatabaseIdentitySHA256, server: server, database: database, request: SQLHistoricalOwnerBatchRequest{AssessmentIDs: slices.Clone(b.request.AssessmentIDs), AnswerSheetIDs: slices.Clone(b.request.AnswerSheetIDs)}, limits: b.limits, before: casCloneImage(sqlHistoricalCASImage{rows: b.rows, schema: b.schema, columns: b.columns})}
+	prepared, e := prepareSQLHistoricalBatchCASFromImage(ctx, tx, p, b.owners, attachments)
+	if e != nil {
+		return nil, e
+	}
+	if e = b.ValidateBorrowedSnapshot(ctx); e != nil {
+		return nil, e
+	}
+	return prepared, nil
+}
+
+// Both callers supply full images and owner facts from their actual native
+// readers. This shared physical builder does not construct a cycle or import
+// an editable snapshot, and does not qualify sources or cross-store closure.
+func prepareSQLHistoricalBatchCASFromImage(ctx context.Context, tx *gorm.DB, p *SQLHistoricalBatchCASPlan, owners map[uint64]*SQLHistoricalOwnerFacts, attachments []SQLHistoricalBatchAttachment) (*SQLHistoricalBatchCASPlan, error) {
+	if ctx == nil || ctx.Err() != nil || tx == nil || p == nil || len(attachments) == 0 || len(attachments) > 512 || len(p.groups) != 0 || len(p.attachments) != 0 {
+		return nil, ErrSQLHistoricalBatchCAS
+	}
 	head, _, _, e := cycleQuery(tx, "SELECT version,dirty FROM schema_migrations ORDER BY version", 2)
 	if e != nil || len(head) != 1 || valueOrEmpty(head[0]["dirty"]) != "0" {
 		return nil, ErrSQLHistoricalBatchCAS
@@ -277,7 +294,7 @@ func PrepareSQLHistoricalBatchCAS(ctx context.Context, b *SQLHistoricalOwnerBatc
 				return ErrSQLHistoricalBatchCAS
 			}
 			ownerID, err := sqlHistoricalUint(row, "assessment_id")
-			facts := b.owners[ownerID]
+			facts := owners[ownerID]
 			if err != nil || facts == nil {
 				return ErrSQLHistoricalBatchCAS
 			}
@@ -324,7 +341,7 @@ func PrepareSQLHistoricalBatchCAS(ctx context.Context, b *SQLHistoricalOwnerBatc
 				if err != nil {
 					return nil, err
 				}
-				binding, err := historicalStableBinding(server, database, priorTable, entry.EventType, priorRow, priorRun)
+				binding, err := historicalStableBinding(p.server, p.database, priorTable, entry.EventType, priorRow, priorRun)
 				if err != nil || binding != entry.Proof.BusinessBindingSHA256 {
 					return nil, ErrSQLHistoricalBatchCAS
 				}
@@ -349,7 +366,7 @@ func PrepareSQLHistoricalBatchCAS(ctx context.Context, b *SQLHistoricalOwnerBatc
 		if err != nil {
 			return nil, err
 		}
-		binding, err := historicalStableBinding(server, database, table, a.Entry.EventType, row, run)
+		binding, err := historicalStableBinding(p.server, p.database, table, a.Entry.EventType, row, run)
 		if err != nil || binding != a.Entry.Proof.BusinessBindingSHA256 {
 			return nil, ErrSQLHistoricalBatchCAS
 		}
@@ -391,9 +408,6 @@ func PrepareSQLHistoricalBatchCAS(ctx context.Context, b *SQLHistoricalOwnerBatc
 		if e = casMissingOriginalRuns(tx, p.missingOriginalRunIDs, false); e != nil {
 			return nil, e
 		}
-	}
-	if e = b.ValidateBorrowedSnapshot(ctx); e != nil {
-		return nil, e
 	}
 	return p, nil
 }

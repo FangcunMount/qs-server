@@ -847,6 +847,147 @@ func TestSQLHistoricalComponentNativeBoundedRWCommitReadbackAndRollback(t *testi
 	}
 }
 
+// Entries below are synthetic fixture conclusions. This test verifies the SQL
+// physical persistence/readback boundary, not real four-source/AI authority.
+func TestSQLHistoricalComponentNativePlanningAttachmentsCommitReadback(t *testing.T) {
+	for _, missingRun := range []bool{false, true} {
+		t.Run(map[bool]string{false: "original_outcome_run", true: "exact_original_run_gap"}[missingRun], func(t *testing.T) {
+			db := openHistoricalReferencesDB(t)
+			insertHistoricalAssessment(t, db, 42)
+			record, _ := testCommittedReference(t, 9001, 42, "current-outcome-native")
+			if err := db.Create(outcomeToPO(record)).Error; err != nil {
+				t.Fatal(err)
+			}
+			if missingRun {
+				if err := db.Exec("DELETE FROM runtime_checkpoint WHERE assessment_id=42").Error; err != nil {
+					t.Fatal(err)
+				}
+			}
+			ids := []string{"planning-request", "planning-outcome"}
+			var recipe *SQLHistoricalComponentRecipe
+			if err := batchNativeTx(t, db, func(ctx context.Context, c *SQLHistoricalResponsibilityCycle) error {
+				batch, err := PrepareSQLHistoricalOwnerBatch(ctx, c, SQLHistoricalOwnerBatchRequest{AssessmentIDs: []uint64{42}, AnswerSheetIDs: []uint64{10042}}, DefaultSQLHistoricalOwnerBatchLimits())
+				if err != nil {
+					return err
+				}
+				catalog, err := PrepareSQLHistoricalCrossStoreCatalog(ctx, c, DefaultSQLCrossStoreLimits())
+				if err != nil {
+					return err
+				}
+				recipes, err := FreezeSQLHistoricalOwnerPlanningRecipes(ctx, batch, catalog, SQLCrossStoreSelectors{EventIDs: ids, AssessmentIDs: []uint64{42}, OrganizationIDs: []uint64{7}, MongoOwners: []SQLCrossStoreOwnerReference{{Kind: "AnswerSheet", ID: "10042"}}}, nil, map[string]uint64{ids[0]: 42, ids[1]: 42})
+				if err != nil {
+					return err
+				}
+				if len(recipes) != 1 || len(recipes[0].plan.groups) != 0 || len(recipes[0].plan.attachments) != 0 {
+					return errors.New("planning input invented a CAS plan")
+				}
+				recipe = recipes[0]
+				return nil
+			}); err != nil {
+				t.Fatal(err)
+			}
+			build := func(ctx context.Context, o *SQLHistoricalComponentObservation) ([]SQLHistoricalBatchAttachment, error) {
+				v, err := o.SemanticView(ctx)
+				if err != nil {
+					return nil, err
+				}
+				var run *evidence.HistoricalRunReferenceV1
+				if !missingRun {
+					run = &evidence.HistoricalRunReferenceV1{RunID: "42:1", Attempt: 1}
+				}
+				var out []SQLHistoricalBatchAttachment
+				for i, eventType := range []string{"evaluation.requested", "evaluation.outcome.committed"} {
+					outcome, original := uint64(0), (*evidence.HistoricalRunReferenceV1)(nil)
+					if i == 1 {
+						outcome, original = 9001, run
+					}
+					binding, err := v.BusinessBinding(ctx, 42, outcome, eventType, original)
+					if err != nil {
+						return nil, err
+					}
+					entry := nativeHistoricalEntry(ids[i], eventType, binding, original)
+					entry.Source.Digest = evidence.SourceDigest("mysql-cast-binary-row-v2", []byte(ids[i]))
+					entry.Proof.Digest = entry.Source.Digest
+					if i == 1 && missingRun {
+						entry.Proof.Class = evidence.Unverifiable
+						entry.Proof.Verification.Reason = "original_outcome_run_absent"
+					}
+					out = append(out, SQLHistoricalBatchAttachment{AssessmentID: 42, OutcomeID: outcome, Entry: entry, ContentDigest: evidence.SourceDigest("legacy-domain-json-bytes-v1", []byte(ids[i]))})
+				}
+				return out, nil
+			}
+			sentinel := errors.New("host rollback after planning attachment statements")
+			var rolled, committed *SQLHistoricalComponentStatement
+			if err := componentSQLNativeObserve(t, db, recipe, true, func(ctx context.Context, o *SQLHistoricalComponentObservation) error {
+				entries, err := build(ctx, o)
+				if err != nil {
+					return err
+				}
+				for _, mutate := range []func(*SQLHistoricalBatchAttachment){
+					func(a *SQLHistoricalBatchAttachment) {
+						a.Entry.EventID = "not-in-original-scope"
+						a.Entry.Proof.EventID = a.Entry.EventID
+					},
+					func(a *SQLHistoricalBatchAttachment) { a.AssessmentID = 43 },
+					func(a *SQLHistoricalBatchAttachment) { a.Entry.Proof.BusinessBindingSHA256 = strings.Repeat("f", 64) },
+					func(a *SQLHistoricalBatchAttachment) {
+						a.Entry.Run = &evidence.HistoricalRunReferenceV1{RunID: "42:2", Attempt: 2}
+					},
+				} {
+					bad := entries[1]
+					bad.Entry = bad.Entry.Clone()
+					mutate(&bad)
+					if statement, err := o.ApplyHistoricalAttachments(ctx, []SQLHistoricalBatchAttachment{bad}); err == nil || statement != nil {
+						return errors.New("physical bridge accepted unrelated identity, binding or Run")
+					}
+				}
+				rolled, err = o.ApplyHistoricalAttachments(ctx, entries)
+				if err != nil {
+					return err
+				}
+				if _, err = o.ApplyHistoricalAttachments(ctx, entries); err == nil {
+					return errors.New("physical observer retried an effect")
+				}
+				return sentinel
+			}); !errors.Is(err, sentinel) {
+				t.Fatal("planning physical rollback failed", err)
+			}
+			readback := func(s *SQLHistoricalComponentStatement) error {
+				return db.Transaction(func(tx *gorm.DB) error {
+					r, err := s.VerifyIndependentPersisted(hostmysql.WithTx(t.Context(), tx), 20*time.Second)
+					if err == nil && (!r.IndependentPersistedReadMatched || r.HostCommitVerified || r.WholeRetirementComplete || r.DropReady) {
+						return errors.New("physical server readback invented paired commit or DROP")
+					}
+					return err
+				}, &sql.TxOptions{Isolation: sql.LevelRepeatableRead, ReadOnly: true})
+			}
+			if err := readback(rolled); err == nil {
+				t.Fatal("rolled-back planning statements became persisted proof")
+			}
+			if err := componentSQLNativeObserve(t, db, recipe, true, func(ctx context.Context, o *SQLHistoricalComponentObservation) error {
+				entries, err := build(ctx, o)
+				if err != nil {
+					return err
+				}
+				committed, err = o.ApplyHistoricalAttachments(ctx, entries)
+				return err
+			}); err != nil {
+				t.Fatal("planning physical commit failed", err)
+			}
+			if err := readback(committed); err != nil {
+				t.Fatal("independent planning server readback failed", err)
+			}
+			if r := committed.Report(); !r.StatementApplied || len(r.Locations) != 2 || r.SourceAuthenticated || r.BusinessClosureVerified || r.HostCommitVerified || r.DropReady {
+				t.Fatal("physical statements gained source/closure/commit permission", r)
+			}
+			set := storedHistoricalSet(t, db, "evaluation_outcome", "historical_committed_evidence", 9001)
+			if set == nil || len(set.Entries) != 1 || set.Entries[0].EventID != ids[1] || (set.Entries[0].Run == nil) != missingRun {
+				t.Fatal("original outcome identity or Run conclusion not persisted")
+			}
+		})
+	}
+}
+
 func TestSQLHistoricalComponentNativeExpiryAndReplayWholePair(t *testing.T) {
 	db := openHistoricalReferencesDB(t)
 	insertHistoricalAssessment(t, db, 42)
