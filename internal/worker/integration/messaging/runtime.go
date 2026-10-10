@@ -8,6 +8,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventing/runtime"
 	"github.com/FangcunMount/qs-server/internal/pkg/messagingruntime"
+	"github.com/FangcunMount/qs-server/internal/pkg/runtimefacts"
 	"github.com/FangcunMount/qs-server/internal/worker/config"
 )
 
@@ -30,10 +31,14 @@ type WirePublisherCloser interface {
 }
 
 func CreateSDKWirePublisher(cfg *config.MessagingConfig) (WirePublisherCloser, error) {
+	return CreateSDKWirePublisherWithFacts(cfg, nil)
+}
+
+func CreateSDKWirePublisherWithFacts(cfg *config.MessagingConfig, facts *runtimefacts.Owner) (WirePublisherCloser, error) {
 	if cfg == nil || cfg.Provider != "nsq" {
 		return nil, fmt.Errorf("native wire publisher requires NSQ provider")
 	}
-	return messagingruntime.NewSDKNSQWirePublisher(cfg.NSQAddr)
+	return messagingruntime.NewSDKNSQWirePublisherWithFacts(cfg.NSQAddr, facts, "worker-retry-publisher", cfg.NSQDHTTPEndpoints)
 }
 
 func EnsureChannels(ctx context.Context, cfg *config.MessagingConfig, serviceName string, source TopicSubscriptionSource) error {

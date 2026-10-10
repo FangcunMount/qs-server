@@ -3,6 +3,8 @@ package process
 import (
 	"context"
 	"fmt"
+	"strconv"
+	"sync/atomic"
 	"time"
 
 	"github.com/FangcunMount/component-base/pkg/logger"
@@ -124,17 +126,20 @@ func (s *server) buildEventSubsystemResourceDeps() eventSubsystemResourceDeps {
 				}
 				config := eventtransport.SubscriberConfig{
 					Provider: "nsq", NSQLookupdAddr: s.config.MessagingOptions.NSQLookupdAddr,
+					NSQDHTTPEndpoints: s.config.MessagingOptions.NSQDHTTPEndpoints,
 				}
+				var sequence atomic.Uint64
 				return func() (eventsubsystem.SDKSubscriber, error) {
-					return eventtransport.NewSDKDeliverySubscriber(config, 0,
-						s.config.MessagingOptions.Delivery.EffectiveMaxAttempts(), eventtransport.SDKFailedHandoffHandler(recorder))
+					return eventtransport.NewSDKDeliverySubscriberWithFacts(config, 0,
+						s.config.MessagingOptions.Delivery.EffectiveMaxAttempts(), eventtransport.SDKFailedHandoffHandler(recorder), s.runtimeFacts,
+						"api-additional-"+strconv.FormatUint(sequence.Add(1), 10))
 				}, nil
 			}
 		}
 	}
 	mongoProfile, assessmentProfile := buildEventProfileOptions(s.config)
 	return eventSubsystemResourceDeps{
-		newSubsystem:              configuredEventSubsystem(s.config),
+		newSubsystem:              configuredEventSubsystemWithFacts(s.config, s.runtimeFacts),
 		buildSDKSubscriberFactory: buildSDKSubscriberFactory,
 		consumers:                 buildEventConsumerOptions(s.config),
 		mongo:                     mongoProfile,
@@ -197,7 +202,7 @@ func (s *server) buildMQPublisherDeps() mqPublisherStageDeps {
 		deps.provider = options.Provider
 		if options.Provider == "nsq" {
 			deps.newWirePublisher = func() (wirePublisherResource, error) {
-				return messagingruntime.NewSDKNSQWirePublisher(options.NSQAddr)
+				return messagingruntime.NewSDKNSQWirePublisherWithFacts(options.NSQAddr, s.runtimeFacts, "api-wire-publisher", options.NSQDHTTPEndpoints)
 			}
 		}
 	}

@@ -18,6 +18,9 @@ type SubscriberConfig struct {
 	NSQLookupdAddr     string
 	NSQMessageTimeout  time.Duration
 	FailedHandoffGroup string
+	// NSQDHTTPEndpoints are the host's loaded topology observation addresses.
+	// They are not NSQD connections or inferred lookupd producer addresses.
+	NSQDHTTPEndpoints []string
 }
 
 func newNSQConfig(messageTimeout time.Duration) (*nsq.Config, error) {
