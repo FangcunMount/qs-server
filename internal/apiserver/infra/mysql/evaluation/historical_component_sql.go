@@ -453,7 +453,7 @@ func FreezeSQLHistoricalOwnerComponentRecipes(ctx context.Context, original *SQL
 			if present[event] != 0 || !slices.Contains(cross.selectors.EventIDs, event) || !slices.Contains(original.request.AnswerSheetIDs, sheet) || !slices.Contains(cross.selectors.MongoOwners, SQLCrossStoreOwnerReference{Kind: "AnswerSheet", ID: strconv.FormatUint(sheet, 10)}) {
 				return nil, ErrSQLHistoricalComponent
 			}
-			if _, err = original.OwnerByAnswerSheet(sheet); !errors.Is(err, ErrSQLHistoricalOwnerAbsent) {
+			if _, ownerErr := original.OwnerByAnswerSheet(sheet); !errors.Is(ownerErr, ErrSQLHistoricalOwnerAbsent) {
 				return nil, ErrSQLHistoricalComponent
 			}
 			for _, attachment := range parent.plan.attachments {
