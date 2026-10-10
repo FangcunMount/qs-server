@@ -1509,13 +1509,36 @@ def inventory_report_diagnostic(args, value):
             fail("report_diagnostic_report_binding_invalid")
     if report["complete"] and (len(seen) != 4 or report["error_category"] != "none" or any(category != "none" for category in categories.values())):
         fail("report_diagnostic_report_binding_invalid")
+    seed = None
+    if report["complete"] and all(item["next_cycle_required"] is False for item in report["targets"]):
+        bindings = {}
+        for database, binding in report["database_bindings"].items():
+            if (any(binding[key] is not True for key in ("metadata_complete", "expected_identity_match", "expected_migration_match"))
+                    or binding["migration_dirty"] is not False or binding["identity_hash"] != request["identity_hashes"][database]
+                    or type(binding["migration_version"]) is not int or binding["migration_version"] != request["expected_migrations"][database]):
+                fail("report_diagnostic_manifest_seed_invalid")
+            bindings[database] = {key: binding[key] for key in ("identity_hash", "migration_version", "migration_dirty", "catalog_hash", "non_target_schema_hash")}
+        validate_approved_namespace_anchor(request, report["database_bindings"]["mongodb"])
+        snapshots = []
+        for target in TARGETS:
+            item = next(item for item in report["targets"] if tuple(item[key] for key in ("database", "name", "kind")) == target)
+            if any(item[key] != item["boundary"][key] for key in ("present", "schema_hash", "identity_hash")):
+                fail("report_diagnostic_manifest_seed_invalid")
+            snapshots.append({key: item[key] for key in ("database", "name", "kind", "identity_hash", "schema_hash", "data_hash", "records")})
+        # Pure installation input from the original report; no history, backup,
+        # fence, execution or DROP capability is created by this projection.
+        seed = {"format_version": 1, "operation_id": report["operation_id"], "source_sha": report["source_sha"],
+                "target_hash": report["target_hash"], "database_bindings": bindings, "targets": snapshots,
+                "evidence": {}, "maintenance": {"max_seconds": MAX_WINDOW_SECONDS, "forward_stop_seconds": FORWARD_STOP_SECONDS,
+                                                "rollback_seconds": MAX_WINDOW_SECONDS - FORWARD_STOP_SECONDS}}
+        validate_manifest(seed, report["operation_id"], report["source_sha"])
     # Recheck protected original files before publishing only fixed categories.
     # Reading a report cannot prove that its source assets or history passed.
     operation_directory(args.root, args.operation_id)
     private_directory(output)
     read_private(directory, "inventory-request.json", reference["request_sha256"])
     read_private(output, "inventory.private.json", reference["sha256"])
-    return {"format_version": 1, "operation": "prepare", "prepare_mode": "report-diagnostic",
+    receipt = {"format_version": 1, "operation": "prepare", "prepare_mode": "report-diagnostic",
             "source_sha": args.actual_source_sha, "run_id": args.run_id, "operation_id": args.operation_id,
             "target_hash": TARGET_HASH, "target_count": 4, "complete": False, "execution_allowed": False,
             "diagnostic_only": True, "drop_ready": False, "report_diagnostic_complete": True,
@@ -1524,6 +1547,9 @@ def inventory_report_diagnostic(args, value):
             "inventory_private_report_hash": report_hash, "inventory_request_hash": reference["request_sha256"],
             "inventory_database_error_categories": categories,
             "error_category": "existing_report_diagnostic_only", "capabilities": {key: False for key in CAPABILITIES}}
+    if seed is not None:
+        receipt["inventory_manifest_seed"] = seed
+    return receipt
 
 
 # Two fixed failed, already terminal producers only. This is temporary-file disposition,
@@ -2726,6 +2752,12 @@ def main(argv=None):
               "report_diagnostic_complete": "bool", "report_diagnostic_approval_sha256": "hash64",
               "observed_boundary_report": {"run_id": "run_id", "source_sha": "sha40", "sha256": "hash64", "request_sha256": "hash64"},
               "observed_inventory_report": {"run_id": "run_id", "source_sha": "sha40", "sha256": "hash64", "request_sha256": "hash64"},
+              "inventory_manifest_seed": {"format_version": "uint", "operation_id": "run_id", "source_sha": "sha40", "target_hash": "hash64",
+                  "database_bindings": {database: {"identity_hash": "hash64", "migration_version": "uint", "migration_dirty": "bool",
+                      "catalog_hash": "hash64", "non_target_schema_hash": "hash64"} for database in ("mysql", "mongodb")},
+                  "targets": [{"database": frozenset({"mysql", "mongodb"}), "name": frozenset(target[1] for target in TARGETS),
+                      "kind": frozenset({"base_table", "collection"}), "identity_hash": "hash64", "schema_hash": "hash64", "data_hash": "hash64", "records": "uint"}],
+                  "evidence": {}, "maintenance": {"max_seconds": "uint", "forward_stop_seconds": "uint", "rollback_seconds": "uint"}},
               "inventory_request_hash": "hash64",
               "boundary_discovery_complete": "bool", "boundary_private_report_hash": "hash64", "boundary_request_hash": "hash64",
               "inventory_next_cycle_required": "bool", "inventory_boundary_report_hash": "nullable_hash64", "inventory_two_equal_scans": "bool",

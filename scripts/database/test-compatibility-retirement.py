@@ -1408,6 +1408,89 @@ class ReportDiagnosticSafetyContracts(unittest.TestCase):
         with self.assertRaisesRegex(tool.Blocked, '^' + category + '$'):
             tool.execute(self.args)
 
+    def inventory_report_fixture(self):
+        self.request.update(kind='readonly_inventory_request', boundary_run_id='701-1', boundary_report_hash='6' * 64,
+                            approved_boundaries=[dict(database=db, name=name, kind=kind, present=True, empty=False,
+                                pk_type='long' if db == 'mongodb' else 'uint64', upper_token=base64.b64encode(
+                                    b'PRIVATE_BSON_BOUNDARY' if db == 'mongodb' else b'42').decode(),
+                                schema_hash='7' * 64, identity_hash='8' * 64) for db, name, kind in tool.TARGETS])
+        self.request_hash = self.write(self.directory / 'inventory-request.json', self.request)
+        self.output = self.directory / ('inventory-' + DIAGNOSTIC_RUN); self.output.mkdir(mode=0o700)
+        self.report.update(kind='readonly_compatibility_inventory', complete=True, error_category='none',
+                           request_hash=self.request_hash, boundary_report_hash=self.request['boundary_report_hash'],
+                           source_bytes_protocol='mysql_cast_binary_columns_pk_order_v2+mongodb_server_bson_pk_order_v2',
+                           consistency_semantics='two_equal_complete_passes_within_independently_approved_upper;sql_same_readonly_snapshot;mongo_homogeneous_bson_id_simple_collation;after_upper_next_cycle_not_fenced',
+                           database_bindings={db: inventory_binding(db, self.request['identity_hashes'][db],
+                               self.request['expected_migrations'][db]) for db in ('mysql', 'mongodb')},
+                           targets=[dict(bound, complete=True, records=index + 1, bytes=32, data_hash='9' * 64,
+                               classification={'private_body': 'PRIVATE_SOURCE_BODY'}, error_category='none', equal_full_passes=2,
+                               pages=2, next_cycle_required=False, source_file='/PRIVATE_SOURCE_PATH', boundary=bound)
+                               for index, bound in enumerate(self.request['approved_boundaries'])])
+        for item in self.report['targets']:
+            for key in ('empty', 'pk_type', 'upper_token'): item.pop(key)
+        self.approval.update(kind='readonly_existing_inventory_report_approval',
+                             inventory_report=dict(self.approval.pop('boundary_report'), request_sha256=self.request_hash))
+        self.refresh_inventory_report()
+
+    def refresh_inventory_report(self):
+        self.approval['inventory_report']['sha256'] = self.write(self.output / 'inventory.private.json', self.report)
+        self.approve()
+
+    def test_inventory_complete_manifest_seed_exact_original_projection_and_transport(self):
+        self.inventory_report_fixture(); before = self.inventory()
+        result = tool.execute(self.args); seed = result['inventory_manifest_seed']
+        expected = {'format_version': 1, 'operation_id': DIAGNOSTIC_OP, 'source_sha': DIAGNOSTIC_ORIGINAL,
+                    'target_hash': tool.TARGET_HASH, 'database_bindings': {db: {key: binding[key] for key in
+                        ('identity_hash', 'migration_version', 'migration_dirty', 'catalog_hash', 'non_target_schema_hash')}
+                        for db, binding in self.report['database_bindings'].items()},
+                    'targets': [{key: item[key] for key in ('database', 'name', 'kind', 'identity_hash', 'schema_hash', 'data_hash', 'records')}
+                        for item in self.report['targets']], 'evidence': {},
+                    'maintenance': {'max_seconds': 1800, 'forward_stop_seconds': 1200, 'rollback_seconds': 600}}
+        self.assertEqual(seed, expected); tool.validate_manifest(seed, DIAGNOSTIC_OP, DIAGNOSTIC_ORIGINAL)
+        self.assertBlockedManifestOrigin(seed)
+        output = io.StringIO()
+        with contextlib.redirect_stdout(output):
+            code = tool.main(['--operation', 'prepare', '--root', str(self.root), '--operation-id', DIAGNOSTIC_OP,
+                '--approved-source-sha', DIAGNOSTIC_SOURCE, '--actual-source-sha', DIAGNOSTIC_SOURCE,
+                '--run-id', DIAGNOSTIC_OBSERVE, '--prepare-mode', 'report-diagnostic',
+                '--bootstrap-approval-json', self.args.bootstrap_approval_json, '--bootstrap-approval-hash', self.args.bootstrap_approval_hash])
+        self.assertEqual(code, 0)
+        receipt = json.loads(tool.transport().decode_armored_receipt(output.getvalue()))
+        self.assertEqual(receipt['inventory_manifest_seed'], expected)
+        for marker in ('PRIVATE_SOURCE_BODY', '/PRIVATE_SOURCE_PATH', 'PRIVATE_BSON_BOUNDARY', 'upper_token', 'namespace_anchor', str(self.root)):
+            self.assertNotIn(marker, json.dumps(receipt))
+        self.assertTrue(all(receipt[key] is False for key in ('complete', 'execution_allowed', 'drop_ready')))
+        self.assertTrue(all(value is False for value in receipt['capabilities'].values()))
+        self.assertEqual(self.inventory(), before)
+
+    def assertBlockedManifestOrigin(self, seed):
+        with self.assertRaisesRegex(tool.Blocked, '^evidence_binding_mismatch$'):
+            tool.validate_manifest(seed, DIAGNOSTIC_OP, DIAGNOSTIC_SOURCE)
+
+    def test_inventory_partial_or_next_cycle_has_no_manifest_seed(self):
+        self.inventory_report_fixture(); original = copy.deepcopy(self.report)
+        for partial in (True, False):
+            with self.subTest(partial=partial):
+                self.report = copy.deepcopy(original)
+                if partial: self.report.update(complete=False, error_category='inventory_incomplete')
+                else: self.report['targets'][0]['next_cycle_required'] = True
+                self.refresh_inventory_report()
+                self.assertNotIn('inventory_manifest_seed', tool.execute(self.args))
+
+    def test_inventory_manifest_seed_rejects_hash_identity_schema_and_origin_conflict(self):
+        self.inventory_report_fixture(); original = copy.deepcopy(self.report)
+        for change in (lambda v: v['database_bindings']['mysql'].update(migration_dirty=True),
+                       lambda v: v['database_bindings']['mongodb'].update(identity_hash='f' * 64),
+                       lambda v: v['database_bindings']['mysql'].update(metadata_complete=False),
+                       lambda v: v['database_bindings']['mysql'].update(migration_version=98),
+                       lambda v: v['database_bindings']['mysql'].update(catalog_hash='invalid'),
+                       lambda v: v['targets'][0].update(identity_hash='f' * 64),
+                       lambda v: v['targets'][0].update(data_hash='invalid'),
+                       lambda v: v.update(source_sha=DIAGNOSTIC_SOURCE)):
+            with self.subTest(change=change):
+                self.report = copy.deepcopy(original); change(self.report); self.refresh_inventory_report()
+                with self.assertRaises(tool.Blocked): tool.execute(self.args)
+
     def test_real_failed_report_exact_origin_readonly_no_runtime_and_no_writes(self):
         before = self.inventory()
         with mock.patch.object(tool, 'live_inventory', side_effect=AssertionError('DB path entered')),\
