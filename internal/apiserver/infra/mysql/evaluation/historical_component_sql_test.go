@@ -2,7 +2,11 @@ package evaluation
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
+	"slices"
+	"sort"
 	"strings"
 	"testing"
 	"time"
@@ -92,11 +96,122 @@ func TestSQLHistoricalComponentSemanticViewRequiresActualObservation(t *testing.
 	if _, err := v.Responsibilities(ctx); err == nil {
 		t.Fatal("forged view claimed a negative closure")
 	}
+	if _, err := v.CrossStoreRows(ctx); err == nil {
+		t.Fatal("forged view exposed raw responsibility or replay rows")
+	}
 	if _, err := v.OutcomeRecord(ctx, 9001); err == nil || v.OriginalOutcomeRunAbsent(ctx, 9001, "42:1") == nil {
 		t.Fatal("forged view claimed an original Outcome/Run")
 	}
 	if _, err := v.BusinessBinding(ctx, 42, 0, "evaluation.requested", nil); err == nil {
 		t.Fatal("forged view minted a business anchor")
+	}
+}
+
+// Synthetic decoder inputs prove no native scope or writing permission. The
+// public view refuses them; actual same-transaction tests live in integration.
+func componentUnitCrossStoreImage(t *testing.T) (sqlHistoricalCASImage, []SQLResponsibilityObservation) {
+	t.Helper()
+	p := crossUnitReplayPage(t)
+	image := sqlHistoricalCASImage{rows: map[string][]historicalSQLRow{}, columns: map[string][]string{}}
+	for _, spec := range sqlResponsibilityTables {
+		image.rows[spec.name], image.columns[spec.name] = []historicalSQLRow{}, slices.Clone(spec.keys)
+	}
+	image.rows["rm_outbox"] = []historicalSQLRow{cycleTestMessage(t, "original-a", "evaluation.requested", "Evaluation", "42", cycleRequestedPayload())}
+	image.rows["qs_rm_replay_requests"] = []historicalSQLRow{p.rows[0]}
+	image.rows["qs_rm_replay_items"] = []historicalSQLRow{p.rows[1], p.rows[2]}
+	var observed []SQLResponsibilityObservation
+	for _, spec := range sqlResponsibilityTables {
+		rows := image.rows[spec.name]
+		if len(rows) > 0 {
+			columns := []string{}
+			for column := range rows[0] {
+				columns = append(columns, column)
+			}
+			sort.Strings(columns)
+			image.columns[spec.name] = columns
+		}
+		for _, row := range rows {
+			observed = append(observed, cycleDecode(spec.name, row))
+		}
+	}
+	return image, observed
+}
+
+func TestSQLHistoricalComponentCrossStoreWholeRawReplayAndCopies(t *testing.T) {
+	image, observed := componentUnitCrossStoreImage(t)
+	observed[0].OwnerUnproven = true
+	observed[0].Reasons = append(observed[0].Reasons, "actual_owner_diagnostic")
+	for i := 2; i < len(observed); i++ {
+		observed[i].link.store = "mongo-domain-events"
+		observed[i].OwnerUnproven = true
+	}
+	rows, err := componentCrossStoreRows(image, observed)
+	if err != nil || len(rows) != 4 || rows[0].Inner == nil || rows[0].Observation.PrimaryKeySHA256 == "" || rows[0].Observation.RowSHA256 == "" || !rows[0].Observation.OwnerUnproven || len(rows[0].Observation.Reasons) != 1 {
+		t.Fatal("whole actual raw row/owner diagnostic lost", err)
+	}
+	raw := mustCycleInner(image.rows["rm_outbox"][0], "rm_outbox")
+	innerSHA, dataSHA := sha256.Sum256(raw), sha256.Sum256(rows[0].Inner.Data)
+	if rows[0].LegacyContentSHA256 != hex.EncodeToString(innerSHA[:]) || rows[0].InnerDataSHA256 != hex.EncodeToString(dataSHA[:]) || rows[0].LegacyContentSHA256 == rows[0].Observation.RowSHA256 {
+		t.Fatal("original layers of actual bytes collapsed")
+	}
+	for _, row := range rows[1:] {
+		if row.Replay == nil || !row.Replay.FingerprintVerified || len(row.Replay.Items) != 2 || row.Replay.Items[1].EventID != "original-b" {
+			t.Fatal("different event in whole replay closure hidden")
+		}
+	}
+	rows[0].Inner.Data[0] ^= 1
+	rows[0].Observation.Reasons[0] = "changed"
+	rows[1].Replay.Items[0].EventID = "changed"
+	if rows[2].Replay.Items[0].EventID != "original-a" {
+		t.Fatal("returned replay row shares editable items")
+	}
+	fresh, err := componentCrossStoreRows(image, observed)
+	if err != nil || fresh[0].Inner.Data[0] == rows[0].Inner.Data[0] || fresh[0].Observation.Reasons[0] != "actual_owner_diagnostic" || fresh[1].Replay.Items[0].EventID != "original-a" {
+		t.Fatal("returned copies changed captured data", err)
+	}
+}
+
+func TestSQLHistoricalComponentCrossStoreClosureAndHashDrift(t *testing.T) {
+	for _, name := range []string{"missing_table", "missing_observation", "extra_observation", "owner_drift", "wrong_row_hash", "duplicate_key", "missing_parent", "ordinal_gap", "wrong_hash", "missing_member", "missing_column"} {
+		t.Run(name, func(t *testing.T) {
+			image, observed := componentUnitCrossStoreImage(t)
+			switch name {
+			case "missing_table":
+				delete(image.rows, "event_delivery_dead_letter")
+			case "missing_observation":
+				observed = observed[:len(observed)-1]
+			case "extra_observation":
+				observed = append(observed, observed[0])
+			case "owner_drift":
+				observed[0].OrgID = 8
+			case "wrong_row_hash":
+				observed[0].RowSHA256 = strings.Repeat("0", 64)
+			case "duplicate_key":
+				image.rows["rm_outbox"] = append(image.rows["rm_outbox"], image.rows["rm_outbox"][0])
+				observed = append(observed[:1], append([]SQLResponsibilityObservation{observed[0]}, observed[1:]...)...)
+			case "missing_parent":
+				image.rows["qs_rm_replay_requests"] = nil
+				observed = append(observed[:1], observed[2:]...)
+			case "ordinal_gap":
+				image.rows["qs_rm_replay_items"][1]["ordinal"] = strptr("2")
+				observed[3] = cycleDecode("qs_rm_replay_items", image.rows["qs_rm_replay_items"][1])
+			case "wrong_hash":
+				image.rows["qs_rm_replay_requests"][0]["input_hash"] = strptr(string(make([]byte, 32)))
+			case "missing_member":
+				image.rows["qs_rm_replay_items"] = image.rows["qs_rm_replay_items"][:1]
+				observed = observed[:3]
+			case "missing_column":
+				delete(image.rows["rm_outbox"][0], "payload")
+			}
+			rows, err := componentCrossStoreRows(image, observed)
+			if name == "wrong_hash" || name == "missing_member" {
+				if err == nil && (rows[1].Replay == nil || rows[1].Replay.FingerprintVerified) {
+					t.Fatal("changed/incomplete replay input declared fingerprint verified")
+				}
+			} else if err == nil {
+				t.Fatal("changed raw closure or key/hash binding accepted")
+			}
+		})
 	}
 }
 

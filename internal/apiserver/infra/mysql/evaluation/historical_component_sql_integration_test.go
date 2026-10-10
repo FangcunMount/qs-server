@@ -645,6 +645,9 @@ func TestSQLHistoricalComponentNativeSemanticViewRejectsDatabaseSwitch(t *testin
 				if _, err = v.BusinessBinding(ctx, 42, 0, "evaluation.requested", nil); err == nil {
 					return errors.New("switched database retained original business binding")
 				}
+				if _, err = v.CrossStoreRows(ctx); err == nil {
+					return errors.New("switched database retained original raw responsibility view")
+				}
 				if !o.expires.Equal(originalExpires) {
 					return errors.New("database identity check extended original deadline")
 				}
@@ -676,6 +679,7 @@ func TestSQLHistoricalComponentNativeFreshSemanticView(t *testing.T) {
 				}
 			}
 			crossSQLNativeReplay(t, db, "old-original")
+			crossSQLNativeHeld(t, db, "actual-semantic-held")
 			r := componentSQLNativeRecipe(t, db, false)
 			var retained *SQLHistoricalComponentSemanticView
 			if err := componentSQLNativeObserve(t, db, r, false, func(ctx context.Context, o *SQLHistoricalComponentObservation) error {
@@ -739,9 +743,48 @@ func TestSQLHistoricalComponentNativeFreshSemanticView(t *testing.T) {
 				if err != nil || items != 2 || parents != 1 {
 					t.Fatal("full replay negative responsibility closure cut", err)
 				}
+				cross, err := v.CrossStoreRows(ctx)
+				if err != nil || len(cross) != len(rows) {
+					t.Fatal("actual raw view did not retain entire responsibility closure", err)
+				}
+				message, replayRows := 0, 0
+				for _, row := range cross {
+					if row.Observation.PrimaryKeySHA256 == "" || row.Observation.RowSHA256 == "" {
+						t.Fatal("actual primary key or complete row bytes unbound")
+					}
+					if row.Observation.Store == "retry_event_hold" {
+						message++
+						if row.Inner == nil || row.Inner.ID != "actual-semantic-held" || row.LegacyContentSHA256 == "" || row.InnerDataSHA256 == "" || row.Observation.RowSHA256 == row.LegacyContentSHA256 {
+							t.Fatal("actual wire decoder or separate byte layers lost")
+						}
+						row.Inner.Data[0] ^= 1
+					}
+					if row.Replay != nil {
+						replayRows++
+						if !row.Replay.FingerprintVerified || len(row.Replay.Items) != 2 || row.Replay.Items[1].EventID != "different-original" {
+							t.Fatal("whole actual replay input hidden by initial event selection")
+						}
+						row.Replay.Items[0].EventID = "edited"
+					}
+				}
+				if message != 1 || replayRows != 3 {
+					t.Fatal("actual message or parent/member replay view missing")
+				}
+				freshCross, err := v.CrossStoreRows(ctx)
+				if err != nil || len(freshCross) != len(cross) {
+					t.Fatal("fresh same-transaction raw view rejected", err)
+				}
+				for i, row := range freshCross {
+					if row.Inner != nil && slices.Equal(row.Inner.Data, cross[i].Inner.Data) || row.Replay != nil && row.Replay.Items[0].EventID != "old-original" {
+						t.Fatal("returned raw/replay copies changed the captured observation")
+					}
+				}
 				o.used = true
 				if v.ValidateBorrowedSnapshot(ctx) == nil || o.ValidateBorrowedObservation(ctx) == nil {
 					t.Fatal("consumed view reused as fresh qualification")
+				}
+				if _, err = v.CrossStoreRows(ctx); err == nil {
+					t.Fatal("consumed view retained raw/replay access")
 				}
 				o.used = false
 				return nil
@@ -750,6 +793,9 @@ func TestSQLHistoricalComponentNativeFreshSemanticView(t *testing.T) {
 			}
 			if retained.ValidateBorrowedSnapshot(t.Context()) == nil {
 				t.Fatal("ended transaction kept semantic view alive")
+			}
+			if _, err := retained.CrossStoreRows(t.Context()); err == nil {
+				t.Fatal("ended transaction retained raw/replay access")
 			}
 		})
 	}

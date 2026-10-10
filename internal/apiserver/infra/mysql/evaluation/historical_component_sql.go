@@ -1,7 +1,10 @@
 package evaluation
 
 import (
+	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -12,8 +15,10 @@ import (
 	"strings"
 	"time"
 
+	standard "github.com/FangcunMount/qs-server/internal/apiserver/eventing/standardoutbox"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationfact"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventing/evidence"
+	domainwire "github.com/FangcunMount/reliable-messaging/wire/domain"
 	"gorm.io/gorm"
 )
 
@@ -1606,6 +1611,145 @@ func (v *SQLHistoricalComponentSemanticView) Responsibilities(ctx context.Contex
 		rows[i].Reasons = slices.Clone(rows[i].Reasons)
 	}
 	return rows, nil
+}
+
+// CrossStoreRows returns data from the whole actual responsibility closure,
+// including every replay member. It grants no completed cycle or CAS permit.
+func (v *SQLHistoricalComponentSemanticView) CrossStoreRows(ctx context.Context) ([]SQLCrossStoreRow, error) {
+	if v.ValidateBorrowedSnapshot(ctx) != nil {
+		return nil, ErrSQLHistoricalComponent
+	}
+	o := v.observation
+	bounded, cancel := context.WithDeadline(ctx, o.expires)
+	defer cancel()
+	tx, err := historicalTx(bounded)
+	if err != nil || tx.Statement.ConnPool != o.pool {
+		return nil, ErrSQLHistoricalComponent
+	}
+	head, _, _, err := cycleQuery(tx, "SELECT version,dirty FROM schema_migrations ORDER BY version", 2)
+	if err != nil || len(head) != 1 || valueOrEmpty(head[0]["dirty"]) != "0" || !reflect.DeepEqual(head, o.business.rows["cas_migration_head"]) {
+		return nil, ErrSQLHistoricalComponent
+	}
+	for _, spec := range sqlResponsibilityTables {
+		columns, schema, _, e := cycleSchema(tx, spec)
+		if e != nil || schema != o.responsibility.schema[spec.name] || !reflect.DeepEqual(columns, o.responsibility.columns[spec.name]) || !sqlCrossStoreSupportedColumns(spec.name, columns) {
+			return nil, ErrSQLHistoricalComponent
+		}
+	}
+	rows, err := componentCrossStoreRows(o.responsibility, o.observations)
+	if err != nil || v.ValidateBorrowedSnapshot(bounded) != nil {
+		return nil, ErrSQLHistoricalComponent
+	}
+	return rows, nil
+}
+
+// Only the live caller validates native scope/schema. This private decoder
+// consumes that caller's captured image; no selector can cut its closure.
+func componentCrossStoreRows(image sqlHistoricalCASImage, observations []SQLResponsibilityObservation) ([]SQLCrossStoreRow, error) {
+	if len(image.rows) != len(sqlResponsibilityTables) || len(image.columns) != len(sqlResponsibilityTables) {
+		return nil, ErrSQLHistoricalComponent
+	}
+	out := make([]SQLCrossStoreRow, 0, len(observations))
+	rawRows := make([]historicalSQLRow, 0, len(observations))
+	parents, items := map[string][]int{}, map[string][]int{}
+	for _, spec := range sqlResponsibilityTables {
+		rows, ok := image.rows[spec.name]
+		if !ok || len(image.columns[spec.name]) == 0 {
+			return nil, ErrSQLHistoricalComponent
+		}
+		var previous []string
+		for _, row := range rows {
+			key, err := cycleKey(spec, row)
+			if err != nil || previous != nil && cycleCompare(spec, previous, key) >= 0 || len(out) >= len(observations) || len(row) != len(image.columns[spec.name]) {
+				return nil, ErrSQLHistoricalComponent
+			}
+			for _, column := range image.columns[spec.name] {
+				if _, ok = row[column]; !ok {
+					return nil, ErrSQLHistoricalComponent
+				}
+			}
+			previous = key
+			observed, decoded := observations[len(out)], cycleDecode(spec.name, row)
+			pk, hash := cycleKeyDigest(key), cycleRowDigest(image.columns[spec.name], row)
+			if observed.Invalid || observed.PrimaryKeySHA256 != "" && observed.PrimaryKeySHA256 != pk || observed.RowSHA256 != "" && observed.RowSHA256 != hash {
+				return nil, ErrSQLHistoricalComponent
+			}
+			base := observed
+			base.PrimaryKeySHA256, base.RowSHA256 = "", ""
+			base.Reasons, base.OwnerUnproven = decoded.Reasons, decoded.OwnerUnproven
+			// checkReverse enriches replay items from their actual parent/current
+			// message, and a gap decision from its actual current message. Keep
+			// those observed conclusions while checking the raw intrinsic fields.
+			switch spec.name {
+			case "qs_rm_replay_items":
+				base.AssessmentID, base.TesteeID, base.EventType = decoded.AssessmentID, decoded.TesteeID, decoded.EventType
+				base.OwnerKind, base.OwnerID, base.ScopeClass = decoded.OwnerKind, decoded.OwnerID, decoded.ScopeClass
+				base.link.store, base.Unfinished = decoded.link.store, decoded.Unfinished
+			case "qs_rm_gap_recovery_request":
+				base.Unfinished = decoded.Unfinished
+			}
+			if !reflect.DeepEqual(base, decoded) {
+				return nil, ErrSQLHistoricalComponent
+			}
+			f := SQLCrossStoreRow{Observation: observed}
+			f.Observation.PrimaryKeySHA256, f.Observation.RowSHA256 = pk, hash
+			f.Observation.Reasons = slices.Clone(observed.Reasons)
+			if spec.name == "rm_outbox" || spec.name == "retry_event_hold" || spec.name == "event_delivery_dead_letter" {
+				raw := mustCycleInner(row, spec.name)
+				var inner domainwire.Envelope
+				if sqlHistoricalStrictJSON(raw, &inner) != nil {
+					return nil, ErrSQLHistoricalComponent
+				}
+				f.Inner = &inner
+				sum := sha256.Sum256(raw)
+				f.LegacyContentSHA256 = hex.EncodeToString(sum[:])
+				sum = sha256.Sum256(inner.Data)
+				f.InnerDataSHA256 = hex.EncodeToString(sum[:])
+			}
+			pair := cyclePair(observed.OrgID, observed.link.requestID)
+			switch spec.name {
+			case "qs_rm_replay_requests":
+				parents[pair] = append(parents[pair], len(out))
+			case "qs_rm_replay_items":
+				items[pair] = append(items[pair], len(out))
+			}
+			out, rawRows = append(out, f), append(rawRows, row)
+		}
+	}
+	if len(out) != len(observations) {
+		return nil, ErrSQLHistoricalComponent
+	}
+	for pair, indexes := range items {
+		if len(parents[pair]) != 1 {
+			return nil, ErrSQLHistoricalComponent
+		}
+		parent := parents[pair][0]
+		header := rawRows[parent]
+		org := cyclePositive(header, "org_id")
+		if org == 0 || org > 1<<63-1 {
+			return nil, ErrSQLHistoricalComponent
+		}
+		input := standard.ReplayRequest{OrgID: int64(org), RequestID: valueOrEmpty(header["request_id"]), Store: valueOrEmpty(header["store_name"]), Reason: valueOrEmpty(header["reason"])}
+		replay := SQLCrossStoreReplay{OrganizationID: org, RequestID: input.RequestID, Store: input.Store, InputSHA256: hex.EncodeToString([]byte(valueOrEmpty(header["input_hash"])))}
+		for ordinal, index := range indexes {
+			row := rawRows[index]
+			n, valid := cycleSafeUint(row, "ordinal")
+			failure, validFailure := cycleSafeUint(row, "expected_failure_count")
+			if !valid || !validFailure || n != uint64(ordinal) || cyclePositive(row, "org_id") != org || valueOrEmpty(row["request_id"]) != input.RequestID {
+				return nil, ErrSQLHistoricalComponent
+			}
+			replay.Items = append(replay.Items, SQLCrossStoreReplayItem{EventID: valueOrEmpty(row["event_id"]), ExpectedFailureCount: failure, Authorized: valueOrEmpty(row["authorized"]) == "1", Reason: valueOrEmpty(row["reason"])})
+			input.Targets = append(input.Targets, standard.ReplayTarget{EventID: valueOrEmpty(row["event_id"]), ExpectedFailureCount: failure})
+		}
+		fingerprint, err := input.Fingerprint()
+		replay.FingerprintVerified = err == nil && bytes.Equal(fingerprint[:], []byte(valueOrEmpty(header["input_hash"])))
+		for _, index := range append(indexes, parent) {
+			copy := replay
+			copy.Items = slices.Clone(replay.Items)
+			out[index].Replay = &copy
+		}
+	}
+	return out, nil
 }
 
 func (v *SQLHistoricalComponentSemanticView) OutcomeRecord(ctx context.Context, id uint64) (*evaluationfact.Record, error) {
