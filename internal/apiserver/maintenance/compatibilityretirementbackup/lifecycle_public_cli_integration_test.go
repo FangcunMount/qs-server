@@ -910,8 +910,32 @@ func publicCLIFixtureAPIImage(t *testing.T, binary, source, operation, run, priv
 	if e != nil || !hashPattern.MatchString(cid) || !checkProbe() {
 		t.Fatal("public_cli_native_api_copy_probe_rejected")
 	}
-	copied, e := publicCLIDocker(ctx, "container", "cp", cid+":/app/qs-apiserver", "-")
+	// Only the program-copy stream has a binary-sized budget. Metadata keeps
+	// nativeCommand's original cap; this tar may contain just the verified file.
+	copyBudget := int64(len(program)) + (64 << 10)
+	copyCtx, copyCancel := context.WithCancel(ctx)
+	copyCommand := exec.CommandContext(copyCtx, "/usr/bin/docker", "--host", "unix:///run/docker.sock", "container", "cp", cid+":/app/qs-apiserver", "-")
+	copyCommand.Env = []string{"PATH=/usr/bin:/bin"}
+	copyCommand.Stderr = io.Discard
+	copyCommand.WaitDelay = 2 * time.Second
+	copyOutput, e := copyCommand.StdoutPipe()
 	if e != nil {
+		copyCancel()
+		t.Fatal("public_cli_native_api_image_program_read_failed")
+	}
+	if e = copyCommand.Start(); e != nil {
+		copyCancel()
+		_ = copyOutput.Close()
+		t.Fatal("public_cli_native_api_image_program_read_failed")
+	}
+	copied, readErr := io.ReadAll(io.LimitReader(copyOutput, copyBudget+1))
+	if readErr != nil || int64(len(copied)) > copyBudget {
+		copyCancel()
+		_ = copyOutput.Close()
+	}
+	waitErr := copyCommand.Wait() // Always reap this actual fixed Docker child.
+	copyCancel()
+	if readErr != nil || waitErr != nil || int64(len(copied)) > copyBudget {
 		t.Fatal("public_cli_native_api_image_program_read_failed")
 	}
 	reader := tar.NewReader(bytes.NewReader(copied))
