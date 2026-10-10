@@ -1707,3 +1707,46 @@ The original b617 native results retain their source and scope. Final-source CI,
 full B business/recovery execution and production retirement acceptance remain
 pending. Production is still at clean MySQL99/Mongo38; no production historical
 CAS, four-target backup/restore rehearsal, DROP, B deployment or purge has run.
+
+
+### Limited deploy entry for the host writer observation
+
+The nonroot `host-writer-scope` caller no longer passes Python source to sudo.
+It executes only `/usr/bin/python3 -I /usr/local/libexec/qs-retirement/<digest>.py`
+with no further arguments. Missing installation is a rejection, with no inline
+Python or password fallback. `SVRA_USERNAME` remains `deploy`, and `SVRA_SSH_KEY`
+must authenticate that account. This observation does not use
+`SVRA_SUDO_PASSWORD` or database credentials.
+
+The release owner generates the installed bytes with
+`fixed_host_entry_program(operation_id, approved_source_sha, native_hashes)` from
+this reviewed source. `native_hashes` contains the SHA-256 of both actual
+`inventory-linux-amd64` and `inventory-linux-arm64` binaries, built with the
+same flags and toolchain as the approved Action. Verify those original bytes
+before administrator installation. The entry pins the operation, source and
+both binary digests, resolves the actual local deploy UID, and accepts only
+bounded run/request/package bindings on stdin. It forces the host observation
+mode; other modes and credential fields are rejected. The original bootstrap
+then reopens and hashes the complete package before staging/execution.
+
+The administrator installs the generated file as root-owned `0555` below the
+root-owned, non-writable `/usr/local/libexec/qs-retirement` hierarchy. The sudoers
+rule permits ONLY the exact interpreter arguments and file path:
+
+```text
+deploy ALL=(root) NOPASSWD: /usr/bin/python3 -I /usr/local/libexec/qs-retirement/<digest>.py
+```
+
+Replace `<digest>` with the actual generated-file SHA-256; do not use wildcards.
+Validate the rule with `visudo` before installation and validate the complete
+sudoers configuration afterward. Set the qs-server `production` environment
+Variable `RETIREMENT_FIXED_HOST_ENTRY_SHA256` to that same digest. The caller
+checks root ownership, every parent, file mode, absence of links and original
+file hash before sudo. Actual ServerA installation and permission remain
+unproven until the Action enters the native observer and returns its receipt.
+
+Remove only this dedicated sudoers rule and installed digest file at R4, clear
+the dedicated Variable, and preserve unrelated deployment rules/files. This
+limited entry currently covers host observation only; database census, image
+preparation and lifecycle execution require their separately reviewed existing
+permissions and are not granted by this rule.

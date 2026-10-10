@@ -2002,6 +2002,112 @@ def root_askpass_environment():
             fail('lifecycle_root_host_channel_required')
 
 
+FIXED_HOST_ENTRY_BASE = Path('/usr/local/libexec/qs-retirement')
+
+# Generated from the reviewed bootstrap, then installed by the administrator.
+# The installed bytes pin one operation/source and both native binary hashes;
+# deploy supplies neither privileged code nor an executable path over stdin.
+FIXED_HOST_ENTRY_GATE = r'''
+import hashlib, io, json, os, platform, pwd, re, stat, sys, tarfile
+from pathlib import Path
+POLICY = @POLICY@
+def reject():
+    print('{"format_version":1,"complete":false,"execution_allowed":false,"drop_ready":false,"error_category":"fixed_host_entry_rejected"}')
+    raise SystemExit(1)
+def authorize():
+    if len(sys.argv)!=1 or os.getuid()!=0 or os.geteuid()!=0: reject()
+    owner=pwd.getpwnam('deploy').pw_uid
+    if owner<1 or os.environ.get('SUDO_UID')!=str(owner): reject()
+    raw=sys.stdin.buffer.read(4097)
+    if len(raw)>4096: reject()
+    def unique(items):
+        value={}
+        for key,item in items:
+            if key in value: reject()
+            value[key]=item
+        return value
+    request=json.loads(raw,object_pairs_hook=unique)
+    if not isinstance(request,dict) or set(request)!={'operation_id','run_id','source_sha','request_sha256','package_sha256'}: reject()
+    if any(not isinstance(v,str) for v in request.values()): reject()
+    if request['operation_id']!=POLICY['operation_id'] or request['source_sha']!=POLICY['source_sha']: reject()
+    if not re.fullmatch(r'[0-9]{1,20}-[0-9]{1,4}',request['run_id']): reject()
+    if not all(re.fullmatch(r'[0-9a-f]{64}',request[k]) for k in ('request_sha256','package_sha256')): reject()
+    arch={'x86_64':'amd64','aarch64':'arm64','arm64':'arm64'}.get(platform.machine())
+    if arch not in POLICY['native_sha256']: reject()
+    archive=Path('/tmp/qs-compatibility-retirement-'+request['run_id']+'.tar.gz')
+    fd=os.open(archive,os.O_RDONLY|os.O_NOFOLLOW|os.O_NONBLOCK)
+    with os.fdopen(fd,'rb') as f:
+        info=os.fstat(f.fileno())
+        if not stat.S_ISREG(info.st_mode) or info.st_nlink!=1 or info.st_uid!=owner or not 0<info.st_size<=256<<20: reject()
+        archive_hash=hashlib.sha256(); archive_bytes=0
+        while True:
+            block=f.read(1<<20)
+            if not block: break
+            archive_bytes+=len(block)
+            if archive_bytes>256<<20: reject()
+            archive_hash.update(block)
+        if archive_bytes!=info.st_size or archive_hash.hexdigest()!=request['package_sha256']: reject()
+        f.seek(0)
+        names=set(); matched=False
+        with tarfile.open(fileobj=f,mode='r|gz') as tar:
+            for member in tar:
+                if len(names)>=16 or member.name in names or not member.isfile() or '/' in member.name or not 0<=member.size<=64<<20: reject()
+                names.add(member.name)
+                if member.name=='inventory-linux-'+arch:
+                    content=tar.extractfile(member); digest=hashlib.sha256(); size=0
+                    while True:
+                        block=content.read(1<<20)
+                        if not block: break
+                        size+=len(block); digest.update(block)
+                    if size!=member.size or size<1 or digest.hexdigest()!=POLICY['native_sha256'][arch]: reject()
+                    matched=True
+        if not matched: reject()
+    return request,owner
+try:
+    request,owner=authorize()
+    # The original bootstrap reopens and hashes the COMPLETE archive before
+    # executing. Replacement between the pin check and staging cannot pass.
+    sys.argv=[sys.argv[0],request['operation_id'],request['run_id'],request['source_sha'],request['request_sha256'],request['package_sha256'],'','sudo-user','host-writer-scope']
+    sys.stdin=io.TextIOWrapper(io.BytesIO(b'{}'))
+    os.environ.clear(); os.environ.update({'PATH':'/usr/bin:/bin','SUDO_UID':str(owner)})
+    exec(compile(@PROGRAM@,'approved-fixed-host-bootstrap','exec'))
+except (OSError,ValueError,KeyError,EOFError,tarfile.TarError):
+    reject()
+'''
+
+
+def fixed_host_entry_program(operation, source, native_hashes):
+    token(operation, RUN)
+    token(source, SHA)
+    if not isinstance(native_hashes, dict) or set(native_hashes) != {'amd64', 'arm64'}:
+        fail('fixed_host_entry_policy_rejected')
+    for value in native_hashes.values(): token(value, HASH)
+    policy={'operation_id':operation,'source_sha':source,'native_sha256':native_hashes}
+    return (FIXED_HOST_ENTRY_GATE.replace('@POLICY@',repr(policy)).replace('@PROGRAM@',repr(ROOT_PREPARE_ONCE))).encode()
+
+
+def installed_fixed_host_entry():
+    expected=os.environ.get('RETIREMENT_FIXED_HOST_ENTRY_SHA256','')
+    if not isinstance(expected,str) or HASH.fullmatch(expected) is None:
+        fail('fixed_host_entry_installation_required')
+    path=FIXED_HOST_ENTRY_BASE/(expected+'.py')
+    try:
+        for parent in (path.parent,*path.parents[1:]):
+            info=parent.lstat()
+            if not stat.S_ISDIR(info.st_mode) or info.st_uid!=0 or stat.S_IMODE(info.st_mode)&0o022:
+                fail('fixed_host_entry_installation_rejected')
+        fd=os.open(path,os.O_RDONLY|os.O_NOFOLLOW|os.O_NONBLOCK)
+        with os.fdopen(fd,'rb') as stream:
+            info=os.fstat(stream.fileno())
+            if not stat.S_ISREG(info.st_mode) or info.st_uid!=0 or info.st_nlink!=1 or stat.S_IMODE(info.st_mode)!=0o555 or not 0<info.st_size<=65536:
+                fail('fixed_host_entry_installation_rejected')
+            if hashlib.sha256(stream.read(65537)).hexdigest()!=expected:
+                fail('fixed_host_entry_installation_rejected')
+    except OSError:
+        fail('fixed_host_entry_installation_rejected')
+    return path
+
+
 def root_once_lifecycle_prepare(args):
     if args.operation != 'prepare' or args.prepare_mode not in ('lifecycle','prepare-facts','host-writer-scope','db-writer-census'):
         fail('lifecycle_root_host_channel_required')
@@ -2026,6 +2132,10 @@ def root_once_lifecycle_prepare(args):
         try:
             if uid == 0:
                 result=subprocess.run(['/usr/bin/python3','-I','-c',ROOT_PREPARE_ONCE,*bindings,'root-direct',*suffix],env={'PATH':'/usr/bin:/bin'},input=packet,stdout=subprocess.PIPE,stderr=private_stderr,timeout=91*60,check=False)
+            elif args.prepare_mode == 'host-writer-scope':
+                fixed=installed_fixed_host_entry()
+                request={'operation_id':args.operation_id,'run_id':args.run_id,'source_sha':args.actual_source_sha,'request_sha256':request_hash,'package_sha256':package_hash}
+                result=subprocess.run(['/usr/bin/sudo','-n','--','/usr/bin/python3','-I',str(fixed)],env={'PATH':'/usr/bin:/bin'},input=canonical_bytes(request),stdout=subprocess.PIPE,stderr=private_stderr,timeout=3*60,check=False)
             else:
                 with root_askpass_environment() as environment:
                     if environment is not None:
@@ -2043,6 +2153,8 @@ def root_once_lifecycle_prepare(args):
             raise NativeReceiptBlocked('lifecycle_native_receipt_invalid', root_native_diagnostic(private_stderr, True, result.stdout, result.returncode))
         if not result.stdout:
             raise NativeReceiptBlocked('lifecycle_native_receipt_missing', root_native_diagnostic(private_stderr, True, result.stdout, result.returncode))
+        if args.prepare_mode == 'host-writer-scope' and result.stdout == b'{"format_version":1,"complete":false,"execution_allowed":false,"drop_ready":false,"error_category":"fixed_host_entry_rejected"}\n':
+            raise NativeReceiptBlocked('fixed_host_entry_rejected', root_native_diagnostic(private_stderr, True, result.stdout, result.returncode))
     if args.prepare_mode == 'prepare-facts':
         wrapped=decode(result.stdout)
         fields(wrapped,('native_receipt','image_preload'))
