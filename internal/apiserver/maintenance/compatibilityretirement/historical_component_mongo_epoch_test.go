@@ -69,13 +69,17 @@ func TestMongoHistoricalSnapshotRecipeRetainsInputOnlyOrigin(t *testing.T) {
 		}
 	}
 	r := &mongoHistoricalComponentReadRecipe{original: mongoCycleTxn{session: bson.Raw("old-native-session"), number: 7}}
-	if r.matchesOriginalInput(nil, r.original) || !r.matchesOriginalInput(nil, mongoCycleTxn{session: r.original.session, number: 8}) {
+	if r.matchesOriginalInput(ctx, nil, r.original) || !r.matchesOriginalInput(ctx, nil, mongoCycleTxn{session: r.original.session, number: 8}) {
 		t.Fatal("original native transaction tuple guard changed")
 	}
 	r.snapshotEpoch, r.snapshotInput, r.snapshotOwner = historicalSpoolSHA([]byte("actual-snapshot")), historicalSpoolSHA([]byte("actual-input")), historicalSpoolSHA([]byte("actual-owner"))
-	if r.matchesOriginalInput(&MongoSnapshotInputEpoch{}, mongoCycleTxn{}) {
+	if r.matchesOriginalInput(ctx, &MongoSnapshotInputEpoch{}, mongoCycleTxn{}) {
 		t.Fatal("snapshot recipe invented an original transaction")
 	}
+	r.original = mongoCycleTxn{}
+	original := &MongoSnapshotInputEpoch{dev: 1, ino: 2, complete: true}
+	original.self = original
+	r.snapshotOriginalInput, r.snapshotDev, r.snapshotIno = original, original.dev, original.ino
 	_, frames := componentFixture(t, 1)
 	f := frames[0]
 	f.mongoRead = r
@@ -103,7 +107,9 @@ func TestMongoHistoricalSnapshotFootprintSealIncludesRowsRangesFactsAndBounds(t 
 	if err != nil {
 		t.Fatal(err)
 	}
-	f := &MongoSnapshotOwnerFootprint{limits: DefaultMongoHistoricalOwnerBatchLimits(), sources: map[verifiedSourceKey]*DecodedSourceEvent{key: facts}, sourceFactsSHA: map[verifiedSourceKey][32]byte{key: factsSHA}, sqlAbsent: map[verifiedSourceKey]bool{key: true}, selection: mongoCASCloneSelection(mongoBatchSelection{}), data: map[string][]bson.Raw{}}
+	original := &MongoSnapshotInputEpoch{dev: 1, ino: 2, complete: true}
+	original.self = original
+	f := &MongoSnapshotOwnerFootprint{originalInput: original, originalDev: original.dev, originalIno: original.ino, limits: DefaultMongoHistoricalOwnerBatchLimits(), sources: map[verifiedSourceKey]*DecodedSourceEvent{key: facts}, sourceFactsSHA: map[verifiedSourceKey][32]byte{key: factsSHA}, sqlAbsent: map[verifiedSourceKey]bool{key: true}, selection: mongoCASCloneSelection(mongoBatchSelection{}), data: map[string][]bson.Raw{}}
 	for _, name := range mongoBatchBusinessCollections {
 		f.data[name] = nil
 	}
@@ -111,6 +117,20 @@ func TestMongoHistoricalSnapshotFootprintSealIncludesRowsRangesFactsAndBounds(t 
 	if f.InputSHA256() == "" {
 		t.Fatal("private algorithm fixture failed to seal")
 	}
+	other := *original
+	other.self = &other
+	if f.matchesOriginalInput(&other) {
+		t.Fatal("different input instance with equal snapshot/native hashes and FD numbers accepted")
+	}
+	other = *original
+	if f.matchesOriginalInput(&other) {
+		t.Fatal("copied original input retained native producer identity")
+	}
+	original.ino++
+	if f.InputSHA256() != "" {
+		t.Fatal("replaced original FD retained footprint seal")
+	}
+	original.ino--
 	copy := *f
 	if copy.InputSHA256() != "" {
 		t.Fatal("copied object retained original producer identity")

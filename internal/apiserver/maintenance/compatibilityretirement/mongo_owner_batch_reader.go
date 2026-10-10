@@ -394,13 +394,16 @@ func (b *MongoHistoricalOwnerBatch) artifactIndexes(ctx context.Context) ([]bson
 type MongoSnapshotOwnerFootprint struct {
 	self                                                                   *MongoSnapshotOwnerFootprint
 	inputSHA, identitySHA, metadataSHA, nativeSHA, sqlRowsSHA, snapshotSHA string
-	limits                                                                 MongoHistoricalOwnerBatchLimits
-	sources                                                                map[verifiedSourceKey]*DecodedSourceEvent
-	sourceFactsSHA                                                         map[verifiedSourceKey][32]byte
-	sqlOwners                                                              map[verifiedSourceKey]sqlevaluation.SQLHistoricalFactsSnapshot
-	sqlAbsent                                                              map[verifiedSourceKey]bool
-	selection                                                              mongoBatchSelection
-	data                                                                   map[string][]bson.Raw
+	// Only the original instance/FD identity is retained, never live authority.
+	originalInput            *MongoSnapshotInputEpoch
+	originalDev, originalIno uint64
+	limits                   MongoHistoricalOwnerBatchLimits
+	sources                  map[verifiedSourceKey]*DecodedSourceEvent
+	sourceFactsSHA           map[verifiedSourceKey][32]byte
+	sqlOwners                map[verifiedSourceKey]sqlevaluation.SQLHistoricalFactsSnapshot
+	sqlAbsent                map[verifiedSourceKey]bool
+	selection                mongoBatchSelection
+	data                     map[string][]bson.Raw
 }
 
 func (*MongoSnapshotOwnerFootprint) MarshalJSON() ([]byte, error) { return nil, ErrSourceSerialization }
@@ -466,7 +469,7 @@ func PrepareMongoSnapshotOwnerFootprint(ctx context.Context, input *MongoSnapsho
 		return nil, err
 	}
 	summary := input.Summary()
-	f := &MongoSnapshotOwnerFootprint{identitySHA: input.metadata.identity, metadataSHA: input.metadata.hash, nativeSHA: summary.NativeEpochSHA256, snapshotSHA: summary.SnapshotSHA256, limits: limits, sqlRowsSHA: sql.Report().BusinessRowsSHA256, sources: selected.sources, sourceFactsSHA: selected.sourceFactsSHA, sqlOwners: map[verifiedSourceKey]sqlevaluation.SQLHistoricalFactsSnapshot{}, sqlAbsent: selected.sqlAbsent, selection: core.selection, data: core.data}
+	f := &MongoSnapshotOwnerFootprint{originalInput: input, originalDev: input.dev, originalIno: input.ino, identitySHA: input.metadata.identity, metadataSHA: input.metadata.hash, nativeSHA: summary.NativeEpochSHA256, snapshotSHA: summary.SnapshotSHA256, limits: limits, sqlRowsSHA: sql.Report().BusinessRowsSHA256, sources: selected.sources, sourceFactsSHA: selected.sourceFactsSHA, sqlOwners: map[verifiedSourceKey]sqlevaluation.SQLHistoricalFactsSnapshot{}, sqlAbsent: selected.sqlAbsent, selection: core.selection, data: core.data}
 	f.self = f
 	for key, owner := range selected.sqlOwners {
 		f.sqlOwners[key] = owner.Snapshot()
@@ -484,10 +487,10 @@ func PrepareMongoSnapshotOwnerFootprint(ctx context.Context, input *MongoSnapsho
 // Rechecking this seal authenticates the actual producer's frozen bytes and
 // complete selectors; it does not renew the original read scope.
 func (f *MongoSnapshotOwnerFootprint) digest() string {
-	if f == nil || !f.limits.valid() || len(f.sources) == 0 || len(f.sources) > f.limits.MaxSources || len(f.data) != len(mongoBatchBusinessCollections) || len(f.sqlOwners)+len(f.sqlAbsent) != len(f.sources) {
+	if f == nil || !f.matchesOriginalInput(f.originalInput) || !f.limits.valid() || len(f.sources) == 0 || len(f.sources) > f.limits.MaxSources || len(f.data) != len(mongoBatchBusinessCollections) || len(f.sqlOwners)+len(f.sqlAbsent) != len(f.sources) {
 		return ""
 	}
-	parts := []string{"mongo-snapshot-owner-input/v1", f.snapshotSHA, f.metadataSHA, f.nativeSHA, f.sqlRowsSHA, mongoOwnerBusinessRowsSHA(f.identitySHA, f.metadataSHA, f.data)}
+	parts := []string{"mongo-snapshot-owner-input/v1", f.snapshotSHA, f.metadataSHA, f.nativeSHA, f.sqlRowsSHA, mongoOwnerBusinessRowsSHA(f.identitySHA, f.metadataSHA, f.data), strconv.FormatUint(f.originalDev, 10), strconv.FormatUint(f.originalIno, 10)}
 	var rows, size uint64
 	for _, name := range mongoBatchBusinessCollections {
 		if _, ok := f.data[name]; !ok {
@@ -535,4 +538,8 @@ func (f *MongoSnapshotOwnerFootprint) digest() string {
 	}
 	parts = append(parts, strconv.Itoa(f.limits.MaxSources), strconv.Itoa(f.limits.MaxRows), strconv.FormatUint(f.limits.MaxBytes, 10), strconv.FormatInt(int64(f.limits.MaxDuration), 10))
 	return mongoOwnerHashParts(parts...)
+}
+
+func (f *MongoSnapshotOwnerFootprint) matchesOriginalInput(input *MongoSnapshotInputEpoch) bool {
+	return f != nil && input != nil && f.originalInput == input && input.self == input && input.complete && !input.poisoned && f.originalDev != 0 && f.originalIno != 0 && input.dev == f.originalDev && input.ino == f.originalIno
 }

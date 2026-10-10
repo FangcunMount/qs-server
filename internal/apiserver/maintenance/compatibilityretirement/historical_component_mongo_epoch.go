@@ -28,6 +28,8 @@ type mongoHistoricalComponentReadRecipe struct {
 	original  mongoCycleTxn
 	// Snapshot-only input has a distinct origin; no transaction is invented.
 	snapshotEpoch, snapshotInput, snapshotOwner string
+	snapshotOriginalInput                       *MongoSnapshotInputEpoch
+	snapshotDev, snapshotIno                    uint64
 }
 
 func (r *mongoHistoricalComponentReadRecipe) digest() string {
@@ -36,7 +38,10 @@ func (r *mongoHistoricalComponentReadRecipe) digest() string {
 	}
 	parts := []string{"mongo-component-read-recipe/v1", r.config.ExpectedIdentityHash, strconv.FormatInt(r.config.ExpectedMigrationVersion, 10), r.metadata, string(r.original.session), strconv.FormatInt(r.original.number, 10), strconv.Itoa(r.limits.MaxSources), strconv.Itoa(r.limits.MaxRows), strconv.FormatUint(r.limits.MaxBytes, 10), strconv.FormatInt(int64(r.limits.MaxDuration), 10)}
 	if r.snapshotEpoch != "" {
-		parts = append(parts, "snapshot-input", r.snapshotEpoch, r.snapshotInput, r.snapshotOwner)
+		if len(r.original.session) != 0 || r.original.number != 0 || r.snapshotOriginalInput == nil || r.snapshotOriginalInput.self != r.snapshotOriginalInput || r.snapshotDev == 0 || r.snapshotIno == 0 || r.snapshotOriginalInput.dev != r.snapshotDev || r.snapshotOriginalInput.ino != r.snapshotIno {
+			return ""
+		}
+		parts = append(parts, "snapshot-input", r.snapshotEpoch, r.snapshotInput, r.snapshotOwner, strconv.FormatUint(r.snapshotDev, 10), strconv.FormatUint(r.snapshotIno, 10))
 	}
 	for _, query := range mongoCASSelections(r.selection) {
 		parts = append(parts, query.name, query.field, r.hints[query.name+":"+query.field])
@@ -72,7 +77,7 @@ func freezeMongoHistoricalComponentReadRecipe(ctx context.Context, b *MongoHisto
 // nontransaction snapshot must still be alive, and selected bytes must match
 // its original private frames. It grants no global, transaction or CAS permit.
 func freezeMongoSnapshotOwnerComponentReadRecipe(parent context.Context, input *MongoSnapshotInputEpoch, footprint *MongoSnapshotOwnerFootprint) (*mongoHistoricalComponentReadRecipe, error) {
-	if input == nil || footprint == nil || input.ValidateBorrowedInputEpoch(parent) != nil || !input.complete || footprint.InputSHA256() == "" {
+	if input == nil || footprint == nil || input.ValidateBorrowedInputEpoch(parent) != nil || !input.complete || !footprint.matchesOriginalInput(input) || footprint.InputSHA256() == "" {
 		return nil, ErrMongoHistoricalComponentEpoch
 	}
 	deadline := time.Now().Add(footprint.limits.MaxDuration)
@@ -85,7 +90,7 @@ func freezeMongoSnapshotOwnerComponentReadRecipe(parent context.Context, input *
 	if footprint.identitySHA != summary.IdentitySHA256 || footprint.metadataSHA != summary.MetadataSHA256 || footprint.nativeSHA != summary.NativeEpochSHA256 || footprint.snapshotSHA != summary.SnapshotSHA256 || input.matchOwnerRows(ctx, footprint.data) != nil {
 		return nil, ErrMongoHistoricalComponentEpoch
 	}
-	r := &mongoHistoricalComponentReadRecipe{config: input.config, metadata: input.metadata.hash, selection: mongoCASCloneSelection(footprint.selection), limits: footprint.limits, hints: map[string]string{}, snapshotEpoch: summary.NativeEpochSHA256, snapshotInput: summary.SnapshotSHA256, snapshotOwner: footprint.InputSHA256()}
+	r := &mongoHistoricalComponentReadRecipe{config: input.config, metadata: input.metadata.hash, selection: mongoCASCloneSelection(footprint.selection), limits: footprint.limits, hints: map[string]string{}, snapshotEpoch: summary.NativeEpochSHA256, snapshotInput: summary.SnapshotSHA256, snapshotOwner: footprint.InputSHA256(), snapshotOriginalInput: input, snapshotDev: footprint.originalDev, snapshotIno: footprint.originalIno}
 	reader := &mongoOwnerReadCore{metadata: input.metadata}
 	for _, query := range mongoCASSelections(r.selection) {
 		if len(query.ids) == 0 {
@@ -106,11 +111,11 @@ func freezeMongoSnapshotOwnerComponentReadRecipe(parent context.Context, input *
 
 // Snapshot recipes can only enter a new physical READ, and must bind the same
 // real frozen epoch. Old transaction recipes retain their original tuple guard.
-func (r *mongoHistoricalComponentReadRecipe) matchesOriginalInput(input *MongoSnapshotInputEpoch, txn mongoCycleTxn) bool {
+func (r *mongoHistoricalComponentReadRecipe) matchesOriginalInput(ctx context.Context, input *MongoSnapshotInputEpoch, txn mongoCycleTxn) bool {
 	if r.snapshotEpoch == "" {
-		return r.snapshotInput == "" && r.snapshotOwner == "" && !(txn.number == r.original.number && bytes.Equal(txn.session, r.original.session))
+		return r.snapshotInput == "" && r.snapshotOwner == "" && r.snapshotOriginalInput == nil && r.snapshotDev == 0 && r.snapshotIno == 0 && !(txn.number == r.original.number && bytes.Equal(txn.session, r.original.session))
 	}
-	if input == nil || len(r.original.session) != 0 || r.original.number != 0 || !evidence.ValidSHA256(r.snapshotEpoch) || !evidence.ValidSHA256(r.snapshotInput) || !evidence.ValidSHA256(r.snapshotOwner) {
+	if input == nil || input.validFile(ctx) != nil || input.self != input || r.snapshotOriginalInput != input || r.snapshotDev == 0 || r.snapshotIno == 0 || r.snapshotDev != input.dev || r.snapshotIno != input.ino || len(r.original.session) != 0 || r.original.number != 0 || !evidence.ValidSHA256(r.snapshotEpoch) || !evidence.ValidSHA256(r.snapshotInput) || !evidence.ValidSHA256(r.snapshotOwner) {
 		return false
 	}
 	summary := input.Summary()
@@ -212,7 +217,7 @@ func PrepareMongoHistoricalComponentObservation(parent context.Context, db *mong
 	}
 	for _, frame := range c.inputs {
 		r := frame.mongoRead
-		if r.metadata != o.metadata || r.config != c.inputs[0].mongoRead.config || r.config.ExpectedIdentityHash != input.metadata.identity || !r.matchesOriginalInput(input, txn) || o.validate(ctx) != nil {
+		if r.metadata != o.metadata || r.config != c.inputs[0].mongoRead.config || r.config.ExpectedIdentityHash != input.metadata.identity || !r.matchesOriginalInput(ctx, input, txn) || o.validate(ctx) != nil {
 			return nil, fmt.Errorf("%w: range_guard", ErrMongoHistoricalComponentEpoch)
 		}
 		// Only capture is reused. This local read helper has no groups and is

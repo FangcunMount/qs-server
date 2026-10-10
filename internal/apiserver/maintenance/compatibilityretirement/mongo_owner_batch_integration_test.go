@@ -630,6 +630,7 @@ func TestMongoBatchNativeSnapshotInputOwnerFootprintMatchesOriginalFD(t *testing
 	}
 	var footprints []*MongoSnapshotOwnerFootprint
 	var inputs []*MongoSnapshotInputEpoch
+	var reads []*mongoHistoricalComponentReadRecipe
 	for round := range 2 {
 		session := snapshotInputNativeSession(t, client)
 		err := historicalSourceInputNativeEpoch(t, sqlDB, db, config, session, func(ctx context.Context, sqlInput *SQLResponsibilitySnapshot, input *MongoSnapshotInputEpoch, _ *gorm.DB) error {
@@ -652,7 +653,7 @@ func TestMongoBatchNativeSnapshotInputOwnerFootprintMatchesOriginalFD(t *testing
 			if e != nil {
 				return e
 			}
-			if read.original.number != 0 || len(read.original.session) != 0 || read.snapshotOwner != f.InputSHA256() || read.snapshotEpoch != input.Summary().NativeEpochSHA256 || !reflect.DeepEqual(read.selection, f.selection) || len(read.hints) == 0 {
+			if read.original.number != 0 || len(read.original.session) != 0 || read.snapshotOwner != f.InputSHA256() || read.snapshotEpoch != input.Summary().NativeEpochSHA256 || read.snapshotOriginalInput != input || read.snapshotDev != input.dev || read.snapshotIno != input.ino || !reflect.DeepEqual(read.selection, f.selection) || len(read.hints) == 0 {
 				t.Fatal("snapshot recipe lost actual origin, complete range or index proof")
 			}
 
@@ -670,6 +671,30 @@ func TestMongoBatchNativeSnapshotInputOwnerFootprintMatchesOriginalFD(t *testing
 				}
 			}
 			if round == 1 {
+				// Both inputs are genuine captured epochs. Equal public fingerprints
+				// never substitute their actual original instance or original FD.
+				t.Logf("actual_two_input_instances=true native_hash_equal=%t snapshot_hash_equal=%t", footprints[0].nativeSHA == f.nativeSHA, footprints[0].snapshotSHA == f.snapshotSHA)
+				if old, e := freezeMongoSnapshotOwnerComponentReadRecipe(ctx, input, footprints[0]); old != nil || e == nil {
+					t.Fatal("another actual input accepted the original footprint")
+				}
+				// Only private negative-probe headers are equalized; no native
+				// session/time or stored frames are changed to mint a qualification.
+				foreign := *footprints[0]
+				foreign.self = &foreign
+				foreign.nativeSHA, foreign.snapshotSHA = f.nativeSHA, f.snapshotSHA
+				foreign.inputSHA = foreign.digest()
+				if foreign.InputSHA256() == "" {
+					t.Fatal("private equal-header rejection probe did not seal")
+				}
+				if bad, e := freezeMongoSnapshotOwnerComponentReadRecipe(ctx, input, &foreign); bad != nil || e == nil {
+					t.Fatal("equal snapshot/native hashes replaced actual input and original FD")
+				}
+				foreignRead := *reads[0]
+				foreignRead.snapshotEpoch, foreignRead.snapshotInput = read.snapshotEpoch, read.snapshotInput
+				if foreignRead.matchesOriginalInput(ctx, input, mongoCycleTxn{}) {
+					t.Fatal("equal read fingerprints replaced original input instance")
+				}
+
 				ranges := input.ownerPages["answersheets"]
 				if len(ranges) == 0 {
 					t.Fatal("actual owner page missing")
@@ -696,6 +721,7 @@ func TestMongoBatchNativeSnapshotInputOwnerFootprintMatchesOriginalFD(t *testing
 					return e
 				}
 			}
+			reads = append(reads, read)
 			footprints = append(footprints, f)
 			inputs = append(inputs, input)
 			return nil
