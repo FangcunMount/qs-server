@@ -39,6 +39,9 @@ jobs:
       - name: Check retired service authentication
         run: python3 scripts/check_service_token_retirement.py
 
+      - name: Verify private Linux loaded MQ observation
+        run: QS_RUNTIME_FACTS_NATIVE_TEST=1 go test -race -count=1 -timeout=30s ./internal/pkg/runtimefacts -run '^TestNativeLinux'
+
       - name: Run tests
         run: |
           go test -v -race -coverprofile=coverage.out -covermode=atomic ./...
