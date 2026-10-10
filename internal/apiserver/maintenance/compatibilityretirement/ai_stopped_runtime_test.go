@@ -116,8 +116,8 @@ func (p *aiStoppedUnitProtocol) requireCarrierAbsent(context.Context, string) er
 	}
 	return nil
 }
-func (p *aiStoppedUnitProtocol) requireOwnerCarriersAbsent(context.Context, string) error {
-	return p.requireCarrierAbsent(nil, "")
+func (p *aiStoppedUnitProtocol) requireOwnerCarriersAbsent(ctx context.Context, _ string) error {
+	return p.requireCarrierAbsent(ctx, "")
 }
 func aiStoppedUnitLease(t *testing.T) (*AIStoppedRuntimeLease, *aiStoppedUnitProtocol) {
 	t.Helper()
