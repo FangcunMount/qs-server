@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	standard "github.com/FangcunMount/qs-server/internal/apiserver/eventing/standardoutbox"
 	hostmysql "github.com/FangcunMount/qs-server/internal/pkg/database/mysql"
 	eventpayload "github.com/FangcunMount/qs-server/internal/pkg/eventing/payload"
 	"gorm.io/gorm"
@@ -313,7 +314,7 @@ func TestSQLHistoricalComponentNativeAbsentOwnerSelector(t *testing.T) {
 	}
 	owners, e := recipe.OwnerIdentities()
 	scope, se := recipe.OriginalSelectors()
-	if e != nil || se != nil || len(owners) != 0 || len(scope.EventIDs) != 1 || scope.EventIDs[0] != "sheet-90" || len(scope.MongoOwners) != 1 || scope.MongoOwners[0].ID != "10090" || recipe.OwnerPartitionResolved() {
+	if e != nil || se != nil || len(owners) != 0 || len(scope.EventIDs) != 1 || scope.EventIDs[0] != "sheet-90" || len(scope.MongoOwners) != 1 || scope.MongoOwners[0].ID != "10090" || !recipe.OwnerPartitionResolved() {
 		t.Fatal("actual SQL-empty subset was lost or called a Mongo qualification", e, se)
 	}
 	if e = componentSQLNativeObserve(t, db, recipe, false, nil); e != nil {
@@ -343,6 +344,87 @@ func TestSQLHistoricalComponentNativeAbsentOwnerSelector(t *testing.T) {
 		return nil
 	}); e != nil {
 		t.Fatal("native complete replay subset rejection failed", e)
+	}
+}
+
+func TestSQLHistoricalComponentNativeMixedPresentAbsentSelectors(t *testing.T) {
+	db := openHistoricalReferencesDB(t)
+	insertHistoricalAssessment(t, db, 42)
+	var recipes []*SQLHistoricalComponentRecipe
+	capture := func(replay bool) error {
+		return batchNativeTx(t, db, func(ctx context.Context, c *SQLHistoricalResponsibilityCycle) error {
+			batch, e := PrepareSQLHistoricalOwnerBatch(ctx, c, SQLHistoricalOwnerBatchRequest{AssessmentIDs: []uint64{42}, AnswerSheetIDs: []uint64{10042, 10090, 10091}}, DefaultSQLHistoricalOwnerBatchLimits())
+			if e != nil {
+				return e
+			}
+			catalog, e := PrepareSQLHistoricalCrossStoreCatalog(ctx, c, DefaultSQLCrossStoreLimits())
+			if e != nil {
+				return e
+			}
+			cross, e := PrepareSQLHistoricalCrossStorePage(ctx, catalog, batch, SQLCrossStoreSelectors{EventIDs: []string{"present-owner", "empty-sheet-90", "empty-sheet-91"}, AssessmentIDs: []uint64{42}, OrganizationIDs: []uint64{7}, MongoOwners: []SQLCrossStoreOwnerReference{{Kind: "AnswerSheet", ID: "10042"}, {Kind: "AnswerSheet", ID: "10090"}, {Kind: "AnswerSheet", ID: "10091"}}})
+			if e != nil {
+				return e
+			}
+			plan, e := PrepareSQLHistoricalBatchCAS(ctx, batch, []SQLHistoricalBatchAttachment{casNativeEntry(t, ctx, batch, 42, 0, "present-owner", "evaluation.requested", nil)})
+			if e != nil {
+				return e
+			}
+			provenance, e := SealSQLHistoricalCASProvenance(ctx, plan, batch)
+			if e != nil {
+				return e
+			}
+			recipes, e = FreezeSQLHistoricalOwnerComponentRecipes(ctx, batch, cross, provenance, nil, nil, map[string]uint64{"present-owner": 42}, map[string]uint64{"empty-sheet-90": 10090, "empty-sheet-91": 10091})
+			if e != nil {
+				return e
+			}
+			if replay {
+				if len(recipes) != 1 || recipes[0].OwnerPartitionResolved() {
+					return errors.New("mixed complete replay was cut into independent partitions")
+				}
+				scope, se := recipes[0].OriginalSelectors()
+				if se != nil || len(scope.EventIDs) != 3 || len(scope.MongoOwners) != 3 || len(recipes[0].plan.request.AnswerSheetIDs) != 3 || len(recipes[0].plan.groups) != 1 || len(recipes[0].responsibility.rows["qs_rm_replay_items"]) != 2 {
+					return errors.New("unresolved original replay/negative/write input lost")
+				}
+				return nil
+			}
+			if len(recipes) != 3 {
+				return errors.New("mixed source page forced unrelated present and absent owners together")
+			}
+			for _, invalid := range []map[string]uint64{{"empty-sheet-90": 10042}, {"outside-source": 10090}, {"empty-sheet-90": 10092}, {"present-owner": 10090}} {
+				if _, e = FreezeSQLHistoricalOwnerComponentRecipes(ctx, batch, cross, provenance, nil, nil, map[string]uint64{"present-owner": 42}, invalid); e == nil {
+					return errors.New("forged/contradictory empty selector admitted on mixed page")
+				}
+			}
+			return nil
+		})
+	}
+	if err := capture(false); err != nil {
+		t.Fatal(err)
+	}
+	for i, recipe := range recipes {
+		owners, e := recipe.OwnerIdentities()
+		events, ee := recipe.SourceEventIDs()
+		if e != nil || ee != nil || !recipe.OwnerPartitionResolved() || len(events) != 1 || i == 0 && (len(owners) != 1 || owners[0].AssessmentID != 42) || i > 0 && len(owners) != 0 {
+			t.Fatal("exact present/negative pure partition was lost", e, ee)
+		}
+		if e = componentSQLNativeObserve(t, db, recipe, false, nil); e != nil {
+			t.Fatal("actual fresh mixed child baseline failed", e)
+		}
+	}
+	crossSQLNativeReplay(t, db, "present-owner")
+	if e := db.Exec("UPDATE qs_rm_replay_items SET event_id=? WHERE org_id=7 AND request_id=? AND ordinal=1", []byte("empty-sheet-90"), []byte("native-cross-replay")).Error; e != nil {
+		t.Fatal(e)
+	}
+	replay := standard.ReplayRequest{OrgID: 7, RequestID: "native-cross-replay", Store: "mongo-domain-events", Reason: "native complete input", Targets: []standard.ReplayTarget{{EventID: "present-owner", ExpectedFailureCount: 3}, {EventID: "empty-sheet-90", ExpectedFailureCount: 4}}}
+	hash, e := replay.Fingerprint()
+	if e != nil {
+		t.Fatal(e)
+	}
+	if e = db.Exec("UPDATE qs_rm_replay_requests SET input_hash=? WHERE org_id=7 AND request_id=?", hash[:], []byte(replay.RequestID)).Error; e != nil {
+		t.Fatal(e)
+	}
+	if err := capture(true); err != nil {
+		t.Fatal("actual wider mixed replay closure failed", err)
 	}
 }
 

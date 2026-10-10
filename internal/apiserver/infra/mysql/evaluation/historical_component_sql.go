@@ -407,9 +407,9 @@ func (r *SQLHistoricalComponentRecipe) OriginalSelectors() (SQLCrossStoreSelecto
 	return componentCopySelectors(loaded.selectors), nil
 }
 
-// False means an original negative/Mongo owner selector could not be assigned
-// by these SQL reads. The whole original input is retained, never guessed or
-// silently dropped. The joint business reader must resolve that boundary.
+// True describes only a complete captured positive or SQL-negative partition.
+// False retains the whole unresolved original input, never a guessed owner or
+// silently dropped range. Neither value authenticates a source/Mongo owner.
 func (r *SQLHistoricalComponentRecipe) OwnerPartitionResolved() bool {
 	loaded, err := r.load(context.Background())
 	return err == nil && loaded.ownerPartitioned
@@ -418,32 +418,69 @@ func (r *SQLHistoricalComponentRecipe) OwnerPartitionResolved() bool {
 // The source page is a transport boundary, not an atomic owner boundary.
 // Partition only private, live original reads. Replay membership joins real
 // owners; shared schema/model/head reads do not join unrelated assessments.
-// sourceOwners is optional pure partition metadata supplied by the joint reader.
+// The first optional map selects actual assessment owners; the second selects
+// actual SQL-absent answer sheets. Both are pure joint-reader partition input.
 // Every event and owner must already belong to these actual original reads. It
 // authenticates no source and cannot grant observation or statement authority.
-func FreezeSQLHistoricalOwnerComponentRecipes(ctx context.Context, original *SQLHistoricalOwnerBatch, cross *SQLHistoricalCrossStorePage, provenance *SQLHistoricalCASProvenance, unchanged *SQLHistoricalCASReadBaseline, spool *SQLHistoricalCASSpool, sourceOwners ...map[string]uint64) ([]*SQLHistoricalComponentRecipe, error) {
+func FreezeSQLHistoricalOwnerComponentRecipes(ctx context.Context, original *SQLHistoricalOwnerBatch, cross *SQLHistoricalCrossStorePage, provenance *SQLHistoricalCASProvenance, unchanged *SQLHistoricalCASReadBaseline, spool *SQLHistoricalCASSpool, sourceSelectors ...map[string]uint64) ([]*SQLHistoricalComponentRecipe, error) {
 	parent, err := FreezeSQLHistoricalComponentRecipe(ctx, original, cross, provenance, unchanged)
 	if err != nil {
 		return nil, fmt.Errorf("%w: owner_parent: %w", ErrSQLHistoricalComponent, err)
 	}
-	if len(sourceOwners) > 1 {
+	if len(sourceSelectors) > 2 {
 		return nil, ErrSQLHistoricalComponent
 	}
-	for _, selected := range sourceOwners {
-		for event, id := range selected {
+	present, absent := map[string]uint64{}, map[string]uint64{}
+	if len(sourceSelectors) > 0 {
+		for event, id := range sourceSelectors[0] {
 			if !slices.Contains(cross.selectors.EventIDs, event) {
 				return nil, ErrSQLHistoricalComponent
 			}
 			if _, err = original.OwnerByAssessment(id); err != nil {
 				return nil, ErrSQLHistoricalComponent
 			}
+			present[event] = id
 		}
 	}
-	parts, err := componentOriginalOwnerPartitions(parent, cross.catalog, sourceOwners...)
+	if len(sourceSelectors) > 1 {
+		for event, sheet := range sourceSelectors[1] {
+			if present[event] != 0 || !slices.Contains(cross.selectors.EventIDs, event) || !slices.Contains(original.request.AnswerSheetIDs, sheet) || !slices.Contains(cross.selectors.MongoOwners, SQLCrossStoreOwnerReference{Kind: "AnswerSheet", ID: strconv.FormatUint(sheet, 10)}) {
+				return nil, ErrSQLHistoricalComponent
+			}
+			if _, err = original.OwnerByAnswerSheet(sheet); !errors.Is(err, ErrSQLHistoricalOwnerAbsent) {
+				return nil, ErrSQLHistoricalComponent
+			}
+			for _, attachment := range parent.plan.attachments {
+				if attachment.Entry.EventID == event {
+					return nil, ErrSQLHistoricalComponent
+				}
+			}
+			for _, i := range cross.catalog.cycle.byEvent[event] {
+				v := cross.catalog.cycle.observations[i]
+				if v.AssessmentID != 0 || v.OwnerKind != "" && (v.OwnerKind != "AnswerSheet" || v.OwnerID != strconv.FormatUint(sheet, 10)) {
+					return nil, ErrSQLHistoricalComponent
+				}
+			}
+			absent[event] = sheet
+		}
+	}
+	partitionParent := parent
+	var ownerArgs []map[string]uint64
+	if len(sourceSelectors) > 0 {
+		ownerArgs = []map[string]uint64{present}
+	}
+	mixedClosed := true
+	if len(absent) > 0 {
+		partitionParent, mixedClosed = componentOriginalMixedParent(parent, cross.catalog, absent)
+	}
+	var parts []sqlOriginalOwnerPart
+	if mixedClosed {
+		parts, err = componentOriginalOwnerPartitions(partitionParent, cross.catalog, ownerArgs...)
+	}
 	if err != nil {
 		return nil, fmt.Errorf("%w: owner_partition", ErrSQLHistoricalComponent)
 	}
-	if parts == nil {
+	if !mixedClosed || parts == nil && len(partitionParent.selectors.EventIDs) != 0 {
 		if spool != nil {
 			parent, err = spoolSQLHistoricalComponentRecipe(ctx, original, parent, spool)
 		}
@@ -454,7 +491,7 @@ func FreezeSQLHistoricalOwnerComponentRecipes(ctx context.Context, original *SQL
 	}
 	out := make([]*SQLHistoricalComponentRecipe, 0, len(parts))
 	for _, part := range parts {
-		child, err := componentOriginalOwnerChild(parent, part)
+		child, err := componentOriginalOwnerChild(partitionParent, part)
 		if err != nil {
 			return nil, fmt.Errorf("%w: owner_child: %w", ErrSQLHistoricalComponent, err)
 		}
@@ -465,6 +502,24 @@ func FreezeSQLHistoricalOwnerComponentRecipes(ctx context.Context, original *SQL
 		child.self, child.seal = child, child.digest()
 		if !child.intact() {
 			return nil, fmt.Errorf("%w: owner_seal", ErrSQLHistoricalComponent)
+		}
+		out = append(out, child)
+	}
+	absentGroups := map[uint64][]string{}
+	for event, sheet := range absent {
+		absentGroups[sheet] = append(absentGroups[sheet], event)
+	}
+	sheets := make([]uint64, 0, len(absentGroups))
+	for sheet := range absentGroups {
+		sheets = append(sheets, sheet)
+	}
+	slices.Sort(sheets)
+	for _, sheet := range sheets {
+		events := absentGroups[sheet]
+		slices.Sort(events)
+		child, e := FreezeSQLHistoricalAbsentOwnerSelectorRecipe(ctx, original, cross, events, []SQLCrossStoreOwnerReference{{Kind: "AnswerSheet", ID: strconv.FormatUint(sheet, 10)}}, []uint64{sheet}, nil)
+		if e != nil {
+			return nil, e
 		}
 		out = append(out, child)
 	}
@@ -479,6 +534,58 @@ func FreezeSQLHistoricalOwnerComponentRecipes(ctx context.Context, original *SQL
 		}
 	}
 	return out, nil
+}
+
+// Preserve the full parent when an actual replay crosses empty/present owners,
+// different empty sheets or an original source that was not captured here.
+// Otherwise only remove those exact empty selectors from the present child
+// basis. The original immutable Before/Groups remain genuine captured values.
+func componentOriginalMixedParent(parent *SQLHistoricalComponentRecipe, catalog *SQLHistoricalCrossStoreCatalog, absent map[string]uint64) (*SQLHistoricalComponentRecipe, bool) {
+	actualOwners := map[uint64]bool{}
+	for _, row := range parent.plan.before.rows["assessment"] {
+		id, err := sqlHistoricalUint(row, "id")
+		if err != nil {
+			return parent, false
+		}
+		actualOwners[id] = true
+	}
+	for _, id := range parent.plan.request.AssessmentIDs {
+		if !actualOwners[id] {
+			return parent, false
+		}
+	}
+	for _, row := range parent.responsibility.rows["qs_rm_replay_items"] {
+		v := cycleDecode("qs_rm_replay_items", row)
+		var group uint64
+		var set bool
+		for _, i := range catalog.byRequest[cyclePair(v.OrgID, v.link.requestID)] {
+			member := catalog.cycle.observations[i]
+			if !slices.Contains(parent.selectors.EventIDs, member.EventID) || set && absent[member.EventID] != group {
+				return parent, false
+			}
+			group, set = absent[member.EventID], true
+		}
+	}
+	copy := *parent
+	plan := *parent.plan
+	copy.plan = &plan
+	copy.selectors = componentCopySelectors(parent.selectors)
+	copy.selectors.EventIDs = slices.DeleteFunc(copy.selectors.EventIDs, func(event string) bool { return absent[event] != 0 })
+	sheets := map[uint64]bool{}
+	for _, sheet := range absent {
+		sheets[sheet] = true
+	}
+	copy.selectors.MongoOwners = slices.DeleteFunc(copy.selectors.MongoOwners, func(owner SQLCrossStoreOwnerReference) bool {
+		return owner.Kind == "AnswerSheet" && sheets[cyclePayloadID(owner.ID)]
+	})
+	plan.request.AnswerSheetIDs = slices.DeleteFunc(slices.Clone(parent.plan.request.AnswerSheetIDs), func(sheet uint64) bool { return sheets[sheet] })
+	if len(copy.selectors.EventIDs) == 0 {
+		if len(plan.before.rows["assessment"]) != 0 || len(plan.request.AssessmentIDs)+len(plan.request.AnswerSheetIDs)+len(copy.selectors.MongoOwners) != 0 {
+			return parent, false
+		}
+	}
+	copy.self, copy.seal = &copy, copy.digest()
+	return &copy, copy.intact()
 }
 
 // FreezeSQLHistoricalAbsentOwnerSelectorRecipe captures only an actual original
@@ -588,6 +695,9 @@ func FreezeSQLHistoricalAbsentOwnerSelectorRecipe(ctx context.Context, original 
 	r.plan.before = actual
 	r.input.before = casCloneImage(actual)
 	r.input.seal = r.input.digest()
+	// Resolved refers only to this complete actual SQL-negative closure. The
+	// recipe still has no SQL owner, source/Mongo authentication or write grant.
+	r.ownerPartitioned = true
 	r.seal = r.digest()
 	if !r.intact() {
 		return nil, ErrSQLHistoricalComponent
