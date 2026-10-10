@@ -85,7 +85,7 @@ func qualifiedCASOwnerIDs(f *DecodedSourceEvent, candidate HistoricalCandidate) 
 // Historical gaps stay explicit. Source row SHA, legacy content SHA and stable
 // business binding stay different; this never manufactures an SDK fingerprint.
 func qualifiedCASEntry(binding HistoricalCoordinatorBinding, row qualifiedCASRow, verifiedAt time.Time) (evidence.HistoricalReferenceEntryV1, error) {
-	if !coordinatorSourceSHA(binding.SourceSHA) || !aiLocalOperationID(binding.OperationID) || verifiedAt.IsZero() || qualifiedCASSourceMatches(row.facts, row.candidate) != nil || !evidence.ValidSHA256(row.bindingSHA) {
+	if row.sourceObservation != nil || !coordinatorSourceSHA(binding.SourceSHA) || !aiLocalOperationID(binding.OperationID) || verifiedAt.IsZero() || qualifiedCASSourceMatches(row.facts, row.candidate) != nil || !evidence.ValidSHA256(row.bindingSHA) {
 		return evidence.HistoricalReferenceEntryV1{}, ErrCoordinatorCASQualification
 	}
 	// A declared original Run may only be retained verbatim. Sources without

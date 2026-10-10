@@ -17,6 +17,7 @@ import (
 	domainwire "github.com/FangcunMount/reliable-messaging/wire/domain"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 	"gorm.io/gorm"
 )
 
@@ -307,6 +308,9 @@ func TestHistoricalSourceInputNativeIndependentUnchangedSnapshotAndReusedUUID(t 
 // native read scopes. Pure planning never consumes an old joint or creates CAS.
 func TestHistoricalSourceInputNativeOwnerComponentPlanner(t *testing.T) {
 	sqlDB, client, db, config, _ := historicalSpoolNativeFixture(t)
+	if _, err := db.Collection("domain_event_outbox").Indexes().CreateOne(t.Context(), mongo.IndexModel{Keys: bson.D{{Key: "aggregate_type", Value: 1}, {Key: "event_type", Value: 1}, {Key: "aggregate_id", Value: 1}}, Options: options.Index().SetName("idx_outbox_consistency_audit")}); err != nil {
+		t.Fatal(err)
+	}
 	emptySheet := mongoLocalSheet()
 	emptySheet.DomainID = meta.FromUint64(10043)
 	insertMongoLocalSheet(t, db, emptySheet)
@@ -433,6 +437,75 @@ func TestHistoricalSourceInputNativeOwnerComponentPlanner(t *testing.T) {
 	}
 	if index.ReleaseInputAuthentication(t.Context(), pair) != nil || pair.ReleaseCaptureIndex(t.Context()) != nil || components.ValidateInputSources(t.Context(), pair) != nil {
 		t.Fatal("released authentication lost immutable planned inputs")
+	}
+	// Genuine third native scopes read the original owners and current MQ rows.
+	// The business result still cannot enter the old whole-source evidence path.
+	var businessSources, blockedIndependentComponents int
+	for _, component := range components.Components() {
+		if err = sqlDB.Transaction(func(tx *gorm.DB) error {
+			return mongoCycleNativeTx(t, client, func(mctx mongo.SessionContext) error {
+				ctx := hostmysql.WithTx(mctx, tx)
+				var sqlObservers []*sqlevaluation.SQLHistoricalComponentObservation
+				for _, input := range component.Inputs() {
+					observed, e := sqlevaluation.PrepareSQLHistoricalComponentObservation(ctx, input.sqlRecipe, 20*time.Second, false)
+					if e != nil {
+						return e
+					}
+					sqlObservers = append(sqlObservers, observed)
+				}
+				mongoObserver, e := PrepareMongoHistoricalComponentObservation(ctx, db, component, pair.second.mongo, 20*time.Second)
+				if e != nil {
+					return e
+				}
+				observation, e := PrepareHistoricalComponentSourceObservation(ctx, component, pair, mongoObserver, sqlObservers, 20*time.Second)
+				if e != nil {
+					return e
+				}
+				rows, e := qualifiedHistoricalComponentBusinessRows(ctx, observation)
+				independent := false
+				for _, input := range component.Inputs() {
+					ids, inputErr := input.sqlRecipe.SourceEventIDs()
+					if inputErr != nil {
+						return inputErr
+					}
+					for _, id := range ids {
+						independent = independent || id == "source-planner-actual-empty-sheet"
+					}
+				}
+				if independent {
+					// This original fixture intentionally retains an SQL held row
+					// with no Assessment owner. Genuine unique SQL absence is
+					// not a permit to erase that unresolved external obligation.
+					if rows != nil || e == nil {
+						return errors.New("SQL-absent held responsibility became business closed")
+					}
+					blockedIndependentComponents++
+					return nil
+				}
+				if e != nil {
+					return e
+				}
+				for _, row := range rows {
+					if row.sourceObservation != observation || !row.candidate.LocalQualified || row.facts == nil || row.bindingSHA == "" {
+						return ErrCoordinatorCASQualification
+					}
+					if _, e = qualifiedCASEntry(coordinatorBinding(), row, time.Now()); e == nil {
+						return errors.New("scoped business candidate entered old whole-source evidence")
+					}
+				}
+				businessSources += len(rows)
+				summary := observation.Summary()
+				if !summary.SQLSourceNegativeClosureRequired || !summary.MongoOwnerSourceNegativeClosureRequired || !summary.SourceWriterFenceRequired || !summary.CurrentMessageClosureRequired || !summary.AIClosureRequired || summary.CASAuthorized || summary.SourceClosureVerified || summary.DropReady {
+					return ErrCoordinatorCASQualification
+				}
+				return nil
+			})
+		}, &sql.TxOptions{Isolation: sql.LevelRepeatableRead, ReadOnly: true}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if businessSources != 4 || blockedIndependentComponents != 1 {
+		t.Fatal("actual original business graphs or unresolved SQL-absent obligation lost", businessSources, blockedIndependentComponents)
 	}
 	firstInput := components.Components()[0].Inputs()[0]
 	originalSHA := firstInput.rows[0].sha

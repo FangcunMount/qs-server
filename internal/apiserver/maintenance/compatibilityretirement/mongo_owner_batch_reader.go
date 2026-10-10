@@ -316,7 +316,13 @@ func (b *MongoHistoricalOwnerBatch) rows(ctx context.Context, name string, filte
 	if err := b.validateReaderContext(ctx); err != nil {
 		return nil, err
 	}
-	idx, exists := b.indexes[name]
+	return mongoBusinessRows(b.indexes, name, filter)
+}
+
+// Exact existing business selectors only; callers bind these rows to their
+// actual native scope before using this private projection.
+func mongoBusinessRows(indexes map[string]map[string]map[uint64][]bson.Raw, name string, filter bson.D) ([]bson.Raw, error) {
+	idx, exists := indexes[name]
 	if !exists || len(filter) != 1 {
 		return nil, ErrMongoBatchInvalid
 	}

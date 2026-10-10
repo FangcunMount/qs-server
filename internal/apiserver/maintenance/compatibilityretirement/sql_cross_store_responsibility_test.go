@@ -123,3 +123,49 @@ func TestSQLMongoCrossStoreProvisionalCauseIsExact(t *testing.T) {
 		})
 	}
 }
+
+// Private rule tests exercise replay bytes/claims, never native authorization.
+func TestSQLMongoCrossStoreReplayRuleUsesActualCurrentClaim(t *testing.T) {
+	source := &DecodedSourceEvent{EventID: "old-mongo-event", OrgID: 7}
+	local := MongoLocalResolution{OrgID: 7, AssessmentID: 42, OwnerLocalTerminal: true}
+	row := sqlevaluation.SQLCrossStoreRow{Observation: sqlevaluation.SQLResponsibilityObservation{Store: "qs_rm_replay_items", EventID: source.EventID, OrgID: 7}, Replay: &sqlevaluation.SQLCrossStoreReplay{OrganizationID: 7, RequestID: "actual-replay", Store: "mongo-domain-events", FingerprintVerified: true, Items: []sqlevaluation.SQLCrossStoreReplayItem{{EventID: source.EventID, Authorized: true, ExpectedFailureCount: 3}}}}
+	current := mongoOwnerStandardRow{ManualReplayRequestID: "actual-replay", ManualReplayVersion: 2, Version: 4, FailureCount: 3, State: "published"}
+	for _, name := range []string{"valid", "absent", "claim", "version", "budget", "pending", "fingerprint", "duplicate_member", "unknown_identity"} {
+		t.Run(name, func(t *testing.T) {
+			actualRow := current
+			actualReplay := *row.Replay
+			actualReplay.Items = append([]sqlevaluation.SQLCrossStoreReplayItem(nil), row.Replay.Items...)
+			actual := row
+			actual.Replay = &actualReplay
+			ptr := &actualRow
+			switch name {
+			case "absent":
+				ptr = nil
+			case "claim":
+				actualRow.ManualReplayRequestID = "another-replay"
+			case "version":
+				actualRow.Version = 1
+			case "budget":
+				actualRow.FailureCount = 2
+			case "pending":
+				actualRow.State = "pending"
+			case "fingerprint":
+				actualReplay.FingerprintVerified = false
+			case "duplicate_member":
+				actualReplay.Items = append(actualReplay.Items, actualReplay.Items[0])
+			case "unknown_identity":
+				actualReplay.Items[0].Authorized = false
+				actualReplay.Items[0].Reason = "ambiguous_identity"
+			}
+			var result SQLMongoCrossStoreResponsibilityView
+			err := verifySQLMongoReplay(&result, source, local, actual, ptr)
+			if name == "valid" {
+				if err != nil || len(result.BlockingReasons) != 0 || len(result.OwnerBoundObservationKeys) != 1 {
+					t.Fatal("exact current claim rejected", err)
+				}
+			} else if err == nil && len(result.BlockingReasons) == 0 {
+				t.Fatal("missing/conflicting current replay claim accepted")
+			}
+		})
+	}
+}

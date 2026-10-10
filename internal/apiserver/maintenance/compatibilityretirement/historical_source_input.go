@@ -7,15 +7,20 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"io"
 	"os"
+	"reflect"
 	"sort"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
 
 	sqlevaluation "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/evaluation"
+	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationfact"
 	hostmysql "github.com/FangcunMount/qs-server/internal/pkg/database/mysql"
+	"github.com/FangcunMount/qs-server/internal/pkg/eventing/evidence"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -865,4 +870,479 @@ func sourceComponentSortedKeys[V any](values map[string]V) []string {
 	}
 	sort.Strings(out)
 	return out
+}
+
+// The whole recipe/source/FD binding is checked at both business-factory
+// boundaries. Inner reads still require the actual original Mongo transaction
+// and deadline; SQL semantic methods independently require their actual pool.
+// Avoid rereading every component spool for each individual business row.
+func historicalComponentBusinessScope(ctx context.Context, o *HistoricalComponentSourceObservation) error {
+	if ctx == nil || ctx.Err() != nil || o == nil || o.self != o || o.rowsSHA == "" || o.component == nil || o.pair == nil || o.pair.self != o.pair || !time.Now().Before(o.started.Add(o.budget)) || o.seal != mongoHistoricalComponentInputSeal(o.component) || o.mongo == nil || o.mongo.component != o.component || !o.mongo.complete || o.mongo.validate(ctx) != nil {
+		return ErrSourceOriginFresh
+	}
+	return nil
+}
+
+// This adapter retains the actual fresh observer, not an editable facts DTO.
+// Every use checks that observer's original native SQL/Mongo scope and deadline.
+type historicalComponentSQLOwnerReader struct {
+	observation *HistoricalComponentSourceObservation
+	view        *sqlevaluation.SQLHistoricalComponentSemanticView
+	ctx         context.Context
+	assessment  uint64
+	resolved    map[string]sqlevaluation.SQLResponsibilityObservation
+}
+
+func (r *historicalComponentSQLOwnerReader) Snapshot() sqlevaluation.SQLHistoricalFactsSnapshot {
+	if r == nil || historicalComponentBusinessScope(r.ctx, r.observation) != nil {
+		return sqlevaluation.SQLHistoricalFactsSnapshot{}
+	}
+	v, err := r.view.OwnerByAssessment(r.ctx, r.assessment)
+	if err != nil {
+		return sqlevaluation.SQLHistoricalFactsSnapshot{}
+	}
+	return sqlMongoResolvedSnapshot(v, r.resolved)
+}
+func (r *historicalComponentSQLOwnerReader) OutcomeRecord(id uint64) (*evaluationfact.Record, error) {
+	if r == nil || historicalComponentBusinessScope(r.ctx, r.observation) != nil {
+		return nil, ErrSourceOriginFresh
+	}
+	return r.view.OutcomeRecord(r.ctx, id)
+}
+func (r *historicalComponentSQLOwnerReader) HasVerifiedAnswerSheetAssociation(id uint64) bool {
+	if r == nil || historicalComponentBusinessScope(r.ctx, r.observation) != nil {
+		return false
+	}
+	v, err := r.view.OwnerByAnswerSheet(r.ctx, id)
+	return err == nil && v.Owner.AssessmentID == r.assessment && v.Owner.AnswerSheetID == id
+}
+
+type historicalComponentMongoReader struct {
+	observation *HistoricalComponentSourceObservation
+	source      *DecodedSourceEvent
+	indexes     map[string]map[string]map[uint64][]bson.Raw
+}
+
+func (r *historicalComponentMongoReader) rows(ctx context.Context, name string, filter bson.D) ([]bson.Raw, error) {
+	if r == nil || historicalComponentBusinessScope(ctx, r.observation) != nil {
+		return nil, ErrSourceOriginFresh
+	}
+	if _, ok := r.indexes[name]; ok {
+		return mongoBusinessRows(r.indexes, name, filter)
+	}
+	var expected bson.D
+	switch name {
+	case "rm_outbox":
+		expected = bson.D{{Key: "$or", Value: bson.A{bson.D{{Key: "scope", Value: "org:" + strconv.FormatUint(r.source.OrgID, 10)}}, bson.D{{Key: "message_id", Value: r.source.EventID}}}}}
+	case "qs_rm_replay_requests":
+		expected = bson.D{{Key: "$or", Value: bson.A{bson.D{{Key: "org_id", Value: int64(r.source.OrgID)}}, bson.D{{Key: "items.event_id", Value: r.source.EventID}}}}}
+	default:
+		return nil, ErrMongoBatchInvalid
+	}
+	if !reflect.DeepEqual(filter, expected) {
+		return nil, ErrMongoBatchInvalid
+	}
+	// Reuse the existing bounded actual DB read, in the SAME host transaction.
+	// These two organization reads never stand in for the global Mongo11 scan.
+	reader := &MongoOwnerResolution{db: r.observation.mongo.db}
+	rows, err := reader.readRows(ctx, name, filter)
+	if err != nil {
+		return nil, err
+	}
+	if historicalComponentBusinessScope(ctx, r.observation) != nil {
+		return nil, ErrSourceOriginFresh
+	}
+	return rows, nil
+}
+func (r *historicalComponentMongoReader) artifactIndexes(ctx context.Context) ([]bson.Raw, error) {
+	if r == nil || historicalComponentBusinessScope(ctx, r.observation) != nil {
+		return nil, ErrSourceOriginFresh
+	}
+	definition, ok := r.observation.mongo.input.metadata.definitions["interpret_report_artifacts"]
+	if !ok {
+		return nil, ErrMongoOwnerConflict
+	}
+	out := make([]bson.Raw, len(definition.indexes))
+	for i, raw := range definition.indexes {
+		out[i] = append(bson.Raw(nil), raw...)
+	}
+	return out, nil
+}
+
+func historicalComponentMongoIndexes(o *HistoricalComponentSourceObservation) (map[string]map[string]map[uint64][]bson.Raw, error) {
+	indexes := map[string]map[string]map[uint64][]bson.Raw{}
+	seen := map[string]map[uint64]bson.Raw{}
+	for _, name := range mongoBatchBusinessCollections {
+		indexes[name] = map[string]map[uint64][]bson.Raw{}
+		seen[name] = map[uint64]bson.Raw{}
+		for _, field := range []string{"domain_id", "outcome_id", "generation_id"} {
+			indexes[name][field] = map[uint64][]bson.Raw{}
+		}
+	}
+	for _, frame := range o.mongo.frames {
+		for _, name := range mongoBatchBusinessCollections {
+			rows, ok := frame[name]
+			if !ok {
+				return nil, ErrMongoBatchInvalid
+			}
+			for _, raw := range rows {
+				id, err := historicalSpoolMongoID(raw)
+				if err != nil || id == 0 {
+					return nil, ErrMongoBatchConflict
+				}
+				if old, ok := seen[name][id]; ok {
+					if !bytes.Equal(old, raw) {
+						return nil, ErrMongoBatchConflict
+					}
+					continue
+				}
+				seen[name][id] = raw
+				for field, values := range indexes[name] {
+					value := raw.Lookup(field)
+					if value.Type == 0 {
+						continue
+					}
+					n, ok := mongoExactInteger(value)
+					if !ok || n < 0 {
+						return nil, ErrMongoBatchConflict
+					}
+					if n > 0 {
+						values[uint64(n)] = append(values[uint64(n)], raw)
+					}
+				}
+			}
+		}
+	}
+	return indexes, nil
+}
+
+func historicalComponentMongoBusiness(ctx context.Context, o *HistoricalComponentSourceObservation, source *DecodedSourceEvent, view *sqlevaluation.SQLHistoricalComponentSemanticView, indexes map[string]map[string]map[uint64][]bson.Raw, resolved map[string]sqlevaluation.SQLResponsibilityObservation) (*MongoOwnerResolution, error) {
+	copy, err := copyMongoSource(source)
+	if err != nil {
+		return nil, err
+	}
+	r := &MongoOwnerResolution{db: o.mongo.db, source: copy, businessReader: &historicalComponentMongoReader{o, copy, indexes}, metadata: mongoOwnerMetadata{identity: o.mongo.input.metadata.identity, collections: map[string]string{}}}
+	for name, definition := range o.mongo.input.metadata.definitions {
+		r.metadata.collections[name] = definition.uuid
+	}
+	r.local = MongoLocalResolution{EventID: copy.EventID, EventType: copy.EventType, OrgID: copy.OrgID, SourceAuthenticationRequired: true, SQLCrossClosureRequired: true, SQLResponsibilityRequired: true, GlobalUnboundResponsibilityCoverageRequired: true}
+	var owner sqlevaluation.SQLHistoricalFactsSnapshot
+	if copy.Submitted != nil {
+		id, e := mongoCycleStringID(copy.Submitted.AnswerSheetID)
+		if e != nil {
+			return nil, e
+		}
+		owner, err = view.OwnerByAnswerSheet(ctx, id)
+	} else {
+		id, e := mongoCycleStringID(copy.Generated.AssessmentID)
+		if e != nil {
+			return nil, e
+		}
+		owner, err = view.OwnerByAssessment(ctx, id)
+	}
+	if err == nil {
+		r.sqlFacts = &historicalComponentSQLOwnerReader{o, view, ctx, owner.Owner.AssessmentID, resolved}
+	} else if copy.Submitted == nil || !errors.Is(err, sqlevaluation.ErrSQLHistoricalOwnerAbsent) {
+		return nil, err
+	}
+	if copy.Submitted != nil {
+		err = r.readSubmission(ctx)
+	} else {
+		err = r.readGenerated(ctx)
+	}
+	if err != nil {
+		return nil, err
+	}
+	if r.sqlFacts == nil && r.local.FrozenAdmissionPurpose == "independent_questionnaire" {
+		var gaps []string
+		for _, gap := range r.local.Gaps {
+			if gap != "independent_admission_sql_absence_and_global_responsibility_not_checked" {
+				gaps = append(gaps, gap)
+			}
+		}
+		r.local.Gaps = append(gaps, "independent_admission_unique_sql_absence_observed_external_coverage_required")
+	}
+	return r, nil
+}
+
+// Business candidates only. The actual observer remains mandatory; no old
+// coordinator, consumed joint/global flags, or completed evidence is minted.
+// All related original sources are retained, including monotone Mongo owners.
+func qualifiedHistoricalComponentBusinessRows(ctx context.Context, o *HistoricalComponentSourceObservation) ([]qualifiedCASRow, error) {
+	if o == nil || o.ValidateBorrowedObservation(ctx) != nil {
+		return nil, ErrSourceOriginFresh
+	}
+	sources, err := sourceComponentEvents(ctx, o.component, o.pair)
+	if err != nil {
+		return nil, err
+	}
+	indexes, err := historicalComponentMongoIndexes(o)
+	if err != nil {
+		return nil, err
+	}
+	views := map[string]*sqlevaluation.SQLHistoricalComponentSemanticView{}
+	physical := map[string]sqlevaluation.SQLCrossStoreRow{}
+	for i, observer := range o.sql {
+		view, e := observer.SemanticView(ctx)
+		if e != nil {
+			return nil, e
+		}
+		ids, e := o.component.inputs[i].sqlRecipe.SourceEventIDs()
+		if e != nil {
+			return nil, e
+		}
+		for _, id := range ids {
+			if views[id] == nil {
+				views[id] = view
+			}
+		}
+		rows, e := view.CrossStoreRows(ctx)
+		if e != nil {
+			return nil, e
+		}
+		for _, row := range rows {
+			key := row.Observation.Store + ":" + row.Observation.PrimaryKeySHA256
+			if row.Observation.PrimaryKeySHA256 == "" || row.Observation.RowSHA256 == "" {
+				return nil, ErrSQLMongoCrossStoreConflict
+			}
+			if prior, ok := physical[key]; ok && !reflect.DeepEqual(prior, row) {
+				return nil, ErrSQLMongoCrossStoreConflict
+			}
+			physical[key] = row
+		}
+	}
+	resolved := map[string]sqlevaluation.SQLResponsibilityObservation{}
+	rowSources := map[string]string{}
+	mongoOwners := map[string]*MongoOwnerResolution{}
+	ids := sourceComponentSortedKeys(sources)
+	for _, id := range ids {
+		source := sources[id]
+		if views[id] == nil {
+			return nil, ErrSourceOriginFresh
+		}
+		if source.Source.Database != "mongodb" {
+			continue
+		}
+		r, e := historicalComponentMongoBusiness(ctx, o, source, views[id], indexes, nil)
+		if e != nil {
+			return nil, e
+		}
+		mongoOwners[id] = r
+		owner, e := views[id].OwnerByAssessment(ctx, r.local.AssessmentID)
+		if r.local.AssessmentID == 0 {
+			continue
+		} // actual independent absence still needs external closure
+		if e != nil || owner.Owner.OrgID != source.OrgID || owner.Owner.TesteeID != r.local.TesteeID || source.Submitted != nil && owner.Owner.AnswerSheetID != r.local.AnswerSheetID {
+			return nil, ErrSQLMongoCrossStoreConflict
+		}
+		for key, row := range physical {
+			observed := row.Observation
+			if (observed.Store != "retry_event_hold" && observed.Store != "event_delivery_dead_letter") || observed.EventID != id || observed.EventType != source.EventType || !observed.OwnerUnproven || observed.Invalid || observed.Unfinished || observed.LeasePresent || observed.ScopeClass != "retirement_related" || len(observed.Reasons) != 0 {
+				continue
+			}
+			var wire SQLMongoCrossStoreResponsibilityView
+			if e = verifyOriginalMongoSQLWire(&wire, source, r.local, row); e != nil {
+				return nil, e
+			}
+			for _, current := range owner.Responsibilities {
+				if current.Store == observed.Store && current.ID == observed.PrimaryKeySHA256 && !sqlMongoProvisionalMatches(current, observed) {
+					return nil, ErrSQLMongoCrossStoreConflict
+				}
+			}
+			resolved[key], rowSources[key] = observed, id
+		}
+	}
+	// The original monotone rule: a sibling's incomplete graph cannot confer
+	// owner immunity; remove its tentative rows and rerun every original graph.
+	for {
+		removed := false
+		for _, id := range ids {
+			if sources[id].Source.Database != "mongodb" {
+				continue
+			}
+			r, e := historicalComponentMongoBusiness(ctx, o, sources[id], views[id], indexes, resolved)
+			if e != nil {
+				return nil, e
+			}
+			mongoOwners[id] = r
+			if !r.local.OwnerLocalTerminal || len(r.local.BlockingReasons) != 0 {
+				for key, owner := range rowSources {
+					if owner == id {
+						if _, ok := resolved[key]; ok {
+							delete(resolved, key)
+							removed = true
+						}
+					}
+				}
+			}
+		}
+		if !removed {
+			break
+		}
+	}
+	for _, id := range ids {
+		if r := mongoOwners[id]; r != nil {
+			if !r.local.OwnerLocalTerminal || len(r.local.BlockingReasons) != 0 {
+				return nil, ErrCoordinatorCASQualification
+			}
+			if err = r.readMongoResponsibilities(ctx); err != nil {
+				return nil, err
+			}
+			if !r.local.OwnerLocalTerminal || len(r.local.BlockingReasons) != 0 {
+				return nil, ErrCoordinatorCASQualification
+			}
+		}
+	}
+	if err = historicalComponentCurrentSQL(ctx, o, sources, views, physical, mongoOwners, resolved); err != nil {
+		return nil, err
+	}
+	out := make([]qualifiedCASRow, 0, len(ids))
+	for _, id := range ids {
+		source, view := sources[id], views[id]
+		candidate := coordinatorEventCandidate(source)
+		row := qualifiedCASRow{sourceObservation: o, facts: source}
+		if source.Source.Database == "mysql" {
+			assessment, e := sqlSourceAssessment(source)
+			if e != nil {
+				return nil, e
+			}
+			reader := &historicalComponentSQLOwnerReader{o, view, ctx, assessment, resolved}
+			local, e := resolveSQLLocalFacts(source, reader.Snapshot())
+			if e != nil || !local.OwnerLocalTerminal || len(local.BlockingReasons) != 0 {
+				return nil, ErrCoordinatorCASQualification
+			}
+			candidate.HistoricalGaps = append(candidate.HistoricalGaps, local.Gaps...)
+			candidate.ActualOriginalRun, candidate.AuthorizationRun, candidate.ExecutionRun = local.OriginalRun, local.AuthorizationRun, local.ExecutionRun
+			candidate.LocalQualified = true
+			outcome := uint64(0)
+			if source.OutcomeCommitted != nil {
+				outcome, e = mongoCycleStringID(source.OutcomeCommitted.OutcomeID)
+				if e != nil {
+					return nil, e
+				}
+			}
+			row.bindingSHA, e = view.BusinessBinding(ctx, assessment, outcome, source.EventType, local.OriginalRun)
+			if e != nil {
+				return nil, e
+			}
+		} else {
+			local := mongoOwners[id].Local()
+			candidate.HistoricalGaps = append(candidate.HistoricalGaps, local.Gaps...)
+			candidate.ActualOriginalRun, candidate.BusinessBindingSHA256, candidate.LocalQualified = local.OriginalRun, local.BusinessBindingSHA256, true
+			row.bindingSHA = local.BusinessBindingSHA256
+		}
+		candidate.RequiredAdapters = append(candidate.RequiredAdapters, "fresh_component_sql_source_negative_closure", "fresh_component_mongo_owner_source_negative_closure", "fresh_component_writer_fence", "fresh_component_global_current_message_closure", "fresh_component_ai_closure")
+		row.candidate = candidate
+		if qualifiedCASSourceMatches(source, candidate) != nil || !evidence.ValidSHA256(row.bindingSHA) {
+			return nil, ErrCoordinatorCASQualification
+		}
+		if _, _, e := qualifiedCASOwnerIDs(source, candidate); e != nil {
+			return nil, e
+		}
+		out = append(out, row)
+	}
+	if o.ValidateBorrowedObservation(ctx) != nil {
+		return nil, ErrSourceOriginFresh
+	}
+	return out, nil
+}
+
+// The whole actual scoped SQL closure is checked, including every replay
+// member. No JOIN-selected zero backlog or event-only closure is accepted.
+func historicalComponentCurrentSQL(ctx context.Context, o *HistoricalComponentSourceObservation, sources map[string]*DecodedSourceEvent, views map[string]*sqlevaluation.SQLHistoricalComponentSemanticView, physical map[string]sqlevaluation.SQLCrossStoreRow, mongoOwners map[string]*MongoOwnerResolution, resolved map[string]sqlevaluation.SQLResponsibilityObservation) error {
+	if o.ValidateBorrowedObservation(ctx) != nil {
+		return ErrSourceOriginFresh
+	}
+	for key, row := range physical {
+		observed := row.Observation
+		if observed.Invalid || len(observed.Reasons) != 0 {
+			return ErrSQLMongoCrossStoreConflict
+		}
+		if observed.ScopeClass != "scope_outside_retirement" && (observed.Unfinished || observed.LeasePresent || observed.ScopeClass == "coordination_required") {
+			return ErrSQLMongoCrossStoreConflict
+		}
+		if observed.OwnerUnproven {
+			actual, ok := resolved[key]
+			if !ok || !reflect.DeepEqual(actual, observed) {
+				return ErrSQLMongoCrossStoreConflict
+			}
+		}
+		if source := sources[observed.EventID]; source != nil {
+			if sqlResponsibilitySourceCollision(observed, source) {
+				return ErrSQLMongoCrossStoreConflict
+			}
+			if row.Inner != nil {
+				if source.Source.Database == "mysql" {
+					if err := verifyOriginalSQLWire(source, row); err != nil {
+						return err
+					}
+				} else {
+					owner := mongoOwners[source.EventID]
+					if owner == nil || observed.Store == "rm_outbox" {
+						return ErrSQLMongoCrossStoreConflict
+					}
+					var view SQLMongoCrossStoreResponsibilityView
+					if err := verifyOriginalMongoSQLWire(&view, source, owner.Local(), row); err != nil {
+						return err
+					}
+				}
+			}
+		}
+		switch observed.Store {
+		case "rm_outbox", "retry_event_hold", "event_delivery_dead_letter":
+			if row.Inner == nil {
+				return ErrSQLMongoCrossStoreConflict
+			}
+			if observed.EventType == "answersheet.submitted" || observed.EventType == "interpretation.report.generated" {
+				if sources[observed.EventID] == nil || mongoOwners[observed.EventID] == nil {
+					return ErrSQLMongoCrossStoreConflict
+				}
+			} else if observed.AssessmentID == 0 || observed.OwnerUnproven {
+				return ErrSQLMongoCrossStoreConflict
+			}
+		case "qs_rm_replay_requests", "qs_rm_replay_items":
+			if row.Replay == nil || !row.Replay.FingerprintVerified || len(row.Replay.Items) == 0 || row.Replay.OrganizationID != observed.OrgID {
+				return ErrSQLMongoCrossStoreConflict
+			}
+			if observed.Store == "qs_rm_replay_requests" {
+				continue
+			} // all actual members below retain the same verified header
+			if row.Replay.Store == "assessment-mysql-outbox" {
+				if observed.AssessmentID == 0 || observed.OwnerUnproven || observed.OwnerKind != "Evaluation" {
+					return ErrSQLMongoCrossStoreConflict
+				}
+				continue // same actual decoder checked parent, all members and current SQL claim
+			}
+			if row.Replay.Store != "mongo-domain-events" {
+				return ErrSQLMongoCrossStoreConflict
+			}
+			source := sources[observed.EventID]
+			owner := mongoOwners[observed.EventID]
+			if source == nil || owner == nil || views[observed.EventID] == nil {
+				return ErrSQLMongoCrossStoreConflict
+			}
+			var current *mongoOwnerStandardRow
+			if actual, ok := owner.currentStandard[observed.EventID]; ok {
+				current = &actual
+			}
+			var replayView SQLMongoCrossStoreResponsibilityView
+			if err := verifySQLMongoReplay(&replayView, source, owner.Local(), row, current); err != nil {
+				return err
+			}
+			if len(replayView.BlockingReasons) != 0 {
+				return ErrSQLMongoCrossStoreConflict
+			}
+		case "system_governance_action_runs":
+			if observed.ScopeClass != "scope_outside_retirement" && observed.OwnerUnproven {
+				return ErrSQLMongoCrossStoreConflict
+			}
+		case "qs_rm_evaluation_request_ref", "qs_rm_gap_recovery_request":
+			if source := sources[observed.EventID]; source != nil && source.Source.Database == "mongodb" {
+				return ErrSQLMongoCrossStoreConflict
+			}
+		default:
+			return ErrSQLMongoCrossStoreConflict
+		}
+	}
+	return o.ValidateBorrowedObservation(ctx)
 }

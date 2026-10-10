@@ -151,6 +151,7 @@ func (r *MongoOwnerResolution) readMongoResponsibilities(ctx context.Context) er
 			return err
 		}
 	}
+	r.currentStandard = relevant
 	r.local.Gaps = append(r.local.Gaps, "sql_retry_event_hold_and_dead_letter_not_mongo_stores", "inbox_and_global_unbound_coverage_require_actual_runtime_coordinator")
 	return nil
 }

@@ -83,6 +83,7 @@ type MongoOwnerResolution struct {
 	reads            []mongoOwnerRead
 	bytes            int
 	local            MongoLocalResolution
+	currentStandard  map[string]mongoOwnerStandardRow
 	expectedStandard []evidence.StandardReference
 }
 

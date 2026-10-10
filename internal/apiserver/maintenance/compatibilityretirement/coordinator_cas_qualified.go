@@ -99,12 +99,16 @@ func (c *HistoricalCoordinator) PrepareQualifiedHistoricalCAS(ctx context.Contex
 }
 
 // This type is private, never serialized and has no public constructor. Only
-// qualifiedCASRows supplies it after exact authenticated-source/proof checks.
+// qualifiedCASRows supplies whole-source rows after its original proof checks.
+// The fresh business-only constructor marks its native observation separately;
+// those rows are rejected by the old whole-source evidence helper.
 type qualifiedCASRow struct {
-	handle     *VerifiedSourceEvent
-	facts      *DecodedSourceEvent
-	candidate  HistoricalCandidate
-	bindingSHA string
+	// A scoped business result cannot enter the legacy whole-source evidence path.
+	sourceObservation *HistoricalComponentSourceObservation
+	handle            *VerifiedSourceEvent
+	facts             *DecodedSourceEvent
+	candidate         HistoricalCandidate
+	bindingSHA        string
 }
 
 func (c *HistoricalCoordinator) qualifiedCASRows(ctx context.Context, joint *WholeSourceJointPage, origin *SourceOriginRecheckProof, ai *AIReverseFreshProof) ([]qualifiedCASRow, error) {

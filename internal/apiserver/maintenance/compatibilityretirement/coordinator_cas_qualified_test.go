@@ -95,6 +95,7 @@ func TestQualifiedCASEntryRejectsUnknownAndIdentityConflicts(t *testing.T) {
 		name   string
 		change func(*qualifiedCASRow)
 	}{
+		{"scoped_business_is_not_whole_source_evidence", func(r *qualifiedCASRow) { r.sourceObservation = &HistoricalComponentSourceObservation{} }},
 		{"current_coverage_gap_is_not_historical", func(r *qualifiedCASRow) {
 			r.candidate.HistoricalGaps = []string{"inbox_and_global_unbound_coverage_require_actual_runtime_coordinator"}
 		}},

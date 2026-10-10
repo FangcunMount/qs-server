@@ -163,13 +163,17 @@ func mongoSubmissionPayload(row sheetmongo.AnswerSheetPO) (eventpayload.AnswerSh
 	return p, nil
 }
 
-// Only the actual opaque batch (including the private resolved-owner wrapper)
-// may supply global original-Run absence. Editable snapshots and the legacy
-// point-reader API are not an absence capability.
+// Only an actual opaque owner batch or the private fresh native semantic view
+// may query original-Run absence. Editable snapshots and the legacy point
+// reader API are not an absence capability.
 func (r *MongoOwnerResolution) originalSQLOutcomeRunAbsent(ctx context.Context, outcome sqlevaluation.SQLHistoricalOutcome) error {
 	switch reader := r.sqlFacts.(type) {
 	case *sqlevaluation.SQLHistoricalBatchOwnerFacts:
 		return reader.OriginalOutcomeRunAbsent(ctx, outcome.ID, outcome.RunID)
+	case *historicalComponentSQLOwnerReader:
+		if reader != nil && reader.view != nil && historicalComponentBusinessScope(ctx, reader.observation) == nil {
+			return reader.view.OriginalOutcomeRunAbsent(ctx, outcome.ID, outcome.RunID)
+		}
 	case *sqlMongoResolvedOwnerReader:
 		if reader != nil && reader.actual != nil {
 			return reader.actual.OriginalOutcomeRunAbsent(ctx, outcome.ID, outcome.RunID)

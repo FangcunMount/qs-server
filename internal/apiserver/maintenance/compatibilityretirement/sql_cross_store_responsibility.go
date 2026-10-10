@@ -206,10 +206,13 @@ type sqlMongoResolvedOwnerReader struct {
 }
 
 func (r *sqlMongoResolvedOwnerReader) Snapshot() sqlevaluation.SQLHistoricalFactsSnapshot {
-	v := r.actual.Snapshot()
+	return sqlMongoResolvedSnapshot(r.actual.Snapshot(), r.resolved)
+}
+
+func sqlMongoResolvedSnapshot(v sqlevaluation.SQLHistoricalFactsSnapshot, resolved map[string]sqlevaluation.SQLResponsibilityObservation) sqlevaluation.SQLHistoricalFactsSnapshot {
 	for i := range v.Responsibilities {
 		current := &v.Responsibilities[i]
-		o, ok := r.resolved[current.Store+":"+current.ID]
+		o, ok := resolved[current.Store+":"+current.ID]
 		if ok && sqlMongoProvisionalMatches(*current, o) {
 			current.Invalid = false
 		}
@@ -382,20 +385,7 @@ func (p *SQLMongoCrossStoreResponsibilityPage) verifyMongoMessage(v *SQLMongoCro
 		v.BlockingReasons = append(v.BlockingReasons, "cross_store_mongo_event_in_sql_rm_namespace")
 	}
 	if o.EventID == source.EventID {
-		if o.EventType != source.EventType || o.OwnerKind != source.AggregateType || o.OwnerID != source.AggregateID || !row.Inner.OccurredAt.Equal(source.OccurredAt) || row.LegacyContentSHA256 != source.ContentDigest.SHA256 {
-			return ErrSQLMongoCrossStoreConflict
-		}
-		if source.Submitted != nil {
-			var body eventpayload.AnswerSheetSubmittedData
-			if strictTyped(row.Inner.Data, &body) != nil || !reflect.DeepEqual(&body, source.Submitted) {
-				return ErrSQLMongoCrossStoreConflict
-			}
-		} else {
-			var body eventoutcome.ReportGeneratedPayload
-			if strictTyped(row.Inner.Data, &body) != nil || !reflect.DeepEqual(&body, source.Generated) {
-				return ErrSQLMongoCrossStoreConflict
-			}
-		}
+		return verifyOriginalMongoSQLWire(v, source, local, row)
 	} else {
 		// A different live event must have a real globally authenticated
 		// Mongo SDK row and original reverse business graph. No synthetic
@@ -439,12 +429,68 @@ func (p *SQLMongoCrossStoreResponsibilityPage) verifyMongoMessage(v *SQLMongoCro
 	return nil
 }
 
+// Exact original Mongo source/wire identity. Related sources must each pass
+// their own real business graph; this helper does not replace a current SDK row.
+func verifyOriginalMongoSQLWire(v *SQLMongoCrossStoreResponsibilityView, source *DecodedSourceEvent, local MongoLocalResolution, row sqlevaluation.SQLCrossStoreRow) error {
+	o := row.Observation
+	if row.Inner == nil || o.EventID != source.EventID || o.EventType != row.Inner.EventType || o.EventID != row.Inner.ID || o.OwnerKind != row.Inner.AggregateType || o.OwnerID != row.Inner.AggregateID || row.InnerDataSHA256 == "" || row.LegacyContentSHA256 == "" {
+		return ErrSQLMongoCrossStoreConflict
+	}
+	if o.EventType != source.EventType || o.OwnerKind != source.AggregateType || o.OwnerID != source.AggregateID || !row.Inner.OccurredAt.Equal(source.OccurredAt) || row.LegacyContentSHA256 != source.ContentDigest.SHA256 {
+		return ErrSQLMongoCrossStoreConflict
+	}
+	if source.Submitted != nil {
+		var body eventpayload.AnswerSheetSubmittedData
+		if strictTyped(row.Inner.Data, &body) != nil || !reflect.DeepEqual(&body, source.Submitted) {
+			return ErrSQLMongoCrossStoreConflict
+		}
+	} else {
+		var body eventoutcome.ReportGeneratedPayload
+		if strictTyped(row.Inner.Data, &body) != nil || !reflect.DeepEqual(&body, source.Generated) {
+			return ErrSQLMongoCrossStoreConflict
+		}
+	}
+	if o.TesteeID != local.TesteeID || o.OrgID != local.OrgID {
+		return ErrSQLMongoCrossStoreConflict
+	}
+	v.OwnerBoundObservationKeys = append(v.OwnerBoundObservationKeys, o.Store+":"+o.PrimaryKeySHA256)
+	return nil
+}
+
 func mustSQLMongoSourceKey(source *DecodedSourceEvent) verifiedSourceKey {
 	key, _ := sourceAuthKey(source.Source.Database, source.Source.Object, source.Source.PrimaryKeySHA256)
 	return key
 }
 
 func (p *SQLMongoCrossStoreResponsibilityPage) verifyReplay(v *SQLMongoCrossStoreResponsibilityView, source *DecodedSourceEvent, local MongoLocalResolution, row sqlevaluation.SQLCrossStoreRow) error {
+	if row.Replay == nil || !row.Replay.FingerprintVerified || row.Replay.OrganizationID != source.OrgID {
+		return ErrSQLMongoCrossStoreConflict
+	}
+	var actualRow *mongoOwnerStandardRow
+	authorized := false
+	if row.Replay != nil {
+		for _, item := range row.Replay.Items {
+			authorized = authorized || item.EventID == row.Observation.EventID && item.Authorized
+		}
+	}
+	if row.Replay != nil && row.Replay.Store == "mongo-domain-events" && authorized {
+		if current, ok := p.mongo.global.graph.messages[row.Observation.EventID]; ok {
+			actual := p.mongo.global.observations[current.observation]
+			if actual.Invalid || actual.OrgID != source.OrgID {
+				return ErrSQLMongoCrossStoreConflict
+			}
+			if actual.Unfinished || actual.LeasePresent {
+				v.BlockingReasons = append(v.BlockingReasons, "cross_store_authorized_replay_business_or_current_responsibility_unclosed")
+			}
+			actualRow = &current.row
+		}
+	}
+	return verifySQLMongoReplay(v, source, local, row, actualRow)
+}
+
+// Current is supplied only by an actual current Mongo row checker; no imported
+// summary or historical source stands in for the SDK row's replay claim.
+func verifySQLMongoReplay(v *SQLMongoCrossStoreResponsibilityView, source *DecodedSourceEvent, local MongoLocalResolution, row sqlevaluation.SQLCrossStoreRow, current *mongoOwnerStandardRow) error {
 	r := row.Replay
 	o := row.Observation
 	if r == nil || !r.FingerprintVerified || r.OrganizationID != source.OrgID {
@@ -476,19 +522,14 @@ func (p *SQLMongoCrossStoreResponsibilityPage) verifyReplay(v *SQLMongoCrossStor
 		return ErrSQLMongoCrossStoreConflict
 	}
 	if item.Authorized {
-		current, ok := p.mongo.global.graph.messages[o.EventID]
-		if !ok {
+		if current == nil {
 			v.BlockingReasons = append(v.BlockingReasons, "cross_store_authorized_replay_current_mongo_event_absent")
 			return nil
 		}
-		actual := p.mongo.global.observations[current.observation]
-		if actual.Invalid || actual.OrgID != source.OrgID {
-			return ErrSQLMongoCrossStoreConflict
-		}
-		if current.row.ManualReplayRequestID != r.RequestID || current.row.ManualReplayVersion == 0 || current.row.Version < current.row.ManualReplayVersion || current.row.FailureCount < item.ExpectedFailureCount {
+		if current.ManualReplayRequestID != r.RequestID || current.ManualReplayVersion == 0 || current.Version < current.ManualReplayVersion || current.FailureCount < item.ExpectedFailureCount {
 			v.BlockingReasons = append(v.BlockingReasons, "cross_store_replay_current_claim_binding_unknown")
 		}
-		if actual.Unfinished || actual.LeasePresent || !local.OwnerLocalTerminal {
+		if current.State != "published" || !local.OwnerLocalTerminal {
 			v.BlockingReasons = append(v.BlockingReasons, "cross_store_authorized_replay_business_or_current_responsibility_unclosed")
 		}
 	} else if item.Reason == "organization_mismatch" || item.Reason == "ambiguous_identity" {

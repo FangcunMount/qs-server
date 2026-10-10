@@ -255,6 +255,11 @@ func (p *WholeSourceJointPage) resolveSQL(ctx context.Context, source *DecodedSo
 }
 
 func (p *WholeSourceJointPage) verifyOriginalSQLWire(source *DecodedSourceEvent, row sqlevaluation.SQLCrossStoreRow) error {
+	return verifyOriginalSQLWire(source, row)
+}
+
+// Shared exact source/wire rule; this grants no current or global closure.
+func verifyOriginalSQLWire(source *DecodedSourceEvent, row sqlevaluation.SQLCrossStoreRow) error {
 	o := row.Observation
 	inner := row.Inner
 	if inner == nil || inner.ID != source.EventID || inner.EventType != source.EventType || inner.AggregateType != source.AggregateType || inner.AggregateID != source.AggregateID || !inner.OccurredAt.Equal(source.OccurredAt) || o.OrgID != source.OrgID || row.LegacyContentSHA256 != source.ContentDigest.SHA256 {

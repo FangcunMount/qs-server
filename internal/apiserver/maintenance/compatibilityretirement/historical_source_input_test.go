@@ -220,3 +220,18 @@ func TestHistoricalSourceInputIndexActualCopiesAndLegacySeparation(t *testing.T)
 		t.Fatal("released recipe rebuilt membership")
 	}
 }
+
+func TestHistoricalComponentBusinessRowsRequireActualSourceObservation(t *testing.T) {
+	for _, observation := range []*HistoricalComponentSourceObservation{nil, {}, {rowsSHA: "editable-summary"}} {
+		if rows, err := qualifiedHistoricalComponentBusinessRows(t.Context(), observation); rows != nil || err == nil {
+			t.Fatal("editable or absent input became business qualification")
+		}
+	}
+	reader := &historicalComponentSQLOwnerReader{ctx: t.Context()}
+	if reader.Snapshot().Owner.AssessmentID != 0 || reader.HasVerifiedAnswerSheetAssociation(42) {
+		t.Fatal("absent native owner returned editable business facts")
+	}
+	if _, err := reader.OutcomeRecord(42); err == nil {
+		t.Fatal("absent native outcome accepted")
+	}
+}
