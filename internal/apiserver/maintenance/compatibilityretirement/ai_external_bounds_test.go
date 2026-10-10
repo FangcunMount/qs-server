@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -14,7 +15,7 @@ func aiDiscoveryFixture(t *testing.T) ([]byte, aiExternalDiscoveryFacts) {
 	t.Helper()
 	facts := aiExternalDiscoveryFacts{Protocol: "qs-ai-readonly-bounds-discovery-facts/v1", SourceSHA: strings.Repeat("a", 40), OperationID: "123-1", RunID: "123", RuntimeSourceSHA: strings.Repeat("b", 40), RuntimeBindingSHA: strings.Repeat("c", 64), ImageID: "sha256:" + strings.Repeat("d", 64), ContainerID: strings.Repeat("e", 64), Bounds: map[string]aiExternalDiscoveredPacket{}, Sections: map[string]aiExternalSection{AIBridgeCommandSource: {1, 128, strings.Repeat("a", 64)}, AILegacyCommandSource: {0, 0, strings.Repeat("b", 64)}}, LogicalObjects: 53, Epochs: 2, Scope: "diagnostic-unapproved-bounds-only"}
 	for _, side := range []string{"ai", "peer"} {
-		count, head, source, identity := 43, "0040_module_table_names", "82ffa1b43308f23fbb1ebe669c3071e0486e105a", strings.Repeat("f", 64)
+		count, head, source, identity := 44, "0040_module_table_names", "82ffa1b43308f23fbb1ebe669c3071e0486e105a", strings.Repeat("f", 64)
 		if side == "peer" {
 			count, head, source, identity = 14, "99", facts.SourceSHA, strings.Repeat("0", 64)
 		}
@@ -39,6 +40,14 @@ func aiDiscoveryFixture(t *testing.T) ([]byte, aiExternalDiscoveryFacts) {
 }
 
 func TestAIExternalBoundsObservationDoesNotAcquireExecutionOrCASAuthority(t *testing.T) {
+	directory, err := filepath.Abs("../../../../scripts/database")
+	if err != nil {
+		t.Fatal(err)
+	}
+	assets, err := aiExternalAssets(directory)
+	if err != nil || sourceSHA(assets.host) != aiExternalHostSHA || !strings.Contains(aiStoppedCarrierHost, aiExternalHostSHA) {
+		t.Fatal("actual host asset and stopped carrier pins differ")
+	}
 	raw, _ := aiDiscoveryFixture(t)
 	facts, ai, peer, err := aiExternalDecodeDiscovery(raw)
 	if err != nil {
@@ -48,7 +57,7 @@ func TestAIExternalBoundsObservationDoesNotAcquireExecutionOrCASAuthority(t *tes
 	o.self = o
 	o.seal = aiJSONHash(facts)
 	s := o.Summary()
-	if s.Scope != "diagnostic-unapproved-bounds-only" || s.AIPhysicalObjects != 43 || s.AILogicalObjects != 53 || s.PeerObjects != 14 || s.IndependentEpochs != 2 || s.PriorAIBindingMatched || s.IndependentApproval || s.BusinessClosure || s.WriterFence || s.BrokerCoverage || s.CASAuthority || s.RetirementWritten || s.RecoveryAuthority || s.DropReady {
+	if s.Scope != "diagnostic-unapproved-bounds-only" || s.AIPhysicalObjects != 44 || s.AILogicalObjects != 53 || s.PeerObjects != 14 || s.IndependentEpochs != 2 || s.PriorAIBindingMatched || s.IndependentApproval || s.BusinessClosure || s.WriterFence || s.BrokerCoverage || s.CASAuthority || s.RetirementWritten || s.RecoveryAuthority || s.DropReady {
 		t.Fatal("discovery scope/authority changed")
 	}
 	if _, err = json.Marshal(o); !errors.Is(err, ErrSourceSerialization) {
@@ -71,7 +80,7 @@ func TestAIExternalBoundsObservationDoesNotAcquireExecutionOrCASAuthority(t *tes
 
 func TestAIExternalBoundsRejectsCapabilityFieldsAndUnboundPacketChanges(t *testing.T) {
 	_, original := aiDiscoveryFixture(t)
-	for _, which := range []string{"approval", "business", "fence", "cas", "drop", "packet_bytes", "packet_hash", "after_upper_set", "identity", "head", "catalog", "profile", "logical", "epochs", "unknown_field", "duplicate", "missing_flag", "null_flag"} {
+	for _, which := range []string{"approval", "business", "fence", "cas", "drop", "packet_bytes", "packet_hash", "after_upper_set", "identity", "head", "catalog", "profile", "physical_missing_head", "physical_extra_object", "logical", "epochs", "unknown_field", "duplicate", "missing_flag", "null_flag"} {
 		t.Run(which, func(t *testing.T) {
 			_, facts := aiDiscoveryFixture(t)
 			p := facts.Bounds["ai"]
@@ -101,7 +110,7 @@ func TestAIExternalBoundsRejectsCapabilityFieldsAndUnboundPacketChanges(t *testi
 			case "epochs":
 				facts.Epochs = 1
 			default:
-				if which == "identity" || which == "head" || which == "catalog" || which == "profile" {
+				if which == "identity" || which == "head" || which == "catalog" || which == "profile" || which == "physical_missing_head" || which == "physical_extra_object" {
 					raw, e := base64.StdEncoding.DecodeString(p.Bytes)
 					if e != nil {
 						t.Fatal(e)
@@ -119,6 +128,14 @@ func TestAIExternalBoundsRejectsCapabilityFieldsAndUnboundPacketChanges(t *testi
 						b["catalog_sha256"] = ""
 					case "profile":
 						b["profile"] = []int{1000}
+					case "physical_missing_head":
+						delete(b["tables"].(map[string]any), "synthetic_43")
+						delete(p.AfterUpper, "synthetic_43")
+						p.Objects = 43
+					case "physical_extra_object":
+						b["tables"].(map[string]any)["synthetic_44"] = map[string]any{"upper": nil}
+						p.AfterUpper["synthetic_44"] = false
+						p.Objects = 45
 					}
 					raw, e = json.Marshal(b)
 					if e != nil {

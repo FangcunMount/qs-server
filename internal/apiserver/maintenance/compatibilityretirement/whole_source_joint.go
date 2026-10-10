@@ -10,6 +10,7 @@ import (
 
 	sqlevaluation "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/evaluation"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventing/evidence"
+	"go.mongodb.org/mongo-driver/mongo"
 )
 
 // Only original source capabilities, real owner batches and complete current
@@ -54,6 +55,60 @@ func (*WholeSourceJointPage) String() string {
 	return "private whole-source joint responsibility reader; no write authorization"
 }
 func (p *WholeSourceJointPage) GoString() string { return p.String() }
+
+// This is the necessary current responsibility closure for one reversible
+// evidence component, not a whole-ledger scan or a writer/DROP fence. Both
+// callers must still borrow the same genuine SQL/Mongo scopes before effects.
+func validateHistoricalComponentResponsibilityClosure(parent context.Context, o *HistoricalComponentObservation) error {
+	if o.ValidateBorrowedObservation(parent) != nil {
+		return ErrCoordinatorCASQualification
+	}
+	scope, cancel := context.WithDeadline(parent, o.expires)
+	defer cancel()
+	ctx := mongo.NewSessionContext(scope, mongo.SessionFromContext(parent))
+	current, err := qualifiedHistoricalComponentBusinessRows(ctx, o.source)
+	if err != nil || historicalComponentResponsibilityRowsMatch(o.rows, current) != nil {
+		return ErrCoordinatorCASQualification
+	}
+	indexes, err := historicalComponentMongoIndexes(o.source)
+	if err != nil || historicalComponentSelectedMongoTerminal(indexes) != nil {
+		return ErrCoordinatorCASQualification
+	}
+	if err = historicalComponentSQLMongoResponsibilities(ctx, o.source, current, indexes); err != nil {
+		return err
+	}
+	return o.ValidateBorrowedObservation(ctx)
+}
+
+func historicalComponentResponsibilityRowsMatch(before, current []qualifiedCASRow) error {
+	if len(before) == 0 || len(before) != len(current) {
+		return ErrCoordinatorCASQualification
+	}
+	seen := map[string]qualifiedCASRow{}
+	for _, row := range before {
+		if row.facts == nil || qualifiedCASSourceMatches(row.facts, row.candidate) != nil || !row.candidate.LocalQualified || len(row.candidate.BlockingReasons) != 0 || row.bindingSHA == "" {
+			return ErrCoordinatorCASQualification
+		}
+		if _, exists := seen[row.facts.EventID]; exists {
+			return ErrCoordinatorCASQualification
+		}
+		seen[row.facts.EventID] = row
+	}
+	for _, row := range current {
+		if row.facts == nil || qualifiedCASSourceMatches(row.facts, row.candidate) != nil || !row.candidate.LocalQualified || len(row.candidate.BlockingReasons) != 0 {
+			return ErrCoordinatorCASQualification
+		}
+		prior, exists := seen[row.facts.EventID]
+		if !exists || prior.sourceObservation != row.sourceObservation || prior.bindingSHA != row.bindingSHA || !reflect.DeepEqual(prior.facts, row.facts) || !reflect.DeepEqual(prior.candidate.HistoricalGaps, row.candidate.HistoricalGaps) || !reflect.DeepEqual(prior.candidate.ActualOriginalRun, row.candidate.ActualOriginalRun) || !reflect.DeepEqual(prior.candidate.AuthorizationRun, row.candidate.AuthorizationRun) || !reflect.DeepEqual(prior.candidate.ExecutionRun, row.candidate.ExecutionRun) {
+			return ErrCoordinatorCASQualification
+		}
+		delete(seen, row.facts.EventID)
+	}
+	if len(seen) != 0 {
+		return ErrCoordinatorCASQualification
+	}
+	return nil
+}
 func (WholeSourceJointObservationBinding) MarshalJSON() ([]byte, error) {
 	return nil, ErrSourceSerialization
 }
@@ -227,7 +282,7 @@ func prepareWholeSourceJointPage(ctx context.Context, c *HistoricalCoordinator, 
 				return nil, err
 			}
 			candidate.LocalQualified = local.OwnerLocalTerminal && len(local.BlockingReasons) == 0 && len(view.BlockingReasons) == 0
-			candidate.HistoricalGaps = append(candidate.HistoricalGaps, local.Gaps...)
+			appendHistoricalComponentMongoGaps(&candidate, local.Gaps)
 			candidate.HistoricalGaps = append(candidate.HistoricalGaps, view.Gaps...)
 			candidate.BlockingReasons = append(candidate.BlockingReasons, local.BlockingReasons...)
 			candidate.BlockingReasons = append(candidate.BlockingReasons, view.BlockingReasons...)
@@ -283,6 +338,9 @@ func (p *WholeSourceJointPage) prepareCrossRows(ctx context.Context) error {
 			cross.qualification[key] = q
 			cross.sources = append(cross.sources, handle)
 			l := q.Local()
+			if l.AnswerSheetID != 0 {
+				owners[sqlevaluation.SQLCrossStoreOwnerReference{Kind: "AnswerSheet", ID: strconv.FormatUint(l.AnswerSheetID, 10)}] = true
+			}
 			if l.GenerationID != 0 {
 				owners[sqlevaluation.SQLCrossStoreOwnerReference{Kind: "ReportGeneration", ID: strconv.FormatUint(l.GenerationID, 10)}] = true
 			}

@@ -740,7 +740,7 @@ func TestPreparationRestoreMetadataRequiresActualFiveProducerHashes(t *testing.T
 	}
 }
 
-func originalHistoricalWriteMaterialFixture(t *testing.T) (string, lifecycleRequest, lifecycleHistoricalMaterialManifest) {
+func originalHistoricalWriteMaterialFixture(t *testing.T, versions ...int) (string, lifecycleRequest, lifecycleHistoricalMaterialManifest) {
 	t.Helper()
 	base, _ := filepath.EvalSymlinks(t.TempDir())
 	_ = os.Chmod(base, 0700)
@@ -749,9 +749,18 @@ func originalHistoricalWriteMaterialFixture(t *testing.T) (string, lifecycleRequ
 		t.Fatal("directory")
 	}
 	m := lifecycleHistoricalMaterialManifest{Version: 1, SourceSHA: strings.Repeat("a", 40), ToolSourceSHA: strings.Repeat("b", 40), OperationID: "123-1", RunID: "789-1", MaxSpoolBytes: 16 << 30, JournalSequence: 2}
-	for _, name := range []string{"prepared-mongo-private.bin", "prepared-sql-private.bin", "journal-1.json", "journal-2.json"} {
+	names := []string{"prepared-mongo-private.bin", "prepared-sql-private.bin"}
+	if len(versions) > 0 {
+		if len(versions) != 1 || versions[0] != 2 {
+			t.Fatal("unknown fixture producer version")
+		}
+		m.Version = 2
+		names = []string{"input-mongo-1.private.bin", "input-source-1.private.bin", "input-ai-1.private.bin", "input-mongo-2.private.bin", "input-source-2.private.bin", "input-ai-2.private.bin", "input-owner-sql.private.bin"}
+	}
+	names = append(names, "journal-1.json", "journal-2.json")
+	for _, name := range names {
 		raw := []byte("private-source-" + name)
-		if name == "prepared-sql-private.bin" {
+		if name == "prepared-sql-private.bin" || name == "input-owner-sql.private.bin" {
 			raw = nil
 		}
 		if os.WriteFile(filepath.Join(path, name), raw, 0600) != nil {
@@ -794,6 +803,67 @@ func TestOriginalHistoricalWriteMaterialHandoffUsesActualSourceIdentityAndEOF(t 
 	}
 	if err = d.checkComplete(true); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestBoundedHistoricalWriteMaterialHandoffUsesExactSevenInputsAndRejectsMixedEpochs(t *testing.T) {
+	for _, mutation := range []string{"none", "missing_owner", "mixed_prepared", "old_version", "unknown_version", "noncontinuous", "different_tool", "changed_input", "extra"} {
+		t.Run(mutation, func(t *testing.T) {
+			path, r, m := originalHistoricalWriteMaterialFixture(t, 2)
+			switch mutation {
+			case "missing_owner":
+				_ = os.Remove(filepath.Join(path, "input-owner-sql.private.bin"))
+			case "mixed_prepared":
+				_ = os.Rename(filepath.Join(path, m.Files[0].Name), filepath.Join(path, "prepared-mongo-private.bin"))
+				m.Files[0].Name = "prepared-mongo-private.bin"
+			case "old_version":
+				m.Version = 1
+			case "unknown_version":
+				m.Version = 3
+			case "noncontinuous":
+				m.Files[len(m.Files)-1].Name = "journal-3.json"
+			case "different_tool":
+				m.ToolSourceSHA = strings.Repeat("e", 40)
+			case "changed_input":
+				_ = os.WriteFile(filepath.Join(path, m.Files[3].Name), []byte("changed raw input"), 0600)
+			case "extra":
+				_ = os.WriteFile(filepath.Join(path, "unknown-input"), []byte("body"), 0600)
+			}
+			// Keep the original producer's report/hash chain intact. This exercises
+			// real file identities and closed metadata, never a business/CAS proof.
+			manifestRaw, marshalErr := json.Marshal(m)
+			if marshalErr != nil || os.WriteFile(filepath.Join(path, "history.materials.private.json"), manifestRaw, 0600) != nil {
+				t.Fatal("manifest")
+			}
+			var report lifecycleHistoricalWriteMaterialReport
+			reportRaw, _ := os.ReadFile(r.HistoricalWriteReport.Path)
+			if json.Unmarshal(reportRaw, &report) != nil {
+				t.Fatal("report")
+			}
+			report.MaterialManifestSHA256 = digestRaw(manifestRaw)
+			reportRaw, marshalErr = json.Marshal(report)
+			if marshalErr != nil || os.WriteFile(r.HistoricalWriteReport.Path, reportRaw, 0600) != nil {
+				t.Fatal("report")
+			}
+			r.HistoricalWriteReport.SHA256 = digestRaw(reportRaw)
+			d, err := openLifecycleHistoricalWriteMaterialFiles(context.Background(), path, r, uint32(os.Getuid()))
+			if mutation != "none" {
+				if err == nil || d != nil {
+					t.Fatal("mixed, unknown or changed original input admitted")
+				}
+				if _, err = os.Stat(r.HistoricalWriteReport.Path); err != nil {
+					t.Fatal("rejection removed producer material")
+				}
+				return
+			}
+			if err != nil || len(d.files) != 11 {
+				t.Fatal("seven original inputs, two journals and report/manifest rejected", err)
+			}
+			defer func() { _ = d.close() }()
+			if d.purge(context.Background()) != nil || d.checkComplete(true) != nil {
+				t.Fatal("exact seven-input material exit failed")
+			}
+		})
 	}
 }
 
@@ -1045,7 +1115,7 @@ func historicalWriteInputFixture(t *testing.T, newerAITool bool) (string, lifecy
 	aiInputHash := put(filepath.Join(bootstrapPath, "ai-host.input.json"), aiInputMap)
 	ai := lifecycleHistoricalAIBoundsMaterial{Protocol: "qs-compatibility-ai-host-readonly/v1", Mode: "bounds", SourceSHA: r.OriginalSourceSHA, ToolSourceSHA: aiInput.ToolSourceSHA, OperationID: r.OperationID, ActualRunID: boundsRun, ExternalRunID: "678", RequestSHA256: aiRequestHash, DescriptorSHA256: aiInputHash,
 		ExpectedRuntimeSHA256: input.RuntimeBindingSHA256, RuntimeSHA256: input.RuntimeBindingSHA256, ErrorCategory: "none", DiagnosticOnly: true, DiagnosticReadComplete: true, RequiredAdapters: []string{},
-		Bounds: &retirement.AIExternalBoundsSummary{Scope: "diagnostic-unapproved-bounds-only", SourceSHA256: strings.Repeat("3", 64), RuntimeBindingSHA256: input.RuntimeBindingSHA256, AIBoundsSHA256: aiBoundsHash, PeerBoundsSHA256: peerBoundsHash, AIPhysicalObjects: 43, AILogicalObjects: 53, PeerObjects: 14, IndependentEpochs: 2, NextCycleRequired: true}}
+		Bounds: &retirement.AIExternalBoundsSummary{Scope: "diagnostic-unapproved-bounds-only", SourceSHA256: strings.Repeat("3", 64), RuntimeBindingSHA256: input.RuntimeBindingSHA256, AIBoundsSHA256: aiBoundsHash, PeerBoundsSHA256: peerBoundsHash, AIPhysicalObjects: 44, AILogicalObjects: 53, PeerObjects: 14, IndependentEpochs: 2, NextCycleRequired: true}}
 	put(filepath.Join(boundsPath, "ai-host.readiness.json"), ai)
 	aiRecord := lifecycleHistoricalAIBootstrapRegistration{FormatVersion: 1, Kind: "readonly_ai_host_derivation_registration", SourceSHA: r.OriginalSourceSHA, OperationID: r.OperationID, ActualRunID: boundsRun, Mode: "bounds", ApprovalSHA256: strings.Repeat("4", 64), ParentRunID: a.RunID, ParentRequestSHA256: parentHash, DerivedRequestSHA256: aiRequestHash, DescriptorSHA256: aiInputHash, BinarySHA256: strings.Repeat("5", 64), OnlyParentFieldReplaced: "run_id"}
 	if newerAITool {

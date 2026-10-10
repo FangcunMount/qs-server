@@ -104,6 +104,128 @@ type sqlSpoolPlan struct {
 	ReadOnly                                 bool
 }
 
+// SQLHistoricalCASFrozenInput retains original physical inputs only. It has no
+// transaction, Apply method, expiry renewal, or serialized import constructor.
+type SQLHistoricalCASFrozenInput struct {
+	self   *SQLHistoricalCASFrozenInput
+	before sqlHistoricalCASImage
+	writes map[string]bool
+	seal   string
+}
+
+func (*SQLHistoricalCASFrozenInput) MarshalJSON() ([]byte, error) {
+	return nil, ErrSQLHistoricalFactsSerialization
+}
+func (*SQLHistoricalCASFrozenInput) MarshalBSON() ([]byte, error) {
+	return nil, ErrSQLHistoricalFactsSerialization
+}
+func (*SQLHistoricalCASFrozenInput) UnmarshalJSON([]byte) error {
+	return ErrSQLHistoricalFactsSerialization
+}
+func (*SQLHistoricalCASFrozenInput) UnmarshalBSON([]byte) error {
+	return ErrSQLHistoricalFactsSerialization
+}
+func (*SQLHistoricalCASFrozenInput) String() string {
+	return "private frozen SQL inputs; no CAS authority"
+}
+func (f *SQLHistoricalCASFrozenInput) digest() string {
+	if f == nil {
+		return ""
+	}
+	keys := make([]string, 0, len(f.writes))
+	for k, write := range f.writes {
+		if !write {
+			return ""
+		}
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	return cycleKeyDigest(append([]string{"sql-cas-frozen-input/v1", casImageHash(f.before)}, keys...))
+}
+
+// Freeze is called while the actual original owner page is alive, before a
+// whole source EOF if necessary. The resulting input cannot qualify a write.
+func FreezeSQLHistoricalCASInput(ctx context.Context, original *SQLHistoricalOwnerBatch, p *SQLHistoricalCASProvenance, b *SQLHistoricalCASReadBaseline) (*SQLHistoricalCASFrozenInput, error) {
+	if ctx == nil || ctx.Err() != nil || original == nil || original.cycle == nil || original.ValidateBorrowedSnapshot(ctx) != nil || (p == nil) == (b == nil) {
+		return nil, ErrSQLHistoricalCASSpool
+	}
+	tx, err := historicalTx(ctx)
+	if err != nil {
+		return nil, err
+	}
+	actual, err := cycleActualTransaction(tx)
+	if err != nil || actual != original.cycle.transaction {
+		return nil, ErrSQLHistoricalCASSpool
+	}
+	f := &SQLHistoricalCASFrozenInput{writes: map[string]bool{}}
+	if p != nil {
+		if !p.intact() || p.readPool != tx.Statement.ConnPool || p.plan.oldTransaction != actual || p.plan.identity != original.report.DatabaseIdentitySHA256 || !reflect.DeepEqual(p.plan.request, original.request) {
+			return nil, ErrSQLHistoricalCASSpool
+		}
+		f.before = casCloneImage(p.plan.before)
+		for _, g := range p.plan.groups {
+			f.writes[sqlSpoolKey(g.table, g.id)] = true
+		}
+	} else {
+		if !b.intact() || b.readPool != tx.Statement.ConnPool || b.identity != original.report.DatabaseIdentitySHA256 || !reflect.DeepEqual(b.request, original.request) {
+			return nil, ErrSQLHistoricalCASSpool
+		}
+		f.before = casCloneImage(b.before)
+	}
+	observed := casCloneImage(f.before)
+	delete(observed.rows, "cas_migration_head")
+	if !reflect.DeepEqual(observed, sqlHistoricalCASImage{rows: original.rows, schema: original.schema, columns: original.columns}) {
+		return nil, ErrSQLHistoricalCASSpool
+	}
+	f.self, f.seal = f, f.digest()
+	if err = f.RowDependencies(func(string, uint64, string, uint64, bool) error { return nil }); err != nil {
+		return nil, err
+	}
+	if original.ValidateBorrowedSnapshot(ctx) != nil {
+		return nil, ErrSQLHistoricalCASSpool
+	}
+	return f, nil
+}
+
+// RowDependencies exposes only exact captured business row identities/hashes.
+// Schema/head/model reads never become write edges. No caller supplied map is
+// accepted, and missing or ambiguous physical write targets reject the input.
+func (f *SQLHistoricalCASFrozenInput) RowDependencies(visit func(table string, id uint64, rawSHA string, rawBytes uint64, write bool) error) error {
+	if f == nil || f.self != f || f.seal == "" || f.seal != f.digest() || visit == nil {
+		return ErrSQLHistoricalCASSpool
+	}
+	seen := map[string]bool{}
+	for _, table := range batchBusinessTables {
+		for _, row := range f.before.rows[table] {
+			id, err := sqlHistoricalUint(row, "id")
+			key := sqlSpoolKey(table, id)
+			if err != nil || id == 0 || seen[key] {
+				return ErrSQLHistoricalCASSpool
+			}
+			seen[key] = true
+			// The existing cell codec preserves NULL and original binary bytes;
+			// gob cannot encode a nil pointer directly in historicalSQLRow.
+			storage := sqlSpoolImageOut(sqlHistoricalCASImage{rows: map[string][]historicalSQLRow{table: {row}}}).Rows[table]
+			raw, err := sqlSpoolEncode(storage)
+			if err != nil {
+				return err
+			}
+			if err = visit(table, id, sqlSpoolRowSHA(row), uint64(len(raw)), f.writes[key]); err != nil {
+				return err
+			}
+		}
+	}
+	for key := range f.writes {
+		if !seen[key] {
+			return ErrSQLHistoricalCASSpool
+		}
+	}
+	if f.seal != f.digest() {
+		return ErrSQLHistoricalCASSpool
+	}
+	return nil
+}
+
 func (*SQLHistoricalCASSpool) MarshalJSON() ([]byte, error) {
 	return nil, ErrSQLHistoricalFactsSerialization
 }

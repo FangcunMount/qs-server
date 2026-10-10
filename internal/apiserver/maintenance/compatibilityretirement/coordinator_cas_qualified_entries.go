@@ -85,7 +85,16 @@ func qualifiedCASOwnerIDs(f *DecodedSourceEvent, candidate HistoricalCandidate) 
 // Historical gaps stay explicit. Source row SHA, legacy content SHA and stable
 // business binding stay different; this never manufactures an SDK fingerprint.
 func qualifiedCASEntry(binding HistoricalCoordinatorBinding, row qualifiedCASRow, verifiedAt time.Time) (evidence.HistoricalReferenceEntryV1, error) {
-	if !coordinatorSourceSHA(binding.SourceSHA) || !aiLocalOperationID(binding.OperationID) || verifiedAt.IsZero() || qualifiedCASSourceMatches(row.facts, row.candidate) != nil || !evidence.ValidSHA256(row.bindingSHA) {
+	if row.sourceObservation != nil {
+		return evidence.HistoricalReferenceEntryV1{}, ErrCoordinatorCASQualification
+	}
+	return qualifiedCASReferenceEntry(binding, row, verifiedAt, "actual-whole-source-joint-fresh-origin-ai14")
+}
+
+// The shared identity/gap rules do not decide qualification. Each private
+// caller must first validate its own genuine opaque native composition.
+func qualifiedCASReferenceEntry(binding HistoricalCoordinatorBinding, row qualifiedCASRow, verifiedAt time.Time, method string) (evidence.HistoricalReferenceEntryV1, error) {
+	if method != "actual-whole-source-joint-fresh-origin-ai14" && method != "actual-fresh-owner-component-source-business-related-ai" || (method == "actual-fresh-owner-component-source-business-related-ai") != (row.sourceObservation != nil) || !coordinatorSourceSHA(binding.SourceSHA) || !aiLocalOperationID(binding.OperationID) || verifiedAt.IsZero() || qualifiedCASSourceMatches(row.facts, row.candidate) != nil || !evidence.ValidSHA256(row.bindingSHA) {
 		return evidence.HistoricalReferenceEntryV1{}, ErrCoordinatorCASQualification
 	}
 	// A declared original Run may only be retained verbatim. Sources without
@@ -121,7 +130,7 @@ func qualifiedCASEntry(binding HistoricalCoordinatorBinding, row qualifiedCASRow
 	}
 	entry := evidence.HistoricalReferenceEntryV1{EventID: row.facts.EventID, EventType: row.facts.EventType, Source: row.facts.Source,
 		Proof: &evidence.EventEvidenceV1{Version: 1, Class: class, EventID: row.facts.EventID, Digest: row.facts.Source.Digest, BusinessBindingSHA256: row.bindingSHA, Origin: "retirement",
-			Verification: evidence.Verification{Method: "actual-whole-source-joint-fresh-origin-ai14", Version: "v1", OperationID: binding.OperationID, Reason: reason, VerifiedAt: verifiedAt.UTC().Truncate(time.Millisecond), BusinessTerminal: true, OwnershipVerified: true, ResponsibilityClosed: true}}}
+			Verification: evidence.Verification{Method: method, Version: "v1", OperationID: binding.OperationID, Reason: reason, VerifiedAt: verifiedAt.UTC().Truncate(time.Millisecond), BusinessTerminal: true, OwnershipVerified: true, ResponsibilityClosed: true}}}
 	if row.candidate.ActualOriginalRun != nil {
 		run := *row.candidate.ActualOriginalRun
 		entry.Run = &run

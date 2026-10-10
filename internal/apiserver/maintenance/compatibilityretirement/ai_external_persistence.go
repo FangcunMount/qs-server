@@ -250,18 +250,22 @@ func (p *AIExternalPageQualification) persistenceDigest() string {
 }
 
 type AICommandPersistenceBatch struct {
-	mu           sync.Mutex
-	self         *AICommandPersistenceBatch
-	owner        *HistoricalCoordinator
-	guard        *AICommandHandoffBatch
-	pages        []*AIExternalPageQualification
-	expected     uint64
-	seal         string
-	attempted    bool
-	writePool    gorm.ConnPool
-	afterLedgers []AIReverseLedgerSummary
-	written      map[string]string
-	afterSeal    string
+	mu               sync.Mutex
+	self             *AICommandPersistenceBatch
+	owner            *HistoricalCoordinator
+	guard            *AICommandHandoffBatch
+	pages            []*AIExternalPageQualification
+	expected         uint64
+	seal             string
+	attempted        bool
+	writePool        gorm.ConnPool
+	afterLedgers     []AIReverseLedgerSummary
+	written          map[string]string
+	afterSeal        string
+	historical       *AIExternalExecutionQualification
+	readbackPool     gorm.ConnPool
+	readbackSeal     string
+	readbackSnapshot *AIReverseSnapshot
 }
 
 type AICommandPersistenceSummary struct {
@@ -367,7 +371,7 @@ func (b *AICommandPersistenceBatch) digest() string {
 	}{b.guard.digest(), seals, b.expected})
 }
 func (b *AICommandPersistenceBatch) intact() bool {
-	return b != nil && b.self == b && b.guard != nil && b.guard.intact() && b.owner != nil && b.seal != "" && b.seal == b.digest()
+	return b != nil && b.self == b && b.guard != nil && (b.guard.intact() || b.historicalEmptyGuardIntact()) && (b.owner != nil && b.historical == nil || b.owner == nil && b.historical != nil && b.historical.self == b.historical) && b.seal != "" && b.seal == b.digest()
 }
 
 // This is an in-transaction caller, not a commit or writer-fence permission.
@@ -381,6 +385,18 @@ func (b *AICommandPersistenceBatch) Record(ctx context.Context, tx *gorm.DB) (AI
 	defer b.mu.Unlock()
 	if !b.intact() || b.attempted || ctx == nil || ctx.Err() != nil || time.Now().After(b.guard.expires) {
 		return AICommandPersistenceSummary{}, ErrAILocalChanged
+	}
+	if b.historical != nil {
+		if tx == nil || tx.Statement == nil || tx.Statement.ConnPool == nil {
+			return AICommandPersistenceSummary{}, ErrAILocalTransaction
+		}
+		if b.historical.historicalIntact(ctx, b.historical.historicalSources, b.historical.historicalPair) != nil {
+			return AICommandPersistenceSummary{}, ErrAIExternalChanged
+		}
+		probe := &AIReverseSnapshot{pool: tx.Statement.ConnPool, started: time.Now(), limits: b.guard.limits, report: AIReverseSummary{DatabaseIdentitySHA256: b.guard.binding.DatabaseIdentityHash}}
+		if _, err := probe.historicalTransaction(ctx, "READ WRITE"); err != nil {
+			return AICommandPersistenceSummary{}, err
+		}
 	}
 	b.attempted = true
 	r, err := NewAILocalResolver(ctx, tx, b.guard.binding)
@@ -406,7 +422,11 @@ func (b *AICommandPersistenceBatch) Record(ctx context.Context, tx *gorm.DB) (AI
 	if err != nil {
 		return AICommandPersistenceSummary{}, err
 	}
-	if err = b.guard.recordCurrent(ctx, tx, r, before); err != nil {
+	if b.historical != nil && b.expected == 0 {
+		if err = b.guard.verifyCurrentMetadata(ctx, r); err != nil {
+			return AICommandPersistenceSummary{}, err
+		}
+	} else if err = b.guard.recordCurrent(ctx, tx, r, before); err != nil {
 		return AICommandPersistenceSummary{}, err
 	}
 	after, hashes, err := aiPersistenceOperationLedger(ctx, b.guard, r)
@@ -425,7 +445,7 @@ func (b *AICommandPersistenceBatch) Record(ctx context.Context, tx *gorm.DB) (AI
 		Ledgers []AIReverseLedgerSummary
 		Written map[string]string
 	}{b.afterLedgers, b.written})
-	return AICommandPersistenceSummary{OriginalCommands: uint64(len(b.guard.evidence)), OriginalSourceReferences: b.expected, InTransactionWritten: true}, nil
+	return AICommandPersistenceSummary{OriginalCommands: uint64(len(b.guard.evidence)), OriginalSourceReferences: b.expected, InTransactionWritten: len(b.guard.evidence) > 0}, nil
 }
 
 func aiPersistencePoolEnded(ctx context.Context, pool gorm.ConnPool) error {
@@ -635,4 +655,313 @@ func (b *AICommandPersistenceBatch) InheritedContext(parent context.Context) (co
 	}
 	ctx, cancel := context.WithDeadline(parent, b.guard.expires)
 	return ctx, cancel, nil
+}
+
+// Read original commands only from the protected complete AI input pages. Their
+// real original full source authentication preceded capture; no DTO can enter.
+func historicalAIOriginalCommands(ctx context.Context, sources *HistoricalSourceInputPair, pair *AIHistoricalInputPair) ([2]map[string]*DecodedAICommand, error) {
+	out := [2]map[string]*DecodedAICommand{{}, {}}
+	if aiComponentPairIntact(ctx, pair, sources) != nil {
+		return out, ErrSourceAuthentication
+	}
+	for page := range pair.second.pages {
+		frame, err := pair.second.componentFrame(ctx, page)
+		if err != nil {
+			return out, err
+		}
+		i := -1
+		if frame.Ledger.Store == AIBridgeCommandSource {
+			i = 0
+		}
+		if frame.Ledger.Store == AILegacyCommandSource {
+			i = 1
+		}
+		if i < 0 || frame.EOF {
+			continue
+		}
+		rows, spec, meta, err := pair.second.componentPage(ctx, page)
+		if err != nil {
+			return out, err
+		}
+		for _, row := range rows {
+			cells := make([][]byte, len(meta.columns))
+			for j, col := range meta.columns {
+				cells[j] = row[col]
+			}
+			v, err := aiCurrentSource(cells, spec.table, meta.sourceColumns, sources.second.boundaries[i+1])
+			if err != nil || out[i][v.CommandID] != nil {
+				return out, ErrSourceAuthentication
+			}
+			out[i][v.CommandID] = v
+			if len(out[0])+len(out[1]) > 10000 {
+				return out, ErrAIExternalInput
+			}
+		}
+	}
+	for i := range out {
+		if uint64(len(out[i])) != sources.second.receipts[i+1].Records {
+			return out, ErrSourceIncomplete
+		}
+	}
+	return out, nil
+}
+func historicalAIKnownHandoffs(reverse *AIReverseSnapshot, commands [2]map[string]*DecodedAICommand) ([]aiExternalKnownHandoff, error) {
+	out := make([]aiExternalKnownHandoff, 0, len(commands[1]))
+	for id, legacy := range commands[1] {
+		bridge := commands[0][id]
+		if bridge == nil || ValidateAISourcePair(bridge, legacy) != nil || aiCommandHandoffNodes(reverse, bridge, legacy) != nil {
+			return nil, ErrAILocalResponsibility
+		}
+		request, op, box := reverse.byTable["ai_bridge_requests"][bridge.RequestID], reverse.byTable["ai_messaging_operations"][id], reverse.byTable["ai_messaging_outbox"][id]
+		if request == nil || op == nil || box == nil {
+			return nil, ErrAIExternalChanged
+		}
+		out = append(out, aiExternalKnownHandoff{CommandID: id, RequestID: bridge.RequestID, SourceKind: bridge.SourceKind, OrganizationID: bridge.OrganizationID, SubjectID: bridge.SubjectID, ResourceID: bridge.ResourceID, TesteeID: request.testee, BridgePayloadSHA: bridge.PayloadBytesDigest.SHA256, LegacyPayloadSHA: legacy.PayloadBytesDigest.SHA256, WriterSHA: bridge.WriterPayloadDigest.SHA256, MessagingSHA: legacy.Transport.MessagingBodySHA256, SourceAttempts: uint64(bridge.Transport.SourceAttempts), Sequence: op.sequence, OperationRowSHA: op.observation.RowSHA256, OutboxRowSHA: box.observation.RowSHA256})
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].CommandID < out[j].CommandID })
+	return out, nil
+}
+
+// All original command IDs are one genuine bounded batch. The original full14
+// baseline and admission are locked by Record; this factory never opens a RW
+// connection, commits, sends, generates a new command ID or grants DROP.
+func PrepareHistoricalAICommandPersistenceBatch(ctx context.Context, sources *HistoricalSourceInputPair, pair *AIHistoricalInputPair, q *AIExternalExecutionQualification) (*AICommandPersistenceBatch, error) {
+	if q.historicalIntact(ctx, sources, pair) != nil || q.reverse.validateHistoricalSnapshot(ctx) != nil {
+		return nil, ErrAIExternalChanged
+	}
+	reverse := q.reverse
+	admission := reverse.byTable["ai_messaging_admission"]["1"]
+	if admission == nil || admission.state != "closed" || reverse.report.Unknown != 0 || len(reverse.structuralReasons) != 0 {
+		return nil, ErrAILocalResponsibility
+	}
+	binding := AIResolverBinding{DatabaseIdentityHash: reverse.report.DatabaseIdentitySHA256, MigrationVersion: 99, SourceSHA: q.historicalBinding.SourceSHA, OperationID: q.historicalBinding.OperationID, AdmissionRevision: admission.sequence, BridgeBoundary: sources.second.boundaries[1], LegacyBoundary: sources.second.boundaries[2]}
+	guard := &AICommandHandoffBatch{binding: binding, oldPool: reverse.pool, started: reverse.started, expires: q.expires, limits: reverse.limits, copies: sources.second.receipts, ledgers: append([]AIReverseLedgerSummary(nil), reverse.report.Ledgers...), anchorMetadataSHA: reverse.anchorMetadataSHA}
+	for i, meta := range reverse.metadata {
+		guard.metadata = append(guard.metadata, aiReverseMetadata{columns: append([]string(nil), meta.columns...), sourceColumns: aiCloneColumns(meta.sourceColumns), schema: meta.schema, pk: meta.pk})
+		switch aiReverseSpecs[i].table {
+		case AIBridgeCommandSource:
+			guard.binding.BridgeColumns = aiCloneColumns(meta.sourceColumns)
+		case AILegacyCommandSource:
+			guard.binding.LegacyColumns = aiCloneColumns(meta.sourceColumns)
+		}
+	}
+	for _, a := range reverse.anchors {
+		guard.anchors = append(guard.anchors, aiCommandHandoffAnchor{a.id, a.org, a.testee, a.sheet, a.rawSHA})
+	}
+	sort.Slice(guard.anchors, func(i, j int) bool {
+		a, _ := strconv.ParseUint(guard.anchors[i].ID, 10, 64)
+		b, _ := strconv.ParseUint(guard.anchors[j].ID, 10, 64)
+		return a < b
+	})
+	commands, err := historicalAIOriginalCommands(ctx, sources, pair)
+	if err != nil {
+		return nil, err
+	}
+	for _, id := range aiReverseSortedKeys(commands[0]) {
+		v := commands[0][id]
+		if legacy := commands[1][id]; legacy != nil {
+			if aiCommandHandoffNodes(reverse, v, legacy) != nil || q.handoffs[id].CommandID != id {
+				return nil, ErrAILocalResponsibility
+			}
+			guard.evidence = append(guard.evidence, aiCommandHandoffEvidence(guard.binding, v, legacy, time.Now().UTC()))
+			continue
+		}
+		original, ok := q.byID[id]
+		if !ok || !aiExternalOriginalValid(original) || reverse.byTable["ai_messaging_operations"][id] != nil || reverse.byTable["ai_messaging_outbox"][id] != nil {
+			return nil, ErrAILocalResponsibility
+		}
+		for _, node := range reverse.nodes {
+			if node.request != v.RequestID && node.aggregate != v.RequestID && node.id != id && node.command != id {
+				continue
+			}
+			if node.observation.Invalid || node.observation.Held || len(node.observation.Reasons) != 0 || node.observation.Unfinished && node.observation.Store != AIBridgeCommandSource {
+				return nil, ErrAILocalResponsibility
+			}
+		}
+		conclusion, reason := "verified", "history_terminal_verified"
+		if original.Result == "historical_original_configuration_not_retained" {
+			conclusion, reason = "unverifiable", "history_terminal_evidence_gap"
+		}
+		guard.evidence = append(guard.evidence, store.CommandRetirementEvidence{Version: 1, OperationID: guard.binding.OperationID, VerifierVersion: "qs-ai-actual-execution/v1", VerificationMethod: "source_identity_hash_and_business_closure", VerifiedAt: time.Now().UTC(), AdmissionRevision: guard.binding.AdmissionRevision, CommandID: v.CommandID, RequestID: v.RequestID, SourceKind: v.SourceKind, OrganizationID: v.OrganizationID, SubjectID: v.SubjectID, ResourceID: v.ResourceID, Sources: []store.CommandRetirementSource{{Table: AIBridgeCommandSource, CommandID: v.CommandID, BytesKind: v.PayloadBytesDigest.Kind, BytesSHA256: v.PayloadBytesDigest.SHA256, BusinessPayloadHash: v.WriterPayloadDigest.SHA256}}, References: []store.CommandRetirementReference{{Kind: "business_record", ID: v.RequestID}, {Kind: "business_record", ID: "qs-ai/session/" + original.SessionID}, {Kind: "business_record", ID: "qs-ai/run/" + original.ActiveRunID}, {Kind: "event", ID: original.TerminalEventID}, {Kind: "migration_manifest", ID: q.seal}, {Kind: "readonly_run", ID: guard.binding.OperationID}}, Conclusion: conclusion, Reason: reason, OwnershipVerified: true, ResponsibilityClosed: true, BusinessTerminal: true})
+	}
+	guard.self, guard.seal = guard, guard.digest()
+	b := &AICommandPersistenceBatch{guard: guard, historical: q, expected: sources.second.receipts[1].Records + sources.second.receipts[2].Records, written: map[string]string{}}
+	b.self, b.seal = b, b.digest()
+	if !b.intact() || q.reverse.validateHistoricalSnapshot(ctx) != nil {
+		return nil, ErrAILocalChanged
+	}
+	return b, nil
+}
+
+// The host must have ended the old and successful write transactions first.
+// Actual current full14 rows, not statement expected bytes, establish continuity.
+func (b *AICommandPersistenceBatch) VerifyHistoricalReadback(ctx context.Context, sources *HistoricalSourceInputPair, pair *AIHistoricalInputPair) (AICommandPersistenceSummary, error) {
+	if b == nil || b.self != b {
+		return AICommandPersistenceSummary{}, ErrAILocalBinding
+	}
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	if !b.intact() || b.historical.historicalIntact(ctx, sources, pair) != nil || !b.attempted || b.afterSeal == "" || b.afterSeal != aiJSONHash(struct {
+		Ledgers []AIReverseLedgerSummary
+		Written map[string]string
+	}{b.afterLedgers, b.written}) || aiPersistencePoolEnded(ctx, b.guard.oldPool) != nil || aiPersistencePoolEnded(ctx, b.writePool) != nil {
+		return AICommandPersistenceSummary{}, ErrAILocalChanged
+	}
+	current, err := prepareHistoricalAIFullSnapshot(ctx, sources, pair, b.guard.limits, "READ ONLY")
+	if err != nil {
+		return AICommandPersistenceSummary{}, err
+	}
+	if current.pool == b.guard.oldPool || current.pool == b.writePool || !historicalAILedgersEqual(current.report.Ledgers, b.afterLedgers) || current.anchorMetadataSHA != b.guard.anchorMetadataSHA || len(current.anchors) != len(b.guard.anchors) {
+		return AICommandPersistenceSummary{}, ErrAILocalChanged
+	}
+	for _, a := range b.guard.anchors {
+		got := current.anchors[a.ID]
+		if got.id != a.ID || got.org != a.Org || got.testee != a.Testee || got.sheet != a.Sheet || got.rawSHA != a.RowSHA256 {
+			return AICommandPersistenceSummary{}, ErrAILocalChanged
+		}
+	}
+	for id, sha := range b.written {
+		node := current.byTable["ai_messaging_operations"][id]
+		if node == nil || node.observation.RowSHA256 != sha || node.observation.Invalid || node.observation.Held || len(node.observation.Reasons) != 0 {
+			return AICommandPersistenceSummary{}, ErrAILocalChanged
+		}
+	}
+	if current.validateHistoricalSnapshot(ctx) != nil {
+		return AICommandPersistenceSummary{}, ErrAILocalChanged
+	}
+	b.readbackSnapshot = current
+	b.readbackPool = current.pool
+	b.readbackSeal = aiReverseHash("historical-ai-committed-server-read/v1", b.afterSeal, current.historicalSeal)
+	return AICommandPersistenceSummary{OriginalCommands: uint64(len(b.guard.evidence)), OriginalSourceReferences: b.expected, InTransactionWritten: len(b.guard.evidence) > 0, IndependentReadbackMatched: true}, nil
+}
+
+// Aggregate-only validation consumes real native facts and committed AI
+// continuity. It neither grants non-AI source closure nor a writer-fence permit.
+func ValidateHistoricalComponentAI(ctx context.Context, o *HistoricalComponentObservation, q *AIExternalExecutionQualification, b *AICommandPersistenceBatch) error {
+	if o == nil || o.ValidateBorrowedObservation(ctx) != nil || q.historicalIntact(ctx, o.source.pair, o.ai.componentPair) != nil || b == nil || b.self != b {
+		return ErrAIReverseBinding
+	}
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	if !b.intact() || b.historical != q || b.readbackSeal == "" || b.readbackSnapshot == nil || b.readbackSnapshot.self != b.readbackSnapshot || b.readbackSnapshot.historicalSeal == "" || b.readbackSnapshot.historicalSeal != b.readbackSnapshot.historicalDigest() || b.readbackSeal != aiReverseHash("historical-ai-committed-server-read/v1", b.afterSeal, b.readbackSnapshot.historicalSeal) || b.writePool == nil || b.readbackPool == nil || aiPersistencePoolEnded(ctx, b.writePool) != nil || aiPersistencePoolEnded(ctx, b.readbackPool) != nil {
+		return ErrAIReverseFresh
+	}
+	// This actual native component read has already expanded its necessary
+	// request/command/resource/owner predicates to a fixed point. Compare that
+	// complete selected closure with the independently read committed image;
+	// unrelated ledgers may change and are not rescanned here. Global unbound
+	// and new-organization negatives remain separate deletion gates.
+	current := o.ai
+	if current.ValidateComponentObservation(ctx) != nil || !historicalAIScopedRowsEqual(current, b.readbackSnapshot) {
+		return ErrAIReverseChanged
+	}
+	admission := current.byTable["ai_messaging_admission"]["1"]
+	if admission == nil || admission.state != "closed" || admission.sequence != b.guard.binding.AdmissionRevision {
+		return ErrAILocalChanged
+	}
+	for _, node := range current.nodes {
+		if node.observation.Store == "ai_messaging_quarantine" || node.observation.Store == "ai_messaging_observations" {
+			continue
+		}
+		if node.observation.Invalid || node.observation.Held || len(node.observation.Reasons) != 0 {
+			return ErrAILocalResponsibility
+		}
+		if node.observation.Unfinished {
+			if node.observation.Store == AIBridgeCommandSource && q.byID[node.id].CommandID == node.id {
+				op := current.byTable["ai_messaging_operations"][node.id]
+				if op != nil && op.retired && b.written[node.id] == op.observation.RowSHA256 {
+					continue
+				}
+			}
+			if historicalAIKnownCurrentPending(node, q) {
+				continue
+			}
+			return ErrAILocalResponsibility
+		}
+	}
+	return current.ValidateComponentObservation(ctx)
+}
+
+// Only private actual observations call this data comparison. It neither
+// constructs a snapshot nor proves the unbound/global negative ranges.
+func historicalAIScopedRowsEqual(current, committed *AIReverseSnapshot) bool {
+	if current == nil || committed == nil || current.scope == nil || len(current.metadata) != len(aiReverseSpecs) || !reflect.DeepEqual(current.metadata, committed.metadata) {
+		return false
+	}
+	for _, spec := range aiReverseSpecs {
+		if spec.table == "ai_messaging_quarantine" || spec.table == "ai_messaging_observations" {
+			continue
+		}
+		for id, got := range current.byTable[spec.table] {
+			want := committed.byTable[spec.table][id]
+			if want == nil || got.observation.PrimaryKeySHA256 != want.observation.PrimaryKeySHA256 || got.observation.RowSHA256 != want.observation.RowSHA256 {
+				return false
+			}
+		}
+		for id, want := range committed.byTable[spec.table] {
+			if historicalAIComponentSelects(current, spec.table, want) && current.byTable[spec.table][id] == nil {
+				return false
+			}
+		}
+	}
+	return true
+}
+
+// This mirrors aiComponentPredicate against the original decoded native
+// column values, so a disappeared matching row cannot be hidden by a JOIN.
+func historicalAIComponentSelects(s *AIReverseSnapshot, table string, n *aiReverseNode) bool {
+	if s == nil || s.scope == nil || n == nil {
+		return false
+	}
+	r, ids, a, resources := s.scope.relatedRequests, s.scope.relatedIDs, s.componentAssessments, s.componentResources
+	switch table {
+	case "ai_bridge_requests":
+		return r[n.id] || resources[n.resource]
+	case "ai_bridge_request_assessments":
+		return r[n.request] || a[n.resource]
+	case AIBridgeCommandSource, AILegacyCommandSource, "ai_bridge_events":
+		return r[n.request] || ids[n.id]
+	case "ai_messaging_operations":
+		return r[n.aggregate] || ids[n.id] || resources[n.resource] || ids[n.receipt]
+	case "ai_messaging_outbox", "ai_messaging_inbox", "ai_messaging_failures":
+		return r[n.aggregate] || ids[n.id]
+	case "ai_messaging_aggregates":
+		return r[n.aggregate]
+	case "ai_messaging_evaluation_states":
+		return resources[n.id] || r[n.id]
+	case "ai_messaging_admission":
+		return true
+	}
+	return false
+}
+
+func (b *AICommandPersistenceBatch) historicalEmptyGuardIntact() bool {
+	if b == nil || b.historical == nil || b.expected != 0 || b.guard == nil || b.guard.self != b.guard || len(b.guard.evidence) != 0 || b.guard.oldPool == nil || !aiValidBinding(b.guard.binding) || len(b.guard.metadata) != len(aiReverseSpecs) || len(b.guard.ledgers) != len(aiReverseSpecs) || !b.guard.limits.valid() || !evidenceHash(b.guard.anchorMetadataSHA) || b.guard.expires.IsZero() || b.guard.seal != b.guard.digest() {
+		return false
+	}
+	q := b.historical
+	return q.self == q && q.seal == aiJSONHash(q.facts) && q.historicalSources != nil && q.historicalSources.second.receipts[1].Records == 0 && q.historicalSources.second.receipts[2].Records == 0 && len(q.byID) == 0 && len(q.handoffs) == 0
+}
+
+func historicalAIKnownCurrentPending(node *aiReverseNode, q *AIExternalExecutionQualification) bool {
+	if node == nil || q == nil || node.observation.Invalid || node.observation.Held || len(node.observation.Reasons) != 0 {
+		return false
+	}
+	switch node.observation.Store {
+	case "ai_bridge_requests":
+		for _, h := range q.handoffs {
+			if h.RequestID == node.id {
+				return true
+			}
+		}
+	case "ai_messaging_operations":
+		return q.handoffs[node.id].CommandID == node.id && !node.retired && node.state == ""
+	case "ai_messaging_outbox":
+		id := node.command
+		if id == "" {
+			id = node.id
+		}
+		return q.handoffs[id].CommandID == id && (node.state == "staged" || node.state == "awaiting_receipt")
+	}
+	return false
 }

@@ -5,11 +5,14 @@ import (
 	"context"
 	"reflect"
 	"sort"
+	"strconv"
 	"time"
 
 	sheetmongo "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/answersheet"
 	interpretmongo "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/interpretation"
+	sqlevaluation "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/evaluation"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
@@ -29,10 +32,37 @@ func mongoBatchPOType(name string) reflect.Type {
 	return nil
 }
 
+// The original transaction and the distinct read-only snapshot input borrow
+// the same bounded query/expansion core with their own strict native guards.
+type mongoOwnerReadCore struct {
+	db        *mongo.Database
+	config    MongoOwnerConfig
+	metadata  mongoCycleMetadata
+	limits    MongoHistoricalOwnerBatchLimits
+	selection mongoBatchSelection
+	data      map[string][]bson.Raw
+	indexes   map[string]map[string]map[uint64][]bson.Raw
+	seen      map[string]map[string]bson.Raw
+	report    MongoHistoricalOwnerBatchReport
+	validate  func(context.Context) error
+}
+
+func (b *MongoHistoricalOwnerBatch) capture(ctx context.Context) error {
+	core := &mongoOwnerReadCore{db: b.global.db, config: b.global.config, metadata: b.global.metadata, limits: b.limits, selection: b.selection, data: b.data, indexes: b.indexes, seen: b.seen, report: b.report, validate: b.ValidateBorrowedSnapshot}
+	if err := core.capture(ctx); err != nil {
+		return err
+	}
+	b.selection, b.data, b.indexes, b.seen, b.report = core.selection, core.data, core.indexes, core.seen, core.report
+	return nil
+}
+func (b *MongoHistoricalOwnerBatch) index(name, field string, unique bool) (string, error) {
+	return (&mongoOwnerReadCore{metadata: b.global.metadata}).index(name, field, unique)
+}
+
 // Indexes are actual immutable metadata from the complete global scan. No
 // partial/sparse/collated index is guessed to cover the selected original IDs.
-func (b *MongoHistoricalOwnerBatch) index(name, field string, unique bool) (string, error) {
-	d, ok := b.global.metadata.definitions[name]
+func (b *mongoOwnerReadCore) index(name, field string, unique bool) (string, error) {
+	d, ok := b.metadata.definitions[name]
 	if !ok {
 		return "", ErrMongoBatchConflict
 	}
@@ -84,8 +114,8 @@ func (b *MongoHistoricalOwnerBatch) index(name, field string, unique bool) (stri
 	return "", ErrMongoCycleSchema
 }
 
-func (b *MongoHistoricalOwnerBatch) capture(ctx context.Context) error {
-	if err := b.ValidateBorrowedSnapshot(ctx); err != nil {
+func (b *mongoOwnerReadCore) capture(ctx context.Context) error {
+	if err := b.validate(ctx); err != nil {
 		return err
 	}
 	for _, name := range mongoBatchBusinessCollections {
@@ -156,37 +186,43 @@ func (b *MongoHistoricalOwnerBatch) capture(ctx context.Context) error {
 	if err := b.fetch(ctx, "interpretation_runs", "domain_id", b.selection.runs); err != nil {
 		return err
 	}
-	parts := []string{"mongo-business-owner-rows/v1", b.global.metadata.identity, b.global.metadata.hash}
 	for _, name := range mongoBatchBusinessCollections {
 		// Sorting only stored byte strings for the page digest does not create
 		// a database cursor/token or replace actual BSON server ordering.
 		sort.Slice(b.data[name], func(i, j int) bool { return bytes.Compare(b.data[name][i], b.data[name][j]) < 0 })
-		parts = append(parts, name)
-		for _, raw := range b.data[name] {
-			parts = append(parts, string(raw))
-		}
 	}
-	b.report.BusinessRowsSHA256 = mongoOwnerHashParts(parts...)
-	if err := b.ValidateBorrowedSnapshot(ctx); err != nil {
+	b.report.BusinessRowsSHA256 = mongoOwnerBusinessRowsSHA(b.metadata.identity, b.metadata.hash, b.data)
+	if err := b.validate(ctx); err != nil {
 		return err
 	}
 	// Metadata commands occur outside the transaction, exactly as in the
 	// global scanner. Bracket this business page with its same-client anchor.
-	end, err := observeMongoCycleMetadata(ctx, b.global.db, b.global.config)
+	end, err := observeMongoCycleMetadata(ctx, b.db, b.config)
 	if err != nil {
 		return err
 	}
-	if end.hash != b.global.metadata.hash {
+	if end.hash != b.metadata.hash {
 		return ErrMongoBatchConflict
 	}
 	return nil
 }
 
-func (b *MongoHistoricalOwnerBatch) fetch(ctx context.Context, name, field string, ids map[uint64]bool) error {
+func mongoOwnerBusinessRowsSHA(identity, metadata string, data map[string][]bson.Raw) string {
+	parts := []string{"mongo-business-owner-rows/v1", identity, metadata}
+	for _, name := range mongoBatchBusinessCollections {
+		parts = append(parts, name)
+		for _, raw := range data[name] {
+			parts = append(parts, string(raw))
+		}
+	}
+	return mongoOwnerHashParts(parts...)
+}
+
+func (b *mongoOwnerReadCore) fetch(ctx context.Context, name, field string, ids map[uint64]bool) error {
 	if len(ids) == 0 {
 		return nil
 	}
-	if err := b.ValidateBorrowedSnapshot(ctx); err != nil {
+	if err := b.validate(ctx); err != nil {
 		return err
 	}
 	index, err := b.index(name, field, field == "domain_id")
@@ -208,7 +244,7 @@ func (b *MongoHistoricalOwnerBatch) fetch(ctx context.Context, name, field strin
 	if remaining <= 0 {
 		return ErrMongoBatchBounds
 	}
-	cur, err := b.global.db.Collection(name).Find(ctx, filter, options.Find().SetHint(index).SetCollation(&options.Collation{Locale: "simple"}).SetSort(bson.D{{Key: "_id", Value: 1}}).SetLimit(int64(remaining+1)).SetBatchSize(128).SetMaxTime(15*time.Second).SetComment("qs_retirement_mongo_business_batch_v1"))
+	cur, err := b.db.Collection(name).Find(ctx, filter, options.Find().SetHint(index).SetCollation(&options.Collation{Locale: "simple"}).SetSort(bson.D{{Key: "_id", Value: 1}}).SetLimit(int64(remaining+1)).SetBatchSize(128).SetMaxTime(15*time.Second).SetComment("qs_retirement_mongo_business_batch_v1"))
 	if err != nil {
 		return ErrMongoOwnerRead
 	}
@@ -271,7 +307,7 @@ func (b *MongoHistoricalOwnerBatch) fetch(ctx context.Context, name, field strin
 	if err = cur.Close(ctx); err != nil {
 		return ErrMongoOwnerRead
 	}
-	return b.ValidateBorrowedSnapshot(ctx)
+	return b.validate(ctx)
 }
 
 // Only the exact selectors used by the shared original business verifier are
@@ -280,7 +316,13 @@ func (b *MongoHistoricalOwnerBatch) rows(ctx context.Context, name string, filte
 	if err := b.validateReaderContext(ctx); err != nil {
 		return nil, err
 	}
-	idx, exists := b.indexes[name]
+	return mongoBusinessRows(b.indexes, name, filter)
+}
+
+// Exact existing business selectors only; callers bind these rows to their
+// actual native scope before using this private projection.
+func mongoBusinessRows(indexes map[string]map[string]map[uint64][]bson.Raw, name string, filter bson.D) ([]bson.Raw, error) {
+	idx, exists := indexes[name]
 	if !exists || len(filter) != 1 {
 		return nil, ErrMongoBatchInvalid
 	}
@@ -351,4 +393,175 @@ func (b *MongoHistoricalOwnerBatch) artifactIndexes(ctx context.Context) ([]bson
 		rows[i] = append(bson.Raw(nil), raw...)
 	}
 	return rows, nil
+}
+
+// MongoSnapshotOwnerFootprint is immutable planning INPUT. It cannot be used
+// as a MongoHistoricalOwnerBatch, global graph, source closure or CAS permit.
+type MongoSnapshotOwnerFootprint struct {
+	self                                                                   *MongoSnapshotOwnerFootprint
+	inputSHA, identitySHA, metadataSHA, nativeSHA, sqlRowsSHA, snapshotSHA string
+	// Only the original instance/FD identity is retained, never live authority.
+	originalInput            *MongoSnapshotInputEpoch
+	originalDev, originalIno uint64
+	limits                   MongoHistoricalOwnerBatchLimits
+	sources                  map[verifiedSourceKey]*DecodedSourceEvent
+	sourceFactsSHA           map[verifiedSourceKey][32]byte
+	sqlOwners                map[verifiedSourceKey]sqlevaluation.SQLHistoricalFactsSnapshot
+	sqlAbsent                map[verifiedSourceKey]bool
+	selection                mongoBatchSelection
+	data                     map[string][]bson.Raw
+}
+
+func (*MongoSnapshotOwnerFootprint) MarshalJSON() ([]byte, error) { return nil, ErrSourceSerialization }
+func (*MongoSnapshotOwnerFootprint) MarshalBSON() ([]byte, error) { return nil, ErrSourceSerialization }
+func (*MongoSnapshotOwnerFootprint) String() string {
+	return "private immutable owner input; no write authority"
+}
+func (f *MongoSnapshotOwnerFootprint) GoString() string { return f.String() }
+func (f *MongoSnapshotOwnerFootprint) InputSHA256() string {
+	if f == nil || f.self != f || f.inputSHA == "" || f.inputSHA != f.digest() {
+		return ""
+	}
+	return f.inputSHA
+}
+func (f *MongoSnapshotOwnerFootprint) VisitRows(ctx context.Context, visit func(string, bson.Raw) error) error {
+	if f == nil || f.self != f || ctx == nil || ctx.Err() != nil || visit == nil || f.InputSHA256() == "" {
+		return ErrMongoBatchInvalid
+	}
+	for _, name := range mongoBatchBusinessCollections {
+		for _, raw := range f.data[name] {
+			if err := visit(name, append(bson.Raw(nil), raw...)); err != nil {
+				return err
+			}
+		}
+	}
+	return ctx.Err()
+}
+
+// The host still owns the original SQL RRRO transaction and the actual
+// nontransaction Mongo snapshot session. Both must remain alive throughout
+// this bounded read; neither is retained as a renewable authority afterwards.
+func PrepareMongoSnapshotOwnerFootprint(ctx context.Context, input *MongoSnapshotInputEpoch, sql *sqlevaluation.SQLHistoricalOwnerBatch, sources []*VerifiedSourceEvent, limits MongoHistoricalOwnerBatchLimits) (*MongoSnapshotOwnerFootprint, error) {
+	if ctx == nil || ctx.Err() != nil || input == nil || sql == nil || !input.complete || !sql.Report().Complete || !limits.valid() || len(sources) == 0 || len(sources) > limits.MaxSources {
+		return nil, ErrMongoBatchInvalid
+	}
+	started := time.Now()
+	ctx, cancel := context.WithDeadline(ctx, started.Add(limits.MaxDuration))
+	defer cancel()
+	validate := func(ctx context.Context) error {
+		if time.Since(started) > limits.MaxDuration {
+			return ErrMongoBatchBounds
+		}
+		if err := input.ValidateBorrowedInputEpoch(ctx); err != nil {
+			return err
+		}
+		return sql.ValidateBorrowedSnapshot(ctx)
+	}
+	if err := validate(ctx); err != nil {
+		return nil, err
+	}
+	selected, err := selectMongoOwnerSources(sql, sources)
+	if err != nil {
+		return nil, err
+	}
+	core := &mongoOwnerReadCore{db: input.db, config: input.config, metadata: input.metadata, limits: limits, selection: selected.selection, data: map[string][]bson.Raw{}, indexes: map[string]map[string]map[uint64][]bson.Raw{}, seen: map[string]map[string]bson.Raw{}, validate: validate}
+	if err = core.capture(ctx); err != nil {
+		return nil, err
+	}
+	if err = input.matchOwnerRows(ctx, core.data); err != nil {
+		return nil, err
+	}
+	if err = validate(ctx); err != nil {
+		return nil, err
+	}
+	summary := input.Summary()
+	f := &MongoSnapshotOwnerFootprint{originalInput: input, originalDev: input.dev, originalIno: input.ino, identitySHA: input.metadata.identity, metadataSHA: input.metadata.hash, nativeSHA: summary.NativeEpochSHA256, snapshotSHA: summary.SnapshotSHA256, limits: limits, sqlRowsSHA: sql.Report().BusinessRowsSHA256, sources: map[verifiedSourceKey]*DecodedSourceEvent{}, sourceFactsSHA: selected.sourceFactsSHA, sqlOwners: map[verifiedSourceKey]sqlevaluation.SQLHistoricalFactsSnapshot{}, sqlAbsent: selected.sqlAbsent, selection: core.selection, data: core.data}
+	f.self = f
+	// selectMongoOwnerSources uses a normalized private business-reading
+	// clone. Its original authenticated SHA must still seal the exact opaque
+	// facts, including IDs and missing-run evidence, rather than that clone.
+	for _, handle := range sources {
+		facts, err := handle.Facts()
+		if err != nil {
+			return nil, err
+		}
+		key, err := sourceAuthKey(facts.Source.Database, facts.Source.Object, facts.Source.PrimaryKeySHA256)
+		digest, hashErr := privateFactsSHA(facts)
+		baseline := selected.sources[key]
+		if err != nil || hashErr != nil || baseline == nil || f.sources[key] != nil || digest != selected.sourceFactsSHA[key] || baseline.Source != facts.Source || baseline.EventID != facts.EventID || baseline.ContentDigest != facts.ContentDigest {
+			return nil, ErrMongoBatchConflict
+		}
+		f.sources[key] = facts
+	}
+	for key, owner := range selected.sqlOwners {
+		f.sqlOwners[key] = owner.Snapshot()
+	}
+	f.inputSHA = f.digest()
+	if f.inputSHA == "" {
+		return nil, ErrMongoBatchConflict
+	}
+	if err = validate(ctx); err != nil {
+		return nil, err
+	}
+	return f, nil
+}
+
+// Rechecking this seal authenticates the actual producer's frozen bytes and
+// complete selectors; it does not renew the original read scope.
+func (f *MongoSnapshotOwnerFootprint) digest() string {
+	if f == nil || !f.matchesOriginalInput(f.originalInput) || !f.limits.valid() || len(f.sources) == 0 || len(f.sources) > f.limits.MaxSources || len(f.data) != len(mongoBatchBusinessCollections) || len(f.sqlOwners)+len(f.sqlAbsent) != len(f.sources) {
+		return ""
+	}
+	parts := []string{"mongo-snapshot-owner-input/v1", f.snapshotSHA, f.metadataSHA, f.nativeSHA, f.sqlRowsSHA, mongoOwnerBusinessRowsSHA(f.identitySHA, f.metadataSHA, f.data), strconv.FormatUint(f.originalDev, 10), strconv.FormatUint(f.originalIno, 10)}
+	var rows, size uint64
+	for _, name := range mongoBatchBusinessCollections {
+		if _, ok := f.data[name]; !ok {
+			return ""
+		}
+		for _, raw := range f.data[name] {
+			rows++
+			size += uint64(len(raw))
+		}
+	}
+	if rows > uint64(f.limits.MaxRows) || size > f.limits.MaxBytes {
+		return ""
+	}
+	keys := make([]verifiedSourceKey, 0, len(f.sources))
+	for key := range f.sources {
+		keys = append(keys, key)
+	}
+	sort.Slice(keys, func(i, j int) bool {
+		return keys[i].object < keys[j].object || keys[i].object == keys[j].object && bytes.Compare(keys[i].pk[:], keys[j].pk[:]) < 0
+	})
+	for _, key := range keys {
+		digest, err := privateFactsSHA(f.sources[key])
+		if err != nil || digest != f.sourceFactsSHA[key] {
+			return ""
+		}
+		parts = append(parts, string([]byte{key.object}), string(key.pk[:]), string(digest[:]))
+		if snapshot, ok := f.sqlOwners[key]; ok {
+			raw, e := historicalSpoolEncode(snapshot)
+			if e != nil || f.sqlAbsent[key] {
+				return ""
+			}
+			parts = append(parts, historicalSpoolSHA(raw))
+		} else if f.sqlAbsent[key] {
+			parts = append(parts, "actual_sql_sheet_absent")
+		} else {
+			return ""
+		}
+	}
+	for _, ids := range []map[uint64]bool{f.selection.sheets, f.selection.outcomes, f.selection.generations, f.selection.artifacts, f.selection.runs} {
+		raw, err := historicalSpoolEncode(mongoBatchIDs(ids))
+		if err != nil {
+			return ""
+		}
+		parts = append(parts, historicalSpoolSHA(raw))
+	}
+	parts = append(parts, strconv.Itoa(f.limits.MaxSources), strconv.Itoa(f.limits.MaxRows), strconv.FormatUint(f.limits.MaxBytes, 10), strconv.FormatInt(int64(f.limits.MaxDuration), 10))
+	return mongoOwnerHashParts(parts...)
+}
+
+func (f *MongoSnapshotOwnerFootprint) matchesOriginalInput(input *MongoSnapshotInputEpoch) bool {
+	return f != nil && input != nil && f.originalInput == input && input.self == input && input.complete && !input.poisoned && f.originalDev != 0 && f.originalIno != 0 && input.dev == f.originalDev && input.ino == f.originalIno
 }

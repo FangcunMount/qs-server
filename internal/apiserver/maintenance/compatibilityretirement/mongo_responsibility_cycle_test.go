@@ -15,6 +15,28 @@ func mongoCycleTestLimits() MongoResponsibilityLimits {
 	return MongoResponsibilityLimits{PageRows: 2, MaxRows: 10_000, MaxBytes: 64 << 20, MaxPages: 10_000, MaxGraphEntries: 30_000, MaxGraphBytes: 64 << 20, MaxDuration: time.Minute}
 }
 
+func TestMongoSnapshotInputHasDistinctBoundsAndNoPublicAuthority(t *testing.T) {
+	l := MongoSnapshotInputLimits{Scan: mongoCycleTestLimits(), MaxDuration: 20 * time.Minute}
+	if !l.valid() || l.Scan.MaxDuration != time.Minute {
+		t.Fatal("input budget changed the original global capability budget")
+	}
+	l.MaxDuration = 30*time.Minute + time.Nanosecond
+	if l.valid() {
+		t.Fatal("unbounded input epoch accepted")
+	}
+	for _, value := range []any{&MongoSnapshotInputEpoch{}, &MongoSnapshotInputPage{}} {
+		if _, err := json.Marshal(value); err == nil {
+			t.Fatal("private input serialized")
+		}
+	}
+	if _, _, _, err := snapshotInputNative(context.Background(), false); err == nil {
+		t.Fatal("hostless context accepted as native snapshot")
+	}
+	if (&MongoSnapshotInputEpoch{}).Summary().CompleteInput || (&MongoSnapshotInputEpoch{}).Summary().CASAuthorized || (&MongoSnapshotInputEpoch{}).Summary().DropReady {
+		t.Fatal("unminted input claims completion or authority")
+	}
+}
+
 func TestMongoCycleLimitsAreExplicitAndHard(t *testing.T) {
 	if (MongoResponsibilityLimits{}).valid() {
 		t.Fatal("empty budgets accepted")

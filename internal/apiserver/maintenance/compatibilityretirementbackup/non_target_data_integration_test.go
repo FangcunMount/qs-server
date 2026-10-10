@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"reflect"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -28,7 +29,18 @@ func nonTargetNativeSQL(t *testing.T) *sql.DB {
 		t.Skip("owned SQL fixture not requested")
 	}
 	cfg, e := drivermysql.ParseDSN(raw)
-	if e != nil || cfg.Net != "tcp" || cfg.Addr != "127.0.0.1:34306" {
+	ciService := false
+	if e == nil && cfg.Net == "tcp" && cfg.Addr == "127.0.0.1:3306" {
+		runID, attemptID := os.Getenv("GITHUB_RUN_ID"), os.Getenv("GITHUB_RUN_ATTEMPT")
+		run, runErr := strconv.ParseUint(runID, 10, 64)
+		attempt, attemptErr := strconv.ParseUint(attemptID, 10, 64)
+		ciService = os.Getenv("QS_HISTORY_CLI_CI_INTEGRATION") == "1" &&
+			os.Getenv("QS_HISTORY_REQUIRE_DATABASE") == "1" && os.Getenv("GITHUB_ACTIONS") == "true" &&
+			os.Getenv("GITHUB_JOB") == "runtime-closure-e2e" &&
+			runPattern.MatchString(runID+"-"+attemptID) && runErr == nil && run > 0 &&
+			attemptErr == nil && attempt > 0 && hashPattern.MatchString(os.Getenv("QS_HISTORY_CI_MYSQL_CONTAINER"))
+	}
+	if e != nil || cfg.Net != "tcp" || (cfg.Addr != "127.0.0.1:34306" && !ciService) {
 		t.Fatal("explicit loopback SQL fixture required")
 	}
 	cfg.DBName, cfg.ParseTime = "", false

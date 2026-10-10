@@ -610,4 +610,50 @@ class FixedDeployHostEntry(unittest.TestCase):
             with mock.patch.object(tool,'FIXED_HOST_ENTRY_BASE',root),mock.patch.dict(os.environ,{'RETIREMENT_FIXED_HOST_ENTRY_SHA256':expected},clear=True),self.assertRaises(tool.Blocked):
                 tool.installed_fixed_host_entry()
 
+
+class FixedPrepareEntry(unittest.TestCase):
+    def scope(self):
+        raw=tool.fixed_prepare_entry_program('123-1','a'*40,{arch:hashlib.sha256(b'approved fixture bytes').hexdigest() for arch in ('amd64','arm64')},'d'*64,'c'*64)
+        tree=ast.parse(raw);setup=[n for n in tree.body if isinstance(n,(ast.Import,ast.ImportFrom,ast.Assign,ast.FunctionDef))]
+        scope={};exec(compile(ast.Module(body=setup,type_ignores=[]),'fixed-prepare-gate','exec'),scope)
+        return scope,raw
+    def test_closed_stage_manifest_and_credentials_schema_before_original_bootstrap(self):
+        scope,raw=self.scope();fixture=FixedDeployHostEntry()
+        with fixture.archive(b'approved fixture bytes') as (_,request):
+            request|=dict(stage='lifecycle',manifest_sha256='c'*64,credentials={})
+            actual,owner=fixture.authorize(scope,request)
+            self.assertEqual(actual,request);self.assertEqual(owner,os.getuid())
+            for change in ({'stage':'apply'},{'manifest_sha256':'e'*64},{'credentials':[]},{'source_sha':'f'*40}):
+                with self.subTest(change=change),contextlib.redirect_stdout(io.StringIO()),self.assertRaises(SystemExit): fixture.authorize(scope,request|change)
+            request|=dict(stage='prepare-facts',manifest_sha256='')
+            with contextlib.redirect_stdout(io.StringIO()),self.assertRaises(SystemExit):fixture.authorize(scope,request)
+        self.assertIn("'wrapper_sha256': '"+'d'*64+"'",raw.decode())
+    def test_only_prepare_facts_named_image_can_cross_original_64m_member_bound(self):
+        # Real gzip/tar data and original hashes. This does not execute Docker.
+        fixture=FixedDeployHostEntry();native=b'approved fixture bytes';wrapper=b'approved pinned wrapper'
+        hashes={arch:hashlib.sha256(native).hexdigest() for arch in ('amd64','arm64')}
+        raw=tool.fixed_prepare_entry_program('123-1','a'*40,hashes,hashlib.sha256(wrapper).hexdigest(),'c'*64)
+        tree=ast.parse(raw);setup=[n for n in tree.body if isinstance(n,(ast.Import,ast.ImportFrom,ast.Assign,ast.FunctionDef))];scope={};exec(compile(ast.Module(body=setup,type_ignores=[]),'actual-prepare-image-bound','exec'),scope)
+        for image_name,accepted in (('preload-image.tar.gz',True),('other.bin',False)):
+            run=str(time.time_ns())+'-1';path=Path('/tmp/qs-compatibility-retirement-'+run+'.tar.gz');fd=os.open(path,os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o600)
+            try:
+                with os.fdopen(fd,'wb') as f,tarfile.open(fileobj=f,mode='w:gz') as tar:
+                    for name,body in [('inventory-linux-'+arch,native) for arch in ('amd64','arm64')]+[('compatibility-window-tool.py',wrapper)]:
+                        member=tarfile.TarInfo(name);member.size=len(body);tar.addfile(member,io.BytesIO(body))
+                    with tempfile.TemporaryFile() as image:
+                        image.truncate((64<<20)+1);image.seek(0);member=tarfile.TarInfo(image_name);member.size=(64<<20)+1;tar.addfile(member,image)
+                request=dict(operation_id='123-1',run_id=run,source_sha='a'*40,request_sha256='b'*64,package_sha256=hashlib.sha256(path.read_bytes()).hexdigest(),stage='prepare-facts',manifest_sha256='',credentials={})
+                if accepted:self.assertEqual(fixture.authorize(scope,request)[0],request)
+                else:
+                    with contextlib.redirect_stdout(io.StringIO()),self.assertRaises(SystemExit):fixture.authorize(scope,request)
+            finally:path.unlink()
+    def test_configured_prepare_caller_never_passes_code_argv_or_password(self):
+        args=RootPrepareOnceTransport().args();fixed=Path('/usr/local/libexec/qs-retirement')/('f'*64+'.py')
+        with mock.patch.dict(os.environ,{'RETIREMENT_PACKAGE_SHA256':'d'*64,'RETIREMENT_FIXED_PREPARE_ENTRY_SHA256':'f'*64,'SUDO_PASSWORD':'fixture-secret'},clear=True),mock.patch.object(tool.os,'getuid',return_value=501),mock.patch.object(tool.os,'geteuid',return_value=501),mock.patch.object(tool,'installed_fixed_host_entry',return_value=fixed) as installed,mock.patch.object(tool,'root_askpass_environment') as askpass,mock.patch.object(tool.subprocess,'run',return_value=subprocess.CompletedProcess([],1,b'fixture_refusal')) as call:
+            tool.root_once_lifecycle_prepare(args)
+        self.assertEqual(call.call_args.args[0],['/usr/bin/sudo','-n','--','/usr/bin/python3','-I',str(fixed)])
+        self.assertEqual(call.call_args.kwargs['env'],{'PATH':'/usr/bin:/bin'});askpass.assert_not_called()
+        packet=json.loads(call.call_args.kwargs['input']);self.assertEqual(packet['stage'],'lifecycle');self.assertEqual(packet['manifest_sha256'],'c'*64)
+        self.assertNotIn('SUDO_PASSWORD',packet['credentials']);installed.assert_called_once_with('RETIREMENT_FIXED_PREPARE_ENTRY_SHA256')
+
 if __name__=='__main__':unittest.main()

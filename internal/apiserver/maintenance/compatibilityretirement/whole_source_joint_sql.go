@@ -8,9 +8,180 @@ import (
 	"sort"
 	"strconv"
 
+	"github.com/FangcunMount/qs-server/internal/apiserver/eventing/eventevidencebinding"
+	standard "github.com/FangcunMount/qs-server/internal/apiserver/eventing/standardoutbox"
+	sheetmongo "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/answersheet"
+	interpretmongo "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/interpretation"
 	sqlevaluation "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/evaluation"
+	"github.com/FangcunMount/qs-server/internal/pkg/eventing/evidence"
+	eventoutcome "github.com/FangcunMount/qs-server/internal/pkg/eventing/outcome"
 	eventpayload "github.com/FangcunMount/qs-server/internal/pkg/eventing/payload"
+	"github.com/FangcunMount/reliable-messaging/message"
+	"go.mongodb.org/mongo-driver/bson"
 )
+
+// Reuse the original typed row decoder for the already captured owner ranges.
+// A one-row decoder has no transaction or Complete capability and is never
+// returned. It cannot prove any absent, unbound or global responsibility.
+func historicalComponentSelectedMongoTerminal(indexes map[string]map[string]map[uint64][]bson.Raw) error {
+	for _, name := range mongoBatchBusinessCollections {
+		for _, rows := range indexes[name]["domain_id"] {
+			if len(rows) != 1 {
+				return ErrMongoOwnerConflict
+			}
+			s := &MongoResponsibilitySnapshot{limits: MongoResponsibilityLimits{MaxGraphEntries: 131072, MaxGraphBytes: 256 << 20}, byEvent: map[string][]int{}, bySheet: map[string][]int{}, byAssessment: map[string][]int{}, byGeneration: map[string][]int{}, byOutcome: map[string][]int{}, report: MongoResponsibilityCycleReport{ClassCounts: map[string]uint64{}}}
+			s.graph.initialize()
+			if s.classifyRow(name, rows[0]) != nil || len(s.observations) != 1 {
+				return ErrMongoOwnerConflict
+			}
+			observed := s.observations[0]
+			if observed.Invalid || observed.Unfinished || observed.LeasePresent {
+				return ErrCoordinatorCASQualification
+			}
+		}
+	}
+	return nil
+}
+
+// SQL-source owners also have downstream Mongo messages and execution runs.
+// The original organization/original-ID reader checks real native rows,
+// fingerprint, reverse business ownership, and complete replay headers/items.
+// Its row/byte/query bounds and this component's absolute deadline remain.
+func historicalComponentSQLMongoResponsibilities(ctx context.Context, o *HistoricalComponentSourceObservation, rows []qualifiedCASRow, indexes map[string]map[string]map[uint64][]bson.Raw) error {
+	views := map[string]*sqlevaluation.SQLHistoricalComponentSemanticView{}
+	for i, observer := range o.sql {
+		view, err := observer.SemanticView(ctx)
+		if err != nil {
+			return err
+		}
+		ids, err := o.component.inputs[i].sqlRecipe.SourceEventIDs()
+		if err != nil {
+			return err
+		}
+		for _, id := range ids {
+			if views[id] == nil {
+				views[id] = view
+			}
+		}
+	}
+	for _, row := range rows {
+		source := row.facts
+		if source.Source.Database != "mysql" {
+			continue // the common business factory already checks Mongo originals
+		}
+		assessment, err := sqlSourceAssessment(source)
+		view := views[source.EventID]
+		if err != nil || view == nil {
+			return ErrSQLMongoCrossStoreConflict
+		}
+		owner, err := view.OwnerByAssessment(ctx, assessment)
+		if err != nil || owner.Owner.OrgID != source.OrgID {
+			return ErrSQLMongoCrossStoreConflict
+		}
+		// The authenticated SQL source is immutable here. The native Mongo
+		// responsibility reader only reads its identity and owner selectors;
+		// it must not reinterpret it as a Mongo legacy source.
+		r := &MongoOwnerResolution{db: o.mongo.db, source: source, businessReader: &historicalComponentMongoReader{o, source, indexes}, sqlFacts: &historicalComponentSQLOwnerReader{o, view, ctx, assessment, nil}}
+		r.local = MongoLocalResolution{EventID: source.EventID, EventType: source.EventType, OrgID: owner.Owner.OrgID, TesteeID: owner.Owner.TesteeID, AssessmentID: assessment, AnswerSheetID: owner.Owner.AnswerSheetID}
+		if len(owner.Outcomes) == 1 {
+			r.local.OutcomeID = owner.Outcomes[0].ID
+		}
+		if err = r.readMongoResponsibilities(ctx); err != nil {
+			return err
+		}
+		if len(r.local.BlockingReasons) != 0 {
+			return ErrCoordinatorCASQualification
+		}
+		if _, collision := r.currentStandard[source.EventID]; collision {
+			return ErrSQLMongoCrossStoreConflict // SQL event identity cannot move stores
+		}
+		if err = historicalComponentSQLMongoReferences(r, owner, indexes); err != nil {
+			return err
+		}
+	}
+	return o.ValidateBorrowedObservation(ctx)
+}
+
+func historicalComponentSQLMongoReferences(r *MongoOwnerResolution, owner sqlevaluation.SQLHistoricalFactsSnapshot, indexes map[string]map[string]map[uint64][]bson.Raw) error {
+	for _, raw := range indexes["answersheets"]["domain_id"][owner.Owner.AnswerSheetID] {
+		var sheet sheetmongo.AnswerSheetPO
+		if bson.Unmarshal(raw, &sheet) != nil {
+			return ErrMongoOwnerConflict
+		}
+		if sheet.DurableAcceptance != nil {
+			if err := historicalComponentCurrentMongoReference(r, sheet.DurableAcceptance.EventID, "answersheet.submitted", sheet.DurableAcceptance.EventEvidence); err != nil {
+				return err
+			}
+		}
+	}
+	for _, outcome := range owner.Outcomes {
+		for _, raw := range indexes["report_generations"]["outcome_id"][outcome.ID] {
+			var generation interpretmongo.ReportGenerationPO
+			if bson.Unmarshal(raw, &generation) != nil {
+				return ErrMongoOwnerConflict
+			}
+			if generation.TransactionSchemaVersion == 1 && generation.Status == "generated" {
+				if err := historicalComponentCurrentMongoReference(r, generation.GeneratedEventID, "interpretation.report.generated", generation.GeneratedEventEvidence); err != nil {
+					return err
+				}
+			}
+			for _, runRaw := range indexes["interpretation_runs"]["generation_id"][uint64(generation.DomainID)] {
+				var run interpretmongo.InterpretationRunPO
+				if bson.Unmarshal(runRaw, &run) != nil {
+					return ErrMongoOwnerConflict
+				}
+				if run.RetryEventID != "" {
+					if err := historicalComponentCurrentMongoReference(r, run.RetryEventID, "interpretation.retry.requested", run.RetryEventEvidence); err != nil {
+						return err
+					}
+				}
+			}
+		}
+	}
+	return nil
+}
+
+func historicalComponentCurrentMongoReference(r *MongoOwnerResolution, id, eventType string, proof *evidence.EventEvidenceV1) error {
+	row, found := r.currentStandard[id]
+	if id == "" || !found || row.EventType != eventType {
+		return ErrMongoOwnerConflict
+	}
+	if proof == nil {
+		return nil // the native reverse reader still verified the actual full body
+	}
+	inner, err := row.envelope()
+	if err != nil {
+		return err
+	}
+	var binding string
+	switch eventType {
+	case "answersheet.submitted":
+		var payload eventpayload.AnswerSheetSubmittedData
+		if strictTyped(inner.Data, &payload) != nil {
+			return ErrMongoOwnerConflict
+		}
+		binding, err = eventevidencebinding.AnswerSheet(payload)
+	case "interpretation.report.generated":
+		var payload eventoutcome.ReportGeneratedPayload
+		if strictTyped(inner.Data, &payload) != nil {
+			return ErrMongoOwnerConflict
+		}
+		binding, err = eventevidencebinding.Generated(payload)
+	case "interpretation.retry.requested":
+		var payload eventoutcome.InterpretationRetryRequestedPayload
+		if strictTyped(inner.Data, &payload) != nil {
+			return ErrMongoOwnerConflict
+		}
+		binding, err = eventevidencebinding.Retry(payload)
+	default:
+		return ErrSourceEventType
+	}
+	msg, messageErr := message.New(row.input())
+	if err != nil || messageErr != nil || mongoCycleProofMatches(proof, standard.ReferenceFromMessage(msg), binding, true) != nil {
+		return ErrMongoOwnerConflict
+	}
+	return nil
+}
 
 func (p *WholeSourceJointPage) originalMongoGraph(ctx context.Context, source *DecodedSourceEvent, key verifiedSourceKey, resolved map[string]sqlevaluation.SQLResponsibilityObservation) (*MongoHistoricalBatchOwnerQualification, error) {
 	initial := p.cross.qualification[key]
@@ -255,6 +426,11 @@ func (p *WholeSourceJointPage) resolveSQL(ctx context.Context, source *DecodedSo
 }
 
 func (p *WholeSourceJointPage) verifyOriginalSQLWire(source *DecodedSourceEvent, row sqlevaluation.SQLCrossStoreRow) error {
+	return verifyOriginalSQLWire(source, row)
+}
+
+// Shared exact source/wire rule; this grants no current or global closure.
+func verifyOriginalSQLWire(source *DecodedSourceEvent, row sqlevaluation.SQLCrossStoreRow) error {
 	o := row.Observation
 	inner := row.Inner
 	if inner == nil || inner.ID != source.EventID || inner.EventType != source.EventType || inner.AggregateType != source.AggregateType || inner.AggregateID != source.AggregateID || !inner.OccurredAt.Equal(source.OccurredAt) || o.OrgID != source.OrgID || row.LegacyContentSHA256 != source.ContentDigest.SHA256 {

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"reflect"
 	"strings"
 	"testing"
 )
@@ -98,6 +99,58 @@ func TestAIExternalRuntimeRequiresActualImmutableSourceAndStableContainer(t *tes
 	if r.matches(in) {
 		t.Fatal("writable protected runtime mount admitted")
 	}
+}
+
+func TestAIExternalRuntimeMountOrderPreservesExactSnapshotSemantics(t *testing.T) {
+	in := AIExternalExecutionInput{RuntimeSourceSHA: strings.Repeat("a", 40), ImageID: "sha256:" + strings.Repeat("b", 64), ContainerID: strings.Repeat("c", 64)}
+	before := aiExternalRuntime{ContainerID: in.ContainerID, ImageID: in.ImageID, Name: "/qs-ai", Status: "running", StartedAt: "2026-10-09T00:00:00Z", Running: true, ReadOnlyRoot: true, Command: []string{"/app/.venv/bin/python", "-m", "qs_ai.bootstrap.server"}, ContainerRevision: in.RuntimeSourceSHA, ImageRevision: in.RuntimeSourceSHA,
+		Mounts: []aiExternalMount{{Type: "tmpfs", Destination: "/tmp", RW: true}, {Type: "bind", Source: "/private/qs-ai.key", Destination: "/run/qs-ai-tls/qs-ai.key"}, {Type: "bind", Source: "/private/ca-chain.crt", Destination: "/run/qs-ai-tls/ca-chain.crt"}}}
+	if err := before.orderMounts(); err != nil || !before.matches(in) {
+		t.Fatal("exact observed runtime rejected")
+	}
+	copyRuntime := func() aiExternalRuntime {
+		v := before
+		v.Mounts = append([]aiExternalMount(nil), before.Mounts...)
+		v.Command = append([]string(nil), before.Command...)
+		return v
+	}
+	after := copyRuntime()
+	after.Mounts[0], after.Mounts[2] = after.Mounts[2], after.Mounts[0]
+	if err := after.orderMounts(); err != nil || !after.matches(in) || !reflect.DeepEqual(before, after) {
+		t.Fatal("unchanged mount set depended on inspect iteration order")
+	}
+	for _, row := range []struct {
+		name   string
+		mutate func(*aiExternalRuntime)
+	}{
+		{"source", func(v *aiExternalRuntime) { v.Mounts[0].Source = "/private/other.crt" }},
+		{"type", func(v *aiExternalRuntime) { v.Mounts[0].Type = "volume" }},
+		{"rw", func(v *aiExternalRuntime) { v.Mounts[0].RW = true }},
+		{"destination", func(v *aiExternalRuntime) { v.Mounts[0].Destination = "/run/qs-ai-tls/qs-ai-fullchain.crt" }},
+		{"container", func(v *aiExternalRuntime) { v.ContainerID = strings.Repeat("d", 64) }},
+		{"image", func(v *aiExternalRuntime) { v.ImageID = "sha256:" + strings.Repeat("e", 64) }},
+		{"started_at", func(v *aiExternalRuntime) { v.StartedAt = "2026-10-09T00:00:01Z" }},
+		{"restart", func(v *aiExternalRuntime) { v.Restarts++ }},
+		{"argv_order", func(v *aiExternalRuntime) { v.Command[0], v.Command[1] = v.Command[1], v.Command[0] }},
+	} {
+		t.Run(row.name, func(t *testing.T) {
+			changed := copyRuntime()
+			row.mutate(&changed)
+			if err := changed.orderMounts(); err != nil {
+				t.Fatal("distinct destinations unexpectedly rejected")
+			}
+			if reflect.DeepEqual(before, changed) {
+				t.Fatal("normalization hid an observed runtime change")
+			}
+		})
+	}
+	t.Run("duplicate_destination", func(t *testing.T) {
+		changed := copyRuntime()
+		changed.Mounts = append(changed.Mounts, changed.Mounts[0])
+		if err := changed.orderMounts(); err != ErrAIExternalRuntime || changed.matches(in) {
+			t.Fatal("duplicate mount destination admitted")
+		}
+	})
 }
 
 func TestAIExternalCurrentObservationKeepsSettingsPrivateAndCannotStop(t *testing.T) {
@@ -201,5 +254,121 @@ func TestAIExternalActualMQRewritePreservesBaseTLSAndBindsEveryJOSEFile(t *testi
 	changed[0].Target = "/app/key.json"
 	if _, err = aiExternalReleaseMounts(raw, changed); err == nil {
 		t.Fatal("app shadow authorized")
+	}
+}
+
+func TestHistoricalAIQualificationRejectsImportedAndExpiredInputs(t *testing.T) {
+	ctx := t.Context()
+	if q, err := PrepareHistoricalAIExternalExecution(ctx, nil, nil, AIExternalExecutionInput{}); q != nil || err == nil {
+		t.Fatal("missing actual inputs minted external qualification")
+	}
+	if b, err := PrepareHistoricalAICommandPersistenceBatch(ctx, nil, nil, &AIExternalExecutionQualification{}); b != nil || err == nil {
+		t.Fatal("external DTO minted persistence batch")
+	}
+	if err := ValidateHistoricalComponentAI(ctx, nil, &AIExternalExecutionQualification{}, &AICommandPersistenceBatch{}); err == nil {
+		t.Fatal("empty component/receipt bypassed actual AI closure")
+	}
+	var b AICommandPersistenceBatch
+	if _, err := b.VerifyHistoricalReadback(ctx, nil, nil); err == nil {
+		t.Fatal("empty batch claimed committed server read")
+	}
+	q := &AIExternalExecutionQualification{}
+	q.self = q
+	if q.historicalIntact(ctx, nil, nil) == nil {
+		t.Fatal("self pointer alone minted qualification")
+	}
+	if _, err := prepareHistoricalAIFullSnapshot(ctx, nil, nil, DefaultAIReverseLimits(), "READ ONLY"); err == nil {
+		t.Fatal("full14 observed without original pair")
+	}
+}
+func TestHistoricalAIWholeLedgerEqualityPreservesActualPhysicalFacts(t *testing.T) {
+	ledgers := make([]AIReverseLedgerSummary, len(aiReverseSpecs))
+	for i, spec := range aiReverseSpecs {
+		ledgers[i] = AIReverseLedgerSummary{Store: spec.table, Rows: 1, Bytes: 8, Pages: 1, SchemaSHA256: "schema", PrimaryKeySHA256: "pk", UpperSHA256: "upper", RowsSHA256: "actual"}
+	}
+	got := append([]AIReverseLedgerSummary(nil), ledgers...)
+	got[0].Pages = 9
+	if !historicalAILedgersEqual(got, ledgers) {
+		t.Fatal("pagination was mistaken for changed content")
+	}
+	for _, mutate := range []func(*AIReverseLedgerSummary){func(v *AIReverseLedgerSummary) { v.Rows++ }, func(v *AIReverseLedgerSummary) { v.Bytes++ }, func(v *AIReverseLedgerSummary) { v.RowsSHA256 = "changed" }, func(v *AIReverseLedgerSummary) { v.SchemaSHA256 = "changed" }, func(v *AIReverseLedgerSummary) { v.PrimaryKeySHA256 = "changed" }, func(v *AIReverseLedgerSummary) { v.UpperSHA256 = "changed" }, func(v *AIReverseLedgerSummary) { v.Store = "outside" }} {
+		changed := append([]AIReverseLedgerSummary(nil), ledgers...)
+		mutate(&changed[3])
+		if historicalAILedgersEqual(changed, ledgers) {
+			t.Fatal("real row/catalog/upper change was hidden")
+		}
+	}
+	if historicalAILedgersEqual(got[:13], ledgers) {
+		t.Fatal("missing whole ledger accepted")
+	}
+}
+
+func TestHistoricalAIKnownPendingDoesNotAdoptReceiptsOrHeldWork(t *testing.T) {
+	q := &AIExternalExecutionQualification{handoffs: map[string]aiExternalKnownHandoff{"original": {CommandID: "original", RequestID: "request"}}}
+	for _, store := range []string{"ai_messaging_inbox", "ai_messaging_failures", AIBridgeCommandSource} {
+		n := &aiReverseNode{id: "original", command: "original", state: "staged", observation: AIReverseObservation{Store: store, Unfinished: true}}
+		if historicalAIKnownCurrentPending(n, q) {
+			t.Fatal("mapped ID adopted another delivery responsibility")
+		}
+	}
+	n := &aiReverseNode{id: "original", command: "original", state: "staged", observation: AIReverseObservation{Store: "ai_messaging_outbox", Unfinished: true}}
+	if !historicalAIKnownCurrentPending(n, q) {
+		t.Fatal("known current staged handoff lost")
+	}
+	n.observation.Held = true
+	if historicalAIKnownCurrentPending(n, q) {
+		t.Fatal("held handoff was adopted")
+	}
+	n.observation.Held = false
+	n.state = "confirmed"
+	if historicalAIKnownCurrentPending(n, q) {
+		t.Fatal("unexpected transport state was adopted")
+	}
+}
+
+func TestHistoricalAIScopedContinuityKeepsNegativeRangesAndIgnoresUnrelatedRows(t *testing.T) {
+	current := &AIReverseSnapshot{metadata: make([]aiReverseMetadata, len(aiReverseSpecs)), scope: &aiReverseScope{relatedRequests: map[string]bool{"request": true}, relatedIDs: map[string]bool{"command": true}}, componentAssessments: map[string]bool{"42": true}, componentResources: map[string]bool{"resource": true}, byTable: map[string]map[string]*aiReverseNode{}}
+	committed := &AIReverseSnapshot{metadata: make([]aiReverseMetadata, len(aiReverseSpecs)), byTable: map[string]map[string]*aiReverseNode{}}
+	for _, spec := range aiReverseSpecs {
+		current.byTable[spec.table], committed.byTable[spec.table] = map[string]*aiReverseNode{}, map[string]*aiReverseNode{}
+	}
+	row := func(table, id, request, resource, hash string) *aiReverseNode {
+		return &aiReverseNode{id: id, request: request, resource: resource, observation: AIReverseObservation{Store: table, PrimaryKeySHA256: "pk:" + id, RowSHA256: hash}}
+	}
+	related := row("ai_messaging_operations", "command", "", "resource", "committed-retirement")
+	current.byTable[related.observation.Store][related.id] = related
+	committed.byTable[related.observation.Store][related.id] = related
+	committed.byTable["ai_messaging_operations"]["unrelated"] = row("ai_messaging_operations", "unrelated", "", "other-resource", "other-current-business")
+	if !historicalAIScopedRowsEqual(current, committed) {
+		t.Fatal("unrelated legitimate business row blocked selected continuity")
+	}
+	delete(current.byTable[related.observation.Store], related.id)
+	if historicalAIScopedRowsEqual(current, committed) {
+		t.Fatal("disappeared related operation hidden")
+	}
+	current.byTable[related.observation.Store][related.id] = row(related.observation.Store, related.id, "", "resource", "changed-org-or-payload")
+	if historicalAIScopedRowsEqual(current, committed) {
+		t.Fatal("changed selected raw row accepted")
+	}
+	current.byTable[related.observation.Store][related.id] = related
+	current.byTable["ai_messaging_operations"]["new-command"] = row("ai_messaging_operations", "new-command", "", "resource", "new-current-responsibility")
+	if historicalAIScopedRowsEqual(current, committed) {
+		t.Fatal("new matching responsibility omitted from expected image")
+	}
+	delete(current.byTable["ai_messaging_operations"], "new-command")
+	absent := row("ai_bridge_request_assessments", "request:42", "request", "42", "original-negative-range")
+	committed.byTable[absent.observation.Store][absent.id] = absent
+	if historicalAIScopedRowsEqual(current, committed) {
+		t.Fatal("request/assessment negative expansion was cut")
+	}
+	delete(committed.byTable[absent.observation.Store], absent.id)
+	admission := row("ai_messaging_admission", "1", "", "", "closed-revision")
+	committed.byTable[admission.observation.Store][admission.id] = admission
+	if historicalAIScopedRowsEqual(current, committed) {
+		t.Fatal("missing actual admission control accepted")
+	}
+	current.byTable[admission.observation.Store][admission.id] = admission
+	if !historicalAIScopedRowsEqual(current, committed) {
+		t.Fatal("same closed selected image rejected")
 	}
 }

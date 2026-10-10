@@ -171,6 +171,13 @@ func sourceOriginSQLToken(b SourceBoundary) (any, error) {
 	return string(raw), nil
 }
 func sourceOriginReadSQL(ctx context.Context, tx *gorm.DB, binding *OriginCopyBinding, index int) (SourceBoundary, SourceCopyReceipt, error) {
+	return sourceOriginReadSQLWithInput(ctx, tx, binding, index, binding.alive, nil)
+}
+
+func sourceOriginReadSQLWithInput(ctx context.Context, tx *gorm.DB, binding *OriginCopyBinding, index int, guard func(context.Context) error, freeze sourceOriginInputSink) (SourceBoundary, SourceCopyReceipt, error) {
+	if binding == nil || guard == nil || index < 0 || index > 2 || guard(ctx) != nil {
+		return SourceBoundary{}, SourceCopyReceipt{}, ErrSourceOrigin
+	}
 	expected := binding.expected[index]
 	boundary, cols, key, e := sourceOriginSQLMetadata(ctx, tx, expected, binding.limits)
 	if e != nil || boundary != expected.Boundary {
@@ -213,7 +220,7 @@ func sourceOriginReadSQL(ctx context.Context, tx *gorm.DB, binding *OriginCopyBi
 		}
 		last := ""
 		for page := uint64(0); ; page++ {
-			if e = binding.alive(ctx); e != nil {
+			if e = guard(ctx); e != nil {
 				return boundary, SourceCopyReceipt{}, e
 			}
 			if page > binding.limits.MaxRows/uint64(binding.limits.PageRows)+1 {
@@ -237,6 +244,9 @@ func sourceOriginReadSQL(ctx context.Context, tx *gorm.DB, binding *OriginCopyBi
 				return boundary, SourceCopyReceipt{}, e
 			}
 			for _, row := range rows {
+				if e = guard(ctx); e != nil {
+					return boundary, SourceCopyReceipt{}, e
+				}
 				encoded := make([]*string, len(row))
 				for i, c := range row {
 					if c != nil {
@@ -268,9 +278,19 @@ func sourceOriginReadSQL(ctx context.Context, tx *gorm.DB, binding *OriginCopyBi
 					last = base64.StdEncoding.EncodeToString([]byte(v.CommandID))
 				}
 			}
+			if freeze != nil {
+				if e = freeze(ctx, sourceOriginInputFrame{Source: index, Boundary: boundary, Columns: cols, SQLRows: rows, EOF: len(rows) < binding.limits.PageRows}); e != nil {
+					return boundary, SourceCopyReceipt{}, e
+				}
+			}
 			if len(rows) < binding.limits.PageRows {
 				break
 			}
+		}
+	}
+	if boundary.Empty && freeze != nil {
+		if e = freeze(ctx, sourceOriginInputFrame{Source: index, Boundary: boundary, Columns: cols, EOF: true}); e != nil {
+			return boundary, SourceCopyReceipt{}, e
 		}
 	}
 	if index == 0 {

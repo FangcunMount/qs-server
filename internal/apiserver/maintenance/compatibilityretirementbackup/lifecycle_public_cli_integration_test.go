@@ -16,6 +16,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"os/signal"
 	"path/filepath"
 	"reflect"
 	"runtime"
@@ -26,6 +27,9 @@ import (
 	"testing"
 	"time"
 
+	fence "github.com/FangcunMount/qs-server/internal/apiserver/maintenance/compatibilityretirementfence"
+	stop "github.com/FangcunMount/qs-server/internal/apiserver/maintenance/compatibilityretirementstop"
+	buildversion "github.com/FangcunMount/qs-server/pkg/version"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 )
@@ -1750,4 +1754,309 @@ print(json.dumps({'actual_root':os.getuid()==0 and os.geteuid()==0,'control_eof'
 	}
 	accepted = true
 	t.Logf("public_cli_owned_process_source_sha=%s actual_linux_root=true actual_subreaper=true actual_pidfd=true actual_control_eof=true detached_descendant_layers=3 actual_descendants_remaining=0 failure_intent_retained_until_acceptance=true daemon_exec_proven=false production_operations=false", source)
+}
+
+// This opt-in native fixture is an inert, source-bound service process, not a
+// business Worker. Docker supplies its actual CID/image/PID/start time. It uses
+// the production stop/recovery constructors without imported opaque authority.
+func init() {
+	if len(os.Args) != 2 || os.Args[1] != "--config=/app/configs/worker.prod.yaml" || os.Getenv("QS_PUBLIC_RECOVERY_WORKER") == "" {
+		return
+	}
+	if runtime.GOOS != "linux" || os.Geteuid() != 0 || os.Getenv("QS_PUBLIC_RECOVERY_WORKER") != buildversion.GitCommit || !sourcePattern.MatchString(buildversion.GitCommit) {
+		os.Exit(93)
+	}
+	ended := make(chan os.Signal, 1)
+	signal.Notify(ended, syscall.SIGTERM)
+	select {
+	case <-ended:
+		signal.Stop(ended)
+		os.Exit(0)
+	case <-time.After(5 * time.Minute):
+		os.Exit(94)
+	}
+}
+
+type publicCLIServiceRecoveryInput struct {
+	DescriptorPath, DescriptorSHA256, Directory string
+	WindowBinding                               fence.WindowBinding
+}
+
+func publicCLIServiceRecoveryPhase(t *testing.T, path, phase string) {
+	t.Helper()
+	var h publicCLIServiceRecoveryInput
+	if publicCLIPrivateJSON(path, &h) != nil || (phase != "stop" && phase != "recover") {
+		t.Fatal("public_cli_service_recovery_handoff_rejected")
+	}
+	// The real Worker stop retains its 510-second grace plus 15-second margin.
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+	defer cancel()
+	a, e := stop.ReadApprovedDescriptor(h.DescriptorPath, h.DescriptorSHA256)
+	if e != nil {
+		t.Fatal("public_cli_service_recovery_actual_approval_rejected")
+	}
+	windowDir, journal := filepath.Join(h.Directory, "window"), filepath.Join(h.Directory, "service-journal")
+	var w *fence.MaintenanceWindow
+	if phase == "stop" {
+		w, e = fence.StartMaintenanceWindow(ctx, windowDir, h.WindowBinding)
+	} else {
+		w, e = fence.OpenMaintenanceWindow(ctx, windowDir, h.WindowBinding)
+	}
+	if e != nil {
+		t.Fatal("public_cli_service_recovery_actual_window_rejected")
+	}
+	t.Cleanup(func() {
+		if w.Close() != nil {
+			t.Error("public_cli_service_recovery_window_close_failed")
+		}
+	})
+	var lease *stop.Lease
+	if phase == "stop" {
+		lease, e = stop.StopAndDrain(ctx, a, journal, w)
+	} else {
+		q, finish, recoveryErr := w.RecoveryContext(ctx)
+		if recoveryErr != nil || q.Err() != nil {
+			t.Fatal("public_cli_service_recovery_budget_rejected")
+		}
+		finish()
+		lease, e = stop.OpenRecoveryDependents(ctx, a, journal, w)
+	}
+	if e != nil || lease == nil {
+		for _, fixed := range []error{stop.ErrBinding, stop.ErrState, stop.ErrCommand, stop.ErrForced, stop.ErrJournal, stop.ErrRemote} {
+			if errors.Is(e, fixed) {
+				t.Logf("public_cli_service_recovery_native_error=%s", fixed.Error())
+				break
+			}
+		}
+		t.Fatal("public_cli_service_recovery_original_native_owner_rejected")
+	}
+	t.Cleanup(func() {
+		if lease.Close() != nil {
+			t.Error("public_cli_service_recovery_owner_close_failed")
+		}
+	})
+	if phase == "recover" {
+		if lease.Check(ctx) == nil || lease.CheckRecoveryStopped(ctx) != nil {
+			t.Fatal("public_cli_service_recovery_only_guard_failed")
+		}
+		if lease.RestoreDependents(ctx) != nil {
+			t.Fatal("public_cli_service_recovery_actual_restore_failed")
+		}
+	}
+	d, e := w.Diagnostic(ctx)
+	if e != nil || d.MutationAllowed || d.DropReady {
+		t.Fatal("public_cli_service_recovery_window_overclaimed")
+	}
+	nativeJSON(t, filepath.Join(h.Directory, phase+".receipt.private.json"), map[string]any{"pid": os.Getpid(), "stage": phase, "window_start_sha256": d.StartSHA256, "recovery_sha256": d.RecoverySHA256, "drop_ready": false})
+}
+
+func TestLifecyclePublicCLINativeCrossProcessServiceRecovery(t *testing.T) {
+	run, e := publicCLIOptIn(os.Getenv("QS_LIFECYCLE_PUBLIC_CLI_NATIVE"), os.Getenv("QS_LIFECYCLE_PUBLIC_CLI_NATIVE_REQUIRED"))
+	if e != nil {
+		t.Fatal(e)
+	}
+	if !run {
+		t.Skip("public lifecycle native fixture not requested")
+	}
+	if runtime.GOOS != "linux" || os.Getuid() != 0 || os.Geteuid() != 0 || os.Getenv("SUDO_UID") != "" {
+		t.Fatal("public_cli_service_recovery_actual_linux_root_required")
+	}
+	if input := os.Getenv("QS_PUBLIC_SERVICE_RECOVERY_INPUT"); input != "" {
+		publicCLIServiceRecoveryPhase(t, input, os.Getenv("QS_PUBLIC_SERVICE_RECOVERY_PHASE"))
+		return
+	}
+	source, repo := os.Getenv("QS_LIFECYCLE_PUBLIC_CLI_SOURCE_SHA"), os.Getenv("QS_LIFECYCLE_PUBLIC_CLI_REPOSITORY")
+	actual, e := nativeCommand(context.Background(), []string{"PATH=/usr/bin:/bin"}, "/usr/bin/git", "-c", "safe.directory="+repo, "-C", repo, "rev-parse", "HEAD")
+	if e != nil || !sourcePattern.MatchString(source) || strings.TrimSpace(string(actual)) != source || buildversion.GitCommit != source {
+		t.Fatal("public_cli_service_recovery_compiled_source_mismatch")
+	}
+	programPath, e := os.Executable()
+	if e != nil {
+		t.Fatal("public_cli_service_recovery_executable_unknown")
+	}
+	program, e := os.ReadFile(programPath)
+	elfFile, elfErr := elf.NewFile(bytes.NewReader(program))
+	if e != nil || elfErr != nil || len(program) == 0 || len(program) > 256<<20 {
+		t.Fatal("public_cli_service_recovery_static_program_rejected")
+	}
+	for _, segment := range elfFile.Progs {
+		if segment.Type == elf.PT_INTERP {
+			t.Fatal("public_cli_service_recovery_dynamic_program_rejected")
+		}
+	}
+	if elfFile.Close() != nil {
+		t.Fatal("public_cli_service_recovery_program_close_failed")
+	}
+	base := "/opt/backups/qs-server/compatibility-retirement"
+	publicCLIProtectedDir(t, base)
+	op := strconv.FormatInt(time.Now().UnixNano(), 10) + "-1"
+	dir := filepath.Join(base, op)
+	for _, path := range []string{dir, filepath.Join(dir, "window"), filepath.Join(dir, "service-journal")} {
+		if os.Mkdir(path, 0700) != nil {
+			t.Fatal("public_cli_service_recovery_owned_directory_rejected")
+		}
+	}
+	owner := source + "/" + op
+	name := "qs-public-recovery-worker-" + op
+	image, cid := "", ""
+	settled := false
+	checkImage := func() bool {
+		raw, err := publicCLIDocker(context.Background(), "image", "inspect", "--format", `{"id":{{json .Id}},"os":{{json .Os}},"architecture":{{json .Architecture}},"revision":{{json (index .Config.Labels "org.opencontainers.image.revision")}},"owner":{{json (index .Config.Labels "codex.public-recovery-owner")}}}`, image)
+		var v struct{ ID, OS, Architecture, Revision, Owner string }
+		return err == nil && json.Unmarshal(raw, &v) == nil && v.ID == image && v.OS == "linux" && v.Architecture == runtime.GOARCH && v.Revision == source && v.Owner == owner
+	}
+	const format = `{"id":{{json .Id}},"name":{{json .Name}},"image":{{json .Image}},"component":{{json (index .Config.Labels "prometheus.component")}},"project":{{json (index .Config.Labels "com.docker.compose.project")}},"service":{{json (index .Config.Labels "com.docker.compose.service")}},"entrypoint":{{json .Config.Entrypoint}},"command":{{json .Config.Cmd}},"running":{{json .State.Running}},"started_at":{{json .State.StartedAt}},"restart_policy":{{json .HostConfig.RestartPolicy.Name}},"restart_maximum":{{json .HostConfig.RestartPolicy.MaximumRetryCount}},"owner":{{json (index .Config.Labels "codex.public-recovery-owner")}},"pid":{{json .State.Pid}},"exit_code":{{json .State.ExitCode}},"readonly":{{json .HostConfig.ReadonlyRootfs}},"network":{{json .HostConfig.NetworkMode}},"mounts":{{json .Mounts}},"execs":{{json .ExecIDs}}}`
+	inspect := func() (stop.Container, int, int, error) {
+		raw, err := publicCLIDocker(context.Background(), "inspect", "--format", format, cid)
+		var v struct {
+			stop.Container
+			Owner, Network string
+			PID, ExitCode  int
+			Readonly       bool
+			Mounts, Execs  []json.RawMessage
+		}
+		if err != nil || json.Unmarshal(raw, &v) != nil || v.ID != cid || v.Image != image || v.Name != "/"+name || v.Owner != owner || !v.Readonly || v.Network != "none" || len(v.Mounts) != 0 || len(v.Execs) != 0 {
+			return stop.Container{}, 0, 0, ErrIsolation
+		}
+		return v.Container, v.PID, v.ExitCode, nil
+	}
+	t.Cleanup(func() {
+		if !settled || t.Failed() {
+			nativeRetainCleanup(t, dir)
+			return
+		}
+		if _, _, _, err := inspect(); err != nil || !checkImage() {
+			t.Error("public_cli_service_recovery_cleanup_identity_unproven")
+			return
+		}
+		if _, err := publicCLIDocker(context.Background(), "rm", "--force", cid); err != nil {
+			t.Error("public_cli_service_recovery_owned_remove_unknown")
+			return
+		}
+		remaining, err := publicCLIDocker(context.Background(), "ps", "--all", "--no-trunc", "--filter", "label=codex.public-recovery-owner="+owner, "--format", "{{.ID}}")
+		if err != nil || len(bytes.TrimSpace(remaining)) != 0 {
+			t.Error("public_cli_service_recovery_owned_zero_unproven")
+			return
+		}
+		if _, err = publicCLIDocker(context.Background(), "image", "rm", "--no-prune", image); err != nil || os.RemoveAll(dir) != nil {
+			t.Error("public_cli_service_recovery_owned_material_cleanup_failed")
+			return
+		}
+		remaining, err = publicCLIDocker(context.Background(), "image", "ls", "--quiet", "--no-trunc", "--filter", "label=codex.public-recovery-owner="+owner)
+		if err != nil || len(bytes.TrimSpace(remaining)) != 0 {
+			t.Error("public_cli_service_recovery_owned_image_zero_unproven")
+		} else {
+			t.Log("public_cli_service_recovery_owned_containers_remaining=0 owned_images_remaining=0")
+		}
+	})
+	nativeJSON(t, filepath.Join(dir, "fixture.intent.private.json"), map[string]string{"source_sha": source, "operation_id": op, "owner": owner, "name": name, "program_sha256": sha(program)})
+	var contextTar bytes.Buffer
+	tw := tar.NewWriter(&contextTar)
+	for _, member := range []struct {
+		name string
+		raw  []byte
+		mode int64
+	}{
+		{"Dockerfile", []byte("FROM scratch\nLABEL org.opencontainers.image.revision=" + source + "\nLABEL codex.public-recovery-owner=" + owner + "\nCOPY worker /app/qs-worker\n"), 0600},
+		{"worker", program, 0555},
+	} {
+		if tw.WriteHeader(&tar.Header{Name: member.name, Mode: member.mode, Size: int64(len(member.raw)), Typeflag: tar.TypeReg}) != nil {
+			t.Fatal("public_cli_service_recovery_context_rejected")
+		}
+		if _, err := tw.Write(member.raw); err != nil {
+			t.Fatal("public_cli_service_recovery_context_rejected")
+		}
+	}
+	if tw.Close() != nil {
+		t.Fatal("public_cli_service_recovery_context_rejected")
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 12*time.Minute)
+	defer cancel()
+	build := exec.CommandContext(ctx, "/usr/bin/docker", "--host", "unix:///run/docker.sock", "build", "--quiet", "--pull=false", "--network=none", "-")
+	build.Env, build.Stdin, build.Stderr = []string{"PATH=/usr/bin:/bin"}, &contextTar, io.Discard
+	built, e := build.Output()
+	image = strings.TrimSpace(string(built))
+	if e != nil || !strings.HasPrefix(image, "sha256:") || !hashPattern.MatchString(strings.TrimPrefix(image, "sha256:")) || !checkImage() {
+		t.Fatal("public_cli_service_recovery_image_unknown")
+	}
+	created, e := publicCLIDocker(ctx, "create", "--name", name, "--label", "codex.public-recovery-owner="+owner, "--label", "prometheus.component=qs-worker", "--label", "com.docker.compose.project=qs-worker", "--label", "com.docker.compose.service=runtime", "--network", "none", "--read-only", "--restart", "unless-stopped", "--env", "QS_PUBLIC_RECOVERY_WORKER="+source, "--entrypoint", "/app/qs-worker", image, "--config=/app/configs/worker.prod.yaml")
+	cid = strings.TrimSpace(string(created))
+	if e != nil || !hashPattern.MatchString(cid) {
+		t.Fatal("public_cli_service_recovery_creation_unknown")
+	}
+	nativeJSON(t, filepath.Join(dir, "fixture.created.private.json"), map[string]string{"container_id": cid, "image_id": image, "owner": owner})
+	if _, e = publicCLIDocker(ctx, "start", cid); e != nil {
+		t.Fatal("public_cli_service_recovery_start_unknown")
+	}
+	original, pid, _, e := inspect()
+	if e != nil || !original.Running || pid <= 0 {
+		t.Fatal("public_cli_service_recovery_original_native_runtime_rejected")
+	}
+	machine, e := os.ReadFile("/etc/machine-id")
+	dockerProgram, dockerErr := os.ReadFile("/usr/bin/docker")
+	if e != nil || dockerErr != nil || len(machine) == 0 || len(dockerProgram) == 0 {
+		t.Fatal("public_cli_service_recovery_host_identity_unknown")
+	}
+	manifest := sha([]byte(owner + "/local-service-recovery-only"))
+	descriptor := stop.Descriptor{Version: 1, SourceSHA: source, RuntimeSourceSHA: source, ToolSourceSHA: source, OriginalRunID: op, OperationID: op, ManifestSHA256: manifest, HostRole: "server-d", MachineIDSHA256: sha(bytes.TrimSpace(machine)), DockerPath: "/usr/bin/docker", DockerSHA256: sha(dockerProgram), Containers: []stop.Container{original}}
+	descriptorPath := filepath.Join(dir, "approved-services.json")
+	descriptorSHA := nativeJSON(t, descriptorPath, descriptor)
+	input := publicCLIServiceRecoveryInput{descriptorPath, descriptorSHA, dir, fence.WindowBinding{TargetSHA256: fence.MaintenanceWindowTargetSHA256(), SourceSHA: source, OperationID: op, ManifestSHA256: manifest, OriginalRunID: op}}
+	path := filepath.Join(dir, "recovery-input.private.json")
+	nativeJSON(t, path, input)
+	var receipts [2]struct {
+		PID                                      int
+		Stage, WindowStartSHA256, RecoverySHA256 string
+		DropReady                                bool
+	}
+	for i, phase := range []string{"stop", "recover"} {
+		child := exec.CommandContext(ctx, programPath, "-test.run=^TestLifecyclePublicCLINativeCrossProcessServiceRecovery$", "-test.count=1", "-test.timeout=12m")
+		child.Env = append(nativeChildEnv(map[string]string{"QS_LIFECYCLE_PUBLIC_CLI_NATIVE": "1", "QS_LIFECYCLE_PUBLIC_CLI_NATIVE_REQUIRED": "1"}), "QS_PUBLIC_SERVICE_RECOVERY_INPUT="+path, "QS_PUBLIC_SERVICE_RECOVERY_PHASE="+phase)
+		var out, stderr bytes.Buffer
+		child.Stdout, child.Stderr = &out, &stderr
+		if err, reaped := publicCLIRunProcessGroup(child); err != nil || !reaped {
+			category := "unrecognized_child_failure"
+			for _, fixed := range []string{
+				"public_cli_service_recovery_handoff_rejected", "public_cli_service_recovery_actual_approval_rejected",
+				"public_cli_service_recovery_actual_window_rejected", "public_cli_service_recovery_window_close_failed",
+				"public_cli_service_recovery_budget_rejected", "public_cli_service_recovery_original_native_owner_rejected",
+				"public_cli_service_recovery_owner_close_failed", "public_cli_service_recovery_only_guard_failed",
+				"public_cli_service_recovery_actual_restore_failed", "public_cli_service_recovery_window_overclaimed",
+			} {
+				if bytes.Contains(out.Bytes(), []byte(fixed)) {
+					category = fixed
+					break
+				}
+			}
+			t.Logf("public_cli_service_recovery_child_failure_category=%s", category)
+			for _, fixed := range []error{stop.ErrBinding, stop.ErrState, stop.ErrCommand, stop.ErrForced, stop.ErrJournal, stop.ErrRemote} {
+				if bytes.Contains(out.Bytes(), []byte("public_cli_service_recovery_native_error="+fixed.Error())) {
+					t.Logf("public_cli_service_recovery_child_native_error=%s", fixed.Error())
+					break
+				}
+			}
+			t.Logf("public_cli_service_recovery_stage=%s child_started=%t child_reaped=%t child_stdout_sha256=%s child_stderr_sha256=%s", phase, child.Process != nil, reaped, sha(out.Bytes()), sha(stderr.Bytes()))
+			t.Fatal("public_cli_service_recovery_original_child_failed")
+		}
+		var raw struct {
+			PID      int    `json:"pid"`
+			Stage    string `json:"stage"`
+			Start    string `json:"window_start_sha256"`
+			Recovery string `json:"recovery_sha256"`
+			Drop     bool   `json:"drop_ready"`
+		}
+		if publicCLIPrivateJSON(filepath.Join(dir, phase+".receipt.private.json"), &raw) != nil || raw.PID <= 0 || raw.PID != child.Process.Pid || raw.Stage != phase || raw.Drop || !hashPattern.MatchString(raw.Start) {
+			t.Fatal("public_cli_service_recovery_native_child_receipt_rejected")
+		}
+		receipts[i].PID, receipts[i].Stage, receipts[i].WindowStartSHA256, receipts[i].RecoverySHA256, receipts[i].DropReady = raw.PID, raw.Stage, raw.Start, raw.Recovery, raw.Drop
+		observed, observedPID, exit, err := inspect()
+		if err != nil || observed.ID != original.ID || observed.Image != original.Image || (i == 0 && (observed.Running || observedPID != 0 || exit != 0 || observed.StartedAt != original.StartedAt)) || (i == 1 && (!observed.Running || observedPID <= 0 || observed.StartedAt == original.StartedAt)) {
+			t.Fatal("public_cli_service_recovery_actual_runtime_state_mismatch")
+		}
+	}
+	if receipts[0].PID == receipts[1].PID || receipts[0].WindowStartSHA256 != receipts[1].WindowStartSHA256 || receipts[0].RecoverySHA256 != "" || !hashPattern.MatchString(receipts[1].RecoverySHA256) {
+		t.Fatal("public_cli_service_recovery_original_process_budget_binding_failed")
+	}
+	settled = true
+	t.Log("public_cli_service_recovery_cross_process=true original_native_stop_journal=true actual_same_cid_restored=true original_window_retained=true recovery_only=true production_writer_fence=false production_drop=false")
 }

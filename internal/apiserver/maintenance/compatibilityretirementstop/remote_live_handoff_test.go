@@ -242,3 +242,42 @@ func TestRemoteTerminalZeroCannotAdoptAnotherOrOldRuntime(t *testing.T) {
 		}
 	}
 }
+
+func TestRecoveryOwnerCannotAcquireForwardOrImportedManagement(t *testing.T) {
+	for _, l := range []*Lease{nil, {}, {failed: true, recoveryDependentsOnly: true}} {
+		if l != nil {
+			l.self = l
+		}
+		if l.CheckRecoveryStopped(t.Context()) == nil || l.Check(t.Context()) == nil || l.CheckRecoveryStoppedWithInlineAPI(t.Context(), strings.Repeat("1", 64)) == nil {
+			t.Fatal("missing original native owner became a service fence")
+		}
+	}
+	for _, c := range []*RemoteController{{recoveryOnly: true}, {recoveryOnly: true, recoveryChecked: true}, {recoveryOnly: true, stopIssued: true}} {
+		c.self = c
+		for _, action := range []string{"bind", "stop", "controlled_resume", "purge_materials", "restore_dependents", "check_recovery"} {
+			if _, e := c.Do(t.Context(), action); e == nil {
+				t.Fatal("imported management/native signature accepted", action)
+			}
+		}
+	}
+}
+func TestRecoveryDependentCatalogPreservesEveryOriginalDependent(t *testing.T) {
+	d := descriptorFixture()
+	l := &Lease{baseline: d.Containers, recoveryDependentsOnly: true, failed: true}
+	l.self = l
+	actual := []actualContainer{}
+	for _, c := range d.Containers {
+		actual = append(actual, actualContainer{Container: c})
+	}
+	got, want, e := l.recoveryDependentCatalog(actual, nil)
+	if e != nil || len(got) != len(d.Containers)-1 || len(want) != len(got) || !l.failed {
+		t.Fatal("recovery lost original dependencies", e)
+	}
+	duplicate := append(append([]actualContainer(nil), actual...), actual[0])
+	if _, _, e = l.recoveryDependentCatalog(duplicate, nil); e == nil {
+		t.Fatal("duplicate API was hidden")
+	}
+	if _, _, e = l.recoveryDependentCatalog(actual, ErrState); e == nil {
+		t.Fatal("failed catalog became an empty successful scope")
+	}
+}

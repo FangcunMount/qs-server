@@ -259,8 +259,6 @@ jobs:
           MYSQL_ROOT_PASSWORD: root
         ports:
           - 3306:3306
-          # The historical fixture keeps its fixed loopback route.
-          - 34306:3306
         options: >-
           --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -proot"
           --health-interval=5s
@@ -333,7 +331,7 @@ jobs:
           docker run --detach --rm \
             --name qs-runtime-closure-e2e-mongo \
             --publish 27017:27017 \
-            mongo:7.0 --replSet rs0 --bind_ip_all --setParameter ttlMonitorSleepSecs=1
+            mongo:7.0 --replSet rs0 --bind_ip_all --setParameter ttlMonitorSleepSecs=1 --setParameter enableTestCommands=1
           for attempt in $(seq 1 30); do
             if docker exec qs-runtime-closure-e2e-mongo mongosh --quiet --eval 'db.adminCommand({ping: 1})' >/dev/null 2>&1; then
               break
@@ -383,6 +381,169 @@ jobs:
           grep -Eq '^--- PASS: TestOwnedMongoPageSizePreservesSourceAndBothEOF \(' "${RUNNER_TEMP}/qs-inventory-page-size.log"
           if grep -Eq -- '--- SKIP:|--- FAIL:' "${RUNNER_TEMP}/qs-inventory-page-size.log"; then exit 1; fi
 
+      # R4: temporary actual qs-ai runtime fixture; no image push or deploy.
+      - name: Checkout fixed public AI runtime for historical CAS fixture
+        uses: actions/checkout@v6
+        with:
+          repository: FangcunMount/qs-ai
+          ref: 90403f759d1d034c7adfbbdaf5f2bd1803daa931
+          path: .retirement-ai-native-source
+          persist-credentials: false
+      - name: Build actual AI runtime fixture image
+        run: |
+          set -euo pipefail
+          ai_source=90403f759d1d034c7adfbbdaf5f2bd1803daa931
+          test "$(git -C .retirement-ai-native-source rev-parse HEAD)" = "$ai_source"
+          test -z "$(git -C .retirement-ai-native-source status --porcelain=v1)"
+          docker build --platform linux/amd64 --build-arg "RELEASE_SHA=$ai_source" \
+            --label "org.opencontainers.image.revision=$ai_source" \
+            --tag "qs-retirement-ai-native:$ai_source" .retirement-ai-native-source
+          docker pull nsqio/nsq:v1.3.0
+
+      - name: Verify retained historical evidence persistence on real databases
+        env:
+          QS_HISTORY_MYSQL_DSN: root:root@tcp(127.0.0.1:3306)/mysql?parseTime=true&multiStatements=true
+          QS_HISTORY_CI_MYSQL_CONTAINER: ${{ job.services.mysql.id }}
+          QS_HISTORY_REQUIRE_DATABASE: '1'
+          QS_HISTORY_CLI_CI_INTEGRATION: '1'
+          QS_HISTORY_AI_RUNTIME_SOURCE: 90403f759d1d034c7adfbbdaf5f2bd1803daa931
+          QS_HISTORY_AI_SOURCE_DIR: ${{ github.workspace }}/.retirement-ai-native-source
+          MYSQL_HOST: 127.0.0.1
+          MYSQL_PORT: '3306'
+          MYSQL_USERNAME: root
+          MYSQL_PASSWORD: root
+          MONGODB_HOST: 127.0.0.1
+          MONGODB_PORT: '27017'
+          QS_HISTORY_MONGO_REPLICA_SET: rs0
+          QS_SERVER_TEST_MONGO_URI: mongodb://127.0.0.1:27017/?replicaSet=rs0
+          QS_SERVER_TEST_MONGO_DB_PREFIX: qs_history_ci_contract
+          QS_RETIREMENT_REQUIRE_ABORT_NATIVE: '1'
+        run: |
+          set -euo pipefail
+          # Hold the original protected /opt ancestor for the real AI release reader.
+          # Restore only this same observed directory on success or failure.
+          opt_fixture_program='
+          import os,re,stat,sys
+          fd=None
+          try:
+              if os.getuid()!=0 or os.geteuid()!=0:
+                  raise ValueError()
+              fd=os.open("/opt",os.O_RDONLY|os.O_DIRECTORY|os.O_NOFOLLOW)
+              before=os.fstat(fd)
+              if not stat.S_ISDIR(before.st_mode):
+                  raise ValueError()
+              action=sys.argv[1]
+              if action=="observe" and len(sys.argv)==2:
+                  print(f"{before.st_uid} {before.st_gid} {stat.S_IMODE(before.st_mode):04o} {before.st_dev} {before.st_ino}")
+              else:
+                  if len(sys.argv)!=7 or action not in ("protect","restore") or not all(re.fullmatch(r"[0-9]{1,20}",v) for v in (sys.argv[2],sys.argv[3],sys.argv[5],sys.argv[6])) or not re.fullmatch(r"[0-7]{4}",sys.argv[4]):
+                      raise ValueError()
+                  uid,gid,mode,dev,inode=int(sys.argv[2]),int(sys.argv[3]),int(sys.argv[4],8),int(sys.argv[5]),int(sys.argv[6])
+                  if (before.st_dev,before.st_ino)!=(dev,inode):
+                      raise ValueError()
+                  if action=="protect":
+                      if (before.st_uid,before.st_gid,stat.S_IMODE(before.st_mode))!=(uid,gid,mode):
+                          raise ValueError()
+                      expected=(0,0,mode & ~0o022)
+                  else:
+                      expected=(uid,gid,mode)
+                  os.fchown(fd,expected[0],expected[1])
+                  os.fchmod(fd,expected[2])
+                  after=os.fstat(fd)
+                  if (after.st_uid,after.st_gid,stat.S_IMODE(after.st_mode),after.st_dev,after.st_ino)!=(*expected,dev,inode):
+                      raise ValueError()
+                  print(f"ci_fixture_opt_parent_{action} uid={after.st_uid} gid={after.st_gid} mode={stat.S_IMODE(after.st_mode):04o} dev={after.st_dev} inode={after.st_ino}")
+          except (OSError,ValueError,IndexError):
+              print("ci_fixture_opt_parent_operation_rejected",file=sys.stderr)
+              raise SystemExit(1)
+          finally:
+              if fd is not None:
+                  os.close(fd)
+          '
+          opt_state="$(sudo -n /usr/bin/python3 -I -c "$opt_fixture_program" observe)"
+          read -r opt_uid opt_gid opt_mode opt_dev opt_inode <<< "$opt_state"
+          printf 'ci_fixture_opt_parent_original uid=%s gid=%s mode=%s dev=%s inode=%s\n' \
+            "$opt_uid" "$opt_gid" "$opt_mode" "$opt_dev" "$opt_inode"
+          restore_opt_fixture() {
+            opt_exit_status=$?
+            trap - EXIT HUP INT TERM
+            if ! sudo -n /usr/bin/python3 -I -c "$opt_fixture_program" restore \
+              "$opt_uid" "$opt_gid" "$opt_mode" "$opt_dev" "$opt_inode"; then
+              opt_exit_status=1
+            fi
+            exit "$opt_exit_status"
+          }
+          trap restore_opt_fixture EXIT
+          trap 'exit 129' HUP
+          trap 'exit 130' INT
+          trap 'exit 143' TERM
+          sudo -n /usr/bin/python3 -I -c "$opt_fixture_program" protect \
+            "$opt_uid" "$opt_gid" "$opt_mode" "$opt_dev" "$opt_inode"
+          sql_component_log="${RUNNER_TEMP}/qs-historical-component-sql-native.log"
+          owner_fragment_log="${RUNNER_TEMP}/qs-historical-owner-fragments-native.log"
+          cli_input_log="${RUNNER_TEMP}/qs-historical-cli-input-native.log"
+          QS_HISTORY_CI_MONGO_CONTAINER="$(docker --host unix:///var/run/docker.sock inspect --format '{{.Id}}' qs-runtime-closure-e2e-mongo)"
+          QS_HISTORY_GO="$(command -v go)"
+          export QS_HISTORY_CI_MONGO_CONTAINER QS_HISTORY_GO
+          go test -race -tags=integration -count=1 -timeout=10m -v ./cmd/qs-compatibility-history -run '^(TestHistoryCIFixtureRequiresActualJobContainers|TestHistoryCLINativeInitialTwoSnapshotInputRounds|TestHistoryCLINativeQualifiedEvidenceWriteActualExternalAndDualCommitReadback|TestHistoryCLINativeGenuineAIQualificationCannotWriteFromReadonlyComponent|TestHistoryCLINativeFreshComponentMissingAIQualificationRollsBack)$' | tee "$cli_input_log"
+          go test -race -tags=integration -count=1 -timeout=10m -v ./internal/apiserver/infra/mysql/evaluation -run '^TestSQLCASProvenanceNative|^TestSQLHistoricalMissingOriginalRunPolicyNative$|^TestSQLHistoricalOriginalRunGlobalAbsenceNative$|^TestSQLHistoricalComponentNative' | tee "$sql_component_log"
+          go test -race -tags=integration -count=1 -timeout=10m -v ./internal/apiserver/maintenance/compatibilityretirement -run '^(TestHistoricalCASPersistenceNative|TestQualifiedHistoricalCASNative|TestFinalHistoricalEOFNative|TestHistoricalSourceInputNative|TestAIHistoricalInputNative|TestMongoHistoricalComponentNative)|^TestMongoBatchNativeSnapshotInputOwnerFootprintMatchesOriginalFD$|^TestWholeSourceJointNativeOwnerComponentsSplitPageWithoutConsumingTwice$|^TestHistoricalCASSpoolNativeTwoPagesCommitAndFinalRawReadback$|^TestHistoricalCIMySQLFixtureRequiresActualJobService$' | tee "$owner_fragment_log"
+          if grep -Eq -- '--- SKIP:|--- FAIL:|DATA RACE' "$sql_component_log" "$owner_fragment_log" "$cli_input_log"; then
+            echo 'Actual historical owner component proof skipped or failed' >&2
+            exit 1
+          fi
+          for marker in \
+            'TestSQLHistoricalComponentNativeSourceOwnerSelectors' \
+            'TestSQLHistoricalComponentNativeAbsentOwnerSelector' \
+            'TestSQLHistoricalComponentNativeMixedPresentAbsentSelectors' \
+            'TestSQLHistoricalComponentNativeOwnerPlanningRecipes' \
+            'TestSQLHistoricalComponentNativeFreshNegativeClosureAndCrossOrganization' \
+            'TestSQLHistoricalComponentNativeFreshSemanticView' \
+            'TestSQLHistoricalComponentNativeSemanticViewRejectsDatabaseSwitch' \
+            'TestSQLHistoricalComponentNativeBoundedRWCommitReadbackAndRollback' \
+            'TestSQLHistoricalComponentNativeExpiryAndReplayWholePair'; do
+            grep -Eq "^[[:space:]]*--- PASS: ${marker} \\(" "$sql_component_log"
+          done
+          for marker in \
+            'TestHistoricalCASSpoolNativeTwoPagesCommitAndFinalRawReadback' \
+            'TestWholeSourceJointNativeOwnerComponentsSplitPageWithoutConsumingTwice' \
+            'TestWholeSourceJointNativeOwnerComponentsSplitPageWithoutConsumingTwice/two_actual_assessments' \
+            'TestWholeSourceJointNativeOwnerComponentsSplitPageWithoutConsumingTwice/actual_assessment_and_empty_sheet' \
+            'TestHistoricalSourceInputNativeTwoFullDiskEpochsAndSourceDrift' \
+            'TestHistoricalSourceInputNativeBudgetAndOriginalMetadataFailure' \
+            'TestHistoricalSourceInputNativeIndependentUnchangedSnapshotAndReusedUUID' \
+            'TestHistoricalSourceInputNativeOwnerComponentPlanner' \
+            'TestAIHistoricalInputNativeTwoSourceBoundFullDiskEpochs' \
+            'TestMongoBatchNativeSnapshotInputOwnerFootprintMatchesOriginalFD' \
+            'TestMongoHistoricalComponentNativeFreshTransactionsAndServerReread' \
+            'TestMongoHistoricalComponentNativeRejectsNewNegativeRangeDescendant' \
+            'TestMongoHistoricalComponentNativeRejectsChangedRowSnapshotModeAndBudget'; do
+            grep -Eq "^[[:space:]]*--- PASS: ${marker} \\(" "$owner_fragment_log"
+          done
+          for marker in \
+            'TestHistoryCIFixtureRequiresActualJobContainers' \
+            'TestHistoryCLINativeInitialTwoSnapshotInputRounds' \
+            'TestHistoryCLINativeQualifiedEvidenceWriteActualExternalAndDualCommitReadback' \
+            'TestHistoryCLINativeGenuineAIQualificationCannotWriteFromReadonlyComponent' \
+            'TestHistoryCLINativeFreshComponentMissingAIQualificationRollsBack' \
+            'TestHistoryCLINativeInitialTwoSnapshotInputRounds/false' \
+            'TestHistoryCLINativeInitialTwoSnapshotInputRounds/true'; do
+            grep -Eq "^[[:space:]]*--- PASS: ${marker} \\(" "$cli_input_log"
+          done
+          go test -race -tags=integration -count=1 -timeout=10m ./internal/apiserver/maintenance/compatibilityretirementbackup -run '^(TestNonTargetDataNativePagingDriftAndBSONIdentity|TestMongoMetadataSnapshotNative)$'
+          go test -race -tags=integration -count=1 -timeout=2m -v ./cmd/qs-compatibility-retirement -run '^TestComparisonMongoAbortNativeOriginalSessionResponseAndUnknown$' | tee "${RUNNER_TEMP}/qs-comparison-mongo-abort-native.log"
+          if grep -q -- '--- SKIP:' "${RUNNER_TEMP}/qs-comparison-mongo-abort-native.log"; then
+            echo 'Original-session Mongo abort response proof unexpectedly skipped' >&2
+            exit 1
+          fi
+          for marker in \
+            'TestComparisonMongoAbortNativeOriginalSessionResponseAndUnknown' \
+            'TestComparisonMongoAbortNativeOriginalSessionResponseAndUnknown/actual-same-session-success' \
+            'TestComparisonMongoAbortNativeOriginalSessionResponseAndUnknown/canceled-rejected-before-fact' \
+            'TestComparisonMongoAbortNativeOriginalSessionResponseAndUnknown/actual-server-reply-withheld-is-unknown'; do
+            grep -q -- "--- PASS: ${marker}" "${RUNNER_TEMP}/qs-comparison-mongo-abort-native.log"
+          done
+
       - name: Verify window-tool root-once capture, restore and owned-process cancellation
         env:
           MYSQL_CONTAINER: ${{ job.services.mysql.id }}
@@ -400,7 +561,9 @@ jobs:
             -o "$lifecycle_cli" ./cmd/qs-compatibility-retirement
           CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -trimpath -ldflags "-X main.sourceSHA=${GITHUB_SHA}" \
             -o "$lifecycle_other_cli" ./cmd/qs-compatibility-retirement
-          go test -c -tags=integration -o "$lifecycle_test" \
+          CGO_ENABLED=0 go test -c -tags=integration \
+            -ldflags "-X github.com/FangcunMount/qs-server/pkg/version.GitCommit=${GITHUB_SHA}" \
+            -o "$lifecycle_test" \
             ./internal/apiserver/maintenance/compatibilityretirementbackup
           mongo_cid="$(docker --host unix:///run/docker.sock inspect --format '{{.Id}}' qs-runtime-closure-e2e-mongo)"
           # Only this ephemeral CI host receives the protected /opt parent
@@ -524,31 +687,6 @@ jobs:
           go test -race -tags=integration -count=1 -timeout=5m ./internal/apiserver/infra/mysql/evaluation -run '^TestCommittedEvidence'
           go test -race -tags=integration -count=1 -timeout=5m ./internal/apiserver/infra/retrygovernance
           go test -race -tags=integration -count=1 -timeout=5m ./internal/pkg/migration -run '^TestCompatibilityRetirementA'
-
-      - name: Verify retained historical evidence persistence on real databases
-        env:
-          QS_HISTORY_MYSQL_DSN: root:root@tcp(127.0.0.1:34306)/mysql?parseTime=true&multiStatements=true
-          QS_HISTORY_REQUIRE_DATABASE: '1'
-          QS_SERVER_TEST_MONGO_URI: mongodb://127.0.0.1:27017/?replicaSet=rs0
-          QS_SERVER_TEST_MONGO_DB_PREFIX: qs_history_ci_contract
-          QS_RETIREMENT_REQUIRE_ABORT_NATIVE: '1'
-        run: |
-          set -euo pipefail
-          go test -race -tags=integration -count=1 -timeout=10m ./internal/apiserver/infra/mysql/evaluation -run '^TestSQLCASProvenanceNative|^TestSQLHistoricalMissingOriginalRunPolicyNative$|^TestSQLHistoricalOriginalRunGlobalAbsenceNative$'
-          go test -race -tags=integration -count=1 -timeout=10m ./internal/apiserver/maintenance/compatibilityretirement -run '^(TestHistoricalCASPersistenceNative|TestQualifiedHistoricalCASNative|TestFinalHistoricalEOFNative)'
-          go test -race -tags=integration -count=1 -timeout=10m ./internal/apiserver/maintenance/compatibilityretirementbackup -run '^(TestNonTargetDataNativePagingDriftAndBSONIdentity|TestMongoMetadataSnapshotNative)$'
-          go test -race -tags=integration -count=1 -timeout=2m -v ./cmd/qs-compatibility-retirement -run '^TestComparisonMongoAbortNativeOriginalSessionResponseAndUnknown$' | tee "${RUNNER_TEMP}/qs-comparison-mongo-abort-native.log"
-          if grep -q -- '--- SKIP:' "${RUNNER_TEMP}/qs-comparison-mongo-abort-native.log"; then
-            echo 'Original-session Mongo abort response proof unexpectedly skipped' >&2
-            exit 1
-          fi
-          for marker in \
-            'TestComparisonMongoAbortNativeOriginalSessionResponseAndUnknown' \
-            'TestComparisonMongoAbortNativeOriginalSessionResponseAndUnknown/actual-same-session-success' \
-            'TestComparisonMongoAbortNativeOriginalSessionResponseAndUnknown/canceled-rejected-before-fact' \
-            'TestComparisonMongoAbortNativeOriginalSessionResponseAndUnknown/actual-server-reply-withheld-is-unknown'; do
-            grep -q -- "--- PASS: ${marker}" "${RUNNER_TEMP}/qs-comparison-mongo-abort-native.log"
-          done
 
       - name: Run Survey and ModelCatalog Mongo integration contracts
         env:

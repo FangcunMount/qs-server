@@ -1509,13 +1509,36 @@ def inventory_report_diagnostic(args, value):
             fail("report_diagnostic_report_binding_invalid")
     if report["complete"] and (len(seen) != 4 or report["error_category"] != "none" or any(category != "none" for category in categories.values())):
         fail("report_diagnostic_report_binding_invalid")
+    seed = None
+    if report["complete"] and all(item["next_cycle_required"] is False for item in report["targets"]):
+        bindings = {}
+        for database, binding in report["database_bindings"].items():
+            if (any(binding[key] is not True for key in ("metadata_complete", "expected_identity_match", "expected_migration_match"))
+                    or binding["migration_dirty"] is not False or binding["identity_hash"] != request["identity_hashes"][database]
+                    or type(binding["migration_version"]) is not int or binding["migration_version"] != request["expected_migrations"][database]):
+                fail("report_diagnostic_manifest_seed_invalid")
+            bindings[database] = {key: binding[key] for key in ("identity_hash", "migration_version", "migration_dirty", "catalog_hash", "non_target_schema_hash")}
+        validate_approved_namespace_anchor(request, report["database_bindings"]["mongodb"])
+        snapshots = []
+        for target in TARGETS:
+            item = next(item for item in report["targets"] if tuple(item[key] for key in ("database", "name", "kind")) == target)
+            if any(item[key] != item["boundary"][key] for key in ("present", "schema_hash", "identity_hash")):
+                fail("report_diagnostic_manifest_seed_invalid")
+            snapshots.append({key: item[key] for key in ("database", "name", "kind", "identity_hash", "schema_hash", "data_hash", "records")})
+        # Pure installation input from the original report; no history, backup,
+        # fence, execution or DROP capability is created by this projection.
+        seed = {"format_version": 1, "operation_id": report["operation_id"], "source_sha": report["source_sha"],
+                "target_hash": report["target_hash"], "database_bindings": bindings, "targets": snapshots,
+                "evidence": {}, "maintenance": {"max_seconds": MAX_WINDOW_SECONDS, "forward_stop_seconds": FORWARD_STOP_SECONDS,
+                                                "rollback_seconds": MAX_WINDOW_SECONDS - FORWARD_STOP_SECONDS}}
+        validate_manifest(seed, report["operation_id"], report["source_sha"])
     # Recheck protected original files before publishing only fixed categories.
     # Reading a report cannot prove that its source assets or history passed.
     operation_directory(args.root, args.operation_id)
     private_directory(output)
     read_private(directory, "inventory-request.json", reference["request_sha256"])
     read_private(output, "inventory.private.json", reference["sha256"])
-    return {"format_version": 1, "operation": "prepare", "prepare_mode": "report-diagnostic",
+    receipt = {"format_version": 1, "operation": "prepare", "prepare_mode": "report-diagnostic",
             "source_sha": args.actual_source_sha, "run_id": args.run_id, "operation_id": args.operation_id,
             "target_hash": TARGET_HASH, "target_count": 4, "complete": False, "execution_allowed": False,
             "diagnostic_only": True, "drop_ready": False, "report_diagnostic_complete": True,
@@ -1524,6 +1547,9 @@ def inventory_report_diagnostic(args, value):
             "inventory_private_report_hash": report_hash, "inventory_request_hash": reference["request_sha256"],
             "inventory_database_error_categories": categories,
             "error_category": "existing_report_diagnostic_only", "capabilities": {key: False for key in CAPABILITIES}}
+    if seed is not None:
+        receipt["inventory_manifest_seed"] = seed
+    return receipt
 
 
 # Two fixed failed, already terminal producers only. This is temporary-file disposition,
@@ -2081,8 +2107,28 @@ def fixed_host_entry_program(operation, source, native_hashes):
     return (FIXED_HOST_ENTRY_GATE.replace('@POLICY@',repr(policy)).replace('@PROGRAM@',repr(ROOT_PREPARE_ONCE))).encode()
 
 
-def installed_fixed_host_entry():
-    expected=os.environ.get('RETIREMENT_FIXED_HOST_ENTRY_SHA256','')
+
+def fixed_prepare_entry_program(operation, source, native_hashes, wrapper_hash, manifest_hash):
+    """One installed, no-argument entry for the three original prepare modes."""
+    token(wrapper_hash, HASH); token(manifest_hash, HASH)
+    program = fixed_host_entry_program(operation, source, native_hashes).decode()
+    program = program.replace("'native_sha256': " + repr(native_hashes), "'native_sha256': " + repr(native_hashes) + ", 'wrapper_sha256': " + repr(wrapper_hash))
+    program = program.replace("raw=sys.stdin.buffer.read(4097)", "raw=sys.stdin.buffer.read(32769)").replace("len(raw)>4096", "len(raw)>32768")
+    program = program.replace("{'operation_id','run_id','source_sha','request_sha256','package_sha256'}", "{'operation_id','run_id','source_sha','request_sha256','package_sha256','stage','manifest_sha256','credentials'}")
+    program = program.replace("for v in request.values()", "for k,v in request.items() if k!='credentials'")
+    program = program.replace("arch={'x86_64'", "if request['stage'] not in ('lifecycle','prepare-facts','db-writer-census'): reject()\n    if type(request['credentials']) is not dict: reject()\n    if (request['stage']=='lifecycle' and not re.fullmatch(r'[0-9a-f]{64}',request['manifest_sha256'])) or (request['stage']!='lifecycle' and request['manifest_sha256']!=''): reject()\n    arch={'x86_64'")
+    program = program.replace("member.size<=64<<20", "member.size<=(200<<20 if request['stage']=='prepare-facts' and member.name=='preload-image.tar.gz' else 64<<20)")
+    program = program.replace("names=set(); matched=False", "names=set(); matched=False; wrapper_matched=False")
+    program = program.replace("if member.name=='inventory-linux-'+arch:", "if member.name=='compatibility-window-tool.py':\n                    wrapper=tar.extractfile(member).read((1<<20)+1)\n                    if len(wrapper)>1<<20 or hashlib.sha256(wrapper).hexdigest()!=POLICY['wrapper_sha256']: reject()\n                    wrapper_matched=True\n                if member.name=='inventory-linux-'+arch:")
+    program = program.replace("if not matched: reject()", "if not matched or (request['stage']=='prepare-facts' and not wrapper_matched): reject()")
+    program = program.replace("request['package_sha256'],'','sudo-user','host-writer-scope']", "request['package_sha256'],request['manifest_sha256'],'sudo-user']\n    if request['stage']!='lifecycle': sys.argv.append(request['stage'])")
+    program = program.replace("io.BytesIO(b'{}')", "io.BytesIO(json.dumps(request['credentials'],separators=(',',':')).encode())")
+    program = program.replace("request['stage']=='lifecycle' and not re.fullmatch(r'[0-9a-f]{64}',request['manifest_sha256'])","request['stage']=='lifecycle' and request['manifest_sha256']!="+repr(manifest_hash))
+    return program.encode()
+
+
+def installed_fixed_host_entry(variable="RETIREMENT_FIXED_HOST_ENTRY_SHA256"):
+    expected=os.environ.get(variable,'')
     if not isinstance(expected,str) or HASH.fullmatch(expected) is None:
         fail('fixed_host_entry_installation_required')
     path=FIXED_HOST_ENTRY_BASE/(expected+'.py')
@@ -2131,6 +2177,10 @@ def root_once_lifecycle_prepare(args):
                 fixed=installed_fixed_host_entry()
                 request={'operation_id':args.operation_id,'run_id':args.run_id,'source_sha':args.actual_source_sha,'request_sha256':request_hash,'package_sha256':package_hash}
                 result=subprocess.run(['/usr/bin/sudo','-n','--','/usr/bin/python3','-I',str(fixed)],env={'PATH':'/usr/bin:/bin'},input=canonical_bytes(request),stdout=subprocess.PIPE,stderr=private_stderr,timeout=3*60,check=False)
+            elif os.environ.get('RETIREMENT_FIXED_PREPARE_ENTRY_SHA256'):
+                fixed=installed_fixed_host_entry('RETIREMENT_FIXED_PREPARE_ENTRY_SHA256')
+                request={'operation_id':args.operation_id,'run_id':args.run_id,'source_sha':args.actual_source_sha,'request_sha256':request_hash,'package_sha256':package_hash,'stage':args.prepare_mode,'manifest_sha256':args.manifest_hash,'credentials':json.loads(packet)}
+                result=subprocess.run(['/usr/bin/sudo','-n','--','/usr/bin/python3','-I',str(fixed)],env={'PATH':'/usr/bin:/bin'},input=canonical_bytes(request),stdout=subprocess.PIPE,stderr=private_stderr,timeout=3*60 if args.prepare_mode=='db-writer-census' else 91*60,check=False)
             else:
                 with root_askpass_environment() as environment:
                     if environment is not None:
@@ -2702,6 +2752,12 @@ def main(argv=None):
               "report_diagnostic_complete": "bool", "report_diagnostic_approval_sha256": "hash64",
               "observed_boundary_report": {"run_id": "run_id", "source_sha": "sha40", "sha256": "hash64", "request_sha256": "hash64"},
               "observed_inventory_report": {"run_id": "run_id", "source_sha": "sha40", "sha256": "hash64", "request_sha256": "hash64"},
+              "inventory_manifest_seed": {"format_version": "uint", "operation_id": "run_id", "source_sha": "sha40", "target_hash": "hash64",
+                  "database_bindings": {database: {"identity_hash": "hash64", "migration_version": "uint", "migration_dirty": "bool",
+                      "catalog_hash": "hash64", "non_target_schema_hash": "hash64"} for database in ("mysql", "mongodb")},
+                  "targets": [{"database": frozenset({"mysql", "mongodb"}), "name": frozenset(target[1] for target in TARGETS),
+                      "kind": frozenset({"base_table", "collection"}), "identity_hash": "hash64", "schema_hash": "hash64", "data_hash": "hash64", "records": "uint"}],
+                  "evidence": {}, "maintenance": {"max_seconds": "uint", "forward_stop_seconds": "uint", "rollback_seconds": "uint"}},
               "inventory_request_hash": "hash64",
               "boundary_discovery_complete": "bool", "boundary_private_report_hash": "hash64", "boundary_request_hash": "hash64",
               "inventory_next_cycle_required": "bool", "inventory_boundary_report_hash": "nullable_hash64", "inventory_two_equal_scans": "bool",

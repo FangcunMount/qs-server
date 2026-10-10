@@ -188,7 +188,11 @@ func serveRemoteHostSession(ctx context.Context, a *Approval, journalDir string,
 			if l == nil {
 				return ErrCommand
 			}
-			e = l.Check(ctx)
+			if recoveryOnly {
+				e = l.CheckRecoveryStopped(ctx)
+			} else {
+				e = l.Check(ctx)
+			}
 		case "observe_db_principals":
 			if l == nil {
 				return ErrCommand

@@ -161,91 +161,15 @@ func PrepareMongoHistoricalOwnerBatch(ctx context.Context, global *MongoResponsi
 	if err := sql.ValidateBorrowedSnapshot(ctx); err != nil {
 		return nil, err
 	}
-	b := &MongoHistoricalOwnerBatch{global: global, sql: sql, limits: limits, sources: map[verifiedSourceKey]*DecodedSourceEvent{}, sourceFactsSHA: map[verifiedSourceKey][32]byte{}, sqlOwners: map[verifiedSourceKey]*sqlevaluation.SQLHistoricalBatchOwnerFacts{}, sqlAbsent: map[verifiedSourceKey]bool{}, data: map[string][]bson.Raw{}, indexes: map[string]map[string]map[uint64][]bson.Raw{}, seen: map[string]map[string]bson.Raw{}, started: time.Now(), sqlConnection: tx.Statement.ConnPool}
-	b.selection = mongoBatchSelection{map[uint64]bool{}, map[uint64]bool{}, map[uint64]bool{}, map[uint64]bool{}, map[uint64]bool{}}
+	b := &MongoHistoricalOwnerBatch{global: global, sql: sql, limits: limits, data: map[string][]bson.Raw{}, indexes: map[string]map[string]map[uint64][]bson.Raw{}, seen: map[string]map[string]bson.Raw{}, started: time.Now(), sqlConnection: tx.Statement.ConnPool}
 	b.sourceHandles = append([]*VerifiedSourceEvent(nil), sources...)
 	b.report = MongoHistoricalOwnerBatchReport{Protocol: "mongo-business-owner-batch/v1", DatabaseIdentitySHA256: global.report.IdentitySHA256, GlobalSnapshotSHA256: global.report.SnapshotSHA256, SQLBusinessRowsSHA256: sql.Report().BusinessRowsSHA256, SourceCopyFactsBound: true, ExternalOriginAuthenticationRequired: true, SQLAIInboxCoverageRequired: true, OriginalBusinessFactsRequired: true, WriterFenceRequired: true, CASRequired: true}
-	for _, handle := range sources {
-		facts, err := handle.Facts()
-		if err != nil {
-			return nil, err
-		}
-		key, err := sourceAuthKey(facts.Source.Database, facts.Source.Object, facts.Source.PrimaryKeySHA256)
-		if err != nil {
-			return nil, err
-		}
-		if b.sources[key] != nil {
-			return nil, ErrMongoBatchInvalid
-		}
-		digest, err := privateFactsSHA(facts)
-		if err != nil {
-			return nil, err
-		}
-		b.sourceFactsSHA[key] = digest
-		var owner *sqlevaluation.SQLHistoricalBatchOwnerFacts
-		switch facts.EventType {
-		case "answersheet.submitted":
-			checked, e := copyMongoSource(facts)
-			if e != nil {
-				return nil, e
-			}
-			facts = checked
-			id, _ := mongoCycleStringID(facts.Submitted.AnswerSheetID)
-			b.selection.sheets[id] = true
-			owner, err = sql.OwnerByAnswerSheet(id)
-			if errors.Is(err, sqlevaluation.ErrSQLHistoricalOwnerAbsent) {
-				b.sqlAbsent[key] = true
-				err = nil
-			}
-		case "interpretation.report.generated":
-			checked, e := copyMongoSource(facts)
-			if e != nil {
-				return nil, e
-			}
-			facts = checked
-			id, _ := mongoCycleStringID(facts.Generated.AssessmentID)
-			owner, err = sql.OwnerByAssessment(id)
-			for _, v := range []struct {
-				text   string
-				target map[uint64]bool
-			}{{facts.Generated.GenerationID, b.selection.generations}, {facts.Generated.OutcomeID, b.selection.outcomes}, {facts.Generated.ReportID, b.selection.artifacts}, {facts.Generated.RunID, b.selection.runs}} {
-				n, e := mongoCycleStringID(v.text)
-				if e != nil {
-					return nil, e
-				}
-				v.target[n] = true
-			}
-		case "evaluation.requested", "evaluation.retry.requested", "evaluation.outcome.committed", "evaluation.failed":
-			id, e := sqlSourceAssessment(facts)
-			if e != nil {
-				return nil, e
-			}
-			owner, err = sql.OwnerByAssessment(id)
-		default:
-			return nil, ErrSourceEventType
-		}
-		if err != nil {
-			return nil, err
-		}
-		if owner != nil {
-			actual := owner.Snapshot()
-			if actual.Owner.OrgID != facts.OrgID {
-				return nil, ErrSourceOrganization
-			}
-			if actual.Owner.AnswerSheetID != 0 {
-				b.selection.sheets[actual.Owner.AnswerSheetID] = true
-			}
-			for _, outcome := range actual.Outcomes {
-				if outcome.AssessmentID != actual.Owner.AssessmentID || outcome.OrgID != facts.OrgID || outcome.ID == 0 {
-					return nil, ErrMongoBatchConflict
-				}
-				b.selection.outcomes[outcome.ID] = true
-			}
-			b.sqlOwners[key] = owner
-		}
-		b.sources[key] = facts
-		b.report.Sources++
+	selection, err := selectMongoOwnerSources(sql, sources)
+	if err != nil {
+		return nil, err
 	}
+	b.sources, b.sourceFactsSHA, b.sqlOwners, b.sqlAbsent, b.selection = selection.sources, selection.sourceFactsSHA, selection.sqlOwners, selection.sqlAbsent, selection.selection
+	b.report.Sources = uint64(len(selection.sources))
 	if err := b.capture(ctx); err != nil {
 		return nil, err
 	}
@@ -494,4 +418,99 @@ func mongoBatchIDs(set map[uint64]bool) []uint64 {
 }
 func viewForMongoBatchError() MongoSourceResponsibilityView {
 	return MongoSourceResponsibilityView{SourceAuthenticationRequired: true, OriginalBusinessFactsRequired: true, SQLAIInboxCoverageRequired: true, WriterFenceRequired: true, CASRequired: true}
+}
+
+type mongoOwnerSourceSelection struct {
+	sources        map[verifiedSourceKey]*DecodedSourceEvent
+	sourceFactsSHA map[verifiedSourceKey][32]byte
+	sqlOwners      map[verifiedSourceKey]*sqlevaluation.SQLHistoricalBatchOwnerFacts
+	sqlAbsent      map[verifiedSourceKey]bool
+	selection      mongoBatchSelection
+}
+
+// Source selectors and real SQL ownership are identical for transaction and
+// snapshot-input readers. This helper grants no Mongo capability.
+func selectMongoOwnerSources(sql *sqlevaluation.SQLHistoricalOwnerBatch, sources []*VerifiedSourceEvent) (*mongoOwnerSourceSelection, error) {
+	selection := &mongoOwnerSourceSelection{sources: map[verifiedSourceKey]*DecodedSourceEvent{}, sourceFactsSHA: map[verifiedSourceKey][32]byte{}, sqlOwners: map[verifiedSourceKey]*sqlevaluation.SQLHistoricalBatchOwnerFacts{}, sqlAbsent: map[verifiedSourceKey]bool{}, selection: mongoBatchSelection{map[uint64]bool{}, map[uint64]bool{}, map[uint64]bool{}, map[uint64]bool{}, map[uint64]bool{}}}
+	for _, handle := range sources {
+		facts, err := handle.Facts()
+		if err != nil {
+			return nil, err
+		}
+		key, err := sourceAuthKey(facts.Source.Database, facts.Source.Object, facts.Source.PrimaryKeySHA256)
+		if err != nil {
+			return nil, err
+		}
+		if selection.sources[key] != nil {
+			return nil, ErrMongoBatchInvalid
+		}
+		digest, err := privateFactsSHA(facts)
+		if err != nil {
+			return nil, err
+		}
+		selection.sourceFactsSHA[key] = digest
+		var owner *sqlevaluation.SQLHistoricalBatchOwnerFacts
+		switch facts.EventType {
+		case "answersheet.submitted":
+			checked, e := copyMongoSource(facts)
+			if e != nil {
+				return nil, e
+			}
+			facts = checked
+			id, _ := mongoCycleStringID(facts.Submitted.AnswerSheetID)
+			selection.selection.sheets[id] = true
+			owner, err = sql.OwnerByAnswerSheet(id)
+			if errors.Is(err, sqlevaluation.ErrSQLHistoricalOwnerAbsent) {
+				selection.sqlAbsent[key] = true
+				err = nil
+			}
+		case "interpretation.report.generated":
+			checked, e := copyMongoSource(facts)
+			if e != nil {
+				return nil, e
+			}
+			facts = checked
+			id, _ := mongoCycleStringID(facts.Generated.AssessmentID)
+			owner, err = sql.OwnerByAssessment(id)
+			for _, v := range []struct {
+				text   string
+				target map[uint64]bool
+			}{{facts.Generated.GenerationID, selection.selection.generations}, {facts.Generated.OutcomeID, selection.selection.outcomes}, {facts.Generated.ReportID, selection.selection.artifacts}, {facts.Generated.RunID, selection.selection.runs}} {
+				n, e := mongoCycleStringID(v.text)
+				if e != nil {
+					return nil, e
+				}
+				v.target[n] = true
+			}
+		case "evaluation.requested", "evaluation.retry.requested", "evaluation.outcome.committed", "evaluation.failed":
+			id, e := sqlSourceAssessment(facts)
+			if e != nil {
+				return nil, e
+			}
+			owner, err = sql.OwnerByAssessment(id)
+		default:
+			return nil, ErrSourceEventType
+		}
+		if err != nil {
+			return nil, err
+		}
+		if owner != nil {
+			actual := owner.Snapshot()
+			if actual.Owner.OrgID != facts.OrgID {
+				return nil, ErrSourceOrganization
+			}
+			if actual.Owner.AnswerSheetID != 0 {
+				selection.selection.sheets[actual.Owner.AnswerSheetID] = true
+			}
+			for _, outcome := range actual.Outcomes {
+				if outcome.AssessmentID != actual.Owner.AssessmentID || outcome.OrgID != facts.OrgID || outcome.ID == 0 {
+					return nil, ErrMongoBatchConflict
+				}
+				selection.selection.outcomes[outcome.ID] = true
+			}
+			selection.sqlOwners[key] = owner
+		}
+		selection.sources[key] = facts
+	}
+	return selection, nil
 }

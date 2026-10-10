@@ -216,6 +216,42 @@ func (h *lifecycleFixedHost) OpenServiceManagement(ctx context.Context, r lifecy
 	if h == nil || h.services != nil {
 		return lifecycleError("lifecycle_service_controller_binding_rejected")
 	}
+	d, err := w.Diagnostic(ctx)
+	if err != nil || d.Binding != lifecycleWindowBinding(r) {
+		return lifecycleError("lifecycle_service_controller_binding_rejected")
+	}
+	if d.RecoverySHA256 != "" {
+		if r.Resume == nil || h.api != nil || h.aiStopped != nil || h.dbWriters != nil {
+			return lifecycleError("lifecycle_original_recovery_owner_missing")
+		}
+		h.api, err = reopenLifecycleAPITransition(ctx, r)
+		if err != nil {
+			return err
+		}
+		if err = h.api.stopBForRecovery(ctx, r); err != nil {
+			return err
+		}
+		apiID := h.api.approved.ID
+		if h.api.bCID != "" {
+			apiID = h.api.bCID
+		} else if h.api.removedOriginal {
+			apiID = ""
+		}
+		v, e := openLifecycleServiceController(ctx, r, w, true, apiID)
+		if e != nil {
+			return e
+		}
+		h.services = v
+		external, e := lifecycleFinalExternalInput(r)
+		if e != nil || external == nil || r.FinalHistory == nil || r.FinalHistory.StopConstraints == nil {
+			return lifecycleError("lifecycle_ai_actual_stop_constraints_missing")
+		}
+		h.aiStopped, e = retirement.OpenAIStoppedRuntimeRecovery(ctx, *external, *r.FinalHistory.StopConstraints, w)
+		if e != nil {
+			return e
+		}
+		return h.reopenDatabaseWriterLease(ctx, r)
+	}
 	v, err := openLifecycleServiceController(ctx, r, w, false)
 	if err != nil {
 		return err
@@ -380,6 +416,9 @@ func (h *lifecycleFixedHost) RestoreRollbackEntrypoints(ctx context.Context, r l
 	// no-migration rollback. Preserve any native partial stop lease, issuer and
 	// original Window and the same existing remote transport.
 	if h.services != nil {
+		if h.services.reopenedRecovery {
+			return errors.Join(h.services.RestoreDependents(ctx), h.restoreAI(ctx))
+		}
 		if err := h.services.UseOriginalRecoverySession(ctx, r, w); err != nil {
 			return errors.Join(err, h.restoreAI(ctx))
 		}

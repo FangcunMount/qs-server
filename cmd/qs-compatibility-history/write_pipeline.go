@@ -18,6 +18,7 @@ import (
 	sqlevaluation "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/evaluation"
 	retirement "github.com/FangcunMount/qs-server/internal/apiserver/maintenance/compatibilityretirement"
 	hostmysql "github.com/FangcunMount/qs-server/internal/pkg/database/mysql"
+	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"go.mongodb.org/mongo-driver/mongo/readconcern"
@@ -29,15 +30,6 @@ import (
 // event/old-command evidence persistence,
 // not a production authority. Actual external facts are obtained only by the
 // fixed producer; current mapped pending/provider work is never completed here.
-type preparedWriteEpoch struct {
-	facts       *epochResult
-	coordinator *retirement.HistoricalCoordinator
-	index       *retirement.WholeSourceJointIndex
-	catalog     *retirement.SQLCrossStoreResponsibilityCatalog
-	global      *retirement.MongoResponsibilitySnapshot
-	anchors     []*retirement.WholeSourceJointReplayAnchor
-	aiBatch     *retirement.AICommandPersistenceBatch
-}
 type preparedWriteDiagnostic struct {
 	Protocol, SourceSHA, OperationID, RunID, CommitState, MongoCommitRequirement                                                   string
 	AIOriginalCommands, AISourceReferences                                                                                         uint64
@@ -204,10 +196,39 @@ func historyMaterialSame(a, b os.FileInfo) bool {
 // The exact names come from original create calls/sequence, never directory
 // adoption. This descriptor is private metadata, not a retirement capability.
 func (j *historyWriteJournal) snapshotMaterials(ctx context.Context) (string, error) {
-	if ctx == nil || ctx.Err() != nil || !j.valid() || j.sequence > 1<<20 || len(j.created) != int(j.sequence)+2 {
+	if ctx == nil || ctx.Err() != nil || !j.valid() || j.sequence > 1<<20 {
 		return "", fixedError("history_write_material_binding_rejected")
 	}
-	names := []string{"prepared-mongo-private.bin", "prepared-sql-private.bin"}
+	var names []string
+	version := 1
+	inputNames := historyInitialInputNames()
+	for _, name := range inputNames {
+		if j.created[name] != nil {
+			names = append(names, inputNames[:]...)
+			break
+		}
+	}
+	if len(names) != 0 || j.created[historyInputOwnerSQLName] != nil {
+		if len(names) != len(inputNames) || j.created[historyInputOwnerSQLName] == nil || j.created["prepared-mongo-private.bin"] != nil || j.created["prepared-sql-private.bin"] != nil {
+			return "", fixedError("history_write_material_binding_rejected")
+		}
+		names = append(names, historyInputOwnerSQLName)
+		version = 2
+	} else {
+		if j.created["prepared-mongo-private.bin"] == nil || j.created["prepared-sql-private.bin"] == nil {
+			return "", fixedError("history_write_material_binding_rejected")
+		}
+		names = []string{"prepared-mongo-private.bin", "prepared-sql-private.bin"}
+	}
+	for _, name := range names {
+		if j.created[name] == nil {
+			return "", fixedError("history_write_material_binding_rejected")
+		}
+	}
+	largeFiles := len(names)
+	if largeFiles == 0 || len(j.created) != largeFiles+int(j.sequence) {
+		return "", fixedError("history_write_material_binding_rejected")
+	}
 	for n := uint64(1); n <= j.sequence; n++ {
 		names = append(names, "journal-"+strconv.FormatUint(n, 10)+".json")
 	}
@@ -220,7 +241,7 @@ func (j *historyWriteJournal) snapshotMaterials(ctx context.Context) (string, er
 			return "", fixedError("history_write_material_binding_rejected")
 		}
 	}
-	m := historyTemporaryMaterialManifest{Version: 1, SourceSHA: j.binding.SourceSHA, ToolSourceSHA: sourceSHA, OperationID: j.binding.OperationID, RunID: j.run, MaxSpoolBytes: 16 << 30, JournalSequence: j.sequence}
+	m := historyTemporaryMaterialManifest{Version: version, SourceSHA: j.binding.SourceSHA, ToolSourceSHA: sourceSHA, OperationID: j.binding.OperationID, RunID: j.run, MaxSpoolBytes: 16 << 30, JournalSequence: j.sequence}
 	for index, name := range names {
 		if ctx.Err() != nil || !j.valid() {
 			return "", fixedError("history_write_material_binding_rejected")
@@ -234,7 +255,7 @@ func (j *historyWriteJournal) snapshotMaterials(ctx context.Context) (string, er
 		named, ne := os.Lstat(filepath.Join(j.path, name))
 		original := j.created[name]
 		limit := int64(64 << 10)
-		if index < 2 {
+		if index < largeFiles {
 			limit = 16 << 30
 		}
 		if be != nil || ne != nil || original == nil || !os.SameFile(original, before) || !aiHostRegular(before, uint64(limit)) || !historyMaterialSame(before, named) {
@@ -278,7 +299,7 @@ func (j *historyWriteJournal) record(ctx context.Context, stage string, position
 		return fixedError("history_write_journal_unknown")
 	}
 	switch stage {
-	case "prepared", "write_epoch_started", "page_statement_applied", "all_statements_applied", "sql_commit_intent", "sql_commit_success", "sql_commit_unknown", "actual_origin_readback_matched", "mongo_commit_not_required", "mongo_commit_intent", "mongo_commit_success", "mongo_commit_unknown", "mongo_abort_failed", "sql_rollback_failed", "fresh_page_verified", "limited_event_readback_finished", "ai_statements_applied", "ai_independent_readback_finished":
+	case "initial_input_epoch_frozen", "initial_inputs_matched", "prepared", "write_epoch_started", "page_statement_applied", "all_statements_applied", "sql_commit_intent", "sql_commit_success", "sql_commit_unknown", "actual_origin_readback_matched", "mongo_commit_not_required", "mongo_commit_intent", "mongo_commit_success", "mongo_commit_unknown", "mongo_abort_failed", "sql_rollback_failed", "fresh_page_verified", "limited_event_readback_finished", "ai_statements_applied", "ai_independent_readback_finished":
 	default:
 		return fixedError("history_write_journal_unknown")
 	}
@@ -303,253 +324,19 @@ func (j *historyWriteJournal) record(ctx context.Context, stage string, position
 	return nil
 }
 
-func buildPreparedWriteEpoch(ctx context.Context, a *approvedInputs, d *historyDatabase, external ...retirement.AIExternalExecutionInput) (*preparedWriteEpoch, error) {
-	if a == nil || d == nil || len(external) > 1 {
-		return nil, fixedError("history_pipeline_input_rejected")
-	}
-	if a.verifyFullFiles(ctx) != nil {
-		return nil, fixedError("history_asset_hash_changed")
-	}
-	// A page must leave room for all related original sources of its owners.
-	// WholeJoint enforces the exact union and fails closed above its hard cap;
-	// this is not a proof of production owner width, transaction TTL or RSS.
-	coordinatorLimits := retirement.DefaultHistoricalCoordinatorLimits()
-	coordinatorLimits.MaxPageRecords = 16
-	c, err := retirement.PrepareHistoricalCoordinator(ctx, retirement.HistoricalCoordinatorBinding{SourceSHA: a.request.SourceSHA, OperationID: a.request.OperationID}, a.copies(), coordinatorLimits)
-	if err != nil {
-		return nil, fixedError("history_source_authentication_failed")
-	}
-	if a.rewind() != nil {
-		return nil, fixedError("history_asset_read_failed")
-	}
-	binding, err := c.BindOriginCopies(ctx, a.originCopies(), retirement.DefaultSourceOriginLimits())
-	if err != nil {
-		return nil, fixedError("history_source_origin_binding_failed")
-	}
-	if a.rewind() != nil {
-		return nil, fixedError("history_asset_read_failed")
-	}
-	jointLimits := retirement.DefaultWholeSourceJointLimits()
-	jointLimits.MaxRelatedSources = 512
-	index, err := c.PrepareWholeSourceJointIndex(ctx, a.jointCopies(), jointLimits)
-	if err != nil {
-		return nil, fixedError("history_complete_source_index_failed")
-	}
-	current, err := retirement.PrepareSQLResponsibilitySnapshot(ctx, a.inventory.Identities["mysql"], sqlevaluation.DefaultSQLResponsibilityLimits())
-	if err != nil {
-		return nil, fixedError("history_global_sql_scan_failed")
-	}
-	mongoLimits := retirement.MongoResponsibilityLimits{PageRows: 512, MaxRows: 2_000_000, MaxBytes: 8 << 30, MaxPages: 2_000_000, MaxGraphEntries: 4_000_000, MaxGraphBytes: 1 << 30, MaxDuration: 5 * time.Minute}
-	global, err := retirement.PrepareMongoResponsibilitySnapshot(ctx, d.mongo, d.mongoConfig, mongoLimits)
-	if err != nil {
-		return nil, fixedError("history_global_mongo_scan_failed")
-	}
-	sqlReport, mongoReport := current.Report(), global.Report()
-	if len(sqlReport.Ledgers) != 8 || !sqlReport.ActualTransactionReadOnlyRR || sqlReport.CompletedAt.IsZero() || len(mongoReport.Collections) != 11 || !mongoReport.Complete {
-		return nil, fixedError("history_global_coverage_incomplete")
-	}
-	if a.rewind() != nil {
-		return nil, fixedError("history_asset_read_failed")
-	}
-	origin, err := retirement.PrepareSourceOriginSnapshotEpoch(ctx, binding, current, global, a.readers())
-	if err != nil {
-		return nil, fixedError("history_actual_source_origin_failed")
-	}
-	if a.rewind() != nil {
-		return nil, fixedError("history_asset_read_failed")
-	}
-	catalog, err := retirement.PrepareSQLCrossStoreResponsibilityCatalog(ctx, current, sqlevaluation.DefaultSQLCrossStoreLimits())
-	if err != nil {
-		return nil, fixedError("history_sql_cross_store_catalog_failed")
-	}
-	// Re-read exact authenticated AI copies to EOF and bind their actual point
-	// graph to this same host-owned RR-RO SQL epoch. Lifecycle remains here.
-	if a.rewind() != nil {
-		return nil, fixedError("history_asset_read_failed")
-	}
-	aiCopies := a.copies()
-	aiReadonly, err := c.PrepareAIReadOnlyResolver(ctx, current, a.inventory.Migrations["mysql"], aiCopies[1:3])
-	if err != nil {
-		return nil, fixedError("history_ai_readonly_resolver_failed")
-	}
-	if a.rewind() != nil {
-		return nil, fixedError("history_asset_read_failed")
-	}
-	// The point graph alone cannot see unreferenced current MQ/inbox/orphans.
-	// Scan the exact complete physical 14-table layout in this same SQL8 RRRO
-	// epoch, then independently re-read all four authenticated source copies.
-	aiReverse, err := retirement.PrepareAIReverseSnapshot(ctx, current, a.inventory.Migrations["mysql"], retirement.DefaultAIReverseLimits())
-	if err != nil {
-		return nil, fixedError("history_ai_reverse_scan_failed")
-	}
-	if a.rewind() != nil {
-		return nil, fixedError("history_asset_read_failed")
-	}
-	if c.BindAIReverseSourceScope(ctx, aiReverse, a.copies()) != nil {
-		return nil, fixedError("history_ai_reverse_source_scope_failed")
-	}
-	aiReverseFacts, err := stableAIReverseObservation(aiReverse.Summary())
-	if err != nil || aiReverseFacts.IdentitySHA256 != sqlReport.DatabaseIdentitySHA256 {
-		return nil, fixedError("history_ai_reverse_coverage_incomplete")
-	}
-	if a.rewind() != nil {
-		return nil, fixedError("history_asset_read_failed")
-	}
-
-	var externalQualification *retirement.AIExternalExecutionQualification
-	var aiPages []*retirement.AIExternalPageQualification
-	if aiCopies[1].Expected.Records+aiCopies[2].Expected.Records > 0 {
-		if len(external) != 1 {
-			return nil, fixedError("history_ai_external_execution_input_required")
-		}
-		input := external[0]
-		canonicalRun, runErr := aiHostRun(a.request.RunID)
-		if runErr != nil || input.RunID != canonicalRun {
-			return nil, fixedError("history_ai_external_execution_input_required")
-		}
-		if retirement.RequireAIExternalExecQuiescence(ctx, retirement.AIExternalExecQuiescenceInput{OperationDirectory: input.OperationDirectory, SourceSHA: a.request.SourceSHA, OperationID: a.request.OperationID, RuntimeSourceSHA: input.RuntimeSourceSHA, ImageID: input.ImageID, ContainerID: input.ContainerID, SudoDocker: input.SudoDocker}) != nil {
-			return nil, fixedError("history_ai_external_exec_quiescence_unproven")
-		}
-		externalQualification, err = c.PrepareAIExternalExecution(ctx, aiReadonly, aiReverse, input)
-		if err != nil {
-			return nil, fixedError("history_ai_external_execution_failed")
-		}
-		if a.rewind() != nil {
-			return nil, fixedError("history_asset_read_failed")
-		}
-	}
-	w := &preparedWriteEpoch{coordinator: c, index: index, catalog: catalog, global: global}
-	e := &epochResult{origin: origin, sql: current, mongo: global, aiFacts: aiReadonly.Summary(), aiReverseFacts: aiReverseFacts, aiReverse: aiReverse, aiReverseCoordinator: c, reasons: map[string]uint64{}}
-	if aiReverseFacts.Unknown > 0 {
-		e.reasons["ai_reverse_global_unknown_responsibility"] = aiReverseFacts.Unknown
-	}
-	if aiReverseFacts.Blocking > 0 {
-		e.reasons["ai_reverse_global_blocking_responsibility"] = aiReverseFacts.Blocking
-	}
-	for _, reason := range aiReverseFacts.BlockingReasons {
-		e.reasons["ai_reverse_"+reason]++
-	}
-	// Global orphan/unknown responsibility remains visible even when all
-	// four legacy sources are empty and there are no candidate-local reasons.
-	if sqlReport.Unknown > 0 {
-		e.reasons["sql_global_unknown_responsibility"] = sqlReport.Unknown
-	}
-	if sqlReport.Blocking > 0 {
-		e.reasons["sql_global_blocking_responsibility"] = sqlReport.Blocking
-	}
-	for _, reason := range mongoReport.BlockingReasons {
-		e.reasons["mongo_global_"+reason]++
-	}
-	for _, gap := range mongoReport.CoverageGaps {
-		e.reasons["mongo_global_coverage_gap_"+gap]++
-	}
-	for {
-		page, err := c.NextPage(ctx)
-		if err == io.EOF {
-			break
-		}
-		if err != nil {
-			return nil, fixedError("history_coordinator_page_failed")
-		}
-		events, err := page.Events()
-		if err != nil {
-			return nil, fixedError("history_coordinator_page_failed")
-		}
-		if len(events) == 0 {
-			if externalQualification == nil {
-				return nil, fixedError("history_ai_external_execution_input_required")
-			}
-			prepared, prepareErr := c.PrepareAICommandPersistencePage(ctx, page, externalQualification)
-			if prepareErr != nil {
-				return nil, fixedError("history_ai_original_persistence_prepare_failed")
-			}
-			aiPages = append(aiPages, prepared)
-			// Local readonly facts do not prove the external qs-ai execution or
-			// whole reverse MQ graph, and cannot authorize evidence CAS or DROP.
-			if c.QualifyAIReadOnlyPage(ctx, page, aiReadonly) != nil {
-				return nil, fixedError("history_ai_readonly_page_failed")
-			}
-			e.aiPages++
-			// Consumption retains every original candidate/blocker. The separately
-			// derived opaque persistence batch neither clears these nor sends commands.
-			continue
-		}
-		selectors, err := retirement.MongoHistoricalSQLBatchSelectors(events)
-		if err != nil {
-			return nil, fixedError("history_original_business_selection_failed")
-		}
-		sqlBatch, err := retirement.PrepareSQLBusinessOwnerBatch(ctx, current, selectors, sqlevaluation.DefaultSQLHistoricalOwnerBatchLimits())
-		if err != nil {
-			return nil, fixedError("history_original_sql_business_failed")
-		}
-		joint, err := c.PrepareWholeSourceJointPage(ctx, page, index, catalog, sqlBatch, global)
-		if err != nil {
-			if errors.Is(err, retirement.ErrWholeSourceJointBounds) {
-				return nil, fixedError("history_related_source_budget_exceeded")
-			}
-			return nil, fixedError("history_joint_original_qualification_failed")
-		}
-		if c.QualifyWholeSourceJointPage(ctx, page, joint) != nil {
-			return nil, fixedError("history_joint_page_consumption_failed")
-		}
-		anchor, sealErr := c.SealWholeSourceJointReplayAnchor(ctx, joint)
-		if sealErr != nil {
-			return nil, fixedError("history_write_replay_seal_failed")
-		}
-		w.anchors = append(w.anchors, anchor)
-		e.jointPages++
-	}
-	e.coordinator = c.Receipt()
-	e.index = index.Summary()
-	if !e.coordinator.SourceCoverageComplete || !e.index.Complete || e.coordinator.DropReady || e.coordinator.BusinessClosureVerified {
-		return nil, fixedError("history_four_source_coverage_incomplete")
-	}
-	for offset := 0; uint64(offset) < e.coordinator.CandidateCount; offset += 128 {
-		rows, err := c.CandidateRange(offset, 128)
-		if err != nil {
-			return nil, fixedError("history_candidate_summary_failed")
-		}
-		for _, row := range rows {
-			for _, reason := range row.BlockingReasons {
-				e.reasons[reason]++
-			}
-		}
-	}
-	w.aiBatch, err = c.SealAICommandPersistencePages(ctx, aiPages)
-	if err != nil {
-		return nil, fixedError("history_ai_original_persistence_prepare_failed")
-	}
-	e.sqlFacts = stableSQLFacts{sqlReport.DatabaseIdentitySHA256, sqlReport.BusinessAnchorsSHA256, sqlReport.SchemaCoverage, sqlReport.Ledgers, sqlReport.Observed, sqlReport.RetirementRelated, sqlReport.OutsideRetirement, sqlReport.Unknown, sqlReport.Blocking}
-	e.mongoFacts = stableMongoFacts{mongoReport.IdentitySHA256, mongoReport.MetadataSHA256, mongoReport.SnapshotSHA256, mongoReport.MigrationVersion, mongoReport.Collections, mongoReport.ClassCounts, mongoReport.BlockingReasons, mongoReport.CoverageGaps, mongoReport.Rows, mongoReport.Bytes, mongoReport.Pages, mongoReport.ClassifiedRows}
-	if current.ValidateBorrowedSnapshot(ctx) != nil || global.ValidateBorrowedSnapshot(ctx) != nil || aiReverse.ValidateBorrowedSnapshot(ctx) != nil || a.verifyFullFiles(ctx) != nil {
-		return nil, fixedError("history_epoch_changed_before_close")
-	}
-	w.facts = e
-	return w, nil
-}
-
-// The explicit host may run prewindow evidence CAS under its existing baseline,
-// admission and original-command gates. This result grants no DROP authority;
-// deletion still requires independent whole-writer fencing and a real window.
 func executeHistoricalEvidenceWrite(ctx context.Context, a *approvedInputs, d *historyDatabase, outputDir string, external ...retirement.AIExternalExecutionInput) (report preparedWriteDiagnostic, result error) {
 	report = preparedWriteDiagnostic{Protocol: "limited-historical-evidence-host/v1", CommitState: "not_attempted", MongoCommitRequirement: "undetermined", Required: []string{"independent_production_source_approval", "whole_writer_and_historical_rerun_fence", "production_process_and_transaction_budget", "actual_external_qs_ai_facts_for_unmapped_original_commands", "complete_original_command_evidence_persistence_and_readback", "final_expected_global_and_absent_range_fence", "prewindow_actual_isolated_restore", "maintenance_acceptance_and_purge"}}
 	if ctx == nil || ctx.Err() != nil || a == nil || d == nil || len(external) > 1 {
 		return report, fixedError("history_write_input_rejected")
 	}
 	report.SourceSHA, report.OperationID, report.RunID = a.request.SourceSHA, a.request.OperationID, a.request.RunID
-	journal, e := newHistoryWriteJournal(outputDir, a)
-	if e != nil {
-		return report, e
+	journal, err := newHistoryWriteJournal(outputDir, a)
+	if err != nil {
+		return report, err
 	}
 	defer func() {
-		// Later defers have already closed both original spool writers. A close
-		// failure or unknown DB result cannot publish a material handoff digest.
 		if result == nil {
-			var err error
-			report.MaterialManifestSHA256, err = journal.snapshotMaterials(ctx)
-			if err != nil {
-				result = err
-			}
+			report.MaterialManifestSHA256, result = journal.snapshotMaterials(ctx)
 		}
 		if journal.dir.Close() != nil && result == nil {
 			result = fixedError("history_write_private_close_failed")
@@ -558,281 +345,236 @@ func executeHistoricalEvidenceWrite(ctx context.Context, a *approvedInputs, d *h
 			report.MaterialManifestSHA256 = ""
 		}
 	}()
-	mongoFile, e := journal.create("prepared-mongo-private.bin")
-	if e != nil {
-		return report, e
+	// These are the only full initial captures. They use two actual ended
+	// RR-RO/snapshot-only scopes and retain input/owner recipes, never an old
+	// consumed global page or write capability. No buildEpoch path runs here.
+	inputs, err := captureHistoryInitialInputs(ctx, a, d, journal)
+	if err != nil {
+		return report, err
 	}
 	defer func() {
-		if mongoFile.Close() != nil && result == nil {
-			result = fixedError("history_write_private_close_failed")
+		if e := inputs.close(); result == nil && e != nil {
+			result = e
 		}
 	}()
-	sqlFile, e := journal.create("prepared-sql-private.bin")
-	if e != nil {
-		return report, e
+	if inputs.components.ValidateInputSources(ctx, inputs.sources) != nil || inputs.ai.ValidateFrozen(ctx) != nil {
+		return report, fixedError("history_write_initial_inputs_changed")
 	}
-	defer func() {
-		if sqlFile.Close() != nil && result == nil {
-			result = fixedError("history_write_private_close_failed")
-		}
-	}()
-	spool, e := retirement.NewHistoricalCASSpool(ctx, mongoFile, sqlFile, 16<<30, 128<<20)
-	if e != nil {
-		return report, fixedError("history_write_spool_failed")
+	components := inputs.components.Components()
+	if a.copies()[0].Expected.Records+a.copies()[1].Expected.Records+a.copies()[2].Expected.Records+a.copies()[3].Expected.Records == 0 {
+		return report, fixedError("history_write_no_original_statements")
 	}
-	var first *epochResult
+	// The fixed external producer runs outside the twenty-second event scopes.
+	// Its returned Q and original input are process-local capabilities, never
+	// a saved successful receipt. AI evidence is committed/read back first,
+	// since event evidence would otherwise alter its actual owner anchors.
+	if len(external) != 1 {
+		return report, fixedError("history_ai_external_original_facts_required")
+	}
+	aiInput := external[0]
+	aiInput.Binding = retirement.HistoricalCoordinatorBinding{SourceSHA: a.request.SourceSHA, OperationID: a.request.OperationID}
+	canonicalRun, runErr := aiHostRun(a.request.RunID)
+	if runErr != nil || aiInput.RunID != canonicalRun {
+		return report, fixedError("history_ai_external_execution_input_required")
+	}
+	if retirement.RequireAIExternalExecQuiescence(ctx, retirement.AIExternalExecQuiescenceInput{OperationDirectory: aiInput.OperationDirectory, SourceSHA: a.request.SourceSHA, OperationID: a.request.OperationID, RuntimeSourceSHA: aiInput.RuntimeSourceSHA, ImageID: aiInput.ImageID, ContainerID: aiInput.ContainerID, SudoDocker: aiInput.SudoDocker}) != nil {
+		return report, fixedError("history_ai_external_exec_quiescence_unproven")
+	}
+	var qualifiedAI *retirement.AIExternalExecutionQualification
 	var aiBatch *retirement.AICommandPersistenceBatch
-	var originAnchor *retirement.FreshRecheckAnchor
-	eventExpected := a.copies()[0].Expected.Records + a.copies()[3].Expected.Records
-	report.MongoCommitRequirement = "not_required"
-	if eventExpected > 0 {
-		report.MongoCommitRequirement = "required"
-	}
-	if e = d.epoch(ctx, func(scope context.Context) error {
+	if e := d.epoch(ctx, func(scope context.Context) error {
 		var err error
-		first, err = buildEpoch(scope, a, d)
+		qualifiedAI, err = retirement.PrepareHistoricalAIExternalExecution(scope, inputs.sources, inputs.ai, aiInput)
 		if err != nil {
-			return err
+			return fixedError("history_ai_external_original_facts_failed")
 		}
-		return first.compactOrigin(scope)
-	}); e != nil {
-		return report, e
-	}
-	// The second actual fresh RO constructs every plan while still alive, but
-	// immediately writes raw bodies/baselines to private bounded disk capsules.
-	// Its related graphs are page-bounded, not retained as 1,242,978 future plans.
-	if e = d.epoch(ctx, func(scope context.Context) error {
-		second, err := buildPreparedWriteEpoch(scope, a, d, external...)
+		aiBatch, err = retirement.PrepareHistoricalAICommandPersistenceBatch(scope, inputs.sources, inputs.ai, qualifiedAI)
 		if err != nil {
-			return err
-		}
-		if compareEpochs(first, second.facts) != nil {
-			return fixedError("history_independent_epoch_facts_changed")
-		}
-		ai, err := first.recheckAIReverse(scope, second.facts, a)
-		if err != nil {
-			return err
-		}
-		if a.rewind() != nil {
-			return fixedError("history_asset_read_failed")
-		}
-		origin, err := first.reverseAnchor.RecheckOrigin(scope, ai, second.facts.sql, second.global, second.coordinator, a.readers())
-		if err != nil {
-			return fixedError("history_actual_origin_independent_epoch_failed")
-		}
-		for _, anchor := range second.anchors {
-			sequence, offset, err := anchor.Selectors()
-			if err != nil {
-				return fixedError("history_write_replay_failed")
-			}
-			joint, err := second.coordinator.ReplayWholeSourceJointPage(scope, anchor, sequence, offset, second.index, second.catalog, second.global)
-			if err != nil {
-				return fixedError("history_write_replay_failed")
-			}
-			// Actual original/fresh source, global and business capabilities, not flags.
-			_, _, sealed, err := second.coordinator.PrepareQualifiedHistoricalCAS(scope, joint, origin, ai)
-			if err != nil {
-				return fixedError("history_write_qualification_failed")
-			}
-			ticket, err := spool.Append(scope, joint, sealed)
-			if err != nil {
-				return fixedError("history_write_spool_failed")
-			}
-			position, refs := ticket.Diagnostic()
-			if journal.record(scope, "prepared", position, refs, nil) != nil {
-				return fixedError("history_write_journal_unknown")
-			}
-			report.PreparedPages++
-			report.EventReferences += refs
-		}
-		if eventExpected > 0 {
-			if spool.Seal(scope, second.coordinator) != nil {
-				return fixedError("history_write_spool_failed")
-			}
-		}
-		aiBatch = second.aiBatch
-		if eventExpected == 0 && aiBatch == nil {
-			return fixedError("history_write_no_original_statements")
-		}
-
-		// Keep only the actual second origin epoch seal. Its original expiry and
-		// exact four source receipts survive; no old transaction or row graph does.
-		originAnchor, err = second.facts.origin.FreezeFreshRecheckAnchor(scope)
-		if err != nil {
-			return fixedError("history_write_origin_anchor_failed")
-		}
-
-		// Do not keep old whole SQL8/Mongo11/AI14/source/index or page replay anchors
-		// past this callback. The spool retains small actual epoch/file capabilities.
-		second = nil
-		return a.verifyFullFiles(scope)
-	}); e != nil {
-		return report, e
-	}
-	first = nil
-	var tickets []*retirement.HistoricalCASSpoolTicket
-	if eventExpected > 0 {
-		tickets, e = spool.Tickets()
-		if e != nil {
-			return report, fixedError("history_write_spool_failed")
-		}
-	}
-	var bounded context.Context
-	var cancel context.CancelFunc
-	if eventExpected > 0 {
-		bounded, cancel, e = spool.InheritedContext(ctx)
-	} else {
-		bounded, cancel, e = aiBatch.InheritedContext(ctx)
-	}
-	if e != nil {
-		return report, fixedError("history_write_spool_failed")
-	}
-	defer cancel()
-	if a.verifyFullFiles(bounded) != nil {
-		return report, fixedError("history_asset_hash_changed")
-	}
-	applied, e := d.writePreparedEpoch(bounded, spool, tickets, journal, &report, aiBatch)
-	if e != nil {
-		return report, e
-	}
-	// Both actual host commit calls returned success. They are NOT distributed
-	// atomic commit. No retry/reconstruction occurs on a failed/unknown response.
-	if e = d.epoch(bounded, func(scope context.Context) error {
-		current, err := retirement.PrepareSQLResponsibilitySnapshot(scope, a.inventory.Identities["mysql"], sqlevaluation.DefaultSQLResponsibilityLimits())
-		if err != nil {
-			return fixedError("history_global_sql_scan_failed")
-		}
-		limits := retirement.MongoResponsibilityLimits{PageRows: 512, MaxRows: 2_000_000, MaxBytes: 8 << 30, MaxPages: 2_000_000, MaxGraphEntries: 4_000_000, MaxGraphBytes: 1 << 30, MaxDuration: 5 * time.Minute}
-		global, err := retirement.PrepareMongoResponsibilitySnapshot(scope, d.mongo, d.mongoConfig, limits)
-		if err != nil {
-			return fixedError("history_global_mongo_scan_failed")
-		}
-		// No JOIN/organization filters or mutable summary switches replace these
-		// actual scans. New current responsibility still blocks final observation.
-		sr, mr := current.Report(), global.Report()
-		if sr.Unknown != 0 || sr.Blocking != 0 || len(mr.BlockingReasons) != 0 || !mr.Complete {
-			return fixedError("history_write_final_global_responsibility_changed")
-		}
-		// SQL8/Mongo11 do not scan the old event ledgers. Re-read the actual
-		// four old sources under their frozen bounds, using the genuine second
-		// epoch seal and new SQL/Mongo transactions, before any completion record.
-		if verifyWrittenSourceOrigin(scope, a, originAnchor, current, global) != nil {
-			return fixedError("history_write_actual_origin_readback_failed")
-		}
-		if journal.record(scope, "actual_origin_readback_matched", -1, eventExpected, nil) != nil {
-			return fixedError("history_write_journal_unknown")
-		}
-		if a.verifyFullFiles(scope) != nil || a.rewind() != nil {
-			return fixedError("history_asset_hash_changed")
-		}
-		c, err := retirement.PrepareHistoricalCoordinator(scope, retirement.HistoricalCoordinatorBinding{SourceSHA: a.request.SourceSHA, OperationID: a.request.OperationID}, a.copies(), retirement.DefaultHistoricalCoordinatorLimits())
-		if err != nil {
-			return fixedError("history_source_authentication_failed")
-		}
-		if a.rewind() != nil {
-			return fixedError("history_asset_read_failed")
-		}
-		jointLimits := retirement.DefaultWholeSourceJointLimits()
-		jointLimits.MaxRelatedSources = 512
-		index, err := c.PrepareWholeSourceJointIndex(scope, a.jointCopies(), jointLimits)
-		if err != nil {
-			return fixedError("history_complete_source_index_failed")
-		}
-		for _, ticket := range tickets {
-			observation, err := spool.VerifyTicket(scope, applied, ticket, current, global, index)
-			if err != nil {
-				return fixedError("history_write_independent_readback_failed")
-			}
-			position, refs := ticket.Diagnostic()
-			if journal.record(scope, "fresh_page_verified", position, refs, &observation) != nil {
-				return fixedError("history_write_journal_unknown")
-			}
-			report.ReadBackPages++
-		}
-		if eventExpected > 0 {
-			if spool.FinishReadback(scope, applied) != nil {
-				return fixedError("history_write_independent_readback_failed")
-			}
-		}
-		if aiBatch != nil {
-			reverse, scanErr := retirement.PrepareAIReverseSnapshot(scope, current, a.inventory.Migrations["mysql"], retirement.DefaultAIReverseLimits())
-			if scanErr != nil {
-				return fixedError("history_ai_reverse_scan_failed")
-			}
-			if a.rewind() != nil || c.BindAIReverseSourceScope(scope, reverse, a.copies()) != nil {
-				return fixedError("history_ai_reverse_source_scope_failed")
-			}
-			observation, readErr := aiBatch.VerifyReadback(scope, reverse)
-			if readErr != nil || !observation.IndependentReadbackMatched || observation.OriginalCommands != report.AIOriginalCommands || observation.OriginalSourceReferences != report.AISourceReferences {
-				return fixedError("history_ai_original_independent_readback_failed")
-			}
-			if journal.record(scope, "ai_independent_readback_finished", -1, report.AISourceReferences, nil) != nil {
-				return fixedError("history_write_journal_unknown")
-			}
-			report.AICommandPersistenceComplete = true
-		}
-
-		if current.ValidateBorrowedSnapshot(scope) != nil || global.ValidateBorrowedSnapshot(scope) != nil || a.verifyFullFiles(scope) != nil {
-			return fixedError("history_epoch_changed_before_close")
+			return fixedError("history_ai_original_persistence_prepare_failed")
 		}
 		return nil
 	}); e != nil {
 		return report, e
 	}
-	if report.ReadBackPages != report.PreparedPages {
-		return report, fixedError("history_write_independent_readback_failed")
-	}
-	if e = journal.record(bounded, "limited_event_readback_finished", -1, report.EventReferences, nil); e != nil {
+	aiCounts, aiCommit, e := d.writeHistoricalAI(ctx, aiBatch, journal)
+	report.CommitState, report.MongoCommitRequirement = aiCommit.CommitState, aiCommit.MongoCommitRequirement
+	report.ActualSQLCommitResponse = aiCommit.ActualSQLCommitResponse
+	report.AIOriginalCommands, report.AISourceReferences = aiCounts.OriginalCommands, aiCounts.OriginalSourceReferences
+	if e != nil {
 		return report, e
 	}
-	report.LimitedEventPersistenceObserved = eventExpected > 0
+	if e = d.epoch(ctx, func(scope context.Context) error {
+		observation, err := aiBatch.VerifyHistoricalReadback(scope, inputs.sources, inputs.ai)
+		if err != nil || !observation.IndependentReadbackMatched || observation.OriginalCommands != aiCounts.OriginalCommands || observation.OriginalSourceReferences != aiCounts.OriginalSourceReferences {
+			return fixedError("history_ai_original_independent_readback_failed")
+		}
+		return journal.record(scope, "ai_independent_readback_finished", -1, observation.OriginalSourceReferences, nil)
+	}); e != nil {
+		return report, e
+	}
+	report.AICommandPersistenceComplete = true
+	expected := a.copies()[0].Expected.Records + a.copies()[3].Expected.Records
+	var mongoComponents uint64
+	for position, component := range components {
+		// The aggregate hashes are checked before and after this loop. Each
+		// actual component revalidates the borrowed original FD and selected
+		// frame hashes; rescanning every source for every component would turn
+		// bounded work back into a repeated full-source traversal.
+		if ctx.Err() != nil {
+			return report, fixedError("history_write_budget_exhausted")
+		}
+		// Qualification and the first effect share this short fresh native RW
+		// scope. The actual adapter locks the original full-row SQL baseline;
+		// Mongo forces writes to every selected current dependency before CAS.
+		statements, mongoStatement, refs, componentReport, e := d.writeHistoricalComponent(ctx, a, inputs, component, position, journal, qualifiedAI, aiBatch)
+		report.ActualSQLCommitResponse = report.ActualSQLCommitResponse || componentReport.ActualSQLCommitResponse
+		report.ActualMongoCommitResponse = report.ActualMongoCommitResponse || componentReport.ActualMongoCommitResponse
+		if componentReport.MongoCommitRequirement == "required" {
+			report.MongoCommitRequirement = "required"
+		}
+		if componentReport.CommitState != "not_attempted" {
+			report.CommitState = componentReport.CommitState
+		}
+		if e != nil {
+			return report, e
+		}
+		report.PreparedPages++
+		report.EventReferences += refs
+		if refs > 0 {
+			mongoComponents++
+		}
+		if e = d.epoch(ctx, func(scope context.Context) error {
+			for _, statement := range statements {
+				if _, e := statement.VerifyIndependentPersisted(scope, 20*time.Second); e != nil {
+					return fixedError("history_write_independent_readback_failed")
+				}
+			}
+			if mongoStatement != nil && mongoStatement.VerifyIndependentPersisted(scope, d.mongo, 20*time.Second) != nil {
+				return fixedError("history_write_independent_readback_failed")
+			}
+			return journal.record(scope, "fresh_page_verified", position, refs, nil)
+		}); e != nil {
+			return report, e
+		}
+		report.ReadBackPages++
+	}
+	if report.EventReferences != expected || report.ReadBackPages != report.PreparedPages || inputs.sources.ValidateFrozen(ctx) != nil || inputs.ai.ValidateFrozen(ctx) != nil || a.verifyFullFiles(ctx) != nil {
+		return report, fixedError("history_write_independent_readback_failed")
+	}
+	if err = journal.record(ctx, "limited_event_readback_finished", -1, report.EventReferences, nil); err != nil {
+		return report, err
+	}
+	report.ActualSQLCommitResponse = true
+	report.ActualMongoCommitResponse = mongoComponents > 0
+	report.MongoCommitRequirement = "not_required"
+	report.CommitState = "sql_committed_mongo_not_required"
+	if mongoComponents > 0 {
+		report.MongoCommitRequirement, report.CommitState = "required", "both_responses_success_non_atomic"
+	}
+	report.LimitedEventPersistenceObserved = expected > 0
 	return report, nil
 }
 
-func (d *historyDatabase) writePreparedEpoch(ctx context.Context, spool *retirement.HistoricalCASSpool, tickets []*retirement.HistoricalCASSpoolTicket, journal *historyWriteJournal, report *preparedWriteDiagnostic, aiBatches ...*retirement.AICommandPersistenceBatch) (applied *retirement.HistoricalCASSpoolApplied, result error) {
-	var aiBatch *retirement.AICommandPersistenceBatch
-	if len(aiBatches) > 1 {
-		return nil, fixedError("history_write_host_epoch_rejected")
+// A known SQL response and a different real readback are mandatory before any
+// event evidence changes owner rows. Unknown Record/Commit is never replayed.
+func (d *historyDatabase) writeHistoricalAI(ctx context.Context, batch *retirement.AICommandPersistenceBatch, journal *historyWriteJournal) (counts retirement.AICommandPersistenceSummary, report preparedWriteDiagnostic, result error) {
+	report.CommitState, report.MongoCommitRequirement = "not_attempted", "not_required"
+	if ctx == nil || ctx.Err() != nil || d == nil || d.sql == nil || batch == nil || journal == nil || d.validateNamespaceAnchor(ctx) != nil {
+		return counts, report, fixedError("history_write_host_epoch_rejected")
 	}
-	if len(aiBatches) == 1 {
-		aiBatch = aiBatches[0]
+	bounded, cancel := context.WithTimeout(ctx, 20*time.Second)
+	defer cancel()
+	tx := d.sql.WithContext(bounded).Begin(&sql.TxOptions{Isolation: sql.LevelRepeatableRead, ReadOnly: false})
+	if tx.Error != nil {
+		return counts, report, fixedError("history_write_host_epoch_rejected")
 	}
-	if d == nil || spool == nil || len(tickets) == 0 && aiBatch == nil || report == nil || ctx == nil || ctx.Err() != nil || d.validateNamespaceAnchor(ctx) != nil {
-		return nil, fixedError("history_write_host_epoch_rejected")
+	committed := false
+	defer func() {
+		if !committed {
+			if e := tx.Rollback().Error; e != nil && !errors.Is(e, sql.ErrTxDone) {
+				cleanup, stop := context.WithTimeout(context.Background(), 10*time.Second)
+				_ = journal.record(cleanup, "sql_rollback_failed", -1, counts.OriginalSourceReferences, nil)
+				stop()
+				journal.unknown = true
+				if result == nil {
+					result = fixedError("history_write_cleanup_unknown")
+				}
+			}
+		}
+	}()
+	paired := hostmysql.WithTx(bounded, tx)
+	counts, err := batch.Record(paired, tx)
+	if err != nil || !counts.InTransactionWritten && (counts.OriginalCommands != 0 || counts.OriginalSourceReferences != 0) {
+		return counts, report, fixedError("history_ai_original_persistence_statement_failed")
 	}
-	if report.MongoCommitRequirement != "required" && report.MongoCommitRequirement != "not_required" ||
-		(report.MongoCommitRequirement == "required") != (len(tickets) > 0) {
-		return nil, fixedError("history_write_host_epoch_rejected")
+	if journal.record(paired, "ai_statements_applied", -1, counts.OriginalSourceReferences, nil) != nil || journal.record(paired, "sql_commit_intent", -1, counts.OriginalSourceReferences, nil) != nil {
+		return counts, report, fixedError("history_write_journal_unknown")
 	}
-	session, e := d.mongoClient.StartSession()
-	if e != nil {
-		return nil, fixedError("history_write_host_epoch_rejected")
+	committed = true // Commit ATTEMPT poisons this original batch even if unknown.
+	if tx.Commit().Error != nil {
+		report.CommitState = "sql_unknown_mongo_not_attempted"
+		cleanup, stop := context.WithTimeout(context.Background(), 10*time.Second)
+		_ = journal.record(cleanup, "sql_commit_unknown", -1, counts.OriginalSourceReferences, nil)
+		stop()
+		journal.unknown = true
+		return counts, report, fixedError("history_write_commit_unknown")
+	}
+	report.ActualSQLCommitResponse = true
+	report.CommitState = "sql_committed_mongo_not_required"
+	if journal.record(ctx, "sql_commit_success", -1, counts.OriginalSourceReferences, nil) != nil {
+		report.CommitState = "sql_response_success_journal_unknown"
+		journal.unknown = true
+		return counts, report, fixedError("history_write_journal_unknown")
+	}
+	if d.validateNamespaceAnchor(ctx) != nil {
+		return counts, report, fixedError("history_database_binding_rejected")
+	}
+	return counts, report, nil
+}
+
+// One component has one fresh host-owned native RW scope, one statement phase
+// and at most one commit attempt per store. Its returned opaque statements are
+// read back only after both known commit responses and this scope has ended.
+func (d *historyDatabase) writeHistoricalComponent(ctx context.Context, a *approvedInputs, inputs *historyInitialInputs, component *retirement.HistoricalCASComponent, position int, journal *historyWriteJournal, qualifiedAI *retirement.AIExternalExecutionQualification, aiBatch *retirement.AICommandPersistenceBatch) (statements []*sqlevaluation.SQLHistoricalComponentStatement, mongoStatement *retirement.MongoHistoricalComponentStatement, refs uint64, report preparedWriteDiagnostic, result error) {
+	report.CommitState, report.MongoCommitRequirement = "not_attempted", "not_required"
+	if d == nil || d.sql == nil || d.mongo == nil || d.mongoClient == nil || a == nil || inputs == nil || component == nil || journal == nil || ctx == nil || ctx.Err() != nil || qualifiedAI == nil || aiBatch == nil || d.validateNamespaceAnchor(ctx) != nil {
+		result = fixedError("history_write_host_epoch_rejected")
+		return
+	}
+	bounded, cancel := context.WithTimeout(ctx, 20*time.Second)
+	defer cancel()
+	session, err := d.mongoClient.StartSession()
+	if err != nil {
+		result = fixedError("history_write_host_epoch_rejected")
+		return
 	}
 	defer func() {
-		cleanup, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		cleanup, stop := context.WithTimeout(context.Background(), 10*time.Second)
 		session.EndSession(cleanup)
-		cancel()
+		stop()
 	}()
 	if session.StartTransaction(options.Transaction().SetReadConcern(readconcern.Snapshot()).SetReadPreference(readpref.Primary())) != nil {
-		return nil, fixedError("history_write_host_epoch_rejected")
+		result = fixedError("history_write_host_epoch_rejected")
+		return
 	}
-	tx := d.sql.WithContext(ctx).Begin(&sql.TxOptions{Isolation: sql.LevelRepeatableRead, ReadOnly: false})
+	tx := d.sql.WithContext(bounded).Begin(&sql.TxOptions{Isolation: sql.LevelRepeatableRead, ReadOnly: false})
 	if tx.Error != nil {
-		cleanup, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-		_ = session.AbortTransaction(cleanup)
-		cancel()
-		return nil, fixedError("history_write_host_epoch_rejected")
+		cleanup, stop := context.WithTimeout(context.Background(), 10*time.Second)
+		if session.AbortTransaction(cleanup) != nil {
+			journal.unknown = true
+		}
+		stop()
+		result = fixedError("history_write_host_epoch_rejected")
+		return
 	}
 	sqlCommitAttempt, mongoCommitAttempt := false, false
-	// Abort/rollback applies only before a commit ATTEMPT. After an unknown
-	// response the durable journal is authoritative about this host's uncertainty;
-	// we do not automatically repeat Commit, Apply, stage new IDs or proof times.
 	defer func() {
-		cleanup, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-		defer cancel()
+		cleanup, stop := context.WithTimeout(context.Background(), 10*time.Second)
+		defer stop()
 		if !sqlCommitAttempt {
-			if err := tx.Rollback().Error; err != nil && !errors.Is(err, sql.ErrTxDone) {
-				_ = journal.record(cleanup, "sql_rollback_failed", -1, 0, nil)
+			if e := tx.Rollback().Error; e != nil && !errors.Is(e, sql.ErrTxDone) {
+				_ = journal.record(cleanup, "sql_rollback_failed", position, refs, nil)
+				journal.unknown = true
 				if result == nil {
 					result = fixedError("history_write_cleanup_unknown")
 				}
@@ -840,109 +582,85 @@ func (d *historyDatabase) writePreparedEpoch(ctx context.Context, spool *retirem
 		}
 		if !mongoCommitAttempt {
 			if session.AbortTransaction(cleanup) != nil {
-				_ = journal.record(cleanup, "mongo_abort_failed", -1, 0, nil)
+				_ = journal.record(cleanup, "mongo_abort_failed", position, refs, nil)
+				journal.unknown = true
 				if result == nil {
 					result = fixedError("history_write_cleanup_unknown")
 				}
 			}
 		}
+		if e := d.validateNamespaceAnchor(cleanup); result == nil && e != nil {
+			result = e
+		}
 	}()
-	var one int
-	if tx.Raw("SELECT 1").Scan(&one).Error != nil || one != 1 {
-		return nil, fixedError("history_write_host_epoch_rejected")
+	paired := mongo.NewSessionContext(hostmysql.WithTx(bounded, tx), session)
+	if journal.record(paired, "write_epoch_started", position, 0, nil) != nil {
+		result = fixedError("history_write_journal_unknown")
+		return
 	}
-	paired := mongo.NewSessionContext(hostmysql.WithTx(ctx, tx), session)
-	if journal.record(paired, "write_epoch_started", -1, 0, nil) != nil {
-		return nil, fixedError("history_write_journal_unknown")
+	observed, e := retirement.PrepareHistoricalComponentObservation(paired, component, inputs.sources, inputs.ai, d.mongo, 20*time.Second, true)
+	if e != nil {
+		result = fixedError("history_write_qualification_failed")
+		return
 	}
-	if aiBatch != nil {
-		written, writeErr := aiBatch.Record(paired, tx)
-		if writeErr != nil || !written.InTransactionWritten {
-			return nil, fixedError("history_ai_original_persistence_statement_failed")
-		}
-		report.AIOriginalCommands, report.AISourceReferences = written.OriginalCommands, written.OriginalSourceReferences
-		if journal.record(paired, "ai_statements_applied", -1, written.OriginalSourceReferences, nil) != nil {
-			return nil, fixedError("history_write_journal_unknown")
-		}
+	// This factory consumes actual native source/business/AI composition.
+	// It rejects unclosed related obligations instead of accepting summaries.
+	statements, mongoStatement, refs, e = retirement.ApplyQualifiedHistoricalComponent(paired, observed, qualifiedAI, aiBatch)
+	if e != nil {
+		result = fixedError("history_write_qualification_or_statement_failed")
+		return
 	}
-	for _, ticket := range tickets {
-		if spool.ApplyTicket(paired, ticket) != nil {
-			return nil, fixedError("history_write_statement_failed")
-		}
-		position, refs := ticket.Diagnostic()
-		if journal.record(paired, "page_statement_applied", position, refs, nil) != nil {
-			return nil, fixedError("history_write_journal_unknown")
-		}
+	if refs > 0 {
+		report.MongoCommitRequirement = "required"
 	}
-	if len(tickets) > 0 {
-		applied, e = spool.FinishApply(paired)
-		if e != nil {
-			return nil, fixedError("history_write_statement_failed")
-		}
+	if journal.record(paired, "page_statement_applied", position, refs, nil) != nil {
+		result = fixedError("history_write_journal_unknown")
+		return
 	}
-
-	if journal.record(paired, "all_statements_applied", -1, report.EventReferences, nil) != nil {
-		return nil, fixedError("history_write_journal_unknown")
+	if e = probePreparedMongo(paired, d.mongo, session, report.MongoCommitRequirement); e != nil {
+		result = e
+		return
 	}
-	// Event counts do not prove a Mongo command ran: a SQL-only owner page
-	// may have an empty Mongo selection. Starting is only a local driver state.
-	// Reject it before either commit so the host's original cleanup rolls back.
-	if err := requireMongoCommitTransaction(session, report.MongoCommitRequirement); err != nil {
-		return nil, err
-	}
-	if journal.record(paired, "sql_commit_intent", -1, 0, nil) != nil {
-		return nil, fixedError("history_write_journal_unknown")
+	if journal.record(paired, "sql_commit_intent", position, refs, nil) != nil {
+		result = fixedError("history_write_journal_unknown")
+		return
 	}
 	sqlCommitAttempt = true
 	if tx.Commit().Error != nil {
 		report.CommitState = "sql_unknown_mongo_not_attempted"
-		cleanup, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-		_ = journal.record(cleanup, "sql_commit_unknown", -1, 0, nil)
-		cancel()
-		return nil, fixedError("history_write_commit_unknown")
+		cleanup, stop := context.WithTimeout(context.Background(), 10*time.Second)
+		_ = journal.record(cleanup, "sql_commit_unknown", position, refs, nil)
+		stop()
+		journal.unknown = true
+		result = fixedError("history_write_commit_unknown")
+		return
 	}
 	report.ActualSQLCommitResponse = true
-	if journal.record(ctx, "sql_commit_success", -1, 0, nil) != nil {
+	if journal.record(ctx, "sql_commit_success", position, refs, nil) != nil {
 		report.CommitState = "sql_response_success_journal_unknown"
-		return nil, fixedError("history_write_journal_unknown")
+		journal.unknown = true
+		result = fixedError("history_write_journal_unknown")
+		return
 	}
-	// No event pages means no Mongo transaction command was executed. The
-	// driver's client-only nil for an empty transaction is not a server response.
 	if report.MongoCommitRequirement == "required" {
-		if journal.record(ctx, "mongo_commit_intent", -1, 0, nil) != nil {
+		if journal.record(ctx, "mongo_commit_intent", position, refs, nil) != nil {
 			report.CommitState = "sql_committed_mongo_not_attempted"
-			return nil, fixedError("history_write_journal_unknown")
+			journal.unknown = true
+			result = fixedError("history_write_journal_unknown")
+			return
 		}
 		mongoCommitAttempt = true
+		report.EventReferences, report.PreparedPages = refs, 1
 	}
-	if err := commitPreparedMongo(ctx, session, journal, report); err != nil {
-		return nil, err
+	result = commitPreparedMongo(bounded, session, journal, &report, position)
+	if result != nil {
+		journal.unknown = true
 	}
-	if d.validateNamespaceAnchor(ctx) != nil {
-		return nil, fixedError("history_database_binding_rejected")
-	}
-	return applied, nil
+	return
 }
 
-// This callback only accepts the opaque second actual origin seal. The existing
-// producer re-reads native SQL/BSON sources and compares every frozen receipt.
-func verifyWrittenSourceOrigin(ctx context.Context, a *approvedInputs, anchor *retirement.FreshRecheckAnchor, current *retirement.SQLResponsibilitySnapshot, global *retirement.MongoResponsibilitySnapshot) error {
-	if a == nil || anchor == nil || current == nil || global == nil || a.verifyFullFiles(ctx) != nil {
-		return fixedError("history_write_actual_origin_readback_failed")
-	}
-	proof, err := anchor.RecheckSnapshots(ctx, current, global, a.readers())
-	if err != nil || proof == nil {
-		return fixedError("history_write_actual_origin_readback_failed")
-	}
-	facts := proof.Report()
-	if !facts.ActualOriginMatched || !facts.SourceFilesMatched || !facts.IndependentEpochRechecked || facts.CASAuthorized || facts.DropReady {
-		return fixedError("history_write_actual_origin_readback_failed")
-	}
-	return nil
-}
-
-func commitPreparedMongo(ctx context.Context, session mongo.Session, journal *historyWriteJournal, report *preparedWriteDiagnostic) error {
-	if report == nil || !report.ActualSQLCommitResponse || session == nil || journal == nil {
+func commitPreparedMongo(ctx context.Context, session mongo.Session, journal *historyWriteJournal, report *preparedWriteDiagnostic, position int) error {
+	if position < -1 || report == nil || !report.ActualSQLCommitResponse || session == nil || journal == nil {
 		return fixedError("history_write_host_epoch_rejected")
 	}
 	if report.MongoCommitRequirement == "not_required" {
@@ -950,7 +668,7 @@ func commitPreparedMongo(ctx context.Context, session mongo.Session, journal *hi
 			return fixedError("history_write_host_epoch_rejected")
 		}
 		report.CommitState = "sql_committed_mongo_not_required"
-		return journal.record(ctx, "mongo_commit_not_required", -1, 0, nil)
+		return journal.record(ctx, "mongo_commit_not_required", position, report.EventReferences, nil)
 	}
 	if report.MongoCommitRequirement != "required" {
 		return fixedError("history_write_host_epoch_rejected")
@@ -958,13 +676,13 @@ func commitPreparedMongo(ctx context.Context, session mongo.Session, journal *hi
 	if session.CommitTransaction(ctx) != nil {
 		report.CommitState = "sql_committed_mongo_unknown"
 		cleanup, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-		_ = journal.record(cleanup, "mongo_commit_unknown", -1, 0, nil)
+		_ = journal.record(cleanup, "mongo_commit_unknown", position, report.EventReferences, nil)
 		cancel()
 		return fixedError("history_write_commit_unknown")
 	}
 	report.ActualMongoCommitResponse = true
 	report.CommitState = "both_responses_success_non_atomic"
-	return journal.record(ctx, "mongo_commit_success", -1, 0, nil)
+	return journal.record(ctx, "mongo_commit_success", position, report.EventReferences, nil)
 }
 
 func requireMongoCommitTransaction(session mongo.Session, requirement string) error {
@@ -983,4 +701,33 @@ func requireMongoCommitTransaction(session mongo.Session, requirement string) er
 		return fixedError("history_write_mongo_transaction_not_started")
 	}
 	return nil
+}
+
+// A local InProgress state can outlive the server transaction. The host probes
+// its existing transaction before the first commit; this never opens a session,
+// starts a replacement transaction, or repeats a failed commit.
+func probePreparedMongo(ctx context.Context, db *mongo.Database, session mongo.Session, requirement string) error {
+	if requirement == "not_required" {
+		return nil
+	}
+	if requirement != "required" || ctx == nil || ctx.Err() != nil || db == nil || session == nil || session.Client() != db.Client() {
+		return fixedError("history_write_mongo_server_probe_rejected")
+	}
+	x, ok := session.(mongo.XSession) //nolint:staticcheck // inspect the pinned driver's actual transaction identity
+	if !ok || x.ClientSession() == nil {
+		return fixedError("history_write_mongo_server_probe_rejected")
+	}
+	actual := x.ClientSession()
+	if actual.Terminated || (!actual.TransactionStarting() && !actual.TransactionInProgress()) || actual.CurrentRc == nil || actual.CurrentRc.Level != "snapshot" {
+		return fixedError("history_write_mongo_server_probe_rejected")
+	}
+	q, cancel := context.WithTimeout(mongo.NewSessionContext(ctx, session), 2*time.Second)
+	defer cancel()
+	// The standard ledger can be empty. ErrNoDocuments still means this exact
+	// transaction received a server response; a transport/server failure does not.
+	err := db.Collection("rm_outbox").FindOne(q, bson.D{}, options.FindOne().SetProjection(bson.D{{Key: "_id", Value: 1}}).SetMaxTime(2*time.Second)).Err()
+	if err != nil && !errors.Is(err, mongo.ErrNoDocuments) {
+		return fixedError("history_write_mongo_server_probe_failed")
+	}
+	return requireMongoCommitTransaction(session, requirement)
 }

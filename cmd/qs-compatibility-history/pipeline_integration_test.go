@@ -9,6 +9,7 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -25,6 +26,10 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/migration"
 	domainwire "github.com/FangcunMount/reliable-messaging/wire/domain"
 	drivermysql "github.com/go-sql-driver/mysql"
+	golangmigrate "github.com/golang-migrate/migrate/v4"
+	migratemongo "github.com/golang-migrate/migrate/v4/database/mongodb"
+	migratemysql "github.com/golang-migrate/migrate/v4/database/mysql"
+	"github.com/golang-migrate/migrate/v4/source/iofs"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -34,11 +39,130 @@ import (
 
 func requireNative(t *testing.T) {
 	t.Helper()
+	if os.Getenv("QS_HISTORY_CLI_CI_INTEGRATION") == "1" {
+		if os.Getenv("QS_HISTORY_CLI_LOCAL_INTEGRATION") != "" || os.Getenv("GITHUB_ACTIONS") != "true" || os.Getenv("GITHUB_JOB") != "runtime-closure-e2e" || os.Getenv("MYSQL_HOST") != "127.0.0.1" || os.Getenv("MYSQL_PORT") != "3306" || os.Getenv("MONGODB_HOST") != "127.0.0.1" || os.Getenv("MONGODB_PORT") != "27017" || os.Getenv("QS_HISTORY_MONGO_REPLICA_SET") != "rs0" {
+			t.Fatal("actual CI job database routes required")
+		}
+		for _, kind := range []string{"MYSQL", "MONGO"} {
+			id := os.Getenv("QS_HISTORY_CI_" + kind + "_CONTAINER")
+			if !hashPattern.MatchString(id) {
+				t.Fatal("actual CI job database container ID required")
+			}
+			ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+			raw, err := exec.CommandContext(ctx, "docker", "--host", "unix:///var/run/docker.sock", "inspect", id).Output()
+			cancel()
+			if err != nil || !historyCIFixtureMatches(raw, id, kind) {
+				t.Fatal("actual CI job database inspection rejected")
+			}
+		}
+		return
+	}
 	if os.Getenv("QS_HISTORY_CLI_LOCAL_INTEGRATION") != "1" {
 		t.Skip("owned CLI native fixtures not selected")
 	}
 	if os.Getenv("MYSQL_HOST") != "127.0.0.1" || os.Getenv("MYSQL_PORT") != "34306" || os.Getenv("MONGODB_HOST") != "127.0.0.1" || os.Getenv("QS_HISTORY_FIXTURE_OWNERSHIP_VERIFIED") != "1" || !hashPattern.MatchString(os.Getenv("QS_HISTORY_MONGO_FIXTURE_ID")) || os.Getenv("QS_HISTORY_MONGO_REPLICA_SET") != "qs_history_cli_native" {
 		t.Fatal("independently verified owned loopback fixtures required")
+	}
+}
+
+// Only the actual job containers may supply this test-only route. Local
+// native fixtures retain their separate port, authentication and replica guards.
+func historyCIFixtureMatches(raw []byte, id, kind string) bool {
+	var rows []struct {
+		ID     string `json:"Id"`
+		Name   string
+		Config struct {
+			Image string
+			Cmd   []string
+		}
+		State struct {
+			Running bool
+			Health  struct{ Status string }
+		}
+		Mounts     []struct{ Type string }
+		HostConfig struct {
+			PortBindings map[string][]struct{ HostIP, HostPort string }
+		}
+		NetworkSettings struct {
+			Ports map[string][]struct{ HostIP, HostPort string }
+		}
+	}
+	if !hashPattern.MatchString(id) || json.Unmarshal(raw, &rows) != nil || len(rows) != 1 || rows[0].ID != id || !rows[0].State.Running {
+		return false
+	}
+	port := "3306"
+	switch kind {
+	case "MYSQL":
+		if rows[0].Config.Image != "mysql:8.4" || rows[0].State.Health.Status != "healthy" {
+			return false
+		}
+	case "MONGO":
+		port = "27017"
+		if rows[0].Config.Image != "mongo:7.0" || rows[0].Name != "/qs-runtime-closure-e2e-mongo" || strings.Join(rows[0].Config.Cmd, "\x00") != "--replSet\x00rs0\x00--bind_ip_all\x00--setParameter\x00ttlMonitorSleepSecs=1\x00--setParameter\x00enableTestCommands=1" {
+			return false
+		}
+	default:
+		return false
+	}
+	for _, mount := range rows[0].Mounts {
+		if mount.Type != "volume" {
+			return false
+		}
+	}
+	requested := rows[0].HostConfig.PortBindings[port+"/tcp"]
+	actual := rows[0].NetworkSettings.Ports[port+"/tcp"]
+	if len(requested) != 1 || requested[0].HostPort != port || requested[0].HostIP != "" && requested[0].HostIP != "0.0.0.0" || len(actual) < 1 || len(actual) > 2 {
+		return false
+	}
+	seen := map[string]bool{}
+	for _, binding := range actual {
+		if binding.HostPort != port || binding.HostIP != "0.0.0.0" && binding.HostIP != "::" || seen[binding.HostIP] {
+			return false
+		}
+		seen[binding.HostIP] = true
+	}
+	return seen["0.0.0.0"]
+}
+
+func TestHistoryCIFixtureRequiresActualJobContainers(t *testing.T) {
+	id := strings.Repeat("a", 64)
+	for _, kind := range []string{"MYSQL", "MONGO"} {
+		port, image, name, command := "3306", "mysql:8.4", "job-service", []string{}
+		if kind == "MONGO" {
+			port, image, name, command = "27017", "mongo:7.0", "qs-runtime-closure-e2e-mongo", []string{"--replSet", "rs0", "--bind_ip_all", "--setParameter", "ttlMonitorSleepSecs=1", "--setParameter", "enableTestCommands=1"}
+		}
+		cmd, err := json.Marshal(command)
+		if err != nil {
+			t.Fatal("fixture command encode")
+		}
+		valid := `[{"Id":"` + id + `","Name":"/` + name + `","Config":{"Image":"` + image + `","Cmd":` + string(cmd) + `},"State":{"Running":true,"Health":{"Status":"healthy"}},"HostConfig":{"PortBindings":{"` + port + `/tcp":[{"HostIp":"","HostPort":"` + port + `"}]}},"NetworkSettings":{"Ports":{"` + port + `/tcp":[{"HostIp":"0.0.0.0","HostPort":"` + port + `"},{"HostIp":"::","HostPort":"` + port + `"}]}}}]`
+		if !historyCIFixtureMatches([]byte(valid), id, kind) {
+			t.Fatal("actual job fixture route rejected")
+		}
+		invalid := map[string]string{
+			"container": strings.Replace(valid, `"Id":"`+id, `"Id":"`+strings.Repeat("b", 64), 1),
+			"image":     strings.Replace(valid, image, "other:latest", 1),
+			"stopped":   strings.Replace(valid, `"Running":true`, `"Running":false`, 1),
+			"port":      strings.Replace(valid, `"HostPort":"`+port+`"`, `"HostPort":"34306"`, 1),
+			"host":      strings.Replace(valid, `"HostIp":"0.0.0.0"`, `"HostIp":"192.0.2.1"`, 1),
+			"duplicate": strings.TrimSuffix(valid, "]") + "," + strings.TrimPrefix(valid, "["),
+			"bind":      strings.Replace(valid, `"State":`, `"Mounts":[{"Type":"bind"}],"State":`, 1),
+		}
+		if kind == "MONGO" {
+			invalid["test_commands_missing"] = strings.Replace(valid, `,"--setParameter","enableTestCommands=1"`, "", 1)
+			invalid["test_commands_disabled"] = strings.Replace(valid, `"enableTestCommands=1"`, `"enableTestCommands=0"`, 1)
+			invalid["extra_command"] = strings.Replace(valid, `"enableTestCommands=1"`, `"enableTestCommands=1","--unexpected"`, 1)
+		}
+		for key, raw := range invalid {
+			t.Run(kind+"/"+key, func(t *testing.T) {
+				if historyCIFixtureMatches([]byte(raw), id, kind) {
+					t.Fatal("unbound job fixture accepted")
+				}
+			})
+		}
+		if kind == "MYSQL" && historyCIFixtureMatches([]byte(strings.Replace(valid, "healthy", "starting", 1)), id, kind) || kind == "MONGO" && (historyCIFixtureMatches([]byte(strings.Replace(valid, "rs0", "other", 1)), id, kind) || historyCIFixtureMatches([]byte(strings.Replace(valid, name, "other", 1)), id, kind)) {
+			t.Fatal("actual job health/name/replica command rejected incorrectly")
+		}
 	}
 }
 func nativeToken(t *testing.T) string {
@@ -69,7 +193,7 @@ func nativeFixture(t *testing.T, nonempty bool) (*sql.DB, *mongo.Client, *mongo.
 	c.User = os.Getenv("MYSQL_USERNAME")
 	c.Passwd = os.Getenv("MYSQL_PASSWORD")
 	c.Net = "tcp"
-	c.Addr = "127.0.0.1:34306"
+	c.Addr = "127.0.0.1:" + os.Getenv("MYSQL_PORT")
 	c.ParseTime = true
 	c.Loc = time.UTC
 	c.MultiStatements = true
@@ -109,18 +233,33 @@ func nativeFixture(t *testing.T, nonempty bool) (*sql.DB, *mongo.Client, *mongo.
 			t.Error("owned SQL pool close failed")
 		}
 	})
-	v, _, err := migration.NewMigrator(pool, &migration.Config{Enabled: true, Database: namespace}).Run()
-	if err != nil || v != 99 {
-		t.Fatal("actual additive99 fixture migration failed")
-	}
+	nativeHistoricalSchema(t, pool, nil, namespace)
 	mongoPort, e := strconv.Atoi(os.Getenv("MONGODB_PORT"))
 	if e != nil || mongoPort < 1024 || mongoPort > 65535 || mongoPort == 33317 {
 		t.Fatal("independently owned Mongo port required")
 	}
-	adminOptions := options.Client().SetHosts([]string{"127.0.0.1:" + strconv.Itoa(mongoPort)}).SetReplicaSet("qs_history_cli_native").SetAuth(options.Credential{Username: os.Getenv("QS_HISTORY_MONGO_ADMIN_USERNAME"), Password: os.Getenv("QS_HISTORY_MONGO_ADMIN_PASSWORD"), AuthSource: "admin"}).SetConnectTimeout(10 * time.Second).SetServerSelectionTimeout(10 * time.Second)
+	adminOptions := options.Client().SetHosts([]string{"127.0.0.1:" + strconv.Itoa(mongoPort)}).SetReplicaSet(os.Getenv("QS_HISTORY_MONGO_REPLICA_SET")).SetConnectTimeout(10 * time.Second).SetServerSelectionTimeout(10 * time.Second)
+	if os.Getenv("QS_HISTORY_CLI_CI_INTEGRATION") != "1" {
+		adminOptions.SetAuth(options.Credential{Username: os.Getenv("QS_HISTORY_MONGO_ADMIN_USERNAME"), Password: os.Getenv("QS_HISTORY_MONGO_ADMIN_PASSWORD"), AuthSource: "admin"})
+	}
 	adminMongo, err := mongo.Connect(t.Context(), adminOptions)
 	if err != nil || adminMongo.Ping(t.Context(), readpref.Primary()) != nil {
 		t.Fatal("owned Mongo connect failed")
+	}
+	if os.Getenv("QS_HISTORY_CLI_CI_INTEGRATION") == "1" {
+		var hello struct {
+			SetName string `bson:"setName"`
+			Primary bool   `bson:"isWritablePrimary"`
+		}
+		var config struct {
+			Config struct {
+				ID      string `bson:"_id"`
+				Members []struct{ Host string }
+			}
+		}
+		if adminMongo.Database("admin").RunCommand(t.Context(), bson.D{{Key: "hello", Value: 1}}).Decode(&hello) != nil || hello.SetName != "rs0" || !hello.Primary || adminMongo.Database("admin").RunCommand(t.Context(), bson.D{{Key: "replSetGetConfig", Value: 1}}).Decode(&config) != nil || config.Config.ID != "rs0" || len(config.Config.Members) != 1 || config.Config.Members[0].Host != "127.0.0.1:27017" {
+			t.Fatal("actual CI Mongo replica configuration rejected")
+		}
 	}
 	db := adminMongo.Database(namespace)
 	role, user, password := "qs_history_cli_role_"+token, "qs_history_cli_user_"+token, nativeToken(t)+nativeToken(t)
@@ -170,10 +309,7 @@ func nativeFixture(t *testing.T, nonempty bool) (*sql.DB, *mongo.Client, *mongo.
 	})
 	// The business qualifier requires the real complete unique indexes; a
 	// hand-created _id-only catalog cannot prove business identity uniqueness.
-	mongoVersion, _, migrationErr := migration.NewMongoMigrator(adminMongo, &migration.Config{Enabled: true, Database: namespace}).Run()
-	if migrationErr != nil || mongoVersion != 38 {
-		t.Fatal("actual additive38 Mongo fixture migration failed")
-	}
+	nativeHistoricalSchema(t, nil, adminMongo, namespace)
 	if adminMongo.Database("admin").RunCommand(t.Context(), bson.D{{Key: "createRole", Value: role}, {Key: "privileges", Value: bson.A{bson.D{{Key: "resource", Value: bson.D{{Key: "cluster", Value: true}}}, {Key: "actions", Value: bson.A{"replSetGetConfig"}}}}}, {Key: "roles", Value: bson.A{}}}).Err() != nil {
 		t.Fatal("owned Mongo identity read role create failed")
 	}
@@ -190,6 +326,72 @@ func nativeFixture(t *testing.T, nonempty bool) (*sql.DB, *mongo.Client, *mongo.
 		nativeOriginalSubmission(t, db)
 	}
 	return pool, adminMongo, db, namespace
+}
+
+// Retained history tests read A's actual complete99/38 layout. Latest ordinary
+// startup now requires B's paired retirement preflight and cannot be used as a
+// historical fixture factory. These explicit targets are test-only and never
+// change the runtime migrator, old migration bytes or borrowed pool lifetime.
+func nativeHistoricalSchema(t *testing.T, pool *sql.DB, client *mongo.Client, namespace string) {
+	t.Helper()
+	backend, target := "mysql", uint(99)
+	if client != nil {
+		backend, target = "mongodb", 38
+	}
+	source, err := iofs.New(os.DirFS("../../internal/pkg/migration/migrations/"+backend), ".")
+	if err != nil {
+		t.Fatal("owned historical migration source")
+	}
+	defer func() {
+		if source.Close() != nil {
+			t.Error("owned historical migration source close")
+		}
+	}()
+	var instance *golangmigrate.Migrate
+	if pool != nil {
+		conn, e := pool.Conn(t.Context())
+		if e != nil {
+			t.Fatal("owned historical SQL connection")
+		}
+		defer func() {
+			if conn.Close() != nil {
+				t.Error("owned historical SQL connection close")
+			}
+		}()
+		driver, e := migratemysql.WithConnection(t.Context(), conn, &migratemysql.Config{DatabaseName: namespace, MigrationsTable: "schema_migrations"})
+		if e != nil {
+			t.Fatal("owned historical SQL driver")
+		}
+		instance, err = golangmigrate.NewWithInstance("iofs", source, namespace, driver)
+	} else {
+		cleanup, e := migration.NewMongoDriver(client).PrepareRun(t.Context(), &migration.Config{Enabled: true, Database: namespace, MigrationsCollection: "schema_migrations"}, 0)
+		if e != nil {
+			t.Fatal("owned historical Mongo preconditions")
+		}
+		defer func() {
+			if cleanup(t.Context()) != nil {
+				t.Error("owned historical Mongo precondition close")
+			}
+		}()
+		driver, e := migratemongo.WithInstance(client, &migratemongo.Config{DatabaseName: namespace, MigrationsCollection: "schema_migrations"})
+		if e != nil {
+			t.Fatal("owned historical Mongo driver")
+		}
+		instance, err = golangmigrate.NewWithInstance("iofs", source, namespace, driver)
+	}
+	if err != nil {
+		t.Fatal("owned historical migration instance")
+	}
+	for attempt := range 2 {
+		err = instance.Migrate(target)
+		if attempt == 0 && err != nil || attempt == 1 && !errors.Is(err, golangmigrate.ErrNoChange) {
+			t.Fatal("owned historical upgrade or repeat")
+		}
+		version, dirty, e := instance.Version()
+		if e != nil || dirty || version != target {
+			t.Fatal("owned historical clean head")
+		}
+	}
 }
 func nativeOriginalSubmission(t *testing.T, db *mongo.Database) {
 	t.Helper()
@@ -292,7 +494,7 @@ func nativeInputs(t *testing.T, pool *sql.DB, client *mongo.Client, db *mongo.Da
 	}
 	_, uuidBytes := metadata[0].Lookup("info", "uuid").Binary()
 	identities := map[string]string{"mysql": framedParts("mysql_database_identity_v1", uuid, namespace), "mongodb": framedParts("mongodb_database_identity_v1", string(encoded), db.Name(), hex.EncodeToString(uuidBytes))}
-	inv := inventoryRequest{FormatVersion: 2, Kind: "readonly_inventory_boundary_request", OperationID: "123-1", SourceSHA: sourceSHA, TargetHash: jsonHash(historyTargets), DatabaseScope: "mysql-and-mongodb", Identities: identities, Migrations: map[string]uint64{"mysql": 99, "mongodb": 38}, Limits: inventoryLimits{30, 1500, 1_000_000, 2 << 30, 1000, 1001}}
+	inv := inventoryRequest{FormatVersion: 2, Kind: "readonly_inventory_boundary_request", OperationID: "123-1", SourceSHA: sourceSHA, TargetHash: jsonHash(historyTargets), DatabaseScope: "mysql-and-mongodb", Identities: identities, Migrations: map[string]uint64{"mysql": 99, "mongodb": 38}, Limits: inventoryLimits{30, 1500, 1_000_000, 2 << 30, 10000, 1001}}
 	boundsPath := filepath.Join(opdir, "boundary-request.json")
 	boundsSHA := writeFixtureJSON(t, boundsPath, inv)
 	binary := nativeInventoryBinary(t)

@@ -26,21 +26,21 @@ func sourceOriginCanonicalBSON(raw bson.Raw) (any, error) {
 	}
 	return value, nil
 }
-func sourceOriginMongoMetadata(ctx context.Context, global *MongoResponsibilitySnapshot, limits SourceOriginLimits) (SourceBoundary, bson.RawValue, error) {
+func sourceOriginMongoDefinitionMetadata(metadata mongoCycleMetadata) (SourceBoundary, error) {
 	boundary := SourceBoundary{Database: "mongodb", Name: "domain_event_outbox", Kind: "collection", Present: true}
-	definition, ok := global.metadata.definitions[boundary.Name]
+	definition, ok := metadata.definitions[boundary.Name]
 	if !ok {
-		return boundary, bson.RawValue{}, ErrSourceSchema
+		return boundary, ErrSourceSchema
 	}
 	if definition.raw.Lookup("type").Type != bson.TypeString || definition.raw.Lookup("type").StringValue() != "collection" {
-		return boundary, bson.RawValue{}, ErrSourceSchema
+		return boundary, ErrSourceSchema
 	}
 	if collation := definition.raw.Lookup("options", "collation", "locale"); collation.Type != 0 && (collation.Type != bson.TypeString || collation.StringValue() != "simple") {
-		return boundary, bson.RawValue{}, ErrSourceSchema
+		return boundary, ErrSourceSchema
 	}
 	collection, err := sourceOriginCanonicalBSON(definition.raw)
 	if err != nil {
-		return boundary, bson.RawValue{}, err
+		return boundary, err
 	}
 	indices := make([]any, 0, len(definition.indexes))
 	idIndex := false
@@ -49,21 +49,21 @@ func sourceOriginMongoMetadata(ctx context.Context, global *MongoResponsibilityS
 			keys, e := exactBSONFields(index.Lookup("key").Document())
 			n, integer := mongoExactInteger(keys["_id"])
 			if e != nil || len(keys) != 1 || !integer || n != 1 {
-				return boundary, bson.RawValue{}, ErrSourceSchema
+				return boundary, ErrSourceSchema
 			}
 			idIndex = true
 			if collation := index.Lookup("collation", "locale"); collation.Type != 0 && (collation.Type != bson.TypeString || collation.StringValue() != "simple") {
-				return boundary, bson.RawValue{}, ErrSourceSchema
+				return boundary, ErrSourceSchema
 			}
 		}
 		value, e := sourceOriginCanonicalBSON(index)
 		if e != nil {
-			return boundary, bson.RawValue{}, e
+			return boundary, e
 		}
 		indices = append(indices, value)
 	}
 	if !idIndex {
-		return boundary, bson.RawValue{}, ErrSourceSchema
+		return boundary, ErrSourceSchema
 	}
 	sort.Slice(indices, func(i, j int) bool {
 		left, _ := sourceOriginDigest(indices[i])
@@ -72,9 +72,17 @@ func sourceOriginMongoMetadata(ctx context.Context, global *MongoResponsibilityS
 	})
 	boundary.SchemaHash, err = sourceOriginDigest(map[string]any{"collection": collection, "indexes": indices})
 	if err != nil {
-		return boundary, bson.RawValue{}, err
+		return boundary, err
 	}
 	boundary.IdentityHash = mongoOwnerHashParts("mongodb-object-v1", definition.uuid)
+	return boundary, nil
+}
+
+func sourceOriginMongoMetadata(ctx context.Context, global *MongoResponsibilitySnapshot, limits SourceOriginLimits) (SourceBoundary, bson.RawValue, error) {
+	boundary, err := sourceOriginMongoDefinitionMetadata(global.metadata)
+	if err != nil {
+		return boundary, bson.RawValue{}, err
+	}
 	q, cancel := context.WithTimeout(ctx, limits.QueryTimeout)
 	defer cancel()
 	col := global.db.Collection(boundary.Name)
@@ -117,6 +125,13 @@ func sourceOriginMongoMetadata(ctx context.Context, global *MongoResponsibilityS
 	return boundary, bson.RawValue{Type: upper.Type, Value: append([]byte(nil), upper.Value...)}, nil
 }
 func sourceOriginReadMongo(ctx context.Context, global *MongoResponsibilitySnapshot, binding *OriginCopyBinding) (SourceBoundary, SourceCopyReceipt, error) {
+	return sourceOriginReadMongoWithInput(ctx, global, binding, binding.alive, nil)
+}
+
+func sourceOriginReadMongoWithInput(ctx context.Context, global *MongoResponsibilitySnapshot, binding *OriginCopyBinding, guard func(context.Context) error, freeze sourceOriginInputSink) (SourceBoundary, SourceCopyReceipt, error) {
+	if binding == nil || global == nil || guard == nil || guard(ctx) != nil {
+		return SourceBoundary{}, SourceCopyReceipt{}, ErrSourceOrigin
+	}
 	expected := binding.expected[3]
 	boundary, upper, err := sourceOriginMongoMetadata(ctx, global, binding.limits)
 	if err != nil || boundary != expected.Boundary {
@@ -125,7 +140,7 @@ func sourceOriginReadMongo(ctx context.Context, global *MongoResponsibilitySnaps
 	decoder := &MongoSourceReader{acc: sourceAccumulator{expectation: expected, h: sha256.New()}, upper: upper}
 	if !boundary.Empty {
 		for page := uint64(0); ; page++ {
-			if err = binding.alive(ctx); err != nil {
+			if err = guard(ctx); err != nil {
 				return boundary, SourceCopyReceipt{}, err
 			}
 			if page > binding.limits.MaxRows/uint64(binding.limits.PageRows)+1 {
@@ -142,8 +157,10 @@ func sourceOriginReadMongo(ctx context.Context, global *MongoResponsibilitySnaps
 				return boundary, SourceCopyReceipt{}, ErrSourceOrigin
 			}
 			n := 0
+			var rawPage []bson.Raw
+			var pageBytes uint64
 			for cursor.Next(q) {
-				if e = binding.alive(ctx); e != nil {
+				if e = guard(ctx); e != nil {
 					break
 				}
 				raw := cursor.Current
@@ -166,6 +183,14 @@ func sourceOriginReadMongo(ctx context.Context, global *MongoResponsibilitySnaps
 				if e = sourceOriginObserve(binding.copies, value, value.Source.Database, value.Source.Object, value.Source.PrimaryKeySHA256); e != nil {
 					break
 				}
+				if freeze != nil {
+					pageBytes += uint64(len(raw))
+					if pageBytes > sourceOriginInputPageBytes {
+						e = ErrSourceBounds
+						break
+					}
+					rawPage = append(rawPage, append(bson.Raw(nil), raw...))
+				}
 				n++
 			}
 			readErr, closeErr := cursor.Err(), cursor.Close(q)
@@ -176,9 +201,19 @@ func sourceOriginReadMongo(ctx context.Context, global *MongoResponsibilitySnaps
 			if readErr != nil || closeErr != nil {
 				return boundary, SourceCopyReceipt{}, ErrSourceOrigin
 			}
+			if freeze != nil {
+				if e = freeze(ctx, sourceOriginInputFrame{Source: 3, Boundary: boundary, MongoRows: rawPage, EOF: n < binding.limits.PageRows}); e != nil {
+					return boundary, SourceCopyReceipt{}, e
+				}
+			}
 			if n < binding.limits.PageRows {
 				break
 			}
+		}
+	}
+	if boundary.Empty && freeze != nil {
+		if err = freeze(ctx, sourceOriginInputFrame{Source: 3, Boundary: boundary, EOF: true}); err != nil {
+			return boundary, SourceCopyReceipt{}, err
 		}
 	}
 	if err = decoder.acc.finish(); err != io.EOF {

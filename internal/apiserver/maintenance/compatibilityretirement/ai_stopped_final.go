@@ -29,7 +29,7 @@ try:
     if not isinstance(settings, dict) or not set(settings) <= allowed or not all(isinstance(k, str) and isinstance(v, str) and not any(c in v for c in "\x00\r\n") for k, v in settings.items()):
         raise ValueError()
     host = base64.b64decode(envelope["host"], validate=True)
-    if hashlib.sha256(host).hexdigest() != "e1d06df65b11ea66fe8930ca0012f6ac3b8c120888f490f399236cbb3d0b5268":
+    if hashlib.sha256(host).hexdigest() != "2c83079dc8466b8ccd61a832bc957cd52c538cc2ddda5ded6dcaad1ed1795bb3":
         raise ValueError()
     packet = base64.b64decode(envelope["packet"], validate=True)
     identity = json.loads(packet)

@@ -1071,7 +1071,22 @@ func openLifecycleHistoricalWriteMaterialFiles(ctx context.Context, path string,
 		return nil, lifecycleError("lifecycle_history_original_material_rejected")
 	}
 	var manifest lifecycleHistoricalMaterialManifest
-	if decodeLifecycleClosedProducer(raw, &manifest) != nil || manifest.Version != 1 || manifest.SourceSHA != report.SourceSHA || manifest.ToolSourceSHA != report.ToolSourceSHA || manifest.OperationID != report.OperationID || manifest.RunID != report.ActualRunID || manifest.MaxSpoolBytes != 16<<30 || manifest.JournalSequence > 1<<20 || len(manifest.Files) != int(manifest.JournalSequence)+2 {
+	if decodeLifecycleClosedProducer(raw, &manifest) != nil || manifest.SourceSHA != report.SourceSHA || manifest.ToolSourceSHA != report.ToolSourceSHA || manifest.OperationID != report.OperationID || manifest.RunID != report.ActualRunID || manifest.MaxSpoolBytes != 16<<30 || manifest.JournalSequence > 1<<20 {
+		return nil, lifecycleError("lifecycle_history_original_material_rejected")
+	}
+	// The source-bound producer version determines the entire spool namespace.
+	// Never adopt names from a directory or combine an old prepared epoch with
+	// the new two-input/owner protocol. Reports still grant no write authority.
+	var spoolNames []string
+	switch manifest.Version {
+	case 1:
+		spoolNames = []string{"prepared-mongo-private.bin", "prepared-sql-private.bin"}
+	case 2:
+		spoolNames = []string{"input-mongo-1.private.bin", "input-source-1.private.bin", "input-ai-1.private.bin", "input-mongo-2.private.bin", "input-source-2.private.bin", "input-ai-2.private.bin", "input-owner-sql.private.bin"}
+	default:
+		return nil, lifecycleError("lifecycle_history_original_material_rejected")
+	}
+	if len(manifest.Files) != int(manifest.JournalSequence)+len(spoolNames) {
 		return nil, lifecycleError("lifecycle_history_original_material_rejected")
 	}
 	var rawMembers struct {
@@ -1084,21 +1099,16 @@ func openLifecycleHistoricalWriteMaterialFiles(ctx context.Context, path string,
 		if ctx.Err() != nil {
 			return nil, ctx.Err()
 		}
-		name := "prepared-mongo-private.bin"
-		if index == 1 {
-			name = "prepared-sql-private.bin"
-		}
-		if index > 1 {
-			name = "journal-" + strconv.Itoa(index-1) + ".json"
-		}
+		name := "journal-" + strconv.Itoa(index-len(spoolNames)+1) + ".json"
 		maximum := int64(64 << 10)
-		if index < 2 {
+		if index < len(spoolNames) {
+			name = spoolNames[index]
 			maximum = 16 << 30
 		}
 		if decodeLifecycleClosedProducer(rawMembers.Files[index], &member) != nil || member.Name != name || !hashRE.MatchString(member.SHA256) || member.Bytes < 0 || member.Bytes > maximum || member.UID != uid || member.Mode != 0600 || member.Inode == 0 {
 			return nil, lifecycleError("lifecycle_history_original_material_rejected")
 		}
-		if index < 2 {
+		if index < len(spoolNames) {
 			err = d.registerHistoricalCASSpool(name, member.SHA256, uid)
 		} else {
 			err = d.register(name, member.SHA256, uid, 0600)
@@ -1406,7 +1416,7 @@ func openLifecycleHistoricalWriteInputFiles(ctx context.Context, r lifecycleRequ
 		return nil, nil, lifecycleError("lifecycle_history_original_material_rejected")
 	}
 	b := ai.Bounds
-	if b.Scope != "diagnostic-unapproved-bounds-only" || !hashRE.MatchString(b.SourceSHA256) || b.RuntimeBindingSHA256 != input.RuntimeBindingSHA256 || b.AIBoundsSHA256 != input.AIBounds.SHA256 || b.PeerBoundsSHA256 != input.PeerBounds.SHA256 || b.AIPhysicalObjects != 43 && b.AIPhysicalObjects != 53 || b.AILogicalObjects != 53 || b.PeerObjects != 14 || b.IndependentEpochs != 2 || b.IndependentApproval || b.BusinessClosure || b.WriterFence || b.BrokerCoverage || b.CASAuthority || b.RetirementWritten || b.RecoveryAuthority || b.DropReady {
+	if b.Scope != "diagnostic-unapproved-bounds-only" || !hashRE.MatchString(b.SourceSHA256) || b.RuntimeBindingSHA256 != input.RuntimeBindingSHA256 || b.AIBoundsSHA256 != input.AIBounds.SHA256 || b.PeerBoundsSHA256 != input.PeerBounds.SHA256 || b.AIPhysicalObjects != 44 && b.AIPhysicalObjects != 53 || b.AILogicalObjects != 53 || b.PeerObjects != 14 || b.IndependentEpochs != 2 || b.IndependentApproval || b.BusinessClosure || b.WriterFence || b.BrokerCoverage || b.CASAuthority || b.RetirementWritten || b.RecoveryAuthority || b.DropReady {
 		return nil, nil, lifecycleError("lifecycle_history_original_material_rejected")
 	}
 	if err = bounds.checkComplete(false); err != nil {

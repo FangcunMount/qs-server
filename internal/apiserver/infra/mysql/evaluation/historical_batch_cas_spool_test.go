@@ -3,10 +3,70 @@ package evaluation
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"os"
 	"reflect"
 	"testing"
 )
+
+func TestSQLHistoricalCASFrozenInputExactPhysicalFootprint(t *testing.T) {
+	id, foreign, raw := "42", "99", string([]byte{0, 0xff, 'x'})
+	f := &SQLHistoricalCASFrozenInput{before: sqlHistoricalCASImage{rows: map[string][]historicalSQLRow{
+		"assessment":         {{"id": &id, "raw": &raw, "nullable": nil}},
+		"runtime_checkpoint": {}, "evaluation_outcome": nil,
+		"cas_migration_head":    {{"id": &foreign}},
+		"shared_readonly_model": {{"id": &foreign}},
+	}}, writes: map[string]bool{"assessment:42": true}}
+	f.self, f.seal = f, f.digest()
+	var visits int
+	if err := f.RowDependencies(func(table string, n uint64, sha string, size uint64, write bool) error {
+		visits++
+		if table != "assessment" || n != 42 || sha != sqlSpoolRowSHA(f.before.rows["assessment"][0]) || size == 0 || !write {
+			t.Fatal("physical row identity/hash/write altered")
+		}
+		return nil
+	}); err != nil || visits != 1 {
+		t.Fatalf("exact physical dependency: %d %v", visits, err)
+	}
+	stop := errors.New("stop visitor")
+	if err := f.RowDependencies(func(string, uint64, string, uint64, bool) error { return stop }); !errors.Is(err, stop) {
+		t.Fatal("visitor failure swallowed")
+	}
+	if _, err := FreezeSQLHistoricalCASInput(context.Background(), nil, nil, nil); err == nil {
+		t.Fatal("detached live producer accepted")
+	}
+	if json.Unmarshal([]byte(`{}`), f) == nil {
+		t.Fatal("JSON input accepted")
+	}
+}
+
+func TestSQLHistoricalCASFrozenInputRejectsAmbiguityMissingWriteAndMutation(t *testing.T) {
+	for _, name := range []string{"duplicate", "missing-write", "zero-id", "changed", "copied"} {
+		t.Run(name, func(t *testing.T) {
+			id := "42"
+			f := &SQLHistoricalCASFrozenInput{before: sqlHistoricalCASImage{rows: map[string][]historicalSQLRow{"assessment": {{"id": &id}}}}, writes: map[string]bool{"assessment:42": true}}
+			switch name {
+			case "duplicate":
+				f.before.rows["assessment"] = append(f.before.rows["assessment"], f.before.rows["assessment"][0])
+			case "missing-write":
+				f.writes["evaluation_outcome:99"] = true
+			case "zero-id":
+				id = "0"
+			}
+			f.self, f.seal = f, f.digest()
+			if name == "changed" {
+				id = "43"
+			}
+			if name == "copied" {
+				copy := *f
+				f = &copy
+			}
+			if err := f.RowDependencies(func(string, uint64, string, uint64, bool) error { return nil }); err == nil {
+				t.Fatal("ambiguous, changed or unproduced footprint accepted")
+			}
+		})
+	}
+}
 
 func TestSQLSpoolCodecPreservesPhysicalNullAndNonUTF8RawColumns(t *testing.T) {
 	empty, raw, id, clock := "", string([]byte{0, 0xff, 0x80, 'x'}), "7", "2026-10-09 01:02:03.123000"

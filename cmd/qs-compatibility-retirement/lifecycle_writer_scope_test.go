@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"database/sql"
 	"encoding/json"
@@ -657,5 +658,151 @@ func TestDatabaseOriginalRestoreReconcilesLostEffectBeforeRetry(t *testing.T) {
 	}
 	if e := m.ExpectationsWereMet(); e != nil {
 		t.Fatal(e)
+	}
+}
+
+// This checks journal bytes only. It does not import a lease or claim the
+// protected root file reader/native database reopening was exercised.
+func TestDatabaseAdmissionJournalRequiresExactSettledOriginalPair(t *testing.T) {
+	expected := lifecycleDBAdmissionEffect{Kind: "original-database-admission-effect/v1", Database: "mysql", Action: "restore", SourceSHA: strings.Repeat("a", 40), OperationID: "12-1", ActualRunID: "22-1", WindowStartSHA256: strings.Repeat("b", 64), BasisSHA256: strings.Repeat("c", 64), PrincipalSHA256: strings.Repeat("d", 64)}
+	raw, err := json.Marshal(expected)
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw = append(raw, '\n')
+	if lifecycleDBAdmissionRecordsMatch(raw, raw, expected) != nil {
+		t.Fatal("exact original settled pair rejected")
+	}
+	for name, mutate := range map[string]func(*lifecycleDBAdmissionEffect){
+		"different-source":    func(v *lifecycleDBAdmissionEffect) { v.SourceSHA = strings.Repeat("e", 40) },
+		"different-operation": func(v *lifecycleDBAdmissionEffect) { v.OperationID = "13-1" },
+		"different-run":       func(v *lifecycleDBAdmissionEffect) { v.ActualRunID = "23-1" },
+		"different-window":    func(v *lifecycleDBAdmissionEffect) { v.WindowStartSHA256 = strings.Repeat("e", 64) },
+		"different-basis":     func(v *lifecycleDBAdmissionEffect) { v.BasisSHA256 = strings.Repeat("e", 64) },
+		"different-principal": func(v *lifecycleDBAdmissionEffect) { v.PrincipalSHA256 = strings.Repeat("e", 64) },
+		"different-store":     func(v *lifecycleDBAdmissionEffect) { v.Database = "mongodb" },
+		"different-action":    func(v *lifecycleDBAdmissionEffect) { v.Action = "lock" },
+	} {
+		t.Run(name, func(t *testing.T) {
+			changed := expected
+			mutate(&changed)
+			other, e := json.Marshal(changed)
+			if e != nil {
+				t.Fatal(e)
+			}
+			other = append(other, '\n')
+			if lifecycleDBAdmissionRecordsMatch(raw, other, expected) == nil || lifecycleDBAdmissionRecordsMatch(other, raw, expected) == nil {
+				t.Fatal("different original effect became a settled pair")
+			}
+		})
+	}
+	for _, pair := range [][2][]byte{{raw, nil}, {nil, raw}, {nil, nil}, {raw, append(append([]byte(nil), raw...), '\n')}, {raw, bytes.Replace(raw, []byte(`"Action":"restore"`), []byte(`"Action":"restore","Action":"restore"`), 1)}} {
+		if lifecycleDBAdmissionRecordsMatch(pair[0], pair[1], expected) == nil {
+			t.Fatal("unknown, noncanonical or duplicate effect became settled")
+		}
+	}
+}
+
+func TestDatabaseSettledRestoreRechecksCurrentStateWithoutAnotherALTER(t *testing.T) {
+	for _, current := range []string{"N", "Y", "unexpected"} {
+		t.Run(current, func(t *testing.T) {
+			v, m := databaseWriterSQLFixture(t)
+			p := v.input.SQLPrincipals[0]
+			m.ExpectQuery(regexp.QuoteMeta("SELECT account_locked FROM mysql.user WHERE User=? AND Host=?")).WithArgs(p.User, p.HostOrDatabase).WillReturnRows(sqlmock.NewRows([]string{"locked"}).AddRow(current))
+			e := v.checkSettledAdmissionRestore(t.Context(), "mysql", p, nil)
+			if (e == nil) != (current == "N") || m.ExpectationsWereMet() != nil {
+				t.Fatal("settled result overwrote changed state or repeated an ALTER", e)
+			}
+		})
+	}
+}
+
+func TestDatabaseReopenRestoreStateBeforeRefence(t *testing.T) {
+	for _, tc := range []struct {
+		name                     string
+		settled, currentRestored bool
+		category                 string
+	}{
+		{"not-attempted-still-fenced", false, false, ""},
+		{"settled-actually-restored", true, true, ""},
+		{"settled-but-still-fenced", true, false, "lifecycle_database_account_restore_conflict"},
+		{"unrecorded-currently-restored", false, true, "lifecycle_database_account_effect_unknown"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			e := lifecycleDBRestoreStateMatches(tc.settled, tc.currentRestored)
+			if (e == nil) != (tc.category == "") || e != nil && lifecycleCategory(e) != tc.category {
+				t.Fatal("original restore journal and actual principal state disagreed", e)
+			}
+		})
+	}
+	// This ordinary directory cannot satisfy the protected reader. Even when
+	// natively still fenced, the reopener must read/refuse it rather than skip it.
+	if refence, e := lifecycleDBOriginalRestoreForRefence(t.TempDir(), "restore", lifecycleDBAdmissionEffect{}, false); e == nil || refence {
+		t.Fatal("still-fenced principal bypassed its original restore journal")
+	}
+}
+
+func TestDatabaseNativeReopenRejectsUnsettledRestoreWhileFenced(t *testing.T) {
+	if os.Geteuid() != 0 || os.Getenv("QS_RETIREMENT_OWNED_DB_FIXTURE") != "mysql-network-none-tmpfs" && os.Getenv("QS_RETIREMENT_OWNED_DB_FIXTURE") != "mongo-network-none-tmpfs" {
+		t.Skip("requires the existing root-owned isolated native database fixture")
+	}
+	for _, database := range []string{"mysql", "mongodb"} {
+		t.Run(database, func(t *testing.T) {
+			expected := lifecycleDBAdmissionEffect{Kind: "original-database-admission-effect/v1", Database: database, Action: "restore", SourceSHA: strings.Repeat("a", 40), OperationID: "12-1", ActualRunID: "22-1", WindowStartSHA256: strings.Repeat("b", 64), BasisSHA256: strings.Repeat("c", 64), PrincipalSHA256: strings.Repeat("d", 64)}
+			raw := append(mustLifecycleJSON(expected), '\n')
+			for _, tc := range []struct {
+				name           string
+				intent, result []byte
+				category       string
+			}{
+				{"not-attempted", nil, nil, ""},
+				{"restore-intent-only", raw, nil, "lifecycle_database_account_effect_unknown"},
+				{"restore-result-only", nil, raw, "lifecycle_database_account_effect_unknown"},
+				{"restore-byte-conflict", raw, append(append([]byte(nil), raw...), '\n'), "lifecycle_database_account_effect_unknown"},
+				{"restore-settled-but-fenced", raw, raw, "lifecycle_database_account_restore_conflict"},
+			} {
+				t.Run(tc.name, func(t *testing.T) {
+					dir, name := t.TempDir(), "database-admission-22-1-"+database+"-0-restore"
+					for suffix, body := range map[string][]byte{"intent": tc.intent, "result": tc.result} {
+						if body != nil {
+							if e := os.WriteFile(filepath.Join(dir, name+"-"+suffix+".private.json"), body, 0600); e != nil {
+								t.Fatal(e)
+							}
+						}
+					}
+					refence, e := lifecycleDBOriginalRestoreForRefence(dir, name, expected, false)
+					if refence || (e == nil) != (tc.category == "") || e != nil && lifecycleCategory(e) != tc.category {
+						t.Fatal("still-fenced principal ignored unknown/conflicting original restore", e)
+					}
+				})
+			}
+		})
+	}
+}
+
+func TestDatabaseRecoveryBasisKeepsOriginalCatalogAndRejectsUnknownEncoding(t *testing.T) {
+	_, original := databaseWriterPolicyFixture(t)
+	body, e := bson.Marshal(original)
+	if e != nil {
+		t.Fatal(e)
+	}
+	b := lifecycleDBRecoveryBasis{FormatVersion: 1, SourceSHA: strings.Repeat("a", 40), OperationID: "12-1", ActualRunID: "22-1", StaticSHA256: lifecycleDBStaticHash(original), BaselineBSON: body}
+	raw, e := json.Marshal(b)
+	if e != nil {
+		t.Fatal(e)
+	}
+	raw = append(raw, '\n')
+	decoded, e := decodeLifecycleDBRecoveryBasis(raw)
+	var catalog dbcensus.Catalog
+	if e != nil || bson.Unmarshal(decoded.BaselineBSON, &catalog) != nil || lifecycleDBStaticHash(catalog) != b.StaticSHA256 || lifecycleDBDigest(catalog.Mongo["users"]) != lifecycleDBDigest(original.Mongo["users"]) || digest(catalog.SQL["accounts"]) != digest(original.SQL["accounts"]) {
+		t.Fatal("original native BSON account/role baseline changed during encoding")
+	}
+	for _, bad := range [][]byte{nil, []byte("null\n"), raw[:len(raw)-1], append(append([]byte(nil), raw...), '\n'), bytes.Replace(raw, []byte(`"FormatVersion":1`), []byte(`"FormatVersion":1,"FormatVersion":1`), 1), bytes.Replace(raw, []byte(`"FormatVersion":1`), []byte(`"FormatVersion":1,"unknown_field":true`), 1)} {
+		if _, err := decodeLifecycleDBRecoveryBasis(bad); err == nil {
+			t.Fatal("unknown or noncanonical recovery basis accepted")
+		}
+	}
+	if settled, err := lifecycleDBAdmissionEffectSettled(t.TempDir(), "database-admission-22-1-mysql-0-restore", lifecycleDBAdmissionEffect{}); err == nil || settled {
+		t.Fatal("ordinary test directory minted protected-root settlement")
 	}
 }

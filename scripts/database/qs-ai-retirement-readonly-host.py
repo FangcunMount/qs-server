@@ -210,6 +210,16 @@ def bounds(module, packet, side):
         reject()
     if side == "peer" and not re.fullmatch(r"[1-9][0-9]{0,8}", value["head"]):
         reject()
+    # Restore only SQL metadata rows lost at the JSON boundary; cursors stay arrays.
+    row_fields = ("columns", "indexes", "generated", "foreign_keys", "checks") if side == "ai" and value["head"] == "0040_module_table_names" else ("columns",)
+    for table in value["tables"].values():
+        if not isinstance(table, dict):
+            reject()
+        for key in row_fields:
+            rows = table.get(key)
+            if not isinstance(rows, list) or any(not isinstance(row, list) for row in rows):
+                reject()
+            table[key] = [tuple(row) for row in rows]
     result = module.FullBounds(side, value["source_sha"], value["identity_hash"], value["head"],
                                value["catalog_sha256"], value["tables"])
     # Approval binds the original canonical bytes, not a reserialized substitute.
@@ -632,7 +642,8 @@ async def execute_discovery(packet, module):
         if fresh[1][1] != sections or len(bounds_set[1].tables) != 14:
             reject()
         logical_count = len(module.AI_SPECS)
-        if bounds_set[0].head == "0040_module_table_names" and (len(bounds_set[0].tables) != 43 or logical_count != 53):
+        # The fixed 0040 layout includes 43 business tables and alembic_version.
+        if bounds_set[0].head == "0040_module_table_names" and (len(bounds_set[0].tables) != 44 or logical_count != 53):
             reject()
         output = {"protocol": "qs-ai-readonly-bounds-discovery-facts/v1", **{k: packet[k] for k in ("source_sha", "operation_id", "run_id", "runtime_source_sha", "runtime_binding_sha256", "image_id", "container_id")}, "bounds": packets, "original_sections": sections, "ai_logical_objects": logical_count, "independent_epochs": 2, "scope": "diagnostic-unapproved-bounds-only", "independent_approval": False, "business_closure": False, "fence": False, "cas_authority": False, "drop_ready": False}
     finally:
@@ -675,8 +686,25 @@ def main():
         encoded = canonical(output)
         if len(encoded) > OUTPUT_LIMIT:
             reject()
-    except Exception:
-        encoded = canonical({"protocol": "qs-ai-actual-execution-failed/v1", "category": "execution_rejected"})
+    except Exception as exception:
+        unit, line = "unknown", 0
+        trace = exception.__traceback__
+        for _ in range(64):
+            if trace is None:
+                break
+            code = trace.tb_frame.f_code
+            name = os.path.basename(code.co_filename)
+            fixed_unit = {"<string>": "host", "qs-ai-retirement-readonly-host.py": "host",
+                          "qs-ai-retirement-readonly-verifier.py": "verifier",
+                          "qs-ai-retirement-readonly-observer.py": "observer",
+                          "qs-ai-retirement-0040-layout.py": "layout"}.get(name)
+            if fixed_unit is not None and code.co_name not in ("reject", "fail", "_fail") and 1 <= trace.tb_lineno <= 10000:
+                unit, line = fixed_unit, trace.tb_lineno
+            trace = trace.tb_next
+        if trace is not None:
+            unit, line = "unknown", 0
+        encoded = canonical({"protocol": "qs-ai-actual-execution-failed/v1", "category": "execution_rejected",
+                             "diagnostic": {"unit": unit, "line": line}})
         output = None
     finally:
         sys.stdout, sys.stderr = original_stdout, original_stderr

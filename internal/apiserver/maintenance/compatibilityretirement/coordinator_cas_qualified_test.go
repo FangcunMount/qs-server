@@ -95,6 +95,7 @@ func TestQualifiedCASEntryRejectsUnknownAndIdentityConflicts(t *testing.T) {
 		name   string
 		change func(*qualifiedCASRow)
 	}{
+		{"scoped_business_is_not_whole_source_evidence", func(r *qualifiedCASRow) { r.sourceObservation = &HistoricalComponentSourceObservation{} }},
 		{"current_coverage_gap_is_not_historical", func(r *qualifiedCASRow) {
 			r.candidate.HistoricalGaps = []string{"inbox_and_global_unbound_coverage_require_actual_runtime_coordinator"}
 		}},
@@ -130,6 +131,16 @@ func TestQualifiedCASPublicFactoryCannotMintFromZeroOpaqueHandles(t *testing.T) 
 			sqlPlan, mongoPlan, sealed, err := owner.PrepareQualifiedHistoricalCAS(context.Background(), &WholeSourceJointPage{}, &SourceOriginRecheckProof{}, proof)
 			if sqlPlan != nil || mongoPlan != nil || sealed != nil || !errors.Is(err, ErrCoordinatorCASQualification) {
 				t.Fatal("zero/private-report constructor minted plans")
+			}
+		}
+	}
+	for _, observed := range []*HistoricalComponentObservation{nil, {}, {nativeRW: true}} {
+		for _, external := range []*AIExternalExecutionQualification{nil, {}} {
+			for _, persisted := range []*AICommandPersistenceBatch{nil, {}} {
+				sql, mongo, refs, err := ApplyQualifiedHistoricalComponent(t.Context(), observed, external, persisted)
+				if len(sql) != 0 || mongo != nil || refs != 0 || !errors.Is(err, ErrCoordinatorCASQualification) {
+					t.Fatal("zero handles or asserted native mode minted component effects")
+				}
 			}
 		}
 	}
@@ -170,6 +181,35 @@ func TestQualifiedCASGlobalUnknownIsNotHistoricalGap(t *testing.T) {
 		change(&changed)
 		if qualifiedCASMongoGlobalKnown(changed) {
 			t.Fatal("partial/orphan global observation accepted")
+		}
+	}
+}
+
+func TestFreshComponentEntryRetainsGapRulesAndDoesNotClaimOldWholeMethod(t *testing.T) {
+	row := qualifiedCASEntryFixture("evaluation.requested")
+	row.sourceObservation = &HistoricalComponentSourceObservation{}
+	row.candidate.HistoricalGaps = []string{"storage_precision_gap"}
+	binding := HistoricalCoordinatorBinding{SourceSHA: strings.Repeat("a", 40), OperationID: "123-1"}
+	at := time.Date(2026, 10, 10, 1, 2, 3, 123456789, time.UTC)
+	if _, err := qualifiedCASEntry(binding, row, at); err == nil {
+		t.Fatal("scoped candidates entered old whole-source evidence path")
+	}
+	entry, err := qualifiedCASReferenceEntry(binding, row, at, "actual-fresh-owner-component-source-business-related-ai")
+	if err != nil || entry.Proof.Class != evidence.Unverifiable || entry.Proof.Verification.Method != "actual-fresh-owner-component-source-business-related-ai" || entry.Proof.Verification.Reason != "storage_precision_gap" || entry.Proof.Digest != row.facts.Source.Digest || entry.Proof.Digest == row.facts.ContentDigest {
+		t.Fatal("fresh scoped entry changed identity, evidence scope or explicit gap")
+	}
+	if _, err := qualifiedCASReferenceEntry(binding, row, at, "actual-whole-source-joint-fresh-origin-ai14"); err == nil {
+		t.Fatal("method scope mismatched native row origin")
+	}
+	if _, err := qualifiedCASReferenceEntry(binding, row, at, "caller_approved_complete"); err == nil {
+		t.Fatal("unknown verification method admitted")
+	}
+	// This is an entry-format regression only. No actual qualification is
+	// manufactured from the private row fixture above.
+	for _, o := range []*HistoricalComponentObservation{nil, {}, {source: row.sourceObservation, rows: []qualifiedCASRow{row}}} {
+		sql, mongo, refs, err := ApplyQualifiedHistoricalComponent(t.Context(), o, &AIExternalExecutionQualification{}, &AICommandPersistenceBatch{})
+		if err == nil || len(sql) != 0 || mongo != nil || refs != 0 {
+			t.Fatal("unbound opaque input performed physical effects")
 		}
 	}
 }

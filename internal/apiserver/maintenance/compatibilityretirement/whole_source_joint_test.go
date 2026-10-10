@@ -11,8 +11,48 @@ import (
 	"testing"
 	"time"
 
+	interpretmongo "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/interpretation"
+	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 	"go.mongodb.org/mongo-driver/bson"
 )
+
+func TestHistoricalComponentResponsibilityClosureRequiresNativeScopes(t *testing.T) {
+	for _, o := range []*HistoricalComponentObservation{nil, {}, {seal: "editable-summary", expires: time.Now().Add(time.Second)}} {
+		if validateHistoricalComponentResponsibilityClosure(t.Context(), o) == nil {
+			t.Fatal("summary or absent native scope became necessary responsibility closure")
+		}
+	}
+}
+
+func TestHistoricalComponentSelectedMongoExecutionMustBeTerminal(t *testing.T) {
+	finished := fixtureClock
+	for _, tc := range []struct {
+		name, status, disposition string
+		lease                     *time.Time
+		closed                    bool
+	}{
+		{"succeeded", "succeeded", "", nil, true},
+		{"pending", "pending", "", nil, false},
+		{"running", "running", "", nil, false},
+		{"lease", "succeeded", "", &finished, false},
+		{"manual", "failed", "manual_required", nil, false},
+		{"automatic", "failed", "automatic", nil, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			run := interpretmongo.InterpretationRunPO{GenerationID: 10, Attempt: 1, Status: tc.status, FinishedAt: &finished, RetryDisposition: tc.disposition, LeaseExpiresAt: tc.lease}
+			run.DomainID = meta.FromUint64(11)
+			raw, err := bson.Marshal(run)
+			if err != nil {
+				t.Fatal(err)
+			}
+			indexes := map[string]map[string]map[uint64][]bson.Raw{"interpretation_runs": {"domain_id": {11: {raw}}}}
+			err = historicalComponentSelectedMongoTerminal(indexes)
+			if (err == nil) != tc.closed {
+				t.Fatalf("selected native run terminal classification: %v", err)
+			}
+		})
+	}
+}
 
 func wholeJointUnitFixture(t *testing.T, ai int, paired bool) authFixture {
 	t.Helper()

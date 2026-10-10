@@ -24,26 +24,57 @@ func TestFinalHistoricalEntryReadbackRetainsOriginalConclusionAndRejectsDrift(t 
 	if finalMatchEventEntry(binding, row, stored) != nil || stored.Proof.Class != evidence.Unverifiable {
 		t.Fatal("accepted pure historical gap changed")
 	}
+	// Persisted entry-format data does not create an opaque final observation.
+	// Both original write methods must survive the fresh whole read comparison.
+	scoped := stored.Clone()
+	scoped.Proof.Verification.Method = "actual-fresh-owner-component-source-business-related-ai"
+	if finalMatchEventEntry(binding, row, scoped) != nil {
+		t.Fatal("persisted scoped method rejected by fresh whole readback")
+	}
+	if stored.Proof.Verification.Method != "actual-whole-source-joint-fresh-origin-ai14" || scoped.Proof.Verification.Method != "actual-fresh-owner-component-source-business-related-ai" {
+		t.Fatal("persisted writer method relabelled")
+	}
 	for _, tc := range []struct {
 		name   string
 		change func(*evidence.HistoricalReferenceEntryV1)
 	}{
 		{"source_bytes", func(v *evidence.HistoricalReferenceEntryV1) { v.Proof.Digest.SHA256 = strings.Repeat("9", 64) }},
+		{"source_reference", func(v *evidence.HistoricalReferenceEntryV1) { v.Source.Digest.SHA256 = strings.Repeat("9", 64) }},
 		{"binding", func(v *evidence.HistoricalReferenceEntryV1) { v.Proof.BusinessBindingSHA256 = strings.Repeat("9", 64) }},
 		{"operation", func(v *evidence.HistoricalReferenceEntryV1) { v.Proof.Verification.OperationID = "124-1" }},
 		{"verifier", func(v *evidence.HistoricalReferenceEntryV1) { v.Proof.Verification.Version = "different" }},
+		{"unknown_method", func(v *evidence.HistoricalReferenceEntryV1) { v.Proof.Verification.Method = "unknown-original-writer" }},
 		{"conclusion", func(v *evidence.HistoricalReferenceEntryV1) { v.Proof.Class = evidence.RetiredVerified }},
 		{"reason", func(v *evidence.HistoricalReferenceEntryV1) { v.Proof.Verification.Reason = "unknown_execution" }},
 		{"event_id", func(v *evidence.HistoricalReferenceEntryV1) { v.EventID = "different" }},
+		{"original_run", func(v *evidence.HistoricalReferenceEntryV1) {
+			v.Run = &evidence.HistoricalRunReferenceV1{RunID: "42:1", Attempt: 1}
+		}},
 		{"missing_proof", func(v *evidence.HistoricalReferenceEntryV1) { v.Proof = nil }},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			v := stored.Clone()
-			tc.change(&v)
-			if finalMatchEventEntry(binding, row, v) == nil {
-				t.Fatal("changed persisted original accepted")
+			for _, original := range []evidence.HistoricalReferenceEntryV1{stored, scoped} {
+				v := original.Clone()
+				tc.change(&v)
+				if finalMatchEventEntry(binding, row, v) == nil {
+					t.Fatal("changed persisted original accepted")
+				}
 			}
 		})
+	}
+	mongoRow := qualifiedCASEntryFixture("answersheet.submitted")
+	appendHistoricalComponentMongoGaps(&mongoRow.candidate, []string{"sql_retry_event_hold_and_dead_letter_not_mongo_stores", "inbox_and_global_unbound_coverage_require_actual_runtime_coordinator", "storage_precision_gap"})
+	mongoStored, e := qualifiedCASEntry(binding, mongoRow, stored.Proof.Verification.VerifiedAt)
+	if e != nil || mongoStored.Proof.Verification.Reason != "storage_precision_gap" {
+		t.Fatal("whole Mongo candidate coverage changed historical conclusion", e)
+	}
+	mongoStored.Proof.Verification.Method = scoped.Proof.Verification.Method
+	if finalMatchEventEntry(binding, mongoRow, mongoStored) != nil {
+		t.Fatal("whole Mongo readback rejected retained scoped writer")
+	}
+	appendHistoricalComponentMongoGaps(&mongoRow.candidate, []string{"unknown_current_responsibility"})
+	if finalMatchEventEntry(binding, mongoRow, mongoStored) == nil {
+		t.Fatal("unknown current coverage promoted to persisted historical evidence")
 	}
 	row.candidate.BlockingReasons = []string{"unknown_execution"}
 	if finalMatchEventEntry(binding, row, stored) == nil {

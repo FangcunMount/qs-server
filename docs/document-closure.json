@@ -2,8 +2,8 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "964eb973598c649de32da2932e95f2a385777295",
-    "verified_on": "2026-10-10"
+    "sha": "2e872afe5136642354e1cf21c8a6c0ed8182d209",
+    "verified_on": "2026-10-11"
   },
   "status_policy": {
     "doc_status": [
@@ -12406,10 +12406,10 @@
         {
           "kind": "source_selector",
           "path": "cmd/qs-compatibility-history/write_pipeline.go",
-          "selector": "proof, err := anchor.RecheckSnapshots(ctx, current, global, a.readers())",
+          "selector": "retirement.PrepareHistoricalComponentObservation(paired, component, inputs.sources, inputs.ai, d.mongo, 20*time.Second, true)",
           "result": "matched",
-          "source_sha": "23bacb7d4a05bd711e353655eca85219514edb49",
-          "verified_on": "2026-10-09"
+          "source_sha": "1cbb13e5d6bf6514cd0c244ec43fcf65b7f19133",
+          "verified_on": "2026-10-10"
         },
         {
           "kind": "source_selector",

@@ -551,13 +551,18 @@ func (d *lifecycleMaterialDirectory) register(name, expected string, uid uint32,
 	return d.registerWithMaximum(name, expected, uid, mode, 2<<30)
 }
 
-// Only the original historical producer's two named spools use its existing
-// 16GiB per-file budget. Other registrations retain their 2GiB bound.
+// Only the versioned historical producer's exact spool names use its existing
+// 16GiB per-file budget. The source-bound manifest validates the whole name set;
+// other registrations retain their 2GiB bound.
 func (d *lifecycleMaterialDirectory) registerHistoricalCASSpool(name, expected string, uid uint32) error {
-	if name != "prepared-mongo-private.bin" && name != "prepared-sql-private.bin" {
+	switch name {
+	case "prepared-mongo-private.bin", "prepared-sql-private.bin",
+		"input-mongo-1.private.bin", "input-source-1.private.bin", "input-ai-1.private.bin",
+		"input-mongo-2.private.bin", "input-source-2.private.bin", "input-ai-2.private.bin", "input-owner-sql.private.bin":
+		return d.registerWithMaximum(name, expected, uid, 0600, 16<<30)
+	default:
 		return lifecycleError("lifecycle_material_registration_rejected")
 	}
-	return d.registerWithMaximum(name, expected, uid, 0600, 16<<30)
 }
 
 func (d *lifecycleMaterialDirectory) registerWithMaximum(name, expected string, uid uint32, mode os.FileMode, maximum int64) error {

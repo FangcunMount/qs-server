@@ -26,6 +26,7 @@ type RemoteController struct {
 	closed                                 bool
 	managementBound, stopIssued            bool
 	forwardRefused, recoveryIssued         bool
+	recoveryOnly, recoveryChecked          bool
 	controlledIssued, controlledResumed    bool
 	runtimeObservation                     *RemoteRuntimeObservation
 	materialsZero                          *RemoteMaterialZero
@@ -46,6 +47,21 @@ func OpenLiveRemoteController(ctx context.Context, i *BudgetIssuer, in, out *os.
 	c.self = c
 	return c, nil
 }
+
+// A fresh recovery channel is not a continuation of Stop. Only its signed
+// check_recovery reply can establish actual original recovery management.
+func OpenLiveRecoveryRemoteController(ctx context.Context, i *BudgetIssuer, in, out *os.File) (*RemoteController, error) {
+	c, e := OpenLiveRemoteController(ctx, i, in, out)
+	if e != nil {
+		return nil, e
+	}
+	d, e := i.window.Diagnostic(ctx)
+	if e != nil || d.RecoverySHA256 == "" || d.Binding != i.record.Binding || d.StartSHA256 != i.record.StartSHA256 {
+		return nil, ErrRemoteBudget
+	}
+	c.recoveryOnly = true
+	return c, nil
+}
 func (c *RemoteController) Do(ctx context.Context, action string) (v SessionDiagnostic, err error) {
 	if c == nil || c.self != c {
 		return v, ErrRemoteBudget
@@ -55,8 +71,11 @@ func (c *RemoteController) Do(ctx context.Context, action string) (v SessionDiag
 	if c.closed || ctx == nil || ctx.Err() != nil || !serviceAction(action) || c.seq >= 256 {
 		return v, ErrRemoteBudget
 	}
-	if action == "bind" && c.seq != 0 || action == "stop" && c.stopIssued || c.forwardRefused && !recoveryAction(action) || recoveryAction(action) && (c.recoveryIssued || c.seq != 0 && !c.stopIssued) ||
-		(action == "check" || recoveryReadAction(action) || action == "observe_db_principals" || action == "resume_dependents" || controlledAction(action)) && !c.stopIssued || action == "observe_db_principals" && (!c.managementBound || c.controlledIssued) || controlledAction(action) && (!c.managementBound || action == "controlled_resume" && c.controlledIssued || (action == "check_running" || action == "observe_loaded_mq" || action == "purge_materials") && !c.controlledResumed || (action == "purge_materials" || action == "observe_loaded_mq") && c.runtimeObservation == nil) {
+	if c.recoveryOnly && (action != "check_recovery" && action != "restore_dependents" || action == "restore_dependents" && !c.recoveryChecked || c.recoveryIssued) {
+		return v, ErrRemoteBudget
+	}
+	if !c.recoveryOnly && (action == "bind" && c.seq != 0 || action == "stop" && c.stopIssued || c.forwardRefused && !recoveryAction(action) || recoveryAction(action) && (c.recoveryIssued || c.seq != 0 && !c.stopIssued) ||
+		(action == "check" || recoveryReadAction(action) || action == "observe_db_principals" || action == "resume_dependents" || controlledAction(action)) && !c.stopIssued || action == "observe_db_principals" && (!c.managementBound || c.controlledIssued) || controlledAction(action) && (!c.managementBound || action == "controlled_resume" && c.controlledIssued || (action == "check_running" || action == "observe_loaded_mq" || action == "purge_materials") && !c.controlledResumed || (action == "purge_materials" || action == "observe_loaded_mq") && c.runtimeObservation == nil)) {
 		return v, ErrRemoteBudget
 	}
 	if action == "check_running_recovery" && (!c.managementBound || !c.controlledResumed) {
@@ -149,6 +168,9 @@ func (c *RemoteController) Do(ctx context.Context, action string) (v SessionDiag
 		knownRefused = true
 		c.forwardRefused = true
 		return v, ErrRemoteActionRefused
+	}
+	if c.recoveryOnly && action == "check_recovery" {
+		c.recoveryChecked = true
 	}
 	if action == "bind" {
 		c.managementBound = true

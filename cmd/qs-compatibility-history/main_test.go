@@ -50,7 +50,7 @@ func requestFixture(t *testing.T) (string, string, historyRequest) {
 	t.Helper()
 	d := privateTestDir(t)
 	mysqlID, mongoID := strings.Repeat("b", 64), strings.Repeat("c", 64)
-	inv := inventoryRequest{FormatVersion: 2, Kind: "readonly_inventory_request", OperationID: "123-1", SourceSHA: sourceSHA, TargetHash: jsonHash(historyTargets), DatabaseScope: "mysql-and-mongodb", Identities: map[string]string{"mysql": mysqlID, "mongodb": mongoID}, Migrations: map[string]uint64{"mysql": 99, "mongodb": 38}, Limits: inventoryLimits{30, 1500, 1_000_000, 2 << 30, 1000, 1001}, BoundaryRunID: "122-1", BoundaryReportHash: strings.Repeat("d", 64)}
+	inv := inventoryRequest{FormatVersion: 2, Kind: "readonly_inventory_request", OperationID: "123-1", SourceSHA: sourceSHA, TargetHash: jsonHash(historyTargets), DatabaseScope: "mysql-and-mongodb", Identities: map[string]string{"mysql": mysqlID, "mongodb": mongoID}, Migrations: map[string]uint64{"mysql": 99, "mongodb": 38}, Limits: inventoryLimits{30, 1500, 1_000_000, 2 << 30, 10000, 1001}, BoundaryRunID: "122-1", BoundaryReportHash: strings.Repeat("d", 64)}
 	report := inventoryReport{FormatVersion: 2, Kind: "readonly_compatibility_inventory", SourceSHA: sourceSHA, OperationID: inv.OperationID, RunID: "124-1", TargetHash: inv.TargetHash, ObservedAt: "2026-10-09T01:02:03Z", Complete: true, DatabaseBindings: map[string]databaseInventory{}, SourceBytesProtocol: "mysql_cast_binary_columns_pk_order_v2+mongodb_server_bson_pk_order_v2", ConsistencySemantics: "two_equal_complete_passes_within_independently_approved_upper;sql_same_readonly_snapshot;mongo_homogeneous_bson_id_simple_collation;after_upper_next_cycle_not_fenced", ErrorCategory: "none", BoundaryReportHash: inv.BoundaryReportHash, DiagnosticOnly: true}
 	for _, db := range []string{"mysql", "mongodb"} {
 		identity := inv.Identities[db]
@@ -119,7 +119,7 @@ func TestPrivateRequestFilesBoundAndEmptyMongoRetained(t *testing.T) {
 	}
 }
 func TestPrivateRequestAndAssetsFailClosed(t *testing.T) {
-	for _, mutation := range []string{"source", "op", "run", "extra", "alias", "missing", "duplicate", "null", "badrawhash", "asset_changed", "asset_symlink", "asset_hardlink", "asset_world_read", "inventory_v1", "report_drop_ready", "report_head", "report_protocol", "unapproved_advance"} {
+	for _, mutation := range []string{"source", "op", "run", "extra", "alias", "missing", "duplicate", "null", "badrawhash", "asset_changed", "asset_symlink", "asset_hardlink", "asset_world_read", "inventory_v1", "inventory_old_page_size", "inventory_arbitrary_page_size", "report_drop_ready", "report_head", "report_protocol", "unapproved_advance"} {
 		t.Run(mutation, func(t *testing.T) {
 			testSource(t)
 			path, hash, r := requestFixture(t)
@@ -178,6 +178,17 @@ func TestPrivateRequestAndAssetsFailClosed(t *testing.T) {
 				inv.FormatVersion = 1
 				r.InventoryRequest.SHA256 = writeFixtureJSON(t, r.InventoryRequest.Path, inv)
 				hash = writeFixtureJSON(t, path, r)
+			case "inventory_old_page_size", "inventory_arbitrary_page_size":
+				var inv inventoryRequest
+				if privateJSON(r.InventoryRequest, &inv) != nil {
+					t.Fatal("fixture inventory")
+				}
+				inv.Limits.PageSize = 1000
+				if mutation == "inventory_arbitrary_page_size" {
+					inv.Limits.PageSize = 9999
+				}
+				r.InventoryRequest.SHA256 = writeFixtureJSON(t, r.InventoryRequest.Path, inv)
+				hash = writeFixtureJSON(t, path, r)
 			default:
 				var report inventoryReport
 				if privateJSON(r.InventoryReport, &report) != nil {
@@ -213,6 +224,9 @@ func TestPrivateRequestAndAssetsFailClosed(t *testing.T) {
 			}
 			if strings.Contains(e.Error(), "sensitive") {
 				t.Fatal("private body leaked")
+			}
+			if (mutation == "inventory_old_page_size" || mutation == "inventory_arbitrary_page_size") && safeCategory(e) != "history_inventory_request_rejected" {
+				t.Fatal("nonproduction inventory profile rejected for a different reason")
 			}
 		})
 	}

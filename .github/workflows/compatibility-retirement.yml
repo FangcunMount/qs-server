@@ -530,6 +530,7 @@ jobs:
       - name: Package only immutable tooling
         id: package
         env:
+          RETIREMENT_MANIFEST_SHA256: ${{ inputs.manifest_sha256 }}
           RETIREMENT_PACKAGE_MODE: ${{ inputs.prepare_mode }}
           RETIREMENT_OPERATION_ID: ${{ inputs.operation_id }}
           RETIREMENT_TOOL_SOURCE_SHA: ${{ needs.validate.outputs.tool_source_sha || github.sha }}
@@ -571,8 +572,8 @@ jobs:
             tar -czf "$archive" -C "$package_dir" compatibility-retirement.py compatibility-history-prepare.py compatibility-ai-history-prepare.py compatibility-retirement-entrypoints.json receipt-transport.py history-linux-amd64 history-linux-arm64 qs-ai-retirement-readonly-host.py qs-ai-retirement-readonly-verifier.py qs-ai-retirement-readonly-observer.py qs-ai-retirement-0040-layout.py
           else
             go test ./cmd/qs-compatibility-retirement
-            CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags="-s -w -X main.sourceSHA=$GITHUB_SHA -X github.com/FangcunMount/qs-server/pkg/version.GitCommit=$GITHUB_SHA" -o "$package_dir/inventory-linux-amd64" ./cmd/qs-compatibility-retirement
-            CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -trimpath -ldflags="-s -w -X main.sourceSHA=$GITHUB_SHA -X github.com/FangcunMount/qs-server/pkg/version.GitCommit=$GITHUB_SHA" -o "$package_dir/inventory-linux-arm64" ./cmd/qs-compatibility-retirement
+            CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -buildvcs=false -trimpath -ldflags="-s -w -X main.sourceSHA=$GITHUB_SHA -X github.com/FangcunMount/qs-server/pkg/version.GitCommit=$GITHUB_SHA" -o "$package_dir/inventory-linux-amd64" ./cmd/qs-compatibility-retirement
+            CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -buildvcs=false -trimpath -ldflags="-s -w -X main.sourceSHA=$GITHUB_SHA -X github.com/FangcunMount/qs-server/pkg/version.GitCommit=$GITHUB_SHA" -o "$package_dir/inventory-linux-arm64" ./cmd/qs-compatibility-retirement
             go test ./cmd/qs-compatibility-history
             CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags="-s -w -X main.sourceSHA=$GITHUB_SHA" -o "$package_dir/history-linux-amd64" ./cmd/qs-compatibility-history
             CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -trimpath -ldflags="-s -w -X main.sourceSHA=$GITHUB_SHA" -o "$package_dir/history-linux-arm64" ./cmd/qs-compatibility-history
@@ -609,9 +610,39 @@ jobs:
           print('Installation manifest SHA256: ' + hashlib.sha256((destination / 'policy.json').read_bytes()).hexdigest())
           PYINSTALL
           fi
+          if [[ "$RETIREMENT_PACKAGE_MODE" == "window-tool" ]]; then
+            python3 - "$package_dir" "$RUNNER_TEMP/qs-retirement-host-install" <<'PYWINDOWINSTALL'
+          import hashlib, importlib.util, json, os, pathlib, sys
+          def load(name,path):
+              spec=importlib.util.spec_from_file_location(name,path);module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module);return module
+          prepare=load('approved_prepare','scripts/database/compatibility-retirement.py')
+          window=load('approved_window','scripts/database/compatibility-window-tool.py')
+          package,destination=map(pathlib.Path,sys.argv[1:]);destination.mkdir(mode=0o700)
+          native={arch:hashlib.sha256((package/('inventory-linux-'+arch)).read_bytes()).hexdigest() for arch in ('amd64','arm64')}
+          wrapper=hashlib.sha256((package/'compatibility-window-tool.py').read_bytes()).hexdigest()
+          operation=os.environ['RETIREMENT_OPERATION_ID'];source=os.environ['RETIREMENT_TOOL_SOURCE_SHA'];manifest=os.environ['RETIREMENT_MANIFEST_SHA256']
+          programs={'prepare':prepare.fixed_prepare_entry_program(operation,source,native,wrapper,manifest),'window':window.fixed_window_entry_program(operation,source,native,wrapper,manifest)}
+          entries={name:hashlib.sha256(raw).hexdigest() for name,raw in programs.items()}
+          rule=''.join('deploy ALL=(root) NOPASSWD: /usr/bin/python3 -I /usr/local/libexec/qs-retirement/'+entries[name]+'.py\n' for name in ('prepare','window')).encode()
+          for name,raw in programs.items(): (destination/(entries[name]+'.py')).write_bytes(raw)
+          (destination/'qs-retirement-window-scope').write_bytes(rule)
+          rule_hash=hashlib.sha256(rule).hexdigest()
+          policy=dict(format_version=1,kind='fixed_deploy_retirement_window_installation',operation_id=operation,source_sha=source,manifest_sha256=manifest,target_hash=window.TARGET,native_sha256=native,wrapper_sha256=wrapper,entry_sha256=entries,sudoers_sha256=rule_hash,automatic_withdrawal_connected=True)
+          (destination/'policy.json').write_text(json.dumps(policy,sort_keys=True,indent=2)+'\n')
+          (destination/'SHA256SUMS').write_text(''.join(hashlib.sha256(path.read_bytes()).hexdigest()+'  '+path.name+'\n' for path in sorted(destination.iterdir())))
+          PYWINDOWINSTALL
+          fi
           echo "sha256=$(shasum -a 256 "$archive" | awk '{print $1}')" >> "$GITHUB_OUTPUT"
+      - name: Preserve original prepare tooling for limited-entry installation
+        if: inputs.prepare_mode == 'prepare-facts'
+        uses: actions/upload-artifact@v7
+        with:
+          name: qs-retirement-prepare-tooling-${{ github.run_id }}-${{ github.run_attempt }}
+          path: qs-compatibility-retirement-${{ github.run_id }}-${{ github.run_attempt }}.tar.gz
+          if-no-files-found: error
+          retention-days: 3
       - name: Publish source-bound administrator installation files
-        if: inputs.prepare_mode == 'host-writer-scope'
+        if: inputs.prepare_mode == 'host-writer-scope' || inputs.prepare_mode == 'window-tool'
         uses: actions/upload-artifact@v7
         with:
           name: qs-retirement-host-install-${{ github.run_id }}-${{ github.run_attempt }}
@@ -634,6 +665,7 @@ jobs:
         env:
           SUDO_PASSWORD: ${{ inputs.operation == 'prepare' && (inputs.prepare_mode == 'lifecycle' || inputs.prepare_mode == 'prepare-facts' || inputs.prepare_mode == 'db-writer-census') && secrets.SVRA_SUDO_PASSWORD || '' }}
           RETIREMENT_FIXED_HOST_ENTRY_SHA256: ${{ vars.RETIREMENT_FIXED_HOST_ENTRY_SHA256 }}
+          RETIREMENT_FIXED_PREPARE_ENTRY_SHA256: ${{ vars.RETIREMENT_FIXED_PREPARE_ENTRY_SHA256 }}
           RETIREMENT_OPERATION: ${{ inputs.operation }}
           RETIREMENT_OPERATION_ID: ${{ inputs.operation_id }}
           RETIREMENT_MANIFEST_SHA256: ${{ inputs.manifest_sha256 }}
@@ -666,7 +698,7 @@ jobs:
           port: ${{ vars.SVRA_SSH_PORT || 22 }}
           fingerprint: ${{ vars.SVRA_SSH_FINGERPRINT }}
           command_timeout: ${{ (inputs.prepare_mode == 'lifecycle' || inputs.prepare_mode == 'prepare-facts') && '100m' || '35m' }}
-          envs: RETIREMENT_OPERATION,RETIREMENT_OPERATION_ID,RETIREMENT_MANIFEST_SHA256,RETIREMENT_INVENTORY_REQUEST_SHA256,RETIREMENT_LIFECYCLE_REQUEST_SHA256,RETIREMENT_PREPARE_MODE,RETIREMENT_IDENTITY_REQUEST_SHA256,RETIREMENT_BOOTSTRAP_APPROVAL_JSON,RETIREMENT_BOOTSTRAP_APPROVAL_SHA256,RETIREMENT_APPROVED_SHA,RETIREMENT_ACTUAL_SHA,RETIREMENT_RUN_ID,RETIREMENT_PACKAGE_SHA256,MYSQL_HOST,MYSQL_PORT,MYSQL_USERNAME,MYSQL_PASSWORD,MYSQL_DATABASE,MONGODB_HOST,MONGODB_PORT,MONGODB_USERNAME,MONGODB_PASSWORD,MONGODB_DBNAME,MONGODB_METADATA_ADMIN_USERNAME,MONGODB_METADATA_ADMIN_PASSWORD,SUDO_PASSWORD,RETIREMENT_FIXED_HOST_ENTRY_SHA256
+          envs: RETIREMENT_OPERATION,RETIREMENT_OPERATION_ID,RETIREMENT_MANIFEST_SHA256,RETIREMENT_INVENTORY_REQUEST_SHA256,RETIREMENT_LIFECYCLE_REQUEST_SHA256,RETIREMENT_PREPARE_MODE,RETIREMENT_IDENTITY_REQUEST_SHA256,RETIREMENT_BOOTSTRAP_APPROVAL_JSON,RETIREMENT_BOOTSTRAP_APPROVAL_SHA256,RETIREMENT_APPROVED_SHA,RETIREMENT_ACTUAL_SHA,RETIREMENT_RUN_ID,RETIREMENT_PACKAGE_SHA256,MYSQL_HOST,MYSQL_PORT,MYSQL_USERNAME,MYSQL_PASSWORD,MYSQL_DATABASE,MONGODB_HOST,MONGODB_PORT,MONGODB_USERNAME,MONGODB_PASSWORD,MONGODB_DBNAME,MONGODB_METADATA_ADMIN_USERNAME,MONGODB_METADATA_ADMIN_PASSWORD,SUDO_PASSWORD,RETIREMENT_FIXED_HOST_ENTRY_SHA256,RETIREMENT_FIXED_PREPARE_ENTRY_SHA256
           script: |
             set -Eeuo pipefail
             umask 077
@@ -921,6 +953,7 @@ jobs:
         uses: appleboy/ssh-action@v1.2.2
         env:
           SUDO_PASSWORD: ${{ secrets.SVRA_SUDO_PASSWORD }}
+          RETIREMENT_FIXED_WINDOW_ENTRY_SHA256: ${{ vars.RETIREMENT_FIXED_WINDOW_ENTRY_SHA256 }}
           RETIREMENT_OPERATION: ${{ inputs.operation }}
           RETIREMENT_OPERATION_ID: ${{ inputs.operation_id }}
           RETIREMENT_MANIFEST_SHA256: ${{ inputs.manifest_sha256 }}
@@ -949,7 +982,7 @@ jobs:
           port: ${{ vars.SVRA_SSH_PORT || 22 }}
           fingerprint: ${{ vars.SVRA_SSH_FINGERPRINT }}
           command_timeout: 115m
-          envs: RETIREMENT_OPERATION,RETIREMENT_OPERATION_ID,RETIREMENT_MANIFEST_SHA256,RETIREMENT_TEMPLATE_SHA256,RETIREMENT_DISPATCHER_SHA,RETIREMENT_RUN_ID,RETIREMENT_BOOTSTRAP_APPROVAL_JSON,RETIREMENT_BOOTSTRAP_APPROVAL_SHA256,RETIREMENT_PACKAGE_SHA256,MYSQL_HOST,MYSQL_PORT,MYSQL_USERNAME,MYSQL_PASSWORD,MYSQL_DATABASE,MONGODB_HOST,MONGODB_PORT,MONGODB_USERNAME,MONGODB_PASSWORD,MONGODB_DBNAME,MONGODB_METADATA_ADMIN_USERNAME,MONGODB_METADATA_ADMIN_PASSWORD,SUDO_PASSWORD
+          envs: RETIREMENT_OPERATION,RETIREMENT_OPERATION_ID,RETIREMENT_MANIFEST_SHA256,RETIREMENT_TEMPLATE_SHA256,RETIREMENT_DISPATCHER_SHA,RETIREMENT_RUN_ID,RETIREMENT_BOOTSTRAP_APPROVAL_JSON,RETIREMENT_BOOTSTRAP_APPROVAL_SHA256,RETIREMENT_PACKAGE_SHA256,MYSQL_HOST,MYSQL_PORT,MYSQL_USERNAME,MYSQL_PASSWORD,MYSQL_DATABASE,MONGODB_HOST,MONGODB_PORT,MONGODB_USERNAME,MONGODB_PASSWORD,MONGODB_DBNAME,MONGODB_METADATA_ADMIN_USERNAME,MONGODB_METADATA_ADMIN_PASSWORD,SUDO_PASSWORD,RETIREMENT_FIXED_WINDOW_ENTRY_SHA256
           script: |
             set -Eeuo pipefail
             umask 077

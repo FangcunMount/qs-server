@@ -480,6 +480,11 @@ func lifecycleRecover(ctx context.Context, r lifecycleRequest, a *backup.Archive
 		return err
 	}
 	defer cancel()
+	// A separate invocation must acquire actual original recovery owners before
+	// inspecting admission or reconciling DDL. This does not repeat Stop or DROP.
+	if err = host.OpenServiceManagement(q, r, w); err != nil {
+		return err
+	}
 	if err = host.CheckWholeWriterFence(q, r); err != nil {
 		return err
 	}
