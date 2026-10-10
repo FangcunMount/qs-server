@@ -1119,7 +1119,7 @@ def live_inventory(args, directory):
                 stream.write("".join(key + "=" + values[key] + "\n" for key in keys))
                 stream.flush(); os.fsync(stream.fileno())
             command = [*docker, "run", "--rm", "--name", name, "--pull=never", "--network", "infra-network",
-                       "--read-only", "--cap-drop=ALL", "--security-opt=no-new-privileges", "--cpus=0.5",
+                       "--read-only", "--cap-drop=ALL", "--security-opt=no-new-privileges", "--cpus=2",
                        "--memory=512m", "--pids-limit=64", "--user", str(os.getuid()) + ":" + str(os.getgid()),
                        "--label", "qs.compatibility-retirement.operation=" + args.operation_id,
                        "--label", "qs.compatibility-retirement.run=" + args.run_id,

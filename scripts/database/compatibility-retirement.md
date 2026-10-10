@@ -1396,6 +1396,9 @@ V2 retains the exact scope, separately approved source/operation, identity hashe
 and expected clean heads. Its immutable per-target profile is
 `query_seconds=30`, `total_seconds=1500`, `max_records=1000000`,
 `max_bytes=2147483648`, `page_size=10000`, `max_pages=1001`.
+The fixed read-only inventory container uses 2 CPUs and 512 MiB of memory;
+these are implementation bounds, with no caller override. The larger CPU budget
+does not establish production throughput or a ten-minute completion guarantee.
 The source-byte total and the actual encoded private source file each have the
 2 GiB bound; framing/base64 overhead cannot bypass the on-disk bound. Exceeding
 any record, byte, page or deadline cap remains incomplete and denies readiness.

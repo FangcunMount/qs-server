@@ -128,6 +128,47 @@ class SafetyContracts(unittest.TestCase):
         self.assertEqual(values["MYSQL_PORT"], "3306")
         self.assertEqual(values["MONGODB_PORT"], "27017")
 
+    def test_live_inventory_container_keeps_fixed_cpu_memory_and_scan_budgets(self):
+        args = self.arguments()
+        args.prepare_mode = "bounds"
+        args.inventory_request_hash = self.write("boundary-request.json", self.v2_request(boundary=True))
+        binary = self.base / "inventory-native"
+        binary.write_bytes(b"synthetic-not-executable")
+        binary.chmod(0o700)
+        args.inventory_binary = str(binary)
+        catalog = self.base / "compatibility-retirement-entrypoints.json"
+        catalog.write_bytes((SCRIPT.parent / catalog.name).read_bytes())
+        catalog.chmod(0o600)
+        commands = []
+
+        def capture(command, **options):
+            if command == [str(binary), "--source-sha"]:
+                return 0, SOURCE.encode("ascii")
+            if command[:4] == ["sudo", "-n", "docker", "image"]:
+                return 0, ("sha256:" + "c" * 64).encode("ascii")
+            if command[:4] == ["sudo", "-n", "docker", "network"]:
+                return 0, b"synthetic-network-inspected"
+            if command[:4] != ["sudo", "-n", "docker", "run"]:
+                raise AssertionError("unexpected native caller")
+            commands.append(command)
+            self.assertEqual(options["timeout"], 1530)
+            raise RuntimeError("container-command-captured")
+
+        with mock.patch.dict(tool.os.environ, self.connection_environment(), clear=True), \
+             mock.patch.object(tool, "__file__", str(self.base / SCRIPT.name)), \
+             mock.patch.object(tool, "capture_fixed", side_effect=capture):
+            with self.assertRaisesRegex(RuntimeError, "^container-command-captured$"):
+                tool.live_inventory(args, self.directory)
+        self.assertEqual(len(commands), 1)
+        command = commands[0]
+        self.assertEqual([item for item in command if item.startswith("--cpus=")], ["--cpus=2"])
+        self.assertEqual([item for item in command if item.startswith("--memory=")], ["--memory=512m"])
+        for fixed in ("--read-only", "--cap-drop=ALL", "--security-opt=no-new-privileges", "--pids-limit=64"):
+            self.assertIn(fixed, command)
+        self.assertNotIn("--privileged", command)
+        self.assertEqual(tool.INVENTORY_V2_LIMITS, {"query_seconds":30,"total_seconds":1500,
+                         "max_records":1000000,"max_bytes":2147483648,"page_size":10000,"max_pages":1001})
+
     def test_inventory_metadata_mongo_pair_is_selected_together(self):
         environment = self.connection_environment()
         environment.update(MONGODB_METADATA_ADMIN_USERNAME="synthetic-meta-user",
