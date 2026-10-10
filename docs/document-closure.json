@@ -2,7 +2,7 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "0dd83a43c4cb8b09f73e011bc2c93862dfa0284e",
+    "sha": "69ab7bf1e328adb168845f3a12bd8208df12cb7a",
     "verified_on": "2026-10-10"
   },
   "status_policy": {
@@ -7550,8 +7550,8 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
-        "verified_on": "2026-10-07"
+        "source_sha": "69ab7bf1e328adb168845f3a12bd8208df12cb7a",
+        "verified_on": "2026-10-10"
       },
       "fact_sources": [
         {
@@ -7626,6 +7626,13 @@
           "result": "passed",
           "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
           "verified_on": "2026-10-07"
+        },
+        {
+          "kind": "command",
+          "command": "go test -race -p=1 -count=1 -json ./internal/pkg/runtimefacts ./internal/pkg/eventing/transport ./internal/pkg/messagingruntime ./internal/pkg/messagingruntime/testsupport ./internal/worker/integration/messaging ./internal/worker/process ./internal/apiserver/process ./internal/apiserver/infra/aibridge ./internal/apiserver/container/modules/interpretation ./internal/collection-server/process",
+          "result": "passed",
+          "source_sha": "be823648e1b43518a7d5846cc8bf39246921eab3",
+          "verified_on": "2026-10-10"
         }
       ],
       "production_evidence": {
@@ -7896,8 +7903,8 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
-        "verified_on": "2026-10-07"
+        "source_sha": "69ab7bf1e328adb168845f3a12bd8208df12cb7a",
+        "verified_on": "2026-10-10"
       },
       "fact_sources": [
         {
@@ -7976,6 +7983,13 @@
           "result": "passed",
           "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
           "verified_on": "2026-10-07"
+        },
+        {
+          "kind": "command",
+          "command": "go test -race -p=1 -count=1 -json ./internal/pkg/runtimefacts ./internal/pkg/eventing/transport ./internal/pkg/messagingruntime ./internal/pkg/messagingruntime/testsupport ./internal/worker/integration/messaging ./internal/worker/process ./internal/apiserver/process ./internal/apiserver/infra/aibridge ./internal/apiserver/container/modules/interpretation ./internal/collection-server/process",
+          "result": "passed",
+          "source_sha": "be823648e1b43518a7d5846cc8bf39246921eab3",
+          "verified_on": "2026-10-10"
         }
       ],
       "production_evidence": {
@@ -11270,7 +11284,7 @@
       "owner": "tooling",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "0dd83a43c4cb8b09f73e011bc2c93862dfa0284e",
+        "source_sha": "69ab7bf1e328adb168845f3a12bd8208df12cb7a",
         "verified_on": "2026-10-10"
       },
       "fact_sources": [
@@ -11525,6 +11539,42 @@
         {
           "kind": "source",
           "path": "internal/apiserver/maintenance/compatibilityretirementdbcensus/*.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/pkg/runtimefacts/*.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/pkg/eventing/transport/sdk_delivery_subscriber.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/pkg/messagingruntime/nsq_wire_publisher.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/worker/process/runtime_bootstrap.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/process/resource_bootstrap.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/process/container_bootstrap.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/process/standard_event_subsystem_m4.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/infra/aibridge/messaging_runtime.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/collection-server/process/root.go"
         }
       ],
       "verification": [
@@ -12366,6 +12416,13 @@
           "selector": "func Observe(ctx context.Context, borrowedSQL *sql.DB, borrowedMongo *mongo.Client) (Catalog, error)",
           "result": "matched",
           "source_sha": "fb8c5c957dcc34edd57814c8008101050595eda1",
+          "verified_on": "2026-10-10"
+        },
+        {
+          "kind": "command",
+          "command": "go test -race -p=1 -count=1 -json ./internal/pkg/runtimefacts ./internal/pkg/eventing/transport ./internal/pkg/messagingruntime ./internal/pkg/messagingruntime/testsupport ./internal/worker/integration/messaging ./internal/worker/process ./internal/apiserver/process ./internal/apiserver/infra/aibridge ./internal/apiserver/container/modules/interpretation ./internal/collection-server/process",
+          "result": "passed",
+          "source_sha": "be823648e1b43518a7d5846cc8bf39246921eab3",
           "verified_on": "2026-10-10"
         }
       ],

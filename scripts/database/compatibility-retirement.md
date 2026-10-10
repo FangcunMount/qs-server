@@ -45,6 +45,48 @@ The exact scope is MySQL `domain_event_outbox`, `ai_bridge_commands`,
 22 CBPT objects, their private archives, normal Mongo backups and whole-db
 restores are outside this scope. No new DROP migration is included in A.
 
+## Process-owned loaded MQ facts
+
+The existing Worker consumer/retry publisher and API standard, additional,
+IAM authorization-version and AI message constructors now register their
+actual driver configuration with one [process owner](../../internal/pkg/runtimefacts/owner.go).
+Successful business and failure subscriptions are recorded after the original
+Subscribe/Connect path completes. AI TCP/HTTP pairs come from its resolved
+runtime map; other transports retain only the addresses actually supplied by
+their host, without inferring ports or dynamic lookupd producers. SDK failure
+handoff producers inherit the consumer's driver identity. Collection explicitly
+declares `no_local_mq`; this declaration applies to its local NSQ role.
+
+Each process has a fresh nonce and scope-specific ClientID, the real driver's
+Hostname, build source SHA and Linux PID/UID/start-ticks/boot identity. The
+[private Linux channel](../../internal/pkg/runtimefacts/native_linux.go) opens
+after the original preparation and shutdown-manager startup at
+`/tmp/qs-runtime-facts-<uid>/<component>/snapshot.sock`. Its original parent
+directory descriptors, owner and inode identities are checked; directories are
+0700 and the socket is 0600. Queries require a native peer with the same UID or
+root, one bounded `qs-runtime-facts-query/v1` GET object with a 64-character
+lowercase hexadecimal challenge, a newline and write-side EOF. The response
+echoes that challenge and contains a fresh fixed-field snapshot. Stop, partial
+registration, unbound source/process identity or socket replacement prevents a
+complete observation; cleanup removes only the original owned socket.
+A root peer outside the server's PID namespace may have kernel peer PID zero;
+this case is accepted only when its kernel UID is zero. Negative PIDs and PID
+zero for other UIDs remain rejected. The retirement reader must bind the
+server's peer credentials to the original host PID; the response's in-container
+PID is a separate identity. CI runs the actual parent-root/child-PID-namespace
+regression with `QS_RUNTIME_FACTS_PIDNS_TEST=1`; its kernel-pair, complete-query
+and owned-cleanup markers must all pass without skips.
+
+`observation_complete` describes this loaded projection and private channel.
+`broker_connections_verified` remains false. Neither a snapshot, `--version`,
+normal health nor the local IDENTIFY protocol fixture establishes current
+all-node broker membership, a writer fence or retirement authority. The
+retirement caller's query/identity binding and actual broker verification remain
+pending. Public REST/gRPC and ordinary health behavior are unchanged; no extra
+MQ client, business transaction or channel-creation operation is added by the
+observer. The snapshot excludes raw environment, DSNs, keys and authentication
+secrets. Native Linux and production acceptance require separate evidence.
+
 ## Approved accelerated execution (2026-10-09)
 
 The user approved consolidating intermediate checks and accepting explicitly
