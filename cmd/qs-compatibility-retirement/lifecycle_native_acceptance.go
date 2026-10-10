@@ -7,6 +7,7 @@ import (
 	"time"
 
 	backup "github.com/FangcunMount/qs-server/internal/apiserver/maintenance/compatibilityretirementbackup"
+	stop "github.com/FangcunMount/qs-server/internal/apiserver/maintenance/compatibilityretirementstop"
 	hostmysql "github.com/FangcunMount/qs-server/internal/pkg/database/mysql"
 	"github.com/FangcunMount/qs-server/internal/pkg/migration"
 	reader "github.com/FangcunMount/qs-server/internal/pkg/runtimefactsreader"
@@ -18,6 +19,25 @@ import (
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
 )
+
+// This is only a summary of the original Worker's registered consumers and
+// visible publisher connections from the native UDS/two-pass broker GET read.
+// It is not a business receipt, historical-message proof, full broker scope,
+// writer fence or permission to accept/purge this batch's materials.
+type lifecycleCurrentMQConnections struct {
+	scope      string
+	diagnostic stop.LoadedMQDiagnostic
+}
+
+func summarizeLifecycleCurrentMQConnections(d stop.LoadedMQDiagnostic, readErr error) (*lifecycleCurrentMQConnections, error) {
+	if readErr != reader.ErrScopeUnproven || !hashRE.MatchString(d.ObservationSHA256) || d.Workers < 1 || d.Workers > 32 || d.Nodes < 1 || d.Nodes > 2048 || d.Clients < 1 || d.Clients > 65536 || !d.ExternalAIUnproven || d.BrokerScopeComplete {
+		return nil, lifecycleError("lifecycle_loaded_mq_observation_failed")
+	}
+	// Publisher history, shared failure-handoff publisher attribution and
+	// external AI remain explicitly unproven. Native reader failures or unknown
+	// gaps do not reach this caller with a valid diagnostic/ScopeUnproven pair.
+	return &lifecycleCurrentMQConnections{scope: "original_worker_registered_consumers_and_visible_publishers", diagnostic: d}, nil
+}
 
 func (h *lifecycleFixedHost) BindAcceptancePlan(ctx context.Context, r lifecycleRequest, a *backup.Archive, p *backup.TargetRecoveryPlan) error {
 	if h == nil || h.owner == nil || h.services == nil || h.services.window == nil || h.dataBaseline == nil || h.acceptancePlan != nil || !h.services.identity.matches(r) {
@@ -31,13 +51,18 @@ func (h *lifecycleFixedHost) BindAcceptancePlan(ctx context.Context, r lifecycle
 }
 
 // Every partial proof below comes from original native owners. This adapter
-// deliberately cannot finish acceptance until actual audit/MQ/broker runtime
-// and the complete same-batch material producers are present. Controlled A/D
+// deliberately cannot finish acceptance until the complete same-batch material
+// producers are present. Audit/current-ledger and original Worker connection
+// observations retain their precise scope rather than proving all broker
+// history or business receipts. Controlled A/D
 // resume is wired only after consuming the retained pre-B comparison. The
 // complete data comparison has already finished before the native B API start (its first controlled internal resume). Acceptance consumes that
 // same-process fact; it does not demand byte equality after normal writers run.
 // It creates no user/event/command or audit checkpoint database write.
 func (h *lifecycleFixedHost) verifyNativeAcceptance(ctx context.Context, r lifecycleRequest, a *backup.Archive) error {
+	if h != nil {
+		h.currentMQ = nil // A failed fresh read cannot retain old success.
+	}
 	if h == nil || ctx == nil || ctx.Err() != nil || h.owner == nil || h.services == nil || h.services.window == nil || !h.services.identity.matches(r) || h.dataBaseline == nil || h.acceptancePlan == nil || h.acceptancePair == nil || h.api == nil {
 		return lifecycleError("lifecycle_actual_runtime_and_data_acceptance_missing")
 	}
@@ -89,17 +114,23 @@ func (h *lifecycleFixedHost) verifyNativeAcceptance(ctx context.Context, r lifec
 	if e = observed.validate(h); e != nil {
 		return e
 	}
-	// The original D channel now performs a genuine loaded UDS + broker GET
-	// observation. It remains incomplete and cannot mint acceptance/materials.
+	// The original D channel performs a genuine loaded UDS + two-pass broker GET
+	// observation. Consume only its registered current-connection scope while
+	// retaining every broader gap, the ScopeUnproven contract and full=false.
 	if e = h.services.child.requireLive(); e != nil {
 		return e
 	}
-	if _, e = h.services.remote.ObserveLoadedMQ(q); errors.Is(e, reader.ErrScopeUnproven) {
-		return lifecycleError("lifecycle_loaded_mq_scope_unproven")
-	} else if e != nil {
-		return lifecycleError("lifecycle_loaded_mq_observation_failed")
+	connections, e := summarizeLifecycleCurrentMQConnections(h.services.remote.ObserveLoadedMQ(q))
+	if e != nil {
+		return e
 	}
-	return lifecycleError("lifecycle_loaded_mq_complete_acceptance_unproven")
+	if e = h.CheckWholeWriterFence(q, r); e != nil {
+		return e
+	}
+	h.currentMQ = connections
+	// The actual accepted-material catalog producer is still missing. Neither
+	// a local connection observation nor its known broader gaps can mint it.
+	return lifecycleError("lifecycle_actual_complete_material_scope_missing")
 }
 
 func (h *lifecycleFixedHost) verifyCompleteDataBeforeInternalResume(ctx context.Context, proof *migration.CompatibilityPairMigrationProof) (result error) {

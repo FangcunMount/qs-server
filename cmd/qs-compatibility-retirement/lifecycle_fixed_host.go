@@ -32,6 +32,7 @@ type lifecycleFixedHost struct {
 	comparisonAttempted bool
 	writers             *lifecycleWriterObservation
 	runtimeLedgers      *lifecycleRuntimeLedgerObservation
+	currentMQ           *lifecycleCurrentMQConnections
 	aiStopped           *retirement.AIStoppedRuntimeLease
 	finalRuntime        *lifecycleControlledRuntime
 }
