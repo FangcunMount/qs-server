@@ -48,13 +48,11 @@ func (s *server) initializeRuntime(resources resourceOutput, containerOutput con
 	if err != nil {
 		return runtimeOutput{}, err
 	}
-	subscriberConfig := eventtransport.SubscriberConfig{
-		Provider: s.config.Messaging.Provider, NSQLookupdAddr: s.config.Messaging.NSQLookupdAddr,
-		NSQMessageTimeout: s.config.Messaging.NSQMessageTimeout,
-	}
-	subscriber, err := eventtransport.NewSDKDeliverySubscriber(
+	subscriberConfig := s.loadedSubscriberConfig()
+	subscriber, err := eventtransport.NewSDKDeliverySubscriberWithFacts(
 		subscriberConfig, s.workerMaxInFlight(), s.workerMaxDeliveryAttempts(),
 		eventtransport.SDKFailedHandoffHandler(deadLetterRecorder),
+		s.runtimeFacts, "worker-events",
 	)
 	if err != nil {
 		_ = deadLetterRecorder.Close()
@@ -93,7 +91,7 @@ func (s *server) initializeRuntime(resources resourceOutput, containerOutput con
 	if s.config.RetryGovernance == nil || s.config.RetryGovernance.AutomaticRetryEnabled {
 		var publisher io.Closer
 		var holdReplayer *messagingintegration.RetryEventHoldReplayer
-		wirePublisher, publishErr := messagingintegration.CreateSDKWirePublisher(s.config.Messaging)
+		wirePublisher, publishErr := messagingintegration.CreateSDKWirePublisherWithFacts(s.config.Messaging, s.runtimeFacts)
 		if publishErr == nil {
 			publisher = wirePublisher
 			holdReplayer, publishErr = messagingintegration.NewSDKRetryEventHoldReplayer(holdStore, wirePublisher)
@@ -114,6 +112,14 @@ func (s *server) initializeRuntime(resources resourceOutput, containerOutput con
 	}
 
 	return output, nil
+}
+
+func (s *server) loadedSubscriberConfig() eventtransport.SubscriberConfig {
+	return eventtransport.SubscriberConfig{
+		Provider: s.config.Messaging.Provider, NSQLookupdAddr: s.config.Messaging.NSQLookupdAddr,
+		NSQMessageTimeout: s.config.Messaging.NSQMessageTimeout,
+		NSQDHTTPEndpoints: s.config.Messaging.NSQDHTTPEndpoints,
+	}
 }
 
 func (s *server) holdReplayPolicy() retrygovernance.Policy {

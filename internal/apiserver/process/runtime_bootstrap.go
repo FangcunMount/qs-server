@@ -43,6 +43,7 @@ func (s *server) buildRuntimeStageDeps(resources resourceOutput, containerOutput
 		}
 		if containerOutput.container.ReportModule != nil {
 			deps.startAIWorkflowRelay = func() error {
+				containerOutput.container.ReportModule.BindMessagingRuntimeFacts(s.runtimeFacts)
 				return containerOutput.container.ReportModule.StartAIWorkflowRelay(context.Background())
 			}
 		}

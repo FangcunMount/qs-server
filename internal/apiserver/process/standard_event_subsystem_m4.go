@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sort"
 	"sync"
 	"time"
 
@@ -18,6 +19,7 @@ import (
 	outboxport "github.com/FangcunMount/qs-server/internal/apiserver/port/outbox"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
 	eventruntime "github.com/FangcunMount/qs-server/internal/pkg/eventing/runtime"
+	"github.com/FangcunMount/qs-server/internal/pkg/runtimefacts"
 	"github.com/FangcunMount/reliable-messaging/outbox"
 	"github.com/FangcunMount/reliable-messaging/relay"
 	sdkmongo "github.com/FangcunMount/reliable-messaging/storage/mongo"
@@ -47,6 +49,10 @@ type standardGovernedEventTypeStatusReader struct {
 // configuredEventSubsystem accepts only standard profiles. Retired configuration
 // must not silently recreate legacy writers; rollback uses a retained image.
 func configuredEventSubsystem(cfg *config.Config) func(eventsubsystem.Options) (*eventsubsystem.Subsystem, error) {
+	return configuredEventSubsystemWithFacts(cfg, nil)
+}
+
+func configuredEventSubsystemWithFacts(cfg *config.Config, facts *runtimefacts.Owner) func(eventsubsystem.Options) (*eventsubsystem.Subsystem, error) {
 	if cfg == nil || cfg.Options == nil || cfg.Eventing == nil || cfg.Eventing.StandardOutbox == nil ||
 		(!cfg.Eventing.StandardOutbox.Mongo && !cfg.Eventing.StandardOutbox.Assessment) {
 		return func(eventsubsystem.Options) (*eventsubsystem.Subsystem, error) {
@@ -55,13 +61,17 @@ func configuredEventSubsystem(cfg *config.Config) func(eventsubsystem.Options) (
 	}
 	selected := *cfg.Eventing.StandardOutbox
 	return func(opts eventsubsystem.Options) (*eventsubsystem.Subsystem, error) {
-		return buildM4StandardEventSubsystem(opts, cfg, selected)
+		return buildM4StandardEventSubsystemWithFacts(opts, cfg, selected, facts)
 	}
 }
 
 // buildM4StandardEventSubsystem gives the selected profiles one SDK-owned NSQ
 // producer and a shared bounded shutdown boundary.
 func buildM4StandardEventSubsystem(opts eventsubsystem.Options, cfg *config.Config, selected options.StandardOutboxOptions) (*eventsubsystem.Subsystem, error) {
+	return buildM4StandardEventSubsystemWithFacts(opts, cfg, selected, nil)
+}
+
+func buildM4StandardEventSubsystemWithFacts(opts eventsubsystem.Options, cfg *config.Config, selected options.StandardOutboxOptions, facts *runtimefacts.Owner) (*eventsubsystem.Subsystem, error) {
 	if cfg == nil || cfg.MessagingOptions == nil || !cfg.MessagingOptions.Enabled ||
 		cfg.MessagingOptions.Provider != "nsq" || cfg.MessagingOptions.NSQAddr == "" ||
 		opts.WirePublisher == nil || opts.PublisherMode != eventruntime.PublishModeMQ {
@@ -119,16 +129,34 @@ func buildM4StandardEventSubsystem(opts eventsubsystem.Options, cfg *config.Conf
 	producerConfig.HeartbeatInterval = 5 * time.Second
 	producerConfig.ReadTimeout = 15 * time.Second
 	producerConfig.WriteTimeout = 10 * time.Second
+	const factsID = "api-standard-publisher"
+	if facts != nil {
+		producerConfig.ClientID = facts.ClientID(factsID)
+		publishTopics := make([]string, 0, len(routes))
+		for topic := range routes {
+			publishTopics = append(publishTopics, topic)
+		}
+		sort.Strings(publishTopics)
+		if err := facts.Declare(runtimefacts.Transport{ID: factsID, Provider: "nsq", Direction: "publisher", NSQDTCPAddresses: []string{cfg.MessagingOptions.NSQAddr}, NSQDHTTPAddresses: cfg.MessagingOptions.NSQDHTTPEndpoints, ClientID: producerConfig.ClientID, Hostname: producerConfig.Hostname, PublishTopics: publishTopics}); err != nil {
+			facts.MarkIncomplete(factsID)
+		}
+	}
 	publisher, err := sdknsq.NewManagedPublisher(sdknsq.ManagedPublisherConfig{
 		Address: cfg.MessagingOptions.NSQAddr, Driver: producerConfig,
 		Routes: routes, MaxInFlight: concurrency,
 	})
 	if err != nil {
+		if facts != nil {
+			facts.MarkIncomplete(factsID)
+		}
 		return nil, fmt.Errorf("create M4 SDK NSQ publisher: %w", err)
 	}
 	owned := true
 	defer func() {
 		if owned {
+			if facts != nil {
+				facts.MarkIncomplete(factsID)
+			}
 			publisher.Interrupt()
 			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 			defer cancel()
@@ -139,6 +167,9 @@ func buildM4StandardEventSubsystem(opts eventsubsystem.Options, cfg *config.Conf
 	var drainErr error
 	drain := func(ctx context.Context) error {
 		drainOnce.Do(func() {
+			if facts != nil {
+				facts.MarkStopped(factsID)
+			}
 			drainErr = publisher.Close(ctx)
 			if drainErr != nil {
 				// A driver call may outlive its SDK publish deadline. Interrupt
@@ -246,6 +277,11 @@ func buildM4StandardEventSubsystem(opts eventsubsystem.Options, cfg *config.Conf
 		return nil, err
 	}
 	owned = false
+	if facts != nil {
+		if err := facts.MarkStarted(factsID); err != nil {
+			facts.MarkIncomplete(factsID)
+		}
+	}
 	return subsystem, nil
 }
 

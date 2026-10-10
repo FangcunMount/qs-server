@@ -42,12 +42,19 @@ type preparedServerTransports struct {
 }
 
 type preparedServerRunDeps struct {
-	startShutdown func() error
-	transports    preparedServerTransports
+	startShutdown     func() error
+	startRuntimeFacts func()
+	stopRuntimeFacts  func()
+	transports        preparedServerTransports
 }
 
 func (s *server) registerShutdownCallback(deps processLifecycleDeps) {
 	s.gs.AddShutdownCallback(shutdown.ShutdownFunc(func(string) error {
+		if s.runtimeFacts != nil {
+			if err := s.runtimeFacts.Close(); err != nil {
+				log.Warn("private runtime facts cleanup incomplete")
+			}
+		}
 		runPrepareRunShutdownHooks(deps.runtime.lifecycle)
 		runProcessLifecycleDeps(deps)
 		log.Info("🏗️  Hexagonal Architecture server shutdown complete")
@@ -145,6 +152,18 @@ func (s preparedServer) buildPreparedServerRunDeps() preparedServerRunDeps {
 	if s.startShutdown != nil {
 		deps.startShutdown = s.startShutdown
 	}
+	if s.runtimeFacts != nil {
+		deps.startRuntimeFacts = func() {
+			if err := s.runtimeFacts.Start(); err != nil {
+				log.Warn("private runtime facts unavailable")
+			}
+		}
+		deps.stopRuntimeFacts = func() {
+			if err := s.runtimeFacts.Close(); err != nil {
+				log.Warn("private runtime facts cleanup incomplete")
+			}
+		}
+	}
 	if s.httpServer != nil {
 		deps.transports.runHTTP = s.httpServer.Run
 	}
@@ -155,10 +174,16 @@ func (s preparedServer) buildPreparedServerRunDeps() preparedServerRunDeps {
 }
 
 func runPreparedServer(deps preparedServerRunDeps) error {
+	if deps.stopRuntimeFacts != nil {
+		defer deps.stopRuntimeFacts()
+	}
 	if deps.startShutdown != nil {
 		if err := deps.startShutdown(); err != nil {
 			log.Fatalf("start shutdown manager failed: %s", err.Error())
 		}
+	}
+	if deps.startRuntimeFacts != nil {
+		deps.startRuntimeFacts()
 	}
 	if deps.transports.runHTTP != nil {
 		log.Info("🚀 Starting Hexagonal Architecture HTTP REST API server...")
