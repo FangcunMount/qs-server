@@ -3,8 +3,12 @@ package retirement
 import (
 	"context"
 	"encoding/json"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
+
+	"go.mongodb.org/mongo-driver/bson"
 )
 
 func TestHistoricalSourceInputFrozenRecipeDoesNotRenewOldCapability(t *testing.T) {
@@ -44,5 +48,118 @@ func TestHistoricalSourceInputFrozenRecipeDoesNotRenewOldCapability(t *testing.T
 	}
 	if _, err = CompareIndependentHistoricalSourceInputs(context.Background(), nil, nil); err == nil {
 		t.Fatal("absent full inputs accepted")
+	}
+}
+
+func TestHistoricalComponentSourceSelectedOriginalFrameAndTamper(t *testing.T) {
+	f := wholeJointUnitFixture(t, 2, true)
+	c, err := PrepareHistoricalCoordinator(t.Context(), coordinatorBinding(), f.inputs(), DefaultHistoricalCoordinatorLimits())
+	if err != nil {
+		t.Fatal(err)
+	}
+	copies := make([]WholeSourceJointCopy, 4)
+	for i := range copies {
+		file, e := os.OpenFile(filepath.Join(t.TempDir(), "source"), os.O_RDWR|os.O_CREATE|os.O_EXCL, 0o600)
+		if e != nil {
+			t.Fatal(e)
+		}
+		t.Cleanup(func() {
+			if e := file.Close(); e != nil {
+				t.Error(e)
+			}
+		})
+		if _, e = file.Write(f.raw[i]); e != nil {
+			t.Fatal(e)
+		}
+		copies[i] = WholeSourceJointCopy{Input: file, Expected: f.expected[i]}
+	}
+	index, err := c.PrepareWholeSourceJointIndex(t.Context(), copies, DefaultWholeSourceJointLimits())
+	if err != nil {
+		t.Fatal(err)
+	}
+	// This fixture supplies only the private byte matching input. It has no
+	// actual SQL/Mongo epoch and cannot satisfy the public read producer.
+	pair := &HistoricalSourceInputPair{second: &HistoricalSourceInputEpoch{recipe: &HistoricalSourceInputRecipe{binding: OriginCopyBinding{expected: f.expected, fileHashes: index.encodedSHA}}, receipts: index.receipts}}
+	pair.self = pair
+	c.started = time.Now().Add(-2 * time.Hour)
+	for _, id := range []string{"coordinator-sql-0", "coordinator-mongo-0"} {
+		facts, e := sourceComponentFrozenEvent(t.Context(), index, pair, id)
+		if e != nil || facts.EventID != id {
+			t.Fatal("selected immutable frame rejected", e)
+		}
+		entry := index.entries[id]
+		file := copies[entry.Key.object].Input.(*os.File)
+		value := []byte{0}
+		if _, e = file.ReadAt(value, entry.Offset); e != nil {
+			t.Fatal(e)
+		}
+		original := value[0]
+		value[0] ^= 1
+		if _, e = file.WriteAt(value, entry.Offset); e != nil {
+			t.Fatal(e)
+		}
+		if _, e = sourceComponentFrozenEvent(t.Context(), index, pair, id); e == nil {
+			t.Fatal("changed same-inode frame accepted")
+		}
+		value[0] = original
+		if _, e = file.WriteAt(value, entry.Offset); e != nil {
+			t.Fatal(e)
+		}
+	}
+	if _, err = PrepareHistoricalComponentSourceObservation(t.Context(), nil, pair, nil, nil, time.Second); err == nil {
+		t.Fatal("byte-only input supplied real read authority")
+	}
+}
+
+func TestHistoricalComponentSourceMongoNegativeIndexEligibility(t *testing.T) {
+	base := bson.D{{Key: "name", Value: "idx_outbox_consistency_audit"}, {Key: "key", Value: bson.D{{Key: "aggregate_type", Value: 1}, {Key: "event_type", Value: 1}, {Key: "aggregate_id", Value: 1}}}}
+	for _, tc := range []struct {
+		name     string
+		extra    bson.E
+		accepted bool
+	}{
+		{"complete", bson.E{}, true},
+		{"partial", bson.E{Key: "partialFilterExpression", Value: bson.D{{Key: "status", Value: "published"}}}, false},
+		{"sparse", bson.E{Key: "sparse", Value: true}, false},
+		{"locale", bson.E{Key: "collation", Value: bson.D{{Key: "locale", Value: "en"}}}, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			doc := append(bson.D(nil), base...)
+			if tc.extra.Key != "" {
+				doc = append(doc, tc.extra)
+			}
+			raw, e := bson.Marshal(doc)
+			if e != nil {
+				t.Fatal(e)
+			}
+			meta := mongoCycleMetadata{definitions: map[string]mongoCycleDefinition{"domain_event_outbox": {indexes: []bson.Raw{raw}}}}
+			if (sourceComponentMongoIndex(meta) == nil) != tc.accepted {
+				t.Fatal("negative-range index eligibility mismatch")
+			}
+		})
+	}
+	for _, keys := range []any{nil, "bad", bson.D{{Key: "aggregate_type", Value: 1}, {Key: "aggregate_id", Value: 1}, {Key: "event_type", Value: 1}}} {
+		raw, e := bson.Marshal(bson.D{{Key: "name", Value: "idx_outbox_consistency_audit"}, {Key: "key", Value: keys}})
+		if e != nil {
+			t.Fatal(e)
+		}
+		meta := mongoCycleMetadata{definitions: map[string]mongoCycleDefinition{"domain_event_outbox": {indexes: []bson.Raw{raw}}}}
+		if sourceComponentMongoIndex(meta) == nil {
+			t.Fatal("wrong or malformed index accepted")
+		}
+	}
+}
+
+func TestHistoricalComponentSourceNeverClaimsOwnerClosureOrCAS(t *testing.T) {
+	var absent *HistoricalComponentSourceObservation
+	r := absent.Summary()
+	if !r.SQLSourceNegativeClosureRequired || !r.MongoOwnerSourceNegativeClosureRequired || !r.SourceWriterFenceRequired || !r.CurrentMessageClosureRequired || !r.AIClosureRequired || r.SourceClosureVerified || r.CASAuthorized || r.DropReady {
+		t.Fatal("read-only source facts overstated closure")
+	}
+	if absent.ValidateBorrowedObservation(t.Context()) == nil {
+		t.Fatal("missing actual native scope accepted")
+	}
+	if _, err := json.Marshal(&HistoricalComponentSourceObservation{}); err == nil {
+		t.Fatal("private source observation serialized")
 	}
 }

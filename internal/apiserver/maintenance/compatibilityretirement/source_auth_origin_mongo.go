@@ -26,21 +26,21 @@ func sourceOriginCanonicalBSON(raw bson.Raw) (any, error) {
 	}
 	return value, nil
 }
-func sourceOriginMongoMetadata(ctx context.Context, global *MongoResponsibilitySnapshot, limits SourceOriginLimits) (SourceBoundary, bson.RawValue, error) {
+func sourceOriginMongoDefinitionMetadata(metadata mongoCycleMetadata) (SourceBoundary, error) {
 	boundary := SourceBoundary{Database: "mongodb", Name: "domain_event_outbox", Kind: "collection", Present: true}
-	definition, ok := global.metadata.definitions[boundary.Name]
+	definition, ok := metadata.definitions[boundary.Name]
 	if !ok {
-		return boundary, bson.RawValue{}, ErrSourceSchema
+		return boundary, ErrSourceSchema
 	}
 	if definition.raw.Lookup("type").Type != bson.TypeString || definition.raw.Lookup("type").StringValue() != "collection" {
-		return boundary, bson.RawValue{}, ErrSourceSchema
+		return boundary, ErrSourceSchema
 	}
 	if collation := definition.raw.Lookup("options", "collation", "locale"); collation.Type != 0 && (collation.Type != bson.TypeString || collation.StringValue() != "simple") {
-		return boundary, bson.RawValue{}, ErrSourceSchema
+		return boundary, ErrSourceSchema
 	}
 	collection, err := sourceOriginCanonicalBSON(definition.raw)
 	if err != nil {
-		return boundary, bson.RawValue{}, err
+		return boundary, err
 	}
 	indices := make([]any, 0, len(definition.indexes))
 	idIndex := false
@@ -49,21 +49,21 @@ func sourceOriginMongoMetadata(ctx context.Context, global *MongoResponsibilityS
 			keys, e := exactBSONFields(index.Lookup("key").Document())
 			n, integer := mongoExactInteger(keys["_id"])
 			if e != nil || len(keys) != 1 || !integer || n != 1 {
-				return boundary, bson.RawValue{}, ErrSourceSchema
+				return boundary, ErrSourceSchema
 			}
 			idIndex = true
 			if collation := index.Lookup("collation", "locale"); collation.Type != 0 && (collation.Type != bson.TypeString || collation.StringValue() != "simple") {
-				return boundary, bson.RawValue{}, ErrSourceSchema
+				return boundary, ErrSourceSchema
 			}
 		}
 		value, e := sourceOriginCanonicalBSON(index)
 		if e != nil {
-			return boundary, bson.RawValue{}, e
+			return boundary, e
 		}
 		indices = append(indices, value)
 	}
 	if !idIndex {
-		return boundary, bson.RawValue{}, ErrSourceSchema
+		return boundary, ErrSourceSchema
 	}
 	sort.Slice(indices, func(i, j int) bool {
 		left, _ := sourceOriginDigest(indices[i])
@@ -72,9 +72,17 @@ func sourceOriginMongoMetadata(ctx context.Context, global *MongoResponsibilityS
 	})
 	boundary.SchemaHash, err = sourceOriginDigest(map[string]any{"collection": collection, "indexes": indices})
 	if err != nil {
-		return boundary, bson.RawValue{}, err
+		return boundary, err
 	}
 	boundary.IdentityHash = mongoOwnerHashParts("mongodb-object-v1", definition.uuid)
+	return boundary, nil
+}
+
+func sourceOriginMongoMetadata(ctx context.Context, global *MongoResponsibilitySnapshot, limits SourceOriginLimits) (SourceBoundary, bson.RawValue, error) {
+	boundary, err := sourceOriginMongoDefinitionMetadata(global.metadata)
+	if err != nil {
+		return boundary, bson.RawValue{}, err
+	}
 	q, cancel := context.WithTimeout(ctx, limits.QueryTimeout)
 	defer cancel()
 	col := global.db.Collection(boundary.Name)

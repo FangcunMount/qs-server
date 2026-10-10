@@ -3,9 +3,14 @@ package retirement
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
+	"io"
 	"os"
+	"sort"
+	"strings"
 	"syscall"
 	"time"
 
@@ -14,6 +19,7 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 const sourceOriginInputPageBytes = 64 << 20
@@ -430,4 +436,433 @@ func (p *HistoricalSourceInputPair) ValidateFrozen(ctx context.Context) error {
 	}
 	_, err := CompareIndependentHistoricalSourceInputs(ctx, p.first, p.second)
 	return err
+}
+
+// This is a current component READ, not a source-writer fence or a qualified
+// CAS plan. SQL has no indexed aggregate/owner negative selector in the retired
+// schema; matching known PKs must never be advertised as excluding new sources.
+// The host supplies the same fresh native SQL and Mongo transactions used by
+// the business observers. This object neither starts nor ends either scope.
+type HistoricalComponentSourceObservation struct {
+	self          *HistoricalComponentSourceObservation
+	component     *HistoricalCASComponent
+	pair          *HistoricalSourceInputPair
+	mongo         *MongoHistoricalComponentObservation
+	sql           []*sqlevaluation.SQLHistoricalComponentObservation
+	started       time.Time
+	budget        time.Duration
+	seal, rowsSHA string
+	rows, bytes   uint64
+	mongoNegative bool
+}
+
+type HistoricalComponentSourceSummary struct {
+	Protocol, ComponentSHA256, SourceInputSHA256, SourceRowsSHA256                                                                                         string
+	Rows, Bytes                                                                                                                                            uint64
+	ActualNativeScope, SelectedSourceBytesMatched, MongoAggregateNegativeRangesMatched                                                                     bool
+	SQLSourceNegativeClosureRequired, MongoOwnerSourceNegativeClosureRequired, SourceWriterFenceRequired, CurrentMessageClosureRequired, AIClosureRequired bool
+	SourceClosureVerified, CASAuthorized, DropReady                                                                                                        bool
+}
+
+func (*HistoricalComponentSourceObservation) MarshalJSON() ([]byte, error) {
+	return nil, ErrSourceSerialization
+}
+func (*HistoricalComponentSourceObservation) MarshalBSON() ([]byte, error) {
+	return nil, ErrSourceSerialization
+}
+func (*HistoricalComponentSourceObservation) String() string {
+	return "private fresh source rows; SQL source negative closure and writer fence unproven"
+}
+func (o *HistoricalComponentSourceObservation) GoString() string { return o.String() }
+
+func sourceComponentPairIntact(ctx context.Context, p *HistoricalSourceInputPair) error {
+	if p == nil || p.self != p || p.first == nil || p.second == nil || p.first == p.second || p.first.validFile(ctx) != nil || p.second.validFile(ctx) != nil || !p.first.complete || !p.second.complete || p.first.recipe.hash != p.second.recipe.hash || p.first.resultHash == "" || p.first.resultHash != p.second.resultHash || p.first.receipts != p.second.receipts || p.first.boundaries != p.second.boundaries || p.first.sqlConnection == p.second.sqlConnection || p.first.sqlCycleID == p.second.sqlCycleID || p.first.mongoSession == p.second.mongoSession || p.second.mongoTime.T < p.first.mongoTime.T || p.second.mongoTime.T == p.first.mongoTime.T && p.second.mongoTime.I < p.first.mongoTime.I {
+		return ErrSourceOrigin
+	}
+	return nil
+}
+
+func (o *HistoricalComponentSourceObservation) ValidateBorrowedObservation(ctx context.Context) error {
+	if o == nil || o.self != o || o.component == nil || o.pair == nil || ctx == nil || ctx.Err() != nil || o.rowsSHA == "" || !time.Now().Before(o.started.Add(o.budget)) || o.seal != mongoHistoricalComponentInputSeal(o.component) || sourceComponentPairIntact(ctx, o.pair) != nil || o.mongo == nil || !o.mongo.complete || o.mongo.component != o.component || o.mongo.validate(ctx) != nil || len(o.sql) != len(o.component.inputs) {
+		return ErrSourceOrigin
+	}
+	for i, sql := range o.sql {
+		if sql == nil || sql.ValidateBorrowedObservation(ctx) != nil {
+			return ErrSourceOriginFresh
+		}
+		view, err := sql.SemanticView(ctx)
+		if err != nil || view.MatchesInput(ctx, o.component.inputs[i].sqlRecipe) != nil {
+			return ErrSourceOriginFresh
+		}
+	}
+	return nil
+}
+
+func (o *HistoricalComponentSourceObservation) Summary() HistoricalComponentSourceSummary {
+	r := HistoricalComponentSourceSummary{Protocol: "historical-component-source-read/v1", SQLSourceNegativeClosureRequired: true, MongoOwnerSourceNegativeClosureRequired: true, SourceWriterFenceRequired: true, CurrentMessageClosureRequired: true, AIClosureRequired: true}
+	if o == nil || o.self != o || o.rowsSHA == "" || o.component == nil || o.seal != mongoHistoricalComponentInputSeal(o.component) || o.pair == nil || o.pair.self != o.pair {
+		return r
+	}
+	r.ComponentSHA256, r.SourceInputSHA256, r.SourceRowsSHA256 = o.seal, o.pair.second.resultHash, o.rowsSHA
+	r.Rows, r.Bytes = o.rows, o.bytes
+	r.ActualNativeScope, r.SelectedSourceBytesMatched, r.MongoAggregateNegativeRangesMatched = true, true, o.mongoNegative
+	return r
+}
+
+// Read only the original selected frame, checking its immutable write-time
+// hash and decoded facts. This does not BindEvent or re-create the coordinator,
+// coverage, source authentication capability or expired origin qualification.
+func sourceComponentFrozenEvent(ctx context.Context, index *WholeSourceJointIndex, pair *HistoricalSourceInputPair, id string) (*DecodedSourceEvent, error) {
+	if ctx == nil || ctx.Err() != nil || index == nil || !index.complete || pair == nil || pair.self != pair || index.encodedSHA != pair.second.recipe.binding.fileHashes || index.receipts != pair.second.receipts {
+		return nil, ErrSourceAuthentication
+	}
+	entry, ok := index.entries[id]
+	if !ok || entry.EventID != id || entry.Key.object != 0 && entry.Key.object != 3 || entry.Length <= 0 || entry.Length > 2*MaxSourceRowBytes+8 || entry.Offset < 0 {
+		return nil, ErrSourceAuthentication
+	}
+	copy := index.copies[entry.Key.object]
+	if copy.Expected != pair.second.recipe.binding.expected[entry.Key.object] {
+		return nil, ErrSourceAuthentication
+	}
+	file, ok := copy.Input.(*os.File)
+	if !ok || file == nil {
+		return nil, ErrSourceOrigin
+	}
+	info, err := file.Stat()
+	if err != nil || !info.Mode().IsRegular() || info.Mode().Perm() != 0o600 || info.Size() < entry.Length || entry.Offset > info.Size()-entry.Length {
+		return nil, ErrSourceOrigin
+	}
+	st, ok := info.Sys().(*syscall.Stat_t)
+	if !ok || st.Nlink != 1 || st.Uid != uint32(os.Geteuid()) {
+		return nil, ErrSourceOrigin
+	}
+	raw := make([]byte, int(entry.Length))
+	if n, err := file.ReadAt(raw, entry.Offset); err != nil || n != len(raw) || sourceSHA(raw) != entry.PhysicalSHA256 {
+		return nil, ErrSourceAuthentication
+	}
+	var facts *DecodedSourceEvent
+	if entry.Key.object == 0 {
+		reader, err := NewSQLSourceReader(io.MultiReader(bytes.NewReader(index.headers[0]), bytes.NewReader(raw)), copy.Expected)
+		if err != nil {
+			return nil, err
+		}
+		facts, err = reader.Next()
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		reader, err := NewMongoSourceReader(bytes.NewReader(raw), copy.Expected)
+		if err != nil {
+			return nil, err
+		}
+		facts, err = reader.Next()
+		if err != nil {
+			return nil, err
+		}
+	}
+	sha, err := privateFactsSHA(facts)
+	key, keyErr := sourceAuthKey(facts.Source.Database, facts.Source.Object, facts.Source.PrimaryKeySHA256)
+	if err != nil || keyErr != nil || sha != entry.FactsSHA256 || key != entry.Key || facts.EventID != id || facts.OrgID != entry.OrgID || facts.EventType != entry.EventType || facts.AggregateType != entry.AggregateType || facts.AggregateID != entry.AggregateID {
+		return nil, ErrSourceAuthentication
+	}
+	return facts, nil
+}
+
+func sourceComponentEvents(ctx context.Context, c *HistoricalCASComponent, p *HistoricalSourceInputPair) (map[string]*DecodedSourceEvent, error) {
+	out := map[string]*DecodedSourceEvent{}
+	for _, f := range c.inputs {
+		ids, err := f.sqlRecipe.SourceEventIDs()
+		if err != nil || len(ids) == 0 {
+			return nil, ErrSourceAuthentication
+		}
+		for _, id := range ids {
+			facts, err := sourceComponentFrozenEvent(ctx, f.index, p, id)
+			if err != nil {
+				return nil, err
+			}
+			if prior, found := out[id]; found {
+				first, e1 := privateFactsSHA(prior)
+				second, e2 := privateFactsSHA(facts)
+				if e1 != nil || e2 != nil || first != second {
+					return nil, ErrSourceAuthentication
+				}
+			} else {
+				out[id] = facts
+			}
+			if len(out) > 4096 {
+				return nil, ErrSourceBounds
+			}
+		}
+	}
+	return out, nil
+}
+
+func sourceComponentSourceMatch(expected, actual *DecodedSourceEvent) error {
+	first, e1 := privateFactsSHA(expected)
+	second, e2 := privateFactsSHA(actual)
+	if e1 != nil || e2 != nil || first != second {
+		return ErrSourceAuthentication
+	}
+	return nil
+}
+
+// The Mongo query does not constrain event type, organization, state or the
+// old upper bound: newly inserted unsupported/cross-org sources also reject.
+// The approved compound index is validated, never invented or replaced by an
+// unhinted collection scan. A missing/ineligible index fails this observation.
+func sourceComponentMongoIndex(metadata mongoCycleMetadata) error {
+	definition, ok := metadata.definitions["domain_event_outbox"]
+	if !ok {
+		return ErrSourceSchema
+	}
+	for _, raw := range definition.indexes {
+		if raw.Lookup("name").Type != bson.TypeString || raw.Lookup("name").StringValue() != "idx_outbox_consistency_audit" {
+			continue
+		}
+		fields, err := exactBSONFields(raw)
+		if err != nil || fields["partialFilterExpression"].Type != 0 || fields["sparse"].Type != 0 && (fields["sparse"].Type != bson.TypeBoolean || fields["sparse"].Boolean()) {
+			return ErrSourceSchema
+		}
+		if c := fields["collation"]; c.Type != 0 && (c.Type != bson.TypeEmbeddedDocument || c.Document().Lookup("locale").Type != bson.TypeString || c.Document().Lookup("locale").StringValue() != "simple") {
+			return ErrSourceSchema
+		}
+		if fields["key"].Type != bson.TypeEmbeddedDocument {
+			return ErrSourceSchema
+		}
+		keys, err := fields["key"].Document().Elements()
+		if err != nil || len(keys) != 3 {
+			return ErrSourceSchema
+		}
+		for i, name := range []string{"aggregate_type", "event_type", "aggregate_id"} {
+			n, integer := mongoExactInteger(keys[i].Value())
+			if keys[i].Key() != name || !integer || n != 1 {
+				return ErrSourceSchema
+			}
+		}
+		return nil
+	}
+	return ErrSourceSchema
+}
+
+func sourceComponentReadMongo(ctx context.Context, o *HistoricalComponentSourceObservation, expected map[string]*DecodedSourceEvent, metadata mongoCycleMetadata, limits SourceOriginLimits) (map[string]*DecodedSourceEvent, error) {
+	if sourceComponentMongoIndex(metadata) != nil {
+		return nil, ErrSourceSchema
+	}
+	boundary, err := sourceOriginMongoDefinitionMetadata(metadata)
+	original := o.pair.second.boundaries[3]
+	if err != nil || boundary.SchemaHash != original.SchemaHash || boundary.IdentityHash != original.IdentityHash {
+		return nil, ErrSourceOrigin
+	}
+	groups := map[string]map[string]bool{}
+	for _, facts := range expected {
+		if groups[facts.AggregateType] == nil {
+			groups[facts.AggregateType] = map[string]bool{}
+		}
+		groups[facts.AggregateType][facts.AggregateID] = true
+	}
+	actual := map[string]*DecodedSourceEvent{}
+	for _, kind := range sourceComponentSortedKeys(groups) {
+		var ids bson.A
+		for _, id := range sourceComponentSortedKeys(groups[kind]) {
+			ids = append(ids, id)
+		}
+		q, cancel := context.WithTimeout(ctx, limits.QueryTimeout)
+		cursor, err := o.mongo.db.Collection("domain_event_outbox").Find(q, bson.D{{Key: "aggregate_type", Value: kind}, {Key: "aggregate_id", Value: bson.D{{Key: "$in", Value: ids}}}}, options.Find().SetHint("idx_outbox_consistency_audit").SetCollation(&options.Collation{Locale: "simple"}).SetLimit(4097).SetBatchSize(128).SetMaxTime(limits.QueryTimeout))
+		if err != nil {
+			cancel()
+			return nil, ErrSourceOrigin
+		}
+		reader, readErr := NewMongoSourceReader(bytes.NewReader(nil), o.pair.second.recipe.binding.expected[3])
+		var count int
+		for readErr == nil && cursor.Next(q) {
+			if o.mongo.validate(q) != nil || len(cursor.Current) > MaxSourceRowBytes || o.bytes+uint64(len(cursor.Current)) > 64<<20 || count >= 4096 {
+				readErr = ErrSourceBounds
+				break
+			}
+			// Compound order is not _id order. Decode each exact original raw
+			// independently while still enforcing the fixed BSON type/upper.
+			reader.hasLast = false
+			facts, err := reader.decodeRaw(cursor.Current)
+			if err != nil || facts.Source.Database != "mongodb" || expected[facts.EventID] == nil || expected[facts.EventID].Source.Database != "mongodb" || actual[facts.EventID] != nil || sourceComponentSourceMatch(expected[facts.EventID], facts) != nil {
+				readErr = ErrSourceAuthentication
+				break
+			}
+			actual[facts.EventID] = facts
+			o.bytes += uint64(len(cursor.Current))
+			count++
+		}
+		cursorErr, closeErr := cursor.Err(), cursor.Close(q)
+		cancel()
+		if readErr != nil {
+			return nil, readErr
+		}
+		if cursorErr != nil || closeErr != nil {
+			return nil, ErrSourceOrigin
+		}
+	}
+	for id, facts := range expected {
+		if facts.Source.Database == "mongodb" && actual[id] == nil {
+			return nil, ErrSourceAuthentication
+		}
+	}
+	return actual, nil
+}
+
+func sourceComponentSQLProjection(columns SQLColumns) string {
+	out := make([]string, len(columns))
+	for i, c := range columns {
+		out[i] = "CAST(" + sourceOriginQuote(*c[0]) + " AS BINARY)"
+	}
+	return strings.Join(out, ",")
+}
+
+// A PK read can verify the chosen original bytes, never the absence of newly
+// inserted owner-related SQL events. The latter remains an explicit REQUIRED
+// typed source-writer/negative-closure input to the separate composition.
+func PrepareHistoricalComponentSourceObservation(parent context.Context, c *HistoricalCASComponent, pair *HistoricalSourceInputPair, mgo *MongoHistoricalComponentObservation, sql []*sqlevaluation.SQLHistoricalComponentObservation, budget time.Duration) (*HistoricalComponentSourceObservation, error) {
+	seal := mongoHistoricalComponentInputSeal(c)
+	if parent == nil || parent.Err() != nil || seal == "" || sourceComponentPairIntact(parent, pair) != nil || mgo == nil || mgo.component != c || !mgo.complete || mgo.validate(parent) != nil || len(sql) != len(c.inputs) || budget <= 0 || budget > 20*time.Second || pair.second.mongo != mgo.input || mgo.input.metadata.identity != pair.second.mongoIdentity || mgo.input.metadata.hash != pair.second.mongoMetadata {
+		return nil, ErrSourceOrigin
+	}
+	o := &HistoricalComponentSourceObservation{component: c, pair: pair, mongo: mgo, sql: append([]*sqlevaluation.SQLHistoricalComponentObservation(nil), sql...), started: time.Now(), budget: budget, seal: seal, rowsSHA: "preparing"}
+	o.self = o
+	ctx, cancel := context.WithDeadline(parent, o.started.Add(budget))
+	defer cancel()
+	if o.ValidateBorrowedObservation(ctx) != nil {
+		return nil, ErrSourceOriginFresh
+	}
+	expected, err := sourceComponentEvents(ctx, c, pair)
+	if err != nil {
+		return nil, err
+	}
+	tx, err := hostmysql.RequireTx(ctx)
+	if err != nil {
+		return nil, ErrSourceOriginFresh
+	}
+	limits := pair.second.recipe.binding.limits
+	identity, err := sourceOriginSQLQuery(ctx, tx, limits, "SELECT CAST(@@server_uuid AS BINARY),CAST(DATABASE() AS BINARY)")
+	if err != nil || len(identity) != 1 || len(identity[0]) != 2 || sourceOriginSQLValue(identity[0], 0) == "" || sourceOriginSQLValue(identity[0], 1) == "" || mongoOwnerHashParts("mysql_database_identity_v1", sourceOriginSQLValue(identity[0], 0), sourceOriginSQLValue(identity[0], 1)) != pair.second.sqlIdentity {
+		return nil, ErrSourceOrigin
+	}
+	head, err := sourceOriginSQLHead(ctx, tx, limits)
+	if err != nil || head != pair.second.sqlHead {
+		return nil, ErrSourceOrigin
+	}
+	boundary, columns, _, err := sourceOriginSQLMetadata(ctx, tx, pair.second.recipe.binding.expected[0], limits)
+	if err != nil || boundary != pair.second.boundaries[0] {
+		return nil, ErrSourceOrigin
+	}
+	columnJSON, err := json.Marshal(columns)
+	if err != nil {
+		return nil, ErrSourceSchema
+	}
+	upper, err := canonicalBase64(boundary.UpperToken)
+	if err != nil && !boundary.Empty {
+		return nil, ErrSourceSchema
+	}
+	var upperID uint64
+	if !boundary.Empty {
+		upperID, err = positiveSQLID(upper)
+		if err != nil {
+			return nil, err
+		}
+	}
+	parts := []string{"historical-component-current-source/v1", seal, pair.second.resultHash}
+	sqlExpected := map[uint64]*DecodedSourceEvent{}
+	var sqlIDs []uint64
+	for _, id := range sourceComponentSortedKeys(expected) {
+		facts := expected[id]
+		if facts.Source.Database != "mysql" {
+			continue
+		}
+		pk, err := canonicalBase64(facts.PrimaryKeyToken)
+		if err != nil {
+			return nil, err
+		}
+		key, err := positiveSQLID(pk)
+		if err != nil || sqlExpected[key] != nil {
+			return nil, ErrSourceAuthentication
+		}
+		sqlExpected[key] = facts
+		sqlIDs = append(sqlIDs, key)
+	}
+	if len(sqlIDs) > 0 {
+		// One native primary-key set read, not a transaction/schema query per
+		// row. Exact set equality below rejects missing and substituted keys.
+		rows, err := sourceOriginSQLQuery(ctx, tx, limits, "SELECT "+sourceComponentSQLProjection(columns)+" FROM `domain_event_outbox` FORCE INDEX (PRIMARY) WHERE id IN ? ORDER BY id LIMIT 4097", sqlIDs)
+		if err != nil || len(rows) != len(sqlIDs) {
+			return nil, ErrSourceOrigin
+		}
+		reader := &SQLSourceReader{acc: sourceAccumulator{expectation: pair.second.recipe.binding.expected[0], h: sha256.New()}, columns: columns, columnsHash: sourceSHA(columnJSON), upper: upperID}
+		for _, row := range rows {
+			encoded := make([]*string, len(row))
+			for i, cell := range row {
+				if cell != nil {
+					value := base64.StdEncoding.EncodeToString([]byte(*cell))
+					encoded[i] = &value
+					o.bytes += uint64(len(*cell))
+				}
+			}
+			if ctx.Err() != nil || o.bytes > 64<<20 {
+				return nil, ErrSourceBounds
+			}
+			line, err := json.Marshal(encoded)
+			if err != nil {
+				return nil, ErrSourceSchema
+			}
+			actual, err := reader.decodeLine(line)
+			if err != nil {
+				return nil, err
+			}
+			pk, err := canonicalBase64(actual.PrimaryKeyToken)
+			if err != nil {
+				return nil, err
+			}
+			key, err := positiveSQLID(pk)
+			if err != nil || sqlExpected[key] == nil || sourceComponentSourceMatch(sqlExpected[key], actual) != nil {
+				return nil, ErrSourceAuthentication
+			}
+			delete(sqlExpected, key)
+			o.rows++
+		}
+		if len(sqlExpected) != 0 || o.ValidateBorrowedObservation(ctx) != nil {
+			return nil, ErrSourceAuthentication
+		}
+	}
+	metadata, err := observeMongoCycleMetadata(ctx, mgo.db, c.inputs[0].mongoRead.config)
+	if err != nil || metadata.hash != mgo.metadata {
+		return nil, ErrSourceOrigin
+	}
+	mongoRows, err := sourceComponentReadMongo(ctx, o, expected, metadata, limits)
+	if err != nil {
+		return nil, err
+	}
+	o.rows += uint64(len(mongoRows))
+	for _, id := range sourceComponentSortedKeys(expected) {
+		sha, err := privateFactsSHA(expected[id])
+		if err != nil {
+			return nil, err
+		}
+		parts = append(parts, id, hex.EncodeToString(sha[:]))
+	}
+	metadata, err = observeMongoCycleMetadata(ctx, mgo.db, c.inputs[0].mongoRead.config)
+	if err != nil || metadata.hash != mgo.metadata {
+		return nil, ErrSourceOrigin
+	}
+	after, _, _, err := sourceOriginSQLMetadata(ctx, tx, pair.second.recipe.binding.expected[0], limits)
+	afterHead, headErr := sourceOriginSQLHead(ctx, tx, limits)
+	if err != nil || after != boundary || headErr != nil || afterHead != head || o.ValidateBorrowedObservation(ctx) != nil {
+		return nil, ErrSourceOrigin
+	}
+	o.rowsSHA, o.mongoNegative = mongoOwnerHashParts(parts...), true
+	return o, nil
+}
+
+func sourceComponentSortedKeys[V any](values map[string]V) []string {
+	out := make([]string, 0, len(values))
+	for key := range values {
+		out = append(out, key)
+	}
+	sort.Strings(out)
+	return out
 }
