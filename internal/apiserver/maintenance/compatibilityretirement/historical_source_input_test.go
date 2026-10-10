@@ -7,6 +7,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strconv"
 	"testing"
 	"time"
 
@@ -244,5 +245,68 @@ func TestHistoricalComponentBusinessRowsRequireActualSourceObservation(t *testin
 	}
 	if _, err := reader.OutcomeRecord(42); err == nil {
 		t.Fatal("absent native outcome accepted")
+	}
+}
+
+func TestHistoricalComponentSourceSQLIndexEligibility(t *testing.T) {
+	valid := func() SQLColumns {
+		var rows SQLColumns
+		for i, name := range []string{"aggregate_type", "aggregate_id", "event_type", "id"} {
+			values := []string{"idx_outbox_aggregate_event_latest", strconv.Itoa(i + 1), name, "", "A", "1", "BTREE", "YES"}
+			row := make([]*string, len(values))
+			for j := range values {
+				if j != 3 {
+					v := values[j]
+					row[j] = &v
+				}
+			}
+			rows = append(rows, row)
+		}
+		return rows
+	}
+	if err := sourceComponentSQLIndex(valid()); err != nil {
+		t.Fatal("actual full index definition rejected", err)
+	}
+	for _, tc := range []struct {
+		name   string
+		column int
+		value  string
+	}{
+		{"other-index", 0, "other"}, {"wrong-sequence", 1, "2"},
+		{"wrong-column", 2, "event_type"}, {"prefix", 3, "16"},
+		{"descending", 4, "D"}, {"unique", 5, "0"},
+		{"hash", 6, "HASH"}, {"invisible", 7, "NO"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			rows := valid()
+			rows[0][tc.column] = &tc.value
+			if sourceComponentSQLIndex(rows) == nil {
+				t.Fatal("ineligible negative-range index accepted")
+			}
+		})
+	}
+	for _, rows := range []SQLColumns{nil, valid()[:3], append(valid(), valid()[0])} {
+		if sourceComponentSQLIndex(rows) == nil {
+			t.Fatal("missing or extra physical index columns accepted")
+		}
+	}
+}
+
+func TestHistoricalComponentSourceSQLRangesIncludeOwnersWithoutSources(t *testing.T) {
+	c := &HistoricalCASComponent{inputs: []*HistoricalCASComponentInput{{owners: []historicalCASOwnerKey{{"assessment", 42, 7}, {"assessment", 43, 8}, {"sheet", 10042, 7}}}}}
+	expected := map[string]*DecodedSourceEvent{
+		"sql":   {AggregateType: "Evaluation", AggregateID: "42"},
+		"mongo": {AggregateType: "Questionnaire", AggregateID: "10042"},
+	}
+	groups, err := sourceComponentSQLRanges(c, expected)
+	if err != nil || len(groups) != 2 || len(groups["Evaluation"]) != 2 || !groups["Evaluation"]["42"] || !groups["Evaluation"]["43"] || !groups["Questionnaire"]["10042"] {
+		t.Fatal("SQL-empty/cross-org actual owner or Mongo aggregate omitted", err)
+	}
+	c.inputs[0].owners[1].org = 0
+	if _, err = sourceComponentSQLRanges(c, expected); err == nil {
+		t.Fatal("unproven owner organization accepted")
+	}
+	if _, err = sourceComponentSQLRanges(&HistoricalCASComponent{}, map[string]*DecodedSourceEvent{"nil": nil}); err == nil {
+		t.Fatal("malformed source aggregate accepted")
 	}
 }

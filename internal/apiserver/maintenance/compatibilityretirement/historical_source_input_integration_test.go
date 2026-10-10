@@ -501,7 +501,7 @@ func TestHistoricalSourceInputNativeOwnerComponentPlanner(t *testing.T) {
 				}
 				businessSources += len(rows)
 				summary := observation.Summary()
-				if !summary.SQLSourceNegativeClosureRequired || !summary.MongoOwnerSourceNegativeClosureRequired || !summary.SourceWriterFenceRequired || !summary.CurrentMessageClosureRequired || !summary.AIClosureRequired || summary.CASAuthorized || summary.SourceClosureVerified || summary.DropReady {
+				if summary.SQLSourceNegativeClosureRequired || !summary.SQLAggregateNegativeRangesMatched || !summary.MongoOwnerSourceNegativeClosureRequired || !summary.SourceWriterFenceRequired || !summary.CurrentMessageClosureRequired || !summary.AIClosureRequired || summary.CASAuthorized || summary.SourceClosureVerified || summary.DropReady {
 					return ErrCoordinatorCASQualification
 				}
 				return nil

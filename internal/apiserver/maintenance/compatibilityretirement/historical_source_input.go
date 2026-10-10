@@ -444,8 +444,8 @@ func (p *HistoricalSourceInputPair) ValidateFrozen(ctx context.Context) error {
 }
 
 // This is a current component READ, not a source-writer fence or a qualified
-// CAS plan. SQL has no indexed aggregate/owner negative selector in the retired
-// schema; matching known PKs must never be advertised as excluding new sources.
+// CAS plan. Exact native aggregate ranges exclude new owner-related SQL
+// sources in this snapshot; they never fence writers or close global gaps.
 // The host supplies the same fresh native SQL and Mongo transactions used by
 // the business observers. This object neither starts nor ends either scope.
 type HistoricalComponentSourceObservation struct {
@@ -459,12 +459,13 @@ type HistoricalComponentSourceObservation struct {
 	seal, rowsSHA string
 	rows, bytes   uint64
 	mongoNegative bool
+	sqlNegative   bool
 }
 
 type HistoricalComponentSourceSummary struct {
 	Protocol, ComponentSHA256, SourceInputSHA256, SourceRowsSHA256                                                                                         string
 	Rows, Bytes                                                                                                                                            uint64
-	ActualNativeScope, SelectedSourceBytesMatched, MongoAggregateNegativeRangesMatched                                                                     bool
+	ActualNativeScope, SelectedSourceBytesMatched, SQLAggregateNegativeRangesMatched, MongoAggregateNegativeRangesMatched                                  bool
 	SQLSourceNegativeClosureRequired, MongoOwnerSourceNegativeClosureRequired, SourceWriterFenceRequired, CurrentMessageClosureRequired, AIClosureRequired bool
 	SourceClosureVerified, CASAuthorized, DropReady                                                                                                        bool
 }
@@ -599,7 +600,7 @@ func (*HistoricalComponentSourceObservation) MarshalBSON() ([]byte, error) {
 	return nil, ErrSourceSerialization
 }
 func (*HistoricalComponentSourceObservation) String() string {
-	return "private fresh source rows; SQL source negative closure and writer fence unproven"
+	return "private fresh source rows; global source closure and writer fence unproven"
 }
 func (o *HistoricalComponentSourceObservation) GoString() string { return o.String() }
 
@@ -633,7 +634,8 @@ func (o *HistoricalComponentSourceObservation) Summary() HistoricalComponentSour
 	}
 	r.ComponentSHA256, r.SourceInputSHA256, r.SourceRowsSHA256 = o.seal, o.pair.second.resultHash, o.rowsSHA
 	r.Rows, r.Bytes = o.rows, o.bytes
-	r.ActualNativeScope, r.SelectedSourceBytesMatched, r.MongoAggregateNegativeRangesMatched = true, true, o.mongoNegative
+	r.ActualNativeScope, r.SelectedSourceBytesMatched, r.SQLAggregateNegativeRangesMatched, r.MongoAggregateNegativeRangesMatched = true, true, o.sqlNegative, o.mongoNegative
+	r.SQLSourceNegativeClosureRequired = !o.sqlNegative
 	return r
 }
 
@@ -844,9 +846,54 @@ func sourceComponentSQLProjection(columns SQLColumns) string {
 	return strings.Join(out, ",")
 }
 
-// A PK read can verify the chosen original bytes, never the absence of newly
-// inserted owner-related SQL events. The latter remains an explicit REQUIRED
-// typed source-writer/negative-closure input to the separate composition.
+// The existing migration-63 index must be present with its complete columns,
+// visible and unprefixed. Schema names from source code alone are not proof.
+func sourceComponentSQLIndex(columns SQLColumns) error {
+	if len(columns) != 4 {
+		return ErrSourceSchema
+	}
+	for i, name := range []string{"aggregate_type", "aggregate_id", "event_type", "id"} {
+		row := columns[i]
+		if len(row) != 8 || sourceOriginSQLValue(row, 0) != "idx_outbox_aggregate_event_latest" || sourceOriginSQLValue(row, 1) != strconv.Itoa(i+1) || sourceOriginSQLValue(row, 2) != name || row[3] != nil || sourceOriginSQLValue(row, 4) != "A" || sourceOriginSQLValue(row, 5) != "1" || sourceOriginSQLValue(row, 6) != "BTREE" || sourceOriginSQLValue(row, 7) != "YES" {
+			return ErrSourceSchema
+		}
+	}
+	return nil
+}
+
+// Select every source aggregate plus actual Assessment owners, including
+// owners with no frozen SQL source. No event type, org, state or upper filter
+// may hide an unexpected row. Collation supersets still fail exact byte checks.
+func sourceComponentSQLRanges(c *HistoricalCASComponent, expected map[string]*DecodedSourceEvent) (map[string]map[string]bool, error) {
+	groups := map[string]map[string]bool{}
+	add := func(kind, id string) {
+		if groups[kind] == nil {
+			groups[kind] = map[string]bool{}
+		}
+		groups[kind][id] = true
+	}
+	for _, facts := range expected {
+		if facts == nil || facts.AggregateType == "" || facts.AggregateID == "" {
+			return nil, ErrSourceAuthentication
+		}
+		add(facts.AggregateType, facts.AggregateID)
+	}
+	for _, input := range c.inputs {
+		for _, owner := range input.owners {
+			if owner.kind == "assessment" {
+				if owner.id == 0 || owner.org == 0 {
+					return nil, ErrSourceOrganization
+				}
+				add("Evaluation", strconv.FormatUint(owner.id, 10))
+			}
+		}
+	}
+	if len(groups) == 0 || len(groups) > 4096 {
+		return nil, ErrSourceBounds
+	}
+	return groups, nil
+}
+
 func PrepareHistoricalComponentSourceObservation(parent context.Context, c *HistoricalCASComponent, pair *HistoricalSourceInputPair, mgo *MongoHistoricalComponentObservation, sql []*sqlevaluation.SQLHistoricalComponentObservation, budget time.Duration) (*HistoricalComponentSourceObservation, error) {
 	seal := mongoHistoricalComponentInputSeal(c)
 	if parent == nil || parent.Err() != nil || seal == "" || sourceComponentPairIntact(parent, pair) != nil || mgo == nil || mgo.component != c || !mgo.complete || mgo.validate(parent) != nil || len(sql) != len(c.inputs) || budget <= 0 || budget > 20*time.Second || pair.second.mongo != mgo.input || mgo.input.metadata.identity != pair.second.mongoIdentity || mgo.input.metadata.hash != pair.second.mongoMetadata {
@@ -897,7 +944,6 @@ func PrepareHistoricalComponentSourceObservation(parent context.Context, c *Hist
 	}
 	parts := []string{"historical-component-current-source/v1", seal, pair.second.resultHash}
 	sqlExpected := map[uint64]*DecodedSourceEvent{}
-	var sqlIDs []uint64
 	for _, id := range sourceComponentSortedKeys(expected) {
 		facts := expected[id]
 		if facts.Source.Database != "mysql" {
@@ -912,14 +958,23 @@ func PrepareHistoricalComponentSourceObservation(parent context.Context, c *Hist
 			return nil, ErrSourceAuthentication
 		}
 		sqlExpected[key] = facts
-		sqlIDs = append(sqlIDs, key)
 	}
-	if len(sqlIDs) > 0 {
-		// One native primary-key set read, not a transaction/schema query per
-		// row. Exact set equality below rejects missing and substituted keys.
-		rows, err := sourceOriginSQLQuery(ctx, tx, limits, "SELECT "+sourceComponentSQLProjection(columns)+" FROM `domain_event_outbox` FORCE INDEX (PRIMARY) WHERE id IN ? ORDER BY id LIMIT 4097", sqlIDs)
-		if err != nil || len(rows) != len(sqlIDs) {
-			return nil, ErrSourceOrigin
+	index, err := sourceOriginSQLQuery(ctx, tx, limits, "SELECT INDEX_NAME,SEQ_IN_INDEX,COLUMN_NAME,SUB_PART,COLLATION,NON_UNIQUE,INDEX_TYPE,IS_VISIBLE FROM information_schema.statistics WHERE TABLE_SCHEMA=DATABASE() AND BINARY TABLE_NAME=BINARY 'domain_event_outbox' AND BINARY INDEX_NAME=BINARY 'idx_outbox_aggregate_event_latest' ORDER BY SEQ_IN_INDEX")
+	if err != nil || sourceComponentSQLIndex(index) != nil {
+		return nil, ErrSourceSchema
+	}
+	groups, err := sourceComponentSQLRanges(c, expected)
+	if err != nil {
+		return nil, err
+	}
+	for _, kind := range sourceComponentSortedKeys(groups) {
+		ids := sourceComponentSortedKeys(groups[kind])
+		if len(ids) > 4096 {
+			return nil, ErrSourceBounds
+		}
+		rows, err := sourceOriginSQLQuery(ctx, tx, limits, "SELECT "+sourceComponentSQLProjection(columns)+" FROM `domain_event_outbox` FORCE INDEX (`idx_outbox_aggregate_event_latest`) WHERE aggregate_type=? AND aggregate_id IN ? ORDER BY id LIMIT 4097", kind, ids)
+		if err != nil {
+			return nil, err
 		}
 		reader := &SQLSourceReader{acc: sourceAccumulator{expectation: pair.second.recipe.binding.expected[0], h: sha256.New()}, columns: columns, columnsHash: sourceSHA(columnJSON), upper: upperID}
 		for _, row := range rows {
@@ -953,10 +1008,14 @@ func PrepareHistoricalComponentSourceObservation(parent context.Context, c *Hist
 			delete(sqlExpected, key)
 			o.rows++
 		}
-		if len(sqlExpected) != 0 || o.ValidateBorrowedObservation(ctx) != nil {
-			return nil, ErrSourceAuthentication
+		if o.ValidateBorrowedObservation(ctx) != nil {
+			return nil, ErrSourceOriginFresh
 		}
 	}
+	if len(sqlExpected) != 0 {
+		return nil, ErrSourceAuthentication
+	}
+	parts = append(parts, "native-sql-aggregate-negative-ranges/v1")
 	metadata, err := observeMongoCycleMetadata(ctx, mgo.db, c.inputs[0].mongoRead.config)
 	if err != nil || metadata.hash != mgo.metadata {
 		return nil, ErrSourceOrigin
@@ -982,7 +1041,7 @@ func PrepareHistoricalComponentSourceObservation(parent context.Context, c *Hist
 	if err != nil || after != boundary || headErr != nil || afterHead != head || o.ValidateBorrowedObservation(ctx) != nil {
 		return nil, ErrSourceOrigin
 	}
-	o.rowsSHA, o.mongoNegative = mongoOwnerHashParts(parts...), true
+	o.rowsSHA, o.mongoNegative, o.sqlNegative = mongoOwnerHashParts(parts...), true, true
 	return o, nil
 }
 
