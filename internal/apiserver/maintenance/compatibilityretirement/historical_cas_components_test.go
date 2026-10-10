@@ -93,6 +93,62 @@ func TestHistoricalCASComponentsSameOwnerAcrossPagesAndReadonlySharedRow(t *test
 	}
 }
 
+func TestHistoricalCASComponentsDifferentOwnersWithinSamePage(t *testing.T) {
+	index, frames := componentFixture(t, 3)
+	for i := 0; i < 2; i++ {
+		frames[i].sequence = 1
+		frames[i].partition, frames[i].partitions = uint32(i+1), 2
+		resealComponentFixture(frames[i])
+	}
+	frames[2].sequence = 2
+	resealComponentFixture(frames[2])
+	result, err := PrepareHistoricalCASComponents(context.Background(), index, frames, DefaultHistoricalCASComponentLimits())
+	if err != nil || len(result.components) != 3 || result.components[0].inputs[0].partition != 1 || result.components[1].inputs[0].partition != 2 {
+		t.Fatalf("independent owners were merged because their source page matched: %v", err)
+	}
+	// Actual owner sharing across pages still joins both relevant fragments.
+	frames[2].owners = append(frames[2].owners, frames[1].owners[0])
+	resealComponentFixture(frames[2])
+	result, err = PrepareHistoricalCASComponents(context.Background(), index, frames, DefaultHistoricalCASComponentLimits())
+	if err != nil || len(result.components) != 2 || len(result.components[1].inputs) != 2 {
+		t.Fatalf("cross-page owner closure was lost: %v", err)
+	}
+}
+
+func TestHistoricalCASComponentsRequireCompleteOriginalPagePartitions(t *testing.T) {
+	for _, invalid := range []string{"missing-partition", "duplicate-partition", "different-count", "mixed-unsplit", "zero-ordinal", "out-of-range", "oversized"} {
+		t.Run(invalid, func(t *testing.T) {
+			index, frames := componentFixture(t, 2)
+			for i, frame := range frames {
+				frame.sequence, frame.partition, frame.partitions = 1, uint32(i+1), 2
+			}
+			switch invalid {
+			case "missing-partition":
+				frames[0].partitions, frames[1].partitions = 3, 3
+			case "duplicate-partition":
+				frames[1].partition = 1
+			case "different-count":
+				frames[1].partitions = 3
+			case "mixed-unsplit":
+				frames[1].partition, frames[1].partitions = 0, 0
+			case "zero-ordinal":
+				frames[0].partition = 0
+			case "out-of-range":
+				frames[1].partition = 3
+			case "oversized":
+				frames[0].partitions = 513
+			}
+			for _, frame := range frames {
+				resealComponentFixture(frame)
+			}
+			result, err := PrepareHistoricalCASComponents(context.Background(), index, frames, DefaultHistoricalCASComponentLimits())
+			if err == nil || result != nil {
+				t.Fatal("partial or mixed original owner partitions admitted")
+			}
+		})
+	}
+}
+
 func TestHistoricalCASComponentsAllBudgetsRejectBeforeBatches(t *testing.T) {
 	for _, field := range []string{"frames", "sources", "owners", "rows", "bytes"} {
 		t.Run(field, func(t *testing.T) {

@@ -32,17 +32,18 @@ type historicalCASOwnerKey struct {
 // not a qualified plan. Only the live owner/capture factory below produces it.
 // Ending or expiring the original epoch never makes this input writable.
 type HistoricalCASComponentInput struct {
-	self      *HistoricalCASComponentInput
-	index     *WholeSourceJointIndex
-	binding   HistoricalCoordinatorBinding
-	sequence  uint64
-	sources   []verifiedSourceKey
-	owners    []historicalCASOwnerKey
-	rows      []historicalCASRowInput
-	sqlRecipe *sqlevaluation.SQLHistoricalComponentRecipe
-	mongoRead *mongoHistoricalComponentReadRecipe
-	mongoCAS  *mongoHistoricalComponentCASRecipe
-	seal      string
+	self                  *HistoricalCASComponentInput
+	index                 *WholeSourceJointIndex
+	binding               HistoricalCoordinatorBinding
+	sequence              uint64
+	partition, partitions uint32
+	sources               []verifiedSourceKey
+	owners                []historicalCASOwnerKey
+	rows                  []historicalCASRowInput
+	sqlRecipe             *sqlevaluation.SQLHistoricalComponentRecipe
+	mongoRead             *mongoHistoricalComponentReadRecipe
+	mongoCAS              *mongoHistoricalComponentCASRecipe
+	seal                  string
 }
 
 func (*HistoricalCASComponentInput) MarshalJSON() ([]byte, error) { return nil, ErrSourceSerialization }
@@ -64,7 +65,7 @@ func (f *HistoricalCASComponentInput) digest() string {
 			return ""
 		}
 	}
-	parts := []string{"historical-cas-component-input/v1", f.binding.SourceSHA, f.binding.OperationID, f.index.indexSHA, strconv.FormatUint(f.sequence, 10), sqlSHA, f.mongoRead.digest(), f.mongoCAS.digest()}
+	parts := []string{"historical-cas-component-input/v2", f.binding.SourceSHA, f.binding.OperationID, f.index.indexSHA, strconv.FormatUint(f.sequence, 10), strconv.FormatUint(uint64(f.partition), 10), strconv.FormatUint(uint64(f.partitions), 10), sqlSHA, f.mongoRead.digest(), f.mongoCAS.digest()}
 	for _, key := range f.sources {
 		parts = append(parts, strconv.Itoa(int(key.object)), string(key.pk[:]))
 	}
@@ -272,7 +273,13 @@ func PrepareHistoricalCASComponents(ctx context.Context, index *WholeSourceJoint
 		return nil, ErrHistoricalCASComponents
 	}
 	seenSources := map[verifiedSourceKey]bool{}
-	seenSequences := map[uint64]bool{}
+	// Several genuine owners may share one source page. Its complete frozen
+	// partition list must survive; page position alone must not join owners.
+	type pageParts struct {
+		count uint32
+		seen  map[uint32]bool
+	}
+	seenSequences := map[uint64]*pageParts{}
 	parent := make([]int, len(inputs))
 	for i := range parent {
 		parent[i] = i
@@ -302,10 +309,21 @@ func PrepareHistoricalCASComponents(ctx context.Context, index *WholeSourceJoint
 	var totalBytes uint64
 	var totalRows int
 	for i, f := range inputs {
-		if ctx.Err() != nil || f == nil || f.self != f || f.index != index || f.binding != index.owner.binding || f.seal == "" || f.seal != f.digest() || f.sequence == 0 || seenSequences[f.sequence] || len(f.sources) == 0 || len(f.owners) == 0 {
+		if ctx.Err() != nil || f == nil || f.self != f || f.index != index || f.binding != index.owner.binding || f.seal == "" || f.seal != f.digest() || f.sequence == 0 || len(f.sources) == 0 || len(f.owners) == 0 {
 			return nil, ErrHistoricalCASComponents
 		}
-		seenSequences[f.sequence] = true
+		if (f.partition == 0) != (f.partitions == 0) || f.partition > f.partitions || f.partitions > 512 {
+			return nil, ErrHistoricalCASComponents
+		}
+		page := seenSequences[f.sequence]
+		if page == nil {
+			page = &pageParts{count: f.partitions, seen: map[uint32]bool{}}
+			seenSequences[f.sequence] = page
+		}
+		if page.count != f.partitions || page.seen[f.partition] {
+			return nil, ErrHistoricalCASComponents
+		}
+		page.seen[f.partition] = true
 		for _, key := range f.sources {
 			if seenSources[key] {
 				return nil, ErrHistoricalCASComponents
@@ -352,6 +370,15 @@ func PrepareHistoricalCASComponents(ctx context.Context, index *WholeSourceJoint
 			}
 		}
 	}
+	for _, page := range seenSequences {
+		expected := int(page.count)
+		if expected == 0 {
+			expected = 1
+		}
+		if len(page.seen) != expected {
+			return nil, ErrCoordinatorIncomplete
+		}
+	}
 	if len(seenSources) != len(index.entries) {
 		return nil, ErrCoordinatorIncomplete
 	}
@@ -373,7 +400,7 @@ func PrepareHistoricalCASComponents(ctx context.Context, index *WholeSourceJoint
 	}
 	result := &HistoricalCASComponents{}
 	for _, frames := range groups {
-		sort.Slice(frames, func(i, j int) bool { return frames[i].sequence < frames[j].sequence })
+		sort.Slice(frames, func(i, j int) bool { return historicalCASInputBefore(frames[i], frames[j]) })
 		sources, owners := map[verifiedSourceKey]bool{}, map[historicalCASOwnerKey]bool{}
 		var rows int
 		var size uint64
@@ -398,12 +425,19 @@ func PrepareHistoricalCASComponents(ctx context.Context, index *WholeSourceJoint
 		result.components = append(result.components, &HistoricalCASComponent{append([]*HistoricalCASComponentInput(nil), frames...)})
 	}
 	sort.Slice(result.components, func(i, j int) bool {
-		return result.components[i].inputs[0].sequence < result.components[j].inputs[0].sequence
+		return historicalCASInputBefore(result.components[i].inputs[0], result.components[j].inputs[0])
 	})
 	if ctx.Err() != nil {
 		return nil, ErrHistoricalCASComponents
 	}
 	return result, nil
+}
+
+func historicalCASInputBefore(a, b *HistoricalCASComponentInput) bool {
+	if a.sequence != b.sequence {
+		return a.sequence < b.sequence
+	}
+	return a.partition < b.partition
 }
 
 func historicalCASFixedRow(key historicalCASRowKey) bool {
