@@ -99,6 +99,9 @@ func newLifecycleFixedHost(ctx context.Context, r lifecycleRequest, a *backup.Ar
 				return nil, errors.Join(err, h.Close())
 			}
 		}
+		if err := registerLifecycleHistoricalServiceInputs(ctx, h.historicalWritePreviousMaterials[len(h.historicalWritePreviousMaterials)-1], r, i.SourceUID); err != nil {
+			return nil, errors.Join(err, h.Close())
+		}
 	}
 	var archiveErr error
 	h.archiveMaterials, archiveErr = openLifecycleOriginalArchiveMaterials(ctx, r, a)

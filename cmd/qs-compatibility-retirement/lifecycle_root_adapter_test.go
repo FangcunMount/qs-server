@@ -1259,3 +1259,70 @@ func TestOriginalPreparationBudgetMaterialRejectsUnknownOrUnboundNativeConclusio
 		})
 	}
 }
+
+func TestOriginalHistoricalServiceInputsUseExistingApprovalHashesAndExactSourceFDs(t *testing.T) {
+	for _, mutation := range []string{"none", "wrong_hash", "missing", "replace_inode", "nil_control"} {
+		t.Run(mutation, func(t *testing.T) {
+			path, _ := filepath.EvalSymlinks(t.TempDir())
+			_ = os.Chmod(path, 0700)
+			d, e := openLifecycleMaterialDirectory(path, uint32(os.Getuid()))
+			if e != nil {
+				t.Fatal(e)
+			}
+			defer d.close()
+			r := lifecycleRequest{ServiceControl: &lifecycleServiceControl{}}
+			for name, value := range map[string]string{"approved-services.json": "original final A descriptor", "ssh-channel.json": "original approved channel"} {
+				raw, _ := json.Marshal(value)
+				_ = os.WriteFile(filepath.Join(path, name), raw, 0600)
+				if name == "approved-services.json" {
+					r.ServiceControl.LocalDescriptorSHA256 = digestRaw(raw)
+				} else {
+					r.ServiceControl.SSHChannelSHA256 = digestRaw(raw)
+				}
+			}
+			if mutation == "wrong_hash" {
+				r.ServiceControl.SSHChannelSHA256 = strings.Repeat("0", 64)
+			}
+			if mutation == "missing" {
+				_ = os.Remove(filepath.Join(path, "ssh-channel.json"))
+			}
+			if mutation == "nil_control" {
+				r.ServiceControl = nil
+			}
+			e = registerLifecycleHistoricalServiceInputs(context.Background(), d, r, uint32(os.Getuid()))
+			if mutation == "wrong_hash" || mutation == "missing" {
+				if e == nil {
+					t.Fatal("unbound source input admitted")
+				}
+				return
+			}
+			if e != nil {
+				t.Fatal(e)
+			}
+			if mutation == "nil_control" {
+				if len(d.files) != 0 {
+					t.Fatal("optional old request guessed files")
+				}
+				return
+			}
+			if len(d.files) != 2 {
+				t.Fatal("exact source input pair omitted")
+			}
+			for _, v := range d.files {
+				if v.file == nil || v.retained || d.checkFile(v) != nil {
+					t.Fatal("actual source FD missing")
+				}
+			}
+			if mutation == "replace_inode" {
+				p := filepath.Join(path, "ssh-channel.json")
+				raw, _ := os.ReadFile(p)
+				_ = os.Rename(p, p+".old")
+				_ = os.WriteFile(p, raw, 0600)
+				_ = os.Remove(p + ".old")
+				if d.checkFile(d.files["ssh-channel.json"]) == nil {
+					t.Fatal("replacement source inode admitted")
+				}
+			}
+		})
+	}
+}

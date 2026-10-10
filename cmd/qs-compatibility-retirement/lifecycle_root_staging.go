@@ -556,6 +556,27 @@ func registerLifecyclePreparationBudgetMaterials(ctx context.Context, d *lifecyc
 	return validateLifecyclePreparationBudgetBytes(basis, result, i)
 }
 
+// The final A descriptor and SSH channel are two exact source-owned inputs of
+// the existing approved service control, separate from the original key basis.
+func registerLifecycleHistoricalServiceInputs(ctx context.Context, d *lifecycleMaterialDirectory, r lifecycleRequest, uid uint32) error {
+	if ctx == nil || ctx.Err() != nil || d == nil {
+		return lifecycleError("lifecycle_history_original_material_rejected")
+	}
+	if r.ServiceControl == nil {
+		return nil
+	}
+	var value json.RawMessage
+	for _, ref := range []struct{ name, hash string }{{"approved-services.json", r.ServiceControl.LocalDescriptorSHA256}, {"ssh-channel.json", r.ServiceControl.SSHChannelSHA256}} {
+		if !hashRE.MatchString(ref.hash) {
+			return lifecycleError("lifecycle_history_original_material_rejected")
+		}
+		if _, err := readLifecycleProducerJSON(d, ref.name, ref.hash, uid, 256<<10, &value); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 type lifecyclePreparationRestoreEngine struct {
 	Kind        string   `json:"kind"`
 	Owner       string   `json:"owner"`
