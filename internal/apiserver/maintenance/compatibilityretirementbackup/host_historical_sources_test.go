@@ -78,7 +78,7 @@ func TestHistoricalFDReadbackRejectsReplacementMetadataHardlinkAndCancelledRead(
 	ctx, c := context.WithCancel(t.Context())
 	c()
 	var out bytes.Buffer
-	if _, e = io.Copy(&out, historicalContextReader{ctx, bytes.NewReader(raw)}); e == nil || out.Len() != 0 {
+	if _, e = io.Copy(&out, historicalCancelableReader{ctx, bytes.NewReader(raw)}); e == nil || out.Len() != 0 {
 		t.Fatal("cancelled read reached EOF as success")
 	}
 }

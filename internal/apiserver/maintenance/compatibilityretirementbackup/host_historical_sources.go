@@ -72,7 +72,7 @@ func (s *HostHistoricalSources) Verify(ctx context.Context) error {
 			return ErrPrivate
 		}
 		h := newCountHash()
-		_, e = io.Copy(h, historicalContextReader{ctx, io.NewSectionReader(f, 0, asset.Bytes+1)})
+		_, e = io.Copy(h, historicalCancelableReader{ctx, io.NewSectionReader(f, 0, asset.Bytes+1)})
 		after, ae := f.Stat()
 		live, le := os.Lstat(filepath.Join(s.archive.dir, sourceNames[i]))
 		if e != nil || ae != nil || le != nil || ctx.Err() != nil || !historicalFileSame(before, after) || !historicalFileSame(before, live) || h.count != asset.Bytes || h.digest() != asset.SHA256 {
@@ -91,12 +91,12 @@ func historicalFileSame(a, b os.FileInfo) bool {
 	return xok && yok && x.Uid == y.Uid && x.Gid == y.Gid && x.Nlink == 1 && y.Nlink == 1
 }
 
-type historicalContextReader struct {
+type historicalCancelableReader struct {
 	ctx    context.Context
 	reader io.Reader
 }
 
-func (r historicalContextReader) Read(p []byte) (int, error) {
+func (r historicalCancelableReader) Read(p []byte) (int, error) {
 	if e := r.ctx.Err(); e != nil {
 		return 0, e
 	}

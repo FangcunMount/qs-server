@@ -626,9 +626,9 @@ func prepareFactsContainerReaderUID(pid int, user string) (uint32, error) {
 	if e != nil {
 		return 0, lifecycleError("prepare_facts_message_protection_reader_rejected")
 	}
-	defer f.Close()
 	raw, e := io.ReadAll(io.LimitReader(f, 32769))
-	if e != nil || len(raw) > 32768 {
+	closeErr := f.Close()
+	if e != nil || closeErr != nil || len(raw) > 32768 {
 		return 0, lifecycleError("prepare_facts_message_protection_reader_rejected")
 	}
 	var result uint32

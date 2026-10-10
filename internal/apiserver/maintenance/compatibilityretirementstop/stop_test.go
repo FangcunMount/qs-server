@@ -6,6 +6,8 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 	"golang.org/x/sys/unix"
 	"os"
+	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -164,5 +166,34 @@ func TestLiveSessionTransportsRequirePipeOrAnonymousUnixStream(t *testing.T) {
 	defer func() { _ = dgramB.Close() }()
 	if validSessionFD(dgramA) || validSessionFD(dgramB) {
 		t.Fatal("datagram control transport accepted")
+	}
+}
+
+func TestLiveSessionRejectsLinuxBoundLocalAndPeerUnixAddresses(t *testing.T) {
+	if runtime.GOOS != "linux" {
+		t.Skip("actual Linux raw Unix address lengths required")
+	}
+	for _, name := range []string{"filesystem", "abstract", "empty_abstract"} {
+		t.Run(name, func(t *testing.T) {
+			fds, err := unix.Socketpair(unix.AF_UNIX, unix.SOCK_STREAM, 0)
+			if err != nil {
+				t.Fatal(err)
+			}
+			a, b := os.NewFile(uintptr(fds[0]), "bound-local"), os.NewFile(uintptr(fds[1]), "bound-peer")
+			defer func() { _ = a.Close() }()
+			defer func() { _ = b.Close() }()
+			address := filepath.Join(t.TempDir(), "session.sock")
+			if name == "abstract" {
+				address = "@qs-retirement-" + filepath.Base(t.TempDir())
+			} else if name == "empty_abstract" {
+				address = "@"
+			}
+			if err = unix.Bind(fds[0], &unix.SockaddrUnix{Name: address}); err != nil {
+				t.Fatal("actual bound fixture failed", err)
+			}
+			if validSessionFD(a) || validSessionFD(b) {
+				t.Fatal("bound local or peer address accepted as anonymous")
+			}
+		})
 	}
 }
