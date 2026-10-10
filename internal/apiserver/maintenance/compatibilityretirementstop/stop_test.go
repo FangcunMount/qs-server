@@ -183,9 +183,10 @@ func TestLiveSessionRejectsLinuxBoundLocalAndPeerUnixAddresses(t *testing.T) {
 			defer func() { _ = a.Close() }()
 			defer func() { _ = b.Close() }()
 			address := filepath.Join(t.TempDir(), "session.sock")
-			if name == "abstract" {
+			switch name {
+			case "abstract":
 				address = "@qs-retirement-" + filepath.Base(t.TempDir())
-			} else if name == "empty_abstract" {
+			case "empty_abstract":
 				address = "@"
 			}
 			if err = unix.Bind(fds[0], &unix.SockaddrUnix{Name: address}); err != nil {

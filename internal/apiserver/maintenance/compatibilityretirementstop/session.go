@@ -7,9 +7,7 @@ import (
 	fence "github.com/FangcunMount/qs-server/internal/apiserver/maintenance/compatibilityretirementfence"
 	"golang.org/x/sys/unix"
 	"os"
-	"runtime"
 	"time"
-	"unsafe"
 )
 
 const sessionProtocol = "qs-fixed-host-service-session/v1"
@@ -81,29 +79,7 @@ func validSessionFD(f *os.File) bool {
 		if err != nil || kind != unix.SOCK_STREAM {
 			return false
 		}
-		if runtime.GOOS == "linux" {
-			// x/sys renders both unnamed and empty abstract Linux addresses as
-			// "@". Preserve the kernel length: only the AF_UNIX family itself
-			// may be present, at both ends of this connected stream.
-			unnamed := func(trap uintptr) bool {
-				var address unix.RawSockaddrAny
-				length := uint32(unix.SizeofSockaddrAny)
-				_, _, errno := unix.Syscall(trap, uintptr(fd), uintptr(unsafe.Pointer(&address)), uintptr(unsafe.Pointer(&length)))
-				return errno == 0 && length == 2 && address.Addr.Family == unix.AF_UNIX
-			}
-			return unnamed(unix.SYS_GETSOCKNAME) && unnamed(unix.SYS_GETPEERNAME)
-		}
-		local, err := unix.Getsockname(fd)
-		if err != nil {
-			return false
-		}
-		remote, err := unix.Getpeername(fd)
-		if err != nil {
-			return false
-		}
-		l, ok := local.(*unix.SockaddrUnix)
-		r, peerOK := remote.(*unix.SockaddrUnix)
-		return ok && peerOK && l.Name == "" && r.Name == ""
+		return unnamedSessionStream(fd)
 	default:
 		return false
 	}
