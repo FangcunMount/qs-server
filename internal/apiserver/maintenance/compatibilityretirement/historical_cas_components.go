@@ -39,7 +39,9 @@ type HistoricalCASComponentInput struct {
 	sources   []verifiedSourceKey
 	owners    []historicalCASOwnerKey
 	rows      []historicalCASRowInput
+	sqlRecipe *sqlevaluation.SQLHistoricalComponentRecipe
 	mongoRead *mongoHistoricalComponentReadRecipe
+	mongoCAS  *mongoHistoricalComponentCASRecipe
 	seal      string
 }
 
@@ -54,7 +56,15 @@ func (f *HistoricalCASComponentInput) digest() string {
 	if f == nil || f.index == nil {
 		return ""
 	}
-	parts := []string{"historical-cas-component-input/v1", f.binding.SourceSHA, f.binding.OperationID, f.index.indexSHA, strconv.FormatUint(f.sequence, 10), f.mongoRead.digest()}
+	sqlSHA := ""
+	if f.sqlRecipe != nil {
+		var err error
+		sqlSHA, err = f.sqlRecipe.InputSHA256()
+		if err != nil {
+			return ""
+		}
+	}
+	parts := []string{"historical-cas-component-input/v1", f.binding.SourceSHA, f.binding.OperationID, f.index.indexSHA, strconv.FormatUint(f.sequence, 10), sqlSHA, f.mongoRead.digest(), f.mongoCAS.digest()}
 	for _, key := range f.sources {
 		parts = append(parts, strconv.Itoa(int(key.object)), string(key.pk[:]))
 	}
@@ -75,11 +85,11 @@ func FreezeHistoricalCASComponentInput(ctx context.Context, joint *WholeSourceJo
 	if ctx == nil || ctx.Err() != nil || joint == nil || joint.page == nil || joint.page.sequence == 0 || joint.index == nil || !joint.index.complete || joint.sql == nil || joint.mongo == nil || len(joint.current) == 0 || historicalCASComponentPageAlive(ctx, joint) != nil || joint.ValidateBorrowedSnapshot(ctx) != nil {
 		return nil, ErrHistoricalCASComponents
 	}
-	sql, err := sqlevaluation.FreezeSQLHistoricalCASInput(ctx, joint.sql.facts, sqlPlan, unchangedSQL)
+	sql, err := sqlevaluation.FreezeSQLHistoricalComponentRecipe(ctx, joint.sql.facts, joint.cross.page, sqlPlan, unchangedSQL)
 	if err != nil {
 		return nil, err
 	}
-	f := &HistoricalCASComponentInput{index: joint.index, binding: joint.owner.binding, sequence: joint.page.sequence}
+	f := &HistoricalCASComponentInput{index: joint.index, binding: joint.owner.binding, sequence: joint.page.sequence, sqlRecipe: sql}
 	f.mongoRead, err = freezeMongoHistoricalComponentReadRecipe(ctx, joint.mongo)
 	if err != nil {
 		return nil, err
@@ -99,6 +109,10 @@ func FreezeHistoricalCASComponentInput(ctx context.Context, joint *WholeSourceJo
 		for _, group := range mongoPlan.groups {
 			writes[historicalCASRowKey{"mongodb", group.collection, group.id}] = true
 		}
+	}
+	f.mongoCAS, err = freezeMongoHistoricalComponentCASRecipe(ctx, joint, mongoPlan)
+	if err != nil {
+		return nil, err
 	}
 	seen := map[historicalCASRowKey]bool{}
 	for _, name := range mongoBatchBusinessCollections {

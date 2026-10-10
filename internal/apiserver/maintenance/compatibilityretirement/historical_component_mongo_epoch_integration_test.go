@@ -20,6 +20,7 @@ func mongoComponentNativeFixture(t *testing.T) (*mongo.Client, *mongo.Database, 
 	t.Helper()
 	client, db, cfg := mongoCycleNativeDB(t)
 	mongoBatchNativeIndexes(t, db)
+	mongoCASNativeHistoryIndexes(t, db)
 	for i := uint64(1); i <= 3; i++ {
 		mongoCycleNativeSheet(t, db, 30_000+i, "", "")
 	}

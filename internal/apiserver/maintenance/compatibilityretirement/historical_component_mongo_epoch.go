@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"reflect"
 	"strconv"
+	"sync"
 	"time"
 
 	"go.mongodb.org/mongo-driver/bson"
@@ -76,6 +77,8 @@ type MongoHistoricalComponentObservation struct {
 	seal      string
 	rowsSeal  string
 	complete  bool
+	applyMu   sync.Mutex
+	applied   bool
 	metadata  string
 	frames    []map[string][]bson.Raw
 	rows      uint64
