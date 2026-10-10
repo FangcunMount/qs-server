@@ -70,6 +70,45 @@ class ActualHostContract(unittest.TestCase):
             self.assertEqual(set(layout.SPECS),set(layout.CONTRACT)|{"alembic_version"})
             self.assertEqual(len(layout.SPECS),44)
             self.assertEqual(len(verifier.AI_SPECS),53)
+            # Real FullBounds bytes cross JSON before the borrowed reader returns tuple rows.
+            columns=[("version_num","varchar(32)","NO",None,"","utf8mb4_0900_ai_ci")]
+            metadata={"columns":columns,"indexes":[("PRIMARY",1,"version_num",0,"A",None,"BTREE","YES",None)],
+                "generated":[("version_num","")],"foreign_keys":[("fk",1,"version_num","db","t","id","RESTRICT","RESTRICT")],
+                "checks":[("check_version","version_num <> ''","YES")],"kinds":{"version_num":"varchar(32)"},
+                "ddl_sha256":"1"*64,"columns_sha256":m.digest(m.canonical(columns)),
+                "upper":[base64.b64encode(b"0040_module_table_names").decode()]}
+            for side,head in (("ai","0040_module_table_names"),("ai",verifier.AI_HEAD),("peer","99")):
+                fields=("columns","indexes","generated","foreign_keys","checks") if head=="0040_module_table_names" else ("columns",)
+                schema={key:value for key,value in metadata.items()
+                    if key in fields or key in ("kinds","ddl_sha256","columns_sha256","upper")}
+                original=verifier.FullBounds(side,packet["source_sha"],"2"*64,head,"3"*64,{"alembic_version":schema})
+                raw=original.private_bytes()
+                supplied={**packet,side+"_bounds":base64.b64encode(raw).decode(),side+"_bounds_sha256":original.digest()}
+                restored=m.bounds(verifier,supplied,side)
+                with self.subTest(side=side,head=head):
+                    self.assertEqual(restored.tables,original.tables)
+                    self.assertEqual(restored.private_bytes(),raw)
+                    self.assertEqual(restored.digest(),original.digest())
+                    self.assertIs(type(restored.tables["alembic_version"]["upper"]),list)
+                    self.assertEqual(restored.tables["alembic_version"]["upper"],schema["upper"])
+                for field in fields:
+                    for invalid in (None,{},["not-a-row"]):
+                        broken=json.loads(raw)
+                        broken["tables"]["alembic_version"][field]=invalid
+                        broken_raw=m.canonical(broken)
+                        bad={**supplied,side+"_bounds":base64.b64encode(broken_raw).decode(),side+"_bounds_sha256":m.digest(broken_raw)}
+                        with self.subTest(side=side,head=head,field=field,invalid=invalid),self.assertRaises(m.Rejected):
+                            m.bounds(verifier,bad,side)
+                    broken=json.loads(raw)
+                    del broken["tables"]["alembic_version"][field]
+                    broken_raw=m.canonical(broken)
+                    with self.subTest(side=side,head=head,missing=field),self.assertRaises(m.Rejected):
+                        m.bounds(verifier,{**supplied,side+"_bounds":base64.b64encode(broken_raw).decode(),
+                            side+"_bounds_sha256":m.digest(broken_raw)},side)
+                with self.subTest(side=side,head=head,approval="mismatched"),self.assertRaises(m.Rejected):
+                    m.bounds(verifier,{**supplied,side+"_bounds_sha256":"0"*64},side)
+                with self.subTest(side=side,head=head,encoding="noncanonical"),self.assertRaises(m.Rejected):
+                    m.bounds(verifier,{**supplied,side+"_bounds":base64.b64encode(raw+b" ").decode()},side)
         packet["modules"]["qs-ai-retirement-readonly-verifier.py"]=base64.b64encode(b"complete=True").decode()
         with tempfile.TemporaryDirectory() as directory,self.assertRaises(m.Rejected):
             m.load_verifier(packet,Path(directory))

@@ -22,7 +22,7 @@ import (
 	store "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/aibridge"
 )
 
-const aiExternalHostSHA = "86c5bf471ce43fcd2cd6ad706cc35759b8ce98a82c44f613e87d43395c9b6a9b"
+const aiExternalHostSHA = "2c83079dc8466b8ccd61a832bc957cd52c538cc2ddda5ded6dcaad1ed1795bb3"
 const aiExternalResultLimit = 32 << 20
 const aiExternalInputLimit = 16 << 20
 

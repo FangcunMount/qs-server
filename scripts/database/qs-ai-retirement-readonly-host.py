@@ -210,6 +210,16 @@ def bounds(module, packet, side):
         reject()
     if side == "peer" and not re.fullmatch(r"[1-9][0-9]{0,8}", value["head"]):
         reject()
+    # Restore only SQL metadata rows lost at the JSON boundary; cursors stay arrays.
+    row_fields = ("columns", "indexes", "generated", "foreign_keys", "checks") if side == "ai" and value["head"] == "0040_module_table_names" else ("columns",)
+    for table in value["tables"].values():
+        if not isinstance(table, dict):
+            reject()
+        for key in row_fields:
+            rows = table.get(key)
+            if not isinstance(rows, list) or any(not isinstance(row, list) for row in rows):
+                reject()
+            table[key] = [tuple(row) for row in rows]
     result = module.FullBounds(side, value["source_sha"], value["identity_hash"], value["head"],
                                value["catalog_sha256"], value["tables"])
     # Approval binds the original canonical bytes, not a reserialized substitute.
