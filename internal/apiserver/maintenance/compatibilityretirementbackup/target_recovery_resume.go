@@ -94,8 +94,11 @@ func closeTargetJournalDirectories(dirs []targetJournalDirectory) error {
 }
 
 func targetDirectoryIdentity(a, b unix.Stat_t) bool {
+	// An ancestor's link count changes when unrelated siblings are created or
+	// removed. Its opened and named device/inode, ownership and mode identify
+	// the original path; the private journal leaf retains its link-count check.
 	return a.Dev == b.Dev && a.Ino == b.Ino && a.Uid == b.Uid &&
-		a.Gid == b.Gid && a.Mode == b.Mode && a.Nlink == b.Nlink
+		a.Gid == b.Gid && a.Mode == b.Mode
 }
 
 func openTargetJournalDirectories(path string) (dirs []targetJournalDirectory, result error) {
@@ -167,13 +170,14 @@ func openTargetJournalDirectories(path string) (dirs []targetJournalDirectory, r
 }
 
 func verifyTargetJournalDirectories(dirs []targetJournalDirectory) error {
-	for _, d := range dirs {
+	for i, d := range dirs {
 		var fd, named unix.Stat_t
-		if unix.Fstat(d.fd, &fd) != nil || !targetDirectoryIdentity(d.stamp, fd) {
+		leaf := i == len(dirs)-1
+		if unix.Fstat(d.fd, &fd) != nil || !targetDirectoryIdentity(d.stamp, fd) || (leaf && d.stamp.Nlink != fd.Nlink) {
 			return ErrRecoveryJournal
 		}
 		if d.parent >= 0 {
-			if unix.Fstatat(d.parent, d.name, &named, unix.AT_SYMLINK_NOFOLLOW) != nil || !targetDirectoryIdentity(fd, named) {
+			if unix.Fstatat(d.parent, d.name, &named, unix.AT_SYMLINK_NOFOLLOW) != nil || !targetDirectoryIdentity(fd, named) || (leaf && fd.Nlink != named.Nlink) {
 				return ErrRecoveryJournal
 			}
 		}
