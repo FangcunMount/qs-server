@@ -51,6 +51,9 @@ func TestSQLHistoricalComponentClosedScopeAndNoImportedAuthority(t *testing.T) {
 	if r, err := FreezeSQLHistoricalAbsentOwnerSelectorRecipe(context.Background(), nil, nil, []string{"exact-event"}, []SQLCrossStoreOwnerReference{{Kind: "AnswerSheet", ID: "10042"}}, []uint64{10042}, nil); r != nil || err == nil {
 		t.Fatal("caller selectors fabricated a live original SQL-empty range")
 	}
+	if recipes, err := FreezeSQLHistoricalOwnerPlanningRecipes(context.Background(), nil, nil, s, nil, map[string]uint64{"exact-event": 42}); recipes != nil || err == nil {
+		t.Fatal("editable selectors fabricated actual owner planning input")
+	}
 	copied := componentCopySelectors(s)
 	copied.EventIDs[0] = "changed"
 	copied.AssessmentIDs[0] = 9

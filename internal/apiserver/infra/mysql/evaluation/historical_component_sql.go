@@ -421,6 +421,23 @@ func (r *SQLHistoricalComponentRecipe) OwnerPartitionResolved() bool {
 	return err == nil && loaded.ownerPartitioned
 }
 
+// Freeze planning input in the SAME actual RRRO scope as the original owner
+// batch and catalog. Every baseline/negative range is read from that scope;
+// no coordinator, global capability, imported evidence or CAS plan is made.
+// The recipes have no groups or write edges. Actual owner/replay dependencies
+// still join components; a later fresh qualified aggregate must prepare writes.
+func FreezeSQLHistoricalOwnerPlanningRecipes(ctx context.Context, original *SQLHistoricalOwnerBatch, catalog *SQLHistoricalCrossStoreCatalog, selectors SQLCrossStoreSelectors, spool *SQLHistoricalCASSpool, sourceSelectors ...map[string]uint64) ([]*SQLHistoricalComponentRecipe, error) {
+	page, err := PrepareSQLHistoricalCrossStorePage(ctx, catalog, original, selectors)
+	if err != nil {
+		return nil, err
+	}
+	baseline, err := SealSQLHistoricalCASReadBaseline(ctx, original)
+	if err != nil {
+		return nil, err
+	}
+	return FreezeSQLHistoricalOwnerComponentRecipes(ctx, original, page, nil, baseline, spool, sourceSelectors...)
+}
+
 // The source page is a transport boundary, not an atomic owner boundary.
 // Partition only private, live original reads. Replay membership joins real
 // owners; shared schema/model/head reads do not join unrelated assessments.

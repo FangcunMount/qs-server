@@ -349,6 +349,88 @@ func TestSQLHistoricalComponentNativeAbsentOwnerSelector(t *testing.T) {
 	}
 }
 
+func TestSQLHistoricalComponentNativeOwnerPlanningRecipes(t *testing.T) {
+	db := openHistoricalReferencesDB(t)
+	insertHistoricalAssessment(t, db, 42)
+	insertHistoricalAssessment(t, db, 43)
+	selectors := SQLCrossStoreSelectors{EventIDs: []string{"planning-owner-42", "planning-owner-43", "planning-empty-sheet"}, AssessmentIDs: []uint64{42, 43}, OrganizationIDs: []uint64{7}, MongoOwners: []SQLCrossStoreOwnerReference{{Kind: "AnswerSheet", ID: "10042"}, {Kind: "AnswerSheet", ID: "10043"}, {Kind: "AnswerSheet", ID: "10090"}}}
+	present := map[string]uint64{"planning-owner-42": 42, "planning-owner-43": 43}
+	absent := map[string]uint64{"planning-empty-sheet": 10090}
+	var recipes []*SQLHistoricalComponentRecipe
+	var retainedContext context.Context
+	var retainedBatch *SQLHistoricalOwnerBatch
+	var retainedCatalog *SQLHistoricalCrossStoreCatalog
+	capture := func(mixedReplay bool) error {
+		return batchNativeTx(t, db, func(ctx context.Context, cycle *SQLHistoricalResponsibilityCycle) error {
+			batch, err := PrepareSQLHistoricalOwnerBatch(ctx, cycle, SQLHistoricalOwnerBatchRequest{AssessmentIDs: []uint64{42, 43}, AnswerSheetIDs: []uint64{10042, 10043, 10090}}, DefaultSQLHistoricalOwnerBatchLimits())
+			if err != nil {
+				return err
+			}
+			catalog, err := PrepareSQLHistoricalCrossStoreCatalog(ctx, cycle, DefaultSQLCrossStoreLimits())
+			if err != nil {
+				return err
+			}
+			recipes, err = FreezeSQLHistoricalOwnerPlanningRecipes(ctx, batch, catalog, selectors, nil, present, absent)
+			if err != nil {
+				return err
+			}
+			retainedContext, retainedBatch, retainedCatalog = ctx, batch, catalog
+			if mixedReplay {
+				if len(recipes) != 1 || recipes[0].OwnerPartitionResolved() || len(recipes[0].responsibility.rows["qs_rm_replay_items"]) != 2 || !slices.Equal(recipes[0].selectors.EventIDs, selectors.EventIDs) || len(recipes[0].plan.request.AnswerSheetIDs) != 3 {
+					return errors.New("planning input cut the actual mixed replay or original negative ranges")
+				}
+			} else if len(recipes) != 3 {
+				return errors.New("planning input joined unrelated positive and absent owners")
+			}
+			for _, recipe := range recipes {
+				if len(recipe.plan.groups) != 0 || len(recipe.plan.attachments) != 0 || len(recipe.input.writes) != 0 {
+					return errors.New("pure planning input invented intended evidence or write groups")
+				}
+				if err := recipe.RowDependencies(func(_ string, _ uint64, _ string, _ uint64, write bool) error {
+					if write {
+						return errors.New("planning metadata granted a physical write edge")
+					}
+					return nil
+				}); err != nil {
+					return err
+				}
+			}
+			return nil
+		})
+	}
+	if err := capture(false); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := FreezeSQLHistoricalOwnerPlanningRecipes(retainedContext, retainedBatch, retainedCatalog, selectors, nil, present, absent); err == nil {
+		t.Fatal("ended host transaction created new planning input")
+	}
+	for _, recipe := range recipes {
+		if err := componentSQLNativeObserve(t, db, recipe, true, func(ctx context.Context, observed *SQLHistoricalComponentObservation) error {
+			if _, err := observed.apply(ctx); err == nil {
+				return errors.New("pure planning recipe authorized actual CAS")
+			}
+			return nil
+		}); err != nil {
+			t.Fatal("genuine fresh planning baseline rejected", err)
+		}
+	}
+	crossSQLNativeReplay(t, db, "planning-owner-42")
+	if err := db.Exec("UPDATE qs_rm_replay_items SET event_id=? WHERE org_id=7 AND request_id=? AND ordinal=1", []byte("planning-empty-sheet"), []byte("native-cross-replay")).Error; err != nil {
+		t.Fatal(err)
+	}
+	replay := standard.ReplayRequest{OrgID: 7, RequestID: "native-cross-replay", Store: "mongo-domain-events", Reason: "native complete input", Targets: []standard.ReplayTarget{{EventID: "planning-owner-42", ExpectedFailureCount: 3}, {EventID: "planning-empty-sheet", ExpectedFailureCount: 4}}}
+	hash, err := replay.Fingerprint()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = db.Exec("UPDATE qs_rm_replay_requests SET input_hash=? WHERE org_id=7 AND request_id=?", hash[:], []byte(replay.RequestID)).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err = capture(true); err != nil {
+		t.Fatal("actual mixed planning replay closure failed", err)
+	}
+}
+
 func TestSQLHistoricalComponentNativeMixedPresentAbsentSelectors(t *testing.T) {
 	db := openHistoricalReferencesDB(t)
 	insertHistoricalAssessment(t, db, 42)
