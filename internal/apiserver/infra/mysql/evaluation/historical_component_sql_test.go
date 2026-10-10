@@ -331,3 +331,34 @@ func TestSQLHistoricalComponentUnionPreservesExactOriginalRowsAndBounds(t *testi
 		})
 	}
 }
+
+func TestSQLHistoricalComponentUnionPreservesNativeEmptyRunBaseline(t *testing.T) {
+	makeObserver := func(present bool) *SQLHistoricalComponentObservation {
+		rows := map[string][]historicalSQLRow{"assessment": {}, "runtime_checkpoint": {}, "evaluation_outcome": {}}
+		if present {
+			rows["assessment"] = []historicalSQLRow{cycleTestRow(map[string]string{"id": "42"})}
+			// cycleQuery returns nil for an actually queried empty descendant
+			// range. capture uses explicit empty slices only without an owner.
+			rows["runtime_checkpoint"], rows["evaluation_outcome"] = nil, nil
+		}
+		return &SQLHistoricalComponentObservation{recipe: &SQLHistoricalComponentRecipe{plan: &SQLHistoricalBatchCASPlan{identity: "identity", server: "server", database: "database", request: SQLHistoricalOwnerBatchRequest{AssessmentIDs: []uint64{42}}, limits: DefaultSQLHistoricalOwnerBatchLimits()}}, business: sqlHistoricalCASImage{rows: rows, schema: map[string]string{}, columns: map[string][]string{}}}
+	}
+	for _, absentFirst := range []bool{false, true} {
+		present, absent := makeObserver(true), makeObserver(false)
+		observations := []*SQLHistoricalComponentObservation{present, absent}
+		if absentFirst {
+			observations = []*SQLHistoricalComponentObservation{absent, present}
+		}
+		merged, err := componentSQLUnionPlan(observations)
+		if err != nil || len(merged.before.rows["assessment"]) != 1 || merged.before.rows["runtime_checkpoint"] != nil || merged.before.rows["evaluation_outcome"] != nil {
+			t.Fatal("actual queried empty descendants changed the complete raw CAS baseline", err)
+		}
+		if present.business.rows["runtime_checkpoint"] != nil || absent.business.rows["runtime_checkpoint"] == nil {
+			t.Fatal("union mutated an original empty range")
+		}
+	}
+	merged, err := componentSQLUnionPlan([]*SQLHistoricalComponentObservation{makeObserver(false)})
+	if err != nil || merged.before.rows["assessment"] == nil || merged.before.rows["runtime_checkpoint"] == nil || merged.before.rows["evaluation_outcome"] == nil {
+		t.Fatal("actual absent-owner capture no longer has explicit empty ranges", err)
+	}
+}

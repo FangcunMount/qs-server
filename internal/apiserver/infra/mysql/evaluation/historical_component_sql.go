@@ -2009,7 +2009,20 @@ func componentSQLUnionPlan(observations []*SQLHistoricalComponentObservation) (*
 			return nil, ErrSQLHistoricalComponent
 		}
 	}
-
+	// Match the original capture's empty result representation. Descendant
+	// queries return nil when selected owners have no rows; without an owner,
+	// capture does not query them and records explicit empty negative ranges.
+	if len(p.before.rows["assessment"]) == 0 {
+		for _, table := range batchBusinessTables {
+			p.before.rows[table] = []historicalSQLRow{}
+		}
+	} else {
+		for _, table := range []string{"runtime_checkpoint", "evaluation_outcome"} {
+			if len(p.before.rows[table]) == 0 {
+				p.before.rows[table] = nil
+			}
+		}
+	}
 	return p, nil
 }
 
