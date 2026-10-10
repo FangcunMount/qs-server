@@ -455,7 +455,7 @@ class ImagePreloadBoundary(unittest.TestCase):
         self.assertNotIn('prune',source)
         workflow=Path(__file__).resolve().parents[2]/'.github/workflows/compatibility-retirement.yml'
         body=workflow.read_text()
-        self.assertIn("if: inputs.prepare_mode == 'window-tool' && inputs.operation == 'prepare'",body)
+        self.assertIn("if: inputs.prepare_mode == 'prepare-facts' && inputs.operation == 'prepare'",body)
         self.assertIn('bash scripts/cd/build-image.sh',body)
         self.assertIn('preload-image.tar.gz',body)
 

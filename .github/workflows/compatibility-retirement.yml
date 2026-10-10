@@ -486,29 +486,29 @@ jobs:
         with:
           go-version-file: go.mod
       - name: Set up the original image builder for window preparation
-        if: inputs.prepare_mode == 'window-tool' && inputs.operation == 'prepare'
+        if: inputs.prepare_mode == 'prepare-facts' && inputs.operation == 'prepare'
         uses: docker/setup-buildx-action@v4
       - name: Authenticate image reads for window preparation
-        if: inputs.prepare_mode == 'window-tool' && inputs.operation == 'prepare'
+        if: inputs.prepare_mode == 'prepare-facts' && inputs.operation == 'prepare'
         uses: docker/login-action@v4
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
       - name: Authenticate original build cache reads
-        if: inputs.prepare_mode == 'window-tool' && inputs.operation == 'prepare'
+        if: inputs.prepare_mode == 'prepare-facts' && inputs.operation == 'prepare'
         uses: docker/login-action@v4
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ github.token }}
       - name: Prebuild and export the exact cached API image without deployment
-        if: inputs.prepare_mode == 'window-tool' && inputs.operation == 'prepare'
+        if: inputs.prepare_mode == 'prepare-facts' && inputs.operation == 'prepare'
         env:
           SERVICE: apiserver
           DOCKER_REGISTRY: ghcr.io
           DOCKER_REPOSITORY: fangcunmount
           DEPLOY_REF: ${{ github.ref_name }}
-          DEPLOY_SHA: ${{ needs.validate.outputs.tool_source_sha }}
+          DEPLOY_SHA: ${{ needs.validate.outputs.tool_source_sha || github.sha }}
           WWW_UID: ${{ secrets.WWW_UID }}
           WWW_GID: ${{ secrets.WWW_GID }}
         run: |
@@ -537,11 +537,7 @@ jobs:
             go test ./cmd/qs-compatibility-retirement
             CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -buildvcs=false -trimpath -ldflags="-s -w -X main.sourceSHA=$RETIREMENT_TOOL_SOURCE_SHA -X github.com/FangcunMount/qs-server/pkg/version.GitCommit=$RETIREMENT_TOOL_SOURCE_SHA" -o "$package_dir/inventory-linux-amd64" ./cmd/qs-compatibility-retirement
             CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -buildvcs=false -trimpath -ldflags="-s -w -X main.sourceSHA=$RETIREMENT_TOOL_SOURCE_SHA -X github.com/FangcunMount/qs-server/pkg/version.GitCommit=$RETIREMENT_TOOL_SOURCE_SHA" -o "$package_dir/inventory-linux-arm64" ./cmd/qs-compatibility-retirement
-            image="$RUNNER_TEMP/qs-retirement-preload-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT.tar.gz"
-            [[ -f "$image" ]] && gzip -t "$image" || exit 1
-            cp "$image" "$package_dir/preload-image.tar.gz"
-            tar -czf "$archive" -C "$package_dir" compatibility-window-tool.py receipt-transport.py inventory-linux-amd64 inventory-linux-arm64 preload-image.tar.gz
-            rm -- "$image" "$package_dir/preload-image.tar.gz"
+            tar -czf "$archive" -C "$package_dir" compatibility-window-tool.py receipt-transport.py inventory-linux-amd64 inventory-linux-arm64
           elif [[ "$RETIREMENT_PACKAGE_MODE" == "host-writer-scope" || "$RETIREMENT_PACKAGE_MODE" == "db-writer-census" ]]; then
             [[ "$RETIREMENT_TOOL_SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]] || exit 1
             [[ "$(git rev-parse HEAD)" == "$RETIREMENT_TOOL_SOURCE_SHA" ]] || exit 1
@@ -571,7 +567,16 @@ jobs:
             go test ./cmd/qs-compatibility-history
             CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags="-s -w -X main.sourceSHA=$GITHUB_SHA" -o "$package_dir/history-linux-amd64" ./cmd/qs-compatibility-history
             CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -trimpath -ldflags="-s -w -X main.sourceSHA=$GITHUB_SHA" -o "$package_dir/history-linux-arm64" ./cmd/qs-compatibility-history
-            tar -czf "$archive" -C "$package_dir" compatibility-retirement.py compatibility-history-prepare.py compatibility-retirement-entrypoints.json receipt-transport.py inventory-linux-amd64 inventory-linux-arm64 history-linux-amd64 history-linux-arm64
+            members=(compatibility-retirement.py compatibility-history-prepare.py compatibility-retirement-entrypoints.json receipt-transport.py inventory-linux-amd64 inventory-linux-arm64 history-linux-amd64 history-linux-arm64)
+            if [[ "$RETIREMENT_PACKAGE_MODE" == "prepare-facts" ]]; then
+              image="$RUNNER_TEMP/qs-retirement-preload-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT.tar.gz"
+              [[ -f "$image" ]] && gzip -t "$image" || exit 1
+              cp scripts/database/compatibility-window-tool.py "$package_dir/"
+              cp "$image" "$package_dir/preload-image.tar.gz"
+              members+=(compatibility-window-tool.py preload-image.tar.gz)
+            fi
+            tar -czf "$archive" -C "$package_dir" "${members[@]}"
+            if [[ "$RETIREMENT_PACKAGE_MODE" == "prepare-facts" ]]; then rm -- "$image" "$package_dir/preload-image.tar.gz"; fi
           fi
           echo "sha256=$(shasum -a 256 "$archive" | awk '{print $1}')" >> "$GITHUB_OUTPUT"
       - name: Upload tooling with pinned ServerA identity

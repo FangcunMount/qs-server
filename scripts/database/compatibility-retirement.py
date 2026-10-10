@@ -1591,11 +1591,18 @@ try:
     with tarfile.open(fileobj=io.BytesIO(raw),mode='r:gz') as tar:
         members=tar.getmembers()
         names=[m.name for m in members]
-        if len(names)!=len(set(names)) or any(not m.isfile() or '/' in m.name or m.size>64<<20 for m in members): stop()
+        if len(names)!=len(set(names)) or any(not m.isfile() or '/' in m.name or m.size>(200<<20 if stage=='prepare-facts' and m.name=='preload-image.tar.gz' else 64<<20) for m in members): stop()
         selected=[m for m in members if m.name==name]
         if len(selected)!=1: stop()
         binary=tar.extractfile(selected[0]).read((64<<20)+1)
         if not binary or len(binary)>64<<20: stop()
+        preload_program=preload_archive=None
+        if stage=='prepare-facts':
+            programs=[m for m in members if m.name=='compatibility-window-tool.py']
+            images=[m for m in members if m.name=='preload-image.tar.gz']
+            if len(programs)!=1 or programs[0].size>1<<20 or len(images)!=1: stop()
+            preload_program=tar.extractfile(programs[0]).read((1<<20)+1)
+            preload_archive=tar.extractfile(images[0]).read((200<<20)+1)
     base=Path('/opt/backups/qs-server/compatibility-retirement-root-prepare')
     try: base.mkdir(mode=0o700)
     except FileExistsError: pass
@@ -1629,6 +1636,20 @@ try:
     credentials['PATH']='/usr/bin:/bin'
     credentials['QS_RETIREMENT_SOURCE_UID']=str(source_uid)
     native_mode = stage+'-root-once' if stage != 'lifecycle' else 'lifecycle-prepare-root-once'
+    native_argv=[str(native),'--mode',native_mode,'--request',request_path,'--request-hash',request_hash,'--operation-id',operation,'--run-id',run]
+    if stage=='prepare-facts':
+        module={'__name__':'approved_cached_image_preparation'}
+        exec(compile(preload_program,'approved-package-cached-image-caller','exec'),module)
+        request_raw=module['read_owned'](Path(request_path),source_uid,request_hash,256<<10)
+        request=module['decode'](request_raw)
+        if request.get('source_sha')!=tool_sha or request.get('operation_id')!=operation or request.get('actual_run_id')!=run: stop()
+        approval={'stage':'prepare','tool_source_sha':tool_sha,'original_source_sha':request['inventory_report']['source_sha'],'operation_id':operation}
+        observed=module['preload_api_image'](preload_archive,approval,run,batch,None)
+        result=subprocess.run(native_argv,env=credentials,stdin=subprocess.DEVNULL,stdout=subprocess.PIPE,stderr=subprocess.DEVNULL,timeout=85*60,check=False)
+        if len(result.stdout)>32768: stop()
+        native_result=json.loads(result.stdout,object_pairs_hook=unique_credentials)
+        print(json.dumps({'native_receipt':native_result,'image_preload':observed},sort_keys=True,separators=(',',':')))
+        raise SystemExit(result.returncode)
     os.execve(native,[str(native),'--mode',native_mode,'--request',request_path,'--request-hash',request_hash,'--operation-id',operation,'--run-id',run],credentials)
 except (OSError,ValueError,KeyError,tarfile.TarError,subprocess.SubprocessError):
     stop()
@@ -1684,6 +1705,11 @@ def root_once_lifecycle_prepare(args):
             raise NativeReceiptBlocked('lifecycle_native_receipt_invalid', root_native_diagnostic(private_stderr, True, result.stdout, result.returncode))
         if not result.stdout:
             raise NativeReceiptBlocked('lifecycle_native_receipt_missing', root_native_diagnostic(private_stderr, True, result.stdout, result.returncode))
+    if args.prepare_mode == 'prepare-facts':
+        wrapped=decode(result.stdout)
+        fields(wrapped,('native_receipt','image_preload'))
+        args.actual_preloaded_image=wrapped['image_preload']
+        return result.returncode,canonical_bytes(wrapped['native_receipt'])
     return result.returncode,result.stdout
 
 
@@ -1895,7 +1921,14 @@ def live_prepare_facts(args):
         create_bootstrap_file(directory, "prepare-facts-request-" + args.run_id + ".json", raw)
         args.prepare_facts_request_hash = request_hash
         code, native = root_once_lifecycle_prepare(args)
-    return validate_prepare_facts_result(decode(native), args, request, request_hash, code)
+    result=validate_prepare_facts_result(decode(native), args, request, request_hash, code)
+    observed=args.actual_preloaded_image
+    fields(observed,('kind','tool_source_sha','original_source_sha','operation_id','actual_run_id','image_archive_sha256','image_id','os','architecture','revision','program_sha256','probe_id','probe_absent','temporary_files_zero','capabilities'))
+    if observed['kind']!='native_cached_api_image_observation' or observed['tool_source_sha']!=args.actual_source_sha or observed['original_source_sha']!=request['inventory_report']['source_sha'] or observed['operation_id']!=args.operation_id or observed['actual_run_id']!=args.run_id or observed['revision']!=args.actual_source_sha or observed['os']!='linux' or observed['architecture']!='amd64' or observed['probe_absent'] is not True or observed['temporary_files_zero'] is not True or observed['capabilities']!={'deployment':False,'writer_fence':False,'drop':False}: fail('prepare_facts_image_preload_rejected')
+    token(observed['image_id'],re.compile(r'sha256:[0-9a-f]{64}'))
+    for key in ('image_archive_sha256','program_sha256','probe_id'):token(observed[key],HASH)
+    result['observed_cached_api_image']={'image_id_sha256':observed['image_id'][7:],'program_sha256':observed['program_sha256'],'source_sha':observed['tool_source_sha'],'original_source_sha':observed['original_source_sha'],'operation_id':observed['operation_id'],'run_id':observed['actual_run_id'],'image_archive_sha256':observed['image_archive_sha256'],'probe_id':observed['probe_id'],'probe_absent':True,'temporary_files_zero':True,'os':'linux','architecture':'amd64'}
+    return result
 
 
 HOST_SCOPE_GAPS = frozenset(('absent_source_end_recheck_changed_or_unread', 'absent_source_end_recheck_unknown', 'account_home_source_unsupported', 'account_startup_indirect_execution_not_proven', 'account_startup_or_public_key_unread', 'activation_source_unread', 'all_match_authentication_domains_not_exhaustively_proven', 'directory_end_recheck_changed_or_unread', 'docker_socket_and_other_container_writer_admission_not_fenced', 'dynamic_key_or_principal_provider_not_exhaustively_proven', 'existing_sessions_not_drained_or_admission_fenced', 'external_database_and_qs_ai_writers_not_observed', 'external_or_conditional_nss_backend_not_exhaustively_proven', 'host_identity_read_unknown', 'host_namespace_read_unknown', 'indirect_activation_scripts_and_arbitrary_commands_unproven', 'local_accounts_schema_unknown', 'local_accounts_unread', 'local_groups_unread', 'local_runner_workflow_admission_not_fenced', 'login_session_listing_unread', 'login_session_schema_unknown', 'native_command_end_recheck_changed_or_unread', 'native_docker_roster_budget_exceeded', 'native_docker_roster_schema_unknown', 'native_docker_roster_unread', 'native_docker_selected_inspect_schema_unknown', 'native_docker_selected_inspect_unread', 'native_nss_accounts_schema_unknown', 'native_nss_differs_from_local_accounts', 'native_nss_enumeration_unread', 'native_systemd_listing_schema_unknown', 'native_systemd_listing_unread', 'native_systemd_properties_unread', 'native_systemd_unit_budget_exceeded', 'nss_sources_unread', 'observation_handle_close_failed', 'pam_and_dynamic_authentication_modules_not_exhaustively_proven', 'pam_authentication_source_unread', 'proc_roster_unread', 'process_cgroup_unread', 'process_changed_during_read', 'process_disappeared_or_stat_unread', 'process_end_recheck_changed_or_unread', 'process_executable_hash_unread', 'process_executable_unread', 'process_namespace_unread', 'process_stat_schema_unknown', 'process_status_unread', 'process_uid_schema_unknown', 'public_key_options_and_certificate_semantics_not_proven', 'source_activation_directory_unread', 'source_activation_symlink_target_not_followed', 'source_activation_symlink_unread', 'source_activation_tree_budget_exceeded', 'source_activation_tree_unread', 'source_end_recheck_changed_or_unread', 'source_sshd_configuration_unread', 'source_sshd_include_cycle_or_duplicate', 'source_sshd_include_directory_unread', 'source_sshd_include_path_unsupported', 'source_sshd_include_pattern_unknown', 'source_sshd_include_scope_or_budget_unknown', 'source_sshd_original_config_from_process_title_unproven', 'source_sshd_syntax_unknown', 'ssh_authorization_path_scope_unknown', 'ssh_key_path_expansion_requires_effective_subject', 'ssh_public_authorization_unread', 'sshd_argv_end_recheck_changed_or_unread', 'sshd_command_line_override_semantics_unproven', 'sshd_daemon_not_observed', 'sshd_loaded_configuration_snapshot_unproven', 'sshd_original_argv_unread', 'symlink_source_end_recheck_changed_or_unread', 'unclassified_processes_require_independent_writer_catalog', 'user_manager_runtime_socket_activation_not_exhaustively_proven', 'writer_admission_and_historical_platform_fence_not_installed'))
@@ -2158,6 +2191,7 @@ def main(argv=None):
               "prepare_source_files": [{"name": frozenset(name.replace(".", "_") for name in PREPARE_SOURCE_NAMES), "sha256": "hash64", "bytes": "uint"}],
               "observed_ordered_mongo_schema_sha256": "hash64_or_empty",
               "observed_restore_engines": {"mysql_image_id_sha256": "hash64", "mongodb_image_id_sha256": "hash64", "architecture": frozenset({"amd64", "arm64"})},
+              "observed_cached_api_image": {"image_id_sha256":"hash64","program_sha256":"hash64","source_sha":"sha40","original_source_sha":"sha40","operation_id":"run_id","run_id":"run_id","image_archive_sha256":"hash64","probe_id":"hash64","probe_absent":"bool","temporary_files_zero":"bool","os":frozenset({"linux"}),"architecture":frozenset({"amd64"})},
               "observed_ai_runtime": {"source_sha": "sha40", "image_id_sha256": "hash64", "container_id": "hash64", "binding_sha256": "hash64", "stop_constraints": {"settings_sha256": "hash64", "network_id": "hash64"}},
               "observed_filesystems": [{"scope": frozenset({"source", "staging", "archive", "docker"}), "path_sha256": "hash64", "total_bytes": "uint", "available_bytes": "uint", "free_bytes": "uint"}],
               "db_census_observation_complete":"bool", "mysql_all_connections_permission_proven":"bool", "mongodb_local_all_sessions_permission_proven":"bool", "all_nodes_sessions_coverage_complete":"bool", "external_writer_coverage_complete":"bool", "db_census_private_catalog_sha256":"hash64_or_empty", "db_census_catalog_sha256":"hash64_or_empty",

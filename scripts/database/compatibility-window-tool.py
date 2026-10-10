@@ -574,8 +574,15 @@ def preload_api_image(raw, approval, run, batch, owner):
     put(image_path,raw)
     def command(*args):
         if identity(docker.stat()) != docker_identity: reject("window_tool_image_preload_rejected")
-        code, output = owned_process([str(docker),"--host","unix:///run/docker.sock",*args],{"PATH":"/usr/bin:/bin"},control=sys.stdin.fileno(),timeout=300,owner=owner)
-        if code or identity(docker.stat()) != docker_identity: reject("window_tool_image_preload_rejected")
+        argv=[str(docker),"--host","unix:///run/docker.sock",*args]
+        if owner is None:
+            # Existing prepare-facts root-once caller has an EOF credential pipe,
+            # not a live Window. Only bounded cached-image preparation uses it.
+            value=subprocess.run(argv,env={"PATH":"/usr/bin:/bin"},stdin=subprocess.DEVNULL,stdout=subprocess.PIPE,stderr=subprocess.DEVNULL,timeout=300,check=False)
+            code, output=value.returncode,value.stdout
+        else:
+            code, output=owned_process(argv,{"PATH":"/usr/bin:/bin"},control=sys.stdin.fileno(),timeout=300,owner=owner)
+        if code or len(output)>1<<20 or identity(docker.stat()) != docker_identity: reject("window_tool_image_preload_rejected")
         return output
     command("load","--input",str(image_path))
     fmt = '{"id":{{json .Id}},"os":{{json .Os}},"architecture":{{json .Architecture}},"revision":{{json (index .Config.Labels "org.opencontainers.image.revision")}}}'
@@ -714,7 +721,14 @@ def root_execute(arguments, packet, source_uid, archive_raw):
         control=sys.stdin.fileno(), timeout=5, owner=owner)
     if check_code or check_raw != a["tool_source_sha"].encode() + b"\n":
         reject("window_tool_actual_source_rejected")
-    image_preload = preload_api_image(preload_raw,a,current_run,batch,owner) if preload_raw is not None else None
+    if preload_raw is not None: reject("window_tool_package_rejected")
+    if stage == "prepare":
+        # The earlier original prepare-facts producer supplies the first actual
+        # image facts. This invocation only re-reads that exact cached identity.
+        image_fmt='{"id":{{json .Id}},"os":{{json .Os}},"architecture":{{json .Architecture}},"revision":{{json (index .Config.Labels "org.opencontainers.image.revision")}}}'
+        for _ in range(2):
+            image_code,image_raw=owned_process(["/usr/bin/docker","--host","unix:///run/docker.sock","image","inspect","--format",image_fmt,a["b_image_id"]],{"PATH":"/usr/bin:/bin"},control=sys.stdin.fileno(),timeout=10,owner=owner)
+            if image_code or decode(image_raw)!={"id":a["b_image_id"],"os":"linux","architecture":arch,"revision":a["tool_source_sha"]}: reject("window_tool_image_preload_rejected")
     budget_result_hash = ""
     if stage == "prepare" and "local_descriptor_sha256" in a:
         budget_result_hash = prepare_budget_key(original, batch, native, source_uid, a, current_run, owner)
@@ -732,7 +746,7 @@ def root_execute(arguments, packet, source_uid, archive_raw):
     # manager imports no completion/permit or guessed production authority.
     code, raw = owned_process([str(native), "--mode", mode, "--request", str(invocation / "lifecycle-request.json"),
                "--request-hash", digest(derived), "--operation-id", operation, "--run-id", current_run], environment, control=sys.stdin.fileno(), owner=owner)
-    sys.stdout.buffer.write(canonical({"native_receipt":decode(raw),"image_preload":image_preload}) if image_preload is not None else raw)
+    sys.stdout.buffer.write(raw)
     sys.stdout.buffer.flush()
     return code
 
@@ -1071,17 +1085,9 @@ def run_window_call(args, raw, approval_hash, package, credentials, *, control=N
         # The live pipe requests root-owned cancellation if this manager loses
         # its caller. No saved JSON is turned into a live proof.
         code, native_raw = owned_process(command, environment, packet=packet, control=control, timeout=115 * 60)
-        image_preload = None
-        root_value = decode(native_raw)
-        if type(root_value) is dict and "image_preload" in root_value:
-            exact(root_value,("native_receipt","image_preload"))
-            if args.operation != "prepare": reject("window_tool_image_preload_rejected")
-            image_preload = validate_image_preload(root_value["image_preload"],a,args.run_id)
-            native_raw = canonical(root_value["native_receipt"])
         native = validate_native(native_raw, code, a, args.run_id, derived_hash)
         result = {"format_version": 1, "kind": "independent_window_tool_call_result", "dispatcher_source_sha": args.dispatcher_sha,
                   "tool_source_sha": a["tool_source_sha"], "approved_template_sha256": args.template_hash, "derived_request_sha256": derived_hash, "native_result": native}
-        if image_preload is not None: result["image_preload"] = image_preload
         emit(result, secrets)
         return code
     except (Refused, OSError, ValueError, subprocess.SubprocessError):

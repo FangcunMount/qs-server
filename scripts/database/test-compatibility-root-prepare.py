@@ -126,6 +126,7 @@ class PrepareFactsBoundaries(unittest.TestCase):
         args=argparse.Namespace(operation='prepare',prepare_mode='prepare-facts',operation_id='123-1',run_id='789-1',actual_source_sha='a'*40,
             approved_source_sha='a'*40,manifest_hash='',identity_request_hash='',inventory_request_hash='',lifecycle_request_hash='',root='/opt/backups/qs-server/compatibility-retirement')
         self.set_descriptor(args,value)
+        args.actual_preloaded_image={'kind':'native_cached_api_image_observation','tool_source_sha':args.actual_source_sha,'original_source_sha':value['inventory_report']['source_sha'],'operation_id':args.operation_id,'actual_run_id':args.run_id,'image_archive_sha256':'1'*64,'image_id':'sha256:'+'2'*64,'os':'linux','architecture':'amd64','revision':args.actual_source_sha,'program_sha256':'3'*64,'probe_id':'4'*64,'probe_absent':True,'temporary_files_zero':True,'capabilities':{'deployment':False,'writer_fence':False,'drop':False}}
         return args,value
     def set_descriptor(self,args,value):
         raw=tool.canonical_bytes(value);args.bootstrap_approval_json=raw[:-1].decode('ascii');args.bootstrap_approval_hash=hashlib.sha256(raw).hexdigest()
@@ -160,10 +161,25 @@ class PrepareFactsBoundaries(unittest.TestCase):
             native.assert_not_called()
     def test_existing_once_channel_uses_new_fixed_mode_without_manifest_or_fake_secret(self):
         args,_=self.args();args.prepare_facts_request_hash='7'*64
-        with mock.patch.dict(os.environ,{'RETIREMENT_PACKAGE_SHA256':'8'*64},clear=True),mock.patch.object(tool.os,'getuid',return_value=501),mock.patch.object(tool.os,'geteuid',return_value=501),mock.patch.object(tool.subprocess,'run',return_value=subprocess.CompletedProcess([],1,b'fixed')) as run:
+        with mock.patch.dict(os.environ,{'RETIREMENT_PACKAGE_SHA256':'8'*64},clear=True),mock.patch.object(tool.os,'getuid',return_value=501),mock.patch.object(tool.os,'geteuid',return_value=501),mock.patch.object(tool.subprocess,'run',return_value=subprocess.CompletedProcess([],1,tool.canonical_bytes({'native_receipt':{'fixed':True},'image_preload':args.actual_preloaded_image}))) as run:
             tool.root_once_lifecycle_prepare(args)
         self.assertEqual(run.call_args.args[0][6:],[args.operation_id,args.run_id,args.actual_source_sha,'7'*64,'8'*64,'','sudo-user','prepare-facts'])
         self.assertEqual(json.loads(run.call_args.kwargs['input'])['MONGODB_PASSWORD'],'')
+    def test_cached_image_projection_is_first_fact_not_window_authority(self):
+        args,_=self.args();request=tool.prepare_facts_request(args)
+        with tempfile.TemporaryDirectory(prefix='cached-image-facts-') as temporary:
+            directory=Path(temporary).resolve();directory.chmod(0o700)
+            def call(a):
+                return 0,tool.canonical_bytes(self.receipt(a,request,a.prepare_facts_request_hash))
+            with mock.patch.object(tool,'operation_directory',return_value=directory),mock.patch.object(tool,'root_once_lifecycle_prepare',side_effect=call):
+                result=tool.live_prepare_facts(args)
+            self.assertEqual(result['observed_cached_api_image']['image_id_sha256'],'2'*64)
+            self.assertEqual(result['observed_cached_api_image']['program_sha256'],'3'*64)
+            self.assertFalse(result['complete']);self.assertFalse(result['drop_ready'])
+            args.run_id='790-1';args.actual_preloaded_image['actual_run_id']='790-1'
+            args.actual_preloaded_image['capabilities']['deployment']=True
+            with mock.patch.object(tool,'operation_directory',return_value=directory),mock.patch.object(tool,'root_once_lifecycle_prepare',side_effect=call),self.assertRaises(tool.Blocked):
+                tool.live_prepare_facts(args)
     def test_actual_receipt_requires_seven_files_real_ordered_hash_and_all_false_capabilities(self):
         args,_=self.args();request=tool.prepare_facts_request(args);request_hash='7'*64
         original=self.receipt(args,request,request_hash)
@@ -254,7 +270,7 @@ if(accepted!==c.accepted)throw new Error('offline_action_validation_mismatch');}
                 first=tool.live_prepare_facts(args)
                 self.assertFalse(first['prepare_facts_observation_complete'])
                 old_path=directory/'prepare-facts-request-789-1.json';old_bytes=old_path.read_bytes()
-                args.run_id='790-1'
+                args.run_id='790-1';args.actual_preloaded_image['actual_run_id']='790-1'
                 second=tool.live_prepare_facts(args)
                 self.assertTrue(second['prepare_facts_observation_complete'])
                 self.assertEqual(old_path.read_bytes(),old_bytes)
