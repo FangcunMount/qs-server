@@ -38,6 +38,7 @@ type lifecycleRequest struct {
 	ResumeKind        string                               `json:"resume_kind,omitempty"`
 	RestoreEngines    *lifecycleRestoreEngines             `json:"restore_engines,omitempty"`
 	SourceFileSHA256  map[string]string                    `json:"source_file_sha256,omitempty"`
+	SourceCopyIntent  *lifecycleFinalFileBinding           `json:"source_copy_intent,omitempty"`
 	ServiceControl    *lifecycleServiceControl             `json:"service_control,omitempty"`
 	DeploymentControl *lifecycleAPIDeploymentControl       `json:"deployment_control,omitempty"`
 	FinalHistory      *lifecycleFinalHistoryInput          `json:"final_history,omitempty"`
@@ -106,6 +107,7 @@ type lifecycleReceipt struct {
 	RecoveryComplete               bool     `json:"recovery_complete"`
 	AcceptanceComplete             bool     `json:"acceptance_complete"`
 	PurgeComplete                  bool     `json:"purge_complete"`
+	SourceCopyIntentSHA256         string   `json:"source_copy_intent_sha256,omitempty"`
 	ErrorCategory                  string   `json:"error_category"`
 	RecoveryErrorCategory          string   `json:"recovery_error_category,omitempty"`
 	RequiredAdapters               []string `json:"required_adapters"`
@@ -323,6 +325,9 @@ func loadLifecycleRequest(ctx context.Context, path, expected, operation, actual
 	if r.FinalHistory != nil && (stage == "prepare" || !r.FinalHistory.valid(r)) {
 		return r, nil, lifecycleError("lifecycle_final_historical_input_rejected")
 	}
+	if r.SourceCopyIntent != nil && (stage == "prepare" || !lifecycleSourceCopyReferenceValid(r)) {
+		return r, nil, lifecycleError("lifecycle_staging_original_intent_rejected")
+	}
 	if stage == "prepare" && !r.RestoreEngines.valid() {
 		return r, nil, lifecycleError("lifecycle_restore_engine_approval_missing")
 	}
@@ -531,6 +536,12 @@ func runLifecycleCLI(ctx context.Context, mode, requestPath, requestHash, operat
 			return receipt, err
 		}
 		receipt.RestoreElapsedMillis = elapsed
+		intentPath := filepath.Join(r.prepareRoot, "source-copy.intent.private.json")
+		intentRaw, err := readLifecycleAPIRecord(intentPath)
+		if err != nil {
+			return receipt, err
+		}
+		receipt.SourceCopyIntentSHA256 = digestRaw(intentRaw)
 		receipt.IsolatedContentRestoreComplete, receipt.Complete = true, true
 		return receipt, nil
 	}

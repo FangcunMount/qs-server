@@ -21,23 +21,25 @@ func lifecycleEffectsPreflight(context.Context) error {
 }
 
 type lifecycleFixedHost struct {
-	owner               *lifecyclePreparationOwner
-	restoreOwner        *lifecyclePreparationOwner
-	materials           *lifecycleBatchMaterials
-	acceptedMaterials   *lifecycleAcceptedMaterials
-	inventoryMaterials  *lifecycleMaterialDirectory
-	services            *lifecycleServiceController
-	api                 *lifecycleAPITransition
-	dataBaseline        *backup.NonTargetDataBaseline
-	acceptancePlan      *backup.TargetRecoveryPlan
-	acceptancePair      *migration.CompatibilityPairMigrationProof
-	preBComparison      *lifecyclePreBDataComparison
-	comparisonAttempted bool
-	writers             *lifecycleWriterObservation
-	runtimeLedgers      *lifecycleRuntimeLedgerObservation
-	currentMQ           *lifecycleCurrentMQConnections
-	aiStopped           *retirement.AIStoppedRuntimeLease
-	finalRuntime        *lifecycleControlledRuntime
+	owner                          *lifecyclePreparationOwner
+	restoreOwner                   *lifecyclePreparationOwner
+	materials                      *lifecycleBatchMaterials
+	acceptedMaterials              *lifecycleAcceptedMaterials
+	inventoryMaterials             *lifecycleMaterialDirectory
+	rootStagingMaterials           *lifecycleMaterialDirectory
+	preparationInvocationMaterials *lifecycleMaterialDirectory
+	services                       *lifecycleServiceController
+	api                            *lifecycleAPITransition
+	dataBaseline                   *backup.NonTargetDataBaseline
+	acceptancePlan                 *backup.TargetRecoveryPlan
+	acceptancePair                 *migration.CompatibilityPairMigrationProof
+	preBComparison                 *lifecyclePreBDataComparison
+	comparisonAttempted            bool
+	writers                        *lifecycleWriterObservation
+	runtimeLedgers                 *lifecycleRuntimeLedgerObservation
+	currentMQ                      *lifecycleCurrentMQConnections
+	aiStopped                      *retirement.AIStoppedRuntimeLease
+	finalRuntime                   *lifecycleControlledRuntime
 }
 
 func newLifecycleFixedHost(ctx context.Context, r lifecycleRequest, a *backup.Archive) (lifecycleHost, error) {
@@ -66,6 +68,10 @@ func newLifecycleFixedHost(ctx context.Context, r lifecycleRequest, a *backup.Ar
 		h.inventoryMaterials, err = openLifecycleOriginalInventoryMaterials(ctx, r, a, i.SourceUID)
 		if err != nil {
 			return nil, err
+		}
+		h.rootStagingMaterials, h.preparationInvocationMaterials, err = openLifecycleOriginalRootStaging(ctx, r, h.inventoryMaterials, i.SourceUID)
+		if err != nil {
+			return nil, errors.Join(err, h.Close())
 		}
 	}
 	return h, nil
@@ -329,6 +335,12 @@ func (h *lifecycleFixedHost) Close() error {
 	var result error
 	if h.inventoryMaterials != nil {
 		result = h.inventoryMaterials.close()
+	}
+	if h.rootStagingMaterials != nil {
+		result = errors.Join(result, h.rootStagingMaterials.close())
+	}
+	if h.preparationInvocationMaterials != nil {
+		result = errors.Join(result, h.preparationInvocationMaterials.close())
 	}
 	if h.writers != nil {
 		h.writers.close()

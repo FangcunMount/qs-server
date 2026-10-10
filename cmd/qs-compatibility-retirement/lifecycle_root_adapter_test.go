@@ -420,6 +420,153 @@ func TestOriginalInventoryMaterialHandoffIncludesAssetsBothPassesAndEmptySources
 		})
 	}
 }
+
+// These are offline original files, not a native Archive or acceptance proof.
+func originalRootStagingMaterialFixture(t *testing.T, windowTool bool) (string, string, lifecycleRequest, map[string]string) {
+	t.Helper()
+	inventory, approval, hashes := originalInventoryMaterialFixture(t, 0)
+	root, _ := filepath.EvalSymlinks(t.TempDir())
+	invocation, _ := filepath.EvalSymlinks(t.TempDir())
+	for _, dir := range []string{root, invocation} {
+		if os.Chmod(dir, 0700) != nil {
+			t.Fatal("directory")
+		}
+	}
+	originalRoot := filepath.Join("/opt/backups/qs-server/compatibility-retirement", approval.OperationID)
+	manifest := []byte("offline frozen manifest")
+	r := lifecycleRequest{FormatVersion: 1, Kind: "compatibility_retirement_lifecycle_request", OriginalSourceSHA: approval.SourceSHA, ToolSourceSHA: strings.Repeat("d", 40), OperationID: approval.OperationID, ActualRunID: "789-1", ManifestSHA256: digestRaw(manifest), Approval: approval, ArchiveDirectory: filepath.Join(originalRoot, "archive"), SourceDirectory: filepath.Join(originalRoot, "inventory-"+approval.RunID), SourceFileSHA256: hashes,
+		Recovery: backup.TargetRecoveryRequest{SourceSHA: approval.SourceSHA, OperationID: approval.OperationID, OriginalRunID: approval.RunID, ActualRunID: "789-1"}}
+	if writeJSON(filepath.Join(root, "lifecycle-request.json"), r) != nil {
+		t.Fatal("request")
+	}
+	request, _ := os.ReadFile(filepath.Join(root, "lifecycle-request.json"))
+	if os.WriteFile(filepath.Join(root, "manifest.json"), manifest, 0600) != nil {
+		t.Fatal("manifest")
+	}
+	if os.WriteFile(filepath.Join(root, "restore-native"), []byte("offline native bytes"), 0700) != nil {
+		t.Fatal("native")
+	}
+	child := filepath.Join(root, "inventory-"+approval.RunID)
+	if os.Mkdir(child, 0700) != nil {
+		t.Fatal("child")
+	}
+	for _, name := range lifecycleSourceNames {
+		raw, _ := os.ReadFile(filepath.Join(inventory, name))
+		if os.WriteFile(filepath.Join(child, name), raw, 0600) != nil {
+			t.Fatal("copy")
+		}
+	}
+	i := lifecycleSourceCopyIntent{1, "root_once_exact_source_copy_intent", r.OriginalSourceSHA, r.ToolSourceSHA, r.OperationID, r.ActualRunID, approval.RunID, digestRaw(request), r.ManifestSHA256, hashes, targets, uint32(os.Getuid()), r.ArchiveDirectory, child, false, true}
+	if writeJSON(filepath.Join(root, "source-copy.intent.private.json"), i) != nil {
+		t.Fatal("intent")
+	}
+	if windowTool {
+		v := lifecycleAPIInvocationIntent{FormatVersion: 1, Kind: "independent_window_tool_native_invocation", DispatcherSourceSHA: strings.Repeat("e", 40), ToolSourceSHA: i.ToolSourceSHA, OriginalSourceSHA: i.OriginalSourceSHA, OperationID: i.OperationID, OriginalRunID: i.OriginalRunID, ActualRunID: i.ActualRunID, Stage: "prepare", TemplateSHA256: strings.Repeat("f", 64), DerivedSHA256: i.RequestSHA256, ManifestSHA256: i.ManifestSHA256, PackageSHA256: strings.Repeat("1", 64), ToolProgramSHA256: strings.Repeat("2", 64), NativeSHA256: digestRaw([]byte("offline native bytes")), NativePath: filepath.Join(root, "restore-native"), SourceUID: i.SourceUID}
+		if writeJSON(filepath.Join(root, "tool.intent.private.json"), v) != nil {
+			t.Fatal("tool")
+		}
+		for _, pair := range [][2]string{{"tool.intent.private.json", "native-call.intent.private.json"}, {"lifecycle-request.json", "lifecycle-request.json"}, {"manifest.json", "manifest.json"}} {
+			raw, _ := os.ReadFile(filepath.Join(root, pair[0]))
+			if os.WriteFile(filepath.Join(invocation, pair[1]), raw, 0600) != nil {
+				t.Fatal("companion")
+			}
+		}
+	} else {
+		v := lifecycleOriginalRootToolIntent{1, "approved_root_once_tool_staging", "lifecycle", i.OperationID, i.ActualRunID, i.ToolSourceSHA, filepath.Join(originalRoot, "lifecycle-request.json"), i.RequestSHA256, i.ManifestSHA256, strings.Repeat("3", 64), digestRaw([]byte("offline native bytes")), i.SourceUID, false, true}
+		if writeJSON(filepath.Join(root, "tool.intent.private.json"), v) != nil {
+			t.Fatal("tool")
+		}
+	}
+	raw, _ := os.ReadFile(filepath.Join(root, "source-copy.intent.private.json"))
+	r.SourceCopyIntent = &lifecycleFinalFileBinding{Path: filepath.Join(root, "source-copy.intent.private.json"), SHA256: digestRaw(raw)}
+	r.ActualRunID, r.ToolSourceSHA = "999-1", strings.Repeat("9", 40)
+	r.Recovery.ArchiveSHA256 = strings.Repeat("8", 64)
+	return root, invocation, r, hashes
+}
+
+func TestOriginalRootStagingMaterialHandoffReopensBothActualProducerSchemas(t *testing.T) {
+	for _, window := range []bool{false, true} {
+		t.Run(fmt.Sprint(window), func(t *testing.T) {
+			root, invocation, r, hashes := originalRootStagingMaterialFixture(t, window)
+			d, peer, err := openLifecycleRootStagingMaterialFiles(context.Background(), root, invocation, r, hashes, uint32(os.Getuid()), uint32(os.Getuid()))
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer d.close()
+			if len(d.files) != 5 || len(d.children) != 1 || len(d.children["inventory-"+r.Approval.RunID].files) != 7 || window && (peer == nil || len(peer.files) != 3) || !window && peer != nil {
+				t.Fatal("producer members incomplete")
+			}
+			if peer != nil {
+				defer peer.close()
+				if err = peer.purge(context.Background()); err != nil {
+					t.Fatal(err)
+				}
+				if err = peer.checkComplete(true); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if err = d.purge(context.Background()); err != nil {
+				t.Fatal(err)
+			}
+			if err = d.checkComplete(true); err != nil {
+				t.Fatal(err)
+			}
+		})
+	}
+}
+
+func TestOriginalRootStagingMaterialHandoffRejectsRebindingAndExtraFiles(t *testing.T) {
+	for _, name := range []string{"wrong_intent_hash", "wrong_source_uid", "wrong_archive", "missing_copy", "changed_native", "extra_root", "extra_child", "extra_companion", "changed_companion", "unknown_tool_schema", "null_intent"} {
+		t.Run(name, func(t *testing.T) {
+			root, invocation, r, hashes := originalRootStagingMaterialFixture(t, true)
+			var i lifecycleSourceCopyIntent
+			intent, _ := os.ReadFile(r.SourceCopyIntent.Path)
+			_ = json.Unmarshal(intent, &i)
+			switch name {
+			case "wrong_intent_hash":
+				r.SourceCopyIntent.SHA256 = strings.Repeat("0", 64)
+			case "wrong_source_uid":
+				i.SourceUID++
+				raw, _ := json.Marshal(i)
+				_ = os.WriteFile(r.SourceCopyIntent.Path, raw, 0600)
+				r.SourceCopyIntent.SHA256 = digestRaw(raw)
+			case "wrong_archive":
+				i.ArchiveDirectory += "-other"
+				raw, _ := json.Marshal(i)
+				_ = os.WriteFile(r.SourceCopyIntent.Path, raw, 0600)
+				r.SourceCopyIntent.SHA256 = digestRaw(raw)
+			case "missing_copy":
+				_ = os.Remove(filepath.Join(i.SourceStagingDirectory, lifecycleSourceNames[3]))
+			case "changed_native":
+				_ = os.WriteFile(filepath.Join(root, "restore-native"), []byte("other"), 0700)
+			case "extra_root":
+				_ = os.WriteFile(filepath.Join(root, "extra"), []byte("body"), 0600)
+			case "extra_child":
+				_ = os.WriteFile(filepath.Join(i.SourceStagingDirectory, "extra"), []byte("body"), 0600)
+			case "extra_companion":
+				_ = os.WriteFile(filepath.Join(invocation, "extra"), []byte("body"), 0600)
+			case "changed_companion":
+				_ = os.WriteFile(filepath.Join(invocation, "manifest.json"), []byte("other"), 0600)
+			case "unknown_tool_schema":
+				_ = os.WriteFile(filepath.Join(root, "tool.intent.private.json"), []byte(`{"kind":"other","complete":true}`), 0600)
+			case "null_intent":
+				raw := bytes.Replace(intent, []byte(`"drop_authority": false`), []byte(`"drop_authority": null`), 1)
+				if bytes.Equal(raw, intent) {
+					raw = bytes.Replace(intent, []byte(`"drop_authority":false`), []byte(`"drop_authority":null`), 1)
+				}
+				_ = os.WriteFile(r.SourceCopyIntent.Path, raw, 0600)
+				r.SourceCopyIntent.SHA256 = digestRaw(raw)
+			}
+			d, peer, err := openLifecycleRootStagingMaterialFiles(context.Background(), root, invocation, r, hashes, uint32(os.Getuid()), uint32(os.Getuid()))
+			if err == nil || d != nil || peer != nil {
+				t.Fatal("unbound original material accepted")
+			}
+			if _, err = os.Stat(filepath.Join(root, "lifecycle-request.json")); err != nil {
+				t.Fatal("rejection purged original")
+			}
+		})
+	}
+}
 func TestOriginalInventoryMaterialHandoffRejectsUnboundIncompleteOrChangedProducerFiles(t *testing.T) {
 	for _, kind := range []string{"missing-asset", "missing-second-pass", "wrong-source", "wrong-request", "wrong-final-prefix", "different-pass-cursor", "extra-member", "wrong-owner", "changed-after-open"} {
 		t.Run(kind, func(t *testing.T) {

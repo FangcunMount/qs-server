@@ -145,6 +145,15 @@ func lifecycleMaterialPathsMatch(c *lifecycleBatchMaterials, r lifecycleRequest)
 		r.prepareRoot: true,
 		lifecycleServicesRoot(r.OperationID, "server-a"): true,
 	}
+	// The original preparation root is supplied by an independently approved
+	// source-copy intent and registered from its actual producer tuple/bytes.
+	// Current-run names and archive paths never imply a previous preparation run.
+	if lifecycleSourceCopyReferenceValid(r) {
+		root := filepath.Dir(r.SourceCopyIntent.Path)
+		run := strings.TrimPrefix(filepath.Base(root), r.OperationID+"-")
+		allowed[root] = true
+		allowed[lifecycleInvocationBatch(r.OperationID, run)] = true
+	}
 	for _, d := range c.directories {
 		if d == nil || !allowed[d.path] || d.path == c.archive.path {
 			return false

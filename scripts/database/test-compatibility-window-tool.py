@@ -76,6 +76,23 @@ class WindowToolMetadata(unittest.TestCase):
         for value in (None,dict(workflow_scope_sha256='a'*64)):
             r=self.request();r['writer_control']=value;a=self.approval(r)
             with self.assertRaises(tool.Refused):tool.derive_request(tool.canonical(r),a,'22-3')
+    def test_source_copy_intent_is_only_approved_original_path_and_hash(self):
+        value = dict(path='/opt/backups/qs-server/compatibility-retirement-root-prepare/12-1-20-1/source-copy.intent.private.json',sha256='7'*64)
+        r=self.request();r['source_copy_intent']=value;a=self.approval(r,'apply')
+        out=tool.decode(tool.derive_request(tool.canonical(r),a,'22-3'))
+        self.assertEqual(out['source_copy_intent'],value)
+        r=self.request();r['source_copy_intent']=value;a=self.approval(r,'prepare')
+        with self.assertRaises(tool.Refused):tool.derive_request(tool.canonical(r),a,'22-3')
+        for changed in (None,dict(value,complete=True),dict(value,sha256='main'),dict(value,path='/tmp/source-copy.intent.private.json'),dict(value,path=value['path'].replace('12-1-20-1','13-1-20-1')),dict(value,path=value['path'].replace('20-1','22-3')),dict(value,path=value['path'].replace('20-1','11-1')),dict(value,path=value['path'].replace('source-copy','other'))):
+            r=self.request();r['source_copy_intent']=changed;a=self.approval(r,'apply')
+            with self.subTest(value=changed),self.assertRaises(tool.Refused):tool.derive_request(tool.canonical(r),a,'22-3')
+
+    def test_prepare_source_copy_receipt_keeps_only_digest_and_rejects_other_stages(self):
+        a,n=self.native('prepare');n['source_copy_intent_sha256']='7'*64
+        self.assertEqual(tool.validate_native(tool.canonical(n),0,a,'22-3','e'*64)['source_copy_intent_sha256'],'7'*64)
+        for stage,value in (('prepare','main'),('apply','7'*64),('prepare',None)):
+            a,n=self.native(stage);n['source_copy_intent_sha256']=value
+            with self.subTest(stage=stage,value=value),self.assertRaises(tool.Refused):tool.validate_native(tool.canonical(n),0,a,'22-3','e'*64)
         r=self.request();a=self.approval(r,'apply')
         out=tool.decode(tool.derive_request(tool.canonical(r),a,'22-3'))
         self.assertEqual(out['writer_control'],r['writer_control'])
