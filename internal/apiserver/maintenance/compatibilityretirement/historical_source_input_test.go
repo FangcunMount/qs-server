@@ -1,8 +1,10 @@
 package retirement
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
 	"testing"
@@ -161,5 +163,60 @@ func TestHistoricalComponentSourceNeverClaimsOwnerClosureOrCAS(t *testing.T) {
 	}
 	if _, err := json.Marshal(&HistoricalComponentSourceObservation{}); err == nil {
 		t.Fatal("private source observation serialized")
+	}
+}
+
+func TestHistoricalSourceInputIndexActualCopiesAndLegacySeparation(t *testing.T) {
+	f := wholeJointUnitFixture(t, 2, true)
+	auth, err := VerifySourceCopies(t.Context(), f.inputs())
+	if err != nil {
+		t.Fatal(err)
+	}
+	binding, err := BindOriginCopies(t.Context(), auth, f.inputs(), DefaultSourceOriginLimits())
+	if err != nil {
+		t.Fatal(err)
+	}
+	recipe, err := FreezeHistoricalSourceInputRecipe(t.Context(), binding)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Frozen input can survive the old authority; indexing must neither renew
+	// nor reconstruct that old authority to read the exact approved bytes.
+	binding.started = binding.started.Add(-2 * time.Hour)
+	x, err := PrepareHistoricalSourceInputIndex(t.Context(), coordinatorBinding(), recipe, wholeJointCopies(f), DefaultWholeSourceJointLimits())
+	if err != nil || x == nil || x.self != x || x.owner != nil || x.auth != auth || x.input != recipe || x.binding != coordinatorBinding() || len(x.entries) != 6 || x.encodedSHA != recipe.binding.fileHashes || x.receipts != auth.receipts || x.Summary().DropReady || binding.alive(t.Context()) == nil {
+		t.Fatal("actual pure input index rejected or old authority reconstructed", err)
+	}
+	for _, id := range []string{"coordinator-sql-0", "coordinator-mongo-0"} {
+		facts, err := x.readEvent(t.Context(), id)
+		if err != nil || facts.EventID != id {
+			t.Fatal("original frame rejected", err)
+		}
+		if _, err = x.event(t.Context(), id); !errors.Is(err, ErrWholeSourceJoint) {
+			t.Fatal("pure index entered legacy bound event path", err)
+		}
+	}
+	if x.RecheckSourceCopies(t.Context(), wholeJointCopies(f)) == nil {
+		t.Fatal("pure index entered legacy coordinator recheck")
+	}
+	if _, err = x.InputEvents(t.Context(), nil, []string{"coordinator-sql-0"}); err == nil {
+		t.Fatal("bytes alone issued handles without two native scopes")
+	}
+	if x.ReleaseInputAuthentication(t.Context(), nil) == nil || x.auth != auth {
+		t.Fatal("missing native pair released authenticated planning membership")
+	}
+	clone := *recipe
+	if _, err = PrepareHistoricalSourceInputIndex(t.Context(), coordinatorBinding(), &clone, wholeJointCopies(f), DefaultWholeSourceJointLimits()); err == nil {
+		t.Fatal("copied recipe accepted")
+	}
+	changed := wholeJointCopies(f)
+	// Equivalent decoded JSON facts do not excuse a different encoded file.
+	changed[0].Input = bytes.NewReader(bytes.Replace(f.raw[0], []byte(`"protocol":`), []byte(`"protocol" :`), 1))
+	if y, err := PrepareHistoricalSourceInputIndex(t.Context(), coordinatorBinding(), recipe, changed, DefaultWholeSourceJointLimits()); !errors.Is(err, ErrSourceAuthentication) || y != nil {
+		t.Fatal("different source bytes with identical facts accepted", err)
+	}
+	recipe.captureStopped = true
+	if _, err = PrepareHistoricalSourceInputIndex(t.Context(), coordinatorBinding(), recipe, wholeJointCopies(f), DefaultWholeSourceJointLimits()); err == nil {
+		t.Fatal("released recipe rebuilt membership")
 	}
 }

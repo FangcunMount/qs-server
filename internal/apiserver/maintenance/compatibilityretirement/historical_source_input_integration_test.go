@@ -41,6 +41,7 @@ func TestHistoricalSourceInputNativeTwoFullDiskEpochsAndSourceDrift(t *testing.T
 	sqlDB, client, db, cfg := originNativeDBs(t, false)
 	firstSession := snapshotInputNativeSession(t, client)
 	var recipe *HistoricalSourceInputRecipe
+	var planning *WholeSourceJointIndex
 	var first, second *HistoricalSourceInputEpoch
 	firstFile := snapshotInputNativeFile(t)
 	err := historicalSourceInputNativeEpoch(t, sqlDB, db, cfg, firstSession, func(ctx context.Context, sqlInput *SQLResponsibilitySnapshot, mongoInput *MongoSnapshotInputEpoch, tx *gorm.DB) error {
@@ -61,6 +62,10 @@ func TestHistoricalSourceInputNativeTwoFullDiskEpochsAndSourceDrift(t *testing.T
 		// An input recipe carries no usable old Origin capability. It does not
 		// inherit the old expiration, create a replacement cap, or authorize CAS.
 		recipe.binding.started = recipe.binding.started.Add(-2 * time.Hour)
+		planning, e = PrepareHistoricalSourceInputIndex(ctx, coordinatorBinding(), recipe, wholeJointCopies(fixture), DefaultWholeSourceJointLimits())
+		if e != nil || planning.owner != nil || planning.auth != copies || planning.encodedSHA != recipe.binding.fileHashes {
+			return errors.New("actual input planning index failed or imported coordinator")
+		}
 		first, e = PrepareHistoricalSourceInputEpoch(ctx, recipe, sqlInput, mongoInput, firstFile, time.Minute)
 		if e != nil {
 			return e
@@ -83,7 +88,10 @@ func TestHistoricalSourceInputNativeTwoFullDiskEpochsAndSourceDrift(t *testing.T
 			return errors.New("external view did not differ")
 		}
 		_, e = db.Collection("answersheets").DeleteMany(t.Context(), bson.D{})
-		return e
+		if e != nil {
+			return e
+		}
+		return first.StopCapture(ctx)
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -95,7 +103,29 @@ func TestHistoricalSourceInputNativeTwoFullDiskEpochsAndSourceDrift(t *testing.T
 	err = historicalSourceInputNativeEpoch(t, sqlDB, db, cfg, secondSession, func(ctx context.Context, sqlInput *SQLResponsibilitySnapshot, mongoInput *MongoSnapshotInputEpoch, _ *gorm.DB) error {
 		var e error
 		second, e = PrepareHistoricalSourceInputEpoch(ctx, recipe, sqlInput, mongoInput, snapshotInputNativeFile(t), time.Minute)
-		return e
+		if e != nil {
+			return e
+		}
+		matched, e := CompareIndependentHistoricalSourceInputs(ctx, first, second)
+		if e != nil {
+			return e
+		}
+		events, e := planning.InputEvents(ctx, matched, []string{"origin-sql-1", "origin-mongo-1"})
+		if e != nil || len(events) != 2 {
+			return errors.New("actual matched live scope could not read original events")
+		}
+		for _, ids := range [][]string{{"origin-sql-1", "origin-sql-1"}, {"outside-approved-input"}} {
+			if _, e = planning.InputEvents(ctx, matched, ids); e == nil {
+				return errors.New("duplicate or out-of-source planning selection accepted")
+			}
+		}
+		if e = second.StopCapture(ctx); e != nil {
+			return e
+		}
+		if _, e = planning.InputEvents(ctx, matched, []string{"origin-sql-1"}); e == nil {
+			return errors.New("stopped native scope issued source handles")
+		}
+		return nil
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -105,6 +135,12 @@ func TestHistoricalSourceInputNativeTwoFullDiskEpochsAndSourceDrift(t *testing.T
 	pair, err := CompareIndependentHistoricalSourceInputs(t.Context(), first, second)
 	if err != nil || !pair.Summary().TwoIndependentInputsMatched || pair.Summary().BusinessClosureVerified || pair.Summary().CASAuthorized || pair.Summary().DropReady {
 		t.Fatal("actual independent pure inputs failed or forged authority", err)
+	}
+	if planning.ReleaseInputAuthentication(t.Context(), pair) != nil || planning.auth != nil || planning.inputIndexIntact(t.Context(), pair, false) != nil {
+		t.Fatal("actual ended pair failed to release planning authentication")
+	}
+	if _, err = planning.InputEvents(t.Context(), pair, []string{"origin-sql-1"}); err == nil {
+		t.Fatal("ended released planning index issued source handles")
 	}
 	// Same inode and size are insufficient. Every original frozen frame is read
 	// and checked against its write-time SHA before pair comparison succeeds.
@@ -138,6 +174,9 @@ func TestHistoricalSourceInputNativeTwoFullDiskEpochsAndSourceDrift(t *testing.T
 	})
 	if err != nil {
 		t.Fatal(err)
+	}
+	if pair.ReleaseCaptureIndex(t.Context()) != nil || !recipe.captureStopped || recipe.binding.copies.rows != nil || recipe.binding.copies.eventIDs != nil || recipe.binding.copies.pairs != nil || planning.auth != nil || len(planning.entries) != 6 || planning.inputIndexIntact(t.Context(), pair, false) != nil {
+		t.Fatal("planning retained the old auth maps or lost its exact offset index")
 	}
 }
 

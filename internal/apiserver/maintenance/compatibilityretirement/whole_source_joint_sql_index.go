@@ -50,6 +50,10 @@ type wholeSourceJointEntry struct {
 // Its own four clean EOF receipts are in addition to the original source seal
 // and the coordinator's independent exactly-once consumption pass.
 type WholeSourceJointIndex struct {
+	self                  *WholeSourceJointIndex
+	binding               HistoricalCoordinatorBinding
+	input                 *HistoricalSourceInputRecipe
+	inputSeal             string
 	owner                 *HistoricalCoordinator
 	auth                  *VerifiedSourceCopies
 	copies                [4]WholeSourceJointCopy
@@ -142,10 +146,57 @@ func (c *HistoricalCoordinator) PrepareWholeSourceJointIndex(ctx context.Context
 	if err := c.alive(ctx); err != nil {
 		return nil, err
 	}
-	x := &WholeSourceJointIndex{owner: c, auth: c.authenticated, byAssessment: map[uint64][]string{}, bySheet: map[uint64][]string{}, limits: limits}
+	x := &WholeSourceJointIndex{owner: c, auth: c.authenticated, limits: limits}
+	var expected [4]SourceCopyExpectation
+	for i := range expected {
+		expected[i] = c.copies[i].Expected
+	}
+	return readWholeSourceJointIndex(ctx, x, copies, expected, c.alive)
+}
+
+// PrepareHistoricalSourceInputIndex indexes actual authenticated source bytes
+// for planning only. It borrows one original recipe/auth index, does not create
+// a coordinator, and never renews an origin or business qualification lifetime.
+func PrepareHistoricalSourceInputIndex(ctx context.Context, binding HistoricalCoordinatorBinding, actual *HistoricalSourceInputRecipe, copies []WholeSourceJointCopy, limits WholeSourceJointLimits) (*WholeSourceJointIndex, error) {
+	if !coordinatorSourceSHA(binding.SourceSHA) || !aiLocalOperationID(binding.OperationID) || actual == nil || !actual.valid() || actual.captureStopped || len(copies) != 4 || !limits.valid() {
+		return nil, ErrWholeSourceJoint
+	}
+	x := &WholeSourceJointIndex{binding: binding, input: actual, auth: actual.binding.copies, limits: limits}
+	recipeSHA := actual.hash
+	validate := func(ctx context.Context) error {
+		// The immutable full recipe is checked before/after the physical pass;
+		// per-row checks must not re-encode it or clone the million-row auth map.
+		if ctx == nil || ctx.Err() != nil || actual.self != actual || actual.hash != recipeSHA || actual.binding.hash != recipeSHA || actual.captureStopped || actual.binding.copies != x.auth {
+			return ErrSourceOrigin
+		}
+		return nil
+	}
+	x, err := readWholeSourceJointIndex(ctx, x, copies, actual.binding.expected, validate)
+	if err != nil {
+		return nil, err
+	}
+	if !actual.valid() || x.encodedSHA != actual.binding.fileHashes || x.receipts != x.auth.receipts {
+		return nil, ErrSourceAuthentication
+	}
+	x.self = x
+	x.inputSeal = x.inputDigest()
+	return x, nil
+}
+
+// The two callers supply their original strict guard. This shared physical
+// reader grants no capability and preserves all four real EOF/auth checks.
+func readWholeSourceJointIndex(ctx context.Context, x *WholeSourceJointIndex, copies []WholeSourceJointCopy, expected [4]SourceCopyExpectation, validate func(context.Context) error) (*WholeSourceJointIndex, error) {
+	if x == nil || x.auth == nil || !x.auth.complete || len(copies) != 4 || !x.limits.valid() || validate == nil {
+		return nil, ErrWholeSourceJoint
+	}
+	if err := validate(ctx); err != nil {
+		return nil, err
+	}
+	limits := x.limits
+	x.byAssessment, x.bySheet = map[uint64][]string{}, map[uint64][]string{}
 	var records uint64
 	for i, v := range copies {
-		if wholeJointReaderAbsent(v.Input) || !reflect.DeepEqual(v.Expected, c.copies[i].Expected) || v.Expected.Records > limits.MaxIndexEntries-records {
+		if wholeJointReaderAbsent(v.Input) || !reflect.DeepEqual(v.Expected, expected[i]) || v.Expected.Records > limits.MaxIndexEntries-records {
 			return nil, ErrWholeSourceJoint
 		}
 		records += v.Expected.Records
@@ -156,7 +207,7 @@ func (c *HistoricalCoordinator) PrepareWholeSourceJointIndex(ctx context.Context
 	}
 	// Use the original authenticated EOF counts only after all four new
 	// expectations and the existing entry/reservation bounds have matched.
-	eventRecords := c.authenticated.receipts[0].Records + c.authenticated.receipts[3].Records
+	eventRecords := x.auth.receipts[0].Records + x.auth.receipts[3].Records
 	x.entries = make(map[string]wholeSourceJointEntry, int(eventRecords))
 	for i, v := range copies {
 		r := &wholeSourceJointAtReader{input: v.Input, limit: int64(limits.MaxEncodedCopyBytes), line: i != 3, h: sha256.New()}
@@ -183,7 +234,7 @@ func (c *HistoricalCoordinator) PrepareWholeSourceJointIndex(ctx context.Context
 				return nil, e
 			}
 			for {
-				if e = c.alive(ctx); e != nil {
+				if e = validate(ctx); e != nil {
 					return nil, e
 				}
 				command, e := s.Next()
@@ -214,7 +265,7 @@ func (c *HistoricalCoordinator) PrepareWholeSourceJointIndex(ctx context.Context
 			}
 		}
 		for {
-			if e := c.alive(ctx); e != nil {
+			if e := validate(ctx); e != nil {
 				return nil, e
 			}
 			before := r.position
@@ -281,6 +332,9 @@ func (c *HistoricalCoordinator) PrepareWholeSourceJointIndex(ctx context.Context
 			return nil, ErrSourceIncomplete
 		}
 	}
+	if err := validate(ctx); err != nil {
+		return nil, err
+	}
 	x.indexSHA = x.digest()
 	x.complete = true
 	return x, nil
@@ -323,6 +377,17 @@ func (x *WholeSourceJointIndex) event(ctx context.Context, id string) (*Verified
 	if x == nil || !x.complete || x.owner == nil || x.auth != x.owner.authenticated || ctx == nil || ctx.Err() != nil {
 		return nil, ErrWholeSourceJoint
 	}
+	facts, err := x.readEvent(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	return x.auth.BindEvent(facts)
+}
+
+func (x *WholeSourceJointIndex) readEvent(ctx context.Context, id string) (*DecodedSourceEvent, error) {
+	if x == nil || !x.complete || ctx == nil || ctx.Err() != nil {
+		return nil, ErrWholeSourceJoint
+	}
 	e, ok := x.entries[id]
 	if !ok {
 		return nil, ErrSourceAuthentication
@@ -360,13 +425,13 @@ func (x *WholeSourceJointIndex) event(ctx context.Context, id string) (*Verified
 	if err != nil || hash != e.FactsSHA256 || facts.EventID != id {
 		return nil, ErrSourceAuthentication
 	}
-	return x.auth.BindEvent(facts)
+	return facts, nil
 }
 
 // Re-authenticate all physical frames and all four logical source receipts to
 // actual EOF. Random-access page decoding is never advertised as fresh EOF.
 func (x *WholeSourceJointIndex) RecheckSourceCopies(ctx context.Context, copies []WholeSourceJointCopy) error {
-	if x == nil || !x.complete {
+	if x == nil || !x.complete || x.owner == nil || x.auth != x.owner.authenticated {
 		return ErrWholeSourceJoint
 	}
 	fresh, err := x.owner.PrepareWholeSourceJointIndex(ctx, copies, x.limits)
@@ -376,5 +441,65 @@ func (x *WholeSourceJointIndex) RecheckSourceCopies(ctx context.Context, copies 
 	if fresh.indexSHA != x.indexSHA || fresh.encodedSHA != x.encodedSHA || !reflect.DeepEqual(fresh.receipts, x.receipts) {
 		return ErrSourceAuthentication
 	}
+	return nil
+}
+
+// inputDigest binds only immutable planning provenance, not a write permit.
+func (x *WholeSourceJointIndex) inputDigest() string {
+	if x == nil || x.input == nil {
+		return ""
+	}
+	return mongoOwnerHashParts("historical-source-input-index/v1", x.binding.SourceSHA, x.binding.OperationID, x.input.hash, x.indexSHA)
+}
+
+func (x *WholeSourceJointIndex) inputIndexIntact(ctx context.Context, pair *HistoricalSourceInputPair, requireAuth bool) error {
+	if ctx == nil || ctx.Err() != nil || x == nil || x.self != x || x.owner != nil || !x.complete || x.input == nil || !x.input.valid() || x.inputSeal == "" || x.inputSeal != x.inputDigest() || sourceComponentPairIntact(ctx, pair) != nil || pair.first.recipe != x.input || pair.second.recipe != x.input || x.receipts != pair.second.receipts || x.encodedSHA != x.input.binding.fileHashes {
+		return ErrWholeSourceJoint
+	}
+	if requireAuth && (x.input.captureStopped || x.auth == nil || x.auth != x.input.binding.copies) {
+		return ErrSourceOrigin
+	}
+	return nil
+}
+
+// InputEvents binds only requested actual original frames, after the two real
+// input reads matched. The original SECOND SQL/Mongo read scope must still be
+// alive; ending it or releasing membership prevents further handle issuance.
+func (x *WholeSourceJointIndex) InputEvents(ctx context.Context, pair *HistoricalSourceInputPair, ids []string) ([]*VerifiedSourceEvent, error) {
+	if x.inputIndexIntact(ctx, pair, true) != nil || !pair.first.captureStopped || pair.second.alive(ctx) != nil || pair.second.sql.ValidateBorrowedSnapshot(ctx) != nil || pair.second.mongo.ValidateBorrowedInputEpoch(ctx) != nil || len(ids) == 0 || len(ids) > x.limits.MaxRelatedSources {
+		return nil, ErrWholeSourceJoint
+	}
+	out := make([]*VerifiedSourceEvent, 0, len(ids))
+	seen := map[string]bool{}
+	for _, id := range ids {
+		if seen[id] {
+			return nil, ErrSourceIdentity
+		}
+		seen[id] = true
+		facts, err := x.readEvent(ctx, id)
+		if err != nil {
+			return nil, err
+		}
+		event, err := x.auth.BindEvent(facts)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, event)
+	}
+	if pair.second.alive(ctx) != nil || pair.second.sql.ValidateBorrowedSnapshot(ctx) != nil || pair.second.mongo.ValidateBorrowedInputEpoch(ctx) != nil {
+		return nil, ErrSourceOrigin
+	}
+	return out, nil
+}
+
+// ReleaseInputAuthentication drops this pure index's membership reference
+// after actual input scopes ended. It never mutates an existing old capability.
+// The host also calls pair.ReleaseCaptureIndex to release its recipe's maps;
+// only one offset/facts/owner index remains for selected fresh component reads.
+func (x *WholeSourceJointIndex) ReleaseInputAuthentication(ctx context.Context, pair *HistoricalSourceInputPair) error {
+	if x.inputIndexIntact(ctx, pair, false) != nil || !pair.first.captureStopped || !pair.second.captureStopped || pair.ValidateFrozen(ctx) != nil {
+		return ErrWholeSourceJoint
+	}
+	x.auth = nil
 	return nil
 }
