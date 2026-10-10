@@ -36,22 +36,31 @@ func (l MongoSnapshotInputLimits) valid() bool {
 // Neither this input nor any frozen page is accepted by the existing CAS,
 // origin, transaction, global responsibility, fence or DROP APIs.
 type MongoSnapshotInputEpoch struct {
-	self      *MongoSnapshotInputEpoch
-	db        *mongo.Database
-	config    MongoOwnerConfig
-	session   mongo.Session
-	sessionID bson.Raw
-	snapshot  primitive.Timestamp
-	started   time.Time
-	limits    MongoSnapshotInputLimits
-	file      *os.File
-	dev, ino  uint64
-	end       int64
-	pages     []historicalSpoolRef
-	metadata  mongoCycleMetadata
-	report    MongoResponsibilityCycleReport
-	complete  bool
-	poisoned  bool
+	self       *MongoSnapshotInputEpoch
+	db         *mongo.Database
+	config     MongoOwnerConfig
+	session    mongo.Session
+	sessionID  bson.Raw
+	snapshot   primitive.Timestamp
+	started    time.Time
+	limits     MongoSnapshotInputLimits
+	file       *os.File
+	dev, ino   uint64
+	end        int64
+	pages      []historicalSpoolRef
+	ownerPages map[string][]mongoSnapshotOwnerPageRange
+	metadata   mongoCycleMetadata
+	report     MongoResponsibilityCycleReport
+	complete   bool
+	poisoned   bool
+}
+
+// Only original write-time page boundaries are indexed, never raw business
+// rows. Selected owner reads can locate an original frame without rescanning
+// the full eleven-collection file for every owner.
+type mongoSnapshotOwnerPageRange struct {
+	page        int
+	first, last [12]byte
 }
 
 type mongoSnapshotInputFrame struct {
@@ -174,7 +183,7 @@ func PrepareMongoSnapshotInputEpoch(parent context.Context, db *mongo.Database, 
 	if !ok || !info.Mode().IsRegular() || info.Mode().Perm() != 0o600 || st.Nlink != 1 || st.Uid != uint32(os.Geteuid()) || info.Size() != 0 {
 		return nil, ErrMongoSnapshotInput
 	}
-	e := &MongoSnapshotInputEpoch{db: db, config: config, session: s, sessionID: id, limits: limits, started: time.Now(), file: file, dev: uint64(st.Dev), ino: uint64(st.Ino)}
+	e := &MongoSnapshotInputEpoch{db: db, config: config, session: s, sessionID: id, limits: limits, started: time.Now(), file: file, ownerPages: map[string][]mongoSnapshotOwnerPageRange{}, dev: uint64(st.Dev), ino: uint64(st.Ino)}
 	e.self = e
 	defer func() {
 		if err != nil {
@@ -240,6 +249,26 @@ func (e *MongoSnapshotInputEpoch) freezePage(ctx context.Context, boundary mongo
 	if e.ValidateBorrowedInputEpoch(ctx) != nil || len(e.pages) >= int(e.limits.Scan.MaxPages)+len(mongoCycleCollections) {
 		return ErrMongoSnapshotInput
 	}
+	var ownerPage *mongoSnapshotOwnerPageRange
+	if len(rows) > 0 && mongoBatchPOType(boundary.report.Collection) != nil {
+		ownerPage = &mongoSnapshotOwnerPageRange{page: len(e.pages)}
+		var previous []byte
+		for i, row := range rows {
+			pk := row.Lookup("_id")
+			if pk.Type != bson.TypeObjectID || len(pk.Value) != 12 || i > 0 && bytes.Compare(previous, pk.Value) >= 0 {
+				return ErrMongoSnapshotInput
+			}
+			if i == 0 {
+				copy(ownerPage.first[:], pk.Value)
+			}
+			copy(ownerPage.last[:], pk.Value)
+			previous = pk.Value
+		}
+		ranges := e.ownerPages[boundary.report.Collection]
+		if len(ranges) > 0 && bytes.Compare(ranges[len(ranges)-1].last[:], ownerPage.first[:]) >= 0 {
+			return ErrMongoSnapshotInput
+		}
+	}
 	f := mongoSnapshotInputFrame{Version: 1, SessionID: e.sessionID, Snapshot: e.snapshot, Metadata: e.metadata.hash, Collection: boundary.report.Collection, Boundary: mongoCycleBoundaryDisk{boundary.report, boundary.lower, boundary.upper}, Rows: rows, EOF: eof}
 	raw, err := historicalSpoolEncode(f)
 	if err != nil || len(raw) > mongoSnapshotInputPageBytes+(1<<20) || int64(len(raw)) > int64(e.limits.Scan.MaxBytes)+(64<<20)-e.end {
@@ -257,6 +286,9 @@ func (e *MongoSnapshotInputEpoch) freezePage(ctx context.Context, boundary mongo
 		return ErrMongoSnapshotInput
 	}
 	e.pages = append(e.pages, ref)
+	if ownerPage != nil {
+		e.ownerPages[boundary.report.Collection] = append(e.ownerPages[boundary.report.Collection], *ownerPage)
+	}
 	return nil
 }
 
@@ -326,4 +358,51 @@ func (e *MongoSnapshotInputEpoch) CompareFreshInput(ctx context.Context, fresh *
 		}
 	}
 	return nil
+}
+
+// Match only native selected rows against their exact initial-input frames.
+// The producer's in-memory page ranges are not an authorization import; each
+// matched frame still passes the original FD and write-time SHA checks.
+func (e *MongoSnapshotInputEpoch) matchOwnerRows(ctx context.Context, data map[string][]bson.Raw) error {
+	if e.validFile(ctx) != nil || !e.complete {
+		return ErrMongoSnapshotInput
+	}
+	for _, name := range mongoBatchBusinessCollections {
+		ranges := e.ownerPages[name]
+		wanted := map[int]map[string]bson.Raw{}
+		for _, raw := range data[name] {
+			pk := raw.Lookup("_id")
+			if pk.Type != bson.TypeObjectID || len(pk.Value) != 12 {
+				return ErrMongoBatchConflict
+			}
+			at := sort.Search(len(ranges), func(i int) bool { return bytes.Compare(ranges[i].last[:], pk.Value) >= 0 })
+			if at == len(ranges) || bytes.Compare(ranges[at].first[:], pk.Value) > 0 {
+				return ErrMongoBatchConflict
+			}
+			page := ranges[at].page
+			if wanted[page] == nil {
+				wanted[page] = map[string]bson.Raw{}
+			}
+			wanted[page][string(pk.Value)] = raw
+		}
+		for page, rows := range wanted {
+			original, err := e.ReadFrozenPage(ctx, page)
+			if err != nil || original.frame.Collection != name {
+				return ErrMongoSnapshotInput
+			}
+			for _, raw := range original.frame.Rows {
+				pk := raw.Lookup("_id")
+				if actual, ok := rows[string(pk.Value)]; ok {
+					if !bytes.Equal(raw, actual) {
+						return ErrMongoBatchConflict
+					}
+					delete(rows, string(pk.Value))
+				}
+			}
+			if len(rows) != 0 {
+				return ErrMongoBatchConflict
+			}
+		}
+	}
+	return e.validFile(ctx)
 }

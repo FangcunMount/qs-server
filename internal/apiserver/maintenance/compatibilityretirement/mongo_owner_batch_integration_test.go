@@ -608,3 +608,104 @@ func TestMongoBatchNativeBatchedIndexedReadDoesNotDependOnUnrelatedPopulation(t 
 	}
 	t.Logf("business_batch_index_plan keys=%d docs=%d returned=%d unrelated_rows=4096", explain.ExecutionStats.TotalKeysExamined, explain.ExecutionStats.TotalDocsExamined, explain.ExecutionStats.NReturned)
 }
+
+// The original native fixture exercises the same indexed owner expansion in
+// a transaction and in two distinct read-only snapshot sessions. No write,
+// global capability or production source authorization is minted here.
+func TestMongoBatchNativeSnapshotInputOwnerFootprintMatchesOriginalFD(t *testing.T) {
+	sqlDB, client, db, config, _, events := wholeJointNativeFixture(t, false)
+	sources := mongoBatchNativeSources(t, events...)
+	var original map[string][]bson.Raw
+	if err := mongoBatchNativePair(t, sqlDB, client, db, config, sources, func(_ context.Context, b *MongoHistoricalOwnerBatch, _ *MongoResponsibilitySnapshot, _ *sqlevaluation.SQLHistoricalOwnerBatch) error {
+		original = map[string][]bson.Raw{}
+		for name, rows := range b.data {
+			for _, raw := range rows {
+				original[name] = append(original[name], append(bson.Raw(nil), raw...))
+			}
+		}
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	var footprints []*MongoSnapshotOwnerFootprint
+	var inputs []*MongoSnapshotInputEpoch
+	for round := range 2 {
+		session := snapshotInputNativeSession(t, client)
+		err := historicalSourceInputNativeEpoch(t, sqlDB, db, config, session, func(ctx context.Context, sqlInput *SQLResponsibilitySnapshot, input *MongoSnapshotInputEpoch, _ *gorm.DB) error {
+			request, e := MongoHistoricalSQLBatchSelectors(sources)
+			if e != nil {
+				return e
+			}
+			sqlBatch, e := sqlevaluation.PrepareSQLHistoricalOwnerBatch(ctx, sqlInput.cycle, request, sqlevaluation.DefaultSQLHistoricalOwnerBatchLimits())
+			if e != nil {
+				return e
+			}
+			if b, e := PrepareMongoHistoricalOwnerBatch(ctx, nil, sqlBatch, sources, DefaultMongoHistoricalOwnerBatchLimits()); b != nil || e == nil {
+				t.Fatal("snapshot input relaxed original global/transaction guard")
+			}
+			f, e := PrepareMongoSnapshotOwnerFootprint(ctx, input, sqlBatch, sources, DefaultMongoHistoricalOwnerBatchLimits())
+			if e != nil {
+				return e
+			}
+			if f.InputSHA256() == "" || len(f.sources) != 2 || len(f.sqlOwners) != 2 || len(f.selection.outcomes) == 0 {
+				t.Fatal("actual owner footprint missing source or negative range")
+			}
+			for _, name := range mongoBatchBusinessCollections {
+				if len(f.data[name]) != len(original[name]) {
+					t.Fatal("shared expansion lost original rows", name)
+				}
+				for i, raw := range f.data[name] {
+					if !bytes.Equal(raw, original[name][i]) {
+						t.Fatal("snapshot input differed from original business bytes", name)
+					}
+				}
+			}
+			if round == 1 {
+				ranges := input.ownerPages["answersheets"]
+				if len(ranges) == 0 {
+					t.Fatal("actual owner page missing")
+				}
+				ref := input.pages[ranges[0].page]
+				one := make([]byte, 1)
+				if _, e = input.file.ReadAt(one, ref.Offset); e != nil {
+					return e
+				}
+				saved := one[0]
+				one[0] ^= 1
+				if _, e = input.file.WriteAt(one, ref.Offset); e != nil {
+					return e
+				}
+				if bad, e := PrepareMongoSnapshotOwnerFootprint(ctx, input, sqlBatch, sources, DefaultMongoHistoricalOwnerBatchLimits()); bad != nil || e == nil {
+					t.Fatal("same-inode initial FD tamper became valid footprint")
+				}
+				one[0] = saved
+				if _, e = input.file.WriteAt(one, ref.Offset); e != nil {
+					return e
+				}
+			}
+			footprints = append(footprints, f)
+			inputs = append(inputs, input)
+			return nil
+		})
+		session.EndSession(t.Context())
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	if inputs[0].CompareFreshInput(t.Context(), inputs[1]) != nil {
+		t.Fatal("independent initial snapshots did not match")
+	}
+	for _, f := range footprints {
+		rows := 0
+		if err := f.VisitRows(t.Context(), func(_ string, raw bson.Raw) error { rows++; raw[0] ^= 1; return nil }); err != nil || rows == 0 {
+			t.Fatal("pure footprint lost rows after native scopes ended", err)
+		}
+		copy := *f
+		if copy.InputSHA256() != "" {
+			t.Fatal("copied input acquired original identity")
+		}
+		if _, err := json.Marshal(f); err == nil {
+			t.Fatal("immutable input serialized as authority")
+		}
+	}
+}
