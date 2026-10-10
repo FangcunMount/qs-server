@@ -418,12 +418,28 @@ func (r *SQLHistoricalComponentRecipe) OwnerPartitionResolved() bool {
 // The source page is a transport boundary, not an atomic owner boundary.
 // Partition only private, live original reads. Replay membership joins real
 // owners; shared schema/model/head reads do not join unrelated assessments.
-func FreezeSQLHistoricalOwnerComponentRecipes(ctx context.Context, original *SQLHistoricalOwnerBatch, cross *SQLHistoricalCrossStorePage, provenance *SQLHistoricalCASProvenance, unchanged *SQLHistoricalCASReadBaseline, spool *SQLHistoricalCASSpool) ([]*SQLHistoricalComponentRecipe, error) {
+// sourceOwners is optional pure partition metadata supplied by the joint reader.
+// Every event and owner must already belong to these actual original reads. It
+// authenticates no source and cannot grant observation or statement authority.
+func FreezeSQLHistoricalOwnerComponentRecipes(ctx context.Context, original *SQLHistoricalOwnerBatch, cross *SQLHistoricalCrossStorePage, provenance *SQLHistoricalCASProvenance, unchanged *SQLHistoricalCASReadBaseline, spool *SQLHistoricalCASSpool, sourceOwners ...map[string]uint64) ([]*SQLHistoricalComponentRecipe, error) {
 	parent, err := FreezeSQLHistoricalComponentRecipe(ctx, original, cross, provenance, unchanged)
 	if err != nil {
 		return nil, fmt.Errorf("%w: owner_parent: %w", ErrSQLHistoricalComponent, err)
 	}
-	parts, err := componentOriginalOwnerPartitions(parent, cross.catalog)
+	if len(sourceOwners) > 1 {
+		return nil, ErrSQLHistoricalComponent
+	}
+	for _, selected := range sourceOwners {
+		for event, id := range selected {
+			if !slices.Contains(cross.selectors.EventIDs, event) {
+				return nil, ErrSQLHistoricalComponent
+			}
+			if _, err = original.OwnerByAssessment(id); err != nil {
+				return nil, ErrSQLHistoricalComponent
+			}
+		}
+	}
+	parts, err := componentOriginalOwnerPartitions(parent, cross.catalog, sourceOwners...)
 	if err != nil {
 		return nil, fmt.Errorf("%w: owner_partition", ErrSQLHistoricalComponent)
 	}
@@ -465,6 +481,136 @@ func FreezeSQLHistoricalOwnerComponentRecipes(ctx context.Context, original *SQL
 	return out, nil
 }
 
+// FreezeSQLHistoricalAbsentOwnerSelectorRecipe captures only an actual original
+// SQL-empty sheet range. All selectors must be contained in the live original
+// page. The new indexed reads stay in its original RR snapshot; they are pure
+// input and do not authenticate the Mongo owner, source or a future write.
+func FreezeSQLHistoricalAbsentOwnerSelectorRecipe(ctx context.Context, original *SQLHistoricalOwnerBatch, cross *SQLHistoricalCrossStorePage, eventIDs []string, mongoOwners []SQLCrossStoreOwnerReference, answerSheetIDs []uint64, spool *SQLHistoricalCASSpool) (*SQLHistoricalComponentRecipe, error) {
+	if ctx == nil || ctx.Err() != nil || original == nil || cross == nil || cross.batch != original || !cross.report.Complete || cross.catalog == nil || cross.catalog.cycle != original.cycle || len(eventIDs) == 0 || len(answerSheetIDs) == 0 || original.ValidateBorrowedSnapshot(ctx) != nil {
+		return nil, ErrSQLHistoricalComponent
+	}
+	events := map[string]bool{}
+	sheets := map[uint64]bool{}
+	owners := map[string]bool{}
+	for _, event := range eventIDs {
+		if events[event] || !slices.Contains(cross.selectors.EventIDs, event) {
+			return nil, ErrSQLHistoricalComponent
+		}
+		events[event] = true
+	}
+	for _, sheet := range answerSheetIDs {
+		if sheets[sheet] || !slices.Contains(original.request.AnswerSheetIDs, sheet) {
+			return nil, ErrSQLHistoricalComponent
+		}
+		if _, err := original.OwnerByAnswerSheet(sheet); !errors.Is(err, ErrSQLHistoricalOwnerAbsent) {
+			return nil, ErrSQLHistoricalComponent
+		}
+		sheets[sheet] = true
+	}
+	for _, owner := range mongoOwners {
+		key := owner.Kind + ":" + owner.ID
+		if owners[key] || !slices.Contains(cross.selectors.MongoOwners, owner) || owner.Kind != "AnswerSheet" || !sheets[cyclePayloadID(owner.ID)] {
+			return nil, ErrSQLHistoricalComponent
+		}
+		owners[key] = true
+	}
+	if len(owners) != len(sheets) {
+		return nil, ErrSQLHistoricalComponent
+	}
+	selected := map[int]bool{}
+	for event := range events {
+		for _, i := range cross.catalog.cycle.byEvent[event] {
+			selected[i] = true
+		}
+	}
+	for owner := range owners {
+		for _, i := range cross.catalog.byMongoOwner[owner] {
+			selected[i] = true
+		}
+	}
+	pairs := map[string]bool{}
+	for i := range selected {
+		v := cross.catalog.cycle.observations[i]
+		if v.link.requestID != "" {
+			pairs[cyclePair(v.OrgID, v.link.requestID)] = true
+		}
+	}
+	// Replay is an atomic responsibility: inspect every actual catalog member,
+	// not only those matching this subset. A wider pair requires regrouping.
+	for pair := range pairs {
+		for _, i := range cross.catalog.byRequest[pair] {
+			selected[i] = true
+		}
+	}
+	for i := range selected {
+		v := cross.catalog.cycle.observations[i]
+		if v.AssessmentID != 0 || v.EventID != "" && !events[v.EventID] || v.OwnerKind != "" && (v.OwnerKind != "AnswerSheet" || !owners[v.OwnerKind+":"+v.OwnerID]) {
+			return nil, ErrSQLHistoricalComponent
+		}
+	}
+	batch, err := PrepareSQLHistoricalOwnerBatch(ctx, original.cycle, SQLHistoricalOwnerBatchRequest{AnswerSheetIDs: slices.Clone(answerSheetIDs)}, original.limits)
+	if err != nil || len(batch.owners) != 0 {
+		return nil, ErrSQLHistoricalComponent
+	}
+	for _, sheet := range answerSheetIDs {
+		if _, err = batch.OwnerByAnswerSheet(sheet); !errors.Is(err, ErrSQLHistoricalOwnerAbsent) {
+			return nil, ErrSQLHistoricalComponent
+		}
+	}
+	subset, err := PrepareSQLHistoricalCrossStorePage(ctx, cross.catalog, batch, SQLCrossStoreSelectors{EventIDs: slices.Clone(eventIDs), OrganizationIDs: slices.Clone(cross.selectors.OrganizationIDs), MongoOwners: slices.Clone(mongoOwners)})
+	if err != nil {
+		return nil, err
+	}
+	baseline, err := SealSQLHistoricalCASReadBaseline(ctx, batch)
+	if err != nil {
+		return nil, err
+	}
+	r, err := FreezeSQLHistoricalComponentRecipe(ctx, batch, subset, nil, baseline)
+	if err != nil {
+		return nil, err
+	}
+	// OwnerBatch represents its empty deduplicated assessment result as nil;
+	// the existing native CAS capture uses an explicit empty result. Freeze
+	// that actual original capture after checking this sole representation
+	// difference. Fresh reads still use the unchanged exact image comparator.
+	tx, err := historicalTx(ctx)
+	if err != nil {
+		return nil, err
+	}
+	actual, err := r.plan.capture(tx, false)
+	expected := casCloneImage(r.plan.before)
+	if expected.rows["assessment"] == nil {
+		expected.rows["assessment"] = []historicalSQLRow{}
+	}
+	if err != nil || !reflect.DeepEqual(actual, expected) {
+		return nil, ErrSQLHistoricalComponent
+	}
+	r.plan.before = actual
+	r.input.before = casCloneImage(actual)
+	r.input.seal = r.input.digest()
+	r.seal = r.digest()
+	if !r.intact() {
+		return nil, ErrSQLHistoricalComponent
+	}
+	// captureOriginalResponsibility can expand negative governance ranges. No
+	// expanded member may quietly import another source or actual SQL owner.
+	for table, rows := range r.responsibility.rows {
+		for _, row := range rows {
+			v := cycleDecode(table, row)
+			if v.AssessmentID != 0 || v.EventID != "" && !events[v.EventID] || v.OwnerKind != "" && (v.OwnerKind != "AnswerSheet" || !owners[v.OwnerKind+":"+v.OwnerID]) {
+				return nil, ErrSQLHistoricalComponent
+			}
+		}
+	}
+	if original.ValidateBorrowedSnapshot(ctx) != nil {
+		return nil, ErrSQLHistoricalComponent
+	}
+	if spool != nil {
+		return spoolSQLHistoricalComponentRecipe(ctx, batch, r, spool)
+	}
+	return r, nil
+}
+
 type sqlOriginalOwnerPart struct {
 	ids    []uint64
 	events []string
@@ -472,19 +618,21 @@ type sqlOriginalOwnerPart struct {
 	mongo  []SQLCrossStoreOwnerReference
 }
 
-func componentOriginalOwnerPartitions(r *SQLHistoricalComponentRecipe, c *SQLHistoricalCrossStoreCatalog) ([]sqlOriginalOwnerPart, error) {
-	if !r.intact() || c == nil || c.cycle == nil || !c.report.Complete {
+func componentOriginalOwnerPartitions(r *SQLHistoricalComponentRecipe, c *SQLHistoricalCrossStoreCatalog, sourceOwners ...map[string]uint64) ([]sqlOriginalOwnerPart, error) {
+	if !r.intact() || c == nil || c.cycle == nil || !c.report.Complete || len(sourceOwners) > 1 {
 		return nil, ErrSQLHistoricalComponent
 	}
 	parents := map[uint64]uint64{}
 	ownerSheets := map[uint64]uint64{}
+	ownerOrgs := map[uint64]uint64{}
 	for _, id := range r.plan.request.AssessmentIDs {
 		parents[id] = id
 	}
 	for _, row := range r.plan.before.rows["assessment"] {
 		id, err := sqlHistoricalUint(row, "id")
 		sheet, se := sqlHistoricalUint(row, "answer_sheet_id")
-		if err != nil || se != nil || id == 0 || sheet == 0 {
+		org, oe := sqlHistoricalUint(row, "org_id")
+		if err != nil || se != nil || oe != nil || id == 0 || sheet == 0 || org == 0 {
 			return nil, ErrSQLHistoricalComponent
 		}
 		parents[id] = id
@@ -492,6 +640,7 @@ func componentOriginalOwnerPartitions(r *SQLHistoricalComponentRecipe, c *SQLHis
 			return nil, ErrSQLHistoricalComponent
 		}
 		ownerSheets[sheet] = id
+		ownerOrgs[id] = org
 	}
 	if len(parents) == 0 {
 		return nil, nil
@@ -541,6 +690,27 @@ func componentOriginalOwnerPartitions(r *SQLHistoricalComponentRecipe, c *SQLHis
 			}
 		}
 	}
+	for _, selected := range sourceOwners {
+		for event, id := range selected {
+			if !slices.Contains(r.selectors.EventIDs, event) || ownerOrgs[id] == 0 || bind(event, id) != nil {
+				return nil, ErrSQLHistoricalComponent
+			}
+		}
+	}
+	// A selector cannot contradict any current readable identity, organization
+	// or sheet binding. Its presence is not evidence of that event's origin.
+	for _, event := range r.selectors.EventIDs {
+		id := eventOwners[event]
+		for _, i := range c.cycle.byEvent[event] {
+			v := c.cycle.observations[i]
+			if id != 0 && v.OrgID != 0 && ownerOrgs[id] != v.OrgID {
+				return nil, ErrSQLHistoricalComponent
+			}
+			if v.OwnerKind == "AnswerSheet" && id != 0 && ownerSheets[cyclePayloadID(v.OwnerID)] != id {
+				return nil, ErrSQLHistoricalComponent
+			}
+		}
+	}
 	// Every actual member of each selected replay request is included. A
 	// member targeting an owner outside the captured business page cannot be
 	// omitted: the caller must capture that owner before splitting this page.
@@ -576,9 +746,9 @@ func componentOriginalOwnerPartitions(r *SQLHistoricalComponentRecipe, c *SQLHis
 			}
 		}
 	}
-	// An unbound original source or missing sheet/ReportGeneration range is
-	// preserved as one original input. Only genuine joint reads can partition
-	// it; a caller-provided mapping is deliberately not accepted here.
+	// Unbound source and missing SQL sheet ranges remain explicit unresolved
+	// input. A generation's SQL-negative range can be shared read-only across
+	// children; it is never guessed to be an assessment identity.
 	for _, event := range r.selectors.EventIDs {
 		if eventOwners[event] == 0 {
 			return nil, nil
@@ -590,6 +760,9 @@ func componentOriginalOwnerPartitions(r *SQLHistoricalComponentRecipe, c *SQLHis
 		}
 	}
 	for _, owner := range r.selectors.MongoOwners {
+		if owner.Kind == "ReportGeneration" && len(sourceOwners) == 1 {
+			continue
+		}
 		if owner.Kind != "AnswerSheet" || ownerSheets[cyclePayloadID(owner.ID)] == 0 {
 			return nil, nil
 		}
@@ -611,6 +784,12 @@ func componentOriginalOwnerPartitions(r *SQLHistoricalComponentRecipe, c *SQLHis
 		byRoot[root].sheets = append(byRoot[root].sheets, sheet)
 	}
 	for _, owner := range r.selectors.MongoOwners {
+		if owner.Kind == "ReportGeneration" {
+			for _, part := range byRoot {
+				part.mongo = append(part.mongo, owner)
+			}
+			continue
+		}
 		root := find(ownerSheets[cyclePayloadID(owner.ID)])
 		byRoot[root].mongo = append(byRoot[root].mongo, owner)
 	}

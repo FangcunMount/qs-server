@@ -7,6 +7,7 @@ import (
 	"database/sql"
 	"errors"
 	"os"
+	"slices"
 	"testing"
 	"time"
 
@@ -203,6 +204,145 @@ func TestSQLHistoricalComponentNativeOriginalOwnerPartition(t *testing.T) {
 		if e = componentSQLNativeObserve(t, db, r, false, nil); e != nil {
 			t.Fatal("actual fresh child read rejected", e)
 		}
+	}
+}
+
+func TestSQLHistoricalComponentNativeSourceOwnerSelectors(t *testing.T) {
+	db := openHistoricalReferencesDB(t)
+	insertHistoricalAssessment(t, db, 42)
+	insertHistoricalAssessment(t, db, 43)
+	if err := batchNativeTx(t, db, func(ctx context.Context, c *SQLHistoricalResponsibilityCycle) error {
+		batch, err := PrepareSQLHistoricalOwnerBatch(ctx, c, SQLHistoricalOwnerBatchRequest{AssessmentIDs: []uint64{42, 43}, AnswerSheetIDs: []uint64{10042, 10043}}, DefaultSQLHistoricalOwnerBatchLimits())
+		if err != nil {
+			return err
+		}
+		catalog, err := PrepareSQLHistoricalCrossStoreCatalog(ctx, c, DefaultSQLCrossStoreLimits())
+		if err != nil {
+			return err
+		}
+		cross, err := PrepareSQLHistoricalCrossStorePage(ctx, catalog, batch, SQLCrossStoreSelectors{EventIDs: []string{"mongo-submitted", "mongo-generated"}, AssessmentIDs: []uint64{42, 43}, OrganizationIDs: []uint64{7}, MongoOwners: []SQLCrossStoreOwnerReference{{Kind: "AnswerSheet", ID: "10042"}, {Kind: "ReportGeneration", ID: "77"}}})
+		if err != nil {
+			return err
+		}
+		baseline, err := SealSQLHistoricalCASReadBaseline(ctx, batch)
+		if err != nil {
+			return err
+		}
+		selected := map[string]uint64{"mongo-submitted": 42, "mongo-generated": 43}
+		recipes, err := FreezeSQLHistoricalOwnerComponentRecipes(ctx, batch, cross, nil, baseline, nil, selected)
+		if err != nil || len(recipes) != 2 {
+			return errors.New("actual Mongo source selectors did not partition captured SQL owners")
+		}
+		selected["mongo-generated"] = 42
+		for i, recipe := range recipes {
+			owners, e := recipe.OwnerIdentities()
+			scope, se := recipe.OriginalSelectors()
+			bindings, be := recipe.SourceOwnerBindings()
+			if e != nil || se != nil || be != nil || len(owners) != 1 || owners[0].AssessmentID != uint64(42+i) || len(scope.EventIDs) != 1 || len(bindings) != 1 || bindings[0].SQLOwnerPresent || !recipe.OwnerPartitionResolved() {
+				return errors.New("pure selector was mutable or promoted to authenticated source binding")
+			}
+			// A generation without a SQL-readable identity keeps its complete
+			// original negative range as shared read-only input in both children.
+			if !slices.Contains(scope.MongoOwners, SQLCrossStoreOwnerReference{Kind: "ReportGeneration", ID: "77"}) {
+				return errors.New("generation negative responsibility range dropped")
+			}
+		}
+		for _, invalid := range []map[string]uint64{{"not-original": 42}, {"mongo-generated": 99}, {"mongo-generated": 0}} {
+			if _, e := FreezeSQLHistoricalOwnerComponentRecipes(ctx, batch, cross, nil, baseline, nil, invalid); e == nil {
+				return errors.New("source or owner outside the actual original scope admitted")
+			}
+		}
+		plan, err := PrepareSQLHistoricalBatchCAS(ctx, batch, []SQLHistoricalBatchAttachment{casNativeEntry(t, ctx, batch, 42, 0, "mongo-submitted", "evaluation.requested", nil)})
+		if err != nil {
+			return err
+		}
+		provenance, err := SealSQLHistoricalCASProvenance(ctx, plan, batch)
+		if err != nil {
+			return err
+		}
+		if _, e := FreezeSQLHistoricalOwnerComponentRecipes(ctx, batch, cross, provenance, nil, nil, map[string]uint64{"mongo-submitted": 43, "mongo-generated": 43}); e == nil {
+			return errors.New("selector contradicted an actual original attachment")
+		}
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestSQLHistoricalComponentNativeAbsentOwnerSelector(t *testing.T) {
+	db := openHistoricalReferencesDB(t)
+	insertHistoricalAssessment(t, db, 42)
+	file, err := os.CreateTemp(t.TempDir(), "absent-owner-input-")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = file.Close() })
+	spool, err := NewSQLHistoricalCASSpool(file, 8<<20, 2<<20)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var recipe *SQLHistoricalComponentRecipe
+	if err = batchNativeTx(t, db, func(ctx context.Context, c *SQLHistoricalResponsibilityCycle) error {
+		batch, e := PrepareSQLHistoricalOwnerBatch(ctx, c, SQLHistoricalOwnerBatchRequest{AssessmentIDs: []uint64{42}, AnswerSheetIDs: []uint64{10042, 10090, 10091}}, DefaultSQLHistoricalOwnerBatchLimits())
+		if e != nil {
+			return e
+		}
+		catalog, e := PrepareSQLHistoricalCrossStoreCatalog(ctx, c, DefaultSQLCrossStoreLimits())
+		if e != nil {
+			return e
+		}
+		cross, e := PrepareSQLHistoricalCrossStorePage(ctx, catalog, batch, SQLCrossStoreSelectors{EventIDs: []string{"sheet-90", "sheet-91"}, AssessmentIDs: []uint64{42}, OrganizationIDs: []uint64{7}, MongoOwners: []SQLCrossStoreOwnerReference{{Kind: "AnswerSheet", ID: "10042"}, {Kind: "AnswerSheet", ID: "10090"}, {Kind: "AnswerSheet", ID: "10091"}}})
+		if e != nil {
+			return e
+		}
+		recipe, e = FreezeSQLHistoricalAbsentOwnerSelectorRecipe(ctx, batch, cross, []string{"sheet-90"}, []SQLCrossStoreOwnerReference{{Kind: "AnswerSheet", ID: "10090"}}, []uint64{10090}, spool)
+		if e != nil {
+			return e
+		}
+		for _, invalid := range []struct {
+			event, sheet string
+			id           uint64
+		}{{"sheet-90", "10042", 10042}, {"outside", "10090", 10090}, {"sheet-90", "10092", 10092}, {"sheet-90", "10091", 10090}} {
+			if _, e = FreezeSQLHistoricalAbsentOwnerSelectorRecipe(ctx, batch, cross, []string{invalid.event}, []SQLCrossStoreOwnerReference{{Kind: "AnswerSheet", ID: invalid.sheet}}, []uint64{invalid.id}, nil); e == nil {
+				return errors.New("nonempty or mismatched original empty range admitted")
+			}
+		}
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	owners, e := recipe.OwnerIdentities()
+	scope, se := recipe.OriginalSelectors()
+	if e != nil || se != nil || len(owners) != 0 || len(scope.EventIDs) != 1 || scope.EventIDs[0] != "sheet-90" || len(scope.MongoOwners) != 1 || scope.MongoOwners[0].ID != "10090" || recipe.OwnerPartitionResolved() {
+		t.Fatal("actual SQL-empty subset was lost or called a Mongo qualification", e, se)
+	}
+	if e = componentSQLNativeObserve(t, db, recipe, false, nil); e != nil {
+		t.Fatal("actual unchanged empty scope rejected", e)
+	}
+	insertHistoricalAssessment(t, db, 90)
+	if e = componentSQLNativeObserve(t, db, recipe, false, nil); e == nil {
+		t.Fatal("new owner in the exact originally empty sheet scope hidden")
+	}
+	crossSQLNativeReplay(t, db, "sheet-91")
+	if e = batchNativeTx(t, db, func(ctx context.Context, c *SQLHistoricalResponsibilityCycle) error {
+		batch, be := PrepareSQLHistoricalOwnerBatch(ctx, c, SQLHistoricalOwnerBatchRequest{AnswerSheetIDs: []uint64{10091}}, DefaultSQLHistoricalOwnerBatchLimits())
+		if be != nil {
+			return be
+		}
+		catalog, ce := PrepareSQLHistoricalCrossStoreCatalog(ctx, c, DefaultSQLCrossStoreLimits())
+		if ce != nil {
+			return ce
+		}
+		cross, ce := PrepareSQLHistoricalCrossStorePage(ctx, catalog, batch, SQLCrossStoreSelectors{EventIDs: []string{"sheet-91"}, OrganizationIDs: []uint64{7}, MongoOwners: []SQLCrossStoreOwnerReference{{Kind: "AnswerSheet", ID: "10091"}}})
+		if ce != nil {
+			return ce
+		}
+		if _, ce = FreezeSQLHistoricalAbsentOwnerSelectorRecipe(ctx, batch, cross, []string{"sheet-91"}, []SQLCrossStoreOwnerReference{{Kind: "AnswerSheet", ID: "10091"}}, []uint64{10091}, nil); ce == nil {
+			return errors.New("actual replay member outside this source subset was cut away")
+		}
+		return nil
+	}); e != nil {
+		t.Fatal("native complete replay subset rejection failed", e)
 	}
 }
 

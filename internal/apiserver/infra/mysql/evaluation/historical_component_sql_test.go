@@ -48,6 +48,9 @@ func TestSQLHistoricalComponentClosedScopeAndNoImportedAuthority(t *testing.T) {
 	if r, err := FreezeSQLHistoricalComponentRecipeToSpool(context.Background(), nil, nil, nil, nil, &SQLHistoricalCASSpool{}); r != nil || err == nil {
 		t.Fatal("private spool fabricated original native inputs")
 	}
+	if r, err := FreezeSQLHistoricalAbsentOwnerSelectorRecipe(context.Background(), nil, nil, []string{"exact-event"}, []SQLCrossStoreOwnerReference{{Kind: "AnswerSheet", ID: "10042"}}, []uint64{10042}, nil); r != nil || err == nil {
+		t.Fatal("caller selectors fabricated a live original SQL-empty range")
+	}
 	copied := componentCopySelectors(s)
 	copied.EventIDs[0] = "changed"
 	copied.AssessmentIDs[0] = 9
@@ -71,6 +74,16 @@ func TestSQLHistoricalComponentOwnerGraphKeepsReplayAtomic(t *testing.T) {
 	if err != nil || len(parts) != 2 {
 		t.Fatal("unrelated source-page owners were joined", err)
 	}
+	for _, selected := range []map[string]uint64{{"first": 43}, {"outside": 42}, {"first": 99}} {
+		if _, err = componentOriginalOwnerPartitions(r, c, selected); err == nil {
+			t.Fatal("pure selector contradicted current bindings or expanded original scope")
+		}
+	}
+	cycle.observations[0].OrgID = 8
+	if _, err = componentOriginalOwnerPartitions(r, c, map[string]uint64{"first": 42}); err == nil {
+		t.Fatal("current cross-organization binding hidden by pure selector")
+	}
+	cycle.observations[0].OrgID = 0
 	r.responsibility.rows["qs_rm_replay_items"] = []historicalSQLRow{cycleTestRow(map[string]string{"org_id": "7", "request_id": "pair"})}
 	r.seal = r.digest()
 	parts, err = componentOriginalOwnerPartitions(r, c)
