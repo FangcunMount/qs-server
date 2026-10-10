@@ -2005,11 +2005,10 @@ func TestLifecyclePublicCLINativeCrossProcessServiceRecovery(t *testing.T) {
 	for i, phase := range []string{"stop", "recover"} {
 		child := exec.CommandContext(ctx, programPath, "-test.run=^TestLifecyclePublicCLINativeCrossProcessServiceRecovery$", "-test.count=1", "-test.timeout=2m")
 		child.Env = append(nativeChildEnv(map[string]string{"QS_LIFECYCLE_PUBLIC_CLI_NATIVE": "1", "QS_LIFECYCLE_PUBLIC_CLI_NATIVE_REQUIRED": "1"}), "QS_PUBLIC_SERVICE_RECOVERY_INPUT="+path, "QS_PUBLIC_SERVICE_RECOVERY_PHASE="+phase)
-		child.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 		var out, stderr bytes.Buffer
 		child.Stdout, child.Stderr = &out, &stderr
 		if err, reaped := publicCLIRunProcessGroup(child); err != nil || !reaped {
-			t.Logf("public_cli_service_recovery_stage=%s child_stdout_sha256=%s child_stderr_sha256=%s", phase, sha(out.Bytes()), sha(stderr.Bytes()))
+			t.Logf("public_cli_service_recovery_stage=%s child_started=%t child_reaped=%t child_stdout_sha256=%s child_stderr_sha256=%s", phase, child.Process != nil, reaped, sha(out.Bytes()), sha(stderr.Bytes()))
 			t.Fatal("public_cli_service_recovery_original_child_failed")
 		}
 		var raw struct {
