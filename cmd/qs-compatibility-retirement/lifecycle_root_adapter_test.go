@@ -1164,7 +1164,7 @@ func originalPreparationBudgetFixture(t *testing.T) (string, string, lifecycleRe
 	if decodeLifecycleSourceCopyIntent(raw, &intent) != nil {
 		t.Fatal("original intent")
 	}
-	basis := stop.Descriptor{Version: 1, SourceSHA: intent.OriginalSourceSHA, ToolSourceSHA: intent.ToolSourceSHA, OriginalRunID: intent.OriginalRunID, OperationID: intent.OperationID, ManifestSHA256: intent.ManifestSHA256, HostRole: "server-a", MachineIDSHA256: strings.Repeat("c", 64), DockerPath: "/usr/bin/docker", DockerSHA256: strings.Repeat("d", 64), Containers: []stop.Container{{Component: "qs-apiserver"}, {Component: "qs-collection-server"}}}
+	basis := stop.Descriptor{Version: 1, SourceSHA: intent.OriginalSourceSHA, RuntimeSourceSHA: strings.Repeat("e", 40), ToolSourceSHA: intent.ToolSourceSHA, OriginalRunID: intent.OriginalRunID, OperationID: intent.OperationID, ManifestSHA256: intent.ManifestSHA256, HostRole: "server-a", MachineIDSHA256: strings.Repeat("c", 64), DockerPath: "/usr/bin/docker", DockerSHA256: strings.Repeat("d", 64), Containers: []stop.Container{{Component: "qs-apiserver"}, {Component: "qs-collection-server"}}}
 	result := lifecyclePreparationBudgetResult{"qs_native_temporary_budget_key_result", intent.ToolSourceSHA, intent.OperationID, intent.ActualRunID, strings.Repeat("e", 64), true, false, false, "none"}
 	for name, value := range map[string]any{"budget-key.basis.private.json": basis, "budget-key.result.private.json": result} {
 		raw, _ := json.Marshal(value)

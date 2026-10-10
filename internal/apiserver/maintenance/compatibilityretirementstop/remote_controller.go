@@ -125,7 +125,7 @@ func (c *RemoteController) Do(ctx context.Context, action string) (v SessionDiag
 	if e != nil {
 		return v, e
 	}
-	if exactJSON(reply, &v) != nil || v.Protocol != sessionProtocol || v.Sequence != c.seq || v.Action != action || v.HostRole != "server-d" || v.SourceSHA != c.issuer.record.Binding.SourceSHA || v.ToolSourceSHA != c.issuer.record.ToolSourceSHA || v.OperationID != c.issuer.record.Binding.OperationID || v.ManifestSHA256 != c.issuer.record.Binding.ManifestSHA256 || v.OriginalRunID != c.issuer.record.Binding.OriginalRunID || v.WindowStartSHA256 != c.issuer.record.StartSHA256 || v.WholeWriterFenceProven || v.RemainingMilliseconds <= 0 || v.RemainingMilliseconds > 1800000 || v.ForwardRemainingMilliseconds < 0 || v.ForwardRemainingMilliseconds > 1200000 || !remoteDiagnosticOutcomeValid(v) {
+	if exactJSON(reply, &v) != nil || v.Protocol != sessionProtocol || v.Sequence != c.seq || v.Action != action || v.HostRole != "server-d" || v.SourceSHA != c.issuer.record.Binding.SourceSHA || v.RuntimeSourceSHA != c.issuer.approval.descriptor.RuntimeSourceSHA || v.ToolSourceSHA != c.issuer.record.ToolSourceSHA || v.OperationID != c.issuer.record.Binding.OperationID || v.ManifestSHA256 != c.issuer.record.Binding.ManifestSHA256 || v.OriginalRunID != c.issuer.record.Binding.OriginalRunID || v.WindowStartSHA256 != c.issuer.record.StartSHA256 || v.WholeWriterFenceProven || v.RemainingMilliseconds <= 0 || v.RemainingMilliseconds > 1800000 || v.ForwardRemainingMilliseconds < 0 || v.ForwardRemainingMilliseconds > 1200000 || !remoteDiagnosticOutcomeValid(v) {
 		return v, ErrRemoteBudget
 	}
 	if !remoteRuntimeDiagnosticValid(v) || !remoteMaterialsDiagnosticValid(v) || !remoteLoadedMQDiagnosticValid(v) {

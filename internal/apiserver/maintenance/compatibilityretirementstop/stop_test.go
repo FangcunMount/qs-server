@@ -11,11 +11,25 @@ import (
 )
 
 func descriptorFixture() Descriptor {
-	return Descriptor{Version: 1, SourceSHA: strings.Repeat("a", 40), ToolSourceSHA: strings.Repeat("b", 40), OriginalRunID: "124-1", OperationID: "123-1", ManifestSHA256: strings.Repeat("b", 64), HostRole: "server-a", MachineIDSHA256: strings.Repeat("c", 64), DockerPath: "/usr/bin/docker", DockerSHA256: strings.Repeat("d", 64), Containers: []Container{
+	return Descriptor{Version: 1, SourceSHA: strings.Repeat("a", 40), RuntimeSourceSHA: strings.Repeat("e", 40), ToolSourceSHA: strings.Repeat("b", 40), OriginalRunID: "124-1", OperationID: "123-1", ManifestSHA256: strings.Repeat("b", 64), HostRole: "server-a", MachineIDSHA256: strings.Repeat("c", 64), DockerPath: "/usr/bin/docker", DockerSHA256: strings.Repeat("d", 64), Containers: []Container{
 		{ID: strings.Repeat("1", 64), Name: "/qs-apiserver", Image: "sha256:" + strings.Repeat("e", 64), Component: "qs-apiserver", Service: "qs-apiserver", Entrypoint: []string{"/app/qs-apiserver"}, Command: []string{"--config=/app/configs/apiserver.prod.yaml"}, Running: true, StartedAt: "2026-10-09T01:02:03Z", RestartPolicy: "unless-stopped"},
 		{ID: strings.Repeat("2", 64), Name: "/qs-collection-server-1", Image: "sha256:" + strings.Repeat("f", 64), Component: "qs-collection-server", Project: "qs-collection", Service: "server", Entrypoint: []string{"/app/collection-server"}, Command: []string{"--config=/app/configs/collection-server.prod.yaml"}, Running: true, StartedAt: "2026-10-09T01:02:03Z", RestartPolicy: "unless-stopped"},
 	}}
 }
+func TestDescriptorRequiresIndependentRuntimeSource(t *testing.T) {
+	d := descriptorFixture()
+	if d.SourceSHA == d.RuntimeSourceSHA || !validDescriptor(d) {
+		t.Fatal("independent batch and runtime sources rejected")
+	}
+	for _, invalid := range []string{"", strings.Repeat("a", 39), strings.Repeat("A", 40), strings.Repeat("a", 41)} {
+		v := d
+		v.RuntimeSourceSHA = invalid
+		if validDescriptor(v) {
+			t.Fatal("missing or malformed runtime source accepted")
+		}
+	}
+}
+
 func TestDescriptorScopesActualSourceTopology(t *testing.T) {
 	d := descriptorFixture()
 	if !validDescriptor(d) {

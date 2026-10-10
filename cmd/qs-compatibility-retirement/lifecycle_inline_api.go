@@ -211,7 +211,7 @@ func prepareLifecycleAPITransition(ctx context.Context, r lifecycleRequest) (v *
 		return v, lifecycleError("lifecycle_api_binding_rejected")
 	}
 	var descriptor stop.Descriptor
-	if readLifecyclePrivate(path, r.ServiceControl.LocalDescriptorSHA256, &descriptor) != nil {
+	if readLifecyclePrivate(path, r.ServiceControl.LocalDescriptorSHA256, &descriptor) != nil || descriptor.RuntimeSourceSHA != r.DeploymentControl.RollbackSourceSHA {
 		return v, lifecycleError("lifecycle_api_binding_rejected")
 	}
 	found := 0

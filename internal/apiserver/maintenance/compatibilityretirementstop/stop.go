@@ -48,19 +48,21 @@ const maxBytes = 4 << 20
 // The actual host identity, container catalog and every listed field are checked
 // before any signal. Server B is IAM and is deliberately not a valid role.
 type Descriptor struct {
-	RemoteDescriptorSHA256 string      `json:"remote_descriptor_sha256,omitempty"`
-	BudgetTrustSHA256      string      `json:"budget_trust_sha256,omitempty"`
-	Version                int         `json:"version"`
-	SourceSHA              string      `json:"source_sha"`
-	ToolSourceSHA          string      `json:"tool_source_sha"`
-	OriginalRunID          string      `json:"original_run_id"`
-	OperationID            string      `json:"operation_id"`
-	ManifestSHA256         string      `json:"manifest_sha256"`
-	HostRole               string      `json:"host_role"`
-	MachineIDSHA256        string      `json:"machine_id_sha256"`
-	DockerPath             string      `json:"docker_path"`
-	DockerSHA256           string      `json:"docker_sha256"`
-	Containers             []Container `json:"containers"`
+	RemoteDescriptorSHA256 string `json:"remote_descriptor_sha256,omitempty"`
+	BudgetTrustSHA256      string `json:"budget_trust_sha256,omitempty"`
+	Version                int    `json:"version"`
+	SourceSHA              string `json:"source_sha"`
+	// RuntimeSourceSHA binds the existing QS instances; SourceSHA binds this retirement batch.
+	RuntimeSourceSHA string      `json:"runtime_source_sha"`
+	ToolSourceSHA    string      `json:"tool_source_sha"`
+	OriginalRunID    string      `json:"original_run_id"`
+	OperationID      string      `json:"operation_id"`
+	ManifestSHA256   string      `json:"manifest_sha256"`
+	HostRole         string      `json:"host_role"`
+	MachineIDSHA256  string      `json:"machine_id_sha256"`
+	DockerPath       string      `json:"docker_path"`
+	DockerSHA256     string      `json:"docker_sha256"`
+	Containers       []Container `json:"containers"`
 }
 type Container struct {
 	ID             string   `json:"id"`
@@ -230,7 +232,7 @@ func validDescriptor(d Descriptor) bool {
 	if d.RemoteDescriptorSHA256 != "" && (d.HostRole != "server-a" || !hash64.MatchString(d.RemoteDescriptorSHA256)) || d.BudgetTrustSHA256 != "" && (d.HostRole != "server-d" || !hash64.MatchString(d.BudgetTrustSHA256)) {
 		return false
 	}
-	if d.Version != 1 || !sha40.MatchString(d.SourceSHA) || !sha40.MatchString(d.ToolSourceSHA) || !opID.MatchString(d.OriginalRunID) || !opID.MatchString(d.OperationID) || !hash64.MatchString(d.ManifestSHA256) || !hash64.MatchString(d.MachineIDSHA256) || !hash64.MatchString(d.DockerSHA256) || (d.DockerPath != "/usr/bin/docker" && d.DockerPath != "/usr/local/bin/docker") || len(d.Containers) < 1 || len(d.Containers) > 32 {
+	if d.Version != 1 || !sha40.MatchString(d.SourceSHA) || !sha40.MatchString(d.RuntimeSourceSHA) || !sha40.MatchString(d.ToolSourceSHA) || !opID.MatchString(d.OriginalRunID) || !opID.MatchString(d.OperationID) || !hash64.MatchString(d.ManifestSHA256) || !hash64.MatchString(d.MachineIDSHA256) || !hash64.MatchString(d.DockerSHA256) || (d.DockerPath != "/usr/bin/docker" && d.DockerPath != "/usr/local/bin/docker") || len(d.Containers) < 1 || len(d.Containers) > 32 {
 		return false
 	}
 	seen := map[string]bool{}

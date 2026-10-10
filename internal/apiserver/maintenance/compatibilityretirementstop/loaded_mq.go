@@ -101,7 +101,7 @@ func (l *Lease) ObserveLoadedMQ(ctx context.Context, client *http.Client) (resul
 		if !ok || v.Component != "qs-worker" || p.ImageID != v.Image || p.StateSHA256 != runtimeDigest(v) || l.noPendingStop(v) != nil {
 			return result, ErrLoadedMQ
 		}
-		owner, e := openLoadedMQProcess(q, v, l.approval.descriptor.SourceSHA, p.ProgramSHA256)
+		owner, e := openLoadedMQProcess(q, v, l.approval.descriptor.RuntimeSourceSHA, p.ProgramSHA256)
 		if e != nil {
 			return result, e
 		}

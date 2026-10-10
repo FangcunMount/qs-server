@@ -438,6 +438,18 @@ print('actual-hup-local-terminal')
 class RootTemplateStaging(unittest.TestCase):
     request=WindowToolMetadata.request
     approval=WindowToolMetadata.approval
+    def test_preparation_rejects_missing_runtime_source_before_native_side_effect(self):
+        from unittest import mock
+        a=self.approval(self.request())
+        basis={k:a[k] for k in ('tool_source_sha','operation_id','original_run_id','manifest_sha256')}
+        basis.update(source_sha=a['original_source_sha'],host_role='server-a')
+        for runtime in (None,'','A'*40,'f'*39):
+            descriptor=dict(basis)
+            if runtime is not None:descriptor['runtime_source_sha']=runtime
+            raw=tool.canonical(descriptor);a['local_descriptor_sha256']=tool.digest(raw)
+            with mock.patch.object(tool,'read_owned',return_value=raw),mock.patch.object(tool,'owned_process') as native:
+                with self.assertRaises(tool.Refused):tool.prepare_budget_key(Path('/unused-source'),Path('/unused-prepare'),Path('/unused-native'),1001,a,'22-3',object())
+                native.assert_not_called()
     def test_preparation_creates_seed_once_then_removes_only_original_inputs_after_native_terminal(self):
         import os,tempfile
         from unittest import mock
@@ -451,7 +463,7 @@ class RootTemplateStaging(unittest.TestCase):
             native=batch/'restore-native';native.write_bytes(b'offline native placeholder');native.chmod(0o700)
             a=self.approval(self.request())
             descriptor={k:a[k] for k in ('tool_source_sha','operation_id','original_run_id','manifest_sha256')}
-            descriptor.update(source_sha=a['original_source_sha'],host_role='server-a')
+            descriptor.update(source_sha=a['original_source_sha'],runtime_source_sha='f'*40,host_role='server-a')
             raw=tool.canonical(descriptor);a['local_descriptor_sha256']=tool.digest(raw)
             (original/'budget-key.descriptor.private.json').write_bytes(raw);(original/'budget-key.descriptor.private.json').chmod(0o600)
             expected_seed=os.urandom(32);calls=[];exit_code=[0]

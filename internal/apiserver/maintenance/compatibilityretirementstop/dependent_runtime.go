@@ -243,7 +243,7 @@ func (a *Approval) readRuntime(ctx context.Context, v actualContainer) (string, 
 		return "", "", e
 	}
 	raw, e = a.docker(ctx, "exec", v.ID, program, "--version=true", "--config="+config)
-	if e != nil || len(raw) > 64<<10 || runtimeVersionValid(string(raw), a.descriptor.SourceSHA, runtime.GOARCH) != nil {
+	if e != nil || len(raw) > 64<<10 || runtimeVersionValid(string(raw), a.descriptor.RuntimeSourceSHA, runtime.GOARCH) != nil {
 		return "", "", ErrState
 	}
 	raw, e = a.docker(ctx, "exec", v.ID, "wget", "-qO-", "-T", "5", fmt.Sprintf("http://127.0.0.1:%d%s", port, endpoint))

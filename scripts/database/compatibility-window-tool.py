@@ -654,6 +654,7 @@ def bootstrap_services(original, root, native, source_uid, approval, request, cr
     descriptor, channel = decode(descriptor_raw), decode(channel_raw)
     if type(descriptor) is not dict:
         reject("window_tool_service_inventory_rejected")
+    token(descriptor.get("runtime_source_sha"), SHA)
     for key, expected in (("source_sha", approval["original_source_sha"]), ("tool_source_sha", approval["tool_source_sha"]), ("operation_id", approval["operation_id"]), ("original_run_id", approval["original_run_id"]), ("manifest_sha256", approval["manifest_sha256"]), ("host_role", "server-a")):
         if descriptor.get(key) != expected:
             reject("window_tool_service_inventory_rejected")
@@ -711,6 +712,9 @@ def prepare_budget_key(original, batch, native, source_uid, approval, run, owner
     """One native key creation before D trust and final descriptors freeze."""
     descriptor_raw = read_owned(original / "budget-key.descriptor.private.json", source_uid, approval["local_descriptor_sha256"], 256 << 10)
     descriptor = decode(descriptor_raw)
+    if type(descriptor) is not dict:
+        reject("window_tool_service_inventory_rejected")
+    token(descriptor.get("runtime_source_sha"), SHA)
     for key, expected in (("source_sha", approval["original_source_sha"]), ("tool_source_sha", approval["tool_source_sha"]), ("operation_id", approval["operation_id"]), ("original_run_id", approval["original_run_id"]), ("manifest_sha256", approval["manifest_sha256"]), ("host_role", "server-a")):
         if type(descriptor) is not dict or descriptor.get(key) != expected:
             reject("window_tool_service_inventory_rejected")

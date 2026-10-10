@@ -83,6 +83,17 @@ func TestRunningReadbackRejectsNewIDsAndUnknownResume(t *testing.T) {
 	}
 }
 
+func TestRuntimeVersionUsesIndependentOriginalServiceSource(t *testing.T) {
+	d := descriptorFixture()
+	raw := "gitVersion: v1\ngitCommit: " + d.RuntimeSourceSHA + "\ngitTreeState: clean\nbuildDate: 2026-10-10\ngoVersion: go1.25.12\ncompiler: gc\nplatform: linux/amd64\n"
+	if runtimeVersionValid(raw, d.RuntimeSourceSHA, "amd64") != nil {
+		t.Fatal("original service runtime source rejected")
+	}
+	if runtimeVersionValid(raw, d.SourceSHA, "amd64") == nil {
+		t.Fatal("batch source accepted as compiled original runtime")
+	}
+}
+
 func TestRuntimeExecutableAndVersionFixedContracts(t *testing.T) {
 	program := "/app/qs-worker"
 	h := strings.Repeat("a", 64)

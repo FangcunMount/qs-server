@@ -265,7 +265,7 @@ func serveRemoteHostSession(ctx context.Context, a *Approval, journalDir string,
 		if be != nil {
 			return be
 		}
-		diagnostic := SessionDiagnostic{Protocol: sessionProtocol, Sequence: seq, Action: req.Action, HostRole: a.descriptor.HostRole, SourceSHA: a.descriptor.SourceSHA, ToolSourceSHA: a.descriptor.ToolSourceSHA, OperationID: a.descriptor.OperationID, ManifestSHA256: a.descriptor.ManifestSHA256, OriginalRunID: a.descriptor.OriginalRunID, WindowStartSHA256: budget.StartSHA256, RemainingMilliseconds: budget.RemainingMilliseconds, ForwardRemainingMilliseconds: remaining, Outcome: "observed", ErrorCategory: sessionCategory(e)}
+		diagnostic := SessionDiagnostic{Protocol: sessionProtocol, Sequence: seq, Action: req.Action, HostRole: a.descriptor.HostRole, SourceSHA: a.descriptor.SourceSHA, RuntimeSourceSHA: a.descriptor.RuntimeSourceSHA, ToolSourceSHA: a.descriptor.ToolSourceSHA, OperationID: a.descriptor.OperationID, ManifestSHA256: a.descriptor.ManifestSHA256, OriginalRunID: a.descriptor.OriginalRunID, WindowStartSHA256: budget.StartSHA256, RemainingMilliseconds: budget.RemainingMilliseconds, ForwardRemainingMilliseconds: remaining, Outcome: "observed", ErrorCategory: sessionCategory(e)}
 		diagnostic.Runtime = actualRuntime
 		diagnostic.Materials = actualMaterials
 		diagnostic.LoadedMQ = actualMQ
