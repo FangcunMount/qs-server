@@ -71,6 +71,9 @@ func TestHistoryCLINativeInitialTwoSnapshotInputRounds(t *testing.T) {
 			if input.sources.ValidateFrozen(t.Context()) != nil || input.ai.ValidateFrozen(t.Context()) != nil || !input.sources.Summary().TwoIndependentInputsMatched || !input.ai.Summary().TwoIndependentInputsMatched || input.ai.Summary().CASAuthority || input.sources.Summary().DropReady {
 				t.Fatal("native input pair forged authorization or lost original bytes")
 			}
+			if input.components == nil || input.components.ValidateInputSources(t.Context(), input.sources) != nil || input.ownerSpool == nil || nonempty && len(input.components.Components()) == 0 || !nonempty && len(input.components.Components()) != 0 {
+				t.Fatal("actual stopped input owner recipes missing or incomplete")
+			}
 			for round := range 2 {
 				s := input.sourceEpochs[round].Summary()
 				if !s.CaptureStopped || s.LiveSQLGraphRetained || len(input.sqlFacts[round].Ledgers) != 8 || len(input.mongoFacts[round].Collections) != 11 || len(input.aiEpochs[round].Summary().Ledgers) != 14 || !s.CompleteInput || input.sourceEpochs[round].StopCapture(t.Context()) == nil {
@@ -92,11 +95,11 @@ func TestHistoryCLINativeInitialTwoSnapshotInputRounds(t *testing.T) {
 			if unix.Getrusage(unix.RUSAGE_SELF, &usage) != nil {
 				t.Fatal("actual RSS unavailable")
 			}
-			t.Logf("actual_initial_input_rounds=2 sql8_rounds=2 mongo11_rounds=2 native_four_source_rounds=2 ai14_rounds=2 input_files=6 retained_sql_graphs=0 heap_before_bytes=%d heap_after_gc_bytes=%d actual_process_peak_rss_platform_units=%d", before.HeapAlloc, after.HeapAlloc, usage.Maxrss)
+			t.Logf("actual_initial_input_rounds=2 sql8_rounds=2 mongo11_rounds=2 native_four_source_rounds=2 ai14_rounds=2 input_files=6 owner_spool_files=1 owner_components=%d retained_sql_graphs=0 heap_before_bytes=%d heap_after_gc_bytes=%d actual_process_peak_rss_platform_units=%d", len(input.components.Components()), before.HeapAlloc, after.HeapAlloc, usage.Maxrss)
 			if input.close() != nil {
 				t.Fatal("actual input file close")
 			}
-			if len(j.created) != 9 || j.sequence != 3 {
+			if len(j.created) != 10 || j.sequence != 3 {
 				t.Fatal("input/journal original members changed")
 			}
 			if hash, e := j.snapshotMaterials(t.Context()); e != nil || hash == "" {

@@ -22,16 +22,21 @@ import (
 type historyInitialInputs struct {
 	sources      *retirement.HistoricalSourceInputPair
 	ai           *retirement.AIHistoricalInputPair
+	index        *retirement.WholeSourceJointIndex
+	components   *retirement.HistoricalCASComponents
+	ownerSpool   *sqlevaluation.SQLHistoricalCASSpool
 	sourceEpochs [2]*retirement.HistoricalSourceInputEpoch
 	aiEpochs     [2]*retirement.AIHistoricalInputEpoch
 	sqlFacts     [2]stableSQLFacts
 	mongoFacts   [2]retirement.MongoSnapshotInputSummary
-	files        [6]*os.File
+	files        [7]*os.File
 }
 
 func historyInitialInputNames() [6]string {
 	return [6]string{"input-mongo-1.private.bin", "input-source-1.private.bin", "input-ai-1.private.bin", "input-mongo-2.private.bin", "input-source-2.private.bin", "input-ai-2.private.bin"}
 }
+
+const historyInputOwnerSQLName = "input-owner-sql.private.bin"
 
 func (input *historyInitialInputs) close() error {
 	if input == nil {
@@ -121,6 +126,14 @@ func captureHistoryInitialInputs(ctx context.Context, a *approvedInputs, d *hist
 			return nil, err
 		}
 	}
+	input.files[6], err = journal.create(historyInputOwnerSQLName)
+	if err != nil {
+		return nil, err
+	}
+	input.ownerSpool, err = sqlevaluation.NewSQLHistoricalCASSpool(input.files[6], 16<<30, 128<<20)
+	if err != nil {
+		return nil, fixedError("history_write_spool_failed")
+	}
 	// Authenticate the source copies once before the native rounds. This
 	// existing compact index has its original reservation/duration limits;
 	// it is not a measured RSS guarantee or any future writer authority.
@@ -141,6 +154,12 @@ func captureHistoryInitialInputs(ctx context.Context, a *approvedInputs, d *hist
 	recipe, err := retirement.FreezeHistoricalSourceInputRecipe(ctx, binding)
 	if err != nil {
 		return nil, fixedError("history_source_origin_binding_failed")
+	}
+	indexLimits := retirement.DefaultWholeSourceJointLimits()
+	indexLimits.MaxRelatedSources = 512
+	input.index, err = retirement.PrepareHistoricalSourceInputIndex(ctx, journal.binding, recipe, a.jointCopies(), indexLimits)
+	if err != nil {
+		return nil, fixedError("history_complete_source_index_failed")
 	}
 	for round := range 2 {
 		err = d.snapshotInputScope(ctx, func(scope context.Context) error {
@@ -177,6 +196,30 @@ func captureHistoryInitialInputs(ctx context.Context, a *approvedInputs, d *hist
 			if e != nil {
 				return fixedError("history_ai_reverse_source_scope_failed")
 			}
+			if round == 1 {
+				// Freeze ownership while this actual second RRRO/snapshot is
+				// still alive. The returned recipes grant no write authority.
+				if !reflect.DeepEqual(input.sqlFacts[0], input.sqlFacts[1]) {
+					return fixedError("history_independent_epoch_facts_changed")
+				}
+				firstMongo, secondMongo := input.mongoFacts[0], input.mongoFacts[1]
+				firstMongo.NativeEpochSHA256, secondMongo.NativeEpochSHA256 = "", ""
+				if !reflect.DeepEqual(firstMongo, secondMongo) {
+					return fixedError("history_independent_epoch_facts_changed")
+				}
+				input.sources, e = retirement.CompareIndependentHistoricalSourceInputs(scope, input.sourceEpochs[0], input.sourceEpochs[1])
+				if e != nil {
+					return fixedError("history_independent_epoch_facts_changed")
+				}
+				input.ai, e = retirement.CompareIndependentAIHistoricalInputs(scope, input.aiEpochs[0], input.aiEpochs[1], input.sources)
+				if e != nil {
+					return fixedError("history_independent_epoch_facts_changed")
+				}
+				input.components, e = retirement.PlanHistoricalSourceOwnerComponents(scope, input.sources, input.index, sqlInput, mongoInput, input.ownerSpool, retirement.DefaultHistoricalCASComponentLimits())
+				if e != nil {
+					return fixedError("history_component_owner_planning_failed")
+				}
+			}
 			return input.sourceEpochs[round].StopCapture(scope)
 		})
 		if err != nil {
@@ -186,20 +229,7 @@ func captureHistoryInitialInputs(ctx context.Context, a *approvedInputs, d *hist
 			return nil, fixedError("history_write_journal_unknown")
 		}
 	}
-	if !reflect.DeepEqual(input.sqlFacts[0], input.sqlFacts[1]) {
-		return nil, fixedError("history_independent_epoch_facts_changed")
-	}
-	firstMongo, secondMongo := input.mongoFacts[0], input.mongoFacts[1]
-	firstMongo.NativeEpochSHA256, secondMongo.NativeEpochSHA256 = "", ""
-	if !reflect.DeepEqual(firstMongo, secondMongo) {
-		return nil, fixedError("history_independent_epoch_facts_changed")
-	}
-	input.sources, err = retirement.CompareIndependentHistoricalSourceInputs(ctx, input.sourceEpochs[0], input.sourceEpochs[1])
-	if err != nil {
-		return nil, fixedError("history_independent_epoch_facts_changed")
-	}
-	input.ai, err = retirement.CompareIndependentAIHistoricalInputs(ctx, input.aiEpochs[0], input.aiEpochs[1], input.sources)
-	if err != nil || input.sources.ReleaseCaptureIndex(ctx) != nil || input.ai.ValidateFrozen(ctx) != nil {
+	if input.sources == nil || input.ai == nil || input.components == nil || input.index.ReleaseInputAuthentication(ctx, input.sources) != nil || input.sources.ReleaseCaptureIndex(ctx) != nil || input.components.ValidateInputSources(ctx, input.sources) != nil || input.ai.ValidateFrozen(ctx) != nil {
 		return nil, fixedError("history_independent_epoch_facts_changed")
 	}
 	if journal.record(ctx, "initial_inputs_matched", -1, 0, nil) != nil {

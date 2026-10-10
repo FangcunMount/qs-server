@@ -8,7 +8,7 @@ import (
 )
 
 func TestHistoryInitialInputsClosedMaterialSet(t *testing.T) {
-	for _, kind := range []string{"input_only", "input_and_prepared", "partial_input", "foreign"} {
+	for _, kind := range []string{"input_only", "input_and_owner", "owner_only", "input_and_prepared", "partial_input", "foreign"} {
 		t.Run(kind, func(t *testing.T) {
 			testSource(t)
 			parent := privateTestDir(t)
@@ -25,6 +25,12 @@ func TestHistoryInitialInputsClosedMaterialSet(t *testing.T) {
 			selected := names[:]
 			if kind == "partial_input" {
 				selected = names[:3]
+			}
+			if kind == "input_and_owner" {
+				selected = append(selected, historyInputOwnerSQLName)
+			}
+			if kind == "owner_only" {
+				selected = []string{historyInputOwnerSQLName}
 			}
 			if kind == "input_and_prepared" {
 				selected = append(selected, "prepared-mongo-private.bin", "prepared-sql-private.bin")
@@ -48,7 +54,7 @@ func TestHistoryInitialInputsClosedMaterialSet(t *testing.T) {
 				t.Fatal(err)
 			}
 			hash, err := j.snapshotMaterials(t.Context())
-			if kind == "foreign" || kind == "partial_input" {
+			if kind == "foreign" || kind == "partial_input" || kind == "owner_only" {
 				if err == nil || hash != "" {
 					t.Fatal("partial or foreign members accepted")
 				}

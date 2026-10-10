@@ -216,6 +216,12 @@ func (j *historyWriteJournal) snapshotMaterials(ctx context.Context) (string, er
 			break
 		}
 	}
+	if j.created[historyInputOwnerSQLName] != nil {
+		if len(names) != len(inputNames) {
+			return "", fixedError("history_write_material_binding_rejected")
+		}
+		names = append(names, historyInputOwnerSQLName)
+	}
 	if j.created["prepared-mongo-private.bin"] != nil || j.created["prepared-sql-private.bin"] != nil {
 		names = append(names, "prepared-mongo-private.bin", "prepared-sql-private.bin")
 	}
