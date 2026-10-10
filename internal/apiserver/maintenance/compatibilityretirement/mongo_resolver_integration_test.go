@@ -12,6 +12,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"os/exec"
 	"strings"
 	"testing"
 	"time"
@@ -400,11 +401,101 @@ func TestMongoLocalNativeCurrentOutboxAndReplayResponsibilities(t *testing.T) {
 	}
 }
 
+// This validation authorizes only the CI test fixture's schema lifecycle;
+// it provides no retirement, production ownership or deletion capability.
+func validHistoricalCIMySQLID(id string) bool {
+	decoded, err := hex.DecodeString(id)
+	return err == nil && len(decoded) == 32 && hex.EncodeToString(decoded) == id
+}
+
+func historicalCIMySQLMatches(raw []byte, containerID string) bool {
+	var rows []struct {
+		ID     string `json:"Id"`
+		Config struct{ Image string }
+		State  struct {
+			Running bool
+			Health  struct{ Status string }
+		}
+		HostConfig struct {
+			PortBindings map[string][]struct{ HostIP, HostPort string }
+		}
+		NetworkSettings struct {
+			Ports map[string][]struct{ HostIP, HostPort string }
+		}
+	}
+	if !validHistoricalCIMySQLID(containerID) || json.Unmarshal(raw, &rows) != nil || len(rows) != 1 || rows[0].ID != containerID || rows[0].Config.Image != "mysql:8.4" || !rows[0].State.Running || rows[0].State.Health.Status != "healthy" {
+		return false
+	}
+	requested := rows[0].HostConfig.PortBindings["3306/tcp"]
+	actual := rows[0].NetworkSettings.Ports["3306/tcp"]
+	if len(requested) != 1 || requested[0].HostPort != "3306" || (requested[0].HostIP != "" && requested[0].HostIP != "0.0.0.0") || len(actual) < 1 || len(actual) > 2 {
+		return false
+	}
+	seen := map[string]bool{}
+	for _, binding := range actual {
+		if binding.HostPort != "3306" || (binding.HostIP != "0.0.0.0" && binding.HostIP != "::") || seen[binding.HostIP] {
+			return false
+		}
+		seen[binding.HostIP] = true
+	}
+	return seen["0.0.0.0"]
+}
+
+func TestHistoricalCIMySQLFixtureRequiresActualJobService(t *testing.T) {
+	id := strings.Repeat("a", 64)
+	valid := `[{"Id":"` + id + `","Config":{"Image":"mysql:8.4"},"State":{"Running":true,"Health":{"Status":"healthy"}},"HostConfig":{"PortBindings":{"3306/tcp":[{"HostIp":"","HostPort":"3306"}]}},"NetworkSettings":{"Ports":{"3306/tcp":[{"HostIp":"0.0.0.0","HostPort":"3306"},{"HostIp":"::","HostPort":"3306"}]}}}]`
+	if !historicalCIMySQLMatches([]byte(valid), id) {
+		t.Fatal("actual job service rejected")
+	}
+	for name, raw := range map[string]string{
+		"wrong_container":      strings.Replace(valid, `"Id":"`+id, `"Id":"`+strings.Repeat("b", 64), 1),
+		"wrong_image":          strings.Replace(valid, "mysql:8.4", "mysql:8.0", 1),
+		"stopped":              strings.Replace(valid, `"Running":true`, `"Running":false`, 1),
+		"unhealthy":            strings.Replace(valid, "healthy", "starting", 1),
+		"wrong_requested_port": strings.Replace(valid, `"HostPort":"3306"`, `"HostPort":"34306"`, 1),
+		"wrong_actual_port":    strings.Replace(valid, `"HostIp":"0.0.0.0","HostPort":"3306"`, `"HostIp":"0.0.0.0","HostPort":"34306"`, 1),
+		"other_host":           strings.Replace(valid, `"HostIp":"0.0.0.0"`, `"HostIp":"192.0.2.1"`, 1),
+		"duplicate_binding":    strings.Replace(valid, `"HostIp":"::"`, `"HostIp":"0.0.0.0"`, 1),
+		"duplicate_container":  strings.TrimSuffix(valid, "]") + "," + strings.TrimPrefix(valid, "["),
+		"malformed":            "{",
+	} {
+		t.Run(name, func(t *testing.T) {
+			if historicalCIMySQLMatches([]byte(raw), id) {
+				t.Fatal("unbound CI service accepted")
+			}
+		})
+	}
+	for _, bad := range []string{"", "short", strings.Repeat("A", 64), strings.Repeat("g", 64)} {
+		if historicalCIMySQLMatches([]byte(valid), bad) {
+			t.Fatal("invalid requested container ID accepted")
+		}
+	}
+}
+
 func mongoLocalSQLFixture(t *testing.T) *gorm.DB {
 	t.Helper()
 	cfg, err := drivermysql.ParseDSN(os.Getenv("QS_HISTORY_MYSQL_DSN"))
-	if err != nil || cfg.Net != "tcp" || cfg.Addr != "127.0.0.1:34306" {
-		t.Fatal("explicit root-owned loopback SQL fixture required")
+	if err != nil || cfg.Net != "tcp" {
+		t.Fatal("explicit owned loopback SQL fixture required")
+	}
+	ciContainer := os.Getenv("QS_HISTORY_CI_MYSQL_CONTAINER")
+	if ciContainer == "" {
+		if cfg.Addr != "127.0.0.1:34306" {
+			t.Fatal("explicit root-owned loopback SQL fixture required")
+		}
+	} else {
+		// CI uses the already-owned job service, not a second fixed host port.
+		// The caller supplies its actual container ID; inspect must prove the
+		// running service and fixed route before any schema may be created.
+		if !validHistoricalCIMySQLID(ciContainer) || cfg.Addr != "127.0.0.1:3306" {
+			t.Fatal("actual CI MySQL service binding required")
+		}
+		ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+		defer cancel()
+		raw, inspectErr := exec.CommandContext(ctx, "docker", "--host", "unix:///var/run/docker.sock", "inspect", ciContainer).Output()
+		if inspectErr != nil || !historicalCIMySQLMatches(raw, ciContainer) {
+			t.Fatal("actual CI MySQL service inspection rejected")
+		}
 	}
 	cfg.DBName = ""
 	cfg.MultiStatements = true

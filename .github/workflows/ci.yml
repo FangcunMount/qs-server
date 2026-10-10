@@ -259,8 +259,6 @@ jobs:
           MYSQL_ROOT_PASSWORD: root
         ports:
           - 3306:3306
-          # The historical fixture keeps its fixed loopback route.
-          - 34306:3306
         options: >-
           --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -proot"
           --health-interval=5s
@@ -502,7 +500,8 @@ jobs:
 
       - name: Verify retained historical evidence persistence on real databases
         env:
-          QS_HISTORY_MYSQL_DSN: root:root@tcp(127.0.0.1:34306)/mysql?parseTime=true&multiStatements=true
+          QS_HISTORY_MYSQL_DSN: root:root@tcp(127.0.0.1:3306)/mysql?parseTime=true&multiStatements=true
+          QS_HISTORY_CI_MYSQL_CONTAINER: ${{ job.services.mysql.id }}
           QS_HISTORY_REQUIRE_DATABASE: '1'
           QS_SERVER_TEST_MONGO_URI: mongodb://127.0.0.1:27017/?replicaSet=rs0
           QS_SERVER_TEST_MONGO_DB_PREFIX: qs_history_ci_contract
@@ -512,7 +511,7 @@ jobs:
           sql_component_log="${RUNNER_TEMP}/qs-historical-component-sql-native.log"
           owner_fragment_log="${RUNNER_TEMP}/qs-historical-owner-fragments-native.log"
           go test -race -tags=integration -count=1 -timeout=10m -v ./internal/apiserver/infra/mysql/evaluation -run '^TestSQLCASProvenanceNative|^TestSQLHistoricalMissingOriginalRunPolicyNative$|^TestSQLHistoricalOriginalRunGlobalAbsenceNative$|^TestSQLHistoricalComponentNative(SourceOwnerSelectors|AbsentOwnerSelector|MixedPresentAbsentSelectors)$' | tee "$sql_component_log"
-          go test -race -tags=integration -count=1 -timeout=10m -v ./internal/apiserver/maintenance/compatibilityretirement -run '^(TestHistoricalCASPersistenceNative|TestQualifiedHistoricalCASNative|TestFinalHistoricalEOFNative)|^TestWholeSourceJointNativeOwnerComponentsSplitPageWithoutConsumingTwice$' | tee "$owner_fragment_log"
+          go test -race -tags=integration -count=1 -timeout=10m -v ./internal/apiserver/maintenance/compatibilityretirement -run '^(TestHistoricalCASPersistenceNative|TestQualifiedHistoricalCASNative|TestFinalHistoricalEOFNative)|^TestWholeSourceJointNativeOwnerComponentsSplitPageWithoutConsumingTwice$|^TestHistoricalCIMySQLFixtureRequiresActualJobService$' | tee "$owner_fragment_log"
           if grep -Eq -- '--- SKIP:|--- FAIL:|DATA RACE' "$sql_component_log" "$owner_fragment_log"; then
             echo 'Actual historical owner component proof skipped or failed' >&2
             exit 1
