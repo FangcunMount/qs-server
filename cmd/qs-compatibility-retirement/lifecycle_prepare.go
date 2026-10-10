@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"io"
 	"net"
 	"os"
@@ -232,7 +233,7 @@ func (o *lifecyclePreparationOwner) finishPreparation() (int64, error) {
 // The standalone prepare producer releases only the isolated engines it just
 // created. The final apply host retains its own engines for acceptance-gated
 // cleanup. No registry can reconstruct this original native owner.
-func (o *lifecyclePreparationOwner) finishPreparationAndReleaseNative(r lifecycleRequest, archive *backup.Archive) (int64, string, error) {
+func (o *lifecyclePreparationOwner) finishPreparationAndReleaseNative(r lifecycleRequest, archive *backup.Archive) (elapsedMillis int64, zeroSHA string, resultErr error) {
 	if o == nil || o.preparationReleaseStarted || o.restoreContext == nil || o.restoreCancel == nil || o.combinedStarted.IsZero() || archive == nil || r.RestoreEngines == nil || !lifecycleMaterialsBinding(r).valid() || r.prepareRoot != lifecycleRootBatch(r.OperationID, r.ActualRunID) || archive.Summary().ArchiveSHA256 != r.Recovery.ArchiveSHA256 || len(o.engines) != 2 {
 		return 0, "", lifecycleError("lifecycle_preparation_release_binding_rejected")
 	}
@@ -248,7 +249,7 @@ func (o *lifecyclePreparationOwner) finishPreparationAndReleaseNative(r lifecycl
 	if err != nil {
 		return 0, "", err
 	}
-	defer d.close() // Every normal success also closes explicitly below.
+	defer func() { resultErr = errors.Join(resultErr, d.close()) }() // Success closes explicitly below.
 	z := lifecyclePreparationRestoreZero{FormatVersion: 1, Kind: "original_preparation_isolated_restore_zero", OriginalSourceSHA: r.OriginalSourceSHA, ToolSourceSHA: r.ToolSourceSHA, OperationID: r.OperationID, OriginalRunID: r.Recovery.OriginalRunID, ActualRunID: r.ActualRunID, ManifestSHA256: r.ManifestSHA256, ArchiveSHA256: r.Recovery.ArchiveSHA256, RequestSHA256: r.requestSHA256}
 	var purges []*lifecycleEnginePurge
 	for index, engine := range o.engines {

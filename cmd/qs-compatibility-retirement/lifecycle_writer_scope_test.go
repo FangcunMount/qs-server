@@ -36,7 +36,7 @@ func TestDatabaseNativeMySQLLockDrainRestore(t *testing.T) {
 	if e != nil {
 		t.Fatal(e)
 	}
-	defer pool.Close()
+	defer func(close func() error) { _ = close() }(pool.Close)
 	for pool.PingContext(ctx) != nil {
 		select {
 		case <-ctx.Done():
@@ -48,7 +48,7 @@ func TestDatabaseNativeMySQLLockDrainRestore(t *testing.T) {
 	if e != nil {
 		t.Fatal(e)
 	}
-	defer conn.Close()
+	defer func(close func() error) { _ = close() }(conn.Close)
 	for _, statement := range []string{"CREATE DATABASE qs", "CREATE TABLE qs.domain_event_outbox(id BIGINT PRIMARY KEY)", "CREATE USER 'owned_app'@'%' IDENTIFIED BY 'owned-fixture-app-only'", "GRANT INSERT,SELECT ON qs.domain_event_outbox TO 'owned_app'@'%'"} {
 		if _, e = conn.ExecContext(ctx, statement); e != nil {
 			t.Fatal(e)
@@ -64,12 +64,12 @@ func TestDatabaseNativeMySQLLockDrainRestore(t *testing.T) {
 	if e != nil {
 		t.Fatal(e)
 	}
-	defer app.Close()
+	defer func(close func() error) { _ = close() }(app.Close)
 	idle, e := app.Conn(ctx)
 	if e != nil {
 		t.Fatal(e)
 	}
-	defer idle.Close()
+	defer func(close func() error) { _ = close() }(idle.Close)
 	var idleID uint64
 	if e = idle.QueryRowContext(ctx, "SELECT CONNECTION_ID()").Scan(&idleID); e != nil {
 		t.Fatal(e)
@@ -102,7 +102,7 @@ func TestDatabaseNativeMySQLLockDrainRestore(t *testing.T) {
 	if e != nil {
 		t.Fatal(e)
 	}
-	defer restored.Close()
+	defer func(close func() error) { _ = close() }(restored.Close)
 	if _, e = restored.ExecContext(ctx, "INSERT INTO domain_event_outbox(id) VALUES(1)"); e != nil {
 		t.Fatal("restored app admission/write failed", e)
 	}
@@ -122,7 +122,7 @@ func TestDatabaseNativeMongoRolesSessionsRestore(t *testing.T) {
 	if e != nil {
 		t.Fatal(e)
 	}
-	defer admin.Disconnect(context.Background())
+	defer func(disconnect func(context.Context) error) { _ = disconnect(context.Background()) }(admin.Disconnect)
 	for admin.Ping(ctx, nil) != nil {
 		select {
 		case <-ctx.Done():
@@ -167,7 +167,7 @@ func TestDatabaseNativeMongoRolesSessionsRestore(t *testing.T) {
 	if e != nil {
 		t.Fatal(e)
 	}
-	defer app.Disconnect(context.Background())
+	defer func(disconnect func(context.Context) error) { _ = disconnect(context.Background()) }(app.Disconnect)
 	if _, e = app.Database("qs").Collection("domain_event_outbox").InsertOne(ctx, bson.M{"_id": 1}); e != nil {
 		t.Fatal("original actual app write failed", e)
 	}
@@ -395,7 +395,7 @@ func TestDatabaseAccountLockCompareApplyReadbackAndConflict(t *testing.T) {
 			p := v.input.SQLPrincipals[0]
 			m.ExpectQuery(q).WithArgs(p.User, p.HostOrDatabase).WillReturnRows(sqlmock.NewRows([]string{"locked"}).AddRow(tc.current))
 			conflict := !tc.restore && tc.current == "Y"
-			if !conflict && !(tc.restore && tc.current == "N") {
+			if !conflict && (!tc.restore || tc.current != "N") {
 				verb, next := "LOCK", "Y"
 				if tc.restore {
 					verb, next = "UNLOCK", "N"
@@ -635,7 +635,8 @@ func TestDatabaseCredentialRestoreCannotInventOriginalRecoveryOwner(t *testing.T
 	if h.owner != owner || h.dbWriters != v || v.restored {
 		t.Fatal("rejected restore destroyed/replaced original owner or marked restored")
 	}
-	if h.restoreDatabaseWriterLeaseAttempt(nil, r, false) == nil {
+	var missingContext context.Context
+	if h.restoreDatabaseWriterLeaseAttempt(missingContext, r, false) == nil {
 		t.Fatal("missing recovery context admitted attempt")
 	}
 }

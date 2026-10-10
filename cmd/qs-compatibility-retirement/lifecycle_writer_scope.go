@@ -855,9 +855,10 @@ func (v *lifecycleDBWriterLease) nativeIdentityAndAuthentication(ctx context.Con
 	}
 	connection := hello.Lookup("connectionId")
 	var mongoID int64
-	if connection.Type == bson.TypeInt64 {
+	switch connection.Type {
+	case bson.TypeInt64:
 		mongoID = connection.Int64()
-	} else if connection.Type == bson.TypeInt32 {
+	case bson.TypeInt32:
 		mongoID = int64(connection.Int32())
 	}
 	if mongoID <= 0 || v.mongoConnectionID != 0 && v.mongoConnectionID != mongoID {
