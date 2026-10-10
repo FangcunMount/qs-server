@@ -1793,3 +1793,10 @@ results retain recovery authority. Fresh production preparation uses one final
 source throughout; running A, CI, installation and production acceptance retain
 their separate identities and proof. New entry installation, full native
 recovery and production deletion remain unverified until their actual runs.
+
+For the first installation, use the original `prepare-facts` tooling artifact
+and these same entry generators with a manifest of actual identity and complete
+inventory facts; an empty `evidence` object makes no historical or recovery
+claim. Prepare and window native binaries use the same build flags. This permits
+limited installation before remote image preload; the real B image/program pair,
+historical CAS, restore and writer-fence gates still require their own results.

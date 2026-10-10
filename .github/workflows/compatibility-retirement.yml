@@ -572,8 +572,8 @@ jobs:
             tar -czf "$archive" -C "$package_dir" compatibility-retirement.py compatibility-history-prepare.py compatibility-ai-history-prepare.py compatibility-retirement-entrypoints.json receipt-transport.py history-linux-amd64 history-linux-arm64 qs-ai-retirement-readonly-host.py qs-ai-retirement-readonly-verifier.py qs-ai-retirement-readonly-observer.py qs-ai-retirement-0040-layout.py
           else
             go test ./cmd/qs-compatibility-retirement
-            CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags="-s -w -X main.sourceSHA=$GITHUB_SHA -X github.com/FangcunMount/qs-server/pkg/version.GitCommit=$GITHUB_SHA" -o "$package_dir/inventory-linux-amd64" ./cmd/qs-compatibility-retirement
-            CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -trimpath -ldflags="-s -w -X main.sourceSHA=$GITHUB_SHA -X github.com/FangcunMount/qs-server/pkg/version.GitCommit=$GITHUB_SHA" -o "$package_dir/inventory-linux-arm64" ./cmd/qs-compatibility-retirement
+            CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -buildvcs=false -trimpath -ldflags="-s -w -X main.sourceSHA=$GITHUB_SHA -X github.com/FangcunMount/qs-server/pkg/version.GitCommit=$GITHUB_SHA" -o "$package_dir/inventory-linux-amd64" ./cmd/qs-compatibility-retirement
+            CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -buildvcs=false -trimpath -ldflags="-s -w -X main.sourceSHA=$GITHUB_SHA -X github.com/FangcunMount/qs-server/pkg/version.GitCommit=$GITHUB_SHA" -o "$package_dir/inventory-linux-arm64" ./cmd/qs-compatibility-retirement
             go test ./cmd/qs-compatibility-history
             CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags="-s -w -X main.sourceSHA=$GITHUB_SHA" -o "$package_dir/history-linux-amd64" ./cmd/qs-compatibility-history
             CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -trimpath -ldflags="-s -w -X main.sourceSHA=$GITHUB_SHA" -o "$package_dir/history-linux-arm64" ./cmd/qs-compatibility-history
@@ -633,6 +633,14 @@ jobs:
           PYWINDOWINSTALL
           fi
           echo "sha256=$(shasum -a 256 "$archive" | awk '{print $1}')" >> "$GITHUB_OUTPUT"
+      - name: Preserve original prepare tooling for limited-entry installation
+        if: inputs.prepare_mode == 'prepare-facts'
+        uses: actions/upload-artifact@v7
+        with:
+          name: qs-retirement-prepare-tooling-${{ github.run_id }}-${{ github.run_attempt }}
+          path: qs-compatibility-retirement-${{ github.run_id }}-${{ github.run_attempt }}.tar.gz
+          if-no-files-found: error
+          retention-days: 3
       - name: Publish source-bound administrator installation files
         if: inputs.prepare_mode == 'host-writer-scope' || inputs.prepare_mode == 'window-tool'
         uses: actions/upload-artifact@v7
