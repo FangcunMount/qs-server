@@ -1366,6 +1366,19 @@ func historicalComponentMongoBusiness(ctx context.Context, o *HistoricalComponen
 	return r, nil
 }
 
+// This private producer classifies resolver data; it grants no read or write
+// capability. Actual scoped responsibility checks remain on the caller.
+func appendHistoricalComponentMongoGaps(candidate *HistoricalCandidate, gaps []string) {
+	for _, gap := range gaps {
+		switch gap {
+		case "sql_retry_event_hold_and_dead_letter_not_mongo_stores", "inbox_and_global_unbound_coverage_require_actual_runtime_coordinator":
+			candidate.RequiredAdapters = append(candidate.RequiredAdapters, gap)
+		default:
+			candidate.HistoricalGaps = append(candidate.HistoricalGaps, gap)
+		}
+	}
+}
+
 // Business candidates only. The actual observer remains mandatory; no old
 // coordinator, consumed joint/global flags, or completed evidence is minted.
 // All related original sources are retained, including monotone Mongo owners.
@@ -1528,7 +1541,7 @@ func qualifiedHistoricalComponentBusinessRows(ctx context.Context, o *Historical
 			}
 		} else {
 			local := mongoOwners[id].Local()
-			candidate.HistoricalGaps = append(candidate.HistoricalGaps, local.Gaps...)
+			appendHistoricalComponentMongoGaps(&candidate, local.Gaps)
 			candidate.ActualOriginalRun, candidate.BusinessBindingSHA256, candidate.LocalQualified = local.OriginalRun, local.BusinessBindingSHA256, true
 			row.bindingSHA = local.BusinessBindingSHA256
 		}

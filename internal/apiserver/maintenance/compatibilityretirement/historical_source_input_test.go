@@ -7,10 +7,12 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"testing"
 	"time"
 
+	"github.com/FangcunMount/qs-server/internal/pkg/eventing/evidence"
 	"go.mongodb.org/mongo-driver/bson"
 )
 
@@ -245,6 +247,24 @@ func TestHistoricalComponentBusinessRowsRequireActualSourceObservation(t *testin
 	}
 	if _, err := reader.OutcomeRecord(42); err == nil {
 		t.Fatal("absent native outcome accepted")
+	}
+	// Exercise the private entry format after the producer's gap classification;
+	// these byte-format fixtures cannot create an actual source observation.
+	row := qualifiedCASEntryFixture("answersheet.submitted")
+	row.sourceObservation = &HistoricalComponentSourceObservation{}
+	gaps := []string{"sql_retry_event_hold_and_dead_letter_not_mongo_stores", "inbox_and_global_unbound_coverage_require_actual_runtime_coordinator", "storage_precision_gap"}
+	before := append([]string(nil), gaps...)
+	appendHistoricalComponentMongoGaps(&row.candidate, gaps)
+	entry, err := qualifiedCASReferenceEntry(coordinatorBinding(), row, time.Date(2026, 10, 9, 1, 2, 3, 0, time.UTC), "actual-fresh-owner-component-source-business-related-ai")
+	if err != nil || entry.Proof == nil || entry.Proof.Class != evidence.Unverifiable || entry.Proof.Verification.Reason != "storage_precision_gap" {
+		t.Fatal("current coverage hints became historical evidence gaps", err)
+	}
+	if !slices.Equal(row.candidate.HistoricalGaps, []string{"storage_precision_gap"}) || !slices.Equal(before, gaps) || !slices.Contains(row.candidate.RequiredAdapters, gaps[0]) || !slices.Contains(row.candidate.RequiredAdapters, gaps[1]) {
+		t.Fatal("coverage requirements or original gap data lost")
+	}
+	appendHistoricalComponentMongoGaps(&row.candidate, []string{"unknown_current_responsibility"})
+	if _, err = qualifiedCASReferenceEntry(coordinatorBinding(), row, time.Date(2026, 10, 9, 1, 2, 3, 0, time.UTC), "actual-fresh-owner-component-source-business-related-ai"); !errors.Is(err, ErrCoordinatorCASQualification) {
+		t.Fatal("unknown resolver gap became historical evidence")
 	}
 }
 
