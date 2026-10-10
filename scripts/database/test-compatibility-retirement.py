@@ -167,7 +167,7 @@ class SafetyContracts(unittest.TestCase):
             self.assertIn(fixed, command)
         self.assertNotIn("--privileged", command)
         self.assertEqual(tool.INVENTORY_V2_LIMITS, {"query_seconds":30,"total_seconds":1500,
-                         "max_records":1000000,"max_bytes":2147483648,"page_size":10000,"max_pages":1001})
+                         "max_records":1000000,"max_bytes":2147483648,"page_size":1000,"max_pages":1001})
 
     def test_inventory_metadata_mongo_pair_is_selected_together(self):
         environment = self.connection_environment()
