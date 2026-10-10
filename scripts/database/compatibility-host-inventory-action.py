@@ -571,6 +571,35 @@ def verify_handshake_key(kind,blob,fingerprint):
     if not hmac.compare_digest(actual,fingerprint):reject('host_key_rejected')
     return 'qs-host-inventory '+kind+' '+blob+'\n'
 
+def prepare_pinned_host_order(route):
+    # ORDER runs before negotiation. Supply only the actual key whose wire hash
+    # matches the approved pin; HOSTNAME still verifies the negotiated key.
+    host,port,pin=route['host'],route['port'],route['fingerprint']
+    if (type(host) is not str or not re.fullmatch(r'[A-Za-z0-9_.:-]{1,253}',host) or host.startswith('-') or type(port) is not str or not port.isdigit() or not 1<=int(port)<=65535 or type(pin) is not str or not re.fullmatch(r'SHA256:[A-Za-z0-9+/]{43}',pin)):
+        reject('route_rejected')
+    code,out,err=capture(['/usr/bin/ssh-keyscan','-T','5','-p',port,'-t','rsa,ecdsa,ed25519',host],timeout=10,cap=65536)
+    if code!=0:reject('host_key_rejected')
+    try:
+        observed=out.decode('ascii').splitlines();errors=err.decode('ascii').splitlines()
+        comments=[line for line in observed+errors if line.startswith('# ')]
+        banners=('# '+host+':'+port+' SSH-2.0-','# ['+host+']:'+port+' SSH-2.0-')
+        if len(comments)>3 or any(len(line)>4096 or not line.startswith(banners) for line in comments) or any(not line.startswith('# ') for line in errors):reject('host_key_rejected')
+        lines=[line for line in observed if not line.startswith('# ')]
+        if not 1<=len(lines)<=3:reject('host_key_rejected')
+        label=host if int(port)==22 else '['+host+']:'+port
+        matches=[];seen=set()
+        for line in lines:
+            fields=line.split()
+            if len(fields)!=3 or fields[0]!=label or fields[1] not in ('ssh-ed25519','ssh-rsa','ecdsa-sha2-nistp256') or len(fields[2])>16384 or fields[1] in seen:reject('host_key_rejected')
+            kind,blob=fields[1:];seen.add(kind)
+            wire=base64.b64decode(blob,validate=True);size=struct.unpack('>I',wire[:4])[0]
+            if size>128 or wire[4:4+size].decode('ascii')!=kind:reject('host_key_rejected')
+            actual='SHA256:'+base64.b64encode(hashlib.sha256(wire).digest()).decode().rstrip('=')
+            if hmac.compare_digest(actual,pin):matches.append(verify_handshake_key(kind,blob,pin))
+        if len(matches)!=1:reject('host_key_rejected')
+        return matches[0]
+    except (ValueError,UnicodeError,struct.error):reject('host_key_rejected')
+
 def clean_namespace(directory,records):
     """Delete only the exact caller-owned registered files after all checks."""
     d,identity=private_dir(directory)
@@ -860,7 +889,7 @@ def main():
         args=p.parse_args()
         if args.command=='known-host':
             raw,unused=read_private(args.route_file);route=decode(raw);exact(route,('host','username','port','fingerprint'),'route_rejected')
-            if args.key_blob=='NONE' and args.key_type=='NONE':return 0
+            if args.key_blob=='NONE' and args.key_type=='NONE':print(prepare_pinned_host_order(route),end='');return 0
             print(verify_handshake_key(args.key_type,args.key_blob,route['fingerprint']),end='');return 0
         if args.command=='remote':print(canonical(remote(args.asset_dir,args.approval_sha,args.run,args.package_sha)).decode(),end='');return 0
         if args.command=='cleanup':print(canonical(remote_cleanup(args.asset_dir,args.package_sha)).decode(),end='');return 0

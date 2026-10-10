@@ -172,6 +172,37 @@ class Tests(unittest.TestCase):
   route=self.put(self.root/'route.json',m.canonical({'host':'PRIVATE_HOST','username':'PRIVATE_USER','port':'22','fingerprint':pin}))
   r=subprocess.run([sys.executable,str(SOURCE),'known-host','--route-file',str(route),'--key-type','ssh-ed25519','--key-blob',blob],stdout=subprocess.PIPE,stderr=subprocess.PIPE,timeout=2)
   self.assertEqual(r.returncode,0);self.assertEqual(r.stderr,b'');self.assertNotIn(b'PRIVATE',r.stdout);self.assertEqual(r.stdout,('qs-host-inventory ssh-ed25519 '+blob+'\n').encode())
+ def test_known_host_order_selects_only_the_actual_approved_algorithm(self):
+  keys=[]
+  for kind in ('ssh-rsa','ecdsa-sha2-nistp256','ssh-ed25519'):
+   wire=struct.pack('>I',len(kind))+kind.encode()+struct.pack('>I',32)+b'x'*32
+   keys.append((kind,base64.b64encode(wire).decode(),'SHA256:'+base64.b64encode(hashlib.sha256(wire).digest()).decode().rstrip('=')))
+  route={'host':'PRIVATE_HOST','username':'PRIVATE_USER','port':'2222','fingerprint':keys[1][2]}
+  raw=''.join('# PRIVATE_HOST:2222 SSH-2.0-fixed\n[PRIVATE_HOST]:2222 '+kind+' '+blob+'\n' for kind,blob,pin in keys).encode()
+  with mock.patch.object(m,'capture',return_value=(0,raw,b'')) as run:
+   self.assertEqual(m.prepare_pinned_host_order(route),'qs-host-inventory '+keys[1][0]+' '+keys[1][1]+'\n')
+  run.assert_called_once_with(['/usr/bin/ssh-keyscan','-T','5','-p','2222','-t','rsa,ecdsa,ed25519','PRIVATE_HOST'],timeout=10,cap=65536)
+ def test_known_host_order_rejects_unknown_missing_duplicate_failed_and_budget(self):
+  kind='ssh-ed25519';wire=struct.pack('>I',len(kind))+kind.encode()+struct.pack('>I',32)+b'x'*32
+  blob=base64.b64encode(wire).decode();pin='SHA256:'+base64.b64encode(hashlib.sha256(wire).digest()).decode().rstrip('=')
+  route={'host':'PRIVATE_HOST','username':'PRIVATE_USER','port':'22','fingerprint':pin};line=('PRIVATE_HOST '+kind+' '+blob+'\n').encode()
+  for code,out,err in [(0,b'',b''),(0,line+line,b''),(0,b'OTHER_HOST '+line.split(b' ',1)[1],b''),(0,b'PRIVATE_HOST unknown '+blob.encode()+b'\n',b''),(1,line,b''),(0,line,b'PRIVATE_ERROR'),(0,b'PRIVATE_HOST ssh-ed25519 invalid\n',b'')]:
+   with self.subTest(code=code,length=len(out)),mock.patch.object(m,'capture',return_value=(code,out,err)):
+    self.rejected('host_key_rejected',lambda:m.prepare_pinned_host_order(route))
+  with mock.patch.object(m,'capture',return_value=(0,line,b'')):
+   self.rejected('host_key_rejected',lambda:m.prepare_pinned_host_order(dict(route,fingerprint='SHA256:'+'A'*43)))
+  with mock.patch.object(m,'capture',side_effect=m.Rejected('transport_budget_exceeded')):
+   self.rejected('transport_budget_exceeded',lambda:m.prepare_pinned_host_order(route))
+ def test_known_host_order_main_uses_private_pin_and_hostname_keeps_strict_check(self):
+  kind='ssh-ed25519';wire=struct.pack('>I',len(kind))+kind.encode()+struct.pack('>I',32)+b'z'*32
+  blob=base64.b64encode(wire).decode();pin='SHA256:'+base64.b64encode(hashlib.sha256(wire).digest()).decode().rstrip('=')
+  route=self.put(self.root/'route-order.json',m.canonical({'host':'PRIVATE_HOST','username':'PRIVATE_USER','port':'22','fingerprint':pin}))
+  import io
+  stdout=io.StringIO()
+  with mock.patch.object(sys,'argv',[str(SOURCE),'known-host','--route-file',str(route),'--key-type','NONE','--key-blob','NONE']),mock.patch.object(m,'capture',return_value=(0,('PRIVATE_HOST '+kind+' '+blob+'\n').encode(),b'')),mock.patch.object(sys,'stdout',stdout):
+   self.assertEqual(m.main(),0)
+  self.assertEqual(stdout.getvalue(),'qs-host-inventory '+kind+' '+blob+'\n');self.assertNotIn('PRIVATE',stdout.getvalue())
+  self.rejected('host_key_rejected',lambda:m.verify_handshake_key('ssh-rsa',blob,pin))
  def test_closed_private_full_report_accepts_real_files_fake_host_reads(self):
   report=self.report();raw=m.canonical(report);self.assertEqual(m.validate_report(raw,self.a,self.approved,self.req,self.run),report)
   p=m.projection(self.a,self.approved,self.run,self.req,raw,report);self.assertFalse(any(p['capabilities'].values()));self.assertGreater(p['unknown_count'],0)
