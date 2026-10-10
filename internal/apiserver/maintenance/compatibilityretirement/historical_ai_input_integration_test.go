@@ -109,7 +109,7 @@ func TestAIHistoricalInputNativeTwoSourceBoundFullDiskEpochs(t *testing.T) {
 	// A new native RRRO scope reads real full14 without an old SQL8 cycle.
 	// It remains ineligible for every legacy global/write entry point.
 	var live *AIReverseSnapshot
-	if err = sqlDB.Transaction(func(tx *gorm.DB) error {
+	if err = sqlDB.Transaction(func(tx *gorm.DB) (result error) {
 		ctx := hostmysql.WithTx(t.Context(), tx)
 		limits := DefaultAIReverseLimits()
 		limits.MaxRetainedBytes = 64 << 20
@@ -128,6 +128,27 @@ func TestAIHistoricalInputNativeTwoSourceBoundFullDiskEpochs(t *testing.T) {
 		if _, e = PrepareHistoricalAICommandPersistenceBatch(ctx, sources, pair, &AIExternalExecutionQualification{}); e == nil {
 			return errors.New("actual full14 alone minted external/persistence authority")
 		}
+		var originalDatabase string
+		if e = tx.Raw("SELECT DATABASE()").Row().Scan(&originalDatabase); e != nil {
+			return e
+		}
+		// USE changes the physical connection's database even after this
+		// transaction ends. Restore the actual owned namespace before returning
+		// the connection, including when the rejection assertion fails.
+		defer func() {
+			restoreErr := tx.Exec("USE " + sourceOriginQuote(originalDatabase)).Error
+			if restoreErr == nil {
+				var restoredDatabase string
+				restoreErr = tx.Raw("SELECT DATABASE()").Row().Scan(&restoredDatabase)
+				if restoreErr == nil && restoredDatabase != originalDatabase {
+					restoreErr = errors.New("actual owned SQL namespace was not restored")
+				}
+				if restoreErr == nil {
+					restoreErr = live.validateHistoricalSnapshot(ctx)
+				}
+			}
+			result = errors.Join(result, restoreErr)
+		}()
 		if e = tx.Exec("USE mysql").Error; e != nil {
 			return e
 		}
