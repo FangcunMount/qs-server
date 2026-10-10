@@ -98,7 +98,7 @@ func historyCIFixtureMatches(raw []byte, id, kind string) bool {
 		}
 	case "MONGO":
 		port = "27017"
-		if rows[0].Config.Image != "mongo:7.0" || rows[0].Name != "/qs-runtime-closure-e2e-mongo" || strings.Join(rows[0].Config.Cmd, "\x00") != "--replSet\x00rs0\x00--bind_ip_all\x00--setParameter\x00ttlMonitorSleepSecs=1" {
+		if rows[0].Config.Image != "mongo:7.0" || rows[0].Name != "/qs-runtime-closure-e2e-mongo" || strings.Join(rows[0].Config.Cmd, "\x00") != "--replSet\x00rs0\x00--bind_ip_all\x00--setParameter\x00ttlMonitorSleepSecs=1\x00--setParameter\x00enableTestCommands=1" {
 			return false
 		}
 	default:
@@ -129,7 +129,7 @@ func TestHistoryCIFixtureRequiresActualJobContainers(t *testing.T) {
 	for _, kind := range []string{"MYSQL", "MONGO"} {
 		port, image, name, command := "3306", "mysql:8.4", "job-service", []string{}
 		if kind == "MONGO" {
-			port, image, name, command = "27017", "mongo:7.0", "qs-runtime-closure-e2e-mongo", []string{"--replSet", "rs0", "--bind_ip_all", "--setParameter", "ttlMonitorSleepSecs=1"}
+			port, image, name, command = "27017", "mongo:7.0", "qs-runtime-closure-e2e-mongo", []string{"--replSet", "rs0", "--bind_ip_all", "--setParameter", "ttlMonitorSleepSecs=1", "--setParameter", "enableTestCommands=1"}
 		}
 		cmd, err := json.Marshal(command)
 		if err != nil {
@@ -139,7 +139,7 @@ func TestHistoryCIFixtureRequiresActualJobContainers(t *testing.T) {
 		if !historyCIFixtureMatches([]byte(valid), id, kind) {
 			t.Fatal("actual job fixture route rejected")
 		}
-		for key, raw := range map[string]string{
+		invalid := map[string]string{
 			"container": strings.Replace(valid, `"Id":"`+id, `"Id":"`+strings.Repeat("b", 64), 1),
 			"image":     strings.Replace(valid, image, "other:latest", 1),
 			"stopped":   strings.Replace(valid, `"Running":true`, `"Running":false`, 1),
@@ -147,7 +147,13 @@ func TestHistoryCIFixtureRequiresActualJobContainers(t *testing.T) {
 			"host":      strings.Replace(valid, `"HostIp":"0.0.0.0"`, `"HostIp":"192.0.2.1"`, 1),
 			"duplicate": strings.TrimSuffix(valid, "]") + "," + strings.TrimPrefix(valid, "["),
 			"bind":      strings.Replace(valid, `"State":`, `"Mounts":[{"Type":"bind"}],"State":`, 1),
-		} {
+		}
+		if kind == "MONGO" {
+			invalid["test_commands_missing"] = strings.Replace(valid, `,"--setParameter","enableTestCommands=1"`, "", 1)
+			invalid["test_commands_disabled"] = strings.Replace(valid, `"enableTestCommands=1"`, `"enableTestCommands=0"`, 1)
+			invalid["extra_command"] = strings.Replace(valid, `"enableTestCommands=1"`, `"enableTestCommands=1","--unexpected"`, 1)
+		}
+		for key, raw := range invalid {
 			t.Run(kind+"/"+key, func(t *testing.T) {
 				if historyCIFixtureMatches([]byte(raw), id, kind) {
 					t.Fatal("unbound job fixture accepted")
