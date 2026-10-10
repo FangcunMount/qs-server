@@ -65,6 +65,11 @@ class ActualHostContract(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             verifier=m.load_verifier(parsed,Path(directory))
             self.assertEqual(verifier.KNOWN_HANDOFF_FIELDS,m.KNOWN_HANDOFF_FIELDS)
+            layout=verifier._scanner("ai","0040_module_table_names")._layout()
+            self.assertEqual(len(layout.CONTRACT),43)
+            self.assertEqual(set(layout.SPECS),set(layout.CONTRACT)|{"alembic_version"})
+            self.assertEqual(len(layout.SPECS),44)
+            self.assertEqual(len(verifier.AI_SPECS),53)
         packet["modules"]["qs-ai-retirement-readonly-verifier.py"]=base64.b64encode(b"complete=True").decode()
         with tempfile.TemporaryDirectory() as directory,self.assertRaises(m.Rejected):
             m.load_verifier(packet,Path(directory))

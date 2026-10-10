@@ -310,7 +310,7 @@ func aiExternalDecodeDiscovery(raw []byte) (aiExternalDiscoveryFacts, []byte, []
 		if d.Decode(&b) != nil || b.Protocol != "qs-ai-full-ledger-bounds/v1" || b.Side != side || !aiOriginalSourceSHA(b.Source) || !evidenceHash(b.Identity) || !evidenceHash(b.Catalog) || len(b.Tables) != packet.Objects || !reflect.DeepEqual(b.Profile, []int64{1000, 1000000, 2 << 30, 256 << 20, 32 << 20, 30, 1500}) {
 			return f, nil, nil, ErrAIExternalBounds
 		}
-		if side == "ai" && (b.Head != "0040_module_table_names" && b.Head != "0038_messaging_observations" || b.Head == "0040_module_table_names" && (packet.Objects != 43 || b.Source != "82ffa1b43308f23fbb1ebe669c3071e0486e105a") || b.Head == "0038_messaging_observations" && packet.Objects != 53) {
+		if side == "ai" && (b.Head != "0040_module_table_names" && b.Head != "0038_messaging_observations" || b.Head == "0040_module_table_names" && (packet.Objects != 44 || b.Source != "82ffa1b43308f23fbb1ebe669c3071e0486e105a") || b.Head == "0038_messaging_observations" && packet.Objects != 53) {
 			return f, nil, nil, ErrAIExternalBounds
 		}
 		if side == "peer" {

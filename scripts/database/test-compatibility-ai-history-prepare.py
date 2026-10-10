@@ -95,7 +95,7 @@ class AIHostAction(unittest.TestCase):
             v = {key: False for key in host.BOUNDS_FALSE}
             v.update(scope="diagnostic-unapproved-bounds-only", facts_sha256="f" * 64,
                 runtime_binding_sha256="e" * 64, ai_bounds_sha256=ai, peer_bounds_sha256=peer,
-                ai_physical_objects=43, ai_logical_objects=53, peer_objects=14, independent_epochs=2,
+                ai_physical_objects=44, ai_logical_objects=53, peer_objects=14, independent_epochs=2,
                 prior_ai_binding_matched=False, next_cycle_required=True)
             r["bounds"] = v
             self.assertNotIn("ai_bounds", descriptor)
@@ -170,6 +170,8 @@ class AIHostAction(unittest.TestCase):
             ("extra", lambda r, d, o: r.update(raw_body="not-permitted")),
             ("cap", lambda r, d, o: r.update(cas_authority=True)),
             ("epoch", lambda r, d, o: r["bounds"].update(independent_epochs=1)),
+            ("missing_system_head", lambda r, d, o: r["bounds"].update(ai_physical_objects=43)),
+            ("extra_physical_object", lambda r, d, o: r["bounds"].update(ai_physical_objects=45)),
             ("type", lambda r, d, o: r["bounds"].update(peer_objects="14")),
             ("binding", lambda r, d, o: r.update(request_sha256="a" * 64)),
             ("incomplete", lambda r, d, o: r.update(diagnostic_read_complete=False)),

@@ -192,7 +192,7 @@ def _report(t, h, raw, output, descriptor, descriptor_hash, expected_rows):
             t.token(v[key], t.HASH)
         for key in ("ai_physical_objects", "ai_logical_objects", "peer_objects", "independent_epochs"):
             t.uint(v[key])
-        if (v["ai_physical_objects"] not in (43, 53) or v["ai_logical_objects"] != 53 or
+        if (v["ai_physical_objects"] not in (44, 53) or v["ai_logical_objects"] != 53 or
             v["peer_objects"] != 14 or v["independent_epochs"] != 2):
             t.fail("ai_host_readiness_summary_invalid")
         for name, key in (("ai.bounds.json", "ai_bounds_sha256"), ("peer.bounds.json", "peer_bounds_sha256")):

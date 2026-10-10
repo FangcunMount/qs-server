@@ -1416,7 +1416,7 @@ func openLifecycleHistoricalWriteInputFiles(ctx context.Context, r lifecycleRequ
 		return nil, nil, lifecycleError("lifecycle_history_original_material_rejected")
 	}
 	b := ai.Bounds
-	if b.Scope != "diagnostic-unapproved-bounds-only" || !hashRE.MatchString(b.SourceSHA256) || b.RuntimeBindingSHA256 != input.RuntimeBindingSHA256 || b.AIBoundsSHA256 != input.AIBounds.SHA256 || b.PeerBoundsSHA256 != input.PeerBounds.SHA256 || b.AIPhysicalObjects != 43 && b.AIPhysicalObjects != 53 || b.AILogicalObjects != 53 || b.PeerObjects != 14 || b.IndependentEpochs != 2 || b.IndependentApproval || b.BusinessClosure || b.WriterFence || b.BrokerCoverage || b.CASAuthority || b.RetirementWritten || b.RecoveryAuthority || b.DropReady {
+	if b.Scope != "diagnostic-unapproved-bounds-only" || !hashRE.MatchString(b.SourceSHA256) || b.RuntimeBindingSHA256 != input.RuntimeBindingSHA256 || b.AIBoundsSHA256 != input.AIBounds.SHA256 || b.PeerBoundsSHA256 != input.PeerBounds.SHA256 || b.AIPhysicalObjects != 44 && b.AIPhysicalObjects != 53 || b.AILogicalObjects != 53 || b.PeerObjects != 14 || b.IndependentEpochs != 2 || b.IndependentApproval || b.BusinessClosure || b.WriterFence || b.BrokerCoverage || b.CASAuthority || b.RetirementWritten || b.RecoveryAuthority || b.DropReady {
 		return nil, nil, lifecycleError("lifecycle_history_original_material_rejected")
 	}
 	if err = bounds.checkComplete(false); err != nil {

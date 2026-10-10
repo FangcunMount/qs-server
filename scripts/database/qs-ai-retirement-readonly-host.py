@@ -632,7 +632,8 @@ async def execute_discovery(packet, module):
         if fresh[1][1] != sections or len(bounds_set[1].tables) != 14:
             reject()
         logical_count = len(module.AI_SPECS)
-        if bounds_set[0].head == "0040_module_table_names" and (len(bounds_set[0].tables) != 43 or logical_count != 53):
+        # The fixed 0040 layout includes 43 business tables and alembic_version.
+        if bounds_set[0].head == "0040_module_table_names" and (len(bounds_set[0].tables) != 44 or logical_count != 53):
             reject()
         output = {"protocol": "qs-ai-readonly-bounds-discovery-facts/v1", **{k: packet[k] for k in ("source_sha", "operation_id", "run_id", "runtime_source_sha", "runtime_binding_sha256", "image_id", "container_id")}, "bounds": packets, "original_sections": sections, "ai_logical_objects": logical_count, "independent_epochs": 2, "scope": "diagnostic-unapproved-bounds-only", "independent_approval": False, "business_closure": False, "fence": False, "cas_authority": False, "drop_ready": False}
     finally:
