@@ -486,6 +486,9 @@ func TestHistoricalSourceInputNativeOwnerComponentPlanner(t *testing.T) {
 					return e
 				}
 				observation, rows := observed.source, observed.rows
+				if e = validateHistoricalComponentResponsibilityClosure(ctx, observed); e != nil {
+					return e
+				}
 				observedComponents = append(observedComponents, observed)
 				combined := observed.Summary()
 				if observed.ValidateBorrowedObservation(ctx) != nil || combined.BusinessCandidates != uint64(len(rows)) || !combined.SameNativeScopesObserved || !combined.FullNegativeClosureRequired || !combined.WriterFenceRequired || combined.CASAuthorized || combined.DropReady || combined.AI.WholeLedgerEOF || !combined.AI.UnboundOrphanNegativeClosureRequired || !combined.AI.NewOwnerOrganizationNegativeClosureRequired {
@@ -516,6 +519,9 @@ func TestHistoricalSourceInputNativeOwnerComponentPlanner(t *testing.T) {
 	for _, observed := range observedComponents {
 		if observed.ValidateBorrowedObservation(t.Context()) == nil {
 			t.Fatal("ended host scopes retained combined native observation")
+		}
+		if validateHistoricalComponentResponsibilityClosure(t.Context(), observed) == nil {
+			t.Fatal("ended native scopes retained selected responsibility closure")
 		}
 	}
 	firstInput := components.Components()[0].Inputs()[0]
