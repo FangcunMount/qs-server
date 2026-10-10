@@ -350,8 +350,10 @@ class FixedSudoRoute(unittest.TestCase):
 
 class OriginalSourceOwner(unittest.TestCase):
     def setUp(self):
-        # Real fixture ancestry avoids macOS /var and /tmp symlink aliases.
-        with patch.object(tempfile,'gettempdir',return_value='/private/tmp'):
+        # Use existing platform ancestry, resolving macOS symlink aliases.
+        temporary_root=Path(tempfile.gettempdir()).resolve(strict=True)
+        self.assertTrue(temporary_root.is_dir())
+        with patch.object(tempfile,'gettempdir',return_value=str(temporary_root)):
             ExactExit.setUp(self)
     tearDown=ExactExit.tearDown
     absent=ExactExit.absent
