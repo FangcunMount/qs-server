@@ -1311,13 +1311,25 @@ func componentResponsibilityFacts(tx *gorm.DB, image sqlHistoricalCASImage) (map
 		if image.rows[spec.name] == nil {
 			image.rows[spec.name] = []historicalSQLRow{}
 		}
+		for _, row := range image.rows[spec.name] {
+			if _, err := cycleKey(spec, row); err != nil {
+				return nil, nil, err
+			}
+		}
 		sort.Slice(image.rows[spec.name], func(i, j int) bool {
 			a, _ := cycleKey(spec, image.rows[spec.name][i])
 			b, _ := cycleKey(spec, image.rows[spec.name][j])
 			return cycleCompare(spec, a, b) < 0
 		})
 		for _, row := range image.rows[spec.name] {
-			c.observations = append(c.observations, cycleDecode(spec.name, row))
+			key, err := cycleKey(spec, row)
+			if err != nil {
+				return nil, nil, err
+			}
+			observation := cycleDecode(spec.name, row)
+			observation.PrimaryKeySHA256 = cycleKeyDigest(key)
+			observation.RowSHA256 = cycleRowDigest(image.columns[spec.name], row)
+			c.observations = append(c.observations, observation)
 		}
 		_, hash, _, err := cycleSchema(tx, spec)
 		if err != nil || hash != image.schema[spec.name] {
