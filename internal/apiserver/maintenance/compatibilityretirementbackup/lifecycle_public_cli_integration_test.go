@@ -321,7 +321,7 @@ func publicCLICleanupEngines(root, archive, source, operation, run, manifest str
 }
 
 const (
-	publicCLIInventoryPageSize = 1000
+	publicCLIInventoryPageSize = 10000
 	publicCLIInventoryMaxPages = 1001
 )
 
@@ -381,11 +381,11 @@ func TestLifecyclePublicCLIInventoryMaterialBoundaries(t *testing.T) {
 	}{
 		{"approved_empty", 0, 0, true},
 		{"nonempty_bound_zero_records", 0, 1, false},
-		{"partial_page", 999, 1, false},
-		{"one_full_page_plus_empty_eof", 1000, 2, false},
-		{"multi_page", 1001, 2, false},
-		{"two_full_pages_plus_empty_eof", 2000, 3, false},
-		{"maximum_records_and_eof", 1000000, 1001, false},
+		{"partial_page", publicCLIInventoryPageSize - 1, 1, false},
+		{"one_full_page_plus_empty_eof", publicCLIInventoryPageSize, 2, false},
+		{"multi_page", publicCLIInventoryPageSize + 1, 2, false},
+		{"two_full_pages_plus_empty_eof", 2 * publicCLIInventoryPageSize, 3, false},
+		{"maximum_records_and_eof", 1000000, 1000000/publicCLIInventoryPageSize + 1, false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			report := publicCLIInventoryMaterialTestReport(tc.records, tc.pagesPerPass, tc.empty)
@@ -412,7 +412,7 @@ func TestLifecyclePublicCLIInventoryMaterialBoundaries(t *testing.T) {
 	}
 	for _, name := range []string{"odd_pages", "missing_eof_page", "extra_pages", "empty_with_records", "source_path_escape", "wrong_passes", "wrong_database", "incomplete_report"} {
 		t.Run(name, func(t *testing.T) {
-			report := publicCLIInventoryMaterialTestReport(1000, 2, false)
+			report := publicCLIInventoryMaterialTestReport(publicCLIInventoryPageSize, 2, false)
 			switch name {
 			case "odd_pages":
 				report.Targets[0].Pages = 3
@@ -454,7 +454,7 @@ func publicCLIInventoryMaterialTestReport(records, pagesPerPass uint64, empty bo
 }
 
 func TestLifecyclePublicCLIInventoryMaterialDirectory(t *testing.T) {
-	report := publicCLIInventoryMaterialTestReport(1000, 2, false)
+	report := publicCLIInventoryMaterialTestReport(publicCLIInventoryPageSize, 2, false)
 	allowed, e := publicCLIInventoryMaterialPaths(report, report.RunID)
 	if e != nil {
 		t.Fatal("public_cli_inventory_material_test_plan_rejected")
