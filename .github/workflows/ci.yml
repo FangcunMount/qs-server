@@ -564,6 +564,65 @@ jobs:
           QS_RETIREMENT_REQUIRE_ABORT_NATIVE: '1'
         run: |
           set -euo pipefail
+          # Hold the original protected /opt ancestor for the real AI release reader.
+          # Restore only this same observed directory on success or failure.
+          opt_fixture_program='
+          import os,re,stat,sys
+          fd=None
+          try:
+              if os.getuid()!=0 or os.geteuid()!=0:
+                  raise ValueError()
+              fd=os.open("/opt",os.O_RDONLY|os.O_DIRECTORY|os.O_NOFOLLOW)
+              before=os.fstat(fd)
+              if not stat.S_ISDIR(before.st_mode):
+                  raise ValueError()
+              action=sys.argv[1]
+              if action=="observe" and len(sys.argv)==2:
+                  print(f"{before.st_uid} {before.st_gid} {stat.S_IMODE(before.st_mode):04o} {before.st_dev} {before.st_ino}")
+              else:
+                  if len(sys.argv)!=7 or action not in ("protect","restore") or not all(re.fullmatch(r"[0-9]{1,20}",v) for v in (sys.argv[2],sys.argv[3],sys.argv[5],sys.argv[6])) or not re.fullmatch(r"[0-7]{4}",sys.argv[4]):
+                      raise ValueError()
+                  uid,gid,mode,dev,inode=int(sys.argv[2]),int(sys.argv[3]),int(sys.argv[4],8),int(sys.argv[5]),int(sys.argv[6])
+                  if (before.st_dev,before.st_ino)!=(dev,inode):
+                      raise ValueError()
+                  if action=="protect":
+                      if (before.st_uid,before.st_gid,stat.S_IMODE(before.st_mode))!=(uid,gid,mode):
+                          raise ValueError()
+                      expected=(0,0,mode & ~0o022)
+                  else:
+                      expected=(uid,gid,mode)
+                  os.fchown(fd,expected[0],expected[1])
+                  os.fchmod(fd,expected[2])
+                  after=os.fstat(fd)
+                  if (after.st_uid,after.st_gid,stat.S_IMODE(after.st_mode),after.st_dev,after.st_ino)!=(*expected,dev,inode):
+                      raise ValueError()
+                  print(f"ci_fixture_opt_parent_{action} uid={after.st_uid} gid={after.st_gid} mode={stat.S_IMODE(after.st_mode):04o} dev={after.st_dev} inode={after.st_ino}")
+          except (OSError,ValueError,IndexError):
+              print("ci_fixture_opt_parent_operation_rejected",file=sys.stderr)
+              raise SystemExit(1)
+          finally:
+              if fd is not None:
+                  os.close(fd)
+          '
+          opt_state="$(sudo -n /usr/bin/python3 -I -c "$opt_fixture_program" observe)"
+          read -r opt_uid opt_gid opt_mode opt_dev opt_inode <<< "$opt_state"
+          printf 'ci_fixture_opt_parent_original uid=%s gid=%s mode=%s dev=%s inode=%s\n' \
+            "$opt_uid" "$opt_gid" "$opt_mode" "$opt_dev" "$opt_inode"
+          restore_opt_fixture() {
+            opt_exit_status=$?
+            trap - EXIT HUP INT TERM
+            if ! sudo -n /usr/bin/python3 -I -c "$opt_fixture_program" restore \
+              "$opt_uid" "$opt_gid" "$opt_mode" "$opt_dev" "$opt_inode"; then
+              opt_exit_status=1
+            fi
+            exit "$opt_exit_status"
+          }
+          trap restore_opt_fixture EXIT
+          trap 'exit 129' HUP
+          trap 'exit 130' INT
+          trap 'exit 143' TERM
+          sudo -n /usr/bin/python3 -I -c "$opt_fixture_program" protect \
+            "$opt_uid" "$opt_gid" "$opt_mode" "$opt_dev" "$opt_inode"
           sql_component_log="${RUNNER_TEMP}/qs-historical-component-sql-native.log"
           owner_fragment_log="${RUNNER_TEMP}/qs-historical-owner-fragments-native.log"
           cli_input_log="${RUNNER_TEMP}/qs-historical-cli-input-native.log"
