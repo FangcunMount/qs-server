@@ -46,11 +46,24 @@ class HostScopeTest(unittest.TestCase):
         with mock.patch.dict(api.os.environ,{'RETIREMENT_PACKAGE_SHA256':'e'*64,'MYSQL_PASSWORD':'must-not-forward'},clear=True),mock.patch.object(api.os,'getuid',return_value=0),mock.patch.object(api.os,'geteuid',return_value=0),mock.patch.object(api.subprocess,'run',return_value=subprocess.CompletedProcess([],1,b'{}')) as run:
             api.root_once_lifecycle_prepare(args)
         call=run.call_args;self.assertEqual(json.loads(call.kwargs['input']),{});self.assertEqual(call.kwargs['env'],{'PATH':'/usr/bin:/bin'});self.assertIn('root-direct',call.args[0]);self.assertEqual(call.args[0][-1],'host-writer-scope');self.assertIn('d'*64,call.args[0]);self.assertIn('e'*64,call.args[0])
-    def test_nonroot_same_sudo_channel_uses_fixed_clean_executables(self):
+    def test_nonroot_uses_only_installed_fixed_entry_without_password_or_code(self):
         args=self.args();args.host_scope_request_hash='d'*64
-        with mock.patch.dict(api.os.environ,{'RETIREMENT_PACKAGE_SHA256':'e'*64,'PATH':'/attacker/path','SUDO_UID':'fake'},clear=True),mock.patch.object(api.os,'getuid',return_value=1001),mock.patch.object(api.os,'geteuid',return_value=1001),mock.patch.object(api.subprocess,'run',return_value=subprocess.CompletedProcess([],1,b'{}')) as run:
+        fixed=Path('/usr/local/libexec/qs-retirement')/('f'*64+'.py')
+        with mock.patch.dict(api.os.environ,{'RETIREMENT_PACKAGE_SHA256':'e'*64,'PATH':'/attacker/path','SUDO_UID':'fake','SUDO_PASSWORD':'private-password'},clear=True),mock.patch.object(api.os,'getuid',return_value=1001),mock.patch.object(api.os,'geteuid',return_value=1001),mock.patch.object(api,'installed_fixed_host_entry',return_value=fixed),mock.patch.object(api,'root_askpass_environment') as askpass,mock.patch.object(api.subprocess,'run',return_value=subprocess.CompletedProcess([],1,b'{}')) as run:
             api.root_once_lifecycle_prepare(args)
-        call=run.call_args;self.assertEqual(call.args[0][:4],['/usr/bin/sudo','-n','--','/usr/bin/python3']);self.assertEqual(call.kwargs['env'],{'PATH':'/usr/bin:/bin'});self.assertEqual(json.loads(call.kwargs['input']),{});self.assertIn('sudo-user',call.args[0])
+        call=run.call_args;self.assertEqual(call.args[0],['/usr/bin/sudo','-n','--','/usr/bin/python3','-I',str(fixed)]);self.assertEqual(call.kwargs['env'],{'PATH':'/usr/bin:/bin'});self.assertEqual(json.loads(call.kwargs['input']),{'operation_id':'123-1','run_id':'124-1','source_sha':'a'*40,'request_sha256':'d'*64,'package_sha256':'e'*64});askpass.assert_not_called()
+        self.assertNotIn('private-password',repr(call));self.assertNotIn('-c',call.args[0])
+    def test_nonroot_missing_installation_rejects_before_sudo_without_fallback(self):
+        args=self.args();args.host_scope_request_hash='d'*64
+        with mock.patch.dict(api.os.environ,{'RETIREMENT_PACKAGE_SHA256':'e'*64},clear=True),mock.patch.object(api.os,'getuid',return_value=1001),mock.patch.object(api.os,'geteuid',return_value=1001),mock.patch.object(api.subprocess,'run') as run,self.assertRaises(api.Blocked):
+            api.root_once_lifecycle_prepare(args)
+        run.assert_not_called()
+    def test_fixed_policy_refusal_remains_native_failure_without_authority(self):
+        args=self.args();args.host_scope_request_hash='d'*64
+        raw=b'{"format_version":1,"complete":false,"execution_allowed":false,"drop_ready":false,"error_category":"fixed_host_entry_rejected"}\n'
+        with mock.patch.dict(api.os.environ,{'RETIREMENT_PACKAGE_SHA256':'e'*64},clear=True),mock.patch.object(api.os,'getuid',return_value=1001),mock.patch.object(api.os,'geteuid',return_value=1001),mock.patch.object(api,'installed_fixed_host_entry',return_value=Path('/usr/local/libexec/qs-retirement')/('f'*64+'.py')),mock.patch.object(api.subprocess,'run',return_value=subprocess.CompletedProcess([],1,raw)),self.assertRaises(api.NativeReceiptBlocked) as error:
+            api.root_once_lifecycle_prepare(args)
+        self.assertEqual(str(error.exception),'fixed_host_entry_rejected');self.assertTrue(error.exception.native_diagnostic['process_completed']);self.assertEqual(error.exception.native_diagnostic['exit_code'],1)
     def test_actual_transport_fixed_a_role_early_refusal_keeps_no_observation(self):
         args=self.args();request=api.host_scope_request(args);rh=hashlib.sha256(api.canonical_bytes(request)).hexdigest();r=self.receipt(args,request,rh)
         r.update(host_observation_complete=False,error_category='host_scope_root_once_required',source_uid=0,process_count=0,file_count=0,entry_count=0,observed_scopes=[],unknown=[],observed_machine_id_sha256='',observed_boot_id_sha256='',observed_namespace_sha256='',host_scope_private_observation_sha256='',host_scope_catalog_sha256='',observation_approval_sha256='',observation_elapsed_millis=2)
