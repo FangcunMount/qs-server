@@ -1395,7 +1395,7 @@ coverage; both live Python and Go entrypoints reject V1 before connecting.
 V2 retains the exact scope, separately approved source/operation, identity hashes
 and expected clean heads. Its immutable per-target profile is
 `query_seconds=30`, `total_seconds=1500`, `max_records=1000000`,
-`max_bytes=2147483648`, `page_size=10000`, `max_pages=1001`.
+`max_bytes=2147483648`, `page_size=1000`, `max_pages=1001`.
 The fixed read-only inventory container uses 2 CPUs and 512 MiB of memory;
 these are implementation bounds, with no caller override. The larger CPU budget
 does not establish production throughput or a ten-minute completion guarantee.

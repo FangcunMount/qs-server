@@ -241,7 +241,13 @@ jobs:
                   typeof report.sha256 !== 'string' || !/^[0-9a-f]{64}$/.test(report.sha256) ||
                   typeof report.request_sha256 !== 'string' || !/^[0-9a-f]{64}$/.test(report.request_sha256) ||
                   !/^[0-9]{1,20}-[0-9]{1,4}$/.test(currentRun) || report.run_id === currentRun) {reject();}
-              if (failedCleanup && (approval.operation_id !== '38019009876-1' || report.run_id !== '38025045551-1' || report.source_sha !== 'ae807219ffee37c1f060f1bfca25dd7c408ef9fd' || report.request_sha256 !== 'e5d29b674698dbfe4d8f85932fad0d8bba445e3b6823028cd78db4a150f16962' || report.sha256 !== '3983779a5fab8be6e027390491a3c9215cdf1270c03316ed8ebcc614793777c8')) {reject();}
+              if (failedCleanup) {
+                const origins = {
+                  '38019009876-1': {run_id:'38025045551-1',source_sha:'ae807219ffee37c1f060f1bfca25dd7c408ef9fd',request_sha256:'e5d29b674698dbfe4d8f85932fad0d8bba445e3b6823028cd78db4a150f16962',sha256:'3983779a5fab8be6e027390491a3c9215cdf1270c03316ed8ebcc614793777c8'},
+                  '38019009876-2': {run_id:'38037670416-1',source_sha:'d638638865c08b2b77a28ecc4920fb3f679ca798',request_sha256:'2b7e3d11b40f0156ac81a0032e897bc3656572935eb82f073935a770c2f83058',sha256:'d5ae36429962634897a7a519dc4fc2af4ddf5fd8a9d17b391c6a733d5038cce2'},
+                };
+                if (!Object.hasOwn(origins, approval.operation_id) || Object.keys(report).some(key => report[key] !== origins[approval.operation_id][key])) {reject();}
+              }
               const line = JSON.stringify(canonical(approval));
               if (line !== input.bootstrap_approval_json || require('crypto').createHash('sha256').update(line+'\n','ascii').digest('hex') !== input.bootstrap_approval_sha256) {reject();}
             }
@@ -295,7 +301,7 @@ jobs:
                   if (digest.digest('hex') !== anchor.hash) {reject();}
                 }
               }
-              const limits = {query_seconds:30,total_seconds:1500,max_records:1000000,max_bytes:2147483648,page_size:10000,max_pages:1001};
+              const limits = {query_seconds:30,total_seconds:1500,max_records:1000000,max_bytes:2147483648,page_size:1000,max_pages:1001};
               if (!exact(approval.limits, Object.keys(limits)) || Object.keys(limits).some(key => approval.limits[key] !== limits[key])) {reject();}
               for (const name of input.prepare_mode === 'bootstrap-inventory' ? ['identity_report', 'boundary_report'] : ['identity_report']) {
                 const ref = approval[name];
@@ -595,6 +601,7 @@ jobs:
         if: inputs.prepare_mode != 'bootstrap-history-metadata' && inputs.prepare_mode != 'bootstrap-history-parent' && inputs.prepare_mode != 'report-diagnostic' && inputs.prepare_mode != 'bootstrap-ai-bounds' && inputs.prepare_mode != 'bootstrap-ai-verify' && inputs.prepare_mode != 'historical-evidence-write' && inputs.prepare_mode != 'historical-ai-bounds' && inputs.prepare_mode != 'window-tool'
         uses: appleboy/ssh-action@v1.2.2
         env:
+          SUDO_PASSWORD: ${{ inputs.operation == 'prepare' && (inputs.prepare_mode == 'lifecycle' || inputs.prepare_mode == 'prepare-facts' || inputs.prepare_mode == 'host-writer-scope' || inputs.prepare_mode == 'db-writer-census') && secrets.SVRA_SUDO_PASSWORD || '' }}
           RETIREMENT_OPERATION: ${{ inputs.operation }}
           RETIREMENT_OPERATION_ID: ${{ inputs.operation_id }}
           RETIREMENT_MANIFEST_SHA256: ${{ inputs.manifest_sha256 }}
@@ -627,7 +634,7 @@ jobs:
           port: ${{ vars.SVRA_SSH_PORT || 22 }}
           fingerprint: ${{ vars.SVRA_SSH_FINGERPRINT }}
           command_timeout: ${{ (inputs.prepare_mode == 'lifecycle' || inputs.prepare_mode == 'prepare-facts') && '100m' || '35m' }}
-          envs: RETIREMENT_OPERATION,RETIREMENT_OPERATION_ID,RETIREMENT_MANIFEST_SHA256,RETIREMENT_INVENTORY_REQUEST_SHA256,RETIREMENT_LIFECYCLE_REQUEST_SHA256,RETIREMENT_PREPARE_MODE,RETIREMENT_IDENTITY_REQUEST_SHA256,RETIREMENT_BOOTSTRAP_APPROVAL_JSON,RETIREMENT_BOOTSTRAP_APPROVAL_SHA256,RETIREMENT_APPROVED_SHA,RETIREMENT_ACTUAL_SHA,RETIREMENT_RUN_ID,RETIREMENT_PACKAGE_SHA256,MYSQL_HOST,MYSQL_PORT,MYSQL_USERNAME,MYSQL_PASSWORD,MYSQL_DATABASE,MONGODB_HOST,MONGODB_PORT,MONGODB_USERNAME,MONGODB_PASSWORD,MONGODB_DBNAME,MONGODB_METADATA_ADMIN_USERNAME,MONGODB_METADATA_ADMIN_PASSWORD
+          envs: RETIREMENT_OPERATION,RETIREMENT_OPERATION_ID,RETIREMENT_MANIFEST_SHA256,RETIREMENT_INVENTORY_REQUEST_SHA256,RETIREMENT_LIFECYCLE_REQUEST_SHA256,RETIREMENT_PREPARE_MODE,RETIREMENT_IDENTITY_REQUEST_SHA256,RETIREMENT_BOOTSTRAP_APPROVAL_JSON,RETIREMENT_BOOTSTRAP_APPROVAL_SHA256,RETIREMENT_APPROVED_SHA,RETIREMENT_ACTUAL_SHA,RETIREMENT_RUN_ID,RETIREMENT_PACKAGE_SHA256,MYSQL_HOST,MYSQL_PORT,MYSQL_USERNAME,MYSQL_PASSWORD,MYSQL_DATABASE,MONGODB_HOST,MONGODB_PORT,MONGODB_USERNAME,MONGODB_PASSWORD,MONGODB_DBNAME,MONGODB_METADATA_ADMIN_USERNAME,MONGODB_METADATA_ADMIN_PASSWORD,SUDO_PASSWORD
           script: |
             set -Eeuo pipefail
             umask 077
@@ -881,6 +888,7 @@ jobs:
         if: inputs.prepare_mode == 'window-tool'
         uses: appleboy/ssh-action@v1.2.2
         env:
+          SUDO_PASSWORD: ${{ secrets.SVRA_SUDO_PASSWORD }}
           RETIREMENT_OPERATION: ${{ inputs.operation }}
           RETIREMENT_OPERATION_ID: ${{ inputs.operation_id }}
           RETIREMENT_MANIFEST_SHA256: ${{ inputs.manifest_sha256 }}
@@ -909,7 +917,7 @@ jobs:
           port: ${{ vars.SVRA_SSH_PORT || 22 }}
           fingerprint: ${{ vars.SVRA_SSH_FINGERPRINT }}
           command_timeout: 115m
-          envs: RETIREMENT_OPERATION,RETIREMENT_OPERATION_ID,RETIREMENT_MANIFEST_SHA256,RETIREMENT_TEMPLATE_SHA256,RETIREMENT_DISPATCHER_SHA,RETIREMENT_RUN_ID,RETIREMENT_BOOTSTRAP_APPROVAL_JSON,RETIREMENT_BOOTSTRAP_APPROVAL_SHA256,RETIREMENT_PACKAGE_SHA256,MYSQL_HOST,MYSQL_PORT,MYSQL_USERNAME,MYSQL_PASSWORD,MYSQL_DATABASE,MONGODB_HOST,MONGODB_PORT,MONGODB_USERNAME,MONGODB_PASSWORD,MONGODB_DBNAME,MONGODB_METADATA_ADMIN_USERNAME,MONGODB_METADATA_ADMIN_PASSWORD
+          envs: RETIREMENT_OPERATION,RETIREMENT_OPERATION_ID,RETIREMENT_MANIFEST_SHA256,RETIREMENT_TEMPLATE_SHA256,RETIREMENT_DISPATCHER_SHA,RETIREMENT_RUN_ID,RETIREMENT_BOOTSTRAP_APPROVAL_JSON,RETIREMENT_BOOTSTRAP_APPROVAL_SHA256,RETIREMENT_PACKAGE_SHA256,MYSQL_HOST,MYSQL_PORT,MYSQL_USERNAME,MYSQL_PASSWORD,MYSQL_DATABASE,MONGODB_HOST,MONGODB_PORT,MONGODB_USERNAME,MONGODB_PASSWORD,MONGODB_DBNAME,MONGODB_METADATA_ADMIN_USERNAME,MONGODB_METADATA_ADMIN_PASSWORD,SUDO_PASSWORD
           script: |
             set -Eeuo pipefail
             umask 077
@@ -973,6 +981,7 @@ jobs:
           echo "directory=$binary_dir" >> "$GITHUB_OUTPUT"
       - name: Hold same-run workflow owner through native acceptance or recovery
         env:
+          SUDO_PASSWORD: ${{ secrets.SVRA_SUDO_PASSWORD }}
           RETIREMENT_PLATFORM_TOKEN: ${{ github.token }}
           RETIREMENT_OPERATION: ${{ inputs.operation }}
           RETIREMENT_OPERATION_ID: ${{ inputs.operation_id }}
