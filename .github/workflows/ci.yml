@@ -509,8 +509,26 @@ jobs:
           QS_RETIREMENT_REQUIRE_ABORT_NATIVE: '1'
         run: |
           set -euo pipefail
-          go test -race -tags=integration -count=1 -timeout=10m ./internal/apiserver/infra/mysql/evaluation -run '^TestSQLCASProvenanceNative|^TestSQLHistoricalMissingOriginalRunPolicyNative$|^TestSQLHistoricalOriginalRunGlobalAbsenceNative$'
-          go test -race -tags=integration -count=1 -timeout=10m ./internal/apiserver/maintenance/compatibilityretirement -run '^(TestHistoricalCASPersistenceNative|TestQualifiedHistoricalCASNative|TestFinalHistoricalEOFNative)'
+          sql_component_log="${RUNNER_TEMP}/qs-historical-component-sql-native.log"
+          owner_fragment_log="${RUNNER_TEMP}/qs-historical-owner-fragments-native.log"
+          go test -race -tags=integration -count=1 -timeout=10m -v ./internal/apiserver/infra/mysql/evaluation -run '^TestSQLCASProvenanceNative|^TestSQLHistoricalMissingOriginalRunPolicyNative$|^TestSQLHistoricalOriginalRunGlobalAbsenceNative$|^TestSQLHistoricalComponentNative(SourceOwnerSelectors|AbsentOwnerSelector|MixedPresentAbsentSelectors)$' | tee "$sql_component_log"
+          go test -race -tags=integration -count=1 -timeout=10m -v ./internal/apiserver/maintenance/compatibilityretirement -run '^(TestHistoricalCASPersistenceNative|TestQualifiedHistoricalCASNative|TestFinalHistoricalEOFNative)|^TestWholeSourceJointNativeOwnerComponentsSplitPageWithoutConsumingTwice$' | tee "$owner_fragment_log"
+          if grep -Eq -- '--- SKIP:|--- FAIL:|DATA RACE' "$sql_component_log" "$owner_fragment_log"; then
+            echo 'Actual historical owner component proof skipped or failed' >&2
+            exit 1
+          fi
+          for marker in \
+            'TestSQLHistoricalComponentNativeSourceOwnerSelectors' \
+            'TestSQLHistoricalComponentNativeAbsentOwnerSelector' \
+            'TestSQLHistoricalComponentNativeMixedPresentAbsentSelectors'; do
+            grep -Eq "^[[:space:]]*--- PASS: ${marker} \\(" "$sql_component_log"
+          done
+          for marker in \
+            'TestWholeSourceJointNativeOwnerComponentsSplitPageWithoutConsumingTwice' \
+            'TestWholeSourceJointNativeOwnerComponentsSplitPageWithoutConsumingTwice/two_actual_assessments' \
+            'TestWholeSourceJointNativeOwnerComponentsSplitPageWithoutConsumingTwice/actual_assessment_and_empty_sheet'; do
+            grep -Eq "^[[:space:]]*--- PASS: ${marker} \\(" "$owner_fragment_log"
+          done
           go test -race -tags=integration -count=1 -timeout=10m ./internal/apiserver/maintenance/compatibilityretirementbackup -run '^(TestNonTargetDataNativePagingDriftAndBSONIdentity|TestMongoMetadataSnapshotNative)$'
           go test -race -tags=integration -count=1 -timeout=2m -v ./cmd/qs-compatibility-retirement -run '^TestComparisonMongoAbortNativeOriginalSessionResponseAndUnknown$' | tee "${RUNNER_TEMP}/qs-comparison-mongo-abort-native.log"
           if grep -q -- '--- SKIP:' "${RUNNER_TEMP}/qs-comparison-mongo-abort-native.log"; then
