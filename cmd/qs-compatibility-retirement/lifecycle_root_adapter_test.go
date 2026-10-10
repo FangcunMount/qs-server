@@ -12,6 +12,7 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+	"syscall"
 	"testing"
 	"time"
 
@@ -1322,6 +1323,404 @@ func TestOriginalHistoricalServiceInputsUseExistingApprovalHashesAndExactSourceF
 				if d.checkFile(d.files["ssh-channel.json"]) == nil {
 					t.Fatal("replacement source inode admitted")
 				}
+			}
+		})
+	}
+}
+
+func originalOperationInventorySourceFixture(t *testing.T) (*lifecycleMaterialDirectory, lifecycleRequest) {
+	t.Helper()
+	root, _ := filepath.EvalSymlinks(t.TempDir())
+	_ = os.Chmod(root, 0700)
+	put := func(directory, name string, value any) string {
+		b, e := json.Marshal(value)
+		if e != nil {
+			t.Fatal(e)
+		}
+		b = append(b, '\n')
+		if e = os.WriteFile(filepath.Join(directory, name), b, 0600); e != nil {
+			t.Fatal(e)
+		}
+		return digestRaw(b)
+	}
+	source := strings.Repeat("a", 40)
+	op := "123-1"
+	identityRun := "111-1"
+	boundsRun := "222-1"
+	q := request{FormatVersion: 2, Kind: "readonly_inventory_boundary_request", OperationID: op, SourceSHA: source, TargetHash: digest(targets), DatabaseScope: "mysql-and-mongodb", Identities: map[string]string{"mysql": strings.Repeat("a", 64), "mongodb": strings.Repeat("b", 64)}, Migrations: map[string]uint64{"mysql": 99, "mongodb": 38}}
+	boundaryRequestSHA := put(root, "boundary-request.json", q)
+	identityRequestValue := identityRequest{FormatVersion: 1, Kind: "readonly_identity_discovery_request", SourceSHA: source, OperationID: op, TargetHash: digest(targets)}
+	identityRequestSHA := put(root, "identity-request.json", identityRequestValue)
+	identityRoot := filepath.Join(root, "identity-"+identityRun)
+	boundsRoot := filepath.Join(root, "bounds-"+boundsRun)
+	for _, d := range []string{identityRoot, boundsRoot} {
+		if os.Mkdir(d, 0700) != nil {
+			t.Fatal("fixture")
+		}
+	}
+	identitySHA := put(identityRoot, "identity.private.json", identityReport{FormatVersion: 1, Kind: "readonly_identity_discovery", SourceSHA: source, OperationID: op, RunID: identityRun, RequestHash: identityRequestSHA, TargetHash: digest(targets), Complete: true, DiagnosticOnly: true, ErrorCategory: "none"})
+	boundsSHA := put(boundsRoot, "boundary.private.json", report{FormatVersion: 2, Kind: "readonly_inventory_boundaries", SourceSHA: source, OperationID: op, RunID: boundsRun, RequestHash: boundaryRequestSHA, TargetHash: digest(targets), Complete: true, DiagnosticOnly: true, ErrorCategory: "none", SourceBytesProtocol: "no_source_body_copy"})
+	q.Kind = "readonly_inventory_request"
+	q.BoundaryRunID = boundsRun
+	q.BoundaryReportHash = boundsSHA
+	inventoryRequestSHA := put(root, "inventory-request.json", q)
+	identityRef := lifecycleOriginalReportReference{identityRun, source, identitySHA}
+	boundaryRef := lifecycleOriginalReportReference{boundsRun, source, boundsSHA}
+	for _, b := range []struct {
+		name, run, mode, sha string
+		boundary             any
+	}{{"boundary-request-bootstrap.json", "333-1", "bootstrap-bounds", boundaryRequestSHA, nil}, {"inventory-request-bootstrap.json", "444-1", "bootstrap-inventory", inventoryRequestSHA, boundaryRef}} {
+		put(root, b.name, map[string]any{"format_version": 1, "kind": "private_request_bootstrap_binding", "source_sha": source, "operation_id": op, "created_run_id": b.run, "prepare_mode": b.mode, "approval_sha256": strings.Repeat("c", 64), "request_sha256": b.sha, "identity_report": identityRef, "boundary_report": b.boundary})
+	}
+	if os.WriteFile(filepath.Join(root, "operation.lock"), nil, 0600) != nil {
+		t.Fatal("fixture")
+	}
+	d, e := openLifecycleMaterialDirectory(root, uint32(os.Getuid()))
+	if e != nil {
+		t.Fatal(e)
+	}
+	t.Cleanup(func() { _ = d.close() })
+	if e = d.register("inventory-request.json", inventoryRequestSHA, uint32(os.Getuid()), 0600); e != nil {
+		t.Fatal(e)
+	}
+	return d, lifecycleRequest{OriginalSourceSHA: source, OperationID: op, Approval: backup.Approval{RunID: "456-1", RequestHash: inventoryRequestSHA}}
+}
+func TestOriginalOperationInventoryCatalogUsesLinkedOriginalHashChain(t *testing.T) {
+	d, r := originalOperationInventorySourceFixture(t)
+	if e := registerLifecycleOriginalOperationLock(d, uint32(os.Getuid())); e != nil {
+		t.Fatal(e)
+	}
+	if e := completeLifecycleOriginalInventoryInputs(context.Background(), r, d, uint32(os.Getuid())); e != nil {
+		t.Fatal(e)
+	}
+	if e := d.checkComplete(false); e != nil {
+		t.Fatal(e)
+	}
+	if len(d.files) != 6 || len(d.children) != 2 {
+		t.Fatal("original fixed producer namespace not closed")
+	}
+	for _, child := range d.children {
+		for _, f := range child.files {
+			if !f.retained {
+				t.Fatal("body-free diagnostic report not retained")
+			}
+		}
+	}
+	if e := os.WriteFile(filepath.Join(d.path, "foreign.json"), []byte("{}\n"), 0600); e != nil {
+		t.Fatal(e)
+	}
+	if d.checkComplete(false) == nil || d.files["foreign.json"] != nil {
+		t.Fatal("foreign material adopted")
+	}
+}
+func TestOriginalOperationInventoryCatalogRejectsChangedReferenceAndBusyLock(t *testing.T) {
+	for _, mutation := range []string{"request_hash", "report_hash", "operation", "run_reuse", "foreign", "busy"} {
+		t.Run(mutation, func(t *testing.T) {
+			d, r := originalOperationInventorySourceFixture(t)
+			if mutation == "busy" {
+				fd, e := syscall.Open(filepath.Join(d.path, "operation.lock"), syscall.O_RDONLY, 0)
+				if e != nil {
+					t.Fatal(e)
+				}
+				defer syscall.Close(fd)
+				if e = syscall.Flock(fd, syscall.LOCK_EX|syscall.LOCK_NB); e != nil {
+					t.Fatal(e)
+				}
+				if registerLifecycleOriginalOperationLock(d, uint32(os.Getuid())) == nil {
+					t.Fatal("active producer lock accepted")
+				}
+				return
+			}
+			path := filepath.Join(d.path, "inventory-request-bootstrap.json")
+			raw, e := os.ReadFile(path)
+			if e != nil {
+				t.Fatal(e)
+			}
+			var value map[string]any
+			if json.Unmarshal(raw, &value) != nil {
+				t.Fatal("fixture")
+			}
+			switch mutation {
+			case "request_hash":
+				value["request_sha256"] = strings.Repeat("0", 64)
+			case "report_hash":
+				value["identity_report"].(map[string]any)["sha256"] = strings.Repeat("0", 64)
+			case "operation":
+				value["operation_id"] = "999-1"
+			case "run_reuse":
+				value["created_run_id"] = "111-1"
+			case "foreign":
+				value["arbitrary_source"] = "foreign.json"
+			}
+			raw, _ = json.Marshal(value)
+			if os.WriteFile(path, raw, 0600) != nil {
+				t.Fatal("fixture")
+			}
+			if completeLifecycleOriginalInventoryInputs(context.Background(), r, d, uint32(os.Getuid())) == nil {
+				t.Fatal("unbound producer chain accepted")
+			}
+		})
+	}
+}
+
+func TestOriginalOperationMetadataCatalogBindsParentApprovalAndProposal(t *testing.T) {
+	for _, mutation := range []string{"none", "metadata_hash", "proposal_hash", "approval_hash", "foreign"} {
+		t.Run(mutation, func(t *testing.T) {
+			d, r := originalOperationInventorySourceFixture(t)
+			put := func(directory, name string, value any) string {
+				b, _ := json.Marshal(value)
+				b = append(b, '\n')
+				if os.WriteFile(filepath.Join(directory, name), b, 0600) != nil {
+					t.Fatal("fixture")
+				}
+				return digestRaw(b)
+			}
+			r.Approval.InventorySHA256 = strings.Repeat("e", 64)
+			requestValue := map[string]any{"format_version": 1, "kind": "readonly_compatibility_history_request", "source_sha": r.OriginalSourceSHA, "operation_id": r.OperationID, "run_id": r.Approval.RunID}
+			requestHash := put(d.path, "history-request.json", requestValue)
+			if e := d.register("history-request.json", requestHash, uint32(os.Getuid()), 0600); e != nil {
+				t.Fatal(e)
+			}
+			inventoryRef := map[string]any{"run_id": r.Approval.RunID, "sha256": r.Approval.InventorySHA256}
+			metaRun := "777-1"
+			metadataApproval := map[string]any{"format_version": 1, "kind": "readonly_history_metadata_approval", "prepare_mode": "bootstrap-history-metadata", "source_sha": r.OriginalSourceSHA, "operation_id": r.OperationID}
+			metadataApprovalBytes, _ := json.Marshal(metadataApproval)
+			metadataApprovalHash := digestRaw(append(metadataApprovalBytes, '\n'))
+			path := filepath.Join(d.path, "history-metadata-"+metaRun)
+			if os.Mkdir(path, 0700) != nil {
+				t.Fatal("fixture")
+			}
+			metadata := map[string]any{"format_version": 1, "kind": "readonly_history_file_metadata", "source_sha": r.OriginalSourceSHA, "operation_id": r.OperationID, "run_id": metaRun, "metadata_limits": map[string]any{}, "approved_inventory_report": inventoryRef, "inventory_request_sha256": r.Approval.RequestHash, "approval_sha256": metadataApprovalHash, "parent_proposal_run_id": r.Approval.RunID, "parent_proposal_sha256": requestHash, "assets": []any{}, "equal_full_physical_passes": 2, "metadata_complete": true, "input_baseline_sha256": strings.Repeat("f", 64), "semantic_source_coverage_verified": false, "production_process_budget_proven": false, "complete": false, "execution_allowed": false, "drop_ready": false, "cas_complete": false}
+			metadataHash := put(path, "history-metadata.json", metadata)
+			put(path, "history-parent-proposal.json", requestValue)
+			put(path, "history-metadata-bootstrap.json", map[string]any{"format_version": 1, "kind": "readonly_history_metadata_binding", "source_sha": r.OriginalSourceSHA, "operation_id": r.OperationID, "created_run_id": metaRun, "approval_sha256": metadataApprovalHash, "approval": metadataApproval, "parent_proposal_run_id": r.Approval.RunID, "parent_proposal_sha256": requestHash})
+			parentApproval := map[string]any{"format_version": 1, "kind": "readonly_history_parent_registration_approval", "source_sha": r.OriginalSourceSHA, "operation_id": r.OperationID}
+			b, _ := json.Marshal(parentApproval)
+			parentApprovalHash := digestRaw(append(b, '\n'))
+			record := map[string]any{"format_version": 1, "kind": "readonly_history_parent_registration", "source_sha": r.OriginalSourceSHA, "operation_id": r.OperationID, "created_run_id": "888-1", "approval_sha256": parentApprovalHash, "approval": parentApproval, "request_sha256": requestHash, "parent_run_id": r.Approval.RunID, "metadata_report": map[string]any{"run_id": metaRun, "sha256": metadataHash}, "inventory_report": inventoryRef}
+			switch mutation {
+			case "metadata_hash":
+				record["metadata_report"].(map[string]any)["sha256"] = strings.Repeat("0", 64)
+			case "proposal_hash":
+				if os.WriteFile(filepath.Join(path, "history-parent-proposal.json"), []byte("{}\n"), 0600) != nil {
+					t.Fatal("fixture")
+				}
+			case "approval_hash":
+				record["approval_sha256"] = strings.Repeat("0", 64)
+			case "foreign":
+				if os.WriteFile(filepath.Join(path, "foreign.json"), []byte("{}\n"), 0600) != nil {
+					t.Fatal("fixture")
+				}
+			}
+			put(d.path, "history-request-bootstrap.json", record)
+			e := completeLifecycleOriginalMetadataInputs(context.Background(), r, d, uint32(os.Getuid()))
+			if mutation == "none" {
+				if e != nil {
+					t.Fatal(e)
+				}
+				if !d.children["history-metadata-"+metaRun].files["history-metadata.json"].retained {
+					t.Fatal("body-free metadata diagnostic not retained")
+				}
+			} else if e == nil {
+				t.Fatal("unbound metadata producer admitted")
+			}
+		})
+	}
+}
+
+func TestOriginalAIExecMaterialCatalogChecksOriginalTupleAndPrefixOnly(t *testing.T) {
+	source := strings.Repeat("a", 40)
+	r := lifecycleRequest{OriginalSourceSHA: source, OperationID: "123-1", FinalHistory: &lifecycleFinalHistoryInput{RuntimeSourceSHA: strings.Repeat("b", 40), ImageID: "sha256:" + strings.Repeat("c", 64), ContainerID: strings.Repeat("d", 64)}}
+	binding := lifecycleOriginalAIExecBinding{SourceSHA: source, OperationID: r.OperationID, RunID: "456", RuntimeSourceSHA: r.FinalHistory.RuntimeSourceSHA, ImageID: r.FinalHistory.ImageID, ContainerID: r.FinalHistory.ContainerID, PythonSHA256: strings.Repeat("e", 64), InputSHA256: strings.Repeat("f", 64), DeadlineUnixNano: 1}
+	first := lifecycleOriginalAIExecRecord{Protocol: "qs-ai-exec-lifecycle/v1", Sequence: 1, Binding: binding, Stage: "create_intent", EngineVersionSHA256: strings.Repeat("a", 64)}
+	initial, _ := json.Marshal(first)
+	initial = append(initial, '\n')
+	next := first
+	next.Sequence = 2
+	next.PreviousSHA256 = digestRaw(initial)
+	next.Stage = "unknown"
+	second, _ := json.Marshal(next)
+	second = append(second, '\n')
+	original := append(append([]byte(nil), initial...), second...)
+	// Unknown remains unknown. Registration may account for original bytes but
+	// supplies no quiescence, native completion or release permission.
+	if e := validateLifecycleOriginalAIExecMaterial(original, r); e != nil {
+		t.Fatal(e)
+	}
+	for _, mutation := range []string{"source", "operation", "runtime", "container", "prefix", "sequence", "unknown_field", "truncated", "oversized"} {
+		t.Run(mutation, func(t *testing.T) {
+			altered := next
+			switch mutation {
+			case "source":
+				altered.Binding.SourceSHA = strings.Repeat("0", 40)
+			case "operation":
+				altered.Binding.OperationID = "999-1"
+			case "runtime":
+				altered.Binding.RuntimeSourceSHA = strings.Repeat("0", 40)
+			case "container":
+				altered.Binding.ContainerID = strings.Repeat("0", 64)
+			case "prefix":
+				altered.PreviousSHA256 = strings.Repeat("0", 64)
+			case "sequence":
+				altered.Sequence = 4
+			}
+			b, _ := json.Marshal(altered)
+			if mutation == "unknown_field" {
+				var fields map[string]any
+				_ = json.Unmarshal(b, &fields)
+				fields["private_body"] = "forbidden"
+				b, _ = json.Marshal(fields)
+			}
+			raw := append(append([]byte(nil), initial...), append(b, '\n')...)
+			if mutation == "truncated" {
+				raw = raw[:len(raw)-1]
+			}
+			if mutation == "oversized" {
+				raw = make([]byte, (64<<10)+1)
+			}
+			if validateLifecycleOriginalAIExecMaterial(raw, r) == nil {
+				t.Fatal("unbound original exec material accepted")
+			}
+		})
+	}
+}
+
+func TestOriginalReadonlyHistoryCatalogFollowsFrozenProofAndTerminalHashes(t *testing.T) {
+	for _, mutation := range []string{"none", "readiness_hash", "source_hash", "unknown_terminal", "shadow_foreign", "output_foreign", "run_reuse"} {
+		t.Run(mutation, func(t *testing.T) {
+			root, r, writer, inventory := historicalWriteInputFixture(t, true)
+			registration, previous, e := openLifecycleHistoricalWriteInputFiles(context.Background(), r, writer, inventory, root, uint32(os.Getuid()))
+			if e != nil {
+				t.Fatal(e)
+			}
+			defer registration.close()
+			parent := previous[len(previous)-1]
+			defer parent.close()
+			for _, d := range previous[:len(previous)-1] {
+				defer d.close()
+			}
+			put := func(path string, value any) string {
+				b, _ := json.Marshal(value)
+				b = append(b, '\n')
+				if os.WriteFile(path, b, 0600) != nil {
+					t.Fatal("fixture")
+				}
+				return digestRaw(b)
+			}
+			run := "888-1"
+			history := filepath.Join(root, "history-"+run)
+			output := filepath.Join(history, "output")
+			shadow := filepath.Join(history, "mysql-volume-shadow")
+			for _, d := range []string{history, output, shadow} {
+				if os.Mkdir(d, 0700) != nil {
+					t.Fatal("fixture")
+				}
+			}
+			var requestValue lifecycleHistoricalRequestMaterial
+			raw, _ := os.ReadFile(filepath.Join(root, "history-request.json"))
+			if json.Unmarshal(raw, &requestValue) != nil {
+				t.Fatal("fixture")
+			}
+			requestValue.RunID = run
+			requestHash := put(filepath.Join(history, "history.request.json"), requestValue)
+			approval := map[string]any{"format_version": 1, "kind": "readonly_history_bootstrap_approval", "source_sha": r.OriginalSourceSHA, "operation_id": r.OperationID}
+			approvalRaw, _ := json.Marshal(approval)
+			put(filepath.Join(history, "history.bootstrap.json"), map[string]any{"format_version": 1, "kind": "immutable_history_run_derivation", "source_sha": r.OriginalSourceSHA, "operation_id": r.OperationID, "actual_run_id": run, "approval_sha256": digestRaw(append(approvalRaw, '\n')), "approval": approval, "parent_request_sha256": parent.files["history-request.json"].hash, "parent_run_id": r.Approval.RunID, "derived_request_sha256": requestHash, "only_changed_field": "run_id", "binary_sha256": strings.Repeat("a", 64)})
+			readiness := map[string]any{}
+			for _, key := range strings.Fields("completed_readonly_pipeline source_files_and_actual_origins_matched whole_four_source_coverage_complete business_and_responsibility_facts_unchanged independent_production_approval_verified ordered_mongo_source_metadata_approved host_process_budget_proven full_external_ai_closure_verified distributed_atomic_snapshot writer_fence_proven cas_complete post_cas_readback_complete backup_restore_qualified mutation_backend_enabled drop_ready") {
+				readiness[key] = false
+			}
+			for _, key := range strings.Fields("completed_readonly_pipeline source_files_and_actual_origins_matched whole_four_source_coverage_complete business_and_responsibility_facts_unchanged") {
+				readiness[key] = true
+			}
+			for _, key := range strings.Fields("local_candidates locally_qualified blocked_local joint_event_pages ai_blocked_pages sql_ledger_count mongo_collection_count elapsed_milliseconds") {
+				readiness[key] = 0
+			}
+			for _, key := range strings.Fields("whole_source_index_sha256 candidate_sha256 sql_current_facts_sha256 mongo_current_facts_sha256") {
+				readiness[key] = strings.Repeat("e", 64)
+			}
+			readiness["protocol"] = "qs-compatibility-history-readonly/v1"
+			readiness["source_sha"] = r.OriginalSourceSHA
+			readiness["operation_id"] = r.OperationID
+			readiness["run_id"] = run
+			readiness["request_sha256"] = requestHash
+			readiness["inventory_request_sha256"] = r.Approval.RequestHash
+			readiness["inventory_report_sha256"] = r.Approval.InventorySHA256
+			readiness["independent_epochs"] = 2
+			readiness["sql_global"] = map[string]any{}
+			readiness["mongo_global"] = map[string]any{}
+			readiness["ai_reverse_global"] = map[string]any{}
+			readiness["blocking_reasons"] = map[string]uint64{}
+			readiness["required_adapters"] = []string{}
+			readiness["error_category"] = "none"
+			var inv report
+			raw, _ = os.ReadFile(filepath.Join(inventory.path, "inventory.private.json"))
+			_ = json.Unmarshal(raw, &inv)
+			hashes := []string{}
+			sources := []retirement.SourceCopyReceipt{}
+			for n, asset := range requestValue.Assets {
+				hashes = append(hashes, asset.SHA256)
+				protocol := retirement.SQLSourceProtocol
+				if targets[n][0] == "mongodb" {
+					protocol = retirement.MongoSourceProtocol
+				}
+				sources = append(sources, retirement.SourceCopyReceipt{Protocol: protocol, Records: inv.Targets[n].Records, Bytes: inv.Targets[n].Bytes, DataHash: inv.Targets[n].DataHash, Complete: true})
+			}
+			if mutation == "source_hash" {
+				hashes[0] = strings.Repeat("0", 64)
+			}
+			readiness["sources"] = sources
+			readiness["full_source_file_sha256"] = hashes
+			readinessHash := put(filepath.Join(output, "history.readiness.json"), readiness)
+			cid := strings.Repeat("b", 64)
+			image := "sha256:" + strings.Repeat("c", 64)
+			nonce := strings.Repeat("d", 64)
+			name := "qs-compatibility-history-" + run
+			labels := map[string]string{"qs.compatibility-retirement.operation": r.OperationID, "qs.compatibility-retirement.run": run, "qs.compatibility-retirement.source": r.OriginalSourceSHA, "qs.compatibility-retirement.request": requestHash, "qs.compatibility-retirement.creation": nonce, "qs.compatibility-retirement.kind": "history-readonly"}
+			created := map[string]any{"id": cid, "name": name, "image": image, "labels": labels, "mounts": map[string]any{}, "limits": map[string]any{}, "owner_uid": os.Getuid(), "owner_gid": os.Getgid()}
+			put(filepath.Join(history, "history.container.json"), created)
+			delete(created, "id")
+			created["declared_image_volumes"] = map[string]any{"/var/lib/mysql": map[string]any{}}
+			put(filepath.Join(history, "history.creation.intent.json"), created)
+			terminal := map[string]any{"id": cid, "name": name, "image": image, "actual_run_id": run, "source_sha": r.OriginalSourceSHA, "request_sha256": requestHash, "creation_nonce": nonce, "owner_uid": os.Getuid(), "owner_gid": os.Getgid(), "status": "exited", "exit_code": 0, "container_removed": true, "private_readiness_sha256": readinessHash}
+			switch mutation {
+			case "readiness_hash":
+				terminal["private_readiness_sha256"] = strings.Repeat("0", 64)
+			case "unknown_terminal":
+				terminal["status"] = "running"
+			case "shadow_foreign":
+				if os.WriteFile(filepath.Join(shadow, "foreign"), nil, 0600) != nil {
+					t.Fatal("fixture")
+				}
+			case "output_foreign":
+				if os.WriteFile(filepath.Join(output, "foreign"), nil, 0600) != nil {
+					t.Fatal("fixture")
+				}
+			}
+			put(filepath.Join(history, "history.terminal.json"), terminal)
+			summary := map[string]any{}
+			for _, key := range strings.Fields("classified verified_live verified_retired unverifiable_closed unresolved ambiguous hash_conflicts unknown_execution unexplained_high retirement_references") {
+				summary[key] = 0
+			}
+			summary["references_hash"] = strings.Repeat("f", 64)
+			producer := map[string]string{"protocol": "qs_compatibility_retirement_history_v1", "source_sha": r.OriginalSourceSHA, "run_id": run}
+			if mutation == "run_reuse" {
+				producer["run_id"] = r.Approval.RunID
+			}
+			proof := map[string]json.RawMessage{}
+			proof["producer"], _ = json.Marshal(producer)
+			proof["summary"], _ = json.Marshal(summary)
+			e = completeLifecycleOriginalReadOnlyHistory(context.Background(), r, parent, inventory, proof, uint32(os.Getuid()))
+			if mutation == "none" {
+				if e != nil {
+					t.Fatal(e)
+				}
+				d := parent.children["history-"+run]
+				if len(d.files) != 5 || len(d.children) != 2 || !d.children["output"].files["history.readiness.json"].retained || !d.files["history.terminal.json"].retained {
+					t.Fatal("fixed history producer scope not closed")
+				}
+			} else if e == nil {
+				t.Fatal("unbound readonly producer accepted")
 			}
 		})
 	}

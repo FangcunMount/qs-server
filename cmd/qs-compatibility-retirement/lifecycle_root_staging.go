@@ -1468,3 +1468,682 @@ func openLifecycleHistoricalWriteInputFiles(ctx context.Context, r lifecycleRequ
 	// responsibilities; its complete-scope check remains mandatory and closed.
 	return registration, previous, nil
 }
+
+// Complete only the original, source-owned producer namespace. References are
+// followed from already approved inventory/write inputs, never from a directory
+// listing. This creates no execution, business, fence or deletion permission.
+func completeLifecycleOriginalOperationMaterials(ctx context.Context, r lifecycleRequest, parent, inventory, writer, registration *lifecycleMaterialDirectory, previous []*lifecycleMaterialDirectory, archive *lifecycleMaterialDirectory, uid uint32) error {
+	if ctx == nil || ctx.Err() != nil || parent == nil || parent.path != filepath.Join("/opt/backups/qs-server/compatibility-retirement", r.OperationID) || parent.unchanged() != nil || inventory == nil || writer == nil || registration == nil || parent.files["history-request.json"] == nil || parent.files["inventory-request.json"] == nil {
+		return lifecycleError("lifecycle_original_operation_material_rejected")
+	}
+	if e := registerLifecycleOriginalOperationLock(parent, uid); e != nil {
+		return e
+	}
+	for _, d := range append([]*lifecycleMaterialDirectory{inventory, writer, registration, archive}, previous...) {
+		if d == nil || d == parent {
+			continue
+		}
+		if filepath.Dir(d.path) != parent.path {
+			if d.externalArchive {
+				continue
+			}
+			return lifecycleError("lifecycle_original_operation_material_rejected")
+		}
+		if parent.children[filepath.Base(d.path)] == d {
+			continue
+		}
+		if e := parent.registerChild(d); e != nil {
+			return e
+		}
+	}
+	if e := completeLifecycleOriginalInventoryInputs(ctx, r, parent, uid); e != nil {
+		return e
+	}
+	if e := completeLifecycleOriginalMetadataInputs(ctx, r, parent, uid); e != nil {
+		return e
+	}
+	if e := registerLifecycleOriginalAIExecMaterials(ctx, r, parent, uid); e != nil {
+		return e
+	}
+	if e := registerLifecycleOriginalDatabaseSourceInput(ctx, r, parent, uid); e != nil {
+		return e
+	}
+	if r.SourceCopyIntent == nil {
+		return lifecycleError("lifecycle_original_operation_material_rejected")
+	}
+	raw, e := readLifecycleOwnedBytes(r.SourceCopyIntent.Path, r.SourceCopyIntent.SHA256, 0, 256<<10)
+	if e != nil {
+		return e
+	}
+	var intent lifecycleSourceCopyIntent
+	if decodeLifecycleSourceCopyIntent(raw, &intent) != nil || intent.SourceUID != uid || intent.OperationID != r.OperationID || intent.OriginalSourceSHA != r.OriginalSourceSHA || intent.ManifestSHA256 != r.ManifestSHA256 {
+		return lifecycleError("lifecycle_original_operation_material_rejected")
+	}
+	if e = registerLifecycleOriginalFrozenFile(parent, "lifecycle-request.json", intent.RequestSHA256, uid); e != nil {
+		return e
+	}
+	if r.WriterControl != nil {
+		if !r.WriterControl.valid() {
+			return lifecycleError("lifecycle_original_operation_material_rejected")
+		}
+		if e = registerLifecycleOriginalFrozenFile(parent, "approved-workflow-scope.json", r.WriterControl.WorkflowScopeSHA256, uid); e != nil {
+			return e
+		}
+	}
+	if e = registerLifecycleOriginalFrozenFile(parent, "manifest.json", r.ManifestSHA256, uid); e != nil {
+		return e
+	}
+	var manifest lifecycleFrozenManifest
+	raw, e = readLifecycleHistoricalHeldJSON(parent, "manifest.json", 256<<10, &manifest)
+	if e != nil || rejectDuplicateJSON(raw) != nil || lifecycleExactJSONNames(raw, reflect.TypeOf(manifest)) != nil || manifest.FormatVersion != 1 || manifest.OperationID != r.OperationID || manifest.SourceSHA != r.OriginalSourceSHA || manifest.TargetHash != digest(targets) {
+		return lifecycleError("lifecycle_original_operation_material_rejected")
+	}
+	for kind, ref := range manifest.Evidence {
+		switch kind {
+		case "inventory", "history", "fence", "backup_restore", "release", "acceptance":
+		default:
+			return lifecycleError("lifecycle_original_operation_material_rejected")
+		}
+		if filepath.Base(ref.Filename) != ref.Filename || ref.Filename == "manifest.json" || !hashRE.MatchString(ref.SHA256) {
+			return lifecycleError("lifecycle_original_operation_material_rejected")
+		}
+		var proof map[string]json.RawMessage
+		b, e := readLifecycleOriginalProducerJSON(ctx, parent, ref.Filename, ref.SHA256, uid, "format_version kind operation_id source_sha target_hash producer complete observed_at valid_until summary")
+		if e != nil {
+			return e
+		}
+		proof = b
+		if originalMaterialText(proof, "kind") != kind || originalMaterialText(proof, "operation_id") != r.OperationID || originalMaterialText(proof, "source_sha") != r.OriginalSourceSHA || originalMaterialText(proof, "target_hash") != digest(targets) {
+			return lifecycleError("lifecycle_original_operation_material_rejected")
+		}
+		// These are the existing closed, body-free verification proofs. Inputs,
+		// credentials, source copies and bootstrap records remain purge required.
+		// Proof bytes are bounded and hash-bound, but this catalog does not
+		// reclassify opaque nested summary fields as body-free. Purge them.
+		parent.files[ref.Filename].retained = false
+		if kind == "history" {
+			if e = completeLifecycleOriginalReadOnlyHistory(ctx, r, parent, inventory, proof, uid); e != nil {
+				return e
+			}
+		}
+	}
+	return parent.checkComplete(false)
+}
+
+func registerLifecycleOriginalOperationLock(d *lifecycleMaterialDirectory, uid uint32) error {
+	if e := registerLifecycleOriginalFrozenFile(d, "operation.lock", digestRaw(nil), uid); e != nil {
+		return e
+	}
+	f := d.files["operation.lock"]
+	if f == nil || f.info.Size() != 0 || syscall.Flock(int(f.file.Fd()), syscall.LOCK_EX|syscall.LOCK_NB) != nil || d.checkFile(f) != nil {
+		return lifecycleError("lifecycle_original_operation_lock_rejected")
+	}
+	// The same registered FD remains locked through purge and is released only
+	// when the original catalog owner closes it. No business fence is implied.
+	return nil
+}
+func registerLifecycleOriginalFrozenFile(d *lifecycleMaterialDirectory, name, hash string, uid uint32) error {
+	if d == nil || filepath.Base(name) != name || !hashRE.MatchString(hash) {
+		return lifecycleError("lifecycle_original_operation_material_rejected")
+	}
+	if f := d.files[name]; f != nil {
+		if f.hash != hash || d.checkFile(f) != nil {
+			return lifecycleError("lifecycle_original_operation_material_rejected")
+		}
+		return nil
+	}
+	return d.register(name, hash, uid, 0600)
+}
+
+// This is a bounded projection of fixed producer schemas, not an ownership
+// manifest: callers supply exact names and follow immutable reference hashes.
+func readLifecycleOriginalProducerJSON(ctx context.Context, d *lifecycleMaterialDirectory, name, hash string, uid uint32, closed string) (map[string]json.RawMessage, error) {
+	if ctx == nil || ctx.Err() != nil {
+		return nil, lifecycleError("lifecycle_original_operation_material_rejected")
+	}
+	var raw []byte
+	var e error
+	var value json.RawMessage
+	if f := d.files[name]; f != nil {
+		if hash != "" && hash != f.hash {
+			return nil, lifecycleError("lifecycle_original_operation_material_rejected")
+		}
+		raw, e = readLifecycleHistoricalHeldJSON(d, name, 256<<10, &value)
+	} else {
+		raw, e = readLifecycleProducerJSON(d, name, hash, uid, 256<<10, &value)
+	}
+	if e != nil {
+		return nil, e
+	}
+	var fields map[string]json.RawMessage
+	if rejectDuplicateJSON(raw) != nil || json.Unmarshal(raw, &fields) != nil || len(fields) != len(strings.Fields(closed)) {
+		return nil, lifecycleError("lifecycle_original_operation_material_rejected")
+	}
+	for _, key := range strings.Fields(closed) {
+		if _, ok := fields[key]; !ok {
+			return nil, lifecycleError("lifecycle_original_operation_material_rejected")
+		}
+	}
+	return fields, nil
+}
+func originalMaterialText(fields map[string]json.RawMessage, key string) string {
+	var v string
+	_ = json.Unmarshal(fields[key], &v)
+	return v
+}
+func originalMaterialBool(fields map[string]json.RawMessage, key string, want bool) bool {
+	var v *bool
+	return json.Unmarshal(fields[key], &v) == nil && v != nil && *v == want
+}
+func originalMaterialVersion(fields map[string]json.RawMessage) bool {
+	var n int
+	return json.Unmarshal(fields["format_version"], &n) == nil && n == 1
+}
+
+type lifecycleOriginalReportReference struct {
+	RunID     string `json:"run_id"`
+	SourceSHA string `json:"source_sha,omitempty"`
+	SHA256    string `json:"sha256"`
+}
+
+func originalMaterialReference(raw json.RawMessage, source string, hasSource bool) (lifecycleOriginalReportReference, error) {
+	var v lifecycleOriginalReportReference
+	var keys map[string]json.RawMessage
+	n := 2
+	if hasSource {
+		n = 3
+	}
+	if rejectDuplicateJSON(raw) != nil || json.Unmarshal(raw, &keys) != nil || len(keys) != n || keys["run_id"] == nil || keys["sha256"] == nil || hasSource && keys["source_sha"] == nil || json.Unmarshal(raw, &v) != nil || !runRE.MatchString(v.RunID) || !hashRE.MatchString(v.SHA256) || hasSource && v.SourceSHA != source {
+		return v, lifecycleError("lifecycle_original_operation_material_rejected")
+	}
+	return v, nil
+}
+func openLifecycleOriginalChild(parent *lifecycleMaterialDirectory, name string, uid uint32) (*lifecycleMaterialDirectory, error) {
+	if filepath.Base(name) != name || parent == nil {
+		return nil, lifecycleError("lifecycle_original_operation_material_rejected")
+	}
+	if d := parent.children[name]; d != nil {
+		return d, nil
+	}
+	d, e := openLifecycleMaterialDirectory(filepath.Join(parent.path, name), uid)
+	if e != nil {
+		return nil, e
+	}
+	if e = parent.registerChild(d); e != nil {
+		_ = d.close()
+		return nil, e
+	}
+	return d, nil
+}
+func originalMaterialBootstrapBinding(m map[string]json.RawMessage, r lifecycleRequest, mode, requestHash string) bool {
+	return originalMaterialVersion(m) && originalMaterialText(m, "kind") == "private_request_bootstrap_binding" && originalMaterialText(m, "source_sha") == r.OriginalSourceSHA && originalMaterialText(m, "operation_id") == r.OperationID && originalMaterialText(m, "prepare_mode") == mode && originalMaterialText(m, "request_sha256") == requestHash && runRE.MatchString(originalMaterialText(m, "created_run_id")) && hashRE.MatchString(originalMaterialText(m, "approval_sha256"))
+}
+func completeLifecycleOriginalInventoryInputs(ctx context.Context, r lifecycleRequest, parent *lifecycleMaterialDirectory, uid uint32) error {
+	const fields = "format_version kind source_sha operation_id created_run_id prepare_mode approval_sha256 request_sha256 identity_report boundary_report"
+	m, e := readLifecycleOriginalProducerJSON(ctx, parent, "inventory-request-bootstrap.json", "", uid, fields)
+	if e != nil || !originalMaterialBootstrapBinding(m, r, "bootstrap-inventory", r.Approval.RequestHash) {
+		return lifecycleError("lifecycle_original_operation_material_rejected")
+	}
+	identityRef, e := originalMaterialReference(m["identity_report"], r.OriginalSourceSHA, true)
+	if e != nil {
+		return e
+	}
+	boundaryRef, e := originalMaterialReference(m["boundary_report"], r.OriginalSourceSHA, true)
+	if e != nil || boundaryRef.RunID == identityRef.RunID || originalMaterialText(m, "created_run_id") == identityRef.RunID || originalMaterialText(m, "created_run_id") == boundaryRef.RunID {
+		return lifecycleError("lifecycle_original_operation_material_rejected")
+	}
+	var q request
+	raw, e := readLifecycleHistoricalHeldJSON(parent, "inventory-request.json", 256<<10, &q)
+	if e != nil || rejectDuplicateJSON(raw) != nil || lifecycleExactJSONNames(raw, reflect.TypeOf(q)) != nil || q.FormatVersion != 2 || q.Kind != "readonly_inventory_request" || q.OperationID != r.OperationID || q.SourceSHA != r.OriginalSourceSHA || q.BoundaryRunID != boundaryRef.RunID || q.BoundaryReportHash != boundaryRef.SHA256 {
+		return lifecycleError("lifecycle_original_operation_material_rejected")
+	}
+	identity, e := openLifecycleOriginalChild(parent, "identity-"+identityRef.RunID, uid)
+	if e != nil {
+		return e
+	}
+	var observed identityReport
+	raw, e = readLifecycleProducerJSON(identity, "identity.private.json", identityRef.SHA256, uid, 256<<10, &observed)
+	if e != nil || rejectDuplicateJSON(raw) != nil || lifecycleExactJSONNames(raw, reflect.TypeOf(observed)) != nil || observed.FormatVersion != 1 || observed.Kind != "readonly_identity_discovery" || observed.SourceSHA != r.OriginalSourceSHA || observed.OperationID != r.OperationID || observed.RunID != identityRef.RunID || !hashRE.MatchString(observed.RequestHash) || observed.TargetHash != digest(targets) || !observed.DiagnosticOnly || observed.DropReady || !observed.Complete || observed.ErrorCategory != "none" {
+		return lifecycleError("lifecycle_original_operation_material_rejected")
+	}
+	var identityRequestValue identityRequest
+	raw, e = readLifecycleProducerJSON(parent, "identity-request.json", observed.RequestHash, uid, 256<<10, &identityRequestValue)
+	if e != nil || identityRequestValue.SourceSHA != r.OriginalSourceSHA || identityRequestValue.OperationID != r.OperationID || identityRequestValue.FormatVersion != 1 || identityRequestValue.Kind != "readonly_identity_discovery_request" {
+		return lifecycleError("lifecycle_original_operation_material_rejected")
+	}
+	identity.files["identity.private.json"].retained = true
+	if e = identity.checkComplete(false); e != nil {
+		return e
+	}
+	bounds, e := openLifecycleOriginalChild(parent, "bounds-"+boundaryRef.RunID, uid)
+	if e != nil {
+		return e
+	}
+	var b report
+	raw, e = readLifecycleProducerJSON(bounds, "boundary.private.json", boundaryRef.SHA256, uid, 256<<10, &b)
+	if e != nil || rejectDuplicateJSON(raw) != nil || lifecycleExactJSONNames(raw, reflect.TypeOf(b)) != nil || b.FormatVersion != 2 || b.Kind != "readonly_inventory_boundaries" || b.SourceSHA != r.OriginalSourceSHA || b.OperationID != r.OperationID || b.RunID != boundaryRef.RunID || !hashRE.MatchString(b.RequestHash) || b.TargetHash != digest(targets) || !b.DiagnosticOnly || b.DropReady || !b.Complete || b.ErrorCategory != "none" || b.SourceBytesProtocol != "no_source_body_copy" {
+		return lifecycleError("lifecycle_original_operation_material_rejected")
+	}
+	var boundaryRequest request
+	raw, e = readLifecycleProducerJSON(parent, "boundary-request.json", b.RequestHash, uid, 256<<10, &boundaryRequest)
+	if e != nil || boundaryRequest.FormatVersion != 2 || boundaryRequest.Kind != "readonly_inventory_boundary_request" || boundaryRequest.SourceSHA != r.OriginalSourceSHA || boundaryRequest.OperationID != r.OperationID || boundaryRequest.BoundaryRunID != "" || len(boundaryRequest.Boundaries) != 0 || digest(boundaryRequest.Identities) != digest(q.Identities) || digest(boundaryRequest.Migrations) != digest(q.Migrations) {
+		return lifecycleError("lifecycle_original_operation_material_rejected")
+	}
+	bootstrap, e := readLifecycleOriginalProducerJSON(ctx, parent, "boundary-request-bootstrap.json", "", uid, fields)
+	if e != nil || !originalMaterialBootstrapBinding(bootstrap, r, "bootstrap-bounds", b.RequestHash) || strings.TrimSpace(string(bootstrap["boundary_report"])) != "null" {
+		return lifecycleError("lifecycle_original_operation_material_rejected")
+	}
+	originalIdentity, e := originalMaterialReference(bootstrap["identity_report"], r.OriginalSourceSHA, true)
+	if e != nil || originalIdentity != identityRef || originalMaterialText(bootstrap, "created_run_id") == identityRef.RunID {
+		return lifecycleError("lifecycle_original_operation_material_rejected")
+	}
+	bounds.files["boundary.private.json"].retained = true
+	return bounds.checkComplete(false)
+}
+func completeLifecycleOriginalMetadataInputs(ctx context.Context, r lifecycleRequest, parent *lifecycleMaterialDirectory, uid uint32) error {
+	m, e := readLifecycleOriginalProducerJSON(ctx, parent, "history-request-bootstrap.json", "", uid, "format_version kind source_sha operation_id created_run_id approval_sha256 approval request_sha256 parent_run_id metadata_report inventory_report")
+	if e != nil || !originalMaterialVersion(m) || originalMaterialText(m, "kind") != "readonly_history_parent_registration" || originalMaterialText(m, "source_sha") != r.OriginalSourceSHA || originalMaterialText(m, "operation_id") != r.OperationID || !runRE.MatchString(originalMaterialText(m, "created_run_id")) || originalMaterialText(m, "request_sha256") != parent.files["history-request.json"].hash || originalMaterialText(m, "parent_run_id") != r.Approval.RunID || digestRaw(append(append([]byte(nil), m["approval"]...), '\n')) != originalMaterialText(m, "approval_sha256") {
+		return lifecycleError("lifecycle_original_operation_material_rejected")
+	}
+	inventoryRef, e := originalMaterialReference(m["inventory_report"], r.OriginalSourceSHA, false)
+	if e != nil || inventoryRef.RunID != r.Approval.RunID || inventoryRef.SHA256 != r.Approval.InventorySHA256 {
+		return lifecycleError("lifecycle_original_operation_material_rejected")
+	}
+	metadataRef, e := originalMaterialReference(m["metadata_report"], r.OriginalSourceSHA, false)
+	if e != nil {
+		return e
+	}
+	d, e := openLifecycleOriginalChild(parent, "history-metadata-"+metadataRef.RunID, uid)
+	if e != nil {
+		return e
+	}
+	metadata, e := readLifecycleOriginalProducerJSON(ctx, d, "history-metadata.json", metadataRef.SHA256, uid, "format_version kind source_sha operation_id run_id metadata_limits approved_inventory_report inventory_request_sha256 approval_sha256 parent_proposal_run_id parent_proposal_sha256 assets equal_full_physical_passes metadata_complete input_baseline_sha256 semantic_source_coverage_verified production_process_budget_proven complete execution_allowed drop_ready cas_complete")
+	if e != nil || !originalMaterialVersion(metadata) || originalMaterialText(metadata, "kind") != "readonly_history_file_metadata" || originalMaterialText(metadata, "source_sha") != r.OriginalSourceSHA || originalMaterialText(metadata, "operation_id") != r.OperationID || originalMaterialText(metadata, "run_id") != metadataRef.RunID || originalMaterialText(metadata, "inventory_request_sha256") != r.Approval.RequestHash || originalMaterialText(metadata, "parent_proposal_sha256") != parent.files["history-request.json"].hash || originalMaterialText(metadata, "parent_proposal_run_id") != r.Approval.RunID || !originalMaterialBool(metadata, "metadata_complete", true) || !originalMaterialBool(metadata, "drop_ready", false) {
+		return lifecycleError("lifecycle_original_operation_material_rejected")
+	}
+	metaInventory, e := originalMaterialReference(metadata["approved_inventory_report"], r.OriginalSourceSHA, false)
+	if e != nil || metaInventory != inventoryRef {
+		return lifecycleError("lifecycle_original_operation_material_rejected")
+	}
+	if e = registerLifecycleOriginalFrozenFile(d, "history-parent-proposal.json", parent.files["history-request.json"].hash, uid); e != nil {
+		return e
+	}
+	bootstrap, e := readLifecycleOriginalProducerJSON(ctx, d, "history-metadata-bootstrap.json", "", uid, "format_version kind source_sha operation_id created_run_id approval_sha256 approval parent_proposal_run_id parent_proposal_sha256")
+	if e != nil || !originalMaterialVersion(bootstrap) || originalMaterialText(bootstrap, "kind") != "readonly_history_metadata_binding" || originalMaterialText(bootstrap, "source_sha") != r.OriginalSourceSHA || originalMaterialText(bootstrap, "operation_id") != r.OperationID || originalMaterialText(bootstrap, "created_run_id") != metadataRef.RunID || originalMaterialText(bootstrap, "approval_sha256") != originalMaterialText(metadata, "approval_sha256") || originalMaterialText(bootstrap, "parent_proposal_run_id") != r.Approval.RunID || originalMaterialText(bootstrap, "parent_proposal_sha256") != parent.files["history-request.json"].hash || digestRaw(append(append([]byte(nil), bootstrap["approval"]...), '\n')) != originalMaterialText(bootstrap, "approval_sha256") {
+		return lifecycleError("lifecycle_original_operation_material_rejected")
+	}
+	d.files["history-metadata.json"].retained = true
+	return d.checkComplete(false)
+}
+
+// The fixed original AI journals contain hashes/IDs only. Registration binds
+// their original immutable source/runtime tuple and prefix chain; fresh native
+// GET quiescence and execution outcome checks remain with their existing owner.
+type lifecycleOriginalAIExecBinding struct {
+	SourceSHA        string `json:"source_sha"`
+	OperationID      string `json:"operation_id"`
+	RunID            string `json:"run_id"`
+	RuntimeSourceSHA string `json:"runtime_source_sha"`
+	ImageID          string `json:"image_id"`
+	ContainerID      string `json:"container_id"`
+	PythonSHA256     string `json:"python_sha256"`
+	InputSHA256      string `json:"input_sha256"`
+	DeadlineUnixNano int64  `json:"deadline_unix_nano"`
+}
+type lifecycleOriginalAIExecRecord struct {
+	Protocol            string                         `json:"protocol"`
+	Sequence            uint64                         `json:"sequence"`
+	PreviousSHA256      string                         `json:"previous_sha256"`
+	Binding             lifecycleOriginalAIExecBinding `json:"binding"`
+	Stage               string                         `json:"stage"`
+	ExecID              string                         `json:"exec_id"`
+	EngineVersionSHA256 string                         `json:"engine_version_sha256"`
+	Running             *bool                          `json:"running"`
+	ExitCode            *int                           `json:"exit_code"`
+	AttachComplete      bool                           `json:"attach_complete"`
+	OutputBytes         uint64                         `json:"output_bytes"`
+	OutputSHA256        string                         `json:"output_sha256"`
+}
+
+func registerLifecycleOriginalAIExecMaterials(ctx context.Context, r lifecycleRequest, parent *lifecycleMaterialDirectory, uid uint32) error {
+	if r.FinalHistory == nil || !r.FinalHistory.valid(r) {
+		return lifecycleError("lifecycle_original_operation_material_rejected")
+	}
+	for _, name := range []string{"qs-ai-external-bounds.exec.jsonl", "qs-ai-external-verify.exec.jsonl", "qs-ai-external-final-verify.exec.jsonl"} {
+		if ctx == nil || ctx.Err() != nil {
+			return lifecycleError("lifecycle_original_operation_material_rejected")
+		}
+		visible, e := os.Lstat(filepath.Join(parent.path, name))
+		if os.IsNotExist(e) {
+			continue
+		}
+		if e != nil {
+			return e
+		}
+		fd, e := syscall.Open(filepath.Join(parent.path, name), syscall.O_RDONLY|syscall.O_NOFOLLOW|syscall.O_NONBLOCK, 0)
+		if e != nil {
+			return e
+		}
+		f := os.NewFile(uintptr(fd), name)
+		info, e := f.Stat()
+		if e != nil || !info.Mode().IsRegular() || info.Mode().Perm() != 0600 || info.Size() < 1 || info.Size() > 64<<10 || info.Sys().(*syscall.Stat_t).Uid != uid || info.Sys().(*syscall.Stat_t).Nlink != 1 || !sameLifecycleFile(visible, info) {
+			_ = f.Close()
+			return lifecycleError("lifecycle_original_operation_material_rejected")
+		}
+		raw, e := io.ReadAll(io.LimitReader(f, (64<<10)+1))
+		after, se := f.Stat()
+		closeErr := f.Close()
+		if e != nil || se != nil || closeErr != nil || !sameLifecycleFile(info, after) || int64(len(raw)) != info.Size() {
+			return lifecycleError("lifecycle_original_operation_material_rejected")
+		}
+		if e = validateLifecycleOriginalAIExecMaterial(raw, r); e != nil {
+			return e
+		}
+		if e = parent.registerWithMaximum(name, digestRaw(raw), uid, 0600, 64<<10); e != nil {
+			return e
+		}
+		held := parent.files[name]
+		if !sameLifecycleFile(info, held.info) || parent.checkFile(held) != nil {
+			return lifecycleError("lifecycle_original_operation_material_rejected")
+		}
+		held.retained = true
+	}
+	return nil
+}
+func validateLifecycleOriginalAIExecMaterial(raw []byte, r lifecycleRequest) error {
+	if len(raw) == 0 || len(raw) > 64<<10 || raw[len(raw)-1] != '\n' || r.FinalHistory == nil {
+		return lifecycleError("lifecycle_original_operation_material_rejected")
+	}
+	lines := strings.Split(string(raw[:len(raw)-1]), "\n")
+	var original lifecycleOriginalAIExecBinding
+	offset := 0
+	for n, line := range lines {
+		var v lifecycleOriginalAIExecRecord
+		var fields map[string]json.RawMessage
+		if rejectDuplicateJSON([]byte(line)) != nil || json.Unmarshal([]byte(line), &fields) != nil || len(fields) != 12 || lifecycleExactJSONNames([]byte(line), reflect.TypeOf(v)) != nil || json.Unmarshal([]byte(line), &v) != nil || v.Protocol != "qs-ai-exec-lifecycle/v1" || v.Sequence != uint64(n+1) || v.PreviousSHA256 != func() string {
+			if n == 0 {
+				return ""
+			}
+			return digestRaw(raw[:offset])
+		}() {
+			return lifecycleError("lifecycle_original_operation_material_rejected")
+		}
+		b := v.Binding
+		if n == 0 {
+			original = b
+		}
+		if b != original || b.SourceSHA != r.OriginalSourceSHA || b.OperationID != r.OperationID || !validLifecycleOriginalAIExecRunID(b.RunID) || b.RuntimeSourceSHA != r.FinalHistory.RuntimeSourceSHA || b.ImageID != r.FinalHistory.ImageID || b.ContainerID != r.FinalHistory.ContainerID || !hashRE.MatchString(b.PythonSHA256) || !hashRE.MatchString(b.InputSHA256) || b.DeadlineUnixNano <= 0 || !hashRE.MatchString(v.EngineVersionSHA256) || v.ExecID != "" && !hashRE.MatchString(v.ExecID) || v.OutputSHA256 != "" && !hashRE.MatchString(v.OutputSHA256) {
+			return lifecycleError("lifecycle_original_operation_material_rejected")
+		}
+		switch v.Stage {
+		case "create_intent", "created", "start_intent", "attached", "unknown", "observed":
+		default:
+			return lifecycleError("lifecycle_original_operation_material_rejected")
+		}
+		offset += len(line) + 1
+	}
+	return nil
+}
+func validLifecycleOriginalAIExecRunID(run string) bool {
+	if len(run) < 1 || len(run) > 20 {
+		return false
+	}
+	for _, c := range run {
+		if c < '0' || c > '9' {
+			return false
+		}
+	}
+	return true
+}
+
+// The history proof's immutable producer run is the only directory selector.
+// Container receipts bind the existing producer's original files; their flags
+// never replace current native liveness, CAS, fence or business acceptance.
+func completeLifecycleOriginalReadOnlyHistory(ctx context.Context, r lifecycleRequest, parent, inventory *lifecycleMaterialDirectory, proof map[string]json.RawMessage, uid uint32) error {
+	producer, e := originalMaterialClosedFields(proof["producer"], "protocol source_sha run_id")
+	if e != nil {
+		return e
+	}
+	run := originalMaterialText(producer, "run_id")
+	if originalMaterialText(producer, "protocol") != "qs_compatibility_retirement_history_v1" || originalMaterialText(producer, "source_sha") != r.OriginalSourceSHA || !runRE.MatchString(run) || run == r.Approval.RunID || run == r.ActualRunID {
+		return lifecycleError("lifecycle_original_operation_material_rejected")
+	}
+	summary, e := originalMaterialClosedFields(proof["summary"], "classified verified_live verified_retired unverifiable_closed unresolved ambiguous hash_conflicts unknown_execution unexplained_high retirement_references references_hash")
+	if e != nil {
+		return e
+	}
+	for name, raw := range summary {
+		if name == "references_hash" {
+			if !hashRE.MatchString(originalMaterialText(summary, name)) {
+				return lifecycleError("lifecycle_original_operation_material_rejected")
+			}
+		} else {
+			var n uint64
+			if json.Unmarshal(raw, &n) != nil {
+				return lifecycleError("lifecycle_original_operation_material_rejected")
+			}
+		}
+	}
+	d, e := openLifecycleOriginalChild(parent, "history-"+run, uid)
+	if e != nil {
+		return e
+	}
+	terminal, e := readLifecycleOriginalProducerJSON(ctx, d, "history.terminal.json", "", uid, "id name image actual_run_id source_sha request_sha256 creation_nonce owner_uid owner_gid status exit_code container_removed private_readiness_sha256")
+	if e != nil {
+		return e
+	}
+	cid, image, nonce, requestHash, readinessHash := originalMaterialText(terminal, "id"), originalMaterialText(terminal, "image"), originalMaterialText(terminal, "creation_nonce"), originalMaterialText(terminal, "request_sha256"), originalMaterialText(terminal, "private_readiness_sha256")
+	var owner uint32
+	var code int
+	if !hashRE.MatchString(cid) || !strings.HasPrefix(image, "sha256:") || !hashRE.MatchString(strings.TrimPrefix(image, "sha256:")) || !hashRE.MatchString(nonce) || !hashRE.MatchString(requestHash) || !hashRE.MatchString(readinessHash) || originalMaterialText(terminal, "name") != "qs-compatibility-history-"+run || originalMaterialText(terminal, "actual_run_id") != run || originalMaterialText(terminal, "source_sha") != r.OriginalSourceSHA || originalMaterialText(terminal, "status") != "exited" || !originalMaterialBool(terminal, "container_removed", true) || json.Unmarshal(terminal["owner_uid"], &owner) != nil || owner != uid || json.Unmarshal(terminal["exit_code"], &code) != nil || code != 0 {
+		return lifecycleError("lifecycle_original_operation_material_rejected")
+	}
+	var q lifecycleHistoricalRequestMaterial
+	raw, e := readLifecycleProducerJSON(d, "history.request.json", requestHash, uid, 256<<10, &q)
+	if e != nil || decodeLifecycleHistoricalRequest(raw, &q) != nil || !lifecycleHistoricalRequestMatches(q, r, inventory, parent.path, run) {
+		return lifecycleError("lifecycle_original_operation_material_rejected")
+	}
+	bootstrap, e := readLifecycleOriginalProducerJSON(ctx, d, "history.bootstrap.json", "", uid, "format_version kind source_sha operation_id actual_run_id approval_sha256 approval parent_request_sha256 parent_run_id derived_request_sha256 only_changed_field binary_sha256")
+	if e != nil || !originalMaterialVersion(bootstrap) || originalMaterialText(bootstrap, "kind") != "immutable_history_run_derivation" || originalMaterialText(bootstrap, "source_sha") != r.OriginalSourceSHA || originalMaterialText(bootstrap, "operation_id") != r.OperationID || originalMaterialText(bootstrap, "actual_run_id") != run || originalMaterialText(bootstrap, "parent_request_sha256") != parent.files["history-request.json"].hash || originalMaterialText(bootstrap, "parent_run_id") != r.Approval.RunID || originalMaterialText(bootstrap, "derived_request_sha256") != requestHash || originalMaterialText(bootstrap, "only_changed_field") != "run_id" || !hashRE.MatchString(originalMaterialText(bootstrap, "binary_sha256")) || digestRaw(append(append([]byte(nil), bootstrap["approval"]...), '\n')) != originalMaterialText(bootstrap, "approval_sha256") {
+		return lifecycleError("lifecycle_original_operation_material_rejected")
+	}
+	var original lifecycleHistoricalRequestMaterial
+	originalRaw, e := readLifecycleHistoricalHeldJSON(parent, "history-request.json", 256<<10, &original)
+	if e != nil || decodeLifecycleHistoricalRequest(originalRaw, &original) != nil {
+		return lifecycleError("lifecycle_original_operation_material_rejected")
+	}
+	original.RunID = run
+	if !reflect.DeepEqual(q, original) {
+		return lifecycleError("lifecycle_original_operation_material_rejected")
+	}
+	created, e := readLifecycleOriginalProducerJSON(ctx, d, "history.container.json", "", uid, "id name image labels mounts limits owner_uid owner_gid")
+	if e != nil {
+		return e
+	}
+	intent, e := readLifecycleOriginalProducerJSON(ctx, d, "history.creation.intent.json", "", uid, "name image labels declared_image_volumes mounts limits owner_uid owner_gid")
+	if e != nil {
+		return e
+	}
+	if originalMaterialText(created, "id") != cid || originalMaterialText(created, "name") != originalMaterialText(terminal, "name") || originalMaterialText(created, "image") != image || originalMaterialText(intent, "name") != originalMaterialText(terminal, "name") || originalMaterialText(intent, "image") != image {
+		return lifecycleError("lifecycle_original_operation_material_rejected")
+	}
+	for _, name := range []string{"labels", "mounts", "limits", "owner_uid", "owner_gid"} {
+		if !reflect.DeepEqual(created[name], intent[name]) {
+			return lifecycleError("lifecycle_original_operation_material_rejected")
+		}
+	}
+	if !reflect.DeepEqual(created["owner_uid"], terminal["owner_uid"]) || !reflect.DeepEqual(created["owner_gid"], terminal["owner_gid"]) {
+		return lifecycleError("lifecycle_original_operation_material_rejected")
+	}
+	var labels map[string]string
+	if json.Unmarshal(created["labels"], &labels) != nil || labels["qs.compatibility-retirement.operation"] != r.OperationID || labels["qs.compatibility-retirement.run"] != run || labels["qs.compatibility-retirement.source"] != r.OriginalSourceSHA || labels["qs.compatibility-retirement.request"] != requestHash || labels["qs.compatibility-retirement.creation"] != nonce || labels["qs.compatibility-retirement.kind"] != "history-readonly" {
+		return lifecycleError("lifecycle_original_operation_material_rejected")
+	}
+	shadow, e := openLifecycleOriginalChild(d, "mysql-volume-shadow", uid)
+	if e != nil {
+		return e
+	}
+	if e = shadow.checkComplete(false); e != nil {
+		return e
+	}
+	output, e := openLifecycleOriginalChild(d, "output", uid)
+	if e != nil {
+		return e
+	}
+	readiness, e := readLifecycleOriginalProducerJSON(ctx, output, "history.readiness.json", readinessHash, uid, "protocol source_sha operation_id run_id request_sha256 inventory_request_sha256 inventory_report_sha256 completed_readonly_pipeline independent_epochs source_files_and_actual_origins_matched whole_four_source_coverage_complete business_and_responsibility_facts_unchanged sources full_source_file_sha256 whole_source_index_sha256 candidate_sha256 sql_current_facts_sha256 mongo_current_facts_sha256 local_candidates locally_qualified blocked_local joint_event_pages ai_blocked_pages sql_ledger_count mongo_collection_count sql_global mongo_global ai_reverse_global blocking_reasons required_adapters independent_production_approval_verified ordered_mongo_source_metadata_approved host_process_budget_proven full_external_ai_closure_verified distributed_atomic_snapshot writer_fence_proven cas_complete post_cas_readback_complete backup_restore_qualified mutation_backend_enabled drop_ready error_category elapsed_milliseconds")
+	if e != nil || originalMaterialText(readiness, "protocol") != "qs-compatibility-history-readonly/v1" || originalMaterialText(readiness, "source_sha") != r.OriginalSourceSHA || originalMaterialText(readiness, "operation_id") != r.OperationID || originalMaterialText(readiness, "run_id") != run || originalMaterialText(readiness, "request_sha256") != requestHash || originalMaterialText(readiness, "inventory_request_sha256") != r.Approval.RequestHash || originalMaterialText(readiness, "inventory_report_sha256") != r.Approval.InventorySHA256 || originalMaterialText(readiness, "error_category") != "none" {
+		return lifecycleError("lifecycle_original_operation_material_rejected")
+	}
+	for _, name := range []string{"completed_readonly_pipeline", "source_files_and_actual_origins_matched", "whole_four_source_coverage_complete", "business_and_responsibility_facts_unchanged"} {
+		if !originalMaterialBool(readiness, name, true) {
+			return lifecycleError("lifecycle_original_operation_material_rejected")
+		}
+	}
+	for _, name := range []string{"independent_production_approval_verified", "ordered_mongo_source_metadata_approved", "host_process_budget_proven", "full_external_ai_closure_verified", "distributed_atomic_snapshot", "writer_fence_proven", "cas_complete", "post_cas_readback_complete", "backup_restore_qualified", "mutation_backend_enabled", "drop_ready"} {
+		if !originalMaterialBool(readiness, name, false) {
+			return lifecycleError("lifecycle_original_operation_material_rejected")
+		}
+	}
+	var epochs int
+	var hashes []string
+	var sources []retirement.SourceCopyReceipt
+	if json.Unmarshal(readiness["independent_epochs"], &epochs) != nil || epochs != 2 || json.Unmarshal(readiness["full_source_file_sha256"], &hashes) != nil || len(hashes) != 4 || json.Unmarshal(readiness["sources"], &sources) != nil || len(sources) != 4 {
+		return lifecycleError("lifecycle_original_operation_material_rejected")
+	}
+	var inventoryReport report
+	if _, e = readLifecycleHistoricalHeldJSON(inventory, "inventory.private.json", 256<<10, &inventoryReport); e != nil || len(inventoryReport.Targets) != 4 {
+		return lifecycleError("lifecycle_original_operation_material_rejected")
+	}
+	for n, source := range sources {
+		protocol := retirement.SQLSourceProtocol
+		if targets[n][0] == "mongodb" {
+			protocol = retirement.MongoSourceProtocol
+		}
+		if hashes[n] != inventory.files[lifecycleSourceNames[3+n]].hash || source.Protocol != protocol || !source.Complete || source.BusinessClosureVerified || source.DropReady || source.Records != inventoryReport.Targets[n].Records || source.Bytes != inventoryReport.Targets[n].Bytes || source.DataHash != inventoryReport.Targets[n].DataHash {
+			return lifecycleError("lifecycle_original_operation_material_rejected")
+		}
+	}
+	// Only the existing native body's-free diagnostic and terminal hash receipt
+	// survive. Original requests, mount/creation inputs and bootstrap bytes purge.
+	output.files["history.readiness.json"].retained = true
+	d.files["history.terminal.json"].retained = true
+	if e = output.checkComplete(false); e != nil {
+		return e
+	}
+	return d.checkComplete(false)
+}
+func originalMaterialClosedFields(raw json.RawMessage, closed string) (map[string]json.RawMessage, error) {
+	var fields map[string]json.RawMessage
+	if rejectDuplicateJSON(raw) != nil || json.Unmarshal(raw, &fields) != nil || len(fields) != len(strings.Fields(closed)) {
+		return nil, lifecycleError("lifecycle_original_operation_material_rejected")
+	}
+	for _, name := range strings.Fields(closed) {
+		if fields[name] == nil || strings.TrimSpace(string(fields[name])) == "null" {
+			return nil, lifecycleError("lifecycle_original_operation_material_rejected")
+		}
+	}
+	return fields, nil
+}
+
+// This exact root-owned observation is outside the source-owned parent tree.
+// The caller must keep the returned leaf in its catalog, never attach it under
+// the source parent or delete another root preparation batch by enumeration.
+func openLifecycleOriginalCensusMaterials(ctx context.Context, r lifecycleRequest, uid uint32) (*lifecycleMaterialDirectory, error) {
+	if ctx == nil || ctx.Err() != nil || r.WriterControl == nil || r.WriterControl.DatabaseInput == nil {
+		return nil, lifecycleError("lifecycle_original_operation_material_rejected")
+	}
+	ref, run, e := lifecycleOriginalCensusReference(r, uid)
+	if e != nil {
+		return nil, e
+	}
+	d, e := openLifecycleMaterialDirectory(filepath.Dir(ref.Path), 0)
+	if e != nil {
+		return nil, e
+	}
+	reject := func(e error) (*lifecycleMaterialDirectory, error) { _ = d.close(); return nil, e }
+	if e = d.registerWithMaximum("db-writer-census.private.json", ref.SHA256, 0, 0600, 64<<20); e != nil {
+		return reject(e)
+	}
+	var c dbCensusPrivate
+	raw, e := readLifecycleHistoricalHeldJSON(d, "db-writer-census.private.json", 64<<20, &c)
+	if e != nil || rejectDuplicateJSON(raw) != nil || lifecycleExactJSONNames(raw, reflect.TypeOf(c)) != nil || !lifecycleDBCensusProducerValid(c, r, run) {
+		return reject(lifecycleError("lifecycle_original_operation_material_rejected"))
+	}
+	var tool lifecycleOriginalRootToolIntent
+	raw, e = readLifecycleProducerJSON(d, "tool.intent.private.json", "", 0, 256<<10, &tool)
+	if e != nil || decodeLifecycleClosedProducer(raw, &tool) != nil || tool.FormatVersion != 1 || tool.Kind != "approved_root_once_tool_staging" || tool.Stage != "db-writer-census" || tool.OperationID != r.OperationID || tool.ActualRunID != run || tool.ToolSourceSHA != r.OriginalSourceSHA || tool.RequestPath != filepath.Join("/opt/backups/qs-server/compatibility-retirement", r.OperationID, "db-writer-census-request-"+run+".json") || tool.RequestSHA256 != c.RequestSHA256 || tool.ManifestSHA256 != "" || !hashRE.MatchString(tool.PackageSHA256) || !hashRE.MatchString(tool.NativeSHA256) || tool.SourceUID != uid || tool.DropAuthority || !tool.PurgeRequired {
+		return reject(lifecycleError("lifecycle_original_operation_material_rejected"))
+	}
+	if e = d.register("restore-native", tool.NativeSHA256, 0, 0700); e != nil {
+		return reject(e)
+	}
+	var request dbCensusRequest
+	raw, e = readLifecycleOwnedBytes(tool.RequestPath, c.RequestSHA256, uid, 256<<10)
+	if e == nil {
+		e = json.Unmarshal(raw, &request)
+	}
+	if e != nil || rejectDuplicateJSON(raw) != nil || lifecycleExactJSONNames(raw, reflect.TypeOf(request)) != nil || request.FormatVersion != 1 || request.Kind != "readonly_db_writer_census_request" || request.SourceSHA != r.OriginalSourceSHA || request.OperationID != r.OperationID || request.ActualRunID != run || request.TargetHash != digest(targets) || request.Identity != c.IdentityProducer {
+		return reject(lifecycleError("lifecycle_original_operation_material_rejected"))
+	}
+	if e = d.checkComplete(false); e != nil {
+		return reject(e)
+	}
+	return d, nil
+}
+
+func lifecycleOriginalCensusReference(r lifecycleRequest, uid uint32) (lifecycleFinalFileBinding, string, error) {
+	if r.WriterControl == nil || r.WriterControl.DatabaseInput == nil {
+		return lifecycleFinalFileBinding{}, "", lifecycleError("lifecycle_original_operation_material_rejected")
+	}
+	ref := *r.WriterControl.DatabaseInput
+	if run, native := lifecycleDBInputCensusRun(ref.Path, r.OperationID); native {
+		return ref, run, nil
+	}
+	if filepath.Dir(ref.Path) != filepath.Join("/opt/backups/qs-server/compatibility-retirement", r.OperationID) {
+		return ref, "", lifecycleError("lifecycle_original_operation_material_rejected")
+	}
+	raw, e := readLifecycleOwnedBytes(ref.Path, ref.SHA256, uid, 256<<10)
+	var input lifecycleDBWriterInput
+	if e != nil || rejectDuplicateJSON(raw) != nil || lifecycleExactJSONNames(raw, reflect.TypeOf(input)) != nil || json.Unmarshal(raw, &input) != nil || !lifecycleDBInputValid(input, r) || input.CensusSourceSHA != r.OriginalSourceSHA {
+		return ref, "", lifecycleError("lifecycle_original_operation_material_rejected")
+	}
+	run, native := lifecycleDBInputCensusRun(input.Census.Path, r.OperationID)
+	if !native || run != input.CensusRunID {
+		return ref, "", lifecycleError("lifecycle_original_operation_material_rejected")
+	}
+	return input.Census, run, nil
+}
+func registerLifecycleOriginalDatabaseSourceInput(ctx context.Context, r lifecycleRequest, parent *lifecycleMaterialDirectory, uid uint32) error {
+	if r.WriterControl == nil || r.WriterControl.DatabaseInput == nil {
+		return nil
+	}
+	if ctx == nil || ctx.Err() != nil {
+		return lifecycleError("lifecycle_original_operation_material_rejected")
+	}
+	originalRef := *r.WriterControl.DatabaseInput
+	if _, native := lifecycleDBInputCensusRun(originalRef.Path, r.OperationID); !native {
+		if filepath.Dir(originalRef.Path) != parent.path || !hashRE.MatchString(originalRef.SHA256) {
+			return lifecycleError("lifecycle_original_operation_material_rejected")
+		}
+		var input lifecycleDBWriterInput
+		raw, e := readLifecycleProducerJSON(parent, filepath.Base(originalRef.Path), originalRef.SHA256, uid, 256<<10, &input)
+		if e != nil || rejectDuplicateJSON(raw) != nil || lifecycleExactJSONNames(raw, reflect.TypeOf(input)) != nil || !lifecycleDBInputValid(input, r) {
+			return lifecycleError("lifecycle_original_operation_material_rejected")
+		}
+	}
+	ref, run, e := lifecycleOriginalCensusReference(r, uid)
+	if e != nil {
+		return e
+	}
+	raw, e := readLifecycleOwnedBytes(ref.Path, ref.SHA256, 0, 64<<20)
+	var c dbCensusPrivate
+	if e != nil || rejectDuplicateJSON(raw) != nil || lifecycleExactJSONNames(raw, reflect.TypeOf(c)) != nil || json.Unmarshal(raw, &c) != nil || !lifecycleDBCensusProducerValid(c, r, run) {
+		return lifecycleError("lifecycle_original_operation_material_rejected")
+	}
+	var q dbCensusRequest
+	raw, e = readLifecycleProducerJSON(parent, "db-writer-census-request-"+run+".json", c.RequestSHA256, uid, 256<<10, &q)
+	if e != nil || rejectDuplicateJSON(raw) != nil || lifecycleExactJSONNames(raw, reflect.TypeOf(q)) != nil || q.FormatVersion != 1 || q.Kind != "readonly_db_writer_census_request" || q.SourceSHA != r.OriginalSourceSHA || q.OperationID != r.OperationID || q.ActualRunID != run || q.TargetHash != digest(targets) || q.Identity != c.IdentityProducer {
+		return lifecycleError("lifecycle_original_operation_material_rejected")
+	}
+	return nil
+}
