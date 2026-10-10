@@ -312,6 +312,9 @@ func (e *HistoricalSourceInputEpoch) verifyFrozen(ctx context.Context) error {
 	var ended [4]bool
 	last := 0
 	for _, ref := range e.pages {
+		if ctx.Err() != nil {
+			return ErrSourceOrigin
+		}
 		if ref.Offset < 0 || ref.Length <= 0 || ref.Length > 2*sourceOriginInputPageBytes+(1<<20) || ref.Offset > e.end-ref.Length {
 			return ErrSourceOrigin
 		}

@@ -256,6 +256,7 @@ type AIReverseSnapshot struct {
 	structuralReasons []string
 	report            AIReverseSummary
 	scope             *aiReverseScope
+	inputSink         aiHistoricalInputSink
 }
 type aiReverseScope struct {
 	owner                       *HistoricalCoordinator
@@ -400,6 +401,10 @@ func (s *AIReverseSnapshot) ValidateBorrowedSnapshot(ctx context.Context) error 
 }
 
 func PrepareAIReverseSnapshot(ctx context.Context, snapshot *SQLResponsibilitySnapshot, expectedMigration uint64, limits AIReverseLimits) (*AIReverseSnapshot, error) {
+	return prepareAIReverseSnapshotWithInput(ctx, snapshot, expectedMigration, limits, nil)
+}
+
+func prepareAIReverseSnapshotWithInput(ctx context.Context, snapshot *SQLResponsibilitySnapshot, expectedMigration uint64, limits AIReverseLimits, sink aiHistoricalInputSink) (*AIReverseSnapshot, error) {
 	if ctx == nil || snapshot == nil || snapshot.cycle == nil || expectedMigration != 99 || !limits.valid() {
 		return nil, ErrAIReverseBinding
 	}
@@ -417,7 +422,7 @@ func PrepareAIReverseSnapshot(ctx context.Context, snapshot *SQLResponsibilitySn
 	if r.CompletedAt.IsZero() || !r.ActualTransactionReadOnlyRR || len(r.Ledgers) != 8 {
 		return nil, ErrAIReverseFresh
 	}
-	s := &AIReverseSnapshot{snapshot: snapshot, pool: tx.Statement.ConnPool, head: expectedMigration, limits: limits, started: time.Now(), byTable: map[string]map[string]*aiReverseNode{}, anchors: map[string]aiReverseAnchor{}}
+	s := &AIReverseSnapshot{inputSink: sink, snapshot: snapshot, pool: tx.Statement.ConnPool, head: expectedMigration, limits: limits, started: time.Now(), byTable: map[string]map[string]*aiReverseNode{}, anchors: map[string]aiReverseAnchor{}}
 	s.self = s
 	var nonce [16]byte
 	if _, e = rand.Read(nonce[:]); e != nil {
@@ -699,6 +704,11 @@ func (s *AIReverseSnapshot) scan(ctx context.Context, spec aiReverseSpec) error 
 			s.byTable[spec.table][n.id] = n
 			s.nodes = append(s.nodes, n)
 		}
+		if s.inputSink != nil {
+			if e = s.inputSink(ctx, ledger, rows, false); e != nil {
+				return e
+			}
+		}
 	}
 	if ledger.Rows != expected || expected > 0 && aiReverseCompare(spec, after, upper) != 0 {
 		return ErrAIReverseChanged
@@ -708,6 +718,11 @@ func (s *AIReverseSnapshot) scan(ctx context.Context, spec aiReverseSpec) error 
 	afterMeta, e := s.schema(ctx, spec)
 	if e != nil || !reflect.DeepEqual(meta, afterMeta) {
 		return ErrAIReverseSchema
+	}
+	if s.inputSink != nil {
+		if e = s.inputSink(ctx, ledger, nil, true); e != nil {
+			return e
+		}
 	}
 	return nil
 }
