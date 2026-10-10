@@ -139,9 +139,23 @@ checked. A different retained closed Run does not substitute for the original;
 unfinished Runs, leases and duplicate retry authorization rows remain conflicts.
 The lower-level persistence bridge borrows the host transaction and does not
 certify that the host committed successfully. The qualified historical CAS
-factory has a public caller described below. Exact lifecycle/reconciliation
-kernels remain library capabilities; the production Action still has no actual
-`apply/verify/recover/purge` lifecycle caller.
+factory has a public caller described below. The production Action's
+`prepare_mode=window-tool` caller now invokes the actual native
+`lifecycle-prepare/apply/verify/recover/purge` entrypoints. The original `apply`
+process owns DROP, B migration and deployment, acceptance, temporary-material
+purge, zero verification and service recovery. The ordinary inventory branch
+still rejects non-prepare effects. A separate `recover` reopens the actual
+original service, AI, database-admission and API recovery owners from their
+protected pre-effect baselines and settled results, then reobserves native
+resources under the unchanged original recovery budget. Missing original
+baselines, unsettled effects and prior rollback attempts remain refused. This
+reopening does not recreate Stop/DROP qualification. Separate `verify/purge`
+still lack their original opaque acceptance and complete material-owner basis;
+their native guards remain closed. A saved result or healthy container cannot
+substitute for those owners. The native cross-process service fixture is a
+local inert runtime and does not prove a complete production host recovery or
+its 600-second scale. The limited deploy host
+observation entry does not authorize the window tool's root execution route.
 The historical write host now provides a private multi-page spool, inherited
 transaction deadlines, separate real commit results, and a fresh read-only epoch
 that checks persisted evidence and raw business bindings. The host owns both

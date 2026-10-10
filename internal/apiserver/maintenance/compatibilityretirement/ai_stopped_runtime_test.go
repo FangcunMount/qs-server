@@ -142,7 +142,7 @@ func aiStoppedUnitLease(t *testing.T) (*AIStoppedRuntimeLease, *aiStoppedUnitPro
 	}
 	w := &aiStoppedUnitWindow{binding: fence.WindowBinding{SourceSHA: strings.Repeat("a", 40), OperationID: "900-1"}, start: strings.Repeat("b", 64), deadline: time.Now().Add(time.Minute)}
 	s := aiStoppedSnapshot{Runtime: aiExternalRuntime{ContainerID: strings.Repeat("c", 64), ImageID: "sha256:" + strings.Repeat("d", 64), Status: "running", Running: true, StartedAt: time.Now().Add(-time.Hour).UTC().Format(time.RFC3339Nano)}, ConfigSHA256: strings.Repeat("1", 64), HostConfigSHA256: strings.Repeat("2", 64), NetworkID: strings.Repeat("3", 64), RestartPolicy: "unless-stopped", Settings: map[string]string{"QS_AI_DATABASE_URL": "synthetic-secret"}, PID: 121, HealthcheckTest: []string{"CMD", "/app/.venv/bin/python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/readyz', timeout=3)"}, HealthStatus: "healthy", HealthExitCode: aiExecQuiescenceCode(0), HealthStart: time.Now().Add(-time.Second), HealthEnd: time.Now()}
-	l := &AIStoppedRuntimeLease{window: w, binding: w.binding, startSHA: w.start, input: AIExternalExecutionInput{ContainerID: s.Runtime.ContainerID, ApprovedAIRuntimeBindingSHA256: strings.Repeat("4", 64)}, baseline: s, journal: f, journalPath: path, journalStat: st, readRelease: func(string, string) (aiExternalRelease, error) {
+	l := &AIStoppedRuntimeLease{window: w, binding: w.binding, startSHA: w.start, input: AIExternalExecutionInput{ContainerID: s.Runtime.ContainerID, ImageID: s.Runtime.ImageID, ApprovedAIRuntimeBindingSHA256: strings.Repeat("4", 64)}, constraints: AIStoppedRuntimeConstraints{SettingsSHA256: sourceSHA(aiJSONBytes(s.Settings)), NetworkID: s.NetworkID}, baseline: s, journal: f, journalPath: path, journalStat: st, readRelease: func(string, string) (aiExternalRelease, error) {
 		return aiExternalRelease{seal: strings.Repeat("4", 64)}, nil
 	}}
 	l.self = l
@@ -491,5 +491,68 @@ func TestAIWriterScopeKeepsOriginalRecoveryBudgetAndUnknownFailures(t *testing.T
 	l.unknown = true
 	if l.CheckWriterScope(t.Context()) == nil {
 		t.Fatal("unknown original effect became proof")
+	}
+}
+
+// Decoding the real protected original journal can retain recovery obligations;
+// it cannot reconstruct a Window, protocol, a Stop lease or a writer fence.
+func TestAIStoppedOriginalJournalBasisReopensOnlySettledNativeSequence(t *testing.T) {
+	l, p := aiStoppedUnitLease(t)
+	if e := l.Stop(t.Context()); e != nil {
+		t.Fatal(e)
+	}
+	if bytes.Contains(l.journalRaw, []byte("synthetic-secret")) {
+		t.Fatal("private setting was persisted")
+	}
+	decode := func(raw []byte) (*AIStoppedRuntimeLease, error) {
+		n := &AIStoppedRuntimeLease{binding: l.binding, startSHA: l.startSHA, input: l.input, constraints: l.constraints}
+		n.self = n
+		return n, n.restoreJournal(raw)
+	}
+	n, e := decode(l.journalRaw)
+	if e != nil || !n.stopped || !n.stopAttempted || n.baseline.PID != 121 || n.baseline.Runtime.StartedAt != l.baseline.Runtime.StartedAt || len(n.baseline.Settings) != 0 {
+		t.Fatal("original native basis was lost", e)
+	}
+	if n.Stop(t.Context()) == nil || n.Restore(t.Context()) == nil {
+		t.Fatal("journal minted a live effect capability")
+	}
+	if e = l.Restore(t.Context()); e != nil {
+		t.Fatal(e)
+	}
+	n, e = decode(l.journalRaw)
+	if e != nil || !n.restored || n.restoredPID != p.snap.PID || !reflect.DeepEqual(n.restoredRuntime, p.snap.Runtime) {
+		t.Fatal("native original start result was not retained", e)
+	}
+	for name, raw := range map[string][]byte{
+		"torn":             l.journalRaw[:len(l.journalRaw)-1],
+		"wrong_origin":     bytes.Replace(l.journalRaw, []byte(l.startSHA), []byte(strings.Repeat("9", 64)), 1),
+		"changed_previous": bytes.Replace(l.journalRaw, []byte(`"Stage":"stopped"`), []byte(`"Stage":"stop_unknown"`), 1),
+		"missing_basis":    bytes.Replace(l.journalRaw, []byte(`"Basis":`), []byte(`"UnknownBasis":`), 1),
+	} {
+		t.Run(name, func(t *testing.T) {
+			if _, e := decode(raw); e == nil {
+				t.Fatal("unknown/changed source acquired recovery state")
+			}
+		})
+	}
+}
+func TestAIStoppedOriginalJournalOutstandingIntentNeverReplays(t *testing.T) {
+	for _, stage := range []string{"stop_intent", "stop_unknown", "carrier_create_intent", "restore_intent"} {
+		t.Run(stage, func(t *testing.T) {
+			l, _ := aiStoppedUnitLease(t)
+			if strings.HasPrefix(stage, "carrier_") || stage == "restore_intent" {
+				if e := l.Stop(t.Context()); e != nil {
+					t.Fatal(e)
+				}
+			}
+			if l.append(stage, "") != nil {
+				t.Fatal("original intent")
+			}
+			n := &AIStoppedRuntimeLease{binding: l.binding, startSHA: l.startSHA, input: l.input, constraints: l.constraints}
+			n.self = n
+			if n.restoreJournal(l.journalRaw) == nil {
+				t.Fatal("unknown issued operation was replayable")
+			}
+		})
 	}
 }

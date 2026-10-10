@@ -179,6 +179,7 @@ type lifecycleAPITransition struct {
 	materials                                 *lifecycleMaterialDirectory
 	acceptance                                *lifecycleAPIRuntimeObservation
 	programProbeIDs                           [2]string
+	reopenedRecovery                          bool
 }
 
 // Prewarm runs before StartMaintenanceWindow. All probes are never started,
@@ -261,7 +262,214 @@ func prepareLifecycleAPITransition(ctx context.Context, r lifecycleRequest) (v *
 		return v, e
 	}
 	v.rollbackProgramVerified = true
+	intentRaw, e := readLifecycleAPIRecord(filepath.Join(r.prepareRoot, "native-call.intent.private.json"))
+	if e != nil {
+		return v, e
+	}
+	basis := lifecycleAPIRecoveryBasis{FormatVersion: 1, ToolSourceSHA: r.ToolSourceSHA, OriginalSourceSHA: r.OriginalSourceSHA, OperationID: r.OperationID, OriginalRunID: r.Recovery.OriginalRunID, ActualRunID: r.ActualRunID, ManifestSHA256: r.ManifestSHA256, NativeIntentSHA256: digestRaw(intentRaw), DeploymentSHA256: digest(r.DeploymentControl), DescriptorSHA256: r.ServiceControl.LocalDescriptorSHA256, Original: v.approved, OriginalPID: original.State.PID, ProbeIDs: v.programProbeIDs}
+	if e = v.record("original-recovery-basis", basis); e != nil {
+		return v, e
+	}
 	return v, nil
+}
+
+// Written by the actual original prewarm producer before any service/database
+// mutation. It contains no outcome flag and grants no acceptance/purge authority.
+type lifecycleAPIRecoveryBasis struct {
+	FormatVersion                                                                                                                                     int `json:"format_version"`
+	ToolSourceSHA, OriginalSourceSHA, OperationID, OriginalRunID, ActualRunID, ManifestSHA256, NativeIntentSHA256, DeploymentSHA256, DescriptorSHA256 string
+	Original                                                                                                                                          stop.Container
+	OriginalPID                                                                                                                                       int
+	ProbeIDs                                                                                                                                          [2]string
+}
+
+func reopenLifecycleAPITransition(ctx context.Context, r lifecycleRequest) (v *lifecycleAPITransition, result error) {
+	if ctx == nil || ctx.Err() != nil || r.Resume == nil || !r.DeploymentControl.valid() || r.ServiceControl == nil || r.ToolSourceSHA != sourceSHA || r.Recovery.ActualRunID == r.ActualRunID || validateLifecycleAPIInvocation(r) != nil {
+		return nil, lifecycleError("lifecycle_api_original_recovery_basis_missing")
+	}
+	oldRoot := lifecycleInvocationBatch(r.OperationID, r.Recovery.ActualRunID)
+	dir := filepath.Join(oldRoot, "api-transition")
+	raw, e := readLifecycleAPIRecord(filepath.Join(dir, "original-recovery-basis.private.json"))
+	if e != nil {
+		return nil, e
+	}
+	var b lifecycleAPIRecoveryBasis
+	if rejectDuplicateJSON(raw) != nil || json.Unmarshal(raw, &b) != nil || !bytes.Equal(append(mustLifecycleJSON(b), '\n'), raw) || b.FormatVersion != 1 || b.ToolSourceSHA != r.ToolSourceSHA || b.OriginalSourceSHA != r.OriginalSourceSHA || b.OperationID != r.OperationID || b.OriginalRunID != r.Recovery.OriginalRunID || b.ActualRunID != r.Recovery.ActualRunID || b.ManifestSHA256 != r.ManifestSHA256 || b.DeploymentSHA256 != digest(r.DeploymentControl) || b.DescriptorSHA256 != r.ServiceControl.LocalDescriptorSHA256 {
+		return nil, lifecycleError("lifecycle_api_original_recovery_basis_missing")
+	}
+	intentRaw, e := readLifecycleAPIRecord(filepath.Join(oldRoot, "native-call.intent.private.json"))
+	if e != nil || digestRaw(intentRaw) != b.NativeIntentSHA256 {
+		return nil, lifecycleError("lifecycle_api_original_recovery_basis_missing")
+	}
+	intent, e := decodeLifecycleAPIInvocationIntent(intentRaw)
+	if e != nil || intent.Stage != "apply" || intent.ToolSourceSHA != sourceSHA || intent.OriginalSourceSHA != r.OriginalSourceSHA || intent.OperationID != r.OperationID || intent.OriginalRunID != r.Recovery.OriginalRunID || intent.ActualRunID != b.ActualRunID || intent.ManifestSHA256 != r.ManifestSHA256 || intent.DropAuthority || intent.BImageID != r.DeploymentControl.BImageID || intent.BProgramSHA256 != r.DeploymentControl.BProgramSHA256 {
+		return nil, lifecycleError("lifecycle_api_original_recovery_basis_missing")
+	}
+	if _, e = readLifecycleRootFile(intent.NativePath, intent.NativeSHA256, true); e != nil {
+		return nil, e
+	}
+	descriptorPath := filepath.Join(lifecycleServicesRoot(r.OperationID, "server-a"), "approved-services.json")
+	approval, e := stop.ReadApprovedDescriptor(descriptorPath, r.ServiceControl.LocalDescriptorSHA256)
+	if e != nil {
+		return nil, e
+	}
+	binding, e := approval.WindowBinding(ctx)
+	if e != nil || binding != lifecycleWindowBinding(r) {
+		return nil, lifecycleError("lifecycle_api_binding_rejected")
+	}
+	var descriptor stop.Descriptor
+	if readLifecyclePrivate(descriptorPath, r.ServiceControl.LocalDescriptorSHA256, &descriptor) != nil {
+		return nil, lifecycleError("lifecycle_api_binding_rejected")
+	}
+	matched := 0
+	for _, c := range descriptor.Containers {
+		if c.Component == "qs-apiserver" {
+			if !reflect.DeepEqual(c, b.Original) {
+				return nil, lifecycleError("lifecycle_api_binding_rejected")
+			}
+			matched++
+		}
+	}
+	if matched != 1 {
+		return nil, lifecycleError("lifecycle_api_binding_rejected")
+	}
+	engine, e := openLifecycleAPIEngine()
+	if e != nil {
+		return nil, e
+	}
+	v = &lifecycleAPITransition{engine: engine, request: r, dir: dir, docker: descriptor.DockerPath, approved: b.Original, programProbeIDs: b.ProbeIDs, reopenedRecovery: true}
+	v.self = v
+	defer func() {
+		if result != nil {
+			engine.transport.CloseIdleConnections()
+			if v.materials != nil {
+				_ = v.materials.close()
+			}
+		}
+	}()
+	specRaw, e := readLifecycleAPIRecord(filepath.Join(dir, "original-runtime-spec.private.json"))
+	if e != nil {
+		return v, e
+	}
+	var spec lifecycleAPISpec
+	if rejectDuplicateJSON(specRaw) != nil || json.Unmarshal(specRaw, &spec) != nil || digest(spec) != r.DeploymentControl.OriginalRuntimeSpecSHA256 {
+		return v, lifecycleError("lifecycle_api_binding_rejected")
+	}
+	v.original.ID = b.Original.ID
+	v.original.Name = b.Original.Name
+	v.original.Image = b.Original.Image
+	v.original.Config = spec.Config
+	v.original.HostConfig = spec.HostConfig
+	v.original.NetworkSettings.Networks = spec.Networks
+	v.original.State.PID = b.OriginalPID
+	v.original.State.Running = b.Original.Running
+	v.original.State.StartedAt = b.Original.StartedAt
+	if !lifecycleAPIStaticMatches(v.original, b.Original, r.DeploymentControl.OriginalRuntimeSpecSHA256) {
+		return v, lifecycleError("lifecycle_api_binding_rejected")
+	}
+	if _, e = readLifecycleRootFile(v.docker, descriptor.DockerSHA256, true); e != nil {
+		return v, e
+	}
+	for i, kind := range []string{"b", "rollback"} {
+		image, src, hash := r.DeploymentControl.BImageID, r.ToolSourceSHA, r.DeploymentControl.BProgramSHA256
+		if kind == "rollback" {
+			image, src, hash = r.DeploymentControl.RollbackImageID, r.DeploymentControl.RollbackSourceSHA, r.DeploymentControl.RollbackProgramSHA256
+		}
+		program, e := readLifecycleRootFile(filepath.Join(dir, kind+"-program"), hash, true)
+		if e != nil {
+			return v, e
+		}
+		info, e := buildinfo.Read(bytes.NewReader(program))
+		if e != nil || !lifecycleCompiledProgramSourceMatches(info, src, runtime.GOARCH) {
+			return v, lifecycleError("lifecycle_api_image_program_unproven")
+		}
+		actualRaw, e := engine.call(ctx, http.MethodGet, "/images/"+image+"/json", nil, 200)
+		var actual struct {
+			ID               string `json:"Id"`
+			Architecture, Os string
+			Config           struct{ Labels map[string]string }
+		}
+		if e != nil || rejectDuplicateJSON(actualRaw) != nil || json.Unmarshal(actualRaw, &actual) != nil || actual.ID != image || actual.Os != "linux" || actual.Architecture != runtime.GOARCH || !lifecycleImageRevisionMatches(kind, actual.Config.Labels, src) {
+			return v, lifecycleError("lifecycle_api_image_program_unproven")
+		}
+		if !hashRE.MatchString(b.ProbeIDs[i]) || lifecycleReadAPIStrings(dir, kind+"-program-create-result", map[string]string{"id": b.ProbeIDs[i]}) != nil || lifecycleReadAPIStrings(dir, kind+"-program-copy-result", map[string]string{"id": b.ProbeIDs[i], "program_sha256": hash}) != nil || lifecycleReadAPIStrings(dir, kind+"-program-remove-result", map[string]string{"id": b.ProbeIDs[i], "state": "absent"}) != nil {
+			return v, lifecycleError("lifecycle_api_image_program_unproven")
+		}
+		if _, e = engine.call(ctx, http.MethodGet, "/containers/"+b.ProbeIDs[i]+"/json", nil, 404); e != nil {
+			return v, e
+		}
+	}
+	v.bProgramVerified = true
+	v.rollbackProgramVerified = true
+	// Reopen only known, settled original B effects. Missing/unknown results are
+	// not replayable. The original API's absence is independently read natively.
+	removeIntent := filepath.Join(dir, "b-api-remove-intent.private.json")
+	if _, e = os.Lstat(removeIntent); e == nil {
+		if lifecycleReadAPIStrings(dir, "b-api-remove-intent", map[string]string{"id": b.Original.ID}) != nil || lifecycleReadAPIStrings(dir, "b-api-remove-result", map[string]string{"id": b.Original.ID, "state": "absent"}) != nil {
+			return v, lifecycleError("lifecycle_api_operation_result_unknown")
+		}
+		if _, e = engine.call(ctx, http.MethodGet, "/containers/"+b.Original.ID+"/json", nil, 404); e != nil {
+			return v, e
+		}
+		v.removedOriginal = true
+	} else if !os.IsNotExist(e) {
+		return v, lifecycleError("lifecycle_api_operation_result_unknown")
+	} else {
+		current, e := lifecycleAPIInspect(ctx, engine, b.Original.ID)
+		if e != nil || !lifecycleAPIStaticMatches(current, b.Original, r.DeploymentControl.OriginalRuntimeSpecSHA256) || current.State.Running || current.State.PID != 0 {
+			return v, lifecycleError("lifecycle_api_original_stop_unproven")
+		}
+	}
+	createdPath := filepath.Join(dir, "b-api-create-intent.private.json")
+	if _, e = os.Lstat(createdPath); e == nil {
+		body, e := readLifecycleAPIRecord(filepath.Join(dir, "b-api-create-body.private.json"))
+		if e != nil {
+			return v, e
+		}
+		old := r
+		old.ActualRunID = b.ActualRunID
+		expected, e := lifecycleAPICreateBody(v.original, r.DeploymentControl.BImageID, false, old)
+		if e != nil || !bytes.Equal(body, expected) || lifecycleReadAPIStrings(dir, "b-api-create-intent", map[string]string{"name": strings.TrimPrefix(v.original.Name, "/"), "image": r.DeploymentControl.BImageID, "body_sha256": digestRaw(body), "program_sha256": r.DeploymentControl.BProgramSHA256}) != nil {
+			return v, lifecycleError("lifecycle_api_operation_result_unknown")
+		}
+		resultRaw, e := readLifecycleAPIRecord(filepath.Join(dir, "b-api-create-result.private.json"))
+		var result map[string]string
+		if e != nil || rejectDuplicateJSON(resultRaw) != nil || json.Unmarshal(resultRaw, &result) != nil || len(result) != 1 || !hashRE.MatchString(result["id"]) {
+			return v, lifecycleError("lifecycle_api_operation_result_unknown")
+		}
+		v.bCID = result["id"]
+		startRaw, e := readLifecycleAPIRecord(filepath.Join(dir, "b-api-start-result.private.json"))
+		var started map[string]string
+		if e != nil || rejectDuplicateJSON(startRaw) != nil || json.Unmarshal(startRaw, &started) != nil || len(started) != 4 || started["id"] != v.bCID || started["image"] != r.DeploymentControl.BImageID || started["program_sha256"] != r.DeploymentControl.BProgramSHA256 || started["started_at"] == "" || lifecycleReadAPIStrings(dir, "b-api-start-intent", map[string]string{"id": v.bCID}) != nil {
+			return v, lifecycleError("lifecycle_api_operation_result_unknown")
+		}
+		current, e := lifecycleAPIInspect(ctx, engine, v.bCID)
+		if e != nil || current.State.StartedAt != started["started_at"] || !lifecycleAPIExpectedConfiguration(current, v.original, r.DeploymentControl.BImageID, digestRaw(body), body) || current.State.Paused || current.State.Restarting || current.State.Dead || current.State.OOMKilled {
+			return v, lifecycleError("lifecycle_api_runtime_binding_unproven")
+		}
+	} else if !os.IsNotExist(e) {
+		return v, lifecycleError("lifecycle_api_operation_result_unknown")
+	}
+	// A recovery-created rollback with unfinished effects is not silently replayed.
+	for _, name := range []string{"rollback-api-remove-intent", "rollback-api-create-intent", "rollback-api-start-intent"} {
+		if _, e = os.Lstat(filepath.Join(dir, name+".private.json")); !os.IsNotExist(e) {
+			return v, lifecycleError("lifecycle_api_operation_result_unknown")
+		}
+	}
+	v.materials, e = openLifecycleMaterialDirectory(dir, 0)
+	if e != nil {
+		return v, e
+	}
+	return v, nil
+}
+func mustLifecycleJSON(v any) []byte { raw, _ := json.Marshal(v); return raw }
+func lifecycleReadAPIStrings(dir, name string, expected map[string]string) error {
+	raw, e := readLifecycleAPIRecord(filepath.Join(dir, name+".private.json"))
+	var value map[string]string
+	if e != nil || rejectDuplicateJSON(raw) != nil || json.Unmarshal(raw, &value) != nil || !reflect.DeepEqual(value, expected) {
+		return lifecycleError("lifecycle_api_operation_result_unknown")
+	}
+	return nil
 }
 
 func (v *lifecycleAPITransition) record(name string, value any) error {
@@ -847,6 +1055,31 @@ func (v *lifecycleAPITransition) deploy(ctx context.Context, r lifecycleRequest,
 	return nil
 }
 
+func (v *lifecycleAPITransition) checkRecoveryAPIStopped(ctx context.Context, r lifecycleRequest) error {
+	if v == nil || v.self != v || !v.reopenedRecovery || v.unknown || v.request.ActualRunID != r.ActualRunID {
+		return lifecycleError("lifecycle_api_original_stop_unproven")
+	}
+	if v.bCID != "" {
+		body, e := readLifecycleAPIRecord(filepath.Join(v.dir, "b-api-create-body.private.json"))
+		if e != nil {
+			return e
+		}
+		current, e := lifecycleAPIInspect(ctx, v.engine, v.bCID)
+		if e != nil || !lifecycleAPIStoppedRuntime(current, v.original, r.DeploymentControl.BImageID, digestRaw(body), body) {
+			return lifecycleError("lifecycle_api_original_stop_unproven")
+		}
+		return nil
+	}
+	if v.removedOriginal {
+		_, e := v.engine.call(ctx, http.MethodGet, "/containers/"+v.approved.ID+"/json", nil, 404)
+		return e
+	}
+	current, e := lifecycleAPIInspect(ctx, v.engine, v.approved.ID)
+	if e != nil || !lifecycleAPIStaticMatches(current, v.approved, r.DeploymentControl.OriginalRuntimeSpecSHA256) || current.State.Running || current.State.PID != 0 || current.State.ExitCode != 0 || current.State.Paused || current.State.Dead || current.State.Restarting || current.State.OOMKilled {
+		return lifecycleError("lifecycle_api_original_stop_unproven")
+	}
+	return nil
+}
 func (v *lifecycleAPITransition) stopBForRecovery(ctx context.Context, r lifecycleRequest) error {
 	if v == nil || v.self != v || v.unknown || v.request.ActualRunID != r.ActualRunID || v.request.OperationID != r.OperationID {
 		return lifecycleError("lifecycle_api_existing_or_unknown")

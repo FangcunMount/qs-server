@@ -398,7 +398,9 @@ jobs:
             -o "$lifecycle_cli" ./cmd/qs-compatibility-retirement
           CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -trimpath -ldflags "-X main.sourceSHA=${GITHUB_SHA}" \
             -o "$lifecycle_other_cli" ./cmd/qs-compatibility-retirement
-          go test -c -tags=integration -o "$lifecycle_test" \
+          CGO_ENABLED=0 go test -c -tags=integration \
+            -ldflags "-X github.com/FangcunMount/qs-server/pkg/version.GitCommit=${GITHUB_SHA}" \
+            -o "$lifecycle_test" \
             ./internal/apiserver/maintenance/compatibilityretirementbackup
           mongo_cid="$(docker --host unix:///run/docker.sock inspect --format '{{.Id}}' qs-runtime-closure-e2e-mongo)"
           # Only this ephemeral CI host receives the protected /opt parent

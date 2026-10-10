@@ -51,9 +51,11 @@ type lifecycleServiceController struct {
 	recoveryAttempted        bool
 	managementReady          bool
 	controlledAttempted      bool
+	reopenedRecovery         bool
+	recoveryAPIID            string
 }
 
-func openLifecycleServiceController(ctx context.Context, r lifecycleRequest, w *fence.MaintenanceWindow, recovery bool) (_ *lifecycleServiceController, result error) {
+func openLifecycleServiceController(ctx context.Context, r lifecycleRequest, w *fence.MaintenanceWindow, recovery bool, nativeRecoveryAPIID ...string) (_ *lifecycleServiceController, result error) {
 	if ctx == nil || ctx.Err() != nil || w == nil || r.ServiceControl == nil ||
 		!hashRE.MatchString(r.ServiceControl.LocalDescriptorSHA256) || !hashRE.MatchString(r.ServiceControl.SSHChannelSHA256) {
 		return nil, lifecycleError("lifecycle_service_controller_binding_rejected")
@@ -125,15 +127,31 @@ func openLifecycleServiceController(ctx context.Context, r lifecycleRequest, w *
 		return nil, lifecycleError("lifecycle_service_approval_rejected")
 	}
 	v.identity.remoteDescriptorSHA256 = channel.RemoteDescriptorSHA256
-	v.remote, err = stop.OpenLiveRemoteController(session, v.issuer, child.in, child.out)
+	if recovery {
+		v.remote, err = stop.OpenLiveRecoveryRemoteController(session, v.issuer, child.in, child.out)
+	} else {
+		v.remote, err = stop.OpenLiveRemoteController(session, v.issuer, child.in, child.out)
+	}
 	if err != nil {
 		return nil, lifecycleError("lifecycle_live_remote_controller_rejected")
 	}
 	if recovery {
-		v.local, err = stop.OpenRecovery(session, a, v.journal, w)
+		v.local, err = stop.OpenRecoveryDependents(session, a, v.journal, w)
 		if err != nil {
 			return nil, err
 		}
+		if len(nativeRecoveryAPIID) != 1 || nativeRecoveryAPIID[0] != "" && !hashRE.MatchString(nativeRecoveryAPIID[0]) {
+			return nil, lifecycleError("lifecycle_api_original_stop_unproven")
+		}
+		v.recoveryAPIID = nativeRecoveryAPIID[0]
+		if err = v.checkLocalRecovery(session); err != nil {
+			return nil, err
+		}
+		if _, err = v.remote.Do(session, "check_recovery"); err != nil {
+			return nil, err
+		}
+		v.reopenedRecovery = true
+		v.managementReady = true
 	} else {
 		if _, err = v.remote.Do(session, "bind"); err != nil {
 			return nil, lifecycleError("lifecycle_live_management_binding_failed")
@@ -234,7 +252,11 @@ func (v *lifecycleServiceController) Check(ctx context.Context) error {
 	if v == nil || v.local == nil || v.remote == nil {
 		return lifecycleError("lifecycle_actual_service_lease_missing")
 	}
-	if err := v.local.Check(ctx); err != nil {
+	if v.reopenedRecovery {
+		if err := v.checkLocalRecovery(ctx); err != nil {
+			return err
+		}
+	} else if err := v.local.Check(ctx); err != nil {
 		return err
 	}
 	action, err := v.originalReadAction(ctx, "check", "check_recovery")
@@ -245,6 +267,15 @@ func (v *lifecycleServiceController) Check(ctx context.Context) error {
 	return err
 }
 
+func (v *lifecycleServiceController) checkLocalRecovery(ctx context.Context) error {
+	if v == nil || v.local == nil {
+		return lifecycleError("lifecycle_actual_service_lease_missing")
+	}
+	if v.recoveryAPIID != "" {
+		return v.local.CheckRecoveryStoppedWithInlineAPI(ctx, v.recoveryAPIID)
+	}
+	return v.local.CheckRecoveryStopped(ctx)
+}
 func (v *lifecycleServiceController) originalReadAction(ctx context.Context, forward, recovery string) (string, error) {
 	if v == nil || v.window == nil {
 		return "", lifecycleError("lifecycle_actual_service_lease_missing")

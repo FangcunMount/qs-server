@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
 	"net/url"
 	"os"
@@ -182,6 +183,207 @@ func OpenAIStoppedRuntimeLease(ctx context.Context, in AIExternalExecutionInput,
 	}
 	return l, nil
 }
+
+// This durable basis is observed by the original constructor before Stop.
+// Settings values remain private to the live native read; only their digest is
+// persisted. Reopening can recover this original identity, never mint a fence.
+type aiStoppedOriginalBasis struct {
+	Runtime                                                  aiExternalRuntime
+	ConfigSHA256, HostConfigSHA256, NetworkID, RestartPolicy string
+	PID                                                      int
+	HealthcheckTest                                          []string
+}
+type aiStoppedRestoredResult struct {
+	Runtime aiExternalRuntime
+	PID     int
+}
+type aiStoppedRecord struct {
+	Protocol, Stage, SourceSHA, OperationID, OriginalRunID, ManifestSHA256, WindowStartSHA256, OriginalContainerID, ImageID, RuntimeBindingSHA256, SettingsSHA256, NetworkID, CarrierID, PreviousSHA256 string
+	Basis                                                                                                                                                                                               *aiStoppedOriginalBasis  `json:",omitempty"`
+	Restored                                                                                                                                                                                            *aiStoppedRestoredResult `json:",omitempty"`
+}
+
+func (l *AIStoppedRuntimeLease) originalBasis() *aiStoppedOriginalBasis {
+	return &aiStoppedOriginalBasis{Runtime: l.baseline.Runtime, ConfigSHA256: l.baseline.ConfigSHA256, HostConfigSHA256: l.baseline.HostConfigSHA256, NetworkID: l.baseline.NetworkID, RestartPolicy: l.baseline.RestartPolicy, PID: l.baseline.PID, HealthcheckTest: append([]string(nil), l.baseline.HealthcheckTest...)}
+}
+
+// OpenAIStoppedRuntimeRecovery reopens the original protected journal and then
+// reobserves the same release/container/network. No saved result alone grants
+// permission to signal, and an unfinished or unknown effect is never retried.
+func OpenAIStoppedRuntimeRecovery(ctx context.Context, in AIExternalExecutionInput, expected AIStoppedRuntimeConstraints, w *fence.MaintenanceWindow) (*AIStoppedRuntimeLease, error) {
+	if runtime.GOOS != "linux" || os.Getuid() != 0 || os.Geteuid() != 0 || ctx == nil || ctx.Err() != nil || w == nil || in.SourceUID == nil || !expected.Valid() {
+		return nil, ErrAIStoppedRuntime
+	}
+	d, e := w.Diagnostic(ctx)
+	if e != nil || !d.DirectoryLeaseHeld || d.RecoverySHA256 == "" || d.Binding.OperationID != filepath.Base(in.OperationDirectory) || !aiOriginalSourceSHA(in.RuntimeSourceSHA) || !aiExternalImageID(in.ImageID) || !evidenceHash(in.ContainerID) || !evidenceHash(in.ApprovedAIRuntimeBindingSHA256) {
+		return nil, ErrAIStoppedRuntime
+	}
+	release, e := aiExternalReadRelease(in.RuntimeSourceSHA, in.ImageID)
+	if e != nil || release.seal != in.ApprovedAIRuntimeBindingSHA256 {
+		return nil, ErrAIStoppedRuntime
+	}
+	docker, e := aiExternalDocker(in.SudoDocker)
+	if e != nil {
+		return nil, e
+	}
+	p := &aiStoppedDocker{docker: docker, wire: &aiExecDockerProtocol{docker: docker}, input: in}
+	path := filepath.Join(in.StoppedJournalDirectory, "qs-ai-original-stop-carrier.jsonl")
+	if aiExecParent(path) != nil {
+		return nil, ErrAIStoppedRuntime
+	}
+	fd, e := syscall.Open(path, syscall.O_RDWR|syscall.O_NOFOLLOW|syscall.O_NONBLOCK, 0)
+	if e != nil {
+		return nil, ErrAIStoppedRuntime
+	}
+	f := os.NewFile(uintptr(fd), "original-ai-recovery-journal")
+	st, e := aiExecFileCheck(f, path, nil)
+	if e != nil || syscall.Flock(fd, syscall.LOCK_EX|syscall.LOCK_NB) != nil {
+		_ = f.Close()
+		return nil, ErrAIStoppedRuntime
+	}
+	raw, e := io.ReadAll(io.LimitReader(f, aiExecJournalLimit+1))
+	l := &AIStoppedRuntimeLease{window: w, readRelease: aiExternalReadRelease, binding: d.Binding, startSHA: d.StartSHA256, input: in, constraints: expected, protocol: p, docker: docker, journal: f, journalPath: path, journalStat: st, journalRaw: raw}
+	l.self = l
+	fail := func() (*AIStoppedRuntimeLease, error) { _ = l.Close(); return nil, ErrAIStoppedRuntime }
+	if e != nil || l.restoreJournal(raw) != nil || l.checkWindow(ctx, true) != nil {
+		return fail()
+	}
+	current, e := p.snapshot(ctx, in.ContainerID)
+	if e != nil || sourceSHA(aiJSONBytes(current.Settings)) != expected.SettingsSHA256 || !release.matchesMounts(current.Runtime.Mounts) || p.network(ctx, current.NetworkID) != nil || aiStoppedReleaseSettings(in, current.Settings) != nil {
+		return fail()
+	}
+	// The current settings are adopted only after matching the original durable
+	// digest. Runtime identity, PID and StartedAt remain the original basis.
+	l.baseline.Settings = current.Settings
+	l.settingsRaw = aiJSONBytes(current.Settings)
+	if !l.baseline.immutableSame(current) || len(current.ExecIDs) != 0 || p.requireOwnerCarriersAbsent(ctx, l.binding.OperationID) != nil {
+		return fail()
+	}
+	if l.carrierAttempted && (!l.carrierZero || p.requireCarrierAbsent(ctx, l.carrierID) != nil) {
+		return fail()
+	}
+	if l.restored {
+		if !reflect.DeepEqual(current.Runtime, l.restoredRuntime) || current.PID != l.restoredPID {
+			return fail()
+		}
+	} else if l.stopped {
+		if !current.stopped() {
+			return fail()
+		}
+	} else if !reflect.DeepEqual(current.Runtime, l.baseline.Runtime) || current.PID != l.baseline.PID {
+		return fail()
+	}
+	return l, nil
+}
+
+func (l *AIStoppedRuntimeLease) restoreJournal(raw []byte) error {
+	if len(raw) == 0 || len(raw) > aiExecJournalLimit || raw[len(raw)-1] != '\n' {
+		return ErrAIStoppedRuntime
+	}
+	lines := bytes.Split(raw[:len(raw)-1], []byte{'\n'})
+	if len(lines) > 64 {
+		return ErrAIStoppedRuntime
+	}
+	offset := 0
+	state := ""
+	carrierState := ""
+	for i, line := range lines {
+		var r aiStoppedRecord
+		dec := json.NewDecoder(bytes.NewReader(line))
+		dec.DisallowUnknownFields()
+		if strictJSON(line) != nil || dec.Decode(&r) != nil || dec.Decode(&struct{}{}) != io.EOF || !bytes.Equal(aiJSONBytes(r), line) || r.Protocol != "qs-ai-original-stop-carrier/v1" || r.SourceSHA != l.binding.SourceSHA || r.OperationID != l.binding.OperationID || r.OriginalRunID != l.binding.OriginalRunID || r.ManifestSHA256 != l.binding.ManifestSHA256 || r.WindowStartSHA256 != l.startSHA || r.OriginalContainerID != l.input.ContainerID || r.ImageID != l.input.ImageID || r.RuntimeBindingSHA256 != l.input.ApprovedAIRuntimeBindingSHA256 || r.SettingsSHA256 != l.constraints.SettingsSHA256 || r.NetworkID != l.constraints.NetworkID || r.PreviousSHA256 != sourceSHA(raw[:offset]) {
+			return ErrAIStoppedRuntime
+		}
+		if i == 0 {
+			if r.Stage != "prepared" || r.Basis == nil || r.Restored != nil || r.CarrierID != "" || r.Basis.Runtime.ContainerID != l.input.ContainerID || r.Basis.Runtime.ImageID != l.input.ImageID || !evidenceHash(r.Basis.ConfigSHA256) || !evidenceHash(r.Basis.HostConfigSHA256) || r.Basis.NetworkID != l.constraints.NetworkID || r.Basis.RestartPolicy != "unless-stopped" || !aiStoppedHealthcheck(r.Basis.HealthcheckTest) {
+				return ErrAIStoppedRuntime
+			}
+			b := r.Basis
+			l.baseline = aiStoppedSnapshot{Runtime: b.Runtime, ConfigSHA256: b.ConfigSHA256, HostConfigSHA256: b.HostConfigSHA256, NetworkID: b.NetworkID, RestartPolicy: b.RestartPolicy, PID: b.PID, HealthcheckTest: b.HealthcheckTest}
+			state = "prepared"
+		} else {
+			if r.Basis != nil || r.Restored != nil && r.Stage != "restored" {
+				return ErrAIStoppedRuntime
+			}
+			switch r.Stage {
+			case "stop_intent":
+				if state != "prepared" {
+					return ErrAIStoppedRuntime
+				}
+				state = r.Stage
+				l.stopAttempted = true
+				l.signalAttempted = true
+			case "stopped":
+				if state != "stop_intent" {
+					return ErrAIStoppedRuntime
+				}
+				state = r.Stage
+				l.stopped = true
+			case "carrier_create_intent":
+				if state != "stopped" || carrierState != "" {
+					return ErrAIStoppedRuntime
+				}
+				carrierState = r.Stage
+				l.carrierAttempted = true
+			case "carrier_created":
+				if carrierState != "carrier_create_intent" || !evidenceHash(r.CarrierID) {
+					return ErrAIStoppedRuntime
+				}
+				carrierState = r.Stage
+				l.carrierID = r.CarrierID
+			case "carrier_start_intent":
+				if carrierState != "carrier_created" || r.CarrierID != l.carrierID {
+					return ErrAIStoppedRuntime
+				}
+				carrierState = r.Stage
+			case "carrier_started":
+				if carrierState != "carrier_start_intent" || r.CarrierID != l.carrierID {
+					return ErrAIStoppedRuntime
+				}
+				carrierState = r.Stage
+				l.carrierStarted = true
+			case "carrier_recovery_observed_idle":
+				if carrierState != "carrier_started" || r.CarrierID != l.carrierID {
+					return ErrAIStoppedRuntime
+				}
+				carrierState = r.Stage
+			case "carrier_remove_intent":
+				if (carrierState != "carrier_started" && carrierState != "carrier_recovery_observed_idle") || r.CarrierID != l.carrierID {
+					return ErrAIStoppedRuntime
+				}
+				carrierState = r.Stage
+			case "carrier_removed_and_zero":
+				if carrierState != "carrier_remove_intent" || r.CarrierID != l.carrierID {
+					return ErrAIStoppedRuntime
+				}
+				carrierState = r.Stage
+				l.carrierZero = true
+			case "restore_intent":
+				if state != "stopped" || l.carrierAttempted && !l.carrierZero {
+					return ErrAIStoppedRuntime
+				}
+				state = r.Stage
+				l.restoreAttempted = true
+			case "restored":
+				if state != "restore_intent" || r.Restored == nil || r.Restored.Runtime.ContainerID != l.input.ContainerID || r.Restored.Runtime.ImageID != l.input.ImageID || !r.Restored.Runtime.Running || r.Restored.Runtime.Status != "running" || r.Restored.Runtime.StartedAt == "" || r.Restored.PID <= 0 {
+					return ErrAIStoppedRuntime
+				}
+				state = r.Stage
+				l.restored = true
+				l.restoredRuntime = r.Restored.Runtime
+				l.restoredPID = r.Restored.PID
+			default:
+				return ErrAIStoppedRuntime
+			}
+		}
+		offset += len(line) + 1
+	}
+	if state == "stop_intent" || state == "restore_intent" || carrierState != "" && !l.carrierZero {
+		return ErrAIStoppedRuntime
+	}
+	return nil
+}
+
 func aiJSONBytes(v any) []byte { b, _ := json.Marshal(v); return b }
 func (l *AIStoppedRuntimeLease) append(stage, id string) error {
 	if l == nil || l.self != l || l.closed || l.journal == nil {
@@ -193,7 +395,13 @@ func (l *AIStoppedRuntimeLease) append(stage, id string) error {
 	if e != nil || st.Size() != int64(len(old)) || len(old) > 0 && re != nil || !bytes.Equal(old, l.journalRaw) {
 		return ErrAIStoppedRuntime
 	}
-	record := struct{ Protocol, Stage, SourceSHA, OperationID, OriginalRunID, ManifestSHA256, WindowStartSHA256, OriginalContainerID, ImageID, RuntimeBindingSHA256, SettingsSHA256, NetworkID, CarrierID, PreviousSHA256 string }{"qs-ai-original-stop-carrier/v1", stage, l.binding.SourceSHA, l.binding.OperationID, l.binding.OriginalRunID, l.binding.ManifestSHA256, l.startSHA, l.input.ContainerID, l.input.ImageID, l.input.ApprovedAIRuntimeBindingSHA256, l.constraints.SettingsSHA256, l.constraints.NetworkID, id, sourceSHA(l.journalRaw)}
+	record := aiStoppedRecord{Protocol: "qs-ai-original-stop-carrier/v1", Stage: stage, SourceSHA: l.binding.SourceSHA, OperationID: l.binding.OperationID, OriginalRunID: l.binding.OriginalRunID, ManifestSHA256: l.binding.ManifestSHA256, WindowStartSHA256: l.startSHA, OriginalContainerID: l.input.ContainerID, ImageID: l.input.ImageID, RuntimeBindingSHA256: l.input.ApprovedAIRuntimeBindingSHA256, SettingsSHA256: l.constraints.SettingsSHA256, NetworkID: l.constraints.NetworkID, CarrierID: id, PreviousSHA256: sourceSHA(l.journalRaw)}
+	if stage == "prepared" {
+		record.Basis = l.originalBasis()
+	}
+	if stage == "restored" {
+		record.Restored = &aiStoppedRestoredResult{Runtime: l.restoredRuntime, PID: l.restoredPID}
+	}
 	raw := append(aiJSONBytes(record), '\n')
 	if len(l.journalRaw)+len(raw) > aiExecJournalLimit {
 		return ErrAIStoppedRuntime
@@ -433,11 +641,11 @@ func (l *AIStoppedRuntimeLease) restoreOriginal(ctx context.Context, recovery bo
 		_ = l.append("restore_unknown", "")
 		return ErrAIStoppedRuntime
 	}
+	l.restoredRuntime, l.restoredPID = after.Runtime, after.PID
 	if l.append("restored", "") != nil {
 		return ErrAIStoppedRuntime
 	}
 	l.restored = true
-	l.restoredRuntime, l.restoredPID = after.Runtime, after.PID
 	return l.waitRestoredReady(ctx, recovery)
 }
 

@@ -7,11 +7,13 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"io"
 	"os"
 	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
 
 	dbcensus "github.com/FangcunMount/qs-server/internal/apiserver/maintenance/compatibilityretirementdbcensus"
@@ -118,6 +120,19 @@ func (h *lifecycleFixedHost) observeWholeWriterScopesForOriginalD(ctx context.Co
 // frozen comparison and credential restoration. Unknown original writers fail.
 func (h *lifecycleFixedHost) observeKnownTargetServiceWriters(ctx context.Context, r lifecycleRequest, terminal *lifecycleDTerminal) error {
 	v := h.services
+	if v != nil && v.reopenedRecovery {
+		d, e := v.window.Diagnostic(ctx)
+		if e != nil || d.RecoverySHA256 == "" || d.Binding != lifecycleWindowBinding(r) || !v.managementReady || !v.identity.matches(r) || h.api == nil || !h.api.reopenedRecovery || h.api.unknown || h.api.rollbackCID != "" || h.aiStopped == nil || h.dbWriters == nil || !h.dbWriters.reopenedRecovery || h.dbWriters.restored || !h.dbWriters.installed || terminal != nil {
+			return lifecycleError("lifecycle_host_database_external_writer_isolation_unproven")
+		}
+		if e = v.Check(ctx); e != nil {
+			return e
+		}
+		if e = h.api.checkRecoveryAPIStopped(ctx, r); e != nil {
+			return e
+		}
+		return h.aiStopped.CheckWriterScope(ctx)
+	}
 	if v == nil || v.local == nil || v.remote == nil || !v.stopAttempted || !v.remoteStopAttempted || !v.identity.matches(r) || h.aiStopped == nil || h.api == nil || h.api.self != h.api || h.api.unknown || h.api.rollbackCID != "" || h.dbWriters == nil {
 		return lifecycleError("lifecycle_host_database_external_writer_isolation_unproven")
 	}
@@ -248,6 +263,273 @@ type lifecycleDBWriterLease struct {
 	sqlAttempted               map[string]bool
 	mongoAttempted             map[string]bool
 	installed, restored        bool
+	reopenedRecovery           bool
+	originalBasisSHA           string
+}
+
+type lifecycleDBRecoveryBasis struct {
+	FormatVersion                                                                                                                                                                      int
+	SourceSHA, OriginalSourceSHA, OperationID, OriginalRunID, ActualRunID, ManifestSHA256, WindowStartSHA256, NativeIntentSHA256, StaticSHA256, SQLIdentitySHA256, MongoIdentitySHA256 string
+	Input                                                                                                                                                                              lifecycleDBWriterInput
+	BaselineBSON                                                                                                                                                                       []byte
+}
+type lifecycleDBAdmissionEffect struct{ Kind, Database, Action, SourceSHA, OperationID, ActualRunID, WindowStartSHA256, BasisSHA256, PrincipalSHA256 string }
+
+func (v *lifecycleDBWriterLease) admissionEffect(ctx context.Context, action, database string, p lifecycleDBPrincipalExpected) (string, lifecycleDBAdmissionEffect, error) {
+	if v == nil || v.self != v || v.host == nil || v.host.api == nil || !hashRE.MatchString(v.originalBasisSHA) {
+		return "", lifecycleDBAdmissionEffect{}, lifecycleError("lifecycle_database_original_recovery_basis_missing")
+	}
+	list := v.input.SQLPrincipals
+	if database == "mongodb" {
+		list = v.input.MongoPrincipals
+	} else if database != "mysql" {
+		return "", lifecycleDBAdmissionEffect{}, lifecycleError("lifecycle_database_principal_rejected")
+	}
+	index := -1
+	for i, c := range list {
+		if digest(c) == digest(p) {
+			if index != -1 {
+				return "", lifecycleDBAdmissionEffect{}, lifecycleError("lifecycle_database_principal_rejected")
+			}
+			index = i
+		}
+	}
+	if index < 0 || index >= 64 || action != "lock" && action != "restore" {
+		return "", lifecycleDBAdmissionEffect{}, lifecycleError("lifecycle_database_principal_rejected")
+	}
+	d, e := v.window.Diagnostic(ctx)
+	if e != nil || d.Binding != v.binding {
+		return "", lifecycleDBAdmissionEffect{}, lifecycleError("lifecycle_database_writer_binding_rejected")
+	}
+	return "database-admission-" + v.actualRunID + "-" + database + "-" + strconv.Itoa(index) + "-" + action, lifecycleDBAdmissionEffect{Kind: "original-database-admission-effect/v1", Database: database, Action: action, SourceSHA: sourceSHA, OperationID: v.binding.OperationID, ActualRunID: v.actualRunID, WindowStartSHA256: d.StartSHA256, BasisSHA256: v.originalBasisSHA, PrincipalSHA256: digest(p)}, nil
+}
+func (v *lifecycleDBWriterLease) recordAdmissionEffect(ctx context.Context, action, database string, p lifecycleDBPrincipalExpected, stage string) error {
+	name, record, e := v.admissionEffect(ctx, action, database, p)
+	if e != nil {
+		return e
+	}
+	if stage != "intent" && stage != "result" {
+		return lifecycleError("lifecycle_database_account_effect_unknown")
+	}
+	return v.host.api.record(name+"-"+stage, record)
+}
+
+// A protected original intent without its durable result is unknown. Native
+// account state is still required below; these bytes alone never admit a writer
+// or authorize replaying a previous management command.
+func lifecycleDBAdmissionEffectSettled(dir, name string, expected lifecycleDBAdmissionEffect) (bool, error) {
+	if filepath.Base(name) != name || name == "." || name == ".." || strings.ContainsAny(name, "/\\\x00") || lifecycleProtectedServiceDirectory(dir) != nil {
+		return false, lifecycleError("lifecycle_database_account_effect_unknown")
+	}
+	intentPath, resultPath := filepath.Join(dir, name+"-intent.private.json"), filepath.Join(dir, name+"-result.private.json")
+	_, intentErr := os.Lstat(intentPath)
+	_, resultErr := os.Lstat(resultPath)
+	if errors.Is(intentErr, os.ErrNotExist) && errors.Is(resultErr, os.ErrNotExist) {
+		return false, nil
+	}
+	if intentErr != nil || resultErr != nil {
+		return false, lifecycleError("lifecycle_database_account_effect_unknown")
+	}
+	intent, e := readLifecycleAPIRecord(intentPath)
+	if e != nil {
+		return false, lifecycleError("lifecycle_database_account_effect_unknown")
+	}
+	result, e := readLifecycleAPIRecord(resultPath)
+	if e != nil || lifecycleDBAdmissionRecordsMatch(intent, result, expected) != nil {
+		return false, lifecycleError("lifecycle_database_account_effect_unknown")
+	}
+	return true, nil
+}
+
+func lifecycleDBAdmissionRecordsMatch(intent, result []byte, expected lifecycleDBAdmissionEffect) error {
+	raw, e := json.Marshal(expected)
+	if e != nil || len(raw) == 0 {
+		return lifecycleError("lifecycle_database_account_effect_unknown")
+	}
+	raw = append(raw, '\n')
+	if !bytes.Equal(intent, raw) || !bytes.Equal(result, raw) {
+		return lifecycleError("lifecycle_database_account_effect_unknown")
+	}
+	return nil
+}
+
+func decodeLifecycleDBRecoveryBasis(raw []byte) (lifecycleDBRecoveryBasis, error) {
+	var v lifecycleDBRecoveryBasis
+	if len(raw) == 0 || len(raw) > 96<<20 || rejectDuplicateJSON(raw) != nil || json.Unmarshal(raw, &v) != nil || len(v.BaselineBSON) == 0 || len(v.BaselineBSON) > 64<<20 || !bytes.Equal(append(mustLifecycleJSON(v), '\n'), raw) {
+		return v, lifecycleError("lifecycle_database_original_recovery_basis_missing")
+	}
+	return v, nil
+}
+
+func readLifecycleDBRecoveryBasis(path string) (lifecycleDBRecoveryBasis, []byte, error) {
+	var v lifecycleDBRecoveryBasis
+	if lifecycleProtectedServiceDirectory(filepath.Dir(path)) != nil {
+		return v, nil, lifecycleError("lifecycle_database_original_recovery_basis_missing")
+	}
+	f, e := os.OpenFile(path, os.O_RDONLY|syscall.O_NOFOLLOW|syscall.O_NONBLOCK, 0)
+	if e != nil {
+		return v, nil, e
+	}
+	before, be := f.Stat()
+	st, ok := infoStat(before)
+	if be != nil || !ok || !before.Mode().IsRegular() || before.Mode().Perm() != 0600 || st.Uid != 0 || st.Nlink != 1 || before.Size() < 1 || before.Size() > 96<<20 {
+		_ = f.Close()
+		return v, nil, lifecycleError("lifecycle_database_original_recovery_basis_missing")
+	}
+	raw, re := io.ReadAll(io.LimitReader(f, (96<<20)+1))
+	after, ae := f.Stat()
+	ce := f.Close()
+	named, ne := os.Lstat(path)
+	if re != nil || ae != nil || ce != nil || ne != nil || len(raw) > 96<<20 || !sameLifecycleFile(before, after) || !sameLifecycleFile(before, named) {
+		return v, nil, lifecycleError("lifecycle_database_original_recovery_basis_missing")
+	}
+	v, e = decodeLifecycleDBRecoveryBasis(raw)
+	if e != nil {
+		return v, nil, e
+	}
+	return v, raw, nil
+}
+func (h *lifecycleFixedHost) reopenDatabaseWriterLease(ctx context.Context, r lifecycleRequest) error {
+	if h == nil || h.dbWriters != nil || h.owner == nil || h.owner.originalConn == nil || h.owner.originalMongo == nil || h.api == nil || !h.api.reopenedRecovery || h.services == nil || !h.services.reopenedRecovery || r.Resume == nil {
+		return lifecycleError("lifecycle_database_original_recovery_basis_missing")
+	}
+	b, raw, e := readLifecycleDBRecoveryBasis(filepath.Join(h.api.dir, "database-admission-original.private.json"))
+	if e != nil {
+		return e
+	}
+	d, e := h.services.window.Diagnostic(ctx)
+	if e != nil || d.RecoverySHA256 == "" || b.FormatVersion != 1 || b.SourceSHA != r.ToolSourceSHA || b.OriginalSourceSHA != r.OriginalSourceSHA || b.OperationID != r.OperationID || b.OriginalRunID != r.Recovery.OriginalRunID || b.ActualRunID != r.Recovery.ActualRunID || b.ManifestSHA256 != r.ManifestSHA256 || b.WindowStartSHA256 != d.StartSHA256 || !hashRE.MatchString(b.NativeIntentSHA256) || !lifecycleDBInputValid(b.Input, r) {
+		return lifecycleError("lifecycle_database_original_recovery_basis_missing")
+	}
+	originalIntent, e := readLifecycleAPIRecord(filepath.Join(filepath.Dir(h.api.dir), "native-call.intent.private.json"))
+	if e != nil || digestRaw(originalIntent) != b.NativeIntentSHA256 {
+		return lifecycleError("lifecycle_database_original_recovery_basis_missing")
+	}
+	var baseline dbcensus.Catalog
+	if bson.Unmarshal(b.BaselineBSON, &baseline) != nil || lifecycleDBRequiredSections(baseline) != nil || lifecycleDBStaticHash(baseline) != b.StaticSHA256 {
+		return lifecycleError("lifecycle_database_original_recovery_basis_missing")
+	}
+	var manifest lifecycleFrozenManifest
+	if readLifecyclePrivate(filepath.Join(r.prepareRoot, "manifest.json"), r.ManifestSHA256, &manifest) != nil || b.SQLIdentitySHA256 != manifest.DatabaseBindings["mysql"].IdentityHash || b.MongoIdentitySHA256 != manifest.DatabaseBindings["mongodb"].IdentityHash {
+		return lifecycleError("lifecycle_database_identity_rejected")
+	}
+	v := &lifecycleDBWriterLease{host: h, window: h.services.window, binding: lifecycleWindowBinding(r), actualRunID: r.ActualRunID, input: b.Input, baseline: baseline, staticSHA: b.StaticSHA256, sqlIdentity: b.SQLIdentitySHA256, mongoIdentity: b.MongoIdentitySHA256, sqlAttempted: map[string]bool{}, mongoAttempted: map[string]bool{}, reopenedRecovery: true, originalBasisSHA: digestRaw(raw)}
+	v.self = v
+	h.dbWriters = v // Original protected basis, never the newly observed catalog.
+	if e = v.nativeIdentityAndAuthentication(ctx); e != nil {
+		return e
+	}
+	census, e := dbcensus.ObserveConnection(ctx, h.owner.originalConn, h.owner.originalMongo)
+	if e != nil && !errors.Is(e, dbcensus.ErrIncomplete) {
+		return e
+	}
+	if lifecycleDBRequiredSections(census) != nil || lifecycleDBStaticHash(census) != v.staticSHA {
+		return lifecycleError("lifecycle_database_catalog_changed")
+	}
+	// Refencing is a new, single recovery effect only after settled original
+	// admission results and native current states agree. Unknown old effects block.
+	refence := map[string][]lifecycleDBPrincipalExpected{}
+	for _, scope := range []struct {
+		db         string
+		principals []lifecycleDBPrincipalExpected
+	}{{"mysql", v.input.SQLPrincipals}, {"mongodb", v.input.MongoPrincipals}} {
+		for i, p := range scope.principals {
+			active := false
+			if scope.db == "mysql" {
+				row := v.sqlAccount(baseline, p)
+				if row == nil {
+					return lifecycleError("lifecycle_database_principal_rejected")
+				}
+				active = val(row, 3) == "N"
+			} else {
+				user := v.mongoUser(baseline, p)
+				if user == nil {
+					return lifecycleError("lifecycle_database_principal_rejected")
+				}
+				roles, e := lifecycleDBArray(user["roles"])
+				if e != nil {
+					return e
+				}
+				active = len(roles) > 0
+			}
+			if !active {
+				continue
+			}
+			name := "database-admission-" + b.ActualRunID + "-" + scope.db + "-" + strconv.Itoa(i) + "-lock"
+			expected := lifecycleDBAdmissionEffect{Kind: "original-database-admission-effect/v1", Database: scope.db, Action: "lock", SourceSHA: b.SourceSHA, OperationID: b.OperationID, ActualRunID: b.ActualRunID, WindowStartSHA256: b.WindowStartSHA256, BasisSHA256: v.originalBasisSHA, PrincipalSHA256: digest(p)}
+			if settled, e := lifecycleDBAdmissionEffectSettled(h.api.dir, name, expected); e != nil || !settled {
+				return lifecycleError("lifecycle_database_account_effect_unknown")
+			}
+			key := lifecycleDBPrincipalKey(p.User, p.HostOrDatabase)
+			needsEffect := false
+			if scope.db == "mysql" {
+				row := v.sqlAccount(census, p)
+				if row == nil || val(row, 3) != "N" && val(row, 3) != "Y" {
+					return lifecycleError("lifecycle_database_principal_rejected")
+				}
+				needsEffect = val(row, 3) == "N"
+				v.sqlAttempted[key] = true
+			} else {
+				roles, e := v.readMongoRoles(ctx, p)
+				if e != nil {
+					return e
+				}
+				originalRoles, e := lifecycleDBArray(v.mongoUser(baseline, p)["roles"])
+				if e != nil || len(roles) != 0 && lifecycleDBDigest(roles) != lifecycleDBDigest(originalRoles) {
+					return lifecycleError("lifecycle_database_account_restore_conflict")
+				}
+				needsEffect = len(roles) > 0
+				v.mongoAttempted[key] = true
+			}
+			if !needsEffect {
+				continue
+			}
+			// Native baseline states alone cannot prove the original unlock/grant
+			// settled. Require its original durable intent/result before refencing.
+			expected.Action = "restore"
+			restoreName := "database-admission-" + b.ActualRunID + "-" + scope.db + "-" + strconv.Itoa(i) + "-restore"
+			if settled, e := lifecycleDBAdmissionEffectSettled(h.api.dir, restoreName, expected); e != nil || !settled {
+				return lifecycleError("lifecycle_database_account_effect_unknown")
+			}
+			refence[scope.db] = append(refence[scope.db], p)
+		}
+	}
+	// Settle every original principal before the first new recovery mutation.
+	// A later missing result cannot be discovered only after refencing an earlier
+	// principal; setters still re-read current native state before each command.
+	for _, database := range []string{"mysql", "mongodb"} {
+		for _, p := range refence[database] {
+			if e = v.recordAdmissionEffect(ctx, "lock", database, p, "intent"); e != nil {
+				return e
+			}
+			if database == "mysql" {
+				e = v.setSQLLock(ctx, p, true)
+			} else {
+				roles, err := lifecycleDBArray(v.mongoUser(baseline, p)["roles"])
+				if err != nil {
+					return err
+				}
+				e = v.setMongoRoles(ctx, p, roles, false)
+			}
+			if e != nil {
+				return e
+			}
+			if e = v.recordAdmissionEffect(ctx, "lock", database, p, "result"); e != nil {
+				return e
+			}
+		}
+	}
+	if e = v.drainSQL(ctx); e != nil {
+		return e
+	}
+	if e = v.drainMongo(ctx); e != nil {
+		return e
+	}
+	if e = v.check(ctx, false); e != nil {
+		return e
+	}
+	v.installed = true
+	return nil
 }
 
 func lifecycleDBPrincipalKey(user, host string) string { return user + "\x00" + host }
@@ -674,6 +956,27 @@ func (h *lifecycleFixedHost) installDatabaseWriterLease(ctx context.Context, r l
 	if e = v.checkSQLPreparedAndDelegated(ctx); e != nil {
 		return e
 	}
+	if h.api == nil || h.api.self != h.api || h.api.materials == nil {
+		return lifecycleError("lifecycle_database_original_recovery_basis_missing")
+	}
+	baselineRaw, e := bson.Marshal(actual)
+	if e != nil || len(baselineRaw) > 64<<20 {
+		return lifecycleError("lifecycle_database_original_recovery_basis_missing")
+	}
+	budget, e := v.window.Diagnostic(ctx)
+	if e != nil {
+		return e
+	}
+	basis := lifecycleDBRecoveryBasis{FormatVersion: 1, SourceSHA: r.ToolSourceSHA, OriginalSourceSHA: r.OriginalSourceSHA, OperationID: r.OperationID, OriginalRunID: r.Recovery.OriginalRunID, ActualRunID: r.ActualRunID, ManifestSHA256: r.ManifestSHA256, WindowStartSHA256: budget.StartSHA256, NativeIntentSHA256: digestRaw(intentRaw), Input: in, BaselineBSON: baselineRaw, StaticSHA256: v.staticSHA, SQLIdentitySHA256: v.sqlIdentity, MongoIdentitySHA256: v.mongoIdentity}
+	raw, e := json.Marshal(basis)
+	if e != nil {
+		return e
+	}
+	raw = append(raw, '\n')
+	if e = h.api.writeMaterial("database-admission-original.private.json", raw); e != nil {
+		return e
+	}
+	v.originalBasisSHA = digestRaw(raw)
 	h.dbWriters = v // Original native owner retained BEFORE the first mutating command.
 	if nativeProducer {
 		encoded, err := json.Marshal(in)
@@ -696,7 +999,13 @@ func (h *lifecycleFixedHost) installDatabaseWriterLease(ctx context.Context, r l
 			continue
 		}
 		v.sqlAttempted[lifecycleDBPrincipalKey(p.User, p.HostOrDatabase)] = true
+		if e = v.recordAdmissionEffect(ctx, "lock", "mysql", p, "intent"); e != nil {
+			return e
+		}
 		if e = v.setSQLLock(ctx, p, true); e != nil {
+			return e
+		}
+		if e = v.recordAdmissionEffect(ctx, "lock", "mysql", p, "result"); e != nil {
 			return e
 		}
 	}
@@ -716,7 +1025,13 @@ func (h *lifecycleFixedHost) installDatabaseWriterLease(ctx context.Context, r l
 			continue
 		}
 		v.mongoAttempted[lifecycleDBPrincipalKey(p.User, p.HostOrDatabase)] = true
+		if e = v.recordAdmissionEffect(ctx, "lock", "mongodb", p, "intent"); e != nil {
+			return e
+		}
 		if e = v.setMongoRoles(ctx, p, roles, false); e != nil {
+			return e
+		}
+		if e = v.recordAdmissionEffect(ctx, "lock", "mongodb", p, "result"); e != nil {
 			return e
 		}
 	}
@@ -1394,6 +1709,9 @@ func (h *lifecycleFixedHost) restoreDatabaseWriterLease(ctx context.Context, r l
 		return e
 	}
 	defer cancel()
+	if v.reopenedRecovery {
+		return h.restoreDatabaseWriterLeaseAttempt(q, r, false)
+	}
 	var last error
 	for {
 		if q.Err() != nil {
@@ -1412,6 +1730,61 @@ func (h *lifecycleFixedHost) restoreDatabaseWriterLease(ctx context.Context, r l
 	}
 }
 
+func (v *lifecycleDBWriterLease) checkSettledAdmissionRestore(ctx context.Context, database string, p lifecycleDBPrincipalExpected, roles []bson.M) error {
+	if database == "mysql" {
+		var locked string
+		if v.host.owner.originalConn.QueryRowContext(ctx, "SELECT account_locked FROM mysql.user WHERE User=? AND Host=?", p.User, p.HostOrDatabase).Scan(&locked) != nil {
+			return lifecycleError("lifecycle_database_account_state_unknown")
+		}
+		if locked != "N" {
+			return lifecycleError("lifecycle_database_account_restore_conflict")
+		}
+		return nil
+	}
+	if database != "mongodb" {
+		return lifecycleError("lifecycle_database_principal_rejected")
+	}
+	current, e := v.readMongoRoles(ctx, p)
+	if e != nil {
+		return e
+	}
+	if lifecycleDBDigest(current) != lifecycleDBDigest(roles) {
+		return lifecycleError("lifecycle_database_account_restore_conflict")
+	}
+	// Do not grant again after a settled result. Cache invalidation remains an
+	// independently observed restoration obligation on the original connection.
+	if v.host.owner.originalMongo.Database("admin").RunCommand(ctx, bson.D{{Key: "invalidateUserCache", Value: 1}}).Err() != nil {
+		return lifecycleError("lifecycle_database_authorization_cache_unproven")
+	}
+	return nil
+}
+
+func (v *lifecycleDBWriterLease) restoreAdmissionEffect(ctx context.Context, database string, p lifecycleDBPrincipalExpected, roles []bson.M) error {
+	name, expected, e := v.admissionEffect(ctx, "restore", database, p)
+	if e != nil {
+		return e
+	}
+	settled, e := lifecycleDBAdmissionEffectSettled(v.host.api.dir, name, expected)
+	if e != nil {
+		return e
+	}
+	if settled {
+		return v.checkSettledAdmissionRestore(ctx, database, p, roles)
+	}
+	if e = v.recordAdmissionEffect(ctx, "restore", database, p, "intent"); e != nil {
+		return e
+	}
+	if database == "mysql" {
+		e = v.setSQLLock(ctx, p, false)
+	} else {
+		e = v.setMongoRoles(ctx, p, roles, true)
+	}
+	if e != nil {
+		return e // Intent stays unknown; a later native N/roles read cannot mint its result.
+	}
+	return v.recordAdmissionEffect(ctx, "restore", database, p, "result")
+}
+
 // Every retry re-reads actual identity, complete grants and current account
 // state. Changed principals/roles remain conflicts; observed original state is
 // idempotent restoration, never a lost command result declared successful.
@@ -1423,9 +1796,15 @@ func (h *lifecycleFixedHost) restoreDatabaseWriterLeaseAttempt(ctx context.Conte
 	if v.self != v || v.host != h || v.binding != lifecycleWindowBinding(r) || v.actualRunID != r.ActualRunID || v.window != h.services.window {
 		return lifecycleError("lifecycle_database_writer_binding_rejected")
 	}
+	if !hashRE.MatchString(v.originalBasisSHA) {
+		return lifecycleError("lifecycle_database_original_recovery_basis_missing")
+	}
 
 	if e := v.nativeIdentityAndAuthentication(ctx); e != nil {
 		return e
+	}
+	if v.restored {
+		return v.check(ctx, true)
 	}
 	if forward {
 		if !v.installed || h.preBComparison == nil || h.acceptancePlan == nil || h.acceptancePair == nil {
@@ -1455,7 +1834,9 @@ func (h *lifecycleFixedHost) restoreDatabaseWriterLeaseAttempt(ctx context.Conte
 			result = errors.Join(result, e)
 			continue
 		}
-		result = errors.Join(result, v.setMongoRoles(ctx, p, roles, true))
+		if e = v.restoreAdmissionEffect(ctx, "mongodb", p, roles); e != nil {
+			result = errors.Join(result, e)
+		}
 	}
 	for _, p := range v.input.SQLPrincipals {
 		if !v.sqlAttempted[lifecycleDBPrincipalKey(p.User, p.HostOrDatabase)] {
@@ -1465,7 +1846,9 @@ func (h *lifecycleFixedHost) restoreDatabaseWriterLeaseAttempt(ctx context.Conte
 			result = errors.Join(result, lifecycleError("lifecycle_database_account_restore_conflict"))
 			continue
 		}
-		result = errors.Join(result, v.setSQLLock(ctx, p, false))
+		if e = v.restoreAdmissionEffect(ctx, "mysql", p, nil); e != nil {
+			result = errors.Join(result, e)
+		}
 	}
 	if result != nil {
 		return result

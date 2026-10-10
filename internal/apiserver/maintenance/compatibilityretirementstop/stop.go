@@ -501,6 +501,7 @@ type Lease struct {
 	stopped                             map[string]bool
 	restored                            map[string]string
 	failed                              bool
+	recoveryDependentsOnly              bool
 	closed                              bool
 	window                              serviceWindow
 	controlledIssued, controlledResumed bool
@@ -654,7 +655,13 @@ func OpenRecovery(ctx context.Context, a *Approval, journalDir string, window *f
 	return openRecoveryWithBudget(ctx, a, journalDir, window)
 }
 
-func openRecoveryWithBudget(ctx context.Context, a *Approval, journalDir string, window serviceWindow) (*Lease, error) {
+// OpenRecoveryDependents retains failed=true and can never satisfy Check or
+// Stop/DROP. API replacement is owned and checked by the host's native API
+// transition; this lease only restores the original Collection/Worker IDs.
+func OpenRecoveryDependents(ctx context.Context, a *Approval, journalDir string, window *fence.MaintenanceWindow) (*Lease, error) {
+	return openRecoveryWithBudget(ctx, a, journalDir, window, true)
+}
+func openRecoveryWithBudget(ctx context.Context, a *Approval, journalDir string, window serviceWindow, dependentsOnly ...bool) (*Lease, error) {
 	if ctx == nil || ctx.Err() != nil || a.validate() != nil {
 		return nil, ErrBinding
 	}
@@ -667,6 +674,7 @@ func openRecoveryWithBudget(ctx context.Context, a *Approval, journalDir string,
 	}
 	l := &Lease{approval: a, window: window, dir: journalDir, dirFD: fd, failed: true, stopped: map[string]bool{}, restored: map[string]string{}}
 	l.self = l
+	l.recoveryDependentsOnly = len(dependentsOnly) == 1 && dependentsOnly[0]
 	fail := func() (*Lease, error) { _ = l.Close(); return nil, ErrJournal }
 	b, e := readProtected(filepath.Join(journalDir, "baseline.json"))
 	if e != nil {
@@ -700,15 +708,110 @@ func openRecoveryWithBudget(ctx context.Context, a *Approval, journalDir string,
 		l.restored[v.ID] = result.StartedAt
 	}
 	actual, e := a.catalog(ctx)
-	if e != nil || len(actual) != len(l.baseline) {
+	baselineForCheck := l.baseline
+	if l.recoveryDependentsOnly {
+		actual, baselineForCheck, e = l.recoveryDependentCatalog(actual, e)
+	}
+	if e != nil || len(actual) != len(baselineForCheck) {
 		return fail()
 	}
 	for i, v := range actual {
-		if !sameIdentity(v, l.baseline[i]) || v.Paused || v.Restarting || v.Dead {
+		if !sameIdentity(v, baselineForCheck[i]) || v.Paused || v.Restarting || v.Dead || l.noPendingStop(v) != nil {
 			return fail()
 		}
 	}
 	return l, nil
+}
+
+// This read cannot turn a recovery-only owner into an original stop proof.
+func (l *Lease) CheckRecoveryStopped(ctx context.Context) error {
+	return l.checkRecoveryStopped(ctx, "")
+}
+
+// The native host separately verifies this exact API CID/config; this method
+// still cannot qualify Stop/DROP and refuses any other observed API instance.
+func (l *Lease) CheckRecoveryStoppedWithInlineAPI(ctx context.Context, nativeAPIID string) error {
+	if !hash64.MatchString(nativeAPIID) {
+		return ErrBinding
+	}
+	return l.checkRecoveryStopped(ctx, nativeAPIID)
+}
+func (l *Lease) checkRecoveryStopped(ctx context.Context, nativeAPIID string) error {
+	if l == nil || l.self != l {
+		return ErrBinding
+	}
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if l.closed || !l.failed || ctx == nil || ctx.Err() != nil || checkWindow(ctx, l.approval, l.window) != nil {
+		return ErrBinding
+	}
+	d, e := l.window.Diagnostic(ctx)
+	if e != nil || d.RecoverySHA256 == "" {
+		return ErrBinding
+	}
+	q, c, e := l.window.RecoveryContext(ctx)
+	if e != nil {
+		return e
+	}
+	defer c()
+	actual, e := l.approval.catalog(q)
+	baseline := l.baseline
+	if l.recoveryDependentsOnly {
+		apis := 0
+		for _, v := range actual {
+			if v.Component == "qs-apiserver" {
+				apis++
+				if v.ID != nativeAPIID {
+					return ErrState
+				}
+			}
+		}
+		if nativeAPIID != "" && apis != 1 || nativeAPIID == "" && apis != 0 {
+			return ErrState
+		}
+		actual, baseline, e = l.recoveryDependentCatalog(actual, e)
+	}
+	if e != nil || len(actual) != len(baseline) {
+		return ErrState
+	}
+	for i, v := range actual {
+		if baseline[i].Running {
+			if _, e := os.Lstat(filepath.Join(l.dir, v.ID+".stop-intent.json")); e != nil {
+				return ErrJournal
+			}
+		}
+		if !sameIdentity(v, baseline[i]) || v.StartedAt != baseline[i].StartedAt || v.Running || v.PID != 0 || v.Paused || v.Restarting || v.Dead || v.OOMKilled || baseline[i].Running && v.ExitCode != 0 || l.noPendingStop(v) != nil {
+			return ErrState
+		}
+	}
+	return nil
+}
+func (l *Lease) recoveryDependentCatalog(actual []actualContainer, err error) ([]actualContainer, []Container, error) {
+	if err != nil {
+		return nil, nil, err
+	}
+	baseline := []Container{}
+	kept := []actualContainer{}
+	apis := 0
+	for _, v := range l.baseline {
+		if v.Component != "qs-apiserver" {
+			baseline = append(baseline, v)
+		}
+	}
+	for _, v := range actual {
+		if v.Component == "qs-apiserver" {
+			apis++
+			if !validDependentScopeAPI(v.Container) {
+				return nil, nil, ErrState
+			}
+		} else {
+			kept = append(kept, v)
+		}
+	}
+	if apis > 1 {
+		return nil, nil, ErrState
+	}
+	return kept, baseline, nil
 }
 
 func (l *Lease) stop(ctx context.Context, v Container) error {
