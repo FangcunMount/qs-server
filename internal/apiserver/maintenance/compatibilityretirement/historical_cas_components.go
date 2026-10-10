@@ -32,14 +32,15 @@ type historicalCASOwnerKey struct {
 // not a qualified plan. Only the live owner/capture factory below produces it.
 // Ending or expiring the original epoch never makes this input writable.
 type HistoricalCASComponentInput struct {
-	self     *HistoricalCASComponentInput
-	index    *WholeSourceJointIndex
-	binding  HistoricalCoordinatorBinding
-	sequence uint64
-	sources  []verifiedSourceKey
-	owners   []historicalCASOwnerKey
-	rows     []historicalCASRowInput
-	seal     string
+	self      *HistoricalCASComponentInput
+	index     *WholeSourceJointIndex
+	binding   HistoricalCoordinatorBinding
+	sequence  uint64
+	sources   []verifiedSourceKey
+	owners    []historicalCASOwnerKey
+	rows      []historicalCASRowInput
+	mongoRead *mongoHistoricalComponentReadRecipe
+	seal      string
 }
 
 func (*HistoricalCASComponentInput) MarshalJSON() ([]byte, error) { return nil, ErrSourceSerialization }
@@ -53,7 +54,7 @@ func (f *HistoricalCASComponentInput) digest() string {
 	if f == nil || f.index == nil {
 		return ""
 	}
-	parts := []string{"historical-cas-component-input/v1", f.binding.SourceSHA, f.binding.OperationID, f.index.indexSHA, strconv.FormatUint(f.sequence, 10)}
+	parts := []string{"historical-cas-component-input/v1", f.binding.SourceSHA, f.binding.OperationID, f.index.indexSHA, strconv.FormatUint(f.sequence, 10), f.mongoRead.digest()}
 	for _, key := range f.sources {
 		parts = append(parts, strconv.Itoa(int(key.object)), string(key.pk[:]))
 	}
@@ -79,6 +80,10 @@ func FreezeHistoricalCASComponentInput(ctx context.Context, joint *WholeSourceJo
 		return nil, err
 	}
 	f := &HistoricalCASComponentInput{index: joint.index, binding: joint.owner.binding, sequence: joint.page.sequence}
+	f.mongoRead, err = freezeMongoHistoricalComponentReadRecipe(ctx, joint.mongo)
+	if err != nil {
+		return nil, err
+	}
 	if err = sql.RowDependencies(func(table string, id uint64, sha string, size uint64, write bool) error {
 		f.rows = append(f.rows, historicalCASRowInput{historicalCASRowKey{"mysql", table, id}, sha, size, write})
 		return nil
