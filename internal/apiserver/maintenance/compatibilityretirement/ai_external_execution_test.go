@@ -128,6 +128,24 @@ func TestAIExternalCurrentObservationKeepsSettingsPrivateAndCannotStop(t *testin
 	}
 }
 
+func TestAIExternalReleaseOwnerUsesNativeRootActorAndActualNonRootUID(t *testing.T) {
+	for _, row := range []struct {
+		euid   int
+		native string
+		want   uint32
+	}{{0, "1001", 1001}, {0, "0", 0}, {0, "", 0}, {1001, "0", 1001}, {1001, "not-an-authenticated-uid", 1001}} {
+		got, err := aiExternalReleaseOwnerUIDValue(row.euid, row.native)
+		if err != nil || got != row.want {
+			t.Fatal("native root actor or actual non-root identity changed")
+		}
+	}
+	for _, value := range []string{"-1", "+1001", "01001", "1001\n", "4294967296", "user", " ", "null"} {
+		if _, err := aiExternalReleaseOwnerUIDValue(0, value); err == nil {
+			t.Fatal("noncanonical native actor accepted")
+		}
+	}
+}
+
 func TestAIExternalPrivateResultOutputHasHardBound(t *testing.T) {
 	writer := &aiExternalBoundedOutput{limit: 3}
 	if n, e := writer.Write([]byte("123")); n != 3 || e != nil {

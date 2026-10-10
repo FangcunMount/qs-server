@@ -807,13 +807,17 @@ func aiExternalReleaseFile(path string, optional bool) ([]byte, error) {
 	if !filepath.IsAbs(path) || filepath.Clean(path) != path {
 		return nil, ErrAIExternalRuntime
 	}
+	owner, e := aiExternalReleaseOwnerUID()
+	if e != nil {
+		return nil, e
+	}
 	for directory := filepath.Dir(path); ; directory = filepath.Dir(directory) {
 		s, e := os.Lstat(directory)
 		if e != nil || !s.IsDir() || s.Mode()&os.ModeSymlink != 0 || s.Mode().Perm()&0022 != 0 {
 			return nil, ErrAIExternalRuntime
 		}
 		uid, ok := s.Sys().(*syscall.Stat_t)
-		if !ok || uid.Uid != 0 && int(uid.Uid) != os.Geteuid() {
+		if !ok || uid.Uid != 0 && uid.Uid != owner {
 			return nil, ErrAIExternalRuntime
 		}
 		if directory == "/" {
@@ -834,7 +838,7 @@ func aiExternalReleaseFile(path string, optional bool) ([]byte, error) {
 		return nil, ErrAIExternalRuntime
 	} // Rejected regardless of cleanup result.
 	u, ok := before.Sys().(*syscall.Stat_t)
-	if !ok || !before.Mode().IsRegular() || before.Size() > 1<<20 || before.Mode().Perm()&0022 != 0 || u.Nlink != 1 || u.Uid != 0 && int(u.Uid) != os.Geteuid() {
+	if !ok || !before.Mode().IsRegular() || before.Size() > 1<<20 || before.Mode().Perm()&0022 != 0 || u.Nlink != 1 || u.Uid != 0 && u.Uid != owner {
 		_ = f.Close()
 		return nil, ErrAIExternalRuntime
 	} // Rejected regardless of cleanup result.
@@ -851,6 +855,27 @@ func aiExternalReleaseFile(path string, optional bool) ([]byte, error) {
 		return nil, ErrAIExternalRuntime
 	}
 	return raw, nil
+}
+
+// The once root invocation sets this from its authenticated original SSH actor,
+// not a request JSON field. Non-root callers always retain their actual euid.
+// No ownership/mode is changed and every original inode check remains required.
+func aiExternalReleaseOwnerUID() (uint32, error) {
+	return aiExternalReleaseOwnerUIDValue(os.Geteuid(), os.Getenv("QS_RETIREMENT_SOURCE_UID"))
+}
+
+func aiExternalReleaseOwnerUIDValue(euid int, nativeSourceUID string) (uint32, error) {
+	if euid < 0 {
+		return 0, ErrAIExternalRuntime
+	}
+	if euid != 0 || nativeSourceUID == "" {
+		return uint32(euid), nil
+	}
+	value, e := strconv.ParseUint(nativeSourceUID, 10, 32)
+	if e != nil || strconv.FormatUint(value, 10) != nativeSourceUID {
+		return 0, ErrAIExternalRuntime
+	}
+	return uint32(value), nil
 }
 func aiExternalReadRelease(source, image string) (aiExternalRelease, error) {
 	var result aiExternalRelease
