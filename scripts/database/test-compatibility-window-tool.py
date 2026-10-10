@@ -60,7 +60,7 @@ class WindowToolMetadata(unittest.TestCase):
             with self.subTest(key=key),self.assertRaises(tool.Refused):tool.derive_request(tool.canonical(q),a,'22-3')
     def final_history(self):
         root='/opt/backups/qs-server/compatibility-retirement/12-1/'
-        return dict(assets_directory='/opt/qs-server/retirement-assets',runtime_source_sha='a'*40,image_id='sha256:'+'b'*64,container_id='c'*64,runtime_binding_sha256='d'*64,ai_bounds=dict(path=root+'ai.json',sha256='1'*64),peer_bounds=dict(path=root+'peer.json',sha256='2'*64),protection=dict(path=root+'protection.json',sha256='3'*64))
+        return dict(assets_directory='/opt/qs-server/retirement-assets',runtime_source_sha='a'*40,image_id='sha256:'+'b'*64,container_id='c'*64,runtime_binding_sha256='d'*64,ai_bounds=dict(path=root+'ai.json',sha256='1'*64),peer_bounds=dict(path=root+'peer.json',sha256='2'*64),protection=dict(path=root+'protection.json',sha256='3'*64),stop_constraints=dict(settings_sha256='4'*64,network_id='5'*64))
     def test_final_history_has_only_inputs_and_current_run_derivation_preserves_them(self):
         r=self.request();r['final_history']=self.final_history();a=self.approval(r,'apply')
         out=tool.decode(tool.derive_request(tool.canonical(r),a,'22-3'))
@@ -71,7 +71,7 @@ class WindowToolMetadata(unittest.TestCase):
                 with self.assertRaises(tool.Refused):tool.validate_final_history(v,'12-1')
     def test_final_history_rejects_null_alias_other_operation_and_nonexact_runtime(self):
         with self.assertRaises(tool.Refused):tool.validate_final_history(None,'12-1')
-        for mutate in (lambda v:v.update(image_id='qs-ai:latest'),lambda v:v['ai_bounds'].update(path='/tmp/ai.json'),lambda v:v['ai_bounds'].update(path='/opt/backups/qs-server/compatibility-retirement/13-1/ai.json'),lambda v:v.update(protection=v['ai_bounds']),lambda v:v.update(runtime_source_sha='main')):
+        for mutate in (lambda v:v.update(stop_constraints=None),lambda v:v['stop_constraints'].update(network_id='infra-network'),lambda v:v['stop_constraints'].update(settings_sha256=''),lambda v:v['stop_constraints'].update(drop_ready=True),lambda v:v.update(image_id='qs-ai:latest'),lambda v:v['ai_bounds'].update(path='/tmp/ai.json'),lambda v:v['ai_bounds'].update(path='/opt/backups/qs-server/compatibility-retirement/13-1/ai.json'),lambda v:v.update(protection=v['ai_bounds']),lambda v:v.update(runtime_source_sha='main')):
             v=self.final_history();mutate(v)
             with self.assertRaises(tool.Refused):tool.validate_final_history(v,'12-1')
     def test_writer_control_preserves_expected_hash_only_and_rejects_prepare_even_null(self):

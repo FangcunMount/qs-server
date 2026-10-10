@@ -242,10 +242,15 @@ def derive_request(raw, approval, current_run):
 
 
 def validate_final_history(value, operation):
-    exact(value, ("assets_directory", "runtime_source_sha", "image_id", "container_id", "runtime_binding_sha256", "ai_bounds", "peer_bounds", "protection"))
+    exact(value, ("assets_directory", "runtime_source_sha", "image_id", "container_id", "runtime_binding_sha256", "ai_bounds", "peer_bounds", "protection"), ("stop_constraints",))
     token(value["runtime_source_sha"], SHA)
     token(value["container_id"], HASH)
     token(value["runtime_binding_sha256"], HASH)
+    if "stop_constraints" in value:
+        constraints=value["stop_constraints"]
+        exact(constraints,("settings_sha256","network_id"))
+        token(constraints["settings_sha256"],HASH)
+        token(constraints["network_id"],HASH)
     if not isinstance(value["image_id"], str) or not value["image_id"].startswith("sha256:"):
         reject("window_tool_final_history_rejected")
     token(value["image_id"][7:], HASH)
