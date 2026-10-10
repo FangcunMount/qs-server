@@ -129,12 +129,12 @@ func openLifecycleOriginalArchiveMaterials(ctx context.Context, r lifecycleReque
 	}
 	// This exact order and schema match backup.registration's original writer.
 	registration := struct {
-		Version                int
-		Approval               backup.Approval
-		Files                  []string
-		ContainsOriginalBodies bool
-		PurgeAfterAcceptance   bool
-		ResumeAllowed          bool
+		Version                int             `json:"version"`
+		Approval               backup.Approval `json:"approval"`
+		Files                  []string        `json:"files"`
+		ContainsOriginalBodies bool            `json:"contains_original_bodies"`
+		PurgeAfterAcceptance   bool            `json:"purge_after_acceptance"`
+		ResumeAllowed          bool            `json:"resume_allowed"`
 	}{1, r.Approval, names, true, true, false}
 	raw, err := json.Marshal(registration)
 	if err != nil {
