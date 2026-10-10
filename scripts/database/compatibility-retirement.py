@@ -44,7 +44,7 @@ RUN = re.compile(r"^[0-9]{1,20}-[0-9]{1,4}$")
 NAME = re.compile(r"^[a-z][a-z0-9_-]{0,80}\.json$")
 MAX_JSON = 256 * 1024
 INVENTORY_V2_LIMITS = {"query_seconds": 30, "total_seconds": 1500, "max_records": 1000000,
-                       "max_bytes": 2147483648, "page_size": 1000, "max_pages": 1001}
+                       "max_bytes": 2147483648, "page_size": 10000, "max_pages": 1001}
 BOOTSTRAP_MODES = frozenset({"bootstrap-bounds", "bootstrap-inventory", "bootstrap-history", "bootstrap-history-metadata", "bootstrap-history-parent", "bootstrap-ai-bounds", "bootstrap-ai-verify", "historical-evidence-write", "historical-ai-bounds"})
 MAX_BOOTSTRAP_APPROVAL = 4096
 MAX_WINDOW_SECONDS = 1800
@@ -1535,7 +1535,11 @@ FAILED_INVENTORY_REFERENCE = {
     "request_sha256": "e5d29b674698dbfe4d8f85932fad0d8bba445e3b6823028cd78db4a150f16962",
     "sha256": "3983779a5fab8be6e027390491a3c9215cdf1270c03316ed8ebcc614793777c8",
 }
-FAILED_INVENTORY_LIMITS = dict(INVENTORY_V2_LIMITS, page_size=1000)
+# Historical receipt parameters are fixed independently of the current profile.
+FAILED_INVENTORY_LIMITS = {
+    "query_seconds": 30, "total_seconds": 1500, "max_records": 1000000,
+    "max_bytes": 2147483648, "page_size": 1000, "max_pages": 1001,
+}
 FAILED_INVENTORY_MONGO_PAGES = 281
 FAILED_INVENTORY_SECOND_OPERATION = "38019009876-2"
 FAILED_INVENTORY_SECOND_REFERENCE = {

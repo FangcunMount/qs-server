@@ -150,3 +150,15 @@ func TestEncodedSourceBytesCannotBypassRawBudget(t *testing.T) {
 		t.Fatal("encoded byte bound bypassed")
 	}
 }
+
+func TestProductionInventoryPageBudgetRejectsPreviousLiveProfile(t *testing.T) {
+	limits := productionLimits()
+	if limits.PageSize != 10000 || limits.MaxPages != 1001 || limits.QuerySeconds != 30 || limits.TotalSeconds != 1500 || limits.MaxRecords != 1000000 || limits.MaxBytes != 2<<30 {
+		t.Fatal("inventory page repair changed other production bounds")
+	}
+	r := v2Request("readonly_inventory_boundary_request")
+	r.Limits.PageSize = 1000
+	if err := validateV2Request(r, "boundary-request.json"); err == nil || err.Error() != "request_limits_invalid" {
+		t.Fatal("old approved source/profile entered current live scanner", err)
+	}
+}
