@@ -381,4 +381,120 @@ class RootNativeReceiptDiagnostic(unittest.TestCase):
         self.assertFalse(receipt['complete']);self.assertFalse(receipt['execution_allowed'])
         self.assertNotIn('PRIVATE',json.dumps(receipt));self.assertNotIn('host_observation_complete',receipt)
 
+
+class RootAskpassPrivateChannel(unittest.TestCase):
+    """Real local scripts/FDs; a controlled sudo substitute grants no root proof."""
+    def args(self, mode='db-writer-census'):
+        return argparse.Namespace(operation='prepare', prepare_mode=mode, operation_id='123-1', run_id='456-1', actual_source_sha='a'*40, db_census_request_hash='b'*64, manifest_hash='')
+
+    def call_actual_substitute(self, password, *, need_password=True, exit_code=0, sleep=False):
+        actual_run = subprocess.run
+        packet_holder=[]; assets=[]
+        fixture = """import hashlib,json,os,subprocess,sys,time
+if sys.argv[1] == '-A':
+ p=os.environ['SUDO_ASKPASS'];s=os.stat(p)
+ assert s.st_mode & 0o777 == 0o700 and s.st_nlink == 1
+ assert os.stat(os.path.dirname(p)).st_mode & 0o777 == 0o700
+ assert os.environ['SUDO_PASSWORD'].encode() not in open(p,'rb').read()
+ if NEED:
+  a=subprocess.run([p],env=dict(os.environ),stdin=subprocess.DEVNULL,stdout=subprocess.PIPE,stderr=subprocess.PIPE,check=True)
+  assert a.stdout == os.environ['SUDO_PASSWORD'].encode()+b'\\n' and not a.stderr
+else:
+ assert sys.argv[1]=='-n' and 'SUDO_PASSWORD' not in os.environ and 'SUDO_ASKPASS' not in os.environ
+if SLEEP: time.sleep(2)
+raw=sys.stdin.buffer.read()
+assert 'SUDO_PASSWORD' not in json.loads(raw)
+if EXIT: raise SystemExit(EXIT)
+print(json.dumps({'fixture_packet_sha256':hashlib.sha256(raw).hexdigest(),'fixture_packet_bytes':len(raw)}))
+""".replace('NEED',repr(need_password)).replace('SLEEP',repr(sleep)).replace('EXIT',repr(exit_code))
+        def launch(command, **kwargs):
+            self.assertEqual(command[:4], ['/usr/bin/sudo','-A' if password else '-n','--','/usr/bin/python3'])
+            self.assertEqual(command[6],tool.ROOT_PREPARE_ONCE)
+            packet_holder.append(kwargs['input'])
+            self.assertEqual(set(kwargs['env']),{'PATH','SUDO_ASKPASS','SUDO_PASSWORD'} if password else {'PATH'})
+            if password:
+                assets.append(Path(kwargs['env']['SUDO_ASKPASS']))
+                self.assertNotIn(password,repr(command))
+                self.assertNotIn(password,kwargs['input'].decode())
+            # This executable only validates bytes/askpass; it never enters the
+            # fixed privileged bootstrap or supplies authenticated SUDO_UID.
+            kwargs['timeout']=.1 if sleep else 5
+            return actual_run([sys.executable,'-I','-c',fixture,*command[1:]],**kwargs)
+        uid=os.getuid()
+        if uid==0:self.skipTest('controlled nonroot caller requires a real nonroot fixture owner')
+        environment={'RETIREMENT_PACKAGE_SHA256':'d'*64,'MYSQL_PASSWORD':'fixture_db_credential','SUDO_PASSWORD':password}
+        with mock.patch.dict(os.environ,environment,clear=True),mock.patch.object(tool.subprocess,'run',side_effect=launch) as dispatch:
+            try:return tool.root_once_lifecycle_prepare(self.args()),packet_holder
+            finally:
+                dispatch.assert_called_once()
+                self.assertTrue(all(not p.exists() and not p.parent.exists() for p in assets))
+
+    def test_actual_askpass_separates_password_and_original_json_stdin(self):
+        for needed in (True,False):
+            with self.subTest(sudo_needs_password=needed):
+                (code,raw),packets=self.call_actual_substitute('fixture_sudo_secret',need_password=needed)
+                self.assertEqual(code,0);value=json.loads(raw)
+                self.assertEqual(value['fixture_packet_sha256'],hashlib.sha256(packets[0]).hexdigest())
+                self.assertEqual(value['fixture_packet_bytes'],len(packets[0]))
+                self.assertEqual(json.loads(packets[0])['MYSQL_PASSWORD'],'fixture_db_credential')
+
+    def test_actual_absence_retains_noninteractive_fallback(self):
+        (code,raw),packets=self.call_actual_substitute('')
+        self.assertEqual(code,0);self.assertEqual(json.loads(raw)['fixture_packet_sha256'],hashlib.sha256(packets[0]).hexdigest())
+
+    def test_actual_authentication_refusal_and_timeout_cleanup_without_success(self):
+        for options,category in (({'exit_code':1},'lifecycle_native_receipt_missing'),({'sleep':True},'lifecycle_native_receipt_timed_out')):
+            with self.subTest(category=category),self.assertRaises(tool.NativeReceiptBlocked) as error:
+                self.call_actual_substitute('fixture_sudo_secret',**options)
+            self.assertEqual(str(error.exception),category)
+            self.assertNotIn('fixture_sudo_secret',json.dumps(error.exception.native_diagnostic))
+            self.assertEqual(error.exception.native_diagnostic['process_completed'],category.endswith('missing'))
+
+    def test_invalid_secret_rejected_before_any_directory_or_child(self):
+        for password in ('x\x00y','x\ry','x\ny','\u00e9'*2049):
+            with self.subTest(password_type='invalid'),mock.patch.object(tool.os,'environ',{'SUDO_PASSWORD':password}),mock.patch.object(tool.tempfile,'mkdtemp') as create,mock.patch.object(tool.subprocess,'run') as run,self.assertRaises(tool.Blocked):
+                with tool.root_askpass_environment():pass
+            create.assert_not_called();run.assert_not_called()
+
+    def test_actual_script_replacement_is_not_adopted_or_removed(self):
+        path=None
+        with mock.patch.dict(os.environ,{'SUDO_PASSWORD':'fixture_sudo_secret'},clear=True),self.assertRaises(tool.Blocked):
+            with tool.root_askpass_environment() as environment:
+                path=Path(environment['SUDO_ASKPASS']);path.unlink();path.write_bytes(b'foreign');path.chmod(0o700)
+        self.assertEqual(path.read_bytes(),b'foreign')
+        # Only our local test owns this deliberate replacement fixture.
+        path.unlink();path.parent.rmdir()
+
+    def test_actual_constructor_write_failure_discards_only_original_inode(self):
+        paths=[];create=tool.tempfile.mkdtemp
+        def remember(**kwargs):
+            result=create(**kwargs);paths.append(Path(result));return result
+        with mock.patch.dict(os.environ,{'SUDO_PASSWORD':'fixture_sudo_secret'},clear=True),mock.patch.object(tool.tempfile,'mkdtemp',side_effect=remember),mock.patch.object(tool.os,'write',side_effect=OSError('fixture write failed')),self.assertRaises(OSError):
+            with tool.root_askpass_environment():pass
+        self.assertTrue(paths);self.assertTrue(all(not p.exists() for p in paths))
+
+    def test_actual_failure_armor_has_no_password_credentials_or_authority(self):
+        def rejected(_):self.call_actual_substitute('fixture_sudo_secret',exit_code=1)
+        output=io.StringIO();errors=io.StringIO()
+        argv=['--operation','prepare','--operation-id','123-1','--approved-source-sha','a'*40,'--actual-source-sha','a'*40,'--run-id','456-1','--prepare-mode','db-writer-census']
+        with mock.patch.object(tool,'execute',side_effect=rejected),contextlib.redirect_stdout(output),contextlib.redirect_stderr(errors):code=tool.main(argv)
+        self.assertEqual(code,42);self.assertEqual(errors.getvalue(),'')
+        receipt=json.loads(tool.transport().decode_armored_receipt(output.getvalue()))
+        self.assertEqual(receipt['error_category'],'lifecycle_native_receipt_missing')
+        self.assertFalse(receipt['complete']);self.assertFalse(receipt['execution_allowed'])
+        self.assertNotIn('fixture_sudo_secret',json.dumps(receipt));self.assertNotIn('fixture_db_credential',json.dumps(receipt))
+
+    def test_direct_root_ignores_secret_and_keeps_original_clean_env(self):
+        args=self.args()
+        with mock.patch.dict(os.environ,{'RETIREMENT_PACKAGE_SHA256':'d'*64,'SUDO_PASSWORD':'invalid\nsecret'},clear=True),mock.patch.object(tool.os,'getuid',return_value=0),mock.patch.object(tool.os,'geteuid',return_value=0),mock.patch.object(tool,'root_askpass_environment') as askpass,mock.patch.object(tool.subprocess,'run',return_value=subprocess.CompletedProcess([],1,b'fixture_refusal')) as run:
+            self.assertEqual(tool.root_once_lifecycle_prepare(args),(1,b'fixture_refusal'))
+        askpass.assert_not_called();self.assertEqual(run.call_args.kwargs['env'],{'PATH':'/usr/bin:/bin'})
+        self.assertNotIn('SUDO_PASSWORD',run.call_args.kwargs['input'].decode())
+
+    def test_fixed_root_native_environment_explicitly_discards_askpass(self):
+        tree=ast.parse(tool.ROOT_PREPARE_ONCE)
+        drops=[ast.unparse(n) for n in ast.walk(tree) if isinstance(n,ast.Call) and isinstance(n.func,ast.Attribute) and n.func.attr=='pop']
+        self.assertIn("os.environ.pop('SUDO_PASSWORD', None)",drops)
+        self.assertIn("os.environ.pop('SUDO_ASKPASS', None)",drops)
+
 if __name__=='__main__':unittest.main()

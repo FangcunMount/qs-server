@@ -204,4 +204,35 @@ class RunnerWindowTests(unittest.TestCase):
             T.encode_armored_receipt(dict(receipt, credentials={}), schema={"protocol":frozenset({"runner_platform_window_owner_v1"}),"error_category":frozenset({"platform_window_native_unknown"}),"whole_writer_fence_proven":"bool","drop_ready":"bool"})
 
 
+
+class RootPasswordClosedTransport(unittest.TestCase):
+    def test_actual_remote_rejects_malformed_password_before_staging(self):
+        import json,subprocess,sys
+        for password in (None,42,'fixture\npassword','fixture\rpassword','fixture\x00password','\u00e9'*2049):
+            with self.subTest(kind=type(password).__name__):
+                packet={'bindings':['apply','12-1','22-1','d'*40,'c'*64,'e'*64],'approval':'','approval_sha256':'a'*64,'package_sha256':'b'*64,'tool_directory':'/tmp/qs-independent-window-tool.invalid','credentials':{'MYSQL_PASSWORD':'fixture_db_secret'},'sudo_password':password}
+                result=subprocess.run([sys.executable,'-I','-c',A.REMOTE],input=(json.dumps(packet)+'\n').encode(),capture_output=True,timeout=5,check=False)
+                self.assertEqual(result.returncode,125);self.assertEqual(result.stdout,b'');self.assertEqual(result.stderr,b'')
+
+    def test_remote_password_is_separate_from_credentials_and_not_in_root_packet(self):
+        import ast
+        ast.parse(A.REMOTE)
+        self.assertIn("'credentials','sudo_password'",A.REMOTE)
+        self.assertIn("if os.getuid()!=0 and password: os.environ['SUDO_PASSWORD']=password",A.REMOTE)
+        source=Path(A.__file__).read_text()
+        packet=source[source.index('        root_packet ='):source.index('        if len(root_packet)')]
+        self.assertNotIn('sudo_password',packet);self.assertNotIn('SUDO_PASSWORD',packet)
+        for name in ('native-window.intent.json','native-window.result.json'):
+            call=next(n for n in ast.walk(ast.parse(source)) if isinstance(n,ast.Call) and any(isinstance(arg,ast.Constant) and arg.value==name for arg in n.args))
+            self.assertNotIn('sudo_password',ast.unparse(call));self.assertNotIn('SUDO_PASSWORD',ast.unparse(call))
+
+    def test_action_plumbs_only_original_a_secret_and_does_not_claim_s0(self):
+        source=Path(__file__).resolve().parents[2]
+        workflow=(source/'.github/workflows/compatibility-retirement.yml').read_text()
+        self.assertEqual(workflow.count('SUDO_PASSWORD: ${{'),3)
+        self.assertEqual(sum('SUDO_PASSWORD' in line for line in workflow.splitlines() if line.strip().startswith('envs:')),2)
+        self.assertIn('secrets.SVRA_SUDO_PASSWORD',workflow)
+        self.assertNotIn('secrets.SVRD_SUDO_PASSWORD',workflow)
+        self.assertIn('sudo -n /usr/bin/python3', (source/'scripts/database/compatibility-s0-exact-exit.py').read_text())
+
 if __name__ == "__main__": unittest.main()

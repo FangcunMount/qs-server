@@ -595,6 +595,7 @@ jobs:
         if: inputs.prepare_mode != 'bootstrap-history-metadata' && inputs.prepare_mode != 'bootstrap-history-parent' && inputs.prepare_mode != 'report-diagnostic' && inputs.prepare_mode != 'bootstrap-ai-bounds' && inputs.prepare_mode != 'bootstrap-ai-verify' && inputs.prepare_mode != 'historical-evidence-write' && inputs.prepare_mode != 'historical-ai-bounds' && inputs.prepare_mode != 'window-tool'
         uses: appleboy/ssh-action@v1.2.2
         env:
+          SUDO_PASSWORD: ${{ inputs.operation == 'prepare' && (inputs.prepare_mode == 'lifecycle' || inputs.prepare_mode == 'prepare-facts' || inputs.prepare_mode == 'host-writer-scope' || inputs.prepare_mode == 'db-writer-census') && secrets.SVRA_SUDO_PASSWORD || '' }}
           RETIREMENT_OPERATION: ${{ inputs.operation }}
           RETIREMENT_OPERATION_ID: ${{ inputs.operation_id }}
           RETIREMENT_MANIFEST_SHA256: ${{ inputs.manifest_sha256 }}
@@ -627,7 +628,7 @@ jobs:
           port: ${{ vars.SVRA_SSH_PORT || 22 }}
           fingerprint: ${{ vars.SVRA_SSH_FINGERPRINT }}
           command_timeout: ${{ (inputs.prepare_mode == 'lifecycle' || inputs.prepare_mode == 'prepare-facts') && '100m' || '35m' }}
-          envs: RETIREMENT_OPERATION,RETIREMENT_OPERATION_ID,RETIREMENT_MANIFEST_SHA256,RETIREMENT_INVENTORY_REQUEST_SHA256,RETIREMENT_LIFECYCLE_REQUEST_SHA256,RETIREMENT_PREPARE_MODE,RETIREMENT_IDENTITY_REQUEST_SHA256,RETIREMENT_BOOTSTRAP_APPROVAL_JSON,RETIREMENT_BOOTSTRAP_APPROVAL_SHA256,RETIREMENT_APPROVED_SHA,RETIREMENT_ACTUAL_SHA,RETIREMENT_RUN_ID,RETIREMENT_PACKAGE_SHA256,MYSQL_HOST,MYSQL_PORT,MYSQL_USERNAME,MYSQL_PASSWORD,MYSQL_DATABASE,MONGODB_HOST,MONGODB_PORT,MONGODB_USERNAME,MONGODB_PASSWORD,MONGODB_DBNAME,MONGODB_METADATA_ADMIN_USERNAME,MONGODB_METADATA_ADMIN_PASSWORD
+          envs: RETIREMENT_OPERATION,RETIREMENT_OPERATION_ID,RETIREMENT_MANIFEST_SHA256,RETIREMENT_INVENTORY_REQUEST_SHA256,RETIREMENT_LIFECYCLE_REQUEST_SHA256,RETIREMENT_PREPARE_MODE,RETIREMENT_IDENTITY_REQUEST_SHA256,RETIREMENT_BOOTSTRAP_APPROVAL_JSON,RETIREMENT_BOOTSTRAP_APPROVAL_SHA256,RETIREMENT_APPROVED_SHA,RETIREMENT_ACTUAL_SHA,RETIREMENT_RUN_ID,RETIREMENT_PACKAGE_SHA256,MYSQL_HOST,MYSQL_PORT,MYSQL_USERNAME,MYSQL_PASSWORD,MYSQL_DATABASE,MONGODB_HOST,MONGODB_PORT,MONGODB_USERNAME,MONGODB_PASSWORD,MONGODB_DBNAME,MONGODB_METADATA_ADMIN_USERNAME,MONGODB_METADATA_ADMIN_PASSWORD,SUDO_PASSWORD
           script: |
             set -Eeuo pipefail
             umask 077
@@ -881,6 +882,7 @@ jobs:
         if: inputs.prepare_mode == 'window-tool'
         uses: appleboy/ssh-action@v1.2.2
         env:
+          SUDO_PASSWORD: ${{ secrets.SVRA_SUDO_PASSWORD }}
           RETIREMENT_OPERATION: ${{ inputs.operation }}
           RETIREMENT_OPERATION_ID: ${{ inputs.operation_id }}
           RETIREMENT_MANIFEST_SHA256: ${{ inputs.manifest_sha256 }}
@@ -909,7 +911,7 @@ jobs:
           port: ${{ vars.SVRA_SSH_PORT || 22 }}
           fingerprint: ${{ vars.SVRA_SSH_FINGERPRINT }}
           command_timeout: 115m
-          envs: RETIREMENT_OPERATION,RETIREMENT_OPERATION_ID,RETIREMENT_MANIFEST_SHA256,RETIREMENT_TEMPLATE_SHA256,RETIREMENT_DISPATCHER_SHA,RETIREMENT_RUN_ID,RETIREMENT_BOOTSTRAP_APPROVAL_JSON,RETIREMENT_BOOTSTRAP_APPROVAL_SHA256,RETIREMENT_PACKAGE_SHA256,MYSQL_HOST,MYSQL_PORT,MYSQL_USERNAME,MYSQL_PASSWORD,MYSQL_DATABASE,MONGODB_HOST,MONGODB_PORT,MONGODB_USERNAME,MONGODB_PASSWORD,MONGODB_DBNAME,MONGODB_METADATA_ADMIN_USERNAME,MONGODB_METADATA_ADMIN_PASSWORD
+          envs: RETIREMENT_OPERATION,RETIREMENT_OPERATION_ID,RETIREMENT_MANIFEST_SHA256,RETIREMENT_TEMPLATE_SHA256,RETIREMENT_DISPATCHER_SHA,RETIREMENT_RUN_ID,RETIREMENT_BOOTSTRAP_APPROVAL_JSON,RETIREMENT_BOOTSTRAP_APPROVAL_SHA256,RETIREMENT_PACKAGE_SHA256,MYSQL_HOST,MYSQL_PORT,MYSQL_USERNAME,MYSQL_PASSWORD,MYSQL_DATABASE,MONGODB_HOST,MONGODB_PORT,MONGODB_USERNAME,MONGODB_PASSWORD,MONGODB_DBNAME,MONGODB_METADATA_ADMIN_USERNAME,MONGODB_METADATA_ADMIN_PASSWORD,SUDO_PASSWORD
           script: |
             set -Eeuo pipefail
             umask 077
@@ -973,6 +975,7 @@ jobs:
           echo "directory=$binary_dir" >> "$GITHUB_OUTPUT"
       - name: Hold same-run workflow owner through native acceptance or recovery
         env:
+          SUDO_PASSWORD: ${{ secrets.SVRA_SUDO_PASSWORD }}
           RETIREMENT_PLATFORM_TOKEN: ${{ github.token }}
           RETIREMENT_OPERATION: ${{ inputs.operation }}
           RETIREMENT_OPERATION_ID: ${{ inputs.operation_id }}

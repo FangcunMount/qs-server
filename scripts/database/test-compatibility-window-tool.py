@@ -656,4 +656,68 @@ class ActualRetirementCLI(unittest.TestCase):
                 self.assertEqual(receipt['original_source_sha'],'');self.assertEqual(receipt['manifest_sha256'],'')
                 self.assertFalse((directory/'nonexistent').exists())
 
+
+class FixedWindowAskpassChannel(unittest.TestCase):
+    """Real local child/control pipe, never a root or production capability."""
+    def test_real_askpass_and_child_keep_original_packet_and_live_control(self):
+        import os,subprocess,sys
+        from unittest import mock
+        program="""import os,subprocess,sys
+p=os.environ['SUDO_ASKPASS']
+a=subprocess.run([p],env=dict(os.environ),stdin=subprocess.DEVNULL,stdout=subprocess.PIPE,stderr=subprocess.PIPE,check=True)
+assert a.stdout==os.environ['SUDO_PASSWORD'].encode()+b'\\n' and not a.stderr
+assert sys.stdin.buffer.readline()==b'{"fixture":"original-stdin"}\\n'
+print('fixture-terminal-only')
+"""
+        read,write=os.pipe();path=None
+        try:
+            with mock.patch.dict(os.environ,{'SUDO_PASSWORD':'fixture_window_sudo'},clear=True):
+                with tool.root_askpass_environment() as environment:
+                    path=Path(environment['SUDO_ASKPASS'])
+                    self.assertEqual(path.stat().st_mode & 0o777,0o700)
+                    self.assertEqual(path.parent.stat().st_mode & 0o777,0o700)
+                    self.assertNotIn(b'fixture_window_sudo',path.read_bytes())
+                    code,raw=tool.owned_process([sys.executable,'-I','-c',program],environment,packet=b'{"fixture":"original-stdin"}\n',control=read,timeout=5)
+            self.assertEqual((code,raw),(0,b'fixture-terminal-only\n'))
+            self.assertFalse(path.exists());self.assertFalse(path.parent.exists())
+        finally:os.close(read);os.close(write)
+
+    def test_known_child_refusal_and_original_unknown_timeout_cleanup(self):
+        import os,sys
+        from unittest import mock
+        for program,timeout,unknown in (('raise SystemExit(1)',5,False),('import time;time.sleep(1)',.05,True)):
+            with self.subTest(unknown=unknown),mock.patch.dict(os.environ,{'SUDO_PASSWORD':'fixture_window_sudo'},clear=True):
+                path=None
+                if unknown:
+                    with self.assertRaises(tool.Refused):
+                        with tool.root_askpass_environment() as environment:
+                            path=Path(environment['SUDO_ASKPASS'])
+                            tool.owned_process([sys.executable,'-I','-c',program],environment,packet=b'{}\n',timeout=timeout)
+                else:
+                    with tool.root_askpass_environment() as environment:
+                        path=Path(environment['SUDO_ASKPASS'])
+                        self.assertEqual(tool.owned_process([sys.executable,'-I','-c',program],environment,packet=b'{}\n',timeout=timeout),(1,b''))
+                self.assertFalse(path.exists());self.assertFalse(path.parent.exists())
+
+    def test_direct_root_excludes_password_and_preserves_fixed_control_caller(self):
+        import argparse,contextlib,io,os
+        from unittest import mock
+        fixture=WindowToolMetadata();request=fixture.request();approval=fixture.approval(request)
+        args=argparse.Namespace(operation='prepare',operation_id='12-1',run_id='22-3',dispatcher_sha='d'*40,manifest_hash='c'*64,template_hash=approval['request_template_sha256'])
+        credentials={k:'' for k in tool.credential_names('prepare')}
+        with mock.patch.dict(os.environ,{'SUDO_PASSWORD':'invalid\nfixture'},clear=True),mock.patch.object(tool.os,'getuid',return_value=0),mock.patch.object(tool.os,'geteuid',return_value=0),mock.patch.object(tool.Path,'resolve',return_value=Path('/tmp/qs-independent-window-tool.abcdef/compatibility-window-tool.py')),mock.patch.object(tool,'approve',return_value=approval),mock.patch.object(tool,'read_owned',return_value=tool.canonical(request)),mock.patch.object(tool,'root_askpass_environment') as askpass,mock.patch.object(tool,'owned_process',return_value=(1,b'fixture-refusal')) as child,mock.patch.object(tool,'validate_native',side_effect=tool.Refused('fixture')),mock.patch.object(tool,'emit'),contextlib.redirect_stdout(io.StringIO()):
+            self.assertEqual(tool.run_window_call(args,'', '1'*64,'2'*64,credentials,control=88),1)
+        askpass.assert_not_called();self.assertEqual(child.call_args.args[1],{'PATH':'/usr/bin:/bin'})
+        self.assertEqual(child.call_args.kwargs['control'],88)
+        self.assertNotIn(b'SUDO_PASSWORD',child.call_args.kwargs['packet'])
+        self.assertEqual(child.call_args.args[0][-1],'root-direct')
+
+    def test_native_bootstrap_filters_password_and_no_new_native_credential(self):
+        tree=ast.parse(tool.ROOT_BOOTSTRAP)
+        drops=[ast.unparse(n) for n in ast.walk(tree) if isinstance(n,ast.Call) and isinstance(n.func,ast.Attribute) and n.func.attr=='pop']
+        self.assertIn("os.environ.pop('SUDO_PASSWORD', None)",drops)
+        self.assertIn("os.environ.pop('SUDO_ASKPASS', None)",drops)
+        self.assertNotIn('SUDO_PASSWORD',tool.credential_names('apply'))
+        self.assertNotIn('SUDO_PASSWORD',tool.credential_names('prepare'))
+
 if __name__=='__main__':unittest.main()

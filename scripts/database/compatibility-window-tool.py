@@ -8,6 +8,7 @@ The same strict template supports A preparation and a separately approved B CLI.
 import argparse
 import base64
 import copy
+import contextlib
 import hashlib
 import io
 import importlib.util
@@ -23,6 +24,7 @@ import stat
 import subprocess
 import sys
 import tarfile
+import tempfile
 import time
 
 SHA = re.compile(r"[0-9a-f]{40}")
@@ -921,6 +923,7 @@ try:
   if 'SUDO_UID' in os.environ: raise ValueError()
   source_uid=os.getuid()
  else: raise ValueError()
+ os.environ.pop('SUDO_PASSWORD',None);os.environ.pop('SUDO_ASKPASS',None)
  if not re.fullmatch(r'[1-9][0-9]{0,19}-[1-9][0-9]{0,3}',run) or not re.fullmatch(r'[0-9a-f]{64}',package_hash): raise ValueError()
  raw=sys.stdin.buffer.readline(32769)
  if len(raw)>32768: raise ValueError()
@@ -1051,6 +1054,80 @@ def emit(result, secrets):
     print(transport.encode_armored_receipt(result, schema=schema, secrets=secrets))
 
 
+@contextlib.contextmanager
+def root_askpass_environment():
+    """One private fixed askpass; never owns a command or native stdin."""
+    password = os.environ.get('SUDO_PASSWORD', '')
+    if not password:
+        yield None
+        return
+    if len(password.encode('utf-8')) > 4096 or any(c in password for c in ('\x00', '\r', '\n')):
+        reject('window_tool_call_rejected')
+    script = b'#!/bin/sh\nprintf \'%s\\n\' "$SUDO_PASSWORD"\n'
+    directory = Path(tempfile.mkdtemp(prefix='qs-retirement-askpass-'))
+    descriptor = None
+    try:
+        info = directory.lstat()
+        if not stat.S_ISDIR(info.st_mode) or info.st_uid != os.getuid() or stat.S_IMODE(info.st_mode) != 0o700:
+            reject('window_tool_call_rejected')
+        dirfd = os.open(directory, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+        try:
+            descriptor = os.open('askpass', os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o700, dir_fd=dirfd)
+            os.fchmod(descriptor, 0o700)
+            created = os.fstat(descriptor)
+            inode = lambda v: (v.st_dev, v.st_ino, v.st_uid, v.st_mode, v.st_nlink)
+            identity = lambda v: (*inode(v), v.st_size, v.st_mtime_ns, v.st_ctime_ns)
+            offset = 0
+            while offset < len(script):
+                count = os.write(descriptor, script[offset:])
+                if count <= 0: reject('window_tool_call_rejected')
+                offset += count
+            os.fsync(descriptor)
+            original = os.fstat(descriptor)
+            # A writable FD must be closed before the kernel executes a script.
+            # Retain the exact original inode through a read-only held FD.
+            readonly = os.open('askpass', os.O_RDONLY | os.O_NOFOLLOW, dir_fd=dirfd)
+            try:
+                os.close(descriptor)
+            except BaseException:
+                os.close(readonly)
+                descriptor = None
+                raise
+            descriptor = readonly
+            if not stat.S_ISREG(original.st_mode) or original.st_nlink != 1 or original.st_uid != os.getuid() or stat.S_IMODE(original.st_mode) != 0o700:
+                reject('window_tool_call_rejected')
+            if identity(os.fstat(descriptor)) != identity(original) or os.read(descriptor, len(script) + 1) != script:
+                reject('window_tool_call_rejected')
+            yield {'PATH': '/usr/bin:/bin', 'SUDO_ASKPASS': str(directory / 'askpass'), 'SUDO_PASSWORD': password}
+        finally:
+            try:
+                if descriptor is not None:
+                    try:
+                        current = directory.lstat()
+                        if (current.st_dev, current.st_ino, current.st_uid, current.st_mode) != (info.st_dev, info.st_ino, info.st_uid, info.st_mode):
+                            reject('window_tool_call_rejected')
+                        held = os.fstat(descriptor)
+                        visible = os.stat('askpass', dir_fd=dirfd, follow_symlinks=False)
+                        if 'original' in locals():
+                            unchanged = identity(held) == identity(original) == identity(visible)
+                        else:
+                            # No child was invoked: discard only our exact
+                            # original, possibly partially written inode.
+                            unchanged = 'created' in locals() and inode(held) == inode(created) == inode(visible)
+                        if not unchanged:
+                            reject('window_tool_call_rejected')
+                        os.unlink('askpass', dir_fd=dirfd)
+                    finally:
+                        os.close(descriptor)
+            finally:
+                os.close(dirfd)
+    finally:
+        try:
+            directory.rmdir()
+        except OSError:
+            reject('window_tool_call_rejected')
+
+
 def run_window_call(args, raw, approval_hash, package, credentials, *, control=None):
     """Actual caller, with credentials borrowed from the private live pipe.
 
@@ -1058,7 +1135,7 @@ def run_window_call(args, raw, approval_hash, package, credentials, *, control=N
     function still loads the protected original template and invokes the fixed
     root supervisor/native binary. It accepts no execution result or callback.
     """
-    secrets = tuple(credentials.values()) if type(credentials) is dict else ()
+    secrets = (tuple(credentials.values()) if type(credentials) is dict else ()) + (os.environ.get("SUDO_PASSWORD", ""),)
     try:
         token(args.run_id, RUN)
         a = approve(raw, approval_hash, args.dispatcher_sha, args.operation, args.operation_id, args.manifest_hash, args.template_hash)
@@ -1080,12 +1157,14 @@ def run_window_call(args, raw, approval_hash, package, credentials, *, control=N
                 reject("window_tool_root_direct_rejected")
             command = ["/usr/bin/python3", "-I", "-c", ROOT_BOOTSTRAP, *bindings, "root-direct"]
             environment = {"PATH": "/usr/bin:/bin"}
-        else:
-            command = ["/usr/bin/sudo", "-n", "--", "/usr/bin/python3", "-I", "-c", ROOT_BOOTSTRAP, *bindings, "sudo-user"]
-            environment = None
         # The live pipe requests root-owned cancellation if this manager loses
         # its caller. No saved JSON is turned into a live proof.
-        code, native_raw = owned_process(command, environment, packet=packet, control=control, timeout=115 * 60)
+        if os.getuid() == 0:
+            code, native_raw = owned_process(command, environment, packet=packet, control=control, timeout=115 * 60)
+        else:
+            with root_askpass_environment() as environment:
+                command = ["/usr/bin/sudo", "-A" if environment is not None else "-n", "--", "/usr/bin/python3", "-I", "-c", ROOT_BOOTSTRAP, *bindings, "sudo-user"]
+                code, native_raw = owned_process(command, environment, packet=packet, control=control, timeout=115 * 60)
         native = validate_native(native_raw, code, a, args.run_id, derived_hash)
         result = {"format_version": 1, "kind": "independent_window_tool_call_result", "dispatcher_source_sha": args.dispatcher_sha,
                   "tool_source_sha": a["tool_source_sha"], "approved_template_sha256": args.template_hash, "derived_request_sha256": derived_hash, "native_result": native}

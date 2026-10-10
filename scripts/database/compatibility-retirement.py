@@ -1715,6 +1715,8 @@ try:
         source_uid = os.getuid() # actual root identity, already jointly checked
     else:
         stop()
+    os.environ.pop('SUDO_PASSWORD', None)
+    os.environ.pop('SUDO_ASKPASS', None)
     allowed = {'MYSQL_HOST','MYSQL_PORT','MYSQL_USERNAME','MYSQL_PASSWORD','MYSQL_DATABASE','MONGODB_HOST','MONGODB_PORT','MONGODB_USERNAME','MONGODB_PASSWORD','MONGODB_DBNAME','MONGODB_METADATA_ADMIN_USERNAME','MONGODB_METADATA_ADMIN_PASSWORD'}
     packet = sys.stdin.buffer.read(32769)
     if len(packet)>32768: stop()
@@ -1817,6 +1819,80 @@ def root_native_diagnostic(private_stderr, completed, stdout=b'', returncode=0):
             'stderr_sample_truncated': size > len(sample)}
 
 
+@contextlib.contextmanager
+def root_askpass_environment():
+    """One private fixed askpass; never owns a command or native stdin."""
+    password = os.environ.get('SUDO_PASSWORD', '')
+    if not password:
+        yield None
+        return
+    if len(password.encode('utf-8')) > 4096 or any(c in password for c in ('\x00', '\r', '\n')):
+        fail('lifecycle_root_host_channel_required')
+    script = b'#!/bin/sh\nprintf \'%s\\n\' "$SUDO_PASSWORD"\n'
+    directory = Path(tempfile.mkdtemp(prefix='qs-retirement-askpass-'))
+    descriptor = None
+    try:
+        info = directory.lstat()
+        if not stat.S_ISDIR(info.st_mode) or info.st_uid != os.getuid() or stat.S_IMODE(info.st_mode) != 0o700:
+            fail('lifecycle_root_host_channel_required')
+        dirfd = os.open(directory, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+        try:
+            descriptor = os.open('askpass', os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o700, dir_fd=dirfd)
+            os.fchmod(descriptor, 0o700)
+            created = os.fstat(descriptor)
+            inode = lambda v: (v.st_dev, v.st_ino, v.st_uid, v.st_mode, v.st_nlink)
+            identity = lambda v: (*inode(v), v.st_size, v.st_mtime_ns, v.st_ctime_ns)
+            offset = 0
+            while offset < len(script):
+                count = os.write(descriptor, script[offset:])
+                if count <= 0: fail('lifecycle_root_host_channel_required')
+                offset += count
+            os.fsync(descriptor)
+            original = os.fstat(descriptor)
+            # A writable FD must be closed before the kernel executes a script.
+            # Retain the exact original inode through a read-only held FD.
+            readonly = os.open('askpass', os.O_RDONLY | os.O_NOFOLLOW, dir_fd=dirfd)
+            try:
+                os.close(descriptor)
+            except BaseException:
+                os.close(readonly)
+                descriptor = None
+                raise
+            descriptor = readonly
+            if not stat.S_ISREG(original.st_mode) or original.st_nlink != 1 or original.st_uid != os.getuid() or stat.S_IMODE(original.st_mode) != 0o700:
+                fail('lifecycle_root_host_channel_required')
+            if identity(os.fstat(descriptor)) != identity(original) or os.read(descriptor, len(script) + 1) != script:
+                fail('lifecycle_root_host_channel_required')
+            yield {'PATH': '/usr/bin:/bin', 'SUDO_ASKPASS': str(directory / 'askpass'), 'SUDO_PASSWORD': password}
+        finally:
+            try:
+                if descriptor is not None:
+                    try:
+                        current = directory.lstat()
+                        if (current.st_dev, current.st_ino, current.st_uid, current.st_mode) != (info.st_dev, info.st_ino, info.st_uid, info.st_mode):
+                            fail('lifecycle_root_host_channel_required')
+                        held = os.fstat(descriptor)
+                        visible = os.stat('askpass', dir_fd=dirfd, follow_symlinks=False)
+                        if 'original' in locals():
+                            unchanged = identity(held) == identity(original) == identity(visible)
+                        else:
+                            # No child was invoked: discard only our exact
+                            # original, possibly partially written inode.
+                            unchanged = 'created' in locals() and inode(held) == inode(created) == inode(visible)
+                        if not unchanged:
+                            fail('lifecycle_root_host_channel_required')
+                        os.unlink('askpass', dir_fd=dirfd)
+                    finally:
+                        os.close(descriptor)
+            finally:
+                os.close(dirfd)
+    finally:
+        try:
+            directory.rmdir()
+        except OSError:
+            fail('lifecycle_root_host_channel_required')
+
+
 def root_once_lifecycle_prepare(args):
     if args.operation != 'prepare' or args.prepare_mode not in ('lifecycle','prepare-facts','host-writer-scope','db-writer-census'):
         fail('lifecycle_root_host_channel_required')
@@ -1841,10 +1917,14 @@ def root_once_lifecycle_prepare(args):
         try:
             if uid == 0:
                 result=subprocess.run(['/usr/bin/python3','-I','-c',ROOT_PREPARE_ONCE,*bindings,'root-direct',*suffix],env={'PATH':'/usr/bin:/bin'},input=packet,stdout=subprocess.PIPE,stderr=private_stderr,timeout=91*60,check=False)
-            elif args.prepare_mode in ('host-writer-scope','db-writer-census'):
-                result=subprocess.run(['/usr/bin/sudo','-n','--','/usr/bin/python3','-I','-c',ROOT_PREPARE_ONCE,*bindings,'sudo-user',*suffix],env={'PATH':'/usr/bin:/bin'},input=packet,stdout=subprocess.PIPE,stderr=private_stderr,timeout=3*60,check=False)
             else:
-                result=subprocess.run(['sudo','-n','python3','-I','-c',ROOT_PREPARE_ONCE,*bindings,'sudo-user',*suffix],input=packet,stdout=subprocess.PIPE,stderr=private_stderr,timeout=91*60,check=False)
+                with root_askpass_environment() as environment:
+                    if environment is not None:
+                        result=subprocess.run(['/usr/bin/sudo','-A','--','/usr/bin/python3','-I','-c',ROOT_PREPARE_ONCE,*bindings,'sudo-user',*suffix],env=environment,input=packet,stdout=subprocess.PIPE,stderr=private_stderr,timeout=3*60 if args.prepare_mode in ('host-writer-scope','db-writer-census') else 91*60,check=False)
+                    elif args.prepare_mode in ('host-writer-scope','db-writer-census'):
+                        result=subprocess.run(['/usr/bin/sudo','-n','--','/usr/bin/python3','-I','-c',ROOT_PREPARE_ONCE,*bindings,'sudo-user',*suffix],env={'PATH':'/usr/bin:/bin'},input=packet,stdout=subprocess.PIPE,stderr=private_stderr,timeout=3*60,check=False)
+                    else:
+                        result=subprocess.run(['sudo','-n','python3','-I','-c',ROOT_PREPARE_ONCE,*bindings,'sudo-user',*suffix],input=packet,stdout=subprocess.PIPE,stderr=private_stderr,timeout=91*60,check=False)
         except OSError:
             raise NativeReceiptBlocked('lifecycle_native_start_failed', root_native_diagnostic(private_stderr, False)) from None
         except subprocess.TimeoutExpired as error:
