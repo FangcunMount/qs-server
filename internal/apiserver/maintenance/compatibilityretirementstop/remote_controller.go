@@ -56,7 +56,7 @@ func (c *RemoteController) Do(ctx context.Context, action string) (v SessionDiag
 		return v, ErrRemoteBudget
 	}
 	if action == "bind" && c.seq != 0 || action == "stop" && c.stopIssued || c.forwardRefused && !recoveryAction(action) || recoveryAction(action) && (c.recoveryIssued || c.seq != 0 && !c.stopIssued) ||
-		(action == "check" || action == "resume_dependents" || controlledAction(action)) && !c.stopIssued || controlledAction(action) && (!c.managementBound || action == "controlled_resume" && c.controlledIssued || (action == "check_running" || action == "observe_loaded_mq" || action == "purge_materials") && !c.controlledResumed || (action == "purge_materials" || action == "observe_loaded_mq") && c.runtimeObservation == nil) {
+		(action == "check" || action == "observe_db_principals" || action == "resume_dependents" || controlledAction(action)) && !c.stopIssued || action == "observe_db_principals" && (!c.managementBound || c.controlledIssued) || controlledAction(action) && (!c.managementBound || action == "controlled_resume" && c.controlledIssued || (action == "check_running" || action == "observe_loaded_mq" || action == "purge_materials") && !c.controlledResumed || (action == "purge_materials" || action == "observe_loaded_mq") && c.runtimeObservation == nil) {
 		return v, ErrRemoteBudget
 	}
 	var a, b unix.Stat_t
@@ -126,6 +126,13 @@ func (c *RemoteController) Do(ctx context.Context, action string) (v SessionDiag
 		return v, ErrRemoteBudget
 	}
 	if !remoteRuntimeDiagnosticValid(v) || !remoteMaterialsDiagnosticValid(v) || !remoteLoadedMQDiagnosticValid(v) {
+		return v, ErrRemoteBudget
+	}
+	if v.Action == "observe_db_principals" && v.Outcome == "observed" {
+		if len(v.DatabasePrincipals) != 1 || v.DatabasePrincipals[0].Component != "qs-worker" || !hash64.MatchString(v.DatabasePrincipals[0].ContainerID) || !hash64.MatchString(v.DatabasePrincipals[0].EnvironmentSHA256) || v.DatabasePrincipals[0].SQLUser == "" || v.DatabasePrincipals[0].SQLDatabase == "" || v.DatabasePrincipals[0].MongoUser == "" || v.DatabasePrincipals[0].MongoDatabase == "" {
+			return v, ErrRemoteBudget
+		}
+	} else if len(v.DatabasePrincipals) != 0 {
 		return v, ErrRemoteBudget
 	}
 	after, e := c.issuer.window.Diagnostic(q)

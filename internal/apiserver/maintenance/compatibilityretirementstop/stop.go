@@ -368,6 +368,87 @@ func (a *Approval) inspect(ctx context.Context, id string) (actualContainer, err
 	}
 	return v, nil
 }
+
+// DatabasePrincipal is a credential-free selection from the actual original
+// container environment. It is not an ownership approval or writer fence.
+type DatabasePrincipal struct {
+	ContainerID       string `json:"container_id"`
+	Component         string `json:"component"`
+	EnvironmentSHA256 string `json:"environment_sha256"`
+	SQLUser           string `json:"mysql_user"`
+	SQLDatabase       string `json:"mysql_database"`
+	MongoUser         string `json:"mongodb_user"`
+	MongoDatabase     string `json:"mongodb_database"`
+}
+
+func (l *Lease) ObserveDatabasePrincipals(ctx context.Context) ([]DatabasePrincipal, error) {
+	if l == nil || l.self != l || l.Check(ctx) != nil {
+		return nil, ErrBinding
+	}
+	out := []DatabasePrincipal{}
+	for _, want := range l.baseline {
+		prefix := ""
+		switch want.Component {
+		case "qs-apiserver":
+			prefix = "QS_APISERVER_"
+		case "qs-worker":
+			prefix = "QS_WORKER_"
+		case "qs-collection-server":
+			continue // Collection uses the original API, not a DB credential.
+		default:
+			return nil, ErrBinding
+		}
+		// The deployed fixed config argument cannot override these env fields via
+		// command-line DB flags. Missing actual env values never use YAML guesses.
+		if len(want.Command) != 1 || !strings.HasPrefix(want.Command[0], "--config=") {
+			return nil, ErrBinding
+		}
+		before, e := l.approval.inspect(ctx, want.ID)
+		if e != nil || !sameIdentity(before, want) || before.Running || before.PID != 0 {
+			return nil, ErrBinding
+		}
+		raw, e := l.approval.docker(ctx, "inspect", "--format", "{{json .Config.Env}}", want.ID)
+		var env []string
+		if e != nil || json.Unmarshal(bytes.TrimSpace(raw), &env) != nil || len(raw) > 32768 {
+			return nil, ErrBinding
+		}
+		v, e := databasePrincipalEnvironment(want, prefix, env)
+		if e != nil {
+			return nil, e
+		}
+		again, e := l.approval.docker(ctx, "inspect", "--format", "{{json .Config.Env}}", want.ID)
+		after, ae := l.approval.inspect(ctx, want.ID)
+		if e != nil || ae != nil || !bytes.Equal(raw, again) || !reflect.DeepEqual(before, after) {
+			return nil, ErrState
+		}
+		out = append(out, v)
+	}
+	if len(out) == 0 || l.Check(ctx) != nil {
+		return nil, ErrBinding
+	}
+	return out, nil
+}
+
+func databasePrincipalEnvironment(want Container, prefix string, env []string) (DatabasePrincipal, error) {
+	v := DatabasePrincipal{ContainerID: want.ID, Component: want.Component, EnvironmentSHA256: digest([]byte(strings.Join(env, "\x00")))}
+	values := map[string]string{}
+	for _, item := range env {
+		k, value, ok := strings.Cut(item, "=")
+		if !ok || strings.ContainsAny(item, "\x00\r\n") {
+			return v, ErrBinding
+		}
+		if _, exists := values[k]; exists {
+			return v, ErrBinding
+		}
+		values[k] = value
+	}
+	v.SQLUser, v.SQLDatabase = values[prefix+"MYSQL_USERNAME"], values[prefix+"MYSQL_DATABASE"]
+	v.MongoUser, v.MongoDatabase = values[prefix+"MONGODB_USERNAME"], values[prefix+"MONGODB_DATABASE"]
+	if v.SQLUser == "" || v.SQLDatabase == "" || v.MongoUser == "" || v.MongoDatabase == "" || values[prefix+"MONGODB_URL"] != "" {
+		return v, ErrBinding
+	}
+	return v, nil
+}
 func relevant(v actualContainer) bool {
 	return v.Component == "qs-apiserver" || v.Component == "qs-collection-server" || v.Component == "qs-worker" || v.Name == "/qs-apiserver" || v.Name == "/qs-worker" || v.Name == "/qs-collection-server" || v.Project == "qs-collection" || v.Project == "qs-worker"
 }

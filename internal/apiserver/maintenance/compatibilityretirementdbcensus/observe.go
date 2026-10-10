@@ -38,7 +38,11 @@ type dbCensusSQLQuery func(context.Context, string) ([][]*string, error)
 type dbCensusMongoCommand func(context.Context, string, bson.D) (bson.M, error)
 type dbCensusMongoAggregate func(context.Context, string, string, mongo.Pipeline) ([]bson.M, error)
 
-func dbCensusSQL(ctx context.Context, db *sql.DB, q string) ([][]*string, error) {
+type sqlReader interface {
+	QueryContext(context.Context, string, ...any) (*sql.Rows, error)
+}
+
+func dbCensusSQL(ctx context.Context, db sqlReader, q string) ([][]*string, error) {
 	if ctx == nil || db == nil {
 		return nil, errors.New("db_census_borrowed_sql_missing")
 	}
@@ -595,6 +599,19 @@ func Observe(ctx context.Context, borrowedSQL *sql.DB, borrowedMongo *mongo.Clie
 	if ctx == nil || ctx.Err() != nil || borrowedSQL == nil || borrowedMongo == nil {
 		return Catalog{}, errors.New("db_census_borrowed_handles_missing")
 	}
+	return observeBorrowed(ctx, borrowedSQL, borrowedMongo)
+}
+
+// ObserveConnection uses the host's already borrowed maintenance connection.
+// In particular, it never waits for another connection from a max-one pool.
+func ObserveConnection(ctx context.Context, borrowedSQL *sql.Conn, borrowedMongo *mongo.Client) (Catalog, error) {
+	if ctx == nil || ctx.Err() != nil || borrowedSQL == nil || borrowedMongo == nil {
+		return Catalog{}, errors.New("db_census_borrowed_handles_missing")
+	}
+	return observeBorrowed(ctx, borrowedSQL, borrowedMongo)
+}
+
+func observeBorrowed(ctx context.Context, borrowedSQL sqlReader, borrowedMongo *mongo.Client) (Catalog, error) {
 	bounded, cancel := context.WithTimeout(ctx, Budget)
 	defer cancel()
 	q := func(ctx context.Context, query string) ([][]*string, error) {

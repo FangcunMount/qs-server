@@ -175,6 +175,7 @@ func serveRemoteHostSession(ctx context.Context, a *Approval, journalDir string,
 		var actualRuntime *DependentRuntimeSnapshot
 		var actualMaterials *RemoteMaterialSnapshot
 		var actualMQ *LoadedMQDiagnostic
+		var actualPrincipals []DatabasePrincipal
 		switch req.Action {
 		case "bind":
 			// Actual descriptor/trust, fresh native signature and original budget
@@ -188,6 +189,11 @@ func serveRemoteHostSession(ctx context.Context, a *Approval, journalDir string,
 				return ErrCommand
 			}
 			e = l.Check(ctx)
+		case "observe_db_principals":
+			if l == nil {
+				return ErrCommand
+			}
+			actualPrincipals, e = l.ObserveDatabasePrincipals(ctx)
 		case "resume_dependents":
 			if l == nil {
 				return ErrCommand
@@ -263,6 +269,7 @@ func serveRemoteHostSession(ctx context.Context, a *Approval, journalDir string,
 		diagnostic.Runtime = actualRuntime
 		diagnostic.Materials = actualMaterials
 		diagnostic.LoadedMQ = actualMQ
+		diagnostic.DatabasePrincipals = actualPrincipals
 		if e != nil {
 			diagnostic.Outcome = "refused"
 		}
@@ -350,7 +357,7 @@ func remoteSessionActionAllowed(action string, bound, stopIssued, forwardRefused
 		return !bound && !stopIssued
 	case "stop":
 		return !stopIssued // Preserves the legacy initial Stop route.
-	case "check", "resume_dependents", "controlled_resume", "check_running", "observe_loaded_mq", "purge_materials":
+	case "check", "observe_db_principals", "resume_dependents", "controlled_resume", "check_running", "observe_loaded_mq", "purge_materials":
 		return stopIssued
 	}
 	return false
@@ -362,6 +369,9 @@ func remoteSessionActionAllowed(action string, bound, stopIssued, forwardRefused
 func remoteSessionRequestAllowed(action string, bound, stopIssued, forwardRefused, recoveryIssued, controlledIssued, controlledResumed bool) bool {
 	if !remoteSessionActionAllowed(action, bound, stopIssued, forwardRefused, recoveryIssued) {
 		return false
+	}
+	if action == "observe_db_principals" {
+		return bound && stopIssued && !controlledIssued
 	}
 	return !controlledAction(action) || bound &&
 		(action != "controlled_resume" || !controlledIssued) &&

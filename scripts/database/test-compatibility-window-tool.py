@@ -134,6 +134,17 @@ class WindowToolMetadata(unittest.TestCase):
         ast.parse(tool.ROOT_BOOTSTRAP)
         self.assertIn("names=namespace['credential_names'](stage)",tool.ROOT_BOOTSTRAP)
 
+    def test_database_writer_expected_bytes_are_bound_without_importing_isolation(self):
+        r=self.request();a=self.approval(r,'apply')
+        file=dict(path='/opt/backups/qs-server/compatibility-retirement/12-1/database-writers.private.json',sha256='a'*64)
+        r['writer_control']['database_input']=file
+        a['request_template_sha256']=tool.digest(tool.canonical(r))
+        out=tool.decode(tool.derive_request(tool.canonical(r),a,'22-3'))
+        self.assertEqual(out['writer_control']['database_input'],file)
+        for mutate in (lambda v:v.update(path='/tmp/writer.json'),lambda v:v.update(path='/opt/backups/qs-server/compatibility-retirement/13-1/writer.json'),lambda v:v.update(complete=True),lambda v:v.update(sha256='main')):
+            bad=copy.deepcopy(r);mutate(bad['writer_control']['database_input']);a['request_template_sha256']=tool.digest(tool.canonical(bad))
+            with self.assertRaises(tool.Refused):tool.derive_request(tool.canonical(bad),a,'22-3')
+
     def test_mixed_unknown_uppercase_and_proof_fields_reject(self):
         for name in ('drop_ready','whole_writer_fence','SourceSHA','tool_sha','window_lease'):
             r=self.request();r[name]=True;a=self.approval(r)

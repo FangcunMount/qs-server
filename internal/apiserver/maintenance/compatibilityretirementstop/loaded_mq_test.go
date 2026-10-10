@@ -87,3 +87,34 @@ func TestLoadedMQWireRequiresTheExplicitIncompleteObservation(t *testing.T) {
 		t.Fatal("blank controller recreated a live observation")
 	}
 }
+
+func TestDatabasePrincipalUsesOnlyActualOriginalEnvAndFixedStoppedAction(t *testing.T) {
+	want := Container{ID: strings.Repeat("a", 64), Component: "qs-worker"}
+	env := []string{"QS_WORKER_MYSQL_USERNAME=app", "QS_WORKER_MYSQL_DATABASE=qs", "QS_WORKER_MONGODB_USERNAME=app", "QS_WORKER_MONGODB_DATABASE=qs", "QS_WORKER_MYSQL_PASSWORD=private-must-not-leave-owner"}
+	v, e := databasePrincipalEnvironment(want, "QS_WORKER_", env)
+	raw, _ := json.Marshal(v)
+	if e != nil || v.SQLUser != "app" || v.MongoDatabase != "qs" || strings.Contains(string(raw), "private-must-not-leave-owner") {
+		t.Fatal("actual fields missing or credentials leaked", e)
+	}
+	for _, bad := range [][]string{env[:3], append(append([]string{}, env...), "QS_WORKER_MYSQL_USERNAME=other"), append(append([]string{}, env...), "QS_WORKER_MONGODB_URL=mongodb://other"), append(append([]string{}, env...), "invalid")} {
+		if _, e = databasePrincipalEnvironment(want, "QS_WORKER_", bad); e == nil {
+			t.Fatal("ambiguous/env override/default guessed")
+		}
+	}
+	action := "observe_db_principals"
+	for _, tc := range []struct{ bound, stopped, refused, recovery, issued, resumed, want bool }{{true, true, false, false, false, false, true}, {false, true, false, false, false, false, false}, {true, false, false, false, false, false, false}, {true, true, true, false, false, false, false}, {true, true, false, true, false, false, false}, {true, true, false, false, true, true, false}} {
+		if remoteSessionRequestAllowed(action, tc.bound, tc.stopped, tc.refused, tc.recovery, tc.issued, tc.resumed) != tc.want {
+			t.Fatal("principal read escaped original stopped service phase")
+		}
+	}
+	raw, _ = json.Marshal(SessionRequest{sessionProtocol, 3, action})
+	if _, e = parseRemoteSessionRequest(raw, 3); e != nil {
+		t.Fatal(e)
+	}
+	if _, e = parseSessionRequest(raw, 3); e == nil {
+		t.Fatal("nonremote arbitrary reader admitted")
+	}
+	if _, e = (&Lease{}).ObserveDatabasePrincipals(t.Context()); e == nil {
+		t.Fatal("imported original service granted native config")
+	}
+}

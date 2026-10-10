@@ -166,8 +166,15 @@ def derive_request(raw, approval, current_run):
         if any(key in r for key in ("resume", "resume_kind", "service_control", "deployment_control", "final_history", "writer_control", "source_copy_intent", "historical_write_report", "preparation_restore_zero")) or q["archive_sha256"] != "":
             reject("window_tool_prepare_effect_fields_rejected")
     if "writer_control" in r:
-        exact(r["writer_control"], ("workflow_scope_sha256",))
+        exact(r["writer_control"], ("workflow_scope_sha256",), ("database_input",))
         token(r["writer_control"]["workflow_scope_sha256"], HASH)
+        if "database_input" in r["writer_control"]:
+            file=r["writer_control"]["database_input"]
+            exact(file,("path","sha256"));token(file["sha256"],HASH)
+            root=Path('/opt/backups/qs-server/compatibility-retirement',approval['operation_id'])
+            p=file['path']
+            if not isinstance(p,str) or not os.path.isabs(p) or os.path.normpath(p)!=p or not Path(p).is_relative_to(root) or p==str(root):
+                reject("window_tool_database_writer_input_rejected")
     if approval["stage"] != "prepare":
         validate_workflow_scope(approval.get("workflow_scope"), approval)
         if "writer_control" not in r or r["writer_control"]["workflow_scope_sha256"] != digest(canonical(approval["workflow_scope"])):

@@ -252,6 +252,26 @@ func (l *AIStoppedRuntimeLease) Stop(ctx context.Context) error {
 	l.stopped = true
 	return nil
 }
+
+// DatabasePrincipal reads the actual original stopped container's immutable
+// settings; only the username/database leave this owner, never its password.
+func (l *AIStoppedRuntimeLease) DatabasePrincipal(ctx context.Context) (string, string, error) {
+	if l == nil || l.CheckStopped(ctx) != nil {
+		return "", "", ErrAIStoppedRuntime
+	}
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	u, e := url.Parse(l.baseline.Settings["QS_AI_DATABASE_URL"])
+	if e != nil || u.Scheme != "mysql+asyncmy" || u.User == nil || u.User.Username() == "" || u.Path == "" || u.Fragment != "" {
+		return "", "", ErrAIStoppedRuntime
+	}
+	query, e := url.ParseQuery(u.RawQuery)
+	if e != nil || len(query) > 1 || len(query) == 1 && (len(query["charset"]) != 1 || query.Get("charset") != "utf8mb4") {
+		return "", "", ErrAIStoppedRuntime
+	}
+	return u.User.Username(), strings.TrimPrefix(u.Path, "/"), nil
+}
+
 func (l *AIStoppedRuntimeLease) CheckStopped(ctx context.Context) error {
 	if l == nil || l.self != l {
 		return ErrAIStoppedRuntime

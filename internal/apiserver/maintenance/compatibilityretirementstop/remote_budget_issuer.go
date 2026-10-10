@@ -237,7 +237,7 @@ type signedRemoteBudget struct {
 func recoveryAction(s string) bool { return s == "restore" || s == "restore_dependents" }
 func serviceAction(s string) bool {
 	switch s {
-	case "bind", "stop", "check", "resume_dependents", "restore", "restore_dependents", "controlled_resume", "check_running", "observe_loaded_mq", "purge_materials":
+	case "bind", "stop", "check", "observe_db_principals", "resume_dependents", "restore", "restore_dependents", "controlled_resume", "check_running", "observe_loaded_mq", "purge_materials":
 		return true
 	}
 	return false

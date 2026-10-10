@@ -38,6 +38,7 @@ type lifecycleFixedHost struct {
 	preBComparison                 *lifecyclePreBDataComparison
 	comparisonAttempted            bool
 	writers                        *lifecycleWriterObservation
+	dbWriters                      *lifecycleDBWriterLease
 	runtimeLedgers                 *lifecycleRuntimeLedgerObservation
 	currentMQ                      *lifecycleCurrentMQConnections
 	aiStopped                      *retirement.AIStoppedRuntimeLease
@@ -145,6 +146,9 @@ func (h *lifecycleFixedHost) StopAndDrain(ctx context.Context, r lifecycleReques
 	if h == nil || h.services == nil || h.services.window != w || !h.services.identity.matches(r) || !h.services.managementReady {
 		return lifecycleError("lifecycle_service_controller_binding_rejected")
 	}
+	if !r.WriterControl.valid() || r.WriterControl.DatabaseInput == nil {
+		return lifecycleError("lifecycle_database_writer_input_missing")
+	}
 	v := h.services
 	var err error
 	if h.aiStopped != nil || r.FinalHistory == nil || r.FinalHistory.StopConstraints == nil {
@@ -173,6 +177,9 @@ func (h *lifecycleFixedHost) StopAndDrain(ctx context.Context, r lifecycleReques
 	if h.owner == nil {
 		return lifecycleError("lifecycle_native_handles_missing")
 	}
+	if err = h.installDatabaseWriterLease(ctx, r); err != nil {
+		return err
+	}
 	_, err = stop.ObserveDatabaseDrain(ctx, h.owner.originalConn, h.owner.originalDB)
 	return err
 }
@@ -198,6 +205,9 @@ func (h *lifecycleFixedHost) RestoreStoppedServices(ctx context.Context, r lifec
 		return lifecycleError("lifecycle_service_controller_binding_rejected")
 	}
 	var result error
+	if err = h.restoreDatabaseWriterLease(ctx, r, false); err != nil {
+		return err
+	}
 	if h.services != nil {
 		result = h.services.RestorePartialStop(ctx, r, w)
 	}
@@ -233,6 +243,13 @@ func (h *lifecycleFixedHost) DeployBInline(ctx context.Context, r lifecycleReque
 	// before the first native API start, while all original services are stopped.
 	h.preBComparison, e = h.compareCompleteDataBeforeB(q, r, p, w)
 	if e != nil {
+		return e
+	}
+	// The four old objects are absent and the complete frozen comparison is
+	// retained. Restore only our original credential states before B can start
+	// its current readers/writers; the outer host/workflow fence remains required.
+	h.acceptancePair = p
+	if e = h.restoreDatabaseWriterLease(q, r, true); e != nil {
 		return e
 	}
 	if e = h.api.deploy(q, r, false); e != nil {
@@ -275,6 +292,9 @@ func (h *lifecycleFixedHost) DeployRollbackInline(ctx context.Context, r lifecyc
 	}
 	if h.api == nil {
 		return lifecycleError("lifecycle_actual_no_migration_rollback_missing")
+	}
+	if e = h.restoreDatabaseWriterLease(q, r, false); e != nil {
+		return e
 	}
 	return h.api.deploy(q, r, true)
 }
@@ -325,6 +345,9 @@ func (h *lifecycleFixedHost) RestoreRollbackEntrypoints(ctx context.Context, r l
 	if h == nil {
 		return lifecycleError("lifecycle_actual_service_lease_missing")
 	}
+	if err := h.restoreDatabaseWriterLease(ctx, r, false); err != nil {
+		return err
+	}
 	// Recovery follows actual DDL reconciliation and the separately verified
 	// no-migration rollback. Preserve any native partial stop lease, issuer and
 	// original Window and the same existing remote transport.
@@ -358,6 +381,9 @@ func (h *lifecycleFixedHost) Close() error {
 	}
 	if h.archiveMaterials != nil {
 		result = errors.Join(result, h.archiveMaterials.close())
+	}
+	if h.dbWriters != nil && (h.dbWriters.self != h.dbWriters || h.dbWriters.host != h || !h.dbWriters.restored) {
+		result = lifecycleError("lifecycle_database_original_account_restore_unproven")
 	}
 	if h.writers != nil {
 		h.writers.close()
