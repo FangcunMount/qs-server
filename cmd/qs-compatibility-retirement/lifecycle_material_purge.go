@@ -8,6 +8,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"reflect"
 	"runtime"
 	"sort"
 	"strings"
@@ -15,6 +16,7 @@ import (
 
 	"golang.org/x/sys/unix"
 
+	backup "github.com/FangcunMount/qs-server/internal/apiserver/maintenance/compatibilityretirementbackup"
 	stop "github.com/FangcunMount/qs-server/internal/apiserver/maintenance/compatibilityretirementstop"
 	"github.com/FangcunMount/qs-server/pkg/version"
 )
@@ -90,6 +92,99 @@ type lifecycleBatchMaterials struct {
 	zeroVerified                     bool
 }
 
+// The fixed backup producer registered exactly these six files before copying
+// any body. Reopening them consumes the native Archive's verified immutable
+// assets; ReadDir may reject extras but cannot expand this deletion scope.
+func openLifecycleOriginalArchiveMaterials(ctx context.Context, r lifecycleRequest, a *backup.Archive) (owned *lifecycleMaterialDirectory, result error) {
+	if ctx == nil || ctx.Err() != nil || a == nil || backup.VerifyHostArchiveBinding(ctx, a, r.Approval) != nil || a.Summary().ArchiveSHA256 != r.Recovery.ArchiveSHA256 {
+		return nil, lifecycleError("lifecycle_material_registration_rejected")
+	}
+	d, err := openLifecycleMaterialDirectory(r.ArchiveDirectory, 0)
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		if result != nil {
+			_ = d.close()
+		}
+	}()
+	d.externalArchive = true // The existing exact backup backend removes it.
+	assets := a.TemporarySourceAssets()
+	names := []string{}
+	for index, asset := range assets {
+		if ctx.Err() != nil || asset.Filename != lifecycleSourceNames[index+3] {
+			return nil, lifecycleError("lifecycle_material_registration_rejected")
+		}
+		if err = d.register(asset.Filename, asset.SHA256, 0, 0600); err != nil {
+			return nil, err
+		}
+		if d.files[asset.Filename].info.Size() != asset.Bytes {
+			return nil, lifecycleError("lifecycle_material_registration_rejected")
+		}
+		names = append(names, asset.Filename)
+	}
+	names = append(names, "archive.private.json")
+	if err = d.register("archive.private.json", r.Recovery.ArchiveSHA256, 0, 0600); err != nil {
+		return nil, err
+	}
+	// This exact order and schema match backup.registration's original writer.
+	registration := struct {
+		Version                int
+		Approval               backup.Approval
+		Files                  []string
+		ContainsOriginalBodies bool
+		PurgeAfterAcceptance   bool
+		ResumeAllowed          bool
+	}{1, r.Approval, names, true, true, false}
+	raw, err := json.Marshal(registration)
+	if err != nil {
+		return nil, err
+	}
+	if err = d.register("assets.private.json", digestRaw(raw), 0, 0600); err != nil {
+		return nil, err
+	}
+	if err = d.checkComplete(false); err != nil {
+		return nil, err
+	}
+	return d, nil
+}
+
+func registerLifecycleCurrentRestoreMetadata(ctx context.Context, d *lifecycleMaterialDirectory, owner *lifecyclePreparationOwner, r lifecycleRequest) error {
+	if ctx == nil || ctx.Err() != nil || d == nil || d.path != r.prepareRoot || owner == nil || len(owner.engines) != 2 || len(owner.materialRecords) != 5 {
+		return lifecycleError("lifecycle_restore_owned_material_binding_rejected")
+	}
+	expected := map[string]string{"lifecycle-restore-" + r.ActualRunID + ".registration.private.json": owner.materialRecords["lifecycle-restore-"+r.ActualRunID+".registration.private.json"]}
+	for _, engine := range owner.engines {
+		if engine == nil || !lifecycleEngineWiresTerminal(engine) || len(engine.materialRecords) != 2 {
+			return lifecycleError("lifecycle_restore_owned_material_binding_rejected")
+		}
+		nonce, err := hex.DecodeString(engine.Owner)
+		if err != nil || len(nonce) != 16 || engine.Owner != hex.EncodeToString(nonce) || engine.Labels["qs.retirement.operation"] != r.OperationID || engine.Labels["qs.retirement.run"] != r.ActualRunID {
+			return lifecycleError("lifecycle_restore_owned_material_binding_rejected")
+		}
+		for _, suffix := range []string{".intent.private.json", ".created.private.json"} {
+			name := "restore-" + engine.Owner + suffix
+			hash := engine.materialRecords[name]
+			if expected[name] != "" || !hashRE.MatchString(hash) || owner.materialRecords[name] != hash {
+				return lifecycleError("lifecycle_restore_owned_material_binding_rejected")
+			}
+			expected[name] = hash
+		}
+	}
+	if !reflect.DeepEqual(expected, owner.materialRecords) {
+		return lifecycleError("lifecycle_restore_owned_material_binding_rejected")
+	}
+	for name, hash := range expected {
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+		if err := d.register(name, hash, 0, 0600); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // Compose only directly available original owners after the native read/fence.
 // Retain partial FD ownership even on failure so host Close can release it.
 // Root/inventory/source/restore-receipt/archive/A registration remains absent;
@@ -112,6 +207,18 @@ func (h *lifecycleFixedHost) composeNativeMaterialOwners(ctx context.Context, r 
 		return e
 	}
 	c.directories = append(c.directories, root)
+	if e = validateLifecycleAPIInvocation(r); e != nil {
+		return e
+	}
+	intentRaw, e := readLifecycleAPIRecord(filepath.Join(r.prepareRoot, "native-call.intent.private.json"))
+	if e != nil {
+		return e
+	}
+	for name, hash := range map[string]string{"native-call.intent.private.json": digestRaw(intentRaw), "lifecycle-request.json": r.requestSHA256, "manifest.json": r.ManifestSHA256} {
+		if e = root.register(name, hash, 0, 0600); e != nil {
+			return e
+		}
+	}
 	if e = root.registerChild(h.api.materials); e != nil {
 		return e
 	}
@@ -119,6 +226,23 @@ func (h *lifecycleFixedHost) composeNativeMaterialOwners(ctx context.Context, r 
 		return e
 	}
 	c.scopes[lifecycleAPIJournalMaterials] = struct{}{}
+	if h.inventoryMaterials == nil || h.inventoryMaterials.checkComplete(false) != nil || h.rootStagingMaterials == nil || h.rootStagingMaterials.checkComplete(false) != nil || h.historicalWriteMaterials == nil || h.historicalWriteMaterials.checkComplete(false) != nil || h.archiveMaterials == nil || h.archiveMaterials.checkComplete(false) != nil {
+		return lifecycleError("lifecycle_actual_complete_material_scope_missing")
+	}
+	c.directories = append(c.directories, h.inventoryMaterials, h.rootStagingMaterials, h.historicalWriteMaterials)
+	c.scopes[lifecycleOriginalInventoryMaterials] = struct{}{}
+	if h.preparationInvocationMaterials != nil {
+		if e = h.preparationInvocationMaterials.checkComplete(false); e != nil {
+			return e
+		}
+		c.directories = append(c.directories, h.preparationInvocationMaterials)
+	}
+	c.scopes[lifecycleRootStagingMaterials] = struct{}{}
+	c.archive = h.archiveMaterials
+	c.scopes[lifecycleArchiveMaterials] = struct{}{}
+	if e = registerLifecycleCurrentRestoreMetadata(ctx, root, h.restoreOwner, r); e != nil {
+		return e
+	}
 	for i, engine := range h.restoreOwner.engines {
 		if engine == nil || i == 0 && engine.Kind != "mysql" || i == 1 && engine.Kind != "mongodb" {
 			return lifecycleError("lifecycle_restore_owned_material_binding_rejected")
@@ -129,9 +253,13 @@ func (h *lifecycleFixedHost) composeNativeMaterialOwners(ctx context.Context, r 
 		}
 		c.engines = append(c.engines, registered)
 	}
-	// The restore registration receipt has not been handed off; do not mark the
-	// restore scope complete merely because both actual engines are registered.
-	return checkLifecycleRestoreMaterialSet(ctx, c.engines, false)
+	if e = checkLifecycleRestoreMaterialSet(ctx, c.engines, false); e != nil {
+		return e
+	}
+	c.scopes[lifecycleRestoreMaterials] = struct{}{}
+	// The preceding history producers, local service issuer and live journals
+	// still have separate native owners. A partial composition is not acceptance.
+	return nil
 }
 
 func lifecycleMaterialPathsMatch(c *lifecycleBatchMaterials, r lifecycleRequest) bool {

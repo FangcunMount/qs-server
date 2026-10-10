@@ -29,6 +29,7 @@ type lifecycleFixedHost struct {
 	rootStagingMaterials           *lifecycleMaterialDirectory
 	preparationInvocationMaterials *lifecycleMaterialDirectory
 	historicalWriteMaterials       *lifecycleMaterialDirectory
+	archiveMaterials               *lifecycleMaterialDirectory
 	services                       *lifecycleServiceController
 	api                            *lifecycleAPITransition
 	dataBaseline                   *backup.NonTargetDataBaseline
@@ -78,6 +79,11 @@ func newLifecycleFixedHost(ctx context.Context, r lifecycleRequest, a *backup.Ar
 		if err != nil {
 			return nil, errors.Join(err, h.Close())
 		}
+	}
+	var archiveErr error
+	h.archiveMaterials, archiveErr = openLifecycleOriginalArchiveMaterials(ctx, r, a)
+	if archiveErr != nil {
+		return nil, errors.Join(archiveErr, h.Close())
 	}
 	return h, nil
 }
@@ -349,6 +355,9 @@ func (h *lifecycleFixedHost) Close() error {
 	}
 	if h.historicalWriteMaterials != nil {
 		result = errors.Join(result, h.historicalWriteMaterials.close())
+	}
+	if h.archiveMaterials != nil {
+		result = errors.Join(result, h.archiveMaterials.close())
 	}
 	if h.writers != nil {
 		h.writers.close()

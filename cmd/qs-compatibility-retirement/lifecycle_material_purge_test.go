@@ -60,6 +60,57 @@ func materialTestBatch(t *testing.T) *lifecycleBatchMaterials {
 	})
 	return c
 }
+
+func TestOriginalRestoreMaterialWriterRejectsReuseWithoutPublishingNewHash(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "restore-record.json")
+	records := map[string]string{}
+	if err := writeLifecycleMaterialJSON(path, map[string]string{"owner": "original"}, records); err != nil {
+		t.Fatal(err)
+	}
+	original, err := os.ReadFile(path)
+	if err != nil || records[filepath.Base(path)] != digestRaw(original) {
+		t.Fatal("original writer bytes were not retained")
+	}
+	second := map[string]string{}
+	if writeLifecycleMaterialJSON(path, map[string]string{"owner": "different"}, second) == nil || len(second) != 0 {
+		t.Fatal("failed exclusive write published a replacement hash")
+	}
+	unchanged, err := os.ReadFile(path)
+	if err != nil || string(unchanged) != string(original) {
+		t.Fatal("original record changed")
+	}
+}
+
+func TestCurrentRestoreMaterialOwnerRejectsPartialOrDifferentWriterBeforeOpeningFiles(t *testing.T) {
+	for _, kind := range []string{"no-owner", "partial", "different-writer", "nonterminal"} {
+		t.Run(kind, func(t *testing.T) {
+			d := materialTestDirectory(t, filepath.Join(t.TempDir(), "current"))
+			r := lifecycleRequest{OperationID: "123-1", ActualRunID: "125-1", prepareRoot: d.path}
+			owner := &lifecyclePreparationOwner{engines: []*lifecycleOwnedEngine{{Owner: strings.Repeat("a", 32), wireClosed: true}, {Owner: strings.Repeat("b", 32), wireClosed: true}}, materialRecords: map[string]string{}}
+			if kind == "no-owner" {
+				owner = nil
+			} else if kind != "partial" {
+				for _, e := range owner.engines {
+					e.Labels = map[string]string{"qs.retirement.operation": r.OperationID, "qs.retirement.run": r.ActualRunID}
+					e.materialRecords = map[string]string{}
+					for _, suffix := range []string{".intent.private.json", ".created.private.json"} {
+						name := "restore-" + e.Owner + suffix
+						e.materialRecords[name], owner.materialRecords[name] = strings.Repeat("c", 64), strings.Repeat("c", 64)
+					}
+				}
+				owner.materialRecords["lifecycle-restore-125-1.registration.private.json"] = strings.Repeat("d", 64)
+				if kind == "different-writer" {
+					owner.engines[0].Labels["qs.retirement.run"] = "126-1"
+				} else {
+					owner.engines[0].wireClosed = false
+				}
+			}
+			if registerLifecycleCurrentRestoreMetadata(t.Context(), d, owner, r) == nil || len(d.files) != 0 {
+				t.Fatal("unbound original writer acquired source handles")
+			}
+		})
+	}
+}
 func TestMaterialDirectoryDeletesOnlyExactRegisteredBodies(t *testing.T) {
 	root := t.TempDir()
 	if err := os.Chmod(root, 0700); err != nil {
