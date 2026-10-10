@@ -5,6 +5,7 @@ self-hosted-runner:
     - ops
 
 config-variables:
+  - RETIREMENT_FIXED_HOST_ENTRY_SHA256
   - PRODUCTION_DEPLOY_PAUSED
   - QS_DEPLOY_EXPORT_REGISTRY
   - QS_DEPLOY_HTTP_PROXY

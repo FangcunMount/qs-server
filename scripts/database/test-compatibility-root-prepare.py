@@ -17,6 +17,8 @@ import sys
 import unittest
 import textwrap
 import tempfile
+import tarfile
+import time
 from types import SimpleNamespace
 from unittest import mock
 
@@ -321,14 +323,14 @@ class RootNativeReceiptDiagnostic(unittest.TestCase):
         def launch(command, **kwargs):
             self.assertEqual(command[:4],['/usr/bin/sudo','-n','--','/usr/bin/python3'])
             self.assertEqual(kwargs['env'],{'PATH':'/usr/bin:/bin'})
-            self.assertEqual(kwargs['input'],b'{}');self.assertEqual(kwargs['timeout'],180)
+            self.assertEqual(json.loads(kwargs['input']),{'operation_id':'123-1','run_id':'456-1','source_sha':'a'*40,'request_sha256':'b'*64,'package_sha256':'d'*64});self.assertEqual(kwargs['timeout'],180)
             fd=kwargs['stderr'];holders.append(fd)
             self.assertNotEqual(fd,subprocess.PIPE);self.assertNotEqual(fd,subprocess.DEVNULL)
             self.assertEqual(stat.S_IMODE(os.fstat(fd.fileno()).st_mode),0o600)
             fd.write(stderr);fd.flush()
             if error is not None:raise error
             return subprocess.CompletedProcess(command,code,stdout)
-        with mock.patch.dict(os.environ,{'RETIREMENT_PACKAGE_SHA256':'d'*64,'MYSQL_PASSWORD':'PRIVATE_CREDENTIAL'},clear=True),mock.patch.object(tool.os,'getuid',return_value=501),mock.patch.object(tool.os,'geteuid',return_value=501),mock.patch.object(tool.subprocess,'run',side_effect=launch) as run:
+        with mock.patch.dict(os.environ,{'RETIREMENT_PACKAGE_SHA256':'d'*64,'MYSQL_PASSWORD':'PRIVATE_CREDENTIAL'},clear=True),mock.patch.object(tool.os,'getuid',return_value=501),mock.patch.object(tool.os,'geteuid',return_value=501),mock.patch.object(tool,'installed_fixed_host_entry',return_value=Path('/usr/local/libexec/qs-retirement')/('f'*64+'.py')),mock.patch.object(tool.subprocess,'run',side_effect=launch) as run:
             try:return tool.root_once_lifecycle_prepare(self.args())
             finally:
                 run.assert_called_once()
@@ -347,7 +349,38 @@ class RootNativeReceiptDiagnostic(unittest.TestCase):
             self.assertEqual(diagnostic['stderr_sample_bytes'],len(secret))
             self.assertEqual(diagnostic['stderr_sample_sha256'],hashlib.sha256(secret).hexdigest())
             self.assertFalse(diagnostic['stderr_sample_truncated'])
+            self.assertEqual(diagnostic['stderr_category'],'unclassified')
             self.assertNotIn(secret.decode(),str(error.exception));self.assertNotIn(secret.decode(),json.dumps(diagnostic))
+    def test_sudo_categories_are_closed_signatures_without_private_text(self):
+        marker=b'PRIVATE_USER_ROUTE_CREDENTIAL'
+        cases=((b'', 'empty'),
+            (b'sudo: a password is required\n','sudo_authentication_required'),
+            (b'sudo: a terminal is required to read the password; use askpass\n','sudo_authentication_required'),
+            (b'Sorry, try again.\nsudo: 3 incorrect password attempts\n','sudo_authentication_failed'),
+            (b'sudo: PAM authentication error: '+marker+b'\n','sudo_authentication_failed'),
+            (marker+b' is not in the sudoers file.  This incident will be reported.\n','sudo_policy_denied'),
+            (b'Sorry, user '+marker+b' is not allowed to execute '+marker+b'\n','sudo_policy_denied'),
+            (b'sudo: unable to run /tmp/'+marker+b'/askpass: Permission denied\n','sudo_askpass_failed'),
+            (b'sudo: no password was provided\n','sudo_askpass_failed'),
+            (b'sudo: '+marker+b': command not found\n','sudo_executable_unavailable'),
+            (b'sudo: unable to execute /'+marker+b': No such file or directory\n','sudo_executable_unavailable'),
+            (marker+b' sudo: a password is required\n','unclassified'),
+            (b'sudo: a password is required\nsudo: 3 incorrect password attempts\n','multiple_categories'))
+        for stderr,expected in cases:
+            with self.subTest(category=expected),self.assertRaises(tool.NativeReceiptBlocked) as error:
+                self.call(1,b'',stderr)
+            diagnostic=error.exception.native_diagnostic
+            self.assertEqual(diagnostic['stderr_category'],expected)
+            self.assertIn(expected,tool.ROOT_NATIVE_STDERR_CATEGORIES)
+            self.assertNotIn(marker.decode(),json.dumps(diagnostic))
+            self.assertEqual(str(error.exception),'lifecycle_native_receipt_missing')
+    def test_category_never_reads_past_original_bounded_sample(self):
+        stderr=b'PRIVATE_STDERR'*700+b'\nsudo: a password is required\n'
+        with self.assertRaises(tool.NativeReceiptBlocked) as error:self.call(1,b'',stderr)
+        diagnostic=error.exception.native_diagnostic
+        self.assertEqual(diagnostic['stderr_category'],'unclassified')
+        self.assertEqual(diagnostic['stderr_sample_bytes'],8192)
+        self.assertTrue(diagnostic['stderr_sample_truncated'])
     def test_stderr_sample_bound_and_stdout_bound_refuse_without_receipt_decode(self):
         raw=b'PRIVATE'+b'x'*9000
         with self.assertRaises(tool.Blocked) as error:self.call(2,b'x'*32769,raw)
@@ -370,7 +403,7 @@ class RootNativeReceiptDiagnostic(unittest.TestCase):
             with self.subTest(code=code):self.assertEqual(self.call(code,raw,b'PRIVATE_STDERR'),(code,raw))
         self.assertEqual(self.call(0,b'x'*32768),(0,b'x'*32768))
     def test_actual_armored_failure_contains_only_fixed_diagnostic_and_no_authority(self):
-        def rejected(_):self.call(1,b'',b'PRIVATE_STDERR_URI_PASSWORD')
+        def rejected(_):self.call(1,b'',b'Sorry, user PRIVATE_STDERR_URI_PASSWORD is not allowed to execute PRIVATE_COMMAND\n')
         output=io.StringIO();errors=io.StringIO()
         argv=['--operation','prepare','--operation-id','123-1','--approved-source-sha','a'*40,'--actual-source-sha','a'*40,'--run-id','456-1','--prepare-mode','host-writer-scope']
         with mock.patch.object(tool,'execute',side_effect=rejected),contextlib.redirect_stdout(output),contextlib.redirect_stderr(errors):code=tool.main(argv)
@@ -378,6 +411,7 @@ class RootNativeReceiptDiagnostic(unittest.TestCase):
         receipt=json.loads(tool.transport().decode_armored_receipt(output.getvalue()))
         self.assertEqual(receipt['error_category'],'lifecycle_native_receipt_missing')
         self.assertEqual(receipt['native_diagnostic']['exit_code'],1)
+        self.assertEqual(receipt['native_diagnostic']['stderr_category'],'sudo_policy_denied')
         self.assertFalse(receipt['complete']);self.assertFalse(receipt['execution_allowed'])
         self.assertNotIn('PRIVATE',json.dumps(receipt));self.assertNotIn('host_observation_complete',receipt)
 
@@ -496,5 +530,84 @@ print(json.dumps({'fixture_packet_sha256':hashlib.sha256(raw).hexdigest(),'fixtu
         drops=[ast.unparse(n) for n in ast.walk(tree) if isinstance(n,ast.Call) and isinstance(n.func,ast.Attribute) and n.func.attr=='pop']
         self.assertIn("os.environ.pop('SUDO_PASSWORD', None)",drops)
         self.assertIn("os.environ.pop('SUDO_ASKPASS', None)",drops)
+
+class FixedDeployHostEntry(unittest.TestCase):
+    """Real archive bytes and negative gates; no sudo/native execution proof."""
+    def gate(self, content=b'approved fixture bytes'):
+        hashes={arch:hashlib.sha256(content).hexdigest() for arch in ('amd64','arm64')}
+        program=tool.fixed_host_entry_program('123-1','a'*40,hashes)
+        tree=ast.parse(program)
+        # Exercise the installed entry's exact authorization function, without
+        # entering the root staging program or executing the fixture bytes.
+        setup=[n for n in tree.body if isinstance(n,(ast.Import,ast.ImportFrom,ast.Assign,ast.FunctionDef))]
+        scope={};exec(compile(ast.Module(body=setup,type_ignores=[]),'fixed-entry-gates','exec'),scope)
+        return scope,program
+
+    @contextlib.contextmanager
+    def archive(self, content):
+        run=str(time.time_ns())+'-1'
+        path=Path('/tmp/qs-compatibility-retirement-'+run+'.tar.gz')
+        fd=os.open(path,os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o600)
+        try:
+            with os.fdopen(fd,'wb') as f,tarfile.open(fileobj=f,mode='w:gz') as tar:
+                for arch in ('amd64','arm64'):
+                    member=tarfile.TarInfo('inventory-linux-'+arch);member.size=len(content)
+                    tar.addfile(member,io.BytesIO(content))
+            yield path,{'operation_id':'123-1','run_id':run,'source_sha':'a'*40,'request_sha256':'b'*64,'package_sha256':hashlib.sha256(path.read_bytes()).hexdigest()}
+        finally:path.unlink()
+
+    def authorize(self, scope, request, extra_arg=False, wrong_uid=False):
+        owner=os.getuid()
+        # Mock only the caller's privilege identity, not file ownership or the
+        # archive digest. This is deliberately not production permission proof.
+        with mock.patch.object(scope['pwd'],'getpwnam',return_value=SimpleNamespace(pw_uid=owner)),mock.patch.object(os,'getuid',return_value=0),mock.patch.object(os,'geteuid',return_value=0),mock.patch.dict(os.environ,{'SUDO_UID':str(owner+1 if wrong_uid else owner)},clear=True),mock.patch.object(sys,'argv',['fixed.py']+(['unexpected'] if extra_arg else [])),mock.patch.object(sys,'stdin',io.TextIOWrapper(io.BytesIO(json.dumps(request).encode()))):
+            return scope['authorize']()
+
+    def test_pinned_archive_authorization_preserves_exact_bindings(self):
+        scope,program=self.gate()
+        with self.archive(b'approved fixture bytes') as (_,request):
+            actual,owner=self.authorize(scope,request)
+        self.assertEqual(actual,request);self.assertEqual(owner,os.getuid())
+        self.assertIn("'host-writer-scope'",program.decode())
+
+    def test_changed_native_bytes_rejected_before_staging(self):
+        scope,_=self.gate()
+        with self.archive(b'unapproved replacement') as (_,request),contextlib.redirect_stdout(io.StringIO()),self.assertRaises(SystemExit):
+            self.authorize(scope,request)
+
+    def test_archive_mutation_cannot_mix_digest_and_approved_native(self):
+        scope,_=self.gate()
+        with self.archive(b'unapproved replacement') as (path,request),self.archive(b'approved fixture bytes') as (approved,_):
+            replacement=approved.read_bytes()
+            original_open=tarfile.open
+            changed=[]
+            def replace_after_package_hash(*args,**kwargs):
+                # Actual same-inode mutation after the complete package hash.
+                # No native bytes are executed; caller UID alone is mocked.
+                path.write_bytes(replacement)
+                changed.append(True)
+                return original_open(*args,**kwargs)
+            with mock.patch.object(tarfile,'open',side_effect=replace_after_package_hash),contextlib.redirect_stdout(io.StringIO()),self.assertRaises(SystemExit):
+                self.authorize(scope,request)
+            self.assertEqual(changed,[True])
+
+    def test_wrong_operation_source_uid_extra_argument_or_credentials_rejected(self):
+        scope,_=self.gate()
+        with self.archive(b'approved fixture bytes') as (_,request):
+            for change,options in (({'operation_id':'999-1'},{}),({'source_sha':'c'*40},{}),({'package_sha256':'f'*64},{}),({'run_id':'../escape'},{}),({'MYSQL_PASSWORD':'private'},{}),({}, {'extra_arg':True}),({}, {'wrong_uid':True})):
+                with self.subTest(change=list(change),options=options),contextlib.redirect_stdout(io.StringIO()),self.assertRaises(SystemExit):
+                    self.authorize(scope,request|change,**options)
+
+    def test_invalid_admin_policy_cannot_generate_a_privileged_entry(self):
+        for hashes in ({},{'amd64':'b'*64},{'amd64':'b'*64,'arm64':'not-a-hash'}):
+            with self.subTest(hashes=list(hashes)),self.assertRaises(tool.Blocked):
+                tool.fixed_host_entry_program('123-1','a'*40,hashes)
+
+    def test_missing_or_symlinked_installation_denies_before_privileged_child(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory);expected='b'*64
+            (root/(expected+'.py')).symlink_to(Path(__file__))
+            with mock.patch.object(tool,'FIXED_HOST_ENTRY_BASE',root),mock.patch.dict(os.environ,{'RETIREMENT_FIXED_HOST_ENTRY_SHA256':expected},clear=True),self.assertRaises(tool.Blocked):
+                tool.installed_fixed_host_entry()
 
 if __name__=='__main__':unittest.main()

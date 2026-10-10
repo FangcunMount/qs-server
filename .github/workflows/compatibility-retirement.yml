@@ -301,7 +301,7 @@ jobs:
                   if (digest.digest('hex') !== anchor.hash) {reject();}
                 }
               }
-              const limits = {query_seconds:30,total_seconds:1500,max_records:1000000,max_bytes:2147483648,page_size:1000,max_pages:1001};
+              const limits = {query_seconds:30,total_seconds:1500,max_records:1000000,max_bytes:2147483648,page_size:10000,max_pages:1001};
               if (!exact(approval.limits, Object.keys(limits)) || Object.keys(limits).some(key => approval.limits[key] !== limits[key])) {reject();}
               for (const name of input.prepare_mode === 'bootstrap-inventory' ? ['identity_report', 'boundary_report'] : ['identity_report']) {
                 const ref = approval[name];
@@ -531,6 +531,7 @@ jobs:
         id: package
         env:
           RETIREMENT_PACKAGE_MODE: ${{ inputs.prepare_mode }}
+          RETIREMENT_OPERATION_ID: ${{ inputs.operation_id }}
           RETIREMENT_TOOL_SOURCE_SHA: ${{ needs.validate.outputs.tool_source_sha || github.sha }}
         run: |
           set -Eeuo pipefail
@@ -586,7 +587,37 @@ jobs:
             tar -czf "$archive" -C "$package_dir" "${members[@]}"
             if [[ "$RETIREMENT_PACKAGE_MODE" == "prepare-facts" ]]; then rm -- "$image" "$package_dir/preload-image.tar.gz"; fi
           fi
+          if [[ "$RETIREMENT_PACKAGE_MODE" == "host-writer-scope" ]]; then
+            python3 - "$package_dir" "$RUNNER_TEMP/qs-retirement-host-install" <<'PYINSTALL'
+          import hashlib, importlib.util, json, os, pathlib, subprocess, sys
+          source = pathlib.Path('scripts/database/compatibility-retirement.py')
+          spec = importlib.util.spec_from_file_location('approved_retirement', source)
+          module = importlib.util.module_from_spec(spec); spec.loader.exec_module(module)
+          package, destination = map(pathlib.Path, sys.argv[1:])
+          destination.mkdir(mode=0o700)
+          native = {arch: hashlib.sha256((package / ('inventory-linux-' + arch)).read_bytes()).hexdigest() for arch in ('amd64', 'arm64')}
+          program = module.fixed_host_entry_program(os.environ['RETIREMENT_OPERATION_ID'], os.environ['RETIREMENT_TOOL_SOURCE_SHA'], native)
+          digest = hashlib.sha256(program).hexdigest()
+          name = digest + '.py'
+          rule = ('deploy ALL=(root) NOPASSWD: /usr/bin/python3 -I /usr/local/libexec/qs-retirement/' + name + '\n').encode()
+          (destination / name).write_bytes(program)
+          (destination / 'qs-retirement-host-scope').write_bytes(rule)
+          manifest = {'format_version': 1, 'kind': 'fixed_deploy_host_scope_installation', 'operation_id': os.environ['RETIREMENT_OPERATION_ID'], 'source_sha': os.environ['RETIREMENT_TOOL_SOURCE_SHA'], 'go_version': subprocess.check_output(['go', 'version'], text=True).strip(), 'native_sha256': native, 'entry_sha256': digest, 'sudoers_sha256': hashlib.sha256(rule).hexdigest(), 'stage': 'prepare/host-writer-scope', 'database_write': False, 'drop': False}
+          (destination / 'policy.json').write_text(json.dumps(manifest, sort_keys=True, indent=2) + '\n')
+          (destination / 'SHA256SUMS').write_text(digest + '  ' + name + '\n' + manifest['sudoers_sha256'] + '  qs-retirement-host-scope\n' + hashlib.sha256((destination / 'policy.json').read_bytes()).hexdigest() + '  policy.json\n')
+          print('Fixed host entry SHA256: ' + digest)
+          print('Installation manifest SHA256: ' + hashlib.sha256((destination / 'policy.json').read_bytes()).hexdigest())
+          PYINSTALL
+          fi
           echo "sha256=$(shasum -a 256 "$archive" | awk '{print $1}')" >> "$GITHUB_OUTPUT"
+      - name: Publish source-bound administrator installation files
+        if: inputs.prepare_mode == 'host-writer-scope'
+        uses: actions/upload-artifact@v7
+        with:
+          name: qs-retirement-host-install-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/qs-retirement-host-install/
+          if-no-files-found: error
+          retention-days: 3
       - name: Upload tooling with pinned ServerA identity
         uses: appleboy/scp-action@v1.0.0
         with:
@@ -601,7 +632,8 @@ jobs:
         if: inputs.prepare_mode != 'bootstrap-history-metadata' && inputs.prepare_mode != 'bootstrap-history-parent' && inputs.prepare_mode != 'report-diagnostic' && inputs.prepare_mode != 'bootstrap-ai-bounds' && inputs.prepare_mode != 'bootstrap-ai-verify' && inputs.prepare_mode != 'historical-evidence-write' && inputs.prepare_mode != 'historical-ai-bounds' && inputs.prepare_mode != 'window-tool'
         uses: appleboy/ssh-action@v1.2.2
         env:
-          SUDO_PASSWORD: ${{ inputs.operation == 'prepare' && (inputs.prepare_mode == 'lifecycle' || inputs.prepare_mode == 'prepare-facts' || inputs.prepare_mode == 'host-writer-scope' || inputs.prepare_mode == 'db-writer-census') && secrets.SVRA_SUDO_PASSWORD || '' }}
+          SUDO_PASSWORD: ${{ inputs.operation == 'prepare' && (inputs.prepare_mode == 'lifecycle' || inputs.prepare_mode == 'prepare-facts' || inputs.prepare_mode == 'db-writer-census') && secrets.SVRA_SUDO_PASSWORD || '' }}
+          RETIREMENT_FIXED_HOST_ENTRY_SHA256: ${{ vars.RETIREMENT_FIXED_HOST_ENTRY_SHA256 }}
           RETIREMENT_OPERATION: ${{ inputs.operation }}
           RETIREMENT_OPERATION_ID: ${{ inputs.operation_id }}
           RETIREMENT_MANIFEST_SHA256: ${{ inputs.manifest_sha256 }}
@@ -634,7 +666,7 @@ jobs:
           port: ${{ vars.SVRA_SSH_PORT || 22 }}
           fingerprint: ${{ vars.SVRA_SSH_FINGERPRINT }}
           command_timeout: ${{ (inputs.prepare_mode == 'lifecycle' || inputs.prepare_mode == 'prepare-facts') && '100m' || '35m' }}
-          envs: RETIREMENT_OPERATION,RETIREMENT_OPERATION_ID,RETIREMENT_MANIFEST_SHA256,RETIREMENT_INVENTORY_REQUEST_SHA256,RETIREMENT_LIFECYCLE_REQUEST_SHA256,RETIREMENT_PREPARE_MODE,RETIREMENT_IDENTITY_REQUEST_SHA256,RETIREMENT_BOOTSTRAP_APPROVAL_JSON,RETIREMENT_BOOTSTRAP_APPROVAL_SHA256,RETIREMENT_APPROVED_SHA,RETIREMENT_ACTUAL_SHA,RETIREMENT_RUN_ID,RETIREMENT_PACKAGE_SHA256,MYSQL_HOST,MYSQL_PORT,MYSQL_USERNAME,MYSQL_PASSWORD,MYSQL_DATABASE,MONGODB_HOST,MONGODB_PORT,MONGODB_USERNAME,MONGODB_PASSWORD,MONGODB_DBNAME,MONGODB_METADATA_ADMIN_USERNAME,MONGODB_METADATA_ADMIN_PASSWORD,SUDO_PASSWORD
+          envs: RETIREMENT_OPERATION,RETIREMENT_OPERATION_ID,RETIREMENT_MANIFEST_SHA256,RETIREMENT_INVENTORY_REQUEST_SHA256,RETIREMENT_LIFECYCLE_REQUEST_SHA256,RETIREMENT_PREPARE_MODE,RETIREMENT_IDENTITY_REQUEST_SHA256,RETIREMENT_BOOTSTRAP_APPROVAL_JSON,RETIREMENT_BOOTSTRAP_APPROVAL_SHA256,RETIREMENT_APPROVED_SHA,RETIREMENT_ACTUAL_SHA,RETIREMENT_RUN_ID,RETIREMENT_PACKAGE_SHA256,MYSQL_HOST,MYSQL_PORT,MYSQL_USERNAME,MYSQL_PASSWORD,MYSQL_DATABASE,MONGODB_HOST,MONGODB_PORT,MONGODB_USERNAME,MONGODB_PASSWORD,MONGODB_DBNAME,MONGODB_METADATA_ADMIN_USERNAME,MONGODB_METADATA_ADMIN_PASSWORD,SUDO_PASSWORD,RETIREMENT_FIXED_HOST_ENTRY_SHA256
           script: |
             set -Eeuo pipefail
             umask 077
