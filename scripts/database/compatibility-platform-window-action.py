@@ -421,9 +421,10 @@ def run(dispatcher_repo, tool_repo, binary_directory):
         if code: fail("platform_window_transfer_unknown")
         for asset in identity_assets: asset.check()
         registration.save("package-transfer.result.json", {"exit_code": code, "eof_and_wait_complete": True})
-        credentials = {key: env.get(key, "") for key in window.CREDENTIALS}
+        credentials = {key: env.get(key, "") for key in window.CREDENTIALS + window.SERVICE_CREDENTIALS}
+        credentials[window.SERVICE_KEY] = credentials[window.SERVICE_KEY].replace("\r", "")
         credentials[window.READ_TOKEN] = token
-        if any(type(v) is not str or len(v) > 8192 or "\x00" in v for v in credentials.values()): fail("platform_window_packet_rejected")
+        window.validate_credentials(credentials, approval["stage"])
         root_packet = platform.canonical({"approval": approval_raw, "credentials": credentials, "tool_directory": remote_directory, "tool_program_sha256": sha(window_raw)})
         if len(root_packet) > 32768: fail("platform_window_packet_rejected")
         fence_dir = state / "workflow-lease"; fence_dir.mkdir(mode=0o700)

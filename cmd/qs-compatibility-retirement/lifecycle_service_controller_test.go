@@ -21,6 +21,9 @@ func TestServicePortsRefuseMissingNativeAuthority(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 	for _, q := range []context.Context{nil, ctx} {
+		if _, err := loadLifecyclePreparationBudgetRole(q, "/missing", "", "1-1", "1-1"); err == nil {
+			t.Fatal("preparation budget role accepted absent native authority")
+		}
 		if err := runLifecycleServiceSession(q, "host-services-d", "/missing", "", "1-1", "1-1", nil, nil); err == nil {
 			t.Fatal("service session accepted absent authority")
 		}

@@ -6,6 +6,7 @@ schema, construct a fence/Window/restore proof, or activate missing adapters.
 The same strict template supports A preparation and a separately approved B CLI.
 """
 import argparse
+import base64
 import copy
 import hashlib
 import io
@@ -32,6 +33,8 @@ STAGES = {"prepare", "apply", "verify", "recover", "purge"}
 CREDENTIALS = ("MYSQL_HOST", "MYSQL_PORT", "MYSQL_USERNAME", "MYSQL_PASSWORD", "MYSQL_DATABASE", "MONGODB_HOST", "MONGODB_PORT", "MONGODB_USERNAME", "MONGODB_PASSWORD", "MONGODB_DBNAME", "MONGODB_METADATA_ADMIN_USERNAME", "MONGODB_METADATA_ADMIN_PASSWORD")
 
 READ_TOKEN = "GITHUB_READ_TOKEN"
+SERVICE_CREDENTIALS = ("RETIREMENT_SERVICE_SSH_HOST", "RETIREMENT_SERVICE_SSH_USERNAME", "RETIREMENT_SERVICE_SSH_PORT", "RETIREMENT_SERVICE_SSH_KEY", "RETIREMENT_SERVICE_SSH_FINGERPRINT")
+SERVICE_KEY = "RETIREMENT_SERVICE_SSH_KEY"
 
 
 def credential_names(stage):
@@ -39,7 +42,12 @@ def credential_names(stage):
         reject()
     # Preparation retains the exact original twelve-credential packet. Only a
     # future effectful caller may borrow this run's short-lived GET credential.
-    return CREDENTIALS if stage == "prepare" else CREDENTIALS + (READ_TOKEN,)
+    return CREDENTIALS if stage == "prepare" else CREDENTIALS + (READ_TOKEN,) + SERVICE_CREDENTIALS
+
+
+def validate_credentials(credentials, stage):
+    if type(credentials) is not dict or set(credentials) != set(credential_names(stage)) or any(type(v) is not str or len(v) > 8192 or "\x00" in v or "\r" in v or ("\n" in v and k != SERVICE_KEY) for k, v in credentials.items()):
+        reject("window_tool_credentials_rejected")
 
 
 class Refused(Exception):
@@ -98,7 +106,7 @@ def approve(raw, expected, dispatcher, stage, operation, manifest, template):
         reject()
     a = decode(supplied)
     fields = ("format_version", "kind", "dispatcher_source_sha", "tool_source_sha", "original_source_sha", "operation_id", "original_run_id", "stage", "target_hash", "manifest_sha256", "request_template_sha256", "tool_binary_sha256", "b_image_id", "b_program_sha256")
-    exact(a, fields if stage == "prepare" else fields + ("workflow_scope",))
+    exact(a, fields if stage == "prepare" else fields + ("workflow_scope",), ("local_descriptor_sha256",) if stage == "prepare" else ())
     if canonical(a) != supplied or digest(supplied) != expected or type(a["format_version"]) is not int or a["format_version"] != 1 or a["kind"] != "independent_compatibility_window_tool_approval" or a["dispatcher_source_sha"] != dispatcher or a["stage"] != stage or a["operation_id"] != operation or a["manifest_sha256"] != manifest or a["request_template_sha256"] != template or a["target_hash"] != TARGET:
         reject()
     for key in ("tool_source_sha", "original_source_sha"):
@@ -107,6 +115,8 @@ def approve(raw, expected, dispatcher, stage, operation, manifest, template):
     exact(a["tool_binary_sha256"], ("amd64", "arm64"))
     for value in a["tool_binary_sha256"].values():
         token(value, HASH)
+    if "local_descriptor_sha256" in a:
+        token(a["local_descriptor_sha256"], HASH)
     # A prepare may approve the current main tool without a B runtime. All
     # effectful stages independently bind an actual prebuilt B image/program.
     if a["b_image_id"] == "" and a["b_program_sha256"] == "":
@@ -603,11 +613,19 @@ def root_execute(arguments, packet, source_uid, archive_raw):
         control=sys.stdin.fileno(), timeout=5, owner=owner)
     if check_code or check_raw != a["tool_source_sha"].encode() + b"\n":
         reject("window_tool_actual_source_rejected")
+    budget_result_hash = ""
+    if stage == "prepare" and "local_descriptor_sha256" in a:
+        budget_result_hash = prepare_budget_key(original, batch, native, source_uid, a, current_run, owner)
+    if stage == "apply" and "service_control" in decode(derived):
+        bootstrap_services(original, tool_root, native, source_uid, a, decode(derived), packet["credentials"], owner)
     write_new(invocation / "lifecycle-request.json", derived)
     write_new(invocation / "manifest.json", frozen_manifest)
-    environment = {name: packet["credentials"][name] for name in credential_names(stage)}
+    environment = {name: packet["credentials"][name] for name in CREDENTIALS + (() if stage == "prepare" else (READ_TOKEN,))}
     environment["PATH"] = "/usr/bin:/bin"
     environment["QS_RETIREMENT_SOURCE_UID"] = str(source_uid)
+    if budget_result_hash:
+        environment["QS_LIFECYCLE_BUDGET_KEY_DESCRIPTOR_SHA256"] = a["local_descriptor_sha256"]
+        environment["QS_LIFECYCLE_BUDGET_KEY_RESULT_SHA256"] = budget_result_hash
     # The real native process owns every later connection/Window/proof. This
     # manager imports no completion/permit or guessed production authority.
     code, raw = owned_process([str(native), "--mode", mode, "--request", str(invocation / "lifecycle-request.json"),
@@ -615,6 +633,157 @@ def root_execute(arguments, packet, source_uid, archive_raw):
     sys.stdout.buffer.write(raw)
     sys.stdout.buffer.flush()
     return code
+
+
+def bootstrap_services(original, root, native, source_uid, approval, request, credentials, owner):
+    """Install the approved actual inventories and open the preparation seed.
+
+    Descriptor hashes remain the independently frozen request inputs. This
+    caller cannot create a host census, stopped-service Lease or writer proof.
+    The D public key is observed with the existing fingerprint before copying
+    the existing deploy credential into this batch's exclusive root namespace.
+    """
+    validate_credentials(credentials, "apply")
+    control = request["service_control"]
+    exact(control, ("local_descriptor_sha256", "ssh_channel_sha256"))
+    descriptor_raw = read_owned(original / "approved-services.json", source_uid, control["local_descriptor_sha256"], 256 << 10)
+    channel_raw = read_owned(original / "ssh-channel.json", source_uid, control["ssh_channel_sha256"], 64 << 10)
+    descriptor, channel = decode(descriptor_raw), decode(channel_raw)
+    if type(descriptor) is not dict:
+        reject("window_tool_service_inventory_rejected")
+    for key, expected in (("source_sha", approval["original_source_sha"]), ("tool_source_sha", approval["tool_source_sha"]), ("operation_id", approval["operation_id"]), ("original_run_id", approval["original_run_id"]), ("manifest_sha256", approval["manifest_sha256"]), ("host_role", "server-a")):
+        if descriptor.get(key) != expected:
+            reject("window_tool_service_inventory_rejected")
+    exact(channel, ("format_version", "kind", "tool_source_sha", "original_source_sha", "operation_id", "manifest_sha256", "original_run_id", "actual_run_id", "ssh_executable_sha256", "host", "port", "user", "identity_sha256", "known_hosts_sha256", "host_key_fingerprint", "remote_request_sha256", "remote_descriptor_sha256"))
+    for key in ("tool_source_sha", "original_source_sha", "operation_id", "manifest_sha256", "original_run_id"):
+        if channel[key] != approval[key]:
+            reject("window_tool_service_inventory_rejected")
+    if type(channel["format_version"]) is not int or channel["format_version"] != 1 or not ((channel["kind"] == "qs_existing_pinned_service_ssh_channel_template" and channel["actual_run_id"] == "") or (channel["kind"] == "qs_existing_pinned_service_ssh_channel" and channel["actual_run_id"] == request["actual_run_id"])):
+        reject("window_tool_service_inventory_rejected")
+    for key in ("ssh_executable_sha256", "identity_sha256", "known_hosts_sha256", "remote_request_sha256", "remote_descriptor_sha256"):
+        token(channel[key], HASH)
+    if descriptor.get("remote_descriptor_sha256") != channel["remote_descriptor_sha256"]:
+        reject("window_tool_service_inventory_rejected")
+    host, user, port, key, pin = (credentials[name] for name in SERVICE_CREDENTIALS)
+    token(host, re.compile(r"[A-Za-z0-9][A-Za-z0-9.-]{0,252}"))
+    token(user, re.compile(r"[a-z_][a-z0-9_-]{0,31}"))
+    token(pin, re.compile(r"SHA256:[A-Za-z0-9+/]{43}"))
+    if ".." in host or not port.isdigit() or not 1 <= int(port) <= 65535 or type(channel["port"]) is not int or (host, user, int(port), pin) != (channel["host"], channel["user"], channel["port"], channel["host_key_fingerprint"]):
+        reject("window_tool_service_route_rejected")
+    key_raw = key.rstrip("\n").encode("ascii") + b"\n"
+    if not key_raw.startswith(b"-----BEGIN ") or not key_raw.rstrip().endswith(b"-----") or digest(key_raw) != channel["identity_sha256"]:
+        reject("window_tool_service_identity_rejected")
+    code, observed = owned_process(["/usr/bin/ssh-keyscan", "-T", "5", "-p", port, "-t", "ed25519,rsa,ecdsa", host], {"PATH": "/usr/bin:/bin"}, control=sys.stdin.fileno(), timeout=20, owner=owner)
+    known = pinned_service_known_host(observed, host, int(port), pin)
+    if code or digest(known) != channel["known_hosts_sha256"]:
+        reject("window_tool_service_peer_rejected")
+    # An earlier/unknown bootstrap is not adopted, even if its bodies match.
+    if set(os.listdir(root)) != {"qs-compatibility-retirement", "approved-workflow-scope.json", "budget-issuer"} or set(os.listdir(root / "budget-issuer")) != {"issuer-seed"}:
+        reject("window_tool_service_namespace_conflict")
+    session = {"format_version": 1, "kind": "qs_root_service_session", "tool_source_sha": approval["tool_source_sha"], "tool_binary_sha256": approval["tool_binary_sha256"][{"x86_64": "amd64", "aarch64": "arm64", "arm64": "arm64"}[platform.machine()]], "original_source_sha": approval["original_source_sha"], "operation_id": approval["operation_id"], "manifest_sha256": approval["manifest_sha256"], "original_run_id": approval["original_run_id"], "actual_run_id": request["actual_run_id"], "descriptor_sha256": control["local_descriptor_sha256"]}
+    session_raw = canonical(session)
+    protected_directory(root / "budget-issuer")
+    for name in ("service-journal", "ssh"):
+        protected_directory(root / name, create=True)
+        sync_directory(root)
+    for path, raw in ((root / "approved-services.json", descriptor_raw), (root / "ssh-channel.json", channel_raw), (root / "service-session.json", session_raw), (root / "ssh" / "identity", key_raw), (root / "ssh" / "known_hosts", known)):
+        write_new(path, raw)
+    # D's already frozen trust names the preparation public key. Never create
+    # a replacement seed after its descriptor/channel were approved.
+    code, raw = owned_process([str(native), "--mode", "host-budget-key-open", "--request", str(root / "service-session.json"), "--request-hash", digest(session_raw), "--operation-id", approval["operation_id"], "--run-id", request["actual_run_id"]], {"PATH": "/usr/bin:/bin"}, control=sys.stdin.fileno(), timeout=35, owner=owner)
+    receipt = decode(raw)
+    exact(receipt, ("kind", "tool_source_sha", "operation_id", "actual_run_id", "public_key", "key_available", "whole_writer_fence_proven", "drop_ready", "error_category"))
+    if code or any(type(receipt[k]) is not bool for k in ("key_available", "whole_writer_fence_proven", "drop_ready")) or receipt != {"kind": "qs_native_temporary_budget_key_result", "tool_source_sha": approval["tool_source_sha"], "operation_id": approval["operation_id"], "actual_run_id": request["actual_run_id"], "public_key": receipt["public_key"], "key_available": True, "whole_writer_fence_proven": False, "drop_ready": False, "error_category": "none"}:
+        reject("window_tool_actual_budget_key_rejected")
+    token(receipt["public_key"], HASH)
+    # The native constructor is the only writer of issuer-seed. The lifecycle
+    # subsequently opens/holds these actual files through its original owner.
+    seed = root / "budget-issuer" / "issuer-seed"
+    info = seed.lstat()
+    if not stat.S_ISREG(info.st_mode) or info.st_uid != 0 or info.st_nlink != 1 or stat.S_IMODE(info.st_mode) != 0o600 or info.st_size != 32:
+        reject("window_tool_actual_budget_key_rejected")
+
+
+def prepare_budget_key(original, batch, native, source_uid, approval, run, owner):
+    """One native key creation before D trust and final descriptors freeze."""
+    descriptor_raw = read_owned(original / "budget-key.descriptor.private.json", source_uid, approval["local_descriptor_sha256"], 256 << 10)
+    descriptor = decode(descriptor_raw)
+    for key, expected in (("source_sha", approval["original_source_sha"]), ("tool_source_sha", approval["tool_source_sha"]), ("operation_id", approval["operation_id"]), ("original_run_id", approval["original_run_id"]), ("manifest_sha256", approval["manifest_sha256"]), ("host_role", "server-a")):
+        if type(descriptor) is not dict or descriptor.get(key) != expected:
+            reject("window_tool_service_inventory_rejected")
+    if descriptor.get("remote_descriptor_sha256", "") != "" or descriptor.get("budget_trust_sha256", "") != "":
+        reject("window_tool_service_inventory_rejected")
+    parent = Path("/opt/qs-server/qs-apiserver/compatibility-retirement")
+    for path in (parent, parent / approval["operation_id"]):
+        try:
+            path.mkdir(mode=0o700)
+        except FileExistsError:
+            pass
+        protected_directory(path)
+    root = parent / approval["operation_id"]
+    if os.listdir(root):
+        reject("window_tool_service_namespace_conflict")
+    directory = root / "budget-issuer"
+    protected_directory(directory, create=True)
+    sync_directory(root)
+    session = {"format_version": 1, "kind": "qs_root_service_session", "tool_source_sha": approval["tool_source_sha"], "tool_binary_sha256": digest(native.read_bytes()), "original_source_sha": approval["original_source_sha"], "operation_id": approval["operation_id"], "manifest_sha256": approval["manifest_sha256"], "original_run_id": approval["original_run_id"], "actual_run_id": run, "descriptor_sha256": approval["local_descriptor_sha256"]}
+    session_raw = canonical(session)
+    write_new(batch / "budget-key.basis.private.json", descriptor_raw)
+    # Both files are actual root-created temporary inputs. Keep their original
+    # FDs until native terminal; unknown native work retains them for recovery.
+    files = []
+    try:
+        for name, raw in (("approved-services.json", descriptor_raw), ("service-session.json", session_raw)):
+            path = directory / name
+            write_new(path, raw)
+            fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW)
+            files.append((path, fd, os.fstat(fd), digest(raw)))
+        code, raw = owned_process([str(native), "--mode", "host-budget-key-create", "--request", str(directory / "service-session.json"), "--request-hash", digest(session_raw), "--operation-id", approval["operation_id"], "--run-id", run], {"PATH": "/usr/bin:/bin"}, control=sys.stdin.fileno(), timeout=35, owner=owner)
+        receipt = decode(raw)
+        exact(receipt, ("kind", "tool_source_sha", "operation_id", "actual_run_id", "public_key", "key_available", "whole_writer_fence_proven", "drop_ready", "error_category"))
+        if code or any(type(receipt[k]) is not bool for k in ("key_available", "whole_writer_fence_proven", "drop_ready")) or receipt != {"kind": "qs_native_temporary_budget_key_result", "tool_source_sha": approval["tool_source_sha"], "operation_id": approval["operation_id"], "actual_run_id": run, "public_key": receipt["public_key"], "key_available": True, "whole_writer_fence_proven": False, "drop_ready": False, "error_category": "none"}:
+            reject("window_tool_actual_budget_key_rejected")
+        token(receipt["public_key"], HASH)
+        result_raw = canonical(receipt)
+        write_new(batch / "budget-key.result.private.json", result_raw)
+        identity = lambda v: (v.st_dev, v.st_ino, v.st_uid, v.st_mode, v.st_nlink, v.st_size, v.st_mtime_ns, v.st_ctime_ns)
+        for path, fd, before, expected in files:
+            if identity(before) != identity(os.fstat(fd)) or identity(before) != identity(path.lstat()) or read_owned(path, 0, expected, 256 << 10) == b"":
+                reject("window_tool_service_namespace_conflict")
+        if set(os.listdir(directory)) != {"approved-services.json", "service-session.json", "issuer-seed"}:
+            reject("window_tool_service_namespace_conflict")
+        for path, fd, before, expected in files:
+            if identity(before) != identity(path.lstat()):
+                reject("window_tool_service_namespace_conflict")
+            path.unlink()
+        sync_directory(directory)
+        return digest(result_raw)
+    finally:
+        for unused, fd, unused, unused in files:
+            os.close(fd)
+
+
+def pinned_service_known_host(raw, host, port, fingerprint):
+    matches = set()
+    target = host if port == 22 else "[" + host + "]:" + str(port)
+    for line in raw.decode("ascii").splitlines():
+        if line.startswith("#") or not line.strip():
+            continue
+        fields = line.split()
+        if len(fields) != 3 or fields[0] != target or fields[1] not in ("ssh-ed25519", "ssh-rsa", "ecdsa-sha2-nistp256"):
+            reject("window_tool_service_peer_rejected")
+        try:
+            blob = base64.b64decode(fields[2], validate=True)
+        except ValueError:
+            reject("window_tool_service_peer_rejected")
+        if not 0 < len(blob) <= 16384:
+            reject("window_tool_service_peer_rejected")
+        actual = "SHA256:" + base64.b64encode(hashlib.sha256(blob).digest()).decode("ascii").rstrip("=")
+        if actual == fingerprint:
+            matches.add((" ".join(fields) + "\n").encode("ascii"))
+    if len(matches) != 1:
+        reject("window_tool_service_peer_rejected")
+    return matches.pop()
 
 
 ROOT_BOOTSTRAP = r'''
@@ -663,7 +832,7 @@ try:
  namespace={'__name__':'approved_window_tool_root_module'}
  exec(compile(program,'approved-hash-bound-window-tool','exec'),namespace)
  names=namespace['credential_names'](stage)
- if set(packet['credentials'])!=set(names) or any(type(v)is not str or any(c in v for c in ('\x00','\r','\n')) for v in packet['credentials'].values()): raise ValueError()
+ namespace['validate_credentials'](packet['credentials'],stage)
  namespace['read_owned'](tool_directory/'compatibility-window-tool.py',source_uid,packet['tool_program_sha256'],1<<20)
  raise SystemExit(namespace['root_execute'](arguments,packet,source_uid,archive_raw))
 except Exception:
@@ -770,8 +939,7 @@ def run_window_call(args, raw, approval_hash, package, credentials, *, control=N
     try:
         token(args.run_id, RUN)
         a = approve(raw, approval_hash, args.dispatcher_sha, args.operation, args.operation_id, args.manifest_hash, args.template_hash)
-        if type(credentials) is not dict or set(credentials) != set(credential_names(args.operation)) or any(type(v) is not str or len(v) > 8192 or "\x00" in v for v in credentials.values()):
-            reject()
+        validate_credentials(credentials, args.operation)
         token(package, HASH)
         directory = Path(__file__).resolve(strict=True).parent
         if not re.fullmatch(r"/tmp/qs-independent-window-tool\.[a-zA-Z0-9]{6,16}", str(directory)):

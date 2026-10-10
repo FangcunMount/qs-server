@@ -129,7 +129,7 @@ class WindowToolMetadata(unittest.TestCase):
             with self.assertRaises(tool.Refused):tool.derive_request(tool.canonical(r),a,'22-3')
     def test_prepare_retains_twelve_credentials_and_effects_use_private_read_token(self):
         self.assertEqual(tool.credential_names('prepare'),tool.CREDENTIALS)
-        self.assertEqual(tool.credential_names('apply'),tool.CREDENTIALS+('GITHUB_READ_TOKEN',))
+        self.assertEqual(tool.credential_names('apply'),tool.CREDENTIALS+('GITHUB_READ_TOKEN',)+tool.SERVICE_CREDENTIALS)
         with self.assertRaises(tool.Refused):tool.credential_names('other')
         ast.parse(tool.ROOT_BOOTSTRAP)
         self.assertIn("names=namespace['credential_names'](stage)",tool.ROOT_BOOTSTRAP)
@@ -144,6 +144,32 @@ class WindowToolMetadata(unittest.TestCase):
         for mutate in (lambda v:v.update(path='/tmp/writer.json'),lambda v:v.update(path='/opt/backups/qs-server/compatibility-retirement/13-1/writer.json'),lambda v:v.update(complete=True),lambda v:v.update(sha256='main')):
             bad=copy.deepcopy(r);mutate(bad['writer_control']['database_input']);a['request_template_sha256']=tool.digest(tool.canonical(bad))
             with self.assertRaises(tool.Refused):tool.derive_request(tool.canonical(bad),a,'22-3')
+    def test_service_credentials_are_private_and_only_key_allows_newlines(self):
+        credentials={k:'' for k in tool.credential_names('apply')}
+        credentials[tool.SERVICE_KEY]='-----BEGIN OPENSSH PRIVATE KEY-----\nprivate\n-----END OPENSSH PRIVATE KEY-----\n'
+        tool.validate_credentials(credentials,'apply')
+        for name in ('MYSQL_HOST','GITHUB_READ_TOKEN','RETIREMENT_SERVICE_SSH_HOST'):
+            v=dict(credentials);v[name]='x\ny'
+            with self.subTest(name=name),self.assertRaises(tool.Refused):tool.validate_credentials(v,'apply')
+        with self.assertRaises(tool.Refused):tool.validate_credentials(credentials,'prepare')
+
+    def test_preparation_inventory_hash_never_becomes_an_effectful_approval(self):
+        a=self.approval(self.request());a['local_descriptor_sha256']='e'*64
+        self.assertEqual(self.approve(a),a)
+        a['local_descriptor_sha256']='main'
+        with self.assertRaises(tool.Refused):self.approve(a)
+        a=self.approval(self.request(),'apply');a.update(local_descriptor_sha256='e'*64,b_image_id='sha256:'+'9'*64,b_program_sha256='a'*64)
+        with self.assertRaises(tool.Refused):self.approve(a)
+
+    def test_service_known_host_uses_observed_key_with_exact_existing_pin(self):
+        import base64,hashlib
+        blob=b'offline public-key parser fixture only'
+        fingerprint='SHA256:'+base64.b64encode(hashlib.sha256(blob).digest()).decode().rstrip('=')
+        raw=b'[server-d.example]:2222 ssh-ed25519 '+base64.b64encode(blob)+b'\n'
+        self.assertEqual(tool.pinned_service_known_host(raw,'server-d.example',2222,fingerprint),raw)
+        for changed in (raw.replace(b'server-d.example',b'server-a.example'),raw.replace(b'2222',b'22'),raw.replace(b'ssh-ed25519',b'@cert-authority'),raw.replace(base64.b64encode(blob),b'invalid')):
+            with self.subTest(changed=changed),self.assertRaises(tool.Refused):tool.pinned_service_known_host(changed,'server-d.example',2222,fingerprint)
+        with self.assertRaises(tool.Refused):tool.pinned_service_known_host(raw,'server-d.example',2222,'SHA256:'+'a'*43)
 
     def test_mixed_unknown_uppercase_and_proof_fields_reject(self):
         for name in ('drop_ready','whole_writer_fence','SourceSHA','tool_sha','window_lease'):
@@ -402,6 +428,60 @@ print('actual-hup-local-terminal')
 class RootTemplateStaging(unittest.TestCase):
     request=WindowToolMetadata.request
     approval=WindowToolMetadata.approval
+    def test_preparation_creates_seed_once_then_removes_only_original_inputs_after_native_terminal(self):
+        import os,tempfile
+        from unittest import mock
+        uid=os.getuid()
+        with tempfile.TemporaryDirectory() as name:
+            local=Path(name).resolve();local.chmod(0o700)
+            prefix='/opt/qs-server/qs-apiserver/compatibility-retirement'
+            parent=local/'retirement';parent.parent.chmod(0o700)
+            original=local/'original';original.mkdir(mode=0o700)
+            batch=local/'prepare';batch.mkdir(mode=0o700)
+            native=batch/'restore-native';native.write_bytes(b'offline native placeholder');native.chmod(0o700)
+            a=self.approval(self.request())
+            descriptor={k:a[k] for k in ('tool_source_sha','operation_id','original_run_id','manifest_sha256')}
+            descriptor.update(source_sha=a['original_source_sha'],host_role='server-a')
+            raw=tool.canonical(descriptor);a['local_descriptor_sha256']=tool.digest(raw)
+            (original/'budget-key.descriptor.private.json').write_bytes(raw);(original/'budget-key.descriptor.private.json').chmod(0o600)
+            expected_seed=os.urandom(32);calls=[];exit_code=[0]
+            def mapped(value):
+                value=str(value)
+                return parent/ value[len(prefix)+1:] if value.startswith(prefix+'/') else parent if value==prefix else Path(value)
+            def protected(path,*,create=False):
+                if create:path.mkdir(mode=0o700)
+                self.assertTrue(path.is_dir());self.assertEqual(path.stat().st_mode&0o777,0o700)
+            real_read=tool.read_owned
+            def read(path,owner,expected,maximum,mode=0o600):
+                # Files are real, but this offline test explicitly substitutes
+                # its own UID. It does not supply production root/native proof.
+                return real_read(path,uid,expected,maximum,mode)
+            def native_call(command,environment,**options):
+                self.assertEqual(command[1:3],['--mode','host-budget-key-create'])
+                self.assertEqual(environment,{'PATH':'/usr/bin:/bin'})
+                session=tool.decode(Path(command[4]).read_bytes())
+                self.assertEqual(session['actual_run_id'],command[-1]);self.assertEqual(session['descriptor_sha256'],a['local_descriptor_sha256'])
+                seed=Path(command[4]).parent/'issuer-seed';tool.write_new(seed,expected_seed)
+                calls.append(command)
+                return exit_code[0],tool.canonical(dict(kind='qs_native_temporary_budget_key_result',tool_source_sha=a['tool_source_sha'],operation_id=command[-3],actual_run_id=command[-1],public_key='e'*64,key_available=True,whole_writer_fence_proven=False,drop_ready=False,error_category='none' if not exit_code[0] else 'lifecycle_actual_budget_issuer_missing'))
+            with mock.patch.object(tool,'Path',side_effect=mapped),mock.patch.object(tool,'protected_directory',side_effect=protected),mock.patch.object(tool,'read_owned',side_effect=read),mock.patch.object(tool,'owned_process',side_effect=native_call):
+                result_hash=tool.prepare_budget_key(original,batch,native,uid,a,'22-3',object())
+                directory=parent/'12-1'/'budget-issuer'
+                self.assertEqual(set(p.name for p in directory.iterdir()),{'issuer-seed'})
+                self.assertEqual((directory/'issuer-seed').read_bytes(),expected_seed)
+                self.assertEqual((original/'budget-key.descriptor.private.json').read_bytes(),raw)
+                self.assertEqual((batch/'budget-key.basis.private.json').read_bytes(),raw)
+                self.assertEqual(result_hash,tool.digest((batch/'budget-key.result.private.json').read_bytes()))
+                self.assertEqual(tool.decode((batch/'budget-key.result.private.json').read_bytes())['public_key'],'e'*64)
+                with self.assertRaises(tool.Refused):tool.prepare_budget_key(original,batch,native,uid,a,'23-1',object())
+                self.assertEqual(len(calls),1)
+                # A nonterminal/native failure retains its actual uncertain
+                # seed+inputs. It cannot use the preceding successful receipt.
+                a['operation_id']='13-1';descriptor['operation_id']='13-1';changed=tool.canonical(descriptor);a['local_descriptor_sha256']=tool.digest(changed)
+                (original/'budget-key.descriptor.private.json').write_bytes(changed);exit_code[0]=1
+                next_batch=local/'prepare-2';next_batch.mkdir(mode=0o700)
+                with self.assertRaises(tool.Refused):tool.prepare_budget_key(original,next_batch,native,uid,a,'24-1',object())
+                self.assertEqual(set(p.name for p in (parent/'13-1'/'budget-issuer').iterdir()),{'issuer-seed','approved-services.json','service-session.json'})
     def test_exact_per_actual_run_intents_derive_only_current_run_and_preserve_originals(self):
         import io,os,subprocess,tarfile,tempfile
         from unittest import mock

@@ -131,7 +131,9 @@ jobs:
               try {a = JSON.parse(input.bootstrap_approval_json);} catch {reject();}
               const prepare = input.operation === 'prepare';
               const keys = ['format_version','kind','dispatcher_source_sha','tool_source_sha','original_source_sha','operation_id','original_run_id','stage','target_hash','manifest_sha256','request_template_sha256','tool_binary_sha256','b_image_id','b_program_sha256'];
-              if (!exact(a, prepare ? keys : [...keys,'workflow_scope']) ||
+              const preparedServices = prepare && Object.hasOwn(a ?? {}, 'local_descriptor_sha256');
+              if (!exact(a, prepare ? [...keys,...(preparedServices ? ['local_descriptor_sha256'] : [])] : [...keys,'workflow_scope']) ||
+                  (preparedServices && !hash(a.local_descriptor_sha256)) ||
                   a.format_version !== 1 || a.kind !== 'independent_compatibility_window_tool_approval' || a.dispatcher_source_sha !== context.sha ||
                   !sha(a.tool_source_sha) || (prepare && a.tool_source_sha !== context.sha) || !sha(a.original_source_sha) || a.operation_id !== input.operation_id ||
                   typeof a.original_run_id !== 'string' || !/^[1-9][0-9]{0,19}-[1-9][0-9]{0,3}$/.test(a.original_run_id) || a.original_run_id === String(context.runId)+'-'+String(process.env.GITHUB_RUN_ATTEMPT) ||
@@ -936,6 +938,13 @@ jobs:
           HOST_INVENTORY_SSH_PORT: ${{ vars.SVRA_SSH_PORT || 22 }}
           HOST_INVENTORY_SSH_KEY: ${{ secrets.SVRA_SSH_KEY }}
           HOST_INVENTORY_SSH_FINGERPRINT: ${{ vars.SVRA_SSH_FINGERPRINT }}
+          # Reuse the ordinary worker deploy route/key and its existing pin.
+          # These credentials remain in the bounded private management packet.
+          RETIREMENT_SERVICE_SSH_HOST: ${{ vars.SVRD_HOST || vars.SVRD_PUBLIC_HOST || secrets.SVRD_PUBLIC_HOST }}
+          RETIREMENT_SERVICE_SSH_USERNAME: ${{ vars.SVRD_USERNAME || vars.SVRA_USERNAME }}
+          RETIREMENT_SERVICE_SSH_PORT: ${{ vars.SVRD_SSH_PORT || vars.SVRA_SSH_PORT || 22 }}
+          RETIREMENT_SERVICE_SSH_KEY: ${{ secrets.SVR_MINI_SSH_KEY || secrets.SVRD_SSH_KEY || secrets.SVRA_SSH_KEY }}
+          RETIREMENT_SERVICE_SSH_FINGERPRINT: ${{ vars.SVRD_SSH_FINGERPRINT }}
           MYSQL_HOST: ${{ secrets.MYSQL_HOST }}
           MYSQL_PORT: ${{ secrets.MYSQL_PORT || 3306 }}
           MYSQL_USERNAME: ${{ secrets.MYSQL_METADATA_ADMIN_USERNAME }}
