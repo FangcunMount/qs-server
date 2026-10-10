@@ -133,9 +133,12 @@ type lifecycleHost interface {
 	OpenRecoveryHandles(context.Context, lifecycleRequest, *backup.Archive) (backup.TargetRecoveryBorrowed, error)
 	StopAndDrain(context.Context, lifecycleRequest, *fence.MaintenanceWindow) error
 	OpenServiceManagement(context.Context, lifecycleRequest, *fence.MaintenanceWindow) error
-	// Before any target DDL plan exists, recover only native service actions
-	// already issued by this host; no reconstruction, database restore or deploy.
+	// Before any target DDL plan exists, recover original service/admission
+	// actions issued by this host; no target-data restore or runtime deployment.
 	RestoreStoppedServices(context.Context, lifecycleRequest, *fence.MaintenanceWindow) error
+	// Before Stop, observe the original management channel and actual platform
+	// quarantine only. This grants neither database admission nor DDL authority.
+	CheckWriterPreconditions(context.Context, lifecycleRequest) error
 	CheckWholeWriterFence(context.Context, lifecycleRequest) error
 	FinalDifferenceAndEOF(context.Context, lifecycleRequest, *backup.Archive) error
 	DeployBInline(context.Context, lifecycleRequest, *migration.CompatibilityPairMigrationProof, *fence.MaintenanceWindow) error
@@ -631,17 +634,18 @@ func runLifecycleCLI(ctx context.Context, mode, requestPath, requestHash, operat
 	}
 	defer cancel()
 	// Establish and verify the actual D native stdio while the existing pinned
-	// SSH entrypoint remains available. The complete writer fence comes next;
-	// it cannot make this control binding into writer/DDL authority.
+	// SSH entrypoint remains available. Pre-stop checks observe the real platform
+	// quarantine and original management readiness. Database admission is held
+	// only after the original actors stop and their native lease is installed.
 	if err = host.OpenServiceManagement(forward, r, window); err != nil {
 		return receipt, err
 	}
-	if err = host.CheckWholeWriterFence(forward, r); err != nil {
+	if err = host.CheckWriterPreconditions(forward, r); err != nil {
 		return receipt, err
 	}
 	// Arm before Stop: a failed call can already have stopped one side. This
-	// service-only recovery covers Stop/check/drain/final-read/plan failures and
-	// borrows the original parent, never the cancelled forward context.
+	// original service/admission recovery covers Stop/check/drain/final-read/plan
+	// failures and borrows the parent, never the cancelled forward context.
 	serviceRecoveryPending := true
 	defer func() {
 		if !serviceRecoveryPending || result == nil || receipt.AcceptanceComplete {
@@ -657,6 +661,11 @@ func runLifecycleCLI(ctx context.Context, mode, requestPath, requestHash, operat
 		receipt.RecoveryErrorCategory = lifecycleCategory(recoveryErr)
 	}()
 	if err = host.StopAndDrain(forward, r, window); err != nil {
+		return receipt, err
+	}
+	// A successful stop/lease installation is not a whole-writer fence. Perform
+	// the complete fresh native check before final scans, plans or target DDL.
+	if err = host.CheckWholeWriterFence(forward, r); err != nil {
 		return receipt, err
 	}
 	if stage == "verify" || stage == "purge" {

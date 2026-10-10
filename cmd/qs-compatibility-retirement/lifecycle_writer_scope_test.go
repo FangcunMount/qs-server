@@ -491,11 +491,26 @@ func TestWriterTokenStaysInLiveOwnerAndIsCleared(t *testing.T) {
 func TestWriterScopeRequiresOriginalLiveNativeManagement(t *testing.T) {
 	r := lifecycleRequest{WriterControl: &lifecycleWriterControl{WorkflowScopeSHA256: strings.Repeat("a", 64)}}
 	for _, h := range []*lifecycleFixedHost{nil, {}, {services: &lifecycleServiceController{window: new(fence.MaintenanceWindow), managementReady: true}}} {
+		if e := h.CheckWriterPreconditions(context.Background(), r); e == nil {
+			t.Fatal("expected identities became actual pre-stop platform quarantine")
+		}
 		if e := h.CheckWholeWriterFence(context.Background(), r); e == nil {
 			t.Fatal("expected identities became isolation")
 		}
 	}
 	if lifecycleEffectsPreflight(context.Background()) == nil {
 		t.Fatal("partial platform leaf activated DDL")
+	}
+}
+
+func TestWriterPreconditionsCannotReuseStoppedOrInstalledOwner(t *testing.T) {
+	for _, h := range []*lifecycleFixedHost{
+		{services: &lifecycleServiceController{stopAttempted: true}},
+		{services: &lifecycleServiceController{remoteStopAttempted: true}},
+		{services: &lifecycleServiceController{}, dbWriters: &lifecycleDBWriterLease{installed: true}},
+	} {
+		if e := h.CheckWriterPreconditions(t.Context(), lifecycleRequest{}); e != lifecycleError("lifecycle_writer_precondition_phase_rejected") {
+			t.Fatal("post-stop state reused narrower precondition", e)
+		}
 	}
 }

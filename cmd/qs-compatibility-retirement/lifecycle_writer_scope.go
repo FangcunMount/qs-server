@@ -91,6 +91,29 @@ func (h *lifecycleFixedHost) checkOriginalDManagementPhase(ctx context.Context, 
 }
 
 func (h *lifecycleFixedHost) observeWholeWriterScopesForOriginalD(ctx context.Context, r lifecycleRequest, terminal *lifecycleDTerminal) error {
+	if e := h.observePlatformQuarantineForOriginalD(ctx, r, terminal); e != nil {
+		return e
+	}
+	if e := h.checkDatabaseWriterLease(ctx, r); e != nil {
+		return e
+	}
+	// Current workflows and the four-target database lease are only components.
+	// Other native host/config/session/external writers still require their real
+	// installed controls. No source/environment/receipt turns this into success.
+	return lifecycleError("lifecycle_host_database_external_writer_isolation_unproven")
+}
+
+// This pre-stop observation deliberately has a narrower contract than the
+// whole fence. The same fresh original-window platform GET is repeated by the
+// whole-fence caller after StopAndDrain installs the actual database lease.
+func (h *lifecycleFixedHost) CheckWriterPreconditions(ctx context.Context, r lifecycleRequest) error {
+	if h == nil || h.services == nil || h.services.stopAttempted || h.services.remoteStopAttempted || h.services.local != nil || h.aiStopped != nil || h.dbWriters != nil {
+		return lifecycleError("lifecycle_writer_precondition_phase_rejected")
+	}
+	return h.observePlatformQuarantineForOriginalD(ctx, r, nil)
+}
+
+func (h *lifecycleFixedHost) observePlatformQuarantineForOriginalD(ctx context.Context, r lifecycleRequest, terminal *lifecycleDTerminal) error {
 	if h == nil || ctx == nil || ctx.Err() != nil || !r.WriterControl.valid() || r.DeploymentControl == nil || h.services == nil || h.services.window == nil || !h.services.managementReady || !h.services.identity.matches(r) || h.services.child == nil {
 		return lifecycleError("lifecycle_writer_scope_binding_rejected")
 	}
@@ -129,14 +152,7 @@ func (h *lifecycleFixedHost) observeWholeWriterScopesForOriginalD(ctx context.Co
 		return lifecycleError("lifecycle_writer_scope_binding_rejected")
 	}
 	h.writers.platform = observed
-	if e := h.checkDatabaseWriterLease(ctx, r); e != nil {
-		return e
-	}
-	// Current workflows are only one component. Native host/config/session,
-	// direct/idle DB admission and external qs-ai writers require their own live
-	// installed leases and complete approved census. Those ports are not yet
-	// implemented here. No source/environment/receipt may turn this into success.
-	return lifecycleError("lifecycle_host_database_external_writer_isolation_unproven")
+	return nil // Only actual platform quarantine and original management binding.
 }
 
 // Expected ownership/baselines only. Actual credentials, principal enumeration,

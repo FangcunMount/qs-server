@@ -132,3 +132,71 @@ func lifecycleTestApplyGuard(condition ast.Expr) bool {
 	value, valueOK := binary.Y.(*ast.BasicLit)
 	return nameOK && valueOK && name.Name == "stage" && value.Kind == token.STRING && value.Value == `"apply"`
 }
+
+// Source ordering checks protect the real fixed caller while its production
+// effects gate remains closed; they do not mint a Window, lease or fence.
+func TestLifecycleWriterKernelPreconditionsGuardStopAndFreshFence(t *testing.T) {
+	f, err := parser.ParseFile(token.NewFileSet(), "lifecycle.go", nil, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var run *ast.FuncDecl
+	for _, declaration := range f.Decls {
+		if fn, ok := declaration.(*ast.FuncDecl); ok && fn.Name.Name == "runLifecycleCLI" {
+			run = fn
+		}
+	}
+	if run == nil {
+		t.Fatal("actual lifecycle caller missing")
+	}
+	positions := map[string]token.Pos{}
+	for _, statement := range run.Body.List {
+		ast.Inspect(statement, func(node ast.Node) bool {
+			if _, deferred := node.(*ast.FuncLit); deferred {
+				return false
+			}
+			call, ok := node.(*ast.CallExpr)
+			if !ok {
+				return true
+			}
+			selector, ok := call.Fun.(*ast.SelectorExpr)
+			if !ok {
+				return true
+			}
+			name := selector.Sel.Name
+			switch name {
+			case "OpenServiceManagement", "CheckWriterPreconditions", "StopAndDrain", "CheckWholeWriterFence", "FinalDifferenceAndEOF", "PrepareTargetRecovery", "ApplyTargets":
+				if positions[name] == 0 {
+					positions[name] = call.Pos()
+				}
+			}
+			if name == "CheckWriterPreconditions" || name == "StopAndDrain" || name == "CheckWholeWriterFence" {
+				guard, ok := statement.(*ast.IfStmt)
+				if !ok || guard.Init == nil || guard.Cond == nil || len(guard.Body.List) != 1 {
+					t.Fatal("writer boundary is not an immediate failure guard")
+				}
+				failure, ok := guard.Cond.(*ast.BinaryExpr)
+				if !ok || failure.Op != token.NEQ {
+					t.Fatal("writer boundary no longer fails on error")
+				}
+				value, valueOK := failure.X.(*ast.Ident)
+				zero, zeroOK := failure.Y.(*ast.Ident)
+				if !valueOK || value.Name != "err" || !zeroOK || zero.Name != "nil" {
+					t.Fatal("writer boundary result ignored")
+				}
+				if _, ok := guard.Body.List[0].(*ast.ReturnStmt); !ok {
+					t.Fatal("failed writer boundary still advances")
+				}
+			}
+			return true
+		})
+	}
+	sequence := []string{"OpenServiceManagement", "CheckWriterPreconditions", "StopAndDrain", "CheckWholeWriterFence", "FinalDifferenceAndEOF", "PrepareTargetRecovery", "ApplyTargets"}
+	var previous token.Pos
+	for _, name := range sequence {
+		if positions[name] == 0 || positions[name] <= previous {
+			t.Fatalf("native kernel order violated at %s", name)
+		}
+		previous = positions[name]
+	}
+}
