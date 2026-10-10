@@ -13,6 +13,7 @@ import (
 
 	standard "github.com/FangcunMount/qs-server/internal/apiserver/eventing/standardoutbox"
 	hostmysql "github.com/FangcunMount/qs-server/internal/pkg/database/mysql"
+	"github.com/FangcunMount/qs-server/internal/pkg/eventing/evidence"
 	eventpayload "github.com/FangcunMount/qs-server/internal/pkg/eventing/payload"
 	"gorm.io/gorm"
 )
@@ -505,6 +506,102 @@ func TestSQLHistoricalComponentNativeFreshNegativeClosureAndCrossOrganization(t 
 	}
 	if err := componentSQLNativeObserve(t, db, r, false, nil); err == nil {
 		t.Fatal("new related business row ignored")
+	}
+}
+
+func TestSQLHistoricalComponentNativeFreshSemanticView(t *testing.T) {
+	for _, missingRun := range []bool{false, true} {
+		t.Run(map[bool]string{false: "actual_owner_outcome_and_replay", true: "exact_original_run_gap"}[missingRun], func(t *testing.T) {
+			db := openHistoricalReferencesDB(t)
+			insertHistoricalAssessment(t, db, 42)
+			record, _ := testCommittedReference(t, 9001, 42, "current-outcome-native")
+			po := outcomeToPO(record)
+			po.CommittedEventID, po.CommittedEventEvidence = nil, nil
+			if err := db.Create(po).Error; err != nil {
+				t.Fatal(err)
+			}
+			if missingRun {
+				if err := db.Exec("DELETE FROM runtime_checkpoint WHERE assessment_id=42").Error; err != nil {
+					t.Fatal(err)
+				}
+			}
+			crossSQLNativeReplay(t, db, "old-original")
+			r := componentSQLNativeRecipe(t, db, false)
+			var retained *SQLHistoricalComponentSemanticView
+			if err := componentSQLNativeObserve(t, db, r, false, func(ctx context.Context, o *SQLHistoricalComponentObservation) error {
+				v, err := o.SemanticView(ctx)
+				if err != nil || v.ValidateBorrowedSnapshot(ctx) != nil || v.MatchesInput(ctx, r) != nil || o.ValidateBorrowedObservation(ctx) != nil {
+					t.Fatal("actual scoped semantic view rejected", err)
+				}
+				retained = v
+				facts, err := v.OwnerByAssessment(ctx, 42)
+				if err != nil || facts.Owner.OrgID != 7 || facts.Owner.TesteeID != 21 || facts.Owner.AnswerSheetID != 10042 || facts.Owner.Status != "evaluated" || len(facts.Outcomes) != 1 || facts.Outcomes[0].RunID != "42:1" || facts.Outcomes[0].Invalid || len(facts.Runs) != map[bool]int{false: 1, true: 0}[missingRun] {
+					t.Fatal("actual organization/terminal status/OriginalRun facts lost", err)
+				}
+				if !missingRun && (facts.Runs[0].ResourceID != "42:1" || facts.Runs[0].Attempt != 1 || facts.Runs[0].Status != "succeeded") {
+					t.Fatal("current/latest Run substituted")
+				}
+				facts.Owner.Status = "forged"
+				facts.Outcomes[0].RunID = "forged"
+				fresh, err := v.OwnerByAnswerSheet(ctx, 10042)
+				if err != nil || fresh.Owner.Status != "evaluated" || fresh.Outcomes[0].RunID != "42:1" {
+					t.Fatal("returned facts mutate the live view", err)
+				}
+				if _, err = v.OwnerByAssessment(ctx, 43); err == nil {
+					t.Fatal("outside selector declared absent")
+				}
+				actual, err := v.OutcomeRecord(ctx, 9001)
+				if err != nil || actual.RunID() != record.RunID() || actual.VersionToken() != sqlHistoricalFactRecord(record).VersionToken() {
+					t.Fatal("native Outcome decoder or immutable body differs", err)
+				}
+				binding, err := v.BusinessBinding(ctx, 42, 0, "evaluation.requested", nil)
+				if err != nil || binding != r.plan.attachments[0].Entry.Proof.BusinessBindingSHA256 {
+					t.Fatal("actual scoped business binding differs from original", err)
+				}
+				if missingRun {
+					if v.OriginalOutcomeRunAbsent(ctx, 9001, "42:1") != nil {
+						t.Fatal("actual exact absent original Run not retained")
+					}
+					if _, err = v.BusinessBinding(ctx, 42, 9001, "evaluation.outcome.committed", nil); err != nil {
+						t.Fatal("fresh original gap could not bind actual Outcome", err)
+					}
+				} else {
+					if v.OriginalOutcomeRunAbsent(ctx, 9001, "42:1") == nil {
+						t.Fatal("retained original Run declared absent")
+					}
+					if _, err = v.BusinessBinding(ctx, 42, 9001, "evaluation.outcome.committed", &evidence.HistoricalRunReferenceV1{RunID: "42:1", Attempt: 1}); err != nil {
+						t.Fatal("actual declared original Run rejected", err)
+					}
+				}
+				if _, err = v.BusinessBinding(ctx, 42, 9001, "evaluation.outcome.committed", &evidence.HistoricalRunReferenceV1{RunID: "latest", Attempt: 2}); err == nil {
+					t.Fatal("unobserved original Run accepted")
+				}
+				rows, err := v.Responsibilities(ctx)
+				items, parents := 0, 0
+				for _, row := range rows {
+					if row.Store == "qs_rm_replay_items" {
+						items++
+					}
+					if row.Store == "qs_rm_replay_requests" {
+						parents++
+					}
+				}
+				if err != nil || items != 2 || parents != 1 {
+					t.Fatal("full replay negative responsibility closure cut", err)
+				}
+				o.used = true
+				if v.ValidateBorrowedSnapshot(ctx) == nil || o.ValidateBorrowedObservation(ctx) == nil {
+					t.Fatal("consumed view reused as fresh qualification")
+				}
+				o.used = false
+				return nil
+			}); err != nil {
+				t.Fatal(err)
+			}
+			if retained.ValidateBorrowedSnapshot(t.Context()) == nil {
+				t.Fatal("ended transaction kept semantic view alive")
+			}
+		})
 	}
 }
 

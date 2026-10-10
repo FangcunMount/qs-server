@@ -12,6 +12,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationfact"
+	"github.com/FangcunMount/qs-server/internal/pkg/eventing/evidence"
 	"gorm.io/gorm"
 )
 
@@ -38,14 +40,18 @@ type SQLHistoricalComponentRecipe struct {
 // The host owns every transaction and its commit. This observer grants only a
 // short-lived SQL component read, not source, Mongo, AI or retirement authority.
 type SQLHistoricalComponentObservation struct {
-	self        *SQLHistoricalComponentObservation
-	recipe      *SQLHistoricalComponentRecipe
-	pool        gorm.ConnPool
-	transaction sqlResponsibilityTransaction
-	expires     time.Time
-	writable    bool
-	used        bool
-	seal        string
+	self           *SQLHistoricalComponentObservation
+	recipe         *SQLHistoricalComponentRecipe
+	pool           gorm.ConnPool
+	transaction    sqlResponsibilityTransaction
+	expires        time.Time
+	writable       bool
+	used           bool
+	seal           string
+	business       sqlHistoricalCASImage
+	responsibility sqlHistoricalCASImage
+	observations   []SQLResponsibilityObservation
+	semantic       *SQLHistoricalComponentSemanticView
 }
 
 type SQLHistoricalComponentStatement struct {
@@ -1159,7 +1165,7 @@ func componentPredicate(spec sqlResponsibilityTable, s SQLCrossStoreSelectors, e
 // Bounded fixed-point closure includes every member of a replay pair and then
 // every event referenced by those members. It reads new matching rows, rather
 // than re-reading only the old primary keys. A growing/oversized graph fails.
-func (r *SQLHistoricalComponentRecipe) captureResponsibility(tx *gorm.DB) (sqlHistoricalCASImage, map[string]string, error) {
+func (r *SQLHistoricalComponentRecipe) captureResponsibility(tx *gorm.DB) (sqlHistoricalCASImage, map[string]string, []SQLResponsibilityObservation, error) {
 	image := sqlHistoricalCASImage{rows: map[string][]historicalSQLRow{}, schema: map[string]string{}, columns: map[string][]string{}}
 	started := time.Now()
 	events := map[string]bool{}
@@ -1173,14 +1179,14 @@ func (r *SQLHistoricalComponentRecipe) captureResponsibility(tx *gorm.DB) (sqlHi
 	for _, spec := range sqlResponsibilityTables {
 		cols, hash, _, err := cycleSchema(tx, spec)
 		if err != nil || !sqlCrossStoreSupportedColumns(spec.name, cols) {
-			return image, nil, ErrSQLHistoricalComponent
+			return image, nil, nil, ErrSQLHistoricalComponent
 		}
 		image.schema[spec.name], image.columns[spec.name] = hash, cols
 		retained[spec.name] = map[string]historicalSQLRow{}
 	}
 	for round := 0; round <= 512; round++ {
 		if time.Since(started) > r.limits.MaxDuration {
-			return image, nil, ErrSQLHistoricalComponent
+			return image, nil, nil, ErrSQLHistoricalComponent
 		}
 		beforeEvents, beforePairs := len(events), len(pairs)
 		ids := make([]string, 0, len(events))
@@ -1189,12 +1195,12 @@ func (r *SQLHistoricalComponentRecipe) captureResponsibility(tx *gorm.DB) (sqlHi
 		}
 		sort.Strings(ids)
 		if len(ids) > 512 || len(pairs) > 512 || len(ids) == 0 && len(r.selectors.AssessmentIDs)+len(r.selectors.MongoOwners)+len(r.selectors.OrganizationIDs) == 0 {
-			return image, nil, ErrSQLHistoricalComponent
+			return image, nil, nil, ErrSQLHistoricalComponent
 		}
 		for _, spec := range sqlResponsibilityTables {
 			predicate, args, err := componentPredicate(spec, r.selectors, ids)
 			if err != nil {
-				return image, nil, err
+				return image, nil, nil, err
 			}
 			if spec.name == "qs_rm_replay_items" || spec.name == "qs_rm_replay_requests" {
 				keys := make([]string, 0, len(pairs))
@@ -1210,20 +1216,20 @@ func (r *SQLHistoricalComponentRecipe) captureResponsibility(tx *gorm.DB) (sqlHi
 			}
 			rows, cols, size, err := cycleQuery(tx, "SELECT * FROM `"+spec.name+"` WHERE "+predicate+" ORDER BY "+strings.Join(spec.keys, ",")+" LIMIT ?", r.limits.MaxPageRows, append(args, r.limits.MaxPageRows+1)...)
 			if err != nil {
-				return image, nil, err
+				return image, nil, nil, err
 			}
 			if !reflect.DeepEqual(cols, image.columns[spec.name]) || size > r.limits.MaxPageBytes {
-				return image, nil, ErrSQLHistoricalComponent
+				return image, nil, nil, ErrSQLHistoricalComponent
 			}
 			for _, row := range rows {
 				key, err := cycleKey(spec, row)
 				if err != nil {
-					return image, nil, err
+					return image, nil, nil, err
 				}
 				digest := cycleKeyDigest(key)
 				if previous := retained[spec.name][digest]; previous != nil {
 					if !reflect.DeepEqual(previous, row) {
-						return image, nil, ErrSQLHistoricalComponent
+						return image, nil, nil, ErrSQLHistoricalComponent
 					}
 					continue
 				}
@@ -1235,7 +1241,7 @@ func (r *SQLHistoricalComponentRecipe) captureResponsibility(tx *gorm.DB) (sqlHi
 					}
 				}
 				if total > r.limits.MaxPageRows || bytes > r.limits.MaxPageBytes {
-					return image, nil, ErrSQLHistoricalComponent
+					return image, nil, nil, ErrSQLHistoricalComponent
 				}
 				retained[spec.name][digest] = row
 				v := cycleDecode(spec.name, row)
@@ -1244,7 +1250,7 @@ func (r *SQLHistoricalComponentRecipe) captureResponsibility(tx *gorm.DB) (sqlHi
 				}
 				if spec.name == "qs_rm_replay_items" || spec.name == "qs_rm_replay_requests" {
 					if v.OrgID == 0 || v.link.requestID == "" {
-						return image, nil, ErrSQLHistoricalComponent
+						return image, nil, nil, ErrSQLHistoricalComponent
 					}
 					pairs[cyclePair(v.OrgID, v.link.requestID)] = v
 				}
@@ -1254,7 +1260,7 @@ func (r *SQLHistoricalComponentRecipe) captureResponsibility(tx *gorm.DB) (sqlHi
 			break
 		}
 		if round == 512 {
-			return image, nil, ErrSQLHistoricalComponent
+			return image, nil, nil, ErrSQLHistoricalComponent
 		}
 	}
 	for _, spec := range sqlResponsibilityTables {
@@ -1262,11 +1268,17 @@ func (r *SQLHistoricalComponentRecipe) captureResponsibility(tx *gorm.DB) (sqlHi
 			image.rows[spec.name] = append(image.rows[spec.name], row)
 		}
 	}
-	anchors, err := componentValidateResponsibility(tx, image)
-	return image, anchors, err
+	anchors, observations, err := componentResponsibilityFacts(tx, image)
+	return image, anchors, observations, err
 }
 
 func componentValidateResponsibility(tx *gorm.DB, image sqlHistoricalCASImage) (map[string]string, error) {
+	anchors, _, err := componentResponsibilityFacts(tx, image)
+	return anchors, err
+}
+
+// This decoder classifies actual scoped rows; it never marks a global cycle complete.
+func componentResponsibilityFacts(tx *gorm.DB, image sqlHistoricalCASImage) (map[string]string, []SQLResponsibilityObservation, error) {
 	c := &SQLHistoricalResponsibilityCycle{owners: map[uint64]sqlResponsibilityOwner{}, anchorDigests: map[string]string{}, byOwner: map[uint64][]int{}, byEvent: map[string][]int{}, byOrgActions: map[uint64][]int{}}
 	for _, spec := range sqlResponsibilityTables {
 
@@ -1283,32 +1295,34 @@ func componentValidateResponsibility(tx *gorm.DB, image sqlHistoricalCASImage) (
 		}
 		_, hash, _, err := cycleSchema(tx, spec)
 		if err != nil || hash != image.schema[spec.name] {
-			return nil, ErrSQLHistoricalComponent
+			return nil, nil, ErrSQLHistoricalComponent
 		}
 	}
 	if err := c.checkPageOwners(tx, 0); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	c.checkReverse()
 	for _, v := range c.observations {
 		if v.Invalid || v.ScopeClass == "retirement_related" && (v.Unfinished || v.LeasePresent) {
-			return nil, ErrSQLHistoricalComponent
+			return nil, nil, ErrSQLHistoricalComponent
 		}
 	}
-	return c.anchorDigests, nil
+	return c.anchorDigests, c.observations, nil
 }
 
 func (o *SQLHistoricalComponentObservation) digest() string {
 	if o == nil || !o.recipe.intact() {
 		return ""
 	}
-	return cycleKeyDigest([]string{o.recipe.seal, sqlHistoricalProvenancePoolToken(o.pool), strconv.FormatUint(o.transaction.connection, 10), strconv.FormatUint(o.transaction.thread, 10), strconv.FormatUint(o.transaction.event, 10), o.expires.UTC().Format(time.RFC3339Nano), strconv.FormatBool(o.writable)})
+	return cycleKeyDigest([]string{o.recipe.seal, sqlHistoricalProvenancePoolToken(o.pool), strconv.FormatUint(o.transaction.connection, 10), strconv.FormatUint(o.transaction.thread, 10), strconv.FormatUint(o.transaction.event, 10), o.expires.UTC().Format(time.RFC3339Nano), strconv.FormatBool(o.writable), casImageHash(o.business), casImageHash(o.responsibility)})
 }
 func (o *SQLHistoricalComponentObservation) live(ctx context.Context) error {
 	if ctx == nil || ctx.Err() != nil || o == nil || o.self != o || o.seal == "" || o.seal != o.digest() || time.Now().After(o.expires) {
 		return ErrSQLHistoricalComponent
 	}
-	tx, err := historicalTx(ctx)
+	bounded, cancel := context.WithDeadline(ctx, o.expires)
+	defer cancel()
+	tx, err := historicalTx(bounded)
 	if err != nil || tx.Statement.ConnPool != o.pool {
 		return ErrSQLHistoricalComponent
 	}
@@ -1318,7 +1332,7 @@ func (o *SQLHistoricalComponentObservation) live(ctx context.Context) error {
 	} else {
 		actual, err = cycleActualTransaction(tx)
 	}
-	if err != nil || actual != o.transaction {
+	if err != nil || actual != o.transaction || bounded.Err() != nil || !time.Now().Before(o.expires) {
 		return ErrSQLHistoricalComponent
 	}
 	return nil
@@ -1358,7 +1372,7 @@ func PrepareSQLHistoricalComponentObservation(ctx context.Context, r *SQLHistori
 	if err != nil || actual == r.plan.oldTransaction {
 		return nil, ErrSQLHistoricalComponent
 	}
-	responsibility, anchors, err := r.captureResponsibility(tx)
+	responsibility, anchors, observations, err := r.captureResponsibility(tx)
 	if err != nil {
 		return nil, fmt.Errorf("%w: responsibility_read", ErrSQLHistoricalComponent)
 	}
@@ -1368,7 +1382,7 @@ func PrepareSQLHistoricalComponentObservation(ctx context.Context, r *SQLHistori
 	if !reflect.DeepEqual(anchors, r.anchors) {
 		return nil, fmt.Errorf("%w: responsibility_anchors", ErrSQLHistoricalComponent)
 	}
-	o := &SQLHistoricalComponentObservation{recipe: r, pool: tx.Statement.ConnPool, transaction: actual, expires: started.Add(budget), writable: writable}
+	o := &SQLHistoricalComponentObservation{recipe: r, pool: tx.Statement.ConnPool, transaction: actual, expires: started.Add(budget), writable: writable, business: image, responsibility: responsibility, observations: observations}
 	o.self = o
 	o.seal = o.digest()
 	if o.live(bounded) != nil {
@@ -1379,6 +1393,246 @@ func PrepareSQLHistoricalComponentObservation(ctx context.Context, r *SQLHistori
 
 func (o *SQLHistoricalComponentObservation) Report() SQLHistoricalComponentReadReport {
 	return SQLHistoricalComponentReadReport{BusinessMatched: o != nil && o.self == o && o.seal != "" && o.seal == o.digest(), ResponsibilitiesMatched: o != nil && o.self == o && o.seal != "" && o.seal == o.digest(), FullSourcesRequired: true, MongoQualificationRequired: true, AIClosureRequired: true, HostCommitRequired: true}
+}
+
+// ValidateBorrowedObservation checks the actual host pool, native transaction
+// and original deadline. It grants no source, business-terminal or write permit.
+func (o *SQLHistoricalComponentObservation) ValidateBorrowedObservation(ctx context.Context) error {
+	if o.live(ctx) != nil || o.used {
+		return ErrSQLHistoricalComponent
+	}
+	return nil
+}
+
+// This view retains only facts decoded from this observer's actual fresh reads.
+// It cannot construct a completed global cycle or enter the physical CAS API.
+type SQLHistoricalComponentSemanticView struct {
+	self        *SQLHistoricalComponentSemanticView
+	observation *SQLHistoricalComponentObservation
+	owners      map[uint64]*SQLHistoricalOwnerFacts
+	sheets      map[uint64]uint64
+	seal        string
+}
+
+func (*SQLHistoricalComponentSemanticView) MarshalJSON() ([]byte, error) {
+	return nil, ErrSQLHistoricalFactsSerialization
+}
+func (*SQLHistoricalComponentSemanticView) MarshalBSON() ([]byte, error) {
+	return nil, ErrSQLHistoricalFactsSerialization
+}
+func (*SQLHistoricalComponentSemanticView) UnmarshalJSON([]byte) error {
+	return ErrSQLHistoricalFactsSerialization
+}
+func (*SQLHistoricalComponentSemanticView) UnmarshalBSON([]byte) error {
+	return ErrSQLHistoricalFactsSerialization
+}
+func (*SQLHistoricalComponentSemanticView) String() string {
+	return "private fresh scoped SQL facts; source/Mongo/AI qualification required"
+}
+func (v *SQLHistoricalComponentSemanticView) GoString() string { return v.String() }
+
+func (v *SQLHistoricalComponentSemanticView) ValidateBorrowedSnapshot(ctx context.Context) error {
+	if v == nil || v.self != v || v.observation == nil || v.seal == "" || v.seal != v.observation.seal {
+		return ErrSQLHistoricalComponent
+	}
+	return v.observation.ValidateBorrowedObservation(ctx)
+}
+
+// MatchesInput binds these live facts to the exact original recipe, including
+// a revalidated owned spool. Matching a hash alone never creates this view.
+func (v *SQLHistoricalComponentSemanticView) MatchesInput(ctx context.Context, input *SQLHistoricalComponentRecipe) error {
+	if v.ValidateBorrowedSnapshot(ctx) != nil {
+		return ErrSQLHistoricalComponent
+	}
+	r, err := input.load(ctx)
+	if err != nil || r.seal != v.observation.recipe.seal {
+		return ErrSQLHistoricalComponent
+	}
+	return v.ValidateBorrowedSnapshot(ctx)
+}
+
+func (o *SQLHistoricalComponentObservation) SemanticView(ctx context.Context) (*SQLHistoricalComponentSemanticView, error) {
+	if o.ValidateBorrowedObservation(ctx) != nil {
+		return nil, ErrSQLHistoricalComponent
+	}
+	if o.semantic != nil {
+		if err := o.semantic.ValidateBorrowedSnapshot(ctx); err != nil {
+			return nil, err
+		}
+		return o.semantic, nil
+	}
+	bounded, cancel := context.WithDeadline(ctx, o.expires)
+	defer cancel()
+	tx, err := historicalTx(bounded)
+	if err != nil {
+		return nil, err
+	}
+	v := &SQLHistoricalComponentSemanticView{observation: o, owners: map[uint64]*SQLHistoricalOwnerFacts{}, sheets: map[uint64]uint64{}}
+	clocks := o.business.rows["business_clock_columns"]
+	if len(clocks) != 7 {
+		return nil, ErrSQLHistoricalComponent
+	}
+	ids := make([]uint64, 0, len(o.business.rows["assessment"]))
+	for _, row := range o.business.rows["assessment"] {
+		id, e := sqlHistoricalUint(row, "id")
+		sheet, se := sqlHistoricalUint(row, "answer_sheet_id")
+		if e != nil || se != nil || id == 0 || sheet == 0 || row["deleted_at"] != nil || v.owners[id] != nil || v.sheets[sheet] != 0 {
+			return nil, ErrSQLHistoricalComponent
+		}
+		f := &SQLHistoricalOwnerFacts{identity: o.recipe.plan.identity, assessmentID: id, outcomeRecords: map[uint64]*evaluationfact.Record{}}
+		if err = batchDecodeOwner(f, row, clocks); err != nil {
+			return nil, err
+		}
+		v.owners[id], v.sheets[sheet] = f, id
+		ids = append(ids, id)
+	}
+	for _, row := range o.business.rows["runtime_checkpoint"] {
+		id, e := sqlHistoricalUint(row, "assessment_id")
+		f := v.owners[id]
+		if e != nil || f == nil || len(f.snapshot.Runs) >= SQLHistoricalOwnerRowLimit {
+			return nil, ErrSQLHistoricalComponent
+		}
+		run, e := batchDecodeRun(row)
+		if e != nil {
+			return nil, e
+		}
+		f.snapshot.Runs = append(f.snapshot.Runs, run)
+	}
+	// Use the existing domain outcome mapper, with every typed row checked
+	// against the already captured raw bytes in the SAME native transaction.
+	var pos []EvaluationOutcomePO
+	if len(ids) != 0 {
+		if err = tx.Raw("SELECT * FROM evaluation_outcome FORCE INDEX (uk_evaluation_outcome_assessment_id) WHERE assessment_id IN ? ORDER BY id LIMIT ?", ids, o.recipe.plan.limits.MaxRows+1).Scan(&pos).Error; err != nil {
+			return nil, ErrSQLHistoricalFactsRead
+		}
+	}
+	if len(pos) != len(o.business.rows["evaluation_outcome"]) {
+		return nil, ErrSQLHistoricalComponent
+	}
+	for i, row := range o.business.rows["evaluation_outcome"] {
+		id, e := sqlHistoricalUint(row, "assessment_id")
+		rowID, re := sqlHistoricalUint(row, "id")
+		org, oe := sqlHistoricalUint(row, "org_id")
+		testee, te := sqlHistoricalUint(row, "testee_id")
+		at, ae := sqlHistoricalTime(row, "evaluated_at")
+		f, po := v.owners[id], &pos[i]
+		if e != nil || re != nil || oe != nil || te != nil || ae != nil || at == nil || f == nil || po.ID != rowID || po.AssessmentID != id || po.OrgID <= 0 || uint64(po.OrgID) != org || po.TesteeID != testee || po.EvaluationRunID != valueOrEmpty(row["evaluation_run_id"]) || !po.EvaluatedAt.Equal(*at) || org != f.snapshot.Owner.OrgID || testee != f.snapshot.Owner.TesteeID {
+			return nil, ErrSQLHistoricalComponent
+		}
+		if po.ModelKind != valueOrEmpty(row["model_kind"]) || po.ModelCode != valueOrEmpty(row["model_code"]) || po.ModelVersion != valueOrEmpty(row["model_version"]) || strconv.FormatUint(uint64(po.SchemaVersion), 10) != valueOrEmpty(row["schema_version"]) || po.PayloadJSON != valueOrEmpty(row["payload_json"]) {
+			return nil, ErrSQLHistoricalComponent
+		}
+		for column, actual := range map[string]*string{"model_sub_kind": po.ModelSubKind, "model_algorithm": po.ModelAlgorithm, "model_title": po.ModelTitle, "decision_kind": po.DecisionKind, "input_snapshot_ref": po.InputSnapshotRef, "report_input_json": po.ReportInputJSON} {
+			if raw, exists := row[column]; !exists || !reflect.DeepEqual(raw, actual) {
+				return nil, ErrSQLHistoricalComponent
+			}
+		}
+		record, e := outcomeFromPO(po)
+		if e == nil {
+			f.outcomeRecords[rowID] = sqlHistoricalFactRecord(record)
+		}
+		f.snapshot.Outcomes = append(f.snapshot.Outcomes, SQLHistoricalOutcome{ID: rowID, AssessmentID: id, OrgID: org, TesteeID: testee, RunID: po.EvaluationRunID, EvaluatedAt: *at, Invalid: e != nil})
+	}
+	for id, f := range v.owners {
+		for _, row := range o.observations {
+			if row.AssessmentID == id || row.Store == "system_governance_action_runs" && row.OrgID == f.snapshot.Owner.OrgID {
+				f.snapshot.Responsibilities = append(f.snapshot.Responsibilities, SQLHistoricalResponsibility{Store: row.Store, ID: row.PrimaryKeySHA256, EventID: row.EventID, EventType: row.EventType, State: row.State, OrgID: row.OrgID, AssessmentID: row.AssessmentID, TesteeID: row.TesteeID, LeasePresent: row.LeasePresent, Unfinished: row.Unfinished, Invalid: row.Invalid || row.OwnerUnproven})
+			}
+		}
+	}
+	v.self, v.seal = v, o.seal
+	if v.ValidateBorrowedSnapshot(bounded) != nil {
+		return nil, ErrSQLHistoricalComponent
+	}
+	o.semantic = v
+	return v, nil
+}
+
+func (v *SQLHistoricalComponentSemanticView) OwnerByAssessment(ctx context.Context, id uint64) (SQLHistoricalFactsSnapshot, error) {
+	if id == 0 || v.ValidateBorrowedSnapshot(ctx) != nil {
+		return SQLHistoricalFactsSnapshot{}, ErrSQLHistoricalComponent
+	}
+	if f := v.owners[id]; f != nil {
+		return f.Snapshot(), nil
+	}
+	if slices.Contains(v.observation.recipe.plan.request.AssessmentIDs, id) {
+		return SQLHistoricalFactsSnapshot{}, ErrSQLHistoricalOwnerAbsent
+	}
+	return SQLHistoricalFactsSnapshot{}, ErrSQLHistoricalComponent
+}
+
+func (v *SQLHistoricalComponentSemanticView) OwnerByAnswerSheet(ctx context.Context, id uint64) (SQLHistoricalFactsSnapshot, error) {
+	if id == 0 || v.ValidateBorrowedSnapshot(ctx) != nil {
+		return SQLHistoricalFactsSnapshot{}, ErrSQLHistoricalComponent
+	}
+	if owner := v.sheets[id]; owner != 0 {
+		return v.owners[owner].Snapshot(), nil
+	}
+	if slices.Contains(v.observation.recipe.plan.request.AnswerSheetIDs, id) {
+		return SQLHistoricalFactsSnapshot{}, ErrSQLHistoricalOwnerAbsent
+	}
+	return SQLHistoricalFactsSnapshot{}, ErrSQLHistoricalComponent
+}
+
+// Return the whole actual scoped closure, including all replay members and
+// negative ranges. The aggregate must not replace it with an event-only slice.
+func (v *SQLHistoricalComponentSemanticView) Responsibilities(ctx context.Context) ([]SQLResponsibilityObservation, error) {
+	if v.ValidateBorrowedSnapshot(ctx) != nil {
+		return nil, ErrSQLHistoricalComponent
+	}
+	rows := slices.Clone(v.observation.observations)
+	for i := range rows {
+		rows[i].Reasons = slices.Clone(rows[i].Reasons)
+	}
+	return rows, nil
+}
+
+func (v *SQLHistoricalComponentSemanticView) OutcomeRecord(ctx context.Context, id uint64) (*evaluationfact.Record, error) {
+	if id == 0 || v.ValidateBorrowedSnapshot(ctx) != nil {
+		return nil, ErrSQLHistoricalComponent
+	}
+	for _, f := range v.owners {
+		if record := f.outcomeRecords[id]; record != nil {
+			return record, nil
+		}
+	}
+	return nil, ErrSQLHistoricalComponent
+}
+
+func (v *SQLHistoricalComponentSemanticView) OriginalOutcomeRunAbsent(ctx context.Context, outcomeID uint64, runID string) error {
+	record, err := v.OutcomeRecord(ctx, outcomeID)
+	if err != nil || runID == "" || record.RunID() != runID {
+		return ErrSQLHistoricalComponent
+	}
+	bounded, cancel := context.WithDeadline(ctx, v.observation.expires)
+	defer cancel()
+	tx, err := historicalTx(bounded)
+	if err != nil || casMissingOriginalRuns(tx, []string{runID}, false) != nil {
+		return ErrSQLHistoricalComponent
+	}
+	return v.ValidateBorrowedSnapshot(bounded)
+}
+
+func (v *SQLHistoricalComponentSemanticView) BusinessBinding(ctx context.Context, assessmentID, outcomeID uint64, eventType string, originalRun *evidence.HistoricalRunReferenceV1) (string, error) {
+	if v.ValidateBorrowedSnapshot(ctx) != nil {
+		return "", ErrSQLHistoricalComponent
+	}
+	a := SQLHistoricalBatchAttachment{AssessmentID: assessmentID, OutcomeID: outcomeID, Entry: evidence.HistoricalReferenceEntryV1{EventType: eventType, Run: originalRun}}
+	table, _, _, row, run, err := casTargetForBinding(v.observation.business, a, true)
+	if err != nil {
+		return "", err
+	}
+	if table == "evaluation_outcome" && originalRun == nil {
+		if err = v.OriginalOutcomeRunAbsent(ctx, outcomeID, valueOrEmpty(row["evaluation_run_id"])); err != nil {
+			return "", err
+		}
+	}
+	p := v.observation.recipe.plan
+	result, err := historicalStableBinding(p.server, p.database, table, eventType, row, run)
+	if err != nil || v.ValidateBorrowedSnapshot(ctx) != nil {
+		return "", ErrSQLHistoricalComponent
+	}
+	return result, nil
 }
 
 // The physical native CAS primitive is private. Frozen input and physical
@@ -1436,7 +1690,7 @@ func (s *SQLHistoricalComponentStatement) VerifyIndependentPersisted(ctx context
 	if err != nil || actual == s.statement.transaction || actual == p.oldTransaction {
 		return r, ErrSQLHistoricalComponent
 	}
-	scoped, anchors, err := s.observation.recipe.captureResponsibility(tx)
+	scoped, anchors, _, err := s.observation.recipe.captureResponsibility(tx)
 	if err != nil || !reflect.DeepEqual(scoped, s.observation.recipe.responsibility) || !reflect.DeepEqual(anchors, s.observation.recipe.anchors) {
 		return r, ErrSQLHistoricalComponent
 	}
