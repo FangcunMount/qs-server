@@ -17,6 +17,7 @@ import (
 
 	retirement "github.com/FangcunMount/qs-server/internal/apiserver/maintenance/compatibilityretirement"
 	backup "github.com/FangcunMount/qs-server/internal/apiserver/maintenance/compatibilityretirementbackup"
+	stop "github.com/FangcunMount/qs-server/internal/apiserver/maintenance/compatibilityretirementstop"
 )
 
 const lifecycleInvocationBase = "/opt/backups/qs-server/compatibility-retirement-invocations"
@@ -239,6 +240,23 @@ func stageLifecycleRootInputs(ctx context.Context, path, expected, operation, ac
 	// original owner/path is modified. The exact per-run source-copy intent is
 	// durable before even the first copied body, including partial failures.
 	intent := map[string]any{"format_version": 1, "kind": "root_once_exact_source_copy_intent", "original_source_sha": r.OriginalSourceSHA, "tool_source_sha": r.ToolSourceSHA, "operation_id": operation, "actual_run_id": actualRun, "original_run_id": r.Approval.RunID, "request_sha256": expected, "manifest_sha256": r.ManifestSHA256, "source_file_sha256": r.SourceFileSHA256, "targets": targets, "source_uid": uid64, "archive_directory": r.ArchiveDirectory, "source_staging_directory": filepath.Join(root, "inventory-"+r.Approval.RunID), "drop_authority": false, "purge_after_acceptance_required": true}
+	// The original approved root caller passes only its actual write-time hashes.
+	// These transient inputs bind files; they never import a native capability.
+	basisHash, resultHash := os.Getenv("QS_LIFECYCLE_BUDGET_KEY_DESCRIPTOR_SHA256"), os.Getenv("QS_LIFECYCLE_BUDGET_KEY_RESULT_SHA256")
+	if (basisHash == "") != (resultHash == "") || basisHash != "" && (!hashRE.MatchString(basisHash) || !hashRE.MatchString(resultHash)) {
+		return "", lifecycleError("lifecycle_preparation_budget_material_rejected")
+	}
+	if basisHash != "" {
+		basis, e := readLifecycleOwnedBytes(filepath.Join(root, "budget-key.basis.private.json"), basisHash, 0, 256<<10)
+		if e != nil {
+			return "", e
+		}
+		result, e := readLifecycleOwnedBytes(filepath.Join(root, "budget-key.result.private.json"), resultHash, 0, 256<<10)
+		if e != nil || validateLifecyclePreparationBudgetBytes(basis, result, lifecycleSourceCopyIntent{OriginalSourceSHA: r.OriginalSourceSHA, ToolSourceSHA: r.ToolSourceSHA, OperationID: operation, ActualRunID: actualRun, OriginalRunID: r.Approval.RunID, ManifestSHA256: r.ManifestSHA256}) != nil {
+			return "", lifecycleError("lifecycle_preparation_budget_material_rejected")
+		}
+		intent["budget_key_descriptor_sha256"], intent["budget_key_result_sha256"] = basisHash, resultHash
+	}
 	if writeJSON(filepath.Join(root, "source-copy.intent.private.json"), intent) != nil {
 		return "", lifecycleError("lifecycle_staging_once_exists_or_unknown")
 	}
@@ -472,6 +490,70 @@ type lifecycleSourceCopyIntent struct {
 	SourceStagingDirectory string            `json:"source_staging_directory"`
 	DropAuthority          bool              `json:"drop_authority"`
 	PurgeRequired          bool              `json:"purge_after_acceptance_required"`
+	BudgetDescriptorSHA256 string            `json:"budget_key_descriptor_sha256,omitempty"`
+	BudgetResultSHA256     string            `json:"budget_key_result_sha256,omitempty"`
+}
+
+func decodeLifecycleSourceCopyIntent(raw []byte, i *lifecycleSourceCopyIntent) error {
+	var fields map[string]json.RawMessage
+	if rejectDuplicateJSON(raw) != nil || json.Unmarshal(raw, &fields) != nil {
+		return lifecycleError("lifecycle_staging_original_intent_rejected")
+	}
+	_, basis := fields["budget_key_descriptor_sha256"]
+	_, result := fields["budget_key_result_sha256"]
+	if basis != result {
+		return lifecycleError("lifecycle_staging_original_intent_rejected")
+	}
+	if !basis {
+		fields["budget_key_descriptor_sha256"], fields["budget_key_result_sha256"] = json.RawMessage(`""`), json.RawMessage(`""`)
+	}
+	normalized, e := json.Marshal(fields)
+	if e != nil || decodeLifecycleClosedProducer(normalized, i) != nil || (i.BudgetDescriptorSHA256 == "") != (i.BudgetResultSHA256 == "") || basis && (!hashRE.MatchString(i.BudgetDescriptorSHA256) || !hashRE.MatchString(i.BudgetResultSHA256)) {
+		return lifecycleError("lifecycle_staging_original_intent_rejected")
+	}
+	return nil
+}
+
+type lifecyclePreparationBudgetResult struct {
+	Kind             string `json:"kind"`
+	ToolSourceSHA    string `json:"tool_source_sha"`
+	OperationID      string `json:"operation_id"`
+	ActualRunID      string `json:"actual_run_id"`
+	PublicKey        string `json:"public_key"`
+	KeyAvailable     bool   `json:"key_available"`
+	WholeWriterFence bool   `json:"whole_writer_fence_proven"`
+	DropReady        bool   `json:"drop_ready"`
+	ErrorCategory    string `json:"error_category"`
+}
+
+// This validates the original temporary bytes and their tuple, never creates
+// an Approval, key/lease or writer fence from either persisted JSON record.
+func validateLifecyclePreparationBudgetBytes(basis, result []byte, i lifecycleSourceCopyIntent) error {
+	var descriptor stop.Descriptor
+	var receipt lifecyclePreparationBudgetResult
+	if rejectDuplicateJSON(basis) != nil || lifecycleExactJSONNames(basis, reflect.TypeOf(descriptor)) != nil || json.Unmarshal(basis, &descriptor) != nil || descriptor.Version != 1 || descriptor.SourceSHA != i.OriginalSourceSHA || descriptor.ToolSourceSHA != i.ToolSourceSHA || descriptor.OriginalRunID != i.OriginalRunID || descriptor.OperationID != i.OperationID || descriptor.ManifestSHA256 != i.ManifestSHA256 || descriptor.HostRole != "server-a" || descriptor.RemoteDescriptorSHA256 != "" || descriptor.BudgetTrustSHA256 != "" || !hashRE.MatchString(descriptor.MachineIDSHA256) || !hashRE.MatchString(descriptor.DockerSHA256) || (descriptor.DockerPath != "/usr/bin/docker" && descriptor.DockerPath != "/usr/local/bin/docker") || len(descriptor.Containers) < 1 || len(descriptor.Containers) > 32 || decodeLifecycleClosedProducer(result, &receipt) != nil || receipt.Kind != "qs_native_temporary_budget_key_result" || receipt.ToolSourceSHA != i.ToolSourceSHA || receipt.OperationID != i.OperationID || receipt.ActualRunID != i.ActualRunID || !hashRE.MatchString(receipt.PublicKey) || !receipt.KeyAvailable || receipt.WholeWriterFence || receipt.DropReady || receipt.ErrorCategory != "none" {
+		return lifecycleError("lifecycle_preparation_budget_material_rejected")
+	}
+	return nil
+}
+
+func registerLifecyclePreparationBudgetMaterials(ctx context.Context, d *lifecycleMaterialDirectory, i lifecycleSourceCopyIntent, uid uint32) error {
+	if i.BudgetDescriptorSHA256 == "" && i.BudgetResultSHA256 == "" {
+		return nil
+	}
+	if ctx == nil || ctx.Err() != nil || !hashRE.MatchString(i.BudgetDescriptorSHA256) || !hashRE.MatchString(i.BudgetResultSHA256) {
+		return lifecycleError("lifecycle_preparation_budget_material_rejected")
+	}
+	var value json.RawMessage
+	basis, e := readLifecycleProducerJSON(d, "budget-key.basis.private.json", i.BudgetDescriptorSHA256, uid, 256<<10, &value)
+	if e != nil {
+		return e
+	}
+	result, e := readLifecycleProducerJSON(d, "budget-key.result.private.json", i.BudgetResultSHA256, uid, 256<<10, &value)
+	if e != nil {
+		return e
+	}
+	return validateLifecyclePreparationBudgetBytes(basis, result, i)
 }
 
 type lifecyclePreparationRestoreEngine struct {
@@ -743,8 +825,11 @@ func openLifecycleRootStagingMaterialFiles(ctx context.Context, root, invocation
 	if err != nil {
 		return nil, nil, err
 	}
-	if decodeLifecycleClosedProducer(raw, &i) != nil || i.FormatVersion != 1 || i.Kind != "root_once_exact_source_copy_intent" || i.OriginalSourceSHA != r.OriginalSourceSHA || !shaRE.MatchString(i.ToolSourceSHA) || i.OperationID != r.OperationID || !runRE.MatchString(i.ActualRunID) || i.ActualRunID == r.ActualRunID || filepath.Base(root) != i.OperationID+"-"+i.ActualRunID || i.OriginalRunID != r.Approval.RunID || i.SourceUID != sourceUID || i.ManifestSHA256 != r.ManifestSHA256 || !hashRE.MatchString(i.RequestSHA256) || !reflect.DeepEqual(i.SourceFileSHA256, hashes) || !reflect.DeepEqual(i.Targets, targets) || i.ArchiveDirectory != r.ArchiveDirectory || i.SourceStagingDirectory != filepath.Join(root, "inventory-"+i.OriginalRunID) || i.DropAuthority || !i.PurgeRequired {
+	if decodeLifecycleSourceCopyIntent(raw, &i) != nil || i.FormatVersion != 1 || i.Kind != "root_once_exact_source_copy_intent" || i.OriginalSourceSHA != r.OriginalSourceSHA || !shaRE.MatchString(i.ToolSourceSHA) || i.OperationID != r.OperationID || !runRE.MatchString(i.ActualRunID) || i.ActualRunID == r.ActualRunID || filepath.Base(root) != i.OperationID+"-"+i.ActualRunID || i.OriginalRunID != r.Approval.RunID || i.SourceUID != sourceUID || i.ManifestSHA256 != r.ManifestSHA256 || !hashRE.MatchString(i.RequestSHA256) || !reflect.DeepEqual(i.SourceFileSHA256, hashes) || !reflect.DeepEqual(i.Targets, targets) || i.ArchiveDirectory != r.ArchiveDirectory || i.SourceStagingDirectory != filepath.Join(root, "inventory-"+i.OriginalRunID) || i.DropAuthority || !i.PurgeRequired {
 		return nil, nil, lifecycleError("lifecycle_staging_original_intent_rejected")
+	}
+	if err = registerLifecyclePreparationBudgetMaterials(ctx, d, i, rootUID); err != nil {
+		return nil, nil, err
 	}
 	var toolRaw json.RawMessage
 	toolBytes, err := readLifecycleProducerJSON(d, "tool.intent.private.json", "", rootUID, 256<<10, &toolRaw)

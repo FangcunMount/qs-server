@@ -86,6 +86,19 @@ func newLifecycleFixedHost(ctx context.Context, r lifecycleRequest, a *backup.Ar
 		if err != nil {
 			return nil, errors.Join(err, h.Close())
 		}
+		// The original budget basis is separately named and never overwritten by
+		// final A descriptors. Its actual SHA comes from the approved root intent.
+		var sourceIntent lifecycleSourceCopyIntent
+		sourceRaw, err := readLifecycleHistoricalHeldJSON(h.rootStagingMaterials, "source-copy.intent.private.json", 256<<10, &sourceIntent)
+		if err != nil || decodeLifecycleSourceCopyIntent(sourceRaw, &sourceIntent) != nil {
+			return nil, errors.Join(lifecycleError("lifecycle_preparation_budget_material_rejected"), h.Close())
+		}
+		if sourceIntent.BudgetDescriptorSHA256 != "" {
+			parent := h.historicalWritePreviousMaterials[len(h.historicalWritePreviousMaterials)-1]
+			if err := parent.register("budget-key.descriptor.private.json", sourceIntent.BudgetDescriptorSHA256, i.SourceUID, 0600); err != nil {
+				return nil, errors.Join(err, h.Close())
+			}
+		}
 	}
 	var archiveErr error
 	h.archiveMaterials, archiveErr = openLifecycleOriginalArchiveMaterials(ctx, r, a)

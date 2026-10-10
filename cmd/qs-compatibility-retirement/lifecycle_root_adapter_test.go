@@ -17,6 +17,7 @@ import (
 
 	retirement "github.com/FangcunMount/qs-server/internal/apiserver/maintenance/compatibilityretirement"
 	backup "github.com/FangcunMount/qs-server/internal/apiserver/maintenance/compatibilityretirementbackup"
+	stop "github.com/FangcunMount/qs-server/internal/apiserver/maintenance/compatibilityretirementstop"
 )
 
 func TestLifecycleRootCopyPreservesBytesOwnerAndRejectsRebinding(t *testing.T) {
@@ -462,7 +463,7 @@ func originalRootStagingMaterialFixture(t *testing.T, windowTool bool) (string, 
 			t.Fatal("copy")
 		}
 	}
-	i := lifecycleSourceCopyIntent{1, "root_once_exact_source_copy_intent", r.OriginalSourceSHA, r.ToolSourceSHA, r.OperationID, r.ActualRunID, approval.RunID, digestRaw(request), r.ManifestSHA256, hashes, targets, uint32(os.Getuid()), r.ArchiveDirectory, child, false, true}
+	i := lifecycleSourceCopyIntent{1, "root_once_exact_source_copy_intent", r.OriginalSourceSHA, r.ToolSourceSHA, r.OperationID, r.ActualRunID, approval.RunID, digestRaw(request), r.ManifestSHA256, hashes, targets, uint32(os.Getuid()), r.ArchiveDirectory, child, false, true, "", ""}
 	if writeJSON(filepath.Join(root, "source-copy.intent.private.json"), i) != nil {
 		t.Fatal("intent")
 	}
@@ -1151,5 +1152,110 @@ func TestHistoricalProducerClosedNestedSchemasRejectNullEmptyBytesAndMissingInpu
 	raw, _ = json.Marshal(fields)
 	if decodeLifecycleHistoricalBoundsInput(raw, &v) == nil {
 		t.Fatal("missing required input field replaced by optional tool field")
+	}
+}
+
+func originalPreparationBudgetFixture(t *testing.T) (string, string, lifecycleRequest, map[string]string) {
+	t.Helper()
+	root, invocation, r, hashes := originalRootStagingMaterialFixture(t, true)
+	var intent lifecycleSourceCopyIntent
+	raw, _ := os.ReadFile(r.SourceCopyIntent.Path)
+	if decodeLifecycleSourceCopyIntent(raw, &intent) != nil {
+		t.Fatal("original intent")
+	}
+	basis := stop.Descriptor{Version: 1, SourceSHA: intent.OriginalSourceSHA, ToolSourceSHA: intent.ToolSourceSHA, OriginalRunID: intent.OriginalRunID, OperationID: intent.OperationID, ManifestSHA256: intent.ManifestSHA256, HostRole: "server-a", MachineIDSHA256: strings.Repeat("c", 64), DockerPath: "/usr/bin/docker", DockerSHA256: strings.Repeat("d", 64), Containers: []stop.Container{{Component: "qs-apiserver"}, {Component: "qs-collection-server"}}}
+	result := lifecyclePreparationBudgetResult{"qs_native_temporary_budget_key_result", intent.ToolSourceSHA, intent.OperationID, intent.ActualRunID, strings.Repeat("e", 64), true, false, false, "none"}
+	for name, value := range map[string]any{"budget-key.basis.private.json": basis, "budget-key.result.private.json": result} {
+		raw, _ := json.Marshal(value)
+		if os.WriteFile(filepath.Join(root, name), raw, 0600) != nil {
+			t.Fatal("original budget producer")
+		}
+		if strings.Contains(name, "basis") {
+			intent.BudgetDescriptorSHA256 = digestRaw(raw)
+		} else {
+			intent.BudgetResultSHA256 = digestRaw(raw)
+		}
+	}
+	raw, _ = json.Marshal(intent)
+	if os.WriteFile(r.SourceCopyIntent.Path, raw, 0600) != nil {
+		t.Fatal("actual producer intent")
+	}
+	r.SourceCopyIntent.SHA256 = digestRaw(raw)
+	return root, invocation, r, hashes
+}
+func TestOriginalPreparationBudgetMaterialIsBoundByWriteTimeIntentAndKeptInRootScope(t *testing.T) {
+	root, invocation, r, hashes := originalPreparationBudgetFixture(t)
+	d, peer, e := openLifecycleRootStagingMaterialFiles(context.Background(), root, invocation, r, hashes, uint32(os.Getuid()), uint32(os.Getuid()))
+	if e != nil {
+		t.Fatal(e)
+	}
+	defer d.close()
+	defer peer.close()
+	if len(d.files) != 13 || d.files["budget-key.basis.private.json"] == nil || d.files["budget-key.result.private.json"] == nil {
+		t.Fatal("actual original budget material omitted")
+	}
+	if d.checkComplete(false) != nil {
+		t.Fatal("full root members unknown")
+	}
+	if lifecycleEffectsPreflight(context.Background()) == nil {
+		t.Fatal("receipt enabled effects")
+	}
+}
+func TestOriginalPreparationBudgetMaterialRejectsUnknownOrUnboundNativeConclusion(t *testing.T) {
+	for _, mutation := range []string{"wrong_hash", "wrong_tuple", "borrow_final_descriptor", "receipt_authority", "missing_basis", "extra_key", "null_public_key", "one_intent_field"} {
+		t.Run(mutation, func(t *testing.T) {
+			root, invocation, r, hashes := originalPreparationBudgetFixture(t)
+			var intent lifecycleSourceCopyIntent
+			raw, _ := os.ReadFile(r.SourceCopyIntent.Path)
+			if decodeLifecycleSourceCopyIntent(raw, &intent) != nil {
+				t.Fatal("intent")
+			}
+			switch mutation {
+			case "wrong_hash":
+				intent.BudgetResultSHA256 = strings.Repeat("0", 64)
+			case "missing_basis":
+				_ = os.Remove(filepath.Join(root, "budget-key.basis.private.json"))
+			default:
+				name := "budget-key.result.private.json"
+				if mutation == "borrow_final_descriptor" {
+					name = "budget-key.basis.private.json"
+				}
+				raw, _ = os.ReadFile(filepath.Join(root, name))
+				var v map[string]any
+				_ = json.Unmarshal(raw, &v)
+				switch mutation {
+				case "wrong_tuple":
+					v["actual_run_id"] = "888-1"
+				case "borrow_final_descriptor":
+					v["remote_descriptor_sha256"] = strings.Repeat("a", 64)
+				case "receipt_authority":
+					v["whole_writer_fence_proven"] = true
+				case "extra_key":
+					v["mutation_permit"] = true
+				case "null_public_key":
+					v["public_key"] = nil
+				}
+				raw, _ = json.Marshal(v)
+				_ = os.WriteFile(filepath.Join(root, name), raw, 0600)
+				if strings.Contains(name, "basis") {
+					intent.BudgetDescriptorSHA256 = digestRaw(raw)
+				} else {
+					intent.BudgetResultSHA256 = digestRaw(raw)
+				}
+			}
+			raw, _ = json.Marshal(intent)
+			if mutation == "one_intent_field" {
+				var v map[string]any
+				_ = json.Unmarshal(raw, &v)
+				delete(v, "budget_key_result_sha256")
+				raw, _ = json.Marshal(v)
+			}
+			_ = os.WriteFile(r.SourceCopyIntent.Path, raw, 0600)
+			r.SourceCopyIntent.SHA256 = digestRaw(raw)
+			d, peer, e := openLifecycleRootStagingMaterialFiles(context.Background(), root, invocation, r, hashes, uint32(os.Getuid()), uint32(os.Getuid()))
+			if e == nil || d != nil || peer != nil {
+				t.Fatal("unbound budget producer material admitted")
+			}
+		})
 	}
 }
