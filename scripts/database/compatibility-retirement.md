@@ -1750,3 +1750,12 @@ the dedicated Variable, and preserve unrelated deployment rules/files. This
 limited entry currently covers host observation only; database census, image
 preparation and lifecycle execution require their separately reviewed existing
 permissions and are not granted by this rule.
+
+For `host-writer-scope`, the existing Action publishes an administrator-only
+installation bundle before the SSH upload. It contains the generated digest
+file, exact `qs-retirement-host-scope` sudoers fragment, source/operation/native
+digests in `policy.json`, and `SHA256SUMS`. The native digests are measured from
+the same actual packaged binaries; no separately rebuilt binary is trusted.
+The artifact contains no credentials or production database contents and expires
+after three days. Download it only from the approved main/source-bound run.
+It grants host observation only and must be removed with the batch at R4.
