@@ -18,6 +18,7 @@ import (
 	sqlevaluation "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/evaluation"
 	retirement "github.com/FangcunMount/qs-server/internal/apiserver/maintenance/compatibilityretirement"
 	hostmysql "github.com/FangcunMount/qs-server/internal/pkg/database/mysql"
+	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"go.mongodb.org/mongo-driver/mongo/readconcern"
@@ -887,7 +888,7 @@ func (d *historyDatabase) writePreparedEpoch(ctx context.Context, spool *retirem
 	// Event counts do not prove a Mongo command ran: a SQL-only owner page
 	// may have an empty Mongo selection. Starting is only a local driver state.
 	// Reject it before either commit so the host's original cleanup rolls back.
-	if err := requireMongoCommitTransaction(session, report.MongoCommitRequirement); err != nil {
+	if err := probePreparedMongo(paired, d.mongo, session, report.MongoCommitRequirement); err != nil {
 		return nil, err
 	}
 	if journal.record(paired, "sql_commit_intent", -1, 0, nil) != nil {
@@ -983,4 +984,33 @@ func requireMongoCommitTransaction(session mongo.Session, requirement string) er
 		return fixedError("history_write_mongo_transaction_not_started")
 	}
 	return nil
+}
+
+// A local InProgress state can outlive the server transaction. The host probes
+// its existing transaction before the first commit; this never opens a session,
+// starts a replacement transaction, or repeats a failed commit.
+func probePreparedMongo(ctx context.Context, db *mongo.Database, session mongo.Session, requirement string) error {
+	if requirement == "not_required" {
+		return nil
+	}
+	if requirement != "required" || ctx == nil || ctx.Err() != nil || db == nil || session == nil || session.Client() != db.Client() {
+		return fixedError("history_write_mongo_server_probe_rejected")
+	}
+	x, ok := session.(mongo.XSession) //nolint:staticcheck // inspect the pinned driver's actual transaction identity
+	if !ok || x.ClientSession() == nil {
+		return fixedError("history_write_mongo_server_probe_rejected")
+	}
+	actual := x.ClientSession()
+	if actual.Terminated || (!actual.TransactionStarting() && !actual.TransactionInProgress()) || actual.CurrentRc == nil || actual.CurrentRc.Level != "snapshot" {
+		return fixedError("history_write_mongo_server_probe_rejected")
+	}
+	q, cancel := context.WithTimeout(mongo.NewSessionContext(ctx, session), 2*time.Second)
+	defer cancel()
+	// The standard ledger can be empty. ErrNoDocuments still means this exact
+	// transaction received a server response; a transport/server failure does not.
+	err := db.Collection("rm_outbox").FindOne(q, bson.D{}, options.FindOne().SetProjection(bson.D{{Key: "_id", Value: 1}}).SetMaxTime(2*time.Second)).Err()
+	if err != nil && !errors.Is(err, mongo.ErrNoDocuments) {
+		return fixedError("history_write_mongo_server_probe_failed")
+	}
+	return requireMongoCommitTransaction(session, requirement)
 }
