@@ -114,8 +114,14 @@ class ActualHostContract(unittest.TestCase):
             capture_output=True, timeout=3, check=False)
         self.assertEqual(result.returncode, 1)
         self.assertEqual(result.stderr, b"")
-        self.assertEqual(json.loads(result.stdout),
+        failure = json.loads(result.stdout)
+        diagnostic = failure.pop("diagnostic")
+        self.assertEqual(failure,
             {"protocol": "qs-ai-actual-execution-failed/v1", "category": "execution_rejected"})
+        self.assertEqual(set(diagnostic), {"unit", "line"})
+        self.assertEqual(diagnostic["unit"], "host")
+        self.assertIs(type(diagnostic["line"]), int)
+        self.assertTrue(1 <= diagnostic["line"] <= 10000)
         self.assertNotIn(b"do-not-publish", result.stdout)
 
 
@@ -166,8 +172,14 @@ class DiscoveryHostContract(unittest.TestCase):
         self.assertEqual(result.returncode, 1)
         self.assertEqual(result.stderr, b"")
         self.assertNotIn(b"do-not-publish", result.stdout)
-        self.assertEqual(json.loads(result.stdout),
+        failure = json.loads(result.stdout)
+        diagnostic = failure.pop("diagnostic")
+        self.assertEqual(failure,
             {"protocol": "qs-ai-actual-execution-failed/v1", "category": "execution_rejected"})
+        self.assertEqual(set(diagnostic), {"unit", "line"})
+        self.assertEqual(diagnostic["unit"], "host")
+        self.assertIs(type(diagnostic["line"]), int)
+        self.assertTrue(1 <= diagnostic["line"] <= 10000)
 
 
 class DiscoveryFreshProtocol(unittest.IsolatedAsyncioTestCase):

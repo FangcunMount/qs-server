@@ -545,6 +545,49 @@ func aiExecProduce(ctx context.Context, p aiExecProtocol, j *aiExecJournal, host
 	v := &aiExternalExecObservation{journal: j, binding: j.binding, execID: id, running: observed.Running, exitCode: observed.ExitCode, output: output, complete: r.AttachComplete}
 	v.self = v
 	if attachErr != nil || work.Err() != nil || !v.complete || v.running || v.exitCode == nil || *v.exitCode != 0 {
+		exit, terminalContext := "null", "unknown"
+		if v.exitCode != nil {
+			exit = "unknown"
+			if *v.exitCode >= 0 && *v.exitCode <= 255 {
+				exit = strconv.Itoa(*v.exitCode)
+			}
+		}
+		switch work.Err() {
+		case nil:
+			terminalContext = "active"
+		case context.Canceled:
+			terminalContext = "cancelled"
+		case context.DeadlineExceeded:
+			terminalContext = "deadline"
+		}
+		unit, line := "unknown", 0
+		if v.complete && !v.running && v.exitCode != nil && *v.exitCode == 1 && v.binding.PythonSHA256 == aiExternalHostSHA && len(v.output) > 0 && len(v.output) <= 1024 && strictJSON(v.output) == nil {
+			var fields, diagnosticFields map[string]json.RawMessage
+			exactFields := json.Unmarshal(v.output, &fields) == nil && len(fields) == 3 && fields["protocol"] != nil && fields["category"] != nil && fields["diagnostic"] != nil && json.Unmarshal(fields["diagnostic"], &diagnosticFields) == nil && len(diagnosticFields) == 2 && diagnosticFields["unit"] != nil && diagnosticFields["line"] != nil
+			var footer struct {
+				Protocol   *string `json:"protocol"`
+				Category   *string `json:"category"`
+				Diagnostic *struct {
+					Unit *string `json:"unit"`
+					Line *int    `json:"line"`
+				} `json:"diagnostic"`
+			}
+			decoder := json.NewDecoder(bytes.NewReader(v.output))
+			decoder.DisallowUnknownFields()
+			if exactFields && decoder.Decode(&footer) == nil && decoder.Decode(new(any)) == io.EOF && footer.Protocol != nil && *footer.Protocol == "qs-ai-actual-execution-failed/v1" && footer.Category != nil && *footer.Category == "execution_rejected" && footer.Diagnostic != nil && footer.Diagnostic.Unit != nil && footer.Diagnostic.Line != nil {
+				switch *footer.Diagnostic.Unit {
+				case "host", "verifier", "observer", "layout":
+					if *footer.Diagnostic.Line >= 1 && *footer.Diagnostic.Line <= 10000 {
+						unit, line = *footer.Diagnostic.Unit, *footer.Diagnostic.Line
+					}
+				case "unknown":
+					if *footer.Diagnostic.Line == 0 {
+						unit, line = "unknown", 0
+					}
+				}
+			}
+		}
+		_, _ = fmt.Fprintln(os.Stderr, "QS_AI_EXEC_TERMINAL_DIAGNOSTIC complete="+strconv.FormatBool(v.complete)+" running="+strconv.FormatBool(v.running)+" exit="+exit+" context="+terminalContext+" unit="+unit+" line="+strconv.Itoa(line))
 		aiExternalExecutionFailure("exec_terminal", ErrAIExternalExecUnknown)
 		return v, ErrAIExternalExecUnknown
 	}

@@ -676,8 +676,25 @@ def main():
         encoded = canonical(output)
         if len(encoded) > OUTPUT_LIMIT:
             reject()
-    except Exception:
-        encoded = canonical({"protocol": "qs-ai-actual-execution-failed/v1", "category": "execution_rejected"})
+    except Exception as exception:
+        unit, line = "unknown", 0
+        trace = exception.__traceback__
+        for _ in range(64):
+            if trace is None:
+                break
+            code = trace.tb_frame.f_code
+            name = os.path.basename(code.co_filename)
+            fixed_unit = {"<string>": "host", "qs-ai-retirement-readonly-host.py": "host",
+                          "qs-ai-retirement-readonly-verifier.py": "verifier",
+                          "qs-ai-retirement-readonly-observer.py": "observer",
+                          "qs-ai-retirement-0040-layout.py": "layout"}.get(name)
+            if fixed_unit is not None and code.co_name not in ("reject", "fail", "_fail") and 1 <= trace.tb_lineno <= 10000:
+                unit, line = fixed_unit, trace.tb_lineno
+            trace = trace.tb_next
+        if trace is not None:
+            unit, line = "unknown", 0
+        encoded = canonical({"protocol": "qs-ai-actual-execution-failed/v1", "category": "execution_rejected",
+                             "diagnostic": {"unit": unit, "line": line}})
         output = None
     finally:
         sys.stdout, sys.stderr = original_stdout, original_stderr
