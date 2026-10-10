@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Fail-closed preparation contract for the four compatibility namespaces.
 
-This A-stage tool validates private, hash-bound evidence and provides a durable
-DDL journal. It does not implement a production database backend. In particular,
+This A-stage tool validates private, hash-bound evidence. It does not implement
+a production database backend. In particular,
 operator-supplied booleans cannot turn an unimplemented fence/history/restore
 verifier into an execution permit. No raw payload, credentials, or rejected
 input is printed. See compatibility-retirement.md for the remaining adapters.
@@ -52,7 +52,7 @@ FORWARD_STOP_SECONDS = 1200
 CAPABILITIES = {
     "manifest_validation": True,
     "immutable_evidence_validation": True,
-    "durable_ddl_journal": True,
+    "durable_ddl_journal": False,
     "live_inventory_verifier": False,
     "history_verifier": False,
     "historical_rerun_fence_verifier": False,
@@ -63,7 +63,6 @@ CAPABILITIES = {
     "private_asset_purge_backend": False,
 }
 PROOF_KINDS = frozenset({"inventory", "history", "fence", "backup_restore", "release", "acceptance"})
-JOURNAL_STATES = frozenset({"pending", "intent", "unknown", "dropped", "restored"})
 HISTOGRAM_TYPES = frozenset({"unknown_type", "request", "change", "cancel", "prepare", "start", "answer",
     "answersheet.submitted", "evaluation.requested", "evaluation.retry.requested", "evaluation.outcome.committed", "evaluation.failed", "interpretation.report.generated", "interpretation.report.failed", "interpretation.retry.requested", "task.opened.reminder.requested",
     "footprint.entry_opened", "footprint.intake_confirmed", "footprint.testee_profile_created", "footprint.care_relationship_established", "footprint.care_relationship_transferred", "footprint.answersheet_submitted", "footprint.assessment_created", "footprint.report_generated",
@@ -1370,105 +1369,6 @@ def validate_identity_receipt(summary, code, args, output, request_hash, entrypo
             "identity_diagnostic_histograms": public_histograms,
             "identity_histogram_bucket_pages": bucket_pages,
             "identity_database_states": clean_states, "error_category": "identity_discovery_requires_independent_approval"}
-
-
-def durable_json(directory, filename, value):
-    if filename not in ("ddl-journal.json",):
-        fail("journal_filename_invalid")
-    private_directory(directory)
-    raw = (json.dumps(value, sort_keys=True, separators=(",", ":"), allow_nan=False) + "\n").encode()
-    temporary = directory / (filename + ".partial")
-    fd = None
-    try:
-        fd = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
-        with os.fdopen(fd, "wb", closefd=False) as stream:
-            stream.write(raw)
-            stream.flush()
-            os.fsync(fd)
-        os.close(fd)
-        fd = None
-        destination = directory / filename
-        if destination.exists() or destination.is_symlink():
-            read_private(directory, filename)
-        os.replace(temporary, destination)
-        parent = os.open(directory, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
-        try:
-            os.fsync(parent)
-        finally:
-            os.close(parent)
-    except Blocked:
-        raise
-    except OSError:
-        fail("journal_persistence_failed")
-    finally:
-        if fd is not None:
-            os.close(fd)
-        # Never remove an existing .partial belonging to another attempt.
-        # A failed persist leaves its intent evidence for an operator.
-
-
-class DDLJournal:
-    """Exact-target, fsync-before-DDL state machine; requires an external lock.
-
-    There is intentionally no automatic resume/retry for intent or unknown.
-    Reconciliation must perform a new read-only observation. This journal is
-    available to the future backend but is never invoked by the A-stage CLI.
-    """
-
-    def __init__(self, directory, manifest_hash, operation_id, source_sha):
-        self.directory = private_directory(directory)
-        token(manifest_hash, HASH)
-        token(operation_id, RUN)
-        token(source_sha, SHA)
-        self.value = {"format_version": 1, "operation_id": operation_id, "source_sha": source_sha,
-                      "manifest_hash": manifest_hash, "target_hash": TARGET_HASH,
-                      "states": ["pending"] * 4}
-        path = directory / "ddl-journal.json"
-        if path.exists() or path.is_symlink():
-            value, _ = read_private(directory, "ddl-journal.json")
-            fields(value, self.value.keys())
-            if any(value[key] != self.value[key] for key in self.value if key != "states"):
-                fail("journal_binding_mismatch")
-            if type(value["states"]) is not list or len(value["states"]) != 4 or any(type(state) is not str or state not in JOURNAL_STATES for state in value["states"]):
-                fail("journal_state_invalid")
-            self.value = value
-
-    def transition(self, index, allowed, result):
-        if type(index) is not int or not 0 <= index < 4 or result not in JOURNAL_STATES:
-            fail("journal_state_invalid")
-        if self.value["states"][index] not in allowed:
-            fail("journal_transition_rejected")
-        proposed = dict(self.value, states=list(self.value["states"]))
-        proposed["states"][index] = result
-        durable_json(self.directory, "ddl-journal.json", proposed)
-        self.value = proposed
-
-    def begin_drop(self, index):
-        self.transition(index, {"pending"}, "intent")
-
-    def mark_unknown(self, index):
-        self.transition(index, {"intent"}, "unknown")
-
-    def observe_absent(self, index):
-        # Called only after a live read confirms absence. This does not permit
-        # another DDL attempt, and a mixed journal does not permit purge.
-        self.transition(index, {"intent", "unknown"}, "dropped")
-
-    def observe_restored(self, index):
-        self.transition(index, {"dropped"}, "restored")
-
-    def require_all_dropped(self):
-        if self.value["states"] != ["dropped"] * 4:
-            fail("ddl_ledger_incomplete")
-
-
-def deadline(started_monotonic, *, clock=time.monotonic, recovering=False):
-    elapsed = clock() - started_monotonic
-    if elapsed < 0:
-        fail("maintenance_clock_invalid")
-    ceiling = MAX_WINDOW_SECONDS if recovering else FORWARD_STOP_SECONDS
-    if elapsed >= ceiling:
-        fail("maintenance_deadline_exceeded")
 
 
 @contextlib.contextmanager
