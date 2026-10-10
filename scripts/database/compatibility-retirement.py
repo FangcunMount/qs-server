@@ -152,6 +152,13 @@ class Blocked(ValueError):
     """Fixed error categories; never include private input in the message."""
 
 
+class NativeReceiptBlocked(Blocked):
+    """Actual child diagnostics contain only fixed scalars and a bounded digest."""
+    def __init__(self, category, diagnostic):
+        super().__init__(category)
+        self.native_diagnostic = diagnostic
+
+
 def fail(category):
     raise Blocked(category)
 
@@ -1728,6 +1735,18 @@ except (OSError,ValueError,KeyError,tarfile.TarError,subprocess.SubprocessError)
 """
 
 
+def root_native_diagnostic(private_stderr, completed, stdout=b'', returncode=0):
+    size = os.fstat(private_stderr.fileno()).st_size
+    private_stderr.seek(0)
+    sample = private_stderr.read(8192)
+    return {'process_completed': completed,
+            'exit_code': max(returncode, 0), 'termination_signal': max(-returncode, 0),
+            'stdout_bytes': len(stdout), 'stderr_bytes': size,
+            'stderr_sample_bytes': len(sample),
+            'stderr_sample_sha256': hashlib.sha256(sample).hexdigest(),
+            'stderr_sample_truncated': size > len(sample)}
+
+
 def root_once_lifecycle_prepare(args):
     if args.operation != 'prepare' or args.prepare_mode not in ('lifecycle','prepare-facts','host-writer-scope','db-writer-census'):
         fail('lifecycle_root_host_channel_required')
@@ -1746,13 +1765,25 @@ def root_once_lifecycle_prepare(args):
     bindings=[args.operation_id,args.run_id,args.actual_source_sha,request_hash,package_hash,args.manifest_hash]
     suffix = [args.prepare_mode] if facts else []
     # Credentials remain on this bounded private pipe, not argv/stdout/logs.
-    if uid == 0:
-        result=subprocess.run(['/usr/bin/python3','-I','-c',ROOT_PREPARE_ONCE,*bindings,'root-direct',*suffix],env={'PATH':'/usr/bin:/bin'},input=packet,stdout=subprocess.PIPE,stderr=subprocess.DEVNULL,timeout=91*60,check=False)
-    elif args.prepare_mode in ('host-writer-scope','db-writer-census'):
-        result=subprocess.run(['/usr/bin/sudo','-n','--','/usr/bin/python3','-I','-c',ROOT_PREPARE_ONCE,*bindings,'sudo-user',*suffix],env={'PATH':'/usr/bin:/bin'},input=packet,stdout=subprocess.PIPE,stderr=subprocess.DEVNULL,timeout=3*60,check=False)
-    else:
-        result=subprocess.run(['sudo','-n','python3','-I','-c',ROOT_PREPARE_ONCE,*bindings,'sudo-user',*suffix],input=packet,stdout=subprocess.PIPE,stderr=subprocess.DEVNULL,timeout=91*60,check=False)
-    if len(result.stdout)>32768: fail('lifecycle_native_receipt_invalid')
+    # Keep stderr on a private temporary FD. Only length and a bounded sample
+    # digest may leave this scope; child text can contain credentials/URIs.
+    with tempfile.TemporaryFile() as private_stderr:
+        try:
+            if uid == 0:
+                result=subprocess.run(['/usr/bin/python3','-I','-c',ROOT_PREPARE_ONCE,*bindings,'root-direct',*suffix],env={'PATH':'/usr/bin:/bin'},input=packet,stdout=subprocess.PIPE,stderr=private_stderr,timeout=91*60,check=False)
+            elif args.prepare_mode in ('host-writer-scope','db-writer-census'):
+                result=subprocess.run(['/usr/bin/sudo','-n','--','/usr/bin/python3','-I','-c',ROOT_PREPARE_ONCE,*bindings,'sudo-user',*suffix],env={'PATH':'/usr/bin:/bin'},input=packet,stdout=subprocess.PIPE,stderr=private_stderr,timeout=3*60,check=False)
+            else:
+                result=subprocess.run(['sudo','-n','python3','-I','-c',ROOT_PREPARE_ONCE,*bindings,'sudo-user',*suffix],input=packet,stdout=subprocess.PIPE,stderr=private_stderr,timeout=91*60,check=False)
+        except OSError:
+            raise NativeReceiptBlocked('lifecycle_native_start_failed', root_native_diagnostic(private_stderr, False)) from None
+        except subprocess.TimeoutExpired as error:
+            output = error.output if isinstance(error.output, bytes) else b''
+            raise NativeReceiptBlocked('lifecycle_native_receipt_timed_out', root_native_diagnostic(private_stderr, False, output)) from None
+        if len(result.stdout)>32768:
+            raise NativeReceiptBlocked('lifecycle_native_receipt_invalid', root_native_diagnostic(private_stderr, True, result.stdout, result.returncode))
+        if not result.stdout:
+            raise NativeReceiptBlocked('lifecycle_native_receipt_missing', root_native_diagnostic(private_stderr, True, result.stdout, result.returncode))
     return result.returncode,result.stdout
 
 
@@ -2188,6 +2219,8 @@ def main(argv=None):
         receipt = execute(args)
     except Blocked as error:
         receipt["error_category"] = str(error)
+        if isinstance(error, NativeReceiptBlocked):
+            receipt["native_diagnostic"] = error.native_diagnostic
     except Exception:
         receipt["error_category"] = "unexpected_preparation_failure"
     schema = {"format_version": "uint", "complete": "bool", "execution_allowed": "bool",
@@ -2270,6 +2303,9 @@ def main(argv=None):
                                                        "migration_head_observed": "bool", "migration_dirty": "nullable_bool",
                                                        "metadata_complete": "bool", "identity_match": "bool"}
                                             for database in ("mysql", "mongodb")},
+              "native_diagnostic": {"process_completed":"bool", "exit_code":"uint", "termination_signal":"uint",
+                  "stdout_bytes":"uint", "stderr_bytes":"uint", "stderr_sample_bytes":"uint",
+                  "stderr_sample_sha256":"hash64", "stderr_sample_truncated":"bool"},
               "error_category": frozenset({receipt["error_category"]}),
               "blockers": [frozenset(receipt.get("blockers", ()))],
               "capabilities": {key: "bool" for key in CAPABILITIES}}
