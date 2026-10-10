@@ -20,15 +20,19 @@ var ErrSQLHistoricalComponent = errors.New("sql_historical_component_rejected")
 // A recipe is a copy of actual original reads, never a renewed qualification.
 // It can only be produced while the original native owner/page is still alive.
 type SQLHistoricalComponentRecipe struct {
-	self           *SQLHistoricalComponentRecipe
-	plan           *SQLHistoricalBatchCASPlan
-	selectors      SQLCrossStoreSelectors
-	responsibility sqlHistoricalCASImage
-	anchors        map[string]string
-	limits         SQLCrossStoreLimits
-	oldPool        gorm.ConnPool
-	seal           string
-	input          *SQLHistoricalCASFrozenInput
+	self             *SQLHistoricalComponentRecipe
+	plan             *SQLHistoricalBatchCASPlan
+	selectors        SQLCrossStoreSelectors
+	responsibility   sqlHistoricalCASImage
+	anchors          map[string]string
+	limits           SQLCrossStoreLimits
+	oldPool          gorm.ConnPool
+	seal             string
+	input            *SQLHistoricalCASFrozenInput
+	spool            *SQLHistoricalCASSpool
+	frame            sqlSpoolRef
+	inlineSeal       string
+	ownerPartitioned bool
 }
 
 // The host owns every transaction and its commit. This observer grants only a
@@ -87,10 +91,16 @@ func componentCopySelectors(v SQLCrossStoreSelectors) SQLCrossStoreSelectors {
 }
 
 func (r *SQLHistoricalComponentRecipe) digest() string {
+	if r != nil && r.spool != nil {
+		if r.plan != nil || r.input != nil || r.inlineSeal == "" || r.frame.SHA256 == "" || r.spool.valid(context.Background()) != nil {
+			return ""
+		}
+		return cycleKeyDigest([]string{"sql-component-spooled-input/v1", r.inlineSeal, r.frame.SHA256, strconv.FormatInt(r.frame.Offset, 10), strconv.FormatInt(r.frame.Length, 10), sqlHistoricalProvenancePoolToken(r.oldPool)})
+	}
 	if r == nil || r.plan == nil || r.input == nil || r.input.self != r.input || r.input.seal == "" || r.input.seal != r.input.digest() {
 		return ""
 	}
-	parts := []string{"sql-historical-component-input/v1", r.input.seal, r.plan.identity, casImageHash(r.plan.before), casImageHash(r.responsibility), sqlHistoricalProvenancePoolToken(r.oldPool)}
+	parts := []string{strconv.FormatBool(r.ownerPartitioned), "sql-historical-component-input/v1", r.input.seal, r.plan.identity, casImageHash(r.plan.before), casImageHash(r.responsibility), sqlHistoricalProvenancePoolToken(r.oldPool)}
 	parts = append(parts, r.selectors.EventIDs...)
 	for _, id := range r.selectors.AssessmentIDs {
 		parts = append(parts, "assessment:"+strconv.FormatUint(id, 10))
@@ -128,13 +138,20 @@ func (r *SQLHistoricalComponentRecipe) InputSHA256() (string, error) {
 	if !r.intact() {
 		return "", ErrSQLHistoricalComponent
 	}
+	if _, err := r.load(context.Background()); err != nil {
+		return "", err
+	}
 	return r.seal, nil
 }
 func (r *SQLHistoricalComponentRecipe) RowDependencies(visit func(string, uint64, string, uint64, bool) error) error {
 	if !r.intact() {
 		return ErrSQLHistoricalComponent
 	}
-	return r.input.RowDependencies(visit)
+	loaded, err := r.load(context.Background())
+	if err != nil {
+		return err
+	}
+	return loaded.input.RowDependencies(visit)
 }
 
 func componentPlanRecord(p *SQLHistoricalBatchCASPlan) sqlSpoolPlan {
@@ -186,24 +203,13 @@ func FreezeSQLHistoricalComponentRecipe(ctx context.Context, original *SQLHistor
 		return nil, err
 	}
 	r := &SQLHistoricalComponentRecipe{plan: plan, selectors: componentCopySelectors(cross.selectors), limits: cross.catalog.limits, oldPool: tx.Statement.ConnPool, input: input}
-	r.responsibility, r.anchors, err = r.captureResponsibility(tx)
+	r.responsibility, r.anchors, err = r.captureOriginalResponsibility(ctx, cross.catalog)
 	if err != nil {
 		return nil, err
 	}
-	// Every expanded row must also have been observed in the same genuine full
-	// original cycle. The factory cannot smuggle in guessed/expected raw rows.
-	known := map[string]string{}
-	for _, v := range cross.catalog.cycle.observations {
-		known[v.Store+":"+v.PrimaryKeySHA256] = v.RowSHA256
-	}
-	for _, spec := range sqlResponsibilityTables {
-		for _, row := range r.responsibility.rows[spec.name] {
-			key, e := cycleKey(spec, row)
-			if e != nil || known[spec.name+":"+cycleKeyDigest(key)] != cycleRowDigest(r.responsibility.columns[spec.name], row) {
-				return nil, ErrSQLHistoricalComponent
-			}
-		}
-	}
+	// captureOriginalResponsibility uses the genuine catalog's key index and
+	// page.read verifies every raw row against that original observation. Do
+	// not rebuild a whole-ledger key/hash map for each component.
 	if original.ValidateBorrowedSnapshot(ctx) != nil {
 		return nil, ErrSQLHistoricalComponent
 	}
@@ -213,6 +219,587 @@ func FreezeSQLHistoricalComponentRecipe(ctx context.Context, original *SQLHistor
 		return nil, ErrSQLHistoricalComponent
 	}
 	return r, nil
+}
+
+// This reuses the host's existing private FD spool. The recipe retains only a
+// bounded record reference; loading one component never renews its old write
+// qualification or imports a caller-supplied image. The host owns the file.
+func FreezeSQLHistoricalComponentRecipeToSpool(ctx context.Context, original *SQLHistoricalOwnerBatch, cross *SQLHistoricalCrossStorePage, provenance *SQLHistoricalCASProvenance, unchanged *SQLHistoricalCASReadBaseline, spool *SQLHistoricalCASSpool) (*SQLHistoricalComponentRecipe, error) {
+	if spool == nil {
+		return nil, ErrSQLHistoricalComponent
+	}
+	r, err := FreezeSQLHistoricalComponentRecipe(ctx, original, cross, provenance, unchanged)
+	if err != nil {
+		return nil, err
+	}
+	return spoolSQLHistoricalComponentRecipe(ctx, original, r, spool)
+}
+
+func spoolSQLHistoricalComponentRecipe(ctx context.Context, original *SQLHistoricalOwnerBatch, r *SQLHistoricalComponentRecipe, spool *SQLHistoricalCASSpool) (*SQLHistoricalComponentRecipe, error) {
+	spool.mu.Lock()
+	defer spool.mu.Unlock()
+	if spool.valid(ctx) != nil || spool.sealed || spool.oldPool != nil || spool.writePool != nil || len(spool.frames) != 0 || spool.applied != 0 {
+		return nil, ErrSQLHistoricalComponent
+	}
+	record := sqlComponentSpoolRecord{Plan: componentPlanRecord(r.plan), Input: sqlSpoolImageOut(r.input.before), Writes: r.input.writes, Responsibility: sqlSpoolImageOut(r.responsibility), Anchors: r.anchors, Selectors: r.selectors, Limits: r.limits, OwnerPartitioned: r.ownerPartitioned}
+	ref, err := spool.put(ctx, record)
+	if err != nil || original.ValidateBorrowedSnapshot(ctx) != nil {
+		return nil, ErrSQLHistoricalComponent
+	}
+	r.inlineSeal, r.frame, r.spool = r.seal, ref, spool
+	r.plan, r.input, r.anchors = nil, nil, nil
+	r.responsibility = sqlHistoricalCASImage{}
+	r.seal = r.digest()
+	if !r.intact() {
+		return nil, ErrSQLHistoricalComponent
+	}
+	return r, nil
+}
+
+type sqlComponentSpoolRecord struct {
+	Plan             sqlSpoolPlan
+	Input            sqlSpoolImage
+	Writes           map[string]bool
+	Responsibility   sqlSpoolImage
+	Anchors          map[string]string
+	Selectors        SQLCrossStoreSelectors
+	Limits           SQLCrossStoreLimits
+	OwnerPartitioned bool
+}
+
+func (r *SQLHistoricalComponentRecipe) load(ctx context.Context) (*SQLHistoricalComponentRecipe, error) {
+	if ctx == nil || ctx.Err() != nil || !r.intact() {
+		return nil, ErrSQLHistoricalComponent
+	}
+	if r.spool == nil {
+		return r, nil
+	}
+	var record sqlComponentSpoolRecord
+	r.spool.mu.Lock()
+	err := r.spool.get(ctx, r.frame, &record)
+	r.spool.mu.Unlock()
+	if err != nil {
+		return nil, ErrSQLHistoricalComponent
+	}
+	p, err := sqlSpoolReconstruct(record.Plan, sqlSpoolImageIn(record.Plan.Before))
+	if err != nil {
+		return nil, ErrSQLHistoricalComponent
+	}
+	f := &SQLHistoricalCASFrozenInput{before: sqlSpoolImageIn(record.Input), writes: record.Writes}
+	f.self, f.seal = f, f.digest()
+	loaded := &SQLHistoricalComponentRecipe{plan: p, input: f, responsibility: sqlSpoolImageIn(record.Responsibility), anchors: record.Anchors, selectors: record.Selectors, limits: record.Limits, oldPool: r.oldPool, ownerPartitioned: record.OwnerPartitioned}
+	loaded.self, loaded.seal = loaded, r.inlineSeal
+	if !loaded.intact() || !r.intact() || ctx.Err() != nil {
+		return nil, ErrSQLHistoricalComponent
+	}
+	return loaded, nil
+}
+
+// These identities describe actual original owner rows only. They grant no
+// source authentication, fresh transaction or write authority.
+type SQLHistoricalComponentOwnerIdentity struct {
+	AssessmentID, OrganizationID, AnswerSheetID uint64
+}
+
+func (r *SQLHistoricalComponentRecipe) OwnerIdentities() ([]SQLHistoricalComponentOwnerIdentity, error) {
+	loaded, err := r.load(context.Background())
+	if err != nil {
+		return nil, err
+	}
+	var out []SQLHistoricalComponentOwnerIdentity
+	for _, row := range loaded.plan.before.rows["assessment"] {
+		id, e := sqlHistoricalUint(row, "id")
+		org, oe := sqlHistoricalUint(row, "org_id")
+		sheet, se := sqlHistoricalUint(row, "answer_sheet_id")
+		if e != nil || oe != nil || se != nil {
+			return nil, ErrSQLHistoricalComponent
+		}
+		out = append(out, SQLHistoricalComponentOwnerIdentity{id, org, sheet})
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].AssessmentID < out[j].AssessmentID })
+	return out, nil
+}
+
+func (r *SQLHistoricalComponentRecipe) SourceEventIDs() ([]string, error) {
+	loaded, err := r.load(context.Background())
+	if err != nil {
+		return nil, err
+	}
+	return slices.Clone(loaded.selectors.EventIDs), nil
+}
+
+type SQLHistoricalSourceOwnerBinding struct {
+	EventID, MongoOwnerKind, MongoOwnerID string
+	AssessmentID                          uint64
+	SQLOwnerPresent                       bool
+}
+
+// An empty owner is an explicit unresolved pure input, never proof of absence
+// of a Mongo business owner. Only exact captured attachment/message identities
+// populate these values; SourceEventIDs still includes every original source.
+func (r *SQLHistoricalComponentRecipe) SourceOwnerBindings() ([]SQLHistoricalSourceOwnerBinding, error) {
+	loaded, err := r.load(context.Background())
+	if err != nil {
+		return nil, err
+	}
+	owners := map[uint64]bool{}
+	sheets := map[string]uint64{}
+	for _, row := range loaded.plan.before.rows["assessment"] {
+		id, e := sqlHistoricalUint(row, "id")
+		if e != nil {
+			return nil, e
+		}
+		owners[id] = true
+		sheets[valueOrEmpty(row["answer_sheet_id"])] = id
+	}
+	var out []SQLHistoricalSourceOwnerBinding
+	for _, event := range loaded.selectors.EventIDs {
+		b := SQLHistoricalSourceOwnerBinding{EventID: event}
+		for _, a := range loaded.plan.attachments {
+			if a.Entry.EventID == event {
+				if b.AssessmentID != 0 && b.AssessmentID != a.AssessmentID {
+					return nil, ErrSQLHistoricalComponent
+				}
+				b.AssessmentID = a.AssessmentID
+			}
+		}
+		for table, rows := range loaded.responsibility.rows {
+			for _, row := range rows {
+				v := cycleDecode(table, row)
+				if v.EventID != event {
+					continue
+				}
+				if v.AssessmentID != 0 {
+					if b.AssessmentID != 0 && b.AssessmentID != v.AssessmentID {
+						return nil, ErrSQLHistoricalComponent
+					}
+					b.AssessmentID = v.AssessmentID
+				}
+				if v.OwnerKind == "AnswerSheet" || v.OwnerKind == "ReportGeneration" {
+					if b.MongoOwnerKind != "" && (b.MongoOwnerKind != v.OwnerKind || b.MongoOwnerID != v.OwnerID) {
+						return nil, ErrSQLHistoricalComponent
+					}
+					b.MongoOwnerKind, b.MongoOwnerID = v.OwnerKind, v.OwnerID
+					if v.OwnerKind == "AnswerSheet" && sheets[v.OwnerID] != 0 {
+						id := sheets[v.OwnerID]
+						if b.AssessmentID != 0 && b.AssessmentID != id {
+							return nil, ErrSQLHistoricalComponent
+						}
+						b.AssessmentID = id
+					}
+				}
+			}
+		}
+		b.SQLOwnerPresent = owners[b.AssessmentID]
+		out = append(out, b)
+	}
+	return out, nil
+}
+
+// OriginalSelectors returns the exact frozen negative ranges as pure metadata.
+// A Mongo-only source can retain its AnswerSheet/Generation range even when
+// these SQL reads contain no assessment row. It is never a qualification.
+func (r *SQLHistoricalComponentRecipe) OriginalSelectors() (SQLCrossStoreSelectors, error) {
+	loaded, err := r.load(context.Background())
+	if err != nil {
+		return SQLCrossStoreSelectors{}, err
+	}
+	return componentCopySelectors(loaded.selectors), nil
+}
+
+// False means an original negative/Mongo owner selector could not be assigned
+// by these SQL reads. The whole original input is retained, never guessed or
+// silently dropped. The joint business reader must resolve that boundary.
+func (r *SQLHistoricalComponentRecipe) OwnerPartitionResolved() bool {
+	loaded, err := r.load(context.Background())
+	return err == nil && loaded.ownerPartitioned
+}
+
+// The source page is a transport boundary, not an atomic owner boundary.
+// Partition only private, live original reads. Replay membership joins real
+// owners; shared schema/model/head reads do not join unrelated assessments.
+func FreezeSQLHistoricalOwnerComponentRecipes(ctx context.Context, original *SQLHistoricalOwnerBatch, cross *SQLHistoricalCrossStorePage, provenance *SQLHistoricalCASProvenance, unchanged *SQLHistoricalCASReadBaseline, spool *SQLHistoricalCASSpool) ([]*SQLHistoricalComponentRecipe, error) {
+	parent, err := FreezeSQLHistoricalComponentRecipe(ctx, original, cross, provenance, unchanged)
+	if err != nil {
+		return nil, fmt.Errorf("%w: owner_parent: %w", ErrSQLHistoricalComponent, err)
+	}
+	parts, err := componentOriginalOwnerPartitions(parent, cross.catalog)
+	if err != nil {
+		return nil, fmt.Errorf("%w: owner_partition", ErrSQLHistoricalComponent)
+	}
+	if parts == nil {
+		if spool != nil {
+			parent, err = spoolSQLHistoricalComponentRecipe(ctx, original, parent, spool)
+		}
+		if err != nil {
+			return nil, err
+		}
+		return []*SQLHistoricalComponentRecipe{parent}, nil
+	}
+	out := make([]*SQLHistoricalComponentRecipe, 0, len(parts))
+	for _, part := range parts {
+		child, err := componentOriginalOwnerChild(parent, part)
+		if err != nil {
+			return nil, fmt.Errorf("%w: owner_child: %w", ErrSQLHistoricalComponent, err)
+		}
+		child.responsibility, child.anchors, err = child.captureOriginalResponsibility(ctx, cross.catalog)
+		if err != nil || original.ValidateBorrowedSnapshot(ctx) != nil {
+			return nil, fmt.Errorf("%w: owner_responsibility: %v", ErrSQLHistoricalComponent, err)
+		}
+		child.self, child.seal = child, child.digest()
+		if !child.intact() {
+			return nil, fmt.Errorf("%w: owner_seal", ErrSQLHistoricalComponent)
+		}
+		out = append(out, child)
+	}
+	// All owner closures and resource bounds are checked before any child is
+	// returned. Persisting these pure inputs never runs a statement or commit.
+	if spool != nil {
+		for i, child := range out {
+			out[i], err = spoolSQLHistoricalComponentRecipe(ctx, original, child, spool)
+			if err != nil {
+				return nil, fmt.Errorf("%w: owner_spool", ErrSQLHistoricalComponent)
+			}
+		}
+	}
+	return out, nil
+}
+
+type sqlOriginalOwnerPart struct {
+	ids    []uint64
+	events []string
+	sheets []uint64
+	mongo  []SQLCrossStoreOwnerReference
+}
+
+func componentOriginalOwnerPartitions(r *SQLHistoricalComponentRecipe, c *SQLHistoricalCrossStoreCatalog) ([]sqlOriginalOwnerPart, error) {
+	if !r.intact() || c == nil || c.cycle == nil || !c.report.Complete {
+		return nil, ErrSQLHistoricalComponent
+	}
+	parents := map[uint64]uint64{}
+	ownerSheets := map[uint64]uint64{}
+	for _, id := range r.plan.request.AssessmentIDs {
+		parents[id] = id
+	}
+	for _, row := range r.plan.before.rows["assessment"] {
+		id, err := sqlHistoricalUint(row, "id")
+		sheet, se := sqlHistoricalUint(row, "answer_sheet_id")
+		if err != nil || se != nil || id == 0 || sheet == 0 {
+			return nil, ErrSQLHistoricalComponent
+		}
+		parents[id] = id
+		if prior := ownerSheets[sheet]; prior != 0 && prior != id {
+			return nil, ErrSQLHistoricalComponent
+		}
+		ownerSheets[sheet] = id
+	}
+	if len(parents) == 0 {
+		return nil, nil
+	}
+	var find func(uint64) uint64
+	find = func(id uint64) uint64 {
+		if parents[id] != id {
+			parents[id] = find(parents[id])
+		}
+		return parents[id]
+	}
+	join := func(a, b uint64) {
+		a, b = find(a), find(b)
+		if a > b {
+			a, b = b, a
+		}
+		parents[b] = a
+	}
+	eventOwners := map[string]uint64{}
+	bind := func(event string, id uint64) error {
+		if event == "" || id == 0 {
+			return nil
+		}
+		if _, ok := parents[id]; !ok {
+			return ErrSQLHistoricalComponent
+		}
+		if prior := eventOwners[event]; prior != 0 && prior != id {
+			return ErrSQLHistoricalComponent
+		}
+		eventOwners[event] = id
+		return nil
+	}
+	for _, a := range r.plan.attachments {
+		if err := bind(a.Entry.EventID, a.AssessmentID); err != nil {
+			return nil, err
+		}
+	}
+	for _, event := range r.selectors.EventIDs {
+		for _, i := range c.cycle.byEvent[event] {
+			v := c.cycle.observations[i]
+			id := v.AssessmentID
+			if id == 0 && v.OwnerKind == "AnswerSheet" {
+				id = ownerSheets[cyclePayloadID(v.OwnerID)]
+			}
+			if err := bind(event, id); err != nil {
+				return nil, err
+			}
+		}
+	}
+	// Every actual member of each selected replay request is included. A
+	// member targeting an owner outside the captured business page cannot be
+	// omitted: the caller must capture that owner before splitting this page.
+	pairs := map[string]bool{}
+	for _, row := range r.responsibility.rows["qs_rm_replay_items"] {
+		v := cycleDecode("qs_rm_replay_items", row)
+		pairs[cyclePair(v.OrgID, v.link.requestID)] = true
+	}
+	for pair := range pairs {
+		var first uint64
+		for _, i := range c.byRequest[pair] {
+			v := c.cycle.observations[i]
+			id := eventOwners[v.EventID]
+			if id == 0 {
+				id = v.AssessmentID
+			}
+			if id == 0 && v.OwnerKind == "AnswerSheet" {
+				id = ownerSheets[cyclePayloadID(v.OwnerID)]
+			}
+			if id == 0 {
+				continue
+			}
+			if _, ok := parents[id]; !ok {
+				return nil, ErrSQLHistoricalComponent
+			}
+			if err := bind(v.EventID, id); err != nil {
+				return nil, err
+			}
+			if first == 0 {
+				first = id
+			} else {
+				join(first, id)
+			}
+		}
+	}
+	// An unbound original source or missing sheet/ReportGeneration range is
+	// preserved as one original input. Only genuine joint reads can partition
+	// it; a caller-provided mapping is deliberately not accepted here.
+	for _, event := range r.selectors.EventIDs {
+		if eventOwners[event] == 0 {
+			return nil, nil
+		}
+	}
+	for _, sheet := range r.plan.request.AnswerSheetIDs {
+		if ownerSheets[sheet] == 0 {
+			return nil, nil
+		}
+	}
+	for _, owner := range r.selectors.MongoOwners {
+		if owner.Kind != "AnswerSheet" || ownerSheets[cyclePayloadID(owner.ID)] == 0 {
+			return nil, nil
+		}
+	}
+	byRoot := map[uint64]*sqlOriginalOwnerPart{}
+	for id := range parents {
+		root := find(id)
+		if byRoot[root] == nil {
+			byRoot[root] = &sqlOriginalOwnerPart{}
+		}
+		byRoot[root].ids = append(byRoot[root].ids, id)
+	}
+	for _, event := range r.selectors.EventIDs {
+		root := find(eventOwners[event])
+		byRoot[root].events = append(byRoot[root].events, event)
+	}
+	for _, sheet := range r.plan.request.AnswerSheetIDs {
+		root := find(ownerSheets[sheet])
+		byRoot[root].sheets = append(byRoot[root].sheets, sheet)
+	}
+	for _, owner := range r.selectors.MongoOwners {
+		root := find(ownerSheets[cyclePayloadID(owner.ID)])
+		byRoot[root].mongo = append(byRoot[root].mongo, owner)
+	}
+	var out []sqlOriginalOwnerPart
+	for _, part := range byRoot {
+		sort.Slice(part.ids, func(i, j int) bool { return part.ids[i] < part.ids[j] })
+		sort.Strings(part.events)
+		out = append(out, *part)
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].ids[0] < out[j].ids[0] })
+	return out, nil
+}
+
+func componentOriginalOwnerChild(parent *SQLHistoricalComponentRecipe, part sqlOriginalOwnerPart) (*SQLHistoricalComponentRecipe, error) {
+	selected := map[uint64]bool{}
+	for _, id := range part.ids {
+		selected[id] = true
+	}
+	p := *parent.plan
+	p.before = sqlHistoricalCASImage{rows: map[string][]historicalSQLRow{}, schema: map[string]string{}, columns: map[string][]string{}}
+	for table, hash := range parent.plan.before.schema {
+		p.before.schema[table] = hash
+		p.before.columns[table] = slices.Clone(parent.plan.before.columns[table])
+	}
+	for table, rows := range parent.plan.before.rows {
+		p.before.rows[table] = nil
+		if table == "assessment" || !slices.Contains(batchBusinessTables, table) && rows != nil {
+			p.before.rows[table] = []historicalSQLRow{}
+		}
+		for _, row := range rows {
+			if !slices.Contains(batchBusinessTables, table) {
+				// Actual schema/index/clock/head reads are readonly shared input.
+				p.before.rows[table] = append(p.before.rows[table], row)
+				continue
+			}
+			column := "assessment_id"
+			if table == "assessment" {
+				column = "id"
+			}
+			id, err := sqlHistoricalUint(row, column)
+			if err != nil {
+				return nil, ErrSQLHistoricalComponent
+			}
+			if selected[id] {
+				p.before.rows[table] = append(p.before.rows[table], row)
+			}
+		}
+	}
+	// The existing native capture preserves nil query results when an owner
+	// exists, and explicit empty descendant ranges when no owner exists.
+	if len(p.before.rows["assessment"]) == 0 {
+		p.before.rows["runtime_checkpoint"] = []historicalSQLRow{}
+		p.before.rows["evaluation_outcome"] = []historicalSQLRow{}
+	}
+	p.request = SQLHistoricalOwnerBatchRequest{AssessmentIDs: slices.Clone(part.ids), AnswerSheetIDs: slices.Clone(part.sheets)}
+	p.groups = nil
+	p.attachments = nil
+	p.missingOriginalRunIDs = nil
+	for _, a := range parent.plan.attachments {
+		if selected[a.AssessmentID] {
+			p.attachments = append(p.attachments, a)
+		}
+	}
+	for _, g := range parent.plan.groups {
+		row, err := casRow(parent.plan.before, g.table, g.id)
+		if err != nil {
+			return nil, err
+		}
+		column := "assessment_id"
+		if g.table == "assessment" {
+			column = "id"
+		}
+		id, err := sqlHistoricalUint(row, column)
+		if err != nil {
+			return nil, err
+		}
+		if selected[id] {
+			p.groups = append(p.groups, g)
+		}
+	}
+	for _, missing := range parent.plan.missingOriginalRunIDs {
+		for _, row := range p.before.rows["evaluation_outcome"] {
+			if valueOrEmpty(row["evaluation_run_id"]) == missing {
+				p.missingOriginalRunIDs = append(p.missingOriginalRunIDs, missing)
+				break
+			}
+		}
+	}
+	raw, err := sqlSpoolEncode(componentPlanRecord(&p))
+	if err != nil {
+		return nil, err
+	}
+	var record sqlSpoolPlan
+	if err = sqlSpoolDecode(raw, &record); err != nil {
+		return nil, err
+	}
+	plan, err := sqlSpoolReconstruct(record, sqlSpoolImageIn(record.Before))
+	if err != nil {
+		return nil, err
+	}
+	input := &SQLHistoricalCASFrozenInput{before: casCloneImage(plan.before), writes: map[string]bool{}}
+	for _, g := range plan.groups {
+		input.writes[sqlSpoolKey(g.table, g.id)] = true
+	}
+	input.self, input.seal = input, input.digest()
+	if err = input.RowDependencies(func(string, uint64, string, uint64, bool) error { return nil }); err != nil {
+		return nil, err
+	}
+	return &SQLHistoricalComponentRecipe{plan: plan, input: input, oldPool: parent.oldPool, limits: parent.limits, ownerPartitioned: true, selectors: SQLCrossStoreSelectors{EventIDs: slices.Clone(part.events), AssessmentIDs: slices.Clone(part.ids), OrganizationIDs: slices.Clone(parent.selectors.OrganizationIDs), MongoOwners: slices.Clone(part.mongo)}}, nil
+}
+
+// The complete original cycle already classified every old ledger row and
+// authenticated its actual ordered primary key. Expand the component using
+// those private indexes and re-read only the exact PRIMARY keys. This is an
+// ORIGINAL input read, never a substitute for fresh negative responsibility.
+// Global unknown/blocking counts remain in the original cycle and must be
+// rejected by whole-source qualification; freezing pure input does not renew
+// that qualification or turn unrelated unknown rows into successful evidence.
+func (r *SQLHistoricalComponentRecipe) captureOriginalResponsibility(ctx context.Context, catalog *SQLHistoricalCrossStoreCatalog) (sqlHistoricalCASImage, map[string]string, error) {
+	image := sqlHistoricalCASImage{rows: map[string][]historicalSQLRow{}, schema: map[string]string{}, columns: map[string][]string{}}
+	if catalog == nil || catalog.cycle == nil || !catalog.report.Complete || catalog.cycle.ValidateBorrowedSnapshot(ctx) != nil {
+		return image, nil, ErrSQLHistoricalComponent
+	}
+	selected := map[int]bool{}
+	add := func(ids []int) {
+		for _, i := range ids {
+			selected[i] = true
+		}
+	}
+	for _, id := range r.selectors.EventIDs {
+		add(catalog.cycle.byEvent[id])
+	}
+	for _, id := range r.selectors.AssessmentIDs {
+		add(catalog.cycle.byOwner[id])
+	}
+	for _, owner := range r.selectors.MongoOwners {
+		add(catalog.byMongoOwner[owner.Kind+":"+owner.ID])
+	}
+	for _, org := range r.selectors.OrganizationIDs {
+		add(catalog.byGovernanceOrg[org])
+		for _, i := range catalog.requestOrganizations[org] {
+			v := catalog.cycle.observations[i]
+			if len(catalog.byRequest[cyclePair(v.OrgID, v.link.requestID)]) == 0 {
+				selected[i] = true
+			}
+		}
+	}
+	for round := 0; ; round++ {
+		before := len(selected)
+		if before > r.limits.MaxPageRows || round > 512 {
+			return image, nil, ErrSQLHistoricalComponent
+		}
+		for i := range selected {
+			v := catalog.cycle.observations[i]
+			if v.EventID != "" {
+				add(catalog.cycle.byEvent[v.EventID])
+			}
+			if v.Store == "qs_rm_replay_items" || v.Store == "qs_rm_replay_requests" {
+				pair := cyclePair(v.OrgID, v.link.requestID)
+				add(catalog.requestParents[pair])
+				add(catalog.byRequest[pair])
+			}
+		}
+		if len(selected) == before {
+			break
+		}
+	}
+	tx, err := historicalTx(ctx)
+	if err != nil {
+		return image, nil, err
+	}
+	page := &SQLHistoricalCrossStorePage{catalog: catalog, rows: map[int]historicalSQLRow{}, started: time.Now()}
+	if err = page.read(ctx, selected); err != nil {
+		return image, nil, err
+	}
+	for _, ledger := range catalog.cycle.ledgers {
+		cols, hash, _, err := cycleSchema(tx, ledger.spec)
+		if err != nil || hash != ledger.report.SchemaSHA256 || !reflect.DeepEqual(cols, ledger.columns) || !sqlCrossStoreSupportedColumns(ledger.spec.name, cols) {
+			return image, nil, ErrSQLHistoricalComponent
+		}
+		image.columns[ledger.spec.name], image.schema[ledger.spec.name] = cols, hash
+		image.rows[ledger.spec.name] = []historicalSQLRow{}
+	}
+	for i, row := range page.rows {
+		name := catalog.cycle.observations[i].Store
+		image.rows[name] = append(image.rows[name], row)
+	}
+	anchors, err := componentValidateResponsibility(tx, image)
+	return image, anchors, err
 }
 
 // These expressions are selectors only. Exact original bytes are subsequently
@@ -312,7 +899,7 @@ func (r *SQLHistoricalComponentRecipe) captureResponsibility(tx *gorm.DB) (sqlHi
 			ids = append(ids, id)
 		}
 		sort.Strings(ids)
-		if len(ids) == 0 || len(ids) > 512 || len(pairs) > 512 {
+		if len(ids) > 512 || len(pairs) > 512 || len(ids) == 0 && len(r.selectors.AssessmentIDs)+len(r.selectors.MongoOwners)+len(r.selectors.OrganizationIDs) == 0 {
 			return image, nil, ErrSQLHistoricalComponent
 		}
 		for _, spec := range sqlResponsibilityTables {
@@ -381,11 +968,19 @@ func (r *SQLHistoricalComponentRecipe) captureResponsibility(tx *gorm.DB) (sqlHi
 			return image, nil, ErrSQLHistoricalComponent
 		}
 	}
-	c := &SQLHistoricalResponsibilityCycle{owners: map[uint64]sqlResponsibilityOwner{}, anchorDigests: map[string]string{}, byOwner: map[uint64][]int{}, byEvent: map[string][]int{}, byOrgActions: map[uint64][]int{}}
 	for _, spec := range sqlResponsibilityTables {
 		for _, row := range retained[spec.name] {
 			image.rows[spec.name] = append(image.rows[spec.name], row)
 		}
+	}
+	anchors, err := componentValidateResponsibility(tx, image)
+	return image, anchors, err
+}
+
+func componentValidateResponsibility(tx *gorm.DB, image sqlHistoricalCASImage) (map[string]string, error) {
+	c := &SQLHistoricalResponsibilityCycle{owners: map[uint64]sqlResponsibilityOwner{}, anchorDigests: map[string]string{}, byOwner: map[uint64][]int{}, byEvent: map[string][]int{}, byOrgActions: map[uint64][]int{}}
+	for _, spec := range sqlResponsibilityTables {
+
 		if image.rows[spec.name] == nil {
 			image.rows[spec.name] = []historicalSQLRow{}
 		}
@@ -399,19 +994,19 @@ func (r *SQLHistoricalComponentRecipe) captureResponsibility(tx *gorm.DB) (sqlHi
 		}
 		_, hash, _, err := cycleSchema(tx, spec)
 		if err != nil || hash != image.schema[spec.name] {
-			return image, nil, ErrSQLHistoricalComponent
+			return nil, ErrSQLHistoricalComponent
 		}
 	}
 	if err := c.checkPageOwners(tx, 0); err != nil {
-		return image, nil, err
+		return nil, err
 	}
 	c.checkReverse()
 	for _, v := range c.observations {
 		if v.Invalid || v.ScopeClass == "retirement_related" && (v.Unfinished || v.LeasePresent) {
-			return image, nil, ErrSQLHistoricalComponent
+			return nil, ErrSQLHistoricalComponent
 		}
 	}
-	return image, c.anchorDigests, nil
+	return c.anchorDigests, nil
 }
 
 func (o *SQLHistoricalComponentObservation) digest() string {
@@ -449,6 +1044,10 @@ func PrepareSQLHistoricalComponentObservation(ctx context.Context, r *SQLHistori
 	started := time.Now()
 	bounded, cancel := context.WithDeadline(ctx, started.Add(budget))
 	defer cancel()
+	r, err := r.load(bounded)
+	if err != nil {
+		return nil, err
+	}
 	tx, err := historicalTx(bounded)
 	if err != nil || tx.Statement.ConnPool == r.oldPool {
 		return nil, ErrSQLHistoricalComponent

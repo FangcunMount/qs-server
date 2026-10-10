@@ -45,11 +45,44 @@ func TestSQLHistoricalComponentClosedScopeAndNoImportedAuthority(t *testing.T) {
 	if _, err := (&SQLHistoricalComponentStatement{}).VerifyIndependentPersisted(context.Background(), time.Second); err == nil {
 		t.Fatal("forged statement readback accepted")
 	}
+	if r, err := FreezeSQLHistoricalComponentRecipeToSpool(context.Background(), nil, nil, nil, nil, &SQLHistoricalCASSpool{}); r != nil || err == nil {
+		t.Fatal("private spool fabricated original native inputs")
+	}
 	copied := componentCopySelectors(s)
 	copied.EventIDs[0] = "changed"
 	copied.AssessmentIDs[0] = 9
 	copied.MongoOwners[0].ID = "other"
 	if s.EventIDs[0] != "exact-event" || s.AssessmentIDs[0] != 42 || s.MongoOwners[0].ID != "10042" {
 		t.Fatal("recipe selectors share editable source slice")
+	}
+}
+
+// This directly checks the private pure graph algorithm. These synthetic
+// metadata values never pass a live factory or create a physical qualification.
+func TestSQLHistoricalComponentOwnerGraphKeepsReplayAtomic(t *testing.T) {
+	plan := &SQLHistoricalBatchCASPlan{request: SQLHistoricalOwnerBatchRequest{AssessmentIDs: []uint64{42, 43}}, before: sqlHistoricalCASImage{rows: map[string][]historicalSQLRow{"assessment": {cycleTestRow(map[string]string{"id": "42", "org_id": "7", "answer_sheet_id": "10042"}), cycleTestRow(map[string]string{"id": "43", "org_id": "7", "answer_sheet_id": "10043"})}}}}
+	input := &SQLHistoricalCASFrozenInput{before: plan.before, writes: map[string]bool{}}
+	input.self, input.seal = input, input.digest()
+	r := &SQLHistoricalComponentRecipe{plan: plan, input: input, selectors: SQLCrossStoreSelectors{EventIDs: []string{"first", "second"}, AssessmentIDs: []uint64{42, 43}}, responsibility: sqlHistoricalCASImage{rows: map[string][]historicalSQLRow{}}}
+	r.self, r.seal = r, r.digest()
+	cycle := &SQLHistoricalResponsibilityCycle{observations: []SQLResponsibilityObservation{{EventID: "first", AssessmentID: 42}, {EventID: "second", AssessmentID: 43}}, byEvent: map[string][]int{"first": {0}, "second": {1}}}
+	c := &SQLHistoricalCrossStoreCatalog{cycle: cycle, report: SQLCrossStoreCatalogReport{Complete: true}, byRequest: map[string][]int{cyclePair(7, "pair"): {0, 1}}}
+	parts, err := componentOriginalOwnerPartitions(r, c)
+	if err != nil || len(parts) != 2 {
+		t.Fatal("unrelated source-page owners were joined", err)
+	}
+	r.responsibility.rows["qs_rm_replay_items"] = []historicalSQLRow{cycleTestRow(map[string]string{"org_id": "7", "request_id": "pair"})}
+	r.seal = r.digest()
+	parts, err = componentOriginalOwnerPartitions(r, c)
+	if err != nil || len(parts) != 1 || len(parts[0].ids) != 2 || len(parts[0].events) != 2 {
+		t.Fatal("complete cross-owner replay dependency was split", err)
+	}
+	cycle.observations = append(cycle.observations, SQLResponsibilityObservation{EventID: "outside", AssessmentID: 99})
+	c.byRequest[cyclePair(7, "pair")] = append(c.byRequest[cyclePair(7, "pair")], 2)
+	if _, err = componentOriginalOwnerPartitions(r, c); err == nil {
+		t.Fatal("outside captured owner was silently dropped")
+	}
+	if _, err = FreezeSQLHistoricalOwnerComponentRecipes(context.Background(), nil, nil, nil, nil, nil); err == nil {
+		t.Fatal("private graph metadata manufactured a live original recipe")
 	}
 }

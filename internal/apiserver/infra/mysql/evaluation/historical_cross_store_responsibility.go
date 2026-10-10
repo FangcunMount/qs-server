@@ -44,6 +44,7 @@ type SQLHistoricalCrossStoreCatalog struct {
 	cycle                     *SQLHistoricalResponsibilityCycle
 	keys                      map[int][]string
 	byRequest, requestParents map[string][]int
+	requestOrganizations      map[uint64][]int
 	byGovernanceOrg           map[uint64][]int
 	byMongoOwner              map[string][]int
 	limits                    SQLCrossStoreLimits
@@ -95,7 +96,7 @@ func PrepareSQLHistoricalCrossStoreCatalog(ctx context.Context, cycle *SQLHistor
 	if err != nil {
 		return nil, err
 	}
-	c := &SQLHistoricalCrossStoreCatalog{cycle: cycle, keys: map[int][]string{}, byRequest: map[string][]int{}, requestParents: map[string][]int{}, byGovernanceOrg: map[uint64][]int{}, byMongoOwner: map[string][]int{}, limits: limits}
+	c := &SQLHistoricalCrossStoreCatalog{cycle: cycle, keys: map[int][]string{}, byRequest: map[string][]int{}, requestParents: map[string][]int{}, requestOrganizations: map[uint64][]int{}, byGovernanceOrg: map[uint64][]int{}, byMongoOwner: map[string][]int{}, limits: limits}
 	c.report = SQLCrossStoreCatalogReport{Version: "sql-cross-store-catalog/v1", CycleID: cycle.report.CycleID, DatabaseIdentitySHA256: cycle.report.DatabaseIdentitySHA256, SourceAuthenticationRequired: true, BusinessQualificationRequired: true, WriterFenceRequired: true}
 	byKey := map[string]int{}
 	for i, v := range cycle.observations {
@@ -110,6 +111,7 @@ func PrepareSQLHistoricalCrossStoreCatalog(ctx context.Context, cycle *SQLHistor
 		switch v.Store {
 		case "qs_rm_replay_requests":
 			c.requestParents[cyclePair(v.OrgID, v.link.requestID)] = append(c.requestParents[cyclePair(v.OrgID, v.link.requestID)], i)
+			c.requestOrganizations[v.OrgID] = append(c.requestOrganizations[v.OrgID], i)
 		case "qs_rm_replay_items":
 			c.byRequest[cyclePair(v.OrgID, v.link.requestID)] = append(c.byRequest[cyclePair(v.OrgID, v.link.requestID)], i)
 		case "system_governance_action_runs":

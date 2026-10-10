@@ -6,6 +6,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"os"
 	"testing"
 	"time"
 
@@ -15,6 +16,10 @@ import (
 )
 
 func componentSQLNativeRecipe(t *testing.T, db *gorm.DB, checkOriginal bool) *SQLHistoricalComponentRecipe {
+	return componentSQLNativeRecipeOnSpool(t, db, checkOriginal, nil)
+}
+
+func componentSQLNativeRecipeOnSpool(t *testing.T, db *gorm.DB, checkOriginal bool, spool *SQLHistoricalCASSpool) *SQLHistoricalComponentRecipe {
 	t.Helper()
 	var recipe *SQLHistoricalComponentRecipe
 	if err := batchNativeTx(t, db, func(ctx context.Context, c *SQLHistoricalResponsibilityCycle) error {
@@ -38,7 +43,11 @@ func componentSQLNativeRecipe(t *testing.T, db *gorm.DB, checkOriginal bool) *SQ
 		if err != nil {
 			return err
 		}
-		recipe, err = FreezeSQLHistoricalComponentRecipe(ctx, batch, cross, provenance, nil)
+		if spool == nil {
+			recipe, err = FreezeSQLHistoricalComponentRecipe(ctx, batch, cross, provenance, nil)
+		} else {
+			recipe, err = FreezeSQLHistoricalComponentRecipeToSpool(ctx, batch, cross, provenance, nil, spool)
+		}
 		if err != nil {
 			return err
 		}
@@ -53,6 +62,148 @@ func componentSQLNativeRecipe(t *testing.T, db *gorm.DB, checkOriginal bool) *SQ
 		t.Fatal(err)
 	}
 	return recipe
+}
+
+func TestSQLHistoricalComponentNativeOwnedSpoolRejectsTampering(t *testing.T) {
+	db := openHistoricalReferencesDB(t)
+	insertHistoricalAssessment(t, db, 42)
+	file, err := os.CreateTemp(t.TempDir(), "component-input-")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = file.Close() })
+	spool, err := NewSQLHistoricalCASSpool(file, 8<<20, 2<<20)
+	if err != nil {
+		t.Fatal(err)
+	}
+	r := componentSQLNativeRecipeOnSpool(t, db, true, spool)
+	if r.plan != nil || r.input != nil || r.anchors != nil || r.responsibility.rows != nil || r.frame.Length <= 0 {
+		t.Fatal("raw component images retained in the frozen recipe")
+	}
+	var rows int
+	if err = r.RowDependencies(func(_ string, _ uint64, _ string, _ uint64, _ bool) error { rows++; return nil }); err != nil || rows != 2 {
+		t.Fatal("actual original dependency lost in disk input", err, rows)
+	}
+	if err = componentSQLNativeObserve(t, db, r, false, nil); err != nil {
+		t.Fatal("genuine spooled physical input rejected", err)
+	}
+	raw := []byte{0}
+	if _, err = file.ReadAt(raw, r.frame.Offset); err != nil {
+		t.Fatal(err)
+	}
+	raw[0] ^= 0xff
+	if _, err = file.WriteAt(raw, r.frame.Offset); err != nil || file.Sync() != nil {
+		t.Fatal("owned spool tamper setup failed", err)
+	}
+	if _, err = r.InputSHA256(); err == nil {
+		t.Fatal("changed FD bytes admitted as the original input")
+	}
+	if err = componentSQLNativeObserve(t, db, r, false, nil); err == nil {
+		t.Fatal("tampered original input admitted to a fresh physical read")
+	}
+}
+
+func TestSQLHistoricalComponentNativeOriginalOwnerPartition(t *testing.T) {
+	db := openHistoricalReferencesDB(t)
+	insertHistoricalAssessment(t, db, 42)
+	insertHistoricalAssessment(t, db, 43)
+	file, err := os.CreateTemp(t.TempDir(), "owner-input-")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = file.Close() })
+	spool, err := NewSQLHistoricalCASSpool(file, 8<<20, 2<<20)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var recipes []*SQLHistoricalComponentRecipe
+	var unresolved *SQLHistoricalComponentRecipe
+	if err = batchNativeTx(t, db, func(ctx context.Context, c *SQLHistoricalResponsibilityCycle) error {
+		batch, e := PrepareSQLHistoricalOwnerBatch(ctx, c, SQLHistoricalOwnerBatchRequest{AssessmentIDs: []uint64{42, 43}, AnswerSheetIDs: []uint64{10042, 10043}}, DefaultSQLHistoricalOwnerBatchLimits())
+		if e != nil {
+			return e
+		}
+		catalog, e := PrepareSQLHistoricalCrossStoreCatalog(ctx, c, DefaultSQLCrossStoreLimits())
+		if e != nil {
+			return e
+		}
+		cross, e := PrepareSQLHistoricalCrossStorePage(ctx, catalog, batch, SQLCrossStoreSelectors{EventIDs: []string{"owner-42", "owner-43"}, AssessmentIDs: []uint64{42, 43}, OrganizationIDs: []uint64{7}, MongoOwners: []SQLCrossStoreOwnerReference{{Kind: "AnswerSheet", ID: "10042"}, {Kind: "AnswerSheet", ID: "10043"}}})
+		if e != nil {
+			return e
+		}
+		plan, e := PrepareSQLHistoricalBatchCAS(ctx, batch, []SQLHistoricalBatchAttachment{casNativeEntry(t, ctx, batch, 42, 0, "owner-42", "evaluation.requested", nil), casNativeEntry(t, ctx, batch, 43, 0, "owner-43", "evaluation.requested", nil)})
+		if e != nil {
+			return e
+		}
+		provenance, e := SealSQLHistoricalCASProvenance(ctx, plan, batch)
+		if e != nil {
+			return e
+		}
+		recipes, e = FreezeSQLHistoricalOwnerComponentRecipes(ctx, batch, cross, provenance, nil, spool)
+		if e != nil {
+			return e
+		}
+		scoped, e := PrepareSQLHistoricalCrossStorePage(ctx, catalog, batch, SQLCrossStoreSelectors{EventIDs: []string{"owner-42", "owner-43", "unbound-mongo-source"}, AssessmentIDs: []uint64{42, 43}, OrganizationIDs: []uint64{7}, MongoOwners: []SQLCrossStoreOwnerReference{{Kind: "ReportGeneration", ID: "77"}}})
+		if e != nil {
+			return e
+		}
+		pending, e := FreezeSQLHistoricalOwnerComponentRecipes(ctx, batch, scoped, provenance, nil, nil)
+		if e != nil {
+			return e
+		}
+		if len(pending) != 1 {
+			return errors.New("unknown owner was guessed or discarded")
+		}
+		unresolved = pending[0]
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if len(recipes) != 2 {
+		t.Fatal("source packet joined unrelated genuine owners", len(recipes))
+	}
+	if unresolved == nil || unresolved.OwnerPartitionResolved() {
+		t.Fatal("unbound Mongo pure input called resolved")
+	}
+	scope, e := unresolved.OriginalSelectors()
+	if e != nil || len(scope.EventIDs) != 3 || len(scope.MongoOwners) != 1 || scope.MongoOwners[0].ID != "77" {
+		t.Fatal("exact unresolved source/negative range discarded", e)
+	}
+	bindings, e := unresolved.SourceOwnerBindings()
+	if e != nil || len(bindings) != 3 || bindings[2].SQLOwnerPresent || bindings[2].AssessmentID != 0 {
+		t.Fatal("Mongo-only input acquired an invented SQL owner", e)
+	}
+	for i, r := range recipes {
+		owners, e := r.OwnerIdentities()
+		if e != nil || len(owners) != 1 || owners[0].AssessmentID != uint64(42+i) || !r.OwnerPartitionResolved() {
+			t.Fatal("actual owner identity omitted", e, owners)
+		}
+		bound, e := r.SourceOwnerBindings()
+		if e != nil || len(bound) != 1 || bound[0].AssessmentID != uint64(42+i) || !bound[0].SQLOwnerPresent {
+			t.Fatal("actual source binding omitted", e)
+		}
+		events, e := r.SourceEventIDs()
+		if e != nil || len(events) != 1 {
+			t.Fatal("original source identity lost", e)
+		}
+		selectors, e := r.OriginalSelectors()
+		if e != nil || len(selectors.MongoOwners) != 1 || len(selectors.AssessmentIDs) != 1 {
+			t.Fatal("negative owner range lost", e)
+		}
+		var rows int
+		if e = r.RowDependencies(func(table string, id uint64, _ string, _ uint64, _ bool) error {
+			rows++
+			if table == "assessment" && id != uint64(42+i) {
+				return errors.New("other owner leaked into child")
+			}
+			return nil
+		}); e != nil || rows != 2 {
+			t.Fatal("exact owner read/write input omitted", e, rows)
+		}
+		if e = componentSQLNativeObserve(t, db, r, false, nil); e != nil {
+			t.Fatal("actual fresh child read rejected", e)
+		}
+	}
 }
 
 func componentSQLNativeObserve(t *testing.T, db *gorm.DB, r *SQLHistoricalComponentRecipe, writable bool, fn func(context.Context, *SQLHistoricalComponentObservation) error) error {
