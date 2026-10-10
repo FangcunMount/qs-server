@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/FangcunMount/qs-server/internal/pkg/eventing/evidence"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 )
@@ -25,6 +26,8 @@ type mongoHistoricalComponentReadRecipe struct {
 	limits    MongoHistoricalOwnerBatchLimits
 	hints     map[string]string
 	original  mongoCycleTxn
+	// Snapshot-only input has a distinct origin; no transaction is invented.
+	snapshotEpoch, snapshotInput, snapshotOwner string
 }
 
 func (r *mongoHistoricalComponentReadRecipe) digest() string {
@@ -32,6 +35,9 @@ func (r *mongoHistoricalComponentReadRecipe) digest() string {
 		return ""
 	}
 	parts := []string{"mongo-component-read-recipe/v1", r.config.ExpectedIdentityHash, strconv.FormatInt(r.config.ExpectedMigrationVersion, 10), r.metadata, string(r.original.session), strconv.FormatInt(r.original.number, 10), strconv.Itoa(r.limits.MaxSources), strconv.Itoa(r.limits.MaxRows), strconv.FormatUint(r.limits.MaxBytes, 10), strconv.FormatInt(int64(r.limits.MaxDuration), 10)}
+	if r.snapshotEpoch != "" {
+		parts = append(parts, "snapshot-input", r.snapshotEpoch, r.snapshotInput, r.snapshotOwner)
+	}
 	for _, query := range mongoCASSelections(r.selection) {
 		parts = append(parts, query.name, query.field, r.hints[query.name+":"+query.field])
 		for _, id := range mongoBatchIDs(query.ids) {
@@ -60,6 +66,55 @@ func freezeMongoHistoricalComponentReadRecipe(ctx context.Context, b *MongoHisto
 		return nil, ErrMongoHistoricalComponentEpoch
 	}
 	return r, nil
+}
+
+// This factory is only an input bridge for the component planner. The actual
+// nontransaction snapshot must still be alive, and selected bytes must match
+// its original private frames. It grants no global, transaction or CAS permit.
+func freezeMongoSnapshotOwnerComponentReadRecipe(parent context.Context, input *MongoSnapshotInputEpoch, footprint *MongoSnapshotOwnerFootprint) (*mongoHistoricalComponentReadRecipe, error) {
+	if input == nil || footprint == nil || input.ValidateBorrowedInputEpoch(parent) != nil || !input.complete || footprint.InputSHA256() == "" {
+		return nil, ErrMongoHistoricalComponentEpoch
+	}
+	deadline := time.Now().Add(footprint.limits.MaxDuration)
+	if input.started.Add(input.limits.MaxDuration).Before(deadline) {
+		deadline = input.started.Add(input.limits.MaxDuration)
+	}
+	ctx, cancel := context.WithDeadline(parent, deadline)
+	defer cancel()
+	summary := input.Summary()
+	if footprint.identitySHA != summary.IdentitySHA256 || footprint.metadataSHA != summary.MetadataSHA256 || footprint.nativeSHA != summary.NativeEpochSHA256 || footprint.snapshotSHA != summary.SnapshotSHA256 || input.matchOwnerRows(ctx, footprint.data) != nil {
+		return nil, ErrMongoHistoricalComponentEpoch
+	}
+	r := &mongoHistoricalComponentReadRecipe{config: input.config, metadata: input.metadata.hash, selection: mongoCASCloneSelection(footprint.selection), limits: footprint.limits, hints: map[string]string{}, snapshotEpoch: summary.NativeEpochSHA256, snapshotInput: summary.SnapshotSHA256, snapshotOwner: footprint.InputSHA256()}
+	reader := &mongoOwnerReadCore{metadata: input.metadata}
+	for _, query := range mongoCASSelections(r.selection) {
+		if len(query.ids) == 0 {
+			continue
+		}
+		hint, err := reader.index(query.name, query.field, query.field == "domain_id")
+		if err != nil {
+			return nil, err
+		}
+		r.hints[query.name+":"+query.field] = hint
+	}
+	metadata, err := observeMongoCycleMetadata(ctx, input.db, input.config)
+	if err != nil || metadata.hash != input.metadata.hash || input.ValidateBorrowedInputEpoch(ctx) != nil || footprint.InputSHA256() != r.snapshotOwner {
+		return nil, ErrMongoHistoricalComponentEpoch
+	}
+	return r, nil
+}
+
+// Snapshot recipes can only enter a new physical READ, and must bind the same
+// real frozen epoch. Old transaction recipes retain their original tuple guard.
+func (r *mongoHistoricalComponentReadRecipe) matchesOriginalInput(input *MongoSnapshotInputEpoch, txn mongoCycleTxn) bool {
+	if r.snapshotEpoch == "" {
+		return r.snapshotInput == "" && r.snapshotOwner == "" && !(txn.number == r.original.number && bytes.Equal(txn.session, r.original.session))
+	}
+	if input == nil || len(r.original.session) != 0 || r.original.number != 0 || !evidence.ValidSHA256(r.snapshotEpoch) || !evidence.ValidSHA256(r.snapshotInput) || !evidence.ValidSHA256(r.snapshotOwner) {
+		return false
+	}
+	summary := input.Summary()
+	return summary.CompleteInput && r.snapshotEpoch == summary.NativeEpochSHA256 && r.snapshotInput == summary.SnapshotSHA256 && r.metadata == summary.MetadataSHA256
 }
 
 // Only an actual host snapshot transaction produces this physical observation.
@@ -110,7 +165,7 @@ func mongoHistoricalComponentInputSeal(c *HistoricalCASComponent) string {
 	}
 	parts := []string{"mongo-component-input-selection/v1"}
 	for _, f := range c.inputs {
-		if f == nil || f.self != f || f.seal == "" || f.seal != f.digest() || f.mongoRead == nil || !f.mongoRead.limits.valid() {
+		if f == nil || f.self != f || f.seal == "" || f.seal != f.digest() || f.mongoRead == nil || !f.mongoRead.limits.valid() || f.mongoRead.snapshotEpoch != "" && f.mongoCAS != nil {
 			return ""
 		}
 		parts = append(parts, f.seal)
@@ -157,7 +212,7 @@ func PrepareMongoHistoricalComponentObservation(parent context.Context, db *mong
 	}
 	for _, frame := range c.inputs {
 		r := frame.mongoRead
-		if r.metadata != o.metadata || r.config != c.inputs[0].mongoRead.config || r.config.ExpectedIdentityHash != input.metadata.identity || txn.number == r.original.number && bytes.Equal(txn.session, r.original.session) || o.validate(ctx) != nil {
+		if r.metadata != o.metadata || r.config != c.inputs[0].mongoRead.config || r.config.ExpectedIdentityHash != input.metadata.identity || !r.matchesOriginalInput(input, txn) || o.validate(ctx) != nil {
 			return nil, fmt.Errorf("%w: range_guard", ErrMongoHistoricalComponentEpoch)
 		}
 		// Only capture is reused. This local read helper has no groups and is

@@ -60,3 +60,69 @@ func TestMongoHistoricalComponentPhysicalRangeRejectsMissingNewAndChangedRows(t 
 		}
 	}
 }
+
+func TestMongoHistoricalSnapshotRecipeRetainsInputOnlyOrigin(t *testing.T) {
+	ctx := t.Context()
+	for _, input := range []*MongoSnapshotInputEpoch{nil, {}} {
+		if r, err := freezeMongoSnapshotOwnerComponentReadRecipe(ctx, input, &MongoSnapshotOwnerFootprint{}); r != nil || err == nil {
+			t.Fatal("unminted snapshot input produced a read recipe")
+		}
+	}
+	r := &mongoHistoricalComponentReadRecipe{original: mongoCycleTxn{session: bson.Raw("old-native-session"), number: 7}}
+	if r.matchesOriginalInput(nil, r.original) || !r.matchesOriginalInput(nil, mongoCycleTxn{session: r.original.session, number: 8}) {
+		t.Fatal("original native transaction tuple guard changed")
+	}
+	r.snapshotEpoch, r.snapshotInput, r.snapshotOwner = historicalSpoolSHA([]byte("actual-snapshot")), historicalSpoolSHA([]byte("actual-input")), historicalSpoolSHA([]byte("actual-owner"))
+	if r.matchesOriginalInput(&MongoSnapshotInputEpoch{}, mongoCycleTxn{}) {
+		t.Fatal("snapshot recipe invented an original transaction")
+	}
+	_, frames := componentFixture(t, 1)
+	f := frames[0]
+	f.mongoRead = r
+	f.mongoRead.limits = DefaultMongoHistoricalOwnerBatchLimits()
+	f.seal = f.digest()
+	c := &HistoricalCASComponent{inputs: frames}
+	if mongoHistoricalComponentInputSeal(c) == "" {
+		t.Fatal("pure read recipe lost graph footprint")
+	}
+	f.mongoCAS = &mongoHistoricalComponentCASRecipe{}
+	f.seal = f.digest()
+	if mongoHistoricalComponentInputSeal(c) != "" {
+		t.Fatal("snapshot-only recipe entered the old physical write path")
+	}
+}
+
+func TestMongoHistoricalSnapshotFootprintSealIncludesRowsRangesFactsAndBounds(t *testing.T) {
+	fixture := sourceAuthFixture(t, false, true)
+	facts := fixture.mongo
+	key, err := sourceAuthKey(facts.Source.Database, facts.Source.Object, facts.Source.PrimaryKeySHA256)
+	if err != nil {
+		t.Fatal(err)
+	}
+	factsSHA, err := privateFactsSHA(facts)
+	if err != nil {
+		t.Fatal(err)
+	}
+	f := &MongoSnapshotOwnerFootprint{limits: DefaultMongoHistoricalOwnerBatchLimits(), sources: map[verifiedSourceKey]*DecodedSourceEvent{key: facts}, sourceFactsSHA: map[verifiedSourceKey][32]byte{key: factsSHA}, sqlAbsent: map[verifiedSourceKey]bool{key: true}, selection: mongoCASCloneSelection(mongoBatchSelection{}), data: map[string][]bson.Raw{}}
+	for _, name := range mongoBatchBusinessCollections {
+		f.data[name] = nil
+	}
+	f.self, f.inputSHA = f, f.digest()
+	if f.InputSHA256() == "" {
+		t.Fatal("private algorithm fixture failed to seal")
+	}
+	copy := *f
+	if copy.InputSHA256() != "" {
+		t.Fatal("copied object retained original producer identity")
+	}
+	for _, mutate := range []func(){func() { f.limits.MaxRows-- }, func() { f.selection.sheets[42] = true }, func() { f.data["answersheets"] = []bson.Raw{bson.Raw("changed-physical-input")} }, func() { f.sources[key].Submitted.QuestionnaireCode += "changed" }} {
+		mutate()
+		if f.InputSHA256() != "" {
+			t.Fatal("changed input bytes/selectors/source/bounds retained frozen seal")
+		}
+		f.inputSHA = f.digest()
+		if f.inputSHA == "" {
+			break // A source-facts conflict cannot be resealed by the producer.
+		}
+	}
+}

@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"reflect"
 	"strconv"
 	"testing"
 	"time"
@@ -647,6 +648,14 @@ func TestMongoBatchNativeSnapshotInputOwnerFootprintMatchesOriginalFD(t *testing
 			if e != nil {
 				return e
 			}
+			read, e := freezeMongoSnapshotOwnerComponentReadRecipe(ctx, input, f)
+			if e != nil {
+				return e
+			}
+			if read.original.number != 0 || len(read.original.session) != 0 || read.snapshotOwner != f.InputSHA256() || read.snapshotEpoch != input.Summary().NativeEpochSHA256 || !reflect.DeepEqual(read.selection, f.selection) || len(read.hints) == 0 {
+				t.Fatal("snapshot recipe lost actual origin, complete range or index proof")
+			}
+
 			if f.InputSHA256() == "" || len(f.sources) != 2 || len(f.sqlOwners) != 2 || len(f.selection.outcomes) == 0 {
 				t.Fatal("actual owner footprint missing source or negative range")
 			}
@@ -678,6 +687,10 @@ func TestMongoBatchNativeSnapshotInputOwnerFootprintMatchesOriginalFD(t *testing
 				if bad, e := PrepareMongoSnapshotOwnerFootprint(ctx, input, sqlBatch, sources, DefaultMongoHistoricalOwnerBatchLimits()); bad != nil || e == nil {
 					t.Fatal("same-inode initial FD tamper became valid footprint")
 				}
+				if bad, e := freezeMongoSnapshotOwnerComponentReadRecipe(ctx, input, f); bad != nil || e == nil {
+					t.Fatal("same-inode original FD tamper became a read recipe")
+				}
+
 				one[0] = saved
 				if _, e = input.file.WriteAt(one, ref.Offset); e != nil {
 					return e
@@ -695,6 +708,12 @@ func TestMongoBatchNativeSnapshotInputOwnerFootprintMatchesOriginalFD(t *testing
 	if inputs[0].CompareFreshInput(t.Context(), inputs[1]) != nil {
 		t.Fatal("independent initial snapshots did not match")
 	}
+	for i, input := range inputs {
+		if r, e := freezeMongoSnapshotOwnerComponentReadRecipe(mongo.NewSessionContext(t.Context(), input.session), input, footprints[i]); r != nil || e == nil {
+			t.Fatal("ended original snapshot produced a new read recipe")
+		}
+	}
+
 	for _, f := range footprints {
 		rows := 0
 		if err := f.VisitRows(t.Context(), func(_ string, raw bson.Raw) error { rows++; raw[0] ^= 1; return nil }); err != nil || rows == 0 {
