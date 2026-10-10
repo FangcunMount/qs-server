@@ -128,6 +128,9 @@ func (h *lifecycleFixedHost) verifyNativeAcceptance(ctx context.Context, r lifec
 		return e
 	}
 	h.currentMQ = connections
+	if e = h.composeNativeMaterialOwners(q, r); e != nil {
+		return e
+	}
 	// The actual accepted-material catalog producer is still missing. Neither
 	// a local connection observation nor its known broader gaps can mint it.
 	return lifecycleError("lifecycle_actual_complete_material_scope_missing")

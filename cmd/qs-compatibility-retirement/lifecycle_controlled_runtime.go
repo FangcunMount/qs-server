@@ -101,6 +101,10 @@ func (h *lifecycleFixedHost) purgeAcceptedRemoteMaterials(ctx context.Context, r
 	if h == nil || h.acceptedMaterials == nil || h.acceptedMaterials.self != h.acceptedMaterials || h.acceptedMaterials.host != h || h.acceptedMaterials.binding != lifecycleMaterialsBinding(r) || o == nil || o.self != o || o.services != h.services || o.api != h.api || o.remote == nil || h.services.remote == nil || h.services.child == nil {
 		return nil, lifecycleError("lifecycle_actual_batch_acceptance_missing")
 	}
+	c := h.materials
+	if c == nil || c != h.acceptedMaterials.catalog || c.self != c || c.binding != lifecycleMaterialsBinding(r) || c.closed || c.unknown || c.started || c.remote != nil || c.scopes == nil {
+		return nil, lifecycleError("lifecycle_actual_complete_material_scope_missing")
+	}
 	// The final real runtime read must precede D terminal and material deletion.
 	// Neither controlled resume nor an old snapshot can replace this readback.
 	fresh, e := h.observeFinalControlledRuntime(ctx, r, o)
@@ -126,6 +130,8 @@ func (h *lifecycleFixedHost) purgeAcceptedRemoteMaterials(ctx context.Context, r
 	}
 	remote := &lifecycleRemoteMaterialZero{binding: lifecycleMaterialsBinding(r), native: z, services: h.services, terminal: terminal}
 	remote.self = remote
+	c.remote = remote // Only the actual zero AND original SSH terminal reach here.
+	c.scopes[lifecycleRemoteServiceMaterials] = struct{}{}
 	h.finalRuntime = fresh // Completed pre-purge native read, never post-purge runtime proof.
 	return remote, nil
 }

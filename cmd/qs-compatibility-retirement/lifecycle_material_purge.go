@@ -19,9 +19,9 @@ import (
 	"github.com/FangcunMount/qs-server/pkg/version"
 )
 
-// This is the seam for the future real runtime/data acceptance producer. There
-// is deliberately no constructor, request field, JSON decoder or receipt loader
-// for it yet. VerifyAcceptance still fails, and effectsPreflight still fails.
+// This is the seam for the future real runtime/data acceptance producer. The
+// partial catalog below registers actual API/engine owners but cannot construct
+// this accepted owner. VerifyAcceptance and effectsPreflight still fail.
 // In particular an absent archive, restored fixture, success DTO or remote
 // process exit cannot mint this same-process accepted-batch capability.
 type lifecycleAcceptedMaterials struct {
@@ -90,6 +90,50 @@ type lifecycleBatchMaterials struct {
 	zeroVerified                     bool
 }
 
+// Compose only directly available original owners after the native read/fence.
+// Retain partial FD ownership even on failure so host Close can release it.
+// Root/inventory/source/restore-receipt/archive/A registration remains absent;
+// no complete batch or other scope is inferred from these two resource leaves.
+func (h *lifecycleFixedHost) composeNativeMaterialOwners(ctx context.Context, r lifecycleRequest) (result error) {
+	b := lifecycleMaterialsBinding(r)
+	if h == nil || ctx == nil || ctx.Err() != nil || runtime.GOOS != "linux" || os.Getuid() != 0 || os.Geteuid() != 0 || version.GitCommit != sourceSHA || !b.valid() || b.tool != sourceSHA || r.prepareRoot != lifecycleInvocationBatch(r.OperationID, r.ActualRunID) || h.materials != nil || h.acceptedMaterials != nil || h.currentMQ == nil || h.api == nil || h.api.self != h.api || h.api.unknown || h.api.materials == nil || h.api.acceptance == nil || h.api.acceptance.self != h.api.acceptance || h.api.acceptance.owner != h.api || lifecycleMaterialsBinding(h.api.request) != b || h.api.dir != filepath.Join(r.prepareRoot, "api-transition") || h.api.materials.path != h.api.dir || !h.api.bProgramVerified || !h.api.rollbackProgramVerified || h.restoreOwner == nil || len(h.restoreOwner.engines) != 2 {
+		return lifecycleError("lifecycle_actual_complete_material_scope_missing")
+	}
+	c := &lifecycleBatchMaterials{binding: b, scopes: map[lifecycleMaterialScope]struct{}{}}
+	c.self = c
+	h.materials = c
+	defer func() {
+		if result != nil {
+			c.unknown = true // A failed partial handoff can never be completed/reused.
+		}
+	}()
+	root, e := openLifecycleMaterialDirectory(r.prepareRoot, 0)
+	if e != nil {
+		return e
+	}
+	c.directories = append(c.directories, root)
+	if e = root.registerChild(h.api.materials); e != nil {
+		return e
+	}
+	if e = h.api.materials.checkComplete(false); e != nil {
+		return e
+	}
+	c.scopes[lifecycleAPIJournalMaterials] = struct{}{}
+	for i, engine := range h.restoreOwner.engines {
+		if engine == nil || i == 0 && engine.Kind != "mysql" || i == 1 && engine.Kind != "mongodb" {
+			return lifecycleError("lifecycle_restore_owned_material_binding_rejected")
+		}
+		registered, err := registerLifecycleEnginePurge(ctx, b, engine)
+		if err != nil {
+			return err
+		}
+		c.engines = append(c.engines, registered)
+	}
+	// The restore registration receipt has not been handed off; do not mark the
+	// restore scope complete merely because both actual engines are registered.
+	return checkLifecycleRestoreMaterialSet(ctx, c.engines, false)
+}
+
 func lifecycleMaterialPathsMatch(c *lifecycleBatchMaterials, r lifecycleRequest) bool {
 	if c.archive.path != r.ArchiveDirectory || r.prepareRoot != lifecycleInvocationBatch(r.OperationID, r.ActualRunID) || c.journal.path != filepath.Join(r.prepareRoot, "material-purge-receipts") {
 		return false
@@ -114,7 +158,7 @@ func (h *lifecycleFixedHost) acceptedBatchMaterials(ctx context.Context, r lifec
 		return nil, lifecycleError("lifecycle_actual_batch_acceptance_missing")
 	}
 	a := h.acceptedMaterials
-	if a == nil || a.self != a || a.host != h || a.binding != lifecycleMaterialsBinding(r) || !a.binding.valid() || a.binding.tool != sourceSHA || a.catalog == nil || a.catalog.self != a.catalog || a.catalog.binding != a.binding {
+	if a == nil || a.self != a || a.host != h || a.binding != lifecycleMaterialsBinding(r) || !a.binding.valid() || a.binding.tool != sourceSHA || a.catalog == nil || a.catalog != h.materials || a.catalog.self != a.catalog || a.catalog.binding != a.binding {
 		return nil, lifecycleError("lifecycle_actual_batch_acceptance_missing")
 	}
 	c := a.catalog
@@ -144,7 +188,7 @@ func (h *lifecycleFixedHost) acceptedBatchMaterials(ctx context.Context, r lifec
 // existing accepted-batch owner; it does not create acceptance or mark a scope
 // complete. Register both real journal identities before closing their writers.
 func (h *lifecycleFixedHost) registerAIStoppedMaterials(ctx context.Context, r lifecycleRequest, c *lifecycleBatchMaterials) error {
-	if h == nil || h.aiStopped == nil || h.acceptedMaterials == nil || h.acceptedMaterials.self != h.acceptedMaterials || h.acceptedMaterials.host != h || h.acceptedMaterials.catalog != c || c == nil || c.self != c || c.binding != lifecycleMaterialsBinding(r) || c.closed || c.unknown || c.remote == nil || c.remote.terminal == nil || r.prepareRoot != lifecycleInvocationBatch(r.OperationID, r.ActualRunID) {
+	if h == nil || h.aiStopped == nil || h.acceptedMaterials == nil || h.acceptedMaterials.self != h.acceptedMaterials || h.acceptedMaterials.host != h || h.acceptedMaterials.catalog != c || c == nil || c != h.materials || c.self != c || c.binding != lifecycleMaterialsBinding(r) || c.closed || c.unknown || c.remote == nil || c.remote.terminal == nil || r.prepareRoot != lifecycleInvocationBatch(r.OperationID, r.ActualRunID) {
 		return lifecycleError("lifecycle_actual_complete_material_scope_missing")
 	}
 	// acceptedBatchMaterials already requires the original D terminal. Recheck

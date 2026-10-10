@@ -22,6 +22,7 @@ func lifecycleEffectsPreflight(context.Context) error {
 type lifecycleFixedHost struct {
 	owner               *lifecyclePreparationOwner
 	restoreOwner        *lifecyclePreparationOwner
+	materials           *lifecycleBatchMaterials
 	acceptedMaterials   *lifecycleAcceptedMaterials
 	services            *lifecycleServiceController
 	api                 *lifecycleAPITransition
@@ -322,6 +323,11 @@ func (h *lifecycleFixedHost) Close() error {
 	}
 	if h.acceptedMaterials != nil && h.acceptedMaterials.catalog != nil {
 		if err := h.acceptedMaterials.catalog.close(); result == nil {
+			result = err
+		}
+	}
+	if h.materials != nil {
+		if err := h.materials.close(); result == nil {
 			result = err
 		}
 	}

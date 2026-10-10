@@ -380,6 +380,58 @@ func TestMaterialEngineRegistrationRejectsUnownedAndNonterminalBeforeNativeCalls
 		}
 	}
 }
+
+func TestNativeMaterialPartialCatalogKeepsBodiesAndClosesOriginalAPIChild(t *testing.T) {
+	root := materialTestDirectory(t, filepath.Join(t.TempDir(), "invocation"))
+	api := materialTestDirectory(t, filepath.Join(root.path, "api-transition"))
+	materialTestFile(t, api, "original-runtime-spec.private.json", "original secret runtime spec")
+	if e := root.registerChild(api); e != nil {
+		t.Fatal(e)
+	}
+	c := &lifecycleBatchMaterials{binding: materialTestBinding(), scopes: map[lifecycleMaterialScope]struct{}{lifecycleAPIJournalMaterials: {}}, directories: []*lifecycleMaterialDirectory{root}}
+	c.self = c
+	h := &lifecycleFixedHost{materials: c, api: &lifecycleAPITransition{materials: api}}
+	if h.PurgeTemporaryCopies(t.Context(), lifecycleRequest{}) == nil || h.VerifyTemporaryMaterialsZero(t.Context(), lifecycleRequest{}) == nil || h.acceptedMaterials != nil || c.remote != nil || len(c.scopes) != 1 {
+		t.Fatal("partial original owners minted complete acceptance or remote zero")
+	}
+	if e := h.Close(); e != nil {
+		t.Fatal(e)
+	}
+	if !c.closed || root.file != nil || api.file != nil || api.files["original-runtime-spec.private.json"].file != nil {
+		t.Fatal("failure cleanup leaked a borrowed API child or root descriptor")
+	}
+	if raw, e := os.ReadFile(filepath.Join(api.path, "original-runtime-spec.private.json")); e != nil || string(raw) != "original secret runtime spec" {
+		t.Fatal("partial registration deleted or changed a body before acceptance")
+	}
+}
+
+func TestNativeMaterialCompositionCallsOriginalAPIChildAfterNativeReadAndFence(t *testing.T) {
+	calls := preBComparisonProductionCalls(t, "lifecycle_native_acceptance.go", "verifyNativeAcceptance")
+	read, fence, compose := -1, -1, -1
+	for i, name := range calls {
+		switch name {
+		case "ObserveLoadedMQ":
+			read = i
+		case "CheckWholeWriterFence":
+			fence = i
+		case "composeNativeMaterialOwners":
+			compose = i
+		}
+	}
+	if read < 0 || fence <= read || compose <= fence {
+		t.Fatal("material registration bypassed the actual native read or post-read fence")
+	}
+	apiChild := false
+	for _, name := range preBComparisonProductionCalls(t, "lifecycle_material_purge.go", "composeNativeMaterialOwners") {
+		apiChild = apiChild || name == "registerChild"
+		if name == "purge" || name == "PurgeOwnedMaterials" || name == "SealTemporaryJournals" {
+			t.Fatal("partial composition performed accepted-only mutation or sealed a live writer")
+		}
+	}
+	if !apiChild || new(lifecycleFixedHost).composeNativeMaterialOwners(t.Context(), lifecycleRequest{}) == nil {
+		t.Fatal("actual API child registration omitted or missing owner admitted")
+	}
+}
 func TestMaterialBindingChangesOriginalProducerRunAndEveryDigest(t *testing.T) {
 	a := materialTestBinding()
 	base := a.digest()
