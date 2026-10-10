@@ -62,11 +62,12 @@ type SQLHistoricalComponentObservation struct {
 }
 
 type SQLHistoricalComponentStatement struct {
-	self        *SQLHistoricalComponentStatement
-	observation *SQLHistoricalComponentObservation
-	plan        *SQLHistoricalBatchCASPlan
-	statement   *SQLHistoricalBatchCASStatement
-	seal        string
+	self         *SQLHistoricalComponentStatement
+	observation  *SQLHistoricalComponentObservation
+	observations []*SQLHistoricalComponentObservation
+	plan         *SQLHistoricalBatchCASPlan
+	statement    *SQLHistoricalBatchCASStatement
+	seal         string
 }
 
 type SQLHistoricalComponentReadReport struct {
@@ -1836,57 +1837,265 @@ func (o *SQLHistoricalComponentObservation) apply(ctx context.Context) (*SQLHist
 // Every target and binding uses this observer's fresh locked full-row baseline
 // and actual semantic owner view, never a reconstructed cycle or owner batch.
 func (o *SQLHistoricalComponentObservation) ApplyHistoricalAttachments(ctx context.Context, attachments []SQLHistoricalBatchAttachment) (*SQLHistoricalComponentStatement, error) {
-	if o == nil {
+	return ApplySQLHistoricalComponentAttachments(ctx, []*SQLHistoricalComponentObservation{o}, [][]SQLHistoricalBatchAttachment{attachments})
+}
+
+// ApplySQLHistoricalComponentAttachments preserves every fragment's sealed
+// source selector and live owner read. Overlapping physical targets are written
+// once, with all entries, so the host has one final image to read independently.
+// This is still only the SQL physical boundary; source/Mongo/AI qualification is
+// required at the maintenance composition before calling it.
+func ApplySQLHistoricalComponentAttachments(ctx context.Context, observations []*SQLHistoricalComponentObservation, attachments [][]SQLHistoricalBatchAttachment) (*SQLHistoricalComponentStatement, error) {
+	if ctx == nil || ctx.Err() != nil || len(observations) == 0 || len(observations) > 512 || len(observations) != len(attachments) {
 		return nil, ErrSQLHistoricalComponent
 	}
-	o.applyMu.Lock()
-	defer o.applyMu.Unlock()
-	if o.live(ctx) != nil || !o.writable || o.used || len(attachments) == 0 || len(attachments) > 512 || len(o.recipe.plan.groups) != 0 || len(o.recipe.plan.attachments) != 0 {
-		return nil, ErrSQLHistoricalComponent
+	unique := map[*SQLHistoricalComponentObservation]bool{}
+	order := slices.Clone(observations)
+	for _, o := range order {
+		if o == nil || unique[o] {
+			return nil, ErrSQLHistoricalComponent
+		}
+		unique[o] = true
 	}
-	bounded, cancel := context.WithDeadline(ctx, o.expires)
+	// Consistent lock order also prevents concurrent overlapping submissions
+	// from using any original observation twice.
+	sort.Slice(order, func(i, j int) bool { return reflect.ValueOf(order[i]).Pointer() < reflect.ValueOf(order[j]).Pointer() })
+	for _, o := range order {
+		o.applyMu.Lock()
+	}
+	defer func() {
+		for i := len(order) - 1; i >= 0; i-- {
+			order[i].applyMu.Unlock()
+		}
+	}()
+	expires := observations[0].expires
+	for _, o := range observations {
+		if o.live(ctx) != nil || !o.writable || o.used || len(o.recipe.plan.groups) != 0 || len(o.recipe.plan.attachments) != 0 {
+			return nil, ErrSQLHistoricalComponent
+		}
+		if o.expires.Before(expires) {
+			expires = o.expires
+		}
+	}
+	bounded, cancel := context.WithDeadline(ctx, expires)
 	defer cancel()
-	view, err := o.SemanticView(bounded)
+	p, err := componentSQLUnionPlan(observations)
 	if err != nil {
 		return nil, err
 	}
-	for _, a := range attachments {
-		if !slices.Contains(o.recipe.selectors.EventIDs, a.Entry.EventID) || view.owners[a.AssessmentID] == nil {
-			return nil, ErrSQLHistoricalComponent
+	owners := map[uint64]*SQLHistoricalOwnerFacts{}
+	var all []SQLHistoricalBatchAttachment
+	for i, o := range observations {
+		view, err := o.SemanticView(bounded)
+		if err != nil {
+			return nil, err
 		}
+		for _, a := range attachments[i] {
+			// A different fragment's event or owner cannot expand this scope.
+			if !slices.Contains(o.recipe.selectors.EventIDs, a.Entry.EventID) || view.owners[a.AssessmentID] == nil || len(all) == 512 {
+				return nil, ErrSQLHistoricalComponent
+			}
+			all = append(all, a)
+		}
+		for id, f := range view.owners {
+			if previous := owners[id]; previous != nil {
+				left, right := previous.Snapshot(), f.Snapshot()
+				left.Responsibilities, right.Responsibilities = nil, nil
+				if previous.identity != f.identity || !reflect.DeepEqual(left, right) {
+					return nil, ErrSQLHistoricalComponent
+				}
+				for _, responsibility := range f.snapshot.Responsibilities {
+					found := false
+					for _, prior := range previous.snapshot.Responsibilities {
+						if prior.Store == responsibility.Store && prior.ID == responsibility.ID {
+							if !reflect.DeepEqual(prior, responsibility) {
+								return nil, ErrSQLHistoricalComponent
+							}
+							found = true
+							break
+						}
+					}
+					if !found {
+						previous.snapshot.Responsibilities = append(previous.snapshot.Responsibilities, responsibility)
+					}
+				}
+			} else {
+				copy := *f
+				copy.snapshot = f.Snapshot()
+				owners[id] = &copy
+			}
+		}
+	}
+	if len(all) == 0 {
+		return nil, ErrSQLHistoricalComponent
 	}
 	tx, err := historicalTx(bounded)
 	if err != nil {
 		return nil, err
 	}
-	base := o.recipe.plan
-	p := &SQLHistoricalBatchCASPlan{oldTransaction: base.oldTransaction, identity: base.identity, server: base.server, database: base.database, request: SQLHistoricalOwnerBatchRequest{AssessmentIDs: slices.Clone(base.request.AssessmentIDs), AnswerSheetIDs: slices.Clone(base.request.AnswerSheetIDs)}, limits: base.limits, before: casCloneImage(o.business)}
-	p, err = prepareSQLHistoricalBatchCASFromImage(bounded, tx, p, view.owners, attachments)
-	if err != nil || !reflect.DeepEqual(p.before, o.business) || o.live(bounded) != nil {
+	before := casCloneImage(p.before)
+	p, err = prepareSQLHistoricalBatchCASFromImage(bounded, tx, p, owners, all)
+	if err != nil || !reflect.DeepEqual(p.before, before) {
 		return nil, ErrSQLHistoricalComponent
 	}
-	// Poison before the first possible write. An unknown effect is not retried
-	// by this original physical observation, even if no statement is returned.
-	o.used = true
+	for _, o := range observations {
+		if o.live(bounded) != nil {
+			return nil, ErrSQLHistoricalComponent
+		}
+	}
+	// Poison ALL inputs before the first possible effect, including fragments
+	// that provide only a negative dependency. Unknown results cannot be reused.
+	for _, o := range observations {
+		o.used = true
+	}
 	statement, err := p.Apply(bounded)
 	if err != nil {
 		return nil, err
 	}
-	if statement.transaction != o.transaction || o.live(bounded) != nil {
-		return nil, ErrSQLHistoricalComponent
+	for _, o := range observations {
+		if statement.transaction != o.transaction || o.live(bounded) != nil {
+			return nil, ErrSQLHistoricalComponent
+		}
 	}
-	s := &SQLHistoricalComponentStatement{observation: o, plan: p, statement: statement}
-	s.self = s
-	s.seal = s.digest()
+	s := &SQLHistoricalComponentStatement{observation: observations[0], observations: slices.Clone(observations), plan: p, statement: statement}
+	s.self, s.seal = s, s.digest()
 	if s.seal == "" {
 		return nil, ErrSQLHistoricalComponent
 	}
 	return s, nil
 }
 
+// Pure merging never grants an observation or changes its sealed selectors.
+// All duplicate physical rows must contain exactly the same original bytes.
+func componentSQLUnionPlan(observations []*SQLHistoricalComponentObservation) (*SQLHistoricalBatchCASPlan, error) {
+	if len(observations) == 0 || observations[0] == nil || observations[0].recipe == nil || observations[0].recipe.plan == nil {
+		return nil, ErrSQLHistoricalComponent
+	}
+	first := observations[0]
+	base := first.recipe.plan
+	p := &SQLHistoricalBatchCASPlan{oldTransaction: base.oldTransaction, identity: base.identity, server: base.server, database: base.database, limits: base.limits, before: sqlHistoricalCASImage{rows: map[string][]historicalSQLRow{}, schema: map[string]string{}, columns: map[string][]string{}}}
+	for _, o := range observations {
+		if o == nil || o.recipe == nil || o.recipe.plan == nil || o.pool != first.pool || o.transaction != first.transaction || o.recipe.oldPool != first.recipe.oldPool {
+			return nil, ErrSQLHistoricalComponent
+		}
+		r := o.recipe.plan
+		if r.oldTransaction != base.oldTransaction || r.identity != base.identity || r.server != base.server || r.database != base.database || r.limits != base.limits {
+			return nil, ErrSQLHistoricalComponent
+		}
+		p.request.AssessmentIDs = append(p.request.AssessmentIDs, r.request.AssessmentIDs...)
+		p.request.AnswerSheetIDs = append(p.request.AnswerSheetIDs, r.request.AnswerSheetIDs...)
+		slices.Sort(p.request.AssessmentIDs)
+		slices.Sort(p.request.AnswerSheetIDs)
+		p.request.AssessmentIDs, p.request.AnswerSheetIDs = slices.Compact(p.request.AssessmentIDs), slices.Compact(p.request.AnswerSheetIDs)
+		if len(p.request.AssessmentIDs) > p.limits.MaxOwners || len(p.request.AnswerSheetIDs) > p.limits.MaxOwners {
+			return nil, ErrSQLHistoricalComponent
+		}
+		if err := componentSQLUnionImage(&p.before, o.business); err != nil {
+			return nil, err
+		}
+		var count int
+		var size uint64
+		for _, table := range batchBusinessTables {
+			for _, row := range p.before.rows[table] {
+				count++
+				for _, value := range row {
+					if value != nil {
+						size += uint64(len(*value))
+					}
+				}
+			}
+		}
+		if count > p.limits.MaxRows || size > p.limits.MaxBytes {
+			return nil, ErrSQLHistoricalComponent
+		}
+	}
+
+	return p, nil
+}
+
+func componentSQLUnionImage(out *sqlHistoricalCASImage, original sqlHistoricalCASImage) error {
+	cloned := casCloneImage(original)
+	for key, value := range cloned.schema {
+		if prior, ok := out.schema[key]; ok && prior != value {
+			return ErrSQLHistoricalComponent
+		}
+		out.schema[key] = value
+	}
+	for key, value := range cloned.columns {
+		if prior, ok := out.columns[key]; ok && !reflect.DeepEqual(prior, value) {
+			return ErrSQLHistoricalComponent
+		}
+		out.columns[key] = value
+	}
+	for table, rows := range cloned.rows {
+		if !slices.Contains(batchBusinessTables, table) {
+			if prior, ok := out.rows[table]; ok && !reflect.DeepEqual(prior, rows) {
+				return ErrSQLHistoricalComponent
+			}
+			out.rows[table] = rows
+			continue
+		}
+		if _, ok := out.rows[table]; !ok {
+			out.rows[table] = []historicalSQLRow{}
+		}
+		byID := map[uint64]historicalSQLRow{}
+		for _, row := range out.rows[table] {
+			id, err := sqlHistoricalUint(row, "id")
+			if err != nil || id == 0 || byID[id] != nil {
+				return ErrSQLHistoricalComponent
+			}
+			byID[id] = row
+		}
+		seen := map[uint64]bool{}
+		for _, row := range rows {
+			id, err := sqlHistoricalUint(row, "id")
+			if err != nil || id == 0 || seen[id] {
+				return ErrSQLHistoricalComponent
+			}
+			seen[id] = true
+			if prior := byID[id]; prior != nil {
+				if !reflect.DeepEqual(prior, row) {
+					return ErrSQLHistoricalComponent
+				}
+			} else {
+				byID[id] = row
+				out.rows[table] = append(out.rows[table], row)
+			}
+		}
+		sort.Slice(out.rows[table], func(i, j int) bool {
+			a, _ := sqlHistoricalUint(out.rows[table][i], "id")
+			b, _ := sqlHistoricalUint(out.rows[table][j], "id")
+			return a < b
+		})
+	}
+	return nil
+}
+
 func (s *SQLHistoricalComponentStatement) digest() string {
 	if s == nil || s.observation == nil || s.statement == nil || s.plan == nil || s.statement.plan != s.plan || !s.observation.recipe.intact() {
 		return ""
+	}
+	if len(s.observations) != 0 {
+		if s.observations[0] != s.observation {
+			return ""
+		}
+		baseline, err := componentSQLUnionPlan(s.observations)
+		if err != nil || baseline.identity != s.plan.identity || baseline.server != s.plan.server || baseline.database != s.plan.database || baseline.oldTransaction != s.plan.oldTransaction || baseline.limits != s.plan.limits || !reflect.DeepEqual(baseline.request, s.plan.request) || !reflect.DeepEqual(baseline.before, s.plan.before) {
+			return ""
+		}
+		parts := []string{"sql-component-union-statement/v1", casImageHash(s.statement.expected), strconv.FormatUint(s.statement.transaction.event, 10)}
+		for _, o := range s.observations {
+			if o.self != o || !o.used || !o.writable || o.seal == "" || o.seal != o.digest() || o.transaction != s.statement.transaction {
+				return ""
+			}
+			parts = append(parts, o.seal)
+		}
+		raw, err := json.Marshal(componentPlanRecord(s.plan))
+		if err != nil {
+			return ""
+		}
+		parts = append(parts, string(raw))
+		return cycleKeyDigest(parts)
 	}
 	base := s.observation.recipe.plan
 	if s.plan.identity != base.identity || s.plan.server != base.server || s.plan.database != base.database || s.plan.oldTransaction != base.oldTransaction || !reflect.DeepEqual(s.plan.request, base.request) || s.plan.limits != base.limits || !reflect.DeepEqual(s.plan.before, s.observation.business) || s.statement.transaction != s.observation.transaction {
@@ -1908,14 +2117,23 @@ func (s *SQLHistoricalComponentStatement) Report() SQLHistoricalBatchCASReport {
 // SQL readback alone deliberately never certifies the paired host commits.
 func (s *SQLHistoricalComponentStatement) VerifyIndependentPersisted(ctx context.Context, budget time.Duration) (SQLHistoricalComponentReadReport, error) {
 	r := SQLHistoricalComponentReadReport{FullSourcesRequired: true, MongoQualificationRequired: true, AIClosureRequired: true, HostCommitRequired: true}
-	if ctx == nil || ctx.Err() != nil || s == nil || s.self != s || s.seal == "" || s.seal != s.digest() || !s.observation.recipe.intact() || budget <= 0 || budget > 20*time.Second {
+	if ctx == nil || ctx.Err() != nil || s == nil || s.self != s || s.seal == "" || s.seal != s.digest() || budget <= 0 || budget > 20*time.Second {
 		return r, ErrSQLHistoricalComponent
 	}
 	bounded, cancel := context.WithTimeout(ctx, budget)
 	defer cancel()
 	tx, err := historicalTx(bounded)
-	if err != nil || tx.Statement.ConnPool == s.observation.pool || tx.Statement.ConnPool == s.observation.recipe.oldPool || sqlHistoricalEndedPool(bounded, s.observation.pool) != nil {
+	if err != nil {
 		return r, ErrSQLHistoricalComponent
+	}
+	observations := s.observations
+	if len(observations) == 0 {
+		observations = []*SQLHistoricalComponentObservation{s.observation}
+	}
+	for _, o := range observations {
+		if !o.recipe.intact() || tx.Statement.ConnPool == o.pool || tx.Statement.ConnPool == o.recipe.oldPool || sqlHistoricalEndedPool(bounded, o.pool) != nil {
+			return r, ErrSQLHistoricalComponent
+		}
 	}
 	server, database, err := historicalDatabase(tx)
 	p := s.plan
@@ -1930,9 +2148,13 @@ func (s *SQLHistoricalComponentStatement) VerifyIndependentPersisted(ctx context
 	if err != nil || actual == s.statement.transaction || actual == p.oldTransaction {
 		return r, ErrSQLHistoricalComponent
 	}
-	scoped, anchors, _, err := s.observation.recipe.captureResponsibility(tx)
-	if err != nil || !reflect.DeepEqual(scoped, s.observation.recipe.responsibility) || !reflect.DeepEqual(anchors, s.observation.recipe.anchors) {
-		return r, ErrSQLHistoricalComponent
+	// Every original negative range/replay expansion is re-read. The merged
+	// business image does not stand in for any fragment's responsibility scope.
+	for _, o := range observations {
+		scoped, anchors, _, err := o.recipe.captureResponsibility(tx)
+		if err != nil || !reflect.DeepEqual(scoped, o.recipe.responsibility) || !reflect.DeepEqual(anchors, o.recipe.anchors) {
+			return r, ErrSQLHistoricalComponent
+		}
 	}
 	after, err := cycleActualTransaction(tx)
 	if err != nil || after != actual || bounded.Err() != nil {

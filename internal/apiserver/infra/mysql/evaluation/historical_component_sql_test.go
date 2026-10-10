@@ -262,3 +262,72 @@ func TestSQLHistoricalComponentOwnerGraphKeepsReplayAtomic(t *testing.T) {
 		t.Fatal("private graph metadata manufactured a live original recipe")
 	}
 }
+
+func TestSQLHistoricalComponentUnionCannotImportOrReuseObservers(t *testing.T) {
+	for _, observers := range [][]*SQLHistoricalComponentObservation{nil, {nil}, {{}}, {{}, {}}} {
+		attachments := make([][]SQLHistoricalBatchAttachment, len(observers))
+		for i := range attachments {
+			attachments[i] = []SQLHistoricalBatchAttachment{{}}
+		}
+		if statement, err := ApplySQLHistoricalComponentAttachments(context.Background(), observers, attachments); err == nil || statement != nil {
+			t.Fatal("imported or absent native union observer accepted")
+		}
+	}
+	o := &SQLHistoricalComponentObservation{}
+	if statement, err := ApplySQLHistoricalComponentAttachments(context.Background(), []*SQLHistoricalComponentObservation{o, o}, [][]SQLHistoricalBatchAttachment{{{}}, {{}}}); err == nil || statement != nil {
+		t.Fatal("duplicate original observer accepted")
+	}
+}
+
+// Pure image tests exercise overlap and bounds only; they create no native
+// observation, SQL statement, source proof or writing authority.
+func TestSQLHistoricalComponentUnionPreservesExactOriginalRowsAndBounds(t *testing.T) {
+	makeObserver := func(id string) *SQLHistoricalComponentObservation {
+		image := sqlHistoricalCASImage{rows: map[string][]historicalSQLRow{"assessment": {cycleTestRow(map[string]string{"id": id, "org_id": "7", "answer_sheet_id": "10042"})}, "runtime_checkpoint": {}, "evaluation_outcome": {}, "cas_migration_head": {cycleTestRow(map[string]string{"version": "99", "dirty": "0"})}}, schema: map[string]string{"assessment": "same"}, columns: map[string][]string{"assessment": {"id", "org_id", "answer_sheet_id"}}}
+		return &SQLHistoricalComponentObservation{recipe: &SQLHistoricalComponentRecipe{plan: &SQLHistoricalBatchCASPlan{identity: "identity", server: "server", database: "database", request: SQLHistoricalOwnerBatchRequest{AssessmentIDs: []uint64{42}, AnswerSheetIDs: []uint64{10042}}, limits: DefaultSQLHistoricalOwnerBatchLimits()}}, business: image}
+	}
+	first, second := makeObserver("42"), makeObserver("42")
+	merged, err := componentSQLUnionPlan([]*SQLHistoricalComponentObservation{first, second})
+	if err != nil || len(merged.before.rows["assessment"]) != 1 || len(merged.request.AssessmentIDs) != 1 {
+		t.Fatal("same actual original physical row not deduplicated", err)
+	}
+	*merged.before.rows["assessment"][0]["org_id"] = "changed"
+	if valueOrEmpty(first.business.rows["assessment"][0]["org_id"]) != "7" || valueOrEmpty(second.business.rows["assessment"][0]["org_id"]) != "7" {
+		t.Fatal("merged plan mutates sealed original images")
+	}
+	for _, which := range []string{"duplicate_raw", "schema", "columns", "metadata", "transaction", "old_transaction", "database", "limits", "owner_budget", "row_budget", "byte_budget"} {
+		t.Run(which, func(t *testing.T) {
+			first, second := makeObserver("42"), makeObserver("42")
+			switch which {
+			case "duplicate_raw":
+				second.business.rows["assessment"][0]["org_id"] = strptr("8")
+			case "schema":
+				second.business.schema["assessment"] = "changed"
+			case "columns":
+				second.business.columns["assessment"] = []string{"id"}
+			case "metadata":
+				second.business.rows["cas_migration_head"][0]["dirty"] = strptr("1")
+			case "transaction":
+				second.transaction.event = 1
+			case "old_transaction":
+				second.recipe.plan.oldTransaction.event = 1
+			case "database":
+				second.recipe.plan.database = "other"
+			case "limits":
+				second.recipe.plan.limits.MaxRows++
+			case "owner_budget":
+				first.recipe.plan.limits.MaxOwners, second.recipe.plan.limits.MaxOwners = 1, 1
+				second.recipe.plan.request.AssessmentIDs = []uint64{43}
+				second.business.rows["assessment"][0]["id"] = strptr("43")
+			case "row_budget":
+				first.recipe.plan.limits.MaxRows, second.recipe.plan.limits.MaxRows = 1, 1
+				second.business.rows["assessment"][0]["id"] = strptr("43")
+			case "byte_budget":
+				first.recipe.plan.limits.MaxBytes, second.recipe.plan.limits.MaxBytes = 1, 1
+			}
+			if _, err := componentSQLUnionPlan([]*SQLHistoricalComponentObservation{first, second}); err == nil {
+				t.Fatal("inconsistent original row/host/bounds accepted")
+			}
+		})
+	}
+}

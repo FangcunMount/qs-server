@@ -1013,3 +1013,135 @@ func TestSQLHistoricalComponentNativeExpiryAndReplayWholePair(t *testing.T) {
 		t.Fatal("new member outside original event selector hidden")
 	}
 }
+
+// Genuine captured owner/range recipes represent two original SQL fragments.
+// The conclusions are synthetic: this proves the SQL union/host/readback
+// boundary, not four-source authentication or paired Mongo/AI acceptance.
+func TestSQLHistoricalComponentNativeUnionTwoFragmentsAppendAndReadback(t *testing.T) {
+	db := openHistoricalReferencesDB(t)
+	insertHistoricalAssessment(t, db, 42)
+	record, _ := testCommittedReference(t, 9001, 42, "current-outcome-native-union")
+	if err := db.Create(outcomeToPO(record)).Error; err != nil {
+		t.Fatal(err)
+	}
+	ids := []string{"union-original-first", "union-original-second"}
+	var recipes []*SQLHistoricalComponentRecipe
+	if err := batchNativeTx(t, db, func(ctx context.Context, c *SQLHistoricalResponsibilityCycle) error {
+		batch, err := PrepareSQLHistoricalOwnerBatch(ctx, c, SQLHistoricalOwnerBatchRequest{AssessmentIDs: []uint64{42}, AnswerSheetIDs: []uint64{10042}}, DefaultSQLHistoricalOwnerBatchLimits())
+		if err != nil {
+			return err
+		}
+		catalog, err := PrepareSQLHistoricalCrossStoreCatalog(ctx, c, DefaultSQLCrossStoreLimits())
+		if err != nil {
+			return err
+		}
+		for _, id := range ids {
+			frozen, err := FreezeSQLHistoricalOwnerPlanningRecipes(ctx, batch, catalog, SQLCrossStoreSelectors{EventIDs: []string{id}, AssessmentIDs: []uint64{42}, OrganizationIDs: []uint64{7}, MongoOwners: []SQLCrossStoreOwnerReference{{Kind: "AnswerSheet", ID: "10042"}}}, nil, map[string]uint64{id: 42})
+			if err != nil {
+				return err
+			}
+			if len(frozen) != 1 || len(frozen[0].plan.groups) != 0 {
+				return errors.New("planning fragment invented write permission")
+			}
+			recipes = append(recipes, frozen[0])
+		}
+		return nil
+	}); err != nil {
+		t.Fatal("original fragments capture", err)
+	}
+	apply := func(ctx context.Context) (*SQLHistoricalComponentStatement, error) {
+		var observations []*SQLHistoricalComponentObservation
+		var attachments [][]SQLHistoricalBatchAttachment
+		for i, recipe := range recipes {
+			o, err := PrepareSQLHistoricalComponentObservation(ctx, recipe, 20*time.Second, true)
+			if err != nil {
+				return nil, err
+			}
+			view, err := o.SemanticView(ctx)
+			if err != nil {
+				return nil, err
+			}
+			original := &evidence.HistoricalRunReferenceV1{RunID: "42:1", Attempt: 1}
+			binding, err := view.BusinessBinding(ctx, 42, 9001, "evaluation.outcome.committed", original)
+			if err != nil {
+				return nil, err
+			}
+			entry := nativeHistoricalEntry(ids[i], "evaluation.outcome.committed", binding, original)
+			entry.Source.Digest = evidence.SourceDigest("mysql-cast-binary-row-v2", []byte(ids[i]))
+			entry.Proof.Digest = entry.Source.Digest
+			observations = append(observations, o)
+			attachments = append(attachments, []SQLHistoricalBatchAttachment{{AssessmentID: 42, OutcomeID: 9001, Entry: entry, ContentDigest: evidence.SourceDigest("legacy-domain-json-bytes-v1", []byte(ids[i]))}})
+		}
+		// An event from the other fragment does not expand the original source
+		// selector. Rejected preparation must not poison a not-yet-used input.
+		if statement, err := ApplySQLHistoricalComponentAttachments(ctx, observations, [][]SQLHistoricalBatchAttachment{attachments[1], attachments[0]}); err == nil || statement != nil {
+			return nil, errors.New("union expanded a fragment source selector")
+		}
+		statement, err := ApplySQLHistoricalComponentAttachments(ctx, observations, attachments)
+		if err != nil {
+			return nil, err
+		}
+		if statement == nil || len(statement.observations) != 2 || len(statement.plan.groups) != 1 || len(statement.plan.groups[0].entries) != 2 || len(statement.statement.expected.rows["evaluation_outcome"]) != 1 {
+			return nil, errors.New("overlap was not one physical target with both entries")
+		}
+		for i, o := range observations {
+			if !o.used || o.ValidateBorrowedObservation(ctx) == nil {
+				return nil, errors.New("original fragment not poisoned before effect")
+			}
+			if repeated, err := o.ApplyHistoricalAttachments(ctx, attachments[i]); err == nil || repeated != nil {
+				return nil, errors.New("original fragment allowed a second effect")
+			}
+		}
+		if repeated, err := ApplySQLHistoricalComponentAttachments(ctx, observations, attachments); err == nil || repeated != nil {
+			return nil, errors.New("union effect was reused")
+		}
+		return statement, nil
+	}
+	readback := func(statement *SQLHistoricalComponentStatement) error {
+		return db.Transaction(func(tx *gorm.DB) error {
+			report, err := statement.VerifyIndependentPersisted(hostmysql.WithTx(t.Context(), tx), 20*time.Second)
+			if err == nil && (!report.IndependentPersistedReadMatched || report.HostCommitVerified || report.DropReady) {
+				return errors.New("SQL union invented paired commit or DROP")
+			}
+			return err
+		}, &sql.TxOptions{Isolation: sql.LevelRepeatableRead, ReadOnly: true})
+	}
+	sentinel := errors.New("original host rollback after union")
+	var rolled, committed *SQLHistoricalComponentStatement
+	if err := db.Transaction(func(tx *gorm.DB) error {
+		var err error
+		rolled, err = apply(hostmysql.WithTx(t.Context(), tx))
+		if err != nil {
+			return err
+		}
+		return sentinel
+	}, &sql.TxOptions{Isolation: sql.LevelRepeatableRead}); !errors.Is(err, sentinel) {
+		t.Fatal("actual union rollback", err)
+	}
+	if err := readback(rolled); err == nil {
+		t.Fatal("rolled-back union became persisted proof")
+	}
+	if err := db.Transaction(func(tx *gorm.DB) error {
+		var err error
+		committed, err = apply(hostmysql.WithTx(t.Context(), tx))
+		return err
+	}, &sql.TxOptions{Isolation: sql.LevelRepeatableRead}); err != nil {
+		t.Fatal("actual same-owner union append", err)
+	}
+	if err := readback(committed); err != nil {
+		t.Fatal("final union independent readback", err)
+	}
+	set := storedHistoricalSet(t, db, "evaluation_outcome", "historical_committed_evidence", 9001)
+	if set == nil || len(set.Entries) != 2 || set.Entries[0].EventID != ids[0] || set.Entries[1].EventID != ids[1] || set.Entries[0].Run == nil || set.Entries[0].Run.RunID != "42:1" || set.Entries[1].Run == nil || set.Entries[1].Run.RunID != "42:1" {
+		t.Fatal("union lost original event IDs or run identity")
+	}
+	if err := componentSQLNativeObserve(t, db, recipes[1], true, nil); err == nil {
+		t.Fatal("old original fragment baseline accepted after real evidence change")
+	}
+	if err := db.Exec("UPDATE evaluation_outcome SET historical_committed_evidence=JSON_REMOVE(historical_committed_evidence,'$.entries[0]') WHERE id=9001").Error; err != nil {
+		t.Fatal("owned actual readback conflict setup", err)
+	}
+	if err := readback(committed); err == nil {
+		t.Fatal("union accepted actual persisted evidence missing one original entry")
+	}
+}
