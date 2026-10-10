@@ -96,7 +96,7 @@ func decodeLifecycleStagingRequest(raw []byte) (lifecycleRequest, error) {
 	if json.Unmarshal(raw, &fields) != nil {
 		return r, lifecycleError("lifecycle_staging_request_rejected")
 	}
-	for _, name := range []string{"resume", "resume_kind", "service_control", "deployment_control", "final_history", "writer_control", "source_copy_intent"} {
+	for _, name := range []string{"resume", "resume_kind", "service_control", "deployment_control", "final_history", "writer_control", "source_copy_intent", "historical_write_report"} {
 		if _, exists := fields[name]; exists {
 			return r, lifecycleError("lifecycle_staging_request_rejected")
 		}
@@ -560,7 +560,7 @@ func openLifecycleRootStagingMaterialFiles(ctx context.Context, root, invocation
 	if err != nil {
 		return nil, nil, err
 	}
-	if decodeLifecycleClosedProducer(raw, &i) != nil || i.FormatVersion != 1 || i.Kind != "root_once_exact_source_copy_intent" || i.OriginalSourceSHA != r.OriginalSourceSHA || !shaRE.MatchString(i.ToolSourceSHA) || i.OperationID != r.OperationID || !runRE.MatchString(i.ActualRunID) || i.ActualRunID == r.ActualRunID || i.OriginalRunID != r.Approval.RunID || i.SourceUID != sourceUID || i.ManifestSHA256 != r.ManifestSHA256 || !hashRE.MatchString(i.RequestSHA256) || !reflect.DeepEqual(i.SourceFileSHA256, hashes) || !reflect.DeepEqual(i.Targets, targets) || i.ArchiveDirectory != r.ArchiveDirectory || i.SourceStagingDirectory != filepath.Join(root, "inventory-"+i.OriginalRunID) || i.DropAuthority || !i.PurgeRequired {
+	if decodeLifecycleClosedProducer(raw, &i) != nil || i.FormatVersion != 1 || i.Kind != "root_once_exact_source_copy_intent" || i.OriginalSourceSHA != r.OriginalSourceSHA || !shaRE.MatchString(i.ToolSourceSHA) || i.OperationID != r.OperationID || !runRE.MatchString(i.ActualRunID) || i.ActualRunID == r.ActualRunID || filepath.Base(root) != i.OperationID+"-"+i.ActualRunID || i.OriginalRunID != r.Approval.RunID || i.SourceUID != sourceUID || i.ManifestSHA256 != r.ManifestSHA256 || !hashRE.MatchString(i.RequestSHA256) || !reflect.DeepEqual(i.SourceFileSHA256, hashes) || !reflect.DeepEqual(i.Targets, targets) || i.ArchiveDirectory != r.ArchiveDirectory || i.SourceStagingDirectory != filepath.Join(root, "inventory-"+i.OriginalRunID) || i.DropAuthority || !i.PurgeRequired {
 		return nil, nil, lifecycleError("lifecycle_staging_original_intent_rejected")
 	}
 	var toolRaw json.RawMessage
@@ -644,4 +644,157 @@ func openLifecycleRootStagingMaterialFiles(ctx context.Context, root, invocation
 		return nil, nil, err
 	}
 	return d, peer, nil
+}
+
+type lifecycleHistoricalWriteMaterialReport struct {
+	Protocol                     string `json:"protocol"`
+	SourceSHA                    string `json:"source_sha"`
+	ToolSourceSHA                string `json:"tool_source_sha"`
+	OperationID                  string `json:"operation_id"`
+	ActualRunID                  string `json:"actual_run_id"`
+	RequestSHA256                string `json:"request_sha256"`
+	DescriptorSHA256             string `json:"descriptor_sha256"`
+	CommitState                  string `json:"commit_state"`
+	MongoCommitRequirement       string `json:"mongo_commit_requirement"`
+	AIOriginalCommands           uint64 `json:"ai_original_commands"`
+	AISourceReferences           uint64 `json:"ai_source_references"`
+	PreparedPages                uint64 `json:"prepared_pages"`
+	ReadBackPages                uint64 `json:"readback_pages"`
+	EventReferences              uint64 `json:"event_references"`
+	ActualSQLCommitResponse      bool   `json:"actual_sql_commit_response"`
+	ActualMongoCommitResponse    bool   `json:"actual_mongo_commit_response"`
+	EventPersistenceObserved     bool   `json:"event_persistence_observed"`
+	AICommandPersistenceComplete bool   `json:"ai_command_persistence_complete"`
+	EvidenceWriteFinished        bool   `json:"evidence_write_finished"`
+	WholeWriterFence             bool   `json:"whole_writer_fence"`
+	FullExternalAIClosure        bool   `json:"full_external_ai_closure"`
+	DropReady                    bool   `json:"drop_ready"`
+	ErrorCategory                string `json:"error_category"`
+	MaterialManifestSHA256       string `json:"material_manifest_sha256,omitempty"`
+}
+
+type lifecycleHistoricalMaterial struct {
+	Name   string `json:"name"`
+	SHA256 string `json:"sha256"`
+	Bytes  int64  `json:"bytes"`
+	UID    uint32 `json:"uid"`
+	GID    uint32 `json:"gid"`
+	Device uint64 `json:"device"`
+	Inode  uint64 `json:"inode"`
+	Mode   uint32 `json:"mode"`
+}
+type lifecycleHistoricalMaterialManifest struct {
+	Version         int                           `json:"version"`
+	SourceSHA       string                        `json:"source_sha"`
+	ToolSourceSHA   string                        `json:"tool_source_sha"`
+	OperationID     string                        `json:"operation_id"`
+	RunID           string                        `json:"run_id"`
+	MaxSpoolBytes   int64                         `json:"max_spool_bytes"`
+	JournalSequence uint64                        `json:"journal_sequence"`
+	Files           []lifecycleHistoricalMaterial `json:"files"`
+}
+
+func lifecycleHistoricalWriteReferenceValid(r lifecycleRequest) bool {
+	if r.HistoricalWriteReport == nil || !hashRE.MatchString(r.HistoricalWriteReport.SHA256) || filepath.Base(r.HistoricalWriteReport.Path) != "history.write.json" {
+		return false
+	}
+	dir := filepath.Dir(r.HistoricalWriteReport.Path)
+	run := strings.TrimPrefix(filepath.Base(dir), "history-write-")
+	return runRE.MatchString(run) && run != r.ActualRunID && r.HistoricalWriteReport.Path == filepath.Join("/opt/backups/qs-server/compatibility-retirement", r.OperationID, "history-write-"+run, "history.write.json")
+}
+
+func openLifecycleOriginalHistoricalWriteMaterials(ctx context.Context, r lifecycleRequest, uid uint32) (*lifecycleMaterialDirectory, error) {
+	if !lifecycleHistoricalWriteReferenceValid(r) {
+		return nil, lifecycleError("lifecycle_history_original_material_rejected")
+	}
+	return openLifecycleHistoricalWriteMaterialFiles(ctx, filepath.Dir(r.HistoricalWriteReport.Path), r, uid)
+}
+
+func openLifecycleHistoricalWriteMaterialFiles(ctx context.Context, path string, r lifecycleRequest, uid uint32) (owned *lifecycleMaterialDirectory, result error) {
+	if ctx == nil || ctx.Err() != nil || r.HistoricalWriteReport == nil || r.HistoricalWriteReport.Path != filepath.Join(path, "history.write.json") {
+		return nil, lifecycleError("lifecycle_history_original_material_rejected")
+	}
+	d, err := openLifecycleMaterialDirectory(path, uid)
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		if result != nil {
+			result = errors.Join(result, d.close())
+		}
+	}()
+	var report lifecycleHistoricalWriteMaterialReport
+	reportRaw, err := readLifecycleProducerJSON(d, "history.write.json", r.HistoricalWriteReport.SHA256, uid, 256<<10, &report)
+	if err != nil {
+		return nil, err
+	}
+	// These are the original producer's metadata and known terminal response,
+	// never a capability for CAS, Q, the writer fence or business acceptance.
+	if decodeLifecycleClosedProducer(reportRaw, &report) != nil || report.Protocol != "qs-compatibility-evidence-write/v1" || report.SourceSHA != r.OriginalSourceSHA || report.OperationID != r.OperationID || !shaRE.MatchString(report.ToolSourceSHA) || !runRE.MatchString(report.ActualRunID) || report.ActualRunID == r.ActualRunID || filepath.Base(path) != "history-write-"+report.ActualRunID || !hashRE.MatchString(report.RequestSHA256) || !hashRE.MatchString(report.DescriptorSHA256) || !hashRE.MatchString(report.MaterialManifestSHA256) || report.ErrorCategory != "none" || !report.EvidenceWriteFinished || !report.ActualSQLCommitResponse || report.DropReady || report.WholeWriterFence || report.FullExternalAIClosure {
+		return nil, lifecycleError("lifecycle_history_original_material_rejected")
+	}
+	knownCommit := report.MongoCommitRequirement == "required" && report.CommitState == "both_responses_success_non_atomic" && report.ActualMongoCommitResponse && report.EventReferences > 0 && report.PreparedPages > 0 && report.EventPersistenceObserved || report.MongoCommitRequirement == "not_required" && report.CommitState == "sql_committed_mongo_not_required" && !report.ActualMongoCommitResponse && report.EventReferences == 0 && report.PreparedPages == 0 && !report.EventPersistenceObserved && report.AIOriginalCommands > 0
+	if !knownCommit || report.PreparedPages != report.ReadBackPages || report.AIOriginalCommands > 0 && !report.AICommandPersistenceComplete {
+		return nil, lifecycleError("lifecycle_history_original_material_rejected")
+	}
+	if err = d.register("history.materials.private.json", report.MaterialManifestSHA256, uid, 0600); err != nil {
+		return nil, err
+	}
+	f := d.files["history.materials.private.json"]
+	if f.info.Size() < 1 || f.info.Size() > 64<<20 {
+		return nil, lifecycleError("lifecycle_history_original_material_rejected")
+	}
+	if _, err = f.file.Seek(0, io.SeekStart); err != nil {
+		return nil, err
+	}
+	raw, err := io.ReadAll(io.LimitReader(f.file, (64<<20)+1))
+	if err != nil || int64(len(raw)) != f.info.Size() || digestRaw(raw) != f.hash || d.checkFile(f) != nil {
+		return nil, lifecycleError("lifecycle_history_original_material_rejected")
+	}
+	var manifest lifecycleHistoricalMaterialManifest
+	if decodeLifecycleClosedProducer(raw, &manifest) != nil || manifest.Version != 1 || manifest.SourceSHA != report.SourceSHA || manifest.ToolSourceSHA != report.ToolSourceSHA || manifest.OperationID != report.OperationID || manifest.RunID != report.ActualRunID || manifest.MaxSpoolBytes != 16<<30 || manifest.JournalSequence > 1<<20 || len(manifest.Files) != int(manifest.JournalSequence)+2 {
+		return nil, lifecycleError("lifecycle_history_original_material_rejected")
+	}
+	var rawMembers struct {
+		Files []json.RawMessage `json:"files"`
+	}
+	if json.Unmarshal(raw, &rawMembers) != nil || len(rawMembers.Files) != len(manifest.Files) {
+		return nil, lifecycleError("lifecycle_history_original_material_rejected")
+	}
+	for index, member := range manifest.Files {
+		if ctx.Err() != nil {
+			return nil, ctx.Err()
+		}
+		name := "prepared-mongo-private.bin"
+		if index == 1 {
+			name = "prepared-sql-private.bin"
+		}
+		if index > 1 {
+			name = "journal-" + strconv.Itoa(index-1) + ".json"
+		}
+		maximum := int64(64 << 10)
+		if index < 2 {
+			maximum = 16 << 30
+		}
+		if decodeLifecycleClosedProducer(rawMembers.Files[index], &member) != nil || member.Name != name || !hashRE.MatchString(member.SHA256) || member.Bytes < 0 || member.Bytes > maximum || member.UID != uid || member.Mode != 0600 || member.Inode == 0 {
+			return nil, lifecycleError("lifecycle_history_original_material_rejected")
+		}
+		if index < 2 {
+			err = d.registerHistoricalCASSpool(name, member.SHA256, uid)
+		} else {
+			err = d.register(name, member.SHA256, uid, 0600)
+		}
+		if err != nil {
+			return nil, err
+		}
+		registered := d.files[name]
+		st, ok := infoStat(registered.info)
+		if !ok || registered.info.Size() != member.Bytes || st.Gid != member.GID || uint64(st.Dev) != member.Device || uint64(st.Ino) != member.Inode {
+			return nil, lifecycleError("lifecycle_history_original_material_rejected")
+		}
+	}
+	if err = d.checkComplete(false); err != nil {
+		return nil, err
+	}
+	return d, nil
 }

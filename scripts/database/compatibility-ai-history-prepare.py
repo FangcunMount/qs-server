@@ -319,7 +319,9 @@ WRITE_STATES = frozenset({"not_attempted", "sql_unknown_mongo_not_attempted", "s
 
 def _write_report(t, h, raw, output, descriptor, descriptor_hash, inventory, code):
     report = t.decode(raw)
-    t.fields(report, WRITE_FIELDS)
+    t.fields(report, WRITE_FIELDS, ("material_manifest_sha256",))
+    if "material_manifest_sha256" in report:
+        t.token(report["material_manifest_sha256"],t.HASH)
     if (report["protocol"] != "qs-compatibility-evidence-write/v1" or
         any(report[key] != descriptor[key] for key in ("source_sha", "tool_source_sha", "operation_id",
             "actual_run_id", "request_sha256")) or report["descriptor_sha256"] != descriptor_hash or

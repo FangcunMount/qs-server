@@ -154,6 +154,9 @@ func lifecycleMaterialPathsMatch(c *lifecycleBatchMaterials, r lifecycleRequest)
 		allowed[root] = true
 		allowed[lifecycleInvocationBatch(r.OperationID, run)] = true
 	}
+	if lifecycleHistoricalWriteReferenceValid(r) {
+		allowed[filepath.Dir(r.HistoricalWriteReport.Path)] = true
+	}
 	for _, d := range c.directories {
 		if d == nil || !allowed[d.path] || d.path == c.archive.path {
 			return false
@@ -300,6 +303,19 @@ func (d *lifecycleMaterialDirectory) unchanged() error {
 	return nil
 }
 func (d *lifecycleMaterialDirectory) register(name, expected string, uid uint32, mode os.FileMode) error {
+	return d.registerWithMaximum(name, expected, uid, mode, 2<<30)
+}
+
+// Only the original historical producer's two named spools use its existing
+// 16GiB per-file budget. Other registrations retain their 2GiB bound.
+func (d *lifecycleMaterialDirectory) registerHistoricalCASSpool(name, expected string, uid uint32) error {
+	if name != "prepared-mongo-private.bin" && name != "prepared-sql-private.bin" {
+		return lifecycleError("lifecycle_material_registration_rejected")
+	}
+	return d.registerWithMaximum(name, expected, uid, 0600, 16<<30)
+}
+
+func (d *lifecycleMaterialDirectory) registerWithMaximum(name, expected string, uid uint32, mode os.FileMode, maximum int64) error {
 	if d.unchanged() != nil || name == "." || name == ".." || filepath.Base(name) != name || strings.ContainsAny(name, "/\\\x00") || !hashRE.MatchString(expected) || d.files[name] != nil || d.children[name] != nil || mode.Perm() != mode || mode&022 != 0 {
 		return lifecycleError("lifecycle_material_registration_rejected")
 	}
@@ -310,7 +326,7 @@ func (d *lifecycleMaterialDirectory) register(name, expected string, uid uint32,
 	f := os.NewFile(uintptr(fd), filepath.Join(d.path, name))
 	info, e := f.Stat()
 	st, ok := infoStat(info)
-	if e != nil || !ok || !info.Mode().IsRegular() || info.Mode().Perm() != mode || st.Uid != uid || st.Nlink != 1 || info.Size() < 0 || info.Size() > 2<<30 {
+	if e != nil || !ok || !info.Mode().IsRegular() || info.Mode().Perm() != mode || st.Uid != uid || st.Nlink != 1 || info.Size() < 0 || info.Size() > maximum {
 		_ = f.Close()
 		return lifecycleError("lifecycle_material_registration_rejected")
 	}

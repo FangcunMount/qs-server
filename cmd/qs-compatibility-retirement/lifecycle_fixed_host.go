@@ -28,6 +28,7 @@ type lifecycleFixedHost struct {
 	inventoryMaterials             *lifecycleMaterialDirectory
 	rootStagingMaterials           *lifecycleMaterialDirectory
 	preparationInvocationMaterials *lifecycleMaterialDirectory
+	historicalWriteMaterials       *lifecycleMaterialDirectory
 	services                       *lifecycleServiceController
 	api                            *lifecycleAPITransition
 	dataBaseline                   *backup.NonTargetDataBaseline
@@ -70,6 +71,10 @@ func newLifecycleFixedHost(ctx context.Context, r lifecycleRequest, a *backup.Ar
 			return nil, err
 		}
 		h.rootStagingMaterials, h.preparationInvocationMaterials, err = openLifecycleOriginalRootStaging(ctx, r, h.inventoryMaterials, i.SourceUID)
+		if err != nil {
+			return nil, errors.Join(err, h.Close())
+		}
+		h.historicalWriteMaterials, err = openLifecycleOriginalHistoricalWriteMaterials(ctx, r, i.SourceUID)
 		if err != nil {
 			return nil, errors.Join(err, h.Close())
 		}
@@ -341,6 +346,9 @@ func (h *lifecycleFixedHost) Close() error {
 	}
 	if h.preparationInvocationMaterials != nil {
 		result = errors.Join(result, h.preparationInvocationMaterials.close())
+	}
+	if h.historicalWriteMaterials != nil {
+		result = errors.Join(result, h.historicalWriteMaterials.close())
 	}
 	if h.writers != nil {
 		h.writers.close()

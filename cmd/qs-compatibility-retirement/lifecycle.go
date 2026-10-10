@@ -21,30 +21,31 @@ import (
 // Window, actual isolated restore, writer lease and original native journal
 // are produced or inspected separately; no imported completion flag is used.
 type lifecycleRequest struct {
-	FormatVersion     int                                  `json:"format_version"`
-	Kind              string                               `json:"kind"`
-	ToolSourceSHA     string                               `json:"tool_source_sha"`
-	OriginalSourceSHA string                               `json:"original_source_sha"`
-	OperationID       string                               `json:"operation_id"`
-	ActualRunID       string                               `json:"actual_run_id"`
-	ManifestSHA256    string                               `json:"manifest_sha256"`
-	ArchiveDirectory  string                               `json:"archive_directory"`
-	SourceDirectory   string                               `json:"source_directory,omitempty"`
-	WindowDirectory   string                               `json:"window_directory"`
-	JournalDirectory  string                               `json:"journal_directory"`
-	Approval          backup.Approval                      `json:"archive_approval"`
-	Recovery          backup.TargetRecoveryRequest         `json:"recovery"`
-	Resume            *backup.TargetBRecoveryResumeRequest `json:"resume,omitempty"`
-	ResumeKind        string                               `json:"resume_kind,omitempty"`
-	RestoreEngines    *lifecycleRestoreEngines             `json:"restore_engines,omitempty"`
-	SourceFileSHA256  map[string]string                    `json:"source_file_sha256,omitempty"`
-	SourceCopyIntent  *lifecycleFinalFileBinding           `json:"source_copy_intent,omitempty"`
-	ServiceControl    *lifecycleServiceControl             `json:"service_control,omitempty"`
-	DeploymentControl *lifecycleAPIDeploymentControl       `json:"deployment_control,omitempty"`
-	FinalHistory      *lifecycleFinalHistoryInput          `json:"final_history,omitempty"`
-	WriterControl     *lifecycleWriterControl              `json:"writer_control,omitempty"`
-	requestSHA256     string                               `json:"-"`
-	prepareRoot       string                               `json:"-"`
+	FormatVersion         int                                  `json:"format_version"`
+	Kind                  string                               `json:"kind"`
+	ToolSourceSHA         string                               `json:"tool_source_sha"`
+	OriginalSourceSHA     string                               `json:"original_source_sha"`
+	OperationID           string                               `json:"operation_id"`
+	ActualRunID           string                               `json:"actual_run_id"`
+	ManifestSHA256        string                               `json:"manifest_sha256"`
+	ArchiveDirectory      string                               `json:"archive_directory"`
+	SourceDirectory       string                               `json:"source_directory,omitempty"`
+	WindowDirectory       string                               `json:"window_directory"`
+	JournalDirectory      string                               `json:"journal_directory"`
+	Approval              backup.Approval                      `json:"archive_approval"`
+	Recovery              backup.TargetRecoveryRequest         `json:"recovery"`
+	Resume                *backup.TargetBRecoveryResumeRequest `json:"resume,omitempty"`
+	ResumeKind            string                               `json:"resume_kind,omitempty"`
+	RestoreEngines        *lifecycleRestoreEngines             `json:"restore_engines,omitempty"`
+	SourceFileSHA256      map[string]string                    `json:"source_file_sha256,omitempty"`
+	SourceCopyIntent      *lifecycleFinalFileBinding           `json:"source_copy_intent,omitempty"`
+	HistoricalWriteReport *lifecycleFinalFileBinding           `json:"historical_write_report,omitempty"`
+	ServiceControl        *lifecycleServiceControl             `json:"service_control,omitempty"`
+	DeploymentControl     *lifecycleAPIDeploymentControl       `json:"deployment_control,omitempty"`
+	FinalHistory          *lifecycleFinalHistoryInput          `json:"final_history,omitempty"`
+	WriterControl         *lifecycleWriterControl              `json:"writer_control,omitempty"`
+	requestSHA256         string                               `json:"-"`
+	prepareRoot           string                               `json:"-"`
 }
 
 type lifecycleFrozenManifest struct {
@@ -327,6 +328,9 @@ func loadLifecycleRequest(ctx context.Context, path, expected, operation, actual
 	}
 	if r.SourceCopyIntent != nil && (stage == "prepare" || !lifecycleSourceCopyReferenceValid(r)) {
 		return r, nil, lifecycleError("lifecycle_staging_original_intent_rejected")
+	}
+	if r.HistoricalWriteReport != nil && (stage == "prepare" || !lifecycleHistoricalWriteReferenceValid(r)) {
+		return r, nil, lifecycleError("lifecycle_history_original_material_rejected")
 	}
 	if stage == "prepare" && !r.RestoreEngines.valid() {
 		return r, nil, lifecycleError("lifecycle_restore_engine_approval_missing")

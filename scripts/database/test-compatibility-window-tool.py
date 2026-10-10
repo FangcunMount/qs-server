@@ -93,6 +93,16 @@ class WindowToolMetadata(unittest.TestCase):
         for stage,value in (('prepare','main'),('apply','7'*64),('prepare',None)):
             a,n=self.native(stage);n['source_copy_intent_sha256']=value
             with self.subTest(stage=stage,value=value),self.assertRaises(tool.Refused):tool.validate_native(tool.canonical(n),0,a,'22-3','e'*64)
+
+    def test_historical_material_report_preserves_exact_original_reference_only(self):
+        value=dict(path='/opt/backups/qs-server/compatibility-retirement/12-1/history-write-20-1/history.write.json',sha256='7'*64)
+        r=self.request();r['historical_write_report']=value;a=self.approval(r,'apply')
+        self.assertEqual(tool.decode(tool.derive_request(tool.canonical(r),a,'22-3'))['historical_write_report'],value)
+        r=self.request();r['historical_write_report']=value;a=self.approval(r,'prepare')
+        with self.assertRaises(tool.Refused):tool.derive_request(tool.canonical(r),a,'22-3')
+        for bad in (None,dict(value,complete=True),dict(value,sha256='main'),dict(value,path='/tmp/history.write.json'),dict(value,path=value['path'].replace('/12-1/','/13-1/')),dict(value,path=value['path'].replace('20-1','22-3'))):
+            r=self.request();r['historical_write_report']=bad;a=self.approval(r,'apply')
+            with self.subTest(value=bad),self.assertRaises(tool.Refused):tool.derive_request(tool.canonical(r),a,'22-3')
         r=self.request();a=self.approval(r,'apply')
         out=tool.decode(tool.derive_request(tool.canonical(r),a,'22-3'))
         self.assertEqual(out['writer_control'],r['writer_control'])

@@ -425,8 +425,12 @@ func TestOriginalInventoryMaterialHandoffIncludesAssetsBothPassesAndEmptySources
 func originalRootStagingMaterialFixture(t *testing.T, windowTool bool) (string, string, lifecycleRequest, map[string]string) {
 	t.Helper()
 	inventory, approval, hashes := originalInventoryMaterialFixture(t, 0)
-	root, _ := filepath.EvalSymlinks(t.TempDir())
-	invocation, _ := filepath.EvalSymlinks(t.TempDir())
+	base, _ := filepath.EvalSymlinks(t.TempDir())
+	root := filepath.Join(base, "123-1-789-1")
+	invocation := filepath.Join(base, "invocation")
+	if os.Mkdir(root, 0700) != nil || os.Mkdir(invocation, 0700) != nil {
+		t.Fatal("directories")
+	}
 	for _, dir := range []string{root, invocation} {
 		if os.Chmod(dir, 0700) != nil {
 			t.Fatal("directory")
@@ -565,6 +569,153 @@ func TestOriginalRootStagingMaterialHandoffRejectsRebindingAndExtraFiles(t *test
 				t.Fatal("rejection purged original")
 			}
 		})
+	}
+}
+
+func originalHistoricalWriteMaterialFixture(t *testing.T) (string, lifecycleRequest, lifecycleHistoricalMaterialManifest) {
+	t.Helper()
+	base, _ := filepath.EvalSymlinks(t.TempDir())
+	_ = os.Chmod(base, 0700)
+	path := filepath.Join(base, "history-write-789-1")
+	if os.Mkdir(path, 0700) != nil {
+		t.Fatal("directory")
+	}
+	m := lifecycleHistoricalMaterialManifest{Version: 1, SourceSHA: strings.Repeat("a", 40), ToolSourceSHA: strings.Repeat("b", 40), OperationID: "123-1", RunID: "789-1", MaxSpoolBytes: 16 << 30, JournalSequence: 2}
+	for _, name := range []string{"prepared-mongo-private.bin", "prepared-sql-private.bin", "journal-1.json", "journal-2.json"} {
+		raw := []byte("private-source-" + name)
+		if name == "prepared-sql-private.bin" {
+			raw = nil
+		}
+		if os.WriteFile(filepath.Join(path, name), raw, 0600) != nil {
+			t.Fatal("source")
+		}
+		info, _ := os.Stat(filepath.Join(path, name))
+		st, _ := infoStat(info)
+		m.Files = append(m.Files, lifecycleHistoricalMaterial{name, digestRaw(raw), info.Size(), st.Uid, st.Gid, uint64(st.Dev), uint64(st.Ino), uint32(info.Mode().Perm())})
+	}
+	if writeJSON(filepath.Join(path, "history.materials.private.json"), m) != nil {
+		t.Fatal("manifest")
+	}
+	raw, _ := os.ReadFile(filepath.Join(path, "history.materials.private.json"))
+	report := lifecycleHistoricalWriteMaterialReport{Protocol: "qs-compatibility-evidence-write/v1", SourceSHA: m.SourceSHA, ToolSourceSHA: m.ToolSourceSHA, OperationID: m.OperationID, ActualRunID: m.RunID, RequestSHA256: strings.Repeat("c", 64), DescriptorSHA256: strings.Repeat("d", 64), CommitState: "sql_committed_mongo_not_required", MongoCommitRequirement: "not_required", AIOriginalCommands: 2, AISourceReferences: 3, ActualSQLCommitResponse: true, AICommandPersistenceComplete: true, EvidenceWriteFinished: true, ErrorCategory: "none", MaterialManifestSHA256: digestRaw(raw)}
+	if writeJSON(filepath.Join(path, "history.write.json"), report) != nil {
+		t.Fatal("report")
+	}
+	raw, _ = os.ReadFile(filepath.Join(path, "history.write.json"))
+	r := lifecycleRequest{OriginalSourceSHA: m.SourceSHA, OperationID: m.OperationID, ActualRunID: "999-1", HistoricalWriteReport: &lifecycleFinalFileBinding{Path: filepath.Join(path, "history.write.json"), SHA256: digestRaw(raw)}}
+	return path, r, m
+}
+
+func TestOriginalHistoricalWriteMaterialHandoffUsesActualSourceIdentityAndEOF(t *testing.T) {
+	path, r, _ := originalHistoricalWriteMaterialFixture(t)
+	d, err := openLifecycleHistoricalWriteMaterialFiles(context.Background(), path, r, uint32(os.Getuid()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer d.close()
+	if len(d.files) != 6 {
+		t.Fatal("original report/manifest/spools/sequence incomplete")
+	}
+	for _, v := range d.files {
+		if v.file == nil || v.info == nil {
+			t.Fatal("no actual RO source FD")
+		}
+	}
+	if err = d.purge(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if err = d.checkComplete(true); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestOriginalHistoricalWriteMaterialHandoffRejectsUnknownSourceOrChangedMembers(t *testing.T) {
+	for _, mutation := range []string{"wrong_report_hash", "wrong_source", "unknown_commit", "missing", "replace_inode", "extra", "wrong_owner", "wrong_budget", "noncontinuous", "wrong_member_hash", "null_member_bytes", "descriptor_permission"} {
+		t.Run(mutation, func(t *testing.T) {
+			path, r, m := originalHistoricalWriteMaterialFixture(t)
+			reportRaw, _ := os.ReadFile(r.HistoricalWriteReport.Path)
+			var report lifecycleHistoricalWriteMaterialReport
+			_ = json.Unmarshal(reportRaw, &report)
+			switch mutation {
+			case "wrong_report_hash":
+				r.HistoricalWriteReport.SHA256 = strings.Repeat("0", 64)
+			case "wrong_source":
+				report.SourceSHA = strings.Repeat("e", 40)
+			case "unknown_commit":
+				report.CommitState = "sql_committed_mongo_unknown"
+			case "missing":
+				_ = os.Remove(filepath.Join(path, "journal-2.json"))
+			case "replace_inode":
+				p := filepath.Join(path, m.Files[0].Name)
+				body, _ := os.ReadFile(p)
+				_ = os.Rename(p, p+"-old")
+				_ = os.WriteFile(p, body, 0600)
+				_ = os.Remove(p + "-old")
+			case "extra":
+				_ = os.WriteFile(filepath.Join(path, "unknown-body"), []byte("body"), 0600)
+			case "wrong_owner":
+				m.Files[0].UID++
+			case "wrong_budget":
+				m.MaxSpoolBytes = 32 << 30
+			case "noncontinuous":
+				m.Files[3].Name = "journal-3.json"
+			case "wrong_member_hash":
+				m.Files[0].SHA256 = strings.Repeat("0", 64)
+			}
+			if mutation == "wrong_owner" || mutation == "wrong_budget" || mutation == "noncontinuous" || mutation == "wrong_member_hash" || mutation == "null_member_bytes" || mutation == "descriptor_permission" {
+				raw, _ := json.Marshal(m)
+				if mutation == "null_member_bytes" {
+					raw = bytes.Replace(raw, []byte(`"bytes":0`), []byte(`"bytes":null`), 1)
+				}
+				if mutation == "descriptor_permission" {
+					raw = append(raw[:len(raw)-1], []byte(`,"permission":true}`)...)
+				}
+				_ = os.WriteFile(filepath.Join(path, "history.materials.private.json"), raw, 0600)
+				report.MaterialManifestSHA256 = digestRaw(raw)
+			}
+			if mutation != "wrong_report_hash" {
+				raw, _ := json.Marshal(report)
+				_ = os.WriteFile(r.HistoricalWriteReport.Path, raw, 0600)
+				r.HistoricalWriteReport.SHA256 = digestRaw(raw)
+			}
+			d, err := openLifecycleHistoricalWriteMaterialFiles(context.Background(), path, r, uint32(os.Getuid()))
+			if err == nil || d != nil {
+				t.Fatal("unbound source admitted")
+			}
+			if _, err = os.Stat(r.HistoricalWriteReport.Path); err != nil {
+				t.Fatal("rejection changed original report")
+			}
+		})
+	}
+}
+
+func TestHistoricalSpoolRegistrationKeepsOrdinaryBoundAndRejectsOtherNames(t *testing.T) {
+	path, _ := filepath.EvalSymlinks(t.TempDir())
+	_ = os.Chmod(path, 0700)
+	d, e := openLifecycleMaterialDirectory(path, uint32(os.Getuid()))
+	if e != nil {
+		t.Fatal(e)
+	}
+	defer d.close()
+	p := filepath.Join(path, "prepared-mongo-private.bin")
+	f, e := os.OpenFile(p, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
+	if e != nil {
+		t.Fatal(e)
+	}
+	if f.Truncate((2<<30)+1) != nil || f.Close() != nil {
+		t.Fatal("sparse source")
+	}
+	if d.register("prepared-mongo-private.bin", strings.Repeat("0", 64), uint32(os.Getuid()), 0600) == nil {
+		t.Fatal("ordinary limit widened")
+	}
+	if d.registerHistoricalCASSpool("ordinary", strings.Repeat("0", 64), uint32(os.Getuid())) == nil {
+		t.Fatal("unrelated large source admitted")
+	}
+	if os.Truncate(p, (16<<30)+1) != nil {
+		t.Fatal("sparse bound")
+	}
+	if d.registerHistoricalCASSpool("prepared-mongo-private.bin", strings.Repeat("0", 64), uint32(os.Getuid())) == nil {
+		t.Fatal("original spool budget widened")
 	}
 }
 func TestOriginalInventoryMaterialHandoffRejectsUnboundIncompleteOrChangedProducerFiles(t *testing.T) {

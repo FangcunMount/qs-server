@@ -117,6 +117,17 @@ class EvidenceWriteResultContract(unittest.TestCase):
         self.assertFalse(report["actual_mongo_commit_response"])
         self.assertEqual(report["mongo_commit_requirement"], "not_required")
 
+    def test_private_material_digest_does_not_change_commit_or_public_authority(self):
+        value=self.report();value['material_manifest_sha256']='7'*64
+        observed,_=self.observe(value)
+        self.assertEqual(observed['material_manifest_sha256'],'7'*64)
+        self.assertFalse(observed['whole_writer_fence']);self.assertFalse(observed['drop_ready'])
+        for digest in (None,True,'main'):
+            value=self.report();value['material_manifest_sha256']=digest
+            with self.subTest(digest=digest),self.assertRaises(tool.Blocked):self.observe(value)
+        value=self.report();value['material_manifest_sha256']='7'*64;value['material_complete']=True
+        with self.assertRaises(tool.Blocked):self.observe(value)
+
     def test_event_batch_requires_actual_mongo_response(self):
         report = self.report()
         report.update(mongo_commit_requirement="required", commit_state="both_responses_success_non_atomic",

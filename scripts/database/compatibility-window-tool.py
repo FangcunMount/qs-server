@@ -148,7 +148,7 @@ def derive_request(raw, approval, current_run):
         reject("window_tool_template_hash_rejected")
     r = decode(raw)
     required = ("format_version", "kind", "tool_source_sha", "original_source_sha", "operation_id", "actual_run_id", "manifest_sha256", "archive_directory", "window_directory", "journal_directory", "archive_approval", "recovery")
-    optional = ("source_directory", "restore_engines", "source_file_sha256", "service_control", "resume", "resume_kind", "deployment_control", "final_history", "writer_control", "source_copy_intent")
+    optional = ("source_directory", "restore_engines", "source_file_sha256", "service_control", "resume", "resume_kind", "deployment_control", "final_history", "writer_control", "source_copy_intent", "historical_write_report")
     exact(r, required, optional)
     if type(r["format_version"]) is not int or r["format_version"] != 1 or r["kind"] != "compatibility_retirement_lifecycle_request" or r["tool_source_sha"] != approval["tool_source_sha"] or r["original_source_sha"] != approval["original_source_sha"] or r["operation_id"] != approval["operation_id"] or r["actual_run_id"] != "" or r["manifest_sha256"] != approval["manifest_sha256"]:
         reject("window_tool_template_binding_rejected")
@@ -163,7 +163,7 @@ def derive_request(raw, approval, current_run):
     result = copy.deepcopy(r)
     result["actual_run_id"] = current_run
     if approval["stage"] == "prepare":
-        if any(key in r for key in ("resume", "resume_kind", "service_control", "deployment_control", "final_history", "writer_control", "source_copy_intent")) or q["archive_sha256"] != "":
+        if any(key in r for key in ("resume", "resume_kind", "service_control", "deployment_control", "final_history", "writer_control", "source_copy_intent", "historical_write_report")) or q["archive_sha256"] != "":
             reject("window_tool_prepare_effect_fields_rejected")
     if "writer_control" in r:
         exact(r["writer_control"], ("workflow_scope_sha256",))
@@ -187,6 +187,17 @@ def derive_request(raw, approval, current_run):
         token(run, RUN)
         if run in (current_run, approval["original_run_id"]) or path != str(Path("/opt/backups/qs-server/compatibility-retirement-root-prepare", batch, "source-copy.intent.private.json")):
             reject("window_tool_source_copy_intent_rejected")
+    if "historical_write_report" in r:
+        value=r["historical_write_report"]
+        exact(value,("path","sha256"));token(value["sha256"],HASH)
+        path=value["path"]
+        if type(path) is not str or os.path.normpath(path)!=path or Path(path).name!="history.write.json":
+            reject("window_tool_history_material_rejected")
+        parent=Path(path).parent.name
+        run=parent[len("history-write-"):] if parent.startswith("history-write-") else ""
+        token(run,RUN)
+        if run==current_run or path!=str(Path("/opt/backups/qs-server/compatibility-retirement",approval["operation_id"],"history-write-"+run,"history.write.json")):
+            reject("window_tool_history_material_rejected")
     if "resume" not in r:
         if "resume_kind" in r or q["actual_run_id"] != "":
             reject("window_tool_current_run_not_empty")
