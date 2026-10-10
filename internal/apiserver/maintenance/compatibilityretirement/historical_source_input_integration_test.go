@@ -332,8 +332,11 @@ func TestHistoricalSourceInputNativeOwnerComponentPlanner(t *testing.T) {
 	var first, second *HistoricalSourceInputEpoch
 	var pair *HistoricalSourceInputPair
 	var components *HistoricalCASComponents
+	var copies authFixture
+	var aiFirst, aiSecond *AIHistoricalInputEpoch
+	var aiPair *AIHistoricalInputPair
 	if err = historicalSourceInputNativeEpoch(t, sqlDB, db, config, snapshotInputNativeSession(t, client), func(ctx context.Context, current *SQLResponsibilitySnapshot, mongoInput *MongoSnapshotInputEpoch, tx *gorm.DB) error {
-		copies := originNativeCopies(t, ctx, tx, &MongoResponsibilitySnapshot{db: db, metadata: mongoInput.metadata})
+		copies = originNativeCopies(t, ctx, tx, &MongoResponsibilitySnapshot{db: db, metadata: mongoInput.metadata})
 		auth, e := VerifySourceCopies(ctx, copies.inputs())
 		if e != nil {
 			return e
@@ -351,6 +354,10 @@ func TestHistoricalSourceInputNativeOwnerComponentPlanner(t *testing.T) {
 			return e
 		}
 		first, e = PrepareHistoricalSourceInputEpoch(ctx, recipe, current, mongoInput, snapshotInputNativeFile(t), time.Minute)
+		if e != nil {
+			return e
+		}
+		aiFirst, e = PrepareAIHistoricalInputEpoch(ctx, nil, first, copies.inputs(), snapshotInputNativeFile(t), DefaultAIReverseLimits())
 		if e != nil {
 			return e
 		}
@@ -377,7 +384,15 @@ func TestHistoricalSourceInputNativeOwnerComponentPlanner(t *testing.T) {
 		if e != nil {
 			return e
 		}
+		aiSecond, e = PrepareAIHistoricalInputEpoch(ctx, nil, second, copies.inputs(), snapshotInputNativeFile(t), DefaultAIReverseLimits())
+		if e != nil {
+			return e
+		}
 		pair, e = CompareIndependentHistoricalSourceInputs(ctx, first, second)
+		if e != nil {
+			return e
+		}
+		aiPair, e = CompareIndependentAIHistoricalInputs(ctx, aiFirst, aiSecond, pair)
 		if e != nil {
 			return e
 		}
@@ -435,33 +450,18 @@ func TestHistoricalSourceInputNativeOwnerComponentPlanner(t *testing.T) {
 	}); err != nil {
 		t.Fatal(err)
 	}
-	if index.ReleaseInputAuthentication(t.Context(), pair) != nil || pair.ReleaseCaptureIndex(t.Context()) != nil || components.ValidateInputSources(t.Context(), pair) != nil {
+	if index.ReleaseInputAuthentication(t.Context(), pair) != nil || pair.ReleaseCaptureIndex(t.Context()) != nil || components.ValidateInputSources(t.Context(), pair) != nil || aiPair.ValidateFrozen(t.Context()) != nil {
 		t.Fatal("released authentication lost immutable planned inputs")
 	}
 	// Genuine third native scopes read the original owners and current MQ rows.
 	// The business result still cannot enter the old whole-source evidence path.
 	var businessSources, blockedIndependentComponents int
+	var observedComponents []*HistoricalComponentObservation
 	for _, component := range components.Components() {
 		if err = sqlDB.Transaction(func(tx *gorm.DB) error {
 			return mongoCycleNativeTx(t, client, func(mctx mongo.SessionContext) error {
 				ctx := hostmysql.WithTx(mctx, tx)
-				var sqlObservers []*sqlevaluation.SQLHistoricalComponentObservation
-				for _, input := range component.Inputs() {
-					observed, e := sqlevaluation.PrepareSQLHistoricalComponentObservation(ctx, input.sqlRecipe, 20*time.Second, false)
-					if e != nil {
-						return e
-					}
-					sqlObservers = append(sqlObservers, observed)
-				}
-				mongoObserver, e := PrepareMongoHistoricalComponentObservation(ctx, db, component, pair.second.mongo, 20*time.Second)
-				if e != nil {
-					return e
-				}
-				observation, e := PrepareHistoricalComponentSourceObservation(ctx, component, pair, mongoObserver, sqlObservers, 20*time.Second)
-				if e != nil {
-					return e
-				}
-				rows, e := qualifiedHistoricalComponentBusinessRows(ctx, observation)
+				observed, e := PrepareHistoricalComponentObservation(ctx, component, pair, aiPair, db, 20*time.Second, false)
 				independent := false
 				for _, input := range component.Inputs() {
 					ids, inputErr := input.sqlRecipe.SourceEventIDs()
@@ -476,7 +476,7 @@ func TestHistoricalSourceInputNativeOwnerComponentPlanner(t *testing.T) {
 					// This original fixture intentionally retains an SQL held row
 					// with no Assessment owner. Genuine unique SQL absence is
 					// not a permit to erase that unresolved external obligation.
-					if rows != nil || e == nil {
+					if observed != nil || e == nil {
 						return errors.New("SQL-absent held responsibility became business closed")
 					}
 					blockedIndependentComponents++
@@ -484,6 +484,12 @@ func TestHistoricalSourceInputNativeOwnerComponentPlanner(t *testing.T) {
 				}
 				if e != nil {
 					return e
+				}
+				observation, rows := observed.source, observed.rows
+				observedComponents = append(observedComponents, observed)
+				combined := observed.Summary()
+				if observed.ValidateBorrowedObservation(ctx) != nil || combined.BusinessCandidates != uint64(len(rows)) || !combined.SameNativeScopesObserved || !combined.FullNegativeClosureRequired || !combined.WriterFenceRequired || combined.CASAuthorized || combined.DropReady || combined.AI.WholeLedgerEOF || !combined.AI.UnboundOrphanNegativeClosureRequired || !combined.AI.NewOwnerOrganizationNegativeClosureRequired {
+					return errors.New("actual component scopes or outstanding global gates lost")
 				}
 				for _, row := range rows {
 					if row.sourceObservation != observation || !row.candidate.LocalQualified || row.facts == nil || row.bindingSHA == "" {
@@ -506,6 +512,11 @@ func TestHistoricalSourceInputNativeOwnerComponentPlanner(t *testing.T) {
 	}
 	if businessSources != 4 || blockedIndependentComponents != 1 {
 		t.Fatal("actual original business graphs or unresolved SQL-absent obligation lost", businessSources, blockedIndependentComponents)
+	}
+	for _, observed := range observedComponents {
+		if observed.ValidateBorrowedObservation(t.Context()) == nil {
+			t.Fatal("ended host scopes retained combined native observation")
+		}
 	}
 	firstInput := components.Components()[0].Inputs()[0]
 	originalSHA := firstInput.rows[0].sha

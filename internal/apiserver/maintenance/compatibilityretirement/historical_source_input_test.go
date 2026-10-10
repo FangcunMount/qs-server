@@ -164,6 +164,17 @@ func TestHistoricalComponentSourceNeverClaimsOwnerClosureOrCAS(t *testing.T) {
 	if _, err := json.Marshal(&HistoricalComponentSourceObservation{}); err == nil {
 		t.Fatal("private source observation serialized")
 	}
+	var component *HistoricalComponentObservation
+	combined := component.Summary()
+	if !combined.FullNegativeClosureRequired || !combined.WriterFenceRequired || !combined.Source.SQLSourceNegativeClosureRequired || !combined.Source.AIClosureRequired || !combined.AI.UnboundOrphanNegativeClosureRequired || !combined.AI.NewOwnerOrganizationNegativeClosureRequired || combined.SameNativeScopesObserved || combined.CASAuthorized || combined.DropReady {
+		t.Fatal("missing combined scopes erased outstanding qualification")
+	}
+	if component.ValidateBorrowedObservation(t.Context()) == nil {
+		t.Fatal("absent combined native scopes accepted")
+	}
+	if _, err := json.Marshal(&HistoricalComponentObservation{}); err == nil {
+		t.Fatal("combined private candidates serialized")
+	}
 }
 
 func TestHistoricalSourceInputIndexActualCopiesAndLegacySeparation(t *testing.T) {

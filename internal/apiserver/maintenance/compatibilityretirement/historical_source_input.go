@@ -469,6 +469,129 @@ type HistoricalComponentSourceSummary struct {
 	SourceClosureVerified, CASAuthorized, DropReady                                                                                                        bool
 }
 
+// A component observation joins the genuine fresh source, business and AI
+// reads. Its private rows are candidates, never portable write permission.
+// The host owns the existing SQL transaction and Mongo session throughout.
+type HistoricalComponentObservation struct {
+	self    *HistoricalComponentObservation
+	source  *HistoricalComponentSourceObservation
+	ai      *AIReverseSnapshot
+	rows    []qualifiedCASRow
+	expires time.Time
+	seal    string
+}
+
+type HistoricalComponentObservationSummary struct {
+	Source                                           HistoricalComponentSourceSummary
+	AI                                               AIReverseSummary
+	BusinessCandidates                               uint64
+	BusinessCandidatesSHA256                         string
+	SameNativeScopesObserved                         bool
+	FullNegativeClosureRequired, WriterFenceRequired bool
+	CASAuthorized, DropReady                         bool
+}
+
+func (*HistoricalComponentObservation) MarshalJSON() ([]byte, error) {
+	return nil, ErrSourceSerialization
+}
+func (*HistoricalComponentObservation) MarshalBSON() ([]byte, error) {
+	return nil, ErrSourceSerialization
+}
+
+func (o *HistoricalComponentObservation) digest() string {
+	if o == nil || o.source == nil || o.ai == nil || len(o.rows) == 0 {
+		return ""
+	}
+	parts := []string{"historical-fresh-component-candidates/v1", o.source.seal, o.source.rowsSHA, o.ai.report.DataSHA256, o.expires.UTC().Format(time.RFC3339Nano)}
+	for _, row := range o.rows {
+		if row.sourceObservation != o.source || row.facts == nil || qualifiedCASSourceMatches(row.facts, row.candidate) != nil || !evidence.ValidSHA256(row.bindingSHA) {
+			return ""
+		}
+		parts = append(parts, row.facts.EventID, row.facts.Source.Digest.SHA256, row.bindingSHA, coordinatorCandidateHash([]HistoricalCandidate{row.candidate}))
+	}
+	return mongoOwnerHashParts(parts...)
+}
+
+// Every query shares one absolute budget, including preparation and later
+// validation. Sequential adapters cannot each obtain another twenty seconds.
+// writable selects native instrumentation only; it grants no CAS authority.
+func PrepareHistoricalComponentObservation(parent context.Context, component *HistoricalCASComponent, sources *HistoricalSourceInputPair, ai *AIHistoricalInputPair, db *mongo.Database, budget time.Duration, writable bool) (*HistoricalComponentObservation, error) {
+	if parent == nil || parent.Err() != nil || component == nil || len(component.inputs) == 0 || db == nil || budget <= 0 || budget > 20*time.Second || sourceComponentPairIntact(parent, sources) != nil || !sources.first.captureStopped || !sources.second.captureStopped || aiComponentPairIntact(parent, ai, sources) != nil {
+		return nil, ErrSourceOriginFresh
+	}
+	started := time.Now()
+	expires := started.Add(budget)
+	if deadline, ok := parent.Deadline(); ok && deadline.Before(expires) {
+		expires = deadline
+	}
+	ctx, cancel := context.WithDeadline(parent, expires)
+	defer cancel()
+	var sqlObservers []*sqlevaluation.SQLHistoricalComponentObservation
+	for _, input := range component.inputs {
+		if input == nil || input.inputPair != sources || input.self != input || input.seal == "" || input.seal != input.digest() {
+			return nil, ErrHistoricalCASComponents
+		}
+		observed, err := sqlevaluation.PrepareSQLHistoricalComponentObservation(ctx, input.sqlRecipe, budget, writable)
+		if err != nil {
+			return nil, err
+		}
+		sqlObservers = append(sqlObservers, observed)
+	}
+	mongoObserver, err := PrepareMongoHistoricalComponentObservation(ctx, db, component, sources.second.mongo, budget)
+	if err != nil {
+		return nil, err
+	}
+	source, err := PrepareHistoricalComponentSourceObservation(ctx, component, sources, mongoObserver, sqlObservers, budget)
+	if err != nil {
+		return nil, err
+	}
+	// Tighten the source's later lifetime to the start of the whole component;
+	// original recipe/input/transaction clocks remain unchanged.
+	source.started, source.budget = started, expires.Sub(started)
+	limits := DefaultAIReverseLimits()
+	limits.MaxDuration, limits.MaxRetainedBytes = budget, 128<<20
+	currentAI, err := PrepareAIHistoricalComponentSnapshot(ctx, component, ai, source, limits)
+	if err != nil {
+		return nil, err
+	}
+	rows, err := qualifiedHistoricalComponentBusinessRows(ctx, source)
+	if err != nil {
+		return nil, err
+	}
+	o := &HistoricalComponentObservation{source: source, ai: currentAI, rows: rows, expires: expires}
+	o.self, o.seal = o, o.digest()
+	if o.ValidateBorrowedObservation(ctx) != nil {
+		return nil, ErrSourceOriginFresh
+	}
+	return o, nil
+}
+
+func (o *HistoricalComponentObservation) ValidateBorrowedObservation(parent context.Context) error {
+	if parent == nil || parent.Err() != nil || o == nil || o.self != o || o.seal == "" || o.seal != o.digest() || !time.Now().Before(o.expires) {
+		return ErrSourceOriginFresh
+	}
+	ctx, cancel := context.WithDeadline(parent, o.expires)
+	defer cancel()
+	if o.source.ValidateBorrowedObservation(ctx) != nil || o.ai.ValidateComponentObservation(ctx) != nil {
+		return ErrSourceOriginFresh
+	}
+	return nil
+}
+
+func (o *HistoricalComponentObservation) Summary() HistoricalComponentObservationSummary {
+	r := HistoricalComponentObservationSummary{FullNegativeClosureRequired: true, WriterFenceRequired: true}
+	r.Source = (*HistoricalComponentSourceObservation)(nil).Summary()
+	r.AI = (*AIReverseSnapshot)(nil).Summary()
+	r.AI.UnboundOrphanNegativeClosureRequired, r.AI.NewOwnerOrganizationNegativeClosureRequired = true, true
+	if o == nil || o.self != o || o.seal == "" || o.seal != o.digest() {
+		return r
+	}
+	r.Source, r.AI = o.source.Summary(), o.ai.Summary()
+	r.BusinessCandidates, r.BusinessCandidatesSHA256 = uint64(len(o.rows)), o.seal
+	r.SameNativeScopesObserved = true
+	return r
+}
+
 func (*HistoricalComponentSourceObservation) MarshalJSON() ([]byte, error) {
 	return nil, ErrSourceSerialization
 }
