@@ -923,26 +923,43 @@ func ObserveAIExternalRuntimeBinding(ctx context.Context, source, image, cid str
 	}
 	work, cancel := context.WithTimeout(ctx, 90*time.Second)
 	defer cancel()
+	reject := func(phase string, err error) (string, error) {
+		// Only fixed phases leave this boundary; private runtime facts and errors do not.
+		_, _ = fmt.Fprintln(os.Stderr, "QS_AI_RUNTIME_BINDING_DIAGNOSTIC phase="+phase)
+		return "", err
+	}
 	d, err := aiExternalDocker(sudo)
 	if err != nil {
-		return "", err
+		return reject("trusted_docker", err)
 	}
 	in := AIExternalExecutionInput{RuntimeSourceSHA: source, ImageID: image, ContainerID: cid}
 	before, err := d.inspect(work, cid)
-	if err != nil || !before.matches(in) {
-		return "", ErrAIExternalRuntime
+	if err != nil {
+		return reject("before_inspect", ErrAIExternalRuntime)
+	}
+	if !before.matches(in) {
+		return reject("before_match", ErrAIExternalRuntime)
 	}
 	r, err := aiExternalReadRelease(source, image)
-	if err != nil || !r.matchesMounts(before.Mounts) {
-		return "", ErrAIExternalRuntime
+	if err != nil {
+		return reject("release_read", ErrAIExternalRuntime)
+	}
+	if !r.matchesMounts(before.Mounts) {
+		return reject("mount_match", ErrAIExternalRuntime)
 	}
 	after, err := d.inspect(work, cid)
-	if err != nil || !reflect.DeepEqual(before, after) {
-		return "", ErrAIExternalRuntime
+	if err != nil {
+		return reject("after_inspect", ErrAIExternalRuntime)
+	}
+	if !reflect.DeepEqual(before, after) {
+		return reject("after_changed", ErrAIExternalRuntime)
 	}
 	recheck, err := aiExternalReadRelease(source, image)
-	if err != nil || !reflect.DeepEqual(r, recheck) {
-		return "", ErrAIExternalRuntime
+	if err != nil {
+		return reject("release_recheck", ErrAIExternalRuntime)
+	}
+	if !reflect.DeepEqual(r, recheck) {
+		return reject("release_changed", ErrAIExternalRuntime)
 	}
 	return r.seal, nil
 }
