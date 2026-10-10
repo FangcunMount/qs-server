@@ -1970,16 +1970,41 @@ func (c *HistoricalCoordinator) BindAIReverseSourceScope(ctx context.Context, s 
 	if c.now == nil || c.alive(ctx) != nil || c.authenticated == nil || !c.authenticated.complete || c.authenticated.rows == nil || uint64(len(c.authenticated.rows)) != c.authenticated.entries || s.ValidateBorrowedSnapshot(ctx) != nil {
 		return ErrAIReverseBinding
 	}
+	var expected [4]SourceCopyExpectation
+	for i := range expected {
+		expected[i] = c.copies[i].Expected
+	}
+	return bindAIReverseSourceFacts(ctx, s, copies, c, c.authenticated, expected, [2]string{c.binding.SourceSHA, c.binding.OperationID}, c.alive)
+}
+
+// This private adapter uses only a live, fully captured input epoch and its
+// authenticated copies. An absent coordinator is intentional: the resulting
+// scope cannot enter the existing coordinator-backed replay/write APIs.
+func bindAIReverseInputSourceScope(ctx context.Context, s *AIReverseSnapshot, source *HistoricalSourceInputEpoch, copies []SourceCopyInput) error {
+	if source == nil || !source.complete || source.alive(ctx) != nil || source.verifyFrozen(ctx) != nil {
+		return ErrAIReverseBinding
+	}
+	authenticated := source.recipe.binding.copies
+	if authenticated == nil || !authenticated.complete || authenticated.rows == nil || uint64(len(authenticated.rows)) != authenticated.entries {
+		return ErrAIReverseBinding
+	}
+	return bindAIReverseSourceFacts(ctx, s, copies, nil, authenticated, source.recipe.binding.expected, [2]string{"historical-source-input/v1", source.recipe.hash}, source.alive)
+}
+
+func bindAIReverseSourceFacts(ctx context.Context, s *AIReverseSnapshot, copies []SourceCopyInput, owner *HistoricalCoordinator, authenticated *VerifiedSourceCopies, expected [4]SourceCopyExpectation, binding [2]string, check func(context.Context) error) error {
+	if s == nil || s.self != s || s.scope != nil || len(copies) != 4 || check == nil || check(ctx) != nil || s.ValidateBorrowedSnapshot(ctx) != nil {
+		return ErrAIReverseBinding
+	}
 	for i, input := range copies {
-		if sourceReaderAbsent(input.Input) || !reflect.DeepEqual(input.Expected, c.copies[i].Expected) {
+		if sourceReaderAbsent(input.Input) || !reflect.DeepEqual(input.Expected, expected[i]) {
 			return ErrAIReverseBinding
 		}
 	}
-	scope := &aiReverseScope{owner: c, auth: c.authenticated, relatedRequests: map[string]bool{}, relatedIDs: map[string]bool{}, identityConflicts: map[string]bool{}}
+	scope := &aiReverseScope{owner: owner, auth: authenticated, relatedRequests: map[string]bool{}, relatedIDs: map[string]bool{}, identityConflicts: map[string]bool{}}
 	factsHash := sha256.New()
 	sourceFrame(factsHash, []byte("ai-reverse-authenticated-source-facts/v1"), false)
-	sourceFrame(factsHash, []byte(c.binding.SourceSHA), false)
-	sourceFrame(factsHash, []byte(c.binding.OperationID), false)
+	sourceFrame(factsHash, []byte(binding[0]), false)
+	sourceFrame(factsHash, []byte(binding[1]), false)
 	byAssessment, bySheet := map[string][]*aiReverseNode{}, map[string][]*aiReverseNode{}
 	for _, r := range s.byTable["ai_bridge_requests"] {
 		for _, id := range r.assessments {
@@ -1993,10 +2018,10 @@ func (c *HistoricalCoordinator) BindAIReverseSourceScope(ctx context.Context, s 
 		if v == nil {
 			return ErrAIReverseBinding
 		}
-		if _, e := c.authenticated.BindEvent(v); e != nil {
+		if _, e := authenticated.BindEvent(v); e != nil {
 			return e
 		}
-		if e := aiReverseSourceFactFrame(factsHash, c.authenticated, v.Source.Database, v.Source.Object, v.Source.PrimaryKeySHA256, v.EventType); e != nil {
+		if e := aiReverseSourceFactFrame(factsHash, authenticated, v.Source.Database, v.Source.Object, v.Source.PrimaryKeySHA256, v.EventType); e != nil {
 			return e
 		}
 		scope.verifiedEntries++
@@ -2022,7 +2047,7 @@ func (c *HistoricalCoordinator) BindAIReverseSourceScope(ctx context.Context, s 
 		return nil
 	}
 	for i, input := range copies {
-		if s.alive(ctx) != nil || c.alive(ctx) != nil {
+		if s.alive(ctx) != nil || check(ctx) != nil {
 			return ErrAIReverseBounds
 		}
 		raw, e := json.Marshal(input.Expected)
@@ -2087,10 +2112,10 @@ func (c *HistoricalCoordinator) BindAIReverseSourceScope(ctx context.Context, s 
 				if e != nil {
 					return e
 				}
-				if _, e = c.authenticated.BindAICommand(v); e != nil {
+				if _, e = authenticated.BindAICommand(v); e != nil {
 					return e
 				}
-				if e = aiReverseSourceFactFrame(factsHash, c.authenticated, v.Source.Database, v.Source.Object, v.Source.PrimaryKeySHA256, "ai-command/"+v.SourceKind); e != nil {
+				if e = aiReverseSourceFactFrame(factsHash, authenticated, v.Source.Database, v.Source.Object, v.Source.PrimaryKeySHA256, "ai-command/"+v.SourceKind); e != nil {
 					return e
 				}
 				scope.verifiedEntries++
@@ -2112,7 +2137,7 @@ func (c *HistoricalCoordinator) BindAIReverseSourceScope(ctx context.Context, s 
 			}
 			scope.receipts[i] = r.Receipt()
 		}
-		if !scope.receipts[i].Complete || scope.receipts[i].BusinessClosureVerified || scope.receipts[i].DropReady || !reflect.DeepEqual(scope.receipts[i], c.authenticated.receipts[i]) {
+		if !scope.receipts[i].Complete || scope.receipts[i].BusinessClosureVerified || scope.receipts[i].DropReady || !reflect.DeepEqual(scope.receipts[i], authenticated.receipts[i]) {
 			return ErrAIReverseBinding
 		}
 		receiptRaw, e := json.Marshal(scope.receipts[i])
@@ -2121,11 +2146,11 @@ func (c *HistoricalCoordinator) BindAIReverseSourceScope(ctx context.Context, s 
 		}
 		sourceFrame(factsHash, receiptRaw, false)
 	}
-	if scope.verifiedEntries != c.authenticated.entries {
+	if scope.verifiedEntries != authenticated.entries {
 		return ErrAIReverseBinding
 	}
 	scope.typedFactsSHA = hex.EncodeToString(factsHash.Sum(nil))
-	if c.alive(ctx) != nil || s.ValidateBorrowedSnapshot(ctx) != nil {
+	if check(ctx) != nil || s.ValidateBorrowedSnapshot(ctx) != nil {
 		return ErrAIReverseFresh
 	}
 	h := sha256.New()

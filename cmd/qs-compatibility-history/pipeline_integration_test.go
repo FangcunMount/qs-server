@@ -9,6 +9,7 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -25,6 +26,10 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/migration"
 	domainwire "github.com/FangcunMount/reliable-messaging/wire/domain"
 	drivermysql "github.com/go-sql-driver/mysql"
+	golangmigrate "github.com/golang-migrate/migrate/v4"
+	migratemongo "github.com/golang-migrate/migrate/v4/database/mongodb"
+	migratemysql "github.com/golang-migrate/migrate/v4/database/mysql"
+	"github.com/golang-migrate/migrate/v4/source/iofs"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -109,10 +114,7 @@ func nativeFixture(t *testing.T, nonempty bool) (*sql.DB, *mongo.Client, *mongo.
 			t.Error("owned SQL pool close failed")
 		}
 	})
-	v, _, err := migration.NewMigrator(pool, &migration.Config{Enabled: true, Database: namespace}).Run()
-	if err != nil || v != 99 {
-		t.Fatal("actual additive99 fixture migration failed")
-	}
+	nativeHistoricalSchema(t, pool, nil, namespace)
 	mongoPort, e := strconv.Atoi(os.Getenv("MONGODB_PORT"))
 	if e != nil || mongoPort < 1024 || mongoPort > 65535 || mongoPort == 33317 {
 		t.Fatal("independently owned Mongo port required")
@@ -170,10 +172,7 @@ func nativeFixture(t *testing.T, nonempty bool) (*sql.DB, *mongo.Client, *mongo.
 	})
 	// The business qualifier requires the real complete unique indexes; a
 	// hand-created _id-only catalog cannot prove business identity uniqueness.
-	mongoVersion, _, migrationErr := migration.NewMongoMigrator(adminMongo, &migration.Config{Enabled: true, Database: namespace}).Run()
-	if migrationErr != nil || mongoVersion != 38 {
-		t.Fatal("actual additive38 Mongo fixture migration failed")
-	}
+	nativeHistoricalSchema(t, nil, adminMongo, namespace)
 	if adminMongo.Database("admin").RunCommand(t.Context(), bson.D{{Key: "createRole", Value: role}, {Key: "privileges", Value: bson.A{bson.D{{Key: "resource", Value: bson.D{{Key: "cluster", Value: true}}}, {Key: "actions", Value: bson.A{"replSetGetConfig"}}}}}, {Key: "roles", Value: bson.A{}}}).Err() != nil {
 		t.Fatal("owned Mongo identity read role create failed")
 	}
@@ -190,6 +189,72 @@ func nativeFixture(t *testing.T, nonempty bool) (*sql.DB, *mongo.Client, *mongo.
 		nativeOriginalSubmission(t, db)
 	}
 	return pool, adminMongo, db, namespace
+}
+
+// Retained history tests read A's actual complete99/38 layout. Latest ordinary
+// startup now requires B's paired retirement preflight and cannot be used as a
+// historical fixture factory. These explicit targets are test-only and never
+// change the runtime migrator, old migration bytes or borrowed pool lifetime.
+func nativeHistoricalSchema(t *testing.T, pool *sql.DB, client *mongo.Client, namespace string) {
+	t.Helper()
+	backend, target := "mysql", uint(99)
+	if client != nil {
+		backend, target = "mongodb", 38
+	}
+	source, err := iofs.New(os.DirFS("../../internal/pkg/migration/migrations/"+backend), ".")
+	if err != nil {
+		t.Fatal("owned historical migration source")
+	}
+	defer func() {
+		if source.Close() != nil {
+			t.Error("owned historical migration source close")
+		}
+	}()
+	var instance *golangmigrate.Migrate
+	if pool != nil {
+		conn, e := pool.Conn(t.Context())
+		if e != nil {
+			t.Fatal("owned historical SQL connection")
+		}
+		defer func() {
+			if conn.Close() != nil {
+				t.Error("owned historical SQL connection close")
+			}
+		}()
+		driver, e := migratemysql.WithConnection(t.Context(), conn, &migratemysql.Config{DatabaseName: namespace, MigrationsTable: "schema_migrations"})
+		if e != nil {
+			t.Fatal("owned historical SQL driver")
+		}
+		instance, err = golangmigrate.NewWithInstance("iofs", source, namespace, driver)
+	} else {
+		cleanup, e := migration.NewMongoDriver(client).PrepareRun(t.Context(), &migration.Config{Enabled: true, Database: namespace, MigrationsCollection: "schema_migrations"}, 0)
+		if e != nil {
+			t.Fatal("owned historical Mongo preconditions")
+		}
+		defer func() {
+			if cleanup(t.Context()) != nil {
+				t.Error("owned historical Mongo precondition close")
+			}
+		}()
+		driver, e := migratemongo.WithInstance(client, &migratemongo.Config{DatabaseName: namespace, MigrationsCollection: "schema_migrations"})
+		if e != nil {
+			t.Fatal("owned historical Mongo driver")
+		}
+		instance, err = golangmigrate.NewWithInstance("iofs", source, namespace, driver)
+	}
+	if err != nil {
+		t.Fatal("owned historical migration instance")
+	}
+	for attempt := range 2 {
+		err = instance.Migrate(target)
+		if attempt == 0 && err != nil || attempt == 1 && !errors.Is(err, golangmigrate.ErrNoChange) {
+			t.Fatal("owned historical upgrade or repeat")
+		}
+		version, dirty, e := instance.Version()
+		if e != nil || dirty || version != target {
+			t.Fatal("owned historical clean head")
+		}
+	}
 }
 func nativeOriginalSubmission(t *testing.T, db *mongo.Database) {
 	t.Helper()

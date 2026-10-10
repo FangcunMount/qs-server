@@ -22,9 +22,10 @@ const sourceOriginInputPageBytes = 64 << 20
 // origin/global capability or its lifetime. Only the live binding can mint it.
 // The host retains ownership of every original stream and all later scopes.
 type HistoricalSourceInputRecipe struct {
-	self    *HistoricalSourceInputRecipe
-	binding OriginCopyBinding
-	hash    string
+	self           *HistoricalSourceInputRecipe
+	binding        OriginCopyBinding
+	hash           string
+	captureStopped bool
 }
 
 type sourceOriginInputFrame struct {
@@ -71,6 +72,7 @@ type HistoricalSourceInputEpoch struct {
 	boundaries                                                     [4]SourceBoundary
 	epochHash, resultHash                                          string
 	complete, poisoned                                             bool
+	captureStopped                                                 bool
 }
 
 type HistoricalSourceInputPair struct {
@@ -85,6 +87,7 @@ type HistoricalSourceInputSummary struct {
 	CompleteInput, TwoIndependentInputsMatched                                                                            bool
 	SQLResponsibilityRequired, MongoResponsibilityRequired, AIResponsibilityRequired, FreshComponentQualificationRequired bool
 	BusinessClosureVerified, CASAuthorized, DropReady                                                                     bool
+	CaptureStopped, LiveSQLGraphRetained                                                                                  bool
 }
 
 func (*HistoricalSourceInputRecipe) MarshalJSON() ([]byte, error) { return nil, ErrSourceSerialization }
@@ -127,7 +130,7 @@ func (r *HistoricalSourceInputRecipe) valid() bool {
 // input deadline. Native SQL metadata is checked at object boundaries; there
 // is no per-row SQL query. No previous capability's expiry is renewed.
 func (e *HistoricalSourceInputEpoch) alive(ctx context.Context) error {
-	if e == nil || e.self != e || e.poisoned || !e.recipe.valid() || ctx == nil || ctx.Err() != nil || !time.Now().Before(e.started.Add(e.budget)) {
+	if e == nil || e.self != e || e.poisoned || e.captureStopped || e.sql == nil || !e.recipe.valid() || ctx == nil || ctx.Err() != nil || !time.Now().Before(e.started.Add(e.budget)) {
 		return ErrSourceOrigin
 	}
 	tx, err := hostmysql.RequireTx(ctx)
@@ -212,7 +215,7 @@ func (e *HistoricalSourceInputEpoch) freeze(ctx context.Context, f sourceOriginI
 // scope. Unsupported snapshots, history eviction, drift and budget exhaustion
 // fail; the host must not replace the selected snapshot and retry this epoch.
 func PrepareHistoricalSourceInputEpoch(parent context.Context, r *HistoricalSourceInputRecipe, sql *SQLResponsibilitySnapshot, mgo *MongoSnapshotInputEpoch, file *os.File, budget time.Duration) (result *HistoricalSourceInputEpoch, err error) {
-	if parent == nil || !r.valid() || sql == nil || sql.cycle == nil || sql.Report().CompletedAt.IsZero() || mgo == nil || !mgo.complete || file == nil || budget <= 0 || budget > 30*time.Minute {
+	if parent == nil || !r.valid() || r.captureStopped || sql == nil || sql.cycle == nil || sql.Report().CompletedAt.IsZero() || mgo == nil || !mgo.complete || file == nil || budget <= 0 || budget > 30*time.Minute {
 		return nil, ErrSourceOrigin
 	}
 	if sql.ValidateBorrowedSnapshot(parent) != nil || mgo.ValidateBorrowedInputEpoch(parent) != nil {
@@ -351,8 +354,43 @@ func (e *HistoricalSourceInputEpoch) Summary() HistoricalSourceInputSummary {
 		r.Sources = e.receipts
 		r.Pages = uint64(len(e.pages))
 		r.CompleteInput = true
+		r.CaptureStopped = e.captureStopped
+		r.LiveSQLGraphRetained = e.sql != nil
 	}
 	return r
+}
+
+// StopCapture consumes only this input read scope. Its original SQL8 graph
+// becomes unreachable from both source and AI inputs; verified disk pages and
+// native identities remain. The host still owns rollback/session/file close.
+// It cannot keep a transaction, previous capability or write permit alive.
+func (e *HistoricalSourceInputEpoch) StopCapture(ctx context.Context) error {
+	if e == nil || e.captureStopped || e.alive(ctx) != nil || !e.complete || e.verifyFrozen(ctx) != nil || e.sql.ValidateBorrowedSnapshot(ctx) != nil || e.mongo.ValidateBorrowedInputEpoch(ctx) != nil {
+		return ErrSourceOrigin
+	}
+	e.captureStopped = true
+	e.sql = nil
+	return nil
+}
+
+// ReleaseCaptureIndex retains the already authenticated receipts and private
+// file hashes, after both scopes were stopped. No new source membership can
+// be captured from this recipe, and no existing old capability is modified.
+func (p *HistoricalSourceInputPair) ReleaseCaptureIndex(ctx context.Context) error {
+	if p.ValidateFrozen(ctx) != nil || !p.first.captureStopped || !p.second.captureStopped {
+		return ErrSourceOrigin
+	}
+	for _, e := range []*HistoricalSourceInputEpoch{p.first, p.second} {
+		r := e.recipe
+		if !r.captureStopped {
+			compact := *r.binding.copies
+			compact.rows, compact.eventIDs, compact.pairs = nil, nil, nil
+			compact.reservation = 0
+			r.binding.copies = &compact
+			r.captureStopped = true
+		}
+	}
+	return p.ValidateFrozen(ctx)
 }
 
 // CompareIndependentHistoricalSourceInputs validates every original spool

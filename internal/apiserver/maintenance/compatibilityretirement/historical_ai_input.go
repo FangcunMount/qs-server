@@ -124,7 +124,7 @@ func (e *AIHistoricalInputEpoch) freeze(ctx context.Context, l AIReverseLedgerSu
 // source-scope binding authenticates all four copies to EOF, retaining unknown
 // and held/orphan facts. It does not imply qs-ai remote business completion.
 func PrepareAIHistoricalInputEpoch(parent context.Context, coordinator *HistoricalCoordinator, source *HistoricalSourceInputEpoch, copies []SourceCopyInput, file *os.File, limits AIReverseLimits) (result *AIHistoricalInputEpoch, err error) {
-	if parent == nil || coordinator == nil || source == nil || !source.complete || source.alive(parent) != nil || source.verifyFrozen(parent) != nil || len(copies) != 4 || file == nil || !limits.valid() || limits.MaxRetainedBytes > aiHistoricalInputMaxRetained {
+	if parent == nil || source == nil || !source.complete || source.alive(parent) != nil || source.verifyFrozen(parent) != nil || len(copies) != 4 || file == nil || !limits.valid() || limits.MaxRetainedBytes > aiHistoricalInputMaxRetained {
 		return nil, ErrAIReverseBinding
 	}
 	for i := range copies {
@@ -153,7 +153,12 @@ func PrepareAIHistoricalInputEpoch(parent context.Context, coordinator *Historic
 	if err != nil {
 		return nil, err
 	}
-	if err = coordinator.BindAIReverseSourceScope(ctx, s, copies); err != nil {
+	if coordinator == nil {
+		err = bindAIReverseInputSourceScope(ctx, s, source, copies)
+	} else {
+		err = coordinator.BindAIReverseSourceScope(ctx, s, copies)
+	}
+	if err != nil {
 		return nil, err
 	}
 	if e.alive(ctx) != nil || source.sql.ValidateBorrowedSnapshot(ctx) != nil || s.ValidateBorrowedSnapshot(ctx) != nil {

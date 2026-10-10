@@ -205,10 +205,24 @@ func historyMaterialSame(a, b os.FileInfo) bool {
 // The exact names come from original create calls/sequence, never directory
 // adoption. This descriptor is private metadata, not a retirement capability.
 func (j *historyWriteJournal) snapshotMaterials(ctx context.Context) (string, error) {
-	if ctx == nil || ctx.Err() != nil || !j.valid() || j.sequence > 1<<20 || len(j.created) != int(j.sequence)+2 {
+	if ctx == nil || ctx.Err() != nil || !j.valid() || j.sequence > 1<<20 {
 		return "", fixedError("history_write_material_binding_rejected")
 	}
-	names := []string{"prepared-mongo-private.bin", "prepared-sql-private.bin"}
+	var names []string
+	inputNames := historyInitialInputNames()
+	for _, name := range inputNames {
+		if j.created[name] != nil {
+			names = append(names, inputNames[:]...)
+			break
+		}
+	}
+	if j.created["prepared-mongo-private.bin"] != nil || j.created["prepared-sql-private.bin"] != nil {
+		names = append(names, "prepared-mongo-private.bin", "prepared-sql-private.bin")
+	}
+	largeFiles := len(names)
+	if largeFiles == 0 || len(j.created) != largeFiles+int(j.sequence) {
+		return "", fixedError("history_write_material_binding_rejected")
+	}
 	for n := uint64(1); n <= j.sequence; n++ {
 		names = append(names, "journal-"+strconv.FormatUint(n, 10)+".json")
 	}
@@ -235,7 +249,7 @@ func (j *historyWriteJournal) snapshotMaterials(ctx context.Context) (string, er
 		named, ne := os.Lstat(filepath.Join(j.path, name))
 		original := j.created[name]
 		limit := int64(64 << 10)
-		if index < 2 {
+		if index < largeFiles {
 			limit = 16 << 30
 		}
 		if be != nil || ne != nil || original == nil || !os.SameFile(original, before) || !aiHostRegular(before, uint64(limit)) || !historyMaterialSame(before, named) {
@@ -279,7 +293,7 @@ func (j *historyWriteJournal) record(ctx context.Context, stage string, position
 		return fixedError("history_write_journal_unknown")
 	}
 	switch stage {
-	case "prepared", "write_epoch_started", "page_statement_applied", "all_statements_applied", "sql_commit_intent", "sql_commit_success", "sql_commit_unknown", "actual_origin_readback_matched", "mongo_commit_not_required", "mongo_commit_intent", "mongo_commit_success", "mongo_commit_unknown", "mongo_abort_failed", "sql_rollback_failed", "fresh_page_verified", "limited_event_readback_finished", "ai_statements_applied", "ai_independent_readback_finished":
+	case "initial_input_epoch_frozen", "initial_inputs_matched", "prepared", "write_epoch_started", "page_statement_applied", "all_statements_applied", "sql_commit_intent", "sql_commit_success", "sql_commit_unknown", "actual_origin_readback_matched", "mongo_commit_not_required", "mongo_commit_intent", "mongo_commit_success", "mongo_commit_unknown", "mongo_abort_failed", "sql_rollback_failed", "fresh_page_verified", "limited_event_readback_finished", "ai_statements_applied", "ai_independent_readback_finished":
 	default:
 		return fixedError("history_write_journal_unknown")
 	}
