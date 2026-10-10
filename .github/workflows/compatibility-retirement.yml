@@ -293,7 +293,7 @@ jobs:
                   if (digest.digest('hex') !== anchor.hash) {reject();}
                 }
               }
-              const limits = {query_seconds:30,total_seconds:1500,max_records:1000000,max_bytes:2147483648,page_size:1000,max_pages:1001};
+              const limits = {query_seconds:30,total_seconds:1500,max_records:1000000,max_bytes:2147483648,page_size:10000,max_pages:1001};
               if (!exact(approval.limits, Object.keys(limits)) || Object.keys(limits).some(key => approval.limits[key] !== limits[key])) {reject();}
               for (const name of input.prepare_mode === 'bootstrap-inventory' ? ['identity_report', 'boundary_report'] : ['identity_report']) {
                 const ref = approval[name];
