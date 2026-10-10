@@ -123,7 +123,7 @@ class ExactExit(unittest.TestCase):
 
     def test_real_armored_completed_owner_and_origin_binding(self):
         transport=s0.load(Path(__file__).parents[1]/'dbops/receipt-transport.py','s0_test_transport')
-        a={'completion_run_id':'77777777777-1','completion_source_sha':'a'*40,'tool_source_sha':'b'*40,
+        a={'failed_inventory_operation_id':s0.OLD_OP,'completion_run_id':'77777777777-1','completion_source_sha':'a'*40,'tool_source_sha':'b'*40,
            'completion_operation_id':'66666666666-1','workflow_scope_sha256':'c'*64,'native_stdout_sha256':'d'*64,
            'producer_workflow_id':123,'classifier_sha256':'e'*64}
         f={'protocol':'runner_platform_window_owner_v1','dispatcher_source_sha':a['completion_source_sha'],
@@ -411,6 +411,100 @@ class OriginalSourceOwner(unittest.TestCase):
                 finally:
                     if child.poll() is None:child.kill();child.wait(timeout=3)
                     for stream in (child.stdin,child.stdout,child.stderr):stream.close()
+
+
+class FixedFailedInventorySelection(unittest.TestCase):
+    def approval(self,operation):
+        a={key:'a'*64 for key in s0.REQUIRED}
+        a.update(protocol='qs-s0-exact-physical-exit/v1',failed_inventory_operation_id=operation,
+            source_sha='a'*40,baseline_observing_source_sha='b'*40,completion_source_sha='c'*40,
+            tool_source_sha='d'*40,baseline_observing_run_id='77777777777-1',completion_run_id='88888888888-1',
+            completion_operation_id='99999999999-1',completion_job_id=123,producer_workflow_id=456,
+            pin_sha256=s0.PIN_SHA,total_seconds=600)
+        return a
+
+    def test_approval_only_two_exact_origins_without_default(self):
+        for operation,origin in s0.FAILED_INVENTORY_ORIGINS.items():
+            a=self.approval(operation);raw=s0.canonical(a)
+            self.assertEqual(s0.approved(raw,s0.sha(raw),'a'*40),a)
+            self.assertEqual(s0.failed_inventory_origin(a),(operation,*origin))
+            a['completion_run_id']=origin[0];raw=s0.canonical(a)
+            with self.assertRaises(s0.Rejected):s0.approved(raw,s0.sha(raw),'a'*40)
+        for operation in ('38019009876-3','../38019009876-2',None,True):
+            a=self.approval(operation);raw=s0.canonical(a)
+            with self.assertRaises(s0.Rejected):s0.approved(raw,s0.sha(raw),'a'*40)
+        a=self.approval(s0.OLD_OP);del a['failed_inventory_operation_id'];raw=s0.canonical(a)
+        with self.assertRaises(s0.Rejected):s0.approved(raw,s0.sha(raw),'a'*40)
+
+    def authority(self,operation):
+        transport=s0.load(Path(__file__).parents[1]/'dbops/receipt-transport.py','s0_selection_transport')
+        a=self.approval(operation)
+        f={'protocol':'runner_platform_window_owner_v1','dispatcher_source_sha':a['completion_source_sha'],
+           'tool_source_sha':a['tool_source_sha'],'operation_id':a['completion_operation_id'],
+           'actual_run_id':a['completion_run_id'],'workflow_scope_sha256':a['workflow_scope_sha256'],
+           'platform_installed':True,'platform_restored':True,'native_channel_terminal':True,
+           'native_disposition':'native_completed','native_stdout_sha256':a['native_stdout_sha256'],
+           'whole_writer_fence_proven':False,'drop_ready':False}
+        schema={k:('bool' if type(v) is bool else 'sha40' if k.endswith('source_sha') else 'hash64' if k.endswith('sha256') else 'run_id' if k in ('operation_id','actual_run_id') else frozenset({v})) for k,v in f.items()}
+        a['completion_footer_sha256']=s0.sha(s0.canonical(f))
+        original_run,original_source=s0.FAILED_INVENTORY_ORIGINS[operation]
+        p={'id':int(original_run.split('-')[0]),'run_attempt':1,'status':'completed','conclusion':'failure','head_sha':original_source,
+           'event':'workflow_dispatch','path':'.github/workflows/compatibility-retirement.yml','workflow_id':456}
+        c=dict(p,id=88888888888,conclusion='success',head_sha=a['completion_source_sha'])
+        proof={'producer':p,'completion':c,'workflow':{'id':456,'path':p['path'],'state':'disabled_manually'},
+            'active_runs':[],'footer':transport.encode_armored_receipt(f,schema=schema),'classifier_sha256':a['classifier_sha256']}
+        return a,proof,transport
+
+    def test_selected_second_producer_cannot_be_first_or_unknown(self):
+        a,proof,transport=self.authority('38019009876-2');p=proof['producer']
+        s0.validate_authority(a,proof,transport)
+        for changes in ({'id':38025045551,'head_sha':s0.OLD_SOURCE},{'run_attempt':2},{'status':'in_progress'},{'head_sha':'0'*40}):
+            with self.subTest(changes=changes),self.assertRaises(s0.Rejected):
+                s0.validate_authority(a,dict(proof,producer=dict(p,**changes)),transport)
+        with self.assertRaises(s0.Rejected):s0.validate_authority(dict(a,failed_inventory_operation_id=s0.OLD_OP),proof,transport)
+
+    def test_real_existing_action_only_exact_selected_producer(self):
+        import textwrap
+        repo=Path(__file__).parents[2]
+        script=textwrap.dedent((repo/'.github/workflows/compatibility-s0-exact-exit.yml').read_text().split('          script: |\n',1)[1].split('      - name:',1)[0])
+        for operation in s0.FAILED_INVENTORY_ORIGINS:
+            a,proof,_=self.authority(operation)
+            for filename,key in (('compatibility-s0-exact-exit.py','operator_sha256'),('compatibility-retirement.py','helper_sha256')):
+                a[key]=s0.sha((repo/'scripts/database'/filename).read_bytes())
+            classifier=(repo/'scripts/database/compatibility-platform-window-action.py').read_bytes()
+            a['classifier_sha256']=s0.sha(classifier)
+            for change in ('none','different_selector','wrong_producer'):
+                with self.subTest(operation=operation,change=change),tempfile.TemporaryDirectory(prefix='qs-owned-s0-action-choice-') as temporary:
+                    producer=dict(proof['producer'])
+                    if change=='wrong_producer':producer['id']+=1
+                    fixture={'producer':producer,'completion':proof['completion'],'workflow':proof['workflow'],
+                        'jobs':[{'id':123,'name':'Retire exact private lifecycle stage with workflow quarantine','status':'completed','conclusion':'success'}],
+                        'footer':proof['footer'],'classifier':base64.b64encode(classifier).decode()}
+                    context={'eventName':'workflow_dispatch','ref':'refs/heads/main','sha':a['source_sha'],'runId':555,
+                        'repo':{'owner':'FangcunMount','repo':'qs-server'}}
+                    program=('const fixture='+json.dumps(fixture)+';const context='+json.dumps(context)+';'
+                        +"const github={rest:{repos:{getBranch:async()=>({data:{commit:{sha:context.sha}}}),getContent:async()=>({data:{type:'file',encoding:'base64',content:fixture.classifier}})},actions:{getWorkflowRun:async()=>({data:fixture.producer}),getWorkflowRunAttempt:async()=>({data:fixture.completion}),getWorkflow:async()=>({data:fixture.workflow}),listWorkflowRuns:async()=>({data:{workflow_runs:[]}}),listJobsForWorkflowRunAttempt:async()=>({data:{jobs:fixture.jobs}}),downloadJobLogsForWorkflowRun:async()=>({data:fixture.footer})}}};const core={setOutput:()=>{}};"
+                        +"new (Object.getPrototypeOf(async function(){}).constructor)('context','github','core','require',"
+                        +json.dumps(script)+")(context,github,core,require).catch(()=>{process.exitCode=1;});")
+                    env=dict(os.environ,GITHUB_WORKFLOW_REF='FangcunMount/qs-server/.github/workflows/compatibility-s0-exact-exit.yml@refs/heads/main',
+                        GITHUB_WORKSPACE=str(repo),RUNNER_TEMP=temporary,S0_APPROVAL_JSON=s0.canonical(a)[:-1].decode(),
+                        S0_APPROVAL_SHA256=s0.sha(s0.canonical(a)),S0_FAILED_INVENTORY_OPERATION_ID=s0.OLD_OP if change=='different_selector' and operation!=s0.OLD_OP else '38019009876-2' if change=='different_selector' else operation)
+                    result=subprocess.run(['node','-e',program],capture_output=True,env=env,timeout=5)
+                    self.assertEqual(result.returncode,0 if change=='none' else 1,result.stderr.decode())
+                    paths=list(Path(temporary).iterdir())
+                    self.assertEqual(len(paths),1 if change=='none' else 0)
+                    if paths:self.assertEqual({p.name for p in paths[0].iterdir()},{'approval.json','authority.json'})
+
+    def test_real_cli_rejects_missing_and_unknown_operation_before_effect(self):
+        path=Path(__file__).with_name('compatibility-s0-exact-exit.py')
+        for values in ([],['--failed-inventory-operation-id','38019009876-3']):
+            result=subprocess.run([sys.executable,str(path),*values],capture_output=True,timeout=3)
+            self.assertEqual(result.returncode,2);self.assertEqual(result.stdout,b'')
+        for operation in s0.FAILED_INVENTORY_ORIGINS:
+            result=subprocess.run([sys.executable,str(path),'--failed-inventory-operation-id',operation,
+                '--repo','/nonexistent','--approval','/nonexistent','--proof','/nonexistent','--approval-sha256','a'*64],capture_output=True,timeout=3)
+            self.assertEqual(result.returncode,1);self.assertIn(b'unknown_or_refused',result.stdout)
+            self.assertEqual(result.stderr,b'')
 
 
 if __name__=='__main__':unittest.main()

@@ -3,6 +3,11 @@ name: Exact failed S0 material exit
 on:
   workflow_dispatch:
     inputs:
+      failed_inventory_operation_id:
+        description: Exact failed inventory batch; each batch requires its own observed baseline
+        required: true
+        type: choice
+        options: [38019009876-1, 38019009876-2]
       approval_json:
         description: Independently reviewed canonical fixed S0 exit authorization; real baseline and successful production receipt required
         required: true
@@ -38,6 +43,7 @@ jobs:
         env:
           S0_APPROVAL_JSON: ${{ inputs.approval_json }}
           S0_APPROVAL_SHA256: ${{ inputs.approval_sha256 }}
+          S0_FAILED_INVENTORY_OPERATION_ID: ${{ inputs.failed_inventory_operation_id }}
         with:
           script: |
             const fail=()=>{throw new Error('s0_actual_authorization_rejected');};
@@ -46,19 +52,22 @@ jobs:
             const raw=process.env.S0_APPROVAL_JSON;
             if(context.eventName!=='workflow_dispatch'||context.ref!=='refs/heads/main'||context.repo.owner!=='FangcunMount'||context.repo.repo!=='qs-server'||process.env.GITHUB_WORKFLOW_REF!=='FangcunMount/qs-server/.github/workflows/compatibility-s0-exact-exit.yml@refs/heads/main'||!raw||raw.length>8192||!/^[0-9a-f]{64}$/.test(process.env.S0_APPROVAL_SHA256||''))fail();
             let a;try{a=JSON.parse(raw);}catch{fail();}
-            const keys=['protocol','source_sha','operator_sha256','helper_sha256','pin_sha256','baseline_sha256','baseline_observing_source_sha','baseline_observing_run_id','completion_source_sha','tool_source_sha','completion_run_id','completion_operation_id','completion_job_id','completion_footer_sha256','classifier_sha256','native_stdout_sha256','workflow_scope_sha256','manifest_sha256','request_sha256','independent_acceptance_sha256','producer_workflow_id','total_seconds'].sort();
+            const keys=['protocol','failed_inventory_operation_id','source_sha','operator_sha256','helper_sha256','pin_sha256','baseline_sha256','baseline_observing_source_sha','baseline_observing_run_id','completion_source_sha','tool_source_sha','completion_run_id','completion_operation_id','completion_job_id','completion_footer_sha256','classifier_sha256','native_stdout_sha256','workflow_scope_sha256','manifest_sha256','request_sha256','independent_acceptance_sha256','producer_workflow_id','total_seconds'].sort();
             if(!a||Object.keys(a).sort().join(',')!==keys.join(',')||JSON.stringify(Object.fromEntries(keys.map(k=>[k,a[k]])))!==raw||digest(raw+'\n')!==process.env.S0_APPROVAL_SHA256||a.source_sha!==context.sha||a.protocol!=='qs-s0-exact-physical-exit/v1')fail();
+            const origins={'38019009876-1':{id:38025045551,source:'ae807219ffee37c1f060f1bfca25dd7c408ef9fd'},'38019009876-2':{id:38037670416,source:'d638638865c08b2b77a28ecc4920fb3f679ca798'}};
+            if(typeof a.failed_inventory_operation_id!=='string'||!Object.hasOwn(origins,a.failed_inventory_operation_id)||a.failed_inventory_operation_id!==process.env.S0_FAILED_INVENTORY_OPERATION_ID)fail();
+            const origin=origins[a.failed_inventory_operation_id];
             for(const k of keys){if(k.endsWith('_sha256')&&!/^[0-9a-f]{64}$/.test(a[k]))fail();if(k.endsWith('_source_sha')&&!/^[0-9a-f]{40}$/.test(a[k]))fail();if(k.endsWith('_run_id')&&!/^[1-9][0-9]{0,19}-[1-9][0-9]{0,3}$/.test(a[k]))fail();}
             if(!Number.isSafeInteger(a.producer_workflow_id)||a.producer_workflow_id<1||!Number.isSafeInteger(a.completion_job_id)||a.completion_job_id<1||a.total_seconds!==600||a.pin_sha256!=='0d64be53c7c692e3d766c2f5495f3fe974a8185b54b0f9b981303515886f41ff')fail();
             const main=await github.rest.repos.getBranch({...context.repo,branch:'main'});
             if(main.data.commit.sha!==context.sha)fail();
             for(const [p,k] of [['scripts/database/compatibility-s0-exact-exit.py','operator_sha256'],['scripts/database/compatibility-retirement.py','helper_sha256'],['scripts/database/compatibility-host-inventory-action.py','pin_sha256']]){if(digest(fs.readFileSync(path.join(process.env.GITHUB_WORKSPACE,p)))!==a[k])fail();}
-            const producer=(await github.rest.actions.getWorkflowRun({...context.repo,run_id:38025045551})).data;
+            const producer=(await github.rest.actions.getWorkflowRun({...context.repo,run_id:origin.id})).data;
             const [run,attempt]=a.completion_run_id.split('-').map(Number);
             if(!Number.isSafeInteger(run)||!Number.isSafeInteger(attempt)||run===context.runId)fail();
             const completion=(await github.rest.actions.getWorkflowRunAttempt({...context.repo,run_id:run,attempt_number:attempt})).data;
             const workflow=(await github.rest.actions.getWorkflow({...context.repo,workflow_id:a.producer_workflow_id})).data;
-            if(producer.run_attempt!==1||producer.status!=='completed'||producer.head_sha!=='ae807219ffee37c1f060f1bfca25dd7c408ef9fd'||producer.workflow_id!==workflow.id||workflow.state!=='disabled_manually'||producer.path!==workflow.path||completion.status!=='completed'||completion.conclusion!=='success'||completion.head_sha!==a.completion_source_sha||completion.path!=='.github/workflows/compatibility-retirement.yml'||completion.event!=='workflow_dispatch')fail();
+            if(producer.id!==origin.id||producer.run_attempt!==1||producer.status!=='completed'||producer.head_sha!==origin.source||producer.workflow_id!==workflow.id||workflow.state!=='disabled_manually'||producer.path!==workflow.path||completion.status!=='completed'||completion.conclusion!=='success'||completion.head_sha!==a.completion_source_sha||completion.path!=='.github/workflows/compatibility-retirement.yml'||completion.event!=='workflow_dispatch')fail();
             // Fresh complete queue enumeration; a capped/unknown queue is refused.
             let ended=false;
             for(let page=1;page<=10;page++){
@@ -101,4 +110,5 @@ jobs:
           S0_APPROVAL_PATH: ${{ steps.proof.outputs.approval }}
           S0_PROOF_PATH: ${{ steps.proof.outputs.proof }}
           S0_APPROVAL_SHA256: ${{ inputs.approval_sha256 }}
-        run: python3 scripts/database/compatibility-s0-exact-exit.py --repo "$GITHUB_WORKSPACE" --approval "$S0_APPROVAL_PATH" --proof "$S0_PROOF_PATH" --approval-sha256 "$S0_APPROVAL_SHA256"
+          S0_FAILED_INVENTORY_OPERATION_ID: ${{ inputs.failed_inventory_operation_id }}
+        run: python3 scripts/database/compatibility-s0-exact-exit.py --failed-inventory-operation-id "$S0_FAILED_INVENTORY_OPERATION_ID" --repo "$GITHUB_WORKSPACE" --approval "$S0_APPROVAL_PATH" --proof "$S0_PROOF_PATH" --approval-sha256 "$S0_APPROVAL_SHA256"

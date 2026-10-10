@@ -195,42 +195,45 @@ class InventoryReportDiagnosticContracts(unittest.TestCase):
 
 
 class FailedInventoryCleanupContracts(unittest.TestCase):
+    operation = tool.FAILED_INVENTORY_OPERATION
+    sql_pages = (2, 2, 2)
     write = base.ReportDiagnosticSafetyContracts.write
     approve = base.ReportDiagnosticSafetyContracts.approve
     tearDown = base.ReportDiagnosticSafetyContracts.tearDown
 
     def setUp(self):
         base.ReportDiagnosticSafetyContracts.setUp(self)
-        self.actual_reference = tool.FAILED_INVENTORY_REFERENCE.copy()
-        self.directory.rename(self.root/tool.FAILED_INVENTORY_OPERATION)
-        self.directory = self.root/tool.FAILED_INVENTORY_OPERATION
-        self.args.operation_id = tool.FAILED_INVENTORY_OPERATION
+        self.actual_reference, limits, _ = tool.failed_inventory_profile(self.operation)
+        self.actual_reference = self.actual_reference.copy()
+        self.directory.rename(self.root/self.operation)
+        self.directory = self.root/self.operation
+        self.args.operation_id = self.operation
         self.output = self.directory/('inventory-'+self.actual_reference['run_id']); self.output.mkdir(mode=0o700)
         self.request.update(kind='readonly_inventory_request', source_sha=self.actual_reference['source_sha'],
-            operation_id=tool.FAILED_INVENTORY_OPERATION, limits=tool.FAILED_INVENTORY_LIMITS.copy(),
+            operation_id=self.operation, limits=limits.copy(),
             boundary_run_id='701-1', boundary_report_hash='5'*64,
             approved_boundaries=[dict(zip(('database','name','kind'),t),present=False,empty=False,
                 pk_type='',upper_token='',schema_hash='6'*64,identity_hash='7'*64) for t in tool.TARGETS])
         request_hash=self.write(self.directory/'inventory-request.json',self.request)
         self.report.update(kind='readonly_compatibility_inventory',source_sha=self.actual_reference['source_sha'],
-            operation_id=tool.FAILED_INVENTORY_OPERATION,run_id=self.actual_reference['run_id'],request_hash=request_hash,
+            operation_id=self.operation,run_id=self.actual_reference['run_id'],request_hash=request_hash,
             targets=[dict(zip(('database','name','kind'),t),complete=i<3,equal_full_passes=2 if i<3 else 0,
-                pages=2 if i<3 else 0,records=1 if i<3 else 0,error_category='none') for i,t in enumerate(tool.TARGETS)])
+                pages=self.sql_pages[i] if i<3 else 0,records=1 if i<3 else 0,error_category='none') for i,t in enumerate(tool.TARGETS)])
         report_hash=self.write(self.output/'inventory.private.json',self.report)
         self.reference=dict(self.actual_reference,request_sha256=request_hash,sha256=report_hash)
-        self.patch=mock.patch.object(tool,'FAILED_INVENTORY_REFERENCE',self.reference);self.patch.start();self.addCleanup(self.patch.stop)
-        self.approval.update(kind='cleanup_only_failed_inventory_baseline_approval',operation_id=tool.FAILED_INVENTORY_OPERATION)
+        self.patch=mock.patch.object(tool,'FAILED_INVENTORY_REFERENCE' if self.operation==tool.FAILED_INVENTORY_OPERATION else 'FAILED_INVENTORY_SECOND_REFERENCE',self.reference);self.patch.start();self.addCleanup(self.patch.stop)
+        self.approval.update(kind='cleanup_only_failed_inventory_baseline_approval',operation_id=self.operation)
         self.approval['inventory_report']=self.reference.copy();self.approval.pop('boundary_report');self.approve()
         for i,(target,filename) in enumerate(tool.SOURCE_FILENAMES.items()):
-            path=self.output/filename;path.write_bytes(b'SYNTHETIC_BODY');path.chmod(0o600)
+            path=self.output/filename;path.write_bytes(b'' if self.operation==tool.FAILED_INVENTORY_SECOND_OPERATION and target[0]=='mongodb' else b'SYNTHETIC_BODY');path.chmod(0o600)
             self.write(self.output/(filename+'.asset.json'),dict(format_version=1,kind='temporary_inventory_source_copy',
-                filename=filename,source_sha=self.reference['source_sha'],operation_id=tool.FAILED_INVENTORY_OPERATION,
+                filename=filename,source_sha=self.reference['source_sha'],operation_id=self.operation,
                 run_id=self.reference['run_id'],request_hash=request_hash,
                 protocol='mysql_cast_binary_columns_pk_order_v2' if target[0]=='mysql' else 'mongodb_server_bson_pk_order_v2',
                 boundary=self.request['approved_boundaries'][i],contains_original_body=True,retirement_proof=False,
                 purge_required_after_acceptance=True,resume_existing_file_allowed=False))
         self.write(self.output/'entrypoints.private.json',dict(format_version=1,kind='source_only_production_entrypoint_catalog',
-            source_sha=self.reference['source_sha'],operation_id=tool.FAILED_INVENTORY_OPERATION,run_id=self.reference['run_id'],
+            source_sha=self.reference['source_sha'],operation_id=self.operation,run_id=self.reference['run_id'],
             request_hash=request_hash,catalog_hash='a'*64,live_fence_proven=False,catalog={}))
         self.write(self.output/'mysql-metadata.private.json',{'synthetic_schema_only':True})
         _,_,_,_,checkpoints=tool.failed_inventory_inputs(self.args)
@@ -247,6 +250,8 @@ class FailedInventoryCleanupContracts(unittest.TestCase):
         self.assertEqual(capture.call_count,4)
         for call in capture.call_args_list:
             self.assertEqual(call.args[0][:6],['sudo','-n','docker','container','ls','--all'])
+        self.assertTrue(any('label=qs.compatibility-retirement.operation='+self.operation in call.args[0] for call in capture.call_args_list))
+        self.assertTrue(any('name=^/qs-compatibility-inventory-'+self.reference['run_id']+'$' in call.args[0] for call in capture.call_args_list))
         return receipt
 
     def test_exact_fd_hash_baseline_does_not_remove_or_certify_original_content(self):
@@ -262,7 +267,7 @@ class FailedInventoryCleanupContracts(unittest.TestCase):
         with self.assertRaises(tool.Blocked):self.execute()  # O_EXCL, no overwrite/resume
 
     def main_arguments(self):
-        return ['--operation','prepare','--root',str(self.root),'--operation-id',tool.FAILED_INVENTORY_OPERATION,
+        return ['--operation','prepare','--root',str(self.root),'--operation-id',self.operation,
             '--approved-source-sha',base.DIAGNOSTIC_SOURCE,'--actual-source-sha',base.DIAGNOSTIC_SOURCE,
             '--run-id',base.DIAGNOSTIC_OBSERVE,'--prepare-mode','report-diagnostic',
             '--bootstrap-approval-json',self.args.bootstrap_approval_json,
@@ -312,7 +317,7 @@ class FailedInventoryCleanupContracts(unittest.TestCase):
         unknown.unlink();self.write(self.output/'mongodb-metadata.private.json',{})
         with self.assertRaisesRegex(tool.Blocked,'failed_inventory_unknown_or_missing_member'):self.execute()
         (self.output/'mongodb-metadata.private.json').unlink()
-        name='mongodb-domain_event_outbox-pass-1-page-000001.checkpoint.json'
+        name=next(name for name in sorted(p.name for p in self.output.iterdir()) if name.endswith('.checkpoint.json'))
         value=json.loads((self.output/name).read_bytes());value['source_sha']='c'*40;self.write(self.output/name,value)
         with self.assertRaisesRegex(tool.Blocked,'failed_inventory_checkpoint_mismatch'):self.execute()
         self.assertFalse((self.directory/tool.FAILED_INVENTORY_BASELINE).exists())
@@ -345,7 +350,7 @@ class FailedInventoryCleanupContracts(unittest.TestCase):
     def test_cleanup_scope_rejects_unapproved_limits_or_other_run(self):
         unapproved=copy.deepcopy(self.request);unapproved['limits']['page_size']=10000
         with self.assertRaisesRegex(tool.Blocked,'inventory_request_limits_invalid'):
-            tool.validate_v2_request(unapproved,tool.FAILED_INVENTORY_OPERATION,self.reference['source_sha'],boundary=False)
+            tool.validate_v2_request(unapproved,self.operation,self.reference['source_sha'],boundary=False)
         self.approval['inventory_report']['run_id']='38025045552-1';self.approve()
         with self.assertRaisesRegex(tool.Blocked,'failed_inventory_cleanup_approval_invalid'):self.execute()
 
@@ -357,7 +362,7 @@ class FailedInventoryCleanupContracts(unittest.TestCase):
             if mutation:changed['inventory_report'][mutation]='999-1' if mutation=='run_id' else '0'*(40 if mutation=='source_sha' else 64)
             raw=tool.canonical_bytes(changed)
             supplied={'operation':'prepare','database':'mysql-and-mongodb','approved_source_sha':base.DIAGNOSTIC_SOURCE,
-                'operation_id':tool.FAILED_INVENTORY_OPERATION,'prepare_mode':'report-diagnostic',
+                'operation_id':self.operation,'prepare_mode':'report-diagnostic',
                 'bootstrap_approval_json':raw[:-1].decode(),'bootstrap_approval_sha256':hashlib.sha256(raw).hexdigest()}
             context={'payload':{'inputs':supplied},'ref':'refs/heads/main','sha':base.DIAGNOSTIC_SOURCE,'runId':703,'runAttempt':1,'repo':{}}
             program=('const script='+json.dumps(script)+';const context='+json.dumps(context)+';const current='+json.dumps(base.DIAGNOSTIC_SOURCE)
@@ -365,6 +370,34 @@ class FailedInventoryCleanupContracts(unittest.TestCase):
                 +"new (Object.getPrototypeOf(async function(){}).constructor)('context','github',script)(context,github).catch(()=>{process.exitCode=1;});")
             result=subprocess.run(['node','-e',program],capture_output=True,env=dict(os.environ,GITHUB_RUN_ATTEMPT='1'),timeout=5)
             self.assertEqual(result.returncode,0 if mutation is None else 1,result.stderr.decode())
+
+
+class SecondFailedInventoryCleanupContracts(FailedInventoryCleanupContracts):
+    operation = tool.FAILED_INVENTORY_SECOND_OPERATION
+    sql_pages = (2, 4, 6)
+
+    def test_second_fixed_original_profile_and_actual_report_page_list(self):
+        reference, limits, mongo_pages = tool.failed_inventory_profile(self.operation)
+        self.assertEqual(reference, self.reference)
+        self.assertEqual(limits['page_size'], 10000);self.assertEqual(mongo_pages,0)
+        _,_,_,names,checkpoints=tool.failed_inventory_inputs(self.args)
+        self.assertEqual(len(checkpoints),sum(self.sql_pages))
+        self.assertEqual(len(names),11+sum(self.sql_pages))
+        self.assertTrue(all(name.startswith('mysql-') for name in checkpoints))
+        self.assertEqual((self.output/'mongodb-domain_event_outbox.source.bsonframes').stat().st_size,0)
+        receipt=self.execute()
+        self.assertFalse(receipt['inventory_complete']);self.assertFalse(receipt['original_content_verified'])
+        self.assertEqual(receipt['observed_inventory_report'],self.reference)
+
+    def test_second_fixed_scope_refuses_even_one_mongo_checkpoint_or_cross_batch_ref(self):
+        extra=self.output/'mongodb-domain_event_outbox-pass-1-page-000001.checkpoint.json'
+        self.write(extra,{})
+        with self.assertRaisesRegex(tool.Blocked,'failed_inventory_unknown_or_missing_member'):self.execute()
+        extra.unlink();self.approval['inventory_report']=tool.FAILED_INVENTORY_REFERENCE.copy();self.approve()
+        with self.assertRaisesRegex(tool.Blocked,'failed_inventory_cleanup_approval_invalid'):self.execute()
+        for operation in ('38019009876-3','other',None,True):
+            with self.subTest(operation=operation),self.assertRaisesRegex(tool.Blocked,'failed_inventory_cleanup_operation_invalid'):
+                tool.failed_inventory_profile(operation)
 
 
 if __name__=='__main__':

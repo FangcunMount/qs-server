@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Temporary, source-reviewed physical exit of one failed S0 producer only."""
+"""Temporary, source-reviewed physical exit of either of two fixed failed producers."""
 import argparse
 import base64
 import hashlib
@@ -22,12 +22,16 @@ ROOT = '/opt/backups/qs-server/compatibility-retirement'
 OLD_OP = '38019009876-1'
 OLD_RUN = '38025045551-1'
 OLD_SOURCE = 'ae807219ffee37c1f060f1bfca25dd7c408ef9fd'
+FAILED_INVENTORY_ORIGINS = {
+    OLD_OP: (OLD_RUN, OLD_SOURCE),
+    '38019009876-2': ('38037670416-1', 'd638638865c08b2b77a28ecc4920fb3f679ca798'),
+}
 PIN_SHA = '0d64be53c7c692e3d766c2f5495f3fe974a8185b54b0f9b981303515886f41ff'
 TRANSPORT_SHA = '5f88b51b14771960a46670a4e32353547bb2da5c0e303c4d3b27b4f58cc2e92a'
 HASH = re.compile(r'^[0-9a-f]{64}$')
 SHA = re.compile(r'^[0-9a-f]{40}$')
 RUN = re.compile(r'^[1-9][0-9]{0,19}-[1-9][0-9]{0,3}$')
-REQUIRED = ('protocol', 'source_sha', 'operator_sha256', 'helper_sha256', 'pin_sha256',
+REQUIRED = ('protocol', 'failed_inventory_operation_id', 'source_sha', 'operator_sha256', 'helper_sha256', 'pin_sha256',
             'baseline_sha256', 'baseline_observing_source_sha', 'baseline_observing_run_id',
             'completion_source_sha', 'tool_source_sha', 'completion_run_id', 'completion_operation_id',
             'completion_job_id', 'completion_footer_sha256', 'classifier_sha256',
@@ -58,18 +62,26 @@ def load(path, name):
     return mod
 
 
+def failed_inventory_origin(a):
+    operation = a.get('failed_inventory_operation_id')
+    if type(operation) is not str or operation not in FAILED_INVENTORY_ORIGINS:
+        fail('s0_approval_rejected')
+    return operation, *FAILED_INVENTORY_ORIGINS[operation]
+
+
 def approved(raw, expected, source):
     try: a = json.loads(raw)
     except (ValueError, TypeError): fail('s0_approval_rejected')
     if type(a) is not dict or set(a) != set(REQUIRED) or canonical(a) != raw or sha(raw) != expected:
         fail('s0_approval_rejected')
+    _, original_run, _ = failed_inventory_origin(a)
     if a['protocol'] != 'qs-s0-exact-physical-exit/v1' or a['source_sha'] != source or not SHA.fullmatch(source):
         fail('s0_approval_rejected')
     for key in REQUIRED:
         if key.endswith('_sha256') and (type(a[key]) is not str or not HASH.fullmatch(a[key])): fail('s0_approval_rejected')
         if key.endswith('_source_sha') and (type(a[key]) is not str or not SHA.fullmatch(a[key])): fail('s0_approval_rejected')
         if key.endswith('_run_id') and (type(a[key]) is not str or not RUN.fullmatch(a[key])): fail('s0_approval_rejected')
-    if not RUN.fullmatch(a['completion_operation_id']) or a['completion_run_id'] == OLD_RUN or a['pin_sha256'] != PIN_SHA:
+    if not RUN.fullmatch(a['completion_operation_id']) or a['completion_run_id'] == original_run or a['pin_sha256'] != PIN_SHA:
         fail('s0_approval_rejected')
     for key in ('completion_job_id', 'producer_workflow_id'):
         if type(a[key]) is not int or not 0 < a[key] < 2**64: fail('s0_approval_rejected')
@@ -83,11 +95,13 @@ def validate_authority(a, proof, transport):
     # from GitHub, and the independent approval binds its original footer.
     if type(proof) is not dict or set(proof) != {'producer', 'completion', 'workflow', 'active_runs', 'footer', 'classifier_sha256'}:
         fail('s0_authority_rejected')
+    _, original_run, original_source = failed_inventory_origin(a)
+    original_id, original_attempt = map(int, original_run.split('-'))
     p, c, w = proof['producer'], proof['completion'], proof['workflow']
     common = {'id', 'run_attempt', 'status', 'conclusion', 'head_sha', 'event', 'path', 'workflow_id'}
     if any(type(v) is not dict or set(v) != common for v in (p,c)): fail('s0_authority_rejected')
     run, attempt = map(int, a['completion_run_id'].split('-'))
-    if p['id'] != 38025045551 or p['run_attempt'] != 1 or p['head_sha'] != OLD_SOURCE or p['status'] != 'completed' or p['event'] != 'workflow_dispatch':
+    if p['id'] != original_id or p['run_attempt'] != original_attempt or p['head_sha'] != original_source or p['status'] != 'completed' or p['event'] != 'workflow_dispatch':
         fail('s0_producer_not_terminal')
     if c['id'] != run or c['run_attempt'] != attempt or c['head_sha'] != a['completion_source_sha'] or c['status'] != 'completed' or c['conclusion'] != 'success' or c['event'] != 'workflow_dispatch' or c['path'] != '.github/workflows/compatibility-retirement.yml':
         fail('s0_completion_not_bound')
@@ -226,9 +240,12 @@ def purge_open(parentfd, name, baseline, names, authority, absence, deadline, *,
 
 def remote(a, proof, actual_run, helper, transport, source_uid):
     validate_authority(a,proof,transport)
+    operation, original_run, original_source = failed_inventory_origin(a)
+    ref, _, _ = helper.failed_inventory_profile(operation)
+    if ref['run_id'] != original_run or ref['source_sha'] != original_source: fail('s0_source_rejected')
     if type(source_uid) is not int or not 0 <= source_uid < 2**32: fail('s0_source_owner_unbound')
-    if os.getuid()!=0 or os.geteuid()!=0 or not RUN.fullmatch(actual_run) or actual_run in (OLD_RUN,a['completion_run_id']): fail('s0_host_or_run_rejected')
-    args=argparse.Namespace(root=ROOT)
+    if os.getuid()!=0 or os.geteuid()!=0 or not RUN.fullmatch(actual_run) or actual_run in (original_run,a['completion_run_id']): fail('s0_host_or_run_rejected')
+    args=argparse.Namespace(root=ROOT,operation_id=operation)
     directory,output,request,names,_=helper.failed_inventory_inputs(args,source_uid=source_uid)
     # Existing lock only: never create or adopt a missing lock.
     parentfd=os.open(directory,os.O_RDONLY|os.O_DIRECTORY|os.O_NOFOLLOW)
@@ -246,7 +263,7 @@ def remote(a, proof, actual_run, helper, transport, source_uid):
         def actual_absence(deadline):
             visible=os.stat(directory,follow_symlinks=False)
             if identity(visible)!=parent_identity or identity(os.fstat(parentfd))!=parent_identity or stamp(os.fstat(lockfd))!=stamp(st) or stamp(os.stat('operation.lock',dir_fd=parentfd,follow_symlinks=False))!=stamp(st):fail('s0_lock_rejected')
-            helper.failed_inventory_container_absent(deadline)
+            helper.failed_inventory_container_absent(deadline,operation)
         baselinefd=os.open(helper.FAILED_INVENTORY_BASELINE,os.O_RDONLY|os.O_NOFOLLOW|os.O_NONBLOCK,dir_fd=parentfd)
         try:
             bs=os.fstat(baselinefd)
@@ -256,7 +273,7 @@ def remote(a, proof, actual_run, helper, transport, source_uid):
             baseline=helper.decode(baseline_raw)
         finally: close(baselinefd)
         keys={'format_version','kind','original_operation_id','original_inventory_report','observing_source_sha','observing_run_id','approval_sha256','directory_identity','files','inventory_complete','retirement_proof','drop_authority','producer_container_absent'}
-        if set(baseline)!=keys or baseline['format_version']!=1 or type(baseline['format_version']) is not int or baseline['kind']!='cleanup_only_failed_inventory_baseline' or baseline['original_operation_id']!=OLD_OP or baseline['original_inventory_report']!=helper.FAILED_INVENTORY_REFERENCE or baseline['observing_source_sha']!=a['baseline_observing_source_sha'] or baseline['observing_run_id']!=a['baseline_observing_run_id'] or any(baseline[k] is not False for k in ('inventory_complete','retirement_proof','drop_authority')) or baseline['producer_container_absent'] is not True: fail('s0_baseline_rejected')
+        if set(baseline)!=keys or baseline['format_version']!=1 or type(baseline['format_version']) is not int or baseline['kind']!='cleanup_only_failed_inventory_baseline' or baseline['original_operation_id']!=operation or baseline['original_inventory_report']!=ref or baseline['observing_source_sha']!=a['baseline_observing_source_sha'] or baseline['observing_run_id']!=a['baseline_observing_run_id'] or any(baseline[k] is not False for k in ('inventory_complete','retirement_proof','drop_authority')) or baseline['producer_container_absent'] is not True: fail('s0_baseline_rejected')
         authority={k:a[k] for k in REQUIRED if k not in ('protocol','pin_sha256','helper_sha256','total_seconds')}
         authority['actual_run_id']=actual_run
         return purge_open(parentfd,output.name,baseline,names,authority,actual_absence,time.monotonic()+a['total_seconds'],source_uid=source_uid)
@@ -406,13 +423,14 @@ except BaseException:
 '''
 
 
-def run(repo, approval_path, proof_path, approved_hash):
+def run(repo, approval_path, proof_path, approved_hash, operation_id):
     platform=load(Path(repo)/'scripts/database/compatibility-platform-window-action.py','s0_platform')
     pin=load(Path(repo)/'scripts/database/compatibility-host-inventory-action.py','s0_pin')
     transport=load(Path(repo)/'scripts/dbops/receipt-transport.py','s0_transport')
     source=os.environ.get('GITHUB_SHA',''); run_id=os.environ.get('GITHUB_RUN_ID','')+'-'+os.environ.get('GITHUB_RUN_ATTEMPT','')
     if os.environ.get('GITHUB_REF')!='refs/heads/main' or os.environ.get('GITHUB_WORKFLOW_REF')!='FangcunMount/qs-server/.github/workflows/compatibility-s0-exact-exit.yml@refs/heads/main' or not RUN.fullmatch(run_id): fail('s0_source_rejected')
     a=approved(Path(approval_path).read_bytes(),approved_hash,source)
+    if a['failed_inventory_operation_id']!=operation_id:fail('s0_approval_rejected')
     proof=json.loads(Path(proof_path).read_bytes()); validate_authority(a,proof,transport)
     sources={}
     for name,path,key in (('operator','scripts/database/compatibility-s0-exact-exit.py','operator_sha256'),('helper','scripts/database/compatibility-retirement.py','helper_sha256'),('pin','scripts/database/compatibility-host-inventory-action.py','pin_sha256'),('transport','scripts/dbops/receipt-transport.py',None)):
@@ -454,10 +472,11 @@ def run(repo, approval_path, proof_path, approved_hash):
 
 def main():
     p=argparse.ArgumentParser(description=__doc__)
+    p.add_argument('--failed-inventory-operation-id',choices=tuple(FAILED_INVENTORY_ORIGINS),required=True)
     p.add_argument('--repo',required=True);p.add_argument('--approval',required=True)
     p.add_argument('--proof',required=True);p.add_argument('--approval-sha256',required=True)
     args=p.parse_args()
-    try:run(args.repo,args.approval,args.proof,args.approval_sha256)
+    try:run(args.repo,args.approval,args.proof,args.approval_sha256,args.failed_inventory_operation_id)
     except BaseException:
         print('{"protocol":"s0_exact_exit_result_v1","complete":false,"disposition":"unknown_or_refused"}')
         raise SystemExit(1)
