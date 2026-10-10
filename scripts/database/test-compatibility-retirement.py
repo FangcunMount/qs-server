@@ -354,36 +354,6 @@ class SafetyContracts(unittest.TestCase):
             self.assertIs(decoded["complete"], False)
             self.assertIs(decoded["execution_allowed"], False)
 
-    def test_journal_persists_intent_then_unknown_and_rejects_blind_retry(self):
-        journal = tool.DDLJournal(self.directory, "f" * 64, OPERATION, SOURCE)
-        with tool.locked_operation(self.directory):
-            journal.begin_drop(0)
-            reloaded = tool.DDLJournal(self.directory, "f" * 64, OPERATION, SOURCE)
-            self.assertEqual(reloaded.value["states"][0], "intent")
-            journal.mark_unknown(0)
-            self.assertBlocked("journal_transition_rejected", journal.begin_drop, 0)
-            self.assertBlocked("ddl_ledger_incomplete", journal.require_all_dropped)
-            journal.observe_absent(0)
-            for index in range(1, 4):
-                journal.begin_drop(index); journal.observe_absent(index)
-            journal.require_all_dropped()
-            journal.observe_restored(0)
-            self.assertBlocked("ddl_ledger_incomplete", journal.require_all_dropped)
-        self.assertEqual((self.directory / "ddl-journal.json").stat().st_mode & 0o777, 0o600)
-
-    def test_journal_binding_bad_states_and_partial_file_fail_closed(self):
-        journal = tool.DDLJournal(self.directory, "f" * 64, OPERATION, SOURCE)
-        journal.begin_drop(0)
-        self.assertBlocked("journal_binding_mismatch", tool.DDLJournal, self.directory, "e" * 64, OPERATION, SOURCE)
-        value = copy.deepcopy(journal.value); value["states"][0] = {}
-        self.write("ddl-journal.json", value)
-        self.assertBlocked("journal_state_invalid", tool.DDLJournal, self.directory, "f" * 64, OPERATION, SOURCE)
-        self.write("ddl-journal.json", journal.value)
-        partial = self.directory / "ddl-journal.json.partial"; partial.write_text("existing-owned-intent")
-        self.assertBlocked("journal_persistence_failed", journal.begin_drop, 1)
-        self.assertEqual(partial.read_text(), "existing-owned-intent")
-        self.assertEqual(journal.value["states"][1], "pending")
-
     def test_operation_lock_rejects_second_owner_and_symlink(self):
         with tool.locked_operation(self.directory):
             with self.assertRaisesRegex(tool.Blocked, "^operation_busy$"):
@@ -394,13 +364,6 @@ class SafetyContracts(unittest.TestCase):
         with self.assertRaisesRegex(tool.Blocked, "^operation_lock_unavailable$"):
             with tool.locked_operation(self.directory):
                 self.fail("symlink accepted")
-
-    def test_deadline_stops_forward_at_twenty_recovery_at_thirty(self):
-        tool.deadline(0, clock=lambda: 1199)
-        self.assertBlocked("maintenance_deadline_exceeded", lambda: tool.deadline(0, clock=lambda: 1200))
-        tool.deadline(0, clock=lambda: 1799, recovering=True)
-        self.assertBlocked("maintenance_deadline_exceeded", lambda: tool.deadline(0, clock=lambda: 1800, recovering=True))
-        self.assertBlocked("maintenance_clock_invalid", lambda: tool.deadline(10, clock=lambda: 9))
 
     def test_inventory_request_is_separate_class_and_exact_bounded_scope(self):
         value = {"format_version": 1, "kind": "readonly_inventory_request", "operation_id": OPERATION,

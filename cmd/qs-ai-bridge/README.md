@@ -38,7 +38,7 @@ Old Start identity uses request_id; old answer/cancel identities use command_id.
 
 An aggregate with multiple unowned pending commands is refused: the old schema does not retain sufficient immutable commit ordering. Such rows stay untouched in the maintenance inventory until an explicit ordering/evidence disposition is reviewed. This API therefore does not claim universal historical migration completion. The maintenance transaction must roll back on any error; the API does not commit, create a transaction or close resources. The runtime no longer contains the old scanner; switching off MQ is not a rollback to old gRPC writes.
 
-## 切换前只读数据库清单
+## 现用 MQ 只读数据库清单
 
 `cmd/qs-ai-messaging-audit` 是维护核查工具，不是消息服务。仅借用显式 DSN 建立宿主拥有的连接，用 MySQL READ ONLY / REPEATABLE READ 事务执行固定 SELECT；不加载密钥、不连接 NSQ、不记录正文、不执行迁移/移交/重投/清理或模型调用。二进制由独立 AI bridge CI 构建并记录源码 SHA。
 
@@ -47,11 +47,11 @@ An aggregate with multiple unowned pending commands is refused: the old schema d
 qs-ai-messaging-audit -limit 1000 > mq-database-inventory.json
 ```
 
-连接从 `QS_AI_MESSAGING_AUDIT_DSN` 获取；构建时通过 `-ldflags '-X main.sourceSHA=<精确提交>'` 固定来源。输出含原 command/request ID、已存正文 hash、原重试预算/UTC available_at、移交关联、新 Outbox 状态统计、Inbox/隔离/失败账本数量。available_at 与展示排序不充当业务提交顺序。多个未移交待投命令的同聚合标为 `unknown_commit_order_requires_review`；单条也只标为待原事务验证，不自动宣称可安全移交。
+连接从 `QS_AI_MESSAGING_AUDIT_DSN` 获取；构建时通过 `-ldflags '-X main.sourceSHA=<精确提交>'` 固定来源。输出含源码和数据库版本、schema head/dirty、现用 MQ 表是否存在、Outbox 各阶段与未确认消息统计、受保护正文引用的字节数/hash，以及 Inbox、隔离和失败账本数量。工具不再读取 `ai_bridge_commands` 或 `ai_messaging_legacy_commands`，不再输出旧命令待处理、delivered 或移交样本；历史交接与退休核验由专用维护流程承担。
 
-移交后旧 command.delivered 不复用为归属标志；核查区分旧来源与新 MQ 记录。关联须匹配首次 source hash/kind/request 与新正文 hash，否则保持未验证。delivered 历史不重置。样本截断明确为 incomplete，必须补齐清单后审核。缺 MQ 表显示为未安装；表存在不能证明迁移 head、Broker 拓扑、密钥、权限或业务就绪。所有这些仍需独立现场证据。
+样本截断明确为 incomplete，必须补齐清单后审核。缺 MQ 表显示为未安装；表存在不能证明迁移 head、Broker 拓扑、密钥、权限或业务就绪。现用 Runtime 继续负责组织隔离与操作关联完整性检查；本工具的计数不能替代这些检查或历史全量核验。
 
-真实 MySQL 门禁验证数据库强制拒绝只读事务中的 UPDATE、原记录/预算不变、宿主池仍可用、历史与未知顺序如实呈现、移交 hash 冲突不冒充有效归属、缺 schema 与截断均不能当成完整清单。测试仅创建和删除带随机 ID 的专属一次性数据库。
+真实 MySQL 门禁验证数据库强制拒绝只读事务中的 UPDATE、原记录/预算不变、宿主池仍可用、旧表缺失时仍能读取现用 MQ，以及 held 阶段、持久 attempts、大整数 ID、Unicode 引用和样本截断。缺 schema 与截断均不能当成完整清单。测试仅创建和删除带随机 ID 的专属一次性数据库。
 
 ## 统一运行类维护门禁
 
