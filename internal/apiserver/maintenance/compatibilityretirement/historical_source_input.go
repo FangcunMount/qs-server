@@ -530,8 +530,9 @@ func PrepareHistoricalComponentObservation(parent context.Context, component *Hi
 	if deadline, ok := parent.Deadline(); ok && deadline.Before(expires) {
 		expires = deadline
 	}
-	ctx, cancel := context.WithDeadline(parent, expires)
+	scope, cancel := context.WithDeadline(parent, expires)
 	defer cancel()
+	ctx := mongo.NewSessionContext(scope, mongo.SessionFromContext(parent))
 	var sqlObservers []*sqlevaluation.SQLHistoricalComponentObservation
 	for _, input := range component.inputs {
 		if input == nil || input.inputPair != sources || input.self != input || input.seal == "" || input.seal != input.digest() {
@@ -578,8 +579,9 @@ func (o *HistoricalComponentObservation) ValidateBorrowedObservation(parent cont
 	if parent == nil || parent.Err() != nil || o == nil || o.self != o || o.seal == "" || o.seal != o.digest() || !time.Now().Before(o.expires) {
 		return ErrSourceOriginFresh
 	}
-	ctx, cancel := context.WithDeadline(parent, o.expires)
+	scope, cancel := context.WithDeadline(parent, o.expires)
 	defer cancel()
+	ctx := mongo.NewSessionContext(scope, mongo.SessionFromContext(parent))
 	if o.source.ValidateBorrowedObservation(ctx) != nil || o.ai.ValidateComponentObservation(ctx) != nil {
 		return ErrSourceOriginFresh
 	}
@@ -911,7 +913,8 @@ func sourceComponentReadMongo(ctx context.Context, o *HistoricalComponentSourceO
 		for _, id := range sourceComponentSortedKeys(groups[kind]) {
 			ids = append(ids, id)
 		}
-		q, cancel := context.WithTimeout(ctx, limits.QueryTimeout)
+		scope, cancel := context.WithTimeout(ctx, limits.QueryTimeout)
+		q := mongo.NewSessionContext(scope, mongo.SessionFromContext(ctx))
 		cursor, err := o.mongo.db.Collection("domain_event_outbox").Find(q, bson.D{{Key: "aggregate_type", Value: kind}, {Key: "aggregate_id", Value: bson.D{{Key: "$in", Value: ids}}}}, options.Find().SetHint("idx_outbox_consistency_audit").SetCollation(&options.Collation{Locale: "simple"}).SetLimit(4097).SetBatchSize(128).SetMaxTime(limits.QueryTimeout))
 		if err != nil {
 			cancel()
@@ -1016,8 +1019,9 @@ func PrepareHistoricalComponentSourceObservation(parent context.Context, c *Hist
 	}
 	o := &HistoricalComponentSourceObservation{component: c, pair: pair, mongo: mgo, sql: append([]*sqlevaluation.SQLHistoricalComponentObservation(nil), sql...), started: time.Now(), budget: budget, seal: seal, rowsSHA: "preparing"}
 	o.self = o
-	ctx, cancel := context.WithDeadline(parent, o.started.Add(budget))
+	scope, cancel := context.WithDeadline(parent, o.started.Add(budget))
 	defer cancel()
+	ctx := mongo.NewSessionContext(scope, mongo.SessionFromContext(parent))
 	if o.ValidateBorrowedObservation(ctx) != nil {
 		return nil, ErrSourceOriginFresh
 	}

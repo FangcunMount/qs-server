@@ -63,8 +63,30 @@ func TestMongoHistoricalComponentNativeFreshTransactionsAndServerReread(t *testi
 	client, db, input, component := mongoComponentNativeFixture(t)
 	var first *MongoHistoricalComponentObservation
 	if err := mongoCycleNativeTx(t, client, func(ctx mongo.SessionContext) error {
+		// Ordinary derived contexts keep the session value but do not implement
+		// the strict native SessionContext contract. Rewrap the same real
+		// session; the host deadline and all native transaction guards remain.
+		bounded, cancel := context.WithDeadline(ctx, time.Now().Add(10*time.Second))
+		defer cancel()
+		if mongo.SessionFromContext(bounded) != mongo.SessionFromContext(ctx) {
+			t.Fatal("derived context lost the original native session value")
+		}
+		if rejected, err := PrepareMongoHistoricalComponentObservation(bounded, db, component, input, time.Second); rejected != nil || !errors.Is(err, ErrMongoHistoricalComponentEpoch) {
+			t.Fatal("ordinary deadline context bypassed strict SessionContext", err)
+		}
+		type hostContextKey struct{}
+		value := context.WithValue(ctx, hostContextKey{}, "native-host-value")
+		if rejected, err := PrepareMongoHistoricalComponentObservation(value, db, component, input, time.Second); rejected != nil || !errors.Is(err, ErrMongoHistoricalComponentEpoch) {
+			t.Fatal("ordinary value context bypassed strict SessionContext", err)
+		}
+		native := mongo.NewSessionContext(bounded, mongo.SessionFromContext(ctx))
+		originalDeadline, _ := bounded.Deadline()
+		nativeDeadline, ok := native.Deadline()
+		if !ok || nativeDeadline != originalDeadline || mongo.SessionFromContext(native) != mongo.SessionFromContext(ctx) {
+			t.Fatal("native rewrap changed the borrowed session or absolute deadline")
+		}
 		var err error
-		first, err = PrepareMongoHistoricalComponentObservation(ctx, db, component, input, 10*time.Second)
+		first, err = PrepareMongoHistoricalComponentObservation(native, db, component, input, 10*time.Second)
 		if err != nil {
 			return err
 		}

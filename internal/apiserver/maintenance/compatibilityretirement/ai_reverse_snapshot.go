@@ -2711,8 +2711,9 @@ func PrepareAIHistoricalComponentSnapshot(parent context.Context, component *His
 	s := &AIReverseSnapshot{pool: tx.Statement.ConnPool, head: 99, limits: limits, started: time.Now(), byTable: map[string]map[string]*aiReverseNode{}, anchors: map[string]aiReverseAnchor{}, component: component, componentSource: source, componentPair: pair, componentSeal: mongoHistoricalComponentInputSeal(component)}
 	s.self = s
 	s.report = AIReverseSummary{Version: "ai-reverse-component/v1", MigrationVersion: 99, DatabaseIdentitySHA256: pair.second.report.DatabaseIdentitySHA256, StartedAt: s.started.UTC(), SourceAuthenticationRequired: true, ExternalOriginRequired: true, ExternalQSAIClosureRequired: true, StoredWireAuthenticationRequired: true, WriterFenceRequired: true, UnboundOrphanNegativeClosureRequired: true, NewOwnerOrganizationNegativeClosureRequired: true}
-	ctx, cancel := context.WithDeadline(parent, s.started.Add(limits.MaxDuration))
+	bounded, cancel := context.WithDeadline(parent, s.started.Add(limits.MaxDuration))
 	defer cancel()
+	ctx := mongo.NewSessionContext(bounded, mongo.SessionFromContext(parent))
 	if err = s.validateComponentScope(ctx); err != nil {
 		return nil, err
 	}

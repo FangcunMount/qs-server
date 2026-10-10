@@ -10,6 +10,7 @@ import (
 
 	sqlevaluation "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/evaluation"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventing/evidence"
+	"go.mongodb.org/mongo-driver/mongo"
 )
 
 // Only original source capabilities, real owner batches and complete current
@@ -62,8 +63,9 @@ func validateHistoricalComponentResponsibilityClosure(parent context.Context, o 
 	if o.ValidateBorrowedObservation(parent) != nil {
 		return ErrCoordinatorCASQualification
 	}
-	ctx, cancel := context.WithDeadline(parent, o.expires)
+	scope, cancel := context.WithDeadline(parent, o.expires)
 	defer cancel()
+	ctx := mongo.NewSessionContext(scope, mongo.SessionFromContext(parent))
 	current, err := qualifiedHistoricalComponentBusinessRows(ctx, o.source)
 	if err != nil || historicalComponentResponsibilityRowsMatch(o.rows, current) != nil {
 		return ErrCoordinatorCASQualification

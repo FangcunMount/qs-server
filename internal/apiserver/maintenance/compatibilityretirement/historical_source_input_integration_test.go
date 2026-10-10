@@ -480,7 +480,7 @@ func TestHistoricalSourceInputNativeOwnerComponentPlanner(t *testing.T) {
 	for _, component := range components.Components() {
 		if err = sqlDB.Transaction(func(tx *gorm.DB) error {
 			return mongoCycleNativeTx(t, client, func(mctx mongo.SessionContext) error {
-				ctx := hostmysql.WithTx(mctx, tx)
+				ctx := mongo.NewSessionContext(hostmysql.WithTx(mctx, tx), mongo.SessionFromContext(mctx))
 				observed, e := PrepareHistoricalComponentObservation(ctx, component, pair, aiPair, db, 20*time.Second, false)
 				independent := false
 				for _, input := range component.Inputs() {
