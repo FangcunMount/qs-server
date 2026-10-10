@@ -51,7 +51,7 @@ jobs:
                 !['qs-host-inventory-action-approval/v1','qs-host-inventory-action-approval/v2'].includes(a.protocol) || a.source_sha !== context.sha ||
                 typeof a.operation_id !== 'string' || !/^[1-9][0-9]{0,19}-[1-9][0-9]{0,3}$/.test(a.operation_id) ||
                 typeof a.host_class !== 'string' || !Object.prototype.hasOwnProperty.call(routes,a.host_class) || a.route !== routes[a.host_class] ||
-                a.inventory_sha256 !== 'f0827b5c2e5fe803cd6ba11676fc0611659d2b91cf91cb2097333a2658c625b4' ||
+                a.inventory_sha256 !== 'f9baa4bd007a3aecbcda06de8a07bb97a1275f2d6b17560f7f811b28599e58ea' ||
                 a.transport_sha256 !== '5f88b51b14771960a46670a4e32353547bb2da5c0e303c4d3b27b4f58cc2e92a' ||
                 typeof a.wrapper_sha256 !== 'string' || !/^[0-9a-f]{64}$/.test(a.wrapper_sha256) ||
                 (observation ? a.context_mode !== 'current_ssh_session_observation' : typeof a.matches_sha256 !== 'string' || !/^[0-9a-f]{64}$/.test(a.matches_sha256)) ||
@@ -106,7 +106,17 @@ jobs:
           HOST_INVENTORY_SSH_PORT: ${{ needs.validate.outputs.host_class == 'worker' && (vars.SVRD_SSH_PORT || 22) || needs.validate.outputs.host_class != 'worker' && (vars.SVRA_SSH_PORT || 22) || '' }}
           HOST_INVENTORY_SSH_KEY: ${{ needs.validate.outputs.host_class == 'worker' && (secrets.SVR_MINI_SSH_KEY || secrets.SVRD_SSH_KEY || secrets.SVRA_SSH_KEY) || needs.validate.outputs.host_class != 'worker' && secrets.SVRA_SSH_KEY || '' }}
           HOST_INVENTORY_SSH_FINGERPRINT: ${{ needs.validate.outputs.host_class == 'worker' && vars.SVRD_SSH_FINGERPRINT || needs.validate.outputs.host_class != 'worker' && vars.SVRA_SSH_FINGERPRINT || '' }}
+        id: inventory
         run: python3 scripts/database/compatibility-host-inventory-action.py run --repo "$GITHUB_WORKSPACE"
+      - name: Save this run's closed readonly QS service input
+        if: steps.inventory.outputs.service_observation_path != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.inventory.outputs.service_observation_artifact }}
+          path: ${{ steps.inventory.outputs.service_observation_path }}
+          if-no-files-found: error
+          include-hidden-files: true
+          retention-days: 1
 
   unsupported-runner:
     needs: validate

@@ -46,7 +46,7 @@ class Fixture:
         self.identity = {"uid": 1001, "euid": 1001, "groups": [1001, 998], "pid": 123, "os": ["Linux", "PRIVATE_HOST", "6.1", "version", "aarch64"]}
         self.settings = {k: "none" for k in m.SSH_PROPERTIES}
         self.settings.update(authorizedkeysfile=".ssh/authorized_keys", pubkeyauthentication="yes", strictmodes="yes", forcecommand="none", acceptenv="LANG LC_*")
-        self.inspect = {"id": CID, "image": "sha256:" + "d" * 64, "status": "exited", "running": False, "started": "2026-10-09T00:00:00Z",
+        self.inspect = {"id": CID, "name": "/unrelated", "component": None, "image": "sha256:" + "d" * 64, "status": "exited", "running": False, "started": "2026-10-09T00:00:00Z",
                         "restarts": 0, "privileged": False, "readonly": False, "user": "PRIVATE_USER", "project": "PRIVATE_PROJECT", "service": "PRIVATE_SERVICE",
                         "mounts": [{"source": "/data/qs", "target": "/app/configs", "rw": True, "type": "bind"}]}
 
@@ -113,6 +113,58 @@ class InventoryTests(unittest.TestCase):
         with self.assertRaises(m.Unknown) as e:
             fn()
         self.assertEqual(str(e.exception), category)
+
+    def service_runner(self, role="server_a", change=None):
+        self.f.put("/etc/machine-id", b"0123456789abcdef0123456789abcdef\n")
+        self.f.request["host_role"] = role
+        components = m.QS_COMPONENTS[:2] if role == "server_a" else m.QS_COMPONENTS[2:]
+        rows = {}
+        for i,c in enumerate(components):
+            binary = {"qs-apiserver":"qs-apiserver", "qs-collection-server":"collection-server", "qs-worker":"qs-worker"}[c]
+            config = {"qs-apiserver":"apiserver", "qs-collection-server":"collection-server", "qs-worker":"worker"}[c]
+            cid = str(i+1)*64
+            rows[cid] = dict(id=cid,name="/"+c,image="sha256:"+"a"*64,component=c,
+                project="qs-collection" if c=="qs-collection-server" else "qs-worker" if c=="qs-worker" else "",
+                service="server" if c=="qs-collection-server" else "runtime" if c=="qs-worker" else "qs-apiserver",
+                entrypoint=["/app/"+binary],command=["--config=/app/configs/"+config+".prod.yaml"],running=True,
+                started_at="2026-10-10T00:00:00.123Z",restart_policy="unless-stopped",restart_maximum=0)
+        runner=FakeRunner(self.f); original=runner.run; calls={}
+        def run(kind,arg=None):
+            if kind not in ("docker_list","docker_inspect","qs_service_inspect"):return original(kind,arg)
+            calls[(kind,arg)] = calls.get((kind,arg),0)+1
+            if kind=="docker_list":raw=("\n".join(rows)+"\n").encode()
+            else:
+                value=copy.deepcopy(rows[arg])
+                if change:change(kind,calls[(kind,arg)],value)
+                if kind=="docker_inspect":
+                    value=dict(self.f.inspect,**{k:value[k] for k in ("id","name","component","image","running","project","service")})
+                raw=m.canonical(value)
+            runner.calls.append(dict(kind=kind,argv_sha256=m.sha(m.canonical(m._argv(kind,arg))),raw_sha256=m.sha(raw),bytes=len(raw),executable_sha256="e"*64))
+            return raw
+        runner.run=run
+        return runner,rows
+
+    def test_fixed_qs_service_rows_are_actual_two_reads_and_not_authority(self):
+        for role in ("server_a","server_d"):
+            runner,rows=self.service_runner(role)
+            value=self.collect(runner)["observations"]["qs_services"]
+            self.assertEqual(value["containers"],list(rows.values()))
+            self.assertEqual(value["machine_id_sha256"],m.sha(b"0123456789abcdef0123456789abcdef"))
+            self.assertEqual(value["docker_path"],"/usr/bin/docker")
+            self.assertTrue(value["recheck_equal"])
+            self.assertEqual(sum(x["kind"]=="qs_service_inspect" for x in runner.calls),2*len(rows))
+            self.assertEqual(m.validate_qs_service_observation(value,role),value)
+            self.assertNotIn("Env",m.QS_SERVICE_FORMAT)
+
+    def test_service_drift_bad_argv_and_missing_component_are_not_input_basis(self):
+        for change in (lambda kind,n,v:v.update(started_at="2026-10-10T01:00:00Z") if kind=="qs_service_inspect" and n==2 else None,
+                       lambda kind,n,v:v.update(command=["--password=PRIVATE_SENTINEL"]) if kind=="qs_service_inspect" else None,
+                       lambda kind,n,v:v.update(component=None)):
+            runner,rows=self.service_runner(change=change)
+            value=self.collect(runner)
+            self.assertIsNone(value["observations"]["qs_services"])
+            self.assertTrue(any(x.startswith("qs_service_visibility:") for x in value["unknown"]))
+            self.assertNotIn(b"PRIVATE_SENTINEL",m.canonical(value))
 
     def test_complete_local_fixture_is_still_unknown_not_authority(self):
         v = self.collect()

@@ -68,6 +68,50 @@ class Tests(unittest.TestCase):
   env={'PATH':os.environ.get('PATH','/usr/bin:/bin'),'GITHUB_WORKFLOW_REF':workflow_ref or 'FangcunMount/qs-server/.github/workflows/compatibility-host-inventory.yml@refs/heads/main'}
   r=subprocess.run([node,'-e',js],stdout=subprocess.PIPE,stderr=subprocess.PIPE,env=env,timeout=10)
   self.assertEqual(r.stderr,b'');return r.returncode,r.stdout
+ def service_projection(self):
+  host=self.root/'service-host';host.mkdir(mode=0o700)
+  suite=f.InventoryTests();suite.f=f.Fixture(host)
+  runner,rows=suite.service_runner()
+  suite.f.request=m.decode(self.req)
+  report=f.m._collect(suite.f.request,m.sha(self.req),f.m._Files(str(host)),runner,suite.f.identity)
+  for r in report['read_only_command_receipts']:r['executable_sha256']='e'*64
+  report['tool_sha256']=m.INVENTORY_SHA
+  raw=m.canonical(report);m.validate_report(raw,self.a,self.approved,self.req,self.run)
+  value=m.projection(self.a,self.approved,self.run,self.req,raw,report,cleanup='verified')
+  value['diagnostics']={'execution_stage':'complete','remote_cleanup':'verified','local_cleanup':'verified','registration_cleanup':'verified','cleanup_failure_stage':'none','cleanup_error_category':'none'}
+  return value
+ def test_service_artifact_preserves_exact_fields_hash_and_closed_armor_binding(self):
+  value=self.service_projection();self.assertIsNotNone(value['qs_services'])
+  m.validate_projection(value,self.a,self.approved,self.run,self.req)
+  output=self.root/'github-output';output.write_text('')
+  env={'RUNNER_TEMP':str(self.root),'GITHUB_OUTPUT':str(output)}
+  closed=m.service_artifact(value,env)
+  name='qs-service-observation-'+self.a['operation_id']+'-'+self.run
+  path=self.root/name/'service-observation.private.json'
+  raw,stamp=m.read_private(path);payload=m.decode(raw)
+  self.assertEqual(closed['qs_service_artifact_sha256'],m.sha(raw))
+  self.assertEqual(payload['service_observation'],value['qs_services'])
+  self.assertEqual(payload['source_sha'],self.a['source_sha'])
+  before=dict(closed);before.pop('qs_service_artifact_sha256')
+  self.assertEqual(payload['actual_projection_sha256'],m.sha(m.canonical(before)))
+  self.assertFalse(any(payload['capabilities'].values()))
+  self.assertNotIn('qs_services',closed)
+  transport=load(TRANSPORT,'service_artifact_transport')
+  armor=transport.encode_armored_receipt(closed,schema=m.PROJECTION_SCHEMA)
+  self.assertEqual(json.loads(transport.decode_armored_receipt(armor)),closed)
+  self.assertIn('service_observation_artifact='+name,output.read_text())
+  self.assertEqual(stamp[2]&0o777,0o600)
+  self.rejected('private_namespace_conflict',lambda:m.service_artifact(value,env))
+ def test_service_decoder_rejects_cross_host_bad_first_row_and_forged_hash(self):
+  value=self.service_projection()
+  for key,changed in [('host_role','server-d'),('observation_sha256','f'*64),('recheck_equal',False)]:
+   bad=copy.deepcopy(value);bad['qs_services'][key]=changed
+   self.rejected('transport_output_rejected',lambda:m.validate_projection(bad,self.a,self.approved,self.run,self.req))
+  bad=copy.deepcopy(value);bad['qs_services']['containers'][0]['command']=['--password=PRIVATE_SENTINEL']
+  body={k:v for k,v in bad['qs_services'].items() if k not in ('observation_sha256','recheck_equal')}
+  bad['qs_services']['observation_sha256']=m.sha(m.canonical(body));bad['qs_service_observation_sha256']=bad['qs_services']['observation_sha256']
+  self.rejected('transport_output_rejected',lambda:m.validate_projection(bad,self.a,self.approved,self.run,self.req))
+
  def test_descriptor_independent_sha_and_current_run_derivation(self):
   a=m.approval(m.canonical(self.a),self.approved,self.a['source_sha'],self.run)
   self.assertEqual(a,self.a);self.assertNotEqual(self.approved,m.sha(self.req))
@@ -278,8 +322,9 @@ class Tests(unittest.TestCase):
   self.assertFalse(any(value['capabilities'].values()))
   self.assertNotIn('PRIVATE',json.dumps(value))
   transport=load(TRANSPORT,'closed_cleanup_diagnostics_transport')
-  armor=transport.encode_armored_receipt(value,schema=m.PROJECTION_SCHEMA)
-  self.assertEqual(json.loads(transport.decode_armored_receipt(armor)),value)
+  closed={k:v for k,v in value.items() if k!='qs_services'}
+  armor=transport.encode_armored_receipt(closed,schema=m.PROJECTION_SCHEMA)
+  self.assertEqual(json.loads(transport.decode_armored_receipt(armor)),closed)
   self.assertEqual(m.validate_projection(value,self.a,self.approved,self.run,self.req),value)
  def test_early_package_rejection_preserves_primary_without_claiming_cleanup(self):
   home,repo=self.setup_local();self.put(repo/'scripts/database/compatibility-retirement-host-inventory.py',b'PRIVATE_BAD_PACKAGE')

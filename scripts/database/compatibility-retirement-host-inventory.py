@@ -362,13 +362,56 @@ class _Files:
             self.list(path)
 
 
-DOCKER_FORMAT = ('{"id":{{json .Id}},"image":{{json .Image}},"status":{{json .State.Status}},'
+DOCKER_FORMAT = ('{"id":{{json .Id}},"name":{{json .Name}},"component":{{json (index .Config.Labels "prometheus.component")}},"image":{{json .Image}},"status":{{json .State.Status}},'
                  '"running":{{json .State.Running}},"started":{{json .State.StartedAt}},"restarts":{{json .RestartCount}},'
                  '"privileged":{{json .HostConfig.Privileged}},"readonly":{{json .HostConfig.ReadonlyRootfs}},'
                  '"user":{{json .Config.User}},"project":{{json (index .Config.Labels "com.docker.compose.project")}},'
                  '"service":{{json (index .Config.Labels "com.docker.compose.service")}},'
                  '"mounts":[{{range $i,$m := .Mounts}}{{if $i}},{{end}}'
                  '{"source":{{json $m.Source}},"target":{{json $m.Destination}},"rw":{{json $m.RW}},"type":{{json $m.Type}}}{{end}}]}')
+QS_SERVICE_FORMAT = ('{"id":{{json .Id}},"name":{{json .Name}},"image":{{json .Image}},'
+ '"component":{{json (index .Config.Labels "prometheus.component")}},'
+ '"project":{{json (index .Config.Labels "com.docker.compose.project")}},'
+ '"service":{{json (index .Config.Labels "com.docker.compose.service")}},'
+ '"entrypoint":{{json .Config.Entrypoint}},"command":{{json .Config.Cmd}},'
+ '"running":{{json .State.Running}},"started_at":{{json .State.StartedAt}},'
+ '"restart_policy":{{json .HostConfig.RestartPolicy.Name}},"restart_maximum":{{json .HostConfig.RestartPolicy.MaximumRetryCount}}}')
+QS_COMPONENTS = ("qs-apiserver", "qs-collection-server", "qs-worker")
+
+def validate_qs_service_observation(value, role):
+    expected = {"kind", "host_role", "machine_id_sha256", "docker_path", "docker_sha256", "containers", "observation_sha256", "recheck_equal"}
+    if (type(value) is not dict or set(value) != expected or role not in ("server_a", "server_d") or
+            value["kind"] != "readonly_qs_service_descriptor_observation" or value["host_role"] != role.replace("_", "-") or
+            value["docker_path"] != "/usr/bin/docker" or value["recheck_equal"] is not True or
+            any(type(value[k]) is not str or not SHA.fullmatch(value[k]) for k in ("machine_id_sha256", "docker_sha256", "observation_sha256")) or
+            type(value["containers"]) is not list or not 1 <= len(value["containers"]) <= 32):
+        reject("docker_projection_schema_unknown")
+    expected_components = set(QS_COMPONENTS[:2] if role == "server_a" else QS_COMPONENTS[2:])
+    keys = {"id", "name", "image", "component", "project", "service", "entrypoint", "command", "running", "started_at", "restart_policy", "restart_maximum"}
+    seen = set()
+    for v in value["containers"]:
+        if type(v) is not dict or set(v) != keys or type(v["id"]) is not str or not SHA.fullmatch(v["id"]) or v["id"] in seen or type(v["component"]) is not str or v["component"] not in expected_components:
+            reject("docker_projection_schema_unknown")
+        seen.add(v["id"])
+        binaries = {"qs-apiserver": "qs-apiserver", "qs-collection-server": "collection-server", "qs-worker": "qs-worker"}
+        configs = {"qs-apiserver": "apiserver", "qs-collection-server": "collection-server", "qs-worker": "worker"}
+        if (type(v["name"]) is not str or type(v["image"]) is not str or not re.fullmatch(r"/[A-Za-z0-9][A-Za-z0-9_.-]{0,127}", v["name"]) or not re.fullmatch(r"sha256:[0-9a-f]{64}", v["image"]) or
+                any(type(v[k]) is not str or not re.fullmatch(r"[A-Za-z0-9_.-]{0,128}", v[k]) for k in ("project", "service")) or
+                v["entrypoint"] != ["/app/" + binaries[v["component"]]] or v["command"] != ["--config=/app/configs/" + configs[v["component"]] + ".prod.yaml"] or
+                type(v["running"]) is not bool or type(v["started_at"]) is not str or not re.fullmatch(r"[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9:.]+Z", v["started_at"]) or
+                v["restart_policy"] != "unless-stopped" or type(v["restart_maximum"]) is not int or v["restart_maximum"] != 0):
+            reject("docker_projection_schema_unknown")
+        if (v["component"] == "qs-apiserver" and (v["name"] != "/qs-apiserver" or v["service"] != "qs-apiserver") or
+                v["component"] == "qs-collection-server" and (v["project"] != "qs-collection" or v["service"] != "server") or
+                v["component"] == "qs-worker" and (v["project"] != "qs-worker" or v["service"] != "runtime")):
+            reject("docker_projection_schema_unknown")
+    if {v["component"] for v in value["containers"]} != expected_components or sum(v["component"] == "qs-apiserver" for v in value["containers"]) > 1:
+        reject("docker_projection_schema_unknown")
+    base = {k:v for k,v in value.items() if k not in ("observation_sha256", "recheck_equal")}
+    if sha(canonical(base)) != value["observation_sha256"]: reject("docker_projection_schema_unknown")
+    return value
+
+
 COMMANDS = {"sudo_list": ("/usr/bin/sudo", ("-n", "-l")),
             "docker_list": ("/usr/bin/docker", ("ps", "-aq", "--no-trunc")),
             "sessions": ("/usr/bin/loginctl", ("list-sessions", "--no-legend", "--no-pager")),
@@ -391,6 +434,8 @@ def _argv(kind, arg=None):
             return ["/usr/sbin/sshd", "-T", "-f", path, "-C", ",".join(k + "=" + match[k] for k in ("user", "host", "addr", "laddr", "lport"))]
     if kind == "docker_inspect" and type(arg) is str and re.fullmatch(r"[0-9a-f]{64}", arg):
         return ["/usr/bin/docker", "inspect", "--format", DOCKER_FORMAT, arg]
+    if kind == "qs_service_inspect" and type(arg) is str and SHA.fullmatch(arg):
+        return ["/usr/bin/docker", "inspect", "--format", QS_SERVICE_FORMAT, arg]
     if kind == "unit" and type(arg) is str and UNIT.fullmatch(arg):
         return ["/usr/bin/systemctl", "show", "--no-pager", "--property=Id,ActiveState,SubState,MainPID,FragmentPath,DropInPaths,User,Group,WorkingDirectory", arg]
     if kind == "session" and type(arg) is str and SESSION.fullmatch(arg):
@@ -739,8 +784,8 @@ class _Observer:
         ids = self.runner.run("docker_list").decode("ascii").splitlines()
         if len(ids) > 256 or len(set(ids)) != len(ids) or any(not re.fullmatch(r"[0-9a-f]{64}", x) for x in ids):
             reject("docker_roster_schema_or_budget_unknown")
-        expected = {"id", "image", "status", "running", "started", "restarts", "privileged", "readonly", "user", "project", "service", "mounts"}
-        rows, initial = [], {}
+        expected = {"id", "name", "component", "image", "status", "running", "started", "restarts", "privileged", "readonly", "user", "project", "service", "mounts"}
+        rows, initial, candidates = [], {}, {}
         for cid in sorted(ids):
             raw = self.runner.run("docker_inspect", cid)
             v = json.loads(raw)
@@ -748,10 +793,14 @@ class _Observer:
                 reject("docker_projection_schema_unknown")
             if (any(type(v[k]) is not bool for k in ("running", "privileged", "readonly"))
                     or type(v["restarts"]) is not int or v["restarts"] < 0
-                    or any(v[k] is not None and type(v[k]) is not str for k in ("user", "project", "service"))
+                    or any(v[k] is not None and type(v[k]) is not str for k in ("user", "project", "service", "component"))
+                    or type(v["name"]) is not str
                     or type(v["status"]) is not str or type(v["started"]) is not str):
                 reject("docker_projection_schema_unknown")
             initial[cid] = sha(raw)
+            if v["component"] in QS_COMPONENTS or v["name"] in ("/qs-apiserver", "/qs-worker", "/qs-collection-server") or v["project"] in ("qs-collection", "qs-worker"):
+                candidates[cid] = {k: v[k] for k in ("name", "component", "project", "service")}
+
             mounts = []
             for m in v["mounts"]:
                 if type(m) is not dict or set(m) != {"source", "target", "rw", "type"} or type(m["rw"]) is not bool:
@@ -765,7 +814,40 @@ class _Observer:
                          "status_sha256": sha(str(v["status"]).encode()), "running": v["running"], "privileged": v["privileged"],
                          "readonly_rootfs": v["readonly"], "mounts": mounts,
                          "project_sha256": sha(canonical(v["project"])), "service_sha256": sha(canonical(v["service"]))})
-        return {"containers": rows, "before_ids": sorted(ids), "before_inspects": initial}
+        return {"containers": rows, "before_ids": sorted(ids), "before_inspects": initial, "qs_candidates": candidates}
+
+    def qs_services(self, role, docker):
+        # The same finite relevance rule as native stop.isRelevant: names and
+        # compose projects also expose missing/mismatched component labels.
+        if role not in ("server_a", "server_d") or docker is None or not docker["qs_candidates"] or len(docker["qs_candidates"]) > 32:
+            reject("docker_projection_schema_unknown")
+        expected_components = set(QS_COMPONENTS[:2] if role == "server_a" else QS_COMPONENTS[2:])
+        keys = {"id", "name", "image", "component", "project", "service", "entrypoint", "command", "running", "started_at", "restart_policy", "restart_maximum"}
+        def read_rows():
+            rows = []
+            for cid, selector in sorted(docker["qs_candidates"].items()):
+                v = json.loads(self.runner.run("qs_service_inspect", cid))
+                if type(v) is not dict or set(v) != keys or v["id"] != cid:
+                    reject("docker_projection_schema_unknown")
+                for key in ("component", "project", "service"):
+                    if v[key] is None: v[key] = ""
+                if ({k: (selector[k] or "") for k in ("component", "project", "service")} != {k: v[k] for k in ("component", "project", "service")} or v["name"] != selector["name"] or v["component"] not in expected_components):
+                    reject("docker_projection_schema_unknown")
+                rows.append(v)
+            if {v["component"] for v in rows} != expected_components or sum(v["component"] == "qs-apiserver" for v in rows) > 1:
+                reject("docker_projection_schema_unknown")
+            return rows
+        machine = self.read("/etc/machine-id").strip()
+        if not re.fullmatch(rb"[0-9a-f]{32}", machine): reject("docker_projection_schema_unknown")
+        before = read_rows()
+        ids = sorted(self.runner.run("docker_list").decode("ascii").splitlines())
+        if ids != docker["before_ids"] or read_rows() != before or self.read("/etc/machine-id").strip() != machine:
+            reject("command_executable_changed")
+        executable = [v["executable_sha256"] for v in self.runner.calls if v["kind"] == "qs_service_inspect"]
+        if not executable or len(set(executable)) != 1 or not SHA.fullmatch(executable[0]): reject("command_executable_unprotected")
+        actual = {"kind": "readonly_qs_service_descriptor_observation", "host_role": role.replace("_", "-"),
+                  "machine_id_sha256": sha(machine), "docker_path": "/usr/bin/docker", "docker_sha256": executable[0], "containers": before}
+        return validate_qs_service_observation(dict(actual, observation_sha256=sha(canonical(actual)), recheck_equal=True), role)
 
     def systemd(self):
         sources = {k: self.runner.run(k) for k in ("units", "unit_files", "timers")}
@@ -896,6 +978,7 @@ def _collect(v, approved, files, runner, identity):
         value = o.attempt("namespace_visibility", lambda: files.link("/proc/" + str(identity["pid"]) + "/ns/" + kind))
         if value is not None:
             namespaces[kind] = sha(value.encode())
+    services = o.attempt("qs_service_visibility", lambda: o.qs_services(v["host_role"], docker)) if v["host_role"] in ("server_a", "server_d") else None
     checks = []
     def end_check(name, fn):
         result = o.attempt(name, fn)
@@ -930,7 +1013,7 @@ def _collect(v, approved, files, runner, identity):
                 "groups_sha256": sha(canonical(identity["groups"])), "os_sha256": sha(canonical(identity.get("os", {}))),
                 "boot_id_sha256": boot, "namespaces": namespaces},
             "observations": {"accounts": accounts, "processes": processes, "ssh": ssh, "docker": docker,
-                             "systemd": systemd, "sessions": sessions, "cron": cron, "sudo_list": sudo, "files": o.files_seen},
+                             "systemd": systemd, "sessions": sessions, "cron": cron, "sudo_list": sudo, "files": o.files_seen, "qs_services": services},
             "end_rechecks": checks, "unknown": sorted(o.unknown), "read_only_command_receipts": runner.calls,
             "observed_budgets": {"read_calls": len(runner.calls), "content_bytes": files.bytes, "binary_hash_bytes": files.binary_bytes,
                                  "distinct_content_files": len(files.witnesses), "elapsed_seconds": round(time.monotonic() - o.started, 6)},
