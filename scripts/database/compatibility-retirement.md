@@ -250,6 +250,14 @@ assets still require the actual source UID obtained from the root/sudo channel,
 private single-link regular files, approved hashes and unchanged file identity;
 a root-owned request does not relax their ownership or source-copy checks.
 
+The root-once caller reports missing receipts, startup failure and timeouts
+with fixed categories. Child stderr stays on a private temporary descriptor;
+public diagnostics contain only process completion, actual exit code or
+signal, byte counts and the SHA256 of at most 8,192 stderr bytes with a
+truncation flag. No error text or credentials are emitted. A missing receipt
+does not establish its cause or grant a capability, and a complete native
+receipt still passes the original validators. The caller does not retry.
+
 Failures and unknown results retain the exact requests, intents and temporary
 materials. The helper owns local children through a live management pipe;
 physical process closure cannot resolve unknown Docker/SSH/database effects.
