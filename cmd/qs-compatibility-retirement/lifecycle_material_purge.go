@@ -87,6 +87,7 @@ type lifecycleBatchMaterials struct {
 	local                            *stop.RootRemoteMaterials
 	directories                      []*lifecycleMaterialDirectory
 	archive                          *lifecycleMaterialDirectory
+	census                           *lifecycleMaterialDirectory
 	engines                          []*lifecycleEnginePurge
 	journal                          *lifecycleMaterialDirectory
 	started, purged, closed, unknown bool
@@ -270,6 +271,11 @@ func (h *lifecycleFixedHost) composeNativeMaterialOwners(ctx context.Context, r 
 	if e != nil {
 		return lifecycleError("lifecycle_material_registration_rejected")
 	}
+	c.census, e = openLifecycleOriginalCensusMaterials(ctx, r, invocation.SourceUID)
+	if e != nil {
+		return e
+	}
+	c.directories = append(c.directories, c.census)
 	if e = completeLifecycleOriginalOperationMaterials(ctx, r, operation, h.inventoryMaterials, h.historicalWriteMaterials, h.historicalWriteRegistrationMaterials, h.historicalWritePreviousMaterials, h.archiveMaterials, invocation.SourceUID); e != nil {
 		return e
 	}
@@ -308,7 +314,7 @@ func (h *lifecycleFixedHost) composeNativeMaterialOwners(ctx context.Context, r 
 }
 
 func lifecycleMaterialPathsMatch(c *lifecycleBatchMaterials, r lifecycleRequest) bool {
-	if c.archive.path != r.ArchiveDirectory || r.prepareRoot != lifecycleInvocationBatch(r.OperationID, r.ActualRunID) || c.journal.path != filepath.Join(r.prepareRoot, "material-purge-receipts") {
+	if c.archive == nil || c.census == nil || c.archive.path != r.ArchiveDirectory || r.prepareRoot != lifecycleInvocationBatch(r.OperationID, r.ActualRunID) || c.journal == nil || c.journal.path != filepath.Join(r.prepareRoot, "material-purge-receipts") {
 		return false
 	}
 	original := filepath.Join("/opt/backups/qs-server/compatibility-retirement", r.OperationID)
@@ -318,6 +324,7 @@ func lifecycleMaterialPathsMatch(c *lifecycleBatchMaterials, r lifecycleRequest)
 		lifecycleRootBatch(r.OperationID, r.ActualRunID):               true,
 		r.prepareRoot: true,
 		lifecycleServicesRoot(r.OperationID, "server-a"): true,
+		c.census.path: true, // Exact original native census owner, separately registered.
 	}
 	// The original preparation root is supplied by an independently approved
 	// source-copy intent and registered from its actual producer tuple/bytes.
@@ -439,19 +446,12 @@ func (h *lifecycleFixedHost) registerLocalServiceMaterials(ctx context.Context, 
 // Consume the original runtime acceptance before D closes. Register both real
 // journal identities before closing their writers; this grants no purge permit.
 func (h *lifecycleFixedHost) registerAIStoppedMaterials(ctx context.Context, r lifecycleRequest, c *lifecycleBatchMaterials) error {
-	if h == nil || h.aiStopped == nil || h.acceptedMaterials == nil || h.acceptedMaterials.self != h.acceptedMaterials || h.acceptedMaterials.host != h || h.acceptedMaterials.runtime.validate(h) != nil || h.acceptedMaterials.catalog != c || c == nil || c != h.materials || c.self != c || c.binding != lifecycleMaterialsBinding(r) || c.closed || c.unknown || r.prepareRoot != lifecycleInvocationBatch(r.OperationID, r.ActualRunID) {
+	if h == nil || h.aiStopped == nil || h.acceptedMaterials == nil || h.acceptedMaterials.self != h.acceptedMaterials || h.acceptedMaterials.host != h || h.acceptedMaterials.runtime.validate(h) != nil || h.acceptedMaterials.catalog != c || c == nil || c != h.materials || c.self != c || c.binding != lifecycleMaterialsBinding(r) || c.closed || c.unknown || c.remote != nil || r.prepareRoot != lifecycleInvocationBatch(r.OperationID, r.ActualRunID) {
 		return lifecycleError("lifecycle_actual_complete_material_scope_missing")
 	}
-	// Before D closes, require the live original fence. Afterwards, only its
-	// retained native terminal and fresh external scopes may be consumed.
-	if c.remote == nil {
-		if e := h.CheckWholeWriterFence(ctx, r); e != nil {
-			return e
-		}
-	} else {
-		if e := h.observeWholeWriterScopesAfterDTerminal(ctx, r, c.remote.terminal); e != nil {
-			return e
-		}
+	// Handoff is completed before D closes; later purge never reopens a writer.
+	if e := h.CheckWholeWriterFence(ctx, r); e != nil {
+		return e
 	}
 	var directory *lifecycleMaterialDirectory
 	for _, d := range c.directories {

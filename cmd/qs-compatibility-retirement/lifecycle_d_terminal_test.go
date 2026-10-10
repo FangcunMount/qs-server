@@ -139,22 +139,26 @@ func TestDTerminalActualCallerPreservesPlatformAndOrdinaryLiveChecks(t *testing.
 	}
 }
 
-// Registration follows the actual D purge/terminal phase. The existing real
-// child tests above cover live/Wait/closed pipes/group observations; this caller
-// check cannot mint native zero, a catalog or a complete external writer fence.
-func TestDTerminalJournalRegistrationConsumesOriginalTerminalScope(t *testing.T) {
-	terminal, seal := -1, -1
+// Registration finishes while D is live. Later cleanup consumes the terminal
+// proof and cannot attempt journal handoff through the closed control channel.
+func TestAIJournalRegistrationFinishesBeforeOriginalDTerminal(t *testing.T) {
+	fence, seal := -1, -1
 	for i, name := range preBComparisonProductionCalls(t, "lifecycle_material_purge.go", "registerAIStoppedMaterials") {
 		switch name {
 		case "CheckWholeWriterFence":
-			t.Fatal("accepted D-terminal catalog still requires the closed child to be live")
+			fence = i
 		case "observeWholeWriterScopesAfterDTerminal":
-			terminal = i
+			t.Fatal("journal registration was deferred until D had closed")
 		case "SealTemporaryJournals":
 			seal = i
 		}
 	}
-	if terminal < 0 || seal <= terminal {
-		t.Fatal("journal sealing bypassed the original validated D terminal and external scopes")
+	if fence < 0 || seal <= fence {
+		t.Fatal("journal sealing bypassed the original live writer fence")
+	}
+	for _, name := range preBComparisonProductionCalls(t, "lifecycle_fixed_host.go", "PurgeTemporaryCopies") {
+		if name == "registerAIStoppedMaterials" || name == "registerLocalServiceMaterials" {
+			t.Fatal("post-seal purge repeated a closed writer handoff")
+		}
 	}
 }
