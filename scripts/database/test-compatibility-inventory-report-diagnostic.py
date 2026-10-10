@@ -2,8 +2,10 @@
 """Offline synthetic report inputs; never production or inventory execution proof."""
 import argparse
 import copy
+import contextlib
 import hashlib
 import importlib.util
+import io
 import json
 import os
 from pathlib import Path
@@ -258,6 +260,51 @@ class FailedInventoryCleanupContracts(unittest.TestCase):
         self.assertNotIn('SYNTHETIC_BODY',raw.decode());self.assertTrue(all(v is False for v in receipt['capabilities'].values()))
         source=next(iter(tool.SOURCE_FILENAMES.values()));self.assertEqual(baseline['files'][source]['stat'][1],(self.output/source).stat().st_ino)
         with self.assertRaises(tool.Blocked):self.execute()  # O_EXCL, no overwrite/resume
+
+    def main_arguments(self):
+        return ['--operation','prepare','--root',str(self.root),'--operation-id',tool.FAILED_INVENTORY_OPERATION,
+            '--approved-source-sha',base.DIAGNOSTIC_SOURCE,'--actual-source-sha',base.DIAGNOSTIC_SOURCE,
+            '--run-id',base.DIAGNOSTIC_OBSERVE,'--prepare-mode','report-diagnostic',
+            '--bootstrap-approval-json',self.args.bootstrap_approval_json,
+            '--bootstrap-approval-hash',self.args.bootstrap_approval_hash]
+
+    def test_real_main_executes_baseline_and_encodes_closed_armored_receipt(self):
+        out,err=io.StringIO(),io.StringIO();transport=tool.transport()
+        with mock.patch.object(tool,'capture_fixed',return_value=(0,b'')), \
+             mock.patch.object(tool,'live_inventory',side_effect=AssertionError('DB rescan')), \
+             mock.patch.object(tool,'transport',return_value=transport), \
+             mock.patch.object(transport,'encode_armored_receipt',wraps=transport.encode_armored_receipt) as encode, \
+             contextlib.redirect_stdout(out),contextlib.redirect_stderr(err):
+            code=tool.main(self.main_arguments())
+        self.assertEqual(code,0,err.getvalue());self.assertEqual(err.getvalue(),'');encode.assert_called_once()
+        receipt=json.loads(transport.decode_armored_receipt(out.getvalue().strip()))
+        baseline=(self.directory/tool.FAILED_INVENTORY_BASELINE).read_bytes()
+        self.assertEqual(receipt['cleanup_baseline_sha256'],hashlib.sha256(baseline).hexdigest())
+        self.assertTrue(receipt['cleanup_only']);self.assertTrue(receipt['cleanup_baseline_complete'])
+        self.assertGreater(receipt['cleanup_file_count'],0);self.assertGreater(receipt['cleanup_source_file_bytes'],0)
+        for key in ('complete','execution_allowed','drop_ready','inventory_complete','original_content_verified','purge_executed'):
+            self.assertIs(receipt[key],False)
+        self.assertTrue(all(v is False for v in receipt['capabilities'].values()))
+        self.assertNotIn('SYNTHETIC_BODY',json.dumps(receipt));self.assertNotIn(str(self.root),json.dumps(receipt))
+        self.assertNotIn('files',receipt);self.assertNotIn('directory_identity',receipt)
+
+    def test_real_main_rejects_wrong_cleanup_field_type_and_false_content_claim(self):
+        execute=tool.execute;transport=tool.transport()
+        for key,value in (('cleanup_file_count',True),('original_content_verified',True)):
+            with self.subTest(key=key):
+                def changed(args):
+                    receipt=execute(args);receipt[key]=value;return receipt
+                out,err=io.StringIO(),io.StringIO()
+                with mock.patch.object(tool,'capture_fixed',return_value=(0,b'')), \
+                     mock.patch.object(tool,'execute',side_effect=changed), \
+                     contextlib.redirect_stdout(out),contextlib.redirect_stderr(err):
+                    self.assertEqual(tool.main(self.main_arguments()),42)
+                if key=='cleanup_file_count':
+                    self.assertEqual(out.getvalue(),'');self.assertIn('receipt_transport_failed',err.getvalue())
+                else:
+                    receipt=json.loads(transport.decode_armored_receipt(out.getvalue().strip()))
+                    self.assertIs(receipt['inventory_complete'],False);self.assertIs(receipt['drop_ready'],False)
+                (self.directory/tool.FAILED_INVENTORY_BASELINE).unlink()
 
     def test_unknown_member_missing_metadata_and_wrong_checkpoint_rejected(self):
         unknown=self.output/'foreign.json';self.write(unknown,{});

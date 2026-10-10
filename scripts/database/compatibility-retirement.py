@@ -2365,6 +2365,9 @@ def main(argv=None):
               "observed_scopes": [{"name":HOST_SCOPE_NAMES, "enumeration_complete":"bool", "recheck_equal":"bool", "items":"uint", "catalog_sha256":"hash64", "unknown":[HOST_SCOPE_GAPS]}],
               "observed_socket_kind": frozenset({"", "fixed_root_owned_unix_docker"}), "observation_elapsed_millis": "uint",
               "inventory_complete": "bool", "inventory_private_report_hash": "hash64",
+              "cleanup_only": "bool", "cleanup_baseline_complete": "bool", "cleanup_baseline_sha256": "hash64",
+              "cleanup_file_count": "uint", "cleanup_source_file_bytes": "uint",
+              "original_content_verified": "bool", "purge_executed": "bool",
               "prepare_mode": frozenset({"identity", "bounds", "inventory", "report-diagnostic", "prepare-facts", "host-writer-scope", "db-writer-census"}) | BOOTSTRAP_MODES, "diagnostic_only": "bool", "drop_ready": "bool",
               "request_bootstrap_complete": "bool", "bootstrap_approval_sha256": "hash64", "derived_request_sha256": "hash64", "request_created_run_id": "run_id",
               "history_metadata_complete": "bool", "history_metadata_process_budget_proven": "bool",
@@ -2437,6 +2440,11 @@ def main(argv=None):
         # valid framed receipt. Never print a raw protocol/debug alternative.
         print("compatibility_retirement_receipt_transport_failed", file=sys.stderr)
     diagnostic_complete = ((receipt.get("prepare_mode") == "prepare-facts" and receipt.get("prepare_facts_observation_complete") is True and receipt.get("diagnostic_only") is True and all(value is False for value in receipt.get("capabilities", {}).values())) or (receipt.get("prepare_mode") == "report-diagnostic" and receipt.get("report_diagnostic_complete") is True and receipt.get("diagnostic_only") is True and all(value is False for value in receipt.get("capabilities", {}).values())) or
+        (receipt.get("prepare_mode") == "report-diagnostic" and receipt.get("error_category") == "failed_inventory_cleanup_baseline_only" and
+         receipt.get("cleanup_only") is True and receipt.get("cleanup_baseline_complete") is True and
+         receipt.get("inventory_complete") is False and receipt.get("original_content_verified") is False and
+         receipt.get("purge_executed") is False and receipt.get("diagnostic_only") is True and
+         all(value is False for value in receipt.get("capabilities", {}).values())) or
         (receipt.get("prepare_mode") == "bootstrap-history" and receipt.get("history_readonly_complete") is True) or
         (receipt.get("prepare_mode") == "bootstrap-history-metadata" and receipt.get("history_metadata_complete") is True) or
         (receipt.get("prepare_mode") == "bootstrap-history-parent" and receipt.get("history_parent_registration_complete") is True and
