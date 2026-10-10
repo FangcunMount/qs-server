@@ -226,13 +226,24 @@ class RootPasswordClosedTransport(unittest.TestCase):
             call=next(n for n in ast.walk(ast.parse(source)) if isinstance(n,ast.Call) and any(isinstance(arg,ast.Constant) and arg.value==name for arg in n.args))
             self.assertNotIn('sudo_password',ast.unparse(call));self.assertNotIn('SUDO_PASSWORD',ast.unparse(call))
 
-    def test_action_plumbs_only_original_a_secret_and_does_not_claim_s0(self):
+    def test_action_plumbs_only_original_a_secret_and_receipt_cannot_claim_s0(self):
         source=Path(__file__).resolve().parents[2]
         workflow=(source/'.github/workflows/compatibility-retirement.yml').read_text()
         self.assertEqual(workflow.count('SUDO_PASSWORD: ${{'),3)
         self.assertEqual(sum('SUDO_PASSWORD' in line for line in workflow.splitlines() if line.strip().startswith('envs:')),2)
         self.assertIn('secrets.SVRA_SUDO_PASSWORD',workflow)
         self.assertNotIn('secrets.SVRD_SUDO_PASSWORD',workflow)
-        self.assertIn('sudo -n /usr/bin/python3', (source/'scripts/database/compatibility-s0-exact-exit.py').read_text())
+        receipt = dict(protocol="runner_platform_window_owner_v1",
+                       error_category="platform_window_native_unknown",
+                       whole_writer_fence_proven=False, drop_ready=False)
+        stream = io.StringIO()
+        with contextlib.redirect_stdout(stream):
+            A.emit(receipt, ("fixture-sudo-password",))
+        self.assertEqual(json.loads(T.decode_armored_receipt(stream.getvalue())), receipt)
+        # The platform receipt cannot acquire S0 physical-exit authority. The
+        # separate S0 suite owns the actual fixed launcher and stdin tests.
+        with patch.object(A, "load", return_value=T), self.assertRaises(T.ReceiptTransportError), \
+             contextlib.redirect_stdout(io.StringIO()):
+            A.emit(dict(receipt, s0_physical_exit_complete=True), ())
 
 if __name__ == "__main__": unittest.main()
