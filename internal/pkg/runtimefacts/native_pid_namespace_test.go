@@ -108,10 +108,16 @@ func TestNativeLinuxRootPeerAcrossPIDNamespace(t *testing.T) {
 			t.Errorf("native child terminal/cleanup unproven; fixture retained: exit=%v stderr=%q", waitError, stderr.String())
 			return
 		}
+		if _, err := os.Lstat(filepath.Join("/tmp", "qs-runtime-facts-0", component)); !os.IsNotExist(err) {
+			t.Error("original native owner leaf cleanup was not observed")
+			return
+		}
 		var current unix.Stat_t
 		if unix.Lstat(directory, &current) != nil || statIdentity(current) != statIdentity(directoryIdentity) || current.Uid != 0 || current.Mode&07777 != 0700 || os.Remove(directory) != nil {
 			t.Error("owned fixture directory cleanup failed")
+			return
 		}
+		t.Log("native_pidns_owned_cleanup_complete=true original_child_exit=0 original_owner_leaf_absent=true original_fixture_dir_removed=true")
 	}()
 	var probe pidNamespacePacket
 	if decoder.Decode(&probe) != nil || probe.Phase != "probe_ready" || probe.Path != filepath.Join(directory, "probe.sock") || probe.Namespace == parentNamespace {
@@ -124,13 +130,14 @@ func TestNativeLinuxRootPeerAcrossPIDNamespace(t *testing.T) {
 		t.Fatal("actual kernel outer root credentials were not PID 0 / UID 0")
 	}
 	ownerStarted = true
+	t.Logf("native_pidns_kernel_pair_observed=true kernel_client_pid=0 kernel_client_uid=0 server_namespace_pid=1 exact_server_host_pid=%d", cmd.Process.Pid)
 	conn = dialPIDNamespaceFixture(t, ready.Path, cmd.Process.Pid)
 	defer func() { _ = conn.Close() }()
 	var challenge [32]byte
 	if _, err = rand.Read(challenge[:]); err != nil {
 		t.Fatal(err)
 	}
-	query := Query{FormatVersion: QueryVersion, Action: "snapshot", Challenge: hex.EncodeToString(challenge[:])}
+	query := Query{FormatVersion: QueryVersion, Action: "GET", Challenge: hex.EncodeToString(challenge[:])}
 	raw, err := json.Marshal(query)
 	if err != nil {
 		t.Fatal(err)
