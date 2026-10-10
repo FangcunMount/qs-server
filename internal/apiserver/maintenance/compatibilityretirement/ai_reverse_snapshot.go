@@ -67,6 +67,7 @@ type AIReverseSummary struct {
 	SourceCopies                                                                                                                             [4]SourceCopyReceipt
 	ActualReadOnlyRR, WholeLedgerEOF                                                                                                         bool
 	SourceAuthenticationRequired, ExternalOriginRequired, ExternalQSAIClosureRequired, StoredWireAuthenticationRequired, WriterFenceRequired bool
+	UnboundOrphanNegativeClosureRequired, NewOwnerOrganizationNegativeClosureRequired                                                        bool
 	GlobalReverseQualified, CASAuthority, DropReady                                                                                          bool
 }
 type AIReverseObservation struct {
@@ -227,6 +228,7 @@ type aiReverseMetadata struct {
 	schema, pk    string
 }
 type aiReverseNode struct {
+	inputPage                                                                                                            int
 	observation                                                                                                          AIReverseObservation
 	id, aggregate, request, resource, org, subject, testee, hash, bodyHash, wireHash                                     string
 	command, receipt, receiptResource, receiptRun, ack, event, linkedHash, linkedWireHash, projectionHash, sourceRowHash string
@@ -257,6 +259,12 @@ type AIReverseSnapshot struct {
 	report            AIReverseSummary
 	scope             *aiReverseScope
 	inputSink         aiHistoricalInputSink
+	inputPage         int
+	component         *HistoricalCASComponent
+	componentSource   *HistoricalComponentSourceObservation
+	componentPair     *AIHistoricalInputPair
+	componentSeal     string
+	componentComplete bool
 }
 type aiReverseScope struct {
 	owner                       *HistoricalCoordinator
@@ -680,6 +688,7 @@ func (s *AIReverseSnapshot) scan(ctx context.Context, spec aiReverseSpec) error 
 			}
 			after = key
 			n := s.decode(spec, row, meta)
+			n.inputPage = s.inputPage
 			n.observation.Store = spec.table
 			n.observation.PrimaryKeySHA256 = aiReverseKeySHA(key)
 			n.observation.RowSHA256 = aiReverseRowSHA(meta.columns, row)
@@ -708,6 +717,7 @@ func (s *AIReverseSnapshot) scan(ctx context.Context, spec aiReverseSpec) error 
 			if e = s.inputSink(ctx, ledger, rows, false); e != nil {
 				return e
 			}
+			s.inputPage++
 		}
 	}
 	if ledger.Rows != expected || expected > 0 && aiReverseCompare(spec, after, upper) != 0 {
@@ -723,6 +733,7 @@ func (s *AIReverseSnapshot) scan(ctx context.Context, spec aiReverseSpec) error 
 		if e = s.inputSink(ctx, ledger, nil, true); e != nil {
 			return e
 		}
+		s.inputPage++
 	}
 	return nil
 }
@@ -2676,4 +2687,442 @@ func (a *AIReverseRecheckAnchor) RecheckOrigin(ctx context.Context, p *AIReverse
 		return nil, ErrAIReverseFresh
 	}
 	return proof, nil
+}
+
+// PrepareAIHistoricalComponentSnapshot reads current local AI responsibilities
+// in the host's same actual SQL/Mongo component scopes. The two full inputs are
+// immutable selection data, never a renewed global reverse/write proof. The
+// host must ValidateFrozen on both complete pairs before its first write.
+func PrepareAIHistoricalComponentSnapshot(parent context.Context, component *HistoricalCASComponent, pair *AIHistoricalInputPair, source *HistoricalComponentSourceObservation, limits AIReverseLimits) (*AIReverseSnapshot, error) {
+	if parent == nil || !limits.valid() || limits.MaxDuration > 20*time.Second || limits.MaxRetainedBytes > aiHistoricalInputMaxRetained || source == nil || source.component != component || source.ValidateBorrowedObservation(parent) != nil || aiComponentPairIntact(parent, pair, source.pair) != nil {
+		return nil, ErrAIReverseBinding
+	}
+	tx, err := hostmysql.RequireTx(parent)
+	if err != nil || tx.Statement == nil || tx.Statement.ConnPool == nil || tx.Statement.ConnPool == pair.first.pool || tx.Statement.ConnPool == pair.second.pool {
+		return nil, ErrAIReverseFresh
+	}
+	if _, err = sdkmysql.BindGORM(tx); err != nil {
+		return nil, ErrAIReverseFresh
+	}
+	s := &AIReverseSnapshot{pool: tx.Statement.ConnPool, head: 99, limits: limits, started: time.Now(), byTable: map[string]map[string]*aiReverseNode{}, anchors: map[string]aiReverseAnchor{}, component: component, componentSource: source, componentPair: pair, componentSeal: mongoHistoricalComponentInputSeal(component)}
+	s.self = s
+	s.report = AIReverseSummary{Version: "ai-reverse-component/v1", MigrationVersion: 99, DatabaseIdentitySHA256: pair.second.report.DatabaseIdentitySHA256, StartedAt: s.started.UTC(), SourceAuthenticationRequired: true, ExternalOriginRequired: true, ExternalQSAIClosureRequired: true, StoredWireAuthenticationRequired: true, WriterFenceRequired: true, UnboundOrphanNegativeClosureRequired: true, NewOwnerOrganizationNegativeClosureRequired: true}
+	ctx, cancel := context.WithDeadline(parent, s.started.Add(limits.MaxDuration))
+	defer cancel()
+	if err = s.validateComponentScope(ctx); err != nil {
+		return nil, err
+	}
+	scope := &aiReverseScope{relatedRequests: map[string]bool{}, relatedIDs: map[string]bool{}, identityConflicts: map[string]bool{}, receipts: pair.second.report.SourceCopies, sha: aiReverseHash("ai-component-scope/v1", s.componentSeal, pair.second.componentIndexSHA, source.rowsSHA)}
+	assessments, resources, owners := map[string]bool{}, map[string]bool{}, map[string]string{}
+	pages := map[int]bool{}
+	originalRequests := map[string]*aiReverseNode{}
+	for _, frame := range component.inputs {
+		for _, owner := range frame.owners {
+			id := strconv.FormatUint(owner.id, 10)
+			if owner.kind == "assessment" {
+				assessments[id] = true
+				owners[id] = strconv.FormatUint(owner.org, 10)
+			}
+			for _, request := range pair.second.componentRequests[owner.kind+":"+id] {
+				scope.relatedRequests[request] = true
+			}
+		}
+		ids, err := frame.sqlRecipe.SourceEventIDs()
+		if err != nil {
+			return nil, ErrAIReverseBinding
+		}
+		for _, id := range ids {
+			scope.relatedIDs[id] = true
+		}
+	}
+	for id := range scope.relatedRequests {
+		for _, page := range pair.second.componentPages["request:"+id] {
+			pages[page] = true
+		}
+	}
+	for id := range scope.relatedIDs {
+		for _, page := range pair.second.componentPages["id:"+id] {
+			pages[page] = true
+		}
+	}
+	// Only selected protected pages are reread here. Full EOF/page verification
+	// belongs to the one aggregate pre-write boundary, not every component.
+	for _, page := range aiComponentPageOrder(pages) {
+		rows, spec, meta, err := pair.second.componentPage(ctx, page)
+		if err != nil {
+			return nil, err
+		}
+		for _, row := range rows {
+			n := s.decode(spec, row, meta)
+			if scope.relatedRequests[n.request] || scope.relatedRequests[n.aggregate] || scope.relatedIDs[n.id] || scope.relatedIDs[n.command] || scope.relatedIDs[n.event] {
+				if spec.table == "ai_bridge_requests" {
+					originalRequests[n.id] = n
+				}
+				aiComponentExpand(scope, assessments, resources, n)
+			}
+		}
+	}
+	// Resolve actual current SQL owners for every sheet, including input-only
+	// SQL absence sheets. These are native rows, not terminal/owner assertions.
+	sheets := map[string]bool{}
+	for _, frame := range component.inputs {
+		for _, owner := range frame.owners {
+			if owner.kind == "sheet" {
+				id := strconv.FormatUint(owner.id, 10)
+				sheets[id] = true
+				org := strconv.FormatUint(owner.org, 10)
+				if prior := owners["sheet:"+id]; prior != "" && prior != org {
+					return nil, ErrAIReverseBinding
+				}
+				owners["sheet:"+id] = org
+			}
+		}
+	}
+	if len(sheets) > 0 {
+		pred, args, err := aiComponentIn("answer_sheet_id", sheets, true)
+		if err != nil {
+			return nil, err
+		}
+		rows, _, size, err := s.read(ctx, "SELECT CAST(id AS BINARY) AS id,CAST(org_id AS BINARY) AS org_id,CAST(answer_sheet_id AS BINARY) AS answer_sheet_id FROM assessment WHERE "+pred+" ORDER BY id LIMIT 4097", 4096, args...)
+		if err != nil {
+			return nil, err
+		}
+		if uint64(len(rows)) > limits.MaxRows || size > limits.MaxBytes-s.report.Bytes {
+			return nil, ErrAIReverseBounds
+		}
+		s.report.Bytes += size
+		for _, row := range rows {
+			if !aiPositiveNumber(row.text("id")) || !aiPositiveNumber(row.text("org_id")) || !sheets[row.text("answer_sheet_id")] {
+				return nil, ErrAIReverseBinding
+			}
+			if owners["sheet:"+row.text("answer_sheet_id")] != row.text("org_id") || owners[row.text("id")] != "" && owners[row.text("id")] != row.text("org_id") {
+				return nil, ErrAIReverseBinding
+			}
+			assessments[row.text("id")] = true
+			owners[row.text("id")] = row.text("org_id")
+		}
+	}
+	for i, spec := range aiReverseSpecs {
+		meta, err := s.schema(ctx, spec)
+		if err != nil || !reflect.DeepEqual(meta, pair.second.metadata[i]) {
+			return nil, ErrAIReverseSchema
+		}
+		s.metadata = append(s.metadata, meta)
+		s.byTable[spec.table] = map[string]*aiReverseNode{}
+	}
+	queries := map[string]string{}
+	stable := false
+	for pass := 0; pass < 16; pass++ {
+		changed := false
+		for i, spec := range aiReverseSpecs {
+			predicate, args, err := aiComponentPredicate(spec, scope, assessments, resources)
+			if err != nil {
+				return nil, err
+			}
+			signature := aiReverseHash(predicate, fmtAIComponentArgs(args))
+			if queries[spec.table] == signature {
+				continue
+			}
+			queries[spec.table] = signature
+			changed = true
+			if predicate == "" {
+				continue
+			}
+			meta := s.metadata[i]
+			projection, order := []string{}, []string{}
+			for _, name := range meta.columns {
+				projection = append(projection, "CAST(`"+name+"` AS BINARY) AS `"+name+"`")
+			}
+			for _, name := range spec.keys {
+				order = append(order, "`"+name+"`")
+			}
+			max := int(s.limits.MaxRows)
+			if max > 100000 {
+				max = 100000
+			}
+			args = append(args, max+1)
+			rows, names, _, err := s.read(ctx, "SELECT "+strings.Join(projection, ",")+" FROM `"+spec.table+"` WHERE "+predicate+" ORDER BY "+strings.Join(order, ",")+" LIMIT ?", max, args...)
+			if err != nil || !reflect.DeepEqual(names, meta.columns) {
+				if err != nil {
+					return nil, err
+				}
+				return nil, ErrAIReverseSchema
+			}
+			for _, row := range rows {
+				key, err := aiReverseKey(spec, row)
+				if err != nil {
+					return nil, err
+				}
+				n := s.decode(spec, row, meta)
+				n.observation.Store = spec.table
+				n.observation.PrimaryKeySHA256 = aiReverseKeySHA(key)
+				n.observation.RowSHA256 = aiReverseRowSHA(meta.columns, row)
+				if old := s.byTable[spec.table][n.id]; old != nil {
+					if old.observation.PrimaryKeySHA256 != n.observation.PrimaryKeySHA256 || old.observation.RowSHA256 != n.observation.RowSHA256 {
+						return nil, ErrAIReverseChanged
+					}
+					continue
+				}
+				rawSize := uint64(0)
+				for _, v := range row {
+					rawSize += uint64(len(v))
+				}
+				cost := uint64(2048) + rawSize
+				if s.report.Rows >= s.limits.MaxRows || rawSize > s.limits.MaxBytes-s.report.Bytes || cost > s.limits.MaxRetainedBytes-s.report.RetainedBudgetBytes {
+					return nil, ErrAIReverseBounds
+				}
+				s.report.Rows++
+				s.report.Bytes += rawSize
+				s.report.RetainedBudgetBytes += cost
+				s.byTable[spec.table][n.id] = n
+				s.nodes = append(s.nodes, n)
+				if spec.table != "ai_messaging_admission" && spec.table != "ai_messaging_observations" && spec.table != "ai_messaging_quarantine" {
+					aiComponentExpand(scope, assessments, resources, n)
+				}
+			}
+		}
+		if !changed {
+			stable = true
+			break
+		}
+	}
+	if !stable {
+		return nil, ErrAIReverseBounds
+	}
+	for id, original := range originalRequests {
+		current := s.byTable["ai_bridge_requests"][id]
+		if current == nil || current.hash != original.hash || current.expectedBodyHash != original.expectedBodyHash || current.org != original.org || current.subject != original.subject || current.testee != original.testee || !reflect.DeepEqual(current.assessments, original.assessments) || original.resource != "" && current.resource != original.resource {
+			return nil, ErrAIReverseChanged
+		}
+	}
+	if err = s.readAssessmentAnchors(ctx); err != nil {
+		return nil, err
+	}
+	for id, org := range owners {
+		if strings.HasPrefix(id, "sheet:") {
+			continue
+		}
+		if anchor, ok := s.anchors[id]; ok && anchor.org != org {
+			return nil, ErrAIReverseBinding
+		}
+	}
+	s.reverse()
+	s.classify(scope)
+	// Preserve unknown/held/orphan facts; a scoped absence never means the
+	// whole organization, external qs-ai or unbound native rows are clear.
+	s.report.SourceAuthenticationRequired = true
+	for i, spec := range aiReverseSpecs {
+		meta, err := s.schema(ctx, spec)
+		if err != nil || !reflect.DeepEqual(meta, s.metadata[i]) {
+			return nil, ErrAIReverseSchema
+		}
+	}
+	if err = s.validateComponentScope(ctx); err != nil {
+		return nil, err
+	}
+	s.report.DataSHA256 = aiComponentDataDigest(s)
+	s.report.CompletedAt = time.Now().UTC()
+	s.componentComplete = true
+	return s, nil
+}
+
+func aiComponentPairIntact(ctx context.Context, p *AIHistoricalInputPair, sources *HistoricalSourceInputPair) error {
+	if p == nil || p.self != p || sources == nil || p.sources != sources || p.first == nil || p.second == nil || p.first == p.second || !p.first.complete || !p.second.complete || p.first.validFile(ctx) != nil || p.second.validFile(ctx) != nil || p.first.source != sources.first || p.second.source != sources.second || p.first.pool == p.second.pool || p.first.cycle == p.second.cycle || p.first.componentIndexSHA == "" || p.second.componentIndexSHA == "" || len(p.second.metadata) != len(aiReverseSpecs) || p.first.report.DataSHA256 != p.second.report.DataSHA256 || p.first.report.DatabaseIdentitySHA256 != p.second.report.DatabaseIdentitySHA256 || sourceComponentPairIntact(ctx, sources) != nil {
+		return ErrAIReverseBinding
+	}
+	return nil
+}
+func (s *AIReverseSnapshot) validateComponentScope(ctx context.Context) error {
+	if s == nil || s.self != s || s.snapshot != nil || s.componentSource == nil || s.componentSource.component != s.component || s.componentSource.ValidateBorrowedObservation(ctx) != nil || s.componentSeal == "" || s.componentSeal != mongoHistoricalComponentInputSeal(s.component) || s.alive(ctx) != nil || aiComponentPairIntact(ctx, s.componentPair, s.componentSource.pair) != nil {
+		return ErrAIReverseFresh
+	}
+	tx, err := hostmysql.RequireTx(ctx)
+	if err != nil || tx.Statement == nil || tx.Statement.ConnPool != s.pool {
+		return ErrAIReverseFresh
+	}
+	rows, _, _, err := s.read(ctx, "SELECT @@server_uuid AS server,DATABASE() AS db,VERSION() AS version", 1)
+	if err != nil || len(rows) != 1 || !strings.HasPrefix(rows[0].text("version"), "8.") || aiReverseHash("mysql_database_identity_v1", rows[0].text("server"), rows[0].text("db")) != s.componentPair.second.report.DatabaseIdentitySHA256 {
+		return ErrAIReverseBinding
+	}
+	rows, _, _, err = s.read(ctx, "SELECT CAST(version AS BINARY) AS version,CAST(dirty AS BINARY) AS dirty FROM schema_migrations", 2)
+	if err != nil || len(rows) != 1 || rows[0].text("version") != "99" || rows[0].text("dirty") != "0" {
+		return ErrAIReverseBinding
+	}
+	return nil
+}
+
+// ValidateComponentObservation verifies only this same native scoped read. It
+// deliberately cannot satisfy ValidateBorrowedSnapshot/RecheckFresh or Apply.
+func (s *AIReverseSnapshot) ValidateComponentObservation(ctx context.Context) error {
+	if s == nil || !s.componentComplete || s.report.WholeLedgerEOF || s.report.DataSHA256 == "" || s.report.DataSHA256 != aiComponentDataDigest(s) {
+		return ErrAIReverseBinding
+	}
+	return s.validateComponentScope(ctx)
+}
+func (e *AIHistoricalInputEpoch) componentPage(ctx context.Context, page int) ([]aiReverseRow, aiReverseSpec, aiReverseMetadata, error) {
+	if e.validFile(ctx) != nil || !e.complete || e.source == nil || e.componentIndexSHA == "" || page < 0 || page >= len(e.pages) {
+		return nil, aiReverseSpec{}, aiReverseMetadata{}, ErrAIReverseBinding
+	}
+	ref := e.pages[page]
+	if ref.Offset < 0 || ref.Length <= 0 || ref.Length > 2*sourceOriginInputPageBytes+(1<<20) || ref.Offset > e.end-ref.Length {
+		return nil, aiReverseSpec{}, aiReverseMetadata{}, ErrAIReverseRead
+	}
+	raw := make([]byte, int(ref.Length))
+	n, err := e.file.ReadAt(raw, ref.Offset)
+	if err != nil || n != len(raw) || historicalSpoolSHA(raw) != ref.SHA256 {
+		return nil, aiReverseSpec{}, aiReverseMetadata{}, ErrAIReverseRead
+	}
+	var frame aiHistoricalInputFrame
+	if historicalSpoolDecode(raw, &frame) != nil || frame.Version != 1 || frame.Epoch != e.epoch || frame.SourceInput != e.source.resultHash || frame.EOF {
+		return nil, aiReverseSpec{}, aiReverseMetadata{}, ErrAIReverseBinding
+	}
+	var rows []aiReverseRow
+	if json.Unmarshal(frame.RowsJSON, &rows) != nil {
+		return nil, aiReverseSpec{}, aiReverseMetadata{}, ErrAIReverseRead
+	}
+	for i, spec := range aiReverseSpecs {
+		if spec.table == frame.Ledger.Store {
+			return rows, spec, e.metadata[i], nil
+		}
+	}
+	return nil, aiReverseSpec{}, aiReverseMetadata{}, ErrAIReverseSchema
+}
+func aiComponentPageOrder(pages map[int]bool) []int {
+	result := make([]int, 0, len(pages))
+	for page := range pages {
+		result = append(result, page)
+	}
+	sort.Ints(result)
+	return result
+}
+func aiComponentExpand(scope *aiReverseScope, assessments, resources map[string]bool, n *aiReverseNode) {
+	for _, id := range []string{n.id, n.command, n.receipt, n.event, n.ack} {
+		if id != "" {
+			scope.relatedIDs[id] = true
+		}
+	}
+	for _, id := range []string{n.request, n.aggregate} {
+		if id != "" {
+			scope.relatedRequests[id] = true
+		}
+	}
+	for _, id := range []string{n.resource, n.receiptResource, n.receiptRun} {
+		if id != "" {
+			resources[id] = true
+		}
+	}
+	for _, id := range n.assessments {
+		assessments[id] = true
+	}
+	if n.observation.Store == "ai_bridge_request_assessments" && n.resource != "" {
+		assessments[n.resource] = true
+	}
+}
+func aiComponentIn(column string, values map[string]bool, numeric bool) (string, []any, error) {
+	if len(values) == 0 {
+		return "", nil, nil
+	}
+	if len(values) > 4096 {
+		return "", nil, ErrAIReverseBounds
+	}
+	placeholders, args := []string{}, []any{}
+	for _, value := range aiReverseSortedKeys(values) {
+		if !aiReverseASCII(value) {
+			return "", nil, ErrAIReverseBinding
+		}
+		placeholders = append(placeholders, "?")
+		if numeric {
+			id, err := strconv.ParseUint(value, 10, 64)
+			if err != nil || id == 0 {
+				return "", nil, ErrAIReverseBinding
+			}
+			args = append(args, id)
+		} else {
+			args = append(args, value)
+		}
+	}
+	return "`" + column + "` IN (" + strings.Join(placeholders, ",") + ")", args, nil
+}
+func aiComponentPredicate(spec aiReverseSpec, scope *aiReverseScope, assessments, resources map[string]bool) (string, []any, error) {
+	// Whole current quarantine/control sets cannot be assigned an owner by
+	// absence of an indexed request. Unknown wire responsibility stays visible.
+	if spec.table == "ai_messaging_quarantine" || spec.table == "ai_messaging_admission" || spec.table == "ai_messaging_observations" {
+		return "1=1", nil, nil
+	}
+	terms, args := []string{}, []any{}
+	add := func(column string, values map[string]bool, numeric bool) error {
+		predicate, params, err := aiComponentIn(column, values, numeric)
+		if err != nil {
+			return err
+		}
+		if predicate != "" {
+			terms = append(terms, predicate)
+			args = append(args, params...)
+		}
+		return nil
+	}
+	var err error
+	switch spec.table {
+	case "ai_bridge_requests":
+		err = add("request_id", scope.relatedRequests, false)
+		if err == nil {
+			err = add("session_id", resources, false)
+		}
+	case "ai_bridge_request_assessments":
+		err = add("request_id", scope.relatedRequests, false)
+		if err == nil {
+			err = add("assessment_id", assessments, true)
+		}
+	case "ai_bridge_commands", "ai_messaging_legacy_commands":
+		err = add("request_id", scope.relatedRequests, false)
+		if err == nil {
+			err = add("command_id", scope.relatedIDs, false)
+		}
+	case "ai_bridge_events":
+		err = add("request_id", scope.relatedRequests, false)
+		if err == nil {
+			err = add("event_id", scope.relatedIDs, false)
+		}
+	case "ai_messaging_operations":
+		err = add("aggregate_key", scope.relatedRequests, false)
+		if err == nil {
+			err = add("command_id", scope.relatedIDs, false)
+		}
+		if err == nil {
+			err = add("resource_id", resources, false)
+		}
+		if err == nil {
+			err = add("receipt_id", scope.relatedIDs, false)
+		}
+	case "ai_messaging_outbox", "ai_messaging_inbox", "ai_messaging_failures":
+		err = add("aggregate_key", scope.relatedRequests, false)
+		if err == nil {
+			err = add("message_id", scope.relatedIDs, false)
+		}
+	case "ai_messaging_aggregates":
+		err = add("aggregate_key", scope.relatedRequests, false)
+	case "ai_messaging_evaluation_states":
+		err = add("run_id", resources, false)
+		if err == nil {
+			err = add("run_id", scope.relatedRequests, false)
+		}
+	default:
+		return "", nil, ErrAIReverseSchema
+	}
+	if err != nil {
+		return "", nil, err
+	}
+	return strings.Join(terms, " OR "), args, nil
+}
+func fmtAIComponentArgs(args []any) string { raw, _ := json.Marshal(args); return string(raw) }
+func aiComponentDataDigest(s *AIReverseSnapshot) string {
+	parts := []string{"ai-reverse-component-current/v1", s.componentSeal, s.report.DatabaseIdentitySHA256, s.report.SourceScopeSHA256, s.report.BusinessAnchorsSHA256}
+	for _, spec := range aiReverseSpecs {
+		for _, id := range aiReverseSortedKeys(s.byTable[spec.table]) {
+			n := s.byTable[spec.table][id]
+			parts = append(parts, spec.table, n.observation.PrimaryKeySHA256, n.observation.RowSHA256, n.observation.Scope, strconv.FormatBool(n.observation.Invalid), strconv.FormatBool(n.observation.Unfinished), strconv.FormatBool(n.observation.Held))
+			parts = append(parts, n.observation.Reasons...)
+		}
+	}
+	return aiReverseHash(parts...)
 }

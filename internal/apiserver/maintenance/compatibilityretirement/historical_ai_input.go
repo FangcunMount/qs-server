@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"os"
 	"reflect"
+	"sort"
+	"strconv"
 	"syscall"
 	"time"
 
@@ -39,6 +41,11 @@ type AIHistoricalInputEpoch struct {
 	pages              []historicalSpoolRef
 	report             AIReverseSummary
 	complete, poisoned bool
+	// Pure typed relations to protected original pages; no live graph/pool is retained.
+	componentRequests map[string][]string
+	componentPages    map[string][]int
+	metadata          []aiReverseMetadata
+	componentIndexSHA string
 }
 type AIHistoricalInputPair struct {
 	self          *AIHistoricalInputPair
@@ -171,6 +178,9 @@ func PrepareAIHistoricalInputEpoch(parent context.Context, coordinator *Historic
 	if e.validFile(ctx) != nil {
 		return nil, ErrAIReverseBinding
 	}
+	if err = e.freezeComponentIndex(s); err != nil {
+		return nil, err
+	}
 	e.complete = true
 	return e, nil
 }
@@ -204,7 +214,7 @@ func (e *AIHistoricalInputEpoch) verifyFrozen(ctx context.Context) error {
 			ended = table == len(aiReverseSpecs)
 		}
 	}
-	if !ended {
+	if !ended || e.componentIndexSHA == "" || e.componentIndexSHA != e.componentIndexDigest() {
 		return ErrAIReverseBinding
 	}
 	return e.validFile(ctx)
@@ -237,6 +247,9 @@ func CompareIndependentAIHistoricalInputs(ctx context.Context, first, second *AI
 	if first.source != sources.first || second.source != sources.second || first.pool == second.pool || first.cycle == second.cycle || first.report.EpochID == second.report.EpochID {
 		return nil, ErrAIReverseFresh
 	}
+	if !reflect.DeepEqual(first.componentRequests, second.componentRequests) || !reflect.DeepEqual(first.componentPages, second.componentPages) || !reflect.DeepEqual(first.metadata, second.metadata) {
+		return nil, ErrAIReverseChanged
+	}
 	a, b := first.report, second.report
 	if a.DatabaseIdentitySHA256 != b.DatabaseIdentitySHA256 || a.DataSHA256 != b.DataSHA256 || a.SourceScopeSHA256 != b.SourceScopeSHA256 || a.SourceCopies != b.SourceCopies || !reflect.DeepEqual(a.Ledgers, b.Ledgers) || a.Related != b.Related || a.OutsideRetirement != b.OutsideRetirement || a.Unknown != b.Unknown || a.Blocking != b.Blocking {
 		return nil, ErrAIReverseChanged
@@ -259,4 +272,118 @@ func (p *AIHistoricalInputPair) Summary() AIHistoricalInputSummary {
 	r := p.second.Summary()
 	r.TwoIndependentInputsMatched = r.CompleteInput
 	return r
+}
+
+// Built only from the same actual decoded full read that wrote the raw pages.
+// This index does not retain the old snapshot, coordinator or source authority.
+func (e *AIHistoricalInputEpoch) freezeComponentIndex(s *AIReverseSnapshot) error {
+	if e == nil || s == nil || len(s.metadata) != len(aiReverseSpecs) || s.inputPage != len(e.pages) {
+		return ErrAIReverseBinding
+	}
+	e.componentRequests, e.componentPages = map[string][]string{}, map[string][]int{}
+	e.metadata = make([]aiReverseMetadata, len(s.metadata))
+	for i, m := range s.metadata {
+		e.metadata[i] = m
+		e.metadata[i].columns = append([]string(nil), m.columns...)
+		e.metadata[i].sourceColumns = make(SQLColumns, len(m.sourceColumns))
+		for j, row := range m.sourceColumns {
+			for _, v := range row {
+				if v == nil {
+					e.metadata[i].sourceColumns[j] = append(e.metadata[i].sourceColumns[j], nil)
+				} else {
+					x := *v
+					e.metadata[i].sourceColumns[j] = append(e.metadata[i].sourceColumns[j], &x)
+				}
+			}
+		}
+	}
+	requests := s.byTable["ai_bridge_requests"]
+	addRequest := func(key, id string) { e.componentRequests[key] = append(e.componentRequests[key], id) }
+	for id, r := range requests {
+		for _, a := range r.assessments {
+			addRequest("assessment:"+a, id)
+			if anchor := s.anchors[a]; anchor.sheet != "" {
+				addRequest("sheet:"+anchor.sheet, id)
+			}
+		}
+	}
+	for _, n := range s.nodes {
+		if n.inputPage < 0 || n.inputPage >= len(e.pages) {
+			return ErrAIReverseBinding
+		}
+		e.componentPages["id:"+n.id] = append(e.componentPages["id:"+n.id], n.inputPage)
+		req := n.request
+		if req == "" && requests[n.aggregate] != nil {
+			req = n.aggregate
+		}
+		if req != "" {
+			e.componentPages["request:"+req] = append(e.componentPages["request:"+req], n.inputPage)
+		}
+	}
+	var cost uint64
+	for key, ids := range e.componentRequests {
+		sort.Strings(ids)
+		out := ids[:0]
+		for _, id := range ids {
+			if len(out) == 0 || out[len(out)-1] != id {
+				out = append(out, id)
+			}
+		}
+		e.componentRequests[key] = out
+		cost += uint64(128 + len(key))
+		for _, id := range out {
+			cost += uint64(32 + len(id))
+		}
+	}
+	for key, pages := range e.componentPages {
+		sort.Ints(pages)
+		out := pages[:0]
+		for _, page := range pages {
+			if len(out) == 0 || out[len(out)-1] != page {
+				out = append(out, page)
+			}
+		}
+		e.componentPages[key] = out
+		cost += uint64(128 + len(key) + 16*len(out))
+	}
+	if s.report.RetainedBudgetBytes > e.limits.MaxRetainedBytes || cost > e.limits.MaxRetainedBytes-s.report.RetainedBudgetBytes {
+		return ErrAIReverseBounds
+	}
+	e.componentIndexSHA = e.componentIndexDigest()
+	if e.componentIndexSHA == "" {
+		return ErrAIReverseBinding
+	}
+	return nil
+}
+func (e *AIHistoricalInputEpoch) componentIndexDigest() string {
+	if e == nil || len(e.metadata) != len(aiReverseSpecs) {
+		return ""
+	}
+	parts := []string{"historical-ai-component-input-index/v1", e.epoch, e.report.DataSHA256}
+	for _, m := range e.metadata {
+		raw, err := json.Marshal(m.sourceColumns)
+		if err != nil {
+			return ""
+		}
+		parts = append(parts, m.schema, m.pk, string(raw), stringsJoinAIColumns(m.columns))
+	}
+	for _, key := range aiReverseSortedKeys(e.componentRequests) {
+		parts = append(parts, key)
+		parts = append(parts, e.componentRequests[key]...)
+	}
+	for _, key := range aiReverseSortedKeys(e.componentPages) {
+		parts = append(parts, key)
+		for _, i := range e.componentPages[key] {
+			if i < 0 || i >= len(e.pages) {
+				return ""
+			}
+			ref := e.pages[i]
+			parts = append(parts, strconv.Itoa(i), strconv.FormatInt(ref.Offset, 10), strconv.FormatInt(ref.Length, 10), ref.SHA256)
+		}
+	}
+	return aiReverseHash(parts...)
+}
+func stringsJoinAIColumns(columns []string) string {
+	raw, _ := json.Marshal(columns)
+	return string(raw)
 }

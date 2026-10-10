@@ -980,3 +980,69 @@ func TestAIReverseCurrentCoordinatorInspectionUsesOwnerMutex(t *testing.T) {
 		t.Fatal("metadata check adopted failed state or reset original budget")
 	}
 }
+
+func TestAIHistoricalComponentPredicatesKeepNegativeClosureAndBounds(t *testing.T) {
+	scope := &aiReverseScope{relatedRequests: map[string]bool{"request-one": true}, relatedIDs: map[string]bool{"receipt-one": true}}
+	assessments, resources := map[string]bool{"42": true}, map[string]bool{"session-one": true}
+	for _, spec := range aiReverseSpecs {
+		predicate, args, err := aiComponentPredicate(spec, scope, assessments, resources)
+		if err != nil || predicate == "" {
+			t.Fatal("missing current responsibility range", spec.table, err)
+		}
+		if strings.Contains(predicate, "organization") || strings.Contains(predicate, "LIMIT") || strings.Contains(predicate, ">") {
+			t.Fatal("negative range was filtered by owner/old upper", predicate)
+		}
+		if spec.table == "ai_bridge_request_assessments" && (predicate != "`request_id` IN (?) OR `assessment_id` IN (?)" || !reflect.DeepEqual(args, []any{"request-one", uint64(42)})) {
+			t.Fatal("new association/other request negative range lost", predicate, args)
+		}
+	}
+	scope.relatedRequests = map[string]bool{}
+	scope.relatedIDs = map[string]bool{}
+	predicate, _, err := aiComponentPredicate(aiReverseSpecByTable("ai_bridge_requests"), scope, nil, nil)
+	if err != nil || predicate != "" {
+		t.Fatal("empty native selection became full request scan")
+	}
+	predicate, _, err = aiComponentPredicate(aiReverseSpecByTable("ai_messaging_quarantine"), scope, nil, nil)
+	if err != nil || predicate != "1=1" {
+		t.Fatal("unbound quarantine disappeared from current observation")
+	}
+	values := map[string]bool{}
+	for i := 0; i < 4097; i++ {
+		values[strconv.Itoa(i+1)] = true
+	}
+	if _, _, err = aiComponentIn("assessment_id", values, true); !errors.Is(err, ErrAIReverseBounds) {
+		t.Fatal("unbounded selector accepted")
+	}
+	if _, _, err = aiComponentIn("assessment_id", map[string]bool{"invalid": true}, true); err == nil {
+		t.Fatal("invalid owner selector accepted")
+	}
+}
+func TestAIHistoricalComponentObservationCannotBecomeOldAuthority(t *testing.T) {
+	limits := DefaultAIReverseLimits()
+	limits.MaxDuration = 20 * time.Second
+	if value, err := PrepareAIHistoricalComponentSnapshot(t.Context(), nil, nil, nil, limits); err == nil || value != nil {
+		t.Fatal("caller input fabricated scoped observation")
+	}
+	s := aiReverseUnitGraph(t)
+	s.componentComplete = true
+	s.report.DataSHA256 = "invented"
+	if s.ValidateComponentObservation(t.Context()) == nil || s.ValidateBorrowedSnapshot(t.Context()) == nil {
+		t.Fatal("private input/summary was treated as live capability")
+	}
+	scope := &aiReverseScope{relatedRequests: map[string]bool{}, relatedIDs: map[string]bool{}, identityConflicts: map[string]bool{}}
+	for id := range s.byTable["ai_bridge_requests"] {
+		scope.relatedRequests[id] = true
+	}
+	for _, request := range s.byTable["ai_bridge_requests"] {
+		request.observation.Unfinished = true
+		request.observation.Held = true
+	}
+	s.reverse()
+	s.classify(scope)
+	s.report.UnboundOrphanNegativeClosureRequired = true
+	s.report.NewOwnerOrganizationNegativeClosureRequired = true
+	r := s.Summary()
+	if r.Blocking == 0 || r.WholeLedgerEOF || r.GlobalReverseQualified || r.CASAuthority || r.DropReady || !r.ExternalQSAIClosureRequired || !r.WriterFenceRequired || !r.UnboundOrphanNegativeClosureRequired || !r.NewOwnerOrganizationNegativeClosureRequired {
+		t.Fatal("unfinished local/unknown external responsibility blessed", r)
+	}
+}

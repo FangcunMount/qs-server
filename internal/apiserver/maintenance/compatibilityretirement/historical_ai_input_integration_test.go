@@ -100,6 +100,24 @@ func TestAIHistoricalInputNativeTwoSourceBoundFullDiskEpochs(t *testing.T) {
 	if err != nil || pair.ValidateFrozen(t.Context()) != nil || !pair.Summary().TwoIndependentInputsMatched || pair.Summary().CASAuthority || pair.Summary().DropReady || pair.Summary().Blocking == 0 {
 		t.Fatal("two actual native pure inputs accepted invalid authority", err)
 	}
+	// The original real fourteen-ledger read also froze a compact owner/page
+	// index. This is pure input; native current component authorization is a
+	// separate caller and is not claimed by this full-input fixture.
+	for _, epoch := range []*AIHistoricalInputEpoch{ai1, ai2} {
+		if epoch.componentIndexSHA == "" || epoch.componentIndexSHA != epoch.componentIndexDigest() || len(epoch.metadata) != 14 || len(epoch.componentPages) == 0 {
+			t.Fatal("actual typed page index was not frozen")
+		}
+		for _, pages := range epoch.componentPages {
+			if len(pages) == 0 {
+				t.Fatal("actual node lost its original raw page")
+			}
+			rows, spec, _, err := epoch.componentPage(t.Context(), pages[0])
+			if err != nil || len(rows) == 0 || spec.table == "" {
+				t.Fatal("actual selected original page could not be verified", err)
+			}
+			break
+		}
+	}
 	if _, err = CompareIndependentAIHistoricalInputs(t.Context(), ai1, ai1, sources); err == nil {
 		t.Fatal("same AI epoch accepted")
 	}
