@@ -162,7 +162,7 @@ func TestHistoryCLINativeFreshComponentMissingAIQualificationRollsBack(t *testin
 		}
 		return append(bson.Raw(nil), raw...)
 	}
-	sheetFilter := bson.D{{Key: "id", Value: uint64(10042)}}
+	sheetFilter := bson.D{{Key: "domain_id", Value: int64(10042)}}
 	sourceFilter := bson.D{{Key: "event_id", Value: "owned-original-submission"}}
 	sheetBefore, sourceBefore := readOriginal("answersheets", sheetFilter), readOriginal("domain_event_outbox", sourceFilter)
 	var operationsBefore, outboxBefore uint64
@@ -284,7 +284,7 @@ func TestHistoryCLINativeQualifiedEvidenceWriteActualExternalAndDualCommitReadba
 	var sheet struct {
 		Legacy *evidence.HistoricalReferenceSetV1 `bson:"legacy_submission_evidence"`
 	}
-	if db.Collection("answersheets").FindOne(t.Context(), bson.D{{Key: "id", Value: uint64(10042)}}).Decode(&sheet) != nil || sheet.Legacy == nil || sheet.Legacy.Validate() != nil || len(sheet.Legacy.Entries) != 1 || sheet.Legacy.Entries[0].EventID != "owned-original-submission" || sheet.Legacy.Entries[0].Proof.Verification.Method != "actual-fresh-owner-component-source-business-related-ai" {
+	if db.Collection("answersheets").FindOne(t.Context(), bson.D{{Key: "domain_id", Value: int64(10042)}}).Decode(&sheet) != nil || sheet.Legacy == nil || sheet.Legacy.Validate() != nil || len(sheet.Legacy.Entries) != 1 || sheet.Legacy.Entries[0].EventID != "owned-original-submission" || sheet.Legacy.Entries[0].Proof.Verification.Method != "actual-fresh-owner-component-source-business-related-ai" {
 		t.Fatal("actual persisted original identity/reference missing")
 	}
 	var historicalSQL []byte
