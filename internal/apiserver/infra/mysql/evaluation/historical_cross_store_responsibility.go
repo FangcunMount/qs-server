@@ -295,6 +295,7 @@ type SQLHistoricalCrossStorePage struct {
 	replayPairs map[string]bool
 	report      SQLCrossStorePageReport
 	started     time.Time
+	selectors   SQLCrossStoreSelectors
 }
 type SQLCrossStorePageReport struct {
 	Version, CycleID, DatabaseIdentitySHA256, RowsSHA256                                                                                     string
@@ -370,7 +371,7 @@ func PrepareSQLHistoricalCrossStorePage(ctx context.Context, catalog *SQLHistori
 	if len(selected) > catalog.limits.MaxPageRows {
 		return nil, ErrSQLCrossStoreBounds
 	}
-	p := &SQLHistoricalCrossStorePage{catalog: catalog, batch: batch, rows: map[int]historicalSQLRow{}, facts: map[int]SQLCrossStoreRow{}, byEvent: map[string][]int{}, byOwner: map[uint64][]int{}, byOrg: map[uint64][]int{}, replayPairs: replayPairs, started: time.Now()}
+	p := &SQLHistoricalCrossStorePage{catalog: catalog, batch: batch, rows: map[int]historicalSQLRow{}, facts: map[int]SQLCrossStoreRow{}, byEvent: map[string][]int{}, byOwner: map[uint64][]int{}, byOrg: map[uint64][]int{}, replayPairs: replayPairs, started: time.Now(), selectors: SQLCrossStoreSelectors{EventIDs: append([]string(nil), selectors.EventIDs...), AssessmentIDs: append([]uint64(nil), selectors.AssessmentIDs...), OrganizationIDs: append([]uint64(nil), selectors.OrganizationIDs...), MongoOwners: append([]SQLCrossStoreOwnerReference(nil), selectors.MongoOwners...)}}
 	p.report = SQLCrossStorePageReport{Version: "sql-cross-store-page/v1", CycleID: catalog.report.CycleID, DatabaseIdentitySHA256: catalog.report.DatabaseIdentitySHA256, SourceAuthenticationRequired: true, MongoQualificationRequired: true, AIInboxCoverageRequired: true, WriterFenceRequired: true, CASRequired: true}
 	p.report.GlobalUnknown, p.report.GlobalBlocking = catalog.cycle.report.Unknown, catalog.cycle.report.Blocking
 	if err := p.read(ctx, selected); err != nil {
