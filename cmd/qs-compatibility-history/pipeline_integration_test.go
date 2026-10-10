@@ -488,7 +488,7 @@ func nativeInputs(t *testing.T, pool *sql.DB, client *mongo.Client, db *mongo.Da
 	}
 	_, uuidBytes := metadata[0].Lookup("info", "uuid").Binary()
 	identities := map[string]string{"mysql": framedParts("mysql_database_identity_v1", uuid, namespace), "mongodb": framedParts("mongodb_database_identity_v1", string(encoded), db.Name(), hex.EncodeToString(uuidBytes))}
-	inv := inventoryRequest{FormatVersion: 2, Kind: "readonly_inventory_boundary_request", OperationID: "123-1", SourceSHA: sourceSHA, TargetHash: jsonHash(historyTargets), DatabaseScope: "mysql-and-mongodb", Identities: identities, Migrations: map[string]uint64{"mysql": 99, "mongodb": 38}, Limits: inventoryLimits{30, 1500, 1_000_000, 2 << 30, 1000, 1001}}
+	inv := inventoryRequest{FormatVersion: 2, Kind: "readonly_inventory_boundary_request", OperationID: "123-1", SourceSHA: sourceSHA, TargetHash: jsonHash(historyTargets), DatabaseScope: "mysql-and-mongodb", Identities: identities, Migrations: map[string]uint64{"mysql": 99, "mongodb": 38}, Limits: inventoryLimits{30, 1500, 1_000_000, 2 << 30, 10000, 1001}}
 	boundsPath := filepath.Join(opdir, "boundary-request.json")
 	boundsSHA := writeFixtureJSON(t, boundsPath, inv)
 	binary := nativeInventoryBinary(t)

@@ -395,7 +395,7 @@ func loadInputsForSource(ctx context.Context, path, expected, op, run, originalS
 		return a, fixedError("history_inventory_input_rejected")
 	}
 	inv, report := a.inventory, a.report
-	fixedLimits := inventoryLimits{30, 1500, 1_000_000, 2 << 30, 1000, 1001}
+	fixedLimits := inventoryLimits{30, 1500, 1_000_000, 2 << 30, 10000, 1001}
 	if inv.FormatVersion != 2 || inv.Kind != "readonly_inventory_request" || inv.OperationID != op || inv.SourceSHA != originalSource || inv.TargetHash != jsonHash(historyTargets) || inv.DatabaseScope != "mysql-and-mongodb" || inv.Limits != fixedLimits || len(inv.Boundaries) != 4 || len(inv.Identities) != 2 || len(inv.Migrations) != 2 || !runPattern.MatchString(inv.BoundaryRunID) || !hashPattern.MatchString(inv.BoundaryReportHash) {
 		return a, fixedError("history_inventory_request_rejected")
 	}
