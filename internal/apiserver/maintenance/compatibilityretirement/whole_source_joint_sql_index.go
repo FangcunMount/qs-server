@@ -503,3 +503,62 @@ func (x *WholeSourceJointIndex) ReleaseInputAuthentication(ctx context.Context, 
 	x.auth = nil
 	return nil
 }
+
+// Check the actual complete offset index and its derived owner links once per
+// planning pass, rather than hashing a million-entry index at every event.
+// Stable physical ordering is unrelated to an owner/component boundary.
+func (x *WholeSourceJointIndex) inputEventOrder(ctx context.Context, pair *HistoricalSourceInputPair, requireAuth bool) ([]string, error) {
+	if x.inputIndexIntact(ctx, pair, requireAuth) != nil || x.indexSHA == "" || x.indexSHA != x.digest() {
+		return nil, ErrWholeSourceJoint
+	}
+	assessments, sheets := map[uint64][]string{}, map[uint64][]string{}
+	ids := make([]string, 0, len(x.entries))
+	keys := map[verifiedSourceKey]bool{}
+	for id, entry := range x.entries {
+		if ctx.Err() != nil || entry.EventID != id || entry.OrgID == 0 || entry.Key.object != 0 && entry.Key.object != 3 || entry.Offset < 0 || entry.Length <= 0 || keys[entry.Key] {
+			return nil, ErrWholeSourceJoint
+		}
+		keys[entry.Key] = true
+		ids = append(ids, id)
+		if entry.AssessmentID != 0 {
+			assessments[entry.AssessmentID] = append(assessments[entry.AssessmentID], id)
+		}
+		if entry.AnswerSheetID != 0 {
+			sheets[entry.AnswerSheetID] = append(sheets[entry.AnswerSheetID], id)
+		}
+	}
+	for i, links := range []map[uint64][]string{x.byAssessment, x.bySheet} {
+		actual := assessments
+		if i == 1 {
+			actual = sheets
+		}
+		if len(links) != len(actual) {
+			return nil, ErrWholeSourceJoint
+		}
+		for owner, expected := range actual {
+			sort.Strings(expected)
+			observed := append([]string(nil), links[owner]...)
+			sort.Strings(observed)
+			if !reflect.DeepEqual(expected, observed) {
+				return nil, ErrWholeSourceJoint
+			}
+		}
+	}
+	sort.Slice(ids, func(i, j int) bool {
+		a, b := x.entries[ids[i]], x.entries[ids[j]]
+		if a.Key.object != b.Key.object {
+			return a.Key.object < b.Key.object
+		}
+		if a.Offset != b.Offset {
+			return a.Offset < b.Offset
+		}
+		return a.EventID < b.EventID
+	})
+	for i := 1; i < len(ids); i++ {
+		a, b := x.entries[ids[i-1]], x.entries[ids[i]]
+		if a.Key.object == b.Key.object && (a.Offset > 1<<63-1-a.Length || a.Offset+a.Length > b.Offset) {
+			return nil, ErrWholeSourceJoint
+		}
+	}
+	return ids, ctx.Err()
+}

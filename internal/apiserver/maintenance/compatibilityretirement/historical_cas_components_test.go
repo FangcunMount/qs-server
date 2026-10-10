@@ -225,3 +225,47 @@ func TestHistoricalCASComponentInputCannotImportOrFreezeDetachedDTO(t *testing.T
 		t.Fatal("copied input admitted")
 	}
 }
+
+func TestHistoricalSourceOwnerPlannerRejectsDetachedInputsAndOldAuthority(t *testing.T) {
+	index, frames := componentFixture(t, 1)
+	pair := &HistoricalSourceInputPair{}
+	pair.self = pair
+	for _, ctx := range []context.Context{nil, context.Background()} {
+		if result, err := PlanHistoricalSourceOwnerComponents(ctx, pair, index, nil, nil, nil, DefaultHistoricalCASComponentLimits()); result != nil || err == nil {
+			t.Fatal("graph fixture supplied actual input/transaction authority")
+		}
+	}
+	index.owner = nil
+	if result, err := PrepareHistoricalCASComponents(t.Context(), index, frames, DefaultHistoricalCASComponentLimits()); result != nil || err == nil {
+		t.Fatal("input-only index bypassed original coordinator guard")
+	}
+	if (&HistoricalCASComponents{}).ValidateInputSources(t.Context(), pair) == nil {
+		t.Fatal("summary/empty result supplied actual frozen input provenance")
+	}
+}
+
+func TestHistoricalSourcePotentialWritesAreOnlyFixedEvidenceTargets(t *testing.T) {
+	for _, tc := range []struct{ event, field, store, table string }{
+		{"evaluation.requested", "assessment_id", "mysql", "assessment"},
+		{"evaluation.retry.requested", "assessment_id", "mysql", "assessment"},
+		{"evaluation.failed", "assessment_id", "mysql", "assessment"},
+		{"evaluation.outcome.committed", "outcome_id", "mysql", "evaluation_outcome"},
+		{"answersheet.submitted", "answersheet_id", "mongodb", "answersheets"},
+		{"interpretation.report.generated", "generation_id", "mongodb", "report_generations"},
+	} {
+		facts := &DecodedSourceEvent{EventType: tc.event, BusinessIDs: map[string]string{tc.field: "42"}}
+		key, err := historicalSourcePotentialWrite(facts)
+		if err != nil || key != (historicalCASRowKey{tc.store, tc.table, 42}) {
+			t.Fatal("wrong potential edge", tc.event, err)
+		}
+		for _, invalid := range []string{"", "0", "042", "unknown", "18446744073709551616"} {
+			facts.BusinessIDs[tc.field] = invalid
+			if _, err := historicalSourcePotentialWrite(facts); err == nil {
+				t.Fatal("invalid physical selector", invalid)
+			}
+		}
+	}
+	if _, err := historicalSourcePotentialWrite(&DecodedSourceEvent{EventType: "uncovered.historical.type"}); err == nil {
+		t.Fatal("unknown source type received a write target")
+	}
+}
