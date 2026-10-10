@@ -65,7 +65,7 @@ func PrepareTargetRecovery(ctx context.Context, a *Archive, b TargetRecoveryBorr
 	return p, nil
 }
 func targetSupportedHead(actual, original uint64) bool {
-	return original > 0 && (actual == original || (original < ^uint64(0) && actual == original+1))
+	return original > 0 && actual == original
 }
 func (p *TargetRecoveryPlan) checkBases(ctx context.Context, held bool) error {
 	if p == nil || p.self != p || p.blocked || ctx == nil || ctx.Err() != nil || p.borrowed.SQL == nil || p.borrowed.Mongo == nil || mongo.SessionFromContext(ctx) != nil {
@@ -73,6 +73,15 @@ func (p *TargetRecoveryPlan) checkBases(ctx context.Context, held bool) error {
 	}
 	sb := p.archive.data.Inventory.Bindings["mysql"]
 	sb.Version = p.request.SQLHead
+	if p.bMigration != nil {
+		if p.bMigration.proof == nil || p.journal == nil || !p.journal.has("b-migration-intent", p.bMigration.intentSHA) || !p.journal.has("b-migration-result", p.bMigration.resultSHA) {
+			return ErrRecoveryJournal
+		}
+		if e := p.bMigration.proof.VerifyAfter(ctx, p.borrowed.SQL, p.borrowed.Mongo); e != nil {
+			return ErrRecoveryHead
+		}
+		sb = p.bMigration.sqlBinding
+	}
 	if _, e := sqlState(ctx, p.borrowed.SQL, sb); e != nil {
 		return ErrRecoveryHead
 	}
@@ -106,11 +115,22 @@ func (p *TargetRecoveryPlan) checkBases(ctx context.Context, held bool) error {
 	}
 	mb := p.archive.data.Inventory.Bindings["mongodb"]
 	mb.Version = p.request.MongoHead
+	if p.bMigration != nil {
+		mb = p.bMigration.mongoBinding
+	}
 	if _, e = mongoState(ctx, p.borrowed.Mongo, mb, cols); e != nil {
 		return ErrRecoveryHead
 	}
 	mnon := targetMongoNonTarget(mdefs)
-	if mnon != p.request.MongoNonTargetSHA256 || (held && mnon != p.mongoBaseline) {
+	expectedMongoNonTarget := p.request.MongoNonTargetSHA256
+	if p.bMigration != nil {
+		stable, e := targetBStableMongoNonTarget(mdefs)
+		if e != nil || stable != p.bMigration.stableMongoSchema {
+			return ErrStructure
+		}
+		expectedMongoNonTarget = p.bMigration.afterMongoSchema
+	}
+	if mnon != expectedMongoNonTarget || (held && mnon != p.mongoBaseline) {
 		return ErrStructure
 	}
 	p.mongoBaseline = mnon
@@ -335,7 +355,7 @@ func RecoverTargets(ctx context.Context, p *TargetRecoveryPlan) (*TargetRecovery
 			return nil, ErrContent
 		}
 	}
-	v := &TargetRecoveryVerification{summary: p.summaryLocked()}
+	v := &TargetRecoveryVerification{plan: p, summary: p.summaryLocked()}
 	v.self = v
 	return v, nil
 }

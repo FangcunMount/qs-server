@@ -17,7 +17,6 @@ import (
 	app "github.com/FangcunMount/qs-server/internal/apiserver/application/aibridge"
 	sqlevaluation "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/evaluation"
 	hostmysql "github.com/FangcunMount/qs-server/internal/pkg/database/mysql"
-	"github.com/FangcunMount/qs-server/internal/pkg/migration"
 	mysql "github.com/go-sql-driver/mysql"
 	gormmysql "gorm.io/driver/mysql"
 	"gorm.io/gorm"
@@ -34,10 +33,7 @@ func aiReverseNativeDatabase(t *testing.T) (*gorm.DB, *sql.DB) {
 	if pool.QueryRowContext(t.Context(), "SELECT DATABASE()").Scan(&name) != nil || !strings.HasPrefix(name, "qs_ai_resolver_") {
 		t.Fatal("random owned namespace binding")
 	}
-	version, _, e := migration.NewMigrator(pool, &migration.Config{Enabled: true, Database: name}).Run()
-	if e != nil || version != 99 {
-		t.Fatal("actual complete additive migration99 required")
-	}
+	migrateHistoricalA99Fixture(t, pool, name)
 	db, e := gorm.Open(gormmysql.New(gormmysql.Config{Conn: pool}), &gorm.Config{Logger: logger.Default.LogMode(logger.Silent)})
 	if e != nil {
 		t.Fatal("owned GORM adapter")

@@ -166,7 +166,7 @@ func canonicalMongo(raw bson.Raw) (any, error) {
 	return v, nil
 }
 func mongoCatalog(ctx context.Context, db *mongo.Database) (map[string]bson.Raw, map[string]any, error) {
-	q, c := context.WithTimeout(ctx, 30*time.Second)
+	q, c := context.WithTimeout(mongoMetadataContext(ctx), 30*time.Second)
 	defer c()
 	cur, e := db.ListCollections(q, bson.D{}, options.ListCollections().SetNameOnly(false).SetAuthorizedCollections(false))
 	if e != nil {
@@ -224,7 +224,7 @@ func mongoCatalog(ctx context.Context, db *mongo.Database) (map[string]bson.Raw,
 }
 func mongoState(ctx context.Context, db *mongo.Database, b Binding, collections map[string]bson.Raw) (string, error) {
 	var hello, config bson.Raw
-	if db.Client().Database("admin").RunCommand(ctx, bson.D{{Key: "hello", Value: 1}}).Decode(&hello) != nil {
+	if db.Client().Database("admin").RunCommand(mongoMetadataContext(ctx), bson.D{{Key: "hello", Value: 1}}).Decode(&hello) != nil {
 		return "", ErrIdentity
 	}
 	migration, ok := collections["schema_migrations"]
@@ -264,7 +264,7 @@ func mongoState(ctx context.Context, db *mongo.Database, b Binding, collections 
 	} else {
 		// Never retry this legacy profile as namespace metadata after code 13
 		// or any other replSetGetConfig failure.
-		if db.Client().Database("admin").RunCommand(ctx, bson.D{{Key: "replSetGetConfig", Value: 1}}).Decode(&config) != nil {
+		if db.Client().Database("admin").RunCommand(mongoMetadataContext(ctx), bson.D{{Key: "replSetGetConfig", Value: 1}}).Decode(&config) != nil {
 			return "", ErrIdentity
 		}
 		id, ok := config.Lookup("config", "settings", "replicaSetId").ObjectIDOK()
@@ -342,7 +342,7 @@ func ReadOrderedMongoSchema(ctx context.Context, db *mongo.Database) (*OrderedMo
 	if ctx == nil || ctx.Err() != nil || db == nil {
 		return nil, ErrRead
 	}
-	q, c := context.WithTimeout(ctx, 30*time.Second)
+	q, c := context.WithTimeout(mongoMetadataContext(ctx), 30*time.Second)
 	defer c()
 	cur, e := db.ListCollections(q, bson.D{{Key: "name", Value: targetNames[3]}}, options.ListCollections().SetNameOnly(false).SetAuthorizedCollections(false))
 	if e != nil {

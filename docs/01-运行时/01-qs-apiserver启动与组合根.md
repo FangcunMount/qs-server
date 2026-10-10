@@ -36,6 +36,8 @@ flowchart LR
 
 这一阶段只建立进程级资源，不应在这里写具体业务规则。连接配置以当前环境 YAML 和 options 为准，文档不固化端口、池大小等易变数值。
 
+数据库管理器在装配前执行配置启用的迁移。发布 B 先联合检查两个选定业务库的身份、clean head、可见性和四个退役对象，再运行 MySQL `100`／MongoDB `39` 收尾；未知状态或部分删除阻断启动。已安装库须先经受控流程删除四目标，新空库另需绑定编译 SHA 与双库身份的一次性外部批准。完整契约见[数据库迁移说明](../../internal/pkg/migration/README.md)。
+
 ### 3.2 initialize container
 
 容器阶段创建 `internal/apiserver/container.Container` 并装配业务模块。当前核心装配收敛在 `internal/apiserver/container/modules`，

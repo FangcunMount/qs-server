@@ -7,6 +7,8 @@ import (
 	"database/sql"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -16,8 +18,12 @@ import (
 	"syscall"
 	"time"
 
+	aibridge "github.com/FangcunMount/qs-server/internal/apiserver/infra/aibridge"
+	binding "github.com/FangcunMount/qs-server/internal/apiserver/maintenance/aimessagingbinding"
+	retirement "github.com/FangcunMount/qs-server/internal/apiserver/maintenance/compatibilityretirement"
 	backup "github.com/FangcunMount/qs-server/internal/apiserver/maintenance/compatibilityretirementbackup"
 	identitymeta "github.com/FangcunMount/qs-server/internal/pkg/databaseidentity"
+	jose "github.com/go-jose/go-jose/v4"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
@@ -56,31 +62,42 @@ type prepareFactsFS struct {
 	AvailableBytes uint64 `json:"available_bytes"`
 	FreeBytes      uint64 `json:"free_bytes"`
 }
+type prepareFactsProtection struct {
+	SHA256          string `json:"sha256"`
+	DecryptKeys     int    `json:"decrypt_key_count"`
+	TrustedSigners  int    `json:"trusted_signer_count"`
+	BindingSHA256   string `json:"source_binding_sha256"`
+	SourceSHA       string `json:"source_sha"`
+	ImageSHA256     string `json:"image_id_sha256"`
+	ContainerSHA256 string `json:"container_id_sha256"`
+}
 type prepareFactsReceipt struct {
-	FormatVersion             int                      `json:"format_version"`
-	Kind                      string                   `json:"kind"`
-	Operation                 string                   `json:"operation"`
-	PrepareMode               string                   `json:"prepare_mode"`
-	SourceSHA                 string                   `json:"source_sha"`
-	OperationID               string                   `json:"operation_id"`
-	RunID                     string                   `json:"run_id"`
-	RequestSHA256             string                   `json:"request_sha256"`
-	ObservationApprovalSHA256 string                   `json:"observation_approval_sha256"`
-	TargetHash                string                   `json:"target_hash"`
-	Complete                  bool                     `json:"complete"`
-	FactsObservationComplete  bool                     `json:"prepare_facts_observation_complete"`
-	DiagnosticOnly            bool                     `json:"diagnostic_only"`
-	ExecutionAllowed          bool                     `json:"execution_allowed"`
-	DropReady                 bool                     `json:"drop_ready"`
-	Producer                  prepareFactsProducer     `json:"observed_inventory_producer"`
-	Files                     []prepareFactsFile       `json:"prepare_source_files"`
-	OrderedMongoSchemaSHA256  string                   `json:"observed_ordered_mongo_schema_sha256"`
-	RestoreEngines            *lifecycleRestoreEngines `json:"observed_restore_engines,omitempty"`
-	Capacity                  []prepareFactsFS         `json:"observed_filesystems"`
-	SocketKind                string                   `json:"observed_socket_kind"`
-	PrivateObservationSHA256  string                   `json:"prepare_facts_private_observation_sha256,omitempty"`
-	ElapsedMillis             int64                    `json:"observation_elapsed_millis"`
-	ErrorCategory             string                   `json:"error_category"`
+	Protection                *prepareFactsProtection                  `json:"observed_ai_message_protection,omitempty"`
+	FormatVersion             int                                      `json:"format_version"`
+	Kind                      string                                   `json:"kind"`
+	Operation                 string                                   `json:"operation"`
+	PrepareMode               string                                   `json:"prepare_mode"`
+	SourceSHA                 string                                   `json:"source_sha"`
+	OperationID               string                                   `json:"operation_id"`
+	RunID                     string                                   `json:"run_id"`
+	RequestSHA256             string                                   `json:"request_sha256"`
+	ObservationApprovalSHA256 string                                   `json:"observation_approval_sha256"`
+	TargetHash                string                                   `json:"target_hash"`
+	Complete                  bool                                     `json:"complete"`
+	FactsObservationComplete  bool                                     `json:"prepare_facts_observation_complete"`
+	DiagnosticOnly            bool                                     `json:"diagnostic_only"`
+	ExecutionAllowed          bool                                     `json:"execution_allowed"`
+	DropReady                 bool                                     `json:"drop_ready"`
+	Producer                  prepareFactsProducer                     `json:"observed_inventory_producer"`
+	Files                     []prepareFactsFile                       `json:"prepare_source_files"`
+	OrderedMongoSchemaSHA256  string                                   `json:"observed_ordered_mongo_schema_sha256"`
+	RestoreEngines            *lifecycleRestoreEngines                 `json:"observed_restore_engines,omitempty"`
+	Capacity                  []prepareFactsFS                         `json:"observed_filesystems"`
+	SocketKind                string                                   `json:"observed_socket_kind"`
+	PrivateObservationSHA256  string                                   `json:"prepare_facts_private_observation_sha256,omitempty"`
+	AIRuntime                 *retirement.AIExternalRuntimeObservation `json:"observed_ai_runtime,omitempty"`
+	ElapsedMillis             int64                                    `json:"observation_elapsed_millis"`
+	ErrorCategory             string                                   `json:"error_category"`
 }
 
 func decodePrepareFacts(raw []byte, dst any) error {
@@ -465,8 +482,17 @@ func runPrepareFacts(ctx context.Context, path, expected, op, run string) (recei
 		return receipt, e
 	}
 	owner = nil
+	aiRuntime, e := retirement.ObserveAIExternalCurrentRuntime(ctx, false)
+	if e != nil {
+		return receipt, lifecycleError("prepare_facts_ai_runtime_unproven")
+	}
+	receipt.AIRuntime = &aiRuntime
 	if ctx.Err() != nil {
 		return receipt, lifecycleError("prepare_facts_read_budget_exceeded")
+	}
+	receipt.Protection, e = prepareFactsMessageProtection(ctx, docker, op, uint32(uid64))
+	if e != nil {
+		return receipt, e
 	}
 	receipt.OrderedMongoSchemaSHA256 = ordered.SHA256()
 	receipt.RestoreEngines = r.RestoreEngines
@@ -482,4 +508,308 @@ func runPrepareFacts(ctx context.Context, path, expected, op, run string) (recei
 	}
 	receipt.PrivateObservationSHA256 = digestRaw(append(encoded, '\n'))
 	return receipt, nil
+}
+
+// The existing prepare-facts root invocation is the only production caller.
+// The actual running API, immutable release binding and read-only mounts supply
+// the keys. No Secret name, caller key map or unreviewed path is accepted.
+type prepareFactsMQContainer struct {
+	Entrypoint []string `json:"entrypoint"`
+	Command    []string `json:"command"`
+	PID        int      `json:"pid"`
+	User       string   `json:"user"`
+	ID         string   `json:"id"`
+	Name       string   `json:"name"`
+	Image      string   `json:"image"`
+	Running    bool     `json:"running"`
+	Service    string   `json:"service"`
+	Mounts     []struct {
+		Type        string
+		Source      string
+		Destination string
+		RW          bool
+	} `json:"mounts"`
+}
+
+const prepareFactsMQInspect = `{"id":{{json .Id}},"name":{{json .Name}},"image":{{json .Image}},"running":{{json .State.Running}},"pid":{{json .State.Pid}},"user":{{json .Config.User}},"entrypoint":{{json .Config.Entrypoint}},"command":{{json .Config.Cmd}},"service":{{json (index .Config.Labels "com.docker.compose.service")}},"mounts":{{json .Mounts}}}`
+
+func prepareFactsKeyFile(path string, uid uint32, private bool, maximum int64) (f *os.File, raw []byte, result error) {
+	// Existing release assets may be root or the source/deployment account owned.
+	if filepath.Clean(path) != path || !filepath.IsAbs(path) {
+		return nil, nil, lifecycleError("prepare_facts_message_protection_rejected")
+	}
+	for d := filepath.Dir(path); d != "/"; d = filepath.Dir(d) {
+		st, e := os.Lstat(d)
+		v, ok := infoStat(st)
+		if e != nil || st == nil || !st.IsDir() || !ok || (v.Uid != 0 && v.Uid != uid) || (st.Mode().Perm()&0022 != 0 && st.Mode()&os.ModeSticky == 0) {
+			return nil, nil, lifecycleError("prepare_facts_message_protection_rejected")
+		}
+	}
+	f, result = os.OpenFile(path, os.O_RDONLY|syscall.O_NOFOLLOW|syscall.O_NONBLOCK, 0)
+	if result != nil {
+		return nil, nil, lifecycleError("prepare_facts_message_protection_rejected")
+	}
+	defer func() {
+		if result != nil {
+			_ = f.Close()
+			f = nil
+			raw = nil
+		}
+	}()
+	st, e := f.Stat()
+	v, ok := infoStat(st)
+	if e != nil || st == nil || !st.Mode().IsRegular() || !ok || (v.Uid != 0 && v.Uid != uid) || v.Nlink != 1 || st.Mode().Perm()&0022 != 0 || (private && st.Mode().Perm()&0007 != 0) || st.Size() < 1 || st.Size() > maximum {
+		return f, nil, lifecycleError("prepare_facts_message_protection_rejected")
+	}
+	raw, e = io.ReadAll(io.LimitReader(f, maximum+1))
+	after, ae := f.Stat()
+	visible, ve := os.Lstat(path)
+	if e != nil || ae != nil || ve != nil || int64(len(raw)) != st.Size() || !sameLifecycleFile(st, after) || !sameLifecycleFile(after, visible) {
+		return f, nil, lifecycleError("prepare_facts_message_protection_rejected")
+	}
+	return f, raw, nil
+}
+
+func prepareFactsProtectionBytes(keys aibridge.MessagingKeys) ([]byte, map[string]string, error) {
+	if len(keys.Ring.Decrypt) < 1 || len(keys.Ring.Decrypt) > 8 || len(keys.Ring.Signers) < 1 || len(keys.Ring.Signers) > 8 {
+		return nil, nil, lifecycleError("prepare_facts_message_protection_rejected")
+	}
+	publics := map[string]jose.JSONWebKey{keys.Signing.KeyID: keys.Signing.Public(), keys.Recipient.KeyID: keys.Recipient.Public()}
+	for kid, k := range keys.Ring.Decrypt {
+		if k.KeyID != kid || !strings.HasPrefix(kid, "qs.encrypt.") || k.IsPublic() {
+			return nil, nil, lifecycleError("prepare_facts_message_protection_rejected")
+		}
+		publics[kid] = k.Public()
+	}
+	for kid, k := range keys.Ring.Signers {
+		if k.Producer != "qs-ai" || k.Key.KeyID != kid || !strings.HasPrefix(kid, "ai.sign.") || !k.Key.IsPublic() {
+			return nil, nil, lifecycleError("prepare_facts_message_protection_rejected")
+		}
+		publics[kid] = k.Key.Public()
+	}
+	fingerprints := map[string]string{}
+	for kid, k := range publics {
+		raw, e := json.Marshal(k)
+		if e != nil {
+			return nil, nil, lifecycleError("prepare_facts_message_protection_rejected")
+		}
+		fingerprints[kid] = digestRaw(raw)
+	}
+	type signer struct {
+		Producer string          `json:"producer"`
+		Key      jose.JSONWebKey `json:"key"`
+	}
+	signers := map[string]signer{}
+	for kid, k := range keys.Ring.Signers {
+		signers[kid] = signer{Producer: k.Producer, Key: k.Key}
+	}
+	raw, e := json.Marshal(struct {
+		Decrypt map[string]jose.JSONWebKey `json:"decrypt_keys"`
+		Signers map[string]signer          `json:"trusted_signers"`
+	}{keys.Ring.Decrypt, signers})
+	if e != nil || len(raw) > 256<<10 {
+		return nil, nil, lifecycleError("prepare_facts_message_protection_rejected")
+	}
+	return append(raw, '\n'), fingerprints, nil
+}
+
+// The current container init process supplies the real host UID used by the
+// existing CD-mounted readers. It is not a caller-supplied owner exception.
+func prepareFactsContainerReaderUID(pid int, user string) (uint32, error) {
+	userParts := strings.Split(user, ":")
+	numericUID, numericErr := strconv.ParseUint(userParts[0], 10, 32)
+	if pid < 1 || len(userParts) > 2 || (user != "www" && (numericErr != nil || numericUID == 0)) {
+		return 0, lifecycleError("prepare_facts_message_protection_reader_rejected")
+	}
+	path := fmt.Sprintf("/proc/%d/status", pid)
+	f, e := os.OpenFile(path, os.O_RDONLY|syscall.O_NOFOLLOW|syscall.O_NONBLOCK, 0)
+	if e != nil {
+		return 0, lifecycleError("prepare_facts_message_protection_reader_rejected")
+	}
+	raw, e := io.ReadAll(io.LimitReader(f, 32769))
+	closeErr := f.Close()
+	if e != nil || closeErr != nil || len(raw) > 32768 {
+		return 0, lifecycleError("prepare_facts_message_protection_reader_rejected")
+	}
+	var result uint32
+	found := false
+	for _, line := range strings.Split(string(raw), "\n") {
+		fields := strings.Fields(line)
+		if len(fields) > 0 && fields[0] == "Uid:" {
+			if found || len(fields) != 5 {
+				return 0, lifecycleError("prepare_facts_message_protection_reader_rejected")
+			}
+			found = true
+			for i, value := range fields[1:] {
+				n, e := strconv.ParseUint(value, 10, 32)
+				if e != nil || n == 0 || (i > 0 && uint32(n) != result) {
+					return 0, lifecycleError("prepare_facts_message_protection_reader_rejected")
+				}
+				result = uint32(n)
+			}
+		}
+	}
+	if !found || (user != "www" && uint64(result) != numericUID) {
+		return 0, lifecycleError("prepare_facts_message_protection_reader_rejected")
+	}
+	return result, nil
+}
+
+func prepareFactsMessageProtection(ctx context.Context, docker, op string, uid uint32) (_ *prepareFactsProtection, result error) {
+	inspect, e := lifecycleDocker(ctx, docker, "inspect", "--format", prepareFactsMQInspect, "qs-apiserver")
+	var container prepareFactsMQContainer
+	if e != nil || rejectDuplicateJSON(inspect) != nil || json.Unmarshal(inspect, &container) != nil || !hashRE.MatchString(container.ID) || container.Name != "/qs-apiserver" || container.Service != "qs-apiserver" || !reflect.DeepEqual(container.Entrypoint, []string{"/app/qs-apiserver"}) || !reflect.DeepEqual(container.Command, []string{"--config=/app/configs/apiserver.prod.yaml"}) || !container.Running || !strings.HasPrefix(container.Image, "sha256:") || !hashRE.MatchString(strings.TrimPrefix(container.Image, "sha256:")) {
+		return nil, lifecycleError("prepare_facts_message_protection_runtime_rejected")
+	}
+	source, e := lifecycleDocker(ctx, docker, "exec", container.ID, "/app/qs-ai-messaging-preflight", "--source-sha")
+	sourceSHA := strings.TrimSpace(string(source))
+	if e != nil || !shaRE.MatchString(sourceSHA) {
+		return nil, lifecycleError("prepare_facts_message_protection_runtime_rejected")
+	}
+	readerUID, e := prepareFactsContainerReaderUID(container.PID, container.User)
+	if e != nil {
+		return nil, e
+	}
+	release := filepath.Join("/opt/qs-server/qs-apiserver/ai-mq-releases", sourceSHA)
+	held := map[string]*os.File{}
+	raws := map[string][]byte{}
+	defer func() {
+		for _, f := range held {
+			result = errors.Join(result, f.Close())
+		}
+	}()
+	read := func(path string, private bool, maximum int64) ([]byte, error) {
+		f, raw, e := prepareFactsKeyFile(path, readerUID, private, maximum)
+		if e == nil {
+			held[path] = f
+			raws[path] = raw
+		}
+		return raw, e
+	}
+	bindingRaw, e := read(filepath.Join(release, "binding.json"), true, 16384)
+	if e != nil {
+		return nil, e
+	}
+	b, e := binding.Decode(bindingRaw)
+	if e != nil {
+		return nil, lifecycleError("prepare_facts_message_protection_rejected")
+	}
+	metadataRaw, e := read(filepath.Join(release, "metadata.json"), true, 32768)
+	if e != nil {
+		return nil, e
+	}
+	var metadata struct {
+		Source      string            `json:"source_sha"`
+		Image       string            `json:"image_id"`
+		BindingFile string            `json:"binding_file_sha256"`
+		Binding     string            `json:"binding_sha256"`
+		Config      string            `json:"rendered_config_sha256"`
+		Publics     map[string]string `json:"public_key_fingerprints"`
+	}
+	if rejectDuplicateJSON(metadataRaw) != nil || json.Unmarshal(metadataRaw, &metadata) != nil || metadata.Source != sourceSHA || metadata.Image != container.Image || metadata.BindingFile != digestRaw(bindingRaw) || metadata.Binding != b.SHA256() {
+		return nil, lifecycleError("prepare_facts_message_protection_binding_rejected")
+	}
+	configPath := filepath.Join(release, "apiserver.json")
+	configRaw, e := read(configPath, true, 1<<20)
+	if e != nil || metadata.Config != digestRaw(configRaw) {
+		return nil, lifecycleError("prepare_facts_message_protection_binding_rejected")
+	}
+	mounts := map[string]string{}
+	for _, m := range container.Mounts {
+		if m.Destination == "/app/configs/apiserver.prod.yaml" || strings.HasPrefix(m.Destination, "/run/qs-server-jose/") {
+			if m.Type != "bind" || m.RW || mounts[m.Destination] != "" {
+				return nil, lifecycleError("prepare_facts_message_protection_mount_rejected")
+			}
+			mounts[m.Destination] = m.Source
+		}
+	}
+	if mounts["/app/configs/apiserver.prod.yaml"] != configPath {
+		return nil, lifecycleError("prepare_facts_message_protection_mount_rejected")
+	}
+	files, e := b.Files()
+	if e != nil || len(mounts) != len(files)+1 {
+		return nil, lifecycleError("prepare_facts_message_protection_mount_rejected")
+	}
+	paths := map[string]string{}
+	for _, key := range files {
+		expected := filepath.Join("/data/infra/qs-server-messaging/versions", b.Revision, filepath.Base(key.Path))
+		if mounts[key.Path] != expected {
+			return nil, lifecycleError("prepare_facts_message_protection_mount_rejected")
+		}
+		raw, e := read(expected, key.Private, 16384)
+		if e != nil || rejectDuplicateJSON(raw) != nil {
+			return nil, lifecycleError("prepare_facts_message_protection_rejected")
+		}
+		paths[key.Path] = fmt.Sprintf("/proc/self/fd/%d", held[expected].Fd())
+	}
+	opts := b.Options()
+	opts.SigningKeyFile = paths[b.Signing]
+	opts.AIRecipientKeyFile = paths[b.Recipient]
+	opts.DecryptKeyFiles = map[string]string{}
+	opts.AISignerFiles = map[string]string{}
+	for kid, path := range b.Decrypt {
+		opts.DecryptKeyFiles[kid] = paths[path]
+	}
+	for kid, path := range b.Signers {
+		opts.AISignerFiles[kid] = paths[path]
+	}
+	keys, e := aibridge.LoadMessagingKeys(opts)
+	if e != nil {
+		return nil, lifecycleError("prepare_facts_message_protection_rejected")
+	}
+	packet, publics, e := prepareFactsProtectionBytes(keys)
+	if e != nil || !reflect.DeepEqual(publics, metadata.Publics) {
+		return nil, lifecycleError("prepare_facts_message_protection_binding_rejected")
+	}
+	// Recheck the original FDs and names after the host loader. No key is read
+	// through an independently reopened, caller-selected filesystem path.
+	for path, f := range held {
+		before, e := f.Stat()
+		if e != nil {
+			return nil, lifecycleError("prepare_facts_message_protection_source_changed")
+		}
+		if _, e = f.Seek(0, io.SeekStart); e != nil {
+			return nil, lifecycleError("prepare_facts_message_protection_source_changed")
+		}
+		current, e := io.ReadAll(io.LimitReader(f, int64(len(raws[path]))+1))
+		after, ae := f.Stat()
+		visible, ve := os.Lstat(path)
+		if e != nil || ae != nil || ve != nil || !bytes.Equal(current, raws[path]) || !sameLifecycleFile(before, after) || !sameLifecycleFile(after, visible) {
+			return nil, lifecycleError("prepare_facts_message_protection_source_changed")
+		}
+	}
+	endingUID, e := prepareFactsContainerReaderUID(container.PID, container.User)
+	if e != nil || endingUID != readerUID {
+		return nil, lifecycleError("prepare_facts_message_protection_reader_changed")
+	}
+	again, e := lifecycleDocker(ctx, docker, "inspect", "--format", prepareFactsMQInspect, container.ID)
+	if e != nil || !bytes.Equal(bytes.TrimSpace(again), bytes.TrimSpace(inspect)) || ctx.Err() != nil {
+		return nil, lifecycleError("prepare_facts_message_protection_runtime_changed")
+	}
+	parent := filepath.Join("/opt/backups/qs-server/compatibility-retirement", op)
+	if lifecycleSourcePrivateDirectory(parent, uid) != nil {
+		return nil, lifecycleError("prepare_facts_message_protection_destination_rejected")
+	}
+	destination := filepath.Join(parent, "ai-message-protection.json")
+	f, e := os.OpenFile(destination, os.O_WRONLY|os.O_CREATE|os.O_EXCL|syscall.O_NOFOLLOW, 0600)
+	if e != nil {
+		return nil, lifecycleError("prepare_facts_message_protection_creation_incomplete")
+	}
+	n, we := f.Write(packet)
+	ce := f.Chown(int(uid), -1)
+	se := f.Sync()
+	closeErr := f.Close()
+	if n != len(packet) || we != nil || ce != nil || se != nil || closeErr != nil {
+		return nil, lifecycleError("prepare_facts_message_protection_creation_incomplete")
+	}
+	dir, e := os.OpenFile(parent, os.O_RDONLY|syscall.O_DIRECTORY|syscall.O_NOFOLLOW, 0)
+	if e != nil {
+		return nil, lifecycleError("prepare_facts_message_protection_creation_incomplete")
+	}
+	syncErr := dir.Sync()
+	closeErr = dir.Close()
+	if syncErr != nil || closeErr != nil {
+		return nil, lifecycleError("prepare_facts_message_protection_creation_incomplete")
+	}
+	return &prepareFactsProtection{SHA256: digestRaw(packet), DecryptKeys: len(keys.Ring.Decrypt), TrustedSigners: len(keys.Ring.Signers), BindingSHA256: metadata.Binding, SourceSHA: sourceSHA, ImageSHA256: strings.TrimPrefix(container.Image, "sha256:"), ContainerSHA256: digestRaw([]byte(container.ID))}, nil
 }

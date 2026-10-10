@@ -9,7 +9,7 @@ import (
 )
 
 func TestAPrepareDescriptorRejectsEffectfulFieldsEvenNull(t *testing.T) {
-	for _, key := range []string{"resume", "resume_kind", "ApprovedBSourceSHA", "migration_intent_sha256", "drop_ready"} {
+	for _, key := range []string{"resume", "resume_kind", "service_control", "ApprovedBSourceSHA", "migration_intent_sha256", "drop_ready"} {
 		t.Run(key, func(t *testing.T) {
 			for _, value := range []string{"null", "{}", `""`} {
 				raw := []byte(`{"` + key + `":` + value + `}`)

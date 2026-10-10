@@ -90,3 +90,100 @@ func TestHistoryWriteCallerRejectsUnqualifiedInputs(t *testing.T) {
 		t.Fatal("input rejection promoted actual persistence or authority")
 	}
 }
+
+func TestHistoryWriteMaterialManifestFromOriginalClosedSpoolsAndJournals(t *testing.T) {
+	prior := sourceSHA
+	sourceSHA = strings.Repeat("b", 40)
+	defer func() { sourceSHA = prior }()
+	parent, _ := filepath.EvalSymlinks(t.TempDir())
+	_ = os.Chmod(parent, 0700)
+	j, err := newHistoryWriteJournal(filepath.Join(parent, "write"), &approvedInputs{request: historyRequest{SourceSHA: strings.Repeat("a", 40), OperationID: "100-1", RunID: "101-1"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func(close func() error) { _ = close() }(j.dir.Close)
+	for _, name := range []string{"prepared-mongo-private.bin", "prepared-sql-private.bin"} {
+		f, e := j.create(name)
+		if e != nil {
+			t.Fatal(e)
+		}
+		if _, e = f.Write([]byte("private-body")); e != nil {
+			t.Fatal(e)
+		}
+		if f.Sync() != nil || f.Close() != nil {
+			t.Fatal("close")
+		}
+	}
+	for _, stage := range []string{"sql_commit_success", "limited_event_readback_finished"} {
+		if j.record(context.Background(), stage, 0, 1, nil) != nil {
+			t.Fatal("journal")
+		}
+	}
+	hash, err := j.snapshotMaterials(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw, _ := os.ReadFile(filepath.Join(j.path, "history.materials.private.json"))
+	var m historyTemporaryMaterialManifest
+	if strictDecode(raw, &m) != nil || rawHash(raw) != hash || m.MaxSpoolBytes != 16<<30 || m.JournalSequence != 2 || len(m.Files) != 4 {
+		t.Fatal("actual member manifest")
+	}
+	for _, v := range m.Files {
+		body, _ := os.ReadFile(filepath.Join(j.path, v.Name))
+		info, _ := os.Stat(filepath.Join(j.path, v.Name))
+		if v.Bytes != int64(len(body)) || v.SHA256 != rawHash(body) || v.UID != uint32(os.Getuid()) || v.Inode == 0 || v.Mode != 0600 || !info.Mode().IsRegular() {
+			t.Fatal("actual source metadata")
+		}
+	}
+	if _, err = j.snapshotMaterials(context.Background()); err == nil {
+		t.Fatal("producer snapshot reissued")
+	}
+	if strings.Contains(string(raw), "private-body") || strings.Contains(string(raw), "complete") || strings.Contains(string(raw), "permission") {
+		t.Fatal("descriptor exposed body or authority")
+	}
+}
+
+func TestHistoryWriteMaterialManifestRejectsUnregisteredOrReplacedObjects(t *testing.T) {
+	for _, mutation := range []string{"extra", "replace", "hardlink", "missing", "unknown", "oversize"} {
+		t.Run(mutation, func(t *testing.T) {
+			parent, _ := filepath.EvalSymlinks(t.TempDir())
+			_ = os.Chmod(parent, 0700)
+			j, e := newHistoryWriteJournal(filepath.Join(parent, "write"), &approvedInputs{request: historyRequest{SourceSHA: strings.Repeat("a", 40), OperationID: "100-1", RunID: "101-1"}})
+			if e != nil {
+				t.Fatal(e)
+			}
+			defer func(close func() error) { _ = close() }(j.dir.Close)
+			for _, name := range []string{"prepared-mongo-private.bin", "prepared-sql-private.bin"} {
+				f, e := j.create(name)
+				if e != nil || f.Close() != nil {
+					t.Fatal("spool")
+				}
+			}
+			p := filepath.Join(j.path, "prepared-mongo-private.bin")
+			switch mutation {
+			case "extra":
+				_ = os.WriteFile(filepath.Join(j.path, "unknown"), nil, 0600)
+			case "replace":
+				_ = os.Rename(p, p+"-old")
+				_ = os.WriteFile(p, nil, 0600)
+				_ = os.Remove(p + "-old")
+			case "hardlink":
+				_ = os.Link(p, filepath.Join(parent, "linked"))
+			case "missing":
+				_ = os.Remove(p)
+			case "unknown":
+				j.unknown = true
+			case "oversize":
+				if os.Truncate(p, (16<<30)+1) != nil {
+					t.Fatal("sparse bound")
+				}
+			}
+			if _, e = j.snapshotMaterials(context.Background()); e == nil {
+				t.Fatal("unbound source accepted")
+			}
+			if _, e = os.Lstat(filepath.Join(j.path, "history.materials.private.json")); !os.IsNotExist(e) {
+				t.Fatal("failed source published descriptor")
+			}
+		})
+	}
+}

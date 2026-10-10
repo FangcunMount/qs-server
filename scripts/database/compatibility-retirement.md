@@ -159,6 +159,162 @@ writer's opaque qualification. Pre-window historical evidence CAS uses the actua
 closed-admission and fresh locked-baseline checks; full writer/old-ref isolation
 and the measured maintenance-window capabilities remain necessary for DROP.
 
+## Final historical readback and temporary-material cleanup
+
+`FinalDifferenceAndEOF` uses the original service lease and maintenance-window
+budget, borrows the existing dedicated SQL connection for RR/read-only work,
+and uses the existing Mongo client in a snapshot transaction. It holds and
+rechecks the four registered source files, compares current sources before and
+after verification, scans fixed upper bounds to EOF, and checks the historical
+conclusions already stored in business records. Missing, conflicting or changed
+references fail. Verification does not apply another CAS, create IDs or resend
+commands. Both borrowed database scopes end before later DDL.
+
+Recovery journal ancestry binds each originally opened directory FD to its
+device/inode, owner and mode, and rechecks each original parent/name without
+following symlinks. Unrelated ancestor siblings may change that ancestor's link
+count; the private journal leaf still checks its original link count on both FD
+and named-path observations. Stored files retain their strict link count,
+physical identity, full content digest and read-after-read checks. The B journal's
+37-entry contract, exact migration filenames, kind validation and original
+recovery responsibilities are unchanged.
+
+Final AI verification has a separate fixed journal. It requires the original
+verify execution to be known successful and independently checks its actual
+Engine/exec identity before starting a fresh final read. An unknown original
+execution remains blocking. The historical verification time and Q fingerprint
+remain historical facts; the final read verifies current closure separately.
+Actual host ownership of both phases remains a required deployment check.
+
+The existing real-database CI step requires the final-readback test with four
+cases: persisted evidence, missing evidence, conflicting evidence and deleted
+source. These cases passed locally against owned random SQL99/Mongo38 test
+namespaces. A second native fixture authenticates and commits two SQL and two
+Mongo originals through the existing two-epoch spool. It checks both answer-sheet
+and report-generation evidence for missing/conflicting entries, rejects deleted
+Mongo sources, and verifies the restored original records again. CI requires
+both final-readback tests. AI source copies remain empty in these fixtures;
+full AI history, the native service/window caller, production fixed bounds and
+the production recovery duration need their own verification.
+
+The host captures every stored non-target object in the approved complete
+namespace catalog in the paired read-only epoch. Metadata commands use a context
+that masks only the existing Mongo session; the original deadline, cancellation
+and host binding values remain. Collection/index/topology metadata therefore
+run outside the transaction, while bodies and the actual migration head retain
+the original snapshot context. No new client, transaction or lifecycle owner is
+created by this metadata context.
+
+After the actual native DROP/migration pair, a fresh snapshot compares the full
+frozen baseline **before the first native B API start**: ordinary B startup can
+immediately resume its A-equivalent relays and schedulers. The comparison ends
+only after an unambiguous server ACK for `abortTransaction` on the original
+Mongo session/transaction, ordinary driver Abort/EndSession and SQL Rollback.
+The host then checks the dedicated SQL connection is actually in autocommit
+with no active transaction, rechecks missing targets, the clean pair, stopped
+services and writer isolation, and retains an opaque same-process comparison
+fact. Missing ACK, unknown cleanup or a changed binding blocks B startup;
+`recovery_complete` or a serialized receipt cannot recreate this fact.
+
+The only normalized data difference is the exact clean schema-head transition
+from MySQL99/Mongo38 to MySQL100/Mongo39. Views retain their full definitions and
+backing stores remain in scope. Missing primary keys, mixed/unsupported BSON
+IDs and unsupported technical collections are explicit blockers; no
+responsibility subset replaces the complete catalog. After B starts, acceptance
+checks the retained frozen-interval comparison, schema/absence, runtime, audit/MQ
+and external isolation; it does not demand an unchanged row snapshot while
+B's normal internal writers are running.
+
+The native API owner reads the actual deployed B container's image, process,
+configuration and fixed health/version/readiness endpoints. Post-deployment
+dependent checks keep the full relevant-container catalog and allow only that
+owner's actual replacement API CID; a residual old API or changed dependent
+still fails. These observations do not prove broker or business acceptance.
+
+The native acceptance host now reads the standard event audit and current MQ
+ledger through its original borrowed handles. A fresh SQL RR/read-only epoch
+scans business records and `rm_outbox` in both directions; a fresh Mongo snapshot
+scans all seven current audit phases, preserving ordered BSON cursor bytes.
+Fixed bounds and an actual final empty page are required for every scan. The
+SQL audit reuses the existing classification matrix without its normal metric
+or business-identity log side effects. Qualified historical gaps remain explicit
+`unverifiable` counts and never become original-message verification successes;
+other findings block this acceptance component.
+
+Current MQ reads reuse Runtime's exact integrity and pending/attempt formulas.
+The organization catalog includes requests and both current operation/outbox
+directions; invalid ownership, orphans and unknown/conflicting states cannot
+appear as zero backlog. START, CHANGE and PARTICIPANT_RETRY count, held remains
+pending, accepted/rejected do not, and inherited persisted attempts count once.
+ACK and evaluation commands stay outside these statistics. Existing application
+Runtime and Health response names, types and statistics semantics are unchanged.
+
+The host retains only private bounded-read counters after an actual Mongo abort
+response, driver Abort/EndSession and SQL rollback, then rechecks the original
+window binding and external isolation. This observation cannot serialize into
+an acceptance or full-writer token. The two database epochs are not a globally
+simultaneous snapshot; actual drift is reported. Real loaded broker endpoints,
+authentication/network/subscription and consumer facts and all eight material
+scopes still require their own native producers. Existing native receipts retain
+their original source and do not certify this component.
+
+The controlled-runtime hook follows those ledger reads and repeated stopped/fence
+checks. It consumes the retained pre-FIRST-B comparison, then uses the original
+local/D leases and signed existing D channel to resume and read back only the
+approved dependents. It rechecks the B API and external fence, and still ends in
+an explicit missing-producer failure. No successful health or read count can
+create complete acceptance or activate the lifecycle effects.
+
+The D material producer requires that same native controller's actual owned-file
+zero before closing its original child. A private terminal fact then requires
+successful original Wait/ProcessState, a fresh absent process group, closed
+original pipes and the same Window/request/issuer/material owners. Ordinary
+phases still require the original child live; only the dedicated terminal phase
+validates that fact before and after the existing platform/intent checks.
+Unknown exit, unissued/foreign zero, failed cleanup or changed ownership remain
+blocking. This component does not establish the remaining A cleanup, broker,
+full writer isolation or complete eight-scope acceptance. Real Linux/root/SSH
+execution of this combination remains unverified; lifecycle effects stay closed.
+
+The current platform reader independently checks the approved workflow roster,
+current run/job/runner, five unfinished run states and fixed main SHA twice.
+The runner quarantine owner records original workflow states and journals each
+disable/enable intent before the actual request. The dedicated window job owns
+that live quarantine and its fixed SSH/native invocation; the preparation job
+retains read-only platform permissions. Restoration requires the actual child's
+EOF/Wait and an unambiguous terminal result. A failed call's recovery-complete
+boolean cannot release workflow isolation or remove identity material; an
+unknown mutation is retained for explicit recovery. Full host, database and
+external-writer isolation and actual platform execution still require proof.
+An observation or saved receipt cannot enable lifecycle effects.
+
+The existing real-database CI step requires non-target reader tests for
+unsigned composite SQL paging, NULL/empty drift, ordered Mongo RM document IDs,
+mixed-ID refusal and the exact clean schema-head normalization, plus
+`TestMongoMetadataSnapshotNative`. It also requires all three original-session
+abort response scenarios: success, cancellation rejected before a fact, and an
+actual server reply withheld as unknown. `pipefail`, explicit SKIP rejection
+and the parent/three child PASS markers prevent zero-test or partial abort
+execution from passing. Missing mandatory Mongo prerequisites fail.
+
+At local source `63bcd7b4b021d11f3b0ceddc13552633019d7fee`, the actual owned
+loopback fixture passed the metadata test, all three abort scenarios and the
+fixture URI whitelist: six PASS actions including parents, with no failure or
+skip. Source `c4c7a9ed433f05bcc2411f4205f198edb7f02cd4` adds only the parent
+budget repair to that code and passed the combined five-package race check
+with 1,607 PASS actions (445 parents, 1,162 subcases), zero failures and one
+unexecuted Linux-root opt-in (`TestMaintenanceWindowActualLinuxRootLease`),
+plus vet, 38 window-tool Python tests and Action syntax checks. The local native
+results remain bound to `63bcd7`; they are not rerun or relabeled as `c4c7`.
+These checks prove neither CI's separate `127.0.0.1:27017/rs0` execution nor a
+production/full Window/Archive/Pair run, final acceptance or recovery duration.
+
+The cleanup kernel retains exact registered file/container/volume ownership
+and requires actual acceptance plus complete material catalogs and zero-leftover
+observations. Complete writer/old-ref fencing, full runtime acceptance, remote-material
+registration and production execution remain unfinished. The lifecycle effects
+preflight continues to reject until those real adapters are verified.
+
 ## Lifecycle preparation and typed Mongo scan diagnostics (2026-10-09)
 
 The lifecycle source connects the existing Action, Python caller and native
@@ -428,6 +584,33 @@ The source-only entrypoint catalog retains `live_fence_proven=false` and
 backup/restore rehearsal, deletion, B deployment, acceptance and purge still
 require their own evidence.
 
+## Source-only A/B preparation integration (2026-10-10)
+
+The current source combination retains the existing `prepare-facts` observer,
+its ten inputs and the separate history-parent channel without database, Go,
+architecture or binary environment. The optional `prepare_mode=window-tool`
+uses those same ten inputs only with `operation=prepare`. Its compact approval
+must bind `tool_source_sha` to the actual approved dispatcher SHA and keep
+`b_image_id` and `b_program_sha256` empty. A different tool source and all four
+effectful stages are rejected before tool metadata or production credentials.
+`inventory_request_sha256` binds the immutable empty-run lifecycle template;
+the helper derives only the assigned actual run, hashes template and derived
+request separately, records exclusive root intents, preserves the original
+producer/manifest/source UID and seven source assets, and retains failures.
+The read-only facts observer itself does not authorize that separate template.
+
+The B inline API, original A/D connection, Window, issuer, partial Stop lease
+and strict unknown-result recovery remain source-only implementations. The
+root key-file exchange primitive is neither a whole-writer fence nor an sshd
+configuration/loaded-state proof. The 26-path original prerequisite snapshot
+is inherited draft source, not a newly approved or production-tested baseline.
+This combination has no new Linux-root/current-SSH/native restore evidence.
+Full writer and old-ref fencing, final historical Q/EOF, controlled execution
+and B deployment within the same retirement run, runtime/data acceptance and
+exact material purge remain required unfinished adapters. Their effects
+preflight continues to reject; the prepare-only Action does not replace the
+final controlled deletion Action or its production lock and recovery duties.
+
 ## Current writer and diagnostic source (2026-10-09)
 
 Source `23bacb7d4a05bd711e353655eca85219514edb49` connects
@@ -623,10 +806,14 @@ original AI commands, historical backfill, four-object DROP, B deployment, accep
   regular file and preserve the existing owner, mode and size checks. A FIFO
   without a writer is rejected before reading. This protects file acquisition;
   it does not bound regular-file I/O or prove the combined 10-minute recovery.
-- The native Go window stops forward work at 20 minutes and bounds the whole
-  window at 30 minutes. Preparation still validates those limits. Neither check
-  proves recovery time: entry requires an actual, independently verified
-  recovery of all four targets and runtime readiness within 10 minutes.
+- The original CLI parent must have a real deadline with at least 30 minutes
+  remaining immediately before opening a fresh apply window and again just
+  after it opens, before any service-management channel or Stop. Preparation
+  time cannot consume the fixed window; no renewed parent/child deadline extends
+  that budget. Forward work still stops at 20 minutes, recovery remains bounded
+  by the original 30-minute window and its 10-minute recovery allowance, and the
+  isolated restore budget remains 600 seconds. These checks alone do not prove
+  readiness: actual restoration and rollback duration must still be measured.
 
 The read-only modes of `cmd/qs-compatibility-history` implement a host for the
 actual inventory outputs; the explicit evidence-write mode is described above. It binds the compiled source, operation/run, approved
@@ -1208,7 +1395,10 @@ coverage; both live Python and Go entrypoints reject V1 before connecting.
 V2 retains the exact scope, separately approved source/operation, identity hashes
 and expected clean heads. Its immutable per-target profile is
 `query_seconds=30`, `total_seconds=1500`, `max_records=1000000`,
-`max_bytes=2147483648`, `page_size=1000`, `max_pages=1001`.
+`max_bytes=2147483648`, `page_size=10000`, `max_pages=1001`.
+The fixed read-only inventory container uses 2 CPUs and 512 MiB of memory;
+these are implementation bounds, with no caller override. The larger CPU budget
+does not establish production throughput or a ten-minute completion guarantee.
 The source-byte total and the actual encoded private source file each have the
 2 GiB bound; framing/base64 overhead cannot bypass the on-disk bound. Exceeding
 any record, byte, page or deadline cap remains incomplete and denies readiness.
@@ -1347,3 +1537,166 @@ stage/source/request checks. Required fields and unknown keys still fail before
 production credentials. The contract test executes the actual github-script
 validator for omitted empty defaults, complete inputs, unknown/mixed requests,
 missing requirements, wrong ref/runtime SHA and an advanced main.
+
+
+## B integration and local cross-process recovery (2026-10-09)
+
+The B product scope is implemented at saved branch source
+`3bcf8125f4fc3002fff73d2c42db4e7fcee55fff` and integrated onto A
+`f5aafcc97626bd8894256edacc68ce4ce1e69c42` at
+`5db561a71fa1b19edc5ad9099978000a9338c02b`. The integration preserves the exact
+36 A-changed paths, 33 B-changed paths and 276 historical migration files. It adds
+only SQL100/Mongo39 tail resources; their original B bytes are retained. The
+main branch and production schema are not changed by this local integration.
+
+Before either normal migration, B jointly observes the two selected database
+identities, clean heads, visibility and all four retired namespaces. Installed
+stores must already have all four targets absent. Partial/all unknown state,
+wrong identity, permission/network failure and reappearing old targets reject
+startup. The local Mongo driver handles only the exact bound B tail drop; it
+does not convert general errors into absence or rebuild old collections.
+Cold bootstrap is separately restricted to externally approved pristine stores,
+actual compiled SHA, identity pair, resource bytes and approval expiry.
+
+`Capture` computes `sql_recovery_non_target_schema_hash` from the actual approved
+SQL metadata and selected database, sealing the recovery projection inside the
+opaque immutable archive. Target-owned foreign keys make the inventory's
+non-target hash a different projection; that inventory contract is unchanged.
+B requires the captured same-projection hash and the current actual catalog.
+Missing older archive fields, malformed/tampered captured hashes or substituted
+caller hashes fail B recovery. Production preparation therefore needs a newly
+captured and actually restored batch archive before DROP.
+
+The saved `3bcf8125` binary executed two actual Linux root parents:
+`TestTargetBCompleteCrossProcessNative` and
+`TestTargetBSQLOnlyCrossProcessNative`. Both passed with no failures or skips;
+they actually dropped the targets, ran B migration and waited for a separate
+recovery process. Root wave receipt SHA256 is
+`391e3e7f4900c9f8ed35872a5a78416ac35fe259945f8f1e7c9aefd35f1d053f`;
+independent after receipt SHA256 is
+`d9519d745af94f736f3a9bd6452c8e180baad0abb363fcc4c5180f7c4b059bf7`.
+The after observation compares catalog and bounded non-system content, confirms
+protected baselines unchanged and zero owned SQL/Mongo namespaces and owner lab.
+Mongo used the actual no-auth state of the two fixed owned fixtures; this is not
+SCRAM coverage. The old failed V6 wave remains failed and is not overwritten.
+
+The integrated `5db561a7` source has 147 backup, 71 default-tag migration and
+46 options passing ordinary test actions; six explicit native opt-in cases are
+skipped, and affected-package lint passes. Initial misuse of the integration tag
+also loaded mandatory Mongo migration cases without an isolated URI; the original
+failure log is retained and only the default-tag ordinary migration scope was
+rerun. Local delivery receipt SHA256 is
+`344eabe52f50c8e92b8480c4dbdd1482e0aa2785afb3206a87cfc66dc354fb2a`.
+Its Linux/amd64 binary is only compiled, SHA256
+`bbf103d928c0c2675cdf240a7354059d2741431604cc0cd5478a79875a32d639`,
+with source manifest SHA256
+`55743efb99f9472d491522a3bb95d7d77d0b71d35c93bed6a4cd057a8b371cb1`.
+The two-parent PASS is not reassigned from `3bcf8125` to this integration or later
+heads; final-head native execution and CI remain separate.
+
+These are bounded synthetic owned-fixture results. They do not establish
+production full-source closure, writer fencing, historical CAS, production-scale
+600-second restoration, B deployment, controlled DROP, acceptance or batch-only
+purge. Production mutation modes retain their gates.
+
+
+### A99 historical fixture follow-up (2026-10-09)
+
+The final B binary at `b617cade837bd3a77bb9797b2c88db99aaa2ef17`
+subsequently passed the same two actual cross-process parents, with zero failures
+or skips. Root wave receipt SHA256 is
+`ee25a8dc994dd9cc2ac5d04876a205982169143aea64deff825847436e235078`;
+independent unchanged/zero after receipt SHA256 is
+`6295982dd0faa74f77c5c0e3d286656728e8ee1b820968a5327301b9abb0f795`.
+These observations retain their exact b617 source and owned-fixture scope.
+
+The b617 Seeddata E2E CI run failed while initializing retained historical
+SQL fixtures: they expected A99 but requested latest, correctly hitting B's
+paired-preflight requirement before business assertions. Test-only commit
+`be2b74d080dfc06eb8b574f114c5e75554e56fd0` uses the complete real migration
+resources with an explicit `Migrate(99)` fixture boundary, checks 98-to-99 where
+required, and verifies a clean 99 head plus no change on the second run. Its
+fixture-owned connection and source are checked and closed when initialization
+returns, leaving the borrowed pool available for actual evidence transactions.
+The B product startup guards, paired migrations and all 276 historical migration
+files are unchanged.
+
+At that test-only source, ordinary tests pass 904 actions with zero failures and
+two existing database-conditional skips. Both affected integration-tag test
+binaries compile, and affected integration-tag lint passes. The ordinary/compile
+receipt SHA256 is
+`848017b314d239ac24659773d814795bceeb211f4883533228078eb311ad8630`;
+lint receipt SHA256 is
+`5cd9d28069d3d1a4c609a23a4deeaacb369fb0c52ad9aa71a737167c8f9b8435`.
+The integration binaries were not executed and no database operation was run for
+this fixture repair. Real-database CI E2E remains required. The b617 native PASS
+is not reassigned to be2 or a later documentation-only head. None of these local
+results establish production deletion, deployment, restoration budget or purge.
+
+### Pristine current-runtime fixture follow-up (2026-10-09)
+
+The `89bf28af9d50ac32b28359a00ff57c6676a1638e` CI run
+`37936257412` is terminal: 18 successful checks, one current-runtime closure
+failure and two skipped checks. The historical A99 persistence steps pass.
+The current-runtime fixture still requested latest migrations independently,
+so B correctly refused it before the empty-pair business assertions.
+
+Test/build-only commit `ff05fbecba16842547da13ff73f60bb3deb19c6f` changes two integration test files, the
+existing CI command and three existing proof runners. It observes both newly
+allocated empty test databases and their actual identities, writes a private
+single-use cold-bootstrap authorization, and uses the public live Pair for
+MySQL100/Mongo39. A fresh installed Pair verifies the second migration run.
+The compiled `pkg/version.GitCommit` comes from each runner's actual checkout;
+no fallback source flag or production guard bypass is introduced.
+
+Both installed-source tag combinations compile. At the committed source, the
+pure no-database identity test reads the actual linked commit, passes a matching
+expectation and rejects a deliberately wrong SHA. Receipt SHA256 is
+`9333c85da9ab8ce83b9b674c95287ac6e4c3a32fb874605dac98ce65956afae3`.
+New-diff lint against 89bf and repository-config depguard pass. Full-package
+integration lint still reports 14 pre-existing diagnostics; it is not reported
+as passed. All product source, 276 historical migrations and four B tail files
+remain unchanged from 89bf. Final-commit CI and genuine empty-pair runtime
+execution remain pending. The prior b617 native evidence keeps its original
+source and scope; this repair does not establish database/native or production
+retirement acceptance.
+
+
+### B current-runtime absent-namespace follow-up (2026-10-09)
+
+The `4cc76b5499b1448410d4a7656d29a814c02e7468` PR checks are terminal:
+18 succeeded, one failed and two skipped. CI `37939857087` passed its historical
+persistence steps 6–13. Its current-runtime test actually completed the pristine
+MySQL100/Mongo39 upgrade and both repeated-start checks, then failed because a
+test assertion still selected the retired SQL `domain_event_outbox` (MySQL 1146).
+The original job log SHA256 is
+`319b77a8d5e28ffc6629a69bfc478d4718b986b2d38faa2f61a228f80b0aa0f4`.
+This establishes those initial migration checks only; the complete business
+closure failed and the two later recovery steps did not execute.
+
+Source `894804a98ce73a179ad57946db52739195969d26` merges the approved A main
+`ca1319ede3fcca3f0713421f896c781a73930667` and changes one existing runtime test
+file. Standard event counts read `rm_outbox`. Exact SQL metadata checks require
+all three retired table names to be absent; Mongo `ListCollections` requires the
+retired collection to be absent. These checks run after the genuine upgrade and
+restart, and again after the full business flow. Metadata or cursor errors fail
+the test. No missing-table error is converted to a zero count. The public paired
+preflight and single-use pristine authorization are unchanged; no A99 fallback
+or mixed historical fixture was added.
+
+All B product guards and four tail migration files remain byte-identical to
+4cc. The 276 preserved historical artifacts consist of 275 numbered migration
+files and one README. Two runtime tag combinations compile and new-diff lint
+passes on the installed merged source; receipt SHA256 is
+`8e3e91fd548d53909f26a740c76c9025c33daf310157752066423d2a3196e41a`.
+The nine CI retirement Python suites run 231 cases successfully with one
+existing native opt-in skip; receipt SHA256 is
+`4e39c8234d0a5c507d95e0d2141f3b33cf300a42e698e0ae0ba3e5f59cb6d10f`.
+The committed-source identity test links and checks the actual 894 source,
+accepts the matching SHA and rejects the wrong SHA without database execution;
+receipt SHA256 is
+`79f5626bb620e1c191d9d4cfecaacae76825d44120213f88d7c38e3ec784bd84`.
+The original b617 native results retain their source and scope. Final-source CI,
+full B business/recovery execution and production retirement acceptance remain
+pending. Production is still at clean MySQL99/Mongo38; no production historical
+CAS, four-target backup/restore rehearsal, DROP, B deployment or purge has run.

@@ -29,7 +29,6 @@ import (
 	eventoutcome "github.com/FangcunMount/qs-server/internal/pkg/eventing/outcome"
 	eventpayload "github.com/FangcunMount/qs-server/internal/pkg/eventing/payload"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
-	"github.com/FangcunMount/qs-server/internal/pkg/migration"
 	"github.com/FangcunMount/qs-server/internal/pkg/mongodbtest"
 	domainwire "github.com/FangcunMount/reliable-messaging/wire/domain"
 	drivermysql "github.com/go-sql-driver/mysql"
@@ -443,9 +442,7 @@ func mongoLocalSQLFixture(t *testing.T) *gorm.DB {
 			t.Error(err)
 		}
 	})
-	if version, _, err := migration.NewMigrator(pool, &migration.Config{Enabled: true, Database: name}).Run(); err != nil || version != 99 {
-		t.Fatal("actual A2 migration99", err)
-	}
+	migrateHistoricalA99Fixture(t, pool, name)
 	at := mongoLocalSheet().FilledAt
 	if err = db.Exec("INSERT INTO assessment(id,org_id,testee_id,questionnaire_code,questionnaire_version,answer_sheet_id,origin_type,status,evaluation_model_kind,evaluation_model_algorithm,evaluation_model_code,evaluation_model_version,created_at,updated_at,submitted_at,evaluated_at,version) VALUES(42,7,21,'Q','1.0',10042,'adhoc','evaluated','scale',?,'M','1.0',?,?,?,?,1)", string(modelcatalog.AlgorithmScaleDefault), at, at, at, at).Error; err != nil {
 		t.Fatal(err)

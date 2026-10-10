@@ -13,28 +13,40 @@ import (
 	"time"
 
 	backup "github.com/FangcunMount/qs-server/internal/apiserver/maintenance/compatibilityretirementbackup"
+	fence "github.com/FangcunMount/qs-server/internal/apiserver/maintenance/compatibilityretirementfence"
+	"github.com/FangcunMount/qs-server/internal/pkg/migration"
 )
 
 // This descriptor supplies expected bindings only. A physical archive, root
 // Window, actual isolated restore, writer lease and original native journal
 // are produced or inspected separately; no imported completion flag is used.
 type lifecycleRequest struct {
-	FormatVersion     int                          `json:"format_version"`
-	Kind              string                       `json:"kind"`
-	ToolSourceSHA     string                       `json:"tool_source_sha"`
-	OriginalSourceSHA string                       `json:"original_source_sha"`
-	OperationID       string                       `json:"operation_id"`
-	ActualRunID       string                       `json:"actual_run_id"`
-	ManifestSHA256    string                       `json:"manifest_sha256"`
-	ArchiveDirectory  string                       `json:"archive_directory"`
-	SourceDirectory   string                       `json:"source_directory,omitempty"`
-	WindowDirectory   string                       `json:"window_directory"`
-	JournalDirectory  string                       `json:"journal_directory"`
-	Approval          backup.Approval              `json:"archive_approval"`
-	Recovery          backup.TargetRecoveryRequest `json:"recovery"`
-	RestoreEngines    *lifecycleRestoreEngines     `json:"restore_engines,omitempty"`
-	SourceFileSHA256  map[string]string            `json:"source_file_sha256,omitempty"`
-	prepareRoot       string                       `json:"-"`
+	FormatVersion          int                                  `json:"format_version"`
+	Kind                   string                               `json:"kind"`
+	ToolSourceSHA          string                               `json:"tool_source_sha"`
+	OriginalSourceSHA      string                               `json:"original_source_sha"`
+	OperationID            string                               `json:"operation_id"`
+	ActualRunID            string                               `json:"actual_run_id"`
+	ManifestSHA256         string                               `json:"manifest_sha256"`
+	ArchiveDirectory       string                               `json:"archive_directory"`
+	SourceDirectory        string                               `json:"source_directory,omitempty"`
+	WindowDirectory        string                               `json:"window_directory"`
+	JournalDirectory       string                               `json:"journal_directory"`
+	Approval               backup.Approval                      `json:"archive_approval"`
+	Recovery               backup.TargetRecoveryRequest         `json:"recovery"`
+	Resume                 *backup.TargetBRecoveryResumeRequest `json:"resume,omitempty"`
+	ResumeKind             string                               `json:"resume_kind,omitempty"`
+	RestoreEngines         *lifecycleRestoreEngines             `json:"restore_engines,omitempty"`
+	SourceFileSHA256       map[string]string                    `json:"source_file_sha256,omitempty"`
+	SourceCopyIntent       *lifecycleFinalFileBinding           `json:"source_copy_intent,omitempty"`
+	PreparationRestoreZero *lifecycleFinalFileBinding           `json:"preparation_restore_zero,omitempty"`
+	HistoricalWriteReport  *lifecycleFinalFileBinding           `json:"historical_write_report,omitempty"`
+	ServiceControl         *lifecycleServiceControl             `json:"service_control,omitempty"`
+	DeploymentControl      *lifecycleAPIDeploymentControl       `json:"deployment_control,omitempty"`
+	FinalHistory           *lifecycleFinalHistoryInput          `json:"final_history,omitempty"`
+	WriterControl          *lifecycleWriterControl              `json:"writer_control,omitempty"`
+	requestSHA256          string                               `json:"-"`
+	prepareRoot            string                               `json:"-"`
 }
 
 type lifecycleFrozenManifest struct {
@@ -97,6 +109,8 @@ type lifecycleReceipt struct {
 	RecoveryComplete               bool     `json:"recovery_complete"`
 	AcceptanceComplete             bool     `json:"acceptance_complete"`
 	PurgeComplete                  bool     `json:"purge_complete"`
+	SourceCopyIntentSHA256         string   `json:"source_copy_intent_sha256,omitempty"`
+	PreparationRestoreZeroSHA256   string   `json:"preparation_restore_zero_sha256,omitempty"`
 	ErrorCategory                  string   `json:"error_category"`
 	RecoveryErrorCategory          string   `json:"recovery_error_category,omitempty"`
 	RequiredAdapters               []string `json:"required_adapters"`
@@ -114,8 +128,38 @@ type lifecyclePreparation struct {
 	combinedElapsedMillis int64
 }
 
-// A preparation has no installed apply/verify/recover/purge adapter. The B
-// effectful caller remains in its independently frozen candidate.
+type lifecycleHost interface {
+	Prepare(context.Context, lifecycleRequest, *backup.Archive) (*lifecyclePreparation, error)
+	OpenRecoveryHandles(context.Context, lifecycleRequest, *backup.Archive) (backup.TargetRecoveryBorrowed, error)
+	StopAndDrain(context.Context, lifecycleRequest, *fence.MaintenanceWindow) error
+	OpenServiceManagement(context.Context, lifecycleRequest, *fence.MaintenanceWindow) error
+	// Before any target DDL plan exists, recover original service/admission
+	// actions issued by this host; no target-data restore or runtime deployment.
+	RestoreStoppedServices(context.Context, lifecycleRequest, *fence.MaintenanceWindow) error
+	// Before Stop, observe the original management channel and actual platform
+	// quarantine only. This grants neither database admission nor DDL authority.
+	CheckWriterPreconditions(context.Context, lifecycleRequest) error
+	CheckWholeWriterFence(context.Context, lifecycleRequest) error
+	FinalDifferenceAndEOF(context.Context, lifecycleRequest, *backup.Archive) error
+	DeployBInline(context.Context, lifecycleRequest, *migration.CompatibilityPairMigrationProof, *fence.MaintenanceWindow) error
+	VerifyAcceptance(context.Context, lifecycleRequest, *backup.Archive) error
+	BindAcceptancePlan(context.Context, lifecycleRequest, *backup.Archive, *backup.TargetRecoveryPlan) error
+	CheckActualDDLStopped(context.Context, lifecycleRequest) error
+	DeployRollbackInline(context.Context, lifecycleRequest, *lifecycleRecoveryReadback, *fence.MaintenanceWindow) error
+	// PurgeTemporaryCopies includes isolated restore copies, full-source/CAS
+	// spools and all original bodies registered to this batch. Receipts retain
+	// only identity/digests/findings. Ordinary backups/old archives are excluded.
+	PurgeTemporaryCopies(context.Context, lifecycleRequest) error
+	VerifyTemporaryMaterialsZero(context.Context, lifecycleRequest) error
+	// Successful B handoff uses ForwardContext and actual approved B identity;
+	// it keeps B API while resuming original Collection/Worker/settings.
+	ResumeAcceptedEntrypoints(context.Context, lifecycleRequest) error
+	// Recovery restores only the approved rollback runtime under the original
+	// RecoveryContext. It must not take the cancelled forward ctx as its parent.
+	RestoreRollbackEntrypoints(context.Context, lifecycleRequest, *fence.MaintenanceWindow) error
+	Close() error
+}
+
 func lifecycleCategory(err error) string {
 	if err == nil {
 		return "none"
@@ -131,8 +175,31 @@ func lifecycleCategory(err error) string {
 	return "lifecycle_native_operation_failed"
 }
 
+// Preparation runs under the original CLI parent. A fresh maintenance window
+// must retain its full 30-minute budget in that same parent; a child context or
+// a renewed deadline cannot extend it. Check again after creating the immutable
+// start, before opening any service-management channel or issuing a stop.
+func lifecycleRequireParentWindowBudget(ctx context.Context) error {
+	if ctx == nil || ctx.Err() != nil {
+		return lifecycleError("lifecycle_parent_window_budget_rejected")
+	}
+	deadline, ok := ctx.Deadline()
+	if !ok || time.Until(deadline) < 30*time.Minute || ctx.Err() != nil {
+		return lifecycleError("lifecycle_parent_window_budget_rejected")
+	}
+	return nil
+}
+
 func readLifecyclePrivate(path, expected string, dst any) error {
-	if !hashRE.MatchString(expected) || privateDir(filepath.Dir(path)) != nil {
+	return readLifecyclePrivateLimit(path, expected, dst, 256<<10)
+}
+
+func readLifecyclePrivateLimit(path, expected string, dst any, maximum int64) error {
+	return readLifecyclePrivateAs(path, expected, dst, maximum, uint32(os.Getuid()))
+}
+
+func readLifecyclePrivateAs(path, expected string, dst any, maximum int64, owner uint32) error {
+	if !hashRE.MatchString(expected) || lifecycleSourcePrivateDirectory(filepath.Dir(path), owner) != nil {
 		return lifecycleError("lifecycle_private_input_rejected")
 	}
 	f, err := os.OpenFile(path, os.O_RDONLY|syscall.O_NOFOLLOW|syscall.O_NONBLOCK, 0)
@@ -140,13 +207,15 @@ func readLifecyclePrivate(path, expected string, dst any) error {
 		return lifecycleError("lifecycle_private_input_rejected")
 	}
 	st, statErr := f.Stat()
-	if statErr != nil || st == nil || !st.Mode().IsRegular() || st.Mode().Perm() != 0600 || st.Size() > 256<<10 || st.Sys().(*syscall.Stat_t).Uid != uint32(os.Getuid()) || st.Sys().(*syscall.Stat_t).Nlink != 1 {
+	if statErr != nil || st == nil || !st.Mode().IsRegular() || st.Mode().Perm() != 0600 || st.Size() < 0 || st.Size() > maximum || st.Sys().(*syscall.Stat_t).Uid != owner || st.Sys().(*syscall.Stat_t).Nlink != 1 {
 		_ = f.Close()
 		return lifecycleError("lifecycle_private_input_rejected")
 	}
-	raw, readErr := io.ReadAll(io.LimitReader(f, (256<<10)+1))
+	raw, readErr := io.ReadAll(io.LimitReader(f, maximum+1))
+	after, afterErr := f.Stat()
+	named, namedErr := os.Lstat(path)
 	closeErr := f.Close()
-	if readErr != nil || closeErr != nil || len(raw) > 256<<10 || digestRaw(raw) != expected || rejectDuplicateJSON(raw) != nil {
+	if readErr != nil || closeErr != nil || afterErr != nil || namedErr != nil || !lifecycleFinalFileSame(st, after) || !lifecycleFinalFileSame(st, named) || int64(len(raw)) > maximum || digestRaw(raw) != expected || rejectDuplicateJSON(raw) != nil {
 		return lifecycleError("lifecycle_private_input_rejected")
 	}
 	d := json.NewDecoder(strings.NewReader(string(raw)))
@@ -242,20 +311,40 @@ func loadLifecycleRequest(ctx context.Context, path, expected, operation, actual
 	recovery := r.Recovery
 	stagedRoot := lifecycleRootBatch(operation, actualRun)
 	staged := root == stagedRoot && stage == "prepare" && r.Recovery.ArchiveSHA256 == "" && r.RestoreEngines.valid()
-	if !staged || r.FormatVersion != 1 || r.Kind != "compatibility_retirement_lifecycle_request" ||
+	invocationRoot := lifecycleInvocationBatch(operation, actualRun)
+	if (stage == "prepare" && !staged || stage != "prepare" && root != wantRoot && root != invocationRoot) || r.FormatVersion != 1 || r.Kind != "compatibility_retirement_lifecycle_request" ||
 		r.ToolSourceSHA != sourceSHA || !shaRE.MatchString(r.OriginalSourceSHA) || r.OperationID != operation || r.ActualRunID != actualRun ||
 		!hashRE.MatchString(r.ManifestSHA256) || r.Approval.SourceSHA != r.OriginalSourceSHA || r.Approval.OperationID != operation ||
 		recovery.SourceSHA != r.OriginalSourceSHA || recovery.OperationID != operation || recovery.OriginalRunID != r.Approval.RunID ||
+		actualRun == r.Approval.RunID || actualRun == recovery.OriginalRunID ||
 		recovery.ManifestSHA256 != r.ManifestSHA256 || (recovery.ArchiveSHA256 != "" && !hashRE.MatchString(recovery.ArchiveSHA256)) ||
 		(recovery.SQLNonTargetSHA256 != "" && !hashRE.MatchString(recovery.SQLNonTargetSHA256)) || !hashRE.MatchString(recovery.MongoNonTargetSHA256) ||
 		recovery.SQLHead != 99 || recovery.MongoHead != 38 || !runRE.MatchString(recovery.ActualRunID) {
 		return r, nil, lifecycleError("lifecycle_binding_rejected")
 	}
+	if stage != "prepare" && !r.WriterControl.valid() {
+		return r, nil, lifecycleError("lifecycle_writer_scope_binding_rejected")
+	}
+	if stage != "prepare" && !r.DeploymentControl.valid() {
+		return r, nil, lifecycleError("lifecycle_actual_inline_image_approval_missing")
+	}
+	if r.FinalHistory != nil && (stage == "prepare" || !r.FinalHistory.valid(r)) {
+		return r, nil, lifecycleError("lifecycle_final_historical_input_rejected")
+	}
+	if r.SourceCopyIntent != nil && (stage == "prepare" || !lifecycleSourceCopyReferenceValid(r)) {
+		return r, nil, lifecycleError("lifecycle_staging_original_intent_rejected")
+	}
+	if r.PreparationRestoreZero != nil && (stage == "prepare" || !lifecyclePreparationRestoreReferenceValid(r)) {
+		return r, nil, lifecycleError("lifecycle_preparation_release_receipt_rejected")
+	}
+	if r.HistoricalWriteReport != nil && (stage == "prepare" || !lifecycleHistoricalWriteReferenceValid(r)) {
+		return r, nil, lifecycleError("lifecycle_history_original_material_rejected")
+	}
 	if stage == "prepare" && !r.RestoreEngines.valid() {
 		return r, nil, lifecycleError("lifecycle_restore_engine_approval_missing")
 	}
 	capture := recovery.ArchiveSHA256 == ""
-	if capture && (stage != "prepare" || r.SourceDirectory != filepath.Join(wantRoot, "inventory-"+r.Approval.RunID)) || !capture && (r.SourceDirectory != "" || !hashRE.MatchString(recovery.SQLNonTargetSHA256)) {
+	if capture && (stage != "prepare" || r.SourceDirectory != filepath.Join(wantRoot, "inventory-"+r.Approval.RunID) || r.Resume != nil) || !capture && (r.SourceDirectory != "" || !hashRE.MatchString(recovery.SQLNonTargetSHA256)) {
 		return r, nil, lifecycleError("lifecycle_capture_binding_rejected")
 	}
 	paths := []string{r.ArchiveDirectory, r.WindowDirectory, r.JournalDirectory}
@@ -272,8 +361,15 @@ func loadLifecycleRequest(ctx context.Context, path, expected, operation, actual
 			}
 		}
 	}
-	if recovery.ActualRunID != actualRun {
-		return r, nil, lifecycleError("lifecycle_binding_rejected")
+	if r.Resume == nil {
+		if r.ResumeKind != "" || recovery.ActualRunID != actualRun {
+			return r, nil, lifecycleError("lifecycle_binding_rejected")
+		}
+	} else if (r.ResumeKind != "original" && r.ResumeKind != "b_complete" && r.ResumeKind != "b_sql_only") ||
+		r.Resume.Recovery.Original != recovery || r.Resume.Recovery.CurrentRunID != actualRun ||
+		!hashRE.MatchString(r.Resume.Recovery.JournalSHA256) || !hashRE.MatchString(r.Resume.Recovery.WindowStartSHA256) ||
+		(r.ResumeKind != "original" && (r.Resume.ApprovedBSourceSHA != sourceSHA || !hashRE.MatchString(r.Resume.MigrationIntentSHA256) || !hashRE.MatchString(r.Resume.MigrationResultSHA256))) {
+		return r, nil, lifecycleError("lifecycle_resume_binding_rejected")
 	}
 	var manifest lifecycleFrozenManifest
 	if err := readLifecyclePrivate(filepath.Join(root, "manifest.json"), r.ManifestSHA256, &manifest); err != nil {
@@ -303,14 +399,17 @@ func loadLifecycleRequest(ctx context.Context, path, expected, operation, actual
 		expectedObjects[i] = backup.HostObjectBinding{Database: object.Database, Name: object.Name, Kind: object.Kind, IdentityHash: object.IdentityHash, SchemaHash: object.SchemaHash, DataHash: object.DataHash, Records: object.Records}
 	}
 	r.prepareRoot = root
+	r.requestSHA256 = expected
 	if staged {
 		translate := func(p string) string { rel, _ := filepath.Rel(wantRoot, p); return filepath.Join(root, rel) }
 		// Preserve the exact approved archive/recovery paths. Only immutable
 		// input bytes move into the root-owned once staging tree.
 		r.SourceDirectory = translate(r.SourceDirectory)
 	}
-	if err := verifyLifecycleRestoreImages(ctx, r.RestoreEngines); err != nil {
-		return r, nil, err
+	if stage == "prepare" {
+		if err := verifyLifecycleRestoreImages(ctx, r.RestoreEngines); err != nil {
+			return r, nil, err
+		}
 	}
 	var a *backup.Archive
 	var err error
@@ -367,20 +466,64 @@ func lifecyclePreparationMatches(a *backup.Archive, p *lifecyclePreparation) boo
 		sqlProof.ElapsedMillis >= 0 && mongoProof.ElapsedMillis >= 0 && sqlProof.ElapsedMillis <= backup.MaxRestoreSeconds*1000 && mongoProof.ElapsedMillis <= backup.MaxRestoreSeconds*1000
 }
 
+func lifecycleWindowBinding(r lifecycleRequest) fence.WindowBinding {
+	return fence.WindowBinding{TargetSHA256: fence.MaintenanceWindowTargetSHA256(), SourceSHA: r.OriginalSourceSHA,
+		OperationID: r.OperationID, ManifestSHA256: r.ManifestSHA256, OriginalRunID: r.Recovery.OriginalRunID}
+}
+
+func lifecycleRecover(ctx context.Context, r lifecycleRequest, a *backup.Archive, p *lifecyclePreparation, w *fence.MaintenanceWindow, host lifecycleHost) error {
+	if r.Resume == nil {
+		return lifecycleError("lifecycle_resume_material_missing")
+	}
+	q, cancel, err := w.RecoveryContext(ctx)
+	if err != nil {
+		return err
+	}
+	defer cancel()
+	if err = host.CheckWholeWriterFence(q, r); err != nil {
+		return err
+	}
+	// Context cancellation alone never proves a remote DDL/driver stopped.
+	if err = host.CheckActualDDLStopped(q, r); err != nil {
+		return err
+	}
+	var reconciliation *backup.TargetRecoveryReconciliation
+	switch r.ResumeKind {
+	case "original":
+		reconciliation, err = backup.ReconcileTargetRecovery(q, a, p.Borrowed, r.Resume.Recovery, r.JournalDirectory, w)
+	case "b_complete":
+		reconciliation, err = backup.ReconcileTargetBRecovery(q, a, p.Borrowed, *r.Resume, r.JournalDirectory, w)
+	case "b_sql_only":
+		reconciliation, err = backup.ReconcileTargetBSQLOnlyRecovery(q, a, p.Borrowed, *r.Resume, r.JournalDirectory, w)
+	default:
+		return lifecycleError("lifecycle_resume_binding_rejected")
+	}
+	if err != nil {
+		return err
+	}
+	recovered, err := backup.ResumeTargetRecovery(q, reconciliation, p.Borrowed, w)
+	if err != nil {
+		return err
+	}
+	if err = host.DeployRollbackInline(q, r, &lifecycleRecoveryReadback{resumed: recovered}, w); err != nil {
+		return err
+	}
+	return host.RestoreRollbackEntrypoints(q, r, w)
+}
+
 func runLifecycleCLI(ctx context.Context, mode, requestPath, requestHash, operation, actualRun string) (receipt lifecycleReceipt, result error) {
 	stage := strings.TrimPrefix(mode, "lifecycle-")
 	receipt = lifecycleReceipt{FormatVersion: 1, Kind: "compatibility_retirement_lifecycle_result", Operation: stage, SourceSHA: sourceSHA,
 		OperationID: operation, RunID: actualRun, RequestSHA256: requestHash, TargetHash: digest(targets), TargetCount: 4,
 		RequiredAdapters: []string{"actual_four_source_historical_persistence_and_readback", "actual_production_bound_isolated_restore", "server_a_and_server_d_stop_drain_lease", "whole_writer_and_old_ref_fence", "prepared_inline_b_and_no_automigration_rollback", "actual_runtime_acceptance_and_private_purge"}}
 	defer func() { receipt.ErrorCategory = lifecycleCategory(result) }()
-	if ctx == nil || ctx.Err() != nil {
+	if ctx == nil || ctx.Err() != nil || (stage != "prepare" && stage != "apply" && stage != "verify" && stage != "recover" && stage != "purge") {
 		return receipt, lifecycleError("lifecycle_operation_rejected")
 	}
 	if stage != "prepare" {
-		if stage == "apply" || stage == "verify" || stage == "recover" || stage == "purge" {
-			return receipt, lifecycleError("lifecycle_actual_host_adapters_missing")
+		if err := lifecycleEffectsPreflight(ctx); err != nil {
+			return receipt, err
 		}
-		return receipt, lifecycleError("lifecycle_operation_rejected")
 	}
 	r, archive, err := loadLifecycleRequest(ctx, requestPath, requestHash, operation, actualRun, stage)
 	receipt.OriginalSourceSHA, receipt.ManifestSHA256, receipt.ArchiveSHA256 = r.OriginalSourceSHA, r.ManifestSHA256, r.Recovery.ArchiveSHA256
@@ -389,21 +532,243 @@ func runLifecycleCLI(ctx context.Context, mode, requestPath, requestHash, operat
 	}
 	receipt.ArchiveBindingComplete = true
 	receipt.SQLRecoveryBaselineSHA256 = r.Recovery.SQLNonTargetSHA256
-	prepared, owner, err := prepareLifecycleNative(ctx, r, archive)
+	if stage == "prepare" {
+		prepared, owner, err := prepareLifecycleNative(ctx, r, archive)
+		if err != nil {
+			return receipt, err
+		}
+		if !lifecyclePreparationMatches(archive, prepared) {
+			_ = owner.Close()
+			return receipt, lifecycleError("lifecycle_actual_restore_proof_missing_or_budget_rejected")
+		}
+		intentPath := filepath.Join(r.prepareRoot, "source-copy.intent.private.json")
+		intentRaw, err := readLifecycleAPIRecord(intentPath)
+		if err != nil {
+			_ = owner.Close()
+			return receipt, err
+		}
+		// No success receipt until every actual handle, wire exec and final runtime
+		// inspection finishes under the unchanged original600-second deadline.
+		elapsed, zeroHash, err := owner.finishPreparationAndReleaseNative(r, archive)
+		if err != nil {
+			return receipt, err
+		}
+		receipt.RestoreElapsedMillis = elapsed
+		receipt.PreparationRestoreZeroSHA256 = zeroHash
+		receipt.SourceCopyIntentSHA256 = digestRaw(intentRaw)
+		receipt.IsolatedContentRestoreComplete, receipt.Complete = true, true
+		return receipt, nil
+	}
+
+	host, err := newLifecycleFixedHost(ctx, r, archive)
+	if err != nil || host == nil {
+		if err == nil {
+			err = lifecycleError("lifecycle_actual_host_adapters_missing")
+		}
+		return receipt, err
+	}
+	defer func() {
+		if err := host.Close(); result == nil && err != nil {
+			result = err
+			receipt.Complete = false
+		}
+	}()
+	var prepared *lifecyclePreparation
+	if stage == "prepare" || stage == "apply" {
+		prepared, err = host.Prepare(ctx, r, archive)
+		if err != nil {
+			return receipt, err
+		}
+		if !lifecyclePreparationMatches(archive, prepared) {
+			return receipt, lifecycleError("lifecycle_actual_restore_proof_missing_or_budget_rejected")
+		}
+	} else {
+		borrowed, openErr := host.OpenRecoveryHandles(ctx, r, archive)
+		if openErr != nil {
+			return receipt, openErr
+		}
+		if borrowed.SQL == nil || borrowed.Mongo == nil {
+			return receipt, lifecycleError("lifecycle_native_handles_missing")
+		}
+		prepared = &lifecyclePreparation{Borrowed: borrowed}
+	}
+	if stage == "prepare" {
+		receipt.Complete = true
+		return receipt, nil
+	}
+	var window *fence.MaintenanceWindow
+	if stage == "apply" {
+		if r.Resume != nil {
+			return receipt, lifecycleError("lifecycle_apply_cannot_resume_or_redrop")
+		}
+		if err = lifecycleRequireParentWindowBudget(ctx); err != nil {
+			return receipt, err
+		}
+		window, err = fence.StartMaintenanceWindow(ctx, r.WindowDirectory, lifecycleWindowBinding(r))
+	} else {
+		window, err = fence.OpenMaintenanceWindow(ctx, r.WindowDirectory, lifecycleWindowBinding(r))
+	}
 	if err != nil {
 		return receipt, err
 	}
-	if !lifecyclePreparationMatches(archive, prepared) {
-		_ = owner.Close()
-		return receipt, lifecycleError("lifecycle_actual_restore_proof_missing_or_budget_rejected")
+	defer func() {
+		if err := window.Close(); result == nil && err != nil {
+			result = err
+			receipt.Complete = false
+		}
+	}()
+	if stage == "apply" {
+		if err = lifecycleRequireParentWindowBudget(ctx); err != nil {
+			return receipt, err
+		}
 	}
-	// No success receipt until every actual handle, wire exec and final runtime
-	// inspection finishes under the unchanged original600-second deadline.
-	elapsed, err := owner.finishPreparation()
+	if stage == "recover" {
+		receipt.RecoveryAttempted = true
+		err = lifecycleRecover(ctx, r, archive, prepared, window, host)
+		receipt.RecoveryComplete, receipt.Complete = err == nil, err == nil
+		return receipt, err
+	}
+	forward, cancel, err := window.ForwardContext(ctx)
 	if err != nil {
 		return receipt, err
 	}
-	receipt.RestoreElapsedMillis = elapsed
-	receipt.IsolatedContentRestoreComplete, receipt.Complete = true, true
+	defer cancel()
+	// Establish and verify the actual D native stdio while the existing pinned
+	// SSH entrypoint remains available. Pre-stop checks observe the real platform
+	// quarantine and original management readiness. Database admission is held
+	// only after the original actors stop and their native lease is installed.
+	if err = host.OpenServiceManagement(forward, r, window); err != nil {
+		return receipt, err
+	}
+	if err = host.CheckWriterPreconditions(forward, r); err != nil {
+		return receipt, err
+	}
+	// Arm before Stop: a failed call can already have stopped one side. This
+	// original service/admission recovery covers Stop/check/drain/final-read/plan
+	// failures and borrows the parent, never the cancelled forward context.
+	serviceRecoveryPending := true
+	defer func() {
+		if !serviceRecoveryPending || result == nil || receipt.AcceptanceComplete {
+			return
+		}
+		receipt.RecoveryAttempted = true
+		q, c, recoveryErr := window.RecoveryContext(ctx)
+		if recoveryErr == nil {
+			defer c()
+			recoveryErr = host.RestoreStoppedServices(q, r, window)
+		}
+		receipt.RecoveryComplete = recoveryErr == nil
+		receipt.RecoveryErrorCategory = lifecycleCategory(recoveryErr)
+	}()
+	if err = host.StopAndDrain(forward, r, window); err != nil {
+		return receipt, err
+	}
+	// A successful stop/lease installation is not a whole-writer fence. Perform
+	// the complete fresh native check before final scans, plans or target DDL.
+	if err = host.CheckWholeWriterFence(forward, r); err != nil {
+		return receipt, err
+	}
+	if stage == "verify" || stage == "purge" {
+		// The host acceptance producer must inspect the original physical journal,
+		// four actual missing targets, schema heads/non-target facts and services.
+		// Absence or a saved receipt alone is insufficient in this new process.
+		if err = host.VerifyAcceptance(forward, r, archive); err != nil {
+			return receipt, err
+		}
+		receipt.AcceptanceComplete = true
+		if stage == "purge" {
+			if err = host.PurgeTemporaryCopies(forward, r); err != nil {
+				return receipt, err
+			}
+			if err = backup.PurgeRegistered(r.ArchiveDirectory, r.Approval); err != nil {
+				return receipt, err
+			}
+			if err = host.VerifyTemporaryMaterialsZero(forward, r); err != nil {
+				return receipt, err
+			}
+			receipt.PurgeComplete = true
+			if err = host.ResumeAcceptedEntrypoints(forward, r); err != nil {
+				return receipt, err
+			}
+		}
+		receipt.Complete = true
+		return receipt, nil
+	}
+	if err = host.FinalDifferenceAndEOF(forward, r, archive); err != nil {
+		return receipt, err
+	}
+	plan, err := backup.PrepareTargetRecovery(forward, archive, prepared.Borrowed, r.Recovery, r.JournalDirectory, window)
+	if err != nil {
+		return receipt, err
+	}
+	if err = host.BindAcceptancePlan(forward, r, archive, plan); err != nil {
+		return receipt, err
+	}
+	// Keep the process-bound native plan alive through DROP, migration, inline
+	// deploy and acceptance. If forward work fails, begin original-window
+	// recovery only after observing actual DDL completion; never down/force dirty.
+	defer func() {
+		if result == nil || receipt.AcceptanceComplete {
+			return
+		}
+		receipt.RecoveryAttempted = true
+		q, c, recoveryErr := window.RecoveryContext(ctx)
+		if recoveryErr == nil {
+			defer c()
+			if recoveryErr = host.CheckWholeWriterFence(q, r); recoveryErr == nil {
+				recoveryErr = host.CheckActualDDLStopped(q, r)
+			}
+			if recoveryErr == nil {
+				var recovered *backup.TargetRecoveryVerification
+				recovered, recoveryErr = backup.RecoverTargets(q, plan)
+				if recoveryErr == nil {
+					recoveryErr = host.DeployRollbackInline(q, r, &lifecycleRecoveryReadback{direct: recovered}, window)
+				}
+			}
+
+			if recoveryErr == nil {
+				recoveryErr = host.RestoreRollbackEntrypoints(q, r, window)
+			}
+		}
+		receipt.RecoveryComplete = recoveryErr == nil
+		receipt.RecoveryErrorCategory = lifecycleCategory(recoveryErr)
+	}()
+	// The complete target plan's existing DDL recovery now owns this failure.
+	// Never restore the same services a second time through the pre-DDL path.
+	serviceRecoveryPending = false
+	if _, err = backup.ApplyTargets(forward, plan); err != nil {
+		return receipt, err
+	}
+	migrated, err := backup.RunTargetBMigration(forward, plan, r.ToolSourceSHA)
+	if err != nil {
+		return receipt, err
+	}
+	// Deploy directly under this run's existing production-deploy lock. Calling
+	// another same-lock workflow and waiting for it would deadlock the window.
+	if err = host.DeployBInline(forward, r, migrated, window); err != nil {
+		return receipt, err
+	}
+	if _, err = backup.VerifyDroppedTargets(forward, plan); err != nil {
+		return receipt, err
+	}
+	if err = host.VerifyAcceptance(forward, r, archive); err != nil {
+		return receipt, err
+	}
+	receipt.AcceptanceComplete = true // Accepted deletion proceeds with cleanup/forward repair.
+	if err = host.PurgeTemporaryCopies(forward, r); err != nil {
+		return receipt, err
+	}
+	if err = backup.PurgeRegistered(r.ArchiveDirectory, r.Approval); err != nil {
+		return receipt, err
+	}
+	if err = host.VerifyTemporaryMaterialsZero(forward, r); err != nil {
+		return receipt, err
+	}
+	receipt.PurgeComplete = true
+	if err = host.ResumeAcceptedEntrypoints(forward, r); err != nil {
+		return receipt, err
+	}
+	receipt.Complete = true
+	receipt.RequiredAdapters = []string{}
 	return receipt, nil
 }

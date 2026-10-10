@@ -48,6 +48,7 @@ case "$architecture" in
 esac
 build_dir=$(mktemp -d "${TMPDIR:-/tmp}/$project-build.XXXXXX")
 (cd "$repo" && GOPROXY=https://proxy.golang.org,direct CGO_ENABLED=0 GOOS=linux GOARCH="$goarch" go test -c \
+  -ldflags "-X github.com/FangcunMount/qs-server/pkg/version.GitCommit=$(git rev-parse HEAD)" \
   -tags='integration,reliable_messaging_m4,reliable_messaging_m5' \
   -o "$build_dir/runtimeclosure.test" ./internal/apiserver/integration/runtimeclosure)
 "${compose[@]}" exec -T mysql mkdir -p /tmp/m5-outcome/configs /tmp/m5-outcome/internal/apiserver/integration/runtimeclosure

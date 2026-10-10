@@ -3,6 +3,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"database/sql"
 	"encoding/base64"
@@ -21,6 +22,88 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
+
+// Compare the actual original BSON stream, fixed upper, EOF and both-pass hash
+// at the two fixed page sizes. Timings describe only this owned local fixture.
+func TestOwnedMongoPageSizePreservesSourceAndBothEOF(t *testing.T) {
+	localInventoryGuard(t)
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer cancel()
+	client, e := mongoOpen(ctx)
+	if e != nil {
+		t.Fatal(e)
+	}
+	defer func() {
+		if e := client.Disconnect(context.Background()); e != nil {
+			t.Error(e)
+		}
+	}()
+	name := "qs_retirement_inventory_test_page_size_" + strconv.FormatInt(time.Now().UnixNano(), 10)
+	db := client.Database(name)
+	defer func() {
+		if e := db.Drop(context.Background()); e != nil {
+			t.Error(e)
+		}
+	}()
+	col := db.Collection("domain_event_outbox")
+	const rows = 10000
+	for start := 1; start <= rows; start += 1000 {
+		docs := make([]any, 0, 1000)
+		for n := start; n < start+1000 && n <= rows; n++ {
+			docs = append(docs, bson.D{{Key: "_id", Value: int64(n)}, {Key: "payload", Value: bytes.Repeat([]byte{byte(n)}, 1536)}, {Key: "status", Value: "published"}})
+		}
+		if _, e := col.InsertMany(ctx, docs); e != nil {
+			t.Fatal(e)
+		}
+	}
+	token, kind, empty, e := mongoUpper(ctx, col, productionLimits())
+	if e != nil || empty || kind != "long" {
+		t.Fatal("native fixed upper was not proved", e)
+	}
+	bound := targetBoundary{Database: "mongodb", Present: true, PKType: kind, UpperToken: token}
+	if _, e := col.InsertOne(ctx, bson.D{{Key: "_id", Value: int64(rows + 1)}, {Key: "payload", Value: "OUTSIDE_APPROVED_UPPER"}}); e != nil {
+		t.Fatal(e)
+	}
+	var original snapshot
+	var originalBytes []byte
+	for _, pageSize := range []int{1000, 10000} {
+		limits := productionLimits()
+		limits.PageSize = pageSize
+		dir := privateTestDir(t)
+		file, e := os.OpenFile(filepath.Join(dir, "source.bsonframes"), os.O_CREATE|os.O_EXCL|os.O_RDWR, 0600)
+		if e != nil {
+			t.Fatal(e)
+		}
+		started := time.Now()
+		first, e := mongoPagedPass(ctx, col, bound, limits, dir, 1, file)
+		if e != nil {
+			_ = file.Close()
+			t.Fatal(e)
+		}
+		if e = file.Sync(); e != nil {
+			_ = file.Close()
+			t.Fatal(e)
+		}
+		if e = file.Close(); e != nil {
+			t.Fatal(e)
+		}
+		second, e := mongoPagedPass(ctx, col, bound, limits, dir, 2, nil)
+		elapsed := time.Since(started)
+		if e != nil || first.Records != rows || second.Records != rows || first.Pages != uint64(rows/pageSize+1) || second.Pages != first.Pages || first.Bytes != second.Bytes || first.DataHash != second.DataHash {
+			t.Fatal("actual fixed-upper stream or complete EOF changed", e)
+		}
+		raw, e := os.ReadFile(file.Name())
+		if e != nil {
+			t.Fatal(e)
+		}
+		if pageSize == 1000 {
+			original, originalBytes = first, raw
+		} else if first.Records != original.Records || first.Bytes != original.Bytes || first.DataHash != original.DataHash || !bytes.Equal(raw, originalBytes) {
+			t.Fatal("page size changed original source bytes or hash")
+		}
+		t.Logf("owned_fixture_page_size=%d records=%d raw_bytes=%d total_pages=%d two_pass_elapsed_ms=%d", pageSize, first.Records, first.Bytes, first.Pages+second.Pages, elapsed.Milliseconds())
+	}
+}
 
 func localInventoryGuard(t *testing.T) {
 	t.Helper()
@@ -99,10 +182,10 @@ func TestOwnedProductionScaleTwoPassInventoryAndFixedUpper(t *testing.T) {
 	if _, e = mdb.Collection("schema_migrations").InsertOne(ctx, bson.D{{Key: "version", Value: int64(37)}, {Key: "dirty", Value: false}}); e != nil {
 		t.Fatal(e)
 	}
-	rows := 2005
+	rows := 2*productionLimits().PageSize + 5
 	if raw := os.Getenv("QS_RETIREMENT_SCALE_ROWS"); raw != "" {
 		rows, e = strconv.Atoi(raw)
-		if e != nil || rows < 2005 || rows > 700000 {
+		if e != nil || rows < 2*productionLimits().PageSize+5 || rows > 700000 {
 			t.Fatal("test size rejected")
 		}
 	}
@@ -125,10 +208,11 @@ func TestOwnedProductionScaleTwoPassInventoryAndFixedUpper(t *testing.T) {
 	}
 	// A UUID-key table spans page boundaries; the second UUID table remains
 	// present-empty and must not collapse to absent.
-	for start := 0; start < 1005; start += 500 {
+	uuidRows := productionLimits().PageSize + 5
+	for start := 0; start < uuidRows; start += 500 {
 		var args []any
 		var placeholders []string
-		for n := start; n < start+500 && n < 1005; n++ {
+		for n := start; n < start+500 && n < uuidRows; n++ {
 			placeholders = append(placeholders, "(?,?,?,?)")
 			args = append(args, fmt.Sprintf("%036d", n), "request", true, `{"sentinel":"PRIVATE_COMMAND_BODY"}`)
 		}
@@ -202,7 +286,7 @@ func TestOwnedProductionScaleTwoPassInventoryAndFixedUpper(t *testing.T) {
 		case 0, 3:
 			expected = uint64(rows)
 		case 1:
-			expected = 1005
+			expected = uint64(uuidRows)
 		}
 		if s.Records != expected || s.Passes != 2 || !s.Complete || s.Boundary == nil {
 			t.Fatalf("target %d coverage failed", i)

@@ -36,6 +36,7 @@ type evidenceWriteReport struct {
 	FullExternalAIClosure        bool   `json:"full_external_ai_closure"`
 	DropReady                    bool   `json:"drop_ready"`
 	ErrorCategory                string `json:"error_category"`
+	MaterialManifestSHA256       string `json:"material_manifest_sha256,omitempty"`
 }
 
 func parseEvidenceWriteFlags(args []string) (map[string]string, error) {
@@ -120,6 +121,7 @@ func applyWriteObservation(r *evidenceWriteReport, p preparedWriteDiagnostic) {
 	r.PreparedPages, r.ReadBackPages, r.EventReferences = p.PreparedPages, p.ReadBackPages, p.EventReferences
 	r.ActualSQLCommitResponse, r.ActualMongoCommitResponse = p.ActualSQLCommitResponse, p.ActualMongoCommitResponse
 	r.EventPersistenceObserved, r.AICommandPersistenceComplete = p.LimitedEventPersistenceObserved, p.AICommandPersistenceComplete
+	r.MaterialManifestSHA256 = p.MaterialManifestSHA256
 }
 
 func runEvidenceWriteCLI(ctx context.Context, args []string) (r evidenceWriteReport, result error) {

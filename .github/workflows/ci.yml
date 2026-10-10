@@ -366,6 +366,11 @@ jobs:
           lifecycle_cli="${RUNNER_TEMP}/qs-lifecycle-inventory-cli"
           lifecycle_test="${RUNNER_TEMP}/qs-lifecycle-public-cli.test"
           lifecycle_other_cli="${RUNNER_TEMP}/qs-lifecycle-inventory-cli-arm64"
+          lifecycle_api="${RUNNER_TEMP}/qs-lifecycle-fixture-api"
+          # Keep compiler ldflags in this fixture's actual API buildinfo.
+          CGO_ENABLED=0 go build \
+            -ldflags "-X github.com/FangcunMount/qs-server/pkg/version.GitCommit=${GITHUB_SHA}" \
+            -o "$lifecycle_api" ./cmd/qs-apiserver
           CGO_ENABLED=0 go build -trimpath -ldflags "-X main.sourceSHA=${GITHUB_SHA}" \
             -o "$lifecycle_cli" ./cmd/qs-compatibility-retirement
           CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -trimpath -ldflags "-X main.sourceSHA=${GITHUB_SHA}" \
@@ -440,6 +445,7 @@ jobs:
             QS_LIFECYCLE_PUBLIC_CLI_SOURCE_SHA="$GITHUB_SHA" \
             QS_LIFECYCLE_PUBLIC_CLI_BINARY="$lifecycle_cli" \
             QS_LIFECYCLE_PUBLIC_CLI_OTHER_BINARY="$lifecycle_other_cli" \
+            QS_LIFECYCLE_PUBLIC_CLI_API_BINARY="$lifecycle_api" \
             QS_LIFECYCLE_PUBLIC_CLI_MYSQL_CID="$MYSQL_CONTAINER" \
             QS_LIFECYCLE_PUBLIC_CLI_MONGO_CID="$mongo_cid" \
             "$lifecycle_test" -test.run '^(TestLifecyclePublicCLI|TestNativeSharedReadback)' \
@@ -500,9 +506,24 @@ jobs:
           QS_HISTORY_REQUIRE_DATABASE: '1'
           QS_SERVER_TEST_MONGO_URI: mongodb://127.0.0.1:27017/?replicaSet=rs0
           QS_SERVER_TEST_MONGO_DB_PREFIX: qs_history_ci_contract
+          QS_RETIREMENT_REQUIRE_ABORT_NATIVE: '1'
         run: |
+          set -euo pipefail
           go test -race -tags=integration -count=1 -timeout=10m ./internal/apiserver/infra/mysql/evaluation -run '^TestSQLCASProvenanceNative|^TestSQLHistoricalMissingOriginalRunPolicyNative$|^TestSQLHistoricalOriginalRunGlobalAbsenceNative$'
-          go test -race -tags=integration -count=1 -timeout=10m ./internal/apiserver/maintenance/compatibilityretirement -run '^(TestHistoricalCASPersistenceNative|TestQualifiedHistoricalCASNative)'
+          go test -race -tags=integration -count=1 -timeout=10m ./internal/apiserver/maintenance/compatibilityretirement -run '^(TestHistoricalCASPersistenceNative|TestQualifiedHistoricalCASNative|TestFinalHistoricalEOFNative)'
+          go test -race -tags=integration -count=1 -timeout=10m ./internal/apiserver/maintenance/compatibilityretirementbackup -run '^(TestNonTargetDataNativePagingDriftAndBSONIdentity|TestMongoMetadataSnapshotNative)$'
+          go test -race -tags=integration -count=1 -timeout=2m -v ./cmd/qs-compatibility-retirement -run '^TestComparisonMongoAbortNativeOriginalSessionResponseAndUnknown$' | tee "${RUNNER_TEMP}/qs-comparison-mongo-abort-native.log"
+          if grep -q -- '--- SKIP:' "${RUNNER_TEMP}/qs-comparison-mongo-abort-native.log"; then
+            echo 'Original-session Mongo abort response proof unexpectedly skipped' >&2
+            exit 1
+          fi
+          for marker in \
+            'TestComparisonMongoAbortNativeOriginalSessionResponseAndUnknown' \
+            'TestComparisonMongoAbortNativeOriginalSessionResponseAndUnknown/actual-same-session-success' \
+            'TestComparisonMongoAbortNativeOriginalSessionResponseAndUnknown/canceled-rejected-before-fact' \
+            'TestComparisonMongoAbortNativeOriginalSessionResponseAndUnknown/actual-server-reply-withheld-is-unknown'; do
+            grep -q -- "--- PASS: ${marker}" "${RUNNER_TEMP}/qs-comparison-mongo-abort-native.log"
+          done
 
       - name: Run Survey and ModelCatalog Mongo integration contracts
         env:
@@ -550,6 +571,7 @@ jobs:
           QS_SERVER_TEST_REDIS_URL: redis://127.0.0.1:6379/15
         run: |
           go test -tags=integration \
+            -ldflags "-X github.com/FangcunMount/qs-server/pkg/version.GitCommit=$(git rev-parse HEAD)" \
             -run '^TestCurrentRuntimeClosure$' \
             -count=1 -timeout=15m -v ./internal/apiserver/integration/runtimeclosure
 
@@ -785,9 +807,11 @@ jobs:
       - name: Validate retirement lifecycle contracts on the final source
         run: |
           python3 -B scripts/database/test-compatibility-retirement.py
+          python3 -B scripts/database/test-compatibility-window-tool.py
+          python3 -B scripts/database/test-compatibility-platform-fence.py
+          python3 -B scripts/database/test-compatibility-platform-window-action.py
           python3 -B scripts/database/test-compatibility-host-writer-scope.py
           python3 -B scripts/database/test-compatibility-db-writer-census.py
-          python3 -B scripts/database/test-compatibility-window-tool.py
           python3 -B scripts/database/test-compatibility-evidence-write-inputs.py
           python3 -B scripts/database/test-compatibility-inventory-report-diagnostic.py
           python3 -B scripts/database/test-compatibility-mongo-target-diagnostic.py

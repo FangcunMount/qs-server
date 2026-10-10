@@ -192,6 +192,17 @@ type Summary struct {
 	DropReady                    bool   `json:"drop_ready"`
 }
 
+// TemporarySourceAssets returns only the original immutable four-file manifest
+// projection. The caller must still verify this native Archive against its
+// independent Approval and open/recheck the actual source files; this projection
+// grants no acceptance, fence or deletion capability.
+func (a *Archive) TemporarySourceAssets() [4]Asset {
+	if a == nil {
+		return [4]Asset{}
+	}
+	return a.data.Assets
+}
+
 func (a *Archive) Summary() Summary {
 	s := Summary{TemporaryOriginalBodies: true, PurgeAfterAcceptanceRequired: true, SourceOriginAuthentication: "host_binding_required", ProductionFence: "unproven", ProductionContainerAdapter: "not_integrated"}
 	if a != nil {

@@ -248,7 +248,7 @@ func nativeMongo(t *testing.T, env map[string]string) *mongo.Client {
 }
 func nativeSourceSchemas(t *testing.T, db *sql.DB, mdb *mongo.Database) {
 	t.Helper()
-	nativeExec(t, db, "CREATE TABLE schema_migrations(version BIGINT NOT NULL,dirty BOOL NOT NULL)")
+	nativeExec(t, db, "CREATE TABLE schema_migrations(version BIGINT NOT NULL PRIMARY KEY,dirty BOOL NOT NULL)")
 	nativeExec(t, db, "INSERT INTO schema_migrations VALUES(99,FALSE)")
 	nativeExec(t, db, "CREATE TABLE rm_outbox(id BIGINT PRIMARY KEY,protected_fact BLOB)")
 	nativeExec(t, db, "INSERT INTO rm_outbox VALUES(1,X'00FF')")
@@ -396,7 +396,7 @@ func nativeInventory(t *testing.T, cli, dir string, env map[string]string, db *s
 	t.Helper()
 	ids, heads := nativeIdentities(t, db, mdb)
 	scope := [][3]string{{"mysql", "domain_event_outbox", "base_table"}, {"mysql", "ai_bridge_commands", "base_table"}, {"mysql", "ai_messaging_legacy_commands", "base_table"}, {"mongodb", "domain_event_outbox", "collection"}}
-	limits := map[string]int{"query_seconds": 30, "total_seconds": 1500, "max_records": 1000000, "max_bytes": 2 << 30, "page_size": 1000, "max_pages": 1001}
+	limits := map[string]int{"query_seconds": 30, "total_seconds": 1500, "max_records": 1000000, "max_bytes": 2 << 30, "page_size": publicCLIInventoryPageSize, "max_pages": 1001}
 	request := map[string]any{"format_version": 2, "kind": "readonly_inventory_boundary_request", "source_sha": strings.Repeat("a", 40), "operation_id": "123-1", "target_hash": jsonSHA(scope), "database_scope": "mysql-and-mongodb", "identity_hashes": ids, "expected_migrations": heads, "limits": limits}
 	path := filepath.Join(dir, "boundary-request.json")
 	hash := nativeJSON(t, path, request)

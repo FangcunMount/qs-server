@@ -126,6 +126,7 @@ class PrepareFactsBoundaries(unittest.TestCase):
         args=argparse.Namespace(operation='prepare',prepare_mode='prepare-facts',operation_id='123-1',run_id='789-1',actual_source_sha='a'*40,
             approved_source_sha='a'*40,manifest_hash='',identity_request_hash='',inventory_request_hash='',lifecycle_request_hash='',root='/opt/backups/qs-server/compatibility-retirement')
         self.set_descriptor(args,value)
+        args.actual_preloaded_image={'kind':'native_cached_api_image_observation','tool_source_sha':args.actual_source_sha,'original_source_sha':value['inventory_report']['source_sha'],'operation_id':args.operation_id,'actual_run_id':args.run_id,'image_archive_sha256':'1'*64,'image_id':'sha256:'+'2'*64,'os':'linux','architecture':'amd64','revision':args.actual_source_sha,'program_sha256':'3'*64,'probe_id':'4'*64,'probe_absent':True,'temporary_files_zero':True,'capabilities':{'deployment':False,'writer_fence':False,'drop':False}}
         return args,value
     def set_descriptor(self,args,value):
         raw=tool.canonical_bytes(value);args.bootstrap_approval_json=raw[:-1].decode('ascii');args.bootstrap_approval_hash=hashlib.sha256(raw).hexdigest()
@@ -135,8 +136,10 @@ class PrepareFactsBoundaries(unittest.TestCase):
             'target_hash':tool.TARGET_HASH,'complete':False,'prepare_facts_observation_complete':True,'diagnostic_only':True,'execution_allowed':False,'drop_ready':False,
             'observed_inventory_producer':request['inventory_report'],'prepare_source_files':[{'name':name,'sha256':request['inventory_report']['sha256'] if i==0 else 'e'*64,'bytes':0} for i,name in enumerate(tool.PREPARE_SOURCE_NAMES)],
             'observed_ordered_mongo_schema_sha256':'f'*64,'observed_restore_engines':request['restore_engines'],
+            'observed_ai_runtime':{'source_sha':'c'*40,'image_id':'sha256:'+'3'*64,'container_id':'4'*64,'binding_sha256':'5'*64,'stop_constraints':{'settings_sha256':'6'*64,'network_id':'7'*64}},
             'observed_filesystems':[{'scope':scope,'path_sha256':'0'*64,'total_bytes':100,'available_bytes':50,'free_bytes':60} for scope in ('source','staging','archive','docker')],
-            'observed_socket_kind':'fixed_root_owned_unix_docker','observation_elapsed_millis':123,'error_category':'none','prepare_facts_private_observation_sha256':'9'*64}
+            'observed_socket_kind':'fixed_root_owned_unix_docker','observation_elapsed_millis':123,'error_category':'none','prepare_facts_private_observation_sha256':'9'*64,
+            'observed_ai_message_protection':{'sha256':'1'*64,'decrypt_key_count':1,'trusted_signer_count':1,'source_binding_sha256':'2'*64,'source_sha':'b'*40,'image_id_sha256':'3'*64,'container_id_sha256':'4'*64}}
     def test_separate_original_producer_request_does_not_approve_ordered_facts(self):
         args,value=self.args();request=tool.prepare_facts_request(args)
         self.assertEqual(request['source_sha'],'a'*40);self.assertEqual(request['inventory_report']['source_sha'],'b'*40)
@@ -159,10 +162,25 @@ class PrepareFactsBoundaries(unittest.TestCase):
             native.assert_not_called()
     def test_existing_once_channel_uses_new_fixed_mode_without_manifest_or_fake_secret(self):
         args,_=self.args();args.prepare_facts_request_hash='7'*64
-        with mock.patch.dict(os.environ,{'RETIREMENT_PACKAGE_SHA256':'8'*64},clear=True),mock.patch.object(tool.os,'getuid',return_value=501),mock.patch.object(tool.os,'geteuid',return_value=501),mock.patch.object(tool.subprocess,'run',return_value=subprocess.CompletedProcess([],1,b'fixed')) as run:
+        with mock.patch.dict(os.environ,{'RETIREMENT_PACKAGE_SHA256':'8'*64},clear=True),mock.patch.object(tool.os,'getuid',return_value=501),mock.patch.object(tool.os,'geteuid',return_value=501),mock.patch.object(tool.subprocess,'run',return_value=subprocess.CompletedProcess([],1,tool.canonical_bytes({'native_receipt':{'fixed':True},'image_preload':args.actual_preloaded_image}))) as run:
             tool.root_once_lifecycle_prepare(args)
         self.assertEqual(run.call_args.args[0][6:],[args.operation_id,args.run_id,args.actual_source_sha,'7'*64,'8'*64,'','sudo-user','prepare-facts'])
         self.assertEqual(json.loads(run.call_args.kwargs['input'])['MONGODB_PASSWORD'],'')
+    def test_cached_image_projection_is_first_fact_not_window_authority(self):
+        args,_=self.args();request=tool.prepare_facts_request(args)
+        with tempfile.TemporaryDirectory(prefix='cached-image-facts-') as temporary:
+            directory=Path(temporary).resolve();directory.chmod(0o700)
+            def call(a):
+                return 0,tool.canonical_bytes(self.receipt(a,request,a.prepare_facts_request_hash))
+            with mock.patch.object(tool,'operation_directory',return_value=directory),mock.patch.object(tool,'root_once_lifecycle_prepare',side_effect=call):
+                result=tool.live_prepare_facts(args)
+            self.assertEqual(result['observed_cached_api_image']['image_id_sha256'],'2'*64)
+            self.assertEqual(result['observed_cached_api_image']['program_sha256'],'3'*64)
+            self.assertFalse(result['complete']);self.assertFalse(result['drop_ready'])
+            args.run_id='790-1';args.actual_preloaded_image['actual_run_id']='790-1'
+            args.actual_preloaded_image['capabilities']['deployment']=True
+            with mock.patch.object(tool,'operation_directory',return_value=directory),mock.patch.object(tool,'root_once_lifecycle_prepare',side_effect=call),self.assertRaises(tool.Blocked):
+                tool.live_prepare_facts(args)
     def test_actual_receipt_requires_seven_files_real_ordered_hash_and_all_false_capabilities(self):
         args,_=self.args();request=tool.prepare_facts_request(args);request_hash='7'*64
         original=self.receipt(args,request,request_hash)
@@ -170,9 +188,16 @@ class PrepareFactsBoundaries(unittest.TestCase):
         self.assertFalse(result['complete']);self.assertFalse(result['drop_ready']);self.assertTrue(result['prepare_facts_observation_complete'])
         self.assertTrue(all(v is False for v in result['capabilities'].values()))
         self.assertEqual(result['observed_restore_engines']['mysql_image_id_sha256'],'1'*64)
+        self.assertEqual(result['observed_ai_runtime']['image_id_sha256'],'3'*64)
+        self.assertEqual(result['observed_ai_runtime']['stop_constraints']['settings_sha256'],'6'*64)
         mutations=(lambda r:r.update(drop_ready=True),lambda r:r.update(complete=True),lambda r:r.update(observed_ordered_mongo_schema_sha256=''),
             lambda r:r['prepare_source_files'].pop(),lambda r:r['observed_inventory_producer'].update(source_sha=args.actual_source_sha),
-            lambda r:r.update(prepare_facts_private_observation_sha256=''),lambda r:r.update(observed_filesystems=[]))
+            lambda r:r.update(prepare_facts_private_observation_sha256=''),lambda r:r.update(observed_filesystems=[]),
+            lambda r:r.pop('observed_ai_runtime'),lambda r:r['observed_ai_runtime'].update(image_id='qs-ai:latest'),
+            lambda r:r['observed_ai_runtime'].update(complete=True),lambda r:r['observed_ai_runtime']['stop_constraints'].update(network_id=''),
+            lambda r:r['observed_ai_runtime']['stop_constraints'].update(settings='secret'),
+            lambda r:r.pop('observed_ai_message_protection'),lambda r:r['observed_ai_message_protection'].update(decrypt_key_count=0),
+            lambda r:r['observed_ai_message_protection'].update(trusted_signer_count=9),lambda r:r['observed_ai_message_protection'].update(private_key='DO_NOT_OUTPUT'))
         for mutate in mutations:
             invalid=copy.deepcopy(original);mutate(invalid)
             with self.assertRaises(tool.Blocked):tool.validate_prepare_facts_result(invalid,args,request,request_hash,0)
@@ -194,6 +219,9 @@ class PrepareFactsBoundaries(unittest.TestCase):
         self.assertEqual(decoded['observed_inventory_producer']['source_sha'],'b'*40)
         self.assertEqual(decoded['observed_ordered_mongo_schema_sha256'],'f'*64)
         self.assertEqual(decoded['prepare_source_files'][0]['name'],'inventory_private_json')
+        self.assertEqual(decoded['observed_ai_runtime']['source_sha'],'c'*40)
+        self.assertEqual(decoded['observed_ai_runtime']['image_id_sha256'],'3'*64)
+        self.assertEqual(decoded['observed_ai_runtime']['stop_constraints']['network_id'],'7'*64)
         self.assertFalse(decoded['complete']);self.assertFalse(decoded['execution_allowed']);self.assertFalse(decoded['drop_ready'])
     def test_actual_action_ten_input_validator_accepts_only_observation_descriptor(self):
         node=shutil.which('node')
@@ -245,7 +273,7 @@ if(accepted!==c.accepted)throw new Error('offline_action_validation_mismatch');}
                 first=tool.live_prepare_facts(args)
                 self.assertFalse(first['prepare_facts_observation_complete'])
                 old_path=directory/'prepare-facts-request-789-1.json';old_bytes=old_path.read_bytes()
-                args.run_id='790-1'
+                args.run_id='790-1';args.actual_preloaded_image['actual_run_id']='790-1'
                 second=tool.live_prepare_facts(args)
                 self.assertTrue(second['prepare_facts_observation_complete'])
                 self.assertEqual(old_path.read_bytes(),old_bytes)

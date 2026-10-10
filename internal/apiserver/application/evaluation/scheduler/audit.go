@@ -55,10 +55,14 @@ type mismatch struct {
 }
 
 type AuditBatchResult struct {
-	Scanned       int
-	Detected      int
-	NextCursor    uint64
-	CycleComplete bool
+	Scanned  int
+	Detected int
+	// HistoricalGaps are explicit retained unverifiable conclusions, not
+	// current standard-message verification successes. Detected keeps its
+	// existing meaning; callers can separate these from actionable drifts.
+	HistoricalGaps int
+	NextCursor     uint64
+	CycleComplete  bool
 }
 
 type Service interface {
@@ -151,15 +155,27 @@ func (s *service) AuditOutboxBatch(ctx context.Context, after, upper uint64, lim
 	return AuditBatchResult{Scanned: batch.Scanned, Detected: len(batch.Conflicts), NextCursor: batch.NextCursor, CycleComplete: batch.CycleComplete}, nil
 }
 func (s *service) classifyBatch(batch evaluationconsistency.Batch) AuditBatchResult {
+	return s.classifyReadOnlyBatch(batch, true)
+}
+
+// SummarizeReadOnlyBatch reuses the scheduler's complete consistency matrix
+// without logging business/message identities or updating runtime metrics.
+// It does not read/write a checkpoint or grant repair/retirement authority.
+func SummarizeReadOnlyBatch(batch evaluationconsistency.Batch, now time.Time) AuditBatchResult {
+	return (&service{now: func() time.Time { return now }}).classifyReadOnlyBatch(batch, false)
+}
+
+func (s *service) classifyReadOnlyBatch(batch evaluationconsistency.Batch, observe bool) AuditBatchResult {
 	detected := 0
+	historicalGaps := 0
 	for _, evidence := range batch.Items {
 		if evidence.AssessmentID == 0 {
 			continue
 		}
-		if evidence.Outbox != nil && evidence.Outbox.Class != "" {
+		if observe && evidence.Outbox != nil && evidence.Outbox.Class != "" {
 			evaluationConsistencyEvidenceClasses.WithLabelValues(string(evidence.Outbox.Class)).Inc()
 		}
-		if history := evidence.CommittedHistory; history != nil && (history.Class == eventevidence.RetiredVerified || history.Class == eventevidence.Unverifiable) {
+		if history := evidence.CommittedHistory; observe && history != nil && (history.Class == eventevidence.RetiredVerified || history.Class == eventevidence.Unverifiable) {
 			evaluationCommittedHistoricalClasses.WithLabelValues(string(history.Class)).Inc()
 		}
 		items := classifyDrifts(consistencyEvidence{
@@ -177,27 +193,36 @@ func (s *service) classifyBatch(batch evaluationconsistency.Batch) AuditBatchRes
 			}
 			switch reference.Class {
 			case eventevidence.RetiredVerified:
-				evaluationHistoricalReferenceClasses.WithLabelValues(string(reference.Class)).Inc()
+				if observe {
+					evaluationHistoricalReferenceClasses.WithLabelValues(string(reference.Class)).Inc()
+				}
 			case eventevidence.Unverifiable:
-				evaluationHistoricalReferenceClasses.WithLabelValues(string(reference.Class)).Inc()
+				if observe {
+					evaluationHistoricalReferenceClasses.WithLabelValues(string(reference.Class)).Inc()
+				}
 				items = append(items, &mismatch{Kind: mismatchHistoricalEventGap, Severity: severityLow, RecommendedAction: "retain the explicit terminal historical gap; full original message verification remains unavailable", DetectedAt: s.now()})
 			default:
 				items = append(items, &mismatch{Kind: mismatchHistoricalReferenceConflict, Severity: severityHigh, RecommendedAction: "investigate invalid historical provenance classification", DetectedAt: s.now()})
 			}
 		}
 		for _, item := range items {
+			if item.Kind == mismatchHistoricalEventGap && item.Severity == severityLow {
+				historicalGaps++
+			}
 			item.AssessmentID = evidence.AssessmentID
-			observeMismatch(item.Kind)
-			observeDisposition(item.Kind, "deferred")
-			log.Warnf(
-				"evaluation consistency drift requires audited migration (assessment_id=%d, kind=%s, severity=%s, action=%s)",
-				item.AssessmentID, item.Kind, item.Severity, item.RecommendedAction,
-			)
+			if observe {
+				observeMismatch(item.Kind)
+				observeDisposition(item.Kind, "deferred")
+				log.Warnf(
+					"evaluation consistency drift requires audited migration (assessment_id=%d, kind=%s, severity=%s, action=%s)",
+					item.AssessmentID, item.Kind, item.Severity, item.RecommendedAction,
+				)
+			}
 			detected++
 		}
 	}
 	return AuditBatchResult{
-		Scanned: len(batch.Items), Detected: detected, NextCursor: batch.NextCursor, CycleComplete: batch.CycleComplete,
+		Scanned: len(batch.Items), Detected: detected, HistoricalGaps: historicalGaps, NextCursor: batch.NextCursor, CycleComplete: batch.CycleComplete,
 	}
 }
 

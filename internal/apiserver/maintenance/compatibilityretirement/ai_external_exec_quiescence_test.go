@@ -80,8 +80,16 @@ func TestAIExecQuiescenceUnknownIntentAndProtectedJournal(t *testing.T) {
 	if e != nil {
 		t.Fatal(e)
 	}
+	if _, e = reopened.file.WriteAt([]byte("x"), 0); e == nil {
+		t.Fatal("original journal reopened for writing")
+	}
 	if e = reopened.Close(); e != nil {
 		t.Fatal(e)
+	}
+	wrongUID := uint32(os.Geteuid()) + 1
+	if bad, e := aiExecQuiescenceJournal(j.path, AIExternalExecQuiescenceInput{SourceUID: &wrongUID}); e == nil {
+		_ = bad.Close()
+		t.Fatal("original UID ignored")
 	}
 	changed := in
 	changed.ContainerID = strings.Repeat("1", 64)

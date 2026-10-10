@@ -3,6 +3,8 @@ package main
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
+	"errors"
 	"io"
 	"net"
 	"os"
@@ -35,6 +37,27 @@ type lifecyclePreparationOwner struct {
 	restoreContext            context.Context
 	restoreCancel             context.CancelFunc
 	combinedStarted           time.Time
+	materialRecords           map[string]string
+	preparationReleaseStarted bool
+}
+
+// The original exclusive writer records its own complete encoded bytes only
+// after write, sync and close succeed. This is a file handoff, never a proof of
+// restore, database acceptance or permission to remove a resource.
+func writeLifecycleMaterialJSON(path string, value any, records map[string]string) error {
+	name := filepath.Base(path)
+	if records == nil || records[name] != "" {
+		return lifecycleError("lifecycle_material_registration_rejected")
+	}
+	raw, err := json.Marshal(value)
+	if err != nil {
+		return err
+	}
+	if err = writeJSON(path, value); err != nil {
+		return err
+	}
+	records[name] = digestRaw(append(raw, '\n'))
+	return nil
 }
 
 func lifecycleConnectionValue(prefix, name string) (string, error) {
@@ -127,7 +150,7 @@ func openLifecyclePreparationOwner(ctx context.Context, r lifecycleRequest) (own
 	if ctx == nil || ctx.Err() != nil || os.Getuid() != 0 || os.Geteuid() != 0 {
 		return nil, lifecycleError("lifecycle_fixed_root_host_required")
 	}
-	owner = &lifecyclePreparationOwner{}
+	owner = &lifecyclePreparationOwner{materialRecords: map[string]string{}}
 	defer func() {
 		if result != nil {
 			_ = owner.Close()
@@ -205,6 +228,92 @@ func (o *lifecyclePreparationOwner) finishPreparation() (int64, error) {
 		return 0, lifecycleError("lifecycle_combined_restore_budget_exceeded")
 	}
 	return elapsed.Milliseconds(), nil
+}
+
+// The standalone prepare producer releases only the isolated engines it just
+// created. The final apply host retains its own engines for acceptance-gated
+// cleanup. No registry can reconstruct this original native owner.
+func (o *lifecyclePreparationOwner) finishPreparationAndReleaseNative(r lifecycleRequest, archive *backup.Archive) (elapsedMillis int64, zeroSHA string, resultErr error) {
+	if o == nil || o.preparationReleaseStarted || o.restoreContext == nil || o.restoreCancel == nil || o.combinedStarted.IsZero() || archive == nil || r.RestoreEngines == nil || !lifecycleMaterialsBinding(r).valid() || r.prepareRoot != lifecycleRootBatch(r.OperationID, r.ActualRunID) || archive.Summary().ArchiveSHA256 != r.Recovery.ArchiveSHA256 || len(o.engines) != 2 {
+		return 0, "", lifecycleError("lifecycle_preparation_release_binding_rejected")
+	}
+	o.preparationReleaseStarted = true // Any unknown result forbids same-owner retry.
+	defer o.restoreCancel()
+	if err := o.closeHandles(o.restoreContext); err != nil {
+		return 0, "", err
+	}
+	if o.restoreContext.Err() != nil || time.Since(o.combinedStarted) > backup.MaxRestoreSeconds*time.Second {
+		return 0, "", lifecycleError("lifecycle_combined_restore_budget_exceeded")
+	}
+	d, err := openLifecycleMaterialDirectory(r.prepareRoot, 0)
+	if err != nil {
+		return 0, "", err
+	}
+	defer func() { resultErr = errors.Join(resultErr, d.close()) }() // Success closes explicitly below.
+	z := lifecyclePreparationRestoreZero{FormatVersion: 1, Kind: "original_preparation_isolated_restore_zero", OriginalSourceSHA: r.OriginalSourceSHA, ToolSourceSHA: r.ToolSourceSHA, OperationID: r.OperationID, OriginalRunID: r.Recovery.OriginalRunID, ActualRunID: r.ActualRunID, ManifestSHA256: r.ManifestSHA256, ArchiveSHA256: r.Recovery.ArchiveSHA256, RequestSHA256: r.requestSHA256}
+	var purges []*lifecycleEnginePurge
+	for index, engine := range o.engines {
+		kind := "mysql"
+		if index == 1 {
+			kind = "mongodb"
+		}
+		if engine == nil || engine.Kind != kind || engine.Archive != r.ArchiveDirectory || index == 1 && (engine.Owner == o.engines[0].Owner || engine.ID == o.engines[0].ID) {
+			return 0, "", lifecycleError("lifecycle_preparation_release_binding_rejected")
+		}
+		p, err := registerLifecycleEnginePurge(o.restoreContext, lifecycleMaterialsBinding(r), engine)
+		if err != nil {
+			return 0, "", err
+		}
+		purges = append(purges, p)
+		z.Engines = append(z.Engines, lifecyclePreparationRestoreEngine{Kind: engine.Kind, Owner: engine.Owner, ContainerID: engine.ID, ImageID: engine.ImageID, Namespace: engine.Namespace, Volumes: append([]string(nil), engine.Volumes...)})
+	}
+	files, err := registerLifecyclePreparationRestoreMetadata(o.restoreContext, d, &z, "", r.RestoreEngines.Architecture, 0, o.materialRecords)
+	if err != nil {
+		return 0, "", err
+	}
+	z.Files = files
+	if err = checkLifecycleRestoreMaterialSet(o.restoreContext, purges, false); err != nil {
+		return 0, "", err
+	}
+	for _, p := range purges {
+		if err = p.purge(o.restoreContext); err != nil {
+			return 0, "", err
+		}
+	}
+	if err = checkLifecycleRestoreMaterialSet(o.restoreContext, purges, true); err != nil {
+		return 0, "", err
+	}
+	if err = d.unchanged(); err != nil {
+		return 0, "", err
+	}
+	for _, file := range d.files {
+		if o.restoreContext.Err() != nil {
+			return 0, "", lifecycleError("lifecycle_combined_restore_budget_exceeded")
+		}
+		if err = d.checkFile(file); err != nil {
+			return 0, "", err
+		}
+	}
+	z.ElapsedMillis = time.Since(o.combinedStarted).Milliseconds()
+	if o.restoreContext.Err() != nil || z.ElapsedMillis > backup.MaxRestoreSeconds*1000 {
+		return 0, "", lifecycleError("lifecycle_combined_restore_budget_exceeded")
+	}
+	path := filepath.Join(r.prepareRoot, "lifecycle-restore-"+r.ActualRunID+".zero.private.json")
+	if err = writeJSON(path, z); err != nil {
+		return 0, "", lifecycleError("lifecycle_preparation_release_receipt_unknown")
+	}
+	zeroRaw, err := readLifecycleAPIRecord(path)
+	if err != nil {
+		return 0, "", err
+	}
+	if err = d.close(); err != nil {
+		return 0, "", err
+	}
+	elapsed := time.Since(o.combinedStarted)
+	if o.restoreContext.Err() != nil || elapsed > backup.MaxRestoreSeconds*time.Second {
+		return 0, "", lifecycleError("lifecycle_combined_restore_budget_exceeded")
+	}
+	return elapsed.Milliseconds(), digestRaw(zeroRaw), nil
 }
 func lifecycleInputFile(path string) (*os.File, error) {
 	if privateDir(filepath.Dir(path)) != nil {
@@ -322,6 +431,9 @@ func prepareLifecycleNative(ctx context.Context, r lifecycleRequest, archive *ba
 	engine, err := startLifecycleOwnedEngine(restoreCtx, r, "mysql", r.RestoreEngines.MySQLImageID, namespace)
 	if err == nil {
 		owner.engines = append(owner.engines, engine)
+		for name, hash := range engine.materialRecords {
+			owner.materialRecords[name] = hash
+		}
 		owner.restoreSQL, err = lifecycleOwnedSQLPool(restoreCtx, engine)
 	}
 	if err != nil {
@@ -338,6 +450,9 @@ func prepareLifecycleNative(ctx context.Context, r lifecycleRequest, archive *ba
 	engine, err = startLifecycleOwnedEngine(restoreCtx, r, "mongodb", r.RestoreEngines.MongoImageID, namespace)
 	if err == nil {
 		owner.engines = append(owner.engines, engine)
+		for name, hash := range engine.materialRecords {
+			owner.materialRecords[name] = hash
+		}
 		owner.restoreMongo, owner.restoreDB, err = lifecycleOwnedMongo(restoreCtx, engine)
 	}
 	if err != nil {
@@ -371,7 +486,7 @@ func prepareLifecycleNative(ctx context.Context, r lifecycleRequest, archive *ba
 		"mysql_original_server_uuid_sha256": digestRaw([]byte(originalUUID)), "mysql_restore_server_uuid_sha256": digestRaw([]byte(restoreUUID)),
 		"mongodb_original_process_sha256": digestRaw([]byte(originalProcess.Hex())), "mongodb_restore_process_sha256": digestRaw([]byte(restoredProcess.Hex())),
 		"purge_after_acceptance_required": true, "drop_authority": false}
-	if writeJSON(filepath.Join(root, "lifecycle-restore-"+r.ActualRunID+".registration.private.json"), registration) != nil {
+	if writeLifecycleMaterialJSON(filepath.Join(root, "lifecycle-restore-"+r.ActualRunID+".registration.private.json"), registration, owner.materialRecords) != nil {
 		return nil, owner, lifecycleError("lifecycle_restore_registry_exists_or_unknown")
 	}
 	sqlProof, err := backup.RestoreSQL(restoreCtx, owner.restoreConn, archive)

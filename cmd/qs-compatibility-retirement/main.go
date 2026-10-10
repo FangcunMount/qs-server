@@ -1224,6 +1224,24 @@ func main() {
 		}
 		return
 	}
+	if *mode == "host-budget-key-create" || *mode == "host-budget-key-open" {
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		r, err := runLifecycleServiceKey(ctx, *mode, *req, *hash, *op, *runID)
+		cancel()
+		if json.NewEncoder(os.Stdout).Encode(r) != nil || err != nil {
+			os.Exit(1)
+		}
+		return
+	}
+	if *mode == "host-services-d" || *mode == "host-services-d-recovery" || *mode == "host-services-d-template" || *mode == "host-services-d-recovery-template" {
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
+		err := runLifecycleServiceSession(ctx, *mode, *req, *hash, *op, *runID, os.Stdin, os.Stdout)
+		cancel()
+		if err != nil {
+			os.Exit(1)
+		}
+		return
+	}
 	if strings.HasPrefix(*mode, "lifecycle-") {
 		ctx, cancel := context.WithTimeout(context.Background(), 90*time.Minute)
 		r, e := runLifecycleCLI(ctx, *mode, *req, *hash, *op, *runID)

@@ -58,6 +58,7 @@ func TestMQRuntimeCommandStatisticsScopeHeldAndInheritedBudget(t *testing.T) {
 	if backlog["pending_commands"] != 3 {
 		t.Fatal("health scope differs", backlog)
 	}
+	assertNativeCurrentMessagingObservation(t, f, 3, 15)
 	// Use the actual receiver decision path, including command hash and original session.
 	var hash string
 	mustMQ(t, f.db.QueryRow("SELECT body_sha256 FROM ai_messaging_operations WHERE command_id=?", f.request.RequestID).Scan(&hash))
@@ -72,6 +73,19 @@ func TestMQRuntimeCommandStatisticsScopeHeldAndInheritedBudget(t *testing.T) {
 	mustMQ(t, err)
 	if got.CommandsPending != 2 || got.CommandAttempts != 15 {
 		t.Fatal("terminal attempts disappeared or accepted stayed pending", got)
+	}
+	assertNativeCurrentMessagingObservation(t, f, 2, 15)
+}
+
+func assertNativeCurrentMessagingObservation(t *testing.T, f *mqFixture, pending, attempts uint64) {
+	t.Helper()
+	tx, err := f.db.BeginTx(t.Context(), &sql.TxOptions{Isolation: sql.LevelRepeatableRead, ReadOnly: true})
+	mustMQ(t, err)
+	defer func() { mustMQ(t, tx.Rollback()) }()
+	v, err := ReadCurrentMessagingOrganization(t.Context(), tx, 1)
+	mustMQ(t, err)
+	if v.Requests == 0 || v.CommandsPending != pending || v.CommandAttempts != attempts {
+		t.Fatal("borrowed native RO ledger read changed current Runtime scope/held/budget/terminal semantics", v)
 	}
 }
 
@@ -127,6 +141,9 @@ func TestMQRuntimeIntegrityDoesNotHideOrphanConflictOrUnknownState(t *testing.T)
 			}
 			if _, err = s.RuntimeBacklog(t.Context(), 1); !errors.Is(err, ErrMessagingLedgerIntegrity) {
 				t.Fatal("invalid ledger returned healthy backlog", err)
+			}
+			if _, err = ReadCurrentMessagingOrganization(t.Context(), f.db, 1); !errors.Is(err, ErrMessagingLedgerIntegrity) {
+				t.Fatal("borrowed read hid an orphan/conflict/unknown ledger", err)
 			}
 		})
 	}

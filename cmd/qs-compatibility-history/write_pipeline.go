@@ -2,12 +2,15 @@ package main
 
 import (
 	"context"
+	"crypto/sha256"
 	"database/sql"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"io"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strconv"
 	"syscall"
 	"time"
@@ -43,6 +46,7 @@ type preparedWriteDiagnostic struct {
 	LimitedEventPersistenceObserved                                                                                                bool
 	AICommandPersistenceComplete, FullExternalAIClosureVerified, WriterFenceProven, CASComplete, DropReady, MutationBackendEnabled bool
 	Required                                                                                                                       []string
+	MaterialManifestSHA256                                                                                                         string
 }
 type historyWriteJournal struct {
 	path     string
@@ -52,6 +56,28 @@ type historyWriteJournal struct {
 	binding  retirement.HistoricalCoordinatorBinding
 	run      string
 	unknown  bool
+	created  map[string]os.FileInfo
+}
+
+type historyTemporaryMaterial struct {
+	Name   string `json:"name"`
+	SHA256 string `json:"sha256"`
+	Bytes  int64  `json:"bytes"`
+	UID    uint32 `json:"uid"`
+	GID    uint32 `json:"gid"`
+	Device uint64 `json:"device"`
+	Inode  uint64 `json:"inode"`
+	Mode   uint32 `json:"mode"`
+}
+type historyTemporaryMaterialManifest struct {
+	Version         int                        `json:"version"`
+	SourceSHA       string                     `json:"source_sha"`
+	ToolSourceSHA   string                     `json:"tool_source_sha"`
+	OperationID     string                     `json:"operation_id"`
+	RunID           string                     `json:"run_id"`
+	MaxSpoolBytes   int64                      `json:"max_spool_bytes"`
+	JournalSequence uint64                     `json:"journal_sequence"`
+	Files           []historyTemporaryMaterial `json:"files"`
 }
 type historyWriteJournalRecord struct {
 	Version        int                                           `json:"version"`
@@ -125,7 +151,7 @@ func newHistoryWriteJournal(dir string, a *approvedInputs) (*historyWriteJournal
 		_ = f.Close()
 		return nil, fixedError("history_write_private_file_rejected")
 	}
-	return &historyWriteJournal{path: dir, dir: f, dev: uint64(st.Dev), ino: uint64(st.Ino), binding: retirement.HistoricalCoordinatorBinding{SourceSHA: a.request.SourceSHA, OperationID: a.request.OperationID}, run: a.request.RunID}, nil
+	return &historyWriteJournal{path: dir, dir: f, dev: uint64(st.Dev), ino: uint64(st.Ino), binding: retirement.HistoricalCoordinatorBinding{SourceSHA: a.request.SourceSHA, OperationID: a.request.OperationID}, run: a.request.RunID, created: map[string]os.FileInfo{}}, nil
 }
 func (j *historyWriteJournal) valid() bool {
 	if j == nil || j.dir == nil || j.unknown {
@@ -150,7 +176,102 @@ func (j *historyWriteJournal) create(name string) (*os.File, error) {
 	if e != nil {
 		return nil, fixedError("history_write_private_file_rejected")
 	}
-	return os.NewFile(uintptr(fd), name), nil
+	f := os.NewFile(uintptr(fd), name)
+	info, err := f.Stat()
+	if err != nil || j.created[name] != nil {
+		_ = f.Close()
+		j.unknown = true
+		return nil, fixedError("history_write_private_file_rejected")
+	}
+	j.created[name] = info
+	return f, nil
+}
+
+func historyMaterialSame(a, b os.FileInfo) bool {
+	if !aiHostSame(a, b) {
+		return false
+	}
+	x, y := reflect.ValueOf(a.Sys()).Elem(), reflect.ValueOf(b.Sys()).Elem()
+	for _, field := range []string{"Ctim", "Ctimespec"} {
+		if x.FieldByName(field).IsValid() {
+			return reflect.DeepEqual(x.FieldByName(field).Interface(), y.FieldByName(field).Interface())
+		}
+	}
+	return false
+}
+
+// Called by the original producer only after both spool writer Close results.
+// The exact names come from original create calls/sequence, never directory
+// adoption. This descriptor is private metadata, not a retirement capability.
+func (j *historyWriteJournal) snapshotMaterials(ctx context.Context) (string, error) {
+	if ctx == nil || ctx.Err() != nil || !j.valid() || j.sequence > 1<<20 || len(j.created) != int(j.sequence)+2 {
+		return "", fixedError("history_write_material_binding_rejected")
+	}
+	names := []string{"prepared-mongo-private.bin", "prepared-sql-private.bin"}
+	for n := uint64(1); n <= j.sequence; n++ {
+		names = append(names, "journal-"+strconv.FormatUint(n, 10)+".json")
+	}
+	entries, e := os.ReadDir(j.path)
+	if e != nil || len(entries) != len(names) {
+		return "", fixedError("history_write_material_binding_rejected")
+	}
+	for _, entry := range entries {
+		if j.created[entry.Name()] == nil || entry.IsDir() {
+			return "", fixedError("history_write_material_binding_rejected")
+		}
+	}
+	m := historyTemporaryMaterialManifest{Version: 1, SourceSHA: j.binding.SourceSHA, ToolSourceSHA: sourceSHA, OperationID: j.binding.OperationID, RunID: j.run, MaxSpoolBytes: 16 << 30, JournalSequence: j.sequence}
+	for index, name := range names {
+		if ctx.Err() != nil || !j.valid() {
+			return "", fixedError("history_write_material_binding_rejected")
+		}
+		fd, e := unix.Openat(int(j.dir.Fd()), name, unix.O_RDONLY|unix.O_NOFOLLOW|unix.O_NONBLOCK, 0)
+		if e != nil {
+			return "", fixedError("history_write_material_binding_rejected")
+		}
+		f := os.NewFile(uintptr(fd), name)
+		before, be := f.Stat()
+		named, ne := os.Lstat(filepath.Join(j.path, name))
+		original := j.created[name]
+		limit := int64(64 << 10)
+		if index < 2 {
+			limit = 16 << 30
+		}
+		if be != nil || ne != nil || original == nil || !os.SameFile(original, before) || !aiHostRegular(before, uint64(limit)) || !historyMaterialSame(before, named) {
+			_ = f.Close()
+			return "", fixedError("history_write_material_binding_rejected")
+		}
+		ost, ook := original.Sys().(*syscall.Stat_t)
+		st, sok := before.Sys().(*syscall.Stat_t)
+		if !ook || !sok || ost.Uid != st.Uid || ost.Gid != st.Gid || original.Mode() != before.Mode() {
+			_ = f.Close()
+			return "", fixedError("history_write_material_binding_rejected")
+		}
+		h := sha256.New()
+		n, re := io.Copy(h, io.LimitReader(f, before.Size()+1))
+		after, ae := f.Stat()
+		named, ne = os.Lstat(filepath.Join(j.path, name))
+		ce := f.Close()
+		if ctx.Err() != nil || re != nil || ae != nil || ne != nil || ce != nil || n != before.Size() || !historyMaterialSame(before, after) || !historyMaterialSame(before, named) {
+			return "", fixedError("history_write_material_binding_rejected")
+		}
+		m.Files = append(m.Files, historyTemporaryMaterial{name, hex.EncodeToString(h.Sum(nil)), n, st.Uid, st.Gid, uint64(st.Dev), uint64(st.Ino), uint32(before.Mode().Perm())})
+	}
+	raw, e := json.Marshal(m)
+	if e != nil || len(raw) > 64<<20 {
+		return "", fixedError("history_write_material_binding_rejected")
+	}
+	f, e := j.create("history.materials.private.json")
+	if e != nil {
+		return "", e
+	}
+	n, we := f.Write(raw)
+	se, ce := f.Sync(), f.Close()
+	if we != nil || n != len(raw) || se != nil || ce != nil || j.dir.Sync() != nil {
+		j.unknown = true
+		return "", fixedError("history_write_material_binding_rejected")
+	}
+	return rawHash(raw), nil
 }
 func (j *historyWriteJournal) record(ctx context.Context, stage string, position int, refs uint64, observation *retirement.HistoricalCASSpoolPageObservation) error {
 	if ctx == nil || ctx.Err() != nil || !j.valid() {
@@ -421,8 +542,20 @@ func executeHistoricalEvidenceWrite(ctx context.Context, a *approvedInputs, d *h
 		return report, e
 	}
 	defer func() {
+		// Later defers have already closed both original spool writers. A close
+		// failure or unknown DB result cannot publish a material handoff digest.
+		if result == nil {
+			var err error
+			report.MaterialManifestSHA256, err = journal.snapshotMaterials(ctx)
+			if err != nil {
+				result = err
+			}
+		}
 		if journal.dir.Close() != nil && result == nil {
 			result = fixedError("history_write_private_close_failed")
+		}
+		if result != nil {
+			report.MaterialManifestSHA256 = ""
 		}
 	}()
 	mongoFile, e := journal.create("prepared-mongo-private.bin")

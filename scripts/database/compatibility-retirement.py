@@ -44,7 +44,7 @@ RUN = re.compile(r"^[0-9]{1,20}-[0-9]{1,4}$")
 NAME = re.compile(r"^[a-z][a-z0-9_-]{0,80}\.json$")
 MAX_JSON = 256 * 1024
 INVENTORY_V2_LIMITS = {"query_seconds": 30, "total_seconds": 1500, "max_records": 1000000,
-                       "max_bytes": 2147483648, "page_size": 1000, "max_pages": 1001}
+                       "max_bytes": 2147483648, "page_size": 10000, "max_pages": 1001}
 BOOTSTRAP_MODES = frozenset({"bootstrap-bounds", "bootstrap-inventory", "bootstrap-history", "bootstrap-history-metadata", "bootstrap-history-parent", "bootstrap-ai-bounds", "bootstrap-ai-verify", "historical-evidence-write", "historical-ai-bounds"})
 MAX_BOOTSTRAP_APPROVAL = 4096
 MAX_WINDOW_SECONDS = 1800
@@ -1119,7 +1119,7 @@ def live_inventory(args, directory):
                 stream.write("".join(key + "=" + values[key] + "\n" for key in keys))
                 stream.flush(); os.fsync(stream.fileno())
             command = [*docker, "run", "--rm", "--name", name, "--pull=never", "--network", "infra-network",
-                       "--read-only", "--cap-drop=ALL", "--security-opt=no-new-privileges", "--cpus=0.5",
+                       "--read-only", "--cap-drop=ALL", "--security-opt=no-new-privileges", "--cpus=2",
                        "--memory=512m", "--pids-limit=64", "--user", str(os.getuid()) + ":" + str(os.getgid()),
                        "--label", "qs.compatibility-retirement.operation=" + args.operation_id,
                        "--label", "qs.compatibility-retirement.run=" + args.run_id,
@@ -1408,6 +1408,8 @@ def report_diagnostic(args):
     raw = canonical_bytes(value)
     if text.encode("ascii") != raw[:-1] or hashlib.sha256(raw).hexdigest() != args.bootstrap_approval_hash:
         fail("report_diagnostic_approval_hash_invalid")
+    if type(value) is dict and value.get("kind") == "cleanup_only_failed_inventory_baseline_approval":
+        return failed_inventory_cleanup_baseline(args, value)
     if type(value) is dict and value.get("kind") == "readonly_existing_inventory_report_approval":
         return inventory_report_diagnostic(args, value)
     fields(value, ("format_version", "kind", "prepare_mode", "source_sha", "operation_id",
@@ -1524,6 +1526,153 @@ def inventory_report_diagnostic(args, value):
             "error_category": "existing_report_diagnostic_only", "capabilities": {key: False for key in CAPABILITIES}}
 
 
+# One failed, already terminal producer only. This is temporary-file disposition,
+# never an alternate inventory parser, history proof, or DROP capability.
+FAILED_INVENTORY_OPERATION = "38019009876-1"
+FAILED_INVENTORY_REFERENCE = {
+    "source_sha": "ae807219ffee37c1f060f1bfca25dd7c408ef9fd",
+    "run_id": "38025045551-1",
+    "request_sha256": "e5d29b674698dbfe4d8f85932fad0d8bba445e3b6823028cd78db4a150f16962",
+    "sha256": "3983779a5fab8be6e027390491a3c9215cdf1270c03316ed8ebcc614793777c8",
+}
+FAILED_INVENTORY_LIMITS = dict(INVENTORY_V2_LIMITS, page_size=1000)
+FAILED_INVENTORY_MONGO_PAGES = 281
+FAILED_INVENTORY_BASELINE = "failed-inventory-cleanup-baseline.json"
+FAILED_INVENTORY_BASELINE_MAX = 3 * 1024 * 1024
+
+
+def failed_inventory_container_absent(deadline):
+    # Check both the exact prospective name and any original op/run-labelled
+    # producer. An inspect error is never interpreted as container absence.
+    filters = (("name=^/qs-compatibility-inventory-" + FAILED_INVENTORY_REFERENCE["run_id"] + "$",),
+               ("label=qs.compatibility-retirement.operation=" + FAILED_INVENTORY_OPERATION,
+                "label=qs.compatibility-retirement.run=" + FAILED_INVENTORY_REFERENCE["run_id"]))
+    for selection in filters:
+        command = ["sudo", "-n", "docker", "container", "ls", "--all", "--no-trunc"]
+        for condition in selection: command.extend(("--filter", condition))
+        command.extend(("--format", "{{.ID}}"))
+        code, raw = capture_fixed(command, timeout=min(15, max(0.01, deadline-time.monotonic())))
+        if code or raw.strip() or time.monotonic() >= deadline:
+            fail("failed_inventory_producer_not_absent")
+
+
+def failed_inventory_stat(st):
+    return [st.st_dev, st.st_ino, st.st_size, st.st_mtime_ns, st.st_ctime_ns,
+            st.st_uid, stat.S_IMODE(st.st_mode), st.st_nlink]
+
+
+def failed_inventory_file(dirfd, name, deadline, *, decode_json=False):
+    # Names come only from the closed original producer list below. Hold the
+    # actual file FD while hashing; no source body enters a JSON receipt.
+    try: fd = os.open(name, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK, dir_fd=dirfd)
+    except OSError: fail("failed_inventory_file_unavailable")
+    try:
+        before = os.fstat(fd)
+        maximum = MAX_JSON if decode_json else FAILED_INVENTORY_LIMITS["max_bytes"]
+        if not stat.S_ISREG(before.st_mode) or before.st_uid != os.getuid() or stat.S_IMODE(before.st_mode) != 0o600 or before.st_nlink != 1 or not 0 <= before.st_size <= maximum:
+            fail("failed_inventory_file_not_private")
+        digest = hashlib.sha256(); chunks = []
+        while True:
+            if time.monotonic() >= deadline: fail("failed_inventory_cleanup_timeout")
+            chunk = os.read(fd, 128 * 1024)
+            if not chunk: break
+            digest.update(chunk)
+            if decode_json: chunks.append(chunk)
+        after = os.fstat(fd)
+        visible = os.stat(name, dir_fd=dirfd, follow_symlinks=False)
+        if failed_inventory_stat(before) != failed_inventory_stat(after) or failed_inventory_stat(after) != failed_inventory_stat(visible):
+            fail("failed_inventory_file_changed")
+        return {"sha256": digest.hexdigest(), "stat": failed_inventory_stat(after)}, decode(b"".join(chunks)) if decode_json else None
+    finally: os.close(fd)
+
+
+def failed_inventory_inputs(args):
+    directory = operation_directory(args.root, FAILED_INVENTORY_OPERATION)
+    ref = FAILED_INVENTORY_REFERENCE
+    request, _ = read_private(directory, "inventory-request.json", ref["request_sha256"])
+    if request.get("limits") != FAILED_INVENTORY_LIMITS or any(type(v) is not int for v in request["limits"].values()):
+        fail("failed_inventory_old_profile_mismatch")
+    # Validate all other existing request semantics without permitting the old
+    # profile in the ordinary/current inventory entry points.
+    validate_v2_request(dict(request, limits=dict(INVENTORY_V2_LIMITS)), FAILED_INVENTORY_OPERATION, ref["source_sha"], boundary=False)
+    output = private_directory(directory / ("inventory-" + ref["run_id"]))
+    report, _ = read_private(output, "inventory.private.json", ref["sha256"])
+    if report.get("kind") != "readonly_compatibility_inventory" or report.get("format_version") != 2 or report.get("source_sha") != ref["source_sha"] or report.get("operation_id") != FAILED_INVENTORY_OPERATION or report.get("run_id") != ref["run_id"] or report.get("request_hash") != ref["request_sha256"] or report.get("target_hash") != TARGET_HASH or report.get("complete") is not False or report.get("drop_ready") is not False or report.get("diagnostic_only") is not True:
+        fail("failed_inventory_report_mismatch")
+    targets = report.get("targets")
+    if type(targets) is not list or len(targets) != 4 or [tuple(i.get(k) for k in ("database","name","kind")) for i in targets] != list(TARGETS):
+        fail("failed_inventory_report_mismatch")
+    names = set(SOURCE_FILENAMES.values()) | ASSET_FILENAMES | {"inventory.private.json", "entrypoints.private.json", "mysql-metadata.private.json"}
+    checkpoints = {}
+    for item in targets[:3]:
+        for key in ("records", "pages", "equal_full_passes"): uint(item.get(key))
+        if item.get("complete") is not True or item["equal_full_passes"] != 2 or item.get("error_category") != "none" or item["pages"] % 2 or item["pages"] > 2002:
+            fail("failed_inventory_sql_checkpoint_scope_invalid")
+        for pass_id in (1,2):
+            for page in range(1, item["pages"]//2+1):
+                checkpoints[f"mysql-{item['name']}-pass-{pass_id}-page-{page:06d}.checkpoint.json"] = (pass_id,page)
+    if targets[3].get("complete") is not False or targets[3].get("equal_full_passes") != 0:
+        fail("failed_inventory_mongo_incomplete_mismatch")
+    for page in range(1, FAILED_INVENTORY_MONGO_PAGES+1):
+        checkpoints[f"mongodb-domain_event_outbox-pass-1-page-{page:06d}.checkpoint.json"] = (1,page)
+    names.update(checkpoints)
+    return directory, output, request, names, checkpoints
+
+
+def failed_inventory_cleanup_baseline(args, value):
+    fields(value, ("format_version", "kind", "prepare_mode", "source_sha", "operation_id",
+                   "target_hash", "database_scope", "inventory_report"))
+    if type(value["format_version"]) is not int or value["format_version"] != 1 or value["kind"] != "cleanup_only_failed_inventory_baseline_approval" or value["prepare_mode"] != "report-diagnostic" or value["target_hash"] != TARGET_HASH or value["database_scope"] != "mysql-and-mongodb" or value["operation_id"] != FAILED_INVENTORY_OPERATION or value["inventory_report"] != FAILED_INVENTORY_REFERENCE:
+        fail("failed_inventory_cleanup_approval_invalid")
+    validate_binding(value, args.operation_id, args.actual_source_sha)
+    if args.run_id == FAILED_INVENTORY_REFERENCE["run_id"]: fail("report_diagnostic_origin_invalid")
+    directory, output, request, names, checkpoints = failed_inventory_inputs(args)
+    deadline = time.monotonic()+100
+    with locked_operation(directory):
+        failed_inventory_container_absent(deadline)
+        dirfd = os.open(output, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+        try:
+            st = os.fstat(dirfd)
+            if st.st_uid != os.getuid() or stat.S_IMODE(st.st_mode) != 0o700:
+                fail("failed_inventory_directory_not_private")
+            if set(os.listdir(dirfd)) != names: fail("failed_inventory_unknown_or_missing_member")
+            entries = {}
+            for name in sorted(names):
+                item, content = failed_inventory_file(dirfd, name, deadline, decode_json=name.endswith(".json") and name != "mysql-metadata.private.json")
+                if name == "inventory.private.json" and item["sha256"] != FAILED_INVENTORY_REFERENCE["sha256"]:
+                    fail("failed_inventory_report_mismatch")
+                if name in checkpoints:
+                    fields(content, ("format_version","kind","source_sha","pass","page","cursor_token","records","source_bytes","prefix_hash","diagnostic_only","resume_existing_file_allowed"))
+                    pass_id,page = checkpoints[name]
+                    if content["format_version"] != 1 or type(content["format_version"]) is not int or content["kind"] != "readonly_inventory_page_checkpoint" or content["source_sha"] != FAILED_INVENTORY_REFERENCE["source_sha"] or type(content["pass"]) is not int or type(content["page"]) is not int or (content["pass"],content["page"]) != (pass_id,page) or content["diagnostic_only"] is not True or content["resume_existing_file_allowed"] is not False or type(content["cursor_token"]) is not str or len(content["cursor_token"]) > 2048:
+                        fail("failed_inventory_checkpoint_mismatch")
+                    uint(content["records"]); uint(content["source_bytes"]); token(content["prefix_hash"], HASH)
+                elif name in ASSET_FILENAMES:
+                    filename = name.removesuffix(".asset.json")
+                    target = next(target for target,path in SOURCE_FILENAMES.items() if path == filename)
+                    boundary = request["approved_boundaries"][next(i for i,t in enumerate(TARGETS) if t[:2] == target)]
+                    expected = {"format_version":1,"kind":"temporary_inventory_source_copy","filename":filename,"source_sha":FAILED_INVENTORY_REFERENCE["source_sha"],"operation_id":FAILED_INVENTORY_OPERATION,"run_id":FAILED_INVENTORY_REFERENCE["run_id"],"request_hash":FAILED_INVENTORY_REFERENCE["request_sha256"],"protocol":"mysql_cast_binary_columns_pk_order_v2" if target[0] == "mysql" else "mongodb_server_bson_pk_order_v2","boundary":boundary,"contains_original_body":True,"retirement_proof":False,"purge_required_after_acceptance":True,"resume_existing_file_allowed":False}
+                    if content != expected: fail("failed_inventory_asset_mismatch")
+                elif name == "entrypoints.private.json":
+                    fields(content, ("format_version","kind","source_sha","operation_id","run_id","request_hash","catalog_hash","live_fence_proven","catalog"))
+                    if content["format_version"] != 1 or type(content["format_version"]) is not int or content["kind"] != "source_only_production_entrypoint_catalog" or content["source_sha"] != FAILED_INVENTORY_REFERENCE["source_sha"] or content["operation_id"] != FAILED_INVENTORY_OPERATION or content["run_id"] != FAILED_INVENTORY_REFERENCE["run_id"] or content["request_hash"] != FAILED_INVENTORY_REFERENCE["request_sha256"] or content["live_fence_proven"] is not False:
+                        fail("failed_inventory_catalog_mismatch")
+                    token(content["catalog_hash"], HASH)
+                entries[name] = item
+            failed_inventory_container_absent(deadline)
+            if set(os.listdir(dirfd)) != names or os.stat(output, follow_symlinks=False).st_ino != st.st_ino or os.stat(output, follow_symlinks=False).st_dev != st.st_dev:
+                fail("failed_inventory_directory_changed")
+            read_private(directory, "inventory-request.json", FAILED_INVENTORY_REFERENCE["request_sha256"])
+            # These are current observed bytes/inodes, NOT original source hash
+            # proof. The hard-coded producer disposition is the narrow scope.
+            baseline = {"format_version":1,"kind":"cleanup_only_failed_inventory_baseline","original_operation_id":FAILED_INVENTORY_OPERATION,"original_inventory_report":FAILED_INVENTORY_REFERENCE.copy(),"observing_source_sha":args.actual_source_sha,"observing_run_id":args.run_id,"approval_sha256":args.bootstrap_approval_hash,"directory_identity":[st.st_dev,st.st_ino,st.st_uid,stat.S_IMODE(st.st_mode)],"files":entries,"inventory_complete":False,"retirement_proof":False,"drop_authority":False,"producer_container_absent":True}
+            raw = canonical_bytes(baseline)
+            if len(raw) > FAILED_INVENTORY_BASELINE_MAX: fail("failed_inventory_baseline_bound_exceeded")
+            create_bootstrap_file(directory, FAILED_INVENTORY_BASELINE, raw)
+        finally: os.close(dirfd)
+    return {"format_version":1,"operation":"prepare","prepare_mode":"report-diagnostic","source_sha":args.actual_source_sha,"run_id":args.run_id,"operation_id":args.operation_id,"target_hash":TARGET_HASH,"target_count":4,"complete":False,"execution_allowed":False,"drop_ready":False,"diagnostic_only":True,"inventory_complete":False,"cleanup_only":True,"cleanup_baseline_complete":True,"cleanup_baseline_sha256":hashlib.sha256(raw).hexdigest(),"cleanup_file_count":len(entries),"cleanup_source_file_bytes":sum(entries[n]["stat"][2] for n in SOURCE_FILENAMES.values()),"observed_inventory_report":FAILED_INVENTORY_REFERENCE.copy(),"original_content_verified":False,"purge_executed":False,"error_category":"failed_inventory_cleanup_baseline_only","capabilities":{key:False for key in CAPABILITIES}}
+
+
 LIFECYCLE_ADAPTERS = frozenset({"actual_four_source_historical_persistence_and_readback",
     "actual_production_bound_isolated_restore", "server_a_and_server_d_stop_drain_lease",
     "whole_writer_and_old_ref_fence", "prepared_inline_b_and_no_automigration_rollback",
@@ -1591,11 +1740,18 @@ try:
     with tarfile.open(fileobj=io.BytesIO(raw),mode='r:gz') as tar:
         members=tar.getmembers()
         names=[m.name for m in members]
-        if len(names)!=len(set(names)) or any(not m.isfile() or '/' in m.name or m.size>64<<20 for m in members): stop()
+        if len(names)!=len(set(names)) or any(not m.isfile() or '/' in m.name or m.size>(200<<20 if stage=='prepare-facts' and m.name=='preload-image.tar.gz' else 64<<20) for m in members): stop()
         selected=[m for m in members if m.name==name]
         if len(selected)!=1: stop()
         binary=tar.extractfile(selected[0]).read((64<<20)+1)
         if not binary or len(binary)>64<<20: stop()
+        preload_program=preload_archive=None
+        if stage=='prepare-facts':
+            programs=[m for m in members if m.name=='compatibility-window-tool.py']
+            images=[m for m in members if m.name=='preload-image.tar.gz']
+            if len(programs)!=1 or programs[0].size>1<<20 or len(images)!=1: stop()
+            preload_program=tar.extractfile(programs[0]).read((1<<20)+1)
+            preload_archive=tar.extractfile(images[0]).read((200<<20)+1)
     base=Path('/opt/backups/qs-server/compatibility-retirement-root-prepare')
     try: base.mkdir(mode=0o700)
     except FileExistsError: pass
@@ -1629,6 +1785,20 @@ try:
     credentials['PATH']='/usr/bin:/bin'
     credentials['QS_RETIREMENT_SOURCE_UID']=str(source_uid)
     native_mode = stage+'-root-once' if stage != 'lifecycle' else 'lifecycle-prepare-root-once'
+    native_argv=[str(native),'--mode',native_mode,'--request',request_path,'--request-hash',request_hash,'--operation-id',operation,'--run-id',run]
+    if stage=='prepare-facts':
+        module={'__name__':'approved_cached_image_preparation'}
+        exec(compile(preload_program,'approved-package-cached-image-caller','exec'),module)
+        request_raw=module['read_owned'](Path(request_path),source_uid,request_hash,256<<10)
+        request=module['decode'](request_raw)
+        if request.get('source_sha')!=tool_sha or request.get('operation_id')!=operation or request.get('actual_run_id')!=run: stop()
+        approval={'stage':'prepare','tool_source_sha':tool_sha,'original_source_sha':request['inventory_report']['source_sha'],'operation_id':operation}
+        observed=module['preload_api_image'](preload_archive,approval,run,batch,None)
+        result=subprocess.run(native_argv,env=credentials,stdin=subprocess.DEVNULL,stdout=subprocess.PIPE,stderr=subprocess.DEVNULL,timeout=85*60,check=False)
+        if len(result.stdout)>32768: stop()
+        native_result=json.loads(result.stdout,object_pairs_hook=unique_credentials)
+        print(json.dumps({'native_receipt':native_result,'image_preload':observed},sort_keys=True,separators=(',',':')))
+        raise SystemExit(result.returncode)
     os.execve(native,[str(native),'--mode',native_mode,'--request',request_path,'--request-hash',request_hash,'--operation-id',operation,'--run-id',run],credentials)
 except (OSError,ValueError,KeyError,tarfile.TarError,subprocess.SubprocessError):
     stop()
@@ -1684,6 +1854,11 @@ def root_once_lifecycle_prepare(args):
             raise NativeReceiptBlocked('lifecycle_native_receipt_invalid', root_native_diagnostic(private_stderr, True, result.stdout, result.returncode))
         if not result.stdout:
             raise NativeReceiptBlocked('lifecycle_native_receipt_missing', root_native_diagnostic(private_stderr, True, result.stdout, result.returncode))
+    if args.prepare_mode == 'prepare-facts':
+        wrapped=decode(result.stdout)
+        fields(wrapped,('native_receipt','image_preload'))
+        args.actual_preloaded_image=wrapped['image_preload']
+        return result.returncode,canonical_bytes(wrapped['native_receipt'])
     return result.returncode,result.stdout
 
 
@@ -1731,7 +1906,7 @@ def live_lifecycle(args, directory):
         "target_hash", "target_count", "complete", "execution_allowed", "drop_ready",
         "archive_binding_complete", "recovery_attempted", "recovery_complete", "acceptance_complete",
         "purge_complete", "error_category", "required_adapters", "isolated_content_restore_complete", "restore_elapsed_millis")
-    fields(result, required, ("recovery_error_category", "mysql_recovery_non_target_sha256"))
+    fields(result, required, ("recovery_error_category", "mysql_recovery_non_target_sha256", "source_copy_intent_sha256", "preparation_restore_zero_sha256"))
     if (result["format_version"] != 1 or result["kind"] != "compatibility_retirement_lifecycle_result" or
         result["operation"] != args.operation or result["source_sha"] != args.actual_source_sha or
         result["original_source_sha"] != request["original_source_sha"] or result["operation_id"] != args.operation_id or
@@ -1748,6 +1923,14 @@ def live_lifecycle(args, directory):
     token(result["archive_sha256"], HASH if result["complete"] else re.compile(r"(?:[0-9a-f]{64})?"))
     if "mysql_recovery_non_target_sha256" in result:
         token(result["mysql_recovery_non_target_sha256"], HASH)
+    if "source_copy_intent_sha256" in result:
+        token(result["source_copy_intent_sha256"], HASH)
+        if args.operation != "prepare":
+            fail("lifecycle_native_receipt_binding_rejected")
+    if "preparation_restore_zero_sha256" in result:
+        token(result["preparation_restore_zero_sha256"], HASH)
+        if args.operation != "prepare":
+            fail("lifecycle_native_receipt_binding_rejected")
     if type(result["restore_elapsed_millis"]) is not int or not 0 <= result["restore_elapsed_millis"] <= 600000:
         fail("lifecycle_native_restore_budget_rejected")
     if args.operation == "prepare" and result["complete"] and not result["isolated_content_restore_complete"]:
@@ -1764,6 +1947,7 @@ def live_lifecycle(args, directory):
 PREPARE_SOURCE_NAMES = ("inventory.private.json", "mysql-metadata.private.json", "mongodb-metadata.private.json",
     "mysql-domain_event_outbox.source.ndjson", "mysql-ai_bridge_commands.source.ndjson",
     "mysql-ai_messaging_legacy_commands.source.ndjson", "mongodb-domain_event_outbox.source.bsonframes")
+
 
 
 def prepare_facts_request(args):
@@ -1809,12 +1993,13 @@ def prepare_facts_request(args):
         "inventory_report": producer, "restore_engines": engines, "archive_directory": path}
 
 
+
 def validate_prepare_facts_result(result, args, request, request_hash, code):
     fields(result, ("format_version", "kind", "operation", "prepare_mode", "source_sha", "operation_id", "run_id",
         "request_sha256", "observation_approval_sha256", "target_hash", "complete", "prepare_facts_observation_complete",
         "diagnostic_only", "execution_allowed", "drop_ready", "observed_inventory_producer", "prepare_source_files",
         "observed_ordered_mongo_schema_sha256", "observed_filesystems", "observed_socket_kind",
-        "observation_elapsed_millis", "error_category"), ("observed_restore_engines", "prepare_facts_private_observation_sha256"))
+        "observation_elapsed_millis", "error_category"), ("observed_restore_engines", "prepare_facts_private_observation_sha256", "observed_ai_runtime", "observed_ai_message_protection"))
     if (type(result["format_version"]) is not int or result["format_version"] != 1 or
         result["kind"] != "readonly_prepare_facts_observation" or result["operation"] != "prepare" or
         result["prepare_mode"] != "prepare-facts" or result["source_sha"] != args.actual_source_sha or
@@ -1827,6 +2012,14 @@ def validate_prepare_facts_result(result, args, request, request_hash, code):
         not re.fullmatch(r"(?:prepare_facts|lifecycle)_[a-z_]{1,100}|none", result["error_category"])):
         fail("prepare_facts_native_binding_rejected")
     uint(result["observation_elapsed_millis"])
+    ai_runtime = result.get("observed_ai_runtime")
+    if ai_runtime is not None:
+        fields(ai_runtime, ("source_sha", "image_id", "container_id", "binding_sha256", "stop_constraints"))
+        token(ai_runtime["source_sha"], SHA)
+        token(ai_runtime["image_id"], re.compile(r"sha256:[0-9a-f]{64}"))
+        for key in ("container_id", "binding_sha256"): token(ai_runtime[key], HASH)
+        fields(ai_runtime["stop_constraints"], ("settings_sha256", "network_id"))
+        for value in ai_runtime["stop_constraints"].values(): token(value, HASH)
     files = result["prepare_source_files"]
     if type(files) is not list or len(files) > 7:
         fail("prepare_facts_native_files_rejected")
@@ -1846,7 +2039,7 @@ def validate_prepare_facts_result(result, args, request, request_hash, code):
     if result["prepare_facts_observation_complete"]:
         token(result["observed_ordered_mongo_schema_sha256"], HASH)
         token(result.get("prepare_facts_private_observation_sha256"), HASH)
-        if (len(files) != 7 or len(capacity) != 4 or result.get("observed_restore_engines") != request["restore_engines"] or
+        if (ai_runtime is None or len(files) != 7 or len(capacity) != 4 or result.get("observed_restore_engines") != request["restore_engines"] or
             result["observed_socket_kind"] != "fixed_root_owned_unix_docker" or files[0]["sha256"] != request["inventory_report"]["sha256"]):
             fail("prepare_facts_native_incomplete")
     else:
@@ -1855,15 +2048,28 @@ def validate_prepare_facts_result(result, args, request, request_hash, code):
             fail("prepare_facts_native_images_rejected")
         if result["observed_socket_kind"] not in ("", "fixed_root_owned_unix_docker"):
             fail("prepare_facts_native_socket_rejected")
+    protection = result.get("observed_ai_message_protection")
+    if protection is not None:
+        fields(protection, ("sha256", "decrypt_key_count", "trusted_signer_count", "source_binding_sha256", "source_sha", "image_id_sha256", "container_id_sha256"))
+        for key in ("sha256", "source_binding_sha256", "image_id_sha256", "container_id_sha256"): token(protection[key], HASH)
+        token(protection["source_sha"], SHA)
+        for key in ("decrypt_key_count", "trusted_signer_count"):
+            uint(protection[key])
+            if not 1 <= protection[key] <= 8: fail("prepare_facts_native_protection_rejected")
+    if result["prepare_facts_observation_complete"] and protection is None:
+        fail("prepare_facts_native_protection_rejected")
     # Only allowlisted tokens go through the existing armored public transport.
     # The root-owned raw observation keeps the exact original filenames/IDs.
     for value in files: value["name"] = value["name"].replace(".", "_")
+    if ai_runtime is not None:
+        ai_runtime["image_id_sha256"] = ai_runtime.pop("image_id")[7:]
     if result.get("observed_restore_engines") is not None:
         engines = result["observed_restore_engines"]
         result["observed_restore_engines"] = {"mysql_image_id_sha256": engines["mysql_image_id"][7:],
             "mongodb_image_id_sha256": engines["mongodb_image_id"][7:], "architecture": engines["architecture"]}
     result["capabilities"] = {key: False for key in CAPABILITIES}
     return result
+
 
 
 def live_prepare_facts(args):
@@ -1874,7 +2080,14 @@ def live_prepare_facts(args):
         create_bootstrap_file(directory, "prepare-facts-request-" + args.run_id + ".json", raw)
         args.prepare_facts_request_hash = request_hash
         code, native = root_once_lifecycle_prepare(args)
-    return validate_prepare_facts_result(decode(native), args, request, request_hash, code)
+    result=validate_prepare_facts_result(decode(native), args, request, request_hash, code)
+    observed=args.actual_preloaded_image
+    fields(observed,('kind','tool_source_sha','original_source_sha','operation_id','actual_run_id','image_archive_sha256','image_id','os','architecture','revision','program_sha256','probe_id','probe_absent','temporary_files_zero','capabilities'))
+    if observed['kind']!='native_cached_api_image_observation' or observed['tool_source_sha']!=args.actual_source_sha or observed['original_source_sha']!=request['inventory_report']['source_sha'] or observed['operation_id']!=args.operation_id or observed['actual_run_id']!=args.run_id or observed['revision']!=args.actual_source_sha or observed['os']!='linux' or observed['architecture']!='amd64' or observed['probe_absent'] is not True or observed['temporary_files_zero'] is not True or observed['capabilities']!={'deployment':False,'writer_fence':False,'drop':False}: fail('prepare_facts_image_preload_rejected')
+    token(observed['image_id'],re.compile(r'sha256:[0-9a-f]{64}'))
+    for key in ('image_archive_sha256','program_sha256','probe_id'):token(observed[key],HASH)
+    result['observed_cached_api_image']={'image_id_sha256':observed['image_id'][7:],'program_sha256':observed['program_sha256'],'source_sha':observed['tool_source_sha'],'original_source_sha':observed['original_source_sha'],'operation_id':observed['operation_id'],'run_id':observed['actual_run_id'],'image_archive_sha256':observed['image_archive_sha256'],'probe_id':observed['probe_id'],'probe_absent':True,'temporary_files_zero':True,'os':'linux','architecture':'amd64'}
+    return result
 
 
 HOST_SCOPE_GAPS = frozenset(('absent_source_end_recheck_changed_or_unread', 'absent_source_end_recheck_unknown', 'account_home_source_unsupported', 'account_startup_indirect_execution_not_proven', 'account_startup_or_public_key_unread', 'activation_source_unread', 'all_match_authentication_domains_not_exhaustively_proven', 'directory_end_recheck_changed_or_unread', 'docker_socket_and_other_container_writer_admission_not_fenced', 'dynamic_key_or_principal_provider_not_exhaustively_proven', 'existing_sessions_not_drained_or_admission_fenced', 'external_database_and_qs_ai_writers_not_observed', 'external_or_conditional_nss_backend_not_exhaustively_proven', 'host_identity_read_unknown', 'host_namespace_read_unknown', 'indirect_activation_scripts_and_arbitrary_commands_unproven', 'local_accounts_schema_unknown', 'local_accounts_unread', 'local_groups_unread', 'local_runner_workflow_admission_not_fenced', 'login_session_listing_unread', 'login_session_schema_unknown', 'native_command_end_recheck_changed_or_unread', 'native_docker_roster_budget_exceeded', 'native_docker_roster_schema_unknown', 'native_docker_roster_unread', 'native_docker_selected_inspect_schema_unknown', 'native_docker_selected_inspect_unread', 'native_nss_accounts_schema_unknown', 'native_nss_differs_from_local_accounts', 'native_nss_enumeration_unread', 'native_systemd_listing_schema_unknown', 'native_systemd_listing_unread', 'native_systemd_properties_unread', 'native_systemd_unit_budget_exceeded', 'nss_sources_unread', 'observation_handle_close_failed', 'pam_and_dynamic_authentication_modules_not_exhaustively_proven', 'pam_authentication_source_unread', 'proc_roster_unread', 'process_cgroup_unread', 'process_changed_during_read', 'process_disappeared_or_stat_unread', 'process_end_recheck_changed_or_unread', 'process_executable_hash_unread', 'process_executable_unread', 'process_namespace_unread', 'process_stat_schema_unknown', 'process_status_unread', 'process_uid_schema_unknown', 'public_key_options_and_certificate_semantics_not_proven', 'source_activation_directory_unread', 'source_activation_symlink_target_not_followed', 'source_activation_symlink_unread', 'source_activation_tree_budget_exceeded', 'source_activation_tree_unread', 'source_end_recheck_changed_or_unread', 'source_sshd_configuration_unread', 'source_sshd_include_cycle_or_duplicate', 'source_sshd_include_directory_unread', 'source_sshd_include_path_unsupported', 'source_sshd_include_pattern_unknown', 'source_sshd_include_scope_or_budget_unknown', 'source_sshd_original_config_from_process_title_unproven', 'source_sshd_syntax_unknown', 'ssh_authorization_path_scope_unknown', 'ssh_key_path_expansion_requires_effective_subject', 'ssh_public_authorization_unread', 'sshd_argv_end_recheck_changed_or_unread', 'sshd_command_line_override_semantics_unproven', 'sshd_daemon_not_observed', 'sshd_loaded_configuration_snapshot_unproven', 'sshd_original_argv_unread', 'symlink_source_end_recheck_changed_or_unread', 'unclassified_processes_require_independent_writer_catalog', 'user_manager_runtime_socket_activation_not_exhaustively_proven', 'writer_admission_and_historical_platform_fence_not_installed'))
@@ -2128,15 +2341,18 @@ def main(argv=None):
               "manifest_hash": "hash64", "target_hash": "hash64", "target_count": "uint",
               "kind": frozenset({"compatibility_retirement_lifecycle_result", "readonly_prepare_facts_observation", "readonly_host_writer_scope_observation", "readonly_db_writer_census_observation"}),
               "original_source_sha": "sha40", "manifest_sha256": "hash64", "request_sha256": "hash64", "archive_sha256": "hash64_or_empty",
-              "isolated_content_restore_complete": "bool", "restore_elapsed_millis": "uint", "mysql_recovery_non_target_sha256": "hash64",
+              "isolated_content_restore_complete": "bool", "restore_elapsed_millis": "uint", "mysql_recovery_non_target_sha256": "hash64", "source_copy_intent_sha256": "hash64", "preparation_restore_zero_sha256": "hash64",
               "archive_binding_complete": "bool", "recovery_attempted": "bool", "recovery_complete": "bool",
               "acceptance_complete": "bool", "purge_complete": "bool", "required_adapters": [LIFECYCLE_ADAPTERS],
               "recovery_error_category": frozenset({receipt.get("recovery_error_category", "none")}),
               "prepare_facts_private_observation_sha256": "hash64", "prepare_facts_observation_complete": "bool", "observation_approval_sha256": "hash64_or_empty",
               "observed_inventory_producer": {"operation_id": "run_id", "run_id": "run_id", "source_sha": "sha40", "sha256": "hash64", "request_sha256": "hash64"},
               "prepare_source_files": [{"name": frozenset(name.replace(".", "_") for name in PREPARE_SOURCE_NAMES), "sha256": "hash64", "bytes": "uint"}],
+              "observed_ai_message_protection": {"sha256":"hash64", "decrypt_key_count":"uint", "trusted_signer_count":"uint", "source_binding_sha256":"hash64", "source_sha":"sha40", "image_id_sha256":"hash64", "container_id_sha256":"hash64"},
               "observed_ordered_mongo_schema_sha256": "hash64_or_empty",
               "observed_restore_engines": {"mysql_image_id_sha256": "hash64", "mongodb_image_id_sha256": "hash64", "architecture": frozenset({"amd64", "arm64"})},
+              "observed_cached_api_image": {"image_id_sha256":"hash64","program_sha256":"hash64","source_sha":"sha40","original_source_sha":"sha40","operation_id":"run_id","run_id":"run_id","image_archive_sha256":"hash64","probe_id":"hash64","probe_absent":"bool","temporary_files_zero":"bool","os":frozenset({"linux"}),"architecture":frozenset({"amd64"})},
+              "observed_ai_runtime": {"source_sha": "sha40", "image_id_sha256": "hash64", "container_id": "hash64", "binding_sha256": "hash64", "stop_constraints": {"settings_sha256": "hash64", "network_id": "hash64"}},
               "observed_filesystems": [{"scope": frozenset({"source", "staging", "archive", "docker"}), "path_sha256": "hash64", "total_bytes": "uint", "available_bytes": "uint", "free_bytes": "uint"}],
               "db_census_observation_complete":"bool", "mysql_all_connections_permission_proven":"bool", "mongodb_local_all_sessions_permission_proven":"bool", "all_nodes_sessions_coverage_complete":"bool", "external_writer_coverage_complete":"bool", "db_census_private_catalog_sha256":"hash64_or_empty", "db_census_catalog_sha256":"hash64_or_empty",
               "observed_identity_producer":({key:frozenset({""}) for key in ("operation_id","run_id","source_sha","sha256","request_sha256")} if not any(receipt.get("observed_identity_producer",{}).values()) else {"operation_id":"run_id", "run_id":"run_id", "source_sha":"sha40", "sha256":"hash64", "request_sha256":"hash64"}),
@@ -2149,6 +2365,9 @@ def main(argv=None):
               "observed_scopes": [{"name":HOST_SCOPE_NAMES, "enumeration_complete":"bool", "recheck_equal":"bool", "items":"uint", "catalog_sha256":"hash64", "unknown":[HOST_SCOPE_GAPS]}],
               "observed_socket_kind": frozenset({"", "fixed_root_owned_unix_docker"}), "observation_elapsed_millis": "uint",
               "inventory_complete": "bool", "inventory_private_report_hash": "hash64",
+              "cleanup_only": "bool", "cleanup_baseline_complete": "bool", "cleanup_baseline_sha256": "hash64",
+              "cleanup_file_count": "uint", "cleanup_source_file_bytes": "uint",
+              "original_content_verified": "bool", "purge_executed": "bool",
               "prepare_mode": frozenset({"identity", "bounds", "inventory", "report-diagnostic", "prepare-facts", "host-writer-scope", "db-writer-census"}) | BOOTSTRAP_MODES, "diagnostic_only": "bool", "drop_ready": "bool",
               "request_bootstrap_complete": "bool", "bootstrap_approval_sha256": "hash64", "derived_request_sha256": "hash64", "request_created_run_id": "run_id",
               "history_metadata_complete": "bool", "history_metadata_process_budget_proven": "bool",
@@ -2221,6 +2440,11 @@ def main(argv=None):
         # valid framed receipt. Never print a raw protocol/debug alternative.
         print("compatibility_retirement_receipt_transport_failed", file=sys.stderr)
     diagnostic_complete = ((receipt.get("prepare_mode") == "prepare-facts" and receipt.get("prepare_facts_observation_complete") is True and receipt.get("diagnostic_only") is True and all(value is False for value in receipt.get("capabilities", {}).values())) or (receipt.get("prepare_mode") == "report-diagnostic" and receipt.get("report_diagnostic_complete") is True and receipt.get("diagnostic_only") is True and all(value is False for value in receipt.get("capabilities", {}).values())) or
+        (receipt.get("prepare_mode") == "report-diagnostic" and receipt.get("error_category") == "failed_inventory_cleanup_baseline_only" and
+         receipt.get("cleanup_only") is True and receipt.get("cleanup_baseline_complete") is True and
+         receipt.get("inventory_complete") is False and receipt.get("original_content_verified") is False and
+         receipt.get("purge_executed") is False and receipt.get("diagnostic_only") is True and
+         all(value is False for value in receipt.get("capabilities", {}).values())) or
         (receipt.get("prepare_mode") == "bootstrap-history" and receipt.get("history_readonly_complete") is True) or
         (receipt.get("prepare_mode") == "bootstrap-history-metadata" and receipt.get("history_metadata_complete") is True) or
         (receipt.get("prepare_mode") == "bootstrap-history-parent" and receipt.get("history_parent_registration_complete") is True and

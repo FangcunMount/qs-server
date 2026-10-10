@@ -8,6 +8,7 @@ import (
 	"compress/gzip"
 	"context"
 	"database/sql"
+	"debug/buildinfo"
 	"debug/elf"
 	"encoding/json"
 	"errors"
@@ -321,7 +322,7 @@ func publicCLICleanupEngines(root, archive, source, operation, run, manifest str
 }
 
 const (
-	publicCLIInventoryPageSize = 1000
+	publicCLIInventoryPageSize = 10000
 	publicCLIInventoryMaxPages = 1001
 )
 
@@ -381,11 +382,11 @@ func TestLifecyclePublicCLIInventoryMaterialBoundaries(t *testing.T) {
 	}{
 		{"approved_empty", 0, 0, true},
 		{"nonempty_bound_zero_records", 0, 1, false},
-		{"partial_page", 999, 1, false},
-		{"one_full_page_plus_empty_eof", 1000, 2, false},
-		{"multi_page", 1001, 2, false},
-		{"two_full_pages_plus_empty_eof", 2000, 3, false},
-		{"maximum_records_and_eof", 1000000, 1001, false},
+		{"partial_page", publicCLIInventoryPageSize - 1, 1, false},
+		{"one_full_page_plus_empty_eof", publicCLIInventoryPageSize, 2, false},
+		{"multi_page", publicCLIInventoryPageSize + 1, 2, false},
+		{"two_full_pages_plus_empty_eof", 2 * publicCLIInventoryPageSize, 3, false},
+		{"maximum_records_and_eof", 1000000, 1000000/publicCLIInventoryPageSize + 1, false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			report := publicCLIInventoryMaterialTestReport(tc.records, tc.pagesPerPass, tc.empty)
@@ -412,7 +413,7 @@ func TestLifecyclePublicCLIInventoryMaterialBoundaries(t *testing.T) {
 	}
 	for _, name := range []string{"odd_pages", "missing_eof_page", "extra_pages", "empty_with_records", "source_path_escape", "wrong_passes", "wrong_database", "incomplete_report"} {
 		t.Run(name, func(t *testing.T) {
-			report := publicCLIInventoryMaterialTestReport(1000, 2, false)
+			report := publicCLIInventoryMaterialTestReport(publicCLIInventoryPageSize, 2, false)
 			switch name {
 			case "odd_pages":
 				report.Targets[0].Pages = 3
@@ -454,7 +455,7 @@ func publicCLIInventoryMaterialTestReport(records, pagesPerPass uint64, empty bo
 }
 
 func TestLifecyclePublicCLIInventoryMaterialDirectory(t *testing.T) {
-	report := publicCLIInventoryMaterialTestReport(1000, 2, false)
+	report := publicCLIInventoryMaterialTestReport(publicCLIInventoryPageSize, 2, false)
 	allowed, e := publicCLIInventoryMaterialPaths(report, report.RunID)
 	if e != nil {
 		t.Fatal("public_cli_inventory_material_test_plan_rejected")
@@ -790,6 +791,170 @@ func publicCLIRunProcessGroup(cmd *exec.Cmd) (runErr error, stopped bool) {
 	}
 }
 
+// This one fixture binds a real API program from the approved source, never
+// a restore-engine image or a guessed hash. Its scratch image needs no network;
+// the exact copy probe is created but never started and has no host mounts.
+func publicCLIFixtureAPIImage(t *testing.T, binary, source, operation, run, private string, cleanupAllowed func() bool) (string, string) {
+	t.Helper()
+	if !filepath.IsAbs(binary) || !sourcePattern.MatchString(source) || !runPattern.MatchString(operation) || !runPattern.MatchString(run) {
+		t.Fatal("public_cli_native_api_fixture_input_rejected")
+	}
+	info, e := buildinfo.ReadFile(binary)
+	if e != nil || info.Path != "github.com/FangcunMount/qs-server/cmd/qs-apiserver" {
+		t.Fatal("public_cli_native_actual_api_program_required")
+	}
+	compiledSource, architecture, goos := "", "", ""
+	for _, setting := range info.Settings {
+		switch setting.Key {
+		case "GOOS":
+			goos = setting.Value
+		case "GOARCH":
+			architecture = setting.Value
+		case "-ldflags":
+			fields := strings.Fields(setting.Value)
+			for i, field := range fields {
+				if strings.Contains(field, "github.com/FangcunMount/qs-server/pkg/version.GitCommit=") {
+					if i == 0 || fields[i-1] != "-X" || field != "github.com/FangcunMount/qs-server/pkg/version.GitCommit="+source || compiledSource != "" {
+						t.Fatal("public_cli_native_actual_api_source_rejected")
+					}
+					compiledSource = source
+				}
+			}
+		}
+	}
+	program, readErr := os.ReadFile(binary)
+	if compiledSource != source || goos != "linux" || architecture != runtime.GOARCH || readErr != nil || len(program) == 0 || len(program) > 256<<20 {
+		t.Fatal("public_cli_native_actual_api_source_rejected")
+	}
+	owner := source + "/" + operation + "/" + run
+	label := "codex.public-cli-api-owner"
+	name := "qs-public-cli-api-" + operation + "-" + run
+	image, cid := "", ""
+	imageFormat := `{"id":{{json .Id}},"os":{{json .Os}},"architecture":{{json .Architecture}},"revision":{{json (index .Config.Labels "org.opencontainers.image.revision")}},"owner":{{json (index .Config.Labels "codex.public-cli-api-owner")}}}`
+	checkImage := func() bool {
+		raw, err := publicCLIDocker(context.Background(), "image", "inspect", "--format", imageFormat, image)
+		var v struct{ ID, OS, Architecture, Revision, Owner string }
+		return err == nil && json.Unmarshal(raw, &v) == nil && v.ID == image && v.OS == "linux" && v.Architecture == runtime.GOARCH && v.Revision == source && v.Owner == owner
+	}
+	probeFormat := `{"id":{{json .Id}},"name":{{json .Name}},"image":{{json .Image}},"owner":{{json (index .Config.Labels "codex.public-cli-api-owner")}},"running":{{json .State.Running}},"status":{{json .State.Status}},"readonly":{{json .HostConfig.ReadonlyRootfs}},"network":{{json .HostConfig.NetworkMode}},"mounts":{{json .Mounts}},"execs":{{json .ExecIDs}}}`
+	checkProbe := func() bool {
+		raw, err := publicCLIDocker(context.Background(), "container", "inspect", "--format", probeFormat, cid)
+		var v struct {
+			ID, Name, Image, Owner, Network, Status string
+			Running, Readonly                       bool
+			Mounts                                  []json.RawMessage
+			Execs                                   []string
+		}
+		return err == nil && json.Unmarshal(raw, &v) == nil && v.ID == cid && v.Name == "/"+name && v.Image == image && v.Owner == owner && !v.Running && v.Status == "created" && v.Readonly && v.Network == "none" && len(v.Mounts) == 0 && len(v.Execs) == 0
+	}
+	// An unknown build/create or unaccepted public child retains only this exact
+	// fixture, with its original body-free intent for diagnosis. Never prune.
+	t.Cleanup(func() {
+		if !cleanupAllowed() || image == "" || cid == "" || !checkImage() || !checkProbe() {
+			nativeRetainCleanup(t, private)
+			t.Error("public_cli_native_api_fixture_cleanup_unproven_retained")
+			return
+		}
+		if _, err := publicCLIDocker(context.Background(), "container", "rm", cid); err != nil {
+			t.Error("public_cli_native_api_probe_remove_unknown")
+			return
+		}
+		remaining, err := publicCLIDocker(context.Background(), "container", "ls", "--all", "--no-trunc", "--filter", "name=^/"+name+"$", "--format", "{{.ID}}")
+		if err != nil || len(bytes.TrimSpace(remaining)) != 0 || !checkImage() {
+			t.Error("public_cli_native_api_probe_zero_unproven")
+			return
+		}
+		if _, err = publicCLIDocker(context.Background(), "image", "rm", "--no-prune", image); err != nil {
+			t.Error("public_cli_native_api_image_remove_unknown")
+			return
+		}
+		remaining, err = publicCLIDocker(context.Background(), "image", "ls", "--quiet", "--no-trunc", "--filter", "label="+label+"="+owner)
+		if err != nil || len(bytes.TrimSpace(remaining)) != 0 {
+			t.Error("public_cli_native_api_image_zero_unproven")
+			return
+		}
+		t.Log("public_cli_native_owned_api_probe_remaining=0 owned_api_images_remaining=0")
+	})
+	nativeJSON(t, filepath.Join(private, "api-image.intent.private.json"), map[string]any{"source_sha": source, "operation_id": operation, "actual_run_id": run, "owner": owner, "container_name": name, "program_sha256": sha(program), "network": "none", "probe_start_allowed": false})
+	var contextTar bytes.Buffer
+	tarWriter := tar.NewWriter(&contextTar)
+	dockerfile := []byte("FROM scratch\nLABEL org.opencontainers.image.revision=" + source + "\nLABEL " + label + "=" + owner + "\nCOPY qs-apiserver /app/qs-apiserver\n")
+	for _, member := range []struct {
+		name string
+		raw  []byte
+		mode int64
+	}{{"Dockerfile", dockerfile, 0600}, {"qs-apiserver", program, 0755}} {
+		if tarWriter.WriteHeader(&tar.Header{Name: member.name, Mode: member.mode, Size: int64(len(member.raw)), Typeflag: tar.TypeReg}) != nil {
+			t.Fatal("public_cli_native_api_build_context_failed")
+		}
+		if _, e = tarWriter.Write(member.raw); e != nil {
+			t.Fatal("public_cli_native_api_build_context_failed")
+		}
+	}
+	if tarWriter.Close() != nil {
+		t.Fatal("public_cli_native_api_build_context_failed")
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer cancel()
+	build := exec.CommandContext(ctx, "/usr/bin/docker", "--host", "unix:///run/docker.sock", "build", "--quiet", "--pull=false", "--network=none", "-")
+	build.Env = []string{"PATH=/usr/bin:/bin"}
+	build.Stdin = &contextTar
+	build.Stderr = io.Discard
+	built, e := build.Output()
+	image = strings.TrimSpace(string(built))
+	if e != nil || !strings.HasPrefix(image, "sha256:") || !hashPattern.MatchString(strings.TrimPrefix(image, "sha256:")) || !checkImage() || !checkImage() {
+		t.Fatal("public_cli_native_actual_api_image_rejected")
+	}
+	created, e := publicCLIDocker(ctx, "container", "create", "--name", name, "--label", label+"="+owner, "--network", "none", "--read-only", "--entrypoint", "/app/qs-apiserver", image, "--version")
+	cid = strings.TrimSpace(string(created))
+	if e != nil || !hashPattern.MatchString(cid) || !checkProbe() {
+		t.Fatal("public_cli_native_api_copy_probe_rejected")
+	}
+	// Only the program-copy stream has a binary-sized budget. Metadata keeps
+	// nativeCommand's original cap; this tar may contain just the verified file.
+	copyBudget := int64(len(program)) + (64 << 10)
+	copyCtx, copyCancel := context.WithCancel(ctx)
+	copyCommand := exec.CommandContext(copyCtx, "/usr/bin/docker", "--host", "unix:///run/docker.sock", "container", "cp", cid+":/app/qs-apiserver", "-")
+	copyCommand.Env = []string{"PATH=/usr/bin:/bin"}
+	copyCommand.Stderr = io.Discard
+	copyCommand.WaitDelay = 2 * time.Second
+	copyOutput, e := copyCommand.StdoutPipe()
+	if e != nil {
+		copyCancel()
+		t.Fatal("public_cli_native_api_image_program_read_failed")
+	}
+	if e = copyCommand.Start(); e != nil {
+		copyCancel()
+		_ = copyOutput.Close()
+		t.Fatal("public_cli_native_api_image_program_read_failed")
+	}
+	copied, readErr := io.ReadAll(io.LimitReader(copyOutput, copyBudget+1))
+	if readErr != nil || int64(len(copied)) > copyBudget {
+		copyCancel()
+		_ = copyOutput.Close()
+	}
+	waitErr := copyCommand.Wait() // Always reap this actual fixed Docker child.
+	copyCancel()
+	if readErr != nil || waitErr != nil || int64(len(copied)) > copyBudget {
+		t.Fatal("public_cli_native_api_image_program_read_failed")
+	}
+	reader := tar.NewReader(bytes.NewReader(copied))
+	header, e := reader.Next()
+	if e != nil || header.Typeflag != tar.TypeReg || header.Name != "qs-apiserver" || header.Size != int64(len(program)) {
+		t.Fatal("public_cli_native_api_image_program_shape_rejected")
+	}
+	actual, e := io.ReadAll(io.LimitReader(reader, int64(len(program))+1))
+	actualInfo, actualInfoErr := buildinfo.Read(bytes.NewReader(actual))
+	if e != nil || actualInfoErr != nil || actualInfo.Path != info.Path || !reflect.DeepEqual(actualInfo.Settings, info.Settings) || sha(actual) != sha(program) || !checkProbe() || !checkImage() {
+		t.Fatal("public_cli_native_api_image_program_changed")
+	}
+	if _, e = reader.Next(); e != io.EOF {
+		t.Fatal("public_cli_native_api_image_program_shape_rejected")
+	}
+	nativeJSON(t, filepath.Join(private, "api-image.created.private.json"), map[string]string{"image_id": image, "container_id": cid, "program_sha256": sha(actual), "source_sha": source, "owner": owner})
+	return image, sha(actual)
+}
+
 func TestLifecyclePublicCLINativeWindowToolPrepareRootOnce(t *testing.T) {
 	run, e := publicCLIOptIn(os.Getenv("QS_LIFECYCLE_PUBLIC_CLI_NATIVE"), os.Getenv("QS_LIFECYCLE_PUBLIC_CLI_NATIVE_REQUIRED"))
 	if e != nil {
@@ -952,6 +1117,8 @@ func TestLifecyclePublicCLINativeWindowToolPrepareRootOnce(t *testing.T) {
 	approval := Approval{}
 	opMaterial := map[string]bool{"inventory-cli": true, "boundary-request.json": true, "inventory-request.json": true, "manifest.json": true, "lifecycle-request-template.json": true, "operation.lock": true, "archive": true, "bounds-" + boundRun: true, "inventory-" + invRun: true}
 	rootMaterial := map[string]bool{"restore-native": true, "tool.intent.private.json": true, "source-copy.intent.private.json": true, "manifest.json": true, "lifecycle-request.json": true, "lifecycle-restore-" + actualRun + ".registration.private.json": true, "inventory-" + invRun: true}
+	zeroName := "lifecycle-restore-" + actualRun + ".zero.private.json"
+	rootMaterial[zeroName] = true // Exact preparation producer member, not a glob.
 	for _, name := range append([]string{"inventory.private.json", "mysql-metadata.private.json", "mongodb-metadata.private.json"}, sourceNames[:]...) {
 		opMaterial[filepath.Join("inventory-"+invRun, name)] = true
 		rootMaterial[filepath.Join("inventory-"+invRun, name)] = true
@@ -1090,7 +1257,8 @@ func TestLifecyclePublicCLINativeWindowToolPrepareRootOnce(t *testing.T) {
 	derivedBytes = append(derivedBytes, '\n')
 	requestHash := sha(derivedBytes)
 	packageHash, binaryHashes, toolHashes := publicCLIWindowPackage(t, pkg, cli, os.Getenv("QS_LIFECYCLE_PUBLIC_CLI_OTHER_BINARY"), repo, toolDirectory)
-	toolApproval := map[string]any{"format_version": 1, "kind": "independent_compatibility_window_tool_approval", "dispatcher_source_sha": source, "tool_source_sha": source, "original_source_sha": source, "operation_id": op, "original_run_id": invRun, "stage": "prepare", "target_hash": report.TargetHash, "manifest_sha256": manifestHash, "request_template_sha256": templateHash, "tool_binary_sha256": binaryHashes, "b_image_id": "", "b_program_sha256": ""}
+	apiImage, apiProgram := publicCLIFixtureAPIImage(t, os.Getenv("QS_LIFECYCLE_PUBLIC_CLI_API_BINARY"), source, op, actualRun, private, cleanupAllowed)
+	toolApproval := map[string]any{"format_version": 1, "kind": "independent_compatibility_window_tool_approval", "dispatcher_source_sha": source, "tool_source_sha": source, "original_source_sha": source, "operation_id": op, "original_run_id": invRun, "stage": "prepare", "target_hash": report.TargetHash, "manifest_sha256": manifestHash, "request_template_sha256": templateHash, "tool_binary_sha256": binaryHashes, "b_image_id": apiImage, "b_program_sha256": apiProgram}
 	approvalBytes, e := json.Marshal(toolApproval)
 	if e != nil {
 		t.Fatal("public_cli_native_tool_approval_failed")
@@ -1149,6 +1317,40 @@ func TestLifecyclePublicCLINativeWindowToolPrepareRootOnce(t *testing.T) {
 	if !ok || elapsed <= 0 || elapsed > 600000 {
 		t.Fatal("public_cli_native_combined_restore_budget_failed")
 	}
+	zeroHash, ok := result["preparation_restore_zero_sha256"].(string)
+	zeroFile, zeroOpenErr := os.OpenFile(filepath.Join(root, zeroName), os.O_RDONLY|syscall.O_NOFOLLOW|syscall.O_NONBLOCK, 0)
+	if !ok || !hashPattern.MatchString(zeroHash) || zeroOpenErr != nil {
+		if zeroFile != nil {
+			_ = zeroFile.Close()
+		}
+		t.Fatal("public_cli_native_preparation_zero_binding_failed")
+	}
+	zeroBefore, zeroStatErr := zeroFile.Stat()
+	if zeroStatErr != nil || !zeroBefore.Mode().IsRegular() || zeroBefore.Mode().Perm() != 0600 || zeroBefore.Sys().(*syscall.Stat_t).Uid != 0 || zeroBefore.Sys().(*syscall.Stat_t).Nlink != 1 || zeroBefore.Size() <= 0 || zeroBefore.Size() > 256<<10 {
+		_ = zeroFile.Close()
+		t.Fatal("public_cli_native_preparation_zero_binding_failed")
+	}
+	zeroRaw, zeroReadErr := io.ReadAll(io.LimitReader(zeroFile, (256<<10)+1))
+	zeroAfter, zeroStatErr := zeroFile.Stat()
+	zeroCloseErr := zeroFile.Close()
+	var zero struct {
+		FormatVersion     int               `json:"format_version"`
+		Kind              string            `json:"kind"`
+		OriginalSourceSHA string            `json:"original_source_sha"`
+		ToolSourceSHA     string            `json:"tool_source_sha"`
+		OperationID       string            `json:"operation_id"`
+		OriginalRunID     string            `json:"original_run_id"`
+		ActualRunID       string            `json:"actual_run_id"`
+		ManifestSHA256    string            `json:"manifest_sha256"`
+		ArchiveSHA256     string            `json:"archive_sha256"`
+		RequestSHA256     string            `json:"request_sha256"`
+		ElapsedMillis     int64             `json:"elapsed_millis"`
+		Engines           []json.RawMessage `json:"engines"`
+		Files             []json.RawMessage `json:"files"`
+	}
+	if zeroReadErr != nil || zeroStatErr != nil || zeroCloseErr != nil || !os.SameFile(zeroBefore, zeroAfter) || zeroBefore.Size() != zeroAfter.Size() || zeroBefore.ModTime() != zeroAfter.ModTime() || int64(len(zeroRaw)) != zeroBefore.Size() || sha(zeroRaw) != zeroHash || exactJSON(zeroRaw, &zero) != nil || zero.FormatVersion != 1 || zero.Kind != "original_preparation_isolated_restore_zero" || zero.OriginalSourceSHA != source || zero.ToolSourceSHA != source || zero.OperationID != op || zero.OriginalRunID != invRun || zero.ActualRunID != actualRun || zero.ManifestSHA256 != manifestHash || zero.ArchiveSHA256 != result["archive_sha256"] || zero.RequestSHA256 != requestHash || zero.ElapsedMillis <= 0 || float64(zero.ElapsedMillis) > elapsed || len(zero.Engines) != 2 || len(zero.Files) != 5 {
+		t.Fatal("public_cli_native_preparation_zero_binding_failed")
+	}
 	after := nativeNamespaceOriginalDigest(t, db, mdb)
 	if before != after {
 		t.Fatal("public_cli_native_original_catalog_or_content_changed")
@@ -1168,7 +1370,8 @@ func TestLifecyclePublicCLINativeWindowToolPrepareRootOnce(t *testing.T) {
 		filepath.Join(invocation, "lifecycle-request.json"):     requestHash,
 		filepath.Join(invocation, "manifest.json"):              manifestHash,
 		filepath.Join(root, "lifecycle-request.json"):           requestHash,
-		pkg: packageHash,
+		filepath.Join(root, zeroName):                           zeroHash,
+		pkg:                                                     packageHash,
 	} {
 		actual, readErr := os.ReadFile(path)
 		if readErr != nil || sha(actual) != expected {
@@ -1176,7 +1379,7 @@ func TestLifecyclePublicCLINativeWindowToolPrepareRootOnce(t *testing.T) {
 		}
 	}
 	var actualIntent publicCLIWindowIntent
-	if publicCLIPrivateJSON(filepath.Join(invocation, "native-call.intent.private.json"), &actualIntent) != nil || actualIntent != (publicCLIWindowIntent{Format: 1, Kind: "independent_window_tool_native_invocation", Dispatcher: source, Tool: source, Original: source, Operation: op, OriginalRun: invRun, ActualRun: actualRun, Stage: "prepare", Template: templateHash, Request: requestHash, Manifest: manifestHash, Package: packageHash, ToolDirectory: toolDirectory, ToolProgram: toolHashes["compatibility-window-tool.py"], Native: binaryHashes[runtime.GOARCH], NativePath: filepath.Join(root, "restore-native"), SourceUID: 0, Drop: false}) {
+	if publicCLIPrivateJSON(filepath.Join(invocation, "native-call.intent.private.json"), &actualIntent) != nil || actualIntent != (publicCLIWindowIntent{Format: 1, Kind: "independent_window_tool_native_invocation", Dispatcher: source, Tool: source, Original: source, Operation: op, OriginalRun: invRun, ActualRun: actualRun, Stage: "prepare", Template: templateHash, Request: requestHash, Manifest: manifestHash, Package: packageHash, ToolDirectory: toolDirectory, ToolProgram: toolHashes["compatibility-window-tool.py"], Native: binaryHashes[runtime.GOARCH], NativePath: filepath.Join(root, "restore-native"), BImage: apiImage, BProgram: apiProgram, SourceUID: 0, Drop: false}) {
 		t.Fatal("public_cli_native_window_tool_intent_binding_failed")
 	}
 	callIntent, e := os.ReadFile(filepath.Join(invocation, "native-call.intent.private.json"))

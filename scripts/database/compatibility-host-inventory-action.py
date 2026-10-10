@@ -36,7 +36,7 @@ CONTEXT_MODE = 'current_ssh_session_observation'
 INVENTORY_PROTOCOL = 'qs-retirement-linux-host-inventory/v1'
 INVENTORY_OBSERVATION_PROTOCOL = 'qs-retirement-linux-host-inventory/v2'
 AUDITED_SOURCE = '0d5d75046328e6d4a415380f4ed249a6d3c9714c'
-INVENTORY_SHA = 'f0827b5c2e5fe803cd6ba11676fc0611659d2b91cf91cb2097333a2658c625b4'
+INVENTORY_SHA = '73b76f309cbdec1524c83624e7b0eb784864713eeb6418589357f880a212922b'
 TRANSPORT_SHA = '5f88b51b14771960a46670a4e32353547bb2da5c0e303c4d3b27b4f58cc2e92a'
 SOURCE = re.compile(r'[0-9a-f]{40}')
 HASH = re.compile(r'[0-9a-f]{64}')
@@ -54,8 +54,8 @@ SSH_FIELDS = ('authenticationmethods', 'authorizedkeysfile', 'authorizedkeyscomm
 ALWAYS_UNKNOWN = frozenset(('management_channel_and_request_origin_unproven', 'all_match_contexts_not_enumerated', 'nss_external_subject_coverage_unknown', 'all_writers_and_external_services_unproven', 'historical_refs_reruns_queues_approvals_not_fenced', 'local_runner_bypass_not_fenced', 'existing_sessions_not_drained', 'effective_acl_visibility_unknown', 'systemd_user_socket_and_transient_activation_coverage_unknown', 'ssh_key_option_semantics_and_authentication_unproven'))
 INVENTORY_ERRORS = frozenset(('account_schema_unknown', 'command_denied_or_failed', 'command_executable_changed', 'command_executable_unprotected', 'command_not_in_closed_read_set', 'command_output_budget_exceeded', 'command_timeout', 'command_unavailable', 'cron_directory_budget_exceeded', 'directory_changed_during_read', 'directory_missing', 'directory_permission_unknown', 'directory_read_unknown', 'docker_mount_schema_unknown', 'docker_projection_schema_unknown', 'docker_roster_schema_or_budget_unknown', 'file_budget_exceeded', 'file_changed_during_read', 'file_link_or_type_unsupported', 'file_missing', 'file_path_unsupported', 'file_permission_unknown', 'file_read_unknown', 'file_content_forbidden', 'inventory_deadline_exceeded', 'inventory_input_rejected', 'inventory_request_rejected', 'inventory_fixed_failure', 'linux_host_required', 'process_budget_exceeded', 'process_link_visibility_unknown', 'process_schema_unknown', 'property_projection_schema_unknown', 'session_listing_schema_unknown', 'ssh_authorized_key_schema_unknown', 'ssh_config_syntax_unknown', 'ssh_effective_duplicate_key', 'ssh_effective_projection_incomplete', 'ssh_include_cycle_or_depth_unknown', 'ssh_include_directory_changed', 'ssh_include_path_unsupported', 'systemd_listing_schema_unknown', 'systemd_unit_budget_exceeded'))
 UNKNOWN_EXTRA = frozenset(('ssh_daemon_original_argv_unknown', 'ssh_daemon_cli_override_unproven', 'ssh_actual_daemon_config_unknown', 'dynamic_ssh_key_or_principal_provider_unknown', 'ssh_context_subject_not_in_local_accounts', 'ssh_key_path_expansion_unsupported', 'ssh_public_key_file_name_unsupported', 'additional_ssh_ca_or_principal_source_unproven', 'systemd_execution_and_secret_environment_not_read', 'cron_contents_and_indirect_scripts_not_read', 'session_environment_origin_unproven', 'ssh_daemon_loaded_configuration_unproven', 'ssh_session_daemon_binding_unknown', 'ssh_session_host_unobserved'))
-ATTEMPTS = frozenset(('accounts_visibility', 'process_visibility', 'ssh_config_visibility', 'ssh_effective_visibility', 'ssh_authorized_key_visibility', 'container_writable_path_visibility', 'systemd_writable_path_visibility', 'docker_visibility', 'systemd_visibility', 'sessions_visibility', 'cron_visibility', 'sudo_list_visibility', 'docker_socket_visibility', 'host_identity_visibility', 'namespace_visibility', 'process_end_recheck', 'docker_end_recheck', 'sessions_end_recheck', 'systemd_end_recheck', 'ssh_end_recheck', 'boot_end_recheck', 'files_end_recheck', 'session_context_visibility'))
-COMMANDS = frozenset(('sudo_list', 'docker_list', 'docker_inspect', 'sessions', 'units', 'unit_files', 'timers', 'sshd', 'unit', 'session','sshd_global'))
+ATTEMPTS = frozenset(('accounts_visibility', 'process_visibility', 'ssh_config_visibility', 'ssh_effective_visibility', 'ssh_authorized_key_visibility', 'container_writable_path_visibility', 'systemd_writable_path_visibility', 'docker_visibility', 'systemd_visibility', 'sessions_visibility', 'cron_visibility', 'sudo_list_visibility', 'docker_socket_visibility', 'host_identity_visibility', 'namespace_visibility', 'process_end_recheck', 'docker_end_recheck', 'sessions_end_recheck', 'systemd_end_recheck', 'ssh_end_recheck', 'boot_end_recheck', 'files_end_recheck', 'session_context_visibility', 'qs_service_visibility'))
+COMMANDS = frozenset(('sudo_list', 'docker_list', 'docker_inspect', 'sessions', 'units', 'unit_files', 'timers', 'sshd', 'unit', 'session','sshd_global', 'qs_service_inspect', 'qs_restore_image_present', 'qs_restore_image_inspect'))
 
 class Rejected(Exception):
     def __init__(self, category):
@@ -297,7 +297,12 @@ def validate_report(raw, a, approved, req_raw, run):
     if i['boot_id_sha256'] is not None: digest(i['boot_id_sha256'])
     if type(i['namespaces']) is not dict or not set(i['namespaces']) <= {'mnt','pid','user'}: reject('inventory_report_rejected')
     for x in i['namespaces'].values(): digest(x)
-    o=v['observations'];exact(o,('accounts','processes','ssh','docker','systemd','sessions','cron','sudo_list','files'),'inventory_report_rejected')
+    o=v['observations'];exact(o,('accounts','processes','ssh','docker','systemd','sessions','cron','sudo_list','files','qs_services'),'inventory_report_rejected')
+    services=o['qs_services']
+    if services is not None:
+        api=inventory_api(INVENTORY_SOURCE_BYTES())
+        try:api['validate_qs_service_observation'](services,ROUTES[a['host_class']][1])
+        except api['Unknown']:reject('inventory_report_rejected')
     accounts=o['accounts']
     if accounts is not None:
         exact(accounts,('local_subjects','passwd_raw_sha256','group_raw_sha256','nss_complete'),'inventory_report_rejected');digest(accounts['passwd_raw_sha256']);digest(accounts['group_raw_sha256'])
@@ -443,6 +448,8 @@ def projection(a, approved, run, req_raw=None, report_raw=None, report=None, cat
                 v['derived_request_created']=False;v.pop('derived_request_sha256',None)
     if report is not None:
         o=report['observations'];v.update(report_sha256=sha(report_raw),unknown_count=len(report['unknown']),unknown_sha256=sha(canonical(report['unknown'])),recheck_failed_count=sum(r['unchanged'] is False for r in report['end_rechecks']),counts={'accounts':len(o['accounts']['local_subjects']) if o['accounts'] is not None else 0,'processes':o['processes']['observed'],'ssh_contexts':len(o['ssh']['matches']),'containers':len(o['docker']['containers']) if o['docker'] is not None else 0,'units':len(o['systemd']['rows']) if o['systemd'] is not None else 0,'sessions':len(o['sessions']['rows']) if o['sessions'] is not None else 0,'files':len(o['files']),'read_calls':len(report['read_only_command_receipts'])})
+        if o['qs_services'] is not None:v['qs_services']=o['qs_services']
+        v['qs_service_observation_sha256']=o['qs_services']['observation_sha256'] if o['qs_services'] is not None else ''
         if a['protocol']==OBSERVATION_PROTOCOL:
             so=report['session_observation']
             v.update(observed_matches_sha256=so['derived_matches_sha256'],session_identity_sha256=so['identity_sha256'],session_connection_sha256=so['connection_sha256'],host_status=so['host_status'],usedns=so['usedns'])
@@ -455,7 +462,7 @@ def projection(a, approved, run, req_raw=None, report_raw=None, report=None, cat
 
 PROJECTION_SCHEMA={'protocol':frozenset(('qs_host_inventory_observation_v1','qs_host_inventory_observation_v2')),'source_sha':'sha40','approval_sha256':'hash64','operation_id':'run_id','run_id':'run_id','host_class':frozenset(ROUTES),'inventory_sha256':'hash64','inventory_audited_source_sha':'sha40','wrapper_sha256':'hash64','derived_request_created':'bool','derived_request_sha256':'hash64','status':frozenset(('observed','failed','unsupported')),'cleanup':frozenset(('verified','unknown')),'capabilities':dict.fromkeys(CAPS,'bool'),'report_sha256':'hash64','unknown_count':'uint','unknown_sha256':'hash64','recheck_failed_count':'uint','counts':dict.fromkeys(('accounts','processes','ssh_contexts','containers','units','sessions','files','read_calls'),'uint'),'error_category':ERRORS,'visibility_gap':frozenset(('runner_management_channel_unknown',))}
 
-PROJECTION_SCHEMA.update({'context_mode':frozenset((CONTEXT_MODE,)),'seed_request_sha256':'hash64','session_origin_proven':'bool','partial':'bool','observed_matches_sha256':'hash64','session_identity_sha256':'hash64','session_connection_sha256':'hash64','host_status':frozenset(('numeric_peer_from_usedns_no','host_unobserved')),'usedns':frozenset(('no','yes','unknown')),'diagnostics':DIAGNOSTIC_SCHEMA})
+PROJECTION_SCHEMA.update({'context_mode':frozenset((CONTEXT_MODE,)),'seed_request_sha256':'hash64','session_origin_proven':'bool','partial':'bool','observed_matches_sha256':'hash64','session_identity_sha256':'hash64','session_connection_sha256':'hash64','host_status':frozenset(('numeric_peer_from_usedns_no','host_unobserved')),'usedns':frozenset(('no','yes','unknown')),'diagnostics':DIAGNOSTIC_SCHEMA, 'qs_service_observation_sha256':'hash64_or_empty', 'qs_service_artifact_sha256':'hash64'})
 
 def validate_diagnostics(value, cleanup):
     exact(value, DIAGNOSTIC_SCHEMA, 'transport_output_rejected')
@@ -474,7 +481,8 @@ def validate_diagnostics(value, cleanup):
 
 def validate_projection(v,a,approved,run,req_raw):
     base={'protocol','source_sha','approval_sha256','operation_id','run_id','host_class','inventory_sha256','inventory_audited_source_sha','wrapper_sha256','derived_request_created','status','cleanup','capabilities','derived_request_sha256'}
-    observed={'report_sha256','unknown_count','unknown_sha256','recheck_failed_count','counts'}
+    observed={'report_sha256','unknown_count','unknown_sha256','recheck_failed_count','counts','qs_service_observation_sha256'}
+    if type(v) is dict and 'qs_services' in v:observed.add('qs_services')
     observation=a['protocol']==OBSERVATION_PROTOCOL
     if observation:
         base|={'context_mode','seed_request_sha256','session_origin_proven','partial'}
@@ -503,6 +511,14 @@ def validate_projection(v,a,approved,run,req_raw):
     if v['status']=='observed' and set(v)!=base|observed:reject('transport_output_rejected')
     if v['status']=='failed' and 'error_category' not in v:reject('transport_output_rejected')
     if 'error_category' in v and v['error_category'] not in ERRORS:reject('transport_output_rejected')
+    if 'qs_service_observation_sha256' in v and (v['qs_service_observation_sha256']!='') != ('qs_services' in v):reject('transport_output_rejected')
+    if 'qs_services' in v:
+        services=v['qs_services']
+        if services is not None:
+            api=inventory_api(INVENTORY_SOURCE_BYTES())
+            try:api['validate_qs_service_observation'](services,ROUTES[a['host_class']][1])
+            except api['Unknown']:reject('transport_output_rejected')
+        if v['qs_service_observation_sha256'] != (services['observation_sha256'] if services is not None else ''):reject('transport_output_rejected')
     if 'counts' in v:
         exact(v['counts'],PROJECTION_SCHEMA['counts'],'transport_output_rejected')
         for val in v['counts'].values():integer(val,32768)
@@ -792,7 +808,39 @@ def run_action(env,repo,capture_fn=capture):
         # Preserve the primary fixed error. Cleanup facts never create authority.
     return result
 
+def service_artifact(value, env):
+    # Only this closed public service projection survives the old raw/private
+    # report cleanup. It is input metadata, not an approval, lease or fence.
+    closed=dict(value); services=closed.pop('qs_services',None)
+    if services is None or closed.get('status')!='observed' or closed.get('cleanup')!='verified':return closed
+    api=inventory_api(INVENTORY_SOURCE_BYTES())
+    try:api['validate_qs_service_observation'](services,ROUTES[closed['host_class']][1])
+    except api['Unknown']:reject('inventory_report_rejected')
+    payload={'protocol':'qs_service_descriptor_observation_v1',
+        **{k:closed[k] for k in ('source_sha','operation_id','run_id','host_class','inventory_sha256','wrapper_sha256','approval_sha256','report_sha256')},
+        'actual_projection_sha256':sha(canonical(closed)), 'service_observation':services,
+        'capabilities':dict.fromkeys(CAPS,False)}
+    raw=canonical(payload); base=Path(env.get('RUNNER_TEMP',''))
+    if not base.is_absolute() or not base.is_dir():reject('private_file_rejected')
+    name='qs-service-observation-'+closed['operation_id']+'-'+closed['run_id']
+    directory=base/name
+    try:directory.mkdir(mode=0o700)
+    except FileExistsError:reject('private_namespace_conflict')
+    fd,_=private_dir(directory);os.close(fd)
+    write_exclusive(directory,'service-observation.private.json',raw)
+    path=directory/'service-observation.private.json'
+    actual,_=read_private(path)
+    if actual!=raw:reject('private_file_changed')
+    closed['qs_service_artifact_sha256']=sha(raw)
+    output=env.get('GITHUB_OUTPUT')
+    if type(output) is not str or not output:reject('action_input_rejected')
+    with open(output,'a',encoding='utf-8') as handle:
+        handle.write('service_observation_path='+str(path)+'\nservice_observation_artifact='+name+'\n')
+    return closed
+
 def emit(v,transport):
+    v=dict(v)
+    if v.pop("qs_services",None) is not None:reject("transport_output_rejected")
     raw=Path(transport).read_bytes()
     if sha(raw)!=TRANSPORT_SHA:reject('package_rejected')
     # Compile the exact pinned bytes, not a second path-based import.
@@ -816,7 +864,7 @@ def main():
             print(verify_handshake_key(args.key_type,args.key_blob,route['fingerprint']),end='');return 0
         if args.command=='remote':print(canonical(remote(args.asset_dir,args.approval_sha,args.run,args.package_sha)).decode(),end='');return 0
         if args.command=='cleanup':print(canonical(remote_cleanup(args.asset_dir,args.package_sha)).decode(),end='');return 0
-        value=run_action(dict(os.environ),args.repo);emit(value,Path(args.repo)/'scripts/dbops/receipt-transport.py');return 0 if value['status']=='observed' and value['cleanup']=='verified' else 1
+        value=service_artifact(run_action(dict(os.environ),args.repo),dict(os.environ));emit(value,Path(args.repo)/'scripts/dbops/receipt-transport.py');return 0 if value['status']=='observed' and value['cleanup']=='verified' else 1
     except Rejected as e:
         # Fixed category only. No argv, file paths, route, captured output or input.
         print(canonical({'protocol':'qs_host_inventory_action_error_v1','error_category':str(e),'capabilities':dict.fromkeys(CAPS,False)}).decode(),end='');return 1

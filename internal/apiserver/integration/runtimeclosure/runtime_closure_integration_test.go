@@ -122,28 +122,37 @@ func runCurrentRuntimeClosure(t *testing.T, eventFactory runtimeClosureEventFact
 	startedAt := time.Now().UTC().Add(-5 * time.Second)
 
 	sqlDB, databaseName := openRuntimeDatabase(t, mysqlDSN)
-	mysqlMigrator := migrationpkg.NewMigrator(sqlDB, &migrationpkg.Config{Enabled: true, Database: databaseName})
-	mysqlVersion, changed, err := mysqlMigrator.Run()
-	if err != nil || !changed || mysqlVersion == 0 {
+	// Current runtime closure proves the real pristine B path. Both stores must
+	// be observed before either migration creates a version namespace.
+	mongoClient, mongoDB := mongodbtest.ReplicaSetDatabase(t)
+	pair := runtimeClosurePristinePair(t, sqlDB, databaseName, mongoClient, mongoDB.Name())
+	mysqlVersion, changed, err := migrationpkg.NewMigrator(sqlDB, pair.MySQLConfig(false)).Run()
+	if err != nil || !changed || mysqlVersion != 100 {
 		t.Fatalf("migrate empty MySQL: version=%d changed=%v err=%v", mysqlVersion, changed, err)
 	}
-	if version, changed, err := mysqlMigrator.Run(); err != nil || changed || version != mysqlVersion {
+	mongoVersion, changed, err := migrationpkg.NewMongoMigrator(mongoClient, pair.MongoConfig(false)).Run()
+	if err != nil || !changed || mongoVersion != 39 {
+		t.Fatalf("migrate empty MongoDB: version=%d changed=%v err=%v", mongoVersion, changed, err)
+	}
+	// The consumed pristine authorization is not reusable. A restart gets a
+	// fresh genuine installed-pair preflight after both actual upgrades finish.
+	restart, err := migrationpkg.PreflightCompatibilityPair(t.Context(), sqlDB, mongoClient, migrationpkg.PairConfig{
+		MySQLDatabase: databaseName, MongoDatabase: mongoDB.Name(), ExpectedSourceSHA: runtimeClosureCompiledSource(t),
+	})
+	if err != nil {
+		t.Fatalf("preflight complete current pair: %v", err)
+	}
+	if version, changed, err := migrationpkg.NewMigrator(sqlDB, restart.MySQLConfig(false)).Run(); err != nil || changed || version != mysqlVersion {
 		t.Fatalf("repeat MySQL migration: version=%d want_version=%d changed=%v err=%v", version, mysqlVersion, changed, err)
+	}
+	if version, changed, err := migrationpkg.NewMongoMigrator(mongoClient, restart.MongoConfig(false)).Run(); err != nil || changed || version != mongoVersion {
+		t.Fatalf("repeat MongoDB migration: version=%d want_version=%d changed=%v err=%v", version, mongoVersion, changed, err)
 	}
 	gormDB, err := gorm.Open(gormmysql.New(gormmysql.Config{Conn: sqlDB, SkipInitializeWithVersion: true}), &gorm.Config{})
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	mongoClient, mongoDB := mongodbtest.ReplicaSetDatabase(t)
-	mongoMigrator := migrationpkg.NewMongoMigrator(mongoClient, &migrationpkg.Config{Enabled: true, Database: mongoDB.Name()})
-	mongoVersion, changed, err := mongoMigrator.Run()
-	if err != nil || !changed || mongoVersion == 0 {
-		t.Fatalf("migrate empty MongoDB: version=%d changed=%v err=%v", mongoVersion, changed, err)
-	}
-	if version, changed, err := mongoMigrator.Run(); err != nil || changed || version != mongoVersion {
-		t.Fatalf("repeat MongoDB migration: version=%d want_version=%d changed=%v err=%v", version, mongoVersion, changed, err)
-	}
+	assertRetiredRuntimeNamespacesAbsent(t, gormDB, mongoDB)
 
 	redisOptions, err := redis.ParseURL(redisURL)
 	if err != nil {
@@ -475,13 +484,13 @@ func runCurrentRuntimeClosure(t *testing.T, eventFactory runtimeClosureEventFact
 	assertCurrentRuntimeFacts(t, gormDB, mongoDB, orgID, testeeID, entryID, taskID, answerResponse.GetId(), readiness.GetAssessmentId(), startedAt)
 	testScanAfterConcurrentClinicianTransfer(t, c, gormDB, orgID, testeeID, entryID)
 	assertLegacyBusinessDateStatistics(t, c, gormDB, orgID, testeeID)
+	assertRetiredRuntimeNamespacesAbsent(t, gormDB, mongoDB)
 }
 
 func assertEvaluationIntentCount(t *testing.T, db *gorm.DB, standard bool, eventType string, want int64) {
 	t.Helper()
 	if standard {
 		assertRowCount(t, db, "rm_outbox", "event_type = ?", want, eventType)
-		assertRowCount(t, db, "domain_event_outbox", "event_type = ?", 0, eventType)
 		return
 	}
 	assertRowCount(t, db, "domain_event_outbox", "event_type = ?", want, eventType)
@@ -505,10 +514,7 @@ func assertStandardEvaluationPublished(t *testing.T, db *gorm.DB, eventType stri
 
 func assertStandardMongoIntentPublished(t *testing.T, db *mongo.Database, eventType string) {
 	t.Helper()
-	old, err := db.Collection("domain_event_outbox").CountDocuments(t.Context(), bson.M{"event_type": eventType})
-	if err != nil || old != 0 {
-		t.Fatalf("old Mongo %s intents=%d err=%v, want zero", eventType, old, err)
-	}
+	assertRetiredMongoRuntimeNamespaceAbsent(t, db)
 	deadline := time.Now().Add(5 * time.Second)
 	for time.Now().Before(deadline) {
 		count, err := db.Collection("rm_outbox").CountDocuments(t.Context(), bson.M{"event_type": eventType, "state": "published"})
@@ -521,6 +527,42 @@ func assertStandardMongoIntentPublished(t *testing.T, db *mongo.Database, eventT
 		time.Sleep(20 * time.Millisecond)
 	}
 	t.Fatalf("standard Mongo %s intent was not published after Worker delivery", eventType)
+}
+
+// B's current-runtime fixture must retain the actual absence of all four
+// retired namespaces through the full business closure. Query failures are
+// failures; neither a missing-table error nor an empty Mongo read proves this.
+func assertRetiredRuntimeNamespacesAbsent(t *testing.T, db *gorm.DB, mongoDB *mongo.Database) {
+	t.Helper()
+	var names []string
+	if err := db.Raw(`SELECT TABLE_NAME FROM information_schema.TABLES
+WHERE TABLE_SCHEMA = DATABASE() AND BINARY TABLE_NAME IN (?, ?, ?)
+ORDER BY TABLE_NAME`, "domain_event_outbox", "ai_bridge_commands", "ai_messaging_legacy_commands").Scan(&names).Error; err != nil {
+		t.Fatalf("read retired SQL namespace metadata: %v", err)
+	}
+	if len(names) != 0 {
+		t.Fatalf("retired SQL namespaces are present: %v", names)
+	}
+	assertRetiredMongoRuntimeNamespaceAbsent(t, mongoDB)
+}
+
+func assertRetiredMongoRuntimeNamespaceAbsent(t *testing.T, db *mongo.Database) {
+	t.Helper()
+	cursor, err := db.ListCollections(t.Context(), bson.D{{Key: "name", Value: "domain_event_outbox"}})
+	if err != nil {
+		t.Fatalf("read retired Mongo namespace metadata: %v", err)
+	}
+	defer func() {
+		if err := cursor.Close(t.Context()); err != nil {
+			t.Errorf("close retired Mongo namespace metadata cursor: %v", err)
+		}
+	}()
+	if cursor.Next(t.Context()) {
+		t.Fatal("retired Mongo namespace domain_event_outbox is present")
+	}
+	if err := cursor.Err(); err != nil {
+		t.Fatalf("scan retired Mongo namespace metadata: %v", err)
+	}
 }
 
 func createRuntimeActorAndEntry(t *testing.T, c *container.Container, grpcDeps grpctransport.Deps, orgID uint64) (uint64, uint64) {
@@ -885,6 +927,10 @@ func assertSingleCommittedReport(t *testing.T, db *mongo.Database, standardMongo
 	count, err := db.Collection(outboxCollection).CountDocuments(t.Context(), bson.M{"event_type": eventcatalog.InterpretationReportGenerated})
 	if err != nil || count != 1 {
 		t.Fatalf("%s report generated count=%d err=%v, want one", outboxCollection, count, err)
+	}
+	if standardMongo {
+		assertRetiredMongoRuntimeNamespaceAbsent(t, db)
+		return
 	}
 	unused, err := db.Collection(unusedCollection).CountDocuments(t.Context(), bson.M{"event_type": eventcatalog.InterpretationReportGenerated})
 	if err != nil || unused != 0 {

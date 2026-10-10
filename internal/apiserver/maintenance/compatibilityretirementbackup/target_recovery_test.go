@@ -112,7 +112,7 @@ func TestTargetRecoveryHeadAndConstraints(t *testing.T) {
 	for _, v := range []struct {
 		actual, original uint64
 		want             bool
-	}{{99, 99, true}, {100, 99, true}, {101, 99, false}, {0, 0, false}, {0, ^uint64(0), false}} {
+	}{{99, 99, true}, {100, 99, false}, {101, 99, false}, {0, 0, false}, {0, ^uint64(0), false}} {
 		if targetSupportedHead(v.actual, v.original) != v.want {
 			t.Fatal("unsupported head rule")
 		}

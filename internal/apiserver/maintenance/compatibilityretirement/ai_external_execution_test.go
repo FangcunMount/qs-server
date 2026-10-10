@@ -100,6 +100,52 @@ func TestAIExternalRuntimeRequiresActualImmutableSourceAndStableContainer(t *tes
 	}
 }
 
+func TestAIExternalCurrentObservationKeepsSettingsPrivateAndCannotStop(t *testing.T) {
+	in := AIExternalExecutionInput{RuntimeSourceSHA: strings.Repeat("a", 40), ImageID: "sha256:" + strings.Repeat("b", 64), ContainerID: strings.Repeat("c", 64)}
+	snap := aiStoppedSnapshot{Runtime: aiExternalRuntime{ContainerID: in.ContainerID, ImageID: in.ImageID, Name: "/qs-ai", Status: "running", StartedAt: "2026-10-09T00:00:00Z", Running: true, ReadOnlyRoot: true, ContainerRevision: in.RuntimeSourceSHA, ImageRevision: in.RuntimeSourceSHA, Command: []string{"/app/.venv/bin/python", "-m", "qs_ai.bootstrap.server"}}, PID: 123, RestartPolicy: "unless-stopped", NetworkID: strings.Repeat("d", 64), Settings: map[string]string{"QS_AI_DATABASE_URL": "synthetic-private-setting"}, HealthcheckTest: []string{"CMD", "/app/.venv/bin/python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/readyz', timeout=3)"}}
+	binding := strings.Repeat("e", 64)
+	observed, err := aiExternalObservationFromSnapshot(in, binding, snap)
+	if err != nil || observed.SourceSHA != in.RuntimeSourceSHA || observed.ImageID != in.ImageID || observed.ContainerID != in.ContainerID || observed.BindingSHA256 != binding || observed.StopConstraints.SettingsSHA256 != sourceSHA(aiJSONBytes(snap.Settings)) || !observed.StopConstraints.Valid() {
+		t.Fatal("actual snapshot projection rejected")
+	}
+	raw, err := json.Marshal(observed)
+	if err != nil || strings.Contains(string(raw), "synthetic-private-setting") || strings.Contains(string(raw), "drop_ready") || strings.Contains(string(raw), "lease") {
+		t.Fatal("settings or authority escaped observation")
+	}
+	for _, mutate := range []func(*aiStoppedSnapshot){func(v *aiStoppedSnapshot) { v.Runtime.Running = false }, func(v *aiStoppedSnapshot) { v.Runtime.ContainerRevision = strings.Repeat("f", 40) }, func(v *aiStoppedSnapshot) { v.PID = 0 }, func(v *aiStoppedSnapshot) { v.RestartPolicy = "always" }, func(v *aiStoppedSnapshot) { v.NetworkID = "unobserved" }, func(v *aiStoppedSnapshot) { v.ExecIDs = []string{"unsettled-original-exec"} }, func(v *aiStoppedSnapshot) { v.HealthcheckTest = nil }, func(v *aiStoppedSnapshot) { v.Paused = true }, func(v *aiStoppedSnapshot) { v.Settings = nil }} {
+		changed := snap
+		mutate(&changed)
+		if _, err = aiExternalObservationFromSnapshot(in, binding, changed); err == nil {
+			t.Fatal("unproven runtime/constraint accepted")
+		}
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	for _, work := range []context.Context{nil, ctx} {
+		if _, err = ObserveAIExternalCurrentRuntime(work, false); err != ErrAIExternalInput {
+			t.Fatal("missing live context reached native reader")
+		}
+	}
+}
+
+func TestAIExternalReleaseOwnerUsesNativeRootActorAndActualNonRootUID(t *testing.T) {
+	for _, row := range []struct {
+		euid   int
+		native string
+		want   uint32
+	}{{0, "1001", 1001}, {0, "0", 0}, {0, "", 0}, {1001, "0", 1001}, {1001, "not-an-authenticated-uid", 1001}} {
+		got, err := aiExternalReleaseOwnerUIDValue(row.euid, row.native)
+		if err != nil || got != row.want {
+			t.Fatal("native root actor or actual non-root identity changed")
+		}
+	}
+	for _, value := range []string{"-1", "+1001", "01001", "1001\n", "4294967296", "user", " ", "null"} {
+		if _, err := aiExternalReleaseOwnerUIDValue(0, value); err == nil {
+			t.Fatal("noncanonical native actor accepted")
+		}
+	}
+}
+
 func TestAIExternalPrivateResultOutputHasHardBound(t *testing.T) {
 	writer := &aiExternalBoundedOutput{limit: 3}
 	if n, e := writer.Write([]byte("123")); n != 3 || e != nil {

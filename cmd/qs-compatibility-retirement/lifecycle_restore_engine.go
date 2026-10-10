@@ -45,6 +45,7 @@ type lifecycleOwnedEngine struct {
 	ID, Name, ImageID, Kind, Tool, Archive, Namespace, Owner, Docker string
 	Volumes                                                          []string
 	Labels, ContainerLabels                                          map[string]string
+	materialRecords                                                  map[string]string
 }
 type lifecycleEngineInspection struct {
 	ID         string `json:"Id"`
@@ -281,6 +282,7 @@ func startLifecycleOwnedEngine(ctx context.Context, r lifecycleRequest, kind, im
 		e.Volumes = append(e.Volumes, "qs-retirement-config-"+owner)
 	}
 	e.ContainerLabels = map[string]string{}
+	e.materialRecords = map[string]string{}
 	for k, v := range actualImage.Config.Labels {
 		e.ContainerLabels[k] = v
 	}
@@ -301,7 +303,7 @@ func startLifecycleOwnedEngine(ctx context.Context, r lifecycleRequest, kind, im
 	// Durable intent precedes the first engine/volume write. Failures deliberately
 	// retain precisely registered resources; no automatic delete/retry/adoption.
 	registry := map[string]any{"format_version": 1, "kind": "temporary_network_none_restore_intent", "original_source_sha": r.OriginalSourceSHA, "tool_source_sha": r.ToolSourceSHA, "operation_id": r.OperationID, "actual_run_id": r.ActualRunID, "manifest_sha256": r.ManifestSHA256, "archive_sha256": r.Recovery.ArchiveSHA256, "namespace": namespace, "owner": owner, "container_name": e.Name, "image_id": image, "architecture": actualImage.Architecture, "labels": e.Labels, "container_labels": e.ContainerLabels, "volumes": e.Volumes, "tool_sha256": hex.EncodeToString(h.Sum(nil)), "network": "none", "drop_authority": false, "purge_after_acceptance_required": true}
-	if writeJSON(filepath.Join(r.prepareRoot, "restore-"+owner+".intent.private.json"), registry) != nil {
+	if writeLifecycleMaterialJSON(filepath.Join(r.prepareRoot, "restore-"+owner+".intent.private.json"), registry, e.materialRecords) != nil {
 		return nil, lifecycleError("lifecycle_restore_registry_exists_or_unknown")
 	}
 	labelArgs := []string{}
@@ -337,7 +339,7 @@ func startLifecycleOwnedEngine(ctx context.Context, r lifecycleRequest, kind, im
 	if err = e.check(ctx, true); err != nil {
 		return nil, err
 	}
-	if writeJSON(filepath.Join(r.prepareRoot, "restore-"+owner+".created.private.json"), map[string]any{"container_id": e.ID, "owner": owner, "operation_id": r.OperationID, "actual_run_id": r.ActualRunID, "drop_authority": false}) != nil {
+	if writeLifecycleMaterialJSON(filepath.Join(r.prepareRoot, "restore-"+owner+".created.private.json"), map[string]any{"container_id": e.ID, "owner": owner, "operation_id": r.OperationID, "actual_run_id": r.ActualRunID, "drop_authority": false}, e.materialRecords) != nil {
 		return nil, lifecycleError("lifecycle_restore_created_record_failed")
 	}
 	return e, nil

@@ -24,6 +24,8 @@ type TargetRecoveryReconciliation struct {
 	journalDir string
 	window     *fence.MaintenanceWindow
 	summary    TargetRecoveryReconciliationSummary
+	bMigration *targetBMigrationTransition
+	bResume    *TargetBRecoveryResumeRequest
 }
 
 type TargetRecoveryReconciliationSummary struct {
@@ -399,6 +401,10 @@ func targetActualNamespace(ctx context.Context, p *TargetRecoveryPlan, i int) (b
 // Current-head migration-generation transitions must be separately approved;
 // the existing checkBases deliberately rejects an unbound generation change.
 func ReconcileTargetRecovery(ctx context.Context, a *Archive, b TargetRecoveryBorrowed, r TargetRecoveryResumeRequest, dir string, w *fence.MaintenanceWindow) (*TargetRecoveryReconciliation, error) {
+	return reconcileTargetRecovery(ctx, a, b, r, dir, w, nil)
+}
+
+func reconcileTargetRecovery(ctx context.Context, a *Archive, b TargetRecoveryBorrowed, r TargetRecoveryResumeRequest, dir string, w *fence.MaintenanceWindow, transition *targetBMigrationTransition) (*TargetRecoveryReconciliation, error) {
 	if ctx == nil || ctx.Err() != nil || a == nil || b.SQL == nil || b.Mongo == nil || w == nil || mongo.SessionFromContext(ctx) != nil || !runPattern.MatchString(r.CurrentRunID) || !hashPattern.MatchString(r.JournalSHA256) || !hashPattern.MatchString(r.WindowStartSHA256) {
 		return nil, ErrRecoveryBinding
 	}
@@ -419,19 +425,30 @@ func ReconcileTargetRecovery(ctx context.Context, a *Archive, b TargetRecoveryBo
 	if e != nil || window.Binding != want || !window.DirectoryLeaseHeld || !window.BudgetOnly || window.StartSHA256 != r.WindowStartSHA256 || window.RemainingMilliseconds <= 0 {
 		return nil, ErrRecoveryBinding
 	}
-	s, e := inspectTargetJournal(ctx, dir, original, r.WindowStartSHA256)
+	s, e := inspectTargetJournalKind(ctx, dir, original, r.WindowStartSHA256, targetTransitionJournalKind(transition))
 	if e != nil {
 		return nil, e
 	}
 	if s.hash != r.JournalSHA256 {
 		return nil, ErrRecoveryJournal
 	}
-	plan := &TargetRecoveryPlan{archive: a, borrowed: b, request: original}
+	// The ordinary API still refuses a B report. Only the separate actual
+	// journal+borrowed-handle producer can supply a private fresh transition.
+	if targetBMigrationJournalPresent(s) != (transition != nil) {
+		return nil, ErrRecoveryHead
+	}
+	plan := &TargetRecoveryPlan{archive: a, borrowed: b, request: original, window: w, bMigration: transition}
+	if transition != nil {
+		plan.journal, e = reopenTargetRecoveryJournalKind(ctx, dir, s, targetTransitionJournalKind(transition))
+		if e != nil {
+			return nil, e
+		}
+	}
 	plan.self = plan
 	if e = plan.checkBases(ctx, false); e != nil {
 		return nil, e
 	}
-	out := &TargetRecoveryReconciliation{archive: a, borrowed: b, request: r, journalDir: dir, window: w}
+	out := &TargetRecoveryReconciliation{archive: a, borrowed: b, request: r, journalDir: dir, window: w, bMigration: transition}
 	out.self = out
 	out.summary = TargetRecoveryReconciliationSummary{SourceSHA: original.SourceSHA, OperationID: original.OperationID, OriginalRunID: original.OriginalRunID, CurrentRunID: r.CurrentRunID, ManifestSHA256: original.ManifestSHA256, ArchiveSHA256: a.digest, JournalSHA256: s.hash, WindowStartSHA256: r.WindowStartSHA256, WriterFenceRequired: true}
 	for i := 0; i < 4; i++ {
@@ -514,7 +531,7 @@ func ReconcileTargetRecovery(ctx context.Context, a *Archive, b TargetRecoveryBo
 	if e = plan.checkBases(ctx, true); e != nil {
 		return nil, e
 	}
-	final, e := inspectTargetJournal(ctx, dir, original, r.WindowStartSHA256)
+	final, e := inspectTargetJournalKind(ctx, dir, original, r.WindowStartSHA256, targetTransitionJournalKind(transition))
 	if e != nil || final.hash != s.hash {
 		return nil, ErrRecoveryJournal
 	}
@@ -534,7 +551,7 @@ func (v *TargetRecoveryReconciliation) Recheck(ctx context.Context, b TargetReco
 	if v == nil || v.self != v {
 		return ErrRecoveryBinding
 	}
-	fresh, e := ReconcileTargetRecovery(ctx, v.archive, b, v.request, v.journalDir, w)
+	fresh, e := v.reconcileActual(ctx, b, w)
 	if e != nil {
 		return e
 	}
