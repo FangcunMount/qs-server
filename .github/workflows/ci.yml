@@ -42,6 +42,12 @@ jobs:
       - name: Verify private Linux loaded MQ observation
         run: QS_RUNTIME_FACTS_NATIVE_TEST=1 go test -race -count=1 -timeout=30s ./internal/pkg/runtimefacts -run '^TestNativeLinux'
 
+      - name: Verify root observer across Linux PID namespaces
+        run: |
+          native_binary="$RUNNER_TEMP/qs-runtime-facts-native.test"
+          go test -race -c -o "$native_binary" ./internal/pkg/runtimefacts
+          sudo env -i PATH=/usr/bin:/bin QS_RUNTIME_FACTS_PIDNS_TEST=1 QS_RUNTIME_FACTS_PIDNS_SOURCE_SHA="$GITHUB_SHA" "$native_binary" -test.run='^TestNativeLinuxRootPeerAcrossPIDNamespace$' -test.v -test.timeout=35s
+
       - name: Run tests
         run: |
           go test -v -race -coverprofile=coverage.out -covermode=atomic ./...
