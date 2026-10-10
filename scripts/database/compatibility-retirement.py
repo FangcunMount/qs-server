@@ -1884,6 +1884,33 @@ except (OSError,ValueError,KeyError,tarfile.TarError,subprocess.SubprocessError)
 """
 
 
+ROOT_NATIVE_STDERR_CATEGORIES = frozenset({'empty', 'unclassified', 'multiple_categories',
+    'sudo_authentication_required', 'sudo_authentication_failed', 'sudo_policy_denied',
+    'sudo_askpass_failed', 'sudo_executable_unavailable'})
+
+
+def root_native_stderr_category(sample):
+    """Fixed sample signatures only, never a credential or permission proof."""
+    if not sample:
+        return 'empty'
+    matched = set()
+    for line in sample.splitlines():
+        if line == b'sudo: a password is required' or line.startswith(b'sudo: a terminal is required to read the password'):
+            matched.add('sudo_authentication_required')
+        elif re.fullmatch(rb'sudo: [0-9]{1,3} incorrect password attempts?', line) or line.startswith(b'sudo: PAM authentication error:'):
+            matched.add('sudo_authentication_failed')
+        elif (re.match(rb'(?:sudo: )?[^\r\n]{1,128} is not in the sudoers file(?:\.|$)', line) or
+              re.match(rb'Sorry, user [^\r\n]{1,128} is not allowed to execute ', line)):
+            matched.add('sudo_policy_denied')
+        elif (line in (b'sudo: no askpass program specified', b'sudo: no password was provided') or
+              re.match(rb'sudo: unable to (?:run|execute) [^\r\n]{1,512}/askpass: ', line)):
+            matched.add('sudo_askpass_failed')
+        elif (re.fullmatch(rb'sudo: [^\r\n]{1,512}: command not found', line) or
+              re.fullmatch(rb'sudo: unable to execute [^\r\n]{1,512}: (?:No such file or directory|Permission denied)', line)):
+            matched.add('sudo_executable_unavailable')
+    return next(iter(matched)) if len(matched) == 1 else 'multiple_categories' if matched else 'unclassified'
+
+
 def root_native_diagnostic(private_stderr, completed, stdout=b'', returncode=0):
     size = os.fstat(private_stderr.fileno()).st_size
     private_stderr.seek(0)
@@ -1893,7 +1920,8 @@ def root_native_diagnostic(private_stderr, completed, stdout=b'', returncode=0):
             'stdout_bytes': len(stdout), 'stderr_bytes': size,
             'stderr_sample_bytes': len(sample),
             'stderr_sample_sha256': hashlib.sha256(sample).hexdigest(),
-            'stderr_sample_truncated': size > len(sample)}
+            'stderr_sample_truncated': size > len(sample),
+            'stderr_category': root_native_stderr_category(sample)}
 
 
 @contextlib.contextmanager
@@ -1988,8 +2016,8 @@ def root_once_lifecycle_prepare(args):
     bindings=[args.operation_id,args.run_id,args.actual_source_sha,request_hash,package_hash,args.manifest_hash]
     suffix = [args.prepare_mode] if facts else []
     # Credentials remain on this bounded private pipe, not argv/stdout/logs.
-    # Keep stderr on a private temporary FD. Only length and a bounded sample
-    # digest may leave this scope; child text can contain credentials/URIs.
+    # Keep stderr on a private temporary FD. Only lengths, a bounded sample
+    # digest and a fixed category leave; child text can contain credentials/URIs.
     with tempfile.TemporaryFile() as private_stderr:
         try:
             if uid == 0:
@@ -2581,7 +2609,8 @@ def main(argv=None):
                                             for database in ("mysql", "mongodb")},
               "native_diagnostic": {"process_completed":"bool", "exit_code":"uint", "termination_signal":"uint",
                   "stdout_bytes":"uint", "stderr_bytes":"uint", "stderr_sample_bytes":"uint",
-                  "stderr_sample_sha256":"hash64", "stderr_sample_truncated":"bool"},
+                  "stderr_sample_sha256":"hash64", "stderr_sample_truncated":"bool",
+                  "stderr_category": ROOT_NATIVE_STDERR_CATEGORIES},
               "error_category": frozenset({receipt["error_category"]}),
               "blockers": [frozenset(receipt.get("blockers", ()))],
               "capabilities": {key: "bool" for key in CAPABILITIES}}

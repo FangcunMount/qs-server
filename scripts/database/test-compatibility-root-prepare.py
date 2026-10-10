@@ -347,7 +347,38 @@ class RootNativeReceiptDiagnostic(unittest.TestCase):
             self.assertEqual(diagnostic['stderr_sample_bytes'],len(secret))
             self.assertEqual(diagnostic['stderr_sample_sha256'],hashlib.sha256(secret).hexdigest())
             self.assertFalse(diagnostic['stderr_sample_truncated'])
+            self.assertEqual(diagnostic['stderr_category'],'unclassified')
             self.assertNotIn(secret.decode(),str(error.exception));self.assertNotIn(secret.decode(),json.dumps(diagnostic))
+    def test_sudo_categories_are_closed_signatures_without_private_text(self):
+        marker=b'PRIVATE_USER_ROUTE_CREDENTIAL'
+        cases=((b'', 'empty'),
+            (b'sudo: a password is required\n','sudo_authentication_required'),
+            (b'sudo: a terminal is required to read the password; use askpass\n','sudo_authentication_required'),
+            (b'Sorry, try again.\nsudo: 3 incorrect password attempts\n','sudo_authentication_failed'),
+            (b'sudo: PAM authentication error: '+marker+b'\n','sudo_authentication_failed'),
+            (marker+b' is not in the sudoers file.  This incident will be reported.\n','sudo_policy_denied'),
+            (b'Sorry, user '+marker+b' is not allowed to execute '+marker+b'\n','sudo_policy_denied'),
+            (b'sudo: unable to run /tmp/'+marker+b'/askpass: Permission denied\n','sudo_askpass_failed'),
+            (b'sudo: no password was provided\n','sudo_askpass_failed'),
+            (b'sudo: '+marker+b': command not found\n','sudo_executable_unavailable'),
+            (b'sudo: unable to execute /'+marker+b': No such file or directory\n','sudo_executable_unavailable'),
+            (marker+b' sudo: a password is required\n','unclassified'),
+            (b'sudo: a password is required\nsudo: 3 incorrect password attempts\n','multiple_categories'))
+        for stderr,expected in cases:
+            with self.subTest(category=expected),self.assertRaises(tool.NativeReceiptBlocked) as error:
+                self.call(1,b'',stderr)
+            diagnostic=error.exception.native_diagnostic
+            self.assertEqual(diagnostic['stderr_category'],expected)
+            self.assertIn(expected,tool.ROOT_NATIVE_STDERR_CATEGORIES)
+            self.assertNotIn(marker.decode(),json.dumps(diagnostic))
+            self.assertEqual(str(error.exception),'lifecycle_native_receipt_missing')
+    def test_category_never_reads_past_original_bounded_sample(self):
+        stderr=b'PRIVATE_STDERR'*700+b'\nsudo: a password is required\n'
+        with self.assertRaises(tool.NativeReceiptBlocked) as error:self.call(1,b'',stderr)
+        diagnostic=error.exception.native_diagnostic
+        self.assertEqual(diagnostic['stderr_category'],'unclassified')
+        self.assertEqual(diagnostic['stderr_sample_bytes'],8192)
+        self.assertTrue(diagnostic['stderr_sample_truncated'])
     def test_stderr_sample_bound_and_stdout_bound_refuse_without_receipt_decode(self):
         raw=b'PRIVATE'+b'x'*9000
         with self.assertRaises(tool.Blocked) as error:self.call(2,b'x'*32769,raw)
@@ -370,7 +401,7 @@ class RootNativeReceiptDiagnostic(unittest.TestCase):
             with self.subTest(code=code):self.assertEqual(self.call(code,raw,b'PRIVATE_STDERR'),(code,raw))
         self.assertEqual(self.call(0,b'x'*32768),(0,b'x'*32768))
     def test_actual_armored_failure_contains_only_fixed_diagnostic_and_no_authority(self):
-        def rejected(_):self.call(1,b'',b'PRIVATE_STDERR_URI_PASSWORD')
+        def rejected(_):self.call(1,b'',b'Sorry, user PRIVATE_STDERR_URI_PASSWORD is not allowed to execute PRIVATE_COMMAND\n')
         output=io.StringIO();errors=io.StringIO()
         argv=['--operation','prepare','--operation-id','123-1','--approved-source-sha','a'*40,'--actual-source-sha','a'*40,'--run-id','456-1','--prepare-mode','host-writer-scope']
         with mock.patch.object(tool,'execute',side_effect=rejected),contextlib.redirect_stdout(output),contextlib.redirect_stderr(errors):code=tool.main(argv)
@@ -378,6 +409,7 @@ class RootNativeReceiptDiagnostic(unittest.TestCase):
         receipt=json.loads(tool.transport().decode_armored_receipt(output.getvalue()))
         self.assertEqual(receipt['error_category'],'lifecycle_native_receipt_missing')
         self.assertEqual(receipt['native_diagnostic']['exit_code'],1)
+        self.assertEqual(receipt['native_diagnostic']['stderr_category'],'sudo_policy_denied')
         self.assertFalse(receipt['complete']);self.assertFalse(receipt['execution_allowed'])
         self.assertNotIn('PRIVATE',json.dumps(receipt));self.assertNotIn('host_observation_complete',receipt)
 
