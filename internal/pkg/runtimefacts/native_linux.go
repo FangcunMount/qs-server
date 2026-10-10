@@ -283,7 +283,10 @@ func verifyNativePeer(conn *net.UnixConn, expectedUID int) error {
 	}
 	var credential *unix.Ucred
 	var inner error
-	if err = raw.Control(func(fd uintptr) { credential, inner = unix.GetsockoptUcred(int(fd), unix.SOL_SOCKET, unix.SO_PEERCRED) }); err != nil || inner != nil || credential == nil || credential.Pid <= 0 || expectedUID < 0 || (credential.Uid != 0 && credential.Uid != uint32(expectedUID)) {
+	// An ancestor PID namespace's peer is not visible in this namespace, so
+	// Linux can report PID 0. Only the kernel-authenticated root UID may use
+	// that case; PID 0 supplies no process identity authority.
+	if err = raw.Control(func(fd uintptr) { credential, inner = unix.GetsockoptUcred(int(fd), unix.SOL_SOCKET, unix.SO_PEERCRED) }); err != nil || inner != nil || credential == nil || credential.Pid < 0 || (credential.Pid == 0 && credential.Uid != 0) || expectedUID < 0 || (credential.Uid != 0 && credential.Uid != uint32(expectedUID)) {
 		return errors.New("runtime facts peer credentials rejected")
 	}
 	return nil
