@@ -975,5 +975,84 @@ func ObserveAIExternalRuntimeBinding(ctx context.Context, source, image, cid str
 	return r.seal, nil
 }
 
+// AIExternalRuntimeObservation contains only hashes and immutable identities
+// from actual reads. It cannot create a stop lease, qualification or authority.
+type AIExternalRuntimeObservation struct {
+	SourceSHA       string                      `json:"source_sha"`
+	ImageID         string                      `json:"image_id"`
+	ContainerID     string                      `json:"container_id"`
+	BindingSHA256   string                      `json:"binding_sha256"`
+	StopConstraints AIStoppedRuntimeConstraints `json:"stop_constraints"`
+}
+
+func aiExternalObservationFromSnapshot(in AIExternalExecutionInput, binding string, snap aiStoppedSnapshot) (AIExternalRuntimeObservation, error) {
+	if !aiOriginalSourceSHA(in.RuntimeSourceSHA) || !aiExternalImageID(in.ImageID) || !evidenceHash(in.ContainerID) || !evidenceHash(binding) || !snap.Runtime.matches(in) || snap.RestartPolicy != "unless-stopped" || snap.PID <= 0 || snap.OOM || snap.Dead || snap.Paused || snap.Restarting || len(snap.ExecIDs) != 0 || !aiStoppedHealthcheck(snap.HealthcheckTest) || !evidenceHash(snap.NetworkID) || len(snap.Settings) == 0 {
+		return AIExternalRuntimeObservation{}, ErrAIExternalRuntime
+	}
+	return AIExternalRuntimeObservation{SourceSHA: in.RuntimeSourceSHA, ImageID: in.ImageID, ContainerID: in.ContainerID, BindingSHA256: binding, StopConstraints: AIStoppedRuntimeConstraints{SettingsSHA256: sourceSHA(aiJSONBytes(snap.Settings)), NetworkID: snap.NetworkID}}, nil
+}
+
+// ObserveAIExternalCurrentRuntime selects only the fixed active /qs-ai service.
+// All Engine operations are GET/inspect; settings never leave this function.
+// The existing stop constructor must independently re-read these constraints.
+func ObserveAIExternalCurrentRuntime(ctx context.Context, sudo bool) (AIExternalRuntimeObservation, error) {
+	var empty AIExternalRuntimeObservation
+	if ctx == nil || ctx.Err() != nil {
+		return empty, ErrAIExternalInput
+	}
+	work, cancel := context.WithTimeout(ctx, 90*time.Second)
+	defer cancel()
+	state, e := aiExternalReleaseFile("/opt/qs-ai/state.json", false)
+	if e != nil || strictJSON(state) != nil {
+		return empty, ErrAIExternalRuntime
+	}
+	var active struct {
+		Current  string `json:"current"`
+		Previous string `json:"previous"`
+	}
+	decoder := json.NewDecoder(bytes.NewReader(state))
+	decoder.DisallowUnknownFields()
+	if decoder.Decode(&active) != nil || decoder.Decode(new(any)) != io.EOF || !regexp.MustCompile(`^[0-9a-f]{40}-[0-9]{1,20}-[0-9]{1,4}$`).MatchString(active.Current) {
+		return empty, ErrAIExternalRuntime
+	}
+	docker, e := aiExternalDocker(sudo)
+	if e != nil {
+		return empty, e
+	}
+	selected, e := docker.inspect(work, "qs-ai")
+	in := AIExternalExecutionInput{RuntimeSourceSHA: active.Current[:40], ImageID: selected.ImageID, ContainerID: selected.ContainerID}
+	if e != nil || !selected.matches(in) {
+		return empty, ErrAIExternalRuntime
+	}
+	binding, e := ObserveAIExternalRuntimeBinding(work, in.RuntimeSourceSHA, in.ImageID, in.ContainerID, sudo)
+	if e != nil {
+		return empty, e
+	}
+	protocol := &aiStoppedDocker{docker: docker, wire: &aiExecDockerProtocol{docker: docker}, input: in}
+	before, e := protocol.snapshot(work, in.ContainerID)
+	if e != nil {
+		return empty, ErrAIExternalRuntime
+	}
+	defer clear(before.Settings)
+	observed, e := aiExternalObservationFromSnapshot(in, binding, before)
+	if e != nil || protocol.network(work, before.NetworkID) != nil || aiStoppedReleaseSettings(in, before.Settings) != nil {
+		return empty, ErrAIExternalRuntime
+	}
+	after, e := protocol.snapshot(work, in.ContainerID)
+	if e != nil {
+		return empty, ErrAIExternalRuntime
+	}
+	defer clear(after.Settings)
+	repeated, e := aiExternalObservationFromSnapshot(in, binding, after)
+	if e != nil || repeated != observed || !before.immutableSame(after) || !reflect.DeepEqual(before.Runtime, after.Runtime) || before.PID != after.PID || protocol.network(work, after.NetworkID) != nil || aiStoppedReleaseSettings(in, after.Settings) != nil {
+		return empty, ErrAIExternalRuntime
+	}
+	end, e := ObserveAIExternalRuntimeBinding(work, in.RuntimeSourceSHA, in.ImageID, in.ContainerID, sudo)
+	if e != nil || end != binding || work.Err() != nil {
+		return empty, ErrAIExternalRuntime
+	}
+	return observed, nil
+}
+
 // Keep fmt from rendering sensitive input internals even in caller diagnostics.
 var _ fmt.Stringer = AIExternalExecutionInput{}

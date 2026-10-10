@@ -1824,7 +1824,7 @@ def validate_prepare_facts_result(result, args, request, request_hash, code):
         "request_sha256", "observation_approval_sha256", "target_hash", "complete", "prepare_facts_observation_complete",
         "diagnostic_only", "execution_allowed", "drop_ready", "observed_inventory_producer", "prepare_source_files",
         "observed_ordered_mongo_schema_sha256", "observed_filesystems", "observed_socket_kind",
-        "observation_elapsed_millis", "error_category"), ("observed_restore_engines", "prepare_facts_private_observation_sha256"))
+        "observation_elapsed_millis", "error_category"), ("observed_restore_engines", "prepare_facts_private_observation_sha256", "observed_ai_runtime"))
     if (type(result["format_version"]) is not int or result["format_version"] != 1 or
         result["kind"] != "readonly_prepare_facts_observation" or result["operation"] != "prepare" or
         result["prepare_mode"] != "prepare-facts" or result["source_sha"] != args.actual_source_sha or
@@ -1837,6 +1837,14 @@ def validate_prepare_facts_result(result, args, request, request_hash, code):
         not re.fullmatch(r"(?:prepare_facts|lifecycle)_[a-z_]{1,100}|none", result["error_category"])):
         fail("prepare_facts_native_binding_rejected")
     uint(result["observation_elapsed_millis"])
+    ai_runtime = result.get("observed_ai_runtime")
+    if ai_runtime is not None:
+        fields(ai_runtime, ("source_sha", "image_id", "container_id", "binding_sha256", "stop_constraints"))
+        token(ai_runtime["source_sha"], SHA)
+        token(ai_runtime["image_id"], re.compile(r"sha256:[0-9a-f]{64}"))
+        for key in ("container_id", "binding_sha256"): token(ai_runtime[key], HASH)
+        fields(ai_runtime["stop_constraints"], ("settings_sha256", "network_id"))
+        for value in ai_runtime["stop_constraints"].values(): token(value, HASH)
     files = result["prepare_source_files"]
     if type(files) is not list or len(files) > 7:
         fail("prepare_facts_native_files_rejected")
@@ -1856,7 +1864,7 @@ def validate_prepare_facts_result(result, args, request, request_hash, code):
     if result["prepare_facts_observation_complete"]:
         token(result["observed_ordered_mongo_schema_sha256"], HASH)
         token(result.get("prepare_facts_private_observation_sha256"), HASH)
-        if (len(files) != 7 or len(capacity) != 4 or result.get("observed_restore_engines") != request["restore_engines"] or
+        if (ai_runtime is None or len(files) != 7 or len(capacity) != 4 or result.get("observed_restore_engines") != request["restore_engines"] or
             result["observed_socket_kind"] != "fixed_root_owned_unix_docker" or files[0]["sha256"] != request["inventory_report"]["sha256"]):
             fail("prepare_facts_native_incomplete")
     else:
@@ -1868,6 +1876,8 @@ def validate_prepare_facts_result(result, args, request, request_hash, code):
     # Only allowlisted tokens go through the existing armored public transport.
     # The root-owned raw observation keeps the exact original filenames/IDs.
     for value in files: value["name"] = value["name"].replace(".", "_")
+    if ai_runtime is not None:
+        ai_runtime["image_id_sha256"] = ai_runtime.pop("image_id")[7:]
     if result.get("observed_restore_engines") is not None:
         engines = result["observed_restore_engines"]
         result["observed_restore_engines"] = {"mysql_image_id_sha256": engines["mysql_image_id"][7:],
@@ -2148,6 +2158,7 @@ def main(argv=None):
               "prepare_source_files": [{"name": frozenset(name.replace(".", "_") for name in PREPARE_SOURCE_NAMES), "sha256": "hash64", "bytes": "uint"}],
               "observed_ordered_mongo_schema_sha256": "hash64_or_empty",
               "observed_restore_engines": {"mysql_image_id_sha256": "hash64", "mongodb_image_id_sha256": "hash64", "architecture": frozenset({"amd64", "arm64"})},
+              "observed_ai_runtime": {"source_sha": "sha40", "image_id_sha256": "hash64", "container_id": "hash64", "binding_sha256": "hash64", "stop_constraints": {"settings_sha256": "hash64", "network_id": "hash64"}},
               "observed_filesystems": [{"scope": frozenset({"source", "staging", "archive", "docker"}), "path_sha256": "hash64", "total_bytes": "uint", "available_bytes": "uint", "free_bytes": "uint"}],
               "db_census_observation_complete":"bool", "mysql_all_connections_permission_proven":"bool", "mongodb_local_all_sessions_permission_proven":"bool", "all_nodes_sessions_coverage_complete":"bool", "external_writer_coverage_complete":"bool", "db_census_private_catalog_sha256":"hash64_or_empty", "db_census_catalog_sha256":"hash64_or_empty",
               "observed_identity_producer":({key:frozenset({""}) for key in ("operation_id","run_id","source_sha","sha256","request_sha256")} if not any(receipt.get("observed_identity_producer",{}).values()) else {"operation_id":"run_id", "run_id":"run_id", "source_sha":"sha40", "sha256":"hash64", "request_sha256":"hash64"}),

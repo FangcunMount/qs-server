@@ -16,6 +16,7 @@ import (
 	"syscall"
 	"time"
 
+	retirement "github.com/FangcunMount/qs-server/internal/apiserver/maintenance/compatibilityretirement"
 	backup "github.com/FangcunMount/qs-server/internal/apiserver/maintenance/compatibilityretirementbackup"
 	identitymeta "github.com/FangcunMount/qs-server/internal/pkg/databaseidentity"
 	"go.mongodb.org/mongo-driver/bson"
@@ -57,30 +58,31 @@ type prepareFactsFS struct {
 	FreeBytes      uint64 `json:"free_bytes"`
 }
 type prepareFactsReceipt struct {
-	FormatVersion             int                      `json:"format_version"`
-	Kind                      string                   `json:"kind"`
-	Operation                 string                   `json:"operation"`
-	PrepareMode               string                   `json:"prepare_mode"`
-	SourceSHA                 string                   `json:"source_sha"`
-	OperationID               string                   `json:"operation_id"`
-	RunID                     string                   `json:"run_id"`
-	RequestSHA256             string                   `json:"request_sha256"`
-	ObservationApprovalSHA256 string                   `json:"observation_approval_sha256"`
-	TargetHash                string                   `json:"target_hash"`
-	Complete                  bool                     `json:"complete"`
-	FactsObservationComplete  bool                     `json:"prepare_facts_observation_complete"`
-	DiagnosticOnly            bool                     `json:"diagnostic_only"`
-	ExecutionAllowed          bool                     `json:"execution_allowed"`
-	DropReady                 bool                     `json:"drop_ready"`
-	Producer                  prepareFactsProducer     `json:"observed_inventory_producer"`
-	Files                     []prepareFactsFile       `json:"prepare_source_files"`
-	OrderedMongoSchemaSHA256  string                   `json:"observed_ordered_mongo_schema_sha256"`
-	RestoreEngines            *lifecycleRestoreEngines `json:"observed_restore_engines,omitempty"`
-	Capacity                  []prepareFactsFS         `json:"observed_filesystems"`
-	SocketKind                string                   `json:"observed_socket_kind"`
-	PrivateObservationSHA256  string                   `json:"prepare_facts_private_observation_sha256,omitempty"`
-	ElapsedMillis             int64                    `json:"observation_elapsed_millis"`
-	ErrorCategory             string                   `json:"error_category"`
+	FormatVersion             int                                      `json:"format_version"`
+	Kind                      string                                   `json:"kind"`
+	Operation                 string                                   `json:"operation"`
+	PrepareMode               string                                   `json:"prepare_mode"`
+	SourceSHA                 string                                   `json:"source_sha"`
+	OperationID               string                                   `json:"operation_id"`
+	RunID                     string                                   `json:"run_id"`
+	RequestSHA256             string                                   `json:"request_sha256"`
+	ObservationApprovalSHA256 string                                   `json:"observation_approval_sha256"`
+	TargetHash                string                                   `json:"target_hash"`
+	Complete                  bool                                     `json:"complete"`
+	FactsObservationComplete  bool                                     `json:"prepare_facts_observation_complete"`
+	DiagnosticOnly            bool                                     `json:"diagnostic_only"`
+	ExecutionAllowed          bool                                     `json:"execution_allowed"`
+	DropReady                 bool                                     `json:"drop_ready"`
+	Producer                  prepareFactsProducer                     `json:"observed_inventory_producer"`
+	Files                     []prepareFactsFile                       `json:"prepare_source_files"`
+	OrderedMongoSchemaSHA256  string                                   `json:"observed_ordered_mongo_schema_sha256"`
+	RestoreEngines            *lifecycleRestoreEngines                 `json:"observed_restore_engines,omitempty"`
+	Capacity                  []prepareFactsFS                         `json:"observed_filesystems"`
+	SocketKind                string                                   `json:"observed_socket_kind"`
+	PrivateObservationSHA256  string                                   `json:"prepare_facts_private_observation_sha256,omitempty"`
+	AIRuntime                 *retirement.AIExternalRuntimeObservation `json:"observed_ai_runtime,omitempty"`
+	ElapsedMillis             int64                                    `json:"observation_elapsed_millis"`
+	ErrorCategory             string                                   `json:"error_category"`
 }
 
 func decodePrepareFacts(raw []byte, dst any) error {
@@ -465,6 +467,11 @@ func runPrepareFacts(ctx context.Context, path, expected, op, run string) (recei
 		return receipt, e
 	}
 	owner = nil
+	aiRuntime, e := retirement.ObserveAIExternalCurrentRuntime(ctx, false)
+	if e != nil {
+		return receipt, lifecycleError("prepare_facts_ai_runtime_unproven")
+	}
+	receipt.AIRuntime = &aiRuntime
 	if ctx.Err() != nil {
 		return receipt, lifecycleError("prepare_facts_read_budget_exceeded")
 	}
