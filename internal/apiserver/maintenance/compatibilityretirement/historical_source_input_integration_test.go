@@ -43,12 +43,21 @@ func historicalSourceInputNativeEpoch(t *testing.T, sqlDB *gorm.DB, db *mongo.Da
 
 func TestHistoricalSourceInputNativeTwoFullDiskEpochsAndSourceDrift(t *testing.T) {
 	sqlDB, client, db, cfg := originNativeDBs(t, false)
+	// The generic source-auth fixture deliberately accepts a nonnumeric
+	// historical sheet ID. Owner planning requires a real numeric selector;
+	// replace the owned database row BEFORE capturing or authenticating copies.
+	body := bytes.ReplaceAll(wireFixture(t, "answersheet.submitted"), []byte("original-event-1"), []byte("origin-mongo-1"))
+	body = bytes.ReplaceAll(body, []byte("sheet-1"), []byte("10042"))
+	replaced, err := db.Collection("domain_event_outbox").ReplaceOne(t.Context(), bson.D{{Key: "_id", Value: int64(1)}}, fixtureMongoRow(t, body, int64(1)))
+	if err != nil || replaced.MatchedCount != 1 {
+		t.Fatal("owned numeric owner source fixture failed")
+	}
 	firstSession := snapshotInputNativeSession(t, client)
 	var recipe *HistoricalSourceInputRecipe
 	var planning *WholeSourceJointIndex
 	var first, second *HistoricalSourceInputEpoch
 	firstFile := snapshotInputNativeFile(t)
-	err := historicalSourceInputNativeEpoch(t, sqlDB, db, cfg, firstSession, func(ctx context.Context, sqlInput *SQLResponsibilitySnapshot, mongoInput *MongoSnapshotInputEpoch, tx *gorm.DB) error {
+	err = historicalSourceInputNativeEpoch(t, sqlDB, db, cfg, firstSession, func(ctx context.Context, sqlInput *SQLResponsibilitySnapshot, mongoInput *MongoSnapshotInputEpoch, tx *gorm.DB) error {
 		fixture := originNativeCopies(t, ctx, tx, &MongoResponsibilitySnapshot{db: db, metadata: mongoInput.metadata})
 		copies, e := VerifySourceCopies(ctx, fixture.inputs())
 		if e != nil {
@@ -67,8 +76,17 @@ func TestHistoricalSourceInputNativeTwoFullDiskEpochsAndSourceDrift(t *testing.T
 		// inherit the old expiration, create a replacement cap, or authorize CAS.
 		recipe.binding.started = recipe.binding.started.Add(-2 * time.Hour)
 		planning, e = PrepareHistoricalSourceInputIndex(ctx, coordinatorBinding(), recipe, wholeJointCopies(fixture), DefaultWholeSourceJointLimits())
-		if e != nil || planning.owner != nil || planning.auth != copies || planning.encodedSHA != recipe.binding.fileHashes {
-			return errors.New("actual input planning index failed or imported coordinator")
+		if e != nil {
+			return e
+		}
+		if planning.owner != nil {
+			return errors.New("actual input planning index imported coordinator")
+		}
+		if planning.auth != copies {
+			return errors.New("actual input planning index changed authentication owner")
+		}
+		if planning.encodedSHA != recipe.binding.fileHashes {
+			return errors.New("actual input planning index changed original file hashes")
 		}
 		first, e = PrepareHistoricalSourceInputEpoch(ctx, recipe, sqlInput, mongoInput, firstFile, time.Minute)
 		if e != nil {
@@ -335,6 +353,8 @@ func TestHistoricalSourceInputNativeOwnerComponentPlanner(t *testing.T) {
 	var copies authFixture
 	var aiFirst, aiSecond *AIHistoricalInputEpoch
 	var aiPair *AIHistoricalInputPair
+	aiInputLimits := DefaultAIReverseLimits()
+	aiInputLimits.MaxRetainedBytes = 64 << 20
 	if err = historicalSourceInputNativeEpoch(t, sqlDB, db, config, snapshotInputNativeSession(t, client), func(ctx context.Context, current *SQLResponsibilitySnapshot, mongoInput *MongoSnapshotInputEpoch, tx *gorm.DB) error {
 		copies = originNativeCopies(t, ctx, tx, &MongoResponsibilitySnapshot{db: db, metadata: mongoInput.metadata})
 		auth, e := VerifySourceCopies(ctx, copies.inputs())
@@ -357,7 +377,7 @@ func TestHistoricalSourceInputNativeOwnerComponentPlanner(t *testing.T) {
 		if e != nil {
 			return e
 		}
-		aiFirst, e = PrepareAIHistoricalInputEpoch(ctx, nil, first, copies.inputs(), snapshotInputNativeFile(t), DefaultAIReverseLimits())
+		aiFirst, e = PrepareAIHistoricalInputEpoch(ctx, nil, first, copies.inputs(), snapshotInputNativeFile(t), aiInputLimits)
 		if e != nil {
 			return e
 		}
@@ -384,7 +404,7 @@ func TestHistoricalSourceInputNativeOwnerComponentPlanner(t *testing.T) {
 		if e != nil {
 			return e
 		}
-		aiSecond, e = PrepareAIHistoricalInputEpoch(ctx, nil, second, copies.inputs(), snapshotInputNativeFile(t), DefaultAIReverseLimits())
+		aiSecond, e = PrepareAIHistoricalInputEpoch(ctx, nil, second, copies.inputs(), snapshotInputNativeFile(t), aiInputLimits)
 		if e != nil {
 			return e
 		}

@@ -336,6 +336,9 @@ func (p *WholeSourceJointPage) prepareCrossRows(ctx context.Context) error {
 			cross.qualification[key] = q
 			cross.sources = append(cross.sources, handle)
 			l := q.Local()
+			if l.AnswerSheetID != 0 {
+				owners[sqlevaluation.SQLCrossStoreOwnerReference{Kind: "AnswerSheet", ID: strconv.FormatUint(l.AnswerSheetID, 10)}] = true
+			}
 			if l.GenerationID != 0 {
 				owners[sqlevaluation.SQLCrossStoreOwnerReference{Kind: "ReportGeneration", ID: strconv.FormatUint(l.GenerationID, 10)}] = true
 			}

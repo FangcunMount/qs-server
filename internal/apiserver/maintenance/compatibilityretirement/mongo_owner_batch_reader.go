@@ -475,8 +475,24 @@ func PrepareMongoSnapshotOwnerFootprint(ctx context.Context, input *MongoSnapsho
 		return nil, err
 	}
 	summary := input.Summary()
-	f := &MongoSnapshotOwnerFootprint{originalInput: input, originalDev: input.dev, originalIno: input.ino, identitySHA: input.metadata.identity, metadataSHA: input.metadata.hash, nativeSHA: summary.NativeEpochSHA256, snapshotSHA: summary.SnapshotSHA256, limits: limits, sqlRowsSHA: sql.Report().BusinessRowsSHA256, sources: selected.sources, sourceFactsSHA: selected.sourceFactsSHA, sqlOwners: map[verifiedSourceKey]sqlevaluation.SQLHistoricalFactsSnapshot{}, sqlAbsent: selected.sqlAbsent, selection: core.selection, data: core.data}
+	f := &MongoSnapshotOwnerFootprint{originalInput: input, originalDev: input.dev, originalIno: input.ino, identitySHA: input.metadata.identity, metadataSHA: input.metadata.hash, nativeSHA: summary.NativeEpochSHA256, snapshotSHA: summary.SnapshotSHA256, limits: limits, sqlRowsSHA: sql.Report().BusinessRowsSHA256, sources: map[verifiedSourceKey]*DecodedSourceEvent{}, sourceFactsSHA: selected.sourceFactsSHA, sqlOwners: map[verifiedSourceKey]sqlevaluation.SQLHistoricalFactsSnapshot{}, sqlAbsent: selected.sqlAbsent, selection: core.selection, data: core.data}
 	f.self = f
+	// selectMongoOwnerSources uses a normalized private business-reading
+	// clone. Its original authenticated SHA must still seal the exact opaque
+	// facts, including IDs and missing-run evidence, rather than that clone.
+	for _, handle := range sources {
+		facts, err := handle.Facts()
+		if err != nil {
+			return nil, err
+		}
+		key, err := sourceAuthKey(facts.Source.Database, facts.Source.Object, facts.Source.PrimaryKeySHA256)
+		digest, hashErr := privateFactsSHA(facts)
+		baseline := selected.sources[key]
+		if err != nil || hashErr != nil || baseline == nil || f.sources[key] != nil || digest != selected.sourceFactsSHA[key] || baseline.Source != facts.Source || baseline.EventID != facts.EventID || baseline.ContentDigest != facts.ContentDigest {
+			return nil, ErrMongoBatchConflict
+		}
+		f.sources[key] = facts
+	}
 	for key, owner := range selected.sqlOwners {
 		f.sqlOwners[key] = owner.Snapshot()
 	}

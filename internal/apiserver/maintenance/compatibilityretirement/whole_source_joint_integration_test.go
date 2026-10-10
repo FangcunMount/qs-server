@@ -617,6 +617,23 @@ func TestWholeSourceJointNativeOwnerComponentsSplitPageWithoutConsumingTwice(t *
 					if pageCount == 0 && (len(fragments) != 2 || fragments[0].partitions != 2 || fragments[0].sequence != fragments[1].sequence) {
 						return ErrHistoricalCASComponents
 					}
+					if !tc.present {
+						found := false
+						for _, fragment := range fragments {
+							scope, e := fragment.sqlRecipe.OriginalSelectors()
+							if e != nil {
+								return e
+							}
+							for _, owner := range scope.MongoOwners {
+								if owner.Kind == "AnswerSheet" && owner.ID == "10043" && len(scope.AssessmentIDs) == 0 && len(scope.EventIDs) == 1 && scope.EventIDs[0] == "whole-joint-actual-empty-sheet" {
+									found = true
+								}
+							}
+						}
+						if !found {
+							return ErrHistoricalCASComponents
+						}
+					}
 					if joint.consumed || page.consumed {
 						return ErrCoordinatorPage
 					}

@@ -649,6 +649,16 @@ func TestMongoBatchNativeSnapshotInputOwnerFootprintMatchesOriginalFD(t *testing
 			if e != nil {
 				return e
 			}
+			for _, handle := range sources {
+				facts, e := handle.Facts()
+				if e != nil {
+					return e
+				}
+				key, e := sourceAuthKey(facts.Source.Database, facts.Source.Object, facts.Source.PrimaryKeySHA256)
+				if e != nil || !reflect.DeepEqual(f.sources[key], facts) {
+					return ErrMongoBatchConflict
+				}
+			}
 			read, e := freezeMongoSnapshotOwnerComponentReadRecipe(ctx, input, f)
 			if e != nil {
 				return e
