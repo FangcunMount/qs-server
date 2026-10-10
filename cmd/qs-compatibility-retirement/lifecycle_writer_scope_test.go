@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"os"
+	"path/filepath"
 	"reflect"
 	"regexp"
 	"strings"
@@ -13,8 +14,10 @@ import (
 	"time"
 
 	"github.com/DATA-DOG/go-sqlmock"
+	backup "github.com/FangcunMount/qs-server/internal/apiserver/maintenance/compatibilityretirementbackup"
 	dbcensus "github.com/FangcunMount/qs-server/internal/apiserver/maintenance/compatibilityretirementdbcensus"
 	fence "github.com/FangcunMount/qs-server/internal/apiserver/maintenance/compatibilityretirementfence"
+	stop "github.com/FangcunMount/qs-server/internal/apiserver/maintenance/compatibilityretirementstop"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -512,5 +515,97 @@ func TestWriterPreconditionsCannotReuseStoppedOrInstalledOwner(t *testing.T) {
 		if e := h.CheckWriterPreconditions(t.Context(), lifecycleRequest{}); e != lifecycleError("lifecycle_writer_precondition_phase_rejected") {
 			t.Fatal("post-stop state reused narrower precondition", e)
 		}
+	}
+}
+
+func TestDatabaseWriterNativeProducerBindsCensusAndOriginalActors(t *testing.T) {
+	v, c := databaseWriterPolicyFixture(t)
+	r := lifecycleRequest{ToolSourceSHA: strings.Repeat("b", 40), OriginalSourceSHA: strings.Repeat("a", 40), OperationID: "12-1", ActualRunID: "22-1", ManifestSHA256: strings.Repeat("c", 64), Recovery: backup.TargetRecoveryRequest{OriginalRunID: "16-1"}}
+	original := dbCensusPrivate{SourceSHA: r.OriginalSourceSHA, OperationID: r.OperationID, RunID: "18-1", RequestSHA256: strings.Repeat("d", 64), IdentityProducer: prepareFactsProducer{OperationID: r.OperationID, RunID: "17-1", SourceSHA: r.OriginalSourceSHA, ReportSHA256: strings.Repeat("e", 64), RequestSHA256: strings.Repeat("f", 64)}}
+	file := lifecycleFinalFileBinding{Path: filepath.Join(lifecycleRootBatch(r.OperationID, original.RunID), "db-writer-census.private.json"), SHA256: strings.Repeat("d", 64)}
+	if run, ok := lifecycleDBInputCensusRun(file.Path, r.OperationID); !ok || run != original.RunID || !lifecycleDBCensusProducerValid(original, r, run) {
+		t.Fatal("actual original census source rejected")
+	}
+	for _, path := range []string{"/tmp/db-writer-census.private.json", strings.Replace(file.Path, "12-1", "13-1", 1), strings.Replace(file.Path, "18-1", "future", 1), file.Path + "/../db-writer-census.private.json"} {
+		if _, ok := lifecycleDBInputCensusRun(path, r.OperationID); ok {
+			t.Fatal("non-exact original source path accepted", path)
+		}
+	}
+	bad := original
+	bad.SourceSHA = r.ToolSourceSHA
+	if lifecycleDBCensusProducerValid(bad, r, original.RunID) {
+		t.Fatal("different census source accepted")
+	}
+	bad = original
+	bad.WriterScopeComplete = true
+	if lifecycleDBCensusProducerValid(bad, r, original.RunID) {
+		t.Fatal("census isolation token accepted")
+	}
+	actors := []stop.DatabasePrincipal{
+		{Component: "qs-apiserver", ContainerID: strings.Repeat("1", 64), EnvironmentSHA256: strings.Repeat("2", 64), SQLUser: "app", SQLDatabase: "qs", MongoUser: "app", MongoDatabase: "qs"},
+		{Component: "qs-worker", ContainerID: strings.Repeat("3", 64), EnvironmentSHA256: strings.Repeat("4", 64), SQLUser: "app", SQLDatabase: "qs", MongoUser: "app", MongoDatabase: "qs"},
+	}
+	row := func(parts ...string) []*string {
+		out := []*string{}
+		for _, part := range parts {
+			copy := part
+			out = append(out, &copy)
+		}
+		return out
+	}
+	// The real AI account exists but its own database grant cannot write the
+	// four qs targets. Its history responsibility is checked by the AI protocol.
+	c.SQL["accounts"] = append(c.SQL["accounts"], row("ai", "%", "caching_sha2_password", "N"))
+	c.SQL["account_grants"] = append(c.SQL["account_grants"], row("ai", "%", "GRANT INSERT ON `ai`.* TO 'ai'@'%'"))
+	sqlObserver := lifecycleDBPrincipalExpected{User: "maint", HostOrDatabase: "%", Owners: []string{"original_maintenance_run"}}
+	mongoObserver := lifecycleDBPrincipalExpected{User: "maint", HostOrDatabase: "admin", Owners: []string{"original_maintenance_run"}}
+	produce := func(actors []stop.DatabasePrincipal, ai string) (lifecycleDBWriterInput, error) {
+		return lifecycleProduceDBWriterInput(r, file, original, c, actors, ai, sqlObserver, mongoObserver, "qs", "qs")
+	}
+	in, e := produce(actors, "ai")
+	if e != nil || len(in.SQLPrincipals) != 1 || len(in.MongoPrincipals) != 1 || !reflect.DeepEqual(in.SQLPrincipals[0].Owners, []string{"qs-apiserver", "qs-worker"}) || !reflect.DeepEqual(in.OriginalActors, actors) {
+		t.Fatal("true original actor ownership not composed", e, in)
+	}
+	for _, tc := range []struct {
+		name   string
+		change func([]stop.DatabasePrincipal)
+	}{
+		{"wrong-component", func(a []stop.DatabasePrincipal) { a[1].Component = "external" }},
+		{"duplicate-component", func(a []stop.DatabasePrincipal) { a[1].Component = a[0].Component }},
+		{"different-database", func(a []stop.DatabasePrincipal) { a[0].SQLDatabase = "other" }},
+		{"missing-config", func(a []stop.DatabasePrincipal) { a[0].EnvironmentSHA256 = "" }},
+		{"shared-maintenance", func(a []stop.DatabasePrincipal) { a[0].SQLUser = "maint" }},
+		{"unknown-account", func(a []stop.DatabasePrincipal) { a[0].SQLUser = "unknown" }},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			a := append([]stop.DatabasePrincipal(nil), actors...)
+			tc.change(a)
+			if _, err := produce(a, "ai"); err == nil {
+				t.Fatal("unproven source accepted")
+			}
+		})
+	}
+	// Reuse the same effective role propagation as the actual isolation policy.
+	c.SQL["account_grants"][1] = row("app", "%", "GRANT SELECT ON `qs`.* TO 'app'@'%'")
+	c.SQL["accounts"] = append(c.SQL["accounts"], row("writer_role", "%", "caching_sha2_password", "Y"))
+	c.SQL["account_grants"] = append(c.SQL["account_grants"], row("writer_role", "%", "GRANT INSERT ON `qs`.* TO 'writer_role'@'%'"))
+	c.SQL["role_edges"] = [][]*string{row("%", "writer_role", "%", "app", "N")}
+	in, e = produce(actors, "ai")
+	if e != nil || len(in.SQLPrincipals) != 1 {
+		t.Fatal("actual inherited target grant omitted", e)
+	}
+	// Native source generation never conceals an unowned writer from coverage.
+	c.SQL["accounts"] = append(c.SQL["accounts"], row("outside", "%", "caching_sha2_password", "N"))
+	c.SQL["account_grants"] = append(c.SQL["account_grants"], row("outside", "%", "GRANT INSERT ON `qs`.* TO 'outside'@'%'"))
+	in, e = produce(actors, "ai")
+	if e != nil {
+		t.Fatal(e)
+	}
+	v.input, v.baseline, v.staticSHA = in, c, lifecycleDBStaticHash(c)
+	if e = v.validateWriterCoverage(c, false); e != lifecycleError("lifecycle_database_unowned_target_writer") {
+		t.Fatal("producer turned unknown catalog ownership into isolation", e)
+	}
+	if lifecycleEffectsPreflight(t.Context()) == nil {
+		t.Fatal("expected input activated production effects")
 	}
 }

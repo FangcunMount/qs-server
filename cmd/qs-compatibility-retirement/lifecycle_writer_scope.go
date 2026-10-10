@@ -187,6 +187,7 @@ type lifecycleDBWriterLease struct {
 	binding                    fence.WindowBinding
 	actualRunID                string
 	input                      lifecycleDBWriterInput
+	inputRecord                *lifecycleFinalFileBinding
 	baseline                   dbcensus.Catalog
 	staticSHA                  string
 	connectionID               uint64
@@ -398,6 +399,133 @@ func lifecycleMongoMayWrite(u bson.M, db string) (bool, error) {
 	return false, nil
 }
 
+// This reference is a previously observed native census, not a caller-created
+// expectation. Only the exact operation/run-owned census file is accepted.
+func lifecycleDBInputCensusRun(path, operation string) (string, bool) {
+	if !runRE.MatchString(operation) || filepath.Clean(path) != path || filepath.Base(path) != "db-writer-census.private.json" {
+		return "", false
+	}
+	run := strings.TrimPrefix(filepath.Base(filepath.Dir(path)), operation+"-")
+	return run, runRE.MatchString(run) && path == filepath.Join(lifecycleRootBatch(operation, run), "db-writer-census.private.json")
+}
+func lifecycleDBCensusProducerValid(c dbCensusPrivate, r lifecycleRequest, run string) bool {
+	p := c.IdentityProducer
+	return c.SourceSHA == r.OriginalSourceSHA && c.OperationID == r.OperationID && c.RunID == run && hashRE.MatchString(c.RequestSHA256) && !c.WriterScopeComplete && p.OperationID == r.OperationID && p.SourceSHA == r.OriginalSourceSHA && runRE.MatchString(p.RunID) && hashRE.MatchString(p.ReportSHA256) && hashRE.MatchString(p.RequestSHA256)
+}
+
+func (h *lifecycleFixedHost) observeDatabaseMaintenancePrincipals(ctx context.Context) (sqlObserver, mongoObserver lifecycleDBPrincipalExpected, database string, result error) {
+	var authenticated, login string
+	if h.owner.originalConn.QueryRowContext(ctx, "SELECT CURRENT_USER(),USER(),DATABASE()").Scan(&authenticated, &login, &database) != nil {
+		result = lifecycleError("lifecycle_database_identity_or_authentication_rejected")
+		return
+	}
+	index := strings.LastIndexByte(authenticated, '@')
+	if index <= 0 || index == len(authenticated)-1 || !strings.HasPrefix(login, authenticated[:index]+"@") || database == "" {
+		result = lifecycleError("lifecycle_database_identity_or_authentication_rejected")
+		return
+	}
+	sqlObserver = lifecycleDBPrincipalExpected{User: authenticated[:index], HostOrDatabase: authenticated[index+1:], Owners: []string{"original_maintenance_run"}}
+	var auth struct {
+		AuthInfo struct {
+			Users []struct {
+				User string `bson:"user"`
+				DB   string `bson:"db"`
+			} `bson:"authenticatedUsers"`
+		} `bson:"authInfo"`
+	}
+	if h.owner.originalMongo.Database("admin").RunCommand(ctx, bson.D{{Key: "connectionStatus", Value: 1}, {Key: "showPrivileges", Value: true}}).Decode(&auth) != nil || len(auth.AuthInfo.Users) != 1 {
+		result = lifecycleError("lifecycle_database_identity_or_authentication_rejected")
+		return
+	}
+	mongoObserver = lifecycleDBPrincipalExpected{User: auth.AuthInfo.Users[0].User, HostOrDatabase: auth.AuthInfo.Users[0].DB, Owners: []string{"original_maintenance_run"}}
+	return
+}
+
+// Configured actors identify ownership; the actual inherited grant catalog
+// decides whether a principal is in this four-target scope. No maintenance
+// account is guessed, and subsequent coverage rejects every unowned writer.
+func lifecycleProduceDBWriterInput(r lifecycleRequest, census lifecycleFinalFileBinding, original dbCensusPrivate, actual dbcensus.Catalog, actors []stop.DatabasePrincipal, aiUser string, sqlObserver, mongoObserver lifecycleDBPrincipalExpected, sqlDatabase, mongoDatabase string) (lifecycleDBWriterInput, error) {
+	in := lifecycleDBWriterInput{FormatVersion: 1, Kind: "qs_four_target_database_writer_expectations", ToolSourceSHA: r.ToolSourceSHA, OriginalSourceSHA: r.OriginalSourceSHA, OperationID: r.OperationID, OriginalRunID: r.Recovery.OriginalRunID, TargetHash: digest(targets), ManifestSHA256: r.ManifestSHA256, Census: census, CensusSourceSHA: original.SourceSHA, CensusRunID: original.RunID, SQLObserver: sqlObserver, MongoObserver: mongoObserver, OriginalActors: actors}
+	if len(actors) != 2 || aiUser == "" || sqlDatabase == "" || mongoDatabase == "" {
+		return in, lifecycleError("lifecycle_database_original_config_changed")
+	}
+	writers, e := lifecycleDBSQLWriters(actual, sqlDatabase)
+	if e != nil {
+		return in, e
+	}
+	appendOwner := func(list *[]lifecycleDBPrincipalExpected, p lifecycleDBPrincipalExpected, owner string) {
+		for i := range *list {
+			if (*list)[i].User == p.User && (*list)[i].HostOrDatabase == p.HostOrDatabase {
+				(*list)[i].Owners = append((*list)[i].Owners, owner)
+				return
+			}
+		}
+		p.Owners = []string{owner}
+		*list = append(*list, p)
+	}
+	addSQL := func(user, owner string) error {
+		var account []*string
+		for _, row := range actual.SQL["accounts"] {
+			if val(row, 0) == user {
+				if len(row) != 4 || account != nil {
+					return lifecycleError("lifecycle_database_ambiguous_session_owner")
+				}
+				account = row
+			}
+		}
+		if account == nil {
+			return lifecycleError("lifecycle_database_principal_rejected")
+		}
+		p := lifecycleDBPrincipalExpected{User: user, HostOrDatabase: val(account, 1)}
+		if user == sqlObserver.User {
+			return lifecycleError("lifecycle_database_shared_maintenance_account")
+		}
+		if writers[lifecycleDBPrincipalKey(p.User, p.HostOrDatabase)] {
+			appendOwner(&in.SQLPrincipals, p, owner)
+		}
+		return nil
+	}
+	components := map[string]bool{}
+	for _, a := range actors {
+		if a.Component != "qs-apiserver" && a.Component != "qs-worker" || components[a.Component] || !hashRE.MatchString(a.ContainerID) || !hashRE.MatchString(a.EnvironmentSHA256) || a.SQLUser == "" || a.MongoUser == "" || a.SQLDatabase != sqlDatabase || a.MongoDatabase != mongoDatabase {
+			return in, lifecycleError("lifecycle_database_original_config_changed")
+		}
+		components[a.Component] = true
+		if e = addSQL(a.SQLUser, a.Component); e != nil {
+			return in, e
+		}
+		var user bson.M
+		for _, u := range actual.Mongo["users"] {
+			if u["user"] == a.MongoUser && u["db"] == "admin" {
+				if user != nil {
+					return in, lifecycleError("lifecycle_database_ambiguous_session_owner")
+				}
+				user = u
+			}
+		}
+		if user == nil {
+			return in, lifecycleError("lifecycle_database_principal_rejected")
+		}
+		if a.MongoUser == mongoObserver.User {
+			return in, lifecycleError("lifecycle_database_shared_maintenance_account")
+		}
+		yes, err := lifecycleMongoMayWrite(user, mongoDatabase)
+		if err != nil {
+			return in, err
+		}
+		if yes {
+			appendOwner(&in.MongoPrincipals, lifecycleDBPrincipalExpected{User: a.MongoUser, HostOrDatabase: "admin"}, a.Component)
+		}
+	}
+	if e = addSQL(aiUser, "qs-ai"); e != nil {
+		return in, e
+	}
+	if !lifecycleDBInputValid(in, r) {
+		return in, lifecycleError("lifecycle_database_writer_input_rejected")
+	}
+	return in, nil
+}
+
 func (h *lifecycleFixedHost) installDatabaseWriterLease(ctx context.Context, r lifecycleRequest) error {
 	if h == nil || h.dbWriters != nil || h.owner == nil || h.owner.originalConn == nil || h.owner.originalMongo == nil || h.services == nil || h.services.window == nil || h.services.local == nil || h.services.remote == nil || h.aiStopped == nil || !r.WriterControl.valid() || r.WriterControl.DatabaseInput == nil {
 		return lifecycleError("lifecycle_database_writer_input_missing")
@@ -414,16 +542,20 @@ func (h *lifecycleFixedHost) installDatabaseWriterLease(ctx context.Context, r l
 		return e
 	}
 	f := *r.WriterControl.DatabaseInput
-	if !lifecycleOwnedPath(filepath.Join("/opt/backups/qs-server/compatibility-retirement", r.OperationID), f.Path) {
-		return lifecycleError("lifecycle_database_writer_input_rejected")
-	}
 	var in lifecycleDBWriterInput
-	if e = readLifecyclePrivateAs(f.Path, f.SHA256, &in, 256<<10, intent.SourceUID); e != nil || !lifecycleDBInputValid(in, r) {
-		return lifecycleError("lifecycle_database_writer_input_rejected")
-	}
 	var original dbCensusPrivate
-	if e = readLifecyclePrivateAs(in.Census.Path, in.Census.SHA256, &original, 64<<20, 0); e != nil || original.SourceSHA != in.CensusSourceSHA || original.OperationID != r.OperationID || original.RunID != in.CensusRunID || original.WriterScopeComplete || original.IdentityProducer.OperationID != r.OperationID {
-		return lifecycleError("lifecycle_database_census_binding_rejected")
+	censusRun, nativeProducer := lifecycleDBInputCensusRun(f.Path, r.OperationID)
+	if nativeProducer {
+		if readLifecyclePrivateAs(f.Path, f.SHA256, &original, 64<<20, 0) != nil || !lifecycleDBCensusProducerValid(original, r, censusRun) {
+			return lifecycleError("lifecycle_database_census_binding_rejected")
+		}
+	} else {
+		if !lifecycleOwnedPath(filepath.Join("/opt/backups/qs-server/compatibility-retirement", r.OperationID), f.Path) || readLifecyclePrivateAs(f.Path, f.SHA256, &in, 256<<10, intent.SourceUID) != nil || !lifecycleDBInputValid(in, r) {
+			return lifecycleError("lifecycle_database_writer_input_rejected")
+		}
+		if readLifecyclePrivateAs(in.Census.Path, in.Census.SHA256, &original, 64<<20, 0) != nil || original.SourceSHA != in.CensusSourceSHA || original.OperationID != r.OperationID || original.RunID != in.CensusRunID || original.WriterScopeComplete || original.IdentityProducer.OperationID != r.OperationID {
+			return lifecycleError("lifecycle_database_census_binding_rejected")
+		}
 	}
 	var manifest lifecycleFrozenManifest
 	if readLifecyclePrivate(filepath.Join(r.prepareRoot, "manifest.json"), r.ManifestSHA256, &manifest) != nil || original.SQLIdentitySHA256 != manifest.DatabaseBindings["mysql"].IdentityHash || original.MongoIdentitySHA256 != manifest.DatabaseBindings["mongodb"].IdentityHash {
@@ -438,7 +570,7 @@ func (h *lifecycleFixedHost) installDatabaseWriterLease(ctx context.Context, r l
 		return e
 	}
 	actors := append(local, d.DatabasePrincipals...)
-	if digest(actors) != digest(in.OriginalActors) {
+	if !nativeProducer && digest(actors) != digest(in.OriginalActors) {
 		return lifecycleError("lifecycle_database_original_config_changed")
 	}
 	aiUser, _, e := h.aiStopped.DatabasePrincipal(ctx)
@@ -462,6 +594,16 @@ func (h *lifecycleFixedHost) installDatabaseWriterLease(ctx context.Context, r l
 	if lifecycleDBStaticHash(actual) == "" || lifecycleDBStaticHash(actual) != lifecycleDBStaticHash(baseline) || digest(actual.SQL["accounts"]) != digest(baseline.SQL["accounts"]) || lifecycleDBDigest(actual.Mongo["users"]) != lifecycleDBDigest(baseline.Mongo["users"]) {
 		return lifecycleError("lifecycle_database_catalog_changed")
 	}
+	if nativeProducer {
+		sqlObserver, mongoObserver, database, err := h.observeDatabaseMaintenancePrincipals(ctx)
+		if err != nil {
+			return err
+		}
+		in, e = lifecycleProduceDBWriterInput(r, f, original, actual, actors, aiUser, sqlObserver, mongoObserver, database, h.owner.originalDB.Name())
+		if e != nil {
+			return e
+		}
+	}
 	// Current run binding comes from the original protected native invocation,
 	// not from a future-run prediction in an independently approved expectation.
 	v := &lifecycleDBWriterLease{host: h, window: h.services.window, binding: lifecycleWindowBinding(r), actualRunID: r.ActualRunID, input: in, baseline: actual, staticSHA: lifecycleDBStaticHash(actual), sqlIdentity: original.SQLIdentitySHA256, mongoIdentity: original.MongoIdentitySHA256, sqlAttempted: map[string]bool{}, mongoAttempted: map[string]bool{}}
@@ -482,6 +624,18 @@ func (h *lifecycleFixedHost) installDatabaseWriterLease(ctx context.Context, r l
 		return e
 	}
 	h.dbWriters = v // Original native owner retained BEFORE the first mutating command.
+	if nativeProducer {
+		encoded, err := json.Marshal(in)
+		if err != nil || len(encoded) > 256<<10 {
+			return lifecycleError("lifecycle_database_writer_record_rejected")
+		}
+		// Exact exclusive native output, owned by this invocation. The original
+		// caller's input/hash is never rewritten and this is never an installed token.
+		v.inputRecord = &lifecycleFinalFileBinding{Path: filepath.Join(r.prepareRoot, "database-writer-expectations.private.json"), SHA256: digestRaw(append(encoded, '\n'))}
+		if err = writeJSON(v.inputRecord.Path, in); err != nil || readLifecyclePrivate(v.inputRecord.Path, v.inputRecord.SHA256, new(lifecycleDBWriterInput)) != nil {
+			return lifecycleError("lifecycle_database_writer_record_write_failed")
+		}
+	}
 	for _, p := range in.SQLPrincipals {
 		row := v.sqlAccount(actual, p)
 		if row == nil {
@@ -709,6 +863,58 @@ func (v *lifecycleDBWriterLease) nativeIdentityAndAuthentication(ctx context.Con
 	return nil
 }
 
+func lifecycleDBSQLWriters(c dbcensus.Catalog, database string) (map[string]bool, error) {
+	writes := map[string]bool{}
+	for _, row := range c.SQL["account_grants"] {
+		if len(row) != 3 {
+			return nil, lifecycleError("lifecycle_database_grant_schema_unproven")
+		}
+		yes, e := lifecycleSQLGrantMayWrite(val(row, 2), database)
+		if e != nil {
+			return nil, e
+		}
+		if yes {
+			writes[lifecycleDBPrincipalKey(val(row, 0), val(row, 1))] = true
+		}
+	}
+	for _, row := range c.SQL["dynamic_grants"] {
+		if len(row) != 4 {
+			return nil, lifecycleError("lifecycle_database_grant_schema_unproven")
+		}
+		switch val(row, 2) {
+		case "ROLE_ADMIN", "SYSTEM_VARIABLES_ADMIN", "CONNECTION_ADMIN", "SYSTEM_USER":
+			writes[lifecycleDBPrincipalKey(val(row, 0), val(row, 1))] = true
+		}
+	}
+	// Any granted role can be activated, not just a default role. Bound the
+	// propagation by account count and fail if an edge names an absent principal.
+	for n := 0; n <= len(c.SQL["accounts"]); n++ {
+		changed := false
+		for _, row := range c.SQL["role_edges"] {
+			if len(row) != 5 {
+				return nil, lifecycleError("lifecycle_database_grant_schema_unproven")
+			}
+			from, to := lifecycleDBPrincipalKey(val(row, 1), val(row, 0)), lifecycleDBPrincipalKey(val(row, 3), val(row, 2))
+			if writes[from] && !writes[to] {
+				writes[to] = true
+				changed = true
+			}
+		}
+		if !changed {
+			break
+		}
+		if n == len(c.SQL["accounts"]) {
+			return nil, lifecycleError("lifecycle_database_role_scope_unproven")
+		}
+	}
+	for _, row := range c.SQL["proxy_grants"] {
+		if len(row) != 5 || writes[lifecycleDBPrincipalKey(val(row, 1), val(row, 0))] || writes[lifecycleDBPrincipalKey(val(row, 3), val(row, 2))] {
+			return nil, lifecycleError("lifecycle_database_proxy_scope_unproven")
+		}
+	}
+	return writes, nil
+}
+
 func (v *lifecycleDBWriterLease) validateWriterCoverage(c dbcensus.Catalog, locked bool) error {
 	if lifecycleDBStaticHash(c) != v.staticSHA {
 		return lifecycleError("lifecycle_database_catalog_changed")
@@ -724,53 +930,9 @@ func (v *lifecycleDBWriterLease) validateWriterCoverage(c dbcensus.Catalog, lock
 			return lifecycleError("lifecycle_database_shared_maintenance_account")
 		}
 	}
-	writes := map[string]bool{}
-	for _, row := range c.SQL["account_grants"] {
-		if len(row) != 3 {
-			return lifecycleError("lifecycle_database_grant_schema_unproven")
-		}
-		yes, e := lifecycleSQLGrantMayWrite(val(row, 2), v.sqlDatabase)
-		if e != nil {
-			return e
-		}
-		if yes {
-			writes[lifecycleDBPrincipalKey(val(row, 0), val(row, 1))] = true
-		}
-	}
-	for _, row := range c.SQL["dynamic_grants"] {
-		if len(row) != 4 {
-			return lifecycleError("lifecycle_database_grant_schema_unproven")
-		}
-		switch val(row, 2) {
-		case "ROLE_ADMIN", "SYSTEM_VARIABLES_ADMIN", "CONNECTION_ADMIN", "SYSTEM_USER":
-			writes[lifecycleDBPrincipalKey(val(row, 0), val(row, 1))] = true
-		}
-	}
-	// Any granted role can be activated, not just a default role. Bound the
-	// propagation by account count and fail if an edge names an absent principal.
-	for n := 0; n <= len(c.SQL["accounts"]); n++ {
-		changed := false
-		for _, row := range c.SQL["role_edges"] {
-			if len(row) != 5 {
-				return lifecycleError("lifecycle_database_grant_schema_unproven")
-			}
-			from, to := lifecycleDBPrincipalKey(val(row, 1), val(row, 0)), lifecycleDBPrincipalKey(val(row, 3), val(row, 2))
-			if writes[from] && !writes[to] {
-				writes[to] = true
-				changed = true
-			}
-		}
-		if !changed {
-			break
-		}
-		if n == len(c.SQL["accounts"]) {
-			return lifecycleError("lifecycle_database_role_scope_unproven")
-		}
-	}
-	for _, row := range c.SQL["proxy_grants"] {
-		if len(row) != 5 || writes[lifecycleDBPrincipalKey(val(row, 1), val(row, 0))] || writes[lifecycleDBPrincipalKey(val(row, 3), val(row, 2))] {
-			return lifecycleError("lifecycle_database_proxy_scope_unproven")
-		}
+	writes, e := lifecycleDBSQLWriters(c, v.sqlDatabase)
+	if e != nil {
+		return e
 	}
 	observer := lifecycleDBPrincipalKey(v.input.SQLObserver.User, v.input.SQLObserver.HostOrDatabase)
 	for _, row := range c.SQL["accounts"] {

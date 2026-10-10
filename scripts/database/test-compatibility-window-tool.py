@@ -171,6 +171,16 @@ class WindowToolMetadata(unittest.TestCase):
             with self.subTest(changed=changed),self.assertRaises(tool.Refused):tool.pinned_service_known_host(changed,'server-d.example',2222,fingerprint)
         with self.assertRaises(tool.Refused):tool.pinned_service_known_host(raw,'server-d.example',2222,'SHA256:'+'a'*43)
 
+    def test_database_writer_native_census_reference_is_exact_and_not_authority(self):
+        r=self.request();a=self.approval(r,'apply')
+        file=dict(path='/opt/backups/qs-server/compatibility-retirement-root-prepare/12-1-18-1/db-writer-census.private.json',sha256='a'*64)
+        r['writer_control']['database_input']=file
+        a['request_template_sha256']=tool.digest(tool.canonical(r))
+        self.assertEqual(tool.decode(tool.derive_request(tool.canonical(r),a,'22-3'))['writer_control']['database_input'],file)
+        for path in (file['path'].replace('12-1','13-1',1),file['path'].replace('18-1','future',1),file['path'].replace('db-writer-census.private.json','other.json'),file['path']+'/../db-writer-census.private.json'):
+            bad=copy.deepcopy(r);bad['writer_control']['database_input']['path']=path;a['request_template_sha256']=tool.digest(tool.canonical(bad))
+            with self.subTest(path=path),self.assertRaises(tool.Refused):tool.derive_request(tool.canonical(bad),a,'22-3')
+
     def test_mixed_unknown_uppercase_and_proof_fields_reject(self):
         for name in ('drop_ready','whole_writer_fence','SourceSHA','tool_sha','window_lease'):
             r=self.request();r[name]=True;a=self.approval(r)

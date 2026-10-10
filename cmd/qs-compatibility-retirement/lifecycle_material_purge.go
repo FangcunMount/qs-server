@@ -226,6 +226,15 @@ func (h *lifecycleFixedHost) composeNativeMaterialOwners(ctx context.Context, r 
 			return e
 		}
 	}
+	if v := h.dbWriters; v != nil && v.inputRecord != nil {
+		f := v.inputRecord
+		if v.self != v || v.host != h || v.binding != lifecycleWindowBinding(r) || v.actualRunID != r.ActualRunID || !v.installed || !v.restored || f.Path != filepath.Join(r.prepareRoot, "database-writer-expectations.private.json") || !hashRE.MatchString(f.SHA256) {
+			return lifecycleError("lifecycle_database_writer_record_rejected")
+		}
+		if e = root.register(filepath.Base(f.Path), f.SHA256, 0, 0600); e != nil {
+			return e
+		}
+	}
 	if e = root.registerChild(h.api.materials); e != nil {
 		return e
 	}

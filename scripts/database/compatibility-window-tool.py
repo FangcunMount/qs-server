@@ -183,7 +183,10 @@ def derive_request(raw, approval, current_run):
             exact(file,("path","sha256"));token(file["sha256"],HASH)
             root=Path('/opt/backups/qs-server/compatibility-retirement',approval['operation_id'])
             p=file['path']
-            if not isinstance(p,str) or not os.path.isabs(p) or os.path.normpath(p)!=p or not Path(p).is_relative_to(root) or p==str(root):
+            census_root='/opt/backups/qs-server/compatibility-retirement-root-prepare/'
+            census_pattern=re.escape(census_root+approval['operation_id']+'-')+RUN.pattern+r'/db-writer-census\.private\.json'
+            census=isinstance(p,str) and re.fullmatch(census_pattern,p) is not None
+            if not isinstance(p,str) or not os.path.isabs(p) or os.path.normpath(p)!=p or not census and (not Path(p).is_relative_to(root) or p==str(root)):
                 reject("window_tool_database_writer_input_rejected")
     if approval["stage"] != "prepare":
         validate_workflow_scope(approval.get("workflow_scope"), approval)
