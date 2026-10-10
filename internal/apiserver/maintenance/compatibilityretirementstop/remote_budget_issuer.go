@@ -237,14 +237,14 @@ type signedRemoteBudget struct {
 func recoveryAction(s string) bool { return s == "restore" || s == "restore_dependents" }
 func serviceAction(s string) bool {
 	switch s {
-	case "bind", "stop", "check", "resume_dependents", "restore", "restore_dependents", "controlled_resume", "check_running", "purge_materials":
+	case "bind", "stop", "check", "resume_dependents", "restore", "restore_dependents", "controlled_resume", "check_running", "observe_loaded_mq", "purge_materials":
 		return true
 	}
 	return false
 }
 
 func controlledAction(s string) bool {
-	return s == "controlled_resume" || s == "check_running" || s == "purge_materials"
+	return s == "controlled_resume" || s == "check_running" || s == "observe_loaded_mq" || s == "purge_materials"
 }
 
 // IssueFreshBudget handles a fresh live challenge from the pinned D session.

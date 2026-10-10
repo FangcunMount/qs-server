@@ -2,9 +2,12 @@ package main
 
 import (
 	"context"
+	"net"
+	"net/http"
 	"os"
 	"path/filepath"
 	"runtime"
+	"time"
 
 	stop "github.com/FangcunMount/qs-server/internal/apiserver/maintenance/compatibilityretirementstop"
 	"github.com/FangcunMount/qs-server/pkg/version"
@@ -96,5 +99,15 @@ func runLifecycleServiceSession(ctx context.Context, mode, path, hash, operation
 	if err != nil {
 		return err
 	}
-	return stop.ServeRootRemoteOwnedSession(ctx, a, materials, journal, in, out)
+	// This client creates metadata GETs only; it has no proxy, credential source,
+	// message producer or redirect path. Missing broker access is a real error.
+	client, transport := lifecycleLoadedMQHTTPClient()
+	defer transport.CloseIdleConnections()
+	return stop.ServeRootRemoteOwnedSessionWithLoadedMQ(ctx, a, materials, journal, in, out, client)
+}
+
+func lifecycleLoadedMQHTTPClient() (*http.Client, *http.Transport) {
+	transport := &http.Transport{Proxy: nil, DialContext: (&net.Dialer{Timeout: 5 * time.Second}).DialContext, DisableKeepAlives: true, TLSHandshakeTimeout: 5 * time.Second, ResponseHeaderTimeout: 5 * time.Second}
+	client := &http.Client{Transport: transport, Timeout: 5 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
+	return client, transport
 }

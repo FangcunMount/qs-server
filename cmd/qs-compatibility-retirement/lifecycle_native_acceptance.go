@@ -9,6 +9,7 @@ import (
 	backup "github.com/FangcunMount/qs-server/internal/apiserver/maintenance/compatibilityretirementbackup"
 	hostmysql "github.com/FangcunMount/qs-server/internal/pkg/database/mysql"
 	"github.com/FangcunMount/qs-server/internal/pkg/migration"
+	reader "github.com/FangcunMount/qs-server/internal/pkg/runtimefactsreader"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"go.mongodb.org/mongo-driver/mongo/readconcern"
@@ -88,11 +89,17 @@ func (h *lifecycleFixedHost) verifyNativeAcceptance(ctx context.Context, r lifec
 	if e = observed.validate(h); e != nil {
 		return e
 	}
-	// A readiness report is Redis/runtime evidence, not complete acceptance.
-	// Do not resume arbitrary IDs, reconnect SSH, mint an accepted-materials
-	// token or purge from a health success/JSON assertion. The remaining real
-	// producers must be integrated under the original full external fence.
-	return lifecycleError("lifecycle_controlled_internal_resume_broker_and_complete_material_producers_missing")
+	// The original D channel now performs a genuine loaded UDS + broker GET
+	// observation. It remains incomplete and cannot mint acceptance/materials.
+	if e = h.services.child.requireLive(); e != nil {
+		return e
+	}
+	if _, e = h.services.remote.ObserveLoadedMQ(q); errors.Is(e, reader.ErrScopeUnproven) {
+		return lifecycleError("lifecycle_loaded_mq_scope_unproven")
+	} else if e != nil {
+		return lifecycleError("lifecycle_loaded_mq_observation_failed")
+	}
+	return lifecycleError("lifecycle_loaded_mq_complete_acceptance_unproven")
 }
 
 func (h *lifecycleFixedHost) verifyCompleteDataBeforeInternalResume(ctx context.Context, proof *migration.CompatibilityPairMigrationProof) (result error) {

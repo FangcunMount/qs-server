@@ -56,7 +56,7 @@ func (c *RemoteController) Do(ctx context.Context, action string) (v SessionDiag
 		return v, ErrRemoteBudget
 	}
 	if action == "bind" && c.seq != 0 || action == "stop" && c.stopIssued || c.forwardRefused && !recoveryAction(action) || recoveryAction(action) && (c.recoveryIssued || c.seq != 0 && !c.stopIssued) ||
-		(action == "check" || action == "resume_dependents" || controlledAction(action)) && !c.stopIssued || controlledAction(action) && (!c.managementBound || action == "controlled_resume" && c.controlledIssued || (action == "check_running" || action == "purge_materials") && !c.controlledResumed || action == "purge_materials" && c.runtimeObservation == nil) {
+		(action == "check" || action == "resume_dependents" || controlledAction(action)) && !c.stopIssued || controlledAction(action) && (!c.managementBound || action == "controlled_resume" && c.controlledIssued || (action == "check_running" || action == "observe_loaded_mq" || action == "purge_materials") && !c.controlledResumed || (action == "purge_materials" || action == "observe_loaded_mq") && c.runtimeObservation == nil) {
 		return v, ErrRemoteBudget
 	}
 	var a, b unix.Stat_t
@@ -125,7 +125,7 @@ func (c *RemoteController) Do(ctx context.Context, action string) (v SessionDiag
 	if exactJSON(reply, &v) != nil || v.Protocol != sessionProtocol || v.Sequence != c.seq || v.Action != action || v.HostRole != "server-d" || v.SourceSHA != c.issuer.record.Binding.SourceSHA || v.ToolSourceSHA != c.issuer.record.ToolSourceSHA || v.OperationID != c.issuer.record.Binding.OperationID || v.ManifestSHA256 != c.issuer.record.Binding.ManifestSHA256 || v.OriginalRunID != c.issuer.record.Binding.OriginalRunID || v.WindowStartSHA256 != c.issuer.record.StartSHA256 || v.WholeWriterFenceProven || v.RemainingMilliseconds <= 0 || v.RemainingMilliseconds > 1800000 || v.ForwardRemainingMilliseconds < 0 || v.ForwardRemainingMilliseconds > 1200000 || !remoteDiagnosticOutcomeValid(v) {
 		return v, ErrRemoteBudget
 	}
-	if !remoteRuntimeDiagnosticValid(v) || !remoteMaterialsDiagnosticValid(v) {
+	if !remoteRuntimeDiagnosticValid(v) || !remoteMaterialsDiagnosticValid(v) || !remoteLoadedMQDiagnosticValid(v) {
 		return v, ErrRemoteBudget
 	}
 	after, e := c.issuer.window.Diagnostic(q)
@@ -183,6 +183,9 @@ func remoteDiagnosticOutcomeValid(v SessionDiagnostic) bool {
 	if v.Outcome != "refused" {
 		return false
 	}
+	if v.ErrorCategory == "loaded_mq_read_failed" {
+		return v.Action == "observe_loaded_mq"
+	}
 	switch v.ErrorCategory {
 	case "service_state_changed", "graceful_exit_unproven", "journal_unknown", "fixed_command_failed", "wrong_host", "bound_rollback_api_required", "binding_or_budget_rejected":
 		return true
@@ -220,4 +223,11 @@ func (c *RemoteController) Close() error {
 	defer c.mu.Unlock()
 	c.closed = true
 	return nil
+}
+
+func remoteLoadedMQDiagnosticValid(v SessionDiagnostic) bool {
+	if v.Action != "observe_loaded_mq" || v.Outcome != "observed" {
+		return v.LoadedMQ == nil
+	}
+	return loadedMQDiagnosticValid(v.LoadedMQ)
 }

@@ -2,6 +2,9 @@ package compatibilityretirementstop
 
 import (
 	"context"
+	"errors"
+	reader "github.com/FangcunMount/qs-server/internal/pkg/runtimefactsreader"
+	"net/http"
 	"os"
 	"time"
 
@@ -22,7 +25,7 @@ func ServeRemoteHostSession(ctx context.Context, a *Approval, policy fence.Polic
 	if e := consumeAuthenticatedStopOrigin(ctx, a, policy, permit, challengeDir); e != nil {
 		return e
 	}
-	return serveRemoteHostSession(ctx, a, journalDir, in, out, recoveryOnly)
+	return serveRemoteHostSession(ctx, a, journalDir, in, out, recoveryOnly, nil)
 }
 
 // ServeRootRemoteHostSession is the service-only port of the existing root
@@ -34,13 +37,19 @@ func ServeRootRemoteHostSession(ctx context.Context, a *Approval, journalDir str
 	if os.Getuid() != 0 || os.Geteuid() != 0 {
 		return ErrBinding
 	}
-	return serveRemoteHostSession(ctx, a, journalDir, in, out, recoveryOnly)
+	return serveRemoteHostSession(ctx, a, journalDir, in, out, recoveryOnly, nil)
 }
 
 // ServeRootRemoteOwnedSession keeps the original live D management channel and
 // owns this process's actual registered temporary files. No completion token is
 // accepted. Recovery and legacy sessions retain their existing cleanup rules.
-func ServeRootRemoteOwnedSession(ctx context.Context, a *Approval, m *RootRemoteMaterials, journal string, in, out *os.File) (result error) {
+func ServeRootRemoteOwnedSession(ctx context.Context, a *Approval, m *RootRemoteMaterials, journal string, in, out *os.File) error {
+	return ServeRootRemoteOwnedSessionWithLoadedMQ(ctx, a, m, journal, in, out, nil)
+}
+
+// The fixed root caller owns this read-only HTTP client; the session borrows it.
+// Its endpoints are exclusively read from the actual live worker UDS snapshot.
+func ServeRootRemoteOwnedSessionWithLoadedMQ(ctx context.Context, a *Approval, m *RootRemoteMaterials, journal string, in, out *os.File, mqClient *http.Client) (result error) {
 	if os.Getuid() != 0 || os.Geteuid() != 0 || a == nil || a.materials != nil || m == nil || m.self != m || m.approval != a || m.closed || m.failed.Load() {
 		return ErrRemoteMaterials
 	}
@@ -50,10 +59,10 @@ func ServeRootRemoteOwnedSession(ctx context.Context, a *Approval, m *RootRemote
 			result = e
 		}
 	}()
-	return serveRemoteHostSession(ctx, a, journal, in, out, false)
+	return serveRemoteHostSession(ctx, a, journal, in, out, false, mqClient)
 }
 
-func serveRemoteHostSession(ctx context.Context, a *Approval, journalDir string, in, out *os.File, recoveryOnly bool) (err error) {
+func serveRemoteHostSession(ctx context.Context, a *Approval, journalDir string, in, out *os.File, recoveryOnly bool, mqClient *http.Client) (err error) {
 	if ctx == nil || ctx.Err() != nil || a.validate() != nil || a.descriptor.HostRole != "server-d" || !validSessionFD(in) || !validSessionFD(out) {
 		return ErrRemoteBudget
 	}
@@ -165,6 +174,7 @@ func serveRemoteHostSession(ctx context.Context, a *Approval, journalDir string,
 		released := false
 		var actualRuntime *DependentRuntimeSnapshot
 		var actualMaterials *RemoteMaterialSnapshot
+		var actualMQ *LoadedMQDiagnostic
 		switch req.Action {
 		case "bind":
 			// Actual descriptor/trust, fresh native signature and original budget
@@ -202,6 +212,16 @@ func serveRemoteHostSession(ctx context.Context, a *Approval, journalDir string,
 				if e == nil {
 					actualRuntime = &snapshot
 				}
+			}
+		case "observe_loaded_mq":
+			if l == nil || l.runtimeObservation == nil || mqClient == nil {
+				return ErrLoadedMQ
+			}
+			var snapshot LoadedMQDiagnostic
+			snapshot, e = l.ObserveLoadedMQ(ctx, mqClient)
+			if errors.Is(e, reader.ErrScopeUnproven) && loadedMQDiagnosticValid(&snapshot) {
+				actualMQ = &snapshot
+				e = nil
 			}
 		case "purge_materials":
 			if l == nil || a.materials == nil || l.runtimeObservation == nil {
@@ -242,6 +262,7 @@ func serveRemoteHostSession(ctx context.Context, a *Approval, journalDir string,
 		diagnostic := SessionDiagnostic{Protocol: sessionProtocol, Sequence: seq, Action: req.Action, HostRole: a.descriptor.HostRole, SourceSHA: a.descriptor.SourceSHA, ToolSourceSHA: a.descriptor.ToolSourceSHA, OperationID: a.descriptor.OperationID, ManifestSHA256: a.descriptor.ManifestSHA256, OriginalRunID: a.descriptor.OriginalRunID, WindowStartSHA256: budget.StartSHA256, RemainingMilliseconds: budget.RemainingMilliseconds, ForwardRemainingMilliseconds: remaining, Outcome: "observed", ErrorCategory: sessionCategory(e)}
 		diagnostic.Runtime = actualRuntime
 		diagnostic.Materials = actualMaterials
+		diagnostic.LoadedMQ = actualMQ
 		if e != nil {
 			diagnostic.Outcome = "refused"
 		}
@@ -329,7 +350,7 @@ func remoteSessionActionAllowed(action string, bound, stopIssued, forwardRefused
 		return !bound && !stopIssued
 	case "stop":
 		return !stopIssued // Preserves the legacy initial Stop route.
-	case "check", "resume_dependents", "controlled_resume", "check_running", "purge_materials":
+	case "check", "resume_dependents", "controlled_resume", "check_running", "observe_loaded_mq", "purge_materials":
 		return stopIssued
 	}
 	return false
@@ -344,5 +365,5 @@ func remoteSessionRequestAllowed(action string, bound, stopIssued, forwardRefuse
 	}
 	return !controlledAction(action) || bound &&
 		(action != "controlled_resume" || !controlledIssued) &&
-		(action != "check_running" && action != "purge_materials" || controlledResumed)
+		(action != "check_running" && action != "observe_loaded_mq" && action != "purge_materials" || controlledResumed)
 }

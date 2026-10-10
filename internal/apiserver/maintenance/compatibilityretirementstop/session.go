@@ -35,6 +35,7 @@ type SessionDiagnostic struct {
 	WholeWriterFenceProven       bool                      `json:"whole_writer_fence_proven"`
 	Runtime                      *DependentRuntimeSnapshot `json:"runtime,omitempty"`
 	Materials                    *RemoteMaterialSnapshot   `json:"materials,omitempty"`
+	LoadedMQ                     *LoadedMQDiagnostic       `json:"loaded_mq,omitempty"`
 }
 
 func parseSessionRequest(raw []byte, sequence uint64) (SessionRequest, error) {
@@ -190,6 +191,8 @@ func sessionCategory(err error) string {
 		return "graceful_exit_unproven"
 	case errors.Is(err, ErrJournal):
 		return "journal_unknown"
+	case errors.Is(err, ErrLoadedMQ):
+		return "loaded_mq_read_failed"
 	case errors.Is(err, ErrCommand):
 		return "fixed_command_failed"
 	case errors.Is(err, ErrRemote):
