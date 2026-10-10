@@ -84,6 +84,60 @@ func TestAPIAcceptanceReadEndpointsAreBoundedGETOnly(t *testing.T) {
 	}
 }
 
+func TestAPIAcceptanceRepeatedReadKeepsOriginalNativeInstance(t *testing.T) {
+	v := &lifecycleAPITransition{bCID: strings.Repeat("a", 64)}
+	actual := lifecycleAPIInspection{ID: v.bCID, Image: "sha256:" + strings.Repeat("b", 64)}
+	actual.State.PID, actual.State.StartedAt = 17, "2026-10-10T00:00:00Z"
+	source, address := strings.Repeat("c", 40), "172.20.0.2:8080"
+	o := &lifecycleAPIRuntimeObservation{owner: v, cid: actual.ID, image: actual.Image, source: source, pid: actual.State.PID, started: actual.State.StartedAt, address: address}
+	o.self = o
+	if !o.matchesCurrent(v, actual, address, source) {
+		t.Fatal("same native API instance could not be read again")
+	}
+	for name, change := range map[string]func(*lifecycleAPIRuntimeObservation){
+		"foreign-owner": func(x *lifecycleAPIRuntimeObservation) { x.owner = new(lifecycleAPITransition) },
+		"saved-copy":    func(x *lifecycleAPIRuntimeObservation) { x.self = o },
+		"new-cid":       func(x *lifecycleAPIRuntimeObservation) { x.cid = strings.Repeat("d", 64) },
+		"new-image":     func(x *lifecycleAPIRuntimeObservation) { x.image = "sha256:" + strings.Repeat("d", 64) },
+		"wrong-source":  func(x *lifecycleAPIRuntimeObservation) { x.source = strings.Repeat("d", 40) },
+		"new-pid":       func(x *lifecycleAPIRuntimeObservation) { x.pid++ },
+		"restarted":     func(x *lifecycleAPIRuntimeObservation) { x.started = "2026-10-10T00:01:00Z" },
+		"new-route":     func(x *lifecycleAPIRuntimeObservation) { x.address = "172.20.0.3:8080" },
+	} {
+		t.Run(name, func(t *testing.T) {
+			x := *o
+			x.self = &x
+			change(&x)
+			if x.matchesCurrent(v, actual, address, source) {
+				t.Fatal("changed API runtime accepted as original instance")
+			}
+		})
+	}
+	// Each cycle goes through the existing fixed GET caller. A later failure
+	// remains an error rather than being satisfied by the first response.
+	reads := 0
+	client := &http.Client{Transport: acceptanceTestTransport(func(req *http.Request) (*http.Response, error) {
+		if req.Method != http.MethodGet || req.URL.Path != "/readyz" {
+			t.Fatal("repeat read was not the fixed GET")
+		}
+		reads++
+		status := 200
+		if reads == 2 {
+			status = 503
+		}
+		return &http.Response{StatusCode: status, Body: io.NopCloser(strings.NewReader(`{"status":"ready"}`))}, nil
+	})}
+	if _, err := lifecycleAPIReadEndpoint(t.Context(), client, address, "/readyz"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := lifecycleAPIReadEndpoint(t.Context(), client, address, "/readyz"); err == nil || reads != 2 {
+		t.Fatal("repeat GET was skipped or old success masked current failure")
+	}
+	if err := v.observeAcceptance(context.Background(), lifecycleRequest{ToolSourceSHA: source}); err == nil || v.acceptance != nil {
+		t.Fatal("missing native inputs produced acceptance")
+	}
+}
+
 func TestAPIMaterialRegistrationFailureRetainsActualWrittenBytesAndUnknown(t *testing.T) {
 	// Real current-UID filesystem refusal. Nonroot bytes cannot become a
 	// root registration. In a true root test process, exercise O_EXCL refusal

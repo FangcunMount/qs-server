@@ -87,6 +87,7 @@ type lifecycleBatchMaterials struct {
 	engines                          []*lifecycleEnginePurge
 	journal                          *lifecycleMaterialDirectory
 	started, purged, closed, unknown bool
+	zeroVerified                     bool
 }
 
 func lifecycleMaterialPathsMatch(c *lifecycleBatchMaterials, r lifecycleRequest) bool {
@@ -605,6 +606,11 @@ func (c *lifecycleBatchMaterials) verifyZero(ctx context.Context) error {
 		c.unknown = true
 		return e
 	}
+	if ctx.Err() != nil {
+		c.unknown = true
+		return lifecycleError("lifecycle_material_purge_cancelled")
+	}
+	c.zeroVerified = true // Actual zero reads and every retained source FD closed.
 	return nil
 }
 func (c *lifecycleBatchMaterials) close() error {

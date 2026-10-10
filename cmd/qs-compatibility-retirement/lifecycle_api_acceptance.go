@@ -104,7 +104,7 @@ func lifecycleAPIValidateResponses(health, build, ready []byte, source, architec
 }
 
 func (v *lifecycleAPITransition) observeAcceptance(ctx context.Context, r lifecycleRequest) error {
-	if ctx == nil || ctx.Err() != nil || v == nil || v.self != v || v.unknown || v.acceptance != nil || v.engine == nil || !v.bProgramVerified || !hashRE.MatchString(v.bCID) || v.materials == nil || v.request.OperationID != r.OperationID || v.request.ActualRunID != r.ActualRunID || v.request.ToolSourceSHA != r.ToolSourceSHA || !r.DeploymentControl.valid() {
+	if ctx == nil || ctx.Err() != nil || v == nil || v.self != v || v.unknown || v.engine == nil || !v.bProgramVerified || !hashRE.MatchString(v.bCID) || v.materials == nil || v.request.OperationID != r.OperationID || v.request.ActualRunID != r.ActualRunID || v.request.ToolSourceSHA != r.ToolSourceSHA || !r.DeploymentControl.valid() {
 		return lifecycleError("lifecycle_actual_api_runtime_unproven")
 	}
 	if e := v.materials.checkComplete(false); e != nil {
@@ -124,6 +124,11 @@ func (v *lifecycleAPITransition) observeAcceptance(ctx context.Context, r lifecy
 	address, e := lifecycleAPIReadAddress(actual)
 	if e != nil {
 		return e
+	}
+	// Repeated acceptance is a fresh bounded GET against this same native B
+	// instance while its original materials still exist, never a second start.
+	if v.acceptance != nil && !v.acceptance.matchesCurrent(v, actual, address, r.ToolSourceSHA) {
+		return lifecycleError("lifecycle_actual_api_runtime_unproven")
 	}
 	transport := &http.Transport{Proxy: nil, DisableKeepAlives: true, DialContext: func(q context.Context, network, addr string) (net.Conn, error) {
 		if network != "tcp" || addr != address {
@@ -169,6 +174,11 @@ func (v *lifecycleAPITransition) observeAcceptance(ctx context.Context, r lifecy
 	o := &lifecycleAPIRuntimeObservation{owner: v, cid: v.bCID, image: actual.Image, source: r.ToolSourceSHA, pid: actual.State.PID, started: actual.State.StartedAt, address: address, health: digestRaw(health), version: digestRaw(build), ready: digestRaw(ready)}
 	o.self, v.acceptance = o, o
 	return ctx.Err()
+}
+
+func (o *lifecycleAPIRuntimeObservation) matchesCurrent(v *lifecycleAPITransition, actual lifecycleAPIInspection, address, source string) bool {
+	return o != nil && o.self == o && v != nil && o.owner == v && o.cid == v.bCID && o.cid == actual.ID && o.image == actual.Image &&
+		o.source == source && o.pid == actual.State.PID && o.started == actual.State.StartedAt && o.address == address
 }
 
 // These are exact never-started native probe IDs produced by this original

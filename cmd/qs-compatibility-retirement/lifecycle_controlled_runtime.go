@@ -101,10 +101,13 @@ func (h *lifecycleFixedHost) purgeAcceptedRemoteMaterials(ctx context.Context, r
 	if h == nil || h.acceptedMaterials == nil || h.acceptedMaterials.self != h.acceptedMaterials || h.acceptedMaterials.host != h || h.acceptedMaterials.binding != lifecycleMaterialsBinding(r) || o == nil || o.self != o || o.services != h.services || o.api != h.api || o.remote == nil || h.services.remote == nil || h.services.child == nil {
 		return nil, lifecycleError("lifecycle_actual_batch_acceptance_missing")
 	}
-	if e := h.CheckWholeWriterFence(ctx, r); e != nil {
+	// The final real runtime read must precede D terminal and material deletion.
+	// Neither controlled resume nor an old snapshot can replace this readback.
+	fresh, e := h.observeFinalControlledRuntime(ctx, r, o)
+	if e != nil {
 		return nil, e
 	}
-	z, e := h.services.remote.PurgeOwnedMaterials(ctx, o.remote)
+	z, e := h.services.remote.PurgeOwnedMaterials(ctx, fresh.remote)
 	if e != nil {
 		return nil, e
 	}
@@ -123,7 +126,53 @@ func (h *lifecycleFixedHost) purgeAcceptedRemoteMaterials(ctx context.Context, r
 	}
 	remote := &lifecycleRemoteMaterialZero{binding: lifecycleMaterialsBinding(r), native: z, services: h.services, terminal: terminal}
 	remote.self = remote
+	h.finalRuntime = fresh // Completed pre-purge native read, never post-purge runtime proof.
 	return remote, nil
+}
+
+func (h *lifecycleFixedHost) observeFinalControlledRuntime(ctx context.Context, r lifecycleRequest, prior *lifecycleControlledRuntime) (*lifecycleControlledRuntime, error) {
+	if prior.validate(h) != nil {
+		return nil, lifecycleError("lifecycle_controlled_original_runtime_missing")
+	}
+	if e := h.CheckWholeWriterFence(ctx, r); e != nil {
+		return nil, e
+	}
+	fresh, e := h.services.observeControlled(ctx, h.api)
+	if e != nil {
+		return nil, e
+	}
+	if e = fresh.validate(h); e != nil {
+		return nil, e
+	}
+	oldLocal, _ := prior.local.Snapshot()
+	newLocal, _ := fresh.local.Snapshot()
+	oldRemote, _ := prior.remote.Snapshot()
+	newRemote, _ := fresh.remote.Snapshot()
+	if !lifecycleSameRuntimeInstances(oldLocal, newLocal) || !lifecycleSameRuntimeInstances(oldRemote, newRemote) {
+		return nil, lifecycleError("lifecycle_controlled_original_runtime_changed")
+	}
+	if e = h.api.observeAcceptance(ctx, r); e != nil {
+		return nil, e
+	}
+	if e = h.CheckWholeWriterFence(ctx, r); e != nil {
+		return nil, e
+	}
+	return fresh, nil
+}
+
+// Snapshots only compare original identity with a newly issued native read.
+// Dynamic readiness digests may change; the new producer validates readiness.
+func lifecycleSameRuntimeInstances(prior, current stop.DependentRuntimeSnapshot) bool {
+	if len(prior.Instances) == 0 || len(prior.Instances) != len(current.Instances) {
+		return false
+	}
+	for i, old := range prior.Instances {
+		actual := current.Instances[i]
+		if old.ContainerID != actual.ContainerID || old.ImageID != actual.ImageID || old.ProgramSHA256 != actual.ProgramSHA256 || old.StateSHA256 != actual.StateSHA256 {
+			return false
+		}
+	}
+	return true
 }
 
 func (o *lifecycleControlledRuntime) validate(h *lifecycleFixedHost) error {

@@ -251,6 +251,9 @@ func TestMaterialBatchRequiresArchiveZeroAndClosesAllSourceFDs(t *testing.T) {
 	if err := c.purge(context.Background()); err != nil {
 		t.Fatal(err)
 	}
+	if c.zeroVerified {
+		t.Fatal("purge alone became completed zero verification")
+	}
 	if _, err := os.Lstat(filepath.Join(c.archive.path, "archive.body")); err != nil {
 		t.Fatal("host deleted external archive")
 	}
@@ -261,6 +264,9 @@ func TestMaterialBatchRequiresArchiveZeroAndClosesAllSourceFDs(t *testing.T) {
 	}
 	if err := c.verifyZero(context.Background()); err != nil {
 		t.Fatal(err)
+	}
+	if !c.zeroVerified {
+		t.Fatal("actual zero and FD closure did not complete the native phase")
 	}
 	for _, fd := range []*os.File{originalFD, archiveFD} {
 		if _, err := fd.Stat(); !errors.Is(err, os.ErrClosed) {
@@ -306,6 +312,9 @@ func TestMaterialZeroNeverTreatsArchiveAbsenceAsWholeScope(t *testing.T) {
 			}
 			if err := c.verifyZero(context.Background()); err == nil {
 				t.Fatal("incomplete scope appeared zero")
+			}
+			if c.zeroVerified {
+				t.Fatal("failed zero verification became final completion")
 			}
 		})
 	}

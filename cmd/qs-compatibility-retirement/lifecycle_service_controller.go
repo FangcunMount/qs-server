@@ -237,18 +237,6 @@ func (v *lifecycleServiceController) CheckStoppedDependents(ctx context.Context,
 	return err
 }
 
-func (v *lifecycleServiceController) ResumeDependents(ctx context.Context) error {
-	if v == nil || v.local == nil || v.remote == nil {
-		return lifecycleError("lifecycle_actual_service_lease_missing")
-	}
-	// The caller has already accepted B's actual API/config/image and current
-	// data. Only original Collection/Worker are started, under ForwardContext.
-	if _, err := v.remote.Do(ctx, "resume_dependents"); err != nil {
-		return err
-	}
-	return v.local.ResumeDependents(ctx)
-}
-
 func (v *lifecycleServiceController) RestoreDependents(ctx context.Context) error {
 	if v == nil || v.local == nil || v.remote == nil {
 		return lifecycleError("lifecycle_actual_service_lease_missing")

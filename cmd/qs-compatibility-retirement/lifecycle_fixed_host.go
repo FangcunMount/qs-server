@@ -33,6 +33,7 @@ type lifecycleFixedHost struct {
 	writers             *lifecycleWriterObservation
 	runtimeLedgers      *lifecycleRuntimeLedgerObservation
 	aiStopped           *retirement.AIStoppedRuntimeLease
+	finalRuntime        *lifecycleControlledRuntime
 }
 
 func newLifecycleFixedHost(ctx context.Context, r lifecycleRequest, a *backup.Archive) (lifecycleHost, error) {
@@ -253,9 +254,17 @@ func (h *lifecycleFixedHost) VerifyTemporaryMaterialsZero(ctx context.Context, r
 	return materials.verifyZero(ctx)
 }
 
-func (h *lifecycleFixedHost) ResumeAcceptedEntrypoints(ctx context.Context, _ lifecycleRequest) error {
-	if h == nil || h.services == nil {
-		return lifecycleError("lifecycle_actual_service_lease_missing")
+func (h *lifecycleFixedHost) ResumeAcceptedEntrypoints(ctx context.Context, r lifecycleRequest) error {
+	materials, err := h.acceptedBatchMaterials(ctx, r)
+	if err != nil {
+		return err
+	}
+	if !materials.purged || !materials.zeroVerified || h.finalRuntime.validate(h) != nil || h.api == nil || h.api.acceptance == nil {
+		return lifecycleError("lifecycle_actual_accepted_entrypoint_completion_missing")
+	}
+	o := h.api.acceptance
+	if o.self != o || o.owner != h.api || o.cid != h.api.bCID || o.source != r.ToolSourceSHA {
+		return lifecycleError("lifecycle_actual_accepted_entrypoint_completion_missing")
 	}
 	if h.aiStopped == nil {
 		return lifecycleError("lifecycle_ai_original_stopped_runtime_unproven")
@@ -263,7 +272,12 @@ func (h *lifecycleFixedHost) ResumeAcceptedEntrypoints(ctx context.Context, _ li
 	if err := h.aiStopped.VerifyResumed(ctx); err != nil {
 		return err
 	}
-	return h.services.ResumeDependents(ctx)
+	// Collection/Worker and B already passed a final live read before D purge.
+	// This acknowledges the same native acceptance/zero/terminal/Window facts;
+	// it does not read deleted journals, restart services or claim a new runtime
+	// observation. The original runner restores ordinary workflow entrypoints
+	// only after this known terminal completion, using its retained quarantine.
+	return ctx.Err()
 }
 func (h *lifecycleFixedHost) RestoreRollbackEntrypoints(ctx context.Context, r lifecycleRequest, w *fence.MaintenanceWindow) error {
 	if h == nil {

@@ -36,7 +36,7 @@ func TestServicePortsRefuseMissingNativeAuthority(t *testing.T) {
 		t.Fatal("imported/zero Window accepted")
 	}
 	v := new(lifecycleServiceController)
-	for _, call := range []func(context.Context) error{v.StopAndDrain, v.Check, v.ResumeDependents, v.RestoreDependents} {
+	for _, call := range []func(context.Context) error{v.StopAndDrain, v.Check, v.RestoreDependents} {
 		if call(context.Background()) == nil {
 			t.Fatal("zero service controller produced success")
 		}
@@ -78,6 +78,7 @@ func TestServiceLeaseCannotActivateRemainingProductionAdapters(t *testing.T) {
 		func() error { return h.DeployRollbackInline(ctx, r, nil, nil) },
 		func() error { return h.PurgeTemporaryCopies(ctx, r) },
 		func() error { return h.VerifyTemporaryMaterialsZero(ctx, r) },
+		func() error { return h.ResumeAcceptedEntrypoints(ctx, r) },
 	} {
 		if call() == nil {
 			t.Fatal("service-only capability activated missing production adapter")
