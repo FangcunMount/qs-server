@@ -435,6 +435,30 @@ print('actual-hup-local-terminal')
         result=subprocess.run([sys.executable,'-c',script,str(Path(__file__).with_name('compatibility-window-tool.py')),self.fixture()],capture_output=True,timeout=8,check=True)
         self.assertEqual(result.stdout,b'actual-hup-local-terminal\n')
 
+class ImagePreloadBoundary(unittest.TestCase):
+    def test_closed_observation_keeps_actual_source_and_no_runtime_authority(self):
+        r=WindowToolMetadata().request();a=WindowToolMetadata().approval(r)
+        value=dict(kind="native_cached_api_image_observation",tool_source_sha=a["tool_source_sha"],original_source_sha=a["original_source_sha"],operation_id=a["operation_id"],actual_run_id="22-3",image_archive_sha256="1"*64,image_id="sha256:"+"2"*64,os="linux",architecture="amd64",revision=a["tool_source_sha"],program_sha256="3"*64,probe_id="4"*64,probe_absent=True,temporary_files_zero=True,capabilities=dict(deployment=False,writer_fence=False,drop=False))
+        self.assertEqual(tool.validate_image_preload(value,a,"22-3"),value)
+        for key,changed in (("image_id","qs-apiserver:latest"),("architecture","arm64"),("revision","b"*40),("tool_source_sha","b"*40),("actual_run_id","11-1"),("probe_absent",False),("temporary_files_zero",False),("capabilities",dict(deployment=True,writer_fence=False,drop=False)),("extra",True)):
+            bad=copy.deepcopy(value);bad[key]=changed
+            with self.subTest(key=key),self.assertRaises(tool.Refused):tool.validate_image_preload(bad,a,"22-3")
+    def test_image_preparation_is_only_existing_prepare_and_never_start_or_deploy(self):
+        import inspect
+        source=inspect.getsource(tool.preload_api_image)
+        self.assertIn('approval["stage"] != "prepare"',source)
+        self.assertIn('"--network","none","--read-only"',source)
+        self.assertIn('command("cp",cid+":/app/qs-apiserver"',source)
+        self.assertIn('second != first',source)
+        self.assertNotIn('command("start"',source)
+        self.assertNotIn('remote-deploy',source)
+        self.assertNotIn('prune',source)
+        workflow=Path(__file__).resolve().parents[2]/'.github/workflows/compatibility-retirement.yml'
+        body=workflow.read_text()
+        self.assertIn("if: inputs.prepare_mode == 'window-tool' && inputs.operation == 'prepare'",body)
+        self.assertIn('bash scripts/cd/build-image.sh',body)
+        self.assertIn('preload-image.tar.gz',body)
+
 class RootTemplateStaging(unittest.TestCase):
     request=WindowToolMetadata.request
     approval=WindowToolMetadata.approval

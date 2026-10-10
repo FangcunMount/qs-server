@@ -458,6 +458,9 @@ jobs:
       labels: [self-hosted, macOS, ARM64, ops]
     environment: production
     timeout-minutes: ${{ (inputs.prepare_mode == 'lifecycle' || inputs.prepare_mode == 'prepare-facts' || inputs.prepare_mode == 'window-tool') && 115 || 40 }}
+    permissions:
+      contents: read
+      packages: read
     steps:
       - name: Validate pinned production SSH binding
         env:
@@ -482,6 +485,40 @@ jobs:
         uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
+      - name: Set up the original image builder for window preparation
+        if: inputs.prepare_mode == 'window-tool' && inputs.operation == 'prepare'
+        uses: docker/setup-buildx-action@v4
+      - name: Authenticate image reads for window preparation
+        if: inputs.prepare_mode == 'window-tool' && inputs.operation == 'prepare'
+        uses: docker/login-action@v4
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Authenticate original build cache reads
+        if: inputs.prepare_mode == 'window-tool' && inputs.operation == 'prepare'
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+      - name: Prebuild and export the exact cached API image without deployment
+        if: inputs.prepare_mode == 'window-tool' && inputs.operation == 'prepare'
+        env:
+          SERVICE: apiserver
+          DOCKER_REGISTRY: ghcr.io
+          DOCKER_REPOSITORY: fangcunmount
+          DEPLOY_REF: ${{ github.ref_name }}
+          DEPLOY_SHA: ${{ needs.validate.outputs.tool_source_sha }}
+          WWW_UID: ${{ secrets.WWW_UID }}
+          WWW_GID: ${{ secrets.WWW_GID }}
+        run: |
+          set -Eeuo pipefail
+          umask 077
+          [[ "$DEPLOY_SHA" =~ ^[0-9a-f]{40}$ ]] && [[ "$(git rev-parse HEAD)" == "$DEPLOY_SHA" ]] || exit 1
+          export RETIREMENT_PRELOAD_REF="qs-retirement/qs-apiserver:$DEPLOY_SHA"
+          export DEPLOY_IMAGE_PACKAGE="$RUNNER_TEMP/qs-retirement-preload-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT.tar.gz"
+          bash scripts/cd/build-image.sh
+          bash scripts/cd/export-image.sh
       - name: Package only immutable tooling
         id: package
         env:
@@ -490,7 +527,7 @@ jobs:
         run: |
           set -Eeuo pipefail
           package_dir=$(mktemp -d "$RUNNER_TEMP/qs-compatibility-package.XXXXXX")
-          trap 'rm -f -- "$package_dir/compatibility-retirement.py" "$package_dir/compatibility-window-tool.py" "$package_dir/compatibility-retirement-entrypoints.json" "$package_dir/receipt-transport.py" "$package_dir/inventory-linux-amd64" "$package_dir/inventory-linux-arm64" "$package_dir/history-linux-amd64" "$package_dir/history-linux-arm64" "$package_dir/compatibility-history-prepare.py" "$package_dir/compatibility-history-parent.py" "$package_dir/compatibility-ai-history-prepare.py" "$package_dir/qs-ai-retirement-readonly-host.py" "$package_dir/qs-ai-retirement-readonly-verifier.py" "$package_dir/qs-ai-retirement-readonly-observer.py" "$package_dir/qs-ai-retirement-0040-layout.py"; rmdir -- "$package_dir"' EXIT
+          trap 'rm -f -- "$package_dir/compatibility-retirement.py" "$package_dir/compatibility-window-tool.py" "$package_dir/preload-image.tar.gz" "$package_dir/compatibility-retirement-entrypoints.json" "$package_dir/receipt-transport.py" "$package_dir/inventory-linux-amd64" "$package_dir/inventory-linux-arm64" "$package_dir/history-linux-amd64" "$package_dir/history-linux-arm64" "$package_dir/compatibility-history-prepare.py" "$package_dir/compatibility-history-parent.py" "$package_dir/compatibility-ai-history-prepare.py" "$package_dir/qs-ai-retirement-readonly-host.py" "$package_dir/qs-ai-retirement-readonly-verifier.py" "$package_dir/qs-ai-retirement-readonly-observer.py" "$package_dir/qs-ai-retirement-0040-layout.py"; rmdir -- "$package_dir"' EXIT
           cp scripts/database/compatibility-retirement.py scripts/database/compatibility-history-prepare.py scripts/database/compatibility-retirement-entrypoints.json scripts/dbops/receipt-transport.py "$package_dir/"
           archive="qs-compatibility-retirement-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.tar.gz"
           if [[ "$RETIREMENT_PACKAGE_MODE" == "window-tool" ]]; then
@@ -500,7 +537,11 @@ jobs:
             go test ./cmd/qs-compatibility-retirement
             CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -buildvcs=false -trimpath -ldflags="-s -w -X main.sourceSHA=$RETIREMENT_TOOL_SOURCE_SHA -X github.com/FangcunMount/qs-server/pkg/version.GitCommit=$RETIREMENT_TOOL_SOURCE_SHA" -o "$package_dir/inventory-linux-amd64" ./cmd/qs-compatibility-retirement
             CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -buildvcs=false -trimpath -ldflags="-s -w -X main.sourceSHA=$RETIREMENT_TOOL_SOURCE_SHA -X github.com/FangcunMount/qs-server/pkg/version.GitCommit=$RETIREMENT_TOOL_SOURCE_SHA" -o "$package_dir/inventory-linux-arm64" ./cmd/qs-compatibility-retirement
-            tar -czf "$archive" -C "$package_dir" compatibility-window-tool.py receipt-transport.py inventory-linux-amd64 inventory-linux-arm64
+            image="$RUNNER_TEMP/qs-retirement-preload-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT.tar.gz"
+            [[ -f "$image" ]] && gzip -t "$image" || exit 1
+            cp "$image" "$package_dir/preload-image.tar.gz"
+            tar -czf "$archive" -C "$package_dir" compatibility-window-tool.py receipt-transport.py inventory-linux-amd64 inventory-linux-arm64 preload-image.tar.gz
+            rm -- "$image" "$package_dir/preload-image.tar.gz"
           elif [[ "$RETIREMENT_PACKAGE_MODE" == "host-writer-scope" || "$RETIREMENT_PACKAGE_MODE" == "db-writer-census" ]]; then
             [[ "$RETIREMENT_TOOL_SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]] || exit 1
             [[ "$(git rev-parse HEAD)" == "$RETIREMENT_TOOL_SOURCE_SHA" ]] || exit 1

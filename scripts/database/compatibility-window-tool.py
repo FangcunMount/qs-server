@@ -525,6 +525,101 @@ def owned_process(command, environment, *, packet=None, control=None, timeout=11
             signal.signal(number, handler)
 
 
+def validate_image_preload(value, approval, run):
+    exact(value, ("kind", "tool_source_sha", "original_source_sha", "operation_id", "actual_run_id", "image_archive_sha256", "image_id", "os", "architecture", "revision", "program_sha256", "probe_id", "probe_absent", "temporary_files_zero", "capabilities"))
+    if value["kind"] != "native_cached_api_image_observation" or any(value[k] != approval[k] for k in ("tool_source_sha", "original_source_sha", "operation_id")) or value["actual_run_id"] != run or value["revision"] != approval["tool_source_sha"] or value["os"] != "linux" or value["architecture"] != "amd64" or value["probe_absent"] is not True or value["temporary_files_zero"] is not True or value["capabilities"] != {"deployment": False, "writer_fence": False, "drop": False}:
+        reject("window_tool_image_preload_rejected")
+    token(value["image_id"], re.compile(r"sha256:[0-9a-f]{64}"))
+    for key in ("image_archive_sha256", "program_sha256", "probe_id"): token(value[key], HASH)
+    return value
+
+
+def preload_api_image(raw, approval, run, batch, owner):
+    # Fixed cached-image preparation only. This original root child never starts
+    # an API, changes the original container, or grants a Window/writer lease.
+    if approval["stage"] != "prepare" or platform.machine() != "x86_64" or not raw or len(raw) > 200 << 20:
+        reject("window_tool_image_preload_rejected")
+    reference = "qs-retirement/qs-apiserver:" + approval["tool_source_sha"]
+    with tarfile.open(fileobj=io.BytesIO(raw), mode="r:gz") as image_tar:
+        members = image_tar.getmembers()
+        if len(members) > 2048 or any(not m.isfile() and not m.isdir() or m.name.startswith("/") or ".." in Path(m.name).parts or m.issym() or m.islnk() for m in members): reject("window_tool_image_preload_rejected")
+        manifest = [m for m in members if m.name == "manifest.json"]
+        if len(manifest) != 1 or manifest[0].size > 65536: reject("window_tool_image_preload_rejected")
+        values = decode(image_tar.extractfile(manifest[0]).read(65537))
+        if type(values) is not list or len(values) != 1 or type(values[0]) is not dict or values[0].get("RepoTags") != [reference]: reject("window_tool_image_preload_rejected")
+        config_name = values[0].get("Config", "")
+        if type(config_name) is not str or not re.fullmatch(r"(?:blobs/sha256/)?[0-9a-f]{64}(?:\.json)?", config_name): reject("window_tool_image_preload_rejected")
+        configs = [m for m in members if m.name == config_name]
+        if len(configs) != 1 or configs[0].size > 1 << 20: reject("window_tool_image_preload_rejected")
+        config_raw = image_tar.extractfile(configs[0]).read((1 << 20)+1)
+        config = decode(config_raw)
+        expected_id = "sha256:"+digest(config_raw)
+        if type(config) is not dict or config.get("os") != "linux" or config.get("architecture") != "amd64" or config.get("config",{}).get("Labels",{}).get("org.opencontainers.image.revision") != approval["tool_source_sha"]: reject("window_tool_image_preload_rejected")
+    docker = Path("/usr/bin/docker")
+    def identity(value): return (value.st_dev,value.st_ino,value.st_uid,value.st_mode,value.st_nlink,value.st_size,value.st_mtime_ns,value.st_ctime_ns)
+    stamp = docker.stat()
+    docker_identity = identity(stamp)
+    sock = Path("/run/docker.sock").stat()
+    if not stat.S_ISREG(stamp.st_mode) or stamp.st_uid != 0 or stamp.st_mode & 0o022 or not stat.S_ISSOCK(sock.st_mode) or sock.st_uid != 0: reject("window_tool_image_preload_rejected")
+    directory = batch / "image-preload"
+    protected_directory(directory, create=True)
+    image_path = directory / "image.tar.gz"
+    name = "qs-retirement-preload-"+approval["operation_id"]+"-"+run
+    labels = {"codex.task":"qs-compatibility-retirement", "codex.operation":approval["operation_id"], "codex.run":run, "codex.kind":"preload-program"}
+    files = {}
+    def put(path, body):
+        write_new(path, body)
+        files[path] = identity(path.stat(follow_symlinks=False))
+    put(directory / "intent.json",canonical({"source_sha":approval["tool_source_sha"],"image_archive_sha256":digest(raw),"image_id":expected_id,"name":name,"labels":labels,"network":"none","start":False}))
+    put(image_path,raw)
+    def command(*args):
+        if identity(docker.stat()) != docker_identity: reject("window_tool_image_preload_rejected")
+        code, output = owned_process([str(docker),"--host","unix:///run/docker.sock",*args],{"PATH":"/usr/bin:/bin"},control=sys.stdin.fileno(),timeout=300,owner=owner)
+        if code or identity(docker.stat()) != docker_identity: reject("window_tool_image_preload_rejected")
+        return output
+    command("load","--input",str(image_path))
+    fmt = '{"id":{{json .Id}},"os":{{json .Os}},"architecture":{{json .Architecture}},"revision":{{json (index .Config.Labels "org.opencontainers.image.revision")}}}'
+    first = decode(command("image","inspect","--format",fmt,reference))
+    if first != {"id":expected_id,"os":"linux","architecture":"amd64","revision":approval["tool_source_sha"]}: reject("window_tool_image_preload_rejected")
+    create = ["create","--name",name,"--network","none","--read-only","--entrypoint","/app/qs-apiserver"]
+    for key in sorted(labels): create.extend(["--label",key+"="+labels[key]])
+    cid = command(*create,expected_id).decode("ascii").strip(); token(cid,HASH)
+    put(directory / "created.json",canonical({"id":cid,"image":expected_id}))
+    probe_fmt = '{"id":{{json .Id}},"name":{{json .Name}},"image":{{json .Image}},"running":{{json .State.Running}},"pid":{{json .State.Pid}},"network":{{json .HostConfig.NetworkMode}},"mounts":{{json .Mounts}}}'
+    probe = decode(command("inspect","--format",probe_fmt,cid))
+    if probe != {"id":cid,"name":"/"+name,"image":expected_id,"running":False,"pid":0,"network":"none","mounts":[]}: reject("window_tool_image_preload_rejected")
+    program = directory / "program"
+    command("cp",cid+":/app/qs-apiserver",str(program))
+    fd=os.open(program,os.O_RDONLY|os.O_NOFOLLOW|os.O_NONBLOCK)
+    try:
+        before=os.fstat(fd)
+        if not stat.S_ISREG(before.st_mode) or before.st_uid != 0 or before.st_nlink != 1 or before.st_size <= 0 or before.st_size > 128 << 20 or before.st_mode & 0o022: reject("window_tool_image_preload_rejected")
+        h=hashlib.sha256()
+        while True:
+            part=os.read(fd,65536)
+            if not part:break
+            h.update(part)
+        if identity(os.fstat(fd)) != identity(before) or identity(program.stat(follow_symlinks=False)) != identity(before): reject("window_tool_image_preload_rejected")
+        program_hash=h.hexdigest()
+        files[program] = identity(before)
+    finally:os.close(fd)
+    second = decode(command("image","inspect","--format",fmt,reference))
+    if second != first or decode(command("inspect","--format",probe_fmt,cid)) != probe: reject("window_tool_image_preload_rejected")
+    command("rm",cid)
+    if command("ps","--all","--no-trunc","--filter","id="+cid,"--format","{{.ID}}").strip(): reject("window_tool_image_preload_rejected")
+    # Delete only this original caller's exact registered files, never an image
+    # or another batch. Unknown/error work stays registered for investigation.
+    expected = {"intent.json", "image.tar.gz", "created.json", "program"}
+    if set(os.listdir(directory)) != expected: reject("window_tool_image_preload_rejected")
+    for path in (directory/"intent.json",image_path,directory/"created.json",program):
+        value=path.stat(follow_symlinks=False)
+        if not stat.S_ISREG(value.st_mode) or value.st_uid != 0 or value.st_nlink != 1 or identity(value) != files[path]: reject("window_tool_image_preload_rejected")
+        path.unlink()
+    directory.rmdir()
+    value = {"kind":"native_cached_api_image_observation","tool_source_sha":approval["tool_source_sha"],"original_source_sha":approval["original_source_sha"],"operation_id":approval["operation_id"],"actual_run_id":run,"image_archive_sha256":digest(raw),"image_id":expected_id,"os":"linux","architecture":"amd64","revision":approval["tool_source_sha"],"program_sha256":program_hash,"probe_id":cid,"probe_absent":True,"temporary_files_zero":not directory.exists(),"capabilities":{"deployment":False,"writer_fence":False,"drop":False}}
+    return validate_image_preload(value,approval,run)
+
+
 def root_execute(arguments, packet, source_uid, archive_raw):
     if os.getuid() != 0 or os.geteuid() != 0 or platform.system() != "Linux":
         reject("window_tool_actual_root_required")
@@ -538,12 +633,15 @@ def root_execute(arguments, packet, source_uid, archive_raw):
     with tarfile.open(fileobj=io.BytesIO(archive_raw), mode="r:gz") as tar:
         members = tar.getmembers()
         names = [m.name for m in members]
-        if set(names) != {"compatibility-window-tool.py", "receipt-transport.py", "inventory-linux-amd64", "inventory-linux-arm64"} or len(names) != 4 or len(names) != len(set(names)) or any(not m.isfile() or "/" in m.name or m.size > 64 << 20 for m in members):
+        base_names = {"compatibility-window-tool.py", "receipt-transport.py", "inventory-linux-amd64", "inventory-linux-arm64"}
+        image_names = {"preload-image.tar.gz"} if stage == "prepare" and "preload-image.tar.gz" in names else set()
+        if set(names) != base_names | image_names or len(names) != len(base_names | image_names) or len(names) != len(set(names)) or any(not m.isfile() or "/" in m.name or m.size > (200 << 20 if m.name == "preload-image.tar.gz" else 64 << 20) for m in members):
             reject("window_tool_package_rejected")
         selected = [m for m in members if m.name == "inventory-linux-" + arch]
         if len(selected) != 1:
             reject("window_tool_package_rejected")
         binary = tar.extractfile(selected[0]).read((64 << 20) + 1)
+        preload_raw = tar.extractfile("preload-image.tar.gz").read((200 << 20)+1) if image_names else None
     if not binary or len(binary) > 64 << 20 or digest(binary) != a["tool_binary_sha256"][arch]:
         reject("window_tool_actual_binary_hash_rejected")
     original = Path("/opt/backups/qs-server/compatibility-retirement") / operation
@@ -616,6 +714,7 @@ def root_execute(arguments, packet, source_uid, archive_raw):
         control=sys.stdin.fileno(), timeout=5, owner=owner)
     if check_code or check_raw != a["tool_source_sha"].encode() + b"\n":
         reject("window_tool_actual_source_rejected")
+    image_preload = preload_api_image(preload_raw,a,current_run,batch,owner) if preload_raw is not None else None
     budget_result_hash = ""
     if stage == "prepare" and "local_descriptor_sha256" in a:
         budget_result_hash = prepare_budget_key(original, batch, native, source_uid, a, current_run, owner)
@@ -633,7 +732,7 @@ def root_execute(arguments, packet, source_uid, archive_raw):
     # manager imports no completion/permit or guessed production authority.
     code, raw = owned_process([str(native), "--mode", mode, "--request", str(invocation / "lifecycle-request.json"),
                "--request-hash", digest(derived), "--operation-id", operation, "--run-id", current_run], environment, control=sys.stdin.fileno(), owner=owner)
-    sys.stdout.buffer.write(raw)
+    sys.stdout.buffer.write(canonical({"native_receipt":decode(raw),"image_preload":image_preload}) if image_preload is not None else raw)
     sys.stdout.buffer.flush()
     return code
 
@@ -831,7 +930,9 @@ try:
  if len(archive_raw)>256<<20 or hashlib.sha256(archive_raw).hexdigest()!=package_hash: raise ValueError()
  with tarfile.open(fileobj=io.BytesIO(archive_raw),mode='r:gz') as tar:
   members=tar.getmembers(); names=[m.name for m in members]
-  if set(names)!={'compatibility-window-tool.py','receipt-transport.py','inventory-linux-amd64','inventory-linux-arm64'} or len(names)!=4 or len(names)!=len(set(names)) or any(not m.isfile() or '/' in m.name or m.size>64<<20 for m in members): raise ValueError()
+  base={'compatibility-window-tool.py','receipt-transport.py','inventory-linux-amd64','inventory-linux-arm64'}
+  extra={'preload-image.tar.gz'} if stage=='prepare' and 'preload-image.tar.gz' in names else set()
+  if set(names)!=base|extra or len(names)!=len(base|extra) or len(names)!=len(set(names)) or any(not m.isfile() or '/' in m.name or m.size>(200<<20 if m.name=='preload-image.tar.gz' else 64<<20) for m in members): raise ValueError()
   candidates=[m for m in members if m.name=='compatibility-window-tool.py']
   if len(candidates)!=1 or candidates[0].size>1<<20: raise ValueError()
   program=tar.extractfile(candidates[0]).read((1<<20)+1)
@@ -970,9 +1071,17 @@ def run_window_call(args, raw, approval_hash, package, credentials, *, control=N
         # The live pipe requests root-owned cancellation if this manager loses
         # its caller. No saved JSON is turned into a live proof.
         code, native_raw = owned_process(command, environment, packet=packet, control=control, timeout=115 * 60)
+        image_preload = None
+        root_value = decode(native_raw)
+        if type(root_value) is dict and "image_preload" in root_value:
+            exact(root_value,("native_receipt","image_preload"))
+            if args.operation != "prepare": reject("window_tool_image_preload_rejected")
+            image_preload = validate_image_preload(root_value["image_preload"],a,args.run_id)
+            native_raw = canonical(root_value["native_receipt"])
         native = validate_native(native_raw, code, a, args.run_id, derived_hash)
         result = {"format_version": 1, "kind": "independent_window_tool_call_result", "dispatcher_source_sha": args.dispatcher_sha,
                   "tool_source_sha": a["tool_source_sha"], "approved_template_sha256": args.template_hash, "derived_request_sha256": derived_hash, "native_result": native}
+        if image_preload is not None: result["image_preload"] = image_preload
         emit(result, secrets)
         return code
     except (Refused, OSError, ValueError, subprocess.SubprocessError):

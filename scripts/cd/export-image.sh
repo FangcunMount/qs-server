@@ -29,6 +29,15 @@ case "$EXPORT_IMAGE_REGISTRY" in
     ;;
 esac
 
+# This exact one-time ref was produced by the original retirement build leaf.
+# A preload exports the actual local image; it must not pull a mutable tag.
+if [ -n "${RETIREMENT_PRELOAD_REF:-}" ]; then
+  [ "$SERVICE" = apiserver ] && [ "${#DEPLOY_SHA}" -eq 40 ] || exit 1
+  [[ "$DEPLOY_SHA" =~ ^[0-9a-f]{40}$ ]] || exit 1
+  [ "$RETIREMENT_PRELOAD_REF" = "qs-retirement/qs-apiserver:${DEPLOY_SHA}" ] || exit 1
+  IMAGE="$RETIREMENT_PRELOAD_REF"
+  docker image inspect "$IMAGE" >/dev/null
+fi
 OUTPUT="${DEPLOY_IMAGE_PACKAGE:-deploy-image-${PACKAGE_SUFFIX}.tar.gz}"
 LOCK_DIR="${CD_DOCKER_EXPORT_LOCK_DIR:-/tmp/qs-server-cd-docker-export.lock}"
 LOCK_WAIT_SECONDS="${CD_DOCKER_EXPORT_LOCK_WAIT_SECONDS:-600}"
@@ -79,6 +88,7 @@ echo "Pulling ${IMAGE} (${EXPORT_IMAGE_REGISTRY}) for tarball export..."
 pull_started=$(date +%s)
 # Mac mini runner 为 ARM64，目标机为 linux/amd64，必须指定平台
 pull_attempt=1
+if [ -z "${RETIREMENT_PRELOAD_REF:-}" ]; then
 while ! docker pull --platform linux/amd64 "$IMAGE"; do
   if [ "$pull_attempt" -ge "$PULL_ATTEMPTS" ]; then
     echo "Failed to pull ${IMAGE} after ${pull_attempt} attempts" >&2
@@ -88,6 +98,7 @@ while ! docker pull --platform linux/amd64 "$IMAGE"; do
   sleep "$PULL_RETRY_DELAY_SECONDS"
   pull_attempt=$((pull_attempt + 1))
 done
+fi
 pull_elapsed=$(($(date +%s) - pull_started))
 echo "Pulled ${IMAGE} in ${pull_elapsed}s"
 
