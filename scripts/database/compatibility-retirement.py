@@ -2510,7 +2510,7 @@ def main(argv=None):
               "capabilities": {key: "bool" for key in CAPABILITIES}}
     emitted = False
     try:
-        secrets = () if getattr(args, "prepare_mode", "") in ("bootstrap-history-metadata", "bootstrap-history-parent", "report-diagnostic") else tuple(os.environ.get(key, "") for key in ("MYSQL_USERNAME", "MYSQL_PASSWORD", "MONGODB_USERNAME", "MONGODB_PASSWORD",
+        secrets = () if getattr(args, "prepare_mode", "") in ("bootstrap-history-metadata", "bootstrap-history-parent", "report-diagnostic") else tuple(os.environ.get(key, "") for key in ("SUDO_PASSWORD", "MYSQL_USERNAME", "MYSQL_PASSWORD", "MONGODB_USERNAME", "MONGODB_PASSWORD",
                                                                           "MONGODB_METADATA_ADMIN_USERNAME", "MONGODB_METADATA_ADMIN_PASSWORD"))
         armor = transport().encode_armored_receipt(receipt, schema=schema, secrets=secrets)
         print(armor)
