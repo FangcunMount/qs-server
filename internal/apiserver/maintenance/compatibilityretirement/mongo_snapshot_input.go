@@ -307,10 +307,12 @@ func (p *MongoSnapshotInputPage) VisitRows(ctx context.Context, visit func(strin
 	return nil
 }
 
-// Both inputs must come from genuinely different native sessions AND actual
-// server snapshot times. Equal cached bytes alone are not a fresh read proof.
+// Both inputs must come from genuinely different native session instances.
+// A server-selected majority snapshot time may remain equal without writes,
+// and the driver may reuse an ended server-session UUID from its pool. Neither
+// fact replaces the native session instance or permits an older snapshot.
 func (e *MongoSnapshotInputEpoch) CompareFreshInput(ctx context.Context, fresh *MongoSnapshotInputEpoch) error {
-	if e.validFile(ctx) != nil || fresh == nil || fresh.validFile(ctx) != nil || !e.complete || !fresh.complete || e == fresh || e.session == fresh.session || bytes.Equal(e.sessionID, fresh.sessionID) || fresh.snapshot.T < e.snapshot.T || fresh.snapshot.T == e.snapshot.T && fresh.snapshot.I <= e.snapshot.I || e.report.SnapshotSHA256 != fresh.report.SnapshotSHA256 || e.metadata.hash != fresh.metadata.hash {
+	if e.validFile(ctx) != nil || fresh == nil || fresh.validFile(ctx) != nil || !e.complete || !fresh.complete || e == fresh || e.session == fresh.session || fresh.snapshot.T < e.snapshot.T || fresh.snapshot.T == e.snapshot.T && fresh.snapshot.I < e.snapshot.I || e.report.SnapshotSHA256 != fresh.report.SnapshotSHA256 || e.metadata.hash != fresh.metadata.hash {
 		return ErrMongoSnapshotInput
 	}
 	// Cached observations do not certify that the original frozen bytes are

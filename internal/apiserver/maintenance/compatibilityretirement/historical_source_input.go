@@ -362,7 +362,10 @@ func CompareIndependentHistoricalSourceInputs(ctx context.Context, first, second
 	if first == nil || second == nil || first == second || first.verifyFrozen(ctx) != nil || second.verifyFrozen(ctx) != nil {
 		return nil, ErrSourceOrigin
 	}
-	if first.sqlConnection == second.sqlConnection || first.sqlCycleID == second.sqlCycleID || first.mongoSession == second.mongoSession || (second.mongoTime.T < first.mongoTime.T || second.mongoTime.T == first.mongoTime.T && second.mongoTime.I <= first.mongoTime.I) {
+	// A second real read may select the same majority snapshot when no Mongo
+	// write occurred. Actual session/SQL transaction identities must differ;
+	// only a strictly older server-selected time is rejected.
+	if first.sqlConnection == second.sqlConnection || first.sqlCycleID == second.sqlCycleID || first.mongoSession == second.mongoSession || (second.mongoTime.T < first.mongoTime.T || second.mongoTime.T == first.mongoTime.T && second.mongoTime.I < first.mongoTime.I) {
 		return nil, ErrSourceOriginFresh
 	}
 	if first.recipe.hash != second.recipe.hash || first.resultHash != second.resultHash || first.receipts != second.receipts || first.boundaries != second.boundaries {

@@ -177,3 +177,86 @@ func TestHistoricalSourceInputNativeBudgetAndOriginalMetadataFailure(t *testing.
 		t.Fatal(err)
 	}
 }
+
+func TestHistoricalSourceInputNativeIndependentUnchangedSnapshotAndReusedUUID(t *testing.T) {
+	sqlDB, client, db, cfg := originNativeDBs(t, true)
+	firstSession := snapshotInputNativeSession(t, client)
+	var recipe *HistoricalSourceInputRecipe
+	var first, second *HistoricalSourceInputEpoch
+	err := historicalSourceInputNativeEpoch(t, sqlDB, db, cfg, firstSession, func(ctx context.Context, sqlInput *SQLResponsibilitySnapshot, mongoInput *MongoSnapshotInputEpoch, tx *gorm.DB) error {
+		fixture := originNativeCopies(t, ctx, tx, &MongoResponsibilitySnapshot{db: db, metadata: mongoInput.metadata})
+		copies, e := VerifySourceCopies(ctx, fixture.inputs())
+		if e != nil {
+			return e
+		}
+		binding, e := BindOriginCopies(ctx, copies, fixture.inputs(), DefaultSourceOriginLimits())
+		if e != nil {
+			return e
+		}
+		recipe, e = FreezeHistoricalSourceInputRecipe(ctx, binding)
+		if e != nil {
+			return e
+		}
+		first, e = PrepareHistoricalSourceInputEpoch(ctx, recipe, sqlInput, mongoInput, snapshotInputNativeFile(t), time.Minute)
+		return e
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	// No Mongo writes, marker documents, timestamp retries or imported session
+	// state occur between these two actual captures. Ending the first session
+	// lets the driver reuse its server UUID in a NEW native session instance.
+	firstSession.EndSession(t.Context())
+	secondSession := snapshotInputNativeSession(t, client)
+	err = historicalSourceInputNativeEpoch(t, sqlDB, db, cfg, secondSession, func(ctx context.Context, sqlInput *SQLResponsibilitySnapshot, mongoInput *MongoSnapshotInputEpoch, _ *gorm.DB) error {
+		var e error
+		second, e = PrepareHistoricalSourceInputEpoch(ctx, recipe, sqlInput, mongoInput, snapshotInputNativeFile(t), time.Minute)
+		return e
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	secondSession.EndSession(t.Context())
+	equalTime := first.mongoTime == second.mongoTime
+	reusedUUID := bytes.Equal(first.mongoSessionID, second.mongoSessionID)
+	t.Logf("actual_independent_sessions=true snapshot_equal=%t pooled_uuid_reused=%t mongo_writes_between=0", equalTime, reusedUUID)
+	if firstSession == secondSession || first.sqlConnection == second.sqlConnection || first.sqlCycleID == second.sqlCycleID || !reusedUUID {
+		t.Fatal("native distinct transaction/session and real pooled UUID case not observed")
+	}
+	pair, err := CompareIndependentHistoricalSourceInputs(t.Context(), first, second)
+	if err != nil || pair.ValidateFrozen(t.Context()) != nil || first.mongo.CompareFreshInput(t.Context(), second.mongo) != nil || pair.Summary().CASAuthorized || pair.Summary().DropReady {
+		t.Fatal("independent unchanged inputs or real UUID reuse rejected", err)
+	}
+	// Controlled negative probes only change the private in-memory comparator
+	// inputs; no server state or stored frame is rewritten to create freshness.
+	second.mongoTime = first.mongoTime
+	second.mongoTime.T--
+	if _, err = CompareIndependentHistoricalSourceInputs(t.Context(), first, second); !errors.Is(err, ErrSourceOriginFresh) {
+		t.Fatal("older source input time accepted", err)
+	}
+	second.mongoTime = second.mongo.snapshot
+	actualTime := second.mongo.snapshot
+	second.mongo.snapshot = first.mongo.snapshot
+	second.mongo.snapshot.T--
+	if first.mongo.CompareFreshInput(t.Context(), second.mongo) == nil {
+		t.Fatal("older Mongo input time accepted")
+	}
+	second.mongo.snapshot = actualTime
+	actualSession, actualSQL, actualCycle := second.mongoSession, second.sqlConnection, second.sqlCycleID
+	second.mongoSession = first.mongoSession
+	if _, err = CompareIndependentHistoricalSourceInputs(t.Context(), first, second); !errors.Is(err, ErrSourceOriginFresh) {
+		t.Fatal("same native session accepted", err)
+	}
+	second.mongoSession, second.sqlConnection = actualSession, first.sqlConnection
+	if _, err = CompareIndependentHistoricalSourceInputs(t.Context(), first, second); !errors.Is(err, ErrSourceOriginFresh) {
+		t.Fatal("same SQL transaction accepted", err)
+	}
+	second.sqlConnection, second.sqlCycleID = actualSQL, first.sqlCycleID
+	if _, err = CompareIndependentHistoricalSourceInputs(t.Context(), first, second); !errors.Is(err, ErrSourceOriginFresh) {
+		t.Fatal("same SQL cycle accepted", err)
+	}
+	second.sqlCycleID = actualCycle
+	if pair.ValidateFrozen(t.Context()) != nil {
+		t.Fatal("restored native inputs failed")
+	}
+}
