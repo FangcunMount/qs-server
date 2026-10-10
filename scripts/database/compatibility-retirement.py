@@ -44,7 +44,7 @@ RUN = re.compile(r"^[0-9]{1,20}-[0-9]{1,4}$")
 NAME = re.compile(r"^[a-z][a-z0-9_-]{0,80}\.json$")
 MAX_JSON = 256 * 1024
 INVENTORY_V2_LIMITS = {"query_seconds": 30, "total_seconds": 1500, "max_records": 1000000,
-                       "max_bytes": 2147483648, "page_size": 10000, "max_pages": 1001}
+                       "max_bytes": 2147483648, "page_size": 1000, "max_pages": 1001}
 BOOTSTRAP_MODES = frozenset({"bootstrap-bounds", "bootstrap-inventory", "bootstrap-history", "bootstrap-history-metadata", "bootstrap-history-parent", "bootstrap-ai-bounds", "bootstrap-ai-verify", "historical-evidence-write", "historical-ai-bounds"})
 MAX_BOOTSTRAP_APPROVAL = 4096
 MAX_WINDOW_SECONDS = 1800

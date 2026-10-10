@@ -71,7 +71,7 @@ func outputError(e error) error {
 }
 
 func productionLimits() scanLimits {
-	return scanLimits{QuerySeconds: 30, TotalSeconds: 1500, MaxRecords: 1000000, MaxBytes: 2 << 30, PageSize: 10000, MaxPages: 1001}
+	return scanLimits{QuerySeconds: 30, TotalSeconds: 1500, MaxRecords: 1000000, MaxBytes: 2 << 30, PageSize: 1000, MaxPages: 1001}
 }
 func legacyLimits() scanLimits {
 	return scanLimits{QuerySeconds: querySeconds, TotalSeconds: totalSeconds, MaxRecords: maxRecords, MaxBytes: maxBytes}
