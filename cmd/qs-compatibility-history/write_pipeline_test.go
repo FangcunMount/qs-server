@@ -101,7 +101,7 @@ func TestHistoryWriteMaterialManifestFromOriginalClosedSpoolsAndJournals(t *test
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer j.dir.Close()
+	defer func(close func() error) { _ = close() }(j.dir.Close)
 	for _, name := range []string{"prepared-mongo-private.bin", "prepared-sql-private.bin"} {
 		f, e := j.create(name)
 		if e != nil {
@@ -152,7 +152,7 @@ func TestHistoryWriteMaterialManifestRejectsUnregisteredOrReplacedObjects(t *tes
 			if e != nil {
 				t.Fatal(e)
 			}
-			defer j.dir.Close()
+			defer func(close func() error) { _ = close() }(j.dir.Close)
 			for _, name := range []string{"prepared-mongo-private.bin", "prepared-sql-private.bin"} {
 				f, e := j.create(name)
 				if e != nil || f.Close() != nil {

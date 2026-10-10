@@ -1707,7 +1707,7 @@ func completeLifecycleOriginalInventoryInputs(ctx context.Context, r lifecycleRe
 		return lifecycleError("lifecycle_original_operation_material_rejected")
 	}
 	var identityRequestValue identityRequest
-	raw, e = readLifecycleProducerJSON(parent, "identity-request.json", observed.RequestHash, uid, 256<<10, &identityRequestValue)
+	_, e = readLifecycleProducerJSON(parent, "identity-request.json", observed.RequestHash, uid, 256<<10, &identityRequestValue)
 	if e != nil || identityRequestValue.SourceSHA != r.OriginalSourceSHA || identityRequestValue.OperationID != r.OperationID || identityRequestValue.FormatVersion != 1 || identityRequestValue.Kind != "readonly_identity_discovery_request" {
 		return lifecycleError("lifecycle_original_operation_material_rejected")
 	}
@@ -1725,7 +1725,7 @@ func completeLifecycleOriginalInventoryInputs(ctx context.Context, r lifecycleRe
 		return lifecycleError("lifecycle_original_operation_material_rejected")
 	}
 	var boundaryRequest request
-	raw, e = readLifecycleProducerJSON(parent, "boundary-request.json", b.RequestHash, uid, 256<<10, &boundaryRequest)
+	_, e = readLifecycleProducerJSON(parent, "boundary-request.json", b.RequestHash, uid, 256<<10, &boundaryRequest)
 	if e != nil || boundaryRequest.FormatVersion != 2 || boundaryRequest.Kind != "readonly_inventory_boundary_request" || boundaryRequest.SourceSHA != r.OriginalSourceSHA || boundaryRequest.OperationID != r.OperationID || boundaryRequest.BoundaryRunID != "" || len(boundaryRequest.Boundaries) != 0 || digest(boundaryRequest.Identities) != digest(q.Identities) || digest(boundaryRequest.Migrations) != digest(q.Migrations) {
 		return lifecycleError("lifecycle_original_operation_material_rejected")
 	}

@@ -401,7 +401,7 @@ func TestOriginalInventoryMaterialHandoffIncludesAssetsBothPassesAndEmptySources
 			if e != nil {
 				t.Fatal(e)
 			}
-			defer d.close()
+			defer func(close func() error) { _ = close() }(d.close)
 			pages := records/pageSize + 1
 			if records == 0 {
 				pages = 0
@@ -541,12 +541,12 @@ func TestOriginalRootStagingMaterialHandoffReopensBothActualProducerSchemas(t *t
 			if err != nil {
 				t.Fatal(err)
 			}
-			defer d.close()
+			defer func(close func() error) { _ = close() }(d.close)
 			if len(d.files) != 11 || len(d.children) != 1 || len(d.children["inventory-"+r.Approval.RunID].files) != 7 || window && (peer == nil || len(peer.files) != 3) || !window && peer != nil {
 				t.Fatal("producer members incomplete")
 			}
 			if peer != nil {
-				defer peer.close()
+				defer func(close func() error) { _ = close() }(peer.close)
 				if err = peer.purge(context.Background()); err != nil {
 					t.Fatal(err)
 				}
@@ -727,7 +727,7 @@ func TestPreparationRestoreMetadataRequiresActualFiveProducerHashes(t *testing.T
 			if err != nil {
 				t.Fatal(err)
 			}
-			defer d.close()
+			defer func(close func() error) { _ = close() }(d.close)
 			files, err := registerLifecyclePreparationRestoreMetadata(context.Background(), d, &z, digestRaw([]byte("offline native bytes")), runtime.GOARCH, uint32(os.Getuid()), originalHashes)
 			if mutation == "none" {
 				if err != nil || len(files) != 5 {
@@ -780,7 +780,7 @@ func TestOriginalHistoricalWriteMaterialHandoffUsesActualSourceIdentityAndEOF(t 
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer d.close()
+	defer func(close func() error) { _ = close() }(d.close)
 	if len(d.files) != 6 {
 		t.Fatal("original report/manifest/spools/sequence incomplete")
 	}
@@ -864,7 +864,7 @@ func TestHistoricalSpoolRegistrationKeepsOrdinaryBoundAndRejectsOtherNames(t *te
 	if e != nil {
 		t.Fatal(e)
 	}
-	defer d.close()
+	defer func(close func() error) { _ = close() }(d.close)
 	p := filepath.Join(path, "prepared-mongo-private.bin")
 	f, e := os.OpenFile(p, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
 	if e != nil {
@@ -945,12 +945,12 @@ func TestOriginalInventoryMaterialHandoffRejectsUnboundIncompleteOrChangedProduc
 				if e != nil {
 					t.Fatal(e)
 				}
-				defer d.close()
+				defer func(close func() error) { _ = close() }(d.close)
 				if os.WriteFile(assetPath, []byte("changed"), 0600) != nil || d.checkComplete(false) == nil {
 					t.Fatal("original identity/bytes change accepted")
 				}
 			} else if e == nil {
-				defer d.close()
+				defer func(close func() error) { _ = close() }(d.close)
 				t.Fatal("foreign/incomplete producer material accepted")
 			}
 			if _, e := os.Stat(filepath.Join(dir, lifecycleSourceNames[3])); e != nil {
@@ -1072,7 +1072,7 @@ func TestOriginalHistoricalInputHandoffUsesActualLinkedProducerFilesAndKeepsPare
 			if e != nil {
 				t.Fatal(e)
 			}
-			defer registration.close()
+			defer func(close func() error) { _ = close() }(registration.close)
 			defer func() {
 				for _, d := range previous {
 					_ = d.close()
@@ -1201,8 +1201,8 @@ func TestOriginalPreparationBudgetMaterialIsBoundByWriteTimeIntentAndKeptInRootS
 	if e != nil {
 		t.Fatal(e)
 	}
-	defer d.close()
-	defer peer.close()
+	defer func(close func() error) { _ = close() }(d.close)
+	defer func(close func() error) { _ = close() }(peer.close)
 	if len(d.files) != 13 || d.files["budget-key.basis.private.json"] == nil || d.files["budget-key.result.private.json"] == nil {
 		t.Fatal("actual original budget material omitted")
 	}
@@ -1281,7 +1281,7 @@ func TestOriginalHistoricalServiceInputsUseExistingApprovalHashesAndExactSourceF
 			if e != nil {
 				t.Fatal(e)
 			}
-			defer d.close()
+			defer func(close func() error) { _ = close() }(d.close)
 			r := lifecycleRequest{ServiceControl: &lifecycleServiceControl{}}
 			for name, value := range map[string]string{"approved-services.json": "original final A descriptor", "ssh-channel.json": "original approved channel"} {
 				raw, _ := json.Marshal(value)
@@ -1433,7 +1433,7 @@ func TestOriginalOperationInventoryCatalogRejectsChangedReferenceAndBusyLock(t *
 				if e != nil {
 					t.Fatal(e)
 				}
-				defer syscall.Close(fd)
+				defer func(fd int) { _ = syscall.Close(fd) }(fd)
 				if e = syscall.Flock(fd, syscall.LOCK_EX|syscall.LOCK_NB); e != nil {
 					t.Fatal(e)
 				}
@@ -1604,11 +1604,11 @@ func TestOriginalReadonlyHistoryCatalogFollowsFrozenProofAndTerminalHashes(t *te
 			if e != nil {
 				t.Fatal(e)
 			}
-			defer registration.close()
+			defer func(close func() error) { _ = close() }(registration.close)
 			parent := previous[len(previous)-1]
-			defer parent.close()
+			defer func(close func() error) { _ = close() }(parent.close)
 			for _, d := range previous[:len(previous)-1] {
-				defer d.close()
+				defer func(close func() error) { _ = close() }(d.close)
 			}
 			put := func(path string, value any) string {
 				b, _ := json.Marshal(value)
