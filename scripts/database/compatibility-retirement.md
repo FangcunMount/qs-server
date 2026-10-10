@@ -609,11 +609,13 @@ original AI commands, historical backfill, four-object DROP, B deployment, accep
   proving terminal ownership with no unsettled/replay responsibility. Unknown
   execution, ambiguity, hash conflict, incomplete retirement references and
   unexplained high findings block preparation.
-- A fsync-before-DDL journal binds all four targets and the immutable manifest.
-  An interrupted `intent`/`unknown` cannot start another DROP. Only a new live
-  read may reconcile it to `dropped`; incomplete/mixed/restored journals do not
-  permit purge. The journal requires an operation lock and is not called by the
-  current lifecycle mutation CLI. Read-only preparation writes only
+- The Python preparation tool validates private inputs, the operation lock,
+  immutable manifest and configured window limits. Its unused DDL journal and
+  deadline helpers have been removed. The native Go lifecycle owns the actual
+  fsync-before-DDL journal and execution reconciliation. An interrupted
+  `intent`/`unknown` cannot start another DROP; object absence alone cannot
+  resolve an unknown execution result. Incomplete, mixed or restored state does
+  not permit purge. Read-only preparation writes only
   operation-owned private source inventory files and issues no database mutations.
   The separately bound `historical-evidence-write` mode can perform qualified
   evidence/retirement-record CAS; it issues no DROP or schema migration commands.
@@ -621,9 +623,10 @@ original AI commands, historical backfill, four-object DROP, B deployment, accep
   regular file and preserve the existing owner, mode and size checks. A FIFO
   without a writer is rejected before reading. This protects file acquisition;
   it does not bound regular-file I/O or prove the combined 10-minute recovery.
-- Deadline helpers stop forward work at 20 minutes and all recovery work at
-  30 minutes. These helpers alone do not guarantee recovery time; readiness
-  requires a measured and independently verified rollback of at most 10 minutes.
+- The native Go window stops forward work at 20 minutes and bounds the whole
+  window at 30 minutes. Preparation still validates those limits. Neither check
+  proves recovery time: entry requires an actual, independently verified
+  recovery of all four targets and runtime readiness within 10 minutes.
 
 The read-only modes of `cmd/qs-compatibility-history` implement a host for the
 actual inventory outputs; the explicit evidence-write mode is described above. It binds the compiled source, operation/run, approved
