@@ -7,6 +7,7 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"os"
@@ -691,6 +692,14 @@ func (p *aiExecDockerProtocol) ordinary(ctx context.Context, method, path string
 		return nil, ErrAIExternalExecUnknown
 	}
 	if resp.StatusCode != status {
+		actual, expected := "unknown", "unknown"
+		if resp.StatusCode >= 100 && resp.StatusCode <= 599 {
+			actual = strconv.Itoa(resp.StatusCode)
+		}
+		if status >= 100 && status <= 599 {
+			expected = strconv.Itoa(status)
+		}
+		_, _ = fmt.Fprintln(os.Stderr, "QS_AI_HTTP_STATUS_DIAGNOSTIC actual="+actual+" expected="+expected)
 		aiExternalExecutionFailure("http_status", ErrAIExternalExecUnknown)
 		_ = resp.Body.Close()
 		return nil, ErrAIExternalExecUnknown
