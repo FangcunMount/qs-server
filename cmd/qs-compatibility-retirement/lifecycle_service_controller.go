@@ -41,6 +41,7 @@ type lifecycleServiceController struct {
 	local                    *stop.Lease
 	remote                   *stop.RemoteController
 	issuer                   *stop.BudgetIssuer
+	materials                *stop.RootRemoteMaterials
 	child                    *lifecycleOwnedServiceSSH
 	journal                  string
 	stopAttempted            bool
@@ -71,11 +72,7 @@ func openLifecycleServiceController(ctx context.Context, r lifecycleRequest, w *
 	if err != nil {
 		return nil, lifecycleError("lifecycle_actual_budget_issuer_missing")
 	}
-	issuer, err := stop.OpenBudgetIssuer(ctx, a, key, w)
-	if err != nil {
-		return nil, lifecycleError("lifecycle_actual_budget_issuer_missing")
-	}
-	v := &lifecycleServiceController{window: w, approval: a, issuer: issuer, journal: filepath.Join(root, "service-journal"),
+	v := &lifecycleServiceController{window: w, approval: a, journal: filepath.Join(root, "service-journal"),
 		identity: lifecycleServiceControllerIdentity{windowBinding: b, toolSourceSHA: r.ToolSourceSHA, actualRunID: r.ActualRunID,
 			localDescriptorSHA256: r.ServiceControl.LocalDescriptorSHA256, sshChannelSHA256: r.ServiceControl.SSHChannelSHA256}}
 	defer func() {
@@ -83,6 +80,28 @@ func openLifecycleServiceController(ctx context.Context, r lifecycleRequest, w *
 			_ = v.Close()
 		}
 	}()
+	if !recovery {
+		if r.WriterControl == nil || !hashRE.MatchString(r.WriterControl.WorkflowScopeSHA256) {
+			return nil, lifecycleError("lifecycle_writer_scope_binding_rejected")
+		}
+		var channel lifecycleServiceSSHChannel
+		channelPath := filepath.Join(root, "ssh-channel.json")
+		if readLifecyclePrivate(channelPath, r.ServiceControl.SSHChannelSHA256, &channel) != nil || !channel.bindingMatches(r) {
+			return nil, lifecycleError("lifecycle_service_channel_rejected")
+		}
+		raw, e := readLifecycleRootFile(channelPath, r.ServiceControl.SSHChannelSHA256, false)
+		if e != nil || validateLifecycleServiceChannelAssignedRun(raw, channel) != nil {
+			return nil, lifecycleError("lifecycle_service_channel_rejected")
+		}
+		v.materials, err = stop.OpenRootLocalMaterials(ctx, a, key, r.ServiceControl.SSHChannelSHA256, channel.IdentitySHA256, channel.KnownHostsSHA256, r.WriterControl.WorkflowScopeSHA256)
+		if err != nil {
+			return nil, err
+		}
+	}
+	v.issuer, err = stop.OpenBudgetIssuer(ctx, a, key, w)
+	if err != nil {
+		return nil, lifecycleError("lifecycle_actual_budget_issuer_missing")
+	}
 	var session context.Context
 	var cancel context.CancelFunc
 	if recovery {
@@ -106,7 +125,7 @@ func openLifecycleServiceController(ctx context.Context, r lifecycleRequest, w *
 		return nil, lifecycleError("lifecycle_service_approval_rejected")
 	}
 	v.identity.remoteDescriptorSHA256 = channel.RemoteDescriptorSHA256
-	v.remote, err = stop.OpenLiveRemoteController(session, issuer, child.in, child.out)
+	v.remote, err = stop.OpenLiveRemoteController(session, v.issuer, child.in, child.out)
 	if err != nil {
 		return nil, lifecycleError("lifecycle_live_remote_controller_rejected")
 	}
@@ -272,6 +291,9 @@ func (v *lifecycleServiceController) Close() error {
 		if err := v.issuer.Close(); result == nil {
 			result = err
 		}
+	}
+	if v.materials != nil {
+		result = errors.Join(result, v.materials.Close())
 	}
 	return result
 }

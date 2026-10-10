@@ -19,6 +19,8 @@ import (
 	"syscall"
 
 	"golang.org/x/sys/unix"
+
+	fence "github.com/FangcunMount/qs-server/internal/apiserver/maintenance/compatibilityretirementfence"
 )
 
 var ErrRemoteMaterials = errors.New("retirement_remote_owned_materials_rejected")
@@ -38,6 +40,7 @@ type RootRemoteMaterials struct {
 	files                  map[string]*remoteMaterialFile
 	failed                 atomic.Bool
 	terminal, zero, closed bool
+	local, sealed          bool
 	receipt                RemoteMaterialSnapshot
 }
 type remoteMaterialDir struct {
@@ -171,6 +174,151 @@ func OpenRootRemoteMaterials(ctx context.Context, a *Approval, requestPath, requ
 	}
 	return m, nil
 }
+
+// A's owner uses only the existing fixed bootstrap and this key's actual seed.
+// Channel hashes come from the caller's independently approved, validated SSH
+// channel. Directory enumeration rejects extras; it never registers them.
+func OpenRootLocalMaterials(ctx context.Context, a *Approval, k *RootBudgetKey, channelHash, identityHash, knownHostsHash, workflowScopeHash string) (_ *RootRemoteMaterials, result error) {
+	if ctx == nil || ctx.Err() != nil || a.validate() != nil || a.descriptor.HostRole != "server-a" || a.materials != nil || k == nil || k.self != k || k.approval != a || !hash64.MatchString(channelHash) || !hash64.MatchString(identityHash) || !hash64.MatchString(knownHostsHash) || !hash64.MatchString(workflowScopeHash) {
+		return nil, ErrRemoteMaterials
+	}
+	root := filepath.Dir(k.dir)
+	if root != filepath.Join("/opt/qs-server/qs-apiserver/compatibility-retirement", a.descriptor.OperationID) || a.path != filepath.Join(root, "approved-services.json") {
+		return nil, ErrRemoteMaterials
+	}
+	raw, e := readRootBudgetFile(filepath.Join(root, "service-session.json"))
+	var r remoteMaterialRequest
+	if e != nil || exactJSON(raw, &r) != nil || r.FormatVersion != 1 || r.Kind != "qs_root_service_session" || r.ToolSourceSHA != a.descriptor.ToolSourceSHA || r.OriginalSourceSHA != a.descriptor.SourceSHA || r.OperationID != a.descriptor.OperationID || r.ManifestSHA256 != a.descriptor.ManifestSHA256 || r.OriginalRunID != a.descriptor.OriginalRunID || !opID.MatchString(r.ActualRunID) || r.DescriptorSHA256 != a.rawHash || !hash64.MatchString(r.ToolBinarySHA256) {
+		return nil, ErrRemoteMaterials
+	}
+	tool, e := hashProtectedExecutable(filepath.Join(root, "qs-compatibility-retirement"))
+	if e != nil || tool != r.ToolBinarySHA256 {
+		return nil, ErrRemoteMaterials
+	}
+	workflow, e := readRootBudgetFile(filepath.Join(root, "approved-workflow-scope.json"))
+	binding, be := a.WindowBinding(ctx)
+	if e != nil || be != nil || digest(workflow) != workflowScopeHash || fence.ValidateRunnerWorkflowScopeBinding(workflow, binding, a.descriptor.ToolSourceSHA) != nil {
+		return nil, ErrRemoteMaterials
+	}
+	m := newRemoteMaterials(root, a)
+	m.local = true
+	defer func() {
+		if result != nil {
+			_ = m.Close()
+		}
+	}()
+	for _, rel := range []string{".", "service-journal", "budget-issuer", "ssh"} {
+		if e = m.openDir(rel, 0); e != nil {
+			return nil, e
+		}
+	}
+	initial := map[string]string{"qs-compatibility-retirement": tool, "approved-services.json": a.rawHash, "service-session.json": digest(raw), "approved-workflow-scope.json": workflowScopeHash, "ssh-channel.json": channelHash, "ssh/identity": identityHash, "ssh/known_hosts": knownHostsHash, "budget-issuer/issuer-seed": k.seedHash}
+	for rel, hash := range initial {
+		if e = m.register(rel, hash, 0); e != nil {
+			return nil, e
+		}
+	}
+	if e = m.checkLocked(); e != nil {
+		return nil, e
+	}
+	a.materials = m
+	return m, nil
+}
+
+func (m *RootRemoteMaterials) CheckLocalMaterials(ctx context.Context, i *BudgetIssuer, l *Lease) error {
+	if m == nil || m.self != m || !m.local || m.approval == nil || ctx == nil || ctx.Err() != nil || i == nil || i.self != i || i.approval != m.approval || l == nil || l.self != l || l.approval != m.approval || l.window != i.window || m.approval.materials != m || checkWindow(ctx, m.approval, i.window) != nil {
+		return ErrRemoteMaterials
+	}
+	i.mu.Lock()
+	defer i.mu.Unlock()
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if i.closed || i.dirFD < 0 || l.closed || l.dirFD < 0 || l.failed || m.sealed {
+		return ErrRemoteMaterials
+	}
+	return m.checkLocked()
+}
+
+// This handoff closes the two original A writers, then transfers only their
+// held, rechecked directory/file identities. No saved receipt can seal them.
+// The host may call it only after its original D zero and terminal observation.
+func (m *RootRemoteMaterials) SealLocalMaterials(ctx context.Context, i *BudgetIssuer, l *Lease, remote *RemoteController, zero *RemoteMaterialZero, directory func(string, *os.File) error, file func(string, *os.File, string) error) error {
+	if directory == nil || file == nil || m.CheckLocalMaterials(ctx, i, l) != nil || remote == nil || remote.issuer != i || zero.ValidateOriginalController(ctx, remote) != nil {
+		return ErrRemoteMaterials
+	}
+	q, cancel, e := i.window.ForwardContext(ctx)
+	if e != nil {
+		return e
+	}
+	defer cancel()
+	return m.sealLocalRegistered(q, i, l, directory, file)
+}
+
+// As with purgeRegistered, non-root tests call only this private FD kernel.
+// They cannot issue the public native A owner, original Window or D proof.
+func (m *RootRemoteMaterials) sealLocalRegistered(ctx context.Context, i *BudgetIssuer, l *Lease, directory func(string, *os.File) error, file func(string, *os.File, string) error) (result error) {
+	if m == nil || m.self != m || !m.local || m.closed || m.sealed || m.failed.Load() || ctx == nil || ctx.Err() != nil || i == nil || i.self != i || i.approval != m.approval || l == nil || l.self != l || l.approval != m.approval || directory == nil || file == nil {
+		return ErrRemoteMaterials
+	}
+	defer func() {
+		if result != nil {
+			m.markUnknown()
+		}
+	}()
+	if result = errors.Join(i.Close(), l.Close()); result != nil {
+		return result
+	}
+	m.mu.Lock()
+	if m.checkLocked() != nil || m.sealed {
+		m.mu.Unlock()
+		return ErrRemoteMaterials
+	}
+	dirs := make([]string, 0, len(m.dirs))
+	for rel := range m.dirs {
+		dirs = append(dirs, rel)
+	}
+	sort.Slice(dirs, func(a, b int) bool {
+		return len(dirs[a]) < len(dirs[b]) || len(dirs[a]) == len(dirs[b]) && dirs[a] < dirs[b]
+	})
+	for _, rel := range dirs {
+		if ctx.Err() != nil || directory(filepath.Join(m.root, rel), m.dirs[rel].file) != nil {
+			m.mu.Unlock()
+			return ErrRemoteMaterials
+		}
+	}
+	for rel, owned := range m.files {
+		if ctx.Err() != nil || file(filepath.Join(m.root, rel), owned.file, owned.hash) != nil {
+			m.mu.Unlock()
+			return ErrRemoteMaterials
+		}
+	}
+	m.mu.Unlock()
+	if result = m.Close(); result != nil {
+		return result
+	}
+	m.mu.Lock()
+	m.sealed = true
+	m.mu.Unlock()
+	return ctx.Err()
+}
+
+func (m *RootRemoteMaterials) LocalMaterialsSealed(i *BudgetIssuer, l *Lease) error {
+	if m == nil || m.self != m || !m.local || m.approval == nil || i == nil || i.self != i || i.approval != m.approval || l == nil || l.self != l || l.approval != m.approval || m.approval.materials != m {
+		return ErrRemoteMaterials
+	}
+	i.mu.Lock()
+	defer i.mu.Unlock()
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if !i.closed || i.dirFD != -1 || !l.closed || l.dirFD != -1 || !m.sealed || !m.closed || m.failed.Load() {
+		return ErrRemoteMaterials
+	}
+	return nil
+}
 func newRemoteMaterials(root string, a *Approval) *RootRemoteMaterials {
 	m := &RootRemoteMaterials{approval: a, root: root, dirs: map[string]*remoteMaterialDir{}, files: map[string]*remoteMaterialFile{}}
 	m.self = m
@@ -255,7 +403,8 @@ func (m *RootRemoteMaterials) registerWritten(rel string, raw []byte) error {
 	}
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	if m.self != m || m.closed || m.terminal || m.failed.Load() || (!strings.HasPrefix(rel, "service-journal/") && !strings.HasPrefix(rel, "remote-budget/")) {
+	localBudget := m.local && (rel == "budget-issuer/issuer-window.json" || strings.HasPrefix(rel, "budget-issuer/nonce-") && hash64.MatchString(strings.TrimPrefix(rel, "budget-issuer/nonce-")))
+	if m.self != m || m.closed || m.terminal || m.sealed || m.failed.Load() || (!strings.HasPrefix(rel, "service-journal/") && (!strings.HasPrefix(rel, "remote-budget/") || m.local) && !localBudget) {
 		m.failed.Store(true)
 		return ErrRemoteMaterials
 	}
@@ -362,7 +511,7 @@ func (m *RootRemoteMaterials) scopeHash() string {
 // bodies and are the only retained operation evidence. Unknown partial effects
 // retain the exact intent and remaining files; they cannot be replayed.
 func (m *RootRemoteMaterials) purge(ctx context.Context, b *RemoteBudget, l *Lease) (RemoteMaterialSnapshot, error) {
-	if m == nil || m.self != m || b == nil || b.approval != m.approval || l == nil || l.approval != m.approval || l.runtimeObservation == nil {
+	if m == nil || m.self != m || m.local || b == nil || b.approval != m.approval || l == nil || l.approval != m.approval || l.runtimeObservation == nil {
 		return RemoteMaterialSnapshot{}, ErrRemoteMaterials
 	}
 	if _, e := l.runtimeObservation.Snapshot(); e != nil {

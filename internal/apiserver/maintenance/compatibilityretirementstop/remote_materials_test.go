@@ -3,10 +3,13 @@ package compatibilityretirementstop
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"golang.org/x/sys/unix"
 )
 
 func ownedMaterialFixture(t *testing.T) *RootRemoteMaterials {
@@ -42,6 +45,88 @@ func ownedMaterialFixture(t *testing.T) *RootRemoteMaterials {
 		t.Fatal(e)
 	}
 	return m
+}
+
+// Only the existing private filesystem kernel is exercised. These actual test
+// FDs confer neither Linux-root approval nor an original Window/D terminal.
+func TestLocalMaterialSealClosesWritersBeforeHeldFDHandoff(t *testing.T) {
+	for _, scenario := range []string{"exact", "foreign", "handoff-failed"} {
+		t.Run(scenario, func(t *testing.T) {
+			m := ownedMaterialFixture(t)
+			m.local = true
+			m.approval.materials = m
+			issuerFD, e := unix.Open(filepath.Join(m.root, "remote-budget"), unix.O_RDONLY|unix.O_DIRECTORY, 0)
+			if e != nil {
+				t.Fatal(e)
+			}
+			leaseFD, e := unix.Open(filepath.Join(m.root, "service-journal"), unix.O_RDONLY|unix.O_DIRECTORY, 0)
+			if e != nil {
+				t.Fatal(e)
+			}
+			i := &BudgetIssuer{approval: m.approval, dirFD: issuerFD}
+			i.self = i
+			l := &Lease{approval: m.approval, dirFD: leaseFD}
+			l.self = l
+			t.Cleanup(func() { _ = i.Close(); _ = l.Close() })
+			if scenario == "foreign" {
+				if e = os.WriteFile(filepath.Join(m.root, "foreign"), []byte("unregistered"), 0600); e != nil {
+					t.Fatal(e)
+				}
+			}
+			files, dirs := 0, 0
+			checkClosed := func() {
+				t.Helper()
+				var st unix.Stat_t
+				if !i.closed || !l.closed || i.dirFD != -1 || l.dirFD != -1 || !errors.Is(unix.Fstat(issuerFD, &st), unix.EBADF) || !errors.Is(unix.Fstat(leaseFD, &st), unix.EBADF) {
+					t.Fatal("actual writers remained open at material handoff")
+				}
+			}
+			e = m.sealLocalRegistered(t.Context(), i, l, func(path string, held *os.File) error {
+				checkClosed()
+				if _, e := held.Stat(); e != nil || !strings.HasPrefix(path, m.root) {
+					t.Fatal("handoff lost its original held directory")
+				}
+				dirs++
+				if scenario == "handoff-failed" {
+					return errors.New("consumer refused original FD")
+				}
+				return nil
+			}, func(path string, held *os.File, hash string) error {
+				checkClosed()
+				got, e := materialFileHash(held)
+				if e != nil || got != hash || !strings.HasPrefix(path, m.root) {
+					t.Fatal("handoff lost its original bytes")
+				}
+				files++
+				return nil
+			})
+			if scenario == "exact" {
+				if e != nil || files != 6 || dirs != 5 || m.LocalMaterialsSealed(i, l) != nil {
+					t.Fatal("actual material handoff failed", files, dirs, e)
+				}
+				for _, v := range m.files {
+					if _, e := v.file.Stat(); !errors.Is(e, os.ErrClosed) {
+						t.Fatal("original raw material FD remained open")
+					}
+				}
+				copy := &RootRemoteMaterials{self: m, local: true, approval: m.approval, sealed: true, closed: true}
+				if copy.LocalMaterialsSealed(i, l) == nil {
+					t.Fatal("copied owner became original sealed proof")
+				}
+			} else if e == nil || !m.failed.Load() || m.LocalMaterialsSealed(i, l) == nil || scenario == "foreign" && (files != 0 || dirs != 0) {
+				t.Fatal("partial/foreign handoff became completion", files, dirs, e)
+			}
+			if _, e := os.Lstat(filepath.Join(m.root, "approved-services.json")); e != nil {
+				t.Fatal("sealing deleted original material")
+			}
+		})
+	}
+	if _, e := OpenRootLocalMaterials(t.Context(), nil, nil, "", "", "", ""); e == nil {
+		t.Fatal("missing native A approval issued material owner")
+	}
+	if new(RootRemoteMaterials).SealLocalMaterials(t.Context(), new(BudgetIssuer), new(Lease), new(RemoteController), new(RemoteMaterialZero), func(string, *os.File) error { return nil }, func(string, *os.File, string) error { return nil }) == nil {
+		t.Fatal("saved/zero Window/D result sealed A materials")
+	}
 }
 func TestRemoteMaterialsActualFileRegistrationRejectsDrift(t *testing.T) {
 	for _, kind := range []string{"same-bytes-new-inode", "changed-body", "changed-mode", "hardlink", "symlink", "foreign", "foreign-directory"} {

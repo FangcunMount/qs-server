@@ -306,6 +306,9 @@ func (h *lifecycleFixedHost) PurgeTemporaryCopies(ctx context.Context, r lifecyc
 	if err = h.registerAIStoppedMaterials(ctx, r, materials); err != nil {
 		return err
 	}
+	if err = h.registerLocalServiceMaterials(ctx, r, materials); err != nil {
+		return err
+	}
 	return materials.purge(ctx)
 }
 func (h *lifecycleFixedHost) VerifyTemporaryMaterialsZero(ctx context.Context, r lifecycleRequest) error {

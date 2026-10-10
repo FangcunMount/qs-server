@@ -29,6 +29,31 @@ func platformScopeFixture() (RunnerWorkflowScope, *platformProtocolFixture) {
 	return s, &platformProtocolFixture{base: &fixtureClient{p: p}}
 }
 
+func TestApprovedWorkflowMaterialBindingUsesOriginalScope(t *testing.T) {
+	s, _ := platformScopeFixture()
+	raw, e := json.Marshal(s)
+	if e != nil {
+		t.Fatal(e)
+	}
+	b := WindowBinding{TargetSHA256: MaintenanceWindowTargetSHA256(), SourceSHA: s.OriginalSourceSHA, OperationID: s.OperationID, ManifestSHA256: s.ManifestSHA256, OriginalRunID: s.OriginalRunID}
+	if ValidateRunnerWorkflowScopeBinding(raw, b, s.ToolSourceSHA) != nil {
+		t.Fatal("original approved material metadata rejected")
+	}
+	for _, changed := range []WindowBinding{{}, {TargetSHA256: b.TargetSHA256, SourceSHA: b.SourceSHA, OperationID: "999-1", ManifestSHA256: b.ManifestSHA256, OriginalRunID: b.OriginalRunID}} {
+		if ValidateRunnerWorkflowScopeBinding(raw, changed, s.ToolSourceSHA) == nil {
+			t.Fatal("another operation's workflow material was adopted")
+		}
+	}
+	if ValidateRunnerWorkflowScopeBinding(raw, b, strings.Repeat("f", 40)) == nil {
+		t.Fatal("another tool's workflow material was adopted")
+	}
+	s.WorkflowIDs = []int64{s.WorkflowID, s.WorkflowID}
+	raw, _ = json.Marshal(s)
+	if ValidateRunnerWorkflowScopeBinding(raw, b, s.ToolSourceSHA) == nil {
+		t.Fatal("invalid approved workflow scope was adopted")
+	}
+}
+
 func (f *platformProtocolFixture) Do(req *http.Request) (*http.Response, error) {
 	response, e := f.base.Do(req)
 	if e != nil || response == nil || response.Body == nil {

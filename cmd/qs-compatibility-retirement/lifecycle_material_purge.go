@@ -84,12 +84,14 @@ type lifecycleBatchMaterials struct {
 	binding                          lifecycleMaterialBinding
 	scopes                           map[lifecycleMaterialScope]struct{}
 	remote                           *lifecycleRemoteMaterialZero
+	local                            *stop.RootRemoteMaterials
 	directories                      []*lifecycleMaterialDirectory
 	archive                          *lifecycleMaterialDirectory
 	engines                          []*lifecycleEnginePurge
 	journal                          *lifecycleMaterialDirectory
 	started, purged, closed, unknown bool
 	zeroVerified                     bool
+	localSealed                      bool
 }
 
 // The fixed backup producer registered exactly these six files before copying
@@ -187,8 +189,8 @@ func registerLifecycleCurrentRestoreMetadata(ctx context.Context, d *lifecycleMa
 
 // Compose only directly available original owners after the native read/fence.
 // Retain partial FD ownership even on failure so host Close can release it.
-// Root/inventory/source/restore-receipt/archive/A registration remains absent;
-// no complete batch or other scope is inferred from these two resource leaves.
+// Root/inventory/source/restore-receipt/archive registration remains absent;
+// no complete batch is inferred from A's actual owner or these resource leaves.
 func (h *lifecycleFixedHost) composeNativeMaterialOwners(ctx context.Context, r lifecycleRequest) (result error) {
 	b := lifecycleMaterialsBinding(r)
 	if h == nil || ctx == nil || ctx.Err() != nil || runtime.GOOS != "linux" || os.Getuid() != 0 || os.Geteuid() != 0 || version.GitCommit != sourceSHA || !b.valid() || b.tool != sourceSHA || r.prepareRoot != lifecycleInvocationBatch(r.OperationID, r.ActualRunID) || h.materials != nil || h.acceptedMaterials != nil || h.currentMQ == nil || h.api == nil || h.api.self != h.api || h.api.unknown || h.api.materials == nil || h.api.acceptance == nil || h.api.acceptance.self != h.api.acceptance || h.api.acceptance.owner != h.api || lifecycleMaterialsBinding(h.api.request) != b || h.api.dir != filepath.Join(r.prepareRoot, "api-transition") || h.api.materials.path != h.api.dir || !h.api.bProgramVerified || !h.api.rollbackProgramVerified || h.restoreOwner == nil || len(h.restoreOwner.engines) != 2 {
@@ -202,6 +204,11 @@ func (h *lifecycleFixedHost) composeNativeMaterialOwners(ctx context.Context, r 
 			c.unknown = true // A failed partial handoff can never be completed/reused.
 		}
 	}()
+	if h.services == nil || h.services.materials == nil || !h.services.identity.matches(r) || h.services.materials.CheckLocalMaterials(ctx, h.services.issuer, h.services.local) != nil {
+		return lifecycleError("lifecycle_actual_complete_material_scope_missing")
+	}
+	c.local = h.services.materials
+	c.scopes[lifecycleLocalServiceMaterials] = struct{}{}
 	root, e := openLifecycleMaterialDirectory(r.prepareRoot, 0)
 	if e != nil {
 		return e
@@ -302,7 +309,7 @@ func (h *lifecycleFixedHost) acceptedBatchMaterials(ctx context.Context, r lifec
 		return nil, lifecycleError("lifecycle_actual_batch_acceptance_missing")
 	}
 	c := a.catalog
-	if c.closed || c.unknown || c.archive == nil || c.journal == nil || len(c.engines) != 2 || h.restoreOwner == nil || len(h.restoreOwner.engines) != 2 || c.remote == nil || c.remote.self != c.remote || c.remote.binding != c.binding || c.remote.native == nil || c.remote.services != h.services || len(c.scopes) != int(lifecycleMaterialScopeCount) || !lifecycleMaterialPathsMatch(c, r) {
+	if c.closed || c.unknown || c.archive == nil || c.journal == nil || len(c.engines) != 2 || h.restoreOwner == nil || len(h.restoreOwner.engines) != 2 || h.services == nil || c.local == nil || c.local != h.services.materials || c.remote == nil || c.remote.self != c.remote || c.remote.binding != c.binding || c.remote.native == nil || c.remote.services != h.services || len(c.scopes) != int(lifecycleMaterialScopeCount) || !lifecycleMaterialPathsMatch(c, r) {
 		return nil, lifecycleError("lifecycle_actual_complete_material_scope_missing")
 	}
 	if z, e := c.remote.native.Snapshot(); e != nil || z.RemainingTemporaryFiles != 0 {
@@ -322,6 +329,72 @@ func (h *lifecycleFixedHost) acceptedBatchMaterials(ctx context.Context, r lifec
 		}
 	}
 	return c, nil
+}
+
+// Consume only the original A owner after the native D zero/terminal and the
+// last broader writer check. Seal closes the actual Lease and budget issuer;
+// callbacks bind existing held identities, never infer ownership from a tree.
+func (h *lifecycleFixedHost) registerLocalServiceMaterials(ctx context.Context, r lifecycleRequest, c *lifecycleBatchMaterials) (result error) {
+	if h == nil || h.services == nil || c == nil || c != h.materials || c.self != c || c.binding != lifecycleMaterialsBinding(r) || c.closed || c.unknown || c.started || c.local == nil || c.local != h.services.materials || c.remote == nil || c.remote.terminal == nil || h.acceptedMaterials == nil || h.acceptedMaterials.catalog != c {
+		return lifecycleError("lifecycle_actual_complete_material_scope_missing")
+	}
+	if c.localSealed {
+		return c.local.LocalMaterialsSealed(h.services.issuer, h.services.local)
+	}
+	if result = h.observeWholeWriterScopesAfterDTerminal(ctx, r, c.remote.terminal); result != nil {
+		return result
+	}
+	defer func() {
+		if result != nil {
+			c.unknown = true
+		}
+	}()
+	root := lifecycleServicesRoot(r.OperationID, "server-a")
+	dirs := map[string]*lifecycleMaterialDirectory{}
+	result = c.local.SealLocalMaterials(ctx, h.services.issuer, h.services.local, h.services.remote, c.remote.native, func(path string, held *os.File) error {
+		if dirs[path] != nil || path != root && path != filepath.Join(root, "service-journal") && path != filepath.Join(root, "budget-issuer") && path != filepath.Join(root, "ssh") || held == nil {
+			return lifecycleError("lifecycle_material_registration_rejected")
+		}
+		d, e := openLifecycleMaterialDirectory(path, 0)
+		if e != nil {
+			return e
+		}
+		before, e := held.Stat()
+		if e != nil || !sameLifecycleFile(before, d.info) {
+			_ = d.close()
+			return lifecycleError("lifecycle_material_registration_rejected")
+		}
+		dirs[path] = d
+		if path == root {
+			c.directories = append(c.directories, d)
+		} else if dirs[root] == nil || dirs[root].registerChild(d) != nil {
+			_ = d.close()
+			return lifecycleError("lifecycle_material_registration_rejected")
+		}
+		return nil
+	}, func(path string, held *os.File, hash string) error {
+		d := dirs[filepath.Dir(path)]
+		if d == nil || held == nil {
+			return lifecycleError("lifecycle_material_registration_rejected")
+		}
+		before, e := held.Stat()
+		if e != nil || d.register(filepath.Base(path), hash, 0, before.Mode().Perm()) != nil {
+			return lifecycleError("lifecycle_material_registration_rejected")
+		}
+		after, e := held.Stat()
+		if e != nil || !sameLifecycleFile(before, after) || !sameLifecycleFile(after, d.files[filepath.Base(path)].info) {
+			return lifecycleError("lifecycle_material_registration_rejected")
+		}
+		return nil
+	})
+	if result != nil {
+		return result
+	}
+	if len(dirs) != 4 || dirs[root] == nil || dirs[root].checkComplete(false) != nil || c.local.LocalMaterialsSealed(h.services.issuer, h.services.local) != nil {
+		return lifecycleError("lifecycle_actual_complete_material_scope_missing")
+	}
+	c.localSealed = true
+	return nil
 }
 
 // The complete catalog producer is still missing. This hook consumes only its
@@ -677,6 +750,9 @@ func (d *lifecycleMaterialDirectory) close() error {
 func (c *lifecycleBatchMaterials) preflight(ctx context.Context) error {
 	if c == nil || c.self != c || !c.binding.valid() || c.started || c.closed || c.unknown || ctx == nil || ctx.Err() != nil || c.journal == nil || c.archive == nil {
 		return lifecycleError("lifecycle_material_registration_rejected")
+	}
+	if c.local != nil && !c.localSealed {
+		return lifecycleError("lifecycle_actual_complete_material_scope_missing")
 	}
 	if e := c.journal.checkComplete(false); e != nil {
 		return e

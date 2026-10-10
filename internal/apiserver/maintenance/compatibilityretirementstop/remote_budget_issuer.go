@@ -196,12 +196,17 @@ func OpenBudgetIssuer(ctx context.Context, a *Approval, k *RootBudgetKey, w *fen
 	existing, e := readRootBudgetFile(path)
 	if _, se := os.Lstat(path); os.IsNotExist(se) {
 		if e = writeRootExclusive(fd, "issuer-window.json", raw); e != nil {
+			a.materials.markUnknown()
 			return nil, e
 		}
 		existing, e = readRootBudgetFile(path)
 	}
 	if e != nil || !bytes.Equal(existing, raw) {
+		a.materials.markUnknown()
 		return nil, ErrRemoteBudget
+	}
+	if e = a.materials.registerWritten("budget-issuer/issuer-window.json", raw); e != nil {
+		return nil, e
 	}
 	out := &BudgetIssuer{approval: a, key: k, window: w, record: record, recordHash: digest(raw), dirFD: fd}
 	out.self = out
@@ -284,6 +289,10 @@ func (i *BudgetIssuer) IssueFreshBudget(ctx context.Context, rawChallenge []byte
 	// A also consumes this nonce durably. A lost response requires a NEW D
 	// challenge; neither process may replay a signed or imported old success.
 	if e = writeRootExclusive(i.dirFD, "nonce-"+c.Nonce, []byte(digest(rawChallenge))); e != nil {
+		i.approval.materials.markUnknown()
+		return nil, e
+	}
+	if e = i.approval.materials.registerWritten("budget-issuer/nonce-"+c.Nonce, []byte(digest(rawChallenge))); e != nil {
 		return nil, e
 	}
 	sig, e := i.key.sign(payload)
@@ -307,6 +316,7 @@ func (i *BudgetIssuer) Close() error {
 	}
 	i.closed = true
 	if syscall.Close(i.dirFD) != nil {
+		i.approval.materials.markUnknown()
 		return ErrRemoteBudget
 	}
 	i.dirFD = -1

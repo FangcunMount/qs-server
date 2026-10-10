@@ -82,6 +82,16 @@ func decodeRunnerWorkflowScope(raw []byte) (RunnerWorkflowScope, error) {
 	return s, nil
 }
 
+// This checks approved metadata only. It cannot issue a platform observation,
+// original Window, admission lease or writer-fence capability.
+func ValidateRunnerWorkflowScopeBinding(raw []byte, b WindowBinding, toolSourceSHA string) error {
+	s, e := decodeRunnerWorkflowScope(raw)
+	if e != nil || s.ToolSourceSHA != toolSourceSHA || b != (WindowBinding{TargetSHA256: MaintenanceWindowTargetSHA256(), SourceSHA: s.OriginalSourceSHA, OperationID: s.OperationID, ManifestSHA256: s.ManifestSHA256, OriginalRunID: s.OriginalRunID}) {
+		return ErrPlatformObservation
+	}
+	return nil
+}
+
 // PlatformObservation proves only two current native API reads. It does not
 // own the runner's mutation lease, prove old credential paths are blocked, or
 // provide a whole-writer fence/DDL capability.

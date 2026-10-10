@@ -1011,6 +1011,7 @@ func (l *Lease) Close() error {
 	e := syscall.Close(l.dirFD)
 	l.dirFD = -1
 	if e != nil {
+		l.approval.materials.markUnknown()
 		return ErrJournal
 	}
 	return nil

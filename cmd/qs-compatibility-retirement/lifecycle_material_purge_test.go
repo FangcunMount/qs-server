@@ -111,6 +111,31 @@ func TestCurrentRestoreMaterialOwnerRejectsPartialOrDifferentWriterBeforeOpening
 		})
 	}
 }
+
+func TestLocalMaterialCallerSealsOriginalWritersOnlyAfterDTerminal(t *testing.T) {
+	for _, check := range []struct{ file, function, before, after string }{
+		{"lifecycle_service_controller.go", "openLifecycleServiceController", "OpenRootLocalMaterials", "OpenBudgetIssuer"},
+		{"lifecycle_material_purge.go", "registerLocalServiceMaterials", "observeWholeWriterScopesAfterDTerminal", "SealLocalMaterials"},
+		{"lifecycle_fixed_host.go", "PurgeTemporaryCopies", "registerLocalServiceMaterials", "purge"},
+	} {
+		calls := preBComparisonProductionCalls(t, check.file, check.function)
+		before, after := -1, -1
+		for i, name := range calls {
+			if name == check.before {
+				before = i
+			}
+			if name == check.after {
+				after = i
+			}
+		}
+		if before < 0 || after <= before {
+			t.Fatal("native material order lost", check.function, before, after)
+		}
+	}
+	if new(lifecycleFixedHost).registerLocalServiceMaterials(t.Context(), lifecycleRequest{}, new(lifecycleBatchMaterials)) == nil {
+		t.Fatal("absent accepted owner and D terminal permitted local sealing")
+	}
+}
 func TestMaterialDirectoryDeletesOnlyExactRegisteredBodies(t *testing.T) {
 	root := t.TempDir()
 	if err := os.Chmod(root, 0700); err != nil {
