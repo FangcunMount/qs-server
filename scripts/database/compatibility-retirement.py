@@ -1731,7 +1731,7 @@ def live_lifecycle(args, directory):
         "target_hash", "target_count", "complete", "execution_allowed", "drop_ready",
         "archive_binding_complete", "recovery_attempted", "recovery_complete", "acceptance_complete",
         "purge_complete", "error_category", "required_adapters", "isolated_content_restore_complete", "restore_elapsed_millis")
-    fields(result, required, ("recovery_error_category", "mysql_recovery_non_target_sha256", "source_copy_intent_sha256"))
+    fields(result, required, ("recovery_error_category", "mysql_recovery_non_target_sha256", "source_copy_intent_sha256", "preparation_restore_zero_sha256"))
     if (result["format_version"] != 1 or result["kind"] != "compatibility_retirement_lifecycle_result" or
         result["operation"] != args.operation or result["source_sha"] != args.actual_source_sha or
         result["original_source_sha"] != request["original_source_sha"] or result["operation_id"] != args.operation_id or
@@ -1750,6 +1750,10 @@ def live_lifecycle(args, directory):
         token(result["mysql_recovery_non_target_sha256"], HASH)
     if "source_copy_intent_sha256" in result:
         token(result["source_copy_intent_sha256"], HASH)
+        if args.operation != "prepare":
+            fail("lifecycle_native_receipt_binding_rejected")
+    if "preparation_restore_zero_sha256" in result:
+        token(result["preparation_restore_zero_sha256"], HASH)
         if args.operation != "prepare":
             fail("lifecycle_native_receipt_binding_rejected")
     if type(result["restore_elapsed_millis"]) is not int or not 0 <= result["restore_elapsed_millis"] <= 600000:
@@ -2135,7 +2139,7 @@ def main(argv=None):
               "manifest_hash": "hash64", "target_hash": "hash64", "target_count": "uint",
               "kind": frozenset({"compatibility_retirement_lifecycle_result", "readonly_prepare_facts_observation", "readonly_host_writer_scope_observation", "readonly_db_writer_census_observation"}),
               "original_source_sha": "sha40", "manifest_sha256": "hash64", "request_sha256": "hash64", "archive_sha256": "hash64_or_empty",
-              "isolated_content_restore_complete": "bool", "restore_elapsed_millis": "uint", "mysql_recovery_non_target_sha256": "hash64", "source_copy_intent_sha256": "hash64",
+              "isolated_content_restore_complete": "bool", "restore_elapsed_millis": "uint", "mysql_recovery_non_target_sha256": "hash64", "source_copy_intent_sha256": "hash64", "preparation_restore_zero_sha256": "hash64",
               "archive_binding_complete": "bool", "recovery_attempted": "bool", "recovery_complete": "bool",
               "acceptance_complete": "bool", "purge_complete": "bool", "required_adapters": [LIFECYCLE_ADAPTERS],
               "recovery_error_category": frozenset({receipt.get("recovery_error_category", "none")}),

@@ -148,7 +148,7 @@ def derive_request(raw, approval, current_run):
         reject("window_tool_template_hash_rejected")
     r = decode(raw)
     required = ("format_version", "kind", "tool_source_sha", "original_source_sha", "operation_id", "actual_run_id", "manifest_sha256", "archive_directory", "window_directory", "journal_directory", "archive_approval", "recovery")
-    optional = ("source_directory", "restore_engines", "source_file_sha256", "service_control", "resume", "resume_kind", "deployment_control", "final_history", "writer_control", "source_copy_intent", "historical_write_report")
+    optional = ("source_directory", "restore_engines", "source_file_sha256", "service_control", "resume", "resume_kind", "deployment_control", "final_history", "writer_control", "source_copy_intent", "historical_write_report", "preparation_restore_zero")
     exact(r, required, optional)
     if type(r["format_version"]) is not int or r["format_version"] != 1 or r["kind"] != "compatibility_retirement_lifecycle_request" or r["tool_source_sha"] != approval["tool_source_sha"] or r["original_source_sha"] != approval["original_source_sha"] or r["operation_id"] != approval["operation_id"] or r["actual_run_id"] != "" or r["manifest_sha256"] != approval["manifest_sha256"]:
         reject("window_tool_template_binding_rejected")
@@ -163,7 +163,7 @@ def derive_request(raw, approval, current_run):
     result = copy.deepcopy(r)
     result["actual_run_id"] = current_run
     if approval["stage"] == "prepare":
-        if any(key in r for key in ("resume", "resume_kind", "service_control", "deployment_control", "final_history", "writer_control", "source_copy_intent", "historical_write_report")) or q["archive_sha256"] != "":
+        if any(key in r for key in ("resume", "resume_kind", "service_control", "deployment_control", "final_history", "writer_control", "source_copy_intent", "historical_write_report", "preparation_restore_zero")) or q["archive_sha256"] != "":
             reject("window_tool_prepare_effect_fields_rejected")
     if "writer_control" in r:
         exact(r["writer_control"], ("workflow_scope_sha256",))
@@ -186,6 +186,16 @@ def derive_request(raw, approval, current_run):
         run = batch[len(prefix):] if batch.startswith(prefix) else ""
         token(run, RUN)
         if run in (current_run, approval["original_run_id"]) or path != str(Path("/opt/backups/qs-server/compatibility-retirement-root-prepare", batch, "source-copy.intent.private.json")):
+            reject("window_tool_source_copy_intent_rejected")
+    if "preparation_restore_zero" in r:
+        value=r["preparation_restore_zero"]
+        exact(value,("path","sha256"));token(value["sha256"],HASH)
+        if "source_copy_intent" not in r or type(value["path"]) is not str:
+            reject("window_tool_source_copy_intent_rejected")
+        intent=Path(r["source_copy_intent"]["path"])
+        batch=intent.parent.name
+        run=batch[len(approval["operation_id"])+1:]
+        if value["path"]!=str(intent.parent/("lifecycle-restore-"+run+".zero.private.json")):
             reject("window_tool_source_copy_intent_rejected")
     if "historical_write_report" in r:
         value=r["historical_write_report"]
@@ -687,7 +697,7 @@ def validate_native(raw, exit_code, approval, current_run, derived_hash):
         if n != {"format_version":1,"complete":False,"execution_allowed":False,"drop_ready":False,"error_category":"window_tool_root_native_call_rejected"} or exit_code == 0:
             reject("window_tool_native_output_rejected")
         return n
-    exact(n, NATIVE_REQUIRED, ("recovery_error_category", "mysql_recovery_non_target_sha256", "source_copy_intent_sha256"))
+    exact(n, NATIVE_REQUIRED, ("recovery_error_category", "mysql_recovery_non_target_sha256", "source_copy_intent_sha256", "preparation_restore_zero_sha256"))
     if type(n["format_version"]) is not int or n["format_version"] != 1 or n["source_sha"] != approval["tool_source_sha"] or n["operation_id"] != approval["operation_id"] or n["run_id"] != current_run or n["operation"] != approval["stage"] or n["request_sha256"] != derived_hash or n["target_hash"] != TARGET or type(n["target_count"]) is not int or n["target_count"] != 4:
         reject("window_tool_native_binding_rejected")
     if any(type(n[k]) is not bool for k in BOOLS) or n["execution_allowed"] is not False or n["drop_ready"] is not False or type(n["required_adapters"]) is not list or len(n["required_adapters"]) > len(ADAPTERS) or set(n["required_adapters"]) - ADAPTERS:
@@ -705,6 +715,10 @@ def validate_native(raw, exit_code, approval, current_run, derived_hash):
         token(n["mysql_recovery_non_target_sha256"], HASH)
     if "source_copy_intent_sha256" in n:
         token(n["source_copy_intent_sha256"], HASH)
+        if approval["stage"] != "prepare":
+            reject("window_tool_native_binding_rejected")
+    if "preparation_restore_zero_sha256" in n:
+        token(n["preparation_restore_zero_sha256"], HASH)
         if approval["stage"] != "prepare":
             reject("window_tool_native_binding_rejected")
     if type(n["restore_elapsed_millis"]) is not int or not 0 <= n["restore_elapsed_millis"] <= 600000 or n["complete"] != (exit_code == 0 and n["error_category"] == "none") or approval["stage"] == "prepare" and n["complete"] and not n["isolated_content_restore_complete"]:
@@ -726,7 +740,7 @@ def emit(result, secrets):
     native_schema = {"format_version":"uint", "kind":frozenset({"compatibility_retirement_lifecycle_result"}), "operation":frozenset(STAGES),
         "source_sha":"sha40", "original_source_sha":"hash64_or_empty", "operation_id":"run_id", "run_id":"run_id", "manifest_sha256":"hash64_or_empty",
         "request_sha256":"hash64", "archive_sha256":"hash64_or_empty", "target_hash":"hash64", "target_count":"uint",
-        **{k:"bool" for k in BOOLS}, "restore_elapsed_millis":"uint", "mysql_recovery_non_target_sha256":"hash64", "source_copy_intent_sha256":"hash64",
+        **{k:"bool" for k in BOOLS}, "restore_elapsed_millis":"uint", "mysql_recovery_non_target_sha256":"hash64", "source_copy_intent_sha256":"hash64", "preparation_restore_zero_sha256":"hash64",
         "required_adapters":[ADAPTERS], "error_category":PUBLIC_ERRORS, "recovery_error_category":PUBLIC_ERRORS}
     # Preserve the existing transport: original source uses a 40-character SHA,
     # with empty permitted only for the actual compile-time preflight rejection.

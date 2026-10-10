@@ -96,7 +96,7 @@ func decodeLifecycleStagingRequest(raw []byte) (lifecycleRequest, error) {
 	if json.Unmarshal(raw, &fields) != nil {
 		return r, lifecycleError("lifecycle_staging_request_rejected")
 	}
-	for _, name := range []string{"resume", "resume_kind", "service_control", "deployment_control", "final_history", "writer_control", "source_copy_intent", "historical_write_report"} {
+	for _, name := range []string{"resume", "resume_kind", "service_control", "deployment_control", "final_history", "writer_control", "source_copy_intent", "historical_write_report", "preparation_restore_zero"} {
 		if _, exists := fields[name]; exists {
 			return r, lifecycleError("lifecycle_staging_request_rejected")
 		}
@@ -473,6 +473,179 @@ type lifecycleSourceCopyIntent struct {
 	PurgeRequired          bool              `json:"purge_after_acceptance_required"`
 }
 
+type lifecyclePreparationRestoreEngine struct {
+	Kind        string   `json:"kind"`
+	Owner       string   `json:"owner"`
+	ContainerID string   `json:"container_id"`
+	ImageID     string   `json:"image_id"`
+	Namespace   string   `json:"namespace"`
+	Volumes     []string `json:"volumes"`
+}
+type lifecyclePreparationRestoreMaterial struct {
+	Name   string `json:"name"`
+	SHA256 string `json:"sha256"`
+	Bytes  int64  `json:"bytes"`
+	UID    uint32 `json:"uid"`
+	GID    uint32 `json:"gid"`
+	Device uint64 `json:"device"`
+	Inode  uint64 `json:"inode"`
+	Mode   uint32 `json:"mode"`
+}
+type lifecyclePreparationRestoreZero struct {
+	FormatVersion     int                                   `json:"format_version"`
+	Kind              string                                `json:"kind"`
+	OriginalSourceSHA string                                `json:"original_source_sha"`
+	ToolSourceSHA     string                                `json:"tool_source_sha"`
+	OperationID       string                                `json:"operation_id"`
+	OriginalRunID     string                                `json:"original_run_id"`
+	ActualRunID       string                                `json:"actual_run_id"`
+	ManifestSHA256    string                                `json:"manifest_sha256"`
+	ArchiveSHA256     string                                `json:"archive_sha256"`
+	RequestSHA256     string                                `json:"request_sha256"`
+	ElapsedMillis     int64                                 `json:"elapsed_millis"`
+	Engines           []lifecyclePreparationRestoreEngine   `json:"engines"`
+	Files             []lifecyclePreparationRestoreMaterial `json:"files"`
+}
+type lifecyclePreparationRestoreIntent struct {
+	FormatVersion     int               `json:"format_version"`
+	Kind              string            `json:"kind"`
+	OriginalSourceSHA string            `json:"original_source_sha"`
+	ToolSourceSHA     string            `json:"tool_source_sha"`
+	OperationID       string            `json:"operation_id"`
+	ActualRunID       string            `json:"actual_run_id"`
+	ManifestSHA256    string            `json:"manifest_sha256"`
+	ArchiveSHA256     string            `json:"archive_sha256"`
+	Namespace         string            `json:"namespace"`
+	Owner             string            `json:"owner"`
+	ContainerName     string            `json:"container_name"`
+	ImageID           string            `json:"image_id"`
+	Architecture      string            `json:"architecture"`
+	Labels            map[string]string `json:"labels"`
+	ContainerLabels   map[string]string `json:"container_labels"`
+	Volumes           []string          `json:"volumes"`
+	ToolSHA256        string            `json:"tool_sha256"`
+	Network           string            `json:"network"`
+	DropAuthority     bool              `json:"drop_authority"`
+	PurgeRequired     bool              `json:"purge_after_acceptance_required"`
+}
+type lifecyclePreparationRestoreCreated struct {
+	ContainerID   string `json:"container_id"`
+	Owner         string `json:"owner"`
+	OperationID   string `json:"operation_id"`
+	ActualRunID   string `json:"actual_run_id"`
+	DropAuthority bool   `json:"drop_authority"`
+}
+type lifecyclePreparationRestoreRegistration struct {
+	FormatVersion        int    `json:"format_version"`
+	Kind                 string `json:"kind"`
+	OriginalSourceSHA    string `json:"original_source_sha"`
+	ToolSourceSHA        string `json:"tool_source_sha"`
+	OperationID          string `json:"operation_id"`
+	OriginalRunID        string `json:"original_run_id"`
+	ActualRunID          string `json:"actual_run_id"`
+	ManifestSHA256       string `json:"manifest_sha256"`
+	ArchiveSHA256        string `json:"archive_sha256"`
+	Namespace            string `json:"namespace"`
+	MySQLOriginalUUID    string `json:"mysql_original_server_uuid_sha256"`
+	MySQLRestoreUUID     string `json:"mysql_restore_server_uuid_sha256"`
+	MongoOriginalProcess string `json:"mongodb_original_process_sha256"`
+	MongoRestoreProcess  string `json:"mongodb_restore_process_sha256"`
+	PurgeRequired        bool   `json:"purge_after_acceptance_required"`
+	DropAuthority        bool   `json:"drop_authority"`
+}
+
+// Exact native producer members only. The same-process preparation supplies its
+// real engines; a later host may reopen approved unchanged metadata, but cannot
+// deserialize either an engine owner or a purge capability from this receipt.
+func registerLifecyclePreparationRestoreMetadata(ctx context.Context, d *lifecycleMaterialDirectory, z *lifecyclePreparationRestoreZero, toolHash, architecture string, uid uint32, originalHashes map[string]string) ([]lifecyclePreparationRestoreMaterial, error) {
+	if ctx == nil || ctx.Err() != nil || d == nil || z == nil || len(z.Engines) != 2 || len(z.Files) != 0 && len(z.Files) != 5 || len(z.Files) == 0 && originalHashes == nil || originalHashes != nil && len(originalHashes) != 5 || architecture != "amd64" && architecture != "arm64" {
+		return nil, lifecycleError("lifecycle_preparation_release_receipt_rejected")
+	}
+	var files []lifecyclePreparationRestoreMaterial
+	read := func(name string, value any) error {
+		index := len(files)
+		hash := ""
+		if originalHashes != nil {
+			hash = originalHashes[name]
+			if !hashRE.MatchString(hash) {
+				return lifecycleError("lifecycle_preparation_release_receipt_rejected")
+			}
+		}
+		if len(z.Files) == 5 {
+			if z.Files[index].Name != name || !hashRE.MatchString(z.Files[index].SHA256) {
+				return lifecycleError("lifecycle_preparation_release_receipt_rejected")
+			}
+			if hash != "" && hash != z.Files[index].SHA256 {
+				return lifecycleError("lifecycle_preparation_release_receipt_rejected")
+			}
+			hash = z.Files[index].SHA256
+		}
+		raw, err := readLifecycleProducerJSON(d, name, hash, uid, 256<<10, value)
+		if err != nil || decodeLifecycleClosedProducer(raw, value) != nil {
+			return lifecycleError("lifecycle_preparation_release_receipt_rejected")
+		}
+		f := d.files[name]
+		st, ok := infoStat(f.info)
+		if !ok || st.Ino == 0 || f.info.Size() < 1 || f.info.Size() > 256<<10 {
+			return lifecycleError("lifecycle_preparation_release_receipt_rejected")
+		}
+		member := lifecyclePreparationRestoreMaterial{name, f.hash, f.info.Size(), st.Uid, st.Gid, uint64(st.Dev), uint64(st.Ino), uint32(f.info.Mode().Perm())}
+		if len(z.Files) == 5 && member != z.Files[index] {
+			return lifecycleError("lifecycle_preparation_release_receipt_rejected")
+		}
+		files = append(files, member)
+		return nil
+	}
+	for index, engine := range z.Engines {
+		kind := "mysql"
+		volumes := []string{"qs-retirement-data-" + engine.Owner}
+		if index == 1 {
+			kind = "mongodb"
+			volumes = append(volumes, "qs-retirement-config-"+engine.Owner)
+		}
+		owner, err := hex.DecodeString(engine.Owner)
+		namespace := "qs_retirement_restore_" + digestRaw([]byte(z.OriginalSourceSHA + "\n" + z.OperationID + "\n" + z.ActualRunID + "\n" + z.ManifestSHA256))[:24]
+		if err != nil || len(owner) != 16 || engine.Kind != kind || !hashRE.MatchString(engine.ContainerID) || !strings.HasPrefix(engine.ImageID, "sha256:") || !hashRE.MatchString(strings.TrimPrefix(engine.ImageID, "sha256:")) || !reflect.DeepEqual(engine.Volumes, volumes) || engine.Namespace != namespace || index == 1 && (engine.Owner == z.Engines[0].Owner || engine.ContainerID == z.Engines[0].ContainerID || engine.Namespace != z.Engines[0].Namespace) {
+			return nil, lifecycleError("lifecycle_preparation_release_receipt_rejected")
+		}
+		labels := map[string]string{"codex.task": "qs-compatibility-retirement", "codex.owner": engine.Owner, "qs.retirement.operation": z.OperationID, "qs.retirement.run": z.ActualRunID}
+		var intent lifecyclePreparationRestoreIntent
+		if err = read("restore-"+engine.Owner+".intent.private.json", &intent); err != nil {
+			return nil, err
+		}
+		if intent.FormatVersion != 1 || intent.Kind != "temporary_network_none_restore_intent" || intent.OriginalSourceSHA != z.OriginalSourceSHA || intent.ToolSourceSHA != z.ToolSourceSHA || intent.OperationID != z.OperationID || intent.ActualRunID != z.ActualRunID || intent.ManifestSHA256 != z.ManifestSHA256 || intent.ArchiveSHA256 != z.ArchiveSHA256 || intent.Namespace != engine.Namespace || intent.Owner != engine.Owner || intent.ContainerName != "qs-retirement-restore-"+engine.Owner || intent.ImageID != engine.ImageID || intent.Architecture != architecture || !reflect.DeepEqual(intent.Labels, labels) || !reflect.DeepEqual(intent.Volumes, engine.Volumes) || !hashRE.MatchString(intent.ToolSHA256) || toolHash != "" && intent.ToolSHA256 != toolHash || intent.Network != "none" || intent.DropAuthority || !intent.PurgeRequired {
+			return nil, lifecycleError("lifecycle_preparation_release_receipt_rejected")
+		}
+		for name, value := range labels {
+			if intent.ContainerLabels[name] != value {
+				return nil, lifecycleError("lifecycle_preparation_release_receipt_rejected")
+			}
+		}
+		if f := d.files["restore-native"]; f != nil {
+			if f.hash != intent.ToolSHA256 {
+				return nil, lifecycleError("lifecycle_preparation_release_receipt_rejected")
+			}
+		} else if err = d.register("restore-native", intent.ToolSHA256, uid, 0700); err != nil {
+			return nil, err
+		}
+		var created lifecyclePreparationRestoreCreated
+		if err = read("restore-"+engine.Owner+".created.private.json", &created); err != nil {
+			return nil, err
+		}
+		if created.ContainerID != engine.ContainerID || created.Owner != engine.Owner || created.OperationID != z.OperationID || created.ActualRunID != z.ActualRunID || created.DropAuthority {
+			return nil, lifecycleError("lifecycle_preparation_release_receipt_rejected")
+		}
+	}
+	var registration lifecyclePreparationRestoreRegistration
+	if err := read("lifecycle-restore-"+z.ActualRunID+".registration.private.json", &registration); err != nil {
+		return nil, err
+	}
+	if registration.FormatVersion != 1 || registration.Kind != "temporary_isolated_restore_registration" || registration.OriginalSourceSHA != z.OriginalSourceSHA || registration.ToolSourceSHA != z.ToolSourceSHA || registration.OperationID != z.OperationID || registration.OriginalRunID != z.OriginalRunID || registration.ActualRunID != z.ActualRunID || registration.ManifestSHA256 != z.ManifestSHA256 || registration.ArchiveSHA256 != z.ArchiveSHA256 || registration.Namespace != z.Engines[0].Namespace || !hashRE.MatchString(registration.MySQLOriginalUUID) || !hashRE.MatchString(registration.MySQLRestoreUUID) || registration.MySQLOriginalUUID == registration.MySQLRestoreUUID || !hashRE.MatchString(registration.MongoOriginalProcess) || !hashRE.MatchString(registration.MongoRestoreProcess) || registration.MongoOriginalProcess == registration.MongoRestoreProcess || !registration.PurgeRequired || registration.DropAuthority {
+		return nil, lifecycleError("lifecycle_preparation_release_receipt_rejected")
+	}
+	return files, nil
+}
+
 type lifecycleOriginalRootToolIntent struct {
 	FormatVersion  int    `json:"format_version"`
 	Kind           string `json:"kind"`
@@ -497,6 +670,15 @@ func lifecycleSourceCopyReferenceValid(r lifecycleRequest) bool {
 	root := filepath.Dir(r.SourceCopyIntent.Path)
 	run := strings.TrimPrefix(filepath.Base(root), r.OperationID+"-")
 	return runRE.MatchString(run) && run != r.ActualRunID && run != r.Approval.RunID && r.SourceCopyIntent.Path == filepath.Join(lifecycleRootBatch(r.OperationID, run), "source-copy.intent.private.json")
+}
+
+func lifecyclePreparationRestoreReferenceValid(r lifecycleRequest) bool {
+	if !lifecycleSourceCopyReferenceValid(r) || r.PreparationRestoreZero == nil || !hashRE.MatchString(r.PreparationRestoreZero.SHA256) {
+		return false
+	}
+	root := filepath.Dir(r.SourceCopyIntent.Path)
+	run := strings.TrimPrefix(filepath.Base(root), r.OperationID+"-")
+	return r.PreparationRestoreZero.Path == filepath.Join(root, "lifecycle-restore-"+run+".zero.private.json")
 }
 
 // Both original root producers write closed, non-null schemas. Source tuples
@@ -610,6 +792,36 @@ func openLifecycleRootStagingMaterialFiles(ctx context.Context, root, invocation
 	original, err = decodeLifecycleStagingRequest(requestBytes)
 	if err != nil || original.FormatVersion != 1 || original.Kind != "compatibility_retirement_lifecycle_request" || original.OperationID != i.OperationID || original.ActualRunID != i.ActualRunID || original.OriginalSourceSHA != i.OriginalSourceSHA || original.ToolSourceSHA != i.ToolSourceSHA || original.ManifestSHA256 != i.ManifestSHA256 || original.Approval != r.Approval || original.Recovery.ArchiveSHA256 != "" || original.Recovery.SourceSHA != i.OriginalSourceSHA || original.Recovery.OperationID != i.OperationID || original.Recovery.OriginalRunID != i.OriginalRunID || original.Recovery.ActualRunID != i.ActualRunID || original.ArchiveDirectory != i.ArchiveDirectory || original.SourceDirectory != filepath.Join("/opt/backups/qs-server/compatibility-retirement", i.OperationID, "inventory-"+i.OriginalRunID) || !reflect.DeepEqual(original.SourceFileSHA256, hashes) {
 		return nil, nil, lifecycleError("lifecycle_staging_original_intent_rejected")
+	}
+	// The standalone producer's native engines are already removed. Its receipt
+	// grants only reopening the six exact metadata files, never engine adoption.
+	if r.PreparationRestoreZero == nil || r.PreparationRestoreZero.Path != filepath.Join(root, "lifecycle-restore-"+i.ActualRunID+".zero.private.json") || !hashRE.MatchString(r.PreparationRestoreZero.SHA256) || original.RestoreEngines == nil {
+		return nil, nil, lifecycleError("lifecycle_preparation_release_receipt_rejected")
+	}
+	var zero lifecyclePreparationRestoreZero
+	zeroRaw, err := readLifecycleProducerJSON(d, filepath.Base(r.PreparationRestoreZero.Path), r.PreparationRestoreZero.SHA256, rootUID, 256<<10, &zero)
+	if err != nil || decodeLifecycleClosedProducer(zeroRaw, &zero) != nil || zero.FormatVersion != 1 || zero.Kind != "original_preparation_isolated_restore_zero" || zero.OriginalSourceSHA != i.OriginalSourceSHA || zero.ToolSourceSHA != i.ToolSourceSHA || zero.OperationID != i.OperationID || zero.OriginalRunID != i.OriginalRunID || zero.ActualRunID != i.ActualRunID || zero.ManifestSHA256 != i.ManifestSHA256 || zero.ArchiveSHA256 != r.Recovery.ArchiveSHA256 || zero.RequestSHA256 != i.RequestSHA256 || zero.ElapsedMillis < 0 || zero.ElapsedMillis > 600000 || len(zero.Files) != 5 || len(zero.Engines) != 2 {
+		return nil, nil, lifecycleError("lifecycle_preparation_release_receipt_rejected")
+	}
+	var originalMembers struct {
+		Files   []json.RawMessage `json:"files"`
+		Engines []json.RawMessage `json:"engines"`
+	}
+	if json.Unmarshal(zeroRaw, &originalMembers) != nil || len(originalMembers.Files) != 5 || len(originalMembers.Engines) != 2 {
+		return nil, nil, lifecycleError("lifecycle_preparation_release_receipt_rejected")
+	}
+	for n := range zero.Files {
+		if decodeLifecycleClosedProducer(originalMembers.Files[n], &zero.Files[n]) != nil {
+			return nil, nil, lifecycleError("lifecycle_preparation_release_receipt_rejected")
+		}
+	}
+	for n := range zero.Engines {
+		if decodeLifecycleClosedProducer(originalMembers.Engines[n], &zero.Engines[n]) != nil || zero.Engines[n].ImageID != []string{original.RestoreEngines.MySQLImageID, original.RestoreEngines.MongoImageID}[n] {
+			return nil, nil, lifecycleError("lifecycle_preparation_release_receipt_rejected")
+		}
+	}
+	if _, err = registerLifecyclePreparationRestoreMetadata(ctx, d, &zero, nativeHash, original.RestoreEngines.Architecture, rootUID, nil); err != nil {
+		return nil, nil, err
 	}
 	child, err := openLifecycleMaterialDirectory(i.SourceStagingDirectory, rootUID)
 	if err != nil {

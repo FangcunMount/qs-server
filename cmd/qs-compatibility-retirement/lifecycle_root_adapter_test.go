@@ -439,7 +439,8 @@ func originalRootStagingMaterialFixture(t *testing.T, windowTool bool) (string, 
 	originalRoot := filepath.Join("/opt/backups/qs-server/compatibility-retirement", approval.OperationID)
 	manifest := []byte("offline frozen manifest")
 	r := lifecycleRequest{FormatVersion: 1, Kind: "compatibility_retirement_lifecycle_request", OriginalSourceSHA: approval.SourceSHA, ToolSourceSHA: strings.Repeat("d", 40), OperationID: approval.OperationID, ActualRunID: "789-1", ManifestSHA256: digestRaw(manifest), Approval: approval, ArchiveDirectory: filepath.Join(originalRoot, "archive"), SourceDirectory: filepath.Join(originalRoot, "inventory-"+approval.RunID), SourceFileSHA256: hashes,
-		Recovery: backup.TargetRecoveryRequest{SourceSHA: approval.SourceSHA, OperationID: approval.OperationID, OriginalRunID: approval.RunID, ActualRunID: "789-1"}}
+		RestoreEngines: &lifecycleRestoreEngines{MySQLImageID: "sha256:" + strings.Repeat("6", 64), MongoImageID: "sha256:" + strings.Repeat("7", 64), Architecture: runtime.GOARCH},
+		Recovery:       backup.TargetRecoveryRequest{SourceSHA: approval.SourceSHA, OperationID: approval.OperationID, OriginalRunID: approval.RunID, ActualRunID: "789-1"}}
 	if writeJSON(filepath.Join(root, "lifecycle-request.json"), r) != nil {
 		t.Fatal("request")
 	}
@@ -483,6 +484,45 @@ func originalRootStagingMaterialFixture(t *testing.T, windowTool bool) (string, 
 	}
 	raw, _ := os.ReadFile(filepath.Join(root, "source-copy.intent.private.json"))
 	r.SourceCopyIntent = &lifecycleFinalFileBinding{Path: filepath.Join(root, "source-copy.intent.private.json"), SHA256: digestRaw(raw)}
+	z := lifecyclePreparationRestoreZero{FormatVersion: 1, Kind: "original_preparation_isolated_restore_zero", OriginalSourceSHA: i.OriginalSourceSHA, ToolSourceSHA: i.ToolSourceSHA, OperationID: i.OperationID, OriginalRunID: i.OriginalRunID, ActualRunID: i.ActualRunID, ManifestSHA256: i.ManifestSHA256, ArchiveSHA256: strings.Repeat("8", 64), RequestSHA256: i.RequestSHA256, ElapsedMillis: 1000}
+	for n, kind := range []string{"mysql", "mongodb"} {
+		owner := strings.Repeat(fmt.Sprint(n+1), 32)
+		engine := lifecyclePreparationRestoreEngine{Kind: kind, Owner: owner, ContainerID: strings.Repeat(fmt.Sprint(n+3), 64), ImageID: []string{r.RestoreEngines.MySQLImageID, r.RestoreEngines.MongoImageID}[n], Namespace: "qs_retirement_restore_" + digestRaw([]byte(i.OriginalSourceSHA + "\n" + i.OperationID + "\n" + i.ActualRunID + "\n" + i.ManifestSHA256))[:24], Volumes: []string{"qs-retirement-data-" + owner}}
+		if n == 1 {
+			engine.Volumes = append(engine.Volumes, "qs-retirement-config-"+owner)
+		}
+		z.Engines = append(z.Engines, engine)
+		labels := map[string]string{"codex.task": "qs-compatibility-retirement", "codex.owner": owner, "qs.retirement.operation": i.OperationID, "qs.retirement.run": i.ActualRunID}
+		intent := lifecyclePreparationRestoreIntent{FormatVersion: 1, Kind: "temporary_network_none_restore_intent", OriginalSourceSHA: i.OriginalSourceSHA, ToolSourceSHA: i.ToolSourceSHA, OperationID: i.OperationID, ActualRunID: i.ActualRunID, ManifestSHA256: i.ManifestSHA256, ArchiveSHA256: z.ArchiveSHA256, Namespace: engine.Namespace, Owner: owner, ContainerName: "qs-retirement-restore-" + owner, ImageID: engine.ImageID, Architecture: runtime.GOARCH, Labels: labels, ContainerLabels: labels, Volumes: engine.Volumes, ToolSHA256: digestRaw([]byte("offline native bytes")), Network: "none", PurgeRequired: true}
+		created := lifecyclePreparationRestoreCreated{ContainerID: engine.ContainerID, Owner: owner, OperationID: i.OperationID, ActualRunID: i.ActualRunID}
+		for _, v := range []struct {
+			name  string
+			value any
+		}{{"restore-" + owner + ".intent.private.json", intent}, {"restore-" + owner + ".created.private.json", created}} {
+			if writeJSON(filepath.Join(root, v.name), v.value) != nil {
+				t.Fatal("restore metadata")
+			}
+			raw, _ := os.ReadFile(filepath.Join(root, v.name))
+			info, _ := os.Stat(filepath.Join(root, v.name))
+			st, _ := infoStat(info)
+			z.Files = append(z.Files, lifecyclePreparationRestoreMaterial{v.name, digestRaw(raw), info.Size(), st.Uid, st.Gid, uint64(st.Dev), uint64(st.Ino), uint32(info.Mode().Perm())})
+		}
+	}
+	registration := lifecyclePreparationRestoreRegistration{FormatVersion: 1, Kind: "temporary_isolated_restore_registration", OriginalSourceSHA: i.OriginalSourceSHA, ToolSourceSHA: i.ToolSourceSHA, OperationID: i.OperationID, OriginalRunID: i.OriginalRunID, ActualRunID: i.ActualRunID, ManifestSHA256: i.ManifestSHA256, ArchiveSHA256: z.ArchiveSHA256, Namespace: z.Engines[0].Namespace, MySQLOriginalUUID: strings.Repeat("a", 64), MySQLRestoreUUID: strings.Repeat("b", 64), MongoOriginalProcess: strings.Repeat("c", 64), MongoRestoreProcess: strings.Repeat("d", 64), PurgeRequired: true}
+	name := "lifecycle-restore-" + i.ActualRunID + ".registration.private.json"
+	if writeJSON(filepath.Join(root, name), registration) != nil {
+		t.Fatal("restore registration")
+	}
+	raw, _ = os.ReadFile(filepath.Join(root, name))
+	info, _ := os.Stat(filepath.Join(root, name))
+	st, _ := infoStat(info)
+	z.Files = append(z.Files, lifecyclePreparationRestoreMaterial{name, digestRaw(raw), info.Size(), st.Uid, st.Gid, uint64(st.Dev), uint64(st.Ino), uint32(info.Mode().Perm())})
+	name = "lifecycle-restore-" + i.ActualRunID + ".zero.private.json"
+	if writeJSON(filepath.Join(root, name), z) != nil {
+		t.Fatal("zero metadata")
+	}
+	raw, _ = os.ReadFile(filepath.Join(root, name))
+	r.PreparationRestoreZero = &lifecycleFinalFileBinding{Path: filepath.Join(root, name), SHA256: digestRaw(raw)}
 	r.ActualRunID, r.ToolSourceSHA = "999-1", strings.Repeat("9", 40)
 	r.Recovery.ArchiveSHA256 = strings.Repeat("8", 64)
 	return root, invocation, r, hashes
@@ -497,7 +537,7 @@ func TestOriginalRootStagingMaterialHandoffReopensBothActualProducerSchemas(t *t
 				t.Fatal(err)
 			}
 			defer d.close()
-			if len(d.files) != 5 || len(d.children) != 1 || len(d.children["inventory-"+r.Approval.RunID].files) != 7 || window && (peer == nil || len(peer.files) != 3) || !window && peer != nil {
+			if len(d.files) != 11 || len(d.children) != 1 || len(d.children["inventory-"+r.Approval.RunID].files) != 7 || window && (peer == nil || len(peer.files) != 3) || !window && peer != nil {
 				t.Fatal("producer members incomplete")
 			}
 			if peer != nil {
@@ -567,6 +607,120 @@ func TestOriginalRootStagingMaterialHandoffRejectsRebindingAndExtraFiles(t *test
 			}
 			if _, err = os.Stat(filepath.Join(root, "lifecycle-request.json")); err != nil {
 				t.Fatal("rejection purged original")
+			}
+		})
+	}
+}
+
+func TestOriginalPreparationRestoreZeroRejectsUnboundAndChangedProducerMetadata(t *testing.T) {
+	// Actual filesystem/source binding only. No fixture can prove Docker zero or
+	// mint the original producer's same-process native release owner.
+	for _, mutation := range []string{"missing_reference", "wrong_receipt_hash", "missing_zero", "wrong_source", "wrong_run", "wrong_request", "late_budget", "reused_owner", "same_cid", "missing_metadata", "replacement_inode", "wrong_member_hash", "wrong_original_uid", "metadata_wrong_operation", "unknown_receipt_field", "null_member_inode"} {
+		t.Run(mutation, func(t *testing.T) {
+			root, invocation, r, hashes := originalRootStagingMaterialFixture(t, true)
+			raw, _ := os.ReadFile(r.PreparationRestoreZero.Path)
+			var z lifecyclePreparationRestoreZero
+			_ = json.Unmarshal(raw, &z)
+			switch mutation {
+			case "missing_reference":
+				r.PreparationRestoreZero = nil
+			case "wrong_receipt_hash":
+				r.PreparationRestoreZero.SHA256 = strings.Repeat("0", 64)
+			case "missing_zero":
+				_ = os.Remove(r.PreparationRestoreZero.Path)
+			case "wrong_source":
+				z.ToolSourceSHA = strings.Repeat("f", 40)
+			case "wrong_run":
+				z.ActualRunID = r.ActualRunID
+			case "wrong_request":
+				z.RequestSHA256 = strings.Repeat("f", 64)
+			case "late_budget":
+				z.ElapsedMillis = 600001
+			case "reused_owner":
+				z.Engines[1].Owner = z.Engines[0].Owner
+			case "same_cid":
+				z.Engines[1].ContainerID = z.Engines[0].ContainerID
+			case "missing_metadata":
+				_ = os.Remove(filepath.Join(root, z.Files[0].Name))
+			case "replacement_inode":
+				path := filepath.Join(root, z.Files[0].Name)
+				body, _ := os.ReadFile(path)
+				_ = os.Rename(path, path+"-old")
+				_ = os.WriteFile(path, body, 0600)
+				_ = os.Remove(path + "-old")
+			case "wrong_member_hash":
+				z.Files[0].SHA256 = strings.Repeat("f", 64)
+			case "wrong_original_uid":
+				z.Files[0].UID++
+			case "metadata_wrong_operation":
+				path := filepath.Join(root, z.Files[0].Name)
+				body, _ := os.ReadFile(path)
+				var intent lifecyclePreparationRestoreIntent
+				_ = json.Unmarshal(body, &intent)
+				intent.OperationID = "other-1"
+				body, _ = json.Marshal(intent)
+				_ = os.WriteFile(path, body, 0600)
+				info, _ := os.Stat(path)
+				st, _ := infoStat(info)
+				z.Files[0] = lifecyclePreparationRestoreMaterial{z.Files[0].Name, digestRaw(body), info.Size(), st.Uid, st.Gid, uint64(st.Dev), uint64(st.Ino), uint32(info.Mode().Perm())}
+			}
+			if mutation != "missing_reference" && mutation != "wrong_receipt_hash" && mutation != "missing_zero" {
+				raw, _ = json.Marshal(z)
+				if mutation == "unknown_receipt_field" {
+					raw = append(raw[:len(raw)-1], []byte(`,"complete":true}`)...)
+				}
+				if mutation == "null_member_inode" {
+					raw = bytes.Replace(raw, []byte(fmt.Sprintf(`"inode":%d`, z.Files[0].Inode)), []byte(`"inode":null`), 1)
+				}
+				_ = os.WriteFile(r.PreparationRestoreZero.Path, raw, 0600)
+				r.PreparationRestoreZero.SHA256 = digestRaw(raw)
+			}
+			d, peer, err := openLifecycleRootStagingMaterialFiles(context.Background(), root, invocation, r, hashes, uint32(os.Getuid()), uint32(os.Getuid()))
+			if err == nil || d != nil || peer != nil {
+				t.Fatal("unbound preparation metadata admitted")
+			}
+			if _, err = os.Stat(filepath.Join(root, "lifecycle-request.json")); err != nil {
+				t.Fatal("rejection changed source files")
+			}
+		})
+	}
+}
+
+func TestPreparationRestoreMetadataRequiresActualFiveProducerHashes(t *testing.T) {
+	for _, mutation := range []string{"none", "missing_original_producer", "missing_member", "extra_member", "changed_original_hash"} {
+		t.Run(mutation, func(t *testing.T) {
+			root, _, r, _ := originalRootStagingMaterialFixture(t, false)
+			raw, _ := os.ReadFile(r.PreparationRestoreZero.Path)
+			var z lifecyclePreparationRestoreZero
+			_ = json.Unmarshal(raw, &z)
+			originalHashes := map[string]string{}
+			for _, m := range z.Files {
+				originalHashes[m.Name] = m.SHA256
+			}
+			first := z.Files[0].Name
+			z.Files = nil // Native path requires the original write-time producer map.
+			switch mutation {
+			case "missing_original_producer":
+				originalHashes = nil
+			case "missing_member":
+				delete(originalHashes, first)
+			case "extra_member":
+				originalHashes["foreign"] = strings.Repeat("f", 64)
+			case "changed_original_hash":
+				originalHashes[first] = strings.Repeat("f", 64)
+			}
+			d, err := openLifecycleMaterialDirectory(root, uint32(os.Getuid()))
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer d.close()
+			files, err := registerLifecyclePreparationRestoreMetadata(context.Background(), d, &z, digestRaw([]byte("offline native bytes")), runtime.GOARCH, uint32(os.Getuid()), originalHashes)
+			if mutation == "none" {
+				if err != nil || len(files) != 5 {
+					t.Fatal("original producer hashes rejected", err)
+				}
+			} else if err == nil || files != nil {
+				t.Fatal("missing original producer accepted")
 			}
 		})
 	}

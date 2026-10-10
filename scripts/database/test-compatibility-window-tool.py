@@ -94,6 +94,24 @@ class WindowToolMetadata(unittest.TestCase):
             a,n=self.native(stage);n['source_copy_intent_sha256']=value
             with self.subTest(stage=stage,value=value),self.assertRaises(tool.Refused):tool.validate_native(tool.canonical(n),0,a,'22-3','e'*64)
 
+    def test_preparation_restore_zero_is_only_same_approved_prepare_root(self):
+        intent=dict(path='/opt/backups/qs-server/compatibility-retirement-root-prepare/12-1-20-1/source-copy.intent.private.json',sha256='7'*64)
+        value=dict(path=str(Path(intent['path']).parent/'lifecycle-restore-20-1.zero.private.json'),sha256='8'*64)
+        r=self.request();r['source_copy_intent']=intent;r['preparation_restore_zero']=value;a=self.approval(r,'apply')
+        self.assertEqual(tool.decode(tool.derive_request(tool.canonical(r),a,'22-3'))['preparation_restore_zero'],value)
+        for stage,bad in (('prepare',value),('apply',None),('apply',dict(value,complete=True)),('apply',dict(value,sha256='main')),('apply',dict(value,path=value['path'].replace('20-1.zero','21-1.zero')))):
+            r=self.request();r['source_copy_intent']=intent;r['preparation_restore_zero']=bad;a=self.approval(r,stage)
+            with self.subTest(stage=stage,bad=bad),self.assertRaises(tool.Refused):tool.derive_request(tool.canonical(r),a,'22-3')
+        r=self.request();r['preparation_restore_zero']=value;a=self.approval(r,'apply')
+        with self.assertRaises(tool.Refused):tool.derive_request(tool.canonical(r),a,'22-3')
+
+    def test_prepare_restore_zero_transport_is_digest_only(self):
+        a,n=self.native('prepare');n['preparation_restore_zero_sha256']='7'*64
+        self.assertEqual(tool.validate_native(tool.canonical(n),0,a,'22-3','e'*64)['preparation_restore_zero_sha256'],'7'*64)
+        for stage,value in (('prepare','main'),('apply','7'*64),('prepare',None)):
+            a,n=self.native(stage);n['preparation_restore_zero_sha256']=value
+            with self.subTest(stage=stage,value=value),self.assertRaises(tool.Refused):tool.validate_native(tool.canonical(n),0,a,'22-3','e'*64)
+
     def test_historical_material_report_preserves_exact_original_reference_only(self):
         value=dict(path='/opt/backups/qs-server/compatibility-retirement/12-1/history-write-20-1/history.write.json',sha256='7'*64)
         r=self.request();r['historical_write_report']=value;a=self.approval(r,'apply')
