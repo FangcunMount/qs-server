@@ -735,6 +735,8 @@ def credential_names(stage): return ()
 def validate_credentials(value,stage):
  if value!={}: raise ValueError()
 def read_owned(*args): return b''
+def load_fixed_entry_context(*args): return None
+def close_fixed_entry_context(context): pass
 def root_execute(arguments,packet,source_uid,archive_raw):
  print(json.dumps({'actual_fd':sys.stdin.fileno(),'tail':os.read(sys.stdin.fileno(),5).decode()}))
  return 0
@@ -772,11 +774,61 @@ def root_execute(arguments,packet,source_uid,archive_raw):
         self.assertEqual(child.call_args.args[1],{'PATH':'/usr/bin:/bin'});self.assertEqual(child.call_args.kwargs['control'],88)
         packet=tool.decode(child.call_args.kwargs['packet']);self.assertEqual(packet['bindings'][0:2],['prepare','12-1']);self.assertEqual(packet['credentials'],credentials)
         self.assertNotIn('fixture-private-password',str(child.call_args.args[0]));self.assertNotIn('SUDO_PASSWORD',packet['credentials'])
+    def test_context_real_fds_reject_tamper_and_exact_owned_fixture_withdrawal(self):
+        import os,stat,tempfile,types,subprocess
+        from unittest import mock
+        real_path=Path;real_lstat=Path.lstat;real_fstat=os.fstat
+        # Actual files, FDs, hashes, mutation, unlink, modes and fsync. Root UID,
+        # protected ancestors, native result and visudo are substituted ONLY in
+        # this isolated fixture; this is not Linux root/production authorization.
+        def root_stat(value,ancestors=False):
+            fields={name:getattr(value,name) for name in ('st_dev','st_ino','st_uid','st_mode','st_nlink','st_size','st_mtime_ns','st_ctime_ns')};fields['st_uid']=0
+            if ancestors and stat.S_ISDIR(fields['st_mode']):fields['st_mode']&=~0o022
+            return types.SimpleNamespace(**fields)
+        for altered in (True,False):
+            with self.subTest(altered=altered),tempfile.TemporaryDirectory(prefix='qs-owned-entry-withdrawal-') as tmp:
+                root=real_path(tmp).resolve(strict=True);base=root/'libexec';base.mkdir(mode=0o700);rules=root/'sudoers';rules.mkdir(mode=0o700)
+                policy=dict(operation_id='12-1',source_sha='a'*40,native_sha256=dict(amd64='7'*64,arm64='7'*64),wrapper_sha256='d'*64,manifest_sha256='c'*64)
+                bodies={'prepare':b'approved prepare fixture','window':b'approved window fixture'};entries={name:tool.digest(body) for name,body in bodies.items()}
+                for name,body in bodies.items():tool.write_new(base/(entries[name]+'.py'),body,mode=0o555)
+                rule_raw=''.join('deploy ALL=(root) NOPASSWD: /usr/bin/python3 -I '+str(base/(entries[name]+'.py'))+'\n' for name in ('prepare','window')).encode();rule=rules/'qs-retirement-window-scope';tool.write_new(rule,rule_raw,mode=0o440)
+                directory=base/('12-1-'+'a'*40);directory.mkdir(mode=0o700)
+                installed=dict(format_version=1,kind='fixed_deploy_retirement_window_installation',**policy,target_hash=tool.TARGET,entry_sha256=entries,sudoers_sha256=tool.digest(rule_raw),automatic_withdrawal_connected=False)
+                tool.write_new(directory/'policy.json',tool.canonical(installed),mode=0o400)
+                def mapped(value):
+                    if value=='/usr/local/libexec/qs-retirement':return base
+                    if value=='/etc/sudoers.d/qs-retirement-window-scope':return rule
+                    return real_path(value)
+                with mock.patch.object(tool,'Path',side_effect=mapped),mock.patch.object(real_path,'lstat',lambda path:root_stat(real_lstat(path),True)),mock.patch.object(tool.os,'fstat',lambda fd:root_stat(real_fstat(fd))),mock.patch.object(tool.os,'getuid',return_value=0),mock.patch.object(tool.os,'geteuid',return_value=0),mock.patch.object(tool,'validate_native',return_value=dict(complete=True,acceptance_complete=True,purge_complete=True,error_category='none')),mock.patch.object(tool.subprocess,'run',return_value=subprocess.CompletedProcess([],0)) as visudo:
+                    context=tool.load_fixed_entry_context(policy,base/(entries['window']+'.py'))
+                    try:
+                        if altered:
+                            os.chmod(base/(entries['window']+'.py'),0o600);(base/(entries['window']+'.py')).write_bytes(b'changed actual owned bytes')
+                            with self.assertRaises(tool.Refused):tool.revoke_fixed_entries_after_native(b'fixture-owned-result',0,dict(stage='apply',operation_id='12-1',tool_source_sha='a'*40,manifest_sha256='c'*64),'22-1','b'*64,context)
+                            visudo.assert_not_called();self.assertTrue(rule.exists());self.assertTrue((directory/'policy.json').exists())
+                        else:
+                            receipt=tool.revoke_fixed_entries_after_native(b'fixture-owned-result',0,dict(stage='apply',operation_id='12-1',tool_source_sha='a'*40,manifest_sha256='c'*64),'22-1','b'*64,context)
+                            self.assertFalse(rule.exists());self.assertFalse(directory.exists());self.assertTrue(receipt['entries_zero']);self.assertEqual(visudo.call_count,2)
+                            stored=base/('12-1-'+'a'*40+'-22-1.withdrawal.receipt.json');self.assertEqual(tool.decode(stored.read_bytes()),receipt);self.assertEqual(stat.S_IMODE(real_lstat(stored).st_mode),0o400)
+                    finally:tool.close_fixed_entry_context(context)
+    def test_readonly_owned_policy_context_is_not_root_installation_proof(self):
+        import os,tempfile
+        from unittest import mock
+        # Real caller identity is enough to reject before accepting any path.
+        if os.getuid()==0:self.skipTest('this negative case requires actual nonroot uid')
+        with mock.patch.object(tool.Path,'lstat') as read,self.assertRaises(tool.Refused):
+            tool.load_fixed_entry_context(dict(operation_id='12-1',source_sha='a'*40),Path('/untrusted/window.py'))
+        read.assert_not_called()
+    def test_successful_saved_receipt_cannot_supply_a_json_context(self):
+        from unittest import mock
+        with mock.patch.object(tool.os,'getuid',return_value=0),mock.patch.object(tool.os,'geteuid',return_value=0),mock.patch.object(tool,'validate_native',return_value=dict(complete=True,acceptance_complete=True,purge_complete=True,error_category='none')),mock.patch.object(tool.Path,'unlink') as remove,self.assertRaises(tool.Refused):
+            tool.revoke_fixed_entries_after_native(b'fixture',0,{'stage':'apply'},'12-1','a'*64,{'materials':[]})
+        remove.assert_not_called()
     def test_revoke_without_known_native_success_refuses_before_any_file_effect(self):
         from unittest import mock
-        with mock.patch.object(tool.os,'getuid',return_value=0),mock.patch.object(tool.os,'geteuid',return_value=0),mock.patch.object(tool,'_fixed_entry_revoke_program') as generate:
+        with mock.patch.object(tool.os,'getuid',return_value=0),mock.patch.object(tool.os,'geteuid',return_value=0),mock.patch.object(tool.os,'unlink') as unlink:
             for code,stage in ((1,'purge'),(0,'apply'),(0,'purge')):
-                with self.subTest(code=code,stage=stage),self.assertRaises(tool.Refused): tool.revoke_fixed_entries_after_native(b'{}',code,{'stage':stage},'12-1','a'*64,['b'*64,'c'*64],'d'*64)
-        generate.assert_not_called()
+                with self.subTest(code=code,stage=stage),self.assertRaises(tool.Refused): tool.revoke_fixed_entries_after_native(b'{}',code,{'stage':stage},'12-1','a'*64,None)
+        unlink.assert_not_called()
 
 if __name__=='__main__':unittest.main()

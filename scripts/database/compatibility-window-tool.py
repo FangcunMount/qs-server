@@ -749,6 +749,9 @@ def root_execute(arguments, packet, source_uid, archive_raw):
     # manager imports no completion/permit or guessed production authority.
     code, raw = owned_process([str(native), "--mode", mode, "--request", str(invocation / "lifecycle-request.json"),
                "--request-hash", digest(derived), "--operation-id", operation, "--run-id", current_run], environment, control=sys.stdin.fileno(), owner=owner)
+    context=globals().get('_fixed_entry_context')
+    if context is not None and stage in ('apply','purge') and code==0:
+        revoke_fixed_entries_after_native(raw,code,a,current_run,digest(derived),context)
     sys.stdout.buffer.write(raw)
     sys.stdout.buffer.flush()
     return code
@@ -1158,56 +1161,95 @@ def fixed_window_entry_program(operation, source, native_hashes, wrapper_hash, m
  if approved['tool_source_sha']!=POLICY['source_sha'] or approved['tool_binary_sha256']!=POLICY['native_sha256']: raise ValueError()
  names=namespace['credential_names'](stage)"""
     program=program.replace(marker,guard)
+    program=program.replace(" approved=namespace['approve']"," namespace['_fixed_entry_context']=namespace['load_fixed_entry_context'](POLICY,Path(sys.argv[0]))\n approved=namespace['approve']")
+    program=program.replace(" raise SystemExit(namespace['root_execute'](arguments,packet,source_uid,archive_raw))"," try:\n  raise SystemExit(namespace['root_execute'](arguments,packet,source_uid,archive_raw))\n finally:\n  namespace['close_fixed_entry_context'](namespace.get('_fixed_entry_context'))")
     program=program.replace(' if len(raw)>32768: raise ValueError()'," if len(raw)>32768 or not raw.endswith(b'\\n'): raise ValueError()")
     return program.encode()
 
 
 
-def _fixed_entry_revoke_program(entry_hashes, rule_hash):
-    """Exact administrator withdrawal; no arbitrary pathname or delete input."""
-    if type(entry_hashes) is not list or len(entry_hashes)!=2 or len(set(entry_hashes))!=2: reject()
-    for value in [*entry_hashes,rule_hash]: token(value,HASH)
-    policy=dict(entries=entry_hashes,rule_sha256=rule_hash)
-    return (r'''import hashlib,os,stat,subprocess,sys
-from pathlib import Path
-POLICY = @POLICY@
-if len(sys.argv)!=1 or os.getuid()!=0 or os.geteuid()!=0: raise SystemExit(1)
-base=Path('/usr/local/libexec/qs-retirement')
-rule=Path('/etc/sudoers.d/qs-retirement-window-scope')
-identity=lambda v:(v.st_dev,v.st_ino,v.st_uid,v.st_mode,v.st_nlink,v.st_size,v.st_mtime_ns,v.st_ctime_ns)
-held=[]
-try:
- for path,expected,mode in [(rule,POLICY['rule_sha256'],0o440)]+[(base/(v+'.py'),v,0o555) for v in POLICY['entries']]:
-  for parent in path.parents:
-   st=parent.lstat()
-   if not stat.S_ISDIR(st.st_mode) or st.st_uid!=0 or stat.S_IMODE(st.st_mode)&0o022: raise ValueError()
-  fd=os.open(path,os.O_RDONLY|os.O_NOFOLLOW|os.O_NONBLOCK);held.append((path,fd))
-  before=os.fstat(fd);raw=os.read(fd,65537)
-  if not stat.S_ISREG(before.st_mode) or before.st_uid!=0 or before.st_nlink!=1 or stat.S_IMODE(before.st_mode)!=mode or not 0<len(raw)<=65536 or hashlib.sha256(raw).hexdigest()!=expected or identity(before)!=identity(os.fstat(fd)) or identity(before)!=identity(path.lstat()): raise ValueError()
- subprocess.run(['/usr/sbin/visudo','-c'],check=True,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
- for path,fd in held:
-  if identity(os.fstat(fd))!=identity(path.lstat()): raise ValueError()
-  path.unlink();directory=os.open(path.parent,os.O_RDONLY|os.O_DIRECTORY|os.O_NOFOLLOW)
-  try: os.fsync(directory)
-  finally: os.close(directory)
-  if path==rule: subprocess.run(['/usr/sbin/visudo','-c'],check=True,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
- print('{"kind":"fixed_retirement_entries_revoked","entries_zero":true}')
-finally:
- for _,fd in held: os.close(fd)
-'''.replace('@POLICY@',repr(policy))).encode()
+
+def close_fixed_entry_context(context):
+    if context is not None:
+        for _,fd,_,_ in context['materials']: os.close(fd)
+        context['materials'].clear()
 
 
+def load_fixed_entry_context(policy, self_path):
+    """Actual installed root objects, never a path or permit from the packet."""
+    if os.getuid()!=0 or os.geteuid()!=0: reject('window_tool_installation_context_rejected')
+    identity=lambda v:(v.st_dev,v.st_ino,v.st_uid,v.st_mode,v.st_nlink,v.st_size,v.st_mtime_ns,v.st_ctime_ns)
+    operation,source=policy['operation_id'],policy['source_sha'];token(operation,RUN);token(source,SHA)
+    base=Path('/usr/local/libexec/qs-retirement');directory=base/(operation+'-'+source)
+    protected_directory(directory)
+    for parent in directory.parents:
+        st=parent.lstat()
+        if not stat.S_ISDIR(st.st_mode) or st.st_uid!=0 or stat.S_IMODE(st.st_mode)&0o022: reject('window_tool_installation_context_rejected')
+    if set(os.listdir(directory))!={'policy.json'}: reject('window_tool_installation_context_rejected')
+    context={'materials':[],'directory':directory,'operation_id':operation,'source_sha':source}
+    context['self']=context
+    try:
+        def hold(path,mode,expected=None):
+            fd=os.open(path,os.O_RDONLY|os.O_NOFOLLOW|os.O_NONBLOCK)
+            before=os.fstat(fd);raw=os.read(fd,65537)
+            context['materials'].append((path,fd,before,digest(raw)))
+            if not stat.S_ISREG(before.st_mode) or before.st_uid!=0 or before.st_nlink!=1 or stat.S_IMODE(before.st_mode)!=mode or not 0<len(raw)<=65536 or identity(before)!=identity(os.fstat(fd)) or identity(before)!=identity(path.lstat()) or expected is not None and digest(raw)!=expected: reject('window_tool_installation_context_rejected')
+            return raw
+        raw=hold(directory/'policy.json',0o400);installed=decode(raw)
+        exact(installed,('format_version','kind','operation_id','source_sha','manifest_sha256','target_hash','native_sha256','wrapper_sha256','entry_sha256','sudoers_sha256','automatic_withdrawal_connected'))
+        if type(installed['format_version']) is not int or installed['format_version']!=1 or installed['kind']!='fixed_deploy_retirement_window_installation' or installed['target_hash']!=TARGET or type(installed['automatic_withdrawal_connected']) is not bool: reject('window_tool_installation_context_rejected')
+        for key in ('operation_id','source_sha','manifest_sha256','native_sha256','wrapper_sha256'):
+            if installed[key]!=policy[key]: reject('window_tool_installation_context_rejected')
+        exact(installed['entry_sha256'],('prepare','window'))
+        entries=installed['entry_sha256']
+        for value in [*entries.values(),installed['sudoers_sha256']]:token(value,HASH)
+        if entries['prepare']==entries['window'] or self_path!=base/(entries['window']+'.py'): reject('window_tool_installation_context_rejected')
+        for name in ('prepare','window'):hold(base/(entries[name]+'.py'),0o555,entries[name])
+        rule=Path('/etc/sudoers.d/qs-retirement-window-scope')
+        for parent in rule.parents:
+            st=parent.lstat()
+            if not stat.S_ISDIR(st.st_mode) or st.st_uid!=0 or stat.S_IMODE(st.st_mode)&0o022: reject('window_tool_installation_context_rejected')
+        expected=''.join('deploy ALL=(root) NOPASSWD: /usr/bin/python3 -I '+str(base/(entries[name]+'.py'))+'\n' for name in ('prepare','window')).encode()
+        if hold(rule,0o440,installed['sudoers_sha256'])!=expected: reject('window_tool_installation_context_rejected')
+        context['installed']=installed;return context
+    except BaseException:
+        close_fixed_entry_context(context);raise
 
-def revoke_fixed_entries_after_native(raw, code, approval, current_run, derived_hash, entry_hashes, rule_hash):
-    """Root caller seam: only its known actual successful purge may withdraw."""
-    if os.getuid()!=0 or os.geteuid()!=0 or approval.get('stage')!='purge' or code!=0: reject('window_tool_actual_purge_receipt_required')
+
+def revoke_fixed_entries_after_native(raw, code, approval, current_run, derived_hash, context):
+    """Only this root caller's known actual apply/purge result may withdraw."""
+    if os.getuid()!=0 or os.geteuid()!=0 or approval.get('stage') not in ('apply','purge') or code!=0: reject('window_tool_actual_purge_receipt_required')
     native=validate_native(raw,code,approval,current_run,derived_hash)
     if not all(native.get(k) is True for k in ('complete','acceptance_complete','purge_complete')) or native.get('error_category')!='none': reject('window_tool_actual_purge_receipt_required')
-    # This is source-generated exact code, never a shell/argv/stdin program.
-    # The final root owner must supply its original installed-context hashes.
-    program=_fixed_entry_revoke_program(entry_hashes,rule_hash)
-    namespace={'__name__':'approved_exact_entry_withdrawal'}
-    exec(compile(program,'approved-exact-entry-withdrawal','exec'),namespace)
+    if type(context) is not dict or context.get('self') is not context: reject('window_tool_installation_context_rejected')
+    identity=lambda v:(v.st_dev,v.st_ino,v.st_uid,v.st_mode,v.st_nlink,v.st_size,v.st_mtime_ns,v.st_ctime_ns)
+    installed=context['installed'];directory=context['directory'];materials=context['materials']
+    base=Path('/usr/local/libexec/qs-retirement');expected_directory=base/(installed['operation_id']+'-'+installed['source_sha'])
+    expected_paths=[expected_directory/'policy.json',*[base/(installed['entry_sha256'][name]+'.py') for name in ('prepare','window')],Path('/etc/sudoers.d/qs-retirement-window-scope')]
+    if directory!=expected_directory or [row[0] for row in materials]!=expected_paths: reject('window_tool_installation_context_rejected')
+    if any(approval[key]!=installed[other] for key,other in (('operation_id','operation_id'),('tool_source_sha','source_sha'),('manifest_sha256','manifest_sha256'))): reject('window_tool_installation_context_rejected')
+    token(current_run,RUN)
+    receipt_path=base/(installed['operation_id']+'-'+installed['source_sha']+'-'+current_run+'.withdrawal.receipt.json')
+    if receipt_path.exists() or receipt_path.is_symlink(): reject('window_tool_installation_context_rejected')
+    if len(materials)!=4 or set(os.listdir(directory))!={'policy.json'}: reject('window_tool_installation_context_rejected')
+    # Revalidate every original held FD and name before the FIRST unlink. The
+    # exact rule is withdrawn first, so any partial result loses sudo authority.
+    for path,fd,before,expected in materials:
+        os.lseek(fd,0,os.SEEK_SET);body=os.read(fd,65537)
+        if identity(before)!=identity(os.fstat(fd)) or identity(before)!=identity(path.lstat()) or digest(body)!=expected: reject('window_tool_installation_context_rejected')
+    subprocess.run(['/usr/sbin/visudo','-c'],check=True,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
+    ordered=[materials[-1],*materials[1:-1],materials[0]]
+    for path,fd,before,_ in ordered:
+        if identity(before)!=identity(os.fstat(fd)) or identity(before)!=identity(path.lstat()): reject('window_tool_installation_context_rejected')
+        path.unlink();sync_directory(path.parent)
+        if path==materials[-1][0]:subprocess.run(['/usr/sbin/visudo','-c'],check=True,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
+    directory.rmdir();sync_directory(directory.parent)
+    if any(path.exists() or path.is_symlink() for path,_,_,_ in materials) or directory.exists() or directory.is_symlink(): reject('window_tool_installation_context_rejected')
+    receipt=dict(format_version=1,kind='fixed_retirement_entries_withdrawn',operation_id=installed['operation_id'],source_sha=installed['source_sha'],actual_run_id=current_run,manifest_sha256=installed['manifest_sha256'],entry_sha256=installed['entry_sha256'],sudoers_sha256=installed['sudoers_sha256'],context_sha256=materials[0][3],known_native_result_sha256=digest(raw),entries_zero=True,rule_zero=True,context_zero=True)
+    # Retained body-free verification receipt; it is explicitly outside the
+    # withdrawn permission context and is not a backup, spool, or executable.
+    write_new(receipt_path,canonical(receipt),mode=0o400)
+    return receipt
 
 
 def installed_fixed_window_entry():
