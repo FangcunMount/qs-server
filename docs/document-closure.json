@@ -2,7 +2,7 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "5f25fc5eba1a313400cefd6e483b6c5fc4c6026c",
+    "sha": "2be3fe69c1ad9a1c9e89442ae25aa434ff020616",
     "verified_on": "2026-10-10"
   },
   "status_policy": {
@@ -11284,7 +11284,7 @@
       "owner": "tooling",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "5f25fc5eba1a313400cefd6e483b6c5fc4c6026c",
+        "source_sha": "2be3fe69c1ad9a1c9e89442ae25aa434ff020616",
         "verified_on": "2026-10-10"
       },
       "fact_sources": [
