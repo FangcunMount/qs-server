@@ -1117,6 +1117,8 @@ func TestLifecyclePublicCLINativeWindowToolPrepareRootOnce(t *testing.T) {
 	approval := Approval{}
 	opMaterial := map[string]bool{"inventory-cli": true, "boundary-request.json": true, "inventory-request.json": true, "manifest.json": true, "lifecycle-request-template.json": true, "operation.lock": true, "archive": true, "bounds-" + boundRun: true, "inventory-" + invRun: true}
 	rootMaterial := map[string]bool{"restore-native": true, "tool.intent.private.json": true, "source-copy.intent.private.json": true, "manifest.json": true, "lifecycle-request.json": true, "lifecycle-restore-" + actualRun + ".registration.private.json": true, "inventory-" + invRun: true}
+	zeroName := "lifecycle-restore-" + actualRun + ".zero.private.json"
+	rootMaterial[zeroName] = true // Exact preparation producer member, not a glob.
 	for _, name := range append([]string{"inventory.private.json", "mysql-metadata.private.json", "mongodb-metadata.private.json"}, sourceNames[:]...) {
 		opMaterial[filepath.Join("inventory-"+invRun, name)] = true
 		rootMaterial[filepath.Join("inventory-"+invRun, name)] = true
@@ -1315,6 +1317,40 @@ func TestLifecyclePublicCLINativeWindowToolPrepareRootOnce(t *testing.T) {
 	if !ok || elapsed <= 0 || elapsed > 600000 {
 		t.Fatal("public_cli_native_combined_restore_budget_failed")
 	}
+	zeroHash, ok := result["preparation_restore_zero_sha256"].(string)
+	zeroFile, zeroOpenErr := os.OpenFile(filepath.Join(root, zeroName), os.O_RDONLY|syscall.O_NOFOLLOW|syscall.O_NONBLOCK, 0)
+	if !ok || !hashPattern.MatchString(zeroHash) || zeroOpenErr != nil {
+		if zeroFile != nil {
+			_ = zeroFile.Close()
+		}
+		t.Fatal("public_cli_native_preparation_zero_binding_failed")
+	}
+	zeroBefore, zeroStatErr := zeroFile.Stat()
+	if zeroStatErr != nil || !zeroBefore.Mode().IsRegular() || zeroBefore.Mode().Perm() != 0600 || zeroBefore.Sys().(*syscall.Stat_t).Uid != 0 || zeroBefore.Sys().(*syscall.Stat_t).Nlink != 1 || zeroBefore.Size() <= 0 || zeroBefore.Size() > 256<<10 {
+		_ = zeroFile.Close()
+		t.Fatal("public_cli_native_preparation_zero_binding_failed")
+	}
+	zeroRaw, zeroReadErr := io.ReadAll(io.LimitReader(zeroFile, (256<<10)+1))
+	zeroAfter, zeroStatErr := zeroFile.Stat()
+	zeroCloseErr := zeroFile.Close()
+	var zero struct {
+		FormatVersion     int               `json:"format_version"`
+		Kind              string            `json:"kind"`
+		OriginalSourceSHA string            `json:"original_source_sha"`
+		ToolSourceSHA     string            `json:"tool_source_sha"`
+		OperationID       string            `json:"operation_id"`
+		OriginalRunID     string            `json:"original_run_id"`
+		ActualRunID       string            `json:"actual_run_id"`
+		ManifestSHA256    string            `json:"manifest_sha256"`
+		ArchiveSHA256     string            `json:"archive_sha256"`
+		RequestSHA256     string            `json:"request_sha256"`
+		ElapsedMillis     int64             `json:"elapsed_millis"`
+		Engines           []json.RawMessage `json:"engines"`
+		Files             []json.RawMessage `json:"files"`
+	}
+	if zeroReadErr != nil || zeroStatErr != nil || zeroCloseErr != nil || !os.SameFile(zeroBefore, zeroAfter) || zeroBefore.Size() != zeroAfter.Size() || zeroBefore.ModTime() != zeroAfter.ModTime() || int64(len(zeroRaw)) != zeroBefore.Size() || sha(zeroRaw) != zeroHash || exactJSON(zeroRaw, &zero) != nil || zero.FormatVersion != 1 || zero.Kind != "original_preparation_isolated_restore_zero" || zero.OriginalSourceSHA != source || zero.ToolSourceSHA != source || zero.OperationID != op || zero.OriginalRunID != invRun || zero.ActualRunID != actualRun || zero.ManifestSHA256 != manifestHash || zero.ArchiveSHA256 != result["archive_sha256"] || zero.RequestSHA256 != requestHash || zero.ElapsedMillis <= 0 || float64(zero.ElapsedMillis) > elapsed || len(zero.Engines) != 2 || len(zero.Files) != 5 {
+		t.Fatal("public_cli_native_preparation_zero_binding_failed")
+	}
 	after := nativeNamespaceOriginalDigest(t, db, mdb)
 	if before != after {
 		t.Fatal("public_cli_native_original_catalog_or_content_changed")
@@ -1334,7 +1370,8 @@ func TestLifecyclePublicCLINativeWindowToolPrepareRootOnce(t *testing.T) {
 		filepath.Join(invocation, "lifecycle-request.json"):     requestHash,
 		filepath.Join(invocation, "manifest.json"):              manifestHash,
 		filepath.Join(root, "lifecycle-request.json"):           requestHash,
-		pkg: packageHash,
+		filepath.Join(root, zeroName):                           zeroHash,
+		pkg:                                                     packageHash,
 	} {
 		actual, readErr := os.ReadFile(path)
 		if readErr != nil || sha(actual) != expected {
