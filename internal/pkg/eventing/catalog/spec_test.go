@@ -133,8 +133,9 @@ func loadMatrixStoreTokens(t *testing.T) map[OutboxProfile]string {
 // Read the actual composition and query rather than copy a second store-name
 // catalog into the test. Fail closed when a source shape changes: that change
 // requires reviewing the documentation contract, not silently skipping a cell.
+// The WithFacts implementation owns storage; the legacy helper only delegates.
 func deriveMatrixStoreTokens(mongoComposition, mysqlStatus, migration string) (map[OutboxProfile]string, error) {
-	mongoBody, err := contractFunction(mongoComposition, "buildM4StandardEventSubsystem")
+	mongoBody, err := contractFunction(mongoComposition, "buildM4StandardEventSubsystemWithFacts")
 	if err != nil {
 		return nil, err
 	}
@@ -241,7 +242,7 @@ func contractStringLiteral(expr ast.Expr) (string, error) {
 
 func TestMatrixStoreEvidenceRejectsAmbiguousAndRetiredSources(t *testing.T) {
 	// A different coherent current name succeeds: no rm_outbox hard-coded oracle.
-	mongo := `package host; func buildM4StandardEventSubsystem() { opts.MongoDB.Collection("current_store") }`
+	mongo := `package host; func buildM4StandardEventSubsystemWithFacts() { opts.MongoDB.Collection("current_store") }`
 	mysql := `package host; func OutboxStatusSnapshot() { r.db.QueryContext(ctx, "SELECT state FROM current_store WHERE state <> 'published'") }`
 	migration := "CREATE TABLE current_store (id BIGINT);\nCREATE TABLE replay_ledger (id BIGINT);"
 	stores, err := deriveMatrixStoreTokens(mongo, mysql, migration)
@@ -254,7 +255,9 @@ func TestMatrixStoreEvidenceRejectsAmbiguousAndRetiredSources(t *testing.T) {
 		{"retired-mongo", strings.ReplaceAll(mongo, "current_store", "domain_event_outbox"), mysql, migration},
 		{"retired-mysql", mongo, strings.ReplaceAll(mysql, "current_store", "domain_event_outbox"), migration},
 		{"retired-sources-vs-migration", strings.ReplaceAll(mongo, "current_store", "domain_event_outbox"), strings.ReplaceAll(mysql, "current_store", "domain_event_outbox"), migration},
-		{"missing-mongo", "package host; func buildM4StandardEventSubsystem() {}", mysql, migration},
+		{"missing-mongo", "package host; func buildM4StandardEventSubsystemWithFacts() {}", mysql, migration},
+		{"legacy-wrapper-only", strings.ReplaceAll(mongo, "buildM4StandardEventSubsystemWithFacts", "buildM4StandardEventSubsystem"), mysql, migration},
+		{"legacy-wrapper-store-not-current", `package host; func buildM4StandardEventSubsystem() { opts.MongoDB.Collection("current_store") }; func buildM4StandardEventSubsystemWithFacts() {}`, mysql, migration},
 		{"multiple-mongo", strings.Replace(mongo, " }", `; opts.MongoDB.Collection("current_store") }`, 1), mysql, migration},
 		{"dynamic-mongo", strings.ReplaceAll(mongo, `"current_store"`, "collectionName"), mysql, migration},
 		{"missing-mysql", mongo, "package host; func OutboxStatusSnapshot() {}", migration},
