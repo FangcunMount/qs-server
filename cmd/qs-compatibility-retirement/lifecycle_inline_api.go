@@ -318,7 +318,10 @@ func (v *lifecycleAPITransition) verifyImageProgram(ctx context.Context, kind, i
 		return lifecycleError("lifecycle_api_image_program_unproven")
 	}
 	name := "qs-retirement-program-" + v.request.OperationID + "-" + v.request.ActualRunID + "-" + kind
-	labels := map[string]string{"codex.task": "qs-compatibility-retirement", "codex.operation": v.request.OperationID, "codex.run": v.request.ActualRunID, "codex.tool_source": sourceSHA, "codex.kind": "api-program-" + kind}
+	labels, e := lifecycleAPIProgramProbeLabels(actual.Config.Labels, map[string]string{"codex.task": "qs-compatibility-retirement", "codex.operation": v.request.OperationID, "codex.run": v.request.ActualRunID, "codex.tool_source": sourceSHA, "codex.kind": "api-program-" + kind})
+	if e != nil {
+		return e
+	}
 	body, _ := json.Marshal(map[string]any{"Image": image, "Entrypoint": []string{"/app/qs-apiserver"}, "Labels": labels, "HostConfig": map[string]any{"NetworkMode": "none", "AutoRemove": false}})
 	if e = v.record(kind+"-program-create-intent", map[string]any{"name": name, "image": image, "labels": labels, "program_sha256": expected}); e != nil {
 		return e
@@ -495,6 +498,22 @@ func (v *lifecycleAPITransition) verifyOriginalRuntimeVersion(ctx context.Contex
 		return lifecycleError("lifecycle_api_image_program_unproven")
 	}
 	return v.record("rollback-program-runtime-version", map[string]string{"id": before.ID, "image": image, "source_sha": source, "version_sha256": digestRaw(raw)})
+}
+
+// Docker inherits all image labels in a never-started probe. Bind that exact
+// original set plus the five owner keys, rejecting conflicting inherited owners.
+func lifecycleAPIProgramProbeLabels(image, owned map[string]string) (map[string]string, error) {
+	labels := make(map[string]string, len(image)+len(owned))
+	for key, value := range image {
+		labels[key] = value
+	}
+	for key, value := range owned {
+		if inherited, exists := image[key]; exists && inherited != value {
+			return nil, lifecycleError("lifecycle_api_image_program_unproven")
+		}
+		labels[key] = value
+	}
+	return labels, nil
 }
 
 type lifecycleAPIInvocationIntent struct {

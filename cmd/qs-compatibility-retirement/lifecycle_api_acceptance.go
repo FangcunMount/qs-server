@@ -76,6 +76,9 @@ func lifecycleAPIReadEndpoint(ctx context.Context, client *http.Client, address,
 	return raw, nil
 }
 
+// The pinned original Dockerfile and this approved-source CLI both retain the
+// source version.GitTreeState default. It is currently empty, not an invented
+// clean marker; match that compiled truth while binding the actual GitCommit.
 func lifecycleAPIValidateResponses(health, build, ready []byte, source, architecture string) error {
 	var h struct {
 		Code    *int              `json:"code"`
@@ -97,7 +100,7 @@ func lifecycleAPIValidateResponses(health, build, ready []byte, source, architec
 			return lifecycleError("lifecycle_actual_api_runtime_unproven")
 		}
 	}
-	if json.Unmarshal(health, &h) != nil || json.Unmarshal(build, &b) != nil || json.Unmarshal(ready, &r) != nil || h.Code == nil || *h.Code != 0 || h.Message != "success" || !reflect.DeepEqual(h.Data, map[string]string{"status": "ok"}) || b.Code == nil || *b.Code != 0 || b.Message != "success" || b.Data.GitCommit != source || b.Data.GitTreeState != "clean" || b.Data.Platform != "linux/"+architecture || r.Status != "ready" || r.Component != "apiserver" || r.Redis.Component != "apiserver" || !r.Redis.Summary.Ready || r.Redis.GeneratedAt.IsZero() || r.Redis.Summary.FamilyTotal <= 0 || len(r.Redis.Families) != r.Redis.Summary.FamilyTotal || r.Redis.Summary.AvailableCount <= 0 {
+	if json.Unmarshal(health, &h) != nil || json.Unmarshal(build, &b) != nil || json.Unmarshal(ready, &r) != nil || h.Code == nil || *h.Code != 0 || h.Message != "success" || !reflect.DeepEqual(h.Data, map[string]string{"status": "ok"}) || b.Code == nil || *b.Code != 0 || b.Message != "success" || b.Data.GitCommit != source || b.Data.GitTreeState != version.GitTreeState || b.Data.Platform != "linux/"+architecture || r.Status != "ready" || r.Component != "apiserver" || r.Redis.Component != "apiserver" || !r.Redis.Summary.Ready || r.Redis.GeneratedAt.IsZero() || r.Redis.Summary.FamilyTotal <= 0 || len(r.Redis.Families) != r.Redis.Summary.FamilyTotal || r.Redis.Summary.AvailableCount <= 0 {
 		return lifecycleError("lifecycle_actual_api_runtime_unproven")
 	}
 	return nil

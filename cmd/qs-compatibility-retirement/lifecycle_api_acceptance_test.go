@@ -12,6 +12,7 @@ import (
 	"time"
 
 	backup "github.com/FangcunMount/qs-server/internal/apiserver/maintenance/compatibilityretirementbackup"
+	"github.com/FangcunMount/qs-server/pkg/version"
 )
 
 func TestAPIAcceptanceFixedReadRouteRequiresActualUnambiguousContainerNetwork(t *testing.T) {
@@ -36,7 +37,7 @@ func TestAPIAcceptanceFixedReadRouteRequiresActualUnambiguousContainerNetwork(t 
 func TestAPIAcceptanceCurrentSourceAndActualDependencyReadinessCannotBeStaticHealth(t *testing.T) {
 	source := strings.Repeat("a", 40)
 	health := []byte(`{"code":0,"message":"success","data":{"status":"ok"}}`)
-	build := []byte(`{"code":0,"message":"success","data":{"gitCommit":"` + source + `","gitTreeState":"clean","platform":"linux/amd64"}}`)
+	build := []byte(`{"code":0,"message":"success","data":{"gitCommit":"` + source + `","gitTreeState":"` + version.GitTreeState + `","platform":"linux/amd64"}}`)
 	ready := []byte(`{"status":"ready","component":"apiserver","redis":{"generated_at":"` + time.Now().UTC().Format(time.RFC3339Nano) + `","component":"apiserver","summary":{"ready":true,"family_total":1,"available_count":1},"families":[{"component":"apiserver","family":"current_runtime","configured":true,"available":true}]}}`)
 	if e := lifecycleAPIValidateResponses(health, build, ready, source, "amd64"); e != nil {
 		t.Fatal(e)
@@ -52,7 +53,7 @@ func TestAPIAcceptanceCurrentSourceAndActualDependencyReadinessCannotBeStaticHea
 			}
 		})
 	}
-	for _, badBuild := range [][]byte{[]byte(strings.Replace(string(build), source, strings.Repeat("b", 40), 1)), []byte(strings.Replace(string(build), `"clean"`, `"dirty"`, 1)), []byte(strings.Replace(string(build), "linux/amd64", "linux/arm64", 1)), []byte(`{"code":0,"code":0,"message":"success","data":{}}`)} {
+	for _, badBuild := range [][]byte{[]byte(strings.Replace(string(build), source, strings.Repeat("b", 40), 1)), []byte(strings.Replace(string(build), `"gitTreeState":"`+version.GitTreeState+`"`, `"gitTreeState":"dirty"`, 1)), []byte(strings.Replace(string(build), "linux/amd64", "linux/arm64", 1)), []byte(`{"code":0,"code":0,"message":"success","data":{}}`)} {
 		if e := lifecycleAPIValidateResponses(health, badBuild, ready, source, "amd64"); e == nil {
 			t.Fatal("wrong or ambiguous deployed source accepted")
 		}
@@ -170,5 +171,30 @@ func TestNativeAcceptanceCannotMintMaterialsFromImportedPlanOrHealthyDTO(t *test
 	}
 	if h.BindAcceptancePlan(context.Background(), lifecycleRequest{}, new(backup.Archive), new(backup.TargetRecoveryPlan)) == nil {
 		t.Fatal("budget/imported plan became live native acceptance binding")
+	}
+}
+
+func TestAPIProgramProbeInheritsExactImageLabelsWithoutOwnerConflict(t *testing.T) {
+	owned := map[string]string{"codex.task": "qs-compatibility-retirement", "codex.operation": "op", "codex.run": "7", "codex.tool_source": "source", "codex.kind": "api-program-b"}
+	image := map[string]string{"org.opencontainers.image.revision": "actual-source", "other.original": "kept"}
+	labels, err := lifecycleAPIProgramProbeLabels(image, owned)
+	if err != nil || len(labels) != 7 || labels["org.opencontainers.image.revision"] != "actual-source" || labels["other.original"] != "kept" {
+		t.Fatal("actual image labels were lost", err)
+	}
+	for key, value := range owned {
+		if labels[key] != value {
+			t.Fatal("owner key lost")
+		}
+	}
+	if len(image) != 2 {
+		t.Fatal("original image labels mutated")
+	}
+	image["codex.run"] = "other-run"
+	if _, err = lifecycleAPIProgramProbeLabels(image, owned); err == nil {
+		t.Fatal("conflicting inherited owner accepted")
+	}
+	image["codex.run"] = "7"
+	if _, err = lifecycleAPIProgramProbeLabels(image, owned); err != nil {
+		t.Fatal("matching original owner rejected", err)
 	}
 }
