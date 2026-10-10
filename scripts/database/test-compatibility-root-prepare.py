@@ -575,6 +575,22 @@ class FixedDeployHostEntry(unittest.TestCase):
         with self.archive(b'unapproved replacement') as (_,request),contextlib.redirect_stdout(io.StringIO()),self.assertRaises(SystemExit):
             self.authorize(scope,request)
 
+    def test_archive_mutation_cannot_mix_digest_and_approved_native(self):
+        scope,_=self.gate()
+        with self.archive(b'unapproved replacement') as (path,request),self.archive(b'approved fixture bytes') as (approved,_):
+            replacement=approved.read_bytes()
+            original_open=tarfile.open
+            changed=[]
+            def replace_after_package_hash(*args,**kwargs):
+                # Actual same-inode mutation after the complete package hash.
+                # No native bytes are executed; caller UID alone is mocked.
+                path.write_bytes(replacement)
+                changed.append(True)
+                return original_open(*args,**kwargs)
+            with mock.patch.object(tarfile,'open',side_effect=replace_after_package_hash),contextlib.redirect_stdout(io.StringIO()),self.assertRaises(SystemExit):
+                self.authorize(scope,request)
+            self.assertEqual(changed,[True])
+
     def test_wrong_operation_source_uid_extra_argument_or_credentials_rejected(self):
         scope,_=self.gate()
         with self.archive(b'approved fixture bytes') as (_,request):

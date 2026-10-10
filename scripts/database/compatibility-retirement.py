@@ -2039,17 +2039,12 @@ def authorize():
     with os.fdopen(fd,'rb') as f:
         info=os.fstat(f.fileno())
         if not stat.S_ISREG(info.st_mode) or info.st_nlink!=1 or info.st_uid!=owner or not 0<info.st_size<=256<<20: reject()
-        archive_hash=hashlib.sha256(); archive_bytes=0
-        while True:
-            block=f.read(1<<20)
-            if not block: break
-            archive_bytes+=len(block)
-            if archive_bytes>256<<20: reject()
-            archive_hash.update(block)
-        if archive_bytes!=info.st_size or archive_hash.hexdigest()!=request['package_sha256']: reject()
-        f.seek(0)
+        # Hash and interpret the SAME immutable bytes. The deploy-owned FD may
+        # change between reads; metadata rechecks alone cannot pin execution.
+        archive_raw=f.read((256<<20)+1)
+        if len(archive_raw)>256<<20 or len(archive_raw)!=info.st_size or hashlib.sha256(archive_raw).hexdigest()!=request['package_sha256']: reject()
         names=set(); matched=False
-        with tarfile.open(fileobj=f,mode='r|gz') as tar:
+        with tarfile.open(fileobj=io.BytesIO(archive_raw),mode='r|gz') as tar:
             for member in tar:
                 if len(names)>=16 or member.name in names or not member.isfile() or '/' in member.name or not 0<=member.size<=64<<20: reject()
                 names.add(member.name)
