@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"debug/buildinfo"
 	"encoding/json"
 	"io"
 	"net"
@@ -12,6 +13,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"runtime"
+	"runtime/debug"
 	"strings"
 	"syscall"
 	"time"
@@ -312,7 +314,7 @@ func (v *lifecycleAPITransition) verifyImageProgram(ctx context.Context, kind, i
 		Architecture, Os string
 		Config           struct{ Labels map[string]string }
 	}
-	if e != nil || rejectDuplicateJSON(raw) != nil || json.Unmarshal(raw, &actual) != nil || actual.ID != image || actual.Os != "linux" || actual.Architecture != runtime.GOARCH || actual.Config.Labels["org.opencontainers.image.revision"] != source {
+	if e != nil || rejectDuplicateJSON(raw) != nil || json.Unmarshal(raw, &actual) != nil || actual.ID != image || actual.Os != "linux" || actual.Architecture != runtime.GOARCH || !lifecycleImageRevisionMatches(kind, actual.Config.Labels, source) {
 		return lifecycleError("lifecycle_api_image_program_unproven")
 	}
 	name := "qs-retirement-program-" + v.request.OperationID + "-" + v.request.ActualRunID + "-" + kind
@@ -350,9 +352,21 @@ func (v *lifecycleAPITransition) verifyImageProgram(ctx context.Context, kind, i
 		v.unknown = true
 		return e
 	}
-	if _, e = readLifecycleRootFile(program, expected, true); e != nil {
+	programRaw, e := readLifecycleRootFile(program, expected, true)
+	if e != nil {
 		v.unknown = true
 		return e
+	}
+	compiled, e := buildinfo.Read(bytes.NewReader(programRaw))
+	if e != nil || !lifecycleCompiledProgramSourceMatches(compiled, source, runtime.GOARCH) {
+		v.unknown = true
+		return lifecycleError("lifecycle_api_image_program_unproven")
+	}
+	if kind == "rollback" {
+		if e = v.verifyOriginalRuntimeVersion(ctx, image, source); e != nil {
+			v.unknown = true
+			return e
+		}
 	}
 	info, e := os.Lstat(program)
 	if e != nil || v.materials == nil || v.materials.register(filepath.Base(program), expected, 0, info.Mode().Perm()) != nil {
@@ -384,6 +398,103 @@ func (v *lifecycleAPITransition) verifyImageProgram(ctx context.Context, kind, i
 		return e
 	}
 	return v.record(kind+"-program-remove-result", map[string]string{"id": result.ID, "state": "absent"})
+}
+
+// A legacy release image may predate OCI labels. The exact image/program and
+// actual compiled source remain required; a present contradictory label fails.
+func lifecycleImageRevisionMatches(kind string, labels map[string]string, source string) bool {
+	revision, present := labels["org.opencontainers.image.revision"]
+	return shaRE.MatchString(source) && (kind == "b" && present && revision == source || kind == "rollback" && (!present || revision == source))
+}
+
+func lifecycleCompiledProgramSourceMatches(info *debug.BuildInfo, source, architecture string) bool {
+	if info == nil || !shaRE.MatchString(source) || (architecture != "amd64" && architecture != "arm64") {
+		return false
+	}
+	seen, osValue, archValue, flags := map[string]bool{}, "", "", ""
+	for _, v := range info.Settings {
+		if v.Key != "GOOS" && v.Key != "GOARCH" && v.Key != "-ldflags" {
+			continue
+		}
+		if seen[v.Key] {
+			return false
+		}
+		seen[v.Key] = true
+		switch v.Key {
+		case "GOOS":
+			osValue = v.Value
+		case "GOARCH":
+			archValue = v.Value
+		case "-ldflags":
+			flags = v.Value
+		}
+	}
+	if osValue != "linux" || archValue != architecture {
+		return false
+	}
+	parts, count := strings.Fields(flags), 0
+	key := "github.com/FangcunMount/qs-server/pkg/version.GitCommit="
+	for i := 0; i < len(parts); i++ {
+		value := ""
+		if parts[i] == "-X" {
+			i++
+			if i >= len(parts) {
+				return false
+			}
+			value = parts[i]
+		} else if strings.HasPrefix(parts[i], "-X=") {
+			value = strings.TrimPrefix(parts[i], "-X=")
+		}
+		if strings.HasPrefix(value, key) {
+			if strings.TrimPrefix(value, key) != source {
+				return false
+			}
+			count++
+		}
+	}
+	return count == 1
+}
+
+func lifecycleOriginalRuntimeVersionMatches(before, after, original lifecycleAPIInspection, image, source string, raw []byte) bool {
+	var build struct {
+		Code    *int         `json:"code"`
+		Message string       `json:"message"`
+		Data    version.Info `json:"data"`
+	}
+	return before.ID == original.ID && before.Image == image && before.State.Running && before.State.PID > 0 &&
+		!before.State.Paused && !before.State.Restarting && !before.State.Dead && !before.State.OOMKilled &&
+		before.State.StartedAt == original.State.StartedAt && before.State.PID == original.State.PID &&
+		reflect.DeepEqual(before.spec(), original.spec()) && reflect.DeepEqual(before, after) &&
+		rejectDuplicateJSON(raw) == nil && json.Unmarshal(raw, &build) == nil && build.Code != nil && *build.Code == 0 &&
+		build.Message == "success" && build.Data.GitCommit == source && build.Data.Platform == "linux/"+runtime.GOARCH
+}
+
+func (v *lifecycleAPITransition) verifyOriginalRuntimeVersion(ctx context.Context, image, source string) error {
+	before, e := lifecycleAPIInspect(ctx, v.engine, v.original.ID)
+	if e != nil {
+		return e
+	}
+	address, e := lifecycleAPIReadAddress(before)
+	if e != nil {
+		return e
+	}
+	transport := &http.Transport{Proxy: nil, DisableKeepAlives: true, DialContext: func(q context.Context, network, addr string) (net.Conn, error) {
+		if network != "tcp" || addr != address {
+			return nil, lifecycleError("lifecycle_actual_api_fixed_read_route_unproven")
+		}
+		return (&net.Dialer{}).DialContext(q, "tcp", address)
+	}}
+	defer transport.CloseIdleConnections()
+	client := &http.Client{Transport: transport, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
+	raw, e := lifecycleAPIReadEndpoint(ctx, client, address, "/version")
+	if e != nil {
+		return e
+	}
+	after, e := lifecycleAPIInspect(ctx, v.engine, v.original.ID)
+	if e != nil || !lifecycleOriginalRuntimeVersionMatches(before, after, v.original, image, source, raw) {
+		return lifecycleError("lifecycle_api_image_program_unproven")
+	}
+	return v.record("rollback-program-runtime-version", map[string]string{"id": before.ID, "image": image, "source_sha": source, "version_sha256": digestRaw(raw)})
 }
 
 type lifecycleAPIInvocationIntent struct {

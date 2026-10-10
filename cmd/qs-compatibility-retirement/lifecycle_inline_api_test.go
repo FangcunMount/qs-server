@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"reflect"
+	"runtime"
+	"runtime/debug"
 	"strings"
 	"testing"
 
@@ -231,5 +233,63 @@ func TestInlineAPIStoppedReadbackChecksConfigAndActiveExecs(t *testing.T) {
 	}
 	if lifecycleAPIJSONEqual([]byte(`9007199254740992`), []byte(`9007199254740993`)) {
 		t.Fatal("large numeric config values collapsed")
+	}
+}
+
+func TestInlineAPIImageSourceBindingKeepsBLabelAndLegacyRuntimeEvidence(t *testing.T) {
+	source := strings.Repeat("a", 40)
+	for _, c := range []struct {
+		kind   string
+		labels map[string]string
+		want   bool
+	}{
+		{"b", nil, false}, {"b", map[string]string{"org.opencontainers.image.revision": source}, true},
+		{"rollback", nil, true}, {"rollback", map[string]string{"org.opencontainers.image.revision": source}, true},
+		{"rollback", map[string]string{"org.opencontainers.image.revision": ""}, false},
+		{"rollback", map[string]string{"org.opencontainers.image.revision": strings.Repeat("b", 40)}, false},
+	} {
+		if lifecycleImageRevisionMatches(c.kind, c.labels, source) != c.want {
+			t.Fatal("revision contract changed")
+		}
+	}
+	settings := []debug.BuildSetting{{Key: "GOOS", Value: "linux"}, {Key: "GOARCH", Value: runtime.GOARCH}, {Key: "-ldflags", Value: "-s -w -X github.com/FangcunMount/qs-server/pkg/version.GitCommit=" + source}}
+	if !lifecycleCompiledProgramSourceMatches(&debug.BuildInfo{Settings: settings}, source, runtime.GOARCH) {
+		t.Fatal("actual compile settings rejected")
+	}
+	for _, change := range []func([]debug.BuildSetting) []debug.BuildSetting{
+		func(v []debug.BuildSetting) []debug.BuildSetting { return v[:2] },
+		func(v []debug.BuildSetting) []debug.BuildSetting { v[0].Value = "darwin"; return v },
+		func(v []debug.BuildSetting) []debug.BuildSetting { v[1].Value = "unknown"; return v },
+		func(v []debug.BuildSetting) []debug.BuildSetting {
+			v[2].Value += " -X github.com/FangcunMount/qs-server/pkg/version.GitCommit=" + source
+			return v
+		},
+		func(v []debug.BuildSetting) []debug.BuildSetting {
+			v[2].Value = strings.ReplaceAll(v[2].Value, source, strings.Repeat("b", 40))
+			return v
+		},
+		func(v []debug.BuildSetting) []debug.BuildSetting { return append(v, v[2]) },
+	} {
+		if lifecycleCompiledProgramSourceMatches(&debug.BuildInfo{Settings: change(append([]debug.BuildSetting(nil), settings...))}, source, runtime.GOARCH) {
+			t.Fatal("ambiguous compiled source accepted")
+		}
+	}
+	original, r := inlineAPIExpectedFixture(t)
+	original.State.Running = true
+	original.State.PID = 321
+	original.State.StartedAt = "2026-10-10T00:00:00Z"
+	build := []byte(`{"code":0,"message":"success","data":{"gitCommit":"` + source + `","platform":"linux/` + runtime.GOARCH + `"}}`)
+	if !lifecycleOriginalRuntimeVersionMatches(original, original, original, r.DeploymentControl.RollbackImageID, source, build) {
+		t.Fatal("same actual original instance rejected")
+	}
+	for _, change := range []func(*lifecycleAPIInspection){func(v *lifecycleAPIInspection) { v.State.PID++ }, func(v *lifecycleAPIInspection) { v.State.StartedAt = "later" }, func(v *lifecycleAPIInspection) { v.Image = r.DeploymentControl.BImageID }, func(v *lifecycleAPIInspection) { v.State.Running = false }} {
+		after := original
+		change(&after)
+		if lifecycleOriginalRuntimeVersionMatches(original, after, original, r.DeploymentControl.RollbackImageID, source, build) {
+			t.Fatal("runtime drift accepted")
+		}
+	}
+	if lifecycleOriginalRuntimeVersionMatches(original, original, original, r.DeploymentControl.RollbackImageID, strings.Repeat("b", 40), build) {
+		t.Fatal("wrong runtime source accepted")
 	}
 }
