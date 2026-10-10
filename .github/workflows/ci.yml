@@ -565,8 +565,9 @@ jobs:
           sql_component_log="${RUNNER_TEMP}/qs-historical-component-sql-native.log"
           owner_fragment_log="${RUNNER_TEMP}/qs-historical-owner-fragments-native.log"
           cli_input_log="${RUNNER_TEMP}/qs-historical-cli-input-native.log"
-          export QS_HISTORY_CI_MONGO_CONTAINER="$(docker --host unix:///var/run/docker.sock inspect --format '{{.Id}}' qs-runtime-closure-e2e-mongo)"
-          export QS_HISTORY_GO="$(command -v go)"
+          QS_HISTORY_CI_MONGO_CONTAINER="$(docker --host unix:///var/run/docker.sock inspect --format '{{.Id}}' qs-runtime-closure-e2e-mongo)"
+          QS_HISTORY_GO="$(command -v go)"
+          export QS_HISTORY_CI_MONGO_CONTAINER QS_HISTORY_GO
           go test -race -tags=integration -count=1 -timeout=10m -v ./internal/apiserver/infra/mysql/evaluation -run '^TestSQLCASProvenanceNative|^TestSQLHistoricalMissingOriginalRunPolicyNative$|^TestSQLHistoricalOriginalRunGlobalAbsenceNative$|^TestSQLHistoricalComponentNative' | tee "$sql_component_log"
           go test -race -tags=integration -count=1 -timeout=10m -v ./internal/apiserver/maintenance/compatibilityretirement -run '^(TestHistoricalCASPersistenceNative|TestQualifiedHistoricalCASNative|TestFinalHistoricalEOFNative|TestHistoricalSourceInputNative|TestAIHistoricalInputNative|TestMongoHistoricalComponentNative)|^TestMongoBatchNativeSnapshotInputOwnerFootprintMatchesOriginalFD$|^TestWholeSourceJointNativeOwnerComponentsSplitPageWithoutConsumingTwice$|^TestHistoricalCASSpoolNativeTwoPagesCommitAndFinalRawReadback$|^TestHistoricalCIMySQLFixtureRequiresActualJobService$' | tee "$owner_fragment_log"
           go test -race -tags=integration -count=1 -timeout=10m -v ./cmd/qs-compatibility-history -run '^(TestHistoryCIFixtureRequiresActualJobContainers|TestHistoryCLINativeInitialTwoSnapshotInputRounds|TestHistoryCLINativeQualifiedEvidenceWriteActualExternalAndDualCommitReadback|TestHistoryCLINativeGenuineAIQualificationCannotWriteFromReadonlyComponent|TestHistoryCLINativeFreshComponentMissingAIQualificationRollsBack)$' | tee "$cli_input_log"
