@@ -1,6 +1,7 @@
 package retirement
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"reflect"
@@ -207,6 +208,198 @@ func FreezeHistoricalCASComponentInput(ctx context.Context, joint *WholeSourceJo
 		return nil, ErrHistoricalCASComponents
 	}
 	return f, nil
+}
+
+// A page only transports sources. These pure fragments retain each actual
+// SQL/replay owner closure and its complete original Mongo negative ranges.
+// The original joint is never copied, partly consumed or used as a child plan.
+func FreezeHistoricalCASOwnerComponentInputs(ctx context.Context, joint *WholeSourceJointPage, sqlPlan *sqlevaluation.SQLHistoricalCASProvenance, unchangedSQL *sqlevaluation.SQLHistoricalCASReadBaseline, mongoPlan *MongoHistoricalBatchCASPlan, spool *sqlevaluation.SQLHistoricalCASSpool) ([]*HistoricalCASComponentInput, error) {
+	if ctx == nil || ctx.Err() != nil || joint == nil || joint.sql == nil || joint.cross == nil || joint.mongo == nil || joint.index == nil || !joint.index.complete || len(joint.current) == 0 || historicalCASComponentPageAlive(ctx, joint) != nil || joint.ValidateBorrowedSnapshot(ctx) != nil || validateMongoHistoricalComponentOriginalPlan(ctx, joint, mongoPlan) != nil {
+		return nil, ErrHistoricalCASComponents
+	}
+	byEvent := map[string]*VerifiedSourceEvent{}
+	entries := map[string]wholeSourceJointEntry{}
+	present, absent := map[string]uint64{}, map[string]uint64{}
+	for _, handle := range joint.sources {
+		facts, key, err := joint.mongo.source(handle)
+		if err != nil || byEvent[facts.EventID] != nil {
+			return nil, ErrHistoricalCASComponents
+		}
+		entry, ok := joint.index.entries[facts.EventID]
+		actualFacts, err := handle.Facts()
+		sha, hashErr := privateFactsSHA(actualFacts)
+		if err != nil || hashErr != nil || !ok || entry.Key != key || entry.FactsSHA256 != sha || entry.OrgID != facts.OrgID || entry.OrgID == 0 {
+			return nil, ErrHistoricalCASComponents
+		}
+		byEvent[facts.EventID], entries[facts.EventID] = handle, entry
+		if owner := joint.mongo.sqlOwners[key]; owner != nil {
+			actual := owner.Snapshot().Owner
+			if actual.AssessmentID == 0 || actual.OrgID != entry.OrgID || entry.AssessmentID != 0 && entry.AssessmentID != actual.AssessmentID || entry.AnswerSheetID != 0 && entry.AnswerSheetID != actual.AnswerSheetID {
+				return nil, ErrHistoricalCASComponents
+			}
+			present[facts.EventID] = actual.AssessmentID
+		} else if joint.mongo.sqlAbsent[key] && actualFacts.Submitted != nil && entry.AnswerSheetID != 0 {
+			absent[facts.EventID] = entry.AnswerSheetID
+		} else {
+			return nil, ErrHistoricalCASComponents
+		}
+	}
+	var recipes []*sqlevaluation.SQLHistoricalComponentRecipe
+	var err error
+	if len(absent) == 0 {
+		recipes, err = sqlevaluation.FreezeSQLHistoricalOwnerComponentRecipes(ctx, joint.sql.facts, joint.cross.page, sqlPlan, unchangedSQL, spool, present)
+	} else {
+		// The second map is independently checked by the SQL factory against
+		// this original live page's actual empty AnswerSheet ranges.
+		recipes, err = sqlevaluation.FreezeSQLHistoricalOwnerComponentRecipes(ctx, joint.sql.facts, joint.cross.page, sqlPlan, unchangedSQL, spool, present, absent)
+	}
+	if err != nil || len(recipes) == 0 || len(recipes) > 512 {
+		return nil, ErrHistoricalCASComponents
+	}
+	current := map[string]bool{}
+	for _, handle := range joint.current {
+		facts, err := handle.Facts()
+		if err != nil || current[facts.EventID] || byEvent[facts.EventID] == nil {
+			return nil, ErrHistoricalCASComponents
+		}
+		current[facts.EventID] = true
+	}
+	parentRows := map[historicalCASRowKey][]byte{}
+	for name, rows := range joint.mongo.data {
+		for _, raw := range rows {
+			id, err := historicalSpoolMongoID(raw)
+			key := historicalCASRowKey{"mongodb", name, id}
+			if err != nil || parentRows[key] != nil {
+				return nil, ErrHistoricalCASComponents
+			}
+			parentRows[key] = raw
+		}
+	}
+	seenEvents, seenCurrent, seenRows := map[string]bool{}, map[string]bool{}, map[historicalCASRowKey]bool{}
+	coveredRanges := mongoCASCloneSelection(mongoBatchSelection{})
+	var out []*HistoricalCASComponentInput
+	for _, recipe := range recipes {
+		if !recipe.OwnerPartitionResolved() {
+			// A wider replay or unsupported ownership remains an explicit block.
+			return nil, ErrHistoricalCASComponents
+		}
+		ids, err := recipe.SourceEventIDs()
+		if err != nil || len(ids) == 0 {
+			return nil, ErrHistoricalCASComponents
+		}
+		var sources []*VerifiedSourceEvent
+		selected := map[string]bool{}
+		owners := map[historicalCASOwnerKey]bool{}
+		f := &HistoricalCASComponentInput{index: joint.index, binding: joint.owner.binding, sequence: joint.page.sequence, partition: uint32(len(out) + 1), partitions: uint32(len(recipes)), sqlRecipe: recipe}
+		for _, eventID := range ids {
+			entry, ok := entries[eventID]
+			if !ok || seenEvents[eventID] || selected[eventID] {
+				return nil, ErrHistoricalCASComponents
+			}
+			selected[eventID], seenEvents[eventID] = true, true
+			sources = append(sources, byEvent[eventID])
+			if owner := joint.mongo.sqlOwners[entry.Key]; owner != nil {
+				actual := owner.Snapshot().Owner
+				owners[historicalCASOwnerKey{"assessment", actual.AssessmentID, actual.OrgID}] = true
+				if actual.AnswerSheetID != 0 {
+					owners[historicalCASOwnerKey{"sheet", actual.AnswerSheetID, actual.OrgID}] = true
+				}
+			} else {
+				owners[historicalCASOwnerKey{"sheet", entry.AnswerSheetID, entry.OrgID}] = true
+			}
+			if current[eventID] {
+				f.sources = append(f.sources, entry.Key)
+				seenCurrent[eventID] = true
+			}
+		}
+		if len(f.sources) == 0 {
+			return nil, ErrHistoricalCASComponents
+		}
+		// This reuses the actual original SQL batch and global Mongo epoch.
+		// Selection derives from ALL related sources, never current targets.
+		batch, err := PrepareMongoHistoricalOwnerBatch(ctx, joint.mongo.global, joint.sql.facts, sources, joint.mongo.limits)
+		if err != nil {
+			return nil, err
+		}
+		for i, query := range mongoCASSelections(batch.selection) {
+			original := mongoCASSelections(joint.mongo.selection)[i]
+			covered := mongoCASSelections(coveredRanges)[i]
+			for id := range query.ids {
+				if !original.ids[id] {
+					return nil, ErrHistoricalCASComponents
+				}
+				covered.ids[id] = true
+			}
+		}
+		f.mongoRead, err = freezeMongoHistoricalComponentReadRecipe(ctx, batch)
+		if err != nil {
+			return nil, err
+		}
+		f.mongoCAS, err = freezeMongoHistoricalOwnerComponentCASRecipe(ctx, joint, mongoPlan, batch, selected)
+		if err != nil {
+			return nil, err
+		}
+		writes := map[historicalCASRowKey]bool{}
+		if f.mongoCAS != nil {
+			for _, g := range f.mongoCAS.groups {
+				writes[historicalCASRowKey{"mongodb", g.collection, g.id}] = true
+			}
+		}
+		if err = recipe.RowDependencies(func(name string, id uint64, sha string, size uint64, write bool) error {
+			f.rows = append(f.rows, historicalCASRowInput{historicalCASRowKey{"mysql", name, id}, sha, size, write})
+			return nil
+		}); err != nil {
+			return nil, err
+		}
+		for name, rows := range batch.data {
+			for _, raw := range rows {
+				id, err := historicalSpoolMongoID(raw)
+				key := historicalCASRowKey{"mongodb", name, id}
+				if err != nil || !bytes.Equal(raw, parentRows[key]) {
+					return nil, ErrMongoBatchConflict
+				}
+				seenRows[key] = true
+				f.rows = append(f.rows, historicalCASRowInput{key, historicalSpoolSHA(raw), uint64(len(raw)), writes[key]})
+			}
+		}
+		for key := range writes {
+			if !seenRows[key] {
+				return nil, ErrHistoricalCASComponents
+			}
+		}
+		for owner := range owners {
+			f.owners = append(f.owners, owner)
+		}
+		sort.Slice(f.owners, func(i, j int) bool {
+			a, b := f.owners[i], f.owners[j]
+			if a.kind != b.kind {
+				return a.kind < b.kind
+			}
+			if a.id != b.id {
+				return a.id < b.id
+			}
+			return a.org < b.org
+		})
+		sort.Slice(f.rows, func(i, j int) bool {
+			a, b := f.rows[i].key, f.rows[j].key
+			if a.store != b.store {
+				return a.store < b.store
+			}
+			if a.name != b.name {
+				return a.name < b.name
+			}
+			return a.id < b.id
+		})
+		f.self, f.seal = f, f.digest()
+		if f.seal == "" {
+			return nil, ErrHistoricalCASComponents
+		}
+		out = append(out, f)
+	}
+	if len(seenEvents) != len(joint.sources) || len(seenCurrent) != len(joint.current) || len(seenRows) != len(parentRows) || !reflect.DeepEqual(coveredRanges, joint.mongo.selection) || historicalCASComponentPageAlive(ctx, joint) != nil || joint.ValidateBorrowedSnapshot(ctx) != nil {
+		return nil, ErrHistoricalCASComponents
+	}
+	return out, nil
 }
 
 func historicalCASComponentPageAlive(ctx context.Context, joint *WholeSourceJointPage) error {

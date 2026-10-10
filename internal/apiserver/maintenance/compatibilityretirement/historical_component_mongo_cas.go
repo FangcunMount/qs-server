@@ -77,6 +77,68 @@ func freezeMongoHistoricalComponentCASRecipe(ctx context.Context, joint *WholeSo
 	return r, nil
 }
 
+// First authenticate the COMPLETE original plan. A fragment never fabricates
+// a partial live plan or substitutes target IDs for a negative range.
+func validateMongoHistoricalComponentOriginalPlan(ctx context.Context, joint *WholeSourceJointPage, p *MongoHistoricalBatchCASPlan) error {
+	if p == nil {
+		return nil
+	}
+	if joint == nil || joint.mongo == nil || joint.mongo.global == nil || joint.ValidateBorrowedSnapshot(ctx) != nil || historicalCASComponentPageAlive(ctx, joint) != nil || p.db != joint.mongo.global.db || p.config != joint.mongo.global.config || p.originalSQLConnection != joint.mongo.sqlConnection || p.oldTxn.number != joint.mongo.global.txn.number || !bytes.Equal(p.oldTxn.session, joint.mongo.global.txn.session) || p.metadataHash != joint.mongo.global.metadata.hash || p.identity != joint.mongo.global.metadata.identity || p.originalSQLIdentity != joint.mongo.sql.Report().DatabaseIdentitySHA256 || p.originalSQLRows != joint.mongo.sql.Report().BusinessRowsSHA256 || !reflect.DeepEqual(p.selection, joint.mongo.selection) || !reflect.DeepEqual(p.before, joint.mongo.data) || !time.Now().Before(p.expires) || len(p.groups) == 0 || len(p.groups) > 512 || len(p.attachments) == 0 || len(p.attachments) > 512 {
+		return ErrMongoBatchCAS
+	}
+	return nil
+}
+
+func freezeMongoHistoricalOwnerComponentCASRecipe(ctx context.Context, joint *WholeSourceJointPage, p *MongoHistoricalBatchCASPlan, batch *MongoHistoricalOwnerBatch, selected map[string]bool) (*mongoHistoricalComponentCASRecipe, error) {
+	if p == nil {
+		return nil, nil
+	}
+	if validateMongoHistoricalComponentOriginalPlan(ctx, joint, p) != nil || batch == nil || batch.ValidateBorrowedSnapshot(ctx) != nil || batch.global != joint.mongo.global || batch.sql != joint.sql.facts || len(selected) == 0 {
+		return nil, ErrMongoBatchCAS
+	}
+	r := &mongoHistoricalComponentCASRecipe{identity: p.identity, sqlIdentity: p.originalSQLIdentity, sqlRows: p.originalSQLRows}
+	for _, group := range p.groups {
+		raw, err := mongoCASRow(batch.data, group.collection, group.id)
+		if err != nil {
+			for _, entry := range group.entries {
+				if selected[entry.EventID] {
+					return nil, ErrMongoBatchConflict
+				}
+			}
+			continue
+		}
+		if !raw.Lookup("_id").Equal(group.pk) {
+			return nil, ErrMongoBatchConflict
+		}
+		var entries []evidence.HistoricalReferenceEntryV1
+		for _, entry := range group.entries {
+			// A shared writable group must remain complete. The caller needs
+			// the real wider owner/replay closure, never a cut set of entries.
+			if entry.Validate() != nil || !selected[entry.EventID] {
+				return nil, ErrMongoBatchCAS
+			}
+			entries = append(entries, entry.Clone())
+		}
+		r.groups = append(r.groups, mongoCASGroup{collection: group.collection, slot: group.slot, id: group.id, pk: bson.RawValue{Type: group.pk.Type, Value: append([]byte(nil), group.pk.Value...)}, set: group.set.Clone(), entries: entries})
+	}
+	for _, a := range p.attachments {
+		if !selected[a.entry.EventID] {
+			continue
+		}
+		if _, err := mongoCASRow(batch.data, a.collection, a.id); err != nil || a.entry.Validate() != nil {
+			return nil, ErrMongoBatchCAS
+		}
+		r.attachments = append(r.attachments, mongoCASAttachmentFacts{a.collection, a.slot, a.id, a.entry.Clone(), a.content})
+	}
+	if len(r.attachments) == 0 && len(r.groups) == 0 {
+		return nil, nil
+	}
+	if len(r.attachments) == 0 || len(r.groups) == 0 || r.digest() == "" || batch.ValidateBorrowedSnapshot(ctx) != nil || validateMongoHistoricalComponentOriginalPlan(ctx, joint, p) != nil {
+		return nil, ErrMongoBatchCAS
+	}
+	return r, nil
+}
+
 // The statement is an actual physical sub-store effect, not a commit receipt.
 // Production entrypoints must first supply the separate opaque fresh source,
 // SQL and AI composition. The effect function below is deliberately PRIVATE.
