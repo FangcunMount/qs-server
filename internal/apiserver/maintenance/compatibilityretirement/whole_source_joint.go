@@ -282,7 +282,7 @@ func prepareWholeSourceJointPage(ctx context.Context, c *HistoricalCoordinator, 
 				return nil, err
 			}
 			candidate.LocalQualified = local.OwnerLocalTerminal && len(local.BlockingReasons) == 0 && len(view.BlockingReasons) == 0
-			candidate.HistoricalGaps = append(candidate.HistoricalGaps, local.Gaps...)
+			appendHistoricalComponentMongoGaps(&candidate, local.Gaps)
 			candidate.HistoricalGaps = append(candidate.HistoricalGaps, view.Gaps...)
 			candidate.BlockingReasons = append(candidate.BlockingReasons, local.BlockingReasons...)
 			candidate.BlockingReasons = append(candidate.BlockingReasons, view.BlockingReasons...)

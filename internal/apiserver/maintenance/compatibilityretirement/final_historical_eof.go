@@ -407,8 +407,19 @@ func finalMatchEventEntry(binding HistoricalCoordinatorBinding, row qualifiedCAS
 	if stored.Proof == nil || stored.Validate() != nil {
 		return ErrFinalHistoricalEOF
 	}
+	method := stored.Proof.Verification.Method
+	if method != "actual-whole-source-joint-fresh-origin-ai14" && method != "actual-fresh-owner-component-source-business-related-ai" {
+		return ErrFinalHistoricalEOF
+	}
 	expected, e := qualifiedCASEntry(binding, row, stored.Proof.Verification.VerifiedAt)
-	if e != nil || !reflect.DeepEqual(stored, expected) {
+	if e != nil {
+		return ErrFinalHistoricalEOF
+	}
+	// The fresh whole graph reconstructs every identity, binding and conclusion.
+	// Retain the stored original writer's method only in this comparison copy;
+	// neither the persisted proof nor any opaque qualification is relabelled.
+	expected.Proof.Verification.Method = method
+	if !reflect.DeepEqual(stored, expected) {
 		return ErrFinalHistoricalEOF
 	}
 	return nil
