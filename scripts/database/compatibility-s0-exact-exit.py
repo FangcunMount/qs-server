@@ -9,6 +9,10 @@ import os
 from pathlib import Path
 import re
 import resource
+import select
+import selectors
+import signal
+import subprocess
 import stat
 import sys
 import time
@@ -261,6 +265,7 @@ BOOTSTRAP = r'''
 import base64,hashlib,json,os,sys,types
 try:
  if os.getuid()!=0 or os.geteuid()!=0: raise ValueError()
+ os.environ.pop('SUDO_PASSWORD',None);os.environ.pop('SUDO_ASKPASS',None)
  raw=sys.stdin.buffer.readline(2097153)
  if len(raw)>2097152 or not raw.endswith(b'\n'): raise ValueError()
  p=json.loads(raw)
@@ -274,6 +279,112 @@ try:
   exec(compile(body,m.__file__,'exec'),m.__dict__);modules[name]=m
  result=modules['operator'].remote(a,p['proof'],p['actual_run_id'],modules['helper'],modules['transport'])
  print(json.dumps(result,sort_keys=True,separators=(',',':')))
+except BaseException:
+ print('{"protocol":"s0_exact_exit_result_v1","complete":false,"disposition":"unknown_or_refused"}')
+ raise SystemExit(1)
+'''
+
+
+def sudo_password(value):
+    if type(value) is not str or len(value.encode('utf-8')) > 4096 or any(c in value for c in ('\x00', '\r', '\n')):
+        fail('s0_root_channel_refused')
+    return value
+
+
+def root_packet_once(packet, helper, control, password):
+    """Only this S0 root program; retain finite stdin until actual EOF/wait.
+
+    Losing the original SSH control pipe makes the result unknown. Closing
+    our pipe is not proof that a root descendant or an unlink completed.
+    """
+    import contextlib
+    uid, euid = os.getuid(), os.geteuid()
+    if uid != euid: fail('s0_root_channel_refused')
+    raw = canonical(packet)
+    if len(raw) > 2097152: fail('s0_packet_rejected')
+    os.environ.clear(); os.environ['PATH'] = '/usr/bin:/bin'
+    if uid and password: os.environ['SUDO_PASSWORD'] = sudo_password(password)
+    environment = contextlib.nullcontext(None) if uid == 0 else helper.root_askpass_environment()
+    child = None; streams = None; previous = {}; cancelled = [False]
+    try:
+        for number in (signal.SIGINT, signal.SIGTERM, signal.SIGHUP):
+            previous[number] = signal.getsignal(number)
+            signal.signal(number, lambda _n, _f: cancelled.__setitem__(0, True))
+        with environment as private:
+            command = ['/usr/bin/python3', '-I', '-c', BOOTSTRAP]
+            if uid: command = ['/usr/bin/sudo', '-A' if private else '-n', '--', *command]
+            child = subprocess.Popen(command, env=private or {'PATH':'/usr/bin:/bin'},
+                stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+                start_new_session=True, bufsize=0)
+            if os.getpgid(child.pid) != child.pid: fail('s0_physical_exit_unknown')
+            streams = selectors.DefaultSelector()
+            os.set_blocking(child.stdin.fileno(), False)
+            streams.register(child.stdin, selectors.EVENT_WRITE, 'stdin')
+            streams.register(child.stdout, selectors.EVENT_READ, 'stdout')
+            offset = 0; output = bytearray(); deadline = time.monotonic()+660
+            try:
+                while streams.get_map() or child.poll() is None:
+                    if cancelled[0] or time.monotonic() >= deadline or select.select([control], [], [], 0)[0]:
+                        fail('s0_physical_exit_unknown')
+                    for key, _ in streams.select(0.1):
+                        if key.data == 'stdin':
+                            offset += os.write(child.stdin.fileno(), raw[offset:offset+8192])
+                            if offset == len(raw): streams.unregister(child.stdin)  # live root control pipe
+                        else:
+                            body = os.read(child.stdout.fileno(), 8192)
+                            if not body: streams.unregister(child.stdout)
+                            else: output.extend(body)
+                            if len(output) > 32768: fail('s0_physical_exit_unknown')
+                code = child.wait()
+                if offset != len(raw) or not output: fail('s0_physical_exit_unknown')
+                # The reaped leader cannot authorize signals to a reused PGID.
+                try: os.killpg(child.pid, 0)
+                except ProcessLookupError: return code, bytes(output)
+                except PermissionError: pass
+                fail('s0_physical_exit_unknown')
+            except BaseException:
+                child.stdin.close()
+                try: child.wait(timeout=25)
+                except subprocess.TimeoutExpired: pass  # root work remains unknown; never retry
+                raise
+    finally:
+        if streams is not None: streams.close()
+        if child is not None:
+            for stream in (child.stdin, child.stdout):
+                if stream is not None and not stream.closed: stream.close()
+        for number, handler in previous.items(): signal.signal(number, handler)
+        os.environ.pop('SUDO_PASSWORD', None); os.environ.pop('SUDO_ASKPASS', None)
+
+
+# Nonroot owns the original SSH control FD. It imports only the two approved
+# source bytes; the password is never part of the unchanged root packet.
+SUDO_BOOTSTRAP = r'''
+import base64,hashlib,json,os,sys,types
+def unique(pairs):
+ d={}
+ for k,v in pairs:
+  if k in d: raise ValueError()
+  d[k]=v
+ return d
+try:
+ if os.getuid()!=os.geteuid(): raise ValueError()
+ raw=sys.stdin.buffer.readline(2097153)
+ if len(raw)>2097152 or not raw.endswith(b'\n'): raise ValueError()
+ envelope=json.loads(raw,object_pairs_hook=unique)
+ if type(envelope)!=dict or set(envelope)!={'root_packet','sudo_password'}: raise ValueError()
+ packet=envelope['root_packet'];password=envelope['sudo_password']
+ if type(password)!=str or len(password.encode('utf-8'))>4096 or any(c in password for c in ('\x00','\r','\n')): raise ValueError()
+ if type(packet)!=dict or set(packet)!={'approval','proof','actual_run_id','sources'}: raise ValueError()
+ a=packet['approval'];modules={}
+ for name,key in (('operator','operator_sha256'),('helper','helper_sha256')):
+  body=base64.b64decode(packet['sources'][name],validate=True)
+  if hashlib.sha256(body).hexdigest()!=a[key]: raise ValueError()
+  m=types.ModuleType('s0_private_'+name);m.__file__='/nonexistent/s0-'+name+'.py';sys.modules[m.__name__]=m
+  exec(compile(body,m.__file__,'exec'),m.__dict__);modules[name]=m
+ code,output=modules['operator'].root_packet_once(packet,modules['helper'],sys.stdin.fileno(),password)
+ sys.stdout.buffer.write(output);sys.stdout.buffer.flush()
+ raise SystemExit(code)
+except SystemExit: raise
 except BaseException:
  print('{"protocol":"s0_exact_exit_result_v1","complete":false,"disposition":"unknown_or_refused"}')
  raise SystemExit(1)
@@ -307,16 +418,18 @@ def run(repo, approval_path, proof_path, approved_hash):
         if any(c.isspace() or c in '\"\'`$\\' for c in str(state)): fail('s0_route_rejected')
         assets.append(platform.IdentityAsset(state/'ssh.config',config))
         for item in assets:item.check()
-        packet=canonical({'approval':a,'proof':proof,'actual_run_id':run_id,'sources':{k:base64.b64encode(v).decode('ascii') for k,v in sources.items() if k!='pin'}})
+        password=sudo_password(os.environ.get('SUDO_PASSWORD',''))
+        root_packet={'approval':a,'proof':proof,'actual_run_id':run_id,'sources':{k:base64.b64encode(v).decode('ascii') for k,v in sources.items() if k!='pin'}}
+        packet=canonical({'root_packet':root_packet,'sudo_password':password})
         if len(packet)>2097152: fail('s0_packet_rejected')
         started=True
-        code,output=platform.collect_owned(['/usr/bin/ssh','-F',str(state/'ssh.config'),'qs-host-inventory','sudo -n /usr/bin/python3 -I -c '+shlex.quote(BOOTSTRAP)],packet=packet,timeout=660)
+        code,output=platform.collect_owned(['/usr/bin/ssh','-F',str(state/'ssh.config'),'qs-host-inventory','/usr/bin/python3 -I -c '+shlex.quote(SUDO_BOOTSTRAP)],packet=packet,timeout=660)
         terminal=True
         for item in assets:item.check()
         result=json.loads(output)
         if code or result.get('complete') is not True or result.get('actual_run_id')!=run_id or result.get('baseline_sha256')!=a['baseline_sha256'] or result.get('disposition')!='owned_namespace_absent' or result.get('remaining_owned_files')!=0: fail('s0_physical_exit_unknown')
         schema={'protocol':frozenset({'s0_exact_exit_result_v1'}),'actual_run_id':'run_id','baseline_sha256':'hash64','complete':'bool','disposition':frozenset({'owned_namespace_absent'}),'removed_file_count':'uint','remaining_owned_files':'uint','original_content_verified':'bool','retirement_proof':'bool','drop_authority':'bool'}
-        print(transport.encode_armored_receipt(result,schema=schema,secrets=()))
+        print(transport.encode_armored_receipt(result,schema=schema,secrets=(password,)))
     finally:
         if terminal or not started:
             for item in assets:item.remove()

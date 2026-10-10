@@ -97,6 +97,7 @@ jobs:
           HOST_INVENTORY_SSH_PORT: ${{ vars.SVRA_SSH_PORT || 22 }}
           HOST_INVENTORY_SSH_KEY: ${{ secrets.SVRA_SSH_KEY }}
           HOST_INVENTORY_SSH_FINGERPRINT: ${{ vars.SVRA_SSH_FINGERPRINT }}
+          SUDO_PASSWORD: ${{ secrets.SVRA_SUDO_PASSWORD }}
           S0_APPROVAL_PATH: ${{ steps.proof.outputs.approval }}
           S0_PROOF_PATH: ${{ steps.proof.outputs.proof }}
           S0_APPROVAL_SHA256: ${{ inputs.approval_sha256 }}

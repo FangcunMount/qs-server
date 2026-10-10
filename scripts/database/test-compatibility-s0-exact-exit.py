@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
 """Real private temporary-file effects; no production, Docker or network."""
+import base64
 import hashlib
 import importlib.util
 import os
 import json
 import subprocess
+import select
 import sys
 from pathlib import Path
 import tempfile
@@ -165,6 +167,185 @@ class ExactExit(unittest.TestCase):
         finally:
             if child.poll() is None:child.kill();child.wait(timeout=3)
             for stream in (child.stdin,child.stdout,child.stderr):stream.close()
+
+
+class FixedSudoRoute(unittest.TestCase):
+    """Actual local child/pipe/script effects, never production root authority."""
+    def setUp(self):
+        self.temp=tempfile.TemporaryDirectory(prefix='qs-owned-s0-root-route-')
+        self.parent=Path(self.temp.name);self.parent.chmod(0o700)
+        self.helper=s0.load(Path(__file__).with_name('compatibility-retirement.py'),'s0_local_sudo_helper')
+        self.control,self.writer=os.pipe()
+        self.packet={'approval':{},'proof':{},'actual_run_id':'99999999999-1','sources':{'fixture':'x'*100000}}
+        self.calls=[];self.children=[];self.askpass=[]
+        self.real_popen=subprocess.Popen
+        self.real_mkdtemp=tempfile.mkdtemp
+
+    def tearDown(self):
+        for child in self.children:
+            if child.poll() is None:child.kill();child.wait(timeout=3)
+        os.close(self.control)
+        if self.writer is not None:os.close(self.writer)
+        self.temp.cleanup()
+
+    def invoke(self,password,*,askpass=True,exit_code=0,empty=False,root=False,deny=False):
+        expected=s0.sha(s0.canonical(self.packet))
+        program=("import hashlib,os,select,stat,subprocess,sys\n"
+                 "raw=sys.stdin.buffer.readline(2097153)\n"
+                 "assert hashlib.sha256(raw).hexdigest()=="+repr(expected)+"\n"
+                 "assert b'sudo_password' not in raw and b'fixture-sudo-password' not in raw\n"
+                 "assert not select.select([sys.stdin.fileno()],[],[],0.05)[0]\n")
+        if password and not root and askpass:
+            program+=("path=os.environ['SUDO_ASKPASS']\n"
+                      "assert stat.S_IMODE(os.stat(path).st_mode)==0o700\n"
+                      "assert stat.S_IMODE(os.stat(os.path.dirname(path)).st_mode)==0o700\n"
+                      "assert b'fixture-sudo-password' not in open(path,'rb').read()\n"
+                      "p=subprocess.run([path],stdout=subprocess.PIPE,stderr=subprocess.DEVNULL,check=True)\n"
+                      "assert p.stdout==b'fixture-sudo-password\\n'\n")
+        if root or not password:
+            program+="assert 'SUDO_PASSWORD' not in os.environ and 'SUDO_ASKPASS' not in os.environ\n"
+        if not empty:program+="sys.stdout.write('fixture terminal\\n');sys.stdout.flush()\n"
+        program+='raise SystemExit('+str(exit_code)+')\n'
+        def popen(command,**kwargs):
+            self.calls.append((command,dict(kwargs['env'])))
+            if 'SUDO_ASKPASS' in kwargs['env']:self.askpass.append(Path(kwargs['env']['SUDO_ASKPASS']))
+            if deny:raise OSError('fixture launcher denied')
+            child=self.real_popen([sys.executable,'-I','-c',program],**kwargs)
+            self.children.append(child);return child
+        def directory(**kwargs):return self.real_mkdtemp(dir=self.parent,**kwargs)
+        with patch.dict(os.environ,{'SUDO_PASSWORD':'dirty-inherited-value','SUDO_ASKPASS':'/unapproved/askpass'},clear=True), \
+             patch.object(s0.subprocess,'Popen',popen),patch.object(self.helper.tempfile,'mkdtemp',directory):
+            if root:
+                with patch.object(s0.os,'getuid',return_value=0),patch.object(s0.os,'geteuid',return_value=0):
+                    return s0.root_packet_once(self.packet,self.helper,self.control,password)
+            return s0.root_packet_once(self.packet,self.helper,self.control,password)
+
+    def assert_clean(self):
+        self.assertTrue(all(not path.exists() and not path.parent.exists() for path in self.askpass))
+        self.assertEqual(list(self.parent.iterdir()),[])
+        self.assertEqual(len(self.calls),1)
+
+    def test_actual_fixed_askpass_separate_large_stdin_and_terminal_cleanup(self):
+        code,output=self.invoke('fixture-sudo-password')
+        self.assertEqual((code,output),(0,b'fixture terminal\n'))
+        self.assertEqual(self.calls[0][0][:4],['/usr/bin/sudo','-A','--','/usr/bin/python3'])
+        self.assertNotIn('fixture-sudo-password',repr(self.calls[0][0]))
+        self.assert_clean()
+
+    def test_nopasswd_does_not_consume_original_native_stdin(self):
+        self.assertEqual(self.invoke('fixture-sudo-password',askpass=False)[0],0)
+        self.assert_clean()
+
+    def test_absent_secret_retains_fixed_sudo_n(self):
+        self.assertEqual(self.invoke('')[0],0)
+        self.assertEqual(self.calls[0][0][:4],['/usr/bin/sudo','-n','--','/usr/bin/python3'])
+        self.assertEqual(self.calls[0][1],{'PATH':'/usr/bin:/bin'})
+        self.assert_clean()
+
+    def test_root_direct_scrubs_inherited_secret_without_creating_askpass(self):
+        self.assertEqual(self.invoke('fixture-sudo-password',root=True)[0],0)
+        self.assertEqual(self.calls[0][0][:3],['/usr/bin/python3','-I','-c'])
+        self.assertEqual(self.calls[0][1],{'PATH':'/usr/bin:/bin'})
+        self.assert_clean()
+
+    def test_actual_child_failure_is_not_native_success_and_cleans_owned_script(self):
+        self.assertEqual(self.invoke('fixture-sudo-password',exit_code=1)[0],1)
+        self.assert_clean()
+
+    def test_askpass_launch_failure_cleans_original_private_script(self):
+        with self.assertRaisesRegex(OSError,'fixture launcher denied'):self.invoke('fixture-sudo-password',deny=True)
+        self.assert_clean()
+
+    def test_original_caller_eof_is_unknown_without_retry(self):
+        os.close(self.writer);self.writer=None
+        with self.assertRaisesRegex(s0.Rejected,'s0_physical_exit_unknown'):self.invoke('fixture-sudo-password')
+        self.assert_clean()
+
+    def test_empty_child_output_cannot_be_completion(self):
+        with self.assertRaisesRegex(s0.Rejected,'s0_physical_exit_unknown'):self.invoke('fixture-sudo-password',empty=True)
+        self.assert_clean()
+
+    def test_password_bounds_reject_before_child_or_private_script(self):
+        for value in (None,False,'bad\nline','bad\rline','bad\x00line','é'*2049):
+            with self.subTest(value_type=type(value).__name__):
+                with self.assertRaises(s0.Rejected):s0.sudo_password(value)
+        self.assertEqual(s0.sudo_password(''),'');self.assertEqual(self.calls,[])
+        self.assertEqual(list(self.parent.iterdir()),[])
+
+    def test_source_bound_supervisor_finite_lf_import_and_rejection(self):
+        operator=b'def root_packet_once(packet,helper,control,password):\n return 0,b"fixture source-only terminal\\n"\n'
+        helper=b'fixture_import_only=True\n'
+        packet={'approval':{'operator_sha256':s0.sha(operator),'helper_sha256':s0.sha(helper)},
+                'proof':{},'actual_run_id':'99999999999-1','sources':{'operator':base64.b64encode(operator).decode(),'helper':base64.b64encode(helper).decode()}}
+        valid={'root_packet':packet,'sudo_password':'fixture-sudo-password'}
+        for mutate,expected in ((lambda v:None,0),(lambda v:v['root_packet']['approval'].update(helper_sha256='0'*64),1),
+                                (lambda v:v.update(sudo_password='bad\nline'),1),(lambda v:v.update(extra=True),1)):
+            with self.subTest(expected=expected):
+                envelope=json.loads(json.dumps(valid));mutate(envelope)
+                child=self.real_popen([sys.executable,'-I','-c',s0.SUDO_BOOTSTRAP],stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.PIPE)
+                self.children.append(child)
+                try:
+                    child.stdin.write(s0.canonical(envelope));child.stdin.flush()  # original caller stays open
+                    self.assertEqual(child.wait(timeout=3),expected)
+                    output=child.stdout.read();self.assertNotIn(b'fixture-sudo-password',output)
+                    self.assertNotIn(b'complete":true',output)
+                finally:
+                    if child.poll() is None:child.kill();child.wait(timeout=3)
+                    for stream in (child.stdin,child.stdout,child.stderr):stream.close()
+
+    def test_current_source_pure_import_reaches_only_fixed_launch_and_cleans_on_refusal(self):
+        operator=Path(__file__).with_name('compatibility-s0-exact-exit.py').read_bytes()
+        helper=Path(__file__).with_name('compatibility-retirement.py').read_bytes()
+        packet={'approval':{'operator_sha256':s0.sha(operator),'helper_sha256':s0.sha(helper)},
+                'proof':{},'actual_run_id':'99999999999-1','sources':{'operator':base64.b64encode(operator).decode(),'helper':base64.b64encode(helper).decode()}}
+        # The real dynamic imports and private constructor run. The audit hook
+        # rejects the only fixed launch before a sudo process can be created.
+        program=("import os,sys,tempfile\n"
+                 "base="+repr(str(self.parent))+"\n"
+                 "original=tempfile.mkdtemp\n"
+                 "tempfile.mkdtemp=lambda **kw:original(dir=base,**kw)\n"
+                 "def audit(event,args):\n"
+                 " if event=='subprocess.Popen':\n"
+                 "  command=args[1]\n"
+                 "  assert command[:4]==['/usr/bin/sudo','-A','--','/usr/bin/python3']\n"
+                 "  assert len(command)==7 and command[4:6]==['-I','-c']\n"
+                 "  assert 'fixture-sudo-password' not in repr(command)\n"
+                 "  sys.stdout.write('fixture fixed launch refused\\n');sys.stdout.flush()\n"
+                 "  raise RuntimeError('fixture pre-launch refusal')\n"
+                 "sys.addaudithook(audit)\n"+s0.SUDO_BOOTSTRAP)
+        child=self.real_popen([sys.executable,'-I','-c',program],stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.PIPE)
+        self.children.append(child)
+        try:
+            child.stdin.write(s0.canonical({'root_packet':packet,'sudo_password':'fixture-sudo-password'}));child.stdin.flush()
+            self.assertEqual(child.wait(timeout=3),1)
+            output=child.stdout.read()
+            self.assertIn(b'fixture fixed launch refused',output)
+            self.assertIn(b'unknown_or_refused',output)
+            self.assertNotIn(b'fixture-sudo-password',output)
+            self.assertEqual(child.stderr.read(),b'')
+            self.assertEqual(list(self.parent.iterdir()),[])
+        finally:
+            if child.poll() is None:child.kill();child.wait(timeout=3)
+            for stream in (child.stdin,child.stdout,child.stderr):stream.close()
+
+    def test_original_root_bootstrap_scrubs_both_secret_names(self):
+        operator=b'import os\ndef remote(*args):\n assert "SUDO_PASSWORD" not in os.environ and "SUDO_ASKPASS" not in os.environ\n return {"fixture":"root environment scrubbed"}\n'
+        helper=b'fixture_import_only=True\n';transport=b'fixture_import_only=True\n'
+        packet={'approval':{'operator_sha256':s0.sha(operator),'helper_sha256':s0.sha(helper)},'proof':{},'actual_run_id':'99999999999-1',
+                'sources':{k:base64.b64encode(v).decode() for k,v in {'operator':operator,'helper':helper,'transport':transport}.items()}}
+        # Only fixture transport digest and UID probes change; no native purge runs.
+        program='import os\nos.getuid=lambda:0\nos.geteuid=lambda:0\n'+s0.BOOTSTRAP.replace(s0.TRANSPORT_SHA,s0.sha(transport))
+        with patch.dict(os.environ,{'SUDO_PASSWORD':'fixture-sudo-password','SUDO_ASKPASS':'/unapproved'},clear=True):
+            child=self.real_popen([sys.executable,'-I','-c',program],stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.PIPE)
+            self.children.append(child)
+            try:
+                child.stdin.write(s0.canonical(packet));child.stdin.flush()
+                self.assertEqual(child.wait(timeout=3),0)
+                self.assertIn(b'root environment scrubbed',child.stdout.read())
+                self.assertEqual(child.stderr.read(),b'')
+            finally:
+                if child.poll() is None:child.kill();child.wait(timeout=3)
+                for stream in (child.stdin,child.stdout,child.stderr):stream.close()
 
 
 if __name__=='__main__':unittest.main()
