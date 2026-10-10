@@ -113,7 +113,7 @@ func freezeMongoSnapshotOwnerComponentReadRecipe(parent context.Context, input *
 // real frozen epoch. Old transaction recipes retain their original tuple guard.
 func (r *mongoHistoricalComponentReadRecipe) matchesOriginalInput(ctx context.Context, input *MongoSnapshotInputEpoch, txn mongoCycleTxn) bool {
 	if r.snapshotEpoch == "" {
-		return r.snapshotInput == "" && r.snapshotOwner == "" && r.snapshotOriginalInput == nil && r.snapshotDev == 0 && r.snapshotIno == 0 && !(txn.number == r.original.number && bytes.Equal(txn.session, r.original.session))
+		return r.snapshotInput == "" && r.snapshotOwner == "" && r.snapshotOriginalInput == nil && r.snapshotDev == 0 && r.snapshotIno == 0 && (txn.number != r.original.number || !bytes.Equal(txn.session, r.original.session))
 	}
 	if input == nil || input.validFile(ctx) != nil || input.self != input || r.snapshotOriginalInput != input || r.snapshotDev == 0 || r.snapshotIno == 0 || r.snapshotDev != input.dev || r.snapshotIno != input.ino || len(r.original.session) != 0 || r.original.number != 0 || !evidence.ValidSHA256(r.snapshotEpoch) || !evidence.ValidSHA256(r.snapshotInput) || !evidence.ValidSHA256(r.snapshotOwner) {
 		return false

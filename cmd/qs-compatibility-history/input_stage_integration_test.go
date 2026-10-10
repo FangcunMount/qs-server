@@ -156,7 +156,7 @@ func TestHistoryCLINativeFreshComponentMissingAIQualificationRollsBack(t *testin
 	}()
 	readOriginal := func(name string, filter bson.D) bson.Raw {
 		t.Helper()
-		raw, e := db.Collection(name).FindOne(t.Context(), filter).DecodeBytes()
+		raw, e := db.Collection(name).FindOne(t.Context(), filter).Raw()
 		if e != nil {
 			t.Fatal("actual original fixture read")
 		}
