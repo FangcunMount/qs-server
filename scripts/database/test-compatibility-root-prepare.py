@@ -138,7 +138,8 @@ class PrepareFactsBoundaries(unittest.TestCase):
             'observed_ordered_mongo_schema_sha256':'f'*64,'observed_restore_engines':request['restore_engines'],
             'observed_ai_runtime':{'source_sha':'c'*40,'image_id':'sha256:'+'3'*64,'container_id':'4'*64,'binding_sha256':'5'*64,'stop_constraints':{'settings_sha256':'6'*64,'network_id':'7'*64}},
             'observed_filesystems':[{'scope':scope,'path_sha256':'0'*64,'total_bytes':100,'available_bytes':50,'free_bytes':60} for scope in ('source','staging','archive','docker')],
-            'observed_socket_kind':'fixed_root_owned_unix_docker','observation_elapsed_millis':123,'error_category':'none','prepare_facts_private_observation_sha256':'9'*64}
+            'observed_socket_kind':'fixed_root_owned_unix_docker','observation_elapsed_millis':123,'error_category':'none','prepare_facts_private_observation_sha256':'9'*64,
+            'observed_ai_message_protection':{'sha256':'1'*64,'decrypt_key_count':1,'trusted_signer_count':1,'source_binding_sha256':'2'*64,'source_sha':'b'*40,'image_id_sha256':'3'*64,'container_id_sha256':'4'*64}}
     def test_separate_original_producer_request_does_not_approve_ordered_facts(self):
         args,value=self.args();request=tool.prepare_facts_request(args)
         self.assertEqual(request['source_sha'],'a'*40);self.assertEqual(request['inventory_report']['source_sha'],'b'*40)
@@ -194,7 +195,9 @@ class PrepareFactsBoundaries(unittest.TestCase):
             lambda r:r.update(prepare_facts_private_observation_sha256=''),lambda r:r.update(observed_filesystems=[]),
             lambda r:r.pop('observed_ai_runtime'),lambda r:r['observed_ai_runtime'].update(image_id='qs-ai:latest'),
             lambda r:r['observed_ai_runtime'].update(complete=True),lambda r:r['observed_ai_runtime']['stop_constraints'].update(network_id=''),
-            lambda r:r['observed_ai_runtime']['stop_constraints'].update(settings='secret'))
+            lambda r:r['observed_ai_runtime']['stop_constraints'].update(settings='secret'),
+            lambda r:r.pop('observed_ai_message_protection'),lambda r:r['observed_ai_message_protection'].update(decrypt_key_count=0),
+            lambda r:r['observed_ai_message_protection'].update(trusted_signer_count=9),lambda r:r['observed_ai_message_protection'].update(private_key='DO_NOT_OUTPUT'))
         for mutate in mutations:
             invalid=copy.deepcopy(original);mutate(invalid)
             with self.assertRaises(tool.Blocked):tool.validate_prepare_facts_result(invalid,args,request,request_hash,0)

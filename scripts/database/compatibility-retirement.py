@@ -1999,7 +1999,7 @@ def validate_prepare_facts_result(result, args, request, request_hash, code):
         "request_sha256", "observation_approval_sha256", "target_hash", "complete", "prepare_facts_observation_complete",
         "diagnostic_only", "execution_allowed", "drop_ready", "observed_inventory_producer", "prepare_source_files",
         "observed_ordered_mongo_schema_sha256", "observed_filesystems", "observed_socket_kind",
-        "observation_elapsed_millis", "error_category"), ("observed_restore_engines", "prepare_facts_private_observation_sha256", "observed_ai_runtime"))
+        "observation_elapsed_millis", "error_category"), ("observed_restore_engines", "prepare_facts_private_observation_sha256", "observed_ai_runtime", "observed_ai_message_protection"))
     if (type(result["format_version"]) is not int or result["format_version"] != 1 or
         result["kind"] != "readonly_prepare_facts_observation" or result["operation"] != "prepare" or
         result["prepare_mode"] != "prepare-facts" or result["source_sha"] != args.actual_source_sha or
@@ -2048,6 +2048,16 @@ def validate_prepare_facts_result(result, args, request, request_hash, code):
             fail("prepare_facts_native_images_rejected")
         if result["observed_socket_kind"] not in ("", "fixed_root_owned_unix_docker"):
             fail("prepare_facts_native_socket_rejected")
+    protection = result.get("observed_ai_message_protection")
+    if protection is not None:
+        fields(protection, ("sha256", "decrypt_key_count", "trusted_signer_count", "source_binding_sha256", "source_sha", "image_id_sha256", "container_id_sha256"))
+        for key in ("sha256", "source_binding_sha256", "image_id_sha256", "container_id_sha256"): token(protection[key], HASH)
+        token(protection["source_sha"], SHA)
+        for key in ("decrypt_key_count", "trusted_signer_count"):
+            uint(protection[key])
+            if not 1 <= protection[key] <= 8: fail("prepare_facts_native_protection_rejected")
+    if result["prepare_facts_observation_complete"] and protection is None:
+        fail("prepare_facts_native_protection_rejected")
     # Only allowlisted tokens go through the existing armored public transport.
     # The root-owned raw observation keeps the exact original filenames/IDs.
     for value in files: value["name"] = value["name"].replace(".", "_")
@@ -2338,6 +2348,7 @@ def main(argv=None):
               "prepare_facts_private_observation_sha256": "hash64", "prepare_facts_observation_complete": "bool", "observation_approval_sha256": "hash64_or_empty",
               "observed_inventory_producer": {"operation_id": "run_id", "run_id": "run_id", "source_sha": "sha40", "sha256": "hash64", "request_sha256": "hash64"},
               "prepare_source_files": [{"name": frozenset(name.replace(".", "_") for name in PREPARE_SOURCE_NAMES), "sha256": "hash64", "bytes": "uint"}],
+              "observed_ai_message_protection": {"sha256":"hash64", "decrypt_key_count":"uint", "trusted_signer_count":"uint", "source_binding_sha256":"hash64", "source_sha":"sha40", "image_id_sha256":"hash64", "container_id_sha256":"hash64"},
               "observed_ordered_mongo_schema_sha256": "hash64_or_empty",
               "observed_restore_engines": {"mysql_image_id_sha256": "hash64", "mongodb_image_id_sha256": "hash64", "architecture": frozenset({"amd64", "arm64"})},
               "observed_cached_api_image": {"image_id_sha256":"hash64","program_sha256":"hash64","source_sha":"sha40","original_source_sha":"sha40","operation_id":"run_id","run_id":"run_id","image_archive_sha256":"hash64","probe_id":"hash64","probe_absent":"bool","temporary_files_zero":"bool","os":frozenset({"linux"}),"architecture":frozenset({"amd64"})},
