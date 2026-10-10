@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"errors"
+	"path/filepath"
 
 	retirement "github.com/FangcunMount/qs-server/internal/apiserver/maintenance/compatibilityretirement"
 	backup "github.com/FangcunMount/qs-server/internal/apiserver/maintenance/compatibilityretirementbackup"
@@ -24,6 +25,7 @@ type lifecycleFixedHost struct {
 	restoreOwner        *lifecyclePreparationOwner
 	materials           *lifecycleBatchMaterials
 	acceptedMaterials   *lifecycleAcceptedMaterials
+	inventoryMaterials  *lifecycleMaterialDirectory
 	services            *lifecycleServiceController
 	api                 *lifecycleAPITransition
 	dataBaseline        *backup.NonTargetDataBaseline
@@ -45,7 +47,28 @@ func newLifecycleFixedHost(ctx context.Context, r lifecycleRequest, a *backup.Ar
 	if err := backup.VerifyHostArchiveBinding(ctx, a, r.Approval); err != nil {
 		return nil, err
 	}
-	return &lifecycleFixedHost{}, nil
+	h := &lifecycleFixedHost{}
+	// Preparation keeps its existing behavior. The final invocation reopens the
+	// exact original producer files under the authenticated source UID and holds
+	// their real read-only FDs; no persisted completion field issues a capability.
+	if r.prepareRoot == lifecycleInvocationBatch(r.OperationID, r.ActualRunID) {
+		if err := validateLifecycleAPIInvocation(r); err != nil {
+			return nil, err
+		}
+		raw, err := readLifecycleAPIRecord(filepath.Join(r.prepareRoot, "native-call.intent.private.json"))
+		if err != nil {
+			return nil, err
+		}
+		i, err := decodeLifecycleAPIInvocationIntent(raw)
+		if err != nil {
+			return nil, err
+		}
+		h.inventoryMaterials, err = openLifecycleOriginalInventoryMaterials(ctx, r, a, i.SourceUID)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return h, nil
 }
 
 func (h *lifecycleFixedHost) OpenRecoveryHandles(ctx context.Context, _ lifecycleRequest, _ *backup.Archive) (backup.TargetRecoveryBorrowed, error) {
@@ -304,11 +327,14 @@ func (h *lifecycleFixedHost) Close() error {
 		return nil
 	}
 	var result error
+	if h.inventoryMaterials != nil {
+		result = h.inventoryMaterials.close()
+	}
 	if h.writers != nil {
 		h.writers.close()
 	}
 	if h.services != nil {
-		result = h.services.Close()
+		result = errors.Join(result, h.services.Close())
 	}
 	if h.aiStopped != nil {
 		result = errors.Join(result, h.aiStopped.Close())

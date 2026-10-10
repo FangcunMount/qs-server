@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -12,6 +13,8 @@ import (
 	"strconv"
 	"strings"
 	"syscall"
+
+	backup "github.com/FangcunMount/qs-server/internal/apiserver/maintenance/compatibilityretirementbackup"
 )
 
 const lifecycleInvocationBase = "/opt/backups/qs-server/compatibility-retirement-invocations"
@@ -264,4 +267,188 @@ func stageLifecycleRootInputs(ctx context.Context, path, expected, operation, ac
 		return "", e
 	}
 	return staged, nil
+}
+
+// These are the existing inventory producer's two closed file schemas. They
+// bind members to the independently approved report, not to an imported permit.
+type lifecycleInventorySourceAsset struct {
+	FormatVersion        int            `json:"format_version"`
+	Kind                 string         `json:"kind"`
+	Filename             string         `json:"filename"`
+	SourceSHA            string         `json:"source_sha"`
+	OperationID          string         `json:"operation_id"`
+	RunID                string         `json:"run_id"`
+	RequestHash          string         `json:"request_hash"`
+	Protocol             string         `json:"protocol"`
+	Boundary             targetBoundary `json:"boundary"`
+	ContainsOriginalBody bool           `json:"contains_original_body"`
+	RetirementProof      bool           `json:"retirement_proof"`
+	PurgeRequired        bool           `json:"purge_required_after_acceptance"`
+	ResumeExisting       bool           `json:"resume_existing_file_allowed"`
+}
+type lifecycleInventoryCheckpoint struct {
+	FormatVersion  int    `json:"format_version"`
+	Kind           string `json:"kind"`
+	SourceSHA      string `json:"source_sha"`
+	Pass           int    `json:"pass"`
+	Page           int    `json:"page"`
+	Cursor         string `json:"cursor_token"`
+	Records        uint64 `json:"records"`
+	SourceBytes    uint64 `json:"source_bytes"`
+	PrefixHash     string `json:"prefix_hash"`
+	DiagnosticOnly bool   `json:"diagnostic_only"`
+	ResumeExisting bool   `json:"resume_existing_file_allowed"`
+}
+
+// Open, read to bounded EOF, validate the original inode, and retain a real RO
+// FD in the existing catalog. Unknown JSON fields never become named members.
+// The caller validates the exact producer tuple/schema before returning an owner.
+func readLifecycleProducerJSON(d *lifecycleMaterialDirectory, name, expected string, uid uint32, maximum int64, value any) (raw []byte, result error) {
+	if d.unchanged() != nil || filepath.Base(name) != name || maximum < 1 || maximum > 4<<20 {
+		return nil, lifecycleError("lifecycle_material_registration_rejected")
+	}
+	f, e := os.OpenFile(filepath.Join(d.path, name), os.O_RDONLY|syscall.O_NOFOLLOW|syscall.O_NONBLOCK, 0)
+	if e != nil {
+		return nil, lifecycleError("lifecycle_material_registration_rejected")
+	}
+	defer func() {
+		if e := f.Close(); e != nil && result == nil {
+			result = lifecycleError("lifecycle_material_file_close_unknown")
+		}
+	}()
+	before, e := f.Stat()
+	st, ok := infoStat(before)
+	if e != nil || !ok || !before.Mode().IsRegular() || before.Mode().Perm() != 0600 || st.Uid != uid || st.Nlink != 1 || before.Size() < 1 || before.Size() > maximum {
+		return nil, lifecycleError("lifecycle_material_registration_rejected")
+	}
+	raw, e = io.ReadAll(io.LimitReader(f, maximum+1))
+	after, ae := f.Stat()
+	if e != nil || ae != nil || int64(len(raw)) != before.Size() || !sameLifecycleFile(before, after) || expected != "" && digestRaw(raw) != expected || rejectDuplicateJSON(raw) != nil || lifecycleExactJSONNames(raw, reflect.TypeOf(value).Elem()) != nil || json.Unmarshal(raw, value) != nil {
+		return nil, lifecycleError("lifecycle_material_bytes_or_identity_changed")
+	}
+	if e = d.register(name, digestRaw(raw), uid, 0600); e != nil {
+		return nil, e
+	}
+	if !sameLifecycleFile(before, d.files[name].info) || d.checkFile(d.files[name]) != nil {
+		return nil, lifecycleError("lifecycle_material_bytes_or_identity_changed")
+	}
+	return raw, nil
+}
+
+func openLifecycleOriginalInventoryMaterials(ctx context.Context, r lifecycleRequest, a *backup.Archive, uid uint32) (*lifecycleMaterialDirectory, error) {
+	if ctx == nil || ctx.Err() != nil || a == nil || !runRE.MatchString(r.OperationID) || !runRE.MatchString(r.Approval.RunID) || r.Approval.SourceSHA != r.OriginalSourceSHA || r.Approval.OperationID != r.OperationID {
+		return nil, lifecycleError("lifecycle_material_registration_rejected")
+	}
+	// The only production caller has just verified this original native Archive
+	// against Approval. Do not rescan its four bodies a second time here.
+	if a.Summary().ArchiveSHA256 != r.Recovery.ArchiveSHA256 || !hashRE.MatchString(r.Recovery.ArchiveSHA256) {
+		return nil, lifecycleError("lifecycle_material_registration_rejected")
+	}
+	hashes := map[string]string{lifecycleSourceNames[0]: r.Approval.InventorySHA256, lifecycleSourceNames[1]: r.Approval.SQLMetadataSHA256, lifecycleSourceNames[2]: r.Approval.MongoMetadataSHA256}
+	for i, asset := range a.TemporarySourceAssets() {
+		if asset.Filename != lifecycleSourceNames[3+i] || !hashRE.MatchString(asset.SHA256) || asset.Bytes < 0 || asset.Bytes > 2<<30 {
+			return nil, lifecycleError("lifecycle_material_registration_rejected")
+		}
+		hashes[asset.Filename] = asset.SHA256
+	}
+	if len(r.SourceFileSHA256) != 0 && !reflect.DeepEqual(r.SourceFileSHA256, hashes) {
+		return nil, lifecycleError("lifecycle_material_registration_rejected")
+	}
+	path := filepath.Join("/opt/backups/qs-server/compatibility-retirement", r.OperationID, "inventory-"+r.Approval.RunID)
+	return openLifecycleInventoryMaterialFiles(ctx, path, uid, r.Approval, hashes)
+}
+
+// The complete name set comes from the approved producer report and its exact
+// two-pass/page-size protocol. ReadDir is used only to reject extra members.
+func openLifecycleInventoryMaterialFiles(ctx context.Context, path string, uid uint32, approval backup.Approval, hashes map[string]string) (owned *lifecycleMaterialDirectory, result error) {
+	if ctx == nil || ctx.Err() != nil || len(hashes) != len(lifecycleSourceNames) || hashes[lifecycleSourceNames[0]] != approval.InventorySHA256 || hashes[lifecycleSourceNames[1]] != approval.SQLMetadataSHA256 || hashes[lifecycleSourceNames[2]] != approval.MongoMetadataSHA256 {
+		return nil, lifecycleError("lifecycle_material_registration_rejected")
+	}
+	d, e := openLifecycleMaterialDirectory(path, uid)
+	if e != nil {
+		return nil, e
+	}
+	defer func() {
+		if result != nil {
+			if e := d.close(); e != nil {
+				result = e
+			}
+		}
+	}()
+	var inventory report
+	if _, e = readLifecycleProducerJSON(d, lifecycleSourceNames[0], approval.InventorySHA256, uid, 4<<20, &inventory); e != nil {
+		return nil, e
+	}
+	if inventory.FormatVersion != 2 || inventory.Kind != "readonly_compatibility_inventory" || inventory.SourceSHA != approval.SourceSHA || inventory.OperationID != approval.OperationID || inventory.RunID != approval.RunID || inventory.RequestHash != approval.RequestHash || inventory.TargetHash != digest(targets) || len(inventory.Targets) != 4 || !inventory.Complete || inventory.DropReady || inventory.ErrorCategory != "none" {
+		return nil, lifecycleError("lifecycle_material_registration_rejected")
+	}
+	for _, name := range lifecycleSourceNames[1:] {
+		if !hashRE.MatchString(hashes[name]) {
+			return nil, lifecycleError("lifecycle_material_registration_rejected")
+		}
+		if e = d.register(name, hashes[name], uid, 0600); e != nil {
+			return nil, e
+		}
+	}
+	limits := productionLimits()
+	for i, s := range inventory.Targets {
+		if ctx.Err() != nil {
+			return nil, ctx.Err()
+		}
+		if s.Database != targets[i][0] || s.Name != targets[i][1] || s.Kind != targets[i][2] || s.SourceFile != lifecycleSourceNames[3+i] || s.Boundary == nil || !s.Present || !s.Complete || s.Passes != 2 || !hashRE.MatchString(s.DataHash) || s.Records > uint64(limits.MaxRecords) || s.Bytes > uint64(limits.MaxBytes) || s.Pages%2 != 0 {
+			return nil, lifecycleError("lifecycle_material_registration_rejected")
+		}
+		pages := s.Pages / 2
+		wantPages := s.Records/uint64(limits.PageSize) + 1
+		if s.Boundary.Empty {
+			wantPages = 0
+			if s.Records != 0 || s.Bytes != 0 {
+				return nil, lifecycleError("lifecycle_material_registration_rejected")
+			}
+		}
+		if pages != wantPages || pages > uint64(limits.MaxPages) {
+			return nil, lifecycleError("lifecycle_material_registration_rejected")
+		}
+		protocol := "mysql_cast_binary_columns_pk_order_v2"
+		if i == 3 {
+			protocol = "mongodb_server_bson_pk_order_v2"
+		}
+		var asset lifecycleInventorySourceAsset
+		if _, e = readLifecycleProducerJSON(d, s.SourceFile+".asset.json", "", uid, 4<<20, &asset); e != nil {
+			return nil, e
+		}
+		if asset.FormatVersion != 1 || asset.Kind != "temporary_inventory_source_copy" || asset.Filename != s.SourceFile || asset.SourceSHA != approval.SourceSHA || asset.OperationID != approval.OperationID || asset.RunID != approval.RunID || asset.RequestHash != approval.RequestHash || asset.Protocol != protocol || !reflect.DeepEqual(asset.Boundary, *s.Boundary) || !asset.ContainsOriginalBody || asset.RetirementProof || !asset.PurgeRequired || asset.ResumeExisting {
+			return nil, lifecycleError("lifecycle_material_registration_rejected")
+		}
+		var previous lifecycleInventoryCheckpoint
+		for page := 1; uint64(page) <= pages; page++ {
+			var pair [2]lifecycleInventoryCheckpoint
+			for pass := 1; pass <= 2; pass++ {
+				if ctx.Err() != nil {
+					return nil, ctx.Err()
+				}
+				name := fmt.Sprintf("%s-%s-pass-%d-page-%06d.checkpoint.json", s.Database, s.Name, pass, page)
+				if _, e = readLifecycleProducerJSON(d, name, "", uid, 4<<20, &pair[pass-1]); e != nil {
+					return nil, e
+				}
+				p := pair[pass-1]
+				records := min(uint64(page)*uint64(limits.PageSize), s.Records)
+				if p.FormatVersion != 1 || p.Kind != "readonly_inventory_page_checkpoint" || p.SourceSHA != approval.SourceSHA || p.Pass != pass || p.Page != page || p.Records != records || p.SourceBytes > s.Bytes || p.SourceBytes < previous.SourceBytes || !hashRE.MatchString(p.PrefixHash) || !p.DiagnosticOnly || p.ResumeExisting || p.Cursor == "" || uint64(page) == pages && (p.Records != s.Records || p.SourceBytes != s.Bytes || p.PrefixHash != s.DataHash) {
+					return nil, lifecycleError("lifecycle_material_registration_rejected")
+				}
+			}
+			pair[1].Pass = 1
+			if !reflect.DeepEqual(pair[0], pair[1]) {
+				return nil, lifecycleError("lifecycle_material_registration_rejected")
+			}
+			if previous.Records < pair[0].Records && previous.Cursor == pair[0].Cursor {
+				return nil, lifecycleError("lifecycle_material_registration_rejected")
+			}
+			previous = pair[0]
+		}
+	}
+	if e = d.checkComplete(false); e != nil {
+		return nil, e
+	}
+	return d, nil
 }

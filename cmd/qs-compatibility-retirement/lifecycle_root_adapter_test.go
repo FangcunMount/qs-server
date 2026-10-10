@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net"
 	"os"
@@ -321,6 +322,173 @@ func TestLifecycleNativeRunReuseRejectedBeforeLaterGates(t *testing.T) {
 			}
 			if after, err := os.ReadFile(path); err != nil || !bytes.Equal(after, raw) {
 				t.Fatal("rejection changed original input")
+			}
+		})
+	}
+}
+
+// Offline original-producer files only. No Archive, acceptance, Window or
+// production mutation is issued by this fixture or its retained filesystem FD.
+func originalInventoryMaterialFixture(t *testing.T, records uint64) (string, backup.Approval, map[string]string) {
+	t.Helper()
+	dir, e := filepath.EvalSymlinks(t.TempDir())
+	if e != nil || os.Chmod(dir, 0700) != nil {
+		t.Fatal("private directory")
+	}
+	a := backup.Approval{SourceSHA: strings.Repeat("a", 40), OperationID: "123-1", RunID: "456-1", RequestHash: strings.Repeat("b", 64)}
+	hashes := map[string]string{}
+	for i, name := range lifecycleSourceNames[1:] {
+		raw := []byte("source-" + name)
+		if records == 0 && i == 5 {
+			raw = nil
+		}
+		if os.WriteFile(filepath.Join(dir, name), raw, 0600) != nil {
+			t.Fatal("source")
+		}
+		hashes[name] = digestRaw(raw)
+	}
+	a.SQLMetadataSHA256 = hashes[lifecycleSourceNames[1]]
+	a.MongoMetadataSHA256 = hashes[lifecycleSourceNames[2]]
+	r := report{FormatVersion: 2, Kind: "readonly_compatibility_inventory", SourceSHA: a.SourceSHA, OperationID: a.OperationID, RunID: a.RunID, RequestHash: a.RequestHash, TargetHash: digest(targets), Complete: true, ErrorCategory: "none"}
+	for i, v := range targets {
+		b := targetBoundary{Database: v[0], Name: v[1], Kind: v[2], Present: true, Empty: records == 0}
+		pages := records/1000 + 1
+		if records == 0 {
+			pages = 0
+		}
+		s := snapshot{Database: v[0], Name: v[1], Kind: v[2], Present: true, Complete: true, Records: records, Bytes: records, DataHash: strings.Repeat("c", 64), SourceFile: lifecycleSourceNames[3+i], Boundary: &b, Pages: 2 * pages, Passes: 2}
+		r.Targets = append(r.Targets, s)
+		protocol := "mysql_cast_binary_columns_pk_order_v2"
+		if i == 3 {
+			protocol = "mongodb_server_bson_pk_order_v2"
+		}
+		asset := lifecycleInventorySourceAsset{1, "temporary_inventory_source_copy", s.SourceFile, a.SourceSHA, a.OperationID, a.RunID, a.RequestHash, protocol, b, true, false, true, false}
+		if writeJSON(filepath.Join(dir, s.SourceFile+".asset.json"), asset) != nil {
+			t.Fatal("asset")
+		}
+		for pass := 1; pass <= 2; pass++ {
+			for page := 1; uint64(page) <= pages; page++ {
+				count := min(uint64(page)*1000, records)
+				p := lifecycleInventoryCheckpoint{1, "readonly_inventory_page_checkpoint", a.SourceSHA, pass, page, fmt.Sprint(count), count, count, s.DataHash, true, false}
+				name := fmt.Sprintf("%s-%s-pass-%d-page-%06d.checkpoint.json", s.Database, s.Name, pass, page)
+				if writeJSON(filepath.Join(dir, name), p) != nil {
+					t.Fatal("checkpoint")
+				}
+			}
+		}
+	}
+	if writeJSON(filepath.Join(dir, lifecycleSourceNames[0]), r) != nil {
+		t.Fatal("report")
+	}
+	raw, e := os.ReadFile(filepath.Join(dir, lifecycleSourceNames[0]))
+	if e != nil {
+		t.Fatal(e)
+	}
+	a.InventorySHA256 = digestRaw(raw)
+	hashes[lifecycleSourceNames[0]] = a.InventorySHA256
+	return dir, a, hashes
+}
+func TestOriginalInventoryMaterialHandoffIncludesAssetsBothPassesAndEmptySources(t *testing.T) {
+	for _, records := range []uint64{0, 1, 1000, 1001} {
+		t.Run(fmt.Sprint(records), func(t *testing.T) {
+			dir, a, hashes := originalInventoryMaterialFixture(t, records)
+			d, e := openLifecycleInventoryMaterialFiles(context.Background(), dir, uint32(os.Getuid()), a, hashes)
+			if e != nil {
+				t.Fatal(e)
+			}
+			defer d.close()
+			pages := records/1000 + 1
+			if records == 0 {
+				pages = 0
+			}
+			if len(d.files) != 11+int(8*pages) || len(d.children) != 0 {
+				t.Fatal("original members were omitted")
+			}
+			for name, v := range d.files {
+				if v.file == nil || d.checkFile(v) != nil || v.retained {
+					t.Fatalf("missing original FD: %s", name)
+				}
+			}
+			if d.purge(context.Background()) != nil || d.checkComplete(true) != nil || d.close() != nil {
+				t.Fatal("exact file purge/close")
+			}
+			for _, v := range d.files {
+				if v.file != nil {
+					t.Fatal("unlinked original FD remains")
+				}
+			}
+		})
+	}
+}
+func TestOriginalInventoryMaterialHandoffRejectsUnboundIncompleteOrChangedProducerFiles(t *testing.T) {
+	for _, kind := range []string{"missing-asset", "missing-second-pass", "wrong-source", "wrong-request", "wrong-final-prefix", "different-pass-cursor", "extra-member", "wrong-owner", "changed-after-open"} {
+		t.Run(kind, func(t *testing.T) {
+			dir, a, hashes := originalInventoryMaterialFixture(t, 1)
+			assetPath := filepath.Join(dir, lifecycleSourceNames[3]+".asset.json")
+			checkpointPath := filepath.Join(dir, "mysql-domain_event_outbox-pass-2-page-000001.checkpoint.json")
+			switch kind {
+			case "missing-asset":
+				if os.Remove(assetPath) != nil {
+					t.Fatal("remove")
+				}
+			case "missing-second-pass":
+				if os.Remove(checkpointPath) != nil {
+					t.Fatal("remove")
+				}
+			case "wrong-source", "wrong-request":
+				var v lifecycleInventorySourceAsset
+				raw, _ := os.ReadFile(assetPath)
+				if json.Unmarshal(raw, &v) != nil {
+					t.Fatal("read")
+				}
+				if kind == "wrong-source" {
+					v.SourceSHA = strings.Repeat("d", 40)
+				} else {
+					v.RequestHash = strings.Repeat("d", 64)
+				}
+				raw, _ = json.Marshal(v)
+				if os.WriteFile(assetPath, raw, 0600) != nil {
+					t.Fatal("write")
+				}
+			case "wrong-final-prefix", "different-pass-cursor":
+				var v lifecycleInventoryCheckpoint
+				raw, _ := os.ReadFile(checkpointPath)
+				if json.Unmarshal(raw, &v) != nil {
+					t.Fatal("read")
+				}
+				if kind == "wrong-final-prefix" {
+					v.PrefixHash = strings.Repeat("d", 64)
+				} else {
+					v.Cursor = "other"
+				}
+				raw, _ = json.Marshal(v)
+				if os.WriteFile(checkpointPath, raw, 0600) != nil {
+					t.Fatal("write")
+				}
+			case "extra-member":
+				if os.WriteFile(filepath.Join(dir, "unknown"), []byte("body"), 0600) != nil {
+					t.Fatal("write")
+				}
+			}
+			uid := uint32(os.Getuid())
+			if kind == "wrong-owner" {
+				uid++
+			}
+			d, e := openLifecycleInventoryMaterialFiles(context.Background(), dir, uid, a, hashes)
+			if kind == "changed-after-open" {
+				if e != nil {
+					t.Fatal(e)
+				}
+				defer d.close()
+				if os.WriteFile(assetPath, []byte("changed"), 0600) != nil || d.checkComplete(false) == nil {
+					t.Fatal("original identity/bytes change accepted")
+				}
+			} else if e == nil {
+				defer d.close()
+				t.Fatal("foreign/incomplete producer material accepted")
+			}
+			if _, e := os.Stat(filepath.Join(dir, lifecycleSourceNames[3])); e != nil {
+				t.Fatal("failed registration deleted a source")
 			}
 		})
 	}
