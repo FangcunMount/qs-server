@@ -19,7 +19,7 @@ class WindowToolMetadata(unittest.TestCase):
     def approval(self,r,stage='prepare'):
         value = {'format_version':1,'kind':'independent_compatibility_window_tool_approval','dispatcher_source_sha':'d'*40,'tool_source_sha':'a'*40,
                 'original_source_sha':'b'*40,'operation_id':'12-1','original_run_id':'11-1','stage':stage,'target_hash':tool.TARGET,'manifest_sha256':'c'*64,
-                'request_template_sha256':tool.digest(tool.canonical(r)),'tool_binary_sha256':{'amd64':'7'*64,'arm64':'8'*64},'b_image_id':'','b_program_sha256':''}
+                'request_template_sha256':tool.digest(tool.canonical(r)),'tool_binary_sha256':{'amd64':'7'*64,'arm64':'8'*64},'b_image_id':'sha256:'+'9'*64,'b_program_sha256':'a'*64}
         if stage != 'prepare':
             scope = {k:value[k] for k in ('dispatcher_source_sha','tool_source_sha','original_source_sha','operation_id','original_run_id','manifest_sha256')}
             scope.update(format_version=1,kind='approved_runner_workflow_quarantine_scope',repository_id='21',owner_id='22',actor_id='23',workflow_id=24,workflow_ids=[24,25],job_name='Retire exact private lifecycle stage with workflow quarantine',runner_id=26)
@@ -35,9 +35,11 @@ class WindowToolMetadata(unittest.TestCase):
         self.assertEqual(self.approve(a),a)
         self.assertNotEqual(a['dispatcher_source_sha'],a['tool_source_sha'])
         self.assertNotEqual(a['original_source_sha'],a['tool_source_sha'])
-    def test_current_main_a_prepare_can_use_same_tool_without_b_image(self):
+    def test_current_main_prepare_same_tool_requires_actual_b_image(self):
         r=self.request();r['tool_source_sha']='d'*40;a=self.approval(r);a['tool_source_sha']='d'*40
         self.assertEqual(self.approve(a),a)
+        a['b_image_id']='';a['b_program_sha256']=''
+        with self.assertRaises(tool.Refused):self.approve(a)
     def test_unknown_run_derives_only_two_new_current_fields_and_keeps_original(self):
         r=self.request();raw=tool.canonical(r);a=self.approval(r)
         derived=tool.derive_request(raw,a,'22-3');value=tool.decode(derived)
@@ -196,7 +198,7 @@ class WindowToolMetadata(unittest.TestCase):
             r=self.request();a=self.approval(r);r['recovery'][key]=value;a['request_template_sha256']=tool.digest(tool.canonical(r))
             with self.subTest(key=key,value=value),self.assertRaises(tool.Refused):tool.derive_request(tool.canonical(r),a,'22-3')
     def test_effects_require_approved_exact_image_and_program(self):
-        a=self.approval(self.request(),'apply')
+        a=self.approval(self.request(),'apply');a['b_image_id']='';a['b_program_sha256']=''
         with self.assertRaises(tool.Refused):self.approve(a)
         a['b_image_id']='sha256:'+'9'*64;a['b_program_sha256']='a'*64
         self.assertEqual(self.approve(a),a)
@@ -326,17 +328,20 @@ const core={setOutput:(k,v)=>outputs[k]=v};process.env.GITHUB_RUN_ATTEMPT='1';
         raw=tool.canonical(a);q.update(bootstrap_approval_json=raw[:-1].decode(),bootstrap_approval_sha256=tool.digest(raw))
         value=self.run_script(q)
         self.assertFalse(value['accepted']);self.assertEqual(value['calls'],[])
-    def test_workflow_refuses_b_image_or_program_fields_for_prepare(self):
-        for field,value in (('b_image_id','sha256:'+'9'*64),('b_program_sha256','a'*64),('b_image_id',None)):
+    def test_workflow_refuses_missing_or_unbound_b_image_pair_for_prepare(self):
+        for field,value in (('b_image_id',''),('b_program_sha256',''),('b_image_id',None),('b_image_id','latest')):
             with self.subTest(field=field,value=value):
                 q=self.inputs();a=tool.decode(q['bootstrap_approval_json']);a[field]=value
                 raw=tool.canonical(a);q.update(bootstrap_approval_json=raw[:-1].decode(),bootstrap_approval_sha256=tool.digest(raw))
                 result=self.run_script(q)
                 self.assertFalse(result['accepted']);self.assertEqual(result['calls'],[])
-    def test_workflow_current_main_a_prepare_requires_no_b_image(self):
-        q=self.inputs();a=tool.decode(q['bootstrap_approval_json']);a['tool_source_sha']='d'*40
+    def test_workflow_same_main_prepare_requires_actual_image_even_same_original_source(self):
+        q=self.inputs();a=tool.decode(q['bootstrap_approval_json']);a['tool_source_sha']='d'*40;a['original_source_sha']='d'*40
         raw=tool.canonical(a);q.update(bootstrap_approval_json=raw[:-1].decode(),bootstrap_approval_sha256=tool.digest(raw))
         self.assertTrue(self.run_script(q,selected='d'*40)['accepted'])
+        a['b_image_id']='';a['b_program_sha256']=''
+        raw=tool.canonical(a);q.update(bootstrap_approval_json=raw[:-1].decode(),bootstrap_approval_sha256=tool.digest(raw))
+        self.assertFalse(self.run_script(q,selected='d'*40)['accepted'])
     def test_workflow_ref_main_advance_selected_mismatch_and_failed_ci_refuse(self):
         for values in ({'branch':'refs/heads/branch'},{'main':'e'*40},{'selected':'e'*40},{'ci':'failure'},{'ci':'running'}):
             with self.subTest(values=values):self.assertFalse(self.run_script(self.inputs(),**values)['accepted'])
@@ -578,11 +583,19 @@ class RootTemplateStaging(unittest.TestCase):
                 raise ChildProcessError('mocked native boundary')
             # This test owns real temp files only; privilege and native owner
             # are explicitly mocked, and never provide Linux/root proof.
-            owner=object();check=[(0,b'd'*40+b'\n')]
+            owner=object();check=[(0,b'd'*40+b'\n')];image_reads=[]
             def run_owned(command,environment,**options):
                 self.assertIs(options['owner'],owner)
                 self.assertEqual(options['control'],tool.sys.stdin.fileno())
                 if command[1]=='--source-sha':return check[0]
+                if command[0]=='/usr/bin/docker':
+                    self.assertEqual(command[1:6],['--host','unix:///run/docker.sock','image','inspect','--format'])
+                    self.assertEqual(command[6],'{"id":{{json .Id}},"os":{{json .Os}},"architecture":{{json .Architecture}},"revision":{{json (index .Config.Labels "org.opencontainers.image.revision")}}}')
+                    self.assertEqual(command[7:], [a['b_image_id']])
+                    self.assertEqual(environment,{'PATH':'/usr/bin:/bin'});self.assertEqual(options['timeout'],10)
+                    image_reads.append(arguments[2])
+                    return 0,tool.canonical({'id':a['b_image_id'],'os':'linux','architecture':'arm64','revision':a['tool_source_sha']})
+                self.assertEqual(command[1:3],['--mode','lifecycle-prepare-root-once'])
                 return execve(command[0],command,environment)
             with mock.patch.object(tool,'Path',side_effect=mapped),mock.patch.object(tool.os,'getuid',return_value=0),mock.patch.object(tool.os,'geteuid',return_value=0),mock.patch.object(tool.platform,'system',return_value='Linux'),mock.patch.object(tool.platform,'machine',return_value='aarch64'),mock.patch.object(tool,'protected_directory',side_effect=protected),mock.patch.object(tool,'LinuxChildOwner',return_value=owner),mock.patch.object(tool,'live_control'),mock.patch.object(tool,'owned_process',side_effect=run_owned):
                 arguments[2]='21-1';check[0]=(0,b'e'*40+b'\n')
@@ -600,6 +613,7 @@ class RootTemplateStaging(unittest.TestCase):
                 with self.assertRaises(ChildProcessError):tool.root_execute(arguments,packet,original_uid,archive)
                 self.assertEqual(len(native_calls),2)
                 self.assertEqual((mapped(prefix+'compatibility-retirement-invocations/12-1-22-3')/'lifecycle-request.json').read_bytes(),first)
+            self.assertEqual(image_reads,['22-3','22-3','23-1','23-1'])
             self.assertEqual(before,{p.name:p.read_bytes() for p in original.iterdir()})
     def test_real_exclusive_write_never_overwrites_an_existing_receipt(self):
         import tempfile

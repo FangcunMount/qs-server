@@ -874,7 +874,7 @@ func openLifecycleRootStagingMaterialFiles(ctx context.Context, root, invocation
 		nativeHash = v.NativeSHA256
 	case "independent_window_tool_native_invocation":
 		v, e := decodeLifecycleAPIInvocationIntent(toolBytes)
-		bIdentityValid := v.BImageID == "" && v.BProgramSHA256 == "" || strings.HasPrefix(v.BImageID, "sha256:") && hashRE.MatchString(strings.TrimPrefix(v.BImageID, "sha256:")) && hashRE.MatchString(v.BProgramSHA256)
+		bIdentityValid := strings.HasPrefix(v.BImageID, "sha256:") && hashRE.MatchString(strings.TrimPrefix(v.BImageID, "sha256:")) && hashRE.MatchString(v.BProgramSHA256)
 		if e != nil || v.FormatVersion != 1 || v.Stage != "prepare" || v.OperationID != i.OperationID || v.ActualRunID != i.ActualRunID || v.OriginalSourceSHA != i.OriginalSourceSHA || v.OriginalRunID != i.OriginalRunID || v.ToolSourceSHA != i.ToolSourceSHA || v.DerivedSHA256 != i.RequestSHA256 || v.ManifestSHA256 != i.ManifestSHA256 || v.NativePath != filepath.Join(root, "restore-native") || v.SourceUID != sourceUID || !shaRE.MatchString(v.DispatcherSourceSHA) || !hashRE.MatchString(v.TemplateSHA256) || !hashRE.MatchString(v.PackageSHA256) || !hashRE.MatchString(v.ToolProgramSHA256) || v.DropAuthority || !bIdentityValid {
 			return nil, nil, lifecycleError("lifecycle_staging_original_intent_rejected")
 		}

@@ -117,14 +117,10 @@ def approve(raw, expected, dispatcher, stage, operation, manifest, template):
         token(value, HASH)
     if "local_descriptor_sha256" in a:
         token(a["local_descriptor_sha256"], HASH)
-    # A prepare may approve the current main tool without a B runtime. All
-    # effectful stages independently bind an actual prebuilt B image/program.
-    if a["b_image_id"] == "" and a["b_program_sha256"] == "":
-        if stage != "prepare":
-            reject()
-    else:
-        token(a["b_image_id"], re.compile(r"sha256:[0-9a-f]{64}"))
-        token(a["b_program_sha256"], HASH)
+    # Earlier prepare-facts supplies actual cached B image/program identity.
+    # Preparation and effectful stages both require that immutable pair.
+    token(a["b_image_id"], re.compile(r"sha256:[0-9a-f]{64}"))
+    token(a["b_program_sha256"], HASH)
     if stage != "prepare":
         validate_workflow_scope(a["workflow_scope"], a)
     return a

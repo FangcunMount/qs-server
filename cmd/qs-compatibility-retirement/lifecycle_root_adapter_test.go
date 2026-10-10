@@ -471,7 +471,7 @@ func originalRootStagingMaterialFixture(t *testing.T, windowTool bool) (string, 
 		t.Fatal("intent")
 	}
 	if windowTool {
-		v := lifecycleAPIInvocationIntent{FormatVersion: 1, Kind: "independent_window_tool_native_invocation", DispatcherSourceSHA: strings.Repeat("e", 40), ToolSourceSHA: i.ToolSourceSHA, OriginalSourceSHA: i.OriginalSourceSHA, OperationID: i.OperationID, OriginalRunID: i.OriginalRunID, ActualRunID: i.ActualRunID, Stage: "prepare", TemplateSHA256: strings.Repeat("f", 64), DerivedSHA256: i.RequestSHA256, ManifestSHA256: i.ManifestSHA256, PackageSHA256: strings.Repeat("1", 64), ToolProgramSHA256: strings.Repeat("2", 64), NativeSHA256: digestRaw([]byte("offline native bytes")), NativePath: filepath.Join(root, "restore-native"), SourceUID: i.SourceUID}
+		v := lifecycleAPIInvocationIntent{FormatVersion: 1, Kind: "independent_window_tool_native_invocation", DispatcherSourceSHA: strings.Repeat("e", 40), ToolSourceSHA: i.ToolSourceSHA, OriginalSourceSHA: i.OriginalSourceSHA, OperationID: i.OperationID, OriginalRunID: i.OriginalRunID, ActualRunID: i.ActualRunID, Stage: "prepare", TemplateSHA256: strings.Repeat("f", 64), DerivedSHA256: i.RequestSHA256, ManifestSHA256: i.ManifestSHA256, PackageSHA256: strings.Repeat("1", 64), ToolProgramSHA256: strings.Repeat("2", 64), NativeSHA256: digestRaw([]byte("offline native bytes")), NativePath: filepath.Join(root, "restore-native"), SourceUID: i.SourceUID, BImageID: "sha256:" + strings.Repeat("9", 64), BProgramSHA256: strings.Repeat("a", 64)}
 		if writeJSON(filepath.Join(root, "tool.intent.private.json"), v) != nil {
 			t.Fatal("tool")
 		}
@@ -565,7 +565,7 @@ func TestOriginalRootStagingMaterialHandoffReopensBothActualProducerSchemas(t *t
 }
 
 func TestOriginalRootStagingMaterialHandoffRejectsRebindingAndExtraFiles(t *testing.T) {
-	for _, name := range []string{"wrong_intent_hash", "wrong_source_uid", "wrong_archive", "missing_copy", "changed_native", "extra_root", "extra_child", "extra_companion", "changed_companion", "unknown_tool_schema", "null_intent"} {
+	for _, name := range []string{"wrong_intent_hash", "wrong_source_uid", "wrong_archive", "missing_copy", "changed_native", "extra_root", "extra_child", "extra_companion", "changed_companion", "unknown_tool_schema", "empty_b_identity", "null_intent"} {
 		t.Run(name, func(t *testing.T) {
 			root, invocation, r, hashes := originalRootStagingMaterialFixture(t, true)
 			var i lifecycleSourceCopyIntent
@@ -598,6 +598,15 @@ func TestOriginalRootStagingMaterialHandoffRejectsRebindingAndExtraFiles(t *test
 				_ = os.WriteFile(filepath.Join(invocation, "manifest.json"), []byte("other"), 0600)
 			case "unknown_tool_schema":
 				_ = os.WriteFile(filepath.Join(root, "tool.intent.private.json"), []byte(`{"kind":"other","complete":true}`), 0600)
+			case "empty_b_identity":
+				path := filepath.Join(root, "tool.intent.private.json")
+				raw, _ := os.ReadFile(path)
+				var v lifecycleAPIInvocationIntent
+				_ = json.Unmarshal(raw, &v)
+				v.BImageID, v.BProgramSHA256 = "", ""
+				raw, _ = json.Marshal(v)
+				_ = os.WriteFile(path, raw, 0600)
+				_ = os.WriteFile(filepath.Join(invocation, "native-call.intent.private.json"), raw, 0600)
 			case "null_intent":
 				raw := bytes.Replace(intent, []byte(`"drop_authority": false`), []byte(`"drop_authority": null`), 1)
 				if bytes.Equal(raw, intent) {
