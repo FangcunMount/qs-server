@@ -240,6 +240,9 @@ func (h *lifecycleFixedHost) PurgeTemporaryCopies(ctx context.Context, r lifecyc
 	if err != nil {
 		return err
 	}
+	if err = h.registerAIStoppedMaterials(ctx, r, materials); err != nil {
+		return err
+	}
 	return materials.purge(ctx)
 }
 func (h *lifecycleFixedHost) VerifyTemporaryMaterialsZero(ctx context.Context, r lifecycleRequest) error {
@@ -257,7 +260,10 @@ func (h *lifecycleFixedHost) ResumeAcceptedEntrypoints(ctx context.Context, _ li
 	if h.aiStopped == nil {
 		return lifecycleError("lifecycle_ai_original_stopped_runtime_unproven")
 	}
-	return errors.Join(h.services.ResumeDependents(ctx), h.aiStopped.Resume(ctx))
+	if err := h.aiStopped.VerifyResumed(ctx); err != nil {
+		return err
+	}
+	return h.services.ResumeDependents(ctx)
 }
 func (h *lifecycleFixedHost) RestoreRollbackEntrypoints(ctx context.Context, r lifecycleRequest, w *fence.MaintenanceWindow) error {
 	if h == nil {

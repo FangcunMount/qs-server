@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"io"
 	"os"
+	"path/filepath"
 	"syscall"
 	"time"
 )
@@ -18,6 +19,8 @@ type AIExternalExecQuiescenceInput struct {
 	SourceSHA, OperationID                 string
 	RuntimeSourceSHA, ImageID, ContainerID string
 	SudoDocker                             bool
+	// Set only by the root caller from its authenticated original invocation.
+	SourceUID *uint32
 }
 
 func (AIExternalExecQuiescenceInput) String() string {
@@ -29,9 +32,14 @@ func (AIExternalExecQuiescenceInput) MarshalJSON() ([]byte, error) {
 }
 
 // Original binding comes from the protected immutable journal, not a caller's
-// terminal/complete claim. Its exact chain is revalidated by aiExecOpenJournal.
+// terminal/complete claim. Keep the actual original read-only FD and lock;
+// never copy, change ownership, or reopen that source journal for writing.
 func aiExecQuiescenceJournal(path string, in AIExternalExecQuiescenceInput) (*aiExecJournal, error) {
-	if aiExecParent(path) != nil {
+	uid := uint32(os.Geteuid())
+	if in.SourceUID != nil {
+		uid = *in.SourceUID
+	}
+	if aiExecParentAs(path, uid) != nil {
 		return nil, ErrAIExternalExecJournal
 	}
 	fd, e := syscall.Open(path, syscall.O_RDONLY|syscall.O_NOFOLLOW|syscall.O_NONBLOCK, 0)
@@ -39,41 +47,47 @@ func aiExecQuiescenceJournal(path string, in AIExternalExecQuiescenceInput) (*ai
 		return nil, ErrAIExternalExecJournal
 	}
 	f := os.NewFile(uintptr(fd), path)
-	before, e := aiExecFileCheck(f, path, nil)
+	reject := func() (*aiExecJournal, error) { _ = f.Close(); return nil, ErrAIExternalExecJournal }
+	if syscall.Flock(fd, syscall.LOCK_EX|syscall.LOCK_NB) != nil {
+		return reject()
+	}
+	parent, e := os.Lstat(filepath.Dir(path))
+	if e != nil {
+		return reject()
+	}
+	before, e := aiExecFileCheckAs(f, path, nil, uid)
 	if e != nil {
 		_ = f.Close()
 		return nil, e
 	}
 	raw, re := io.ReadAll(io.LimitReader(f, aiExecJournalLimit+1))
-	after, ae := aiExecFileCheck(f, path, before)
-	ce := f.Close()
-	if re != nil || ae != nil || ce != nil || before.Size() != after.Size() || !before.ModTime().Equal(after.ModTime()) || int64(len(raw)) != after.Size() || len(raw) == 0 || len(raw) > aiExecJournalLimit {
-		return nil, ErrAIExternalExecJournal
+	after, ae := aiExecFileCheckAs(f, path, before, uid)
+	if re != nil || ae != nil || before.Size() != after.Size() || !before.ModTime().Equal(after.ModTime()) || int64(len(raw)) != after.Size() || len(raw) == 0 || len(raw) > aiExecJournalLimit {
+		return reject()
 	}
 	end := bytes.IndexByte(raw, '\n')
 	if end <= 0 {
-		return nil, ErrAIExternalExecJournal
+		return reject()
 	}
 	var first aiExecRecord
 	d := json.NewDecoder(bytes.NewReader(raw[:end]))
 	d.DisallowUnknownFields()
 	if strictJSON(raw[:end]) != nil || d.Decode(&first) != nil || d.Decode(&struct{}{}) != io.EOF {
-		return nil, ErrAIExternalExecJournal
+		return reject()
 	}
 	b := first.Binding
 	if !b.valid() || b.SourceSHA != in.SourceSHA || b.OperationID != in.OperationID || b.RuntimeSourceSHA != in.RuntimeSourceSHA || b.ImageID != in.ImageID || b.ContainerID != in.ContainerID {
-		return nil, ErrAIExternalExecJournal
+		return reject()
 	}
-	if _, e = aiExecDecodeJournal(raw, b); e != nil {
-		return nil, e
-	}
-	j, e := aiExecOpenJournal(path, b, false)
+	records, e := aiExecDecodeJournal(raw, b)
 	if e != nil {
+		_ = f.Close()
 		return nil, e
 	}
-	if !bytes.Equal(j.raw, raw) {
-		_ = j.Close()
-		return nil, ErrAIExternalExecJournal
+	j := &aiExecJournal{file: f, path: path, initial: before, lastStat: after, parentStat: parent, ownerUID: uid, binding: b, raw: raw, last: records[len(records)-1]}
+	j.self = j
+	if j.checkLocked() != nil {
+		return reject()
 	}
 	return j, nil
 }
@@ -108,7 +122,7 @@ func RequireAIExternalExecQuiescence(ctx context.Context, in AIExternalExecQuies
 	}
 	var docker *aiExternalDockerExecutor
 	for _, mode := range []aiExternalExecMode{aiExternalBoundsMode, aiExternalVerifyMode, aiExternalFinalVerifyMode} {
-		path, e := aiExternalExecModePath(in.OperationDirectory, in.OperationID, mode)
+		path, e := aiExternalExecModePathAs(in.OperationDirectory, in.OperationID, mode, in.SourceUID)
 		if e != nil {
 			return e
 		}

@@ -84,7 +84,9 @@ func (p *aiStoppedUnitProtocol) start(_ context.Context, cid string) error {
 	}
 	p.snap.Runtime.Running = true
 	p.snap.Runtime.Status = "running"
-	p.snap.Runtime.StartedAt = "fresh-original-process"
+	p.snap.Runtime.StartedAt = time.Now().Add(-time.Second).UTC().Format(time.RFC3339Nano)
+	p.snap.HealthStart = time.Now().Add(-time.Millisecond)
+	p.snap.HealthEnd = time.Now()
 	p.snap.PID = 122
 	return p.startErr
 }
@@ -139,7 +141,7 @@ func aiStoppedUnitLease(t *testing.T) (*AIStoppedRuntimeLease, *aiStoppedUnitPro
 		t.Fatal(e)
 	}
 	w := &aiStoppedUnitWindow{binding: fence.WindowBinding{SourceSHA: strings.Repeat("a", 40), OperationID: "900-1"}, start: strings.Repeat("b", 64), deadline: time.Now().Add(time.Minute)}
-	s := aiStoppedSnapshot{Runtime: aiExternalRuntime{ContainerID: strings.Repeat("c", 64), ImageID: "sha256:" + strings.Repeat("d", 64), Status: "running", Running: true, StartedAt: "original-process"}, ConfigSHA256: strings.Repeat("1", 64), HostConfigSHA256: strings.Repeat("2", 64), NetworkID: strings.Repeat("3", 64), RestartPolicy: "unless-stopped", Settings: map[string]string{"QS_AI_DATABASE_URL": "synthetic-secret"}, PID: 121}
+	s := aiStoppedSnapshot{Runtime: aiExternalRuntime{ContainerID: strings.Repeat("c", 64), ImageID: "sha256:" + strings.Repeat("d", 64), Status: "running", Running: true, StartedAt: time.Now().Add(-time.Hour).UTC().Format(time.RFC3339Nano)}, ConfigSHA256: strings.Repeat("1", 64), HostConfigSHA256: strings.Repeat("2", 64), NetworkID: strings.Repeat("3", 64), RestartPolicy: "unless-stopped", Settings: map[string]string{"QS_AI_DATABASE_URL": "synthetic-secret"}, PID: 121, HealthcheckTest: []string{"CMD", "/app/.venv/bin/python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/readyz', timeout=3)"}, HealthStatus: "healthy", HealthExitCode: aiExecQuiescenceCode(0), HealthStart: time.Now().Add(-time.Second), HealthEnd: time.Now()}
 	l := &AIStoppedRuntimeLease{window: w, binding: w.binding, startSHA: w.start, input: AIExternalExecutionInput{ContainerID: s.Runtime.ContainerID, ApprovedAIRuntimeBindingSHA256: strings.Repeat("4", 64)}, baseline: s, journal: f, journalPath: path, journalStat: st, readRelease: func(string, string) (aiExternalRelease, error) {
 		return aiExternalRelease{seal: strings.Repeat("4", 64)}, nil
 	}}
@@ -166,7 +168,7 @@ func TestAIStoppedRuntimeSignalAndExactRecoveryAreSingleAttempt(t *testing.T) {
 	if e := l.Restore(t.Context()); e != nil {
 		t.Fatal(e)
 	}
-	if p.starts != 1 || !l.restored || l.Restore(t.Context()) == nil || p.starts != 1 {
+	if p.starts != 1 || !l.restored || l.Restore(t.Context()) != nil || p.starts != 1 {
 		t.Fatal("restoration was repeated")
 	}
 }
@@ -356,5 +358,90 @@ func TestAIStoppedFinalPythonWrapperRejectsUntrustedPacketWithoutOutput(t *testi
 		if !errors.As(e, &exit) || exit.ExitCode() != 71 || len(output) != 0 {
 			t.Fatal("fixed anonymous wrapper accepted untrusted input or emitted private contents")
 		}
+	}
+}
+
+// Known native start is not readiness, and observing it again never sends a
+// second start. These are private protocol tests, not real Engine acceptance.
+func TestAIStoppedReadinessRejectsStaleHealthAndChangedOriginal(t *testing.T) {
+	l, p := aiStoppedUnitLease(t)
+	if e := l.Stop(t.Context()); e != nil {
+		t.Fatal(e)
+	}
+	if e := l.Resume(t.Context()); e != nil {
+		t.Fatal(e)
+	}
+	p.snap.HealthEnd, p.snap.HealthStart = time.Now().Add(-time.Hour), time.Now().Add(-time.Hour)
+	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Millisecond)
+	defer cancel()
+	if l.Resume(ctx) == nil || p.starts != 1 {
+		t.Fatal("stale healthy sample accepted or start repeated")
+	}
+	p.snap.HealthStart, p.snap.HealthEnd = time.Now().Add(-time.Millisecond), time.Now()
+	p.snap.PID++
+	if l.Resume(t.Context()) == nil || p.starts != 1 {
+		t.Fatal("different original process adopted")
+	}
+}
+
+func TestAIStoppedJournalHandoffClosesWritersBeforeUnlinkAndFinalResume(t *testing.T) {
+	l, p := aiStoppedUnitLease(t)
+	if e := l.Stop(t.Context()); e != nil {
+		t.Fatal(e)
+	}
+	l.carrierAttempted, l.carrierZero, l.carrierID, p.removes = true, true, p.nativeCID, 1
+	j := aiExecUnitJournal(t, aiExecUnitBinding([]byte("test-only")))
+	j.mu.Lock()
+	e := j.appendLocked(aiExecRecord{Stage: "create_intent", EngineVersionSHA256: strings.Repeat("e", 64)})
+	j.mu.Unlock()
+	if e != nil {
+		t.Fatal(e)
+	}
+	l.carrierJournal = j
+	if e = l.Resume(t.Context()); e != nil {
+		t.Fatal(e)
+	}
+	if l.VerifyResumed(t.Context()) == nil {
+		t.Fatal("open writers accepted as final resume")
+	}
+	stopWriter, execWriter := l.journal, j.file
+	var readers []*os.File
+	err := l.SealTemporaryJournals(t.Context(), func(path string, writer *os.File, expected string) error {
+		f, e := os.OpenFile(path, os.O_RDONLY|syscall.O_NOFOLLOW, 0)
+		if e != nil {
+			return e
+		}
+		readers = append(readers, f)
+		w, we := writer.Stat()
+		actual, ae := f.Stat()
+		raw, re := io.ReadAll(f)
+		if we != nil || ae != nil || re != nil || !os.SameFile(w, actual) || sourceSHA(raw) != expected {
+			return ErrAIStoppedRuntime
+		}
+		return nil
+	})
+	defer func() {
+		for _, f := range readers {
+			_ = f.Close()
+		}
+	}()
+	if err != nil || len(readers) != 2 {
+		t.Fatalf("actual double registration: %v", err)
+	}
+	if _, e = stopWriter.WriteAt([]byte("x"), 0); e == nil {
+		t.Fatal("stop writer remained open")
+	}
+	if _, e = execWriter.WriteAt([]byte("x"), 0); e == nil {
+		t.Fatal("exec writer remained open")
+	}
+	if e = os.Remove(l.journalPath); e != nil {
+		t.Fatal(e)
+	}
+	if e = os.Remove(j.path); e != nil {
+		t.Fatal(e)
+	}
+	before := append([]byte(nil), l.journalRaw...)
+	if e = l.VerifyResumed(t.Context()); e != nil || p.starts != 1 || !bytes.Equal(before, l.journalRaw) {
+		t.Fatal("final resume started/appended after purge")
 	}
 }

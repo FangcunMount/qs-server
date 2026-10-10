@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/url"
 	"os"
@@ -13,6 +14,7 @@ import (
 	"strings"
 	"sync"
 	"syscall"
+	"time"
 
 	fence "github.com/FangcunMount/qs-server/internal/apiserver/maintenance/compatibilityretirementfence"
 )
@@ -41,6 +43,10 @@ type aiStoppedSnapshot struct {
 	PID                            int
 	OOM, Dead, Paused, Restarting  bool
 	ExecIDs                        []string
+	HealthcheckTest                []string
+	HealthStatus                   string
+	HealthStart, HealthEnd         time.Time
+	HealthExitCode                 *int
 }
 
 func (v aiStoppedSnapshot) immutableSame(other aiStoppedSnapshot) bool {
@@ -49,7 +55,7 @@ func (v aiStoppedSnapshot) immutableSame(other aiStoppedSnapshot) bool {
 	a.StartedAt, b.StartedAt = "", ""
 	a.Running, b.Running = false, false
 	a.Restarts, b.Restarts = 0, 0
-	return reflect.DeepEqual(a, b) && v.ConfigSHA256 == other.ConfigSHA256 && v.HostConfigSHA256 == other.HostConfigSHA256 && v.NetworkID == other.NetworkID && v.RestartPolicy == other.RestartPolicy && reflect.DeepEqual(v.Settings, other.Settings)
+	return reflect.DeepEqual(a, b) && v.ConfigSHA256 == other.ConfigSHA256 && v.HostConfigSHA256 == other.HostConfigSHA256 && v.NetworkID == other.NetworkID && v.RestartPolicy == other.RestartPolicy && reflect.DeepEqual(v.Settings, other.Settings) && reflect.DeepEqual(v.HealthcheckTest, other.HealthcheckTest)
 }
 func (v aiStoppedSnapshot) stopped() bool {
 	return !v.Runtime.Running && v.Runtime.Status == "exited" && v.PID == 0 && !v.OOM && !v.Dead && !v.Paused && !v.Restarting && v.ExitCode == 0
@@ -102,6 +108,8 @@ type AIStoppedRuntimeLease struct {
 	carrierAttempted, carrierStarted, carrierUnknown, carrierZero       bool
 	stopAttempted, stopped, restoreAttempted, restored, closed, unknown bool
 	signalAttempted                                                     bool
+	restoredRuntime                                                     aiExternalRuntime
+	restoredPID                                                         int
 }
 
 func (*AIStoppedRuntimeLease) MarshalJSON() ([]byte, error) { return nil, ErrSourceSerialization }
@@ -126,14 +134,14 @@ func (l *AIStoppedRuntimeLease) checkWindow(ctx context.Context, recovery bool) 
 // OpenAIStoppedRuntimeLease performs actual preflight only. The caller must
 // retain the returned owner BEFORE Stop; this constructor never signals a process.
 func OpenAIStoppedRuntimeLease(ctx context.Context, in AIExternalExecutionInput, expected AIStoppedRuntimeConstraints, w *fence.MaintenanceWindow) (*AIStoppedRuntimeLease, error) {
-	if runtime.GOOS != "linux" || os.Getuid() != 0 || os.Geteuid() != 0 || ctx == nil || ctx.Err() != nil || w == nil || !expected.Valid() {
+	if runtime.GOOS != "linux" || os.Getuid() != 0 || os.Geteuid() != 0 || ctx == nil || ctx.Err() != nil || w == nil || in.SourceUID == nil || !expected.Valid() {
 		return nil, ErrAIStoppedRuntime
 	}
 	d, e := w.Diagnostic(ctx)
 	if e != nil || !d.DirectoryLeaseHeld || d.RecoverySHA256 != "" || d.Binding.OperationID != filepath.Base(in.OperationDirectory) || !aiOriginalSourceSHA(in.RuntimeSourceSHA) || !aiExternalImageID(in.ImageID) || !evidenceHash(in.ContainerID) || !evidenceHash(in.ApprovedAIRuntimeBindingSHA256) {
 		return nil, ErrAIStoppedRuntime
 	}
-	if e = RequireAIExternalExecQuiescence(ctx, AIExternalExecQuiescenceInput{OperationDirectory: in.OperationDirectory, SourceSHA: d.Binding.SourceSHA, OperationID: d.Binding.OperationID, RuntimeSourceSHA: in.RuntimeSourceSHA, ImageID: in.ImageID, ContainerID: in.ContainerID, SudoDocker: in.SudoDocker}); e != nil {
+	if e = RequireAIExternalExecQuiescence(ctx, AIExternalExecQuiescenceInput{SourceUID: in.SourceUID, OperationDirectory: in.OperationDirectory, SourceSHA: d.Binding.SourceSHA, OperationID: d.Binding.OperationID, RuntimeSourceSHA: in.RuntimeSourceSHA, ImageID: in.ImageID, ContainerID: in.ContainerID, SudoDocker: in.SudoDocker}); e != nil {
 		return nil, e
 	}
 	release, e := aiExternalReadRelease(in.RuntimeSourceSHA, in.ImageID)
@@ -146,13 +154,13 @@ func OpenAIStoppedRuntimeLease(ctx context.Context, in AIExternalExecutionInput,
 	}
 	p := &aiStoppedDocker{docker: docker, wire: &aiExecDockerProtocol{docker: docker}, input: in}
 	snap, e := p.snapshot(ctx, in.ContainerID)
-	if e != nil || !snap.Runtime.matches(in) || !release.matchesMounts(snap.Runtime.Mounts) || snap.RestartPolicy != "unless-stopped" || snap.NetworkID != expected.NetworkID || sourceSHA(aiJSONBytes(snap.Settings)) != expected.SettingsSHA256 || len(snap.ExecIDs) != 0 || p.network(ctx, snap.NetworkID) != nil {
+	if e != nil || !snap.Runtime.matches(in) || !release.matchesMounts(snap.Runtime.Mounts) || snap.RestartPolicy != "unless-stopped" || snap.NetworkID != expected.NetworkID || sourceSHA(aiJSONBytes(snap.Settings)) != expected.SettingsSHA256 || len(snap.ExecIDs) != 0 || !aiStoppedHealthcheck(snap.HealthcheckTest) || p.network(ctx, snap.NetworkID) != nil {
 		return nil, ErrAIStoppedRuntime
 	}
 	if e = aiStoppedReleaseSettings(in, snap.Settings); e != nil {
 		return nil, e
 	}
-	path := filepath.Join(in.OperationDirectory, "qs-ai-original-stop-carrier.jsonl")
+	path := filepath.Join(in.StoppedJournalDirectory, "qs-ai-original-stop-carrier.jsonl")
 	if aiExecParent(path) != nil {
 		return nil, ErrAIStoppedRuntime
 	}
@@ -298,8 +306,9 @@ func (l *AIStoppedRuntimeLease) Restore(ctx context.Context) error {
 	return l.restoreOriginal(ctx, true)
 }
 
-// Resume is the successful forward path. It starts the same original stopped
-// CID after its carrier is proved absent; it has no migration/recreate path.
+// Resume is used only by the internal controlled stage after frozen-data
+// comparison. It starts the exact original CID once and waits for its existing
+// frozen Healthcheck. Ordinary final entrypoint resume only rechecks readiness.
 func (l *AIStoppedRuntimeLease) Resume(ctx context.Context) error {
 	if l == nil || l.self != l {
 		return ErrAIStoppedRuntime
@@ -320,7 +329,13 @@ func (l *AIStoppedRuntimeLease) restoreOriginal(ctx context.Context, recovery bo
 	if !l.stopAttempted {
 		return nil
 	} // Preflight owner was armed; no signal sent.
-	if l.restoreAttempted || l.carrierAttempted && !l.carrierZero || !recovery && l.unknown {
+	if l.carrierAttempted && (!l.carrierZero || l.protocol.requireCarrierAbsent(ctx, l.carrierID) != nil || l.protocol.requireOwnerCarriersAbsent(ctx, l.binding.OperationID) != nil) {
+		return ErrAIStoppedRuntime
+	}
+	if l.restored {
+		return l.waitRestoredReady(ctx, recovery)
+	}
+	if l.restoreAttempted || !recovery && l.unknown {
 		return ErrAIStoppedRuntime
 	}
 	snap, e := l.protocol.snapshot(ctx, l.input.ContainerID)
@@ -337,9 +352,12 @@ func (l *AIStoppedRuntimeLease) restoreOriginal(ctx context.Context, recovery bo
 		if l.signalAttempted || !reflect.DeepEqual(snap.Runtime, l.baseline.Runtime) {
 			return ErrAIStoppedRuntime
 		}
-		l.restoreAttempted = true
-		l.restored = true
-		return l.append("original_unchanged", "")
+		l.restoreAttempted, l.restored = true, true
+		l.restoredRuntime, l.restoredPID = snap.Runtime, snap.PID
+		if l.append("original_unchanged", "") != nil {
+			return ErrAIStoppedRuntime
+		}
+		return l.waitRestoredReady(ctx, recovery)
 	}
 	if snap.Runtime.Running || snap.Runtime.Status != "exited" || snap.PID != 0 || snap.ExitCode < 0 || snap.ExitCode > 255 {
 		return ErrAIStoppedRuntime
@@ -350,7 +368,7 @@ func (l *AIStoppedRuntimeLease) restoreOriginal(ctx context.Context, recovery bo
 	}
 	e = l.protocol.start(ctx, l.input.ContainerID)
 	after, ae := l.protocol.snapshot(ctx, l.input.ContainerID)
-	if e != nil || ae != nil || !l.baseline.immutableSame(after) || !after.Runtime.Running || after.Runtime.Status != "running" || after.PID <= 0 || after.OOM || after.Dead || after.Restarting || l.checkWindow(ctx, recovery) != nil {
+	if e != nil || ae != nil || !l.baseline.immutableSame(after) || !after.Runtime.Running || after.Runtime.Status != "running" || after.PID <= 0 || after.OOM || after.Dead || after.Paused || after.Restarting || after.Runtime.StartedAt == l.baseline.Runtime.StartedAt || l.checkWindow(ctx, recovery) != nil {
 		l.unknown = true
 		_ = l.append("restore_unknown", "")
 		return ErrAIStoppedRuntime
@@ -359,7 +377,112 @@ func (l *AIStoppedRuntimeLease) restoreOriginal(ctx context.Context, recovery bo
 		return ErrAIStoppedRuntime
 	}
 	l.restored = true
-	return nil
+	l.restoredRuntime, l.restoredPID = after.Runtime, after.PID
+	return l.waitRestoredReady(ctx, recovery)
+}
+
+func aiStoppedHealthcheck(test []string) bool {
+	return reflect.DeepEqual(test, []string{"CMD", "/app/.venv/bin/python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/readyz', timeout=3)"})
+}
+
+// This is observation of the original Docker Healthcheck, not a new exec or
+// HTTP probe. Every read remains inside the original forward/recovery epoch.
+func (l *AIStoppedRuntimeLease) waitRestoredReady(ctx context.Context, recovery bool) error {
+	for {
+		if l.checkWindow(ctx, recovery) != nil || !l.restored || l.protocol == nil || l.readRelease == nil {
+			return ErrAIStoppedRuntime
+		}
+		s, e := l.protocol.snapshot(ctx, l.input.ContainerID)
+		release, re := l.readRelease(l.input.RuntimeSourceSHA, l.input.ImageID)
+		if e != nil || re != nil || release.seal != l.input.ApprovedAIRuntimeBindingSHA256 || !l.baseline.immutableSame(s) || !reflect.DeepEqual(s.Runtime, l.restoredRuntime) || s.PID != l.restoredPID || s.PID <= 0 || !s.Runtime.Running || s.Runtime.Status != "running" || s.OOM || s.Dead || s.Paused || s.Restarting || len(s.ExecIDs) != 0 || !aiStoppedHealthcheck(s.HealthcheckTest) {
+			return ErrAIStoppedRuntime
+		}
+		started, e := time.Parse(time.RFC3339Nano, s.Runtime.StartedAt)
+		if e != nil || started.After(time.Now()) {
+			return ErrAIStoppedRuntime
+		}
+		if s.HealthStatus == "healthy" && s.HealthExitCode != nil && *s.HealthExitCode == 0 && !s.HealthStart.Before(started) && !s.HealthEnd.Before(s.HealthStart) && !s.HealthEnd.After(time.Now()) {
+			return l.checkWindow(ctx, recovery)
+		}
+		if s.HealthStatus != "starting" && s.HealthStatus != "healthy" {
+			return ErrAIStoppedRuntime
+		}
+		timer := time.NewTimer(100 * time.Millisecond)
+		select {
+		case <-ctx.Done():
+			timer.Stop()
+			return ErrAIStoppedRuntime
+		case <-timer.C:
+		}
+	}
+}
+
+// Final resume performs GET-only revalidation, including carrier zero, after
+// the writers have been closed and purged. It cannot append or start again.
+func (l *AIStoppedRuntimeLease) VerifyResumed(ctx context.Context) error {
+	if l == nil || l.self != l {
+		return ErrAIStoppedRuntime
+	}
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	q, cancel, e := l.forwardScope(ctx)
+	if e != nil {
+		return e
+	}
+	defer cancel()
+	if !l.carrierAttempted || !l.carrierZero || l.carrierUnknown || l.unknown || l.journal != nil || l.carrierJournal == nil || !l.carrierJournal.closed || l.protocol.requireCarrierAbsent(q, l.carrierID) != nil || l.protocol.requireOwnerCarriersAbsent(q, l.binding.OperationID) != nil {
+		return ErrAIStoppedRuntime
+	}
+	return l.waitRestoredReady(q, false)
+}
+
+// SealTemporaryJournals hands the exact held writer FDs to the existing catalog
+// registrar, which must retain real read-only FDs with matching identities and
+// digests. A missing/partial catalog cannot call this hook or authorize purge.
+func (l *AIStoppedRuntimeLease) SealTemporaryJournals(ctx context.Context, register func(string, *os.File, string) error) error {
+	if l == nil || l.self != l || register == nil {
+		return ErrAIStoppedRuntime
+	}
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	q, cancel, e := l.forwardScope(ctx)
+	if e != nil {
+		return e
+	}
+	defer cancel()
+	if !l.restored || l.unknown || l.carrierUnknown || !l.carrierAttempted || !l.carrierZero || l.journal == nil || l.carrierJournal == nil || l.waitRestoredReady(q, false) != nil || l.protocol.requireCarrierAbsent(q, l.carrierID) != nil || l.protocol.requireOwnerCarriersAbsent(q, l.binding.OperationID) != nil {
+		return ErrAIStoppedRuntime
+	}
+	// Check the existing owner bytes before handoff; no additional record
+	// is appended after acceptance.
+	st, e := aiExecFileCheck(l.journal, l.journalPath, l.journalStat)
+	raw := make([]byte, len(l.journalRaw))
+	_, re := l.journal.ReadAt(raw, 0)
+	if e != nil || st.Size() != int64(len(raw)) || re != nil || !bytes.Equal(raw, l.journalRaw) {
+		return ErrAIStoppedRuntime
+	}
+	j := l.carrierJournal
+	j.mu.Lock()
+	defer j.mu.Unlock()
+	if j.checkLocked() != nil || register(l.journalPath, l.journal, sourceSHA(raw)) != nil || register(j.path, j.file, sourceSHA(j.raw)) != nil || j.checkLocked() != nil {
+		return ErrAIStoppedRuntime
+	}
+	if repeated, e := aiExecFileCheck(l.journal, l.journalPath, l.journalStat); e != nil || repeated.Size() != st.Size() || !repeated.ModTime().Equal(st.ModTime()) {
+		return ErrAIStoppedRuntime
+	}
+	if _, e = l.journal.ReadAt(raw, 0); e != nil || !bytes.Equal(raw, l.journalRaw) {
+		return ErrAIStoppedRuntime
+	}
+	// Close both writers before any registered unlink; retain the lease owner
+	// and actual restored identity for later read-only final resume/recovery.
+	j.closed = true
+	e = j.file.Close()
+	e = errors.Join(e, l.journal.Close())
+	l.journal = nil
+	if e != nil {
+		l.unknown = true
+	}
+	return e
 }
 func (l *AIStoppedRuntimeLease) Close() error {
 	if l == nil || l.self != l {
@@ -473,6 +596,15 @@ func (p *aiStoppedDocker) snapshot(ctx context.Context, cid string) (aiStoppedSn
 		State      struct {
 			ExitCode, Pid                       int
 			OOMKilled, Dead, Paused, Restarting bool
+			Running                             bool
+			Status, StartedAt                   string
+			Health                              struct {
+				Status string
+				Log    []struct {
+					Start, End time.Time
+					ExitCode   *int
+				}
+			}
 		}
 		ExecIDs         []string
 		NetworkSettings struct {
@@ -482,7 +614,10 @@ func (p *aiStoppedDocker) snapshot(ctx context.Context, cid string) (aiStoppedSn
 	if json.Unmarshal(raw, &v) != nil || v.ID != cid || len(v.Config) == 0 || len(v.HostConfig) == 0 || len(v.NetworkSettings.Networks) != 1 {
 		return out, ErrAIStoppedRuntime
 	}
-	var config struct{ Env []string }
+	var config struct {
+		Env         []string
+		Healthcheck struct{ Test []string }
+	}
 	var host struct {
 		RestartPolicy struct {
 			Name              string
@@ -497,8 +632,13 @@ func (p *aiStoppedDocker) snapshot(ctx context.Context, cid string) (aiStoppedSn
 		return out, e
 	}
 	out.Runtime, e = p.docker.inspect(ctx, cid)
-	if e != nil {
-		return out, e
+	if e != nil || out.Runtime.Running != v.State.Running || out.Runtime.Status != v.State.Status || out.Runtime.StartedAt != v.State.StartedAt {
+		return out, ErrAIStoppedRuntime
+	}
+	out.HealthcheckTest, out.HealthStatus = config.Healthcheck.Test, v.State.Health.Status
+	if n := len(v.State.Health.Log); n > 0 {
+		last := v.State.Health.Log[n-1]
+		out.HealthStart, out.HealthEnd, out.HealthExitCode = last.Start, last.End, last.ExitCode
 	}
 	out.ConfigSHA256 = sourceSHA(v.Config)
 	out.HostConfigSHA256 = sourceSHA(v.HostConfig)

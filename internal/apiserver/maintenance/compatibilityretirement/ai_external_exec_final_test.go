@@ -89,13 +89,13 @@ func TestAIFinalVerifyFixedPhaseIsSeparateExclusiveAndRejectsMissingOrImportedPr
 		t.Fatal("final mode changed original journal identity")
 	}
 	owner := HistoricalCoordinatorBinding{SourceSHA: strings.Repeat("a", 40), OperationID: "900-1"}
-	if j, e := aiExecOpenFinalPredecessor(t.Context(), nil, op, owner, strings.Repeat("b", 40), "sha256:"+strings.Repeat("c", 64), strings.Repeat("d", 64)); e == nil || j != nil {
+	if j, e := aiExecOpenFinalPredecessor(t.Context(), nil, op, owner, strings.Repeat("b", 40), "sha256:"+strings.Repeat("c", 64), strings.Repeat("d", 64), nil); e == nil || j != nil {
 		t.Fatal("missing prior chain admitted final")
 	}
 	if os.WriteFile(old, []byte("{\"complete\":true,\"exit_code\":0}\n"), 0600) != nil {
 		t.Fatal("fixture JSON")
 	}
-	if j, e := aiExecOpenFinalPredecessor(t.Context(), nil, op, owner, strings.Repeat("b", 40), "sha256:"+strings.Repeat("c", 64), strings.Repeat("d", 64)); e == nil || j != nil {
+	if j, e := aiExecOpenFinalPredecessor(t.Context(), nil, op, owner, strings.Repeat("b", 40), "sha256:"+strings.Repeat("c", 64), strings.Repeat("d", 64), nil); e == nil || j != nil {
 		t.Fatal("JSON success imported")
 	}
 	b := aiExecUnitBinding([]byte("fresh-final-packet"))

@@ -39,8 +39,12 @@ var (
 type AIExternalExecutionInput struct {
 	// Same actual operation_directory(root, operation_id) across attempts.
 	// Never an attempt/run child directory or a caller-generated journal name.
-	OperationDirectory                               string
-	AssetsDirectory                                  string
+	OperationDirectory string
+	AssetsDirectory    string
+	// Root invocation directory and original UID are supplied by authenticated
+	// lifecycle provenance, never JSON or a directory ownership change.
+	StoppedJournalDirectory                          string
+	SourceUID                                        *uint32
 	RunID                                            string
 	RuntimeSourceSHA, ImageID, ContainerID           string
 	AIBounds, PeerBounds                             []byte

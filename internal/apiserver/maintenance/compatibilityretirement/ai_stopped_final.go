@@ -65,7 +65,7 @@ func (l *AIStoppedRuntimeLease) executeFinal(ctx context.Context, owner Historic
 	if e != nil {
 		return nil, e
 	}
-	prior, e := aiExecOpenFinalPredecessor(ctx, l.docker, in.OperationDirectory, owner, in.RuntimeSourceSHA, in.ImageID, in.ContainerID)
+	prior, e := aiExecOpenFinalPredecessor(ctx, l.docker, in.OperationDirectory, owner, in.RuntimeSourceSHA, in.ImageID, in.ContainerID, in.SourceUID)
 	if e != nil {
 		return nil, e
 	}
@@ -122,7 +122,7 @@ func (l *AIStoppedRuntimeLease) executeFinal(ctx context.Context, owner Historic
 		return nil, ErrAIStoppedRuntime
 	}
 	// Fixed independent path: never replace or append to old raw final journals.
-	path := filepath.Join(in.OperationDirectory, "qs-ai-external-stopped-final-verify.exec.jsonl")
+	path := filepath.Join(in.StoppedJournalDirectory, "qs-ai-external-stopped-final-verify.exec.jsonl")
 	j, e := aiExecOpenJournal(path, b, true)
 	if e != nil {
 		return nil, e

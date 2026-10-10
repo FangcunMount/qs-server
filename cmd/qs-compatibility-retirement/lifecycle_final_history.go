@@ -126,7 +126,7 @@ func lifecycleFinalExternalInput(r lifecycleRequest) (*retirement.AIExternalExec
 	if peer.Port, e = envPort("MYSQL_PORT", 3306); e != nil {
 		return nil, lifecycleError("lifecycle_connection_input_rejected")
 	}
-	return &retirement.AIExternalExecutionInput{OperationDirectory: filepath.Join("/opt/backups/qs-server/compatibility-retirement", r.OperationID), AssetsDirectory: v.AssetsDirectory, RunID: parts[0], RuntimeSourceSHA: v.RuntimeSourceSHA, ImageID: v.ImageID, ContainerID: v.ContainerID, ApprovedAIRuntimeBindingSHA256: v.RuntimeBindingSHA256, AIBounds: raw[0], PeerBounds: raw[1], ProtectionJSON: raw[2], ApprovedAIBoundsSHA256: v.AIBounds.SHA256, ApprovedPeerBoundsSHA256: v.PeerBounds.SHA256, PeerConnection: peer, SudoDocker: true}, nil
+	return &retirement.AIExternalExecutionInput{OperationDirectory: filepath.Join("/opt/backups/qs-server/compatibility-retirement", r.OperationID), StoppedJournalDirectory: r.prepareRoot, SourceUID: &intent.SourceUID, AssetsDirectory: v.AssetsDirectory, RunID: parts[0], RuntimeSourceSHA: v.RuntimeSourceSHA, ImageID: v.ImageID, ContainerID: v.ContainerID, ApprovedAIRuntimeBindingSHA256: v.RuntimeBindingSHA256, AIBounds: raw[0], PeerBounds: raw[1], ProtectionJSON: raw[2], ApprovedAIBoundsSHA256: v.AIBounds.SHA256, ApprovedPeerBoundsSHA256: v.PeerBounds.SHA256, PeerConnection: peer, SudoDocker: true}, nil
 }
 
 func (h *lifecycleFixedHost) finalDifferenceAndEOF(ctx context.Context, r lifecycleRequest, a *backup.Archive) (result error) {

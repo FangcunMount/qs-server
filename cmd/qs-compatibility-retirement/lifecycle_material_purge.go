@@ -139,6 +139,55 @@ func (h *lifecycleFixedHost) acceptedBatchMaterials(ctx context.Context, r lifec
 	return c, nil
 }
 
+// The complete catalog producer is still missing. This hook consumes only its
+// existing accepted-batch owner; it does not create acceptance or mark a scope
+// complete. Register both real journal identities before closing their writers.
+func (h *lifecycleFixedHost) registerAIStoppedMaterials(ctx context.Context, r lifecycleRequest, c *lifecycleBatchMaterials) error {
+	if h == nil || h.aiStopped == nil || h.acceptedMaterials == nil || h.acceptedMaterials.self != h.acceptedMaterials || h.acceptedMaterials.host != h || h.acceptedMaterials.catalog != c || c == nil || c.self != c || c.binding != lifecycleMaterialsBinding(r) || c.closed || c.unknown || r.prepareRoot != lifecycleInvocationBatch(r.OperationID, r.ActualRunID) {
+		return lifecycleError("lifecycle_actual_complete_material_scope_missing")
+	}
+	if e := h.CheckWholeWriterFence(ctx, r); e != nil {
+		return e
+	}
+	var directory *lifecycleMaterialDirectory
+	for _, d := range c.directories {
+		if d != nil && d.path == r.prepareRoot {
+			if directory != nil {
+				return lifecycleError("lifecycle_material_registration_rejected")
+			}
+			directory = d
+		}
+	}
+	if directory == nil || directory.unchanged() != nil {
+		return lifecycleError("lifecycle_actual_complete_material_scope_missing")
+	}
+	names := map[string]bool{"qs-ai-original-stop-carrier.jsonl": true, "qs-ai-external-stopped-final-verify.exec.jsonl": true}
+	// A known completed handoff is revalidated without reopening a writer or
+	// repeating registration. Missing/partial entries never become completion.
+	if directory.files["qs-ai-original-stop-carrier.jsonl"] != nil && directory.files["qs-ai-external-stopped-final-verify.exec.jsonl"] != nil && h.aiStopped.VerifyResumed(ctx) == nil {
+		return nil
+	}
+	return h.aiStopped.SealTemporaryJournals(ctx, func(path string, writer *os.File, expected string) error {
+		name := filepath.Base(path)
+		if filepath.Dir(path) != r.prepareRoot || !names[name] || writer == nil {
+			return lifecycleError("lifecycle_material_registration_rejected")
+		}
+		before, e := writer.Stat()
+		if e != nil {
+			return e
+		}
+		if e = directory.register(name, expected, 0, 0600); e != nil {
+			return e
+		}
+		registered := directory.files[name]
+		after, e := writer.Stat()
+		if e != nil || !sameLifecycleFile(before, after) || !sameLifecycleFile(after, registered.info) {
+			return lifecycleError("lifecycle_material_registration_rejected")
+		}
+		return directory.checkFile(registered)
+	})
+}
+
 // Registration holds real directory/file FDs and exact inode/UID/mode/nlink,
 // source digest and size. Expected names/digests alone are never delete permits.
 // All file names must be explicit products of the same trusted owner; a tree

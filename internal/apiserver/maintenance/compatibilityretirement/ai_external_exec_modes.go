@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"os"
 	"path/filepath"
 	"time"
 )
@@ -17,6 +18,9 @@ const aiExternalFinalVerifyMode aiExternalExecMode = "final-verify"
 // This is the existing host operation_directory(root, operation_id), not a new
 // root authorization mechanism. Fixed names remain identical across attempts.
 func aiExternalExecModePath(directory, operation string, mode aiExternalExecMode) (string, error) {
+	return aiExternalExecModePathAs(directory, operation, mode, nil)
+}
+func aiExternalExecModePathAs(directory, operation string, mode aiExternalExecMode, sourceUID *uint32) (string, error) {
 	if !aiLocalOperationID(operation) || !filepath.IsAbs(directory) || filepath.Clean(directory) != directory || filepath.Base(directory) != operation {
 		return "", ErrAIExternalExecJournal
 	}
@@ -36,7 +40,11 @@ func aiExternalExecModePath(directory, operation string, mode aiExternalExecMode
 		return "", ErrAIExternalExecJournal
 	}
 	path := filepath.Join(directory, name)
-	if aiExecParent(path) != nil {
+	uid := uint32(os.Geteuid())
+	if sourceUID != nil {
+		uid = *sourceUID
+	}
+	if aiExecParentAs(path, uid) != nil {
 		return "", ErrAIExternalExecJournal
 	}
 	return path, nil
@@ -99,7 +107,7 @@ func aiExternalExecuteMode(ctx context.Context, docker *aiExternalDockerExecutor
 	if mode == aiExternalFinalVerifyMode {
 		// A new fixed phase is not a retry of an old unknown execution. Keep
 		// the original successful verify chain locked throughout the fresh Q.
-		prior, e = aiExecOpenFinalPredecessor(ctx, docker, directory, owner, runtime, image, cid)
+		prior, e = aiExecOpenFinalPredecessor(ctx, docker, directory, owner, runtime, image, cid, nil)
 		if e != nil {
 			return nil, e
 		}

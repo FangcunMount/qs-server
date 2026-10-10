@@ -164,7 +164,7 @@ func PrepareFinalHistoricalEOF(ctx context.Context, in FinalHistoricalInput) (*F
 			return nil, ErrAIExternalInput
 		}
 		input := *in.External
-		if e = RequireAIExternalExecQuiescence(ctx, AIExternalExecQuiescenceInput{OperationDirectory: input.OperationDirectory, SourceSHA: in.Binding.SourceSHA, OperationID: in.Binding.OperationID, RuntimeSourceSHA: input.RuntimeSourceSHA, ImageID: input.ImageID, ContainerID: input.ContainerID, SudoDocker: input.SudoDocker}); e != nil {
+		if e = RequireAIExternalExecQuiescence(ctx, AIExternalExecQuiescenceInput{SourceUID: input.SourceUID, OperationDirectory: input.OperationDirectory, SourceSHA: in.Binding.SourceSHA, OperationID: in.Binding.OperationID, RuntimeSourceSHA: input.RuntimeSourceSHA, ImageID: input.ImageID, ContainerID: input.ContainerID, SudoDocker: input.SudoDocker}); e != nil {
 			return nil, e
 		}
 		if in.StoppedExternal != nil {

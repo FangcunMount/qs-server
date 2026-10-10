@@ -56,13 +56,22 @@ func (v *lifecycleServiceController) observeControlled(ctx context.Context, api 
 // host's still-required whole fence is rechecked on both sides. It is not called
 // from a JSON field, service health callback or ordinary deployment workflow.
 func (h *lifecycleFixedHost) observeControlledAfterDataComparison(ctx context.Context, r lifecycleRequest) (*lifecycleControlledRuntime, error) {
-	if h == nil || h.services == nil || h.api == nil || h.owner == nil || h.dataBaseline == nil || h.acceptancePair == nil {
+	if h == nil || h.services == nil || h.api == nil || h.owner == nil || h.dataBaseline == nil || h.acceptancePair == nil || h.aiStopped == nil {
 		return nil, lifecycleError("lifecycle_actual_runtime_and_data_acceptance_missing")
 	}
 	// B already started only after the complete stopped comparison and actual
 	// RO cleanup. Consume that original host/Window/plan fact again here; never
 	// compare live rows after its normal background writers have resumed.
 	if e := h.verifyPreBDataComparison(ctx, r); e != nil {
+		return nil, e
+	}
+	if e := h.CheckWholeWriterFence(ctx, r); e != nil {
+		return nil, e
+	}
+	// Only this existing controlled stage may restore AI: the complete frozen
+	// non-target comparison and its actual RO cleanup already finished. Ordinary
+	// entrypoints and historical refs remain fenced while live acceptance runs.
+	if e := h.aiStopped.Resume(ctx); e != nil {
 		return nil, e
 	}
 	if e := h.CheckWholeWriterFence(ctx, r); e != nil {

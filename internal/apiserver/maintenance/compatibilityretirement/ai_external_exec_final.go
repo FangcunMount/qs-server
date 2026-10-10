@@ -7,12 +7,12 @@ import (
 
 // This is an execution-order check, not adoption of prior output or a Q.
 // Missing/conflicting/unknown original chains fail before the new final create.
-func aiExecOpenFinalPredecessor(ctx context.Context, docker *aiExternalDockerExecutor, directory string, owner HistoricalCoordinatorBinding, runtime, image, cid string) (*aiExecJournal, error) {
-	path, e := aiExternalExecModePath(directory, owner.OperationID, aiExternalVerifyMode)
+func aiExecOpenFinalPredecessor(ctx context.Context, docker *aiExternalDockerExecutor, directory string, owner HistoricalCoordinatorBinding, runtime, image, cid string, uid *uint32) (*aiExecJournal, error) {
+	path, e := aiExternalExecModePathAs(directory, owner.OperationID, aiExternalVerifyMode, uid)
 	if e != nil {
 		return nil, e
 	}
-	j, e := aiExecQuiescenceJournal(path, AIExternalExecQuiescenceInput{OperationDirectory: directory, SourceSHA: owner.SourceSHA, OperationID: owner.OperationID, RuntimeSourceSHA: runtime, ImageID: image, ContainerID: cid})
+	j, e := aiExecQuiescenceJournal(path, AIExternalExecQuiescenceInput{SourceUID: uid, OperationDirectory: directory, SourceSHA: owner.SourceSHA, OperationID: owner.OperationID, RuntimeSourceSHA: runtime, ImageID: image, ContainerID: cid})
 	if e != nil {
 		return nil, e
 	}

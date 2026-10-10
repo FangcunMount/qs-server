@@ -58,3 +58,34 @@ func TestControlledRuntimeActualCallerConsumesRetainedPreBProof(t *testing.T) {
 		})
 	}
 }
+
+func TestControlledAIResumePrecedesDependentResumeAndFinalOnlyVerifies(t *testing.T) {
+	calls := preBComparisonProductionCalls(t, "lifecycle_controlled_runtime.go", "observeControlledAfterDataComparison")
+	proof, fence, ai, dependents := -1, -1, -1, -1
+	for i, name := range calls {
+		switch name {
+		case "verifyPreBDataComparison":
+			proof = i
+		case "CheckWholeWriterFence":
+			if fence < 0 {
+				fence = i
+			}
+		case "Resume":
+			ai = i
+		case "controlledResume":
+			dependents = i
+		}
+	}
+	if proof < 0 || fence <= proof || ai <= fence || dependents <= ai {
+		t.Fatal("AI resume bypassed completed comparison/full fence or followed dependents")
+	}
+	for _, name := range preBComparisonProductionCalls(t, "lifecycle_fixed_host.go", "ResumeAcceptedEntrypoints") {
+		if name == "Resume" {
+			t.Fatal("ordinary final resume may start AI again")
+		}
+	}
+	h := new(lifecycleFixedHost)
+	if h.registerAIStoppedMaterials(t.Context(), lifecycleRequest{}, new(lifecycleBatchMaterials)) == nil {
+		t.Fatal("missing catalog minted journal handoff")
+	}
+}
