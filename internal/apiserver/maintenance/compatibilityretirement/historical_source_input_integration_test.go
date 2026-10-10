@@ -7,6 +7,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"io"
 	"os"
 	"testing"
 	"time"
@@ -351,17 +352,40 @@ func TestHistoricalSourceInputNativeOwnerComponentPlanner(t *testing.T) {
 	var pair *HistoricalSourceInputPair
 	var components *HistoricalCASComponents
 	var copies authFixture
+	var sourceFiles [4]*os.File
+	indexCopies := make([]WholeSourceJointCopy, len(sourceFiles))
+	originalInputs := func() []SourceCopyInput {
+		out := make([]SourceCopyInput, len(sourceFiles))
+		for i, file := range sourceFiles {
+			out[i] = SourceCopyInput{Input: io.NewSectionReader(file, 0, int64(len(copies.raw[i]))), Expected: copies.expected[i]}
+		}
+		return out
+	}
 	var aiFirst, aiSecond *AIHistoricalInputEpoch
 	var aiPair *AIHistoricalInputPair
 	aiInputLimits := DefaultAIReverseLimits()
 	aiInputLimits.MaxRetainedBytes = 64 << 20
 	if err = historicalSourceInputNativeEpoch(t, sqlDB, db, config, snapshotInputNativeSession(t, client), func(ctx context.Context, current *SQLResponsibilitySnapshot, mongoInput *MongoSnapshotInputEpoch, tx *gorm.DB) error {
 		copies = originNativeCopies(t, ctx, tx, &MongoResponsibilitySnapshot{db: db, metadata: mongoInput.metadata})
-		auth, e := VerifySourceCopies(ctx, copies.inputs())
+		// The live planner later rereads selected original frames through actual
+		// protected FDs. Authenticate and index those same four owned files,
+		// rather than the generic in-memory ReaderAt unit fixture.
+		for i, raw := range copies.raw {
+			file := snapshotInputNativeFile(t)
+			if n, e := file.Write(raw); e != nil || n != len(raw) {
+				return errors.New("original owned source file write failed")
+			}
+			if e := file.Sync(); e != nil {
+				return e
+			}
+			sourceFiles[i] = file
+			indexCopies[i] = WholeSourceJointCopy{Input: file, Expected: copies.expected[i]}
+		}
+		auth, e := VerifySourceCopies(ctx, originalInputs())
 		if e != nil {
 			return e
 		}
-		bound, e := BindOriginCopies(ctx, auth, copies.inputs(), DefaultSourceOriginLimits())
+		bound, e := BindOriginCopies(ctx, auth, originalInputs(), DefaultSourceOriginLimits())
 		if e != nil {
 			return e
 		}
@@ -369,7 +393,7 @@ func TestHistoricalSourceInputNativeOwnerComponentPlanner(t *testing.T) {
 		if e != nil {
 			return e
 		}
-		index, e = PrepareHistoricalSourceInputIndex(ctx, coordinatorBinding(), recipe, wholeJointCopies(copies), DefaultWholeSourceJointLimits())
+		index, e = PrepareHistoricalSourceInputIndex(ctx, coordinatorBinding(), recipe, indexCopies, DefaultWholeSourceJointLimits())
 		if e != nil {
 			return e
 		}
@@ -377,7 +401,7 @@ func TestHistoricalSourceInputNativeOwnerComponentPlanner(t *testing.T) {
 		if e != nil {
 			return e
 		}
-		aiFirst, e = PrepareAIHistoricalInputEpoch(ctx, nil, first, copies.inputs(), snapshotInputNativeFile(t), aiInputLimits)
+		aiFirst, e = PrepareAIHistoricalInputEpoch(ctx, nil, first, originalInputs(), snapshotInputNativeFile(t), aiInputLimits)
 		if e != nil {
 			return e
 		}
@@ -404,7 +428,7 @@ func TestHistoricalSourceInputNativeOwnerComponentPlanner(t *testing.T) {
 		if e != nil {
 			return e
 		}
-		aiSecond, e = PrepareAIHistoricalInputEpoch(ctx, nil, second, copies.inputs(), snapshotInputNativeFile(t), aiInputLimits)
+		aiSecond, e = PrepareAIHistoricalInputEpoch(ctx, nil, second, originalInputs(), snapshotInputNativeFile(t), aiInputLimits)
 		if e != nil {
 			return e
 		}
