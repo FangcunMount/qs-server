@@ -21,28 +21,30 @@ func lifecycleEffectsPreflight(context.Context) error {
 }
 
 type lifecycleFixedHost struct {
-	owner                          *lifecyclePreparationOwner
-	restoreOwner                   *lifecyclePreparationOwner
-	materials                      *lifecycleBatchMaterials
-	acceptedMaterials              *lifecycleAcceptedMaterials
-	inventoryMaterials             *lifecycleMaterialDirectory
-	rootStagingMaterials           *lifecycleMaterialDirectory
-	preparationInvocationMaterials *lifecycleMaterialDirectory
-	historicalWriteMaterials       *lifecycleMaterialDirectory
-	archiveMaterials               *lifecycleMaterialDirectory
-	services                       *lifecycleServiceController
-	api                            *lifecycleAPITransition
-	dataBaseline                   *backup.NonTargetDataBaseline
-	acceptancePlan                 *backup.TargetRecoveryPlan
-	acceptancePair                 *migration.CompatibilityPairMigrationProof
-	preBComparison                 *lifecyclePreBDataComparison
-	comparisonAttempted            bool
-	writers                        *lifecycleWriterObservation
-	dbWriters                      *lifecycleDBWriterLease
-	runtimeLedgers                 *lifecycleRuntimeLedgerObservation
-	currentMQ                      *lifecycleCurrentMQConnections
-	aiStopped                      *retirement.AIStoppedRuntimeLease
-	finalRuntime                   *lifecycleControlledRuntime
+	owner                                *lifecyclePreparationOwner
+	restoreOwner                         *lifecyclePreparationOwner
+	materials                            *lifecycleBatchMaterials
+	acceptedMaterials                    *lifecycleAcceptedMaterials
+	inventoryMaterials                   *lifecycleMaterialDirectory
+	rootStagingMaterials                 *lifecycleMaterialDirectory
+	preparationInvocationMaterials       *lifecycleMaterialDirectory
+	historicalWriteMaterials             *lifecycleMaterialDirectory
+	historicalWriteRegistrationMaterials *lifecycleMaterialDirectory
+	historicalWritePreviousMaterials     []*lifecycleMaterialDirectory
+	archiveMaterials                     *lifecycleMaterialDirectory
+	services                             *lifecycleServiceController
+	api                                  *lifecycleAPITransition
+	dataBaseline                         *backup.NonTargetDataBaseline
+	acceptancePlan                       *backup.TargetRecoveryPlan
+	acceptancePair                       *migration.CompatibilityPairMigrationProof
+	preBComparison                       *lifecyclePreBDataComparison
+	comparisonAttempted                  bool
+	writers                              *lifecycleWriterObservation
+	dbWriters                            *lifecycleDBWriterLease
+	runtimeLedgers                       *lifecycleRuntimeLedgerObservation
+	currentMQ                            *lifecycleCurrentMQConnections
+	aiStopped                            *retirement.AIStoppedRuntimeLease
+	finalRuntime                         *lifecycleControlledRuntime
 }
 
 func newLifecycleFixedHost(ctx context.Context, r lifecycleRequest, a *backup.Archive) (lifecycleHost, error) {
@@ -77,6 +79,10 @@ func newLifecycleFixedHost(ctx context.Context, r lifecycleRequest, a *backup.Ar
 			return nil, errors.Join(err, h.Close())
 		}
 		h.historicalWriteMaterials, err = openLifecycleOriginalHistoricalWriteMaterials(ctx, r, i.SourceUID)
+		if err != nil {
+			return nil, errors.Join(err, h.Close())
+		}
+		h.historicalWriteRegistrationMaterials, h.historicalWritePreviousMaterials, err = openLifecycleOriginalHistoricalWriteInputs(ctx, r, h.historicalWriteMaterials, h.inventoryMaterials, i.SourceUID)
 		if err != nil {
 			return nil, errors.Join(err, h.Close())
 		}
@@ -387,6 +393,12 @@ func (h *lifecycleFixedHost) Close() error {
 	}
 	if h.dbWriters != nil && (h.dbWriters.self != h.dbWriters || h.dbWriters.host != h || !h.dbWriters.restored) {
 		result = lifecycleError("lifecycle_database_original_account_restore_unproven")
+	}
+	if h.historicalWriteRegistrationMaterials != nil {
+		result = errors.Join(result, h.historicalWriteRegistrationMaterials.close())
+	}
+	for _, directory := range h.historicalWritePreviousMaterials {
+		result = errors.Join(result, directory.close())
 	}
 	if h.writers != nil {
 		h.writers.close()

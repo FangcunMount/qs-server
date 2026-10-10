@@ -15,6 +15,7 @@ import (
 	"testing"
 	"time"
 
+	retirement "github.com/FangcunMount/qs-server/internal/apiserver/maintenance/compatibilityretirement"
 	backup "github.com/FangcunMount/qs-server/internal/apiserver/maintenance/compatibilityretirementbackup"
 )
 
@@ -943,5 +944,212 @@ func TestOriginalInventoryMaterialHandoffRejectsUnboundIncompleteOrChangedProduc
 				t.Fatal("failed registration deleted a source")
 			}
 		})
+	}
+}
+
+// Only real temporary fixture FDs and original producer wire formats are used.
+// The intentionally partial operation parent cannot authorize final acceptance.
+func historicalWriteInputFixture(t *testing.T, newerAITool bool) (string, lifecycleRequest, *lifecycleMaterialDirectory, *lifecycleMaterialDirectory) {
+	t.Helper()
+	writerPath, r, _ := originalHistoricalWriteMaterialFixture(t)
+	root := filepath.Dir(writerPath)
+	inventoryPath, a, hashes := originalInventoryMaterialFixture(t, 0)
+	requestRaw := []byte("original readonly inventory request")
+	a.RequestHash = digestRaw(requestRaw)
+	put := func(path string, value any) string {
+		raw, e := json.Marshal(value)
+		if e != nil || os.WriteFile(path, raw, 0600) != nil {
+			t.Fatal("fixture producer JSON")
+		}
+		return digestRaw(raw)
+	}
+	var inv report
+	raw, _ := os.ReadFile(filepath.Join(inventoryPath, "inventory.private.json"))
+	_ = json.Unmarshal(raw, &inv)
+	inv.RequestHash = a.RequestHash
+	for _, name := range lifecycleSourceNames[3:] {
+		var asset lifecycleInventorySourceAsset
+		raw, _ = os.ReadFile(filepath.Join(inventoryPath, name+".asset.json"))
+		_ = json.Unmarshal(raw, &asset)
+		asset.RequestHash = a.RequestHash
+		put(filepath.Join(inventoryPath, name+".asset.json"), asset)
+	}
+	a.InventorySHA256 = put(filepath.Join(inventoryPath, "inventory.private.json"), inv)
+	hashes[lifecycleSourceNames[0]] = a.InventorySHA256
+	actualInventory := filepath.Join(root, "inventory-"+a.RunID)
+	if os.Rename(inventoryPath, actualInventory) != nil || os.WriteFile(filepath.Join(root, "inventory-request.json"), requestRaw, 0600) != nil {
+		t.Fatal("fixture original inventory")
+	}
+	r.Approval = a
+	inventory, e := openLifecycleInventoryMaterialFiles(context.Background(), actualInventory, uint32(os.Getuid()), a, hashes)
+	if e != nil {
+		t.Fatal(e)
+	}
+	t.Cleanup(func() { _ = inventory.close() })
+	parent := lifecycleHistoricalRequestMaterial{FormatVersion: 1, Kind: "readonly_compatibility_history_request", SourceSHA: r.OriginalSourceSHA, OperationID: r.OperationID, RunID: a.RunID,
+		InventoryRequest: lifecycleFinalFileBinding{filepath.Join(root, "inventory-request.json"), a.RequestHash}, InventoryReport: lifecycleFinalFileBinding{filepath.Join(actualInventory, "inventory.private.json"), a.InventorySHA256}}
+	for n, target := range targets {
+		f := inventory.files[lifecycleSourceNames[3+n]]
+		parent.Assets = append(parent.Assets, lifecycleHistoricalRequestAsset{target[0], target[1], filepath.Join(actualInventory, lifecycleSourceNames[3+n]), f.hash, uint64(f.info.Size())})
+	}
+	parentHash := put(filepath.Join(root, "history-request.json"), parent)
+	writeRun, boundsRun := "789-1", "678-1"
+	registrationPath := filepath.Join(root, "history-write-registration-"+writeRun)
+	boundsPath := filepath.Join(root, "ai-host-bounds-"+boundsRun)
+	bootstrapPath := filepath.Join(root, "ai-bootstrap-bounds-"+boundsRun)
+	for _, path := range []string{registrationPath, boundsPath, bootstrapPath} {
+		if os.Mkdir(path, 0700) != nil {
+			t.Fatal("fixture original producer directory")
+		}
+	}
+	request := parent
+	request.RunID = writeRun
+	writeRequestHash := put(filepath.Join(registrationPath, "history.request.json"), request)
+	request.RunID = boundsRun
+	aiRequestHash := put(filepath.Join(bootstrapPath, "history.request.json"), request)
+	protectionHash := put(filepath.Join(root, "ai-message-protection.json"), map[string]string{"original": "protection"})
+	aiBoundsHash := put(filepath.Join(boundsPath, "ai.bounds.json"), map[string]string{"original": "ai bounds"})
+	peerBoundsHash := put(filepath.Join(boundsPath, "peer.bounds.json"), map[string]string{"original": "peer bounds"})
+	input := lifecycleHistoricalInputMaterial{FormatVersion: 1, Kind: "historical_evidence_write_host_input", SourceSHA: r.OriginalSourceSHA, ToolSourceSHA: strings.Repeat("b", 40), OperationID: r.OperationID, ActualRunID: writeRun, Mode: "write", RequestSHA256: writeRequestHash,
+		RuntimeSourceSHA: strings.Repeat("c", 40), ImageID: "sha256:" + strings.Repeat("d", 64), ContainerID: strings.Repeat("e", 64), RuntimeBindingSHA256: strings.Repeat("f", 64), AssetsDirectory: "/actual/host/assets",
+		AIBounds: &lifecycleFinalFileBinding{filepath.Join(boundsPath, "ai.bounds.json"), aiBoundsHash}, PeerBounds: &lifecycleFinalFileBinding{filepath.Join(boundsPath, "peer.bounds.json"), peerBoundsHash}, Protection: &lifecycleFinalFileBinding{filepath.Join(root, "ai-message-protection.json"), protectionHash}}
+	inputHash := put(filepath.Join(registrationPath, "write.input.json"), input)
+	record := lifecycleHistoricalInputRegistration{1, "historical_evidence_write_registration", input.SourceSHA, input.ToolSourceSHA, r.OperationID, writeRun, strings.Repeat("1", 64), a.RunID, parentHash, writeRequestHash, inputHash, strings.Repeat("2", 64), "run_id"}
+	put(filepath.Join(registrationPath, "write.registration.json"), record)
+	aiInput := input
+	aiInput.Kind, aiInput.Mode, aiInput.ActualRunID, aiInput.RequestSHA256 = "readonly_ai_external_host_input", "bounds", boundsRun, aiRequestHash
+	aiInput.AIBounds, aiInput.PeerBounds, aiInput.Protection = nil, nil, nil
+	aiInput.ToolSourceSHA = ""
+	if newerAITool {
+		aiInput.ToolSourceSHA = input.ToolSourceSHA
+	}
+	encoded, _ := json.Marshal(aiInput)
+	var aiInputMap map[string]any
+	_ = json.Unmarshal(encoded, &aiInputMap)
+	if !newerAITool {
+		delete(aiInputMap, "tool_source_sha")
+	}
+	aiInputHash := put(filepath.Join(bootstrapPath, "ai-host.input.json"), aiInputMap)
+	ai := lifecycleHistoricalAIBoundsMaterial{Protocol: "qs-compatibility-ai-host-readonly/v1", Mode: "bounds", SourceSHA: r.OriginalSourceSHA, ToolSourceSHA: aiInput.ToolSourceSHA, OperationID: r.OperationID, ActualRunID: boundsRun, ExternalRunID: "678", RequestSHA256: aiRequestHash, DescriptorSHA256: aiInputHash,
+		ExpectedRuntimeSHA256: input.RuntimeBindingSHA256, RuntimeSHA256: input.RuntimeBindingSHA256, ErrorCategory: "none", DiagnosticOnly: true, DiagnosticReadComplete: true, RequiredAdapters: []string{},
+		Bounds: &retirement.AIExternalBoundsSummary{Scope: "diagnostic-unapproved-bounds-only", SourceSHA256: strings.Repeat("3", 64), RuntimeBindingSHA256: input.RuntimeBindingSHA256, AIBoundsSHA256: aiBoundsHash, PeerBoundsSHA256: peerBoundsHash, AIPhysicalObjects: 43, AILogicalObjects: 53, PeerObjects: 14, IndependentEpochs: 2, NextCycleRequired: true}}
+	put(filepath.Join(boundsPath, "ai-host.readiness.json"), ai)
+	aiRecord := lifecycleHistoricalAIBootstrapRegistration{FormatVersion: 1, Kind: "readonly_ai_host_derivation_registration", SourceSHA: r.OriginalSourceSHA, OperationID: r.OperationID, ActualRunID: boundsRun, Mode: "bounds", ApprovalSHA256: strings.Repeat("4", 64), ParentRunID: a.RunID, ParentRequestSHA256: parentHash, DerivedRequestSHA256: aiRequestHash, DescriptorSHA256: aiInputHash, BinarySHA256: strings.Repeat("5", 64), OnlyParentFieldReplaced: "run_id"}
+	if newerAITool {
+		aiRecord.OriginalSourceSHA, aiRecord.ToolSourceSHA = r.OriginalSourceSHA, input.ToolSourceSHA
+	}
+	put(filepath.Join(bootstrapPath, "ai-host.registration.json"), aiRecord)
+	var writerReport lifecycleHistoricalWriteMaterialReport
+	raw, _ = os.ReadFile(r.HistoricalWriteReport.Path)
+	_ = json.Unmarshal(raw, &writerReport)
+	writerReport.RequestSHA256, writerReport.DescriptorSHA256 = writeRequestHash, inputHash
+	r.HistoricalWriteReport.SHA256 = put(r.HistoricalWriteReport.Path, writerReport)
+	writer, e := openLifecycleHistoricalWriteMaterialFiles(context.Background(), writerPath, r, uint32(os.Getuid()))
+	if e != nil {
+		t.Fatal(e)
+	}
+	t.Cleanup(func() { _ = writer.close() })
+	return root, r, writer, inventory
+}
+func TestOriginalHistoricalInputHandoffUsesActualLinkedProducerFilesAndKeepsParentIncomplete(t *testing.T) {
+	for _, newer := range []bool{false, true} {
+		t.Run(fmt.Sprint(newer), func(t *testing.T) {
+			root, r, writer, inventory := historicalWriteInputFixture(t, newer)
+			registration, previous, e := openLifecycleHistoricalWriteInputFiles(context.Background(), r, writer, inventory, root, uint32(os.Getuid()))
+			if e != nil {
+				t.Fatal(e)
+			}
+			defer registration.close()
+			defer func() {
+				for _, d := range previous {
+					_ = d.close()
+				}
+			}()
+			if len(registration.files) != 3 || len(previous) != 3 || len(previous[0].files) != 3 || len(previous[1].files) != 3 || len(previous[2].files) != 3 {
+				t.Fatal("original linked members omitted")
+			}
+			for _, d := range append([]*lifecycleMaterialDirectory{registration}, previous...) {
+				for _, f := range d.files {
+					if f.file == nil || d.checkFile(f) != nil || f.retained {
+						t.Fatal("original FD not held")
+					}
+				}
+			}
+			if previous[2].checkComplete(false) == nil {
+				t.Fatal("partial operation parent became complete")
+			}
+			if registration.checkComplete(false) != nil || previous[0].checkComplete(false) != nil || previous[1].checkComplete(false) != nil {
+				t.Fatal("exact original leaves incomplete")
+			}
+			p := filepath.Join(registration.path, "write.input.json")
+			raw, _ := os.ReadFile(p)
+			if os.Rename(p, p+".prior") != nil || os.WriteFile(p, raw, 0600) != nil || os.Remove(p+".prior") != nil || registration.checkFile(registration.files["write.input.json"]) == nil {
+				t.Fatal("replacement original inode admitted")
+			}
+		})
+	}
+}
+func TestOriginalHistoricalInputHandoffRejectsUnknownOrUnboundPreviousMaterials(t *testing.T) {
+	for _, mutation := range []string{"registration_extra", "bounds_extra", "bootstrap_extra", "missing_bounds", "wrong_parent", "wrong_asset", "wrong_runtime", "null_bounds_field", "unknown_readiness_authority", "wrong_bootstrap_source"} {
+		t.Run(mutation, func(t *testing.T) {
+			root, r, writer, inventory := historicalWriteInputFixture(t, false)
+			bounds := filepath.Join(root, "ai-host-bounds-678-1")
+			bootstrap := filepath.Join(root, "ai-bootstrap-bounds-678-1")
+			switch mutation {
+			case "registration_extra":
+				_ = os.WriteFile(filepath.Join(root, "history-write-registration-789-1", "unknown"), nil, 0600)
+			case "bounds_extra":
+				_ = os.WriteFile(filepath.Join(bounds, "unknown"), nil, 0600)
+			case "bootstrap_extra":
+				_ = os.WriteFile(filepath.Join(bootstrap, "unknown"), nil, 0600)
+			case "missing_bounds":
+				_ = os.Remove(filepath.Join(bounds, "peer.bounds.json"))
+			case "wrong_parent":
+				_ = os.WriteFile(filepath.Join(root, "history-request.json"), []byte("changed"), 0600)
+			case "wrong_asset":
+				_ = os.WriteFile(filepath.Join(inventory.path, lifecycleSourceNames[6]), []byte("changed"), 0600)
+			default:
+				p := filepath.Join(bounds, "ai-host.readiness.json")
+				if mutation == "wrong_bootstrap_source" {
+					p = filepath.Join(bootstrap, "ai-host.registration.json")
+				}
+				raw, _ := os.ReadFile(p)
+				var value map[string]any
+				_ = json.Unmarshal(raw, &value)
+				switch mutation {
+				case "wrong_runtime":
+					value["runtime_binding_sha256"] = strings.Repeat("0", 64)
+				case "null_bounds_field":
+					value["bounds"].(map[string]any)["recovery_authority"] = nil
+				case "unknown_readiness_authority":
+					value["production_success"] = true
+				case "wrong_bootstrap_source":
+					value["source_sha"] = strings.Repeat("0", 40)
+				}
+				raw, _ = json.Marshal(value)
+				_ = os.WriteFile(p, raw, 0600)
+			}
+			registration, previous, e := openLifecycleHistoricalWriteInputFiles(context.Background(), r, writer, inventory, root, uint32(os.Getuid()))
+			if e == nil || registration != nil || previous != nil {
+				t.Fatal("unbound original producer admitted")
+			}
+		})
+	}
+}
+func TestHistoricalProducerClosedNestedSchemasRejectNullEmptyBytesAndMissingInputField(t *testing.T) {
+	q := lifecycleHistoricalRequestMaterial{FormatVersion: 1, Kind: "readonly_compatibility_history_request", InventoryRequest: lifecycleFinalFileBinding{"/a", "hash"}, InventoryReport: lifecycleFinalFileBinding{"/b", "hash"}, Assets: make([]lifecycleHistoricalRequestAsset, 4)}
+	raw, _ := json.Marshal(q)
+	raw = bytes.Replace(raw, []byte(`"full_file_bytes":0`), []byte(`"full_file_bytes":null`), 1)
+	if decodeLifecycleHistoricalRequest(raw, &q) == nil {
+		t.Fatal("null empty source bytes admitted")
+	}
+	v := lifecycleHistoricalInputMaterial{}
+	raw, _ = json.Marshal(v)
+	var fields map[string]any
+	_ = json.Unmarshal(raw, &fields)
+	delete(fields, "expected_ai_head") // 14 fields still remain when tool_source_sha is present.
+	raw, _ = json.Marshal(fields)
+	if decodeLifecycleHistoricalBoundsInput(raw, &v) == nil {
+		t.Fatal("missing required input field replaced by optional tool field")
 	}
 }

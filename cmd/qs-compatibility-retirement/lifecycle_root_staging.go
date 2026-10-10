@@ -15,6 +15,7 @@ import (
 	"strings"
 	"syscall"
 
+	retirement "github.com/FangcunMount/qs-server/internal/apiserver/maintenance/compatibilityretirement"
 	backup "github.com/FangcunMount/qs-server/internal/apiserver/maintenance/compatibilityretirementbackup"
 )
 
@@ -1009,4 +1010,355 @@ func openLifecycleHistoricalWriteMaterialFiles(ctx context.Context, path string,
 		return nil, err
 	}
 	return d, nil
+}
+
+// These project only the existing original producer's schemas. They reopen
+// exact hash-bound files; none of their flags is a fence or acceptance proof.
+type lifecycleHistoricalRequestMaterial struct {
+	FormatVersion    int                               `json:"format_version"`
+	Kind             string                            `json:"kind"`
+	SourceSHA        string                            `json:"source_sha"`
+	OperationID      string                            `json:"operation_id"`
+	RunID            string                            `json:"run_id"`
+	InventoryRequest lifecycleFinalFileBinding         `json:"inventory_request"`
+	InventoryReport  lifecycleFinalFileBinding         `json:"inventory_report"`
+	Assets           []lifecycleHistoricalRequestAsset `json:"assets"`
+}
+type lifecycleHistoricalRequestAsset struct {
+	Database string `json:"database"`
+	Name     string `json:"name"`
+	Path     string `json:"path"`
+	SHA256   string `json:"full_file_sha256"`
+	Bytes    uint64 `json:"full_file_bytes"`
+}
+type lifecycleHistoricalInputMaterial struct {
+	FormatVersion          int                        `json:"format_version"`
+	Kind                   string                     `json:"kind"`
+	SourceSHA              string                     `json:"source_sha"`
+	ToolSourceSHA          string                     `json:"tool_source_sha"`
+	OperationID            string                     `json:"operation_id"`
+	ActualRunID            string                     `json:"actual_run_id"`
+	Mode                   string                     `json:"mode"`
+	RequestSHA256          string                     `json:"request_sha256"`
+	RuntimeSourceSHA       string                     `json:"runtime_source_sha"`
+	ImageID                string                     `json:"image_id"`
+	ContainerID            string                     `json:"container_id"`
+	RuntimeBindingSHA256   string                     `json:"approved_runtime_binding_sha256"`
+	AssetsDirectory        string                     `json:"assets_directory"`
+	ExpectedAIIdentityHash string                     `json:"expected_ai_identity_hash"`
+	ExpectedAIHead         string                     `json:"expected_ai_head"`
+	AIBounds               *lifecycleFinalFileBinding `json:"ai_bounds,omitempty"`
+	PeerBounds             *lifecycleFinalFileBinding `json:"peer_bounds,omitempty"`
+	Protection             *lifecycleFinalFileBinding `json:"protection,omitempty"`
+}
+type lifecycleHistoricalInputRegistration struct {
+	FormatVersion           int    `json:"format_version"`
+	Kind                    string `json:"kind"`
+	SourceSHA               string `json:"source_sha"`
+	ToolSourceSHA           string `json:"tool_source_sha"`
+	OperationID             string `json:"operation_id"`
+	ActualRunID             string `json:"actual_run_id"`
+	ApprovalSHA256          string `json:"approval_sha256"`
+	ParentRunID             string `json:"parent_run_id"`
+	ParentRequestSHA256     string `json:"parent_request_sha256"`
+	DerivedRequestSHA256    string `json:"derived_request_sha256"`
+	DescriptorSHA256        string `json:"descriptor_sha256"`
+	BinarySHA256            string `json:"history_binary_sha256"`
+	OnlyParentFieldReplaced string `json:"only_parent_field_replaced"`
+}
+type lifecycleHistoricalAIBoundsMaterial struct {
+	Protocol               string                              `json:"protocol"`
+	Mode                   string                              `json:"mode"`
+	SourceSHA              string                              `json:"source_sha"`
+	ToolSourceSHA          string                              `json:"tool_source_sha,omitempty"`
+	OperationID            string                              `json:"operation_id"`
+	ActualRunID            string                              `json:"actual_run_id"`
+	ExternalRunID          string                              `json:"external_run_id"`
+	RequestSHA256          string                              `json:"request_sha256"`
+	DescriptorSHA256       string                              `json:"descriptor_sha256"`
+	ExpectedRuntimeSHA256  string                              `json:"expected_runtime_binding_sha256"`
+	RuntimeSHA256          string                              `json:"runtime_binding_sha256"`
+	Bounds                 *retirement.AIExternalBoundsSummary `json:"bounds"`
+	ErrorCategory          string                              `json:"error_category"`
+	DiagnosticOnly         bool                                `json:"diagnostic_only"`
+	DiagnosticReadComplete bool                                `json:"diagnostic_read_complete"`
+	Complete               bool                                `json:"complete"`
+	IndependentApproval    bool                                `json:"independent_approval"`
+	WholeWriterFence       bool                                `json:"whole_writer_fence"`
+	CASAuthority           bool                                `json:"cas_authority"`
+	RetirementWritten      bool                                `json:"retirement_written"`
+	DropReady              bool                                `json:"drop_ready"`
+	RequiredAdapters       []string                            `json:"required_adapters"`
+}
+type lifecycleHistoricalAIBootstrapRegistration struct {
+	FormatVersion           int    `json:"format_version"`
+	Kind                    string `json:"kind"`
+	SourceSHA               string `json:"source_sha"`
+	OriginalSourceSHA       string `json:"original_source_sha,omitempty"`
+	ToolSourceSHA           string `json:"tool_source_sha,omitempty"`
+	OperationID             string `json:"operation_id"`
+	ActualRunID             string `json:"actual_run_id"`
+	Mode                    string `json:"mode"`
+	ApprovalSHA256          string `json:"approval_sha256"`
+	ParentRunID             string `json:"parent_run_id"`
+	ParentRequestSHA256     string `json:"parent_request_sha256"`
+	DerivedRequestSHA256    string `json:"derived_request_sha256"`
+	DescriptorSHA256        string `json:"descriptor_sha256"`
+	BinarySHA256            string `json:"history_binary_sha256"`
+	OnlyParentFieldReplaced string `json:"only_parent_field_replaced"`
+}
+
+// The original AI producers have two known wire shapes: original source, or
+// source-bound newer tool. Only the absent optional strings are normalized for
+// decoding; the registered original bytes/hash/inode never change.
+func decodeLifecycleHistoricalAIProducer(raw []byte, value any, optional ...string) error {
+	var fields map[string]json.RawMessage
+	if rejectDuplicateJSON(raw) != nil || json.Unmarshal(raw, &fields) != nil {
+		return lifecycleError("lifecycle_history_original_material_rejected")
+	}
+	found := 0
+	for _, name := range optional {
+		if _, ok := fields[name]; ok {
+			found++
+		}
+	}
+	if found != 0 && found != len(optional) {
+		return lifecycleError("lifecycle_history_original_material_rejected")
+	}
+	if found == 0 {
+		for _, name := range optional {
+			fields[name] = json.RawMessage(`""`)
+		}
+	}
+	normalized, err := json.Marshal(fields)
+	if err != nil || decodeLifecycleClosedProducer(normalized, value) != nil {
+		return lifecycleError("lifecycle_history_original_material_rejected")
+	}
+	return nil
+}
+func decodeLifecycleHistoricalRequest(raw []byte, q *lifecycleHistoricalRequestMaterial) error {
+	if decodeLifecycleClosedProducer(raw, q) != nil {
+		return lifecycleError("lifecycle_history_original_material_rejected")
+	}
+	var members struct {
+		InventoryRequest json.RawMessage   `json:"inventory_request"`
+		InventoryReport  json.RawMessage   `json:"inventory_report"`
+		Assets           []json.RawMessage `json:"assets"`
+	}
+	if json.Unmarshal(raw, &members) != nil || len(members.Assets) != 4 || decodeLifecycleClosedProducer(members.InventoryRequest, &q.InventoryRequest) != nil || decodeLifecycleClosedProducer(members.InventoryReport, &q.InventoryReport) != nil {
+		return lifecycleError("lifecycle_history_original_material_rejected")
+	}
+	for n := range members.Assets {
+		if decodeLifecycleClosedProducer(members.Assets[n], &q.Assets[n]) != nil {
+			return lifecycleError("lifecycle_history_original_material_rejected")
+		}
+	}
+	return nil
+}
+func decodeLifecycleHistoricalBoundsInput(raw []byte, v *lifecycleHistoricalInputMaterial) error {
+	var fields map[string]json.RawMessage
+	if rejectDuplicateJSON(raw) != nil || lifecycleExactJSONNames(raw, reflect.TypeOf(*v)) != nil || json.Unmarshal(raw, &fields) != nil || len(fields) != 14 && len(fields) != 15 {
+		return lifecycleError("lifecycle_history_original_material_rejected")
+	}
+	for _, name := range []string{"format_version", "kind", "source_sha", "operation_id", "actual_run_id", "mode", "request_sha256", "runtime_source_sha", "image_id", "container_id", "approved_runtime_binding_sha256", "assets_directory", "expected_ai_identity_hash", "expected_ai_head"} {
+		if b, ok := fields[name]; !ok || strings.TrimSpace(string(b)) == "null" {
+			return lifecycleError("lifecycle_history_original_material_rejected")
+		}
+	}
+	for name, b := range fields {
+		if strings.TrimSpace(string(b)) == "null" || name == "ai_bounds" || name == "peer_bounds" || name == "protection" {
+			return lifecycleError("lifecycle_history_original_material_rejected")
+		}
+	}
+	if json.Unmarshal(raw, v) != nil {
+		return lifecycleError("lifecycle_history_original_material_rejected")
+	}
+	return nil
+}
+func readLifecycleHistoricalHeldJSON(d *lifecycleMaterialDirectory, name string, maximum int64, value any) ([]byte, error) {
+	if d == nil || d.files[name] == nil || d.files[name].info.Size() < 1 || d.files[name].info.Size() > maximum {
+		return nil, lifecycleError("lifecycle_history_original_material_rejected")
+	}
+	f := d.files[name]
+	if d.checkFile(f) != nil {
+		return nil, lifecycleError("lifecycle_history_original_material_rejected")
+	}
+	if _, err := f.file.Seek(0, io.SeekStart); err != nil {
+		return nil, err
+	}
+	raw, err := io.ReadAll(io.LimitReader(f.file, maximum+1))
+	if err != nil || int64(len(raw)) > maximum || digestRaw(raw) != f.hash || json.Unmarshal(raw, value) != nil || d.checkFile(f) != nil {
+		return nil, lifecycleError("lifecycle_history_original_material_rejected")
+	}
+	return raw, nil
+}
+func lifecycleHistoricalRequestMatches(q lifecycleHistoricalRequestMaterial, r lifecycleRequest, inventory *lifecycleMaterialDirectory, operationRoot, run string) bool {
+	if inventory == nil || inventory.unchanged() != nil || q.FormatVersion != 1 || q.Kind != "readonly_compatibility_history_request" || q.SourceSHA != r.OriginalSourceSHA || q.OperationID != r.OperationID || q.RunID != run || q.InventoryRequest != (lifecycleFinalFileBinding{filepath.Join(operationRoot, "inventory-request.json"), r.Approval.RequestHash}) || q.InventoryReport != (lifecycleFinalFileBinding{filepath.Join(operationRoot, "inventory-"+r.Approval.RunID, "inventory.private.json"), r.Approval.InventorySHA256}) || len(q.Assets) != 4 {
+		return false
+	}
+	for n, asset := range q.Assets {
+		f := inventory.files[lifecycleSourceNames[3+n]]
+		if f == nil || inventory.checkFile(f) != nil || asset.Database != targets[n][0] || asset.Name != targets[n][1] || asset.Path != filepath.Join(operationRoot, "inventory-"+r.Approval.RunID, lifecycleSourceNames[3+n]) || asset.SHA256 != f.hash || asset.Bytes != uint64(f.info.Size()) {
+			return false
+		}
+	}
+	return true
+}
+func openLifecycleOriginalHistoricalWriteInputs(ctx context.Context, r lifecycleRequest, writer, inventory *lifecycleMaterialDirectory, uid uint32) (*lifecycleMaterialDirectory, []*lifecycleMaterialDirectory, error) {
+	if !lifecycleHistoricalWriteReferenceValid(r) || writer == nil || writer.path != filepath.Dir(r.HistoricalWriteReport.Path) {
+		return nil, nil, lifecycleError("lifecycle_history_original_material_rejected")
+	}
+	return openLifecycleHistoricalWriteInputFiles(ctx, r, writer, inventory, filepath.Dir(writer.path), uid)
+}
+
+// The operation parent is deliberately partial. Its three original inputs are
+// held by real FDs, but other approved run directories, locks and native journals
+// must be composed by their actual owners before the full catalog can succeed.
+func openLifecycleHistoricalWriteInputFiles(ctx context.Context, r lifecycleRequest, writer, inventory *lifecycleMaterialDirectory, operationRoot string, uid uint32) (registration *lifecycleMaterialDirectory, previous []*lifecycleMaterialDirectory, result error) {
+	if ctx == nil || ctx.Err() != nil || writer == nil || writer.unchanged() != nil || inventory == nil || r.HistoricalWriteReport == nil || writer.files["history.write.json"] == nil || writer.files["history.write.json"].hash != r.HistoricalWriteReport.SHA256 || filepath.Dir(writer.path) != operationRoot {
+		return nil, nil, lifecycleError("lifecycle_history_original_material_rejected")
+	}
+	var report lifecycleHistoricalWriteMaterialReport
+	raw, err := readLifecycleHistoricalHeldJSON(writer, "history.write.json", 256<<10, &report)
+	if err != nil || decodeLifecycleClosedProducer(raw, &report) != nil || report.SourceSHA != r.OriginalSourceSHA || report.OperationID != r.OperationID || !runRE.MatchString(report.ActualRunID) || filepath.Base(writer.path) != "history-write-"+report.ActualRunID {
+		return nil, nil, lifecycleError("lifecycle_history_original_material_rejected")
+	}
+	opened := []*lifecycleMaterialDirectory{}
+	defer func() {
+		if result != nil {
+			for _, d := range opened {
+				result = errors.Join(result, d.close())
+			}
+			registration = nil
+			previous = nil
+		}
+	}()
+	open := func(path string) (*lifecycleMaterialDirectory, error) {
+		d, e := openLifecycleMaterialDirectory(path, uid)
+		if e == nil {
+			opened = append(opened, d)
+		}
+		return d, e
+	}
+	registration, err = open(filepath.Join(operationRoot, "history-write-registration-"+report.ActualRunID))
+	if err != nil {
+		return nil, nil, err
+	}
+	var request lifecycleHistoricalRequestMaterial
+	requestRaw, err := readLifecycleProducerJSON(registration, "history.request.json", report.RequestSHA256, uid, 256<<10, &request)
+	if err != nil || decodeLifecycleHistoricalRequest(requestRaw, &request) != nil || !lifecycleHistoricalRequestMatches(request, r, inventory, operationRoot, report.ActualRunID) {
+		return nil, nil, lifecycleError("lifecycle_history_original_material_rejected")
+	}
+	var input lifecycleHistoricalInputMaterial
+	inputRaw, err := readLifecycleProducerJSON(registration, "write.input.json", report.DescriptorSHA256, uid, 256<<10, &input)
+	if err != nil || decodeLifecycleClosedProducer(inputRaw, &input) != nil || input.FormatVersion != 1 || input.Kind != "historical_evidence_write_host_input" || input.Mode != "write" || input.SourceSHA != report.SourceSHA || input.ToolSourceSHA != report.ToolSourceSHA || input.OperationID != r.OperationID || input.ActualRunID != report.ActualRunID || input.RequestSHA256 != report.RequestSHA256 || !shaRE.MatchString(input.RuntimeSourceSHA) || !strings.HasPrefix(input.ImageID, "sha256:") || !hashRE.MatchString(strings.TrimPrefix(input.ImageID, "sha256:")) || !hashRE.MatchString(input.ContainerID) || !hashRE.MatchString(input.RuntimeBindingSHA256) || !filepath.IsAbs(input.AssetsDirectory) || filepath.Clean(input.AssetsDirectory) != input.AssetsDirectory || input.ExpectedAIIdentityHash != "" || input.ExpectedAIHead != "" || input.AIBounds == nil || input.PeerBounds == nil || input.Protection == nil {
+		return nil, nil, lifecycleError("lifecycle_history_original_material_rejected")
+	}
+	var inputRefs map[string]json.RawMessage
+	if json.Unmarshal(inputRaw, &inputRefs) != nil || decodeLifecycleClosedProducer(inputRefs["ai_bounds"], input.AIBounds) != nil || decodeLifecycleClosedProducer(inputRefs["peer_bounds"], input.PeerBounds) != nil || decodeLifecycleClosedProducer(inputRefs["protection"], input.Protection) != nil {
+		return nil, nil, lifecycleError("lifecycle_history_original_material_rejected")
+	}
+	var record lifecycleHistoricalInputRegistration
+	recordRaw, err := readLifecycleProducerJSON(registration, "write.registration.json", "", uid, 256<<10, &record)
+	if err != nil || decodeLifecycleClosedProducer(recordRaw, &record) != nil || record.FormatVersion != 1 || record.Kind != "historical_evidence_write_registration" || record.SourceSHA != report.SourceSHA || record.ToolSourceSHA != report.ToolSourceSHA || record.OperationID != r.OperationID || record.ActualRunID != report.ActualRunID || !hashRE.MatchString(record.ApprovalSHA256) || record.ParentRunID != r.Approval.RunID || !hashRE.MatchString(record.ParentRequestSHA256) || record.DerivedRequestSHA256 != report.RequestSHA256 || record.DescriptorSHA256 != report.DescriptorSHA256 || !hashRE.MatchString(record.BinarySHA256) || record.OnlyParentFieldReplaced != "run_id" {
+		return nil, nil, lifecycleError("lifecycle_history_original_material_rejected")
+	}
+	if err = registration.checkComplete(false); err != nil {
+		return nil, nil, err
+	}
+	for _, ref := range []*lifecycleFinalFileBinding{input.AIBounds, input.PeerBounds, input.Protection} {
+		if !hashRE.MatchString(ref.SHA256) {
+			return nil, nil, lifecycleError("lifecycle_history_original_material_rejected")
+		}
+	}
+	boundsRoot := filepath.Dir(input.AIBounds.Path)
+	boundsRun := strings.TrimPrefix(filepath.Base(boundsRoot), "ai-host-bounds-")
+	if !runRE.MatchString(boundsRun) || boundsRun == report.ActualRunID || input.AIBounds.Path != filepath.Join(operationRoot, "ai-host-bounds-"+boundsRun, "ai.bounds.json") || input.PeerBounds.Path != filepath.Join(boundsRoot, "peer.bounds.json") || input.Protection.Path != filepath.Join(operationRoot, "ai-message-protection.json") {
+		return nil, nil, lifecycleError("lifecycle_history_original_material_rejected")
+	}
+	bounds, err := open(boundsRoot)
+	if err != nil {
+		return nil, nil, err
+	}
+	previous = append(previous, bounds)
+	if err = bounds.register("ai.bounds.json", input.AIBounds.SHA256, uid, 0600); err != nil {
+		return nil, nil, err
+	}
+	if err = bounds.register("peer.bounds.json", input.PeerBounds.SHA256, uid, 0600); err != nil {
+		return nil, nil, err
+	}
+	if bounds.files["ai.bounds.json"].info.Size() > 4<<20 || bounds.files["peer.bounds.json"].info.Size() > 4<<20 {
+		return nil, nil, lifecycleError("lifecycle_history_original_material_rejected")
+	}
+	var ai lifecycleHistoricalAIBoundsMaterial
+	aiRaw, err := readLifecycleProducerJSON(bounds, "ai-host.readiness.json", "", uid, 32768, &ai)
+	if err != nil || decodeLifecycleHistoricalAIProducer(aiRaw, &ai, "tool_source_sha") != nil || ai.Protocol != "qs-compatibility-ai-host-readonly/v1" || ai.Mode != "bounds" || ai.SourceSHA != r.OriginalSourceSHA || ai.ToolSourceSHA != "" && !shaRE.MatchString(ai.ToolSourceSHA) || ai.OperationID != r.OperationID || ai.ActualRunID != boundsRun || ai.ExternalRunID != strings.Split(boundsRun, "-")[0] || !hashRE.MatchString(ai.RequestSHA256) || !hashRE.MatchString(ai.DescriptorSHA256) || ai.ExpectedRuntimeSHA256 != input.RuntimeBindingSHA256 || ai.RuntimeSHA256 != input.RuntimeBindingSHA256 || ai.ErrorCategory != "none" || !ai.DiagnosticOnly || !ai.DiagnosticReadComplete || ai.Complete || ai.IndependentApproval || ai.WholeWriterFence || ai.CASAuthority || ai.RetirementWritten || ai.DropReady || ai.Bounds == nil {
+		return nil, nil, lifecycleError("lifecycle_history_original_material_rejected")
+	}
+	var aiMembers map[string]json.RawMessage
+	if json.Unmarshal(aiRaw, &aiMembers) != nil || decodeLifecycleClosedProducer(aiMembers["bounds"], ai.Bounds) != nil {
+		return nil, nil, lifecycleError("lifecycle_history_original_material_rejected")
+	}
+	b := ai.Bounds
+	if b.Scope != "diagnostic-unapproved-bounds-only" || !hashRE.MatchString(b.SourceSHA256) || b.RuntimeBindingSHA256 != input.RuntimeBindingSHA256 || b.AIBoundsSHA256 != input.AIBounds.SHA256 || b.PeerBoundsSHA256 != input.PeerBounds.SHA256 || b.AIPhysicalObjects != 43 && b.AIPhysicalObjects != 53 || b.AILogicalObjects != 53 || b.PeerObjects != 14 || b.IndependentEpochs != 2 || b.IndependentApproval || b.BusinessClosure || b.WriterFence || b.BrokerCoverage || b.CASAuthority || b.RetirementWritten || b.RecoveryAuthority || b.DropReady {
+		return nil, nil, lifecycleError("lifecycle_history_original_material_rejected")
+	}
+	if err = bounds.checkComplete(false); err != nil {
+		return nil, nil, err
+	}
+	bootstrap, err := open(filepath.Join(operationRoot, "ai-bootstrap-bounds-"+boundsRun))
+	if err != nil {
+		return nil, nil, err
+	}
+	previous = append(previous, bootstrap)
+	var aiRequest lifecycleHistoricalRequestMaterial
+	aiRequestRaw, err := readLifecycleProducerJSON(bootstrap, "history.request.json", ai.RequestSHA256, uid, 256<<10, &aiRequest)
+	if err != nil || decodeLifecycleHistoricalRequest(aiRequestRaw, &aiRequest) != nil || !lifecycleHistoricalRequestMatches(aiRequest, r, inventory, operationRoot, boundsRun) {
+		return nil, nil, lifecycleError("lifecycle_history_original_material_rejected")
+	}
+	var aiInput lifecycleHistoricalInputMaterial
+	aiInputRaw, err := readLifecycleProducerJSON(bootstrap, "ai-host.input.json", ai.DescriptorSHA256, uid, 256<<10, &aiInput)
+	if err != nil || decodeLifecycleHistoricalBoundsInput(aiInputRaw, &aiInput) != nil || aiInput.FormatVersion != 1 || aiInput.Kind != "readonly_ai_external_host_input" || aiInput.SourceSHA != ai.SourceSHA || aiInput.ToolSourceSHA != ai.ToolSourceSHA || aiInput.OperationID != r.OperationID || aiInput.ActualRunID != boundsRun || aiInput.Mode != "bounds" || aiInput.RequestSHA256 != ai.RequestSHA256 || aiInput.RuntimeSourceSHA != input.RuntimeSourceSHA || aiInput.ImageID != input.ImageID || aiInput.ContainerID != input.ContainerID || aiInput.RuntimeBindingSHA256 != input.RuntimeBindingSHA256 || !filepath.IsAbs(aiInput.AssetsDirectory) || filepath.Clean(aiInput.AssetsDirectory) != aiInput.AssetsDirectory || aiInput.AIBounds != nil || aiInput.PeerBounds != nil || aiInput.Protection != nil || (aiInput.ExpectedAIIdentityHash == "") != (aiInput.ExpectedAIHead == "") || aiInput.ExpectedAIIdentityHash != "" && (!hashRE.MatchString(aiInput.ExpectedAIIdentityHash) || aiInput.ExpectedAIHead != "0038_messaging_observations" && aiInput.ExpectedAIHead != "0040_module_table_names") {
+		return nil, nil, lifecycleError("lifecycle_history_original_material_rejected")
+	}
+	var aiRecord lifecycleHistoricalAIBootstrapRegistration
+	aiRecordRaw, err := readLifecycleProducerJSON(bootstrap, "ai-host.registration.json", "", uid, 256<<10, &aiRecord)
+	if err != nil || decodeLifecycleHistoricalAIProducer(aiRecordRaw, &aiRecord, "original_source_sha", "tool_source_sha") != nil || aiRecord.FormatVersion != 1 || aiRecord.Kind != "readonly_ai_host_derivation_registration" || aiRecord.SourceSHA != ai.SourceSHA || aiRecord.ToolSourceSHA != ai.ToolSourceSHA || aiRecord.OriginalSourceSHA != "" && aiRecord.OriginalSourceSHA != ai.SourceSHA || aiRecord.OperationID != r.OperationID || aiRecord.ActualRunID != boundsRun || aiRecord.Mode != "bounds" || !hashRE.MatchString(aiRecord.ApprovalSHA256) || aiRecord.ParentRunID != record.ParentRunID || aiRecord.ParentRequestSHA256 != record.ParentRequestSHA256 || aiRecord.DerivedRequestSHA256 != ai.RequestSHA256 || aiRecord.DescriptorSHA256 != ai.DescriptorSHA256 || !hashRE.MatchString(aiRecord.BinarySHA256) || aiRecord.OnlyParentFieldReplaced != "run_id" {
+		return nil, nil, lifecycleError("lifecycle_history_original_material_rejected")
+	}
+	if err = bootstrap.checkComplete(false); err != nil {
+		return nil, nil, err
+	}
+	parent, err := open(operationRoot)
+	if err != nil {
+		return nil, nil, err
+	}
+	previous = append(previous, parent)
+	var original lifecycleHistoricalRequestMaterial
+	parentRaw, err := readLifecycleProducerJSON(parent, "history-request.json", record.ParentRequestSHA256, uid, 256<<10, &original)
+	if err != nil || decodeLifecycleHistoricalRequest(parentRaw, &original) != nil || !lifecycleHistoricalRequestMatches(original, r, inventory, operationRoot, record.ParentRunID) {
+		return nil, nil, lifecycleError("lifecycle_history_original_material_rejected")
+	}
+	if err = parent.register("inventory-request.json", r.Approval.RequestHash, uid, 0600); err != nil {
+		return nil, nil, err
+	}
+	if err = parent.register("ai-message-protection.json", input.Protection.SHA256, uid, 0600); err != nil {
+		return nil, nil, err
+	}
+	if parent.files["ai-message-protection.json"].info.Size() < 1 || parent.files["ai-message-protection.json"].info.Size() > 256<<10 {
+		return nil, nil, lifecycleError("lifecycle_history_original_material_rejected")
+	}
+	for _, d := range opened {
+		for _, f := range d.files {
+			if ctx.Err() != nil {
+				return nil, nil, ctx.Err()
+			}
+			if err = d.checkFile(f); err != nil {
+				return nil, nil, err
+			}
+		}
+	}
+	// Only registered objects are returned. The parent retains unregistered
+	// responsibilities; its complete-scope check remains mandatory and closed.
+	return registration, previous, nil
 }
