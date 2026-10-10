@@ -627,7 +627,7 @@ jobs:
           for name,raw in programs.items(): (destination/(entries[name]+'.py')).write_bytes(raw)
           (destination/'qs-retirement-window-scope').write_bytes(rule)
           rule_hash=hashlib.sha256(rule).hexdigest()
-          policy=dict(format_version=1,kind='fixed_deploy_retirement_window_installation',operation_id=operation,source_sha=source,manifest_sha256=manifest,target_hash=window.TARGET,native_sha256=native,wrapper_sha256=wrapper,entry_sha256=entries,sudoers_sha256=rule_hash,automatic_withdrawal_connected=False)
+          policy=dict(format_version=1,kind='fixed_deploy_retirement_window_installation',operation_id=operation,source_sha=source,manifest_sha256=manifest,target_hash=window.TARGET,native_sha256=native,wrapper_sha256=wrapper,entry_sha256=entries,sudoers_sha256=rule_hash,automatic_withdrawal_connected=True)
           (destination/'policy.json').write_text(json.dumps(policy,sort_keys=True,indent=2)+'\n')
           (destination/'SHA256SUMS').write_text(''.join(hashlib.sha256(path.read_bytes()).hexdigest()+'  '+path.name+'\n' for path in sorted(destination.iterdir())))
           PYWINDOWINSTALL

@@ -1756,8 +1756,9 @@ Validate the rule with `visudo` before installation and validate the complete
 sudoers configuration afterward. Set the qs-server `production` environment
 Variable `RETIREMENT_FIXED_HOST_ENTRY_SHA256` to that same digest. The caller
 checks root ownership, every parent, file mode, absence of links and original
-file hash before sudo. Actual ServerA installation and permission remain
-unproven until the Action enters the native observer and returns its receipt.
+file hash before sudo. Run `38061422468-3` entered the actual observer through
+the installed limited entry. Its host observation was incomplete and remains a
+diagnostic result; it does not establish the production database writer fence.
 
 Remove only this dedicated sudoers rule and installed digest file at R4, clear
 the dedicated Variable, and preserve unrelated deployment rules/files. This
@@ -1773,3 +1774,22 @@ the same actual packaged binaries; no separately rebuilt binary is trusted.
 The artifact contains no credentials or production database contents and expires
 after three days. Download it only from the approved main/source-bound run.
 It grants host observation only and must be removed with the batch at R4.
+
+The database prepare and controlled window use two separate digest-pinned,
+no-argument deploy entries generated from the final approved source, actual
+native binaries, wrapper and immutable manifest. Their exact variables are
+`RETIREMENT_FIXED_PREPARE_ENTRY_SHA256` and
+`RETIREMENT_FIXED_WINDOW_ENTRY_SHA256`. The administrator installs the original
+`policy.json` at `/usr/local/libexec/qs-retirement/<operation>-<source>/policy.json`
+as root-owned `0400` inside its dedicated `0700` directory. The dedicated
+`qs-retirement-window-scope` rule permits only those two exact commands.
+
+Normal `apply` already performs acceptance, temporary-material purge and resume
+under its original owners; standalone `verify` or forward `purge` is not a
+supported substitute. Only the installed caller's actual successful accepted
+`apply`/`purge` result withdraws that exact rule, both entries and their policy
+directory, preserving one root-owned, body-free withdrawal receipt. Unknown
+results retain recovery authority. Fresh production preparation uses one final
+source throughout; running A, CI, installation and production acceptance retain
+their separate identities and proof. New entry installation, full native
+recovery and production deletion remain unverified until their actual runs.
