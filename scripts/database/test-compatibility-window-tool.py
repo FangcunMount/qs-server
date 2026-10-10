@@ -720,4 +720,63 @@ print('fixture-terminal-only')
         self.assertNotIn('SUDO_PASSWORD',tool.credential_names('apply'))
         self.assertNotIn('SUDO_PASSWORD',tool.credential_names('prepare'))
 
+
+class FixedWindowEntry(unittest.TestCase):
+    def test_generated_window_has_no_argv_code_and_preserves_original_control_fd(self):
+        import io,os,pwd,sys,tarfile,time,tempfile,contextlib
+        from unittest import mock
+        native={arch:'7'*64 for arch in ('amd64','arm64')}
+        fixture="""import os,sys,json
+ def_unused=0
+""".replace(' def_unused','def_unused')
+        fixture+="""
+def approve(*args): return {'tool_source_sha':'a'*40,'tool_binary_sha256':{'amd64':'%s','arm64':'%s'}}
+def credential_names(stage): return ()
+def validate_credentials(value,stage):
+ if value!={}: raise ValueError()
+def read_owned(*args): return b''
+def root_execute(arguments,packet,source_uid,archive_raw):
+ print(json.dumps({'actual_fd':sys.stdin.fileno(),'tail':os.read(sys.stdin.fileno(),5).decode()}))
+ return 0
+"""%('7'*64,'7'*64)
+        wrapper=fixture.encode();wrapper_hash=tool.digest(wrapper)
+        program=tool.fixed_window_entry_program('12-1','a'*40,native,wrapper_hash,'c'*64);ast.parse(program)
+        run=str(time.time_ns())+'-1';path=Path('/tmp/qs-compatibility-retirement-'+run+'.tar.gz');fd=os.open(path,os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o600)
+        try:
+            with os.fdopen(fd,'wb') as f,tarfile.open(fileobj=f,mode='w:gz') as tar:
+                for name,body in {'compatibility-window-tool.py':wrapper,'receipt-transport.py':b'fixture', 'inventory-linux-amd64':b'fixture','inventory-linux-arm64':b'fixture'}.items():
+                    member=tarfile.TarInfo(name);member.size=len(body);tar.addfile(member,io.BytesIO(body))
+            bindings=['prepare','12-1',run,'a'*40,'1'*64,tool.digest(path.read_bytes()),'c'*64,'2'*64]
+            packet=dict(credentials={},approval='fixture',tool_directory='/tmp/qs-independent-window-tool.abcdef',tool_program_sha256=wrapper_hash,bindings=bindings)
+            for change,success in (({},True),({'tool_program_sha256':'f'*64},False),({'bindings':bindings[:1]+['99-1']+bindings[2:]},False)):
+                read,write=os.pipe();os.write(write,tool.canonical(packet|change)+b'ALIVE')
+                with os.fdopen(read,'rb',buffering=0) as stream:
+                    stdin=io.TextIOWrapper(stream);output=io.StringIO();owner=os.getuid()
+                    with mock.patch.object(tool.os,'getuid',return_value=0),mock.patch.object(tool.os,'geteuid',return_value=0),mock.patch.object(pwd,'getpwnam',return_value=type('Owner',(),{'pw_uid':owner})()),mock.patch.dict(os.environ,{'SUDO_UID':str(owner),'SUDO_PASSWORD':'fixture-secret'},clear=True),mock.patch.object(sys,'argv',['fixed.py']),mock.patch.object(sys,'stdin',stdin),contextlib.redirect_stdout(output),self.assertRaises(SystemExit) as result:
+                        exec(compile(program,'actual-fixed-window-gate','exec'),{})
+                    self.assertEqual(result.exception.code,0 if success else 1)
+                    if success:self.assertEqual(json.loads(output.getvalue()),dict(actual_fd=read,tail='ALIVE'))
+                    else:self.assertNotIn('fixture-secret',output.getvalue())
+                os.close(write)
+        finally:path.unlink()
+    def test_configured_window_uses_fixed_file_and_same_held_control(self):
+        import argparse,contextlib,io,os
+        from unittest import mock
+        fixture=WindowToolMetadata();request=fixture.request();approval=fixture.approval(request)
+        args=argparse.Namespace(operation='prepare',operation_id='12-1',run_id='22-3',dispatcher_sha='d'*40,manifest_hash='c'*64,template_hash=approval['request_template_sha256'])
+        credentials={k:'' for k in tool.credential_names('prepare')};credentials['MYSQL_PASSWORD']='fixture-private-password'
+        fixed=Path('/usr/local/libexec/qs-retirement')/('f'*64+'.py')
+        with mock.patch.dict(os.environ,{'RETIREMENT_FIXED_WINDOW_ENTRY_SHA256':'f'*64,'SUDO_PASSWORD':'fixture-sudo-secret'},clear=True),mock.patch.object(tool.os,'getuid',return_value=501),mock.patch.object(tool.os,'geteuid',return_value=501),mock.patch.object(tool.Path,'resolve',return_value=Path('/tmp/qs-independent-window-tool.abcdef/compatibility-window-tool.py')),mock.patch.object(tool,'approve',return_value=approval),mock.patch.object(tool,'read_owned',return_value=tool.canonical(request)),mock.patch.object(tool,'installed_fixed_window_entry',return_value=fixed),mock.patch.object(tool,'root_askpass_environment') as askpass,mock.patch.object(tool,'owned_process',return_value=(1,b'fixture-refusal')) as child,mock.patch.object(tool,'validate_native',side_effect=tool.Refused('fixture')),mock.patch.object(tool,'emit'),contextlib.redirect_stdout(io.StringIO()):
+            self.assertEqual(tool.run_window_call(args,'','1'*64,'2'*64,credentials,control=88),1)
+        askpass.assert_not_called();self.assertEqual(child.call_args.args[0],['/usr/bin/sudo','-n','--','/usr/bin/python3','-I',str(fixed)])
+        self.assertEqual(child.call_args.args[1],{'PATH':'/usr/bin:/bin'});self.assertEqual(child.call_args.kwargs['control'],88)
+        packet=tool.decode(child.call_args.kwargs['packet']);self.assertEqual(packet['bindings'][0:2],['prepare','12-1']);self.assertEqual(packet['credentials'],credentials)
+        self.assertNotIn('fixture-private-password',str(child.call_args.args[0]));self.assertNotIn('SUDO_PASSWORD',packet['credentials'])
+    def test_revoke_without_known_native_success_refuses_before_any_file_effect(self):
+        from unittest import mock
+        with mock.patch.object(tool.os,'getuid',return_value=0),mock.patch.object(tool.os,'geteuid',return_value=0),mock.patch.object(tool,'_fixed_entry_revoke_program') as generate:
+            for code,stage in ((1,'purge'),(0,'apply'),(0,'purge')):
+                with self.subTest(code=code,stage=stage),self.assertRaises(tool.Refused): tool.revoke_fixed_entries_after_native(b'{}',code,{'stage':stage},'12-1','a'*64,['b'*64,'c'*64],'d'*64)
+        generate.assert_not_called()
+
 if __name__=='__main__':unittest.main()

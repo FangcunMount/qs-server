@@ -2081,8 +2081,27 @@ def fixed_host_entry_program(operation, source, native_hashes):
     return (FIXED_HOST_ENTRY_GATE.replace('@POLICY@',repr(policy)).replace('@PROGRAM@',repr(ROOT_PREPARE_ONCE))).encode()
 
 
-def installed_fixed_host_entry():
-    expected=os.environ.get('RETIREMENT_FIXED_HOST_ENTRY_SHA256','')
+
+def fixed_prepare_entry_program(operation, source, native_hashes, wrapper_hash, manifest_hash):
+    """One installed, no-argument entry for the three original prepare modes."""
+    token(wrapper_hash, HASH); token(manifest_hash, HASH)
+    program = fixed_host_entry_program(operation, source, native_hashes).decode()
+    program = program.replace("'native_sha256': " + repr(native_hashes), "'native_sha256': " + repr(native_hashes) + ", 'wrapper_sha256': " + repr(wrapper_hash))
+    program = program.replace("raw=sys.stdin.buffer.read(4097)", "raw=sys.stdin.buffer.read(32769)").replace("len(raw)>4096", "len(raw)>32768")
+    program = program.replace("{'operation_id','run_id','source_sha','request_sha256','package_sha256'}", "{'operation_id','run_id','source_sha','request_sha256','package_sha256','stage','manifest_sha256','credentials'}")
+    program = program.replace("for v in request.values()", "for k,v in request.items() if k!='credentials'")
+    program = program.replace("arch={'x86_64'", "if request['stage'] not in ('lifecycle','prepare-facts','db-writer-census'): reject()\n    if type(request['credentials']) is not dict: reject()\n    if (request['stage']=='lifecycle' and not re.fullmatch(r'[0-9a-f]{64}',request['manifest_sha256'])) or (request['stage']!='lifecycle' and request['manifest_sha256']!=''): reject()\n    arch={'x86_64'")
+    program = program.replace("names=set(); matched=False", "names=set(); matched=False; wrapper_matched=False")
+    program = program.replace("if member.name=='inventory-linux-'+arch:", "if member.name=='compatibility-window-tool.py':\n                    wrapper=tar.extractfile(member).read((1<<20)+1)\n                    if len(wrapper)>1<<20 or hashlib.sha256(wrapper).hexdigest()!=POLICY['wrapper_sha256']: reject()\n                    wrapper_matched=True\n                if member.name=='inventory-linux-'+arch:")
+    program = program.replace("if not matched: reject()", "if not matched or (request['stage']=='prepare-facts' and not wrapper_matched): reject()")
+    program = program.replace("request['package_sha256'],'','sudo-user','host-writer-scope']", "request['package_sha256'],request['manifest_sha256'],'sudo-user']\n    if request['stage']!='lifecycle': sys.argv.append(request['stage'])")
+    program = program.replace("io.BytesIO(b'{}')", "io.BytesIO(json.dumps(request['credentials'],separators=(',',':')).encode())")
+    program = program.replace("request['stage']=='lifecycle' and not re.fullmatch(r'[0-9a-f]{64}',request['manifest_sha256'])","request['stage']=='lifecycle' and request['manifest_sha256']!="+repr(manifest_hash))
+    return program.encode()
+
+
+def installed_fixed_host_entry(variable="RETIREMENT_FIXED_HOST_ENTRY_SHA256"):
+    expected=os.environ.get(variable,'')
     if not isinstance(expected,str) or HASH.fullmatch(expected) is None:
         fail('fixed_host_entry_installation_required')
     path=FIXED_HOST_ENTRY_BASE/(expected+'.py')
@@ -2131,6 +2150,10 @@ def root_once_lifecycle_prepare(args):
                 fixed=installed_fixed_host_entry()
                 request={'operation_id':args.operation_id,'run_id':args.run_id,'source_sha':args.actual_source_sha,'request_sha256':request_hash,'package_sha256':package_hash}
                 result=subprocess.run(['/usr/bin/sudo','-n','--','/usr/bin/python3','-I',str(fixed)],env={'PATH':'/usr/bin:/bin'},input=canonical_bytes(request),stdout=subprocess.PIPE,stderr=private_stderr,timeout=3*60,check=False)
+            elif os.environ.get('RETIREMENT_FIXED_PREPARE_ENTRY_SHA256'):
+                fixed=installed_fixed_host_entry('RETIREMENT_FIXED_PREPARE_ENTRY_SHA256')
+                request={'operation_id':args.operation_id,'run_id':args.run_id,'source_sha':args.actual_source_sha,'request_sha256':request_hash,'package_sha256':package_hash,'stage':args.prepare_mode,'manifest_sha256':args.manifest_hash,'credentials':json.loads(packet)}
+                result=subprocess.run(['/usr/bin/sudo','-n','--','/usr/bin/python3','-I',str(fixed)],env={'PATH':'/usr/bin:/bin'},input=canonical_bytes(request),stdout=subprocess.PIPE,stderr=private_stderr,timeout=3*60 if args.prepare_mode=='db-writer-census' else 91*60,check=False)
             else:
                 with root_askpass_environment() as environment:
                     if environment is not None:

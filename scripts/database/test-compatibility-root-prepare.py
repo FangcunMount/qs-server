@@ -610,4 +610,31 @@ class FixedDeployHostEntry(unittest.TestCase):
             with mock.patch.object(tool,'FIXED_HOST_ENTRY_BASE',root),mock.patch.dict(os.environ,{'RETIREMENT_FIXED_HOST_ENTRY_SHA256':expected},clear=True),self.assertRaises(tool.Blocked):
                 tool.installed_fixed_host_entry()
 
+
+class FixedPrepareEntry(unittest.TestCase):
+    def scope(self):
+        raw=tool.fixed_prepare_entry_program('123-1','a'*40,{arch:hashlib.sha256(b'approved fixture bytes').hexdigest() for arch in ('amd64','arm64')},'d'*64,'c'*64)
+        tree=ast.parse(raw);setup=[n for n in tree.body if isinstance(n,(ast.Import,ast.ImportFrom,ast.Assign,ast.FunctionDef))]
+        scope={};exec(compile(ast.Module(body=setup,type_ignores=[]),'fixed-prepare-gate','exec'),scope)
+        return scope,raw
+    def test_closed_stage_manifest_and_credentials_schema_before_original_bootstrap(self):
+        scope,raw=self.scope();fixture=FixedDeployHostEntry()
+        with fixture.archive(b'approved fixture bytes') as (_,request):
+            request|=dict(stage='lifecycle',manifest_sha256='c'*64,credentials={})
+            actual,owner=fixture.authorize(scope,request)
+            self.assertEqual(actual,request);self.assertEqual(owner,os.getuid())
+            for change in ({'stage':'apply'},{'manifest_sha256':'e'*64},{'credentials':[]},{'source_sha':'f'*40}):
+                with self.subTest(change=change),contextlib.redirect_stdout(io.StringIO()),self.assertRaises(SystemExit): fixture.authorize(scope,request|change)
+            request|=dict(stage='prepare-facts',manifest_sha256='')
+            with contextlib.redirect_stdout(io.StringIO()),self.assertRaises(SystemExit):fixture.authorize(scope,request)
+        self.assertIn("'wrapper_sha256': '"+'d'*64+"'",raw.decode())
+    def test_configured_prepare_caller_never_passes_code_argv_or_password(self):
+        args=RootPrepareOnceTransport().args();fixed=Path('/usr/local/libexec/qs-retirement')/('f'*64+'.py')
+        with mock.patch.dict(os.environ,{'RETIREMENT_PACKAGE_SHA256':'d'*64,'RETIREMENT_FIXED_PREPARE_ENTRY_SHA256':'f'*64,'SUDO_PASSWORD':'fixture-secret'},clear=True),mock.patch.object(tool.os,'getuid',return_value=501),mock.patch.object(tool.os,'geteuid',return_value=501),mock.patch.object(tool,'installed_fixed_host_entry',return_value=fixed) as installed,mock.patch.object(tool,'root_askpass_environment') as askpass,mock.patch.object(tool.subprocess,'run',return_value=subprocess.CompletedProcess([],1,b'fixture_refusal')) as call:
+            tool.root_once_lifecycle_prepare(args)
+        self.assertEqual(call.call_args.args[0],['/usr/bin/sudo','-n','--','/usr/bin/python3','-I',str(fixed)])
+        self.assertEqual(call.call_args.kwargs['env'],{'PATH':'/usr/bin:/bin'});askpass.assert_not_called()
+        packet=json.loads(call.call_args.kwargs['input']);self.assertEqual(packet['stage'],'lifecycle');self.assertEqual(packet['manifest_sha256'],'c'*64)
+        self.assertNotIn('SUDO_PASSWORD',packet['credentials']);installed.assert_called_once_with('RETIREMENT_FIXED_PREPARE_ENTRY_SHA256')
+
 if __name__=='__main__':unittest.main()
