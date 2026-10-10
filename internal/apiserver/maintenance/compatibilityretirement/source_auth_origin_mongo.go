@@ -117,6 +117,13 @@ func sourceOriginMongoMetadata(ctx context.Context, global *MongoResponsibilityS
 	return boundary, bson.RawValue{Type: upper.Type, Value: append([]byte(nil), upper.Value...)}, nil
 }
 func sourceOriginReadMongo(ctx context.Context, global *MongoResponsibilitySnapshot, binding *OriginCopyBinding) (SourceBoundary, SourceCopyReceipt, error) {
+	return sourceOriginReadMongoWithInput(ctx, global, binding, binding.alive, nil)
+}
+
+func sourceOriginReadMongoWithInput(ctx context.Context, global *MongoResponsibilitySnapshot, binding *OriginCopyBinding, guard func(context.Context) error, freeze sourceOriginInputSink) (SourceBoundary, SourceCopyReceipt, error) {
+	if binding == nil || global == nil || guard == nil || guard(ctx) != nil {
+		return SourceBoundary{}, SourceCopyReceipt{}, ErrSourceOrigin
+	}
 	expected := binding.expected[3]
 	boundary, upper, err := sourceOriginMongoMetadata(ctx, global, binding.limits)
 	if err != nil || boundary != expected.Boundary {
@@ -125,7 +132,7 @@ func sourceOriginReadMongo(ctx context.Context, global *MongoResponsibilitySnaps
 	decoder := &MongoSourceReader{acc: sourceAccumulator{expectation: expected, h: sha256.New()}, upper: upper}
 	if !boundary.Empty {
 		for page := uint64(0); ; page++ {
-			if err = binding.alive(ctx); err != nil {
+			if err = guard(ctx); err != nil {
 				return boundary, SourceCopyReceipt{}, err
 			}
 			if page > binding.limits.MaxRows/uint64(binding.limits.PageRows)+1 {
@@ -142,8 +149,10 @@ func sourceOriginReadMongo(ctx context.Context, global *MongoResponsibilitySnaps
 				return boundary, SourceCopyReceipt{}, ErrSourceOrigin
 			}
 			n := 0
+			var rawPage []bson.Raw
+			var pageBytes uint64
 			for cursor.Next(q) {
-				if e = binding.alive(ctx); e != nil {
+				if e = guard(ctx); e != nil {
 					break
 				}
 				raw := cursor.Current
@@ -166,6 +175,14 @@ func sourceOriginReadMongo(ctx context.Context, global *MongoResponsibilitySnaps
 				if e = sourceOriginObserve(binding.copies, value, value.Source.Database, value.Source.Object, value.Source.PrimaryKeySHA256); e != nil {
 					break
 				}
+				if freeze != nil {
+					pageBytes += uint64(len(raw))
+					if pageBytes > sourceOriginInputPageBytes {
+						e = ErrSourceBounds
+						break
+					}
+					rawPage = append(rawPage, append(bson.Raw(nil), raw...))
+				}
 				n++
 			}
 			readErr, closeErr := cursor.Err(), cursor.Close(q)
@@ -176,9 +193,19 @@ func sourceOriginReadMongo(ctx context.Context, global *MongoResponsibilitySnaps
 			if readErr != nil || closeErr != nil {
 				return boundary, SourceCopyReceipt{}, ErrSourceOrigin
 			}
+			if freeze != nil {
+				if e = freeze(ctx, sourceOriginInputFrame{Source: 3, Boundary: boundary, MongoRows: rawPage, EOF: n < binding.limits.PageRows}); e != nil {
+					return boundary, SourceCopyReceipt{}, e
+				}
+			}
 			if n < binding.limits.PageRows {
 				break
 			}
+		}
+	}
+	if boundary.Empty && freeze != nil {
+		if err = freeze(ctx, sourceOriginInputFrame{Source: 3, Boundary: boundary, EOF: true}); err != nil {
+			return boundary, SourceCopyReceipt{}, err
 		}
 	}
 	if err = decoder.acc.finish(); err != io.EOF {

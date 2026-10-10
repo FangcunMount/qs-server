@@ -38,6 +38,7 @@ func (l MongoSnapshotInputLimits) valid() bool {
 type MongoSnapshotInputEpoch struct {
 	self      *MongoSnapshotInputEpoch
 	db        *mongo.Database
+	config    MongoOwnerConfig
 	session   mongo.Session
 	sessionID bson.Raw
 	snapshot  primitive.Timestamp
@@ -173,7 +174,7 @@ func PrepareMongoSnapshotInputEpoch(parent context.Context, db *mongo.Database, 
 	if !ok || !info.Mode().IsRegular() || info.Mode().Perm() != 0o600 || st.Nlink != 1 || st.Uid != uint32(os.Geteuid()) || info.Size() != 0 {
 		return nil, ErrMongoSnapshotInput
 	}
-	e := &MongoSnapshotInputEpoch{db: db, session: s, sessionID: id, limits: limits, started: time.Now(), file: file, dev: uint64(st.Dev), ino: uint64(st.Ino)}
+	e := &MongoSnapshotInputEpoch{db: db, config: config, session: s, sessionID: id, limits: limits, started: time.Now(), file: file, dev: uint64(st.Dev), ino: uint64(st.Ino)}
 	e.self = e
 	defer func() {
 		if err != nil {
