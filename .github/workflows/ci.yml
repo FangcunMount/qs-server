@@ -503,6 +503,14 @@ jobs:
           QS_HISTORY_MYSQL_DSN: root:root@tcp(127.0.0.1:3306)/mysql?parseTime=true&multiStatements=true
           QS_HISTORY_CI_MYSQL_CONTAINER: ${{ job.services.mysql.id }}
           QS_HISTORY_REQUIRE_DATABASE: '1'
+          QS_HISTORY_CLI_CI_INTEGRATION: '1'
+          MYSQL_HOST: 127.0.0.1
+          MYSQL_PORT: '3306'
+          MYSQL_USERNAME: root
+          MYSQL_PASSWORD: root
+          MONGODB_HOST: 127.0.0.1
+          MONGODB_PORT: '27017'
+          QS_HISTORY_MONGO_REPLICA_SET: rs0
           QS_SERVER_TEST_MONGO_URI: mongodb://127.0.0.1:27017/?replicaSet=rs0
           QS_SERVER_TEST_MONGO_DB_PREFIX: qs_history_ci_contract
           QS_RETIREMENT_REQUIRE_ABORT_NATIVE: '1'
@@ -510,23 +518,49 @@ jobs:
           set -euo pipefail
           sql_component_log="${RUNNER_TEMP}/qs-historical-component-sql-native.log"
           owner_fragment_log="${RUNNER_TEMP}/qs-historical-owner-fragments-native.log"
-          go test -race -tags=integration -count=1 -timeout=10m -v ./internal/apiserver/infra/mysql/evaluation -run '^TestSQLCASProvenanceNative|^TestSQLHistoricalMissingOriginalRunPolicyNative$|^TestSQLHistoricalOriginalRunGlobalAbsenceNative$|^TestSQLHistoricalComponentNative(SourceOwnerSelectors|AbsentOwnerSelector|MixedPresentAbsentSelectors)$' | tee "$sql_component_log"
-          go test -race -tags=integration -count=1 -timeout=10m -v ./internal/apiserver/maintenance/compatibilityretirement -run '^(TestHistoricalCASPersistenceNative|TestQualifiedHistoricalCASNative|TestFinalHistoricalEOFNative)|^TestWholeSourceJointNativeOwnerComponentsSplitPageWithoutConsumingTwice$|^TestHistoricalCIMySQLFixtureRequiresActualJobService$' | tee "$owner_fragment_log"
-          if grep -Eq -- '--- SKIP:|--- FAIL:|DATA RACE' "$sql_component_log" "$owner_fragment_log"; then
+          cli_input_log="${RUNNER_TEMP}/qs-historical-cli-input-native.log"
+          export QS_HISTORY_CI_MONGO_CONTAINER="$(docker --host unix:///var/run/docker.sock inspect --format '{{.Id}}' qs-runtime-closure-e2e-mongo)"
+          export QS_HISTORY_GO="$(command -v go)"
+          go test -race -tags=integration -count=1 -timeout=10m -v ./internal/apiserver/infra/mysql/evaluation -run '^TestSQLCASProvenanceNative|^TestSQLHistoricalMissingOriginalRunPolicyNative$|^TestSQLHistoricalOriginalRunGlobalAbsenceNative$|^TestSQLHistoricalComponentNative' | tee "$sql_component_log"
+          go test -race -tags=integration -count=1 -timeout=10m -v ./internal/apiserver/maintenance/compatibilityretirement -run '^(TestHistoricalCASPersistenceNative|TestQualifiedHistoricalCASNative|TestFinalHistoricalEOFNative|TestHistoricalSourceInputNative|TestAIHistoricalInputNative|TestMongoHistoricalComponentNative)|^TestMongoBatchNativeSnapshotInputOwnerFootprintMatchesOriginalFD$|^TestWholeSourceJointNativeOwnerComponentsSplitPageWithoutConsumingTwice$|^TestHistoricalCIMySQLFixtureRequiresActualJobService$' | tee "$owner_fragment_log"
+          go test -race -tags=integration -count=1 -timeout=10m -v ./cmd/qs-compatibility-history -run '^(TestHistoryCIFixtureRequiresActualJobContainers|TestHistoryCLINativeInitialTwoSnapshotInputRounds)$' | tee "$cli_input_log"
+          if grep -Eq -- '--- SKIP:|--- FAIL:|DATA RACE' "$sql_component_log" "$owner_fragment_log" "$cli_input_log"; then
             echo 'Actual historical owner component proof skipped or failed' >&2
             exit 1
           fi
           for marker in \
             'TestSQLHistoricalComponentNativeSourceOwnerSelectors' \
             'TestSQLHistoricalComponentNativeAbsentOwnerSelector' \
-            'TestSQLHistoricalComponentNativeMixedPresentAbsentSelectors'; do
+            'TestSQLHistoricalComponentNativeMixedPresentAbsentSelectors' \
+            'TestSQLHistoricalComponentNativeOwnerPlanningRecipes' \
+            'TestSQLHistoricalComponentNativeFreshNegativeClosureAndCrossOrganization' \
+            'TestSQLHistoricalComponentNativeFreshSemanticView' \
+            'TestSQLHistoricalComponentNativeSemanticViewRejectsDatabaseSwitch' \
+            'TestSQLHistoricalComponentNativeBoundedRWCommitReadbackAndRollback' \
+            'TestSQLHistoricalComponentNativeExpiryAndReplayWholePair'; do
             grep -Eq "^[[:space:]]*--- PASS: ${marker} \\(" "$sql_component_log"
           done
           for marker in \
             'TestWholeSourceJointNativeOwnerComponentsSplitPageWithoutConsumingTwice' \
             'TestWholeSourceJointNativeOwnerComponentsSplitPageWithoutConsumingTwice/two_actual_assessments' \
-            'TestWholeSourceJointNativeOwnerComponentsSplitPageWithoutConsumingTwice/actual_assessment_and_empty_sheet'; do
+            'TestWholeSourceJointNativeOwnerComponentsSplitPageWithoutConsumingTwice/actual_assessment_and_empty_sheet' \
+            'TestHistoricalSourceInputNativeTwoFullDiskEpochsAndSourceDrift' \
+            'TestHistoricalSourceInputNativeBudgetAndOriginalMetadataFailure' \
+            'TestHistoricalSourceInputNativeIndependentUnchangedSnapshotAndReusedUUID' \
+            'TestHistoricalSourceInputNativeOwnerComponentPlanner' \
+            'TestAIHistoricalInputNativeTwoSourceBoundFullDiskEpochs' \
+            'TestMongoBatchNativeSnapshotInputOwnerFootprintMatchesOriginalFD' \
+            'TestMongoHistoricalComponentNativeFreshTransactionsAndServerReread' \
+            'TestMongoHistoricalComponentNativeRejectsNewNegativeRangeDescendant' \
+            'TestMongoHistoricalComponentNativeRejectsChangedRowSnapshotModeAndBudget'; do
             grep -Eq "^[[:space:]]*--- PASS: ${marker} \\(" "$owner_fragment_log"
+          done
+          for marker in \
+            'TestHistoryCIFixtureRequiresActualJobContainers' \
+            'TestHistoryCLINativeInitialTwoSnapshotInputRounds' \
+            'TestHistoryCLINativeInitialTwoSnapshotInputRounds/false' \
+            'TestHistoryCLINativeInitialTwoSnapshotInputRounds/true'; do
+            grep -Eq "^[[:space:]]*--- PASS: ${marker} \\(" "$cli_input_log"
           done
           go test -race -tags=integration -count=1 -timeout=10m ./internal/apiserver/maintenance/compatibilityretirementbackup -run '^(TestNonTargetDataNativePagingDriftAndBSONIdentity|TestMongoMetadataSnapshotNative)$'
           go test -race -tags=integration -count=1 -timeout=2m -v ./cmd/qs-compatibility-retirement -run '^TestComparisonMongoAbortNativeOriginalSessionResponseAndUnknown$' | tee "${RUNNER_TEMP}/qs-comparison-mongo-abort-native.log"
