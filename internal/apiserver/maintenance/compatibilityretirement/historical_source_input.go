@@ -662,11 +662,15 @@ func ApplyQualifiedHistoricalComponent(ctx context.Context, o *HistoricalCompone
 	}
 	o.applied = true // Any partial/unknown statement result forbids reuse.
 	var statements []*sqlevaluation.SQLHistoricalComponentStatement
-	for i, attachments := range sqlAttachments {
-		if len(attachments) == 0 {
-			continue
-		}
-		statement, err := o.source.sql[i].ApplyHistoricalAttachments(ctx, attachments)
+	hasSQLAttachments := false
+	for _, attachments := range sqlAttachments {
+		hasSQLAttachments = hasSQLAttachments || len(attachments) > 0
+	}
+	if hasSQLAttachments {
+		// All original fragments share this actual fresh RW scope. One native
+		// union preserves every original baseline and produces one final image
+		// for independent readback; no earlier statement becomes a new baseline.
+		statement, err := sqlevaluation.ApplySQLHistoricalComponentAttachments(ctx, o.source.sql, sqlAttachments)
 		if err != nil {
 			return nil, nil, 0, err
 		}
