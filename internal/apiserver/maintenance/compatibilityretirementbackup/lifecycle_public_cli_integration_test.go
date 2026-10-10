@@ -1788,7 +1788,8 @@ func publicCLIServiceRecoveryPhase(t *testing.T, path, phase string) {
 	if publicCLIPrivateJSON(path, &h) != nil || (phase != "stop" && phase != "recover") {
 		t.Fatal("public_cli_service_recovery_handoff_rejected")
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	// The real Worker stop retains its 510-second grace plus 15-second margin.
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 	defer cancel()
 	a, e := stop.ReadApprovedDescriptor(h.DescriptorPath, h.DescriptorSHA256)
 	if e != nil {
@@ -1821,6 +1822,12 @@ func publicCLIServiceRecoveryPhase(t *testing.T, path, phase string) {
 		lease, e = stop.OpenRecoveryDependents(ctx, a, journal, w)
 	}
 	if e != nil || lease == nil {
+		for _, fixed := range []error{stop.ErrBinding, stop.ErrState, stop.ErrCommand, stop.ErrForced, stop.ErrJournal, stop.ErrRemote} {
+			if errors.Is(e, fixed) {
+				t.Logf("public_cli_service_recovery_native_error=%s", fixed.Error())
+				break
+			}
+		}
 		t.Fatal("public_cli_service_recovery_original_native_owner_rejected")
 	}
 	t.Cleanup(func() {
@@ -1963,7 +1970,7 @@ func TestLifecyclePublicCLINativeCrossProcessServiceRecovery(t *testing.T) {
 	if tw.Close() != nil {
 		t.Fatal("public_cli_service_recovery_context_rejected")
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
+	ctx, cancel := context.WithTimeout(context.Background(), 12*time.Minute)
 	defer cancel()
 	build := exec.CommandContext(ctx, "/usr/bin/docker", "--host", "unix:///run/docker.sock", "build", "--quiet", "--pull=false", "--network=none", "-")
 	build.Env, build.Stdin, build.Stderr = []string{"PATH=/usr/bin:/bin"}, &contextTar, io.Discard
@@ -2003,11 +2010,31 @@ func TestLifecyclePublicCLINativeCrossProcessServiceRecovery(t *testing.T) {
 		DropReady                                bool
 	}
 	for i, phase := range []string{"stop", "recover"} {
-		child := exec.CommandContext(ctx, programPath, "-test.run=^TestLifecyclePublicCLINativeCrossProcessServiceRecovery$", "-test.count=1", "-test.timeout=2m")
+		child := exec.CommandContext(ctx, programPath, "-test.run=^TestLifecyclePublicCLINativeCrossProcessServiceRecovery$", "-test.count=1", "-test.timeout=12m")
 		child.Env = append(nativeChildEnv(map[string]string{"QS_LIFECYCLE_PUBLIC_CLI_NATIVE": "1", "QS_LIFECYCLE_PUBLIC_CLI_NATIVE_REQUIRED": "1"}), "QS_PUBLIC_SERVICE_RECOVERY_INPUT="+path, "QS_PUBLIC_SERVICE_RECOVERY_PHASE="+phase)
 		var out, stderr bytes.Buffer
 		child.Stdout, child.Stderr = &out, &stderr
 		if err, reaped := publicCLIRunProcessGroup(child); err != nil || !reaped {
+			category := "unrecognized_child_failure"
+			for _, fixed := range []string{
+				"public_cli_service_recovery_handoff_rejected", "public_cli_service_recovery_actual_approval_rejected",
+				"public_cli_service_recovery_actual_window_rejected", "public_cli_service_recovery_window_close_failed",
+				"public_cli_service_recovery_budget_rejected", "public_cli_service_recovery_original_native_owner_rejected",
+				"public_cli_service_recovery_owner_close_failed", "public_cli_service_recovery_only_guard_failed",
+				"public_cli_service_recovery_actual_restore_failed", "public_cli_service_recovery_window_overclaimed",
+			} {
+				if bytes.Contains(out.Bytes(), []byte(fixed)) {
+					category = fixed
+					break
+				}
+			}
+			t.Logf("public_cli_service_recovery_child_failure_category=%s", category)
+			for _, fixed := range []error{stop.ErrBinding, stop.ErrState, stop.ErrCommand, stop.ErrForced, stop.ErrJournal, stop.ErrRemote} {
+				if bytes.Contains(out.Bytes(), []byte("public_cli_service_recovery_native_error="+fixed.Error())) {
+					t.Logf("public_cli_service_recovery_child_native_error=%s", fixed.Error())
+					break
+				}
+			}
 			t.Logf("public_cli_service_recovery_stage=%s child_started=%t child_reaped=%t child_stdout_sha256=%s child_stderr_sha256=%s", phase, child.Process != nil, reaped, sha(out.Bytes()), sha(stderr.Bytes()))
 			t.Fatal("public_cli_service_recovery_original_child_failed")
 		}
