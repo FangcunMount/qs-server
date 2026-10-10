@@ -3,21 +3,26 @@ package main
 import (
 	"context"
 	"errors"
+	"os"
 	"path/filepath"
+	"runtime"
 
 	retirement "github.com/FangcunMount/qs-server/internal/apiserver/maintenance/compatibilityretirement"
 	backup "github.com/FangcunMount/qs-server/internal/apiserver/maintenance/compatibilityretirementbackup"
 	fence "github.com/FangcunMount/qs-server/internal/apiserver/maintenance/compatibilityretirementfence"
 	stop "github.com/FangcunMount/qs-server/internal/apiserver/maintenance/compatibilityretirementstop"
 	"github.com/FangcunMount/qs-server/internal/pkg/migration"
+	"github.com/FangcunMount/qs-server/pkg/version"
 )
 
-// Remaining production ports have no actual producer yet. This source gate is
-// deliberately before request/DB/window/service writes; no environment flag,
-// imported Permit or callback/receipt can flip it. The five-stage kernel remains
-// compiled below, but a service-only lease cannot activate it.
-func lifecycleEffectsPreflight(context.Context) error {
-	return lifecycleError("lifecycle_actual_host_adapters_missing")
+// This preliminary check admits only the actual source-bound Linux root tool.
+// The kernel independently checks the original request, archive, native owners,
+// maintenance budget and complete four-target writer fence before each effect.
+func lifecycleEffectsPreflight(ctx context.Context) error {
+	if ctx == nil || ctx.Err() != nil || runtime.GOOS != "linux" || os.Getuid() != 0 || os.Geteuid() != 0 || !shaRE.MatchString(sourceSHA) || version.GitCommit != sourceSHA {
+		return lifecycleError("lifecycle_actual_host_adapters_missing")
+	}
+	return nil
 }
 
 type lifecycleFixedHost struct {
@@ -322,14 +327,11 @@ func (h *lifecycleFixedHost) DeployRollbackInline(ctx context.Context, r lifecyc
 	return h.api.deploy(q, r, true)
 }
 func (h *lifecycleFixedHost) PurgeTemporaryCopies(ctx context.Context, r lifecycleRequest) error {
+	if err := h.sealNativeAcceptedMaterials(ctx, r); err != nil {
+		return err
+	}
 	materials, err := h.acceptedBatchMaterials(ctx, r)
 	if err != nil {
-		return err
-	}
-	if err = h.registerAIStoppedMaterials(ctx, r, materials); err != nil {
-		return err
-	}
-	if err = h.registerLocalServiceMaterials(ctx, r, materials); err != nil {
 		return err
 	}
 	return materials.purge(ctx)

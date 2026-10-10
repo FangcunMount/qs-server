@@ -131,9 +131,92 @@ func (h *lifecycleFixedHost) verifyNativeAcceptance(ctx context.Context, r lifec
 	if e = h.composeNativeMaterialOwners(q, r); e != nil {
 		return e
 	}
-	// The actual accepted-material catalog producer is still missing. Neither
-	// a local connection observation nor its known broader gaps can mint it.
-	return lifecycleError("lifecycle_actual_complete_material_scope_missing")
+	return h.issueNativeAcceptedMaterials(q, r, observed)
+}
+
+// Only the original successful acceptance path reaches this producer. The
+// original CLI records business acceptance before any temporary material is
+// destroyed. Purge separately seals this owner; unsealed cannot permit cleanup.
+func (h *lifecycleFixedHost) issueNativeAcceptedMaterials(ctx context.Context, r lifecycleRequest, observed *lifecycleControlledRuntime) error {
+	if h == nil || ctx == nil || ctx.Err() != nil || observed.validate(h) != nil || h.currentMQ == nil || h.api == nil || h.api.acceptance == nil || h.acceptedMaterials != nil {
+		return lifecycleError("lifecycle_actual_batch_acceptance_missing")
+	}
+	c := h.materials
+	if c == nil || c.self != c || c.binding != lifecycleMaterialsBinding(r) || !c.binding.valid() || c.binding.tool != sourceSHA || c.closed || c.unknown || c.started || c.remote != nil || c.localSealed || c.local == nil || h.services == nil || c.local != h.services.materials || c.archive == nil || c.journal == nil || len(c.engines) != 2 || !lifecycleMaterialPathsMatch(c, r) || len(c.scopes) != int(lifecycleMaterialScopeCount)-1 {
+		return lifecycleError("lifecycle_actual_complete_material_scope_missing")
+	}
+	for scope := lifecycleMaterialScope(0); scope < lifecycleMaterialScopeCount; scope++ {
+		_, present := c.scopes[scope]
+		if present != (scope != lifecycleRemoteServiceMaterials) {
+			return lifecycleError("lifecycle_actual_complete_material_scope_missing")
+		}
+	}
+	a := &lifecycleAcceptedMaterials{host: h, binding: c.binding, catalog: c, runtime: observed}
+	a.self = a
+	h.acceptedMaterials = a
+	return nil
+}
+
+// Called only after actual business acceptance. A partial material failure
+// retains the original owner and backups for forward repair, never grants
+// sealed permission or attempts rollback through already destroyed controllers.
+func (h *lifecycleFixedHost) sealNativeAcceptedMaterials(ctx context.Context, r lifecycleRequest) (result error) {
+	if h == nil || ctx == nil || ctx.Err() != nil || h.acceptedMaterials == nil {
+		return lifecycleError("lifecycle_actual_batch_acceptance_missing")
+	}
+	a := h.acceptedMaterials
+	c := h.materials
+	if a.self != a || a.host != h || a.sealed || a.runtime.validate(h) != nil || a.binding != lifecycleMaterialsBinding(r) || c == nil || a.catalog != c || c.self != c || c.binding != a.binding || c.closed || c.unknown || c.started || c.remote != nil || c.localSealed || h.services == nil || c.local == nil || c.local != h.services.materials {
+		return lifecycleError("lifecycle_actual_complete_material_scope_missing")
+	}
+	defer func() {
+		if result != nil {
+			c.unknown = true
+		}
+	}()
+	if result = h.registerAIStoppedMaterials(ctx, r, c); result != nil {
+		return result
+	}
+	// Reject foreign or incomplete materials before any original D cleanup.
+	// The A lease is still live here, so its actual owner is checked separately.
+	if result = c.local.CheckLocalMaterials(ctx, h.services.issuer, h.services.local); result != nil {
+		return result
+	}
+	for _, d := range c.directories {
+		if result = d.checkComplete(false); result != nil {
+			return result
+		}
+	}
+	if result = c.archive.checkComplete(false); result != nil {
+		return result
+	}
+	for _, engine := range c.engines {
+		if engine == nil {
+			return lifecycleError("lifecycle_material_registration_rejected")
+		}
+		if result = engine.check(ctx); result != nil {
+			return result
+		}
+	}
+	if result = checkLifecycleRestoreMaterialSet(ctx, c.engines, false); result != nil {
+		return result
+	}
+	if _, result = h.purgeAcceptedRemoteMaterials(ctx, r, a.runtime); result != nil {
+		return result
+	}
+	if result = h.registerLocalServiceMaterials(ctx, r, c); result != nil {
+		return result
+	}
+	if len(c.scopes) != int(lifecycleMaterialScopeCount) {
+		return lifecycleError("lifecycle_actual_complete_material_scope_missing")
+	}
+	if result = c.preflight(ctx); result != nil {
+		return result
+	}
+	a.runtime = h.finalRuntime
+	a.sealed = true
+	_, result = h.acceptedBatchMaterials(ctx, r)
+	return result
 }
 
 func (h *lifecycleFixedHost) verifyCompleteDataBeforeInternalResume(ctx context.Context, proof *migration.CompatibilityPairMigrationProof) (result error) {

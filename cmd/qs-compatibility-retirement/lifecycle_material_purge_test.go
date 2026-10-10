@@ -116,7 +116,9 @@ func TestLocalMaterialCallerSealsOriginalWritersOnlyAfterDTerminal(t *testing.T)
 	for _, check := range []struct{ file, function, before, after string }{
 		{"lifecycle_service_controller.go", "openLifecycleServiceController", "OpenRootLocalMaterials", "OpenBudgetIssuer"},
 		{"lifecycle_material_purge.go", "registerLocalServiceMaterials", "observeWholeWriterScopesAfterDTerminal", "SealLocalMaterials"},
-		{"lifecycle_fixed_host.go", "PurgeTemporaryCopies", "registerLocalServiceMaterials", "purge"},
+		{"lifecycle_native_acceptance.go", "sealNativeAcceptedMaterials", "registerAIStoppedMaterials", "purgeAcceptedRemoteMaterials"},
+		{"lifecycle_native_acceptance.go", "sealNativeAcceptedMaterials", "purgeAcceptedRemoteMaterials", "registerLocalServiceMaterials"},
+		{"lifecycle_fixed_host.go", "PurgeTemporaryCopies", "sealNativeAcceptedMaterials", "purge"},
 	} {
 		calls := preBComparisonProductionCalls(t, check.file, check.function)
 		before, after := -1, -1
@@ -134,6 +136,9 @@ func TestLocalMaterialCallerSealsOriginalWritersOnlyAfterDTerminal(t *testing.T)
 	}
 	if new(lifecycleFixedHost).registerLocalServiceMaterials(t.Context(), lifecycleRequest{}, new(lifecycleBatchMaterials)) == nil {
 		t.Fatal("absent accepted owner and D terminal permitted local sealing")
+	}
+	if new(lifecycleFixedHost).issueNativeAcceptedMaterials(t.Context(), lifecycleRequest{}, new(lifecycleControlledRuntime)) == nil || new(lifecycleFixedHost).sealNativeAcceptedMaterials(t.Context(), lifecycleRequest{}) == nil {
+		t.Fatal("missing actual runtime acceptance permitted sealing")
 	}
 }
 func TestMaterialDirectoryDeletesOnlyExactRegisteredBodies(t *testing.T) {

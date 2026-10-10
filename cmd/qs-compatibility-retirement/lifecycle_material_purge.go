@@ -21,16 +21,16 @@ import (
 	"github.com/FangcunMount/qs-server/pkg/version"
 )
 
-// This is the seam for the future real runtime/data acceptance producer. The
-// partial catalog below registers actual API/engine owners but cannot construct
-// this accepted owner. VerifyAcceptance and effectsPreflight still fail.
-// In particular an absent archive, restored fixture, success DTO or remote
-// process exit cannot mint this same-process accepted-batch capability.
+// Issued only after this host's native data, runtime and current-ledger reads.
+// Sealed becomes true only after original D zero/terminal and actual A/AI FD
+// handoff. A DTO, restored fixture or process exit cannot construct this owner.
 type lifecycleAcceptedMaterials struct {
 	self    *lifecycleAcceptedMaterials
 	host    *lifecycleFixedHost
 	binding lifecycleMaterialBinding
 	catalog *lifecycleBatchMaterials
+	runtime *lifecycleControlledRuntime
+	sealed  bool
 }
 
 type lifecycleMaterialBinding struct {
@@ -214,6 +214,17 @@ func (h *lifecycleFixedHost) composeNativeMaterialOwners(ctx context.Context, r 
 		return e
 	}
 	c.directories = append(c.directories, root)
+	journalPath := filepath.Join(r.prepareRoot, "material-purge-receipts")
+	if e = os.Mkdir(journalPath, 0700); e != nil {
+		return lifecycleError("lifecycle_material_registration_rejected")
+	}
+	c.journal, e = openLifecycleMaterialDirectory(journalPath, 0)
+	if e != nil {
+		return e
+	}
+	if e = root.registerChild(c.journal); e != nil {
+		return e
+	}
 	if e = validateLifecycleAPIInvocation(r); e != nil {
 		return e
 	}
@@ -245,8 +256,26 @@ func (h *lifecycleFixedHost) composeNativeMaterialOwners(ctx context.Context, r 
 	if h.inventoryMaterials == nil || h.inventoryMaterials.checkComplete(false) != nil || h.rootStagingMaterials == nil || h.rootStagingMaterials.checkComplete(false) != nil || h.historicalWriteMaterials == nil || h.historicalWriteMaterials.checkComplete(false) != nil || h.archiveMaterials == nil || h.archiveMaterials.checkComplete(false) != nil {
 		return lifecycleError("lifecycle_actual_complete_material_scope_missing")
 	}
-	c.directories = append(c.directories, h.inventoryMaterials, h.rootStagingMaterials, h.historicalWriteMaterials)
+	var operation *lifecycleMaterialDirectory
+	operationPath := filepath.Join("/opt/backups/qs-server/compatibility-retirement", r.OperationID)
+	for _, d := range h.historicalWritePreviousMaterials {
+		if d != nil && d.path == operationPath {
+			if operation != nil {
+				return lifecycleError("lifecycle_material_registration_rejected")
+			}
+			operation = d
+		}
+	}
+	invocation, e := decodeLifecycleAPIInvocationIntent(intentRaw)
+	if e != nil {
+		return lifecycleError("lifecycle_material_registration_rejected")
+	}
+	if e = completeLifecycleOriginalOperationMaterials(ctx, r, operation, h.inventoryMaterials, h.historicalWriteMaterials, h.historicalWriteRegistrationMaterials, h.historicalWritePreviousMaterials, h.archiveMaterials, invocation.SourceUID); e != nil {
+		return e
+	}
+	c.directories = append(c.directories, operation, h.rootStagingMaterials)
 	c.scopes[lifecycleOriginalInventoryMaterials] = struct{}{}
+	c.scopes[lifecycleFullSourceCASMaterials] = struct{}{}
 	if h.preparationInvocationMaterials != nil {
 		if e = h.preparationInvocationMaterials.checkComplete(false); e != nil {
 			return e
@@ -284,6 +313,7 @@ func lifecycleMaterialPathsMatch(c *lifecycleBatchMaterials, r lifecycleRequest)
 	}
 	original := filepath.Join("/opt/backups/qs-server/compatibility-retirement", r.OperationID)
 	allowed := map[string]bool{
+		original: true,
 		filepath.Join(original, "inventory-"+r.Recovery.OriginalRunID): true,
 		lifecycleRootBatch(r.OperationID, r.ActualRunID):               true,
 		r.prepareRoot: true,
@@ -314,7 +344,7 @@ func (h *lifecycleFixedHost) acceptedBatchMaterials(ctx context.Context, r lifec
 		return nil, lifecycleError("lifecycle_actual_batch_acceptance_missing")
 	}
 	a := h.acceptedMaterials
-	if a == nil || a.self != a || a.host != h || a.binding != lifecycleMaterialsBinding(r) || !a.binding.valid() || a.binding.tool != sourceSHA || a.catalog == nil || a.catalog != h.materials || a.catalog.self != a.catalog || a.catalog.binding != a.binding {
+	if a == nil || a.self != a || a.host != h || !a.sealed || a.runtime.validate(h) != nil || a.binding != lifecycleMaterialsBinding(r) || !a.binding.valid() || a.binding.tool != sourceSHA || a.catalog == nil || a.catalog != h.materials || a.catalog.self != a.catalog || a.catalog.binding != a.binding {
 		return nil, lifecycleError("lifecycle_actual_batch_acceptance_missing")
 	}
 	c := a.catalog
@@ -406,17 +436,22 @@ func (h *lifecycleFixedHost) registerLocalServiceMaterials(ctx context.Context, 
 	return nil
 }
 
-// The complete catalog producer is still missing. This hook consumes only its
-// existing accepted-batch owner; it does not create acceptance or mark a scope
-// complete. Register both real journal identities before closing their writers.
+// Consume the original runtime acceptance before D closes. Register both real
+// journal identities before closing their writers; this grants no purge permit.
 func (h *lifecycleFixedHost) registerAIStoppedMaterials(ctx context.Context, r lifecycleRequest, c *lifecycleBatchMaterials) error {
-	if h == nil || h.aiStopped == nil || h.acceptedMaterials == nil || h.acceptedMaterials.self != h.acceptedMaterials || h.acceptedMaterials.host != h || h.acceptedMaterials.catalog != c || c == nil || c != h.materials || c.self != c || c.binding != lifecycleMaterialsBinding(r) || c.closed || c.unknown || c.remote == nil || c.remote.terminal == nil || r.prepareRoot != lifecycleInvocationBatch(r.OperationID, r.ActualRunID) {
+	if h == nil || h.aiStopped == nil || h.acceptedMaterials == nil || h.acceptedMaterials.self != h.acceptedMaterials || h.acceptedMaterials.host != h || h.acceptedMaterials.runtime.validate(h) != nil || h.acceptedMaterials.catalog != c || c == nil || c != h.materials || c.self != c || c.binding != lifecycleMaterialsBinding(r) || c.closed || c.unknown || r.prepareRoot != lifecycleInvocationBatch(r.OperationID, r.ActualRunID) {
 		return lifecycleError("lifecycle_actual_complete_material_scope_missing")
 	}
-	// acceptedBatchMaterials already requires the original D terminal. Recheck
-	// that same native terminal and every external scope, never live D again.
-	if e := h.observeWholeWriterScopesAfterDTerminal(ctx, r, c.remote.terminal); e != nil {
-		return e
+	// Before D closes, require the live original fence. Afterwards, only its
+	// retained native terminal and fresh external scopes may be consumed.
+	if c.remote == nil {
+		if e := h.CheckWholeWriterFence(ctx, r); e != nil {
+			return e
+		}
+	} else {
+		if e := h.observeWholeWriterScopesAfterDTerminal(ctx, r, c.remote.terminal); e != nil {
+			return e
+		}
 	}
 	var directory *lifecycleMaterialDirectory
 	for _, d := range c.directories {
