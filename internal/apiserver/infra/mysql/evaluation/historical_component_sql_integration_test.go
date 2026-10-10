@@ -8,6 +8,7 @@ import (
 	"errors"
 	"os"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 
@@ -506,6 +507,73 @@ func TestSQLHistoricalComponentNativeFreshNegativeClosureAndCrossOrganization(t 
 	}
 	if err := componentSQLNativeObserve(t, db, r, false, nil); err == nil {
 		t.Fatal("new related business row ignored")
+	}
+}
+
+func TestSQLHistoricalComponentNativeSemanticViewRejectsDatabaseSwitch(t *testing.T) {
+	for _, writable := range []bool{false, true} {
+		t.Run(map[bool]string{false: "read_only", true: "read_write"}[writable], func(t *testing.T) {
+			db := openHistoricalReferencesDB(t)
+			insertHistoricalAssessment(t, db, 42)
+			record, _ := testCommittedReference(t, 9001, 42, "current-outcome-native")
+			po := outcomeToPO(record)
+			po.CommittedEventID, po.CommittedEventEvidence = nil, nil
+			if err := db.Create(po).Error; err != nil {
+				t.Fatal(err)
+			}
+			r := componentSQLNativeRecipe(t, db, false)
+			if err := componentSQLNativeObserve(t, db, r, writable, func(ctx context.Context, o *SQLHistoricalComponentObservation) (result error) {
+				v, err := o.SemanticView(ctx)
+				if err != nil || v.ValidateBorrowedSnapshot(ctx) != nil {
+					return errors.New("actual original database view rejected")
+				}
+				tx, err := historicalTx(ctx)
+				if err != nil {
+					return err
+				}
+				originalExpires := o.expires
+				restore := "USE `" + strings.ReplaceAll(r.plan.database, "`", "``") + "`"
+				defer func() {
+					if err := tx.Exec(restore).Error; err != nil {
+						result = errors.New("original database restore failed")
+					}
+				}()
+				if err = tx.Exec("USE `information_schema`").Error; err != nil {
+					return err
+				}
+				server, database, err := historicalDatabase(tx)
+				if err != nil || server != r.plan.server || database != "information_schema" {
+					return errors.New("native database switch not observed")
+				}
+				var actual sqlResponsibilityTransaction
+				if writable {
+					actual, err = casActualRW(tx)
+				} else {
+					actual, err = cycleActualTransaction(tx)
+				}
+				if err != nil || actual != o.transaction {
+					return errors.New("database switch did not retain original native transaction")
+				}
+				if o.ValidateBorrowedObservation(ctx) == nil || v.ValidateBorrowedSnapshot(ctx) == nil || v.OriginalOutcomeRunAbsent(ctx, 9001, "42:1") == nil {
+					return errors.New("switched database retained observation or original Run authority")
+				}
+				if _, err = v.OwnerByAssessment(ctx, 42); err == nil {
+					return errors.New("switched database retained original owner facts")
+				}
+				if _, err = v.BusinessBinding(ctx, 42, 0, "evaluation.requested", nil); err == nil {
+					return errors.New("switched database retained original business binding")
+				}
+				if !o.expires.Equal(originalExpires) {
+					return errors.New("database identity check extended original deadline")
+				}
+				if err = tx.Exec(restore).Error; err != nil {
+					return err
+				}
+				return v.ValidateBorrowedSnapshot(ctx)
+			}); err != nil {
+				t.Fatal(err)
+			}
+		})
 	}
 }
 

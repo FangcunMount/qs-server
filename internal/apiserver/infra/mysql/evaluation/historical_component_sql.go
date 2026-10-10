@@ -1326,6 +1326,10 @@ func (o *SQLHistoricalComponentObservation) live(ctx context.Context) error {
 	if err != nil || tx.Statement.ConnPool != o.pool {
 		return ErrSQLHistoricalComponent
 	}
+	server, database, err := historicalDatabase(tx)
+	if err != nil || server != o.recipe.plan.server || database != o.recipe.plan.database || sqlHistoricalIdentity(server, database) != o.recipe.plan.identity {
+		return ErrSQLHistoricalComponent
+	}
 	var actual sqlResponsibilityTransaction
 	if o.writable {
 		actual, err = casActualRW(tx)
@@ -1395,8 +1399,8 @@ func (o *SQLHistoricalComponentObservation) Report() SQLHistoricalComponentReadR
 	return SQLHistoricalComponentReadReport{BusinessMatched: o != nil && o.self == o && o.seal != "" && o.seal == o.digest(), ResponsibilitiesMatched: o != nil && o.self == o && o.seal != "" && o.seal == o.digest(), FullSourcesRequired: true, MongoQualificationRequired: true, AIClosureRequired: true, HostCommitRequired: true}
 }
 
-// ValidateBorrowedObservation checks the actual host pool, native transaction
-// and original deadline. It grants no source, business-terminal or write permit.
+// ValidateBorrowedObservation checks the actual host pool, database identity,
+// native transaction and original deadline. It grants no source, business-terminal or write permit.
 func (o *SQLHistoricalComponentObservation) ValidateBorrowedObservation(ctx context.Context) error {
 	if o.live(ctx) != nil || o.used {
 		return ErrSQLHistoricalComponent
