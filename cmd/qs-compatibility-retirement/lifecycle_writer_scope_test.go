@@ -143,6 +143,17 @@ func TestDatabaseNativeMongoRolesSessionsRestore(t *testing.T) {
 		case <-time.After(250 * time.Millisecond):
 		}
 	}
+	// Mongo root does not imply impersonate. The first native fixture exposed
+	// this exact missing privilege; configure it explicitly in this owned fixture.
+	if e = admin.Database("admin").RunCommand(ctx, bson.D{{Key: "createRole", Value: "owned_session_controller"}, {Key: "privileges", Value: bson.A{bson.D{{Key: "resource", Value: bson.D{{Key: "cluster", Value: true}}}, {Key: "actions", Value: bson.A{"impersonate"}}}}}, {Key: "roles", Value: bson.A{}}}).Err(); e != nil {
+		t.Fatal(e)
+	}
+	if e = admin.Database("admin").RunCommand(ctx, bson.D{{Key: "grantRolesToUser", Value: "owned_admin"}, {Key: "roles", Value: bson.A{bson.D{{Key: "role", Value: "owned_session_controller"}, {Key: "db", Value: "admin"}}}}}).Err(); e != nil {
+		t.Fatal(e)
+	}
+	if e = admin.Database("admin").RunCommand(ctx, bson.D{{Key: "invalidateUserCache", Value: 1}}).Err(); e != nil {
+		t.Fatal(e)
+	}
 	p := lifecycleDBPrincipalExpected{User: "owned_app", HostOrDatabase: "admin"}
 	original := []bson.M{{"role": "readWrite", "db": "qs"}}
 	if e = admin.Database("admin").RunCommand(ctx, bson.D{{Key: "createUser", Value: p.User}, {Key: "pwd", Value: "owned-fixture-app-only"}, {Key: "roles", Value: original}, {Key: "writeConcern", Value: bson.D{{Key: "w", Value: "majority"}}}}).Err(); e != nil {
@@ -157,6 +168,24 @@ func TestDatabaseNativeMongoRolesSessionsRestore(t *testing.T) {
 	if _, e = app.Database("qs").Collection("domain_event_outbox").InsertOne(ctx, bson.M{"_id": 1}); e != nil {
 		t.Fatal("original actual app write failed", e)
 	}
+	session, e := app.StartSession()
+	if e != nil {
+		t.Fatal(e)
+	}
+	if e = session.StartTransaction(); e != nil {
+		t.Fatal(e)
+	}
+	sc := mongo.NewSessionContext(ctx, session)
+	if _, e = app.Database("qs").Collection("domain_event_outbox").InsertOne(sc, bson.M{"_id": 10}); e != nil {
+		t.Fatal(e)
+	}
+	if v.checkMongoTransactions(ctx) == nil {
+		t.Fatal("actual original app transaction was ignored")
+	}
+	if e = session.AbortTransaction(sc); e != nil {
+		t.Fatal(e)
+	}
+	session.EndSession(ctx)
 	if e = v.setMongoRoles(ctx, p, original, false); e != nil {
 		t.Fatal(e)
 	}
