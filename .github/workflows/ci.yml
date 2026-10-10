@@ -331,7 +331,7 @@ jobs:
           docker run --detach --rm \
             --name qs-runtime-closure-e2e-mongo \
             --publish 27017:27017 \
-            mongo:7.0 --replSet rs0 --bind_ip_all --setParameter ttlMonitorSleepSecs=1
+            mongo:7.0 --replSet rs0 --bind_ip_all --setParameter ttlMonitorSleepSecs=1 --setParameter enableTestCommands=1
           for attempt in $(seq 1 30); do
             if docker exec qs-runtime-closure-e2e-mongo mongosh --quiet --eval 'db.adminCommand({ping: 1})' >/dev/null 2>&1; then
               break
