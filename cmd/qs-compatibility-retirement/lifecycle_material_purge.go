@@ -143,10 +143,12 @@ func (h *lifecycleFixedHost) acceptedBatchMaterials(ctx context.Context, r lifec
 // existing accepted-batch owner; it does not create acceptance or mark a scope
 // complete. Register both real journal identities before closing their writers.
 func (h *lifecycleFixedHost) registerAIStoppedMaterials(ctx context.Context, r lifecycleRequest, c *lifecycleBatchMaterials) error {
-	if h == nil || h.aiStopped == nil || h.acceptedMaterials == nil || h.acceptedMaterials.self != h.acceptedMaterials || h.acceptedMaterials.host != h || h.acceptedMaterials.catalog != c || c == nil || c.self != c || c.binding != lifecycleMaterialsBinding(r) || c.closed || c.unknown || r.prepareRoot != lifecycleInvocationBatch(r.OperationID, r.ActualRunID) {
+	if h == nil || h.aiStopped == nil || h.acceptedMaterials == nil || h.acceptedMaterials.self != h.acceptedMaterials || h.acceptedMaterials.host != h || h.acceptedMaterials.catalog != c || c == nil || c.self != c || c.binding != lifecycleMaterialsBinding(r) || c.closed || c.unknown || c.remote == nil || c.remote.terminal == nil || r.prepareRoot != lifecycleInvocationBatch(r.OperationID, r.ActualRunID) {
 		return lifecycleError("lifecycle_actual_complete_material_scope_missing")
 	}
-	if e := h.CheckWholeWriterFence(ctx, r); e != nil {
+	// acceptedBatchMaterials already requires the original D terminal. Recheck
+	// that same native terminal and every external scope, never live D again.
+	if e := h.observeWholeWriterScopesAfterDTerminal(ctx, r, c.remote.terminal); e != nil {
 		return e
 	}
 	var directory *lifecycleMaterialDirectory

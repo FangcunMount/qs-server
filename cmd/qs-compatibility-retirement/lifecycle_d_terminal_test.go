@@ -138,3 +138,23 @@ func TestDTerminalActualCallerPreservesPlatformAndOrdinaryLiveChecks(t *testing.
 		t.Fatal("ordinary intermediate phase stopped requiring the original live child")
 	}
 }
+
+// Registration follows the actual D purge/terminal phase. The existing real
+// child tests above cover live/Wait/closed pipes/group observations; this caller
+// check cannot mint native zero, a catalog or a complete external writer fence.
+func TestDTerminalJournalRegistrationConsumesOriginalTerminalScope(t *testing.T) {
+	terminal, seal := -1, -1
+	for i, name := range preBComparisonProductionCalls(t, "lifecycle_material_purge.go", "registerAIStoppedMaterials") {
+		switch name {
+		case "CheckWholeWriterFence":
+			t.Fatal("accepted D-terminal catalog still requires the closed child to be live")
+		case "observeWholeWriterScopesAfterDTerminal":
+			terminal = i
+		case "SealTemporaryJournals":
+			seal = i
+		}
+	}
+	if terminal < 0 || seal <= terminal {
+		t.Fatal("journal sealing bypassed the original validated D terminal and external scopes")
+	}
+}
