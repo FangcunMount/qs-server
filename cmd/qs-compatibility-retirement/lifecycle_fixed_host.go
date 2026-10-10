@@ -2,7 +2,9 @@ package main
 
 import (
 	"context"
+	"errors"
 
+	retirement "github.com/FangcunMount/qs-server/internal/apiserver/maintenance/compatibilityretirement"
 	backup "github.com/FangcunMount/qs-server/internal/apiserver/maintenance/compatibilityretirementbackup"
 	fence "github.com/FangcunMount/qs-server/internal/apiserver/maintenance/compatibilityretirementfence"
 	stop "github.com/FangcunMount/qs-server/internal/apiserver/maintenance/compatibilityretirementstop"
@@ -30,6 +32,7 @@ type lifecycleFixedHost struct {
 	comparisonAttempted bool
 	writers             *lifecycleWriterObservation
 	runtimeLedgers      *lifecycleRuntimeLedgerObservation
+	aiStopped           *retirement.AIStoppedRuntimeLease
 }
 
 func newLifecycleFixedHost(ctx context.Context, r lifecycleRequest, a *backup.Archive) (lifecycleHost, error) {
@@ -101,10 +104,25 @@ func (h *lifecycleFixedHost) StopAndDrain(ctx context.Context, r lifecycleReques
 	}
 	v := h.services
 	var err error
+	if h.aiStopped != nil || r.FinalHistory == nil || r.FinalHistory.StopConstraints == nil {
+		return lifecycleError("lifecycle_ai_actual_stop_constraints_missing")
+	}
+	external, err := lifecycleFinalExternalInput(r)
+	if err != nil || external == nil {
+		return lifecycleError("lifecycle_ai_actual_stop_constraints_missing")
+	}
+	lease, err := retirement.OpenAIStoppedRuntimeLease(ctx, *external, *r.FinalHistory.StopConstraints, w)
+	if err != nil {
+		return err
+	}
+	h.aiStopped = lease // Retain original restoration owner before any native Stop.
 	if err = v.StopAndDrain(ctx); err != nil {
 		return err
 	}
 	if err = v.Check(ctx); err != nil {
+		return err
+	}
+	if err = h.aiStopped.Stop(ctx); err != nil {
 		return err
 	}
 	// Observe the actual two databases as a separate drain check. This neither
@@ -136,11 +154,20 @@ func (h *lifecycleFixedHost) RestoreStoppedServices(ctx context.Context, r lifec
 	if err != nil || d.Binding != lifecycleWindowBinding(r) || d.RecoverySHA256 == "" {
 		return lifecycleError("lifecycle_service_controller_binding_rejected")
 	}
-	if h.services == nil {
-		// Controller creation failed before either native Stop was called.
+	var result error
+	if h.services != nil {
+		result = h.services.RestorePartialStop(ctx, r, w)
+	}
+	return errors.Join(result, h.restoreAI(ctx))
+}
+func (h *lifecycleFixedHost) restoreAI(ctx context.Context) error {
+	if h.aiStopped == nil {
 		return nil
 	}
-	return h.services.RestorePartialStop(ctx, r, w)
+	if e := h.aiStopped.CleanupCarrierForRecovery(ctx); e != nil {
+		return e
+	}
+	return h.aiStopped.Restore(ctx)
 }
 
 func (h *lifecycleFixedHost) CheckWholeWriterFence(ctx context.Context, r lifecycleRequest) error {
@@ -227,7 +254,10 @@ func (h *lifecycleFixedHost) ResumeAcceptedEntrypoints(ctx context.Context, _ li
 	if h == nil || h.services == nil {
 		return lifecycleError("lifecycle_actual_service_lease_missing")
 	}
-	return h.services.ResumeDependents(ctx)
+	if h.aiStopped == nil {
+		return lifecycleError("lifecycle_ai_original_stopped_runtime_unproven")
+	}
+	return errors.Join(h.services.ResumeDependents(ctx), h.aiStopped.Resume(ctx))
 }
 func (h *lifecycleFixedHost) RestoreRollbackEntrypoints(ctx context.Context, r lifecycleRequest, w *fence.MaintenanceWindow) error {
 	if h == nil {
@@ -238,9 +268,9 @@ func (h *lifecycleFixedHost) RestoreRollbackEntrypoints(ctx context.Context, r l
 	// original Window and the same existing remote transport.
 	if h.services != nil {
 		if err := h.services.UseOriginalRecoverySession(ctx, r, w); err != nil {
-			return err
+			return errors.Join(err, h.restoreAI(ctx))
 		}
-		return h.services.RestoreDependents(ctx)
+		return errors.Join(h.services.RestoreDependents(ctx), h.restoreAI(ctx))
 	}
 	// A lost original channel cannot be replaced by a login after its key was
 	// fenced. Cross-process recovery needs its actual pre-established management
@@ -257,6 +287,9 @@ func (h *lifecycleFixedHost) Close() error {
 	}
 	if h.services != nil {
 		result = h.services.Close()
+	}
+	if h.aiStopped != nil {
+		result = errors.Join(result, h.aiStopped.Close())
 	}
 	if h.api != nil && h.api.engine != nil {
 		h.api.engine.transport.CloseIdleConnections()

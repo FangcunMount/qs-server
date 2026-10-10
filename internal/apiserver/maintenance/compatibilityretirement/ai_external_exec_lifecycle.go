@@ -39,8 +39,12 @@ type aiExecBinding struct {
 	RuntimeSourceSHA string `json:"runtime_source_sha"`
 	ImageID          string `json:"image_id"`
 	ContainerID      string `json:"container_id"`
-	PythonSHA256     string `json:"python_sha256"`
-	InputSHA256      string `json:"input_sha256"`
+	// Empty on all original running-runtime journals. A stopped-final producer
+	// retains the business CID and records its separate native execution owner.
+	ExecutionContainerID string `json:"execution_container_id,omitempty"`
+	StoppedLeaseSHA256   string `json:"stopped_lease_sha256,omitempty"`
+	PythonSHA256         string `json:"python_sha256"`
+	InputSHA256          string `json:"input_sha256"`
 	// The producer inherits the original epoch deadline; neither a new attempt
 	// nor reconciliation replaces it with now + another duration.
 	DeadlineUnixNano int64 `json:"deadline_unix_nano"`
@@ -48,7 +52,17 @@ type aiExecBinding struct {
 
 func (b aiExecBinding) valid() bool {
 	parts := strings.Split(b.OperationID, "-")
-	return aiOriginalSourceSHA(b.SourceSHA) && len(parts) == 2 && aiExternalRunID(parts[0]) && aiExternalRunID(parts[1]) && aiExternalRunID(b.RunID) && aiOriginalSourceSHA(b.RuntimeSourceSHA) && aiExternalImageID(b.ImageID) && evidenceHash(b.ContainerID) && b.PythonSHA256 == aiExternalHostSHA && evidenceHash(b.InputSHA256) && b.DeadlineUnixNano > 0
+	python := b.PythonSHA256 == aiExternalHostSHA && b.ExecutionContainerID == "" && b.StoppedLeaseSHA256 == ""
+	if b.ExecutionContainerID != "" || b.StoppedLeaseSHA256 != "" {
+		python = evidenceHash(b.ExecutionContainerID) && b.ExecutionContainerID != b.ContainerID && evidenceHash(b.StoppedLeaseSHA256) && b.PythonSHA256 == sourceSHA([]byte(aiStoppedCarrierHost))
+	}
+	return aiOriginalSourceSHA(b.SourceSHA) && len(parts) == 2 && aiExternalRunID(parts[0]) && aiExternalRunID(parts[1]) && aiExternalRunID(b.RunID) && aiOriginalSourceSHA(b.RuntimeSourceSHA) && aiExternalImageID(b.ImageID) && evidenceHash(b.ContainerID) && python && evidenceHash(b.InputSHA256) && b.DeadlineUnixNano > 0
+}
+func (b aiExecBinding) executionCID() string {
+	if b.ExecutionContainerID != "" {
+		return b.ExecutionContainerID
+	}
+	return b.ContainerID
 }
 func (b aiExecBinding) scope(ctx context.Context) (context.Context, context.CancelFunc, error) {
 	if ctx == nil || !b.valid() {
@@ -456,7 +470,7 @@ func aiExecProduce(ctx context.Context, p aiExecProtocol, j *aiExecJournal, host
 		}
 		return nil, ErrAIExternalExecUnknown
 	}
-	id, createErr := p.create(work, j.binding.ContainerID, host)
+	id, createErr := p.create(work, j.binding.executionCID(), host)
 	if !evidenceHash(id) {
 		return markUnknown()
 	}
@@ -468,7 +482,7 @@ func aiExecProduce(ctx context.Context, p aiExecProtocol, j *aiExecJournal, host
 	if createErr != nil {
 		return markUnknown()
 	}
-	original, e := p.inspect(work, id, j.binding.ContainerID, j.binding.PythonSHA256)
+	original, e := p.inspect(work, id, j.binding.executionCID(), j.binding.PythonSHA256)
 	if e != nil || original.Running || original.ExitCode != nil {
 		return markUnknown()
 	}
@@ -494,7 +508,7 @@ func aiExecProduce(ctx context.Context, p aiExecProtocol, j *aiExecJournal, host
 	}
 	// Never infer process exit from local Wait/EOF/cancellation. Only inspect
 	// the original Engine exec ID, with the original absolute budget still set.
-	observed, e := p.inspect(work, id, j.binding.ContainerID, j.binding.PythonSHA256)
+	observed, e := p.inspect(work, id, j.binding.executionCID(), j.binding.PythonSHA256)
 	if e != nil {
 		return markUnknown()
 	}
@@ -543,7 +557,7 @@ func aiExecReconcileProtocolLocked(work context.Context, p aiExecProtocol, j *ai
 	if e != nil || version != j.last.EngineVersionSHA256 {
 		return nil, ErrAIExternalExecUnknown
 	}
-	observed, e := p.inspect(work, j.last.ExecID, j.binding.ContainerID, j.binding.PythonSHA256)
+	observed, e := p.inspect(work, j.last.ExecID, j.binding.executionCID(), j.binding.PythonSHA256)
 	if e != nil {
 		return nil, ErrAIExternalExecUnknown
 	}
@@ -693,7 +707,7 @@ func aiExecVersionSupports(minimum, maximum string) bool {
 	return a && b && low <= 44 && high >= 44 && low <= high
 }
 func (p *aiExecDockerProtocol) create(ctx context.Context, cid string, host []byte) (string, error) {
-	if !evidenceHash(cid) || sourceSHA(host) != aiExternalHostSHA {
+	if !evidenceHash(cid) || (sourceSHA(host) != aiExternalHostSHA && sourceSHA(host) != sourceSHA([]byte(aiStoppedCarrierHost))) {
 		return "", ErrAIExternalExecUnknown
 	}
 	request := struct {
@@ -740,7 +754,7 @@ func aiExecDecodeInspect(raw []byte, id, cid, pythonSHA string) (aiExecInspect, 
 	return aiExecInspect{Running: *v.Running, ExitCode: v.ExitCode}, nil
 }
 func (p *aiExecDockerProtocol) inspect(ctx context.Context, id, cid, pythonSHA string) (aiExecInspect, error) {
-	if !evidenceHash(id) || !evidenceHash(cid) || pythonSHA != aiExternalHostSHA {
+	if !evidenceHash(id) || !evidenceHash(cid) || (pythonSHA != aiExternalHostSHA && pythonSHA != sourceSHA([]byte(aiStoppedCarrierHost))) {
 		return aiExecInspect{}, ErrAIExternalExecUnknown
 	}
 	raw, e := p.ordinary(ctx, http.MethodGet, "/v"+aiExecAPIVersion+"/exec/"+id+"/json", nil, http.StatusOK)

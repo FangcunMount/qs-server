@@ -33,18 +33,22 @@ type lifecycleFinalFileBinding struct {
 // The current run is derived by the native host; no imported Q/closure flag,
 // command, executable, database connection or new source identity is accepted.
 type lifecycleFinalHistoryInput struct {
-	AssetsDirectory      string                    `json:"assets_directory"`
-	RuntimeSourceSHA     string                    `json:"runtime_source_sha"`
-	ImageID              string                    `json:"image_id"`
-	ContainerID          string                    `json:"container_id"`
-	RuntimeBindingSHA256 string                    `json:"runtime_binding_sha256"`
-	AIBounds             lifecycleFinalFileBinding `json:"ai_bounds"`
-	PeerBounds           lifecycleFinalFileBinding `json:"peer_bounds"`
-	Protection           lifecycleFinalFileBinding `json:"protection"`
+	AssetsDirectory      string                                  `json:"assets_directory"`
+	RuntimeSourceSHA     string                                  `json:"runtime_source_sha"`
+	ImageID              string                                  `json:"image_id"`
+	ContainerID          string                                  `json:"container_id"`
+	RuntimeBindingSHA256 string                                  `json:"runtime_binding_sha256"`
+	AIBounds             lifecycleFinalFileBinding               `json:"ai_bounds"`
+	PeerBounds           lifecycleFinalFileBinding               `json:"peer_bounds"`
+	Protection           lifecycleFinalFileBinding               `json:"protection"`
+	StopConstraints      *retirement.AIStoppedRuntimeConstraints `json:"stop_constraints,omitempty"`
 }
 
 func (v *lifecycleFinalHistoryInput) valid(r lifecycleRequest) bool {
 	if v == nil || !shaRE.MatchString(v.RuntimeSourceSHA) || !strings.HasPrefix(v.ImageID, "sha256:") || !hashRE.MatchString(strings.TrimPrefix(v.ImageID, "sha256:")) || !hashRE.MatchString(v.ContainerID) || !hashRE.MatchString(v.RuntimeBindingSHA256) || !filepath.IsAbs(v.AssetsDirectory) || filepath.Clean(v.AssetsDirectory) != v.AssetsDirectory {
+		return false
+	}
+	if v.StopConstraints != nil && !v.StopConstraints.Valid() {
 		return false
 	}
 	root := filepath.Join("/opt/backups/qs-server/compatibility-retirement", r.OperationID)
@@ -205,7 +209,10 @@ func (h *lifecycleFixedHost) finalDifferenceAndEOF(ctx context.Context, r lifecy
 	if e = backup.VerifyHostOriginalSources(paired, a, borrowed); e != nil {
 		return e
 	}
-	o, e := retirement.PrepareFinalHistoricalEOF(paired, retirement.FinalHistoricalInput{Binding: retirement.HistoricalCoordinatorBinding{SourceSHA: r.OriginalSourceSHA, OperationID: r.OperationID}, SQLIdentity: binding.SQLIdentitySHA256, SQLHead: binding.SQLHead, MongoDatabase: h.owner.originalDB, MongoConfig: retirement.MongoOwnerConfig{ExpectedIdentityHash: binding.MongoIdentitySHA256, ExpectedMigrationVersion: int64(binding.MongoHead)}, Copies: copies, External: external})
+	if h.aiStopped == nil || h.aiStopped.CheckStopped(paired) != nil {
+		return lifecycleError("lifecycle_ai_original_stopped_runtime_unproven")
+	}
+	o, e := retirement.PrepareFinalHistoricalEOF(paired, retirement.FinalHistoricalInput{Binding: retirement.HistoricalCoordinatorBinding{SourceSHA: r.OriginalSourceSHA, OperationID: r.OperationID}, SQLIdentity: binding.SQLIdentitySHA256, SQLHead: binding.SQLHead, MongoDatabase: h.owner.originalDB, MongoConfig: retirement.MongoOwnerConfig{ExpectedIdentityHash: binding.MongoIdentitySHA256, ExpectedMigrationVersion: int64(binding.MongoHead)}, Copies: copies, External: external, StoppedExternal: h.aiStopped})
 	if e != nil {
 		return e
 	}

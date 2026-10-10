@@ -189,17 +189,26 @@ func (q *AIExternalExecutionQualification) Summary() AIExternalExecutionSummary 
 // The fixed Python host owns its separate ai/peer read-only pools and sessions.
 // The controller accepts only the producer it just executed, never saved output.
 func (c *HistoricalCoordinator) PrepareAIExternalExecution(ctx context.Context, local *AIReadOnlyResolver, reverse *AIReverseSnapshot, in AIExternalExecutionInput) (*AIExternalExecutionQualification, error) {
-	return c.prepareAIExternalExecution(ctx, local, reverse, in, aiExternalVerifyMode)
+	return c.prepareAIExternalExecution(ctx, local, reverse, in, aiExternalVerifyMode, nil)
 }
 
 // The window's fixed final phase runs a complete fresh native producer after
 // a known successful original phase. It cannot select another mode or reuse a
 // saved Q, and never changes the original operation, journal or business IDs.
 func (c *HistoricalCoordinator) PrepareAIFinalExternalExecution(ctx context.Context, local *AIReadOnlyResolver, reverse *AIReverseSnapshot, in AIExternalExecutionInput) (*AIExternalExecutionQualification, error) {
-	return c.prepareAIExternalExecution(ctx, local, reverse, in, aiExternalFinalVerifyMode)
+	return c.prepareAIExternalExecution(ctx, local, reverse, in, aiExternalFinalVerifyMode, nil)
 }
 
-func (c *HistoricalCoordinator) prepareAIExternalExecution(ctx context.Context, local *AIReadOnlyResolver, reverse *AIReverseSnapshot, in AIExternalExecutionInput, mode aiExternalExecMode) (*AIExternalExecutionQualification, error) {
+// The stopped-final path reuses every frozen ledger/module check below. The
+// carrier lease is an original live owner, never a caller completion receipt.
+func (c *HistoricalCoordinator) PrepareAIStoppedFinalExternalExecution(ctx context.Context, local *AIReadOnlyResolver, reverse *AIReverseSnapshot, in AIExternalExecutionInput, lease *AIStoppedRuntimeLease) (*AIExternalExecutionQualification, error) {
+	if lease == nil {
+		return nil, ErrAIStoppedRuntime
+	}
+	return c.prepareAIExternalExecution(ctx, local, reverse, in, aiExternalFinalVerifyMode, lease)
+}
+
+func (c *HistoricalCoordinator) prepareAIExternalExecution(ctx context.Context, local *AIReadOnlyResolver, reverse *AIReverseSnapshot, in AIExternalExecutionInput, mode aiExternalExecMode, stopped *AIStoppedRuntimeLease) (*AIExternalExecutionQualification, error) {
 	if c == nil || ctx == nil {
 		return nil, ErrAIExternalInput
 	}
@@ -268,21 +277,31 @@ func (c *HistoricalCoordinator) prepareAIExternalExecution(ctx context.Context, 
 	}
 	work, cancel := context.WithDeadline(ctx, deadline)
 	defer cancel()
-	docker, err := aiExternalDocker(in.SudoDocker)
-	if err != nil {
-		return nil, err
+	var result []byte
+	if stopped != nil {
+		if mode != aiExternalFinalVerifyMode {
+			return nil, ErrAIStoppedRuntime
+		}
+		result, err = stopped.executeFinal(work, c.binding, in, assets.host, raw)
+	} else {
+		docker, e := aiExternalDocker(in.SudoDocker)
+		if e != nil {
+			return nil, e
+		}
+		before, e := docker.inspect(work, in.ContainerID)
+		if e != nil || !before.matches(in) || !release.matchesMounts(before.Mounts) {
+			return nil, ErrAIExternalRuntime
+		}
+		result, err = aiExternalExecuteMode(work, docker, in.OperationDirectory, mode, c.binding, in.RunID, in.RuntimeSourceSHA, in.ImageID, in.ContainerID, assets.host, raw)
+		if err == nil {
+			after, e := docker.inspect(work, in.ContainerID)
+			if e != nil || !reflect.DeepEqual(before, after) || !after.matches(in) || !release.matchesMounts(after.Mounts) {
+				return nil, ErrAIExternalRuntime
+			}
+		}
 	}
-	before, err := docker.inspect(work, in.ContainerID)
-	if err != nil || !before.matches(in) || !release.matchesMounts(before.Mounts) {
-		return nil, ErrAIExternalRuntime
-	}
-	result, err := aiExternalExecuteMode(work, docker, in.OperationDirectory, mode, c.binding, in.RunID, in.RuntimeSourceSHA, in.ImageID, in.ContainerID, assets.host, raw)
 	if err != nil {
 		return nil, ErrAIExternalExecution
-	}
-	after, err := docker.inspect(work, in.ContainerID)
-	if err != nil || !reflect.DeepEqual(before, after) || !after.matches(in) || !release.matchesMounts(after.Mounts) {
-		return nil, ErrAIExternalRuntime
 	}
 	repeated, err := aiExternalReadRelease(in.RuntimeSourceSHA, in.ImageID)
 	if err != nil || repeated.seal != release.seal || !reflect.DeepEqual(repeated, release) {

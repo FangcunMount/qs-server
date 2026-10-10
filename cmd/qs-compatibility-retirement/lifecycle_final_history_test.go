@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	retirement "github.com/FangcunMount/qs-server/internal/apiserver/maintenance/compatibilityretirement"
 	"os"
 	"path/filepath"
 	"strings"
@@ -37,6 +38,12 @@ func TestLifecycleFinalHistoryRequiresExactCurrentOriginalAndFileConstraints(t *
 		}},
 		{"aliased_input", func(v *lifecycleFinalHistoryInput) { v.Protection = v.AIBounds }},
 		{"body_path", func(v *lifecycleFinalHistoryInput) { v.AIBounds.Path = "/tmp/body" }},
+		{"guessed_network", func(v *lifecycleFinalHistoryInput) {
+			v.StopConstraints = &retirement.AIStoppedRuntimeConstraints{SettingsSHA256: strings.Repeat("a", 64), NetworkID: "infra-network"}
+		}},
+		{"unbound_settings", func(v *lifecycleFinalHistoryInput) {
+			v.StopConstraints = &retirement.AIStoppedRuntimeConstraints{NetworkID: strings.Repeat("b", 64)}
+		}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			v := *d

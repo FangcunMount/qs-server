@@ -23,13 +23,14 @@ const ErrFinalHistoricalEOF SourceError = "final_historical_persistence_or_eof_r
 // borrowed paired RR-RO/snapshot context. No result, count, complete bit, CAS
 // receipt or external qualification can be imported through this input.
 type FinalHistoricalInput struct {
-	Binding       HistoricalCoordinatorBinding
-	SQLIdentity   string
-	SQLHead       uint64
-	MongoDatabase *mongo.Database
-	MongoConfig   MongoOwnerConfig
-	Copies        []SourceCopyInput
-	External      *AIExternalExecutionInput
+	Binding         HistoricalCoordinatorBinding
+	SQLIdentity     string
+	SQLHead         uint64
+	MongoDatabase   *mongo.Database
+	MongoConfig     MongoOwnerConfig
+	Copies          []SourceCopyInput
+	External        *AIExternalExecutionInput
+	StoppedExternal *AIStoppedRuntimeLease
 }
 
 type FinalHistoricalSummary struct {
@@ -166,7 +167,11 @@ func PrepareFinalHistoricalEOF(ctx context.Context, in FinalHistoricalInput) (*F
 		if e = RequireAIExternalExecQuiescence(ctx, AIExternalExecQuiescenceInput{OperationDirectory: input.OperationDirectory, SourceSHA: in.Binding.SourceSHA, OperationID: in.Binding.OperationID, RuntimeSourceSHA: input.RuntimeSourceSHA, ImageID: input.ImageID, ContainerID: input.ContainerID, SudoDocker: input.SudoDocker}); e != nil {
 			return nil, e
 		}
-		external, e = c.PrepareAIFinalExternalExecution(ctx, local, reverse, input)
+		if in.StoppedExternal != nil {
+			external, e = c.PrepareAIStoppedFinalExternalExecution(ctx, local, reverse, input, in.StoppedExternal)
+		} else {
+			external, e = c.PrepareAIFinalExternalExecution(ctx, local, reverse, input)
+		}
 		if e != nil {
 			return nil, e
 		}
